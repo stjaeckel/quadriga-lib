@@ -1,7 +1,7 @@
 ---
-title: "Python API Documentation for Quadriga-Lib v0.11.8"
+title: "Python API Documentation for Quadriga-Lib v0.12.0"
 author: "Stephan Jaeckel"
-date: "14.07.2026"
+date: "16.07.2026"
 lang: en-US
 ---
 
@@ -52,18 +52,18 @@ lang: en-US
 | [version](#version) | Miscellaneous / Tools | 1699 |
 | [write_png](#write_png) | Miscellaneous / Tools | 1712 |
 | [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 1755 |
-| [cube](#cube) | Site-specific simulation tools | 1808 |
-| [icosphere](#icosphere) | Site-specific simulation tools | 1836 |
-| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 1868 |
-| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 1901 |
-| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 1951 |
-| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 1998 |
-| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 2025 |
-| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 2055 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 2088 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 2125 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 2168 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 2194 |
+| [cube](#cube) | Site-specific simulation tools | 1807 |
+| [icosphere](#icosphere) | Site-specific simulation tools | 1834 |
+| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 1866 |
+| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 1899 |
+| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 1949 |
+| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 1996 |
+| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 2023 |
+| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 2053 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 2086 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 2123 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 2166 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 2192 |
 
 ---
 
@@ -1779,7 +1779,7 @@ gain, xprmat, coord = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, me
 - **`orig`** — TX positions; `(n_pos, 3)`
 - **`dest`** — RX positions; `(n_pos, 3)`
 - **`mesh`** — Triangle vertices, each row `[X1,Y1,Z1,X2,Y2,Z2,X3,Y3,Z3]`; `(n_mesh, 9)`
-- **`mtl_ind`** — 0-based material index per face (the `csv_ind` output of [obj_file_read](#obj_file_read)); `(n_mesh,)`
+- **`mtl_ind`** — 1-based material index per face (0 = no material; the `csv_ind` output of [obj_file_read](#obj_file_read)); `(n_mesh,)`
 - **`mtl_prop`** — Material properties as a `dict`; each key is one column (the `csv_prop` output of [obj_file_read](#obj_file_read)) mapping to a 1D array of length `n_mtl`
 - **`center_frequency`** — Center frequency
 - **`lod`** — Level of detail (0–6), controls `n_path` and `n_seg`; see [generate_diffraction_paths](#generate_diffraction_paths); default: 2
@@ -1795,8 +1795,7 @@ gain, xprmat, coord = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, me
 ### Outputs:
 - **`gain`** — Diffraction gain per TX-RX pair, linear scale; `(n_pos,)`
 - **`xprmat`** — EM mode: polarization transfer matrix excluding FSPL, interleaved complex, column-major
-  `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]`, `(8, n_pos)`; scalar mode: scalar pressure coefficient
-  `[Re Im]`, `(2, n_pos)`
+  `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]`, `(8, n_pos)`; scalar mode: scalar pressure coefficient `[Re Im]`, `(2, n_pos)`
 - **`coord`** — Diffracted path coordinates excluding endpoints; `(3, n_seg-1, n_pos)`
 
 ### See also:
@@ -1829,8 +1828,7 @@ mesh = quadriga_lib.RTtools.cube( scale, rotation, location, n_div )
 - **`n_div`** — Number of subdivisions per edge; yields 12 · n_div^2 triangles; default: 1
 
 ### Outputs:
-- **`mesh`** — Triangle mesh; each row holds (x1, y1, z1, x2, y2, z2, x3, y3, z3);
-  `(12 · n_div^2, 9)`
+- **`mesh`** — Triangle mesh; each row holds (x1, y1, z1, x2, y2, z2, x3, y3, z3); `(12 · n_div^2, 9)`
 
 ---
 ## icosphere
