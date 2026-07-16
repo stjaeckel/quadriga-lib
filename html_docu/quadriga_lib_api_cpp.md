@@ -1,7 +1,7 @@
 ---
-title: "C++ API Documentation for Quadriga-Lib v0.11.8"
+title: "C++ API Documentation for Quadriga-Lib v0.12.0"
 author: "Stephan Jaeckel"
-date: "14.07.2026"
+date: "16.07.2026"
 lang: en-US
 ---
 
