@@ -15,6 +15,7 @@
 #include <cmath>
 #include <complex>
 #include <fstream>
+#include <cstdint>
 
 namespace quadriga_lib
 {
@@ -90,6 +91,104 @@ namespace quadriga_lib
                                      dtype radius_min = 0.01,        // Minimum tube radius in meters
                                      arma::uword n_edges = 5) const; // Number of vertices in the circle building the tube, must be >= 3
     };
+
+    // Class for storing and managing path data
+    class path
+    {
+    private:
+        uint8_t nFRQ = 1;                                                   // Bit 7: scalar flag; bits 0-6: number of frequencies (1-127)
+        uint8_t nSEG = 0;                                                   // Number of segments
+        uint8_t interact_type[6] = {0, 0, 0, 0, 0, 0};                      // Type of the first 6 interactions
+        float xprmat[8] = {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f}; // EM: Jones matrix for freq 0, col-major; SCALAR: Pressure coeffs for freqs 0-3
+        float *data = nullptr;                                              // Variable-length data buffer
+
+        // Data buffer EM:
+        // ┌─────────────────────────────────────────────────────┐
+        // │ Coordinates: [x,y,z] × nSEG = 12×nSEG bytes         │
+        // ├─────────────────────────────────────────────────────┤
+        // │ Jones: [ReVV,ImVV,ReHV,ImHV,ReVH,ImVH,ReHH,ImHH]    │
+        // │        × nFREQ-1 = 32×(nFREQ-1) bytes               │
+        // ├─────────────────────────────────────────────────────┤
+        // | Interactions: 4 * ((nSEG-3) / 4) bytes, nSEG ≥ 7    │
+        // └─────────────────────────────────────────────────────┘
+
+        // Data buffer SCALAR:
+        // ┌─────────────────────────────────────────────────────┐
+        // │ Coordinates: [x,y,z] × nSEG = 12×nSEG bytes         │
+        // ├─────────────────────────────────────────────────────┤
+        // │ Coeff: [Re,Im] × (nFREQ-4) = 8×(nFREQ-4) bytes      │
+        // ├─────────────────────────────────────────────────────┤
+        // | Interactions: 4 * ((nSEG-3) / 4) bytes, nSEG ≥ 7    │
+        // └─────────────────────────────────────────────────────┘
+
+    public:
+        unsigned iC = 0;     // Channel ID (= the channel to which the path belongs to)
+        unsigned iR = 0;     // Ray index (= relative index in launch config)
+        uint8_t nREF = 0;    // Number of reflections
+        uint8_t nTRA = 0;    // Number of transmissions / refractions
+        uint8_t nSUB = 0;    // Number of subdivisions
+        uint8_t nSCT = 0;    // Number of scallering events
+        float length = 0.0f; // Accumulated path length
+
+        path() = default;                       // Default constructor: 0 segments, 1 frequency, EM mode
+        path(path &&other) noexcept;            // Move constructor
+        path(const path &other);                // Copy constructor
+        path &operator=(path &&other) noexcept; // Move assignment
+        path &operator=(const path &other);     // Copy assignment
+        void free();                            // Manually clear data buffer
+        ~path() { free(); }                     // Destructor
+
+        size_t n_seg() const { return (size_t)nSEG; }         // Number of segments
+        size_t n_freq() const { return size_t(nFRQ & 0x7F); } // Number of frequencies
+        bool is_scalar() const { return (nFRQ & 0x80) != 0; } // Layout mode
+
+        // Initialize data storage to a given layout
+        void init(size_t segments = 0, size_t frequencies = 1, bool scalar = false);
+        path(size_t segments, size_t frequencies = 1, bool scalar = false); // Init constructor
+
+        // Access coordinates of a specific segment
+        const float *coord(size_t seg = 0) const; // Read-only
+        float *coord(size_t seg = 0);             // Read + write
+
+        // Gets last segment coordinate by index (0=x, 1=y, 2=z)
+        float operator()(unsigned x) const { return (nSEG > 0 && x < 3 && data) ? data[(size_t(nSEG) - 1) * 3 + x] : NAN; }
+
+        // Calculate the total length of the path
+        // D = destination after last seg, O = origin before first seg
+        float calc_length(float Dx, float Dy, float Dz) const;                         // member length + last to D distance
+        float calc_length(float Dx, float Dy, float Dz, float Ox, float Oy, float Oz); // calculate full path length
+        float calc_length(const float *D, const float *O = nullptr);                   // 3-element overload
+
+        // Access xprmat coefficients for a specific frequency
+        const float *xpr_coeff(size_t freq = 0) const; // Read only
+        float *xpr_coeff(size_t freq = 0);             // Read + write
+
+        // Left-multiply ray's Jones matrix; coeff_update must have length 8 (EM) or 2 (scalar)
+        // + calculate gain from xprmat coefficients; fGHz > 0 applies FSPL
+        float xpr_update(const float *coeff_update = nullptr, float gain_update = 1.0f, size_t freq = 0, float fGHz = 0.0f);
+
+        // Calculate gain from xprmat coefficients; fGHz > 0 applies FSPL
+        float calc_gain(float fGHz = 0.0f, size_t freq = 0, float len = 0.0f) const;
+
+        // Duplicate path, writing to "target"; return length
+        float duplicate(path &target) const;
+
+        // Duplicate path and append segment; increase nTRA for types 1-127, nREF for types 128-255; return length
+        // - Must be called before xpr_update/gain to use the correct path length in gain calculation
+        float extend(path &target, float x, float y, float z, uint8_t type = 0) const;
+
+        // Get the interaction type sequence
+        std::vector<uint8_t> interaction_type_codes() const;
+
+        // Comparison operators compare by iR index
+        friend bool operator<(const path &p1, const path &p2) { return p1.iR < p2.iR; }
+        friend bool operator>(const path &p1, const path &p2) { return p1.iR > p2.iR; }
+        friend bool operator<=(const path &p1, const path &p2) { return p1.iR <= p2.iR; }
+        friend bool operator>=(const path &p1, const path &p2) { return p1.iR >= p2.iR; }
+        friend bool operator==(const path &p1, const path &p2) { return p1.iR == p2.iR; }
+        friend bool operator!=(const path &p1, const path &p2) { return p1.iR != p2.iR; }
+    };
+    static_assert(sizeof(path) <= 64, "path must be exactly 64 bytes or less");
 
     // Function to obtain the HDF5 library version
     std::string get_HDF5_version();

@@ -1,7 +1,7 @@
 ---
 title: "C++ API Documentation for Quadriga-Lib v0.12.0"
 author: "Stephan Jaeckel"
-date: "16.07.2026"
+date: "20.07.2026"
 lang: en-US
 ---
 
@@ -27,108 +27,109 @@ lang: en-US
 
 | Function | Section | Line |
 | --- | --- | --- |
-| [arrayant](#arrayant) | Array antenna class | 138 |
-| [.append](#append) | Array antenna class | 189 |
-| [.calc_beamwidth_deg](#calc_beamwidth_deg) | Array antenna class | 211 |
-| [.calc_directivity_dBi](#calc_directivity_dbi) | Array antenna class | 243 |
-| [.combine_pattern](#combine_pattern) | Array antenna class | 264 |
-| [.copy_element](#copy_element) | Array antenna class | 289 |
-| [.export_obj_file](#export_obj_file) | Array antenna class | 309 |
-| [.interpolate](#interpolate) | Array antenna class | 339 |
-| [.is_valid](#is_valid) | Array antenna class | 391 |
-| [.qdant_write](#qdant_write) | Array antenna class | 409 |
-| [.remove_zeros](#remove_zeros) | Array antenna class | 436 |
-| [.rotate_pattern](#rotate_pattern) | Array antenna class | 452 |
-| [.set_size](#set_size) | Array antenna class | 488 |
-| [arrayant_combine_pattern_multi](#arrayant_combine_pattern_multi) | Array antenna functions | 514 |
-| [arrayant_concat_multi](#arrayant_concat_multi) | Array antenna functions | 548 |
-| [arrayant_copy_element_multi](#arrayant_copy_element_multi) | Array antenna functions | 582 |
-| [arrayant_interpolate_multi](#arrayant_interpolate_multi) | Array antenna functions | 622 |
-| [arrayant_is_valid_multi](#arrayant_is_valid_multi) | Array antenna functions | 681 |
-| [arrayant_rotate_pattern_multi](#arrayant_rotate_pattern_multi) | Array antenna functions | 708 |
-| [arrayant_set_element_pos_multi](#arrayant_set_element_pos_multi) | Array antenna functions | 740 |
-| [generate_arrayant_3GPP](#generate_arrayant_3gpp) | Array antenna functions | 766 |
-| [generate_arrayant_custom](#generate_arrayant_custom) | Array antenna functions | 816 |
-| [generate_arrayant_dipole](#generate_arrayant_dipole) | Array antenna functions | 841 |
-| [generate_arrayant_half_wave_dipole](#generate_arrayant_half_wave_dipole) | Array antenna functions | 858 |
-| [generate_arrayant_multibeam](#generate_arrayant_multibeam) | Array antenna functions | 875 |
-| [generate_arrayant_omni](#generate_arrayant_omni) | Array antenna functions | 929 |
-| [generate_arrayant_ula](#generate_arrayant_ula) | Array antenna functions | 946 |
-| [generate_arrayant_xpol](#generate_arrayant_xpol) | Array antenna functions | 974 |
-| [generate_speaker](#generate_speaker) | Array antenna functions | 991 |
-| [qdant_read](#qdant_read) | Array antenna functions | 1066 |
-| [qdant_read_multi](#qdant_read_multi) | Array antenna functions | 1092 |
-| [qdant_write_multi](#qdant_write_multi) | Array antenna functions | 1119 |
-| [channel](#channel) | Channel class | 1148 |
-| [.add_paths](#add_paths) | Channel class | 1195 |
-| [.calc_effective_path_gain](#calc_effective_path_gain) | Channel class | 1233 |
-| [.write_paths_to_obj_file](#write_paths_to_obj_file) | Channel class | 1252 |
-| [any_type_id](#any_type_id) | Channel functions | 1293 |
-| [baseband_freq_response](#baseband_freq_response) | Channel functions | 1336 |
-| [baseband_freq_response_multi](#baseband_freq_response_multi) | Channel functions | 1379 |
-| [baseband_freq_response_vec](#baseband_freq_response_vec) | Channel functions | 1427 |
-| [get_HDF5_version](#get_hdf5_version) | Channel functions | 1465 |
-| [hdf5_create](#hdf5_create) | Channel functions | 1477 |
-| [hdf5_read_channel](#hdf5_read_channel) | Channel functions | 1507 |
-| [hdf5_read_dset](#hdf5_read_dset) | Channel functions | 1539 |
-| [hdf5_read_dset_names](#hdf5_read_dset_names) | Channel functions | 1575 |
-| [hdf5_read_layout](#hdf5_read_layout) | Channel functions | 1609 |
-| [hdf5_reshape_layout](#hdf5_reshape_layout) | Channel functions | 1635 |
-| [hdf5_write](#hdf5_write) | Channel functions | 1663 |
-| [hdf5_write_dset](#hdf5_write_dset) | Channel functions | 1703 |
-| [qrt_file_parse](#qrt_file_parse) | Channel functions | 1742 |
-| [qrt_file_read](#qrt_file_read) | Channel functions | 1790 |
-| [qrt_read_cache_init](#qrt_read_cache_init) | Channel functions | 1882 |
-| [quantize_delays](#quantize_delays) | Channel functions | 1919 |
-| [get_channels_ieee_indoor](#get_channels_ieee_indoor) | Channel generation functions | 1981 |
-| [get_channels_irs](#get_channels_irs) | Channel generation functions | 2062 |
-| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 2156 |
-| [get_channels_planar](#get_channels_planar) | Channel generation functions | 2224 |
-| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 2292 |
-| [acdf](#acdf) | Channel statistics | 2368 |
-| [calc_angular_spreads_sphere](#calc_angular_spreads_sphere) | Channel statistics | 2403 |
-| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 2445 |
-| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 2497 |
-| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 2530 |
-| [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | 2565 |
-| [fast_acos](#fast_acos) | Math functions | 2598 |
-| [fast_asin](#fast_asin) | Math functions | 2617 |
-| [fast_atan2](#fast_atan2) | Math functions | 2636 |
-| [fast_cart2geo](#fast_cart2geo) | Math functions | 2657 |
-| [fast_geo2cart](#fast_geo2cart) | Math functions | 2690 |
-| [fast_sincos](#fast_sincos) | Math functions | 2735 |
-| [fast_slerp](#fast_slerp) | Math functions | 2756 |
-| [interp_2D](#interp_2d) | Math functions | 2791 |
-| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 2855 |
-| [colormap](#colormap) | Site-specific simulation tools | 2912 |
-| [combine_irs_coord](#combine_irs_coord) | Site-specific simulation tools | 2931 |
-| [coord2path](#coord2path) | Site-specific simulation tools | 2974 |
-| [cube](#cube) | Site-specific simulation tools | 3012 |
-| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 3045 |
-| [icosphere](#icosphere) | Site-specific simulation tools | 3089 |
-| [interface_gain](#interface_gain) | Site-specific simulation tools | 3123 |
-| [medium_gain](#medium_gain) | Site-specific simulation tools | 3159 |
-| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 3196 |
-| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 3238 |
-| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 3305 |
-| [obj_overlap_test](#obj_overlap_test) | Site-specific simulation tools | 3366 |
-| [path_to_tube](#path_to_tube) | Site-specific simulation tools | 3397 |
-| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 3425 |
-| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 3454 |
-| [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 3493 |
-| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 3529 |
-| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 3565 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 3683 |
-| [ray_state_update](#ray_state_update) | Site-specific simulation tools | 3726 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 3850 |
-| [refractive_index](#refractive_index) | Site-specific simulation tools | 3898 |
-| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 3930 |
-| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 3974 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 4004 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 4032 |
-| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 4073 |
-| [write_png](#write_png) | Site-specific simulation tools | 4108 |
-| [xpr_update](#xpr_update) | Site-specific simulation tools | 4134 |
+| [arrayant](#arrayant) | Array antenna class | 139 |
+| [.append](#append) | Array antenna class | 190 |
+| [.calc_beamwidth_deg](#calc_beamwidth_deg) | Array antenna class | 212 |
+| [.calc_directivity_dBi](#calc_directivity_dbi) | Array antenna class | 244 |
+| [.combine_pattern](#combine_pattern) | Array antenna class | 265 |
+| [.copy_element](#copy_element) | Array antenna class | 290 |
+| [.export_obj_file](#export_obj_file) | Array antenna class | 310 |
+| [.interpolate](#interpolate) | Array antenna class | 340 |
+| [.is_valid](#is_valid) | Array antenna class | 392 |
+| [.qdant_write](#qdant_write) | Array antenna class | 410 |
+| [.remove_zeros](#remove_zeros) | Array antenna class | 437 |
+| [.rotate_pattern](#rotate_pattern) | Array antenna class | 453 |
+| [.set_size](#set_size) | Array antenna class | 489 |
+| [arrayant_combine_pattern_multi](#arrayant_combine_pattern_multi) | Array antenna functions | 515 |
+| [arrayant_concat_multi](#arrayant_concat_multi) | Array antenna functions | 549 |
+| [arrayant_copy_element_multi](#arrayant_copy_element_multi) | Array antenna functions | 583 |
+| [arrayant_interpolate_multi](#arrayant_interpolate_multi) | Array antenna functions | 623 |
+| [arrayant_is_valid_multi](#arrayant_is_valid_multi) | Array antenna functions | 682 |
+| [arrayant_rotate_pattern_multi](#arrayant_rotate_pattern_multi) | Array antenna functions | 709 |
+| [arrayant_set_element_pos_multi](#arrayant_set_element_pos_multi) | Array antenna functions | 741 |
+| [generate_arrayant_3GPP](#generate_arrayant_3gpp) | Array antenna functions | 767 |
+| [generate_arrayant_custom](#generate_arrayant_custom) | Array antenna functions | 817 |
+| [generate_arrayant_dipole](#generate_arrayant_dipole) | Array antenna functions | 842 |
+| [generate_arrayant_half_wave_dipole](#generate_arrayant_half_wave_dipole) | Array antenna functions | 859 |
+| [generate_arrayant_multibeam](#generate_arrayant_multibeam) | Array antenna functions | 876 |
+| [generate_arrayant_omni](#generate_arrayant_omni) | Array antenna functions | 930 |
+| [generate_arrayant_ula](#generate_arrayant_ula) | Array antenna functions | 947 |
+| [generate_arrayant_xpol](#generate_arrayant_xpol) | Array antenna functions | 975 |
+| [generate_speaker](#generate_speaker) | Array antenna functions | 992 |
+| [qdant_read](#qdant_read) | Array antenna functions | 1067 |
+| [qdant_read_multi](#qdant_read_multi) | Array antenna functions | 1093 |
+| [qdant_write_multi](#qdant_write_multi) | Array antenna functions | 1120 |
+| [channel](#channel) | Channel class | 1149 |
+| [.add_paths](#add_paths) | Channel class | 1196 |
+| [.calc_effective_path_gain](#calc_effective_path_gain) | Channel class | 1234 |
+| [.write_paths_to_obj_file](#write_paths_to_obj_file) | Channel class | 1253 |
+| [any_type_id](#any_type_id) | Channel functions | 1294 |
+| [baseband_freq_response](#baseband_freq_response) | Channel functions | 1337 |
+| [baseband_freq_response_multi](#baseband_freq_response_multi) | Channel functions | 1380 |
+| [baseband_freq_response_vec](#baseband_freq_response_vec) | Channel functions | 1428 |
+| [get_HDF5_version](#get_hdf5_version) | Channel functions | 1466 |
+| [hdf5_create](#hdf5_create) | Channel functions | 1478 |
+| [hdf5_read_channel](#hdf5_read_channel) | Channel functions | 1508 |
+| [hdf5_read_dset](#hdf5_read_dset) | Channel functions | 1540 |
+| [hdf5_read_dset_names](#hdf5_read_dset_names) | Channel functions | 1576 |
+| [hdf5_read_layout](#hdf5_read_layout) | Channel functions | 1610 |
+| [hdf5_reshape_layout](#hdf5_reshape_layout) | Channel functions | 1636 |
+| [hdf5_write](#hdf5_write) | Channel functions | 1664 |
+| [hdf5_write_dset](#hdf5_write_dset) | Channel functions | 1704 |
+| [path](#path) | Channel functions | 1743 |
+| [qrt_file_parse](#qrt_file_parse) | Channel functions | 1862 |
+| [qrt_file_read](#qrt_file_read) | Channel functions | 1910 |
+| [qrt_read_cache_init](#qrt_read_cache_init) | Channel functions | 2002 |
+| [quantize_delays](#quantize_delays) | Channel functions | 2039 |
+| [get_channels_ieee_indoor](#get_channels_ieee_indoor) | Channel generation functions | 2101 |
+| [get_channels_irs](#get_channels_irs) | Channel generation functions | 2182 |
+| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 2276 |
+| [get_channels_planar](#get_channels_planar) | Channel generation functions | 2344 |
+| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 2412 |
+| [acdf](#acdf) | Channel statistics | 2488 |
+| [calc_angular_spreads_sphere](#calc_angular_spreads_sphere) | Channel statistics | 2523 |
+| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 2565 |
+| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 2617 |
+| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 2650 |
+| [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | 2685 |
+| [fast_acos](#fast_acos) | Math functions | 2718 |
+| [fast_asin](#fast_asin) | Math functions | 2737 |
+| [fast_atan2](#fast_atan2) | Math functions | 2756 |
+| [fast_cart2geo](#fast_cart2geo) | Math functions | 2777 |
+| [fast_geo2cart](#fast_geo2cart) | Math functions | 2810 |
+| [fast_sincos](#fast_sincos) | Math functions | 2855 |
+| [fast_slerp](#fast_slerp) | Math functions | 2876 |
+| [interp_2D](#interp_2d) | Math functions | 2911 |
+| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 2975 |
+| [colormap](#colormap) | Site-specific simulation tools | 3033 |
+| [combine_irs_coord](#combine_irs_coord) | Site-specific simulation tools | 3052 |
+| [coord2path](#coord2path) | Site-specific simulation tools | 3095 |
+| [cube](#cube) | Site-specific simulation tools | 3133 |
+| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 3166 |
+| [icosphere](#icosphere) | Site-specific simulation tools | 3210 |
+| [interface_gain](#interface_gain) | Site-specific simulation tools | 3244 |
+| [medium_gain](#medium_gain) | Site-specific simulation tools | 3280 |
+| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 3317 |
+| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 3359 |
+| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 3426 |
+| [obj_overlap_test](#obj_overlap_test) | Site-specific simulation tools | 3487 |
+| [path_to_tube](#path_to_tube) | Site-specific simulation tools | 3518 |
+| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 3546 |
+| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 3575 |
+| [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 3614 |
+| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 3650 |
+| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 3686 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 3804 |
+| [ray_state_update](#ray_state_update) | Site-specific simulation tools | 3847 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 3971 |
+| [refractive_index](#refractive_index) | Site-specific simulation tools | 4019 |
+| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 4051 |
+| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 4095 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 4125 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 4153 |
+| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 4194 |
+| [write_png](#write_png) | Site-specific simulation tools | 4229 |
+| [xpr_update](#xpr_update) | Site-specific simulation tools | 4255 |
 
 ---
 
@@ -1739,6 +1740,125 @@ void quadriga_lib::hdf5_write_dset(
 - [any_type_id](#any_type_id) (inspect the type held in a `std::any`)
 
 ---
+## path
+Class for storing and managing a single propagation path with a compact fixed-size header
+
+- Represents one ray from origin to destination through a sequence of `nSEG` interaction points
+- A 64-byte header holds metadata, the first 6 interaction type codes, and the frequency-0
+  transfer coefficients; a variable-length heap buffer holds coordinates, the remaining
+  frequency coefficients, and the overflow interaction codes
+- Two layout modes selected at initialization: EM carries a full 2x2 Jones matrix per frequency;
+  SCALAR carries a single complex pressure coefficient per frequency
+- Copyable and movable; the moved-from object is left in the valid empty state (`nSEG == 0`, `nFRQ == 1`, EM)
+
+### Attributes:
+| Attribute            | Size   | Description                                                       |
+| -------------------- | ------ | ----------------------------------------------------------------- |
+| `unsigned iC`        | scalar | Channel ID: the channel to which the path belongs                 |
+| `unsigned iR`        | scalar | Ray index: relative index in the launch configuration             |
+| `uint8_t nREF`       | scalar | Number of reflections (interaction type codes 128-255)            |
+| `uint8_t nTRA`       | scalar | Number of transmissions / refractions (type codes 1-127)          |
+| `uint8_t nSUB`       | scalar | Number of subdivisions                                            |
+| `uint8_t nSCT`       | scalar | Number of scattering events                                       |
+| `float length`       | scalar | Accumulated path length, origin through the last interaction (m)  |
+
+### Data buffer layout (EM mode):
+| Block         | Size (floats)     | Description                                             |
+| ------------- | ----------------- | ------------------------------------------------------- |
+| Coordinates   | `3 * nSEG`        | Interaction points `[x, y, z]` per segment              |
+| Jones         | `8 * (nFRQ - 1)`  | Transfer matrices for frequencies 1..nFRQ-1, col-major  |
+| Interactions  | `(nSEG - 3) / 4`  | Overflow type codes past the first 6, packed 4 per float, present for `nSEG >= 7` |
+
+### Data buffer layout (SCALAR mode):
+| Block         | Size (floats)     | Description                                             |
+| ------------- | ----------------- | ------------------------------------------------------- |
+| Coordinates   | `3 * nSEG`        | Interaction points `[x, y, z]` per segment              |
+| Coeff         | `2 * (nFRQ - 4)`  | Pressure coefficients for frequencies 4..nFRQ-1         |
+| Interactions  | `(nSEG - 3) / 4`  | Overflow type codes past the first 6, packed 4 per float, present for `nSEG >= 7` |
+
+### Simple member functions:
+| Method            | Description                                                       |
+| ----------------- | ----------------------------------------------------------------- |
+| `.n_freq()`       | Returns the number of frequencies (1-127)                         |
+| `.n_seg()`        | Returns the number of segments                                    |
+| `.is_scalar()`    | Returns true for SCALAR layout, false for EM                      |
+| `.init()`         | (Re)initializes storage to a given segment / frequency layout     |
+| `.free()`         | Releases the data buffer and resets to the valid empty state      |
+| `.coord()`        | Returns a pointer to a segment's `[x, y, z]` coordinates          |
+| `.xpr_coeff()`    | Returns a pointer to a frequency's transfer coefficients          |
+| `.operator()`     | Returns a last-segment coordinate by index (0=x, 1=y, 2=z)        |
+| `.interaction_type_codes()` | Returns the full interaction type sequence as a vector  |
+
+### Function 'calc_length':
+Calculates the total length of the path
+
+- The stored member `length` spans origin through the last interaction; it never includes the leg to the destination
+- The read-only overload adds only the final last-to-D leg to the stored member; the origin overloads recompute every leg and overwrite the member with the origin-to-last total
+- Returns the full length including the leg to `D`; on an empty path (`nSEG == 0`) the read-only form returns NaN while the origin form returns the straight origin-to-destination distance
+```
+float calc_length(float Dx, float Dy, float Dz) const;                         // member length + last to D distance
+float calc_length(float Dx, float Dy, float Dz, float Ox, float Oy, float Oz); // calculate full path length, update member
+float calc_length(const float *D, const float *O = nullptr);                   // 3-element overload
+```
+- **`Dx`, `Dy`, `Dz`, `*D`** — Destination coordinates
+- **`Ox`, `Oy`, `Oz`, `*O`** — Origin coordinates (optional); if provided, accumulated path length is updated
+
+### Function 'calc_gain':
+Calculates the path gain (linear power) from the transfer coefficients at one frequency
+
+- EM mode returns the maximum column power of the 2x2 Jones matrix; SCALAR mode returns the squared magnitude of the pressure coefficient
+- A degenerate coefficient set (all-zero, underflowed, or containing NaN) returns 0, flagging the path for pruning
+- With `fGHz > 0`, free-space path loss is folded in: `(lambda / (4 pi d))^2` in EM mode, `1 / d^2` (frequency-independent) in SCALAR mode
+- The distance `d` is the stored `length` by default; pass `len > 0` to override it, e.g. to match a total length from the 
+  read-only `calc_length` before the member is updated
+```
+float calc_gain(float fGHz = 0.0f, size_t freq = 0, float len = 0.0f) const;
+```
+- **`fGHz`** — Frequency in GHz; `> 0` applies path loss, `0` returns polarization power only. In SCALAR mode any 
+  positive value applies spherical spreading; the magnitude is ignored
+- **`freq`** — Frequency index into the coefficient store, valid range `0` to `nFRQ - 1`
+- **`len`** — Path length override in meters; `> 0` replaces the stored `length` for the path-loss term, `<= 0` uses the stored value
+
+### Function 'xpr_update':
+Left-multiplies the ray's transfer matrix by an interaction matrix, applies a power gain, and returns the resulting gain
+
+- Updates the coefficient slot for one frequency in place: `M := coeff_update * M`, then scales by `sqrt(gain_update)` in amplitude
+- `coeff_update == nullptr` applies only the gain; `gain_update == 1.0` applies only the multiply; both defaults leave the matrix unchanged and just measure it
+- The update reads all old values before writing, so `coeff_update` may alias the slot; the return value uses the same gain definition as `calc_gain`
+- Must be called after `extend` closes the path, so the stored `length` is final when path loss is requested
+```
+float xpr_update(const float *coeff_update = nullptr, float gain_update = 1.0f, size_t freq = 0, float fGHz = 0.0f);
+```
+- **`coeff_update`** — Interaction matrix, length 8 (EM) or 2 (SCALAR); `nullptr` skips the multiply
+- **`gain_update`** — Power gain applied to the slot (converted to an amplitude factor internally); `1.0` skips the scaling
+- **`freq`** — Frequency index into the coefficient store, valid range `0` to `nFRQ - 1`
+- **`fGHz`** — Frequency in GHz for the returned gain; `> 0` applies path loss as in `calc_gain`, `0` returns polarization power only
+
+### Function 'duplicate';
+Copies the path into an existing target object and returns its length
+
+- Performs a deep copy: the target receives an independent data buffer and all metadata
+- The target's previous contents are released; the source is left unchanged
+```
+float duplicate(path &target) const;
+```
+- **`target`** — Destination path, overwritten with a deep copy of the source
+
+### Function 'extend':
+Copies the path into a target and appends one new segment, returning the new total length
+
+- The new coordinate is appended after the existing segments; the stored `length` grows by the origin-to-new-point distance of the appended leg
+- The interaction `type` is recorded for the new segment and classifies the interaction: codes 1-127 increment `nTRA`, codes 128-255 increment `nREF`, code 0 increments neither
+- The target receives an independent buffer sized for the extra segment; the source is left unchanged
+- Throws if the source already holds the maximum of 255 segments
+```
+float extend(path &target, float x, float y, float z, uint8_t type = 0) const;
+```
+- **`target`** — Destination path, overwritten with the extended copy
+- **`x`, `y`, `z`** — Coordinates of the appended interaction point
+- **`type`** — Interaction type code for the new segment; drives the reflection / transmission counters
+
+---
 ## qrt_file_parse
 Read metadata from a QRT file
 
@@ -2862,11 +2982,11 @@ Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh
 ### Declaration:
 ```
 void calc_diffraction_gain(
-    const arma::Mat<dtype> *orig,
-    const arma::Mat<dtype> *dest,
-    const arma::Mat<dtype> *mesh,
-    const arma::uvec *mtl_ind,
-    const std::unordered_map<std::string, std::vector<dtype>> *mtl_prop,
+    const arma::Mat<dtype> &orig,
+    const arma::Mat<dtype> &dest,
+    const arma::Mat<dtype> &mesh,
+    const arma::uvec &mtl_ind,
+    const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
     dtype center_frequency,
     int lod = 2,
     arma::Col<dtype> *gain = nullptr,
@@ -2876,7 +2996,8 @@ void calc_diffraction_gain(
     const arma::u32_vec *sub_mesh_index = nullptr,
     int use_kernel = 0,
     int gpu_id = 0,
-    bool scalar_mode = false);
+    bool scalar_mode = false,
+    double thin_slab_threshold = 0.0);
 ```
 
 ### Inputs:

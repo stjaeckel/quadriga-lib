@@ -152,6 +152,7 @@
   <tr><td><a href="#hdf5_reshape_layout">hdf5_reshape_layout</a></td><td>Reshape the 4D storage layout of an existing HDF5 channel file</td></tr>
   <tr><td><a href="#hdf5_write">hdf5_write</a></td><td>Write a channel object to an HDF5 file at a specified 4D index</td></tr>
   <tr><td><a href="#hdf5_write_dset">hdf5_write_dset</a></td><td>Write a single unstructured dataset to an HDF5 file at a specified 4D index</td></tr>
+  <tr><td><a href="#path">path</a></td><td>Class for storing and managing a single propagation path with a compact fixed-size header</td></tr>
   <tr><td><a href="#qrt_file_parse">qrt_file_parse</a></td><td>Read metadata from a QRT file</td></tr>
   <tr><td><a href="#qrt_file_read">qrt_file_read</a></td><td>Read ray-tracing CIR data from a QRT file</td></tr>
   <tr><td><a href="#qrt_read_cache_init">qrt_read_cache_init</a></td><td>Initialize a QRT read cache for fast repeated access</td></tr>
@@ -2547,6 +2548,240 @@ void quadriga_lib::hdf5_write_dset(
 </ul>
 
 <hr class="greyline"><br>
+<span id="path" class="qd-func"><b>path</b></span><br>
+<hr class="thin">
+Class for storing and managing a single propagation path with a compact fixed-size header
+<ul>
+<li>Represents one ray from origin to destination through a sequence of <code>nSEG</code> interaction points</li>
+<li>A 64-byte header holds metadata, the first 6 interaction type codes, and the frequency-0 transfer coefficients; a variable-length heap buffer holds coordinates, the remaining frequency coefficients, and the overflow interaction codes</li>
+<li>Two layout modes selected at initialization: EM carries a full 2x2 Jones matrix per frequency; SCALAR carries a single complex pressure coefficient per frequency</li>
+<li>Copyable and movable; the moved-from object is left in the valid empty state (<code>nSEG == 0</code>, <code>nFRQ == 1</code>, EM)</li>
+</ul>
+
+<b>Attributes:<br></b><br>
+<table class="md">
+<tr>
+  <th>Attribute</th>
+  <th>Size</th>
+  <th>Description</th>
+</tr>
+<tr>
+  <td><code>unsigned iC</code></td>
+  <td>scalar</td>
+  <td>Channel ID: the channel to which the path belongs</td>
+</tr>
+<tr>
+  <td><code>unsigned iR</code></td>
+  <td>scalar</td>
+  <td>Ray index: relative index in the launch configuration</td>
+</tr>
+<tr>
+  <td><code>uint8_t nREF</code></td>
+  <td>scalar</td>
+  <td>Number of reflections (interaction type codes 128-255)</td>
+</tr>
+<tr>
+  <td><code>uint8_t nTRA</code></td>
+  <td>scalar</td>
+  <td>Number of transmissions / refractions (type codes 1-127)</td>
+</tr>
+<tr>
+  <td><code>uint8_t nSUB</code></td>
+  <td>scalar</td>
+  <td>Number of subdivisions</td>
+</tr>
+<tr>
+  <td><code>uint8_t nSCT</code></td>
+  <td>scalar</td>
+  <td>Number of scattering events</td>
+</tr>
+<tr>
+  <td><code>float length</code></td>
+  <td>scalar</td>
+  <td>Accumulated path length, origin through the last interaction (m)</td>
+</tr>
+</table>
+
+<b>Data buffer layout (EM mode):<br></b><br>
+<table class="md">
+<tr>
+  <th>Block</th>
+  <th>Size (floats)</th>
+  <th>Description</th>
+</tr>
+<tr>
+  <td>Coordinates</td>
+  <td><code>3 * nSEG</code></td>
+  <td>Interaction points <code>[x, y, z]</code> per segment</td>
+</tr>
+<tr>
+  <td>Jones</td>
+  <td><code>8 * (nFRQ - 1)</code></td>
+  <td>Transfer matrices for frequencies 1..nFRQ-1, col-major</td>
+</tr>
+<tr>
+  <td>Interactions</td>
+  <td><code>(nSEG - 3) / 4</code></td>
+  <td>Overflow type codes past the first 6, packed 4 per float, present for <code>nSEG &gt;= 7</code></td>
+</tr>
+</table>
+
+<b>Data buffer layout (SCALAR mode):<br></b><br>
+<table class="md">
+<tr>
+  <th>Block</th>
+  <th>Size (floats)</th>
+  <th>Description</th>
+</tr>
+<tr>
+  <td>Coordinates</td>
+  <td><code>3 * nSEG</code></td>
+  <td>Interaction points <code>[x, y, z]</code> per segment</td>
+</tr>
+<tr>
+  <td>Coeff</td>
+  <td><code>2 * (nFRQ - 4)</code></td>
+  <td>Pressure coefficients for frequencies 4..nFRQ-1</td>
+</tr>
+<tr>
+  <td>Interactions</td>
+  <td><code>(nSEG - 3) / 4</code></td>
+  <td>Overflow type codes past the first 6, packed 4 per float, present for <code>nSEG &gt;= 7</code></td>
+</tr>
+</table>
+
+<b>Simple member functions:<br></b><br>
+<table class="md">
+<tr>
+  <th>Method</th>
+  <th>Description</th>
+</tr>
+<tr>
+  <td><code>.n_freq()</code></td>
+  <td>Returns the number of frequencies (1-127)</td>
+</tr>
+<tr>
+  <td><code>.n_seg()</code></td>
+  <td>Returns the number of segments</td>
+</tr>
+<tr>
+  <td><code>.is_scalar()</code></td>
+  <td>Returns true for SCALAR layout, false for EM</td>
+</tr>
+<tr>
+  <td><code>.init()</code></td>
+  <td>(Re)initializes storage to a given segment / frequency layout</td>
+</tr>
+<tr>
+  <td><code>.free()</code></td>
+  <td>Releases the data buffer and resets to the valid empty state</td>
+</tr>
+<tr>
+  <td><code>.coord()</code></td>
+  <td>Returns a pointer to a segment's <code>[x, y, z]</code> coordinates</td>
+</tr>
+<tr>
+  <td><code>.xpr_coeff()</code></td>
+  <td>Returns a pointer to a frequency's transfer coefficients</td>
+</tr>
+<tr>
+  <td><code>.operator()</code></td>
+  <td>Returns a last-segment coordinate by index (0=x, 1=y, 2=z)</td>
+</tr>
+<tr>
+  <td><code>.interaction_type_codes()</code></td>
+  <td>Returns the full interaction type sequence as a vector</td>
+</tr>
+</table>
+
+<b>Function 'calc_length':</b><br>
+Calculates the total length of the path 
+ 
+<ul>
+<li>The stored member <code>length</code> spans origin through the last interaction; it never includes the leg to the destination</li>
+<li>The read-only overload adds only the final last-to-D leg to the stored member; the origin overloads recompute every leg and overwrite the member with the origin-to-last total</li>
+<li>Returns the full length including the leg to <code>D</code>; on an empty path (<code>nSEG == 0</code>) the read-only form returns NaN while the origin form returns the straight origin-to-destination distance</li>
+</ul>
+<pre>
+float calc_length(float Dx, float Dy, float Dz) const;                         // member length + last to D distance
+float calc_length(float Dx, float Dy, float Dz, float Ox, float Oy, float Oz); // calculate full path length, update member
+float calc_length(const float *D, const float *O = nullptr);                   // 3-element overload
+</pre>
+<ul>
+<li><b><code>Dx</code>, <code>Dy</code>, <code>Dz</code>, <code>*D</code></b> — Destination coordinates</li>
+<li><b><code>Ox</code>, <code>Oy</code>, <code>Oz</code>, <code>*O</code></b> — Origin coordinates (optional); if provided, accumulated path length is updated</li>
+</ul>
+
+<b>Function 'calc_gain':</b><br>
+Calculates the path gain (linear power) from the transfer coefficients at one frequency 
+ 
+<ul>
+<li>EM mode returns the maximum column power of the 2x2 Jones matrix; SCALAR mode returns the squared magnitude of the pressure coefficient</li>
+<li>A degenerate coefficient set (all-zero, underflowed, or containing NaN) returns 0, flagging the path for pruning</li>
+<li>With <code>fGHz &gt; 0</code>, free-space path loss is folded in: <code>(lambda / (4 pi d))^2</code> in EM mode, <code>1 / d^2</code> (frequency-independent) in SCALAR mode</li>
+<li>The distance <code>d</code> is the stored <code>length</code> by default; pass <code>len &gt; 0</code> to override it, e.g. to match a total length from the read-only <code>calc_length</code> before the member is updated</li>
+</ul>
+<pre>
+float calc_gain(float fGHz = 0.0f, size_t freq = 0, float len = 0.0f) const;
+</pre>
+<ul>
+<li><b><code>fGHz</code></b> — Frequency in GHz; <code>&gt; 0</code> applies path loss, <code>0</code> returns polarization power only. In SCALAR mode any positive value applies spherical spreading; the magnitude is ignored</li>
+<li><b><code>freq</code></b> — Frequency index into the coefficient store, valid range <code>0</code> to <code>nFRQ - 1</code></li>
+<li><b><code>len</code></b> — Path length override in meters; <code>&gt; 0</code> replaces the stored <code>length</code> for the path-loss term, <code>&lt;= 0</code> uses the stored value</li>
+</ul>
+
+<b>Function 'xpr_update':</b><br>
+Left-multiplies the ray's transfer matrix by an interaction matrix, applies a power gain, and returns the resulting gain 
+ 
+<ul>
+<li>Updates the coefficient slot for one frequency in place: <code>M := coeff_update * M</code>, then scales by <code>sqrt(gain_update)</code> in amplitude</li>
+<li><code>coeff_update == nullptr</code> applies only the gain; <code>gain_update == 1.0</code> applies only the multiply; both defaults leave the matrix unchanged and just measure it</li>
+<li>The update reads all old values before writing, so <code>coeff_update</code> may alias the slot; the return value uses the same gain definition as <code>calc_gain</code></li>
+<li>Must be called after <code>extend</code> closes the path, so the stored <code>length</code> is final when path loss is requested</li>
+</ul>
+<pre>
+float xpr_update(const float *coeff_update = nullptr, float gain_update = 1.0f, size_t freq = 0, float fGHz = 0.0f);
+</pre>
+<ul>
+<li><b><code>coeff_update</code></b> — Interaction matrix, length 8 (EM) or 2 (SCALAR); <code>nullptr</code> skips the multiply</li>
+<li><b><code>gain_update</code></b> — Power gain applied to the slot (converted to an amplitude factor internally); <code>1.0</code> skips the scaling</li>
+<li><b><code>freq</code></b> — Frequency index into the coefficient store, valid range <code>0</code> to <code>nFRQ - 1</code></li>
+<li><b><code>fGHz</code></b> — Frequency in GHz for the returned gain; <code>&gt; 0</code> applies path loss as in <code>calc_gain</code>, <code>0</code> returns polarization power only</li>
+</ul>
+
+<b>Function 'duplicate';</b><br>
+Copies the path into an existing target object and returns its length 
+ 
+<ul>
+<li>Performs a deep copy: the target receives an independent data buffer and all metadata</li>
+<li>The target's previous contents are released; the source is left unchanged</li>
+</ul>
+<pre>
+float duplicate(path &amp;target) const;
+</pre>
+<ul>
+<li><b><code>target</code></b> — Destination path, overwritten with a deep copy of the source</li>
+</ul>
+
+<b>Function 'extend':</b><br>
+Copies the path into a target and appends one new segment, returning the new total length 
+ 
+<ul>
+<li>The new coordinate is appended after the existing segments; the stored <code>length</code> grows by the origin-to-new-point distance of the appended leg</li>
+<li>The interaction <code>type</code> is recorded for the new segment and classifies the interaction: codes 1-127 increment <code>nTRA</code>, codes 128-255 increment <code>nREF</code>, code 0 increments neither</li>
+<li>The target receives an independent buffer sized for the extra segment; the source is left unchanged</li>
+<li>Throws if the source already holds the maximum of 255 segments</li>
+</ul>
+<pre>
+float extend(path &amp;target, float x, float y, float z, uint8_t type = 0) const;
+</pre>
+<ul>
+<li><b><code>target</code></b> — Destination path, overwritten with the extended copy</li>
+<li><b><code>x</code>, <code>y</code>, <code>z</code></b> — Coordinates of the appended interaction point</li>
+<li><b><code>type</code></b> — Interaction type code for the new segment; drives the reflection / transmission counters</li>
+</ul>
+
+<hr class="greyline"><br>
 <span id="qrt_file_parse" class="qd-func"><b>qrt_file_parse</b></span><br>
 <hr class="thin">
 Read metadata from a QRT file
@@ -3931,11 +4166,11 @@ Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh
 <b>Declaration:</b><br>
 <pre>
 void calc_diffraction_gain(
-    const arma::Mat&lt;dtype&gt; *orig,
-    const arma::Mat&lt;dtype&gt; *dest,
-    const arma::Mat&lt;dtype&gt; *mesh,
-    const arma::uvec *mtl_ind,
-    const std::unordered_map&lt;std::string, std::vector&lt;dtype&gt;&gt; *mtl_prop,
+    const arma::Mat&lt;dtype&gt; &amp;orig,
+    const arma::Mat&lt;dtype&gt; &amp;dest,
+    const arma::Mat&lt;dtype&gt; &amp;mesh,
+    const arma::uvec &amp;mtl_ind,
+    const std::unordered_map&lt;std::string, std::vector&lt;dtype&gt;&gt; &amp;mtl_prop,
     dtype center_frequency,
     int lod = 2,
     arma::Col&lt;dtype&gt; *gain = nullptr,
@@ -3945,7 +4180,8 @@ void calc_diffraction_gain(
     const arma::u32_vec *sub_mesh_index = nullptr,
     int use_kernel = 0,
     int gpu_id = 0,
-    bool scalar_mode = false);
+    bool scalar_mode = false,
+    double thin_slab_threshold = 0.0);
 </pre>
 
 <b>Inputs:</b><br>
