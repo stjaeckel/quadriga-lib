@@ -191,18 +191,18 @@ namespace
             A += oX[2] * oX[2] + oX[3] * oX[3];
             B = oX[4] * oX[4] + oX[5] * oX[5] + oX[6] * oX[6] + oX[7] * oX[7]; // |col 1|^2
         }
-        dtype AB = A > B ? A : B;
+        dtype gain = A > B ? A : B;
 
         // Guard in the squared domain: AB below the smallest normal means the squares have already
         // underflowed (float: entry magnitude < ~1.1e-19). Anything finite and >= that is safe, and
         // every element is bounded by sqrt(AB), so the scaled result cannot overflow. NaN fails the
         // comparison and lands in the degenerate branch instead of laundering through the divide.
-        if (AB >= std::numeric_limits<dtype>::min())
+        if (gain >= std::numeric_limits<dtype>::min())
         {
-            dtype gain = std::sqrt(AB);
+            dtype amplitude = std::sqrt(gain);
             if (apply)
             {
-                dtype scale = (dtype)1.0 / gain;
+                dtype scale = (dtype)1.0 / amplitude;
                 oX[0] *= scale, oX[1] *= scale;
                 if (!scalar_mode)
                     oX[2] *= scale, oX[3] *= scale, oX[4] *= scale, oX[5] *= scale, oX[6] *= scale, oX[7] *= scale;
