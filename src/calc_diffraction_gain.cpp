@@ -40,11 +40,11 @@ Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh
 ## Declaration:
 ```
 void calc_diffraction_gain(
-    const arma::Mat<dtype> *orig,
-    const arma::Mat<dtype> *dest,
-    const arma::Mat<dtype> *mesh,
-    const arma::uvec *mtl_ind,
-    const std::unordered_map<std::string, std::vector<dtype>> *mtl_prop,
+    const arma::Mat<dtype> &orig,
+    const arma::Mat<dtype> &dest,
+    const arma::Mat<dtype> &mesh,
+    const arma::uvec &mtl_ind,
+    const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
     dtype center_frequency,
     int lod = 2,
     arma::Col<dtype> *gain = nullptr,
@@ -54,7 +54,8 @@ void calc_diffraction_gain(
     const arma::u32_vec *sub_mesh_index = nullptr,
     int use_kernel = 0,
     int gpu_id = 0,
-    bool scalar_mode = false);
+    bool scalar_mode = false,
+    double thin_slab_threshold = 0.0);
 ```
 
 ## Inputs:
@@ -580,6 +581,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
     // Finalize XPRMAT: normalize (remove gain)
     if (xprmat)
     {
+        // Normalize XPRMAT to remove the gain
         quadriga_lib::xpr_update<dtype>(*xprmat, nullptr, nullptr, false, true);
 
         if (verbose == 2 && n_pos == 1) // Debug output

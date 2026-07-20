@@ -1,7 +1,7 @@
 ---
 title: "Python API Documentation for Quadriga-Lib v0.12.0"
 author: "Stephan Jaeckel"
-date: "16.07.2026"
+date: "20.07.2026"
 lang: en-US
 ---
 
@@ -36,34 +36,34 @@ lang: en-US
 | [hdf5_write_dset](#hdf5_write_dset) | Channel functions | 1002 |
 | [qrt_file_parse](#qrt_file_parse) | Channel functions | 1032 |
 | [qrt_file_read](#qrt_file_read) | Channel functions | 1065 |
-| [quantize_delays](#quantize_delays) | Channel functions | 1120 |
-| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 1184 |
-| [get_channels_planar](#get_channels_planar) | Channel generation functions | 1242 |
-| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 1299 |
-| [get_ieee_indoor](#get_ieee_indoor) | Channel generation functions | 1359 |
-| [acdf](#acdf) | Channel statistics | 1441 |
-| [calc_angular_spread](#calc_angular_spread) | Channel statistics | 1472 |
-| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 1511 |
-| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 1561 |
-| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 1589 |
-| [cart2geo](#cart2geo) | Math functions | 1623 |
-| [geo2cart](#geo2cart) | Math functions | 1653 |
-| [components](#components) | Miscellaneous / Tools | 1690 |
-| [version](#version) | Miscellaneous / Tools | 1699 |
-| [write_png](#write_png) | Miscellaneous / Tools | 1712 |
-| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 1755 |
-| [cube](#cube) | Site-specific simulation tools | 1807 |
-| [icosphere](#icosphere) | Site-specific simulation tools | 1834 |
-| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 1866 |
-| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 1899 |
-| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 1949 |
-| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 1996 |
-| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 2023 |
-| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 2053 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 2086 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 2123 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 2166 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 2192 |
+| [quantize_delays](#quantize_delays) | Channel functions | 1122 |
+| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 1186 |
+| [get_channels_planar](#get_channels_planar) | Channel generation functions | 1244 |
+| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 1301 |
+| [get_ieee_indoor](#get_ieee_indoor) | Channel generation functions | 1361 |
+| [acdf](#acdf) | Channel statistics | 1443 |
+| [calc_angular_spread](#calc_angular_spread) | Channel statistics | 1474 |
+| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 1513 |
+| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 1563 |
+| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 1591 |
+| [cart2geo](#cart2geo) | Math functions | 1625 |
+| [geo2cart](#geo2cart) | Math functions | 1655 |
+| [components](#components) | Miscellaneous / Tools | 1692 |
+| [version](#version) | Miscellaneous / Tools | 1701 |
+| [write_png](#write_png) | Miscellaneous / Tools | 1714 |
+| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 1757 |
+| [cube](#cube) | Site-specific simulation tools | 1809 |
+| [icosphere](#icosphere) | Site-specific simulation tools | 1836 |
+| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 1868 |
+| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 1901 |
+| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 1951 |
+| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 1998 |
+| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 2025 |
+| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 2055 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 2088 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 2125 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 2168 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 2194 |
 
 ---
 
@@ -1073,8 +1073,8 @@ Read ray-tracing CIR data from a QRT file
 
 ### Usage:
 ```
-center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, M, aod, eod, \
-    aoa, eoa, path_coord, no_int, coord = quadriga_lib.channel.qrt_file_read( fn, cir, orig, downlink, normalize_M )
+center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, M, aod, eod, aoa, eoa, \
+    path_coord, no_int, coord, interact_type = quadriga_lib.channel.qrt_file_read( fn, cir, orig, downlink, normalize_M )
 ```
 
 ### Inputs:
@@ -1109,6 +1109,8 @@ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, p
 - **`path_coord`** — Interaction coordinates per path; list of length `n_out`; each entry is a list of length `n_path` with arrays `(3, n_interact + 2)`
 - **`no_int`** — Number of mesh interactions per path (0 indicates LOS); list of length `n_out`; entries `(n_path,)`
 - **`coord`** — Interaction coordinates concatenated across paths; list of length `n_out`; entries `(3, sum(no_int))`
+- **`interact_type`** — Interaction type codes concatenated across paths (matching `coord`); list of length `n_out`;
+  entries `(sum(no_int),)`. Empty for v4 legacy files.
 
 ### See also:
 - [generate](#generate) (for generating antenna arrays)

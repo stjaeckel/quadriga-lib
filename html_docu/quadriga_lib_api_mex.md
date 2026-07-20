@@ -1,7 +1,7 @@
 ---
 title: "MATLAB / Octave API Documentation for Quadriga-Lib v0.12.0"
 author: "Stephan Jaeckel"
-date: "16.07.2026"
+date: "20.07.2026"
 lang: en-US
 ---
 
@@ -52,39 +52,39 @@ lang: en-US
 | [hdf5_write_dset](#hdf5_write_dset) | Channel functions | 1060 |
 | [qrt_file_parse](#qrt_file_parse) | Channel functions | 1092 |
 | [qrt_file_read](#qrt_file_read) | Channel functions | 1125 |
-| [quantize_delays](#quantize_delays) | Channel functions | 1182 |
-| [get_channels_ieee_indoor](#get_channels_ieee_indoor) | Channel generation functions | 1226 |
-| [get_channels_irs](#get_channels_irs) | Channel generation functions | 1299 |
-| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 1365 |
-| [get_channels_planar](#get_channels_planar) | Channel generation functions | 1414 |
-| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 1465 |
-| [acdf](#acdf) | Channel statistics | 1523 |
-| [calc_angular_spread](#calc_angular_spread) | Channel statistics | 1554 |
-| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 1594 |
-| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 1636 |
-| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 1664 |
-| [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | 1694 |
-| [cart2geo](#cart2geo) | Math functions | 1716 |
-| [fast_sincos](#fast_sincos) | Math functions | 1743 |
-| [geo2cart](#geo2cart) | Math functions | 1771 |
-| [interp](#interp) | Math functions | 1811 |
-| [version](#version) | Miscellaneous / Tools | 1842 |
-| [write_png](#write_png) | Miscellaneous / Tools | 1859 |
-| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 1883 |
-| [cube](#cube) | Site-specific simulation tools | 1931 |
-| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 1964 |
-| [icosphere](#icosphere) | Site-specific simulation tools | 2002 |
-| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 2028 |
-| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 2076 |
-| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 2122 |
-| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 2149 |
-| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 2176 |
-| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 2205 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 2305 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 2345 |
-| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 2385 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 2409 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 2436 |
+| [quantize_delays](#quantize_delays) | Channel functions | 1184 |
+| [get_channels_ieee_indoor](#get_channels_ieee_indoor) | Channel generation functions | 1228 |
+| [get_channels_irs](#get_channels_irs) | Channel generation functions | 1301 |
+| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 1367 |
+| [get_channels_planar](#get_channels_planar) | Channel generation functions | 1416 |
+| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 1467 |
+| [acdf](#acdf) | Channel statistics | 1525 |
+| [calc_angular_spread](#calc_angular_spread) | Channel statistics | 1556 |
+| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 1596 |
+| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 1638 |
+| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 1666 |
+| [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | 1696 |
+| [cart2geo](#cart2geo) | Math functions | 1718 |
+| [fast_sincos](#fast_sincos) | Math functions | 1745 |
+| [geo2cart](#geo2cart) | Math functions | 1773 |
+| [interp](#interp) | Math functions | 1813 |
+| [version](#version) | Miscellaneous / Tools | 1844 |
+| [write_png](#write_png) | Miscellaneous / Tools | 1861 |
+| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 1885 |
+| [cube](#cube) | Site-specific simulation tools | 1933 |
+| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 1966 |
+| [icosphere](#icosphere) | Site-specific simulation tools | 2004 |
+| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 2030 |
+| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 2078 |
+| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 2124 |
+| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 2151 |
+| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 2178 |
+| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 2207 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 2307 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 2347 |
+| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 2387 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 2411 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 2438 |
 
 ---
 
@@ -1132,7 +1132,7 @@ Read ray-tracing CIR data from a QRT file
 ### Usage:
 ```
 [ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, ...
-    path_length, M, aod, eod, aoa, eoa, path_coord, no_int, coord ] = ...
+    path_length, M, aod, eod, aoa, eoa, path_coord, no_int, coord, interact_type ] = ...
     quadriga_lib.qrt_file_read( fn, i_cir, i_orig, downlink, normalize_M );
 ```
 
@@ -1171,6 +1171,8 @@ Read ray-tracing CIR data from a QRT file
   Cell of length `n_out`; elements `[n_path]`
 - **`coord`** — Interaction coordinates (flat, concatenated across paths); single;
   Cell of length `n_out`; elements `[3, sum(no_int)]`
+- **`interact_type`** — Interaction type codes (flat, concatenated across paths, matching `coord`); uint32;
+  Cell of length `n_out`; elements `[sum(no_int)]`. Empty for v4 legacy files.
 
 ### See also:
 - [arrayant_generate](#arrayant_generate) (for generating antenna arrays)

@@ -1718,7 +1718,7 @@ Read ray-tracing CIR data from a QRT file
 <b>Usage:</b><br>
 <pre>
 [ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, ...
-    path_length, M, aod, eod, aoa, eoa, path_coord, no_int, coord ] = ...
+    path_length, M, aod, eod, aoa, eoa, path_coord, no_int, coord, interact_type ] = ...
     quadriga_lib.qrt_file_read( fn, i_cir, i_orig, downlink, normalize_M );
 </pre>
 
@@ -1773,6 +1773,7 @@ Read ray-tracing CIR data from a QRT file
 <li><b><code>path_coord</code></b> — Interaction coordinates per path; Cell of length <code>n_out</code>; elements Cell of length <code>n_path</code>, each <code>[3, n_interact + 2]</code></li>
 <li><b><code>no_int</code></b> — Number of mesh interactions per path; 0 indicates LOS; uint32; Cell of length <code>n_out</code>; elements <code>[n_path]</code></li>
 <li><b><code>coord</code></b> — Interaction coordinates (flat, concatenated across paths); single; Cell of length <code>n_out</code>; elements <code>[3, sum(no_int)]</code></li>
+<li><b><code>interact_type</code></b> — Interaction type codes (flat, concatenated across paths, matching <code>coord</code>); uint32; Cell of length <code>n_out</code>; elements <code>[sum(no_int)]</code>. Empty for v4 legacy files.</li>
 </ul>
 
 <b>See also:</b><br>

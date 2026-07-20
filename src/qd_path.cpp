@@ -55,17 +55,18 @@ Class for storing and managing a single propagation path with a compact fixed-si
 | Interactions  | `(nSEG - 3) / 4`  | Overflow type codes past the first 6, packed 4 per float, present for `nSEG >= 7` |
 
 ## Simple member functions:<br>
-| Method            | Description                                                       |
-| ----------------- | ----------------------------------------------------------------- |
-| `.n_freq()`       | Returns the number of frequencies (1-127)                         |
-| `.n_seg()`        | Returns the number of segments                                    |
-| `.is_scalar()`    | Returns true for SCALAR layout, false for EM                      |
-| `.init()`         | (Re)initializes storage to a given segment / frequency layout     |
-| `.free()`         | Releases the data buffer and resets to the valid empty state      |
-| `.coord()`        | Returns a pointer to a segment's `[x, y, z]` coordinates          |
-| `.xpr_coeff()`    | Returns a pointer to a frequency's transfer coefficients          |
-| `.operator()`     | Returns a last-segment coordinate by index (0=x, 1=y, 2=z)        |
-| `.interaction_type_codes()` | Returns the full interaction type sequence as a vector  |
+| Method            | Description                                                                     |
+| ----------------- | ------------------------------------------------------------------------------- |
+| `.n_freq()`       | Returns the number of frequencies (1-127)                                       |
+| `.n_seg()`        | Returns the number of segments                                                  |
+| `.is_scalar()`    | Returns true for SCALAR layout, false for EM                                    |
+| `.init()`         | (Re)initializes storage to a given segment / frequency layout                   |
+| `.free()`         | Releases the data buffer and resets to the valid empty state                    |
+| `.coord()`        | Returns a pointer to a segment's `[x, y, z]` coordinates                        |
+| `.xpr_coeff()`    | Returns a pointer to a frequency's transfer coefficients                        |
+| `.operator()`     | Returns a last-segment coordinate by index (0=x, 1=y, 2=z)                      |
+| `.interaction_type_codes()` | Returns the full interaction type sequence as a vector                |
+| `.set_interaction_type_codes()` | Sets the interaction type sequence; requires one code per segment |
 
 ## Function 'calc_length':
 Calculates the total length of the path
@@ -563,6 +564,27 @@ std::vector<uint8_t> quadriga_lib::path::interaction_type_codes() const
         std::memcpy(out.data() + INLINE_TYPES, codes, n - INLINE_TYPES);
     }
     return out;
+}
+
+// Set the interaction type sequence
+void quadriga_lib::path::set_interaction_type_codes(const std::vector<uint8_t> &codes)
+{
+    size_t n = (size_t)nSEG;
+    if (codes.size() != n)
+        throw std::invalid_argument("Number of type codes must equal the number of segments.");
+
+    size_t n_inline = n < INLINE_TYPES ? n : INLINE_TYPES;
+    for (size_t i = 0; i < n_inline; ++i)
+        interact_type[i] = codes[i];
+
+    if (n > INLINE_TYPES)
+    {
+        if (data == nullptr)
+            throw std::runtime_error("Data buffer is not allocated.");
+
+        uint8_t *h = reinterpret_cast<uint8_t *>(data + history_offset(n, n_freq(), is_scalar()));
+        std::memcpy(h, codes.data() + INLINE_TYPES, n - INLINE_TYPES);
+    }
 }
 
 #undef INLINE_TYPES

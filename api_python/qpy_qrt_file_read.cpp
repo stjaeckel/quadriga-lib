@@ -21,8 +21,8 @@ Read ray-tracing CIR data from a QRT file
 
 ## Usage:
 ```
-center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, M, aod, eod, \
-    aoa, eoa, path_coord, no_int, coord = quadriga_lib.channel.qrt_file_read( fn, cir, orig, downlink, normalize_M )
+center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, M, aod, eod, aoa, eoa, \
+    path_coord, no_int, coord, interact_type = quadriga_lib.channel.qrt_file_read( fn, cir, orig, downlink, normalize_M )
 ```
 
 ## Inputs:
@@ -57,6 +57,8 @@ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, p
 - **`path_coord`** — Interaction coordinates per path; list of length `n_out`; each entry is a list of length `n_path` with arrays `(3, n_interact + 2)`
 - **`no_int`** — Number of mesh interactions per path (0 indicates LOS); list of length `n_out`; entries `(n_path,)`
 - **`coord`** — Interaction coordinates concatenated across paths; list of length `n_out`; entries `(3, sum(no_int))`
+- **`interact_type`** — Interaction type codes concatenated across paths (matching `coord`); list of length `n_out`;
+  entries `(sum(no_int),)`. Empty for v4 legacy files.
 
 ## See also:
 - [[generate]] (for generating antenna arrays)
@@ -99,7 +101,7 @@ py::tuple qrt_file_read(const std::string &fn,
 
     // Per-snapshot outputs (one list entry per requested snapshot)
     py::list fbs_pos_py, lbs_pos_py, path_gain_py, path_length_py, M_py;
-    py::list aod_py, eod_py, aoa_py, eoa_py, path_coord_py, no_int_py, coord_py;
+    py::list aod_py, eod_py, aoa_py, eoa_py, path_coord_py, no_int_py, coord_py, interact_type_py;
 
     // Per-snapshot read buffers
     arma::vec tx_pos_buf, tx_orientation_buf, rx_pos_buf, rx_orientation_buf;
@@ -109,6 +111,7 @@ py::tuple qrt_file_read(const std::string &fn,
     std::vector<arma::mat> path_coord;
     arma::u32_vec no_int;
     arma::fmat coord;
+    std::vector<uint8_t> interact_type;
 
     // Iterate over all requested snapshots, reusing the stream and cache
     for (arma::uword i_out = 0; i_out < no_out; ++i_out)
@@ -117,7 +120,7 @@ py::tuple qrt_file_read(const std::string &fn,
                                             &tx_pos_buf, &tx_orientation_buf, &rx_pos_buf, &rx_orientation_buf,
                                             &fbs_pos, &lbs_pos, &path_gain, &path_length, &M,
                                             &aod, &eod, &aoa, &eoa, &path_coord, normalize_M,
-                                            &no_int, &coord, &stream, &cache);
+                                            &no_int, &coord, &interact_type, &stream, &cache);
 
         tx_pos.col(i_out) = tx_pos_buf;
         tx_orientation.col(i_out) = tx_orientation_buf;
@@ -136,6 +139,9 @@ py::tuple qrt_file_read(const std::string &fn,
         path_coord_py.append(qd_python_copy2list(&path_coord));
         no_int_py.append(qd_python_copy2numpy(&no_int));
         coord_py.append(qd_python_copy2numpy(&coord));
+
+        arma::Col<arma::u8> it_view(interact_type.data(), interact_type.size(), false, true);
+        interact_type_py.append(qd_python_copy2numpy(&it_view));
     }
 
     stream.close();
@@ -143,7 +149,8 @@ py::tuple qrt_file_read(const std::string &fn,
     // Return tuple
     return py::make_tuple(center_freq_py, tx_pos_py, tx_orientation_py, rx_pos_py, rx_orientation_py,
                           fbs_pos_py, lbs_pos_py, path_gain_py, path_length_py, M_py,
-                          aod_py, eod_py, aoa_py, eoa_py, path_coord_py, no_int_py, coord_py);
+                          aod_py, eod_py, aoa_py, eoa_py, path_coord_py, no_int_py, coord_py,
+                          interact_type_py);
 }
 
 // pybind11 declaration:

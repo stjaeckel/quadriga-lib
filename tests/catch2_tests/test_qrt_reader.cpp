@@ -119,7 +119,7 @@ TEST_CASE("QRT Reader")
             quadriga_lib::qrt_file_read<double>(fn, 0, 0, true, &center_frequency, &tx_pos, &tx_orientation,
                                                 &rx_pos, &rx_orientation, &fbs_pos, &lbs_pos, &path_gain,
                                                 &path_length, &M, &aod, &eod, &aoa, &eoa, &path_coord, 0,
-                                                nullptr, nullptr, &stream, &cache);
+                                                nullptr, nullptr, nullptr, &stream, &cache);
 
         CHECK(center_frequency[0] == 3.75e9);
         arma::vec O = {-12.9607, 59.6906, 2.0};
@@ -226,7 +226,7 @@ TEST_CASE("QRT Reader")
             quadriga_lib::qrt_file_read<double>(fn, 0, 0, true, nullptr, nullptr, nullptr,
                                                 nullptr, nullptr, nullptr, nullptr, &path_gain1,
                                                 nullptr, &M1, nullptr, nullptr, nullptr, nullptr, nullptr, 1,
-                                                nullptr, nullptr, &stream, &cache);
+                                                nullptr, nullptr, nullptr, &stream, &cache);
 
         REQUIRE(M.n_rows == 8);
         REQUIRE(M.n_cols == 19);
