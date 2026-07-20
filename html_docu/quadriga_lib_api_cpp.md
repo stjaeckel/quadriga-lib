@@ -27,109 +27,112 @@ lang: en-US
 
 | Function | Section | Line |
 | --- | --- | --- |
-| [arrayant](#arrayant) | Array antenna class | 139 |
-| [.append](#append) | Array antenna class | 190 |
-| [.calc_beamwidth_deg](#calc_beamwidth_deg) | Array antenna class | 212 |
-| [.calc_directivity_dBi](#calc_directivity_dbi) | Array antenna class | 244 |
-| [.combine_pattern](#combine_pattern) | Array antenna class | 265 |
-| [.copy_element](#copy_element) | Array antenna class | 290 |
-| [.export_obj_file](#export_obj_file) | Array antenna class | 310 |
-| [.interpolate](#interpolate) | Array antenna class | 340 |
-| [.is_valid](#is_valid) | Array antenna class | 392 |
-| [.qdant_write](#qdant_write) | Array antenna class | 410 |
-| [.remove_zeros](#remove_zeros) | Array antenna class | 437 |
-| [.rotate_pattern](#rotate_pattern) | Array antenna class | 453 |
-| [.set_size](#set_size) | Array antenna class | 489 |
-| [arrayant_combine_pattern_multi](#arrayant_combine_pattern_multi) | Array antenna functions | 515 |
-| [arrayant_concat_multi](#arrayant_concat_multi) | Array antenna functions | 549 |
-| [arrayant_copy_element_multi](#arrayant_copy_element_multi) | Array antenna functions | 583 |
-| [arrayant_interpolate_multi](#arrayant_interpolate_multi) | Array antenna functions | 623 |
-| [arrayant_is_valid_multi](#arrayant_is_valid_multi) | Array antenna functions | 682 |
-| [arrayant_rotate_pattern_multi](#arrayant_rotate_pattern_multi) | Array antenna functions | 709 |
-| [arrayant_set_element_pos_multi](#arrayant_set_element_pos_multi) | Array antenna functions | 741 |
-| [generate_arrayant_3GPP](#generate_arrayant_3gpp) | Array antenna functions | 767 |
-| [generate_arrayant_custom](#generate_arrayant_custom) | Array antenna functions | 817 |
-| [generate_arrayant_dipole](#generate_arrayant_dipole) | Array antenna functions | 842 |
-| [generate_arrayant_half_wave_dipole](#generate_arrayant_half_wave_dipole) | Array antenna functions | 859 |
-| [generate_arrayant_multibeam](#generate_arrayant_multibeam) | Array antenna functions | 876 |
-| [generate_arrayant_omni](#generate_arrayant_omni) | Array antenna functions | 930 |
-| [generate_arrayant_ula](#generate_arrayant_ula) | Array antenna functions | 947 |
-| [generate_arrayant_xpol](#generate_arrayant_xpol) | Array antenna functions | 975 |
-| [generate_speaker](#generate_speaker) | Array antenna functions | 992 |
-| [qdant_read](#qdant_read) | Array antenna functions | 1067 |
-| [qdant_read_multi](#qdant_read_multi) | Array antenna functions | 1093 |
-| [qdant_write_multi](#qdant_write_multi) | Array antenna functions | 1120 |
-| [channel](#channel) | Channel class | 1149 |
-| [.add_paths](#add_paths) | Channel class | 1196 |
-| [.calc_effective_path_gain](#calc_effective_path_gain) | Channel class | 1234 |
-| [.write_paths_to_obj_file](#write_paths_to_obj_file) | Channel class | 1253 |
-| [any_type_id](#any_type_id) | Channel functions | 1294 |
-| [baseband_freq_response](#baseband_freq_response) | Channel functions | 1337 |
-| [baseband_freq_response_multi](#baseband_freq_response_multi) | Channel functions | 1380 |
-| [baseband_freq_response_vec](#baseband_freq_response_vec) | Channel functions | 1428 |
-| [get_HDF5_version](#get_hdf5_version) | Channel functions | 1466 |
-| [hdf5_create](#hdf5_create) | Channel functions | 1478 |
-| [hdf5_read_channel](#hdf5_read_channel) | Channel functions | 1508 |
-| [hdf5_read_dset](#hdf5_read_dset) | Channel functions | 1540 |
-| [hdf5_read_dset_names](#hdf5_read_dset_names) | Channel functions | 1576 |
-| [hdf5_read_layout](#hdf5_read_layout) | Channel functions | 1610 |
-| [hdf5_reshape_layout](#hdf5_reshape_layout) | Channel functions | 1636 |
-| [hdf5_write](#hdf5_write) | Channel functions | 1664 |
-| [hdf5_write_dset](#hdf5_write_dset) | Channel functions | 1704 |
-| [path](#path) | Channel functions | 1743 |
-| [qrt_file_parse](#qrt_file_parse) | Channel functions | 1862 |
-| [qrt_file_read](#qrt_file_read) | Channel functions | 1910 |
-| [qrt_read_cache_init](#qrt_read_cache_init) | Channel functions | 2002 |
-| [quantize_delays](#quantize_delays) | Channel functions | 2039 |
-| [get_channels_ieee_indoor](#get_channels_ieee_indoor) | Channel generation functions | 2101 |
-| [get_channels_irs](#get_channels_irs) | Channel generation functions | 2182 |
-| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 2276 |
-| [get_channels_planar](#get_channels_planar) | Channel generation functions | 2344 |
-| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 2412 |
-| [acdf](#acdf) | Channel statistics | 2488 |
-| [calc_angular_spreads_sphere](#calc_angular_spreads_sphere) | Channel statistics | 2523 |
-| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 2565 |
-| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 2617 |
-| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 2650 |
-| [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | 2685 |
-| [fast_acos](#fast_acos) | Math functions | 2718 |
-| [fast_asin](#fast_asin) | Math functions | 2737 |
-| [fast_atan2](#fast_atan2) | Math functions | 2756 |
-| [fast_cart2geo](#fast_cart2geo) | Math functions | 2777 |
-| [fast_geo2cart](#fast_geo2cart) | Math functions | 2810 |
-| [fast_sincos](#fast_sincos) | Math functions | 2855 |
-| [fast_slerp](#fast_slerp) | Math functions | 2876 |
-| [interp_2D](#interp_2d) | Math functions | 2911 |
-| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 2975 |
-| [colormap](#colormap) | Site-specific simulation tools | 3033 |
-| [combine_irs_coord](#combine_irs_coord) | Site-specific simulation tools | 3052 |
-| [coord2path](#coord2path) | Site-specific simulation tools | 3095 |
-| [cube](#cube) | Site-specific simulation tools | 3133 |
-| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 3166 |
-| [icosphere](#icosphere) | Site-specific simulation tools | 3210 |
-| [interface_gain](#interface_gain) | Site-specific simulation tools | 3244 |
-| [medium_gain](#medium_gain) | Site-specific simulation tools | 3280 |
-| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 3317 |
-| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 3359 |
-| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 3426 |
-| [obj_overlap_test](#obj_overlap_test) | Site-specific simulation tools | 3487 |
-| [path_to_tube](#path_to_tube) | Site-specific simulation tools | 3518 |
-| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 3546 |
-| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 3575 |
-| [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 3614 |
-| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 3650 |
-| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 3686 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 3804 |
-| [ray_state_update](#ray_state_update) | Site-specific simulation tools | 3847 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 3971 |
-| [refractive_index](#refractive_index) | Site-specific simulation tools | 4019 |
-| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 4051 |
-| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 4095 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 4125 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 4153 |
-| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 4194 |
-| [write_png](#write_png) | Site-specific simulation tools | 4229 |
-| [xpr_update](#xpr_update) | Site-specific simulation tools | 4255 |
+| [arrayant](#arrayant) | Array antenna class | 142 |
+| [.append](#append) | Array antenna class | 193 |
+| [.calc_beamwidth_deg](#calc_beamwidth_deg) | Array antenna class | 215 |
+| [.calc_directivity_dBi](#calc_directivity_dbi) | Array antenna class | 247 |
+| [.combine_pattern](#combine_pattern) | Array antenna class | 268 |
+| [.copy_element](#copy_element) | Array antenna class | 293 |
+| [.export_obj_file](#export_obj_file) | Array antenna class | 313 |
+| [.interpolate](#interpolate) | Array antenna class | 343 |
+| [.is_valid](#is_valid) | Array antenna class | 395 |
+| [.qdant_write](#qdant_write) | Array antenna class | 413 |
+| [.remove_zeros](#remove_zeros) | Array antenna class | 440 |
+| [.rotate_pattern](#rotate_pattern) | Array antenna class | 456 |
+| [.set_size](#set_size) | Array antenna class | 492 |
+| [arrayant_combine_pattern_multi](#arrayant_combine_pattern_multi) | Array antenna functions | 518 |
+| [arrayant_concat_multi](#arrayant_concat_multi) | Array antenna functions | 552 |
+| [arrayant_copy_element_multi](#arrayant_copy_element_multi) | Array antenna functions | 586 |
+| [arrayant_interpolate_multi](#arrayant_interpolate_multi) | Array antenna functions | 626 |
+| [arrayant_is_valid_multi](#arrayant_is_valid_multi) | Array antenna functions | 685 |
+| [arrayant_rotate_pattern_multi](#arrayant_rotate_pattern_multi) | Array antenna functions | 712 |
+| [arrayant_set_element_pos_multi](#arrayant_set_element_pos_multi) | Array antenna functions | 744 |
+| [generate_arrayant_3GPP](#generate_arrayant_3gpp) | Array antenna functions | 770 |
+| [generate_arrayant_custom](#generate_arrayant_custom) | Array antenna functions | 820 |
+| [generate_arrayant_dipole](#generate_arrayant_dipole) | Array antenna functions | 845 |
+| [generate_arrayant_half_wave_dipole](#generate_arrayant_half_wave_dipole) | Array antenna functions | 862 |
+| [generate_arrayant_multibeam](#generate_arrayant_multibeam) | Array antenna functions | 879 |
+| [generate_arrayant_omni](#generate_arrayant_omni) | Array antenna functions | 933 |
+| [generate_arrayant_ula](#generate_arrayant_ula) | Array antenna functions | 950 |
+| [generate_arrayant_xpol](#generate_arrayant_xpol) | Array antenna functions | 978 |
+| [generate_speaker](#generate_speaker) | Array antenna functions | 995 |
+| [qdant_read](#qdant_read) | Array antenna functions | 1070 |
+| [qdant_read_multi](#qdant_read_multi) | Array antenna functions | 1096 |
+| [qdant_write_multi](#qdant_write_multi) | Array antenna functions | 1123 |
+| [channel](#channel) | Channel class | 1152 |
+| [.add_paths](#add_paths) | Channel class | 1199 |
+| [.calc_effective_path_gain](#calc_effective_path_gain) | Channel class | 1237 |
+| [.write_paths_to_obj_file](#write_paths_to_obj_file) | Channel class | 1256 |
+| [any_type_id](#any_type_id) | Channel functions | 1297 |
+| [baseband_freq_response](#baseband_freq_response) | Channel functions | 1340 |
+| [baseband_freq_response_multi](#baseband_freq_response_multi) | Channel functions | 1383 |
+| [baseband_freq_response_vec](#baseband_freq_response_vec) | Channel functions | 1431 |
+| [get_HDF5_version](#get_hdf5_version) | Channel functions | 1469 |
+| [hdf5_create](#hdf5_create) | Channel functions | 1481 |
+| [hdf5_read_channel](#hdf5_read_channel) | Channel functions | 1511 |
+| [hdf5_read_dset](#hdf5_read_dset) | Channel functions | 1543 |
+| [hdf5_read_dset_names](#hdf5_read_dset_names) | Channel functions | 1579 |
+| [hdf5_read_layout](#hdf5_read_layout) | Channel functions | 1613 |
+| [hdf5_reshape_layout](#hdf5_reshape_layout) | Channel functions | 1639 |
+| [hdf5_write](#hdf5_write) | Channel functions | 1667 |
+| [hdf5_write_dset](#hdf5_write_dset) | Channel functions | 1707 |
+| [path](#path) | Channel functions | 1746 |
+| [qrt_file_append](#qrt_file_append) | Channel functions | 1866 |
+| [qrt_file_init](#qrt_file_init) | Channel functions | 1902 |
+| [qrt_file_parse](#qrt_file_parse) | Channel functions | 1940 |
+| [qrt_file_read](#qrt_file_read) | Channel functions | 1988 |
+| [qrt_file_read_raw](#qrt_file_read_raw) | Channel functions | 2085 |
+| [qrt_read_cache_init](#qrt_read_cache_init) | Channel functions | 2122 |
+| [quantize_delays](#quantize_delays) | Channel functions | 2161 |
+| [get_channels_ieee_indoor](#get_channels_ieee_indoor) | Channel generation functions | 2223 |
+| [get_channels_irs](#get_channels_irs) | Channel generation functions | 2304 |
+| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 2398 |
+| [get_channels_planar](#get_channels_planar) | Channel generation functions | 2466 |
+| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 2534 |
+| [acdf](#acdf) | Channel statistics | 2610 |
+| [calc_angular_spreads_sphere](#calc_angular_spreads_sphere) | Channel statistics | 2645 |
+| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 2687 |
+| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 2739 |
+| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 2772 |
+| [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | 2807 |
+| [fast_acos](#fast_acos) | Math functions | 2840 |
+| [fast_asin](#fast_asin) | Math functions | 2859 |
+| [fast_atan2](#fast_atan2) | Math functions | 2878 |
+| [fast_cart2geo](#fast_cart2geo) | Math functions | 2899 |
+| [fast_geo2cart](#fast_geo2cart) | Math functions | 2932 |
+| [fast_sincos](#fast_sincos) | Math functions | 2977 |
+| [fast_slerp](#fast_slerp) | Math functions | 2998 |
+| [interp_2D](#interp_2d) | Math functions | 3033 |
+| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 3097 |
+| [colormap](#colormap) | Site-specific simulation tools | 3155 |
+| [combine_irs_coord](#combine_irs_coord) | Site-specific simulation tools | 3174 |
+| [coord2path](#coord2path) | Site-specific simulation tools | 3217 |
+| [cube](#cube) | Site-specific simulation tools | 3255 |
+| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 3288 |
+| [icosphere](#icosphere) | Site-specific simulation tools | 3332 |
+| [interface_gain](#interface_gain) | Site-specific simulation tools | 3366 |
+| [medium_gain](#medium_gain) | Site-specific simulation tools | 3402 |
+| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 3439 |
+| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 3481 |
+| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 3548 |
+| [obj_overlap_test](#obj_overlap_test) | Site-specific simulation tools | 3609 |
+| [path_to_tube](#path_to_tube) | Site-specific simulation tools | 3640 |
+| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 3668 |
+| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 3697 |
+| [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 3736 |
+| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 3772 |
+| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 3808 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 3926 |
+| [ray_state_update](#ray_state_update) | Site-specific simulation tools | 3969 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 4093 |
+| [refractive_index](#refractive_index) | Site-specific simulation tools | 4141 |
+| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 4173 |
+| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 4217 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 4247 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 4275 |
+| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 4316 |
+| [write_png](#write_png) | Site-specific simulation tools | 4351 |
+| [xpr_update](#xpr_update) | Site-specific simulation tools | 4377 |
 
 ---
 
@@ -1777,17 +1780,18 @@ Class for storing and managing a single propagation path with a compact fixed-si
 | Interactions  | `(nSEG - 3) / 4`  | Overflow type codes past the first 6, packed 4 per float, present for `nSEG >= 7` |
 
 ### Simple member functions:
-| Method            | Description                                                       |
-| ----------------- | ----------------------------------------------------------------- |
-| `.n_freq()`       | Returns the number of frequencies (1-127)                         |
-| `.n_seg()`        | Returns the number of segments                                    |
-| `.is_scalar()`    | Returns true for SCALAR layout, false for EM                      |
-| `.init()`         | (Re)initializes storage to a given segment / frequency layout     |
-| `.free()`         | Releases the data buffer and resets to the valid empty state      |
-| `.coord()`        | Returns a pointer to a segment's `[x, y, z]` coordinates          |
-| `.xpr_coeff()`    | Returns a pointer to a frequency's transfer coefficients          |
-| `.operator()`     | Returns a last-segment coordinate by index (0=x, 1=y, 2=z)        |
-| `.interaction_type_codes()` | Returns the full interaction type sequence as a vector  |
+| Method            | Description                                                                     |
+| ----------------- | ------------------------------------------------------------------------------- |
+| `.n_freq()`       | Returns the number of frequencies (1-127)                                       |
+| `.n_seg()`        | Returns the number of segments                                                  |
+| `.is_scalar()`    | Returns true for SCALAR layout, false for EM                                    |
+| `.init()`         | (Re)initializes storage to a given segment / frequency layout                   |
+| `.free()`         | Releases the data buffer and resets to the valid empty state                    |
+| `.coord()`        | Returns a pointer to a segment's `[x, y, z]` coordinates                        |
+| `.xpr_coeff()`    | Returns a pointer to a frequency's transfer coefficients                        |
+| `.operator()`     | Returns a last-segment coordinate by index (0=x, 1=y, 2=z)                      |
+| `.interaction_type_codes()` | Returns the full interaction type sequence as a vector                |
+| `.set_interaction_type_codes()` | Sets the interaction type sequence; requires one code per segment |
 
 ### Function 'calc_length':
 Calculates the total length of the path
@@ -1859,6 +1863,80 @@ float extend(path &target, float x, float y, float z, uint8_t type = 0) const;
 - **`type`** — Interaction type code for the new segment; drives the reflection / transmission counters
 
 ---
+## qrt_file_append
+Append one transmitter's path data to an existing QRT file
+
+- Writes the path data for a single TX into the next free slot reserved by [qrt_file_init](#qrt_file_init), and records the TX name, position, and orientation.
+- Paths are grouped by their CIR index (`path::iC`) and stored per CIR as: interaction counts, polarization coefficients, interaction coordinates, and interaction type codes.
+- Validates every path before writing: `iC` must be within the file's CIR count, and each path's frequency count and layout mode (EM/scalar) must match the file exactly.
+- Throws when all TX slots are already filled — the file holds at most the `no_orig` slots reserved at init.
+- Only v5/6 files can be appended to. Positional data is converted to `float` on write.
+- Returns the total number of paths written.
+
+### Declaration:
+```
+template <typename dtype>
+size_t quadriga_lib::qrt_file_append(
+    const std::string &fn,
+    const std::vector<quadriga_lib::path> &path_data,
+    const arma::Col<dtype> &orig_pos,
+    const arma::Col<dtype> &orig_orientation = {0.0, 0.0, 0.0},
+    const std::string &orig_name = "TX");
+```
+
+### Inputs:
+- **`fn`** — Path to an existing QRT file created by [qrt_file_init](#qrt_file_init)
+- **`path_data`** — Paths to write; each carries its CIR index in `iC` and must match the file's frequency count and layout mode
+- **`orig_pos`** — Transmitter position; `[3]`
+- **`orig_orientation`** — Transmitter orientation (bank, tilt, head) in rad; `[3]`
+- **`orig_name`** — Transmitter name; at most 255 characters
+
+### Returns:
+- Number of paths written across all CIRs.
+
+### See also:
+- [qrt_file_init](#qrt_file_init) (create the file and reserve TX slots)
+- [qrt_file_read](#qrt_file_read) (read the appended data back)
+
+---
+## qrt_file_init
+Create a new QRT file and write its metadata header
+
+- Writes a v5 (EM) or v6 (scalar) header: frequencies, CIR positions/orientations, RX (MT) metadata, and a reserved BS (TX) region.
+- Writes no path data. The BS position/orientation rows and the BS index table are reserved as zeros; each [qrt_file_append](#qrt_file_append) call fills the next free slot.
+- CIR orientation is stored compressed: only the angle columns that carry a nonzero value are written, encoded in a per-file format byte.
+- `no_orig` fixes the number of TX slots; the file can hold at most that many appended TX blocks.
+- Positional data is converted to `float` on write regardless of `dtype`.
+
+### Declaration:
+```
+template <typename dtype>
+void quadriga_lib::qrt_file_init(
+    const std::string &fn,
+    const arma::Col<dtype> &freq,
+    const arma::Mat<dtype> &cir_pos,
+    const arma::Mat<dtype> &cir_orientation,
+    const std::vector<std::string> &dest_names = {"RX"},
+    const arma::u32_vec &cir_offset = {0},
+    unsigned no_orig = 1,
+    bool scalar_mode = false);
+```
+
+### Inputs:
+- **`fn`** — Path to the QRT file to create (truncated if it exists)
+- **`freq`** — Frequencies in GHz (EM) or Hz (scalar); `[n_freq]`, 1 to 127 entries
+- **`cir_pos`** — CIR positions in Cartesian coordinates; `[no_cir, 3]`
+- **`cir_orientation`** — CIR orientations as Euler angles (bank, tilt, head); `[no_cir, 3]` or empty for none
+- **`dest_names`** — Receiver (MT) names; `[no_dest]`
+- **`cir_offset`** — CIR offset for each receiver, 0-based; `[no_dest]`, must equal `dest_names` in length
+- **`no_orig`** — Number of origin (TX) slots to reserve; at least 1
+- **`scalar_mode`** — `true` writes a v6 scalar-layout file, `false` a v5 EM file
+
+### See also:
+- [qrt_file_append](#qrt_file_append) (write one TX block into a reserved slot)
+- [qrt_file_read](#qrt_file_read) (read CIR data back)
+
+---
 ## qrt_file_parse
 Read metadata from a QRT file
 
@@ -1915,6 +1993,8 @@ Read ray-tracing CIR data from a QRT file
 - If `downlink = true`, origin is TX and destination is RX; if `false`, roles are swapped.
 - For tight-loop performance, pass a pre-opened `std::ifstream` and a [qrt_read_cache_init](#qrt_read_cache_init)-populated cache; reduces per-call I/O to 2 seeks and 4 reads.
 - `fn` is ignored when both `file` and `cache` are provided.
+- Reading a TX slot that was reserved by [qrt_file_init](#qrt_file_init) but not yet written by [qrt_file_append](#qrt_file_append) returns
+  empty path outputs with zeroed positions, rather than throwing; an out-of-range index still throws.
 
 ### Declaration:
 ```
@@ -1941,6 +2021,7 @@ void quadriga_lib::qrt_file_read(
     int normalize_M = 1,
     arma::u32_vec *no_int = nullptr,
     arma::fmat *coord = nullptr,
+    std::vector<uint8_t> *interact_type = nullptr,
     std::ifstream *file = nullptr,
     const qrt_read_cache *cache = nullptr);
 ```
@@ -1961,23 +2042,25 @@ void quadriga_lib::qrt_file_read(
 - **`cache`** *(optional)* — Pre-populated cache from [qrt_read_cache_init](#qrt_read_cache_init)
 
 ### Outputs:
-- **`center_frequency`** *(optional)* — Center frequency in Hz; `[n_freq]`
-- **`tx_pos`** *(optional)* — Transmitter position in Cartesian coordinates; `[3]`
-- **`tx_orientation`** *(optional)* — Transmitter orientation (bank, tilt, heading); `[3]`
-- **`rx_pos`** *(optional)* — Receiver position in Cartesian coordinates; `[3]`
-- **`rx_orientation`** *(optional)* — Receiver orientation (bank, tilt, heading); `[3]`
-- **`fbs_pos`** *(optional)* — First-bounce scatterer positions; `[3, n_path]`
-- **`lbs_pos`** *(optional)* — Last-bounce scatterer positions; `[3, n_path]`
-- **`path_gain`** *(optional)* — Path gain on linear scale; `[n_path, n_freq]`
-- **`path_length`** *(optional)* — Absolute path length TX to RX phase center; `[n_path]`
-- **`M`** *(optional)* — Polarization transfer matrix; `[8, n_path, n_freq]` or `[2, n_path, n_freq]` for v6 files
-- **`aod`** *(optional)* — Departure azimuth angles; `[n_path]`
-- **`eod`** *(optional)* — Departure elevation angles; `[n_path]`
-- **`aoa`** *(optional)* — Arrival azimuth angles; `[n_path]`
-- **`eoa`** *(optional)* — Arrival elevation angles; `[n_path]`
-- **`path_coord`** *(optional)* — Interaction coordinates per path; vector of length `n_path`, each `[3, n_interact + 2]`
-- **`no_int`** *(optional)* — Number of mesh interactions per path; 0 indicates LOS; `[n_path]`
-- **`coord`** *(optional)* — Interaction coordinates; `[3, sum(no_int)]`
+- **`center_frequency`** — Center frequency in Hz; `[n_freq]`
+- **`tx_pos`** — Transmitter position in Cartesian coordinates; `[3]`
+- **`tx_orientation`** — Transmitter orientation (bank, tilt, heading); `[3]`
+- **`rx_pos`** — Receiver position in Cartesian coordinates; `[3]`
+- **`rx_orientation`** — Receiver orientation (bank, tilt, heading); `[3]`
+- **`fbs_pos`** — First-bounce scatterer positions; `[3, n_path]`
+- **`lbs_pos`** — Last-bounce scatterer positions; `[3, n_path]`
+- **`path_gain`** — Path gain on linear scale; `[n_path, n_freq]`
+- **`path_length`** — Absolute path length TX to RX phase center; `[n_path]`
+- **`M`** — Polarization transfer matrix; `[8, n_path, n_freq]` or `[2, n_path, n_freq]` for v6 files
+- **`aod`** — Departure azimuth angles; `[n_path]`
+- **`eod`** — Departure elevation angles; `[n_path]`
+- **`aoa`** — Arrival azimuth angles; `[n_path]`
+- **`eoa`** — Arrival elevation angles; `[n_path]`
+- **`path_coord`** — Interaction coordinates per path; vector of length `n_path`, each `[3, n_interact + 2]`
+- **`no_int`** — Number of mesh interactions per path; 0 indicates LOS; `[n_path]`
+- **`coord`** — Interaction coordinates; `[3, sum(no_int)]`
+- **`interact_type`** — Interaction type codes, concatenated per path and segmented by `no_int`; `[sum(no_int)]`.
+  Empty for v4 legacy files.
 
 ### Example:
 ```
@@ -1999,6 +2082,43 @@ for (arma::uword ic = 0; ic < cache.no_cir; ++ic)
 - [qrt_file_parse](#qrt_file_parse) (extract file metadata without reading CIR data)
 
 ---
+## qrt_file_read_raw
+Read raw ray-tracing path data from a QRT file into path objects
+
+- Reassembles the stored path data for a single origin (TX) into a vector of [path](#path) objects — the inverse of [qrt_file_append](#qrt_file_append).
+- Unlike [qrt_file_read](#qrt_file_read), which returns processed CIR data (channel matrices, angles, path loss), this returns the raw per-path storage:
+  coordinates, polarization coefficients, and interaction type codes.
+- Each returned path has `iC` set to its CIR index and `iR` to a running index within the origin. Counters not stored in the file
+  (`nREF`, `nTRA`, `nSUB`, `nSCT`) and `length` are left at their defaults.
+- Only v05/v06 files can be read as raw paths; v4 legacy files are rejected.
+- An origin slot that was reserved by [qrt_file_init](#qrt_file_init) but never written by [qrt_file_append](#qrt_file_append) returns an empty vector.
+- For tight loops over many origins, pass a pre-opened `std::ifstream` and a [qrt_read_cache_init](#qrt_read_cache_init)-populated cache to avoid
+  re-parsing the header on each call.
+
+### Declaration:
+```
+std::vector<quadriga_lib::path> quadriga_lib::qrt_file_read_raw(
+    const std::string &fn,
+    arma::uword i_orig = 0,
+    std::ifstream *file = nullptr,
+    const qrt_read_cache *cache = nullptr);
+```
+
+### Inputs:
+- **`fn`** — Path to the QRT file; ignored when both `file` and `cache` are supplied
+- **`i_orig`** — Origin index to read (for downlink, origin = TX); must be less than `no_orig`
+- **`file`** *(optional)* — Pre-opened binary `std::ifstream`; pass `nullptr` to let the function open/close the file internally
+- **`cache`** *(optional)* — Pre-parsed metadata from [qrt_read_cache_init](#qrt_read_cache_init); pass `nullptr` to parse the header on this call
+
+### Returns:
+- Vector of [path](#path) objects for the requested origin, one per stored path across all CIRs; empty if the origin slot is unwritten.
+
+### See also:
+- [qrt_file_append](#qrt_file_append) (write path data — the inverse operation)
+- [qrt_read_cache_init](#qrt_read_cache_init) (populate cache for fast repeated reads)
+- [qrt_file_read](#qrt_file_read) (read processed CIR data instead of raw paths)
+
+---
 ## qrt_read_cache_init
 Initialize a QRT read cache for fast repeated access
 
@@ -2006,6 +2126,8 @@ Initialize a QRT read cache for fast repeated access
 - Pre-computes byte offsets so subsequent [qrt_file_read](#qrt_file_read) calls need only 2 seeks and 4 reads instead of re-parsing the header.
 - Populate once, then pass the cache and a shared `std::ifstream` to [qrt_file_read](#qrt_file_read) for tight-loop performance.
 - If `file` is `nullptr`, the file is opened internally and closed on return; if provided, the stream is left open.
+- For a TX slot reserved by [qrt_file_init](#qrt_file_init) but not yet written, `orig_index` and `path_data_offset`
+  are `0`; [qrt_file_read](#qrt_file_read) treats that as an empty (unwritten) origin.
 
 ### Declaration:
 ```
@@ -2020,20 +2142,20 @@ quadriga_lib::qrt_read_cache quadriga_lib::qrt_read_cache_init(
 
 ### Returns:
 - Populated `quadriga_lib::qrt_read_cache` struct with the following members:
-  | Member             | Type         | Description                                                      |
-  | ------------------ | ------------ | ---------------------------------------------------------------- |
-  | `version`          | `int`        | QRT file version                                                 |
-  | `no_orig`          | `unsigned`   | Number of origin (TX) positions                                  |
-  | `no_cir`           | `unsigned`   | Number of CIRs per origin                                        |
-  | `no_dest`          | `unsigned`   | Number of destinations (RX)                                      |
-  | `no_freq`          | `unsigned`   | Number of frequency bands                                        |
-  | `freq`             | `arma::fvec` | Frequency in GHz; `[no_freq]`                                    |
-  | `cir_pos`          | `arma::fmat` | CIR positions; `[no_cir, 3]`                                     |
-  | `cir_orientation`  | `arma::fmat` | CIR orientations (Euler); `[no_cir, 3]`                          |
-  | `orig_pos_all`     | `arma::fmat` | Origin positions; `[no_orig, 3]`                                 |
-  | `orig_orientation` | `arma::fmat` | Origin orientations (Euler); `[no_orig, 3]`                      |
-  | `orig_index`       | `arma::uvec` | Byte offsets from BOF to each origin data block; `[no_orig]`     |
-  | `path_data_offset` | `arma::uvec` | Absolute offset to path_data_index array per origin; `[no_orig]` |
+  | Member             | Type         | Description                                                                                     |
+  | ------------------ | ------------ | ----------------------------------------------------------------------------------------------- |
+  | `version`          | `int`        | QRT file version                                                                                |
+  | `no_orig`          | `unsigned`   | Number of origin (TX) positions                                                                 |
+  | `no_cir`           | `unsigned`   | Number of CIRs per origin                                                                       |
+  | `no_dest`          | `unsigned`   | Number of destinations (RX)                                                                     |
+  | `no_freq`          | `unsigned`   | Number of frequency bands                                                                       |
+  | `freq`             | `arma::fvec` | Frequency in GHz; `[no_freq]`                                                                   |
+  | `cir_pos`          | `arma::fmat` | CIR positions; `[no_cir, 3]`                                                                    |
+  | `cir_orientation`  | `arma::fmat` | CIR orientations (Euler); `[no_cir, 3]`                                                         |
+  | `orig_pos_all`     | `arma::fmat` | Origin positions; `[no_orig, 3]`                                                                |
+  | `orig_orientation` | `arma::fmat` | Origin orientations (Euler); `[no_orig, 3]`                                                     |
+  | `orig_index`       | `arma::uvec` | Byte offsets from BOF to each origin data block; `[no_orig]`                                    |
+  | `path_data_offset` | `arma::uvec` | Absolute offset to path_data_index array per origin; 0 if the TX slot is unwritten; `[no_orig]` |
 
 ---
 ## quantize_delays

@@ -1452,8 +1452,8 @@ Read ray-tracing CIR data from a QRT file
 
 <b>Usage:</b><br>
 <pre>
-center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, M, aod, eod, \
-    aoa, eoa, path_coord, no_int, coord = quadriga_lib.channel.qrt_file_read( fn, cir, orig, downlink, normalize_M )
+center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, M, aod, eod, aoa, eoa, \
+    path_coord, no_int, coord, interact_type = quadriga_lib.channel.qrt_file_read( fn, cir, orig, downlink, normalize_M )
 </pre>
 
 <b>Inputs:</b><br>
@@ -1507,6 +1507,7 @@ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, p
 <li><b><code>path_coord</code></b> — Interaction coordinates per path; list of length <code>n_out</code>; each entry is a list of length <code>n_path</code> with arrays <code>(3, n_interact + 2)</code></li>
 <li><b><code>no_int</code></b> — Number of mesh interactions per path (0 indicates LOS); list of length <code>n_out</code>; entries <code>(n_path,)</code></li>
 <li><b><code>coord</code></b> — Interaction coordinates concatenated across paths; list of length <code>n_out</code>; entries <code>(3, sum(no_int))</code></li>
+<li><b><code>interact_type</code></b> — Interaction type codes concatenated across paths (matching <code>coord</code>); list of length <code>n_out</code>; entries <code>(sum(no_int),)</code>. Empty for v4 legacy files.</li>
 </ul>
 
 <b>See also:</b><br>

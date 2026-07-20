@@ -92,7 +92,7 @@ class test_case(unittest.TestCase):
         # --- downlink, first link: i_cir=0, i_orig=0 ---
         (center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation,
          fbs_pos, lbs_pos, path_gain, path_length, M,
-         aod, eod, aoa, eoa, path_coord, no_int, coord) = \
+         aod, eod, aoa, eoa, path_coord, no_int, coord, interact_type) = \
             channel.qrt_file_read(FN_V4, [0], 0, True, 1)
 
         # qrt_file_read returns center_freq in Hz
@@ -113,7 +113,7 @@ class test_case(unittest.TestCase):
         # --- downlink, second link: i_cir=1, i_orig=1 ---
         (center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation,
          fbs_dl, lbs_dl, path_gain, path_length, M,
-         aod, eod, aoa_dl, eoa_dl, path_coord, no_int, coord) = \
+         aod, eod, aoa_dl, eoa_dl, path_coord, no_int, coord, interact_type) = \
             channel.qrt_file_read(FN_V4, [1], 1, True, 1)
 
         npt.assert_allclose(tx_pos[:, 0], [-2.67888, 60.257, 2.0], atol=1.5e-4, rtol=0)
@@ -124,7 +124,7 @@ class test_case(unittest.TestCase):
         # --- uplink: i_cir=1, i_orig=1, downlink=False ---
         (center_freq, tx_pos_ul, tx_ori_ul, rx_pos_ul, rx_ori_ul,
          fbs_ul, lbs_ul, path_gain, path_length, M,
-         aod_ul, eod_ul, aoa, eoa, path_coord, no_int, coord) = \
+         aod_ul, eod_ul, aoa, eoa, path_coord, no_int, coord, interact_type) = \
             channel.qrt_file_read(FN_V4, [1], 1, False, 1)
 
         # TX / RX swap between downlink and uplink
@@ -148,7 +148,7 @@ class test_case(unittest.TestCase):
         # normalize_M = 0: M and path_gain as stored in the QRT file
         (center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation,
          fbs_pos, lbs_pos, path_gain, path_length, M,
-         aod, eod, aoa, eoa, path_coord, no_int, coord) = \
+         aod, eod, aoa, eoa, path_coord, no_int, coord, interact_type) = \
             channel.qrt_file_read(FN_V5, [1], 0, True, 0)
 
         self.assertEqual(len(center_freq), 2)
@@ -174,7 +174,7 @@ class test_case(unittest.TestCase):
     def test_read_multi_cir(self):
         (center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation,
          fbs_pos, lbs_pos, path_gain, path_length, M,
-         aod, eod, aoa, eoa, path_coord, no_int, coord) = \
+         aod, eod, aoa, eoa, path_coord, no_int, coord, interact_type) = \
             channel.qrt_file_read(FN_V4, [0, 1, 2], 0, True, 1)
 
         # Scalar-per-snapshot outputs: (3, n_out) matrices
@@ -216,6 +216,11 @@ class test_case(unittest.TestCase):
         npt.assert_allclose(M[1], r1[9][0], atol=1e-6, rtol=0)
         npt.assert_allclose(aod[0], r0[10][0], atol=1e-6, rtol=0)
         npt.assert_allclose(aod[1], r1[10][0], atol=1e-6, rtol=0)
+
+        # v4 files store no interaction-type codes: entries are present but empty
+        self.assertEqual(len(interact_type), 3)
+        for i in range(3):
+            self.assertEqual(len(interact_type[i]), 0)
 
     # ------------------------------------------------------------------
     # qrt_file_read - default arguments

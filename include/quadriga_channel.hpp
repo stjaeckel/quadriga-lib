@@ -177,8 +177,9 @@ namespace quadriga_lib
         // - Must be called before xpr_update/gain to use the correct path length in gain calculation
         float extend(path &target, float x, float y, float z, uint8_t type = 0) const;
 
-        // Get the interaction type sequence
+        // Get/set the interaction type sequence
         std::vector<uint8_t> interaction_type_codes() const;
+        void set_interaction_type_codes(const std::vector<uint8_t> &codes);
 
         // Comparison operators compare by iR index
         friend bool operator<(const path &p1, const path &p2) { return p1.iR < p2.iR; }
@@ -397,6 +398,25 @@ namespace quadriga_lib
     qrt_read_cache qrt_read_cache_init(const std::string &fn,          // Path to the QRT file
                                        std::ifstream *file = nullptr); // Optional pre-opened ifstream
 
+    // Initialize new QRT file and write metadata
+    template <typename dtype>
+    void qrt_file_init(const std::string &fn,                               // Path to the QRT file
+                       const arma::Col<dtype> &freq,                        // List of frequencies in GHz (EM) or Hz (scalar), length [ n_freq ]
+                       const arma::Mat<dtype> &cir_pos,                     // CIR positions; [ n_cir, 3 ]
+                       const arma::Mat<dtype> &cir_orientation,             // CIR orientations; [ n_cir, 3 ]
+                       const std::vector<std::string> &dest_names = {"RX"}, // Receiver names; length [ n_rx ]
+                       const arma::u32_vec &cir_offset = {0},               // CIR offset for each receiver; length [ n_rx ]
+                       unsigned no_orig = 1,                                // Number transmitters
+                       bool scalar_mode = false);                           // Flag for scalar layout
+
+    // Append new TX path data to exisiting QRT file, throws when storage capacity is reached
+    template <typename dtype>
+    size_t qrt_file_append(const std::string &fn,                                      // Path to the QRT file
+                           const std::vector<quadriga_lib::path> &path_data,           // Path data
+                           const arma::Col<dtype> &orig_pos,                           // Transmitter position, Size [3, 1]
+                           const arma::Col<dtype> &orig_orientation = {0.0, 0.0, 0.0}, // Transmitter orientation (bank, tilt, head) in [rad], Size [3, 1]
+                           const std::string &orig_name = "TX");                       // Transmitter name
+
     // Read metadata from a QRT file
     void qrt_file_parse(const std::string &fn,                          // Path to the QRT file
                         arma::uword *no_cir = nullptr,                  // Number of channel snapshots per origin point
@@ -441,8 +461,16 @@ namespace quadriga_lib
                        int normalize_M = 1,                                 // Normalize M options
                        arma::u32_vec *no_int = nullptr,                     // Number of mesh interactions per path of current RX, vector of length [no_path], 0=LOS
                        arma::fmat *coord = nullptr,                         // Interaction coordinates, size [3, sum(no_int)]
+                       std::vector<uint8_t> *interact_type = nullptr,       // Interaction type codes, length [ sum(no_int) ]
                        std::ifstream *file = nullptr,                       // Optional pre-opened ifstream; if nullptr the file is opened from fn and closed on return
                        const qrt_read_cache *cache = nullptr);              // Optional pre-parsed metadata cache for maximum performance in tight loops
+
+    // Read raw ray-tracing data from QRT file
+    std::vector<quadriga_lib::path> qrt_file_read_raw(const std::string &fn,                  // Path to the QRT file
+                                                      arma::uword i_orig = 0,                 // Origin index (for downlink Origin = TX)
+                                                      std::ifstream *file = nullptr,          // Optional pre-opened ifstream; if nullptr the file is opened from fn and closed on return
+                                                      const qrt_read_cache *cache = nullptr); // Optional pre-parsed metadata cache for maximum performance in tight loops
+
 }
 
 #endif

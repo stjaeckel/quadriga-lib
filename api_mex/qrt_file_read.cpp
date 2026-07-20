@@ -21,7 +21,7 @@ Read ray-tracing CIR data from a QRT file
 ## Usage:
 ```
 [ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, ...
-    path_length, M, aod, eod, aoa, eoa, path_coord, no_int, coord ] = ...
+    path_length, M, aod, eod, aoa, eoa, path_coord, no_int, coord, interact_type ] = ...
     quadriga_lib.qrt_file_read( fn, i_cir, i_orig, downlink, normalize_M );
 ```
 
@@ -60,6 +60,8 @@ Read ray-tracing CIR data from a QRT file
   Cell of length `n_out`; elements `[n_path]`
 - **`coord`** — Interaction coordinates (flat, concatenated across paths); single;
   Cell of length `n_out`; elements `[3, sum(no_int)]`
+- **`interact_type`** — Interaction type codes (flat, concatenated across paths, matching `coord`); uint32;
+  Cell of length `n_out`; elements `[sum(no_int)]`. Empty for v4 legacy files.
 
 ## See also:
 - [[arrayant_generate]] (for generating antenna arrays)
@@ -73,7 +75,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Validate argument counts
     if (nrhs < 1 || nrhs > 5)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
-    if (nlhs > 17)
+    if (nlhs > 18)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read inputs
@@ -171,6 +173,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 16)
         plhs[16] = mxCreateCellMatrix(no_out, 1);
 
+    if (nlhs > 17)
+        plhs[17] = mxCreateCellMatrix(no_out, 1);
+
     // Temporary read buffers
     arma::vec tx_pos_buff, tx_orientation_buff, rx_pos_buff, rx_orientation_buff;
     arma::mat fbs_pos, lbs_pos, path_gain;
@@ -179,6 +184,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     std::vector<arma::mat> path_coord;
     arma::u32_vec no_int;
     arma::fmat coord;
+    std::vector<uint8_t> interact_type;
 
     // Wrap optional output pointers based on nlhs
     arma::vec *p_tx_pos = (nlhs > 1) ? &tx_pos_buff : nullptr;
@@ -197,6 +203,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     std::vector<arma::mat> *p_path_coord = (nlhs > 14) ? &path_coord : nullptr;
     arma::u32_vec *p_no_int = (nlhs > 15) ? &no_int : nullptr;
     arma::fmat *p_coord = (nlhs > 16) ? &coord : nullptr;
+    std::vector<uint8_t> *p_interact_type = (nlhs > 17) ? &interact_type : nullptr;
 
     // Iterate over all CIRs
     for (arma::uword i_out = 0; i_out < no_out; ++i_out)
@@ -207,8 +214,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                                                     p_fbs_pos, p_lbs_pos, p_path_gain, p_path_length, p_M,
                                                     p_aod, p_eod, p_aoa, p_eoa,
                                                     p_path_coord, normalize_M,
-                                                    p_no_int, p_coord, &stream, &cache));
-
+                                                    p_no_int, p_coord, p_interact_type, &stream, &cache));
         // Copy to MATLAB
         if (nlhs > 1)
             tx_pos.col(i_out) = tx_pos_buff;
@@ -249,6 +255,14 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             mxSetCell(plhs[15], i_out, qd_mex_copy2matlab(&no_int));
         if (nlhs > 16)
             mxSetCell(plhs[16], i_out, qd_mex_copy2matlab(&coord));
+        if (nlhs > 17)
+        {
+            const mwSize n_it = (mwSize)interact_type.size();
+            mxArray *it_out = mxCreateNumericMatrix(n_it, 1, mxUINT8_CLASS, mxREAL);
+            if (n_it != 0)
+                std::memcpy(mxGetData(it_out), interact_type.data(), n_it * sizeof(uint8_t));
+            mxSetCell(plhs[17], i_out, it_out);
+        }
     }
 
     // Close stream

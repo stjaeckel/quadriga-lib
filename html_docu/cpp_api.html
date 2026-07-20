@@ -153,8 +153,11 @@
   <tr><td><a href="#hdf5_write">hdf5_write</a></td><td>Write a channel object to an HDF5 file at a specified 4D index</td></tr>
   <tr><td><a href="#hdf5_write_dset">hdf5_write_dset</a></td><td>Write a single unstructured dataset to an HDF5 file at a specified 4D index</td></tr>
   <tr><td><a href="#path">path</a></td><td>Class for storing and managing a single propagation path with a compact fixed-size header</td></tr>
+  <tr><td><a href="#qrt_file_append">qrt_file_append</a></td><td>Append one transmitter's path data to an existing QRT file</td></tr>
+  <tr><td><a href="#qrt_file_init">qrt_file_init</a></td><td>Create a new QRT file and write its metadata header</td></tr>
   <tr><td><a href="#qrt_file_parse">qrt_file_parse</a></td><td>Read metadata from a QRT file</td></tr>
   <tr><td><a href="#qrt_file_read">qrt_file_read</a></td><td>Read ray-tracing CIR data from a QRT file</td></tr>
+  <tr><td><a href="#qrt_file_read_raw">qrt_file_read_raw</a></td><td>Read raw ray-tracing path data from a QRT file into path objects</td></tr>
   <tr><td><a href="#qrt_read_cache_init">qrt_read_cache_init</a></td><td>Initialize a QRT read cache for fast repeated access</td></tr>
   <tr><td><a href="#quantize_delays">quantize_delays</a></td><td>Map path delays to a fixed tap grid using two-tap power-weighted interpolation</td></tr>
 </tbody></table><br>
@@ -2692,6 +2695,10 @@ Class for storing and managing a single propagation path with a compact fixed-si
   <td><code>.interaction_type_codes()</code></td>
   <td>Returns the full interaction type sequence as a vector</td>
 </tr>
+<tr>
+  <td><code>.set_interaction_type_codes()</code></td>
+  <td>Sets the interaction type sequence; requires one code per segment</td>
+</tr>
 </table>
 
 <b>Function 'calc_length':</b><br>
@@ -2782,6 +2789,94 @@ float extend(path &amp;target, float x, float y, float z, uint8_t type = 0) cons
 </ul>
 
 <hr class="greyline"><br>
+<span id="qrt_file_append" class="qd-func"><b>qrt_file_append</b></span><br>
+<hr class="thin">
+Append one transmitter's path data to an existing QRT file
+<ul>
+<li>Writes the path data for a single TX into the next free slot reserved by <a href="#qrt_file_init">qrt_file_init</a>, and records the TX name, position, and orientation.</li>
+<li>Paths are grouped by their CIR index (<code>path::iC</code>) and stored per CIR as: interaction counts, polarization coefficients, interaction coordinates, and interaction type codes.</li>
+<li>Validates every path before writing: <code>iC</code> must be within the file's CIR count, and each path's frequency count and layout mode (EM/scalar) must match the file exactly.</li>
+<li>Throws when all TX slots are already filled — the file holds at most the <code>no_orig</code> slots reserved at init.</li>
+<li>Only v5/6 files can be appended to. Positional data is converted to <code>float</code> on write.</li>
+<li>Returns the total number of paths written.</li>
+</ul>
+
+<b>Declaration:</b><br>
+<pre>
+template &lt;typename dtype&gt;
+size_t quadriga_lib::qrt_file_append(
+    const std::string &amp;fn,
+    const std::vector&lt;quadriga_lib::path&gt; &amp;path_data,
+    const arma::Col&lt;dtype&gt; &amp;orig_pos,
+    const arma::Col&lt;dtype&gt; &amp;orig_orientation = {0.0, 0.0, 0.0},
+    const std::string &amp;orig_name = "TX");
+</pre>
+
+<b>Inputs:</b><br>
+<ul>
+<li><b><code>fn</code></b> — Path to an existing QRT file created by <a href="#qrt_file_init">qrt_file_init</a></li>
+<li><b><code>path_data</code></b> — Paths to write; each carries its CIR index in <code>iC</code> and must match the file's frequency count and layout mode</li>
+<li><b><code>orig_pos</code></b> — Transmitter position; <code>[3]</code></li>
+<li><b><code>orig_orientation</code></b> — Transmitter orientation (bank, tilt, head) in rad; <code>[3]</code></li>
+<li><b><code>orig_name</code></b> — Transmitter name; at most 255 characters</li>
+</ul>
+
+<b>Returns:</b><br>
+<ul>
+<li>Number of paths written across all CIRs.</li>
+</ul>
+
+<b>See also:</b><br>
+<ul>
+<li><a href="#qrt_file_init">qrt_file_init</a> (create the file and reserve TX slots)</li>
+<li><a href="#qrt_file_read">qrt_file_read</a> (read the appended data back)</li>
+</ul>
+
+<hr class="greyline"><br>
+<span id="qrt_file_init" class="qd-func"><b>qrt_file_init</b></span><br>
+<hr class="thin">
+Create a new QRT file and write its metadata header
+<ul>
+<li>Writes a v5 (EM) or v6 (scalar) header: frequencies, CIR positions/orientations, RX (MT) metadata, and a reserved BS (TX) region.</li>
+<li>Writes no path data. The BS position/orientation rows and the BS index table are reserved as zeros; each <a href="#qrt_file_append">qrt_file_append</a> call fills the next free slot.</li>
+<li>CIR orientation is stored compressed: only the angle columns that carry a nonzero value are written, encoded in a per-file format byte.</li>
+<li><code>no_orig</code> fixes the number of TX slots; the file can hold at most that many appended TX blocks.</li>
+<li>Positional data is converted to <code>float</code> on write regardless of <code>dtype</code>.</li>
+</ul>
+
+<b>Declaration:</b><br>
+<pre>
+template &lt;typename dtype&gt;
+void quadriga_lib::qrt_file_init(
+    const std::string &amp;fn,
+    const arma::Col&lt;dtype&gt; &amp;freq,
+    const arma::Mat&lt;dtype&gt; &amp;cir_pos,
+    const arma::Mat&lt;dtype&gt; &amp;cir_orientation,
+    const std::vector&lt;std::string&gt; &amp;dest_names = {"RX"},
+    const arma::u32_vec &amp;cir_offset = {0},
+    unsigned no_orig = 1,
+    bool scalar_mode = false);
+</pre>
+
+<b>Inputs:</b><br>
+<ul>
+<li><b><code>fn</code></b> — Path to the QRT file to create (truncated if it exists)</li>
+<li><b><code>freq</code></b> — Frequencies in GHz (EM) or Hz (scalar); <code>[n_freq]</code>, 1 to 127 entries</li>
+<li><b><code>cir_pos</code></b> — CIR positions in Cartesian coordinates; <code>[no_cir, 3]</code></li>
+<li><b><code>cir_orientation</code></b> — CIR orientations as Euler angles (bank, tilt, head); <code>[no_cir, 3]</code> or empty for none</li>
+<li><b><code>dest_names</code></b> — Receiver (MT) names; <code>[no_dest]</code></li>
+<li><b><code>cir_offset</code></b> — CIR offset for each receiver, 0-based; <code>[no_dest]</code>, must equal <code>dest_names</code> in length</li>
+<li><b><code>no_orig</code></b> — Number of origin (TX) slots to reserve; at least 1</li>
+<li><b><code>scalar_mode</code></b> — <code>true</code> writes a v6 scalar-layout file, <code>false</code> a v5 EM file</li>
+</ul>
+
+<b>See also:</b><br>
+<ul>
+<li><a href="#qrt_file_append">qrt_file_append</a> (write one TX block into a reserved slot)</li>
+<li><a href="#qrt_file_read">qrt_file_read</a> (read CIR data back)</li>
+</ul>
+
+<hr class="greyline"><br>
 <span id="qrt_file_parse" class="qd-func"><b>qrt_file_parse</b></span><br>
 <hr class="thin">
 Read metadata from a QRT file
@@ -2845,6 +2940,7 @@ Read ray-tracing CIR data from a QRT file
 <li>If <code>downlink = true</code>, origin is TX and destination is RX; if <code>false</code>, roles are swapped.</li>
 <li>For tight-loop performance, pass a pre-opened <code>std::ifstream</code> and a <a href="#qrt_read_cache_init">qrt_read_cache_init</a>-populated cache; reduces per-call I/O to 2 seeks and 4 reads.</li>
 <li><code>fn</code> is ignored when both <code>file</code> and <code>cache</code> are provided.</li>
+<li>Reading a TX slot that was reserved by <a href="#qrt_file_init">qrt_file_init</a> but not yet written by <a href="#qrt_file_append">qrt_file_append</a> returns empty path outputs with zeroed positions, rather than throwing; an out-of-range index still throws.</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -2872,6 +2968,7 @@ void quadriga_lib::qrt_file_read(
     int normalize_M = 1,
     arma::u32_vec *no_int = nullptr,
     arma::fmat *coord = nullptr,
+    std::vector&lt;uint8_t&gt; *interact_type = nullptr,
     std::ifstream *file = nullptr,
     const qrt_read_cache *cache = nullptr);
 </pre>
@@ -2912,23 +3009,24 @@ void quadriga_lib::qrt_file_read(
 
 <b>Outputs:</b><br>
 <ul>
-<li><b><code>center_frequency</code></b> <i>(optional)</i> — Center frequency in Hz; <code>[n_freq]</code></li>
-<li><b><code>tx_pos</code></b> <i>(optional)</i> — Transmitter position in Cartesian coordinates; <code>[3]</code></li>
-<li><b><code>tx_orientation</code></b> <i>(optional)</i> — Transmitter orientation (bank, tilt, heading); <code>[3]</code></li>
-<li><b><code>rx_pos</code></b> <i>(optional)</i> — Receiver position in Cartesian coordinates; <code>[3]</code></li>
-<li><b><code>rx_orientation</code></b> <i>(optional)</i> — Receiver orientation (bank, tilt, heading); <code>[3]</code></li>
-<li><b><code>fbs_pos</code></b> <i>(optional)</i> — First-bounce scatterer positions; <code>[3, n_path]</code></li>
-<li><b><code>lbs_pos</code></b> <i>(optional)</i> — Last-bounce scatterer positions; <code>[3, n_path]</code></li>
-<li><b><code>path_gain</code></b> <i>(optional)</i> — Path gain on linear scale; <code>[n_path, n_freq]</code></li>
-<li><b><code>path_length</code></b> <i>(optional)</i> — Absolute path length TX to RX phase center; <code>[n_path]</code></li>
-<li><b><code>M</code></b> <i>(optional)</i> — Polarization transfer matrix; <code>[8, n_path, n_freq]</code> or <code>[2, n_path, n_freq]</code> for v6 files</li>
-<li><b><code>aod</code></b> <i>(optional)</i> — Departure azimuth angles; <code>[n_path]</code></li>
-<li><b><code>eod</code></b> <i>(optional)</i> — Departure elevation angles; <code>[n_path]</code></li>
-<li><b><code>aoa</code></b> <i>(optional)</i> — Arrival azimuth angles; <code>[n_path]</code></li>
-<li><b><code>eoa</code></b> <i>(optional)</i> — Arrival elevation angles; <code>[n_path]</code></li>
-<li><b><code>path_coord</code></b> <i>(optional)</i> — Interaction coordinates per path; vector of length <code>n_path</code>, each <code>[3, n_interact + 2]</code></li>
-<li><b><code>no_int</code></b> <i>(optional)</i> — Number of mesh interactions per path; 0 indicates LOS; <code>[n_path]</code></li>
-<li><b><code>coord</code></b> <i>(optional)</i> — Interaction coordinates; <code>[3, sum(no_int)]</code></li>
+<li><b><code>center_frequency</code></b> — Center frequency in Hz; <code>[n_freq]</code></li>
+<li><b><code>tx_pos</code></b> — Transmitter position in Cartesian coordinates; <code>[3]</code></li>
+<li><b><code>tx_orientation</code></b> — Transmitter orientation (bank, tilt, heading); <code>[3]</code></li>
+<li><b><code>rx_pos</code></b> — Receiver position in Cartesian coordinates; <code>[3]</code></li>
+<li><b><code>rx_orientation</code></b> — Receiver orientation (bank, tilt, heading); <code>[3]</code></li>
+<li><b><code>fbs_pos</code></b> — First-bounce scatterer positions; <code>[3, n_path]</code></li>
+<li><b><code>lbs_pos</code></b> — Last-bounce scatterer positions; <code>[3, n_path]</code></li>
+<li><b><code>path_gain</code></b> — Path gain on linear scale; <code>[n_path, n_freq]</code></li>
+<li><b><code>path_length</code></b> — Absolute path length TX to RX phase center; <code>[n_path]</code></li>
+<li><b><code>M</code></b> — Polarization transfer matrix; <code>[8, n_path, n_freq]</code> or <code>[2, n_path, n_freq]</code> for v6 files</li>
+<li><b><code>aod</code></b> — Departure azimuth angles; <code>[n_path]</code></li>
+<li><b><code>eod</code></b> — Departure elevation angles; <code>[n_path]</code></li>
+<li><b><code>aoa</code></b> — Arrival azimuth angles; <code>[n_path]</code></li>
+<li><b><code>eoa</code></b> — Arrival elevation angles; <code>[n_path]</code></li>
+<li><b><code>path_coord</code></b> — Interaction coordinates per path; vector of length <code>n_path</code>, each <code>[3, n_interact + 2]</code></li>
+<li><b><code>no_int</code></b> — Number of mesh interactions per path; 0 indicates LOS; <code>[n_path]</code></li>
+<li><b><code>coord</code></b> — Interaction coordinates; <code>[3, sum(no_int)]</code></li>
+<li><b><code>interact_type</code></b> — Interaction type codes, concatenated per path and segmented by <code>no_int</code>; <code>[sum(no_int)]</code>. Empty for v4 legacy files.</li>
 </ul>
 
 <b>Example:</b><br>
@@ -2953,6 +3051,48 @@ for (arma::uword ic = 0; ic &lt; cache.no_cir; ++ic)
 </ul>
 
 <hr class="greyline"><br>
+<span id="qrt_file_read_raw" class="qd-func"><b>qrt_file_read_raw</b></span><br>
+<hr class="thin">
+Read raw ray-tracing path data from a QRT file into path objects
+<ul>
+<li>Reassembles the stored path data for a single origin (TX) into a vector of <a href="#path">path</a> objects — the inverse of <a href="#qrt_file_append">qrt_file_append</a>.</li>
+<li>Unlike <a href="#qrt_file_read">qrt_file_read</a>, which returns processed CIR data (channel matrices, angles, path loss), this returns the raw per-path storage: coordinates, polarization coefficients, and interaction type codes.</li>
+<li>Each returned path has <code>iC</code> set to its CIR index and <code>iR</code> to a running index within the origin. Counters not stored in the file (<code>nREF</code>, <code>nTRA</code>, <code>nSUB</code>, <code>nSCT</code>) and <code>length</code> are left at their defaults.</li>
+<li>Only v05/v06 files can be read as raw paths; v4 legacy files are rejected.</li>
+<li>An origin slot that was reserved by <a href="#qrt_file_init">qrt_file_init</a> but never written by <a href="#qrt_file_append">qrt_file_append</a> returns an empty vector.</li>
+<li>For tight loops over many origins, pass a pre-opened <code>std::ifstream</code> and a <a href="#qrt_read_cache_init">qrt_read_cache_init</a>-populated cache to avoid re-parsing the header on each call.</li>
+</ul>
+
+<b>Declaration:</b><br>
+<pre>
+std::vector&lt;quadriga_lib::path&gt; quadriga_lib::qrt_file_read_raw(
+    const std::string &amp;fn,
+    arma::uword i_orig = 0,
+    std::ifstream *file = nullptr,
+    const qrt_read_cache *cache = nullptr);
+</pre>
+
+<b>Inputs:</b><br>
+<ul>
+<li><b><code>fn</code></b> — Path to the QRT file; ignored when both <code>file</code> and <code>cache</code> are supplied</li>
+<li><b><code>i_orig</code></b> — Origin index to read (for downlink, origin = TX); must be less than <code>no_orig</code></li>
+<li><b><code>file</code></b> <i>(optional)</i> — Pre-opened binary <code>std::ifstream</code>; pass <code>nullptr</code> to let the function open/close the file internally</li>
+<li><b><code>cache</code></b> <i>(optional)</i> — Pre-parsed metadata from <a href="#qrt_read_cache_init">qrt_read_cache_init</a>; pass <code>nullptr</code> to parse the header on this call</li>
+</ul>
+
+<b>Returns:</b><br>
+<ul>
+<li>Vector of <a href="#path">path</a> objects for the requested origin, one per stored path across all CIRs; empty if the origin slot is unwritten.</li>
+</ul>
+
+<b>See also:</b><br>
+<ul>
+<li><a href="#qrt_file_append">qrt_file_append</a> (write path data — the inverse operation)</li>
+<li><a href="#qrt_read_cache_init">qrt_read_cache_init</a> (populate cache for fast repeated reads)</li>
+<li><a href="#qrt_file_read">qrt_file_read</a> (read processed CIR data instead of raw paths)</li>
+</ul>
+
+<hr class="greyline"><br>
 <span id="qrt_read_cache_init" class="qd-func"><b>qrt_read_cache_init</b></span><br>
 <hr class="thin">
 Initialize a QRT read cache for fast repeated access
@@ -2961,6 +3101,7 @@ Initialize a QRT read cache for fast repeated access
 <li>Pre-computes byte offsets so subsequent <a href="#qrt_file_read">qrt_file_read</a> calls need only 2 seeks and 4 reads instead of re-parsing the header.</li>
 <li>Populate once, then pass the cache and a shared <code>std::ifstream</code> to <a href="#qrt_file_read">qrt_file_read</a> for tight-loop performance.</li>
 <li>If <code>file</code> is <code>nullptr</code>, the file is opened internally and closed on return; if provided, the stream is left open.</li>
+<li>For a TX slot reserved by <a href="#qrt_file_init">qrt_file_init</a> but not yet written, <code>orig_index</code> and <code>path_data_offset</code> are <code>0</code>; <a href="#qrt_file_read">qrt_file_read</a> treats that as an empty (unwritten) origin.</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -3043,7 +3184,7 @@ quadriga_lib::qrt_read_cache quadriga_lib::qrt_read_cache_init(
 <tr>
   <td><code>path_data_offset</code></td>
   <td><code>arma::uvec</code></td>
-  <td>Absolute offset to path_data_index array per origin; <code>[no_orig]</code></td>
+  <td>Absolute offset to path_data_index array per origin; 0 if the TX slot is unwritten; <code>[no_orig]</code></td>
 </tr>
 </table>
 </li>
