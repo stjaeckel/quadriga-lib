@@ -88,12 +88,12 @@ Calculates the path gain (linear power) from the transfer coefficients at one fr
 - EM mode returns the maximum column power of the 2x2 Jones matrix; SCALAR mode returns the squared magnitude of the pressure coefficient
 - A degenerate coefficient set (all-zero, underflowed, or containing NaN) returns 0, flagging the path for pruning
 - With `fGHz > 0`, free-space path loss is folded in: `(lambda / (4 pi d))^2` in EM mode, `1 / d^2` (frequency-independent) in SCALAR mode
-- The distance `d` is the stored `length` by default; pass `len > 0` to override it, e.g. to match a total length from the 
+- The distance `d` is the stored `length` by default; pass `len > 0` to override it, e.g. to match a total length from the
   read-only `calc_length` before the member is updated
 ```
 float calc_gain(float fGHz = 0.0f, size_t freq = 0, float len = 0.0f) const;
 ```
-- **`fGHz`** — Frequency in GHz; `> 0` applies path loss, `0` returns polarization power only. In SCALAR mode any 
+- **`fGHz`** — Frequency in GHz; `> 0` applies path loss, `0` returns polarization power only. In SCALAR mode any
   positive value applies spherical spreading; the magnitude is ignored
 - **`freq`** — Frequency index into the coefficient store, valid range `0` to `nFRQ - 1`
 - **`len`** — Path length override in meters; `> 0` replaces the stored `length` for the path-loss term, `<= 0` uses the stored value
@@ -106,12 +106,13 @@ Left-multiplies the ray's transfer matrix by an interaction matrix, applies a po
 - The update reads all old values before writing, so `coeff_update` may alias the slot; the return value uses the same gain definition as `calc_gain`
 - Must be called after `extend` closes the path, so the stored `length` is final when path loss is requested
 ```
-float xpr_update(const float *coeff_update = nullptr, float gain_update = 1.0f, size_t freq = 0, float fGHz = 0.0f);
+float xpr_update(const float *coeff_update = nullptr, float gain_update = 1.0f, size_t freq = 0, float fGHz = 0.0f, float len = 0.0f);
 ```
 - **`coeff_update`** — Interaction matrix, length 8 (EM) or 2 (SCALAR); `nullptr` skips the multiply
 - **`gain_update`** — Power gain applied to the slot (converted to an amplitude factor internally); `1.0` skips the scaling
 - **`freq`** — Frequency index into the coefficient store, valid range `0` to `nFRQ - 1`
 - **`fGHz`** — Frequency in GHz for the returned gain; `> 0` applies path loss as in `calc_gain`, `0` returns polarization power only
+- **`len`** — Path length override in meters; `> 0` replaces the stored `length` for the path-loss term, `<= 0` uses the stored value
 
 ## Function 'duplicate';
 Copies the path into an existing target object and returns its length
@@ -407,10 +408,11 @@ float *quadriga_lib::path::xpr_coeff(size_t freq)
 
 // Left-multiply ray's Jones matrix; coeff_update must have length 8 (EM) or 2 (scalar)
 // + calculate gain from xprmat coefficients; fGHz > 0 applies FSPL
-float quadriga_lib::path::xpr_update(const float *coeff_update, float gain_update, size_t freq, float fGHz)
+float quadriga_lib::path::xpr_update(const float *coeff_update, float gain_update, size_t freq, float fGHz, float len)
 {
     float *oX = xpr_coeff(freq); // Bounds-checked; resolves to xprmat or into the data buffer
     float amplitude_update = gain_update == 1.0f ? 1.0f : std::sqrt(std::abs(gain_update));
+    float d = len > 0.0f ? len : length;
 
     if (is_scalar()) // 2 values: [Re, Im]
     {
@@ -426,7 +428,7 @@ float quadriga_lib::path::xpr_update(const float *coeff_update, float gain_updat
 
         oRe *= amplitude_update, oIm *= amplitude_update;
         oX[0] = oRe, oX[1] = oIm;
-        return gain_from_coeff(oRe, oIm, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, true, length, fGHz);
+        return gain_from_coeff(oRe, oIm, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, true, d, fGHz);
     }
 
     // EM mode, 8 values: [ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH], column-major
@@ -460,7 +462,8 @@ float quadriga_lib::path::xpr_update(const float *coeff_update, float gain_updat
 
     oX[0] = oReVV, oX[1] = oImVV, oX[2] = oReHV, oX[3] = oImHV;
     oX[4] = oReVH, oX[5] = oImVH, oX[6] = oReHH, oX[7] = oImHH;
-    return gain_from_coeff(oReVV, oImVV, oReHV, oImHV, oReVH, oImVH, oReHH, oImHH, false, length, fGHz);
+
+    return gain_from_coeff(oReVV, oImVV, oReHV, oImHV, oReVH, oImVH, oReHH, oImHH, false, d, fGHz);
 }
 
 // Calculate gain from xprmat coefficients; fGHz > 0 applies FSPL; len > 0 overrides stored length

@@ -165,7 +165,7 @@ namespace quadriga_lib
 
         // Left-multiply ray's Jones matrix; coeff_update must have length 8 (EM) or 2 (scalar)
         // + calculate gain from xprmat coefficients; fGHz > 0 applies FSPL
-        float xpr_update(const float *coeff_update = nullptr, float gain_update = 1.0f, size_t freq = 0, float fGHz = 0.0f);
+        float xpr_update(const float *coeff_update = nullptr, float gain_update = 1.0f, size_t freq = 0, float fGHz = 0.0f, float len = 0.0f);
 
         // Calculate gain from xprmat coefficients; fGHz > 0 applies FSPL
         float calc_gain(float fGHz = 0.0f, size_t freq = 0, float len = 0.0f) const;

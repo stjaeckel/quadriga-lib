@@ -2747,13 +2747,14 @@ Left-multiplies the ray's transfer matrix by an interaction matrix, applies a po
 <li>Must be called after <code>extend</code> closes the path, so the stored <code>length</code> is final when path loss is requested</li>
 </ul>
 <pre>
-float xpr_update(const float *coeff_update = nullptr, float gain_update = 1.0f, size_t freq = 0, float fGHz = 0.0f);
+float xpr_update(const float *coeff_update = nullptr, float gain_update = 1.0f, size_t freq = 0, float fGHz = 0.0f, float len = 0.0f);
 </pre>
 <ul>
 <li><b><code>coeff_update</code></b> — Interaction matrix, length 8 (EM) or 2 (SCALAR); <code>nullptr</code> skips the multiply</li>
 <li><b><code>gain_update</code></b> — Power gain applied to the slot (converted to an amplitude factor internally); <code>1.0</code> skips the scaling</li>
 <li><b><code>freq</code></b> — Frequency index into the coefficient store, valid range <code>0</code> to <code>nFRQ - 1</code></li>
 <li><b><code>fGHz</code></b> — Frequency in GHz for the returned gain; <code>&gt; 0</code> applies path loss as in <code>calc_gain</code>, <code>0</code> returns polarization power only</li>
+<li><b><code>len</code></b> — Path length override in meters; <code>&gt; 0</code> replaces the stored <code>length</code> for the path-loss term, <code>&lt;= 0</code> uses the stored value</li>
 </ul>
 
 <b>Function 'duplicate';</b><br>
