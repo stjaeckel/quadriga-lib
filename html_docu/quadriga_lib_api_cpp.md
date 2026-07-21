@@ -1,7 +1,7 @@
 ---
 title: "C++ API Documentation for Quadriga-Lib v0.12.0"
 author: "Stephan Jaeckel"
-date: "20.07.2026"
+date: "21.07.2026"
 lang: en-US
 ---
 
@@ -77,62 +77,62 @@ lang: en-US
 | [hdf5_write](#hdf5_write) | Channel functions | 1667 |
 | [hdf5_write_dset](#hdf5_write_dset) | Channel functions | 1707 |
 | [path](#path) | Channel functions | 1746 |
-| [qrt_file_append](#qrt_file_append) | Channel functions | 1866 |
-| [qrt_file_init](#qrt_file_init) | Channel functions | 1902 |
-| [qrt_file_parse](#qrt_file_parse) | Channel functions | 1940 |
-| [qrt_file_read](#qrt_file_read) | Channel functions | 1988 |
-| [qrt_file_read_raw](#qrt_file_read_raw) | Channel functions | 2085 |
-| [qrt_read_cache_init](#qrt_read_cache_init) | Channel functions | 2122 |
-| [quantize_delays](#quantize_delays) | Channel functions | 2161 |
-| [get_channels_ieee_indoor](#get_channels_ieee_indoor) | Channel generation functions | 2223 |
-| [get_channels_irs](#get_channels_irs) | Channel generation functions | 2304 |
-| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 2398 |
-| [get_channels_planar](#get_channels_planar) | Channel generation functions | 2466 |
-| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 2534 |
-| [acdf](#acdf) | Channel statistics | 2610 |
-| [calc_angular_spreads_sphere](#calc_angular_spreads_sphere) | Channel statistics | 2645 |
-| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 2687 |
-| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 2739 |
-| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 2772 |
-| [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | 2807 |
-| [fast_acos](#fast_acos) | Math functions | 2840 |
-| [fast_asin](#fast_asin) | Math functions | 2859 |
-| [fast_atan2](#fast_atan2) | Math functions | 2878 |
-| [fast_cart2geo](#fast_cart2geo) | Math functions | 2899 |
-| [fast_geo2cart](#fast_geo2cart) | Math functions | 2932 |
-| [fast_sincos](#fast_sincos) | Math functions | 2977 |
-| [fast_slerp](#fast_slerp) | Math functions | 2998 |
-| [interp_2D](#interp_2d) | Math functions | 3033 |
-| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 3097 |
-| [colormap](#colormap) | Site-specific simulation tools | 3155 |
-| [combine_irs_coord](#combine_irs_coord) | Site-specific simulation tools | 3174 |
-| [coord2path](#coord2path) | Site-specific simulation tools | 3217 |
-| [cube](#cube) | Site-specific simulation tools | 3255 |
-| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 3288 |
-| [icosphere](#icosphere) | Site-specific simulation tools | 3332 |
-| [interface_gain](#interface_gain) | Site-specific simulation tools | 3366 |
-| [medium_gain](#medium_gain) | Site-specific simulation tools | 3402 |
-| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 3439 |
-| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 3481 |
-| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 3548 |
-| [obj_overlap_test](#obj_overlap_test) | Site-specific simulation tools | 3609 |
-| [path_to_tube](#path_to_tube) | Site-specific simulation tools | 3640 |
-| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 3668 |
-| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 3697 |
-| [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 3736 |
-| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 3772 |
-| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 3808 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 3926 |
-| [ray_state_update](#ray_state_update) | Site-specific simulation tools | 3969 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 4093 |
-| [refractive_index](#refractive_index) | Site-specific simulation tools | 4141 |
-| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 4173 |
-| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 4217 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 4247 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 4275 |
-| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 4316 |
-| [write_png](#write_png) | Site-specific simulation tools | 4351 |
-| [xpr_update](#xpr_update) | Site-specific simulation tools | 4377 |
+| [qrt_file_append](#qrt_file_append) | Channel functions | 1867 |
+| [qrt_file_init](#qrt_file_init) | Channel functions | 1903 |
+| [qrt_file_parse](#qrt_file_parse) | Channel functions | 1941 |
+| [qrt_file_read](#qrt_file_read) | Channel functions | 1989 |
+| [qrt_file_read_raw](#qrt_file_read_raw) | Channel functions | 2086 |
+| [qrt_read_cache_init](#qrt_read_cache_init) | Channel functions | 2123 |
+| [quantize_delays](#quantize_delays) | Channel functions | 2162 |
+| [get_channels_ieee_indoor](#get_channels_ieee_indoor) | Channel generation functions | 2224 |
+| [get_channels_irs](#get_channels_irs) | Channel generation functions | 2305 |
+| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 2399 |
+| [get_channels_planar](#get_channels_planar) | Channel generation functions | 2467 |
+| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 2535 |
+| [acdf](#acdf) | Channel statistics | 2611 |
+| [calc_angular_spreads_sphere](#calc_angular_spreads_sphere) | Channel statistics | 2646 |
+| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 2688 |
+| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 2740 |
+| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 2773 |
+| [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | 2808 |
+| [fast_acos](#fast_acos) | Math functions | 2841 |
+| [fast_asin](#fast_asin) | Math functions | 2860 |
+| [fast_atan2](#fast_atan2) | Math functions | 2879 |
+| [fast_cart2geo](#fast_cart2geo) | Math functions | 2900 |
+| [fast_geo2cart](#fast_geo2cart) | Math functions | 2933 |
+| [fast_sincos](#fast_sincos) | Math functions | 2978 |
+| [fast_slerp](#fast_slerp) | Math functions | 2999 |
+| [interp_2D](#interp_2d) | Math functions | 3034 |
+| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 3098 |
+| [colormap](#colormap) | Site-specific simulation tools | 3156 |
+| [combine_irs_coord](#combine_irs_coord) | Site-specific simulation tools | 3175 |
+| [coord2path](#coord2path) | Site-specific simulation tools | 3218 |
+| [cube](#cube) | Site-specific simulation tools | 3256 |
+| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 3289 |
+| [icosphere](#icosphere) | Site-specific simulation tools | 3333 |
+| [interface_gain](#interface_gain) | Site-specific simulation tools | 3367 |
+| [medium_gain](#medium_gain) | Site-specific simulation tools | 3403 |
+| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 3440 |
+| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 3482 |
+| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 3549 |
+| [obj_overlap_test](#obj_overlap_test) | Site-specific simulation tools | 3610 |
+| [path_to_tube](#path_to_tube) | Site-specific simulation tools | 3641 |
+| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 3669 |
+| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 3698 |
+| [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 3737 |
+| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 3773 |
+| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 3809 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 3927 |
+| [ray_state_update](#ray_state_update) | Site-specific simulation tools | 3970 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 4094 |
+| [refractive_index](#refractive_index) | Site-specific simulation tools | 4142 |
+| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 4174 |
+| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 4218 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 4248 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 4276 |
+| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 4317 |
+| [write_png](#write_png) | Site-specific simulation tools | 4352 |
+| [xpr_update](#xpr_update) | Site-specific simulation tools | 4378 |
 
 ---
 
@@ -1813,12 +1813,12 @@ Calculates the path gain (linear power) from the transfer coefficients at one fr
 - EM mode returns the maximum column power of the 2x2 Jones matrix; SCALAR mode returns the squared magnitude of the pressure coefficient
 - A degenerate coefficient set (all-zero, underflowed, or containing NaN) returns 0, flagging the path for pruning
 - With `fGHz > 0`, free-space path loss is folded in: `(lambda / (4 pi d))^2` in EM mode, `1 / d^2` (frequency-independent) in SCALAR mode
-- The distance `d` is the stored `length` by default; pass `len > 0` to override it, e.g. to match a total length from the 
+- The distance `d` is the stored `length` by default; pass `len > 0` to override it, e.g. to match a total length from the
   read-only `calc_length` before the member is updated
 ```
 float calc_gain(float fGHz = 0.0f, size_t freq = 0, float len = 0.0f) const;
 ```
-- **`fGHz`** — Frequency in GHz; `> 0` applies path loss, `0` returns polarization power only. In SCALAR mode any 
+- **`fGHz`** — Frequency in GHz; `> 0` applies path loss, `0` returns polarization power only. In SCALAR mode any
   positive value applies spherical spreading; the magnitude is ignored
 - **`freq`** — Frequency index into the coefficient store, valid range `0` to `nFRQ - 1`
 - **`len`** — Path length override in meters; `> 0` replaces the stored `length` for the path-loss term, `<= 0` uses the stored value
@@ -1831,12 +1831,13 @@ Left-multiplies the ray's transfer matrix by an interaction matrix, applies a po
 - The update reads all old values before writing, so `coeff_update` may alias the slot; the return value uses the same gain definition as `calc_gain`
 - Must be called after `extend` closes the path, so the stored `length` is final when path loss is requested
 ```
-float xpr_update(const float *coeff_update = nullptr, float gain_update = 1.0f, size_t freq = 0, float fGHz = 0.0f);
+float xpr_update(const float *coeff_update = nullptr, float gain_update = 1.0f, size_t freq = 0, float fGHz = 0.0f, float len = 0.0f);
 ```
 - **`coeff_update`** — Interaction matrix, length 8 (EM) or 2 (SCALAR); `nullptr` skips the multiply
 - **`gain_update`** — Power gain applied to the slot (converted to an amplitude factor internally); `1.0` skips the scaling
 - **`freq`** — Frequency index into the coefficient store, valid range `0` to `nFRQ - 1`
 - **`fGHz`** — Frequency in GHz for the returned gain; `> 0` applies path loss as in `calc_gain`, `0` returns polarization power only
+- **`len`** — Path length override in meters; `> 0` replaces the stored `length` for the path-loss term, `<= 0` uses the stored value
 
 ### Function 'duplicate';
 Copies the path into an existing target object and returns its length
