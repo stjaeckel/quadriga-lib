@@ -213,6 +213,7 @@
   <tr><td><a href="#point_cloud_segmentation">point_cloud_segmentation</a></td><td>Reorganize a point cloud into spatial sub-clouds for efficient processing</td></tr>
   <tr><td><a href="#point_cloud_split">point_cloud_split</a></td><td>Split a point cloud into two sub-clouds along a spatial axis</td></tr>
   <tr><td><a href="#point_inside_mesh">point_inside_mesh</a></td><td>Test whether 3D points are inside a triangle mesh using raycasting</td></tr>
+  <tr><td><a href="#ray_init">ray_init</a></td><td>Seed a sphere of rays from a point source</td></tr>
   <tr><td><a href="#ray_mesh_interact">ray_mesh_interact</a></td><td>Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh surfaces</td></tr>
   <tr><td><a href="#ray_point_intersect">ray_point_intersect</a></td><td>Calculate intersections of ray beams with points in 3D space</td></tr>
   <tr><td><a href="#ray_state_update">ray_state_update</a></td><td>Batched inside/outside ray-state machine with analytic thin-slab (Fabry-Perot) resolution</td></tr>
@@ -5156,6 +5157,80 @@ arma::uvec quadriga_lib::point_inside_mesh(
 <b>See also:</b><br>
 <ul>
 <li><a href="#obj_file_read">obj_file_read</a> (for reading <code>mesh</code> and <code>obj_ind</code> from an .obj file)</li>
+</ul>
+
+<hr class="greyline"><br>
+<span id="ray_init" class="qd-func"><b>ray_init</b></span><br>
+<hr class="thin">
+Seed a sphere of rays from a point source
+<ul>
+<li>Launches <code>n_ray</code> rays from a point source <code>O</code> onto an <a href="#icosphere">icosphere</a> tessellation, giving near-uniform angular coverage of the full sphere (4π sr).</li>
+<li><code>n_ray</code> is quantized to the icosphere grid: <code>n_div = round(sqrt(n_ray_target / 20))</code> (min 1) and <code>n_ray = 20 · n_div²</code>, so the returned count is the closest tessellation to <code>n_ray_target</code>, not exact.</li>
+<li>Ray origins sit on a small launch sphere of radius <code>r0</code> centered at <code>O</code>, not at <code>O</code> itself, so the beam triangles (<code>trivec</code>) have finite extent from the first segment. <code>orig_length</code> carries the <code>O</code>-to-origin offset as the initial accumulated path length.</li>
+<li>When <code>mesh</code> is supplied, <code>r0</code> is auto-sized to 0.8× the nearest obstacle distance along a coarse probe sphere (clamped to ≥ 0.01 m); if no obstacle is hit within <code>max_path_length</code>, or without <code>mesh</code>, <code>r0 = 0.01 m</code>.</li>
+<li>Emits the per-ray medium-state words and distance accumulators consumed by <a href="#ray_state_update">ray_state_update</a>, all initialized to the outside-air / zero-distance start state.</li>
+<li>Beam wavefront (<code>trivec</code>) and directions (<code>tridir</code>, Cartesian) match the <a href="#ray_mesh_interact">ray_mesh_interact</a> input format.</li>
+</ul>
+
+<b>Declaration:</b><br>
+<pre>
+arma::uword ray_init(
+    arma::uword n_ray_target,
+    arma::uword n_freq,
+    float Ox, float Oy, float Oz,
+    float max_path_length,
+    arma::fmat *orig = nullptr,
+    arma::fmat *dest = nullptr,
+    arma::fmat *trivec = nullptr,
+    arma::fmat *tridir = nullptr,
+    arma::fvec *orig_length = nullptr,
+    arma::Col&lt;short&gt; *mtl_ind_prev = nullptr,
+    arma::Col&lt;short&gt; *mtl_ind_current = nullptr,
+    arma::Col&lt;short&gt; *mtl_ind_buffer = nullptr,
+    arma::fmat *path_dir_prev = nullptr,
+    arma::fmat *acc_dist = nullptr,
+    std::vector&lt;quadriga_lib::path&gt; *paths = nullptr,
+    const arma::fmat *mesh = nullptr,
+    const arma::u32_vec *sub_mesh_index = nullptr,
+    bool scalar_mode = false);
+</pre>
+
+<b>Inputs:</b><br>
+<ul>
+<li><b><code>n_ray_target</code></b> — Desired ray count; quantized to the nearest icosphere grid (see above)</li>
+<li><b><code>n_freq</code></b> — Number of frequency bins allocated per path in <code>paths</code>; must be ≥ 1 (throws if 0; the <a href="#path">path</a> layout supports 1-127)</li>
+<li><b><code>Ox</code></b>, <b><code>Oy</code></b>, <b><code>Oz</code></b> — Point-source (transmitter) position in GCS [m]</li>
+<li><b><code>max_path_length</code></b> — Maximum ray length [m]; sets <code>dest</code> and bounds the launch-sphere probe (floored at 0.01 m)</li>
+<li><b><code>mesh</code></b> <i>(optional)</i> — Triangle mesh faces; see <a href="#obj_file_read">obj_file_read</a>; <code>[n_mesh, 9]</code>. Used only to auto-size the launch sphere <code>r0</code>. NULL → <code>r0 = 0.01 m</code>.</li>
+<li><b><code>sub_mesh_index</code></b> <i>(optional)</i> — Sub-mesh partition offsets for the accelerated intersect; passed to <a href="#ray_triangle_intersect">ray_triangle_intersect</a>. NULL → no partitioning.</li>
+<li><b><code>scalar_mode</code></b> — Path storage layout passed to <code>paths</code>: <code>true</code> = SCALAR (acoustic, one pressure coefficient per frequency), <code>false</code> = EM (2×2 Jones matrix per frequency)</li>
+</ul>
+
+<b>Outputs:</b><br>
+<ul>
+<li><b><code>orig</code></b> — Ray origins on the launch sphere, <code>O + r0·d̂</code>; <code>[n_ray, 3]</code></li>
+<li><b><code>dest</code></b> — Ray destinations at <code>max_path_length</code> from <code>O</code>; <code>[n_ray, 3]</code></li>
+<li><b><code>trivec</code></b> — Beam wavefront triangle vertices relative to origin; <code>[n_ray, 9]</code>, matches <a href="#ray_mesh_interact">ray_mesh_interact</a></li>
+<li><b><code>tridir</code></b> — Per-vertex ray directions, Cartesian; <code>[n_ray, 9]</code></li>
+<li><b><code>orig_length</code></b> — <code>O</code>-to-origin distance per ray (launch-sphere inradius ≈ <code>r0</code>), the initial accumulated path length; <code>[n_ray]</code></li>
+<li><b><code>mtl_ind_prev</code></b>, <b><code>mtl_ind_current</code></b>, <b><code>mtl_ind_buffer</code></b> — Initial medium-state words for <a href="#ray_state_update">ray_state_update</a>, all zeroed (outside air, no flags); <code>[n_ray]</code></li>
+<li><b><code>path_dir_prev</code></b> — Initial physical ray direction (unit vectors from <code>O</code>); <code>[n_ray, 3]</code></li>
+<li><b><code>acc_dist</code></b> — Accumulated in-layer distance, zeroed; <code>[n_ray, 2]</code>; col 1 = refracted distance, col 2 = geometric distance</li>
+<li><b><code>paths</code></b> — Per-ray <a href="#path">path</a> objects, one per ray; each reinitialized to 0 segments with <code>n_freq</code> frequency bins in the <code>scalar_mode</code> layout, and <code>length</code> seeded to <code>orig_length</code> (the <code>O</code>-to-origin offset); <code>n_ray</code> entries</li>
+</ul>
+
+<b>Returns:</b><br>
+<ul>
+<li>Number of rays generated, <code>n_ray = 20 · n_div²</code></li>
+</ul>
+
+<b>See also:</b><br>
+<ul>
+<li><a href="#icosphere">icosphere</a> (generates the ray fan, beam wavefront, and directions)</li>
+<li><a href="#ray_triangle_intersect">ray_triangle_intersect</a> (launch-sphere sizing and per-segment intersection)</li>
+<li><a href="#ray_mesh_interact">ray_mesh_interact</a> (consumes <code>orig</code> / <code>dest</code> / <code>trivec</code> / <code>tridir</code> / <code>orig_length</code>)</li>
+<li><a href="#ray_state_update">ray_state_update</a> (consumes the medium-state words, <code>path_dir_prev</code>, and <code>acc_dist</code>)</li>
+<li><a href="#path">path</a> (the per-ray storage object populated in <code>paths</code>)</li>
 </ul>
 
 <hr class="greyline"><br>
