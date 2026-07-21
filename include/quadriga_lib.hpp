@@ -89,6 +89,26 @@ namespace quadriga_lib
                              double dBP_m = NAN,                // Overwrites the default breakpoint distance in meters
                              arma::uvec n_walls = {0},          // Number of walls per user TGax models; [n_users] or [1]
                              double wall_loss = 5.0);           // Penetration loss for a single wall; TGax defines 5.0 (default) or 7.0
+
+    // Initialize rays; float only; returns n_ray; min 190 byte per ray
+    arma::uword ray_init(arma::uword n_ray_target,                         // Target number of rays
+                         arma::uword n_freq,                               // Number of frequencies
+                         float Ox, float Oy, float Oz,                     // Origin position
+                         float max_path_length,                            // Maximum path length
+                         arma::fmat *orig = nullptr,                       // Ray origins in GCS, [n_ray, 3]
+                         arma::fmat *dest = nullptr,                       // Ray destinations in GCS, [n_ray, 3]
+                         arma::fmat *trivec = nullptr,                     // Beam wavefront vertices relative to origin, [n_ray, 9]
+                         arma::fmat *tridir = nullptr,                     // Vertex-ray directions, spherical [n_ray, 6] or Cartesian [n_ray, 9]
+                         arma::fvec *orig_length = nullptr,                // Path length at origin, [n_ray]
+                         arma::Col<short> *mtl_ind_prev = nullptr,         // Previous medium (0 = outside), [n_ray]
+                         arma::Col<short> *mtl_ind_current = nullptr,      // Current medium (0 = outside), [n_ray]
+                         arma::Col<short> *mtl_ind_buffer = nullptr,       // Next-transition buffer (0 = empty), [n_ray]
+                         arma::fmat *path_dir_prev = nullptr,              // Physical ray direction, [n_ray, 3]
+                         arma::fmat *acc_dist = nullptr,                   // Accumulated in-layer distance, [n_ray, 2]
+                         std::vector<quadriga_lib::path> *paths = nullptr, // Path data storage, 64 byte + overflow, [n_ray]
+                         const arma::fmat *mesh = nullptr,                 // Optional: faces of the triangular mesh for sphere size detection, [ n_mesh, 9 ]
+                         const arma::u32_vec *sub_mesh_index = nullptr,    // Optional: Sub-mesh index, 0-based, [ n_sub ]
+                         bool scalar_mode = false);                        // Switch for EM mode or scalar mode
 }
 
 #endif
