@@ -35,13 +35,14 @@ static inline float calc_direction(float Dx, float Dy, float Dz,    // Destinati
 // HELPER: Vector compaction
 template <typename dtype>
 static inline arma::Col<dtype> compact(const arma::Col<dtype> &data,
-                                       const arma::u32_vec &ind, arma::uword ind_count = 0)
+                                       const arma::u32_vec &ind,
+                                       arma::uword ind_count)
 {
     if (data.empty())
         return arma::Col<dtype>();
 
-    const long long n_ind = ind_count ? (long long)ind_count : (long long)ind.n_elem;
-    arma::Col<dtype> out((arma::uword)n_ind, arma::fill::none);
+    const long long n_ind = (long long)ind_count;
+    arma::Col<dtype> out(ind_count, arma::fill::none);
 
     const dtype *__restrict p_data = data.memptr();
     const arma::u32 *p_ind = ind.memptr();
@@ -57,13 +58,14 @@ static inline arma::Col<dtype> compact(const arma::Col<dtype> &data,
 // HELPER: std::vector compaction
 template <typename dtype>
 static inline std::vector<dtype> compact(const std::vector<dtype> &data,
-                                         const arma::u32_vec &ind, arma::uword ind_count = 0)
+                                         const arma::u32_vec &ind,
+                                         arma::uword ind_count)
 {
     if (data.empty())
         return std::vector<dtype>();
 
-    const long long n_ind = ind_count ? (long long)ind_count : (long long)ind.n_elem;
-    std::vector<dtype> out((size_t)n_ind);
+    const long long n_ind = (long long)ind_count;
+    std::vector<dtype> out(ind_count);
 
     const dtype *__restrict p_data = data.data();
     const arma::u32 *p_ind = ind.memptr();
@@ -79,19 +81,19 @@ static inline std::vector<dtype> compact(const std::vector<dtype> &data,
 // Helper: Matrix compaction
 template <typename dtype>
 static inline arma::Mat<dtype> compact(const arma::Mat<dtype> &data,
-                                       const arma::u32_vec &ind,  // row or col indices
-                                       arma::uword ind_count = 0, // overwrite for ind.n_elem
-                                       bool compact_rows = true)  // switch for dimension
+                                       const arma::u32_vec &ind, // row or col indices
+                                       arma::uword ind_count,    // number of used indices
+                                       bool compact_rows = true) // switch for dimension
 {
     if (data.empty())
         return arma::Mat<dtype>();
 
-    const long long n_ind = ind_count ? (long long)ind_count : (long long)ind.n_elem;
+    const long long n_ind = (long long)ind_count;
     const long long n_rows = (long long)data.n_rows;
     const long long n_cols = (long long)data.n_cols;
 
-    arma::Mat<dtype> out(compact_rows ? (arma::uword)n_ind : data.n_rows,
-                         compact_rows ? data.n_cols : (arma::uword)n_ind,
+    arma::Mat<dtype> out(compact_rows ? ind_count : data.n_rows,
+                         compact_rows ? data.n_cols : ind_count,
                          arma::fill::none);
 
     const dtype *__restrict p_data = data.memptr();
@@ -242,7 +244,9 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
 - **`mtl_ind_prev`**, **`mtl_ind_current`**, **`mtl_ind_buffer`** — Medium-state words (bit-masked: `mat = w & 0x7FFF`, `flag = w & 0x8000`); `[n_ray]`
 - **`path_dir_prev`** — Physical ray direction entering the current segment (unit vectors); `[n_ray, 3]`
 - **`acc_dist`** — Accumulated in-layer distance; `[n_ray, 2]`; col 1 = refracted distance, col 2 = geometric distance
-- **`paths`** — Per-ray [[path]] objects; `n_ray` entries. Frequency count and layout must match `center_frequency` and `scalar_mode`. Terminated paths are freed; surviving paths carry the appended interaction segment and the updated polarization product
+- **`paths`** — Per-ray [[path]] objects; `n_ray` entries. Frequency count and layout must match
+  `center_frequency` and `scalar_mode`. Terminated paths are freed; surviving paths carry the appended 
+  interaction segment and the updated polarization product
 - **`trivec`** *(optional)* — Beam wavefront triangle vertices relative to origin; `[n_ray, 9]`. Must be supplied together with `tridir`; empty / NULL disables beam tracing
 - **`tridir`** *(optional)* — Vertex-ray directions, Cartesian; `[n_ray, 9]`
 
@@ -797,7 +801,13 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
             size_t iY = (size_t)i_int + n_interact;
             size_t iZ = iY + n_interact;
 
-            float length = calc_length(p_fbs[i_int], p_fbs[iY], p_fbs[iZ], p_orig[i_int], p_orig[iY], p_orig[iZ]) + paths[i_int].length;
+            // Total source-to-FBS distance. A path with no segments has travelled a straight
+            // line from the point source, so measure from O directly; after the first interaction
+            // the accumulated polyline plus the current leg is the only correct form.
+            float length = (paths[i_int].n_seg() == 0)
+                               ? calc_length(p_fbs[i_int], p_fbs[iY], p_fbs[iZ], Ox, Oy, Oz)
+                               : calc_length(p_fbs[i_int], p_fbs[iY], p_fbs[iZ], p_orig[i_int], p_orig[iY], p_orig[iZ]) + paths[i_int].length;
+
             p_gain[i_int] = paths[i_int].calc_gain(fRef_GHz, 0, length);
         }
     }
@@ -853,7 +863,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
         const short *cB = bufferN.memptr();
         const float *p_path_dirN = path_dirN.memptr();
         const float *p_acc_distN = acc_distN.memptr();
-        const float *p_fbsN = fbsN.memptr();
+        const float *p_fbs = fbsN.memptr();
         const float *p_xpr = xprmatN.memptr();
         const uint8_t *p_type = interact_type.data();
 
@@ -911,7 +921,10 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
             p_acc[2 * i_out + 1] = p_acc_distN[iY];
 
             // Add new segment to path storage and left-multiply XPR matrix at base frequency
-            paths[iX].extend(p_path[i_out], p_fbsN[iX], p_fbsN[iY], p_fbsN[iZ], p_type[iX]);
+            paths[iX].extend(p_path[i_out], p_fbs[iX], p_fbs[iY], p_fbs[iZ], p_type[iX]);
+            if (paths[iX].n_seg() == 0) // source -> new interaction point: derive the first leg (no previous coordinate)
+                p_path[i_out].length = calc_length(p_fbs[iX], p_fbs[iY], p_fbs[iZ], Ox, Oy, Oz);
+
             p_path[i_out].xpr_update(&p_xpr[nXPR * iX]);
             if (reflect_pass)
                 ++p_path[i_out].nREF;
