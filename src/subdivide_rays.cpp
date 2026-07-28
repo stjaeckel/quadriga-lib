@@ -12,397 +12,359 @@ SECTION!*/
 # subdivide_rays
 Subdivide ray beams into four smaller sub-beams
 
-- Each triangular beam is split into 4 sub-beams; output size is `4 × n_ray` or `4 × n_ind` when `index` is provided
-- `tridir` format auto-detected: spherical `[n_ray, 6]` or Cartesian `[n_ray, 9]`; output matches input format
+- Each triangular beam is split into 4 sub-beams, `n_rayN = 4 * n_subdiv` rays are written to the output
+- Rays can be selected by `index` (0-based list), all rays are subdivided if it is not given
+- `n_subdiv` is the number of selected rays
+- `tridir` format is auto-detected: spherical `[n_ray, 6]` or Cartesian `[n_ray, 9]`, output matches the input format
+- Pre-allocated outputs that can hold all new rays are reused as they are and must have the same number of rows,
+  the new rays are written to the first `n_rayN` rows, leaving the remaining rows untouched. Smaller buffers are
+  re-allocated to that size, discarding their content.
+- Internal math is done in double precision, the new origins stay within 1 ULP of the wavefront plane
+  spanned by `orig` and `trivec`, no offset is applied along the propagation direction
+- The direction values of the 3 original vertices are passed through unchanged, only the 3 new edge-midpoint
+  directions are calculated, hence repeated subdivision does not accumulate rounding errors at the corners
+- If `transposed_output` is true, all outputs are written transposed, i.e. the rays are in the columns
+  and the components in the rows, e.g. `origN` becomes `[3, n_rayN]`
 
 ## Declaration:
 ```
 arma::uword quadriga_lib::subdivide_rays(
-    const arma::Mat<dtype> *orig,
-    const arma::Mat<dtype> *trivec,
-    const arma::Mat<dtype> *tridir,
+    const arma::Mat<dtype> &orig,
+    const arma::Mat<dtype> &trivec,
+    const arma::Mat<dtype> &tridir,
     const arma::Mat<dtype> *dest = nullptr,
     arma::Mat<dtype> *origN = nullptr,
     arma::Mat<dtype> *trivecN = nullptr,
     arma::Mat<dtype> *tridirN = nullptr,
     arma::Mat<dtype> *destN = nullptr,
-    const arma::u32_vec *index = nullptr,
-    const double ray_offset = 0.0);
+    const arma::u32_vec *index = nullptr);
 ```
 
 ## Inputs:
 - **`orig`** — Ray origin points in GCS; `[n_ray, 3]`
-- **`trivec`** — Vectors from origin to triangle vertices, columns `[x1 y1 z1 x2 y2 z2 x3 y3 z3]`; `[n_ray, 9]`
-- **`tridir`** — Vertex-ray directions, spherical `[v1az v1el v2az v2el v3az v3el]` or Cartesian `[v1x v1y v1z v2x v2y v2z v3x v3y v3z]`; `[n_ray, 6]` or `[n_ray, 9]`
-- **`dest`** (optional) — Ray destination points; `[n_ray, 3]`
-- **`index`** (optional) — 0-based indices of rays to subdivide; `[n_ind]`
-- **`ray_offset`** (optional) — Origin offset along propagation direction
+- **`trivec`** — Vectors from origin to the wavefront vertices, columns `[x1 y1 z1 x2 y2 z2 x3 y3 z3]`; `[n_ray, 9]`
+- **`tridir`** — Vertex-ray directions, spherical `[v1az v1el v2az v2el v3az v3el]` or Cartesian
+  `[v1x v1y v1z v2x v2y v2z v3x v3y v3z]`; `[n_ray, 6]` or `[n_ray, 9]`
+- **`dest`** (optional) — Ray destination points, ignored if empty; `[n_ray, 3]`
+- **`index`** (optional) — 0-based indices of the rays that should be subdivided, may repeat indices and
+  determines the output order; Invalid indices raise an exception after the loop has finished,
+  outputs may be partially written by then; `[n_subdiv]`
+- **`transposed_output`** (optional) — If true, the outputs are written transposed with the rays in the
+  columns, e.g. `origN` becomes `[3, n_rayN]`; default = `false`
 
 ## Outputs:
-- **`origN`** — Subdivided ray origins; `[n_rayN, 3]`
-- **`trivecN`** — Subdivided triangle vectors; `[n_rayN, 9]`
-- **`tridirN`** — Subdivided vertex-ray directions, same format as `tridir`; `[n_rayN, 6]` or `[n_rayN, 9]`
-- **`destN`** — Subdivided destinations, empty if `dest` was `nullptr` or empty; `[n_rayN, 3]`
+- **`origN`** — Subdivided ray origins, centroids of the sub-beam wavefronts; `[n_rayN, 3]` or `[3, n_rayN]` for `transposed_output`
+- **`trivecN`** — Subdivided wavefront vectors, relative to `origN`; `[n_rayN, 9]` or `[9, n_rayN]` for `transposed_output`
+- **`tridirN`** — Subdivided vertex-ray directions, same format as `tridir`; `[n_rayN, 6]` or `[n_rayN, 9]` or `[6/9, n_rayN]` for `transposed_output`
+- **`destN`** — Subdivided destinations, left untouched if `dest` was `nullptr` or empty; `[n_rayN, 3]` or `[3, n_rayN]` for `transposed_output`
 
 ## Returns:
-- `n_rayN` — Number of output rays
+- `n_rayN` — Number of rays written to the output, `4 * n_subdiv`
 
 ## See also:
 - [[icosphere]] (generate initial beams)
-- [[ray_point_intersect]] (beam–sample-point interaction)
-- [[ray_triangle_intersect]] (beam–triangle interaction)
+- [[ray_point_intersect]] (beam-sample-point interaction)
+- [[ray_triangle_intersect]] (beam-triangle interaction)
 MD!*/
 
 template <typename dtype>
-arma::uword quadriga_lib::subdivide_rays(const arma::Mat<dtype> *orig, const arma::Mat<dtype> *trivec, const arma::Mat<dtype> *tridir, const arma::Mat<dtype> *dest,
-                                         arma::Mat<dtype> *origN, arma::Mat<dtype> *trivecN, arma::Mat<dtype> *tridirN, arma::Mat<dtype> *destN,
-                                         const arma::u32_vec *index, const double ray_offset)
+arma::uword quadriga_lib::subdivide_rays(const arma::Mat<dtype> &orig,
+                                         const arma::Mat<dtype> &trivec,
+                                         const arma::Mat<dtype> &tridir,
+                                         const arma::Mat<dtype> *dest,
+                                         arma::Mat<dtype> *origN,
+                                         arma::Mat<dtype> *trivecN,
+                                         arma::Mat<dtype> *tridirN,
+                                         arma::Mat<dtype> *destN,
+                                         const arma::u32_vec *index,
+                                         bool transposed_output)
 {
-    // Check for NULL pointers
-    if (orig == nullptr)
-        throw std::invalid_argument("Input 'orig' cannot be NULL.");
-    if (trivec == nullptr)
-        throw std::invalid_argument("Input 'trivec' cannot be NULL.");
-    if (tridir == nullptr)
-        throw std::invalid_argument("Input 'tridir' cannot be NULL.");
-
-    if (orig->n_cols != 3)
+    // Check input dimensions
+    if (orig.n_cols != 3)
         throw std::invalid_argument("Input 'orig' must have 3 columns containing x,y,z coordinates.");
 
-    const arma::uword n_ray = orig->n_rows; // Number of rays
-    const unsigned n_ray_u = (unsigned)n_ray;
+    const arma::uword n_ray = orig.n_rows; // Number of rays
 
-    if (trivec->n_cols != 9)
+    if (trivec.n_cols != 9)
         throw std::invalid_argument("Input 'trivec' must have 9 columns.");
-    if (tridir->n_cols != 6 && tridir->n_cols != 9)
+    if (tridir.n_cols != 6 && tridir.n_cols != 9)
         throw std::invalid_argument("Input 'tridir' must have 6 or 9 columns.");
-    if (trivec->n_rows != n_ray)
+    if (trivec.n_rows != n_ray)
         throw std::invalid_argument("Number of rows in 'orig' and 'trivec' dont match.");
-    if (tridir->n_rows != n_ray)
+    if (tridir.n_rows != n_ray)
         throw std::invalid_argument("Number of rows in 'orig' and 'tridir' dont match.");
 
-    if (dest != nullptr && !dest->is_empty() && dest->n_rows != n_ray)
+    const bool have_dest = (dest && !dest->is_empty());
+    if (have_dest && dest->n_rows != n_ray)
         throw std::invalid_argument("Number of rows in 'dest' does not match number of rows in 'orig'.");
-    if (dest != nullptr && !dest->is_empty() && dest->n_cols != 3)
+    if (have_dest && dest->n_cols != 3)
         throw std::invalid_argument("Input 'dest' must have 3 columns containing x,y,z coordinates.");
 
-    arma::uword n_ind = 0;
-    unsigned *p_ind;
-    if (index != nullptr && index->n_elem != 0)
+    // Ray selection
+    const unsigned *p_ind = nullptr;
+    arma::uword n_subdiv = n_ray;
+    if (index && index->n_elem != 0)
+        p_ind = index->memptr(), n_subdiv = (arma::uword)index->n_elem;
+    const arma::uword n_rayN = 4 * n_subdiv; // Number of rays in the output
+
+    if (n_rayN == 0) // Nothing to do, outputs are left untouched
+        return 0;
+
+    if (origN == nullptr && trivecN == nullptr && tridirN == nullptr && (!have_dest || destN == nullptr))
+        return n_rayN; // No outputs were requested
+
+    // Indicator for Cartesian format
+    const bool cartesian_format = (tridir.n_cols == 9);
+    const arma::uword n_comp = cartesian_format ? 3 : 2; // Direction components per vertex
+
+    // Output buffers, 'destN' is size-checked but never written if 'dest' is not given
+    arma::Mat<dtype> *out_list[4] = {origN, trivecN, tridirN, destN};
+    const arma::uword out_cols[4] = {3, 9, tridir.n_cols, 3};
+    const char *out_name[4] = {"origN", "trivecN", "tridirN", "destN"};
+
+    // Number of ray slots in the output buffers, rays are in the columns for transposed output.
+    // Buffers that can hold all new rays are reused as they are and must have the same size.
+    arma::uword n_slotN = 0;
+    for (int i = 0; i < 4; ++i)
     {
-        n_ind = (arma::uword)index->n_elem;
-        const unsigned *tmp = index->memptr();
+        if (out_list[i] == nullptr)
+            continue;
 
-        for (arma::uword i = 0; i < n_ind; ++i)
-            if (tmp[i] >= (unsigned)n_ray)
-                throw std::invalid_argument("Indices cannot exceed number of rays.");
+        const arma::uword n_slot = transposed_output ? out_list[i]->n_cols : out_list[i]->n_rows;
 
-        p_ind = new unsigned[n_ind];
-        std::memcpy(p_ind, tmp, n_ind * sizeof(unsigned));
+        if (n_slot < n_rayN) // Too small, will be re-allocated
+            continue;
+
+        if (n_slotN == 0)
+            n_slotN = n_slot;
+        else if (n_slot != n_slotN)
+            throw std::invalid_argument("Pre-allocated output matrices must have the same number of rays.");
     }
-    else
+    n_slotN = (n_slotN == 0) ? n_rayN : n_slotN;
+
+    // Resize the outputs, reused buffers keep their content beyond ray 'n_rayN'
+    for (int i = 0; i < 4; ++i)
     {
-        n_ind = n_ray;
-        p_ind = new unsigned[n_ray];
-        for (unsigned i_ray = 0; i_ray < n_ray_u; ++i_ray)
-            p_ind[i_ray] = i_ray;
+        if (out_list[i] == nullptr || (i == 3 && !have_dest)) // 'destN' is not written if 'dest' is not given
+            continue;
+
+        const arma::uword n_slot = transposed_output ? out_list[i]->n_cols : out_list[i]->n_rows;
+        const arma::uword n_fix = transposed_output ? out_list[i]->n_rows : out_list[i]->n_cols;
+
+        if (n_slot != n_slotN)
+        {
+            if (transposed_output)
+                out_list[i]->set_size(out_cols[i], n_slotN);
+            else
+                out_list[i]->set_size(n_slotN, out_cols[i]);
+        }
+        else if (n_fix != out_cols[i])
+            throw std::invalid_argument("Output '" + std::string(out_name[i]) + "' has an unsupported size.");
     }
-
-    // Number of rays in the output
-    arma::uword n_rayN = 4 * n_ind;
-
-    // Indicator for Cartesian Format
-    bool cartesian_format = false;
-    if (tridir->n_cols == 9)
-        cartesian_format = true;
 
     // Memory pointers (inputs)
-    const dtype *p_orig = orig->memptr();
-    const dtype *p_trivec = trivec->memptr();
-    const dtype *p_tridir = tridir->memptr();
-    const dtype *p_dest = (dest == nullptr || dest->is_empty()) ? nullptr : dest->memptr();
+    const dtype *p_orig = orig.memptr();
+    const dtype *p_trivec = trivec.memptr();
+    const dtype *p_tridir = tridir.memptr();
+    const dtype *p_dest = have_dest ? dest->memptr() : nullptr;
 
-    // Allocate output memory, if needed
-    if (origN != nullptr && (origN->n_rows != n_rayN || origN->n_cols != 3))
-        origN->set_size(n_rayN, 3);
+    // Memory pointers (outputs)
+    dtype *p_origN = origN ? origN->memptr() : nullptr;
+    dtype *p_trivecN = trivecN ? trivecN->memptr() : nullptr;
+    dtype *p_tridirN = tridirN ? tridirN->memptr() : nullptr;
+    dtype *p_destN = (have_dest && destN) ? destN->memptr() : nullptr;
 
-    if (trivecN != nullptr && (trivecN->n_rows != n_rayN || trivecN->n_cols != 9))
-        trivecN->set_size(n_rayN, 9);
+    // Address of component 'c' of output ray 'i_out' is "p[i_out * s_ray + c * s_comp]"
+    const arma::uword s_comp = transposed_output ? 1 : n_slotN;        // Step between the components
+    const arma::uword s_ray_3 = transposed_output ? 3 : 1;             // Step between the rays, 'origN' and 'destN'
+    const arma::uword s_ray_9 = transposed_output ? 9 : 1;             // Step between the rays, 'trivecN'
+    const arma::uword s_ray_t = transposed_output ? tridir.n_cols : 1; // Step between the rays, 'tridirN'
 
-    if (tridirN != nullptr && cartesian_format && (tridirN->n_rows != n_rayN || tridirN->n_cols != 9))
-        tridirN->set_size(n_rayN, 9);
-    else if (tridirN != nullptr && (tridirN->n_rows != n_rayN || tridirN->n_cols != 6))
-        tridirN->set_size(n_rayN, 6);
+    // Vertex numbering: 0 = V1, 1 = V2, 2 = V3, 3 = V12, 4 = V13, 5 = V23
+    const int mid_a[3] = {0, 0, 1};                                     // First parent vertex of a midpoint
+    const int mid_b[3] = {1, 2, 2};                                     // Second parent vertex of a midpoint
+    const int vid[4][3] = {{0, 3, 4}, {4, 3, 5}, {4, 5, 2}, {3, 1, 5}}; // Vertices of the 4 sub-beams
 
-    if (dest != nullptr && !dest->is_empty() && destN != nullptr && (destN->n_rows != n_rayN || destN->n_cols != 3))
-        destN->set_size(n_rayN, 3);
-    else if (destN != nullptr)
-        destN->reset();
+    const long long n_subdiv_l = (long long)n_subdiv; // Signed loop bound for OpenMP 2.0
+    int out_of_bound = 0;                             // Set by any thread that hits an invalid index
 
-    // Get output pointers
-    dtype *p_origN = (origN == nullptr) ? nullptr : origN->memptr();
-    dtype *p_trivecN = (trivecN == nullptr) ? nullptr : trivecN->memptr();
-    dtype *p_tridirN = (tridirN == nullptr) ? nullptr : tridirN->memptr();
-    dtype *p_destN = (destN == nullptr || destN->is_empty()) ? nullptr : destN->memptr();
-
-    // Iterate through all indices
-    for (arma::uword i_ind = 0; i_ind < n_ind; ++i_ind)
+    // Iterate through all selected rays
+#pragma omp parallel for schedule(static) reduction(| : out_of_bound)
+    for (long long i_subdiv = 0; i_subdiv < n_subdiv_l; ++i_subdiv)
     {
-        arma::uword i_ray = p_ind[i_ind];
+        const arma::uword i_ray = p_ind ? (arma::uword)p_ind[i_subdiv] : (arma::uword)i_subdiv;
+
+        if (i_ray >= n_ray) // Must be skipped, loading the ray would access invalid memory
+        {
+            out_of_bound = 1;
+            continue;
+        }
 
         // Load beam origin
-        double Ox = (double)p_orig[i_ray],
-               Oy = (double)p_orig[i_ray + n_ray],
-               Oz = (double)p_orig[i_ray + 2 * n_ray];
+        const double Ox = (double)p_orig[i_ray],
+                     Oy = (double)p_orig[i_ray + n_ray],
+                     Oz = (double)p_orig[i_ray + 2 * n_ray];
 
         // Load destination and calculate the length from orig to dest
-        double length = NAN;
-        if (p_dest != nullptr)
+        double length = 0.0;
+        if (p_destN)
         {
-            double Ux = (double)p_dest[i_ray] - Ox;
-            double Uy = (double)p_dest[i_ray + n_ray] - Oy;
-            double Uz = (double)p_dest[i_ray + 2 * n_ray] - Oz;
+            const double Ux = (double)p_dest[i_ray] - Ox,
+                         Uy = (double)p_dest[i_ray + n_ray] - Oy,
+                         Uz = (double)p_dest[i_ray + 2 * n_ray] - Oz;
             length = std::sqrt(Ux * Ux + Uy * Uy + Uz * Uz);
         }
 
-        // Load the 3 beam vertices
-        double W1x = Ox + (double)p_trivec[i_ray],
-               W1y = Oy + (double)p_trivec[i_ray + n_ray],
-               W1z = Oz + (double)p_trivec[i_ray + 2 * n_ray];
+        double Wx[6], Wy[6], Wz[6]; // Wavefront vertex positions
+        double Dx[6], Dy[6], Dz[6]; // Wavefront vertex directions (normalized)
+        dtype To[6][3];             // Vertex directions in output format
 
-        double W2x = Ox + (double)p_trivec[i_ray + 3 * n_ray],
-               W2y = Oy + (double)p_trivec[i_ray + 4 * n_ray],
-               W2z = Oz + (double)p_trivec[i_ray + 5 * n_ray];
-
-        double W3x = Ox + (double)p_trivec[i_ray + 6 * n_ray],
-               W3y = Oy + (double)p_trivec[i_ray + 7 * n_ray],
-               W3z = Oz + (double)p_trivec[i_ray + 8 * n_ray];
-
-        // Calculate the 3 additional vertices
-        double W12x = 0.5 * (W1x + W2x), W12y = 0.5 * (W1y + W2y), W12z = 0.5 * (W1z + W2z);
-        double W13x = 0.5 * (W1x + W3x), W13y = 0.5 * (W1y + W3y), W13z = 0.5 * (W1z + W3z);
-        double W23x = 0.5 * (W2x + W3x), W23y = 0.5 * (W2y + W3y), W23z = 0.5 * (W2z + W3z);
-
-        // Calculate the direction vectors at the vertices
-        double D1x, D1y, D1z, D2x, D2y, D2z, D3x, D3y, D3z, scl;
-        if (cartesian_format)
+        // Load the 3 beam vertices, the sum "O + T" is exact in double precision
+        for (int v = 0; v < 3; ++v)
         {
-            D1x = (double)p_tridir[i_ray];
-            D1y = (double)p_tridir[i_ray + n_ray];
-            D1z = (double)p_tridir[i_ray + 2 * n_ray];
-
-            scl = D1x * D1x + D1y * D1y + D1z * D1z;
-            if (std::abs(scl - 1.0) > 2.0e-7) // Normalize
-                scl = 1.0 / std::sqrt(scl), D1x *= scl, D1y *= scl, D1z *= scl;
-
-            D2x = (double)p_tridir[i_ray + 3 * n_ray];
-            D2y = (double)p_tridir[i_ray + 4 * n_ray];
-            D2z = (double)p_tridir[i_ray + 5 * n_ray];
-
-            scl = D2x * D2x + D2y * D2y + D2z * D2z;
-            if (std::abs(scl - 1.0) > 2.0e-7) // Normalize
-                scl = 1.0 / std::sqrt(scl), D2x *= scl, D2y *= scl, D2z *= scl;
-
-            D3x = (double)p_tridir[i_ray + 6 * n_ray];
-            D3y = (double)p_tridir[i_ray + 7 * n_ray];
-            D3z = (double)p_tridir[i_ray + 8 * n_ray];
-
-            scl = D3x * D3x + D3y * D3y + D3z * D3z;
-            if (std::abs(scl - 1.0) > 2.0e-7) // Normalize
-                scl = 1.0 / std::sqrt(scl), D3x *= scl, D3y *= scl, D3z *= scl;
-        }
-        else // Spherical format
-        {
-            double az = (double)p_tridir[i_ray],
-                   el = (double)p_tridir[i_ray + n_ray];
-
-            scl = std::cos(el);
-            D1x = std::cos(az) * scl, D1y = std::sin(az) * scl, D1z = std::sin(el);
-
-            az = (double)p_tridir[i_ray + 2 * n_ray];
-            el = (double)p_tridir[i_ray + 3 * n_ray];
-
-            scl = std::cos(el);
-            D2x = std::cos(az) * scl, D2y = std::sin(az) * scl, D2z = std::sin(el);
-
-            az = (double)p_tridir[i_ray + 4 * n_ray];
-            el = (double)p_tridir[i_ray + 5 * n_ray];
-
-            scl = std::cos(el);
-            D3x = std::cos(az) * scl, D3y = std::sin(az) * scl, D3z = std::sin(el);
+            const arma::uword o = (arma::uword)(3 * v) * n_ray;
+            Wx[v] = Ox + (double)p_trivec[i_ray + o];
+            Wy[v] = Oy + (double)p_trivec[i_ray + o + n_ray];
+            Wz[v] = Oz + (double)p_trivec[i_ray + o + 2 * n_ray];
         }
 
-        // Calculate the directions at the 3 additional vertices
-        double D12x = 0.5 * (D1x + D2x), D12y = 0.5 * (D1y + D2y), D12z = 0.5 * (D1z + D2z);
-        scl = 1.0 / std::sqrt(D12x * D12x + D12y * D12y + D12z * D12z), D12x *= scl, D12y *= scl, D12z *= scl;
-
-        double D13x = 0.5 * (D1x + D3x), D13y = 0.5 * (D1y + D3y), D13z = 0.5 * (D1z + D3z);
-        scl = 1.0 / std::sqrt(D13x * D13x + D13y * D13y + D13z * D13z), D13x *= scl, D13y *= scl, D13z *= scl;
-
-        double D23x = 0.5 * (D2x + D3x), D23y = 0.5 * (D2y + D3y), D23z = 0.5 * (D2z + D3z);
-        scl = 1.0 / std::sqrt(D23x * D23x + D23y * D23y + D23z * D23z), D23x *= scl, D23y *= scl, D23z *= scl;
-
-        // Convert to Spheric coordinates
-        dtype az12 = NAN, el12 = NAN, az13 = NAN, el13 = NAN, az23 = NAN, el23 = NAN;
-        if (p_tridirN != nullptr && !cartesian_format)
+        // Load the direction vectors at the 3 beam vertices
+        for (int v = 0; v < 3; ++v)
         {
-            az12 = (dtype)std::atan2(D12y, D12x), el12 = (dtype)std::asin(D12z);
-            az13 = (dtype)std::atan2(D13y, D13x), el13 = (dtype)std::asin(D13z);
-            az23 = (dtype)std::atan2(D23y, D23x), el23 = (dtype)std::asin(D23z);
+            const arma::uword o = (arma::uword)v * n_comp * n_ray;
+
+            if (cartesian_format)
+            {
+                double dx = (double)p_tridir[i_ray + o],
+                       dy = (double)p_tridir[i_ray + o + n_ray],
+                       dz = (double)p_tridir[i_ray + o + 2 * n_ray];
+
+                const double scl = 1.0 / std::sqrt(dx * dx + dy * dy + dz * dz); // Normalize
+                Dx[v] = dx * scl, Dy[v] = dy * scl, Dz[v] = dz * scl;
+            }
+            else // Spherical format
+            {
+                const double az = (double)p_tridir[i_ray + o],
+                             el = (double)p_tridir[i_ray + o + n_ray];
+
+                const double scl = std::cos(el);
+                Dx[v] = std::cos(az) * scl, Dy[v] = std::sin(az) * scl, Dz[v] = std::sin(el);
+            }
+
+            // Pass the original vertex directions through unchanged
+            if (p_tridirN)
+                for (arma::uword c = 0; c < n_comp; ++c)
+                    To[v][c] = p_tridir[i_ray + o + c * n_ray];
         }
 
-        // Create the 4 sub-triangles
+        // Calculate the 3 additional vertices at the edge midpoints
+        for (int m = 0; m < 3; ++m)
+        {
+            const int a = mid_a[m], b = mid_b[m], v = m + 3;
+
+            Wx[v] = 0.5 * (Wx[a] + Wx[b]);
+            Wy[v] = 0.5 * (Wy[a] + Wy[b]);
+            Wz[v] = 0.5 * (Wz[a] + Wz[b]);
+
+            // The factor 0.5 of the midpoint direction is irrelevant after normalization
+            double dx = Dx[a] + Dx[b], dy = Dy[a] + Dy[b], dz = Dz[a] + Dz[b];
+
+            const double scl = 1.0 / std::sqrt(dx * dx + dy * dy + dz * dz);
+            dx *= scl, dy *= scl, dz *= scl;
+            Dx[v] = dx, Dy[v] = dy, Dz[v] = dz;
+
+            if (p_tridirN && cartesian_format)
+                To[v][0] = (dtype)dx, To[v][1] = (dtype)dy, To[v][2] = (dtype)dz;
+            else if (p_tridirN) // Convert to spherical coordinates
+            {
+                dz = (dz > 1.0) ? 1.0 : ((dz < -1.0) ? -1.0 : dz); // Guard against rounding
+                To[v][0] = (dtype)std::atan2(dy, dx), To[v][1] = (dtype)std::asin(dz);
+            }
+        }
+
+        // Centroids of the 4 sub-beams, written as exact barycentric combinations of the
+        // original vertices, e.g. the centroid of sub-beam 0 is (4*W1 + W2 + W3) / 6.
+        // This keeps them in the plane spanned by W1, W2, W3 to within 2 ULP (double).
+        const double Sx = Wx[0] + Wx[1] + Wx[2],
+                     Sy = Wy[0] + Wy[1] + Wy[2],
+                     Sz = Wz[0] + Wz[1] + Wz[2];
+
+        const double Cx[4] = {(Sx + 3.0 * Wx[0]) / 6.0, Sx / 3.0, (Sx + 3.0 * Wx[2]) / 6.0, (Sx + 3.0 * Wx[1]) / 6.0};
+        const double Cy[4] = {(Sy + 3.0 * Wy[0]) / 6.0, Sy / 3.0, (Sy + 3.0 * Wy[2]) / 6.0, (Sy + 3.0 * Wy[1]) / 6.0};
+        const double Cz[4] = {(Sz + 3.0 * Wz[0]) / 6.0, Sz / 3.0, (Sz + 3.0 * Wz[2]) / 6.0, (Sz + 3.0 * Wz[1]) / 6.0};
+
+        // Create the 4 sub-beams
         for (arma::uword i_sub = 0; i_sub < 4; ++i_sub)
         {
-            // Index of the ray in the output
-            arma::uword i_rayN = 4 * i_ind + i_sub;
+            const arma::uword i_out = 4 * (arma::uword)i_subdiv + i_sub; // Index of the ray in the output
 
-            double w1x, w1y, w1z, w2x, w2y, w2z, w3x, w3y, w3z;
-            double d1x, d1y, d1z, d2x, d2y, d2z, d3x, d3y, d3z;
-
-            if (i_sub == 0)
-            {
-                w1x = W1x, w1y = W1y, w1z = W1z, w2x = W12x, w2y = W12y, w2z = W12z, w3x = W13x, w3y = W13y, w3z = W13z;
-                d1x = D1x, d1y = D1y, d1z = D1z, d2x = D12x, d2y = D12y, d2z = D12z, d3x = D13x, d3y = D13y, d3z = D13z;
-
-                if (p_tridirN != nullptr && !cartesian_format)
-                {
-                    p_tridirN[i_rayN] = p_tridir[i_ray];
-                    p_tridirN[i_rayN + n_rayN] = p_tridir[i_ray + n_ray];
-                    p_tridirN[i_rayN + 2 * n_rayN] = az12;
-                    p_tridirN[i_rayN + 3 * n_rayN] = el12;
-                    p_tridirN[i_rayN + 4 * n_rayN] = az13;
-                    p_tridirN[i_rayN + 5 * n_rayN] = el13;
-                }
-            }
-            else if (i_sub == 1)
-            {
-                w1x = W13x, w1y = W13y, w1z = W13z, w2x = W12x, w2y = W12y, w2z = W12z, w3x = W23x, w3y = W23y, w3z = W23z;
-                d1x = D13x, d1y = D13y, d1z = D13z, d2x = D12x, d2y = D12y, d2z = D12z, d3x = D23x, d3y = D23y, d3z = D23z;
-
-                if (p_tridirN != nullptr && !cartesian_format)
-                {
-                    p_tridirN[i_rayN] = az13;
-                    p_tridirN[i_rayN + n_rayN] = el13;
-                    p_tridirN[i_rayN + 2 * n_rayN] = az12;
-                    p_tridirN[i_rayN + 3 * n_rayN] = el12;
-                    p_tridirN[i_rayN + 4 * n_rayN] = az23;
-                    p_tridirN[i_rayN + 5 * n_rayN] = el23;
-                }
-            }
-            else if (i_sub == 2)
-            {
-                w1x = W13x, w1y = W13y, w1z = W13z, w2x = W23x, w2y = W23y, w2z = W23z, w3x = W3x, w3y = W3y, w3z = W3z;
-                d1x = D13x, d1y = D13y, d1z = D13z, d2x = D23x, d2y = D23y, d2z = D23z, d3x = D3x, d3y = D3y, d3z = D3z;
-
-                if (p_tridirN != nullptr && !cartesian_format)
-                {
-                    p_tridirN[i_rayN] = az13;
-                    p_tridirN[i_rayN + n_rayN] = el13;
-                    p_tridirN[i_rayN + 2 * n_rayN] = az23;
-                    p_tridirN[i_rayN + 3 * n_rayN] = el23;
-                    p_tridirN[i_rayN + 4 * n_rayN] = p_tridir[i_ray + 4 * n_ray];
-                    p_tridirN[i_rayN + 5 * n_rayN] = p_tridir[i_ray + 5 * n_ray];
-                }
-            }
-            else if (i_sub == 3)
-            {
-                w1x = W12x, w1y = W12y, w1z = W12z, w2x = W2x, w2y = W2y, w2z = W2z, w3x = W23x, w3y = W23y, w3z = W23z;
-                d1x = D12x, d1y = D12y, d1z = D12z, d2x = D2x, d2y = D2y, d2z = D2z, d3x = D23x, d3y = D23y, d3z = D23z;
-
-                if (p_tridirN != nullptr && !cartesian_format)
-                {
-                    p_tridirN[i_rayN] = az12;
-                    p_tridirN[i_rayN + n_rayN] = el12;
-                    p_tridirN[i_rayN + 2 * n_rayN] = p_tridir[i_ray + 2 * n_ray];
-                    p_tridirN[i_rayN + 3 * n_rayN] = p_tridir[i_ray + 3 * n_ray];
-                    p_tridirN[i_rayN + 4 * n_rayN] = az23;
-                    p_tridirN[i_rayN + 5 * n_rayN] = el23;
-                }
-            }
-
-            // Write "tridir" for Cartesian format
-            if (p_tridirN != nullptr && cartesian_format)
-            {
-                p_tridirN[i_rayN] = (dtype)d1x;
-                p_tridirN[i_rayN + n_rayN] = (dtype)d1y;
-                p_tridirN[i_rayN + 2 * n_rayN] = (dtype)d1z;
-                p_tridirN[i_rayN + 3 * n_rayN] = (dtype)d2x;
-                p_tridirN[i_rayN + 4 * n_rayN] = (dtype)d2y;
-                p_tridirN[i_rayN + 5 * n_rayN] = (dtype)d2z;
-                p_tridirN[i_rayN + 6 * n_rayN] = (dtype)d3x;
-                p_tridirN[i_rayN + 7 * n_rayN] = (dtype)d3y;
-                p_tridirN[i_rayN + 8 * n_rayN] = (dtype)d3z;
-            }
-
-            // Calculate center point
-            double ox = 0.333333333333333 * (w1x + w2x + w3x),
-                   oy = 0.333333333333333 * (w1y + w2y + w3y),
-                   oz = 0.333333333333333 * (w1z + w2z + w3z);
-
-            // Calculate ray direction at center point
-            double dx = 0.333333333333333 * (d1x + d2x + d3x),
-                   dy = 0.333333333333333 * (d1y + d2y + d3y),
-                   dz = 0.333333333333333 * (d1z + d2z + d3z);
-
-            double scl = 1.0 / std::sqrt(dx * dx + dy * dy + dz * dz);
-            dx *= scl, dy *= scl, dz *= scl;
-
-            // Write new destination
-            if (p_destN != nullptr)
-            {
-                double tx = ox + length * dx,
-                       ty = oy + length * dy,
-                       tz = oz + length * dz;
-
-                p_destN[i_rayN] = (dtype)tx;
-                p_destN[i_rayN + n_rayN] = (dtype)ty;
-                p_destN[i_rayN + 2 * n_rayN] = (dtype)tz;
-            }
-
-            // Calculate new origin point (consider ray offset)
-            ox += ray_offset * dx, oy += ray_offset * dy, oz += ray_offset * dz;
+            // Round the new origin to the output type before calculating 'trivecN', this way
+            // "origN + trivecN" reproduces the wavefront vertices to within 0.5 ULP of 'trivecN'
+            const dtype ox = (dtype)Cx[i_sub], oy = (dtype)Cy[i_sub], oz = (dtype)Cz[i_sub];
+            const double oxd = (double)ox, oyd = (double)oy, ozd = (double)oz;
 
             // Write new origin point
-            if (p_origN != nullptr)
+            if (p_origN)
             {
-                p_origN[i_rayN] = (dtype)ox;
-                p_origN[i_rayN + n_rayN] = (dtype)oy;
-                p_origN[i_rayN + 2 * n_rayN] = (dtype)oz;
+                const arma::uword o = i_out * s_ray_3;
+                p_origN[o] = ox;
+                p_origN[o + s_comp] = oy;
+                p_origN[o + 2 * s_comp] = oz;
             }
 
             // Write new trivec
-            if (p_trivecN != nullptr)
+            if (p_trivecN)
+                for (arma::uword v = 0; v < 3; ++v)
+                {
+                    const int k = vid[i_sub][v];
+                    const arma::uword o = i_out * s_ray_9 + 3 * v * s_comp;
+
+                    p_trivecN[o] = (dtype)(Wx[k] - oxd);
+                    p_trivecN[o + s_comp] = (dtype)(Wy[k] - oyd);
+                    p_trivecN[o + 2 * s_comp] = (dtype)(Wz[k] - ozd);
+                }
+
+            // Write new tridir
+            if (p_tridirN)
+                for (arma::uword v = 0; v < 3; ++v)
+                {
+                    const int k = vid[i_sub][v];
+                    const arma::uword o = i_out * s_ray_t + v * n_comp * s_comp;
+
+                    for (arma::uword c = 0; c < n_comp; ++c)
+                        p_tridirN[o + c * s_comp] = To[k][c];
+                }
+
+            // Write new destination
+            if (p_destN)
             {
-                double tx = w1x - ox, ty = w1y - oy, tz = w1z - oz;
+                const int k0 = vid[i_sub][0], k1 = vid[i_sub][1], k2 = vid[i_sub][2];
 
-                p_trivecN[i_rayN] = (dtype)tx;
-                p_trivecN[i_rayN + n_rayN] = (dtype)ty;
-                p_trivecN[i_rayN + 2 * n_rayN] = (dtype)tz;
+                // Ray direction at the center of the sub-beam
+                const double dx = Dx[k0] + Dx[k1] + Dx[k2],
+                             dy = Dy[k0] + Dy[k1] + Dy[k2],
+                             dz = Dz[k0] + Dz[k1] + Dz[k2];
 
-                tx = w2x - ox, ty = w2y - oy, tz = w2z - oz;
+                const double scl = length / std::sqrt(dx * dx + dy * dy + dz * dz);
+                const arma::uword o = i_out * s_ray_3;
 
-                p_trivecN[i_rayN + 3 * n_rayN] = (dtype)tx;
-                p_trivecN[i_rayN + 4 * n_rayN] = (dtype)ty;
-                p_trivecN[i_rayN + 5 * n_rayN] = (dtype)tz;
-
-                tx = w3x - ox, ty = w3y - oy, tz = w3z - oz;
-
-                p_trivecN[i_rayN + 6 * n_rayN] = (dtype)tx;
-                p_trivecN[i_rayN + 7 * n_rayN] = (dtype)ty;
-                p_trivecN[i_rayN + 8 * n_rayN] = (dtype)tz;
+                p_destN[o] = (dtype)(oxd + dx * scl);
+                p_destN[o + s_comp] = (dtype)(oyd + dy * scl);
+                p_destN[o + 2 * s_comp] = (dtype)(ozd + dz * scl);
             }
         }
     }
 
-    delete[] p_ind;
+    if (out_of_bound != 0)
+        throw std::invalid_argument("Indices cannot exceed number of rays.");
+
     return n_rayN;
 }
 
-template arma::uword quadriga_lib::subdivide_rays(const arma::Mat<float> *orig, const arma::Mat<float> *trivec, const arma::Mat<float> *tridir, const arma::Mat<float> *dest,
+template arma::uword quadriga_lib::subdivide_rays(const arma::Mat<float> &orig, const arma::Mat<float> &trivec, const arma::Mat<float> &tridir, const arma::Mat<float> *dest,
                                                   arma::Mat<float> *origN, arma::Mat<float> *trivecN, arma::Mat<float> *tridirN, arma::Mat<float> *destN,
-                                                  const arma::u32_vec *index, const double ray_offset);
+                                                  const arma::u32_vec *index, bool transposed_output);
 
-template arma::uword quadriga_lib::subdivide_rays(const arma::Mat<double> *orig, const arma::Mat<double> *trivec, const arma::Mat<double> *tridir, const arma::Mat<double> *dest,
+template arma::uword quadriga_lib::subdivide_rays(const arma::Mat<double> &orig, const arma::Mat<double> &trivec, const arma::Mat<double> &tridir, const arma::Mat<double> *dest,
                                                   arma::Mat<double> *origN, arma::Mat<double> *trivecN, arma::Mat<double> *tridirN, arma::Mat<double> *destN,
-                                                  const arma::u32_vec *index, const double ray_offset);
+                                                  const arma::u32_vec *index, bool transposed_output);

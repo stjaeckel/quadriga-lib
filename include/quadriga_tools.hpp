@@ -423,25 +423,20 @@ namespace quadriga_lib
                                 int gpu_id = 0);                               // GPU device ID for CUDA kernel, ignored otherwise
 
     // Subdivide rays
-    // - Subdivides ray beams into 4 sub beams
-    // - The input "tridir" can have 2 formats: Spherical or Cartesian
-    // - For spherical directions, the values of "tridir" are in the order [ v1az, v1el, v2az, v2el, v3az, v3el ]
-    // - For Cartesian directions, the order is [ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]
-    // - The output "tridirN" will have the same format as the input
-    // - If the (optional) index is given, the output will contain 'n_rayN = 4 * n_sub' elements.
-    // - If the input "dest" is not given, the corresponding output "destN" will be empty
-    // - Returns the number of rays in the output 'n_rayN'
+    // - Splits each selected beam into 4 sub-beams, writes 4*n_subdiv rays to the first output rows and returns that count
+    // - All non-NULL outputs need the same number of rows: too small is re-allocated (content discarded), larger is kept and only partly overwritten, wrong column count throws
+    // - Rays are selected by 'index' (all rays if it is NULL), no offset is applied to the new origins (they stay in the wavefront plane)
     template <typename dtype>
-    arma::uword subdivide_rays(const arma::Mat<dtype> *orig,           // Ray origin points in GCS, Size [ n_ray, 3 ]
-                               const arma::Mat<dtype> *trivec,         // Vectors pointing from the origin to the vertices of the triangular propagation tube, Size [ n_ray, 9 ]
-                               const arma::Mat<dtype> *tridir,         // Directions of the vertex-rays; matrix of size [no_ray, 6] or [no_ray, 9]
-                               const arma::Mat<dtype> *dest = nullptr, // Ray destination points in GCS, Size [ n_ray, 3 ]
-                               arma::Mat<dtype> *origN = nullptr,      // New ray origin points in GCS, Size [ n_rayN, 3 ]
-                               arma::Mat<dtype> *trivecN = nullptr,    // Vectors pointing from the new origin to the vertices of the triangular propagation tube, Size [ n_rayN, 9 ]
-                               arma::Mat<dtype> *tridirN = nullptr,    // The new directions of the vertex-rays, Size [ n_rayN, 6 ]
-                               arma::Mat<dtype> *destN = nullptr,      // New ray destination points in GCS, Size [ n_rayN, 3 ]
-                               const arma::u32_vec *index = nullptr,   // Optional list of indices, 0-based, Length [ n_ind ]
-                               const double ray_offset = 0.0);         // Offset of new ray origin from face plane
+    arma::uword subdivide_rays(const arma::Mat<dtype> &orig,           // Ray origins in GCS, [n_ray, 3]
+                               const arma::Mat<dtype> &trivec,         // Beam wavefront vertices relative to origin, [n_ray, 9]
+                               const arma::Mat<dtype> &tridir,         // Vertex-ray directions, spherical [n_ray, 6] or Cartesian [n_ray, 9]
+                               const arma::Mat<dtype> *dest = nullptr, // Optional: Ray destinations in GCS, [n_ray, 3] or empty
+                               arma::Mat<dtype> *origN = nullptr,      // Output: Subdivided ray origins in GCS, [n_rayN, 3]
+                               arma::Mat<dtype> *trivecN = nullptr,    // Output: Subdivided wavefront vertices, [n_rayN, 9]
+                               arma::Mat<dtype> *tridirN = nullptr,    // Output: Subdivided vertex-ray directions, format of 'tridir', [n_rayN, 6 or 9]
+                               arma::Mat<dtype> *destN = nullptr,      // Output: Subdivided destinations, untouched if 'dest' is not given, [n_rayN, 3]
+                               const arma::u32_vec *index = nullptr,   // Optional: 0-based ray indices, may repeat, sets output order, [n_subdiv]
+                               bool transposed_output = false);        // If true, all putputs are transposed: [3/6/9, n_rayN]
 
     // Subdivide triangles into smaller triangles
     template <typename dtype>
