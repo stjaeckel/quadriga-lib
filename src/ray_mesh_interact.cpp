@@ -809,7 +809,7 @@ void quadriga_lib::ray_mesh_interact(
   `path_dirN` (`eH = ẑ × k̂` normalized, `eV = eH × k̂`); `[8, n_rayN]`. For types 3–5 (scalar): `[Re Im]`
   where `Re + jIm` is the scalar pressure coefficient; `[2, n_rayN]`.
   - *Included:* TE/TM interface coefficients (with the lumped `interface_gain` folded in for the transmission
-    classes 1/2/4/5) and the incidence-plane orientation. 
+    classes 1/2/4/5) and the incidence-plane orientation.
   - *Excluded:* in-medium attenuation and excess phase — added by [[ray_state_update]] — and FSPL / spreading
     loss, which is never applied here or downstream.
 - **`trivecN`**, **`tridirN`** — Updated beam geometry/direction (format matches input); empty if inputs not provided
@@ -1046,8 +1046,10 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         ray_indN->set_size(n_rayN);
     unsigned *p_ray_indN = ray_indN ? ray_indN->memptr() : nullptr;
 
-    // Only calculate ray tube if it is required in the output
-    if (use_ray_tube && p_trivecN == nullptr && p_tridirN == nullptr)
+    // Under refraction (geometry_type 2) the per-vertex incidence can escalate to whole-tube TIR below,
+    // which changes cTE/cTM, the path direction and the TIR flag. Skip the tube only when no tube
+    // output is requested AND the tube cannot affect the center-ray result.
+    if (use_ray_tube && geometry_type != 2 && p_trivecN == nullptr && p_tridirN == nullptr && p_edge_lengthN == nullptr)
         use_ray_tube = 0;
 
 #pragma omp parallel for schedule(static)
@@ -1601,11 +1603,11 @@ template void quadriga_lib::ray_mesh_interact(int interaction_type, float center
                                               const arma::Mat<float> *mesh, const arma::uvec *mtl_ind,
                                               const std::unordered_map<std::string, std::vector<float>> *mtl_prop,
                                               const arma::u32_vec *fbs_ind, const arma::u32_vec *sbs_ind,
-                                              const arma::Mat<float> *trivec, const arma::Mat<float> *tridir, 
+                                              const arma::Mat<float> *trivec, const arma::Mat<float> *tridir,
                                               arma::Mat<float> *origN, arma::Mat<float> *destN,
                                               arma::Mat<float> *fbsN, arma::Mat<float> *sbsN,
                                               arma::Col<float> *gainN, arma::Mat<float> *xprmatN,
-                                              arma::Mat<float> *trivecN, arma::Mat<float> *tridirN, 
+                                              arma::Mat<float> *trivecN, arma::Mat<float> *tridirN,
                                               arma::Col<float> *fbs_angleN, arma::Col<float> *thicknessN, arma::Col<float> *edge_lengthN,
                                               arma::Mat<float> *normal_vecN, std::vector<uint8_t> *out_typeN,
                                               arma::Mat<float> *path_dirN, bool compact, arma::u32_vec *ray_indN);
@@ -1615,11 +1617,11 @@ template void quadriga_lib::ray_mesh_interact(int interaction_type, double cente
                                               const arma::Mat<double> *mesh, const arma::uvec *mtl_ind,
                                               const std::unordered_map<std::string, std::vector<double>> *mtl_prop,
                                               const arma::u32_vec *fbs_ind, const arma::u32_vec *sbs_ind,
-                                              const arma::Mat<double> *trivec, const arma::Mat<double> *tridir, 
+                                              const arma::Mat<double> *trivec, const arma::Mat<double> *tridir,
                                               arma::Mat<double> *origN, arma::Mat<double> *destN,
                                               arma::Mat<double> *fbsN, arma::Mat<double> *sbsN,
                                               arma::Col<double> *gainN, arma::Mat<double> *xprmatN,
-                                              arma::Mat<double> *trivecN, arma::Mat<double> *tridirN, 
+                                              arma::Mat<double> *trivecN, arma::Mat<double> *tridirN,
                                               arma::Col<double> *fbs_angleN, arma::Col<double> *thicknessN, arma::Col<double> *edge_lengthN,
                                               arma::Mat<double> *normal_vecN, std::vector<uint8_t> *out_typeN,
                                               arma::Mat<double> *path_dirN, bool compact, arma::u32_vec *ray_indN);
@@ -1870,16 +1872,12 @@ void quadriga_lib::ray_state_update(int interaction_type,
         throw std::invalid_argument("Input 'mtl_ind_buffer_in' must match the number of rays in 'orig'.");
     const short *p_buf_in = mtl_ind_buffer_in ? mtl_ind_buffer_in->memptr() : nullptr;
 
-    if (path_dir_prev && !path_dir_prev->is_finite())
-        throw std::invalid_argument("Input 'path_dir_prev' must be finite.");
     if (path_dir_prev && (path_dir_prev->n_rows != n_ray || path_dir_prev->n_cols != 3))
         throw std::invalid_argument("Input 'path_dir_prev' must have size [n_ray, 3].");
     const dtype *p_path_dir_prev = path_dir_prev ? path_dir_prev->memptr() : nullptr;
 
     if (acc_dist_in && acc_dist_in->n_rows != n_ray)
         throw std::invalid_argument("Number of rows in 'acc_dist_in' must match the number of rays in 'orig'.");
-    if (acc_dist_in && (!acc_dist_in->is_finite() || acc_dist_in->min() < (dtype)0.0))
-        throw std::invalid_argument("Input 'acc_dist_in' must be finite and >= 0.");
     const dtype *p_acc_dist_in = acc_dist_in ? acc_dist_in->memptr() : nullptr;
 
     if (mtl_ind_prev_outN && mtl_ind_prev_outN->n_elem != n_rayN)
@@ -2459,7 +2457,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
             typeR[7] = true; // Set reflection flag
 
             int mtl_exit = GET_EXIT_MATERIAL();
-            mtl_current = mtl_exit ? mtl_exit : mtl_current;          // Material the ray travels in
+            mtl_current = mtl_exit ? mtl_exit : mtl_current;        // Material the ray travels in
             int mtl_next = typeH == 5 ? M2 : (typeH == 7 ? M1 : 0); // Material the ray reflects off
 
             // Events that trigger a transparent pass-through cannot reflect at the same time
