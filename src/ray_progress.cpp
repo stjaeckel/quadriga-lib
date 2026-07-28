@@ -34,10 +34,14 @@ static inline float calc_direction(float Dx, float Dy, float Dz,    // Destinati
 
 // HELPER: Vector compaction
 template <typename dtype>
-static inline arma::Col<dtype> compact(const arma::Col<dtype> &data, const arma::u32_vec &ind)
+static inline arma::Col<dtype> compact(const arma::Col<dtype> &data,
+                                       const arma::u32_vec &ind, arma::uword ind_count = 0)
 {
-    const long long n_ind = (long long)ind.n_elem;
-    arma::Col<dtype> out(ind.n_elem, arma::fill::none);
+    if (data.empty())
+        return arma::Col<dtype>();
+
+    const long long n_ind = ind_count ? (long long)ind_count : (long long)ind.n_elem;
+    arma::Col<dtype> out((arma::uword)n_ind, arma::fill::none);
 
     const dtype *__restrict p_data = data.memptr();
     const arma::u32 *p_ind = ind.memptr();
@@ -52,9 +56,13 @@ static inline arma::Col<dtype> compact(const arma::Col<dtype> &data, const arma:
 
 // HELPER: std::vector compaction
 template <typename dtype>
-static inline std::vector<dtype> compact(const std::vector<dtype> &data, const arma::u32_vec &ind)
+static inline std::vector<dtype> compact(const std::vector<dtype> &data,
+                                         const arma::u32_vec &ind, arma::uword ind_count = 0)
 {
-    const long long n_ind = (long long)ind.n_elem;
+    if (data.empty())
+        return std::vector<dtype>();
+
+    const long long n_ind = ind_count ? (long long)ind_count : (long long)ind.n_elem;
     std::vector<dtype> out((size_t)n_ind);
 
     const dtype *__restrict p_data = data.data();
@@ -71,15 +79,19 @@ static inline std::vector<dtype> compact(const std::vector<dtype> &data, const a
 // Helper: Matrix compaction
 template <typename dtype>
 static inline arma::Mat<dtype> compact(const arma::Mat<dtype> &data,
-                                       const arma::u32_vec &ind, // row or col indices
-                                       bool compact_rows = true) // switch for dimension
+                                       const arma::u32_vec &ind,  // row or col indices
+                                       arma::uword ind_count = 0, // overwrite for ind.n_elem
+                                       bool compact_rows = true)  // switch for dimension
 {
-    const long long n_ind = (long long)ind.n_elem;
+    if (data.empty())
+        return arma::Mat<dtype>();
+
+    const long long n_ind = ind_count ? (long long)ind_count : (long long)ind.n_elem;
     const long long n_rows = (long long)data.n_rows;
     const long long n_cols = (long long)data.n_cols;
 
-    arma::Mat<dtype> out(compact_rows ? ind.n_elem : data.n_rows,
-                         compact_rows ? data.n_cols : ind.n_elem,
+    arma::Mat<dtype> out(compact_rows ? (arma::uword)n_ind : data.n_rows,
+                         compact_rows ? data.n_cols : (arma::uword)n_ind,
                          arma::fill::none);
 
     const dtype *__restrict p_data = data.memptr();
@@ -88,10 +100,13 @@ static inline arma::Mat<dtype> compact(const arma::Mat<dtype> &data,
 
     if (compact_rows) // strided gather within each column
     {
-#pragma omp parallel for collapse(2) schedule(static) if (n_ind * n_cols >= 51200)
-        for (long long c = 0; c < n_cols; ++c)
-            for (long long i = 0; i < n_ind; ++i)
-                p_out[c * n_ind + i] = p_data[c * n_rows + (long long)p_ind[i]];
+#pragma omp parallel for schedule(static) if (n_ind * n_cols >= 51200)
+        for (long long i = 0; i < n_ind; ++i)
+        {
+            const long long src = (long long)p_ind[i];
+            for (long long c = 0; c < n_cols; ++c)
+                p_out[c * n_ind + i] = p_data[c * n_rows + src];
+        }
     }
     else // whole columns are contiguous, copy them in one block
     {
@@ -105,6 +120,42 @@ static inline arma::Mat<dtype> compact(const arma::Mat<dtype> &data,
     return out;
 }
 
+// HELPER: commit a [k, n_out] ray-major launch buffer into an [n_out, k] Armadillo object.
+// Source ray i occupies src[k*i .. k*i+k-1]; destination element (i, c) lands at d[i + c*n_out].
+// Blocked so the k output streams stay resident while a tile of the source is hot in L1.
+template <typename dtype, typename outT>
+static inline void commit(outT &out, const dtype *src, arma::uword k, arma::uword n_out)
+{
+    out.set_size(n_out, k);
+    if (n_out == 0 || src == nullptr)
+        return;
+
+    dtype *__restrict d = out.memptr();
+    const long long n = (long long)n_out;
+    const long long kk = (long long)k;
+
+    if (kk == 1) // no transpose needed
+    {
+        std::memcpy(d, src, (size_t)n * sizeof(dtype));
+        return;
+    }
+
+    constexpr long long block = 256; // 256 rays x 9 floats = 9 kB, fits L1
+
+#pragma omp parallel for schedule(static) if (n * kk >= 32768)
+    for (long long b = 0; b < n; b += block)
+    {
+        const long long e = (b + block < n) ? b + block : n;
+        for (long long c = 0; c < kk; ++c)
+        {
+            dtype *__restrict dc = d + c * n;
+            const dtype *__restrict s = src + kk * b + c;
+            for (long long i = b; i < e; ++i, s += kk)
+                dc[i] = *s;
+        }
+    }
+}
+
 /*!SECTION
 Site-specific simulation tools
 SECTION!*/
@@ -116,14 +167,13 @@ Advance a ray set by one interaction, spawning reflected, transmitted, and subdi
 - Consumes a launch configuration (origins, destinations, per-ray medium state, and [[path]] storage) and
   returns the next iteration: for every ray that hits the mesh, its reflected and/or transmitted
   continuation(s), plus the four sub-beams of any ray flagged for subdivision. Rays that miss, fall below
-  `min_gain_dB`, or reach an interaction/reflection/transmission/subdivision limit are terminated.
+  `min_gain_dB`, or reach an interaction, reflection or transmission limit are terminated.
 - The full pipeline per call is: intersect ([[ray_triangle_intersect]]) → interaction ([[ray_mesh_interact]])
   → state resolve ([[ray_state_update]]) for a reflection pass and a transmission/refraction pass →
   subdivision ([[subdivide_rays]]) → assembly of the new launch configuration.
 - The function returns per-stage counts (see Returns); the new configuration holds `n_out = 4·n_subdiv + n_reflect + n_transmit`
-  rays, which may exceed or fall short of the `n_ray` passed in. When all four counts are zero the arrays come back empty 
-  (column counts preserved), and a subsequent call with an empty orig throws — so callers detect end-of-trace from an empty 
-  launch configuration (or an all-zero return) rather than a single count.
+  rays, which may exceed or fall short of the `n_ray` passed in.
+- An empty returned launch configuration (`orig.n_rows == 0`) signals end of trace; a subsequent call with an empty orig throws.
 - Memory is sized for the worst case but committed lazily: the output is built in a reserved-then-resized
   buffer, inputs are compacted in place on the intersect result before the expensive passes, and dead
   intermediates are released as the function proceeds, so peak footprint stays close to one generation.
@@ -132,7 +182,7 @@ Advance a ray set by one interaction, spawning reflected, transmitted, and subdi
   only the polarization/gain coefficient is recomputed and folded into each [[path]]; the per-frequency
   refracted direction and in-medium distance are approximated by the reference-frequency values (see the
   note on `center_frequency`).
-- Beam subdivision and beam-front updates is active only when `trivec` and `tridir` are supplied;
+- Beam subdivision and beam-front updates are active only when `trivec` and `tridir` are supplied;
   otherwise rays are traced as infinitesimal.
 
 ## Declaration:
@@ -172,9 +222,9 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
 - **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [[obj_file_read]]); each value has length `n_mtl` (max 32767)
 - **`center_frequency`** — Center frequencies in [Hz]; `[n_freq]`, 1 to 127 entries. `center_frequency[0]` is the reference frequency that defines the traced geometry
 - **`Ox`**, **`Oy`**, **`Oz`** — Point-source (transmitter) position in GCS [m]; used to recompute path length at new sub-beam origins
-- **`sub_mesh_index`** *(optional)* — Sub-mesh partition offsets for the accelerated intersect; 0-based, strictly increasing, 
+- **`sub_mesh_index`** *(optional)* — Sub-mesh partition offsets for the accelerated intersect; 0-based, strictly increasing,
   first entry 0; passed to [[ray_triangle_intersect]]; `[n_sub]`. NULL → no partitioning
-- **`aabb`** *(optional)* — Axis-aligned bounding box per sub-mesh; `[n_sub, 6]`. Requires `sub_mesh_index`. 
+- **`aabb`** *(optional)* — Axis-aligned bounding box per sub-mesh; `[n_sub, 6]`. Requires `sub_mesh_index`.
   NULL with a partition present → boxes are computed internally via [[triangle_mesh_aabb]]
 - **`max_no_interactions`** — Total interactions (segments) per ray before termination, 0 to 255. 0 disables tracing (returns 0 rays)
 - **`max_no_reflections`** — Reflections per ray, 0 to 255. 0 skips the reflection pass
@@ -186,7 +236,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
 - **`refraction_mode`** — `true` = refraction (Snell-bent transmission), `false` = straight-path transmission
 - **`scalar_mode`** — `true` = scalar (acoustic) layout, `false` = EM (2×2 Jones). Must match the layout of `paths`
 
-## In/out (launch configuration, updated in place; `[n_ray, …]` on entry, `[n_out, …]` on return):
+## In/out (launch configuration, updated in place; [n_ray, …] on entry, [n_out, …] on return):
 - **`orig`** — Ray origins in GCS; `[n_ray, 3]`. Defines `n_ray`; must be non-empty
 - **`dest`** — Ray destinations in GCS; `[n_ray, 3]`
 - **`mtl_ind_prev`**, **`mtl_ind_current`**, **`mtl_ind_buffer`** — Medium-state words (bit-masked: `mat = w & 0x7FFF`, `flag = w & 0x8000`); `[n_ray]`
@@ -202,7 +252,6 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
   - **`n_subdiv`** — rays flagged for subdivision, each expanded into 4 sub-beams
   - **`n_reflect`** — reflected continuations launched
   - **`n_transmit`** — transmitted / refracted continuations launched
-- The size of the new launch configuration is `4·n_subdiv + n_reflect + n_transmit`. All four zero means every ray terminated and the arrays come back empty
 
 ## See also:
 - [[ray_init]] (produces the initial launch configuration this function advances)
@@ -259,7 +308,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
         }
     if (n_mtl > 32767)
         throw std::invalid_argument("Number of materials cannot exceed 32767.");
-    if (n_mtl != 0 && mtl_ind.max() > n_mtl)
+    if (mtl_ind.max() > n_mtl)
         throw std::invalid_argument("Entries of 'mtl_ind' cannot exceed the number of materials.");
 
     // Frequencies; the path storage layout supports 1 to 127 frequencies
@@ -300,8 +349,6 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
 
     if (acc_dist.n_rows != n_ray || acc_dist.n_cols != 2)
         throw std::invalid_argument("Input 'acc_dist' must have size [n_ray, 2].");
-    if (acc_dist.min() < 0.0f)
-        throw std::invalid_argument("Input 'acc_dist' must be >= 0.");
 
     // Path storage must match the ray count and the requested layout
     if (paths.size() != n_ray)
@@ -374,77 +421,60 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
         throw std::invalid_argument("Input 'subdivision_tolerance_m' must be > 0.");
 
     // Launch config data
+    // Buffers are allocated once at the worst case and never grow. "new T[n]" (no parens)
+    // default-initializes, so the POD arrays are not zero-filled and untouched pages stay
+    // uncommitted on Linux; resize() only advances the committed ray count.
+    // NOTE: nothing pre-clears these buffers, so every committed slot MUST be fully written
+    // before it is read. Subdivision writes [0, 4*n_subdiv), each update_launch_config pass
+    // writes [offset, offset+n_rays); trivec/tridir are only touched in beam mode.
     struct launch_config
     {
-        std::vector<float> orig;
-        std::vector<float> dest;
-        std::vector<float> trivec;
-        std::vector<float> tridir;
-        std::vector<short> mtl_ind_prev;
-        std::vector<short> mtl_ind_current;
-        std::vector<short> mtl_ind_buffer;
-        std::vector<float> path_dir_prev;
-        std::vector<float> acc_dist;
-        std::vector<quadriga_lib::path> paths;
-        bool beam_mode_flag;
+        std::unique_ptr<float[]> orig, dest, trivec, tridir, path_dir_prev, acc_dist;
+        std::unique_ptr<short[]> mtl_ind_prev, mtl_ind_current, mtl_ind_buffer;
+        std::vector<quadriga_lib::path> paths; // std::vector so the caller can steal it with one move
 
-        size_t size() { return paths.size(); }
+        size_t n_max = 0;  // reserved ray slots
+        size_t n_used = 0; // committed ray slots
+        bool beam_mode_flag = false;
 
-        void reserve(size_t sz, bool beam_mode = true) // Reserve address space
+        size_t size() const { return n_used; }
+
+        launch_config(size_t sz, bool beam_mode = true) : n_max(sz), beam_mode_flag(beam_mode)
         {
-            orig.reserve(3 * sz);
-            dest.reserve(3 * sz);
-            trivec.reserve(beam_mode ? 9 * sz : 0);
-            tridir.reserve(beam_mode ? 9 * sz : 0);
-            mtl_ind_prev.reserve(sz);
-            mtl_ind_current.reserve(sz);
-            mtl_ind_buffer.reserve(sz);
-            path_dir_prev.reserve(3 * sz);
-            acc_dist.reserve(2 * sz);
+            orig.reset(new float[3 * sz]);
+            dest.reset(new float[3 * sz]);
+            if (beam_mode)
+                trivec.reset(new float[9 * sz]), tridir.reset(new float[9 * sz]);
+            mtl_ind_prev.reset(new short[sz]);
+            mtl_ind_current.reset(new short[sz]);
+            mtl_ind_buffer.reset(new short[sz]);
+            path_dir_prev.reset(new float[3 * sz]);
+            acc_dist.reset(new float[2 * sz]);
             paths.reserve(sz);
-            beam_mode_flag = beam_mode;
         }
-        launch_config(size_t sz, bool beam_mode = true) { reserve(sz, beam_mode); } // Construct
 
-        void resize(size_t sz) // Allocate
+        void resize(size_t sz) // Commit ray slots; the memory is already there
         {
-            if (sz < size())
+            if (sz < n_used)
                 throw std::invalid_argument("Launch buffer size cannot shrink.");
+            if (sz > n_max)
+                throw std::logic_error("Launch buffer exceeds reserved worst case.");
 
-            orig.resize(3 * sz);
-            dest.resize(3 * sz);
-            trivec.resize(beam_mode_flag ? 9 * sz : 0);
-            tridir.resize(beam_mode_flag ? 9 * sz : 0);
-            mtl_ind_prev.resize(sz);
-            mtl_ind_current.resize(sz);
-            mtl_ind_buffer.resize(sz);
-            path_dir_prev.resize(3 * sz);
-            acc_dist.resize(2 * sz);
             paths.resize(sz);
+            n_used = sz;
         }
-
-        // Armadillo wrappers
-        arma::fmat origA(bool copy = false) { return arma::fmat(orig.data(), 3, size(), copy, !copy); }
-        arma::fmat destA(bool copy = false) { return arma::fmat(dest.data(), 3, size(), copy, !copy); }
-        arma::fmat trivecA(bool copy = false) { return beam_mode_flag ? arma::fmat(trivec.data(), 9, size(), copy, !copy) : arma::fmat(); }
-        arma::fmat tridirA(bool copy = false) { return beam_mode_flag ? arma::fmat(tridir.data(), 9, size(), copy, !copy) : arma::fmat(); }
-        arma::Col<short> prevA(bool copy = false) { return arma::Col<short>(mtl_ind_prev.data(), size(), copy, !copy); }
-        arma::Col<short> currentA(bool copy = false) { return arma::Col<short>(mtl_ind_current.data(), size(), copy, !copy); }
-        arma::Col<short> bufferA(bool copy = false) { return arma::Col<short>(mtl_ind_buffer.data(), size(), copy, !copy); }
-        arma::fmat dirA(bool copy = false) { return arma::fmat(path_dir_prev.data(), 3, size(), copy, !copy); }
-        arma::fmat accA(bool copy = false) { return arma::fmat(acc_dist.data(), 2, size(), copy, !copy); }
 
         // Raw pointers
-        float *origP(size_t offset = 0) { return orig.data() + 3 * offset; }
-        float *destP(size_t offset = 0) { return dest.data() + 3 * offset; };
-        float *trivecP(size_t offset = 0) { return beam_mode_flag ? trivec.data() + 9 * offset : nullptr; };
-        float *tridirP(size_t offset = 0) { return beam_mode_flag ? tridir.data() + 9 * offset : nullptr; };
-        short *prevP(size_t offset = 0) { return mtl_ind_prev.data() + offset; };
-        short *currentP(size_t offset = 0) { return mtl_ind_current.data() + offset; };
-        short *bufferP(size_t offset = 0) { return mtl_ind_buffer.data() + offset; };
-        float *dirP(size_t offset = 0) { return path_dir_prev.data() + 3 * offset; };
-        float *accP(size_t offset = 0) { return acc_dist.data() + 2 * offset; };
-        quadriga_lib::path *pathP(size_t offset = 0) { return paths.data() + offset; };
+        float *origP(size_t offset = 0) { return orig.get() + 3 * offset; }
+        float *destP(size_t offset = 0) { return dest.get() + 3 * offset; }
+        float *trivecP(size_t offset = 0) { return beam_mode_flag ? trivec.get() + 9 * offset : nullptr; }
+        float *tridirP(size_t offset = 0) { return beam_mode_flag ? tridir.get() + 9 * offset : nullptr; }
+        short *prevP(size_t offset = 0) { return mtl_ind_prev.get() + offset; }
+        short *currentP(size_t offset = 0) { return mtl_ind_current.get() + offset; }
+        short *bufferP(size_t offset = 0) { return mtl_ind_buffer.get() + offset; }
+        float *dirP(size_t offset = 0) { return path_dir_prev.get() + 3 * offset; }
+        float *accP(size_t offset = 0) { return acc_dist.get() + 2 * offset; }
+        quadriga_lib::path *pathP(size_t offset = 0) { return paths.data() + offset; }
     };
 
     // Calculate Ray-Mesh interactions (OMP + AVX or CUDA accelerated, very compute-heavy)
@@ -455,11 +485,12 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
 
     // Count number of rays that interact with mesh, build ray_map from compaction, clear discarded path data
     arma::uword n_interact = 0;
-    arma::u32_vec ray_map(n_ray, arma::fill::none);
+    arma::u32_vec ray_map;
     if (max_no_interactions)
     {
         arma::u32 cnt = 0u;
         const arma::u32 *pi = no_interact.memptr();
+        ray_map.set_size(n_ray);
         arma::u32 *po = ray_map.memptr();
         for (unsigned i = 0; i < (unsigned)n_ray; ++i)
         {
@@ -473,9 +504,9 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
                 paths[i].free();
         }
         n_interact = (arma::uword)cnt;
-        ray_map.resize(n_interact);
     }
-    paths.resize(n_interact); // Delete tail after compaction
+    paths.resize(n_interact);             // Delete tail after compaction
+    const arma::uword n_hit = n_interact; // reported count; n_interact becomes a stride below
 
     if (n_interact == 0) // No ray hits the mesh, all paths are terminated
     {
@@ -494,18 +525,18 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
     }
 
     // Compact inputs, discard all rays that do not hit the mesh
-    orig = compact(orig, ray_map);
-    dest = compact(dest, ray_map);
+    orig = compact(orig, ray_map, n_interact);
+    dest = compact(dest, ray_map, n_interact);
     if (beam_mode)
-        *trivec = compact(*trivec, ray_map), *tridir = compact(*tridir, ray_map);
-    mtl_ind_prev = compact(mtl_ind_prev, ray_map);
-    mtl_ind_current = compact(mtl_ind_current, ray_map);
-    mtl_ind_buffer = compact(mtl_ind_buffer, ray_map);
-    path_dir_prev = compact(path_dir_prev, ray_map);
-    acc_dist = compact(acc_dist, ray_map);
-    no_interact = compact(no_interact, ray_map);
-    fbs_ind = compact(fbs_ind, ray_map);
-    sbs_ind = compact(sbs_ind, ray_map);
+        *trivec = compact(*trivec, ray_map, n_interact), *tridir = compact(*tridir, ray_map, n_interact);
+    mtl_ind_prev = compact(mtl_ind_prev, ray_map, n_interact);
+    mtl_ind_current = compact(mtl_ind_current, ray_map, n_interact);
+    mtl_ind_buffer = compact(mtl_ind_buffer, ray_map, n_interact);
+    path_dir_prev = compact(path_dir_prev, ray_map, n_interact);
+    acc_dist = compact(acc_dist, ray_map, n_interact);
+    no_interact = compact(no_interact, ray_map, n_interact);
+    fbs_ind = compact(fbs_ind, ray_map, n_interact);
+    sbs_ind = compact(sbs_ind, ray_map, n_interact);
     ray_map.reset(); // No longer needed
 
     // Reflection @ reference frequency
@@ -520,20 +551,36 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
     std::vector<uint8_t> interact_type; // Interaction type code
     arma::fmat path_dirN;               // Refraction-correct path direction
 
-    quadriga_lib::ray_mesh_interact<float>((scalar_mode ? 3 : 0),
-                                           fRef_Hz, &orig, &dest, &mesh, &mtl_ind, &mtl_prop,
-                                           &fbs_ind, &sbs_ind,
-                                           (beam_mode ? trivec : nullptr),
-                                           (beam_mode ? tridir : nullptr),
-                                           &origN, &destN, &fbsN, &sbsN, &gainN, &xprmatN,
-                                           (beam_mode ? &trivecN : nullptr),
-                                           (beam_mode ? &tridirN : nullptr),
-                                           &fbs_angleN, nullptr,
-                                           (beam_mode ? &edge_lengthN : nullptr),
-                                           &normal_vecN, &interact_type, &path_dirN);
+    if (max_no_reflections) // Full set for reflection
+        quadriga_lib::ray_mesh_interact<float>((scalar_mode ? 3 : 0),
+                                               fRef_Hz, &orig, &dest, &mesh, &mtl_ind, &mtl_prop,
+                                               &fbs_ind, &sbs_ind,
+                                               (beam_mode ? trivec : nullptr),
+                                               (beam_mode ? tridir : nullptr),
+                                               &origN, &destN, &fbsN, &sbsN, &gainN, &xprmatN,
+                                               (beam_mode ? &trivecN : nullptr),
+                                               (beam_mode ? &tridirN : nullptr),
+                                               &fbs_angleN, nullptr,
+                                               (beam_mode ? &edge_lengthN : nullptr),
+                                               &normal_vecN, &interact_type, &path_dirN, false);
+    else // Reflection disabled, only compute shared fbsN, sbsN, fbs_angleN, normal_vecN + edge_lengthN for subdivision
+        quadriga_lib::ray_mesh_interact<float>((scalar_mode ? 3 : 0),
+                                               fRef_Hz, &orig, &dest, &mesh, &mtl_ind, &mtl_prop,
+                                               &fbs_ind, &sbs_ind,
+                                               (beam_mode ? trivec : nullptr),
+                                               (beam_mode ? tridir : nullptr),
+                                               nullptr, nullptr, &fbsN, &sbsN, nullptr, nullptr,
+                                               nullptr, nullptr,
+                                               &fbs_angleN, nullptr,
+                                               (beam_mode ? &edge_lengthN : nullptr),
+                                               &normal_vecN, nullptr, nullptr, false);
+
+    // Check if stream compaction is really OFF in ray_mesh_interact
+    if (fbsN.n_rows != n_interact)
+        throw std::runtime_error("ray_mesh_interact compacted the stream.");
 
     // Flag rays that should be subdivided
-    arma::uword n_subdiv = 0;
+    arma::uword n_subdiv = 0, n_keep = 0;
     arma::u32_vec subdiv_ind, keep_ind;
     std::vector<bool> subdiv_flag(n_interact); // Init to false, bit-packed, cannot parallel write
     if (beam_mode && max_no_subdivisions)
@@ -546,12 +593,12 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
         unsigned *p_subdiv_ind = subdiv_ind.memptr();
         unsigned *p_keep_ind = keep_ind.memptr();
 
-        arma::uword n_keep = 0;
         for (unsigned i_int = 0; i_int < n_interact; ++i_int)
         {
-            if (p_current[i_int] == 0 &&                   // Currently outside
-                paths[i_int].nSUB < max_no_subdivisions && // Max. subdiv not reached
-                p_edge[i_int] > subdivision_tolerance_m)   // Tolerance exceeded
+            if (p_current[i_int] == 0 &&
+                paths[i_int].nSUB < max_no_subdivisions &&
+                paths[i_int].n_seg() < (size_t)max_no_interactions &&
+                p_edge[i_int] > subdivision_tolerance_m)
             {
                 subdiv_flag[i_int] = true;
                 p_subdiv_ind[n_subdiv++] = i_int;
@@ -559,32 +606,31 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
             else
                 p_keep_ind[n_keep++] = i_int;
         }
-        subdiv_ind.resize(n_subdiv);
-        keep_ind.resize(n_keep);
     }
     edge_lengthN.reset(); // No longer needed
 
-    // Buffer for the next state, use std::vector ans reserve address space only (lazy allocation on linux)
+    // Buffer for the next state
     arma::uword n_out_max = 4 * n_subdiv + 2 * (n_interact - n_subdiv);
-    auto L = launch_config(n_out_max, beam_mode); // Reserve only
+    auto L = launch_config(n_out_max, beam_mode); // Allocate worst case, commit lazily
 
     // Subdivision
     if (n_subdiv)
     {
-        // Allocate memory
+        // Commit ray slots
         L.resize(4 * n_subdiv);
 
         // Subdivision of origs, dest, trivec, tridir
-        arma::fmat L_orig = L.origA();
-        arma::fmat L_dest = L.destA();
-        arma::fmat L_trivec = L.trivecA();
-        arma::fmat L_tridir = L.tridirA();
-        quadriga_lib::subdivide_rays<float>(orig, *trivec, *tridir, &dest, &L_orig, &L_trivec, &L_tridir, &L_dest, &subdiv_ind, true);
+        arma::fmat L_orig(L.origP(), 3, 4 * n_subdiv, false, true);
+        arma::fmat L_dest(L.destP(), 3, 4 * n_subdiv, false, true);
+        arma::fmat L_trivec(L.trivecP(), 9, 4 * n_subdiv, false, true);
+        arma::fmat L_tridir(L.tridirP(), 9, 4 * n_subdiv, false, true);
+        const arma::u32_vec subdiv_ind_view(subdiv_ind.memptr(), n_subdiv, false, true);
+        quadriga_lib::subdivide_rays<float>(orig, *trivec, *tridir, &dest, &L_orig, &L_trivec, &L_tridir, &L_dest, &subdiv_ind_view, true);
 
         // Read pointers
         const unsigned *p_subdiv_ind = subdiv_ind.memptr(); // i_subdiv to i_int map
         const float *p_orig = L.origP();                    // Updated origins
-        const float *p_dest = L.destP();                    // Updated origins
+        const float *p_dest = L.destP();                    // Updated destinations
         const short *cP = mtl_ind_prev.memptr();
         const short *cC = mtl_ind_current.memptr();
         const short *cB = mtl_ind_buffer.memptr();
@@ -597,7 +643,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
         float *p_acc = L.accP();
 
         // Update path storage, state words, directions
-#pragma omp parallel for schedule(static)
+#pragma omp parallel for schedule(static) if (n_subdiv >= 64)
         for (long long i_subdiv = 0; i_subdiv < (long long)n_subdiv; ++i_subdiv)
         {
             const arma::uword i_int = p_subdiv_ind[i_subdiv]; // Interaction ID
@@ -633,7 +679,10 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
                 pC[i_out] = cC[i_int];
                 pB[i_out] = cB[i_int];
 
-                // Update path direction
+                // Sub-beams are only created outside a medium (gated on mtl_ind_current == 0 above).
+                // That is what makes it safe to (a) recompute path_dir_prev geometrically — inside a
+                // medium in undeviated mode it would differ from the tracked refracted direction — and
+                // (b) reset acc_dist to zero. Do not relax the gate without revisiting both.
                 float Vx, Vy, Vz;
                 calc_direction(p_dest[i_out3], p_dest[i_out3 + 1], p_dest[i_out3 + 2], Sx, Sy, Sz, Vx, Vy, Vz);
                 p_dir[i_out3] = Vx, p_dir[i_out3 + 1] = Vy, p_dir[i_out3 + 2] = Vz;
@@ -645,45 +694,53 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
     }
     subdiv_ind.reset(); // No longer needed
 
-    // Compact stream, discard all rays that have been subdivided
-    if (double(n_subdiv) / double(n_interact) > 0.05) // only if the cost is worth it
+    // Compaction moves roughly 800 bytes of traffic per surviving ray; skipping it wastes
+    // 2*n_freq heavy ray_mesh_interact / ray_state_update passes on every subdivided ray.
+    // Break-even is near 1% at n_freq = 1 and lower above that, so the threshold sits at 1%.
+    // It also caps how much dead intermediate storage is carried into the transmission pass.
+    if (double(n_subdiv) / double(n_interact) > 0.01)
     {
+
         // Previous launch config, still consumed by ray_state_update
-        orig = compact(orig, keep_ind);
-        dest = compact(dest, keep_ind);
-        mtl_ind_prev = compact(mtl_ind_prev, keep_ind);
-        mtl_ind_current = compact(mtl_ind_current, keep_ind);
-        mtl_ind_buffer = compact(mtl_ind_buffer, keep_ind);
-        path_dir_prev = compact(path_dir_prev, keep_ind);
-        acc_dist = compact(acc_dist, keep_ind);
-        no_interact = compact(no_interact, keep_ind);
-        fbs_ind = compact(fbs_ind, keep_ind);
-        sbs_ind = compact(sbs_ind, keep_ind);
+        orig = compact(orig, keep_ind, n_keep);
+        dest = compact(dest, keep_ind, n_keep);
+        mtl_ind_prev = compact(mtl_ind_prev, keep_ind, n_keep);
+        mtl_ind_current = compact(mtl_ind_current, keep_ind, n_keep);
+        mtl_ind_buffer = compact(mtl_ind_buffer, keep_ind, n_keep);
+        path_dir_prev = compact(path_dir_prev, keep_ind, n_keep);
+        acc_dist = compact(acc_dist, keep_ind, n_keep);
+        no_interact = compact(no_interact, keep_ind, n_keep);
+        fbs_ind = compact(fbs_ind, keep_ind, n_keep);
+        sbs_ind = compact(sbs_ind, keep_ind, n_keep);
 
         // ray_mesh_interact outputs
-        origN = compact(origN, keep_ind);
-        destN = compact(destN, keep_ind);
-        fbsN = compact(fbsN, keep_ind);
-        sbsN = compact(sbsN, keep_ind);
-        gainN = compact(gainN, keep_ind);
-        xprmatN = compact(xprmatN, keep_ind, false); // rays are in the columns
-        fbs_angleN = compact(fbs_angleN, keep_ind);
-        normal_vecN = compact(normal_vecN, keep_ind);
-        path_dirN = compact(path_dirN, keep_ind);
-        interact_type = compact(interact_type, keep_ind);
+        origN = compact(origN, keep_ind, n_keep);
+        destN = compact(destN, keep_ind, n_keep);
+        fbsN = compact(fbsN, keep_ind, n_keep);
+        sbsN = compact(sbsN, keep_ind, n_keep);
+        gainN = compact(gainN, keep_ind, n_keep);
+        xprmatN = compact(xprmatN, keep_ind, n_keep, false); // rays are in the columns
+        fbs_angleN = compact(fbs_angleN, keep_ind, n_keep);
+        normal_vecN = compact(normal_vecN, keep_ind, n_keep);
+        path_dirN = compact(path_dirN, keep_ind, n_keep);
+        interact_type = compact(interact_type, keep_ind, n_keep);
+
         if (beam_mode)
-            trivecN = compact(trivecN, keep_ind), tridirN = compact(tridirN, keep_ind);
+        {
+            *trivec = compact(*trivec, keep_ind, n_keep);
+            *tridir = compact(*tridir, keep_ind, n_keep);
+            trivecN = compact(trivecN, keep_ind, n_keep);
+            tridirN = compact(tridirN, keep_ind, n_keep);
+        }
 
         // Path storage, moved in place: keep_ind is strictly increasing, so source >= target
         const unsigned *p_keep = keep_ind.memptr();
-        const size_t n_keep = (size_t)keep_ind.n_elem;
         for (size_t i = 0; i < n_keep; ++i)
             if ((size_t)p_keep[i] != i)
                 paths[i] = std::move(paths[p_keep[i]]);
-        paths.resize(n_keep); // Delete tail after compaction
-
-        n_interact -= n_subdiv;
-        subdiv_flag.assign(n_interact, false); // set false
+        paths.resize(n_keep);              // Delete tail after compaction
+        subdiv_flag.assign(n_keep, false); // set false
+        n_interact = n_keep;
     }
     keep_ind.reset(); // No longer needed
 
@@ -715,12 +772,41 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
     arma::Col<short> prevN, currentN, bufferN; // New state words
     arma::fmat acc_distN;                      // Updated accumulated VBS distance
 
+    // Compute existing gains @ reference freq
+    // calc_gain (sqrt + divide) is hoisted out of check_gains, which is serial because it
+    // builds a compacted index with a running counter. Recomputing it there would cost two
+    // serial sqrt passes over n_interact. If check_gains is ever parallelized, drop this
+    // array and compute the gain inline instead.
+    arma::fvec pre_interaction_gains;
+    if (n_interact && (max_no_reflections || max_no_transmissions))
+    {
+        pre_interaction_gains.set_size(n_interact);
+        const float *p_orig = orig.memptr();
+        const float *p_fbs = fbsN.memptr();
+        float *p_gain = pre_interaction_gains.memptr();
+
+#pragma omp parallel for schedule(static) if (n_interact >= 4096)
+        for (long long i_int = 0; i_int < (long long)n_interact; ++i_int)
+        {
+            if (subdiv_flag[i_int])
+            {
+                p_gain[i_int] = 0.0;
+                continue;
+            }
+
+            size_t iY = (size_t)i_int + n_interact;
+            size_t iZ = iY + n_interact;
+
+            float length = calc_length(p_fbs[i_int], p_fbs[iY], p_fbs[iZ], p_orig[i_int], p_orig[iY], p_orig[iZ]) + paths[i_int].length;
+            p_gain[i_int] = paths[i_int].calc_gain(fRef_GHz, 0, length);
+        }
+    }
+
     // Lambda to determine which paths to keep based on the gain, used by reflect and transmit pass
     auto check_gains = [&](bool reflect_pass) -> arma::uword
     {
         // Read pointers
-        const float *p_orig = orig.memptr();
-        const float *p_fbs = fbsN.memptr();
+        const float *p_gainO = pre_interaction_gains.memptr();
         const float *p_gainN = gainN.memptr();
 
         // Write indices
@@ -730,15 +816,8 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
         arma::uword cnt = 0;
         for (unsigned i_int = 0; i_int < n_interact; ++i_int)
         {
-            if (subdiv_flag[i_int])
-                continue;
-
-            size_t iY = (size_t)i_int + n_interact;
-            size_t iZ = iY + n_interact;
-
-            float length = calc_length(p_fbs[i_int], p_fbs[iY], p_fbs[iZ], p_orig[i_int], p_orig[iY], p_orig[iZ]) + paths[i_int].length;
-            float gain = paths[i_int].calc_gain(fRef_GHz, 0, length) * p_gainN[i_int];
-
+            // subdivided rays carry pre_interaction_gains == 0 and fail the threshold below
+            float gain = p_gainO[i_int] * p_gainN[i_int];
             if (gain > min_gain_linear && paths[i_int].n_seg() < (size_t)max_no_interactions)
             {
                 if (reflect_pass)
@@ -750,7 +829,6 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
                     p_keep_ind[cnt++] = i_int;
             }
         }
-        keep_ind.resize(cnt);
         return cnt;
     };
 
@@ -791,7 +869,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
         float *p_acc = L.accP(offset);
         quadriga_lib::path *p_path = L.pathP(offset);
 
-#pragma omp parallel for schedule(static)
+#pragma omp parallel for schedule(static) if (n_rays >= 256)
         for (long long i_ray = 0; i_ray < (long long)n_rays; ++i_ray)
         {
             const size_t i_out = (size_t)i_ray;
@@ -849,10 +927,13 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
 
         for (arma::uword i_freq = 1; i_freq < n_freq; ++i_freq)
         {
+            // Note: fbsN, sbsN, fbs_angleN, normal_vecN are re-used from the reflection / subdivision pass
+            // trivec and tridir are needed as input to evaluate TIR conditions for the entire ray tube and not just he spine
             quadriga_lib::ray_mesh_interact<float>(interaction_type, center_frequency[i_freq], &orig, &dest,
-                                                   &mesh, &mtl_ind, &mtl_prop, &fbs_ind, &sbs_ind, nullptr, nullptr,
+                                                   &mesh, &mtl_ind, &mtl_prop, &fbs_ind, &sbs_ind,
+                                                   (beam_mode ? trivec : nullptr), (beam_mode ? tridir : nullptr),
                                                    nullptr, nullptr, nullptr, nullptr, nullptr, &xprmatN, nullptr, nullptr,
-                                                   nullptr, nullptr, nullptr, nullptr, &interact_type, &path_dirN);
+                                                   nullptr, nullptr, nullptr, nullptr, &interact_type, &path_dirN, false);
 
             // ISSUE: "path_dir_prev" and "acc_dist" are for the base frequency. "path_dirN" is computed at the correct frequency
             // Both probably need to be tracked per-frequency, adding 5 floats per frequency.
@@ -875,7 +956,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
 
             const float *p_xpr_freq = xprmatN.memptr();
 
-#pragma omp parallel for schedule(static) if (n_interact >= 51200)
+#pragma omp parallel for schedule(static) if (n_rays >= 2048)
             for (long long i_ray = 0; i_ray < (long long)n_rays; ++i_ray)
             {
                 const size_t iX = (size_t)p_keep_ind[i_ray];
@@ -916,7 +997,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
                                                &origN, &destN, &fbsN, &sbsN, &gainN, &xprmatN,
                                                (beam_mode ? &trivecN : nullptr),
                                                (beam_mode ? &tridirN : nullptr),
-                                               nullptr, nullptr, nullptr, nullptr, &interact_type, &path_dirN);
+                                               nullptr, nullptr, nullptr, nullptr, &interact_type, &path_dirN, false);
 
         // Resolve ray state for transmission pass
         quadriga_lib::ray_state_update<float>((scalar_mode ? (refraction_mode ? 5 : 4) : (refraction_mode ? 2 : 1)),
@@ -936,54 +1017,53 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
     }
 
     // Free memory
-    origN.reset();
-    destN.reset();
-    fbsN.reset();
-    sbsN.reset();
-    xprmatN.reset();
-    interact_type.clear();
-    prevN.reset();
-    currentN.reset();
-    bufferN.reset();
-    path_dirN.reset();
-    acc_distN.reset();
-    no_interact.reset();
-
-    // ISSUE: The armadillo transpose on an armadillo view may be slow (no OMP, etc.).
-    // Should benchmark and hand-roll if needed.
+    std::vector<bool>().swap(subdiv_flag);      // deallocate
+    std::vector<uint8_t>().swap(interact_type); // deallocate
+    pre_interaction_gains.reset();
+    orig.reset(), dest.reset(), path_dir_prev.reset(), acc_dist.reset();
+    mtl_ind_prev.reset(), mtl_ind_current.reset(), mtl_ind_buffer.reset();
+    origN.reset(), destN.reset(), fbsN.reset(), sbsN.reset(), xprmatN.reset();
+    prevN.reset(), currentN.reset(), bufferN.reset();
+    path_dirN.reset(), acc_distN.reset(), normal_vecN.reset(), fbs_angleN.reset();
+    no_interact.reset(), fbs_ind.reset(), sbs_ind.reset();
+    mtl_ind_fbs.reset(), mtl_ind_sbs.reset(), keep_ind.reset();
+    if (beam_mode)
+        trivec->reset(), tridir->reset(), trivecN.reset(), tridirN.reset();
 
     // Copy paths to new launch config
-    orig = L.origA().t();
-    L.orig.clear();
+    const arma::uword n_out = (arma::uword)L.size();
 
-    dest = L.destA().t();
-    L.dest.clear();
+    commit(orig, L.origP(), 3, n_out);
+    L.orig.reset();
 
-    mtl_ind_prev = L.prevA(true);
-    L.mtl_ind_prev.clear();
+    commit(dest, L.destP(), 3, n_out);
+    L.dest.reset();
 
-    mtl_ind_current = L.currentA(true);
-    L.mtl_ind_current.clear();
+    commit(mtl_ind_prev, L.prevP(), 1, n_out);
+    L.mtl_ind_prev.reset();
 
-    mtl_ind_buffer = L.bufferA(true);
-    L.mtl_ind_buffer.clear();
+    commit(mtl_ind_current, L.currentP(), 1, n_out);
+    L.mtl_ind_current.reset();
 
-    path_dir_prev = L.dirA().t();
-    L.path_dir_prev.clear();
+    commit(mtl_ind_buffer, L.bufferP(), 1, n_out);
+    L.mtl_ind_buffer.reset();
 
-    acc_dist = L.accA().t();
-    L.acc_dist.clear();
+    commit(path_dir_prev, L.dirP(), 3, n_out);
+    L.path_dir_prev.reset();
+
+    commit(acc_dist, L.accP(), 2, n_out);
+    L.acc_dist.reset();
 
     paths = std::move(L.paths);
     if (beam_mode)
     {
-        *trivec = L.trivecA().t();
-        L.trivec.clear();
-        *tridir = L.tridirA().t();
-        L.tridir.clear();
+        commit(*trivec, L.trivecP(), 9, n_out);
+        L.trivec.reset();
+        commit(*tridir, L.tridirP(), 9, n_out);
+        L.tridir.reset();
     }
 
     // Statistics
-    std::array<unsigned, 4> stats = {(unsigned)n_interact, (unsigned)n_subdiv, (unsigned)n_reflect, (unsigned)n_transmit};
+    std::array<unsigned, 4> stats = {(unsigned)n_hit, (unsigned)n_subdiv, (unsigned)n_reflect, (unsigned)n_transmit};
     return stats;
 }

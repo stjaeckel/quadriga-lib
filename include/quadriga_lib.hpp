@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 #include <array>
+#include <memory>
 
 // If arma::uword and size_t are not the same width (e.g. 64 bit), the compiler will throw an error here
 // This allows the use of "arma::uword", "size_t" and "unsigned long long" interchangeably
