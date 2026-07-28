@@ -10,6 +10,7 @@
 #include <armadillo>
 #include <string>
 #include <vector>
+#include <array>
 
 // If arma::uword and size_t are not the same width (e.g. 64 bit), the compiler will throw an error here
 // This allows the use of "arma::uword", "size_t" and "unsigned long long" interchangeably
@@ -108,6 +109,39 @@ namespace quadriga_lib
                          const arma::fmat *mesh = nullptr,                 // Optional: faces of the triangular mesh for sphere size detection, [ n_mesh, 9 ]
                          const arma::u32_vec *sub_mesh_index = nullptr,    // Optional: Sub-mesh index, 0-based, [n_sub]
                          bool scalar_mode = false);                        // Switch for EM mode or scalar mode
+
+    // Progress rays to next iteration step
+    // - Retuns number of rays in new launch configuration
+    // - Termination conditions: below min gain, reached destination
+    // - Rays exceeding any of their assigned limits (reflections, transmissions, subdivision) are terminated
+    // - Launch configuration is updated in-place
+    std::array<unsigned, 4> ray_progress(const arma::fmat &mesh,                                              // Faces of the triangular mesh, [n_mesh, 9]
+                                         const arma::uvec &mtl_ind,                                           // 1-based material index per face, [n_mesh]
+                                         const std::unordered_map<std::string, std::vector<float>> &mtl_prop, // Material properties
+                                         const arma::fvec &center_frequency,                                  // Center frequencies in Hz, [n_freq]
+                                         float Ox, float Oy, float Oz,                                        // Origin position
+                                         arma::fmat &orig,                                                    // Ray origins in GCS, updated in-place, [n_ray, 3]
+                                         arma::fmat &dest,                                                    // Ray destinations in GCS, updated in-place, [n_ray, 3]
+                                         arma::Col<short> &mtl_ind_prev,                                      // Previous medium (0 = outside), updated in-place, [n_ray]
+                                         arma::Col<short> &mtl_ind_current,                                   // Current medium (0 = outside), updated in-place, [n_ray]
+                                         arma::Col<short> &mtl_ind_buffer,                                    // Next-transition buffer (0 = empty), updated in-place, [n_ray]
+                                         arma::fmat &path_dir_prev,                                           // Physical ray direction, updated in-place, [n_ray, 3]
+                                         arma::fmat &acc_dist,                                                // Accumulated in-layer distance, updated in-place, [n_ray, 2]
+                                         std::vector<quadriga_lib::path> &paths,                              // Path data storage, 64 byte + overflow, updated in-place, [n_ray]
+                                         arma::fmat *trivec = nullptr,                                        // Optional: Beam wavefront vertices relative to origin, updated in-place, [n_ray, 9]
+                                         arma::fmat *tridir = nullptr,                                        // Optional: Vertex-ray directions, updated in-place, Cartesian [n_ray, 9]
+                                         const arma::u32_vec *sub_mesh_index = nullptr,                       // Optional: Sub-mesh index, 0-based, [n_sub]
+                                         const arma::fmat *aabb = nullptr,                                    // Optional: Bounding box matrix; [n_sub, 6]
+                                         uint8_t max_no_interactions = 20,                                    // Total number of interactions per ray, 0-255
+                                         uint8_t max_no_reflections = 10,                                     // Number of reflections, 0-255
+                                         uint8_t max_no_transmissions = 10,                                   // Number of transmissions / refractions, 0-255
+                                         uint8_t max_no_subdivisions = 2,                                     // Number of subdivisions, 0-255
+                                         float min_gain_dB = -140.0f,                                         // Minimum gain below which a path is terminated
+                                         float subdivision_tolerance_m = 3.0f,                                // Max. beam edge length before subdivision
+                                         float thin_slab_threshold = 0.15f,                                   // Resolve threshold on the round-trip in-slab amplitude
+                                         bool refraction_mode = true,                                         // Switch for straight-path / refraction
+                                         bool scalar_mode = false                                             // Switch for EM mode or scalar mode
+    );
 
 }
 
