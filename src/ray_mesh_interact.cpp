@@ -762,7 +762,6 @@ void quadriga_lib::ray_mesh_interact(
     const arma::u32_vec *sbs_ind,
     const arma::Mat<dtype> *trivec = nullptr,
     const arma::Mat<dtype> *tridir = nullptr,
-    const arma::Col<dtype> *orig_length = nullptr,
     arma::Mat<dtype> *origN = nullptr,
     arma::Mat<dtype> *destN = nullptr,
     arma::Mat<dtype> *fbsN = nullptr,
@@ -771,20 +770,19 @@ void quadriga_lib::ray_mesh_interact(
     arma::Mat<dtype> *xprmatN = nullptr,
     arma::Mat<dtype> *trivecN = nullptr,
     arma::Mat<dtype> *tridirN = nullptr,
-    arma::Col<dtype> *orig_lengthN = nullptr,
     arma::Col<dtype> *fbs_angleN = nullptr,
     arma::Col<dtype> *thicknessN = nullptr,
     arma::Col<dtype> *edge_lengthN = nullptr,
     arma::Mat<dtype> *normal_vecN = nullptr,
     std::vector<uint8_t> *out_typeN = nullptr,
     arma::Mat<dtype> *path_dirN = nullptr,
-    bool compact = true,
+    bool compact = false,
     arma::u32_vec *ray_indN = nullptr);
 ```
 
 ## Inputs:
 - **`interaction_type`** — 0 = EM reflection, 1 = EM transmission, 2 = EM refraction, 3 = scalar reflection, 4 = scalar transmission, 5 = scalar refraction
-- **`center_frequency`** — Center frequency
+- **`center_frequency`** — Center frequency in [Hz]
 - **`orig`**, **`dest`** — Ray origin and destination in GCS; `[n_ray, 3]`
 - **`mesh`** — Triangle mesh faces; see [[obj_file_read]]; `[n_mesh, 9]`
 - **`mtl_ind`** — 1-based material index per face (the `csv_ind` output of [[obj_file_read]]); `[n_mesh]`.
@@ -794,21 +792,27 @@ void quadriga_lib::ray_mesh_interact(
 - **`fbs_ind`**, **`sbs_ind`** — 1-based mesh face indices per ray (0 = no hit); `[n_ray]`
 - **`trivec`** *(optional)* — Beam wavefront triangle vertices relative to origin; `[n_ray, 9]`, order `[v1x v1y v1z v2x v2y v2z v3x v3y v3z]`
 - **`tridir`** *(optional)* — Vertex-ray directions; `[n_ray, 6]` for spherical `[v1az v1el v2az v2el v3az v3el]` or `[n_ray, 9]` for Cartesian
-- **`orig_length`** *(optional)* — Accumulated path length at origin; `[n_ray]`, default 0
-- **`compact`** *(optional)* — If `true` (default), no-hit rays are dropped and `n_rayN ≤ n_ray`. If
-  `false`, all rays are kept (`n_rayN = n_ray`) and no-hit rays are written as a transparent pass-through
+- **`compact`** *(optional)* — If `true`, no-hit rays are dropped and `n_rayN ≤ n_ray`. If
+  `false` (default), all rays are kept (`n_rayN = n_ray`) and no-hit rays are written as a transparent pass-through
   (gain 1, identity `xprmat`, `out_type = 0`).
 
 ## Outputs:
-- **`origN`** — New origins after interaction (offset 0.001 m along travel direction); `[n_rayN, 3]`
+- **`origN`** — New origins after interaction, nudged off the face along the travel direction by ~8 float ULP
+  at the interaction-point coordinate magnitude; `[n_rayN, 3]`
 - **`destN`** — New destinations accounting for direction change; `[n_rayN, 3]`
 - **`fbsN`**, **`sbsN`** — First/second interaction points in GCS; `[n_ray, 3]`
-- **`gainN`** — Interaction gain; averaged over TE/TM polarizations for types 0–2, TE-only for types 3–5; `[n_rayN]`
-- **`xprmatN`** — For types 0–2: polarization transfer matrix, interleaved complex, col-major `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]`;
-  includes interaction gain, TE/TM coefficients, incidence plane orientation; excludes in-medium attenuation, FSPL `[8, n_rayN]`.
-  For types 3–5 (scalar): `[Re Im]` where Re+jIm is the scalar pressure coefficient; `[2, n_rayN]`.
+- **`gainN`** — Linear power gain of the interaction. Derived from `xprmatN`, not an independent factor; `[n_rayN]`
+- **`xprmatN`** — Polarization transfer matrix; not normalized: the entries are amplitude coefficients
+  that already carry the interaction gain. For types 0–2: interleaved complex, col-major
+  `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]`, i.e. the Jones matrix `M = [VV VH; HV HH]` acting as
+  `e_out = M · e_in`; the incoming V/H basis is built from the incident direction, the outgoing basis from
+  `path_dirN` (`eH = ẑ × k̂` normalized, `eV = eH × k̂`); `[8, n_rayN]`. For types 3–5 (scalar): `[Re Im]`
+  where `Re + jIm` is the scalar pressure coefficient; `[2, n_rayN]`.
+  - *Included:* TE/TM interface coefficients (with the lumped `interface_gain` folded in for the transmission
+    classes 1/2/4/5) and the incidence-plane orientation. 
+  - *Excluded:* in-medium attenuation and excess phase — added by [[ray_state_update]] — and FSPL / spreading
+    loss, which is never applied here or downstream.
 - **`trivecN`**, **`tridirN`** — Updated beam geometry/direction (format matches input); empty if inputs not provided
-- **`orig_lengthN`** — Path length from `orig` to `origN`, added to input `orig_length` if given; `[n_rayN]`
 - **`fbs_angleN`** — Incidence angle at FBS in rad; `[n_rayN]`
 - **`thicknessN`** — Material thickness (FBS-to-SBS distance); `[n_rayN]`
 - **`edge_lengthN`** — Max edge length of ray tube triangle at new origin (∞ if partial hit); `[n_rayN]`
@@ -836,7 +840,7 @@ void quadriga_lib::ray_mesh_interact(
    |  23   |  55   | Corner hit, outside→inside→outside                  |
    |  29   |  61   | Corner hit, inside-inside→outside                   |
    |  31   |  63   | Corner hit, outside→inside-inside                   |
-- **`path_dirN`** — Refraction-correct path direction: mirror for types 0/3, Snell direction for types 1/2/4; `[n_rayN, 3]`.
+- **`path_dirN`** — Refraction-correct path direction: mirror for types 0/3, Snell direction for types 1/2/4/5; `[n_rayN, 3]`.
   For undeviated transmission (types 1/4) this is the *refracted* direction, which differs from the geometric continuation
   (along the incoming ray) used for `origN`/`destN`; it lets downstream code recover the true transmission angle.
 - **`ray_indN`** — 0-based input ray index for each output ray (inverse of the internal compaction map; order-preserving); `[n_rayN]`
@@ -862,7 +866,6 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
                                      const arma::u32_vec *sbs_ind,
                                      const arma::Mat<dtype> *trivec,
                                      const arma::Mat<dtype> *tridir,
-                                     const arma::Col<dtype> *orig_length,
                                      arma::Mat<dtype> *origN,
                                      arma::Mat<dtype> *destN,
                                      arma::Mat<dtype> *fbsN,
@@ -871,7 +874,6 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
                                      arma::Mat<dtype> *xprmatN,
                                      arma::Mat<dtype> *trivecN,
                                      arma::Mat<dtype> *tridirN,
-                                     arma::Col<dtype> *orig_lengthN,
                                      arma::Col<dtype> *fbs_angleN,
                                      arma::Col<dtype> *thicknessN,
                                      arma::Col<dtype> *edge_lengthN,
@@ -952,16 +954,11 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
     const dtype *p_trivec = trivec ? trivec->memptr() : nullptr;
     const dtype *p_tridir = tridir ? tridir->memptr() : nullptr;
 
-    // Check for 'orig_length'
-    if (orig_length && !orig_length->is_empty() && orig_length->n_elem != n_ray)
-        throw std::invalid_argument("Number of elements in 'orig_length' does not match number of rows in 'orig'.");
-    const dtype *p_orig_length = orig_length ? orig_length->memptr() : nullptr;
-
     // Resolve material columns once; air (empty) table when no material model is supplied.
     const arma::uword *p_mtl_ind = (mtl_ind == nullptr || mtl_ind->is_empty()) ? nullptr : mtl_ind->memptr();
     MaterialCols<dtype> cols = (mtl_prop) ? MaterialCols<dtype>(*mtl_prop) : MaterialCols<dtype>();
-    if (p_mtl_ind && (arma::uword)mtl_ind->max() > cols.n_mtl)
-        throw std::invalid_argument("Values in 'mtl_ind' exceed the number of materials in 'mtl_prop'.");
+    if (p_mtl_ind && mtl_ind->max() > cols.n_mtl)
+        throw std::invalid_argument("Entries of 'mtl_ind' cannot exceed the number of materials.");
 
     // Get number of output rays and build output ray index
     // - Only consider rays that have at least one interaction with the mesh, i.e. 'fbs_ind != 0'
@@ -1020,10 +1017,6 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
     else if (tridirN && !use_ray_tube && !tridirN->is_empty())
         tridirN->reset();
     dtype *p_tridirN = tridirN ? tridirN->memptr() : nullptr;
-
-    if (orig_lengthN && orig_lengthN->n_elem != n_rayN)
-        orig_lengthN->set_size(n_rayN);
-    dtype *p_orig_lengthN = orig_lengthN ? orig_lengthN->memptr() : nullptr;
 
     if (fbs_angleN && fbs_angleN->n_elem != n_rayN)
         fbs_angleN->set_size(n_rayN);
@@ -1214,7 +1207,6 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
                 }
             }
 
-            SET1(p_orig_lengthN, (p_orig_length ? double(p_orig_length[iRx]) + OD_length : OD_length));
             SET1(p_fbs_angleN, 1.570796326794897);
             SET1(p_thicknessN, 0.0);
 
@@ -1589,7 +1581,6 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         else // Cartesian
             SETL(p_tridirN, p_tridir_tmp);
 
-        SET1(p_orig_lengthN, (p_orig_length ? double(p_orig_length[iRx]) + OF_length : OF_length));
         SET1(p_fbs_angleN, thetaF);
         SET1(p_thicknessN, FS_length);
         SET1(p_edge_lengthN, edge_length_tmp);
@@ -1610,11 +1601,11 @@ template void quadriga_lib::ray_mesh_interact(int interaction_type, float center
                                               const arma::Mat<float> *mesh, const arma::uvec *mtl_ind,
                                               const std::unordered_map<std::string, std::vector<float>> *mtl_prop,
                                               const arma::u32_vec *fbs_ind, const arma::u32_vec *sbs_ind,
-                                              const arma::Mat<float> *trivec, const arma::Mat<float> *tridir, const arma::Col<float> *orig_length,
+                                              const arma::Mat<float> *trivec, const arma::Mat<float> *tridir, 
                                               arma::Mat<float> *origN, arma::Mat<float> *destN,
                                               arma::Mat<float> *fbsN, arma::Mat<float> *sbsN,
                                               arma::Col<float> *gainN, arma::Mat<float> *xprmatN,
-                                              arma::Mat<float> *trivecN, arma::Mat<float> *tridirN, arma::Col<float> *orig_lengthN,
+                                              arma::Mat<float> *trivecN, arma::Mat<float> *tridirN, 
                                               arma::Col<float> *fbs_angleN, arma::Col<float> *thicknessN, arma::Col<float> *edge_lengthN,
                                               arma::Mat<float> *normal_vecN, std::vector<uint8_t> *out_typeN,
                                               arma::Mat<float> *path_dirN, bool compact, arma::u32_vec *ray_indN);
@@ -1624,11 +1615,11 @@ template void quadriga_lib::ray_mesh_interact(int interaction_type, double cente
                                               const arma::Mat<double> *mesh, const arma::uvec *mtl_ind,
                                               const std::unordered_map<std::string, std::vector<double>> *mtl_prop,
                                               const arma::u32_vec *fbs_ind, const arma::u32_vec *sbs_ind,
-                                              const arma::Mat<double> *trivec, const arma::Mat<double> *tridir, const arma::Col<double> *orig_length,
+                                              const arma::Mat<double> *trivec, const arma::Mat<double> *tridir, 
                                               arma::Mat<double> *origN, arma::Mat<double> *destN,
                                               arma::Mat<double> *fbsN, arma::Mat<double> *sbsN,
                                               arma::Col<double> *gainN, arma::Mat<double> *xprmatN,
-                                              arma::Mat<double> *trivecN, arma::Mat<double> *tridirN, arma::Col<double> *orig_lengthN,
+                                              arma::Mat<double> *trivecN, arma::Mat<double> *tridirN, 
                                               arma::Col<double> *fbs_angleN, arma::Col<double> *thicknessN, arma::Col<double> *edge_lengthN,
                                               arma::Mat<double> *normal_vecN, std::vector<uint8_t> *out_typeN,
                                               arma::Mat<double> *path_dirN, bool compact, arma::u32_vec *ray_indN);
@@ -1711,8 +1702,17 @@ void quadriga_lib::ray_state_update(
   compact set; `[n_rayN]`. NULL skips the write. Passing all six state args NULL disables tracking —
   each interaction is corrected on its own (entry loss, TR kill, single-hit air-gap `S`); cross-interaction slab `S` and
   reflection-bounce `S` need the tracked medium.
-- **`gainN`** *(in/out)* — Per-interaction gain, updated in place; `[n_rayN]`
-- **`xprmatN`** *(in/out)* — Polarization transfer matrix; updated in place; `[8, n_rayN]` for EM mode, `[2, n_rayN]` for scalar mode
+- **`gainN`** *(in/out)* — Per-interaction linear power gain, updated in place; `[n_rayN]`. Kept consistent
+  with `xprmatN` at every write. A killed ray (`resolved_typeN == 0`) yields `gainN = 0` together with
+  an all-zero `xprmatN`.
+- **`xprmatN`** *(in/out)* — Polarization transfer matrix, updated in place; `[8, n_rayN]` for EM mode,
+  `[2, n_rayN]` for scalar mode. Same layout and basis convention as in [[ray_mesh_interact]], but with the
+  medium closed out: on return it additionally contains the in-medium attenuation and excess phase of the
+  traversed segment and, when the resolve bit of `resolved_typeN` is set, the closed-form thin-slab (Airy)
+  factor `S` covering the full internal multiple-reflection series. FSPL / spreading loss remains excluded,
+  so the matrix is the complete per-interaction Jones factor and can be left-multiplied directly into a
+  per-path product. When the series is re-emitted instead (`ρ < eps`, resolve bit clear), the matrix carries
+  only the first-pass coefficient and the remaining bounces arrive as separate interactions.
 - **`path_dirN`** *(in/out)* — Continuation direction, corrected in place by the VBS construction, compact set; `[n_rayN, 3]`
 - **`acc_dist_outN`** — Accumulated VBS distance leaving this call, compact set; `[n_rayN, 2]`
 - **`resolved_typeN`** *(optional)* — Resolved interaction-type code, bit-encoded (`qd::bits<uint8_t>`),

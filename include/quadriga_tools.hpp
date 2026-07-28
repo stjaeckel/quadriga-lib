@@ -322,7 +322,6 @@ namespace quadriga_lib
                            const arma::u32_vec *sbs_ind,                                        // 1-based SBS mesh index (0 = no hit), [n_ray]
                            const arma::Mat<dtype> *trivec = nullptr,                            // Beam wavefront vertices relative to origin, [n_ray, 9]
                            const arma::Mat<dtype> *tridir = nullptr,                            // Vertex-ray directions, spherical [n_ray, 6] or Cartesian [n_ray, 9]
-                           const arma::Col<dtype> *orig_length = nullptr,                       // Accumulated path length at origin, [n_ray]
                            arma::Mat<dtype> *origN = nullptr,                                   // New origins after interaction, [n_rayN, 3]
                            arma::Mat<dtype> *destN = nullptr,                                   // New destinations after interaction, [n_rayN, 3]
                            arma::Mat<dtype> *fbsN = nullptr,                                    // First interaction points in GCS, [n_rayN, 3]
@@ -331,14 +330,13 @@ namespace quadriga_lib
                            arma::Mat<dtype> *xprmatN = nullptr,                                 // Polarization transfer matrix [ReVV ImVV ReVH ImVH ReHV ImHV ReHH ImHH], [n_rayN, 8]
                            arma::Mat<dtype> *trivecN = nullptr,                                 // Updated beam wavefront vertices, [n_rayN, 9]
                            arma::Mat<dtype> *tridirN = nullptr,                                 // Updated vertex-ray directions, format matches input
-                           arma::Col<dtype> *orig_lengthN = nullptr,                            // Accumulated path length at new origin, [n_rayN]
                            arma::Col<dtype> *fbs_angleN = nullptr,                              // Incidence angle at FBS in [rad], [n_rayN]
                            arma::Col<dtype> *thicknessN = nullptr,                              // Material thickness (FBS-SBS distance) in [m], [n_rayN]
                            arma::Col<dtype> *edge_lengthN = nullptr,                            // Max beam triangle edge length at new origin, [n_rayN, 3]
                            arma::Mat<dtype> *normal_vecN = nullptr,                             // FBS/SBS normals [Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S], [n_rayN, 6]
                            std::vector<uint8_t> *out_typeN = nullptr,                           // Interaction type code, [n_rayN]
                            arma::Mat<dtype> *path_dirN = nullptr,                               // Refraction-correct path direction, [n_rayN, 3]
-                           bool compact = true,                                                 // Remove non-hits from output, key on fbs_ind != 0
+                           bool compact = false,                                                 // Remove non-hits from output, key on fbs_ind != 0
                            arma::u32_vec *ray_indN = nullptr);                                  // 0-based input ray index for each output ray, [n_rayN]
 
     // Update inside/outside ray state and correct gainN / xprmatN
@@ -367,7 +365,7 @@ namespace quadriga_lib
                           arma::Col<dtype> *gainN = nullptr,                                   // In/Out: interaction gain, updated in place; [n_rayN]
                           arma::Mat<dtype> *xprmatN = nullptr,                                 // In/Out: polarization transfer matrix, updated in place; [n_rayN, 8]
                           arma::Mat<dtype> *path_dirN = nullptr,                               // In/Out: Continuation direction, updated in place; [n_rayN]
-                          arma::Mat<dtype> *acc_dist_outN = nullptr,                           // In/Out: Accumulated VBS distance leaving this call, [n_rayN, 2]
+                          arma::Mat<dtype> *acc_dist_outN = nullptr,                           // Out: Accumulated VBS distance leaving this call, [n_rayN, 2]
                           std::vector<uint8_t> *resolved_typeN = nullptr,                      // Out: Resolved ray type, [n_rayN]
                           const arma::u32_vec *ray_indN = nullptr,                             // rayN -> ray map; NULL = identity (ray = rayN); [n_rayN]
                           double eps = 0.15);                                                  // Airy resolve threshold in [0, 1]; 0 = always resolve

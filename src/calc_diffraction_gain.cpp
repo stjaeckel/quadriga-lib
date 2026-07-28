@@ -329,8 +329,8 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
 
             // Calculate the interface interactions; no compaction
             quadriga_lib::ray_mesh_interact<dtype>(interaction_type, center_frequency, &s_orig, &s_dest, &mesh, &mtl_ind, &mtl_prop,
-                                                   &fbs_ind, &sbs_ind, nullptr, nullptr, nullptr, &origN, nullptr, &fbsN, &sbsN,
-                                                   &gainN, &xprmatN, nullptr, nullptr, nullptr, &fbs_angle, nullptr,
+                                                   &fbs_ind, &sbs_ind, nullptr, nullptr, &origN, nullptr, &fbsN, &sbsN,
+                                                   &gainN, &xprmatN, nullptr, nullptr, &fbs_angle, nullptr,
                                                    nullptr, &normal_vec, &hit_type, &dirN, false);
 
             // Declare outputs of ray_state_update
