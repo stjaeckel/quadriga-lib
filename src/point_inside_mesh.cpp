@@ -149,9 +149,17 @@ arma::uvec quadriga_lib::point_inside_mesh(const arma::Mat<dtype> *points,
 
     // Calculate the incidence angles
     arma::Col<dtype> fbs_angle, thickness;
-    quadriga_lib::ray_mesh_interact<dtype>(0, 1.0e9, &orig, &dest, &meshR, nullptr, nullptr, &fbs_ind, &sbs_ind,
-                                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                                           nullptr, nullptr, nullptr, &fbs_angle, &thickness);
+    quadriga_lib::ray_mesh_interact<dtype>(0, 1.0e9, &orig, &dest, &meshR,
+                                           nullptr, nullptr,                   // mtl_ind, mtl_prop
+                                           &fbs_ind, &sbs_ind,                 // fbs_ind, sbs_ind
+                                           nullptr, nullptr,                   // trivec, tridir
+                                           nullptr, nullptr, nullptr, nullptr, // origN, destN, fbsN, sbsN
+                                           nullptr, nullptr,                   // gainN, xprmatN
+                                           nullptr, nullptr,                   // trivecN, tridirN
+                                           &fbs_angle, &thickness,             // fbs_angle, thickness
+                                           nullptr, nullptr,                   // edge_lengthN, normal_vecN
+                                           nullptr, nullptr,                   // out_typeN, path_dirN
+                                           true);                              // Compact output
 
     // Check inside condition
     arma::uvec output(n_points);

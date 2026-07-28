@@ -87,10 +87,10 @@ static double rmi_gain(int interaction_type, double freq,
     arma::vec gainN;
     quadriga_lib::ray_mesh_interact<double>(interaction_type, freq, &orig, &dest, &mesh, &mtl_ind, &mtl,
                                             &fbs_ind, &sbs_ind,
-                                            nullptr, nullptr, nullptr, // trivec, tridir, orig_length
-                                            nullptr, nullptr,          // origN, destN
-                                            nullptr, nullptr,          // fbsN, sbsN
-                                            &gainN);                   // gainN
+                                            nullptr, nullptr, // trivec, tridir,
+                                            nullptr, nullptr, // origN, destN
+                                            nullptr, nullptr, // fbsN, sbsN
+                                            &gainN);          // gainN
     return gainN.n_elem ? gainN(0) : 0.0;
 }
 

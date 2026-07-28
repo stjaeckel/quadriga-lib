@@ -17,8 +17,7 @@ Seed a sphere of rays from a point source
 - `n_ray` is quantized to the icosphere grid: `n_div = round(sqrt(n_ray_target / 20))` (min 1) and
   `n_ray = 20 · n_div²`, so the returned count is the closest tessellation to `n_ray_target`, not exact.
 - Ray origins sit on a small launch sphere of radius `r0` centered at `O`, not at `O` itself, so the beam
-  triangles (`trivec`) have finite extent from the first segment. `orig_length` carries the `O`-to-origin
-  offset as the initial accumulated path length.
+  triangles (`trivec`) have finite extent from the first segment. 
 - When `mesh` is supplied, `r0` is auto-sized to 0.8× the nearest obstacle distance along a coarse probe
   sphere (clamped to ≥ 0.01 m); if no obstacle is hit within `max_path_length`, or without `mesh`, `r0 = 0.01 m`.
 - Emits the per-ray medium-state words and distance accumulators consumed by [[ray_state_update]], all
@@ -36,7 +35,6 @@ arma::uword ray_init(
     arma::fmat *dest = nullptr,
     arma::fmat *trivec = nullptr,
     arma::fmat *tridir = nullptr,
-    arma::fvec *orig_length = nullptr,
     arma::Col<short> *mtl_ind_prev = nullptr,
     arma::Col<short> *mtl_ind_current = nullptr,
     arma::Col<short> *mtl_ind_buffer = nullptr,
@@ -66,8 +64,6 @@ arma::uword ray_init(
 - **`dest`** — Ray destinations at `max_path_length` from `O`; `[n_ray, 3]`
 - **`trivec`** — Beam wavefront triangle vertices relative to origin; `[n_ray, 9]`, matches [[ray_mesh_interact]]
 - **`tridir`** — Per-vertex ray directions, Cartesian; `[n_ray, 9]`
-- **`orig_length`** — `O`-to-origin distance per ray (launch-sphere inradius ≈ `r0`), the initial accumulated
-  path length; `[n_ray]`
 - **`mtl_ind_prev`**, **`mtl_ind_current`**, **`mtl_ind_buffer`** — Initial medium-state words for
   [[ray_state_update]], all zeroed (outside air, no flags); `[n_ray]`
 - **`path_dir_prev`** — Initial physical ray direction (unit vectors from `O`); `[n_ray, 3]`
@@ -95,7 +91,6 @@ arma::uword quadriga_lib::ray_init(arma::uword n_ray_target,
                                    arma::fmat *dest,
                                    arma::fmat *trivec,
                                    arma::fmat *tridir,
-                                   arma::fvec *orig_length,
                                    arma::Col<short> *mtl_ind_prev,
                                    arma::Col<short> *mtl_ind_current,
                                    arma::Col<short> *mtl_ind_buffer,
@@ -128,12 +123,13 @@ arma::uword quadriga_lib::ray_init(arma::uword n_ray_target,
     {
         // Make a small icosphere
         arma::fmat orig_tmp, intersect_tmp;
-        arma::fvec orig_length_tmp;
-        arma::uword n_rays_test = quadriga_lib::icosphere<float>(12, 0.01f, &orig_tmp, &orig_length_tmp);
+        arma::fvec length_tmp;
+        arma::uword n_rays_test = quadriga_lib::icosphere<float>(12, 0.01f, &orig_tmp, &length_tmp);
 
         // Test origin and destinations
         arma::fmat dest_tmp(n_rays_test, 3, arma::fill::none);
-        float *p_start = orig_tmp.memptr(), *p_end = dest_tmp.memptr(), *p_length = orig_length_tmp.memptr();
+        const float *p_length = length_tmp.memptr();
+        float *p_start = orig_tmp.memptr(), *p_end = dest_tmp.memptr();
         for (size_t i_ray = 0; i_ray < n_rays_test; ++i_ray)
         {
             float scl = max_path_length / p_length[i_ray];
@@ -230,9 +226,6 @@ arma::uword quadriga_lib::ray_init(arma::uword n_ray_target,
             (*paths)[i_ray0].length = p_length_local[i_ray0];
         }
     }
-
-    if (orig_length)
-        *orig_length = std::move(orig_length_local);
 
     if (mtl_ind_prev)
         mtl_ind_prev->zeros(n_ray);

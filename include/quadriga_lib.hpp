@@ -98,8 +98,7 @@ namespace quadriga_lib
                          arma::fmat *orig = nullptr,                       // Ray origins in GCS, [n_ray, 3]
                          arma::fmat *dest = nullptr,                       // Ray destinations in GCS, [n_ray, 3]
                          arma::fmat *trivec = nullptr,                     // Beam wavefront vertices relative to origin, [n_ray, 9]
-                         arma::fmat *tridir = nullptr,                     // Vertex-ray directions, spherical [n_ray, 6] or Cartesian [n_ray, 9]
-                         arma::fvec *orig_length = nullptr,                // Path length at origin, [n_ray]
+                         arma::fmat *tridir = nullptr,                     // Vertex-ray directions, [n_ray, 9]
                          arma::Col<short> *mtl_ind_prev = nullptr,         // Previous medium (0 = outside), [n_ray]
                          arma::Col<short> *mtl_ind_current = nullptr,      // Current medium (0 = outside), [n_ray]
                          arma::Col<short> *mtl_ind_buffer = nullptr,       // Next-transition buffer (0 = empty), [n_ray]
@@ -107,8 +106,9 @@ namespace quadriga_lib
                          arma::fmat *acc_dist = nullptr,                   // Accumulated in-layer distance, [n_ray, 2]
                          std::vector<quadriga_lib::path> *paths = nullptr, // Path data storage, 64 byte + overflow, [n_ray]
                          const arma::fmat *mesh = nullptr,                 // Optional: faces of the triangular mesh for sphere size detection, [ n_mesh, 9 ]
-                         const arma::u32_vec *sub_mesh_index = nullptr,    // Optional: Sub-mesh index, 0-based, [ n_sub ]
+                         const arma::u32_vec *sub_mesh_index = nullptr,    // Optional: Sub-mesh index, 0-based, [n_sub]
                          bool scalar_mode = false);                        // Switch for EM mode or scalar mode
+
 }
 
 #endif
