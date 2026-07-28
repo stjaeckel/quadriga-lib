@@ -82,7 +82,7 @@ TEST_CASE("Ray-Point Intersect - Ray Subdivision")
 
     // Subdivide all rays
     arma::mat origN, trivecN, tridirN;
-    quadriga_lib::subdivide_rays<double>(&orig, &trivec, &tridir, nullptr, &origN, &trivecN, &tridirN);
+    quadriga_lib::subdivide_rays<double>(orig, trivec, tridir, nullptr, &origN, &trivecN, &tridirN);
     CHECK(origN.n_rows == 4 * orig.n_rows);
 
     // Call intersect
@@ -98,7 +98,10 @@ TEST_CASE("Ray-Point Intersect - Ray Subdivision")
     index = arma::unique(index);
     CHECK(index.n_elem < 4 * orig.n_rows);
 
-    quadriga_lib::subdivide_rays<double>(&orig, &trivec, &tridir, nullptr, &origN, &trivecN, &tridirN, nullptr, &index);
+    origN.reset();
+    trivecN.reset();
+    tridirN.reset();
+    quadriga_lib::subdivide_rays<double>(orig, trivec, tridir, nullptr, &origN, &trivecN, &tridirN, nullptr, &index);
     CHECK(origN.n_rows == 4 * index.n_elem);
 
     // Call intersect

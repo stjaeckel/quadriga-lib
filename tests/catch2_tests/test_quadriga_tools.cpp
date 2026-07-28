@@ -306,17 +306,17 @@ TEST_CASE("Quadriga tools - Subdivide Rays")
     arma::Mat<float> tridirN;
 
     // No index given
-    auto n_rayN = quadriga_lib::subdivide_rays<float>(&orig, &trivec, &tridir, nullptr, &origN, &trivecN, &tridirN);
+    auto n_rayN = quadriga_lib::subdivide_rays<float>(orig, trivec, tridir, nullptr, &origN, &trivecN, &tridirN);
     CHECK(n_rayN == 4 * orig.n_rows);
 
     // Empty index
     arma::u32_vec index;
-    n_rayN = quadriga_lib::subdivide_rays<float>(&orig, &trivec, &tridir, nullptr, &origN, &trivecN, &tridirN, nullptr, &index);
+    n_rayN = quadriga_lib::subdivide_rays<float>(orig, trivec, tridir, nullptr, &origN, &trivecN, &tridirN, nullptr, &index);
     CHECK(n_rayN == 4 * orig.n_rows);
 
     // Select two beams
     index = {2, 1};
-    n_rayN = quadriga_lib::subdivide_rays<float>(&orig, &trivec, &tridir, nullptr, &origN, &trivecN, &tridirN, nullptr, &index);
+    n_rayN = quadriga_lib::subdivide_rays<float>(orig, trivec, tridir, nullptr, &origN, &trivecN, &tridirN, nullptr, &index);
     CHECK(n_rayN == 8);
 
     // Check for directions that are equal (beam 1)
@@ -348,7 +348,7 @@ TEST_CASE("Quadriga tools - Subdivide Rays")
     arma::fmat destN;
 
     index = {0};
-    n_rayN = quadriga_lib::subdivide_rays<float>(&orig, &trivec, &tridir, &dest, &origN, &trivecN, &tridirN, &destN, &index, 0.1);
+    n_rayN = quadriga_lib::subdivide_rays<float>(orig, trivec, tridir, &dest, &origN, &trivecN, &tridirN, &destN, &index);
 
     CHECK(n_rayN == 4);
 }
