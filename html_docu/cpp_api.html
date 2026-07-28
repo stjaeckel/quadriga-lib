@@ -216,6 +216,7 @@
   <tr><td><a href="#ray_init">ray_init</a></td><td>Seed a sphere of rays from a point source</td></tr>
   <tr><td><a href="#ray_mesh_interact">ray_mesh_interact</a></td><td>Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh surfaces</td></tr>
   <tr><td><a href="#ray_point_intersect">ray_point_intersect</a></td><td>Calculate intersections of ray beams with points in 3D space</td></tr>
+  <tr><td><a href="#ray_progress">ray_progress</a></td><td>Advance a ray set by one interaction, spawning reflected, transmitted, and subdivided rays</td></tr>
   <tr><td><a href="#ray_state_update">ray_state_update</a></td><td>Batched inside/outside ray-state machine with analytic thin-slab (Fabry-Perot) resolution</td></tr>
   <tr><td><a href="#ray_triangle_intersect">ray_triangle_intersect</a></td><td>Compute ray-triangle intersections in 3D using the Möller–Trumbore algorithm</td></tr>
   <tr><td><a href="#refractive_index">refractive_index</a></td><td>Real refractive index of a homogeneous medium</td></tr>
@@ -2777,7 +2778,7 @@ Copies the path into a target and appends one new segment, returning the new tot
  
 <ul>
 <li>The new coordinate is appended after the existing segments; the stored <code>length</code> grows by the origin-to-new-point distance of the appended leg</li>
-<li>The interaction <code>type</code> is recorded for the new segment and classifies the interaction: codes 1-127 increment <code>nTRA</code>, codes 128-255 increment <code>nREF</code>, code 0 increments neither</li>
+<li>The interaction <code>type</code> is recorded for the new segment, counters nREF, nTRA, nSUB, nSCT are not updated (left to the caller)</li>
 <li>The target receives an independent buffer sized for the extra segment; the source is left unchanged</li>
 <li>Throws if the source already holds the maximum of 255 segments</li>
 </ul>
@@ -5166,7 +5167,7 @@ Seed a sphere of rays from a point source
 <ul>
 <li>Launches <code>n_ray</code> rays from a point source <code>O</code> onto an <a href="#icosphere">icosphere</a> tessellation, giving near-uniform angular coverage of the full sphere (4π sr).</li>
 <li><code>n_ray</code> is quantized to the icosphere grid: <code>n_div = round(sqrt(n_ray_target / 20))</code> (min 1) and <code>n_ray = 20 · n_div²</code>, so the returned count is the closest tessellation to <code>n_ray_target</code>, not exact.</li>
-<li>Ray origins sit on a small launch sphere of radius <code>r0</code> centered at <code>O</code>, not at <code>O</code> itself, so the beam triangles (<code>trivec</code>) have finite extent from the first segment. <code>orig_length</code> carries the <code>O</code>-to-origin offset as the initial accumulated path length.</li>
+<li>Ray origins sit on a small launch sphere of radius <code>r0</code> centered at <code>O</code>, not at <code>O</code> itself, so the beam triangles (<code>trivec</code>) have finite extent from the first segment.</li>
 <li>When <code>mesh</code> is supplied, <code>r0</code> is auto-sized to 0.8× the nearest obstacle distance along a coarse probe sphere (clamped to ≥ 0.01 m); if no obstacle is hit within <code>max_path_length</code>, or without <code>mesh</code>, <code>r0 = 0.01 m</code>.</li>
 <li>Emits the per-ray medium-state words and distance accumulators consumed by <a href="#ray_state_update">ray_state_update</a>, all initialized to the outside-air / zero-distance start state.</li>
 <li>Beam wavefront (<code>trivec</code>) and directions (<code>tridir</code>, Cartesian) match the <a href="#ray_mesh_interact">ray_mesh_interact</a> input format.</li>
@@ -5183,7 +5184,6 @@ arma::uword ray_init(
     arma::fmat *dest = nullptr,
     arma::fmat *trivec = nullptr,
     arma::fmat *tridir = nullptr,
-    arma::fvec *orig_length = nullptr,
     arma::Col&lt;short&gt; *mtl_ind_prev = nullptr,
     arma::Col&lt;short&gt; *mtl_ind_current = nullptr,
     arma::Col&lt;short&gt; *mtl_ind_buffer = nullptr,
@@ -5212,7 +5212,6 @@ arma::uword ray_init(
 <li><b><code>dest</code></b> — Ray destinations at <code>max_path_length</code> from <code>O</code>; <code>[n_ray, 3]</code></li>
 <li><b><code>trivec</code></b> — Beam wavefront triangle vertices relative to origin; <code>[n_ray, 9]</code>, matches <a href="#ray_mesh_interact">ray_mesh_interact</a></li>
 <li><b><code>tridir</code></b> — Per-vertex ray directions, Cartesian; <code>[n_ray, 9]</code></li>
-<li><b><code>orig_length</code></b> — <code>O</code>-to-origin distance per ray (launch-sphere inradius ≈ <code>r0</code>), the initial accumulated path length; <code>[n_ray]</code></li>
 <li><b><code>mtl_ind_prev</code></b>, <b><code>mtl_ind_current</code></b>, <b><code>mtl_ind_buffer</code></b> — Initial medium-state words for <a href="#ray_state_update">ray_state_update</a>, all zeroed (outside air, no flags); <code>[n_ray]</code></li>
 <li><b><code>path_dir_prev</code></b> — Initial physical ray direction (unit vectors from <code>O</code>); <code>[n_ray, 3]</code></li>
 <li><b><code>acc_dist</code></b> — Accumulated in-layer distance, zeroed; <code>[n_ray, 2]</code>; col 1 = refracted distance, col 2 = geometric distance</li>
@@ -5262,7 +5261,6 @@ void quadriga_lib::ray_mesh_interact(
     const arma::u32_vec *sbs_ind,
     const arma::Mat&lt;dtype&gt; *trivec = nullptr,
     const arma::Mat&lt;dtype&gt; *tridir = nullptr,
-    const arma::Col&lt;dtype&gt; *orig_length = nullptr,
     arma::Mat&lt;dtype&gt; *origN = nullptr,
     arma::Mat&lt;dtype&gt; *destN = nullptr,
     arma::Mat&lt;dtype&gt; *fbsN = nullptr,
@@ -5271,21 +5269,20 @@ void quadriga_lib::ray_mesh_interact(
     arma::Mat&lt;dtype&gt; *xprmatN = nullptr,
     arma::Mat&lt;dtype&gt; *trivecN = nullptr,
     arma::Mat&lt;dtype&gt; *tridirN = nullptr,
-    arma::Col&lt;dtype&gt; *orig_lengthN = nullptr,
     arma::Col&lt;dtype&gt; *fbs_angleN = nullptr,
     arma::Col&lt;dtype&gt; *thicknessN = nullptr,
     arma::Col&lt;dtype&gt; *edge_lengthN = nullptr,
     arma::Mat&lt;dtype&gt; *normal_vecN = nullptr,
     std::vector&lt;uint8_t&gt; *out_typeN = nullptr,
     arma::Mat&lt;dtype&gt; *path_dirN = nullptr,
-    bool compact = true,
+    bool compact = false,
     arma::u32_vec *ray_indN = nullptr);
 </pre>
 
 <b>Inputs:</b><br>
 <ul>
 <li><b><code>interaction_type</code></b> — 0 = EM reflection, 1 = EM transmission, 2 = EM refraction, 3 = scalar reflection, 4 = scalar transmission, 5 = scalar refraction</li>
-<li><b><code>center_frequency</code></b> — Center frequency</li>
+<li><b><code>center_frequency</code></b> — Center frequency in [Hz]</li>
 <li><b><code>orig</code></b>, <b><code>dest</code></b> — Ray origin and destination in GCS; <code>[n_ray, 3]</code></li>
 <li><b><code>mesh</code></b> — Triangle mesh faces; see <a href="#obj_file_read">obj_file_read</a>; <code>[n_mesh, 9]</code></li>
 <li><b><code>mtl_ind</code></b> — 1-based material index per face (the <code>csv_ind</code> output of <a href="#obj_file_read">obj_file_read</a>); <code>[n_mesh]</code>. 0 = face has no material (air). NULL → all faces treated as air.</li>
@@ -5293,19 +5290,22 @@ void quadriga_lib::ray_mesh_interact(
 <li><b><code>fbs_ind</code></b>, <b><code>sbs_ind</code></b> — 1-based mesh face indices per ray (0 = no hit); <code>[n_ray]</code></li>
 <li><b><code>trivec</code></b> <i>(optional)</i> — Beam wavefront triangle vertices relative to origin; <code>[n_ray, 9]</code>, order <code>[v1x v1y v1z v2x v2y v2z v3x v3y v3z]</code></li>
 <li><b><code>tridir</code></b> <i>(optional)</i> — Vertex-ray directions; <code>[n_ray, 6]</code> for spherical <code>[v1az v1el v2az v2el v3az v3el]</code> or <code>[n_ray, 9]</code> for Cartesian</li>
-<li><b><code>orig_length</code></b> <i>(optional)</i> — Accumulated path length at origin; <code>[n_ray]</code>, default 0</li>
-<li><b><code>compact</code></b> <i>(optional)</i> — If <code>true</code> (default), no-hit rays are dropped and <code>n_rayN ≤ n_ray</code>. If <code>false</code>, all rays are kept (<code>n_rayN = n_ray</code>) and no-hit rays are written as a transparent pass-through (gain 1, identity <code>xprmat</code>, <code>out_type = 0</code>).</li>
+<li><b><code>compact</code></b> <i>(optional)</i> — If <code>true</code>, no-hit rays are dropped and <code>n_rayN ≤ n_ray</code>. If <code>false</code> (default), all rays are kept (<code>n_rayN = n_ray</code>) and no-hit rays are written as a transparent pass-through (gain 1, identity <code>xprmat</code>, <code>out_type = 0</code>).</li>
 </ul>
 
 <b>Outputs:</b><br>
 <ul>
-<li><b><code>origN</code></b> — New origins after interaction (offset 0.001 m along travel direction); <code>[n_rayN, 3]</code></li>
+<li><b><code>origN</code></b> — New origins after interaction, nudged off the face along the travel direction by ~8 float ULP at the interaction-point coordinate magnitude; <code>[n_rayN, 3]</code></li>
 <li><b><code>destN</code></b> — New destinations accounting for direction change; <code>[n_rayN, 3]</code></li>
 <li><b><code>fbsN</code></b>, <b><code>sbsN</code></b> — First/second interaction points in GCS; <code>[n_ray, 3]</code></li>
-<li><b><code>gainN</code></b> — Interaction gain; averaged over TE/TM polarizations for types 0–2, TE-only for types 3–5; <code>[n_rayN]</code></li>
-<li><b><code>xprmatN</code></b> — For types 0–2: polarization transfer matrix, interleaved complex, col-major <code>[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]</code>; includes interaction gain, TE/TM coefficients, incidence plane orientation; excludes in-medium attenuation, FSPL <code>[8, n_rayN]</code>. For types 3–5 (scalar): <code>[Re Im]</code> where Re+jIm is the scalar pressure coefficient; <code>[2, n_rayN]</code>.</li>
+<li><b><code>gainN</code></b> — Linear power gain of the interaction. Derived from <code>xprmatN</code>, not an independent factor; <code>[n_rayN]</code></li>
+<li><b><code>xprmatN</code></b> — Polarization transfer matrix; not normalized: the entries are amplitude coefficients that already carry the interaction gain. For types 0–2: interleaved complex, col-major <code>[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]</code>, i.e. the Jones matrix <code>M = [VV VH; HV HH]</code> acting as <code>e_out = M · e_in</code>; the incoming V/H basis is built from the incident direction, the outgoing basis from <code>path_dirN</code> (<code>eH = ẑ × k̂</code> normalized, <code>eV = eH × k̂</code>); <code>[8, n_rayN]</code>. For types 3–5 (scalar): <code>[Re Im]</code> where <code>Re + jIm</code> is the scalar pressure coefficient; <code>[2, n_rayN]</code>.
+<ul>
+<li><i>Included:</i> TE/TM interface coefficients (with the lumped <code>interface_gain</code> folded in for the transmission classes 1/2/4/5) and the incidence-plane orientation.</li>
+<li><i>Excluded:</i> in-medium attenuation and excess phase — added by <a href="#ray_state_update">ray_state_update</a> — and FSPL / spreading loss, which is never applied here or downstream.</li>
+</ul>
+</li>
 <li><b><code>trivecN</code></b>, <b><code>tridirN</code></b> — Updated beam geometry/direction (format matches input); empty if inputs not provided</li>
-<li><b><code>orig_lengthN</code></b> — Path length from <code>orig</code> to <code>origN</code>, added to input <code>orig_length</code> if given; <code>[n_rayN]</code></li>
 <li><b><code>fbs_angleN</code></b> — Incidence angle at FBS in rad; <code>[n_rayN]</code></li>
 <li><b><code>thicknessN</code></b> — Material thickness (FBS-to-SBS distance); <code>[n_rayN]</code></li>
 <li><b><code>edge_lengthN</code></b> — Max edge length of ray tube triangle at new origin (∞ if partial hit); <code>[n_rayN]</code></li>
@@ -5405,7 +5405,7 @@ Reachable composite values (add 32 for the total-reflection variant):<br><br>
 </tr>
 </table>
 </li>
-<li><b><code>path_dirN</code></b> — Refraction-correct path direction: mirror for types 0/3, Snell direction for types 1/2/4; <code>[n_rayN, 3]</code>. For undeviated transmission (types 1/4) this is the <i>refracted</i> direction, which differs from the geometric continuation (along the incoming ray) used for <code>origN</code>/<code>destN</code>; it lets downstream code recover the true transmission angle.</li>
+<li><b><code>path_dirN</code></b> — Refraction-correct path direction: mirror for types 0/3, Snell direction for types 1/2/4/5; <code>[n_rayN, 3]</code>. For undeviated transmission (types 1/4) this is the <i>refracted</i> direction, which differs from the geometric continuation (along the incoming ray) used for <code>origN</code>/<code>destN</code>; it lets downstream code recover the true transmission angle.</li>
 <li><b><code>ray_indN</code></b> — 0-based input ray index for each output ray (inverse of the internal compaction map; order-preserving); <code>[n_rayN]</code></li>
 </ul>
 
@@ -5473,6 +5473,105 @@ std::vector&lt;arma::u32_vec&gt; quadriga_lib::ray_point_intersect(
 </ul>
 
 <hr class="greyline"><br>
+<span id="ray_progress" class="qd-func"><b>ray_progress</b></span><br>
+<hr class="thin">
+Advance a ray set by one interaction, spawning reflected, transmitted, and subdivided rays
+<ul>
+<li>Consumes a launch configuration (origins, destinations, per-ray medium state, and <a href="#path">path</a> storage) and returns the next iteration: for every ray that hits the mesh, its reflected and/or transmitted continuation(s), plus the four sub-beams of any ray flagged for subdivision. Rays that miss, fall below <code>min_gain_dB</code>, or reach an interaction, reflection or transmission limit are terminated.</li>
+<li>The full pipeline per call is: intersect (<a href="#ray_triangle_intersect">ray_triangle_intersect</a>) → interaction (<a href="#ray_mesh_interact">ray_mesh_interact</a>) → state resolve (<a href="#ray_state_update">ray_state_update</a>) for a reflection pass and a transmission/refraction pass → subdivision (<a href="#subdivide_rays">subdivide_rays</a>) → assembly of the new launch configuration.</li>
+<li>The function returns per-stage counts (see Returns); the new configuration holds <code>n_out = 4·n_subdiv + n_reflect + n_transmit</code> rays, which may exceed or fall short of the <code>n_ray</code> passed in.</li>
+<li>An empty returned launch configuration (<code>orig.n_rows == 0</code>) signals end of trace; a subsequent call with an empty orig throws.</li>
+<li>Memory is sized for the worst case but committed lazily: the output is built in a reserved-then-resized buffer, inputs are compacted in place on the intersect result before the expensive passes, and dead intermediates are released as the function proceeds, so peak footprint stays close to one generation. Designed for <code>n_ray</code> up to ~10^8; the ray index is 32-bit, so <code>n_ray</code> is capped at 2^32-1.</li>
+<li>Geometry is traced once, at the reference frequency <code>center_frequency[0]</code>. For the remaining frequencies only the polarization/gain coefficient is recomputed and folded into each <a href="#path">path</a>; the per-frequency refracted direction and in-medium distance are approximated by the reference-frequency values (see the note on <code>center_frequency</code>).</li>
+<li>Beam subdivision and beam-front updates are active only when <code>trivec</code> and <code>tridir</code> are supplied; otherwise rays are traced as infinitesimal.</li>
+</ul>
+
+<b>Declaration:</b><br>
+<pre>
+std::array&lt;unsigned, 4&gt; quadriga_lib::ray_progress(
+    const arma::fmat &amp;mesh,
+    const arma::uvec &amp;mtl_ind,
+    const std::unordered_map&lt;std::string, std::vector&lt;float&gt;&gt; &amp;mtl_prop,
+    const arma::fvec &amp;center_frequency,
+    float Ox, float Oy, float Oz,
+    arma::fmat &amp;orig,
+    arma::fmat &amp;dest,
+    arma::Col&lt;short&gt; &amp;mtl_ind_prev,
+    arma::Col&lt;short&gt; &amp;mtl_ind_current,
+    arma::Col&lt;short&gt; &amp;mtl_ind_buffer,
+    arma::fmat &amp;path_dir_prev,
+    arma::fmat &amp;acc_dist,
+    std::vector&lt;quadriga_lib::path&gt; &amp;paths,
+    arma::fmat *trivec = nullptr,
+    arma::fmat *tridir = nullptr,
+    const arma::u32_vec *sub_mesh_index = nullptr,
+    const arma::fmat *aabb = nullptr,
+    uint8_t max_no_interactions = 20,
+    uint8_t max_no_reflections = 10,
+    uint8_t max_no_transmissions = 10,
+    uint8_t max_no_subdivisions = 2,
+    float min_gain_dB = -140.0f,
+    float subdivision_tolerance_m = 3.0f,
+    float thin_slab_threshold = 0.15f,
+    bool refraction_mode = true,
+    bool scalar_mode = false);
+</pre>
+
+<b>Inputs:</b><br>
+<ul>
+<li><b><code>mesh</code></b> — Triangle mesh faces; see <a href="#obj_file_read">obj_file_read</a>; <code>[n_mesh, 9]</code></li>
+<li><b><code>mtl_ind</code></b> — 1-based material index per face (the <code>csv_ind</code> output of <a href="#obj_file_read">obj_file_read</a>); <code>[n_mesh]</code>. 0 = air</li>
+<li><b><code>mtl_prop</code></b> — Material properties keyed by column name (the <code>csv_prop</code> output of <a href="#obj_file_read">obj_file_read</a>); each value has length <code>n_mtl</code> (max 32767)</li>
+<li><b><code>center_frequency</code></b> — Center frequencies in [Hz]; <code>[n_freq]</code>, 1 to 127 entries. <code>center_frequency[0]</code> is the reference frequency that defines the traced geometry</li>
+<li><b><code>Ox</code></b>, <b><code>Oy</code></b>, <b><code>Oz</code></b> — Point-source (transmitter) position in GCS [m]; used to recompute path length at new sub-beam origins</li>
+<li><b><code>sub_mesh_index</code></b> <i>(optional)</i> — Sub-mesh partition offsets for the accelerated intersect; 0-based, strictly increasing, first entry 0; passed to <a href="#ray_triangle_intersect">ray_triangle_intersect</a>; <code>[n_sub]</code>. NULL → no partitioning</li>
+<li><b><code>aabb</code></b> <i>(optional)</i> — Axis-aligned bounding box per sub-mesh; <code>[n_sub, 6]</code>. Requires <code>sub_mesh_index</code>. NULL with a partition present → boxes are computed internally via <a href="#triangle_mesh_aabb">triangle_mesh_aabb</a></li>
+<li><b><code>max_no_interactions</code></b> — Total interactions (segments) per ray before termination, 0 to 255. 0 disables tracing (returns 0 rays)</li>
+<li><b><code>max_no_reflections</code></b> — Reflections per ray, 0 to 255. 0 skips the reflection pass</li>
+<li><b><code>max_no_transmissions</code></b> — Transmissions / refractions per ray, 0 to 255. 0 skips the transmission pass</li>
+<li><b><code>max_no_subdivisions</code></b> — Beam subdivisions per ray, 0 to 255. 0 (or no beam mode) disables subdivision</li>
+<li><b><code>min_gain_dB</code></b> — Path gain below which a continuation is not launched, in dB (linear-power threshold applied to the accumulated per-path gain × interaction gain)</li>
+<li><b><code>subdivision_tolerance_m</code></b> — Maximum beam-tube edge length before a ray is subdivided, in [m]; must be > 0</li>
+<li><b><code>thin_slab_threshold</code></b> — Thin-slab (Fabry-Pérot) resolve threshold forwarded to <a href="#ray_state_update">ray_state_update</a> as its <code>eps</code>; see there. Default 0.15</li>
+<li><b><code>refraction_mode</code></b> — <code>true</code> = refraction (Snell-bent transmission), <code>false</code> = straight-path transmission</li>
+<li><b><code>scalar_mode</code></b> — <code>true</code> = scalar (acoustic) layout, <code>false</code> = EM (2×2 Jones). Must match the layout of <code>paths</code></li>
+</ul>
+
+<b>In/out (launch configuration, updated in place; [n_ray, …] on entry, [n_out, …] on return):</b><br>
+<ul>
+<li><b><code>orig</code></b> — Ray origins in GCS; <code>[n_ray, 3]</code>. Defines <code>n_ray</code>; must be non-empty</li>
+<li><b><code>dest</code></b> — Ray destinations in GCS; <code>[n_ray, 3]</code></li>
+<li><b><code>mtl_ind_prev</code></b>, <b><code>mtl_ind_current</code></b>, <b><code>mtl_ind_buffer</code></b> — Medium-state words (bit-masked: <code>mat = w &amp; 0x7FFF</code>, <code>flag = w &amp; 0x8000</code>); <code>[n_ray]</code></li>
+<li><b><code>path_dir_prev</code></b> — Physical ray direction entering the current segment (unit vectors); <code>[n_ray, 3]</code></li>
+<li><b><code>acc_dist</code></b> — Accumulated in-layer distance; <code>[n_ray, 2]</code>; col 1 = refracted distance, col 2 = geometric distance</li>
+<li><b><code>paths</code></b> — Per-ray <a href="#path">path</a> objects; <code>n_ray</code> entries. Frequency count and layout must match <code>center_frequency</code> and <code>scalar_mode</code>. Terminated paths are freed; surviving paths carry the appended interaction segment and the updated polarization product</li>
+<li><b><code>trivec</code></b> <i>(optional)</i> — Beam wavefront triangle vertices relative to origin; <code>[n_ray, 9]</code>. Must be supplied together with <code>tridir</code>; empty / NULL disables beam tracing</li>
+<li><b><code>tridir</code></b> <i>(optional)</i> — Vertex-ray directions, Cartesian; <code>[n_ray, 9]</code></li>
+</ul>
+
+<b>Returns:</b><br>
+<ul>
+<li>Per-stage ray counts <code>{n_interact, n_subdiv, n_reflect, n_transmit}</code>:
+<ul>
+<li><b><code>n_interact</code></b> — rays that hit the mesh (survived compaction against the intersect result)</li>
+<li><b><code>n_subdiv</code></b> — rays flagged for subdivision, each expanded into 4 sub-beams</li>
+<li><b><code>n_reflect</code></b> — reflected continuations launched</li>
+<li><b><code>n_transmit</code></b> — transmitted / refracted continuations launched</li>
+</ul>
+</li>
+</ul>
+
+<b>See also:</b><br>
+<ul>
+<li><a href="#ray_init">ray_init</a> (produces the initial launch configuration this function advances)</li>
+<li><a href="#ray_triangle_intersect">ray_triangle_intersect</a> (first/second interaction points)</li>
+<li><a href="#ray_mesh_interact">ray_mesh_interact</a> (per-interaction Fresnel/Jones result)</li>
+<li><a href="#ray_state_update">ray_state_update</a> (inside/outside state machine and thin-slab resolution)</li>
+<li><a href="#subdivide_rays">subdivide_rays</a> (adaptive beam-tube refinement)</li>
+<li><a href="#path">path</a> (per-ray storage object accumulated across generations)</li>
+</ul>
+
+<hr class="greyline"><br>
 <span id="ray_state_update" class="qd-func"><b>ray_state_update</b></span><br>
 <hr class="thin">
 Batched inside/outside ray-state machine with analytic thin-slab (Fabry-Perot) resolution
@@ -5537,8 +5636,8 @@ void quadriga_lib::ray_state_update(
 <b>Outputs:</b><br>
 <ul>
 <li><b><code>mtl_ind_prev_outN</code></b>, <b><code>mtl_ind_current_outN</code></b>, <b><code>mtl_ind_buffer_outN</code></b> — Updated state words, compact set; <code>[n_rayN]</code>. NULL skips the write. Passing all six state args NULL disables tracking — each interaction is corrected on its own (entry loss, TR kill, single-hit air-gap <code>S</code>); cross-interaction slab <code>S</code> and reflection-bounce <code>S</code> need the tracked medium.</li>
-<li><b><code>gainN</code></b> <i>(in/out)</i> — Per-interaction gain, updated in place; <code>[n_rayN]</code></li>
-<li><b><code>xprmatN</code></b> <i>(in/out)</i> — Polarization transfer matrix; updated in place; <code>[8, n_rayN]</code> for EM mode, <code>[2, n_rayN]</code> for scalar mode</li>
+<li><b><code>gainN</code></b> <i>(in/out)</i> — Per-interaction linear power gain, updated in place; <code>[n_rayN]</code>. Kept consistent with <code>xprmatN</code> at every write. A killed ray (<code>resolved_typeN == 0</code>) yields <code>gainN = 0</code> together with an all-zero <code>xprmatN</code>.</li>
+<li><b><code>xprmatN</code></b> <i>(in/out)</i> — Polarization transfer matrix, updated in place; <code>[8, n_rayN]</code> for EM mode, <code>[2, n_rayN]</code> for scalar mode. Same layout and basis convention as in <a href="#ray_mesh_interact">ray_mesh_interact</a>, but with the medium closed out: on return it additionally contains the in-medium attenuation and excess phase of the traversed segment and, when the resolve bit of <code>resolved_typeN</code> is set, the closed-form thin-slab (Airy) factor <code>S</code> covering the full internal multiple-reflection series. FSPL / spreading loss remains excluded, so the matrix is the complete per-interaction Jones factor and can be left-multiplied directly into a per-path product. When the series is re-emitted instead (<code>ρ &amp;lt; eps</code>, resolve bit clear), the matrix carries only the first-pass coefficient and the remaining bounces arrive as separate interactions.</li>
 <li><b><code>path_dirN</code></b> <i>(in/out)</i> — Continuation direction, corrected in place by the VBS construction, compact set; <code>[n_rayN, 3]</code></li>
 <li><b><code>acc_dist_outN</code></b> — Accumulated VBS distance leaving this call, compact set; <code>[n_rayN, 2]</code></li>
 <li><b><code>resolved_typeN</code></b> <i>(optional)</i> — Resolved interaction-type code, bit-encoded (<code>qd::bits&lt;uint8_t&gt;</code>), compact set; <code>[n_rayN]</code>. 0 = ray killed. NULL skips the write.<br><br>
@@ -5863,53 +5962,58 @@ dtype quadriga_lib::refractive_index(
 <hr class="thin">
 Subdivide ray beams into four smaller sub-beams
 <ul>
-<li>Each triangular beam is split into 4 sub-beams; output size is <code>4 × n_ray</code> or <code>4 × n_ind</code> when <code>index</code> is provided</li>
-<li><code>tridir</code> format auto-detected: spherical <code>[n_ray, 6]</code> or Cartesian <code>[n_ray, 9]</code>; output matches input format</li>
+<li>Each triangular beam is split into 4 sub-beams, <code>n_rayN = 4 * n_subdiv</code> rays are written to the output</li>
+<li>Rays can be selected by <code>index</code> (0-based list), all rays are subdivided if it is not given</li>
+<li><code>n_subdiv</code> is the number of selected rays</li>
+<li><code>tridir</code> format is auto-detected: spherical <code>[n_ray, 6]</code> or Cartesian <code>[n_ray, 9]</code>, output matches the input format</li>
+<li>Pre-allocated outputs that can hold all new rays are reused as they are and must have the same number of rows, the new rays are written to the first <code>n_rayN</code> rows, leaving the remaining rows untouched. Smaller buffers are re-allocated to that size, discarding their content.</li>
+<li>Internal math is done in double precision, the new origins stay within 1 ULP of the wavefront plane spanned by <code>orig</code> and <code>trivec</code>, no offset is applied along the propagation direction</li>
+<li>The direction values of the 3 original vertices are passed through unchanged, only the 3 new edge-midpoint directions are calculated, hence repeated subdivision does not accumulate rounding errors at the corners</li>
+<li>If <code>transposed_output</code> is true, all outputs are written transposed, i.e. the rays are in the columns and the components in the rows, e.g. <code>origN</code> becomes <code>[3, n_rayN]</code></li>
 </ul>
 
 <b>Declaration:</b><br>
 <pre>
 arma::uword quadriga_lib::subdivide_rays(
-    const arma::Mat&lt;dtype&gt; *orig,
-    const arma::Mat&lt;dtype&gt; *trivec,
-    const arma::Mat&lt;dtype&gt; *tridir,
+    const arma::Mat&lt;dtype&gt; &amp;orig,
+    const arma::Mat&lt;dtype&gt; &amp;trivec,
+    const arma::Mat&lt;dtype&gt; &amp;tridir,
     const arma::Mat&lt;dtype&gt; *dest = nullptr,
     arma::Mat&lt;dtype&gt; *origN = nullptr,
     arma::Mat&lt;dtype&gt; *trivecN = nullptr,
     arma::Mat&lt;dtype&gt; *tridirN = nullptr,
     arma::Mat&lt;dtype&gt; *destN = nullptr,
-    const arma::u32_vec *index = nullptr,
-    const double ray_offset = 0.0);
+    const arma::u32_vec *index = nullptr);
 </pre>
 
 <b>Inputs:</b><br>
 <ul>
 <li><b><code>orig</code></b> — Ray origin points in GCS; <code>[n_ray, 3]</code></li>
-<li><b><code>trivec</code></b> — Vectors from origin to triangle vertices, columns <code>[x1 y1 z1 x2 y2 z2 x3 y3 z3]</code>; <code>[n_ray, 9]</code></li>
+<li><b><code>trivec</code></b> — Vectors from origin to the wavefront vertices, columns <code>[x1 y1 z1 x2 y2 z2 x3 y3 z3]</code>; <code>[n_ray, 9]</code></li>
 <li><b><code>tridir</code></b> — Vertex-ray directions, spherical <code>[v1az v1el v2az v2el v3az v3el]</code> or Cartesian <code>[v1x v1y v1z v2x v2y v2z v3x v3y v3z]</code>; <code>[n_ray, 6]</code> or <code>[n_ray, 9]</code></li>
-<li><b><code>dest</code></b> (optional) — Ray destination points; <code>[n_ray, 3]</code></li>
-<li><b><code>index</code></b> (optional) — 0-based indices of rays to subdivide; <code>[n_ind]</code></li>
-<li><b><code>ray_offset</code></b> (optional) — Origin offset along propagation direction</li>
+<li><b><code>dest</code></b> (optional) — Ray destination points, ignored if empty; <code>[n_ray, 3]</code></li>
+<li><b><code>index</code></b> (optional) — 0-based indices of the rays that should be subdivided, may repeat indices and determines the output order; Invalid indices raise an exception after the loop has finished, outputs may be partially written by then; <code>[n_subdiv]</code></li>
+<li><b><code>transposed_output</code></b> (optional) — If true, the outputs are written transposed with the rays in the columns, e.g. <code>origN</code> becomes <code>[3, n_rayN]</code>; default = <code>false</code></li>
 </ul>
 
 <b>Outputs:</b><br>
 <ul>
-<li><b><code>origN</code></b> — Subdivided ray origins; <code>[n_rayN, 3]</code></li>
-<li><b><code>trivecN</code></b> — Subdivided triangle vectors; <code>[n_rayN, 9]</code></li>
-<li><b><code>tridirN</code></b> — Subdivided vertex-ray directions, same format as <code>tridir</code>; <code>[n_rayN, 6]</code> or <code>[n_rayN, 9]</code></li>
-<li><b><code>destN</code></b> — Subdivided destinations, empty if <code>dest</code> was <code>nullptr</code> or empty; <code>[n_rayN, 3]</code></li>
+<li><b><code>origN</code></b> — Subdivided ray origins, centroids of the sub-beam wavefronts; <code>[n_rayN, 3]</code> or <code>[3, n_rayN]</code> for <code>transposed_output</code></li>
+<li><b><code>trivecN</code></b> — Subdivided wavefront vectors, relative to <code>origN</code>; <code>[n_rayN, 9]</code> or <code>[9, n_rayN]</code> for <code>transposed_output</code></li>
+<li><b><code>tridirN</code></b> — Subdivided vertex-ray directions, same format as <code>tridir</code>; <code>[n_rayN, 6]</code> or <code>[n_rayN, 9]</code> or <code>[6/9, n_rayN]</code> for <code>transposed_output</code></li>
+<li><b><code>destN</code></b> — Subdivided destinations, left untouched if <code>dest</code> was <code>nullptr</code> or empty; <code>[n_rayN, 3]</code> or <code>[3, n_rayN]</code> for <code>transposed_output</code></li>
 </ul>
 
 <b>Returns:</b><br>
 <ul>
-<li><code>n_rayN</code> — Number of output rays</li>
+<li><code>n_rayN</code> — Number of rays written to the output, <code>4 * n_subdiv</code></li>
 </ul>
 
 <b>See also:</b><br>
 <ul>
 <li><a href="#icosphere">icosphere</a> (generate initial beams)</li>
-<li><a href="#ray_point_intersect">ray_point_intersect</a> (beam–sample-point interaction)</li>
-<li><a href="#ray_triangle_intersect">ray_triangle_intersect</a> (beam–triangle interaction)</li>
+<li><a href="#ray_point_intersect">ray_point_intersect</a> (beam-sample-point interaction)</li>
+<li><a href="#ray_triangle_intersect">ray_triangle_intersect</a> (beam-triangle interaction)</li>
 </ul>
 
 <hr class="greyline"><br>

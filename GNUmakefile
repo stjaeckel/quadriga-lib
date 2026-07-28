@@ -86,8 +86,10 @@ endif
 ifeq ($(matlab),ON)
 	matlab -batch "run('tests/quadriga_lib_mex_tests.m');"
 endif
+ifeq ($(python),ON)
 ifneq ($(PYTHON_SHARED_OBJ),)
 	python3 -m pytest tests/python_tests -x -s
+endif
 endif
 
 python_test: 
