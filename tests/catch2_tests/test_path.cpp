@@ -64,10 +64,10 @@ TEST_CASE("path - default construction")
 TEST_CASE("path - init argument validation")
 {
     path p;
-    CHECK_THROWS_AS(p.init(256), std::invalid_argument);       // segments > 255
-    CHECK_THROWS_AS(p.init(0, 0), std::invalid_argument);      // frequencies == 0
-    CHECK_THROWS_AS(p.init(0, 128), std::invalid_argument);    // frequencies > 127
-    CHECK_NOTHROW(p.init(255, 127));                           // boundary: both max
+    CHECK_THROWS_AS(p.init(256), std::invalid_argument);    // segments > 255
+    CHECK_THROWS_AS(p.init(0, 0), std::invalid_argument);   // frequencies == 0
+    CHECK_THROWS_AS(p.init(0, 128), std::invalid_argument); // frequencies > 127
+    CHECK_NOTHROW(p.init(255, 127));                        // boundary: both max
     CHECK(p.n_freq() == 127);
     CHECK(p.is_scalar() == false);
 }
@@ -405,44 +405,14 @@ TEST_CASE("path - extend appends segment, distance, counters")
     CHECK(std::abs(L - 5.0f) < 1e-5f);
     CHECK(std::abs(t1.length - 5.0f) < 1e-5f);
     CHECK(t1.n_seg() == 2);
-    CHECK(t1.nTRA == 1);         // type 1..127 increments nTRA
+    CHECK(t1.nTRA == 0);
     CHECK(t1.nREF == 0);
-    CHECK(t1.nSCT == 7);         // propagated unchanged
+    CHECK(t1.nSCT == 7); // propagated unchanged
 
     // New coordinate landed in the appended slot.
     CHECK(t1(0) == 3.0f);
     CHECK(t1(1) == 4.0f);
     CHECK(t1(2) == 0.0f);
-}
-
-TEST_CASE("path - extend counter classification by type")
-{
-    auto extend_once = [](uint8_t type, uint8_t &ref_out, uint8_t &tra_out)
-    {
-        path src(1, 1, false);
-        src.coord(0)[0] = 0.0f;
-        path t;
-        src.extend(t, 1.0f, 0.0f, 0.0f, type);
-        ref_out = t.nREF;
-        tra_out = t.nTRA;
-    };
-
-    uint8_t ref, tra;
-    extend_once(0, ref, tra);
-    CHECK(ref == 0);
-    CHECK(tra == 0); // type 0 increments neither
-    extend_once(1, ref, tra);
-    CHECK(tra == 1);
-    CHECK(ref == 0);
-    extend_once(127, ref, tra);
-    CHECK(tra == 1);
-    CHECK(ref == 0);
-    extend_once(128, ref, tra);
-    CHECK(ref == 1);
-    CHECK(tra == 0);
-    extend_once(255, ref, tra);
-    CHECK(ref == 1);
-    CHECK(tra == 0);
 }
 
 TEST_CASE("path - extend across the inline/history boundary")
@@ -492,7 +462,7 @@ TEST_CASE("path - interaction_type_codes short path stays inline")
 
     std::vector<uint8_t> seq = c.interaction_type_codes();
     REQUIRE(seq.size() == 4);
-    CHECK(seq[0] == 0);  // original segment
+    CHECK(seq[0] == 0); // original segment
     CHECK(seq[1] == 11);
     CHECK(seq[2] == 22);
     CHECK(seq[3] == 33);
@@ -527,7 +497,7 @@ TEST_CASE("path - move assignment frees existing and transfers")
     a = std::move(b);
     CHECK(a.coord(0)[0] == 2.0f);
     CHECK(a.coord(0) == b_buf);
-    CHECK(b.n_seg() == 0);     // b emptied to the valid empty state
+    CHECK(b.n_seg() == 0); // b emptied to the valid empty state
     CHECK(b.n_freq() == 1);
     CHECK(std::isnan(b(0)));
 }
@@ -544,7 +514,7 @@ TEST_CASE("path - copy assignment is deep and self-safe")
     CHECK(b.iR == 7);
     CHECK(b.coord(1) != a.coord(1)); // distinct buffers
     b.coord(1)[0] = -5.0f;
-    CHECK(a.coord(1)[0] == 9.0f);    // a unaffected
+    CHECK(a.coord(1)[0] == 9.0f); // a unaffected
 
     // Self-assignment must not corrupt or free-then-read.
     a = a;
@@ -563,9 +533,9 @@ TEST_CASE("path - free resets to a valid empty state")
     CHECK_FALSE(p.is_scalar());
 
     // Accessors must be safe on a freed object, not segfault.
-    CHECK(std::isnan(p(0)));                                 // nSEG == 0 -> NaN
+    CHECK(std::isnan(p(0)));                                // nSEG == 0 -> NaN
     CHECK_THROWS_AS(p.coord(0), std::invalid_argument);     // seg >= nSEG(0)
-    CHECK_NOTHROW(p.xpr_coeff(0));                           // freq 0 always valid (xprmat)
+    CHECK_NOTHROW(p.xpr_coeff(0));                          // freq 0 always valid (xprmat)
     CHECK_THROWS_AS(p.xpr_coeff(1), std::invalid_argument); // freq >= n_freq(1)
 
     // Idempotent: freeing again is safe.
@@ -582,7 +552,7 @@ TEST_CASE("path - comparison operators order by iR")
     CHECK(b > a);
     CHECK(a <= b);
     CHECK(b >= a);
-    CHECK(b == c);   // equal iR compares equal
+    CHECK(b == c); // equal iR compares equal
     CHECK(a != b);
     CHECK_FALSE(a == b);
     CHECK(b <= c);

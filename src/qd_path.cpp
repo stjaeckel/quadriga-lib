@@ -128,7 +128,7 @@ float duplicate(path &target) const;
 Copies the path into a target and appends one new segment, returning the new total length
 
 - The new coordinate is appended after the existing segments; the stored `length` grows by the origin-to-new-point distance of the appended leg
-- The interaction `type` is recorded for the new segment and classifies the interaction: codes 1-127 increment `nTRA`, codes 128-255 increment `nREF`, code 0 increments neither
+- The interaction `type` is recorded for the new segment, counters nREF, nTRA, nSUB, nSCT are not updated (left to the caller)
 - The target receives an independent buffer sized for the extra segment; the source is left unchanged
 - Throws if the source already holds the maximum of 255 segments
 ```
@@ -336,7 +336,7 @@ const float *quadriga_lib::path::coord(size_t seg) const
 {
     if (seg >= (size_t)nSEG)
         throw std::invalid_argument("Requested segment out-of-bound.");
-    return data + seg * 3;
+    return data ? data + seg * 3 : nullptr;
 }
 float *quadriga_lib::path::coord(size_t seg)
 {
@@ -532,8 +532,8 @@ float quadriga_lib::path::extend(path &target, float x, float y, float z, uint8_
     target.iC = iC, target.iR = iR;
     target.nFRQ = nFRQ;
     target.nSEG = (uint8_t)nS_new;
-    target.nREF = type > 127 ? nREF + 1 : nREF;
-    target.nTRA = type && type < 128 ? nTRA + 1 : nTRA;
+    target.nREF = nREF;
+    target.nTRA = nTRA;
     target.nSUB = nSUB;
     target.nSCT = nSCT;
 
