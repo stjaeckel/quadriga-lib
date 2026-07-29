@@ -962,21 +962,50 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
 
     // Get number of output rays and build output ray index
     // - Only consider rays that have at least one interaction with the mesh, i.e. 'fbs_ind != 0'
+    // - Without compaction the map is the identity, so it is not materialized at all: at 1e8 rays
+    //   the index array alone costs 400 MB, and the range check then parallelizes.
+    //   With compaction the running counter is a prefix sum and the loop has to stay serial.
     unsigned n_rayN_u = 0;
-    std::vector<unsigned> output_ray_index(n_ray); // 1-based
-    for (size_t i_ray = 0; i_ray < n_ray; ++i_ray) // Ray loop
+    arma::u32_vec output_ray_index; // 1-based, empty = identity map
+
+    if (compact)
     {
-        if (p_fbs_ind[i_ray] > n_mesh) // Invalid, must be 1 ... n_mesh (1-based index)
+        output_ray_index.set_size(n_ray); // not zero-filled: every element is written below
+        unsigned *p_ind = output_ray_index.memptr();
+        for (size_t i_ray = 0; i_ray < n_ray; ++i_ray) // Ray loop
+        {
+            if (p_fbs_ind[i_ray] > n_mesh) // Invalid, must be 1 ... n_mesh (1-based index)
+                throw std::invalid_argument("Some values in 'fbs_ind' exceed number of mesh elements.");
+            if (p_sbs_ind[i_ray] > n_mesh)
+                throw std::invalid_argument("Some values in 'sbs_ind' exceed number of mesh elements.");
+
+            if (p_fbs_ind[i_ray] == 0)
+                p_ind[i_ray] = 0; // drop no-hits
+            else
+                p_ind[i_ray] = ++n_rayN_u; // keep
+        }
+    }
+    else // Identity map: only the index range is left to check, and that is a reduction
+    {
+        int bad = 0;
+#pragma omp parallel for schedule(static) reduction(| : bad) if (n_ray >= 51200)
+        for (long long i_ray = 0; i_ray < (long long)n_ray; ++i_ray) // Ray loop
+        {
+            if (p_fbs_ind[i_ray] > n_mesh) // Invalid, must be 1 ... n_mesh (1-based index)
+                bad |= 1;
+            if (p_sbs_ind[i_ray] > n_mesh)
+                bad |= 2;
+        }
+
+        if (bad & 1)
             throw std::invalid_argument("Some values in 'fbs_ind' exceed number of mesh elements.");
-        if (p_sbs_ind[i_ray] > n_mesh)
+        if (bad & 2)
             throw std::invalid_argument("Some values in 'sbs_ind' exceed number of mesh elements.");
 
-        if (compact && p_fbs_ind[i_ray] == 0)
-            output_ray_index[i_ray] = 0; // compact: drop no-hits
-        else
-            output_ray_index[i_ray] = ++n_rayN_u; // keep (hit, or no-hit when !compact)
+        n_rayN_u = (unsigned)n_ray;
     }
     const arma::uword n_rayN = (arma::uword)n_rayN_u;
+    const unsigned *p_ray_map = output_ray_index.empty() ? nullptr : output_ray_index.memptr();
 
     // Allocate output memory, if needed
     if (origN && (origN->n_rows != n_rayN || origN->n_cols != 3))
@@ -1055,10 +1084,10 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
 #pragma omp parallel for schedule(static)
     for (long long i_ray = 0; i_ray < (long long)n_ray; ++i_ray) // Ray loop
     {
-        size_t iRx = (size_t)i_ray;                // Ray x-index
-        size_t iRy = iRx + n_ray;                  // Ray y-index
-        size_t iRz = iRy + n_ray;                  // Ray z-index
-        size_t i_rayN = output_ray_index[iRx] - 1; // Output ray index, 0-based
+        size_t iRx = (size_t)i_ray;                                   // Ray x-index
+        size_t iRy = iRx + n_ray;                                     // Ray y-index
+        size_t iRz = iRy + n_ray;                                     // Ray z-index
+        size_t i_rayN = p_ray_map ? (size_t)p_ray_map[iRx] - 1 : iRx; // Output ray index, 0-based
 
         // Normalization lambda
         auto NORMALIZE = [](double &x, double &y, double &z, bool apply = true) -> double

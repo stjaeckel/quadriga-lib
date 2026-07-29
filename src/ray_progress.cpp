@@ -186,6 +186,9 @@ Advance a ray set by one interaction, spawning reflected, transmitted, and subdi
   note on `center_frequency`).
 - Beam subdivision and beam-front updates are active only when `trivec` and `tridir` are supplied;
   otherwise rays are traced as infinitesimal.
+- The ray-mesh intersection can be delegated: pass `no_interact_in`, `fbs_ind_in` and `sbs_ind_in`
+  to reuse a [[ray_triangle_intersect]] result. When the intersection is delegated, `sub_mesh_index` and `aabb` are unused —
+  they only accelerate the internal intersector — validation is skipped in this case and the parameters may be omitted.
 
 ## Declaration:
 ```
@@ -215,7 +218,10 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
     float subdivision_tolerance_m = 3.0f,
     float thin_slab_threshold = 0.15f,
     bool refraction_mode = true,
-    bool scalar_mode = false);
+    bool scalar_mode = false,
+    const arma::u32_vec *no_interact_in = nullptr,
+    const arma::u32_vec *fbs_ind_in = nullptr,
+    const arma::u32_vec *sbs_ind_in = nullptr);
 ```
 
 ## Inputs:
@@ -237,6 +243,11 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
 - **`thin_slab_threshold`** — Thin-slab (Fabry-Pérot) resolve threshold forwarded to [[ray_state_update]] as its `eps`; see there. Default 0.15
 - **`refraction_mode`** — `true` = refraction (Snell-bent transmission), `false` = straight-path transmission
 - **`scalar_mode`** — `true` = scalar (acoustic) layout, `false` = EM (2×2 Jones). Must match the layout of `paths`
+- **`no_interact_in`** *(optional)* — Externally computed intersection count per ray from [[ray_triangle_intersect]]; `[n_ray]`.
+  When given, the internal intersector is skipped and `fbs_ind_in` and `sbs_ind_in` become mandatory
+- **`fbs_ind_in`** *(optional)* — Externally computed 1-based index of the first intersected mesh element, 0 = none; `[n_ray]`.
+  Must be non-zero wherever `no_interact_in` is non-zero.
+- **`sbs_ind_in`** *(optional)* — Externally computed 1-based index of the second intersected mesh element, 0 = none; `[n_ray]`
 
 ## In/out (launch configuration, updated in place; [n_ray, …] on entry, [n_out, …] on return):
 - **`orig`** — Ray origins in GCS; `[n_ray, 3]`. Defines `n_ray`; must be non-empty
@@ -245,7 +256,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
 - **`path_dir_prev`** — Physical ray direction entering the current segment (unit vectors); `[n_ray, 3]`
 - **`acc_dist`** — Accumulated in-layer distance; `[n_ray, 2]`; col 1 = refracted distance, col 2 = geometric distance
 - **`paths`** — Per-ray [[path]] objects; `n_ray` entries. Frequency count and layout must match
-  `center_frequency` and `scalar_mode`. Terminated paths are freed; surviving paths carry the appended 
+  `center_frequency` and `scalar_mode`. Terminated paths are freed; surviving paths carry the appended
   interaction segment and the updated polarization product
 - **`trivec`** *(optional)* — Beam wavefront triangle vertices relative to origin; `[n_ray, 9]`. Must be supplied together with `tridir`; empty / NULL disables beam tracing
 - **`tridir`** *(optional)* — Vertex-ray directions, Cartesian; `[n_ray, 9]`
@@ -291,7 +302,10 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
                                                    float subdivision_tolerance_m,
                                                    float thin_slab_threshold,
                                                    bool refraction_mode,
-                                                   bool scalar_mode)
+                                                   bool scalar_mode,
+                                                   const arma::u32_vec *no_interact_in,
+                                                   const arma::u32_vec *fbs_ind_in,
+                                                   const arma::u32_vec *sbs_ind_in)
 {
     // Mesh validation
     const arma::uword n_mesh = mesh.n_rows;
@@ -301,6 +315,11 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
         throw std::invalid_argument("Input 'mesh' must have 9 columns containing x,y,z coordinates of 3 vertices.");
     if (mtl_ind.n_elem != n_mesh)
         throw std::invalid_argument("Length of 'mtl_ind' must match the number of mesh faces.");
+
+    // Delegated ray-mesh intersection: all three arrays or none
+    bool run_intersector = (no_interact_in == nullptr && fbs_ind_in == nullptr && sbs_ind_in == nullptr);
+    if (!run_intersector && (no_interact_in == nullptr || fbs_ind_in == nullptr || sbs_ind_in == nullptr))
+        throw std::invalid_argument("Inputs 'no_interact_in', 'fbs_ind_in' and 'sbs_ind_in' must be provided together.");
 
     // Validate mtl_prop
     arma::uword n_mtl = 0;
@@ -383,7 +402,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
 
     // Optional sub-mesh partitioning, 0-based start indices into the mesh rows
     arma::uword n_sub = 0;
-    if (sub_mesh_index && sub_mesh_index->n_elem != 0)
+    if (run_intersector && sub_mesh_index && sub_mesh_index->n_elem != 0)
     {
         n_sub = sub_mesh_index->n_elem;
         const unsigned *p_sub = sub_mesh_index->memptr();
@@ -403,7 +422,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
     // Optional axis-aligned bounding boxes, one per sub-mesh
     arma::fmat aabb_local;
     const arma::fmat *aabb_ptr = nullptr;
-    if (aabb && aabb->n_elem != 0)
+    if (run_intersector && aabb && aabb->n_elem != 0)
     {
         if (n_sub == 0)
             throw std::invalid_argument("Input 'aabb' requires 'sub_mesh_index'.");
@@ -421,8 +440,22 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
         throw std::invalid_argument("Input 'min_gain_dB' must be finite.");
     float min_gain_linear = std::pow(10.0f, 0.1f * min_gain_dB);
 
-    if (subdivision_tolerance_m <= 0.0)
+    if (subdivision_tolerance_m <= 0.0f)
         throw std::invalid_argument("Input 'subdivision_tolerance_m' must be > 0.");
+
+    if (thin_slab_threshold < 0.0f || thin_slab_threshold > 1.0f)
+        throw std::invalid_argument("Input 'thin_slab_threshold' must be >= 0 and <= 1.");
+
+    // Validate optional inputs, deep-check done by ray_mesh_interact
+    if (!run_intersector)
+    {
+        if (no_interact_in->n_elem != n_ray)
+            throw std::invalid_argument("Number of elements in 'no_interact_in' does not match number of rows in 'orig'.");
+        if (fbs_ind_in->n_elem != n_ray)
+            throw std::invalid_argument("Number of elements in 'fbs_ind_in' does not match number of rows in 'orig'.");
+        if (sbs_ind_in->n_elem != n_ray)
+            throw std::invalid_argument("Number of elements in 'sbs_ind_in' does not match number of rows in 'orig'.");
+    }
 
     // Launch config data
     // Buffers are allocated once at the worst case and never grow. "new T[n]" (no parens)
@@ -481,11 +514,16 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
         quadriga_lib::path *pathP(size_t offset = 0) { return paths.data() + offset; }
     };
 
-    // Calculate Ray-Mesh interactions (OMP + AVX or CUDA accelerated, very compute-heavy)
+    // Ray-mesh intersections: computed here, or supplied by the caller
     arma::u32_vec no_interact, fbs_ind, sbs_ind; // FBS and SBS indices, 1-based, 0 = no hit
-    if (max_no_interactions)
+    if (run_intersector && max_no_interactions)
         quadriga_lib::ray_triangle_intersect<float>(&orig, &dest, &mesh, nullptr, nullptr, &no_interact,
                                                     &fbs_ind, &sbs_ind, sub_mesh_index, aabb_ptr);
+
+    // Source for the compaction below. Delegated arrays are read in place, never copied.
+    const arma::u32_vec *p_ni = run_intersector ? &no_interact : no_interact_in;
+    const arma::u32_vec *p_fi = run_intersector ? &fbs_ind : fbs_ind_in;
+    const arma::u32_vec *p_si = run_intersector ? &sbs_ind : sbs_ind_in;
 
     // Count number of rays that interact with mesh, build ray_map from compaction, clear discarded path data
     arma::uword n_interact = 0;
@@ -493,14 +531,14 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
     if (max_no_interactions)
     {
         arma::u32 cnt = 0u;
-        const arma::u32 *pi = no_interact.memptr();
+        const arma::u32 *pi = p_ni->memptr();
         ray_map.set_size(n_ray);
         arma::u32 *po = ray_map.memptr();
         for (unsigned i = 0; i < (unsigned)n_ray; ++i)
         {
-            if (pi[i])
+            if (pi[i]) // has interactions
             {
-                if (cnt != i)
+                if (cnt != i) // compact paths
                     paths[cnt] = std::move(paths[i]);
                 po[cnt] = i, ++cnt;
             }
@@ -538,9 +576,9 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
     mtl_ind_buffer = compact(mtl_ind_buffer, ray_map, n_interact);
     path_dir_prev = compact(path_dir_prev, ray_map, n_interact);
     acc_dist = compact(acc_dist, ray_map, n_interact);
-    no_interact = compact(no_interact, ray_map, n_interact);
-    fbs_ind = compact(fbs_ind, ray_map, n_interact);
-    sbs_ind = compact(sbs_ind, ray_map, n_interact);
+    no_interact = compact(*p_ni, ray_map, n_interact);
+    fbs_ind = compact(*p_fi, ray_map, n_interact);
+    sbs_ind = compact(*p_si, ray_map, n_interact);
     ray_map.reset(); // No longer needed
 
     // Reflection @ reference frequency
