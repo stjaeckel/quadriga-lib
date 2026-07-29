@@ -28,6 +28,12 @@
 // so seeding it in the builder gives a stable handle from an output row back to the input ray it
 // came from. That is what makes the cross-branch comparison possible.
 //
+// Delegated intersection: the optional no_interact_in / fbs_ind_in / sbs_ind_in inputs let a caller
+// hand in a ray_triangle_intersect result instead of having ray_progress compute it. Those cases
+// assert bit-identical output against the internal path rather than mere equivalence, since the two
+// routes feed the same arrays into the same per-ray kernels in the same order; anything less would
+// let a remapping bug hide behind a tolerance.
+//
 // Conventions:
 //  - All cubes are the 2x2x2 Blender-style cube, translated by the constructor argument. A cube
 //    centred at (5,0,0) therefore has faces at x = 4 (near) and x = 6 (far).
@@ -162,6 +168,11 @@ namespace
         bool refraction = true;
         const arma::u32_vec *smi = nullptr;
         const arma::fmat *aabb = nullptr;
+
+        // Delegated ray-mesh intersection (all three or none)
+        const arma::u32_vec *ni_in = nullptr;
+        const arma::u32_vec *fi_in = nullptr;
+        const arma::u32_vec *si_in = nullptr;
     };
 
     struct Cfg
@@ -187,7 +198,8 @@ namespace
                                               o.smi, o.aabb,
                                               o.max_int, o.max_ref, o.max_tra, o.max_sub,
                                               o.min_gain_dB, o.sub_tol, o.slab,
-                                              o.refraction, scalar);
+                                              o.refraction, scalar,
+                                              o.ni_in, o.fi_in, o.si_in);
         }
     };
 
@@ -295,6 +307,35 @@ namespace
     }
 
     // ---------------------------------------------------------------------------------------
+    // Delegated ray-mesh intersection
+    // ---------------------------------------------------------------------------------------
+
+    // Intersection results, computed exactly the way a caller delegating the work would
+    struct Hits
+    {
+        arma::u32_vec no_interact, fbs_ind, sbs_ind;
+    };
+
+    Hits intersect(const Cfg &C, const Scene &S, const arma::u32_vec *smi = nullptr)
+    {
+        Hits H;
+        quadriga_lib::ray_triangle_intersect<float>(&C.orig, &C.dest, &S.mesh, nullptr, nullptr,
+                                                    &H.no_interact, &H.fbs_ind, &H.sbs_ind,
+                                                    smi, nullptr);
+        return H;
+    }
+
+    // Bind a delegated intersection into an option block
+    Opt with_hits(const Opt &base, const Hits &H)
+    {
+        Opt o = base;
+        o.ni_in = &H.no_interact;
+        o.fi_in = &H.fbs_ind;
+        o.si_in = &H.sbs_ind;
+        return o;
+    }
+
+    // ---------------------------------------------------------------------------------------
     // Assertions
     // ---------------------------------------------------------------------------------------
 
@@ -399,6 +440,40 @@ namespace
                 }
         }
         CHECK(matched > 0); // a vacuous comparison is a failed comparison
+    }
+
+    // Two runs that must agree row for row, not merely ray for ray
+    void check_identical(const Cfg &A, const Cfg &B)
+    {
+        REQUIRE(A.n() == B.n());
+        REQUIRE(A.paths.size() == B.paths.size());
+
+        if (A.n() != 0)
+        {
+            CHECK(arma::approx_equal(A.orig, B.orig, "absdiff", 0.0f));
+            CHECK(arma::approx_equal(A.dest, B.dest, "absdiff", 0.0f));
+            CHECK(arma::approx_equal(A.path_dir, B.path_dir, "absdiff", 0.0f));
+            CHECK(arma::approx_equal(A.acc_dist, B.acc_dist, "absdiff", 0.0f));
+            CHECK(arma::all(A.prev == B.prev));
+            CHECK(arma::all(A.cur == B.cur));
+            CHECK(arma::all(A.buf == B.buf));
+            if (A.beam && B.beam)
+            {
+                CHECK(arma::approx_equal(A.trivec, B.trivec, "absdiff", 0.0f));
+                CHECK(arma::approx_equal(A.tridir, B.tridir, "absdiff", 0.0f));
+            }
+        }
+
+        for (size_t i = 0; i < A.paths.size(); ++i)
+        {
+            CHECK(A.paths[i].iR == B.paths[i].iR);
+            CHECK(A.paths[i].n_seg() == B.paths[i].n_seg());
+            CHECK((int)A.paths[i].nREF == (int)B.paths[i].nREF);
+            CHECK((int)A.paths[i].nTRA == (int)B.paths[i].nTRA);
+            CHECK((int)A.paths[i].nSUB == (int)B.paths[i].nSUB);
+            CHECK(A.paths[i].length == B.paths[i].length);
+            CHECK(A.paths[i].calc_gain(0.0f, 0) == B.paths[i].calc_gain(0.0f, 0));
+        }
     }
 
     // Distance from a row of M to the coordinate origin
@@ -1230,6 +1305,253 @@ TEST_CASE("ray_progress - accumulated path length")
     REQUIRE(sb[1] == 1);
     for (arma::uword i = 0; i < B.n(); ++i)
         CHECK(std::abs(B.paths[i].length - radius(B.orig, i)) < 1e-4f);
+}
+
+// ===========================================================================================
+// Delegated ray-mesh intersection
+// ===========================================================================================
+
+TEST_CASE("ray_progress - delegated intersection matches the internal one")
+{
+    // Supplying the ray_triangle_intersect result must be a pure refactor: bit-identical output,
+    // not merely an equivalent one. Exact comparison is legitimate here because the delegated and
+    // internal paths feed the same arrays into the same per-ray kernels in the same order.
+    Scene S = one_cube(5.0f, 0.0f, 0.0f);
+
+    arma::fmat dirs;
+    arma::fvec half;
+
+    SECTION("no beam")
+    {
+        beam_fan(64, 0, dirs, half);
+        Cfg A = make_cfg(dirs, 10.0f);
+        Cfg B = make_cfg(dirs, 10.0f);
+
+        Opt o;
+        Hits H = intersect(B, S);
+        auto sa = A.step(S, o);
+        auto sb = B.step(S, with_hits(o, H));
+
+        CHECK(sa == sb);
+        CHECK(sa[0] == 64); // the hit count comes from the delegated array
+        check_identical(A, B);
+    }
+    SECTION("beam, no subdivision")
+    {
+        beam_fan(64, 0, dirs, half);
+        Cfg A = make_cfg(dirs, 10.0f, 1, false, half);
+        Cfg B = make_cfg(dirs, 10.0f, 1, false, half);
+
+        Opt o;
+        o.sub_tol = SUB_TOL;
+        Hits H = intersect(B, S);
+        auto sa = A.step(S, o);
+        auto sb = B.step(S, with_hits(o, H));
+
+        CHECK(sa == sb);
+        REQUIRE(sa[1] == 0);
+        check_identical(A, B);
+    }
+    SECTION("beam with subdivision, above the compaction threshold")
+    {
+        // 4 wide of 229 = 1.75 %, so the internal compaction branch runs. The delegated arrays
+        // are full-length and are remapped by the same ray_map as everything else.
+        beam_fan(229, 4, dirs, half);
+        Cfg A = make_cfg(dirs, 10.0f, 1, false, half);
+        Cfg B = make_cfg(dirs, 10.0f, 1, false, half);
+
+        Opt o;
+        o.sub_tol = SUB_TOL;
+        o.max_tra = 0;
+        Hits H = intersect(B, S);
+        auto sa = A.step(S, o);
+        auto sb = B.step(S, with_hits(o, H));
+
+        CHECK(sa == sb);
+        REQUIRE(sa[1] == 4);
+        REQUIRE(sa[0] == 229);
+        check_identical(A, B);
+    }
+    SECTION("rays that miss are dropped the same way")
+    {
+        // Half the fan is aimed away from the cube, so the delegated no_interact drives the
+        // compaction rather than an internally computed one.
+        beam_fan(32, 0, dirs, half);
+        arma::fmat away = dirs;
+        for (arma::uword i = 0; i < 32; i += 2)
+            away(i, 0) = -4.0f; // fired backwards
+
+        Cfg A = make_cfg(away, 10.0f);
+        Cfg B = make_cfg(away, 10.0f);
+
+        Opt o;
+        Hits H = intersect(B, S);
+        auto sa = A.step(S, o);
+        auto sb = B.step(S, with_hits(o, H));
+
+        CHECK(sa == sb);
+        CHECK(sa[0] == 16);
+        check_identical(A, B);
+    }
+    SECTION("multi-frequency")
+    {
+        beam_fan(48, 0, dirs, half);
+        Cfg A = make_cfg(dirs, 10.0f, 3);
+        Cfg B = make_cfg(dirs, 10.0f, 3);
+
+        Opt o;
+        Hits H = intersect(B, S);
+        auto sa = A.step(S, o);
+        auto sb = B.step(S, with_hits(o, H));
+
+        CHECK(sa == sb);
+        check_identical(A, B);
+        for (size_t i = 0; i < A.paths.size(); ++i)
+            for (arma::uword f = 0; f < 3; ++f)
+                CHECK(A.paths[i].calc_gain(0.0f, f) == B.paths[i].calc_gain(0.0f, f));
+    }
+}
+
+TEST_CASE("ray_progress - delegated intersection across a multi-generation trace")
+{
+    // Delegation is per call, not per trace: each generation emits a new orig/dest pair, so the
+    // caller has to re-intersect every time. Running both variants in lockstep also proves that
+    // nothing from a delegated call leaks into the next one.
+    Scene S = two_cubes();
+
+    arma::fmat dirs;
+    arma::fvec half;
+    beam_fan(64, 0, dirs, half);
+
+    Cfg A = make_cfg(dirs, 30.0f);
+    Cfg B = make_cfg(dirs, 30.0f);
+
+    Opt o;
+    o.max_int = 4;
+    o.max_ref = 2;
+    o.max_tra = 2;
+
+    bool ended = false;
+    for (int gen = 0; gen < 20; ++gen)
+    {
+        Hits H = intersect(B, S); // from B's current, pre-step launch configuration
+
+        auto sa = A.step(S, o);
+        auto sb = B.step(S, with_hits(o, H));
+
+        CHECK(sa == sb);
+        check_identical(A, B);
+
+        if (A.n() == 0)
+        {
+            ended = true;
+            break;
+        }
+    }
+    CHECK(ended);
+}
+
+TEST_CASE("ray_progress - delegated intersection ignores the acceleration structure")
+{
+    // sub_mesh_index and aabb only feed the internal intersector, so passing them alongside a
+    // delegated result must change nothing. They are still validated.
+    Scene S = two_cubes();
+    arma::u32_vec smi = {0u, 12u};
+
+    arma::fmat dirs;
+    arma::fvec half;
+    beam_fan(32, 0, dirs, half);
+
+    Cfg A = make_cfg(dirs, 20.0f);
+    Cfg B = make_cfg(dirs, 20.0f);
+
+    Opt o;
+    Hits H = intersect(A, S); // computed without segmentation
+
+    Opt oa = with_hits(o, H);
+    Opt ob = with_hits(o, H);
+    ob.smi = &smi; // supplied but unused
+
+    auto sa = A.step(S, oa);
+    auto sb = B.step(S, ob);
+
+    CHECK(sa == sb);
+    check_identical(A, B);
+}
+
+TEST_CASE("ray_progress - delegated intersection with max_no_interactions = 0")
+{
+    // Tracing stays disabled even when the caller hands in a full set of hits.
+    Scene S = one_cube(5.0f, 0.0f, 0.0f);
+    Cfg C = one_ray();
+
+    Hits H = intersect(C, S);
+    REQUIRE(H.no_interact(0) > 0u); // the ray really does hit
+
+    Opt o;
+    o.max_int = 0;
+
+    auto s = C.step(S, with_hits(o, H));
+    CHECK(s[0] == 0);
+    CHECK(s[1] == 0);
+    CHECK(s[2] == 0);
+    CHECK(s[3] == 0);
+    check_shapes(C, 0);
+}
+
+TEST_CASE("ray_progress - delegated intersection validation")
+{
+    Scene S = one_cube(5.0f, 0.0f, 0.0f);
+    const arma::u32 n_mesh = (arma::u32)S.mesh.n_rows;
+
+    Cfg probe = one_ray();
+    const Hits ref = intersect(probe, S);
+
+    SECTION("the three arrays must be supplied together")
+    {
+        // Each of the six partial combinations
+        for (int mask = 1; mask < 7; ++mask)
+        {
+            Cfg C = one_ray();
+            Opt o;
+            if (mask & 1)
+                o.ni_in = &ref.no_interact;
+            if (mask & 2)
+                o.fi_in = &ref.fbs_ind;
+            if (mask & 4)
+                o.si_in = &ref.sbs_ind;
+            CHECK_THROWS_AS(C.step(S, o), std::invalid_argument);
+        }
+    }
+    SECTION("each array must match the ray count")
+    {
+        Hits H = ref;
+        H.no_interact.set_size(2);
+        Cfg C = one_ray();
+        CHECK_THROWS_AS(C.step(S, with_hits(Opt(), H)), std::invalid_argument);
+
+        Hits G = ref;
+        G.fbs_ind.set_size(2);
+        Cfg D = one_ray();
+        CHECK_THROWS_AS(D.step(S, with_hits(Opt(), G)), std::invalid_argument);
+
+        Hits F = ref;
+        F.sbs_ind.set_size(2);
+        Cfg E = one_ray();
+        CHECK_THROWS_AS(E.step(S, with_hits(Opt(), F)), std::invalid_argument);
+    }
+    SECTION("face indices must lie within the mesh")
+    {
+        Hits H = ref;
+        H.fbs_ind(0) = n_mesh + 1u;
+        Cfg C = one_ray();
+        CHECK_THROWS_AS(C.step(S, with_hits(Opt(), H)), std::invalid_argument);
+
+        Hits G = ref;
+        G.sbs_ind(0) = n_mesh + 1u;
+        Cfg D = one_ray();
+        CHECK_THROWS_AS(D.step(S, with_hits(Opt(), G)), std::invalid_argument);
+    }
 }
 
 // ===========================================================================================
