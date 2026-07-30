@@ -173,6 +173,9 @@ namespace
         const arma::u32_vec *ni_in = nullptr;
         const arma::u32_vec *fi_in = nullptr;
         const arma::u32_vec *si_in = nullptr;
+
+        // Delegated subdivision flag
+        const std::vector<bool> *sf_in = nullptr;
     };
 
     struct Cfg
@@ -199,7 +202,7 @@ namespace
                                               o.max_int, o.max_ref, o.max_tra, o.max_sub,
                                               o.min_gain_dB, o.sub_tol, o.slab,
                                               o.refraction, scalar,
-                                              o.ni_in, o.fi_in, o.si_in);
+                                              o.ni_in, o.fi_in, o.si_in, o.sf_in);
         }
     };
 
@@ -333,6 +336,31 @@ namespace
         o.fi_in = &H.fbs_ind;
         o.si_in = &H.sbs_ind;
         return o;
+    }
+
+    // Subdivision flags, computed the way a shading pass would: from the launch configuration as it
+    // stands, before ray_progress touches it, using the same limits ray_progress will apply.
+    std::vector<bool> subdiv_flags(const Cfg &C, const Scene &S, const Hits &H, const Opt &o)
+    {
+        return quadriga_lib::ray_subdivide_flag(S.mesh, C.orig, C.dest, H.fbs_ind, C.trivec, C.tridir,
+                                                C.paths, C.cur, o.max_int, o.max_sub, o.sub_tol);
+    }
+
+    // Bind a delegated subdivision flag into an option block
+    Opt with_flag(const Opt &base, const std::vector<bool> &f)
+    {
+        Opt o = base;
+        o.sf_in = &f;
+        return o;
+    }
+
+    // Number of set flags
+    arma::uword count_true(const std::vector<bool> &f)
+    {
+        arma::uword n = 0;
+        for (size_t i = 0; i < f.size(); ++i)
+            n += f[i] ? 1u : 0u;
+        return n;
     }
 
     // ---------------------------------------------------------------------------------------
@@ -1551,6 +1579,311 @@ TEST_CASE("ray_progress - delegated intersection validation")
         G.sbs_ind(0) = n_mesh + 1u;
         Cfg D = one_ray();
         CHECK_THROWS_AS(D.step(S, with_hits(Opt(), G)), std::invalid_argument);
+    }
+}
+
+// ===========================================================================================
+// Delegated subdivision flag
+// ===========================================================================================
+
+TEST_CASE("ray_progress - delegated subdivision flag matches the internal one")
+{
+    // ray_subdivide_flag is the single source of truth: handing its result back in must reproduce
+    // the internal path exactly, so a shading pass and ray_progress can never disagree about which
+    // beams will reappear as sub-beams.
+    Scene S = one_cube(5.0f, 0.0f, 0.0f);
+
+    arma::fmat dirs;
+    arma::fvec half;
+
+    SECTION("nothing to subdivide")
+    {
+        beam_fan(64, 0, dirs, half); // all narrow
+        Cfg A = make_cfg(dirs, 10.0f, 1, false, half);
+        Cfg B = make_cfg(dirs, 10.0f, 1, false, half);
+
+        Opt o;
+        o.sub_tol = SUB_TOL;
+
+        Hits H = intersect(B, S);
+        auto f = subdiv_flags(B, S, H, o);
+        REQUIRE(count_true(f) == 0u);
+
+        auto sa = A.step(S, o);
+        auto sb = B.step(S, with_flag(o, f));
+
+        CHECK(sa == sb);
+        CHECK(sb[1] == 0);
+        check_identical(A, B);
+    }
+    SECTION("below the compaction threshold")
+    {
+        beam_fan(454, 4, dirs, half); // 4 of 454 = 0.88 %, compaction skipped
+        Cfg A = make_cfg(dirs, 10.0f, 1, false, half);
+        Cfg B = make_cfg(dirs, 10.0f, 1, false, half);
+
+        Opt o;
+        o.sub_tol = SUB_TOL;
+        o.max_tra = 0;
+
+        Hits H = intersect(B, S);
+        auto f = subdiv_flags(B, S, H, o);
+        REQUIRE(count_true(f) == 4u);
+
+        auto sa = A.step(S, o);
+        auto sb = B.step(S, with_flag(o, f));
+
+        CHECK(sa == sb);
+        CHECK(sb[1] == 4);
+        check_identical(A, B);
+    }
+    SECTION("above the compaction threshold")
+    {
+        beam_fan(229, 4, dirs, half); // 4 of 229 = 1.75 %, compaction runs
+        Cfg A = make_cfg(dirs, 10.0f, 1, false, half);
+        Cfg B = make_cfg(dirs, 10.0f, 1, false, half);
+
+        Opt o;
+        o.sub_tol = SUB_TOL;
+        o.max_tra = 0;
+
+        Hits H = intersect(B, S);
+        auto f = subdiv_flags(B, S, H, o);
+        REQUIRE(count_true(f) == 4u);
+
+        auto sa = A.step(S, o);
+        auto sb = B.step(S, with_flag(o, f));
+
+        CHECK(sa == sb);
+        CHECK(sb[1] == 4);
+        CHECK(sb[0] == 229);
+        check_identical(A, B);
+    }
+    SECTION("mixed hit and miss: the flag is remapped, not truncated")
+    {
+        // Half the fan is fired backwards. The flag is indexed in the full ray set while
+        // ray_progress works on the compacted one, so the remap has to line up.
+        beam_fan(64, 0, dirs, half);
+        arma::uword n_wide_hit = 0;
+        for (arma::uword i = 0; i < 64; ++i)
+            if (i % 2 == 0) // fired backwards, misses the cube
+            {
+                dirs(i, 0) = -4.0f;
+                half(i) = WIDE_DEG; // and would be flagged if it did hit
+            }
+            else if (i % 8 == 1) // a subset of the 32 survivors subdivides
+            {
+                half(i) = WIDE_DEG;
+                ++n_wide_hit;
+            }
+        REQUIRE(n_wide_hit == 8u); // pin the construction, not just the outcome
+
+        Cfg A = make_cfg(dirs, 10.0f, 1, false, half);
+        Cfg B = make_cfg(dirs, 10.0f, 1, false, half);
+
+        Opt o;
+        o.sub_tol = SUB_TOL;
+        o.max_tra = 0;
+
+        Hits H = intersect(B, S);
+        auto f = subdiv_flags(B, S, H, o);
+
+        auto sa = A.step(S, o);
+        auto sb = B.step(S, with_flag(o, f));
+
+        CHECK(sa == sb);
+        CHECK(sb[0] == 32);                        // only the forward half hits
+        CHECK(sb[1] == (unsigned)n_wide_hit);      // and only the wide survivors subdivide
+        CHECK(count_true(f) == n_wide_hit);        // rays that miss are never flagged
+        CHECK(sb[1] == (unsigned)count_true(f));   // the flag is the decision, one for one
+        check_identical(A, B);
+    }
+    SECTION("combined with a delegated intersection")
+    {
+        beam_fan(229, 4, dirs, half);
+        Cfg A = make_cfg(dirs, 10.0f, 1, false, half);
+        Cfg B = make_cfg(dirs, 10.0f, 1, false, half);
+
+        Opt o;
+        o.sub_tol = SUB_TOL;
+        o.max_tra = 0;
+
+        Hits H = intersect(B, S);
+        auto f = subdiv_flags(B, S, H, o);
+
+        auto sa = A.step(S, o);
+        auto sb = B.step(S, with_flag(with_hits(o, H), f));
+
+        CHECK(sa == sb);
+        check_identical(A, B);
+    }
+}
+
+TEST_CASE("ray_progress - the delegated flag count is the reported n_subdiv")
+{
+    // The shading pass counts the beams it must hold back; that count has to be exactly what
+    // ray_progress expands into sub-beams.
+    Scene S = one_cube(5.0f, 0.0f, 0.0f);
+
+    arma::fmat dirs;
+    arma::fvec half;
+    beam_fan(128, 0, dirs, half);
+    for (arma::uword i = 0; i < 128; i += 3)
+        half(i) = WIDE_DEG;
+
+    Cfg C = make_cfg(dirs, 10.0f, 1, false, half);
+
+    Opt o;
+    o.sub_tol = SUB_TOL;
+
+    Hits H = intersect(C, S);
+    auto f = subdiv_flags(C, S, H, o);
+    const arma::uword n_flagged = count_true(f);
+    REQUIRE(n_flagged > 0u);
+    REQUIRE(n_flagged < 128u);
+
+    auto s = C.step(S, with_flag(o, f));
+    CHECK(s[1] == (unsigned)n_flagged);
+
+    // Every sub-beam carries one more subdivision and no interaction
+    arma::uword n_sub_out = 0;
+    for (const auto &p : C.paths)
+        if (p.nSUB == 1)
+        {
+            ++n_sub_out;
+            CHECK(p.n_seg() == 0);
+        }
+    CHECK(n_sub_out == 4u * n_flagged);
+}
+
+TEST_CASE("ray_progress - the delegated flag overrides the geometry")
+{
+    // Proves the flag is taken as the decision rather than treated as a hint. Both directions are
+    // exercised: a narrow beam forced to split, and a wide one forced to continue.
+    Scene S = one_cube(5.0f, 0.0f, 0.0f);
+
+    Opt o;
+    o.sub_tol = SUB_TOL;
+    o.max_tra = 0;
+
+    SECTION("a narrow beam is split when the flag says so")
+    {
+        Cfg C = one_ray(10.0f, 1, false, NARROW_DEG);
+        Hits H = intersect(C, S);
+        auto f = subdiv_flags(C, S, H, o);
+        REQUIRE(f.size() == 1u);
+        REQUIRE(f[0] == false); // geometry alone would not split it
+
+        f[0] = true;
+        auto s = C.step(S, with_flag(o, f));
+        CHECK(s[1] == 1);
+        CHECK(s[2] == 0); // a subdivided ray does not also reflect
+        check_shapes(C, 4);
+        for (const auto &p : C.paths)
+            CHECK((int)p.nSUB == 1);
+    }
+    SECTION("a wide beam continues when the flag says so")
+    {
+        Cfg C = one_ray(10.0f, 1, false, WIDE_DEG);
+        Hits H = intersect(C, S);
+        auto f = subdiv_flags(C, S, H, o);
+        REQUIRE(f.size() == 1u);
+        REQUIRE(f[0] == true); // geometry alone would split it
+
+        f[0] = false;
+        auto s = C.step(S, with_flag(o, f));
+        CHECK(s[1] == 0);
+        CHECK(s[2] == 1); // reflects instead
+        check_shapes(C, 1);
+        CHECK((int)C.paths[0].nSUB == 0);
+        CHECK(C.paths[0].n_seg() == 1);
+    }
+}
+
+TEST_CASE("ray_progress - delegated subdivision flag across a multi-generation trace")
+{
+    // The flag has to be recomputed every generation, exactly like the intersection: each call
+    // emits a new launch configuration. Running both variants in lockstep also shows that nothing
+    // from a delegated call leaks into the next.
+    Scene S = two_cubes();
+
+    arma::fmat dirs;
+    arma::fvec half;
+    beam_fan(96, 6, dirs, half);
+
+    Cfg A = make_cfg(dirs, 30.0f, 1, false, half);
+    Cfg B = make_cfg(dirs, 30.0f, 1, false, half);
+
+    Opt o;
+    o.max_int = 4;
+    o.max_ref = 2;
+    o.max_tra = 2;
+    o.sub_tol = SUB_TOL;
+
+    bool ended = false;
+    for (int gen = 0; gen < 20; ++gen)
+    {
+        Hits H = intersect(B, S);
+        auto f = subdiv_flags(B, S, H, o);
+
+        auto sa = A.step(S, o);
+        auto sb = B.step(S, with_flag(with_hits(o, H), f));
+
+        CHECK(sa == sb);
+        check_identical(A, B);
+
+        if (A.n() == 0)
+        {
+            ended = true;
+            break;
+        }
+    }
+    CHECK(ended);
+}
+
+TEST_CASE("ray_progress - delegated subdivision flag validation")
+{
+    Scene S = one_cube(5.0f, 0.0f, 0.0f);
+
+    Cfg probe = one_ray(10.0f, 1, false, WIDE_DEG);
+    Hits H = intersect(probe, S);
+
+    Opt base;
+    base.sub_tol = SUB_TOL;
+    const std::vector<bool> good = subdiv_flags(probe, S, H, base);
+    REQUIRE(good.size() == 1u);
+
+    SECTION("the flag must have one entry per ray")
+    {
+        std::vector<bool> wrong(2, false);
+        Cfg C = one_ray(10.0f, 1, false, WIDE_DEG);
+        CHECK_THROWS_AS(C.step(S, with_flag(base, wrong)), std::invalid_argument);
+
+        std::vector<bool> empty;
+        Cfg D = one_ray(10.0f, 1, false, WIDE_DEG);
+        CHECK_THROWS_AS(D.step(S, with_flag(base, empty)), std::invalid_argument);
+    }
+    SECTION("beam mode is required")
+    {
+        // Without trivec / tridir there is no wavefront to split
+        Cfg C = one_ray(); // no beam data
+        std::vector<bool> f(1, false);
+        CHECK_THROWS_AS(C.step(S, with_flag(base, f)), std::invalid_argument);
+    }
+    SECTION("max_no_subdivisions = 0 rejects a flag instead of ignoring it")
+    {
+        Opt o = base;
+        o.max_sub = 0;
+        Cfg C = one_ray(10.0f, 1, false, WIDE_DEG);
+        CHECK_THROWS_AS(C.step(S, with_flag(o, good)), std::invalid_argument);
+    }
+    SECTION("an all-false flag is accepted and disables subdivision")
+    {
+        std::vector<bool> none(1, false);
+        Cfg C = one_ray(10.0f, 1, false, WIDE_DEG);
+        auto s = C.step(S, with_flag(base, none));
+        CHECK(s[1] == 0);
+        CHECK(s[2] == 1);
     }
 }
 

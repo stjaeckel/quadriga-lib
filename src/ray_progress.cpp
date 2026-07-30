@@ -170,9 +170,9 @@ Advance a ray set by one interaction, spawning reflected, transmitted, and subdi
   returns the next iteration: for every ray that hits the mesh, its reflected and/or transmitted
   continuation(s), plus the four sub-beams of any ray flagged for subdivision. Rays that miss, fall below
   `min_gain_dB`, or reach an interaction, reflection or transmission limit are terminated.
-- The full pipeline per call is: intersect ([[ray_triangle_intersect]]) → interaction ([[ray_mesh_interact]])
-  → state resolve ([[ray_state_update]]) for a reflection pass and a transmission/refraction pass →
-  subdivision ([[subdivide_rays]]) → assembly of the new launch configuration.
+- The full pipeline per call is: intersect ([[ray_triangle_intersect]]) → subdivision flag ([[ray_subdivide_flag]]) 
+  → subdivision ([[subdivide_rays]]) → interaction ([[ray_mesh_interact]]) → state resolve ([[ray_state_update]]) for a 
+  reflection pass and a transmission/refraction pass → assembly.
 - The function returns per-stage counts (see Returns); the new configuration holds `n_out = 4·n_subdiv + n_reflect + n_transmit`
   rays, which may exceed or fall short of the `n_ray` passed in.
 - An empty returned launch configuration (`orig.n_rows == 0`) signals end of trace; a subsequent call with an empty orig throws.
@@ -221,7 +221,8 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
     bool scalar_mode = false,
     const arma::u32_vec *no_interact_in = nullptr,
     const arma::u32_vec *fbs_ind_in = nullptr,
-    const arma::u32_vec *sbs_ind_in = nullptr);
+    const arma::u32_vec *sbs_ind_in = nullptr, 
+    const std::vector<bool> *subdiv_flag_in = nullptr);
 ```
 
 ## Inputs:
@@ -248,6 +249,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
 - **`fbs_ind_in`** *(optional)* — Externally computed 1-based index of the first intersected mesh element, 0 = none; `[n_ray]`.
   Must be non-zero wherever `no_interact_in` is non-zero.
 - **`sbs_ind_in`** *(optional)* — Externally computed 1-based index of the second intersected mesh element, 0 = none; `[n_ray]`
+- **`subdiv_flag_in`** *(optional)* — Flags that mark rays for subdivision; Output of [[ray_subdivide_flag]]; [n_ray]
 
 ## In/out (launch configuration, updated in place; [n_ray, …] on entry, [n_out, …] on return):
 - **`orig`** — Ray origins in GCS; `[n_ray, 3]`. Defines `n_ray`; must be non-empty
@@ -305,7 +307,8 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
                                                    bool scalar_mode,
                                                    const arma::u32_vec *no_interact_in,
                                                    const arma::u32_vec *fbs_ind_in,
-                                                   const arma::u32_vec *sbs_ind_in)
+                                                   const arma::u32_vec *sbs_ind_in,
+                                                   const std::vector<bool> *subdiv_flag_in)
 {
     // Mesh validation
     const arma::uword n_mesh = mesh.n_rows;
@@ -457,6 +460,18 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
             throw std::invalid_argument("Number of elements in 'sbs_ind_in' does not match number of rows in 'orig'.");
     }
 
+    // Delegated subdivision flag. Unlike the intersect arrays this one is indexed in the full ray
+    // set and is remapped onto the compacted set below.
+    if (subdiv_flag_in)
+    {
+        if (subdiv_flag_in->size() != n_ray)
+            throw std::invalid_argument("Number of elements in 'subdiv_flag_in' does not match number of rows in 'orig'.");
+        if (!beam_mode)
+            throw std::invalid_argument("Input 'subdiv_flag_in' requires beam mode ('trivec' and 'tridir').");
+        if (max_no_subdivisions == 0)
+            throw std::invalid_argument("Input 'subdiv_flag_in' conflicts with 'max_no_subdivisions' = 0.");
+    }
+
     // Launch config data
     // Buffers are allocated once at the worst case and never grow. "new T[n]" (no parens)
     // default-initializes, so the POD arrays are not zero-filled and untouched pages stay
@@ -579,77 +594,39 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
     no_interact = compact(*p_ni, ray_map, n_interact);
     fbs_ind = compact(*p_fi, ray_map, n_interact);
     sbs_ind = compact(*p_si, ray_map, n_interact);
-    ray_map.reset(); // No longer needed
-
-    // Reflection @ reference frequency
-    arma::fmat origN, destN;            // Origin and destination after mesh interaction
-    arma::fmat fbsN, sbsN;              // FBS and SBS recomputed with higher precision
-    arma::fvec gainN;                   // Interaction gain
-    arma::fmat xprmatN;                 // Polarization transfer function
-    arma::fmat trivecN, tridirN;        // Beam front geometry after mesh interaction
-    arma::fvec fbs_angleN;              // Incidence angle at FBS in rad
-    arma::fvec edge_lengthN;            // Max edge length of ray tube triangle at new origin
-    arma::fmat normal_vecN;             // FBS and SBS normal vectors
-    std::vector<uint8_t> interact_type; // Interaction type code
-    arma::fmat path_dirN;               // Refraction-correct path direction
-
-    if (max_no_reflections) // Full set for reflection
-        quadriga_lib::ray_mesh_interact<float>((scalar_mode ? 3 : 0),
-                                               fRef_Hz, &orig, &dest, &mesh, &mtl_ind, &mtl_prop,
-                                               &fbs_ind, &sbs_ind,
-                                               (beam_mode ? trivec : nullptr),
-                                               (beam_mode ? tridir : nullptr),
-                                               &origN, &destN, &fbsN, &sbsN, &gainN, &xprmatN,
-                                               (beam_mode ? &trivecN : nullptr),
-                                               (beam_mode ? &tridirN : nullptr),
-                                               &fbs_angleN, nullptr,
-                                               (beam_mode ? &edge_lengthN : nullptr),
-                                               &normal_vecN, &interact_type, &path_dirN, false);
-    else // Reflection disabled, only compute shared fbsN, sbsN, fbs_angleN, normal_vecN + edge_lengthN for subdivision
-        quadriga_lib::ray_mesh_interact<float>((scalar_mode ? 3 : 0),
-                                               fRef_Hz, &orig, &dest, &mesh, &mtl_ind, &mtl_prop,
-                                               &fbs_ind, &sbs_ind,
-                                               (beam_mode ? trivec : nullptr),
-                                               (beam_mode ? tridir : nullptr),
-                                               nullptr, nullptr, &fbsN, &sbsN, nullptr, nullptr,
-                                               nullptr, nullptr,
-                                               &fbs_angleN, nullptr,
-                                               (beam_mode ? &edge_lengthN : nullptr),
-                                               &normal_vecN, nullptr, nullptr, false);
-
-    // Check if stream compaction is really OFF in ray_mesh_interact
-    if (fbsN.n_rows != n_interact)
-        throw std::runtime_error("ray_mesh_interact compacted the stream.");
-
-    // Flag rays that should be subdivided
+    
+    // Flag rays for subdivision. The decision needs only the launch configuration and the FBS face,
+    // so it is taken before the interaction is evaluated. ray_subdivide_flag is the single source of
+    // truth: a caller that needs the outcome in advance passes the same list back in.
     arma::uword n_subdiv = 0, n_keep = 0;
     arma::u32_vec subdiv_ind, keep_ind;
     std::vector<bool> subdiv_flag(n_interact); // Init to false, bit-packed, cannot parallel write
+
     if (beam_mode && max_no_subdivisions)
     {
+        if (subdiv_flag_in) // Delegated, arrives in full-ray-set indexing
+        {
+            const arma::u32 *p_map = ray_map.memptr();
+            for (arma::uword i_int = 0; i_int < n_interact; ++i_int)
+                subdiv_flag[i_int] = (*subdiv_flag_in)[p_map[i_int]];
+        }
+        else
+            subdiv_flag = quadriga_lib::ray_subdivide_flag(mesh, orig, dest, fbs_ind, *trivec, *tridir,
+                                                           paths, mtl_ind_current, max_no_interactions,
+                                                           max_no_subdivisions, subdivision_tolerance_m);
+
         subdiv_ind.set_size(n_interact);
         keep_ind.set_size(n_interact);
-
-        const float *p_edge = edge_lengthN.memptr();
-        const short *p_current = mtl_ind_current.memptr();
         unsigned *p_subdiv_ind = subdiv_ind.memptr();
         unsigned *p_keep_ind = keep_ind.memptr();
 
         for (unsigned i_int = 0; i_int < n_interact; ++i_int)
-        {
-            if (p_current[i_int] == 0 &&
-                paths[i_int].nSUB < max_no_subdivisions &&
-                paths[i_int].n_seg() < (size_t)max_no_interactions &&
-                p_edge[i_int] > subdivision_tolerance_m)
-            {
-                subdiv_flag[i_int] = true;
+            if (subdiv_flag[i_int])
                 p_subdiv_ind[n_subdiv++] = i_int;
-            }
             else
                 p_keep_ind[n_keep++] = i_int;
-        }
     }
-    edge_lengthN.reset(); // No longer needed
+    ray_map.reset(); // No longer needed
 
     // Buffer for the next state
     arma::uword n_out_max = 4 * n_subdiv + 2 * (n_interact - n_subdiv);
@@ -742,7 +719,6 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
     // It also caps how much dead intermediate storage is carried into the transmission pass.
     if (double(n_subdiv) / double(n_interact) > 0.01)
     {
-
         // Previous launch config, still consumed by ray_state_update
         orig = compact(orig, keep_ind, n_keep);
         dest = compact(dest, keep_ind, n_keep);
@@ -755,24 +731,10 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
         fbs_ind = compact(fbs_ind, keep_ind, n_keep);
         sbs_ind = compact(sbs_ind, keep_ind, n_keep);
 
-        // ray_mesh_interact outputs
-        origN = compact(origN, keep_ind, n_keep);
-        destN = compact(destN, keep_ind, n_keep);
-        fbsN = compact(fbsN, keep_ind, n_keep);
-        sbsN = compact(sbsN, keep_ind, n_keep);
-        gainN = compact(gainN, keep_ind, n_keep);
-        xprmatN = compact(xprmatN, keep_ind, n_keep, false); // rays are in the columns
-        fbs_angleN = compact(fbs_angleN, keep_ind, n_keep);
-        normal_vecN = compact(normal_vecN, keep_ind, n_keep);
-        path_dirN = compact(path_dirN, keep_ind, n_keep);
-        interact_type = compact(interact_type, keep_ind, n_keep);
-
         if (beam_mode)
         {
             *trivec = compact(*trivec, keep_ind, n_keep);
             *tridir = compact(*tridir, keep_ind, n_keep);
-            trivecN = compact(trivecN, keep_ind, n_keep);
-            tridirN = compact(tridirN, keep_ind, n_keep);
         }
 
         // Path storage, moved in place: keep_ind is strictly increasing, so source >= target
@@ -811,6 +773,15 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
 
     // Storage for new ray state
     arma::uword n_reflect = 0, n_transmit = 0;
+    arma::fmat origN, destN;                   // Origin and destination after mesh interaction
+    arma::fmat fbsN, sbsN;                     // FBS and SBS recomputed with higher precision
+    arma::fvec gainN;                          // Interaction gain
+    arma::fmat xprmatN;                        // Polarization transfer function
+    arma::fmat trivecN, tridirN;               // Beam front geometry after mesh interaction
+    arma::fvec fbs_angleN;                     // Incidence angle at FBS in rad
+    arma::fmat normal_vecN;                    // FBS and SBS normal vectors
+    std::vector<uint8_t> interact_type;        // Interaction type code
+    arma::fmat path_dirN;                      // Refraction-correct path direction
     arma::Col<short> prevN, currentN, bufferN; // New state words
     arma::fmat acc_distN;                      // Updated accumulated VBS distance
 
@@ -820,35 +791,41 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
     // serial sqrt passes over n_interact. If check_gains is ever parallelized, drop this
     // array and compute the gain inline instead.
     arma::fvec pre_interaction_gains;
-    if (n_interact && (max_no_reflections || max_no_transmissions))
+    auto ensure_pre_gains = [&]()
     {
-        pre_interaction_gains.set_size(n_interact);
-        const float *p_orig = orig.memptr();
-        const float *p_fbs = fbsN.memptr();
-        float *p_gain = pre_interaction_gains.memptr();
+        if (!pre_interaction_gains.is_empty() || n_interact == 0)
+            return;
+
+        if (n_interact && (max_no_reflections || max_no_transmissions))
+        {
+            pre_interaction_gains.set_size(n_interact);
+            const float *p_orig = orig.memptr();
+            const float *p_fbs = fbsN.memptr();
+            float *p_gain = pre_interaction_gains.memptr();
 
 #pragma omp parallel for schedule(static) if (n_interact >= 4096)
-        for (long long i_int = 0; i_int < (long long)n_interact; ++i_int)
-        {
-            if (subdiv_flag[i_int])
+            for (long long i_int = 0; i_int < (long long)n_interact; ++i_int)
             {
-                p_gain[i_int] = 0.0;
-                continue;
+                if (subdiv_flag[i_int])
+                {
+                    p_gain[i_int] = 0.0;
+                    continue;
+                }
+
+                size_t iY = (size_t)i_int + n_interact;
+                size_t iZ = iY + n_interact;
+
+                // Total source-to-FBS distance. A path with no segments has travelled a straight
+                // line from the point source, so measure from O directly; after the first interaction
+                // the accumulated polyline plus the current leg is the only correct form.
+                float length = (paths[i_int].n_seg() == 0)
+                                   ? calc_length(p_fbs[i_int], p_fbs[iY], p_fbs[iZ], Ox, Oy, Oz)
+                                   : calc_length(p_fbs[i_int], p_fbs[iY], p_fbs[iZ], p_orig[i_int], p_orig[iY], p_orig[iZ]) + paths[i_int].length;
+
+                p_gain[i_int] = paths[i_int].calc_gain(fRef_GHz, 0, length);
             }
-
-            size_t iY = (size_t)i_int + n_interact;
-            size_t iZ = iY + n_interact;
-
-            // Total source-to-FBS distance. A path with no segments has travelled a straight
-            // line from the point source, so measure from O directly; after the first interaction
-            // the accumulated polyline plus the current leg is the only correct form.
-            float length = (paths[i_int].n_seg() == 0)
-                               ? calc_length(p_fbs[i_int], p_fbs[iY], p_fbs[iZ], Ox, Oy, Oz)
-                               : calc_length(p_fbs[i_int], p_fbs[iY], p_fbs[iZ], p_orig[i_int], p_orig[iY], p_orig[iZ]) + paths[i_int].length;
-
-            p_gain[i_int] = paths[i_int].calc_gain(fRef_GHz, 0, length);
         }
-    }
+    };
 
     // Lambda to determine which paths to keep based on the gain, used by reflect and transmit pass
     auto check_gains = [&](bool reflect_pass) -> arma::uword
@@ -1019,6 +996,20 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
     // Add reflected paths to launch config
     if (max_no_reflections && n_interact)
     {
+        quadriga_lib::ray_mesh_interact<float>((scalar_mode ? 3 : 0),
+                                               fRef_Hz, &orig, &dest, &mesh, &mtl_ind, &mtl_prop,
+                                               &fbs_ind, &sbs_ind,
+                                               (beam_mode ? trivec : nullptr),
+                                               (beam_mode ? tridir : nullptr),
+                                               &origN, &destN, &fbsN, &sbsN, &gainN, &xprmatN,
+                                               (beam_mode ? &trivecN : nullptr),
+                                               (beam_mode ? &tridirN : nullptr),
+                                               &fbs_angleN, nullptr, nullptr,
+                                               &normal_vecN, &interact_type, &path_dirN, false);
+
+        if (fbsN.n_rows != n_interact) // Check that stream compaction is really OFF
+            throw std::runtime_error("ray_mesh_interact compacted the stream.");
+
         // Resolve ray state for reflection pass
         quadriga_lib::ray_state_update<float>((scalar_mode ? 3 : 0),
                                               fRef_Hz, &orig, &dest, &fbsN, &sbsN,
@@ -1031,6 +1022,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
                                               &interact_type, // Aliasing OK and deliberate
                                               nullptr, (double)thin_slab_threshold);
 
+        ensure_pre_gains();
         n_reflect = check_gains(true); // Parse gainN and build keep_ind
         gainN.reset();                 // No longer needed
         update_launch_config(true);    // Add paths
@@ -1040,6 +1032,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
     if (max_no_transmissions && n_interact)
     {
         // Compute transmission / refraction into medium
+        const bool need_shared = (max_no_reflections == 0); // reflection pass did not fill these
         quadriga_lib::ray_mesh_interact<float>((scalar_mode ? (refraction_mode ? 5 : 4) : (refraction_mode ? 2 : 1)),
                                                fRef_Hz, &orig, &dest, &mesh, &mtl_ind, &mtl_prop,
                                                &fbs_ind, &sbs_ind,
@@ -1048,7 +1041,11 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
                                                &origN, &destN, &fbsN, &sbsN, &gainN, &xprmatN,
                                                (beam_mode ? &trivecN : nullptr),
                                                (beam_mode ? &tridirN : nullptr),
-                                               nullptr, nullptr, nullptr, nullptr, &interact_type, &path_dirN, false);
+                                               (need_shared ? &fbs_angleN : nullptr), nullptr, nullptr,
+                                               (need_shared ? &normal_vecN : nullptr), &interact_type, &path_dirN, false);
+
+        if (need_shared && fbsN.n_rows != n_interact)
+            throw std::runtime_error("ray_mesh_interact compacted the stream.");
 
         // Resolve ray state for transmission pass
         quadriga_lib::ray_state_update<float>((scalar_mode ? (refraction_mode ? 5 : 4) : (refraction_mode ? 2 : 1)),
@@ -1062,6 +1059,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
                                               &interact_type, // Aliasing OK and deliberate
                                               nullptr, (double)thin_slab_threshold);
 
+        ensure_pre_gains();
         n_transmit = check_gains(false); // Parse gainN and build keep_ind
         gainN.reset();                   // No longer needed
         update_launch_config(false);     // Add paths

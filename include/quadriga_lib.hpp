@@ -113,6 +113,20 @@ namespace quadriga_lib
         const arma::u32_vec *sub_mesh_index = nullptr,    // Optional: Sub-mesh index, 0-based, [n_sub]
         bool scalar_mode = false);                        // Switch for EM mode or scalar mode
 
+    // Flag rays for subdivision
+    std::vector<bool> ray_subdivide_flag(
+        const arma::fmat &mesh,                       // Faces of the triangular mesh, [n_mesh, 9]
+        const arma::fmat &orig,                       // Ray origins in GCS, [n_ray, 3]
+        const arma::fmat &dest,                       // Ray destinations in GCS, [n_ray, 3]
+        const arma::u32_vec &fbs_ind,                 // 1-based FBS face index, 0 = no hit, [n_ray]
+        const arma::fmat &trivec,                     // Beam wavefront vertices relative to ray origin, [n_ray, 9]
+        const arma::fmat &tridir,                     // Vertex-ray directions, Cartesian [n_ray, 9]
+        const std::vector<quadriga_lib::path> &paths, // Path data storage, [n_ray]
+        const arma::Col<short> &mtl_ind_current,      // Current medium (0 = outside), [n_ray]
+        uint8_t max_no_interactions = 20,             // Total number of interactions per ray, 0-255
+        uint8_t max_no_subdivisions = 2,              // Number of subdivisions, 0-255
+        float subdivision_tolerance_m = 3.0f);        // Max. beam edge length before subdivision
+
     // Progress rays to next iteration step
     // - Retuns number of rays in new launch configuration
     // - Termination conditions: below min gain, reached destination
@@ -147,7 +161,9 @@ namespace quadriga_lib
         bool scalar_mode = false,                                            // Switch for EM mode or scalar mode
         const arma::u32_vec *no_interact_in = nullptr,                       // Optional: Externally computed intersection count per ray, skips the internal intersector, [n_ray]
         const arma::u32_vec *fbs_ind_in = nullptr,                           // Optional: Externally computed 1-based FBS face index, 0 = no hit, [n_ray]
-        const arma::u32_vec *sbs_ind_in = nullptr);                          // Optional: Externally computed 1-based SBS face index, 0 = no hit, [n_ray]
+        const arma::u32_vec *sbs_ind_in = nullptr,                           // Optional: Externally computed 1-based SBS face index, 0 = no hit, [n_ray]
+        const std::vector<bool> *subdiv_flag_in = nullptr);                  // Optional: List of beam to subdivide, [n_ray]
+
 
 }
 
