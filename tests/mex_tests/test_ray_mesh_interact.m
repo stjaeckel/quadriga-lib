@@ -16,8 +16,8 @@ orig(2,:) = [  10.0,  0.0,  -0.5 ]; dest(2,:) = [ -10.0,  0.0,  -0.5];   % FBS E
 % Call without outputs - should be fine
 quadriga_lib.ray_mesh_interact( 0, 10e9, orig, dest, mesh, mtl_ind, mtl_st, fbs_ind, sbs_ind );
 
-% Reflection sweep: outputs 1..13 in one call (no ray tube -> trivecN/tridirN empty)
-[ origN, destN, fbsN, sbsN, gainN, xprmatN, trivecN, tridirN, orig_lengthN, ...
+% Reflection sweep: outputs 1..12 in one call (no ray tube -> trivecN/tridirN empty)
+[ origN, destN, fbsN, sbsN, gainN, xprmatN, trivecN, tridirN, ...
     fbs_angleN, thicknessN, edge_lengthN, normal_vecN ] = ...
     quadriga_lib.ray_mesh_interact( 0, 10e9, orig, dest, mesh, mtl_ind, mtl_st, fbs_ind, sbs_ind );
 
@@ -32,23 +32,21 @@ assertEqual( size(xprmatN), [8 2] );                               % xprmat is n
 assertElementsAlmostEqual( xprmatN, zeros(8,2), 'absolute', 1e-6 );
 assertTrue( isempty(trivecN) );
 assertTrue( isempty(tridirN) );
-assertElementsAlmostEqual( orig_lengthN, [9;9], 'absolute', 1e-6 );  % orig->FBS, no offset (was 9.001)
 assertElementsAlmostEqual( fbs_angleN, [pi/2;pi/2], 'absolute', 1e-6 );
 assertElementsAlmostEqual( thicknessN, [2;2], 'absolute', 1e-6 );
 assertEqual( size(edge_lengthN), [2 1] );                          % value checked in the beam test below
 assertElementsAlmostEqual( normal_vecN, [-1,0,0,1,0,0 ; 1,0,0,-1,0,0], 'absolute', 1e-6 );
 
-% Transmission sweep with custom orig_length (trivec/tridir/orig_length are args 10/11/12)
-[ origN, destN, ~, ~, gainN, xprmatN, trivecN, tridirN, orig_lengthN, ...
+% Transmission sweep with explicitly empty ray tube (trivec/tridir are args 10/11)
+[ origN, destN, ~, ~, gainN, xprmatN, trivecN, tridirN, ...
     fbs_angleN, thicknessN, ~, normal_vecN ] = ...
-    quadriga_lib.ray_mesh_interact( 1, 10e9, orig, dest, mesh, mtl_ind, mtl_st, fbs_ind, sbs_ind, [], [], [5;3] );
+    quadriga_lib.ray_mesh_interact( 1, 10e9, orig, dest, mesh, mtl_ind, mtl_st, fbs_ind, sbs_ind, [], [] );
 assertElementsAlmostEqual( origN, [-1.0, 0, 0.5; 1.0, 0, -0.5], 'absolute', 1e-6 );
 assertElementsAlmostEqual( destN, dest, 'absolute', 5e-6 );
 assertElementsAlmostEqual( gainN, [1;1], 'absolute', 1e-6 );
 assertElementsAlmostEqual( xprmatN, [1 1; 0 0; 0 0; 0 0; 0 0; 0 0; 1 1; 0 0], 'absolute', 1e-6 );
 assertTrue( isempty(trivecN) );
 assertTrue( isempty(tridirN) );
-assertElementsAlmostEqual( orig_lengthN, [14;12], 'absolute', 1e-6 );  % 9+5, 9+3 (was 14.001/12.001)
 assertElementsAlmostEqual( fbs_angleN, [pi/2;pi/2], 'absolute', 1e-6 );
 assertElementsAlmostEqual( thicknessN, [2;2], 'absolute', 1e-6 );
 assertElementsAlmostEqual( normal_vecN, [-1,0,0,1,0,0 ; 1,0,0,-1,0,0], 'absolute', 1e-6 );
@@ -56,15 +54,14 @@ assertElementsAlmostEqual( normal_vecN, [-1,0,0,1,0,0 ; 1,0,0,-1,0,0], 'absolute
 % Ray-tube reflection (single ray, spherical tridir), geometry matched to the Catch2 oracle
 orig_b = [ -10.0, 0.0, 0.5 ]; dest_b = [ 10.0, 0.0, 0.5 ];
 [ ~, ~, ~, fbs_ind_b, sbs_ind_b ] = quadriga_lib.ray_triangle_intersect( orig_b, dest_b, mesh );
-orig_length_b = 2.7;
 trivec_b = [0.0, -0.1, 0.2, 0.0, -0.1, -0.2, 0.0, 0.2, 0.0];
 tridir_sph = zeros(1,6);
 tridir_sph(2) = 1*pi/180;   % v1 elevation
 tridir_sph(5) = 1*pi/180;   % v3 azimuth
 
-[ origN, destN, ~, ~, gainN, xprmatN, trivecN, tridir_sphN, orig_lengthN, ~, ~, edge_lengthN ] = ...
+[ origN, destN, ~, ~, gainN, xprmatN, trivecN, tridir_sphN, ~, ~, edge_lengthN ] = ...
     quadriga_lib.ray_mesh_interact( 0, 10e9, orig_b, dest_b, mesh, mtl_ind, mtl_st, fbs_ind_b, sbs_ind_b, ...
-    trivec_b, tridir_sph, orig_length_b );
+    trivec_b, tridir_sph );
 
 a = tan(1*pi/180) * 9.0 + 0.2;
 assertElementsAlmostEqual( origN, [-1.0, 0, 0.5], 'absolute', 1e-6 );
@@ -74,7 +71,6 @@ assertElementsAlmostEqual( xprmatN, zeros(8,1), 'absolute', 1e-6 );
 assertEqual( size(tridir_sphN,2), 6 );
 assertElementsAlmostEqual( trivecN, [0,-0.1,a, 0,-0.1,-0.2, 0,a,0], 'absolute', 1e-6 );
 assertElementsAlmostEqual( tridir_sphN, [180,1,180,0,179,0]*pi/180, 'absolute', 1e-6 );
-assertElementsAlmostEqual( orig_lengthN, 2.7 + 9.0, 'absolute', 1e-6 );
 assertElementsAlmostEqual( edge_lengthN, sqrt(a*a + (a+0.1)*(a+0.1)), 'absolute', 1e-6 );
 
 % Same ray tube with a Cartesian (9-col) tridir -> tridirN comes back in 9-col Cartesian form
@@ -84,7 +80,7 @@ tridir_crt = [ cos(tridir_sph(2))*cos(tridir_sph(1)), cos(tridir_sph(2))*sin(tri
                cos(tridir_sph(6))*cos(tridir_sph(5)), cos(tridir_sph(6))*sin(tridir_sph(5)), sin(tridir_sph(6)) ];
 [ ~, ~, ~, ~, ~, ~, ~, tridir_crtN ] = ...
     quadriga_lib.ray_mesh_interact( 0, 10e9, orig_b, dest_b, mesh, mtl_ind, mtl_st, fbs_ind_b, sbs_ind_b, ...
-    trivec_b, tridir_crt, orig_length_b );
+    trivec_b, tridir_crt );
 expc = [ cos(sphN(2))*cos(sphN(1)), cos(sphN(2))*sin(sphN(1)), sin(sphN(2)), ...
          cos(sphN(4))*cos(sphN(3)), cos(sphN(4))*sin(sphN(3)), sin(sphN(4)), ...
          cos(sphN(6))*cos(sphN(5)), cos(sphN(6))*sin(sphN(5)), sin(sphN(6)) ];
@@ -228,15 +224,15 @@ dest_c = [ 0.0, 0.0, 0.0;  0.0, 3.0, 0.0;  0.0, 0.5, 0.5];
 assertTrue( fbs_ind_c(2) == 0 );   % ray 2 really misses
 
 % compact = true (default): missed ray dropped, ray_indN maps survivors to 1-based input indices
-[ origN, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, out_typeN, ~, ray_indN ] = ...
+[ origN, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, out_typeN, ~, ray_indN ] = ...
     quadriga_lib.ray_mesh_interact( 0, 10e9, orig_c, dest_c, mesh, mtl_c_ind, mtl_c_st, fbs_ind_c, sbs_ind_c );
 assertEqual( size(origN,1), 2 );
 assertEqual( double(ray_indN(:)), [1;3] );
 
 % compact = false: all rays retained in input order; the missed ray passes through untouched
-[ origN, ~, ~, ~, gainN, xprmatN, ~, ~, ~, ~, ~, ~, ~, out_typeN, ~, ray_indN ] = ...
+[ origN, ~, ~, ~, gainN, xprmatN, ~, ~, ~, ~, ~, ~, out_typeN, ~, ray_indN ] = ...
     quadriga_lib.ray_mesh_interact( 0, 10e9, orig_c, dest_c, mesh, mtl_c_ind, mtl_c_st, ...
-    fbs_ind_c, sbs_ind_c, [], [], [], false );
+    fbs_ind_c, sbs_ind_c, [], [], false );
 assertEqual( size(origN,1), 3 );
 assertEqual( numel(gainN), 3 );
 assertEqual( size(xprmatN), [8 3] );
@@ -252,17 +248,17 @@ orig_pd = [-1.5, 0.0, 0.0]; dest_pd = [0.0, 0.0, 1.5];
 [ ~, ~, ~, fbs_ind_pd, sbs_ind_pd ] = quadriga_lib.ray_triangle_intersect( orig_pd, dest_pd, mesh );
 incoming = (dest_pd - orig_pd) ./ norm(dest_pd - orig_pd);
 
-[ o0, d0, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, pd0 ] = ...   % reflection -> mirror
+[ o0, d0, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, pd0 ] = ...   % reflection -> mirror
     quadriga_lib.ray_mesh_interact( 0, 10e9, orig_pd, dest_pd, mesh, mtl_d_ind, mtl_d_st, fbs_ind_pd, sbs_ind_pd );
 assertElementsAlmostEqual( norm(pd0), 1, 'absolute', 1e-6 );
 assertElementsAlmostEqual( pd0, (d0-o0)./norm(d0-o0), 'absolute', 1e-6 );
 
-[ o2, d2, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, pd2 ] = ...   % refraction -> Snell
+[ o2, d2, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, pd2 ] = ...   % refraction -> Snell
     quadriga_lib.ray_mesh_interact( 2, 10e9, orig_pd, dest_pd, mesh, mtl_d_ind, mtl_d_st, fbs_ind_pd, sbs_ind_pd );
 assertElementsAlmostEqual( norm(pd2), 1, 'absolute', 1e-6 );
 assertElementsAlmostEqual( pd2, (d2-o2)./norm(d2-o2), 'absolute', 1e-6 );
 
-[ o1, d1, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, pd1 ] = ...   % undeviated transmission
+[ o1, d1, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, pd1 ] = ...   % undeviated transmission
     quadriga_lib.ray_mesh_interact( 1, 10e9, orig_pd, dest_pd, mesh, mtl_d_ind, mtl_d_st, fbs_ind_pd, sbs_ind_pd );
 assertElementsAlmostEqual( norm(pd1), 1, 'absolute', 1e-6 );
 assertElementsAlmostEqual( pd1, pd2, 'absolute', 1e-6 );                       % path_dir is the Snell direction
@@ -270,19 +266,19 @@ assertElementsAlmostEqual( (d1-o1)./norm(d1-o1), incoming, 'absolute', 1e-6 ); %
 assertTrue( norm(pd1 - incoming) > 1e-2 );                                     % and differs from incoming
 
 % out_typeN bit encoding (uint32): entry = 3, exit = 1, exit|TIR = 33
-[ ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, out_typeN ] = ...   % air -> dielectric, front face -> entry
+[ ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, out_typeN ] = ...   % air -> dielectric, front face -> entry
     quadriga_lib.ray_mesh_interact( 1, 10e9, orig_d, dest_d, mesh, mtl_d_ind, mtl_d_st, fbs_ind_d, sbs_ind_d );
 assertEqual( class(out_typeN), 'uint32' );
 assertEqual( double(out_typeN(1)), 3 );
 
-[ ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, out_typeN ] = ...   % inside dielectric -> air, no TIR -> exit
+[ ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, out_typeN ] = ...   % inside dielectric -> air, no TIR -> exit
     quadriga_lib.ray_mesh_interact( 1, 10e9, orig_s, dest_s, mesh, mtl_s_ind, mtl_s_st, fbs_ind_s, sbs_ind_s );
 assertEqual( double(out_typeN(1)), 1 );
 assertEqual( bitand(double(out_typeN(1)),32), 0 );
 
 mtl_tir = repmat([2.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0], 12, 1);   % eps 2.5, 45 deg -> TIR
 [mtl_tir_ind, mtl_tir_st] = m2p(mtl_tir);
-[ ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, out_typeN ] = ...
+[ ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, out_typeN ] = ...
     quadriga_lib.ray_mesh_interact( 0, 10e9, orig_s, dest_s, mesh, mtl_tir_ind, mtl_tir_st, fbs_ind_s, sbs_ind_s );
 assertEqual( double(out_typeN(1)), 33 );
 assertTrue( bitand(double(out_typeN(1)),32) ~= 0 );
@@ -303,8 +299,8 @@ catch ME
     end
 end
 
-try % 14 inputs (too many, maximum is 13)
-    quadriga_lib.ray_mesh_interact( 1, 10e9, orig, dest, mesh, mtl_ind, mtl_st, fbs_ind, sbs_ind, [], [], [5;3], true, 99 );
+try % 13 inputs (too many, maximum is 12)
+    quadriga_lib.ray_mesh_interact( 1, 10e9, orig, dest, mesh, mtl_ind, mtl_st, fbs_ind, sbs_ind, [], [], true, 99 );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Wrong number of input arguments.';
@@ -313,8 +309,8 @@ catch ME
     end
 end
 
-try % 17 outputs (too many, maximum is 16)
-    [~,~,~,~,~,~,~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.ray_mesh_interact( 0, 10e9, orig, dest, mesh, mtl_ind, mtl_st, fbs_ind, sbs_ind );
+try % 16 outputs (too many, maximum is 15)
+    [~,~,~,~,~,~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.ray_mesh_interact( 0, 10e9, orig, dest, mesh, mtl_ind, mtl_st, fbs_ind, sbs_ind );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Wrong number of output arguments.';
@@ -493,15 +489,20 @@ catch ME
     end
 end
 
-try % wrong orig_length
-    quadriga_lib.ray_mesh_interact( 2, 10e9, orig, dest, mesh, mtl_ind, mtl_st, fbs_ind, sbs_ind, [], [], 1 );
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    expectedErrorMessage = 'Number of elements in ''orig_length'' does not match number of rows in ''orig''.';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
-    end
-end
+% compact sits in argument slot 12, the slot orig_length used to occupy. Passing it there
+% must reach the flag itself: with compact = false both rays are kept even though ray 2 misses.
+orig_z = [ -10.0, 0.0, 0.5 ; -10.0, 3.0, 0.5 ];
+dest_z = [  10.0, 0.0, 0.5 ;  10.0, 3.0, 0.5 ];
+[ ~, ~, ~, fbs_ind_z, sbs_ind_z ] = quadriga_lib.ray_triangle_intersect( orig_z, dest_z, mesh );
+assertTrue( fbs_ind_z(2) == 0 );
+
+origN = quadriga_lib.ray_mesh_interact( 0, 10e9, orig_z, dest_z, mesh, mtl_ind, mtl_st, ...
+    fbs_ind_z, sbs_ind_z, [], [], false );
+assertEqual( size(origN,1), 2 );
+
+origN = quadriga_lib.ray_mesh_interact( 0, 10e9, orig_z, dest_z, mesh, mtl_ind, mtl_st, ...
+    fbs_ind_z, sbs_ind_z, [], [], true );
+assertEqual( size(origN,1), 1 );
 
 end
 
