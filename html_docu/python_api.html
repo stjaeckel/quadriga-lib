@@ -2597,13 +2597,17 @@ See also:
 Calculate intersections of ray beams with points in 3D space
 <ul>
 <li>Models rays as volumetric beams defined by a triangular wavefront that diverges from the origin, enabling energy spread simulation</li>
-<li>Returns, for each point, the list of ray indices whose beam intersects that point</li>
+<li>Reports, for each point, the list of ray indices whose beam intersects that point</li>
+<li>Results use a compressed sparse row layout: <code>hit_index</code> holds the ray indices grouped by point and <code>hit_offset</code> marks where each point's block starts</li>
+<li>The rays hitting point <code>i</code> are <code>hit_index[hit_offset[i]:hit_offset[i+1]]</code>, a zero-copy numpy view</li>
+<li><code>numpy.split(hit_index, hit_offset[1:-1])</code> produces a per-point list of arrays if that form is needed</li>
 <li>All internal computations use single precision</li>
 </ul>
 
 <b>Usage:</b><br>
 <pre>
-hit_count, ray_ind = quadriga_lib.RTtools.ray_point_intersect( orig, trivec, tridir, points, sub_cloud_ind, use_kernel, gpu_id )
+hit_count, hit_index, hit_offset = quadriga_lib.RTtools.ray_point_intersect( orig, trivec, tridir,
+    points, sub_cloud_ind, use_kernel, gpu_id )
 </pre>
 
 <b>Inputs:</b><br>
@@ -2613,14 +2617,15 @@ hit_count, ray_ind = quadriga_lib.RTtools.ray_point_intersect( orig, trivec, tri
 <li><b><code>tridir</code></b> — Direction vectors of the three vertex-rays in Cartesian coordinates; not normalized; order <code>{d1x, d1y, d1z, d2x, d2y, d2z, d3x, d3y, d3z}</code>; <code>(n_ray, 9)</code></li>
 <li><b><code>points</code></b> — 3D point cloud coordinates; <code>(n_points, 3)</code></li>
 <li><b><code>sub_cloud_index</code></b> <i>(optional)</i> — 0-based segment boundary indices for the point cloud (see <code>quadriga_lib.point_cloud_segmentation</code>); uint32; <code>(n_sub,)</code></li>
-<li><b><code>use_kernel</code></b> <i>(optional)</i> — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable; auto mode selects CUDA when <code>n_points &gt;= 10000</code> and CUDA is available, else AVX2, else GENERIC; default: 0</li>
+<li><b><code>use_kernel</code></b> <i>(optional)</i> — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable; auto mode selects CUDA when <code>n_points &gt;= 500</code> and CUDA is available, else AVX2, else GENERIC; default: 0</li>
 <li><b><code>gpu_id</code></b> <i>(optional)</i> — CUDA device ID; ignored when not using CUDA; default: 0</li>
 </ul>
 
 <b>Outputs:</b><br>
 <ul>
-<li><b><code>hit_count</code></b> — Number of beams intersecting each point; uint32; <code>(n_points,)</code></li>
-<li><b><code>ray_ind</code></b> — List of length <code>(n_points,)</code>; each list entry is a 1-D array of 0-based ray indices that hit that point. Entries may be empty if no hit was detected; uint32</li>
+<li><b><code>hit_count</code></b> — Number of beams intersecting each point; equals <code>numpy.diff(hit_offset)</code>; uint32; <code>(n_points,)</code></li>
+<li><b><code>hit_index</code></b> — Flat list of 0-based ray indices, grouped by point; <code>(n_hit,)</code></li>
+<li><b><code>hit_offset</code></b> — Start of each point's block within <code>hit_index</code>; the last element equals <code>n_hit</code>; uint32; <code>(n_points + 1,)</code></li>
 </ul>
 
 <b>See also:</b><br>

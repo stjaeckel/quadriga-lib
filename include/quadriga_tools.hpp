@@ -336,7 +336,7 @@ namespace quadriga_lib
                            arma::Mat<dtype> *normal_vecN = nullptr,                             // FBS/SBS normals [Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S], [n_rayN, 6]
                            std::vector<uint8_t> *out_typeN = nullptr,                           // Interaction type code, [n_rayN]
                            arma::Mat<dtype> *path_dirN = nullptr,                               // Refraction-correct path direction, [n_rayN, 3]
-                           bool compact = false,                                                 // Remove non-hits from output, key on fbs_ind != 0
+                           bool compact = false,                                                // Remove non-hits from output, key on fbs_ind != 0
                            arma::u32_vec *ray_indN = nullptr);                                  // 0-based input ray index for each output ray, [n_rayN]
 
     // Update inside/outside ray state and correct gainN / xprmatN
@@ -390,19 +390,18 @@ namespace quadriga_lib
                            dtype center_frequency);                                             // Frequency in Hz
 
     // Calculate the intersections of ray tubes with point clouds
-    // - Returns the number of hits per point and the (0-based) indices of the rays that hit each point
-    // - It is strongly recommended to use "point_cloud_segmentation" to speed up computations
-    // - Returns the indices of the rays that hit the points; 0-based; Length (std::vector) [ n_points ]
-    // - All internal computations are done using single precision
     template <typename dtype>
-    std::vector<arma::u32_vec> ray_point_intersect(const arma::Mat<dtype> *points,                 // Points in 3D Space, Size: [ n_points, 3 ]
-                                                   const arma::Mat<dtype> *orig,                   // Ray origin points in GCS, Size [ n_ray, 3 ]
-                                                   const arma::Mat<dtype> *trivec,                 // Vectors pointing from the origin to the vertices of the triangular propagation tube, Size [ n_ray, 9 ]
-                                                   const arma::Mat<dtype> *tridir,                 // Directions of the vertex-rays; Cartesian format; Size [ n_ray, 9 ]
-                                                   const arma::u32_vec *sub_cloud_index = nullptr, // Sub-cloud index, 0-based, Optional, Length: [ n_sub ]
-                                                   arma::u32_vec *hit_count = nullptr,             // Hit counter; Optional Output; Length [ n_points ]
-                                                   int use_kernel = 0,                             // Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA
-                                                   int gpu_id = 0);                                // GPU device ID for CUDA kernel, ignored otherwise
+    void ray_point_intersect(const arma::Mat<dtype> &points,                       // Points in 3D Space, [ n_points, 3 ]
+                             const arma::Mat<dtype> &orig,                         // Ray origin points in GCS,[ n_ray, 3 ]
+                             const arma::Mat<dtype> &trivec,                       // Vectors pointing from the origin to the vertices of the triangular propagation tube, [ n_ray, 9 ]
+                             const arma::Mat<dtype> &tridir,                       // Directions of the vertex-rays; Cartesian format; [ n_ray, 9 ]
+                             std::vector<unsigned> *hit_index = nullptr,           // flat list of 0-based ray indices, [n_hit]
+                             arma::u32_vec *hit_offset = nullptr,                  // 0-based start of each point's block, [n_points + 1]
+                             arma::u32_vec *hit_count = nullptr,                   // Hit counter; Optional Output; Length [ n_points ]
+                             std::vector<arma::u32_vec> *hits_per_point = nullptr, // Number of hits per point and the (0-based) indices of the rays that hit each point; [n_points]
+                             const arma::u32_vec *sub_cloud_index = nullptr,       // Sub-cloud index, 0-based, Optional, Length: [ n_sub ]
+                             int use_kernel = 0,                                   // Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA
+                             int gpu_id = 0);                                      // GPU device ID for CUDA kernel, ignored otherwise
 
     // Calculates the intersection of rays and triangles in three dimensions
     // - Implements the Möller–Trumbore ray-triangle intersection algorithm

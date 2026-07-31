@@ -22,18 +22,23 @@ SECTION!*/
 Calculate intersections of ray beams with points in 3D space
 
 - Models rays as volumetric beams defined by a triangular wavefront that diverges from the origin, enabling energy spread simulation.
-- Returns, for each point, the list of 0-based ray indices whose beam intersects that point.
+- Reports, for each point, the list of 0-based ray indices whose beam intersects that point.
+- The primary output is a flat CSR pair (`hit_index`, `hit_offset`); the ray indices of point `i` are `hit_index[hit_offset[i] .. hit_offset[i+1]-1]`.
+- All outputs are optional and are only computed when a non-NULL pointer is passed.
 - All internal computations use single precision.
 
 ## Declaration:
 ```
-std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(
-    const arma::Mat<dtype> *points,
-    const arma::Mat<dtype> *orig,
-    const arma::Mat<dtype> *trivec,
-    const arma::Mat<dtype> *tridir,
-    const arma::u32_vec *sub_cloud_index = nullptr,
+void quadriga_lib::ray_point_intersect(
+    const arma::Mat<dtype> &points,
+    const arma::Mat<dtype> &orig,
+    const arma::Mat<dtype> &trivec,
+    const arma::Mat<dtype> &tridir,
+    std::vector<unsigned> *hit_index = nullptr,
+    arma::u32_vec *hit_offset = nullptr,
     arma::u32_vec *hit_count = nullptr,
+    std::vector<arma::u32_vec> *hits_per_point = nullptr,
+    const arma::u32_vec *sub_cloud_index = nullptr,
     int use_kernel = 0,
     int gpu_id = 0);
 ```
@@ -47,11 +52,11 @@ std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(
 - **`use_kernel`** *(optional)* — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable; auto mode selects CUDA when `n_points >= 500` and CUDA is available, else AVX2, else GENERIC.
 - **`gpu_id`** *(optional)* — CUDA device ID; ignored when not using CUDA
 
-## Optional output:
-- **`hit_count`** — Number of rays intersecting each point; `[n_points]`
-
-## Returns:
-- `std::vector<arma::u32_vec>` — Per-point list of 0-based ray indices that intersected that point; length `n_points`
+## Optional outputs:
+- **`hit_index`** — Flat list of 0-based ray indices, grouped by point; written by the compute kernel without an intermediate copy; `[n_hit]`
+- **`hit_offset`** — Start of each point's block within `hit_index`, last element is `n_hit`; `[n_points + 1]`
+- **`hit_count`** — Number of rays intersecting each point, equals `hit_offset[i+1] - hit_offset[i]`; `[n_points]`
+- **`hits_per_point`** — Per-point list of 0-based ray indices; allocates one `arma::u32_vec` per non-empty point, so only request it when the split form is actually needed; `[n_points]`
 
 ## See also:
 - [[icosphere]] (generate ray beams)
@@ -62,13 +67,16 @@ std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(
 MD!*/
 
 template <typename dtype>
-std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(const arma::Mat<dtype> *points,
-                                                             const arma::Mat<dtype> *orig,
-                                                             const arma::Mat<dtype> *trivec,
-                                                             const arma::Mat<dtype> *tridir,
-                                                             const arma::u32_vec *sub_cloud_index,
-                                                             arma::u32_vec *hit_count,
-                                                             int use_kernel, int gpu_id)
+void quadriga_lib::ray_point_intersect(const arma::Mat<dtype> &points,
+                                       const arma::Mat<dtype> &orig,
+                                       const arma::Mat<dtype> &trivec,
+                                       const arma::Mat<dtype> &tridir,
+                                       std::vector<unsigned> *hit_index,
+                                       arma::u32_vec *hit_offset,
+                                       arma::u32_vec *hit_count,
+                                       std::vector<arma::u32_vec> *hits_per_point,
+                                       const arma::u32_vec *sub_cloud_index,
+                                       int use_kernel, int gpu_id)
 {
     // Suppress unused-parameter warning when CUDA support is disabled at compile time
 #if !BUILD_WITH_CUDA
@@ -76,27 +84,24 @@ std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(const arma::Mat<dty
 #endif
 
     // Input validation
-    if (points == nullptr || points->n_elem == 0)
-        throw std::invalid_argument("Input 'points' cannot be NULL.");
-    if (orig == nullptr || orig->n_elem == 0)
-        throw std::invalid_argument("Input 'orig' cannot be NULL.");
-    if (trivec == nullptr)
-        throw std::invalid_argument("Input 'trivec' cannot be NULL.");
-    if (tridir == nullptr)
-        throw std::invalid_argument("Input 'tridir' cannot be NULL.");
+    if (points.n_elem == 0)
+        throw std::invalid_argument("Input 'points' cannot be empty.");
+    if (orig.n_elem == 0)
+        throw std::invalid_argument("Input 'orig' cannot be empty.");
 
-    if (points->n_cols != 3)
+    if (points.n_cols != 3)
         throw std::invalid_argument("Input 'points' must have 3 columns containing x,y,z coordinates.");
-    if (orig->n_cols != 3)
+    if (orig.n_cols != 3)
         throw std::invalid_argument("Input 'orig' must have 3 columns containing x,y,z coordinates.");
-    if (trivec->n_cols != 9)
+    if (trivec.n_cols != 9)
         throw std::invalid_argument("Input 'trivec' must have 9 columns containing x,y,z coordinates of ray tube vertices.");
-    if (tridir->n_cols != 9)
+    if (tridir.n_cols != 9)
         throw std::invalid_argument("Input 'tridir' must have 9 columns containing ray directions in Cartesian format.");
 
-    size_t n_ray_t = orig->n_rows;
-    size_t n_point_t = (size_t)points->n_rows;
+    size_t n_ray_t = orig.n_rows;
+    size_t n_point_t = (size_t)points.n_rows;
     int n_ray_i = (int)n_ray_t;
+    long long n_point_l = (long long)n_point_t;
 
     // Bound check
     if (n_point_t >= INT32_MAX)
@@ -104,9 +109,9 @@ std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(const arma::Mat<dty
     if (n_ray_t >= INT32_MAX)
         throw std::invalid_argument("Number of rays exceeds maximum supported number.");
 
-    if (trivec->n_rows != n_ray_t)
+    if (trivec.n_rows != n_ray_t)
         throw std::invalid_argument("Number of rows in 'orig' and 'trivec' dont match.");
-    if (tridir->n_rows != n_ray_t)
+    if (tridir.n_rows != n_ray_t)
         throw std::invalid_argument("Number of rows in 'orig' and 'tridir' dont match.");
 
     // Determine which compute kernel to use
@@ -173,9 +178,9 @@ std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(const arma::Mat<dty
     auto dirA = arma::fmat(n_ray_t, 9, arma::fill::none);    // Vertex directions (Cartesian)
     auto invDotA = arma::fmat(n_ray_t, 3, arma::fill::none); // Inverse dot product
     {
-        const dtype *p_orig = orig->memptr();     // Origin pointer
-        const dtype *p_trivec = trivec->memptr(); // Trivec pointer
-        const dtype *p_tridir = tridir->memptr(); // Direction pointer
+        const dtype *p_orig = orig.memptr();     // Origin pointer
+        const dtype *p_trivec = trivec.memptr(); // Trivec pointer
+        const dtype *p_tridir = tridir.memptr(); // Direction pointer
 
         float *p_trivecA = trivecA.memptr();
         float *p_normalA = normalA.memptr();
@@ -313,7 +318,7 @@ std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(const arma::Mat<dty
 
     // Convert points to float and compute bounding boxes
     // Calculate bounding box for each sub-cloud
-    const dtype *p_points = points->memptr();
+    const dtype *p_points = points.memptr();
     const unsigned *p_sub = sci.memptr();
 
     // Set parameters for the first AABB
@@ -353,7 +358,8 @@ std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(const arma::Mat<dty
 
             // Update counters
             ++i_sub;
-            i_next = (i_sub == n_sub_t - 1) ? n_point_t - 1 : (size_t)p_sub[i_sub + 1] - 1;
+            if (i_sub < n_sub_t)
+                i_next = (i_sub == n_sub_t - 1) ? n_point_t - 1 : (size_t)p_sub[i_sub + 1] - 1;
         }
     }
 
@@ -369,15 +375,27 @@ std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(const arma::Mat<dty
         Zmin[i_sub] = 0.0f, Zmax[i_sub] = 0.0f;
     }
 
-    // Output container
-    std::vector<std::vector<unsigned>> hit_vec(n_ray_t);
-    std::vector<unsigned> *p_hit = hit_vec.data();
+    // CSR row pointers, written into the caller's buffer when one is provided
+    arma::u32_vec off_vec;
+    if (hit_offset != nullptr)
+    {
+        if (hit_offset->n_elem != n_point_t + 1)
+            hit_offset->set_size(n_point_t + 1);
+    }
+    else
+        off_vec.set_size(n_point_t + 1);
+    unsigned *p_off = (hit_offset != nullptr) ? hit_offset->memptr() : off_vec.memptr();
+
+    // Flat list of ray indices, grouped by point. The kernel writes into the
+    // caller's buffer directly, the local one is only a fallback.
+    std::vector<unsigned> idx_local;
+    std::vector<unsigned> *p_idx_vec = (hit_index != nullptr) ? hit_index : &idx_local;
 
     // Dispatch to selected kernel
     if (kernel == 3) // CUDA
     {
 #if BUILD_WITH_CUDA
-        qd_RPI_CUDA(Px, Py, Pz, n_point_s,
+        qd_RPI_CUDA(Px, Py, Pz, n_point_t,
                     sci.memptr(), Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub_t,
                     trivecA.colptr(0), trivecA.colptr(1), trivecA.colptr(2),
                     trivecA.colptr(3), trivecA.colptr(4), trivecA.colptr(5),
@@ -387,13 +405,13 @@ std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(const arma::Mat<dty
                     dirA.colptr(3), dirA.colptr(4), dirA.colptr(5),
                     dirA.colptr(6), dirA.colptr(7), dirA.colptr(8),
                     invDotA.colptr(0), invDotA.colptr(1), invDotA.colptr(2),
-                    n_ray_t, p_hit, gpu_id);
+                    n_ray_t, p_idx_vec, p_off, gpu_id);
 #endif
     }
     else if (kernel == 2) // AVX2
     {
 #if BUILD_WITH_AVX2
-        qd_RPI_AVX2(Px, Py, Pz, n_point_s,
+        qd_RPI_AVX2(Px, Py, Pz, n_point_t,
                     sci.memptr(), Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub_t,
                     trivecA.colptr(0), trivecA.colptr(1), trivecA.colptr(2),
                     trivecA.colptr(3), trivecA.colptr(4), trivecA.colptr(5),
@@ -403,7 +421,7 @@ std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(const arma::Mat<dty
                     dirA.colptr(3), dirA.colptr(4), dirA.colptr(5),
                     dirA.colptr(6), dirA.colptr(7), dirA.colptr(8),
                     invDotA.colptr(0), invDotA.colptr(1), invDotA.colptr(2),
-                    n_ray_t, p_hit);
+                    n_ray_t, p_idx_vec, p_off);
 #endif
     }
     else // GENERIC
@@ -418,58 +436,62 @@ std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(const arma::Mat<dty
                        dirA.colptr(3), dirA.colptr(4), dirA.colptr(5),
                        dirA.colptr(6), dirA.colptr(7), dirA.colptr(8),
                        invDotA.colptr(0), invDotA.colptr(1), invDotA.colptr(2),
-                       n_ray_t, p_hit);
+                       n_ray_t, p_idx_vec, p_off);
     }
 
-    // Count hits per point
-    arma::u32_vec cnt_vec(n_point_s, arma::fill::zeros);
-    unsigned *p_cnt = cnt_vec.memptr();
+    // The kernel has filled 'hit_index' and 'p_off', the remaining outputs
+    // are derived from those without touching the flat list again
+    const unsigned *p_idx = p_idx_vec->data();
 
-    for (size_t i_ray = 0; i_ray < n_ray_t; ++i_ray)
-        for (size_t i_hit = 0; i_hit < p_hit[i_ray].size(); ++i_hit)
-            ++p_cnt[p_hit[i_ray][i_hit]];
-
+    // Hit counter
     if (hit_count != nullptr)
     {
         if (hit_count->n_elem != n_point_t)
             hit_count->set_size(n_point_t);
 
-        std::memcpy(hit_count->memptr(), p_cnt, n_point_t * sizeof(unsigned));
+        unsigned *p_cnt = hit_count->memptr();
+        for (size_t i_point = 0; i_point < n_point_t; ++i_point)
+            p_cnt[i_point] = p_off[i_point + 1] - p_off[i_point];
     }
 
-    // Generate output
-    std::vector<arma::u32_vec> output(n_point_t);
-
-    for (size_t i_point = 0; i_point < n_point_t; ++i_point)
+    // Split form, one arma::u32_vec per non-empty point
+    if (hits_per_point != nullptr)
     {
-        if (p_cnt[i_point] != 0)
-            output[i_point].set_size(p_cnt[i_point]);
-        p_cnt[i_point] = 0;
-    }
+        hits_per_point->clear();
+        hits_per_point->resize(n_point_t);
+        arma::u32_vec *p_out = hits_per_point->data();
 
-    for (size_t i_ray = 0; i_ray < n_ray_t; ++i_ray)
-        for (size_t i_hit = 0; i_hit < p_hit[i_ray].size(); ++i_hit)
+#pragma omp parallel for schedule(static)
+        for (long long i_point = 0; i_point < n_point_l; ++i_point)
         {
-            unsigned i_point = p_hit[i_ray][i_hit];
-            if (i_point < n_point_t)
-                output[i_point].at(p_cnt[i_point]++) = (unsigned)i_ray;
-        }
+            unsigned n_local = p_off[i_point + 1] - p_off[i_point];
+            if (n_local == 0)
+                continue;
 
-    return output;
+            p_out[i_point].set_size(n_local);
+            std::memcpy(p_out[i_point].memptr(), &p_idx[p_off[i_point]], n_local * sizeof(unsigned));
+        }
+    }
 }
 
-template std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(const arma::Mat<float> *points,
-                                                                      const arma::Mat<float> *orig,
-                                                                      const arma::Mat<float> *trivec,
-                                                                      const arma::Mat<float> *tridir,
-                                                                      const arma::u32_vec *sub_cloud_index,
-                                                                      arma::u32_vec *hit_count,
-                                                                      int use_kernel, int gpu_id);
+template void quadriga_lib::ray_point_intersect(const arma::Mat<float> &points,
+                                                const arma::Mat<float> &orig,
+                                                const arma::Mat<float> &trivec,
+                                                const arma::Mat<float> &tridir,
+                                                std::vector<unsigned> *hit_index,
+                                                arma::u32_vec *hit_offset,
+                                                arma::u32_vec *hit_count,
+                                                std::vector<arma::u32_vec> *hits_per_point,
+                                                const arma::u32_vec *sub_cloud_index,
+                                                int use_kernel, int gpu_id);
 
-template std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(const arma::Mat<double> *points,
-                                                                      const arma::Mat<double> *orig,
-                                                                      const arma::Mat<double> *trivec,
-                                                                      const arma::Mat<double> *tridir,
-                                                                      const arma::u32_vec *sub_cloud_index,
-                                                                      arma::u32_vec *hit_count,
-                                                                      int use_kernel, int gpu_id);
+template void quadriga_lib::ray_point_intersect(const arma::Mat<double> &points,
+                                                const arma::Mat<double> &orig,
+                                                const arma::Mat<double> &trivec,
+                                                const arma::Mat<double> &tridir,
+                                                std::vector<unsigned> *hit_index,
+                                                arma::u32_vec *hit_offset,
+                                                arma::u32_vec *hit_count,
+                                                std::vector<arma::u32_vec> *hits_per_point,
+                                                const arma::u32_vec *sub_cloud_index,
+                                                int use_kernel, int gpu_id);

@@ -3051,10 +3051,10 @@ Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh 
 
 <b>Usage:</b><br>
 <pre>
-[ origN, destN, fbsN, sbsN, gainN, xprmatN, trivecN, tridirN, orig_lengthN, fbs_angleN, ...
-    thicknessN, edge_lengthN, normal_vecN, out_typeN, path_dirN, ray_indN ] = ...
+[ origN, destN, fbsN, sbsN, gainN, xprmatN, trivecN, tridirN, fbs_angleN, thicknessN, ...
+    edge_lengthN, normal_vecN, out_typeN, path_dirN, ray_indN ] = ...
     quadriga_lib.ray_mesh_interact( interaction_type, center_frequency, orig, dest, mesh, ...
-    mtl_ind, mtl_prop, fbs_ind, sbs_ind, trivec, tridir, orig_length, compact );
+    mtl_ind, mtl_prop, fbs_ind, sbs_ind, trivec, tridir, compact );
 </pre>
 
 <b>Inputs:</b><br>
@@ -3068,7 +3068,6 @@ Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh 
 <li><b><code>fbs_ind</code></b>, <b><code>sbs_ind</code></b> — 1-based mesh face indices per ray (0 = no hit); uint32; <code>[n_ray]</code></li>
 <li><b><code>trivec</code></b> <i>(optional)</i> — Beam wavefront triangle vertices relative to origin; order <code>[v1x v1y v1z v2x v2y v2z v3x v3y v3z]</code>; <code>[n_ray, 9]</code>; default: <code>[]</code></li>
 <li><b><code>tridir</code></b> <i>(optional)</i> — Vertex-ray directions; <code>[n_ray, 6]</code> for spherical <code>[v1az v1el v2az v2el v3az v3el]</code> or <code>[n_ray, 9]</code> for Cartesian; default: <code>[]</code></li>
-<li><b><code>orig_length</code></b> <i>(optional)</i> — Accumulated path length at origin; <code>[n_ray]</code>; default: 0</li>
 <li><b><code>compact</code></b> <i>(optional)</i> — If true, rays with no interaction (<code>fbs_ind = 0</code>) are dropped so <code>n_rayN &lt;= n_ray</code>; if false, all rays are kept (<code>n_rayN = n_ray</code>) and no-hit rays are returned as a transparent pass-through; logical; default: true</li>
 </ul>
 
@@ -3080,10 +3079,9 @@ Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh 
 <li><b><code>gainN</code></b> — Interaction gain (linear scale); averaged over TE/TM polarizations for types 0–2, single TE coefficient for types 3–5; <code>[n_rayN]</code></li>
 <li><b><code>xprmatN</code></b> — For types 0–2: polarization transfer matrix, interleaved complex, column-major <code>[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]</code>; includes interaction gain, TE/TM coefficients, incidence plane orientation; excludes in-medium attenuation and FSPL; <code>[8, n_rayN]</code>. For types 3–5 (scalar): <code>[Re Im]</code> where Re+jIm is the scalar pressure coefficient; <code>[2, n_rayN]</code></li>
 <li><b><code>trivecN</code></b>, <b><code>tridirN</code></b> — Updated beam geometry/direction (format matches input); empty if <code>trivec</code>/<code>tridir</code> not provided</li>
-<li><b><code>orig_lengthN</code></b> — Path length from <code>orig</code> to <code>origN</code>, added to input <code>orig_length</code> if given; <code>[n_rayN]</code></li>
 <li><b><code>fbs_angleN</code></b> — Incidence angle at FBS; <code>[n_rayN]</code></li>
 <li><b><code>thicknessN</code></b> — Material thickness (FBS-to-SBS distance); <code>[n_rayN]</code></li>
-<li><b><code>edge_lengthN</code></b> — Max edge length of ray tube triangle at new origin (Inf if partial hit); <code>[n_rayN]</code></li>
+<li><b><code>edge_lengthN</code></b> — Max edge length of ray tube triangle at new origin (Inf if partial hit); requires the <code>trivec</code> and <code>tridir</code> inputs, returns all zeros without them; <code>[n_rayN]</code></li>
 <li><b><code>normal_vecN</code></b> — FBS and SBS normal vectors <code>[Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]</code>; <code>[n_rayN, 6]</code></li>
 <li><b><code>out_typeN</code></b> — Interaction type code, bit-encoded (uint32); <code>[n_rayN]</code><br><br>
 <table class="md">
@@ -3215,7 +3213,7 @@ Calculate intersections of ray beams with points in 3D space
 <li><b><code>tridir</code></b> — Direction vectors of the three vertex-rays in Cartesian coordinates; not normalized; order <code>{d1x, d1y, d1z, d2x, d2y, d2z, d3x, d3y, d3z}</code>; <code>[n_ray, 9]</code></li>
 <li><b><code>points</code></b> — 3D point cloud coordinates; <code>[n_points, 3]</code></li>
 <li><b><code>sub_cloud_index</code></b> — Segment boundary indices for the point cloud; use <a href="#point_cloud_segmentation">point_cloud_segmentation</a> to gnerate; uint32; <code>[n_sub]</code>; default: <code>[]</code> (not using sub-clouds)</li>
-<li><b><code>use_kernel</code></b> — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable; auto mode selects CUDA when <code>n_points &gt;= 10000</code> and CUDA is available, else AVX2, else GENERIC; default: 0</li>
+<li><b><code>use_kernel</code></b> — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable; auto mode selects CUDA when <code>n_points &gt;= 500</code> and CUDA is available, else AVX2, else GENERIC; default: 0</li>
 <li><b><code>gpu_id</code></b> — CUDA device ID; ignored when not using CUDA; default: 0</li>
 </ul>
 

@@ -14,6 +14,7 @@
 
 #include "cuda_common.hpp" // replaces local CUDA_CHECK + cuda_runtime.h
 #include "quadriga_lib_cuda_functions.hpp"
+#include "quadriga_lib_generic_functions.hpp" // qd_RPI_assemble
 
 namespace
 { // ---------------------------------------------------------------
@@ -701,19 +702,21 @@ void qd_RPI_CUDA(
     const float *D3x, const float *D3y, const float *D3z,
     const float *rD1, const float *rD2, const float *rD3,
     const size_t n_ray,
-    std::vector<unsigned> *p_hit,
+    std::vector<unsigned> *hit_index,
+    unsigned *hit_offset,
     int gpu_id)
 {
     // --- Early returns (Section 8) ---
-    if (n_ray == 0)
+    // An empty run still has to produce a valid, all-zero CSR list
+    if (n_ray == 0 || n_sub == 0 || n_point == 0)
+    {
+        qd_RPI_assemble(nullptr, nullptr, 0, n_point, hit_index, hit_offset);
         return;
+    }
 
-    // Clear all output vectors
-    for (size_t i = 0; i < n_ray; ++i)
-        p_hit[i].clear();
-
-    if (n_sub == 0 || n_point == 0)
-        return;
+    // Host-side staging, one exactly sized buffer of packed hit records per
+    // batch. Nothing is ever reallocated or copied after it is written.
+    std::vector<std::vector<unsigned long long>> stage;
 
     // --- Range checks ---
     if (n_sub > 65535)
@@ -932,6 +935,27 @@ void qd_RPI_CUDA(
     // End_bit for CUB radix sort
     int num_sub_bits = std::max(1, (int)std::ceil(std::log2((double)n_sub)));
 
+    // Pack the hits of one finished batch into an exactly sized staging buffer
+    // Point index goes into the high 32 bit, ray index into the low 32 bit
+    auto append_hits = [&](int idx_stream)
+    {
+        // The retry logic above guarantees h_hit_count <= hit_capacity, the
+        // clamp only protects the pinned buffers against a missed retry
+        const uint32_t n_hit = std::min(h_hit_count[idx_stream], hit_capacity);
+        if (n_hit == 0)
+            return;
+
+        const unsigned long long ray_base = (unsigned long long)batch_offsets[idx_stream];
+        const uint32_t *src_ray = buf.h_hit_ray_pinned[idx_stream];
+        const uint32_t *src_point = buf.h_hit_point_pinned[idx_stream];
+
+        stage.push_back(std::vector<unsigned long long>(n_hit));
+        unsigned long long *dst = stage.back().data();
+
+        for (uint32_t i = 0; i < n_hit; ++i)
+            dst[i] = (ray_base + (unsigned long long)src_ray[i]) | ((unsigned long long)src_point[i] << 32);
+    };
+
     // --- Stage batch 0 into pinned memory BEFORE the loop ---
     {
         size_t count0 = std::min(batch_size, n_ray);
@@ -955,12 +979,8 @@ void qd_RPI_CUDA(
         {
             CUDA_CHECK(cudaStreamSynchronize(buf.stream[sp]));
 
-            // Scatter hits from previous batch into p_hit[] vectors on host
-            for (uint32_t i = 0; i < h_hit_count[sp]; ++i)
-            {
-                size_t actual_ray = batch_offsets[sp] + buf.h_hit_ray_pinned[sp][i];
-                p_hit[actual_ray].push_back((unsigned)buf.h_hit_point_pinned[sp][i]);
-            }
+            // Stage hits from the previous batch on the host
+            append_hits(sp);
         }
 
         // --- H→D: upload ray data for this batch ---
@@ -1374,11 +1394,21 @@ void qd_RPI_CUDA(
         int last_s = (int)((n_batches - 1) % 2);
         CUDA_CHECK(cudaStreamSynchronize(buf.stream[last_s]));
 
-        for (uint32_t i = 0; i < h_hit_count[last_s]; ++i)
-        {
-            size_t actual_ray = batch_offsets[last_s] + buf.h_hit_ray_pinned[last_s][i];
-            p_hit[actual_ray].push_back((unsigned)buf.h_hit_point_pinned[last_s][i]);
-        }
+        append_hits(last_s);
+    }
+
+    // Assemble the point-major CSR hit list
+    // Batches are staged in order, but the order within one batch follows the
+    // shared memory flush order of kernel 2, so a point's ray list is grouped
+    // by batch and not fully sorted
+    {
+        std::vector<const unsigned long long *> p_buffer(stage.size());
+        std::vector<size_t> n_hit_buffer(stage.size());
+
+        for (size_t i = 0; i < stage.size(); ++i)
+            p_buffer[i] = stage[i].data(), n_hit_buffer[i] = stage[i].size();
+
+        qd_RPI_assemble(p_buffer.data(), n_hit_buffer.data(), p_buffer.size(), n_point, hit_index, hit_offset);
     }
 
     // CudaBuffers destructor handles all cleanup (RAII)

@@ -218,6 +218,7 @@
   <tr><td><a href="#ray_point_intersect">ray_point_intersect</a></td><td>Calculate intersections of ray beams with points in 3D space</td></tr>
   <tr><td><a href="#ray_progress">ray_progress</a></td><td>Advance a ray set by one interaction, spawning reflected, transmitted, and subdivided rays</td></tr>
   <tr><td><a href="#ray_state_update">ray_state_update</a></td><td>Batched inside/outside ray-state machine with analytic thin-slab (Fabry-Perot) resolution</td></tr>
+  <tr><td><a href="#ray_subdivide_flag">ray_subdivide_flag</a></td><td>Compute the per-ray subdivision decision from the beam-tube footprint at the first bounce</td></tr>
   <tr><td><a href="#ray_triangle_intersect">ray_triangle_intersect</a></td><td>Compute ray-triangle intersections in 3D using the Möller–Trumbore algorithm</td></tr>
   <tr><td><a href="#refractive_index">refractive_index</a></td><td>Real refractive index of a homogeneous medium</td></tr>
   <tr><td><a href="#subdivide_rays">subdivide_rays</a></td><td>Subdivide ray beams into four smaller sub-beams</td></tr>
@@ -5425,19 +5426,24 @@ Reachable composite values (add 32 for the total-reflection variant):<br><br>
 Calculate intersections of ray beams with points in 3D space
 <ul>
 <li>Models rays as volumetric beams defined by a triangular wavefront that diverges from the origin, enabling energy spread simulation.</li>
-<li>Returns, for each point, the list of 0-based ray indices whose beam intersects that point.</li>
+<li>Reports, for each point, the list of 0-based ray indices whose beam intersects that point.</li>
+<li>The primary output is a flat CSR pair (<code>hit_index</code>, <code>hit_offset</code>); the ray indices of point <code>i</code> are <code>hit_index[hit_offset[i] .. hit_offset[i+1]-1]</code>.</li>
+<li>All outputs are optional and are only computed when a non-NULL pointer is passed.</li>
 <li>All internal computations use single precision.</li>
 </ul>
 
 <b>Declaration:</b><br>
 <pre>
-std::vector&lt;arma::u32_vec&gt; quadriga_lib::ray_point_intersect(
-    const arma::Mat&lt;dtype&gt; *points,
-    const arma::Mat&lt;dtype&gt; *orig,
-    const arma::Mat&lt;dtype&gt; *trivec,
-    const arma::Mat&lt;dtype&gt; *tridir,
-    const arma::u32_vec *sub_cloud_index = nullptr,
+void quadriga_lib::ray_point_intersect(
+    const arma::Mat&lt;dtype&gt; &amp;points,
+    const arma::Mat&lt;dtype&gt; &amp;orig,
+    const arma::Mat&lt;dtype&gt; &amp;trivec,
+    const arma::Mat&lt;dtype&gt; &amp;tridir,
+    std::vector&lt;unsigned&gt; *hit_index = nullptr,
+    arma::u32_vec *hit_offset = nullptr,
     arma::u32_vec *hit_count = nullptr,
+    std::vector&lt;arma::u32_vec&gt; *hits_per_point = nullptr,
+    const arma::u32_vec *sub_cloud_index = nullptr,
     int use_kernel = 0,
     int gpu_id = 0);
 </pre>
@@ -5453,14 +5459,12 @@ std::vector&lt;arma::u32_vec&gt; quadriga_lib::ray_point_intersect(
 <li><b><code>gpu_id</code></b> <i>(optional)</i> — CUDA device ID; ignored when not using CUDA</li>
 </ul>
 
-<b>Optional output:</b><br>
+<b>Optional outputs:</b><br>
 <ul>
-<li><b><code>hit_count</code></b> — Number of rays intersecting each point; <code>[n_points]</code></li>
-</ul>
-
-<b>Returns:</b><br>
-<ul>
-<li><code>std::vector&lt;arma::u32_vec&gt;</code> — Per-point list of 0-based ray indices that intersected that point; length <code>n_points</code></li>
+<li><b><code>hit_index</code></b> — Flat list of 0-based ray indices, grouped by point; written by the compute kernel without an intermediate copy; <code>[n_hit]</code></li>
+<li><b><code>hit_offset</code></b> — Start of each point's block within <code>hit_index</code>, last element is <code>n_hit</code>; <code>[n_points + 1]</code></li>
+<li><b><code>hit_count</code></b> — Number of rays intersecting each point, equals <code>hit_offset[i+1] - hit_offset[i]</code>; <code>[n_points]</code></li>
+<li><b><code>hits_per_point</code></b> — Per-point list of 0-based ray indices; allocates one <code>arma::u32_vec</code> per non-empty point, so only request it when the split form is actually needed; <code>[n_points]</code></li>
 </ul>
 
 <b>See also:</b><br>
@@ -5477,13 +5481,17 @@ std::vector&lt;arma::u32_vec&gt; quadriga_lib::ray_point_intersect(
 <hr class="thin">
 Advance a ray set by one interaction, spawning reflected, transmitted, and subdivided rays
 <ul>
-<li>Consumes a launch configuration (origins, destinations, per-ray medium state, and <a href="#path">path</a> storage) and returns the next iteration: for every ray that hits the mesh, its reflected and/or transmitted continuation(s), plus the four sub-beams of any ray flagged for subdivision. Rays that miss, fall below <code>min_gain_dB</code>, or reach an interaction, reflection or transmission limit are terminated.</li>
-<li>The full pipeline per call is: intersect (<a href="#ray_triangle_intersect">ray_triangle_intersect</a>) → interaction (<a href="#ray_mesh_interact">ray_mesh_interact</a>) → state resolve (<a href="#ray_state_update">ray_state_update</a>) for a reflection pass and a transmission/refraction pass → subdivision (<a href="#subdivide_rays">subdivide_rays</a>) → assembly of the new launch configuration.</li>
+<li>Consumes a launch configuration (origins, destinations, per-ray medium state, and <a href="#path">path</a> storage) and returns the next iteration: for every ray that hits the mesh, its reflected and/or transmitted continuation(s), plus the four sub-beams of any ray flagged for subdivision. Rays that miss, fall below <code>min_gain_dB</code>, or reach an interaction, reflection or transmission limit are terminated — unless they are flagged for subdivision, which takes precedence and is evaluated first.</li>
+<li>The full pipeline per call is: intersect (<a href="#ray_triangle_intersect">ray_triangle_intersect</a>) → subdivision flag (<a href="#ray_subdivide_flag">ray_subdivide_flag</a>) → subdivision (<a href="#subdivide_rays">subdivide_rays</a>) → compaction → interaction (<a href="#ray_mesh_interact">ray_mesh_interact</a>) → state resolve (<a href="#ray_state_update">ray_state_update</a>) for a reflection pass and a transmission/refraction pass → assembly.</li>
+<li>The subdivision decision is taken on the full ray set, before the interaction is evaluated and before the launch configuration is compacted. A flagged ray is split and does not take part in the interaction passes this generation; its sub-beams are re-intersected in the next one.</li>
 <li>The function returns per-stage counts (see Returns); the new configuration holds <code>n_out = 4·n_subdiv + n_reflect + n_transmit</code> rays, which may exceed or fall short of the <code>n_ray</code> passed in.</li>
 <li>An empty returned launch configuration (<code>orig.n_rows == 0</code>) signals end of trace; a subsequent call with an empty orig throws.</li>
-<li>Memory is sized for the worst case but committed lazily: the output is built in a reserved-then-resized buffer, inputs are compacted in place on the intersect result before the expensive passes, and dead intermediates are released as the function proceeds, so peak footprint stays close to one generation. Designed for <code>n_ray</code> up to ~10^8; the ray index is 32-bit, so <code>n_ray</code> is capped at 2^32-1.</li>
+<li>Memory is sized for the worst case but committed lazily: the output is built in a worst-case-sized buffer committed on first write, the launch configuration is compacted once — on the intersect result and the subdivision flag together — before the expensive passes, and dead intermediates are released as the function proceeds, so peak footprint stays close to one generation. Designed for <code>n_ray</code> up to ~10^8; the ray index is 32-bit, so <code>n_ray</code> is capped at 2^32-1.</li>
 <li>Geometry is traced once, at the reference frequency <code>center_frequency[0]</code>. For the remaining frequencies only the polarization/gain coefficient is recomputed and folded into each <a href="#path">path</a>; the per-frequency refracted direction and in-medium distance are approximated by the reference-frequency values (see the note on <code>center_frequency</code>).</li>
 <li>Beam subdivision and beam-front updates are active only when <code>trivec</code> and <code>tridir</code> are supplied; otherwise rays are traced as infinitesimal.</li>
+<li>The ray-mesh intersection can be delegated: pass <code>no_interact_in</code>, <code>fbs_ind_in</code> and <code>sbs_ind_in</code> to reuse a <a href="#ray_triangle_intersect">ray_triangle_intersect</a> result. When the intersection is delegated, <code>sub_mesh_index</code> and <code>aabb</code> are unused — they only accelerate the internal intersector — validation is skipped in this case and the parameters may be omitted.</li>
+<li>The subdivision decision can likewise be delegated via <code>subdiv_flag_in</code>, which a shading pass needs so it does not commit beams that reappear as sub-beams. When supplied it is the authority on what gets split; see the input description for what that overrides.</li>
+<li><a href="#ray_subdivide_flag">ray_subdivide_flag</a> never flags a ray with <code>fbs_ind</code> = 0, because there is no face to project the beam tube onto. The internal decision therefore never subdivides a ray that missed the mesh; only a delegated flag reaches that case.</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -5514,7 +5522,11 @@ std::array&lt;unsigned, 4&gt; quadriga_lib::ray_progress(
     float subdivision_tolerance_m = 3.0f,
     float thin_slab_threshold = 0.15f,
     bool refraction_mode = true,
-    bool scalar_mode = false);
+    bool scalar_mode = false,
+    const arma::u32_vec *no_interact_in = nullptr,
+    const arma::u32_vec *fbs_ind_in = nullptr,
+    const arma::u32_vec *sbs_ind_in = nullptr, 
+    const std::vector&lt;bool&gt; *subdiv_flag_in = nullptr);
 </pre>
 
 <b>Inputs:</b><br>
@@ -5529,12 +5541,16 @@ std::array&lt;unsigned, 4&gt; quadriga_lib::ray_progress(
 <li><b><code>max_no_interactions</code></b> — Total interactions (segments) per ray before termination, 0 to 255. 0 disables tracing (returns 0 rays)</li>
 <li><b><code>max_no_reflections</code></b> — Reflections per ray, 0 to 255. 0 skips the reflection pass</li>
 <li><b><code>max_no_transmissions</code></b> — Transmissions / refractions per ray, 0 to 255. 0 skips the transmission pass</li>
-<li><b><code>max_no_subdivisions</code></b> — Beam subdivisions per ray, 0 to 255. 0 (or no beam mode) disables subdivision</li>
+<li><b><code>max_no_subdivisions</code></b> — Beam subdivisions per ray, 0 to 255. 0 (or no beam mode) disables subdivision. Not applied when <code>subdiv_flag_in</code> is given — the caller owns termination in that case, and the per-path counter <code>nSUB</code> saturates at 255 instead of wrapping</li>
 <li><b><code>min_gain_dB</code></b> — Path gain below which a continuation is not launched, in dB (linear-power threshold applied to the accumulated per-path gain × interaction gain)</li>
 <li><b><code>subdivision_tolerance_m</code></b> — Maximum beam-tube edge length before a ray is subdivided, in [m]; must be > 0</li>
 <li><b><code>thin_slab_threshold</code></b> — Thin-slab (Fabry-Pérot) resolve threshold forwarded to <a href="#ray_state_update">ray_state_update</a> as its <code>eps</code>; see there. Default 0.15</li>
 <li><b><code>refraction_mode</code></b> — <code>true</code> = refraction (Snell-bent transmission), <code>false</code> = straight-path transmission</li>
 <li><b><code>scalar_mode</code></b> — <code>true</code> = scalar (acoustic) layout, <code>false</code> = EM (2×2 Jones). Must match the layout of <code>paths</code></li>
+<li><b><code>no_interact_in</code></b> <i>(optional)</i> — Externally computed intersection count per ray from <a href="#ray_triangle_intersect">ray_triangle_intersect</a>; <code>[n_ray]</code>. When given, the internal intersector is skipped and <code>fbs_ind_in</code> and <code>sbs_ind_in</code> become mandatory</li>
+<li><b><code>fbs_ind_in</code></b> <i>(optional)</i> — Externally computed 1-based index of the first intersected mesh element, 0 = none; <code>[n_ray]</code>. Must be non-zero wherever <code>no_interact_in</code> is non-zero.</li>
+<li><b><code>sbs_ind_in</code></b> <i>(optional)</i> — Externally computed 1-based index of the second intersected mesh element, 0 = none; <code>[n_ray]</code></li>
+<li><b><code>subdiv_flag_in</code></b> <i>(optional)</i> — Flags that mark rays for subdivision; <code>[n_ray]</code>, indexed in the full ray set (unlike everything else, which is compacted first). When supplied it is the authority on what gets subdivided: a flagged ray is split regardless of whether it hit the mesh, how often it has already been subdivided, or whether it is travelling inside a medium, and <code>subdivision_tolerance_m</code> is unused. Pass the output of <a href="#ray_subdivide_flag">ray_subdivide_flag</a> to reproduce the internal decision exactly; a hand-built list overrides it. Requires beam mode; conflicts with <code>max_no_subdivisions</code> = 0</li>
 </ul>
 
 <b>In/out (launch configuration, updated in place; [n_ray, …] on entry, [n_out, …] on return):</b><br>
@@ -5553,12 +5569,13 @@ std::array&lt;unsigned, 4&gt; quadriga_lib::ray_progress(
 <ul>
 <li>Per-stage ray counts <code>{n_interact, n_subdiv, n_reflect, n_transmit}</code>:
 <ul>
-<li><b><code>n_interact</code></b> — rays that hit the mesh (survived compaction against the intersect result)</li>
-<li><b><code>n_subdiv</code></b> — rays flagged for subdivision, each expanded into 4 sub-beams</li>
+<li><b><code>n_interact</code></b> — rays that hit the mesh, i.e. <code>no_interact != 0</code>, counted before any compaction</li>
+<li><b><code>n_subdiv</code></b> — rays flagged for subdivision, each expanded into 4 sub-beams. Not a subset of <code>n_interact</code>: a delegated flag may mark rays that missed the mesh, so the two counts are independent</li>
 <li><b><code>n_reflect</code></b> — reflected continuations launched</li>
 <li><b><code>n_transmit</code></b> — transmitted / refracted continuations launched</li>
 </ul>
 </li>
+<li>Only rays that hit the mesh <i>and</i> were not subdivided reach the interaction passes, so <code>n_reflect + n_transmit</code> is bounded by twice that number, not by <code>2·n_interact</code>.</li>
 </ul>
 
 <b>See also:</b><br>
@@ -5567,6 +5584,7 @@ std::array&lt;unsigned, 4&gt; quadriga_lib::ray_progress(
 <li><a href="#ray_triangle_intersect">ray_triangle_intersect</a> (first/second interaction points)</li>
 <li><a href="#ray_mesh_interact">ray_mesh_interact</a> (per-interaction Fresnel/Jones result)</li>
 <li><a href="#ray_state_update">ray_state_update</a> (inside/outside state machine and thin-slab resolution)</li>
+<li><a href="#ray_subdivide_flag">ray_subdivide_flag</a> (per-ray subdivision decision, delegated via <code>subdiv_flag_in</code>)</li>
 <li><a href="#subdivide_rays">subdivide_rays</a> (adaptive beam-tube refinement)</li>
 <li><a href="#path">path</a> (per-ray storage object accumulated across generations)</li>
 </ul>
@@ -5862,6 +5880,61 @@ Reachable composite values for reflection:<br><br>
 <li><a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md">The quadriga-lib Material Model and Ray-State Machine</a> (companion document)</li>
 <li><a href="#ray_mesh_interact">ray_mesh_interact</a> (computes the per-interaction Fresnel/Jones result this function corrects)</li>
 <li><a href="#calc_diffraction_gain">calc_diffraction_gain</a> (the reference state machine this function ports)</li>
+</ul>
+
+<hr class="greyline"><br>
+<span id="ray_subdivide_flag" class="qd-func"><b>ray_subdivide_flag</b></span><br>
+<hr class="thin">
+Compute the per-ray subdivision decision from the beam-tube footprint at the first bounce
+<ul>
+<li>Projects the three vertex rays of each beam tube onto the plane of the first-bounce face and measures the longest edge of the resulting wavefront triangle</li>
+<li>Flags a ray when that edge exceeds <code>subdivision_tolerance_m</code> and the ray is still eligible to be split, i.e. it travels outside a medium and has not reached its subdivision or interaction limit</li>
+<li>The decision is purely geometric: the vertex origins on the face are the same for reflection, transmission and refraction, so no material data, second-bounce index or frequency is needed</li>
+<li>This is the single source of truth for the subdivision decision. <a href="#ray_progress">ray_progress</a> consumes the result when it is passed in and calls this function itself otherwise, so a caller that needs to know the outcome in advance — a shading pass that must not commit beams which will reappear as sub-beams — gets exactly the set that will actually be split</li>
+</ul>
+
+<b>Declaration:</b><br>
+<pre>
+std::vector&lt;bool&gt; quadriga_lib::ray_subdivide_flag(
+    const arma::fmat &amp;mesh,
+    const arma::fmat &amp;orig,
+    const arma::fmat &amp;dest,
+    const arma::u32_vec &amp;fbs_ind,
+    const arma::fmat &amp;trivec,
+    const arma::fmat &amp;tridir,
+    const std::vector&lt;quadriga_lib::path&gt; &amp;paths,
+    const arma::Col&lt;short&gt; &amp;mtl_ind_current,
+    uint8_t max_no_interactions = 20,
+    uint8_t max_no_subdivisions = 2,
+    float subdivision_tolerance_m = 3.0f);
+</pre>
+
+<b>Inputs:</b><br>
+<ul>
+<li><b><code>mesh</code></b> — Faces of the triangular mesh; each row: <code>{x1 y1 z1 x2 y2 z2 x3 y3 z3}</code>; <code>[n_mesh, 9]</code></li>
+<li><b><code>orig</code></b> — Ray origins in GCS; <code>[n_ray, 3]</code>. Defines <code>n_ray</code>; must be non-empty</li>
+<li><b><code>dest</code></b> — Ray destinations in GCS; <code>[n_ray, 3]</code></li>
+<li><b><code>fbs_ind</code></b> — 1-based index of the first intersected mesh element, 0 = no hit; <code>[n_ray]</code>. Obtained from <a href="#ray_triangle_intersect">ray_triangle_intersect</a> for the same <code>orig</code> / <code>dest</code> pair</li>
+<li><b><code>trivec</code></b> — Beam wavefront triangle vertices relative to the ray origin; <code>[n_ray, 9]</code></li>
+<li><b><code>tridir</code></b> — Vertex-ray directions, Cartesian; <code>[n_ray, 9]</code>. Need not be unit length</li>
+<li><b><code>paths</code></b> — Per-ray <a href="#path">path</a> objects; <code>n_ray</code> entries. Only the subdivision counter <code>nSUB</code> and the segment count are read</li>
+<li><b><code>mtl_ind_current</code></b> — Current medium state word, 0 = outside; <code>[n_ray]</code>. A ray inside a medium is never split: the sub-beams restart their in-layer accumulator and recompute their direction geometrically, which is only valid outside</li>
+<li><b><code>max_no_interactions</code></b> <i>(optional)</i> — Total interactions per ray, 0 to 255. A ray that has already reached the limit is not split, so it does not expand into four sub-beams that all terminate in the next generation</li>
+<li><b><code>max_no_subdivisions</code></b> <i>(optional)</i> — Number of subdivisions per ray, 0 to 255. 0 disables subdivision and the returned flags are all <code>false</code></li>
+<li><b><code>subdivision_tolerance_m</code></b> <i>(optional)</i> — Maximum beam-tube edge length before a ray is split, in metres; must be greater than 0</li>
+</ul>
+
+<b>Output:</b><br>
+<ul>
+<li><b><code>subdiv_flag</code></b> — <code>true</code> where the ray must be split; <code>n_ray</code> entries. Rays that miss the mesh (<code>fbs_ind = 0</code>) are always <code>false</code>. A beam whose tube only partially covers the face — a vertex ray running parallel to it, pointing away from it, or intersecting absurdly far away — is treated as having an infinite edge and is always flagged</li>
+</ul>
+
+<b>See also:</b><br>
+<ul>
+<li><a href="#ray_progress">ray_progress</a> (advance one generation of a beam-traced ray set)</li>
+<li><a href="#ray_triangle_intersect">ray_triangle_intersect</a> (compute <code>fbs_ind</code>)</li>
+<li><a href="#subdivide_rays">subdivide_rays</a> (split the flagged beams into sub-beams)</li>
+<li><a href="#ray_mesh_interact">ray_mesh_interact</a> (reports the same edge length as <code>edge_lengthN</code>)</li>
 </ul>
 
 <hr class="greyline"><br>

@@ -40,7 +40,7 @@ void qd_RTI_AVX2(const dtype *Tx, const dtype *Ty, const dtype *Tz, // First ver
 
 // AVX2 accelerated implementation of RayPointIntersect
 void qd_RPI_AVX2(const float *Px, const float *Py, const float *Pz,    // Point coordinates, aligned to 32 byte, length n_point
-                 const size_t n_point,                                 // Number of points
+                 const size_t n_point,                                 // Number of points, the arrays must be allocated up to the next multiple of 8
                  const unsigned *SCI,                                  // List of sub-cloud indices, length n_sub
                  const float *Xmin, const float *Xmax,                 // Minimum and maximum x-values of the AABB, aligned to 32 byte, length n_sub_s
                  const float *Ymin, const float *Ymax,                 // Minimum and maximum y-values of the AABB, aligned to 32 byte, length n_sub_s
@@ -55,7 +55,8 @@ void qd_RPI_AVX2(const float *Px, const float *Py, const float *Pz,    // Point 
                  const float *D3x, const float *D3y, const float *D3z, // Third ray direction in GCS, length n_ray
                  const float *rD1, const float *rD2, const float *rD3, // Inverse Dot product of ray direction and normal vector
                  const size_t n_ray,                                   // Number of rays
-                 std::vector<unsigned> *p_hit);
+                 std::vector<unsigned> *hit_index,                     // Output: flat list of 0-based ray indices grouped by point, resized by the kernel
+                 unsigned *hit_offset);                                // Output: 0-based start of each point's block, length n_point + 1, allocated by the caller
 
 // AVX2 accelerated implementation of DFT
 template <typename dtype>

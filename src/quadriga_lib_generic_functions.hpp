@@ -11,8 +11,22 @@
 #include <vector>
 #include <cmath>
 #include <climits>
+#include <limits>
 #include <stdexcept>
 #include <cstdint>
+
+// Assemble a point-major CSR hit list from a set of packed hit buffers
+// Each hit is a 64 bit record, the upper 32 bit hold the 0-based point index
+// and the lower 32 bit the 0-based ray index. The buffers are concatenated in
+// the given order, which also fixes the order of the ray indices within each
+// point's block. Used by the GENERIC, AVX2 and CUDA implementations of
+// RayPointIntersect, defined in ray_point_intersect_generic.cpp
+void qd_RPI_assemble(const unsigned long long *const *hit_buffer, // Packed hit records, one pointer per buffer, length n_buffer
+                     const size_t *n_hit_buffer,                  // Number of records in each buffer, length n_buffer
+                     const size_t n_buffer,                       // Number of buffers, may be 0
+                     const size_t n_point,                        // Number of points
+                     std::vector<unsigned> *hit_index,            // Output: flat list of ray indices grouped by point, resized to the total hit count
+                     unsigned *hit_offset);                       // Output: 0-based start of each point's block, length n_point + 1
 
 // Generic C++ implementation of RayTriangleIntersect
 template <typename dtype>
@@ -52,7 +66,8 @@ void qd_RPI_GENERIC(const dtype *Px, const dtype *Py, const dtype *Pz,    // Poi
                     const dtype *D3x, const dtype *D3y, const dtype *D3z, // Third ray direction in GCS, length n_ray
                     const dtype *rD1, const dtype *rD2, const dtype *rD3, // Inverse Dot product of ray direction and normal vector
                     const size_t n_ray,                                   // Number of rays
-                    std::vector<unsigned> *p_hit);                        // Output: Array of std::vector containing list of points that were hit by a ray, length n_ray
+                    std::vector<unsigned> *hit_index,                     // Output: flat list of 0-based ray indices grouped by point, resized by the kernel
+                    unsigned *hit_offset);                                // Output: 0-based start of each point's block, length n_point + 1, allocated by the caller
 
 // Generic C++ implementation of DFT
 template <typename dtype>
