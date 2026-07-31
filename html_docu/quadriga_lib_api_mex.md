@@ -1,7 +1,7 @@
 ---
 title: "MATLAB / Octave API Documentation for Quadriga-Lib v0.12.0"
 author: "Stephan Jaeckel"
-date: "28.07.2026"
+date: "31.07.2026"
 lang: en-US
 ---
 
@@ -80,11 +80,11 @@ lang: en-US
 | [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 2151 |
 | [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 2178 |
 | [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 2207 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 2307 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 2347 |
-| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 2387 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 2411 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 2438 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 2304 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 2344 |
+| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 2384 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 2408 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 2435 |
 
 ---
 
@@ -2223,10 +2223,10 @@ Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh 
 
 ### Usage:
 ```
-[ origN, destN, fbsN, sbsN, gainN, xprmatN, trivecN, tridirN, orig_lengthN, fbs_angleN, ...
-    thicknessN, edge_lengthN, normal_vecN, out_typeN, path_dirN, ray_indN ] = ...
+[ origN, destN, fbsN, sbsN, gainN, xprmatN, trivecN, tridirN, fbs_angleN, thicknessN, ...
+    edge_lengthN, normal_vecN, out_typeN, path_dirN, ray_indN ] = ...
     quadriga_lib.ray_mesh_interact( interaction_type, center_frequency, orig, dest, mesh, ...
-    mtl_ind, mtl_prop, fbs_ind, sbs_ind, trivec, tridir, orig_length, compact );
+    mtl_ind, mtl_prop, fbs_ind, sbs_ind, trivec, tridir, compact );
 ```
 
 ### Inputs:
@@ -2244,7 +2244,6 @@ Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh 
   `[v1x v1y v1z v2x v2y v2z v3x v3y v3z]`; `[n_ray, 9]`; default: `[]`
 - **`tridir`** *(optional)* — Vertex-ray directions; `[n_ray, 6]` for spherical
   `[v1az v1el v2az v2el v3az v3el]` or `[n_ray, 9]` for Cartesian; default: `[]`
-- **`orig_length`** *(optional)* — Accumulated path length at origin; `[n_ray]`; default: 0
 - **`compact`** *(optional)* — If true, rays with no interaction (`fbs_ind = 0`) are dropped so
   `n_rayN <= n_ray`; if false, all rays are kept (`n_rayN = n_ray`) and no-hit rays are returned as a
   transparent pass-through; logical; default: true
@@ -2261,12 +2260,10 @@ Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh 
   3–5 (scalar): `[Re Im]` where Re+jIm is the scalar pressure coefficient; `[2, n_rayN]`
 - **`trivecN`**, **`tridirN`** — Updated beam geometry/direction (format matches input); empty if
   `trivec`/`tridir` not provided
-- **`orig_lengthN`** — Path length from `orig` to `origN`, added to input `orig_length` if given;
-  `[n_rayN]`
 - **`fbs_angleN`** — Incidence angle at FBS; `[n_rayN]`
 - **`thicknessN`** — Material thickness (FBS-to-SBS distance); `[n_rayN]`
 - **`edge_lengthN`** — Max edge length of ray tube triangle at new origin (Inf if partial hit);
-  `[n_rayN]`
+  requires the `trivec` and `tridir` inputs, returns all zeros without them; `[n_rayN]`
 - **`normal_vecN`** — FBS and SBS normal vectors `[Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]`; `[n_rayN, 6]`
 - **`out_typeN`** — Interaction type code, bit-encoded (uint32); `[n_rayN]`
    |  Bit | Meaning                                                                 |
@@ -2322,18 +2319,18 @@ Calculate intersections of ray beams with points in 3D space
 - **`orig`** — Ray origin positions in global Cartesian coordinates; `[n_ray, 3]`
 - **`trivec`** — Vectors from ray origin center to triangular wavefront vertices, order
   `{v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z}`; `[n_ray, 9]`
-- **`tridir`** — Direction vectors of the three vertex-rays in Cartesian coordinates; not normalized; 
+- **`tridir`** — Direction vectors of the three vertex-rays in Cartesian coordinates; not normalized;
   order `{d1x, d1y, d1z, d2x, d2y, d2z, d3x, d3y, d3z}`; `[n_ray, 9]`
 - **`points`** — 3D point cloud coordinates; `[n_points, 3]`
 - **`sub_cloud_index`** — Segment boundary indices for the point cloud; use [point_cloud_segmentation](#point_cloud_segmentation) to gnerate;
   uint32; `[n_sub]`; default: `[]` (not using sub-clouds)
-- **`use_kernel`** — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable; 
-  auto mode selects CUDA when `n_points >= 10000` and CUDA is available, else AVX2, else GENERIC; default: 0
+- **`use_kernel`** — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable;
+  auto mode selects CUDA when `n_points >= 500` and CUDA is available, else AVX2, else GENERIC; default: 0
 - **`gpu_id`** — CUDA device ID; ignored when not using CUDA; default: 0
 
 ### Outputs:
 - **`hit_count`** — Number of beams intersecting each point; `[n_points, 1]`
-- **`ray_ind`** — Per-point list of 1-based ray indices that intersected that point; zero-padded to 
+- **`ray_ind`** — Per-point list of 1-based ray indices that intersected that point; zero-padded to
   a regular 2D array (zero entries indicate unused slots); uint32; `[max_hits, n_points]`
 
 ### See also:

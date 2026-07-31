@@ -4,6 +4,153 @@
 
 #include "quadriga_lib_generic_functions.hpp"
 
+#include <cstring>
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
+// Number of packed hit records per staging chunk
+// Chunks are never reallocated, so the staged data is written exactly once
+static const size_t QD_RPI_CHUNK = 16384;
+
+// Assemble a point-major CSR hit list from a set of packed hit buffers
+// The buffers are split into contiguous runs, one per worker. Each worker
+// histograms its own run, the histograms are turned into disjoint write
+// cursors, and each worker then scatters its own run without contention.
+void qd_RPI_assemble(const unsigned long long *const *hit_buffer, // Packed hit records, one pointer per buffer, length n_buffer
+                     const size_t *n_hit_buffer,                  // Number of records in each buffer, length n_buffer
+                     const size_t n_buffer,                       // Number of buffers, may be 0
+                     const size_t n_point,                        // Number of points
+                     std::vector<unsigned> *hit_index,            // Output: flat list of ray indices grouped by point
+                     unsigned *hit_offset)                        // Output: 0-based start of each point's block, length n_point + 1
+{
+    if (hit_index == nullptr)
+        throw std::invalid_argument("Output 'hit_index' cannot be NULL.");
+    if (hit_offset == nullptr)
+        throw std::invalid_argument("Output 'hit_offset' cannot be NULL.");
+
+    // Total number of hits
+    unsigned long long n_hit_total = 0ULL;
+    for (size_t i_buf = 0; i_buf < n_buffer; ++i_buf)
+        n_hit_total += (unsigned long long)n_hit_buffer[i_buf];
+
+    if (n_hit_total > 0xFFFFFFFFULL)
+        throw std::invalid_argument("Total number of hits exceeds the 32 bit index range.");
+
+    if (n_hit_total == 0ULL)
+    {
+        std::memset(hit_offset, 0, (n_point + 1) * sizeof(unsigned));
+        hit_index->clear();
+        return;
+    }
+
+    // Number of workers, limited by the buffer count and by the memory that
+    // the per-worker histograms would need
+    const size_t hist_budget = 32ULL * 1024ULL * 1024ULL; // entries, 128 MByte
+
+#ifdef _OPENMP
+    long long n_work = (long long)omp_get_max_threads();
+#else
+    long long n_work = 1LL;
+#endif
+    if (n_work > (long long)n_buffer)
+        n_work = (long long)n_buffer;
+    if (n_point != 0 && (unsigned long long)n_work * (unsigned long long)n_point > (unsigned long long)hist_budget)
+        n_work = (long long)(hist_budget / n_point);
+    if (n_work < 1LL)
+        n_work = 1LL;
+
+    // Split the buffers into contiguous runs of roughly equal hit count
+    std::vector<size_t> run_first((size_t)n_work + 1, 0);
+    {
+        unsigned long long acc = 0ULL;
+        size_t i_work = 1;
+
+        for (size_t i_buf = 0; i_buf < n_buffer; ++i_buf)
+        {
+            acc += (unsigned long long)n_hit_buffer[i_buf];
+            while (i_work < (size_t)n_work && acc * (unsigned long long)n_work >= n_hit_total * (unsigned long long)i_work)
+                run_first[i_work++] = i_buf + 1;
+        }
+        while (i_work <= (size_t)n_work)
+            run_first[i_work++] = n_buffer;
+    }
+
+    // Per-worker histograms, hist[i_work * n_point + i_point]
+    std::vector<unsigned> hist((size_t)n_work * n_point, 0u);
+    unsigned *p_hist = hist.data();
+    const long long n_point_l = (long long)n_point;
+
+    // Count the hits per point, each worker into its own histogram
+#pragma omp parallel for schedule(static)
+    for (long long i_work = 0; i_work < n_work; ++i_work)
+    {
+        unsigned *p_local = p_hist + (size_t)i_work * n_point;
+
+        for (size_t i_buf = run_first[(size_t)i_work]; i_buf < run_first[(size_t)i_work + 1]; ++i_buf)
+        {
+            const unsigned long long *p_rec = hit_buffer[i_buf];
+            const size_t n_rec = n_hit_buffer[i_buf];
+
+            for (size_t i_rec = 0; i_rec < n_rec; ++i_rec)
+                ++p_local[(size_t)(p_rec[i_rec] >> 32)];
+        }
+    }
+
+    // Total hits per point
+#pragma omp parallel for schedule(static)
+    for (long long i_point = 0; i_point < n_point_l; ++i_point)
+    {
+        unsigned total = 0u;
+        for (long long i_work = 0; i_work < n_work; ++i_work)
+            total += p_hist[(size_t)i_work * n_point + (size_t)i_point];
+        hit_offset[i_point + 1] = total;
+    }
+
+    // Exclusive prefix sum over the points
+    hit_offset[0] = 0u;
+    for (size_t i_point = 0; i_point < n_point; ++i_point)
+        hit_offset[i_point + 1] += hit_offset[i_point];
+
+    // Turn the histograms into disjoint write cursors, worker order decides
+    // the order of the ray indices within a point's block
+#pragma omp parallel for schedule(static)
+    for (long long i_point = 0; i_point < n_point_l; ++i_point)
+    {
+        unsigned running = hit_offset[i_point];
+        for (long long i_work = 0; i_work < n_work; ++i_work)
+        {
+            unsigned *p_cursor = p_hist + (size_t)i_work * n_point + (size_t)i_point;
+            unsigned count = *p_cursor;
+            *p_cursor = running;
+            running += count;
+        }
+    }
+
+    hit_index->resize((size_t)n_hit_total);
+    unsigned *p_index = hit_index->data();
+
+    // Scatter, each worker writes into its own disjoint slots
+#pragma omp parallel for schedule(static)
+    for (long long i_work = 0; i_work < n_work; ++i_work)
+    {
+        unsigned *p_cursor = p_hist + (size_t)i_work * n_point;
+
+        for (size_t i_buf = run_first[(size_t)i_work]; i_buf < run_first[(size_t)i_work + 1]; ++i_buf)
+        {
+            const unsigned long long *p_rec = hit_buffer[i_buf];
+            const size_t n_rec = n_hit_buffer[i_buf];
+
+            for (size_t i_rec = 0; i_rec < n_rec; ++i_rec)
+            {
+                const unsigned long long rec = p_rec[i_rec];
+                p_index[p_cursor[(size_t)(rec >> 32)]++] = (unsigned)rec;
+            }
+        }
+    }
+}
+
 // Generic C++ implementation of RayPointIntersect
 template <typename dtype>
 void qd_RPI_GENERIC(const dtype *Px, const dtype *Py, const dtype *Pz,    // Point coordinates, length n_point
@@ -22,25 +169,56 @@ void qd_RPI_GENERIC(const dtype *Px, const dtype *Py, const dtype *Pz,    // Poi
                     const dtype *D3x, const dtype *D3y, const dtype *D3z, // Third ray direction in GCS, length n_ray
                     const dtype *rD1, const dtype *rD2, const dtype *rD3, // Inverse Dot product of ray direction and normal vector
                     const size_t n_ray,                                   // Number of rays
-                    std::vector<unsigned> *p_hit)                         // Output: Array of std::vector containing list of points that were hit by a ray, length n_ray
+                    std::vector<unsigned> *hit_index,                     // Output: flat list of 0-based ray indices grouped by point, resized by the kernel
+                    unsigned *hit_offset)                                 // Output: 0-based start of each point's block, length n_point + 1, allocated by the caller
 {
-    if (n_point >= INT32_MAX)
+    // Point and ray indices are packed into 32 bit fields of the hit records
+    if ((unsigned long long)n_point > 0xFFFFFFFFULL)
         throw std::invalid_argument("Number of points exceeds maximum supported number.");
-    if (n_ray >= INT32_MAX)
+    if ((unsigned long long)n_ray > 0xFFFFFFFFULL)
         throw std::invalid_argument("Number of rays exceeds maximum supported number.");
 
     // Constant values needed for some operations
-    const int n_point_i = (int)n_point; // Number of points as int
-    const int n_ray_i = (int)n_ray;     // Number of rays as int
+    const long long n_point_l = (long long)n_point; // Number of points as signed 64 bit
+    const long long n_ray_l = (long long)n_ray;     // Number of rays as signed 64 bit
 
     constexpr dtype slack = dtype(1.0e-5);
 
-#pragma omp parallel for
-    for (int i_ray = 0; i_ray < n_ray_i; ++i_ray) // Ray loop
+#ifdef _OPENMP
+    const int n_threads = omp_get_max_threads();
+#else
+    const int n_threads = 1;
+#endif
+
+    // Per-thread staging, a list of fixed size chunks of packed hit records
+    // Appending a chunk never moves the records already written, so the staged
+    // data is written exactly once and the peak memory is the payload size
+    std::vector<std::vector<std::vector<unsigned long long>>> stage((size_t)n_threads);
+
+#pragma omp parallel
     {
-        // Initialize indicator for sub-cloud hits
+#ifdef _OPENMP
+        const size_t i_thread = (size_t)omp_get_thread_num();
+#else
+        const size_t i_thread = 0;
+#endif
+        std::vector<std::vector<unsigned long long>> &chunks = stage[i_thread];
+        chunks.reserve(64);
+        chunks.push_back(std::vector<unsigned long long>(QD_RPI_CHUNK));
+        unsigned long long *p_write = chunks.back().data();
+        unsigned long long *p_stop = p_write + QD_RPI_CHUNK;
+
+        // Per-thread indicator for sub-cloud hits, reused across ray iterations
         std::vector<int> sub_hit(n_sub);
         int *p_sub_hit = sub_hit.data();
+
+        // Static scheduling gives each thread one contiguous ray range, so the
+        // staged hits are ray-ascending both within and across the buffers
+#pragma omp for schedule(static)
+    for (long long i_ray = 0; i_ray < n_ray_l; ++i_ray) // Ray loop
+    {
+        // Ray index in the low 32 bit of every hit record of this ray
+        const unsigned long long ray_bits = (unsigned long long)i_ray;
 
         // Load origin
         dtype ox[3], oy[3], oz[3];
@@ -134,10 +312,11 @@ void qd_RPI_GENERIC(const dtype *Px, const dtype *Py, const dtype *Pz,    // Poi
             }
 
             // Check for a potential overlap between the AABBs
-            if (a0_high >= b0_low && a0_low <= b0_high &&
-                a1_high >= b1_low && a1_low <= b1_high &&
-                a2_high >= b2_low && a2_low <= b2_high)
-                p_sub_hit[i_sub] = 1;
+            p_sub_hit[i_sub] = (a0_high >= b0_low && a0_low <= b0_high &&
+                                a1_high >= b1_low && a1_low <= b1_high &&
+                                a2_high >= b2_low && a2_low <= b2_high)
+                                   ? 1
+                                   : 0;
         }
 
         // Step 2 - Check intersection with points within the sub-clouds
@@ -148,10 +327,10 @@ void qd_RPI_GENERIC(const dtype *Px, const dtype *Py, const dtype *Pz,    // Poi
             if (p_sub_hit[i_sub] == 0)
                 continue;
 
-            int i_point_start = (int)SCI[i_sub];
-            int i_point_end = (i_sub == n_sub - 1) ? n_point_i : (int)SCI[i_sub + 1];
+            long long i_point_start = (long long)SCI[i_sub];
+            long long i_point_end = (i_sub == n_sub - 1) ? n_point_l : (long long)SCI[i_sub + 1];
 
-            for (int i_point = i_point_start; i_point < i_point_end; ++i_point) // Point loop
+            for (long long i_point = i_point_start; i_point < i_point_end; ++i_point) // Point loop
             {
                 // Load point coordinate
                 dtype rx = Px[i_point];
@@ -217,12 +396,36 @@ void qd_RPI_GENERIC(const dtype *Px, const dtype *Py, const dtype *Pz,    // Poi
                 // Check intersect conditions
                 bool C1 = (U >= dtype(0.0)) & (V >= dtype(0.0)) & ((U + V) <= dtype(1.0)) & (d >= dtype(0.0));
 
-                // Add point to points list
+                // Add hit to the staging buffer
                 if (C1)
-                    p_hit[i_ray].push_back(i_point);
+                {
+                    if (p_write == p_stop) // Current chunk is full
+                    {
+                        chunks.push_back(std::vector<unsigned long long>(QD_RPI_CHUNK));
+                        p_write = chunks.back().data();
+                        p_stop = p_write + QD_RPI_CHUNK;
+                    }
+                    *p_write++ = ray_bits | ((unsigned long long)i_point << 32);
+                }
             }
         }
     }
+        // Trim the last chunk to the number of records actually written
+        chunks.back().resize((size_t)(p_write - chunks.back().data()));
+    } // end omp parallel
+
+    // Collect the chunks in thread order, which preserves the ray order
+    std::vector<const unsigned long long *> p_buffer;
+    std::vector<size_t> n_hit_buffer;
+
+    for (size_t i_thread = 0; i_thread < (size_t)n_threads; ++i_thread)
+        for (size_t i_chunk = 0; i_chunk < stage[i_thread].size(); ++i_chunk)
+            if (!stage[i_thread][i_chunk].empty())
+                p_buffer.push_back(stage[i_thread][i_chunk].data()),
+                    n_hit_buffer.push_back(stage[i_thread][i_chunk].size());
+
+    // Assemble the point-major CSR hit list
+    qd_RPI_assemble(p_buffer.data(), n_hit_buffer.data(), p_buffer.size(), n_point, hit_index, hit_offset);
 }
 
 template void qd_RPI_GENERIC<float>(const float *Px, const float *Py, const float *Pz, size_t n_point,
@@ -231,7 +434,7 @@ template void qd_RPI_GENERIC<float>(const float *Px, const float *Py, const floa
                                     const float *T3x, const float *T3y, const float *T3z, const float *Nx, const float *Ny, const float *Nz,
                                     const float *D1x, const float *D1y, const float *D1z, const float *D2x, const float *D2y, const float *D2z,
                                     const float *D3x, const float *D3y, const float *D3z, const float *rD1, const float *rD2, const float *rD3,
-                                    size_t n_ray, std::vector<unsigned int> *p_hit);
+                                    size_t n_ray, std::vector<unsigned> *hit_index, unsigned *hit_offset);
 
 template void qd_RPI_GENERIC<double>(const double *Px, const double *Py, const double *Pz, size_t n_point,
                                      const unsigned int *SCI, const double *Xmin, const double *Xmax, const double *Ymin, const double *Ymax, const double *Zmin, const double *Zmax,
@@ -239,4 +442,4 @@ template void qd_RPI_GENERIC<double>(const double *Px, const double *Py, const d
                                      const double *T3x, const double *T3y, const double *T3z, const double *Nx, const double *Ny, const double *Nz,
                                      const double *D1x, const double *D1y, const double *D1z, const double *D2x, const double *D2y, const double *D2z,
                                      const double *D3x, const double *D3y, const double *D3z, const double *rD1, const double *rD2, const double *rD3,
-                                     size_t n_ray, std::vector<unsigned int> *p_hit);
+                                     size_t n_ray, std::vector<unsigned> *hit_index, unsigned *hit_offset);

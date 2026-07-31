@@ -1,7 +1,7 @@
 ---
 title: "C++ API Documentation for Quadriga-Lib v0.12.0"
 author: "Stephan Jaeckel"
-date: "28.07.2026"
+date: "31.07.2026"
 lang: en-US
 ---
 
@@ -27,114 +27,115 @@ lang: en-US
 
 | Function | Section | Line |
 | --- | --- | --- |
-| [arrayant](#arrayant) | Array antenna class | 144 |
-| [.append](#append) | Array antenna class | 195 |
-| [.calc_beamwidth_deg](#calc_beamwidth_deg) | Array antenna class | 217 |
-| [.calc_directivity_dBi](#calc_directivity_dbi) | Array antenna class | 249 |
-| [.combine_pattern](#combine_pattern) | Array antenna class | 270 |
-| [.copy_element](#copy_element) | Array antenna class | 295 |
-| [.export_obj_file](#export_obj_file) | Array antenna class | 315 |
-| [.interpolate](#interpolate) | Array antenna class | 345 |
-| [.is_valid](#is_valid) | Array antenna class | 397 |
-| [.qdant_write](#qdant_write) | Array antenna class | 415 |
-| [.remove_zeros](#remove_zeros) | Array antenna class | 442 |
-| [.rotate_pattern](#rotate_pattern) | Array antenna class | 458 |
-| [.set_size](#set_size) | Array antenna class | 494 |
-| [arrayant_combine_pattern_multi](#arrayant_combine_pattern_multi) | Array antenna functions | 520 |
-| [arrayant_concat_multi](#arrayant_concat_multi) | Array antenna functions | 554 |
-| [arrayant_copy_element_multi](#arrayant_copy_element_multi) | Array antenna functions | 588 |
-| [arrayant_interpolate_multi](#arrayant_interpolate_multi) | Array antenna functions | 628 |
-| [arrayant_is_valid_multi](#arrayant_is_valid_multi) | Array antenna functions | 687 |
-| [arrayant_rotate_pattern_multi](#arrayant_rotate_pattern_multi) | Array antenna functions | 714 |
-| [arrayant_set_element_pos_multi](#arrayant_set_element_pos_multi) | Array antenna functions | 746 |
-| [generate_arrayant_3GPP](#generate_arrayant_3gpp) | Array antenna functions | 772 |
-| [generate_arrayant_custom](#generate_arrayant_custom) | Array antenna functions | 822 |
-| [generate_arrayant_dipole](#generate_arrayant_dipole) | Array antenna functions | 847 |
-| [generate_arrayant_half_wave_dipole](#generate_arrayant_half_wave_dipole) | Array antenna functions | 864 |
-| [generate_arrayant_multibeam](#generate_arrayant_multibeam) | Array antenna functions | 881 |
-| [generate_arrayant_omni](#generate_arrayant_omni) | Array antenna functions | 935 |
-| [generate_arrayant_ula](#generate_arrayant_ula) | Array antenna functions | 952 |
-| [generate_arrayant_xpol](#generate_arrayant_xpol) | Array antenna functions | 980 |
-| [generate_speaker](#generate_speaker) | Array antenna functions | 997 |
-| [qdant_read](#qdant_read) | Array antenna functions | 1072 |
-| [qdant_read_multi](#qdant_read_multi) | Array antenna functions | 1098 |
-| [qdant_write_multi](#qdant_write_multi) | Array antenna functions | 1125 |
-| [channel](#channel) | Channel class | 1154 |
-| [.add_paths](#add_paths) | Channel class | 1201 |
-| [.calc_effective_path_gain](#calc_effective_path_gain) | Channel class | 1239 |
-| [.write_paths_to_obj_file](#write_paths_to_obj_file) | Channel class | 1258 |
-| [any_type_id](#any_type_id) | Channel functions | 1299 |
-| [baseband_freq_response](#baseband_freq_response) | Channel functions | 1342 |
-| [baseband_freq_response_multi](#baseband_freq_response_multi) | Channel functions | 1385 |
-| [baseband_freq_response_vec](#baseband_freq_response_vec) | Channel functions | 1433 |
-| [get_HDF5_version](#get_hdf5_version) | Channel functions | 1471 |
-| [hdf5_create](#hdf5_create) | Channel functions | 1483 |
-| [hdf5_read_channel](#hdf5_read_channel) | Channel functions | 1513 |
-| [hdf5_read_dset](#hdf5_read_dset) | Channel functions | 1545 |
-| [hdf5_read_dset_names](#hdf5_read_dset_names) | Channel functions | 1581 |
-| [hdf5_read_layout](#hdf5_read_layout) | Channel functions | 1615 |
-| [hdf5_reshape_layout](#hdf5_reshape_layout) | Channel functions | 1641 |
-| [hdf5_write](#hdf5_write) | Channel functions | 1669 |
-| [hdf5_write_dset](#hdf5_write_dset) | Channel functions | 1709 |
-| [path](#path) | Channel functions | 1748 |
-| [qrt_file_append](#qrt_file_append) | Channel functions | 1869 |
-| [qrt_file_init](#qrt_file_init) | Channel functions | 1905 |
-| [qrt_file_parse](#qrt_file_parse) | Channel functions | 1943 |
-| [qrt_file_read](#qrt_file_read) | Channel functions | 1991 |
-| [qrt_file_read_raw](#qrt_file_read_raw) | Channel functions | 2088 |
-| [qrt_read_cache_init](#qrt_read_cache_init) | Channel functions | 2125 |
-| [quantize_delays](#quantize_delays) | Channel functions | 2164 |
-| [get_channels_ieee_indoor](#get_channels_ieee_indoor) | Channel generation functions | 2226 |
-| [get_channels_irs](#get_channels_irs) | Channel generation functions | 2307 |
-| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 2401 |
-| [get_channels_planar](#get_channels_planar) | Channel generation functions | 2469 |
-| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 2537 |
-| [acdf](#acdf) | Channel statistics | 2613 |
-| [calc_angular_spreads_sphere](#calc_angular_spreads_sphere) | Channel statistics | 2648 |
-| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 2690 |
-| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 2742 |
-| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 2775 |
-| [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | 2810 |
-| [fast_acos](#fast_acos) | Math functions | 2843 |
-| [fast_asin](#fast_asin) | Math functions | 2862 |
-| [fast_atan2](#fast_atan2) | Math functions | 2881 |
-| [fast_cart2geo](#fast_cart2geo) | Math functions | 2902 |
-| [fast_geo2cart](#fast_geo2cart) | Math functions | 2935 |
-| [fast_sincos](#fast_sincos) | Math functions | 2980 |
-| [fast_slerp](#fast_slerp) | Math functions | 3001 |
-| [interp_2D](#interp_2d) | Math functions | 3036 |
-| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 3100 |
-| [colormap](#colormap) | Site-specific simulation tools | 3158 |
-| [combine_irs_coord](#combine_irs_coord) | Site-specific simulation tools | 3177 |
-| [coord2path](#coord2path) | Site-specific simulation tools | 3220 |
-| [cube](#cube) | Site-specific simulation tools | 3258 |
-| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 3291 |
-| [icosphere](#icosphere) | Site-specific simulation tools | 3335 |
-| [interface_gain](#interface_gain) | Site-specific simulation tools | 3369 |
-| [medium_gain](#medium_gain) | Site-specific simulation tools | 3405 |
-| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 3442 |
-| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 3484 |
-| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 3551 |
-| [obj_overlap_test](#obj_overlap_test) | Site-specific simulation tools | 3612 |
-| [path_to_tube](#path_to_tube) | Site-specific simulation tools | 3643 |
-| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 3671 |
-| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 3700 |
-| [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 3739 |
-| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 3775 |
-| [ray_init](#ray_init) | Site-specific simulation tools | 3811 |
-| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 3885 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 4007 |
-| [ray_progress](#ray_progress) | Site-specific simulation tools | 4050 |
-| [ray_state_update](#ray_state_update) | Site-specific simulation tools | 4153 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 4286 |
-| [refractive_index](#refractive_index) | Site-specific simulation tools | 4334 |
-| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 4366 |
-| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 4424 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 4454 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 4482 |
-| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 4523 |
-| [write_png](#write_png) | Site-specific simulation tools | 4558 |
-| [xpr_update](#xpr_update) | Site-specific simulation tools | 4584 |
+| [arrayant](#arrayant) | Array antenna class | 145 |
+| [.append](#append) | Array antenna class | 196 |
+| [.calc_beamwidth_deg](#calc_beamwidth_deg) | Array antenna class | 218 |
+| [.calc_directivity_dBi](#calc_directivity_dbi) | Array antenna class | 250 |
+| [.combine_pattern](#combine_pattern) | Array antenna class | 271 |
+| [.copy_element](#copy_element) | Array antenna class | 296 |
+| [.export_obj_file](#export_obj_file) | Array antenna class | 316 |
+| [.interpolate](#interpolate) | Array antenna class | 346 |
+| [.is_valid](#is_valid) | Array antenna class | 398 |
+| [.qdant_write](#qdant_write) | Array antenna class | 416 |
+| [.remove_zeros](#remove_zeros) | Array antenna class | 443 |
+| [.rotate_pattern](#rotate_pattern) | Array antenna class | 459 |
+| [.set_size](#set_size) | Array antenna class | 495 |
+| [arrayant_combine_pattern_multi](#arrayant_combine_pattern_multi) | Array antenna functions | 521 |
+| [arrayant_concat_multi](#arrayant_concat_multi) | Array antenna functions | 555 |
+| [arrayant_copy_element_multi](#arrayant_copy_element_multi) | Array antenna functions | 589 |
+| [arrayant_interpolate_multi](#arrayant_interpolate_multi) | Array antenna functions | 629 |
+| [arrayant_is_valid_multi](#arrayant_is_valid_multi) | Array antenna functions | 688 |
+| [arrayant_rotate_pattern_multi](#arrayant_rotate_pattern_multi) | Array antenna functions | 715 |
+| [arrayant_set_element_pos_multi](#arrayant_set_element_pos_multi) | Array antenna functions | 747 |
+| [generate_arrayant_3GPP](#generate_arrayant_3gpp) | Array antenna functions | 773 |
+| [generate_arrayant_custom](#generate_arrayant_custom) | Array antenna functions | 823 |
+| [generate_arrayant_dipole](#generate_arrayant_dipole) | Array antenna functions | 848 |
+| [generate_arrayant_half_wave_dipole](#generate_arrayant_half_wave_dipole) | Array antenna functions | 865 |
+| [generate_arrayant_multibeam](#generate_arrayant_multibeam) | Array antenna functions | 882 |
+| [generate_arrayant_omni](#generate_arrayant_omni) | Array antenna functions | 936 |
+| [generate_arrayant_ula](#generate_arrayant_ula) | Array antenna functions | 953 |
+| [generate_arrayant_xpol](#generate_arrayant_xpol) | Array antenna functions | 981 |
+| [generate_speaker](#generate_speaker) | Array antenna functions | 998 |
+| [qdant_read](#qdant_read) | Array antenna functions | 1073 |
+| [qdant_read_multi](#qdant_read_multi) | Array antenna functions | 1099 |
+| [qdant_write_multi](#qdant_write_multi) | Array antenna functions | 1126 |
+| [channel](#channel) | Channel class | 1155 |
+| [.add_paths](#add_paths) | Channel class | 1202 |
+| [.calc_effective_path_gain](#calc_effective_path_gain) | Channel class | 1240 |
+| [.write_paths_to_obj_file](#write_paths_to_obj_file) | Channel class | 1259 |
+| [any_type_id](#any_type_id) | Channel functions | 1300 |
+| [baseband_freq_response](#baseband_freq_response) | Channel functions | 1343 |
+| [baseband_freq_response_multi](#baseband_freq_response_multi) | Channel functions | 1386 |
+| [baseband_freq_response_vec](#baseband_freq_response_vec) | Channel functions | 1434 |
+| [get_HDF5_version](#get_hdf5_version) | Channel functions | 1472 |
+| [hdf5_create](#hdf5_create) | Channel functions | 1484 |
+| [hdf5_read_channel](#hdf5_read_channel) | Channel functions | 1514 |
+| [hdf5_read_dset](#hdf5_read_dset) | Channel functions | 1546 |
+| [hdf5_read_dset_names](#hdf5_read_dset_names) | Channel functions | 1582 |
+| [hdf5_read_layout](#hdf5_read_layout) | Channel functions | 1616 |
+| [hdf5_reshape_layout](#hdf5_reshape_layout) | Channel functions | 1642 |
+| [hdf5_write](#hdf5_write) | Channel functions | 1670 |
+| [hdf5_write_dset](#hdf5_write_dset) | Channel functions | 1710 |
+| [path](#path) | Channel functions | 1749 |
+| [qrt_file_append](#qrt_file_append) | Channel functions | 1870 |
+| [qrt_file_init](#qrt_file_init) | Channel functions | 1906 |
+| [qrt_file_parse](#qrt_file_parse) | Channel functions | 1944 |
+| [qrt_file_read](#qrt_file_read) | Channel functions | 1992 |
+| [qrt_file_read_raw](#qrt_file_read_raw) | Channel functions | 2089 |
+| [qrt_read_cache_init](#qrt_read_cache_init) | Channel functions | 2126 |
+| [quantize_delays](#quantize_delays) | Channel functions | 2165 |
+| [get_channels_ieee_indoor](#get_channels_ieee_indoor) | Channel generation functions | 2227 |
+| [get_channels_irs](#get_channels_irs) | Channel generation functions | 2308 |
+| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 2402 |
+| [get_channels_planar](#get_channels_planar) | Channel generation functions | 2470 |
+| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 2538 |
+| [acdf](#acdf) | Channel statistics | 2614 |
+| [calc_angular_spreads_sphere](#calc_angular_spreads_sphere) | Channel statistics | 2649 |
+| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 2691 |
+| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 2743 |
+| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 2776 |
+| [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | 2811 |
+| [fast_acos](#fast_acos) | Math functions | 2844 |
+| [fast_asin](#fast_asin) | Math functions | 2863 |
+| [fast_atan2](#fast_atan2) | Math functions | 2882 |
+| [fast_cart2geo](#fast_cart2geo) | Math functions | 2903 |
+| [fast_geo2cart](#fast_geo2cart) | Math functions | 2936 |
+| [fast_sincos](#fast_sincos) | Math functions | 2981 |
+| [fast_slerp](#fast_slerp) | Math functions | 3002 |
+| [interp_2D](#interp_2d) | Math functions | 3037 |
+| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 3101 |
+| [colormap](#colormap) | Site-specific simulation tools | 3159 |
+| [combine_irs_coord](#combine_irs_coord) | Site-specific simulation tools | 3178 |
+| [coord2path](#coord2path) | Site-specific simulation tools | 3221 |
+| [cube](#cube) | Site-specific simulation tools | 3259 |
+| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 3292 |
+| [icosphere](#icosphere) | Site-specific simulation tools | 3336 |
+| [interface_gain](#interface_gain) | Site-specific simulation tools | 3370 |
+| [medium_gain](#medium_gain) | Site-specific simulation tools | 3406 |
+| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 3443 |
+| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 3485 |
+| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 3552 |
+| [obj_overlap_test](#obj_overlap_test) | Site-specific simulation tools | 3613 |
+| [path_to_tube](#path_to_tube) | Site-specific simulation tools | 3644 |
+| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 3672 |
+| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 3701 |
+| [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 3740 |
+| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 3776 |
+| [ray_init](#ray_init) | Site-specific simulation tools | 3812 |
+| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 3886 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 4008 |
+| [ray_progress](#ray_progress) | Site-specific simulation tools | 4056 |
+| [ray_state_update](#ray_state_update) | Site-specific simulation tools | 4194 |
+| [ray_subdivide_flag](#ray_subdivide_flag) | Site-specific simulation tools | 4327 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 4388 |
+| [refractive_index](#refractive_index) | Site-specific simulation tools | 4436 |
+| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 4468 |
+| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 4526 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 4556 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 4584 |
+| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 4625 |
+| [write_png](#write_png) | Site-specific simulation tools | 4660 |
+| [xpr_update](#xpr_update) | Site-specific simulation tools | 4686 |
 
 ---
 
@@ -4008,18 +4009,23 @@ void quadriga_lib::ray_mesh_interact(
 Calculate intersections of ray beams with points in 3D space
 
 - Models rays as volumetric beams defined by a triangular wavefront that diverges from the origin, enabling energy spread simulation.
-- Returns, for each point, the list of 0-based ray indices whose beam intersects that point.
+- Reports, for each point, the list of 0-based ray indices whose beam intersects that point.
+- The primary output is a flat CSR pair (`hit_index`, `hit_offset`); the ray indices of point `i` are `hit_index[hit_offset[i] .. hit_offset[i+1]-1]`.
+- All outputs are optional and are only computed when a non-NULL pointer is passed.
 - All internal computations use single precision.
 
 ### Declaration:
 ```
-std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(
-    const arma::Mat<dtype> *points,
-    const arma::Mat<dtype> *orig,
-    const arma::Mat<dtype> *trivec,
-    const arma::Mat<dtype> *tridir,
-    const arma::u32_vec *sub_cloud_index = nullptr,
+void quadriga_lib::ray_point_intersect(
+    const arma::Mat<dtype> &points,
+    const arma::Mat<dtype> &orig,
+    const arma::Mat<dtype> &trivec,
+    const arma::Mat<dtype> &tridir,
+    std::vector<unsigned> *hit_index = nullptr,
+    arma::u32_vec *hit_offset = nullptr,
     arma::u32_vec *hit_count = nullptr,
+    std::vector<arma::u32_vec> *hits_per_point = nullptr,
+    const arma::u32_vec *sub_cloud_index = nullptr,
     int use_kernel = 0,
     int gpu_id = 0);
 ```
@@ -4033,11 +4039,11 @@ std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(
 - **`use_kernel`** *(optional)* — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable; auto mode selects CUDA when `n_points >= 500` and CUDA is available, else AVX2, else GENERIC.
 - **`gpu_id`** *(optional)* — CUDA device ID; ignored when not using CUDA
 
-### Optional output:
-- **`hit_count`** — Number of rays intersecting each point; `[n_points]`
-
-### Returns:
-- `std::vector<arma::u32_vec>` — Per-point list of 0-based ray indices that intersected that point; length `n_points`
+### Optional outputs:
+- **`hit_index`** — Flat list of 0-based ray indices, grouped by point; written by the compute kernel without an intermediate copy; `[n_hit]`
+- **`hit_offset`** — Start of each point's block within `hit_index`, last element is `n_hit`; `[n_points + 1]`
+- **`hit_count`** — Number of rays intersecting each point, equals `hit_offset[i+1] - hit_offset[i]`; `[n_points]`
+- **`hits_per_point`** — Per-point list of 0-based ray indices; allocates one `arma::u32_vec` per non-empty point, so only request it when the split form is actually needed; `[n_points]`
 
 ### See also:
 - [icosphere](#icosphere) (generate ray beams)
@@ -4053,16 +4059,21 @@ Advance a ray set by one interaction, spawning reflected, transmitted, and subdi
 - Consumes a launch configuration (origins, destinations, per-ray medium state, and [path](#path) storage) and
   returns the next iteration: for every ray that hits the mesh, its reflected and/or transmitted
   continuation(s), plus the four sub-beams of any ray flagged for subdivision. Rays that miss, fall below
-  `min_gain_dB`, or reach an interaction, reflection or transmission limit are terminated.
-- The full pipeline per call is: intersect ([ray_triangle_intersect](#ray_triangle_intersect)) → interaction ([ray_mesh_interact](#ray_mesh_interact))
-  → state resolve ([ray_state_update](#ray_state_update)) for a reflection pass and a transmission/refraction pass →
-  subdivision ([subdivide_rays](#subdivide_rays)) → assembly of the new launch configuration.
+  `min_gain_dB`, or reach an interaction, reflection or transmission limit are terminated — unless they
+  are flagged for subdivision, which takes precedence and is evaluated first.
+- The full pipeline per call is: intersect ([ray_triangle_intersect](#ray_triangle_intersect)) → subdivision flag ([ray_subdivide_flag](#ray_subdivide_flag))
+  → subdivision ([subdivide_rays](#subdivide_rays)) → compaction → interaction ([ray_mesh_interact](#ray_mesh_interact)) → state resolve
+  ([ray_state_update](#ray_state_update)) for a reflection pass and a transmission/refraction pass → assembly.
+- The subdivision decision is taken on the full ray set, before the interaction is evaluated and before the
+  launch configuration is compacted. A flagged ray is split and does not take part in the interaction passes
+  this generation; its sub-beams are re-intersected in the next one.
 - The function returns per-stage counts (see Returns); the new configuration holds `n_out = 4·n_subdiv + n_reflect + n_transmit`
   rays, which may exceed or fall short of the `n_ray` passed in.
 - An empty returned launch configuration (`orig.n_rows == 0`) signals end of trace; a subsequent call with an empty orig throws.
-- Memory is sized for the worst case but committed lazily: the output is built in a reserved-then-resized
-  buffer, inputs are compacted in place on the intersect result before the expensive passes, and dead
-  intermediates are released as the function proceeds, so peak footprint stays close to one generation.
+- Memory is sized for the worst case but committed lazily: the output is built in a worst-case-sized buffer
+  committed on first write, the launch configuration is compacted once — on the intersect result and the
+  subdivision flag together — before the expensive passes, and dead intermediates are released as the
+  function proceeds, so peak footprint stays close to one generation.
   Designed for `n_ray` up to ~10^8; the ray index is 32-bit, so `n_ray` is capped at 2^32-1.
 - Geometry is traced once, at the reference frequency `center_frequency[0]`. For the remaining frequencies
   only the polarization/gain coefficient is recomputed and folded into each [path](#path); the per-frequency
@@ -4070,6 +4081,15 @@ Advance a ray set by one interaction, spawning reflected, transmitted, and subdi
   note on `center_frequency`).
 - Beam subdivision and beam-front updates are active only when `trivec` and `tridir` are supplied;
   otherwise rays are traced as infinitesimal.
+- The ray-mesh intersection can be delegated: pass `no_interact_in`, `fbs_ind_in` and `sbs_ind_in`
+  to reuse a [ray_triangle_intersect](#ray_triangle_intersect) result. When the intersection is delegated, `sub_mesh_index` and `aabb` are unused —
+  they only accelerate the internal intersector — validation is skipped in this case and the parameters may be omitted.
+- The subdivision decision can likewise be delegated via `subdiv_flag_in`, which a shading pass needs so it
+  does not commit beams that reappear as sub-beams. When supplied it is the authority on what gets split;
+  see the input description for what that overrides.
+- [ray_subdivide_flag](#ray_subdivide_flag) never flags a ray with `fbs_ind` = 0, because there is no face to project the beam
+  tube onto. The internal decision therefore never subdivides a ray that missed the mesh; only a delegated
+  flag reaches that case.
 
 ### Declaration:
 ```
@@ -4099,7 +4119,11 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
     float subdivision_tolerance_m = 3.0f,
     float thin_slab_threshold = 0.15f,
     bool refraction_mode = true,
-    bool scalar_mode = false);
+    bool scalar_mode = false,
+    const arma::u32_vec *no_interact_in = nullptr,
+    const arma::u32_vec *fbs_ind_in = nullptr,
+    const arma::u32_vec *sbs_ind_in = nullptr, 
+    const std::vector<bool> *subdiv_flag_in = nullptr);
 ```
 
 ### Inputs:
@@ -4115,12 +4139,25 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
 - **`max_no_interactions`** — Total interactions (segments) per ray before termination, 0 to 255. 0 disables tracing (returns 0 rays)
 - **`max_no_reflections`** — Reflections per ray, 0 to 255. 0 skips the reflection pass
 - **`max_no_transmissions`** — Transmissions / refractions per ray, 0 to 255. 0 skips the transmission pass
-- **`max_no_subdivisions`** — Beam subdivisions per ray, 0 to 255. 0 (or no beam mode) disables subdivision
+- **`max_no_subdivisions`** — Beam subdivisions per ray, 0 to 255. 0 (or no beam mode) disables subdivision.
+  Not applied when `subdiv_flag_in` is given — the caller owns termination in that case, and the per-path
+  counter `nSUB` saturates at 255 instead of wrapping
 - **`min_gain_dB`** — Path gain below which a continuation is not launched, in dB (linear-power threshold applied to the accumulated per-path gain × interaction gain)
 - **`subdivision_tolerance_m`** — Maximum beam-tube edge length before a ray is subdivided, in [m]; must be > 0
 - **`thin_slab_threshold`** — Thin-slab (Fabry-Pérot) resolve threshold forwarded to [ray_state_update](#ray_state_update) as its `eps`; see there. Default 0.15
 - **`refraction_mode`** — `true` = refraction (Snell-bent transmission), `false` = straight-path transmission
 - **`scalar_mode`** — `true` = scalar (acoustic) layout, `false` = EM (2×2 Jones). Must match the layout of `paths`
+- **`no_interact_in`** *(optional)* — Externally computed intersection count per ray from [ray_triangle_intersect](#ray_triangle_intersect); `[n_ray]`.
+  When given, the internal intersector is skipped and `fbs_ind_in` and `sbs_ind_in` become mandatory
+- **`fbs_ind_in`** *(optional)* — Externally computed 1-based index of the first intersected mesh element, 0 = none; `[n_ray]`.
+  Must be non-zero wherever `no_interact_in` is non-zero.
+- **`sbs_ind_in`** *(optional)* — Externally computed 1-based index of the second intersected mesh element, 0 = none; `[n_ray]`
+- **`subdiv_flag_in`** *(optional)* — Flags that mark rays for subdivision; `[n_ray]`, indexed in the full ray
+  set (unlike everything else, which is compacted first). When supplied it is the authority on what gets
+  subdivided: a flagged ray is split regardless of whether it hit the mesh, how often it has already been
+  subdivided, or whether it is travelling inside a medium, and `subdivision_tolerance_m` is unused. Pass the
+  output of [ray_subdivide_flag](#ray_subdivide_flag) to reproduce the internal decision exactly; a hand-built list overrides it.
+  Requires beam mode; conflicts with `max_no_subdivisions` = 0
 
 ### In/out (launch configuration, updated in place; [n_ray, …] on entry, [n_out, …] on return):
 - **`orig`** — Ray origins in GCS; `[n_ray, 3]`. Defines `n_ray`; must be non-empty
@@ -4129,23 +4166,27 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
 - **`path_dir_prev`** — Physical ray direction entering the current segment (unit vectors); `[n_ray, 3]`
 - **`acc_dist`** — Accumulated in-layer distance; `[n_ray, 2]`; col 1 = refracted distance, col 2 = geometric distance
 - **`paths`** — Per-ray [path](#path) objects; `n_ray` entries. Frequency count and layout must match
-  `center_frequency` and `scalar_mode`. Terminated paths are freed; surviving paths carry the appended 
+  `center_frequency` and `scalar_mode`. Terminated paths are freed; surviving paths carry the appended
   interaction segment and the updated polarization product
 - **`trivec`** *(optional)* — Beam wavefront triangle vertices relative to origin; `[n_ray, 9]`. Must be supplied together with `tridir`; empty / NULL disables beam tracing
 - **`tridir`** *(optional)* — Vertex-ray directions, Cartesian; `[n_ray, 9]`
 
 ### Returns:
 - Per-stage ray counts `{n_interact, n_subdiv, n_reflect, n_transmit}`:
-  - **`n_interact`** — rays that hit the mesh (survived compaction against the intersect result)
-  - **`n_subdiv`** — rays flagged for subdivision, each expanded into 4 sub-beams
+  - **`n_interact`** — rays that hit the mesh, i.e. `no_interact != 0`, counted before any compaction
+  - **`n_subdiv`** — rays flagged for subdivision, each expanded into 4 sub-beams. Not a subset of
+    `n_interact`: a delegated flag may mark rays that missed the mesh, so the two counts are independent
   - **`n_reflect`** — reflected continuations launched
   - **`n_transmit`** — transmitted / refracted continuations launched
+- Only rays that hit the mesh *and* were not subdivided reach the interaction passes, so
+  `n_reflect + n_transmit` is bounded by twice that number, not by `2·n_interact`.
 
 ### See also:
 - [ray_init](#ray_init) (produces the initial launch configuration this function advances)
 - [ray_triangle_intersect](#ray_triangle_intersect) (first/second interaction points)
 - [ray_mesh_interact](#ray_mesh_interact) (per-interaction Fresnel/Jones result)
 - [ray_state_update](#ray_state_update) (inside/outside state machine and thin-slab resolution)
+- [ray_subdivide_flag](#ray_subdivide_flag) (per-ray subdivision decision, delegated via `subdiv_flag_in`)
 - [subdivide_rays](#subdivide_rays) (adaptive beam-tube refinement)
 - [path](#path) (per-ray storage object accumulated across generations)
 
@@ -4281,6 +4322,67 @@ void quadriga_lib::ray_state_update(
 - <a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md">The quadriga-lib Material Model and Ray-State Machine</a> (companion document)
 - [ray_mesh_interact](#ray_mesh_interact) (computes the per-interaction Fresnel/Jones result this function corrects)
 - [calc_diffraction_gain](#calc_diffraction_gain) (the reference state machine this function ports)
+
+---
+## ray_subdivide_flag
+Compute the per-ray subdivision decision from the beam-tube footprint at the first bounce
+
+- Projects the three vertex rays of each beam tube onto the plane of the first-bounce face and
+  measures the longest edge of the resulting wavefront triangle
+- Flags a ray when that edge exceeds `subdivision_tolerance_m` and the ray is still eligible to be
+  split, i.e. it travels outside a medium and has not reached its subdivision or interaction limit
+- The decision is purely geometric: the vertex origins on the face are the same for reflection,
+  transmission and refraction, so no material data, second-bounce index or frequency is needed
+- This is the single source of truth for the subdivision decision. [ray_progress](#ray_progress) consumes the
+  result when it is passed in and calls this function itself otherwise, so a caller that needs to
+  know the outcome in advance — a shading pass that must not commit beams which will reappear as
+  sub-beams — gets exactly the set that will actually be split
+
+### Declaration:
+```
+std::vector<bool> quadriga_lib::ray_subdivide_flag(
+    const arma::fmat &mesh,
+    const arma::fmat &orig,
+    const arma::fmat &dest,
+    const arma::u32_vec &fbs_ind,
+    const arma::fmat &trivec,
+    const arma::fmat &tridir,
+    const std::vector<quadriga_lib::path> &paths,
+    const arma::Col<short> &mtl_ind_current,
+    uint8_t max_no_interactions = 20,
+    uint8_t max_no_subdivisions = 2,
+    float subdivision_tolerance_m = 3.0f);
+```
+
+### Inputs:
+- **`mesh`** — Faces of the triangular mesh; each row: `{x1 y1 z1 x2 y2 z2 x3 y3 z3}`; `[n_mesh, 9]`
+- **`orig`** — Ray origins in GCS; `[n_ray, 3]`. Defines `n_ray`; must be non-empty
+- **`dest`** — Ray destinations in GCS; `[n_ray, 3]`
+- **`fbs_ind`** — 1-based index of the first intersected mesh element, 0 = no hit; `[n_ray]`. Obtained from [ray_triangle_intersect](#ray_triangle_intersect) for the same `orig` / `dest` pair
+- **`trivec`** — Beam wavefront triangle vertices relative to the ray origin; `[n_ray, 9]`
+- **`tridir`** — Vertex-ray directions, Cartesian; `[n_ray, 9]`. Need not be unit length
+- **`paths`** — Per-ray [path](#path) objects; `n_ray` entries. Only the subdivision counter `nSUB` and the segment count are read
+- **`mtl_ind_current`** — Current medium state word, 0 = outside; `[n_ray]`. A ray inside a medium is
+  never split: the sub-beams restart their in-layer accumulator and recompute their direction
+  geometrically, which is only valid outside
+- **`max_no_interactions`** *(optional)* — Total interactions per ray, 0 to 255. A ray that has already reached the limit 
+  is not split, so it does not expand into four sub-beams that all terminate in the next generation
+- **`max_no_subdivisions`** *(optional)* — Number of subdivisions per ray, 0 to 255. 0 disables subdivision and 
+  the returned flags are all `false`
+- **`subdivision_tolerance_m`** *(optional)* — Maximum beam-tube edge length before a ray is split, in
+  metres; must be greater than 0
+
+### Output:
+- **`subdiv_flag`** — `true` where the ray must be split; `n_ray` entries. Rays that miss the mesh
+  (`fbs_ind = 0`) are always `false`. A beam whose tube only partially covers the face — a vertex ray
+  running parallel to it, pointing away from it, or intersecting absurdly far away — is treated as
+  having an infinite edge and is always flagged
+
+### See also:
+- [ray_progress](#ray_progress) (advance one generation of a beam-traced ray set)
+- [ray_triangle_intersect](#ray_triangle_intersect) (compute `fbs_ind`)
+- [subdivide_rays](#subdivide_rays) (split the flagged beams into sub-beams)
+- [ray_mesh_interact](#ray_mesh_interact) (reports the same edge length as `edge_lengthN`)
 
 ---
 ## ray_triangle_intersect

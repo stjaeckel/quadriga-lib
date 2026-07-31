@@ -8,17 +8,37 @@
 #include <immintrin.h>
 
 #include "quadriga_lib_avx2_functions.hpp"
+#include "quadriga_lib_generic_functions.hpp" // qd_RPI_assemble
 
 #if defined(_MSC_VER) // Windows
 #include <intrin.h>
 #endif
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 // Vector size for AVX2
 #define VEC_SIZE 8
 
+// Number of packed hit records per staging chunk
+static const size_t QD_RPI_CHUNK = 16384;
+
+// Index of the lowest set bit, mask must not be zero
+static inline int qd_first_set_bit(int mask)
+{
+#if defined(_MSC_VER)
+    unsigned long index;
+    _BitScanForward(&index, (unsigned long)mask);
+    return (int)index;
+#else
+    return __builtin_ctz((unsigned)mask);
+#endif
+}
+
 // AVX2 accelerated implementation of RayPointIntersect
 void qd_RPI_AVX2(const float *Px, const float *Py, const float *Pz,    // Point coordinates, length n_point (padded to multiple of 8)
-                 const size_t n_point,                                 // Number of points
+                 const size_t n_point,                                 // Number of points, the arrays must be allocated up to the next multiple of 8
                  const unsigned *SCI,                                  // List of sub-cloud indices, length n_sub
                  const float *Xmin, const float *Xmax,                 // Minimum and maximum x-values of the AABB, length n_sub_s
                  const float *Ymin, const float *Ymax,                 // Minimum and maximum y-values of the AABB, length n_sub_s
@@ -33,33 +53,63 @@ void qd_RPI_AVX2(const float *Px, const float *Py, const float *Pz,    // Point 
                  const float *D3x, const float *D3y, const float *D3z, // Third ray direction in GCS, length n_ray
                  const float *rD1, const float *rD2, const float *rD3, // Inverse Dot product of ray direction and normal vector
                  const size_t n_ray,                                   // Number of rays
-                 std::vector<unsigned> *p_hit)                         // Output: Array of std::vector containing list of points that were hit by a ray, length n_ray
+                 std::vector<unsigned> *hit_index,                     // Output: flat list of 0-based ray indices grouped by point, resized by the kernel
+                 unsigned *hit_offset)                                 // Output: 0-based start of each point's block, length n_point + 1, allocated by the caller
 
 {
-    if (n_point % VEC_SIZE != 0) // Check alignment
-        throw std::invalid_argument("Number of points must be a multiple of 8.");
-    if (n_point >= INT32_MAX)
+    // Point and ray indices are packed into 32 bit fields of the hit records
+    if ((unsigned long long)n_point > 0xFFFFFFFFULL)
         throw std::invalid_argument("Number of points exceeds maximum supported number.");
-    if (n_ray >= INT32_MAX)
+    if ((unsigned long long)n_ray > 0xFFFFFFFFULL)
         throw std::invalid_argument("Number of rays exceeds maximum supported number.");
 
     // Constant values needed for some operations
     const size_t n_sub_s = (n_sub % VEC_SIZE == 0) ? n_sub : VEC_SIZE * (n_sub / VEC_SIZE + 1);
-    const int n_point_i = (int)n_point;             // Number of points as int
-    const int n_ray_i = (int)n_ray;                 // Number of rays as int
+    const long long n_point_l = (long long)n_point; // Number of points as signed 64 bit
+    const long long n_ray_l = (long long)n_ray;     // Number of rays as signed 64 bit
+
+    // The point arrays are read in blocks of 8, the last block may reach past
+    // the real points. Those lanes are discarded when the hits are emitted.
+    const long long n_point_pad = (long long)(VEC_SIZE * ((n_point + VEC_SIZE - 1) / VEC_SIZE));
     const __m256 r0 = _mm256_set1_ps(0.0f);         // Zero (float8)
     const __m256 r1 = _mm256_set1_ps(1.0f);         // One (float8)
     const __m256 r_slack = _mm256_set1_ps(1.0e-5f); // Small value for numeric stability
 
+#ifdef _OPENMP
+    const int n_threads = omp_get_max_threads();
+#else
+    const int n_threads = 1;
+#endif
+
+    // Per-thread staging, a list of fixed size chunks of packed hit records
+    // Appending a chunk never moves the records already written, so the staged
+    // data is written exactly once and the peak memory is the payload size
+    std::vector<std::vector<std::vector<unsigned long long>>> stage((size_t)n_threads);
+
 #pragma omp parallel
     {
+#ifdef _OPENMP
+        const size_t i_thread = (size_t)omp_get_thread_num();
+#else
+        const size_t i_thread = 0;
+#endif
+        std::vector<std::vector<unsigned long long>> &chunks = stage[i_thread];
+        chunks.reserve(64);
+        chunks.push_back(std::vector<unsigned long long>(QD_RPI_CHUNK));
+        unsigned long long *p_write = chunks.back().data();
+        unsigned long long *p_stop = p_write + QD_RPI_CHUNK;
+
         // Per-thread storage for sub-cloud hit indicators, reused across ray iterations
         std::vector<int> sub_hit_vec(n_sub_s);
         int *p_sub_hit = sub_hit_vec.data();
 
-#pragma omp for
-        for (int i_ray = 0; i_ray < n_ray_i; ++i_ray) // Ray loop
+        // Static scheduling gives each thread one contiguous ray range, so the
+        // staged hits are ray-ascending both within and across the buffers
+#pragma omp for schedule(static)
+        for (long long i_ray = 0; i_ray < n_ray_l; ++i_ray) // Ray loop
         {
+        // Ray index in the low 32 bit of every hit record of this ray
+        const unsigned long long ray_bits = (unsigned long long)i_ray;
 
         // Load origin into AVX2 registers
         __m256 ox0 = _mm256_set1_ps(T1x[i_ray]);
@@ -233,10 +283,10 @@ void qd_RPI_AVX2(const float *Px, const float *Py, const float *Pz,    // Point 
             if (p_sub_hit[i_sub] == 0)
                 continue;
 
-            int i_point_start = (int)SCI[i_sub];
-            int i_point_end = (i_sub == n_sub - 1) ? n_point_i : (int)SCI[i_sub + 1];
+            long long i_point_start = (long long)SCI[i_sub];
+            long long i_point_end = (i_sub == n_sub - 1) ? n_point_pad : (long long)SCI[i_sub + 1];
 
-            for (int i_point = i_point_start; i_point < i_point_end; i_point += VEC_SIZE) // Points loop
+            for (long long i_point = i_point_start; i_point < i_point_end; i_point += VEC_SIZE) // Points loop
             {
                 // Load point coordinate
                 __m256 rx = _mm256_loadu_ps(&Px[i_point]);
@@ -341,16 +391,43 @@ void qd_RPI_AVX2(const float *Px, const float *Py, const float *Pz,    // Point 
                 D = _mm256_cmp_ps(d2, r0, _CMP_GE_OQ);       // d2 >= 0
                 C = _mm256_and_ps(C, D);                     // U >= 0 & V >= 0 & (U + V) <= 1 & d0 >= 0 & d1 >= 0 & d2 >= 0
 
-                // Add point to points list
-                int result[8];
-                __m256i final_result_int = _mm256_castps_si256(C);
-                _mm256_storeu_si256((__m256i *)result, final_result_int);
-                for (int i = 0; i < 8; ++i)
-                    if (result[i] != 0)
-                        p_hit[i_ray].push_back(i_point + i);
+                // Add hits to the staging buffer, most iterations have none
+                int mask = _mm256_movemask_ps(C);
+                while (mask != 0)
+                {
+                    const long long i = (long long)qd_first_set_bit(mask);
+                    mask &= mask - 1;
+
+                    if (i_point + i >= n_point_l) // Lane belongs to the padding
+                        continue;
+
+                    if (p_write == p_stop) // Current chunk is full
+                    {
+                        chunks.push_back(std::vector<unsigned long long>(QD_RPI_CHUNK));
+                        p_write = chunks.back().data();
+                        p_stop = p_write + QD_RPI_CHUNK;
+                    }
+                    *p_write++ = ray_bits | ((unsigned long long)(i_point + i) << 32);
+                }
             }
         }
 
         } // end ray loop
+
+        // Trim the last chunk to the number of records actually written
+        chunks.back().resize((size_t)(p_write - chunks.back().data()));
     } // end omp parallel
+
+    // Collect the chunks in thread order, which preserves the ray order
+    std::vector<const unsigned long long *> p_buffer;
+    std::vector<size_t> n_hit_buffer;
+
+    for (size_t i_thread = 0; i_thread < (size_t)n_threads; ++i_thread)
+        for (size_t i_chunk = 0; i_chunk < stage[i_thread].size(); ++i_chunk)
+            if (!stage[i_thread][i_chunk].empty())
+                p_buffer.push_back(stage[i_thread][i_chunk].data()),
+                    n_hit_buffer.push_back(stage[i_thread][i_chunk].size());
+
+    // Assemble the point-major CSR hit list
+    qd_RPI_assemble(p_buffer.data(), n_hit_buffer.data(), p_buffer.size(), n_point, hit_index, hit_offset);
 }

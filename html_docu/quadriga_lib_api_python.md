@@ -1,7 +1,7 @@
 ---
 title: "Python API Documentation for Quadriga-Lib v0.12.0"
 author: "Stephan Jaeckel"
-date: "28.07.2026"
+date: "31.07.2026"
 lang: en-US
 ---
 
@@ -61,9 +61,9 @@ lang: en-US
 | [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 2025 |
 | [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 2055 |
 | [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 2088 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 2125 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 2168 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 2194 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 2133 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 2176 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 2202 |
 
 ---
 
@@ -2088,13 +2088,19 @@ See also:
 ## ray_point_intersect
 Calculate intersections of ray beams with points in 3D space
 
-- Models rays as volumetric beams defined by a triangular wavefront that diverges from the origin, enabling energy spread simulation
-- Returns, for each point, the list of ray indices whose beam intersects that point
+- Models rays as volumetric beams defined by a triangular wavefront that diverges from the origin,
+  enabling energy spread simulation
+- Reports, for each point, the list of ray indices whose beam intersects that point
+- Results use a compressed sparse row layout: `hit_index` holds the ray indices grouped by point and
+  `hit_offset` marks where each point's block starts
+- The rays hitting point `i` are `hit_index[hit_offset[i]:hit_offset[i+1]]`, a zero-copy numpy view
+- `numpy.split(hit_index, hit_offset[1:-1])` produces a per-point list of arrays if that form is needed
 - All internal computations use single precision
 
 ### Usage:
 ```
-hit_count, ray_ind = quadriga_lib.RTtools.ray_point_intersect( orig, trivec, tridir, points, sub_cloud_ind, use_kernel, gpu_id )
+hit_count, hit_index, hit_offset = quadriga_lib.RTtools.ray_point_intersect( orig, trivec, tridir,
+    points, sub_cloud_ind, use_kernel, gpu_id )
 ```
 
 ### Inputs:
@@ -2107,14 +2113,16 @@ hit_count, ray_ind = quadriga_lib.RTtools.ray_point_intersect( orig, trivec, tri
 - **`sub_cloud_index`** *(optional)* — 0-based segment boundary indices for the point cloud
   (see `quadriga_lib.point_cloud_segmentation`); uint32; `(n_sub,)`
 - **`use_kernel`** *(optional)* — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2,
-  3 = CUDA; throws if unavailable; auto mode selects CUDA when `n_points >= 10000` and CUDA is
+  3 = CUDA; throws if unavailable; auto mode selects CUDA when `n_points >= 500` and CUDA is
   available, else AVX2, else GENERIC; default: 0
 - **`gpu_id`** *(optional)* — CUDA device ID; ignored when not using CUDA; default: 0
 
 ### Outputs:
-- **`hit_count`** — Number of beams intersecting each point; uint32; `(n_points,)`
-- **`ray_ind`** — List of length `(n_points,)`; each list entry is a 1-D array of 0-based ray indices
-  that hit that point. Entries may be empty if no hit was detected; uint32
+- **`hit_count`** — Number of beams intersecting each point; equals `numpy.diff(hit_offset)`; uint32;
+  `(n_points,)`
+- **`hit_index`** — Flat list of 0-based ray indices, grouped by point; `(n_hit,)`
+- **`hit_offset`** — Start of each point's block within `hit_index`; the last element equals `n_hit`;
+  uint32; `(n_points + 1,)`
 
 ### See also:
 - [icosphere](#icosphere) (for generating beams)
