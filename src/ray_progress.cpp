@@ -169,16 +169,21 @@ Advance a ray set by one interaction, spawning reflected, transmitted, and subdi
 - Consumes a launch configuration (origins, destinations, per-ray medium state, and [[path]] storage) and
   returns the next iteration: for every ray that hits the mesh, its reflected and/or transmitted
   continuation(s), plus the four sub-beams of any ray flagged for subdivision. Rays that miss, fall below
-  `min_gain_dB`, or reach an interaction, reflection or transmission limit are terminated.
-- The full pipeline per call is: intersect ([[ray_triangle_intersect]]) → subdivision flag ([[ray_subdivide_flag]]) 
-  → subdivision ([[subdivide_rays]]) → interaction ([[ray_mesh_interact]]) → state resolve ([[ray_state_update]]) for a 
-  reflection pass and a transmission/refraction pass → assembly.
+  `min_gain_dB`, or reach an interaction, reflection or transmission limit are terminated — unless they
+  are flagged for subdivision, which takes precedence and is evaluated first.
+- The full pipeline per call is: intersect ([[ray_triangle_intersect]]) → subdivision flag ([[ray_subdivide_flag]])
+  → subdivision ([[subdivide_rays]]) → compaction → interaction ([[ray_mesh_interact]]) → state resolve
+  ([[ray_state_update]]) for a reflection pass and a transmission/refraction pass → assembly.
+- The subdivision decision is taken on the full ray set, before the interaction is evaluated and before the
+  launch configuration is compacted. A flagged ray is split and does not take part in the interaction passes
+  this generation; its sub-beams are re-intersected in the next one.
 - The function returns per-stage counts (see Returns); the new configuration holds `n_out = 4·n_subdiv + n_reflect + n_transmit`
   rays, which may exceed or fall short of the `n_ray` passed in.
 - An empty returned launch configuration (`orig.n_rows == 0`) signals end of trace; a subsequent call with an empty orig throws.
-- Memory is sized for the worst case but committed lazily: the output is built in a reserved-then-resized
-  buffer, inputs are compacted in place on the intersect result before the expensive passes, and dead
-  intermediates are released as the function proceeds, so peak footprint stays close to one generation.
+- Memory is sized for the worst case but committed lazily: the output is built in a worst-case-sized buffer
+  committed on first write, the launch configuration is compacted once — on the intersect result and the
+  subdivision flag together — before the expensive passes, and dead intermediates are released as the
+  function proceeds, so peak footprint stays close to one generation.
   Designed for `n_ray` up to ~10^8; the ray index is 32-bit, so `n_ray` is capped at 2^32-1.
 - Geometry is traced once, at the reference frequency `center_frequency[0]`. For the remaining frequencies
   only the polarization/gain coefficient is recomputed and folded into each [[path]]; the per-frequency
@@ -189,6 +194,12 @@ Advance a ray set by one interaction, spawning reflected, transmitted, and subdi
 - The ray-mesh intersection can be delegated: pass `no_interact_in`, `fbs_ind_in` and `sbs_ind_in`
   to reuse a [[ray_triangle_intersect]] result. When the intersection is delegated, `sub_mesh_index` and `aabb` are unused —
   they only accelerate the internal intersector — validation is skipped in this case and the parameters may be omitted.
+- The subdivision decision can likewise be delegated via `subdiv_flag_in`, which a shading pass needs so it
+  does not commit beams that reappear as sub-beams. When supplied it is the authority on what gets split;
+  see the input description for what that overrides.
+- [[ray_subdivide_flag]] never flags a ray with `fbs_ind` = 0, because there is no face to project the beam
+  tube onto. The internal decision therefore never subdivides a ray that missed the mesh; only a delegated
+  flag reaches that case.
 
 ## Declaration:
 ```
@@ -238,7 +249,9 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
 - **`max_no_interactions`** — Total interactions (segments) per ray before termination, 0 to 255. 0 disables tracing (returns 0 rays)
 - **`max_no_reflections`** — Reflections per ray, 0 to 255. 0 skips the reflection pass
 - **`max_no_transmissions`** — Transmissions / refractions per ray, 0 to 255. 0 skips the transmission pass
-- **`max_no_subdivisions`** — Beam subdivisions per ray, 0 to 255. 0 (or no beam mode) disables subdivision
+- **`max_no_subdivisions`** — Beam subdivisions per ray, 0 to 255. 0 (or no beam mode) disables subdivision.
+  Not applied when `subdiv_flag_in` is given — the caller owns termination in that case, and the per-path
+  counter `nSUB` saturates at 255 instead of wrapping
 - **`min_gain_dB`** — Path gain below which a continuation is not launched, in dB (linear-power threshold applied to the accumulated per-path gain × interaction gain)
 - **`subdivision_tolerance_m`** — Maximum beam-tube edge length before a ray is subdivided, in [m]; must be > 0
 - **`thin_slab_threshold`** — Thin-slab (Fabry-Pérot) resolve threshold forwarded to [[ray_state_update]] as its `eps`; see there. Default 0.15
@@ -249,7 +262,12 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
 - **`fbs_ind_in`** *(optional)* — Externally computed 1-based index of the first intersected mesh element, 0 = none; `[n_ray]`.
   Must be non-zero wherever `no_interact_in` is non-zero.
 - **`sbs_ind_in`** *(optional)* — Externally computed 1-based index of the second intersected mesh element, 0 = none; `[n_ray]`
-- **`subdiv_flag_in`** *(optional)* — Flags that mark rays for subdivision; Output of [[ray_subdivide_flag]]; [n_ray]
+- **`subdiv_flag_in`** *(optional)* — Flags that mark rays for subdivision; `[n_ray]`, indexed in the full ray
+  set (unlike everything else, which is compacted first). When supplied it is the authority on what gets
+  subdivided: a flagged ray is split regardless of whether it hit the mesh, how often it has already been
+  subdivided, or whether it is travelling inside a medium, and `subdivision_tolerance_m` is unused. Pass the
+  output of [[ray_subdivide_flag]] to reproduce the internal decision exactly; a hand-built list overrides it.
+  Requires beam mode; conflicts with `max_no_subdivisions` = 0
 
 ## In/out (launch configuration, updated in place; [n_ray, …] on entry, [n_out, …] on return):
 - **`orig`** — Ray origins in GCS; `[n_ray, 3]`. Defines `n_ray`; must be non-empty
@@ -265,16 +283,20 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
 
 ## Returns:
 - Per-stage ray counts `{n_interact, n_subdiv, n_reflect, n_transmit}`:
-  - **`n_interact`** — rays that hit the mesh (survived compaction against the intersect result)
-  - **`n_subdiv`** — rays flagged for subdivision, each expanded into 4 sub-beams
+  - **`n_interact`** — rays that hit the mesh, i.e. `no_interact != 0`, counted before any compaction
+  - **`n_subdiv`** — rays flagged for subdivision, each expanded into 4 sub-beams. Not a subset of
+    `n_interact`: a delegated flag may mark rays that missed the mesh, so the two counts are independent
   - **`n_reflect`** — reflected continuations launched
   - **`n_transmit`** — transmitted / refracted continuations launched
+- Only rays that hit the mesh *and* were not subdivided reach the interaction passes, so
+  `n_reflect + n_transmit` is bounded by twice that number, not by `2·n_interact`.
 
 ## See also:
 - [[ray_init]] (produces the initial launch configuration this function advances)
 - [[ray_triangle_intersect]] (first/second interaction points)
 - [[ray_mesh_interact]] (per-interaction Fresnel/Jones result)
 - [[ray_state_update]] (inside/outside state machine and thin-slab resolution)
+- [[ray_subdivide_flag]] (per-ray subdivision decision, delegated via `subdiv_flag_in`)
 - [[subdivide_rays]] (adaptive beam-tube refinement)
 - [[path]] (per-ray storage object accumulated across generations)
 MD!*/
@@ -460,8 +482,8 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
             throw std::invalid_argument("Number of elements in 'sbs_ind_in' does not match number of rows in 'orig'.");
     }
 
-    // Delegated subdivision flag. Unlike the intersect arrays this one is indexed in the full ray
-    // set and is remapped onto the compacted set below.
+    // Delegated subdivision flag. Unlike the intersect arrays this one stays in full-ray-set indexing
+    // throughout: the subdivision runs before the compaction.
     if (subdiv_flag_in)
     {
         if (subdiv_flag_in->size() != n_ray)
@@ -531,41 +553,58 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
 
     // Ray-mesh intersections: computed here, or supplied by the caller
     arma::u32_vec no_interact, fbs_ind, sbs_ind; // FBS and SBS indices, 1-based, 0 = no hit
-    if (run_intersector && max_no_interactions)
-        quadriga_lib::ray_triangle_intersect<float>(&orig, &dest, &mesh, nullptr, nullptr, &no_interact,
-                                                    &fbs_ind, &sbs_ind, sub_mesh_index, aabb_ptr);
+    std::vector<bool> subdiv_flag;               // Internally computed flag, empty when delegated
 
-    // Source for the compaction below. Delegated arrays are read in place, never copied.
-    const arma::u32_vec *p_ni = run_intersector ? &no_interact : no_interact_in;
-    const arma::u32_vec *p_fi = run_intersector ? &fbs_ind : fbs_ind_in;
-    const arma::u32_vec *p_si = run_intersector ? &sbs_ind : sbs_ind_in;
+    const arma::u32_vec *p_ni = nullptr; // Intersect count, full ray set
+    const arma::u32_vec *p_fi = nullptr; // FBS face index, full ray set
+    const arma::u32_vec *p_si = nullptr; // SBS face index, full ray set
+    const std::vector<bool> *p_sf = nullptr;
+    bool has_flag = false;
 
-    // Count number of rays that interact with mesh, build ray_map from compaction, clear discarded path data
-    arma::uword n_interact = 0;
-    arma::u32_vec ray_map;
-    if (max_no_interactions)
+    arma::uword n_hit = 0;    // Rays that hit the mesh, reported as n_interact
+    arma::uword n_subdiv = 0; // Rays flagged for subdivision, may or may not have hit
+    arma::uword n_keep = 0;   // Rays that hit and were not subdivided, i.e. go to the interaction passes
+
+    if (max_no_interactions) // 0 disables tracing outright, no intersect and no subdivision
     {
-        arma::u32 cnt = 0u;
-        const arma::u32 *pi = p_ni->memptr();
-        ray_map.set_size(n_ray);
-        arma::u32 *po = ray_map.memptr();
-        for (unsigned i = 0; i < (unsigned)n_ray; ++i)
-        {
-            if (pi[i]) // has interactions
-            {
-                if (cnt != i) // compact paths
-                    paths[cnt] = std::move(paths[i]);
-                po[cnt] = i, ++cnt;
-            }
-            else // clear discontinued paths
-                paths[i].free();
-        }
-        n_interact = (arma::uword)cnt;
-    }
-    paths.resize(n_interact);             // Delete tail after compaction
-    const arma::uword n_hit = n_interact; // reported count; n_interact becomes a stride below
+        if (run_intersector)
+            quadriga_lib::ray_triangle_intersect<float>(&orig, &dest, &mesh, nullptr, nullptr, &no_interact,
+                                                        &fbs_ind, &sbs_ind, sub_mesh_index, aabb_ptr);
 
-    if (n_interact == 0) // No ray hits the mesh, all paths are terminated
+        // Delegated arrays are read in place, never copied
+        p_ni = run_intersector ? &no_interact : no_interact_in;
+        p_fi = run_intersector ? &fbs_ind : fbs_ind_in;
+        p_si = run_intersector ? &sbs_ind : sbs_ind_in;
+
+        // Flag rays for subdivision, in full-ray-set indexing. The decision needs only the launch
+        // configuration and the FBS face, so it is taken before the interaction is evaluated.
+        // ray_subdivide_flag never flags a ray with fbs_ind == 0 (no face to project the beam tube
+        // onto), so the internal decision never subdivides a ray that missed the mesh. A delegated
+        // flag is authoritative and may.
+        if (beam_mode && max_no_subdivisions && subdiv_flag_in == nullptr)
+            subdiv_flag = quadriga_lib::ray_subdivide_flag(mesh, orig, dest, *p_fi, *trivec, *tridir,
+                                                           paths, mtl_ind_current, max_no_interactions,
+                                                           max_no_subdivisions, subdivision_tolerance_m);
+
+        p_sf = (subdiv_flag_in != nullptr) ? subdiv_flag_in : &subdiv_flag;
+        has_flag = (p_sf->size() == n_ray);
+
+        // Pass 1: count. Reading a bit-packed vector concurrently is safe, writing it is not.
+        // The induction variable must be signed for OpenMP 2.0; the reduction variables need not be.
+        const arma::u32 *p_ni_m = p_ni->memptr();
+
+#pragma omp parallel for schedule(static) reduction(+ : n_hit, n_subdiv, n_keep) if (n_ray >= 51200)
+        for (long long i = 0; i < (long long)n_ray; ++i)
+        {
+            const bool hit = p_ni_m[i] != 0u;
+            const bool sub = has_flag && (*p_sf)[(size_t)i];
+            n_hit += hit ? 1u : 0u;
+            n_subdiv += sub ? 1u : 0u;
+            n_keep += (hit && !sub) ? 1u : 0u;
+        }
+    }
+
+    if (n_hit == 0 && n_subdiv == 0) // Nothing continues, all paths are terminated
     {
         orig.set_size(0, 3);
         dest.set_size(0, 3);
@@ -581,55 +620,34 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
         return std::array<unsigned, 4>();
     }
 
-    // Compact inputs, discard all rays that do not hit the mesh
-    orig = compact(orig, ray_map, n_interact);
-    dest = compact(dest, ray_map, n_interact);
-    if (beam_mode)
-        *trivec = compact(*trivec, ray_map, n_interact), *tridir = compact(*tridir, ray_map, n_interact);
-    mtl_ind_prev = compact(mtl_ind_prev, ray_map, n_interact);
-    mtl_ind_current = compact(mtl_ind_current, ray_map, n_interact);
-    mtl_ind_buffer = compact(mtl_ind_buffer, ray_map, n_interact);
-    path_dir_prev = compact(path_dir_prev, ray_map, n_interact);
-    acc_dist = compact(acc_dist, ray_map, n_interact);
-    no_interact = compact(*p_ni, ray_map, n_interact);
-    fbs_ind = compact(*p_fi, ray_map, n_interact);
-    sbs_ind = compact(*p_si, ray_map, n_interact);
-    
-    // Flag rays for subdivision. The decision needs only the launch configuration and the FBS face,
-    // so it is taken before the interaction is evaluated. ray_subdivide_flag is the single source of
-    // truth: a caller that needs the outcome in advance passes the same list back in.
-    arma::uword n_subdiv = 0, n_keep = 0;
+    // Pass 2: scatter into the two disjoint index lists, both in full-ray-set indexing. Serial, the
+    // write cursors are a running prefix sum. Sizing both exactly keeps their combined footprint at
+    // 4 bytes per ray. Rays that neither continue nor subdivide release their path data here: they
+    // would otherwise stay alive until the compaction below, which is well past the subdivision.
     arma::u32_vec subdiv_ind, keep_ind;
-    std::vector<bool> subdiv_flag(n_interact); // Init to false, bit-packed, cannot parallel write
-
-    if (beam_mode && max_no_subdivisions)
+    subdiv_ind.set_size(n_subdiv);
+    keep_ind.set_size(n_keep);
     {
-        if (subdiv_flag_in) // Delegated, arrives in full-ray-set indexing
-        {
-            const arma::u32 *p_map = ray_map.memptr();
-            for (arma::uword i_int = 0; i_int < n_interact; ++i_int)
-                subdiv_flag[i_int] = (*subdiv_flag_in)[p_map[i_int]];
-        }
-        else
-            subdiv_flag = quadriga_lib::ray_subdivide_flag(mesh, orig, dest, fbs_ind, *trivec, *tridir,
-                                                           paths, mtl_ind_current, max_no_interactions,
-                                                           max_no_subdivisions, subdivision_tolerance_m);
-
-        subdiv_ind.set_size(n_interact);
-        keep_ind.set_size(n_interact);
+        const arma::u32 *p_ni_m = p_ni->memptr();
         unsigned *p_subdiv_ind = subdiv_ind.memptr();
         unsigned *p_keep_ind = keep_ind.memptr();
+        arma::uword c_sub = 0, c_keep = 0;
 
-        for (unsigned i_int = 0; i_int < n_interact; ++i_int)
-            if (subdiv_flag[i_int])
-                p_subdiv_ind[n_subdiv++] = i_int;
+        for (arma::uword i = 0; i < n_ray; ++i)
+            if (has_flag && (*p_sf)[(size_t)i])
+                p_subdiv_ind[c_sub++] = (unsigned)i;
+            else if (p_ni_m[i])
+                p_keep_ind[c_keep++] = (unsigned)i;
             else
-                p_keep_ind[n_keep++] = i_int;
+                paths[i].free();
     }
-    ray_map.reset(); // No longer needed
+    p_sf = nullptr;
+    std::vector<bool>().swap(subdiv_flag); // deallocate, the index lists carry the decision now
 
     // Buffer for the next state
-    arma::uword n_out_max = 4 * n_subdiv + 2 * (n_interact - n_subdiv);
+    // Worst case: every sub-beam plus a reflected and a transmitted continuation per kept ray.
+    // n_subdiv is no longer a subset of the rays that hit, so the two counts are independent.
+    arma::uword n_out_max = 4 * n_subdiv + 2 * n_keep;
     auto L = launch_config(n_out_max, beam_mode); // Allocate worst case, commit lazily
 
     // Subdivision
@@ -646,13 +664,16 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
         const arma::u32_vec subdiv_ind_view(subdiv_ind.memptr(), n_subdiv, false, true);
         quadriga_lib::subdivide_rays<float>(orig, *trivec, *tridir, &dest, &L_orig, &L_trivec, &L_tridir, &L_dest, &subdiv_ind_view, true);
 
-        // Read pointers
-        const unsigned *p_subdiv_ind = subdiv_ind.memptr(); // i_subdiv to i_int map
+        // Read pointers. All source arrays are still the full ray set here, so the column stride
+        // is n_ray and p_subdiv_ind holds full-ray-set indices.
+        const unsigned *p_subdiv_ind = subdiv_ind.memptr(); // i_subdiv to i_ray map
         const float *p_orig = L.origP();                    // Updated origins
         const float *p_dest = L.destP();                    // Updated destinations
         const short *cP = mtl_ind_prev.memptr();
         const short *cC = mtl_ind_current.memptr();
         const short *cB = mtl_ind_buffer.memptr();
+        const float *pD = path_dir_prev.memptr();
+        const float *pA = acc_dist.memptr();
 
         // Write pointers
         short *pP = L.prevP();
@@ -665,8 +686,9 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
 #pragma omp parallel for schedule(static) if (n_subdiv >= 64)
         for (long long i_subdiv = 0; i_subdiv < (long long)n_subdiv; ++i_subdiv)
         {
-            const arma::uword i_int = p_subdiv_ind[i_subdiv]; // Interaction ID
-            size_t n_seg = paths[i_int].n_seg();
+            const arma::uword i_ray = p_subdiv_ind[i_subdiv]; // Ray index, full ray set
+            size_t n_seg = paths[i_ray].n_seg();
+            const bool outside = (cC[i_ray] == 0); // Travelling outside a medium
 
             // Create the 4 sub-beams
             for (arma::uword i_sub = 0; i_sub < 4; ++i_sub)
@@ -674,8 +696,13 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
                 const arma::uword i_out = 4 * (arma::uword)i_subdiv + i_sub; // Index of the ray in the output
                 const arma::uword i_out3 = 3 * i_out;
 
-                L.paths[i_out] = paths[i_int]; // Deep copy (copy assignment)
-                ++L.paths[i_out].nSUB;         // Increase subdivision counter
+                L.paths[i_out] = paths[i_ray]; // Deep copy (copy assignment)
+
+                // Increase subdivision counter. A delegated subdiv_flag_in is authoritative and does
+                // not apply max_no_subdivisions, so saturate rather than wrap: a wrapped nSUB reads
+                // as 0 and would let the same beam be split without bound.
+                if (L.paths[i_out].nSUB != 255)
+                    ++L.paths[i_out].nSUB;
 
                 // New origin at subdivision point
                 float Sx = p_orig[i_out3];
@@ -694,59 +721,77 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
                 L.paths[i_out].length = length;
 
                 // Copy interaction state
-                pP[i_out] = cP[i_int];
-                pC[i_out] = cC[i_int];
-                pB[i_out] = cB[i_int];
+                pP[i_out] = cP[i_ray];
+                pC[i_out] = cC[i_ray];
+                pB[i_out] = cB[i_ray];
 
-                // Sub-beams are only created outside a medium (gated on mtl_ind_current == 0 above).
-                // That is what makes it safe to (a) recompute path_dir_prev geometrically — inside a
-                // medium in undeviated mode it would differ from the tracked refracted direction — and
-                // (b) reset acc_dist to zero. Do not relax the gate without revisiting both.
-                float Vx, Vy, Vz;
-                calc_direction(p_dest[i_out3], p_dest[i_out3 + 1], p_dest[i_out3 + 2], Sx, Sy, Sz, Vx, Vy, Vz);
-                p_dir[i_out3] = Vx, p_dir[i_out3 + 1] = Vy, p_dir[i_out3 + 2] = Vz;
-
-                // Initialize in-object accumulator
-                p_acc[2 * i_out] = 0.0f, p_acc[2 * i_out + 1] = 0.0f;
+                // Outside a medium the physical direction is the geometric one, so every sub-beam
+                // gets its own recomputed direction and a cleared in-object accumulator. Inside a
+                // medium the tracked direction is the refracted one and deliberately differs from
+                // the geometric continuation, and the accumulator holds the in-layer distance
+                // travelled so far, so both are inherited from the parent. ray_subdivide_flag only
+                // ever flags rays outside a medium, but a delegated subdiv_flag_in is authoritative
+                // and may flag either state, so both branches are reachable.
+                if (outside)
+                {
+                    float Vx, Vy, Vz;
+                    calc_direction(p_dest[i_out3], p_dest[i_out3 + 1], p_dest[i_out3 + 2], Sx, Sy, Sz, Vx, Vy, Vz);
+                    p_dir[i_out3] = Vx, p_dir[i_out3 + 1] = Vy, p_dir[i_out3 + 2] = Vz;
+                    p_acc[2 * i_out] = 0.0f, p_acc[2 * i_out + 1] = 0.0f;
+                }
+                else
+                {
+                    p_dir[i_out3] = pD[i_ray];
+                    p_dir[i_out3 + 1] = pD[i_ray + n_ray];
+                    p_dir[i_out3 + 2] = pD[i_ray + 2 * n_ray];
+                    p_acc[2 * i_out] = pA[i_ray];
+                    p_acc[2 * i_out + 1] = pA[i_ray + n_ray];
+                }
             }
+
+            // The 4 deep copies are done and a subdivided ray is never kept, so the parent path
+            // data is dead. Releasing it here keeps it out of the compaction below.
+            paths[i_ray].free();
         }
     }
     subdiv_ind.reset(); // No longer needed
 
-    // Compaction moves roughly 800 bytes of traffic per surviving ray; skipping it wastes
-    // 2*n_freq heavy ray_mesh_interact / ray_state_update passes on every subdivided ray.
-    // Break-even is near 1% at n_freq = 1 and lower above that, so the threshold sits at 1%.
-    // It also caps how much dead intermediate storage is carried into the transmission pass.
-    if (double(n_subdiv) / double(n_interact) > 0.01)
+    // Compact the launch configuration onto the rays that continue: hit the mesh and were not
+    // subdivided. This is the only compaction in the pipeline. Because it is unconditional, no ray
+    // in the compacted set is subdivided, so the subdivision flag is not needed downstream.
+    // Source and target are the same object for no_interact / fbs_ind / sbs_ind when the intersector
+    // ran here; compact() completes its result before the move-assignment, so the read finishes
+    // first. p_ni / p_fi / p_si are dangling after this point.
+    orig = compact(orig, keep_ind, n_keep);
+    dest = compact(dest, keep_ind, n_keep);
+    mtl_ind_prev = compact(mtl_ind_prev, keep_ind, n_keep);
+    mtl_ind_current = compact(mtl_ind_current, keep_ind, n_keep);
+    mtl_ind_buffer = compact(mtl_ind_buffer, keep_ind, n_keep);
+    path_dir_prev = compact(path_dir_prev, keep_ind, n_keep);
+    acc_dist = compact(acc_dist, keep_ind, n_keep);
+    no_interact = compact(*p_ni, keep_ind, n_keep);
+    fbs_ind = compact(*p_fi, keep_ind, n_keep);
+    sbs_ind = compact(*p_si, keep_ind, n_keep);
+    p_ni = nullptr, p_fi = nullptr, p_si = nullptr;
+
+    if (beam_mode)
     {
-        // Previous launch config, still consumed by ray_state_update
-        orig = compact(orig, keep_ind, n_keep);
-        dest = compact(dest, keep_ind, n_keep);
-        mtl_ind_prev = compact(mtl_ind_prev, keep_ind, n_keep);
-        mtl_ind_current = compact(mtl_ind_current, keep_ind, n_keep);
-        mtl_ind_buffer = compact(mtl_ind_buffer, keep_ind, n_keep);
-        path_dir_prev = compact(path_dir_prev, keep_ind, n_keep);
-        acc_dist = compact(acc_dist, keep_ind, n_keep);
-        no_interact = compact(no_interact, keep_ind, n_keep);
-        fbs_ind = compact(fbs_ind, keep_ind, n_keep);
-        sbs_ind = compact(sbs_ind, keep_ind, n_keep);
+        *trivec = compact(*trivec, keep_ind, n_keep);
+        *tridir = compact(*tridir, keep_ind, n_keep);
+    }
 
-        if (beam_mode)
-        {
-            *trivec = compact(*trivec, keep_ind, n_keep);
-            *tridir = compact(*tridir, keep_ind, n_keep);
-        }
-
-        // Path storage, moved in place: keep_ind is strictly increasing, so source >= target
+    // Path storage, moved in place: keep_ind is strictly increasing, so source >= target. Every
+    // path not moved down is either already freed above or released by the resize below.
+    {
         const unsigned *p_keep = keep_ind.memptr();
         for (size_t i = 0; i < n_keep; ++i)
             if ((size_t)p_keep[i] != i)
                 paths[i] = std::move(paths[p_keep[i]]);
-        paths.resize(n_keep);              // Delete tail after compaction
-        subdiv_flag.assign(n_keep, false); // set false
-        n_interact = n_keep;
     }
-    keep_ind.reset(); // No longer needed
+    paths.resize(n_keep); // Delete tail after compaction
+
+    arma::uword n_interact = n_keep; // Stride of every per-ray array from here on
+    keep_ind.reset();                // No longer needed, reused as scratch by check_gains
 
     // Build material indices
     arma::Col<short> mtl_ind_fbs, mtl_ind_sbs;
@@ -806,12 +851,6 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
 #pragma omp parallel for schedule(static) if (n_interact >= 4096)
             for (long long i_int = 0; i_int < (long long)n_interact; ++i_int)
             {
-                if (subdiv_flag[i_int])
-                {
-                    p_gain[i_int] = 0.0;
-                    continue;
-                }
-
                 size_t iY = (size_t)i_int + n_interact;
                 size_t iZ = iY + n_interact;
 
@@ -841,7 +880,6 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
         arma::uword cnt = 0;
         for (unsigned i_int = 0; i_int < n_interact; ++i_int)
         {
-            // subdivided rays carry pre_interaction_gains == 0 and fail the threshold below
             float gain = p_gainO[i_int] * p_gainN[i_int];
             if (gain > min_gain_linear && paths[i_int].n_seg() < (size_t)max_no_interactions)
             {
@@ -1066,7 +1104,6 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
     }
 
     // Free memory
-    std::vector<bool>().swap(subdiv_flag);      // deallocate
     std::vector<uint8_t>().swap(interact_type); // deallocate
     pre_interaction_gains.reset();
     orig.reset(), dest.reset(), path_dir_prev.reset(), acc_dist.reset();

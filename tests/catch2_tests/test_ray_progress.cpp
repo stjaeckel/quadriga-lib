@@ -17,7 +17,7 @@
 // block, the ordering of the new launch configuration (sub-beams, then reflections, then
 // transmissions), the survival gates (gain, interaction / reflection / transmission / subdivision
 // limits), the medium-state hand-off across a slab, and — most importantly — that the two sides of
-// the internal subdivided-ray compaction branch produce identical per-ray results.
+// the single compaction is a pure permutation of per-ray results.
 //
 // Oracles: geometry is exact by construction (axis-aligned 2x2x2 cubes, rays aimed at known
 // points), so first-bounce coordinates are asserted directly. Where the value depends on the
@@ -961,19 +961,20 @@ TEST_CASE("ray_progress - beam buffers survive the assembly")
 }
 
 // ===========================================================================================
-// The subdivided-ray compaction branch
+// Compaction
 // ===========================================================================================
 
-TEST_CASE("ray_progress - the compaction branch preserves per-ray results")
+TEST_CASE("ray_progress - compaction preserves per-ray results")
 {
-    // ray_progress compacts the stream in place when the subdivided fraction exceeds an internal
-    // threshold, which remaps every intermediate array into a shorter index space. Both sides of
-    // that branch must give the same answer for the rays that are not subdivided.
+    // ray_progress compacts the launch configuration onto the rays that hit the mesh and were not
+    // subdivided, remapping every intermediate array into a shorter index space. That compaction
+    // must be a pure permutation: the surviving rays have to come out unchanged, and the subdivided
+    // fraction must not influence them.
     //
-    // Two fans share their narrow prefix and differ only in length, so the same physical rays land
-    // on either side of the threshold:
-    //     HIGH:   4 wide of 229 -> 1.75 %, above the threshold, compaction runs
-    //     LOW:    4 wide of 454 -> 0.88 %, below the threshold, compaction is skipped
+    // Three runs, where two fans share their narrow prefix and differ only in length so the same
+    // physical rays appear at very different subdivided fractions:
+    //     HIGH:   4 wide of 229 -> 1.75 %
+    //     LOW:    4 wide of 454 -> 0.88 %
     //     REF:    the HIGH fan with subdivision disabled entirely
     Scene S = one_cube(5.0f, 0.0f, 0.0f);
 
@@ -1033,11 +1034,11 @@ TEST_CASE("ray_progress - the compaction branch preserves per-ray results")
     }
 }
 
-TEST_CASE("ray_progress - the hit count does not depend on the compaction heuristic")
+TEST_CASE("ray_progress - the reported hit count is independent of subdivision")
 {
-    // n_interact is reported as the number of rays that hit the mesh. It is also used internally
-    // as an array stride and is decremented by the compaction, so it must be snapshotted before
-    // that happens — otherwise the reported value silently tracks an internal threshold.
+    // n_interact is reported as the number of rays that hit the mesh, counted before anything is
+    // compacted or split. Subdivision removes rays from the interaction passes, so a count taken
+    // after that stage — or reused as an array stride — would silently under-report.
     Scene S = one_cube(5.0f, 0.0f, 0.0f);
 
     Opt o;
@@ -1046,8 +1047,8 @@ TEST_CASE("ray_progress - the hit count does not depend on the compaction heuris
 
     arma::fmat dh, dl;
     arma::fvec hh, hl;
-    beam_fan(229, 4, dh, hh); // above the threshold
-    beam_fan(454, 4, dl, hl); // below the threshold
+    beam_fan(229, 4, dh, hh);
+    beam_fan(454, 4, dl, hl);
 
     Cfg HIGH = make_cfg(dh, 10.0f, 1, false, hh);
     Cfg LOW = make_cfg(dl, 10.0f, 1, false, hl);
@@ -1380,10 +1381,10 @@ TEST_CASE("ray_progress - delegated intersection matches the internal one")
         REQUIRE(sa[1] == 0);
         check_identical(A, B);
     }
-    SECTION("beam with subdivision, above the compaction threshold")
+    SECTION("beam with subdivision")
     {
-        // 4 wide of 229 = 1.75 %, so the internal compaction branch runs. The delegated arrays
-        // are full-length and are remapped by the same ray_map as everything else.
+        // 4 wide of 229. The delegated intersect arrays are full-length and are compacted by the
+        // same index list as everything else.
         beam_fan(229, 4, dirs, half);
         Cfg A = make_cfg(dirs, 10.0f, 1, false, half);
         Cfg B = make_cfg(dirs, 10.0f, 1, false, half);
@@ -1616,9 +1617,9 @@ TEST_CASE("ray_progress - delegated subdivision flag matches the internal one")
         CHECK(sb[1] == 0);
         check_identical(A, B);
     }
-    SECTION("below the compaction threshold")
+    SECTION("a small subdivided fraction")
     {
-        beam_fan(454, 4, dirs, half); // 4 of 454 = 0.88 %, compaction skipped
+        beam_fan(454, 4, dirs, half); // 4 of 454 = 0.88 %
         Cfg A = make_cfg(dirs, 10.0f, 1, false, half);
         Cfg B = make_cfg(dirs, 10.0f, 1, false, half);
 
@@ -1637,9 +1638,9 @@ TEST_CASE("ray_progress - delegated subdivision flag matches the internal one")
         CHECK(sb[1] == 4);
         check_identical(A, B);
     }
-    SECTION("above the compaction threshold")
+    SECTION("a larger subdivided fraction")
     {
-        beam_fan(229, 4, dirs, half); // 4 of 229 = 1.75 %, compaction runs
+        beam_fan(229, 4, dirs, half); // 4 of 229 = 1.75 %
         Cfg A = make_cfg(dirs, 10.0f, 1, false, half);
         Cfg B = make_cfg(dirs, 10.0f, 1, false, half);
 
@@ -1885,6 +1886,270 @@ TEST_CASE("ray_progress - delegated subdivision flag validation")
         CHECK(s[1] == 0);
         CHECK(s[2] == 1);
     }
+}
+
+// ===========================================================================================
+// Authoritative subdivision flag
+// ===========================================================================================
+//
+// A delegated subdiv_flag_in is the authority on what gets split. It overrides every condition
+// ray_subdivide_flag would otherwise apply: the mesh-hit status, the per-ray subdivision limit and
+// the outside-a-medium gate. These paths are unreachable from the internal decision, so each case
+// first asserts that ray_subdivide_flag really does refuse the ray, then forces the flag and checks
+// that ray_progress obeys.
+
+TEST_CASE("ray_progress - a flagged ray that misses the mesh is still subdivided")
+{
+    // The interaction compaction used to discard these rays before the subdivision was applied, so
+    // a shading pass that held the beam back saw its energy vanish. n_subdiv is now independent of
+    // n_interact and the two are counted separately.
+    Scene S = one_cube(5.0f, 0.0f, 0.0f);
+
+    arma::fmat d = {{-1.0f, 0.0f, 0.0f}}; // fired away from the cube
+    arma::fvec h = {WIDE_DEG};
+    Cfg C = make_cfg(d, 10.0f, 1, false, h);
+
+    Opt o;
+    o.sub_tol = SUB_TOL;
+
+    Hits H = intersect(C, S);
+    REQUIRE(H.fbs_ind(0) == 0u); // it really does miss
+
+    // ray_subdivide_flag refuses: with no first-bounce face there is no footprint to measure
+    auto f_auto = subdiv_flags(C, S, H, o);
+    REQUIRE(f_auto.size() == 1u);
+    CHECK(f_auto[0] == false);
+
+    std::vector<bool> f(1, true);
+    auto s = C.step(S, with_flag(o, f));
+
+    CHECK(s[0] == 0); // nothing hit the mesh
+    CHECK(s[1] == 1); // but the beam was split anyway
+    CHECK(s[2] == 0);
+    CHECK(s[3] == 0);
+
+    check_shapes(C, 4);
+    REQUIRE(C.n() == 4);
+    for (const auto &p : C.paths)
+    {
+        CHECK((int)p.nSUB == 1);
+        CHECK(p.n_seg() == 0); // no interaction was consumed
+        CHECK(p.iR == 0u);
+    }
+    CHECK(arma::accu(arma::abs(C.trivec)) > 0.0f);
+}
+
+TEST_CASE("ray_progress - the end-of-trace signal accounts for subdivision")
+{
+    // The trace ends only when nothing hits the mesh AND nothing is flagged. A flagged ray that
+    // misses keeps the trace alive; an unflagged one does not.
+    Scene S = one_cube(5.0f, 0.0f, 0.0f);
+
+    arma::fmat d = {{-1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}};
+    arma::fvec h = {WIDE_DEG, WIDE_DEG};
+
+    Opt o;
+    o.sub_tol = SUB_TOL;
+
+    SECTION("all-false flag: the trace ends")
+    {
+        Cfg C = make_cfg(d, 10.0f, 1, false, h);
+        std::vector<bool> f(2, false);
+        auto s = C.step(S, with_flag(o, f));
+        CHECK(s[0] == 0);
+        CHECK(s[1] == 0);
+        check_shapes(C, 0);
+        CHECK_THROWS_AS(C.step(S, o), std::invalid_argument); // empty config is end of trace
+    }
+    SECTION("one flagged: the trace continues")
+    {
+        Cfg C = make_cfg(d, 10.0f, 1, false, h);
+        std::vector<bool> f(2, false);
+        f[1] = true;
+        auto s = C.step(S, with_flag(o, f));
+        CHECK(s[0] == 0);
+        CHECK(s[1] == 1);
+        check_shapes(C, 4);
+        for (const auto &p : C.paths)
+            CHECK(p.iR == 1u); // the sub-beams descend from the flagged ray, not its neighbour
+    }
+}
+
+TEST_CASE("ray_progress - a flagged ray past its subdivision limit is still subdivided")
+{
+    Scene S = one_cube(5.0f, 0.0f, 0.0f);
+
+    Opt o;
+    o.sub_tol = SUB_TOL;
+    o.max_sub = 2;
+
+    SECTION("the limit is overridden and the counter advances past it")
+    {
+        Cfg C = one_ray(10.0f, 1, false, WIDE_DEG);
+        C.paths[0].nSUB = 2;
+
+        Hits H = intersect(C, S);
+        auto f_auto = subdiv_flags(C, S, H, o);
+        REQUIRE(f_auto[0] == false); // ray_subdivide_flag applies max_no_subdivisions
+
+        std::vector<bool> f(1, true);
+        auto s = C.step(S, with_flag(o, f));
+        CHECK(s[1] == 1);
+        CHECK(s[2] == 0); // a subdivided ray does not also reflect
+        REQUIRE(C.n() == 4);
+        for (const auto &p : C.paths)
+            CHECK((int)p.nSUB == 3);
+    }
+    SECTION("the counter saturates instead of wrapping")
+    {
+        // nSUB is a uint8_t. A wrapped counter reads as 0, which would let ray_subdivide_flag
+        // re-arm the same beam and split it without bound.
+        Cfg C = one_ray(10.0f, 1, false, WIDE_DEG);
+        C.paths[0].nSUB = 255;
+
+        std::vector<bool> f(1, true);
+        auto s = C.step(S, with_flag(o, f));
+        CHECK(s[1] == 1);
+        REQUIRE(C.n() == 4);
+        for (const auto &p : C.paths)
+            CHECK((int)p.nSUB == 255);
+    }
+}
+
+TEST_CASE("ray_progress - a flagged ray inside a medium inherits its propagation state")
+{
+    // Outside a medium each sub-beam gets a freshly recomputed geometric direction and a cleared
+    // in-layer accumulator. Inside one, the tracked direction is the refracted direction and
+    // deliberately differs from the geometric continuation, and the accumulator holds the distance
+    // travelled so far — so both must be inherited from the parent instead. Only a delegated flag
+    // reaches this branch; ray_subdivide_flag gates on mtl_ind_current == 0.
+    Scene S = one_cube(5.0f, 0.0f, 0.0f);
+    Cfg C = one_ray(10.0f, 1, false, WIDE_DEG);
+
+    C.cur(0) = 1;              // travelling inside material 1
+    C.acc_dist(0, 0) = 1.25f;  // refracted in-layer distance
+    C.acc_dist(0, 1) = 1.10f;  // geometric in-layer distance
+
+    // A tracked direction that is deliberately not the geometric +x continuation
+    const float dx = 0.6f, dy = 0.8f, dz = 0.0f;
+    C.path_dir(0, 0) = dx, C.path_dir(0, 1) = dy, C.path_dir(0, 2) = dz;
+
+    Opt o;
+    o.sub_tol = SUB_TOL;
+
+    Hits H = intersect(C, S);
+    auto f_auto = subdiv_flags(C, S, H, o);
+    REQUIRE(f_auto[0] == false); // ray_subdivide_flag refuses a ray inside a medium
+
+    std::vector<bool> f(1, true);
+    auto s = C.step(S, with_flag(o, f));
+    CHECK(s[1] == 1);
+    REQUIRE(C.n() == 4);
+
+    for (arma::uword i = 0; i < 4; ++i)
+    {
+        INFO("sub-beam " << i);
+        CHECK((int)C.cur(i) == 1); // still inside the medium
+
+        // Accumulator carried over, not cleared
+        CHECK(std::abs(C.acc_dist(i, 0) - 1.25f) < 1e-6f);
+        CHECK(std::abs(C.acc_dist(i, 1) - 1.10f) < 1e-6f);
+
+        // Refracted direction carried over, not recomputed from the new origin
+        CHECK(std::abs(C.path_dir(i, 0) - dx) < 1e-6f);
+        CHECK(std::abs(C.path_dir(i, 1) - dy) < 1e-6f);
+        CHECK(std::abs(C.path_dir(i, 2) - dz) < 1e-6f);
+    }
+}
+
+TEST_CASE("ray_progress - the outside-a-medium branch still recomputes and clears")
+{
+    // The counterpart to the case above: with mtl_ind_current == 0 the sub-beams must NOT inherit.
+    // Both branches share one loop, so this pins that the added condition did not invert it.
+    Scene S = one_cube(5.0f, 0.0f, 0.0f);
+    Cfg C = one_ray(10.0f, 1, false, WIDE_DEG);
+
+    C.acc_dist(0, 0) = 2.5f; // stale values that must be discarded
+    C.acc_dist(0, 1) = 2.5f;
+    C.path_dir(0, 0) = 0.6f, C.path_dir(0, 1) = 0.8f, C.path_dir(0, 2) = 0.0f;
+
+    Opt o;
+    o.sub_tol = SUB_TOL;
+
+    auto s = C.step(S, o); // internal flag: the ray is outside and wide, so it is split
+    REQUIRE(s[1] == 1);
+    REQUIRE(C.n() == 4);
+
+    for (arma::uword i = 0; i < 4; ++i)
+    {
+        INFO("sub-beam " << i);
+        CHECK((int)C.cur(i) == 0);
+        CHECK(C.acc_dist(i, 0) == 0.0f);
+        CHECK(C.acc_dist(i, 1) == 0.0f);
+
+        // Direction is the unit vector from the new origin to the new destination
+        const float nx = C.dest(i, 0) - C.orig(i, 0);
+        const float ny = C.dest(i, 1) - C.orig(i, 1);
+        const float nz = C.dest(i, 2) - C.orig(i, 2);
+        const float ln = std::sqrt(nx * nx + ny * ny + nz * nz);
+        CHECK(std::abs(C.path_dir(i, 0) - nx / ln) < 1e-4f);
+        CHECK(std::abs(C.path_dir(i, 1) - ny / ln) < 1e-4f);
+        CHECK(std::abs(C.path_dir(i, 2) - nz / ln) < 1e-4f);
+        CHECK(C.path_dir(i, 0) > 0.9f); // and it points along +x, not the stale (0.6, 0.8, 0)
+    }
+}
+
+TEST_CASE("ray_progress - hit and subdivision counts are independent")
+{
+    // n_subdiv is no longer a subset of n_interact. A mixed set exercises all four combinations of
+    // (hit, flagged) in one call and pins the identity n_out = 4*n_subdiv + n_reflect + n_transmit.
+    Scene S = one_cube(5.0f, 0.0f, 0.0f);
+
+    arma::fmat dirs;
+    arma::fvec half;
+    beam_fan(64, 0, dirs, half);
+    for (arma::uword i = 0; i < 64; i += 2)
+        dirs(i, 0) = -4.0f; // even rays miss, odd rays hit
+
+    Cfg C = make_cfg(dirs, 10.0f, 1, false, half);
+
+    Opt o;
+    o.sub_tol = SUB_TOL;
+    o.max_tra = 0;
+
+    Hits H = intersect(C, S);
+
+    // Flag every missing ray plus a quarter of the hitting ones
+    std::vector<bool> f(64, false);
+    arma::uword n_miss_flagged = 0, n_hit_flagged = 0;
+    for (arma::uword i = 0; i < 64; ++i)
+        if (H.fbs_ind(i) == 0u)
+            f[i] = true, ++n_miss_flagged;
+        else if (i % 8 == 1)
+            f[i] = true, ++n_hit_flagged;
+
+    REQUIRE(n_miss_flagged == 32u);
+    REQUIRE(n_hit_flagged == 8u);
+
+    auto s = C.step(S, with_flag(o, f));
+
+    CHECK(s[0] == 32);                                          // rays that hit the mesh
+    CHECK(s[1] == (unsigned)(n_miss_flagged + n_hit_flagged));  // rays that were split
+    CHECK(s[2] == (unsigned)(32 - n_hit_flagged));              // hit and not split -> reflected
+    CHECK(s[3] == 0);
+
+    check_shapes(C, expected_out(s));
+    CHECK(C.n() == expected_out(s));
+
+    // Every flagged ray produced four sub-beams and consumed no interaction
+    arma::uword n_sub_out = 0;
+    for (const auto &p : C.paths)
+        if (p.nSUB == 1)
+        {
+            ++n_sub_out;
+            CHECK(p.n_seg() == 0);
+        }
+    CHECK(n_sub_out == 4u * (n_miss_flagged + n_hit_flagged));
 }
 
 // ===========================================================================================
