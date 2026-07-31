@@ -30,10 +30,10 @@ Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh 
 
 ## Usage:
 ```
-[ origN, destN, fbsN, sbsN, gainN, xprmatN, trivecN, tridirN, orig_lengthN, fbs_angleN, ...
-    thicknessN, edge_lengthN, normal_vecN, out_typeN, path_dirN, ray_indN ] = ...
+[ origN, destN, fbsN, sbsN, gainN, xprmatN, trivecN, tridirN, fbs_angleN, thicknessN, ...
+    edge_lengthN, normal_vecN, out_typeN, path_dirN, ray_indN ] = ...
     quadriga_lib.ray_mesh_interact( interaction_type, center_frequency, orig, dest, mesh, ...
-    mtl_ind, mtl_prop, fbs_ind, sbs_ind, trivec, tridir, orig_length, compact );
+    mtl_ind, mtl_prop, fbs_ind, sbs_ind, trivec, tridir, compact );
 ```
 
 ## Inputs:
@@ -51,7 +51,6 @@ Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh 
   `[v1x v1y v1z v2x v2y v2z v3x v3y v3z]`; `[n_ray, 9]`; default: `[]`
 - **`tridir`** *(optional)* — Vertex-ray directions; `[n_ray, 6]` for spherical
   `[v1az v1el v2az v2el v3az v3el]` or `[n_ray, 9]` for Cartesian; default: `[]`
-- **`orig_length`** *(optional)* — Accumulated path length at origin; `[n_ray]`; default: 0
 - **`compact`** *(optional)* — If true, rays with no interaction (`fbs_ind = 0`) are dropped so
   `n_rayN <= n_ray`; if false, all rays are kept (`n_rayN = n_ray`) and no-hit rays are returned as a
   transparent pass-through; logical; default: true
@@ -68,12 +67,10 @@ Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh 
   3–5 (scalar): `[Re Im]` where Re+jIm is the scalar pressure coefficient; `[2, n_rayN]`
 - **`trivecN`**, **`tridirN`** — Updated beam geometry/direction (format matches input); empty if
   `trivec`/`tridir` not provided
-- **`orig_lengthN`** — Path length from `orig` to `origN`, added to input `orig_length` if given;
-  `[n_rayN]`
 - **`fbs_angleN`** — Incidence angle at FBS; `[n_rayN]`
 - **`thicknessN`** — Material thickness (FBS-to-SBS distance); `[n_rayN]`
 - **`edge_lengthN`** — Max edge length of ray tube triangle at new origin (Inf if partial hit);
-  `[n_rayN]`
+  requires the `trivec` and `tridir` inputs, returns all zeros without them; `[n_rayN]`
 - **`normal_vecN`** — FBS and SBS normal vectors `[Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]`; `[n_rayN, 6]`
 - **`out_typeN`** — Interaction type code, bit-encoded (uint32); `[n_rayN]`<br><br>
    |  Bit | Meaning                                                                 |
@@ -114,9 +111,9 @@ MD!*/
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
     // Validate argument counts
-    if (nrhs < 9 || nrhs > 13)
+    if (nrhs < 9 || nrhs > 12)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
-    if (nlhs > 16)
+    if (nlhs > 15)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read input data
@@ -131,8 +128,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const auto sbs_ind = qd_mex_get_Col<unsigned>(prhs[8]);
     const auto trivec = (nrhs < 10) ? arma::mat() : qd_mex_get_Mat<double>(prhs[9]);
     const auto tridir = (nrhs < 11) ? arma::mat() : qd_mex_get_Mat<double>(prhs[10]);
-    const auto orig_length = (nrhs < 12) ? arma::vec() : qd_mex_get_Col<double>(prhs[11]);
-    const auto compact = (nrhs < 13) ? true : qd_mex_get_scalar<bool>(prhs[12], "compact", true);
+    const auto compact = (nrhs < 12) ? true : qd_mex_get_scalar<bool>(prhs[11], "compact", true);
 
     // Number of output rays: all rays when compact == false, else only rays that hit (fbs_ind != 0)
     arma::uword n_rayN = orig.n_rows;
@@ -147,13 +143,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Wrap optional input pointers
     const arma::mat *p_trivec = trivec.empty() ? nullptr : &trivec;
     const arma::mat *p_tridir = tridir.empty() ? nullptr : &tridir;
-    const arma::vec *p_orig_length = orig_length.empty() ? nullptr : &orig_length;
     const arma::uvec *p_mtl_ind = mtl_ind.is_empty() ? nullptr : &mtl_ind;
     const auto *p_mtl_prop = mtl_prop.empty() ? nullptr : &mtl_prop;
 
     // Output containers with known size (aliased to MATLAB memory via qd_mex_init_output)
     arma::mat origN, destN, fbsN, sbsN, xprmatN, trivecN, tridirN, normal_vecN, path_dirN;
-    arma::vec gainN, orig_lengthN, fbs_angleN, thicknessN, edge_lengthN;
+    arma::vec gainN, fbs_angleN, thicknessN, edge_lengthN;
     std::vector<uint8_t> out_typeN;
     arma::u32_vec ray_indN;
 
@@ -177,17 +172,15 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 7)
         plhs[7] = p_tridir ? qd_mex_init_output(&tridirN, n_rayN, tridir.n_cols) : mxCreateDoubleMatrix(0, 0, mxREAL);
     if (nlhs > 8)
-        plhs[8] = qd_mex_init_output(&orig_lengthN, n_rayN);
+        plhs[8] = qd_mex_init_output(&fbs_angleN, n_rayN);
     if (nlhs > 9)
-        plhs[9] = qd_mex_init_output(&fbs_angleN, n_rayN);
+        plhs[9] = qd_mex_init_output(&thicknessN, n_rayN);
     if (nlhs > 10)
-        plhs[10] = qd_mex_init_output(&thicknessN, n_rayN);
+        plhs[10] = qd_mex_init_output(&edge_lengthN, n_rayN);
     if (nlhs > 11)
-        plhs[11] = qd_mex_init_output(&edge_lengthN, n_rayN);
-    if (nlhs > 12)
-        plhs[12] = qd_mex_init_output(&normal_vecN, n_rayN, 6);
-    if (nlhs > 14)
-        plhs[14] = qd_mex_init_output(&path_dirN, n_rayN, 3);
+        plhs[11] = qd_mex_init_output(&normal_vecN, n_rayN, 6);
+    if (nlhs > 13)
+        plhs[13] = qd_mex_init_output(&path_dirN, n_rayN, 3);
 
     // Wrap optional output pointers based on requested outputs
     arma::mat *p_origN = (nlhs > 0) ? &origN : nullptr;
@@ -198,37 +191,36 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::mat *p_xprmatN = (nlhs > 5) ? &xprmatN : nullptr;
     arma::mat *p_trivecN = (nlhs > 6) ? &trivecN : nullptr;
     arma::mat *p_tridirN = (nlhs > 7) ? &tridirN : nullptr;
-    arma::vec *p_orig_lengthN = (nlhs > 8) ? &orig_lengthN : nullptr;
-    arma::vec *p_fbs_angleN = (nlhs > 9) ? &fbs_angleN : nullptr;
-    arma::vec *p_thicknessN = (nlhs > 10) ? &thicknessN : nullptr;
-    arma::vec *p_edge_lengthN = (nlhs > 11) ? &edge_lengthN : nullptr;
-    arma::mat *p_normal_vecN = (nlhs > 12) ? &normal_vecN : nullptr;
-    std::vector<uint8_t> *p_out_typeN = (nlhs > 13) ? &out_typeN : nullptr;
-    arma::mat *p_path_dirN = (nlhs > 14) ? &path_dirN : nullptr;
-    arma::u32_vec *p_ray_indN = (nlhs > 15) ? &ray_indN : nullptr;
+    arma::vec *p_fbs_angleN = (nlhs > 8) ? &fbs_angleN : nullptr;
+    arma::vec *p_thicknessN = (nlhs > 9) ? &thicknessN : nullptr;
+    arma::vec *p_edge_lengthN = (nlhs > 10) ? &edge_lengthN : nullptr;
+    arma::mat *p_normal_vecN = (nlhs > 11) ? &normal_vecN : nullptr;
+    std::vector<uint8_t> *p_out_typeN = (nlhs > 12) ? &out_typeN : nullptr;
+    arma::mat *p_path_dirN = (nlhs > 13) ? &path_dirN : nullptr;
+    arma::u32_vec *p_ray_indN = (nlhs > 14) ? &ray_indN : nullptr;
 
     // Call library function
     CALL_QD(quadriga_lib::ray_mesh_interact<double>(
         interaction_type, center_frequency,
         &orig, &dest, &mesh, p_mtl_ind, p_mtl_prop, &fbs_ind, &sbs_ind,
-        p_trivec, p_tridir, p_orig_length,
+        p_trivec, p_tridir,
         p_origN, p_destN, p_fbsN, p_sbsN, p_gainN, p_xprmatN,
-        p_trivecN, p_tridirN, p_orig_lengthN,
+        p_trivecN, p_tridirN,
         p_fbs_angleN, p_thicknessN, p_edge_lengthN, p_normal_vecN, p_out_typeN,
         p_path_dirN, compact, p_ray_indN));
 
     // Copy post-processed outputs to MATLAB
-    if (nlhs > 13) // out_typeN: bit-encoded uint8 -> uint32
+    if (nlhs > 12) // out_typeN: bit-encoded uint8 -> uint32
     {
         arma::u32_vec out_type_u32;
-        plhs[13] = qd_mex_init_output(&out_type_u32, out_typeN.size());
+        plhs[12] = qd_mex_init_output(&out_type_u32, out_typeN.size());
         for (arma::uword i = 0; i < (arma::uword)out_typeN.size(); ++i)
             out_type_u32[i] = (unsigned)out_typeN[i];
     }
 
-    if (nlhs > 15) // ray_indN: 0-based (C++) -> 1-based (MATLAB)
+    if (nlhs > 14) // ray_indN: 0-based (C++) -> 1-based (MATLAB)
     {
         ray_indN += 1;
-        plhs[15] = qd_mex_copy2matlab(&ray_indN);
+        plhs[14] = qd_mex_copy2matlab(&ray_indN);
     }
 }
