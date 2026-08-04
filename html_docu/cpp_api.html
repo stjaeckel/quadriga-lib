@@ -5275,6 +5275,7 @@ arma::uword ray_init(
     std::vector&lt;quadriga_lib::path&gt; *paths = nullptr,
     const arma::fmat *mesh = nullptr,
     const arma::u32_vec *sub_mesh_index = nullptr,
+    const arma::fmat *aabb = nullptr,
     const arma::fmat *rx_points = nullptr,
     bool scalar_mode = false);
 </pre>
@@ -5285,8 +5286,9 @@ arma::uword ray_init(
 <li><b><code>n_freq</code></b> — Number of frequency bins allocated per path in <code>paths</code>; must be ≥ 1 (throws if 0; the <a href="#path">path</a> layout supports 1-127)</li>
 <li><b><code>Ox</code></b>, <b><code>Oy</code></b>, <b><code>Oz</code></b> — Point-source (transmitter) position in GCS [m]</li>
 <li><b><code>max_path_length</code></b> — Maximum ray length [m]; sets <code>dest</code> and bounds the launch-sphere probe (floored at 0.01 m)</li>
-<li><b><code>mesh</code></b> <i>(optional)</i> — Triangle mesh faces; see <a href="#obj_file_read">obj_file_read</a>; <code>[n_mesh, 9]</code>. Used only to auto-size the launch sphere <code>r0</code>. NULL → <code>r0 = 0.01 m</code>.</li>
-<li><b><code>sub_mesh_index</code></b> <i>(optional)</i> — Sub-mesh partition offsets for the accelerated intersect; passed to <a href="#ray_triangle_intersect">ray_triangle_intersect</a>. NULL → no partitioning.</li>
+<li><b><code>mesh</code></b> <i>(optional)</i> — Triangle mesh faces; see <a href="#obj_file_read">obj_file_read</a>; <code>[n_mesh, 9]</code>. Used only to auto-size the launch sphere <code>r0</code>. NULL → the mesh does not bound <code>r0</code>.</li>
+<li><b><code>sub_mesh_index</code></b> <i>(optional)</i> — Sub-mesh partition offsets for the accelerated intersect; 0-based, strictly increasing, first entry 0; passed to <a href="#ray_triangle_intersect">ray_triangle_intersect</a>; <code>[n_sub]</code>. NULL → no partitioning</li>
+<li><b><code>aabb</code></b> <i>(optional)</i> — Axis-aligned bounding box per sub-mesh; <code>[n_sub, 6]</code>. Requires <code>sub_mesh_index</code>. Unlike <a href="#ray_progress">ray_progress</a>, boxes are <i>not</i> computed internally when omitted: the probe is a fixed 2880 rays, so building them here would usually cost more than it saves. Pass the <a href="#triangle_mesh_aabb">triangle_mesh_aabb</a> result the caller already holds for the tracing loop.</li>
 <li><b><code>rx_points</code></b> <i>(optional)</i> — Receive points in 3D space; <code>[n_point, 3]</code>. Used only to bound the launch sphere <code>r0</code>, so that no receiver starts inside it. NULL → receivers are not considered.</li>
 <li><b><code>scalar_mode</code></b> — Path storage layout passed to <code>paths</code>: <code>true</code> = SCALAR (acoustic, one pressure coefficient per frequency), <code>false</code> = EM (2×2 Jones matrix per frequency)</li>
 </ul>
@@ -5312,10 +5314,12 @@ arma::uword ray_init(
 <ul>
 <li><a href="#icosphere">icosphere</a> (generates the ray fan, beam wavefront, and directions)</li>
 <li><a href="#ray_triangle_intersect">ray_triangle_intersect</a> (launch-sphere sizing and per-segment intersection)</li>
-<li><a href="#ray_mesh_interact">ray_mesh_interact</a> (consumes <code>orig</code> / <code>dest</code> / <code>trivec</code> / <code>tridir</code> / <code>orig_length</code>)</li>
+<li><a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a> (generates <code>sub_mesh_index</code>)</li>
+<li><a href="#triangle_mesh_aabb">triangle_mesh_aabb</a> (generates <code>aabb</code>)</li>
+<li><a href="#ray_mesh_interact">ray_mesh_interact</a> (consumes <code>orig</code> / <code>dest</code> / <code>trivec</code> / <code>tridir</code>)</li>
 <li><a href="#ray_state_update">ray_state_update</a> (consumes the medium-state words, <code>path_dir_prev</code>, and <code>acc_dist</code>)</li>
+<li><a href="#ray_commit">ray_commit</a> (consumes the same <code>points</code> when committing paths that reach a receiver)</li>
 <li><a href="#path">path</a> (the per-ray storage object populated in <code>paths</code>)</li>
-<li><a href="#ray_commit">ray_commit</a> (consumes the same <code>rx_points</code> when committing paths that reach a receiver)</li>
 </ul>
 
 <hr class="greyline"><br>

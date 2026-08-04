@@ -111,6 +111,7 @@ namespace quadriga_lib
         std::vector<quadriga_lib::path> *paths = nullptr, // Path data storage, 64 byte + overflow, [n_ray]
         const arma::fmat *mesh = nullptr,                 // Optional: faces of the triangular mesh for sphere size detection, [ n_mesh, 9 ]
         const arma::u32_vec *sub_mesh_index = nullptr,    // Optional: Sub-mesh index, 0-based, [n_sub]
+        const arma::fmat *aabb = nullptr,                 // Axis-aligned bounding boxes for the sub-meshes, Size [ n_sub, 6 ]
         const arma::fmat *rx_points = nullptr,            // Receive points in 3D Space, Size: [n_points, 3]
         bool scalar_mode = false);                        // Switch for EM mode or scalar mode
 
