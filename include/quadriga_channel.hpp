@@ -98,7 +98,8 @@ namespace quadriga_lib
     private:
         uint8_t nFRQ = 1;                                                   // Bit 7: scalar flag; bits 0-6: number of frequencies (1-127)
         uint8_t nSEG = 0;                                                   // Number of segments
-        uint8_t interact_type[6] = {0, 0, 0, 0, 0, 0};                      // Type of the first 6 interactions
+        uint8_t interact_type[2] = {0, 0};                                  // Type of the first 2 interactions
+        float len_acc = 0.0f;                                               // Accumulated path length
         float xprmat[8] = {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f}; // EM: Jones matrix for freq 0, col-major; SCALAR: Pressure coeffs for freqs 0-3
         float *data = nullptr;                                              // Variable-length data buffer
 
@@ -122,13 +123,11 @@ namespace quadriga_lib
         // └─────────────────────────────────────────────────────┘
 
     public:
-        unsigned iC = 0;     // Channel ID (= the channel to which the path belongs to)
-        unsigned iR = 0;     // Ray index (= relative index in launch config)
-        uint8_t nREF = 0;    // Number of reflections
-        uint8_t nTRA = 0;    // Number of transmissions / refractions
-        uint8_t nSUB = 0;    // Number of subdivisions
-        uint8_t nSCT = 0;    // Number of scallering events
-        float length = 0.0f; // Accumulated path length
+        unsigned iC = 0;  // Channel ID (= the channel to which the path belongs to)
+        uint8_t nREF = 0; // Number of reflections
+        uint8_t nTRA = 0; // Number of transmissions / refractions
+        uint8_t nSUB = 0; // Number of subdivisions
+        uint8_t nSCT = 0; // Number of scallering events
 
         path() = default;                       // Default constructor: 0 segments, 1 frequency, EM mode
         path(path &&other) noexcept;            // Move constructor
@@ -155,6 +154,8 @@ namespace quadriga_lib
 
         // Calculate the total length of the path
         // D = destination after last seg, O = origin before first seg
+        float length() const { return len_acc; }                                       // Get length
+        void set_length(float val) { len_acc = val; }                                  // Set length
         float calc_length(float Dx, float Dy, float Dz) const;                         // member length + last to D distance
         float calc_length(float Dx, float Dy, float Dz, float Ox, float Oy, float Oz); // calculate full path length
         float calc_length(const float *D, const float *O = nullptr);                   // 3-element overload
@@ -180,16 +181,8 @@ namespace quadriga_lib
         // Get/set the interaction type sequence
         std::vector<uint8_t> interaction_type_codes() const;
         void set_interaction_type_codes(const std::vector<uint8_t> &codes);
-
-        // Comparison operators compare by iR index
-        friend bool operator<(const path &p1, const path &p2) { return p1.iR < p2.iR; }
-        friend bool operator>(const path &p1, const path &p2) { return p1.iR > p2.iR; }
-        friend bool operator<=(const path &p1, const path &p2) { return p1.iR <= p2.iR; }
-        friend bool operator>=(const path &p1, const path &p2) { return p1.iR >= p2.iR; }
-        friend bool operator==(const path &p1, const path &p2) { return p1.iR == p2.iR; }
-        friend bool operator!=(const path &p1, const path &p2) { return p1.iR != p2.iR; }
     };
-    static_assert(sizeof(path) <= 64, "path must be exactly 64 bytes or less");
+    static_assert(sizeof(path) == 56, "path must be exactly 56 bytes"); // 64 bit only
 
     // Function to obtain the HDF5 library version
     std::string get_HDF5_version();

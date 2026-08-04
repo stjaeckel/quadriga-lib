@@ -1752,7 +1752,6 @@ std::vector<quadriga_lib::path> quadriga_lib::qrt_file_read_raw(const std::strin
 
             quadriga_lib::path p(ns, no_freq, scalar); // allocates buffer, seeds identity
             p.iC = ci;
-            p.iR = (unsigned)out.size(); // running index within this origin
 
             // Coordinates -> coord buffer (3 * ns floats)
             if (ns != 0)

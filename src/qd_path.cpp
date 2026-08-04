@@ -139,7 +139,7 @@ float extend(path &target, float x, float y, float z, uint8_t type = 0) const;
 - **`type`** — Interaction type code for the new segment; drives the reflection / transmission counters
 MD!*/
 
-#define INLINE_TYPES 6 // Length of the inline type codes
+#define INLINE_TYPES 2 // Length of the inline type codes
 
 // Helper: Compute the offset of the history block in the data buffer
 constexpr static size_t history_offset(size_t segments, size_t frequencies, bool scalar)
@@ -159,7 +159,7 @@ constexpr static size_t data_size(size_t segments, size_t frequencies, bool scal
 // Scalar mode passes the pressure coefficient as [ReVV, ImVV] and zeros for the rest
 static inline float gain_from_coeff(float ReVV, float ImVV, float ReHV, float ImHV,
                                     float ReVH, float ImVH, float ReHH, float ImHH,
-                                    bool scalar, float length, float fGHz)
+                                    bool scalar, float path_length, float fGHz)
 {
     float A = ReVV * ReVV + ImVV * ImVV + ReHV * ReHV + ImHV * ImHV; // |col 0|^2
     float B = ReVH * ReVH + ImVH * ImVH + ReHH * ReHH + ImHH * ImHH; // |col 1|^2
@@ -171,13 +171,13 @@ static inline float gain_from_coeff(float ReVV, float ImVV, float ReHV, float Im
         return 0.0f;
 
     // Path loss (linear power): EM = (lambda / (4 pi d))^2, lambda = c / f; scalar = 1 / d^2
-    if (fGHz > 0.0f && length > 0.0f)
+    if (fGHz > 0.0f && path_length > 0.0f)
     {
         if (scalar)
-            P /= length * length;
+            P /= path_length * path_length;
         else
         {
-            float k = 0.299792458f / (12.566370614f * fGHz * length);
+            float k = 0.299792458f / (12.566370614f * fGHz * path_length);
             P *= k * k;
         }
     }
@@ -186,9 +186,9 @@ static inline float gain_from_coeff(float ReVV, float ImVV, float ReHV, float Im
 
 // Move constructor
 quadriga_lib::path::path(path &&other) noexcept
-    : nFRQ(other.nFRQ), nSEG(other.nSEG), data(other.data),
-      iC(other.iC), iR(other.iR), nREF(other.nREF), nTRA(other.nTRA), nSUB(other.nSUB), nSCT(other.nSCT),
-      length(other.length)
+    : nFRQ(other.nFRQ), nSEG(other.nSEG), len_acc(other.len_acc), data(other.data),
+      iC(other.iC), nREF(other.nREF), nTRA(other.nTRA), nSUB(other.nSUB), nSCT(other.nSCT)
+
 {
     std::memcpy(interact_type, other.interact_type, sizeof(interact_type));
     std::memcpy(xprmat, other.xprmat, sizeof(xprmat));
@@ -199,9 +199,9 @@ quadriga_lib::path::path(path &&other) noexcept
 
 // Copy constructor
 quadriga_lib::path::path(const path &other)
-    : nFRQ(other.nFRQ), nSEG(other.nSEG),
-      iC(other.iC), iR(other.iR), nREF(other.nREF), nTRA(other.nTRA), nSUB(other.nSUB), nSCT(other.nSCT),
-      length(other.length)
+    : nFRQ(other.nFRQ), nSEG(other.nSEG), len_acc(other.len_acc),
+      iC(other.iC), nREF(other.nREF), nTRA(other.nTRA), nSUB(other.nSUB), nSCT(other.nSCT)
+
 {
     std::memcpy(interact_type, other.interact_type, sizeof(interact_type));
     std::memcpy(xprmat, other.xprmat, sizeof(xprmat));
@@ -227,9 +227,9 @@ quadriga_lib::path &quadriga_lib::path::operator=(path &&other) noexcept
 
     data = other.data;
 
-    iC = other.iC, iR = other.iR;
+    iC = other.iC;
     nREF = other.nREF, nTRA = other.nTRA, nSUB = other.nSUB, nSCT = other.nSCT;
-    length = other.length;
+    len_acc = other.len_acc;
 
     other.data = nullptr;
     other.nFRQ = 1;
@@ -258,9 +258,9 @@ quadriga_lib::path &quadriga_lib::path::operator=(const path &other)
     delete[] data;
     data = buf;
 
-    iC = other.iC, iR = other.iR;
+    iC = other.iC;
     nREF = other.nREF, nTRA = other.nTRA, nSUB = other.nSUB, nSCT = other.nSCT;
-    length = other.length;
+    len_acc = other.len_acc;
 
     return *this;
 }
@@ -315,14 +315,12 @@ void quadriga_lib::path::init(size_t segments, size_t frequencies, bool scalar)
     }
 
     iC = 0;
-    iR = 0;
-
     nREF = 0;
     nTRA = 0;
     nSUB = 0;
     nSCT = 0;
 
-    length = 0.0f;
+    len_acc = 0.0f;
 }
 
 // Constructor
@@ -350,7 +348,7 @@ float quadriga_lib::path::calc_length(float Dx, float Dy, float Dz) const
         return NAN;
     const float *last = data + (size_t(nSEG) - 1) * 3;
     float dx = Dx - last[0], dy = Dy - last[1], dz = Dz - last[2];
-    return length + std::sqrt(dx * dx + dy * dy + dz * dz);
+    return len_acc + std::sqrt(dx * dx + dy * dy + dz * dz);
 }
 
 // Full recalculation O -> seg[0] -> ... -> seg[nSEG-1] -> D.
@@ -367,7 +365,7 @@ float quadriga_lib::path::calc_length(float Dx, float Dy, float Dz, float Ox, fl
         total += std::sqrt(dx * dx + dy * dy + dz * dz);
         px = c[0], py = c[1], pz = c[2];
     }
-    length = total; // O -> last, excludes final leg to D
+    len_acc = total; // O -> last, excludes final leg to D
 
     float dx = Dx - px, dy = Dy - py, dz = Dz - pz;
     return total + std::sqrt(dx * dx + dy * dy + dz * dz);
@@ -412,7 +410,7 @@ float quadriga_lib::path::xpr_update(const float *coeff_update, float gain_updat
 {
     float *oX = xpr_coeff(freq); // Bounds-checked; resolves to xprmat or into the data buffer
     float amplitude_update = gain_update == 1.0f ? 1.0f : std::sqrt(std::abs(gain_update));
-    float d = len > 0.0f ? len : length;
+    float d = len > 0.0f ? len : len_acc;
 
     if (is_scalar()) // 2 values: [Re, Im]
     {
@@ -470,7 +468,7 @@ float quadriga_lib::path::xpr_update(const float *coeff_update, float gain_updat
 float quadriga_lib::path::calc_gain(float fGHz, size_t freq, float len) const
 {
     const float *cf = xpr_coeff(freq); // Bounds-checked; resolves to xprmat or into the data buffer
-    float d = len > 0.0f ? len : length;
+    float d = len > 0.0f ? len : len_acc;
 
     if (is_scalar()) // Only 2 values in the slot; reading cf[2..7] would overrun
         return gain_from_coeff(cf[0], cf[1], 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, true, d, fGHz);
@@ -482,7 +480,7 @@ float quadriga_lib::path::calc_gain(float fGHz, size_t freq, float len) const
 float quadriga_lib::path::duplicate(path &target) const
 {
     target = *this;
-    return length;
+    return len_acc;
 }
 
 // Duplicate path and append a new segment
@@ -529,7 +527,7 @@ float quadriga_lib::path::extend(path &target, float x, float y, float z, uint8_
     delete[] target.data;
     target.data = buf;
 
-    target.iC = iC, target.iR = iR;
+    target.iC = iC;
     target.nFRQ = nFRQ;
     target.nSEG = (uint8_t)nS_new;
     target.nREF = nREF;
@@ -543,8 +541,8 @@ float quadriga_lib::path::extend(path &target, float x, float y, float z, uint8_
         target.interact_type[nS] = type;
 
     std::memcpy(target.xprmat, xprmat, sizeof(xprmat));
-    target.length = length + dl;
-    return target.length;
+    target.len_acc = len_acc + dl;
+    return target.len_acc;
 }
 
 // Assemble the interaction type sequence

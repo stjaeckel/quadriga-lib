@@ -24,9 +24,11 @@
 // physics kernels, the assertion is an invariant instead (finiteness, monotonicity, cross-branch
 // agreement, energy <= 1) so this file does not duplicate — or drift from — the kernel suites.
 //
-// Ray identity: quadriga_lib::path::iR is preserved by both path::extend and path copy-assignment,
-// so seeding it in the builder gives a stable handle from an output row back to the input ray it
-// came from. That is what makes the cross-branch comparison possible.
+// Ray identity: the tests borrow quadriga_lib::path::iC as a stable per-ray handle. ray_progress
+// never writes it (only the downstream commit stage assigns real channel IDs), and both
+// path::extend and path copy-assignment preserve it, so seeding it in the builder gives a stable
+// handle from an output row back to the input ray it came from. That is what makes the
+// cross-branch comparison possible.
 //
 // Delegated intersection: the optional no_interact_in / fbs_ind_in / sbs_ind_in inputs let a caller
 // hand in a ray_triangle_intersect result instead of having ray_progress compute it. Those cases
@@ -241,8 +243,8 @@ namespace
         for (arma::uword i = 0; i < n; ++i)
         {
             C.paths[i].init(0, n_freq, scalar);
-            C.paths[i].length = R0;      // source -> ray origin
-            C.paths[i].iR = (unsigned)i; // stable identity, preserved by copy and extend
+            C.paths[i].set_length(R0);   // source -> ray origin
+            C.paths[i].iC = (unsigned)i; // stable identity, preserved by copy and extend
         }
 
         if (C.beam)
@@ -406,7 +408,7 @@ namespace
         }
         for (const auto &p : C.paths)
         {
-            CHECK(std::isfinite(p.length));
+            CHECK(std::isfinite(p.length()));
             CHECK(p.calc_gain(0.0f, 0) >= 0.0f);
         }
     }
@@ -417,13 +419,13 @@ namespace
         return 4ull * s[1] + s[2] + s[3];
     }
 
-    // Map input ray id (path::iR) -> output row. Requires the ids to be unique, which holds when
+    // Map input ray id (path::iC) -> output row. Requires the ids to be unique, which holds when
     // only one continuation class is launched (e.g. reflections with max_no_transmissions = 0).
     std::map<unsigned, arma::uword> id_map(const Cfg &C)
     {
         std::map<unsigned, arma::uword> m;
         for (arma::uword i = 0; i < C.paths.size(); ++i)
-            m.emplace(C.paths[i].iR, i);
+            m.emplace(C.paths[i].iC, i);
         return m;
     }
 
@@ -494,12 +496,12 @@ namespace
 
         for (size_t i = 0; i < A.paths.size(); ++i)
         {
-            CHECK(A.paths[i].iR == B.paths[i].iR);
+            CHECK(A.paths[i].iC == B.paths[i].iC);
             CHECK(A.paths[i].n_seg() == B.paths[i].n_seg());
             CHECK((int)A.paths[i].nREF == (int)B.paths[i].nREF);
             CHECK((int)A.paths[i].nTRA == (int)B.paths[i].nTRA);
             CHECK((int)A.paths[i].nSUB == (int)B.paths[i].nSUB);
-            CHECK(A.paths[i].length == B.paths[i].length);
+            CHECK(A.paths[i].length() == B.paths[i].length());
             CHECK(A.paths[i].calc_gain(0.0f, 0) == B.paths[i].calc_gain(0.0f, 0));
         }
     }
@@ -548,7 +550,7 @@ TEST_CASE("ray_progress - single reflection")
     CHECK((int)C.paths[0].nREF == 1);
     CHECK((int)C.paths[0].nTRA == 0);
     CHECK((int)C.paths[0].nSUB == 0);
-    CHECK(C.paths[0].iR == 0u);
+    CHECK(C.paths[0].iC == 0u);
 
     const float *crd = C.paths[0].coord(0);
     CHECK(std::abs(crd[0] - 4.0f) < 1e-3f);
@@ -608,8 +610,8 @@ TEST_CASE("ray_progress - reflection and transmission in one call")
     CHECK((int)C.paths[1].nTRA == 1);
 
     // Both continuations descend from the same input ray
-    CHECK(C.paths[0].iR == 0u);
-    CHECK(C.paths[1].iR == 0u);
+    CHECK(C.paths[0].iC == 0u);
+    CHECK(C.paths[1].iC == 0u);
 
     // Reflection stays outside, transmission enters the medium
     CHECK((int)C.cur(0) == 0);
@@ -815,7 +817,7 @@ TEST_CASE("ray_progress - beam subdivision")
     for (arma::uword i = 0; i < 4; ++i)
     {
         // The sub-beam carries the parent's history and one more subdivision
-        CHECK(C.paths[i].iR == 0u);
+        CHECK(C.paths[i].iC == 0u);
         CHECK(C.paths[i].n_seg() == 0); // no interaction was consumed
         CHECK((int)C.paths[i].nSUB == 1);
         CHECK((int)C.paths[i].nREF == 0);
@@ -828,7 +830,7 @@ TEST_CASE("ray_progress - beam subdivision")
         CHECK(std::sqrt(dx * dx + dy * dy + dz * dz) < 0.01f);
 
         // The stored length is recomputed from the source, not inherited
-        CHECK(std::abs(C.paths[i].length - radius(C.orig, i)) < 1e-4f);
+        CHECK(std::abs(C.paths[i].length() - radius(C.orig, i)) < 1e-4f);
 
         // Sub-beams start outside a medium with a cleared accumulator
         CHECK((int)C.cur(i) == 0);
@@ -980,7 +982,7 @@ TEST_CASE("ray_progress - compaction preserves per-ray results")
 
     Opt sub;
     sub.sub_tol = SUB_TOL;
-    sub.max_tra = 0; // reflections only, so path::iR is unique in the output
+    sub.max_tra = 0; // reflections only, so path::iC is unique in the output
 
     Opt nosub = sub;
     nosub.max_sub = 0;
@@ -1202,7 +1204,7 @@ TEST_CASE("ray_progress - sub-mesh partitioning does not change the result")
     CHECK(arma::all(PLAIN.prev == PART.prev));
     for (arma::uword i = 0; i < PLAIN.paths.size(); ++i)
     {
-        CHECK(PLAIN.paths[i].iR == PART.paths[i].iR);
+        CHECK(PLAIN.paths[i].iC == PART.paths[i].iC);
         CHECK(PLAIN.paths[i].n_seg() == PART.paths[i].n_seg());
     }
 }
@@ -1286,9 +1288,9 @@ TEST_CASE("ray_progress - repeated calls are deterministic")
 
     for (arma::uword i = 0; i < A.paths.size(); ++i)
     {
-        CHECK(A.paths[i].iR == B.paths[i].iR);
+        CHECK(A.paths[i].iC == B.paths[i].iC);
         CHECK(A.paths[i].n_seg() == B.paths[i].n_seg());
-        CHECK(A.paths[i].length == B.paths[i].length);
+        CHECK(A.paths[i].length() == B.paths[i].length());
         for (arma::uword f = 0; f < 2; ++f)
             CHECK(A.paths[i].calc_gain(0.0f, f) == B.paths[i].calc_gain(0.0f, f));
     }
@@ -1313,9 +1315,9 @@ TEST_CASE("ray_progress - accumulated path length")
 
     auto s1 = C.step(S, o);
     REQUIRE(s1[3] == 1);
-    CHECK(std::abs(C.paths[0].length - 4.0f) < 1e-2f); // source -> first bounce at x = 4
+    CHECK(std::abs(C.paths[0].length() - 4.0f) < 1e-2f); // source -> first bounce at x = 4
 
-    const float after_first = C.paths[0].length;
+    const float after_first = C.paths[0].length();
 
     auto s2 = C.step(S, o);
     REQUIRE(s2[3] == 1);
@@ -1323,7 +1325,7 @@ TEST_CASE("ray_progress - accumulated path length")
     // Independent of the absolute value, the increment must be the length of the new leg,
     // here the 2 m slab crossing from x = 4 to x = 6. This isolates the defect to the first
     // extend rather than to the accumulation.
-    CHECK(std::abs((C.paths[0].length - after_first) - 2.0f) < 1e-2f);
+    CHECK(std::abs((C.paths[0].length() - after_first) - 2.0f) < 1e-2f);
 
     // The subdivision path recomputes the length from the source instead of accumulating it,
     // and is correct for a fresh path.
@@ -1333,7 +1335,7 @@ TEST_CASE("ray_progress - accumulated path length")
     auto sb = B.step(S, ob);
     REQUIRE(sb[1] == 1);
     for (arma::uword i = 0; i < B.n(); ++i)
-        CHECK(std::abs(B.paths[i].length - radius(B.orig, i)) < 1e-4f);
+        CHECK(std::abs(B.paths[i].length() - radius(B.orig, i)) < 1e-4f);
 }
 
 // ===========================================================================================
@@ -1934,7 +1936,7 @@ TEST_CASE("ray_progress - a flagged ray that misses the mesh is still subdivided
     {
         CHECK((int)p.nSUB == 1);
         CHECK(p.n_seg() == 0); // no interaction was consumed
-        CHECK(p.iR == 0u);
+        CHECK(p.iC == 0u);
     }
     CHECK(arma::accu(arma::abs(C.trivec)) > 0.0f);
 }
@@ -1971,7 +1973,7 @@ TEST_CASE("ray_progress - the end-of-trace signal accounts for subdivision")
         CHECK(s[1] == 1);
         check_shapes(C, 4);
         for (const auto &p : C.paths)
-            CHECK(p.iR == 1u); // the sub-beams descend from the flagged ray, not its neighbour
+            CHECK(p.iC == 1u); // the sub-beams descend from the flagged ray, not its neighbour
     }
 }
 

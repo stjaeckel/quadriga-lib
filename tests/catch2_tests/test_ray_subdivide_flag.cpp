@@ -170,8 +170,7 @@ namespace
         for (arma::uword i = 0; i < n; ++i)
         {
             B.paths[i].init(0, 1, false);
-            B.paths[i].length = R0;
-            B.paths[i].iR = (unsigned)i;
+            B.paths[i].set_length(R0);
         }
 
         for (arma::uword i = 0; i < n; ++i)

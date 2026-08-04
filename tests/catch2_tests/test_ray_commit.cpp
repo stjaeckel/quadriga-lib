@@ -170,8 +170,7 @@ namespace
         for (arma::uword i = 0; i < n; ++i)
         {
             C.paths[i].init(0, n_freq, scalar);
-            C.paths[i].length = R0;
-            C.paths[i].iR = (unsigned)i;
+            C.paths[i].set_length(R0);
         }
 
         C.trivec.zeros(n, 9);
@@ -237,7 +236,7 @@ namespace
             CHECK(out[i].n_freq() == n_freq);
             CHECK(out[i].is_scalar() == scalar);
             CHECK(out[i].iC < (unsigned)n_point);
-            CHECK(std::isfinite(out[i].length));
+            CHECK(std::isfinite(out[i].length()));
             CHECK(out[i].calc_gain(0.0f, 0) > 0.0f);
 
             // Output is point-major, so the receiver index never decreases within one call
@@ -267,16 +266,20 @@ TEST_CASE("ray_commit - a receiver on the beam axis is committed")
     REQUIRE(out.size() == 1);
 
     CHECK(out[0].iC == 0u);                      // receiver index
-    CHECK(out[0].iR == 0u);                      // ray identity carried over
     CHECK(out[0].n_seg() == C.paths[0].n_seg()); // the receiver is not an interaction point
-    CHECK(out[0].length == C.paths[0].length);   // length still ends at the last interaction
+    CHECK(out[0].length() == C.paths[0].length()); // length still ends at the last interaction
+
+    // The committed path descends from the source path rather than being freshly built
+    CHECK((int)out[0].nREF == (int)C.paths[0].nREF);
+    CHECK((int)out[0].nTRA == (int)C.paths[0].nTRA);
+    CHECK((int)out[0].nSUB == (int)C.paths[0].nSUB);
 
     // A zero-segment path has no last interaction, so the read-only overload cannot form the leg
     CHECK(std::isnan(out[0].calc_length(5.0f, 0.0f, 0.0f)));
 
     // The caller recovers the total from the source position instead
     const float leg = 5.0f - R0;
-    CHECK(std::abs(out[0].length + leg - 5.0f) < 1e-3f);
+    CHECK(std::abs(out[0].length() + leg - 5.0f) < 1e-3f);
 
     check_commit_shape(out, 0, P.n_rows, 1, false);
 }
@@ -624,8 +627,11 @@ TEST_CASE("ray_commit - repeated calls are deterministic")
     for (size_t i = 0; i < a.size(); ++i)
     {
         CHECK(a[i].iC == b[i].iC);
-        CHECK(a[i].iR == b[i].iR);
-        CHECK(a[i].length == b[i].length);
+        CHECK(a[i].n_seg() == b[i].n_seg());
+        CHECK((int)a[i].nREF == (int)b[i].nREF);
+        CHECK((int)a[i].nTRA == (int)b[i].nTRA);
+        CHECK((int)a[i].nSUB == (int)b[i].nSUB);
+        CHECK(a[i].length() == b[i].length());
         CHECK(a[i].calc_gain(0.0f, 0) == b[i].calc_gain(0.0f, 0));
     }
 }
