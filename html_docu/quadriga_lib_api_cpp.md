@@ -1,7 +1,7 @@
 ---
 title: "C++ API Documentation for Quadriga-Lib v0.12.0"
 author: "Stephan Jaeckel"
-date: "03.08.2026"
+date: "04.08.2026"
 lang: en-US
 ---
 
@@ -123,20 +123,20 @@ lang: en-US
 | [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 3777 |
 | [ray_commit](#ray_commit) | Site-specific simulation tools | 3813 |
 | [ray_init](#ray_init) | Site-specific simulation tools | 3901 |
-| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 3975 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 4097 |
-| [ray_progress](#ray_progress) | Site-specific simulation tools | 4145 |
-| [ray_state_update](#ray_state_update) | Site-specific simulation tools | 4283 |
-| [ray_subdivide_flag](#ray_subdivide_flag) | Site-specific simulation tools | 4416 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 4477 |
-| [refractive_index](#refractive_index) | Site-specific simulation tools | 4525 |
-| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 4557 |
-| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 4615 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 4645 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 4673 |
-| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 4714 |
-| [write_png](#write_png) | Site-specific simulation tools | 4749 |
-| [xpr_update](#xpr_update) | Site-specific simulation tools | 4775 |
+| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 3981 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 4103 |
+| [ray_progress](#ray_progress) | Site-specific simulation tools | 4151 |
+| [ray_state_update](#ray_state_update) | Site-specific simulation tools | 4289 |
+| [ray_subdivide_flag](#ray_subdivide_flag) | Site-specific simulation tools | 4422 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 4483 |
+| [refractive_index](#refractive_index) | Site-specific simulation tools | 4531 |
+| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 4563 |
+| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 4621 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 4651 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 4679 |
+| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 4720 |
+| [write_png](#write_png) | Site-specific simulation tools | 4755 |
+| [xpr_update](#xpr_update) | Site-specific simulation tools | 4781 |
 
 ---
 
@@ -3843,7 +3843,7 @@ arma::uword quadriga_lib::ray_commit(
     const arma::fmat &trivec,
     const arma::fmat &tridir,
     const arma::Col<short> &mtl_ind_current,
-    const arma::fmat &points,
+    const arma::fmat &rx_points,
     const arma::u32_vec *sub_cloud_index = nullptr,
     const std::vector<bool> *subdiv_flag_in = nullptr,
     float max_path_length = 10e3,
@@ -3866,7 +3866,7 @@ arma::uword quadriga_lib::ray_commit(
 - **`tridir`** — Vertex-ray directions, Cartesian; `[n_ray, 9]`. Need not be unit length
 - **`mtl_ind_current`** — Current medium state word, 0 = outside (bit-masked: `mat = w & 0x7FFF`,
   `flag = w & 0x8000`); `[n_ray]`
-- **`points`** — Receive points in 3D space; `[n_point, 3]`
+- **`rx_points`** — Receive points in 3D space; `[n_point, 3]`
 - **`sub_cloud_index`** *(optional)* — Sub-cloud partition offsets for the point cloud (see
   [point_cloud_segmentation](#point_cloud_segmentation)); `[n_sub]`. NULL → no partitioning
 - **`subdiv_flag_in`** *(optional)* — Rays that will be split in the next generation and must not be
@@ -3906,9 +3906,11 @@ Seed a sphere of rays from a point source
 - `n_ray` is quantized to the icosphere grid: `n_div = round(sqrt(n_ray_target / 20))` (min 1) and
   `n_ray = 20 · n_div²`, so the returned count is the closest tessellation to `n_ray_target`, not exact.
 - Ray origins sit on a small launch sphere of radius `r0` centered at `O`, not at `O` itself, so the beam
-  triangles (`trivec`) have finite extent from the first segment. 
-- When `mesh` is supplied, `r0` is auto-sized to 0.8× the nearest obstacle distance along a coarse probe
-  sphere (clamped to ≥ 0.01 m); if no obstacle is hit within `max_path_length`, or without `mesh`, `r0 = 0.01 m`.
+  triangles (`trivec`) have finite extent from the first segment.
+- When `mesh` or `rx_points` is supplied, `r0` is auto-sized to 0.8× the distance to the nearest obstacle
+  (found along a coarse probe sphere) or receive point, whichever is closer, clamped to ≥ 0.01 m. A receive
+  point inside the launch sphere would never be hit by any ray, so it bounds `r0` the same way an obstacle
+  does. If neither is within `max_path_length`, or with both omitted, `r0 = 0.01 m`.
 - Emits the per-ray medium-state words and distance accumulators consumed by [ray_state_update](#ray_state_update), all
   initialized to the outside-air / zero-distance start state.
 - Beam wavefront (`trivec`) and directions (`tridir`, Cartesian) match the [ray_mesh_interact](#ray_mesh_interact) input format.
@@ -3932,6 +3934,7 @@ arma::uword ray_init(
     std::vector<quadriga_lib::path> *paths = nullptr,
     const arma::fmat *mesh = nullptr,
     const arma::u32_vec *sub_mesh_index = nullptr,
+    const arma::fmat *rx_points = nullptr,
     bool scalar_mode = false);
 ```
 
@@ -3945,6 +3948,8 @@ arma::uword ray_init(
   the launch sphere `r0`. NULL → `r0 = 0.01 m`.
 - **`sub_mesh_index`** *(optional)* — Sub-mesh partition offsets for the accelerated intersect; passed to
   [ray_triangle_intersect](#ray_triangle_intersect). NULL → no partitioning.
+- **`rx_points`** *(optional)* — Receive points in 3D space; `[n_point, 3]`. Used only to bound the launch
+  sphere `r0`, so that no receiver starts inside it. NULL → receivers are not considered.
 - **`scalar_mode`** — Path storage layout passed to `paths`: `true` = SCALAR (acoustic, one pressure
   coefficient per frequency), `false` = EM (2×2 Jones matrix per frequency)
 
@@ -3970,6 +3975,7 @@ arma::uword ray_init(
 - [ray_mesh_interact](#ray_mesh_interact) (consumes `orig` / `dest` / `trivec` / `tridir` / `orig_length`)
 - [ray_state_update](#ray_state_update) (consumes the medium-state words, `path_dir_prev`, and `acc_dist`)
 - [path](#path) (the per-ray storage object populated in `paths`)
+- [ray_commit](#ray_commit) (consumes the same `rx_points` when committing paths that reach a receiver)
 
 ---
 ## ray_mesh_interact
@@ -4211,7 +4217,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
     bool scalar_mode = false,
     const arma::u32_vec *no_interact_in = nullptr,
     const arma::u32_vec *fbs_ind_in = nullptr,
-    const arma::u32_vec *sbs_ind_in = nullptr, 
+    const arma::u32_vec *sbs_ind_in = nullptr,
     const std::vector<bool> *subdiv_flag_in = nullptr);
 ```
 

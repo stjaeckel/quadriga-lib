@@ -111,6 +111,7 @@ namespace quadriga_lib
         std::vector<quadriga_lib::path> *paths = nullptr, // Path data storage, 64 byte + overflow, [n_ray]
         const arma::fmat *mesh = nullptr,                 // Optional: faces of the triangular mesh for sphere size detection, [ n_mesh, 9 ]
         const arma::u32_vec *sub_mesh_index = nullptr,    // Optional: Sub-mesh index, 0-based, [n_sub]
+        const arma::fmat *rx_points = nullptr,            // Receive points in 3D Space, Size: [n_points, 3]
         bool scalar_mode = false);                        // Switch for EM mode or scalar mode
 
     // Flag rays for subdivision
@@ -181,7 +182,7 @@ namespace quadriga_lib
         const arma::fmat &tridir,                                            // Vertex-ray directions, Cartesian [n_ray, 9]
         const arma::Col<short> &mtl_ind_current,                             // Current medium (0 = outside), [n_ray]
         const arma::fmat &points,                                            // Receive points in 3D Space, Size: [n_points, 3]
-        const arma::u32_vec *sub_cloud_index,                                 // Sub-cloud index, 0-based, Length: [n_sub]
+        const arma::u32_vec *sub_cloud_index = nullptr,                      // Sub-cloud index, 0-based, Length: [n_sub]
         const std::vector<bool> *subdiv_flag_in = nullptr,                   // Optional: List of beam to subdivide, [n_ray], NULL/empty = none
         float max_path_length = 10e3,                                        // Maximum path length
         float min_gain_dB = -140.0f,                                         // Minimum gain below which a path is terminated
