@@ -37,15 +37,31 @@ namespace
     // radius r0, so this returns a fixed fraction of r0 rather than r0 itself. Comparing two runs
     // with the same n_ray_target cancels that fraction exactly.
     float launch_radius(arma::uword n_ray_target, float max_path_length,
-                        const arma::fmat *mesh, const arma::fmat *points)
+                        const arma::fmat *mesh, const arma::fmat *points,
+                        const arma::u32_vec *sub_mesh_index = nullptr,
+                        const arma::fmat *aabb = nullptr)
     {
         arma::fmat orig;
         arma::uword n = quadriga_lib::ray_init(n_ray_target, 1, 0.0f, 0.0f, 0.0f, max_path_length,
                                                &orig, nullptr, nullptr, nullptr,
                                                nullptr, nullptr, nullptr, nullptr, nullptr,
-                                               nullptr, mesh, nullptr, points, false);
+                                               nullptr, mesh, sub_mesh_index, aabb, points, false);
         REQUIRE(orig.n_rows == n);
         return row_norms(orig).max();
+    }
+
+    // A mesh large enough that triangle_mesh_segmentation produces more than one sub-mesh:
+    // a grid of cubes in the x-y plane, none of them nearer than the reference cube at x = 3
+    arma::fmat cube_grid()
+    {
+        arma::fmat M;
+        for (int ix = 0; ix < 4; ++ix)
+            for (int iy = -2; iy <= 2; ++iy)
+            {
+                arma::fmat c = quadriga_lib::cube<float>({}, {}, {3.0f + 6.0f * (float)ix, 6.0f * (float)iy, 0.0f});
+                M = M.n_rows ? arma::join_vert(M, c) : c;
+            }
+        return M;
     }
 }
 
@@ -65,7 +81,7 @@ TEST_CASE("ray_init - Ray count quantization")
         arma::uword n = quadriga_lib::ray_init(c.target, 1, 0.0f, 0.0f, 0.0f, 5.0f,
                                                &orig, nullptr, nullptr, nullptr,
                                                nullptr, nullptr, nullptr, nullptr, nullptr,
-                                               nullptr, nullptr, nullptr, nullptr, false);
+                                               nullptr, nullptr, nullptr, nullptr, nullptr, false);
         CHECK(n == c.expected);
         CHECK(orig.n_rows == c.expected);
     }
@@ -80,7 +96,7 @@ TEST_CASE("ray_init - Output shapes")
     arma::uword n = quadriga_lib::ray_init(500, 4, 0.0f, 0.0f, 0.0f, 5.0f,
                                            &orig, &dest, &trivec, &tridir,
                                            &mtl_prev, &mtl_current, &mtl_buffer, &path_dir, &acc_dist,
-                                           &paths, nullptr, nullptr, nullptr, false);
+                                           &paths, nullptr, nullptr, nullptr, nullptr, false);
 
     REQUIRE(n == 500);
 
@@ -114,7 +130,7 @@ TEST_CASE("ray_init - Geometry invariants (no mesh)")
     arma::uword n = quadriga_lib::ray_init(500, 1, O(0), O(1), O(2), maxpath,
                                            &orig, &dest, nullptr, nullptr,
                                            nullptr, nullptr, nullptr, &path_dir, nullptr,
-                                           nullptr, nullptr, nullptr, nullptr, false);
+                                           nullptr, nullptr, nullptr, nullptr, nullptr, false);
     REQUIRE(n == 500);
 
     // Destinations lie at max_path_length from O
@@ -149,7 +165,7 @@ TEST_CASE("ray_init - max_path_length floor")
     arma::uword n = quadriga_lib::ray_init(80, 1, 0.0f, 0.0f, 0.0f, 0.0f,
                                            &orig, &dest, nullptr, nullptr,
                                            nullptr, nullptr, nullptr, nullptr, nullptr,
-                                           nullptr, nullptr, nullptr, nullptr, false);
+                                           nullptr, nullptr, nullptr, nullptr, nullptr, false);
     REQUIRE(n == 80);
 
     arma::fvec dd = dist_from(dest, arma::frowvec{0.0f, 0.0f, 0.0f});
@@ -172,7 +188,7 @@ TEST_CASE("ray_init - Path initialization")
         arma::uword n = quadriga_lib::ray_init(80, n_freq, 0.0f, 0.0f, 0.0f, 5.0f,
                                                &orig, nullptr, nullptr, nullptr,
                                                nullptr, nullptr, nullptr, nullptr, nullptr,
-                                               &paths, nullptr, nullptr, nullptr, scalar_mode);
+                                               &paths, nullptr, nullptr, nullptr, nullptr, scalar_mode);
         REQUIRE(n == 80);
         REQUIRE(paths.size() == n);
 
@@ -198,7 +214,7 @@ TEST_CASE("ray_init - Optional (NULL) outputs")
     arma::uword n = quadriga_lib::ray_init(80, 4, 1.0f, 2.0f, 3.0f, 5.0f,
                                            &orig, nullptr, nullptr, nullptr,
                                            nullptr, nullptr, nullptr, nullptr, nullptr,
-                                           nullptr, nullptr, nullptr, nullptr, false);
+                                           nullptr, nullptr, nullptr, nullptr, nullptr, false);
     REQUIRE(n == 80);
     REQUIRE((orig.n_rows == 80 && orig.n_cols == 3));
 
@@ -206,7 +222,7 @@ TEST_CASE("ray_init - Optional (NULL) outputs")
     arma::uword m = quadriga_lib::ray_init(80, 4, 0.0f, 0.0f, 0.0f, 5.0f,
                                            nullptr, nullptr, nullptr, nullptr,
                                            nullptr, nullptr, nullptr, nullptr, nullptr,
-                                           nullptr, nullptr, nullptr, nullptr, false);
+                                           nullptr, nullptr, nullptr, nullptr, nullptr, false);
     CHECK(m == 80);
 }
 
@@ -216,7 +232,7 @@ TEST_CASE("ray_init - Error cases")
     CHECK_THROWS_AS(quadriga_lib::ray_init(80, 0, 0.0f, 0.0f, 0.0f, 5.0f,
                                            nullptr, nullptr, nullptr, nullptr,
                                            nullptr, nullptr, nullptr, nullptr, nullptr,
-                                           nullptr, nullptr, nullptr, nullptr, false),
+                                           nullptr, nullptr, nullptr, nullptr, nullptr, false),
                     std::invalid_argument);
 
     // Mesh with the wrong number of columns
@@ -224,7 +240,7 @@ TEST_CASE("ray_init - Error cases")
     CHECK_THROWS_AS(quadriga_lib::ray_init(80, 1, 0.0f, 0.0f, 0.0f, 5.0f,
                                            nullptr, nullptr, nullptr, nullptr,
                                            nullptr, nullptr, nullptr, nullptr, nullptr,
-                                           nullptr, &bad_mesh, nullptr, nullptr, false),
+                                           nullptr, &bad_mesh, nullptr, nullptr, nullptr, false),
                     std::invalid_argument);
 
     // Points with the wrong number of columns
@@ -232,7 +248,7 @@ TEST_CASE("ray_init - Error cases")
     CHECK_THROWS_AS(quadriga_lib::ray_init(80, 1, 0.0f, 0.0f, 0.0f, 5.0f,
                                            nullptr, nullptr, nullptr, nullptr,
                                            nullptr, nullptr, nullptr, nullptr, nullptr,
-                                           nullptr, nullptr, nullptr, &bad_points, false),
+                                           nullptr, nullptr, nullptr, nullptr, &bad_points, false),
                     std::invalid_argument);
 
     // An empty point matrix is treated as absent, not as an error
@@ -240,7 +256,7 @@ TEST_CASE("ray_init - Error cases")
     CHECK_NOTHROW(quadriga_lib::ray_init(80, 1, 0.0f, 0.0f, 0.0f, 5.0f,
                                          nullptr, nullptr, nullptr, nullptr,
                                          nullptr, nullptr, nullptr, nullptr, nullptr,
-                                         nullptr, nullptr, nullptr, &empty_points, false));
+                                         nullptr, nullptr, nullptr, nullptr, &empty_points, false));
 }
 
 TEST_CASE("ray_init - Launch sphere sizing with mesh")
@@ -253,7 +269,7 @@ TEST_CASE("ray_init - Launch sphere sizing with mesh")
     arma::uword n = quadriga_lib::ray_init(180, 1, 0.0f, 0.0f, 0.0f, maxpath,
                                            &orig, &dest, nullptr, nullptr,
                                            nullptr, nullptr, nullptr, &path_dir, nullptr, nullptr,
-                                           &mesh, nullptr, nullptr, false);
+                                           &mesh, nullptr, nullptr, nullptr, false);
     REQUIRE(n == 180);
 
     // Launch sphere radius, read back from the origins (launch point at the coordinate origin)
@@ -352,7 +368,7 @@ TEST_CASE("ray_init - Points do not disturb the other outputs")
     arma::uword n = quadriga_lib::ray_init(180, 2, O(0), O(1), O(2), maxpath,
                                            &orig, &dest, &trivec, &tridir,
                                            &mtl_prev, &mtl_current, &mtl_buffer, &path_dir, &acc_dist,
-                                           &paths, nullptr, nullptr, &P, false);
+                                           &paths, nullptr, nullptr, nullptr, &P, false);
     REQUIRE(n == 180);
 
     // Destinations still sit at max_path_length, directions are still unit length
@@ -371,4 +387,128 @@ TEST_CASE("ray_init - Points do not disturb the other outputs")
     CHECK(arma::all(mtl_current == 0));
     CHECK((acc_dist.n_rows == n && acc_dist.n_cols == 2));
     CHECK(arma::accu(arma::abs(acc_dist)) == 0.0f);
+}
+TEST_CASE("ray_init - Sub-mesh acceleration does not change the launch sphere")
+{
+    // sub_mesh_index and aabb only speed up the probe. The radius they produce must be bit-identical
+    // to the unpartitioned run, otherwise the acceleration is dropping faces.
+    const float maxpath = 40.0f;
+    arma::fmat mesh = cube_grid();
+
+    arma::fmat mesh_seg;
+    arma::u32_vec smi;
+    quadriga_lib::triangle_mesh_segmentation<float>(&mesh, &mesh_seg, &smi, 64, 8);
+    REQUIRE(smi.n_elem > 1); // a single sub-mesh would make the comparison vacuous
+
+    arma::fmat boxes = quadriga_lib::triangle_mesh_aabb<float>(&mesh_seg, &smi);
+    REQUIRE(boxes.n_rows == smi.n_elem);
+    REQUIRE(boxes.n_cols == 6);
+
+    const float r_plain = launch_radius(180, maxpath, &mesh_seg, nullptr);
+    const float r_smi = launch_radius(180, maxpath, &mesh_seg, nullptr, &smi);
+    const float r_full = launch_radius(180, maxpath, &mesh_seg, nullptr, &smi, &boxes);
+
+    CHECK(r_plain > 0.1f); // the probe must register hits, or all three are the 1 cm default
+    CHECK(r_smi == r_plain);
+    CHECK(r_full == r_plain);
+
+    // The nearest face of the grid is still the one at x = 2, so the known bound holds
+    CHECK(r_full <= 0.8f * 2.0f + 1e-3f);
+}
+
+TEST_CASE("ray_init - Sub-mesh acceleration alongside receive points")
+{
+    // The point scan and the accelerated probe feed one shared minimum; whichever is nearer wins
+    const float maxpath = 40.0f;
+    arma::fmat mesh = cube_grid();
+
+    arma::fmat mesh_seg;
+    arma::u32_vec smi;
+    quadriga_lib::triangle_mesh_segmentation<float>(&mesh, &mesh_seg, &smi, 64, 8);
+    arma::fmat boxes = quadriga_lib::triangle_mesh_aabb<float>(&mesh_seg, &smi);
+
+    const float r_mesh = launch_radius(180, maxpath, &mesh_seg, nullptr, &smi, &boxes);
+
+    // A receive point at 1 m, closer than the nearest face at 2 m, halves the radius
+    arma::fmat P_near = make_points({{0.0f, 1.0f, 0.0f}});
+    const float r_near = launch_radius(180, maxpath, &mesh_seg, &P_near, &smi, &boxes);
+    CHECK(std::abs(r_near / r_mesh - 0.5f) < 1e-3f);
+
+    // A receive point beyond the mesh leaves the mesh-derived radius untouched
+    arma::fmat P_far = make_points({{0.0f, 0.0f, 12.0f}});
+    const float r_far = launch_radius(180, maxpath, &mesh_seg, &P_far, &smi, &boxes);
+    CHECK(r_far == r_mesh);
+}
+
+TEST_CASE("ray_init - Sub-mesh and aabb error cases")
+{
+    arma::fmat mesh = quadriga_lib::cube<float>({}, {}, {3.0f, 0.0f, 0.0f});
+    const arma::uword n_face = mesh.n_rows;
+
+    auto call = [&](const arma::u32_vec *smi, const arma::fmat *box)
+    {
+        return quadriga_lib::ray_init(80, 1, 0.0f, 0.0f, 0.0f, 10.0f,
+                                      nullptr, nullptr, nullptr, nullptr,
+                                      nullptr, nullptr, nullptr, nullptr, nullptr,
+                                      nullptr, &mesh, smi, box, nullptr, false);
+    };
+
+    SECTION("valid baseline")
+    {
+        arma::u32_vec smi = {0u, 6u};
+        arma::fmat box(2, 6, arma::fill::zeros);
+        box.col(1).ones(), box.col(3).ones(), box.col(5).ones();
+        CHECK_NOTHROW(call(&smi, &box));
+        CHECK_NOTHROW(call(&smi, nullptr)); // boxes are optional, not computed internally
+        CHECK_NOTHROW(call(nullptr, nullptr));
+    }
+
+    SECTION("sub_mesh_index must start at 0")
+    {
+        arma::u32_vec smi = {1u, 6u};
+        CHECK_THROWS_AS(call(&smi, nullptr), std::invalid_argument);
+    }
+
+    SECTION("sub_mesh_index must be strictly increasing")
+    {
+        arma::u32_vec bad = {0u, 6u, 6u};
+        CHECK_THROWS_AS(call(&bad, nullptr), std::invalid_argument);
+
+        arma::u32_vec desc = {0u, 8u, 4u};
+        CHECK_THROWS_AS(call(&desc, nullptr), std::invalid_argument);
+    }
+
+    SECTION("sub_mesh_index cannot exceed the face count")
+    {
+        arma::u32_vec smi = {0u, (unsigned)n_face};
+        CHECK_THROWS_AS(call(&smi, nullptr), std::invalid_argument);
+    }
+
+    SECTION("aabb requires sub_mesh_index")
+    {
+        arma::fmat box(1, 6, arma::fill::zeros);
+        CHECK_THROWS_AS(call(nullptr, &box), std::invalid_argument);
+    }
+
+    SECTION("aabb shape must match the partition")
+    {
+        arma::u32_vec smi = {0u, 6u};
+
+        arma::fmat rows(3, 6, arma::fill::zeros); // three boxes, two sub-meshes
+        CHECK_THROWS_AS(call(&smi, &rows), std::invalid_argument);
+
+        arma::fmat cols(2, 5, arma::fill::zeros); // five columns, not six
+        CHECK_THROWS_AS(call(&smi, &cols), std::invalid_argument);
+    }
+
+    SECTION("both are ignored without a mesh")
+    {
+        // Nothing to probe, so the acceleration inputs are dropped rather than validated
+        arma::u32_vec bad = {7u, 3u};
+        arma::fmat box(9, 4, arma::fill::zeros);
+        CHECK_NOTHROW(quadriga_lib::ray_init(80, 1, 0.0f, 0.0f, 0.0f, 10.0f,
+                                             nullptr, nullptr, nullptr, nullptr,
+                                             nullptr, nullptr, nullptr, nullptr, nullptr,
+                                             nullptr, nullptr, &bad, &box, nullptr, false));
+    }
 }

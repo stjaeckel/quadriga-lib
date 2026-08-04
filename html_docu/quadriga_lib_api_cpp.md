@@ -123,20 +123,20 @@ lang: en-US
 | [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 3777 |
 | [ray_commit](#ray_commit) | Site-specific simulation tools | 3813 |
 | [ray_init](#ray_init) | Site-specific simulation tools | 3918 |
-| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 3998 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 4120 |
-| [ray_progress](#ray_progress) | Site-specific simulation tools | 4168 |
-| [ray_state_update](#ray_state_update) | Site-specific simulation tools | 4306 |
-| [ray_subdivide_flag](#ray_subdivide_flag) | Site-specific simulation tools | 4439 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 4500 |
-| [refractive_index](#refractive_index) | Site-specific simulation tools | 4548 |
-| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 4580 |
-| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 4638 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 4668 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 4696 |
-| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 4737 |
-| [write_png](#write_png) | Site-specific simulation tools | 4772 |
-| [xpr_update](#xpr_update) | Site-specific simulation tools | 4798 |
+| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 4005 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 4127 |
+| [ray_progress](#ray_progress) | Site-specific simulation tools | 4175 |
+| [ray_state_update](#ray_state_update) | Site-specific simulation tools | 4313 |
+| [ray_subdivide_flag](#ray_subdivide_flag) | Site-specific simulation tools | 4446 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 4507 |
+| [refractive_index](#refractive_index) | Site-specific simulation tools | 4555 |
+| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 4587 |
+| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 4645 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 4675 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 4703 |
+| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 4744 |
+| [write_png](#write_png) | Site-specific simulation tools | 4779 |
+| [xpr_update](#xpr_update) | Site-specific simulation tools | 4805 |
 
 ---
 
@@ -3951,6 +3951,7 @@ arma::uword ray_init(
     std::vector<quadriga_lib::path> *paths = nullptr,
     const arma::fmat *mesh = nullptr,
     const arma::u32_vec *sub_mesh_index = nullptr,
+    const arma::fmat *aabb = nullptr,
     const arma::fmat *rx_points = nullptr,
     bool scalar_mode = false);
 ```
@@ -3962,9 +3963,13 @@ arma::uword ray_init(
 - **`Ox`**, **`Oy`**, **`Oz`** — Point-source (transmitter) position in GCS [m]
 - **`max_path_length`** — Maximum ray length [m]; sets `dest` and bounds the launch-sphere probe (floored at 0.01 m)
 - **`mesh`** *(optional)* — Triangle mesh faces; see [obj_file_read](#obj_file_read); `[n_mesh, 9]`. Used only to auto-size
-  the launch sphere `r0`. NULL → `r0 = 0.01 m`.
-- **`sub_mesh_index`** *(optional)* — Sub-mesh partition offsets for the accelerated intersect; passed to
-  [ray_triangle_intersect](#ray_triangle_intersect). NULL → no partitioning.
+  the launch sphere `r0`. NULL → the mesh does not bound `r0`.
+- **`sub_mesh_index`** *(optional)* — Sub-mesh partition offsets for the accelerated intersect; 0-based,
+  strictly increasing, first entry 0; passed to [ray_triangle_intersect](#ray_triangle_intersect); `[n_sub]`. NULL → no partitioning
+- **`aabb`** *(optional)* — Axis-aligned bounding box per sub-mesh; `[n_sub, 6]`. Requires `sub_mesh_index`.
+  Unlike [ray_progress](#ray_progress), boxes are *not* computed internally when omitted: the probe is a fixed 2880 rays,
+  so building them here would usually cost more than it saves. Pass the [triangle_mesh_aabb](#triangle_mesh_aabb) result the
+  caller already holds for the tracing loop.
 - **`rx_points`** *(optional)* — Receive points in 3D space; `[n_point, 3]`. Used only to bound the launch
   sphere `r0`, so that no receiver starts inside it. NULL → receivers are not considered.
 - **`scalar_mode`** — Path storage layout passed to `paths`: `true` = SCALAR (acoustic, one pressure
@@ -3989,10 +3994,12 @@ arma::uword ray_init(
 ### See also:
 - [icosphere](#icosphere) (generates the ray fan, beam wavefront, and directions)
 - [ray_triangle_intersect](#ray_triangle_intersect) (launch-sphere sizing and per-segment intersection)
-- [ray_mesh_interact](#ray_mesh_interact) (consumes `orig` / `dest` / `trivec` / `tridir` / `orig_length`)
+- [triangle_mesh_segmentation](#triangle_mesh_segmentation) (generates `sub_mesh_index`)
+- [triangle_mesh_aabb](#triangle_mesh_aabb) (generates `aabb`)
+- [ray_mesh_interact](#ray_mesh_interact) (consumes `orig` / `dest` / `trivec` / `tridir`)
 - [ray_state_update](#ray_state_update) (consumes the medium-state words, `path_dir_prev`, and `acc_dist`)
+- [ray_commit](#ray_commit) (consumes the same `points` when committing paths that reach a receiver)
 - [path](#path) (the per-ray storage object populated in `paths`)
-- [ray_commit](#ray_commit) (consumes the same `rx_points` when committing paths that reach a receiver)
 
 ---
 ## ray_mesh_interact
