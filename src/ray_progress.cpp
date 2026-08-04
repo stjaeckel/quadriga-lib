@@ -232,7 +232,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
     bool scalar_mode = false,
     const arma::u32_vec *no_interact_in = nullptr,
     const arma::u32_vec *fbs_ind_in = nullptr,
-    const arma::u32_vec *sbs_ind_in = nullptr, 
+    const arma::u32_vec *sbs_ind_in = nullptr,
     const std::vector<bool> *subdiv_flag_in = nullptr);
 ```
 
@@ -718,7 +718,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
                 // Update length
                 float length = (n_seg <= 1) ? calc_length(Sx, Sy, Sz, Ox, Oy, Oz)
                                             : L.paths[i_out].calc_length(Sx, Sy, Sz, Ox, Oy, Oz);
-                L.paths[i_out].length = length;
+                L.paths[i_out].set_length(length);
 
                 // Copy interaction state
                 pP[i_out] = cP[i_ray];
@@ -859,7 +859,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
                 // the accumulated polyline plus the current leg is the only correct form.
                 float length = (paths[i_int].n_seg() == 0)
                                    ? calc_length(p_fbs[i_int], p_fbs[iY], p_fbs[iZ], Ox, Oy, Oz)
-                                   : calc_length(p_fbs[i_int], p_fbs[iY], p_fbs[iZ], p_orig[i_int], p_orig[iY], p_orig[iZ]) + paths[i_int].length;
+                                   : calc_length(p_fbs[i_int], p_fbs[iY], p_fbs[iZ], p_orig[i_int], p_orig[iY], p_orig[iZ]) + paths[i_int].length();
 
                 p_gain[i_int] = paths[i_int].calc_gain(fRef_GHz, 0, length);
             }
@@ -976,7 +976,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
             // Add new segment to path storage and left-multiply XPR matrix at base frequency
             paths[iX].extend(p_path[i_out], p_fbs[iX], p_fbs[iY], p_fbs[iZ], p_type[iX]);
             if (paths[iX].n_seg() == 0) // source -> new interaction point: derive the first leg (no previous coordinate)
-                p_path[i_out].length = calc_length(p_fbs[iX], p_fbs[iY], p_fbs[iZ], Ox, Oy, Oz);
+                p_path[i_out].set_length(calc_length(p_fbs[iX], p_fbs[iY], p_fbs[iZ], Ox, Oy, Oz));
 
             p_path[i_out].xpr_update(&p_xpr[nXPR * iX]);
             if (reflect_pass)

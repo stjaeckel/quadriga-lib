@@ -160,7 +160,7 @@ TEST_CASE("ray_init - Path initialization")
             CHECK(paths[i].n_seg() == 0);
             CHECK(paths[i].n_freq() == n_freq);
             CHECK(paths[i].is_scalar() == scalar_mode);
-            CHECK(std::abs(paths[i].length - r0(i)) < 1e-5f);
+            CHECK(std::abs(paths[i].length() - r0(i)) < 1e-5f);
         }
     };
 

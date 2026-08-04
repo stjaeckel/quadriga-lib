@@ -245,7 +245,7 @@ arma::uword quadriga_lib::ray_commit(const std::vector<quadriga_lib::path> &path
 
         const quadriga_lib::path &P = paths[iR];
 
-        if (P.length >= max_path_length) // already too long without the final leg
+        if (P.length() >= max_path_length) // already too long without the final leg
             continue;
 
         if (ignore_direct_path && P.nREF == 0 && P.nSCT == 0) // covered by the diffraction model
@@ -310,7 +310,7 @@ arma::uword quadriga_lib::ray_commit(const std::vector<quadriga_lib::path> &path
             // Length of the final leg and the resulting total path length
             const float dx = Rx - Ox, dy = Ry - Oy, dz = Rz - Oz;
             const float seg_length = std::sqrt(dx * dx + dy * dy + dz * dz);
-            const float len = paths[iR].length + seg_length;
+            const float len = paths[iR].length() + seg_length;
             if (len >= max_path_length)
                 continue;
 

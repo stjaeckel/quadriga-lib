@@ -17,7 +17,7 @@ Seed a sphere of rays from a point source
 - `n_ray` is quantized to the icosphere grid: `n_div = round(sqrt(n_ray_target / 20))` (min 1) and
   `n_ray = 20 · n_div²`, so the returned count is the closest tessellation to `n_ray_target`, not exact.
 - Ray origins sit on a small launch sphere of radius `r0` centered at `O`, not at `O` itself, so the beam
-  triangles (`trivec`) have finite extent from the first segment. 
+  triangles (`trivec`) have finite extent from the first segment.
 - When `mesh` is supplied, `r0` is auto-sized to 0.8× the nearest obstacle distance along a coarse probe
   sphere (clamped to ≥ 0.01 m); if no obstacle is hit within `max_path_length`, or without `mesh`, `r0 = 0.01 m`.
 - Emits the per-ray medium-state words and distance accumulators consumed by [[ray_state_update]], all
@@ -223,7 +223,7 @@ arma::uword quadriga_lib::ray_init(arma::uword n_ray_target,
         if (has_paths)
         {
             (*paths)[i_ray0].init(0, n_freq, scalar_mode);
-            (*paths)[i_ray0].length = p_length_local[i_ray0];
+            (*paths)[i_ray0].set_length(p_length_local[i_ray0]);
         }
     }
 

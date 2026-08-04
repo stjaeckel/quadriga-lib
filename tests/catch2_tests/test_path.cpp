@@ -13,7 +13,7 @@ using quadriga_lib::path;
 // Layout mirror for expected-value computation in tests. Must match qd_path.cpp.
 namespace
 {
-    constexpr size_t INLINE_TYPES = 6;
+    constexpr size_t INLINE_TYPES = 2;
 
     size_t hist_floats(size_t nseg)
     {
@@ -43,9 +43,8 @@ TEST_CASE("path - default construction")
     path p;
     CHECK(p.n_freq() == 1);
     CHECK_FALSE(p.is_scalar());
-    CHECK(p.length == 0.0f);
+    CHECK(p.length() == 0.0f);
     CHECK(p.iC == 0);
-    CHECK(p.iR == 0);
     CHECK(p.nREF == 0);
     CHECK(p.nTRA == 0);
     CHECK(p.nSUB == 0);
@@ -166,7 +165,7 @@ TEST_CASE("path - calc_length read-only (member + last-to-D)")
     c0[0] = 0.0f, c0[1] = 0.0f, c0[2] = 0.0f;
     float *c1 = p.coord(1);
     c1[0] = 3.0f, c1[1] = 0.0f, c1[2] = 0.0f;
-    p.length = 10.0f; // pretend accumulated length
+    p.set_length(10.0f); // pretend accumulated length
 
     // last point is (3,0,0); D at (3,4,0) is 4 away -> 10 + 4 = 14.
     CHECK(std::abs(p.calc_length(3.0f, 4.0f, 0.0f) - 14.0f) < 1e-5f);
@@ -176,7 +175,7 @@ TEST_CASE("path - calc_length read-only (member + last-to-D)")
     CHECK(std::abs(p.calc_length(D) - 14.0f) < 1e-5f);
 
     // Read-only form does not touch the member.
-    CHECK(p.length == 10.0f);
+    CHECK(p.length() == 10.0f);
 }
 
 TEST_CASE("path - calc_length read-only on empty path returns NaN")
@@ -197,7 +196,7 @@ TEST_CASE("path - calc_length full recalculation updates member")
     // stored member = O..last = 1 + 3 = 4 ; return = 4 + 4 = 8.
     float ret = p.calc_length(4.0f, 4.0f, 0.0f, 0.0f, 0.0f, 0.0f);
     CHECK(std::abs(ret - 8.0f) < 1e-5f);
-    CHECK(std::abs(p.length - 4.0f) < 1e-5f); // member excludes the ->D leg
+    CHECK(std::abs(p.length() - 4.0f) < 1e-5f); // member excludes the ->D leg
 
     // A subsequent read-only call must agree: member(4) + last(4,0,0)->D(4,4,0)=4 -> 8.
     CHECK(std::abs(p.calc_length(4.0f, 4.0f, 0.0f) - 8.0f) < 1e-5f);
@@ -212,7 +211,7 @@ TEST_CASE("path - calc_length recalculation on empty path is O->D")
     path p; // nSEG == 0, loop body never runs
     float ret = p.calc_length(3.0f, 4.0f, 0.0f, 0.0f, 0.0f, 0.0f);
     CHECK(std::abs(ret - 5.0f) < 1e-5f); // straight O->D distance
-    CHECK(p.length == 0.0f);             // no interior length
+    CHECK(p.length() == 0.0f);             // no interior length
 }
 
 TEST_CASE("path - calc_gain polarization power without path loss")
@@ -241,11 +240,11 @@ TEST_CASE("path - calc_gain degenerate matrix returns zero")
 TEST_CASE("path - calc_gain EM free-space path loss")
 {
     path p(0, 1, false);
-    p.length = 100.0f;
+    p.set_length(100.0f);
 
     // FSPL linear power = (c / (4 pi f d))^2 with f in GHz, d in m, c = 0.299792458 m*GHz.
     float fGHz = 2.4f;
-    float k = 0.299792458f / (12.566370614f * fGHz * p.length);
+    float k = 0.299792458f / (12.566370614f * fGHz * p.length());
     float expected = k * k; // identity matrix gain == 1
 
     CHECK(std::abs(p.calc_gain(fGHz) - expected) < 1e-12f);
@@ -257,7 +256,7 @@ TEST_CASE("path - calc_gain EM free-space path loss")
 TEST_CASE("path - calc_gain scalar spherical spreading")
 {
     path p(0, 2, true);
-    p.length = 10.0f;
+    p.set_length(10.0f);
     float *c = p.xpr_coeff(0); // scalar coeff [Re, Im]
     c[0] = 1.0f, c[1] = 0.0f;
 
@@ -349,9 +348,9 @@ TEST_CASE("path - xpr_update scalar mode")
 TEST_CASE("path - xpr_update applies path loss when fGHz given")
 {
     path p(0, 1, false);
-    p.length = 100.0f;
+    p.set_length(100.0f);
     float fGHz = 2.4f;
-    float k = 0.299792458f / (12.566370614f * fGHz * p.length);
+    float k = 0.299792458f / (12.566370614f * fGHz * p.length());
     float expected = k * k; // identity gain 1, scaled by FSPL
 
     float g = p.xpr_update(nullptr, 1.0f, 0, fGHz);
@@ -363,9 +362,9 @@ TEST_CASE("path - duplicate produces independent deep copy")
     path src(3, 2, false);
     float *c = src.coord(1);
     c[0] = 5.0f, c[1] = 6.0f, c[2] = 7.0f;
-    src.iC = 11, src.iR = 22;
+    src.iC = 11;
     src.nREF = 2, src.nTRA = 3, src.nSUB = 1, src.nSCT = 4;
-    src.length = 99.0f;
+    src.set_length(99.0f);
     float *m = src.xpr_coeff(1);
     m[0] = 3.0f;
 
@@ -375,7 +374,6 @@ TEST_CASE("path - duplicate produces independent deep copy")
 
     // Metadata copied.
     CHECK(dst.iC == 11);
-    CHECK(dst.iR == 22);
     CHECK(dst.nREF == 2);
     CHECK(dst.nTRA == 3);
     CHECK(dst.nSUB == 1);
@@ -396,14 +394,14 @@ TEST_CASE("path - extend appends segment, distance, counters")
     path src(1, 1, false);
     float *c = src.coord(0);
     c[0] = 0.0f, c[1] = 0.0f, c[2] = 0.0f;
-    src.length = 0.0f;
+    src.set_length(0.0f);
     src.nREF = 0, src.nTRA = 0, src.nSCT = 7;
 
     // Extend to (3,4,0): new segment 3-4-5 triangle -> +5 length. type 100 -> nTRA++.
     path t1;
     float L = src.extend(t1, 3.0f, 4.0f, 0.0f, 100);
     CHECK(std::abs(L - 5.0f) < 1e-5f);
-    CHECK(std::abs(t1.length - 5.0f) < 1e-5f);
+    CHECK(std::abs(t1.length() - 5.0f) < 1e-5f);
     CHECK(t1.n_seg() == 2);
     CHECK(t1.nTRA == 0);
     CHECK(t1.nREF == 0);
@@ -417,9 +415,10 @@ TEST_CASE("path - extend appends segment, distance, counters")
 
 TEST_CASE("path - extend across the inline/history boundary")
 {
-    // Chain extends 1..N so that segment s gets interaction code s+1.
-    // With INLINE_TYPES = 6, codes 1..6 sit inline, 7.. spill into the buffer.
+    // Chain extends 1..N so that segment s gets interaction code s+1. The codes for the
+    // first INLINE_TYPES segments sit in the header; the rest spill into the buffer.
     const size_t N = 10;
+    REQUIRE(N > INLINE_TYPES); // otherwise the boundary is never crossed
     path cur(1, 1, false);
     cur.coord(0)[0] = 0.0f, cur.coord(0)[1] = 0.0f, cur.coord(0)[2] = 0.0f;
 
@@ -453,32 +452,44 @@ TEST_CASE("path - extend at segment cap throws")
 
 TEST_CASE("path - interaction_type_codes short path stays inline")
 {
-    path src(1, 1, false);
-    src.coord(0)[0] = 0.0f;
-    path a, b, c;
-    src.extend(a, 1, 0, 0, 11);
-    a.extend(b, 2, 0, 0, 22);
-    b.extend(c, 3, 0, 0, 33);
+    // A path with exactly INLINE_TYPES segments keeps every code in the header, so the
+    // buffer carries no history block at all. Written against the constant rather than a
+    // hard-coded count so it keeps testing the inline-only route if INLINE_TYPES changes.
+    REQUIRE(hist_floats(INLINE_TYPES) == 0);
 
-    std::vector<uint8_t> seq = c.interaction_type_codes();
-    REQUIRE(seq.size() == 4);
-    CHECK(seq[0] == 0); // original segment
-    CHECK(seq[1] == 11);
-    CHECK(seq[2] == 22);
-    CHECK(seq[3] == 33);
+    path cur(1, 1, false);
+    cur.coord(0)[0] = 0.0f;
+
+    std::vector<uint8_t> expected(1, 0); // segment 0: default, never assigned
+    for (size_t s = 1; s < INLINE_TYPES; ++s)
+    {
+        path nxt;
+        uint8_t type = (uint8_t)(10 * s + 1);
+        cur.extend(nxt, (float)s, 0.0f, 0.0f, type);
+        cur = std::move(nxt);
+        expected.push_back(type);
+    }
+
+    std::vector<uint8_t> seq = cur.interaction_type_codes();
+    REQUIRE(seq.size() == INLINE_TYPES);
+    for (size_t s = 0; s < INLINE_TYPES; ++s)
+    {
+        INFO("segment " << s);
+        CHECK(seq[s] == expected[s]);
+    }
 }
 
 TEST_CASE("path - move constructor transfers ownership")
 {
     path src(4, 2, false);
     src.coord(0)[0] = 42.0f;
-    src.iR = 5;
+    src.iC = 5;
     const float *buf = src.coord(0);
 
     path dst(std::move(src));
     CHECK(dst.coord(0)[0] == 42.0f);
     CHECK(dst.coord(0) == buf); // same buffer, no reallocation
-    CHECK(dst.iR == 5);
+    CHECK(dst.iC == 5);
 
     // Moved-from path is left in the valid empty state (nSEG == 0, nFRQ == 1, no buffer).
     CHECK(src.n_seg() == 0);
@@ -506,12 +517,12 @@ TEST_CASE("path - copy assignment is deep and self-safe")
 {
     path a(3, 2, false);
     a.coord(1)[0] = 9.0f;
-    a.iR = 7;
+    a.iC = 7;
 
     path b;
     b = a;
     CHECK(b.coord(1)[0] == 9.0f);
-    CHECK(b.iR == 7);
+    CHECK(b.iC == 7);
     CHECK(b.coord(1) != a.coord(1)); // distinct buffers
     b.coord(1)[0] = -5.0f;
     CHECK(a.coord(1)[0] == 9.0f); // a unaffected
@@ -519,7 +530,7 @@ TEST_CASE("path - copy assignment is deep and self-safe")
     // Self-assignment must not corrupt or free-then-read.
     a = a;
     CHECK(a.coord(1)[0] == 9.0f);
-    CHECK(a.iR == 7);
+    CHECK(a.iC == 7);
 }
 
 TEST_CASE("path - free resets to a valid empty state")
@@ -541,20 +552,4 @@ TEST_CASE("path - free resets to a valid empty state")
     // Idempotent: freeing again is safe.
     CHECK_NOTHROW(p.free());
     CHECK(p.n_seg() == 0);
-}
-
-TEST_CASE("path - comparison operators order by iR")
-{
-    path a, b, c;
-    a.iR = 1, b.iR = 2, c.iR = 2;
-
-    CHECK(a < b);
-    CHECK(b > a);
-    CHECK(a <= b);
-    CHECK(b >= a);
-    CHECK(b == c); // equal iR compares equal
-    CHECK(a != b);
-    CHECK_FALSE(a == b);
-    CHECK(b <= c);
-    CHECK(b >= c);
 }
