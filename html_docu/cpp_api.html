@@ -5190,7 +5190,7 @@ arma::uword quadriga_lib::ray_commit(
     const arma::fmat &amp;trivec,
     const arma::fmat &amp;tridir,
     const arma::Col&lt;short&gt; &amp;mtl_ind_current,
-    const arma::fmat &amp;points,
+    const arma::fmat &amp;rx_points,
     const arma::u32_vec *sub_cloud_index = nullptr,
     const std::vector&lt;bool&gt; *subdiv_flag_in = nullptr,
     float max_path_length = 10e3,
@@ -5209,7 +5209,7 @@ arma::uword quadriga_lib::ray_commit(
 <li><b><code>trivec</code></b> — Beam wavefront triangle vertices relative to the ray origin; <code>[n_ray, 9]</code></li>
 <li><b><code>tridir</code></b> — Vertex-ray directions, Cartesian; <code>[n_ray, 9]</code>. Need not be unit length</li>
 <li><b><code>mtl_ind_current</code></b> — Current medium state word, 0 = outside (bit-masked: <code>mat = w &amp; 0x7FFF</code>, <code>flag = w &amp; 0x8000</code>); <code>[n_ray]</code></li>
-<li><b><code>points</code></b> — Receive points in 3D space; <code>[n_point, 3]</code></li>
+<li><b><code>rx_points</code></b> — Receive points in 3D space; <code>[n_point, 3]</code></li>
 <li><b><code>sub_cloud_index</code></b> <i>(optional)</i> — Sub-cloud partition offsets for the point cloud (see <a href="#point_cloud_segmentation">point_cloud_segmentation</a>); <code>[n_sub]</code>. NULL → no partitioning</li>
 <li><b><code>subdiv_flag_in</code></b> <i>(optional)</i> — Rays that will be split in the next generation and must not be committed now; <code>[n_ray]</code>, indexed in the full ray set. Pass the output of <a href="#ray_subdivide_flag">ray_subdivide_flag</a> for the same launch configuration. NULL / empty → no ray is excluded on these grounds</li>
 <li><b><code>max_path_length</code></b> <i>(optional)</i> — Maximum total path length including the leg to the receiver [m]</li>
@@ -5245,7 +5245,7 @@ Seed a sphere of rays from a point source
 <li>Launches <code>n_ray</code> rays from a point source <code>O</code> onto an <a href="#icosphere">icosphere</a> tessellation, giving near-uniform angular coverage of the full sphere (4π sr).</li>
 <li><code>n_ray</code> is quantized to the icosphere grid: <code>n_div = round(sqrt(n_ray_target / 20))</code> (min 1) and <code>n_ray = 20 · n_div²</code>, so the returned count is the closest tessellation to <code>n_ray_target</code>, not exact.</li>
 <li>Ray origins sit on a small launch sphere of radius <code>r0</code> centered at <code>O</code>, not at <code>O</code> itself, so the beam triangles (<code>trivec</code>) have finite extent from the first segment.</li>
-<li>When <code>mesh</code> is supplied, <code>r0</code> is auto-sized to 0.8× the nearest obstacle distance along a coarse probe sphere (clamped to ≥ 0.01 m); if no obstacle is hit within <code>max_path_length</code>, or without <code>mesh</code>, <code>r0 = 0.01 m</code>.</li>
+<li>When <code>mesh</code> or <code>rx_points</code> is supplied, <code>r0</code> is auto-sized to 0.8× the distance to the nearest obstacle (found along a coarse probe sphere) or receive point, whichever is closer, clamped to ≥ 0.01 m. A receive point inside the launch sphere would never be hit by any ray, so it bounds <code>r0</code> the same way an obstacle does. If neither is within <code>max_path_length</code>, or with both omitted, <code>r0 = 0.01 m</code>.</li>
 <li>Emits the per-ray medium-state words and distance accumulators consumed by <a href="#ray_state_update">ray_state_update</a>, all initialized to the outside-air / zero-distance start state.</li>
 <li>Beam wavefront (<code>trivec</code>) and directions (<code>tridir</code>, Cartesian) match the <a href="#ray_mesh_interact">ray_mesh_interact</a> input format.</li>
 </ul>
@@ -5269,6 +5269,7 @@ arma::uword ray_init(
     std::vector&lt;quadriga_lib::path&gt; *paths = nullptr,
     const arma::fmat *mesh = nullptr,
     const arma::u32_vec *sub_mesh_index = nullptr,
+    const arma::fmat *rx_points = nullptr,
     bool scalar_mode = false);
 </pre>
 
@@ -5280,6 +5281,7 @@ arma::uword ray_init(
 <li><b><code>max_path_length</code></b> — Maximum ray length [m]; sets <code>dest</code> and bounds the launch-sphere probe (floored at 0.01 m)</li>
 <li><b><code>mesh</code></b> <i>(optional)</i> — Triangle mesh faces; see <a href="#obj_file_read">obj_file_read</a>; <code>[n_mesh, 9]</code>. Used only to auto-size the launch sphere <code>r0</code>. NULL → <code>r0 = 0.01 m</code>.</li>
 <li><b><code>sub_mesh_index</code></b> <i>(optional)</i> — Sub-mesh partition offsets for the accelerated intersect; passed to <a href="#ray_triangle_intersect">ray_triangle_intersect</a>. NULL → no partitioning.</li>
+<li><b><code>rx_points</code></b> <i>(optional)</i> — Receive points in 3D space; <code>[n_point, 3]</code>. Used only to bound the launch sphere <code>r0</code>, so that no receiver starts inside it. NULL → receivers are not considered.</li>
 <li><b><code>scalar_mode</code></b> — Path storage layout passed to <code>paths</code>: <code>true</code> = SCALAR (acoustic, one pressure coefficient per frequency), <code>false</code> = EM (2×2 Jones matrix per frequency)</li>
 </ul>
 
@@ -5307,6 +5309,7 @@ arma::uword ray_init(
 <li><a href="#ray_mesh_interact">ray_mesh_interact</a> (consumes <code>orig</code> / <code>dest</code> / <code>trivec</code> / <code>tridir</code> / <code>orig_length</code>)</li>
 <li><a href="#ray_state_update">ray_state_update</a> (consumes the medium-state words, <code>path_dir_prev</code>, and <code>acc_dist</code>)</li>
 <li><a href="#path">path</a> (the per-ray storage object populated in <code>paths</code>)</li>
+<li><a href="#ray_commit">ray_commit</a> (consumes the same <code>rx_points</code> when committing paths that reach a receiver)</li>
 </ul>
 
 <hr class="greyline"><br>
@@ -5601,7 +5604,7 @@ std::array&lt;unsigned, 4&gt; quadriga_lib::ray_progress(
     bool scalar_mode = false,
     const arma::u32_vec *no_interact_in = nullptr,
     const arma::u32_vec *fbs_ind_in = nullptr,
-    const arma::u32_vec *sbs_ind_in = nullptr, 
+    const arma::u32_vec *sbs_ind_in = nullptr,
     const std::vector&lt;bool&gt; *subdiv_flag_in = nullptr);
 </pre>
 

@@ -50,7 +50,7 @@ arma::uword quadriga_lib::ray_commit(
     const arma::fmat &trivec,
     const arma::fmat &tridir,
     const arma::Col<short> &mtl_ind_current,
-    const arma::fmat &points,
+    const arma::fmat &rx_points,
     const arma::u32_vec *sub_cloud_index = nullptr,
     const std::vector<bool> *subdiv_flag_in = nullptr,
     float max_path_length = 10e3,
@@ -73,7 +73,7 @@ arma::uword quadriga_lib::ray_commit(
 - **`tridir`** — Vertex-ray directions, Cartesian; `[n_ray, 9]`. Need not be unit length
 - **`mtl_ind_current`** — Current medium state word, 0 = outside (bit-masked: `mat = w & 0x7FFF`,
   `flag = w & 0x8000`); `[n_ray]`
-- **`points`** — Receive points in 3D space; `[n_point, 3]`
+- **`rx_points`** — Receive points in 3D space; `[n_point, 3]`
 - **`sub_cloud_index`** *(optional)* — Sub-cloud partition offsets for the point cloud (see
   [[point_cloud_segmentation]]); `[n_sub]`. NULL → no partitioning
 - **`subdiv_flag_in`** *(optional)* — Rays that will be split in the next generation and must not be
@@ -115,7 +115,7 @@ arma::uword quadriga_lib::ray_commit(const std::vector<quadriga_lib::path> &path
                                      const arma::fmat &trivec,
                                      const arma::fmat &tridir,
                                      const arma::Col<short> &mtl_ind_current,
-                                     const arma::fmat &points,
+                                     const arma::fmat &rx_points,
                                      const arma::u32_vec *sub_cloud_index,
                                      const std::vector<bool> *subdiv_flag_in,
                                      float max_path_length, float min_gain_dB, bool ignore_direct_path)
@@ -195,8 +195,8 @@ arma::uword quadriga_lib::ray_commit(const std::vector<quadriga_lib::path> &path
     // Compute ray-point intersections
     std::vector<unsigned> hit_index;
     arma::u32_vec hit_offset;
-    quadriga_lib::ray_point_intersect(points, orig, trivec, tridir, &hit_index, &hit_offset, nullptr, nullptr, sub_cloud_index);
-    const arma::uword n_points = points.n_rows;
+    quadriga_lib::ray_point_intersect(rx_points, orig, trivec, tridir, &hit_index, &hit_offset, nullptr, nullptr, sub_cloud_index);
+    const arma::uword n_points = rx_points.n_rows;
 
     // Number of ray-point pairs found by the intersector
     const size_t n_hit = hit_index.size();
@@ -208,7 +208,7 @@ arma::uword quadriga_lib::ray_commit(const std::vector<quadriga_lib::path> &path
     const unsigned *p_fbs_ind = fbs_ind.memptr();
     const short *p_current = mtl_ind_current.memptr();
     const float *p_orig = orig.memptr();
-    const float *p_points = points.memptr();
+    const float *p_points = rx_points.memptr();
     const float *p_mesh = mesh.memptr();
 
     // Per-ray gate. Evaluated once so the pair loop reads a single byte per pair and
