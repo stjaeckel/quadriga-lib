@@ -122,21 +122,21 @@ lang: en-US
 | [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 3741 |
 | [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 3777 |
 | [ray_commit](#ray_commit) | Site-specific simulation tools | 3813 |
-| [ray_init](#ray_init) | Site-specific simulation tools | 3901 |
-| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 3981 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 4103 |
-| [ray_progress](#ray_progress) | Site-specific simulation tools | 4151 |
-| [ray_state_update](#ray_state_update) | Site-specific simulation tools | 4289 |
-| [ray_subdivide_flag](#ray_subdivide_flag) | Site-specific simulation tools | 4422 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 4483 |
-| [refractive_index](#refractive_index) | Site-specific simulation tools | 4531 |
-| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 4563 |
-| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 4621 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 4651 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 4679 |
-| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 4720 |
-| [write_png](#write_png) | Site-specific simulation tools | 4755 |
-| [xpr_update](#xpr_update) | Site-specific simulation tools | 4781 |
+| [ray_init](#ray_init) | Site-specific simulation tools | 3918 |
+| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 3998 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 4120 |
+| [ray_progress](#ray_progress) | Site-specific simulation tools | 4168 |
+| [ray_state_update](#ray_state_update) | Site-specific simulation tools | 4306 |
+| [ray_subdivide_flag](#ray_subdivide_flag) | Site-specific simulation tools | 4439 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 4500 |
+| [refractive_index](#refractive_index) | Site-specific simulation tools | 4548 |
+| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 4580 |
+| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 4638 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 4668 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 4696 |
+| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 4737 |
+| [write_png](#write_png) | Site-specific simulation tools | 4772 |
+| [xpr_update](#xpr_update) | Site-specific simulation tools | 4798 |
 
 ---
 
@@ -3825,8 +3825,15 @@ Commit the paths of a launch configuration that reach a receiver
 - A ray travelling inside a medium is committed with the in-layer attenuation of the final leg folded into
   its coefficients, per frequency, via [medium_gain](#medium_gain) on `mtl_ind_current & 0x7FFF`.
 - In EM mode a receive-side mirror (`VV = 1`, `HH = -1`) is applied per frequency; in SCALAR mode only the gain is applied.
-- The receiver index is written to the committed path's `iC`. It indexes `points` as passed in, so a caller
-  using a cloud reordered by [point_cloud_segmentation](#point_cloud_segmentation) must map it back itself.
+- The receiver index is written to the committed path's `iC`, 0-based. Without `point_index` it indexes
+  `points` as passed in; with `point_index` it indexes the caller's original, unsegmented point list, so a
+  cloud reordered by [point_cloud_segmentation](#point_cloud_segmentation) needs no remapping afterwards.
+- Padding points inserted by [point_cloud_segmentation](#point_cloud_segmentation) for SIMD alignment sit at the center of their
+  sub-cloud AABB and are therefore hit often. They are dropped when `point_index` is supplied and committed
+  as if they were receivers when it is not.
+- `min_no_segments` suppresses commits from rays that have not interacted often enough. The launch-sphere
+  beams of the first generation carry `nSEG = 0` and are far too wide for a point-in-tube test to be
+  meaningful, so a beam-traced run passes 1 here.
 - The committed path is not extended by a segment: the receiver is not an interaction point, so `nSEG` and
   `length` are those of the in-flight ray and the caller recovers the total with `path::calc_length`.
 
@@ -3845,9 +3852,11 @@ arma::uword quadriga_lib::ray_commit(
     const arma::Col<short> &mtl_ind_current,
     const arma::fmat &rx_points,
     const arma::u32_vec *sub_cloud_index = nullptr,
+    const arma::u32_vec *point_index = nullptr,
     const std::vector<bool> *subdiv_flag_in = nullptr,
     float max_path_length = 10e3,
     float min_gain_dB = -140.0f,
+    uint8_t min_no_segments = 0,
     bool ignore_direct_path = false);
 ```
 
@@ -3869,12 +3878,20 @@ arma::uword quadriga_lib::ray_commit(
 - **`rx_points`** — Receive points in 3D space; `[n_point, 3]`
 - **`sub_cloud_index`** *(optional)* — Sub-cloud partition offsets for the point cloud (see
   [point_cloud_segmentation](#point_cloud_segmentation)); `[n_sub]`. NULL → no partitioning
+- **`point_index`** *(optional)* — 1-based map from each row of `points` back to the caller's original point
+  list, 0 = padding inserted for SIMD alignment; `[n_point]`. Pass the `forward_index` output of
+  [point_cloud_segmentation](#point_cloud_segmentation) for the same cloud — not `reverse_index`, which runs the other way and has
+  length `n_point` of the *unsegmented* cloud. Padded rows are skipped and `iC` is written in the original
+  indexing. NULL → `points` is used as passed in and `iC` indexes it directly
 - **`subdiv_flag_in`** *(optional)* — Rays that will be split in the next generation and must not be
   committed now; `[n_ray]`, indexed in the full ray set. Pass the output of [ray_subdivide_flag](#ray_subdivide_flag) for the
   same launch configuration. NULL / empty → no ray is excluded on these grounds
 - **`max_path_length`** *(optional)* — Maximum total path length including the leg to the receiver [m]
 - **`min_gain_dB`** *(optional)* — Gain at `center_frequency[0]` below which a path is not committed, in dB;
   evaluated with free-space path loss and the in-medium loss of the final leg included
+- **`min_no_segments`** *(optional)* — Minimum number of interaction segments (`nSEG`) a ray must carry
+  before it can commit, 0 to 255. 0 = no restriction. 1 excludes the launch-sphere beams of the first
+  generation, including the sub-beams they spawn, which keep `nSEG = 0` until their first interaction
 - **`ignore_direct_path`** *(optional)* — Drop every path that arrives by transmission only
   (`nREF == 0 && nSCT == 0`, which includes pure LOS); these are covered by [calc_diffraction_gain](#calc_diffraction_gain).
   The test is unconditional: under refraction the traced path is longer than the straight line, so a
@@ -3882,7 +3899,7 @@ arma::uword quadriga_lib::ray_commit(
 
 ### Output:
 - **`paths_commit`** — Committed paths, appended to whatever the vector already holds; extended by
-  `n_commit` entries. Each carries the receiver index in `iC`, the interaction history of its ray, and the
+  `n_commit` entries. Each carries the 0-based receiver index in `iC`, the interaction history of its ray, and the
   transfer coefficients with the receive-side mirror and any in-medium loss applied. Existing entries are
   not modified; if the vector is non-empty its layout must match `paths`
 
@@ -3893,7 +3910,7 @@ arma::uword quadriga_lib::ray_commit(
 - [ray_point_intersect](#ray_point_intersect) (ray-point intersection, produces the pair list)
 - [ray_subdivide_flag](#ray_subdivide_flag) (produces `subdiv_flag_in`)
 - [ray_progress](#ray_progress) (advance the launch configuration to the next generation)
-- [point_cloud_segmentation](#point_cloud_segmentation) (generate `sub_cloud_index`)
+- [point_cloud_segmentation](#point_cloud_segmentation) (generate `sub_cloud_index` and `point_index`)
 - [calc_diffraction_gain](#calc_diffraction_gain) (covers the paths removed by `ignore_direct_path`)
 - [path](#path) (the per-ray storage object)
 

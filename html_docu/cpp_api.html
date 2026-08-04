@@ -5173,7 +5173,9 @@ Commit the paths of a launch configuration that reach a receiver
 <li>Rays flagged in <code>subdiv_flag_in</code> are skipped entirely — they reappear as sub-beams in the next generation and would otherwise be committed twice. Subdivision is not detected internally.</li>
 <li>A ray travelling inside a medium is committed with the in-layer attenuation of the final leg folded into its coefficients, per frequency, via <a href="#medium_gain">medium_gain</a> on <code>mtl_ind_current &amp; 0x7FFF</code>.</li>
 <li>In EM mode a receive-side mirror (<code>VV = 1</code>, <code>HH = -1</code>) is applied per frequency; in SCALAR mode only the gain is applied.</li>
-<li>The receiver index is written to the committed path's <code>iC</code>. It indexes <code>points</code> as passed in, so a caller using a cloud reordered by <a href="#point_cloud_segmentation">point_cloud_segmentation</a> must map it back itself.</li>
+<li>The receiver index is written to the committed path's <code>iC</code>, 0-based. Without <code>point_index</code> it indexes <code>points</code> as passed in; with <code>point_index</code> it indexes the caller's original, unsegmented point list, so a cloud reordered by <a href="#point_cloud_segmentation">point_cloud_segmentation</a> needs no remapping afterwards.</li>
+<li>Padding points inserted by <a href="#point_cloud_segmentation">point_cloud_segmentation</a> for SIMD alignment sit at the center of their sub-cloud AABB and are therefore hit often. They are dropped when <code>point_index</code> is supplied and committed as if they were receivers when it is not.</li>
+<li><code>min_no_segments</code> suppresses commits from rays that have not interacted often enough. The launch-sphere beams of the first generation carry <code>nSEG = 0</code> and are far too wide for a point-in-tube test to be meaningful, so a beam-traced run passes 1 here.</li>
 <li>The committed path is not extended by a segment: the receiver is not an interaction point, so <code>nSEG</code> and <code>length</code> are those of the in-flight ray and the caller recovers the total with <code>path::calc_length</code>.</li>
 </ul>
 
@@ -5192,9 +5194,11 @@ arma::uword quadriga_lib::ray_commit(
     const arma::Col&lt;short&gt; &amp;mtl_ind_current,
     const arma::fmat &amp;rx_points,
     const arma::u32_vec *sub_cloud_index = nullptr,
+    const arma::u32_vec *point_index = nullptr,
     const std::vector&lt;bool&gt; *subdiv_flag_in = nullptr,
     float max_path_length = 10e3,
     float min_gain_dB = -140.0f,
+    uint8_t min_no_segments = 0,
     bool ignore_direct_path = false);
 </pre>
 
@@ -5211,15 +5215,17 @@ arma::uword quadriga_lib::ray_commit(
 <li><b><code>mtl_ind_current</code></b> — Current medium state word, 0 = outside (bit-masked: <code>mat = w &amp; 0x7FFF</code>, <code>flag = w &amp; 0x8000</code>); <code>[n_ray]</code></li>
 <li><b><code>rx_points</code></b> — Receive points in 3D space; <code>[n_point, 3]</code></li>
 <li><b><code>sub_cloud_index</code></b> <i>(optional)</i> — Sub-cloud partition offsets for the point cloud (see <a href="#point_cloud_segmentation">point_cloud_segmentation</a>); <code>[n_sub]</code>. NULL → no partitioning</li>
+<li><b><code>point_index</code></b> <i>(optional)</i> — 1-based map from each row of <code>points</code> back to the caller's original point list, 0 = padding inserted for SIMD alignment; <code>[n_point]</code>. Pass the <code>forward_index</code> output of <a href="#point_cloud_segmentation">point_cloud_segmentation</a> for the same cloud — not <code>reverse_index</code>, which runs the other way and has length <code>n_point</code> of the <i>unsegmented</i> cloud. Padded rows are skipped and <code>iC</code> is written in the original indexing. NULL → <code>points</code> is used as passed in and <code>iC</code> indexes it directly</li>
 <li><b><code>subdiv_flag_in</code></b> <i>(optional)</i> — Rays that will be split in the next generation and must not be committed now; <code>[n_ray]</code>, indexed in the full ray set. Pass the output of <a href="#ray_subdivide_flag">ray_subdivide_flag</a> for the same launch configuration. NULL / empty → no ray is excluded on these grounds</li>
 <li><b><code>max_path_length</code></b> <i>(optional)</i> — Maximum total path length including the leg to the receiver [m]</li>
 <li><b><code>min_gain_dB</code></b> <i>(optional)</i> — Gain at <code>center_frequency[0]</code> below which a path is not committed, in dB; evaluated with free-space path loss and the in-medium loss of the final leg included</li>
+<li><b><code>min_no_segments</code></b> <i>(optional)</i> — Minimum number of interaction segments (<code>nSEG</code>) a ray must carry before it can commit, 0 to 255. 0 = no restriction. 1 excludes the launch-sphere beams of the first generation, including the sub-beams they spawn, which keep <code>nSEG = 0</code> until their first interaction</li>
 <li><b><code>ignore_direct_path</code></b> <i>(optional)</i> — Drop every path that arrives by transmission only (<code>nREF == 0 &amp;&amp; nSCT == 0</code>, which includes pure LOS); these are covered by <a href="#calc_diffraction_gain">calc_diffraction_gain</a>. The test is unconditional: under refraction the traced path is longer than the straight line, so a length-based test would let it through and double-count against the diffraction model</li>
 </ul>
 
 <b>Output:</b><br>
 <ul>
-<li><b><code>paths_commit</code></b> — Committed paths, appended to whatever the vector already holds; extended by <code>n_commit</code> entries. Each carries the receiver index in <code>iC</code>, the interaction history of its ray, and the transfer coefficients with the receive-side mirror and any in-medium loss applied. Existing entries are not modified; if the vector is non-empty its layout must match <code>paths</code></li>
+<li><b><code>paths_commit</code></b> — Committed paths, appended to whatever the vector already holds; extended by <code>n_commit</code> entries. Each carries the 0-based receiver index in <code>iC</code>, the interaction history of its ray, and the transfer coefficients with the receive-side mirror and any in-medium loss applied. Existing entries are not modified; if the vector is non-empty its layout must match <code>paths</code></li>
 </ul>
 
 <b>Returns:</b><br>
@@ -5232,7 +5238,7 @@ arma::uword quadriga_lib::ray_commit(
 <li><a href="#ray_point_intersect">ray_point_intersect</a> (ray-point intersection, produces the pair list)</li>
 <li><a href="#ray_subdivide_flag">ray_subdivide_flag</a> (produces <code>subdiv_flag_in</code>)</li>
 <li><a href="#ray_progress">ray_progress</a> (advance the launch configuration to the next generation)</li>
-<li><a href="#point_cloud_segmentation">point_cloud_segmentation</a> (generate <code>sub_cloud_index</code>)</li>
+<li><a href="#point_cloud_segmentation">point_cloud_segmentation</a> (generate <code>sub_cloud_index</code> and <code>point_index</code>)</li>
 <li><a href="#calc_diffraction_gain">calc_diffraction_gain</a> (covers the paths removed by <code>ignore_direct_path</code>)</li>
 <li><a href="#path">path</a> (the per-ray storage object)</li>
 </ul>

@@ -8,10 +8,11 @@
 // test_ray_point_intersect, the material model by test_ray_mesh_interact, and the path storage by
 // test_path. This suite asserts the things only ray_commit can get wrong:
 //
-//   the gates      length, gain, shading, subdivision, direct-path
+//   the gates      length, gain, shading, subdivision, direct-path, segment count
 //   the count      the survivor mask and the block prefix sum agree with what is written
 //   the payload    iC, the receive-side mirror, the in-medium loss, per frequency
 //   the append     existing entries untouched, return value equals the number added
+//   the index map  padding rows dropped, iC reported in the caller's original ordering
 //
 // Oracles: geometry is exact by construction (a single ray along +x, receivers placed on its axis),
 // so the shading decision has a known answer. The coefficient assertions are relative — committed
@@ -21,6 +22,10 @@
 // Block boundary: pass B and pass C walk the pair list in blocks of 65536. One test drives the pair
 // count past that so the prefix sum over more than one block is exercised; a single-block suite
 // would never touch it.
+//
+// Index map: most point_index cases use a hand-built map so the expected iC is exact. One case runs
+// the real point_cloud_segmentation and compares against the unsegmented result, which is the only
+// oracle that catches a change in the padding convention.
 //
 // Conventions:
 //  - The point source sits at the coordinate origin; rays are launched from a launch sphere of
@@ -115,9 +120,11 @@ namespace
     struct Opt
     {
         const arma::u32_vec *sci = nullptr;
+        const arma::u32_vec *pt_ind = nullptr;
         const std::vector<bool> *sf_in = nullptr;
         float max_len = 10e3f;
         float min_gain_dB = -140.0f;
+        uint8_t min_seg = 0;
         bool ignore_direct = false;
     };
 
@@ -139,7 +146,8 @@ namespace
         {
             return quadriga_lib::ray_commit(paths, out, S.mesh, S.mtl_prop, freq,
                                             orig, fbs_ind, trivec, tridir, cur, points,
-                                            o.sci, o.sf_in, o.max_len, o.min_gain_dB, o.ignore_direct);
+                                            o.sci, o.pt_ind, o.sf_in,
+                                            o.max_len, o.min_gain_dB, o.min_seg, o.ignore_direct);
         }
     };
 
@@ -226,24 +234,50 @@ namespace
         return P;
     }
 
-    // Every committed path is well formed and its receiver index is in range
+    // Every committed path is well formed and its receiver index is in range.
+    // "n_index" bounds iC: the point count without point_index, the original cloud size with it.
+    // Point-major output means iC never decreases within one call, but only while iC and the
+    // storage order agree; a point_index permutes them, so that check is opt-out.
     void check_commit_shape(const std::vector<quadriga_lib::path> &out, size_t from,
-                            arma::uword n_point, arma::uword n_freq, bool scalar)
+                            arma::uword n_index, arma::uword n_freq, bool scalar,
+                            bool monotonic_iC = true)
     {
         unsigned last_iC = 0;
         for (size_t i = from; i < out.size(); ++i)
         {
             CHECK(out[i].n_freq() == n_freq);
             CHECK(out[i].is_scalar() == scalar);
-            CHECK(out[i].iC < (unsigned)n_point);
+            CHECK(out[i].iC < (unsigned)n_index);
             CHECK(std::isfinite(out[i].length()));
             CHECK(out[i].calc_gain(0.0f, 0) > 0.0f);
 
             // Output is point-major, so the receiver index never decreases within one call
-            if (i > from)
+            if (monotonic_iC && i > from)
                 CHECK(out[i].iC >= last_iC);
             last_iC = out[i].iC;
         }
+    }
+
+    // Append one interaction segment to a ray's path, so it clears a min_no_segments gate.
+    // The vertex is placed at the ray origin, which leaves the accumulated length untouched
+    // and keeps the committed leg identical to the zero-segment case.
+    void add_segment(Cfg &C, arma::uword i_ray)
+    {
+        quadriga_lib::path tmp;
+        C.paths[i_ray].extend(tmp, C.orig(i_ray, 0), C.orig(i_ray, 1), C.orig(i_ray, 2), 128);
+        C.paths[i_ray] = std::move(tmp);
+    }
+
+    // Sorted receiver indices of a commit result, for comparing two runs that differ only in
+    // the order the points were presented in
+    std::vector<unsigned> sorted_iC(const std::vector<quadriga_lib::path> &out)
+    {
+        std::vector<unsigned> v;
+        v.reserve(out.size());
+        for (const auto &p : out)
+            v.push_back(p.iC);
+        std::sort(v.begin(), v.end());
+        return v;
     }
 }
 
@@ -265,8 +299,8 @@ TEST_CASE("ray_commit - a receiver on the beam axis is committed")
     REQUIRE(C.commit(S, P, out) == 1);
     REQUIRE(out.size() == 1);
 
-    CHECK(out[0].iC == 0u);                      // receiver index
-    CHECK(out[0].n_seg() == C.paths[0].n_seg()); // the receiver is not an interaction point
+    CHECK(out[0].iC == 0u);                        // receiver index
+    CHECK(out[0].n_seg() == C.paths[0].n_seg());   // the receiver is not an interaction point
     CHECK(out[0].length() == C.paths[0].length()); // length still ends at the last interaction
 
     // The committed path descends from the source path rather than being freshly built
@@ -702,6 +736,198 @@ TEST_CASE("ray_commit - sub-cloud partitioning does not change the result")
 }
 
 // ===========================================================================================
+// Point index mapping
+// ===========================================================================================
+
+TEST_CASE("ray_commit - point_index drops padding rows")
+{
+    // A hand-built stand-in for a segmented cloud: row 1 is padding, the other two are real.
+    // point_index is 1-based into the caller's original list, 0 marks padding.
+    Scene S = one_cube(50.0f, 0.0f, 0.0f);
+    Cfg C = one_ray();
+
+    arma::fmat P = pts({{3.0f, 0.0f, 0.0f}, {5.0f, 0.0f, 0.0f}, {7.0f, 0.0f, 0.0f}});
+    std::vector<quadriga_lib::path> out;
+
+    // Without the map all three rows are receivers
+    REQUIRE(C.commit(S, P, out) == 3);
+    out.clear();
+
+    arma::u32_vec fwd = {1u, 0u, 2u};
+    Opt o;
+    o.pt_ind = &fwd;
+
+    REQUIRE(C.commit(S, P, out, o) == 2);
+    CHECK(out[0].iC == 0u); // row 0 maps to original point 0
+    CHECK(out[1].iC == 1u); // row 2 maps to original point 1, row 1 was padding
+
+    // An empty map is treated as absent
+    out.clear();
+    arma::u32_vec none;
+    o.pt_ind = &none;
+    CHECK(C.commit(S, P, out, o) == 3);
+}
+
+TEST_CASE("ray_commit - point_index remaps iC into the original ordering")
+{
+    // A reversing map: the segmented row order is the opposite of the caller's, so a correct
+    // implementation returns descending iC while the storage order stays point-major
+    Scene S = one_cube(50.0f, 0.0f, 0.0f);
+    Cfg C = one_ray();
+
+    arma::fmat P = pts({{3.0f, 0.0f, 0.0f}, {5.0f, 0.0f, 0.0f}, {7.0f, 0.0f, 0.0f}});
+    arma::u32_vec fwd = {3u, 2u, 1u};
+
+    Opt o;
+    o.pt_ind = &fwd;
+    std::vector<quadriga_lib::path> out;
+    REQUIRE(C.commit(S, P, out, o) == 3);
+
+    CHECK(out[0].iC == 2u);
+    CHECK(out[1].iC == 1u);
+    CHECK(out[2].iC == 0u);
+
+    // The leg is still measured to the row that was actually hit, not to the mapped index
+    check_commit_shape(out, 0, P.n_rows, 1, false, false);
+}
+
+TEST_CASE("ray_commit - point_index agrees with point_cloud_segmentation")
+{
+    // The real integration: segment a cloud with SIMD alignment, then check that committing
+    // against the segmented cloud with its forward_index reproduces the unsegmented result.
+    Scene S = one_cube(200.0f, 0.0f, 0.0f);
+    Cfg C = one_ray(200.0f, 20.0f);
+
+    const arma::uword n_pt = 50;
+    arma::fmat P0(n_pt, 3, arma::fill::none);
+    for (arma::uword i = 0; i < n_pt; ++i)
+        P0(i, 0) = 5.0f + 0.2f * (float)i, P0(i, 1) = 0.0f, P0(i, 2) = 0.0f;
+
+    arma::fmat PR;
+    arma::u32_vec sci, fwd;
+    quadriga_lib::point_cloud_segmentation<float>(&P0, &PR, &sci, 8, 8, &fwd);
+
+    // The scenario is only meaningful when alignment padding was actually inserted
+    REQUIRE(PR.n_rows > n_pt);
+    REQUIRE(fwd.n_elem == PR.n_rows);
+    REQUIRE(arma::any(fwd == 0u));
+
+    std::vector<quadriga_lib::path> a, b;
+    const arma::uword na = C.commit(S, P0, a);
+    REQUIRE(na > 0);
+
+    Opt o;
+    o.sci = &sci;
+    o.pt_ind = &fwd;
+    const arma::uword nb = C.commit(S, PR, b, o);
+
+    CHECK(na == nb);
+    CHECK(sorted_iC(a) == sorted_iC(b));
+    check_commit_shape(b, 0, n_pt, 1, false, false);
+}
+
+TEST_CASE("ray_commit - padding is committed when point_index is omitted")
+{
+    // Padding points sit at the centre of their sub-cloud AABB, so they are hit as readily as
+    // any real point. This pins the failure mode the map exists to prevent.
+    Scene S = one_cube(200.0f, 0.0f, 0.0f);
+    Cfg C = one_ray(200.0f, 20.0f);
+
+    const arma::uword n_pt = 50;
+    arma::fmat P0(n_pt, 3, arma::fill::none);
+    for (arma::uword i = 0; i < n_pt; ++i)
+        P0(i, 0) = 5.0f + 0.2f * (float)i, P0(i, 1) = 0.0f, P0(i, 2) = 0.0f;
+
+    arma::fmat PR;
+    arma::u32_vec sci, fwd;
+    quadriga_lib::point_cloud_segmentation<float>(&P0, &PR, &sci, 8, 8, &fwd);
+    REQUIRE(PR.n_rows > n_pt);
+
+    Opt with_map, without_map;
+    with_map.sci = &sci, with_map.pt_ind = &fwd;
+    without_map.sci = &sci;
+
+    std::vector<quadriga_lib::path> a, b;
+    const arma::uword na = C.commit(S, PR, a, with_map);
+    const arma::uword nb = C.commit(S, PR, b, without_map);
+
+    CHECK(nb > na); // the extra entries are the padding rows
+}
+
+// ===========================================================================================
+// min_no_segments
+// ===========================================================================================
+
+TEST_CASE("ray_commit - min_no_segments gate")
+{
+    Scene S = one_cube(50.0f, 0.0f, 0.0f);
+    Cfg C = one_ray();
+    REQUIRE(C.paths[0].n_seg() == 0);
+
+    arma::fmat P = pts({{5.0f, 0.0f, 0.0f}});
+    std::vector<quadriga_lib::path> out;
+
+    // The default admits a zero-segment ray
+    Opt o;
+    CHECK(C.commit(S, P, out, o) == 1);
+
+    // Requiring one interaction excludes it: this is the launch-sphere beam of generation 0
+    out.clear();
+    o.min_seg = 1;
+    CHECK(C.commit(S, P, out, o) == 0);
+
+    // After an interaction the same ray commits again
+    add_segment(C, 0);
+    REQUIRE(C.paths[0].n_seg() == 1);
+    out.clear();
+    CHECK(C.commit(S, P, out, o) == 1);
+
+    // And a higher threshold excludes it once more
+    out.clear();
+    o.min_seg = 2;
+    CHECK(C.commit(S, P, out, o) == 0);
+}
+
+TEST_CASE("ray_commit - min_no_segments and ignore_direct_path are independent gates")
+{
+    // A once-reflected ray passes ignore_direct_path but not a two-segment threshold, and a
+    // two-segment transmission-only ray passes the threshold but not ignore_direct_path
+    Scene S = one_cube(50.0f, 0.0f, 0.0f);
+    arma::fmat P = pts({{5.0f, 0.0f, 0.0f}});
+    std::vector<quadriga_lib::path> out;
+
+    {
+        Cfg C = one_ray();
+        add_segment(C, 0);
+        C.paths[0].nREF = 1;
+
+        Opt o;
+        o.ignore_direct = true;
+        CHECK(C.commit(S, P, out, o) == 1);
+
+        out.clear();
+        o.min_seg = 2;
+        CHECK(C.commit(S, P, out, o) == 0);
+    }
+
+    {
+        Cfg C = one_ray();
+        add_segment(C, 0);
+        add_segment(C, 0);
+        C.paths[0].nTRA = 2; // transmissions only, so it is still a direct arrival
+
+        Opt o;
+        o.min_seg = 2;
+        out.clear();
+        CHECK(C.commit(S, P, out, o) == 1);
+
+        o.ignore_direct = true;
+        out.clear();
+        CHECK(C.commit(S, P, out, o) == 0);
+    }
+}
+
+// ===========================================================================================
 // Input validation
 // ===========================================================================================
 
@@ -794,6 +1020,24 @@ TEST_CASE("ray_commit - input validation")
         CHECK_THROWS_AS(C.commit(S, P, out, o), std::invalid_argument);
     }
 
+    SECTION("point_index length")
+    {
+        // P has one row, so a two-element map does not describe it
+        arma::u32_vec bad = {1u, 2u};
+        Opt o;
+        o.pt_ind = &bad;
+        CHECK_THROWS_AS(C.commit(S, P, out, o), std::invalid_argument);
+
+        arma::u32_vec good = {1u};
+        o.pt_ind = &good;
+        CHECK_NOTHROW(C.commit(S, P, out, o));
+
+        // Empty is absent, not a length mismatch
+        arma::u32_vec none;
+        o.pt_ind = &none;
+        CHECK_NOTHROW(C.commit(S, P, out, o));
+    }
+
     SECTION("thresholds")
     {
         Opt o;
@@ -826,5 +1070,19 @@ TEST_CASE("ray_commit - input validation")
 
         arma::fmat wide(1, 4, arma::fill::zeros);
         CHECK_THROWS_AS(C.commit(S, wide, out), std::invalid_argument);
+    }
+
+    SECTION("all paths must share one layout")
+    {
+        Cfg X = one_ray();
+        X.paths.resize(2);
+        X.paths[1].init(0, 2, false); // second path has two frequencies
+        X.orig = arma::join_vert(X.orig, X.orig);
+        X.dest = arma::join_vert(X.dest, X.dest);
+        X.trivec = arma::join_vert(X.trivec, X.trivec);
+        X.tridir = arma::join_vert(X.tridir, X.tridir);
+        X.fbs_ind.zeros(2);
+        X.cur.zeros(2);
+        CHECK_THROWS_AS(X.commit(S, P, out), std::invalid_argument);
     }
 }
