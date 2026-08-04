@@ -213,6 +213,7 @@
   <tr><td><a href="#point_cloud_segmentation">point_cloud_segmentation</a></td><td>Reorganize a point cloud into spatial sub-clouds for efficient processing</td></tr>
   <tr><td><a href="#point_cloud_split">point_cloud_split</a></td><td>Split a point cloud into two sub-clouds along a spatial axis</td></tr>
   <tr><td><a href="#point_inside_mesh">point_inside_mesh</a></td><td>Test whether 3D points are inside a triangle mesh using raycasting</td></tr>
+  <tr><td><a href="#ray_commit">ray_commit</a></td><td>Commit the paths of a launch configuration that reach a receiver</td></tr>
   <tr><td><a href="#ray_init">ray_init</a></td><td>Seed a sphere of rays from a point source</td></tr>
   <tr><td><a href="#ray_mesh_interact">ray_mesh_interact</a></td><td>Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh surfaces</td></tr>
   <tr><td><a href="#ray_point_intersect">ray_point_intersect</a></td><td>Calculate intersections of ray beams with points in 3D space</td></tr>
@@ -5159,6 +5160,81 @@ arma::uvec quadriga_lib::point_inside_mesh(
 <b>See also:</b><br>
 <ul>
 <li><a href="#obj_file_read">obj_file_read</a> (for reading <code>mesh</code> and <code>obj_ind</code> from an .obj file)</li>
+</ul>
+
+<hr class="greyline"><br>
+<span id="ray_commit" class="qd-func"><b>ray_commit</b></span><br>
+<hr class="thin">
+Commit the paths of a launch configuration that reach a receiver
+<ul>
+<li>Intersects the current beam set with the receive point cloud (<a href="#ray_point_intersect">ray_point_intersect</a>) and appends one <a href="#path">path</a> object to <code>paths_commit</code> for every ray-point pair that survives the gates below.</li>
+<li>A pair is committed when the receiver is not shaded by the ray's own first-bounce face, the total path length stays below <code>max_path_length</code>, and the gain at <code>center_frequency[0]</code> stays above <code>min_gain_dB</code>.</li>
+<li>Shading is a half-space test against the plane of the first-bounce face: the receiver must lie on the same side of that plane as the ray origin. The face is treated as an infinite plane, so a receiver just past the edge of a small face is conservatively dropped.</li>
+<li>Rays flagged in <code>subdiv_flag_in</code> are skipped entirely — they reappear as sub-beams in the next generation and would otherwise be committed twice. Subdivision is not detected internally.</li>
+<li>A ray travelling inside a medium is committed with the in-layer attenuation of the final leg folded into its coefficients, per frequency, via <a href="#medium_gain">medium_gain</a> on <code>mtl_ind_current &amp; 0x7FFF</code>.</li>
+<li>In EM mode a receive-side mirror (<code>VV = 1</code>, <code>HH = -1</code>) is applied per frequency; in SCALAR mode only the gain is applied.</li>
+<li>The receiver index is written to the committed path's <code>iC</code>. It indexes <code>points</code> as passed in, so a caller using a cloud reordered by <a href="#point_cloud_segmentation">point_cloud_segmentation</a> must map it back itself.</li>
+<li>The committed path is not extended by a segment: the receiver is not an interaction point, so <code>nSEG</code> and <code>length</code> are those of the in-flight ray and the caller recovers the total with <code>path::calc_length</code>.</li>
+</ul>
+
+<b>Declaration:</b><br>
+<pre>
+arma::uword quadriga_lib::ray_commit(
+    const std::vector&lt;quadriga_lib::path&gt; &amp;paths,
+    std::vector&lt;quadriga_lib::path&gt; &amp;paths_commit,
+    const arma::fmat &amp;mesh,
+    const std::unordered_map&lt;std::string, std::vector&lt;float&gt;&gt; &amp;mtl_prop,
+    const arma::fvec &amp;center_frequency,
+    const arma::fmat &amp;orig,
+    const arma::u32_vec &amp;fbs_ind,
+    const arma::fmat &amp;trivec,
+    const arma::fmat &amp;tridir,
+    const arma::Col&lt;short&gt; &amp;mtl_ind_current,
+    const arma::fmat &amp;points,
+    const arma::u32_vec *sub_cloud_index = nullptr,
+    const std::vector&lt;bool&gt; *subdiv_flag_in = nullptr,
+    float max_path_length = 10e3,
+    float min_gain_dB = -140.0f,
+    bool ignore_direct_path = false);
+</pre>
+
+<b>Inputs:</b><br>
+<ul>
+<li><b><code>paths</code></b> — In-flight per-ray <a href="#path">path</a> objects; <code>[n_ray]</code>. Frequency count and layout define those of the committed paths; not modified</li>
+<li><b><code>mesh</code></b> — Faces of the triangular mesh; each row <code>{x1 y1 z1 x2 y2 z2 x3 y3 z3}</code>; <code>[n_mesh, 9]</code>. Only the faces named by <code>fbs_ind</code> are read, for the shading plane</li>
+<li><b><code>mtl_prop</code></b> — Material properties keyed by column name (the <code>csv_prop</code> output of <a href="#obj_file_read">obj_file_read</a>); each value has length <code>n_mtl</code> (max 32767)</li>
+<li><b><code>center_frequency</code></b> — Center frequencies in [Hz]; <code>[n_freq]</code>, 1 to 127 entries, must match the layout of <code>paths</code>. <code>center_frequency[0]</code> is the reference frequency for the gain gate</li>
+<li><b><code>orig</code></b> — Ray origins in GCS; <code>[n_ray, 3]</code>. Defines <code>n_ray</code>; must be non-empty</li>
+<li><b><code>fbs_ind</code></b> — 1-based index of the first intersected mesh element, 0 = no hit; <code>[n_ray]</code>. Obtained from <a href="#ray_triangle_intersect">ray_triangle_intersect</a> for the same launch configuration</li>
+<li><b><code>trivec</code></b> — Beam wavefront triangle vertices relative to the ray origin; <code>[n_ray, 9]</code></li>
+<li><b><code>tridir</code></b> — Vertex-ray directions, Cartesian; <code>[n_ray, 9]</code>. Need not be unit length</li>
+<li><b><code>mtl_ind_current</code></b> — Current medium state word, 0 = outside (bit-masked: <code>mat = w &amp; 0x7FFF</code>, <code>flag = w &amp; 0x8000</code>); <code>[n_ray]</code></li>
+<li><b><code>points</code></b> — Receive points in 3D space; <code>[n_point, 3]</code></li>
+<li><b><code>sub_cloud_index</code></b> <i>(optional)</i> — Sub-cloud partition offsets for the point cloud (see <a href="#point_cloud_segmentation">point_cloud_segmentation</a>); <code>[n_sub]</code>. NULL → no partitioning</li>
+<li><b><code>subdiv_flag_in</code></b> <i>(optional)</i> — Rays that will be split in the next generation and must not be committed now; <code>[n_ray]</code>, indexed in the full ray set. Pass the output of <a href="#ray_subdivide_flag">ray_subdivide_flag</a> for the same launch configuration. NULL / empty → no ray is excluded on these grounds</li>
+<li><b><code>max_path_length</code></b> <i>(optional)</i> — Maximum total path length including the leg to the receiver [m]</li>
+<li><b><code>min_gain_dB</code></b> <i>(optional)</i> — Gain at <code>center_frequency[0]</code> below which a path is not committed, in dB; evaluated with free-space path loss and the in-medium loss of the final leg included</li>
+<li><b><code>ignore_direct_path</code></b> <i>(optional)</i> — Drop every path that arrives by transmission only (<code>nREF == 0 &amp;&amp; nSCT == 0</code>, which includes pure LOS); these are covered by <a href="#calc_diffraction_gain">calc_diffraction_gain</a>. The test is unconditional: under refraction the traced path is longer than the straight line, so a length-based test would let it through and double-count against the diffraction model</li>
+</ul>
+
+<b>Output:</b><br>
+<ul>
+<li><b><code>paths_commit</code></b> — Committed paths, appended to whatever the vector already holds; extended by <code>n_commit</code> entries. Each carries the receiver index in <code>iC</code>, the interaction history of its ray, and the transfer coefficients with the receive-side mirror and any in-medium loss applied. Existing entries are not modified; if the vector is non-empty its layout must match <code>paths</code></li>
+</ul>
+
+<b>Returns:</b><br>
+<ul>
+<li>Number of newly committed paths, <code>n_commit</code></li>
+</ul>
+
+<b>See also:</b><br>
+<ul>
+<li><a href="#ray_point_intersect">ray_point_intersect</a> (ray-point intersection, produces the pair list)</li>
+<li><a href="#ray_subdivide_flag">ray_subdivide_flag</a> (produces <code>subdiv_flag_in</code>)</li>
+<li><a href="#ray_progress">ray_progress</a> (advance the launch configuration to the next generation)</li>
+<li><a href="#point_cloud_segmentation">point_cloud_segmentation</a> (generate <code>sub_cloud_index</code>)</li>
+<li><a href="#calc_diffraction_gain">calc_diffraction_gain</a> (covers the paths removed by <code>ignore_direct_path</code>)</li>
+<li><a href="#path">path</a> (the per-ray storage object)</li>
 </ul>
 
 <hr class="greyline"><br>

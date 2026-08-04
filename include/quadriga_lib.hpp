@@ -175,15 +175,13 @@ namespace quadriga_lib
         const arma::fmat &mesh,                                              // Faces of the triangular mesh, [n_mesh, 9]
         const std::unordered_map<std::string, std::vector<float>> &mtl_prop, // Material properties
         const arma::fvec &center_frequency,                                  // Center frequencies in Hz, [n_freq]
-        float Ox, float Oy, float Oz,                                        // Global origin position
         const arma::fmat &orig,                                              // Ray origins in GCS, [n_ray, 3]
-        const arma::fmat &fbs,                                               // First interaction points in GCS, [n_ray, 3]
         const arma::u32_vec &fbs_ind,                                        // 1-based FBS face index, 0 = no hit, [n_ray]
         const arma::fmat &trivec,                                            // Beam wavefront vertices relative to ray origin, [n_ray, 9]
         const arma::fmat &tridir,                                            // Vertex-ray directions, Cartesian [n_ray, 9]
         const arma::Col<short> &mtl_ind_current,                             // Current medium (0 = outside), [n_ray]
         const arma::fmat &points,                                            // Receive points in 3D Space, Size: [n_points, 3]
-        const arma::u32_vec sub_cloud_index,                                 // Sub-cloud index, 0-based, Length: [n_sub]
+        const arma::u32_vec *sub_cloud_index,                                 // Sub-cloud index, 0-based, Length: [n_sub]
         const std::vector<bool> *subdiv_flag_in = nullptr,                   // Optional: List of beam to subdivide, [n_ray], NULL/empty = none
         float max_path_length = 10e3,                                        // Maximum path length
         float min_gain_dB = -140.0f,                                         // Minimum gain below which a path is terminated
