@@ -32,8 +32,15 @@ Commit the paths of a launch configuration that reach a receiver
 - A ray travelling inside a medium is committed with the in-layer attenuation of the final leg folded into
   its coefficients, per frequency, via [[medium_gain]] on `mtl_ind_current & 0x7FFF`.
 - In EM mode a receive-side mirror (`VV = 1`, `HH = -1`) is applied per frequency; in SCALAR mode only the gain is applied.
-- The receiver index is written to the committed path's `iC`. It indexes `points` as passed in, so a caller
-  using a cloud reordered by [[point_cloud_segmentation]] must map it back itself.
+- The receiver index is written to the committed path's `iC`, 0-based. Without `point_index` it indexes
+  `points` as passed in; with `point_index` it indexes the caller's original, unsegmented point list, so a
+  cloud reordered by [[point_cloud_segmentation]] needs no remapping afterwards.
+- Padding points inserted by [[point_cloud_segmentation]] for SIMD alignment sit at the center of their
+  sub-cloud AABB and are therefore hit often. They are dropped when `point_index` is supplied and committed
+  as if they were receivers when it is not.
+- `min_no_segments` suppresses commits from rays that have not interacted often enough. The launch-sphere
+  beams of the first generation carry `nSEG = 0` and are far too wide for a point-in-tube test to be
+  meaningful, so a beam-traced run passes 1 here.
 - The committed path is not extended by a segment: the receiver is not an interaction point, so `nSEG` and
   `length` are those of the in-flight ray and the caller recovers the total with `path::calc_length`.
 
@@ -52,9 +59,11 @@ arma::uword quadriga_lib::ray_commit(
     const arma::Col<short> &mtl_ind_current,
     const arma::fmat &rx_points,
     const arma::u32_vec *sub_cloud_index = nullptr,
+    const arma::u32_vec *point_index = nullptr,
     const std::vector<bool> *subdiv_flag_in = nullptr,
     float max_path_length = 10e3,
     float min_gain_dB = -140.0f,
+    uint8_t min_no_segments = 0,
     bool ignore_direct_path = false);
 ```
 
@@ -76,12 +85,20 @@ arma::uword quadriga_lib::ray_commit(
 - **`rx_points`** — Receive points in 3D space; `[n_point, 3]`
 - **`sub_cloud_index`** *(optional)* — Sub-cloud partition offsets for the point cloud (see
   [[point_cloud_segmentation]]); `[n_sub]`. NULL → no partitioning
+- **`point_index`** *(optional)* — 1-based map from each row of `points` back to the caller's original point
+  list, 0 = padding inserted for SIMD alignment; `[n_point]`. Pass the `forward_index` output of
+  [[point_cloud_segmentation]] for the same cloud — not `reverse_index`, which runs the other way and has
+  length `n_point` of the *unsegmented* cloud. Padded rows are skipped and `iC` is written in the original
+  indexing. NULL → `points` is used as passed in and `iC` indexes it directly
 - **`subdiv_flag_in`** *(optional)* — Rays that will be split in the next generation and must not be
   committed now; `[n_ray]`, indexed in the full ray set. Pass the output of [[ray_subdivide_flag]] for the
   same launch configuration. NULL / empty → no ray is excluded on these grounds
 - **`max_path_length`** *(optional)* — Maximum total path length including the leg to the receiver [m]
 - **`min_gain_dB`** *(optional)* — Gain at `center_frequency[0]` below which a path is not committed, in dB;
   evaluated with free-space path loss and the in-medium loss of the final leg included
+- **`min_no_segments`** *(optional)* — Minimum number of interaction segments (`nSEG`) a ray must carry
+  before it can commit, 0 to 255. 0 = no restriction. 1 excludes the launch-sphere beams of the first
+  generation, including the sub-beams they spawn, which keep `nSEG = 0` until their first interaction
 - **`ignore_direct_path`** *(optional)* — Drop every path that arrives by transmission only
   (`nREF == 0 && nSCT == 0`, which includes pure LOS); these are covered by [[calc_diffraction_gain]].
   The test is unconditional: under refraction the traced path is longer than the straight line, so a
@@ -89,7 +106,7 @@ arma::uword quadriga_lib::ray_commit(
 
 ## Output:
 - **`paths_commit`** — Committed paths, appended to whatever the vector already holds; extended by
-  `n_commit` entries. Each carries the receiver index in `iC`, the interaction history of its ray, and the
+  `n_commit` entries. Each carries the 0-based receiver index in `iC`, the interaction history of its ray, and the
   transfer coefficients with the receive-side mirror and any in-medium loss applied. Existing entries are
   not modified; if the vector is non-empty its layout must match `paths`
 
@@ -100,7 +117,7 @@ arma::uword quadriga_lib::ray_commit(
 - [[ray_point_intersect]] (ray-point intersection, produces the pair list)
 - [[ray_subdivide_flag]] (produces `subdiv_flag_in`)
 - [[ray_progress]] (advance the launch configuration to the next generation)
-- [[point_cloud_segmentation]] (generate `sub_cloud_index`)
+- [[point_cloud_segmentation]] (generate `sub_cloud_index` and `point_index`)
 - [[calc_diffraction_gain]] (covers the paths removed by `ignore_direct_path`)
 - [[path]] (the per-ray storage object)
 MD!*/
@@ -117,8 +134,10 @@ arma::uword quadriga_lib::ray_commit(const std::vector<quadriga_lib::path> &path
                                      const arma::Col<short> &mtl_ind_current,
                                      const arma::fmat &rx_points,
                                      const arma::u32_vec *sub_cloud_index,
+                                     const arma::u32_vec *point_index,
                                      const std::vector<bool> *subdiv_flag_in,
-                                     float max_path_length, float min_gain_dB, bool ignore_direct_path)
+                                     float max_path_length, float min_gain_dB,
+                                     uint8_t min_no_segments, bool ignore_direct_path)
 {
     // Mesh validation
     const arma::uword n_mesh = mesh.n_rows;
@@ -168,7 +187,7 @@ arma::uword quadriga_lib::ray_commit(const std::vector<quadriga_lib::path> &path
     // Path storage must match the ray count; the layout is taken from the paths themselves
     if (paths.size() != n_ray)
         throw std::invalid_argument("Input 'paths' must have n_ray elements.");
-    if (paths[0].n_freq() != n_freq) // Quick check first path, deep check later
+    if (paths[0].n_freq() != n_freq) // Cheap check here, every path is checked in the gate pass
         throw std::invalid_argument("Number of frequencies in 'paths' must match 'center_frequency'.");
 
     const bool scalar_mode = paths[0].is_scalar();
@@ -181,6 +200,21 @@ arma::uword quadriga_lib::ray_commit(const std::vector<quadriga_lib::path> &path
     const bool has_subdiv = subdiv_flag_in && !subdiv_flag_in->empty();
     if (has_subdiv && (arma::uword)subdiv_flag_in->size() != n_ray)
         throw std::invalid_argument("Input 'subdiv_flag_in' must have n_ray elements.");
+
+    // Point count, needed before the intersect call to validate the index map
+    const arma::uword n_points = rx_points.n_rows;
+
+    // Optional map from the segmented cloud back to the caller's point list. This is the
+    // forward_index of point_cloud_segmentation: 1-based, 0 marks a padding row. Padding points sit
+    // at the center of their sub-cloud AABB, so they are hit as readily as any real point and must
+    // be dropped rather than committed.
+    const bool has_pt_index = point_index && !point_index->empty();
+    if (has_pt_index && (arma::uword)point_index->n_elem != n_points)
+        throw std::invalid_argument("Input 'point_index' must have n_point elements.");
+    const unsigned *p_pt_index = has_pt_index ? point_index->memptr() : nullptr;
+
+    // Minimum interaction count, evaluated per ray below
+    const size_t min_seg = (size_t)min_no_segments;
 
     // Termination thresholds
     if (!std::isfinite(min_gain_dB))
@@ -196,7 +230,6 @@ arma::uword quadriga_lib::ray_commit(const std::vector<quadriga_lib::path> &path
     std::vector<unsigned> hit_index;
     arma::u32_vec hit_offset;
     quadriga_lib::ray_point_intersect(rx_points, orig, trivec, tridir, &hit_index, &hit_offset, nullptr, nullptr, sub_cloud_index);
-    const arma::uword n_points = rx_points.n_rows;
 
     // Number of ray-point pairs found by the intersector
     const size_t n_hit = hit_index.size();
@@ -240,10 +273,19 @@ arma::uword quadriga_lib::ray_commit(const std::vector<quadriga_lib::path> &path
             continue;
         }
 
+        if (paths[iR].n_freq() != n_freq || paths[iR].is_scalar() != scalar_mode)
+        {
+            bad |= 4;
+            continue;
+        }
+
         if (has_subdiv && (*subdiv_flag_in)[iR]) // reappears as sub-beams next iteration
             continue;
 
         const quadriga_lib::path &P = paths[iR];
+
+        if (P.n_seg() < min_seg) // has not interacted often enough to be committed
+            continue;
 
         if (P.length() >= max_path_length) // already too long without the final leg
             continue;
@@ -268,6 +310,9 @@ arma::uword quadriga_lib::ray_commit(const std::vector<quadriga_lib::path> &path
 
     if (bad & 2)
         throw std::invalid_argument("Some values in 'mtl_ind_current' exceed the number of materials.");
+
+    if (bad & 4)
+        throw std::invalid_argument("All entries of 'paths' must have the same frequency count and layout.");
 
     // Survivor mask, one bit per ray-point pair. Blocks are a multiple of 8 pairs, so no two threads ever write the same byte.
     // Blocking the flat pair list instead of the point list keeps the load balanced: hit counts per point vary by orders
@@ -298,6 +343,9 @@ arma::uword quadriga_lib::ray_commit(const std::vector<quadriga_lib::path> &path
         {
             while (k >= (size_t)p_off[i_point + 1]) // advance across empty points
                 ++i_point;
+
+            if (p_pt_index && p_pt_index[i_point] == 0u) // padding row, no receiver behind it
+                continue;
 
             const size_t iR = (size_t)p_hit[k]; // Ray index
             const qd::bits<uint8_t> g = p_gate[iR];
@@ -388,6 +436,9 @@ arma::uword quadriga_lib::ray_commit(const std::vector<quadriga_lib::path> &path
             while (k >= (size_t)p_off[i_point + 1])
                 ++i_point;
 
+            if (p_pt_index && p_pt_index[i_point] == 0u) // padding row, never marked in the mask
+                continue;
+
             if (!p_mask[k / 8][k % 8]) // pair k did not survive
                 continue;
 
@@ -396,7 +447,10 @@ arma::uword quadriga_lib::ray_commit(const std::vector<quadriga_lib::path> &path
             quadriga_lib::path &C = paths_commit[i_out];
 
             P.duplicate(C);
-            C.iC = (unsigned)i_point; // receiver index, the caller owns the mapping
+
+            // Receiver index, 0-based. point_index is 1-based over the segmented cloud, so
+            // subtracting one lands in the caller's original point ordering.
+            C.iC = p_pt_index ? (p_pt_index[i_point] - 1u) : (unsigned)i_point;
             ++i_out;
 
             // Length of the final leg, needed for the in-medium attenuation
