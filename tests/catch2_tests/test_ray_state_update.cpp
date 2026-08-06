@@ -1022,16 +1022,17 @@ TEST_CASE("ray_state_update - survival gate thresholds on eps")
     }
 }
 
-TEST_CASE("ray_state_update - mass-law material feeds |phi| from medium_gain")
+TEST_CASE("ray_state_update - lossy medium feeds |phi| from medium_gain")
 {
-    // For a mass-law slab |phi|^2 must equal the implementation's own medium_gain(L), not an
-    // eta-only loss. The mass column has no public closed form, so the test measures
-    // medium_gain through a cavity-exit magnitude and then checks S against the closed form.
+    // For a slab with power-law absorption |phi|^2 must equal the implementation's own
+    // medium_gain(L), not an eta-only loss. The test measures medium_gain through a cavity-exit
+    // magnitude and then checks S against the closed form. (The mass column cannot be used here:
+    // m > 0 marks a lumped-transmission material and is excluded from slab resolution.)
     arma::mat M = {{4.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
     arma::uvec ind;
     std::unordered_map<std::string, std::vector<double>> mtl;
     mtl_matrix_to_map<double>(M, ind, mtl);
-    mtl["m"] = {10.0}; // mass-law slope, dB/decade
+    mtl["alpha"] = {5.0}; // power-law absorption, dB/m (alphaB defaults to 0)
 
     const double F10 = 10.0e9; // mass law engages above its clamp (fGHz * dist > 1)
     const double L = 40.0 * half_wave(2.0, F10);
@@ -1065,6 +1066,42 @@ TEST_CASE("ray_state_update - mass-law material feeds |phi| from medium_gain")
     CHECK(std::abs(S_func - S_right) < 1e-6);
     if (g_L < 0.99)
         CHECK(std::abs(S_func - S_right) < std::abs(S_func - S_wrong));
+}
+
+TEST_CASE("ray_state_update - mass-law material is excluded from slab resolution")
+{
+    // A mass-law slab carries a lumped transmission surrogate: eta/mu are calibrated for the
+    // surface impedance only, so the in-slab phase of phi is not physical and the internal series
+    // must not be resummed. This is a material property, not an accuracy threshold, so the gate
+    // holds even at eps = 0.
+    arma::mat M = {{4.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
+    arma::uvec ind;
+    std::unordered_map<std::string, std::vector<double>> mtl;
+    mtl_matrix_to_map<double>(M, ind, mtl);
+    mtl["m"] = {10.0};
+
+    const double F10 = 10.0e9;
+    const double L = 40.0 * half_wave(2.0, F10);
+
+    auto C = make1<double>(mtl, 4, OT_EXIT, 1, 1, 0, 0, 1, 0, L, 2.0, 0.5, QPI / 2.0, 0.0,
+                           std::complex<double>(0.5, 0.3), F10);
+    C.run();
+
+    // Measure medium_gain over L the same way, with eps high so no S can appear
+    auto D = make1<double>(mtl, 4, OT_EXIT, 1, 1, 0, 0, 1, 0, L, 2.0, 0.5, QPI / 2.0, 1.5,
+                           std::complex<double>(0.5, 0.3), F10);
+    D.run();
+    double g_L = std::norm(vvf(D));
+
+    double k0 = 2.0 * QPI * F10 / C0;
+    std::complex<double> close = std::sqrt(g_L) * std::exp(std::complex<double>(0.0, -k0 * (2.0 - 1.0) * L));
+
+    CHECK(std::abs(vvf(C) / close - 1.0) < 1e-6); // bare close-out, S = 1
+    check_rtype(C, RT_EXIT);                      // not RT_EXIT_SLAB
+
+    // Teeth: without the gate this slab would have resolved to a clearly non-unit S
+    std::complex<double> r = fresnel_te({4.0, 0.0}, {1.0, 0.0}, 0.0).r;
+    CHECK(std::abs(airy_S(r, r, phi_one_way(2.0, g_L, F10, L)) - 1.0) > 1e-2);
 }
 
 TEST_CASE("ray_state_update - transmission factor folds into the resolved gain")
