@@ -577,8 +577,13 @@ TEST_CASE("Ray-Mesh Interact - Dielectric Medium to Air (x-y plane, float)")
     U = {1.0f};
     CHECK(arma::approx_equal(gainN, U, "absdiff", 1e-6));
 
-    T = {{1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f}};
-    CHECK(arma::approx_equal(xprmatN.t(), T, "absdiff", 1e-6));
+    // eta = 2 at 45 deg sits exactly on the critical angle, where ct2 = 0 is a sqrt branch point:
+    // a 1e-7 error in cos(theta) moves the TIR phase by ~1e-4 rad. Only |R| = 1 and a near-zero
+    // phase are well defined here; the conditioned above-critical case follows below.
+    CHECK(std::abs(std::hypot(xprmatN(0), xprmatN(1)) - 1.0f) < 1e-5f);
+    CHECK(std::abs(std::hypot(xprmatN(6), xprmatN(7)) - 1.0f) < 1e-5f);
+    CHECK(std::abs(std::atan2(xprmatN(1), xprmatN(0))) < 1e-3f);
+    CHECK(std::abs(std::atan2(xprmatN(7), xprmatN(6))) < 1e-3f);
 
     quadriga_lib::ray_mesh_interact(2, 10.0e9f, &orig, &dest, &cube, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind, &trivec, &tridir,
                                     &origN, &destN, (arma::fmat *)nullptr, (arma::fmat *)nullptr, &gainN, &xprmatN, &trivecN, &tridirN);
@@ -587,6 +592,22 @@ TEST_CASE("Ray-Mesh Interact - Dielectric Medium to Air (x-y plane, float)")
 
     T = {{0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f}};
     CHECK(arma::approx_equal(xprmatN.t(), T, "absdiff", 1e-6));
+
+    // Above critical (eta = 4 at 45 deg): TIR keeps |R| = 1 but carries a non-zero Fresnel phase
+    mtl_prop = {{4.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
+    mtl_prop = repmat(mtl_prop, 12, 1);
+    mtl_matrix_to_map<float>(mtl_prop, mtl_ind, mtl_map);
+
+    quadriga_lib::ray_mesh_interact(0, 10.0e9f, &orig, &dest, &cube, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind, &trivec, &tridir,
+                                    &origN, &destN, (arma::fmat *)nullptr, (arma::fmat *)nullptr, &gainN, &xprmatN, &trivecN, &tridirN);
+    U = {1.0f};
+    CHECK(arma::approx_equal(gainN, U, "absdiff", 1e-6));
+
+    // z1 = 2, z2 = 1, ct2 = -i (decaying evanescent wave, exp(-jkz) convention):
+    //   R_te = (2c + i)/(2c - i) = 1/3 + i*2*sqrt(2)/3
+    //   R_tm = (c + 2i)/(c - 2i) = -7/9 + i*4*sqrt(2)/9,   c = cos(45 deg)
+    T = {{0.333333f, 0.942809f, 0.0f, 0.0f, 0.0f, 0.0f, -0.777778f, 0.628539f}};
+    CHECK(arma::approx_equal(xprmatN.t(), T, "absdiff", 1e-5));
 }
 
 TEST_CASE("Ray-Mesh Interact - Medium to Medium (x-y plane, double)")
