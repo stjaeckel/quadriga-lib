@@ -2331,6 +2331,13 @@ void quadriga_lib::ray_state_update(int interaction_type,
 
             Material mat_slab = MAT(mtl_slab), mat_near = MAT(mtl_near), mat_far = MAT(mtl_far);
 
+            // Mass-law materials carry a lumped transmission surrogate: eta/mu are calibrated for
+            // surface impedance only, so the in-slab index (and hence the phase of phi) is not
+            // physical and the internal series must not be resummed. Re-emit; the tracer follows
+            // the bounces and each traversal pays medium_gain once.
+            if (mat_slab.m > 0.0)
+                return false;
+
             const double c0 = 299792458.0;
             const double omega = 2.0 * 3.14159265358979323846 * fGHz * 1e9;
 
