@@ -358,7 +358,10 @@ namespace
 
             std::complex<double> eta1_d_eta2 = (eta1 * mu1) / (eta2 * mu2);
             double snell = std::sqrt(std::abs(eta1_d_eta2));
-            std::complex<double> ct2 = std::sqrt(1.0 - eta1_d_eta2 * sin_theta * sin_theta);
+            std::complex<double> ct2_arg = 1.0 - eta1_d_eta2 * sin_theta * sin_theta;
+            if (std::imag(ct2_arg) == 0.0 && std::real(ct2_arg) < 0.0)
+                ct2_arg = std::complex<double>(std::real(ct2_arg), -0.0); // TIR branch cut: decaying evanescent wave
+            std::complex<double> ct2 = std::sqrt(ct2_arg);
             std::complex<double> z1 = std::sqrt(eta1 / mu1); // admittances sqrt(eps/mu)
             std::complex<double> z2 = std::sqrt(eta2 / mu2);
 
@@ -370,8 +373,8 @@ namespace
             if (interaction_type < 3) // EM: types 0 (reflection), 1 (transmission), 2 (refraction)
             {
                 // Fresnel reflection (TE/TM), ITU-R P.2040-1 eq. (31); under TIR the interface is a perfect mirror
-                std::complex<double> R_TE = tir ? std::complex<double>(1.0, 0.0) : (z1 * abs_cos_theta - z2 * ct2) / (z1 * abs_cos_theta + z2 * ct2);
-                std::complex<double> R_TM = tir ? std::complex<double>(1.0, 0.0) : (z2 * abs_cos_theta - z1 * ct2) / (z2 * abs_cos_theta + z1 * ct2);
+                std::complex<double> R_TE = (z1 * abs_cos_theta - z2 * ct2) / (z1 * abs_cos_theta + z2 * ct2);
+                std::complex<double> R_TM = (z2 * abs_cos_theta - z1 * ct2) / (z2 * abs_cos_theta + z1 * ct2);
                 double reflectance = tir ? 1.0 : 0.5 * (std::norm(R_TE) + std::norm(R_TM));
 
                 // ISSUE: reflectance is constructed from the average R_TE, R_TM, but the two should probably be treated
@@ -420,7 +423,7 @@ namespace
             }
             else // Scalar (acoustic): types 3 (reflection), 4 (transmission), 5 (refraction)
             {
-                std::complex<double> R = tir ? std::complex<double>(1.0, 0.0) : (z1 * abs_cos_theta - z2 * ct2) / (z1 * abs_cos_theta + z2 * ct2);
+                std::complex<double> R = (z1 * abs_cos_theta - z2 * ct2) / (z1 * abs_cos_theta + z2 * ct2);
                 double reflectance = tir ? 1.0 : std::norm(R);
                 double R_eff = apply_tf_pair(other, reflectance, fGHz);
                 std::complex<double> T = 1.0 + R; // pressure transmission coefficient
@@ -2293,7 +2296,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
             // Walk-off (cos^2) only for the undeviated tracer, where it substitutes for the untraced
             // lateral shift. Genuine refraction traced the bent path, so cos2 = 1. The free-space
             // reference sits on the same thickness axis, so dist_geo carries the geometric-incidence cos^2.
-            bool walk_off = use_vbs || refl_pass || resolved;
+            bool walk_off = !use_vbs || refl_pass || resolved;
             double cos2 = walk_off ? abs_cos_theta_t * abs_cos_theta_t : 1.0; // medium side, theta_t
             double cos2_geo = walk_off ? abs_cos_theta * abs_cos_theta : 1.0; // free-space side, theta_i
             double excess_phase = k0 * (n_re * dist_refract * cos2 - dist_geo * cos2_geo);
