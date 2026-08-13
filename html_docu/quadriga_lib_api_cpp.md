@@ -1,7 +1,7 @@
 ---
-title: "C++ API Documentation for Quadriga-Lib v0.12.0"
+title: "C++ API Documentation for Quadriga-Lib v0.12.1"
 author: "Stephan Jaeckel"
-date: "04.08.2026"
+date: "13.08.2026"
 lang: en-US
 ---
 
@@ -115,28 +115,28 @@ lang: en-US
 | [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 3444 |
 | [obj_file_read](#obj_file_read) | Site-specific simulation tools | 3486 |
 | [obj_file_write](#obj_file_write) | Site-specific simulation tools | 3553 |
-| [obj_overlap_test](#obj_overlap_test) | Site-specific simulation tools | 3614 |
-| [path_to_tube](#path_to_tube) | Site-specific simulation tools | 3645 |
-| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 3673 |
-| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 3702 |
-| [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 3741 |
-| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 3777 |
-| [ray_commit](#ray_commit) | Site-specific simulation tools | 3813 |
-| [ray_init](#ray_init) | Site-specific simulation tools | 3918 |
-| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 4005 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 4127 |
-| [ray_progress](#ray_progress) | Site-specific simulation tools | 4175 |
-| [ray_state_update](#ray_state_update) | Site-specific simulation tools | 4313 |
-| [ray_subdivide_flag](#ray_subdivide_flag) | Site-specific simulation tools | 4446 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 4507 |
-| [refractive_index](#refractive_index) | Site-specific simulation tools | 4555 |
-| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 4587 |
-| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 4645 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 4675 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 4703 |
-| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 4744 |
-| [write_png](#write_png) | Site-specific simulation tools | 4779 |
-| [xpr_update](#xpr_update) | Site-specific simulation tools | 4805 |
+| [obj_overlap_test](#obj_overlap_test) | Site-specific simulation tools | 3620 |
+| [path_to_tube](#path_to_tube) | Site-specific simulation tools | 3651 |
+| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 3679 |
+| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 3708 |
+| [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 3747 |
+| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 3783 |
+| [ray_commit](#ray_commit) | Site-specific simulation tools | 3819 |
+| [ray_init](#ray_init) | Site-specific simulation tools | 3924 |
+| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 4011 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 4133 |
+| [ray_progress](#ray_progress) | Site-specific simulation tools | 4181 |
+| [ray_state_update](#ray_state_update) | Site-specific simulation tools | 4319 |
+| [ray_subdivide_flag](#ray_subdivide_flag) | Site-specific simulation tools | 4452 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 4513 |
+| [refractive_index](#refractive_index) | Site-specific simulation tools | 4561 |
+| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 4593 |
+| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 4651 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 4681 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 4709 |
+| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 4750 |
+| [write_png](#write_png) | Site-specific simulation tools | 4785 |
+| [xpr_update](#xpr_update) | Site-specific simulation tools | 4811 |
 
 ---
 
@@ -3558,9 +3558,13 @@ Write a triangulated Wavefront .obj (and .mtl) file
   are closer than `threshold` (no merging across objects). With `vert_list`/`face_ind`: data is written unchanged
 - Faces are written grouped by object; the faces of each object must form a contiguous block in `obj_ind`
 - Without `obj_ind`/`obj_names`: a single object named `object` is written
+- With `split_loose_parts`: objects are separated into connected components ("separate by loose parts"); connectivity
+  follows the welded vertex list, so unwelded input geometry yields one part per face
 - Without `mtl_ind`: no `usemtl` tags and no `.mtl` file are written. With `mtl_ind`, each face carries a
   1-based material index (0 = no material, leaving that face unassigned); pass `mtl_ind = nullptr` to omit materials entirely
 - The `.mtl` (named after the `.obj`) lists each used material; values default to a gray material when `bsdf` is omitted
+- Duplicate entries in `mtl_names` are merged into one `.mtl` entry if their `bsdf` rows are identical (or if `bsdf`
+  is omitted); duplicates with differing `bsdf` rows are disambiguated as `name.001`, `name.002`, ...
 - If `csv_names` is given, the EM/acoustic material table is written to a companion `.csv` (named after the `.obj`):
   columns follow a fixed canonical order, then any extra `csv_prop` columns (alphabetical); `csv_write_defaults`
   additionally emits canonical columns absent from `csv_prop`, filled with their defaults (`a`, `e`, `fRef` = 1, else 0)
@@ -3583,7 +3587,8 @@ void obj_file_write(
     const arma::uvec *csv_ind = nullptr,
     const std::vector<std::string> *csv_names = nullptr,
     const std::unordered_map<std::string, std::vector<dtype>> *csv_prop = nullptr,
-    bool csv_write_defaults = false);
+    bool csv_write_defaults = false,
+    bool split_loose_parts = false);
 ```
 
 ### Inputs:
@@ -3601,6 +3606,7 @@ void obj_file_write(
 - **`csv_names`** — EM/acoustic material names (the full table); writing the `.csv` requires this
 - **`csv_prop`** — Material properties keyed by column name; each vector must have one value per `csv_names` entry
 - **`csv_write_defaults`** — If `true`, also write canonical columns absent from `csv_prop`, using their defaults
+- **`split_loose_parts`** — If `true`, split each object into connected components (faces sharing a vertex); parts of a split object are named `name.001`, `name.002`, ...
 
 ### Outputs:
 - **`vert_list_out`** — Vertices derived from `mesh`, or a copy of `vert_list`; `[n_vert, 3]`

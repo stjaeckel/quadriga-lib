@@ -46,7 +46,7 @@
 
       <!-- CONTENT BEGIN -->
 
-<span class="qd-heading"><b>MALAB / Octave API Documentation for Quadriga-Lib v0.12.0</b></span>
+<span class="qd-heading"><b>MALAB / Octave API Documentation for Quadriga-Lib v0.12.1</b></span>
 <br><br><br>
 
 <b>Markdown version of this page:</b>
@@ -2900,15 +2900,18 @@ Write a Wavefront .obj file
 <li>With <code>vert_list</code> and <code>face_ind</code>, the geometry is written unchanged</li>
 <li>Faces are written grouped by object; the faces of each object must form a contiguous block in <code>obj_ind</code></li>
 <li>Without <code>obj_ind</code> and <code>obj_names</code>, a single object named <code>object</code> is written</li>
+<li>With <code>split_loose_parts</code>, each object is split into connected components ("separate by loose parts"); faces sharing a vertex belong to the same part, and parts of a split object are named <code>name.001</code>, <code>name.002</code>, ...</li>
 <li>Without <code>mtl_ind</code>, no <code>usemtl</code> tags and no <code>.mtl</code> file are written</li>
 <li>The <code>.mtl</code> file is named after the <code>.obj</code> and lists each used material; values default to a gray material when <code>bsdf</code> is omitted</li>
+<li>Duplicate entries in <code>mtl_names</code> are merged into one <code>.mtl</code> entry if their <code>bsdf</code> rows are identical (or if <code>bsdf</code> is omitted); duplicates with differing <code>bsdf</code> rows are written as <code>name.001</code>, <code>name.002</code>, ...</li>
 <li>If <code>csv_names</code> is given, the EM/acoustic material table is written to a companion <code>.csv</code> (named after the <code>.obj</code>); columns follow a fixed canonical order then any extra <code>csv_prop</code> fields; <code>csv_write_defaults</code> also emits canonical columns absent from <code>csv_prop</code>, filled with their defaults (<code>a</code>, <code>e</code>, <code>fRef</code> = 1, else 0)</li>
 </ul>
 
 <b>Usage:</b><br>
 <pre>
 [ vert_list_out, face_ind_out ] = quadriga_lib.obj_file_write( fn, mesh, obj_ind, mtl_ind, obj_names, ...
-    mtl_names, vert_list, face_ind, bsdf, threshold, csv_ind, csv_names, csv_prop, csv_write_defaults );
+    mtl_names, vert_list, face_ind, bsdf, threshold, csv_ind, csv_names, csv_prop, csv_write_defaults, ...
+    split_loose_parts );
 </pre>
 
 <b>Inputs:</b><br>
@@ -2927,6 +2930,7 @@ Write a Wavefront .obj file
 <li><b><code>csv_names</code></b> <i>(optional)</i> — EM/acoustic material names; cell array of strings; required to write the <code>.csv</code></li>
 <li><b><code>csv_prop</code></b> <i>(optional)</i> — Material properties as a struct; each field is one CSV column holding a vector of length <code>numel(csv_names)</code></li>
 <li><b><code>csv_write_defaults</code></b> <i>(optional)</i> — If true, also write canonical columns absent from <code>csv_prop</code> using their defaults; default: false</li>
+<li><b><code>split_loose_parts</code></b> <i>(optional)</i> — If true, split each object into connected components; default: false</li>
 </ul>
 
 <b>Outputs:</b><br>

@@ -1,7 +1,7 @@
 ---
-title: "MATLAB / Octave API Documentation for Quadriga-Lib v0.12.0"
+title: "MATLAB / Octave API Documentation for Quadriga-Lib v0.12.1"
 author: "Stephan Jaeckel"
-date: "04.08.2026"
+date: "13.08.2026"
 lang: en-US
 ---
 
@@ -76,15 +76,15 @@ lang: en-US
 | [icosphere](#icosphere) | Site-specific simulation tools | 2004 |
 | [obj_file_read](#obj_file_read) | Site-specific simulation tools | 2030 |
 | [obj_file_write](#obj_file_write) | Site-specific simulation tools | 2078 |
-| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 2124 |
-| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 2151 |
-| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 2178 |
-| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 2207 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 2304 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 2344 |
-| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 2384 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 2408 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 2435 |
+| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 2130 |
+| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 2157 |
+| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 2184 |
+| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 2213 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 2310 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 2350 |
+| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 2390 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 2414 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 2441 |
 
 ---
 
@@ -2084,9 +2084,13 @@ Write a Wavefront .obj file
 - With `vert_list` and `face_ind`, the geometry is written unchanged
 - Faces are written grouped by object; the faces of each object must form a contiguous block in `obj_ind`
 - Without `obj_ind` and `obj_names`, a single object named `object` is written
+- With `split_loose_parts`, each object is split into connected components ("separate by loose parts");
+  faces sharing a vertex belong to the same part, and parts of a split object are named `name.001`, `name.002`, ...
 - Without `mtl_ind`, no `usemtl` tags and no `.mtl` file are written
 - The `.mtl` file is named after the `.obj` and lists each used material; values default to a gray
   material when `bsdf` is omitted
+- Duplicate entries in `mtl_names` are merged into one `.mtl` entry if their `bsdf` rows are identical (or if
+  `bsdf` is omitted); duplicates with differing `bsdf` rows are written as `name.001`, `name.002`, ...
 - If `csv_names` is given, the EM/acoustic material table is written to a companion `.csv` (named after the
   `.obj`); columns follow a fixed canonical order then any extra `csv_prop` fields; `csv_write_defaults` also
   emits canonical columns absent from `csv_prop`, filled with their defaults (`a`, `e`, `fRef` = 1, else 0)
@@ -2094,7 +2098,8 @@ Write a Wavefront .obj file
 ### Usage:
 ```
 [ vert_list_out, face_ind_out ] = quadriga_lib.obj_file_write( fn, mesh, obj_ind, mtl_ind, obj_names, ...
-    mtl_names, vert_list, face_ind, bsdf, threshold, csv_ind, csv_names, csv_prop, csv_write_defaults );
+    mtl_names, vert_list, face_ind, bsdf, threshold, csv_ind, csv_names, csv_prop, csv_write_defaults, ...
+    split_loose_parts );
 ```
 
 ### Inputs:
@@ -2112,6 +2117,7 @@ Write a Wavefront .obj file
 - **`csv_names`** *(optional)* — EM/acoustic material names; cell array of strings; required to write the `.csv`
 - **`csv_prop`** *(optional)* — Material properties as a struct; each field is one CSV column holding a vector of length `numel(csv_names)`
 - **`csv_write_defaults`** *(optional)* — If true, also write canonical columns absent from `csv_prop` using their defaults; default: false
+- **`split_loose_parts`** *(optional)* — If true, split each object into connected components; default: false
 
 ### Outputs:
 - **`vert_list_out`** — Vertices derived from `mesh`, or a copy of `vert_list`; `[n_vert, 3]`

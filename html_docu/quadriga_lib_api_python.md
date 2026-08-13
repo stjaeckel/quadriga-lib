@@ -1,7 +1,7 @@
 ---
-title: "Python API Documentation for Quadriga-Lib v0.12.0"
+title: "Python API Documentation for Quadriga-Lib v0.12.1"
 author: "Stephan Jaeckel"
-date: "04.08.2026"
+date: "13.08.2026"
 lang: en-US
 ---
 
@@ -57,13 +57,13 @@ lang: en-US
 | [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 1868 |
 | [obj_file_read](#obj_file_read) | Site-specific simulation tools | 1901 |
 | [obj_file_write](#obj_file_write) | Site-specific simulation tools | 1951 |
-| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 1998 |
-| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 2025 |
-| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 2055 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 2088 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 2133 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 2176 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 2202 |
+| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 2004 |
+| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 2031 |
+| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 2061 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 2094 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 2139 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 2182 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 2208 |
 
 ---
 
@@ -1956,8 +1956,12 @@ Write a Wavefront .obj file
   that are closer than `threshold` (no merging across objects)
 - With `vert_list` and `face_ind`, the geometry is written unchanged
 - Faces are written grouped by object; the faces of each object must form a contiguous block in `obj_ind`
+- With `split_loose_parts`, each object is split into connected components ("separate by loose parts");
+  faces sharing a vertex belong to the same part, and parts of a split object are named `name.001`, `name.002`, ...
 - Without `mtl_ind`, no `usemtl` tags and no `.mtl` file are written
 - The `.mtl` file is named after the `.obj` and lists each used material; values default to a gray material when `bsdf` is omitted
+- Duplicate entries in `mtl_names` are merged into one `.mtl` entry if their `bsdf` rows are identical (or if `bsdf`
+  is omitted); duplicates with differing `bsdf` rows are written as `name.001`, `name.002`, ...
 - If `csv_names` is given, the EM/acoustic material table is written to a companion `.csv` (named after the
   `.obj`); columns follow a fixed canonical order then any extra `csv_prop` fields (alphabetical);
   `csv_write_defaults` also emits canonical columns absent from `csv_prop`, filled with their defaults
@@ -1967,7 +1971,8 @@ Write a Wavefront .obj file
 ### Usage:
 ```
 vert_list_out, face_ind_out = quadriga_lib.RTtools.obj_file_write( fn, mesh, obj_ind, mtl_ind, obj_names, \
-    mtl_names, vert_list, face_ind, bsdf, threshold, csv_ind, csv_names, csv_prop, csv_write_defaults )
+    mtl_names, vert_list, face_ind, bsdf, threshold, csv_ind, csv_names, csv_prop, csv_write_defaults, \
+    split_loose_parts )
 ```
 
 ### Inputs:
@@ -1985,6 +1990,7 @@ vert_list_out, face_ind_out = quadriga_lib.RTtools.obj_file_write( fn, mesh, obj
 - **`csv_names`** — EM/acoustic material names (the full table); list of str; required to write the `.csv`; default: None
 - **`csv_prop`** — Material properties as a `dict`; each key is one CSV column mapping to a 1D array of length `len(csv_names)`; default: None
 - **`csv_write_defaults`** — If True, also write canonical columns absent from `csv_prop` using their defaults; default: False
+- **`split_loose_parts`** — If True, split each object into connected components; default: False
 
 ### Outputs:
 - **`vert_list_out`** — Vertices derived from `mesh`, or a copy of `vert_list`; `(n_vert, 3)`

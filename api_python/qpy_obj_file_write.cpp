@@ -18,8 +18,12 @@ Write a Wavefront .obj file
   that are closer than `threshold` (no merging across objects)
 - With `vert_list` and `face_ind`, the geometry is written unchanged
 - Faces are written grouped by object; the faces of each object must form a contiguous block in `obj_ind`
+- With `split_loose_parts`, each object is split into connected components ("separate by loose parts");
+  faces sharing a vertex belong to the same part, and parts of a split object are named `name.001`, `name.002`, ...
 - Without `mtl_ind`, no `usemtl` tags and no `.mtl` file are written
 - The `.mtl` file is named after the `.obj` and lists each used material; values default to a gray material when `bsdf` is omitted
+- Duplicate entries in `mtl_names` are merged into one `.mtl` entry if their `bsdf` rows are identical (or if `bsdf`
+  is omitted); duplicates with differing `bsdf` rows are written as `name.001`, `name.002`, ...
 - If `csv_names` is given, the EM/acoustic material table is written to a companion `.csv` (named after the
   `.obj`); columns follow a fixed canonical order then any extra `csv_prop` fields (alphabetical);
   `csv_write_defaults` also emits canonical columns absent from `csv_prop`, filled with their defaults
@@ -29,7 +33,8 @@ Write a Wavefront .obj file
 ## Usage:
 ```
 vert_list_out, face_ind_out = quadriga_lib.RTtools.obj_file_write( fn, mesh, obj_ind, mtl_ind, obj_names, \
-    mtl_names, vert_list, face_ind, bsdf, threshold, csv_ind, csv_names, csv_prop, csv_write_defaults )
+    mtl_names, vert_list, face_ind, bsdf, threshold, csv_ind, csv_names, csv_prop, csv_write_defaults, \
+    split_loose_parts )
 ```
 
 ## Inputs:
@@ -47,6 +52,7 @@ vert_list_out, face_ind_out = quadriga_lib.RTtools.obj_file_write( fn, mesh, obj
 - **`csv_names`** — EM/acoustic material names (the full table); list of str; required to write the `.csv`; default: None
 - **`csv_prop`** — Material properties as a `dict`; each key is one CSV column mapping to a 1D array of length `len(csv_names)`; default: None
 - **`csv_write_defaults`** — If True, also write canonical columns absent from `csv_prop` using their defaults; default: False
+- **`split_loose_parts`** — If True, split each object into connected components; default: False
 
 ## Outputs:
 - **`vert_list_out`** — Vertices derived from `mesh`, or a copy of `vert_list`; `(n_vert, 3)`
@@ -70,7 +76,8 @@ py::tuple obj_file_write(const std::string &fn,
                          py::handle csv_ind,
                          py::handle csv_names,
                          py::handle csv_prop,
-                         bool csv_write_defaults)
+                         bool csv_write_defaults,
+                         bool split_loose_parts)
 {
     // Convert inputs (empty Armadillo object when the handle is None)
     const auto mesh_a = qd_python_numpy2arma_Mat<double>(mesh, true);
@@ -110,7 +117,7 @@ py::tuple obj_file_write(const std::string &fn,
     quadriga_lib::obj_file_write<double>(fn, p_mesh, p_obj_ind, p_mtl_ind, p_obj_names, p_mtl_names,
                                          &vert_list_out, &face_ind_out, p_vert_list, p_face_ind,
                                          p_bsdf, threshold, p_csv_ind, p_csv_names, p_csv_prop,
-                                         csv_write_defaults);
+                                         csv_write_defaults, split_loose_parts);
 
     // Copy to python (face indices stay 0-based)
     auto vert_list_out_py = qd_python_copy2numpy(&vert_list_out);
@@ -134,4 +141,5 @@ py::tuple obj_file_write(const std::string &fn,
 //       py::arg("csv_ind") = py::none(),
 //       py::arg("csv_names") = py::none(),
 //       py::arg("csv_prop") = py::none(),
-//       py::arg("csv_write_defaults") = false);
+//       py::arg("csv_write_defaults") = false,
+//       py::arg("split_loose_parts") = false);
