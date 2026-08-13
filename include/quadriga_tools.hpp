@@ -239,7 +239,8 @@ namespace quadriga_lib
                         const arma::uvec *csv_ind = nullptr,                                           // 1-based EM/acoustic-material index per face (0 = no material)
                         const std::vector<std::string> *csv_names = nullptr,                           // EM/acoustic material names
                         const std::unordered_map<std::string, std::vector<dtype>> *csv_prop = nullptr, // Material properties keyed by column name
-                        bool csv_write_defaults = false);                                              // If `true`, also write canonical columns absent from `csv_prop`
+                        bool csv_write_defaults = false,                                               // If `true`, also write canonical columns absent from `csv_prop`
+                        bool split_loose_parts = false);                                               // If `true`, split each object into connected components
 
     // Tests if 3D objects overlap (have a shared volume or boolean intersection)
     // - Returns: Subset of list of object indices (obj_ind) that are overlapping, length [ n_overlap ]

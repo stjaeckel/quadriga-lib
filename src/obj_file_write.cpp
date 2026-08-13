@@ -10,9 +10,12 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <set>
+#include <map>
+#include <algorithm>
 #include <stdexcept>
 #include <filesystem>
 #include <limits>
+#include <cmath>       // std::floor
 #include <cstdio>      // std::snprintf
 #include <cstdlib>     // std::strtod
 #include <type_traits> // std::is_same
@@ -25,7 +28,9 @@
 //  "face_ind" holds 0-based GLOBAL indices into "vert_list".
 // - Requires the faces of each object to form a single contiguous block in "obj_ind"
 //  (e.g. {1,1,2,2} is valid; {1,1,2,2,1} throws).
-// - Greedy O(n^2) weld per object; not performance-critical.
+// - Weld uses a spatial hash grid with cell size "threshold" (27-cell neighborhood search);
+//  lowest vertex index wins, which reproduces the insertion order of a greedy linear scan.
+// - Objects are welded independently and in parallel (OpenMP); output ordering is unaffected.
 template <typename dtype>
 static void mesh2vert_list(const arma::Mat<dtype> &mesh, // mesh, Size: [ n_mesh, 9 ]
                            const arma::uvec &obj_ind,    // Object index, 0-based, Size: [ n_mesh ]
@@ -66,69 +71,234 @@ static void mesh2vert_list(const arma::Mat<dtype> &mesh, // mesh, Size: [ n_mesh
     }
 
     const dtype threshold_sq = threshold * threshold;
+    const dtype cell = (threshold > (dtype)0) ? threshold : (dtype)1e-6;
+    const double inv_cell = 1.0 / (double)cell;
 
-    // Global accumulated vertex coordinates
-    std::vector<dtype> vx, vy, vz;
-    vx.reserve(3 * n_mesh);
-    vy.reserve(3 * n_mesh);
-    vz.reserve(3 * n_mesh);
+    // Object block boundaries (contiguity already verified above)
+    std::vector<arma::uword> blk_start, blk_end;
+    {
+        arma::uword s = 0;
+        for (arma::uword n = 1; n < n_mesh; ++n)
+            if (obj_ind.at(n) != obj_ind.at(n - 1))
+            {
+                blk_start.push_back(s);
+                blk_end.push_back(n);
+                s = n;
+            }
+        blk_start.push_back(s);
+        blk_end.push_back(n_mesh);
+    }
+    const size_t n_blk = blk_start.size();
+
+    // Spatial hash grid key: integer cell coordinates of size "threshold"
+    struct CellKey
+    {
+        long long x, y, z;
+        bool operator==(const CellKey &o) const { return x == o.x && y == o.y && z == o.z; }
+    };
+    struct CellHash
+    {
+        size_t operator()(const CellKey &k) const
+        {
+            return (size_t)(k.x * 73856093LL) ^ (size_t)(k.y * 19349663LL) ^ (size_t)(k.z * 83492791LL);
+        }
+    };
 
     face_ind.set_size(n_mesh, 3);
 
-    // Global indices of vertices belonging to the current object (reset at each block)
-    std::vector<arma::uword> obj_reps;
-    arma::uword cur_obj = obj_ind.at(0);
+    // Per-object vertex coordinates, concatenated later
+    std::vector<std::vector<dtype>> bvx(n_blk), bvy(n_blk), bvz(n_blk);
 
-    for (arma::uword n = 0; n < n_mesh; ++n)
+    // Weld each object independently; objects never share vertices
+#pragma omp parallel for schedule(dynamic)
+    for (long long b = 0; b < (long long)n_blk; ++b)
     {
-        if (obj_ind.at(n) != cur_obj) // entered a new object block
-        {
-            cur_obj = obj_ind.at(n);
-            obj_reps.clear();
-        }
+        const size_t bb = (size_t)b;
+        const arma::uword s = blk_start[bb], e = blk_end[bb];
 
-        for (arma::uword k = 0; k < 3; ++k) // three triangle corners
-        {
-            const dtype x = mesh.at(n, 3 * k);
-            const dtype y = mesh.at(n, 3 * k + 1);
-            const dtype z = mesh.at(n, 3 * k + 2);
+        std::vector<dtype> &vx = bvx[bb], &vy = bvy[bb], &vz = bvz[bb];
+        vx.reserve(3 * (e - s));
+        vy.reserve(3 * (e - s));
+        vz.reserve(3 * (e - s));
 
-            // Search for a co-located vertex already added for this object
-            bool found = false;
-            arma::uword idx = 0;
-            for (const arma::uword g : obj_reps)
+        std::unordered_map<CellKey, std::vector<arma::uword>, CellHash> grid;
+        grid.reserve(3 * (e - s));
+
+        const arma::uword NONE = std::numeric_limits<arma::uword>::max();
+
+        for (arma::uword n = s; n < e; ++n)
+            for (arma::uword k = 0; k < 3; ++k) // three triangle corners
             {
-                const dtype dx = vx[g] - x, dy = vy[g] - y, dz = vz[g] - z;
-                if (dx * dx + dy * dy + dz * dz <= threshold_sq)
+                const dtype x = mesh.at(n, 3 * k);
+                const dtype y = mesh.at(n, 3 * k + 1);
+                const dtype z = mesh.at(n, 3 * k + 2);
+
+                const long long cx = (long long)std::floor((double)x * inv_cell);
+                const long long cy = (long long)std::floor((double)y * inv_cell);
+                const long long cz = (long long)std::floor((double)z * inv_cell);
+
+                // Search the 27 neighboring cells; lowest index wins (= greedy scan order)
+                arma::uword idx = NONE;
+                for (long long ix = cx - 1; ix <= cx + 1; ++ix)
+                    for (long long iy = cy - 1; iy <= cy + 1; ++iy)
+                        for (long long iz = cz - 1; iz <= cz + 1; ++iz)
+                        {
+                            auto it = grid.find(CellKey{ix, iy, iz});
+                            if (it == grid.end())
+                                continue;
+
+                            for (const arma::uword g : it->second) // bucket is sorted by insertion
+                            {
+                                if (g >= idx)
+                                    break;
+                                const dtype dx = vx[g] - x, dy = vy[g] - y, dz = vz[g] - z;
+                                if (dx * dx + dy * dy + dz * dz <= threshold_sq)
+                                {
+                                    idx = g;
+                                    break;
+                                }
+                            }
+                        }
+
+                if (idx == NONE) // add new vertex
                 {
-                    idx = g;
-                    found = true;
-                    break;
+                    idx = (arma::uword)vx.size();
+                    vx.push_back(x);
+                    vy.push_back(y);
+                    vz.push_back(z);
+                    grid[CellKey{cx, cy, cz}].push_back(idx);
                 }
-            }
 
-            if (!found) // add new vertex
-            {
-                idx = (arma::uword)vx.size();
-                vx.push_back(x);
-                vy.push_back(y);
-                vz.push_back(z);
-                obj_reps.push_back(idx);
+                face_ind.at(n, k) = idx; // object-local index, shifted to global below
             }
-
-            face_ind.at(n, k) = idx; // 0-based global index
-        }
     }
+
+    // Prefix offsets over the per-object vertex lists
+    std::vector<arma::uword> offs(n_blk + 1, 0);
+    for (size_t b = 0; b < n_blk; ++b)
+        offs[b + 1] = offs[b] + (arma::uword)bvx[b].size();
 
     // Assemble output vertex list, Size: [ n_vert, 3 ]
-    const arma::uword n_vert = (arma::uword)vx.size();
+    const arma::uword n_vert = offs[n_blk];
     vert_list.set_size(n_vert, 3);
-    for (arma::uword i = 0; i < n_vert; ++i)
+
+#pragma omp parallel for schedule(dynamic)
+    for (long long b = 0; b < (long long)n_blk; ++b)
     {
-        vert_list.at(i, 0) = vx[i];
-        vert_list.at(i, 1) = vy[i];
-        vert_list.at(i, 2) = vz[i];
+        const size_t bb = (size_t)b;
+        const arma::uword o = offs[bb];
+
+        for (arma::uword n = blk_start[bb]; n < blk_end[bb]; ++n)
+            for (arma::uword k = 0; k < 3; ++k)
+                face_ind.at(n, k) += o; // 0-based global index
+
+        for (size_t i = 0; i < bvx[bb].size(); ++i)
+        {
+            vert_list.at(o + i, 0) = bvx[bb][i];
+            vert_list.at(o + i, 1) = bvy[bb][i];
+            vert_list.at(o + i, 2) = bvz[bb][i];
+        }
     }
+}
+
+// Helper: Split objects into connected components ("separate by loose parts")
+// - Two faces belong to the same part if they share at least one vertex index; connectivity is
+//  therefore defined by the welded vertex list, not by coordinates.
+// - Parts never span objects, even if objects happen to share vertex indices.
+// - Union-find over vertex indices, O(n_mesh * inverse-Ackermann); parts are numbered in order of
+//  their first face, so the output order follows the input face order.
+// - Parts are disjoint by construction, so splitting never duplicates vertices.
+static void separate_loose_parts(const arma::umat &face_ind, // Face indices, Size: [ n_mesh, 3 ]
+                                 const arma::uvec *obj_ind,  // Object index or nullptr, Size: [ n_mesh ]
+                                 arma::uword n_vert,         // Number of vertices in the vertex list
+                                 std::vector<arma::uword> &face_order, // Out: face indices grouped by part
+                                 std::vector<arma::uword> &part_bnd,   // Out: part boundaries in "face_order", Size: [ n_part+1 ]
+                                 std::vector<arma::uword> &part_obj)   // Out: parent object of each part, Size: [ n_part ]
+{
+    const arma::uword n_mesh = face_ind.n_rows;
+
+    std::vector<arma::uword> parent(n_vert);
+    std::vector<unsigned char> rank(n_vert, 0);
+    for (arma::uword i = 0; i < n_vert; ++i)
+        parent[i] = i;
+
+    auto find = [&parent](arma::uword x) -> arma::uword
+    {
+        while (parent[x] != x) // path halving
+        {
+            parent[x] = parent[parent[x]];
+            x = parent[x];
+        }
+        return x;
+    };
+
+    auto unite = [&](arma::uword a, arma::uword b)
+    {
+        a = find(a), b = find(b);
+        if (a == b)
+            return;
+        if (rank[a] < rank[b])
+            std::swap(a, b);
+        parent[b] = a;
+        if (rank[a] == rank[b])
+            ++rank[a];
+    };
+
+    for (arma::uword i = 0; i < n_mesh; ++i)
+    {
+        unite(face_ind.at(i, 0), face_ind.at(i, 1));
+        unite(face_ind.at(i, 1), face_ind.at(i, 2));
+    }
+
+    // Assign a part to each face; key on (root, object) so parts cannot span objects
+    struct PartKey
+    {
+        arma::uword root, obj;
+        bool operator==(const PartKey &o) const { return root == o.root && obj == o.obj; }
+    };
+    struct PartHash
+    {
+        size_t operator()(const PartKey &k) const
+        {
+            return (size_t)(k.root * 1000003ULL) ^ (size_t)(k.obj * 2654435761ULL);
+        }
+    };
+
+    std::unordered_map<PartKey, arma::uword, PartHash> key2part;
+    key2part.reserve(1024);
+
+    std::vector<arma::uword> part_of_face(n_mesh), count;
+    part_obj.clear();
+
+    for (arma::uword i = 0; i < n_mesh; ++i)
+    {
+        const PartKey key{find(face_ind.at(i, 0)), (obj_ind != nullptr) ? obj_ind->at(i) : (arma::uword)0};
+
+        arma::uword p;
+        if (auto it = key2part.find(key); it != key2part.end())
+            p = it->second;
+        else // new part, numbered in order of first appearance
+        {
+            p = (arma::uword)count.size();
+            key2part.emplace(key, p);
+            count.push_back(0);
+            part_obj.push_back(key.obj);
+        }
+
+        part_of_face[i] = p;
+        ++count[p];
+    }
+
+    // Counting sort of the faces by part (stable: face order within a part is preserved)
+    const arma::uword n_part = (arma::uword)count.size();
+    part_bnd.assign(n_part + 1, 0);
+    for (arma::uword p = 0; p < n_part; ++p)
+        part_bnd[p + 1] = part_bnd[p] + count[p];
+
+    std::vector<arma::uword> cursor(part_bnd.begin(), part_bnd.end() - 1);
+    face_order.resize(n_mesh);
+    for (arma::uword i = 0; i < n_mesh; ++i)
+        face_order[cursor[part_of_face[i]]++] = i;
 }
 
 /*!SECTION
@@ -144,9 +314,13 @@ Write a triangulated Wavefront .obj (and .mtl) file
   are closer than `threshold` (no merging across objects). With `vert_list`/`face_ind`: data is written unchanged
 - Faces are written grouped by object; the faces of each object must form a contiguous block in `obj_ind`
 - Without `obj_ind`/`obj_names`: a single object named `object` is written
+- With `split_loose_parts`: objects are separated into connected components ("separate by loose parts"); connectivity
+  follows the welded vertex list, so unwelded input geometry yields one part per face
 - Without `mtl_ind`: no `usemtl` tags and no `.mtl` file are written. With `mtl_ind`, each face carries a
   1-based material index (0 = no material, leaving that face unassigned); pass `mtl_ind = nullptr` to omit materials entirely
 - The `.mtl` (named after the `.obj`) lists each used material; values default to a gray material when `bsdf` is omitted
+- Duplicate entries in `mtl_names` are merged into one `.mtl` entry if their `bsdf` rows are identical (or if `bsdf`
+  is omitted); duplicates with differing `bsdf` rows are disambiguated as `name.001`, `name.002`, ...
 - If `csv_names` is given, the EM/acoustic material table is written to a companion `.csv` (named after the `.obj`):
   columns follow a fixed canonical order, then any extra `csv_prop` columns (alphabetical); `csv_write_defaults`
   additionally emits canonical columns absent from `csv_prop`, filled with their defaults (`a`, `e`, `fRef` = 1, else 0)
@@ -169,7 +343,8 @@ void obj_file_write(
     const arma::uvec *csv_ind = nullptr,
     const std::vector<std::string> *csv_names = nullptr,
     const std::unordered_map<std::string, std::vector<dtype>> *csv_prop = nullptr,
-    bool csv_write_defaults = false);
+    bool csv_write_defaults = false,
+    bool split_loose_parts = false);
 ```
 
 ## Inputs:
@@ -187,6 +362,7 @@ void obj_file_write(
 - **`csv_names`** — EM/acoustic material names (the full table); writing the `.csv` requires this
 - **`csv_prop`** — Material properties keyed by column name; each vector must have one value per `csv_names` entry
 - **`csv_write_defaults`** — If `true`, also write canonical columns absent from `csv_prop`, using their defaults
+- **`split_loose_parts`** — If `true`, split each object into connected components (faces sharing a vertex); parts of a split object are named `name.001`, `name.002`, ...
 
 ## Outputs:
 - **`vert_list_out`** — Vertices derived from `mesh`, or a copy of `vert_list`; `[n_vert, 3]`
@@ -213,7 +389,8 @@ void quadriga_lib::obj_file_write(const std::string &fn,
                                   const arma::uvec *csv_ind,
                                   const std::vector<std::string> *csv_names,
                                   const std::unordered_map<std::string, std::vector<dtype>> *csv_prop,
-                                  bool csv_write_defaults)
+                                  bool csv_write_defaults,
+                                  bool split_loose_parts)
 {
     // Mode selection: mesh XOR (vert_list + face_ind)
     const bool has_mesh = (mesh != nullptr);
@@ -383,6 +560,78 @@ void quadriga_lib::obj_file_write(const std::string &fn,
                 used_mtl.insert(m); // 0-based material row (no-material faces skipped)
     const bool write_materials = !used_mtl.empty();
 
+    // Resolve the material names written to the .obj / .mtl.
+    // 'mtl_names' may contain duplicates: entries sharing a name are merged into a single .mtl entry
+    // when their BSDF rows are identical (or when no BSDF is given). Entries sharing a name but
+    // carrying different BSDF data are disambiguated with ".001", ".002", ... suffixes.
+    std::unordered_map<arma::uword, std::string> mtl_out_name; // used material row -> written name
+    std::vector<arma::uword> mtl_write_order;                  // representative rows, ascending
+
+    if (write_materials)
+    {
+        auto same_bsdf = [&](arma::uword p, arma::uword q) -> bool
+        {
+            if (bsdf == nullptr)
+                return true; // no BSDF data -> all same-named entries collapse into one
+            for (arma::uword c = 0; c < 17; ++c)
+                if (bsdf->at(p, c) != bsdf->at(q, c))
+                    return false;
+            return true;
+        };
+
+        // Group the used material rows by name (used_mtl is sorted, so rows stay ascending)
+        std::map<std::string, std::vector<arma::uword>> by_name;
+        for (const arma::uword id : used_mtl)
+            by_name[(*mtl_names)[id]].push_back(id);
+
+        // Reserve every base name so generated suffixes cannot collide with an existing name
+        std::unordered_set<std::string> taken;
+        for (const auto &kv : by_name)
+            taken.insert(kv.first);
+
+        for (const auto &kv : by_name)
+        {
+            const std::string &base = kv.first;
+
+            // Split the group into distinct BSDF variants, in order of first appearance
+            std::vector<std::vector<arma::uword>> variants;
+            for (const arma::uword id : kv.second)
+            {
+                bool placed = false;
+                for (auto &v : variants)
+                    if (same_bsdf(v.front(), id))
+                    {
+                        v.push_back(id);
+                        placed = true;
+                        break;
+                    }
+                if (!placed)
+                    variants.push_back(std::vector<arma::uword>{id});
+            }
+
+            const bool need_suffix = (variants.size() > 1);
+            int ctr = 0;
+            for (const auto &v : variants)
+            {
+                std::string name = base;
+                if (need_suffix)
+                    do
+                    {
+                        char buf[16];
+                        std::snprintf(buf, sizeof(buf), ".%03d", ++ctr);
+                        name = base + buf;
+                    } while (taken.find(name) != taken.end());
+                taken.insert(name);
+
+                for (const arma::uword id : v)
+                    mtl_out_name[id] = name;
+                mtl_write_order.push_back(v.front());
+            }
+        }
+
+        std::sort(mtl_write_order.begin(), mtl_write_order.end()); // keep .mtl in material-row order
+    }
+
     // Shortest round-trip number formatter (also maps -0 -> 0)
     // snprintf-based to avoid the std::to_chars float overloads (GLIBCXX_3.4.29 / GCC 11)
     auto fmt = [](dtype v) -> std::string
@@ -413,35 +662,81 @@ void quadriga_lib::obj_file_write(const std::string &fn,
     const arma::Mat<dtype> &VL = *pVL;
     const arma::umat &FI = *pFI;
 
-    arma::uword offset = 0; // cumulative vertices already written (global 1-based base)
-    arma::uword f = 0;
-    while (f < n_mesh)
+    // Blocks to write: "blk_bnd" delimits them in "face_order", "blk_obj" names their parent object.
+    // Without splitting this is just the object blocks in input order (face_order = identity).
+    std::vector<arma::uword> face_order, blk_bnd, blk_obj;
+
+    if (split_loose_parts)
+        separate_loose_parts(FI, obj_ind, VL.n_rows, face_order, blk_bnd, blk_obj);
+    else
     {
-        const arma::uword cur_obj = objid(f);
+        face_order.resize(n_mesh);
+        for (arma::uword i = 0; i < n_mesh; ++i)
+            face_order[i] = i;
 
-        // Object block end (contiguous, guaranteed by the obj_ind guard)
-        arma::uword g = f;
-        while (g < n_mesh && objid(g) == cur_obj)
-            ++g;
+        blk_bnd.push_back(0);
+        for (arma::uword i = 1; i < n_mesh; ++i)
+            if (objid(i) != objid(i - 1))
+            {
+                blk_obj.push_back(objid(i - 1));
+                blk_bnd.push_back(i);
+            }
+        blk_obj.push_back(objid(n_mesh - 1));
+        blk_bnd.push_back(n_mesh);
+    }
+    const size_t n_blk = blk_obj.size();
 
-        // Object header
-        std::string oname;
+    // Parts per parent object; only objects that actually split get suffixed names
+    std::unordered_map<arma::uword, arma::uword> n_parts, part_ctr;
+    if (split_loose_parts)
+        for (const arma::uword o : blk_obj)
+            ++n_parts[o];
+
+    auto base_name = [&](arma::uword o) -> std::string
+    {
         if (obj_ind != nullptr)
-            oname = (*obj_names)[cur_obj];
-        else if (obj_names != nullptr && !obj_names->empty())
-            oname = (*obj_names)[0];
-        else
-            oname = "object";
+            return (*obj_names)[o];
+        if (obj_names != nullptr && !obj_names->empty())
+            return (*obj_names)[0];
+        return std::string("object");
+    };
+
+    // Reserve every base name so generated suffixes cannot collide with an existing object name
+    std::unordered_set<std::string> obj_taken;
+    if (split_loose_parts)
+        for (const arma::uword o : blk_obj)
+            obj_taken.insert(base_name(o));
+
+    arma::uword offset = 0; // cumulative vertices already written (global 1-based base)
+    for (size_t blk = 0; blk < n_blk; ++blk)
+    {
+        const arma::uword bf = blk_bnd[blk], bg = blk_bnd[blk + 1];
+        const arma::uword cur_obj = blk_obj[blk];
+
+        // Object header; parts of a split object are suffixed ".001", ".002", ...
+        std::string oname = base_name(cur_obj);
+        if (split_loose_parts && n_parts[cur_obj] > 1)
+        {
+            const std::string base = oname;
+            arma::uword &ctr = part_ctr[cur_obj];
+            do
+            {
+                char buf[16];
+                std::snprintf(buf, sizeof(buf), ".%03d", (int)++ctr);
+                oname = base + buf;
+            } while (obj_taken.find(oname) != obj_taken.end());
+            obj_taken.insert(oname);
+        }
         obj << "o " << oname << "\n";
 
-        // Collect this object's vertices in first-use order
+        // Collect this block's vertices in first-use order
         std::unordered_map<arma::uword, arma::uword> remap;
         std::vector<arma::uword> order;
-        order.reserve((g - f) * 3);
-        for (arma::uword i = f; i < g; ++i)
+        order.reserve((bg - bf) * 3);
+        for (arma::uword ii = bf; ii < bg; ++ii)
             for (arma::uword k = 0; k < 3; ++k)
             {
-                const arma::uword gv = FI.at(i, k);
+                const arma::uword gv = FI.at(face_order[ii], k);
                 if (remap.find(gv) == remap.end())
                 {
                     remap.emplace(gv, (arma::uword)order.size());
@@ -454,14 +749,23 @@ void quadriga_lib::obj_file_write(const std::string &fn,
             obj << "v " << fmt(VL.at(gv, 0)) << " " << fmt(VL.at(gv, 1)) << " " << fmt(VL.at(gv, 2)) << "\n";
 
         // Faces; emit usemtl on material change (reset per object, like the reader)
-        arma::uword last_mtl = NO_MTL;
-        for (arma::uword i = f; i < g; ++i)
+        // Compared by written name, so merged duplicates do not emit a redundant tag
+        std::string last_mtl_name;
+        bool have_last_mtl = false;
+        for (arma::uword ii = bf; ii < bg; ++ii)
         {
+            const arma::uword i = face_order[ii];
+
             if (write_materials)
-                if (const arma::uword m = mtlid(i); m != NO_MTL && m != last_mtl)
+                if (const arma::uword m = mtlid(i); m != NO_MTL)
                 {
-                    obj << "usemtl " << (*mtl_names)[m] << "\n";
-                    last_mtl = m;
+                    const std::string &mname = mtl_out_name.at(m);
+                    if (!have_last_mtl || mname != last_mtl_name)
+                    {
+                        obj << "usemtl " << mname << "\n";
+                        last_mtl_name = mname;
+                        have_last_mtl = true;
+                    }
                 }
 
             const arma::uword a = offset + remap[FI.at(i, 0)] + 1;
@@ -471,7 +775,6 @@ void quadriga_lib::obj_file_write(const std::string &fn,
         }
 
         offset += (arma::uword)order.size();
-        f = g;
     }
     obj.close();
 
@@ -484,9 +787,9 @@ void quadriga_lib::obj_file_write(const std::string &fn,
 
         mtl << "# Wavefront MTL file written by quadriga-lib\n";
 
-        for (const arma::uword id : used_mtl)
+        for (const arma::uword id : mtl_write_order)
         {
-            mtl << "\nnewmtl " << (*mtl_names)[id] << "\n";
+            mtl << "\nnewmtl " << mtl_out_name.at(id) << "\n";
 
             if (bsdf != nullptr)
             {
@@ -613,7 +916,8 @@ template void quadriga_lib::obj_file_write(const std::string &fn,
                                            const arma::uvec *csv_ind,
                                            const std::vector<std::string> *csv_names,
                                            const std::unordered_map<std::string, std::vector<float>> *csv_prop,
-                                           bool csv_write_defaults);
+                                           bool csv_write_defaults,
+                                           bool split_loose_parts);
 
 template void quadriga_lib::obj_file_write(const std::string &fn,
                                            const arma::Mat<double> *mesh,
@@ -630,4 +934,5 @@ template void quadriga_lib::obj_file_write(const std::string &fn,
                                            const arma::uvec *csv_ind,
                                            const std::vector<std::string> *csv_names,
                                            const std::unordered_map<std::string, std::vector<double>> *csv_prop,
-                                           bool csv_write_defaults);
+                                           bool csv_write_defaults,
+                                           bool split_loose_parts);
