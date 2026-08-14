@@ -12,9 +12,6 @@
 #include <algorithm>
 #include <type_traits>
 #include <vector>
-#include <thread>
-#include <chrono>
-#include <cstdio>
 
 #include <cub/cub.cuh>
 
@@ -32,48 +29,7 @@ namespace
     static_assert(BLOCK_SIZE % 32 == 0, "BLOCK_SIZE must be a multiple of 32 (warp size)");
 
     // Conservative estimate for average AABB hits per ray (used for queue sizing)
-    static constexpr int EST_AVG_HITS = 16;
-
-    // Memory budget constants for batch sizing
-    static constexpr size_t MEM_RESERVE = 512ull << 20;  // absolute VRAM reserve, not a fraction
-    static constexpr size_t MAX_WORKSET = 1536ull << 20; // no throughput gain beyond this
-    static constexpr size_t MAX_BATCH_RAYS = 2ull << 20; // 2M rays saturates any GPU
-    static constexpr size_t OOM_RETRY_RESERVE = 256ull << 20;
-
-    // Retryable out-of-memory condition: the caller reruns with a smaller batch.
-    // cudaErrorMemoryAllocation is not sticky, so the context stays usable.
-    struct RTI_oom : public std::runtime_error
-    {
-        RTI_oom() : std::runtime_error("qd_RTI_CUDA: GPU out of memory") {}
-    };
-
-    // Non-throwing device allocation; converts OOM into a retryable exception
-    template <typename T>
-    static inline void RTI_malloc(T **ptr, size_t bytes)
-    {
-        cudaError_t rc = cudaMalloc(ptr, bytes);
-        if (rc == cudaErrorMemoryAllocation)
-        {
-            *ptr = nullptr;
-            (void)cudaGetLastError(); // clear the error state
-            throw RTI_oom();
-        }
-        CUDA_CHECK(rc);
-    }
-
-    // Non-throwing pinned host allocation
-    template <typename T>
-    static inline void RTI_malloc_host(T **ptr, size_t bytes)
-    {
-        cudaError_t rc = cudaMallocHost(ptr, bytes);
-        if (rc == cudaErrorMemoryAllocation)
-        {
-            *ptr = nullptr;
-            (void)cudaGetLastError();
-            throw RTI_oom();
-        }
-        CUDA_CHECK(rc);
-    }
+    static constexpr int EST_AVG_HITS = 10;
 
     // Sentinel for packed FBS/SBS: t=1.0f (no hit), face=UINT32_MAX
     static constexpr uint64_t PACKED_SENTINEL = (uint64_t(0x3F800000u) << 32) | uint64_t(0xFFFFFFFFu);
@@ -691,7 +647,7 @@ namespace
     template <typename dtype>
     static inline void RTI_upload_scene(float *&d_ptr, const dtype *h_ptr, size_t count)
     {
-        RTI_malloc(&d_ptr, count * sizeof(float));
+        CUDA_CHECK(cudaMalloc(&d_ptr, count * sizeof(float)));
         if constexpr (std::is_same_v<dtype, float>)
         {
             CUDA_CHECK(cudaMemcpy(d_ptr, h_ptr, count * sizeof(float), cudaMemcpyHostToDevice));
@@ -749,27 +705,24 @@ namespace
 
 } // end anonymous namespace --------------------------------------------------
 
-// Internal implementation — a single attempt with a given batch cap.
-// batch_cap is an input limit (0 = derive from free memory) and is written back
-// with the batch size that was actually used, so the caller can halve it.
+// Public entry point — external linkage
 template <typename dtype>
-static void RTI_run(const dtype *Tx, const dtype *Ty, const dtype *Tz,
-                    const dtype *Ux, const dtype *Uy, const dtype *Uz,
-                    const dtype *Vx, const dtype *Vy, const dtype *Vz,
-                    const size_t n_mesh,
-                    const unsigned *SMI,
-                    const dtype *Xmin, const dtype *Xmax,
-                    const dtype *Ymin, const dtype *Ymax,
-                    const dtype *Zmin, const dtype *Zmax,
-                    const size_t n_sub,
-                    const dtype *Ox, const dtype *Oy, const dtype *Oz,
-                    const dtype *Dx, const dtype *Dy, const dtype *Dz,
-                    const size_t n_ray,
-                    dtype *Wf, dtype *Ws,
-                    unsigned *If, unsigned *Is,
-                    unsigned *hit_cnt,
-                    int gpu_id,
-                    size_t &batch_cap)
+void qd_RTI_CUDA(const dtype *Tx, const dtype *Ty, const dtype *Tz,
+                 const dtype *Ux, const dtype *Uy, const dtype *Uz,
+                 const dtype *Vx, const dtype *Vy, const dtype *Vz,
+                 const size_t n_mesh,
+                 const unsigned *SMI,
+                 const dtype *Xmin, const dtype *Xmax,
+                 const dtype *Ymin, const dtype *Ymax,
+                 const dtype *Zmin, const dtype *Zmax,
+                 const size_t n_sub,
+                 const dtype *Ox, const dtype *Oy, const dtype *Oz,
+                 const dtype *Dx, const dtype *Dy, const dtype *Dz,
+                 const size_t n_ray,
+                 dtype *Wf, dtype *Ws,
+                 unsigned *If, unsigned *Is,
+                 unsigned *hit_cnt,
+                 int gpu_id)
 {
     constexpr bool is_double = std::is_same_v<dtype, double>;
 
@@ -838,7 +791,7 @@ static void RTI_run(const dtype *Tx, const dtype *Ty, const dtype *Tz,
             smi_with_sentinel[i] = (uint32_t)SMI[i];
         smi_with_sentinel[n_sub] = (uint32_t)n_mesh;
 
-        RTI_malloc(&buf.d_SMI, (n_sub + 1) * sizeof(uint32_t));
+        CUDA_CHECK(cudaMalloc(&buf.d_SMI, (n_sub + 1) * sizeof(uint32_t)));
         CUDA_CHECK(cudaMemcpy(buf.d_SMI, smi_with_sentinel.data(),
                               (n_sub + 1) * sizeof(uint32_t), cudaMemcpyHostToDevice));
     }
@@ -894,34 +847,15 @@ static void RTI_run(const dtype *Tx, const dtype *Ty, const dtype *Tz,
     if (cub_temp_per_stream < 1024)
         cub_temp_per_stream = 1024; // minimum sanity
 
-    // Memory budget: leave headroom for the driver, fragmentation, and other
-    // processes that may claim VRAM while we run (compositor, Blender, ...).
-    // Sizing the batch to fill the card buys no throughput but makes every
-    // work-queue overflow proportionally more expensive to recover from.
-    size_t budget = (free_mem > MEM_RESERVE) ? free_mem - MEM_RESERVE : 0;
-    budget = std::min(budget, MAX_WORKSET);
-
-    size_t fixed_bytes = 2 * cub_temp_per_stream;
-    size_t batch_size = (budget > fixed_bytes) ? (budget - fixed_bytes) / (2 * per_ray_bytes) : 0;
-
-    if (batch_cap != 0)
-        batch_size = std::min(batch_size, batch_cap);
+    // Use 75% of free memory, double-buffered
+    size_t usable = (size_t)(free_mem * 0.75);
+    size_t batch_size = (usable - 2 * cub_temp_per_stream) / (2 * per_ray_bytes);
     batch_size = std::min(batch_size, n_ray);
-    batch_size = std::min(batch_size, MAX_BATCH_RAYS);
     batch_size = (batch_size / BLOCK_SIZE) * BLOCK_SIZE; // align to block size
     if (batch_size == 0)
         batch_size = BLOCK_SIZE; // minimum 1 block
 
-    // Queue index space is uint32 and CUB takes int num_items
     size_t queue_capacity = batch_size * E;
-    if (queue_capacity > (size_t)INT32_MAX)
-    {
-        batch_size = ((size_t)INT32_MAX / E / BLOCK_SIZE) * BLOCK_SIZE;
-        queue_capacity = batch_size * E;
-    }
-
-    // Report the batch size actually used, so the caller can retry smaller
-    batch_cap = batch_size;
 
     // =====================================================================
     // Create streams
@@ -950,55 +884,55 @@ static void RTI_run(const dtype *Tx, const dtype *Ty, const dtype *Tz,
     for (int s = 0; s < 2; ++s)
     {
         // Ray input
-        RTI_malloc(&buf.d_Ox[s], ray_f_bytes);
-        RTI_malloc(&buf.d_Oy[s], ray_f_bytes);
-        RTI_malloc(&buf.d_Oz[s], ray_f_bytes);
-        RTI_malloc(&buf.d_Dx[s], ray_f_bytes);
-        RTI_malloc(&buf.d_Dy[s], ray_f_bytes);
-        RTI_malloc(&buf.d_Dz[s], ray_f_bytes);
+        CUDA_CHECK(cudaMalloc(&buf.d_Ox[s], ray_f_bytes));
+        CUDA_CHECK(cudaMalloc(&buf.d_Oy[s], ray_f_bytes));
+        CUDA_CHECK(cudaMalloc(&buf.d_Oz[s], ray_f_bytes));
+        CUDA_CHECK(cudaMalloc(&buf.d_Dx[s], ray_f_bytes));
+        CUDA_CHECK(cudaMalloc(&buf.d_Dy[s], ray_f_bytes));
+        CUDA_CHECK(cudaMalloc(&buf.d_Dz[s], ray_f_bytes));
 
         // Ray output
-        RTI_malloc(&buf.d_Wf[s], ray_f_bytes);
-        RTI_malloc(&buf.d_Ws[s], ray_f_bytes);
-        RTI_malloc(&buf.d_If[s], ray_u_bytes);
-        RTI_malloc(&buf.d_Is[s], ray_u_bytes);
-        RTI_malloc(&buf.d_hit_cnt[s], ray_u_bytes);
+        CUDA_CHECK(cudaMalloc(&buf.d_Wf[s], ray_f_bytes));
+        CUDA_CHECK(cudaMalloc(&buf.d_Ws[s], ray_f_bytes));
+        CUDA_CHECK(cudaMalloc(&buf.d_If[s], ray_u_bytes));
+        CUDA_CHECK(cudaMalloc(&buf.d_Is[s], ray_u_bytes));
+        CUDA_CHECK(cudaMalloc(&buf.d_hit_cnt[s], ray_u_bytes));
 
         // Intermediate
-        RTI_malloc(&buf.d_fbs_packed[s], ray_8_bytes);
-        RTI_malloc(&buf.d_sbs_packed[s], ray_8_bytes);
-        RTI_malloc(&buf.d_hit_cnt_atomic[s], ray_u_bytes);
+        CUDA_CHECK(cudaMalloc(&buf.d_fbs_packed[s], ray_8_bytes));
+        CUDA_CHECK(cudaMalloc(&buf.d_sbs_packed[s], ray_8_bytes));
+        CUDA_CHECK(cudaMalloc(&buf.d_hit_cnt_atomic[s], ray_u_bytes));
 
         // Work queue
-        RTI_malloc(&buf.d_wq_ray_idx_A[s], wq_ray_bytes);
-        RTI_malloc(&buf.d_wq_ray_idx_B[s], wq_ray_bytes);
-        RTI_malloc(&buf.d_wq_aabb_idx_A[s], wq_aabb_bytes);
-        RTI_malloc(&buf.d_wq_aabb_idx_B[s], wq_aabb_bytes);
-        RTI_malloc(&buf.d_queue_tail[s], sizeof(uint32_t)); // own alloc for cache line isolation
-        RTI_malloc(&buf.d_wq_had_hit[s], wq_flag_bytes);
-        RTI_malloc(&buf.d_compact_indices[s], wq_comp_bytes);
-        RTI_malloc(&buf.d_num_selected[s], sizeof(uint32_t));
+        CUDA_CHECK(cudaMalloc(&buf.d_wq_ray_idx_A[s], wq_ray_bytes));
+        CUDA_CHECK(cudaMalloc(&buf.d_wq_ray_idx_B[s], wq_ray_bytes));
+        CUDA_CHECK(cudaMalloc(&buf.d_wq_aabb_idx_A[s], wq_aabb_bytes));
+        CUDA_CHECK(cudaMalloc(&buf.d_wq_aabb_idx_B[s], wq_aabb_bytes));
+        CUDA_CHECK(cudaMalloc(&buf.d_queue_tail[s], sizeof(uint32_t))); // own alloc for cache line isolation
+        CUDA_CHECK(cudaMalloc(&buf.d_wq_had_hit[s], wq_flag_bytes));
+        CUDA_CHECK(cudaMalloc(&buf.d_compact_indices[s], wq_comp_bytes));
+        CUDA_CHECK(cudaMalloc(&buf.d_num_selected[s], sizeof(uint32_t)));
 
         // CUB temp
-        RTI_malloc(&buf.d_cub_temp[s], cub_temp_per_stream);
+        CUDA_CHECK(cudaMalloc(&buf.d_cub_temp[s], cub_temp_per_stream));
 
         // Pinned host memory
         if constexpr (is_double)
         {
-            RTI_malloc(&buf.d_ray_input_d[s], 6 * batch_size * sizeof(double));
-            RTI_malloc(&buf.d_Wf_d[s], batch_size * sizeof(double));
-            RTI_malloc(&buf.d_Ws_d[s], batch_size * sizeof(double));
+            CUDA_CHECK(cudaMalloc(&buf.d_ray_input_d[s], 6 * batch_size * sizeof(double)));
+            CUDA_CHECK(cudaMalloc(&buf.d_Wf_d[s], batch_size * sizeof(double)));
+            CUDA_CHECK(cudaMalloc(&buf.d_Ws_d[s], batch_size * sizeof(double)));
 
             buf.pinned_input_bytes_d = 6 * batch_size * sizeof(double);
             buf.pinned_output_bytes_d = 2 * batch_size * sizeof(double) + 3 * ray_u_bytes;
 
-            RTI_malloc_host(&buf.h_ray_input_pinned_d[s], buf.pinned_input_bytes_d);
-            RTI_malloc_host(&buf.h_ray_output_pinned_d[s], buf.pinned_output_bytes_d);
+            CUDA_CHECK(cudaMallocHost(&buf.h_ray_input_pinned_d[s], buf.pinned_input_bytes_d));
+            CUDA_CHECK(cudaMallocHost(&buf.h_ray_output_pinned_d[s], buf.pinned_output_bytes_d));
         }
         else
         {
-            RTI_malloc_host(&buf.h_ray_input_pinned[s], buf.pinned_input_bytes);
-            RTI_malloc_host(&buf.h_ray_output_pinned[s], buf.pinned_output_bytes);
+            CUDA_CHECK(cudaMallocHost(&buf.h_ray_input_pinned[s], buf.pinned_input_bytes));
+            CUDA_CHECK(cudaMallocHost(&buf.h_ray_output_pinned[s], buf.pinned_output_bytes));
         }
     }
 
@@ -1135,22 +1069,8 @@ static void RTI_run(const dtype *Tx, const dtype *Ty, const dtype *Tz,
             CUDA_CHECK(cudaStreamSynchronize(buf.stream[0]));
             CUDA_CHECK(cudaStreamSynchronize(buf.stream[1]));
 
-            // Grow the queue, but only as far as free VRAM actually allows.
-            // Growing blindly is what turns a queue overflow into a hard OOM.
-            const size_t bytes_per_entry = 4 + 4 + 2 + 2 + 1 + 4; // ray A/B, aabb A/B, flag, compact
-            const size_t old_queue_bytes = 2 * queue_capacity * bytes_per_entry;
-
-            size_t new_capacity = (size_t)h_queue_tail[s] + (size_t)h_queue_tail[s] / 2; // 1.5x
-            new_capacity = std::min(new_capacity, (size_t)INT32_MAX);
-
-            size_t free_now = 0, total_now = 0;
-            CUDA_CHECK(cudaMemGetInfo(&free_now, &total_now));
-            size_t avail = free_now + old_queue_bytes; // the old buffers are about to be freed
-            avail = (avail > OOM_RETRY_RESERVE) ? avail - OOM_RETRY_RESERVE : 0;
-            new_capacity = std::min(new_capacity, avail / (2 * bytes_per_entry));
-
-            if (new_capacity <= queue_capacity)
-                throw RTI_oom(); // no room to grow — caller retries with a smaller batch
+            // Calculate new capacity: 2x the actual count
+            size_t new_capacity = (size_t)h_queue_tail[s] * 2;
 
             size_t new_wq_ray_bytes = new_capacity * sizeof(uint32_t);
             size_t new_wq_aabb_bytes = new_capacity * sizeof(uint16_t);
@@ -1173,12 +1093,12 @@ static void RTI_run(const dtype *Tx, const dtype *Ty, const dtype *Tz,
                 cudaFree(buf.d_compact_indices[ss]);
                 buf.d_compact_indices[ss] = nullptr;
 
-                RTI_malloc(&buf.d_wq_ray_idx_A[ss], new_wq_ray_bytes);
-                RTI_malloc(&buf.d_wq_ray_idx_B[ss], new_wq_ray_bytes);
-                RTI_malloc(&buf.d_wq_aabb_idx_A[ss], new_wq_aabb_bytes);
-                RTI_malloc(&buf.d_wq_aabb_idx_B[ss], new_wq_aabb_bytes);
-                RTI_malloc(&buf.d_wq_had_hit[ss], new_wq_flag_bytes);
-                RTI_malloc(&buf.d_compact_indices[ss], new_wq_comp_bytes);
+                CUDA_CHECK(cudaMalloc(&buf.d_wq_ray_idx_A[ss], new_wq_ray_bytes));
+                CUDA_CHECK(cudaMalloc(&buf.d_wq_ray_idx_B[ss], new_wq_ray_bytes));
+                CUDA_CHECK(cudaMalloc(&buf.d_wq_aabb_idx_A[ss], new_wq_aabb_bytes));
+                CUDA_CHECK(cudaMalloc(&buf.d_wq_aabb_idx_B[ss], new_wq_aabb_bytes));
+                CUDA_CHECK(cudaMalloc(&buf.d_wq_had_hit[ss], new_wq_flag_bytes));
+                CUDA_CHECK(cudaMalloc(&buf.d_compact_indices[ss], new_wq_comp_bytes));
             }
 
             // Re-query CUB temp size for new capacity and reallocate if needed
@@ -1199,7 +1119,7 @@ static void RTI_run(const dtype *Tx, const dtype *Ty, const dtype *Tz,
                 {
                     cudaFree(buf.d_cub_temp[ss]);
                     buf.d_cub_temp[ss] = nullptr;
-                    RTI_malloc(&buf.d_cub_temp[ss], new_cub_temp);
+                    CUDA_CHECK(cudaMalloc(&buf.d_cub_temp[ss], new_cub_temp));
                 }
                 cub_temp_per_stream = new_cub_temp;
             }
@@ -1406,61 +1326,6 @@ static void RTI_run(const dtype *Tx, const dtype *Ty, const dtype *Tz,
     }
 
     // RAII destructor handles all cleanup
-}
-
-// Public entry point — external linkage.
-// Retries with a halved batch size when the GPU runs out of memory, so a
-// long-running job degrades in throughput instead of aborting.
-template <typename dtype>
-void qd_RTI_CUDA(const dtype *Tx, const dtype *Ty, const dtype *Tz,
-                 const dtype *Ux, const dtype *Uy, const dtype *Uz,
-                 const dtype *Vx, const dtype *Vy, const dtype *Vz,
-                 const size_t n_mesh,
-                 const unsigned *SMI,
-                 const dtype *Xmin, const dtype *Xmax,
-                 const dtype *Ymin, const dtype *Ymax,
-                 const dtype *Zmin, const dtype *Zmax,
-                 const size_t n_sub,
-                 const dtype *Ox, const dtype *Oy, const dtype *Oz,
-                 const dtype *Dx, const dtype *Dy, const dtype *Dz,
-                 const size_t n_ray,
-                 dtype *Wf, dtype *Ws,
-                 unsigned *If, unsigned *Is,
-                 unsigned *hit_cnt,
-                 int gpu_id)
-{
-    size_t batch_cap = 0; // 0 = derive from free memory
-
-    for (int attempt = 0; attempt < 12; ++attempt)
-    {
-        try
-        {
-            RTI_run<dtype>(Tx, Ty, Tz, Ux, Uy, Uz, Vx, Vy, Vz, n_mesh, SMI,
-                           Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub,
-                           Ox, Oy, Oz, Dx, Dy, Dz, n_ray,
-                           Wf, Ws, If, Is, hit_cnt, gpu_id, batch_cap);
-            return;
-        }
-        catch (const RTI_oom &)
-        {
-            // CudaBuffers RAII has already released everything during unwinding
-            (void)cudaGetLastError();
-            (void)cudaDeviceSynchronize();
-            (void)cudaGetLastError();
-
-            batch_cap = (batch_cap / 2 / BLOCK_SIZE) * BLOCK_SIZE;
-            if (batch_cap < (size_t)BLOCK_SIZE)
-                throw std::runtime_error("qd_RTI_CUDA: out of GPU memory at the minimum batch size.");
-
-            fprintf(stderr, "qd_RTI_CUDA: GPU out of memory, retrying with batch_size = %zu\n", batch_cap);
-            fflush(stderr);
-
-            // Let transient allocations from other processes settle
-            std::this_thread::sleep_for(std::chrono::seconds(5));
-        }
-    }
-
-    throw std::runtime_error("qd_RTI_CUDA: out of GPU memory after repeated retries.");
 }
 
 template void qd_RTI_CUDA<float>(const float *, const float *, const float *,
