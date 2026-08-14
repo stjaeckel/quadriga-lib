@@ -120,9 +120,16 @@ moxunit-lib:
 	- rm -rf external/MOxUnit-master
 	unzip external/MOxUnit.zip -d external/
 
+# Build source package from committed release
 package:
 	mkdir -p release
 	git archive --format=zip --prefix=quadriga_lib_$(QUADRIGA_VERSION)/ -o release/quadriga_lib_$(QUADRIGA_VERSION).zip HEAD
+
+# Build dirty package for testing - do not publish these!
+package_dirty: clean
+	mkdir -p release
+	- rm release/quadriga_lib_$(QUADRIGA_VERSION).zip
+	zip -r release/quadriga_lib_$(QUADRIGA_VERSION).zip . -x '.git/*' -x 'release/*' -x 'html_docu/releases/*'
 
 # Python targets:
 #
