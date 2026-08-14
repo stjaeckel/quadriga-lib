@@ -143,10 +143,11 @@ void quadriga_lib_arrayant(py::module_ &m)
           py::arg("tx_orientation"),
           py::arg("rx_pos"),
           py::arg("rx_orientation"),
-          py::arg("center_freq") = 0.0,
+          py::arg("center_freq") = py::none(),
           py::arg("use_absolute_delays") = false,
           py::arg("add_fake_los_path") = false,
-          py::arg("complex") = false);
+          py::arg("complex") = false,
+          py::arg("freq") = 0);
 
     m.def("get_channels_spherical", &get_channels_spherical,
           py::arg("ant_tx"),
@@ -160,11 +161,12 @@ void quadriga_lib_arrayant(py::module_ &m)
           py::arg("tx_orientation"),
           py::arg("rx_pos"),
           py::arg("rx_orientation"),
-          py::arg("center_freq") = 0.0,
+          py::arg("center_freq") = py::none(),
           py::arg("use_absolute_delays") = false,
           py::arg("add_fake_los_path") = false,
           py::arg("angles") = false,
-          py::arg("complex") = false);
+          py::arg("complex") = false,
+          py::arg("freq") = 0);
 
     m.def("get_channels_multifreq", &get_channels_multifreq,
           py::arg("ant_tx"),

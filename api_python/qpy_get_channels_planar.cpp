@@ -17,7 +17,9 @@ Calculate MIMO channel coefficients for planar wave paths
 - Interpolates antenna patterns for both arrays, accounting for element positions, orientation, and polarization.
 - LOS path detection is distance-based; the input angles are not used for LOS detection.
 - Polarization coupling is applied via the 8-row transfer matrix `M` (interleaved Re/Im for VV, VH, HV, HH).
-- If `center_freq == 0`, phase calculation is disabled and only delays are computed.
+- Path data is given for `n_freq` frequencies; single-frequency data uses `n_freq = 1`.
+- The scalar argument `freq` selects the frequency index that is processed; a single frequency is returned per call.
+- If `center_freq` is `None` or the selected entry is `0`, phase calculation is disabled and only delays are computed.
 - If `use_absolute_delays == False`, the straight-line TX-RX delay (LOS delay) is subtracted from all paths.
 - If `add_fake_los_path == True`, a zero-power LOS path is prepended when none is present, making the
   output size `n_path + 1`.
@@ -31,6 +33,8 @@ coeff_re, coeff_im, delays, rx_Doppler = quadriga_lib.arrayant.get_channels_plan
     center_freq, use_absolute_delays, add_fake_los_path )
 
 coeff, delays, rx_Doppler = quadriga_lib.arrayant.get_channels_planar( ..., complex=True )
+
+coeff_re, coeff_im, delays, rx_Doppler = quadriga_lib.arrayant.get_channels_planar( ..., freq=1 )
 ```
 
 ## Inputs:
@@ -40,18 +44,22 @@ coeff, delays, rx_Doppler = quadriga_lib.arrayant.get_channels_planar( ..., comp
 - **`eod`** — Departure elevation angles in rad; `(n_path,)`
 - **`aoa`** — Arrival azimuth angles in rad; `(n_path,)`
 - **`eoa`** — Arrival elevation angles in rad; `(n_path,)`
-- **`path_gain`** — Path gains in linear scale; `(n_path,)`
+- **`path_gain`** — Path gains in linear scale; `(n_path, n_freq)`
 - **`path_length`** — Total path lengths from TX to RX phase center; `(n_path,)`
-- **`M`** — Polarization transfer matrix, interleaved Re/Im; `(8, n_path)` (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH)
+- **`M`** — Polarization transfer matrix, interleaved Re/Im; `(8, n_path, n_freq)`
+  (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH)
 - **`tx_pos`** — Transmitter position in Cartesian coordinates; `(3,)`
 - **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `(3,)`
 - **`rx_pos`** — Receiver position in Cartesian coordinates; `(3,)`
 - **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading); `(3,)`
-- **`center_freq`** — Center frequency in Hz; set to `0` to skip phase computation; default: `0.0`
+- **`center_freq`** — Center frequencies in Hz; `(n_freq,)`; set an entry to `0` or pass `None` to skip
+  phase computation; default: `None`
 - **`use_absolute_delays`** — If `True`, delays include the LOS component; default: `False`
 - **`add_fake_los_path`** — If `True`, prepends a zero-power LOS path when none is present; default: `False`
 - **`complex`** — If `True`, combine coefficients into a single complex array `coeff`; if `False`, return
   separate `coeff_re` and `coeff_im`; default: `False`
+- **`freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `M` and `center_freq` that is
+  processed; default: `0`
 
 ## Outputs:
 - **`coeff_re`** — Real part of channel coefficients (`complex=False`); `(n_ports_rx, n_ports_tx, n_path)`
@@ -79,10 +87,11 @@ py::tuple get_channels_planar(const py::dict &ant_tx,
                               const py::array_t<double> &tx_orientation,
                               const py::array_t<double> &rx_pos,
                               const py::array_t<double> &rx_orientation,
-                              const double center_freq,
+                              py::handle center_freq,
                               const bool use_absolute_delays,
                               const bool add_fake_los_path,
-                              const bool complex)
+                              const bool complex,
+                              const arma::uword freq)
 {
     // Parse input arguments
     const auto ant_tx_a = qd_python_dict2arrayant(ant_tx, true);
@@ -91,9 +100,10 @@ py::tuple get_channels_planar(const py::dict &ant_tx,
     const auto eod_a = qd_python_numpy2arma_Col(eod, true);
     const auto aoa_a = qd_python_numpy2arma_Col(aoa, true);
     const auto eoa_a = qd_python_numpy2arma_Col(eoa, true);
-    const auto path_gain_a = qd_python_numpy2arma_Col(path_gain, true);
+    const auto path_gain_a = qd_python_numpy2arma_Mat(path_gain, true);
     const auto path_length_a = qd_python_numpy2arma_Col(path_length, true);
-    const auto M_a = qd_python_numpy2arma_Mat(M, true);
+    const auto M_a = qd_python_numpy2arma_Cube(M, true);
+    const auto center_freq_a = qd_python_numpy2arma_Col<double>(center_freq, true);
     const auto tx_pos_a = qd_python_numpy2arma_Col(tx_pos, true, false, "tx_pos", 3);
     const auto tx_orientation_a = qd_python_numpy2arma_Col(tx_orientation, true, false, "tx_orientation", 3);
     const auto rx_pos_a = qd_python_numpy2arma_Col(rx_pos, true, false, "rx_pos", 3);
@@ -108,7 +118,24 @@ py::tuple get_channels_planar(const py::dict &ant_tx,
     // Derived inputs
     arma::uword n_ports_tx = ant_tx_a.n_ports();
     arma::uword n_ports_rx = ant_rx_a.n_ports();
-    arma::uword n_path = add_fake_los_path ? aod_a.n_elem + 1 : aod_a.n_elem;
+    arma::uword n_path_in = aod_a.n_elem;
+    arma::uword n_freq = path_gain_a.n_cols;
+    arma::uword n_path = add_fake_los_path ? n_path_in + 1 : n_path_in;
+
+    // Check multi-frequency data consistency, path counts are validated by the C++ core
+    if (M_a.n_slices != n_freq)
+        throw std::invalid_argument("Inputs 'path_gain' and 'M' must have the same number of frequencies.");
+
+    if (!center_freq_a.empty() && center_freq_a.n_elem != n_freq)
+        throw std::invalid_argument("Input 'center_freq' must have 'n_freq' elements.");
+
+    if (freq >= n_freq)
+        throw std::out_of_range("Input 'freq' exceeds the number of frequencies.");
+
+    // Select the frequency slice, aliased without copying the data
+    const arma::Col<double> path_gain_f(const_cast<double *>(path_gain_a.colptr(freq)), path_gain_a.n_rows, false, true);
+    const arma::Mat<double> M_f(const_cast<double *>(M_a.slice_memptr(freq)), M_a.n_rows, M_a.n_cols, false, true);
+    const double center_frequency = center_freq_a.empty() ? 0.0 : center_freq_a.at(freq);
 
     // Initialize delay and Doppler outputs (always real, zero-copy)
     arma::cube coeff_re, coeff_im, delay;
@@ -120,9 +147,9 @@ py::tuple get_channels_planar(const py::dict &ant_tx,
     {
         quadriga_lib::get_channels_planar<double>(&ant_tx_a, &ant_rx_a,
                                                   Tx, Ty, Tz, Tb, Tt, Th, Rx, Ry, Rz, Rb, Rt, Rh,
-                                                  &aod_a, &eod_a, &aoa_a, &eoa_a, &path_gain_a, &path_length_a, &M_a,
+                                                  &aod_a, &eod_a, &aoa_a, &eoa_a, &path_gain_f, &path_length_a, &M_f,
                                                   &coeff_re, &coeff_im, &delay,
-                                                  center_freq, use_absolute_delays, add_fake_los_path,
+                                                  center_frequency, use_absolute_delays, add_fake_los_path,
                                                   &rx_Doppler);
 
         auto coeff_p = qd_python_copy2numpy<double, std::complex<double>>(&coeff_re, &coeff_im);
@@ -135,9 +162,9 @@ py::tuple get_channels_planar(const py::dict &ant_tx,
 
     quadriga_lib::get_channels_planar<double>(&ant_tx_a, &ant_rx_a,
                                               Tx, Ty, Tz, Tb, Tt, Th, Rx, Ry, Rz, Rb, Rt, Rh,
-                                              &aod_a, &eod_a, &aoa_a, &eoa_a, &path_gain_a, &path_length_a, &M_a,
+                                              &aod_a, &eod_a, &aoa_a, &eoa_a, &path_gain_f, &path_length_a, &M_f,
                                               &coeff_re, &coeff_im, &delay,
-                                              center_freq, use_absolute_delays, add_fake_los_path,
+                                              center_frequency, use_absolute_delays, add_fake_los_path,
                                               &rx_Doppler);
 
     return py::make_tuple(coeff_re_p, coeff_im_p, delay_p, rx_Doppler_p);
@@ -158,7 +185,8 @@ py::tuple get_channels_planar(const py::dict &ant_tx,
 //       py::arg("tx_orientation"),
 //       py::arg("rx_pos"),
 //       py::arg("rx_orientation"),
-//       py::arg("center_freq") = 0.0,
+//       py::arg("center_freq") = py::none(),
 //       py::arg("use_absolute_delays") = false,
 //       py::arg("add_fake_los_path") = false,
-//       py::arg("complex") = false);
+//       py::arg("complex") = false,
+//       py::arg("freq") = 0);
