@@ -15,6 +15,27 @@
 
 #include <cub/cub.cuh>
 
+// Compile-time diagnostics. Build with -DRTI_DEBUG=1 (or set it to 1 here) to
+// print batch sizing, memory budget, and per-batch queue statistics to stdout.
+#ifndef RTI_DEBUG
+#define RTI_DEBUG 0
+#endif
+
+#if RTI_DEBUG
+#include <cstdio>
+#define RTI_DBG(...)                    \
+    do                                  \
+    {                                   \
+        printf("RTI-DBG " __VA_ARGS__); \
+        fflush(stdout);                 \
+    } while (0)
+#else
+#define RTI_DBG(...) \
+    do               \
+    {                \
+    } while (0)
+#endif
+
 #include "cuda_common.hpp" // replaces local CUDA_CHECK + cuda_runtime.h
 #include "quadriga_lib_cuda_functions.hpp"
 
@@ -30,6 +51,18 @@ namespace
 
     // Conservative estimate for average AABB hits per ray (used for queue sizing)
     static constexpr int EST_AVG_HITS = 10;
+
+#if RTI_DEBUG
+    // Report free device memory at a named point in the call
+    static inline void RTI_dbg_mem(const char *tag)
+    {
+        size_t f = 0, t = 0;
+        cudaMemGetInfo(&f, &t);
+        RTI_DBG("[%s] free=%zu MB / total=%zu MB\n", tag, f >> 20, t >> 20);
+    }
+#else
+    static inline void RTI_dbg_mem(const char *) {}
+#endif
 
     // Sentinel for packed FBS/SBS: t=1.0f (no hit), face=UINT32_MAX
     static constexpr uint64_t PACKED_SENTINEL = (uint64_t(0x3F800000u) << 32) | uint64_t(0xFFFFFFFFu);
@@ -537,8 +570,8 @@ namespace
         char *h_ray_output_pinned[2] = {};
 
         // Double-precision staging (allocated only by double specialization)
-        double *d_ray_input_d[2] = {}; // flat SoA: 6 * batch_size doubles
-        double *d_Wf_d[2] = {};        // batch_size doubles
+        double *d_ray_input_d[2] = {}; // flat SoA: 6 * stride doubles
+        double *d_Wf_d[2] = {};        // stride doubles
         double *d_Ws_d[2] = {};
 
         // Pinned host for double I/O
@@ -808,8 +841,16 @@ void qd_RTI_CUDA(const dtype *Tx, const dtype *Ty, const dtype *Tz,
     // Batch size calculation (Section 5.1)
     // =====================================================================
 
+    RTI_dbg_mem("after scene upload");
+
     size_t free_mem = 0, total_mem = 0;
     CUDA_CHECK(cudaMemGetInfo(&free_mem, &total_mem));
+
+    RTI_DBG("=== call start ===\n");
+    RTI_DBG("dtype=%s n_ray=%zu n_mesh=%zu n_sub=%zu count_hits=%d\n",
+            is_double ? "double" : "float", n_ray, n_mesh, n_sub, (int)count_hits);
+    RTI_DBG("free=%zu MB total=%zu MB EST_AVG_HITS=%d\n",
+            free_mem >> 20, total_mem >> 20, EST_AVG_HITS);
 
     // Per-ray memory budget
     const size_t E = EST_AVG_HITS;
@@ -825,37 +866,79 @@ void qd_RTI_CUDA(const dtype *Tx, const dtype *Ty, const dtype *Tz,
         per_ray_bytes += 6 * sizeof(double)    // d_ray_input_d
                          + 2 * sizeof(double); // d_Wf_d + d_Ws_d
 
-    // Query CUB temp requirements at runtime
-    size_t max_queue_estimate = (n_ray < 10000000) ? n_ray * E : 10000000ULL * E;
+    // Query CUB temp requirements at runtime, for a given number of queue entries
+    auto cub_temp_for = [](size_t items) -> size_t
+    {
+        int n_items = (int)std::min(items, (size_t)INT32_MAX);
 
-    size_t cub_sort_temp = 0;
-    cub::DeviceRadixSort::SortPairs(nullptr, cub_sort_temp,
-                                    (uint16_t *)nullptr, (uint16_t *)nullptr,
-                                    (uint32_t *)nullptr, (uint32_t *)nullptr,
-                                    (int)std::min(max_queue_estimate, (size_t)INT32_MAX),
-                                    0, 16, (cudaStream_t)0);
+        size_t sort_temp = 0;
+        cub::DeviceRadixSort::SortPairs(nullptr, sort_temp,
+                                        (uint16_t *)nullptr, (uint16_t *)nullptr,
+                                        (uint32_t *)nullptr, (uint32_t *)nullptr,
+                                        n_items, 0, 16, (cudaStream_t)0);
 
-    size_t cub_compact_temp = 0;
-    cub::DeviceSelect::Flagged(nullptr, cub_compact_temp,
-                               cub::CountingInputIterator<uint32_t>(0),
-                               (uint8_t *)nullptr, (uint32_t *)nullptr, (uint32_t *)nullptr,
-                               (int)std::min(max_queue_estimate, (size_t)INT32_MAX),
-                               (cudaStream_t)0);
+        size_t compact_temp = 0;
+        cub::DeviceSelect::Flagged(nullptr, compact_temp,
+                                   cub::CountingInputIterator<uint32_t>(0),
+                                   (uint8_t *)nullptr, (uint32_t *)nullptr, (uint32_t *)nullptr,
+                                   n_items, (cudaStream_t)0);
 
-    size_t cub_temp_per_stream = std::max(cub_sort_temp, cub_compact_temp);
-    cub_temp_per_stream = (size_t)(cub_temp_per_stream * 1.2); // 20% margin
-    if (cub_temp_per_stream < 1024)
-        cub_temp_per_stream = 1024; // minimum sanity
+        size_t bytes = (size_t)(std::max(sort_temp, compact_temp) * 1.2); // 20% margin
+        return (bytes < 1024) ? (size_t)1024 : bytes;
+    };
 
     // Use 75% of free memory, double-buffered
     size_t usable = (size_t)(free_mem * 0.75);
-    size_t batch_size = (usable - 2 * cub_temp_per_stream) / (2 * per_ray_bytes);
-    batch_size = std::min(batch_size, n_ray);
-    batch_size = (batch_size / BLOCK_SIZE) * BLOCK_SIZE; // align to block size
-    if (batch_size == 0)
-        batch_size = BLOCK_SIZE; // minimum 1 block
 
+    auto derive_batch = [&](size_t cub_bytes) -> size_t
+    {
+        size_t fixed = 2 * cub_bytes;
+        size_t b = (usable > fixed) ? (usable - fixed) / (2 * per_ray_bytes) : 0;
+        b = std::min(b, n_ray);
+        b = (b / BLOCK_SIZE) * BLOCK_SIZE; // align to block size
+        return (b == 0) ? (size_t)BLOCK_SIZE : b; // minimum 1 block
+    };
+
+    // The CUB temp size depends on the queue capacity, which depends on the
+    // batch size, which depends on the CUB temp size. Three passes settle it:
+    // pass 1 uses a pessimistic bound, passes 2 and 3 use the real capacity.
+    // Sizing it from n_ray instead (the original approach) reserved temp space
+    // for a queue far larger than the one actually allocated.
+    size_t cub_temp_per_stream = cub_temp_for((n_ray < 10000000) ? n_ray * E : 10000000ULL * E);
+    size_t batch_size = derive_batch(cub_temp_per_stream);
+    RTI_DBG("sizing pass 1: cub=%zu MB batch=%zu\n", cub_temp_per_stream >> 20, batch_size);
+
+    cub_temp_per_stream = cub_temp_for(batch_size * E); // <= previous, so batch grows
+    batch_size = derive_batch(cub_temp_per_stream);
+    RTI_DBG("sizing pass 2: cub=%zu MB batch=%zu\n", cub_temp_per_stream >> 20, batch_size);
+
+    cub_temp_per_stream = cub_temp_for(batch_size * E); // >= previous, so batch shrinks
+    batch_size = derive_batch(cub_temp_per_stream);
+    RTI_DBG("sizing pass 3: cub=%zu MB batch=%zu\n", cub_temp_per_stream >> 20, batch_size);
+
+    // batch_size now fits inside `usable` together with the temp actually
+    // allocated, and that temp covers the final (smaller or equal) capacity.
     size_t queue_capacity = batch_size * E;
+
+    // Allocation stride: fixed for the whole call. The per-batch chunk length
+    // may shrink below this on queue overflow, but the buffers never move.
+    const size_t stride = batch_size;
+
+    // Rays per batch. Shrinks if a batch overflows the work queue.
+    size_t chunk = batch_size;
+
+#if RTI_DEBUG
+    {
+        const size_t bpe = 4 + 4 + 2 + 2 + 1 + 4; // work queue bytes per entry
+        size_t queue_bytes = 2 * queue_capacity * bpe;
+        size_t ray_bytes = 2 * batch_size * (per_ray_bytes - E * bpe);
+        RTI_DBG("per_ray_bytes=%zu usable(75%%)=%zu MB batch_size=%zu queue_capacity=%zu\n",
+                per_ray_bytes, usable >> 20, batch_size, queue_capacity);
+        RTI_DBG("planned: queue=%zu MB ray=%zu MB cub=%zu MB total=%zu MB\n",
+                queue_bytes >> 20, ray_bytes >> 20, (2 * cub_temp_per_stream) >> 20,
+                (queue_bytes + ray_bytes + 2 * cub_temp_per_stream) >> 20);
+    }
+#endif
 
     // =====================================================================
     // Create streams
@@ -869,9 +952,9 @@ void qd_RTI_CUDA(const dtype *Tx, const dtype *Ty, const dtype *Tz,
     // Allocate per-stream device buffers + pinned host memory
     // =====================================================================
 
-    size_t ray_f_bytes = batch_size * sizeof(float);
-    size_t ray_u_bytes = batch_size * sizeof(uint32_t);
-    size_t ray_8_bytes = batch_size * sizeof(uint64_t);
+    size_t ray_f_bytes = stride * sizeof(float);
+    size_t ray_u_bytes = stride * sizeof(uint32_t);
+    size_t ray_8_bytes = stride * sizeof(uint64_t);
     size_t wq_ray_bytes = queue_capacity * sizeof(uint32_t);
     size_t wq_aabb_bytes = queue_capacity * sizeof(uint16_t);
     size_t wq_flag_bytes = queue_capacity * sizeof(uint8_t);
@@ -919,12 +1002,12 @@ void qd_RTI_CUDA(const dtype *Tx, const dtype *Ty, const dtype *Tz,
         // Pinned host memory
         if constexpr (is_double)
         {
-            CUDA_CHECK(cudaMalloc(&buf.d_ray_input_d[s], 6 * batch_size * sizeof(double)));
-            CUDA_CHECK(cudaMalloc(&buf.d_Wf_d[s], batch_size * sizeof(double)));
-            CUDA_CHECK(cudaMalloc(&buf.d_Ws_d[s], batch_size * sizeof(double)));
+            CUDA_CHECK(cudaMalloc(&buf.d_ray_input_d[s], 6 * stride * sizeof(double)));
+            CUDA_CHECK(cudaMalloc(&buf.d_Wf_d[s], stride * sizeof(double)));
+            CUDA_CHECK(cudaMalloc(&buf.d_Ws_d[s], stride * sizeof(double)));
 
-            buf.pinned_input_bytes_d = 6 * batch_size * sizeof(double);
-            buf.pinned_output_bytes_d = 2 * batch_size * sizeof(double) + 3 * ray_u_bytes;
+            buf.pinned_input_bytes_d = 6 * stride * sizeof(double);
+            buf.pinned_output_bytes_d = 2 * stride * sizeof(double) + 3 * ray_u_bytes;
 
             CUDA_CHECK(cudaMallocHost(&buf.h_ray_input_pinned_d[s], buf.pinned_input_bytes_d));
             CUDA_CHECK(cudaMallocHost(&buf.h_ray_output_pinned_d[s], buf.pinned_output_bytes_d));
@@ -935,6 +1018,8 @@ void qd_RTI_CUDA(const dtype *Tx, const dtype *Ty, const dtype *Tz,
             CUDA_CHECK(cudaMallocHost(&buf.h_ray_output_pinned[s], buf.pinned_output_bytes));
         }
     }
+
+    RTI_dbg_mem("after per-stream allocation");
 
     // =====================================================================
     // Compute number of bits for CUB radix sort
@@ -948,28 +1033,34 @@ void qd_RTI_CUDA(const dtype *Tx, const dtype *Ty, const dtype *Tz,
     // Batching loop — double-buffered async pipeline (Section 5.2)
     // =====================================================================
 
-    size_t n_batches = (n_ray + batch_size - 1) / batch_size;
-
     // Host-side readback values (one per stream)
     uint32_t h_queue_tail[2] = {0, 0};
     uint32_t h_num_compact[2] = {0, 0};
 
+    // What each stream currently has in flight. Chunk lengths are no longer
+    // uniform, so the D→H unstage cannot recompute them from the batch index.
+    size_t inflight_offset[2] = {0, 0};
+    size_t inflight_count[2] = {0, 0};
+    int last_stream = 0;
+
+    // Rays staged in the pinned buffer for the batch about to be processed
+    size_t staged_count = std::min(chunk, n_ray);
+
     // Stage batch 0 into pinned memory BEFORE the loop
     {
-        size_t count0 = std::min(batch_size, n_ray);
         if constexpr (is_double)
-            RTI_stage_ray_input(buf.h_ray_input_pinned_d[0], batch_size, Ox, Oy, Oz, Dx, Dy, Dz, 0, count0);
+            RTI_stage_ray_input(buf.h_ray_input_pinned_d[0], stride, Ox, Oy, Oz, Dx, Dy, Dz, 0, staged_count);
         else
-            RTI_stage_ray_input(buf.h_ray_input_pinned[0], batch_size, Ox, Oy, Oz, Dx, Dy, Dz, 0, count0);
+            RTI_stage_ray_input(buf.h_ray_input_pinned[0], stride, Ox, Oy, Oz, Dx, Dy, Dz, 0, staged_count);
     }
 
-    for (size_t batch_idx = 0; batch_idx < n_batches; ++batch_idx)
+    for (size_t batch_idx = 0, ray_offset = 0; ray_offset < n_ray; ++batch_idx)
     {
         int s = (int)(batch_idx % 2);        // current stream
         int sp = (int)((batch_idx - 1) % 2); // previous stream (wraps safely since unsigned)
+        last_stream = s;
 
-        size_t ray_offset = batch_idx * batch_size;
-        size_t n_ray_batch = std::min(batch_size, n_ray - ray_offset);
+        size_t n_ray_batch = staged_count;
         uint32_t n_ray_batch_u = (uint32_t)n_ray_batch;
 
         // --- Wait for previous batch's D→H to finish, then copy to user arrays ---
@@ -977,21 +1068,21 @@ void qd_RTI_CUDA(const dtype *Tx, const dtype *Ty, const dtype *Tz,
         {
             CUDA_CHECK(cudaStreamSynchronize(buf.stream[sp]));
 
-            size_t prev_offset = (batch_idx - 1) * batch_size;
-            size_t prev_count = std::min(batch_size, n_ray - prev_offset);
+            size_t prev_offset = inflight_offset[sp];
+            size_t prev_count = inflight_count[sp];
 
             if constexpr (is_double)
-                RTI_unstage_ray_output(buf.h_ray_output_pinned_d[sp], batch_size,
+                RTI_unstage_ray_output(buf.h_ray_output_pinned_d[sp], stride,
                                        Wf, Ws, If, Is, hit_cnt, count_hits,
                                        prev_offset, prev_count);
             else
-                RTI_unstage_ray_output(buf.h_ray_output_pinned[sp], batch_size,
+                RTI_unstage_ray_output(buf.h_ray_output_pinned[sp], stride,
                                        Wf, Ws, If, Is, hit_cnt, count_hits,
                                        prev_offset, prev_count);
         }
 
         // --- H→D: upload ray data for this batch ---
-        // Layout in pinned: [Ox | Oy | Oz | Dx | Dy | Dz], each batch_size floats
+        // Layout in pinned: [Ox | Oy | Oz | Dx | Dy | Dz], each `stride` floats
         cudaStream_t cs = buf.stream[s];
 
         if constexpr (is_double)
@@ -1000,8 +1091,8 @@ void qd_RTI_CUDA(const dtype *Tx, const dtype *Ty, const dtype *Tz,
             double *d_in = buf.d_ray_input_d[s];
             double *h_in = buf.h_ray_input_pinned_d[s];
             for (int k = 0; k < 6; ++k)
-                CUDA_CHECK(cudaMemcpyAsync(d_in + k * batch_size,
-                                           h_in + k * batch_size,
+                CUDA_CHECK(cudaMemcpyAsync(d_in + k * stride,
+                                           h_in + k * stride,
                                            n_ray_batch * sizeof(double),
                                            cudaMemcpyHostToDevice, cs));
 
@@ -1009,21 +1100,21 @@ void qd_RTI_CUDA(const dtype *Tx, const dtype *Ty, const dtype *Tz,
             uint32_t grid_cvt = (n_ray_batch_u + BLOCK_SIZE - 1) / BLOCK_SIZE;
             float *d_float[6] = {buf.d_Ox[s], buf.d_Oy[s], buf.d_Oz[s], buf.d_Dx[s], buf.d_Dy[s], buf.d_Dz[s]};
             for (int k = 0; k < 6; ++k)
-                RTI_d2f<<<grid_cvt, BLOCK_SIZE, 0, cs>>>(d_in + k * batch_size, d_float[k], n_ray_batch_u);
+                RTI_d2f<<<grid_cvt, BLOCK_SIZE, 0, cs>>>(d_in + k * stride, d_float[k], n_ray_batch_u);
         }
         else
         {
-            CUDA_CHECK(cudaMemcpyAsync(buf.d_Ox[s], buf.h_ray_input_pinned[s] + 0 * batch_size,
+            CUDA_CHECK(cudaMemcpyAsync(buf.d_Ox[s], buf.h_ray_input_pinned[s] + 0 * stride,
                                        n_ray_batch * sizeof(float), cudaMemcpyHostToDevice, cs));
-            CUDA_CHECK(cudaMemcpyAsync(buf.d_Oy[s], buf.h_ray_input_pinned[s] + 1 * batch_size,
+            CUDA_CHECK(cudaMemcpyAsync(buf.d_Oy[s], buf.h_ray_input_pinned[s] + 1 * stride,
                                        n_ray_batch * sizeof(float), cudaMemcpyHostToDevice, cs));
-            CUDA_CHECK(cudaMemcpyAsync(buf.d_Oz[s], buf.h_ray_input_pinned[s] + 2 * batch_size,
+            CUDA_CHECK(cudaMemcpyAsync(buf.d_Oz[s], buf.h_ray_input_pinned[s] + 2 * stride,
                                        n_ray_batch * sizeof(float), cudaMemcpyHostToDevice, cs));
-            CUDA_CHECK(cudaMemcpyAsync(buf.d_Dx[s], buf.h_ray_input_pinned[s] + 3 * batch_size,
+            CUDA_CHECK(cudaMemcpyAsync(buf.d_Dx[s], buf.h_ray_input_pinned[s] + 3 * stride,
                                        n_ray_batch * sizeof(float), cudaMemcpyHostToDevice, cs));
-            CUDA_CHECK(cudaMemcpyAsync(buf.d_Dy[s], buf.h_ray_input_pinned[s] + 4 * batch_size,
+            CUDA_CHECK(cudaMemcpyAsync(buf.d_Dy[s], buf.h_ray_input_pinned[s] + 4 * stride,
                                        n_ray_batch * sizeof(float), cudaMemcpyHostToDevice, cs));
-            CUDA_CHECK(cudaMemcpyAsync(buf.d_Dz[s], buf.h_ray_input_pinned[s] + 5 * batch_size,
+            CUDA_CHECK(cudaMemcpyAsync(buf.d_Dz[s], buf.h_ray_input_pinned[s] + 5 * stride,
                                        n_ray_batch * sizeof(float), cudaMemcpyHostToDevice, cs));
         }
 
@@ -1036,7 +1127,7 @@ void qd_RTI_CUDA(const dtype *Tx, const dtype *Ty, const dtype *Tz,
         }
 
         // --- Kernel 0: init per-ray state ---
-        uint32_t grid0 = (n_ray_batch_u + BLOCK_SIZE - 1) / BLOCK_SIZE;
+        uint32_t grid0 = (n_ray_batch_u + BLOCK_SIZE - 1) / BLOCK_SIZE; // reassigned if the chunk shrinks
         RTI_init_per_ray_state<<<grid0, BLOCK_SIZE, 0, cs>>>(
             (uint64_t *)buf.d_fbs_packed[s],
             (uint64_t *)buf.d_sbs_packed[s],
@@ -1062,71 +1153,42 @@ void qd_RTI_CUDA(const dtype *Tx, const dtype *Ty, const dtype *Tz,
                                    sizeof(uint32_t), cudaMemcpyDeviceToHost, cs));
         CUDA_CHECK(cudaStreamSynchronize(cs));
 
-        // --- Check for queue overflow ---
-        if (h_queue_tail[s] > (uint32_t)queue_capacity)
+        // --- Queue overflow: shrink the batch, never grow the queue ---
+        // RTI_enqueue_warp counts every candidate with atomicAdd and only guards
+        // the writes, so queue_tail is the exact number of entries this batch
+        // needs even when it exceeded capacity. Scaling the chunk by cap/tail
+        // makes the batch fit the queue that is already allocated: no
+        // reallocation, so this path cannot run out of memory. The shrink is
+        // kept for all later batches, so it self-calibrates to the scene and
+        // EST_AVG_HITS only has to be a reasonable starting guess.
+        while (h_queue_tail[s] > (uint32_t)queue_capacity)
         {
-            // Sync both streams before reallocating
             CUDA_CHECK(cudaStreamSynchronize(buf.stream[0]));
             CUDA_CHECK(cudaStreamSynchronize(buf.stream[1]));
 
-            // Calculate new capacity: 2x the actual count
-            size_t new_capacity = (size_t)h_queue_tail[s] * 2;
+            // 10% margin: the hit rate varies from batch to batch
+            double scale = (double)queue_capacity / ((double)h_queue_tail[s] * 1.1);
+            size_t new_chunk = (size_t)((double)n_ray_batch * scale);
+            new_chunk = (new_chunk / BLOCK_SIZE) * BLOCK_SIZE;
 
-            size_t new_wq_ray_bytes = new_capacity * sizeof(uint32_t);
-            size_t new_wq_aabb_bytes = new_capacity * sizeof(uint16_t);
-            size_t new_wq_flag_bytes = new_capacity * sizeof(uint8_t);
-            size_t new_wq_comp_bytes = new_capacity * sizeof(uint32_t);
+            // Always make progress, even if rounding or a pathological batch
+            // would otherwise leave the chunk unchanged
+            if (new_chunk == 0 || new_chunk >= n_ray_batch)
+                new_chunk = (n_ray_batch / 2 / BLOCK_SIZE) * BLOCK_SIZE;
+            if (new_chunk == 0)
+                new_chunk = BLOCK_SIZE;
 
-            // Free and reallocate queue buffers for BOTH streams
-            for (int ss = 0; ss < 2; ++ss)
-            {
-                cudaFree(buf.d_wq_ray_idx_A[ss]);
-                buf.d_wq_ray_idx_A[ss] = nullptr;
-                cudaFree(buf.d_wq_ray_idx_B[ss]);
-                buf.d_wq_ray_idx_B[ss] = nullptr;
-                cudaFree(buf.d_wq_aabb_idx_A[ss]);
-                buf.d_wq_aabb_idx_A[ss] = nullptr;
-                cudaFree(buf.d_wq_aabb_idx_B[ss]);
-                buf.d_wq_aabb_idx_B[ss] = nullptr;
-                cudaFree(buf.d_wq_had_hit[ss]);
-                buf.d_wq_had_hit[ss] = nullptr;
-                cudaFree(buf.d_compact_indices[ss]);
-                buf.d_compact_indices[ss] = nullptr;
+            RTI_DBG("*** OVERFLOW batch %zu: n_ray_batch=%zu tail=%u cap=%zu hits/ray=%.2f -> chunk=%zu\n",
+                    batch_idx, n_ray_batch, h_queue_tail[s], queue_capacity,
+                    (double)h_queue_tail[s] / (double)(n_ray_batch ? n_ray_batch : 1), new_chunk);
 
-                CUDA_CHECK(cudaMalloc(&buf.d_wq_ray_idx_A[ss], new_wq_ray_bytes));
-                CUDA_CHECK(cudaMalloc(&buf.d_wq_ray_idx_B[ss], new_wq_ray_bytes));
-                CUDA_CHECK(cudaMalloc(&buf.d_wq_aabb_idx_A[ss], new_wq_aabb_bytes));
-                CUDA_CHECK(cudaMalloc(&buf.d_wq_aabb_idx_B[ss], new_wq_aabb_bytes));
-                CUDA_CHECK(cudaMalloc(&buf.d_wq_had_hit[ss], new_wq_flag_bytes));
-                CUDA_CHECK(cudaMalloc(&buf.d_compact_indices[ss], new_wq_comp_bytes));
-            }
+            chunk = new_chunk; // applies to every later batch too
+            n_ray_batch = new_chunk;
+            n_ray_batch_u = (uint32_t)n_ray_batch;
+            grid0 = (n_ray_batch_u + BLOCK_SIZE - 1) / BLOCK_SIZE;
 
-            // Re-query CUB temp size for new capacity and reallocate if needed
-            size_t new_sort_temp = 0, new_compact_temp = 0;
-            cub::DeviceRadixSort::SortPairs(nullptr, new_sort_temp,
-                                            (uint16_t *)nullptr, (uint16_t *)nullptr,
-                                            (uint32_t *)nullptr, (uint32_t *)nullptr,
-                                            (int)std::min(new_capacity, (size_t)INT32_MAX), 0, 16, (cudaStream_t)0);
-            cub::DeviceSelect::Flagged(nullptr, new_compact_temp,
-                                       cub::CountingInputIterator<uint32_t>(0),
-                                       (uint8_t *)nullptr, (uint32_t *)nullptr, (uint32_t *)nullptr,
-                                       (int)std::min(new_capacity, (size_t)INT32_MAX), (cudaStream_t)0);
-            size_t new_cub_temp = (size_t)(std::max(new_sort_temp, new_compact_temp) * 1.2);
-
-            if (new_cub_temp > cub_temp_per_stream)
-            {
-                for (int ss = 0; ss < 2; ++ss)
-                {
-                    cudaFree(buf.d_cub_temp[ss]);
-                    buf.d_cub_temp[ss] = nullptr;
-                    CUDA_CHECK(cudaMalloc(&buf.d_cub_temp[ss], new_cub_temp));
-                }
-                cub_temp_per_stream = new_cub_temp;
-            }
-
-            queue_capacity = new_capacity;
-
-            // Re-run current batch from Kernel 0
+            // The rays are already staged and uploaded; a shorter chunk is just
+            // a prefix of what is on the device, so no re-upload is needed.
             RTI_init_per_ray_state<<<grid0, BLOCK_SIZE, 0, cs>>>(
                 (uint64_t *)buf.d_fbs_packed[s],
                 (uint64_t *)buf.d_sbs_packed[s],
@@ -1151,7 +1213,16 @@ void qd_RTI_CUDA(const dtype *Tx, const dtype *Ty, const dtype *Tz,
             CUDA_CHECK(cudaStreamSynchronize(cs));
         }
 
+        // Record what this stream now has in flight (chunk may have shrunk)
+        inflight_offset[s] = ray_offset;
+        inflight_count[s] = n_ray_batch;
+
         uint32_t qt = h_queue_tail[s];
+
+        if (batch_idx < 3 || (batch_idx % 25) == 0)
+            RTI_DBG("batch %zu: offset=%zu n_ray_batch=%zu tail=%u cap=%zu hits/ray=%.2f\n",
+                    batch_idx, ray_offset, n_ray_batch, qt, queue_capacity,
+                    (double)qt / (double)(n_ray_batch ? n_ray_batch : 1));
 
         // --- CUB radix sort: work queue by aabb_idx (Section 6) ---
         // Use DoubleBuffer to avoid explicit input/output management
@@ -1217,15 +1288,16 @@ void qd_RTI_CUDA(const dtype *Tx, const dtype *Ty, const dtype *Tz,
 
         // --- CPU staging window: GPU is busy with sort + K2 + compact ---
         // Stage NEXT batch into pinned memory (overlaps with GPU work)
-        if (batch_idx + 1 < n_batches)
+        size_t next_offset = ray_offset + n_ray_batch;
+        if (next_offset < n_ray)
         {
             int next_s = (int)((batch_idx + 1) % 2);
-            size_t next_offset = (batch_idx + 1) * batch_size;
-            size_t next_count = std::min(batch_size, n_ray - next_offset);
+            size_t next_count = std::min(chunk, n_ray - next_offset);
             if constexpr (is_double)
-                RTI_stage_ray_input(buf.h_ray_input_pinned_d[next_s], batch_size, Ox, Oy, Oz, Dx, Dy, Dz, next_offset, next_count);
+                RTI_stage_ray_input(buf.h_ray_input_pinned_d[next_s], stride, Ox, Oy, Oz, Dx, Dy, Dz, next_offset, next_count);
             else
-                RTI_stage_ray_input(buf.h_ray_input_pinned[next_s], batch_size, Ox, Oy, Oz, Dx, Dy, Dz, next_offset, next_count);
+                RTI_stage_ray_input(buf.h_ray_input_pinned[next_s], stride, Ox, Oy, Oz, Dx, Dy, Dz, next_offset, next_count);
+            staged_count = next_count;
         }
 
         CUDA_CHECK(cudaStreamSynchronize(cs)); // need num_compact for K3 grid
@@ -1271,8 +1343,8 @@ void qd_RTI_CUDA(const dtype *Tx, const dtype *Ty, const dtype *Tz,
 
             // D→H into double-typed pinned output: [Wf_d | Ws_d | If | Is | hit_cnt]
             char *out = buf.h_ray_output_pinned_d[s];
-            size_t dW = batch_size * sizeof(double);
-            size_t u4 = batch_size * sizeof(uint32_t);
+            size_t dW = stride * sizeof(double);
+            size_t u4 = stride * sizeof(uint32_t);
             size_t off = 0;
             CUDA_CHECK(cudaMemcpyAsync(out + off, buf.d_Wf_d[s], n_ray_batch * sizeof(double), cudaMemcpyDeviceToHost, cs));
             off += dW;
@@ -1291,39 +1363,40 @@ void qd_RTI_CUDA(const dtype *Tx, const dtype *Ty, const dtype *Tz,
             size_t out_off = 0;
             CUDA_CHECK(cudaMemcpyAsync(buf.h_ray_output_pinned[s] + out_off,
                                        buf.d_Wf[s], n_ray_batch * sizeof(float), cudaMemcpyDeviceToHost, cs));
-            out_off += batch_size * sizeof(float);
+            out_off += stride * sizeof(float);
             CUDA_CHECK(cudaMemcpyAsync(buf.h_ray_output_pinned[s] + out_off,
                                        buf.d_Ws[s], n_ray_batch * sizeof(float), cudaMemcpyDeviceToHost, cs));
-            out_off += batch_size * sizeof(float);
+            out_off += stride * sizeof(float);
             CUDA_CHECK(cudaMemcpyAsync(buf.h_ray_output_pinned[s] + out_off,
                                        buf.d_If[s], n_ray_batch * sizeof(uint32_t), cudaMemcpyDeviceToHost, cs));
-            out_off += batch_size * sizeof(uint32_t);
+            out_off += stride * sizeof(uint32_t);
             CUDA_CHECK(cudaMemcpyAsync(buf.h_ray_output_pinned[s] + out_off,
                                        buf.d_Is[s], n_ray_batch * sizeof(uint32_t), cudaMemcpyDeviceToHost, cs));
-            out_off += batch_size * sizeof(uint32_t);
+            out_off += stride * sizeof(uint32_t);
             if (count_hits)
                 CUDA_CHECK(cudaMemcpyAsync(buf.h_ray_output_pinned[s] + out_off,
                                            buf.d_hit_cnt[s], n_ray_batch * sizeof(uint32_t), cudaMemcpyDeviceToHost, cs));
         }
+
+        ray_offset = next_offset;
     }
 
     // --- Drain last batch ---
     {
-        int last_s = (int)((n_batches - 1) % 2);
-        CUDA_CHECK(cudaStreamSynchronize(buf.stream[last_s]));
-
-        size_t last_offset = (n_batches - 1) * batch_size;
-        size_t last_count = n_ray - last_offset;
+        CUDA_CHECK(cudaStreamSynchronize(buf.stream[last_stream]));
 
         if constexpr (is_double)
-            RTI_unstage_ray_output(buf.h_ray_output_pinned_d[last_s], batch_size,
+            RTI_unstage_ray_output(buf.h_ray_output_pinned_d[last_stream], stride,
                                    Wf, Ws, If, Is, hit_cnt, count_hits,
-                                   last_offset, last_count);
+                                   inflight_offset[last_stream], inflight_count[last_stream]);
         else
-            RTI_unstage_ray_output(buf.h_ray_output_pinned[last_s], batch_size,
+            RTI_unstage_ray_output(buf.h_ray_output_pinned[last_stream], stride,
                                    Wf, Ws, If, Is, hit_cnt, count_hits,
-                                   last_offset, last_count);
+                                   inflight_offset[last_stream], inflight_count[last_stream]);
     }
+
+    RTI_dbg_mem("call end");
+    RTI_DBG("=== call done ===\n");
 
     // RAII destructor handles all cleanup
 }
