@@ -17,7 +17,9 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
 - Interpolates antenna patterns for both arrays, accounting for element positions and array orientation
   (bank/tilt/heading Euler angles).
 - Polarization coupling is applied via the 8-row transfer matrix `M` (interleaved Re/Im for VV, VH, HV, HH components).
-- If `center_freq == 0`, phase calculation is disabled and only delays are computed.
+- Path data is given for `n_freq` frequencies; single-frequency data uses `n_freq = 1`.
+- The scalar argument `freq` selects the frequency index that is processed; a single frequency is returned per call.
+- If `center_freq` is `None` or the selected entry is `0`, phase calculation is disabled and only delays are computed.
 - If `use_absolute_delays == False`, the minimum delay (LOS delay) is subtracted from all paths.
 - If `add_fake_los_path == True`, a zero-power LOS path is prepended when no LOS path is detected.
 - `complex=True` returns one combined complex coefficient array `coeff`; `complex=False` (default) returns
@@ -32,6 +34,8 @@ coeff_re, coeff_im, delays = quadriga_lib.arrayant.get_channels_spherical( ant_t
 coeff, delays = quadriga_lib.arrayant.get_channels_spherical( ..., complex=True )
 
 coeff_re, coeff_im, delays, aod, eod, aoa, eoa = quadriga_lib.arrayant.get_channels_spherical( ..., angles=True )
+
+coeff_re, coeff_im, delays = quadriga_lib.arrayant.get_channels_spherical( ..., freq=1 )
 ```
 
 ## Inputs:
@@ -39,19 +43,22 @@ coeff_re, coeff_im, delays, aod, eod, aoa, eoa = quadriga_lib.arrayant.get_chann
 - **`ant_rx`** — Receive arrayant dict; see [[generate]]
 - **`fbs_pos`** — First-bounce scatterer positions; `(3, n_path)`
 - **`lbs_pos`** — Last-bounce scatterer positions; `(3, n_path)`
-- **`path_gain`** — Path gains in linear scale; `(n_path,)`
+- **`path_gain`** — Path gains in linear scale; `(n_path, n_freq)`
 - **`path_length`** — Total path lengths from TX to RX phase center; `(n_path,)`
-- **`M`** — Polarization transfer matrix, interleaved Re/Im; `(8, n_path)` (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH)
+- **`M`** — Polarization transfer matrix, interleaved Re/Im; `(8, n_path, n_freq)`; (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH)
 - **`tx_pos`** — Transmitter position in Cartesian coordinates; `(3,)`
 - **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `(3,)`
 - **`rx_pos`** — Receiver position in Cartesian coordinates; `(3,)`
 - **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading); `(3,)`
-- **`center_freq`** — Center frequency in Hz; set to `0` to skip phase computation; default: `0.0`
+- **`center_freq`** — Center frequencies in Hz; `(n_freq,)`; set an entry to `0` or pass `None` to skip
+  phase computation; default: `None`
 - **`use_absolute_delays`** — If `True`, delays include the LOS component; default: `False`
 - **`add_fake_los_path`** — If `True`, prepends a zero-power LOS path when none is present; default: `False`
 - **`angles`** — If `True`, also return departure/arrival angles in antenna-local coordinates; default: `False`
 - **`complex`** — If `True`, combine coefficients into a single complex array `coeff`; if `False`, return
   separate `coeff_re` and `coeff_im`; default: `False`
+- **`freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `M` and `center_freq` that is
+  processed; default: `0`
 
 ## Outputs:
 - **`coeff_re`** — Real part of channel coefficients (`complex=False`); `(n_ports_rx, n_ports_tx, n_path)`
@@ -80,20 +87,22 @@ py::tuple get_channels_spherical(const py::dict &ant_tx,
                                  const py::array_t<double> &tx_orientation,
                                  const py::array_t<double> &rx_pos,
                                  const py::array_t<double> &rx_orientation,
-                                 const double center_freq,
+                                 py::handle center_freq,
                                  const bool use_absolute_delays,
                                  const bool add_fake_los_path,
                                  const bool angles,
-                                 const bool complex)
+                                 const bool complex,
+                                 const arma::uword freq)
 {
     // Parse input arguments
     const auto ant_tx_a = qd_python_dict2arrayant(ant_tx, true);
     const auto ant_rx_a = qd_python_dict2arrayant(ant_rx, true);
     const auto fbs_pos_a = qd_python_numpy2arma_Mat(fbs_pos, true);
     const auto lbs_pos_a = qd_python_numpy2arma_Mat(lbs_pos, true);
-    const auto path_gain_a = qd_python_numpy2arma_Col(path_gain, true);
+    const auto path_gain_a = qd_python_numpy2arma_Mat(path_gain, true);
     const auto path_length_a = qd_python_numpy2arma_Col(path_length, true);
-    const auto M_a = qd_python_numpy2arma_Mat(M, true);
+    const auto M_a = qd_python_numpy2arma_Cube(M, true);
+    const auto center_freq_a = qd_python_numpy2arma_Col<double>(center_freq, true);
     const auto tx_pos_a = qd_python_numpy2arma_Col(tx_pos, true, false, "tx_pos", 3);
     const auto tx_orientation_a = qd_python_numpy2arma_Col(tx_orientation, true, false, "tx_orientation", 3);
     const auto rx_pos_a = qd_python_numpy2arma_Col(rx_pos, true, false, "rx_pos", 3);
@@ -108,7 +117,30 @@ py::tuple get_channels_spherical(const py::dict &ant_tx,
     // Derived inputs
     arma::uword n_ports_tx = ant_tx_a.n_ports();
     arma::uword n_ports_rx = ant_rx_a.n_ports();
-    arma::uword n_path = add_fake_los_path ? fbs_pos_a.n_cols + 1 : fbs_pos_a.n_cols;
+    arma::uword n_path_in = fbs_pos_a.n_cols;
+    arma::uword n_freq = path_gain_a.n_cols;
+    arma::uword n_path = add_fake_los_path ? n_path_in + 1 : n_path_in;
+
+    // Check multi-frequency data consistency
+    if (path_gain_a.n_rows != n_path_in)
+        throw std::invalid_argument("Input 'path_gain' must have 'n_path' rows.");
+
+    if (M_a.n_rows != 8 || M_a.n_cols != n_path_in)
+        throw std::invalid_argument("Input 'M' must have 8 rows and 'n_path' columns.");
+
+    if (M_a.n_slices != n_freq)
+        throw std::invalid_argument("Inputs 'path_gain' and 'M' must have the same number of frequencies.");
+
+    if (!center_freq_a.empty() && center_freq_a.n_elem != n_freq)
+        throw std::invalid_argument("Input 'center_freq' must have 'n_freq' elements.");
+
+    if (freq >= n_freq)
+        throw std::out_of_range("Input 'freq' exceeds the number of frequencies.");
+
+    // Select the frequency slice, aliased without copying the data
+    const arma::Col<double> path_gain_f(const_cast<double *>(path_gain_a.colptr(freq)), n_path_in, false, true);
+    const arma::Mat<double> M_f(const_cast<double *>(M_a.slice_memptr(freq)), 8, n_path_in, false, true);
+    const double center_frequency = center_freq_a.empty() ? 0.0 : center_freq_a.at(freq);
 
     // Initialize angles
     arma::cube aod, eod, aoa, eoa;
@@ -135,9 +167,9 @@ py::tuple get_channels_spherical(const py::dict &ant_tx,
         quadriga_lib::get_channels_spherical<double>(&ant_tx_a, &ant_rx_a,
                                                      Tx, Ty, Tz, Tb, Tt, Th,
                                                      Rx, Ry, Rz, Rb, Rt, Rh,
-                                                     &fbs_pos_a, &lbs_pos_a, &path_gain_a, &path_length_a, &M_a,
+                                                     &fbs_pos_a, &lbs_pos_a, &path_gain_f, &path_length_a, &M_f,
                                                      &coeff_re, &coeff_im, &delay,
-                                                     center_freq, use_absolute_delays, add_fake_los_path,
+                                                     center_frequency, use_absolute_delays, add_fake_los_path,
                                                      p_aod, p_eod, p_aoa, p_eoa);
 
         auto coeff_py = qd_python_copy2numpy<double, std::complex<double>>(&coeff_re, &coeff_im);
@@ -155,9 +187,9 @@ py::tuple get_channels_spherical(const py::dict &ant_tx,
     quadriga_lib::get_channels_spherical<double>(&ant_tx_a, &ant_rx_a,
                                                  Tx, Ty, Tz, Tb, Tt, Th,
                                                  Rx, Ry, Rz, Rb, Rt, Rh,
-                                                 &fbs_pos_a, &lbs_pos_a, &path_gain_a, &path_length_a, &M_a,
+                                                 &fbs_pos_a, &lbs_pos_a, &path_gain_f, &path_length_a, &M_f,
                                                  &coeff_re, &coeff_im, &delay,
-                                                 center_freq, use_absolute_delays, add_fake_los_path,
+                                                 center_frequency, use_absolute_delays, add_fake_los_path,
                                                  p_aod, p_eod, p_aoa, p_eoa);
 
     if (angles)
@@ -179,8 +211,9 @@ py::tuple get_channels_spherical(const py::dict &ant_tx,
 //       py::arg("tx_orientation"),
 //       py::arg("rx_pos"),
 //       py::arg("rx_orientation"),
-//       py::arg("center_freq") = 0.0,
+//       py::arg("center_freq") = py::none(),
 //       py::arg("use_absolute_delays") = false,
 //       py::arg("add_fake_los_path") = false,
 //       py::arg("angles") = false,
-//       py::arg("complex") = false);
+//       py::arg("complex") = false,
+//       py::arg("freq") = 0);
