@@ -5,6 +5,10 @@
 #include "python_arma_adapter.hpp"
 #include "quadriga_lib.hpp"
 
+#include <thread>
+#include <mutex>
+#include <condition_variable>
+
 /*!SECTION
 Channel functions
 SECTION!*/
@@ -16,6 +20,8 @@ Read ray-tracing CIR data from a QRT file
 - Reads channel impulse response data from QRT files
 - A file read cache is initialized once and reused across all requested snapshots, which
   significantly speeds up multi-snapshot reads
+- File reading and the conversion to numpy arrays are overlapped: a background thread reads the
+  next snapshot into a double buffer while the main thread converts the previous one
 - If `downlink = True`, origin is TX and destination is RX; if `False`, the roles are swapped
 - Per-snapshot outputs are returned as lists with one entry per requested snapshot
 
@@ -67,6 +73,19 @@ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, p
 - [[get_channels_multifreq]] (for multi-frequency antenna embedding)
 MD!*/
 
+// Per-snapshot read buffer, two of these are used as a double buffer
+struct qd_qrt_slot
+{
+    arma::vec tx_pos, tx_orientation, rx_pos, rx_orientation;
+    arma::mat fbs_pos, lbs_pos, path_gain;
+    arma::vec path_length, aod, eod, aoa, eoa;
+    arma::cube M;
+    std::vector<arma::mat> path_coord;
+    arma::u32_vec no_int;
+    arma::fmat coord;
+    std::vector<uint8_t> interact_type;
+};
+
 py::tuple qrt_file_read(const std::string &fn,
                         py::handle cir,
                         arma::uword orig,
@@ -103,48 +122,104 @@ py::tuple qrt_file_read(const std::string &fn,
     py::list fbs_pos_py, lbs_pos_py, path_gain_py, path_length_py, M_py;
     py::list aod_py, eod_py, aoa_py, eoa_py, path_coord_py, no_int_py, coord_py, interact_type_py;
 
-    // Per-snapshot read buffers
-    arma::vec tx_pos_buf, tx_orientation_buf, rx_pos_buf, rx_orientation_buf;
-    arma::mat fbs_pos, lbs_pos, path_gain;
-    arma::vec path_length, aod, eod, aoa, eoa;
-    arma::cube M;
-    std::vector<arma::mat> path_coord;
-    arma::u32_vec no_int;
-    arma::fmat coord;
-    std::vector<uint8_t> interact_type;
+    // Double buffer, the reader thread fills one slot while the main thread converts the other
+    qd_qrt_slot slot[2];
+    std::mutex mtx;
+    std::condition_variable cv;
+    arma::uword n_produced = 0ULL; // Number of slots filled by the reader
+    arma::uword n_consumed = 0ULL; // Number of slots converted by the main thread
+    bool reader_failed = false;
+    std::string reader_error;
 
-    // Iterate over all requested snapshots, reusing the stream and cache
-    for (arma::uword i_out = 0; i_out < no_out; ++i_out)
+    // Reader thread: owns the file stream and the cache, never touches Python objects
+    std::thread reader([&]()
+                       {
+        for (arma::uword i = 0ULL; i < no_out; ++i)
+        {
+            // Wait until a free slot is available
+            {
+                std::unique_lock<std::mutex> lk(mtx);
+                cv.wait(lk, [&] { return n_produced - n_consumed < 2ULL; });
+            }
+
+            try
+            {
+                qd_qrt_slot &s = slot[i % 2ULL];
+                quadriga_lib::qrt_file_read<double>(fn, i_cir_a[i], orig, downlink, nullptr,
+                                                    &s.tx_pos, &s.tx_orientation, &s.rx_pos, &s.rx_orientation,
+                                                    &s.fbs_pos, &s.lbs_pos, &s.path_gain, &s.path_length, &s.M,
+                                                    &s.aod, &s.eod, &s.aoa, &s.eoa, &s.path_coord, normalize_M,
+                                                    &s.no_int, &s.coord, &s.interact_type, &stream, &cache);
+            }
+            catch (const std::exception &e)
+            {
+                std::lock_guard<std::mutex> lk(mtx);
+                reader_failed = true;
+                reader_error = "Snapshot " + std::to_string(i) + ": " + e.what();
+                cv.notify_all();
+                return;
+            }
+
+            {
+                std::lock_guard<std::mutex> lk(mtx);
+                ++n_produced;
+            }
+            cv.notify_all();
+        } });
+
+    // Main thread: converts the filled slots to numpy, holds the GIL
+    for (arma::uword i_out = 0ULL; i_out < no_out; ++i_out)
     {
-        quadriga_lib::qrt_file_read<double>(fn, i_cir_a[i_out], orig, downlink, nullptr,
-                                            &tx_pos_buf, &tx_orientation_buf, &rx_pos_buf, &rx_orientation_buf,
-                                            &fbs_pos, &lbs_pos, &path_gain, &path_length, &M,
-                                            &aod, &eod, &aoa, &eoa, &path_coord, normalize_M,
-                                            &no_int, &coord, &interact_type, &stream, &cache);
+        // Wait for the next filled slot, release the GIL while waiting
+        {
+            py::gil_scoped_release release;
+            std::unique_lock<std::mutex> lk(mtx);
+            cv.wait(lk, [&] { return n_produced > n_consumed || reader_failed; });
+            if (reader_failed)
+                break;
+        }
 
-        tx_pos.col(i_out) = tx_pos_buf;
-        tx_orientation.col(i_out) = tx_orientation_buf;
-        rx_pos.col(i_out) = rx_pos_buf;
-        rx_orientation.col(i_out) = rx_orientation_buf;
+        qd_qrt_slot &s = slot[i_out % 2ULL];
 
-        fbs_pos_py.append(qd_python_copy2numpy(&fbs_pos));
-        lbs_pos_py.append(qd_python_copy2numpy(&lbs_pos));
-        path_gain_py.append(qd_python_copy2numpy(&path_gain));
-        path_length_py.append(qd_python_copy2numpy(&path_length));
-        M_py.append(qd_python_copy2numpy(&M));
-        aod_py.append(qd_python_copy2numpy(&aod));
-        eod_py.append(qd_python_copy2numpy(&eod));
-        aoa_py.append(qd_python_copy2numpy(&aoa));
-        eoa_py.append(qd_python_copy2numpy(&eoa));
-        path_coord_py.append(qd_python_copy2list(&path_coord));
-        no_int_py.append(qd_python_copy2numpy(&no_int));
-        coord_py.append(qd_python_copy2numpy(&coord));
+        tx_pos.col(i_out) = s.tx_pos;
+        tx_orientation.col(i_out) = s.tx_orientation;
+        rx_pos.col(i_out) = s.rx_pos;
+        rx_orientation.col(i_out) = s.rx_orientation;
 
-        arma::Col<arma::u8> it_view(interact_type.data(), interact_type.size(), false, true);
+        fbs_pos_py.append(qd_python_copy2numpy(&s.fbs_pos));
+        lbs_pos_py.append(qd_python_copy2numpy(&s.lbs_pos));
+        path_gain_py.append(qd_python_copy2numpy(&s.path_gain));
+        path_length_py.append(qd_python_copy2numpy(&s.path_length));
+        M_py.append(qd_python_copy2numpy(&s.M));
+        aod_py.append(qd_python_copy2numpy(&s.aod));
+        eod_py.append(qd_python_copy2numpy(&s.eod));
+        aoa_py.append(qd_python_copy2numpy(&s.aoa));
+        eoa_py.append(qd_python_copy2numpy(&s.eoa));
+        path_coord_py.append(qd_python_copy2list(&s.path_coord));
+        no_int_py.append(qd_python_copy2numpy(&s.no_int));
+        coord_py.append(qd_python_copy2numpy(&s.coord));
+
+        arma::Col<arma::u8> it_view(s.interact_type.data(), s.interact_type.size(), false, true);
         interact_type_py.append(qd_python_copy2numpy(&it_view));
+
+        // Release the slot back to the reader
+        {
+            std::lock_guard<std::mutex> lk(mtx);
+            ++n_consumed;
+        }
+        cv.notify_all();
+    }
+
+    // Join the reader before touching the stream or reporting errors
+    {
+        py::gil_scoped_release release;
+        reader.join();
     }
 
     stream.close();
+
+    if (reader_failed)
+        throw std::runtime_error(reader_error.c_str());
 
     // Return tuple
     return py::make_tuple(center_freq_py, tx_pos_py, tx_orientation_py, rx_pos_py, rx_orientation_py,
