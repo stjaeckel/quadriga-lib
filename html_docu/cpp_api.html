@@ -209,6 +209,7 @@
   <tr><td><a href="#obj_file_write">obj_file_write</a></td><td>Write a triangulated Wavefront .obj (and .mtl) file</td></tr>
   <tr><td><a href="#obj_overlap_test">obj_overlap_test</a></td><td>Detect overlapping 3D objects in a triangular mesh</td></tr>
   <tr><td><a href="#path_to_tube">path_to_tube</a></td><td>Convert a 3D path into a tube surface mesh for visualization</td></tr>
+  <tr><td><a href="#plane">plane</a></td><td>Construct a triangulated plane mesh</td></tr>
   <tr><td><a href="#point_cloud_aabb">point_cloud_aabb</a></td><td>Compute the axis-aligned bounding boxes (AABB) of a 3D point cloud</td></tr>
   <tr><td><a href="#point_cloud_segmentation">point_cloud_segmentation</a></td><td>Reorganize a point cloud into spatial sub-clouds for efficient processing</td></tr>
   <tr><td><a href="#point_cloud_split">point_cloud_split</a></td><td>Split a point cloud into two sub-clouds along a spatial axis</td></tr>
@@ -4994,6 +4995,49 @@ void quadriga_lib::path_to_tube(
 <ul>
 <li><b><code>vert</code></b> — Tube vertex positions; <code>[3, (n_coord + n_split) × n_edges]</code> where <code>n_split</code> is the number of bends > 10°</li>
 <li><b><code>faces</code></b> — Quad face indices into <code>vert</code>, 4 indices per quad; <code>[4, (n_coord - 1) × n_edges]</code></li>
+</ul>
+
+<hr class="greyline"><br>
+<span id="plane" class="qd-func"><b>plane</b></span><br>
+<hr class="thin">
+Construct a triangulated plane mesh
+<ul>
+<li>Generates a Blender-style plane: a 2 x 2 quad in the xy-plane centered at the origin (vertices at +/-1, z = 0) before scaling</li>
+<li>The quad is split into 2 triangles, yielding 2 triangles at n_div = 1</li>
+<li>Optional uniform subdivision produces 2 * n_div^2 triangles</li>
+<li>Triangle winding is consistent (normals point in +z direction), compatible with <a href="#obj_file_write">obj_file_write</a></li>
+<li>The plane has no thickness in z-direction; scaling therefore only affects x and y</li>
+<li>Scale, Euler rotation, and translation are applied in that order (scale -> rotate -> translate)</li>
+</ul>
+
+<b>Declaration:</b><br>
+<pre>
+arma::Mat&lt;dtype&gt; quadriga_lib::plane(
+    const arma::vec &amp;scale = {1.0},
+    const arma::vec &amp;rotation = {0.0, 0.0, 0.0},
+    const arma::vec &amp;location = {0.0, 0.0, 0.0},
+    const arma::uword n_div = 1);
+</pre>
+
+<b>Inputs:</b><br>
+<ul>
+<li><b><code>scale</code></b> — Length 1 scales x and y uniformly; length 2 scales <code>{x,y}</code> independently; length 3 is accepted for compatibility with <a href="#cube">cube</a>, but the third element is ignored; empty = 1 (no scaling)</li>
+<li><b><code>rotation</code></b> — Euler angles in [rad] about {x,y,z}, applied as R = Rz<i>Ry</i>Rx (Blender XYZ); length 3 or empty (no rotation)</li>
+<li><b><code>location</code></b> — Translation {x,y,z} in [m]; length 3 or empty (origin)</li>
+<li><b><code>n_div</code></b> — Number of subdivisions per edge; results in <code>2 * n_div^2</code> triangles</li>
+</ul>
+
+<b>Returns:</b><br>
+<ul>
+<li>Triangle mesh; each row holds <code>{x1,y1,z1,x2,y2,z2,x3,y3,z3}</code>; <code>[2 * n_div^2, 9]</code></li>
+</ul>
+
+<b>See also:</b><br>
+<ul>
+<li><a href="#cube">cube</a></li>
+<li><a href="#icosphere">icosphere</a></li>
+<li><a href="#subdivide_triangles">subdivide_triangles</a></li>
+<li><a href="#obj_file_write">obj_file_write</a></li>
 </ul>
 
 <hr class="greyline"><br>

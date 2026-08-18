@@ -1,7 +1,7 @@
 ---
 title: "Python API Documentation for Quadriga-Lib v0.12.1"
 author: "Stephan Jaeckel"
-date: "13.08.2026"
+date: "18.08.2026"
 lang: en-US
 ---
 
@@ -12,58 +12,59 @@ lang: en-US
 
 | Function | Section | Line |
 | --- | --- | --- |
-| [calc_beamwidth](#calc_beamwidth) | Array antenna functions | 73 |
-| [calc_directivity](#calc_directivity) | Array antenna functions | 109 |
-| [combine_pattern](#combine_pattern) | Array antenna functions | 138 |
-| [concat](#concat) | Array antenna functions | 179 |
-| [copy_element](#copy_element) | Array antenna functions | 209 |
-| [export_obj_file](#export_obj_file) | Array antenna functions | 245 |
-| [generate](#generate) | Array antenna functions | 270 |
-| [generate_speaker](#generate_speaker) | Array antenna functions | 366 |
-| [interpolate](#interpolate) | Array antenna functions | 450 |
-| [qdant_read](#qdant_read) | Array antenna functions | 527 |
-| [qdant_write](#qdant_write) | Array antenna functions | 567 |
-| [rotate_pattern](#rotate_pattern) | Array antenna functions | 605 |
-| [baseband_freq_response](#baseband_freq_response) | Channel functions | 655 |
-| [channel_export_obj_file](#channel_export_obj_file) | Channel functions | 723 |
-| [hdf5_create_file](#hdf5_create_file) | Channel functions | 768 |
-| [hdf5_read_channel](#hdf5_read_channel) | Channel functions | 797 |
-| [hdf5_read_dset](#hdf5_read_dset) | Channel functions | 856 |
-| [hdf5_read_dset_names](#hdf5_read_dset_names) | Channel functions | 887 |
-| [hdf5_read_layout](#hdf5_read_layout) | Channel functions | 914 |
-| [hdf5_reshape_layout](#hdf5_reshape_layout) | Channel functions | 939 |
-| [hdf5_write_channel](#hdf5_write_channel) | Channel functions | 960 |
-| [hdf5_write_dset](#hdf5_write_dset) | Channel functions | 1002 |
-| [qrt_file_parse](#qrt_file_parse) | Channel functions | 1032 |
-| [qrt_file_read](#qrt_file_read) | Channel functions | 1065 |
-| [quantize_delays](#quantize_delays) | Channel functions | 1122 |
-| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 1186 |
-| [get_channels_planar](#get_channels_planar) | Channel generation functions | 1244 |
-| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 1301 |
-| [get_ieee_indoor](#get_ieee_indoor) | Channel generation functions | 1361 |
-| [acdf](#acdf) | Channel statistics | 1443 |
-| [calc_angular_spread](#calc_angular_spread) | Channel statistics | 1474 |
-| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 1513 |
-| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 1563 |
-| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 1591 |
-| [cart2geo](#cart2geo) | Math functions | 1625 |
-| [geo2cart](#geo2cart) | Math functions | 1655 |
-| [components](#components) | Miscellaneous / Tools | 1692 |
-| [version](#version) | Miscellaneous / Tools | 1701 |
-| [write_png](#write_png) | Miscellaneous / Tools | 1714 |
-| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 1757 |
-| [cube](#cube) | Site-specific simulation tools | 1809 |
-| [icosphere](#icosphere) | Site-specific simulation tools | 1836 |
-| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 1868 |
-| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 1901 |
-| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 1951 |
-| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 2004 |
-| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 2031 |
-| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 2061 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 2094 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 2139 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 2182 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 2208 |
+| [calc_beamwidth](#calc_beamwidth) | Array antenna functions | 74 |
+| [calc_directivity](#calc_directivity) | Array antenna functions | 110 |
+| [combine_pattern](#combine_pattern) | Array antenna functions | 139 |
+| [concat](#concat) | Array antenna functions | 180 |
+| [copy_element](#copy_element) | Array antenna functions | 210 |
+| [export_obj_file](#export_obj_file) | Array antenna functions | 246 |
+| [generate](#generate) | Array antenna functions | 271 |
+| [generate_speaker](#generate_speaker) | Array antenna functions | 367 |
+| [interpolate](#interpolate) | Array antenna functions | 451 |
+| [qdant_read](#qdant_read) | Array antenna functions | 528 |
+| [qdant_write](#qdant_write) | Array antenna functions | 568 |
+| [rotate_pattern](#rotate_pattern) | Array antenna functions | 606 |
+| [baseband_freq_response](#baseband_freq_response) | Channel functions | 656 |
+| [channel_export_obj_file](#channel_export_obj_file) | Channel functions | 724 |
+| [hdf5_create_file](#hdf5_create_file) | Channel functions | 769 |
+| [hdf5_read_channel](#hdf5_read_channel) | Channel functions | 798 |
+| [hdf5_read_dset](#hdf5_read_dset) | Channel functions | 857 |
+| [hdf5_read_dset_names](#hdf5_read_dset_names) | Channel functions | 888 |
+| [hdf5_read_layout](#hdf5_read_layout) | Channel functions | 915 |
+| [hdf5_reshape_layout](#hdf5_reshape_layout) | Channel functions | 940 |
+| [hdf5_write_channel](#hdf5_write_channel) | Channel functions | 961 |
+| [hdf5_write_dset](#hdf5_write_dset) | Channel functions | 1003 |
+| [qrt_file_parse](#qrt_file_parse) | Channel functions | 1033 |
+| [qrt_file_read](#qrt_file_read) | Channel functions | 1066 |
+| [quantize_delays](#quantize_delays) | Channel functions | 1125 |
+| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 1189 |
+| [get_channels_planar](#get_channels_planar) | Channel generation functions | 1247 |
+| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 1312 |
+| [get_ieee_indoor](#get_ieee_indoor) | Channel generation functions | 1392 |
+| [acdf](#acdf) | Channel statistics | 1474 |
+| [calc_angular_spread](#calc_angular_spread) | Channel statistics | 1505 |
+| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 1544 |
+| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 1594 |
+| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 1622 |
+| [cart2geo](#cart2geo) | Math functions | 1656 |
+| [geo2cart](#geo2cart) | Math functions | 1686 |
+| [components](#components) | Miscellaneous / Tools | 1723 |
+| [version](#version) | Miscellaneous / Tools | 1732 |
+| [write_png](#write_png) | Miscellaneous / Tools | 1745 |
+| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 1788 |
+| [cube](#cube) | Site-specific simulation tools | 1840 |
+| [icosphere](#icosphere) | Site-specific simulation tools | 1867 |
+| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 1899 |
+| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 1932 |
+| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 1982 |
+| [plane](#plane) | Site-specific simulation tools | 2035 |
+| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 2064 |
+| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 2091 |
+| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 2121 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 2154 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 2199 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 2242 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 2268 |
 
 ---
 
@@ -1068,6 +1069,8 @@ Read ray-tracing CIR data from a QRT file
 - Reads channel impulse response data from QRT files
 - A file read cache is initialized once and reused across all requested snapshots, which
   significantly speeds up multi-snapshot reads
+- File reading and the conversion to numpy arrays are overlapped: a background thread reads the
+  next snapshot into a double buffer while the main thread converts the previous one
 - If `downlink = True`, origin is TX and destination is RX; if `False`, the roles are swapped
 - Per-snapshot outputs are returned as lists with one entry per requested snapshot
 
@@ -1249,7 +1252,9 @@ Calculate MIMO channel coefficients for planar wave paths
 - Interpolates antenna patterns for both arrays, accounting for element positions, orientation, and polarization.
 - LOS path detection is distance-based; the input angles are not used for LOS detection.
 - Polarization coupling is applied via the 8-row transfer matrix `M` (interleaved Re/Im for VV, VH, HV, HH).
-- If `center_freq == 0`, phase calculation is disabled and only delays are computed.
+- Path data is given for `n_freq` frequencies; single-frequency data uses `n_freq = 1`.
+- The scalar argument `freq` selects the frequency index that is processed; a single frequency is returned per call.
+- If `center_freq` is `None` or the selected entry is `0`, phase calculation is disabled and only delays are computed.
 - If `use_absolute_delays == False`, the straight-line TX-RX delay (LOS delay) is subtracted from all paths.
 - If `add_fake_los_path == True`, a zero-power LOS path is prepended when none is present, making the
   output size `n_path + 1`.
@@ -1263,6 +1268,8 @@ coeff_re, coeff_im, delays, rx_Doppler = quadriga_lib.arrayant.get_channels_plan
     center_freq, use_absolute_delays, add_fake_los_path )
 
 coeff, delays, rx_Doppler = quadriga_lib.arrayant.get_channels_planar( ..., complex=True )
+
+coeff_re, coeff_im, delays, rx_Doppler = quadriga_lib.arrayant.get_channels_planar( ..., freq=1 )
 ```
 
 ### Inputs:
@@ -1272,18 +1279,22 @@ coeff, delays, rx_Doppler = quadriga_lib.arrayant.get_channels_planar( ..., comp
 - **`eod`** — Departure elevation angles in rad; `(n_path,)`
 - **`aoa`** — Arrival azimuth angles in rad; `(n_path,)`
 - **`eoa`** — Arrival elevation angles in rad; `(n_path,)`
-- **`path_gain`** — Path gains in linear scale; `(n_path,)`
+- **`path_gain`** — Path gains in linear scale; `(n_path, n_freq)`
 - **`path_length`** — Total path lengths from TX to RX phase center; `(n_path,)`
-- **`M`** — Polarization transfer matrix, interleaved Re/Im; `(8, n_path)` (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH)
+- **`M`** — Polarization transfer matrix, interleaved Re/Im; `(8, n_path, n_freq)`
+  (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH)
 - **`tx_pos`** — Transmitter position in Cartesian coordinates; `(3,)`
 - **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `(3,)`
 - **`rx_pos`** — Receiver position in Cartesian coordinates; `(3,)`
 - **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading); `(3,)`
-- **`center_freq`** — Center frequency in Hz; set to `0` to skip phase computation; default: `0.0`
+- **`center_freq`** — Center frequencies in Hz; `(n_freq,)`; set an entry to `0` or pass `None` to skip
+  phase computation; default: `None`
 - **`use_absolute_delays`** — If `True`, delays include the LOS component; default: `False`
 - **`add_fake_los_path`** — If `True`, prepends a zero-power LOS path when none is present; default: `False`
 - **`complex`** — If `True`, combine coefficients into a single complex array `coeff`; if `False`, return
   separate `coeff_re` and `coeff_im`; default: `False`
+- **`freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `M` and `center_freq` that is
+  processed; default: `0`
 
 ### Outputs:
 - **`coeff_re`** — Real part of channel coefficients (`complex=False`); `(n_ports_rx, n_ports_tx, n_path)`
@@ -1306,11 +1317,24 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
 - Interpolates antenna patterns for both arrays, accounting for element positions and array orientation
   (bank/tilt/heading Euler angles).
 - Polarization coupling is applied via the 8-row transfer matrix `M` (interleaved Re/Im for VV, VH, HV, HH components).
-- If `center_freq == 0`, phase calculation is disabled and only delays are computed.
+- Path data is given for `n_freq` frequencies; single-frequency data uses `n_freq = 1`.
+- The scalar argument `freq` selects the frequency index that is processed; a single frequency is returned per call.
+- If `center_freq` is `None` or the selected entry is `0`, phase calculation is disabled and only delays are computed.
 - If `use_absolute_delays == False`, the minimum delay (LOS delay) is subtracted from all paths.
 - If `add_fake_los_path == True`, a zero-power LOS path is prepended when no LOS path is detected.
 - `complex=True` returns one combined complex coefficient array `coeff`; `complex=False` (default) returns
   separate real `coeff_re` and `coeff_im` via a zero-copy fast path
+
+### Batch mode:
+- If `fbs_pos` is a `list` of arrays, the function switches to batch mode and processes `n_out` snapshots
+  in one call, distributing the snapshots over all available cores (OpenMP).
+- The path inputs `fbs_pos`, `lbs_pos`, `path_gain`, `path_length` and `M` are then lists of length `n_out`,
+  matching the output format of [qrt_file_read](#qrt_file_read); list entries are aliased, not copied.
+- The position and orientation inputs are `(3, n_out)` arrays with one column per snapshot; a `(3,)` array
+  or a single-column `(3, 1)` array is applied to all snapshots.
+- All outputs are returned as lists of length `n_out`, one entry per snapshot.
+- Snapshots without any path produce an empty output entry with `n_path = 0`.
+- Batch mode releases the GIL while processing, so it can be combined with Python threads.
 
 ### Usage:
 ```
@@ -1321,26 +1345,31 @@ coeff_re, coeff_im, delays = quadriga_lib.arrayant.get_channels_spherical( ant_t
 coeff, delays = quadriga_lib.arrayant.get_channels_spherical( ..., complex=True )
 
 coeff_re, coeff_im, delays, aod, eod, aoa, eoa = quadriga_lib.arrayant.get_channels_spherical( ..., angles=True )
+
+coeff_re, coeff_im, delays = quadriga_lib.arrayant.get_channels_spherical( ..., freq=1 )
 ```
 
 ### Inputs:
 - **`ant_tx`** — Transmit arrayant dict; see [generate](#generate)
 - **`ant_rx`** — Receive arrayant dict; see [generate](#generate)
-- **`fbs_pos`** — First-bounce scatterer positions; `(3, n_path)`
-- **`lbs_pos`** — Last-bounce scatterer positions; `(3, n_path)`
-- **`path_gain`** — Path gains in linear scale; `(n_path,)`
-- **`path_length`** — Total path lengths from TX to RX phase center; `(n_path,)`
-- **`M`** — Polarization transfer matrix, interleaved Re/Im; `(8, n_path)` (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH)
-- **`tx_pos`** — Transmitter position in Cartesian coordinates; `(3,)`
-- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `(3,)`
-- **`rx_pos`** — Receiver position in Cartesian coordinates; `(3,)`
-- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading); `(3,)`
-- **`center_freq`** — Center frequency in Hz; set to `0` to skip phase computation; default: `0.0`
+- **`fbs_pos`** — First-bounce scatterer positions; `(3, n_path)`, or a list of length `n_out` in batch mode
+- **`lbs_pos`** — Last-bounce scatterer positions; `(3, n_path)`, or a list of length `n_out` in batch mode
+- **`path_gain`** — Path gains in linear scale; `(n_path, n_freq)`, or a list of length `n_out` in batch mode
+- **`path_length`** — Total path lengths from TX to RX phase center; `(n_path,)`, or a list of length `n_out` in batch mode
+- **`M`** — Polarization transfer matrix, interleaved Re/Im; `(8, n_path, n_freq)`, or a list of length
+  `n_out` in batch mode; (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH)
+- **`tx_pos`** — Transmitter position in Cartesian coordinates; `(3,)`, or `(3, n_out)` in batch mode
+- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `(3,)`, or `(3, n_out)` in batch mode
+- **`rx_pos`** — Receiver position in Cartesian coordinates; `(3,)`, or `(3, n_out)` in batch mode
+- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading); `(3,)`, or `(3, n_out)` in batch mode
+- **`center_freq`** — Center frequencies in Hz; `(n_freq,)`; set an entry to `0` or pass `None` to skip phase computation; default: `None`
 - **`use_absolute_delays`** — If `True`, delays include the LOS component; default: `False`
 - **`add_fake_los_path`** — If `True`, prepends a zero-power LOS path when none is present; default: `False`
 - **`angles`** — If `True`, also return departure/arrival angles in antenna-local coordinates; default: `False`
 - **`complex`** — If `True`, combine coefficients into a single complex array `coeff`; if `False`, return
   separate `coeff_re` and `coeff_im`; default: `False`
+- **`freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `M` and `center_freq` that is
+  processed; default: `0`
 
 ### Outputs:
 - **`coeff_re`** — Real part of channel coefficients (`complex=False`); `(n_ports_rx, n_ports_tx, n_path)`
@@ -1351,11 +1380,13 @@ coeff_re, coeff_im, delays, aod, eod, aoa, eoa = quadriga_lib.arrayant.get_chann
 - **`eod`** — Elevation of departure in rad; same shape; only when `angles=True`
 - **`aoa`** — Azimuth of arrival in rad; same shape; only when `angles=True`
 - **`eoa`** — Elevation of arrival in rad; same shape; only when `angles=True`
+- In batch mode, every output is a list of length `n_out` whose entries have the shapes given above.
 
 ### See also:
 - [get_channels_multifreq](#get_channels_multifreq) (multi-frequency extension)
 - [get_channels_planar](#get_channels_planar) (planar wave variant)
 - [get_channels_irs](#get_channels_irs) (IRS-assisted communication)
+- [qrt_file_read](#qrt_file_read) (produces the list format used by batch mode)
 
 ---
 ## get_ieee_indoor
@@ -1999,6 +2030,35 @@ vert_list_out, face_ind_out = quadriga_lib.RTtools.obj_file_write( fn, mesh, obj
 ### See also:
 - [obj_file_read](#obj_file_read) (for reading OBJ files and the BSDF column layout)
 - [mitsuba_xml_file_write](#mitsuba_xml_file_write) (for exporting to Mitsuba scene file format)
+
+---
+## plane
+Construct a triangulated plane mesh
+
+- Generates a Blender-style plane: a 2 x 2 quad in the xy-plane centered at the origin (vertices at +/-1, z = 0)
+- The quad is split into 2 triangles, yielding 2 triangles at n_div = 1
+- Optional uniform subdivision produces 2 · n_div^2 triangles
+- Triangle winding is consistent (normals point in +z direction), compatible with obj_file_write
+- The plane has no thickness in z-direction; scaling therefore only affects x and y
+- Scale, rotation, and translation are applied in that order (scale -> rotate -> translate)
+- An odd number of negative scale components flips the winding (normals point in -z direction)
+
+### Usage:
+```
+mesh = quadriga_lib.RTtools.plane( scale, rotation, location, n_div )
+```
+
+### Inputs:
+- **`scale`** — Length 1 scales x and y uniformly; length 2 scales (x, y) independently; length 3 is
+  accepted for compatibility with `cube`, but the third element is ignored; `None` or empty = 1
+  (no scaling); default: `None`
+- **`rotation`** — Euler angles about (x, y, z), applied as R = Rz·Ry·Rx (Blender XYZ); shape `(3,)`;
+  `None` or empty = no rotation; default: `None`
+- **`location`** — Translation (x, y, z); shape `(3,)`; `None` or empty = origin; default: `None`
+- **`n_div`** — Number of subdivisions per edge; yields 2 · n_div^2 triangles; default: 1
+
+### Outputs:
+- **`mesh`** — Triangle mesh; each row holds (x1, y1, z1, x2, y2, z2, x3, y3, z3); `(2 · n_div^2, 9)`
 
 ---
 ## point_cloud_aabb

@@ -1,7 +1,7 @@
 ---
 title: "MATLAB / Octave API Documentation for Quadriga-Lib v0.12.1"
 author: "Stephan Jaeckel"
-date: "13.08.2026"
+date: "18.08.2026"
 lang: en-US
 ---
 
@@ -27,64 +27,65 @@ lang: en-US
 
 | Function | Section | Line |
 | --- | --- | --- |
-| [arrayant_calc_beamwidth](#arrayant_calc_beamwidth) | Array antenna functions | 94 |
-| [arrayant_calc_directivity](#arrayant_calc_directivity) | Array antenna functions | 146 |
-| [arrayant_combine_pattern](#arrayant_combine_pattern) | Array antenna functions | 184 |
-| [arrayant_concat](#arrayant_concat) | Array antenna functions | 234 |
-| [arrayant_copy_element](#arrayant_copy_element) | Array antenna functions | 264 |
-| [arrayant_export_obj_file](#arrayant_export_obj_file) | Array antenna functions | 292 |
-| [arrayant_generate](#arrayant_generate) | Array antenna functions | 321 |
-| [arrayant_interpolate](#arrayant_interpolate) | Array antenna functions | 442 |
-| [arrayant_qdant_read](#arrayant_qdant_read) | Array antenna functions | 513 |
-| [arrayant_qdant_write](#arrayant_qdant_write) | Array antenna functions | 553 |
-| [arrayant_rotate_pattern](#arrayant_rotate_pattern) | Array antenna functions | 605 |
-| [generate_speaker](#generate_speaker) | Array antenna functions | 657 |
-| [baseband_freq_response](#baseband_freq_response) | Channel functions | 719 |
-| [channel_export_obj_file](#channel_export_obj_file) | Channel functions | 781 |
-| [hdf5_create_file](#hdf5_create_file) | Channel functions | 817 |
-| [hdf5_read_channel](#hdf5_read_channel) | Channel functions | 845 |
-| [hdf5_read_dset](#hdf5_read_dset) | Channel functions | 903 |
-| [hdf5_read_dset_names](#hdf5_read_dset_names) | Channel functions | 932 |
-| [hdf5_read_layout](#hdf5_read_layout) | Channel functions | 958 |
-| [hdf5_reshape_layout](#hdf5_reshape_layout) | Channel functions | 982 |
-| [hdf5_version](#hdf5_version) | Channel functions | 1008 |
-| [hdf5_write_channel](#hdf5_write_channel) | Channel functions | 1024 |
-| [hdf5_write_dset](#hdf5_write_dset) | Channel functions | 1060 |
-| [qrt_file_parse](#qrt_file_parse) | Channel functions | 1092 |
-| [qrt_file_read](#qrt_file_read) | Channel functions | 1125 |
-| [quantize_delays](#quantize_delays) | Channel functions | 1184 |
-| [get_channels_ieee_indoor](#get_channels_ieee_indoor) | Channel generation functions | 1228 |
-| [get_channels_irs](#get_channels_irs) | Channel generation functions | 1301 |
-| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 1367 |
-| [get_channels_planar](#get_channels_planar) | Channel generation functions | 1416 |
-| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 1467 |
-| [acdf](#acdf) | Channel statistics | 1525 |
-| [calc_angular_spread](#calc_angular_spread) | Channel statistics | 1556 |
-| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 1596 |
-| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 1638 |
-| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 1666 |
-| [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | 1696 |
-| [cart2geo](#cart2geo) | Math functions | 1718 |
-| [fast_sincos](#fast_sincos) | Math functions | 1745 |
-| [geo2cart](#geo2cart) | Math functions | 1773 |
-| [interp](#interp) | Math functions | 1813 |
-| [version](#version) | Miscellaneous / Tools | 1844 |
-| [write_png](#write_png) | Miscellaneous / Tools | 1861 |
-| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 1885 |
-| [cube](#cube) | Site-specific simulation tools | 1933 |
-| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 1966 |
-| [icosphere](#icosphere) | Site-specific simulation tools | 2004 |
-| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 2030 |
-| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 2078 |
-| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 2130 |
-| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 2157 |
-| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 2184 |
-| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 2213 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 2310 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 2350 |
-| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 2390 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 2414 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 2441 |
+| [arrayant_calc_beamwidth](#arrayant_calc_beamwidth) | Array antenna functions | 95 |
+| [arrayant_calc_directivity](#arrayant_calc_directivity) | Array antenna functions | 147 |
+| [arrayant_combine_pattern](#arrayant_combine_pattern) | Array antenna functions | 185 |
+| [arrayant_concat](#arrayant_concat) | Array antenna functions | 235 |
+| [arrayant_copy_element](#arrayant_copy_element) | Array antenna functions | 265 |
+| [arrayant_export_obj_file](#arrayant_export_obj_file) | Array antenna functions | 293 |
+| [arrayant_generate](#arrayant_generate) | Array antenna functions | 322 |
+| [arrayant_interpolate](#arrayant_interpolate) | Array antenna functions | 443 |
+| [arrayant_qdant_read](#arrayant_qdant_read) | Array antenna functions | 514 |
+| [arrayant_qdant_write](#arrayant_qdant_write) | Array antenna functions | 554 |
+| [arrayant_rotate_pattern](#arrayant_rotate_pattern) | Array antenna functions | 606 |
+| [generate_speaker](#generate_speaker) | Array antenna functions | 658 |
+| [baseband_freq_response](#baseband_freq_response) | Channel functions | 720 |
+| [channel_export_obj_file](#channel_export_obj_file) | Channel functions | 782 |
+| [hdf5_create_file](#hdf5_create_file) | Channel functions | 818 |
+| [hdf5_read_channel](#hdf5_read_channel) | Channel functions | 846 |
+| [hdf5_read_dset](#hdf5_read_dset) | Channel functions | 904 |
+| [hdf5_read_dset_names](#hdf5_read_dset_names) | Channel functions | 933 |
+| [hdf5_read_layout](#hdf5_read_layout) | Channel functions | 959 |
+| [hdf5_reshape_layout](#hdf5_reshape_layout) | Channel functions | 983 |
+| [hdf5_version](#hdf5_version) | Channel functions | 1009 |
+| [hdf5_write_channel](#hdf5_write_channel) | Channel functions | 1025 |
+| [hdf5_write_dset](#hdf5_write_dset) | Channel functions | 1061 |
+| [qrt_file_parse](#qrt_file_parse) | Channel functions | 1093 |
+| [qrt_file_read](#qrt_file_read) | Channel functions | 1126 |
+| [quantize_delays](#quantize_delays) | Channel functions | 1185 |
+| [get_channels_ieee_indoor](#get_channels_ieee_indoor) | Channel generation functions | 1229 |
+| [get_channels_irs](#get_channels_irs) | Channel generation functions | 1302 |
+| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 1368 |
+| [get_channels_planar](#get_channels_planar) | Channel generation functions | 1417 |
+| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 1468 |
+| [acdf](#acdf) | Channel statistics | 1526 |
+| [calc_angular_spread](#calc_angular_spread) | Channel statistics | 1557 |
+| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 1597 |
+| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 1639 |
+| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 1667 |
+| [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | 1697 |
+| [cart2geo](#cart2geo) | Math functions | 1719 |
+| [fast_sincos](#fast_sincos) | Math functions | 1746 |
+| [geo2cart](#geo2cart) | Math functions | 1774 |
+| [interp](#interp) | Math functions | 1814 |
+| [version](#version) | Miscellaneous / Tools | 1845 |
+| [write_png](#write_png) | Miscellaneous / Tools | 1862 |
+| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 1886 |
+| [cube](#cube) | Site-specific simulation tools | 1934 |
+| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 1967 |
+| [icosphere](#icosphere) | Site-specific simulation tools | 2005 |
+| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 2031 |
+| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 2079 |
+| [plane](#plane) | Site-specific simulation tools | 2131 |
+| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 2168 |
+| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 2195 |
+| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 2222 |
+| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 2251 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 2348 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 2388 |
+| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 2428 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 2452 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 2479 |
 
 ---
 
@@ -2125,6 +2126,43 @@ Write a Wavefront .obj file
 
 ### See also:
 - [obj_file_read](#obj_file_read) (for reading OBJ files and the BSDF column layout)
+
+---
+## plane
+Construct a triangulated plane mesh
+
+### Description:
+- Generates a Blender-style plane: a 2 x 2 quad in the xy-plane centered at the origin (vertices
+  at +/-1, z = 0)
+- The quad is split into 2 triangles, yielding 2 triangles at n_div = 1
+- Optional uniform subdivision produces 2 · n_div^2 triangles
+- Triangle winding is consistent (normals point in +z direction), compatible with obj_file_write
+- The plane has no thickness in z-direction; scaling therefore only affects x and y
+- Scale, rotation, and translation are applied in that order (scale -> rotate -> translate)
+- An odd number of negative scale components flips the winding (normals point in -z direction)
+
+### Usage:
+```
+mesh = quadriga_lib.plane( scale, rotation, location, n_div );
+```
+
+### Inputs:
+- **`scale`** *(optional)* — Length 1 scales x and y uniformly; length 2 scales {x,y}
+  independently; length 3 is accepted for compatibility with `cube`, but the third element is
+  ignored; empty or omitted = 1 (no scaling)
+- **`rotation`** *(optional)* — Euler angles about {x,y,z}, applied as R = Rz·Ry·Rx (Blender
+  XYZ); length 3; empty or omitted = no rotation
+- **`location`** *(optional)* — Translation {x,y,z}; length 3; empty or omitted = origin
+- **`n_div`** *(optional)* — Number of subdivisions per edge; yields 2 · n_div^2 triangles;
+  default: 1
+
+### Outputs:
+- **`mesh`** — Triangle mesh; each row holds {x1,y1,z1,x2,y2,z2,x3,y3,z3}; `[2 · n_div^2, 9]`
+
+### See also:
+- [cube](#cube)
+- [icosphere](#icosphere)
+- [obj_file_write](#obj_file_write)
 
 ---
 ## point_cloud_aabb
