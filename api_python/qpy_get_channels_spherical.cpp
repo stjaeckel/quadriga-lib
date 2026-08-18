@@ -271,8 +271,10 @@ py::tuple get_channels_spherical(const py::dict &ant_tx,
         {
             py::gil_scoped_release release;
 
-#ifdef _OPENMP
+#if defined(_OPENMP) && _OPENMP >= 200805
             omp_set_max_active_levels(1); // Parallelize over snapshots, the path loop in the core stays serial
+#elif defined(_OPENMP)
+            omp_set_nested(0); // OpenMP 2.0 (MSVC /openmp) has no max_active_levels
 #endif
 
 #pragma omp parallel for schedule(dynamic)
