@@ -11,6 +11,10 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <array>
+#include <utility>
+#include <cmath>
+#include <cstdio>
 
 static inline bool my_fancy_cube(std::string fn, std::string mtl_name = "", std::string mtl_name2 = "")
 {
