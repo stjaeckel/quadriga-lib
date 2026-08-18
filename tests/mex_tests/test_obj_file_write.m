@@ -328,9 +328,9 @@ end
 
 %% Error handling - wrapper argument counts (specific messages)
 
-% Too many inputs (> 10)
+% Too many inputs (> 15)
 try
-    quadriga_lib.obj_file_write( fn, mesh, [], [], [], [], [], [], [], 0.001, [], [], [], false, 1 );
+    quadriga_lib.obj_file_write( fn, mesh, [], [], [], [], [], [], [], 0.001, [], [], [], false, false, 1 );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Wrong number of input arguments.';
