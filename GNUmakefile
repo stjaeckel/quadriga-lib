@@ -6,10 +6,10 @@ hdf5_internal = OFF
 arma_internal = OFF
 static_lib = ON
 shared_lib = OFF
-octave = OFF
-matlab = OFF
-python = OFF
-avx2 = OFF
+octave = ON
+matlab = ON
+python = ON
+avx2 = ON
 cuda = OFF
 
 # GCC version override. Empty for system default. Note: NVCC max is 13, MATLAB max is 12
@@ -28,6 +28,9 @@ OCTAVE_VERSION := $(shell mkoctfile -v 2>/dev/null)
 
 # Get Quadriga-Lib version
 QUADRIGA_VERSION := $(shell grep -oP '(?<=#define QUADRIGA_LIB_VERSION_STR ")[^"]+' include/quadriga_lib.hpp)
+
+# Matlab
+MATLAB_BIN = matlab24
 
 ifneq ($(gcc_version),)
   CMAKE_CXX_ARG = -D CMAKE_C_COMPILER=gcc-$(gcc_version) -D CMAKE_CXX_COMPILER=g++-$(gcc_version)
@@ -84,7 +87,7 @@ ifneq ($(OCTAVE_VERSION),)
 endif
 endif
 ifeq ($(matlab),ON)
-	matlab -batch "run('tests/quadriga_lib_mex_tests.m');"
+	$(MATLAB_BIN) -batch "run('tests/quadriga_lib_mex_tests.m');"
 endif
 ifeq ($(python),ON)
 ifneq ($(PYTHON_SHARED_OBJ),)
