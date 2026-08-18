@@ -1,5 +1,5 @@
 ---
-title: "MATLAB / Octave API Documentation for Quadriga-Lib v0.12.1"
+title: "MATLAB / Octave API Documentation for Quadriga-Lib v0.12.2"
 author: "Stephan Jaeckel"
 date: "18.08.2026"
 lang: en-US
