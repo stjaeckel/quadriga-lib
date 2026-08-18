@@ -445,7 +445,8 @@ TEST_CASE("Ray-Mesh Interact - Air to Dielectric Medium (x-z plane)")
     T = T * std::sqrt((1 - G) / H);
     CHECK(arma::approx_equal(xprmatN.t(), T, "absdiff", 1e-6));
 
-    T = {{-a, -0.1, 0.2 - a, -a, -0.1, -0.2 - a, -a, 0.2, -a}};
+    // Sub-rays are parallel to the main ray, so the offsets are unchanged
+    T = {{0.0, -0.1, 0.2, 0.0, -0.1, -0.2, 0.0, 0.2, 0.0}};
     CHECK(arma::approx_equal(trivecN, T, "absdiff", 1e-6));
 
     a = 45.0 * deg2rad;
