@@ -156,12 +156,18 @@ namespace quadriga_lib
                            const std::vector<bool> *active_path = nullptr); // List of active paths, vector of length [n_path_1 * n_path_2]
 
     // Make a (default) cube
-    // - Returns cube mesh of size [12*n_div^2, 9]
     template <typename dtype>
     arma::Mat<dtype> cube(const arma::vec &scale = {1.0},              // Scale; Vector of length [1] scales all axes; length [3] scales {x,y,z} independently
                           const arma::vec &rotation = {0.0, 0.0, 0.0}, // Euler rotations in [rad], Vector of length [3]; Empty = default
                           const arma::vec &location = {0.0, 0.0, 0.0}, // Location, Vector of length [3]; Empty = default
                           const arma::uword n_div = 1);                // Number of divisions
+
+    // Make a (default) plane
+    template <typename dtype>
+    arma::Mat<dtype> plane(const arma::vec &scale = {1.0},              // Scale; Vector of length [1] scales all axes; length [3] scales {x,y,z} independently
+                           const arma::vec &rotation = {0.0, 0.0, 0.0}, // Euler rotations in [rad], Vector of length [3]; Empty = default
+                           const arma::vec &location = {0.0, 0.0, 0.0}, // Location, Vector of length [3]; Empty = default
+                           const arma::uword n_div = 1);                // Number of divisions
 
     // Generate diffraction ellipsoid
     template <typename dtype>                                     // float or double

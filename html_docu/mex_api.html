@@ -160,6 +160,7 @@
   <tr><td><a href="#icosphere">icosphere</a></td><td>Construct a geodesic polyhedron from recursive icosahedron subdivision</td></tr>
   <tr><td><a href="#obj_file_read">obj_file_read</a></td><td>Read a Wavefront `.obj` file and extract geometry, visual materials, and EM/acoustic materials</td></tr>
   <tr><td><a href="#obj_file_write">obj_file_write</a></td><td>Write a Wavefront .obj file</td></tr>
+  <tr><td><a href="#plane">plane</a></td><td>Construct a triangulated plane mesh</td></tr>
   <tr><td><a href="#point_cloud_aabb">point_cloud_aabb</a></td><td>Compute the axis-aligned bounding boxes (AABB) of a 3D point cloud</td></tr>
   <tr><td><a href="#point_cloud_segmentation">point_cloud_segmentation</a></td><td>Reorganize a point cloud into spatial sub-clouds for efficient processing</td></tr>
   <tr><td><a href="#point_inside_mesh">point_inside_mesh</a></td><td>Test whether 3D points are inside a triangle mesh using raycasting</td></tr>
@@ -2942,6 +2943,47 @@ Write a Wavefront .obj file
 <b>See also:</b><br>
 <ul>
 <li><a href="#obj_file_read">obj_file_read</a> (for reading OBJ files and the BSDF column layout)</li>
+</ul>
+
+<hr class="greyline"><br>
+<span id="plane" class="qd-func"><b>plane</b></span><br>
+<hr class="thin">
+Construct a triangulated plane mesh
+<br><br>
+<b>Description:</b><br>
+<ul>
+<li>Generates a Blender-style plane: a 2 x 2 quad in the xy-plane centered at the origin (vertices at +/-1, z = 0)</li>
+<li>The quad is split into 2 triangles, yielding 2 triangles at n_div = 1</li>
+<li>Optional uniform subdivision produces 2 · n_div^2 triangles</li>
+<li>Triangle winding is consistent (normals point in +z direction), compatible with obj_file_write</li>
+<li>The plane has no thickness in z-direction; scaling therefore only affects x and y</li>
+<li>Scale, rotation, and translation are applied in that order (scale -> rotate -> translate)</li>
+<li>An odd number of negative scale components flips the winding (normals point in -z direction)</li>
+</ul>
+
+<b>Usage:</b><br>
+<pre>
+mesh = quadriga_lib.plane( scale, rotation, location, n_div );
+</pre>
+
+<b>Inputs:</b><br>
+<ul>
+<li><b><code>scale</code></b> <i>(optional)</i> — Length 1 scales x and y uniformly; length 2 scales {x,y} independently; length 3 is accepted for compatibility with <code>cube</code>, but the third element is ignored; empty or omitted = 1 (no scaling)</li>
+<li><b><code>rotation</code></b> <i>(optional)</i> — Euler angles about {x,y,z}, applied as R = Rz·Ry·Rx (Blender XYZ); length 3; empty or omitted = no rotation</li>
+<li><b><code>location</code></b> <i>(optional)</i> — Translation {x,y,z}; length 3; empty or omitted = origin</li>
+<li><b><code>n_div</code></b> <i>(optional)</i> — Number of subdivisions per edge; yields 2 · n_div^2 triangles; default: 1</li>
+</ul>
+
+<b>Outputs:</b><br>
+<ul>
+<li><b><code>mesh</code></b> — Triangle mesh; each row holds {x1,y1,z1,x2,y2,z2,x3,y3,z3}; <code>[2 · n_div^2, 9]</code></li>
+</ul>
+
+<b>See also:</b><br>
+<ul>
+<li><a href="#cube">cube</a></li>
+<li><a href="#icosphere">icosphere</a></li>
+<li><a href="#obj_file_write">obj_file_write</a></li>
 </ul>
 
 <hr class="greyline"><br>

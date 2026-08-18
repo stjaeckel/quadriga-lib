@@ -160,6 +160,7 @@ import quadriga_lib
   <tr><td><a href="#mitsuba_xml_file_write">mitsuba_xml_file_write</a></td><td>Write a triangular mesh to a Mitsuba 3 XML scene file</td></tr>
   <tr><td><a href="#obj_file_read">obj_file_read</a></td><td>Read a Wavefront `.obj` file and extract geometry, visual materials, and EM/acoustic materials</td></tr>
   <tr><td><a href="#obj_file_write">obj_file_write</a></td><td>Write a Wavefront .obj file</td></tr>
+  <tr><td><a href="#plane">plane</a></td><td>Construct a triangulated plane mesh</td></tr>
   <tr><td><a href="#point_cloud_aabb">point_cloud_aabb</a></td><td>Compute the axis-aligned bounding boxes (AABB) of a 3D point cloud</td></tr>
   <tr><td><a href="#point_cloud_segmentation">point_cloud_segmentation</a></td><td>Reorganize a point cloud into spatial sub-clouds for efficient processing</td></tr>
   <tr><td><a href="#point_inside_mesh">point_inside_mesh</a></td><td>Test whether 3D points are inside a triangle mesh using raycasting</td></tr>
@@ -1446,6 +1447,7 @@ Read ray-tracing CIR data from a QRT file
 <ul>
 <li>Reads channel impulse response data from QRT files</li>
 <li>A file read cache is initialized once and reused across all requested snapshots, which significantly speeds up multi-snapshot reads</li>
+<li>File reading and the conversion to numpy arrays are overlapped: a background thread reads the next snapshot into a double buffer while the main thread converts the previous one</li>
 <li>If <code>downlink = True</code>, origin is TX and destination is RX; if <code>False</code>, the roles are swapped</li>
 <li>Per-snapshot outputs are returned as lists with one entry per requested snapshot</li>
 </ul>
@@ -1640,7 +1642,9 @@ Calculate MIMO channel coefficients for planar wave paths
 <li>Interpolates antenna patterns for both arrays, accounting for element positions, orientation, and polarization.</li>
 <li>LOS path detection is distance-based; the input angles are not used for LOS detection.</li>
 <li>Polarization coupling is applied via the 8-row transfer matrix <code>M</code> (interleaved Re/Im for VV, VH, HV, HH).</li>
-<li>If <code>center_freq == 0</code>, phase calculation is disabled and only delays are computed.</li>
+<li>Path data is given for <code>n_freq</code> frequencies; single-frequency data uses <code>n_freq = 1</code>.</li>
+<li>The scalar argument <code>freq</code> selects the frequency index that is processed; a single frequency is returned per call.</li>
+<li>If <code>center_freq</code> is <code>None</code> or the selected entry is <code>0</code>, phase calculation is disabled and only delays are computed.</li>
 <li>If <code>use_absolute_delays == False</code>, the straight-line TX-RX delay (LOS delay) is subtracted from all paths.</li>
 <li>If <code>add_fake_los_path == True</code>, a zero-power LOS path is prepended when none is present, making the output size <code>n_path + 1</code>.</li>
 <li><code>complex=True</code> returns one combined complex coefficient array <code>coeff</code>; <code>complex=False</code> (default) returns separate real <code>coeff_re</code> and <code>coeff_im</code> via a zero-copy fast path.</li>
@@ -1653,6 +1657,8 @@ coeff_re, coeff_im, delays, rx_Doppler = quadriga_lib.arrayant.get_channels_plan
     center_freq, use_absolute_delays, add_fake_los_path )
 
 coeff, delays, rx_Doppler = quadriga_lib.arrayant.get_channels_planar( ..., complex=True )
+
+coeff_re, coeff_im, delays, rx_Doppler = quadriga_lib.arrayant.get_channels_planar( ..., freq=1 )
 </pre>
 
 <b>Inputs:</b><br>
@@ -1663,17 +1669,18 @@ coeff, delays, rx_Doppler = quadriga_lib.arrayant.get_channels_planar( ..., comp
 <li><b><code>eod</code></b> — Departure elevation angles in rad; <code>(n_path,)</code></li>
 <li><b><code>aoa</code></b> — Arrival azimuth angles in rad; <code>(n_path,)</code></li>
 <li><b><code>eoa</code></b> — Arrival elevation angles in rad; <code>(n_path,)</code></li>
-<li><b><code>path_gain</code></b> — Path gains in linear scale; <code>(n_path,)</code></li>
+<li><b><code>path_gain</code></b> — Path gains in linear scale; <code>(n_path, n_freq)</code></li>
 <li><b><code>path_length</code></b> — Total path lengths from TX to RX phase center; <code>(n_path,)</code></li>
-<li><b><code>M</code></b> — Polarization transfer matrix, interleaved Re/Im; <code>(8, n_path)</code> (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH)</li>
+<li><b><code>M</code></b> — Polarization transfer matrix, interleaved Re/Im; <code>(8, n_path, n_freq)</code> (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH)</li>
 <li><b><code>tx_pos</code></b> — Transmitter position in Cartesian coordinates; <code>(3,)</code></li>
 <li><b><code>tx_orientation</code></b> — Transmitter orientation as Euler angles (bank, tilt, heading); <code>(3,)</code></li>
 <li><b><code>rx_pos</code></b> — Receiver position in Cartesian coordinates; <code>(3,)</code></li>
 <li><b><code>rx_orientation</code></b> — Receiver orientation as Euler angles (bank, tilt, heading); <code>(3,)</code></li>
-<li><b><code>center_freq</code></b> — Center frequency in Hz; set to <code>0</code> to skip phase computation; default: <code>0.0</code></li>
+<li><b><code>center_freq</code></b> — Center frequencies in Hz; <code>(n_freq,)</code>; set an entry to <code>0</code> or pass <code>None</code> to skip phase computation; default: <code>None</code></li>
 <li><b><code>use_absolute_delays</code></b> — If <code>True</code>, delays include the LOS component; default: <code>False</code></li>
 <li><b><code>add_fake_los_path</code></b> — If <code>True</code>, prepends a zero-power LOS path when none is present; default: <code>False</code></li>
 <li><b><code>complex</code></b> — If <code>True</code>, combine coefficients into a single complex array <code>coeff</code>; if <code>False</code>, return separate <code>coeff_re</code> and <code>coeff_im</code>; default: <code>False</code></li>
+<li><b><code>freq</code></b> — Frequency index (0-based) selecting the slice of <code>path_gain</code>, <code>M</code> and <code>center_freq</code> that is processed; default: <code>0</code></li>
 </ul>
 
 <b>Outputs:</b><br>
@@ -1700,10 +1707,22 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
 <li>Computes complex channel coefficients and propagation delays for all TX/RX element pairs and paths, using the spherical wave assumption with per-element phase and delay.</li>
 <li>Interpolates antenna patterns for both arrays, accounting for element positions and array orientation (bank/tilt/heading Euler angles).</li>
 <li>Polarization coupling is applied via the 8-row transfer matrix <code>M</code> (interleaved Re/Im for VV, VH, HV, HH components).</li>
-<li>If <code>center_freq == 0</code>, phase calculation is disabled and only delays are computed.</li>
+<li>Path data is given for <code>n_freq</code> frequencies; single-frequency data uses <code>n_freq = 1</code>.</li>
+<li>The scalar argument <code>freq</code> selects the frequency index that is processed; a single frequency is returned per call.</li>
+<li>If <code>center_freq</code> is <code>None</code> or the selected entry is <code>0</code>, phase calculation is disabled and only delays are computed.</li>
 <li>If <code>use_absolute_delays == False</code>, the minimum delay (LOS delay) is subtracted from all paths.</li>
 <li>If <code>add_fake_los_path == True</code>, a zero-power LOS path is prepended when no LOS path is detected.</li>
 <li><code>complex=True</code> returns one combined complex coefficient array <code>coeff</code>; <code>complex=False</code> (default) returns separate real <code>coeff_re</code> and <code>coeff_im</code> via a zero-copy fast path</li>
+</ul>
+
+<b>Batch mode:</b><br>
+<ul>
+<li>If <code>fbs_pos</code> is a <code>list</code> of arrays, the function switches to batch mode and processes <code>n_out</code> snapshots in one call, distributing the snapshots over all available cores (OpenMP).</li>
+<li>The path inputs <code>fbs_pos</code>, <code>lbs_pos</code>, <code>path_gain</code>, <code>path_length</code> and <code>M</code> are then lists of length <code>n_out</code>, matching the output format of <a href="#qrt_file_read">qrt_file_read</a>; list entries are aliased, not copied.</li>
+<li>The position and orientation inputs are <code>(3, n_out)</code> arrays with one column per snapshot; a <code>(3,)</code> array or a single-column <code>(3, 1)</code> array is applied to all snapshots.</li>
+<li>All outputs are returned as lists of length <code>n_out</code>, one entry per snapshot.</li>
+<li>Snapshots without any path produce an empty output entry with <code>n_path = 0</code>.</li>
+<li>Batch mode releases the GIL while processing, so it can be combined with Python threads.</li>
 </ul>
 
 <b>Usage:</b><br>
@@ -1715,26 +1734,29 @@ coeff_re, coeff_im, delays = quadriga_lib.arrayant.get_channels_spherical( ant_t
 coeff, delays = quadriga_lib.arrayant.get_channels_spherical( ..., complex=True )
 
 coeff_re, coeff_im, delays, aod, eod, aoa, eoa = quadriga_lib.arrayant.get_channels_spherical( ..., angles=True )
+
+coeff_re, coeff_im, delays = quadriga_lib.arrayant.get_channels_spherical( ..., freq=1 )
 </pre>
 
 <b>Inputs:</b><br>
 <ul>
 <li><b><code>ant_tx</code></b> — Transmit arrayant dict; see <a href="#generate">generate</a></li>
 <li><b><code>ant_rx</code></b> — Receive arrayant dict; see <a href="#generate">generate</a></li>
-<li><b><code>fbs_pos</code></b> — First-bounce scatterer positions; <code>(3, n_path)</code></li>
-<li><b><code>lbs_pos</code></b> — Last-bounce scatterer positions; <code>(3, n_path)</code></li>
-<li><b><code>path_gain</code></b> — Path gains in linear scale; <code>(n_path,)</code></li>
-<li><b><code>path_length</code></b> — Total path lengths from TX to RX phase center; <code>(n_path,)</code></li>
-<li><b><code>M</code></b> — Polarization transfer matrix, interleaved Re/Im; <code>(8, n_path)</code> (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH)</li>
-<li><b><code>tx_pos</code></b> — Transmitter position in Cartesian coordinates; <code>(3,)</code></li>
-<li><b><code>tx_orientation</code></b> — Transmitter orientation as Euler angles (bank, tilt, heading); <code>(3,)</code></li>
-<li><b><code>rx_pos</code></b> — Receiver position in Cartesian coordinates; <code>(3,)</code></li>
-<li><b><code>rx_orientation</code></b> — Receiver orientation as Euler angles (bank, tilt, heading); <code>(3,)</code></li>
-<li><b><code>center_freq</code></b> — Center frequency in Hz; set to <code>0</code> to skip phase computation; default: <code>0.0</code></li>
+<li><b><code>fbs_pos</code></b> — First-bounce scatterer positions; <code>(3, n_path)</code>, or a list of length <code>n_out</code> in batch mode</li>
+<li><b><code>lbs_pos</code></b> — Last-bounce scatterer positions; <code>(3, n_path)</code>, or a list of length <code>n_out</code> in batch mode</li>
+<li><b><code>path_gain</code></b> — Path gains in linear scale; <code>(n_path, n_freq)</code>, or a list of length <code>n_out</code> in batch mode</li>
+<li><b><code>path_length</code></b> — Total path lengths from TX to RX phase center; <code>(n_path,)</code>, or a list of length <code>n_out</code> in batch mode</li>
+<li><b><code>M</code></b> — Polarization transfer matrix, interleaved Re/Im; <code>(8, n_path, n_freq)</code>, or a list of length <code>n_out</code> in batch mode; (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH)</li>
+<li><b><code>tx_pos</code></b> — Transmitter position in Cartesian coordinates; <code>(3,)</code>, or <code>(3, n_out)</code> in batch mode</li>
+<li><b><code>tx_orientation</code></b> — Transmitter orientation as Euler angles (bank, tilt, heading); <code>(3,)</code>, or <code>(3, n_out)</code> in batch mode</li>
+<li><b><code>rx_pos</code></b> — Receiver position in Cartesian coordinates; <code>(3,)</code>, or <code>(3, n_out)</code> in batch mode</li>
+<li><b><code>rx_orientation</code></b> — Receiver orientation as Euler angles (bank, tilt, heading); <code>(3,)</code>, or <code>(3, n_out)</code> in batch mode</li>
+<li><b><code>center_freq</code></b> — Center frequencies in Hz; <code>(n_freq,)</code>; set an entry to <code>0</code> or pass <code>None</code> to skip phase computation; default: <code>None</code></li>
 <li><b><code>use_absolute_delays</code></b> — If <code>True</code>, delays include the LOS component; default: <code>False</code></li>
 <li><b><code>add_fake_los_path</code></b> — If <code>True</code>, prepends a zero-power LOS path when none is present; default: <code>False</code></li>
 <li><b><code>angles</code></b> — If <code>True</code>, also return departure/arrival angles in antenna-local coordinates; default: <code>False</code></li>
 <li><b><code>complex</code></b> — If <code>True</code>, combine coefficients into a single complex array <code>coeff</code>; if <code>False</code>, return separate <code>coeff_re</code> and <code>coeff_im</code>; default: <code>False</code></li>
+<li><b><code>freq</code></b> — Frequency index (0-based) selecting the slice of <code>path_gain</code>, <code>M</code> and <code>center_freq</code> that is processed; default: <code>0</code></li>
 </ul>
 
 <b>Outputs:</b><br>
@@ -1747,6 +1769,7 @@ coeff_re, coeff_im, delays, aod, eod, aoa, eoa = quadriga_lib.arrayant.get_chann
 <li><b><code>eod</code></b> — Elevation of departure in rad; same shape; only when <code>angles=True</code></li>
 <li><b><code>aoa</code></b> — Azimuth of arrival in rad; same shape; only when <code>angles=True</code></li>
 <li><b><code>eoa</code></b> — Elevation of arrival in rad; same shape; only when <code>angles=True</code></li>
+<li>In batch mode, every output is a list of length <code>n_out</code> whose entries have the shapes given above.</li>
 </ul>
 
 <b>See also:</b><br>
@@ -1754,6 +1777,7 @@ coeff_re, coeff_im, delays, aod, eod, aoa, eoa = quadriga_lib.arrayant.get_chann
 <li><a href="#get_channels_multifreq">get_channels_multifreq</a> (multi-frequency extension)</li>
 <li><a href="#get_channels_planar">get_channels_planar</a> (planar wave variant)</li>
 <li><a href="#get_channels_irs">get_channels_irs</a> (IRS-assisted communication)</li>
+<li><a href="#qrt_file_read">qrt_file_read</a> (produces the list format used by batch mode)</li>
 </ul>
 
 <hr class="greyline"><br>
@@ -2491,6 +2515,38 @@ vert_list_out, face_ind_out = quadriga_lib.RTtools.obj_file_write( fn, mesh, obj
 <ul>
 <li><a href="#obj_file_read">obj_file_read</a> (for reading OBJ files and the BSDF column layout)</li>
 <li><a href="#mitsuba_xml_file_write">mitsuba_xml_file_write</a> (for exporting to Mitsuba scene file format)</li>
+</ul>
+
+<hr class="greyline"><br>
+<span id="plane" class="qd-func"><b>plane</b></span><br>
+<hr class="thin">
+Construct a triangulated plane mesh
+<ul>
+<li>Generates a Blender-style plane: a 2 x 2 quad in the xy-plane centered at the origin (vertices at +/-1, z = 0)</li>
+<li>The quad is split into 2 triangles, yielding 2 triangles at n_div = 1</li>
+<li>Optional uniform subdivision produces 2 · n_div^2 triangles</li>
+<li>Triangle winding is consistent (normals point in +z direction), compatible with obj_file_write</li>
+<li>The plane has no thickness in z-direction; scaling therefore only affects x and y</li>
+<li>Scale, rotation, and translation are applied in that order (scale -> rotate -> translate)</li>
+<li>An odd number of negative scale components flips the winding (normals point in -z direction)</li>
+</ul>
+
+<b>Usage:</b><br>
+<pre>
+mesh = quadriga_lib.RTtools.plane( scale, rotation, location, n_div )
+</pre>
+
+<b>Inputs:</b><br>
+<ul>
+<li><b><code>scale</code></b> — Length 1 scales x and y uniformly; length 2 scales (x, y) independently; length 3 is accepted for compatibility with <code>cube</code>, but the third element is ignored; <code>None</code> or empty = 1 (no scaling); default: <code>None</code></li>
+<li><b><code>rotation</code></b> — Euler angles about (x, y, z), applied as R = Rz·Ry·Rx (Blender XYZ); shape <code>(3,)</code>; <code>None</code> or empty = no rotation; default: <code>None</code></li>
+<li><b><code>location</code></b> — Translation (x, y, z); shape <code>(3,)</code>; <code>None</code> or empty = origin; default: <code>None</code></li>
+<li><b><code>n_div</code></b> — Number of subdivisions per edge; yields 2 · n_div^2 triangles; default: 1</li>
+</ul>
+
+<b>Outputs:</b><br>
+<ul>
+<li><b><code>mesh</code></b> — Triangle mesh; each row holds (x1, y1, z1, x2, y2, z2, x3, y3, z3); <code>(2 · n_div^2, 9)</code></li>
 </ul>
 
 <hr class="greyline"><br>

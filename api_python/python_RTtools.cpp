@@ -21,6 +21,7 @@ namespace py = pybind11;
 #include "qpy_ray_triangle_intersect.cpp"
 #include "qpy_triangle_mesh_aabb.cpp"
 #include "qpy_triangle_mesh_segmentation.cpp"
+#include "qpy_plane.cpp"
 
 void quadriga_lib_RTtools(py::module_ &m)
 {
@@ -80,6 +81,12 @@ void quadriga_lib_RTtools(py::module_ &m)
           py::arg("csv_prop") = py::none(),
           py::arg("csv_write_defaults") = false,
           py::arg("split_loose_parts") = false);
+
+    m.def("plane", &plane,
+          py::arg("scale") = py::none(),
+          py::arg("rotation") = py::none(),
+          py::arg("location") = py::none(),
+          py::arg("n_div") = 1);
 
     m.def("point_cloud_aabb", &point_cloud_aabb,
           py::arg("points") = py::array_t<double>(),
