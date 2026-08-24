@@ -35,6 +35,7 @@ namespace
         const dtype *f = nullptr;      // Frequency exponent for μr
         const dtype *g = nullptr;      // σμ (magnetic loss) at fRef
         const dtype *h = nullptr;      // Frequency exponent for σμ
+        const dtype *thk = nullptr;    // Material thickness, m
         const dtype *att = nullptr;    // Penetration loss at fRef, dB
         const dtype *attB = nullptr;   // Frequency exponent for att
         const dtype *alpha = nullptr;  // In-medium absorption at fRef, dB/m
@@ -89,6 +90,7 @@ namespace
             f = resolve("f");
             g = resolve("g");
             h = resolve("h");
+            thk = resolve("thk");
             att = resolve("att");
             attB = resolve("attB");
             alpha = resolve("alpha");
@@ -125,6 +127,7 @@ namespace
             require(e, "e", true);          // relative permeability > 0 (diamagnets < 1 allowed)
             require(c, "c", false);         // conductivity >= 0
             require(g, "g", false);         // magnetic loss >= 0
+            require(thk, "thk", false);     // thickness >= 0
             require(att, "att", false);     // penetration loss >= 0
             require(alpha, "alpha", false); // in-medium absorption >= 0
             require(m, "m", false);         // mass-law slope >= 0
@@ -132,6 +135,22 @@ namespace
             require(resQ, "resQ", false);   // resonance Q >= 0 (0 disables)
             require(coiF, "coiF", false);   // coincidence frequency >= 0 (0 disables)
             require(coiQ, "coiQ", false);   // coincidence Q >= 0
+        }
+
+        // Flag for a "thin-sheet" material
+        bool is_sheet(arma::uword idx) const
+        {
+            if (idx > n_mtl)
+                throw std::out_of_range("Material index " + std::to_string(idx) +
+                                        " out of range [0, " + std::to_string(n_mtl) + "]");
+
+            if (thk == nullptr)
+                return false;
+            if (idx == 0) // Not in table, default
+                return false;
+            if (thk[idx - 1] == (dtype)0.0)
+                return false;
+            return true;
         }
     };
 
@@ -147,6 +166,7 @@ namespace
         double f = 0.0;      // Frequency exponent for μr
         double g = 0.0;      // σμ (magnetic loss) at fRef
         double h = 0.0;      // Frequency exponent for σμ
+        double thk = 0.0;    // Thickness, m
         double att = 0.0;    // Penetration loss at fRef, dB
         double attB = 0.0;   // Frequency exponent for att
         double alpha = 0.0;  // In-medium absorption at fRef, dB/m
@@ -184,6 +204,7 @@ namespace
             f = cols.f ? (double)cols.f[i] : f;
             g = cols.g ? (double)cols.g[i] : g;
             h = cols.h ? (double)cols.h[i] : h;
+            thk = cols.thk ? (double)cols.thk[i] : thk;
             att = cols.att ? (double)cols.att[i] : att;
             attB = cols.attB ? (double)cols.attB[i] : attB;
             alpha = cols.alpha ? (double)cols.alpha[i] : alpha;
@@ -314,6 +335,7 @@ namespace
                    f == other.f &&
                    g == other.g &&
                    h == other.h &&
+                   thk == other.thk &&
                    att == other.att &&
                    attB == other.attB &&
                    alpha == other.alpha &&
@@ -829,6 +851,7 @@ void quadriga_lib::ray_mesh_interact(
    |   3  | Same-direction flag (FBS and SBS normals point the same way)            |
    |   4  | Corner-hit flag (FBS/SBS faces not parallel)                            |
    |   5  | Total-reflection flag (also set when a transmission factor forced it)   |
+   |   6  | Thin sheet flag (material is a thin single-face sheet)                  |
    Reachable composite values (add 32 for the total-reflection variant):<br><br>
    | Code  |  TIR  | Description                                         |
    | :---: | :---: | --------------------------------------------------- |
@@ -959,8 +982,8 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
 
     // Resolve material columns once; air (empty) table when no material model is supplied.
     const arma::uword *p_mtl_ind = (mtl_ind == nullptr || mtl_ind->is_empty()) ? nullptr : mtl_ind->memptr();
-    MaterialCols<dtype> cols = (mtl_prop) ? MaterialCols<dtype>(*mtl_prop) : MaterialCols<dtype>();
-    if (p_mtl_ind && mtl_ind->max() > cols.n_mtl)
+    MaterialCols<dtype> MaterialSet = (mtl_prop) ? MaterialCols<dtype>(*mtl_prop) : MaterialCols<dtype>();
+    if (p_mtl_ind && mtl_ind->max() > MaterialSet.n_mtl)
         throw std::invalid_argument("Entries of 'mtl_ind' cannot exceed the number of materials.");
 
     // Get number of output rays and build output ray index
@@ -1261,6 +1284,10 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         // Material indices for FBS and SBS faces (0 if no material table)
         arma::uword iMF = (p_mtl_ind && iFBS) ? p_mtl_ind[iFBS - 1] : 0;
         arma::uword iMS = (p_mtl_ind && iSBS) ? p_mtl_ind[iSBS - 1] : 0;
+        
+        // Thin-sheet flags for FBS and SBS
+        bool sheetFBS = MaterialSet.is_sheet(iMF);
+        bool sheetSBS = MaterialSet.is_sheet(iMS);
 
         // Compute the FBS intersect point, initialize with fallback
         double Fx = (double)p_mesh[iFBS - 1];
@@ -1360,7 +1387,12 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
                     (!out_flags[1] && thetaS < 0.0))
                     out_flags[3] = true; // Same direction flag
             }
+
+            // SHEET: How to set the correct material_to_material and out_flags[6] here?
+
         }
+        else if (sheetFBS)
+            out_flags[6] = true;
 
         // Flip normal vector in case of back side illumination
         if (thetaF < 0.0)
@@ -1371,22 +1403,34 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         // Limit value to 0 ... 1 for calculating reflection and transmission coefficients
         double abs_cos_theta = std::abs(cos_theta);
 
+        // SHEET: For co-located materials where one is a sheet, the sheet is applied to the outside. On entry, the sheet is 
+        // applied first (independent of it being the FBS or SBS), followed by an Sheet2Material transition with Sheet = M1 and 
+        // Solid = M2. On exit, it is reversed, the ray leaves the material through the sheet.
+        // The normal orientation of the sheet should be irrelvant.
+
         // Incidence-side (medium 1) and entered/reflected-off (medium 2) materials, default air.
         // 1-based: Material(cols, 0) -> air. M2 always carries the FBS-face material whose
         // interface_gain is the transition gain (front: iMF; back: air, or iMS for M2M).
         Material M1, M2;
         if (thetaF >= 0.0) // front hit: entered material = FBS face (iMF)
         {
-            M2 = Material(cols, iMF);
+            M2 = Material(MaterialSet, iMF);
             if (material_to_material) // SBS (front) hit first
-                M1 = Material(cols, iMS);
+                M1 = Material(MaterialSet, iMS);
         }
         else // back hit: incidence material = FBS face (iMF)
         {
-            M1 = Material(cols, iMF);
+            M1 = Material(MaterialSet, iMF);
             if (material_to_material) // FBS (back) hit first, entered = SBS
-                M2 = Material(cols, iMS);
+                M2 = Material(MaterialSet, iMS);
         }
+
+        // SHEET: Interaction logic: 
+        // If M1 is a sheet (entry), the logic is Air > Sheet (M1) > Solid (M2), so this needs to be put into M1.interact_with(M2 ...
+        // If M2 is a sheet (exit), the logic is Solid (M1) > Sheet (M2) > Air
+        // A sheet embedded in a material needs to be handled by ray_state_update and is out of scope here.
+        // Also: the sheet needs to always resolve its SLAB_AIRY_FACTOR, so we either put the SLAB_AIRY_FACTOR lambda from ray_state_update
+        // into the Material struct or make it a static inline that both functions can call
 
         // Interface evaluation (single source): coefficients + geometry quantities.
         std::complex<double> cTE, cTM, cos_theta2, eta1_div_eta2;
@@ -1394,6 +1438,11 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         bool total_reflection;
         M1.interact_with(M2, interaction_type, thetaF, fGHz, &cTE, &cTM, &cos_theta2, &eta1_div_eta2, &eta, &total_reflection);
         bool tir_central = total_reflection; // pre-ray-tube TIR state
+
+        // SHEET: Refraction
+        // The sheet itself never refracts since it is an atomic event.
+        // However, Air-Sheet-Material or Material-Sheet-Air logic needs to apply the correct refraction angles taking
+        // the Sheet-Material / Sheet-Air bend into account
 
         // Calculate the center path direction after medium interaction (normalized to length 1)
         double FDx = Dx - Fx, FDy = Dy - Fy, FDz = Dz - Fz; // Vector from FBS to destination
@@ -1434,6 +1483,9 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
                     if (eta * sin_thetaV[i] >= 1.0)
                         total_reflection = true;
         }
+
+        // SHEET: Reflection
+        // Same issue here either reflection of the sheet (entry) or of the Solid-Sheet boundary (exit) with Slab-Resolve on the sheet side.
 
         if (geometry_type == 0) // Reflection, normalized by default
             qd_reflect(ODx, ODy, ODz, Nx, Ny, Nz, FDx, FDy, FDz);

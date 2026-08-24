@@ -1,4 +1,5 @@
 # This Makefile is for Windows / MSVC environments
+# Build steps: external, all, (moxunit-lib), test, pip-win, release-win
 
 # Components to build
 matlab = ON
@@ -112,7 +113,7 @@ pip-win: pip-win-cp310 pip-win-cp311 pip-win-cp312 pip-win-cp313 pip-win-cp314
 
 # Release
 # Make these first: external all pip-win
-release: 
+release-win: 
 	- rmdir /s /q $(DIST_DIR)
 	cmake --install $(CMAKE_BUILD_DIR) --config Release --prefix $(DIST_DIR)
 	mkdir $(DIST_DIR)\wheels

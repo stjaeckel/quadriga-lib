@@ -197,13 +197,6 @@ release/$(DEB_NOBLE):
 	docker run --rm -v /tmp/quadriga_docker_out:/out quadriga-deb-noble
 	cp /tmp/quadriga_docker_out/$(DEB_NOBLE) release/
 
-DEB_PLUCKY := quadriga-lib_$(QUADRIGA_VERSION)-1+plucky_amd64.deb
-release/$(DEB_PLUCKY):
-	mkdir -p release
-	docker build --build-arg UBUNTU_VERSION=25.10 --progress=plain -f Dockerfile.ubuntu -t quadriga-deb-plucky . 2>&1 | tee build_plucky.log
-	docker run --rm -v /tmp/quadriga_docker_out:/out quadriga-deb-plucky
-	cp /tmp/quadriga_docker_out/$(DEB_PLUCKY) release/
-
 DEB_RECOLUTE := quadriga-lib_$(QUADRIGA_VERSION)-1+resolute_amd64.deb
 release/$(DEB_RECOLUTE):
 	mkdir -p release
@@ -213,11 +206,10 @@ release/$(DEB_RECOLUTE):
 
 deb-jammy:  release/$(DEB_JAMMY)
 deb-noble:  release/$(DEB_NOBLE)
-deb-plucky: release/$(DEB_PLUCKY)
 deb-resolute: release/$(DEB_RECOLUTE)
 
 deb: 
-	$(MAKE) -j deb-jammy deb-noble deb-plucky
+	$(MAKE) -j deb-jammy deb-noble deb-resolute
 
 # Release
 release: documentation package
