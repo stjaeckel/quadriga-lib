@@ -128,7 +128,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 10)
     {
         // Stable field order: standard EM columns first, then any extra CSV columns
-        std::vector<std::string> order = {"a", "b", "c", "d", "e", "f", "g", "h",
+        std::vector<std::string> order = {"a", "b", "c", "d", "e", "f", "g", "h", "thk",
                                           "att", "attB", "alpha", "alphaB", "fRef", "m",
                                           "resF", "resQ", "resS", "coiF", "coiQ", "coiA", "tf", "tfB"};
         for (const auto &kv : csv_prop)

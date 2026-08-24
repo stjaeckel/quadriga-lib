@@ -75,7 +75,7 @@ py::tuple obj_file_read(const std::string &fn,
                                         fn_csv, &csv_ind, &csv_names, &csv_prop, csv_strict);
 
     // Stable dict key order: standard EM columns first, then any extra CSV columns
-    std::vector<std::string> order = {"a", "b", "c", "d", "e", "f", "g", "h",
+    std::vector<std::string> order = {"a", "b", "c", "d", "e", "f", "g", "h", "thk",
                                       "att", "attB", "alpha", "alphaB", "fRef", "m",
                                       "resF", "resQ", "resS", "coiF", "coiQ", "coiA", "tf", "tfB"};
 
