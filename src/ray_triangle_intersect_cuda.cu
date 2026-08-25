@@ -919,6 +919,27 @@ void qd_RTI_CUDA(const dtype *Tx, const dtype *Ty, const dtype *Tz,
     // batch_size now fits inside `usable` together with the temp actually
     // allocated, and that temp covers the final (smaller or equal) capacity.
     size_t queue_capacity = batch_size * E;
+    {
+        const size_t bpe = 4 + 4 + 2 + 2 + 1 + 4; // work queue bytes per entry
+
+        // A ray can enqueue at most one entry per sub-mesh, so batch_size * n_sub
+        // is the worst case the queue could ever need.
+        size_t worst_case = batch_size * n_sub;
+
+        // Spend leftover budget on queue headroom. When n_ray is small the batch
+        // is clamped by n_ray rather than by memory, which used to leave a queue
+        // sized for E=10 next to gigabytes of unused VRAM — and a scene with a
+        // high hit rate then had to re-run the batch several times to fit it.
+        size_t base_bytes = 2 * cub_temp_per_stream + 2 * batch_size * per_ray_bytes;
+        size_t spare = (usable > base_bytes) ? usable - base_bytes : 0;
+        queue_capacity = std::min(worst_case, queue_capacity + spare / (2 * bpe));
+
+        // Termination floor: the chunk can never shrink below one block, so the
+        // queue must always hold one block's worst case. Otherwise a batch that
+        // is already minimal keeps overflowing and the retry loop never exits.
+        // BLOCK_SIZE * n_sub entries is well under a megabyte.
+        queue_capacity = std::max(queue_capacity, (size_t)BLOCK_SIZE * n_sub);
+    }
 
     // Allocation stride: fixed for the whole call. The per-batch chunk length
     // may shrink below this on queue overflow, but the buffers never move.
@@ -1177,6 +1198,12 @@ void qd_RTI_CUDA(const dtype *Tx, const dtype *Ty, const dtype *Tz,
                 new_chunk = (n_ray_batch / 2 / BLOCK_SIZE) * BLOCK_SIZE;
             if (new_chunk == 0)
                 new_chunk = BLOCK_SIZE;
+
+            // One block is the floor. The queue is sized to hold a full block's
+            // worst case (BLOCK_SIZE * n_sub), so this is unreachable — but
+            // failing loudly beats looping forever or silently dropping entries.
+            if (n_ray_batch <= (size_t)BLOCK_SIZE)
+                throw std::runtime_error("qd_RTI_CUDA: work queue too small for a single block");
 
             RTI_DBG("*** OVERFLOW batch %zu: n_ray_batch=%zu tail=%u cap=%zu hits/ray=%.2f -> chunk=%zu\n",
                     batch_idx, n_ray_batch, h_queue_tail[s], queue_capacity,
