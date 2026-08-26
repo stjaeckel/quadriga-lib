@@ -620,12 +620,14 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
 
         // Path-loss reference at 1 m and air absorption, shared with the QRT reader
         const double gain_at_1m = qd_gain_at_1m(freq, scalar_mode);
-        const double alpha_dB_per_m = scalar_mode ? qd_iso9613_alpha(freq) : 0.0;
 
-        // Wave number 2*pi/lambda; the medium wave speed selects EM vs. acoustic
-        const double wave_speed = scalar_mode ? qd_speed_of_sound : qd_speed_of_light;
-        const double wave_number = 6.283185307179586 * freq / wave_speed;
-        const double wavelength = wave_speed / freq;
+       // Air absorption is defined against the true acoustic frequency, so undo the mapping
+        const double alpha_dB_per_m = scalar_mode ? qd_iso9613_alpha(freq / qd_acoustic_freq_scale) : 0.0;
+
+        // In scalar mode the frequency is already EM-equivalent, so c_light / f is the acoustic
+        // wavelength and the phase term is identical in both modes
+        const double wave_number = 6.283185307179586 * freq / qd_speed_of_light;
+        const double wavelength = qd_speed_of_light / freq;
 
         dtype *p_xprmat = xprmat ? xprmat->memptr() : nullptr;
 

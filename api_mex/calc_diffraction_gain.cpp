@@ -36,7 +36,8 @@ Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh
 - **`mtl_ind`** — 1-based material index per face (0 = no material; the `csv_ind` output of [[obj_file_read]]); `[n_mesh]`
 - **`mtl_prop`** — Material properties as a struct; each field is one column (the `csv_prop` output of
   [[obj_file_read]]); each field holds a vector of length `n_mtl`
-- **`center_freq`** — Center frequency
+- **`center_freq`** — Center frequency in Hz. In scalar mode this is the true acoustic frequency;
+  it is converted internally to the EM-equivalent frequency used by the core
 - **`lod`** — Level of detail (0–6), controls `n_path` and `n_seg`; see [[generate_diffraction_paths]]; default: 2
 - **`verbose`** — Verbosity level; default: 0 (no output)
 - **`sub_mesh_index`** — 1-based sub-mesh index for acceleration; see [[triangle_mesh_segmentation]];  `[n_mesh, 1]`;
@@ -109,6 +110,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     bool apply_fspl = (nrhs < 14) ? false : qd_mex_get_scalar<bool>(prhs[13], "apply_fspl", false);
     bool apply_phase = (nrhs < 15) ? false : qd_mex_get_scalar<bool>(prhs[14], "apply_phase", false);
 
+    // Scalar mode: the public API takes true acoustic Hz, the core works in EM-equivalent Hz
+    // (c_light / f_eq == acoustic wavelength). Must match qd_atmospheric_absorption.hpp.
+    const double center_freq_core = scalar_mode ? center_freq * (3.0e8 / 343.0) : center_freq;
+
     arma::uword n_pos = orig.n_rows;
     arma::uword n_seg = 0;
     if (lod == 1 || lod == 2)
@@ -140,7 +145,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::u32_vec *p_sub_mesh_index = sub_mesh_index.empty() ? nullptr : &sub_mesh_index;
 
     CALL_QD(quadriga_lib::calc_diffraction_gain(orig, dest, mesh, mtl_ind, mtl_prop,
-                                                center_freq, lod, p_gain, p_xprmat, p_coord, verbose,
+                                                center_freq_core, lod, p_gain, p_xprmat, p_coord, verbose,
                                                 p_sub_mesh_index, use_kernel, gpu_id, scalar_mode,
                                                 thin_slab_threshold, apply_fspl, apply_phase));
 }
