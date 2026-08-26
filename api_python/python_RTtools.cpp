@@ -38,7 +38,9 @@ void quadriga_lib_RTtools(py::module_ &m)
           py::arg("use_kernel") = 0,
           py::arg("gpu_id") = 0,
           py::arg("scalar_mode") = false,
-          py::arg("thin_slab_threshold") = 0.0);
+          py::arg("thin_slab_threshold") = 0.0,
+          py::arg("apply_fspl") = false,
+          py::arg("apply_phase") = false);
 
     m.def("cube", &cube,
           py::arg("scale") = py::none(),

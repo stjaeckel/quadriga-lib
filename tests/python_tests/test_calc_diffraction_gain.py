@@ -299,6 +299,146 @@ class test_case(unittest.TestCase):
         self.assertTrue(0.0 < g_off[0] <= 1.0 + 1e-9)
         self.assertTrue(g_on[0] > g_off[0] + 1e-3)  # resonance enhances transmission
 
+    # --- apply_fspl / apply_phase ---
+
+    def test_fspl_phase_defaults(self):
+        # Both flags default to False: omitting them must reproduce the legacy
+        # result exactly (gain relative to FSPL, xprmat without propagation phase).
+        g_def, x_def, c_def = quadriga_lib.RTtools.calc_diffraction_gain(
+            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, 2)
+        g_exp, x_exp, c_exp = quadriga_lib.RTtools.calc_diffraction_gain(
+            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, 2,
+            apply_fspl=False, apply_phase=False)
+        npt.assert_allclose(g_def, g_exp, atol=1e-14, rtol=0)
+        npt.assert_allclose(x_def, x_exp, atol=1e-14, rtol=0)
+        npt.assert_allclose(c_def, c_exp, atol=1e-14, rtol=0)
+
+    def test_fspl_value_em(self):
+        # Clear 5 m path at 1 GHz: diffraction gain is 1, so the returned gain is
+        # pure FSPL = 32.45 + 20*log10(f_GHz) + 20*log10(d).
+        d, f = 5.0, 1e9
+        g_rel, _, _ = quadriga_lib.RTtools.calc_diffraction_gain(
+            self.orig_clear, self.dest_clear, self.cube, self.mtl_ind, self.mtl_prop, f, 0)
+        g_abs, _, _ = quadriga_lib.RTtools.calc_diffraction_gain(
+            self.orig_clear, self.dest_clear, self.cube, self.mtl_ind, self.mtl_prop, f, 0,
+            apply_fspl=True)
+        npt.assert_allclose(g_rel, 1.0, atol=1e-12, rtol=0)
+
+        loss_dB = 32.45 + 20 * np.log10(f / 1e9) + 20 * np.log10(d)
+        npt.assert_allclose(g_abs, 10 ** (-0.1 * loss_dB), atol=0, rtol=1e-9)
+
+    def test_fspl_value_scalar(self):
+        # Scalar mode uses 1/r spreading plus ISO 9613-1 air absorption. At 125 Hz
+        # absorption over 5 m is far below 0.1 dB, so the result is ~1/d^2 and must
+        # sit just below it.
+        d = 5.0
+        g_ac, _, _ = quadriga_lib.RTtools.calc_diffraction_gain(
+            self.orig_clear, self.dest_clear, self.cube, self.mtl_ind, self.mtl_prop, 125.0, 0,
+            scalar_mode=True, apply_fspl=True)
+        npt.assert_allclose(g_ac, 1.0 / d ** 2, atol=0, rtol=1e-3)
+        self.assertTrue(g_ac[0] < 1.0 / d ** 2)
+
+        # Absorption grows with frequency: 16 kHz loses clearly more than 125 Hz.
+        g_hi, _, _ = quadriga_lib.RTtools.calc_diffraction_gain(
+            self.orig_clear, self.dest_clear, self.cube, self.mtl_ind, self.mtl_prop, 16000.0, 0,
+            scalar_mode=True, apply_fspl=True)
+        self.assertTrue(g_hi[0] < g_ac[0])
+
+        # EM at the same frequency differs (it carries the 20*log10(f_GHz) term).
+        g_em, _, _ = quadriga_lib.RTtools.calc_diffraction_gain(
+            self.orig_clear, self.dest_clear, self.cube, self.mtl_ind, self.mtl_prop, 16000.0, 0,
+            apply_fspl=True)
+        self.assertTrue(abs(g_em[0] - g_hi[0]) > 1e-12)
+
+    def test_fspl_scales_multi_position(self):
+        # Two positions with different TX-RX distances: each row must use its own
+        # distance. 5 m vs 10 m is exactly a factor of 4 in power.
+        orig = np.array([[-20.0, 0.0, 0.5], [-20.0, 0.0, 0.5]])
+        dest = np.array([[-15.0, 0.0, 0.5], [-10.0, 0.0, 0.5]])
+        gain, _, _ = quadriga_lib.RTtools.calc_diffraction_gain(
+            orig, dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, 0, apply_fspl=True)
+        self.assertEqual(gain.shape, (2,))
+        npt.assert_allclose(gain[0] / gain[1], 4.0, atol=0, rtol=1e-9)
+
+    def test_phase_value_and_normalization(self):
+        # apply_phase rotates xprmat by exp(-j*2*pi*d/lambda). On a clear path the
+        # Jones matrix is the identity, so VV and HH equal the bare phasor and the
+        # magnitude stays 1 (xprmat remains normalized).
+        d, f = 5.0, 1e9
+        _, xpr, _ = quadriga_lib.RTtools.calc_diffraction_gain(
+            self.orig_clear, self.dest_clear, self.cube, self.mtl_ind, self.mtl_prop, f, 0,
+            apply_phase=True)
+        self.assertEqual(xpr.shape, (8, 1))
+
+        expect = np.exp(-2j * np.pi * f * d / 299792458.0)
+        vv = xpr[0, 0] + 1j * xpr[1, 0]
+        hh = xpr[6, 0] + 1j * xpr[7, 0]
+        npt.assert_allclose(vv, expect, atol=1e-9, rtol=0)
+        npt.assert_allclose(hh, expect, atol=1e-9, rtol=0)
+        npt.assert_allclose(abs(vv), 1.0, atol=1e-12, rtol=0)
+        npt.assert_allclose(xpr[2:6, 0], np.zeros(4), atol=1e-12, rtol=0)
+
+    def test_phase_scalar_mode(self):
+        # Scalar mode: (2, n_pos) output, wavelength from the speed of sound, so
+        # the phasor differs from the EM one at the same frequency and distance.
+        d, f = 5.0, 1000.0
+        _, xpr_ac, _ = quadriga_lib.RTtools.calc_diffraction_gain(
+            self.orig_clear, self.dest_clear, self.cube, self.mtl_ind, self.mtl_prop, f, 0,
+            scalar_mode=True, apply_phase=True)
+        self.assertEqual(xpr_ac.shape, (2, 1))
+
+        ac = xpr_ac[0, 0] + 1j * xpr_ac[1, 0]
+        npt.assert_allclose(abs(ac), 1.0, atol=1e-12, rtol=0)
+        npt.assert_allclose(ac, np.exp(-2j * np.pi * f * d / 343.2), atol=1e-9, rtol=0)
+
+        _, xpr_em, _ = quadriga_lib.RTtools.calc_diffraction_gain(
+            self.orig_clear, self.dest_clear, self.cube, self.mtl_ind, self.mtl_prop, f, 0,
+            apply_phase=True)
+        self.assertTrue(abs((xpr_em[0, 0] + 1j * xpr_em[1, 0]) - ac) > 1e-3)
+
+    def test_flags_are_independent(self):
+        # apply_fspl touches only gain, apply_phase touches only xprmat, and
+        # enabling both reproduces each single-flag result.
+        args = (self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 10e9, 2)
+        g00, x00, _ = quadriga_lib.RTtools.calc_diffraction_gain(*args)
+        g10, x10, _ = quadriga_lib.RTtools.calc_diffraction_gain(*args, apply_fspl=True)
+        g01, x01, _ = quadriga_lib.RTtools.calc_diffraction_gain(*args, apply_phase=True)
+        g11, x11, _ = quadriga_lib.RTtools.calc_diffraction_gain(
+            *args, apply_fspl=True, apply_phase=True)
+
+        npt.assert_allclose(x10, x00, atol=1e-14, rtol=0)   # fspl leaves xprmat alone
+        npt.assert_allclose(g01, g00, atol=1e-14, rtol=0)   # phase leaves gain alone
+        npt.assert_allclose(g11, g10, atol=1e-14, rtol=0)
+        npt.assert_allclose(x11, x01, atol=1e-14, rtol=0)
+
+        # Both effects are actually present
+        self.assertTrue(np.all(g10 < g00))
+        self.assertTrue(np.max(np.abs(x01 - x00)) > 1e-3)
+
+    def test_flags_positional(self):
+        # The flags are the last two positional arguments, after
+        # thin_slab_threshold. Positional and keyword forms must agree.
+        g_pos, x_pos, _ = quadriga_lib.RTtools.calc_diffraction_gain(
+            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9,
+            2, 0, None, 0, 0, False, 0.0, True, True)
+        g_kw, x_kw, _ = quadriga_lib.RTtools.calc_diffraction_gain(
+            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, 2,
+            apply_fspl=True, apply_phase=True)
+        npt.assert_allclose(g_pos, g_kw, atol=1e-14, rtol=0)
+        npt.assert_allclose(x_pos, x_kw, atol=1e-14, rtol=0)
+
+    def test_flags_outputs_finite(self):
+        # All outputs stay finite with the flags on, including the degenerate
+        # co-located case where distance-based terms are undefined and skipped.
+        orig = np.array([[-10.0, 0.0, 0.5], [-10.0, 0.0, 0.5]])
+        dest = np.array([[10.0, 0.0, 0.5], [-10.0, 0.0, 0.5]])  # row 1 co-located
+        gain, xpr, coord = quadriga_lib.RTtools.calc_diffraction_gain(
+            orig, dest, self.cube, self.mtl_ind, self.mtl_prop, 3.5e9, 2,
+            apply_fspl=True, apply_phase=True)
+        self.assertTrue(np.all(np.isfinite(gain)))
+        self.assertTrue(np.all(np.isfinite(xpr)))
+        self.assertTrue(np.all(np.isfinite(coord)))
+
     # --- Error handling ---
     # pybind11 re-raises std::exception as RuntimeError; the reference tests match
     # only that an exception is raised, not the message text (library-layer

@@ -2269,11 +2269,13 @@ Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh
 <pre>
 # Output as tuple
 data = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_ind, mtl_prop, \
-    center_frequency, lod, verbose, sub_mesh_index, use_kernel, gpu_id, scalar_mode, thin_slab_threshold )
+    center_frequency, lod, verbose, sub_mesh_index, use_kernel, gpu_id, scalar_mode, \
+    thin_slab_threshold, apply_fspl, apply_phase )
 
 # Unpacked outputs
 gain, xprmat, coord = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_ind, mtl_prop, \
-    center_frequency, lod, verbose, sub_mesh_index, use_kernel, gpu_id, scalar_mode, thin_slab_threshold )
+    center_frequency, lod, verbose, sub_mesh_index, use_kernel, gpu_id, scalar_mode, \
+    thin_slab_threshold, apply_fspl, apply_phase )
 </pre>
 
 <b>Inputs:</b><br>
@@ -2291,12 +2293,14 @@ gain, xprmat, coord = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, me
 <li><b><code>gpu_id</code></b> — CUDA device ID; ignored for non-CUDA kernels; default: 0</li>
 <li><b><code>scalar_mode</code></b> — If <code>True</code>, uses scalar transmission (TE-only reflection coefficient, energy-conservation transmission) instead of EM TE/TM averaging; default: <code>False</code></li>
 <li><b><code>thin_slab_threshold</code></b> — Thin-slab (Fabry-Pérot) resolve threshold; 0 = resolve always, 1 = resolve never; see <a href="#ray_state_update">ray_state_update</a>; default: 0</li>
+<li><b><code>apply_fspl</code></b> — If <code>True</code>, folds the geometric spreading loss into <code>gain</code>, making it an absolute propagation gain instead of a value relative to FSPL. The reference distance is the direct TX-RX distance, matching the <code>path_length</code> used by <a href="#qrt_file_read">qrt_file_read</a> for a transmission-only path. EM mode: <code>32.45 + 20<i>log10(f_GHz) + 20</i>log10(d_m)</code> dB; scalar mode: <code>20<i>log10(d_m) + alpha(f)</i>d_m</code> dB, with <code>alpha</code> from ISO 9613-1 at T = 20 °C, RH = 50 %, p = 1 atm.; default: <code>False</code></li>
+<li><b><code>apply_phase</code></b> — If <code>True</code>, multiplies <code>xprmat</code> by the propagation phase <code>exp(-j<i>2</i>pi*d/lambda)</code> using the same direct TX-RX distance. The wavelength follows from <code>center_frequency</code> and the medium wave speed (speed of light in EM mode, speed of sound in scalar mode). The term has unit magnitude, so <code>xprmat</code> stays normalized. This is the phase <a href="#get_channels_spherical">get_channels_spherical</a> would otherwise add from <code>path_length</code>; default: <code>False</code></li>
 </ul>
 
 <b>Outputs:</b><br>
 <ul>
-<li><b><code>gain</code></b> — Diffraction gain per TX-RX pair, linear scale; <code>(n_pos,)</code></li>
-<li><b><code>xprmat</code></b> — EM mode: polarization transfer matrix excluding FSPL, interleaved complex, column-major <code>[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]</code>, <code>(8, n_pos)</code>; scalar mode: scalar pressure coefficient <code>[Re Im]</code>, <code>(2, n_pos)</code></li>
+<li><b><code>gain</code></b> — Diffraction gain per TX-RX pair, linear power scale; <code>(n_pos,)</code>. Relative to FSPL by default (bounded by 0 and 1), absolute propagation gain when <code>apply_fspl = True</code></li>
+<li><b><code>xprmat</code></b> — Normalized polarization transfer matrix: the amplitude carries no path gain (max column power is 1), only the relative polarization coupling and phase; <code>gain</code> holds the power. EM mode: interleaved complex, column-major <code>[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]</code>, <code>(8, n_pos)</code>; scalar mode: scalar pressure coefficient <code>[Re Im]</code>, <code>(2, n_pos)</code></li>
 <li><b><code>coord</code></b> — Diffracted path coordinates excluding endpoints; <code>(3, n_seg-1, n_pos)</code></li>
 </ul>
 
@@ -2305,6 +2309,8 @@ gain, xprmat, coord = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, me
 <li><a href="#generate_diffraction_paths">generate_diffraction_paths</a> (controls path/segment count via <code>lod</code>)</li>
 <li><a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a> (generates <code>sub_mesh_index</code>)</li>
 <li><a href="#obj_file_read">obj_file_read</a> (defines the material format)</li>
+<li><a href="#qrt_file_read">qrt_file_read</a> (same path-loss model, used by <code>apply_fspl</code>)</li>
+<li><a href="#get_channels_spherical">get_channels_spherical</a> (applies the same propagation phase as <code>apply_phase</code>)</li>
 </ul>
 
 <hr class="greyline"><br>

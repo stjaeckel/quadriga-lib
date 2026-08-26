@@ -182,7 +182,7 @@ namespace quadriga_lib
         std::vector<uint8_t> interaction_type_codes() const;
         void set_interaction_type_codes(const std::vector<uint8_t> &codes);
     };
-    static_assert(sizeof(path) == 56, "path must be exactly 56 bytes"); // 64 bit only
+    static_assert(sizeof(path) == 56, "path must be exactly 56 bytes");
 
     // Function to obtain the HDF5 library version
     std::string get_HDF5_version();

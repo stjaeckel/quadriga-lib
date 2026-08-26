@@ -26,11 +26,13 @@ Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh
 ```
 # Output as tuple
 data = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_ind, mtl_prop, \
-    center_frequency, lod, verbose, sub_mesh_index, use_kernel, gpu_id, scalar_mode, thin_slab_threshold )
+    center_frequency, lod, verbose, sub_mesh_index, use_kernel, gpu_id, scalar_mode, \
+    thin_slab_threshold, apply_fspl, apply_phase )
 
 # Unpacked outputs
 gain, xprmat, coord = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_ind, mtl_prop, \
-    center_frequency, lod, verbose, sub_mesh_index, use_kernel, gpu_id, scalar_mode, thin_slab_threshold )
+    center_frequency, lod, verbose, sub_mesh_index, use_kernel, gpu_id, scalar_mode, \
+    thin_slab_threshold, apply_fspl, apply_phase )
 ```
 
 ## Inputs:
@@ -49,17 +51,33 @@ gain, xprmat, coord = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, me
   energy-conservation transmission) instead of EM TE/TM averaging; default: `False`
 - **`thin_slab_threshold`** — Thin-slab (Fabry-Pérot) resolve threshold; 0 = resolve always, 1 = resolve
   never; see [[ray_state_update]]; default: 0
+- **`apply_fspl`** — If `True`, folds the geometric spreading loss into `gain`, making it an absolute
+  propagation gain instead of a value relative to FSPL. The reference distance is the direct TX-RX
+  distance, matching the `path_length` used by [[qrt_file_read]] for a
+  transmission-only path. EM mode: `32.45 + 20*log10(f_GHz) + 20*log10(d_m)` dB; scalar mode:
+  `20*log10(d_m) + alpha(f)*d_m` dB, with `alpha` from ISO 9613-1 at T = 20 °C, RH = 50 %, p = 1 atm.; 
+  default: `False`
+- **`apply_phase`** — If `True`, multiplies `xprmat` by the propagation phase `exp(-j*2*pi*d/lambda)`
+  using the same direct TX-RX distance. The wavelength follows from `center_frequency` and the medium
+  wave speed (speed of light in EM mode, speed of sound in scalar mode). The term has unit magnitude,
+  so `xprmat` stays normalized. This is the phase [[get_channels_spherical]] would otherwise add from
+  `path_length`; default: `False`
 
 ## Outputs:
-- **`gain`** — Diffraction gain per TX-RX pair, linear scale; `(n_pos,)`
-- **`xprmat`** — EM mode: polarization transfer matrix excluding FSPL, interleaved complex, column-major
-  `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]`, `(8, n_pos)`; scalar mode: scalar pressure coefficient `[Re Im]`, `(2, n_pos)`
+- **`gain`** — Diffraction gain per TX-RX pair, linear power scale; `(n_pos,)`. Relative to FSPL by
+  default (bounded by 0 and 1), absolute propagation gain when `apply_fspl = True`
+- **`xprmat`** — Normalized polarization transfer matrix: the amplitude carries no path gain (max column
+  power is 1), only the relative polarization coupling and phase; `gain` holds the power. EM mode:
+  interleaved complex, column-major `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]`, `(8, n_pos)`; scalar
+  mode: scalar pressure coefficient `[Re Im]`, `(2, n_pos)`
 - **`coord`** — Diffracted path coordinates excluding endpoints; `(3, n_seg-1, n_pos)`
 
 ## See also:
 - [[generate_diffraction_paths]] (controls path/segment count via `lod`)
 - [[triangle_mesh_segmentation]] (generates `sub_mesh_index`)
 - [[obj_file_read]] (defines the material format)
+- [[qrt_file_read]] (same path-loss model, used by `apply_fspl`)
+- [[get_channels_spherical]] (applies the same propagation phase as `apply_phase`)
 MD!*/
 
 py::tuple calc_diffraction_gain(const py::array_t<double> &orig,
@@ -74,7 +92,9 @@ py::tuple calc_diffraction_gain(const py::array_t<double> &orig,
                                 int use_kernel,
                                 int gpu_id,
                                 bool scalar_mode,
-                                double thin_slab_threshold)
+                                double thin_slab_threshold,
+                                bool apply_fspl,
+                                bool apply_phase)
 {
     const auto orig_a = qd_python_numpy2arma_Mat<double>(orig, true);
     const auto dest_a = qd_python_numpy2arma_Mat<double>(dest, true);
@@ -108,7 +128,7 @@ py::tuple calc_diffraction_gain(const py::array_t<double> &orig,
     quadriga_lib::calc_diffraction_gain<double>(orig_a, dest_a, mesh_a, mtl_ind_a, mtl_prop_map,
                                                 center_freq, lod, &gain, &xprmat, &coord, verbose,
                                                 p_sub_mesh_index, use_kernel, gpu_id, scalar_mode,
-                                                thin_slab_threshold);
+                                                thin_slab_threshold, apply_fspl, apply_phase);
 
     return py::make_tuple(gain_p, xprmat_p, coord_p);
 }
@@ -127,4 +147,6 @@ py::tuple calc_diffraction_gain(const py::array_t<double> &orig,
 //       py::arg("use_kernel") = 0,
 //       py::arg("gpu_id") = 0,
 //       py::arg("scalar_mode") = false,
-//       py::arg("thin_slab_threshold") = 0.0);
+//       py::arg("thin_slab_threshold") = 0.0,
+//       py::arg("apply_fspl") = false,
+//       py::arg("apply_phase") = false);
