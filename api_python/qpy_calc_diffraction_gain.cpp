@@ -55,7 +55,7 @@ gain, xprmat, coord = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, me
   propagation gain instead of a value relative to FSPL. The reference distance is the direct TX-RX
   distance, matching the `path_length` used by [[qrt_file_read]] for a
   transmission-only path. EM mode: `32.45 + 20*log10(f_GHz) + 20*log10(d_m)` dB; scalar mode:
-  `20*log10(d_m) + alpha(f)*d_m` dB, with `alpha` from ISO 9613-1 at T = 20 °C, RH = 50 %, p = 1 atm.; 
+  `20*log10(d_m) + alpha(f)*d_m` dB, with `alpha` from ISO 9613-1 at T = 20 °C, RH = 50 %, p = 1 atm.;
   default: `False`
 - **`apply_phase`** — If `True`, multiplies `xprmat` by the propagation phase `exp(-j*2*pi*d/lambda)`
   using the same direct TX-RX distance. The wavelength follows from `center_frequency` and the medium
@@ -125,8 +125,12 @@ py::tuple calc_diffraction_gain(const py::array_t<double> &orig,
     // Resolve optional pointer
     const arma::u32_vec *p_sub_mesh_index = sub_mesh_index_a.empty() ? nullptr : &sub_mesh_index_a;
 
+    // Scalar mode: the public API takes true acoustic Hz, the core works in EM-equivalent Hz
+    // (c_light / f_eq == acoustic wavelength). Must match qd_atmospheric_absorption.hpp.
+    const double center_freq_core = scalar_mode ? center_freq * (3.0e8 / 343.0) : center_freq;
+
     quadriga_lib::calc_diffraction_gain<double>(orig_a, dest_a, mesh_a, mtl_ind_a, mtl_prop_map,
-                                                center_freq, lod, &gain, &xprmat, &coord, verbose,
+                                                center_freq_core, lod, &gain, &xprmat, &coord, verbose,
                                                 p_sub_mesh_index, use_kernel, gpu_id, scalar_mode,
                                                 thin_slab_threshold, apply_fspl, apply_phase);
 

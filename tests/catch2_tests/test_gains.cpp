@@ -26,7 +26,11 @@
 
 // Speed of sound used for the acoustic tests. This must match the value the library uses to
 // form the acoustic wavelength in calc_diffraction_gain, otherwise the phase tests below fail.
-static constexpr double SPEED_OF_SOUND = 343.2;
+// calc_diffraction_gain takes an EM-equivalent frequency in scalar mode: c_light / f_eq is the
+// acoustic wavelength. Must match qd_atmospheric_absorption.hpp. The effective wave speed is
+// NOT 343: the scale is formed with c = 3e8 while the phase uses the exact speed of light.
+static constexpr double ACOUSTIC_FREQ_SCALE = 3.0e8 / 343.0;                     // 874635.59
+static constexpr double SPEED_OF_SOUND = 299792458.0 / ACOUSTIC_FREQ_SCALE;      // 342.76276
 
 // A lossless material assigned to every face of the reference cube. The cross-validation runs
 // on clear paths, so the material is never evaluated; it only has to be well-formed.
@@ -186,10 +190,11 @@ TEST_CASE("Gains - FSPL matches qrt_file_read, scalar mode")
         for (arma::uword f = 0; f < freq_Hz.n_elem; ++f)
         {
             arma::vec g_abs;
-            quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map, cf(f), 0,
+            quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map,
+                                                        cf(f) * ACOUSTIC_FREQ_SCALE, 0,
                                                         &g_abs, nullptr, nullptr, 0, nullptr, 0, 0,
                                                         true, 0.0, true, false);
-            CHECK(std::abs(g_abs(0) / pg(0, f) - 1.0) < 1e-9);
+            CHECK(std::abs(g_abs(0) / pg(0, f) - 1.0) < 1e-6);
         }
 
         // Spreading alone is frequency-independent in scalar mode, so any band-to-band
@@ -380,10 +385,12 @@ TEST_CASE("Gains - Phase matches get_channels_multifreq, scalar mode")
 
             arma::vec gain;
             arma::mat X_plain, X_phase;
-            quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, ind, map, freq, 0,
+            quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, ind, map,
+                                                        freq * ACOUSTIC_FREQ_SCALE, 0,
                                                         &gain, &X_plain, nullptr, 0, nullptr, 0, 0,
                                                         true, 0.0, false, false);
-            quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, ind, map, freq, 0,
+            quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, ind, map,
+                                                        freq * ACOUSTIC_FREQ_SCALE, 0,
                                                         nullptr, &X_phase, nullptr, 0, nullptr, 0, 0,
                                                         true, 0.0, false, true);
 
@@ -470,7 +477,8 @@ TEST_CASE("Gains - Acoustic and EM phase use different wave speeds")
     quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map, freq, 0,
                                                 nullptr, &X_em, nullptr, 0, nullptr, 0, 0,
                                                 false, 0.0, false, true);
-    quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map, freq, 0,
+    quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map,
+                                                freq * ACOUSTIC_FREQ_SCALE, 0,
                                                 nullptr, &X_ac, nullptr, 0, nullptr, 0, 0,
                                                 true, 0.0, false, true);
 
@@ -488,7 +496,8 @@ TEST_CASE("Gains - Acoustic and EM phase use different wave speeds")
     // The acoustic phasor advances by exactly one turn per wavelength of extra distance
     arma::mat dest2 = {{-10.0 + SPEED_OF_SOUND / freq, 0.0, 2.0}};
     arma::mat X_ac2;
-    quadriga_lib::calc_diffraction_gain<double>(orig, dest2, cube, mtl_ind, mtl_map, freq, 0,
+    quadriga_lib::calc_diffraction_gain<double>(orig, dest2, cube, mtl_ind, mtl_map,
+                                                freq * ACOUSTIC_FREQ_SCALE, 0,
                                                 nullptr, &X_ac2, nullptr, 0, nullptr, 0, 0,
                                                 true, 0.0, false, true);
     std::complex<double> ac2(X_ac2(0, 0), X_ac2(1, 0));

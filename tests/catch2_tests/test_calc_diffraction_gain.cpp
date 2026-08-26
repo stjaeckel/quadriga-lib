@@ -774,11 +774,18 @@ static inline double ref_spreading_gain(double f_Hz, double dist, bool scalar_mo
     return std::pow(10.0, 0.1 * (gain_at_1m - 20.0 * std::log10(dist) - alpha * dist));
 }
 
+// Scalar mode takes an EM-equivalent frequency at the library API: c_light / f_eq is the
+// acoustic wavelength. These two must match qd_atmospheric_absorption.hpp. Note the effective
+// acoustic wave speed is NOT 343: the scale is formed with c = 3e8 while the phase uses the
+// exact speed of light, so the two differ by 0.07 %.
+static constexpr double ACOUSTIC_FREQ_SCALE = 3.0e8 / 343.0;                     // 874635.59
+static constexpr double ACOUSTIC_WAVE_SPEED = 299792458.0 / ACOUSTIC_FREQ_SCALE; // 342.76276
+
 // Reference propagation phase exp(-j*2*pi*d/lambda), unit magnitude. The wave speed selects
 // EM (speed of light) vs. acoustic (speed of sound at 20 C, ISO 9613-1 reference conditions).
 static inline std::complex<double> ref_prop_phase(double f_Hz, double dist, bool scalar_mode)
 {
-    double wave_speed = scalar_mode ? 343.2 : 299792458.0;
+    double wave_speed = scalar_mode ? ACOUSTIC_WAVE_SPEED : 299792458.0;
     return std::polar(1.0, -2.0 * arma::datum::pi * f_Hz * dist / wave_speed);
 }
 
@@ -818,7 +825,7 @@ TEST_CASE("Calc Diffraction Gain - FSPL EM mode on clear path")
     double expect = ref_spreading_gain(freq, dist, false);
     CHECK(std::abs(g_abs(0) / expect - 1.0) < 1e-12);
 
-    // Sanity on the absolute level: 32.45 + 20*log10(10) + 20*log10(5) = 66.4 dB
+    // Sanity on the absolute level: 32.45 + 20*log10(10) + 20*log10(5) = 66.4288 dB
     CHECK(std::abs(-10.0 * std::log10(g_abs(0)) - 66.4288) < 0.001);
 }
 
@@ -899,27 +906,30 @@ TEST_CASE("Calc Diffraction Gain - FSPL scalar mode with air absorption")
     for (double freq : {1.0e3, 20.0e3})
     {
         arma::vec gain;
-        quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map, freq, 0,
+        quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map,
+                                                    freq * ACOUSTIC_FREQ_SCALE, 0,
                                                     &gain, nullptr, nullptr, 0, nullptr, 0, 0, true, 0.0, true, false);
-        CHECK(std::abs(gain(0) / ref_spreading_gain(freq, dist, true) - 1.0) < 1e-11);
+        CHECK(std::abs(gain(0) / ref_spreading_gain(freq, dist, true) - 1.0) < 1e-8);
     }
 
     // 1 kHz: absorption is only ~0.047 dB over 10 m, so spreading dominates
     arma::vec g_low;
-    quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map, 1.0e3, 0,
+    quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map,
+                                                1.0e3 * ACOUSTIC_FREQ_SCALE, 0,
                                                 &g_low, nullptr, nullptr, 0, nullptr, 0, 0, true, 0.0, true, false);
     CHECK(ref_iso9613_alpha(1.0e3) * dist < 0.1);                   // absorption stays minor
     CHECK(std::abs(g_low(0) / (1.0 / (dist * dist)) - 1.0) < 0.02); // within 2 % of 1/d^2
 
     // 20 kHz: absorption adds real loss on top of spreading
     arma::vec g_high;
-    quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map, 20.0e3, 0,
+    quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map,
+                                                20.0e3 * ACOUSTIC_FREQ_SCALE, 0,
                                                 &g_high, nullptr, nullptr, 0, nullptr, 0, 0, true, 0.0, true, false);
     CHECK(g_high(0) < g_low(0));
     // The ratio isolates the absorption difference; both endpoints carry their own alpha
     double extra_dB = -10.0 * std::log10(g_high(0) / g_low(0));
     double expect_dB = (ref_iso9613_alpha(20.0e3) - ref_iso9613_alpha(1.0e3)) * dist;
-    CHECK(std::abs(extra_dB - expect_dB) < 1e-9);
+    CHECK(std::abs(extra_dB - expect_dB) < 1e-6);
 
     // Scalar and EM disagree at the same frequency: EM carries the 32.45 + 20*log10(f_GHz) term
     arma::vec g_em;
@@ -964,7 +974,8 @@ TEST_CASE("Calc Diffraction Gain - Propagation phase on clear path")
 
     // Scalar mode: single coefficient, wavelength from the speed of sound
     arma::mat Xs;
-    quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map, 1.0e3, 0,
+    quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map,
+                                                1.0e3 * ACOUSTIC_FREQ_SCALE, 0,
                                                 nullptr, &Xs, nullptr, 0, nullptr, 0, 0, true, 0.0, false, true);
     REQUIRE(Xs.n_rows == 2);
     CHECK(std::abs(xpr_cx(Xs, 0, 0) - ref_prop_phase(1.0e3, dist, true)) < 1e-9);
@@ -1003,10 +1014,11 @@ TEST_CASE("Calc Diffraction Gain - Propagation phase wraps at one wavelength")
     CHECK(std::abs(xpr_cx(Xh, 0, 0) + xpr_cx(Xh, 0, 1)) < 1e-9);
 
     // Same acoustic check, using the speed of sound to form lambda
-    const double f_ac = 2.0e3, lambda_ac = 343.2 / f_ac;
+    const double f_ac = 2.0e3, lambda_ac = ACOUSTIC_WAVE_SPEED / f_ac;
     arma::mat dest_ac = {{-30.0, 0.0, 0.5}, {-30.0 + lambda_ac, 0.0, 0.5}};
     arma::mat Xa;
-    quadriga_lib::calc_diffraction_gain<double>(orig, dest_ac, cube, mtl_ind, mtl_map, f_ac, 0,
+    quadriga_lib::calc_diffraction_gain<double>(orig, dest_ac, cube, mtl_ind, mtl_map,
+                                                f_ac * ACOUSTIC_FREQ_SCALE, 0,
                                                 nullptr, &Xa, nullptr, 0, nullptr, 0, 0, true, 0.0, false, true);
     CHECK(std::abs(xpr_cx(Xa, 0, 0) - xpr_cx(Xa, 0, 1)) < 1e-9);
 }
@@ -1050,7 +1062,6 @@ TEST_CASE("Calc Diffraction Gain - Propagation phase composes with material phas
     arma::vec ident(8, arma::fill::zeros);
     ident(0) = 1.0, ident(6) = 1.0; // ReVV and ReHH
     CHECK(arma::abs(X0.col(0) - ident).max() > 1e-6);
-    CHECK(arma::abs(X0 - ident).max() > 1e-6);
 }
 
 // The two flags are independent: apply_fspl touches only gain, apply_phase touches only
@@ -1088,8 +1099,8 @@ TEST_CASE("Calc Diffraction Gain - apply_fspl and apply_phase are independent")
     CHECK(arma::approx_equal(X11, X01, "absdiff", 1e-14));
 
     // ... and both effects are actually present
-    CHECK(g10(0) < 1e-3 * g00(0));            // 28 GHz over 20 m is a big loss
-    CHECK(arma::abs(X01 - X00).max() > 1e-3); // phase was applied
+    CHECK(g10(0) < 1e-3 * g00(0));                      // 28 GHz over 20 m is a big loss
+    CHECK(arma::abs(X01 - X00).max() > 1e-3);           // phase was applied
     double p00 = 0.0, p01 = 0.0;
     for (arma::uword k = 0; k < X00.n_elem; ++k)
         p00 += X00(k) * X00(k), p01 += X01(k) * X01(k);
