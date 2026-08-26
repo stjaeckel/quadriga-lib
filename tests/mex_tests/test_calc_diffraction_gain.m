@@ -31,7 +31,7 @@ quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_ind, mtl_st, 1e9 );
 gain_only = quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_ind, mtl_st, 1e9, 2 );
 assertTrue( numel(gain_only) == 2 );
 
-% Basic gain, lod = 0, explicit verbose. Per-body att -> 3 dB per path.
+% Basic gain, lod = 0, explicit verbose. Per-body att -> 3 dB per path
 gain = quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_ind, mtl_st, 1e9, 0, 0 );
 assertElementsAlmostEqual( gain, [10^(-0.3); 10^(-0.3)], 'absolute', 1e-10 );
 
@@ -184,13 +184,102 @@ assertTrue( g_on  > 0 && g_on  <= 1 + 1e-9 );
 assertTrue( g_off > 0 && g_off <= 1 + 1e-9 );
 assertTrue( g_on > g_off + 1e-3 );   % half-wave resonance enhances transmission
 
+%% apply_fspl / apply_phase
+
+% Both flags default to false: omitting them reproduces the legacy result.
+[g_def, x_def, c_def] = quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_ind, mtl_st, 1e9, 2 );
+[g_exp, x_exp, c_exp] = quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_ind, mtl_st, 1e9, 2, 0, [], 0, 0, false, 0.0, false, false );
+assertElementsAlmostEqual( g_def, g_exp, 'absolute', 1e-14 );
+assertElementsAlmostEqual( x_def, x_exp, 'absolute', 1e-14 );
+assertElementsAlmostEqual( c_def, c_exp, 'absolute', 1e-14 );
+
+% Clear 5 m path at 1 GHz: the diffraction gain is 1, so the returned gain with
+% apply_fspl is pure FSPL = 32.45 + 20*log10(f_GHz) + 20*log10(d).
+d_clr = 5.0; f_clr = 1e9;
+g_rel = quadriga_lib.calc_diffraction_gain( orig_clear, dest_clear, cube, mtl_ind, mtl_st, f_clr, 0 );
+g_abs = quadriga_lib.calc_diffraction_gain( orig_clear, dest_clear, cube, mtl_ind, mtl_st, f_clr, 0, 0, [], 0, 0, false, 0.0, true );
+assertElementsAlmostEqual( g_rel, 1.0, 'absolute', 1e-12 );
+loss_dB = 32.45 + 20*log10(f_clr/1e9) + 20*log10(d_clr);
+assertElementsAlmostEqual( g_abs, 10^(-0.1*loss_dB), 'relative', 1e-9 );
+
+% Scalar mode: 1/r spreading plus ISO 9613-1 air absorption. At 125 Hz the
+% absorption over 5 m is far below 0.1 dB, so the result sits just under 1/d^2.
+g_ac = quadriga_lib.calc_diffraction_gain( orig_clear, dest_clear, cube, mtl_ind, mtl_st, 125.0, 0, 0, [], 0, 0, true, 0.0, true );
+assertElementsAlmostEqual( g_ac, 1/d_clr^2, 'relative', 1e-3 );
+assertTrue( g_ac < 1/d_clr^2 );
+
+% Absorption grows with frequency, and EM at the same frequency differs (it
+% carries the 20*log10(f_GHz) term that scalar mode does not have).
+g_hi = quadriga_lib.calc_diffraction_gain( orig_clear, dest_clear, cube, mtl_ind, mtl_st, 16000.0, 0, 0, [], 0, 0, true, 0.0, true );
+g_em = quadriga_lib.calc_diffraction_gain( orig_clear, dest_clear, cube, mtl_ind, mtl_st, 16000.0, 0, 0, [], 0, 0, false, 0.0, true );
+assertTrue( g_hi < g_ac );
+assertTrue( abs(g_em - g_hi) > 1e-12 );
+
+% Per-row distance: 5 m vs 10 m is exactly a factor of 4 in power.
+orig_2d = [ -20, 0, 0.5 ; -20, 0, 0.5 ];
+dest_2d = [ -15, 0, 0.5 ; -10, 0, 0.5 ];
+g_2d = quadriga_lib.calc_diffraction_gain( orig_2d, dest_2d, cube, mtl_ind, mtl_st, 1e9, 0, 0, [], 0, 0, false, 0.0, true );
+assertTrue( isequal( size(g_2d), [2, 1] ) );
+assertElementsAlmostEqual( g_2d(1)/g_2d(2), 4.0, 'relative', 1e-9 );
+
+% apply_phase rotates xprmat by exp(-1i*2*pi*d/lambda). On a clear path the
+% Jones matrix is the identity, so VV and HH equal the bare phasor and the
+% magnitude stays 1 (xprmat remains normalized).
+[~, xpr_ph] = quadriga_lib.calc_diffraction_gain( orig_clear, dest_clear, cube, mtl_ind, mtl_st, f_clr, 0, 0, [], 0, 0, false, 0.0, false, true );
+assertTrue( isequal( size(xpr_ph), [8, 1] ) );
+ph_exp = exp( -1i * 2*pi * f_clr * d_clr / 299792458 );
+vv = xpr_ph(1) + 1i*xpr_ph(2);
+hh = xpr_ph(7) + 1i*xpr_ph(8);
+assertElementsAlmostEqual( vv, ph_exp, 'absolute', 1e-9 );
+assertElementsAlmostEqual( hh, ph_exp, 'absolute', 1e-9 );
+assertElementsAlmostEqual( abs(vv), 1.0, 'absolute', 1e-12 );
+assertElementsAlmostEqual( xpr_ph(3:6), zeros(4,1), 'absolute', 1e-12 );
+
+% Scalar mode: [2, n_pos] output, wavelength from the speed of sound, so the
+% phasor differs from the EM one at the same frequency and distance.
+f_ac = 1000.0;
+[~, xpr_ac] = quadriga_lib.calc_diffraction_gain( orig_clear, dest_clear, cube, mtl_ind, mtl_st, f_ac, 0, 0, [], 0, 0, true, 0.0, false, true );
+assertTrue( isequal( size(xpr_ac), [2, 1] ) );
+ac = xpr_ac(1) + 1i*xpr_ac(2);
+assertElementsAlmostEqual( abs(ac), 1.0, 'absolute', 1e-12 );
+assertElementsAlmostEqual( ac, exp( -1i * 2*pi * f_ac * d_clr / 343.2 ), 'absolute', 1e-9 );
+[~, xpr_em] = quadriga_lib.calc_diffraction_gain( orig_clear, dest_clear, cube, mtl_ind, mtl_st, f_ac, 0, 0, [], 0, 0, false, 0.0, false, true );
+assertTrue( abs( (xpr_em(1) + 1i*xpr_em(2)) - ac ) > 1e-3 );
+
+% The flags are independent: apply_fspl touches only gain, apply_phase only
+% xprmat, and enabling both reproduces each single-flag result.
+[g00, x00] = quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_ind, mtl_st, 10e9, 2 );
+[g10, x10] = quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_ind, mtl_st, 10e9, 2, 0, [], 0, 0, false, 0.0, true,  false );
+[g01, x01] = quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_ind, mtl_st, 10e9, 2, 0, [], 0, 0, false, 0.0, false, true  );
+[g11, x11] = quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_ind, mtl_st, 10e9, 2, 0, [], 0, 0, false, 0.0, true,  true  );
+assertElementsAlmostEqual( x10, x00, 'absolute', 1e-14 );   % fspl leaves xprmat alone
+assertElementsAlmostEqual( g01, g00, 'absolute', 1e-14 );   % phase leaves gain alone
+assertElementsAlmostEqual( g11, g10, 'absolute', 1e-14 );
+assertElementsAlmostEqual( x11, x01, 'absolute', 1e-14 );
+assertTrue( all( g10 < g00 ) );                             % both effects present
+assertTrue( max(max(abs( x01 - x00 ))) > 1e-3 );
+
+% Outputs stay finite with the flags on, including the degenerate co-located
+% case where the distance-based terms are undefined and skipped.
+orig_dg = [ -10, 0, 0.5 ; -10, 0, 0.5 ];
+dest_dg = [  10, 0, 0.5 ; -10, 0, 0.5 ];
+[g_dg, x_dg, c_dg] = quadriga_lib.calc_diffraction_gain( orig_dg, dest_dg, cube, mtl_ind, mtl_st, 3.5e9, 2, 0, [], 0, 0, false, 0.0, true, true );
+assertTrue( all( isfinite( g_dg(:) ) ) );
+assertTrue( all( isfinite( x_dg(:) ) ) );
+assertTrue( all( isfinite( c_dg(:) ) ) );
+
+% Requesting only gain with apply_phase is legal but a no-op: the phase lands in
+% xprmat, which the caller did not ask for.
+g_1out = quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_ind, mtl_st, 10e9, 2, 0, [], 0, 0, false, 0.0, false, true );
+assertElementsAlmostEqual( g_1out, g00, 'absolute', 1e-14 );
+
 %% Error handling
 
 % MEX-layer guards (exact strings from the wrapper).
 assert_throws( @() quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_ind, mtl_st ), ...
     'Wrong number of input arguments.' );                                          % too few (5 args)
-assert_throws( @() quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_ind, mtl_st, 1e9, 0, 0, [], 0, 0, false, 0, 0 ), ...
-    'Wrong number of input arguments.' );                                          % too many (14 args)
+assert_throws( @() quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_ind, mtl_st, 1e9, 0, 0, [], 0, 0, false, 0, false, false, false ), ...
+    'Wrong number of input arguments.' );                                          % too many (16 args)
 assert_throws( @() out4( orig, dest, cube, mtl_ind, mtl_st, 1e9, 5 ), ...
     'Too many output arguments.' );                                                % 4 outputs
 assert_throws( @() quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_ind, mtl_st, 1e9, 0, 0, 0 ), ...

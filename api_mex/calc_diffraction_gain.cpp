@@ -25,7 +25,8 @@ Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh
 ## Usage:
 ```
 [ gain, xprmat, coord ] = quadriga_lib.calc_diffraction_gain( orig, dest, mesh, mtl_ind, mtl_prop, ...
-    center_freq, lod, verbose, sub_mesh_index, use_kernel, gpu_id, scalar_mode, resolve_multi_bounce );
+    center_freq, lod, verbose, sub_mesh_index, use_kernel, gpu_id, scalar_mode, thin_slab_threshold, ...
+    apply_fspl, apply_phase );
 ```
 
 ## Inputs:
@@ -46,22 +47,37 @@ Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh
   energy-conservation transmission) instead of EM TE/TM averaging. Default `false` (EM mode).
 - **`thin_slab_threshold`** — Thin-slab (Fabry-Pérot) resolve threshold; 0 = resolve always (default), 
   1 = resolve never, see [[ray_state_update]]
+- **`apply_fspl`** — If `true`, folds the geometric spreading loss into `gain`, making it an absolute
+  propagation gain instead of a value relative to FSPL. The reference distance is the direct TX-RX
+  distance, matching the `path_length` used by [[qrt_file_read]] for a
+  transmission-only path. EM mode: `32.45 + 20*log10(f_GHz) + 20*log10(d_m)` dB; scalar mode:
+  `20*log10(d_m) + alpha(f)*d_m` dB, with `alpha` from ISO 9613-1 at T = 20 °C, RH = 50 %, p = 1 atm; default: `false`
+- **`apply_phase`** — If `true`, multiplies `xprmat` by the propagation phase `exp(-j*2*pi*d/lambda)`
+  using the same direct TX-RX distance. The wavelength follows from `center_freq` and the medium wave
+  speed (speed of light in EM mode, speed of sound in scalar mode). The term has unit magnitude, so
+  `xprmat` stays normalized. This is the phase [[get_channels_spherical]] would otherwise add from
+  `path_length`; default: `false`
 
 ## Outputs:
-- **`gain`** — Diffraction gain per TX-RX pair, linear scale; `[n_pos, 1]`
-- **`xprmat`** — For EM mode: polarization transfer matrix excluding FSPL, interleaved complex, col-major 
-  `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]`; `[8, n_pos]`; For scalar mode: scalar pressure coefficient `[Re Im]`; `[2, n_pos]`.
+- **`gain`** — Diffraction gain per TX-RX pair, linear power scale; `[n_pos, 1]`. Relative to FSPL by
+  default (bounded by 0 and 1), absolute propagation gain when `apply_fspl = true`
+- **`xprmat`** — Normalized polarization transfer matrix: the amplitude carries no path gain (max column
+  power is 1), only the relative polarization coupling and phase; `gain` holds the power. EM mode:
+  interleaved complex, col-major `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]`; `[8, n_pos]`; scalar mode:
+  scalar pressure coefficient `[Re Im]`; `[2, n_pos]`
 - **`coord`** — Diffracted path coordinates excluding endpoints; `[3, n_seg-1, n_pos]`
 
 ## See also:
 - [[generate_diffraction_paths]] (controls path/segment count via `lod`)
 - [[triangle_mesh_segmentation]] (generates `sub_mesh_index`)
 - [[obj_file_read]] (defines `mtl_prop` format)
+- [[qrt_file_read]] (same path-loss model, used by `apply_fspl`)
+- [[get_channels_spherical]] (applies the same propagation phase as `apply_phase`)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    if (nrhs < 6 || nrhs > 13)
+    if (nrhs < 6 || nrhs > 15)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
 
     if (nlhs > 3)
@@ -90,6 +106,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     int gpu_id = (nrhs < 11) ? 0 : qd_mex_get_scalar<int>(prhs[10], "gpu_id", 0);
     bool scalar_mode = (nrhs < 12) ? false : qd_mex_get_scalar<bool>(prhs[11], "scalar_mode", false);
     double thin_slab_threshold = (nrhs < 13) ? 0.0 : qd_mex_get_scalar<double>(prhs[12], "thin_slab_threshold", 0.0);
+    bool apply_fspl = (nrhs < 14) ? false : qd_mex_get_scalar<bool>(prhs[13], "apply_fspl", false);
+    bool apply_phase = (nrhs < 15) ? false : qd_mex_get_scalar<bool>(prhs[14], "apply_phase", false);
 
     arma::uword n_pos = orig.n_rows;
     arma::uword n_seg = 0;
@@ -123,5 +141,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     CALL_QD(quadriga_lib::calc_diffraction_gain(orig, dest, mesh, mtl_ind, mtl_prop,
                                                 center_freq, lod, p_gain, p_xprmat, p_coord, verbose,
-                                                p_sub_mesh_index, use_kernel, gpu_id, scalar_mode, thin_slab_threshold));
+                                                p_sub_mesh_index, use_kernel, gpu_id, scalar_mode,
+                                                thin_slab_threshold, apply_fspl, apply_phase));
 }

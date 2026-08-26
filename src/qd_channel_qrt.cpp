@@ -4,6 +4,7 @@
 
 #include "quadriga_channel.hpp"
 #include "quadriga_tools.hpp"
+#include "qd_atmospheric_absorption.hpp"
 
 static_assert(sizeof(arma::uword) == sizeof(unsigned long long), "arma::uword and unsigned long long have different sizes");
 static_assert(sizeof(size_t) == sizeof(unsigned long long), "size_t and unsigned long long have different sizes");
@@ -1330,54 +1331,18 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
         fileR.close();
 
     // Gain at 1 m (path-loss reference)
+    // EM: FSPL reference. Scalar: 1/r spreading, frequency-independent.
+    // p_freq is GHz for v4/v5 and Hz for v6; qd_gain_at_1m expects Hz.
     arma::vec gain_at_1m(no_freq);
-    if (v6) // Scalar: 1/r spreading, frequency-independent reference at 1 m.
-        gain_at_1m.zeros();
-    else
-        for (arma::uword i_freq = 0; i_freq < no_freq; ++i_freq)
-            gain_at_1m[i_freq] = -32.45 - 20.0 * std::log10((double)p_freq[i_freq]);
+    for (arma::uword i_freq = 0; i_freq < no_freq; ++i_freq)
+        gain_at_1m[i_freq] = qd_gain_at_1m((double)p_freq[i_freq] * (v6 ? 1.0 : 1.0e9), v6);
 
-    // Air absorption α(f) in dB/m (ISO 9613-1)
-    // Defaults: T = 20 °C, RH = 50 %, p = 1 atm (indoor sea-level).
+    // Air absorption in dB/m (ISO 9613-1, T = 20 C, RH = 50 %, p = 1 atm).
     // Zero for v4/v5 (EM) so the per-path loop works uniformly.
     arma::vec alpha_dB_per_m(no_freq, arma::fill::zeros);
     if (v6)
-    {
-        auto iso9613_alpha = [](double f_Hz,
-                                double T_celsius = 20.0,
-                                double RH_percent = 50.0,
-                                double p_kPa = 101.325) -> double
-        {
-            constexpr double T0 = 293.15;   // Reference temperature [K]
-            constexpr double T01 = 273.16;  // Triple-point isotherm [K]
-            constexpr double p_r = 101.325; // Reference pressure [kPa]
-
-            const double T = T_celsius + 273.15; // Absolute temperature [K]
-
-            // Saturation vapor pressure ratio and molar concentration of water vapor [%]
-            const double C = -6.8346 * std::pow(T01 / T, 1.261) + 4.6151;
-            const double psat = std::pow(10.0, C);
-            const double h = RH_percent * psat / (p_kPa / p_r);
-
-            // Relaxation frequencies for O2 and N2 [Hz]
-            const double pa_pr = p_kPa / p_r;
-            const double T_T0 = T / T0;
-            const double f_rO = pa_pr * (24.0 + 4.04e4 * h * (0.02 + h) / (0.391 + h));
-            const double f_rN = pa_pr * std::pow(T_T0, -0.5) * (9.0 + 280.0 * h * std::exp(-4.170 * (std::pow(T_T0, -1.0 / 3.0) - 1.0)));
-
-            // Absorption coefficient [dB/m]
-            const double f2 = f_Hz * f_Hz;
-            const double classical = 1.84e-11 / pa_pr * std::sqrt(T_T0);
-            const double rot_O = 0.01275 * std::exp(-2239.1 / T) / (f_rO + f2 / f_rO);
-            const double rot_N = 0.1068 * std::exp(-3352.0 / T) / (f_rN + f2 / f_rN);
-
-            return 8.686 * f2 * (classical + std::pow(T_T0, -2.5) * (rot_O + rot_N));
-        };
-
-        // p_freq is stored in Hz (see center_frequency export)
         for (arma::uword i_freq = 0; i_freq < no_freq; ++i_freq)
-            alpha_dB_per_m[i_freq] = iso9613_alpha((double)p_freq[i_freq]);
-    }
+            alpha_dB_per_m[i_freq] = qd_iso9613_alpha((double)p_freq[i_freq]);
 
     // Output: center_frequency
     if (center_frequency)

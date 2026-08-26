@@ -1,7 +1,7 @@
 ---
 title: "Python API Documentation for Quadriga-Lib v0.12.2"
 author: "Stephan Jaeckel"
-date: "18.08.2026"
+date: "26.08.2026"
 lang: en-US
 ---
 
@@ -52,19 +52,19 @@ lang: en-US
 | [version](#version) | Miscellaneous / Tools | 1732 |
 | [write_png](#write_png) | Miscellaneous / Tools | 1745 |
 | [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 1788 |
-| [cube](#cube) | Site-specific simulation tools | 1840 |
-| [icosphere](#icosphere) | Site-specific simulation tools | 1867 |
-| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 1899 |
-| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 1932 |
-| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 1982 |
-| [plane](#plane) | Site-specific simulation tools | 2035 |
-| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 2064 |
-| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 2091 |
-| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 2121 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 2154 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 2199 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 2242 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 2268 |
+| [cube](#cube) | Site-specific simulation tools | 1858 |
+| [icosphere](#icosphere) | Site-specific simulation tools | 1885 |
+| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 1917 |
+| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 1950 |
+| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 2000 |
+| [plane](#plane) | Site-specific simulation tools | 2053 |
+| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 2082 |
+| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 2109 |
+| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 2139 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 2172 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 2217 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 2260 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 2286 |
 
 ---
 
@@ -1801,11 +1801,13 @@ Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh
 ```
 # Output as tuple
 data = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_ind, mtl_prop, \
-    center_frequency, lod, verbose, sub_mesh_index, use_kernel, gpu_id, scalar_mode, thin_slab_threshold )
+    center_frequency, lod, verbose, sub_mesh_index, use_kernel, gpu_id, scalar_mode, \
+    thin_slab_threshold, apply_fspl, apply_phase )
 
 # Unpacked outputs
 gain, xprmat, coord = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_ind, mtl_prop, \
-    center_frequency, lod, verbose, sub_mesh_index, use_kernel, gpu_id, scalar_mode, thin_slab_threshold )
+    center_frequency, lod, verbose, sub_mesh_index, use_kernel, gpu_id, scalar_mode, \
+    thin_slab_threshold, apply_fspl, apply_phase )
 ```
 
 ### Inputs:
@@ -1824,17 +1826,33 @@ gain, xprmat, coord = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, me
   energy-conservation transmission) instead of EM TE/TM averaging; default: `False`
 - **`thin_slab_threshold`** — Thin-slab (Fabry-Pérot) resolve threshold; 0 = resolve always, 1 = resolve
   never; see [ray_state_update](#ray_state_update); default: 0
+- **`apply_fspl`** — If `True`, folds the geometric spreading loss into `gain`, making it an absolute
+  propagation gain instead of a value relative to FSPL. The reference distance is the direct TX-RX
+  distance, matching the `path_length` used by [qrt_file_read](#qrt_file_read) for a
+  transmission-only path. EM mode: `32.45 + 20*log10(f_GHz) + 20*log10(d_m)` dB; scalar mode:
+  `20*log10(d_m) + alpha(f)*d_m` dB, with `alpha` from ISO 9613-1 at T = 20 °C, RH = 50 %, p = 1 atm.; 
+  default: `False`
+- **`apply_phase`** — If `True`, multiplies `xprmat` by the propagation phase `exp(-j*2*pi*d/lambda)`
+  using the same direct TX-RX distance. The wavelength follows from `center_frequency` and the medium
+  wave speed (speed of light in EM mode, speed of sound in scalar mode). The term has unit magnitude,
+  so `xprmat` stays normalized. This is the phase [get_channels_spherical](#get_channels_spherical) would otherwise add from
+  `path_length`; default: `False`
 
 ### Outputs:
-- **`gain`** — Diffraction gain per TX-RX pair, linear scale; `(n_pos,)`
-- **`xprmat`** — EM mode: polarization transfer matrix excluding FSPL, interleaved complex, column-major
-  `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]`, `(8, n_pos)`; scalar mode: scalar pressure coefficient `[Re Im]`, `(2, n_pos)`
+- **`gain`** — Diffraction gain per TX-RX pair, linear power scale; `(n_pos,)`. Relative to FSPL by
+  default (bounded by 0 and 1), absolute propagation gain when `apply_fspl = True`
+- **`xprmat`** — Normalized polarization transfer matrix: the amplitude carries no path gain (max column
+  power is 1), only the relative polarization coupling and phase; `gain` holds the power. EM mode:
+  interleaved complex, column-major `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]`, `(8, n_pos)`; scalar
+  mode: scalar pressure coefficient `[Re Im]`, `(2, n_pos)`
 - **`coord`** — Diffracted path coordinates excluding endpoints; `(3, n_seg-1, n_pos)`
 
 ### See also:
 - [generate_diffraction_paths](#generate_diffraction_paths) (controls path/segment count via `lod`)
 - [triangle_mesh_segmentation](#triangle_mesh_segmentation) (generates `sub_mesh_index`)
 - [obj_file_read](#obj_file_read) (defines the material format)
+- [qrt_file_read](#qrt_file_read) (same path-loss model, used by `apply_fspl`)
+- [get_channels_spherical](#get_channels_spherical) (applies the same propagation phase as `apply_phase`)
 
 ---
 ## cube

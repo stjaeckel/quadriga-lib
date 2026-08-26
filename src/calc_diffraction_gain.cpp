@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
+#include "qd_atmospheric_absorption.hpp"
 
 // Helper functions
 namespace
@@ -55,7 +56,9 @@ void calc_diffraction_gain(
     int use_kernel = 0,
     int gpu_id = 0,
     bool scalar_mode = false,
-    double thin_slab_threshold = 0.0);
+    double thin_slab_threshold = 0.0,
+    bool apply_fspl = false,
+    bool apply_phase = false);
 ```
 
 ## Inputs:
@@ -74,11 +77,27 @@ void calc_diffraction_gain(
   energy-conservation transmission) instead of EM TE/TM averaging. Default `false` (EM mode). Selects
   interaction type passed to [[ray_mesh_interact]] (4 vs. 1).
 - **`thin_slab_threshold`** — Thin-slab (Fabry-Pérot) resolve threshold; 0 = resolve always (default), 1 = resolve never,  see [[ray_state_update]]
+- **`apply_fspl`** — If `true`, folds the geometric spreading loss into `gain`, so that `gain` becomes an
+  absolute propagation gain instead of a value relative to FSPL. Default `false`. The reference distance is
+  the direct TX-RX distance, matching the `path_length` definition used by [[qrt_file_read]] for a transmission-only 
+  path. In EM mode the loss is `32.45 + 20·log10(f_GHz) + 20·log10(d_m)` [dB]; in scalar mode it is 
+  `20·log10(d_m) + α(f)·d_m` [dB], with `α` from ISO 9613-1 at T = 20 °C, RH = 50 %, p = 1 atm.
+- **`apply_phase`** — If `true`, multiplies `xprmat` by the propagation phase term `exp(-j·2π·d/λ)`, using the
+  same direct TX-RX distance `d`. Default `false`. The wavelength follows from `center_frequency` and the
+  medium wave speed (speed of light in EM mode, speed of sound in scalar mode). Since the term has unit
+  magnitude, `xprmat` stays normalized. This is the phase contribution that
+  [[get_channels_spherical]] would otherwise add from `path_length`; enabling it here gives the complete
+  omni-radiator coefficient without running the channel generator.
 
 ## Outputs:
-- **`gain`** — Diffraction gain per TX-RX pair, linear scale; `[n_pos]`
-- **`xprmat`** — For EM mode: polarization transfer matrix excluding FSPL, interleaved complex, col-major `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]`; `[8, n_pos]`;
+- **`gain`** — Diffraction gain per TX-RX pair, linear power scale; `[n_pos]`. Relative to FSPL by default,
+  i.e. bounded by 0 and 1; absolute propagation gain when `apply_fspl = true`.
+- **`xprmat`** — Normalized polarization transfer matrix: the amplitude carries no path gain (max column
+  power is 1), only the relative polarization coupling and phase. The `gain` output holds the power.
+  For EM mode: interleaved complex, col-major `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]`; `[8, n_pos]`;
   For scalar mode: scalar pressure coefficient `[Re Im]`; `[2, n_pos]`.
+  With `apply_phase = true`, the propagation phase `exp(-j·2π·d/λ)` is applied on top; the normalization
+  is unaffected because that term has unit magnitude.
 - **`coord`** — Diffracted path coordinates excluding endpoints; `[3, n_seg-1, n_pos]`
 
 ## See also:
@@ -86,6 +105,8 @@ void calc_diffraction_gain(
 - [[triangle_mesh_segmentation]] (generates `sub_mesh_index`)
 - [[obj_file_read]] (defines mtl_prop format)
 - [[ray_mesh_interact]] (used for media interactions)
+- [[qrt_file_read]] (same path-loss model, used by `apply_fspl`)
+- [[get_channels_spherical]] (applies the same propagation phase as `apply_phase`)
 MD!*/
 
 template <typename dtype>
@@ -104,7 +125,9 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
                                          int use_kernel,
                                          int gpu_id,
                                          bool scalar_mode,
-                                         double thin_slab_threshold)
+                                         double thin_slab_threshold,
+                                         bool apply_fspl,
+                                         bool apply_phase)
 {
     // Check for correct number of columns
     if (orig.n_cols != 3)
@@ -587,6 +610,60 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
         if (verbose == 2 && n_pos == 1) // Debug output
             (*xprmat).t().print("Total xprmat = ");
     }
+
+    // Optionally fold the geometric spreading loss into 'gain' and the propagation phase into 'xprmat'.
+    // Both use the direct TX-RX distance, which is the 'path_length' that qrt_file_read and
+    // get_channels_spherical see for a transmission-only path (the spine ray is a straight line).
+    if ((apply_fspl && p_gain) || (apply_phase && xprmat))
+    {
+        const double freq = (double)center_frequency;
+
+        // Path-loss reference at 1 m and air absorption, shared with the QRT reader
+        const double gain_at_1m = qd_gain_at_1m(freq, scalar_mode);
+        const double alpha_dB_per_m = scalar_mode ? qd_iso9613_alpha(freq) : 0.0;
+
+        // Wave number 2*pi/lambda; the medium wave speed selects EM vs. acoustic
+        const double wave_speed = scalar_mode ? qd_speed_of_sound : qd_speed_of_light;
+        const double wave_number = 6.283185307179586 * freq / wave_speed;
+        const double wavelength = wave_speed / freq;
+
+        dtype *p_xprmat = xprmat ? xprmat->memptr() : nullptr;
+
+        for (arma::uword iR = 0; iR < n_pos; ++iR)
+        {
+            double dx = (double)dest.at(iR, 0) - (double)orig.at(iR, 0);
+            double dy = (double)dest.at(iR, 1) - (double)orig.at(iR, 1);
+            double dz = (double)dest.at(iR, 2) - (double)orig.at(iR, 2);
+            double dist = std::sqrt(dx * dx + dy * dy + dz * dz);
+
+            if (dist < 1.0e-9) // Co-located TX and RX, path loss and phase are undefined
+                continue;
+
+            if (apply_fspl && p_gain)
+            {
+                double gainPL = gain_at_1m - 20.0 * std::log10(dist) - alpha_dB_per_m * dist;
+                p_gain[iR] *= (dtype)std::pow(10.0, 0.1 * gainPL);
+            }
+
+            if (apply_phase && p_xprmat)
+            {
+                // exp(-j*k*d); wrap the distance to one wavelength first to keep the argument small
+                double phase = -wave_number * std::fmod(dist, wavelength);
+                double cp = std::cos(phase), sp = std::sin(phase);
+
+                dtype *col = &p_xprmat[iR * nXPR];
+                for (arma::uword k = 0; k < nXPR; k += 2) // Interleaved complex pairs
+                {
+                    double re = (double)col[k], im = (double)col[k + 1];
+                    col[k] = (dtype)(re * cp - im * sp);
+                    col[k + 1] = (dtype)(re * sp + im * cp);
+                }
+            }
+        }
+
+        if (verbose == 2 && n_pos == 1 && xprmat) // Debug output
+            (*xprmat).t().print("Total xprmat incl. phase = ");
+    }
 }
 
 template void quadriga_lib::calc_diffraction_gain(const arma::Mat<float> &orig, const arma::Mat<float> &dest,
@@ -595,7 +672,8 @@ template void quadriga_lib::calc_diffraction_gain(const arma::Mat<float> &orig, 
                                                   float center_frequency, int lod,
                                                   arma::Col<float> *gain, arma::Mat<float> *xprmat, arma::Cube<float> *coord,
                                                   int verbose, const arma::u32_vec *sub_mesh_index,
-                                                  int use_kernel, int gpu_id, bool scalar_mode, double thin_slab_threshold);
+                                                  int use_kernel, int gpu_id, bool scalar_mode, double thin_slab_threshold,
+                                                  bool apply_fspl, bool apply_phase);
 
 template void quadriga_lib::calc_diffraction_gain(const arma::Mat<double> &orig, const arma::Mat<double> &dest,
                                                   const arma::Mat<double> &mesh, const arma::uvec &mtl_ind,
@@ -603,4 +681,5 @@ template void quadriga_lib::calc_diffraction_gain(const arma::Mat<double> &orig,
                                                   double center_frequency, int lod,
                                                   arma::Col<double> *gain, arma::Mat<double> *xprmat, arma::Cube<double> *coord,
                                                   int verbose, const arma::u32_vec *sub_mesh_index,
-                                                  int use_kernel, int gpu_id, bool scalar_mode, double thin_slab_threshold);
+                                                  int use_kernel, int gpu_id, bool scalar_mode, double thin_slab_threshold,
+                                                  bool apply_fspl, bool apply_phase);

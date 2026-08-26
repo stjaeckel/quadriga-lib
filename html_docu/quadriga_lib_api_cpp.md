@@ -1,7 +1,7 @@
 ---
 title: "C++ API Documentation for Quadriga-Lib v0.12.2"
 author: "Stephan Jaeckel"
-date: "18.08.2026"
+date: "26.08.2026"
 lang: en-US
 ---
 
@@ -104,40 +104,40 @@ lang: en-US
 | [fast_slerp](#fast_slerp) | Math functions | 3004 |
 | [interp_2D](#interp_2d) | Math functions | 3039 |
 | [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 3103 |
-| [colormap](#colormap) | Site-specific simulation tools | 3161 |
-| [combine_irs_coord](#combine_irs_coord) | Site-specific simulation tools | 3180 |
-| [coord2path](#coord2path) | Site-specific simulation tools | 3223 |
-| [cube](#cube) | Site-specific simulation tools | 3261 |
-| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 3294 |
-| [icosphere](#icosphere) | Site-specific simulation tools | 3338 |
-| [interface_gain](#interface_gain) | Site-specific simulation tools | 3372 |
-| [medium_gain](#medium_gain) | Site-specific simulation tools | 3408 |
-| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 3445 |
-| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 3487 |
-| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 3554 |
-| [obj_overlap_test](#obj_overlap_test) | Site-specific simulation tools | 3621 |
-| [path_to_tube](#path_to_tube) | Site-specific simulation tools | 3652 |
-| [plane](#plane) | Site-specific simulation tools | 3680 |
-| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 3716 |
-| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 3745 |
-| [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 3784 |
-| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 3820 |
-| [ray_commit](#ray_commit) | Site-specific simulation tools | 3856 |
-| [ray_init](#ray_init) | Site-specific simulation tools | 3961 |
-| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 4048 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 4170 |
-| [ray_progress](#ray_progress) | Site-specific simulation tools | 4218 |
-| [ray_state_update](#ray_state_update) | Site-specific simulation tools | 4356 |
-| [ray_subdivide_flag](#ray_subdivide_flag) | Site-specific simulation tools | 4489 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 4550 |
-| [refractive_index](#refractive_index) | Site-specific simulation tools | 4598 |
-| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 4630 |
-| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 4688 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 4718 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 4746 |
-| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 4787 |
-| [write_png](#write_png) | Site-specific simulation tools | 4822 |
-| [xpr_update](#xpr_update) | Site-specific simulation tools | 4848 |
+| [colormap](#colormap) | Site-specific simulation tools | 3181 |
+| [combine_irs_coord](#combine_irs_coord) | Site-specific simulation tools | 3200 |
+| [coord2path](#coord2path) | Site-specific simulation tools | 3243 |
+| [cube](#cube) | Site-specific simulation tools | 3281 |
+| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 3314 |
+| [icosphere](#icosphere) | Site-specific simulation tools | 3358 |
+| [interface_gain](#interface_gain) | Site-specific simulation tools | 3392 |
+| [medium_gain](#medium_gain) | Site-specific simulation tools | 3428 |
+| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 3465 |
+| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 3507 |
+| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 3574 |
+| [obj_overlap_test](#obj_overlap_test) | Site-specific simulation tools | 3641 |
+| [path_to_tube](#path_to_tube) | Site-specific simulation tools | 3672 |
+| [plane](#plane) | Site-specific simulation tools | 3700 |
+| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 3736 |
+| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 3765 |
+| [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 3804 |
+| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 3840 |
+| [ray_commit](#ray_commit) | Site-specific simulation tools | 3876 |
+| [ray_init](#ray_init) | Site-specific simulation tools | 3981 |
+| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 4068 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 4191 |
+| [ray_progress](#ray_progress) | Site-specific simulation tools | 4239 |
+| [ray_state_update](#ray_state_update) | Site-specific simulation tools | 4377 |
+| [ray_subdivide_flag](#ray_subdivide_flag) | Site-specific simulation tools | 4510 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 4571 |
+| [refractive_index](#refractive_index) | Site-specific simulation tools | 4619 |
+| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 4651 |
+| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 4709 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 4739 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 4767 |
+| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 4808 |
+| [write_png](#write_png) | Site-specific simulation tools | 4843 |
+| [xpr_update](#xpr_update) | Site-specific simulation tools | 4869 |
 
 ---
 
@@ -3125,7 +3125,9 @@ void calc_diffraction_gain(
     int use_kernel = 0,
     int gpu_id = 0,
     bool scalar_mode = false,
-    double thin_slab_threshold = 0.0);
+    double thin_slab_threshold = 0.0,
+    bool apply_fspl = false,
+    bool apply_phase = false);
 ```
 
 ### Inputs:
@@ -3144,11 +3146,27 @@ void calc_diffraction_gain(
   energy-conservation transmission) instead of EM TE/TM averaging. Default `false` (EM mode). Selects
   interaction type passed to [ray_mesh_interact](#ray_mesh_interact) (4 vs. 1).
 - **`thin_slab_threshold`** — Thin-slab (Fabry-Pérot) resolve threshold; 0 = resolve always (default), 1 = resolve never,  see [ray_state_update](#ray_state_update)
+- **`apply_fspl`** — If `true`, folds the geometric spreading loss into `gain`, so that `gain` becomes an
+  absolute propagation gain instead of a value relative to FSPL. Default `false`. The reference distance is
+  the direct TX-RX distance, matching the `path_length` definition used by [qrt_file_read](#qrt_file_read) for a transmission-only 
+  path. In EM mode the loss is `32.45 + 20·log10(f_GHz) + 20·log10(d_m)` [dB]; in scalar mode it is 
+  `20·log10(d_m) + α(f)·d_m` [dB], with `α` from ISO 9613-1 at T = 20 °C, RH = 50 %, p = 1 atm.
+- **`apply_phase`** — If `true`, multiplies `xprmat` by the propagation phase term `exp(-j·2π·d/λ)`, using the
+  same direct TX-RX distance `d`. Default `false`. The wavelength follows from `center_frequency` and the
+  medium wave speed (speed of light in EM mode, speed of sound in scalar mode). Since the term has unit
+  magnitude, `xprmat` stays normalized. This is the phase contribution that
+  [get_channels_spherical](#get_channels_spherical) would otherwise add from `path_length`; enabling it here gives the complete
+  omni-radiator coefficient without running the channel generator.
 
 ### Outputs:
-- **`gain`** — Diffraction gain per TX-RX pair, linear scale; `[n_pos]`
-- **`xprmat`** — For EM mode: polarization transfer matrix excluding FSPL, interleaved complex, col-major `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]`; `[8, n_pos]`;
+- **`gain`** — Diffraction gain per TX-RX pair, linear power scale; `[n_pos]`. Relative to FSPL by default,
+  i.e. bounded by 0 and 1; absolute propagation gain when `apply_fspl = true`.
+- **`xprmat`** — Normalized polarization transfer matrix: the amplitude carries no path gain (max column
+  power is 1), only the relative polarization coupling and phase. The `gain` output holds the power.
+  For EM mode: interleaved complex, col-major `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]`; `[8, n_pos]`;
   For scalar mode: scalar pressure coefficient `[Re Im]`; `[2, n_pos]`.
+  With `apply_phase = true`, the propagation phase `exp(-j·2π·d/λ)` is applied on top; the normalization
+  is unaffected because that term has unit magnitude.
 - **`coord`** — Diffracted path coordinates excluding endpoints; `[3, n_seg-1, n_pos]`
 
 ### See also:
@@ -3156,6 +3174,8 @@ void calc_diffraction_gain(
 - [triangle_mesh_segmentation](#triangle_mesh_segmentation) (generates `sub_mesh_index`)
 - [obj_file_read](#obj_file_read) (defines mtl_prop format)
 - [ray_mesh_interact](#ray_mesh_interact) (used for media interactions)
+- [qrt_file_read](#qrt_file_read) (same path-loss model, used by `apply_fspl`)
+- [get_channels_spherical](#get_channels_spherical) (applies the same propagation phase as `apply_phase`)
 
 ---
 ## colormap
@@ -4139,6 +4159,7 @@ void quadriga_lib::ray_mesh_interact(
    |   3  | Same-direction flag (FBS and SBS normals point the same way)            |
    |   4  | Corner-hit flag (FBS/SBS faces not parallel)                            |
    |   5  | Total-reflection flag (also set when a transmission factor forced it)   |
+   |   6  | Thin sheet flag (material is a thin single-face sheet)                  |
    Reachable composite values (add 32 for the total-reflection variant):
    | Code  |  TIR  | Description                                         |
    | :---: | :---: | --------------------------------------------------- |
