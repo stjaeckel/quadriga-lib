@@ -1,7 +1,7 @@
 ---
 title: "Python API Documentation for Quadriga-Lib v0.12.2"
 author: "Stephan Jaeckel"
-date: "26.08.2026"
+date: "28.08.2026"
 lang: en-US
 ---
 
@@ -1830,7 +1830,7 @@ gain, xprmat, coord = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, me
   propagation gain instead of a value relative to FSPL. The reference distance is the direct TX-RX
   distance, matching the `path_length` used by [qrt_file_read](#qrt_file_read) for a
   transmission-only path. EM mode: `32.45 + 20*log10(f_GHz) + 20*log10(d_m)` dB; scalar mode:
-  `20*log10(d_m) + alpha(f)*d_m` dB, with `alpha` from ISO 9613-1 at T = 20 °C, RH = 50 %, p = 1 atm.; 
+  `20*log10(d_m) + alpha(f)*d_m` dB, with `alpha` from ISO 9613-1 at T = 20 °C, RH = 50 %, p = 1 atm.;
   default: `False`
 - **`apply_phase`** — If `True`, multiplies `xprmat` by the propagation phase `exp(-j*2*pi*d/lambda)`
   using the same direct TX-RX distance. The wavelength follows from `center_frequency` and the medium

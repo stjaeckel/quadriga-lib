@@ -5766,14 +5766,16 @@ void quadriga_lib::ray_state_update(
     const arma::Col&lt;short&gt; *mtl_ind_current_in = nullptr,
     const arma::Col&lt;short&gt; *mtl_ind_buffer_in = nullptr,
     const arma::Mat&lt;dtype&gt; *path_dir_prev = nullptr,
-    const arma::Mat&lt;dtype&gt; *acc_dist_in = nullptr,
+    const arma::Col&lt;dtype&gt; *acc_dist_geometric = nullptr,
+    const arma::Col&lt;dtype&gt; *acc_dist_refracted = nullptr,
     arma::Col&lt;short&gt; *mtl_ind_prev_outN = nullptr,
     arma::Col&lt;short&gt; *mtl_ind_current_outN = nullptr,
     arma::Col&lt;short&gt; *mtl_ind_buffer_outN = nullptr,
     arma::Col&lt;dtype&gt; *gainN = nullptr,
     arma::Mat&lt;dtype&gt; *xprmatN = nullptr,
     arma::Mat&lt;dtype&gt; *path_dirN = nullptr,
-    arma::Mat&lt;dtype&gt; *acc_dist_outN = nullptr,
+    arma::Col&lt;dtype&gt; *acc_dist_geometricN = nullptr,
+    arma::Col&lt;dtype&gt; *acc_dist_refractedN = nullptr,
     std::vector&lt;uint8_t&gt; *resolved_typeN = nullptr,
     const arma::u32_vec *ray_indN = nullptr,
     double eps = 0.15);
@@ -5793,7 +5795,8 @@ void quadriga_lib::ray_state_update(
 <li><b><code>mtl_ind_fbsN</code></b>, <b><code>mtl_ind_sbsN</code></b> — Material indices M1 / M2 of the FBS / SBS faces, compact set; <code>[n_rayN]</code> (0 = air)</li>
 <li><b><code>mtl_ind_prev_in</code></b>, <b><code>mtl_ind_current_in</code></b>, <b><code>mtl_ind_buffer_in</code></b> — State words, full ray set; <code>[n_ray]</code>, read at <code>g</code>, never written. NULL reads as state <code>0</code> (outside, no flags).</li>
 <li><b><code>path_dir_prev</code></b> — Physical ray direction entering this segment, full ray set; <code>[n_ray, 3]</code></li>
-<li><b><code>acc_dist_in</code></b> — Accumulated in-layer distance carried into this call, full ray set; <code>[n_ray, 2]</code>; col 1 = refracted distance; col 2 = geometric distance</li>
+<li><b><code>acc_dist_geometric</code></b> — Accumulated geometric in-layer distance carried into this call, full ray set; <code>[n_ray]</code>. NULL reads as 0. Frequency-independent: built from the traced <code>orig</code>-<code>fbs</code> / <code>fbs</code>-<code>dest</code> lengths only, so a multi-frequency caller keeps a single shared instance.</li>
+<li><b><code>acc_dist_refracted</code></b> — Accumulated refracted (VBS) in-layer distance carried into this call, full ray set; <code>[n_ray]</code>. NULL reads as 0. Frequency-dependent, since the Snell bend that defines it follows the material at <code>center_frequency</code>, so a multi-frequency caller keeps one instance per frequency. The two inputs are independent; either may be NULL.</li>
 <li><b><code>ray_indN</code></b> — Compact-to-full ray index map; <code>[n_rayN]</code> to <code>[n_ray]</code>; NULL = identity (<code>n_ray == n_rayN</code>)</li>
 <li><b><code>eps</code></b> <i>(optional)</i> — Thin-slab (Fabry-Pérot) resolve threshold on the round-trip in-slab amplitude <code>ρ</code> (<code>ρ ∈ [0, 1]</code>): the closed-form Airy factor is applied when <code>ρ ≥ eps</code> and the series is re-emitted to the tracer when <code>ρ &amp;lt; eps</code> (weak / fast-decaying slabs). <code>eps = 0</code> always resolves (for callers that cannot re-emit, e.g. <a href="#calc_diffraction_gain">calc_diffraction_gain</a>); <code>eps ≥ 1</code> always re-emits (resolution disabled). A near-pole <code>S</code> or a known non-parallel slab re-emits regardless of <code>eps</code>. Default <code>0.15</code>.</li>
 </ul>
@@ -5804,7 +5807,8 @@ void quadriga_lib::ray_state_update(
 <li><b><code>gainN</code></b> <i>(in/out)</i> — Per-interaction linear power gain, updated in place; <code>[n_rayN]</code>. Kept consistent with <code>xprmatN</code> at every write. A killed ray (<code>resolved_typeN == 0</code>) yields <code>gainN = 0</code> together with an all-zero <code>xprmatN</code>.</li>
 <li><b><code>xprmatN</code></b> <i>(in/out)</i> — Polarization transfer matrix, updated in place; <code>[8, n_rayN]</code> for EM mode, <code>[2, n_rayN]</code> for scalar mode. Same layout and basis convention as in <a href="#ray_mesh_interact">ray_mesh_interact</a>, but with the medium closed out: on return it additionally contains the in-medium attenuation and excess phase of the traversed segment and, when the resolve bit of <code>resolved_typeN</code> is set, the closed-form thin-slab (Airy) factor <code>S</code> covering the full internal multiple-reflection series. FSPL / spreading loss remains excluded, so the matrix is the complete per-interaction Jones factor and can be left-multiplied directly into a per-path product. When the series is re-emitted instead (<code>ρ &amp;lt; eps</code>, resolve bit clear), the matrix carries only the first-pass coefficient and the remaining bounces arrive as separate interactions.</li>
 <li><b><code>path_dirN</code></b> <i>(in/out)</i> — Continuation direction, corrected in place by the VBS construction, compact set; <code>[n_rayN, 3]</code></li>
-<li><b><code>acc_dist_outN</code></b> — Accumulated VBS distance leaving this call, compact set; <code>[n_rayN, 2]</code></li>
+<li><b><code>acc_dist_geometricN</code></b> — Accumulated geometric distance leaving this call, compact set; <code>[n_rayN]</code>. NULL skips the write.</li>
+<li><b><code>acc_dist_refractedN</code></b> — Accumulated refracted (VBS) distance leaving this call, compact set; <code>[n_rayN]</code>. NULL skips the write.</li>
 <li><b><code>resolved_typeN</code></b> <i>(optional)</i> — Resolved interaction-type code, bit-encoded (<code>qd::bits&lt;uint8_t&gt;</code>), compact set; <code>[n_rayN]</code>. 0 = ray killed. NULL skips the write.<br><br>
 <table class="md">
 <tr>

@@ -274,7 +274,9 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
 - **`dest`** — Ray destinations in GCS; `[n_ray, 3]`
 - **`mtl_ind_prev`**, **`mtl_ind_current`**, **`mtl_ind_buffer`** — Medium-state words (bit-masked: `mat = w & 0x7FFF`, `flag = w & 0x8000`); `[n_ray]`
 - **`path_dir_prev`** — Physical ray direction entering the current segment (unit vectors); `[n_ray, 3]`
-- **`acc_dist`** — Accumulated in-layer distance; `[n_ray, 2]`; col 1 = refracted distance, col 2 = geometric distance
+- **`acc_dist`** — Accumulated in-layer distance; `[n_ray, 2]`; col 0 = geometric distance, col 1 = refracted distance.
+  The geometric column is frequency-independent and the refracted one is not, so the layout keeps the shared
+  column first: a later multi-frequency version widens this to `[n_ray, 1 + n_freq]`
 - **`paths`** — Per-ray [[path]] objects; `n_ray` entries. Frequency count and layout must match
   `center_frequency` and `scalar_mode`. Terminated paths are freed; surviving paths carry the appended
   interaction segment and the updated polarization product
@@ -728,8 +730,8 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
                 // Outside a medium the physical direction is the geometric one, so every sub-beam
                 // gets its own recomputed direction and a cleared in-object accumulator. Inside a
                 // medium the tracked direction is the refracted one and deliberately differs from
-                // the geometric continuation, and the accumulator holds the in-layer distance
-                // travelled so far, so both are inherited from the parent. ray_subdivide_flag only
+                // the geometric continuation, and the accumulator holds both in-layer distances
+                // travelled so far, so all are inherited from the parent. ray_subdivide_flag only
                 // ever flags rays outside a medium, but a delegated subdiv_flag_in is authoritative
                 // and may flag either state, so both branches are reachable.
                 if (outside)
@@ -793,6 +795,12 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
     arma::uword n_interact = n_keep; // Stride of every per-ray array from here on
     keep_ind.reset();                // No longer needed, reused as scratch by check_gains
 
+    // Column views onto the accumulator. ray_state_update takes the geometric and the refracted
+    // distance as separate vectors, so no copy is needed. These alias acc_dist and do not own its
+    // memory, so they must be released before acc_dist itself is.
+    const arma::fvec acc_geo(acc_dist.colptr(0), n_interact, false, true);
+    const arma::fvec acc_ref(acc_dist.colptr(1), n_interact, false, true);
+
     // Build material indices
     arma::Col<short> mtl_ind_fbs, mtl_ind_sbs;
     if (n_interact) // All rays may be subdivided
@@ -828,7 +836,8 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
     std::vector<uint8_t> interact_type;        // Interaction type code
     arma::fmat path_dirN;                      // Refraction-correct path direction
     arma::Col<short> prevN, currentN, bufferN; // New state words
-    arma::fmat acc_distN;                      // Updated accumulated VBS distance
+    arma::fvec acc_geoN;                       // Updated accumulated geometric distance
+    arma::fvec acc_refN;                       // Updated accumulated refracted (VBS) distance
 
     // Compute existing gains @ reference freq
     // calc_gain (sqrt + divide) is hoisted out of check_gains, which is serial because it
@@ -915,7 +924,8 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
         const short *cC = currentN.memptr();
         const short *cB = bufferN.memptr();
         const float *p_path_dirN = path_dirN.memptr();
-        const float *p_acc_distN = acc_distN.memptr();
+        const float *p_acc_geoN = acc_geoN.memptr();
+        const float *p_acc_refN = acc_refN.memptr();
         const float *p_fbs = fbsN.memptr();
         const float *p_xpr = xprmatN.memptr();
         const uint8_t *p_type = interact_type.data();
@@ -969,9 +979,9 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
             p_dir[i_out3 + 1] = p_path_dirN[iY];
             p_dir[i_out3 + 2] = p_path_dirN[iZ];
 
-            // Update in-object accumulator
-            p_acc[2 * i_out] = p_acc_distN[iX];
-            p_acc[2 * i_out + 1] = p_acc_distN[iY];
+            // Update in-object accumulator, col 1 = geometric, col 2 = refracted
+            p_acc[2 * i_out] = p_acc_geoN[iX];
+            p_acc[2 * i_out + 1] = p_acc_refN[iX];
 
             // Add new segment to path storage and left-multiply XPR matrix at base frequency
             paths[iX].extend(p_path[i_out], p_fbs[iX], p_fbs[iY], p_fbs[iZ], p_type[iX]);
@@ -1016,8 +1026,8 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
                                                   &fbsN, &sbsN, &no_interact, &fbs_angleN, &normal_vecN,
                                                   &interact_type, &mtl_prop, &mtl_ind_fbs, &mtl_ind_sbs,
                                                   &mtl_ind_prev, &mtl_ind_current, &mtl_ind_buffer,
-                                                  &path_dir_prev, &acc_dist, nullptr, nullptr, nullptr,
-                                                  nullptr, &xprmatN, &path_dirN, &acc_distN,
+                                                  &path_dir_prev, &acc_geo, &acc_ref, nullptr, nullptr, nullptr,
+                                                  nullptr, &xprmatN, &path_dirN, &acc_geoN, &acc_refN,
                                                   nullptr, nullptr, (double)thin_slab_threshold);
 
             const float *p_xpr_freq = xprmatN.memptr();
@@ -1054,9 +1064,9 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
                                               &no_interact, &fbs_angleN, &normal_vecN, &interact_type,
                                               &mtl_prop, &mtl_ind_fbs, &mtl_ind_sbs,
                                               &mtl_ind_prev, &mtl_ind_current, &mtl_ind_buffer,
-                                              &path_dir_prev, &acc_dist,
+                                              &path_dir_prev, &acc_geo, &acc_ref,
                                               &prevN, &currentN, &bufferN,
-                                              &gainN, &xprmatN, &path_dirN, &acc_distN,
+                                              &gainN, &xprmatN, &path_dirN, &acc_geoN, &acc_refN,
                                               &interact_type, // Aliasing OK and deliberate
                                               nullptr, (double)thin_slab_threshold);
 
@@ -1091,9 +1101,9 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
                                               &no_interact, &fbs_angleN, &normal_vecN, &interact_type,
                                               &mtl_prop, &mtl_ind_fbs, &mtl_ind_sbs,
                                               &mtl_ind_prev, &mtl_ind_current, &mtl_ind_buffer,
-                                              &path_dir_prev, &acc_dist,
+                                              &path_dir_prev, &acc_geo, &acc_ref,
                                               &prevN, &currentN, &bufferN,
-                                              &gainN, &xprmatN, &path_dirN, &acc_distN,
+                                              &gainN, &xprmatN, &path_dirN, &acc_geoN, &acc_refN,
                                               &interact_type, // Aliasing OK and deliberate
                                               nullptr, (double)thin_slab_threshold);
 
@@ -1110,7 +1120,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
     mtl_ind_prev.reset(), mtl_ind_current.reset(), mtl_ind_buffer.reset();
     origN.reset(), destN.reset(), fbsN.reset(), sbsN.reset(), xprmatN.reset();
     prevN.reset(), currentN.reset(), bufferN.reset();
-    path_dirN.reset(), acc_distN.reset(), normal_vecN.reset(), fbs_angleN.reset();
+    path_dirN.reset(), acc_geoN.reset(), acc_refN.reset(), normal_vecN.reset(), fbs_angleN.reset();
     no_interact.reset(), fbs_ind.reset(), sbs_ind.reset();
     mtl_ind_fbs.reset(), mtl_ind_sbs.reset(), keep_ind.reset();
     if (beam_mode)
