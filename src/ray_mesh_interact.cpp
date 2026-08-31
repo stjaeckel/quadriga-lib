@@ -1745,14 +1745,16 @@ void quadriga_lib::ray_state_update(
     const arma::Col<short> *mtl_ind_current_in = nullptr,
     const arma::Col<short> *mtl_ind_buffer_in = nullptr,
     const arma::Mat<dtype> *path_dir_prev = nullptr,
-    const arma::Mat<dtype> *acc_dist_in = nullptr,
+    const arma::Col<dtype> *acc_dist_geometric = nullptr,
+    const arma::Col<dtype> *acc_dist_refracted = nullptr,
     arma::Col<short> *mtl_ind_prev_outN = nullptr,
     arma::Col<short> *mtl_ind_current_outN = nullptr,
     arma::Col<short> *mtl_ind_buffer_outN = nullptr,
     arma::Col<dtype> *gainN = nullptr,
     arma::Mat<dtype> *xprmatN = nullptr,
     arma::Mat<dtype> *path_dirN = nullptr,
-    arma::Mat<dtype> *acc_dist_outN = nullptr,
+    arma::Col<dtype> *acc_dist_geometricN = nullptr,
+    arma::Col<dtype> *acc_dist_refractedN = nullptr,
     std::vector<uint8_t> *resolved_typeN = nullptr,
     const arma::u32_vec *ray_indN = nullptr,
     double eps = 0.15);
@@ -1774,7 +1776,13 @@ void quadriga_lib::ray_state_update(
 - **`mtl_ind_prev_in`**, **`mtl_ind_current_in`**, **`mtl_ind_buffer_in`** — State words, full ray set; `[n_ray]`,
   read at `g`, never written. NULL reads as state `0` (outside, no flags).
 - **`path_dir_prev`** — Physical ray direction entering this segment, full ray set; `[n_ray, 3]`
-- **`acc_dist_in`** — Accumulated in-layer distance carried into this call, full ray set; `[n_ray, 2]`; col 1 = refracted distance; col 2 = geometric distance
+- **`acc_dist_geometric`** — Accumulated geometric in-layer distance carried into this call, full ray set; `[n_ray]`.
+  NULL reads as 0. Frequency-independent: built from the traced `orig`-`fbs` / `fbs`-`dest` lengths only, so a
+  multi-frequency caller keeps a single shared instance.
+- **`acc_dist_refracted`** — Accumulated refracted (VBS) in-layer distance carried into this call, full ray set; `[n_ray]`.
+  NULL reads as 0. Frequency-dependent, since the Snell bend that defines it follows the material at
+  `center_frequency`, so a multi-frequency caller keeps one instance per frequency. The two inputs are
+  independent; either may be NULL.
 - **`ray_indN`** — Compact-to-full ray index map; `[n_rayN]` to `[n_ray]`; NULL = identity (`n_ray == n_rayN`)
 - **`eps`** *(optional)* — Thin-slab (Fabry-Pérot) resolve threshold on the round-trip in-slab
   amplitude `ρ` (`ρ ∈ [0, 1]`): the closed-form Airy factor is applied when `ρ ≥ eps` and the series
@@ -1800,7 +1808,8 @@ void quadriga_lib::ray_state_update(
   per-path product. When the series is re-emitted instead (`ρ < eps`, resolve bit clear), the matrix carries
   only the first-pass coefficient and the remaining bounces arrive as separate interactions.
 - **`path_dirN`** *(in/out)* — Continuation direction, corrected in place by the VBS construction, compact set; `[n_rayN, 3]`
-- **`acc_dist_outN`** — Accumulated VBS distance leaving this call, compact set; `[n_rayN, 2]`
+- **`acc_dist_geometricN`** — Accumulated geometric distance leaving this call, compact set; `[n_rayN]`. NULL skips the write.
+- **`acc_dist_refractedN`** — Accumulated refracted (VBS) distance leaving this call, compact set; `[n_rayN]`. NULL skips the write.
 - **`resolved_typeN`** *(optional)* — Resolved interaction-type code, bit-encoded (`qd::bits<uint8_t>`),
   compact set; `[n_rayN]`. 0 = ray killed. NULL skips the write.<br><br>
    | Bit  | Flag        | Meaning                                                                        |
@@ -1863,14 +1872,16 @@ void quadriga_lib::ray_state_update(int interaction_type,
                                     const arma::Col<short> *mtl_ind_current_in,
                                     const arma::Col<short> *mtl_ind_buffer_in,
                                     const arma::Mat<dtype> *path_dir_prev,
-                                    const arma::Mat<dtype> *acc_dist_in,
+                                    const arma::Col<dtype> *acc_dist_geometric,
+                                    const arma::Col<dtype> *acc_dist_refracted,
                                     arma::Col<short> *mtl_ind_prev_outN,
                                     arma::Col<short> *mtl_ind_current_outN,
                                     arma::Col<short> *mtl_ind_buffer_outN,
                                     arma::Col<dtype> *gainN,
                                     arma::Mat<dtype> *xprmatN,
                                     arma::Mat<dtype> *path_dirN,
-                                    arma::Mat<dtype> *acc_dist_outN,
+                                    arma::Col<dtype> *acc_dist_geometricN,
+                                    arma::Col<dtype> *acc_dist_refractedN,
                                     std::vector<uint8_t> *resolved_typeN,
                                     const arma::u32_vec *ray_indN,
                                     double eps)
@@ -1960,9 +1971,13 @@ void quadriga_lib::ray_state_update(int interaction_type,
         throw std::invalid_argument("Input 'path_dir_prev' must have size [n_ray, 3].");
     const dtype *p_path_dir_prev = path_dir_prev ? path_dir_prev->memptr() : nullptr;
 
-    if (acc_dist_in && acc_dist_in->n_rows != n_ray)
-        throw std::invalid_argument("Number of rows in 'acc_dist_in' must match the number of rays in 'orig'.");
-    const dtype *p_acc_dist_in = acc_dist_in ? acc_dist_in->memptr() : nullptr;
+    if (acc_dist_geometric && acc_dist_geometric->n_elem != n_ray)
+        throw std::invalid_argument("Input 'acc_dist_geometric' must match the number of rays in 'orig'.");
+    const dtype *p_acc_geo_in = acc_dist_geometric ? acc_dist_geometric->memptr() : nullptr;
+
+    if (acc_dist_refracted && acc_dist_refracted->n_elem != n_ray)
+        throw std::invalid_argument("Input 'acc_dist_refracted' must match the number of rays in 'orig'.");
+    const dtype *p_acc_refract_in = acc_dist_refracted ? acc_dist_refracted->memptr() : nullptr;
 
     if (mtl_ind_prev_outN && mtl_ind_prev_outN->n_elem != n_rayN)
         mtl_ind_prev_outN->set_size(n_rayN);
@@ -1988,9 +2003,13 @@ void quadriga_lib::ray_state_update(int interaction_type,
         throw std::invalid_argument("In-out 'path_dirN' must have size [n_rayN, 3].");
     dtype *p_path_dirN = path_dirN ? path_dirN->memptr() : nullptr;
 
-    if (acc_dist_outN && (acc_dist_outN->n_rows != n_rayN || acc_dist_outN->n_cols != 2))
-        acc_dist_outN->set_size(n_rayN, 2);
-    dtype *p_acc_dist_outN = acc_dist_outN ? acc_dist_outN->memptr() : nullptr;
+    if (acc_dist_geometricN && acc_dist_geometricN->n_elem != n_rayN)
+        acc_dist_geometricN->set_size(n_rayN);
+    dtype *p_acc_geo_outN = acc_dist_geometricN ? acc_dist_geometricN->memptr() : nullptr;
+
+    if (acc_dist_refractedN && acc_dist_refractedN->n_elem != n_rayN)
+        acc_dist_refractedN->set_size(n_rayN);
+    dtype *p_acc_refract_outN = acc_dist_refractedN ? acc_dist_refractedN->memptr() : nullptr;
 
     if (resolved_typeN && resolved_typeN->size() != n_rayN)
         resolved_typeN->resize(n_rayN, 0); // Init to 0
@@ -2177,8 +2196,8 @@ void quadriga_lib::ray_state_update(int interaction_type,
         }
 
         // Accumulated in-medium distance
-        double dist_refract = p_acc_dist_in ? (double)p_acc_dist_in[i_ray] : 0.0;
-        double dist_geo = p_acc_dist_in ? (double)p_acc_dist_in[i_ray + n_ray] : 0.0;
+        double dist_refract = p_acc_refract_in ? (double)p_acc_refract_in[i_ray] : 0.0;
+        double dist_geo = p_acc_geo_in ? (double)p_acc_geo_in[i_ray] : 0.0;
         auto DIST_ADD = [&](double val_refract = 0.0, double val_geo = 0.0)
         {
             dist_refract += (val_refract == 0.0) ? dist_orig_vbs : val_refract;
@@ -2694,11 +2713,10 @@ void quadriga_lib::ray_state_update(int interaction_type,
             p_cur_outN[ii] = next_current;
         if (p_buf_outN)
             p_buf_outN[ii] = next_buffer;
-        if (p_acc_dist_outN)
-        {
-            p_acc_dist_outN[ii] = (dtype)dist_refract;
-            p_acc_dist_outN[ii + n_rayN] = (dtype)dist_geo;
-        }
+        if (p_acc_geo_outN)
+            p_acc_geo_outN[ii] = (dtype)dist_geo;
+        if (p_acc_refract_outN)
+            p_acc_refract_outN[ii] = (dtype)dist_refract;
         if (p_resolved_typeN)
             p_resolved_typeN[ii] = (uint8_t)typeR;
     }
@@ -2713,11 +2731,14 @@ template void quadriga_lib::ray_state_update(int interaction_type, float center_
                                              const arma::Col<short> *mtl_ind_fbs, const arma::Col<short> *mtl_ind_sbs,
                                              const arma::Col<short> *mtl_ind_prev_in, const arma::Col<short> *mtl_ind_current_in,
                                              const arma::Col<short> *mtl_ind_buffer_in,
-                                             const arma::Mat<float> *path_dir_prev, const arma::Mat<float> *acc_dist_in,
+                                             const arma::Mat<float> *path_dir_prev,
+                                             const arma::Col<float> *acc_dist_geometric, const arma::Col<float> *acc_dist_refracted,
                                              arma::Col<short> *mtl_ind_prev_outN, arma::Col<short> *mtl_ind_current_outN,
                                              arma::Col<short> *mtl_ind_buffer_outN,
                                              arma::Col<float> *gainN, arma::Mat<float> *xprmatN,
-                                             arma::Mat<float> *path_dirN, arma::Mat<float> *acc_dist_outN, std::vector<uint8_t> *resolved_typeN,
+                                             arma::Mat<float> *path_dirN,
+                                             arma::Col<float> *acc_dist_geometricN, arma::Col<float> *acc_dist_refractedN,
+                                             std::vector<uint8_t> *resolved_typeN,
                                              const arma::u32_vec *ray_indN, double eps);
 
 template void quadriga_lib::ray_state_update(int interaction_type, double center_frequency,
@@ -2729,9 +2750,12 @@ template void quadriga_lib::ray_state_update(int interaction_type, double center
                                              const arma::Col<short> *mtl_ind_fbs, const arma::Col<short> *mtl_ind_sbs,
                                              const arma::Col<short> *mtl_ind_prev_in, const arma::Col<short> *mtl_ind_current_in,
                                              const arma::Col<short> *mtl_ind_buffer_in,
-                                             const arma::Mat<double> *path_dir_prev, const arma::Mat<double> *acc_dist_in,
+                                             const arma::Mat<double> *path_dir_prev,
+                                             const arma::Col<double> *acc_dist_geometric, const arma::Col<double> *acc_dist_refracted,
                                              arma::Col<short> *mtl_ind_prev_outN, arma::Col<short> *mtl_ind_current_outN,
                                              arma::Col<short> *mtl_ind_buffer_outN,
                                              arma::Col<double> *gainN, arma::Mat<double> *xprmatN,
-                                             arma::Mat<double> *path_dirN, arma::Mat<double> *acc_dist_outN, std::vector<uint8_t> *resolved_typeN,
+                                             arma::Mat<double> *path_dirN,
+                                             arma::Col<double> *acc_dist_geometricN, arma::Col<double> *acc_dist_refractedN,
+                                             std::vector<uint8_t> *resolved_typeN,
                                              const arma::u32_vec *ray_indN, double eps);

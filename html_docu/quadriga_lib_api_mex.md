@@ -1,7 +1,7 @@
 ---
 title: "MATLAB / Octave API Documentation for Quadriga-Lib v0.12.2"
 author: "Stephan Jaeckel"
-date: "26.08.2026"
+date: "28.08.2026"
 lang: en-US
 ---
 
@@ -71,21 +71,21 @@ lang: en-US
 | [version](#version) | Miscellaneous / Tools | 1845 |
 | [write_png](#write_png) | Miscellaneous / Tools | 1862 |
 | [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 1886 |
-| [cube](#cube) | Site-specific simulation tools | 1934 |
-| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 1967 |
-| [icosphere](#icosphere) | Site-specific simulation tools | 2005 |
-| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 2031 |
-| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 2079 |
-| [plane](#plane) | Site-specific simulation tools | 2131 |
-| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 2168 |
-| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 2195 |
-| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 2222 |
-| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 2251 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 2348 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 2388 |
-| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 2428 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 2452 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 2479 |
+| [cube](#cube) | Site-specific simulation tools | 1951 |
+| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 1984 |
+| [icosphere](#icosphere) | Site-specific simulation tools | 2022 |
+| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 2048 |
+| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 2096 |
+| [plane](#plane) | Site-specific simulation tools | 2148 |
+| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 2185 |
+| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 2212 |
+| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 2239 |
+| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 2268 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 2365 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 2405 |
+| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 2445 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 2469 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 2496 |
 
 ---
 
@@ -1897,7 +1897,8 @@ Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh
 ### Usage:
 ```
 [ gain, xprmat, coord ] = quadriga_lib.calc_diffraction_gain( orig, dest, mesh, mtl_ind, mtl_prop, ...
-    center_freq, lod, verbose, sub_mesh_index, use_kernel, gpu_id, scalar_mode, resolve_multi_bounce );
+    center_freq, lod, verbose, sub_mesh_index, use_kernel, gpu_id, scalar_mode, thin_slab_threshold, ...
+    apply_fspl, apply_phase );
 ```
 
 ### Inputs:
@@ -1907,7 +1908,8 @@ Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh
 - **`mtl_ind`** — 1-based material index per face (0 = no material; the `csv_ind` output of [obj_file_read](#obj_file_read)); `[n_mesh]`
 - **`mtl_prop`** — Material properties as a struct; each field is one column (the `csv_prop` output of
   [obj_file_read](#obj_file_read)); each field holds a vector of length `n_mtl`
-- **`center_freq`** — Center frequency
+- **`center_freq`** — Center frequency in Hz. In scalar mode this is the true acoustic frequency;
+  it is converted internally to the EM-equivalent frequency used by the core
 - **`lod`** — Level of detail (0–6), controls `n_path` and `n_seg`; see [generate_diffraction_paths](#generate_diffraction_paths); default: 2
 - **`verbose`** — Verbosity level; default: 0 (no output)
 - **`sub_mesh_index`** — 1-based sub-mesh index for acceleration; see [triangle_mesh_segmentation](#triangle_mesh_segmentation);  `[n_mesh, 1]`;
@@ -1918,17 +1920,32 @@ Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh
   energy-conservation transmission) instead of EM TE/TM averaging. Default `false` (EM mode).
 - **`thin_slab_threshold`** — Thin-slab (Fabry-Pérot) resolve threshold; 0 = resolve always (default), 
   1 = resolve never, see [ray_state_update](#ray_state_update)
+- **`apply_fspl`** — If `true`, folds the geometric spreading loss into `gain`, making it an absolute
+  propagation gain instead of a value relative to FSPL. The reference distance is the direct TX-RX
+  distance, matching the `path_length` used by [qrt_file_read](#qrt_file_read) for a
+  transmission-only path. EM mode: `32.45 + 20*log10(f_GHz) + 20*log10(d_m)` dB; scalar mode:
+  `20*log10(d_m) + alpha(f)*d_m` dB, with `alpha` from ISO 9613-1 at T = 20 °C, RH = 50 %, p = 1 atm; default: `false`
+- **`apply_phase`** — If `true`, multiplies `xprmat` by the propagation phase `exp(-j*2*pi*d/lambda)`
+  using the same direct TX-RX distance. The wavelength follows from `center_freq` and the medium wave
+  speed (speed of light in EM mode, speed of sound in scalar mode). The term has unit magnitude, so
+  `xprmat` stays normalized. This is the phase [get_channels_spherical](#get_channels_spherical) would otherwise add from
+  `path_length`; default: `false`
 
 ### Outputs:
-- **`gain`** — Diffraction gain per TX-RX pair, linear scale; `[n_pos, 1]`
-- **`xprmat`** — For EM mode: polarization transfer matrix excluding FSPL, interleaved complex, col-major 
-  `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]`; `[8, n_pos]`; For scalar mode: scalar pressure coefficient `[Re Im]`; `[2, n_pos]`.
+- **`gain`** — Diffraction gain per TX-RX pair, linear power scale; `[n_pos, 1]`. Relative to FSPL by
+  default (bounded by 0 and 1), absolute propagation gain when `apply_fspl = true`
+- **`xprmat`** — Normalized polarization transfer matrix: the amplitude carries no path gain (max column
+  power is 1), only the relative polarization coupling and phase; `gain` holds the power. EM mode:
+  interleaved complex, col-major `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]`; `[8, n_pos]`; scalar mode:
+  scalar pressure coefficient `[Re Im]`; `[2, n_pos]`
 - **`coord`** — Diffracted path coordinates excluding endpoints; `[3, n_seg-1, n_pos]`
 
 ### See also:
 - [generate_diffraction_paths](#generate_diffraction_paths) (controls path/segment count via `lod`)
 - [triangle_mesh_segmentation](#triangle_mesh_segmentation) (generates `sub_mesh_index`)
 - [obj_file_read](#obj_file_read) (defines `mtl_prop` format)
+- [qrt_file_read](#qrt_file_read) (same path-loss model, used by `apply_fspl`)
+- [get_channels_spherical](#get_channels_spherical) (applies the same propagation phase as `apply_phase`)
 
 ---
 ## cube

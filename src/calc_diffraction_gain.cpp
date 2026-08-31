@@ -195,8 +195,9 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
     // Cosine of the air-medium angle, needed for calculating the in-medium compression factor
     arma::Col<dtype> g_cosair(G, arma::fill::zeros);
 
-    // Accumulated distance: col 0 = dist_refract, col 1 = dist_geo
-    arma::Mat<dtype> g_acc(G, 2, arma::fill::zeros);
+    // Accumulated in-medium distance, tracked separately for the geometric and the refracted path
+    arma::Col<dtype> g_acc_geo(G, arma::fill::zeros);
+    arma::Col<dtype> g_acc_ref(G, arma::fill::zeros);
 
     // Allocate memory for continued rays start and end points
     arma::Mat<dtype> c_orig(G, 3, arma::fill::none); // Origin of continued ray
@@ -358,7 +359,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
 
             // Declare outputs of ray_state_update
             arma::Col<short> prev_out, cur_out, buf_out; // State words
-            arma::Mat<dtype> acc_out;                    // Accumulated distance
+            arma::Col<dtype> acc_geo_out, acc_ref_out;   // Accumulated distance
             std::vector<uint8_t> res_type;               // Resolved type
 
             // Only store resolved type for debugging
@@ -371,7 +372,8 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
                 arma::Col<short> mtl_fbs(R, arma::fill::none);   // FBS face material, 1-based
                 arma::Col<short> mtl_sbs(R, arma::fill::none);   // SBS face material, 1-based
                 arma::Mat<dtype> dir_in(R, 3, arma::fill::none); // Physical ray direction
-                arma::Mat<dtype> acc_in(R, 2, arma::fill::none); // Accumulated distance
+                arma::Col<dtype> acc_geo_in(R, arma::fill::none); // Accumulated geometric distance
+                arma::Col<dtype> acc_ref_in(R, arma::fill::none); // Accumulated refracted distance
 
                 // Direct pointer access
                 short *p_prev_in = prev_in.memptr();
@@ -380,7 +382,8 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
                 short *p_mtl_fbs = mtl_fbs.memptr();
                 short *p_mtl_sbs = mtl_sbs.memptr();
                 dtype *p_dir_in = dir_in.memptr();
-                dtype *p_acc_in = acc_in.memptr();
+                dtype *p_acc_geo_in = acc_geo_in.memptr();
+                dtype *p_acc_ref_in = acc_ref_in.memptr();
 
                 for (arma::uword iR = 0; iR < R; ++iR) // R-set
                 {
@@ -393,8 +396,8 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
                     p_dir_in[iR] = g_dir.at(iG, 0);                                           // Refracted direction (x)
                     p_dir_in[iR + R] = g_dir.at(iG, 1);                                       // Refracted direction (y)
                     p_dir_in[iR + 2 * R] = g_dir.at(iG, 2);                                   // Refracted direction (z)
-                    p_acc_in[iR] = g_acc.at(iG, 0);                                           // Refracted distance
-                    p_acc_in[iR + R] = g_acc.at(iG, 1);                                       // Geometric distance
+                    p_acc_ref_in[iR] = g_acc_ref[iG];                                         // Refracted distance
+                    p_acc_geo_in[iR] = g_acc_geo[iG];                                         // Geometric distance
 
                     if (no_interact[iR] == 0) // Overwrite zero-hit normal vectors with the buffered ones
                         normal_vec(iR, 0) = g_normal(iG, 0), normal_vec(iR, 1) = g_normal(iG, 1), normal_vec(iR, 2) = g_normal(iG, 2);
@@ -406,10 +409,10 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
                                                       &hit_type,                                    // Hit type code
                                                       &mtl_prop, &mtl_fbs, &mtl_sbs,                // FBS/SBS materials
                                                       &prev_in, &cur_in, &buf_in,                   // Previous state, reduced-set
-                                                      &dir_in, &acc_in,                             // path_dir_prev, acc_dist_in
+                                                      &dir_in, &acc_geo_in, &acc_ref_in,            // path_dir_prev, acc_dist in
                                                       &prev_out, &cur_out, &buf_out,                // Next state words
                                                       &gainN, &xprmatN,                             // gain, xprmat of transition
-                                                      &dirN, &acc_out,                              // path_dirN, acc_dist_outN
+                                                      &dirN, &acc_geo_out, &acc_ref_out,            // path_dirN, acc_dist out
                                                       ptr_res_type,                                 // resolved_typeN
                                                       nullptr,                                      // No compaction n_rayN == n_ray
                                                       thin_slab_threshold);
@@ -439,7 +442,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
                 // Account for in-medium gain if the last segment ends inside an object
                 // Note: the in-medium gain for intermediate segments is resolved by ray_state_update
                 if (last_segment && !ray_continues)
-                    seg_weight *= new_cur ? quadriga_lib::medium_gain<dtype>(mtl_prop, (arma::uword)new_cur, acc_out.at(iR, 0), center_frequency) : 1.0;
+                    seg_weight *= new_cur ? quadriga_lib::medium_gain<dtype>(mtl_prop, (arma::uword)new_cur, acc_ref_out[iR], center_frequency) : 1.0;
 
                 // Capture cos(theta_air)
                 if (old_cur == 0 && new_cur != 0)                     // air -> medium: capture cos(theta_air)
@@ -477,7 +480,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
                               << ", prev " << (g_prev[iG] & (short)0x7FFF) << ">" << (prev_out[iR] & (short)0x7FFF)
                               << ", buf " << g_buf[iG] << ">" << buf_out[iR]
                               << ", P " << p_weight[iD] << " > " << seg_weight
-                              << ", acc (" << g_acc.at(iG, 0) << ", " << g_acc.at(iG, 1) << ") > (" << acc_out.at(iR, 0) << ", " << acc_out.at(iR, 1) << ")"
+                              << ", acc (" << g_acc_ref[iG] << ", " << g_acc_geo[iG] << ") > (" << acc_ref_out[iR] << ", " << acc_geo_out[iR] << ")"
                               << ", O(" << s_orig.at(iG, 0) << "," << s_orig.at(iG, 1) << "," << s_orig.at(iG, 2) << ")"
                               << ", D(" << s_dest.at(iG, 0) << "," << s_dest.at(iG, 1) << "," << s_dest.at(iG, 2) << ")"
                               << ", F" << fbs_ind[iR] << "-(" << fbsN.at(iG, 0) << "," << fbsN.at(iG, 1) << "," << fbsN.at(iG, 2) << ")"
@@ -491,7 +494,8 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
                 g_prev[iG] = prev_out[iR];
                 g_cur[iG] = cur_out[iR];
                 g_buf[iG] = buf_out[iR];
-                g_acc.row(iG) = acc_out.row(iR);
+                g_acc_geo[iG] = acc_geo_out[iR];
+                g_acc_ref[iG] = acc_ref_out[iR];
                 g_dir.row(iG) = dirN.row(iR);
                 if (new_cur == 0) // outside: clear stale direction
                     g_dir.row(iG).zeros();

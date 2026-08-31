@@ -1,7 +1,7 @@
 ---
 title: "C++ API Documentation for Quadriga-Lib v0.12.2"
 author: "Stephan Jaeckel"
-date: "26.08.2026"
+date: "28.08.2026"
 lang: en-US
 ---
 
@@ -128,16 +128,16 @@ lang: en-US
 | [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 4191 |
 | [ray_progress](#ray_progress) | Site-specific simulation tools | 4239 |
 | [ray_state_update](#ray_state_update) | Site-specific simulation tools | 4377 |
-| [ray_subdivide_flag](#ray_subdivide_flag) | Site-specific simulation tools | 4510 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 4571 |
-| [refractive_index](#refractive_index) | Site-specific simulation tools | 4619 |
-| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 4651 |
-| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 4709 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 4739 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 4767 |
-| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 4808 |
-| [write_png](#write_png) | Site-specific simulation tools | 4843 |
-| [xpr_update](#xpr_update) | Site-specific simulation tools | 4869 |
+| [ray_subdivide_flag](#ray_subdivide_flag) | Site-specific simulation tools | 4519 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 4580 |
+| [refractive_index](#refractive_index) | Site-specific simulation tools | 4628 |
+| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 4660 |
+| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 4718 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 4748 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 4776 |
+| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 4817 |
+| [write_png](#write_png) | Site-specific simulation tools | 4852 |
+| [xpr_update](#xpr_update) | Site-specific simulation tools | 4878 |
 
 ---
 
@@ -4408,14 +4408,16 @@ void quadriga_lib::ray_state_update(
     const arma::Col<short> *mtl_ind_current_in = nullptr,
     const arma::Col<short> *mtl_ind_buffer_in = nullptr,
     const arma::Mat<dtype> *path_dir_prev = nullptr,
-    const arma::Mat<dtype> *acc_dist_in = nullptr,
+    const arma::Col<dtype> *acc_dist_geometric = nullptr,
+    const arma::Col<dtype> *acc_dist_refracted = nullptr,
     arma::Col<short> *mtl_ind_prev_outN = nullptr,
     arma::Col<short> *mtl_ind_current_outN = nullptr,
     arma::Col<short> *mtl_ind_buffer_outN = nullptr,
     arma::Col<dtype> *gainN = nullptr,
     arma::Mat<dtype> *xprmatN = nullptr,
     arma::Mat<dtype> *path_dirN = nullptr,
-    arma::Mat<dtype> *acc_dist_outN = nullptr,
+    arma::Col<dtype> *acc_dist_geometricN = nullptr,
+    arma::Col<dtype> *acc_dist_refractedN = nullptr,
     std::vector<uint8_t> *resolved_typeN = nullptr,
     const arma::u32_vec *ray_indN = nullptr,
     double eps = 0.15);
@@ -4437,7 +4439,13 @@ void quadriga_lib::ray_state_update(
 - **`mtl_ind_prev_in`**, **`mtl_ind_current_in`**, **`mtl_ind_buffer_in`** — State words, full ray set; `[n_ray]`,
   read at `g`, never written. NULL reads as state `0` (outside, no flags).
 - **`path_dir_prev`** — Physical ray direction entering this segment, full ray set; `[n_ray, 3]`
-- **`acc_dist_in`** — Accumulated in-layer distance carried into this call, full ray set; `[n_ray, 2]`; col 1 = refracted distance; col 2 = geometric distance
+- **`acc_dist_geometric`** — Accumulated geometric in-layer distance carried into this call, full ray set; `[n_ray]`.
+  NULL reads as 0. Frequency-independent: built from the traced `orig`-`fbs` / `fbs`-`dest` lengths only, so a
+  multi-frequency caller keeps a single shared instance.
+- **`acc_dist_refracted`** — Accumulated refracted (VBS) in-layer distance carried into this call, full ray set; `[n_ray]`.
+  NULL reads as 0. Frequency-dependent, since the Snell bend that defines it follows the material at
+  `center_frequency`, so a multi-frequency caller keeps one instance per frequency. The two inputs are
+  independent; either may be NULL.
 - **`ray_indN`** — Compact-to-full ray index map; `[n_rayN]` to `[n_ray]`; NULL = identity (`n_ray == n_rayN`)
 - **`eps`** *(optional)* — Thin-slab (Fabry-Pérot) resolve threshold on the round-trip in-slab
   amplitude `ρ` (`ρ ∈ [0, 1]`): the closed-form Airy factor is applied when `ρ ≥ eps` and the series
@@ -4463,7 +4471,8 @@ void quadriga_lib::ray_state_update(
   per-path product. When the series is re-emitted instead (`ρ < eps`, resolve bit clear), the matrix carries
   only the first-pass coefficient and the remaining bounces arrive as separate interactions.
 - **`path_dirN`** *(in/out)* — Continuation direction, corrected in place by the VBS construction, compact set; `[n_rayN, 3]`
-- **`acc_dist_outN`** — Accumulated VBS distance leaving this call, compact set; `[n_rayN, 2]`
+- **`acc_dist_geometricN`** — Accumulated geometric distance leaving this call, compact set; `[n_rayN]`. NULL skips the write.
+- **`acc_dist_refractedN`** — Accumulated refracted (VBS) distance leaving this call, compact set; `[n_rayN]`. NULL skips the write.
 - **`resolved_typeN`** *(optional)* — Resolved interaction-type code, bit-encoded (`qd::bits<uint8_t>`),
   compact set; `[n_rayN]`. 0 = ray killed. NULL skips the write.
    | Bit  | Flag        | Meaning                                                                        |

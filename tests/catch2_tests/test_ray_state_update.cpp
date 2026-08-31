@@ -380,7 +380,8 @@ static inline std::complex<double> close_at(int m, double L, double f = FRQ)
 // Call harness. Owns every argument of ray_state_update; has_* switches turn each optional
 // (and, for the validation group, required) pointer into nullptr. run() snapshots the incoming
 // gain / xprmat so factor checks can compare out against in.
-//   Full ray set  [n_ray]  : orig, dest, no_interact, prev_in, cur_in, buf_in, path_dir_prev, acc_dist_in
+//   Full ray set  [n_ray]  : orig, dest, no_interact, prev_in, cur_in, buf_in, path_dir_prev,
+//                            acc_dist_geometric, acc_dist_refracted
 //   Compact set   [n_rayN] : fbs, sbs, fbs_angle, normals, out_type, m1, m2, and every output
 template <typename dtype>
 struct Rsu
@@ -399,13 +400,15 @@ struct Rsu
     arma::Col<short> m1, m2;                  // compact [n_rayN]
     arma::Col<short> prev_in, cur_in, buf_in; // full [n_ray]
     arma::Mat<dtype> path_dir_prev;           // full  [n_ray, 3]
-    arma::Mat<dtype> acc_dist_in;             // full  [n_ray, 2]  (col 0 refracted, col 1 geometric)
+    arma::Col<dtype> acc_geo_in;              // full  [n_ray]  geometric in-medium distance
+    arma::Col<dtype> acc_ref_in;              // full  [n_ray]  refracted (VBS) in-medium distance
 
     arma::Col<short> prev_out, cur_out, buf_out; // compact [n_rayN]
     arma::Col<dtype> gain;                       // compact [n_rayN]
     arma::Mat<dtype> xprmat;                     // compact [nXPR, n_rayN]
     arma::Mat<dtype> path_dirN;                  // compact [n_rayN, 3]
-    arma::Mat<dtype> acc_dist_out;               // compact [n_rayN, 2]
+    arma::Col<dtype> acc_geo_out;                // compact [n_rayN]
+    arma::Col<dtype> acc_ref_out;                // compact [n_rayN]
     std::vector<uint8_t> resolved_type;          // compact [n_rayN]
     arma::u32_vec ray_ind;                       // compact [n_rayN]
 
@@ -416,10 +419,12 @@ struct Rsu
     bool has_angle = true, has_normals = true, has_otype = true, has_mtl = true;
     bool has_m1 = true, has_m2 = true;
     bool has_prev_in = true, has_cur_in = true, has_buf_in = true;
-    bool has_path_dir = false, has_acc_in = false;
+    bool has_path_dir = false;
+    bool has_acc_geo_in = false, has_acc_ref_in = false;
     bool has_prev_out = true, has_cur_out = true, has_buf_out = true;
     bool has_gain = true, has_xprmat = true;
-    bool has_path_dirN = false, has_acc_out = false, has_rtype = true, has_ray_ind = false;
+    bool has_path_dirN = false, has_rtype = true, has_ray_ind = false;
+    bool has_acc_geo_out = false, has_acc_ref_out = false;
 
     int nXPR() const { return itype >= 3 ? 2 : 8; }
 
@@ -444,14 +449,16 @@ struct Rsu
             has_cur_in ? &cur_in : nullptr,
             has_buf_in ? &buf_in : nullptr,
             has_path_dir ? &path_dir_prev : nullptr,
-            has_acc_in ? &acc_dist_in : nullptr,
+            has_acc_geo_in ? &acc_geo_in : nullptr,
+            has_acc_ref_in ? &acc_ref_in : nullptr,
             has_prev_out ? &prev_out : nullptr,
             has_cur_out ? &cur_out : nullptr,
             has_buf_out ? &buf_out : nullptr,
             has_gain ? &gain : nullptr,
             has_xprmat ? &xprmat : nullptr,
             has_path_dirN ? &path_dirN : nullptr,
-            has_acc_out ? &acc_dist_out : nullptr,
+            has_acc_geo_out ? &acc_geo_out : nullptr,
+            has_acc_ref_out ? &acc_ref_out : nullptr,
             has_rtype ? &resolved_type : nullptr,
             has_ray_ind ? &ray_ind : nullptr,
             eps);
@@ -1652,32 +1659,68 @@ TEST_CASE("ray_state_update - accumulated distance ledger")
     {
         double dof = 1.0, dfd = 2.0;
         auto C = make1<double>(mtl, 4, OT_EXIT, 1, 4, 0, 0, 4, 0, dof, dfd, 0.5, QPI / 2.0, 1.5);
-        C.has_acc_out = true;
-        C.acc_dist_out.zeros(1, 2);
+        C.has_acc_geo_out = true, C.has_acc_ref_out = true;
+        C.acc_geo_out.zeros(1);
+        C.acc_ref_out.zeros(1);
         C.run();
-        CHECK(std::abs((double)C.acc_dist_out(0, 0) - dfd) < 1e-9); // refracted (post-exit leg is unrefracted)
-        CHECK(std::abs((double)C.acc_dist_out(0, 1) - dfd) < 1e-9); // geometric
+        CHECK(std::abs((double)C.acc_ref_out(0) - dfd) < 1e-9); // refracted (post-exit leg is unrefracted)
+        CHECK(std::abs((double)C.acc_geo_out(0) - dfd) < 1e-9); // geometric
     }
     SECTION("a non-terminal entry restarts the in-medium distance at zero")
     {
         auto C = make1<double>(mtl, 4, OT_ENTRY, 2, 4, 4, 0, 0, 0, 1.5, 2.0, 0.5, QPI / 2.0, 1.5);
-        C.has_acc_out = true;
-        C.acc_dist_out.zeros(1, 2);
+        C.has_acc_geo_out = true, C.has_acc_ref_out = true;
+        C.acc_geo_out.zeros(1);
+        C.acc_ref_out.zeros(1);
         C.run();
-        CHECK(std::abs((double)C.acc_dist_out(0, 0)) < 1e-9);
-        CHECK(std::abs((double)C.acc_dist_out(0, 1)) < 1e-9);
+        CHECK(std::abs((double)C.acc_ref_out(0)) < 1e-9);
+        CHECK(std::abs((double)C.acc_geo_out(0)) < 1e-9);
     }
-    SECTION("acc_dist_in threads into the exit medium loss")
+    SECTION("the accumulated input distance threads into the exit medium loss")
     {
         double dof = 0.7, preload = 0.5;
         double L = dof + preload;
         auto C = make1<double>(mtl, 4, OT_EXIT, 1, 6, 0, 0, 6, 0, dof, 2.0, 0.5, QPI / 2.0, 1.5); // ABSORB
-        C.has_acc_in = true;
-        C.acc_dist_in.zeros(1, 2);
-        C.acc_dist_in(0, 0) = preload; // refracted
-        C.acc_dist_in(0, 1) = preload; // geometric
+        C.has_acc_geo_in = true, C.has_acc_ref_in = true;
+        C.acc_geo_in.zeros(1);
+        C.acc_ref_in.zeros(1);
+        C.acc_ref_in(0) = preload; // refracted
+        C.acc_geo_in(0) = preload; // geometric
         C.run();
         CHECK(std::abs(std::norm(vvf(C)) - medg(6, L)) < 1e-9); // |factor|^2 = medium_gain(acc_in + d(orig,fbs))
+    }
+    SECTION("the geometric and refracted columns are independent on both sides")
+    {
+        // A caller that shares one geometric accumulator across frequencies passes the refracted
+        // column alone on all but the first, so each side must accept one column without the other.
+        double dof = 0.7, preload = 0.5;
+        double L = dof + preload;
+
+        const double sentinel = 7.5; // a NULL side must leave the caller's vector exactly as it was
+
+        auto C = make1<double>(mtl, 4, OT_EXIT, 1, 6, 0, 0, 6, 0, dof, 2.0, 0.5, QPI / 2.0, 1.5); // ABSORB
+        C.has_acc_ref_in = true; // geometric input omitted, reads as 0
+        C.acc_ref_in.zeros(1);
+        C.acc_ref_in(0) = preload;
+        C.has_acc_ref_out = true; // geometric output omitted, write skipped
+        C.acc_ref_out.zeros(1);
+        C.acc_geo_out.ones(1);
+        C.acc_geo_out(0) = sentinel;
+        CHECK_NOTHROW(C.run());
+        CHECK(std::abs(std::norm(vvf(C)) - medg(6, L)) < 1e-9); // the refracted column still drives the loss
+        CHECK(std::abs((double)C.acc_geo_out(0) - sentinel) < 1e-9); // untouched by the call
+
+        auto D = make1<double>(mtl, 4, OT_EXIT, 1, 6, 0, 0, 6, 0, dof, 2.0, 0.5, QPI / 2.0, 1.5);
+        D.has_acc_geo_in = true; // refracted input omitted, reads as 0
+        D.acc_geo_in.zeros(1);
+        D.acc_geo_in(0) = preload;
+        D.has_acc_geo_out = true; // refracted output omitted, write skipped
+        D.acc_geo_out.zeros(1);
+        D.acc_ref_out.ones(1);
+        D.acc_ref_out(0) = sentinel;
+        CHECK_NOTHROW(D.run());
+        CHECK(std::abs(std::norm(vvf(D)) - medg(6, dof)) < 1e-9); // refracted preload absent -> loss over d(orig,fbs) only
+        CHECK(std::abs((double)D.acc_ref_out(0) - sentinel) < 1e-9); // untouched by the call
     }
 }
 
@@ -2007,6 +2050,44 @@ TEST_CASE("ray_state_update - input validation")
         auto D = make_valid();
         D.cur_in = sv({0, 0, 0});
         CHECK_THROWS_AS(D.run(), std::invalid_argument);
+    }
+    SECTION("the accumulated-distance inputs are sized against n_ray")
+    {
+        auto C = make_valid();
+        C.has_acc_geo_in = true;
+        C.acc_geo_in.zeros(3); // n_ray is 2
+        CHECK_THROWS_AS(C.run(), std::invalid_argument);
+
+        auto D = make_valid();
+        D.has_acc_ref_in = true;
+        D.acc_ref_in.zeros(3);
+        CHECK_THROWS_AS(D.run(), std::invalid_argument);
+
+        auto E = make_valid(); // correctly sized, either column alone
+        E.has_acc_geo_in = true;
+        E.acc_geo_in.zeros(2);
+        CHECK_NOTHROW(E.run());
+
+        auto F = make_valid();
+        F.has_acc_ref_in = true;
+        F.acc_ref_in.zeros(2);
+        CHECK_NOTHROW(F.run());
+    }
+    SECTION("the accumulated-distance outputs are resized on demand")
+    {
+        auto C = make_valid(); // n_rayN is 1, both start empty
+        C.has_acc_geo_out = true, C.has_acc_ref_out = true;
+        CHECK_NOTHROW(C.run());
+        CHECK(C.acc_geo_out.n_elem == 1);
+        CHECK(C.acc_ref_out.n_elem == 1);
+
+        auto D = make_valid(); // wrong size is corrected, not rejected
+        D.has_acc_geo_out = true, D.has_acc_ref_out = true;
+        D.acc_geo_out.zeros(7);
+        D.acc_ref_out.zeros(7);
+        CHECK_NOTHROW(D.run());
+        CHECK(D.acc_geo_out.n_elem == 1);
+        CHECK(D.acc_ref_out.n_elem == 1);
     }
     SECTION("compact arrays must agree on n_rayN")
     {
