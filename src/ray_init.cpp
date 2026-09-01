@@ -23,7 +23,10 @@ Seed a sphere of rays from a point source
   point inside the launch sphere would never be hit by any ray, so it bounds `r0` the same way an obstacle
   does. If neither is within `max_path_length`, or with both omitted, `r0 = 0.01 m`.
 - Emits the per-ray medium-state words and distance accumulators consumed by [[ray_state_update]], all
-  initialized to the outside-air / zero-distance start state.
+  initialized to the outside-air / zero-distance start state. `path_dir_prev` and the refracted half of
+  `acc_dist` are tracked per frequency, since the Snell bend that defines them depends on the material at
+  the evaluation frequency. A launched ray is outside a medium, so the initial direction is the geometric
+  one and is replicated across all `n_freq` slices of `path_dir_prev`.
 - Beam wavefront (`trivec`) and directions (`tridir`, Cartesian) match the [[ray_mesh_interact]] input format.
 
 ## Declaration:
@@ -40,7 +43,7 @@ arma::uword ray_init(
     arma::Col<short> *mtl_ind_prev = nullptr,
     arma::Col<short> *mtl_ind_current = nullptr,
     arma::Col<short> *mtl_ind_buffer = nullptr,
-    arma::fmat *path_dir_prev = nullptr,
+    arma::fcube *path_dir_prev = nullptr,
     arma::fmat *acc_dist = nullptr,
     std::vector<quadriga_lib::path> *paths = nullptr,
     const arma::fmat *mesh = nullptr,
@@ -76,8 +79,11 @@ arma::uword ray_init(
 - **`tridir`** — Per-vertex ray directions, Cartesian; `[n_ray, 9]`
 - **`mtl_ind_prev`**, **`mtl_ind_current`**, **`mtl_ind_buffer`** — Initial medium-state words for
   [[ray_state_update]], all zeroed (outside air, no flags); `[n_ray]`
-- **`path_dir_prev`** — Initial physical ray direction (unit vectors from `O`); `[n_ray, 3]`
-- **`acc_dist`** — Accumulated in-layer distance, zeroed; `[n_ray, 2]`; col 1 = refracted distance, col 2 = geometric distance
+- **`path_dir_prev`** — Initial physical ray direction (unit vectors from `O`), one slice per frequency;
+  `[n_ray, 3, n_freq]`. Every slice is seeded with the same launch direction. Slice `f` is contiguous, so a
+  consumer can alias it as an `[n_ray, 3]` matrix without copying
+- **`acc_dist`** — Accumulated in-layer distance, zeroed; `[n_ray, 1 + n_freq]`; col 1 = geometric distance
+  (frequency-independent, shared), col `1+f` = refracted distance at frequency `f`
 - **`paths`** — Per-ray [[path]] objects, one per ray; each reinitialized to 0 segments with `n_freq`
   frequency bins in the `scalar_mode` layout, and `length` seeded to `orig_length` (the `O`-to-origin offset);
   `n_ray` entries
@@ -107,7 +113,7 @@ arma::uword quadriga_lib::ray_init(arma::uword n_ray_target,
                                    arma::Col<short> *mtl_ind_prev,
                                    arma::Col<short> *mtl_ind_current,
                                    arma::Col<short> *mtl_ind_buffer,
-                                   arma::fmat *path_dir_prev,
+                                   arma::fcube *path_dir_prev,
                                    arma::fmat *acc_dist,
                                    std::vector<quadriga_lib::path> *paths,
                                    const arma::fmat *mesh,
@@ -263,8 +269,8 @@ arma::uword quadriga_lib::ray_init(arma::uword n_ray_target,
     float *p_orig = has_orig ? orig->memptr() : nullptr;
 
     bool has_dir = path_dir_prev != nullptr;
-    if (has_dir && (path_dir_prev->n_rows != n_ray || path_dir_prev->n_cols != 3))
-        path_dir_prev->set_size(n_ray, 3);
+    if (has_dir && (path_dir_prev->n_rows != n_ray || path_dir_prev->n_cols != 3 || path_dir_prev->n_slices != n_freq))
+        path_dir_prev->set_size(n_ray, 3, n_freq);
     float *p_dir = has_dir ? path_dir_prev->memptr() : nullptr;
 
     bool has_dest = dest != nullptr;
@@ -314,6 +320,16 @@ arma::uword quadriga_lib::ray_init(arma::uword n_ray_target,
         }
     }
 
+    // Replicate the launch direction into the remaining frequency slices. A launched ray is outside
+    // a medium, so every frequency starts from the same geometric direction. The ray loop above wrote
+    // slice 0 and each slice is contiguous, so this is one copy per frequency.
+    if (has_dir && n_freq > 1)
+    {
+        const size_t slice = 3 * (size_t)n_ray;
+        for (arma::uword i_freq = 1; i_freq < n_freq; ++i_freq)
+            std::memcpy(p_dir + i_freq * slice, p_dir, slice * sizeof(float));
+    }
+
     if (mtl_ind_prev)
         mtl_ind_prev->zeros(n_ray);
 
@@ -324,7 +340,7 @@ arma::uword quadriga_lib::ray_init(arma::uword n_ray_target,
         mtl_ind_buffer->zeros(n_ray);
 
     if (acc_dist)
-        acc_dist->zeros(n_ray, 2);
+        acc_dist->zeros(n_ray, 1 + n_freq);
 
     return n_ray;
 }

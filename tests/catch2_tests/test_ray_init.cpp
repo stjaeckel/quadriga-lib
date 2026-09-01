@@ -89,11 +89,14 @@ TEST_CASE("ray_init - Ray count quantization")
 
 TEST_CASE("ray_init - Output shapes")
 {
-    arma::fmat orig, dest, trivec, tridir, path_dir, acc_dist;
+    const arma::uword n_freq = 4;
+
+    arma::fmat orig, dest, trivec, tridir, acc_dist;
+    arma::fcube path_dir;
     arma::Col<short> mtl_prev, mtl_current, mtl_buffer;
     std::vector<quadriga_lib::path> paths;
 
-    arma::uword n = quadriga_lib::ray_init(500, 4, 0.0f, 0.0f, 0.0f, 5.0f,
+    arma::uword n = quadriga_lib::ray_init(500, n_freq, 0.0f, 0.0f, 0.0f, 5.0f,
                                            &orig, &dest, &trivec, &tridir,
                                            &mtl_prev, &mtl_current, &mtl_buffer, &path_dir, &acc_dist,
                                            &paths, nullptr, nullptr, nullptr, nullptr, false);
@@ -102,7 +105,7 @@ TEST_CASE("ray_init - Output shapes")
 
     CHECK((orig.n_rows == n && orig.n_cols == 3));
     CHECK((dest.n_rows == n && dest.n_cols == 3));
-    CHECK((path_dir.n_rows == n && path_dir.n_cols == 3));
+    CHECK((path_dir.n_rows == n && path_dir.n_cols == 3 && path_dir.n_slices == n_freq));
     CHECK((trivec.n_rows == n && trivec.n_cols == 9));
     CHECK((tridir.n_rows == n && tridir.n_cols == 9));
     CHECK(paths.size() == n);
@@ -115,10 +118,19 @@ TEST_CASE("ray_init - Output shapes")
     CHECK(arma::all(mtl_current == 0));
     CHECK(arma::all(mtl_buffer == 0));
 
-    // acc_dist encodes the ray_state_update contract: [n_ray, 2], col 0 refracted, col 1 geometric
+    // acc_dist encodes the ray_state_update contract: [n_ray, 1+n_freq], col 0 geometric (shared),
+    // col 1+f refracted at frequency f
     REQUIRE(acc_dist.n_rows == n);
-    CHECK(acc_dist.n_cols == 2);
+    CHECK(acc_dist.n_cols == 1 + n_freq);
     CHECK(arma::accu(arma::abs(acc_dist)) == 0.0f);
+
+    // A launched ray is outside a medium, so every frequency starts from the same geometric
+    // direction. Slice 0 is written by the ray loop and the rest are replicated from it.
+    for (arma::uword f = 1; f < n_freq; ++f)
+    {
+        INFO("slice " << f);
+        CHECK(arma::approx_equal(path_dir.slice(f), path_dir.slice(0), "absdiff", 0.0f));
+    }
 }
 
 TEST_CASE("ray_init - Geometry invariants (no mesh)")
@@ -126,7 +138,8 @@ TEST_CASE("ray_init - Geometry invariants (no mesh)")
     const arma::frowvec O = {10.0f, 20.0f, 30.0f};
     const float maxpath = 5.0f;
 
-    arma::fmat orig, dest, path_dir;
+    arma::fmat orig, dest;
+    arma::fcube path_dir;
     arma::uword n = quadriga_lib::ray_init(500, 1, O(0), O(1), O(2), maxpath,
                                            &orig, &dest, nullptr, nullptr,
                                            nullptr, nullptr, nullptr, &path_dir, nullptr,
@@ -138,23 +151,24 @@ TEST_CASE("ray_init - Geometry invariants (no mesh)")
     CHECK(arma::approx_equal(dd, arma::fvec(n, arma::fill::value(maxpath)), "absdiff", 1e-3f));
 
     // path_dir_prev holds unit vectors
-    arma::fvec dn = row_norms(path_dir);
+    const arma::fmat &dir0 = path_dir.slice(0);
+    arma::fvec dn = row_norms(dir0);
     CHECK(arma::approx_equal(dn, arma::fvec(n, arma::fill::ones), "absdiff", 1e-4f));
 
     // Origin and destination directions are consistent with path_dir_prev
     arma::fmat od = orig.each_row() - O;
     arma::fvec r0 = row_norms(od); // launch sphere radius per ray
     od.each_col() /= r0;
-    CHECK(arma::approx_equal(od, path_dir, "absdiff", 1e-3f));
+    CHECK(arma::approx_equal(od, dir0, "absdiff", 1e-3f));
 
     arma::fmat dsd = (dest.each_row() - O) / maxpath;
-    CHECK(arma::approx_equal(dsd, path_dir, "absdiff", 1e-3f));
+    CHECK(arma::approx_equal(dsd, dir0, "absdiff", 1e-3f));
 
     // Full-sphere coverage: directions span both extremes on every axis
     for (arma::uword c = 0; c < 3; ++c)
     {
-        CHECK(path_dir.col(c).max() > 0.9f);
-        CHECK(path_dir.col(c).min() < -0.9f);
+        CHECK(dir0.col(c).max() > 0.9f);
+        CHECK(dir0.col(c).min() < -0.9f);
     }
 }
 
@@ -265,7 +279,8 @@ TEST_CASE("ray_init - Launch sphere sizing with mesh")
     const float h = 2.0f; // nearest obstacle face at 2 m from the origin
     arma::fmat mesh = quadriga_lib::cube<float>({}, {}, {3.0f, 0.0f, 0.0f});
 
-    arma::fmat orig, dest, path_dir;
+    arma::fmat orig, dest;
+    arma::fcube path_dir;
     arma::uword n = quadriga_lib::ray_init(180, 1, 0.0f, 0.0f, 0.0f, maxpath,
                                            &orig, &dest, nullptr, nullptr,
                                            nullptr, nullptr, nullptr, &path_dir, nullptr, nullptr,
@@ -286,7 +301,7 @@ TEST_CASE("ray_init - Launch sphere sizing with mesh")
     CHECK(r0.max() > 0.1f);
 
     // Core invariants still hold with a mesh present
-    CHECK(arma::approx_equal(row_norms(path_dir), arma::fvec(n, arma::fill::ones), "absdiff", 1e-4f));
+    CHECK(arma::approx_equal(row_norms(path_dir.slice(0)), arma::fvec(n, arma::fill::ones), "absdiff", 1e-4f));
     arma::fvec dd = dist_from(dest, O);
     CHECK(arma::approx_equal(dd, arma::fvec(n, arma::fill::value(maxpath)), "absdiff", 1e-3f));
 }
@@ -361,11 +376,14 @@ TEST_CASE("ray_init - Points do not disturb the other outputs")
 
     arma::fmat P = make_points({{5.0f, -3.0f, 4.0f}}); // 3 m above the launch point
 
-    arma::fmat orig, dest, trivec, tridir, path_dir, acc_dist;
+    const arma::uword n_freq = 2;
+
+    arma::fmat orig, dest, trivec, tridir, acc_dist;
+    arma::fcube path_dir;
     arma::Col<short> mtl_prev, mtl_current, mtl_buffer;
     std::vector<quadriga_lib::path> paths;
 
-    arma::uword n = quadriga_lib::ray_init(180, 2, O(0), O(1), O(2), maxpath,
+    arma::uword n = quadriga_lib::ray_init(180, n_freq, O(0), O(1), O(2), maxpath,
                                            &orig, &dest, &trivec, &tridir,
                                            &mtl_prev, &mtl_current, &mtl_buffer, &path_dir, &acc_dist,
                                            &paths, nullptr, nullptr, nullptr, &P, false);
@@ -374,7 +392,8 @@ TEST_CASE("ray_init - Points do not disturb the other outputs")
     // Destinations still sit at max_path_length, directions are still unit length
     arma::fvec dd = dist_from(dest, O);
     CHECK(arma::approx_equal(dd, arma::fvec(n, arma::fill::value(maxpath)), "absdiff", 1e-3f));
-    CHECK(arma::approx_equal(row_norms(path_dir), arma::fvec(n, arma::fill::ones), "absdiff", 1e-4f));
+    CHECK(arma::approx_equal(row_norms(path_dir.slice(0)), arma::fvec(n, arma::fill::ones), "absdiff", 1e-4f));
+    CHECK(arma::approx_equal(path_dir.slice(1), path_dir.slice(0), "absdiff", 0.0f));
 
     // The enlarged launch sphere is reflected in the seeded path length
     arma::fvec r0 = dist_from(orig, O);
@@ -385,7 +404,7 @@ TEST_CASE("ray_init - Points do not disturb the other outputs")
 
     // State words and accumulators are unaffected
     CHECK(arma::all(mtl_current == 0));
-    CHECK((acc_dist.n_rows == n && acc_dist.n_cols == 2));
+    CHECK((acc_dist.n_rows == n && acc_dist.n_cols == 1 + n_freq));
     CHECK(arma::accu(arma::abs(acc_dist)) == 0.0f);
 }
 TEST_CASE("ray_init - Sub-mesh acceleration does not change the launch sphere")

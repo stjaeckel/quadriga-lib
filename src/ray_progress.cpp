@@ -214,7 +214,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
     arma::Col<short> &mtl_ind_prev,
     arma::Col<short> &mtl_ind_current,
     arma::Col<short> &mtl_ind_buffer,
-    arma::fmat &path_dir_prev,
+    arma::fcube &path_dir_prev,
     arma::fmat &acc_dist,
     std::vector<quadriga_lib::path> &paths,
     arma::fmat *trivec = nullptr,
@@ -273,10 +273,13 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
 - **`orig`** — Ray origins in GCS; `[n_ray, 3]`. Defines `n_ray`; must be non-empty
 - **`dest`** — Ray destinations in GCS; `[n_ray, 3]`
 - **`mtl_ind_prev`**, **`mtl_ind_current`**, **`mtl_ind_buffer`** — Medium-state words (bit-masked: `mat = w & 0x7FFF`, `flag = w & 0x8000`); `[n_ray]`
-- **`path_dir_prev`** — Physical ray direction entering the current segment (unit vectors); `[n_ray, 3]`
-- **`acc_dist`** — Accumulated in-layer distance; `[n_ray, 2]`; col 0 = geometric distance, col 1 = refracted distance.
-  The geometric column is frequency-independent and the refracted one is not, so the layout keeps the shared
-  column first: a later multi-frequency version widens this to `[n_ray, 1 + n_freq]`
+- **`path_dir_prev`** — Physical ray direction entering the current segment (unit vectors), one slice per
+  frequency; `[n_ray, 3, n_freq]`. The Snell bend that defines this direction depends on the material at the
+  evaluation frequency, so a dispersive medium gives a different direction in every slice. Outside a medium
+  all slices hold the same geometric direction
+- **`acc_dist`** — Accumulated in-layer distance; `[n_ray, 1 + n_freq]`; col 0 = geometric distance,
+  col `1+f` = refracted distance at frequency `f`. The geometric column is shared because the traced polyline
+  is the base-frequency geometry by construction; only the refracted length varies with frequency
 - **`paths`** — Per-ray [[path]] objects; `n_ray` entries. Frequency count and layout must match
   `center_frequency` and `scalar_mode`. Terminated paths are freed; surviving paths carry the appended
   interaction segment and the updated polarization product
@@ -313,7 +316,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
                                                    arma::Col<short> &mtl_ind_prev,
                                                    arma::Col<short> &mtl_ind_current,
                                                    arma::Col<short> &mtl_ind_buffer,
-                                                   arma::fmat &path_dir_prev,
+                                                   arma::fcube &path_dir_prev,
                                                    arma::fmat &acc_dist,
                                                    std::vector<quadriga_lib::path> &paths,
                                                    arma::fmat *trivec,
@@ -394,11 +397,11 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
     if (mtl_ind_buffer.n_elem != n_ray)
         throw std::invalid_argument("Input 'mtl_ind_buffer' must have n_ray elements.");
 
-    if (path_dir_prev.n_rows != n_ray || path_dir_prev.n_cols != 3)
-        throw std::invalid_argument("Input 'path_dir_prev' must have size [n_ray, 3].");
+    if (path_dir_prev.n_rows != n_ray || path_dir_prev.n_cols != 3 || path_dir_prev.n_slices != n_freq)
+        throw std::invalid_argument("Input 'path_dir_prev' must have size [n_ray, 3, n_freq].");
 
-    if (acc_dist.n_rows != n_ray || acc_dist.n_cols != 2)
-        throw std::invalid_argument("Input 'acc_dist' must have size [n_ray, 2].");
+    if (acc_dist.n_rows != n_ray || acc_dist.n_cols != 1 + n_freq)
+        throw std::invalid_argument("Input 'acc_dist' must have size [n_ray, 1+n_freq].");
 
     // Path storage must match the ray count and the requested layout
     if (paths.size() != n_ray)
@@ -511,11 +514,12 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
 
         size_t n_max = 0;  // reserved ray slots
         size_t n_used = 0; // committed ray slots
+        size_t nf = 1;     // frequency count, sets the per-ray stride of path_dir_prev and acc_dist
         bool beam_mode_flag = false;
 
         size_t size() const { return n_used; }
 
-        launch_config(size_t sz, bool beam_mode = true) : n_max(sz), beam_mode_flag(beam_mode)
+        launch_config(size_t sz, size_t n_freq, bool beam_mode = true) : n_max(sz), nf(n_freq), beam_mode_flag(beam_mode)
         {
             orig.reset(new float[3 * sz]);
             dest.reset(new float[3 * sz]);
@@ -524,8 +528,8 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
             mtl_ind_prev.reset(new short[sz]);
             mtl_ind_current.reset(new short[sz]);
             mtl_ind_buffer.reset(new short[sz]);
-            path_dir_prev.reset(new float[3 * sz]);
-            acc_dist.reset(new float[2 * sz]);
+            path_dir_prev.reset(new float[3 * n_freq * sz]);
+            acc_dist.reset(new float[(1 + n_freq) * sz]);
             paths.reserve(sz);
         }
 
@@ -548,8 +552,8 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
         short *prevP(size_t offset = 0) { return mtl_ind_prev.get() + offset; }
         short *currentP(size_t offset = 0) { return mtl_ind_current.get() + offset; }
         short *bufferP(size_t offset = 0) { return mtl_ind_buffer.get() + offset; }
-        float *dirP(size_t offset = 0) { return path_dir_prev.get() + 3 * offset; }
-        float *accP(size_t offset = 0) { return acc_dist.get() + 2 * offset; }
+        float *dirP(size_t offset = 0) { return path_dir_prev.get() + 3 * nf * offset; }
+        float *accP(size_t offset = 0) { return acc_dist.get() + (1 + nf) * offset; }
         quadriga_lib::path *pathP(size_t offset = 0) { return paths.data() + offset; }
     };
 
@@ -613,8 +617,8 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
         mtl_ind_prev.reset();
         mtl_ind_current.reset();
         mtl_ind_buffer.reset();
-        path_dir_prev.set_size(0, 3);
-        acc_dist.set_size(0, 2);
+        path_dir_prev.set_size(0, 3, n_freq);
+        acc_dist.set_size(0, 1 + n_freq);
         if (beam_mode)
             trivec->set_size(0, 9), tridir->set_size(0, 9);
         paths.clear();
@@ -650,7 +654,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
     // Worst case: every sub-beam plus a reflected and a transmitted continuation per kept ray.
     // n_subdiv is no longer a subset of the rays that hit, so the two counts are independent.
     arma::uword n_out_max = 4 * n_subdiv + 2 * n_keep;
-    auto L = launch_config(n_out_max, beam_mode); // Allocate worst case, commit lazily
+    auto L = launch_config(n_out_max, (size_t)n_freq, beam_mode); // Allocate worst case, commit lazily
 
     // Subdivision
     if (n_subdiv)
@@ -734,20 +738,32 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
                 // travelled so far, so all are inherited from the parent. ray_subdivide_flag only
                 // ever flags rays outside a medium, but a delegated subdiv_flag_in is authoritative
                 // and may flag either state, so both branches are reachable.
+                const size_t dbase = 3 * (size_t)n_freq * i_out; // path_dir_prev, ray-major, 3 floats per frequency
+                const size_t abase = (1 + (size_t)n_freq) * i_out; // acc_dist, geometric then one per frequency
+
                 if (outside)
                 {
                     float Vx, Vy, Vz;
                     calc_direction(p_dest[i_out3], p_dest[i_out3 + 1], p_dest[i_out3 + 2], Sx, Sy, Sz, Vx, Vy, Vz);
-                    p_dir[i_out3] = Vx, p_dir[i_out3 + 1] = Vy, p_dir[i_out3 + 2] = Vz;
-                    p_acc[2 * i_out] = 0.0f, p_acc[2 * i_out + 1] = 0.0f;
+                    p_acc[abase] = 0.0f;
+                    for (arma::uword f = 0; f < n_freq; ++f) // Outside, every frequency shares the geometric direction
+                    {
+                        p_dir[dbase + 3 * f] = Vx;
+                        p_dir[dbase + 3 * f + 1] = Vy;
+                        p_dir[dbase + 3 * f + 2] = Vz;
+                        p_acc[abase + 1 + f] = 0.0f;
+                    }
                 }
                 else
                 {
-                    p_dir[i_out3] = pD[i_ray];
-                    p_dir[i_out3 + 1] = pD[i_ray + n_ray];
-                    p_dir[i_out3 + 2] = pD[i_ray + 2 * n_ray];
-                    p_acc[2 * i_out] = pA[i_ray];
-                    p_acc[2 * i_out + 1] = pA[i_ray + n_ray];
+                    p_acc[abase] = pA[i_ray];
+                    for (arma::uword f = 0; f < n_freq; ++f)
+                    {
+                        p_dir[dbase + 3 * f] = pD[i_ray + (3 * f) * n_ray];
+                        p_dir[dbase + 3 * f + 1] = pD[i_ray + (3 * f + 1) * n_ray];
+                        p_dir[dbase + 3 * f + 2] = pD[i_ray + (3 * f + 2) * n_ray];
+                        p_acc[abase + 1 + f] = pA[i_ray + (1 + f) * n_ray];
+                    }
                 }
             }
 
@@ -769,7 +785,15 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
     mtl_ind_prev = compact(mtl_ind_prev, keep_ind, n_keep);
     mtl_ind_current = compact(mtl_ind_current, keep_ind, n_keep);
     mtl_ind_buffer = compact(mtl_ind_buffer, keep_ind, n_keep);
-    path_dir_prev = compact(path_dir_prev, keep_ind, n_keep);
+    // path_dir_prev is a cube [n_ray, 3, n_freq] whose memory is identical to an [n_ray, 3*n_freq]
+    // matrix, so compact it through an alias and work on the matrix from here on. Slice f then lives
+    // in columns 3f..3f+2, which stays contiguous and lets each per-frequency call take a view.
+    arma::fmat dir_prev;
+    {
+        const arma::fmat dir_view(path_dir_prev.memptr(), n_ray, 3 * n_freq, false, true);
+        dir_prev = compact(dir_view, keep_ind, n_keep);
+    }
+    path_dir_prev.reset(); // Rebuilt from the launch buffer at the end
     acc_dist = compact(acc_dist, keep_ind, n_keep);
     no_interact = compact(*p_ni, keep_ind, n_keep);
     fbs_ind = compact(*p_fi, keep_ind, n_keep);
@@ -795,11 +819,14 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
     arma::uword n_interact = n_keep; // Stride of every per-ray array from here on
     keep_ind.reset();                // No longer needed, reused as scratch by check_gains
 
-    // Column views onto the accumulator. ray_state_update takes the geometric and the refracted
-    // distance as separate vectors, so no copy is needed. These alias acc_dist and do not own its
-    // memory, so they must be released before acc_dist itself is.
+    // Views onto the per-frequency propagation state. ray_state_update evaluates one frequency at a
+    // time, so every call gets a zero-copy view: the direction slice for that frequency and its own
+    // refracted-distance column. The geometric column is shared across frequencies. These are strict
+    // aliases over dir_prev / acc_dist: they own no memory and are never resized, so they must not
+    // outlive their owners in use.
     const arma::fvec acc_geo(acc_dist.colptr(0), n_interact, false, true);
-    const arma::fvec acc_ref(acc_dist.colptr(1), n_interact, false, true);
+    const arma::fmat dir_0(dir_prev.colptr(0), n_interact, 3, false, true);
+    const arma::fvec acc_ref_0(acc_dist.colptr(1), n_interact, false, true);
 
     // Build material indices
     arma::Col<short> mtl_ind_fbs, mtl_ind_sbs;
@@ -923,9 +950,6 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
         const short *cP = prevN.memptr();
         const short *cC = currentN.memptr();
         const short *cB = bufferN.memptr();
-        const float *p_path_dirN = path_dirN.memptr();
-        const float *p_acc_geoN = acc_geoN.memptr();
-        const float *p_acc_refN = acc_refN.memptr();
         const float *p_fbs = fbsN.memptr();
         const float *p_xpr = xprmatN.memptr();
         const uint8_t *p_type = interact_type.data();
@@ -941,6 +965,33 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
         float *p_dir = L.dirP(offset);
         float *p_acc = L.accP(offset);
         quadriga_lib::path *p_path = L.pathP(offset);
+
+        // Scatter the propagation state of one frequency into the launch buffer. The direction slice
+        // and the refracted distance are per-frequency; the geometric distance is shared and written
+        // on the base pass only. path_dirN / acc_refN are re-used by every pass, so this must be
+        // called while the outputs of that frequency's ray_state_update are still live.
+        auto scatter_freq = [&](arma::uword i_freq)
+        {
+            const float *p_dirN = path_dirN.memptr();
+            const float *p_refN = acc_refN.memptr();
+            const float *p_geoN = (i_freq == 0) ? acc_geoN.memptr() : nullptr;
+
+#pragma omp parallel for schedule(static) if (n_rays >= 2048)
+            for (long long i_ray = 0; i_ray < (long long)n_rays; ++i_ray)
+            {
+                const size_t i_out = (size_t)i_ray;
+                const size_t iX = (size_t)p_keep_ind[i_ray];
+
+                float *d = p_dir + 3 * (size_t)n_freq * i_out + 3 * (size_t)i_freq;
+                d[0] = p_dirN[iX];
+                d[1] = p_dirN[iX + n_interact];
+                d[2] = p_dirN[iX + 2 * n_interact];
+
+                p_acc[(1 + (size_t)n_freq) * i_out + 1 + (size_t)i_freq] = p_refN[iX];
+                if (p_geoN)
+                    p_acc[(1 + (size_t)n_freq) * i_out] = p_geoN[iX];
+            }
+        };
 
 #pragma omp parallel for schedule(static) if (n_rays >= 256)
         for (long long i_ray = 0; i_ray < (long long)n_rays; ++i_ray)
@@ -974,15 +1025,6 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
             pC[i_out] = cC[iX];
             pB[i_out] = cB[iX];
 
-            // Update path direction
-            p_dir[i_out3] = p_path_dirN[iX];
-            p_dir[i_out3 + 1] = p_path_dirN[iY];
-            p_dir[i_out3 + 2] = p_path_dirN[iZ];
-
-            // Update in-object accumulator, col 1 = geometric, col 2 = refracted
-            p_acc[2 * i_out] = p_acc_geoN[iX];
-            p_acc[2 * i_out + 1] = p_acc_refN[iX];
-
             // Add new segment to path storage and left-multiply XPR matrix at base frequency
             paths[iX].extend(p_path[i_out], p_fbs[iX], p_fbs[iY], p_fbs[iZ], p_type[iX]);
             if (paths[iX].n_seg() == 0) // source -> new interaction point: derive the first leg (no previous coordinate)
@@ -995,8 +1037,17 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
                 ++p_path[i_out].nTRA;
         }
 
-        // Update xprmat for other frequencies
-        // ISSUE: For virtual direction tracking, this should always be straight-through (modes 1/4)
+        // Base frequency. Must run before the loop below overwrites path_dirN / acc_refN.
+        scatter_freq(0);
+
+        // Update xprmat for other frequencies. Each one re-evaluates the interface from its own
+        // direction slice and refracted accumulator, so a dispersive medium now bends and attenuates
+        // correctly per band instead of inheriting the base-frequency Snell angle.
+        //
+        // LIMITATION: with refraction_mode the traced polyline was bent at the base frequency, so at
+        // f != f0 the committed geometry is not the physical path and the per-frequency state can only
+        // describe a ray that does not exist. Undeviated tracing (types 1/4) has no such gap, because
+        // the polyline is frequency-independent and the bend lives entirely in the VBS correction.
         int interaction_type = scalar_mode ? (refraction_mode ? 5 : 4) : (refraction_mode ? 2 : 1);
         if (reflect_pass)
             interaction_type = scalar_mode ? 3 : 0;
@@ -1011,24 +1062,21 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
                                                    nullptr, nullptr, nullptr, nullptr, nullptr, &xprmatN, nullptr, nullptr,
                                                    nullptr, nullptr, nullptr, nullptr, &interact_type, &path_dirN, false);
 
-            // ISSUE: "path_dir_prev" and "acc_dist" are for the base frequency. "path_dirN" is computed at the correct frequency
-            // Both probably need to be tracked per-frequency, adding 5 floats per frequency.
-            // What is the error, if we ignore this here? "path_dir_prev" and "acc_dist" are for f0, path_dirN if for f[i_freq]
-            // We probably only need to track the refracted in-medium distance here instead of refracted + geometric.
-            // The physical one follows from orig-fbs. This requires a contract change in ray_state_update,
-            // but reduced the total cost per-frequency to 4 floats.
-
-            // Questions: In refract mode, the geometric path follows the refracted path @ base frequency.
-            // But at other frequencies, the "virtual" path_dir and acc_dist will differ. Do we always pass straight-through
-            // mode here?
+            // Zero-copy views of this frequency's incoming state. The geometric accumulator is shared
+            // and its output is not requested here: the traced polyline is the base-frequency geometry,
+            // so its arc length is the base-frequency value by definition.
+            const arma::fmat dir_f(dir_prev.colptr(3 * i_freq), n_interact, 3, false, true);
+            const arma::fvec acc_ref_f(acc_dist.colptr(1 + i_freq), n_interact, false, true);
 
             quadriga_lib::ray_state_update<float>(interaction_type, center_frequency[i_freq], &orig, &dest,
                                                   &fbsN, &sbsN, &no_interact, &fbs_angleN, &normal_vecN,
                                                   &interact_type, &mtl_prop, &mtl_ind_fbs, &mtl_ind_sbs,
                                                   &mtl_ind_prev, &mtl_ind_current, &mtl_ind_buffer,
-                                                  &path_dir_prev, &acc_geo, &acc_ref, nullptr, nullptr, nullptr,
-                                                  nullptr, &xprmatN, &path_dirN, &acc_geoN, &acc_refN,
+                                                  &dir_f, &acc_geo, &acc_ref_f, nullptr, nullptr, nullptr,
+                                                  nullptr, &xprmatN, &path_dirN, nullptr, &acc_refN,
                                                   nullptr, nullptr, (double)thin_slab_threshold);
+
+            scatter_freq(i_freq);
 
             const float *p_xpr_freq = xprmatN.memptr();
 
@@ -1064,7 +1112,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
                                               &no_interact, &fbs_angleN, &normal_vecN, &interact_type,
                                               &mtl_prop, &mtl_ind_fbs, &mtl_ind_sbs,
                                               &mtl_ind_prev, &mtl_ind_current, &mtl_ind_buffer,
-                                              &path_dir_prev, &acc_geo, &acc_ref,
+                                              &dir_0, &acc_geo, &acc_ref_0,
                                               &prevN, &currentN, &bufferN,
                                               &gainN, &xprmatN, &path_dirN, &acc_geoN, &acc_refN,
                                               &interact_type, // Aliasing OK and deliberate
@@ -1101,7 +1149,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
                                               &no_interact, &fbs_angleN, &normal_vecN, &interact_type,
                                               &mtl_prop, &mtl_ind_fbs, &mtl_ind_sbs,
                                               &mtl_ind_prev, &mtl_ind_current, &mtl_ind_buffer,
-                                              &path_dir_prev, &acc_geo, &acc_ref,
+                                              &dir_0, &acc_geo, &acc_ref_0,
                                               &prevN, &currentN, &bufferN,
                                               &gainN, &xprmatN, &path_dirN, &acc_geoN, &acc_refN,
                                               &interact_type, // Aliasing OK and deliberate
@@ -1116,7 +1164,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
     // Free memory
     std::vector<uint8_t>().swap(interact_type); // deallocate
     pre_interaction_gains.reset();
-    orig.reset(), dest.reset(), path_dir_prev.reset(), acc_dist.reset();
+    orig.reset(), dest.reset(), dir_prev.reset(), acc_dist.reset();
     mtl_ind_prev.reset(), mtl_ind_current.reset(), mtl_ind_buffer.reset();
     origN.reset(), destN.reset(), fbsN.reset(), sbsN.reset(), xprmatN.reset();
     prevN.reset(), currentN.reset(), bufferN.reset();
@@ -1144,10 +1192,17 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
     commit(mtl_ind_buffer, L.bufferP(), 1, n_out);
     L.mtl_ind_buffer.reset();
 
-    commit(path_dir_prev, L.dirP(), 3, n_out);
+    // Rebuild the cube from the ray-major launch buffer through an [n_out, 3*n_freq] alias, so the
+    // blocked transpose in commit() is reused unchanged.
+    path_dir_prev.set_size(n_out, 3, n_freq);
+    if (n_out)
+    {
+        arma::fmat dir_out(path_dir_prev.memptr(), n_out, 3 * n_freq, false, true);
+        commit(dir_out, L.dirP(), 3 * n_freq, n_out);
+    }
     L.path_dir_prev.reset();
 
-    commit(acc_dist, L.accP(), 2, n_out);
+    commit(acc_dist, L.accP(), 1 + n_freq, n_out);
     L.acc_dist.reset();
 
     paths = std::move(L.paths);
