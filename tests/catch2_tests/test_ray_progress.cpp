@@ -187,11 +187,13 @@ namespace
         bool scalar = false;
         bool beam = false;
 
-        arma::fmat orig, dest, path_dir, acc_dist, trivec, tridir;
+        arma::fmat orig, dest, acc_dist, trivec, tridir;
+        arma::fcube path_dir; // [n_ray, 3, n_freq], one direction slice per frequency
         arma::Col<short> prev, cur, buf;
         std::vector<quadriga_lib::path> paths;
 
         arma::uword n() const { return orig.n_rows; }
+        arma::uword nf() const { return freq.n_elem; }
 
         std::array<unsigned, 4> step(const Scene &S, const Opt &o = Opt())
         {
@@ -232,12 +234,16 @@ namespace
 
         C.orig = d * R0;
         C.dest = d * (R0 + len);
-        C.path_dir = d;
+
+        // A launched ray is outside a medium, so every frequency starts from the same direction
+        C.path_dir.set_size(n, 3, n_freq);
+        for (arma::uword f = 0; f < n_freq; ++f)
+            C.path_dir.slice(f) = d;
 
         C.prev.zeros(n);
         C.cur.zeros(n);
         C.buf.zeros(n);
-        C.acc_dist.zeros(n, 2);
+        C.acc_dist.zeros(n, 1 + n_freq);
 
         C.paths.resize(n);
         for (arma::uword i = 0; i < n; ++i)
@@ -378,8 +384,9 @@ namespace
         CHECK(C.dest.n_cols == 3);
         CHECK(C.path_dir.n_rows == n_out);
         CHECK(C.path_dir.n_cols == 3);
+        CHECK(C.path_dir.n_slices == C.nf());
         CHECK(C.acc_dist.n_rows == n_out);
-        CHECK(C.acc_dist.n_cols == 2);
+        CHECK(C.acc_dist.n_cols == 1 + C.nf());
         CHECK(C.prev.n_elem == n_out);
         CHECK(C.cur.n_elem == n_out);
         CHECK(C.buf.n_elem == n_out);
@@ -450,10 +457,11 @@ namespace
             {
                 CHECK(std::abs(A.orig(ia, c) - B.orig(ib, c)) < tol);
                 CHECK(std::abs(A.dest(ia, c) - B.dest(ib, c)) < tol);
-                CHECK(std::abs(A.path_dir(ia, c) - B.path_dir(ib, c)) < tol);
+                for (arma::uword f = 0; f < A.path_dir.n_slices; ++f)
+                    CHECK(std::abs(A.path_dir(ia, c, f) - B.path_dir(ib, c, f)) < tol);
             }
-            CHECK(std::abs(A.acc_dist(ia, 0) - B.acc_dist(ib, 0)) < tol);
-            CHECK(std::abs(A.acc_dist(ia, 1) - B.acc_dist(ib, 1)) < tol);
+            for (arma::uword c = 0; c < A.acc_dist.n_cols; ++c)
+                CHECK(std::abs(A.acc_dist(ia, c) - B.acc_dist(ib, c)) < tol);
             CHECK((int)A.prev(ia) == (int)B.prev(ib));
             CHECK((int)A.cur(ia) == (int)B.cur(ib));
             CHECK((int)A.buf(ia) == (int)B.buf(ib));
@@ -542,7 +550,7 @@ TEST_CASE("ray_progress - single reflection")
 
     // Normal incidence on the -x face sends the ray straight back
     CHECK(C.dest(0, 0) < 4.0f);
-    CHECK(C.path_dir(0, 0) < -0.99f);
+    CHECK(C.path_dir(0, 0, 0) < -0.99f);
 
     // Path bookkeeping
     REQUIRE(C.paths.size() == 1);
@@ -578,7 +586,7 @@ TEST_CASE("ray_progress - single transmission")
 
     CHECK(std::abs(C.orig(0, 0) - 4.0f) < 1e-3f);
     CHECK(C.dest(0, 0) > 4.0f);      // continues into the slab
-    CHECK(C.path_dir(0, 0) > 0.99f); // normal incidence: no bending
+    CHECK(C.path_dir(0, 0, 0) > 0.99f); // normal incidence: no bending
 
     CHECK(C.paths[0].n_seg() == 1);
     CHECK((int)C.paths[0].nREF == 0);
@@ -619,7 +627,7 @@ TEST_CASE("ray_progress - reflection and transmission in one call")
 
     // They leave the same point in opposite directions
     CHECK(std::abs(C.orig(0, 0) - C.orig(1, 0)) < 1e-3f);
-    CHECK(C.path_dir(0, 0) * C.path_dir(1, 0) < 0.0f);
+    CHECK(C.path_dir(0, 0, 0) * C.path_dir(1, 0, 0) < 0.0f);
 }
 
 TEST_CASE("ray_progress - no hit terminates the trace")
@@ -639,7 +647,7 @@ TEST_CASE("ray_progress - no hit terminates the trace")
     // Empty, but the column counts survive so the caller can keep chaining shapes
     check_shapes(C, 0);
     CHECK(C.orig.n_cols == 3);
-    CHECK(C.acc_dist.n_cols == 2);
+    CHECK(C.acc_dist.n_cols == 1 + C.nf());
     CHECK(C.paths.empty());
 
     // End of trace: feeding the empty configuration back in is an error, not a no-op
@@ -834,15 +842,15 @@ TEST_CASE("ray_progress - beam subdivision")
 
         // Sub-beams start outside a medium with a cleared accumulator
         CHECK((int)C.cur(i) == 0);
-        CHECK(C.acc_dist(i, 0) == 0.0f);
-        CHECK(C.acc_dist(i, 1) == 0.0f);
+        for (arma::uword c = 0; c < C.acc_dist.n_cols; ++c)
+            CHECK(C.acc_dist(i, c) == 0.0f);
 
         // Direction is the unit vector from the new origin to the new destination
         const float nx = C.dest(i, 0) - C.orig(i, 0);
         const float ny = C.dest(i, 1) - C.orig(i, 1);
         const float nz = C.dest(i, 2) - C.orig(i, 2);
         const float ln = std::sqrt(nx * nx + ny * ny + nz * nz);
-        CHECK(std::abs(C.path_dir(i, 0) - nx / ln) < 1e-4f);
+        CHECK(std::abs(C.path_dir(i, 0, 0) - nx / ln) < 1e-4f);
     }
 
     // The sub-beam tubes are real geometry, not a zeroed buffer
@@ -1108,6 +1116,35 @@ TEST_CASE("ray_progress - multi-frequency")
     REQUIRE(se[2] == 1);
     for (arma::uword f = 1; f < n_freq; ++f)
         CHECK(std::abs(E.paths[0].calc_gain(0.0f, f) - E.paths[0].calc_gain(0.0f, 0)) < 1e-5f);
+
+    // Per-frequency propagation state. The refracted direction inside a dispersive medium follows
+    // that band's material, so the slices of path_dir must actually disagree. Oblique incidence is
+    // required: at normal incidence there is no bend for them to disagree about.
+    {
+        arma::fmat d = {{1.0f, 0.15f, 0.0f}}; // strikes the near face at y = 0.6, inside the face
+        Opt ot;
+        ot.max_ref = 0; // transmission only, so the surviving ray is the one inside the medium
+
+        Cfg T = make_cfg(d, 10.0f, n_freq);
+        auto st = T.step(S, ot); // S is the concrete cube
+        REQUIRE(st[3] == 1);
+        REQUIRE(T.n() == 1);
+        REQUIRE((int)T.cur(0) == 1); // inside the medium
+        REQUIRE(T.path_dir.n_slices == n_freq);
+
+        bool any_diff = false;
+        for (arma::uword f = 1; f < n_freq; ++f)
+            for (arma::uword c = 0; c < 3; ++c)
+                any_diff |= std::abs(T.path_dir(0, c, f) - T.path_dir(0, c, 0)) > 1e-6f;
+        CHECK(any_diff);
+
+        // The same geometry in a frequency-independent material must agree across every slice
+        Cfg U = make_cfg(d, 10.0f, n_freq);
+        auto su = U.step(D, ot);
+        REQUIRE(su[3] == 1);
+        for (arma::uword f = 1; f < n_freq; ++f)
+            CHECK(arma::approx_equal(U.path_dir.slice(f), U.path_dir.slice(0), "absdiff", 1e-6f));
+    }
 }
 
 TEST_CASE("ray_progress - scalar layout")
@@ -1165,8 +1202,8 @@ TEST_CASE("ray_progress - medium state across a slab")
     CHECK(std::abs(crd[0] - 6.0f) < 1e-2f);
 
     // Leaving the slab clears the accumulator
-    CHECK(C.acc_dist(0, 0) >= 0.0f);
-    CHECK(C.acc_dist(0, 1) >= 0.0f);
+    for (arma::uword c = 0; c < C.acc_dist.n_cols; ++c)
+        CHECK(C.acc_dist(0, c) >= 0.0f);
 }
 
 TEST_CASE("ray_progress - sub-mesh partitioning does not change the result")
@@ -2029,12 +2066,12 @@ TEST_CASE("ray_progress - a flagged ray inside a medium inherits its propagation
     Cfg C = one_ray(10.0f, 1, false, WIDE_DEG);
 
     C.cur(0) = 1;              // travelling inside material 1
-    C.acc_dist(0, 0) = 1.25f;  // refracted in-layer distance
-    C.acc_dist(0, 1) = 1.10f;  // geometric in-layer distance
+    C.acc_dist(0, 0) = 1.10f;  // geometric in-layer distance, shared across frequencies
+    C.acc_dist(0, 1) = 1.25f;  // refracted in-layer distance at the single frequency
 
     // A tracked direction that is deliberately not the geometric +x continuation
     const float dx = 0.6f, dy = 0.8f, dz = 0.0f;
-    C.path_dir(0, 0) = dx, C.path_dir(0, 1) = dy, C.path_dir(0, 2) = dz;
+    C.path_dir(0, 0, 0) = dx, C.path_dir(0, 1, 0) = dy, C.path_dir(0, 2, 0) = dz;
 
     Opt o;
     o.sub_tol = SUB_TOL;
@@ -2054,13 +2091,13 @@ TEST_CASE("ray_progress - a flagged ray inside a medium inherits its propagation
         CHECK((int)C.cur(i) == 1); // still inside the medium
 
         // Accumulator carried over, not cleared
-        CHECK(std::abs(C.acc_dist(i, 0) - 1.25f) < 1e-6f);
-        CHECK(std::abs(C.acc_dist(i, 1) - 1.10f) < 1e-6f);
+        CHECK(std::abs(C.acc_dist(i, 0) - 1.10f) < 1e-6f);
+        CHECK(std::abs(C.acc_dist(i, 1) - 1.25f) < 1e-6f);
 
         // Refracted direction carried over, not recomputed from the new origin
-        CHECK(std::abs(C.path_dir(i, 0) - dx) < 1e-6f);
-        CHECK(std::abs(C.path_dir(i, 1) - dy) < 1e-6f);
-        CHECK(std::abs(C.path_dir(i, 2) - dz) < 1e-6f);
+        CHECK(std::abs(C.path_dir(i, 0, 0) - dx) < 1e-6f);
+        CHECK(std::abs(C.path_dir(i, 1, 0) - dy) < 1e-6f);
+        CHECK(std::abs(C.path_dir(i, 2, 0) - dz) < 1e-6f);
     }
 }
 
@@ -2073,7 +2110,7 @@ TEST_CASE("ray_progress - the outside-a-medium branch still recomputes and clear
 
     C.acc_dist(0, 0) = 2.5f; // stale values that must be discarded
     C.acc_dist(0, 1) = 2.5f;
-    C.path_dir(0, 0) = 0.6f, C.path_dir(0, 1) = 0.8f, C.path_dir(0, 2) = 0.0f;
+    C.path_dir(0, 0, 0) = 0.6f, C.path_dir(0, 1, 0) = 0.8f, C.path_dir(0, 2, 0) = 0.0f;
 
     Opt o;
     o.sub_tol = SUB_TOL;
@@ -2086,18 +2123,18 @@ TEST_CASE("ray_progress - the outside-a-medium branch still recomputes and clear
     {
         INFO("sub-beam " << i);
         CHECK((int)C.cur(i) == 0);
-        CHECK(C.acc_dist(i, 0) == 0.0f);
-        CHECK(C.acc_dist(i, 1) == 0.0f);
+        for (arma::uword c = 0; c < C.acc_dist.n_cols; ++c)
+            CHECK(C.acc_dist(i, c) == 0.0f);
 
         // Direction is the unit vector from the new origin to the new destination
         const float nx = C.dest(i, 0) - C.orig(i, 0);
         const float ny = C.dest(i, 1) - C.orig(i, 1);
         const float nz = C.dest(i, 2) - C.orig(i, 2);
         const float ln = std::sqrt(nx * nx + ny * ny + nz * nz);
-        CHECK(std::abs(C.path_dir(i, 0) - nx / ln) < 1e-4f);
-        CHECK(std::abs(C.path_dir(i, 1) - ny / ln) < 1e-4f);
-        CHECK(std::abs(C.path_dir(i, 2) - nz / ln) < 1e-4f);
-        CHECK(C.path_dir(i, 0) > 0.9f); // and it points along +x, not the stale (0.6, 0.8, 0)
+        CHECK(std::abs(C.path_dir(i, 0, 0) - nx / ln) < 1e-4f);
+        CHECK(std::abs(C.path_dir(i, 1, 0) - ny / ln) < 1e-4f);
+        CHECK(std::abs(C.path_dir(i, 2, 0) - nz / ln) < 1e-4f);
+        CHECK(C.path_dir(i, 0, 0) > 0.9f); // and it points along +x, not the stale (0.6, 0.8, 0)
     }
 }
 
@@ -2232,7 +2269,12 @@ TEST_CASE("ray_progress - input validation")
         }
         {
             Cfg C = one_ray();
-            C.path_dir = arma::fmat(1, 2, arma::fill::zeros);
+            C.path_dir.zeros(1, 2, 1); // wrong column count
+            CHECK_THROWS_AS(C.step(S), std::invalid_argument);
+        }
+        {
+            Cfg C = one_ray(10.0f, 2); // two frequencies, one direction slice
+            C.path_dir.zeros(1, 3, 1);
             CHECK_THROWS_AS(C.step(S), std::invalid_argument);
         }
         {
@@ -2241,15 +2283,19 @@ TEST_CASE("ray_progress - input validation")
             CHECK_THROWS_AS(C.step(S), std::invalid_argument);
         }
     }
-    SECTION("acc_dist must be [n_ray, 2]")
+    SECTION("acc_dist must be [n_ray, 1+n_freq]")
     {
-        Cfg C = one_ray();
-        C.acc_dist.zeros(1, 1); // what ray_init currently produces
+        Cfg C = one_ray(); // one frequency, so two columns are required
+        C.acc_dist.zeros(1, 1);
         CHECK_THROWS_AS(C.step(S), std::invalid_argument);
 
         Cfg D = one_ray();
         D.acc_dist.zeros(1, 3);
         CHECK_THROWS_AS(D.step(S), std::invalid_argument);
+
+        Cfg E = one_ray(10.0f, 2); // two frequencies need three columns, not two
+        E.acc_dist.zeros(1, 2);
+        CHECK_THROWS_AS(E.step(S), std::invalid_argument);
     }
     SECTION("path layout must match the request")
     {

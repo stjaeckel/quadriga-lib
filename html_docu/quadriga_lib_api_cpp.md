@@ -1,7 +1,7 @@
 ---
 title: "C++ API Documentation for Quadriga-Lib v0.12.2"
 author: "Stephan Jaeckel"
-date: "28.08.2026"
+date: "01.09.2026"
 lang: en-US
 ---
 
@@ -124,20 +124,20 @@ lang: en-US
 | [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 3840 |
 | [ray_commit](#ray_commit) | Site-specific simulation tools | 3876 |
 | [ray_init](#ray_init) | Site-specific simulation tools | 3981 |
-| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 4068 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 4191 |
-| [ray_progress](#ray_progress) | Site-specific simulation tools | 4239 |
-| [ray_state_update](#ray_state_update) | Site-specific simulation tools | 4377 |
-| [ray_subdivide_flag](#ray_subdivide_flag) | Site-specific simulation tools | 4519 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 4580 |
-| [refractive_index](#refractive_index) | Site-specific simulation tools | 4628 |
-| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 4660 |
-| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 4718 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 4748 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 4776 |
-| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 4817 |
-| [write_png](#write_png) | Site-specific simulation tools | 4852 |
-| [xpr_update](#xpr_update) | Site-specific simulation tools | 4878 |
+| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 4074 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 4197 |
+| [ray_progress](#ray_progress) | Site-specific simulation tools | 4245 |
+| [ray_state_update](#ray_state_update) | Site-specific simulation tools | 4388 |
+| [ray_subdivide_flag](#ray_subdivide_flag) | Site-specific simulation tools | 4530 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 4591 |
+| [refractive_index](#refractive_index) | Site-specific simulation tools | 4639 |
+| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 4671 |
+| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 4729 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 4759 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 4787 |
+| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 4828 |
+| [write_png](#write_png) | Site-specific simulation tools | 4863 |
+| [xpr_update](#xpr_update) | Site-specific simulation tools | 4889 |
 
 ---
 
@@ -3992,7 +3992,10 @@ Seed a sphere of rays from a point source
   point inside the launch sphere would never be hit by any ray, so it bounds `r0` the same way an obstacle
   does. If neither is within `max_path_length`, or with both omitted, `r0 = 0.01 m`.
 - Emits the per-ray medium-state words and distance accumulators consumed by [ray_state_update](#ray_state_update), all
-  initialized to the outside-air / zero-distance start state.
+  initialized to the outside-air / zero-distance start state. `path_dir_prev` and the refracted half of
+  `acc_dist` are tracked per frequency, since the Snell bend that defines them depends on the material at
+  the evaluation frequency. A launched ray is outside a medium, so the initial direction is the geometric
+  one and is replicated across all `n_freq` slices of `path_dir_prev`.
 - Beam wavefront (`trivec`) and directions (`tridir`, Cartesian) match the [ray_mesh_interact](#ray_mesh_interact) input format.
 
 ### Declaration:
@@ -4009,7 +4012,7 @@ arma::uword ray_init(
     arma::Col<short> *mtl_ind_prev = nullptr,
     arma::Col<short> *mtl_ind_current = nullptr,
     arma::Col<short> *mtl_ind_buffer = nullptr,
-    arma::fmat *path_dir_prev = nullptr,
+    arma::fcube *path_dir_prev = nullptr,
     arma::fmat *acc_dist = nullptr,
     std::vector<quadriga_lib::path> *paths = nullptr,
     const arma::fmat *mesh = nullptr,
@@ -4045,8 +4048,11 @@ arma::uword ray_init(
 - **`tridir`** — Per-vertex ray directions, Cartesian; `[n_ray, 9]`
 - **`mtl_ind_prev`**, **`mtl_ind_current`**, **`mtl_ind_buffer`** — Initial medium-state words for
   [ray_state_update](#ray_state_update), all zeroed (outside air, no flags); `[n_ray]`
-- **`path_dir_prev`** — Initial physical ray direction (unit vectors from `O`); `[n_ray, 3]`
-- **`acc_dist`** — Accumulated in-layer distance, zeroed; `[n_ray, 2]`; col 1 = refracted distance, col 2 = geometric distance
+- **`path_dir_prev`** — Initial physical ray direction (unit vectors from `O`), one slice per frequency;
+  `[n_ray, 3, n_freq]`. Every slice is seeded with the same launch direction. Slice `f` is contiguous, so a
+  consumer can alias it as an `[n_ray, 3]` matrix without copying
+- **`acc_dist`** — Accumulated in-layer distance, zeroed; `[n_ray, 1 + n_freq]`; col 1 = geometric distance
+  (frequency-independent, shared), col `1+f` = refracted distance at frequency `f`
 - **`paths`** — Per-ray [path](#path) objects, one per ray; each reinitialized to 0 segments with `n_freq`
   frequency bins in the `scalar_mode` layout, and `length` seeded to `orig_length` (the `O`-to-origin offset);
   `n_ray` entries
@@ -4287,7 +4293,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
     arma::Col<short> &mtl_ind_prev,
     arma::Col<short> &mtl_ind_current,
     arma::Col<short> &mtl_ind_buffer,
-    arma::fmat &path_dir_prev,
+    arma::fcube &path_dir_prev,
     arma::fmat &acc_dist,
     std::vector<quadriga_lib::path> &paths,
     arma::fmat *trivec = nullptr,
@@ -4346,8 +4352,13 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
 - **`orig`** — Ray origins in GCS; `[n_ray, 3]`. Defines `n_ray`; must be non-empty
 - **`dest`** — Ray destinations in GCS; `[n_ray, 3]`
 - **`mtl_ind_prev`**, **`mtl_ind_current`**, **`mtl_ind_buffer`** — Medium-state words (bit-masked: `mat = w & 0x7FFF`, `flag = w & 0x8000`); `[n_ray]`
-- **`path_dir_prev`** — Physical ray direction entering the current segment (unit vectors); `[n_ray, 3]`
-- **`acc_dist`** — Accumulated in-layer distance; `[n_ray, 2]`; col 1 = refracted distance, col 2 = geometric distance
+- **`path_dir_prev`** — Physical ray direction entering the current segment (unit vectors), one slice per
+  frequency; `[n_ray, 3, n_freq]`. The Snell bend that defines this direction depends on the material at the
+  evaluation frequency, so a dispersive medium gives a different direction in every slice. Outside a medium
+  all slices hold the same geometric direction
+- **`acc_dist`** — Accumulated in-layer distance; `[n_ray, 1 + n_freq]`; col 0 = geometric distance,
+  col `1+f` = refracted distance at frequency `f`. The geometric column is shared because the traced polyline
+  is the base-frequency geometry by construction; only the refracted length varies with frequency
 - **`paths`** — Per-ray [path](#path) objects; `n_ray` entries. Frequency count and layout must match
   `center_frequency` and `scalar_mode`. Terminated paths are freed; surviving paths carry the appended
   interaction segment and the updated polarization product

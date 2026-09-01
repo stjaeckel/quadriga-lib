@@ -5306,7 +5306,7 @@ Seed a sphere of rays from a point source
 <li><code>n_ray</code> is quantized to the icosphere grid: <code>n_div = round(sqrt(n_ray_target / 20))</code> (min 1) and <code>n_ray = 20 · n_div²</code>, so the returned count is the closest tessellation to <code>n_ray_target</code>, not exact.</li>
 <li>Ray origins sit on a small launch sphere of radius <code>r0</code> centered at <code>O</code>, not at <code>O</code> itself, so the beam triangles (<code>trivec</code>) have finite extent from the first segment.</li>
 <li>When <code>mesh</code> or <code>rx_points</code> is supplied, <code>r0</code> is auto-sized to 0.8× the distance to the nearest obstacle (found along a coarse probe sphere) or receive point, whichever is closer, clamped to ≥ 0.01 m. A receive point inside the launch sphere would never be hit by any ray, so it bounds <code>r0</code> the same way an obstacle does. If neither is within <code>max_path_length</code>, or with both omitted, <code>r0 = 0.01 m</code>.</li>
-<li>Emits the per-ray medium-state words and distance accumulators consumed by <a href="#ray_state_update">ray_state_update</a>, all initialized to the outside-air / zero-distance start state.</li>
+<li>Emits the per-ray medium-state words and distance accumulators consumed by <a href="#ray_state_update">ray_state_update</a>, all initialized to the outside-air / zero-distance start state. <code>path_dir_prev</code> and the refracted half of <code>acc_dist</code> are tracked per frequency, since the Snell bend that defines them depends on the material at the evaluation frequency. A launched ray is outside a medium, so the initial direction is the geometric one and is replicated across all <code>n_freq</code> slices of <code>path_dir_prev</code>.</li>
 <li>Beam wavefront (<code>trivec</code>) and directions (<code>tridir</code>, Cartesian) match the <a href="#ray_mesh_interact">ray_mesh_interact</a> input format.</li>
 </ul>
 
@@ -5324,7 +5324,7 @@ arma::uword ray_init(
     arma::Col&lt;short&gt; *mtl_ind_prev = nullptr,
     arma::Col&lt;short&gt; *mtl_ind_current = nullptr,
     arma::Col&lt;short&gt; *mtl_ind_buffer = nullptr,
-    arma::fmat *path_dir_prev = nullptr,
+    arma::fcube *path_dir_prev = nullptr,
     arma::fmat *acc_dist = nullptr,
     std::vector&lt;quadriga_lib::path&gt; *paths = nullptr,
     const arma::fmat *mesh = nullptr,
@@ -5354,8 +5354,8 @@ arma::uword ray_init(
 <li><b><code>trivec</code></b> — Beam wavefront triangle vertices relative to origin; <code>[n_ray, 9]</code>, matches <a href="#ray_mesh_interact">ray_mesh_interact</a></li>
 <li><b><code>tridir</code></b> — Per-vertex ray directions, Cartesian; <code>[n_ray, 9]</code></li>
 <li><b><code>mtl_ind_prev</code></b>, <b><code>mtl_ind_current</code></b>, <b><code>mtl_ind_buffer</code></b> — Initial medium-state words for <a href="#ray_state_update">ray_state_update</a>, all zeroed (outside air, no flags); <code>[n_ray]</code></li>
-<li><b><code>path_dir_prev</code></b> — Initial physical ray direction (unit vectors from <code>O</code>); <code>[n_ray, 3]</code></li>
-<li><b><code>acc_dist</code></b> — Accumulated in-layer distance, zeroed; <code>[n_ray, 2]</code>; col 1 = refracted distance, col 2 = geometric distance</li>
+<li><b><code>path_dir_prev</code></b> — Initial physical ray direction (unit vectors from <code>O</code>), one slice per frequency; <code>[n_ray, 3, n_freq]</code>. Every slice is seeded with the same launch direction. Slice <code>f</code> is contiguous, so a consumer can alias it as an <code>[n_ray, 3]</code> matrix without copying</li>
+<li><b><code>acc_dist</code></b> — Accumulated in-layer distance, zeroed; <code>[n_ray, 1 + n_freq]</code>; col 1 = geometric distance (frequency-independent, shared), col <code>1+f</code> = refracted distance at frequency <code>f</code></li>
 <li><b><code>paths</code></b> — Per-ray <a href="#path">path</a> objects, one per ray; each reinitialized to 0 segments with <code>n_freq</code> frequency bins in the <code>scalar_mode</code> layout, and <code>length</code> seeded to <code>orig_length</code> (the <code>O</code>-to-origin offset); <code>n_ray</code> entries</li>
 </ul>
 
@@ -5654,7 +5654,7 @@ std::array&lt;unsigned, 4&gt; quadriga_lib::ray_progress(
     arma::Col&lt;short&gt; &amp;mtl_ind_prev,
     arma::Col&lt;short&gt; &amp;mtl_ind_current,
     arma::Col&lt;short&gt; &amp;mtl_ind_buffer,
-    arma::fmat &amp;path_dir_prev,
+    arma::fcube &amp;path_dir_prev,
     arma::fmat &amp;acc_dist,
     std::vector&lt;quadriga_lib::path&gt; &amp;paths,
     arma::fmat *trivec = nullptr,
@@ -5705,8 +5705,8 @@ std::array&lt;unsigned, 4&gt; quadriga_lib::ray_progress(
 <li><b><code>orig</code></b> — Ray origins in GCS; <code>[n_ray, 3]</code>. Defines <code>n_ray</code>; must be non-empty</li>
 <li><b><code>dest</code></b> — Ray destinations in GCS; <code>[n_ray, 3]</code></li>
 <li><b><code>mtl_ind_prev</code></b>, <b><code>mtl_ind_current</code></b>, <b><code>mtl_ind_buffer</code></b> — Medium-state words (bit-masked: <code>mat = w &amp; 0x7FFF</code>, <code>flag = w &amp; 0x8000</code>); <code>[n_ray]</code></li>
-<li><b><code>path_dir_prev</code></b> — Physical ray direction entering the current segment (unit vectors); <code>[n_ray, 3]</code></li>
-<li><b><code>acc_dist</code></b> — Accumulated in-layer distance; <code>[n_ray, 2]</code>; col 1 = refracted distance, col 2 = geometric distance</li>
+<li><b><code>path_dir_prev</code></b> — Physical ray direction entering the current segment (unit vectors), one slice per frequency; <code>[n_ray, 3, n_freq]</code>. The Snell bend that defines this direction depends on the material at the evaluation frequency, so a dispersive medium gives a different direction in every slice. Outside a medium all slices hold the same geometric direction</li>
+<li><b><code>acc_dist</code></b> — Accumulated in-layer distance; <code>[n_ray, 1 + n_freq]</code>; col 0 = geometric distance, col <code>1+f</code> = refracted distance at frequency <code>f</code>. The geometric column is shared because the traced polyline is the base-frequency geometry by construction; only the refracted length varies with frequency</li>
 <li><b><code>paths</code></b> — Per-ray <a href="#path">path</a> objects; <code>n_ray</code> entries. Frequency count and layout must match <code>center_frequency</code> and <code>scalar_mode</code>. Terminated paths are freed; surviving paths carry the appended interaction segment and the updated polarization product</li>
 <li><b><code>trivec</code></b> <i>(optional)</i> — Beam wavefront triangle vertices relative to origin; <code>[n_ray, 9]</code>. Must be supplied together with <code>tridir</code>; empty / NULL disables beam tracing</li>
 <li><b><code>tridir</code></b> <i>(optional)</i> — Vertex-ray directions, Cartesian; <code>[n_ray, 9]</code></li>
