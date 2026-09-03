@@ -5387,6 +5387,13 @@ Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh 
 <li>With <code>compact = true</code> (default), rays with <code>fbs_ind = 0</code> (no interaction) are omitted from output, so <code>n_rayN ≤ n_ray</code>; with <code>compact = false</code> they are kept as transparent pass-throughs (<code>n_rayN = n_ray</code>).</li>
 <li>Output direction encoding (spherical/Cartesian) matches input <code>tridir</code> format.</li>
 <li>Overlapping mesh geometry must be avoided (materials are transparent to radio waves).</li>
+<li>Thin sheets: a material with <code>thk &gt; 0</code> marks its faces as a <b>sheet</b> — a single face carrying an authored thickness instead of a traced interior. Each crossing is one atomic entry + traversal + exit, with the internal multi-bounce series resolved in closed form. <code>thk = 0</code>, or no <code>thk</code> column, keeps the classic behavior where thickness comes from the geometry and the <a href="#ray_state_update">ray_state_update</a> state machine. Modeling notes:
+<ul>
+<li>Two coincident sheets of the <i>same</i> material are collapsed to a single crossing. Exporters emit back-to-back face pairs to make geometry double-sided, and treating such a pair as a two-layer laminate would double both the thickness and the loss. Author a genuine laminate as two <i>different</i> materials, or as one material with the summed <code>thk</code>.</li>
+<li>Stack depth is capped at two faces, because the FBS/SBS intersector returns two. A third layer is hit as a separate FBS after the relaunch and concatenates incoherently, and <code>solid + sheet + solid</code> is already three faces. Scenes have to be designed around this.</li>
+<li>A closed solid built from a sheet material is legal, not an error: it becomes a hollow box, with sheet loss on entry, the embedding medium inside, and sheet loss on exit.</li>
+</ul>
+</li>
 <li>Types 3–5 (scalar) use a single TE-only coefficient (acoustic simulation with impedance-mapped materials, <code>ε</code> derived from <code>Z</code>); total internal reflection is handled as in the EM path (<code>snell·sinθ ≥ 1</code> ⇒ unit reflection, refraction collapses to undeviated transmission).</li>
 <li>For a detailed description of the material model see <a href="http://quadriga-lib.org/formats.html">Data Formats</a></li>
 </ul>
@@ -5451,7 +5458,7 @@ void quadriga_lib::ray_mesh_interact(
 </li>
 <li><b><code>trivecN</code></b>, <b><code>tridirN</code></b> — Updated beam geometry/direction (format matches input); empty if inputs not provided</li>
 <li><b><code>fbs_angleN</code></b> — Incidence angle at FBS in rad; <code>[n_rayN]</code></li>
-<li><b><code>thicknessN</code></b> — Material thickness (FBS-to-SBS distance); <code>[n_rayN]</code></li>
+<li><b><code>thicknessN</code></b> — Geometric FBS-to-SBS distance; <code>[n_rayN]</code>. Unrelated to the material <code>thk</code> column: this is what the mesh measured, <code>thk</code> is what the material table authored.</li>
 <li><b><code>edge_lengthN</code></b> — Max edge length of ray tube triangle at new origin (∞ if partial hit); <code>[n_rayN]</code></li>
 <li><b><code>normal_vecN</code></b> — FBS and SBS normal vectors <code>[Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]</code>; <code>[n_rayN, 6]</code></li>
 <li><b><code>out_typeN</code></b> — Interaction type code, bit-encoded (<code>qd::bits&lt;uint8_t&gt;</code>); <code>[n_rayN]</code><br><br>
@@ -5466,7 +5473,7 @@ void quadriga_lib::ray_mesh_interact(
 </tr>
 <tr>
   <td class="c">1</td>
-  <td>Front-side flag (1 = front: o→i or M2 hit first; 0 = back: i→o or M1)</td>
+  <td>Front-side flag — meaning depends on bits 2 and 6, see below</td>
 </tr>
 <tr>
   <td class="c">2</td>
@@ -5486,7 +5493,30 @@ void quadriga_lib::ray_mesh_interact(
 </tr>
 <tr>
   <td class="c">6</td>
-  <td>Thin sheet flag (material is a thin single-face sheet)</td>
+  <td>Thin-sheet flag (at least one of FBS/SBS is a <code>thk &gt; 0</code> material)</td>
+</tr>
+</table>
+Bit 1 by context:<br><br>
+<table class="md">
+<tr>
+  <th>Context</th>
+  <th>Bit 1 = 1 means</th>
+</tr>
+<tr>
+  <td>Solid (bit 6 = 0)</td>
+  <td>Front-side hit on FBS (o→i, or M2 hit first)</td>
+</tr>
+<tr>
+  <td>Isolated sheet (bit 6 = 1, bit 2 = 0)</td>
+  <td>Front-side hit on FBS; informational only</td>
+</tr>
+<tr>
+  <td>Sheet glued to a solid (exactly one sheet)</td>
+  <td>Front-side hit on the <b>solid</b> face</td>
+</tr>
+<tr>
+  <td>Two co-located sheets</td>
+  <td>FBS traversed first (0 = SBS traversed first)</td>
 </tr>
 </table>
 Reachable composite values (add 32 for the total-reflection variant):<br><br>
@@ -5551,7 +5581,38 @@ Reachable composite values (add 32 for the total-reflection variant):<br><br>
   <td class="c">63</td>
   <td>Corner hit, outside→inside-inside</td>
 </tr>
+<tr>
+  <td class="c">65</td>
+  <td class="c">—</td>
+  <td>Isolated sheet, back-side hit; or a sheet at a corner with SBS dropped</td>
+</tr>
+<tr>
+  <td class="c">67</td>
+  <td class="c">—</td>
+  <td>Isolated sheet, front-side hit; or a sheet at a corner with SBS dropped</td>
+</tr>
+<tr>
+  <td class="c">69</td>
+  <td class="c">101</td>
+  <td>Glued exit (solid→sheet→air); or a stack with SBS first; or a collapsed duplicate</td>
+</tr>
+<tr>
+  <td class="c">71</td>
+  <td class="c">103</td>
+  <td>Glued entry (air→sheet→solid); or a stack with FBS first; or a collapsed duplicate</td>
+</tr>
+<tr>
+  <td class="c">79</td>
+  <td class="c">—</td>
+  <td>Two-sheet stack with an ill-posed order (geometric FBS→SBS fallback was used)</td>
+</tr>
 </table>
+Codes 69 and 71 are shared by three cases, deliberately: <a href="#ray_state_update">ray_state_update</a> builds its own material
+set and holds both <code>mtl_ind_fbs</code> and <code>mtl_ind_sbs</code>, so it can re-derive sheet-ness per face and material
+identity on the pair. The full case is <code>(composite code, is_sheet(FBS), is_sheet(SBS), same material)</code>.
+Bit 6 alone is a hint meaning <i>at least one face is a sheet</i>; the re-derivation is authoritative. Total
+reflection can only co-occur with bit 6 for the glued cases, where the media either side of the sheet
+differ. Bit 7 is unused.
 </li>
 <li><b><code>path_dirN</code></b> — Refraction-correct path direction: mirror for types 0/3, Snell direction for types 1/2/4/5; <code>[n_rayN, 3]</code>. For undeviated transmission (types 1/4) this is the <i>refracted</i> direction, which differs from the geometric continuation (along the incoming ray) used for <code>origN</code>/<code>destN</code>; it lets downstream code recover the true transmission angle.</li>
 <li><b><code>ray_indN</code></b> — 0-based input ray index for each output ray (inverse of the internal compaction map; order-preserving); <code>[n_rayN]</code></li>
