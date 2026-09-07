@@ -628,8 +628,9 @@ namespace
     //                   own interface, so no magnitude conversion is owed. In scalar mode both outputs
     //                   carry the same factor, because the caller scales a stored xprmat in place
     //                   instead of rebuilding it from cTE. Both boundaries are evaluated at the real
-    //                   in-slab angle, because the caller's angle comes from traced ray geometry and
-    //                   its result must not move.
+    //                   in-slab angle, unless the caller supplies ct_slab_exact - the exact complex
+    //                   value recovered from the traced direction - in which case both boundaries and
+    //                   the propagation factor use that instead.
     // produce == true : T_te / T_tm and R_te / R_tm are absolute composite coefficients. The
     //                   transmit port carries the slab's interface gain, plus the far medium's when
     //                   the far medium is one the wave newly enters, matching what
@@ -661,8 +662,9 @@ namespace
                                 std::complex<double> *T_te, std::complex<double> *T_tm,
                                 std::complex<double> *R_te = nullptr,
                                 std::complex<double> *R_tm = nullptr,
-                                bool disp_far = false,      // sheet sits on the far side (glued exit)
-                                double disp_budget = -1.0)  // max normal thickness it may replace, < 0 = all
+                                bool disp_far = false,     // sheet sits on the far side (glued exit)
+                                double disp_budget = -1.0, // max normal thickness it may replace, < 0 = all
+                                std::complex<double> ct_slab_exact = std::complex<double>(0.0, 0.0))
     {
         // Mass-law materials carry a lumped transmission surrogate: eta/mu are calibrated for
         // surface impedance only, so the in-slab index (and hence the phase of phi) is not
@@ -680,7 +682,16 @@ namespace
         std::complex<double> eta_s_if = mat_slab.eta(fGHz) + mat_slab.eta_resonance(fGHz);
         std::complex<double> mu_s = mat_slab.mu(fGHz);
         double n_cur = std::real(std::sqrt(mat_slab.eta(fGHz) * mu_s)); // resonance-excluded slab index
-        double sin2 = 1.0 - abs_cos_theta_t * abs_cos_theta_t;          // incidence sine (fbs_angleN convention)
+        // Slab-side propagation cosine for correction mode. The tracer's direction is real, so
+        // normally only the real projection of it is available and every boundary gets re-derived from
+        // that projection - including the entry boundary, whose coefficient ray_mesh_interact had
+        // already applied exactly. The Airy denominator then sums a series against a coefficient the
+        // path never carried. When the caller has recovered the exact complex value by inverting the
+        // refraction map it passes it here, and both boundaries and the propagation factor use it.
+        bool have_exact_ct = std::abs(ct_slab_exact) > 0.0;
+        std::complex<double> cs = have_exact_ct ? ct_slab_exact
+                                                : std::complex<double>(abs_cos_theta_t, 0.0);
+        std::complex<double> sin2 = 1.0 - cs * cs; // in-slab sine (fbs_angleN convention)
 
         // Exact complex in-slab cosine, derived from the incidence angle in the near medium. Produce
         // mode holds that angle, so nothing has to be projected onto a real direction: the far
@@ -723,8 +734,8 @@ namespace
                 ct2_arg = std::complex<double>(std::real(ct2_arg), -0.0);
             std::complex<double> cos_t2 = std::sqrt(ct2_arg);
 
-            std::complex<double> te = (z1 * abs_cos_theta_t - z2 * cos_t2) / (z1 * abs_cos_theta_t + z2 * cos_t2);
-            std::complex<double> tm = is_scalar ? te : (z2 * abs_cos_theta_t - z1 * cos_t2) / (z2 * abs_cos_theta_t + z1 * cos_t2);
+            std::complex<double> te = (z1 * cs - z2 * cos_t2) / (z1 * cs + z2 * cos_t2);
+            std::complex<double> tm = is_scalar ? te : (z2 * cs - z1 * cos_t2) / (z2 * cs + z1 * cos_t2);
             const Material &owner = slab_is_air ? adj : mat_slab; // tf of the solid face
             Ra_te = owner.apply_tf(std::norm(te), fGHz);
             Ra_tm = owner.apply_tf(std::norm(tm), fGHz);
@@ -732,8 +743,8 @@ namespace
             r_tm = std::polar(std::sqrt(Ra_tm), std::arg(tm));
 
             if (t_out) // ITU-R P.2040-1 eq. (32) with the slab as the incidence medium
-                t_out[0] = (2.0 * z1 * abs_cos_theta_t) / (z1 * abs_cos_theta_t + z2 * cos_t2),
-                t_out[1] = is_scalar ? t_out[0] : (2.0 * z1 * abs_cos_theta_t) / (z2 * abs_cos_theta_t + z1 * cos_t2);
+                t_out[0] = (2.0 * z1 * cs) / (z1 * cs + z2 * cos_t2),
+                t_out[1] = is_scalar ? t_out[0] : (2.0 * z1 * cs) / (z2 * cs + z1 * cos_t2);
         };
 
         // The near interface seen from the incidence side, at the true incidence angle rather than at
@@ -915,6 +926,16 @@ namespace
             std::complex<double> n_cx = std::sqrt(mat_slab.eta(fGHz) * mu_s); // complex, resonance-excluded
             double ex = mat_slab.excess_gain(dist_refract, fGHz);             // alpha only, no conductivity
             phi_1 = std::exp(std::complex<double>(0.0, -1.0) * (omega / c0) * n_cx * thk_normal * cts_exact) *
+                    std::sqrt((ex < 0.0) ? 0.0 : ex);
+        }
+        else if (have_exact_ct)
+        {
+            // Same exact form as produce mode. The normal thickness is pure geometry - the traced path
+            // times the traced cosine - and only the phase and loss across it use the recovered angle.
+            double thk_normal = dist_refract * abs_cos_theta_t;
+            std::complex<double> n_cx = std::sqrt(mat_slab.eta(fGHz) * mu_s); // resonance-excluded
+            double ex = mat_slab.excess_gain(dist_refract, fGHz);             // alpha only
+            phi_1 = std::exp(std::complex<double>(0.0, -1.0) * (omega / c0) * n_cx * thk_normal * cs) *
                     std::sqrt((ex < 0.0) ? 0.0 : ex);
         }
         else
@@ -3172,6 +3193,84 @@ void quadriga_lib::ray_state_update(int interaction_type,
             return mtl_exit;
         };
 
+        // Recover the exact complex in-slab cosine from the traced direction.
+        //
+        // A traced ray must have a real direction, so qd_refract normalizes a vector built from
+        // Re(cos_theta2) and the imaginary part is dropped. Everything downstream then re-derives the
+        // boundaries from that real projection - including the ENTRY boundary, whose coefficient
+        // ray_mesh_interact had already applied at the true angle with the complex cosine kept. The
+        // Airy denominator therefore sums a series against a coefficient the path never carried, and
+        // interact_with(slab, air, theta_t) even reconstructs a complex angle inside a lossless
+        // medium, which is not an approximation but an impossibility.
+        //
+        // The information is not lost, only transformed. qd_refract's map from the incidence angle to
+        // the traced in-slab cosine,
+        //     ct_traced = Re(ct2) / sqrt(eta^2 sin^2(theta_i) + Re(ct2)^2),  ct2 = sqrt(1 - eps sin^2),
+        // is deterministic and monotone, and every parameter of it is present here: the entry medium is
+        // in the previous-medium word and the slab is the current one. Inverting it returns the exact
+        // incidence angle, and the complex cosine follows.
+        //
+        // Real-index Snell is NOT that map. Inverting that instead - the obvious thing to try - leaves
+        // a residual that is worst exactly where the defect is worst, because it ignores the
+        // normalization qd_refract performs. So the map itself is inverted: two Newton steps on
+        // eta^2 u = t^2 Re(sqrt(1 - eps u))^2 with u = sin^2(theta_i), starting from the real-index
+        // guess, which reaches machine precision.
+        //
+        // Returns 0 where the recovery does not apply, which the resolve reads as "use the projection".
+        auto EXACT_IN_SLAB_COSINE = [&]() -> std::complex<double>
+        {
+            const std::complex<double> none(0.0, 0.0);
+
+            // No real direction was supplied, so nothing was projected in the first place.
+            if (!use_vbs || mtl_current < 1)
+                return none;
+
+            // The faces are not a parallel pair, so the entry face is not this face's twin and the
+            // in-slab angle here says nothing about the angle the ray came in at. Checked here as well
+            // as in the caller, because the caller's wedge gate is bypassed at eps == 0.
+            if (prev_nonpar)
+                return none;
+
+            // Under total reflection the direction was never bent, so there is no map to invert.
+            // Normal incidence is NOT excluded: the projection and the exact value coincide there, but
+            // the two propagation factors do not, and declining leaves the hybrid medium_gain form in
+            // place while every neighbouring angle uses the exact one. The solve handles it directly -
+            // t = 0 gives u = 0 and the first residual is already zero, returning exactly 1.
+            if (total_reflection || abs_cos_theta_t <= 0.0 || abs_cos_theta_t > 1.0)
+                return none;
+
+            Material M_ent = MAT(mtl_prev), M_slb = MAT(mtl_current);
+            std::complex<double> e1 = (M_ent.eta(fGHz) + M_ent.eta_resonance(fGHz)) * M_ent.mu(fGHz);
+            std::complex<double> e2 = (M_slb.eta(fGHz) + M_slb.eta_resonance(fGHz)) * M_slb.mu(fGHz);
+            if (std::abs(e2) <= 0.0)
+                return none;
+            std::complex<double> eps_r = e1 / e2; // qd_refract's eta1_div_eta2
+            double eta2 = std::abs(eps_r);        // qd_refract's eta, squared
+            if (eta2 <= 0.0 || std::abs(eps_r - 1.0) < 1.0e-12)
+                return none; // matched media: no bend to invert
+
+            double ct = abs_cos_theta_t;
+            double ct2c = 1.0 - ct * ct;
+            double t = std::sqrt((ct2c > 0.0) ? ct2c : 0.0) / ct; // tan of the traced in-slab angle
+            double u = t * t / (eta2 * (1.0 + t * t)); // real-index Snell start
+            u = (u > 1.0) ? 1.0 : u;
+            for (int k = 0; k < 3; ++k)
+            {
+                std::complex<double> w = std::sqrt(1.0 - eps_r * u);
+                double fu = eta2 * u - t * t * std::real(w) * std::real(w);
+                double dfu = eta2 + t * t * std::real(w) * std::real(eps_r / w);
+                if (!(std::abs(dfu) > 1.0e-300))
+                    break;
+                u -= fu / dfu;
+                u = (u < 0.0) ? 0.0 : ((u > 1.0) ? 1.0 : u);
+            }
+
+            std::complex<double> arg = 1.0 - eps_r * u;
+            if (std::imag(arg) == 0.0 && std::real(arg) < 0.0)
+                arg = std::complex<double>(std::real(arg), -0.0); // decaying evanescent root
+            return std::sqrt(arg);
+        };
+
         // Analytic thin-slab (Fabry-Perot) resolution, applied to the current medium.
         // The physics lives in qd_slab_resolve; what stays here is the index lookup, the wedge gate
         // and the buffer write, because the two public callers write to different buffers.
@@ -3191,7 +3290,8 @@ void quadriga_lib::ray_state_update(int interaction_type,
             std::complex<double> fac_te, fac_tm;
             if (!qd_slab_resolve(MAT(mtl_near), MAT(mtl_slab), MAT(mtl_far),
                                  dist_refract, dist_geo, abs_cos_theta_t, abs_cos_theta,
-                                 fGHz, is_scalar, eps, false, &fac_te, &fac_tm))
+                                 fGHz, is_scalar, eps, false, &fac_te, &fac_tm,
+                                 nullptr, nullptr, false, -1.0, EXACT_IN_SLAB_COSINE()))
                 return false;
 
             // Scalar mode carries one port and the factor is a pure scale, so scale the stored
