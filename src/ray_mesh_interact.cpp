@@ -651,14 +651,13 @@ namespace
         double sin2 = 1.0 - abs_cos_theta_t * abs_cos_theta_t;          // incidence sine (fbs_angleN convention)
 
         // Fresnel TE/TM amplitude reflection at slab|adjacent from the slab side, tf folded into |r|.
-        // t_out / t_in return the raw Fresnel transmission amplitudes for the two crossing directions;
-        // only their phase is used, since tf redistributes energy between the ports and the raw
-        // magnitude is no longer the transmitted one.
+        // t_out returns the raw Fresnel transmission amplitude for the slab -> adjacent crossing; only
+        // its phase is used, since tf redistributes energy between the ports and the raw magnitude is
+        // no longer the transmitted one.
         auto fresnel_r = [&](const Material &adj,
                              std::complex<double> &r_te, std::complex<double> &r_tm,
                              double &Ra_te, double &Ra_tm,
-                             std::complex<double> *t_out = nullptr, // [te, tm] slab -> adjacent
-                             std::complex<double> *t_in = nullptr)  // [te, tm] adjacent -> slab
+                             std::complex<double> *t_out = nullptr) // [te, tm] slab -> adjacent
         {
             std::complex<double> eta_a_if = adj.eta(fGHz) + adj.eta_resonance(fGHz);
             std::complex<double> mu_a = adj.mu(fGHz);
@@ -687,16 +686,57 @@ namespace
             if (t_out) // ITU-R P.2040-1 eq. (32) with the slab as the incidence medium
                 t_out[0] = (2.0 * z1 * abs_cos_theta_t) / (z1 * abs_cos_theta_t + z2 * cos_t2),
                 t_out[1] = is_scalar ? t_out[0] : (2.0 * z1 * abs_cos_theta_t) / (z2 * abs_cos_theta_t + z1 * cos_t2);
-            if (t_in) // same interface crossed the other way: swap the two media
-                t_in[0] = (2.0 * z2 * cos_t2) / (z1 * abs_cos_theta_t + z2 * cos_t2),
-                t_in[1] = is_scalar ? t_in[0] : (2.0 * z2 * cos_t2) / (z2 * abs_cos_theta_t + z1 * cos_t2);
+        };
+
+        // The near interface seen from the incidence side, at the true incidence angle rather than at
+        // the real-projected in-slab angle. The two views are reciprocal only for a lossless slab: in a
+        // lossy one the in-slab refraction cosine is complex, and dropping its imaginary part costs
+        // exact reciprocity - by 3 % at 80 deg for sigma = 0.02 S/m, far more for a conductive slab.
+        // A traced solid evaluates its entry interface from the incidence side, so a sheet has to do
+        // the same to stay equivalent to one. Correction mode keeps the slab-side view, because
+        // ray_state_update's angle comes from real ray geometry and its result must not move.
+        auto fresnel_r_near = [&](std::complex<double> &r_te, std::complex<double> &r_tm,
+                                  double &Ra_te, double &Ra_tm,
+                                  std::complex<double> *t_fwd,  // [te, tm] near -> slab
+                                  std::complex<double> *t_bwd)  // [te, tm] slab -> near
+        {
+            std::complex<double> eta_a_if = mat_near.eta(fGHz) + mat_near.eta_resonance(fGHz);
+            std::complex<double> mu_a = mat_near.mu(fGHz);
+            std::complex<double> z_a = std::sqrt(eta_a_if / mu_a);
+            std::complex<double> z_s = std::sqrt(eta_s_if / mu_s);
+            std::complex<double> rat = (eta_a_if * mu_a) / (eta_s_if * mu_s);
+            double sin2_i = 1.0 - abs_cos_theta * abs_cos_theta;
+
+            std::complex<double> ct2_arg = 1.0 - rat * sin2_i;
+            if (std::imag(ct2_arg) == 0.0 && std::real(ct2_arg) < 0.0)
+                ct2_arg = std::complex<double>(std::real(ct2_arg), -0.0); // decaying evanescent root
+            std::complex<double> cos_t2 = std::sqrt(ct2_arg);
+
+            std::complex<double> te = (z_a * abs_cos_theta - z_s * cos_t2) / (z_a * abs_cos_theta + z_s * cos_t2);
+            std::complex<double> tm = is_scalar ? te : (z_s * abs_cos_theta - z_a * cos_t2) / (z_s * abs_cos_theta + z_a * cos_t2);
+            const Material &owner = slab_is_air ? mat_near : mat_slab;
+            Ra_te = owner.apply_tf(std::norm(te), fGHz);
+            Ra_tm = owner.apply_tf(std::norm(tm), fGHz);
+
+            // Returned as the slab-side reflection, so that rn keeps one meaning throughout: the
+            // internal series and the front port then differ only by the Stokes sign.
+            r_te = std::polar(std::sqrt(Ra_te), std::arg(-te));
+            r_tm = std::polar(std::sqrt(Ra_tm), std::arg(-tm));
+
+            t_fwd[0] = (2.0 * z_a * abs_cos_theta) / (z_a * abs_cos_theta + z_s * cos_t2);
+            t_fwd[1] = is_scalar ? t_fwd[0] : (2.0 * z_a * abs_cos_theta) / (z_s * abs_cos_theta + z_a * cos_t2);
+            t_bwd[0] = (2.0 * z_s * cos_t2) / (z_s * cos_t2 + z_a * abs_cos_theta);
+            t_bwd[1] = is_scalar ? t_bwd[0] : (2.0 * z_s * cos_t2) / (z_a * cos_t2 + z_s * abs_cos_theta);
         };
 
         std::complex<double> rn_te, rn_tm, rf_te, rf_tm;
-        std::complex<double> tn_out[2], tn_in[2], tf_out[2];
+        std::complex<double> tn_fwd[2], tn_bwd[2], tf_out[2];
         double Rn_te = 0.0, Rn_tm = 0.0, Rf_te = 0.0, Rf_tm = 0.0;
-        fresnel_r(mat_near, rn_te, rn_tm, Rn_te, Rn_tm, produce ? tn_out : nullptr, produce ? tn_in : nullptr);
-        fresnel_r(mat_far, rf_te, rf_tm, Rf_te, Rf_tm, produce ? tf_out : nullptr, nullptr);
+        if (produce)
+            fresnel_r_near(rn_te, rn_tm, Rn_te, Rn_tm, tn_fwd, tn_bwd);
+        else
+            fresnel_r(mat_near, rn_te, rn_tm, Rn_te, Rn_tm);
+        fresnel_r(mat_far, rf_te, rf_tm, Rf_te, Rf_tm, produce ? tf_out : nullptr);
 
         // Interface amplitudes for the produce ports: magnitude from the tf-corrected reflectance so
         // the energy bookkeeping matches the single-pass convention used in correction mode below,
@@ -708,8 +748,8 @@ namespace
         {
             auto AMP = [](double R, const std::complex<double> &t) -> std::complex<double>
             { return std::polar(std::sqrt(1.0 - R), std::arg(t)); };
-            tns_te = AMP(Rn_te, tn_in[0]), tns_tm = AMP(Rn_tm, tn_in[1]);   // near -> slab
-            tsn_te = AMP(Rn_te, tn_out[0]), tsn_tm = AMP(Rn_tm, tn_out[1]); // slab -> near
+            tns_te = AMP(Rn_te, tn_fwd[0]), tns_tm = AMP(Rn_tm, tn_fwd[1]); // near -> slab
+            tsn_te = AMP(Rn_te, tn_bwd[0]), tsn_tm = AMP(Rn_tm, tn_bwd[1]); // slab -> near
             tsf_te = AMP(Rf_te, tf_out[0]), tsf_tm = AMP(Rf_tm, tf_out[1]); // slab -> far
             ig = std::sqrt(mat_slab.interface_gain(fGHz) * (far_is_air ? 1.0 : mat_far.interface_gain(fGHz)));
         }
@@ -1546,6 +1586,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         double Nx = 0.0, Ny = 0.0, Nz = 0.0; // FBS normal vector
         double cos_theta = 0.0;              // Angle between FBS normal and incoming ray
         double OF_length = 0.0;              // Distance from origin to FBS
+        double face_extent = 0.0;            // In-plane extent of the FBS face (thin-sheet grazing clamp)
         if (iFBS)
         {
             double E1x = (double)p_mesh[iFBS - 1 + 3 * n_mesh] - Fx,
@@ -1554,6 +1595,19 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
             double E2x = (double)p_mesh[iFBS - 1 + 6 * n_mesh] - Fx,
                    E2y = (double)p_mesh[iFBS - 1 + 7 * n_mesh] - Fy,
                    E2z = (double)p_mesh[iFBS - 1 + 8 * n_mesh] - Fz;
+
+            // Longest triangle edge, needed only by the thin-sheet grazing clamp. It bounds how far a
+            // ray may walk sideways inside a notional slab before it would have left through the side
+            // of the slab rather than crossing it. Computed only when a sheet is in play.
+            if (sheetFBS || sheetSBS)
+            {
+                double E3x = E2x - E1x, E3y = E2y - E1y, E3z = E2z - E1z;
+                double l1 = E1x * E1x + E1y * E1y + E1z * E1z;
+                double l2 = E2x * E2x + E2y * E2y + E2z * E2z;
+                double l3 = E3x * E3x + E3y * E3y + E3z * E3z;
+                double lm = (l1 > l2) ? l1 : l2;
+                face_extent = std::sqrt((l3 > lm) ? l3 : lm);
+            }
 
             // Plane normal vector
             Nx = E1y * E2z - E1z * E2y, Ny = E1z * E2x - E1x * E2z, Nz = E1x * E2y - E1y * E2x;
@@ -1731,6 +1785,10 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         out_flags[1] = front_eff;
 
         // Flip normal vector in case of back side illumination
+        // This is pure geometry: it orients N toward the incidence side so that qd_reflect and
+        // qd_refract bend the right way. It therefore stays on the FBS test even for a glued sheet
+        // whose own normal happens to be reversed relative to the solid it sits on - front_eff decides
+        // which material is near and which is far, never which way a normal points.
         if (thetaF < 0.0)
             Nx = -Nx, Ny = -Ny, Nz = -Nz,
             cos_theta = ODx * Nx + ODy * Ny + ODz * Nz,
@@ -1739,16 +1797,40 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         // Limit value to 0 ... 1 for calculating reflection and transmission coefficients
         double abs_cos_theta = std::abs(cos_theta);
 
-        // SHEET: For co-located materials where one is a sheet, the sheet is applied to the outside. On entry, the sheet is 
-        // applied first (independent of it being the FBS or SBS), followed by an Sheet2Material transition with Sheet = M1 and 
-        // Solid = M2. On exit, it is reversed, the ray leaves the material through the sheet.
-        // The normal orientation of the sheet should be irrelvant.
-
         // Incidence-side (medium 1) and entered/reflected-off (medium 2) materials, default air.
         // 1-based: Material(cols, 0) -> air. M2 always carries the FBS-face material whose
         // interface_gain is the transition gain (front: iMF; back: air, or iMS for M2M).
-        Material M1, M2;
-        if (thetaF >= 0.0) // front hit: entered material = FBS face (iMF)
+        // A sheet crossing does not fit that pattern: Material::interact_with is a two-medium interface
+        // function, while a sheet is three media, two interfaces and one slab. So M1 and M2 become the
+        // media on either side of the sheet - near and far - and the sheet itself goes into M_slab.
+        // material_to_material plays no part in the sheet branches; the pair is one atomic crossing,
+        // not a transition between two traced media.
+        Material M1, M2, M_slab;
+        bool sheet_resolve = false; // coefficients come from qd_slab_resolve instead of interact_with
+        if (sheet_case == 1 || sheet_case == 5)
+        {
+            // Isolated sheet, or a collapsed double-sided duplicate: the same medium sits on both
+            // sides, so near = far = air. The sheet material never reaches interact_with - it enters
+            // only through the slab resolve, which is what makes its normal orientation irrelevant.
+            M_slab = Material(MaterialSet, iMF);
+            sheet_resolve = true;
+        }
+        else if (sheet_case == 2 || sheet_case == 3)
+        {
+            // Glued pair: air | sheet | solid on entry, solid | sheet | air on exit. Which of the two
+            // co-located faces carries the sheet does not matter, because front_eff already took the
+            // verdict from the solid face, so FBS-sheet and SBS-sheet geometry land here identically.
+            // A back-side hit on the solid implies the ray is already inside it, which is the same
+            // trick the M1/M2 block below uses to recover the incidence medium without any state.
+            M_slab = Material(MaterialSet, sheetFBS ? iMF : iMS);
+            Material M_solid(MaterialSet, sheetFBS ? iMS : iMF);
+            if (front_eff) // glued entry, o->i
+                M2 = M_solid;
+            else // glued exit, i->o
+                M1 = M_solid;
+            sheet_resolve = true;
+        }
+        else if (thetaF >= 0.0) // front hit: entered material = FBS face (iMF)
         {
             M2 = Material(MaterialSet, iMF);
             if (material_to_material) // SBS (front) hit first
@@ -1761,23 +1843,59 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
                 M2 = Material(MaterialSet, iMS);
         }
 
-        // SHEET: Interaction logic: 
-        // If M1 is a sheet (entry), the logic is Air > Sheet (M1) > Solid (M2), so this needs to be put into M1.interact_with(M2 ...
-        // If M2 is a sheet (exit), the logic is Solid (M1) > Sheet (M2) > Air
-        // A sheet embedded in a material needs to be handled by ray_state_update and is out of scope here.
-        // The always-resolve requirement is covered: qd_slab_resolve in produce mode has no bail-outs.
-
-        // Interface evaluation (single source): coefficients + geometry quantities.
+        // Interface evaluation. For a solid this one call supplies both the coefficients and the
+        // geometry. For a sheet the two are split by purpose: the geometry comes from the near/far pair
+        // evaluated here, the coefficients from the slab resolve below.
         std::complex<double> cTE, cTM, cos_theta2, eta1_div_eta2;
         double eta; // Snell ratio sqrt|eta1*mu1 / eta2*mu2|
         bool total_reflection;
         M1.interact_with(M2, interaction_type, thetaF, fGHz, &cTE, &cTM, &cos_theta2, &eta1_div_eta2, &eta, &total_reflection);
+
+        // Direction and total reflection come from near/far, never from near/slab. Snell's law is
+        // transitive - n_near*sin_near = n_slab*sin_slab = n_far*sin_far - so the net bend and the
+        // critical angle depend only on the two outer media and the sheet cannot affect the outgoing
+        // direction at all. Reading them off interact_with(near, sheet) would invent total reflection
+        // past the air|sheet critical angle, and in scalar mode the impedance mapping readily gives
+        // n < 1, which would turn an acoustic sheet into a mirror.
+        if (sheet_case == 1 || sheet_case == 5)
+            total_reflection = false; // near == far: unreachable except at exact tangency, so force it off
         bool tir_central = total_reflection; // pre-ray-tube TIR state
 
-        // SHEET: Refraction
-        // The sheet itself never refracts since it is an atomic event.
-        // However, Air-Sheet-Material or Material-Sheet-Air logic needs to apply the correct refraction angles taking
-        // the Sheet-Material / Sheet-Air bend into account
+        if (sheet_resolve)
+        {
+            double thk = M_slab.thk;
+
+            // In-slab propagation angle. Only cos_theta2 is used; the coefficients and the TIR verdict
+            // of this near|sheet interface are deliberately thrown away for the reason just given.
+            std::complex<double> ct2_slab;
+            M1.interact_with(M_slab, interaction_type, thetaF, fGHz, nullptr, nullptr, &ct2_slab, nullptr, nullptr, nullptr);
+
+            // Grazing clamp. thk/cos diverges at tangency, but well before that the ray would have left
+            // through the side of the notional slab: the cutoff is where the lateral walk-off
+            // thk*tan(theta) exceeds the face's in-plane extent. Clamping the cosine from below caps
+            // the traversal at sqrt(thk^2 + extent^2) with no tangent or inverse trig call.
+            double ext = (face_extent > 0.0) ? face_extent : thk;
+            double cos_min = thk / std::sqrt(thk * thk + ext * ext);
+            double ct_geo = (abs_cos_theta < cos_min) ? cos_min : abs_cos_theta;
+            double ct_slab = std::abs(std::real(ct2_slab));
+            ct_slab = (ct_slab < cos_min) ? cos_min : ct_slab;
+
+            // Thickness enters only here, mapped onto the medium_gain signature: the refracted path
+            // carries the in-slab attenuation, the geometric path carries the acoustic mass-law term.
+            // At zero geometric thickness the mass law cannot evaluate at all, which is precisely what
+            // a sheet needs this mapping for.
+            std::complex<double> Tte, Ttm, Rte, Rtm;
+            qd_slab_resolve(M1, M_slab, M2, thk / ct_slab, thk / ct_geo, ct_slab, ct_geo,
+                            fGHz, is_scalar, 0.0, true, &Tte, &Ttm, &Rte, &Rtm);
+
+            // Both ports come out of the one pass over the same Fresnel quantities. The reflection port
+            // is its own Airy sum, not what interact_with would return for a half-space: expect real
+            // angular and frequency structure instead of a smooth Fresnel value.
+            if (geometry_type == 0) // Reflection
+                cTE = Rte, cTM = Rtm;
+            else // Transmission or refraction
+                cTE = Tte, cTM = Ttm;
+        }
 
         // Calculate the center path direction after medium interaction (normalized to length 1)
         double FDx = Dx - Fx, FDy = Dy - Fy, FDz = Dz - Fz; // Vector from FBS to destination
@@ -1812,16 +1930,19 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
                 cos_thetaV[iTube + 1] = c, sin_thetaV[iTube + 1] = std::sqrt(1.0 - c * c);
             }
 
-            // Whole-tube TIR: pass through (undeviated) if the spine OR any edge is past critical
-            if (geometry_type == 2)
+            // Whole-tube TIR: pass through (undeviated) if the spine OR any edge is past critical.
+            // Skipped where near == far, since the Snell ratio is then 1 and the test can only trip on
+            // numerical tangency - which would escalate the entire tube into a mirror on the strength
+            // of a rounding artifact at the spine.
+            if (geometry_type == 2 && sheet_case != 1 && sheet_case != 4 && sheet_case != 5)
                 for (int i = 0; i <= 3 && !total_reflection; ++i)
                     if (eta * sin_thetaV[i] >= 1.0)
                         total_reflection = true;
         }
 
-        // SHEET: Reflection
-        // Same issue here either reflection of the sheet (entry) or of the Solid-Sheet boundary (exit) with Slab-Resolve on the sheet side.
-
+        // Outgoing spine direction. No sheet special case is needed here: with near == far the interface
+        // call returned eta = 1 and cos_theta2 = cos_theta, so the refraction branch reproduces the
+        // incoming direction and cases 1/4/5 land undeviated on their own.
         if (geometry_type == 0) // Reflection, normalized by default
             qd_reflect(ODx, ODy, ODz, Nx, Ny, Nz, FDx, FDy, FDz);
         else if (geometry_type == 1 || total_reflection) // Transmission without refraction
@@ -1947,7 +2068,11 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
             }
         }
 
-        // Re-evaluate coefficients if the ray tube introduced TIR (type-2 tube vertices)
+        // Re-evaluate coefficients if the ray tube introduced TIR (type-2 tube vertices).
+        // For a glued sheet this discards the slab composite and falls back to the forced-TIR near/far
+        // interface result, losing the sheet's own loss for that ray. Accepted as a bounded degradation:
+        // it can only fire for cases 2/3, where near and far differ, and only when a tube edge is past
+        // critical while the spine is not. The cases where near == far never reach it.
         if (total_reflection != tir_central)
             M1.interact_with(M2, interaction_type, thetaF, fGHz, &cTE, &cTM, nullptr, nullptr, nullptr, nullptr, true);
 
