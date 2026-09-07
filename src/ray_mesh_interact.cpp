@@ -612,13 +612,21 @@ namespace
     //
     // produce == false: T_te / T_tm are per-channel correction factors for ports the caller holds.
     //                   In scalar mode both carry the uncorrected series sum, because the caller
-    //                   scales a stored xprmat in place instead of rebuilding it from cTE.
+    //                   scales a stored xprmat in place instead of rebuilding it from cTE. Both
+    //                   boundaries are evaluated at the real in-slab angle, because the caller's angle
+    //                   comes from traced ray geometry and its result must not move.
     // produce == true : T_te / T_tm and R_te / R_tm are absolute composite coefficients. The
     //                   transmit port carries the slab's interface gain, plus the far medium's when
-    //                   the far side is a real material, matching what Material::interact_with folds
-    //                   in for a transmission-class interaction. The reflect port carries neither.
-    //                   A caller that also passes the far medium through separately (the layer-2
-    //                   forward path of a sheet stack) must not pay that interface gain twice.
+    //                   the far medium is one the wave newly enters, matching what
+    //                   Material::interact_with folds in for a transmission-class interaction. The
+    //                   reflect port carries neither. A caller that also passes the far medium through
+    //                   separately (the layer-2 forward path of a sheet stack) must not pay that
+    //                   interface gain twice.
+    //                   Both boundaries are evaluated at the true complex angles, which the incidence
+    //                   angle alone determines - nothing propagates geometrically inside a sheet, so
+    //                   there is no real direction to project onto. The transmit port also subtracts
+    //                   the free-space phase over the sheet's thickness, since the tracer walked that
+    //                   length as air and the FSPL leg already carries it.
     //
     // Returns false only in correction mode, meaning "did not resolve, let the tracer follow the
     // bounces". Produce mode always resolves.
@@ -729,14 +737,61 @@ namespace
             t_bwd[1] = is_scalar ? t_bwd[0] : (2.0 * z_s * cos_t2) / (z_a * cos_t2 + z_s * abs_cos_theta);
         };
 
+        // The far interface at the true complex in-slab cosine rather than at its real projection.
+        // Produce mode holds the real incidence angle in the near medium, so the in-slab cosine follows
+        // from Snell with nothing projected away, and Snell is transitive: the cosine in the far medium
+        // depends only on the near and far media, not on the slab between them. Dropping the imaginary
+        // part here was worth 2 dB at 85 deg for a 10 cm concrete slab and is the whole of the sheet's
+        // remaining error at grazing incidence. Correction mode keeps the real-angle path above,
+        // because ray_state_update's angle comes from real ray geometry and its result must not move.
+        auto fresnel_r_far = [&](std::complex<double> &r_te, std::complex<double> &r_tm,
+                                 double &Ra_te, double &Ra_tm,
+                                 std::complex<double> *t_out) // [te, tm] slab -> far
+        {
+            std::complex<double> eta_n_if = mat_near.eta(fGHz) + mat_near.eta_resonance(fGHz);
+            std::complex<double> mu_n = mat_near.mu(fGHz);
+            std::complex<double> eta_a_if = mat_far.eta(fGHz) + mat_far.eta_resonance(fGHz);
+            std::complex<double> mu_a = mat_far.mu(fGHz);
+            std::complex<double> z_s = std::sqrt(eta_s_if / mu_s);
+            std::complex<double> z_a = std::sqrt(eta_a_if / mu_a);
+            double sin2_i = 1.0 - abs_cos_theta * abs_cos_theta;
+
+            auto ROOT = [](std::complex<double> arg) -> std::complex<double>
+            {
+                if (std::imag(arg) == 0.0 && std::real(arg) < 0.0)
+                    arg = std::complex<double>(std::real(arg), -0.0); // decaying evanescent root
+                return std::sqrt(arg);
+            };
+
+            // In-slab cosine, and the cosine in the far medium. Both from the incidence-side sine.
+            std::complex<double> cts = ROOT(1.0 - ((eta_n_if * mu_n) / (eta_s_if * mu_s)) * sin2_i);
+            std::complex<double> cos_t2 = ROOT(1.0 - ((eta_n_if * mu_n) / (eta_a_if * mu_a)) * sin2_i);
+
+            std::complex<double> te = (z_s * cts - z_a * cos_t2) / (z_s * cts + z_a * cos_t2);
+            std::complex<double> tm = is_scalar ? te : (z_a * cts - z_s * cos_t2) / (z_a * cts + z_s * cos_t2);
+            const Material &owner = slab_is_air ? mat_far : mat_slab; // tf of the solid face
+            Ra_te = owner.apply_tf(std::norm(te), fGHz);
+            Ra_tm = owner.apply_tf(std::norm(tm), fGHz);
+            r_te = std::polar(std::sqrt(Ra_te), std::arg(te));
+            r_tm = std::polar(std::sqrt(Ra_tm), std::arg(tm));
+
+            t_out[0] = (2.0 * z_s * cts) / (z_s * cts + z_a * cos_t2);
+            t_out[1] = is_scalar ? t_out[0] : (2.0 * z_s * cts) / (z_a * cts + z_s * cos_t2);
+        };
+
         std::complex<double> rn_te, rn_tm, rf_te, rf_tm;
         std::complex<double> tn_fwd[2], tn_bwd[2], tf_out[2];
         double Rn_te = 0.0, Rn_tm = 0.0, Rf_te = 0.0, Rf_tm = 0.0;
         if (produce)
+        {
             fresnel_r_near(rn_te, rn_tm, Rn_te, Rn_tm, tn_fwd, tn_bwd);
+            fresnel_r_far(rf_te, rf_tm, Rf_te, Rf_tm, tf_out);
+        }
         else
+        {
             fresnel_r(mat_near, rn_te, rn_tm, Rn_te, Rn_tm);
-        fresnel_r(mat_far, rf_te, rf_tm, Rf_te, Rf_tm, produce ? tf_out : nullptr);
+            fresnel_r(mat_far, rf_te, rf_tm, Rf_te, Rf_tm);
+        }
 
         // Interface amplitudes for the produce ports: magnitude from the tf-corrected reflectance so
         // the energy bookkeeping matches the single-pass convention used in correction mode below,
@@ -813,10 +868,20 @@ namespace
             CLAMP_POLE(denom_te), CLAMP_POLE(denom_tm);
 
             std::complex<double> phi = std::polar(abs_phi, arg_phi);
+
+            // Free-space reference for the transmit port. A sheet has zero geometric thickness, so the
+            // tracer walked its thk as air and the FSPL leg already carries that phase; adding the
+            // absolute in-slab phase on top counts the same length twice. SCALE_BY_MEDIUM subtracts the
+            // same term for a traced solid, which is why the two disagreed by k0*thk*cos(theta_i) - 60
+            // deg at normal incidence for a 10 cm slab. It belongs on the single forward pass only:
+            // phi2 in the denominator is a round-trip inside the slab and must stay absolute, and the
+            // reflect port turns around at the face without displacing any air.
+            std::complex<double> phi_t = phi * std::polar(1.0, (omega / c0) * dist_geo * abs_cos_theta * abs_cos_theta);
+
             if (T_te)
-                *T_te = ig * tns_te * tsf_te * phi / denom_te;
+                *T_te = ig * tns_te * tsf_te * phi_t / denom_te;
             if (T_tm)
-                *T_tm = ig * tns_tm * tsf_tm * phi / denom_tm;
+                *T_tm = ig * tns_tm * tsf_tm * phi_t / denom_tm;
             if (R_te) // front-face reflection plus the series leaking back out through the near face
                 *R_te = -rn_te + tns_te * tsn_te * rf_te * phi2 / denom_te;
             if (R_tm)
@@ -2203,6 +2268,11 @@ Batched inside/outside ray-state machine with analytic thin-slab (Fabry-Perot) r
   a medium is bounded by that medium on both sides, and the wrong pair moves both Fresnel boundaries,
   the internal series and the lumped interface gain at once. The sheet material never becomes the current
   medium; it is recorded in the previous-medium word so the host layer on the far side reflects off it.
+  The total-reflection verdict and the continuation direction are re-derived here too, at the corrected
+  angle, for the same reason [[ray_state_update]] re-derives them for a traced solid: an undeviated
+  tracer inside a medium travels at its external angle, so the hit code's geometric-angle verdict turns
+  a glued exit into a mirror past the internal critical angle, and leaving `path_dirN` unchanged would
+  hand the next interaction a geometric direction where a refracted one is required.
 
 ## Declaration:
 ```
@@ -2348,8 +2418,8 @@ void quadriga_lib::ray_state_update(
    |   65 | 0x41 |   —  |     —   | trans, ok                  | advance to ray destination, identity interface     |
    |   69 | 0x45 |   85 |   101   | sheet, resolve, ok         | isolated sheet crossed in air                      |
    |   77 | 0x4D |   93 |   109   | sheet, resolve, inside, ok | isolated sheet crossed inside a medium (embedded)  |
-   |   71 | 0x47 |   87 |   103   | sheet, glued, resolve, ok  | glued exit, solid \ sheet \ enclosing              |
-   |   79 | 0x4F |   95 |   111   | sheet, glued, resolve, inside, ok | glued entry, host \ sheet \ solid           |
+   |   71 | 0x47 |   87 |   103   | sheet, glued, resolve, ok  | glued exit, solid \ sheet \ enclosing            |
+   |   79 | 0x4F |   95 |   111   | sheet, glued, resolve, inside, ok | glued entry, host \ sheet \ solid         |
    Reachable composite values for reflection:<br><br>
    |  Dec | Hex  |  FIX |   TIR   | Flags set                       | Meaning                                                      |
    | :--: | :--: | :--: | :-----: | ------------------------------- |------------------------------------------------------------- |
@@ -2361,7 +2431,7 @@ void quadriga_lib::ray_state_update(
    |  197 | 0xC5 |  213 |   229   | refl, sheet, resolve, ok        | reflection off an isolated sheet, ray outside                |
    |  205 | 0xCD |  221 |   237   | refl, sheet, resolve, inside, ok | reflection off an isolated sheet, ray inside a medium       |
    |  199 | 0xC7 |  215 |   231   | refl, sheet, glued, resolve, ok | reflection off a glued sheet from the host side              |
-   |  207 | 0xCF |  223 |   239   | refl, sheet, glued, resolve, inside, ok | reflection off a glued sheet from the solid side     |
+   |  207 | 0xCF |  223 |   239   | refl, sheet, glued, resolve, inside, ok | reflection off a glued sheet from the solid side    |
    |  192+| 0xC0+|    — |    —    | refl, scatter, resolve clear    | reserved: scattering not implemented                         |
    A thin-sheet stack of two different materials (`out_typeN` 79, or 69/71 with two sheet faces of
    different materials) is **not implemented** and returns 0: the case is detected but has no physics in
@@ -3016,51 +3086,90 @@ void quadriga_lib::ray_state_update(int interaction_type,
         // ray_mesh_interact wrote it.
         auto SHEET_RESOLVE = [&](int mtl_slab, int mtl_near, int mtl_far) -> bool
         {
-            // Under total reflection ray_mesh_interact replaced the slab composite with the forced-TIR
-            // near/far interface result. There is no transmitted composite left to rebuild, and
-            // rebuilding one would contradict the TIR verdict the tracer is acting on.
-            if (total_reflection)
-                return false;
-
             Material M_slab = MAT(mtl_slab), M_near = MAT(mtl_near), M_far = MAT(mtl_far);
             double thk = M_slab.thk;
             if (thk <= 0.0) // Not a sheet material after all: leave the composite alone
                 return false;
 
-            // In-slab propagation angle. Only the refraction cosine is used; the coefficients and the
-            // TIR verdict of this near|sheet interface are deliberately discarded, because Snell is
-            // transitive and the net bend depends only on the two outer media.
-            std::complex<double> ct2_slab;
-            M_near.interact_with(M_slab, interaction_type, theta_t, fGHz, nullptr, nullptr, &ct2_slab, nullptr, nullptr, nullptr);
+            // Geometry and the total-reflection verdict from the outer pair, at theta_t.
+            //
+            // Both have to be re-derived here rather than taken from the hit code. With an undeviated
+            // tracer a ray inside a solid travels at its external angle, so ray_mesh_interact evaluated
+            // the crossing at an angle that is not the in-slab one, and past the internal critical angle
+            // it declares a mirror where there is none - a glued exit then loses tens of dB.
+            // REPLACE_BY_VBS performs exactly this correction for solids and this path deliberately does
+            // not call it. Only the outer media decide: Snell is transitive, so the sheet can neither
+            // create nor remove total reflection, and it cannot bend the outgoing ray either.
+            std::complex<double> ct2_far;
+            double snell = 1.0;
+            bool tir = false;
+            M_near.interact_with(M_far, interaction_type, theta_t, fGHz, nullptr, nullptr,
+                                 &ct2_far, nullptr, &snell, &tir);
+            typeR[5] = tir;
 
-            // Grazing clamp. ray_mesh_interact bounds the lateral walk-off by the longest FBS triangle
-            // edge, but that edge is not among this function's inputs and cannot be recovered from them
-            // (thicknessN is zero for a sheet). A fixed extent-to-thickness ratio stands in. This is a
-            // divergence guard rather than physics - it only bites inside the clamp region, which a
-            // sensibly meshed face never reaches - but it does mean the two functions disagree at
-            // extreme grazing incidence.
-            // ISSUE: pass the face extent through if an output slot ever becomes available.
-            const double sheet_extent_ratio = 1000.0;
-            const double cos_min = 1.0 / std::sqrt(1.0 + sheet_extent_ratio * sheet_extent_ratio);
-            double ct_geo = (abs_cos_theta_t < cos_min) ? cos_min : abs_cos_theta_t;
-            double ct_slab = std::abs(std::real(ct2_slab));
-            ct_slab = (ct_slab < cos_min) ? cos_min : ct_slab;
+            // Continuation direction. Leaving path_dirN as ray_mesh_interact wrote it replaces the
+            // physical refracted direction with the geometric one, which silently breaks the VBS chain
+            // for every later interaction on the path: the next face is then evaluated at the wrong
+            // angle and, inside a solid, total-reflects. With near == far the interface call returns
+            // eta = 1 and a refraction cosine equal to the incidence cosine, so the refraction branch
+            // reproduces dir_prev and the isolated sheet needs no special case.
+            if (refl_pass)
+                qd_reflect(dir_prev[0], dir_prev[1], dir_prev[2], N[0], N[1], N[2],
+                           dir_next[0], dir_next[1], dir_next[2]);
+            else if (tir) // no Snell direction under total reflection; any leak travels undeviated
+                dir_next[0] = dir_prev[0], dir_next[1] = dir_prev[1], dir_next[2] = dir_prev[2];
+            else
+                qd_refract(dir_prev[0], dir_prev[1], dir_prev[2], N[0], N[1], N[2],
+                           snell, abs_cos_theta_t, ct2_far, dir_next[0], dir_next[1], dir_next[2]);
 
-            // Thickness enters only here, mapped onto the medium_gain signature: the refracted path
-            // carries the in-slab attenuation, the geometric path carries the acoustic mass-law term.
-            std::complex<double> Tte, Ttm, Rte, Rtm;
-            qd_slab_resolve(M_near, M_slab, M_far, thk / ct_slab, thk / ct_geo, ct_slab, ct_geo,
-                            fGHz, is_scalar, 0.0, true, &Tte, &Ttm, &Rte, &Rtm);
+            if (p_path_dirN)
+                p_path_dirN[ii] = (dtype)dir_next[0],
+                p_path_dirN[ii + n_rayN] = (dtype)dir_next[1],
+                p_path_dirN[ii + 2 * n_rayN] = (dtype)dir_next[2];
 
-            // Both ports come out of the one pass. The reflection port is its own Airy sum, not the
-            // half-space Fresnel value, so expect real angular and frequency structure in it.
-            cTE = refl_pass ? Rte : Tte;
-            cTM = refl_pass ? Rtm : Ttm;
+            if (tir)
+            {
+                // The slab composite is meaningless under total reflection - nothing crosses the far
+                // boundary - so fall back to the forced-TIR outer-pair result, which is what
+                // ray_mesh_interact does for its own tube-TIR re-evaluation. Doing it here rather than
+                // trusting the hit code matters in both directions: the verdict just re-derived may
+                // have turned a mirror back into a real crossing, or the reverse.
+                M_near.interact_with(M_far, interaction_type, theta_t, fGHz, &cTE, &cTM,
+                                     nullptr, nullptr, nullptr, nullptr, true);
+            }
+            else
+            {
+                // In-slab propagation angle. Only the refraction cosine is used; the coefficients and
+                // the TIR verdict of this near|sheet interface are deliberately discarded for the
+                // reason just given.
+                std::complex<double> ct2_slab;
+                M_near.interact_with(M_slab, interaction_type, theta_t, fGHz, nullptr, nullptr, &ct2_slab, nullptr, nullptr, nullptr);
 
-            // ISSUE: the outgoing direction is left as ray_mesh_interact wrote it. For an isolated
-            // sheet near == far, so there is no bend to correct. For a glued sheet reached from inside
-            // a medium other than air the net bend does change, and the direction is then marginally
-            // inconsistent with the coefficients rebuilt here.
+                // Grazing clamp. ray_mesh_interact bounds the lateral walk-off by the longest FBS
+                // triangle edge, but that edge is not among this function's inputs and cannot be
+                // recovered from them (thicknessN is zero for a sheet). A fixed extent-to-thickness
+                // ratio stands in. This is a divergence guard rather than physics - it only bites
+                // inside the clamp region, which a sensibly meshed face never reaches - but it does
+                // mean the two functions disagree at extreme grazing incidence.
+                // ISSUE: pass the face extent through if an output slot ever becomes available.
+                const double sheet_extent_ratio = 1000.0;
+                const double cos_min = 1.0 / std::sqrt(1.0 + sheet_extent_ratio * sheet_extent_ratio);
+                double ct_geo = (abs_cos_theta_t < cos_min) ? cos_min : abs_cos_theta_t;
+                double ct_slab = std::abs(std::real(ct2_slab));
+                ct_slab = (ct_slab < cos_min) ? cos_min : ct_slab;
+
+                // Thickness enters only here, mapped onto the medium_gain signature: the refracted path
+                // carries the in-slab attenuation, the geometric path the acoustic mass-law term.
+                std::complex<double> Tte, Ttm, Rte, Rtm;
+                qd_slab_resolve(M_near, M_slab, M_far, thk / ct_slab, thk / ct_geo, ct_slab, ct_geo,
+                                fGHz, is_scalar, 0.0, true, &Tte, &Ttm, &Rte, &Rtm);
+
+                // Both ports come out of the one pass. The reflection port is its own Airy sum, not the
+                // half-space Fresnel value, so expect real angular and frequency structure in it.
+                cTE = refl_pass ? Rte : Tte;
+                cTM = refl_pass ? Rtm : Ttm;
+            }
+
             double xprmat[8], pgain;
             qd_polbasis(dir_prev[0], dir_prev[1], dir_prev[2], dir_next[0], dir_next[1], dir_next[2],
                         N[0], N[1], N[2], 1.0, cTE, cTM, is_scalar, xprmat, pgain);
@@ -3121,9 +3230,11 @@ void quadriga_lib::ray_state_update(int interaction_type,
             // Close out the host medium. Its series reflects off the sheet ahead and off whatever the
             // host was entered through, which is the existing argument order with the sheet index
             // substituted for the face material. A sheet passed as mtl_near is treated as a half-space
-            // by the correction-mode Fresnel, not as a slab - an approximation to the true three-layer
-            // coupling, but strictly closer than passing air. Skipped without a sheet composite,
-            // because the factor is applied through cTE / cTM.
+            // by the correction-mode Fresnel, not as a slab, so a sheet whose impedance is close to the
+            // host's collapses the denominator and the host layer loses its internal series entirely.
+            // ISSUE: the exact treatment is a transfer matrix over the whole stack, which is also what
+            // case 4 needs. Skipped without a sheet composite, because the factor is applied through
+            // cTE / cTM.
             if (mtl_current != 0)
             {
                 if (have_composite)
