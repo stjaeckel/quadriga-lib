@@ -50,7 +50,7 @@
 // Diagnostic output for the thin-sheet / slab work. Uncomment to print the tables. The
 // assertions in the diagnostic cases run either way and only check sanity, so leaving this
 // commented costs nothing but the printing.
-#define QD_TEST_VERBOSE
+// #define QD_TEST_VERBOSE
 
 #ifdef QD_TEST_VERBOSE
 #include <cstdio>
@@ -2287,6 +2287,12 @@ TEST_CASE("ray_state_update - input validation")
 //   5 LO      eps = 1.50 - 0.40j at 1 GHz
 //   6 LO_CLEAN eps = 1.50, lossless
 //   7 LO_SHEET electrically identical to LO, plus thk = 6 mm
+//   8 LO_CLEAN_TWIN electrically identical to LO_CLEAN, plus thk = 6 mm
+//
+// The twins (3 with 1, 7 with 5, 8 with 6) are distinct material indices presenting no boundary to a
+// wave. Placed as the previous medium they make the far Fresnel coefficient vanish, so the Airy
+// denominator is 1 and the series factor is exactly 1 with everything else about the run untouched -
+// which is how a diagnostic measures its own reference instead of reconstructing it.
 //
 // The LO group exists because an i-o exit from eps 5.24 into air total-reflects above
 // asin(1/2.289) = 25.9 deg, which turns every row past 25 deg of an in-slab sweep into a
@@ -2298,18 +2304,19 @@ template <typename dtype>
 static inline std::unordered_map<std::string, std::vector<dtype>> diag_palette()
 {
     std::unordered_map<std::string, std::vector<dtype>> m;
-    m["a"] = {(dtype)5.24, (dtype)5.24, (dtype)5.24, (dtype)9.0, (dtype)1.50, (dtype)1.50, (dtype)1.50};
-    m["b"] = std::vector<dtype>(7, (dtype)0.0);
+    m["a"] = {(dtype)5.24, (dtype)5.24, (dtype)5.24, (dtype)9.0,
+              (dtype)1.50, (dtype)1.50, (dtype)1.50, (dtype)1.50};
+    m["b"] = std::vector<dtype>(8, (dtype)0.0);
     m["c"] = {(dtype)(0.63 / 17.98), (dtype)0.0, (dtype)(0.63 / 17.98), (dtype)(1.20 / 17.98),
-              (dtype)(0.40 / 17.98), (dtype)0.0, (dtype)(0.40 / 17.98)};
-    m["d"] = std::vector<dtype>(7, (dtype)0.0);
-    m["att"] = std::vector<dtype>(7, (dtype)0.0);
-    m["attB"] = std::vector<dtype>(7, (dtype)0.0);
-    m["alpha"] = std::vector<dtype>(7, (dtype)0.0);
-    m["alphaB"] = std::vector<dtype>(7, (dtype)0.0);
-    m["fRef"] = std::vector<dtype>(7, (dtype)1.0);
+              (dtype)(0.40 / 17.98), (dtype)0.0, (dtype)(0.40 / 17.98), (dtype)0.0};
+    m["d"] = std::vector<dtype>(8, (dtype)0.0);
+    m["att"] = std::vector<dtype>(8, (dtype)0.0);
+    m["attB"] = std::vector<dtype>(8, (dtype)0.0);
+    m["alpha"] = std::vector<dtype>(8, (dtype)0.0);
+    m["alphaB"] = std::vector<dtype>(8, (dtype)0.0);
+    m["fRef"] = std::vector<dtype>(8, (dtype)1.0);
     m["thk"] = {(dtype)0.0, (dtype)0.0, (dtype)0.006, (dtype)0.0,
-                (dtype)0.0, (dtype)0.0, (dtype)0.006};
+                (dtype)0.0, (dtype)0.0, (dtype)0.006, (dtype)0.006};
     return m;
 }
 
@@ -2358,15 +2365,34 @@ static inline std::complex<double> diag_phi(std::complex<double> eps, double L,
     return std::sqrt(gL) * std::exp(std::complex<double>(0.0, -k0 * n_re * L * ct * ct));
 }
 
-// The exact complex in-slab cosine that the real projection cos(theta_n) stands for. Invert Snell
-// with the real index to recover the angle outside, then take the complex cosine that angle
-// implies. This is the reconstruction the entry-boundary fix proposes, used here as a reference so
-// the size of the error is visible before the fix lands.
-static inline std::complex<double> diag_ct_exact(std::complex<double> eps, double theta_n_rad)
+// The qd_refract map itself: incidence angle in air -> the real in-slab cosine a tracer is left
+// holding. qd_refract normalizes eta*u + (eta*cos_in - Re(ct2))*n, so the traced cosine is NOT
+// Re(ct2) but Re(ct2)/sqrt(eta^2 sin^2 + Re(ct2)^2). Reproduced here so the fixture can hand the
+// function the same direction a tracer would have produced, and so the reference for the recovery is
+// the map that was actually applied rather than real-index Snell, which is a different map.
+static inline double diag_traced_ct(std::complex<double> eps_slab, double theta_ext_rad)
 {
-    double n_re = std::real(std::sqrt(eps));
-    double s_out = std::min(1.0, n_re * std::sin(theta_n_rad));
-    return std::sqrt(1.0 - (1.0 / eps) * s_out * s_out);
+    std::complex<double> eps_r = 1.0 / eps_slab; // entry medium is air
+    double s = std::sin(theta_ext_rad);
+    std::complex<double> ct2 = std::sqrt(1.0 - eps_r * s * s);
+    double eta = std::sqrt(std::abs(eps_r)), r = std::real(ct2);
+    return r / std::sqrt((eta * s) * (eta * s) + r * r);
+}
+
+// The exact complex in-slab cosine the projection above stands for
+static inline std::complex<double> diag_ct_exact(std::complex<double> eps_slab, double theta_ext_rad)
+{
+    double s = std::sin(theta_ext_rad);
+    return std::sqrt(1.0 - (1.0 / eps_slab) * s * s);
+}
+
+// Conductivity-only medium gain over a path, ITU-R P.2040 form (the palette carries no alpha)
+static inline double diag_medium_gain(std::complex<double> eps, double dist, double f_hz)
+{
+    double er = std::real(eps), td = std::imag(eps) / er;
+    double cd = 1.0 / std::sqrt(1.0 + td * td);
+    double Del = std::sqrt(2.0 * cd / (1.0 - cd)) * 0.0477135 / ((f_hz * 1e-9) * std::sqrt(er));
+    return std::pow(10.0, -0.1 * (dist * 8.686 / Del));
 }
 
 // Slab-side Fresnel reflection at a slab|adjacent boundary, TE / scalar form, parameterized by
@@ -2475,64 +2501,120 @@ TEST_CASE("Diagnostic - Slab factor per polarization")
 
 TEST_CASE("Diagnostic - Entry boundary evaluated at two angles")
 {
-    // One slab crossing, two evaluations that do not agree. The entry boundary was applied by
-    // ray_mesh_interact from the incidence side at the true incidence angle, with the complex
-    // refraction cosine kept. qd_slab_resolve then re-derives that same boundary from the slab side
-    // at the REAL projected in-slab angle, and it is the re-derived value that enters the Airy
-    // denominator.
+    // One slab crossing, evaluated two ways. ray_mesh_interact applied the entry boundary at the true
+    // incidence angle with the complex refraction cosine kept; qd_slab_resolve then re-derived that
+    // same boundary from the real projection the tracer was left holding, so the Airy denominator
+    // summed a series against a coefficient the path never carried.
     //
-    // Scalar mode, so the applied correction is out/in exactly. diag_close divides out the
-    // in-medium factor and leaves the series factor. S_traced builds BOTH boundaries from
-    // cos(theta_n), which is what the function does today and what the applied column should match
-    // to the last digit. S_exact replaces the entry boundary with the exact complex in-slab cosine
-    // recovered by inverting Snell - the reconstruction the fix proposes - so the gap between the
-    // last two columns is the size of the defect.
+    // The fixture hands the function what a tracer would actually have produced: fbs_angle carries the
+    // geometric external angle, path_dir_prev carries the direction qd_refract wrote, and the in-slab
+    // cosine the function sees is that direction's real projection. Supplying path_dir_prev is what
+    // arms the recovery - without it nothing was ever projected and the gate correctly declines.
     //
-    // eps 1.50 keeps the critical angle at 54.7 deg so the sweep stays out of total reflection.
+    // The series factor is MEASURED, not reconstructed. Supplying path_dir_prev also switches on the
+    // VBS redo, which replaces the coefficient rather than scaling it: the exit interface is
+    // re-applied at the corrected angle, the polarization basis is rebuilt, and the medium factor
+    // switches to the raw path lengths. An analytic reference for all of that was tried and was wrong
+    // by 4.6 dB, which the lossless control exposed immediately - for a real permittivity the
+    // normalization inside qd_refract is inert, so ct_traced IS the exact cosine, the recovery is a
+    // provable no-op, and no no-op moves a result by 4.6 dB.
+    //
+    // So each row runs twice, differing only in the previous medium. With a twin of the slab behind
+    // it the far Fresnel coefficient vanishes and the series factor is exactly 1 whatever the
+    // propagation factor does, while the exit interface, the medium factor, the basis and the VBS
+    // geometry are identical to the first run and divide out. The resolve still fires in both, so the
+    // resolved flag and the walk-off branch match.
     const double f_hz = FRQ;
     const double L = 0.10;
     auto mtl = diag_palette<double>();
 
-    QD_DIAG("\n# diag: entry boundary, exact complex angle versus the real projection\n");
-    QD_DIAG("theta_n,|S_applied|,arg_S_applied,|S_traced|,arg_S_traced,|S_exact|,arg_S_exact,"
-            "d_applied_vs_traced_dB,d_exact_vs_traced_dB,rtype\n");
+    QD_DIAG("\n# diag: entry boundary, recovered complex angle versus the real projection\n");
+    QD_DIAG("theta_ext,ct_traced,|S_applied|,arg_S_applied,|S_exact|,arg_S_exact,|S_traced|,"
+            "arg_S_traced,d_vs_exact_dB,d_traced_vs_exact_dB,rtype\n");
+
+    // material -> a distinct index presenting the same impedance, used to null the far boundary
+    auto twin_of = [](int m) { return (m == 5) ? 7 : 8; };
 
     for (int m : {5, 6}) // 5 = lossy eps 1.50 - 0.40j, 6 = lossless control
     {
         QD_DIAG("# material %d (%s)\n", m, (m == 5) ? "lossy eps 1.50 - 0.40j" : "lossless eps 1.50");
-        for (double thd : {0.0, 10.0, 20.0, 30.0, 40.0, 50.0})
+        for (double thd : {0.0, 20.0, 40.0, 60.0, 75.0})
         {
-            double theta_n = thd * QPI / 180.0;
-            auto C = make1<double>(mtl, /*scalar transmission*/ 4, OT_EXIT, 1u,
-                                   /*M1*/ m, /*M2*/ 0, /*prev*/ 0, /*cur*/ m, /*buf*/ 0,
-                                   L, 0.5, 0.5, QPI / 2.0 - theta_n, /*always resolve*/ 0.0);
-            C.run();
-
-            std::complex<double> out = cpx(C.xprmat, 0, 0), in = cpx(C.x_in, 0, 0);
-            std::complex<double> applied = (std::abs(in) > 0.0) ? out / in : std::complex<double>(0.0, 0.0);
             std::complex<double> es = diag_eps(m, f_hz), ea(1.0, 0.0);
-            std::complex<double> close = diag_close(es, L, theta_n, f_hz);
-            std::complex<double> S_applied = (std::abs(close) > 0.0) ? applied / close
-                                                                     : std::complex<double>(0.0, 0.0);
+            double th_ext = thd * QPI / 180.0;
+            double ct_tr = diag_traced_ct(es, th_ext);
+            std::complex<double> ct_ex = diag_ct_exact(es, th_ext);
 
-            std::complex<double> phi = diag_phi(es, L, theta_n, f_hz);
-            std::complex<double> r_traced = diag_r_slabside(es, ea, std::complex<double>(std::cos(theta_n), 0.0));
-            std::complex<double> r_exact = diag_r_slabside(es, ea, diag_ct_exact(es, theta_n));
-            std::complex<double> S_traced = 1.0 / (1.0 - r_traced * r_traced * phi * phi);
-            std::complex<double> S_exact = 1.0 / (1.0 - r_exact * r_traced * phi * phi);
+            unsigned rtype_seen = 0;
+            auto run_with_prev = [&](int prev) -> std::complex<double>
+            {
+                auto C = make1<double>(mtl, /*scalar transmission*/ 4, OT_EXIT, 1u,
+                                       /*M1*/ m, /*M2*/ 0, prev, /*cur*/ m, /*buf*/ 0,
+                                       L, 0.5, 0.5, /*fbs angle = geometric*/ QPI / 2.0 - th_ext,
+                                       /*always resolve*/ 0.0);
+                // The refracted direction the tracer left behind: |dir . N| is the traced in-slab cosine
+                C.has_path_dir = true;
+                C.path_dir_prev.zeros(1, 3);
+                C.path_dir_prev(0, 0) = (double)ct_tr;
+                C.path_dir_prev(0, 1) = (double)std::sqrt(1.0 - ct_tr * ct_tr);
+                C.run();
+                std::complex<double> out = cpx(C.xprmat, 0, 0), in = cpx(C.x_in, 0, 0);
+                rtype_seen = (unsigned)C.resolved_type[0];
+                return (std::abs(in) > 0.0) ? out / in : std::complex<double>(0.0, 0.0);
+            };
+
+            std::complex<double> with_series = run_with_prev(0);            // air behind: the real series
+            std::complex<double> no_series = run_with_prev(twin_of(m));     // twin behind: S == 1 exactly
+            std::complex<double> S_applied = (std::abs(no_series) > 0.0)
+                                                 ? with_series / no_series
+                                                 : std::complex<double>(0.0, 0.0);
+
+            // Two references, differing only in the cosine both boundaries are built from. The
+            // propagation factor follows the same cosine, as the function does.
+            //
+            // Whether the recovery fires at all is decided by use_vbs, not by the angle: at exactly
+            // normal incidence the traced direction and the geometric one coincide, nothing was ever
+            // projected, and the function correctly declines and keeps the hybrid medium_gain
+            // propagation factor. The exact reference has to follow it there, or the row reports the
+            // 2.5e-5 dB gap between the ITU-R P.2040 Delta form and exp(-k0 Im(n) L) as if it were a
+            // defect in the recovery. That gap is real and is a candidate for unifying correction mode
+            // onto the exact form, but it is not what this case measures.
+            bool recovery_fires = std::abs(ct_tr - std::cos(th_ext)) > 1e-6;
+
+            double dr = L / ct_tr;
+            double thk_n = dr * ct_tr; // normal thickness, pure geometry
+            const double k0 = 2.0 * QPI * f_hz / C0;
+            std::complex<double> n_cx = std::sqrt(es);
+            double n_re = std::real(n_cx);
+            std::complex<double> phi_ex =
+                std::exp(std::complex<double>(0.0, -1.0) * k0 * n_cx * thk_n * ct_ex);
+            std::complex<double> phi_tr =
+                std::sqrt(diag_medium_gain(es, dr, f_hz)) *
+                std::exp(std::complex<double>(0.0, -k0 * n_re * dr * ct_tr * ct_tr));
+            std::complex<double> r_ex = diag_r_slabside(es, ea, ct_ex);
+            std::complex<double> r_tr = diag_r_slabside(es, ea, std::complex<double>(ct_tr, 0.0));
+            std::complex<double> phi_x = recovery_fires ? phi_ex : phi_tr;
+            std::complex<double> S_ex = 1.0 / (1.0 - r_ex * r_ex * phi_x * phi_x);
+            std::complex<double> S_tr = 1.0 / (1.0 - r_tr * r_tr * phi_tr * phi_tr);
 
             auto dB = [](std::complex<double> x, std::complex<double> y)
             { return 20.0 * std::log10(std::max(1e-300, std::abs(x)) / std::max(1e-300, std::abs(y))); };
 
-            QD_DIAG("%.1f,%.9f,%.3f,%.9f,%.3f,%.9f,%.3f,%.6f,%.6f,%u\n",
-                    thd, std::abs(S_applied), std::arg(S_applied) * 180.0 / QPI,
-                    std::abs(S_traced), std::arg(S_traced) * 180.0 / QPI,
-                    std::abs(S_exact), std::arg(S_exact) * 180.0 / QPI,
-                    dB(S_applied, S_traced), dB(S_exact, S_traced),
-                    (unsigned)C.resolved_type[0]);
+            QD_DIAG("%.1f,%.9f,%.9f,%.3f,%.9f,%.3f,%.9f,%.3f,%.6f,%.6f,%u\n",
+                    thd, ct_tr, std::abs(S_applied), std::arg(S_applied) * 180.0 / QPI,
+                    std::abs(S_ex), std::arg(S_ex) * 180.0 / QPI,
+                    std::abs(S_tr), std::arg(S_tr) * 180.0 / QPI,
+                    dB(S_applied, S_ex), dB(S_tr, S_ex), rtype_seen);
 
-            CHECK(std::isfinite(C.gain(0)));
-            CHECK(C.gain(0) >= 0.0);
+            // The series is built from the recovered angle, not its projection.
+            INFO("material " << m << ", theta_ext " << thd);
+            CHECK(std::abs(S_applied - S_ex) < 1e-9);
+
+            // The lossless control pins the reference itself: there the normalization inside
+            // qd_refract is inert, so both cosines coincide and the two references must agree
+            // exactly. A gap here means diag_traced_ct no longer matches the map qd_refract applies.
+            if (m == 6)
+                CHECK(std::abs(S_tr - S_ex) < 1e-12);
         }
     }
 }
