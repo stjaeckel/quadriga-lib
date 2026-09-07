@@ -751,7 +751,15 @@ namespace
             tns_te = AMP(Rn_te, tn_fwd[0]), tns_tm = AMP(Rn_tm, tn_fwd[1]); // near -> slab
             tsn_te = AMP(Rn_te, tn_bwd[0]), tsn_tm = AMP(Rn_tm, tn_bwd[1]); // slab -> near
             tsf_te = AMP(Rf_te, tf_out[0]), tsf_tm = AMP(Rf_tm, tf_out[1]); // slab -> far
-            ig = std::sqrt(mat_slab.interface_gain(fGHz) * (far_is_air ? 1.0 : mat_far.interface_gain(fGHz)));
+
+            // The far medium's lumped interface_gain is owed only when the wave actually enters a new
+            // medium, which is what Material::interact_with folds in for a transmission-class
+            // interaction. Testing for air was a proxy for that, and the proxy fails for a sheet
+            // embedded in a medium: with near == far the ray was already inside the far medium and
+            // must not pay its entry loss a second time. Air-bounded and air|sheet|solid stacks are
+            // unaffected, and solid|sheet|air gives air's interface_gain of 1.0 on either test.
+            bool far_is_new = !far_is_air && !mat_far.same_as(mat_near);
+            ig = std::sqrt(mat_slab.interface_gain(fGHz) * (far_is_new ? mat_far.interface_gain(fGHz) : 1.0));
         }
 
         if (produce && mat_slab.m > 0.0) // Incoherent route for mass-law slabs
@@ -1153,9 +1161,13 @@ void quadriga_lib::ray_mesh_interact(
    Codes 69 and 71 are shared by three cases, deliberately: [[ray_state_update]] builds its own material
    set and holds both `mtl_ind_fbs` and `mtl_ind_sbs`, so it can re-derive sheet-ness per face and material
    identity on the pair. The full case is `(composite code, is_sheet(FBS), is_sheet(SBS), same material)`.
-   Bit 6 alone is a hint meaning *at least one face is a sheet*; the re-derivation is authoritative. Total
-   reflection can only co-occur with bit 6 for the glued cases, where the media either side of the sheet
-   differ. Bit 7 is unused.
+   Bit 6 alone is a hint meaning *at least one face is a sheet*; the re-derivation is authoritative and
+   [[ray_state_update]] performs it. Total reflection can only co-occur with bit 6 for the glued cases,
+   where the media either side of the sheet differ. Bit 7 is unused.<br><br>
+   The near / far media written into a sheet composite here are **provisional**. They come from face
+   geometry alone, so air is assumed on any side the mesh does not name, which is only correct while the
+   ray is in air. [[ray_state_update]] holds the tracked medium and re-resolves the composite against the
+   real bounding pair whenever medium tracking is enabled; without it, the air-bounded result stands.
 - **`path_dirN`** — Refraction-correct path direction: mirror for types 0/3, Snell direction for types 1/2/4/5; `[n_rayN, 3]`.
   For undeviated transmission (types 1/4) this is the *refracted* direction, which differs from the geometric continuation
   (along the incoming ray) used for `origN`/`destN`; it lets downstream code recover the true transmission angle.
@@ -2184,6 +2196,13 @@ Batched inside/outside ray-state machine with analytic thin-slab (Fabry-Perot) r
 - Called twice per interaction by the ray tracer: once for the reflection pass (`interaction_type` 0
   or 3) and once for the transmission/refraction pass (`interaction_type` 1, 2, 4, 5). With `S`
   suppressed (the survival gate re-emits) the transmission/refraction path reproduces [[calc_diffraction_gain]]
+- Thin sheets: a `thk > 0` crossing arrives from [[ray_mesh_interact]] already resolved as one atomic
+  three-medium event, but with its bounding media guessed from face geometry alone — air on any side the
+  mesh did not name. This function supplies the media the tracked state actually reports and re-resolves
+  the composite against them, which matters for every sheet that does not sit in air: a sheet embedded in
+  a medium is bounded by that medium on both sides, and the wrong pair moves both Fresnel boundaries,
+  the internal series and the lumped interface gain at once. The sheet material never becomes the current
+  medium; it is recorded in the previous-medium word so the host layer on the far side reflects off it.
 
 ## Declaration:
 ```
@@ -2230,9 +2249,15 @@ void quadriga_lib::ray_state_update(
 - **`normal_vecN`** — FBS and SBS normals `[Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]`, compact set; `[n_rayN, 6]`.
   The VBS plane normal for the Snell corrections; currently also gates the parallelism (wedge) test.
   NULL disables the wedge test.
-- **`out_typeN`** — Interaction type code from [[ray_mesh_interact]], compact set; `[n_rayN]`
-- **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [[obj_file_read]])
-- **`mtl_ind_fbsN`**, **`mtl_ind_sbsN`** — Material indices M1 / M2 of the FBS / SBS faces, compact set; `[n_rayN]` (0 = air)
+- **`out_typeN`** — Interaction type code from [[ray_mesh_interact]], compact set; `[n_rayN]`. Bit 5 is
+  stripped and re-evaluated at the VBS angle; bit 6 (thin sheet) is dispatched on and is *not* stripped,
+  so the sheet codes 65 / 67 / 69 / 71 / 79 take their own path ahead of the solid state machine.
+- **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [[obj_file_read]]).
+  The `thk` column is read here as well as in [[ray_mesh_interact]]; it selects the thin-sheet path.
+- **`mtl_ind_fbsN`**, **`mtl_ind_sbsN`** — Material indices M1 / M2 of the FBS / SBS faces, compact set; `[n_rayN]` (0 = air).
+  `mtl_ind_sbsN` is load-bearing beyond media-to-media: it carries the second face of a glued or duplicate
+  sheet pair, and the thin-sheet case is re-derived from
+  `(code, is_sheet(FBS), is_sheet(SBS), same material)` because codes 69 and 71 are shared by three topologies.
 - **`mtl_ind_prev_in`**, **`mtl_ind_current_in`**, **`mtl_ind_buffer_in`** — State words, full ray set; `[n_ray]`,
   read at `g`, never written. NULL reads as state `0` (outside, no flags).
 - **`path_dir_prev`** — Physical ray direction entering this segment, full ray set; `[n_ray, 3]`
@@ -2249,11 +2274,17 @@ void quadriga_lib::ray_state_update(
   is re-emitted to the tracer when `ρ < eps` (weak / fast-decaying slabs). `eps = 0` always resolves
   (for callers that cannot re-emit, e.g. [[calc_diffraction_gain]]); `eps ≥ 1` always re-emits
   (resolution disabled). A near-pole `S` or a known non-parallel slab re-emits regardless of `eps`.
+  Does **not** gate a thin sheet's own series: a sheet has no interior for the tracer to re-emit into, so
+  that series always resolves. `eps` still gates the host layer a sheet is embedded in.
   Default `0.15`.
 
 ## Outputs:
 - **`mtl_ind_prev_outN`**, **`mtl_ind_current_outN`**, **`mtl_ind_buffer_outN`** — Updated state words,
-  compact set; `[n_rayN]`. NULL skips the write. Passing all six state args NULL disables tracking —
+  compact set; `[n_rayN]`. `mtl_ind_prev_outN` may hold a **sheet** material index after a thin-sheet
+  crossing. That is a boundary material, not a medium the ray travelled through: the previous-medium word
+  is only ever read as the far material of a slab resolve and for the parallelism flag, and a sheet is the
+  correct far material for the layer on either side of it.
+  NULL skips the write. Passing all six state args NULL disables tracking —
   each interaction is corrected on its own (entry loss, TR kill, single-hit air-gap `S`); cross-interaction slab `S` and
   reflection-bounce `S` need the tracked medium.
 - **`gainN`** *(in/out)* — Per-interaction linear power gain, updated in place; `[n_rayN]`. Kept consistent
@@ -2267,6 +2298,9 @@ void quadriga_lib::ray_state_update(
   so the matrix is the complete per-interaction Jones factor and can be left-multiplied directly into a
   per-path product. When the series is re-emitted instead (`ρ < eps`, resolve bit clear), the matrix carries
   only the first-pass coefficient and the remaining bounces arrive as separate interactions.
+  On a thin-sheet crossing the matrix is *replaced* by the composite re-resolved for the bounding media the
+  state words report, and no medium gain is charged for the sheet material itself — its traversal loss and
+  phase are already inside the composite. The host medium the ray was travelling in is still closed out.
 - **`path_dirN`** *(in/out)* — Continuation direction, corrected in place by the VBS construction, compact set; `[n_rayN, 3]`
 - **`acc_dist_geometricN`** — Accumulated geometric distance leaving this call, compact set; `[n_rayN]`. NULL skips the write.
 - **`acc_dist_refractedN`** — Accumulated refracted (VBS) distance leaving this call, compact set; `[n_rayN]`. NULL skips the write.
@@ -2276,12 +2310,27 @@ void quadriga_lib::ray_state_update(
    | :--: | :---------: | ------------------------------------------------------------------------------ |
    |   0  | ok          | OK flag (0 = a deferred degenerate-resolve buffer is pending)                  |
    |   1  | vbs         | VBS correction (gain/xprmat corrected at the VBS instead of FBS/SBS)           |
-   |   2  | resolve     | Slab-resolve flag (an internal multi-bounce series was resolved analytically)  |
+   |   2  | resolve     | Internal multi-bounce series accounted for (expect no further internal bounces) |
    |   3  | inside      | Inside-object flag (1 = ray continues inside, 0 = continues outside)           |
    |   4  | fix         | Fix flag (resolved-false-outside, or entry/exit material mismatch)             |
    |   5  | tir         | Total-reflection flag (also set when a transmission factor forced reflection)  |
-   |   6  | trans       | Transmission: transparent-interface flag; reflection: scatter flag             |
+   |   6  | trans/sheet | See the qualification below                                                    |
    |   7  | refl        | Reflection flag (0 = transmission/refraction, 1 = reflection/scattering)       |
+   Bit 6 is qualified by bit 2, because a transparent interface resolves no series and scattering is not
+   implemented, so the two bits together are unreachable for any non-sheet interaction:<br><br>
+   | Bit 6 | Bit 2 | Meaning                                                                       |
+   | :---: | :---: | ----------------------------------------------------------------------------- |
+   |   1   |   0   | Transparent interface (transmission) / scatter (reflection) — as before       |
+   |   1   |   1   | **Thin-sheet crossing**                                                       |
+   Inside the thin-sheet region bit 1 does not mean VBS: the crossing is always re-resolved at the VBS
+   angle, so a VBS flag would be constant there. It carries the glued verdict instead:<br><br>
+   | Bit 1 (sheet region) | Meaning                                                                |
+   | :------------------: | ---------------------------------------------------------------------- |
+   |          0           | Isolated — the same medium bounds both sides of the sheet              |
+   |          1           | Glued — the two bounding media differ                                  |
+   The sheet region reports the resolved *state*, not the sheet topology; the state words and `out_typeN`
+   separate an embedded sheet from a glued entry. Note that 69 and 71 also occur as `out_typeN` values with
+   entirely different meanings — the two fields have always had separate tables.
    Reachable composite values for transmission / refraction:<br><br>
    |  Dec | Hex  | FIX  |   TIR   | Flags set                  | Meaning                                            |
    | :--: | :--: | :--: | :-----: | -------------------------- | -------------------------------------------------- |
@@ -2297,6 +2346,10 @@ void quadriga_lib::ray_state_update(
    |   73 | 0x49 |  89  |     —   | trans, inside, ok          | ignore-hit / same-medium pass, no gain change      |
    |   72 | 0x48 |  88  |     —   | trans, inside              | nested pass-through, buffer deferred               |
    |   65 | 0x41 |   —  |     —   | trans, ok                  | advance to ray destination, identity interface     |
+   |   69 | 0x45 |   85 |   101   | sheet, resolve, ok         | isolated sheet crossed in air                      |
+   |   77 | 0x4D |   93 |   109   | sheet, resolve, inside, ok | isolated sheet crossed inside a medium (embedded)  |
+   |   71 | 0x47 |   87 |   103   | sheet, glued, resolve, ok  | glued exit, solid \ sheet \ enclosing              |
+   |   79 | 0x4F |   95 |   111   | sheet, glued, resolve, inside, ok | glued entry, host \ sheet \ solid           |
    Reachable composite values for reflection:<br><br>
    |  Dec | Hex  |  FIX |   TIR   | Flags set                       | Meaning                                                      |
    | :--: | :--: | :--: | :-----: | ------------------------------- |------------------------------------------------------------- |
@@ -2305,7 +2358,14 @@ void quadriga_lib::ray_state_update(
    |  139 | 0x8B |  155 | 171,187 | refl, inside, vbs, ok           | internal back-reflection (incoming undev. 1/4, VBS)          |
    |  141 | 0x8D |  157 | 173,189 | refl, inside, resolve, ok       | internal back-reflection + slab series (incoming refr. 2/5)  |
    |  143 | 0x8F |  159 | 175,191 | refl, inside, resolve, vbs, ok  | internal back-reflection + slab series (incoming undev. 1/4) |
-   |  192+| 0xC0+|    — |    —    | refl, trans, ...                | reserved: scattering not implemented                         |
+   |  197 | 0xC5 |  213 |   229   | refl, sheet, resolve, ok        | reflection off an isolated sheet, ray outside                |
+   |  205 | 0xCD |  221 |   237   | refl, sheet, resolve, inside, ok | reflection off an isolated sheet, ray inside a medium       |
+   |  199 | 0xC7 |  215 |   231   | refl, sheet, glued, resolve, ok | reflection off a glued sheet from the host side              |
+   |  207 | 0xCF |  223 |   239   | refl, sheet, glued, resolve, inside, ok | reflection off a glued sheet from the solid side     |
+   |  192+| 0xC0+|    — |    —    | refl, scatter, resolve clear    | reserved: scattering not implemented                         |
+   A thin-sheet stack of two different materials (`out_typeN` 79, or 69/71 with two sheet faces of
+   different materials) is **not implemented** and returns 0: the case is detected but has no physics in
+   [[ray_mesh_interact]] either.
 
 
 ## See also:
@@ -2526,6 +2586,47 @@ void quadriga_lib::ray_state_update(int interaction_type,
         // only matches itself; two real materials match on identical properties.
         auto SAME = [&](int a, int b) -> bool
         { return a == b || (a > 0 && b > 0 && MAT(a).same_as(MAT(b))); };
+
+        // Thin-sheet test for a 1-based material index
+        auto IS_SHEET = [&](int m) -> bool
+        { return m > 0 && (arma::uword)m <= cols.n_mtl && cols.is_sheet((arma::uword)m); };
+
+        // Thin-sheet case re-derivation. Bit 6 of the hit code is only a hint meaning "at least one of
+        // the two faces is a sheet"; codes 69 and 71 are shared by three different topologies on
+        // purpose, because this function holds both material indices and can tell them apart while
+        // ray_mesh_interact cannot spare the bits. The authoritative case is
+        // (code, is_sheet(FBS), is_sheet(SBS), same material), exactly as documented there. Derived
+        // once here so the transmission and reflection paths cannot drift apart.
+        //   0 = no sheet
+        //   1 = isolated sheet, collapsed double-sided duplicate, or a corner whose SBS was dropped
+        //   2 = glued entry, host | sheet | solid
+        //   3 = glued exit, solid | sheet | whatever encloses the host
+        //   4 = ordered stack of two different sheets (physics not implemented, see below)
+        int sheet_case = 0, sheet_mtl = 0, sheet_solid = 0;
+        if (typeH[6])
+        {
+            bool shF = IS_SHEET(M1), shS = IS_SHEET(M2);
+            if (!typeH[2]) // No co-located second face: nothing can be glued to it
+            {
+                sheet_case = (shF || shS) ? 1 : 0;
+                sheet_mtl = shF ? M1 : (shS ? M2 : 0);
+            }
+            else if (shF && shS) // Two sheets: a duplicate collapses, a laminate does not
+            {
+                sheet_case = SAME(M1, M2) ? 1 : 4;
+                sheet_mtl = M1;
+            }
+            else if (shF || shS) // One sheet glued to one solid face
+            {
+                sheet_mtl = shF ? M1 : M2;
+                sheet_solid = shF ? M2 : M1;
+
+                // A glued pair whose non-sheet face carries no material has the same medium on both
+                // sides of the sheet and is an isolated sheet in disguise. Otherwise bit 1 carries the
+                // front/back verdict taken from the solid face, which is the only face that has one.
+                sheet_case = (sheet_solid == 0) ? 1 : (typeH[1] ? 2 : 3);
+            }
+        }
 
         // Euclidean distance between two points
         auto DIST = [](const double *A, const double *B) -> double
@@ -2894,6 +2995,203 @@ void quadriga_lib::ray_state_update(int interaction_type,
             return true;
         };
 
+        // Re-resolve a thin-sheet crossing against the media the tracked state reports.
+        //
+        // ray_mesh_interact derives the sheet's near and far media from face geometry alone, so it has
+        // to assume air on any side the mesh does not name. That assumption holds only while the ray is
+        // in air. A sheet inside a medium is bounded by that medium on both sides; a sheet glued to a
+        // solid but reached from inside another medium has that medium on its near side. Getting it
+        // wrong is not a small error: it moves both Fresnel boundaries, the Airy denominator that
+        // couples them, and the lumped interface gain, all at once. This function is the first place
+        // that knows the answer, which is why qd_slab_resolve sits at file scope instead of being a
+        // lambda inside ray_mesh_interact.
+        //
+        // The incidence angle is theta_t rather than the FBS angle, so the redo also carries the same
+        // geometric correction that REPLACE_BY_VBS gives a traced solid. That makes VBS correctness
+        // unconditional here, which is why bit 1 of the resolved type is free to mean something else
+        // inside the sheet region.
+        //
+        // Sets cTE / cTM so that a following SLAB_AIRY_FACTOR can fold the host medium's own series
+        // into the same TE/TM pair. Returns false when the composite must be left exactly as
+        // ray_mesh_interact wrote it.
+        auto SHEET_RESOLVE = [&](int mtl_slab, int mtl_near, int mtl_far) -> bool
+        {
+            // Under total reflection ray_mesh_interact replaced the slab composite with the forced-TIR
+            // near/far interface result. There is no transmitted composite left to rebuild, and
+            // rebuilding one would contradict the TIR verdict the tracer is acting on.
+            if (total_reflection)
+                return false;
+
+            Material M_slab = MAT(mtl_slab), M_near = MAT(mtl_near), M_far = MAT(mtl_far);
+            double thk = M_slab.thk;
+            if (thk <= 0.0) // Not a sheet material after all: leave the composite alone
+                return false;
+
+            // In-slab propagation angle. Only the refraction cosine is used; the coefficients and the
+            // TIR verdict of this near|sheet interface are deliberately discarded, because Snell is
+            // transitive and the net bend depends only on the two outer media.
+            std::complex<double> ct2_slab;
+            M_near.interact_with(M_slab, interaction_type, theta_t, fGHz, nullptr, nullptr, &ct2_slab, nullptr, nullptr, nullptr);
+
+            // Grazing clamp. ray_mesh_interact bounds the lateral walk-off by the longest FBS triangle
+            // edge, but that edge is not among this function's inputs and cannot be recovered from them
+            // (thicknessN is zero for a sheet). A fixed extent-to-thickness ratio stands in. This is a
+            // divergence guard rather than physics - it only bites inside the clamp region, which a
+            // sensibly meshed face never reaches - but it does mean the two functions disagree at
+            // extreme grazing incidence.
+            // ISSUE: pass the face extent through if an output slot ever becomes available.
+            const double sheet_extent_ratio = 1000.0;
+            const double cos_min = 1.0 / std::sqrt(1.0 + sheet_extent_ratio * sheet_extent_ratio);
+            double ct_geo = (abs_cos_theta_t < cos_min) ? cos_min : abs_cos_theta_t;
+            double ct_slab = std::abs(std::real(ct2_slab));
+            ct_slab = (ct_slab < cos_min) ? cos_min : ct_slab;
+
+            // Thickness enters only here, mapped onto the medium_gain signature: the refracted path
+            // carries the in-slab attenuation, the geometric path carries the acoustic mass-law term.
+            std::complex<double> Tte, Ttm, Rte, Rtm;
+            qd_slab_resolve(M_near, M_slab, M_far, thk / ct_slab, thk / ct_geo, ct_slab, ct_geo,
+                            fGHz, is_scalar, 0.0, true, &Tte, &Ttm, &Rte, &Rtm);
+
+            // Both ports come out of the one pass. The reflection port is its own Airy sum, not the
+            // half-space Fresnel value, so expect real angular and frequency structure in it.
+            cTE = refl_pass ? Rte : Tte;
+            cTM = refl_pass ? Rtm : Ttm;
+
+            // ISSUE: the outgoing direction is left as ray_mesh_interact wrote it. For an isolated
+            // sheet near == far, so there is no bend to correct. For a glued sheet reached from inside
+            // a medium other than air the net bend does change, and the direction is then marginally
+            // inconsistent with the coefficients rebuilt here.
+            double xprmat[8], pgain;
+            qd_polbasis(dir_prev[0], dir_prev[1], dir_prev[2], dir_next[0], dir_next[1], dir_next[2],
+                        N[0], N[1], N[2], 1.0, cTE, cTM, is_scalar, xprmat, pgain);
+            if (p_xprmatN)
+                for (size_t iX = 0; iX < nXPR; ++iX)
+                    p_xprmatN[ii * nXPR + iX] = (dtype)xprmat[iX];
+            if (p_gainN)
+                p_gainN[ii] = (dtype)pgain;
+            return true;
+        };
+
+        // A thin-sheet crossing is an atomic three-medium event. ray_mesh_interact already summed the
+        // internal series, so nothing here may re-apply an interface coefficient through interact_with
+        // or charge a medium gain for the sheet material. What this function owes is the part
+        // ray_mesh_interact could not know - the bounding media - plus the state bookkeeping around the
+        // event.
+        //
+        // A sheet inside a solid is a three-layer stack, and the existing machinery already models one.
+        // The sequence is the same in every case:
+        //   1. close out the host leg, whose internal series now reflects off the sheet rather than off
+        //      whatever face material the mesh named (SLAB_AIRY_FACTOR with the sheet as mtl_near),
+        //   2. re-resolve the sheet against the media the state words report,
+        //   3. start a fresh leg with the sheet recorded as the previous medium, so that the next host
+        //      leg reflects off it from the other side.
+        // Steps 1 and 2 are written in the opposite order below, and have to be: SLAB_AIRY_FACTOR
+        // rebuilds xprmat from cTE / cTM, and those only exist once the sheet has been resolved.
+        auto SHEET_EVENT = [&]()
+        {
+            // Ordered stack. Detection and the type bits are correct, but ray_mesh_interact runs no
+            // sheet physics for this case either - it falls through to the legacy M1/M2 path with the
+            // sheet bit set. Explicitly unhandled rather than silently wrong.
+            if (sheet_case == 4)
+            {
+                KILL_RAY();
+                return;
+            }
+
+            bool ray_ends = nH == 1 || (nH == 2 && typeH[2]);
+
+            // Bounding media from the tracked state. mtl_current is the near side in every case: the
+            // ray is travelling in it when it reaches the sheet. The far side is that same medium for
+            // an isolated sheet, the glued solid on entry, and on exit the medium the host was entered
+            // through - mtl_prev being exactly "what is on the other side of this cavity". mtl_prev is
+            // one level deep, so a sheet | solid | sheet sandwich resolves but a deeper nesting falls
+            // back to air.
+            int m_near = mtl_current;
+            int m_far = (sheet_case == 2) ? sheet_solid : ((sheet_case == 3) ? mtl_prev : mtl_current);
+            int m_next = m_far; // medium the ray travels in after the crossing
+
+            // No sheet code in scope carries a deferred buffer. Flag the violation rather than guess.
+            if (mtl_buffer != 0)
+                typeR[4] = true;
+
+            DIST_ADD(); // Advance the host leg up to the sheet
+
+            bool have_composite = SHEET_RESOLVE(sheet_mtl, m_near, m_far);
+
+            // Close out the host medium. Its series reflects off the sheet ahead and off whatever the
+            // host was entered through, which is the existing argument order with the sheet index
+            // substituted for the face material. A sheet passed as mtl_near is treated as a half-space
+            // by the correction-mode Fresnel, not as a slab - an approximation to the true three-layer
+            // coupling, but strictly closer than passing air. Skipped without a sheet composite,
+            // because the factor is applied through cTE / cTM.
+            if (mtl_current != 0)
+            {
+                if (have_composite)
+                    SLAB_AIRY_FACTOR(mtl_current, sheet_mtl, mtl_prev);
+                SCALE_BY_MEDIUM(mtl_current);
+            }
+
+            // Type bits. Bit 6 set together with bit 2 marks a thin-sheet event; that combination is
+            // unreachable for any other interaction, because a transparent interface resolves no series
+            // and scattering is not implemented. Inside that region bit 1 no longer means VBS - the
+            // redo above is always evaluated at theta_t, so a VBS flag would be constant - and carries
+            // the glued verdict instead.
+            typeR[1] = (sheet_case == 2 || sheet_case == 3); // glued: the two sides differ
+            typeR[2] = true;                                 // the internal series is accounted for
+            typeR[6] = true;                                 // qualified by bit 2: thin sheet
+            typeR[3] = refl_pass ? (mtl_current != 0) : (m_next != 0);
+
+            if (refl_pass) // A reflection stays in the host medium
+            {
+                DIST_SET();
+                if (mtl_current != 0)
+                {
+                    // Terminate the internal bounce series exactly as a resolved solid does
+                    next_current = (short)((mtl_current & 0x7FFF) | (int)0x8000);
+                    next_prev = (short)((sheet_mtl & 0x7FFF) | (prev_nonpar ? (int)0x8000 : 0));
+                    next_buffer = (short)0;
+                }
+                return;
+            }
+
+            // Transmission: the leg restarts on the far side of the sheet. With air on both sides there
+            // is no leg and no state to advance - the accumulators keep running and are dropped at the
+            // next medium entry, matching the ordinary pass-through convention.
+            if (mtl_current == 0 && m_next == 0)
+                return;
+
+            next_current = (short)(m_next & 0x7FFF); // Clearing the resolved flag starts a new leg
+
+            // The sheet becomes the previous medium so the next host leg reflects off it. It is a
+            // boundary material here, never a traversed one: mtl_prev is only ever read as the far
+            // material of a slab resolve and for the parallelism flag. On an exit into air there is no
+            // following leg, so the ordinary convention (the medium just left) is kept instead.
+            //
+            // The wedge test is unusable for a glued entry: fbs_sbs_not_parallel compares FBS and SBS,
+            // which are the sheet and the solid's near face, and they are co-located by construction.
+            // The question it should answer is whether the solid's far face is parallel to its near
+            // face, and that face is not in this hit at all. Defaulting to parallel allows the resolve
+            // at the far side, which is right for the motivating geometry (a coating on a flat wall)
+            // and wrong for a sheet glued to a wedge.
+            bool nonpar = (sheet_case == 2) ? false : prev_nonpar;
+            next_prev = (m_next != 0) ? (short)((sheet_mtl & 0x7FFF) | (nonpar ? (int)0x8000 : 0))
+                                      : (short)(mtl_current & 0x7FFF);
+            next_buffer = (short)0;
+
+            if (ray_ends && m_next != 0) // Entering or staying in a medium: refracted preload
+            {
+                double dist_VV;
+                if (VBS_INTERSECT(F, dir_next, D, N, &dist_VV))
+                    DIST_SET(dist_VV, dist_fbs_dest);
+                else
+                    DIST_SET(dist_fbs_dest);
+            }
+            else if (ray_ends) // Leaving into air: the post-exit leg is unrefracted
+                DIST_SET(dist_fbs_dest);
+            else
+                DIST_SET();
+        };
+
         // M2M transition (i-i) and cavity exit (i-o)
         auto APPLY_TRANSITION = [&](bool exit = false,         // Cavity exit flag
                                     int mtl_next = 0,          // Next material: air (exit default)
@@ -2969,6 +3267,8 @@ void quadriga_lib::ray_state_update(int interaction_type,
 
             if (resolved)                 // Internal front reflection already included in internal back reflection
                 KILL_RAY();               // This terminates the infinite internal bounce series (typeR 0)
+            else if (sheet_case != 0)     // Thin sheet: the composite already carries the reflect port
+                SHEET_EVENT();            // (typeR 197, 199, 205, 207)
             else if (transparent_forward) // Ray did not hit anything (= transparent pass-through, cannot reflect)
                 KILL_RAY();               // Set typeR 0
             else if (mtl_current == 0)    // Entry front reflection, bare Fresnel copy-through
@@ -3002,6 +3302,10 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 REPLACE_BY_GAIN(1.0, mtl_current != 0); // Pass-through, flags: transparent, ok (typeR 65)
                 if (mtl_current != 0)                   // Currently inside a material?
                     typeR[3] = true;                    // Pass-through, flags: transparent, inside, ok (typeR 73)
+            }
+            else if (sheet_case != 0) // Thin-sheet crossing (typeR 69, 71, 77, 79)
+            {
+                SHEET_EVENT();
             }
             else if (typeH == 3 || typeH == 15 || typeH == 31) // o-i
             {
