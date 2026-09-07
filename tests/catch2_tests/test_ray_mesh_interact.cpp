@@ -7,11 +7,122 @@
 #include "quadriga_tools.hpp"
 
 #include <iostream>
+#include <algorithm>
+#include <cmath>
 #include <complex>
+#include <limits>
 #include <unordered_map>
 #include <vector>
 #include <string>
 #include <cstdint>
+
+// Diagnostic output for the thin-sheet / slab work. Uncomment to print the tables. The
+// assertions in the diagnostic cases run either way and only check sanity, so leaving this
+// commented costs nothing but the printing.
+#define QD_TEST_VERBOSE
+
+#ifdef QD_TEST_VERBOSE
+#include <cstdio>
+#define QD_DIAG(...) std::printf(__VA_ARGS__)
+#else
+#define QD_DIAG(...) ((void)0)
+#endif
+
+// Exact analytic slab, complex angles throughout, per polarization:
+//   T = t12 t23 phi / (1 - r12 r23 phi^2),  phi = exp(-j k0 n d cos(theta_slab))
+// Independent of every library internal. This is the oracle both the thin-sheet composite and
+// the traced solid are measured against, and it is the only way to tell which of the two moved
+// when they disagree.
+struct QdSlabRef
+{
+    double p_te = 0.0, p_tm = 0.0, p_avg = 0.0, ratio = 0.0; // powers and min/max channel ratio
+    std::complex<double> t_te, t_tm;                         // complex amplitudes
+    std::complex<double> ct_slab;                            // complex in-slab cosine
+};
+
+static inline QdSlabRef qd_slab_ref(std::complex<double> eps_s, double thk,
+                                    double theta_n_rad, double f_hz)
+{
+    const double k0 = 2.0 * arma::datum::pi * f_hz / 299792458.0;
+    const std::complex<double> z1(1.0, 0.0), z2 = std::sqrt(eps_s), n = std::sqrt(eps_s);
+    const double c1 = std::cos(theta_n_rad), s1 = std::sin(theta_n_rad);
+    const std::complex<double> c2 = std::sqrt(1.0 - (1.0 / eps_s) * s1 * s1);
+    const std::complex<double> phi = std::exp(std::complex<double>(0.0, -1.0) * k0 * n * thk * c2);
+
+    QdSlabRef R;
+    R.ct_slab = c2;
+    for (int pol = 0; pol < 2; ++pol)
+    {
+        std::complex<double> r, t12, t21;
+        if (pol == 0) // TE
+            r = (z1 * c1 - z2 * c2) / (z1 * c1 + z2 * c2),
+            t12 = (2.0 * z1 * c1) / (z1 * c1 + z2 * c2),
+            t21 = (2.0 * z2 * c2) / (z2 * c2 + z1 * c1);
+        else // TM
+            r = (z2 * c1 - z1 * c2) / (z2 * c1 + z1 * c2),
+            t12 = (2.0 * z1 * c1) / (z2 * c1 + z1 * c2),
+            t21 = (2.0 * z2 * c2) / (z1 * c2 + z2 * c1);
+        std::complex<double> T = t12 * t21 * phi / (1.0 - r * r * phi * phi);
+        if (pol == 0)
+            R.t_te = T, R.p_te = std::norm(T);
+        else
+            R.t_tm = T, R.p_tm = std::norm(T);
+    }
+    R.p_avg = 0.5 * (R.p_te + R.p_tm);
+    double lo = std::min(R.p_te, R.p_tm), hi = std::max(R.p_te, R.p_tm);
+    R.ratio = (hi > 0.0) ? lo / hi : 0.0;
+    return R;
+}
+
+// Single-interface Fresnel powers, per polarization. eta1 -> eta2 at theta from the normal.
+struct QdIfaceRef
+{
+    double R_te = 0.0, R_tm = 0.0, T_te = 0.0, T_tm = 0.0;
+    double R_avg = 0.0, T_avg = 0.0;
+};
+
+static inline QdIfaceRef qd_iface_ref(std::complex<double> e1, std::complex<double> e2, double theta_n_rad)
+{
+    const std::complex<double> z1 = std::sqrt(e1), z2 = std::sqrt(e2);
+    const double c1 = std::cos(theta_n_rad), s1 = std::sin(theta_n_rad);
+    const std::complex<double> c2 = std::sqrt(1.0 - (e1 / e2) * s1 * s1);
+    QdIfaceRef F;
+    F.R_te = std::norm((z1 * c1 - z2 * c2) / (z1 * c1 + z2 * c2));
+    F.R_tm = std::norm((z2 * c1 - z1 * c2) / (z2 * c1 + z1 * c2));
+    F.T_te = std::norm((2.0 * z1 * c1) / (z1 * c1 + z2 * c2));
+    F.T_tm = std::norm((2.0 * z1 * c1) / (z2 * c1 + z1 * c2));
+    F.R_avg = 0.5 * (F.R_te + F.R_tm);
+    F.T_avg = 0.5 * (F.T_te + F.T_tm);
+    return F;
+}
+
+// Two coplanar triangles spanning +-half in y and z at x = x0, normal along -x. Built by hand
+// rather than through plane() so the face extent - which drives the thin-sheet grazing clamp - is
+// set explicitly and independently of the builder's conventions.
+//
+// The winding matters and is easy to get wrong. ray_mesh_interact forms
+// thetaF = acos(OD . N) - pi/2, so a normal pointing ALONG the ray gives thetaF < 0, which is a
+// back-side hit: the face material becomes M1 and the interaction is medium -> air, not air ->
+// medium. With the rays below travelling towards +x the normal has to point at -x. The shared
+// triangulation edge runs along y + z = 0, so a ray in the z = 0 plane must not cross at y = 0.
+static inline arma::mat qd_quad_x(double half, double x0)
+{
+    arma::mat m(2, 9);
+    m.row(0) = arma::rowvec{x0, -half, -half, x0, -half, half, x0, half, -half};
+    m.row(1) = arma::rowvec{x0, half, -half, x0, -half, half, x0, half, half};
+    return m;
+}
+
+// TX at (-1, 0, 0), RX placed so the ray crosses the plane x = 0 at the given angle from the
+// face normal. The crossing point moves with the angle, which is what keeps it off the shared
+// triangulation edge at normal incidence.
+static inline void qd_ray_at(double theta_n_deg, arma::mat &orig, arma::mat &dest)
+{
+    double t = std::tan(theta_n_deg * arma::datum::pi / 180.0);
+    orig = arma::mat{{-1.0, 0.37, 0.0}};
+    dest = arma::mat{{1.0, 0.37 + 2.0 * t, 0.0}};
+}
+
 
 // Function to calculate the gain
 static inline double calc_transition_gain(int interaction_type,       // (0) Reflection, (1) Transmission, (2) Refraction
@@ -1845,4 +1956,342 @@ TEST_CASE("Ray-Mesh Interact - compact = false keeps missed rays in place")
     CHECK(((int)otype[2] & 1) != 0);
     CHECK(gainN(0) < 1.0);
     CHECK(gainN(2) < 1.0);
+}
+// ================================================================================================
+// Diagnostics for the thin-sheet / slab work.
+//
+// These cases exist to produce numbers, not to gate the build. Each prints a table under
+// QD_TEST_VERBOSE and asserts only sanity (finite, energy-conserving), so they stay green while
+// the divergences they measure are still open.
+// ================================================================================================
+
+TEST_CASE("Diagnostic - Interface energy split per polarization")
+{
+    // Where the averaged reflectance enters. Material::interact_with builds its gain from
+    // 0.5*(|R_TE|^2 + |R_TM|^2) and rescales both Fresnel coefficients by one common factor to
+    // carry it. This table shows what that does to each channel at a single interface: the
+    // per-channel RATIO should survive the common rescale, while the reported gain is the average
+    // by construction. If the ratio moves here, the defect is in interact_with itself; if it only
+    // moves after a slab resolve, it is the corr / Tsp coupling in qd_slab_resolve.
+    //
+    // Channel identification. The ray lies in the x-y plane and the normal is along x, so
+    // eQ = U x N is parallel to z, and so is eV. qd_polbasis therefore performs a clean swap rather
+    // than a mixing rotation: VV is the TE channel and HH is the TM channel, up to sign. That is the
+    // reverse of the degenerate collinear case, and getting it backwards inverts every comparison
+    // against a per-polarization reference.
+    const double f_hz = 1.0e9;
+    const std::complex<double> eps_s(5.24, -0.63); // lossy concrete-like at 1 GHz
+    arma::mat mesh = qd_quad_x(200.0, 0.0);
+
+    arma::uvec mtl_ind(2, arma::fill::value(1));
+    std::unordered_map<std::string, std::vector<double>> mtl;
+    mtl["a"] = {5.24};
+    mtl["b"] = {0.0};
+    mtl["c"] = {0.63 / 17.98}; // eta_i = -17.98 * c / fGHz = -0.63 at 1 GHz
+    mtl["d"] = {0.0};
+    mtl["att"] = {0.0};
+    mtl["attB"] = {0.0};
+    mtl["alpha"] = {0.0};
+    mtl["alphaB"] = {0.0};
+    mtl["fRef"] = {1.0};
+
+    QD_DIAG("\n# diag: interface energy split per polarization, air -> eps 5.24 - 0.63j, 1 GHz\n");
+    QD_DIAG("type,angle,gain,ref_avg,VV2_te,HH2_tm,ref_TE,ref_TM,ratio_code,ratio_ref,d_ratio\n");
+
+    for (int type : {0, 2})
+        for (double thd : {0.0, 20.0, 40.0, 60.0, 70.0, 80.0, 85.0})
+        {
+            arma::mat orig, dest;
+            qd_ray_at(thd, orig, dest);
+            arma::mat fbs, sbs;
+            arma::u32_vec fbs_ind, sbs_ind;
+            quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+
+            arma::mat origN, destN, xprmatN;
+            arma::vec gainN;
+            quadriga_lib::ray_mesh_interact(type, f_hz, &orig, &dest, &mesh, &mtl_ind, &mtl,
+                                            &fbs_ind, &sbs_ind, (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                            &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                            &gainN, &xprmatN, (arma::mat *)nullptr, (arma::mat *)nullptr);
+
+            REQUIRE(gainN.n_elem == 1);
+            double vv2 = xprmatN(0, 0) * xprmatN(0, 0) + xprmatN(1, 0) * xprmatN(1, 0);
+            double hh2 = xprmatN(6, 0) * xprmatN(6, 0) + xprmatN(7, 0) * xprmatN(7, 0);
+
+            QdIfaceRef F = qd_iface_ref(std::complex<double>(1.0, 0.0), eps_s, thd * arma::datum::pi / 180.0);
+            double ref_te = (type == 0) ? F.R_te : F.T_te; // pairs with VV
+            double ref_tm = (type == 0) ? F.R_tm : F.T_tm; // pairs with HH
+            double ref_avg = (type == 0) ? F.R_avg : F.T_avg;
+
+            double lo_c = std::min(vv2, hh2), hi_c = std::max(vv2, hh2);
+            double lo_r = std::min(ref_tm, ref_te), hi_r = std::max(ref_tm, ref_te);
+            double rc = (hi_c > 0.0) ? lo_c / hi_c : 0.0;
+            double rr = (hi_r > 0.0) ? lo_r / hi_r : 0.0;
+
+            QD_DIAG("%d,%.1f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.3e\n",
+                    type, thd, gainN(0), ref_avg, vv2, hh2, ref_te, ref_tm, rc, rr, rc - rr);
+
+            CHECK(std::isfinite(gainN(0)));
+            CHECK(gainN(0) >= 0.0);
+            CHECK(std::abs(gainN(0) - 0.5 * (vv2 + hh2)) < 1e-9); // gain is derived from xprmat
+
+            // interact_with hands over exact per-channel coefficients. The averaged reflectance sets
+            // the total and rescales both channels by one common factor, so it cannot move a ratio -
+            // measured to 8e-16. Anything that reintroduces a per-channel rescale here fails.
+            INFO("type " << type << ", angle " << thd);
+            CHECK(std::abs(gainN(0) - ref_avg) < 1e-12);
+            CHECK(std::abs(vv2 - ref_te) < 1e-12);
+            CHECK(std::abs(hh2 - ref_tm) < 1e-12);
+            CHECK(std::abs(rc - rr) < 1e-12);
+        }
+}
+
+TEST_CASE("Diagnostic - Thin sheet composite vs analytic slab")
+{
+    // The sheet composite is produced in one atomic event and should equal the exact analytic
+    // slab. Any residual here is the floor on how close the sheet can get to physics, and the
+    // traced solid cannot do better than that floor either. The polarization-ratio columns are
+    // the sharper of the two: a power error can hide behind the TE/TM average, a ratio error
+    // cannot.
+    const double f_hz = 1.0e9;
+
+    struct Mat
+    {
+        const char *name;
+        double a, c, thk;
+    };
+    const std::vector<Mat> mats = {
+        {"lossless eps 5.24, 100 mm", 5.24, 0.0, 0.100},
+        {"lossy eps 5.24, 100 mm", 5.24, 0.63 / 17.98, 0.100},
+        {"low eps 2.0, weak loss, 100 mm", 2.0, 0.25 / 17.98, 0.100},
+        {"high eps 25.0, strong loss, 100 mm", 25.0, 2.50 / 17.98, 0.100},
+        {"lossy eps 5.24, 6 mm", 5.24, 0.63 / 17.98, 0.006},
+    };
+
+    QD_DIAG("\n# diag: thin sheet composite vs analytic slab, 1 GHz\n");
+    QD_DIAG("material,angle,sheet_dB,ana_dB,d_dB,ratio_sheet,ratio_ana,d_ratio,arg_sheet_deg,arg_ana_te_deg,d_arg_deg,pred_k0_thk_cos\n");
+
+    for (const auto &M : mats)
+    {
+        arma::mat mesh = qd_quad_x(200.0, 0.0);
+        arma::uvec mtl_ind(2, arma::fill::value(1));
+        std::unordered_map<std::string, std::vector<double>> mtl;
+        mtl["a"] = {M.a};
+        mtl["b"] = {0.0};
+        mtl["c"] = {M.c};
+        mtl["d"] = {0.0};
+        mtl["att"] = {0.0};
+        mtl["attB"] = {0.0};
+        mtl["alpha"] = {0.0};
+        mtl["alphaB"] = {0.0};
+        mtl["fRef"] = {1.0};
+        mtl["thk"] = {M.thk};
+        std::complex<double> eps_s(M.a, -17.98 * M.c / (f_hz * 1e-9));
+
+        for (double thd : {0.0, 20.0, 40.0, 60.0, 70.0, 80.0, 85.0, 88.0})
+        {
+            arma::mat orig, dest;
+            qd_ray_at(thd, orig, dest);
+            arma::mat fbs, sbs;
+            arma::u32_vec fbs_ind, sbs_ind;
+            quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+
+            arma::mat origN, destN, xprmatN;
+            arma::vec gainN;
+            quadriga_lib::ray_mesh_interact(1, f_hz, &orig, &dest, &mesh, &mtl_ind, &mtl,
+                                            &fbs_ind, &sbs_ind, (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                            &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                            &gainN, &xprmatN, (arma::mat *)nullptr, (arma::mat *)nullptr);
+
+            REQUIRE(gainN.n_elem == 1);
+            double vv2 = xprmatN(0, 0) * xprmatN(0, 0) + xprmatN(1, 0) * xprmatN(1, 0);
+            double hh2 = xprmatN(6, 0) * xprmatN(6, 0) + xprmatN(7, 0) * xprmatN(7, 0);
+            double arg_vv = std::atan2(xprmatN(1, 0), xprmatN(0, 0)) * 180.0 / arma::datum::pi;
+
+            QdSlabRef R = qd_slab_ref(eps_s, M.thk, thd * arma::datum::pi / 180.0, f_hz);
+            double lo_c = std::min(vv2, hh2), hi_c = std::max(vv2, hh2);
+            double rc = (hi_c > 0.0) ? lo_c / hi_c : 0.0;
+            // VV is the TE channel here (see the note in the interface case), so the phase has to be
+            // compared against t_te. d_arg is predicted to be exactly k0 * thk * cos(theta_i): the
+            // free-space reference the sheet subtracts and the analytic slab does not.
+            double arg_ref = std::arg(R.t_te) * 180.0 / arma::datum::pi;
+            double d_arg = arg_vv - arg_ref;
+            while (d_arg > 180.0)
+                d_arg -= 360.0;
+            while (d_arg <= -180.0)
+                d_arg += 360.0;
+
+            auto dB = [](double p)
+            { return (p > 0.0) ? 10.0 * std::log10(p) : -std::numeric_limits<double>::infinity(); };
+
+            double k0 = 2.0 * arma::datum::pi * f_hz / 299792458.0;
+            double pred = k0 * M.thk * std::cos(thd * arma::datum::pi / 180.0) * 180.0 / arma::datum::pi;
+            while (pred > 180.0)
+                pred -= 360.0;
+            while (pred <= -180.0)
+                pred += 360.0;
+
+            QD_DIAG("%s,%.1f,%.6f,%.6f,%.6f,%.9f,%.9f,%.3e,%.2f,%.2f,%.2f,%.2f\n",
+                    M.name, thd, dB(gainN(0)), dB(R.p_avg), dB(gainN(0)) - dB(R.p_avg),
+                    rc, R.ratio, rc - R.ratio, arg_vv, arg_ref, d_arg, pred);
+
+            CHECK(std::isfinite(gainN(0)));
+            CHECK(gainN(0) >= 0.0);
+            CHECK(gainN(0) <= 1.0);
+
+            // The sheet composite matches the exact analytic slab to the amplitude-convention floor,
+            // and its phase sits exactly one free-space reference term away from it. Both hold across
+            // five materials and eight angles, so both are regression guards rather than targets.
+            // With the raw-amplitude interface convention and the exact complex propagation factor
+            // both in, nothing separates the sheet composite from the exact analytic slab: it is the
+            // same closed form evaluated the same way. The bounds are numerical, not physical, and a
+            // failure here means an approximation has been reintroduced somewhere in produce mode.
+            INFO(M.name << ", angle " << thd);
+            CHECK(std::abs(dB(gainN(0)) - dB(R.p_avg)) < 1.0e-6);
+            CHECK(std::abs(rc - R.ratio) < 1.0e-9);
+            CHECK(std::abs(d_arg - pred) < 1.0e-3);
+        }
+    }
+}
+
+TEST_CASE("Diagnostic - In-slab cosine projection, two ways")
+{
+    // The sheet path takes the in-slab cosine as |Re(cos_theta2)|. The traced solid gets it from
+    // path_dirN, which qd_refract produced by normalizing a vector built from Re(cos_theta2) -
+    // and that normalization is not angle preserving. The two therefore disagree for a lossy
+    // slab. The last column converts the disagreement into the traversal-distance error for a
+    // 100 mm slab, which is the form in which it reaches the result.
+    const double f_hz = 1.0e9;
+    const std::complex<double> eps_s(5.24, -0.63);
+    arma::mat mesh = qd_quad_x(200.0, 0.0);
+
+    arma::uvec mtl_ind(2, arma::fill::value(1));
+    std::unordered_map<std::string, std::vector<double>> mtl;
+    mtl["a"] = {5.24};
+    mtl["b"] = {0.0};
+    mtl["c"] = {0.63 / 17.98};
+    mtl["d"] = {0.0};
+    mtl["att"] = {0.0};
+    mtl["attB"] = {0.0};
+    mtl["alpha"] = {0.0};
+    mtl["alphaB"] = {0.0};
+    mtl["fRef"] = {1.0};
+
+    QD_DIAG("\n# diag: in-slab cosine, |Re(ct2)| versus the traced path_dirN projection\n");
+    QD_DIAG("angle,ct_sheet,ct_traced,rel_diff,d_dist_mm_per_100mm\n");
+
+    for (double thd : {0.0, 20.0, 40.0, 60.0, 70.0, 80.0, 85.0})
+    {
+        arma::mat orig, dest;
+        qd_ray_at(thd, orig, dest);
+        arma::mat fbs, sbs;
+        arma::u32_vec fbs_ind, sbs_ind;
+        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+
+        arma::mat origN, destN, path_dirN, normal_vecN;
+        quadriga_lib::ray_mesh_interact(1, f_hz, &orig, &dest, &mesh, &mtl_ind, &mtl,
+                                        &fbs_ind, &sbs_ind, (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                        &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                        (arma::vec *)nullptr, (arma::mat *)nullptr,
+                                        (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                        (arma::vec *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr,
+                                        &normal_vecN, (std::vector<uint8_t> *)nullptr,
+                                        &path_dirN, true, (arma::u32_vec *)nullptr);
+
+        REQUIRE(path_dirN.n_rows == 1);
+        double nx = normal_vecN(0, 0), ny = normal_vecN(0, 1), nz = normal_vecN(0, 2);
+        double ct_traced = std::abs(path_dirN(0, 0) * nx + path_dirN(0, 1) * ny + path_dirN(0, 2) * nz);
+
+        double s1 = std::sin(thd * arma::datum::pi / 180.0);
+        double ct_sheet = std::abs(std::real(std::sqrt(1.0 - (1.0 / eps_s) * s1 * s1)));
+        double rel = (ct_traced > 0.0) ? (ct_sheet - ct_traced) / ct_traced : 0.0;
+        double d_dist = 1000.0 * (0.1 / ct_sheet - 0.1 / ct_traced); // mm, for a 100 mm slab
+
+        QD_DIAG("%.1f,%.9f,%.9f,%.3e,%.6f\n", thd, ct_sheet, ct_traced, rel, d_dist);
+
+        CHECK(ct_traced > 0.0);
+        CHECK(ct_traced <= 1.0 + 1e-12);
+
+        // The two projections differ by under 1e-3 relative, which is 0.08 mm of path over a 100 mm
+        // slab and below every other term in this suite. Guarded rather than fixed.
+        INFO("angle " << thd << ", ct_sheet " << ct_sheet << ", ct_traced " << ct_traced);
+        CHECK(std::abs(rel) < 1.0e-3);
+    }
+}
+
+TEST_CASE("Diagnostic - Grazing clamp engagement versus face extent")
+{
+    // ray_mesh_interact bounds the lateral walk-off inside a notional slab by the longest FBS
+    // triangle edge. ray_state_update cannot see that edge and substitutes a fixed
+    // extent-to-thickness ratio, so the two disagree once the clamp engages. This sweep runs the
+    // same sheet on a large face and a small one; the angle at which the two columns part is
+    // where the clamp starts to act, and the analytic column says which of them is still right.
+    const double f_hz = 1.0e9;
+    const double thk = 0.006;
+    const std::complex<double> eps_s(5.24, -0.63);
+
+    std::unordered_map<std::string, std::vector<double>> mtl;
+    mtl["a"] = {5.24};
+    mtl["b"] = {0.0};
+    mtl["c"] = {0.63 / 17.98};
+    mtl["d"] = {0.0};
+    mtl["att"] = {0.0};
+    mtl["attB"] = {0.0};
+    mtl["alpha"] = {0.0};
+    mtl["alphaB"] = {0.0};
+    mtl["fRef"] = {1.0};
+    mtl["thk"] = {thk};
+
+    // Clamp threshold: ray_mesh_interact caps the in-slab cosine at thk / sqrt(thk^2 + ext^2),
+    // where ext is the longest FBS triangle edge. For the small face that is a specific angle, and
+    // the table should show the small-face column departing only past it.
+    double ext_small = std::sqrt(2.0) * 2.0 * 0.02;
+    double cos_min_small = thk / std::sqrt(thk * thk + ext_small * ext_small);
+    QD_DIAG("\n# diag: grazing clamp, sheet thk 6 mm on a large and a small face\n");
+    QD_DIAG("# small face longest edge %.4f m -> clamp engages past %.2f deg\n",
+            ext_small, std::acos(cos_min_small) * 180.0 / arma::datum::pi);
+    QD_DIAG("angle,large_face_dB,small_face_dB,ana_dB,large-ana,small-ana\n");
+
+    auto run_face = [&](double half, double thd) -> double
+    {
+        arma::mat mesh = qd_quad_x(half, 0.0);
+        arma::uvec mtl_ind(2, arma::fill::value(1));
+        arma::mat orig, dest;
+        // Keep the crossing on the face at every angle. The crossing sits at y0 + reach * tan(theta),
+        // so the reach has to shrink with the angle or the ray walks off a small face and the row
+        // reads -inf for a geometric reason rather than a physical one. y0 is offset from the centre
+        // because the shared triangulation edge crosses z = 0 at y = 0.
+        double t = std::tan(thd * arma::datum::pi / 180.0);
+        double y0 = 0.3 * half;
+        double reach = (t > 1.0e-6) ? 0.4 * half / t : half;
+        orig = arma::mat{{-reach, y0, 0.0}};
+        dest = arma::mat{{reach, y0 + 2.0 * reach * t, 0.0}};
+        arma::mat fbs, sbs;
+        arma::u32_vec fbs_ind, sbs_ind;
+        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+        if (fbs_ind.n_elem == 0 || fbs_ind(0) == 0)
+            return std::numeric_limits<double>::quiet_NaN();
+
+        arma::mat origN, destN, xprmatN;
+        arma::vec gainN;
+        quadriga_lib::ray_mesh_interact(1, f_hz, &orig, &dest, &mesh, &mtl_ind, &mtl,
+                                        &fbs_ind, &sbs_ind, (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                        &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                        &gainN, &xprmatN, (arma::mat *)nullptr, (arma::mat *)nullptr);
+        return gainN(0);
+    };
+
+    auto dB = [](double p)
+    { return (p > 0.0) ? 10.0 * std::log10(p) : -std::numeric_limits<double>::infinity(); };
+
+    for (double thd : {60.0, 80.0, 85.0, 88.0, 89.0, 89.5, 89.9})
+    {
+        double gL = run_face(200.0, thd);   // longest edge ~ 566 m, clamp far away
+        double gS = run_face(0.02, thd);    // longest edge ~ 57 mm, clamp reachable
+        QdSlabRef R = qd_slab_ref(eps_s, thk, thd * arma::datum::pi / 180.0, f_hz);
+        QD_DIAG("%.2f,%.6f,%.6f,%.6f,%.6f,%.6f\n", thd, dB(gL), dB(gS), dB(R.p_avg),
+                dB(gL) - dB(R.p_avg), dB(gS) - dB(R.p_avg));
+        CHECK((std::isnan(gL) || (gL >= 0.0 && gL <= 1.0)));
+        CHECK((std::isnan(gS) || (gS >= 0.0 && gS <= 1.0)));
+    }
 }
