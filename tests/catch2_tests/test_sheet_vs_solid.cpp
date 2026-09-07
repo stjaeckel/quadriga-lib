@@ -36,7 +36,7 @@
 #include <utility>
 #include <vector>
 
-#define QD_TEST_VERBOSE
+//#define QD_TEST_VERBOSE
 
 namespace
 {
