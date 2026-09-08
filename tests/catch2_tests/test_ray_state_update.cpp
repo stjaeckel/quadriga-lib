@@ -2409,8 +2409,11 @@ static inline std::complex<double> diag_r_slabside(std::complex<double> eps_s, s
 
 // Exact analytic slab, TE/TM averaged power, air | slab | air. Independent of every library
 // internal; the same closed form the ray_mesh_interact suite uses as its oracle.
-static inline double diag_slab_p_avg(std::complex<double> eps_s, double thk,
-                                     double theta_n_rad, double f_hz)
+// Exact analytic slab, per polarization. Same closed form as diag_slab_p_avg, which is the
+// average of the two outputs; split out because a scalar chain measures one channel.
+static inline void diag_slab_p_pol(std::complex<double> eps_s, double thk,
+                                   double theta_n_rad, double f_hz,
+                                   double &p_te, double &p_tm)
 {
     const double k0 = 2.0 * QPI * f_hz / C0;
     const std::complex<double> z1(1.0, 0.0), z2 = std::sqrt(eps_s), n = std::sqrt(eps_s);
@@ -2431,7 +2434,141 @@ static inline double diag_slab_p_avg(std::complex<double> eps_s, double thk,
             t21 = (2.0 * z2 * c2) / (z1 * c2 + z2 * c1);
         p[pol] = std::norm(t12 * t21 * phi / (1.0 - r * r * phi * phi));
     }
-    return 0.5 * (p[0] + p[1]);
+    p_te = p[0], p_tm = p[1];
+}
+
+// The transmission port Material::interact_with writes for a crossing e1 -> e2, at an incidence
+// cosine that may be complex: the raw Fresnel amplitude times the square root of its own
+// per-channel normal-flux obliquity factor, Re(z2 c2)/Re(z1 c1) for TE and the conjugated form for
+// TM. The diagnostic palette carries no tf and no att, so neither of those two scales appears.
+//
+// Passing a real cosine reproduces an ordinary face hit; passing the exact complex in-slab cosine
+// reproduces the far face of a traced solid.
+static inline void diag_port(std::complex<double> e1, std::complex<double> e2,
+                             std::complex<double> ct1, bool scalar,
+                             std::complex<double> &T_te, std::complex<double> &T_tm)
+{
+    std::complex<double> z1 = std::sqrt(e1), z2 = std::sqrt(e2);
+    std::complex<double> a = 1.0 - (e1 / e2) * (1.0 - ct1 * ct1);
+    if (std::imag(a) == 0.0 && std::real(a) < 0.0)
+        a = std::complex<double>(std::real(a), -0.0); // decaying evanescent root
+    std::complex<double> ct2 = std::sqrt(a);
+
+    double den_te = std::real(z1 * ct1), den_tm = std::real(std::conj(z1) * ct1);
+    double num_te = std::real(z2 * ct2), num_tm = std::real(std::conj(z2) * ct2);
+    double s_te = (den_te > 0.0 && num_te > 0.0) ? std::sqrt(num_te / den_te) : 0.0;
+    double s_tm = (den_tm > 0.0 && num_tm > 0.0) ? std::sqrt(num_tm / den_tm) : 0.0;
+
+    if (scalar) // pressure form, T = 1 + R, which is the TE amplitude
+    {
+        std::complex<double> R = (z1 * ct1 - z2 * ct2) / (z1 * ct1 + z2 * ct2);
+        T_te = (1.0 + R) * s_te;
+        T_tm = T_te;
+        return;
+    }
+    T_te = ((2.0 * z1 * ct1) / (z1 * ct1 + z2 * ct2)) * s_te;
+    T_tm = ((2.0 * z1 * ct1) / (z2 * ct1 + z1 * ct2)) * s_tm;
+}
+
+// Correction-mode series factor S = 1 / (1 - rn rf phi^2), with both boundaries and the
+// propagation factor written at one in-slab cosine. Reflections are taken from the slab side, so
+// the near and far media enter only through their own refraction cosines.
+static inline void diag_series(std::complex<double> es, std::complex<double> en,
+                               std::complex<double> ef, std::complex<double> cs,
+                               double thk_normal, double f_hz, bool scalar,
+                               std::complex<double> &S_te, std::complex<double> &S_tm)
+{
+    const double k0 = 2.0 * QPI * f_hz / C0;
+    const std::complex<double> zs = std::sqrt(es);
+    const std::complex<double> sin2 = 1.0 - cs * cs;
+
+    auto refl = [&](std::complex<double> ea, std::complex<double> &te, std::complex<double> &tm)
+    {
+        std::complex<double> za = std::sqrt(ea);
+        std::complex<double> a = 1.0 - (es / ea) * sin2;
+        if (std::imag(a) == 0.0 && std::real(a) < 0.0)
+            a = std::complex<double>(std::real(a), -0.0);
+        std::complex<double> c2 = std::sqrt(a);
+        te = (zs * cs - za * c2) / (zs * cs + za * c2);
+        tm = scalar ? te : (za * cs - zs * c2) / (za * cs + zs * c2);
+    };
+
+    std::complex<double> rn_te, rn_tm, rf_te, rf_tm;
+    refl(en, rn_te, rn_tm);
+    refl(ef, rf_te, rf_tm);
+    std::complex<double> phi = std::exp(std::complex<double>(0.0, -1.0) * k0 * std::sqrt(es) * thk_normal * cs);
+    S_te = 1.0 / (1.0 - rn_te * rf_te * phi * phi);
+    S_tm = scalar ? S_te : 1.0 / (1.0 - rn_tm * rf_tm * phi * phi);
+}
+
+// In-medium traversal factor on a leg the tracer refracted into, exact form:
+//   exp(-j k0 (n cs d + q s)) / exp(-j k0 dist_geo)
+// with d the normal thickness and s the transverse displacement, both pure geometry off the traced
+// direction, and q the transverse wavenumber the medium carries, q^2 = n^2 (1 - cs^2). The
+// division is the free-space reference the distance ledger already carries.
+//
+// For a real index the two terms recombine into n * dist_refract, so this reduces to the walk-off
+// form rather than replacing it. The palette carries no alpha, so there is no excess-gain factor.
+static inline std::complex<double> diag_medium_vbs(std::complex<double> es, double dist_refract,
+                                                   double ct_traced, double dist_geo,
+                                                   std::complex<double> cs, double f_hz)
+{
+    const double k0 = 2.0 * QPI * f_hz / C0;
+    const std::complex<double> n = std::sqrt(es);
+    double d = dist_refract * ct_traced;
+    double s2 = 1.0 - ct_traced * ct_traced;
+    double s = dist_refract * std::sqrt((s2 > 0.0) ? s2 : 0.0);
+
+    std::complex<double> qa = n * n * (1.0 - cs * cs);
+    if (std::imag(qa) == 0.0 && std::real(qa) < 0.0)
+        qa = std::complex<double>(std::real(qa), -0.0);
+    std::complex<double> q = std::sqrt(qa);
+
+    return std::exp(std::complex<double>(0.0, -1.0) * k0 * (n * cs * d + q * s)) *
+           std::exp(std::complex<double>(0.0, 1.0) * k0 * dist_geo);
+}
+
+// In-medium traversal factor with no VBS correction available: magnitude from the ITU-R P.2040
+// path form, phase from the real index over the same path, both against the free-space reference.
+static inline std::complex<double> diag_medium_geo(std::complex<double> es, double dist,
+                                                   double dist_geo, double f_hz)
+{
+    const double k0 = 2.0 * QPI * f_hz / C0;
+    double n_re = std::real(std::sqrt(es));
+    return std::sqrt(diag_medium_gain(es, dist, f_hz)) *
+           std::exp(std::complex<double>(0.0, -k0 * (n_re * dist - dist_geo)));
+}
+
+// Two coplanar triangles spanning +-half in y and z at x = x0, normal along -x, so a ray
+// travelling towards +x makes a front-side hit and the crossing is air -> medium. Same winding as
+// the builder in the ray_mesh_interact suite; the shared triangulation edge runs along y + z = 0,
+// so a ray in the z = 0 plane must not cross at y = 0.
+static inline arma::mat diag_quad_x(double half, double x0)
+{
+    arma::mat m(2, 9);
+    m.row(0) = arma::rowvec{x0, -half, -half, x0, -half, half, x0, half, -half};
+    m.row(1) = arma::rowvec{x0, half, -half, x0, -half, half, x0, half, half};
+    return m;
+}
+
+// TX at (-1, 0.37, 0), RX placed so the ray crosses x = 0 at the given angle from the face normal.
+// The offset in y keeps the crossing off the triangulation edge at normal incidence.
+static inline void diag_ray_at(double theta_n_deg, arma::mat &orig, arma::mat &dest)
+{
+    double t = std::tan(theta_n_deg * QPI / 180.0);
+    orig = arma::mat{{-1.0, 0.37, 0.0}};
+    dest = arma::mat{{1.0, 0.37 + 2.0 * t, 0.0}};
+}
+
+// Exact analytic slab, TE/TM averaged power, air | slab | air. Independent of every library
+// internal; the same closed form the ray_mesh_interact suite uses as its oracle. Delegates to the
+// per-polarization form below so there is one copy of the closed form, not two.
+static inline double diag_slab_p_avg(std::complex<double> eps_s, double thk,
+                                     double theta_n_rad, double f_hz)
+{
+    double p_te = 0.0, p_tm = 0.0;
+    diag_slab_p_pol(eps_s, thk, theta_n_rad, f_hz, p_te, p_tm);
+    return 0.5 * (p_te + p_tm);
 }
 
 TEST_CASE("Diagnostic - Slab factor per polarization")
@@ -2538,19 +2675,20 @@ TEST_CASE("Diagnostic - Entry boundary evaluated at two angles")
     // cosine the function sees is that direction's real projection. Supplying path_dir_prev is what
     // arms the recovery - without it nothing was ever projected and the gate correctly declines.
     //
-    // The series factor is MEASURED, not reconstructed. Supplying path_dir_prev also switches on the
-    // VBS redo, which replaces the coefficient rather than scaling it: the exit interface is
-    // re-applied at the corrected angle, the polarization basis is rebuilt, and the medium factor
-    // switches to the raw path lengths. An analytic reference for all of that was tried and was wrong
-    // by 4.6 dB, which the lossless control exposed immediately - for a real permittivity the
-    // normalization inside qd_refract is inert, so ct_traced IS the exact cosine, the recovery is a
-    // provable no-op, and no no-op moves a result by 4.6 dB.
+    // ISOLATION. This case used to run each row twice, dividing a run with air behind the slab by one
+    // with an electrically identical twin behind it, whose far Fresnel coefficient vanishes so the
+    // series factor is exactly 1. Everything other than the series was common to the two runs and
+    // divided out. That construction no longer holds: the twin makes the entry and slab permittivities
+    // equal, which is one of the recovery's own decline conditions, so the twin run evaluates its exit
+    // port at the real projection while the air run evaluates it at the recovered cosine. The ratio
+    // then carries T_exit(cs) / T_exit(ct_traced) on top of the series - up to 4.1 dB at 85 deg - and
+    // measures the two things at once.
     //
-    // So each row runs twice, differing only in the previous medium. With a twin of the slab behind
-    // it the far Fresnel coefficient vanishes and the series factor is exactly 1 whatever the
-    // propagation factor does, while the exit interface, the medium factor, the basis and the VBS
-    // geometry are identical to the first run and divide out. The resolve still fires in both, so the
-    // resolved flag and the walk-off branch match.
+    // So the series is now isolated against a closed form instead. That was tried once before and was
+    // wrong by 4.6 dB, because the exit port was evaluated at an angle no closed form could name; with
+    // the port on the recovered cosine the whole leg is analytic and the reconstruction is exact. The
+    // lossless control pins it: for a real permittivity the normalization inside qd_refract is inert,
+    // both cosines coincide, and the two references must agree exactly.
     const double f_hz = FRQ;
     const double L = 0.10;
     auto mtl = diag_palette<double>();
@@ -2558,9 +2696,6 @@ TEST_CASE("Diagnostic - Entry boundary evaluated at two angles")
     QD_DIAG("\n# diag: entry boundary, recovered complex angle versus the real projection\n");
     QD_DIAG("theta_ext,ct_traced,|S_applied|,arg_S_applied,|S_exact|,arg_S_exact,|S_traced|,"
             "arg_S_traced,d_vs_exact_dB,d_traced_vs_exact_dB,rtype\n");
-
-    // material -> a distinct index presenting the same impedance, used to null the far boundary
-    auto twin_of = [](int m) { return (m == 5) ? 7 : 8; };
 
     for (int m : {5, 6}) // 5 = lossy eps 1.50 - 0.40j, 6 = lossless control
     {
@@ -2572,56 +2707,66 @@ TEST_CASE("Diagnostic - Entry boundary evaluated at two angles")
             double ct_tr = diag_traced_ct(es, th_ext);
             std::complex<double> ct_ex = diag_ct_exact(es, th_ext);
 
-            unsigned rtype_seen = 0;
-            auto run_with_prev = [&](int prev) -> std::complex<double>
-            {
-                auto C = make1<double>(mtl, /*scalar transmission*/ 4, OT_EXIT, 1u,
-                                       /*M1*/ m, /*M2*/ 0, prev, /*cur*/ m, /*buf*/ 0,
-                                       L, 0.5, 0.5, /*fbs angle = geometric*/ QPI / 2.0 - th_ext,
-                                       /*always resolve*/ 0.0);
-                // The refracted direction the tracer left behind: |dir . N| is the traced in-slab cosine
-                C.has_path_dir = true;
-                C.path_dir_prev.zeros(1, 3);
-                C.path_dir_prev(0, 0) = (double)ct_tr;
-                C.path_dir_prev(0, 1) = (double)std::sqrt(1.0 - ct_tr * ct_tr);
-                C.run();
-                std::complex<double> out = cpx(C.xprmat, 0, 0), in = cpx(C.x_in, 0, 0);
-                rtype_seen = (unsigned)C.resolved_type[0];
-                return (std::abs(in) > 0.0) ? out / in : std::complex<double>(0.0, 0.0);
-            };
+            auto C = make1<double>(mtl, /*scalar transmission*/ 4, OT_EXIT, 1u,
+                                   /*M1*/ m, /*M2*/ 0, /*prev*/ 0, /*cur*/ m, /*buf*/ 0,
+                                   L, 0.5, 0.5, /*fbs angle = geometric*/ QPI / 2.0 - th_ext,
+                                   /*always resolve*/ 0.0);
+            // The refracted direction the tracer left behind: |dir . N| is the traced in-slab cosine
+            C.has_path_dir = true;
+            C.path_dir_prev.zeros(1, 3);
+            C.path_dir_prev(0, 0) = ct_tr;
+            C.path_dir_prev(0, 1) = std::sqrt(1.0 - ct_tr * ct_tr);
+            C.run();
 
-            std::complex<double> with_series = run_with_prev(0);            // air behind: the real series
-            std::complex<double> no_series = run_with_prev(twin_of(m));     // twin behind: S == 1 exactly
-            std::complex<double> S_applied = (std::abs(no_series) > 0.0)
-                                                 ? with_series / no_series
-                                                 : std::complex<double>(0.0, 0.0);
+            std::complex<double> out = cpx(C.xprmat, 0, 0);
+            std::complex<double> probe = cpx(C.x_in, 0, 0);
+            unsigned rtype_seen = (unsigned)C.resolved_type[0];
 
-            // Two references, differing only in the cosine both boundaries are built from. The
-            // propagation factor follows the same cosine, as the function does.
-            //
             // Whether the recovery fires at all is decided by use_vbs, not by the angle: at exactly
             // normal incidence the traced direction and the geometric one coincide, nothing was ever
-            // projected, and the function correctly declines and keeps the hybrid medium_gain
-            // propagation factor. The exact reference has to follow it there, or the row reports the
-            // 2.5e-5 dB gap between the ITU-R P.2040 Delta form and exp(-k0 Im(n) L) as if it were a
-            // defect in the recovery. That gap is real and is a candidate for unifying correction mode
-            // onto the exact form, but it is not what this case measures.
+            // projected, and the function correctly declines. It then keeps BOTH the hybrid
+            // medium_gain propagation factor and, because the VBS correction is a no-op there, the
+            // interface coefficient ray_mesh_interact already wrote - so the probe field survives
+            // into the output instead of being rebuilt. The reference has to follow it on both
+            // counts, or the row reports the gap between the ITU-R P.2040 Delta form and
+            // exp(-k0 Im(n) L) as if it were a defect in the recovery.
             bool recovery_fires = std::abs(ct_tr - std::cos(th_ext)) > 1e-6;
 
             double dr = L / ct_tr;
             double thk_n = dr * ct_tr; // normal thickness, pure geometry
             const double k0 = 2.0 * QPI * f_hz / C0;
-            std::complex<double> n_cx = std::sqrt(es);
-            double n_re = std::real(n_cx);
-            std::complex<double> phi_ex =
-                std::exp(std::complex<double>(0.0, -1.0) * k0 * n_cx * thk_n * ct_ex);
+            double n_re = std::real(std::sqrt(es));
+
+            // The carrier: everything the exit leg applies apart from the series.
+            std::complex<double> carrier, S_ex;
+            if (recovery_fires)
+            {
+                std::complex<double> T_te, T_tm, S_te, S_tm;
+                diag_port(es, ea, ct_ex, true, T_te, T_tm);
+                diag_series(es, ea, ea, ct_ex, thk_n, f_hz, true, S_te, S_tm);
+                carrier = T_te * diag_medium_vbs(es, dr, ct_tr, L, ct_ex, f_hz);
+                S_ex = S_te;
+            }
+            else
+            {
+                std::complex<double> phi_tr =
+                    std::sqrt(diag_medium_gain(es, dr, f_hz)) *
+                    std::exp(std::complex<double>(0.0, -k0 * n_re * dr * ct_tr * ct_tr));
+                std::complex<double> r_tr = diag_r_slabside(es, ea, std::complex<double>(ct_tr, 0.0));
+                S_ex = 1.0 / (1.0 - r_tr * r_tr * phi_tr * phi_tr);
+                carrier = probe * diag_medium_geo(es, dr, L, f_hz);
+            }
+
+            std::complex<double> S_applied = (std::abs(carrier) > 0.0)
+                                                 ? out / carrier
+                                                 : std::complex<double>(0.0, 0.0);
+
+            // The reference the code would produce if both boundaries and the propagation factor
+            // were built from the real projection instead of the recovered cosine. Printed only.
             std::complex<double> phi_tr =
                 std::sqrt(diag_medium_gain(es, dr, f_hz)) *
                 std::exp(std::complex<double>(0.0, -k0 * n_re * dr * ct_tr * ct_tr));
-            std::complex<double> r_ex = diag_r_slabside(es, ea, ct_ex);
             std::complex<double> r_tr = diag_r_slabside(es, ea, std::complex<double>(ct_tr, 0.0));
-            std::complex<double> phi_x = recovery_fires ? phi_ex : phi_tr;
-            std::complex<double> S_ex = 1.0 / (1.0 - r_ex * r_ex * phi_x * phi_x);
             std::complex<double> S_tr = 1.0 / (1.0 - r_tr * r_tr * phi_tr * phi_tr);
 
             auto dB = [](std::complex<double> x, std::complex<double> y)
@@ -2874,5 +3019,225 @@ TEST_CASE("Thin sheet - the redo sits on the analytic slab at grazing incidence"
         REQUIRE(std::isfinite(g));
         CHECK(g >= 0.0);
         CHECK(std::abs(dB(g) - dB(ana)) < 1.0e-6);
+    }
+}
+
+TEST_CASE("Exit boundary - the port at the recovered angle")
+{
+    // The far face of a traced solid, measured against a hand-built reference at the exact
+    // recovered cosine rather than at the real projection the tracer was left holding.
+    //
+    // The whole exit leg is asserted, not just the port: ray_state_update writes
+    // T_exit * S * M, with S the series factor and M the in-medium traversal, and all three are
+    // reproduced here from closed forms that share no code with the library. The port alone is
+    // printed as out / (S M) so the table shows the quantity the fix moves.
+    //
+    // Nothing here divides one run by another. REPLACE_BY_VBS REBUILDS the field from the
+    // interface coefficient rather than scaling what it was handed, so the written value is
+    // absolute and the probe cancels out of the measurement by construction.
+    //
+    // Two modes. The scalar run pins the complex coefficient outright. The EM run pins the gain,
+    // which is the Frobenius norm of the Jones matrix and is therefore invariant under the
+    // polarization basis - so it measures the TE and TM ports without depending on which matrix
+    // element each one lands in for this geometry.
+    const double f_hz = FRQ;
+    const double L = 0.10; // normal thickness of the traversed layer
+    auto mtl = diag_palette<double>();
+
+    QD_DIAG("\n# diag: exit port at the recovered complex cosine, i-o exit, normal thickness 100 mm\n");
+    QD_DIAG("# port_ref is the exit interface at the exact angle; port_traced is the same interface\n");
+    QD_DIAG("# at the real projection, which is what the exit used to be evaluated at\n");
+    QD_DIAG("mtl,theta_ext,ct_traced,|port_meas|,|port_ref|,|port_traced|,d_port_dB,"
+            "d_amp,d_gain_em,rtype\n");
+
+    for (int m : {5, 1, 4, 6})
+    {
+        QD_DIAG("# material %d, eps %.2f %+.2fj\n", m,
+                std::real(diag_eps(m, f_hz)), std::imag(diag_eps(m, f_hz)));
+        for (double thd : {10.0, 20.0, 40.0, 60.0, 75.0, 85.0})
+        {
+            std::complex<double> es = diag_eps(m, f_hz), ea(1.0, 0.0);
+            double th = thd * QPI / 180.0;
+            double ct = diag_traced_ct(es, th);
+            std::complex<double> cs = diag_ct_exact(es, th);
+            double dr = L / ct; // refracted path the tracer walked
+
+            // Every angle in this sweep bends the direction, so the recovery is armed on all of
+            // them. Normal incidence is excluded deliberately: there is nothing projected there and
+            // the exit keeps the geometric path, which the entry-boundary case covers instead.
+            REQUIRE(std::abs(ct - std::cos(th)) > 1e-6);
+
+            std::complex<double> Ts_te, Ts_tm, Te_te, Te_tm;
+            diag_port(es, ea, cs, true, Ts_te, Ts_tm);  // scalar port at the exact cosine
+            diag_port(es, ea, cs, false, Te_te, Te_tm); // EM port, per channel
+
+            std::complex<double> Ss_te, Ss_tm, Se_te, Se_tm;
+            diag_series(es, ea, ea, cs, L, f_hz, true, Ss_te, Ss_tm);
+            diag_series(es, ea, ea, cs, L, f_hz, false, Se_te, Se_tm);
+
+            std::complex<double> M = diag_medium_vbs(es, dr, ct, L, cs, f_hz);
+
+            auto run = [&](int itype)
+            {
+                auto C = make1<double>(mtl, itype, OT_EXIT, 1u,
+                                       /*M1*/ m, /*M2*/ 0, /*prev*/ 0, /*cur*/ m, /*buf*/ 0,
+                                       L, 0.5, 0.5, /*fbs angle = geometric*/ QPI / 2.0 - th,
+                                       /*always resolve*/ 0.0);
+                // The refracted direction the tracer left behind
+                C.has_path_dir = true;
+                C.path_dir_prev.zeros(1, 3);
+                C.path_dir_prev(0, 0) = ct;
+                C.path_dir_prev(0, 1) = std::sqrt(1.0 - ct * ct);
+                C.run();
+                return C;
+            };
+
+            auto Cs = run(4); // scalar transmission
+            auto Ce = run(1); // EM transmission
+
+            std::complex<double> out = cpx(Cs.xprmat, 0, 0);
+            std::complex<double> ref = Ts_te * Ss_te * M;
+            std::complex<double> carrier = Ss_te * M;
+            std::complex<double> port_meas = (std::abs(carrier) > 0.0)
+                                                 ? out / carrier
+                                                 : std::complex<double>(0.0, 0.0);
+
+            // The same port at the real projection, which is what the code applied before.
+            std::complex<double> Tt_te, Tt_tm;
+            diag_port(es, ea, std::complex<double>(ct, 0.0), true, Tt_te, Tt_tm);
+
+            double g_ref = 0.5 * (std::norm(Te_te * Se_te * M) + std::norm(Te_tm * Se_tm * M));
+
+            auto dB = [](double x, double y)
+            { return 20.0 * std::log10(std::max(1e-300, x) / std::max(1e-300, y)); };
+
+            QD_DIAG("%d,%.1f,%.9f,%.9f,%.9f,%.9f,%.6f,%.3e,%.3e,%u\n",
+                    m, thd, ct, std::abs(port_meas), std::abs(Ts_te), std::abs(Tt_te),
+                    dB(std::abs(Tt_te), std::abs(Ts_te)),
+                    std::abs(out - ref), std::abs(Ce.gain(0) - g_ref),
+                    (unsigned)Cs.resolved_type[0]);
+
+            // The exit leg is the port at the recovered angle, the series and the traversal, and
+            // nothing else.
+            INFO("material " << m << ", theta_ext " << thd);
+            CHECK(std::abs(out - ref) < 1e-9);
+
+            // Same statement per channel, read through a basis-invariant quantity so the EM run
+            // pins the TM port as well.
+            CHECK(std::abs(Ce.gain(0) - g_ref) < 1e-9);
+
+            // Sanity: the port actually moved, so the case can fail. The recovery is a provable
+            // no-op for a real permittivity, which is why the lossless control is exempt.
+            if (m != 6 && thd >= 40.0)
+                CHECK(std::abs(Tt_te - Ts_te) > 1e-6);
+        }
+    }
+}
+
+TEST_CASE("Traced solid - air | slab | air chain against the analytic slab")
+{
+    // The end-to-end statement, and the case that would have caught the exit-angle defect.
+    //
+    // The chain is assembled from the ports the two public functions actually write, with nothing
+    // reconstructed in between: ray_mesh_interact supplies the entry coefficient and the refracted
+    // direction, and ray_state_update supplies the exit leg - exit port, internal series and
+    // in-medium traversal - from that direction. Their product is compared against the analytic
+    // slab, which shares no code with either.
+    //
+    // The tracer is undeviated (type 4), which is the configuration the whole VBS machinery exists
+    // for: the geometric ray continues straight, so the far face is met at the external angle,
+    // while path_dirN carries the Snell direction and the two disagree. A refracting tracer
+    // (type 5) bends the geometry itself, the two angles coincide, and there is nothing to correct.
+    //
+    // Why the entry-boundary case cannot see what this one sees: it divides the exit factor out by
+    // construction, so an exit evaluated at the wrong cosine cancels against itself. Here it does
+    // not cancel against anything.
+    const double f_hz = FRQ;
+    const double L = 0.10; // normal thickness of the slab
+    auto mtl = diag_palette<double>();
+    arma::mat mesh = diag_quad_x(200.0, 0.0);
+
+    QD_DIAG("\n# diag: traced chain, entry port from ray_mesh_interact, exit leg from ray_state_update\n");
+    QD_DIAG("# air | slab | air, normal thickness 100 mm, 1 GHz; oracle is the analytic slab, TE channel\n");
+    QD_DIAG("mtl,theta_ext,ct_mesh,ct_map,d_ct,chain_dB,ana_dB,d_dB,rtype\n");
+
+    for (int m : {5, 1, 4, 6})
+    {
+        QD_DIAG("# material %d, eps %.2f %+.2fj\n", m,
+                std::real(diag_eps(m, f_hz)), std::imag(diag_eps(m, f_hz)));
+        for (double thd : {10.0, 20.0, 40.0, 60.0, 75.0, 85.0})
+        {
+            std::complex<double> es = diag_eps(m, f_hz);
+            double th = thd * QPI / 180.0;
+
+            // Entry: one face, air -> slab, undeviated transmission.
+            arma::mat orig, dest;
+            diag_ray_at(thd, orig, dest);
+            arma::uvec mtl_ind(mesh.n_rows, arma::fill::value((arma::uword)m));
+
+            arma::mat fbs, sbs;
+            arma::u32_vec fbs_ind, sbs_ind;
+            quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, NULL,
+                                                 &fbs_ind, &sbs_ind);
+            REQUIRE(fbs_ind.n_elem == 1);
+            REQUIRE(fbs_ind(0) != 0);
+
+            arma::mat origN, destN, xprmatN, path_dirN, normal_vecN;
+            arma::vec gainN;
+            quadriga_lib::ray_mesh_interact(4, f_hz, &orig, &dest, &mesh, &mtl_ind, &mtl,
+                                            &fbs_ind, &sbs_ind, (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                            &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                            &gainN, &xprmatN, (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                            (arma::vec *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr,
+                                            &normal_vecN, (std::vector<uint8_t> *)nullptr,
+                                            &path_dirN, true, (arma::u32_vec *)nullptr);
+
+            REQUIRE(path_dirN.n_rows == 1);
+            std::complex<double> a_entry(xprmatN(0, 0), xprmatN(1, 0));
+
+            double nx = normal_vecN(0, 0), ny = normal_vecN(0, 1), nz = normal_vecN(0, 2);
+            double ct_mesh = std::abs(path_dirN(0, 0) * nx + path_dirN(0, 1) * ny + path_dirN(0, 2) * nz);
+            double ct_map = diag_traced_ct(es, th); // the same map, evaluated by hand
+
+            // Exit: the far face of the layer, reached along the direction the mesh call wrote.
+            // fbs_angle stays the external angle - the geometric ray was never bent - and the
+            // normal thickness enters as the origin-to-face distance.
+            auto C = make1<double>(mtl, 4, OT_EXIT, 1u,
+                                   /*M1*/ m, /*M2*/ 0, /*prev*/ 0, /*cur*/ m, /*buf*/ 0,
+                                   L, 0.5, 0.5, QPI / 2.0 - th, /*always resolve*/ 0.0);
+            C.has_path_dir = true;
+            C.path_dir_prev.zeros(1, 3);
+            C.path_dir_prev(0, 0) = path_dirN(0, 0);
+            C.path_dir_prev(0, 1) = path_dirN(0, 1);
+            C.path_dir_prev(0, 2) = path_dirN(0, 2);
+            C.run();
+
+            // Absolute, because the exit rebuilds the field rather than scaling it.
+            std::complex<double> a_exit = cpx(C.xprmat, 0, 0);
+            std::complex<double> chain = a_entry * a_exit;
+
+            double p_te = 0.0, p_tm = 0.0;
+            diag_slab_p_pol(es, L, th, f_hz, p_te, p_tm);
+
+            double chain_dB = 10.0 * std::log10(std::max(1e-300, std::norm(chain)));
+            double ana_dB = 10.0 * std::log10(std::max(1e-300, p_te));
+
+            QD_DIAG("%d,%.1f,%.9f,%.9f,%.3e,%.6f,%.6f,%.6f,%u\n",
+                    m, thd, ct_mesh, ct_map, std::abs(ct_mesh - ct_map),
+                    chain_dB, ana_dB, chain_dB - ana_dB, (unsigned)C.resolved_type[0]);
+
+            // The direction the tracer wrote is the map the recovery inverts. A gap here means the
+            // two have drifted apart and every reference below is measuring the wrong thing.
+            INFO("material " << m << ", theta_ext " << thd);
+            CHECK(std::abs(ct_mesh - ct_map) < 1e-9);
+
+            // Entry port, traversal, exit port and series, telescoping onto the analytic slab.
+            CHECK(std::abs(chain_dB - ana_dB) < 1e-6);
+
+            // The oracle is the average of the two channels; the scalar chain measures TE, so the
+            // average is printed only where the two coincide. Kept as a guard that the per-channel
+            // split of the reference has not been swapped.
+            CHECK(std::abs(diag_slab_p_avg(es, L, th, f_hz) - 0.5 * (p_te + p_tm)) < 1e-15);
+        }
     }
 }

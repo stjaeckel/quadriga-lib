@@ -370,8 +370,21 @@ namespace
         // |E|^2 Re(z c) for TE and to |E|^2 Re(conj(z) c) for TM, with z = sqrt(eps/mu). The energy
         // crossing the boundary is therefore Re(z2 c2)/Re(z1 c1) |t_TE|^2 in one channel and
         // Re(conj(z2) c2)/Re(conj(z1) c1) |t_TM|^2 in the other, and the two obliquity factors are
-        // not the same once z2 is complex. The incidence angle here is always real, so both
-        // denominators reduce to Re(z1)*abs_cos_theta and only the numerators differ.
+        // not the same once z2 is complex.
+        //
+        // Both cosines are complex here. For a real ct1 the two denominators coincide at
+        // Re(z1)*ct1, since Re(conj(z1) ct1) = Re(z1 ct1) = Re(z1)*ct1, so an interface evaluated
+        // from a real incidence angle is unchanged by the general form. They separate when the
+        // incidence side is itself a lossy medium entered at an angle, which is the case at the far
+        // face of a traced solid: there the propagation cosine recovered from the traced direction
+        // is complex, and the incidence-side flux the transmitted port is measured against is
+        // Re(z1 ct1) per channel rather than Re(z1)*|ct1|.
+        //
+        // Writing it this way is what makes a chain of crossings telescope. Two consecutive
+        // crossings that share a medium contribute Re(z2 c2)/Re(z1 c1) and Re(z3 c3)/Re(z2 c2); the
+        // shared flux cancels as a ratio of one and the same real number, leaving
+        // Re(z3 c3)/Re(z1 c1), provided both crossings are evaluated at the same cosine in the
+        // shared medium.
         //
         // For a lossless incidence medium this makes the per-channel transmittance identically
         // 1 - R_X, at any angle and for any complex second medium, so an air-side crossing keeps the
@@ -385,19 +398,18 @@ namespace
         // The scalar branch uses the TE form: z is the acoustic admittance 1/(rho c) and the normal
         // intensity is |p|^2 Re(z c).
         static void flux_amp(const std::complex<double> &z1, const std::complex<double> &z2,
-                             double abs_cos_theta, const std::complex<double> &ct2,
+                             const std::complex<double> &ct1, const std::complex<double> &ct2,
                              double &s_te, double &s_tm)
         {
-            double den = std::real(z1) * abs_cos_theta; // incidence-side flux, both polarizations
-            if (!(den > 1.0e-300))                      // exact tangency: no incident flux to convert
-            {
-                s_te = 0.0, s_tm = 0.0;
-                return;
-            }
+            double den_te = std::real(z1 * ct1); // incidence-side normal flux, per channel
+            double den_tm = std::real(std::conj(z1) * ct1);
             double n_te = std::real(z2 * ct2);
             double n_tm = std::real(std::conj(z2) * ct2);
-            s_te = std::sqrt((n_te > 0.0) ? n_te / den : 0.0);
-            s_tm = std::sqrt((n_tm > 0.0) ? n_tm / den : 0.0);
+
+            // A non-positive denominator is exact tangency or a non-propagating incidence-side
+            // wave: there is no incident flux to convert and the port closes.
+            s_te = (den_te > 1.0e-300 && n_te > 0.0) ? std::sqrt(n_te / den_te) : 0.0;
+            s_tm = (den_tm > 1.0e-300 && n_tm > 0.0) ? std::sqrt(n_tm / den_tm) : 0.0;
         }
 
         // Medium-medium interaction
@@ -411,9 +423,16 @@ namespace
         // undeviated and refracting types therefore report the same energy for the same interface,
         // which is what they owe once the outgoing ray tube carries no power of its own. Reflection
         // stays in one medium, where the obliquity factor is identically 1, and is unchanged.
+        //
+        // Incidence cosine. `theta` is a real angle and is what a face hit supplies. An interface
+        // met from inside a traced medium has no real incidence angle to offer: the medium's
+        // propagation cosine is complex there, and the tracer's direction carries only its real
+        // projection. Such a caller passes the recovered value through cos_theta_in and `theta` is
+        // then unused. Everything below is written in that cosine and is analytic in it, so the two
+        // paths are one expression and a real cos_theta_in reproduces the angle path exactly.
         double interact_with(const Material &other,                         // Material that the path enters into / reflects of
                              int interaction_type,                          // 0 = EM reflect, 1 = EM transmit, 2 = EM refract, 3 = scalar reflect, 4 = scalar transmit, 5 = scalar refract
-                             double theta,                                  // Incidence angle
+                             double theta,                                  // Incidence angle (ignored when cos_theta_in is given)
                              double fGHz,                                   // Frequency
                              std::complex<double> *cTE = nullptr,           // Out: E-field coefficient, R for reflection (0/3), T for transmission/refraction (1/2/4)
                              std::complex<double> *cTM = nullptr,           // Out: M-field coefficient
@@ -421,12 +440,32 @@ namespace
                              std::complex<double> *eta1_div_eta2 = nullptr, // Out: eta1/eta2
                              double *Snell_ratio = nullptr,                 // Out: sqrt|eta1*mu1 / eta2*mu2| (Snell ratio, type-2 direction)
                              bool *total_reflection = nullptr,              // Out: Total reflection indicator
-                             bool force_tir = false) const                  // Switch to force total internal reflection
+                             bool force_tir = false,                        // Switch to force total internal reflection
+                             const std::complex<double> *cos_theta_in = nullptr) const // Incidence cosine, complex; overrides theta
         {
-            // Interface geometry, shared by every interaction type
-            double abs_cos_theta = std::abs(std::cos(theta + 1.570796326794897)); // |OF . N| convention
-            abs_cos_theta = (abs_cos_theta > 1.0) ? 1.0 : abs_cos_theta;
-            double sin_theta = std::sqrt(1.0 - abs_cos_theta * abs_cos_theta);
+            // Interface geometry, shared by every interaction type.
+            //
+            // The real-angle path forms sin^2 as sqrt(1 - c^2) squared, which is not the same double
+            // as 1 - c^2, and keeps its own total-reflection test. Both are reproduced here rather
+            // than folded into the complex form: at a matched interface the difference is one ulp in
+            // ct2, which is enough to lift the reflectance off exactly zero and send a tf-forced
+            // reflection down the rescale branch instead of the flat one, flipping the sign of a
+            // coefficient whose power is unchanged. Nothing on the angle path may move.
+            std::complex<double> ct1, sin2_theta;
+            double sin_theta_real = -1.0; // >= 0 on the angle path only, and its TIR test
+            if (cos_theta_in)
+            {
+                ct1 = *cos_theta_in;
+                sin2_theta = 1.0 - ct1 * ct1;
+            }
+            else
+            {
+                double abs_cos_theta = std::abs(std::cos(theta + 1.570796326794897)); // |OF . N| convention
+                abs_cos_theta = (abs_cos_theta > 1.0) ? 1.0 : abs_cos_theta;
+                sin_theta_real = std::sqrt(1.0 - abs_cos_theta * abs_cos_theta);
+                ct1 = std::complex<double>(abs_cos_theta, 0.0);
+                sin2_theta = std::complex<double>(sin_theta_real * sin_theta_real, 0.0);
+            }
 
             std::complex<double> eta1 = eta(fGHz) + eta_resonance(fGHz); // incidence medium (this)
             std::complex<double> eta2 = other.eta(fGHz) + other.eta_resonance(fGHz);
@@ -435,14 +474,29 @@ namespace
 
             std::complex<double> eta1_d_eta2 = (eta1 * mu1) / (eta2 * mu2);
             double snell = std::sqrt(std::abs(eta1_d_eta2));
-            std::complex<double> ct2_arg = 1.0 - eta1_d_eta2 * sin_theta * sin_theta;
+
+            // Same value either way; written with the original association on the angle path so
+            // that path stays bit-identical. Reassociating it moved coefficients by up to 6e-14
+            // relative, which is above the 1e-12 the per-channel split is asserted to.
+            std::complex<double> ct2_arg = (sin_theta_real >= 0.0)
+                                               ? (1.0 - eta1_d_eta2 * sin_theta_real * sin_theta_real)
+                                               : (1.0 - eta1_d_eta2 * sin2_theta);
             if (std::imag(ct2_arg) == 0.0 && std::real(ct2_arg) < 0.0)
                 ct2_arg = std::complex<double>(std::real(ct2_arg), -0.0); // TIR branch cut: decaying evanescent wave
             std::complex<double> ct2 = std::sqrt(ct2_arg);
             std::complex<double> z1 = std::sqrt(eta1 / mu1); // admittances sqrt(eps/mu)
             std::complex<double> z2 = std::sqrt(eta2 / mu2);
 
-            bool tir = force_tir || snell * sin_theta >= 1.0;
+            // Total reflection, written in the transverse term the refraction root is built from.
+            // For a real angle this is snell * sin(theta) >= 1, unchanged. For a recovered complex
+            // cosine the same product is the transverse term carried in from the medium the wave
+            // entered through - Snell is transitive, so eta1_d_eta2 * sin2_theta equals
+            // (eta_entry mu_entry / eta2 mu2) sin^2(theta_entry) exactly - so the verdict is the one
+            // the outer pair of media gives, which is the only pair that can create or remove total
+            // reflection. The two forms are the same statement; they are written separately only so
+            // the angle path keeps its own rounding.
+            bool tir = force_tir || ((sin_theta_real >= 0.0) ? (snell * sin_theta_real >= 1.0)
+                                                            : (std::abs(eta1_d_eta2 * sin2_theta) >= 1.0));
 
             std::complex<double> coeff_TE, coeff_TM;
             double gain;
@@ -450,8 +504,8 @@ namespace
             if (interaction_type < 3) // EM: types 0 (reflection), 1 (transmission), 2 (refraction)
             {
                 // Fresnel reflection (TE/TM), ITU-R P.2040-1 eq. (31); under TIR the interface is a perfect mirror
-                std::complex<double> R_TE = (z1 * abs_cos_theta - z2 * ct2) / (z1 * abs_cos_theta + z2 * ct2);
-                std::complex<double> R_TM = (z2 * abs_cos_theta - z1 * ct2) / (z2 * abs_cos_theta + z1 * ct2);
+                std::complex<double> R_TE = (z1 * ct1 - z2 * ct2) / (z1 * ct1 + z2 * ct2);
+                std::complex<double> R_TM = (z2 * ct1 - z1 * ct2) / (z2 * ct1 + z1 * ct2);
                 double reflectance = tir ? 1.0 : 0.5 * (std::norm(R_TE) + std::norm(R_TM));
 
                 // reflectance is the TE/TM average, which is what the returned gain is defined to be
@@ -487,14 +541,14 @@ namespace
                     else
                     {
                         // Fresnel transmission, ITU-R P.2040-1 eq. (32)
-                        std::complex<double> T_TE = (2.0 * z1 * abs_cos_theta) / (z1 * abs_cos_theta + z2 * ct2);
-                        std::complex<double> T_TM = (2.0 * z1 * abs_cos_theta) / (z2 * abs_cos_theta + z1 * ct2);
+                        std::complex<double> T_TE = (2.0 * z1 * ct1) / (z1 * ct1 + z2 * ct2);
+                        std::complex<double> T_TM = (2.0 * z1 * ct1) / (z2 * ct1 + z1 * ct2);
 
                         // tf redistributes between the ports and is not per-channel, so it enters as
                         // one scale on top of the per-channel flux amplitudes. It is 1 at tf = 0.
                         double tf_scale = (reflectance < 1.0) ? (1.0 - R_eff) / (1.0 - reflectance) : 0.0;
                         double s_te = 0.0, s_tm = 0.0;
-                        flux_amp(z1, z2, abs_cos_theta, ct2, s_te, s_tm);
+                        flux_amp(z1, z2, ct1, ct2, s_te, s_tm);
                         double a = std::sqrt(tf_scale);
                         coeff_TE = T_TE * (s_te * a);
                         coeff_TM = T_TM * (s_tm * a);
@@ -504,7 +558,7 @@ namespace
             }
             else // Scalar (acoustic): types 3 (reflection), 4 (transmission), 5 (refraction)
             {
-                std::complex<double> R = (z1 * abs_cos_theta - z2 * ct2) / (z1 * abs_cos_theta + z2 * ct2);
+                std::complex<double> R = (z1 * ct1 - z2 * ct2) / (z1 * ct1 + z2 * ct2);
                 double reflectance = tir ? 1.0 : std::norm(R);
                 double R_eff = apply_tf_pair(other, reflectance, fGHz);
                 std::complex<double> T = 1.0 + R; // pressure transmission coefficient
@@ -523,7 +577,7 @@ namespace
                 {
                     double tf_scale = (reflectance < 1.0) ? (1.0 - R_eff) / (1.0 - reflectance) : 0.0;
                     double s_te = 0.0, s_tm = 0.0;
-                    flux_amp(z1, z2, abs_cos_theta, ct2, s_te, s_tm); // s_tm unused, one channel
+                    flux_amp(z1, z2, ct1, ct2, s_te, s_tm); // s_tm unused, one channel
                     coeff_TE = T * (s_te * std::sqrt(tf_scale));
                     gain = std::norm(coeff_TE);
                 }
@@ -1002,7 +1056,7 @@ namespace
                     cf_arg = std::complex<double>(std::real(cf_arg), -0.0); // decaying evanescent root
                 std::complex<double> c_far = std::sqrt(cf_arg);
 
-                Material::flux_amp(z_n, z_f, abs_cos_theta, c_far, fx_te, fx_tm);
+                Material::flux_amp(z_n, z_f, std::complex<double>(abs_cos_theta, 0.0), c_far, fx_te, fx_tm);
                 if (is_scalar)
                     fx_tm = fx_te;
             }
@@ -3231,108 +3285,6 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 p_path_dirN[ii + 2 * n_rayN] = (dtype)dir_prev[2];
         };
 
-        // VBS-corrected coefficients
-        std::complex<double> cTE(0.0, 0.0), cTM(0.0, 0.0);
-
-        // Replace the FBS-relative interface result ray_mesh_interact wrote with the VBS-equivalent at theta_t
-        // - interface coefficients (interface_gain folded inside interact_with), incoming basis from dir_in,
-        //   outgoing basis from the corrected continuation. In-medium magnitude/phase stay deferred to close_med.
-        // - geom: 0 = reflect at VBS, 2 = Snell refract at VBS (undeviated under TIR), 3 = exit (keep the traced origN->destN direction).
-        auto REPLACE_BY_VBS = [&](int Ma, int Mb, int itype, int geom) -> double
-        {
-            // A resolved path will not call SLAB_AIRY_FACTOR, so we don't need the coefficients.
-            if (resolved)
-                return dist_fbs_dest;
-
-            // Compute coefficients (cTE and cTM are required by SLAB_AIRY_FACTOR, so we always compute them)
-            // only cTE/cTM are needed past the fast return; the geometry outs are used only in the VBS branch
-            std::complex<double> cos_t2, e1de2;
-            double xprmat[8], pgain;
-            double snell = 1.0;
-            bool tir = false;
-            MAT(Ma).interact_with(MAT(Mb), itype, theta_t, fGHz, &cTE, &cTM, &cos_t2, &e1de2, &snell, &tir);
-            typeR[5] = tir; // TIR re-evaluated at the corrected VBS angle (overrides the geometric-angle verdict)
-
-            // Transition into buffer
-            if (!use_vbs && mtl_buffer && Mb == mtl_buffer && !SAME(mtl_buffer, M1))
-            {
-                qd_polbasis(dir_prev[0], dir_prev[1], dir_prev[2], dir_next[0], dir_next[1], dir_next[2],
-                            N[0], N[1], N[2], 1.0, cTE, cTM, is_scalar, xprmat, pgain);
-                if (p_xprmatN)
-                    for (size_t iX = 0; iX < nXPR; ++iX)
-                        p_xprmatN[ii * nXPR + iX] = (dtype)xprmat[iX];
-                if (p_gainN)
-                    p_gainN[ii] = (dtype)pgain;
-            }
-
-            if (!use_vbs) // Fast return
-                return dist_fbs_dest;
-
-            typeR[1] = true; // Set VBS correction flag
-
-            // Update the outgoing direction based on the VBS geometry (using the refracted incoming direction)
-            if (geom == 0) // Reflect at VBS
-                qd_reflect(dir_prev[0], dir_prev[1], dir_prev[2], N[0], N[1], N[2], dir_next[0], dir_next[1], dir_next[2]);
-            else if (geom == 2 && !tir) // Snell refract at VBS (undeviated under TIR)
-                qd_refract(dir_prev[0], dir_prev[1], dir_prev[2], N[0], N[1], N[2], snell, abs_cos_theta_t, cos_t2, dir_next[0], dir_next[1], dir_next[2]);
-
-            if (p_path_dirN && geom != 3) // write the corrected continuation; an exit keeps the traced direction
-                p_path_dirN[ii] = (dtype)dir_next[0],
-                p_path_dirN[ii + n_rayN] = (dtype)dir_next[1],
-                p_path_dirN[ii + 2 * n_rayN] = (dtype)dir_next[2];
-
-            qd_polbasis(dir_prev[0], dir_prev[1], dir_prev[2], dir_next[0], dir_next[1], dir_next[2],
-                        N[0], N[1], N[2], 1.0, cTE, cTM, is_scalar, xprmat, pgain);
-            if (p_xprmatN)
-                for (size_t iX = 0; iX < nXPR; ++iX)
-                    p_xprmatN[ii * nXPR + iX] = (dtype)xprmat[iX];
-            if (p_gainN)
-                p_gainN[ii] = (dtype)pgain;
-
-            // Return virtual vbs-dest distance using the VBS position as start
-            // The refracted angle at the VBS differs from the FBS angle, so the refracted path length
-            // in the entered medium differs as well.
-            double dist_VV; // Distance from VBS to virtual destination
-            if (VBS_INTERSECT(V, dir_next, D, N, &dist_VV))
-                return dist_VV;
-            return dist_fbs_dest; // Fallback
-        };
-
-        // Apply medium gain and phase
-        auto SCALE_BY_MEDIUM = [&](int m)
-        {
-            Material mtl = MAT(m);
-            double g = mtl.medium_gain(dist_refract, fGHz, abs_cos_theta_t, dist_geo, abs_cos_theta);
-            double n_re = std::real(std::sqrt(mtl.eta(fGHz) * mtl.mu(fGHz)));
-            double k0 = 2.0 * 3.14159265358979323846 * fGHz * 1e9 / 299792458.0;
-
-            // Walk-off (cos^2) only for the undeviated tracer, where it substitutes for the untraced
-            // lateral shift. Genuine refraction traced the bent path, so cos2 = 1. The free-space
-            // reference sits on the same thickness axis, so dist_geo carries the geometric-incidence cos^2.
-            bool walk_off = !use_vbs || refl_pass || resolved;
-            double cos2 = walk_off ? abs_cos_theta_t * abs_cos_theta_t : 1.0; // medium side, theta_t
-            double cos2_geo = walk_off ? abs_cos_theta * abs_cos_theta : 1.0; // free-space side, theta_i
-            double excess_phase = k0 * (n_re * dist_refract * cos2 - dist_geo * cos2_geo);
-
-            double amp = std::sqrt(g < 0.0 ? 0.0 : g);
-            SCALE_RAY(amp * std::cos(-excess_phase), amp * std::sin(-excess_phase));
-        };
-
-        // Obtain the material of the current medium by its exit face, flag a mismatch with mtl_current
-        auto GET_EXIT_MATERIAL = [&]() -> int
-        {
-            int mtl_exit = 0;
-            if (typeH == 1 || typeH == 5 || typeH == 13 || typeH == 21 || typeH == 29) // i-o or i-i
-                mtl_exit = M1;
-            else if (typeH == 7) // i-i with M2 (next, front) hit first
-                mtl_exit = M2;
-
-            if (mtl_exit && mtl_current != mtl_exit) // Current and exit mismatch
-                typeR[4] = true;                     // Set fix-flag
-
-            return mtl_exit;
-        };
-
         // Recover the exact complex in-slab cosine from the traced direction.
         //
         // A traced ray must have a real direction, so qd_refract normalizes a vector built from
@@ -3357,7 +3309,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
         // guess, which reaches machine precision.
         //
         // Returns 0 where the recovery does not apply, which the resolve reads as "use the projection".
-        auto EXACT_IN_SLAB_COSINE = [&]() -> std::complex<double>
+        auto EXACT_IN_SLAB_COSINE_SOLVE = [&]() -> std::complex<double>
         {
             const std::complex<double> none(0.0, 0.0);
 
@@ -3409,6 +3361,198 @@ void quadriga_lib::ray_state_update(int interaction_type,
             if (std::imag(arg) == 0.0 && std::real(arg) < 0.0)
                 arg = std::complex<double>(std::real(arg), -0.0); // decaying evanescent root
             return std::sqrt(arg);
+        };
+
+        // Three sites want the same value - the exit interface, the slab series and the traversal
+        // factor - and every gate above depends on the ray, not on the caller. mtl_current is the
+        // one thing that moves between them (APPLY_TRANSITION rewrites it before the interface
+        // call), so it is the memo key; a solve is one Newton triple and this keeps it at one per
+        // medium per ray.
+        int ct_slab_exact_for = -2; // -2 = nothing solved yet (0 is a valid medium: air)
+        std::complex<double> ct_slab_exact_val(0.0, 0.0);
+        auto EXACT_IN_SLAB_COSINE = [&]() -> std::complex<double>
+        {
+            if (ct_slab_exact_for != mtl_current)
+                ct_slab_exact_val = EXACT_IN_SLAB_COSINE_SOLVE(), ct_slab_exact_for = mtl_current;
+            return ct_slab_exact_val;
+        };
+
+        // VBS-corrected coefficients
+        std::complex<double> cTE(0.0, 0.0), cTM(0.0, 0.0);
+
+        // Replace the FBS-relative interface result ray_mesh_interact wrote with the VBS-equivalent at theta_t
+        // - interface coefficients (interface_gain folded inside interact_with), incoming basis from dir_in,
+        //   outgoing basis from the corrected continuation. In-medium magnitude/phase stay deferred to close_med.
+        // - geom: 0 = reflect at VBS, 2 = Snell refract at VBS (undeviated under TIR), 3 = exit (keep the traced origN->destN direction).
+        auto REPLACE_BY_VBS = [&](int Ma, int Mb, int itype, int geom) -> double
+        {
+            // A resolved path will not call SLAB_AIRY_FACTOR, so we don't need the coefficients.
+            if (resolved)
+                return dist_fbs_dest;
+
+            // Compute coefficients (cTE and cTM are required by SLAB_AIRY_FACTOR, so we always compute them)
+            // only cTE/cTM are needed past the fast return; the geometry outs are used only in the VBS branch
+            std::complex<double> cos_t2, e1de2;
+            double xprmat[8], pgain;
+            double snell = 1.0;
+            bool tir = false;
+
+            // This interface is met from INSIDE the current medium. Where the ray reached it by
+            // refracting through a parallel face, that medium's propagation cosine is complex and
+            // the traced direction carries only its real projection; the recovery inverts qd_refract
+            // and returns the value the entry boundary was evaluated at. Handing it over here is
+            // what makes the entry and exit obliquity factors cancel: both are then formed at the
+            // same cosine in the shared medium, so the pair telescopes to
+            // Re(z_far c_far)/Re(z_entry c_entry) - exactly 1 for a solid re-entering the medium it
+            // came from - instead of leaving the ratio of two different views of the same flux.
+            //
+            // The gates are the recovery's own, so where it declines the cosine is zero and the real
+            // angle is used exactly as before. Ma is mtl_current at both call sites; the test is
+            // there so the value can never be read as a cosine in some other medium.
+            //
+            // cos_t2 moves with it. Snell is transitive, so the exact cosine turns the refraction
+            // root into the cosine the OUTER pair of media gives, which is the one the continuation
+            // direction owes. Only geom 2 consumes it - an exit keeps the traced direction and a
+            // mirror does not use it at all.
+            std::complex<double> ct_in = (Ma == mtl_current) ? EXACT_IN_SLAB_COSINE()
+                                                             : std::complex<double>(0.0, 0.0);
+            bool use_exact_ct = std::abs(ct_in) > 0.0;
+
+            MAT(Ma).interact_with(MAT(Mb), itype, theta_t, fGHz, &cTE, &cTM, &cos_t2, &e1de2, &snell, &tir,
+                                  false, use_exact_ct ? &ct_in : nullptr);
+            typeR[5] = tir; // TIR re-evaluated at the corrected VBS angle (overrides the geometric-angle verdict)
+
+            // Transition into buffer
+            if (!use_vbs && mtl_buffer && Mb == mtl_buffer && !SAME(mtl_buffer, M1))
+            {
+                qd_polbasis(dir_prev[0], dir_prev[1], dir_prev[2], dir_next[0], dir_next[1], dir_next[2],
+                            N[0], N[1], N[2], 1.0, cTE, cTM, is_scalar, xprmat, pgain);
+                if (p_xprmatN)
+                    for (size_t iX = 0; iX < nXPR; ++iX)
+                        p_xprmatN[ii * nXPR + iX] = (dtype)xprmat[iX];
+                if (p_gainN)
+                    p_gainN[ii] = (dtype)pgain;
+            }
+
+            if (!use_vbs) // Fast return
+                return dist_fbs_dest;
+
+            typeR[1] = true; // Set VBS correction flag
+
+            // Update the outgoing direction based on the VBS geometry (using the refracted incoming direction)
+            if (geom == 0) // Reflect at VBS
+                qd_reflect(dir_prev[0], dir_prev[1], dir_prev[2], N[0], N[1], N[2], dir_next[0], dir_next[1], dir_next[2]);
+            else if (geom == 2 && !tir) // Snell refract at VBS (undeviated under TIR)
+                qd_refract(dir_prev[0], dir_prev[1], dir_prev[2], N[0], N[1], N[2], snell, abs_cos_theta_t, cos_t2, dir_next[0], dir_next[1], dir_next[2]);
+
+            if (p_path_dirN && geom != 3) // write the corrected continuation; an exit keeps the traced direction
+                p_path_dirN[ii] = (dtype)dir_next[0],
+                p_path_dirN[ii + n_rayN] = (dtype)dir_next[1],
+                p_path_dirN[ii + 2 * n_rayN] = (dtype)dir_next[2];
+
+            qd_polbasis(dir_prev[0], dir_prev[1], dir_prev[2], dir_next[0], dir_next[1], dir_next[2],
+                        N[0], N[1], N[2], 1.0, cTE, cTM, is_scalar, xprmat, pgain);
+            if (p_xprmatN)
+                for (size_t iX = 0; iX < nXPR; ++iX)
+                    p_xprmatN[ii * nXPR + iX] = (dtype)xprmat[iX];
+            if (p_gainN)
+                p_gainN[ii] = (dtype)pgain;
+
+            // Return virtual vbs-dest distance using the VBS position as start
+            // The refracted angle at the VBS differs from the FBS angle, so the refracted path length
+            // in the entered medium differs as well.
+            double dist_VV; // Distance from VBS to virtual destination
+            if (VBS_INTERSECT(V, dir_next, D, N, &dist_VV))
+                return dist_VV;
+            return dist_fbs_dest; // Fallback
+        };
+
+        // Apply medium gain and phase
+        auto SCALE_BY_MEDIUM = [&](int m)
+        {
+            Material mtl = MAT(m);
+            double n_re = std::real(std::sqrt(mtl.eta(fGHz) * mtl.mu(fGHz)));
+            double k0 = 2.0 * 3.14159265358979323846 * fGHz * 1e9 / 299792458.0;
+
+            // Walk-off (cos^2) only for the undeviated tracer, where it substitutes for the untraced
+            // lateral shift. Genuine refraction traced the bent path, so cos2 = 1. The free-space
+            // reference sits on the same thickness axis, so dist_geo carries the geometric-incidence cos^2.
+            bool walk_off = !use_vbs || refl_pass || resolved;
+
+            // Exact in-medium propagation, wherever the recovered cosine exists.
+            //
+            // medium_gain takes the ITU-R P.2040 loss rate along the PATH, which is the decay of a
+            // homogeneous plane wave. The wave inside a traced solid is not homogeneous: entered
+            // from a lossless medium its transverse wavenumber is real, so the whole decay sits on
+            // the normal component and is exp(k0 Im(n cs) d) over the NORMAL thickness, independent
+            // of how long the ray is. The two agree only at normal incidence, which is where the
+            // 2.5e-5 dB figure for the hybrid form was taken; at 85 deg through 100 mm of
+            // eps 1.50 - 0.40j the same substitution is worth 0.040 dB, and it is the entire
+            // residual left between a traced solid and the analytic slab once the interfaces are
+            // right.
+            //
+            // Written as one factor, exp(-j k0 (n cs d + q s)), with d the normal thickness and s
+            // the transverse displacement the tracer walked. q is the transverse wavenumber the
+            // medium carries, q^2 = n^2 (1 - cs^2), which Snell conserves from the entry medium. For
+            // a real index the two terms recombine into n * dist_refract exactly, so this reduces to
+            // the form below rather than replacing it. The normal thickness is pure geometry - the
+            // traced path times the traced cosine - and only the phase and loss across it use the
+            // recovered angle; qd_slab_resolve splits it the same way.
+            //
+            // The conductivity lives inside n, so only the alpha column is drawn from the material.
+            // Mass-law materials are excluded: their eta is calibrated for surface impedance, the
+            // in-medium index is not physical, and the mass term is not a per-meter loss at all.
+            // Where the tracer did not trace the bend the ledger is not on a refracted path and
+            // there is nothing to be exact about, so the walk-off branch keeps the form it had.
+            std::complex<double> cs = (!walk_off && m == mtl_current && !(mtl.m > 0.0))
+                                          ? EXACT_IN_SLAB_COSINE()
+                                          : std::complex<double>(0.0, 0.0);
+
+            if (std::abs(cs) > 0.0)
+            {
+                std::complex<double> n_cx = std::sqrt(mtl.eta(fGHz) * mtl.mu(fGHz)); // resonance-excluded
+                double d_norm = dist_refract * abs_cos_theta_t;                      // normal thickness
+                double sin_t = 1.0 - abs_cos_theta_t * abs_cos_theta_t;
+                double s_lat = dist_refract * std::sqrt((sin_t > 0.0) ? sin_t : 0.0); // transverse walk
+
+                std::complex<double> q_arg = n_cx * n_cx * (1.0 - cs * cs);
+                if (std::imag(q_arg) == 0.0 && std::real(q_arg) < 0.0)
+                    q_arg = std::complex<double>(std::real(q_arg), -0.0); // decaying evanescent root
+                std::complex<double> q = std::sqrt(q_arg);
+
+                double ex = mtl.excess_gain(dist_refract, fGHz); // alpha only, no conductivity
+                std::complex<double> P =
+                    std::exp(std::complex<double>(0.0, -1.0) * k0 * (n_cx * cs * d_norm + q * s_lat)) *
+                    std::sqrt((ex < 0.0) ? 0.0 : ex);
+
+                // Free-space reference over the geometric length, as below
+                P *= std::exp(std::complex<double>(0.0, 1.0) * k0 * dist_geo);
+                SCALE_RAY(std::real(P), std::imag(P));
+                return;
+            }
+
+            double g = mtl.medium_gain(dist_refract, fGHz, abs_cos_theta_t, dist_geo, abs_cos_theta);
+            double cos2 = walk_off ? abs_cos_theta_t * abs_cos_theta_t : 1.0; // medium side, theta_t
+            double cos2_geo = walk_off ? abs_cos_theta * abs_cos_theta : 1.0; // free-space side, theta_i
+            double excess_phase = k0 * (n_re * dist_refract * cos2 - dist_geo * cos2_geo);
+
+            double amp = std::sqrt(g < 0.0 ? 0.0 : g);
+            SCALE_RAY(amp * std::cos(-excess_phase), amp * std::sin(-excess_phase));
+        };
+
+        // Obtain the material of the current medium by its exit face, flag a mismatch with mtl_current
+        auto GET_EXIT_MATERIAL = [&]() -> int
+        {
+            int mtl_exit = 0;
+            if (typeH == 1 || typeH == 5 || typeH == 13 || typeH == 21 || typeH == 29) // i-o or i-i
+                mtl_exit = M1;
+            else if (typeH == 7) // i-i with M2 (next, front) hit first
+                mtl_exit = M2;
+
+            if (mtl_exit && mtl_current != mtl_exit) // Current and exit mismatch
+                typeR[4] = true;                     // Set fix-flag
+
+            return mtl_exit;
         };
 
         // Analytic thin-slab (Fabry-Perot) resolution, applied to the current medium.
