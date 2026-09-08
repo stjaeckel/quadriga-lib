@@ -50,7 +50,7 @@
 // Diagnostic output for the thin-sheet / slab work. Uncomment to print the tables. The
 // assertions in the diagnostic cases run either way and only check sanity, so leaving this
 // commented costs nothing but the printing.
-// #define QD_TEST_VERBOSE
+#define QD_TEST_VERBOSE
 
 #ifdef QD_TEST_VERBOSE
 #include <cstdio>
@@ -2407,6 +2407,33 @@ static inline std::complex<double> diag_r_slabside(std::complex<double> eps_s, s
     return (z1 * cos_slab - z2 * c2) / (z1 * cos_slab + z2 * c2);
 }
 
+// Exact analytic slab, TE/TM averaged power, air | slab | air. Independent of every library
+// internal; the same closed form the ray_mesh_interact suite uses as its oracle.
+static inline double diag_slab_p_avg(std::complex<double> eps_s, double thk,
+                                     double theta_n_rad, double f_hz)
+{
+    const double k0 = 2.0 * QPI * f_hz / C0;
+    const std::complex<double> z1(1.0, 0.0), z2 = std::sqrt(eps_s), n = std::sqrt(eps_s);
+    const double c1 = std::cos(theta_n_rad), s1 = std::sin(theta_n_rad);
+    const std::complex<double> c2 = std::sqrt(1.0 - (1.0 / eps_s) * s1 * s1);
+    const std::complex<double> phi = std::exp(std::complex<double>(0.0, -1.0) * k0 * n * thk * c2);
+    double p[2] = {0.0, 0.0};
+    for (int pol = 0; pol < 2; ++pol)
+    {
+        std::complex<double> r, t12, t21;
+        if (pol == 0)
+            r = (z1 * c1 - z2 * c2) / (z1 * c1 + z2 * c2),
+            t12 = (2.0 * z1 * c1) / (z1 * c1 + z2 * c2),
+            t21 = (2.0 * z2 * c2) / (z2 * c2 + z1 * c1);
+        else
+            r = (z2 * c1 - z1 * c2) / (z2 * c1 + z1 * c2),
+            t12 = (2.0 * z1 * c1) / (z2 * c1 + z1 * c2),
+            t21 = (2.0 * z2 * c2) / (z1 * c2 + z2 * c1);
+        p[pol] = std::norm(t12 * t21 * phi / (1.0 - r * r * phi * phi));
+    }
+    return 0.5 * (p[0] + p[1]);
+}
+
 TEST_CASE("Diagnostic - Slab factor per polarization")
 {
     // The traced solid's TE/TM ratio, and the acceptance test for removing the Tsp * corr pair from
@@ -2795,5 +2822,57 @@ TEST_CASE("Diagnostic - Excess-phase walk-off convention")
 
         CHECK(std::isfinite(C.gain(0)));
         CHECK(C.gain(0) >= 0.0);
+    }
+}
+
+TEST_CASE("Thin sheet - the redo sits on the analytic slab at grazing incidence")
+{
+    // ray_state_update re-resolves every sheet crossing when medium tracking is on, so in any run
+    // with state this function's composite is the one that reaches the output and whatever
+    // ray_mesh_interact computed is discarded. It also has no mesh: the fixture supplies none, and
+    // the function has no way to learn anything about the face.
+    //
+    // That is why the grazing clamp here was a fixed extent-to-thickness ratio rather than a
+    // geometry, and why it froze the interface past 89.943 deg for every sheet at every thickness.
+    // With it gone the composite is the analytic slab all the way to tangency.
+    //
+    // The sheet is isolated in air, so mtl_current is 0: no host leg is closed and no medium factor
+    // is applied, and the gain the function writes is the composite by itself. It is written, not
+    // scaled - SHEET_RESOLVE rebuilds xprmat from cTE/cTM with unit amplitude - so the incoming
+    // probe field sets the polarization basis and not the level.
+    const double f_hz = FRQ;
+    const double thk = 0.006;
+    auto mtl = diag_palette<double>();
+    const int SHEET = 3;               // eps 5.24 - 0.63j, thk 6 mm
+    const uint8_t OT_SHEET_FRONT = 67; // isolated sheet, front-side hit
+    const std::complex<double> eps_s = diag_eps(SHEET, f_hz);
+
+    auto dB = [](double p)
+    { return (p > 0.0) ? 10.0 * std::log10(p) : -std::numeric_limits<double>::infinity(); };
+
+    QD_DIAG("\n# diag: sheet redo at grazing incidence, thk 6 mm, eps 5.24 - 0.63j\n");
+    QD_DIAG("# the old placeholder clamped past 89.94270 deg; there is no clamp now\n");
+    QD_DIAG("angle,gain_out,gain_dB,ana_dB,d_dB,rtype\n");
+
+    for (double thd : {80.0, 85.0, 88.0, 89.5, 89.9, 89.94, 89.96, 89.99, 89.999})
+    {
+        double theta_n = thd * QPI / 180.0;
+        auto C = make1<double>(mtl, /*EM transmission*/ 1, OT_SHEET_FRONT, 1u,
+                               /*M1 = the sheet face*/ SHEET, /*M2*/ 0,
+                               /*prev*/ 0, /*cur = air*/ 0, /*buf*/ 0,
+                               /*d_orig_fbs*/ 1.0, /*d_fbs_dest*/ 0.5, /*d_fbs_sbs*/ 0.5,
+                               QPI / 2.0 - theta_n, /*always resolve*/ 0.0);
+        C.run();
+
+        double g = (double)C.gain(0);
+        double ana = diag_slab_p_avg(eps_s, thk, theta_n, f_hz);
+
+        QD_DIAG("%.4f,%.9e,%.6f,%.6f,%.6f,%u\n",
+                thd, g, dB(g), dB(ana), dB(g) - dB(ana), (unsigned)C.resolved_type[0]);
+
+        INFO("angle " << thd);
+        REQUIRE(std::isfinite(g));
+        CHECK(g >= 0.0);
+        CHECK(std::abs(dB(g) - dB(ana)) < 1.0e-6);
     }
 }

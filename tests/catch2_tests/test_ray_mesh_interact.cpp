@@ -113,6 +113,25 @@ static inline arma::mat qd_quad_x(double half, double x0)
     return m;
 }
 
+// The same square as qd_quad_x, meshed as 2 * n^2 triangles instead of 2. Same plane, same normal
+// orientation, same material - only the triangulation differs. Every cell is split on the same
+// diagonal as the parent quad, so the winding and therefore the normal direction are unchanged.
+static inline arma::mat qd_quad_x_sub(double half, double x0, int n)
+{
+    arma::mat m((arma::uword)(2 * n * n), 9);
+    double step = 2.0 * half / (double)n;
+    arma::uword row = 0;
+    for (int iy = 0; iy < n; ++iy)
+        for (int iz = 0; iz < n; ++iz)
+        {
+            double y0 = -half + step * (double)iy, y1 = y0 + step;
+            double z0 = -half + step * (double)iz, z1 = z0 + step;
+            m.row(row++) = arma::rowvec{x0, y0, z0, x0, y0, z1, x0, y1, z0};
+            m.row(row++) = arma::rowvec{x0, y1, z0, x0, y0, z1, x0, y1, z1};
+        }
+    return m;
+}
+
 // TX at (-1, 0, 0), RX placed so the ray crosses the plane x = 0 at the given angle from the
 // face normal. The crossing point moves with the angle, which is what keeps it off the shared
 // triangulation edge at normal incidence.
@@ -2219,53 +2238,41 @@ TEST_CASE("Diagnostic - In-slab cosine projection, two ways")
     }
 }
 
-TEST_CASE("Diagnostic - Grazing clamp engagement versus face extent")
+// Shared fixture for the grazing cases below: one 6 mm lossy sheet, one ray per angle, either
+// port. The reach shrinks with the angle so the crossing stays on the face at every angle instead
+// of walking off a small one and reporting -inf for a geometric reason.
+struct QdSheetFace
 {
-    // ray_mesh_interact bounds the lateral walk-off inside a notional slab by the longest FBS
-    // triangle edge. ray_state_update cannot see that edge and substitutes a fixed
-    // extent-to-thickness ratio, so the two disagree once the clamp engages. This sweep runs the
-    // same sheet on a large face and a small one; the angle at which the two columns part is
-    // where the clamp starts to act, and the analytic column says which of them is still right.
-    const double f_hz = 1.0e9;
-    const double thk = 0.006;
-    const std::complex<double> eps_s(5.24, -0.63);
+    double f_hz = 1.0e9;
+    double thk = 0.006;
 
-    std::unordered_map<std::string, std::vector<double>> mtl;
-    mtl["a"] = {5.24};
-    mtl["b"] = {0.0};
-    mtl["c"] = {0.63 / 17.98};
-    mtl["d"] = {0.0};
-    mtl["att"] = {0.0};
-    mtl["attB"] = {0.0};
-    mtl["alpha"] = {0.0};
-    mtl["alphaB"] = {0.0};
-    mtl["fRef"] = {1.0};
-    mtl["thk"] = {thk};
-
-    // Clamp threshold: ray_mesh_interact caps the in-slab cosine at thk / sqrt(thk^2 + ext^2),
-    // where ext is the longest FBS triangle edge. For the small face that is a specific angle, and
-    // the table should show the small-face column departing only past it.
-    double ext_small = std::sqrt(2.0) * 2.0 * 0.02;
-    double cos_min_small = thk / std::sqrt(thk * thk + ext_small * ext_small);
-    QD_DIAG("\n# diag: grazing clamp, sheet thk 6 mm on a large and a small face\n");
-    QD_DIAG("# small face longest edge %.4f m -> clamp engages past %.2f deg\n",
-            ext_small, std::acos(cos_min_small) * 180.0 / arma::datum::pi);
-    QD_DIAG("angle,large_face_dB,small_face_dB,ana_dB,large-ana,small-ana\n");
-
-    auto run_face = [&](double half, double thd) -> double
+    std::unordered_map<std::string, std::vector<double>> mtl() const
     {
-        arma::mat mesh = qd_quad_x(half, 0.0);
-        arma::uvec mtl_ind(2, arma::fill::value(1));
-        arma::mat orig, dest;
-        // Keep the crossing on the face at every angle. The crossing sits at y0 + reach * tan(theta),
-        // so the reach has to shrink with the angle or the ray walks off a small face and the row
-        // reads -inf for a geometric reason rather than a physical one. y0 is offset from the centre
-        // because the shared triangulation edge crosses z = 0 at y = 0.
+        std::unordered_map<std::string, std::vector<double>> m;
+        m["a"] = {5.24};
+        m["b"] = {0.0};
+        m["c"] = {0.63 / 17.98};
+        m["d"] = {0.0};
+        m["att"] = {0.0};
+        m["attB"] = {0.0};
+        m["alpha"] = {0.0};
+        m["alphaB"] = {0.0};
+        m["fRef"] = {1.0};
+        m["thk"] = {thk};
+        return m;
+    }
+
+    double run(arma::mat &mesh, double half, double thd, int type) const
+    {
+        arma::uvec mtl_ind(mesh.n_rows, arma::fill::value(1));
+        auto mp = mtl();
+
         double t = std::tan(thd * arma::datum::pi / 180.0);
         double y0 = 0.3 * half;
         double reach = (t > 1.0e-6) ? 0.4 * half / t : half;
-        orig = arma::mat{{-reach, y0, 0.0}};
-        dest = arma::mat{{reach, y0 + 2.0 * reach * t, 0.0}};
+        arma::mat orig = arma::mat{{-reach, y0, 0.0}};
+        arma::mat dest = arma::mat{{reach, y0 + 2.0 * reach * t, 0.0}};
+
         arma::mat fbs, sbs;
         arma::u32_vec fbs_ind, sbs_ind;
         quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
@@ -2274,24 +2281,203 @@ TEST_CASE("Diagnostic - Grazing clamp engagement versus face extent")
 
         arma::mat origN, destN, xprmatN;
         arma::vec gainN;
-        quadriga_lib::ray_mesh_interact(1, f_hz, &orig, &dest, &mesh, &mtl_ind, &mtl,
+        quadriga_lib::ray_mesh_interact(type, f_hz, &orig, &dest, &mesh, &mtl_ind, &mp,
                                         &fbs_ind, &sbs_ind, (arma::mat *)nullptr, (arma::mat *)nullptr,
                                         &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr,
                                         &gainN, &xprmatN, (arma::mat *)nullptr, (arma::mat *)nullptr);
         return gainN(0);
-    };
+    }
+};
+
+// Composite slab reflectance, TE/TM averaged, air | slab | air. The stack is symmetric, so the
+// internal reflection is the same at both faces and R = r (1 - phi^2) / (1 - r^2 phi^2).
+static inline double qd_slab_ref_R(std::complex<double> eps_s, double thk,
+                                   double theta_n_rad, double f_hz)
+{
+    const double k0 = 2.0 * arma::datum::pi * f_hz / 299792458.0;
+    const std::complex<double> z1(1.0, 0.0), z2 = std::sqrt(eps_s), n = std::sqrt(eps_s);
+    const double c1 = std::cos(theta_n_rad), s1 = std::sin(theta_n_rad);
+    const std::complex<double> c2 = std::sqrt(1.0 - (1.0 / eps_s) * s1 * s1);
+    const std::complex<double> phi = std::exp(std::complex<double>(0.0, -1.0) * k0 * n * thk * c2);
+    const std::complex<double> e = phi * phi;
+    const std::complex<double> r_te = (z1 * c1 - z2 * c2) / (z1 * c1 + z2 * c2);
+    const std::complex<double> r_tm = (z2 * c1 - z1 * c2) / (z2 * c1 + z1 * c2);
+    const std::complex<double> R_te = r_te * (1.0 - e) / (1.0 - r_te * r_te * e);
+    const std::complex<double> R_tm = r_tm * (1.0 - e) / (1.0 - r_tm * r_tm * e);
+    return 0.5 * (std::norm(R_te) + std::norm(R_tm));
+}
+
+TEST_CASE("Thin sheet - grazing incidence does not depend on the face")
+{
+    // A thin sheet is a laterally infinite layer, so the triangle it was cut from does not enter the
+    // composite and the composite is the analytic slab at every angle up to tangency. This replaces
+    // the clamp-threshold case: the grazing clamp used to floor the incidence cosine at
+    // thk / sqrt(thk^2 + ext^2), which froze the whole interface at the onset angle. On the 57 mm
+    // face below that meant a constant -3.315 dB of transmission from 83.95 deg onward, 28.8 dB
+    // above the slab at 89.9 deg, with the reflected port held at 0.473 where the slab reflects
+    // 0.997.
+    //
+    // Both ports are checked. Grazing incidence turns a pane into a mirror, so the reflected port is
+    // where the freeze did the most damage in absolute energy, and it is held to the same bound as
+    // the transmitted one.
+    const QdSheetFace F;
+    const std::complex<double> eps_s(5.24, -0.63);
 
     auto dB = [](double p)
     { return (p > 0.0) ? 10.0 * std::log10(p) : -std::numeric_limits<double>::infinity(); };
 
-    for (double thd : {60.0, 80.0, 85.0, 88.0, 89.0, 89.5, 89.9})
+    QD_DIAG("\n# diag: thin sheet at grazing incidence, large face versus small face, thk 6 mm\n");
+    QD_DIAG("# large face longest edge 565.7 m, small face 0.0566 m; the old clamp engaged past\n");
+    QD_DIAG("# 89.9994 deg and 83.95 deg respectively\n");
+    QD_DIAG("angle,T_large_dB,T_small_dB,T_ana_dB,R_large_dB,R_small_dB,R_ana_dB,sum_large,sum_ana\n");
+
+    for (double thd : {60.0, 80.0, 85.0, 88.0, 89.0, 89.5, 89.9, 89.99, 89.999})
     {
-        double gL = run_face(200.0, thd);   // longest edge ~ 566 m, clamp far away
-        double gS = run_face(0.02, thd);    // longest edge ~ 57 mm, clamp reachable
-        QdSlabRef R = qd_slab_ref(eps_s, thk, thd * arma::datum::pi / 180.0, f_hz);
-        QD_DIAG("%.2f,%.6f,%.6f,%.6f,%.6f,%.6f\n", thd, dB(gL), dB(gS), dB(R.p_avg),
-                dB(gL) - dB(R.p_avg), dB(gS) - dB(R.p_avg));
-        CHECK((std::isnan(gL) || (gL >= 0.0 && gL <= 1.0)));
-        CHECK((std::isnan(gS) || (gS >= 0.0 && gS <= 1.0)));
+        arma::mat big = qd_quad_x(200.0, 0.0), small = qd_quad_x(0.02, 0.0);
+        double Tl = F.run(big, 200.0, thd, 1), Ts = F.run(small, 0.02, thd, 1);
+        double Rl = F.run(big, 200.0, thd, 0), Rs = F.run(small, 0.02, thd, 0);
+
+        double th = thd * arma::datum::pi / 180.0;
+        QdSlabRef A = qd_slab_ref(eps_s, F.thk, th, F.f_hz);
+        double Ra = qd_slab_ref_R(eps_s, F.thk, th, F.f_hz);
+
+        QD_DIAG("%.3f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f\n",
+                thd, dB(Tl), dB(Ts), dB(A.p_avg), dB(Rl), dB(Rs), dB(Ra), Tl + Rl, A.p_avg + Ra);
+
+        INFO("angle " << thd);
+        REQUIRE(std::isfinite(Tl));
+        REQUIRE(std::isfinite(Ts));
+        REQUIRE(std::isfinite(Rl));
+        REQUIRE(std::isfinite(Rs));
+
+        // Both faces sit on the analytic slab, in both ports, at every angle.
+        CHECK(std::abs(dB(Tl) - dB(A.p_avg)) < 1.0e-6);
+        CHECK(std::abs(dB(Ts) - dB(A.p_avg)) < 1.0e-6);
+        CHECK(std::abs(dB(Rl) - dB(Ra)) < 1.0e-6);
+        CHECK(std::abs(dB(Rs) - dB(Ra)) < 1.0e-6);
+
+        // And they agree with each other to rounding, which is the property the pipeline needs:
+        // ray_state_update re-resolves every sheet crossing and never sees the face at all.
+        CHECK(std::abs(Tl - Ts) <= 1.0e-9 * std::max(Tl, 1.0e-300));
+        CHECK(std::abs(Rl - Rs) <= 1.0e-9 * std::max(Rl, 1.0e-300));
+    }
+}
+
+TEST_CASE("Thin sheet - mesh subdivision invariance")
+{
+    // The same plane, the same rays, the same material, meshed two ways: as two triangles and as
+    // 2 * 65^2. No coefficient may notice. The grazing clamp did notice, because it read the longest
+    // edge of the hit triangle: the coarse mesh clamped past 89.9994 deg and the fine mesh past
+    // 89.96 deg, so at 89.99 deg the same wall answered 20 dB apart depending on mesh density.
+    //
+    // 65 cells per side is odd, which puts z = 0 inside a row rather than on a shared edge, and the
+    // crossing at y = 140 is not a cell boundary either. The physics does not care - every
+    // sub-triangle is coplanar, identically oriented and carries the same material - but a hit
+    // landing exactly on a shared edge would make the comparison depend on which of two triangles
+    // the intersector happened to return.
+    const QdSheetFace F;
+    const std::complex<double> eps_s(5.24, -0.63);
+    const double half = 200.0;
+    const int n_sub = 65;
+
+    arma::mat coarse = qd_quad_x(half, 0.0);
+    arma::mat fine = qd_quad_x_sub(half, 0.0, n_sub);
+    REQUIRE(fine.n_rows == (arma::uword)(2 * n_sub * n_sub));
+
+    auto dB = [](double p)
+    { return (p > 0.0) ? 10.0 * std::log10(p) : -std::numeric_limits<double>::infinity(); };
+
+    QD_DIAG("\n# diag: subdivision invariance, 400 m face as 2 triangles and as 2 * 65^2\n");
+    QD_DIAG("# coarse longest edge 565.7 m, fine 8.70 m\n");
+    QD_DIAG("angle,T_coarse_dB,T_fine_dB,T_ana_dB,R_coarse_dB,R_fine_dB,R_ana_dB,rel_T,rel_R\n");
+
+    for (double thd : {60.0, 80.0, 88.0, 89.9, 89.99, 89.999})
+    {
+        double Tc = F.run(coarse, half, thd, 1), Tf = F.run(fine, half, thd, 1);
+        double Rc = F.run(coarse, half, thd, 0), Rf = F.run(fine, half, thd, 0);
+
+        double th = thd * arma::datum::pi / 180.0;
+        QdSlabRef A = qd_slab_ref(eps_s, F.thk, th, F.f_hz);
+        double Ra = qd_slab_ref_R(eps_s, F.thk, th, F.f_hz);
+
+        double rel_T = std::abs(Tc - Tf) / std::max(Tc, 1.0e-300);
+        double rel_R = std::abs(Rc - Rf) / std::max(Rc, 1.0e-300);
+
+        QD_DIAG("%.3f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.3e,%.3e\n",
+                thd, dB(Tc), dB(Tf), dB(A.p_avg), dB(Rc), dB(Rf), dB(Ra), rel_T, rel_R);
+
+        INFO("angle " << thd);
+        REQUIRE(std::isfinite(Tc));
+        REQUIRE(std::isfinite(Tf));
+        REQUIRE(std::isfinite(Rc));
+        REQUIRE(std::isfinite(Rf));
+
+        CHECK(rel_T < 1.0e-9);
+        CHECK(rel_R < 1.0e-9);
+        CHECK(std::abs(dB(Tf) - dB(A.p_avg)) < 1.0e-6);
+        CHECK(std::abs(dB(Rf) - dB(Ra)) < 1.0e-6);
+    }
+}
+
+TEST_CASE("Diagnostic - Derived lengths and the tangency limit")
+{
+    // What the clamp was said to be guarding against, printed unclamped.
+    //
+    // The transfer function is written in the normal thickness and the complex in-slab cosine. The
+    // normal thickness is thk by construction and the in-slab cosine is bounded from below by the
+    // internal critical angle - 0.9011 for eps 5.24 - so neither moves at grazing incidence. The
+    // geometric path thk / cos does grow without bound, but it reaches a result only as the mass-law
+    // term dist_geo * cos^2 = thk * cos, which shrinks instead. qd_slab_resolve now forms that term
+    // as a product and never builds the quotient.
+    //
+    // The one genuine path length left is thk / cos_slab, read by the alpha column and by the
+    // mass-law conductivity term. Both are dB-linear in it, so it saturates and is capped by loss
+    // rather than by angle.
+    const QdSheetFace F;
+    const std::complex<double> eps_s(5.24, -0.63);
+
+    auto dB = [](double p)
+    { return (p > 0.0) ? 10.0 * std::log10(p) : -std::numeric_limits<double>::infinity(); };
+
+    QD_DIAG("\n# diag: derived lengths, sheet thk 6 mm, eps 5.24 - 0.63j\n");
+    QD_DIAG("angle,ct_geo,ct_slab,thk_over_ct_slab_m,thk_normal_m,thk_over_ct_geo_m,mass_path_m\n");
+    for (double thd : {80.0, 89.0, 89.9, 89.99, 89.999, 89.9999})
+    {
+        double th = thd * arma::datum::pi / 180.0;
+        double ct_geo = std::cos(th), s1 = std::sin(th);
+        double ct_slab = std::abs(std::real(std::sqrt(1.0 - (1.0 / eps_s) * s1 * s1)));
+        double d_slab = F.thk / ct_slab, d_geo = F.thk / ct_geo;
+
+        QD_DIAG("%.4f,%.3e,%.9f,%.9f,%.9f,%.6f,%.3e\n",
+                thd, ct_geo, ct_slab, d_slab, d_slab * ct_slab, d_geo, d_geo * ct_geo * ct_geo);
+
+        CHECK(std::abs(d_slab * ct_slab - F.thk) < 1e-15);       // clamp-invariant by construction
+        CHECK(d_geo * ct_geo * ct_geo <= F.thk + 1e-15);         // shrinks rather than diverging
+        CHECK(ct_slab > 0.9);                                    // bounded by the internal critical angle
+    }
+
+    // The tangency limit itself. A lossy slab approaches a perfect mirror, so the transmitted port
+    // goes to zero and the reflected one to unity, and both stay finite all the way in. This is the
+    // behaviour the clamp was introduced to protect and which it in fact prevented.
+    arma::mat mesh = qd_quad_x(200.0, 0.0);
+    QD_DIAG("\n# diag: tangency limit, unclamped\n");
+    QD_DIAG("angle,T_dB,T_ana_dB,R_lin,R_ana_lin\n");
+    for (double thd : {89.9, 89.99, 89.999, 89.9999})
+    {
+        double T = F.run(mesh, 200.0, thd, 1);
+        double R = F.run(mesh, 200.0, thd, 0);
+        double th = thd * arma::datum::pi / 180.0;
+        QdSlabRef A = qd_slab_ref(eps_s, F.thk, th, F.f_hz);
+        double Ra = qd_slab_ref_R(eps_s, F.thk, th, F.f_hz);
+
+        QD_DIAG("%.4f,%.6f,%.6f,%.9f,%.9f\n", thd, dB(T), dB(A.p_avg), R, Ra);
+
+        INFO("angle " << thd);
+        REQUIRE(std::isfinite(T));
+        REQUIRE(std::isfinite(R));
+        CHECK(T >= 0.0);
+        CHECK(R <= 1.0);
+        CHECK(std::abs(dB(T) - dB(A.p_avg)) < 1.0e-6);
+        CHECK(std::abs(R - Ra) < 1.0e-9);
     }
 }
