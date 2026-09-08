@@ -619,9 +619,16 @@ namespace
     // "interface ahead of the ray / interface it entered through" order. Produce mode is NOT
     // symmetric: the reflect port and the interface gains both depend on which side the wave is on.
     //
-    // Angles and distances describe the path inside the slab, so abs_cos_theta_t is the in-slab
-    // propagation cosine and abs_cos_theta the incidence cosine at the outer face. Thickness never
-    // enters here: the caller maps thk onto dist_refract / dist_geo and owns the grazing clamp.
+    // abs_cos_theta_t is the in-slab propagation cosine and abs_cos_theta the incidence cosine at
+    // the outer face, in both modes. The two length arguments differ by mode:
+    //
+    //   produce == false: dist_refract and dist_geo are the traced path lengths through the layer,
+    //                     refracted and geometric, exactly as the tracer measured them.
+    //   produce == true : dist_refract is the sheet's NORMAL thickness and dist_geo is unused. A
+    //                     sheet has no traced path, so the caller has nothing to measure and the one
+    //                     quotient the traversal needs, thk / cos, is formed here instead. It used to
+    //                     be formed by the caller under a geometric floor on the cosine; see the
+    //                     saturation note at the top of the body for why that floor is gone.
     //
     // produce == false: T_te / T_tm are the per-channel series factor S, and nothing else. The port
     //                   the caller holds already carries the per-channel Fresnel coefficient of its
@@ -656,7 +663,8 @@ namespace
     inline bool qd_slab_resolve(const Material &mat_near,
                                 const Material &mat_slab,
                                 const Material &mat_far,
-                                double dist_refract, double dist_geo,
+                                double dist_refract,       // correction: traced refracted path; produce: normal thickness
+                                double dist_geo,           // correction: traced geometric path; produce: unused
                                 double abs_cos_theta_t, double abs_cos_theta,
                                 double fGHz, bool is_scalar, double eps, bool produce,
                                 std::complex<double> *T_te, std::complex<double> *T_tm,
@@ -682,6 +690,44 @@ namespace
         std::complex<double> eta_s_if = mat_slab.eta(fGHz) + mat_slab.eta_resonance(fGHz);
         std::complex<double> mu_s = mat_slab.mu(fGHz);
         double n_cur = std::real(std::sqrt(mat_slab.eta(fGHz) * mu_s)); // resonance-excluded slab index
+
+        // Traversal geometry, in the form the rest of the function needs.
+        //
+        // The physics is written in the normal thickness and a cosine: the propagation factor is
+        // exp(-j k0 n thk_normal cos_slab) and the mass-law term is thk_normal * cos_theta. Neither
+        // diverges at any angle. The path length thk / cos does diverge, and it is the only quantity
+        // here that can, so it is formed once and only where a genuine path length is owed - the
+        // alpha column and the mass-law conductivity term.
+        //
+        // Both of those are dB-linear in the path, so the quotient saturates: past the length at
+        // which the layer is opaque nothing downstream can move. dist_max is that length, read off
+        // the material's own loss per meter, and it is never shorter than the normal thickness so the
+        // cap cannot reach a result at any angle a propagating wave has. It depends on the material
+        // and the frequency and on no geometry at all, which is what a geometric floor on the cosine
+        // could not offer.
+        //
+        // Correction mode is handed genuine traced lengths and keeps them.
+        const double thk_normal = produce ? dist_refract : dist_refract * abs_cos_theta_t;
+        double dist_slab = dist_refract;
+        if (produce)
+        {
+            double dist_max = 1.0e30;
+            double g1m = mat_slab.medium_gain(1.0, fGHz, 1.0, 0.0, 0.0, 1.0e300); // 1 m, mass term off
+            if (g1m > 0.0)
+            {
+                double rate = -10.0 * std::log10(g1m); // dB per meter
+                if (rate > 0.0)
+                    dist_max = 400.0 / rate;
+            }
+            else
+                dist_max = 0.0; // opaque within a meter
+            if (dist_max < thk_normal)
+                dist_max = thk_normal;
+
+            dist_slab = (abs_cos_theta_t > 0.0) ? thk_normal / abs_cos_theta_t : dist_max;
+            if (!(dist_slab < dist_max)) // also catches inf and NaN
+                dist_slab = dist_max;
+        }
         // Slab-side propagation cosine for correction mode. The tracer's direction is real, so
         // normally only the real projection of it is available and every boundary gets re-derived from
         // that projection - including the entry boundary, whose coefficient ray_mesh_interact had
@@ -888,7 +934,15 @@ namespace
             // No series and no in-slab phase, but the two interface phases are genuine surface
             // effects and are kept. mass_min_path = 0.0 because a thin sheet is a real traversal;
             // the default floor exists to reject sub-millimeter paths in traced solids.
-            double gI = mat_slab.medium_gain(dist_refract, fGHz, abs_cos_theta_t, dist_geo, abs_cos_theta, 0.0);
+            //
+            // medium_gain reads the mass-law term as dist_geo * cos^2, which for a sheet is
+            // thk_normal * cos. Passing that product directly, with a cosine of one, keeps the term
+            // identical while never forming thk / cos. At exact tangency the product is zero, which
+            // medium_gain would read as "no geometric path supplied" and would then substitute the
+            // refracted path, so the term is disabled outright in that case instead.
+            double mass_path = thk_normal * abs_cos_theta;
+            double mass_floor = (mass_path > 0.0) ? 0.0 : 1.0e300;
+            double gI = mat_slab.medium_gain(dist_slab, fGHz, abs_cos_theta_t, mass_path, 1.0, mass_floor);
             double aI = std::sqrt((gI < 0.0) ? 0.0 : gI);
             if (T_te)
                 *T_te = ig * aI * tns_te * tsf_te;
@@ -922,9 +976,8 @@ namespace
         std::complex<double> phi_1;
         if (produce)
         {
-            double thk_normal = dist_refract * abs_cos_theta_t;               // sheet thickness along the normal
             std::complex<double> n_cx = std::sqrt(mat_slab.eta(fGHz) * mu_s); // complex, resonance-excluded
-            double ex = mat_slab.excess_gain(dist_refract, fGHz);             // alpha only, no conductivity
+            double ex = mat_slab.excess_gain(dist_slab, fGHz);                // alpha only, no conductivity
             phi_1 = std::exp(std::complex<double>(0.0, -1.0) * (omega / c0) * n_cx * thk_normal * cts_exact) *
                     std::sqrt((ex < 0.0) ? 0.0 : ex);
         }
@@ -932,9 +985,8 @@ namespace
         {
             // Same exact form as produce mode. The normal thickness is pure geometry - the traced path
             // times the traced cosine - and only the phase and loss across it use the recovered angle.
-            double thk_normal = dist_refract * abs_cos_theta_t;
             std::complex<double> n_cx = std::sqrt(mat_slab.eta(fGHz) * mu_s); // resonance-excluded
-            double ex = mat_slab.excess_gain(dist_refract, fGHz);             // alpha only
+            double ex = mat_slab.excess_gain(dist_slab, fGHz);                // alpha only
             phi_1 = std::exp(std::complex<double>(0.0, -1.0) * (omega / c0) * n_cx * thk_normal * cs) *
                     std::sqrt((ex < 0.0) ? 0.0 : ex);
         }
@@ -1011,7 +1063,7 @@ namespace
                 cd_arg = std::complex<double>(std::real(cd_arg), -0.0);
             std::complex<double> c_disp = std::sqrt(cd_arg);
 
-            double thk_n = dist_refract * abs_cos_theta_t; // sheet thickness along the normal
+            double thk_n = thk_normal; // sheet thickness along the normal
             double t_disp = (disp_budget >= 0.0 && disp_budget < thk_n) ? disp_budget : thk_n;
             if (t_disp < 0.0)
                 t_disp = 0.0;
@@ -1802,7 +1854,6 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         double Nx = 0.0, Ny = 0.0, Nz = 0.0; // FBS normal vector
         double cos_theta = 0.0;              // Angle between FBS normal and incoming ray
         double OF_length = 0.0;              // Distance from origin to FBS
-        double face_extent = 0.0;            // In-plane extent of the FBS face (thin-sheet grazing clamp)
         if (iFBS)
         {
             double E1x = (double)p_mesh[iFBS - 1 + 3 * n_mesh] - Fx,
@@ -1812,18 +1863,10 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
                    E2y = (double)p_mesh[iFBS - 1 + 7 * n_mesh] - Fy,
                    E2z = (double)p_mesh[iFBS - 1 + 8 * n_mesh] - Fz;
 
-            // Longest triangle edge, needed only by the thin-sheet grazing clamp. It bounds how far a
-            // ray may walk sideways inside a notional slab before it would have left through the side
-            // of the slab rather than crossing it. Computed only when a sheet is in play.
-            if (sheetFBS || sheetSBS)
-            {
-                double E3x = E2x - E1x, E3y = E2y - E1y, E3z = E2z - E1z;
-                double l1 = E1x * E1x + E1y * E1y + E1z * E1z;
-                double l2 = E2x * E2x + E2y * E2y + E2z * E2z;
-                double l3 = E3x * E3x + E3y * E3y + E3z * E3z;
-                double lm = (l1 > l2) ? l1 : l2;
-                face_extent = std::sqrt((l3 > lm) ? l3 : lm);
-            }
+            // The longest triangle edge used to be measured here, as the in-plane extent driving the
+            // thin-sheet grazing clamp. It is gone with the clamp. Nothing in the sheet path reads a
+            // property of the triangulation any more, so a face and the same face subdivided produce
+            // the same coefficients.
 
             // Plane normal vector
             Nx = E1y * E2z - E1z * E2y, Ny = E1z * E2x - E1x * E2z, Nz = E1x * E2y - E1y * E2x;
@@ -2086,20 +2129,35 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
             std::complex<double> ct2_slab;
             M1.interact_with(M_slab, interaction_type, thetaF, fGHz, nullptr, nullptr, &ct2_slab, nullptr, nullptr, nullptr);
 
-            // Grazing clamp. thk/cos diverges at tangency, but well before that the ray would have left
-            // through the side of the notional slab: the cutoff is where the lateral walk-off
-            // thk*tan(theta) exceeds the face's in-plane extent. Clamping the cosine from below caps
-            // the traversal at sqrt(thk^2 + extent^2) with no tangent or inverse trig call.
-            double ext = (face_extent > 0.0) ? face_extent : thk;
-            double cos_min = thk / std::sqrt(thk * thk + ext * ext);
-            double ct_geo = (abs_cos_theta < cos_min) ? cos_min : abs_cos_theta;
+            // A thin sheet is a laterally infinite layer, which is what the rest of the composite
+            // already assumes: plane-wave Fresnel boundaries and a plane-parallel internal series.
+            // There is no grazing clamp.
+            //
+            // There used to be one, flooring both cosines at thk / sqrt(thk^2 + ext^2) on the argument
+            // that a grazing ray through a finite pane would leave through its side. Three things were
+            // wrong with it. It floored the INCIDENCE cosine, which sits upstream of both Fresnel
+            // boundaries and of the exact in-slab cosine, so it froze the entire interface at the
+            // onset angle rather than capping a traversal: measured, transmission held 28.8 dB above
+            // the analytic slab at 89.9 deg while the specular mirror that grazing incidence should
+            // produce was removed. It keyed the onset to the longest edge of the hit triangle, so the
+            // same wall answered differently depending on how finely it was meshed - a 1000 m pane as
+            // two triangles clamps past 89.9998 deg, the same pane in 1 m triangles past 89.757 deg,
+            // and at 89.99 deg the two differ by 27.7 dB. And it was inert in production anyway, since
+            // ray_state_update re-resolves every sheet crossing and discards what is computed here.
+            //
+            // Finite lateral extent is an edge-diffraction question. It is not expressible from a
+            // triangle index in any case: the extent that matters belongs to the connected coplanar
+            // region, and the mesh carries no adjacency. At the angles where the walk-off would
+            // matter it is also comparable to the Fresnel zone over which the interaction is
+            // averaged, so a per-ray walk-off test resolves geometry below the scale on which the
+            // transfer function is defined.
+            //
+            // Nothing diverges without it: qd_slab_resolve is written in the normal thickness and the
+            // complex in-slab cosine, and forms the one quotient that can grow under a loss-saturation
+            // cap of its own.
+            double ct_geo = abs_cos_theta;
             double ct_slab = std::abs(std::real(ct2_slab));
-            ct_slab = (ct_slab < cos_min) ? cos_min : ct_slab;
 
-            // Thickness enters only here, mapped onto the medium_gain signature: the refracted path
-            // carries the in-slab attenuation, the geometric path carries the acoustic mass-law term.
-            // At zero geometric thickness the mass law cannot evaluate at all, which is precisely what
-            // a sheet needs this mapping for.
             // Displacement side and budget. The sheet sits on whichever side of a glued pair is not
             // the solid, which is the far side only for a glued exit. The budget is what this
             // function can see of the medium being displaced - the leg it has just travelled - and it
@@ -2110,8 +2168,10 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
             const Material &M_disp = disp_far ? M2 : M1;
             double disp_budget = M_disp.same_as(Material()) ? -1.0 : 0.8 * OF_length * ct_geo;
 
+            // Thickness enters only here. Produce mode takes the normal thickness and the two
+            // cosines and owns every length it derives from them; the geometric-path slot is unused.
             std::complex<double> Tte, Ttm, Rte, Rtm;
-            qd_slab_resolve(M1, M_slab, M2, thk / ct_slab, thk / ct_geo, ct_slab, ct_geo,
+            qd_slab_resolve(M1, M_slab, M2, thk, 0.0, ct_slab, ct_geo,
                             fGHz, is_scalar, 0.0, true, &Tte, &Ttm, &Rte, &Rtm,
                             disp_far, disp_budget);
 
@@ -3395,13 +3455,6 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 std::complex<double> ct2_slab;
                 M_near.interact_with(M_slab, interaction_type, theta_t, fGHz, nullptr, nullptr, &ct2_slab, nullptr, nullptr, nullptr);
 
-                // Grazing clamp. ray_mesh_interact bounds the lateral walk-off by the longest FBS
-                // triangle edge, but that edge is not among this function's inputs and cannot be
-                // recovered from them (thicknessN is zero for a sheet). A fixed extent-to-thickness
-                // ratio stands in. This is a divergence guard rather than physics - it only bites
-                // inside the clamp region, which a sensibly meshed face never reaches - but it does
-                // mean the two functions disagree at extreme grazing incidence.
-                // ISSUE: pass the face extent through if an output slot ever becomes available.
                 // How much of the displaced medium may be taken back out. Air costs nothing to
                 // displace and cannot amplify, so it is uncapped. For a real medium the cap is 80% of
                 // the host path the tracer can see around the crossing - what it has already travelled
@@ -3416,16 +3469,21 @@ void quadriga_lib::ray_state_update(int interaction_type,
                     disp_budget = 0.8 * host_seen * abs_cos_theta_t;
                 }
 
-                const double sheet_extent_ratio = 1000.0;
-                const double cos_min = 1.0 / std::sqrt(1.0 + sheet_extent_ratio * sheet_extent_ratio);
-                double ct_geo = (abs_cos_theta_t < cos_min) ? cos_min : abs_cos_theta_t;
+                // No grazing clamp, matching ray_mesh_interact. A fixed extent-to-thickness ratio
+                // used to stand in for the face extent this function cannot see, and it froze the
+                // interface past 89.943 deg for every sheet at every thickness. Passing the real
+                // extent through instead was the obvious repair and is the one option that had to be
+                // rejected: that extent is the longest edge of the hit triangle, so importing it here
+                // would have made a production result depend on how finely a wall was meshed, which
+                // it currently does not. The sheet is a laterally infinite layer in both functions;
+                // the note at the corresponding site in ray_mesh_interact gives the measurements.
+                double ct_geo = abs_cos_theta_t;
                 double ct_slab = std::abs(std::real(ct2_slab));
-                ct_slab = (ct_slab < cos_min) ? cos_min : ct_slab;
 
-                // Thickness enters only here, mapped onto the medium_gain signature: the refracted path
-                // carries the in-slab attenuation, the geometric path the acoustic mass-law term.
+                // Thickness enters only here. Produce mode takes the normal thickness and the two
+                // cosines; the geometric-path slot is unused.
                 std::complex<double> Tte, Ttm, Rte, Rtm;
-                qd_slab_resolve(M_near, M_slab, M_far, thk / ct_slab, thk / ct_geo, ct_slab, ct_geo,
+                qd_slab_resolve(M_near, M_slab, M_far, thk, 0.0, ct_slab, ct_geo,
                                 fGHz, is_scalar, 0.0, true, &Tte, &Ttm, &Rte, &Rtm,
                                 disp_far, disp_budget);
 
