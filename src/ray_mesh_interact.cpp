@@ -253,9 +253,11 @@ namespace
         double medium_gain(double dist_refract,              // In-medium distance (refracted path)
                            double fGHz = 1.0,                // Frequency
                            double abs_cos_theta_t = 1.0,     // Cosine of incidence angle @ FBS/VBS (refracted path)
-                           double dist_geo = 0.0,               // Geometric distance (0.0 = dist_refract)
-                           double abs_cos_theta = 0.0,          // Cosine of incidence angle @ orig (only used when dist_geo > 0)
-                           double mass_min_path = 0.0015) const // Shortest geometric path that still carries a mass-law term
+                           double dist_geo = 0.0,              // Geometric distance (0.0 = dist_refract)
+                           double abs_cos_theta = 0.0,         // Cosine of incidence angle @ orig (only used when dist_geo > 0)
+                           double mass_min_path = 0.0015,      // Shortest geometric path that still carries a mass-law term
+                           double mass_normal = -1.0,          // Surface-mass surrogate with the angle removed (< 0 = dist_geo * abs_cos_theta)
+                           double mass_cos = -1.0) const       // Angle factor for the mass-law term (< 0 = abs_cos_theta)
         {
             if (dist_geo == 0.0) // Identity fallback
                 dist_geo = dist_refract, abs_cos_theta = abs_cos_theta_t;
@@ -272,12 +274,52 @@ namespace
             // The mass-law floor guards traced solids, where a sub-millimeter path is a meshing
             // artifact rather than a real traversal. A thin sheet is a real traversal at any
             // thickness, so the sheet path passes 0.0 and keeps the term.
+            //
+            // The panel's transfer impedance and the fluid's wave admittance enter the transmission
+            // coefficient as one product, x = Z_panel * cos(theta) / (2 z0), so the term is a
+            // function of that single argument and carries two slopes that are not the same
+            // quantity. The panel side carries the fitted slope m, in dB per decade of frequency
+            // and of surface mass. The angle side carries 20 dB per decade of cos(theta), which
+            // comes from the fluid admittance rather than from the panel and therefore does not
+            // follow m. They were tied together while the angle sat inside the same logarithm as
+            // the frequency; mass_normal and mass_cos separate them.
+            //
+            // mass_normal is the surface-mass surrogate with the angle removed and mass_cos is the
+            // angle factor. A caller supplying neither gets dist_geo * abs_cos_theta as the
+            // surrogate and abs_cos_theta as the factor, whose product is the dist_geo * cos^2 term
+            // this was written in before: across a slab traversal dist_geo is the normal thickness
+            // divided by the cosine, so the surrogate is the normal thickness.
+            //
+            // mass_A is the normal-incidence term, unchanged in form and in value, including its
+            // clip at an argument of one. The angle carries the mass law's own shape,
+            // log10(1 + x^2), normalized so that the two endpoints are exact: mass_A at normal
+            // incidence and zero at tangency. The normalization matters because mass_A is a fitted
+            // lumped quantity rather than one derived from a density and a thickness, so the
+            // material table owns the normal-incidence value and the angle law must not move it.
+            // For any panel with meaningful loss the normalization factor is within 10*eps/mass_A
+            // of ten - 5e-4 relative at 25 dB - so this is the exact single-panel mass law wherever
+            // the term is worth anything.
+            //
+            // The angle dependence has no cutoff. It tapers to zero and is never negative, and its
+            // knee sits at x = 1, fixed by m, the frequency and the surface mass, and by no
+            // geometry.
             if (m > 0.0 && dist_geo > mass_min_path)
             {
-                double mass_path = dist_geo * abs_cos_theta * abs_cos_theta;
-                double m_dB = m * std::log10((fGHz / fRef) * mass_path);
-                if (m_dB > 0.0)
-                    loss += m_dB;
+                double mass_n = (mass_normal >= 0.0) ? mass_normal : dist_geo * abs_cos_theta;
+                double mass_c = (mass_cos >= 0.0) ? mass_cos : abs_cos_theta;
+                double mass_arg = (fGHz / fRef) * mass_n;
+                double mass_A = (mass_arg > 0.0) ? m * std::log10(mass_arg) : 0.0;
+                if (mass_A > 0.0 && mass_c > 0.0)
+                {
+                    if (mass_c >= 1.0) // normal incidence, and the guard against a cosine over one
+                        loss += mass_A;
+                    else
+                    {
+                        double X0 = std::pow(mass_arg, 0.05 * m); // = 10^(mass_A/20)
+                        double x = X0 * mass_c;
+                        loss += mass_A * std::log10(1.0 + x * x) / std::log10(1.0 + X0 * X0);
+                    }
+                }
             }
             return std::pow(10.0, -0.1 * loss);
         }
@@ -1068,14 +1110,18 @@ namespace
             // effects and are kept. mass_min_path = 0.0 because a thin sheet is a real traversal;
             // the default floor exists to reject sub-millimeter paths in traced solids.
             //
-            // medium_gain reads the mass-law term as dist_geo * cos^2, which for a sheet is
-            // thk_normal * cos. Passing that product directly, with a cosine of one, keeps the term
-            // identical while never forming thk / cos. At exact tangency the product is zero, which
-            // medium_gain would read as "no geometric path supplied" and would then substitute the
-            // refracted path, so the term is disabled outright in that case instead.
+            // The mass term is handed its two pieces separately: thk_normal is the surface-mass
+            // surrogate and abs_cos_theta is the angle factor, so the sheet and a traced solid of
+            // the same normal thickness form the same argument. The geometric-distance slot keeps
+            // the product thk_normal * cos, which is what the minimum-path gate reads and what the
+            // zero sentinel tests; neither the quotient thk / cos nor a floor on the cosine is
+            // formed anywhere. At exact tangency the product is zero, which medium_gain would read
+            // as "no geometric path supplied" and would then substitute the refracted path, so the
+            // term is disabled outright in that case instead.
             double mass_path = thk_normal * abs_cos_theta;
             double mass_floor = (mass_path > 0.0) ? 0.0 : 1.0e300;
-            double gI = mat_slab.medium_gain(dist_slab, fGHz, abs_cos_theta_t, mass_path, 1.0, mass_floor);
+            double gI = mat_slab.medium_gain(dist_slab, fGHz, abs_cos_theta_t, mass_path, 1.0, mass_floor,
+                                             thk_normal, abs_cos_theta);
             double aI = std::sqrt((gI < 0.0) ? 0.0 : gI);
             if (T_te)
                 *T_te = ig * fx_te * aI * tns_te * tsf_te;
@@ -1262,8 +1308,12 @@ Linear gain of a ray traversing a homogeneous lossy medium
     `σ = c·(f/fRef)^d`. These give an attenuation length `Δ` and a per-meter power loss `8.686 / Δ` dB/m.
   - Distance absorption of the form `α·(f/fRef)^αB` dB/m, intended to model excess loss not captured
     by `σ` (e.g. foliage, scattering media).
-  - An acoustic mass-law term `m·log10((f/fRef)·dist)` dB, added once (not per meter) when `m > 0`,
-    `dist` exceeds ~1.5 mm, and the term is positive; `m` is the mass-law slope in dB/decade.
+  - An acoustic mass-law term `A = m·log10((f/fRef)·dist)` dB, added once (not per meter) when `m > 0`,
+    `dist` exceeds ~1.5 mm, and the term is positive; `m` is the mass-law slope in dB/decade. At oblique
+    incidence the term carries the mass law's angle shape, `A·log10(1 + x²)/log10(1 + X₀²)` with
+    `X₀ = 10^(A/20)` and `x = X₀·cos θ`, which is `A` at normal incidence, tapers to zero at tangency,
+    and has an angle slope of 20 dB/decade of `cos θ` independent of `m`. This entry point supplies
+    `cos θ = 1` and therefore returns `A` unchanged.
 - The penetration-loss columns (`att`, `attB`) of `mtl_prop` are not used — they describe
   thin-slab transmission loss, not propagation through a finite-thickness medium.
 
