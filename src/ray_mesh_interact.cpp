@@ -364,11 +364,53 @@ namespace
                    tfB == other.tfB;
         }
 
+        // Per-channel normal-flux obliquity, returned as an amplitude factor.
+        //
+        // The time-averaged normal Poynting component of a plane wave is proportional to
+        // |E|^2 Re(z c) for TE and to |E|^2 Re(conj(z) c) for TM, with z = sqrt(eps/mu). The energy
+        // crossing the boundary is therefore Re(z2 c2)/Re(z1 c1) |t_TE|^2 in one channel and
+        // Re(conj(z2) c2)/Re(conj(z1) c1) |t_TM|^2 in the other, and the two obliquity factors are
+        // not the same once z2 is complex. The incidence angle here is always real, so both
+        // denominators reduce to Re(z1)*abs_cos_theta and only the numerators differ.
+        //
+        // For a lossless incidence medium this makes the per-channel transmittance identically
+        // 1 - R_X, at any angle and for any complex second medium, so an air-side crossing keeps the
+        // total it reported before. For a lossy incidence medium the two quantities differ, because
+        // the incident and reflected waves interfere and the split into two independent fluxes is
+        // not exact there; the flux form is the one that composes across a chain of crossings.
+        //
+        // Past the critical angle Re(z2 c2) vanishes for a lossless second medium, so the
+        // transmitted port closes on its own without the magnitude test that declares TIR.
+        //
+        // The scalar branch uses the TE form: z is the acoustic admittance 1/(rho c) and the normal
+        // intensity is |p|^2 Re(z c).
+        static void flux_amp(const std::complex<double> &z1, const std::complex<double> &z2,
+                             double abs_cos_theta, const std::complex<double> &ct2,
+                             double &s_te, double &s_tm)
+        {
+            double den = std::real(z1) * abs_cos_theta; // incidence-side flux, both polarizations
+            if (!(den > 1.0e-300))                      // exact tangency: no incident flux to convert
+            {
+                s_te = 0.0, s_tm = 0.0;
+                return;
+            }
+            double n_te = std::real(z2 * ct2);
+            double n_tm = std::real(std::conj(z2) * ct2);
+            s_te = std::sqrt((n_te > 0.0) ? n_te / den : 0.0);
+            s_tm = std::sqrt((n_tm > 0.0) ? n_tm / den : 0.0);
+        }
+
         // Medium-medium interaction
         // 'this' is the medium the ray travels in (incidence side, medium 1); 'other' is the medium it enters into / reflects off (medium 2).
         // Computes the ITU-R P.2040-1 interface coefficients and returns the interface power gain.
-        // For transmission/refraction (1/2/4), the returned gain and cTE/cTM include the entered medium's lumped
+        // For transmission/refraction (1/2/4/5), the returned gain and cTE/cTM include the entered medium's lumped
         // interface_gain (att + coincidence); reflection (0/3) does not. 0.5*(|cTE|^2 + |cTM|^2) == gain in all cases.
+        //
+        // Energy convention. A transmitted coefficient carries the per-channel normal-flux amplitude,
+        // the raw Fresnel amplitude times sqrt of its own obliquity factor; see flux_amp above. The
+        // undeviated and refracting types therefore report the same energy for the same interface,
+        // which is what they owe once the outgoing ray tube carries no power of its own. Reflection
+        // stays in one medium, where the obliquity factor is identically 1, and is unchanged.
         double interact_with(const Material &other,                         // Material that the path enters into / reflects of
                              int interaction_type,                          // 0 = EM reflect, 1 = EM transmit, 2 = EM refract, 3 = scalar reflect, 4 = scalar transmit, 5 = scalar refract
                              double theta,                                  // Incidence angle
@@ -412,12 +454,15 @@ namespace
                 std::complex<double> R_TM = (z2 * abs_cos_theta - z1 * ct2) / (z2 * abs_cos_theta + z1 * ct2);
                 double reflectance = tir ? 1.0 : 0.5 * (std::norm(R_TE) + std::norm(R_TM));
 
-                // reflectance is the TE/TM average, which is what the returned gain is defined to be.
-                // It does not distort the per-channel split: the coefficients below are rescaled by one
-                // factor common to both channels, so their ratio is the raw Fresnel one throughout, and
-                // at tf = 0 that factor is identically 1. tf redistributes energy between the reflected
-                // and transmitted ports and is polarization-agnostic by design; if it is ever made
-                // polarization-dependent, this average is the first thing that has to change.
+                // reflectance is the TE/TM average, which is what the returned gain is defined to be
+                // for a reflection. It does not distort the per-channel split there: the coefficients
+                // below are rescaled by one factor common to both channels, so their ratio is the raw
+                // Fresnel one throughout, and at tf = 0 that factor is identically 1. tf redistributes
+                // energy between the reflected and transmitted ports and is polarization-agnostic by
+                // design; if it is ever made polarization-dependent, this average is the first thing
+                // that has to change. The transmission branch below no longer rescales by an averaged
+                // quantity at all - each channel carries its own obliquity factor - and reads the
+                // average only through tf.
 
                 if (interaction_type == 0) // EM reflection: tf-adjusted reflectance
                 {
@@ -430,32 +475,30 @@ namespace
                     else // tf < 0 created reflection at a zero-reflectance interface -> flat coefficients
                         coeff_TE = coeff_TM = std::complex<double>(std::sqrt(gain), 0.0);
                 }
-                else // EM transmission (1) or refraction (2)
+                else // EM transmission (1) or refraction (2): one branch, one convention
                 {
-                    // Fresnel transmission, ITU-R P.2040-1 eq. (32)
-                    std::complex<double> T_TE = tir ? std::complex<double>(0.0, 0.0) : (2.0 * z1 * abs_cos_theta) / (z1 * abs_cos_theta + z2 * ct2);
-                    std::complex<double> T_TM = tir ? std::complex<double>(0.0, 0.0) : (2.0 * z1 * abs_cos_theta) / (z2 * abs_cos_theta + z1 * ct2);
-                    double refraction_gain = tir ? 0.0 : 0.5 * (std::norm(T_TE) + std::norm(T_TM));
-
                     double R_eff = apply_tf_pair(other, reflectance, fGHz);
 
-                    if (interaction_type == 1) // undeviated transmission (1): energy-conserving forward beam = 1 - R_eff
+                    if (tir) // no Fresnel forward port; any tf leak travels undeviated, flat coefficients
                     {
                         gain = 1.0 - R_eff;
-                        if (refraction_gain > 0.0) // rescale the Fresnel T coefficients to carry the forward gain
-                        {
-                            double s = std::sqrt(gain / refraction_gain);
-                            coeff_TE = T_TE * s, coeff_TM = T_TM * s;
-                        }
-                        else // no Fresnel forward port (TIR, or grazing) -> flat coefficients
-                            coeff_TE = coeff_TM = std::complex<double>(std::sqrt(gain), 0.0);
+                        coeff_TE = coeff_TM = std::complex<double>(std::sqrt(gain), 0.0);
                     }
-                    else // refraction (2)
+                    else
                     {
+                        // Fresnel transmission, ITU-R P.2040-1 eq. (32)
+                        std::complex<double> T_TE = (2.0 * z1 * abs_cos_theta) / (z1 * abs_cos_theta + z2 * ct2);
+                        std::complex<double> T_TM = (2.0 * z1 * abs_cos_theta) / (z2 * abs_cos_theta + z1 * ct2);
+
+                        // tf redistributes between the ports and is not per-channel, so it enters as
+                        // one scale on top of the per-channel flux amplitudes. It is 1 at tf = 0.
                         double tf_scale = (reflectance < 1.0) ? (1.0 - R_eff) / (1.0 - reflectance) : 0.0;
-                        gain = tir ? 1.0 - R_eff : refraction_gain * tf_scale;
-                        coeff_TE = tir ? std::complex<double>(std::sqrt(gain), 0.0) : T_TE * std::sqrt(tf_scale);
-                        coeff_TM = tir ? std::complex<double>(std::sqrt(gain), 0.0) : T_TM * std::sqrt(tf_scale);
+                        double s_te = 0.0, s_tm = 0.0;
+                        flux_amp(z1, z2, abs_cos_theta, ct2, s_te, s_tm);
+                        double a = std::sqrt(tf_scale);
+                        coeff_TE = T_TE * (s_te * a);
+                        coeff_TM = T_TM * (s_tm * a);
+                        gain = 0.5 * (std::norm(coeff_TE) + std::norm(coeff_TM));
                     }
                 }
             }
@@ -471,16 +514,18 @@ namespace
                     gain = R_eff;
                     coeff_TE = std::polar(std::sqrt(gain), std::arg(R));
                 }
-                else if (interaction_type == 4 || tir) // Undeviated transmission (4), or refraction (5) collapsed under TIR
+                else if (tir) // Transmission (4) or refraction (5) with no forward port: flat tf leak
                 {
                     gain = 1.0 - R_eff;
                     coeff_TE = std::polar(std::sqrt(gain), std::arg(T));
                 }
-                else // interaction_type == 5, non-TIR: scalar refraction, field power |T|^2 scaled by the tf shift
+                else // Scalar transmission (4) and refraction (5): one branch, one convention
                 {
                     double tf_scale = (reflectance < 1.0) ? (1.0 - R_eff) / (1.0 - reflectance) : 0.0;
-                    gain = std::norm(T) * tf_scale;
-                    coeff_TE = T * std::sqrt(tf_scale);
+                    double s_te = 0.0, s_tm = 0.0;
+                    flux_amp(z1, z2, abs_cos_theta, ct2, s_te, s_tm); // s_tm unused, one channel
+                    coeff_TE = T * (s_te * std::sqrt(tf_scale));
+                    gain = std::norm(coeff_TE);
                 }
                 coeff_TM = coeff_TE;
             }
@@ -895,17 +940,21 @@ namespace
         // Interface amplitudes for the produce ports: the raw Fresnel amplitude, rescaled only by
         // whatever tf redistributes between the reflected and transmitted ports.
         //
-        // The magnitude used to be sqrt(1 - R), the normal-flux energy transmittance. That is not the
-        // single-pass amplitude of a two-interface stack unless the slab is lossless: |t12 * t21|
-        // differs from (1 - |r|^2) by the cosine of the phase between z1*c1 and z2*c2, which is 1
-        // only for real impedances and angles. Measured against an exact transfer matrix, that one
-        // substitution was the entire residual of the sheet composite - 0.0156 dB at normal incidence
-        // for lossy concrete, against 2.5e-5 dB from every other approximation here combined.
+        // The magnitude used to be sqrt(1 - R). That is not the normal-flux transmittance, which is
+        // Re(z2 c2)/Re(z1 c1) |t|^2 per channel; the two coincide only when the incidence medium is
+        // lossless, and neither of the two internal crossings here has a lossless incidence side.
+        // It is also not the single-pass amplitude of a two-interface stack: |t12 * t21| differs
+        // from (1 - |r|^2) by the phase between z1*c1 and z2*c2. Measured against an exact transfer
+        // matrix, that one substitution was the entire residual of the sheet composite - 0.0156 dB
+        // at normal incidence for lossy concrete, against 2.5e-5 dB from every other approximation
+        // here combined.
         //
-        // Raw amplitudes also telescope: the air-to-air product over a whole path is the product of
-        // the per-crossing amplitudes, which the flux form does not reproduce for a lossy medium.
+        // The raw amplitudes stay, because the intermediate slab flux cancels between the two
+        // crossings and never appears in the composite. What the composite does owe is the obliquity
+        // factor of the pair it actually spans, near to far, which is applied once below.
         std::complex<double> tns_te, tns_tm, tsn_te, tsn_tm, tsf_te, tsf_tm;
         double ig = 1.0;
+        double fx_te = 1.0, fx_tm = 1.0; // near -> far normal-flux conversion, transmit port only
         if (produce)
         {
             auto AMP = [](double R_tf, double R0, const std::complex<double> &t) -> std::complex<double>
@@ -927,6 +976,36 @@ namespace
             // unaffected, and solid|sheet|air gives air's interface_gain of 1.0 on either test.
             bool far_is_new = !far_is_air && !mat_far.same_as(mat_near);
             ig = std::sqrt(mat_slab.interface_gain(fGHz) * (far_is_new ? mat_far.interface_gain(fGHz) : 1.0));
+
+            // Normal-flux conversion for the transmit port, matching what Material::interact_with
+            // applies to a single crossing. The composite carries the wave from the near medium into
+            // the far one, so it owes that pair's obliquity factor exactly once; the flux inside the
+            // slab cancels between the two internal crossings and never enters. The reflect port
+            // turns around in the near medium, where the factor is 1, and is left alone.
+            //
+            // With near == far the factor is identically 1, so an isolated sheet, a collapsed
+            // duplicate and a sheet embedded in one medium are all untouched. Only the glued cases
+            // move. Snell is transitive, so the cosine in the far medium follows from the incidence
+            // sine and the slab drops out of it.
+            if (!mat_far.same_as(mat_near))
+            {
+                std::complex<double> eta_n_if = mat_near.eta(fGHz) + mat_near.eta_resonance(fGHz);
+                std::complex<double> mu_n = mat_near.mu(fGHz);
+                std::complex<double> eta_f_if = mat_far.eta(fGHz) + mat_far.eta_resonance(fGHz);
+                std::complex<double> mu_f = mat_far.mu(fGHz);
+                std::complex<double> z_n = std::sqrt(eta_n_if / mu_n);
+                std::complex<double> z_f = std::sqrt(eta_f_if / mu_f);
+
+                std::complex<double> cf_arg = 1.0 - ((eta_n_if * mu_n) / (eta_f_if * mu_f)) *
+                                                        (1.0 - abs_cos_theta * abs_cos_theta);
+                if (std::imag(cf_arg) == 0.0 && std::real(cf_arg) < 0.0)
+                    cf_arg = std::complex<double>(std::real(cf_arg), -0.0); // decaying evanescent root
+                std::complex<double> c_far = std::sqrt(cf_arg);
+
+                Material::flux_amp(z_n, z_f, abs_cos_theta, c_far, fx_te, fx_tm);
+                if (is_scalar)
+                    fx_tm = fx_te;
+            }
         }
 
         if (produce && mat_slab.m > 0.0) // Incoherent route for mass-law slabs
@@ -945,9 +1024,9 @@ namespace
             double gI = mat_slab.medium_gain(dist_slab, fGHz, abs_cos_theta_t, mass_path, 1.0, mass_floor);
             double aI = std::sqrt((gI < 0.0) ? 0.0 : gI);
             if (T_te)
-                *T_te = ig * aI * tns_te * tsf_te;
+                *T_te = ig * fx_te * aI * tns_te * tsf_te;
             if (T_tm)
-                *T_tm = ig * aI * tns_tm * tsf_tm;
+                *T_tm = ig * fx_tm * aI * tns_tm * tsf_tm;
             if (R_te) // Stokes reversal: the near interface seen from the incidence side
                 *R_te = -rn_te;
             if (R_tm)
@@ -1073,9 +1152,9 @@ namespace
             std::complex<double> phi_t = (std::abs(phi_disp) > 0.0) ? phi / phi_disp : phi;
 
             if (T_te)
-                *T_te = ig * tns_te * tsf_te * phi_t / denom_te;
+                *T_te = ig * fx_te * tns_te * tsf_te * phi_t / denom_te;
             if (T_tm)
-                *T_tm = ig * tns_tm * tsf_tm * phi_t / denom_tm;
+                *T_tm = ig * fx_tm * tns_tm * tsf_tm * phi_t / denom_tm;
             if (R_te) // front-face reflection plus the series leaking back out through the near face
                 *R_te = -rn_te + tns_te * tsn_te * rf_te * phi2 / denom_te;
             if (R_tm)
@@ -1093,12 +1172,13 @@ namespace
         // was measured emitting exactly |T_X|^2 * |S_X|^2 * Tsp_X - the per-channel transmittance
         // applied a second time on top of a port that already carried it.
         //
-        // The averaging in interact_with does not distort a channel ratio. At tf = 0 its rescale
-        // factor is identically 1 for reflection and refraction, and for undeviated transmission it
-        // is one common factor across both channels; tf only redistributes energy between the ports
-        // and is polarization-agnostic by design. And even if a per-channel conversion were needed,
-        // corr divides by a TWO-interface single pass while ray_state_update corrects one
-        // interaction at a time, so the port in hand carries one interface, not two.
+        // The averaging in interact_with never distorted a channel ratio, and after the energy
+        // convention change there is no averaged rescale left in the transmission branch at all:
+        // each channel carries its own normal-flux obliquity factor, and the TE/TM average enters
+        // only through tf, which is polarization-agnostic by design. And even if a per-channel
+        // conversion were needed here, corr divides by a TWO-interface single pass while
+        // ray_state_update corrects one interaction at a time, so the port in hand carries one
+        // interface, not two.
         //
         // The two branches now agree except for the scalar duplication: scalar mode carries one port
         // and the caller scales a stored xprmat in place rather than rebuilding it from cTE, so both

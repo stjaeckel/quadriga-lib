@@ -79,13 +79,24 @@ struct QdIfaceRef
 {
     double R_te = 0.0, R_tm = 0.0, T_te = 0.0, T_tm = 0.0;
     double R_avg = 0.0, T_avg = 0.0;
+    double obl_te = 0.0, obl_tm = 0.0;          // normal-flux obliquity factor, per polarization
+    double F_te = 0.0, F_tm = 0.0, F_avg = 0.0; // per-channel normal-flux transmittance
 };
 
 static inline QdIfaceRef qd_iface_ref(std::complex<double> e1, std::complex<double> e2, double theta_n_rad)
 {
     const std::complex<double> z1 = std::sqrt(e1), z2 = std::sqrt(e2);
     const double c1 = std::cos(theta_n_rad), s1 = std::sin(theta_n_rad);
-    const std::complex<double> c2 = std::sqrt(1.0 - (e1 / e2) * s1 * s1);
+
+    // Past the critical angle the argument is negative real and the principal root is the growing
+    // evanescent wave. Force the decaying root, as the library does, so that a medium -> air
+    // reference stays comparable above critical. For a complex e2 the argument never lands on the
+    // negative real axis and this is inert.
+    std::complex<double> ct2_arg = 1.0 - (e1 / e2) * s1 * s1;
+    if (std::imag(ct2_arg) == 0.0 && std::real(ct2_arg) < 0.0)
+        ct2_arg = std::complex<double>(std::real(ct2_arg), -0.0);
+    const std::complex<double> c2 = std::sqrt(ct2_arg);
+
     QdIfaceRef F;
     F.R_te = std::norm((z1 * c1 - z2 * c2) / (z1 * c1 + z2 * c2));
     F.R_tm = std::norm((z2 * c1 - z1 * c2) / (z2 * c1 + z1 * c2));
@@ -93,6 +104,18 @@ static inline QdIfaceRef qd_iface_ref(std::complex<double> e1, std::complex<doub
     F.T_tm = std::norm((2.0 * z1 * c1) / (z2 * c1 + z1 * c2));
     F.R_avg = 0.5 * (F.R_te + F.R_tm);
     F.T_avg = 0.5 * (F.T_te + F.T_tm);
+
+    // Normal-flux transmittance. The time-averaged normal Poynting component of a plane wave is
+    // proportional to |E|^2 Re(z c) for TE and to |E|^2 Re(conj(z) c) for TM, with z = sqrt(eps/mu),
+    // so the obliquity factor in front of |t|^2 is not the same in the two channels once z is
+    // complex. F_X equals 1 - R_X identically when the incidence medium is lossless, at any angle
+    // and for any complex e2; it does not when the incidence medium is lossy, where it is also not
+    // bounded by 1.
+    F.obl_te = std::real(z2 * c2) / std::real(z1 * c1);
+    F.obl_tm = std::real(std::conj(z2) * c2) / std::real(std::conj(z1) * c1);
+    F.F_te = F.obl_te * F.T_te;
+    F.F_tm = F.obl_tm * F.T_tm;
+    F.F_avg = 0.5 * (F.F_te + F.F_tm);
     return F;
 }
 
@@ -129,6 +152,19 @@ static inline arma::mat qd_quad_x_sub(double half, double x0, int n)
             m.row(row++) = arma::rowvec{x0, y0, z0, x0, y0, z1, x0, y1, z0};
             m.row(row++) = arma::rowvec{x0, y1, z0, x0, y0, z1, x0, y1, z1};
         }
+    return m;
+}
+
+// The same square as qd_quad_x with the winding reversed, so the normal points along +x. A ray
+// travelling towards +x then produces thetaF < 0, which is a back-side hit: the face material
+// becomes M1 and the crossing is medium -> air. That is the same trick ray_mesh_interact uses to
+// recover the incidence medium without any state. The triangulation edge is unchanged, so the
+// rays from qd_ray_at clear it exactly as they do for the front-side quad.
+static inline arma::mat qd_quad_x_rev(double half, double x0)
+{
+    arma::mat m(2, 9);
+    m.row(0) = arma::rowvec{x0, -half, -half, x0, half, -half, x0, -half, half};
+    m.row(1) = arma::rowvec{x0, half, -half, x0, half, half, x0, -half, half};
     return m;
 }
 
@@ -536,12 +572,21 @@ TEST_CASE("Ray-Mesh Interact - Air to Dielectric Medium (x-z plane)")
     T = {{x, 0.0, z}};
     CHECK(arma::approx_equal(destN, T, "absdiff", 1e-6));
 
-    // Transmission coefficients, ITU-R P.2040-1, eq. (32a) and (32b)
+    // Transmission coefficients, ITU-R P.2040-1, eq. (32a) and (32b), converted to normal flux.
+    // A transmitted coefficient carries its own obliquity factor Re(z2 c2)/Re(z1 c1) for TE and
+    // Re(conj(z2) c2)/Re(conj(z1) c1) for TM. Both media are real here, so the two coincide.
     double T_te = 2.0 * cos_th / (cos_th + std::sqrt(eps) * std::cos(th2));
     double T_tm = 2.0 * cos_th / (std::sqrt(eps) * cos_th + std::cos(th2));
+    double obl = std::sqrt(eps) * std::cos(th2) / cos_th;
+    T_te *= std::sqrt(obl), T_tm *= std::sqrt(obl);
 
     U = {0.5 * T_tm * T_tm + 0.5 * T_te * T_te}; // Gain without FSPL
     CHECK(arma::approx_equal(gainN, U, "absdiff", 1e-6));
+
+    // With a lossless incidence medium the flux-converted pair total is identically 1 - R
+    double R_avg_ref = calc_transition_gain(0, 45.0, 0.0, 0.0,
+                                            std::complex<double>(1.0, 0.0), std::complex<double>(eps, 0.0));
+    CHECK(std::abs(U(0) - (1.0 - R_avg_ref)) < 1e-9);
 
     T = {{T_tm, 0.0, 0.0, 0.0, 0.0, 0.0, T_te, 0.0}};
     CHECK(arma::approx_equal(xprmatN.t(), T, "absdiff", 1e-6));
@@ -571,8 +616,12 @@ TEST_CASE("Ray-Mesh Interact - Air to Dielectric Medium (x-z plane)")
     U = {1.0 - G};
     CHECK(arma::approx_equal(gainN, U, "absdiff", 1e-6));
 
-    T = {{T_tm, 0.0, 0.0, 0.0, 0.0, 0.0, T_te, 0.0}}; // Same as refraction
-    T = T * std::sqrt((1 - G) / H);
+    // The obliquity factor is exactly the ratio the undeviated type used to apply as a rescale
+    CHECK(std::abs((1.0 - G) / H - obl) < 1e-9);
+
+    // Bending the ray does not change the energy the interface passes, so the coefficients are the
+    // same ones the refraction type reported, with no rescale on top
+    T = {{T_tm, 0.0, 0.0, 0.0, 0.0, 0.0, T_te, 0.0}};
     CHECK(arma::approx_equal(xprmatN.t(), T, "absdiff", 1e-6));
 
     // Sub-rays are parallel to the main ray, so the offsets are unchanged
@@ -667,14 +716,18 @@ TEST_CASE("Ray-Mesh Interact - Dielectric Medium to Air (x-y plane, float)")
     T = {{x, y, 0.0}};
     CHECK(arma::approx_equal(destN, T, "absdiff", 1e-6));
 
-    // Tranmission coefficients, ITU-R P.2040-1, eq. (31a) and (31b)
+    // Tranmission coefficients, ITU-R P.2040-1, eq. (31a) and (31b), converted to normal flux
     float T_te = (2.0 * sqrt_eps * cos_th) / (sqrt_eps * cos_th + cos_th2);
     float T_tm = (2.0 * sqrt_eps * cos_th) / (cos_th + sqrt_eps * cos_th2);
+    float obl = cos_th2 / (sqrt_eps * cos_th); // Re(z2 c2)/Re(z1 c1), the same in both channels here
+    T_te *= std::sqrt(obl), T_tm *= std::sqrt(obl);
 
     U = {0.5f * T_tm * T_tm + 0.5f * T_te * T_te}; // Gain without FSPL
     CHECK(arma::approx_equal(gainN, U, "absdiff", 1e-6));
 
-    G = calc_transition_gain(2, 45.0, 0.0, 0.0, eta1, eta2);
+    // The incidence medium is lossless, so the flux-converted pair total is 1 - R, which is what
+    // the undeviated type reports for this same interface
+    G = calc_transition_gain(1, 45.0, 0.0, 0.0, eta1, eta2);
     U = {(float)G}; // Gain without FSPL
     CHECK(arma::approx_equal(gainN, U, "absdiff", 1e-6));
 
@@ -840,8 +893,10 @@ TEST_CASE("Ray-Mesh Interact - Medium to Medium (x-y plane, double)")
     double T_te = (2.0 * sqrt_eps1 * cos_th) / (sqrt_eps1 * cos_th + sqrt_eps2 * cos_th2);
     double T_tm = (2.0 * sqrt_eps1 * cos_th) / (sqrt_eps2 * cos_th + sqrt_eps1 * cos_th2);
 
-    T_te *= std::sqrt(transition_gain);
-    T_tm *= std::sqrt(transition_gain);
+    // Normal-flux conversion; both media are real here, so one obliquity factor serves both channels
+    double obl = sqrt_eps2 * cos_th2 / (sqrt_eps1 * cos_th);
+    T_te *= std::sqrt(obl * transition_gain);
+    T_tm *= std::sqrt(obl * transition_gain);
 
     U = {0.5f * T_tm * T_tm + 0.5f * T_te * T_te}; // Gain without FSPL
     CHECK(arma::approx_equal(gainN, U, "absdiff", 1e-6));
@@ -954,9 +1009,14 @@ TEST_CASE("Ray-Mesh Interact - Conductive to Dielectric (x-y plane, double)")
     T = {{x, y, 0.0}};
     CHECK(arma::approx_equal(destN, T, "absdiff", 1e-3));
 
-    // Tranmission coefficients, ITU-R P.2040-1, eq. (31a) and (31b); M2 is lossless (att = 0)
+    // Tranmission coefficients, ITU-R P.2040-1, eq. (31a) and (31b); M2 is lossless (att = 0).
+    // The incidence medium is conductive, so this is the case where the normal-flux transmittance
+    // and 1 - R part company: the reference below is the flux form, per channel.
     std::complex<double> T_te = (2.0 * sqrt_eps1 * cos_th) / (sqrt_eps1 * cos_th + sqrt_eps2 * cos_th2);
     std::complex<double> T_tm = (2.0 * sqrt_eps1 * cos_th) / (sqrt_eps2 * cos_th + sqrt_eps1 * cos_th2);
+    double obl_te = std::real(sqrt_eps2 * cos_th2) / std::real(sqrt_eps1 * cos_th);
+    double obl_tm = std::real(std::conj(sqrt_eps2) * cos_th2) / std::real(std::conj(sqrt_eps1) * cos_th);
+    T_te *= std::sqrt(obl_te), T_tm *= std::sqrt(obl_tm);
 
     U = {0.5 * std::norm(T_tm) + 0.5 * std::norm(T_te)}; // Gain without FSPL
     CHECK(arma::approx_equal(gainN, U, "absdiff", 1e-3));
@@ -2038,9 +2098,12 @@ TEST_CASE("Diagnostic - Interface energy split per polarization")
             double hh2 = xprmatN(6, 0) * xprmatN(6, 0) + xprmatN(7, 0) * xprmatN(7, 0);
 
             QdIfaceRef F = qd_iface_ref(std::complex<double>(1.0, 0.0), eps_s, thd * arma::datum::pi / 180.0);
-            double ref_te = (type == 0) ? F.R_te : F.T_te; // pairs with VV
-            double ref_tm = (type == 0) ? F.R_tm : F.T_tm; // pairs with HH
-            double ref_avg = (type == 0) ? F.R_avg : F.T_avg;
+            // Reflection stays in one medium, where the obliquity factor is 1; transmission carries
+            // the per-channel normal-flux transmittance, which for this lossless incidence medium is
+            // identically 1 - R_X.
+            double ref_te = (type == 0) ? F.R_te : F.F_te; // pairs with VV
+            double ref_tm = (type == 0) ? F.R_tm : F.F_tm; // pairs with HH
+            double ref_avg = (type == 0) ? F.R_avg : F.F_avg;
 
             double lo_c = std::min(vv2, hh2), hi_c = std::max(vv2, hh2);
             double lo_r = std::min(ref_tm, ref_te), hi_r = std::max(ref_tm, ref_te);
@@ -2063,6 +2126,168 @@ TEST_CASE("Diagnostic - Interface energy split per polarization")
             CHECK(std::abs(hh2 - ref_tm) < 1e-12);
             CHECK(std::abs(rc - rr) < 1e-12);
         }
+}
+
+TEST_CASE("Diagnostic - Transmission convention baseline, single interface")
+{
+    // Absolute per-type level at one interface, which nothing else in either suite prints. Every
+    // other table here measures a ratio or a composite: a ratio is nearly blind to the obliquity
+    // factor, and the sheet composite never takes its coefficients from Material::interact_with at
+    // all. Without this table a shifted level after the convention change could only be compared
+    // against the previous run, not against physics.
+    //
+    // Two references sit beside the code's output:
+    //   raw_X  = |t_X|^2, the Fresnel amplitude power with no obliquity factor
+    //   flux_X = Re(z2 c2)/Re(z1 c1) |t_TE|^2  and  Re(conj(z2) c2)/Re(conj(z1) c1) |t_TM|^2,
+    //            the per-channel normal-flux transmittance
+    //
+    // d_raw_dB and d_flux_dB report which of the two each interaction type is currently on. Types
+    // 2 and 5 sit on raw and types 1 and 4 on the TE/TM-averaged flux value, so the same physical
+    // crossing reports different energy depending only on whether the tracer was asked to bend the
+    // ray. That gap, not the channel ratio, is the size of the convention defect.
+    //
+    // The m2a rows are the lossy-incidence case, where flux_X and 1 - R_X separate and flux_X is
+    // no longer bounded by 1. The a2m rows are where the two coincide identically.
+    //
+    // Channel identification: the ray lies in the x-y plane and the normal is along x, so
+    // qd_polbasis performs a clean swap and VV is TE while HH is TM, in both hit directions - the
+    // back-side hit flips the normal before the basis is built. Scalar types carry one coefficient;
+    // VV2 is repeated into HH2 and both references use the TE form, which is what the scalar branch
+    // computes, since z is the acoustic admittance and T = 1 + R equals t_TE algebraically.
+    //
+    // The acceptance test is |d_flux_dB| < 1e-9 for all four types in both directions, with the
+    // total-reflection rows excluded. d_raw_dB is kept as a printed column: it is the size of the
+    // obliquity factor and records what the raw-amplitude convention used to report.
+    const double f_hz = 1.0e9;
+    const double fGHz = f_hz * 1e-9;
+
+    struct Mat
+    {
+        const char *name;
+        double a, c; // eps_r at fRef, and the sigma column: eta_i = -17.98 * c / fGHz
+    };
+    const std::vector<Mat> mats = {
+        {"lossless eps 1.50", 1.5, 0.0},
+        {"lossy eps 1.50 - 0.40j", 1.5, 0.40 / 17.98},
+        {"lossy eps 5.24 - 0.63j", 5.24, 0.63 / 17.98},
+        {"lossy eps 25.0 - 8.00j", 25.0, 8.00 / 17.98},
+    };
+
+    // Air to medium reaches grazing incidence. Medium to air stops at 50 deg, because the denser
+    // materials are past their internal critical angle well before that and every row beyond it
+    // reports total reflection instead of a transmittance.
+    const std::vector<double> ang_a2m = {0.0, 20.0, 40.0, 60.0, 75.0, 85.0};
+    const std::vector<double> ang_m2a = {0.0, 10.0, 20.0, 30.0, 40.0, 50.0};
+
+    auto dB_ratio = [](double num, double den) -> double
+    {
+        if (!(num > 0.0) || !(den > 0.0))
+            return std::numeric_limits<double>::quiet_NaN();
+        return 10.0 * std::log10(num / den);
+    };
+    auto ratio_of = [](double a, double b)
+    { double lo = std::min(a, b), hi = std::max(a, b); return (hi > 0.0) ? lo / hi : 0.0; };
+
+    QD_DIAG("\n# diag: transmission convention baseline, single interface, 1 GHz\n");
+    QD_DIAG("# dir a2m = air -> medium (front-side hit), m2a = medium -> air (back-side hit)\n");
+    QD_DIAG("# raw = |t|^2; flux = Re(z2 c2)/Re(z1 c1) |t_TE|^2, Re(z2* c2)/Re(z1* c1) |t_TM|^2\n");
+    QD_DIAG("material,dir,type,angle,tir,gain,VV2_te,HH2_tm,raw_te,raw_tm,flux_te,flux_tm,"
+            "d_raw_dB,d_flux_dB,ratio_code,ratio_flux\n");
+
+    for (const auto &M : mats)
+    {
+        std::unordered_map<std::string, std::vector<double>> mtl;
+        mtl["a"] = {M.a};
+        mtl["b"] = {0.0};
+        mtl["c"] = {M.c};
+        mtl["d"] = {0.0};
+        mtl["att"] = {0.0};
+        mtl["attB"] = {0.0};
+        mtl["alpha"] = {0.0};
+        mtl["alphaB"] = {0.0};
+        mtl["fRef"] = {1.0};
+
+        const std::complex<double> eps_s(M.a, -17.98 * M.c / fGHz);
+        const std::complex<double> eps_air(1.0, 0.0);
+
+        for (int dir = 0; dir < 2; ++dir)
+        {
+            arma::mat mesh = (dir == 0) ? qd_quad_x(200.0, 0.0) : qd_quad_x_rev(200.0, 0.0);
+            arma::uvec mtl_ind(2, arma::fill::value(1));
+            const std::complex<double> e1 = (dir == 0) ? eps_air : eps_s;
+            const std::complex<double> e2 = (dir == 0) ? eps_s : eps_air;
+            const std::vector<double> &angles = (dir == 0) ? ang_a2m : ang_m2a;
+
+            for (int type : {1, 2, 4, 5})
+                for (double thd : angles)
+                {
+                    arma::mat orig, dest;
+                    qd_ray_at(thd, orig, dest);
+                    arma::mat fbs, sbs;
+                    arma::u32_vec fbs_ind, sbs_ind;
+                    quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+
+                    arma::mat origN, destN, xprmatN;
+                    arma::vec gainN;
+                    std::vector<uint8_t> otype;
+                    quadriga_lib::ray_mesh_interact(type, f_hz, &orig, &dest, &mesh, &mtl_ind, &mtl,
+                                                    &fbs_ind, &sbs_ind,
+                                                    (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                                    &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                                    &gainN, &xprmatN,
+                                                    (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                                    (arma::vec *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr,
+                                                    (arma::mat *)nullptr, &otype);
+
+                    REQUIRE(gainN.n_elem == 1);
+                    REQUIRE(otype.size() == 1);
+
+                    const bool is_scalar = (type >= 3);
+                    const bool tir = ((int)otype[0] & 32) != 0;
+                    const bool front = ((int)otype[0] & 2) != 0;
+
+                    // The hit direction has to be the one the mesh winding was chosen for; if it is
+                    // not, every reference below is built for the wrong pair of media.
+                    REQUIRE(front == (dir == 0));
+
+                    double vv2 = xprmatN(0, 0) * xprmatN(0, 0) + xprmatN(1, 0) * xprmatN(1, 0);
+                    double hh2 = is_scalar ? vv2
+                                           : xprmatN(6, 0) * xprmatN(6, 0) + xprmatN(7, 0) * xprmatN(7, 0);
+
+                    QdIfaceRef F = qd_iface_ref(e1, e2, thd * arma::datum::pi / 180.0);
+                    double raw_te = F.T_te, raw_tm = is_scalar ? F.T_te : F.T_tm;
+                    double flux_te = F.F_te, flux_tm = is_scalar ? F.F_te : F.F_tm;
+                    double raw_avg = is_scalar ? raw_te : 0.5 * (raw_te + raw_tm);
+                    double flux_avg = is_scalar ? flux_te : 0.5 * (flux_te + flux_tm);
+
+                    QD_DIAG("%s,%s,%d,%.1f,%d,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.4f,%.4f,%.9f,%.9f\n",
+                            M.name, (dir == 0) ? "a2m" : "m2a", type, thd, tir ? 1 : 0,
+                            gainN(0), vv2, hh2, raw_te, raw_tm, flux_te, flux_tm,
+                            dB_ratio(gainN(0), raw_avg), dB_ratio(gainN(0), flux_avg),
+                            ratio_of(vv2, hh2), ratio_of(flux_te, flux_tm));
+
+                    INFO("material " << M.name << ", dir " << ((dir == 0) ? "a2m" : "m2a")
+                                     << ", type " << type << ", angle " << thd);
+                    CHECK(std::isfinite(gainN(0)));
+                    CHECK(gainN(0) >= 0.0);
+                    CHECK(std::abs(gainN(0) - (is_scalar ? vv2 : 0.5 * (vv2 + hh2))) < 1e-9);
+
+                    // Acceptance test for the energy convention: every transmission-class type
+                    // reports the per-channel normal-flux transmittance of its own interface, and
+                    // the four types therefore agree with each other. Total reflection is excluded,
+                    // because there is no forward Fresnel port there and the coefficient carries a
+                    // flat tf leak instead.
+                    if (!tir)
+                    {
+                        CHECK(std::abs(vv2 - flux_te) < 1e-9);
+                        CHECK(std::abs(hh2 - flux_tm) < 1e-9);
+                        CHECK(std::abs(gainN(0) - (is_scalar ? flux_te : flux_avg)) < 1e-9);
+                    }
+                    else
+                        CHECK(gainN(0) < 1e-12); // tf = 0 here, so the leak port is closed
+                }
+        }
+    }
 }
 
 TEST_CASE("Diagnostic - Thin sheet composite vs analytic slab")
