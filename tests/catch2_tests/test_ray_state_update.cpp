@@ -3022,6 +3022,290 @@ TEST_CASE("Thin sheet - the redo sits on the analytic slab at grazing incidence"
     }
 }
 
+// Hand-built thin-sheet composite for a near | sheet | far stack, per polarization, in the form
+// produce mode returns it. Shares no code with the library.
+//
+// The stack is three media and two interfaces. In raw amplitudes its transfer and its front
+// reflection are the plane-parallel Airy pair
+//
+//   A_X = t_ns,X t_sf,X phi / (1 - r_sn,X r_sf,X phi^2)
+//   R_X = r_ns,X + t_ns,X t_sn,X r_sf,X phi^2 / (1 - r_sn,X r_sf,X phi^2)
+//
+// An amplitude is not what a ray tube carries. The normal-flux transmittance of the pair the
+// composite spans is |A_X|^2 Re(z_f c_f) / Re(z_n c_n), so the transmit port owes the square root
+// of that ratio once, and only once: the flux inside the sheet cancels between the two internal
+// crossings and never enters. That factor is fx_X below. The reflect port turns around in the near
+// medium, where the ratio is Re(z_n c_n) / Re(z_n c_n) = 1, so it carries no such factor.
+//
+// Cosines, one per medium, each named where it is used:
+//   c_n = ct, the real incidence cosine in the near medium
+//   c_s = sqrt(1 - (e_n/e_s)(1 - ct^2)), the cosine in the sheet
+//   c_f = sqrt(1 - (e_n/e_f)(1 - ct^2)), the cosine in the far medium
+// c_f is written from the near-side sine directly rather than by chaining through the sheet. Snell
+// is transitive - e_n sin^2_n = e_s sin^2_s = e_f sin^2_f - so the sheet drops out of it. That is
+// what makes c_f, and therefore fx, the same quantity a bare near|far crossing would have used,
+// and it is why a glued composite can be measured against an unglued reference at all.
+//
+// The transmit port also divides out the propagation of the medium the sheet displaces: a sheet has
+// no world-space thickness, so the tracer walked thk of the host and the rest of the path already
+// carries it. The host is the side of a glued pair that is not the solid - the near medium on an
+// entry, the far medium on an exit.
+//
+// Preconditions, all met by diag_palette: mu = 1, no permittivity resonance, att = 0 so every
+// interface gain is 1, tf = 0 so there is no port redistribution, alpha = 0 so the only in-sheet
+// loss is the conductivity the complex index already carries, m = 0 so the mass-law route is not
+// taken, and the displacement budget is uncapped so the full thickness is replaced. Under those
+// conditions the in-slab cosine the caller passes is inert in produce mode - it reaches only
+// excess_gain, which is 1 - so this reference does not take one.
+struct DiagSheet
+{
+    std::complex<double> T_te, T_tm, R_te, R_tm;
+    double fx_te = 1.0, fx_tm = 1.0;    // near -> far normal-flux conversion, transmit port only
+    std::complex<double> c_slab, c_far; // the cosines the sheet and far terms are evaluated at
+};
+
+static inline DiagSheet diag_sheet_composite(std::complex<double> e_near, std::complex<double> e_slab,
+                                             std::complex<double> e_far, double thk, double ct,
+                                             double f_hz, bool disp_far, bool scalar)
+{
+    const double k0 = 2.0 * QPI * f_hz / C0;
+    auto root = [](std::complex<double> a)
+    {
+        if (std::imag(a) == 0.0 && std::real(a) < 0.0)
+            a = std::complex<double>(std::real(a), -0.0); // decaying evanescent root
+        return std::sqrt(a);
+    };
+
+    const std::complex<double> zn = std::sqrt(e_near), zs = std::sqrt(e_slab), zf = std::sqrt(e_far);
+    const double s2 = 1.0 - ct * ct;
+    const std::complex<double> c1(ct, 0.0);
+    const std::complex<double> cs = root(1.0 - (e_near / e_slab) * s2);
+    const std::complex<double> cf = root(1.0 - (e_near / e_far) * s2);
+
+    DiagSheet D;
+    D.c_slab = cs, D.c_far = cf;
+
+    // near | sheet, at c1 in the near medium and cs in the sheet
+    std::complex<double> r_ns_te = (zn * c1 - zs * cs) / (zn * c1 + zs * cs);
+    std::complex<double> t_ns_te = (2.0 * zn * c1) / (zn * c1 + zs * cs);
+    std::complex<double> t_sn_te = (2.0 * zs * cs) / (zs * cs + zn * c1);
+    std::complex<double> r_ns_tm = scalar ? r_ns_te : (zs * c1 - zn * cs) / (zs * c1 + zn * cs);
+    std::complex<double> t_ns_tm = scalar ? t_ns_te : (2.0 * zn * c1) / (zs * c1 + zn * cs);
+    std::complex<double> t_sn_tm = scalar ? t_sn_te : (2.0 * zs * cs) / (zn * cs + zs * c1);
+
+    // sheet | far, at cs in the sheet and cf in the far medium
+    std::complex<double> r_sf_te = (zs * cs - zf * cf) / (zs * cs + zf * cf);
+    std::complex<double> t_sf_te = (2.0 * zs * cs) / (zs * cs + zf * cf);
+    std::complex<double> r_sf_tm = scalar ? r_sf_te : (zf * cs - zs * cf) / (zf * cs + zs * cf);
+    std::complex<double> t_sf_tm = scalar ? t_sf_te : (2.0 * zs * cs) / (zf * cs + zs * cf);
+
+    // One-way propagation across the sheet, at cs, and the host propagation it replaces, taken at
+    // the host's own cosine over the same normal thickness.
+    const std::complex<double> phi =
+        std::exp(std::complex<double>(0.0, -1.0) * k0 * std::sqrt(e_slab) * thk * cs);
+    const std::complex<double> e_disp = disp_far ? e_far : e_near;
+    const std::complex<double> c_disp = root(1.0 - (e_near / e_disp) * s2);
+    const std::complex<double> phi_disp =
+        std::exp(std::complex<double>(0.0, -1.0) * k0 * std::sqrt(e_disp) * thk * c_disp);
+    const std::complex<double> phi_t = phi / phi_disp;
+
+    // Near -> far normal flux, per channel. Both denominators collapse to Re(z_n) * ct for a real
+    // incidence cosine, so with a real near side the two channels can separate only through the far
+    // medium. The gate is near == far, which is why an isolated sheet and a sheet embedded in a
+    // medium both take the factor as exactly 1.
+    if (e_far != e_near)
+    {
+        double den_te = std::real(zn * c1), den_tm = std::real(std::conj(zn) * c1);
+        double num_te = std::real(zf * cf), num_tm = std::real(std::conj(zf) * cf);
+        D.fx_te = (den_te > 0.0 && num_te > 0.0) ? std::sqrt(num_te / den_te) : 0.0;
+        D.fx_tm = (den_tm > 0.0 && num_tm > 0.0) ? std::sqrt(num_tm / den_tm) : 0.0;
+        if (scalar)
+            D.fx_tm = D.fx_te;
+    }
+
+    // The internal series runs between the two sheet-side reflections, and r_sn = -r_ns.
+    std::complex<double> p2 = phi * phi;
+    std::complex<double> den_te = 1.0 + r_ns_te * r_sf_te * p2;
+    std::complex<double> den_tm = 1.0 + r_ns_tm * r_sf_tm * p2;
+
+    D.T_te = D.fx_te * t_ns_te * t_sf_te * phi_t / den_te;
+    D.T_tm = D.fx_tm * t_ns_tm * t_sf_tm * phi_t / den_tm;
+    D.R_te = r_ns_te + t_ns_te * t_sn_te * r_sf_te * p2 / den_te;
+    D.R_tm = r_ns_tm + t_ns_tm * t_sn_tm * r_sf_tm * p2 / den_tm;
+    return D;
+}
+
+TEST_CASE("Glued sheet - the near-to-far flux conversion")
+{
+    // qd_slab_resolve produce mode applies the near-to-far obliquity factor once, on the transmit
+    // port, so that a glued sheet reports the same energy as the equivalent traced entry. The branch
+    // is gated on near != far, so only sheet_case 2 (glued entry, air | sheet | solid) and
+    // sheet_case 3 (glued exit, solid | sheet | air) reach it. It shipped unmeasured: every existing
+    // sheet case is air | sheet | air or has near == far on every row.
+    //
+    // Six stacks. Two exercise the trivial branch and four the non-trivial one. The embedded row is
+    // there so the gate is pinned as near == far rather than as "far is air": it is a sheet inside a
+    // medium, where the factor must still be exactly 1.
+    //
+    // ISOLATION. The composite is what is measured, so nothing else may multiply it.
+    //   - Entry rows run with mtl_current = 0, so SHEET_EVENT applies no host factors at all and the
+    //     written field is the composite outright. Those rows are asserted complex.
+    //   - Rows inside a medium close out a host leg. eps = 1.5 puts the survival gate above any
+    //     reachable rho, so the correction-mode series declines and SLAB_AIRY_FACTOR applies
+    //     nothing; SCALE_BY_MEDIUM then contributes sqrt(medium_gain) with a phase. Those rows are
+    //     asserted per-channel in power, where the phase drops out. That is the right target anyway:
+    //     fx is a real positive scale and cannot move a phase, and the composite phase is already
+    //     pinned by the air | sheet | air cases.
+    //
+    // Channel identification: make1 puts orig, fbs and dest on the x axis with the normal along x,
+    // so the incidence plane is degenerate, qd_polbasis takes its identity branch, and VV is TM
+    // while HH is TE, for the reflected direction as well as the transmitted one.
+    //
+    // The exit sweeps stop at 50 deg. The internal critical angle of eps 1.50 against air is
+    // 54.7 deg, and past it the slab-side TM reflection magnitude exceeds 1 for a lossy sheet, which
+    // apply_tf clamps; that is a separate question from this one and is kept out of the measurement.
+    const double f_hz = FRQ;
+    const double thk = 0.006; // the sheet material's own thickness column
+    const double L = 0.10;    // host path up to the sheet, only read on the rows inside a medium
+    auto mtl = diag_palette<double>();
+
+    const uint8_t OT_SHEET_ISO = 67;   // ok | sheet, no co-located face
+    const uint8_t OT_GLUED_ENTRY = 71; // ok | front | co-located | sheet -> sheet_case 2
+    const uint8_t OT_GLUED_EXIT = 69;  // ok | co-located | sheet      -> sheet_case 3
+    const int SHEET = 3, LOSSY = 1, LO = 5, LO_CLEAN = 6;
+
+    struct Row
+    {
+        const char *name;
+        uint8_t otype;
+        unsigned nH;
+        int m2;       // the co-located non-sheet face, 0 when there is none
+        int cur;      // medium the ray is travelling in
+        int e_near;   // palette index of the near medium (0 = air)
+        int e_far;    // palette index of the far medium
+        bool disp_far;
+        double lim;   // highest angle swept
+        bool trivial; // near == far, so the factor must be exactly 1
+    };
+    const std::vector<Row> rows = {
+        {"isolated   air | sheet | air", OT_SHEET_ISO, 1u, 0, 0, 0, 0, false, 85.0, true},
+        {"embedded   LO_CLEAN | sheet | LO_CLEAN", OT_SHEET_ISO, 1u, 0, LO_CLEAN, LO_CLEAN, LO_CLEAN, false, 50.0, true},
+        {"entry      air | sheet | LOSSY", OT_GLUED_ENTRY, 2u, LOSSY, 0, 0, LOSSY, false, 85.0, false},
+        {"entry      air | sheet | LO", OT_GLUED_ENTRY, 2u, LO, 0, 0, LO, false, 85.0, false},
+        {"exit       LO_CLEAN | sheet | air", OT_GLUED_EXIT, 2u, LO_CLEAN, LO_CLEAN, LO_CLEAN, 0, true, 50.0, false},
+        {"exit       LO | sheet | air", OT_GLUED_EXIT, 2u, LO, LO, LO, 0, true, 50.0, false},
+    };
+
+    QD_DIAG("\n# diag: glued-sheet near-to-far flux conversion, sheet eps 5.24 - 0.63j, thk 6 mm\n");
+    QD_DIAG("# fx_dB is what the composite carries against one built with the factor omitted\n");
+    QD_DIAG("stack,theta_n,fx_te,fx_tm,fx_te_dB,fx_tm_dB,P_te_meas,P_te_ref,P_tm_meas,P_tm_ref,"
+            "d_te,d_tm,rtype\n");
+
+    for (const auto &R : rows)
+        for (double thd : {0.0, 10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 85.0})
+        {
+            if (thd > R.lim)
+                continue;
+            double theta_n = thd * QPI / 180.0, ct = std::cos(theta_n);
+
+            auto C = make1<double>(mtl, /*EM transmission*/ 1, R.otype, R.nH,
+                                   /*M1 = the sheet face*/ SHEET, /*M2*/ R.m2,
+                                   /*prev*/ 0, /*cur*/ R.cur, /*buf*/ 0,
+                                   L, 0.5, 0.5, QPI / 2.0 - theta_n,
+                                   /*eps: the host series must not fire*/ 1.5);
+            C.run();
+
+            DiagSheet D = diag_sheet_composite(diag_eps(R.e_near, f_hz), diag_eps(SHEET, f_hz),
+                                               diag_eps(R.e_far, f_hz), thk, ct, f_hz,
+                                               R.disp_far, false);
+
+            // The host leg the crossing closes out. Lossless hosts contribute exactly 1 in
+            // magnitude; the lossy one contributes the ITU-R P.2040 path form over L, which is what
+            // SCALE_BY_MEDIUM applies with no path_dir supplied.
+            double host_g = (R.cur == 0) ? 1.0 : diag_medium_gain(diag_eps(R.cur, f_hz), L, f_hz);
+
+            double vv2 = C.xprmat(0, 0) * C.xprmat(0, 0) + C.xprmat(1, 0) * C.xprmat(1, 0); // TM
+            double hh2 = C.xprmat(6, 0) * C.xprmat(6, 0) + C.xprmat(7, 0) * C.xprmat(7, 0); // TE
+            double P_te = std::norm(D.T_te) * host_g, P_tm = std::norm(D.T_tm) * host_g;
+
+            QD_DIAG("%s,%.1f,%.6f,%.6f,%+.4f,%+.4f,%.9e,%.9e,%.9e,%.9e,%.2e,%.2e,%u\n",
+                    R.name, thd, D.fx_te, D.fx_tm,
+                    20.0 * std::log10(D.fx_te > 0.0 ? D.fx_te : 1.0),
+                    20.0 * std::log10(D.fx_tm > 0.0 ? D.fx_tm : 1.0),
+                    hh2, P_te, vv2, P_tm, hh2 - P_te, vv2 - P_tm,
+                    (unsigned)C.resolved_type[0]);
+
+            INFO(R.name << ", theta_n " << thd);
+            REQUIRE(std::isfinite(C.gain(0)));
+            REQUIRE(C.resolved_type[0] != 0); // the ray must survive: case 4 kills, and so does a
+                                              // hit code that fails the sheet re-derivation
+
+            // The composite, per channel, against the hand-built stack.
+            CHECK(std::abs(hh2 - P_te) < 1.0e-9);
+            CHECK(std::abs(vv2 - P_tm) < 1.0e-9);
+            CHECK(std::abs((double)C.gain(0) - 0.5 * (P_te + P_tm)) < 1.0e-9);
+
+            // Where nothing else multiplies the composite, pin the phase too.
+            if (R.cur == 0)
+            {
+                CHECK(std::abs(cpx(C.xprmat, 0, 0) - D.T_tm) < 1.0e-9);
+                CHECK(std::abs(cpx(C.xprmat, 0, 3) - D.T_te) < 1.0e-9);
+            }
+
+            if (R.trivial)
+            {
+                // near == far: the factor is identically 1, not merely close to it. This is what
+                // separates the two branches, and it holds for a sheet embedded in a medium as well
+                // as for one in air.
+                CHECK(D.fx_te == 1.0);
+                CHECK(D.fx_tm == 1.0);
+            }
+            else
+            {
+                // And the non-trivial branch is worth enough that the assertion above cannot pass
+                // with the factor removed. It is 3.6 dB at normal incidence for the lossy entry, so
+                // this does not rely on grazing angles.
+                CHECK(std::abs(20.0 * std::log10(D.fx_te)) > 0.5);
+                CHECK(std::abs(hh2 - P_te / (D.fx_te * D.fx_te)) > 1.0e-6);
+                CHECK(std::abs(vv2 - P_tm / (D.fx_tm * D.fx_tm)) > 1.0e-6);
+            }
+        }
+
+    // The reflect port carries no flux conversion, because a reflection turns around in the near
+    // medium where the obliquity ratio is 1. Measured on the entry rows only, where mtl_current is 0
+    // and the reflection pass applies nothing beyond the composite itself.
+    QD_DIAG("\n# diag: glued-sheet reflect port, which carries no flux conversion\n");
+    QD_DIAG("stack,theta_n,R_te_meas,R_te_ref,R_tm_meas,R_tm_ref,d_te,d_tm,rtype\n");
+
+    for (const auto &R : rows)
+    {
+        if (R.cur != 0)
+            continue;
+        for (double thd : {0.0, 20.0, 40.0, 60.0, 80.0})
+        {
+            double theta_n = thd * QPI / 180.0, ct = std::cos(theta_n);
+            auto C = make1<double>(mtl, /*EM reflection*/ 0, R.otype, R.nH,
+                                   SHEET, R.m2, /*prev*/ 0, /*cur*/ R.cur, /*buf*/ 0,
+                                   L, 0.5, 0.5, QPI / 2.0 - theta_n, 1.5);
+            C.run();
+
+            DiagSheet D = diag_sheet_composite(diag_eps(R.e_near, f_hz), diag_eps(SHEET, f_hz),
+                                               diag_eps(R.e_far, f_hz), thk, ct, f_hz,
+                                               R.disp_far, false);
+
+            std::complex<double> vv = cpx(C.xprmat, 0, 0), hh = cpx(C.xprmat, 0, 3);
+            QD_DIAG("%s,%.1f,%.9f,%.9f,%.9f,%.9f,%.2e,%.2e,%u\n",
+                    R.name, thd, std::abs(hh), std::abs(D.R_te), std::abs(vv), std::abs(D.R_tm),
+                    std::abs(hh - D.R_te), std::abs(vv - D.R_tm), (unsigned)C.resolved_type[0]);
+
+            INFO(R.name << " reflect, theta_n " << thd);
+            REQUIRE(std::isfinite(C.gain(0)));
+            CHECK(std::abs(hh - D.R_te) < 1.0e-9);
+            CHECK(std::abs(vv - D.R_tm) < 1.0e-9);
+        }
+    }
+}
+
 TEST_CASE("Exit boundary - the port at the recovered angle")
 {
     // The far face of a traced solid, measured against a hand-built reference at the exact
