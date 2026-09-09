@@ -2552,6 +2552,23 @@ static inline std::complex<double> diag_medium_geo(std::complex<double> es, doub
            std::exp(std::complex<double>(0.0, -k0 * (n_re * dist - dist_geo)));
 }
 
+// In-medium traversal on the walk-off branch, in its general form. SCALE_BY_MEDIUM takes this
+// branch whenever walk_off is true, which on a sheet crossing means the reflection pass:
+//   sqrt(medium_gain(dist_refract)) * exp(-j k0 (n_re dist_refract ct_t^2 - dist_geo ct^2))
+// diag_medium_geo is the ct_t = ct = 1 special case of it and cannot be used where the traced and
+// geometric cosines differ. The palette carries no alpha and no mass term, so medium_gain is the
+// ITU-R P.2040 path form over dist_refract alone.
+static inline std::complex<double> diag_medium_walk(std::complex<double> es, double dist_refract,
+                                                    double ct_traced, double dist_geo,
+                                                    double ct_geo, double f_hz)
+{
+    const double k0 = 2.0 * QPI * f_hz / C0;
+    double n_re = std::real(std::sqrt(es));
+    double excess = k0 * (n_re * dist_refract * ct_traced * ct_traced - dist_geo * ct_geo * ct_geo);
+    return std::sqrt(diag_medium_gain(es, dist_refract, f_hz)) *
+           std::exp(std::complex<double>(0.0, -excess));
+}
+
 // Two coplanar triangles spanning +-half in y and z at x = x0, normal along -x, so a ray
 // travelling towards +x makes a front-side hit and the crossing is air -> medium. Same winding as
 // the builder in the ray_mesh_interact suite; the shared triangulation edge runs along y + z = 0,
@@ -2934,11 +2951,29 @@ TEST_CASE("Diagnostic - Excess-phase walk-off convention")
     // it did. A thin sheet is never displaced and carries the cos^2 form unconditionally, so the two
     // paths describe different geometries and their phases differ.
     //
-    // The first run pinned the applied form exactly: with no path_dir supplied it is
-    // -k0 * (n - 1) * L * cos^2(theta_fbs), matching to 0.000 deg at every angle. Both candidate
-    // conventions are printed against it. The lossless material keeps the in-slab angle real, which
-    // isolates the convention from every complex-angle effect. eps = 1.5 for the resolve gate means
-    // the series never fires, so only the medium factor acts.
+    // Both terms sit on the thickness axis. Grouping each into a normal thickness, d_t =
+    // dist_refract * ct_t and d_i = dist_geo * ct_i, the applied argument is
+    // -k0 * (n * d_t * ct_t - d_i * ct_i), which is the tilted-slab excess phase
+    // k0 * d * (n * cos_t - cos_i) referenced to the emergent wavefront rather than to the ray path.
+    // An undeviated tracer holds no cos_t, so the branch substitutes cos_i and the expression
+    // collapses to k0 * d * cos_i * (n - 1) = k0 * L * cos_i^2 * (n - 1). That is what the cos^2
+    // standing in for the untraced lateral shift amounts to.
+    //
+    // The case isolates that factor. With no path_dir supplied use_vbs is false, so REPLACE_BY_VBS
+    // takes its fast return and writes no coefficient; the buffer branch above that return needs
+    // mtl_buffer != 0 and the fixture passes 0. eps = 1.5 exceeds any reachable rho, which is
+    // bounded by 1, so SLAB_AIRY_FACTOR declines on every row. out / in is the medium factor alone.
+    // The lossless material keeps the in-slab angle real, which isolates the convention from every
+    // complex-angle effect and puts medium_gain at exactly 1.
+    //
+    // What this fixture cannot separate. use_vbs false forces walk_off true whatever refl_pass and
+    // resolved hold, dist_refract equals dist_geo, and ct_t equals ct_i, so the two cosines and the
+    // two length ledgers are one quantity each here; any degree-2 split on the n-term agrees. The
+    // recovery also declines on its no-direction gate, so the exact branch is unreachable. The
+    // reference below is therefore called in its general form with those equalities passed in as
+    // arguments rather than written into the expression, so the row states what it rests on. A
+    // fixture that separates them needs path_dir_prev at an angle to orig -> FBS on a leg that still
+    // takes this branch, which is issue 7's and not this one's.
     const double f_hz = FRQ;
     const double L = 0.10;
     auto mtl = diag_palette<double>();
@@ -2980,6 +3015,29 @@ TEST_CASE("Diagnostic - Excess-phase walk-off convention")
 
         CHECK(std::isfinite(C.gain(0)));
         CHECK(C.gain(0) >= 0.0);
+
+        // Promoted. The applied factor against the general walk-off traversal form, with the
+        // fixture's own degeneracies (ct_t = ct_i = ct, dist_refract = dist_geo = L) supplied as
+        // arguments. Written this way the row survives issue 7 in either direction: narrowing
+        // walk_off leaves this leg on the branch, routing recovered-cosine legs to the exact form
+        // leaves it alone because no cosine is recovered here, and a change to which cosine the
+        // walk-off form reads lands in diag_medium_walk rather than in this expression.
+        //
+        // The magnitude is asserted with the phase so the object pinned is the factor and not its
+        // argument. The palette carries no alpha and the material is lossless, so medium_gain is 1
+        // and this also catches an interface coefficient or an undeclined series reaching this path.
+        std::complex<double> ref = diag_medium_walk(diag_eps(SLAB, f_hz), L, ct, L, ct, f_hz);
+
+        INFO("angle " << thd);
+        CHECK(std::abs(wrap(a - std::arg(ref) * 180.0 / QPI)) < 1.0e-2);
+        CHECK(std::abs(std::abs(applied) - std::abs(ref)) < 1.0e-12);
+
+        // The raw-path convention, the other column the table prints, is excluded by a margin that
+        // grows with the angle. The equality above says nothing about whether the row can tell the
+        // two conventions apart; this records that it can. The two coincide at normal incidence by
+        // construction, so the margin is claimed only past it.
+        if (thd > 0.0)
+            CHECK(std::abs(wrap(a - rw)) > 1.0);
     }
 }
 
@@ -3373,23 +3431,6 @@ static inline DiagSheet diag_cm_stack(std::complex<double> e_near, std::complex<
     D.T_te = D.fx_te * t_te / phi_disp;
     D.T_tm = D.fx_tm * t_tm / phi_disp;
     return D;
-}
-
-// In-medium traversal on the walk-off branch, in its general form. SCALE_BY_MEDIUM takes this
-// branch whenever walk_off is true, which on a sheet crossing means the reflection pass:
-//   sqrt(medium_gain(dist_refract)) * exp(-j k0 (n_re dist_refract ct_t^2 - dist_geo ct^2))
-// diag_medium_geo is the ct_t = ct = 1 special case of it and cannot be used where the traced and
-// geometric cosines differ. The palette carries no alpha and no mass term, so medium_gain is the
-// ITU-R P.2040 path form over dist_refract alone.
-static inline std::complex<double> diag_medium_walk(std::complex<double> es, double dist_refract,
-                                                    double ct_traced, double dist_geo,
-                                                    double ct_geo, double f_hz)
-{
-    const double k0 = 2.0 * QPI * f_hz / C0;
-    double n_re = std::real(std::sqrt(es));
-    double excess = k0 * (n_re * dist_refract * ct_traced * ct_traced - dist_geo * ct_geo * ct_geo);
-    return std::sqrt(diag_medium_gain(es, dist_refract, f_hz)) *
-           std::exp(std::complex<double>(0.0, -excess));
 }
 
 TEST_CASE("Glued sheet - the near-to-far flux conversion")
