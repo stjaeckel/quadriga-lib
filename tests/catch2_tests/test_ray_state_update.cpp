@@ -2383,9 +2383,10 @@ static inline std::complex<double> diag_phi(std::complex<double> eps, double L,
 // Re(ct2) but Re(ct2)/sqrt(eta^2 sin^2 + Re(ct2)^2). Reproduced here so the fixture can hand the
 // function the same direction a tracer would have produced, and so the reference for the recovery is
 // the map that was actually applied rather than real-index Snell, which is a different map.
-static inline double diag_traced_ct(std::complex<double> eps_slab, double theta_ext_rad)
+static inline double diag_traced_ct(std::complex<double> eps_slab, double theta_ext_rad,
+                                    std::complex<double> mu_slab = std::complex<double>(1.0, 0.0))
 {
-    std::complex<double> eps_r = 1.0 / eps_slab; // entry medium is air
+    std::complex<double> eps_r = 1.0 / (eps_slab * mu_slab); // entry medium is air
     double s = std::sin(theta_ext_rad);
     std::complex<double> ct2 = std::sqrt(1.0 - eps_r * s * s);
     double eta = std::sqrt(std::abs(eps_r)), r = std::real(ct2);
@@ -2393,10 +2394,11 @@ static inline double diag_traced_ct(std::complex<double> eps_slab, double theta_
 }
 
 // The exact complex in-slab cosine the projection above stands for
-static inline std::complex<double> diag_ct_exact(std::complex<double> eps_slab, double theta_ext_rad)
+static inline std::complex<double> diag_ct_exact(std::complex<double> eps_slab, double theta_ext_rad,
+                                                 std::complex<double> mu_slab = std::complex<double>(1.0, 0.0))
 {
     double s = std::sin(theta_ext_rad);
-    return std::sqrt(1.0 - (1.0 / eps_slab) * s * s);
+    return std::sqrt(1.0 - (1.0 / (eps_slab * mu_slab)) * s * s);
 }
 
 // Conductivity-only medium gain over a path, ITU-R P.2040 form (the palette carries no alpha)
@@ -2426,12 +2428,14 @@ static inline std::complex<double> diag_r_slabside(std::complex<double> eps_s, s
 // average of the two outputs; split out because a scalar chain measures one channel.
 static inline void diag_slab_p_pol(std::complex<double> eps_s, double thk,
                                    double theta_n_rad, double f_hz,
-                                   double &p_te, double &p_tm)
+                                   double &p_te, double &p_tm,
+                                   std::complex<double> mu_s = std::complex<double>(1.0, 0.0))
 {
     const double k0 = 2.0 * QPI * f_hz / C0;
-    const std::complex<double> z1(1.0, 0.0), z2 = std::sqrt(eps_s), n = std::sqrt(eps_s);
+    const std::complex<double> z1(1.0, 0.0), z2 = std::sqrt(eps_s / mu_s),
+                               n = std::sqrt(eps_s * mu_s);
     const double c1 = std::cos(theta_n_rad), s1 = std::sin(theta_n_rad);
-    const std::complex<double> c2 = std::sqrt(1.0 - (1.0 / eps_s) * s1 * s1);
+    const std::complex<double> c2 = std::sqrt(1.0 - (1.0 / (eps_s * mu_s)) * s1 * s1);
     const std::complex<double> phi = std::exp(std::complex<double>(0.0, -1.0) * k0 * n * thk * c2);
     double p[2] = {0.0, 0.0};
     for (int pol = 0; pol < 2; ++pol)
@@ -2594,10 +2598,11 @@ static inline void diag_ray_at(double theta_n_deg, arma::mat &orig, arma::mat &d
 // internal; the same closed form the ray_mesh_interact suite uses as its oracle. Delegates to the
 // per-polarization form below so there is one copy of the closed form, not two.
 static inline double diag_slab_p_avg(std::complex<double> eps_s, double thk,
-                                     double theta_n_rad, double f_hz)
+                                     double theta_n_rad, double f_hz,
+                                     std::complex<double> mu_s = std::complex<double>(1.0, 0.0))
 {
     double p_te = 0.0, p_tm = 0.0;
-    diag_slab_p_pol(eps_s, thk, theta_n_rad, f_hz, p_te, p_tm);
+    diag_slab_p_pol(eps_s, thk, theta_n_rad, f_hz, p_te, p_tm, mu_s);
     return 0.5 * (p_te + p_tm);
 }
 
@@ -4076,6 +4081,302 @@ TEST_CASE("Traced solid - air | slab | air chain against the analytic slab")
             // split of the reference has not been swapped.
             CHECK(std::abs(diag_slab_p_avg(es, L, th, f_hz) - 0.5 * (p_te + p_tm)) < 1e-15);
         }
+    }
+}
+
+TEST_CASE("Permeability - the traced solid and a magnetic layer in a stack")
+{
+    // The sheet, glued and single-layer stack paths are covered elsewhere and the library was found
+    // correct on them without a source change. Two statements were left open by that work and are
+    // made here: a traced solid with mu != 1, and a magnetic layer inside an ordered stack.
+    //
+    // The analytic-slab oracle could not express either. diag_slab_p_pol formed both the admittance
+    // and the index as sqrt(eps), so a magnetic slab had no reference at all; it now takes the same
+    // three substitutions the sheet builders took, z = sqrt(eps/mu), the Snell ratio as a ratio of
+    // eps*mu products, and n = sqrt(eps*mu). diag_traced_ct and diag_ct_exact take the third of
+    // those, since the map qd_refract applies is built from the product.
+    //
+    // What is distinct about a magnetic traced solid, over and above a magnetic sheet:
+    //
+    //   The telescoping property does not read mu. The entry port carries
+    //   sqrt(Re(z_s c_s)/Re(z_a c_a)) and the exit port its reciprocal, and the pair cancels as a
+    //   ratio of one and the same real number whatever z_s is. So mu cannot break it; what a
+    //   magnetic run checks is that both crossings still read the SAME z_s and the same c_s, which
+    //   is the property the recovered cosine exists to provide.
+    //
+    //   The swap leaves the geometry bit-identical. qd_refract's snell, its refraction root, the
+    //   total-reflection test, EXACT_IN_SLAB_COSINE's eps_r, medium_gain's loss rate and
+    //   SCALE_BY_MEDIUM's index are all eps*mu products, so an eps<->mu swap moves nothing about
+    //   the traced path, the recovered cosine or the traversal - only the two interface channels,
+    //   which it exchanges. That is a stronger statement than the sheet version of it, because it
+    //   also asserts that none of the geometry reads the admittance.
+    const double f_hz = FRQ;
+    const double L = 0.10;   // normal thickness of the traced solid
+    const double thk = 0.006; // sheet thickness in the stack block
+    arma::mat mesh = diag_quad_x(200.0, 0.0);
+    const std::complex<double> U(1.0, 0.0), e_air(1.0, 0.0);
+
+    struct MuRow
+    {
+        double a, c, e, g, thk;
+    };
+    const int MSOL = 1, MSWP = 2, MMAT = 3, MLAY = 4, DLAY = 5;
+    const std::vector<MuRow> pal = {
+        {1.50, 0.40 / 17.98, 1.20, 0.0, 0.0},                  // 1 MSOL, magnetic lossy solid
+        {1.20, 0.0, 1.50, 0.40 / 17.98, 0.0},                  // 2 MSWP, its eps<->mu swap
+        {2.00, 0.0, 2.00, 0.0, 0.0},                           // 3 MMAT, matched: z = 1, n = 2
+        {5.24, 0.63 / 17.98, 2.10, 0.35 / 17.98, 0.006},       // 4 MLAY, magnetic sheet layer
+        {1.50, 0.40 / 17.98, 1.00, 0.0, 0.006},                // 5 DLAY, dielectric sheet layer
+    };
+    const std::complex<double> e_sol(1.50, -0.40), mu_sol(1.20, 0.0);
+    const std::complex<double> e_swp(1.20, 0.0), mu_swp(1.50, -0.40);
+    const std::complex<double> e_mat(2.0, 0.0), mu_mat(2.0, 0.0);
+    const std::complex<double> e_lay(5.24, -0.63), mu_lay(2.10, -0.35);
+    const std::complex<double> e_dly(1.50, -0.40);
+
+    std::unordered_map<std::string, std::vector<double>> mtl;
+    for (const char *k : {"a", "b", "c", "d", "e", "f", "g", "h", "thk", "att", "attB",
+                          "alpha", "alphaB", "fRef"})
+        mtl[k] = std::vector<double>(pal.size(), 0.0);
+    for (size_t i = 0; i < pal.size(); ++i)
+    {
+        mtl["a"][i] = pal[i].a, mtl["c"][i] = pal[i].c;
+        mtl["e"][i] = pal[i].e, mtl["g"][i] = pal[i].g;
+        mtl["thk"][i] = pal[i].thk, mtl["fRef"][i] = 1.0;
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // A traced air | slab | air chain through a magnetic solid, assembled from the ports the two
+    // public functions write, exactly as the dielectric chain case assembles it: the entry
+    // coefficient and the refracted direction from ray_mesh_interact, the exit leg from
+    // ray_state_update, nothing reconstructed in between.
+    //
+    // The sweep stops at 75 deg. The internal critical angle of eps*mu = 1.80 - 0.48j is 47.6 deg
+    // and the traced internal angle reaches 45.5 deg at 75 deg of external incidence, so the whole
+    // sweep stays below it with about two degrees to spare and no row turns into a forced mirror.
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: permeability, traced air | slab | air chain, normal thickness 100 mm\n");
+    QD_DIAG("# MSOL is eps 1.50 - 0.40j with mu 1.20; MSWP is the eps<->mu swap of it, so the two\n");
+    QD_DIAG("# share every cosine and every phase and differ only in the admittance.\n");
+    QD_DIAG("mtl,theta_ext,ct_mesh,ct_map,d_ct,chain_dB,ana_dB,d_dB,rtype\n");
+
+    struct Solid
+    {
+        const char *name;
+        int idx;
+        std::complex<double> e, mu;
+    };
+    const std::vector<Solid> solids = {
+        {"MSOL", MSOL, e_sol, mu_sol},
+        {"MSWP", MSWP, e_swp, mu_swp},
+        {"MMAT", MMAT, e_mat, mu_mat},
+    };
+
+    // The sweep starts at 10 deg, as the dielectric chain case does. At exactly normal incidence
+    // the traced and geometric cosines coincide, ray_state_update drops use_vbs on its own 1e-6
+    // re-test, and the traversal falls back to the hybrid path form, which sits 2.5e-5 dB from the
+    // exact one and would not clear the bound below. That gap is its own open item and is nothing
+    // to do with permeability, so it is kept out of the measurement rather than absorbed into it.
+    for (const auto &S : solids)
+        for (double thd : {10.0, 20.0, 40.0, 60.0, 75.0})
+        {
+            double th = thd * QPI / 180.0;
+
+            arma::mat orig, dest;
+            diag_ray_at(thd, orig, dest);
+            arma::uvec mtl_ind(mesh.n_rows, arma::fill::value((arma::uword)S.idx));
+
+            arma::mat fbs, sbs;
+            arma::u32_vec fbs_ind, sbs_ind;
+            quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, NULL,
+                                                 &fbs_ind, &sbs_ind);
+            REQUIRE(fbs_ind.n_elem == 1);
+            REQUIRE(fbs_ind(0) != 0);
+
+            arma::mat origN, destN, xprmatN, path_dirN, normal_vecN;
+            arma::vec gainN;
+            quadriga_lib::ray_mesh_interact(4, f_hz, &orig, &dest, &mesh, &mtl_ind, &mtl,
+                                            &fbs_ind, &sbs_ind, (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                            &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                            &gainN, &xprmatN, (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                            (arma::vec *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr,
+                                            &normal_vecN, (std::vector<uint8_t> *)nullptr,
+                                            &path_dirN, true, (arma::u32_vec *)nullptr);
+
+            REQUIRE(path_dirN.n_rows == 1);
+            std::complex<double> a_entry(xprmatN(0, 0), xprmatN(1, 0));
+
+            double nx = normal_vecN(0, 0), ny = normal_vecN(0, 1), nz = normal_vecN(0, 2);
+            double ct_mesh = std::abs(path_dirN(0, 0) * nx + path_dirN(0, 1) * ny + path_dirN(0, 2) * nz);
+            double ct_map = diag_traced_ct(S.e, th, S.mu);
+
+            auto C = make1<double>(mtl, 4, OT_EXIT, 1u,
+                                   /*M1*/ S.idx, /*M2*/ 0, /*prev*/ 0, /*cur*/ S.idx, /*buf*/ 0,
+                                   L, 0.5, 0.5, QPI / 2.0 - th, /*always resolve*/ 0.0);
+            C.has_path_dir = true;
+            C.path_dir_prev.zeros(1, 3);
+            C.path_dir_prev(0, 0) = path_dirN(0, 0);
+            C.path_dir_prev(0, 1) = path_dirN(0, 1);
+            C.path_dir_prev(0, 2) = path_dirN(0, 2);
+            C.run();
+
+            std::complex<double> chain = a_entry * cpx(C.xprmat, 0, 0);
+
+            double p_te = 0.0, p_tm = 0.0;
+            diag_slab_p_pol(S.e, L, th, f_hz, p_te, p_tm, S.mu);
+
+            double chain_dB = 10.0 * std::log10(std::max(1e-300, std::norm(chain)));
+            double ana_dB = 10.0 * std::log10(std::max(1e-300, p_te));
+
+            QD_DIAG("%s,%.1f,%.9f,%.9f,%.3e,%.6f,%.6f,%.6f,%u\n",
+                    S.name, thd, ct_mesh, ct_map, std::abs(ct_mesh - ct_map),
+                    chain_dB, ana_dB, chain_dB - ana_dB, (unsigned)C.resolved_type[0]);
+
+            INFO(S.name << ", theta_ext " << thd);
+
+            // The direction the tracer wrote is the map the recovery inverts, with the product
+            // eps*mu in both. A gap here means the map and the reference have drifted apart.
+            CHECK(std::abs(ct_mesh - ct_map) < 1.0e-9);
+
+            // Entry port, traversal, exit port and series, telescoping onto the analytic slab.
+            CHECK(std::abs(chain_dB - ana_dB) < 1.0e-6);
+            CHECK(std::abs(diag_slab_p_avg(S.e, L, th, f_hz, S.mu) - 0.5 * (p_te + p_tm)) < 1.0e-15);
+
+            // The matched solid, eps = mu = 2, has unit admittance, so neither face reflects at
+            // normal incidence and the lossless slab is fully transparent there. At any angle its
+            // two channels stay equal, because equal admittances collapse the TE and TM Fresnel
+            // expressions onto the same function of the two cosines. No permittivity reaches
+            // either statement.
+            if (S.idx == MMAT)
+                CHECK(std::abs(p_te - p_tm) < 1.0e-14);
+        }
+
+    // The matched solid at normal incidence, on the reference alone, where the chain cannot be used
+    // for the reason above. With z = 1 on both sides neither face reflects and a lossless slab is
+    // fully transparent whatever its index; the transmitted field is the propagation across it and
+    // nothing else. No permittivity reaches this, because one that moves n also moves z.
+    {
+        double p_te = 0.0, p_tm = 0.0;
+        diag_slab_p_pol(e_mat, L, 0.0, f_hz, p_te, p_tm, mu_mat);
+        INFO("matched solid at normal incidence");
+        CHECK(std::abs(p_te - 1.0) < 1.0e-12);
+        CHECK(std::abs(p_tm - 1.0) < 1.0e-12);
+    }
+
+    // The swap, read off the two sweeps above. Scalar mode carries the TE channel only, so the
+    // exchange shows up as the swapped run's TE equalling the original run's TM. The traced cosine
+    // is asserted identical between the two, which is the geometry half of the statement.
+    QD_DIAG("\n# diag: permeability, eps<->mu swap on a traced solid\n");
+    QD_DIAG("theta_ext,d_ct,p_te_swp,p_tm_sol,d_exchange,separation_dB\n");
+
+    for (double thd : {0.0, 10.0, 20.0, 40.0, 60.0, 75.0})
+    {
+        double th = thd * QPI / 180.0;
+        double a_te = 0.0, a_tm = 0.0, b_te = 0.0, b_tm = 0.0;
+        diag_slab_p_pol(e_sol, L, th, f_hz, a_te, a_tm, mu_sol);
+        diag_slab_p_pol(e_swp, L, th, f_hz, b_te, b_tm, mu_swp);
+
+        double ct_a = diag_traced_ct(e_sol, th, mu_sol), ct_b = diag_traced_ct(e_swp, th, mu_swp);
+        double sep = 10.0 * std::log10(a_te / a_tm);
+
+        QD_DIAG("%.1f,%.3e,%.9e,%.9e,%.3e,%+.4f\n", thd, std::abs(ct_a - ct_b),
+                b_te, a_tm, std::abs(b_te - a_tm), sep);
+
+        INFO("swap, theta_ext " << thd);
+        CHECK(std::abs(ct_a - ct_b) < 1.0e-12); // the traced path does not move
+        CHECK(std::abs(b_te - a_tm) < 1.0e-14); // and the two channels exchange
+        CHECK(std::abs(b_tm - a_te) < 1.0e-14);
+
+        // Past normal incidence the two channels are far enough apart that the exchange is a
+        // statement rather than an identity between two equal numbers.
+        if (thd >= 40.0)
+            CHECK(std::abs(sep) > 1.0e-2);
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // A magnetic layer inside an ordered two-sheet stack, air | 6 mm | 6 mm | air. diag_cm_stack
+    // already carries (eps, mu) per layer, so this is a fixture row rather than a reference change.
+    // What it adds over a magnetic single sheet is the layer product: the matrix multiplies two
+    // layers whose admittances and indices are now independent of each other, and the order
+    // statement has to survive that.
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: permeability, ordered stack with one magnetic layer\n");
+    QD_DIAG("# air | MLAY (eps 5.24 - 0.63j, mu 2.10 - 0.35j) | DLAY (eps 1.50 - 0.40j) | air\n");
+    QD_DIAG("order,theta_n,ref_|T|,ref_|R|,out_|T|,out_|R|,dT,dR,rtype_T,rtype_R\n");
+
+    const uint8_t OT_STACK_FBS = 71; // FBS layer traversed first
+    const uint8_t OT_STACK_SBS = 69; // SBS layer traversed first
+
+    struct MuOrd
+    {
+        const char *name;
+        uint8_t otype;
+        std::complex<double> e1, mu1, e2, mu2;
+    };
+    const std::vector<MuOrd> orders = {
+        {"M|D", OT_STACK_FBS, e_lay, mu_lay, e_dly, U},
+        {"D|M", OT_STACK_SBS, e_dly, U, e_lay, mu_lay},
+    };
+
+    for (const auto &O : orders)
+        for (double thd : {0.0, 20.0, 45.0, 70.0})
+        {
+            double th = thd * QPI / 180.0;
+            std::complex<double> ci(std::cos(th), 0.0);
+
+            DiagSheet Xs = diag_cm_stack(e_air, U, {{O.e1, O.mu1, thk}, {O.e2, O.mu2, thk}},
+                                         e_air, U, ci, f_hz, false, /*scalar*/ true);
+            DiagSheet Xe = diag_cm_stack(e_air, U, {{O.e1, O.mu1, thk}, {O.e2, O.mu2, thk}},
+                                         e_air, U, ci, f_hz, false, /*EM*/ false);
+
+            auto run = [&](int itype)
+            {
+                auto C = make1<double>(mtl, itype, O.otype, 2u,
+                                       /*M1*/ MLAY, /*M2*/ DLAY,
+                                       /*prev*/ 0, /*cur = air*/ 0, /*buf*/ 0,
+                                       0.5, 0.5, 0.5, QPI / 2.0 - th, 0.0);
+                C.run();
+                return C;
+            };
+
+            auto Ct = run(4), Ce = run(1), Cr = run(3), Cx = run(0);
+
+            double gT = 0.5 * (std::norm(Xe.T_te) + std::norm(Xe.T_tm));
+            double gR = 0.5 * (std::norm(Xe.R_te) + std::norm(Xe.R_tm));
+            double dT = std::abs(cpx(Ct.xprmat, 0, 0) - Xs.T_te);
+            double dR = std::abs(cpx(Cr.xprmat, 0, 0) - Xs.R_te);
+
+            QD_DIAG("%s,%.1f,%.9f,%.9f,%.9f,%.9f,%.3e,%.3e,%u,%u\n",
+                    O.name, thd, std::abs(Xs.T_te), std::abs(Xs.R_te),
+                    std::abs(cpx(Ct.xprmat, 0, 0)), std::abs(cpx(Cr.xprmat, 0, 0)),
+                    dT, dR, (unsigned)Ct.resolved_type[0], (unsigned)Cr.resolved_type[0]);
+
+            INFO("magnetic stack " << O.name << ", theta_n " << thd);
+            CHECK(gT > 1.0e-3);
+            CHECK(gR > 1.0e-3);
+            CHECK(Ct.resolved_type[0] != 0);
+            CHECK(Cr.resolved_type[0] != 0);
+            CHECK(dT < 1.0e-9);
+            CHECK(dR < 1.0e-9);
+            CHECK(std::abs((double)Ce.gain(0) - gT) < 1.0e-9);
+            CHECK(std::abs((double)Cx.gain(0) - gR) < 1.0e-9);
+        }
+
+    // Reciprocity survives a magnetic layer: the transmit port of the stack does not depend on
+    // which layer comes first and the reflect port does, with the layers now differing in their
+    // admittance as well as their index.
+    for (double thd : {0.0, 45.0})
+    {
+        double th = thd * QPI / 180.0;
+        std::complex<double> ci(std::cos(th), 0.0);
+        DiagSheet MD = diag_cm_stack(e_air, U, {{e_lay, mu_lay, thk}, {e_dly, U, thk}},
+                                     e_air, U, ci, f_hz, false, false);
+        DiagSheet DM = diag_cm_stack(e_air, U, {{e_dly, U, thk}, {e_lay, mu_lay, thk}},
+                                     e_air, U, ci, f_hz, false, false);
+        INFO("magnetic stack order, theta_n " << thd);
+        CHECK(std::abs(MD.T_te - DM.T_te) < 1.0e-14);
+        CHECK(std::abs(MD.T_tm - DM.T_tm) < 1.0e-14);
+        CHECK(std::abs(MD.R_te - DM.R_te) > 1.0e-3);
     }
 }
 // ================================================================================================
