@@ -2288,6 +2288,15 @@ TEST_CASE("ray_state_update - input validation")
 //   6 LO_CLEAN eps = 1.50, lossless
 //   7 LO_SHEET electrically identical to LO, plus thk = 6 mm
 //   8 LO_CLEAN_TWIN electrically identical to LO_CLEAN, plus thk = 6 mm
+//   9 LO_NEAR  eps = 1.5015 - 0.40j at 1 GHz, plus thk = 6 mm
+//
+// LO_NEAR is a sheet NEAR-matched to LO rather than matched to it. The 1e-3 relative offset in the
+// real part is large enough that TRANSPARENT_TO fails, so SHEET_EVENT does not merge the host layer
+// and the sheet is written into the previous-medium word, and small enough that the host | sheet
+// reflection is 2.5e-4 in amplitude, so the wave passes through it almost unimpeded. It is the case
+// section 3.1 names as the one merge_host cannot catch: correction-mode Fresnel reads r = 0 at that
+// boundary and drops the host layer's internal series, when physically the sheet is a nearly
+// transparent 6 mm layer through which the wave still sees the real boundary behind it.
 //
 // The twins (3 with 1, 7 with 5, 8 with 6) are distinct material indices presenting no boundary to a
 // wave. Placed as the previous medium they make the far Fresnel coefficient vanish, so the Airy
@@ -2305,28 +2314,32 @@ static inline std::unordered_map<std::string, std::vector<dtype>> diag_palette()
 {
     std::unordered_map<std::string, std::vector<dtype>> m;
     m["a"] = {(dtype)5.24, (dtype)5.24, (dtype)5.24, (dtype)9.0,
-              (dtype)1.50, (dtype)1.50, (dtype)1.50, (dtype)1.50};
-    m["b"] = std::vector<dtype>(8, (dtype)0.0);
+              (dtype)1.50, (dtype)1.50, (dtype)1.50, (dtype)1.50, (dtype)1.5015};
+    m["b"] = std::vector<dtype>(9, (dtype)0.0);
     m["c"] = {(dtype)(0.63 / 17.98), (dtype)0.0, (dtype)(0.63 / 17.98), (dtype)(1.20 / 17.98),
-              (dtype)(0.40 / 17.98), (dtype)0.0, (dtype)(0.40 / 17.98), (dtype)0.0};
-    m["d"] = std::vector<dtype>(8, (dtype)0.0);
-    m["att"] = std::vector<dtype>(8, (dtype)0.0);
-    m["attB"] = std::vector<dtype>(8, (dtype)0.0);
-    m["alpha"] = std::vector<dtype>(8, (dtype)0.0);
-    m["alphaB"] = std::vector<dtype>(8, (dtype)0.0);
-    m["fRef"] = std::vector<dtype>(8, (dtype)1.0);
+              (dtype)(0.40 / 17.98), (dtype)0.0, (dtype)(0.40 / 17.98), (dtype)0.0,
+              (dtype)(0.40 / 17.98)};
+    m["d"] = std::vector<dtype>(9, (dtype)0.0);
+    m["att"] = std::vector<dtype>(9, (dtype)0.0);
+    m["attB"] = std::vector<dtype>(9, (dtype)0.0);
+    m["alpha"] = std::vector<dtype>(9, (dtype)0.0);
+    m["alphaB"] = std::vector<dtype>(9, (dtype)0.0);
+    m["fRef"] = std::vector<dtype>(9, (dtype)1.0);
     m["thk"] = {(dtype)0.0, (dtype)0.0, (dtype)0.006, (dtype)0.0,
-                (dtype)0.0, (dtype)0.0, (dtype)0.006, (dtype)0.006};
+                (dtype)0.0, (dtype)0.0, (dtype)0.006, (dtype)0.006, (dtype)0.006};
     return m;
 }
 
 // Complex relative permittivity of a diag_palette entry at f_hz
+// Index 0 is air, and the tables run to the palette's last material. They used to stop at 8
+// entries while the palette carried 8 materials, so a lookup for material 8 read one past the end;
+// no case called it, but adding material 9 makes the range explicit rather than latent.
 static inline std::complex<double> diag_eps(int idx, double f_hz)
 {
-    static const double a[8] = {1.0, 5.24, 5.24, 5.24, 9.0, 1.50, 1.50, 1.50};
-    static const double c[8] = {0.0, 0.63 / 17.98, 0.0, 0.63 / 17.98, 1.20 / 17.98,
-                                0.40 / 17.98, 0.0, 0.40 / 17.98};
-    if (idx < 1)
+    static const double a[10] = {1.0, 5.24, 5.24, 5.24, 9.0, 1.50, 1.50, 1.50, 1.50, 1.5015};
+    static const double c[10] = {0.0, 0.63 / 17.98, 0.0, 0.63 / 17.98, 1.20 / 17.98,
+                                 0.40 / 17.98, 0.0, 0.40 / 17.98, 0.0, 0.40 / 17.98};
+    if (idx < 1 || idx > 9)
         return std::complex<double>(1.0, 0.0);
     return std::complex<double>(a[idx], -17.98 * c[idx] / (f_hz * 1e-9));
 }
@@ -3218,6 +3231,150 @@ static inline DiagSheet diag_sheet_composite_cx(std::complex<double> e_near, std
     return D;
 }
 
+// One layer of a stratified stack: a complex permittivity and permeability pair and a normal
+// thickness. Permeability is carried from the start even though nothing supplies it yet, because
+// issue 3 generalizes the two builders above the same way and the core is meant to inherit a
+// reference that already has it.
+struct DiagLayer
+{
+    std::complex<double> e{1.0, 0.0};
+    std::complex<double> mu{1.0, 0.0};
+    double d = 0.0; // normal thickness, m
+};
+
+// Hand-built 2x2 characteristic-matrix reference for an ordered stack of layers between two
+// half-spaces. Shares no code with the library and no code with the two single-layer builders
+// above, which it has to reproduce.
+//
+// The variables. Per medium the admittance is z = sqrt(eps/mu) and the index is n = sqrt(eps mu),
+// and every cosine comes from the transverse invariant eps mu (1 - c^2), which is conserved across
+// every boundary and is fixed by the incidence cosine in the near medium. Per polarization the
+// tilted admittance is
+//
+//     eta_TE = z c        eta_TM = z / c
+//
+// which are the groupings the Fresnel expressions in the library are already written in: the TE
+// reflection is (eta1 - eta2)/(eta1 + eta2) exactly, and dividing the TM reflection through by
+// c1 c2 turns it into (eta2 - eta1)/(eta2 + eta1), so the library's TM reflection is minus the
+// admittance-form one and its TM transmission carries an extra c1/c2. Both conversions are applied
+// at the ends below.
+//
+// What propagates. Tangential E and tangential H are continuous across a boundary; normal flux is
+// not, since it decays inside a lossy layer. So the state that the matrix product carries is the
+// amplitude pair, and the conversion to per-channel normal flux is applied once, at the outer pair,
+// on the transmit port. Inside the product the intermediate admittances cancel identically, which
+// is the same statement as the library's "the intermediate slab flux cancels between the two
+// crossings and never appears in the composite", here for any layer count.
+//
+// The layer matrix for thickness d and phase delta = k0 n c d is
+//
+//     [ cos delta            (i / eta) sin delta ]
+//     [ i eta sin delta       cos delta          ]
+//
+// and with M the product in propagation order, [B; C] = M [1; eta_far],
+//
+//     r = (eta_near B - C) / (eta_near B + C)      t = 2 eta_near / (eta_near B + C)
+//
+// At one layer this reduces to the Airy pair term for term, which is asserted against both
+// builders above rather than assumed.
+//
+// The displaced host is not a matrix quantity. A sheet has no world-space thickness, so the
+// transmit port divides out the propagation of the medium the stack displaces over the total
+// normal thickness, capped by disp_budget exactly as produce mode caps it. Pass disp_budget = 0.0
+// where the reference is wanted undisplaced, which is what the reflect port always is.
+//
+// Same preconditions as the two builders above: no permittivity resonance, att = tf = alpha = 0,
+// and no mass-law column, so no interface gain and no port redistribution appear.
+static inline DiagSheet diag_cm_stack(std::complex<double> e_near, std::complex<double> mu_near,
+                                      const std::vector<DiagLayer> &layers,
+                                      std::complex<double> e_far, std::complex<double> mu_far,
+                                      std::complex<double> ct, double f_hz,
+                                      bool disp_far, bool scalar, double disp_budget = -1.0)
+{
+    const double k0 = 2.0 * QPI * f_hz / C0;
+    auto root = [](std::complex<double> a)
+    {
+        if (std::imag(a) == 0.0 && std::real(a) < 0.0)
+            a = std::complex<double>(std::real(a), -0.0); // decaying evanescent root
+        return std::sqrt(a);
+    };
+
+    const std::complex<double> w_near = e_near * mu_near; // the transverse invariant's anchor
+    const std::complex<double> s2 = 1.0 - ct * ct;
+    const std::complex<double> zn = std::sqrt(e_near / mu_near), zf = std::sqrt(e_far / mu_far);
+    const std::complex<double> cf = root(1.0 - (w_near / (e_far * mu_far)) * s2);
+
+    DiagSheet D;
+    D.c_far = cf;
+    D.c_slab = layers.empty() ? ct : root(1.0 - (w_near / (layers[0].e * layers[0].mu)) * s2);
+
+    std::complex<double> r_pol[2], t_pol[2];
+    for (int pol = 0; pol < 2; ++pol)
+    {
+        auto adm = [&](std::complex<double> z, std::complex<double> c)
+        { return (pol == 0) ? (z * c) : (z / c); };
+
+        std::complex<double> M11(1.0, 0.0), M12(0.0, 0.0), M21(0.0, 0.0), M22(1.0, 0.0);
+        for (const DiagLayer &L : layers)
+        {
+            std::complex<double> cj = root(1.0 - (w_near / (L.e * L.mu)) * s2);
+            std::complex<double> nj = std::sqrt(L.e * L.mu);
+            std::complex<double> dl = k0 * nj * cj * L.d;
+            std::complex<double> ej = adm(std::sqrt(L.e / L.mu), cj);
+
+            std::complex<double> A = std::cos(dl);
+            std::complex<double> B = std::complex<double>(0.0, 1.0) * std::sin(dl) / ej;
+            std::complex<double> Cc = std::complex<double>(0.0, 1.0) * ej * std::sin(dl);
+            std::complex<double> Dd = std::cos(dl);
+
+            std::complex<double> n11 = M11 * A + M12 * Cc, n12 = M11 * B + M12 * Dd;
+            std::complex<double> n21 = M21 * A + M22 * Cc, n22 = M21 * B + M22 * Dd;
+            M11 = n11, M12 = n12, M21 = n21, M22 = n22;
+        }
+
+        std::complex<double> y0 = adm(zn, ct), ys = adm(zf, cf);
+        std::complex<double> B = M11 + M12 * ys, Cc = M21 + M22 * ys;
+        std::complex<double> den = y0 * B + Cc;
+        r_pol[pol] = (y0 * B - Cc) / den;
+        t_pol[pol] = 2.0 * y0 / den;
+    }
+
+    // Into the library's amplitude convention: the TM reflection sign, and the TM cosine ratio,
+    // which telescopes over the stack because the intermediate cosines cancel in the product.
+    D.R_te = r_pol[0];
+    D.R_tm = scalar ? r_pol[0] : -r_pol[1];
+    std::complex<double> t_te = t_pol[0];
+    std::complex<double> t_tm = scalar ? t_pol[0] : (ct / cf) * t_pol[1];
+
+    // The one conversion to per-channel normal flux, at the outer pair, transmit port only.
+    if (e_far != e_near || mu_far != mu_near)
+    {
+        double den_te = std::real(zn * ct), den_tm = std::real(std::conj(zn) * ct);
+        double num_te = std::real(zf * cf), num_tm = std::real(std::conj(zf) * cf);
+        D.fx_te = (den_te > 0.0 && num_te > 0.0) ? std::sqrt(num_te / den_te) : 0.0;
+        D.fx_tm = (den_tm > 0.0 && num_tm > 0.0) ? std::sqrt(num_tm / den_tm) : 0.0;
+        if (scalar)
+            D.fx_tm = D.fx_te;
+    }
+
+    double t_tot = 0.0;
+    for (const DiagLayer &L : layers)
+        t_tot += L.d;
+    double t_disp = (disp_budget >= 0.0 && disp_budget < t_tot) ? disp_budget : t_tot;
+    if (t_disp < 0.0)
+        t_disp = 0.0;
+
+    const std::complex<double> e_d = disp_far ? e_far : e_near;
+    const std::complex<double> mu_d = disp_far ? mu_far : mu_near;
+    const std::complex<double> c_disp = root(1.0 - (w_near / (e_d * mu_d)) * s2);
+    const std::complex<double> phi_disp =
+        std::exp(std::complex<double>(0.0, -1.0) * k0 * std::sqrt(e_d * mu_d) * t_disp * c_disp);
+
+    D.T_te = D.fx_te * t_te / phi_disp;
+    D.T_tm = D.fx_tm * t_tm / phi_disp;
+    return D;
+}
+
 // In-medium traversal on the walk-off branch, in its general form. SCALE_BY_MEDIUM takes this
 // branch whenever walk_off is true, which on a sheet crossing means the reflection pass:
 //   sqrt(medium_gain(dist_refract)) * exp(-j k0 (n_re dist_refract ct_t^2 - dist_geo ct^2))
@@ -3856,5 +4013,384 @@ TEST_CASE("Traced solid - air | slab | air chain against the analytic slab")
             // split of the reference has not been swapped.
             CHECK(std::abs(diag_slab_p_avg(es, L, th, f_hz) - 0.5 * (p_te + p_tm)) < 1e-15);
         }
+    }
+}
+// ================================================================================================
+// Layered stacks. Issue 1 of the fix plan: there is no transfer-matrix core, so a stack of more
+// than one layer is either approximated or dropped. Three symptoms, measured separately below.
+//
+// The reference for all three is diag_cm_stack, the hand-built characteristic matrix defined
+// above. The first case pins that reference against the two single-layer builders the plan names
+// as its regression oracles; the second and third then use it on stacks the solver cannot express.
+// ================================================================================================
+
+TEST_CASE("Layered stack - the characteristic-matrix reference against the single-layer oracles")
+{
+    // diag_cm_stack has to reproduce diag_sheet_composite and diag_sheet_composite_cx exactly at
+    // one layer, since those are what the shipped composite is already asserted against. Nothing
+    // here touches the library: it is a check that two independently written closed forms agree,
+    // so that a failure in the two cases below is attributable to the solver rather than to the
+    // reference.
+    //
+    // Four further properties of the matrix product are asserted, each of which would catch a
+    // different transcription error:
+    //   a layer of zero thickness is inert, which pins the identity element,
+    //   splitting one layer into two halves is inert, which pins the product and the phase,
+    //   the transmit port is invariant under layer order, which is reciprocity (det M = 1),
+    //   the reflect port is not, which is the whole reason sheet_case 4 carries an order at all.
+    const double f_hz = FRQ;
+    const double thk = 0.006;
+    const std::complex<double> U(1.0, 0.0);
+
+    const std::complex<double> e_air(1.0, 0.0);
+    const std::complex<double> e_s = diag_eps(3, f_hz);  // sheet, eps 5.24 - 0.63j
+    const std::complex<double> e_lo = diag_eps(5, f_hz); // LO, eps 1.50 - 0.40j
+    const std::complex<double> e_d = diag_eps(4, f_hz);  // DENSER, eps 9.0 - 1.20j
+
+    struct Stack
+    {
+        const char *name;
+        std::complex<double> e_near, e_far;
+        bool disp_far;
+    };
+    const std::vector<Stack> stacks = {
+        {"air | sheet | air", e_air, e_air, false},
+        {"air | sheet | LO ", e_air, e_lo, false},
+        {"LO  | sheet | air", e_lo, e_air, true},
+        {"LO  | sheet | LO ", e_lo, e_lo, false},
+        {"DEN | sheet | LO ", e_d, e_lo, false},
+    };
+
+    QD_DIAG("\n# diag: characteristic-matrix reference against the single-layer builders\n");
+    QD_DIAG("stack,mode,theta_n,d_real_builder,d_complex_builder\n");
+
+    double worst_real = 0.0, worst_cx = 0.0;
+    for (const auto &S : stacks)
+        for (int mode = 0; mode < 2; ++mode) // 0 = EM, 1 = scalar
+            for (double thd : {0.0, 10.0, 30.0, 50.0, 70.0, 85.0, 89.9})
+            {
+                bool scalar = (mode == 1);
+                double th = thd * QPI / 180.0, ct = std::cos(th);
+
+                DiagSheet A = diag_sheet_composite(S.e_near, e_s, S.e_far, thk, ct, f_hz,
+                                                   S.disp_far, scalar);
+                DiagSheet B = diag_cm_stack(S.e_near, U, {{e_s, U, thk}}, S.e_far, U,
+                                            std::complex<double>(ct, 0.0), f_hz, S.disp_far, scalar);
+
+                double d_re = std::max(std::max(std::abs(A.T_te - B.T_te), std::abs(A.T_tm - B.T_tm)),
+                                       std::max(std::abs(A.R_te - B.R_te), std::abs(A.R_tm - B.R_tm)));
+
+                // The same statement at a complex incidence cosine, which is the argument the core
+                // will actually be handed wherever the near medium is a traced solid.
+                std::complex<double> cx = diag_ct_exact(e_lo, th);
+                DiagSheet Ac = diag_sheet_composite_cx(e_lo, e_s, S.e_far, thk, cx, f_hz,
+                                                       S.disp_far, scalar);
+                DiagSheet Bc = diag_cm_stack(e_lo, U, {{e_s, U, thk}}, S.e_far, U, cx, f_hz,
+                                             S.disp_far, scalar);
+                double d_cx = std::max(std::max(std::abs(Ac.T_te - Bc.T_te), std::abs(Ac.T_tm - Bc.T_tm)),
+                                       std::max(std::abs(Ac.R_te - Bc.R_te), std::abs(Ac.R_tm - Bc.R_tm)));
+
+                worst_real = std::max(worst_real, d_re);
+                worst_cx = std::max(worst_cx, d_cx);
+
+                QD_DIAG("%s,%s,%.1f,%.3e,%.3e\n", S.name, scalar ? "scalar" : "EM    ", thd, d_re, d_cx);
+
+                INFO(S.name << ", " << (scalar ? "scalar" : "EM") << ", theta_n " << thd);
+                CHECK(d_re < 1.0e-14);
+                CHECK(d_cx < 1.0e-14);
+            }
+
+    QD_DIAG("# worst against the real-cosine builder %.3e, against the complex one %.3e\n",
+            worst_real, worst_cx);
+
+    // Structural properties of the product, on a stack the two cases below both use.
+    for (double thd : {0.0, 40.0, 80.0})
+    {
+        double th = thd * QPI / 180.0;
+        std::complex<double> ci(std::cos(th), 0.0);
+
+        DiagSheet one = diag_cm_stack(e_air, U, {{e_s, U, thk}}, e_air, U, ci, f_hz, false, false);
+        DiagSheet zero = diag_cm_stack(e_air, U, {{e_s, U, thk}, {e_d, U, 0.0}}, e_air, U, ci, f_hz,
+                                       false, false);
+        DiagSheet half = diag_cm_stack(e_air, U, {{e_s, U, 0.5 * thk}, {e_s, U, 0.5 * thk}},
+                                       e_air, U, ci, f_hz, false, false);
+
+        DiagSheet AB = diag_cm_stack(e_air, U, {{e_s, U, thk}, {e_lo, U, thk}}, e_air, U, ci, f_hz,
+                                     false, false);
+        DiagSheet BA = diag_cm_stack(e_air, U, {{e_lo, U, thk}, {e_s, U, thk}}, e_air, U, ci, f_hz,
+                                     false, false);
+
+        INFO("theta_n " << thd);
+
+        // A layer of zero thickness contributes the identity.
+        CHECK(std::abs(one.T_te - zero.T_te) < 1.0e-14);
+        CHECK(std::abs(one.R_tm - zero.R_tm) < 1.0e-14);
+
+        // One layer and two halves of it are the same layer.
+        CHECK(std::abs(one.T_te - half.T_te) < 1.0e-14);
+        CHECK(std::abs(one.R_tm - half.R_tm) < 1.0e-14);
+
+        // Reciprocity: the transmit port of a stack does not depend on which layer comes first.
+        CHECK(std::abs(AB.T_te - BA.T_te) < 1.0e-14);
+        CHECK(std::abs(AB.T_tm - BA.T_tm) < 1.0e-14);
+
+        // The reflect port does. This is the only thing the ordering machinery of sheet_case 4
+        // exists to serve, and it is asserted so that a reference that lost the order shows up here
+        // rather than as a silent pass in the third case below.
+        CHECK(std::abs(AB.R_te - BA.R_te) > 1.0e-3);
+    }
+}
+
+TEST_CASE("Layered stack - a host layer bounded by a sheet")
+{
+    // Symptom one and symptom two of issue 1, on the same geometry.
+    //
+    // An i-o exit out of a host layer whose previous-medium word holds a sheet. APPLY_TRANSITION
+    // calls SLAB_AIRY_FACTOR(mtl_current, mtl_next, mtl_prev), so correction mode is handed the
+    // sheet as mat_far and treats it as a half-space: no thickness, no internal structure, and
+    // nothing behind it. The host layer's Airy denominator then reflects off an object that does
+    // not exist.
+    //
+    // Two sheets are swept. SHEET (eps 5.24 - 0.63j) is a real boundary and measures the
+    // cross-layer coupling: the denominator gets a reflection coefficient of roughly the right size
+    // but the wrong value. LO_NEAR (eps 1.5015 - 0.40j) is near-matched to the host and measures
+    // the series collapse: the half-space reflection is 2.5e-4, the denominator collapses onto 1,
+    // and the host loses its internal series entirely, when physically the wave passes through the
+    // sheet almost unimpeded and still sees the boundary behind it.
+    //
+    // The reference is the two-layer stack the crossing actually is. The quantity the harness can
+    // isolate is the series factor, so the reference is written as
+    //     S = 1 / (1 - r_ahead * r_behind * phi^2)
+    // with r_behind taken from the characteristic matrix rather than from a half-space Fresnel
+    // value. That factorization is exact: substituting the matrix value for r_behind reproduces the
+    // full two-layer stack, which is what makes a series-factor assertion a statement about the
+    // stack and not about the shape of the correction.
+    //
+    // Everything else in the row is held at the values the shipped diagnostic uses. No path_dir is
+    // supplied, so abs_cos_theta_t is the fbs cosine, the propagation factor is the hybrid form
+    // diag_phi reproduces, and both boundaries are taken from the slab side at that same real
+    // cosine. The reference is built at the same cosine for the same reason.
+    const double f_hz = FRQ;
+    const double thk = 0.006;
+    auto mtl = diag_palette<double>();
+    const std::complex<double> U(1.0, 0.0);
+    const int HOST = 5, SHEET = 3, NEAR = 9;
+
+    const std::complex<double> e_h = diag_eps(HOST, f_hz), e_air(1.0, 0.0);
+
+    struct Row
+    {
+        const char *name;
+        int prev;
+        bool near_matched;
+    };
+    const std::vector<Row> rows = {
+        {"SHEET   eps 5.24 - 0.63j", SHEET, false},
+        {"LO_NEAR eps 1.5015- 0.40j", NEAR, true},
+    };
+
+    QD_DIAG("\n# diag: host layer bounded by a sheet, host eps 1.50 - 0.40j, sheet thk 6 mm, 1 GHz.\n");
+    QD_DIAG("# S_applied is the series SLAB_AIRY_FACTOR produces; S_ref is the same series with the\n");
+    QD_DIAG("# sheet resolved as a layer backed by air, from the characteristic matrix. r_hs is the\n");
+    QD_DIAG("# half-space reflection the solver used before the core landed and r_cm is the layer\n");
+    QD_DIAG("# value it uses now; the gap between them is what the core closed.\n");
+    QD_DIAG("sheet,L_mm,theta_n,|S_applied|,arg_S_applied,|S_ref|,arg_S_ref,|dS|,d_dB,|r_hs|,|r_cm|,rtype\n");
+
+    for (const auto &R : rows)
+        for (double L : {0.05, 0.10})
+            for (double thd : {0.0, 20.0, 40.0, 50.0})
+            {
+                double theta_n = thd * QPI / 180.0;
+                const std::complex<double> e_s = diag_eps(R.prev, f_hz);
+
+                auto C = make1<double>(mtl, 4, OT_EXIT, 1u,
+                                       /*M1*/ HOST, /*M2*/ 0, /*prev*/ R.prev, /*cur*/ HOST, /*buf*/ 0,
+                                       L, 0.5, 0.5, QPI / 2.0 - theta_n, /*eps: always resolve*/ 0.0);
+                C.run();
+
+                std::complex<double> out = cpx(C.xprmat, 0, 0), in = cpx(C.x_in, 0, 0);
+                std::complex<double> applied = (std::abs(in) > 0.0) ? out / in
+                                                                    : std::complex<double>(0.0, 0.0);
+                std::complex<double> close = diag_close(e_h, L, theta_n, f_hz);
+                std::complex<double> S_applied = (std::abs(close) > 0.0)
+                                                     ? applied / close
+                                                     : std::complex<double>(0.0, 0.0);
+
+                // The reference. cs is the cosine correction mode uses on both boundaries, and the
+                // matrix is anchored in the host so that its transverse invariant is the same one.
+                std::complex<double> cs(std::cos(theta_n), 0.0);
+                std::complex<double> phi = diag_phi(e_h, L, theta_n, f_hz);
+                std::complex<double> r_ahead = diag_r_slabside(e_h, e_air, cs);
+                std::complex<double> r_hs = diag_r_slabside(e_h, e_s, cs);
+
+                DiagSheet B = diag_cm_stack(e_h, U, {{e_s, U, thk}}, e_air, U, cs, f_hz,
+                                            false, true, /*undisplaced*/ 0.0);
+                std::complex<double> S_ref = 1.0 / (1.0 - r_ahead * B.R_te * phi * phi);
+
+                double dS = std::abs(S_applied - S_ref);
+                double d_dB = 20.0 * std::log10(std::max(1e-300, std::abs(S_applied)) /
+                                                std::max(1e-300, std::abs(S_ref)));
+
+                QD_DIAG("%s,%.1f,%.1f,%.9f,%+7.3f,%.9f,%+7.3f,%.3e,%+.4f,%.3e,%.3e,%u\n",
+                        R.name, L * 1000.0, thd,
+                        std::abs(S_applied), std::arg(S_applied) * 180.0 / QPI,
+                        std::abs(S_ref), std::arg(S_ref) * 180.0 / QPI,
+                        dS, d_dB, std::abs(r_hs), std::abs(B.R_te),
+                        (unsigned)C.resolved_type[0]);
+
+                INFO(R.name << ", L " << L * 1000.0 << " mm, theta_n " << thd);
+
+                // The row has to be a resolve, or there is no series to measure.
+                REQUIRE(C.resolved_type[0] != 0);
+                REQUIRE(rt_bit(C.resolved_type[0], 2));
+                REQUIRE(std::isfinite(C.gain(0)));
+
+                // The two far-side reflections are far enough apart that the assertion below
+                // discriminates. A statement about the references, true whichever one the solver is
+                // built against, so it guards against a revert as well as against a bad reference.
+                CHECK(std::abs(r_hs - B.R_te) > 1.0e-3);
+
+                // A near-matched sheet is nearly not a boundary, so the layer it stands for is
+                // nearly six more millimeters of host. At normal incidence the two descriptions of
+                // that stack are the same object and the reference converges onto the extended-path
+                // form linearly in the mismatch. Only at normal incidence: at an angle the two
+                // carry different propagation conventions, the layer using k0 n thk cos and the
+                // extended path the walk-off cos^2 of issue 9, and the gap between those two is not
+                // a statement about this item.
+                if (R.near_matched && thd == 0.0)
+                {
+                    std::complex<double> phi2 = diag_phi(e_h, L + thk, theta_n, f_hz);
+                    std::complex<double> S_ext = 1.0 / (1.0 - r_ahead * r_ahead * phi2 * phi2);
+                    CHECK(std::abs(S_ref - S_ext) < 1.0e-4);
+                }
+
+                // The host layer's series resolves against the sheet as a layer, magnitude and
+                // phase together.
+                CHECK(std::abs(std::abs(S_applied) - std::abs(S_ref)) < 1.0e-9);
+                CHECK(std::abs(S_applied - S_ref) < 1.0e-9);
+            }
+}
+
+TEST_CASE("Layered stack - sheet_case 4 resolves rather than killing the ray")
+{
+    // Symptom three. Two co-located sheets of different materials are an ordered stack. Detection
+    // and the type bits are correct in both functions, but no sheet physics runs for it:
+    // SHEET_EVENT calls KILL_RAY and the ray disappears.
+    //
+    // The stack here is air | A | B | air with both sheets 6 mm, so mtl_current bounds both sides,
+    // near == far, the flux conversion is identically 1, and the displaced host is 12 mm of air.
+    // That makes the target composite a pure two-layer characteristic matrix with nothing else
+    // multiplying it: with mtl_current at 0, SHEET_EVENT closes out no host leg and returns without
+    // touching the state words, so the written field IS the composite.
+    //
+    // Both orders are run. Bit 1 of the hit code carries the traversal order that ray_mesh_interact
+    // derived from the face normals, the layer hit on its front side being traversed first, with
+    // bit 3 recording that the order fell back to the geometric FBS -> SBS sequence. Note that
+    // ray_state_update's case re-derivation currently keeps only sheet_mtl = M1 and leaves
+    // sheet_solid at 0, so the second material index and the order are both discarded before
+    // SHEET_EVENT sees them; the core needs them carried.
+    //
+    // Transmission is order-independent by reciprocity and only the reflect port separates the two,
+    // which is asserted here on the reference as well as on the solver so that the order can be
+    // seen to matter at all.
+    const double f_hz = FRQ;
+    const double thk = 0.006;
+    auto mtl = diag_palette<double>();
+    const std::complex<double> U(1.0, 0.0);
+    const std::complex<double> e_air(1.0, 0.0);
+
+    const uint8_t OT_STACK_FBS = 71; // ok | front | co-located | sheet: FBS layer traversed first
+    const uint8_t OT_STACK_SBS = 69; // ok | back  | co-located | sheet: SBS layer traversed first
+
+    const int A = 3, B = 7; // SHEET eps 5.24 - 0.63j and LO_SHEET eps 1.50 - 0.40j, both 6 mm
+    const std::complex<double> e_A = diag_eps(A, f_hz), e_B = diag_eps(B, f_hz);
+
+    struct Ord
+    {
+        const char *name;
+        uint8_t otype;
+        int m1, m2;
+        std::complex<double> first, second;
+    };
+    const std::vector<Ord> orders = {
+        {"A|B", OT_STACK_FBS, A, B, e_A, e_B},
+        {"B|A", OT_STACK_SBS, A, B, e_B, e_A},
+    };
+
+    QD_DIAG("\n# diag: sheet_case 4, air | 6 mm | 6 mm | air, sheets eps 5.24 - 0.63j and\n");
+    QD_DIAG("# eps 1.50 - 0.40j, 1 GHz. ref_* is the two-layer characteristic matrix, out_* is what\n");
+    QD_DIAG("# the stack resolve wrote. This case killed the ray outright before the core landed.\n");
+    QD_DIAG("order,theta_n,ref_|T|,ref_|R|,out_|T|,out_gain_T,out_gain_R,dT,dR,rtype_T,rtype_R\n");
+
+    for (const auto &O : orders)
+        for (double thd : {0.0, 20.0, 45.0, 70.0})
+        {
+            double th = thd * QPI / 180.0;
+            std::complex<double> ci(std::cos(th), 0.0);
+
+            // near == far == air, so the conversion is 1 and the displaced host is air over the
+            // whole 12 mm, which is what SHEET_RESOLVE leaves uncapped for an air host.
+            DiagSheet Xs = diag_cm_stack(e_air, U, {{O.first, U, thk}, {O.second, U, thk}},
+                                         e_air, U, ci, f_hz, false, /*scalar*/ true);
+            DiagSheet Xe = diag_cm_stack(e_air, U, {{O.first, U, thk}, {O.second, U, thk}},
+                                         e_air, U, ci, f_hz, false, /*EM*/ false);
+
+            auto run = [&](int itype)
+            {
+                auto C = make1<double>(mtl, itype, O.otype, 2u,
+                                       /*M1*/ O.m1, /*M2*/ O.m2,
+                                       /*prev*/ 0, /*cur = air*/ 0, /*buf*/ 0,
+                                       0.5, 0.5, 0.5, QPI / 2.0 - th, 0.0);
+                C.run();
+                return C;
+            };
+
+            auto Ct = run(4); // scalar transmission
+            auto Ce = run(1); // EM transmission
+            auto Cr = run(3); // scalar reflection
+            auto Cx = run(0); // EM reflection
+
+            double gT = 0.5 * (std::norm(Xe.T_te) + std::norm(Xe.T_tm));
+            double gR = 0.5 * (std::norm(Xe.R_te) + std::norm(Xe.R_tm));
+
+            double dT = std::abs(cpx(Ct.xprmat, 0, 0) - Xs.T_te);
+            double dR = std::abs(cpx(Cr.xprmat, 0, 0) - Xs.R_te);
+
+            QD_DIAG("%s,%.1f,%.9f,%.9f,%.9f,%.9f,%.9f,%.3e,%.3e,%u,%u\n",
+                    O.name, thd, std::abs(Xs.T_te), std::abs(Xs.R_te),
+                    std::abs(cpx(Ct.xprmat, 0, 0)), (double)Ce.gain(0), (double)Cx.gain(0),
+                    dT, dR, (unsigned)Ct.resolved_type[0], (unsigned)Cr.resolved_type[0]);
+
+            INFO("order " << O.name << ", theta_n " << thd);
+
+            // The reference carries real energy on both ports, so a zero output is a dropped ray
+            // and not a genuinely dark stack.
+            CHECK(gT > 1.0e-3);
+            CHECK(gR > 1.0e-3);
+
+            // The stack resolves, both ports, scalar and EM. This case killed the ray outright
+            // before the core landed, so the first two lines are the whole of what changed for it.
+            CHECK(Ct.resolved_type[0] != 0);
+            CHECK(Cr.resolved_type[0] != 0);
+            CHECK(dT < 1.0e-9);
+            CHECK(dR < 1.0e-9);
+            CHECK(std::abs((double)Ce.gain(0) - gT) < 1.0e-9);
+            CHECK(std::abs((double)Cx.gain(0) - gR) < 1.0e-9);
+        }
+
+    // The order matters, and only in reflection. Asserted on the reference alone, so a core that
+    // lost the traversal order fails here rather than passing a transmission-only check.
+    for (double thd : {0.0, 45.0})
+    {
+        double th = thd * QPI / 180.0;
+        std::complex<double> ci(std::cos(th), 0.0);
+        DiagSheet AB = diag_cm_stack(e_air, U, {{e_A, U, thk}, {e_B, U, thk}}, e_air, U, ci, f_hz,
+                                     false, false);
+        DiagSheet BA = diag_cm_stack(e_air, U, {{e_B, U, thk}, {e_A, U, thk}}, e_air, U, ci, f_hz,
+                                     false, false);
+        INFO("theta_n " << thd);
+        CHECK(std::abs(AB.T_te - BA.T_te) < 1.0e-14);
+        CHECK(std::abs(AB.T_tm - BA.T_tm) < 1.0e-14);
+        CHECK(std::abs(AB.R_te - BA.R_te) > 1.0e-3);
     }
 }
