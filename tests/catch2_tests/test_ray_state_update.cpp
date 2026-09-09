@@ -3135,6 +3135,106 @@ static inline DiagSheet diag_sheet_composite(std::complex<double> e_near, std::c
     return D;
 }
 
+// The same composite written at a complex incidence cosine.
+//
+// diag_sheet_composite takes a real ct because every stack it was built for is reached from air or
+// from a medium the harness enters at the geometric angle. A sheet reached from inside a traced
+// solid has no real incidence cosine: the propagation cosine there is complex and the traced
+// direction carries only its real projection. The form is unchanged and every expression below is
+// analytic in ct, so passing a real cosine reproduces the function above term for term; the fixture
+// asserts that on every row rather than assuming it.
+//
+// Snell transitivity is what makes this well posed. The transverse invariant is e mu (1 - c^2),
+// conserved across every interface, so writing c_slab and c_far from the near-side cosine gives the
+// same two numbers the entry medium's own cosine would have given. With the exact complex c_near
+// they are the cosines a bare air | slab and air | far crossing would use; with the real projection
+// they are not, and that is the whole of what this reference measures.
+//
+// Same preconditions as diag_sheet_composite: mu = 1, no resonance, att = tf = alpha = 0, m = 0,
+// and an uncapped displacement budget.
+static inline DiagSheet diag_sheet_composite_cx(std::complex<double> e_near, std::complex<double> e_slab,
+                                                std::complex<double> e_far, double thk,
+                                                std::complex<double> ct, double f_hz,
+                                                bool disp_far, bool scalar)
+{
+    const double k0 = 2.0 * QPI * f_hz / C0;
+    auto root = [](std::complex<double> a)
+    {
+        if (std::imag(a) == 0.0 && std::real(a) < 0.0)
+            a = std::complex<double>(std::real(a), -0.0); // decaying evanescent root
+        return std::sqrt(a);
+    };
+
+    const std::complex<double> zn = std::sqrt(e_near), zs = std::sqrt(e_slab), zf = std::sqrt(e_far);
+    const std::complex<double> c1 = ct;
+    const std::complex<double> s2 = 1.0 - c1 * c1;
+    const std::complex<double> cs = root(1.0 - (e_near / e_slab) * s2);
+    const std::complex<double> cf = root(1.0 - (e_near / e_far) * s2);
+
+    DiagSheet D;
+    D.c_slab = cs, D.c_far = cf;
+
+    std::complex<double> r_ns_te = (zn * c1 - zs * cs) / (zn * c1 + zs * cs);
+    std::complex<double> t_ns_te = (2.0 * zn * c1) / (zn * c1 + zs * cs);
+    std::complex<double> t_sn_te = (2.0 * zs * cs) / (zs * cs + zn * c1);
+    std::complex<double> r_ns_tm = scalar ? r_ns_te : (zs * c1 - zn * cs) / (zs * c1 + zn * cs);
+    std::complex<double> t_ns_tm = scalar ? t_ns_te : (2.0 * zn * c1) / (zs * c1 + zn * cs);
+    std::complex<double> t_sn_tm = scalar ? t_sn_te : (2.0 * zs * cs) / (zn * cs + zs * c1);
+
+    std::complex<double> r_sf_te = (zs * cs - zf * cf) / (zs * cs + zf * cf);
+    std::complex<double> t_sf_te = (2.0 * zs * cs) / (zs * cs + zf * cf);
+    std::complex<double> r_sf_tm = scalar ? r_sf_te : (zf * cs - zs * cf) / (zf * cs + zs * cf);
+    std::complex<double> t_sf_tm = scalar ? t_sf_te : (2.0 * zs * cs) / (zf * cs + zs * cf);
+
+    const std::complex<double> phi =
+        std::exp(std::complex<double>(0.0, -1.0) * k0 * std::sqrt(e_slab) * thk * cs);
+    const std::complex<double> e_disp = disp_far ? e_far : e_near;
+    const std::complex<double> c_disp = root(1.0 - (e_near / e_disp) * s2);
+    const std::complex<double> phi_disp =
+        std::exp(std::complex<double>(0.0, -1.0) * k0 * std::sqrt(e_disp) * thk * c_disp);
+    const std::complex<double> phi_t = phi / phi_disp;
+
+    // Per-channel normal flux, near to far. With a complex incidence cosine the two denominators
+    // Re(z_n c_n) and Re(conj(z_n) c_n) no longer collapse onto Re(z_n) ct, so the channels separate
+    // through the near medium as well as through the far one.
+    if (e_far != e_near)
+    {
+        double den_te = std::real(zn * c1), den_tm = std::real(std::conj(zn) * c1);
+        double num_te = std::real(zf * cf), num_tm = std::real(std::conj(zf) * cf);
+        D.fx_te = (den_te > 0.0 && num_te > 0.0) ? std::sqrt(num_te / den_te) : 0.0;
+        D.fx_tm = (den_tm > 0.0 && num_tm > 0.0) ? std::sqrt(num_tm / den_tm) : 0.0;
+        if (scalar)
+            D.fx_tm = D.fx_te;
+    }
+
+    std::complex<double> p2 = phi * phi;
+    std::complex<double> den_te = 1.0 + r_ns_te * r_sf_te * p2;
+    std::complex<double> den_tm = 1.0 + r_ns_tm * r_sf_tm * p2;
+
+    D.T_te = D.fx_te * t_ns_te * t_sf_te * phi_t / den_te;
+    D.T_tm = D.fx_tm * t_ns_tm * t_sf_tm * phi_t / den_tm;
+    D.R_te = r_ns_te + t_ns_te * t_sn_te * r_sf_te * p2 / den_te;
+    D.R_tm = r_ns_tm + t_ns_tm * t_sn_tm * r_sf_tm * p2 / den_tm;
+    return D;
+}
+
+// In-medium traversal on the walk-off branch, in its general form. SCALE_BY_MEDIUM takes this
+// branch whenever walk_off is true, which on a sheet crossing means the reflection pass:
+//   sqrt(medium_gain(dist_refract)) * exp(-j k0 (n_re dist_refract ct_t^2 - dist_geo ct^2))
+// diag_medium_geo is the ct_t = ct = 1 special case of it and cannot be used where the traced and
+// geometric cosines differ. The palette carries no alpha and no mass term, so medium_gain is the
+// ITU-R P.2040 path form over dist_refract alone.
+static inline std::complex<double> diag_medium_walk(std::complex<double> es, double dist_refract,
+                                                    double ct_traced, double dist_geo,
+                                                    double ct_geo, double f_hz)
+{
+    const double k0 = 2.0 * QPI * f_hz / C0;
+    double n_re = std::real(std::sqrt(es));
+    double excess = k0 * (n_re * dist_refract * ct_traced * ct_traced - dist_geo * ct_geo * ct_geo);
+    return std::sqrt(diag_medium_gain(es, dist_refract, f_hz)) *
+           std::exp(std::complex<double>(0.0, -excess));
+}
+
 TEST_CASE("Glued sheet - the near-to-far flux conversion")
 {
     // qd_slab_resolve produce mode applies the near-to-far obliquity factor once, on the transmit
@@ -3304,6 +3404,239 @@ TEST_CASE("Glued sheet - the near-to-far flux conversion")
             CHECK(std::abs(vv - D.R_tm) < 1.0e-9);
         }
     }
+}
+
+TEST_CASE("Sheet in a medium - the composite at the exact in-medium cosine")
+{
+    // Issue 2. SHEET_RESOLVE hands qd_slab_resolve produce mode ct_geo = abs_cos_theta_t as the
+    // incidence cosine, and produce mode builds every term of the composite from it on the
+    // assumption that it is a real incidence angle in mat_near. When mat_near is a traced solid it
+    // is not: the propagation cosine there is complex and abs_cos_theta_t is the real projection
+    // qd_refract left behind. This case measures the gap.
+    //
+    // What separates it from the glued-sheet case above. That one supplies no path_dir, so
+    // abs_cos_theta_t equals the fbs angle and the cosine handed to produce mode is a genuine real
+    // incidence cosine; the reference is then built at the same value and the case is a check on the
+    // conversion's form rather than on its argument. Here path_dir_prev carries the refracted
+    // direction a tracer would have written, so the two separate and the reference is built at the
+    // exact complex cosine instead.
+    //
+    // Geometry, the same one the exit-boundary case uses. A ray crosses air | LO at the external
+    // angle, the tracer writes the refracted direction, and the sheet is met after 100 mm of normal
+    // thickness. fbs_angle stays the external angle because the geometric ray was never bent.
+    //
+    // Two stacks:
+    //   embedded    LO | sheet | LO,  sheet_case 1, near == far so the flux conversion is 1
+    //   glued exit  LO | sheet | air, sheet_case 3, near != far so the conversion is live
+    // and both ports of each, so the reflect port is covered as well as the transmit port.
+    //
+    // Isolation. eps = 1.5 puts the correction-mode survival gate above any reachable rho, so
+    // SLAB_AIRY_FACTOR declines and the only thing multiplying the composite is the host leg
+    // SCALE_BY_MEDIUM closes out. That leg is reproduced from the closed forms already used by the
+    // exit-boundary case: the exact inhomogeneous form on the transmission pass, where the recovery
+    // is armed, and the walk-off form on the reflection pass, where it is not.
+    //
+    // Modes. The scalar run pins the complex coefficient outright. The EM run pins the gain, which
+    // is the Frobenius norm of the Jones matrix and therefore invariant under the polarization
+    // basis, so it measures both channels without depending on which matrix element each lands in.
+    // The refracted direction has a transverse component, so the basis is not the degenerate one the
+    // glued-sheet case relies on.
+    const double f_hz = FRQ;
+    const double thk = 0.006; // the sheet material's own thickness column
+    const double L = 0.10;    // normal thickness of the host layer up to the sheet
+    auto mtl = diag_palette<double>();
+
+    const uint8_t OT_SHEET_ISO = 67;  // ok | sheet, no co-located face   -> sheet_case 1
+    const uint8_t OT_GLUED_EXIT = 69; // ok | co-located | sheet          -> sheet_case 3
+    const int SHEET = 3, LO = 5;
+
+    const std::complex<double> e_h = diag_eps(LO, f_hz);    // host, eps 1.50 - 0.40j
+    const std::complex<double> e_s = diag_eps(SHEET, f_hz); // sheet, eps 5.24 - 0.63j
+    const std::complex<double> e_air(1.0, 0.0);
+
+    struct Row
+    {
+        const char *name;
+        uint8_t otype;
+        unsigned nH;
+        int m2;                    // the co-located non-sheet face, 0 when there is none
+        std::complex<double> e_far;
+        bool disp_far;             // the sheet sits on the side that is not the solid
+        bool trivial;              // near == far, so the flux conversion is identically 1
+    };
+    const std::vector<Row> rows = {
+        {"embedded   LO | sheet | LO", OT_SHEET_ISO, 1u, 0, e_h, false, true},
+        {"glued exit LO | sheet | air", OT_GLUED_EXIT, 2u, LO, e_air, true, false},
+    };
+
+    QD_DIAG("\n# diag: sheet reached from inside a traced solid, host eps 1.50 - 0.40j over 100 mm,\n");
+    QD_DIAG("# sheet eps 5.24 - 0.63j, thk 6 mm, 1 GHz. The composite is built at ct_traced; the\n");
+    QD_DIAG("# reference is the same composite at the exact complex in-medium cosine.\n");
+    QD_DIAG("# A is the composite amplitude moving with the cosine, B is the flux conversion failing\n");
+    QD_DIAG("# to cancel against the entry that produced it, and A + B is the total on the TE port.\n");
+    QD_DIAG("stack,theta_ext,ct_traced,ct_exact_re,ct_exact_im,A_te_dB,B_te_dB,tot_te_dB,tot_tm_dB,"
+            "R_te_dB,R_tm_dB,d_T_scalar,d_T_gain,d_R_scalar,d_R_gain,d_host_T,d_host_R,rtype_T,rtype_R\n");
+
+    for (const auto &R : rows)
+        for (double thd : {0.0, 10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 85.0})
+        {
+            double th = thd * QPI / 180.0;
+            double ct = diag_traced_ct(e_h, th);              // the real projection the tracer holds
+            std::complex<double> cx = diag_ct_exact(e_h, th); // the exact complex in-medium cosine
+            double dr = L / ct;                              // refracted path up to the sheet
+
+            // The gate use_vbs applies. At normal incidence the projection and the exact value
+            // coincide, the recovery declines and the traversal keeps its walk-off form, so that row
+            // is a control: it must read zero before the fix as well as after.
+            bool armed = std::abs(ct - std::cos(th)) > 1.0e-6;
+
+            std::complex<double> Mt = armed ? diag_medium_vbs(e_h, dr, ct, L, cx, f_hz)
+                                            : diag_medium_geo(e_h, L, L, f_hz);
+            std::complex<double> Mr = diag_medium_walk(e_h, dr, ct, L, std::cos(th), f_hz);
+
+            // The reference, at the exact cosine, and the same composite at the projection, which is
+            // what the code built before the recovery was handed to the sheet path. The second is
+            // printed and used to record the size of the defect; it is never the target.
+            DiagSheet Xs = diag_sheet_composite_cx(e_h, e_s, R.e_far, thk, cx, f_hz, R.disp_far, true);
+            DiagSheet Xe = diag_sheet_composite_cx(e_h, e_s, R.e_far, thk, cx, f_hz, R.disp_far, false);
+            std::complex<double> cp(ct, 0.0);
+            DiagSheet Pe = diag_sheet_composite_cx(e_h, e_s, R.e_far, thk, cp, f_hz, R.disp_far, false);
+
+            auto run = [&](int itype, double host_len)
+            {
+                auto C = make1<double>(mtl, itype, R.otype, R.nH,
+                                       /*M1 = the sheet face*/ SHEET, /*M2*/ R.m2,
+                                       /*prev = what the host was entered through*/ 0,
+                                       /*cur*/ LO, /*buf*/ 0,
+                                       host_len, 0.5, 0.5, /*fbs angle = geometric*/ QPI / 2.0 - th,
+                                       /*eps: the host series must not fire*/ 1.5);
+                C.has_path_dir = true;
+                C.path_dir_prev.zeros(1, 3);
+                C.path_dir_prev(0, 0) = ct;
+                C.path_dir_prev(0, 1) = std::sqrt(1.0 - ct * ct);
+                C.run();
+                return C;
+            };
+
+            auto Ct = run(4, L); // scalar transmission
+            auto Ce = run(1, L); // EM transmission
+            auto Cr = run(3, L); // scalar reflection
+            auto Cx = run(0, L); // EM reflection
+
+            // The same two crossings over twice the host path. Only the traversal changes: the
+            // composite is a function of the cosine and the materials and is identical on both, so
+            // it cancels out of the ratio below.
+            auto Ct2 = run(4, 2.0 * L);
+            auto Cr2 = run(3, 2.0 * L);
+
+            std::complex<double> refTs = Xs.T_te * Mt, refRs = Xs.R_te * Mr;
+            double refTg = 0.5 * (std::norm(Xe.T_te * Mt) + std::norm(Xe.T_tm * Mt));
+            double refRg = 0.5 * (std::norm(Xe.R_te * Mr) + std::norm(Xe.R_tm * Mr));
+
+            double d_Ts = std::abs(cpx(Ct.xprmat, 0, 0) - refTs);
+            double d_Tg = std::abs((double)Ce.gain(0) - refTg);
+            double d_Rs = std::abs(cpx(Cr.xprmat, 0, 0) - refRs);
+            double d_Rg = std::abs((double)Cx.gain(0) - refRg);
+
+            // The host leg on its own, isolated from the composite entirely.
+            //
+            // Dividing the written field by a hand-built composite would only work while the code
+            // and that composite are built at the same cosine, so it cannot survive a change to
+            // which cosine the composite uses. Two runs that differ only in host path length can:
+            // the composite is identical on both and cancels in the ratio, whatever it is. Both
+            // traversal forms are pure exponentials in the path length, so the ratio over L and 2L
+            // is the factor over L itself.
+            //
+            // diag_medium_vbs is also asserted by the exit-boundary case; diag_medium_walk is not
+            // asserted anywhere else, which is why the reflect pass gets its own row.
+            double d_hT = std::abs(cpx(Ct2.xprmat, 0, 0) / cpx(Ct.xprmat, 0, 0) - Mt);
+            double d_hR = std::abs(cpx(Cr2.xprmat, 0, 0) / cpx(Cr.xprmat, 0, 0) - Mr);
+
+            auto dB = [](std::complex<double> a, std::complex<double> b)
+            { return 20.0 * std::log10(std::max(1e-300, std::abs(a)) / std::max(1e-300, std::abs(b))); };
+
+            double B_te = (Xe.fx_te > 0.0 && Pe.fx_te > 0.0) ? 20.0 * std::log10(Pe.fx_te / Xe.fx_te) : 0.0;
+            double tot_te = dB(Pe.T_te, Xe.T_te), tot_tm = dB(Pe.T_tm, Xe.T_tm);
+
+            QD_DIAG("%s,%.1f,%.9f,%.9f,%.9f,%+.4f,%+.4f,%+.4f,%+.4f,%+.4f,%+.4f,"
+                    "%.3e,%.3e,%.3e,%.3e,%.3e,%.3e,%u,%u\n",
+                    R.name, thd, ct, std::real(cx), std::imag(cx),
+                    tot_te - B_te, B_te, tot_te, tot_tm,
+                    dB(Pe.R_te, Xe.R_te), dB(Pe.R_tm, Xe.R_tm),
+                    d_Ts, d_Tg, d_Rs, d_Rg, d_hT, d_hR,
+                    (unsigned)Ct.resolved_type[0], (unsigned)Cr.resolved_type[0]);
+
+            INFO(R.name << ", theta_ext " << thd);
+
+            // The ray must survive: sheet_case 4 kills, and so does a hit code that fails the sheet
+            // re-derivation.
+            REQUIRE(Ct.resolved_type[0] != 0);
+            REQUIRE(Cr.resolved_type[0] != 0);
+            REQUIRE(std::isfinite(Ct.gain(0)));
+            REQUIRE(std::isfinite(Cr.gain(0)));
+
+            // The complex builder reproduces the measured one at a real cosine, term for term. This
+            // is what carries the 1.67e-15 bound of the glued-sheet case over to this reference.
+            DiagSheet Pd = diag_sheet_composite(e_h, e_s, R.e_far, thk, ct, f_hz, R.disp_far, false);
+            CHECK(std::abs(Pd.T_te - Pe.T_te) < 1.0e-15);
+            CHECK(std::abs(Pd.T_tm - Pe.T_tm) < 1.0e-15);
+            CHECK(std::abs(Pd.R_te - Pe.R_te) < 1.0e-15);
+            CHECK(std::abs(Pd.R_tm - Pe.R_tm) < 1.0e-15);
+
+            // Two conditions the measurement depends on, asserted so that a failure of either shows
+            // up as itself rather than as an unexplained residual.
+            //
+            // The apply_tf clamp of section 5 must not engage. It caps the slab-side TM reflection at
+            // unity past the internal critical angle of the near | far pair, and this sweep stays
+            // below that angle at every row because the in-medium traced angle reaches only 51.7 deg
+            // at 85 deg of external incidence.
+            std::complex<double> zs = std::sqrt(e_s), zf = std::sqrt(R.e_far);
+            std::complex<double> r_slab_p = (zf * Pe.c_slab - zs * Pe.c_far) / (zf * Pe.c_slab + zs * Pe.c_far);
+            std::complex<double> r_slab_x = (zf * Xe.c_slab - zs * Xe.c_far) / (zf * Xe.c_slab + zs * Xe.c_far);
+            CHECK(std::abs(r_slab_p) < 1.0);
+            CHECK(std::abs(r_slab_x) < 1.0);
+
+            // The displacement budget must not cap, so the reference may divide out the full
+            // thickness. Air costs nothing to displace and is uncapped, so only the embedded stack
+            // needs it: the budget is 80 percent of the host path the crossing can see.
+            if (!R.disp_far)
+                CHECK(0.8 * (dr + 0.5) * ct > thk);
+
+            // The two cosines differ, so the case can fail. This stays true after the fix and is not
+            // an assertion about the defect.
+            if (thd > 0.0)
+                CHECK(std::abs(cx - cp) > 1.0e-6);
+
+            // The flux conversion is identically 1 wherever near == far, at a complex cosine as well
+            // as at a real one. The gate is near == far, not "far is air".
+            if (R.trivial)
+            {
+                CHECK(Xe.fx_te == 1.0);
+                CHECK(Xe.fx_tm == 1.0);
+            }
+
+            // The host leg the crossing closes out, on its own. Asserted first, so that a red
+            // fixture is attributable: these two are independent of the composite by construction
+            // and a failure here is a statement about the traversal reference, not about the
+            // incidence cosine.
+            CHECK(d_hT < 1.0e-12);
+            CHECK(d_hR < 1.0e-12);
+
+            // The two references are far enough apart that the composite assertions below cannot
+            // pass at both cosines. This is a statement about the references, not about the code,
+            // so it holds whichever one the code is built at and guards against a revert.
+            if (thd >= 20.0)
+            {
+                CHECK(std::abs(Pe.T_te - Xe.T_te) > 1.0e-6);
+                CHECK(std::abs(Pe.R_tm - Xe.R_tm) > 1.0e-6);
+            }
+
+            // The composite at the exact in-medium cosine, both ports, both modes.
+            CHECK(d_Ts < 1.0e-9);
+            CHECK(d_Tg < 1.0e-9);
+            CHECK(d_Rs < 1.0e-9);
+            CHECK(d_Rg < 1.0e-9);
+        }
 }
 
 TEST_CASE("Exit boundary - the port at the recovered angle")

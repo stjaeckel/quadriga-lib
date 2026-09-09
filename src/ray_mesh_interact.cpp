@@ -813,7 +813,8 @@ namespace
                                 std::complex<double> *R_tm = nullptr,
                                 bool disp_far = false,     // sheet sits on the far side (glued exit)
                                 double disp_budget = -1.0, // max normal thickness it may replace, < 0 = all
-                                std::complex<double> ct_slab_exact = std::complex<double>(0.0, 0.0))
+                                std::complex<double> ct_slab_exact = std::complex<double>(0.0, 0.0),
+                                std::complex<double> ct_near_exact = std::complex<double>(0.0, 0.0))
     {
         // Mass-law materials carry a lumped transmission surrogate: eta/mu are calibrated for
         // surface impedance only, so the in-slab index (and hence the phase of phi) is not
@@ -880,17 +881,36 @@ namespace
                                                 : std::complex<double>(abs_cos_theta_t, 0.0);
         std::complex<double> sin2 = 1.0 - cs * cs; // in-slab sine (fbs_angleN convention)
 
-        // Exact complex in-slab cosine, derived from the incidence angle in the near medium. Produce
-        // mode holds that angle, so nothing has to be projected onto a real direction: the far
-        // boundary and the propagation factor both use this. Correction mode has only the traced real
-        // angle and keeps the real form throughout.
+        // Incidence cosine in the near medium, produce mode only.
+        //
+        // abs_cos_theta is a real angle and is what a face hit supplies. A sheet reached from inside
+        // a traced medium has no real incidence cosine: the propagation cosine there is complex and
+        // the tracer's direction carries only its real projection. Such a caller passes the
+        // recovered value through ct_near_exact, and the projection is then unused. Every expression
+        // below is analytic in it, so a real value reproduces the angle path exactly; where the
+        // caller supplies nothing, sin2_i keeps the real spelling verbatim so nothing moves.
+        //
+        // Correction mode never reads either of these. Its angle comes from real ray geometry and
+        // its result must not move.
+        bool have_exact_ci = std::abs(ct_near_exact) > 0.0;
+        std::complex<double> ci = have_exact_ci ? ct_near_exact
+                                                : std::complex<double>(abs_cos_theta, 0.0);
+        std::complex<double> sin2_i =
+            have_exact_ci ? (1.0 - ci * ci)
+                          : std::complex<double>(1.0 - abs_cos_theta * abs_cos_theta, 0.0);
+
+        // Exact complex in-slab cosine, derived from the incidence cosine in the near medium.
+        // Produce mode holds that cosine, so nothing has to be projected onto a real direction: the
+        // far boundary and the propagation factor both use this. Snell is transitive, so with the
+        // recovered near-side cosine this is the same value a bare entry | slab crossing would have
+        // used, and the host drops out of it. Correction mode has only the traced real angle and
+        // keeps the real form throughout.
         std::complex<double> cts_exact(1.0, 0.0);
         if (produce)
         {
             std::complex<double> eta_n_if = mat_near.eta(fGHz) + mat_near.eta_resonance(fGHz);
             std::complex<double> mu_n = mat_near.mu(fGHz);
-            std::complex<double> arg = 1.0 - ((eta_n_if * mu_n) / (eta_s_if * mu_s)) *
-                                                 (1.0 - abs_cos_theta * abs_cos_theta);
+            std::complex<double> arg = 1.0 - ((eta_n_if * mu_n) / (eta_s_if * mu_s)) * sin2_i;
             if (std::imag(arg) == 0.0 && std::real(arg) < 0.0)
                 arg = std::complex<double>(std::real(arg), -0.0); // decaying evanescent root
             cts_exact = std::sqrt(arg);
@@ -952,15 +972,14 @@ namespace
             std::complex<double> z_a = std::sqrt(eta_a_if / mu_a);
             std::complex<double> z_s = std::sqrt(eta_s_if / mu_s);
             std::complex<double> rat = (eta_a_if * mu_a) / (eta_s_if * mu_s);
-            double sin2_i = 1.0 - abs_cos_theta * abs_cos_theta;
 
             std::complex<double> ct2_arg = 1.0 - rat * sin2_i;
             if (std::imag(ct2_arg) == 0.0 && std::real(ct2_arg) < 0.0)
                 ct2_arg = std::complex<double>(std::real(ct2_arg), -0.0); // decaying evanescent root
             std::complex<double> cos_t2 = std::sqrt(ct2_arg);
 
-            std::complex<double> te = (z_a * abs_cos_theta - z_s * cos_t2) / (z_a * abs_cos_theta + z_s * cos_t2);
-            std::complex<double> tm = is_scalar ? te : (z_s * abs_cos_theta - z_a * cos_t2) / (z_s * abs_cos_theta + z_a * cos_t2);
+            std::complex<double> te = (z_a * ci - z_s * cos_t2) / (z_a * ci + z_s * cos_t2);
+            std::complex<double> tm = is_scalar ? te : (z_s * ci - z_a * cos_t2) / (z_s * ci + z_a * cos_t2);
             const Material &owner = slab_is_air ? mat_near : mat_slab;
             R0_te = std::norm(te), R0_tm = std::norm(tm);
             Ra_te = owner.apply_tf(R0_te, fGHz);
@@ -971,10 +990,10 @@ namespace
             r_te = std::polar(std::sqrt(Ra_te), std::arg(-te));
             r_tm = std::polar(std::sqrt(Ra_tm), std::arg(-tm));
 
-            t_fwd[0] = (2.0 * z_a * abs_cos_theta) / (z_a * abs_cos_theta + z_s * cos_t2);
-            t_fwd[1] = is_scalar ? t_fwd[0] : (2.0 * z_a * abs_cos_theta) / (z_s * abs_cos_theta + z_a * cos_t2);
-            t_bwd[0] = (2.0 * z_s * cos_t2) / (z_s * cos_t2 + z_a * abs_cos_theta);
-            t_bwd[1] = is_scalar ? t_bwd[0] : (2.0 * z_s * cos_t2) / (z_a * cos_t2 + z_s * abs_cos_theta);
+            t_fwd[0] = (2.0 * z_a * ci) / (z_a * ci + z_s * cos_t2);
+            t_fwd[1] = is_scalar ? t_fwd[0] : (2.0 * z_a * ci) / (z_s * ci + z_a * cos_t2);
+            t_bwd[0] = (2.0 * z_s * cos_t2) / (z_s * cos_t2 + z_a * ci);
+            t_bwd[1] = is_scalar ? t_bwd[0] : (2.0 * z_s * cos_t2) / (z_a * cos_t2 + z_s * ci);
         };
 
         // The far interface at the true complex in-slab cosine rather than at its real projection.
@@ -995,7 +1014,6 @@ namespace
             std::complex<double> mu_a = mat_far.mu(fGHz);
             std::complex<double> z_s = std::sqrt(eta_s_if / mu_s);
             std::complex<double> z_a = std::sqrt(eta_a_if / mu_a);
-            double sin2_i = 1.0 - abs_cos_theta * abs_cos_theta;
 
             // In-slab cosine from the hoisted value; the cosine in the far medium follows from the
             // same incidence-side sine, since Snell is transitive and the slab drops out of it.
@@ -1092,13 +1110,16 @@ namespace
                 std::complex<double> z_n = std::sqrt(eta_n_if / mu_n);
                 std::complex<double> z_f = std::sqrt(eta_f_if / mu_f);
 
-                std::complex<double> cf_arg = 1.0 - ((eta_n_if * mu_n) / (eta_f_if * mu_f)) *
-                                                        (1.0 - abs_cos_theta * abs_cos_theta);
+                std::complex<double> cf_arg = 1.0 - ((eta_n_if * mu_n) / (eta_f_if * mu_f)) * sin2_i;
                 if (std::imag(cf_arg) == 0.0 && std::real(cf_arg) < 0.0)
                     cf_arg = std::complex<double>(std::real(cf_arg), -0.0); // decaying evanescent root
                 std::complex<double> c_far = std::sqrt(cf_arg);
 
-                Material::flux_amp(z_n, z_f, std::complex<double>(abs_cos_theta, 0.0), c_far, fx_te, fx_tm);
+                // The denominator is the incidence-side normal flux, Re(z_n c_n) per channel. It has
+                // to be the same real number the crossing that entered the near medium put in its
+                // numerator, or the pair does not telescope; that is what makes the recovered cosine
+                // matter here and not only in the amplitudes.
+                Material::flux_amp(z_n, z_f, ci, c_far, fx_te, fx_tm);
                 if (is_scalar)
                     fx_tm = fx_te;
             }
@@ -1118,6 +1139,13 @@ namespace
             // formed anywhere. At exact tangency the product is zero, which medium_gain would read
             // as "no geometric path supplied" and would then substitute the refracted path, so the
             // term is disabled outright in that case instead.
+            //
+            // Both pieces keep the real projection even where a complex incidence cosine was
+            // recovered. The surrogate and its angle factor are lumped quantities the material table
+            // is calibrated on, not wave quantities, and medium_gain takes them as real by
+            // construction; the same reasoning excludes a mass-law slab from the exact in-medium
+            // branch in SCALE_BY_MEDIUM. The two interface amplitudes above are wave quantities and
+            // do carry the recovered cosine.
             double mass_path = thk_normal * abs_cos_theta;
             double mass_floor = (mass_path > 0.0) ? 0.0 : 1.0e300;
             double gI = mat_slab.medium_gain(dist_slab, fGHz, abs_cos_theta_t, mass_path, 1.0, mass_floor,
@@ -1237,7 +1265,7 @@ namespace
             std::complex<double> n_d = std::sqrt(disp_mtl.eta(fGHz) * mu_d); // resonance-excluded, as above
             std::complex<double> cd_arg = 1.0 - ((mat_near.eta(fGHz) + mat_near.eta_resonance(fGHz)) *
                                                  mat_near.mu(fGHz) / (eta_d * mu_d)) *
-                                                    (1.0 - abs_cos_theta * abs_cos_theta);
+                                                    sin2_i;
             if (std::imag(cd_arg) == 0.0 && std::real(cd_arg) < 0.0)
                 cd_arg = std::complex<double>(std::real(cd_arg), -0.0);
             std::complex<double> c_disp = std::sqrt(cd_arg);
@@ -3373,6 +3401,17 @@ void quadriga_lib::ray_state_update(int interaction_type,
             if (prev_nonpar)
                 return none;
 
+            // The previous-medium word has to name the medium the current leg was ENTERED from.
+            // SHEET_EVENT writes the sheet into it, so on any leg that follows a sheet crossing the
+            // entry medium is one level further back than this can see. Decline rather than invert
+            // the wrong map: a sheet electrically matched to its host would fall through the
+            // matched-media test below and return zero anyway, while one that differs would return a
+            // number formed from the wrong pair, so the answer would otherwise depend on how many
+            // sheets the ray had already crossed. This is the same one-level-deep limit that stops a
+            // sheet | solid | sheet sandwich from resolving its second crossing.
+            if (IS_SHEET(mtl_prev))
+                return none;
+
             // Under total reflection the direction was never bent, so there is no map to invert.
             // Normal incidence is NOT excluded: the projection and the exact value coincide there, but
             // the two propagation factors do not, and declining leaves the hybrid medium_gain form in
@@ -3754,12 +3793,23 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 double ct_geo = abs_cos_theta_t;
                 double ct_slab = std::abs(std::real(ct2_slab));
 
+                // Incidence cosine in the near medium. ct_geo is the real projection qd_refract left
+                // behind, which is a genuine incidence cosine only while the ray arrives from air.
+                // Where the near medium is a traced solid the recovery returns the complex value the
+                // path actually carried, and produce mode then builds both boundaries, the internal
+                // series, the displaced-host propagation and the near-to-far flux conversion from
+                // it. Where it declines, produce mode falls back to ct_geo and nothing moves.
+                //
+                // The recovery names its own entry medium: mtl_prev is the medium this leg was
+                // entered through, and it declines when that word holds a sheet instead.
+                std::complex<double> ct_near = EXACT_IN_SLAB_COSINE();
+
                 // Thickness enters only here. Produce mode takes the normal thickness and the two
                 // cosines; the geometric-path slot is unused.
                 std::complex<double> Tte, Ttm, Rte, Rtm;
                 qd_slab_resolve(M_near, M_slab, M_far, thk, 0.0, ct_slab, ct_geo,
                                 fGHz, is_scalar, 0.0, true, &Tte, &Ttm, &Rte, &Rtm,
-                                disp_far, disp_budget);
+                                disp_far, disp_budget, std::complex<double>(0.0, 0.0), ct_near);
 
                 // Both ports come out of the one pass. The reflection port is its own Airy sum, not the
                 // half-space Fresnel value, so expect real angular and frequency structure in it.
