@@ -3122,7 +3122,13 @@ TEST_CASE("Thin sheet - the redo sits on the analytic slab at grazing incidence"
 // carries it. The host is the side of a glued pair that is not the solid - the near medium on an
 // entry, the far medium on an exit.
 //
-// Preconditions, all met by diag_palette: mu = 1, no permittivity resonance, att = 0 so every
+// Permeability enters in exactly three places and nowhere else: the admittance becomes
+// z = sqrt(eps/mu), every Snell ratio becomes a ratio of the products eps*mu, and the propagation
+// index becomes n = sqrt(eps*mu). The Fresnel groupings, the Airy assembly, the Stokes sign and the
+// flux conversion are already written in z and c and need no structural change. The three arguments
+// default to 1, so every dielectric call site reads exactly as before.
+//
+// Preconditions, all met by diag_palette: no permittivity resonance, att = 0 so every
 // interface gain is 1, tf = 0 so there is no port redistribution, alpha = 0 so the only in-sheet
 // loss is the conductivity the complex index already carries, m = 0 so the mass-law route is not
 // taken, and the displacement budget is uncapped so the full thickness is replaced. Under those
@@ -3137,7 +3143,10 @@ struct DiagSheet
 
 static inline DiagSheet diag_sheet_composite(std::complex<double> e_near, std::complex<double> e_slab,
                                              std::complex<double> e_far, double thk, double ct,
-                                             double f_hz, bool disp_far, bool scalar)
+                                             double f_hz, bool disp_far, bool scalar,
+                                             std::complex<double> mu_near = std::complex<double>(1.0, 0.0),
+                                             std::complex<double> mu_slab = std::complex<double>(1.0, 0.0),
+                                             std::complex<double> mu_far = std::complex<double>(1.0, 0.0))
 {
     const double k0 = 2.0 * QPI * f_hz / C0;
     auto root = [](std::complex<double> a)
@@ -3147,11 +3156,13 @@ static inline DiagSheet diag_sheet_composite(std::complex<double> e_near, std::c
         return std::sqrt(a);
     };
 
-    const std::complex<double> zn = std::sqrt(e_near), zs = std::sqrt(e_slab), zf = std::sqrt(e_far);
+    const std::complex<double> zn = std::sqrt(e_near / mu_near), zs = std::sqrt(e_slab / mu_slab),
+                               zf = std::sqrt(e_far / mu_far);
+    const std::complex<double> w_near = e_near * mu_near; // the transverse invariant's anchor
     const double s2 = 1.0 - ct * ct;
     const std::complex<double> c1(ct, 0.0);
-    const std::complex<double> cs = root(1.0 - (e_near / e_slab) * s2);
-    const std::complex<double> cf = root(1.0 - (e_near / e_far) * s2);
+    const std::complex<double> cs = root(1.0 - (w_near / (e_slab * mu_slab)) * s2);
+    const std::complex<double> cf = root(1.0 - (w_near / (e_far * mu_far)) * s2);
 
     DiagSheet D;
     D.c_slab = cs, D.c_far = cf;
@@ -3173,18 +3184,19 @@ static inline DiagSheet diag_sheet_composite(std::complex<double> e_near, std::c
     // One-way propagation across the sheet, at cs, and the host propagation it replaces, taken at
     // the host's own cosine over the same normal thickness.
     const std::complex<double> phi =
-        std::exp(std::complex<double>(0.0, -1.0) * k0 * std::sqrt(e_slab) * thk * cs);
+        std::exp(std::complex<double>(0.0, -1.0) * k0 * std::sqrt(e_slab * mu_slab) * thk * cs);
     const std::complex<double> e_disp = disp_far ? e_far : e_near;
-    const std::complex<double> c_disp = root(1.0 - (e_near / e_disp) * s2);
+    const std::complex<double> mu_disp = disp_far ? mu_far : mu_near;
+    const std::complex<double> c_disp = root(1.0 - (w_near / (e_disp * mu_disp)) * s2);
     const std::complex<double> phi_disp =
-        std::exp(std::complex<double>(0.0, -1.0) * k0 * std::sqrt(e_disp) * thk * c_disp);
+        std::exp(std::complex<double>(0.0, -1.0) * k0 * std::sqrt(e_disp * mu_disp) * thk * c_disp);
     const std::complex<double> phi_t = phi / phi_disp;
 
     // Near -> far normal flux, per channel. Both denominators collapse to Re(z_n) * ct for a real
     // incidence cosine, so with a real near side the two channels can separate only through the far
     // medium. The gate is near == far, which is why an isolated sheet and a sheet embedded in a
     // medium both take the factor as exactly 1.
-    if (e_far != e_near)
+    if (e_far != e_near || mu_far != mu_near)
     {
         double den_te = std::real(zn * c1), den_tm = std::real(std::conj(zn) * c1);
         double num_te = std::real(zf * cf), num_tm = std::real(std::conj(zf) * cf);
@@ -3221,12 +3233,19 @@ static inline DiagSheet diag_sheet_composite(std::complex<double> e_near, std::c
 // they are the cosines a bare air | slab and air | far crossing would use; with the real projection
 // they are not, and that is the whole of what this reference measures.
 //
-// Same preconditions as diag_sheet_composite: mu = 1, no resonance, att = tf = alpha = 0, m = 0,
+// Same preconditions as diag_sheet_composite, and the same three permeability substitutions. Neither
+// s2 nor c1 reads mu, so the generalization is identical in the two builders and the statement that
+// this one reproduces the other at a real cosine is unaffected by it.
+//
+// Same preconditions otherwise: no resonance, att = tf = alpha = 0, m = 0,
 // and an uncapped displacement budget.
 static inline DiagSheet diag_sheet_composite_cx(std::complex<double> e_near, std::complex<double> e_slab,
                                                 std::complex<double> e_far, double thk,
                                                 std::complex<double> ct, double f_hz,
-                                                bool disp_far, bool scalar)
+                                                bool disp_far, bool scalar,
+                                                std::complex<double> mu_near = std::complex<double>(1.0, 0.0),
+                                                std::complex<double> mu_slab = std::complex<double>(1.0, 0.0),
+                                                std::complex<double> mu_far = std::complex<double>(1.0, 0.0))
 {
     const double k0 = 2.0 * QPI * f_hz / C0;
     auto root = [](std::complex<double> a)
@@ -3236,11 +3255,13 @@ static inline DiagSheet diag_sheet_composite_cx(std::complex<double> e_near, std
         return std::sqrt(a);
     };
 
-    const std::complex<double> zn = std::sqrt(e_near), zs = std::sqrt(e_slab), zf = std::sqrt(e_far);
+    const std::complex<double> zn = std::sqrt(e_near / mu_near), zs = std::sqrt(e_slab / mu_slab),
+                               zf = std::sqrt(e_far / mu_far);
+    const std::complex<double> w_near = e_near * mu_near; // the transverse invariant's anchor
     const std::complex<double> c1 = ct;
     const std::complex<double> s2 = 1.0 - c1 * c1;
-    const std::complex<double> cs = root(1.0 - (e_near / e_slab) * s2);
-    const std::complex<double> cf = root(1.0 - (e_near / e_far) * s2);
+    const std::complex<double> cs = root(1.0 - (w_near / (e_slab * mu_slab)) * s2);
+    const std::complex<double> cf = root(1.0 - (w_near / (e_far * mu_far)) * s2);
 
     DiagSheet D;
     D.c_slab = cs, D.c_far = cf;
@@ -3258,17 +3279,18 @@ static inline DiagSheet diag_sheet_composite_cx(std::complex<double> e_near, std
     std::complex<double> t_sf_tm = scalar ? t_sf_te : (2.0 * zs * cs) / (zf * cs + zs * cf);
 
     const std::complex<double> phi =
-        std::exp(std::complex<double>(0.0, -1.0) * k0 * std::sqrt(e_slab) * thk * cs);
+        std::exp(std::complex<double>(0.0, -1.0) * k0 * std::sqrt(e_slab * mu_slab) * thk * cs);
     const std::complex<double> e_disp = disp_far ? e_far : e_near;
-    const std::complex<double> c_disp = root(1.0 - (e_near / e_disp) * s2);
+    const std::complex<double> mu_disp = disp_far ? mu_far : mu_near;
+    const std::complex<double> c_disp = root(1.0 - (w_near / (e_disp * mu_disp)) * s2);
     const std::complex<double> phi_disp =
-        std::exp(std::complex<double>(0.0, -1.0) * k0 * std::sqrt(e_disp) * thk * c_disp);
+        std::exp(std::complex<double>(0.0, -1.0) * k0 * std::sqrt(e_disp * mu_disp) * thk * c_disp);
     const std::complex<double> phi_t = phi / phi_disp;
 
     // Per-channel normal flux, near to far. With a complex incidence cosine the two denominators
     // Re(z_n c_n) and Re(conj(z_n) c_n) no longer collapse onto Re(z_n) ct, so the channels separate
     // through the near medium as well as through the far one.
-    if (e_far != e_near)
+    if (e_far != e_near || mu_far != mu_near)
     {
         double den_te = std::real(zn * c1), den_tm = std::real(std::conj(zn) * c1);
         double num_te = std::real(zf * cf), num_tm = std::real(std::conj(zf) * cf);
@@ -4179,6 +4201,300 @@ TEST_CASE("Layered stack - the characteristic-matrix reference against the singl
         // exists to serve, and it is asserted so that a reference that lost the order shows up here
         // rather than as a silent pass in the third case below.
         CHECK(std::abs(AB.R_te - BA.R_te) > 1.0e-3);
+    }
+}
+
+TEST_CASE("Permeability - the sheet, stack and glued paths")
+{
+    // The e, f, g, h columns are live in every expression the sheet and stack paths form, and no
+    // sheet, stack, glued pair or traced chain has ever run with a non-unit mu. This case supplies
+    // the coverage. No source change accompanies it.
+    //
+    // Where mu enters. Every site is one of two forms and never a third. Through the PRODUCT
+    // eps*mu: the index n = sqrt(eps*mu) in every propagation factor, every Snell ratio and every
+    // refraction root, the total-reflection test, medium_gain's loss rate, qd_refract's snell,
+    // EXACT_IN_SLAB_COSINE's eps_r, the displaced-host cosine and index, and SCALE_BY_MEDIUM, which
+    // never sees mu on its own at all. Through the QUOTIENT eps/mu: the admittance z in every
+    // Fresnel amplitude, the core's tilted admittances z*c and z/c, and flux_amp's Re(z c) and
+    // Re(conj(z) c).
+    //
+    // So there is exactly one magnetic degree of freedom to test: n and z stop being the same
+    // number. A single permittivity fixes both, which is why no dielectric palette can reach any of
+    // this, and it is why an eps<->mu swap is the sharpest available probe - it holds n, and
+    // therefore every cosine and every phase, fixed while inverting z.
+    //
+    // What the six existing permeability cases cover is the product-and-quotient split at a single
+    // interface and in medium_gain. None of them involves a layer, so none of them can see a
+    // propagation phase built at the wrong index or an internal series built at the wrong
+    // admittance.
+    const double f_hz = FRQ;
+    const double thk = 0.006;
+    const double L = 0.10;
+
+    // A local palette, so diag_palette and diag_eps stay dielectric and every existing residual
+    // stays where it is. Same column convention: eps = a - j*17.98*c/fGHz, mu = e - j*17.98*g/fGHz.
+    struct MuRow
+    {
+        double a, c, e, g, thk;
+    };
+    const std::complex<double> e_air(1.0, 0.0), U(1.0, 0.0);
+    const std::complex<double> e_ms(5.24, -0.63), mu_ms(2.10, -0.35); // magnetic sheet
+    const std::complex<double> e_mh(1.50, -0.40), mu_mh(1.60, 0.0);   // magnetic host
+    const std::complex<double> e_k(4.0, 0.0), mu_k(4.0, 0.0);         // matched dense sheet
+
+    const int MSHEET = 1, MSWAP = 2, MHOST = 3, MATCHED = 4;
+    const std::vector<MuRow> pal = {
+        {5.24, 0.63 / 17.98, 2.10, 0.35 / 17.98, thk}, // 1 MSHEET
+        {2.10, 0.35 / 17.98, 5.24, 0.63 / 17.98, thk}, // 2 MSWAP, the eps<->mu swap of MSHEET
+        {1.50, 0.40 / 17.98, 1.60, 0.0, 0.0},          // 3 MHOST, a magnetic solid
+        {4.00, 0.0, 4.00, 0.0, thk},                   // 4 MATCHED, eps = mu so z = 1, n = 4
+    };
+
+    std::unordered_map<std::string, std::vector<double>> mtl;
+    for (const char *k : {"a", "b", "c", "d", "e", "f", "g", "h", "thk", "att", "attB",
+                          "alpha", "alphaB", "fRef"})
+        mtl[k] = std::vector<double>(pal.size(), 0.0);
+    for (size_t i = 0; i < pal.size(); ++i)
+    {
+        mtl["a"][i] = pal[i].a, mtl["c"][i] = pal[i].c;
+        mtl["e"][i] = pal[i].e, mtl["g"][i] = pal[i].g;
+        mtl["thk"][i] = pal[i].thk, mtl["fRef"][i] = 1.0;
+    }
+
+    const uint8_t OT_SHEET_ISO = 67;   // ok | sheet, no co-located face
+    const uint8_t OT_GLUED_ENTRY = 71; // ok | front | co-located | sheet -> sheet_case 2
+
+    // Channel identification, as in the flux-conversion case: make1 puts orig, fbs and dest on the
+    // x axis with the normal along x, so the incidence plane is degenerate, qd_polbasis takes its
+    // identity branch, and VV is TM while HH is TE.
+    auto TM = [](const arma::mat &X)
+    { return cpx(X, 0, 0); };
+    auto TE = [](const arma::mat &X)
+    { return cpx(X, 0, 3); };
+
+    // ------------------------------------------------------------------------------------------
+    // The generalized builders against diag_cm_stack, at mu != 1. Nothing here touches the
+    // library. diag_cm_stack was written with (eps, mu) pairs from the start and shares no code
+    // with the two single-layer builders, so this is what establishes that the three substitutions
+    // above are the right three before any of them is used as an oracle below.
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: permeability, generalized single-layer builders against diag_cm_stack\n");
+    QD_DIAG("stack,mode,theta_n,d_real_builder,d_complex_builder\n");
+
+    struct MuStack
+    {
+        const char *name;
+        std::complex<double> e_near, mu_near, e_far, mu_far;
+        bool disp_far;
+    };
+    const std::vector<MuStack> stacks = {
+        {"air  | Msheet | air ", e_air, U, e_air, U, false},
+        {"air  | Msheet | Mhst", e_air, U, e_mh, mu_mh, false},
+        {"Mhst | Msheet | air ", e_mh, mu_mh, e_air, U, true},
+        {"Mhst | Msheet | Mhst", e_mh, mu_mh, e_mh, mu_mh, false},
+    };
+
+    double worst_re = 0.0, worst_cx = 0.0;
+    for (const auto &S : stacks)
+        for (int mode = 0; mode < 2; ++mode)
+            for (double thd : {0.0, 10.0, 30.0, 50.0, 70.0, 85.0, 89.9})
+            {
+                bool scalar = (mode == 1);
+                double th = thd * QPI / 180.0, ct = std::cos(th);
+
+                DiagSheet A = diag_sheet_composite(S.e_near, e_ms, S.e_far, thk, ct, f_hz,
+                                                   S.disp_far, scalar, S.mu_near, mu_ms, S.mu_far);
+                DiagSheet B = diag_cm_stack(S.e_near, S.mu_near, {{e_ms, mu_ms, thk}},
+                                            S.e_far, S.mu_far, std::complex<double>(ct, 0.0),
+                                            f_hz, S.disp_far, scalar);
+                double d_re = std::max(std::max(std::abs(A.T_te - B.T_te), std::abs(A.T_tm - B.T_tm)),
+                                       std::max(std::abs(A.R_te - B.R_te), std::abs(A.R_tm - B.R_tm)));
+
+                // The same at a complex incidence cosine, which is what a sheet reached from inside
+                // a magnetic solid is handed. The cosine is built from the eps*mu product, so this
+                // also pins that the transverse invariant carries mu.
+                std::complex<double> cx =
+                    std::sqrt(1.0 - ((e_air * U) / (e_mh * mu_mh)) * (1.0 - ct * ct));
+                DiagSheet Ac = diag_sheet_composite_cx(e_mh, e_ms, S.e_far, thk, cx, f_hz,
+                                                       S.disp_far, scalar, mu_mh, mu_ms, S.mu_far);
+                DiagSheet Bc = diag_cm_stack(e_mh, mu_mh, {{e_ms, mu_ms, thk}}, S.e_far, S.mu_far,
+                                             cx, f_hz, S.disp_far, scalar);
+                double d_cx = std::max(std::max(std::abs(Ac.T_te - Bc.T_te), std::abs(Ac.T_tm - Bc.T_tm)),
+                                       std::max(std::abs(Ac.R_te - Bc.R_te), std::abs(Ac.R_tm - Bc.R_tm)));
+
+                worst_re = std::max(worst_re, d_re), worst_cx = std::max(worst_cx, d_cx);
+                QD_DIAG("%s,%s,%.1f,%.3e,%.3e\n", S.name, scalar ? "scalar" : "EM    ", thd, d_re, d_cx);
+
+                INFO(S.name << ", " << (scalar ? "scalar" : "EM") << ", theta_n " << thd);
+                CHECK(d_re < 1.0e-14);
+                CHECK(d_cx < 1.0e-14);
+
+                // And the complex-cosine builder still reproduces the real-cosine one at a real
+                // cosine with mu live, which is the invariant the sheet-in-a-medium case rests on.
+                DiagSheet Ar = diag_sheet_composite_cx(S.e_near, e_ms, S.e_far, thk,
+                                                       std::complex<double>(ct, 0.0), f_hz,
+                                                       S.disp_far, scalar, S.mu_near, mu_ms, S.mu_far);
+                CHECK(std::abs(A.T_te - Ar.T_te) < 1.0e-14);
+                CHECK(std::abs(A.R_tm - Ar.R_tm) < 1.0e-14);
+            }
+
+    QD_DIAG("# worst against the real-cosine builder %.3e, against the complex one %.3e\n",
+            worst_re, worst_cx);
+
+    // ------------------------------------------------------------------------------------------
+    // An isolated magnetic sheet in air, and a glued entry into a magnetic solid, both against the
+    // generalized reference. The isolated rows run with mtl_current = 0, so SHEET_EVENT applies no
+    // host factor and the written field is the composite outright; those are asserted complex.
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: permeability through the library, sheet eps 5.24 - 0.63j, mu 2.10 - 0.35j\n");
+    QD_DIAG("stack,theta_n,T_te_meas,T_te_ref,T_tm_meas,T_tm_ref,d_te,d_tm,rtype\n");
+
+    struct LibRow
+    {
+        const char *name;
+        uint8_t otype;
+        unsigned nH;
+        int m2;
+        int cur;
+        std::complex<double> e_far, mu_far;
+        bool disp_far;
+    };
+    const std::vector<LibRow> lrows = {
+        {"isolated air | Msheet | air ", OT_SHEET_ISO, 1u, 0, 0, e_air, U, false},
+        {"entry    air | Msheet | Mhst", OT_GLUED_ENTRY, 2u, MHOST, 0, e_mh, mu_mh, false},
+    };
+
+    for (const auto &R : lrows)
+        for (double thd : {0.0, 20.0, 40.0, 60.0, 80.0, 85.0})
+        {
+            double theta_n = thd * QPI / 180.0, ct = std::cos(theta_n);
+            auto C = make1<double>(mtl, /*EM transmission*/ 1, R.otype, R.nH,
+                                   /*M1 = the sheet face*/ MSHEET, /*M2*/ R.m2,
+                                   /*prev*/ 0, /*cur*/ R.cur, /*buf*/ 0,
+                                   L, 0.5, 0.5, QPI / 2.0 - theta_n,
+                                   /*eps: the host series must not fire*/ 1.5);
+            C.run();
+
+            DiagSheet D = diag_sheet_composite(e_air, e_ms, R.e_far, thk, ct, f_hz,
+                                               R.disp_far, false, U, mu_ms, R.mu_far);
+
+            std::complex<double> t_te = TE(C.xprmat), t_tm = TM(C.xprmat);
+            QD_DIAG("%s,%.1f,%.9f,%.9f,%.9f,%.9f,%.2e,%.2e,%u\n", R.name, thd,
+                    std::abs(t_te), std::abs(D.T_te), std::abs(t_tm), std::abs(D.T_tm),
+                    std::abs(t_te - D.T_te), std::abs(t_tm - D.T_tm), (unsigned)C.resolved_type[0]);
+
+            INFO(R.name << ", theta_n " << thd);
+            REQUIRE(std::isfinite(C.gain(0)));
+            REQUIRE(C.resolved_type[0] != 0);
+            CHECK(std::abs(t_te - D.T_te) < 1.0e-9);
+            CHECK(std::abs(t_tm - D.T_tm) < 1.0e-9);
+            CHECK(std::abs((double)C.gain(0) - 0.5 * (std::norm(D.T_te) + std::norm(D.T_tm))) < 1.0e-9);
+        }
+
+    // ------------------------------------------------------------------------------------------
+    // The eps<->mu swap, on the sheet only, in air. Swapping holds n = sqrt(eps*mu) and therefore
+    // every cosine and the propagation factor exactly fixed, and replaces z by 1/z. With both hosts
+    // at unit admittance every reflection and every transmission product in the Airy pair maps onto
+    // its opposite polarization, so the swap exchanges the TE and TM ports exactly, on both ports.
+    //
+    // The power-averaged gain is invariant under that exchange, so this statement is invisible to
+    // gain and to scalar mode and can only be made per channel. That is the point: a solver that
+    // reverted the admittance to sqrt(eps) would still report the same total.
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: permeability, eps<->mu swap on an isolated sheet in air\n");
+    QD_DIAG("theta_n,d_te_vs_tm,d_tm_vs_te,d_gain,separation\n");
+
+    for (double thd : {0.0, 20.0, 45.0, 70.0, 85.0})
+    {
+        double theta_n = thd * QPI / 180.0;
+        auto mk = [&](int idx)
+        {
+            auto C = make1<double>(mtl, /*EM transmission*/ 1, OT_SHEET_ISO, 1u,
+                                   idx, 0, 0, 0, 0, L, 0.5, 0.5, QPI / 2.0 - theta_n, 1.5);
+            C.run();
+            return C;
+        };
+        auto A = mk(MSHEET), B = mk(MSWAP);
+
+        std::complex<double> a_te = TE(A.xprmat), a_tm = TM(A.xprmat);
+        std::complex<double> b_te = TE(B.xprmat), b_tm = TM(B.xprmat);
+        double d1 = std::abs(b_te - a_tm), d2 = std::abs(b_tm - a_te);
+        double dg = std::abs((double)A.gain(0) - (double)B.gain(0));
+        double sep = std::abs(a_te - a_tm);
+
+        QD_DIAG("%.1f,%.3e,%.3e,%.3e,%.6f\n", thd, d1, d2, dg, sep);
+
+        INFO("swap, theta_n " << thd);
+        REQUIRE(A.resolved_type[0] != 0);
+        REQUIRE(B.resolved_type[0] != 0);
+        CHECK(d1 < 1.0e-9);
+        CHECK(d2 < 1.0e-9);
+        CHECK(dg < 1.0e-12);
+
+        // Past normal incidence the two channels are far enough apart that the exchange above is a
+        // statement rather than an identity between two equal numbers.
+        if (thd > 0.0)
+            CHECK(sep > 1.0e-3);
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // An impedance-matched dense sheet, eps = mu = 4, so z = 1 and n = 4. At normal incidence both
+    // interfaces vanish and the sheet is invisible except for its phase: the composite is exactly
+    // the propagation it carries over the host it displaces, exp(-j k0 thk (n - 1)), with unit
+    // magnitude and no reflection at all. No dielectric can do that, because a single permittivity
+    // that moves n also moves z.
+    //
+    // At oblique incidence it does reflect, and the reflection is polarization-independent, since
+    // with z equal on both sides the TE and TM Fresnel expressions collapse onto the same function
+    // of the two cosines. That is the second thing only a magnetic material produces.
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: permeability, impedance-matched dense sheet, eps = mu = 4, thk 6 mm\n");
+    QD_DIAG("theta_n,|T|,arg_T_deg,pred_deg,|R_te|,|R_tm|,d_pol\n");
+
+    const double k0 = 2.0 * QPI * f_hz / C0;
+    for (double thd : {0.0, 20.0, 45.0, 70.0})
+    {
+        double theta_n = thd * QPI / 180.0, ct = std::cos(theta_n);
+
+        auto Ct = make1<double>(mtl, /*EM transmission*/ 1, OT_SHEET_ISO, 1u,
+                                MATCHED, 0, 0, 0, 0, L, 0.5, 0.5, QPI / 2.0 - theta_n, 1.5);
+        Ct.run();
+        auto Cr = make1<double>(mtl, /*EM reflection*/ 0, OT_SHEET_ISO, 1u,
+                                MATCHED, 0, 0, 0, 0, L, 0.5, 0.5, QPI / 2.0 - theta_n, 1.5);
+        Cr.run();
+
+        DiagSheet D = diag_sheet_composite(e_air, e_k, e_air, thk, ct, f_hz, false, false,
+                                           U, mu_k, U);
+
+        std::complex<double> t_te = TE(Ct.xprmat);
+        double pred = -k0 * thk * (4.0 - 1.0) * 180.0 / QPI; // normal incidence only
+        double arg_t = std::arg(t_te) * 180.0 / QPI;
+        double r_te = std::abs(TE(Cr.xprmat)), r_tm = std::abs(TM(Cr.xprmat));
+
+        QD_DIAG("%.1f,%.9f,%.6f,%.6f,%.9f,%.9f,%.2e\n", thd, std::abs(t_te), arg_t,
+                (thd == 0.0) ? pred : 0.0, r_te, r_tm, std::abs(r_te - r_tm));
+
+        INFO("matched sheet, theta_n " << thd);
+        CHECK(std::abs(t_te - D.T_te) < 1.0e-9);
+        CHECK(std::abs(TM(Ct.xprmat) - D.T_tm) < 1.0e-9);
+
+        // The reflection carries no polarization dependence at any angle.
+        CHECK(std::abs(std::abs(D.R_te) - std::abs(D.R_tm)) < 1.0e-14);
+        CHECK(std::abs(r_te - r_tm) < 1.0e-9);
+
+        if (thd == 0.0)
+        {
+            // Invisible except for the phase, exactly.
+            CHECK(std::abs(D.R_te) < 1.0e-15);
+            CHECK(std::abs(std::abs(t_te) - 1.0) < 1.0e-9);
+            CHECK(std::abs(arg_t - pred) < 1.0e-3);
+            CHECK((double)Cr.gain(0) < 1.0e-12);
+        }
+        else
+        {
+            // And it is a real reflection, so the normal-incidence statement is not the whole story.
+            CHECK(r_te > 1.0e-3);
+        }
     }
 }
 
