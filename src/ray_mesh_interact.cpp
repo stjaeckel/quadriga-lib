@@ -749,6 +749,214 @@ namespace
                           HH_Re * HH_Re + HH_Im * HH_Im);
     }
 
+    // One layer of a stratified stack: a material and the normal thickness it occupies.
+    struct QdLayer
+    {
+        const Material *mtl = nullptr;
+        double thk = 0.0;
+    };
+
+    // 2x2 characteristic-matrix resolve for an ordered stack of layers between two half-spaces.
+    //
+    // Why a matrix rather than another Airy sum. An Airy sum is a statement about one layer with a
+    // half-space on either side. Two layers couple through reflections between non-adjacent
+    // boundaries, and those do not factor into a product of per-layer series. The matrix carries the
+    // whole stack in one pass and is exact for any layer count.
+    //
+    // The variables are the ones the rest of this file already uses. Per medium the admittance is
+    // z = sqrt(eps/mu) and the index is n = sqrt(eps mu), and every cosine comes from the transverse
+    // invariant eps mu (1 - c^2), which is conserved across every boundary and is fixed by the
+    // incidence cosine in the near medium. Per polarization the tilted admittance is
+    //
+    //     eta_TE = z c        eta_TM = z / c
+    //
+    // which are the groupings Material::interact_with is written in: its TE reflection is
+    // (eta1 - eta2)/(eta1 + eta2) exactly, and dividing its TM reflection through by c1 c2 turns it
+    // into (eta2 - eta1)/(eta2 + eta1). So the library's TM reflection is minus the admittance-form
+    // one and its TM transmission carries an extra c1/c2; both conversions are applied at the ends
+    // below, and the c1/c2 telescopes over the stack because the intermediate cosines cancel.
+    //
+    // What propagates is the tangential field pair, not flux: tangential E and H are continuous
+    // across every boundary while normal flux decays inside a lossy layer. So the product runs in
+    // amplitudes and the conversion to per-channel normal flux is applied once, at the outer pair,
+    // on the transmit port. Inside the product the intermediate admittances cancel identically,
+    // which is the same statement qd_slab_resolve makes for one layer when it keeps the raw Fresnel
+    // amplitudes.
+    //
+    // At one layer this reduces to the Airy pair produce mode returns, term for term, including the
+    // Stokes sign on the near reflection, the flux conversion, the lumped interface gains and the
+    // displaced host. Produce mode is deliberately NOT routed through here: its one-layer path is
+    // asserted bit-identical to its pre-change form over 31104 rows, and the two forms are
+    // algebraically equal but not bit-identical. The layered-stack fixture measures the two against
+    // each other, so unifying them later is a checked step rather than a leap.
+    //
+    // Three material columns have no matrix expression and make this decline rather than approximate:
+    //   m > 0     a lumped acoustic surrogate whose in-layer index is not physical, the same
+    //             reasoning that keeps a mass-law slab out of correction mode entirely
+    //   alpha     dB per meter of PATH, which produce mode applies as a one-way multiplier on phi;
+    //             a matrix layer has no one-way phi to multiply
+    //   tf        redistributes energy between the reflected and transmitted ports at a boundary,
+    //             which is not expressible as a boundary admittance
+    // Where it declines the caller keeps whatever it did before.
+    //
+    // Returns false when it declines. ci is the incidence cosine in mat_near, complex wherever that
+    // medium is a traced solid, exactly as produce mode's ct_near_exact.
+    inline bool qd_stack_resolve(const Material &mat_near,
+                                 const QdLayer *layers, int n_layers,
+                                 const Material &mat_far,
+                                 std::complex<double> ci,
+                                 double fGHz, bool is_scalar,
+                                 std::complex<double> *T_te, std::complex<double> *T_tm,
+                                 std::complex<double> *R_te, std::complex<double> *R_tm,
+                                 bool disp_far = false, double disp_budget = -1.0)
+    {
+        if (n_layers < 1 || layers == nullptr)
+            return false;
+        for (int i = 0; i < n_layers; ++i)
+        {
+            if (layers[i].mtl == nullptr || layers[i].thk < 0.0)
+                return false;
+            const Material &L = *layers[i].mtl;
+            if (L.m > 0.0 || L.alpha != 0.0 || L.tf(fGHz) != 0.0)
+                return false;
+        }
+
+        const double c0 = 299792458.0;
+        const double omega = 2.0 * 3.14159265358979323846 * fGHz * 1e9;
+        const double k0 = omega / c0;
+
+        auto root = [](std::complex<double> a)
+        {
+            if (std::imag(a) == 0.0 && std::real(a) < 0.0)
+                a = std::complex<double>(std::real(a), -0.0); // decaying evanescent root
+            return std::sqrt(a);
+        };
+
+        // Interface permittivities carry the resonance, the propagation index does not. That split
+        // is the one the rest of this file applies at five separate sites: a permittivity resonance
+        // is an interface effect rather than a propagation one.
+        std::complex<double> eta_n = mat_near.eta(fGHz) + mat_near.eta_resonance(fGHz);
+        std::complex<double> mu_n = mat_near.mu(fGHz);
+        std::complex<double> eta_f = mat_far.eta(fGHz) + mat_far.eta_resonance(fGHz);
+        std::complex<double> mu_f = mat_far.mu(fGHz);
+
+        const std::complex<double> w_near = eta_n * mu_n; // anchors the transverse invariant
+        const std::complex<double> s2 = 1.0 - ci * ci;
+        const std::complex<double> z_n = std::sqrt(eta_n / mu_n);
+        const std::complex<double> z_f = std::sqrt(eta_f / mu_f);
+        const std::complex<double> c_far = root(1.0 - (w_near / (eta_f * mu_f)) * s2);
+
+        // One-way loss cap, in nepers of amplitude. cos and sin of a complex phase grow like
+        // exp(|Im|), where the Airy form's phi decayed instead, so an opaque layer would overflow
+        // the product rather than vanish from it. 46.05 Np is 400 dB, the same opacity floor produce
+        // mode caps its path length at, so nothing a propagating wave can reach is touched.
+        const double dl_im_cap = 46.05;
+
+        std::complex<double> r_pol[2], t_pol[2];
+        for (int pol = 0; pol < 2; ++pol)
+        {
+            std::complex<double> M11(1.0, 0.0), M12(0.0, 0.0), M21(0.0, 0.0), M22(1.0, 0.0);
+            for (int i = 0; i < n_layers; ++i)
+            {
+                const Material &L = *layers[i].mtl;
+                std::complex<double> eta_L = L.eta(fGHz) + L.eta_resonance(fGHz);
+                std::complex<double> mu_L = L.mu(fGHz);
+                std::complex<double> c_L = root(1.0 - (w_near / (eta_L * mu_L)) * s2);
+                std::complex<double> n_L = std::sqrt(L.eta(fGHz) * mu_L); // resonance-excluded
+                std::complex<double> y_L = (pol == 0) ? (std::sqrt(eta_L / mu_L) * c_L)
+                                                      : (std::sqrt(eta_L / mu_L) / c_L);
+
+                std::complex<double> dl = k0 * n_L * c_L * layers[i].thk;
+                if (std::imag(dl) < -dl_im_cap)
+                    dl = std::complex<double>(std::real(dl), -dl_im_cap);
+                else if (std::imag(dl) > dl_im_cap)
+                    dl = std::complex<double>(std::real(dl), dl_im_cap);
+
+                std::complex<double> A = std::cos(dl);
+                std::complex<double> B = std::complex<double>(0.0, 1.0) * std::sin(dl) / y_L;
+                std::complex<double> C = std::complex<double>(0.0, 1.0) * y_L * std::sin(dl);
+                std::complex<double> D = std::cos(dl);
+
+                std::complex<double> m11 = M11 * A + M12 * C, m12 = M11 * B + M12 * D;
+                std::complex<double> m21 = M21 * A + M22 * C, m22 = M21 * B + M22 * D;
+                M11 = m11, M12 = m12, M21 = m21, M22 = m22;
+            }
+
+            std::complex<double> y0 = (pol == 0) ? (z_n * ci) : (z_n / ci);
+            std::complex<double> ys = (pol == 0) ? (z_f * c_far) : (z_f / c_far);
+            std::complex<double> Bv = M11 + M12 * ys, Cv = M21 + M22 * ys;
+            std::complex<double> den = y0 * Bv + Cv;
+            if (!(std::abs(den) > 0.0))
+                return false;
+            r_pol[pol] = (y0 * Bv - Cv) / den;
+            t_pol[pol] = 2.0 * y0 / den;
+
+            if (is_scalar) // one channel, the TE / admittance form, as everywhere else in this file
+            {
+                r_pol[1] = r_pol[0], t_pol[1] = t_pol[0];
+                break;
+            }
+        }
+
+        std::complex<double> Rv_te = r_pol[0];
+        std::complex<double> Rv_tm = is_scalar ? r_pol[0] : -r_pol[1];
+        std::complex<double> tv_te = t_pol[0];
+        std::complex<double> tv_tm = is_scalar ? t_pol[0] : (ci / c_far) * t_pol[1];
+
+        // The one conversion to per-channel normal flux, at the outer pair, transmit port only. The
+        // gate is near == far, so an isolated stack, a stack embedded in one medium and a collapsed
+        // duplicate all take it as exactly 1, matching produce mode.
+        double fx_te = 1.0, fx_tm = 1.0;
+        if (!mat_far.same_as(mat_near))
+        {
+            Material::flux_amp(z_n, z_f, ci, c_far, fx_te, fx_tm);
+            if (is_scalar)
+                fx_tm = fx_te;
+        }
+
+        // Lumped interface gains: one per layer entered, plus the far medium's when the wave enters
+        // a medium it was not already in. The generalization of produce mode's ig to a stack.
+        bool far_is_air = mat_far.same_as(Material());
+        bool far_is_new = !far_is_air && !mat_far.same_as(mat_near);
+        double ig2 = far_is_new ? mat_far.interface_gain(fGHz) : 1.0;
+        for (int i = 0; i < n_layers; ++i)
+            ig2 *= layers[i].mtl->interface_gain(fGHz);
+        double ig = std::sqrt((ig2 < 0.0) ? 0.0 : ig2);
+
+        // The displaced host, over the stack's TOTAL normal thickness. A stack of sheets has no
+        // world-space thickness either, so the tracer walked the whole of it as the host medium and
+        // the transmit port owes the same division a single sheet owes. disp_budget caps it exactly
+        // as it caps a single sheet, which matters more here: a two-layer stack reaches a budget a
+        // one-layer one would not.
+        double t_tot = 0.0;
+        for (int i = 0; i < n_layers; ++i)
+            t_tot += layers[i].thk;
+        double t_disp = (disp_budget >= 0.0 && disp_budget < t_tot) ? disp_budget : t_tot;
+        if (t_disp < 0.0)
+            t_disp = 0.0;
+
+        const Material &disp_mtl = disp_far ? mat_far : mat_near;
+        std::complex<double> eta_d = disp_mtl.eta(fGHz) + disp_mtl.eta_resonance(fGHz);
+        std::complex<double> mu_d = disp_mtl.mu(fGHz);
+        std::complex<double> n_d = std::sqrt(disp_mtl.eta(fGHz) * mu_d); // resonance-excluded
+        std::complex<double> c_disp = root(1.0 - (w_near / (eta_d * mu_d)) * s2);
+        std::complex<double> phi_disp =
+            std::exp(std::complex<double>(0.0, -1.0) * k0 * n_d * t_disp * c_disp);
+        std::complex<double> undisp = (std::abs(phi_disp) > 0.0)
+                                          ? std::complex<double>(1.0, 0.0) / phi_disp
+                                          : std::complex<double>(1.0, 0.0);
+
+        if (T_te)
+            *T_te = ig * fx_te * tv_te * undisp;
+        if (T_tm)
+            *T_tm = ig * fx_tm * tv_tm * undisp;
+        if (R_te)
+            *R_te = Rv_te;
+        if (R_tm)
+            *R_tm = Rv_tm;
+        return true;
+    }
+
     // Analytic thin-slab (Fabry-Perot) resolve for a near | slab | far stack. Shared by both public
     // functions in this file: ray_state_update corrects coefficients it has already written, while
     // ray_mesh_interact produces them outright, because a sheet has zero world-space thickness and
@@ -814,7 +1022,8 @@ namespace
                                 bool disp_far = false,     // sheet sits on the far side (glued exit)
                                 double disp_budget = -1.0, // max normal thickness it may replace, < 0 = all
                                 std::complex<double> ct_slab_exact = std::complex<double>(0.0, 0.0),
-                                std::complex<double> ct_near_exact = std::complex<double>(0.0, 0.0))
+                                std::complex<double> ct_near_exact = std::complex<double>(0.0, 0.0),
+                                const Material *back_near = nullptr) // what lies behind a sheet named as mat_near
     {
         // Mass-law materials carry a lumped transmission surrogate: eta/mu are calibrated for
         // surface impedance only, so the in-slab index (and hence the phase of phi) is not
@@ -923,7 +1132,8 @@ namespace
         auto fresnel_r = [&](const Material &adj,
                              std::complex<double> &r_te, std::complex<double> &r_tm,
                              double &Ra_te, double &Ra_tm,
-                             std::complex<double> *t_out = nullptr) // [te, tm] slab -> adjacent
+                             std::complex<double> *t_out = nullptr, // [te, tm] slab -> adjacent
+                             const Material *backing = nullptr)     // what lies behind adj if it is a sheet
         {
             std::complex<double> eta_a_if = adj.eta(fGHz) + adj.eta_resonance(fGHz);
             std::complex<double> mu_a = adj.mu(fGHz);
@@ -943,6 +1153,35 @@ namespace
 
             std::complex<double> te = (z1 * cs - z2 * cos_t2) / (z1 * cs + z2 * cos_t2);
             std::complex<double> tm = is_scalar ? te : (z2 * cs - z1 * cos_t2) / (z2 * cs + z1 * cos_t2);
+
+            // A sheet named as a bounding medium is a layer of finite thickness, not a half-space.
+            // Reading only its eta and mu says the wave enters it and never comes back, which is
+            // exact only if whatever sits behind the sheet has the sheet's own permittivity. For a
+            // sheet electrically close to the slab it is worse than inexact: the half-space
+            // reflection goes to zero, the Airy denominator collapses to 1, and the slab loses its
+            // internal series, when physically the wave passes through the sheet almost unimpeded
+            // and still reflects off the boundary behind it.
+            //
+            // The backing is what the state format cannot always name. Where the caller knows it,
+            // it passes it; where it does not, air is assumed. Air is the right default for the
+            // motivating geometry, a coating on the room side of a wall, and it is what the
+            // characteristic-matrix reference in the fixture encodes. Naming it from the state
+            // rather than assuming it is its own open item.
+            //
+            // Only the amplitude is taken from the layer. tf still redistributes at the boundary in
+            // the same way, and the sheet's own tf, alpha or mass-law column makes the core decline,
+            // in which case the half-space value above stands exactly as before.
+            if (adj.thk > 0.0)
+            {
+                QdLayer lay;
+                lay.mtl = &adj, lay.thk = adj.thk;
+                Material air_backing;
+                std::complex<double> Lr_te, Lr_tm;
+                if (qd_stack_resolve(mat_slab, &lay, 1, backing ? *backing : air_backing,
+                                     cs, fGHz, is_scalar, nullptr, nullptr, &Lr_te, &Lr_tm))
+                    te = Lr_te, tm = is_scalar ? Lr_te : Lr_tm;
+            }
+
             const Material &owner = slab_is_air ? adj : mat_slab; // tf of the solid face
             Ra_te = owner.apply_tf(std::norm(te), fGHz);
             Ra_tm = owner.apply_tf(std::norm(tm), fGHz);
@@ -1047,7 +1286,7 @@ namespace
         }
         else
         {
-            fresnel_r(mat_near, rn_te, rn_tm, Rn_te, Rn_tm);
+            fresnel_r(mat_near, rn_te, rn_tm, Rn_te, Rn_tm, nullptr, back_near);
             fresnel_r(mat_far, rf_te, rf_tm, Rf_te, Rf_tm);
         }
 
@@ -3115,7 +3354,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
         //   2 = glued entry, host | sheet | solid
         //   3 = glued exit, solid | sheet | whatever encloses the host
         //   4 = ordered stack of two different sheets (physics not implemented, see below)
-        int sheet_case = 0, sheet_mtl = 0, sheet_solid = 0;
+        int sheet_case = 0, sheet_mtl = 0, sheet_solid = 0, sheet_mtl2 = 0;
         if (typeH[6])
         {
             bool shF = IS_SHEET(M1), shS = IS_SHEET(M2);
@@ -3127,7 +3366,19 @@ void quadriga_lib::ray_state_update(int interaction_type,
             else if (shF && shS) // Two sheets: a duplicate collapses, a laminate does not
             {
                 sheet_case = SAME(M1, M2) ? 1 : 4;
-                sheet_mtl = M1;
+                if (sheet_case == 4)
+                {
+                    // Traversal order. The layer hit on its front side is traversed first, and that
+                    // is what ray_mesh_interact wrote into bit 1; bit 3 records that the normals
+                    // gave no order and the geometric FBS -> SBS sequence was used instead. Both
+                    // bits survive into this function and only have to be read. The order matters
+                    // for the reflect port alone - a stack's transmit coefficient is invariant under
+                    // it, by reciprocity - so getting it wrong is silent in transmission.
+                    sheet_mtl = typeH[1] ? M1 : M2;
+                    sheet_mtl2 = typeH[1] ? M2 : M1;
+                }
+                else
+                    sheet_mtl = M1;
             }
             else if (shF || shS) // One sheet glued to one solid face
             {
@@ -3655,16 +3906,24 @@ void quadriga_lib::ray_state_update(int interaction_type,
         // mode is symmetric in the two so this is harmless, but a produce-mode call from here would
         // have to swap them.
         // Returns true when the series resolved (caller sets any extra state, e.g. the reflected slab flag).
-        auto SLAB_AIRY_FACTOR = [&](int mtl_slab, int mtl_near, int mtl_far) -> bool
+        auto SLAB_AIRY_FACTOR = [&](int mtl_slab, int mtl_near, int mtl_far, int mtl_back = 0) -> bool
         {
             if (eps > 0.0 && prev_nonpar) // known wedge/edge -> re-emit (eps = 0.0 always resolves)
                 return false;
+
+            // What lies behind a sheet named as mtl_near, where the caller knows it. SHEET_EVENT
+            // does, because at the crossing it still holds the medium on the far side of the sheet;
+            // on any later leg the previous-medium word holds the sheet and what is behind it is one
+            // level further back than the state format reaches, so air is assumed. Air is also the
+            // default here, which is why every other call site passes nothing.
+            Material M_back = MAT(mtl_back);
 
             std::complex<double> fac_te, fac_tm;
             if (!qd_slab_resolve(MAT(mtl_near), MAT(mtl_slab), MAT(mtl_far),
                                  dist_refract, dist_geo, abs_cos_theta_t, abs_cos_theta,
                                  fGHz, is_scalar, eps, false, &fac_te, &fac_tm,
-                                 nullptr, nullptr, false, -1.0, EXACT_IN_SLAB_COSINE()))
+                                 nullptr, nullptr, false, -1.0, EXACT_IN_SLAB_COSINE(),
+                                 std::complex<double>(0.0, 0.0), &M_back))
                 return false;
 
             // Scalar mode carries one port and the factor is a pure scale, so scale the stored
@@ -3707,11 +3966,16 @@ void quadriga_lib::ray_state_update(int interaction_type,
         // Sets cTE / cTM so that a following SLAB_AIRY_FACTOR can fold the host medium's own series
         // into the same TE/TM pair. Returns false when the composite must be left exactly as
         // ray_mesh_interact wrote it.
-        auto SHEET_RESOLVE = [&](int mtl_slab, int mtl_near, int mtl_far, bool disp_far) -> bool
+        auto SHEET_RESOLVE = [&](int mtl_slab, int mtl_near, int mtl_far, bool disp_far,
+                                 int mtl_slab2 = 0) -> bool
         {
             Material M_slab = MAT(mtl_slab), M_near = MAT(mtl_near), M_far = MAT(mtl_far);
+            Material M_slab2 = MAT(mtl_slab2);
             double thk = M_slab.thk;
+            double thk2 = (mtl_slab2 != 0) ? M_slab2.thk : 0.0;
             if (thk <= 0.0) // Not a sheet material after all: leave the composite alone
+                return false;
+            if (mtl_slab2 != 0 && thk2 <= 0.0) // an ordered stack whose second layer is not a sheet
                 return false;
 
             // Geometry and the total-reflection verdict from the outer pair, at theta_t.
@@ -3806,10 +4070,30 @@ void quadriga_lib::ray_state_update(int interaction_type,
 
                 // Thickness enters only here. Produce mode takes the normal thickness and the two
                 // cosines; the geometric-path slot is unused.
+                //
+                // An ordered stack goes to the characteristic-matrix core instead, because two
+                // layers couple through reflections between non-adjacent boundaries and those do not
+                // factor into a product of per-layer series. The single-sheet call below is left
+                // exactly as it was: the two forms are algebraically equal at one layer and agree to
+                // 9.6e-16 wherever no boundary is past its critical angle, but they are not
+                // bit-identical, and produce mode's one-layer path is asserted to be.
                 std::complex<double> Tte, Ttm, Rte, Rtm;
-                qd_slab_resolve(M_near, M_slab, M_far, thk, 0.0, ct_slab, ct_geo,
-                                fGHz, is_scalar, 0.0, true, &Tte, &Ttm, &Rte, &Rtm,
-                                disp_far, disp_budget, std::complex<double>(0.0, 0.0), ct_near);
+                if (mtl_slab2 != 0)
+                {
+                    QdLayer lay[2];
+                    lay[0].mtl = &M_slab, lay[0].thk = thk;
+                    lay[1].mtl = &M_slab2, lay[1].thk = thk2;
+                    std::complex<double> ci = (std::abs(ct_near) > 0.0)
+                                                  ? ct_near
+                                                  : std::complex<double>(ct_geo, 0.0);
+                    if (!qd_stack_resolve(M_near, lay, 2, M_far, ci, fGHz, is_scalar,
+                                          &Tte, &Ttm, &Rte, &Rtm, disp_far, disp_budget))
+                        return false; // a lumped column the matrix cannot express; the caller decides
+                }
+                else
+                    qd_slab_resolve(M_near, M_slab, M_far, thk, 0.0, ct_slab, ct_geo,
+                                    fGHz, is_scalar, 0.0, true, &Tte, &Ttm, &Rte, &Rtm,
+                                    disp_far, disp_budget, std::complex<double>(0.0, 0.0), ct_near);
 
                 // Both ports come out of the one pass. The reflection port is its own Airy sum, not the
                 // half-space Fresnel value, so expect real angular and frequency structure in it.
@@ -3845,15 +4129,12 @@ void quadriga_lib::ray_state_update(int interaction_type,
         // rebuilds xprmat from cTE / cTM, and those only exist once the sheet has been resolved.
         auto SHEET_EVENT = [&]()
         {
-            // Ordered stack. Detection and the type bits are correct, but ray_mesh_interact runs no
-            // sheet physics for this case either - it falls through to the legacy M1/M2 path with the
-            // sheet bit set. Explicitly unhandled rather than silently wrong.
-            if (sheet_case == 4)
-            {
-                KILL_RAY();
-                return;
-            }
-
+            // Ordered stack, sheet_case 4. The two sheets are one atomic crossing resolved by the
+            // characteristic-matrix core, in the order the hit code carries. Both sides of the pair
+            // are the medium the ray is travelling in, so near == far, the flux conversion is 1, and
+            // the stack displaces its whole thickness of that medium. Where the core declines - a
+            // lumped column it cannot express - the ray is killed, which is what this case did
+            // unconditionally before.
             bool ray_ends = nH == 1 || (nH == 2 && typeH[2]);
 
             // Bounding media from the tracked state. mtl_current is the near side in every case: the
@@ -3880,32 +4161,43 @@ void quadriga_lib::ray_state_update(int interaction_type,
             // alone, and let the series resolve once at the far side over the whole path. Only the
             // sheet's own composite is applied here.
             //
-            // This is a special case, not the general fix. A sheet whose impedance differs from the
-            // host still splits the layer, and the cross-layer coupling of a genuine two-layer stack
-            // is still absent; both need the transfer-matrix core. Restricted to the transmission
-            // pass: a matched sheet reflects nothing, so the reflect port is already zero and the
-            // reflected ray carries no energy either way.
-            bool merge_host = !refl_pass && mtl_current != 0 && m_next == mtl_current &&
-                              TRANSPARENT_TO(sheet_mtl, mtl_current);
+            // This stays a special case rather than the general fix. A sheet that merely fails the
+            // transparency test still splits the layer, and it is the characteristic-matrix core
+            // below that keeps the split honest by resolving the sheet as a layer rather than as a
+            // half-space; the merge only avoids doing that work where there is provably no boundary.
+            //
+            // Restricted to the transmission pass, because a matched sheet reflects nothing and the
+            // reflected ray carries no energy either way. Restricted to a single layer as well: an
+            // ordered stack is not transparent because its first layer happens to be, and merging on
+            // that test would carry the leg through while discarding the second sheet entirely.
+            bool merge_host = !refl_pass && sheet_case != 4 && mtl_current != 0 &&
+                              m_next == mtl_current && TRANSPARENT_TO(sheet_mtl, mtl_current);
 
             DIST_ADD(); // Advance the host leg up to the sheet
 
             // The sheet sits on the side of a glued pair that is not the solid: near for a glued
             // entry, far for a glued exit. Isolated sheets have near == far and are unaffected.
-            bool have_composite = SHEET_RESOLVE(sheet_mtl, m_near, m_far, sheet_case == 3);
+            // sheet_mtl2 is zero except for an ordered stack, where it is the second layer.
+            bool have_composite = SHEET_RESOLVE(sheet_mtl, m_near, m_far, sheet_case == 3, sheet_mtl2);
+
+            if (sheet_case == 4 && !have_composite)
+            {
+                KILL_RAY(); // no stack physics available, and no legacy result worth keeping
+                return;
+            }
 
             // Close out the host medium. Its series reflects off the sheet ahead and off whatever the
             // host was entered through, which is the existing argument order with the sheet index
-            // substituted for the face material. A sheet passed as mtl_near is treated as a half-space
-            // by the correction-mode Fresnel, not as a slab, so a sheet whose impedance is close to the
-            // host's collapses the denominator and the host layer loses its internal series entirely.
-            // ISSUE: the exact treatment is a transfer matrix over the whole stack, which is also what
-            // case 4 needs. Skipped without a sheet composite, because the factor is applied through
-            // cTE / cTM.
+            // substituted for the face material. The sheet passed as mtl_near is now resolved as a
+            // layer of its own thickness rather than as a half-space, so a sheet electrically close
+            // to the host no longer collapses the denominator and cost the host its internal series.
+            // This is the one site that can name what lies behind that sheet - m_far is still in
+            // scope here - so it passes it; a later leg cannot and assumes air. Skipped without a
+            // sheet composite, because the factor is applied through cTE / cTM.
             if (mtl_current != 0 && !merge_host)
             {
                 if (have_composite)
-                    SLAB_AIRY_FACTOR(mtl_current, sheet_mtl, mtl_prev);
+                    SLAB_AIRY_FACTOR(mtl_current, sheet_mtl, mtl_prev, m_far);
                 SCALE_BY_MEDIUM(mtl_current);
             }
 
@@ -3953,7 +4245,11 @@ void quadriga_lib::ray_state_update(int interaction_type,
             // at the far side, which is right for the motivating geometry (a coating on a flat wall)
             // and wrong for a sheet glued to a wedge.
             bool nonpar = (sheet_case == 2) ? false : prev_nonpar;
-            next_prev = (m_next != 0) ? (short)((sheet_mtl & 0x7FFF) | (nonpar ? (int)0x8000 : 0))
+
+            // The boundary material behind the ray is the LAST layer it crossed, which differs from
+            // sheet_mtl only for an ordered stack.
+            int sheet_back = (sheet_mtl2 != 0) ? sheet_mtl2 : sheet_mtl;
+            next_prev = (m_next != 0) ? (short)((sheet_back & 0x7FFF) | (nonpar ? (int)0x8000 : 0))
                                       : (short)(mtl_current & 0x7FFF);
             next_buffer = (short)0;
 
