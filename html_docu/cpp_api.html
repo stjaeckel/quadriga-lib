@@ -5610,9 +5610,13 @@ Reachable composite values (add 32 for the total-reflection variant):<br><br>
 Codes 69 and 71 are shared by three cases, deliberately: <a href="#ray_state_update">ray_state_update</a> builds its own material
 set and holds both <code>mtl_ind_fbs</code> and <code>mtl_ind_sbs</code>, so it can re-derive sheet-ness per face and material
 identity on the pair. The full case is <code>(composite code, is_sheet(FBS), is_sheet(SBS), same material)</code>.
-Bit 6 alone is a hint meaning <i>at least one face is a sheet</i>; the re-derivation is authoritative. Total
-reflection can only co-occur with bit 6 for the glued cases, where the media either side of the sheet
-differ. Bit 7 is unused.
+Bit 6 alone is a hint meaning <i>at least one face is a sheet</i>; the re-derivation is authoritative and
+<a href="#ray_state_update">ray_state_update</a> performs it. Total reflection can only co-occur with bit 6 for the glued cases,
+where the media either side of the sheet differ. Bit 7 is unused.<br><br>
+The near / far media written into a sheet composite here are <b>provisional</b>. They come from face
+geometry alone, so air is assumed on any side the mesh does not name, which is only correct while the
+ray is in air. <a href="#ray_state_update">ray_state_update</a> holds the tracked medium and re-resolves the composite against the
+real bounding pair whenever medium tracking is enabled; without it, the air-bounded result stands.
 </li>
 <li><b><code>path_dirN</code></b> — Refraction-correct path direction: mirror for types 0/3, Snell direction for types 1/2/4/5; <code>[n_rayN, 3]</code>. For undeviated transmission (types 1/4) this is the <i>refracted</i> direction, which differs from the geometric continuation (along the incoming ray) used for <code>origN</code>/<code>destN</code>; it lets downstream code recover the true transmission angle.</li>
 <li><b><code>ray_indN</code></b> — 0-based input ray index for each output ray (inverse of the internal compaction map; order-preserving); <code>[n_rayN]</code></li>
@@ -5805,6 +5809,7 @@ Batched inside/outside ray-state machine with analytic thin-slab (Fabry-Perot) r
 <li>Corrects the per-interaction <code>gainN</code> / <code>xprmatN</code> produced by <a href="#ray_mesh_interact">ray_mesh_interact</a> using a tracked per-ray medium state, and carries that state forward. Three signed-<code>short</code> words per ray hold the current medium, the previous medium, and a one-slot next-transition buffer (bit-masked: `mat = w & 0x7FFF<code>, </code>flag = w & 0x8000`).</li>
 <li>Implements the inside/outside state machine and overlays a closed-form thin-slab factor <code>S</code> (the Airy sum) so a single coefficient captures the full internal multiple-reflection series of a parallel slab thin enough to matter, instead of relying on the tracer to follow every internal bounce.</li>
 <li>Called twice per interaction by the ray tracer: once for the reflection pass (<code>interaction_type</code> 0 or 3) and once for the transmission/refraction pass (<code>interaction_type</code> 1, 2, 4, 5). With <code>S</code> suppressed (the survival gate re-emits) the transmission/refraction path reproduces <a href="#calc_diffraction_gain">calc_diffraction_gain</a></li>
+<li>Thin sheets: a <code>thk &gt; 0</code> crossing arrives from <a href="#ray_mesh_interact">ray_mesh_interact</a> already resolved as one atomic three-medium event, but with its bounding media guessed from face geometry alone — air on any side the mesh did not name. This function supplies the media the tracked state actually reports and re-resolves the composite against them, which matters for every sheet that does not sit in air: a sheet embedded in a medium is bounded by that medium on both sides, and the wrong pair moves both Fresnel boundaries, the internal series and the lumped interface gain at once. The sheet material never becomes the current medium; it is recorded in the previous-medium word so the host layer on the far side reflects off it.</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -5851,22 +5856,22 @@ void quadriga_lib::ray_state_update(
 <li><b><code>no_interact</code></b> — Mesh-hit count per ray, full ray set; <code>[n_ray]</code></li>
 <li><b><code>fbs_angleN</code></b> — Incidence angle at FBS (ITU convention), compact set; <code>[n_rayN]</code></li>
 <li><b><code>normal_vecN</code></b> — FBS and SBS normals <code>[Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]</code>, compact set; <code>[n_rayN, 6]</code>. The VBS plane normal for the Snell corrections; currently also gates the parallelism (wedge) test. NULL disables the wedge test.</li>
-<li><b><code>out_typeN</code></b> — Interaction type code from <a href="#ray_mesh_interact">ray_mesh_interact</a>, compact set; <code>[n_rayN]</code></li>
-<li><b><code>mtl_prop</code></b> — Material properties keyed by column name (the <code>csv_prop</code> output of <a href="#obj_file_read">obj_file_read</a>)</li>
-<li><b><code>mtl_ind_fbsN</code></b>, <b><code>mtl_ind_sbsN</code></b> — Material indices M1 / M2 of the FBS / SBS faces, compact set; <code>[n_rayN]</code> (0 = air)</li>
+<li><b><code>out_typeN</code></b> — Interaction type code from <a href="#ray_mesh_interact">ray_mesh_interact</a>, compact set; <code>[n_rayN]</code>. Bit 5 is stripped and re-evaluated at the VBS angle; bit 6 (thin sheet) is dispatched on and is <i>not</i> stripped, so the sheet codes 65 / 67 / 69 / 71 / 79 take their own path ahead of the solid state machine.</li>
+<li><b><code>mtl_prop</code></b> — Material properties keyed by column name (the <code>csv_prop</code> output of <a href="#obj_file_read">obj_file_read</a>). The <code>thk</code> column is read here as well as in <a href="#ray_mesh_interact">ray_mesh_interact</a>; it selects the thin-sheet path.</li>
+<li><b><code>mtl_ind_fbsN</code></b>, <b><code>mtl_ind_sbsN</code></b> — Material indices M1 / M2 of the FBS / SBS faces, compact set; <code>[n_rayN]</code> (0 = air). <code>mtl_ind_sbsN</code> is load-bearing beyond media-to-media: it carries the second face of a glued or duplicate sheet pair, and the thin-sheet case is re-derived from <code>(code, is_sheet(FBS), is_sheet(SBS), same material)</code> because codes 69 and 71 are shared by three topologies.</li>
 <li><b><code>mtl_ind_prev_in</code></b>, <b><code>mtl_ind_current_in</code></b>, <b><code>mtl_ind_buffer_in</code></b> — State words, full ray set; <code>[n_ray]</code>, read at <code>g</code>, never written. NULL reads as state <code>0</code> (outside, no flags).</li>
 <li><b><code>path_dir_prev</code></b> — Physical ray direction entering this segment, full ray set; <code>[n_ray, 3]</code></li>
 <li><b><code>acc_dist_geometric</code></b> — Accumulated geometric in-layer distance carried into this call, full ray set; <code>[n_ray]</code>. NULL reads as 0. Frequency-independent: built from the traced <code>orig</code>-<code>fbs</code> / <code>fbs</code>-<code>dest</code> lengths only, so a multi-frequency caller keeps a single shared instance.</li>
 <li><b><code>acc_dist_refracted</code></b> — Accumulated refracted (VBS) in-layer distance carried into this call, full ray set; <code>[n_ray]</code>. NULL reads as 0. Frequency-dependent, since the Snell bend that defines it follows the material at <code>center_frequency</code>, so a multi-frequency caller keeps one instance per frequency. The two inputs are independent; either may be NULL.</li>
 <li><b><code>ray_indN</code></b> — Compact-to-full ray index map; <code>[n_rayN]</code> to <code>[n_ray]</code>; NULL = identity (<code>n_ray == n_rayN</code>)</li>
-<li><b><code>eps</code></b> <i>(optional)</i> — Thin-slab (Fabry-Pérot) resolve threshold on the round-trip in-slab amplitude <code>ρ</code> (<code>ρ ∈ [0, 1]</code>): the closed-form Airy factor is applied when <code>ρ ≥ eps</code> and the series is re-emitted to the tracer when <code>ρ &amp;lt; eps</code> (weak / fast-decaying slabs). <code>eps = 0</code> always resolves (for callers that cannot re-emit, e.g. <a href="#calc_diffraction_gain">calc_diffraction_gain</a>); <code>eps ≥ 1</code> always re-emits (resolution disabled). A near-pole <code>S</code> or a known non-parallel slab re-emits regardless of <code>eps</code>. Default <code>0.15</code>.</li>
+<li><b><code>eps</code></b> <i>(optional)</i> — Thin-slab (Fabry-Pérot) resolve threshold on the round-trip in-slab amplitude <code>ρ</code> (<code>ρ ∈ [0, 1]</code>): the closed-form Airy factor is applied when <code>ρ ≥ eps</code> and the series is re-emitted to the tracer when <code>ρ &amp;lt; eps</code> (weak / fast-decaying slabs). <code>eps = 0</code> always resolves (for callers that cannot re-emit, e.g. <a href="#calc_diffraction_gain">calc_diffraction_gain</a>); <code>eps ≥ 1</code> always re-emits (resolution disabled). A near-pole <code>S</code> or a known non-parallel slab re-emits regardless of <code>eps</code>. Does <b>not</b> gate a thin sheet's own series: a sheet has no interior for the tracer to re-emit into, so that series always resolves. <code>eps</code> still gates the host layer a sheet is embedded in. Default <code>0.15</code>.</li>
 </ul>
 
 <b>Outputs:</b><br>
 <ul>
-<li><b><code>mtl_ind_prev_outN</code></b>, <b><code>mtl_ind_current_outN</code></b>, <b><code>mtl_ind_buffer_outN</code></b> — Updated state words, compact set; <code>[n_rayN]</code>. NULL skips the write. Passing all six state args NULL disables tracking — each interaction is corrected on its own (entry loss, TR kill, single-hit air-gap <code>S</code>); cross-interaction slab <code>S</code> and reflection-bounce <code>S</code> need the tracked medium.</li>
+<li><b><code>mtl_ind_prev_outN</code></b>, <b><code>mtl_ind_current_outN</code></b>, <b><code>mtl_ind_buffer_outN</code></b> — Updated state words, compact set; <code>[n_rayN]</code>. <code>mtl_ind_prev_outN</code> may hold a <b>sheet</b> material index after a thin-sheet crossing. That is a boundary material, not a medium the ray travelled through: the previous-medium word is only ever read as the far material of a slab resolve and for the parallelism flag, and a sheet is the correct far material for the layer on either side of it. NULL skips the write. Passing all six state args NULL disables tracking — each interaction is corrected on its own (entry loss, TR kill, single-hit air-gap <code>S</code>); cross-interaction slab <code>S</code> and reflection-bounce <code>S</code> need the tracked medium.</li>
 <li><b><code>gainN</code></b> <i>(in/out)</i> — Per-interaction linear power gain, updated in place; <code>[n_rayN]</code>. Kept consistent with <code>xprmatN</code> at every write. A killed ray (<code>resolved_typeN == 0</code>) yields <code>gainN = 0</code> together with an all-zero <code>xprmatN</code>.</li>
-<li><b><code>xprmatN</code></b> <i>(in/out)</i> — Polarization transfer matrix, updated in place; <code>[8, n_rayN]</code> for EM mode, <code>[2, n_rayN]</code> for scalar mode. Same layout and basis convention as in <a href="#ray_mesh_interact">ray_mesh_interact</a>, but with the medium closed out: on return it additionally contains the in-medium attenuation and excess phase of the traversed segment and, when the resolve bit of <code>resolved_typeN</code> is set, the closed-form thin-slab (Airy) factor <code>S</code> covering the full internal multiple-reflection series. FSPL / spreading loss remains excluded, so the matrix is the complete per-interaction Jones factor and can be left-multiplied directly into a per-path product. When the series is re-emitted instead (<code>ρ &amp;lt; eps</code>, resolve bit clear), the matrix carries only the first-pass coefficient and the remaining bounces arrive as separate interactions.</li>
+<li><b><code>xprmatN</code></b> <i>(in/out)</i> — Polarization transfer matrix, updated in place; <code>[8, n_rayN]</code> for EM mode, <code>[2, n_rayN]</code> for scalar mode. Same layout and basis convention as in <a href="#ray_mesh_interact">ray_mesh_interact</a>, but with the medium closed out: on return it additionally contains the in-medium attenuation and excess phase of the traversed segment and, when the resolve bit of <code>resolved_typeN</code> is set, the closed-form thin-slab (Airy) factor <code>S</code> covering the full internal multiple-reflection series. FSPL / spreading loss remains excluded, so the matrix is the complete per-interaction Jones factor and can be left-multiplied directly into a per-path product. When the series is re-emitted instead (<code>ρ &amp;lt; eps</code>, resolve bit clear), the matrix carries only the first-pass coefficient and the remaining bounces arrive as separate interactions. On a thin-sheet crossing the matrix is <i>replaced</i> by the composite re-resolved for the bounding media the state words report, and no medium gain is charged for the sheet material itself — its traversal loss and phase are already inside the composite. The host medium the ray was travelling in is still closed out.</li>
 <li><b><code>path_dirN</code></b> <i>(in/out)</i> — Continuation direction, corrected in place by the VBS construction, compact set; <code>[n_rayN, 3]</code></li>
 <li><b><code>acc_dist_geometricN</code></b> — Accumulated geometric distance leaving this call, compact set; <code>[n_rayN]</code>. NULL skips the write.</li>
 <li><b><code>acc_dist_refractedN</code></b> — Accumulated refracted (VBS) distance leaving this call, compact set; <code>[n_rayN]</code>. NULL skips the write.</li>
@@ -5890,7 +5895,7 @@ void quadriga_lib::ray_state_update(
 <tr>
   <td class="c">2</td>
   <td class="c">resolve</td>
-  <td>Slab-resolve flag (an internal multi-bounce series was resolved analytically)</td>
+  <td>Internal multi-bounce series accounted for (expect no further internal bounces)</td>
 </tr>
 <tr>
   <td class="c">3</td>
@@ -5909,8 +5914,8 @@ void quadriga_lib::ray_state_update(
 </tr>
 <tr>
   <td class="c">6</td>
-  <td class="c">trans</td>
-  <td>Transmission: transparent-interface flag; reflection: scatter flag</td>
+  <td class="c">trans/sheet</td>
+  <td>See the qualification below</td>
 </tr>
 <tr>
   <td class="c">7</td>
@@ -5918,6 +5923,44 @@ void quadriga_lib::ray_state_update(
   <td>Reflection flag (0 = transmission/refraction, 1 = reflection/scattering)</td>
 </tr>
 </table>
+Bit 6 is qualified by bit 2, because a transparent interface resolves no series and scattering is not
+implemented, so the two bits together are unreachable for any non-sheet interaction:<br><br>
+<table class="md">
+<tr>
+  <th class="c">Bit 6</th>
+  <th class="c">Bit 2</th>
+  <th>Meaning</th>
+</tr>
+<tr>
+  <td class="c">1</td>
+  <td class="c">0</td>
+  <td>Transparent interface (transmission) / scatter (reflection) — as before</td>
+</tr>
+<tr>
+  <td class="c">1</td>
+  <td class="c">1</td>
+  <td><b>Thin-sheet crossing</b></td>
+</tr>
+</table>
+Inside the thin-sheet region bit 1 does not mean VBS: the crossing is always re-resolved at the VBS
+angle, so a VBS flag would be constant there. It carries the glued verdict instead:<br><br>
+<table class="md">
+<tr>
+  <th class="c">Bit 1 (sheet region)</th>
+  <th>Meaning</th>
+</tr>
+<tr>
+  <td class="c">0</td>
+  <td>Isolated — the same medium bounds both sides of the sheet</td>
+</tr>
+<tr>
+  <td class="c">1</td>
+  <td>Glued — the two bounding media differ</td>
+</tr>
+</table>
+The sheet region reports the resolved <i>state</i>, not the sheet topology; the state words and <code>out_typeN</code>
+separate an embedded sheet from a glued entry. Note that 69 and 71 also occur as <code>out_typeN</code> values with
+entirely different meanings — the two fields have always had separate tables.
 Reachable composite values for transmission / refraction:<br><br>
 <table class="md">
 <tr>
@@ -6024,6 +6067,38 @@ Reachable composite values for transmission / refraction:<br><br>
   <td>trans, ok</td>
   <td>advance to ray destination, identity interface</td>
 </tr>
+<tr>
+  <td class="c">69</td>
+  <td class="c">0x45</td>
+  <td class="c">85</td>
+  <td class="c">101</td>
+  <td>sheet, resolve, ok</td>
+  <td>isolated sheet crossed in air</td>
+</tr>
+<tr>
+  <td class="c">77</td>
+  <td class="c">0x4D</td>
+  <td class="c">93</td>
+  <td class="c">109</td>
+  <td>sheet, resolve, inside, ok</td>
+  <td>isolated sheet crossed inside a medium (embedded)</td>
+</tr>
+<tr>
+  <td class="c">71</td>
+  <td class="c">0x47</td>
+  <td class="c">87</td>
+  <td class="c">103</td>
+  <td>sheet, glued, resolve, ok</td>
+  <td>glued exit, solid \ sheet \ enclosing</td>
+</tr>
+<tr>
+  <td class="c">79</td>
+  <td class="c">0x4F</td>
+  <td class="c">95</td>
+  <td class="c">111</td>
+  <td>sheet, glued, resolve, inside, ok</td>
+  <td>glued entry, host \ sheet \ solid</td>
+</tr>
 </table>
 Reachable composite values for reflection:<br><br>
 <table class="md">
@@ -6076,14 +6151,49 @@ Reachable composite values for reflection:<br><br>
   <td>internal back-reflection + slab series (incoming undev. 1/4)</td>
 </tr>
 <tr>
+  <td class="c">197</td>
+  <td class="c">0xC5</td>
+  <td class="c">213</td>
+  <td class="c">229</td>
+  <td>refl, sheet, resolve, ok</td>
+  <td>reflection off an isolated sheet, ray outside</td>
+</tr>
+<tr>
+  <td class="c">205</td>
+  <td class="c">0xCD</td>
+  <td class="c">221</td>
+  <td class="c">237</td>
+  <td>refl, sheet, resolve, inside, ok</td>
+  <td>reflection off an isolated sheet, ray inside a medium</td>
+</tr>
+<tr>
+  <td class="c">199</td>
+  <td class="c">0xC7</td>
+  <td class="c">215</td>
+  <td class="c">231</td>
+  <td>refl, sheet, glued, resolve, ok</td>
+  <td>reflection off a glued sheet from the host side</td>
+</tr>
+<tr>
+  <td class="c">207</td>
+  <td class="c">0xCF</td>
+  <td class="c">223</td>
+  <td class="c">239</td>
+  <td>refl, sheet, glued, resolve, inside, ok</td>
+  <td>reflection off a glued sheet from the solid side</td>
+</tr>
+<tr>
   <td class="c">192+</td>
   <td class="c">0xC0+</td>
   <td class="c">—</td>
   <td class="c">—</td>
-  <td>refl, trans, ...</td>
+  <td>refl, scatter, resolve clear</td>
   <td>reserved: scattering not implemented</td>
 </tr>
 </table>
+A thin-sheet stack of two different materials (<code>out_typeN</code> 79, or 69/71 with two sheet faces of
+different materials) is <b>not implemented</b> and returns 0: the case is detected but has no physics in
+<a href="#ray_mesh_interact">ray_mesh_interact</a> either.
 </li>
 </ul>
 
