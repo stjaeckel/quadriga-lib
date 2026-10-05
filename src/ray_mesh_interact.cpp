@@ -790,14 +790,19 @@ namespace
     // algebraically equal but not bit-identical. The layered-stack fixture measures the two against
     // each other, so unifying them later is a checked step rather than a leap.
     //
-    // Three material columns have no matrix expression and make this decline rather than approximate:
+    // Two material columns have no matrix expression and make this decline rather than approximate:
     //   m > 0     a lumped acoustic surrogate whose in-layer index is not physical, the same
     //             reasoning that keeps a mass-law slab out of correction mode entirely
-    //   alpha     dB per meter of PATH, which produce mode applies as a one-way multiplier on phi;
-    //             a matrix layer has no one-way phi to multiply
     //   tf        redistributes energy between the reflected and transmitted ports at a boundary,
     //             which is not expressible as a boundary admittance
     // Where it declines the caller keeps whatever it did before.
+    //
+    // alpha is carried. It is dB per meter of PATH, which produce mode applies as a real one-way
+    // multiplier on phi, and the layer phase is the logarithm of that same phi: the matrix is built
+    // from cos and sin of delta, and phi = exp(-j delta). So the multiplier goes into the imaginary
+    // part of delta, over the same path thk / |Re c| produce mode forms, and the one-layer reduction
+    // then reproduces produce mode's alpha term for term. The tilted admittance does not read it,
+    // since alpha is a propagation loss and not an interface quantity.
     //
     // Returns false when it declines. ci is the incidence cosine in mat_near, complex wherever that
     // medium is a traced solid, exactly as produce mode's ct_near_exact.
@@ -817,7 +822,7 @@ namespace
             if (layers[i].mtl == nullptr || layers[i].thk < 0.0)
                 return false;
             const Material &L = *layers[i].mtl;
-            if (L.m > 0.0 || L.alpha != 0.0 || L.tf(fGHz) != 0.0)
+            if (L.m > 0.0 || L.tf(fGHz) != 0.0)
                 return false;
         }
 
@@ -867,6 +872,18 @@ namespace
                                                       : (std::sqrt(eta_L / mu_L) / c_L);
 
                 std::complex<double> dl = k0 * n_L * c_L * layers[i].thk;
+
+                // The alpha column, as nepers of amplitude over the path thk / |Re c|. At a
+                // vanishing cosine the path is unbounded and the layer is opaque, which the cap
+                // below expresses.
+                double a_dB = L.alpha * std::pow(fGHz / L.fRef, L.alphaB); // dB per meter
+                if (a_dB > 0.0)
+                {
+                    double ct_r = std::abs(std::real(c_L));
+                    double a_Np = (ct_r > 0.0) ? 0.05 * std::log(10.0) * a_dB * layers[i].thk / ct_r
+                                               : dl_im_cap;
+                    dl -= std::complex<double>(0.0, a_Np);
+                }
                 if (std::imag(dl) < -dl_im_cap)
                     dl = std::complex<double>(std::real(dl), -dl_im_cap);
                 else if (std::imag(dl) > dl_im_cap)
@@ -1169,8 +1186,8 @@ namespace
             // rather than assuming it is its own open item.
             //
             // Only the amplitude is taken from the layer. tf still redistributes at the boundary in
-            // the same way, and the sheet's own tf, alpha or mass-law column makes the core decline,
-            // in which case the half-space value above stands exactly as before.
+            // the same way, and the sheet's own tf or mass-law column makes the core decline, in
+            // which case the half-space value above stands exactly as before.
             if (adj.thk > 0.0)
             {
                 QdLayer lay;
