@@ -33,6 +33,12 @@
 // Independent of every library internal. This is the oracle both the thin-sheet composite and
 // the traced solid are measured against, and it is the only way to tell which of the two moved
 // when they disagree.
+//
+// Permeability enters through three substitutions and nowhere else: the admittance is
+// z = sqrt(eps/mu), the Snell ratio is a ratio of eps*mu products, and the propagation index is
+// n = sqrt(eps*mu). Air is on both sides, so the near-side product is 1 and z1 does not move. The
+// Fresnel groupings and the Airy assembly are already written in z and c. mu_s defaults to 1, where
+// all three reduce to the dielectric expressions they replace.
 struct QdSlabRef
 {
     double p_te = 0.0, p_tm = 0.0, p_avg = 0.0, ratio = 0.0; // powers and min/max channel ratio
@@ -41,12 +47,13 @@ struct QdSlabRef
 };
 
 static inline QdSlabRef qd_slab_ref(std::complex<double> eps_s, double thk,
-                                    double theta_n_rad, double f_hz)
+                                    double theta_n_rad, double f_hz,
+                                    std::complex<double> mu_s = std::complex<double>(1.0, 0.0))
 {
     const double k0 = 2.0 * arma::datum::pi * f_hz / 299792458.0;
-    const std::complex<double> z1(1.0, 0.0), z2 = std::sqrt(eps_s), n = std::sqrt(eps_s);
+    const std::complex<double> z1(1.0, 0.0), z2 = std::sqrt(eps_s / mu_s), n = std::sqrt(eps_s * mu_s);
     const double c1 = std::cos(theta_n_rad), s1 = std::sin(theta_n_rad);
-    const std::complex<double> c2 = std::sqrt(1.0 - (1.0 / eps_s) * s1 * s1);
+    const std::complex<double> c2 = std::sqrt(1.0 - (1.0 / (eps_s * mu_s)) * s1 * s1);
     const std::complex<double> phi = std::exp(std::complex<double>(0.0, -1.0) * k0 * n * thk * c2);
 
     QdSlabRef R;
@@ -72,6 +79,96 @@ static inline QdSlabRef qd_slab_ref(std::complex<double> eps_s, double thk,
     double lo = std::min(R.p_te, R.p_tm), hi = std::max(R.p_te, R.p_tm);
     R.ratio = (hi > 0.0) ? lo / hi : 0.0;
     return R;
+}
+
+// Composite slab reflectance, TE/TM averaged, air | slab | air. The stack is symmetric, so the
+// internal reflection is the same at both faces and R = r (1 - phi^2) / (1 - r^2 phi^2).
+//
+// Carries permeability through the same three substitutions as qd_slab_ref, and returns the two
+// channels separately where asked: the average cannot tell TE from TM, and for a magnetic sheet
+// which of the two is the larger is exactly what is under test.
+static inline double qd_slab_ref_R(std::complex<double> eps_s, double thk,
+                                   double theta_n_rad, double f_hz,
+                                   std::complex<double> mu_s = std::complex<double>(1.0, 0.0),
+                                   double *R_te_out = nullptr, double *R_tm_out = nullptr)
+{
+    const double k0 = 2.0 * arma::datum::pi * f_hz / 299792458.0;
+    const std::complex<double> z1(1.0, 0.0), z2 = std::sqrt(eps_s / mu_s), n = std::sqrt(eps_s * mu_s);
+    const double c1 = std::cos(theta_n_rad), s1 = std::sin(theta_n_rad);
+    const std::complex<double> c2 = std::sqrt(1.0 - (1.0 / (eps_s * mu_s)) * s1 * s1);
+    const std::complex<double> phi = std::exp(std::complex<double>(0.0, -1.0) * k0 * n * thk * c2);
+    const std::complex<double> e = phi * phi;
+    const std::complex<double> r_te = (z1 * c1 - z2 * c2) / (z1 * c1 + z2 * c2);
+    const std::complex<double> r_tm = (z2 * c1 - z1 * c2) / (z2 * c1 + z1 * c2);
+    const std::complex<double> R_te = r_te * (1.0 - e) / (1.0 - r_te * r_te * e);
+    const std::complex<double> R_tm = r_tm * (1.0 - e) / (1.0 - r_tm * r_tm * e);
+    if (R_te_out)
+        *R_te_out = std::norm(R_te);
+    if (R_tm_out)
+        *R_tm_out = std::norm(R_tm);
+    return 0.5 * (std::norm(R_te) + std::norm(R_tm));
+}
+
+// The analytic slab with the lumped material columns a sheet can carry, air | sheet | air, both
+// ports, per polarization. Written separately from qd_slab_ref so that the oracle everything else
+// is measured against stays the plain Airy pair; at its defaults this reproduces it, which the
+// fixture asserts rather than assumes.
+//
+//   att_dB   Penetration loss of the sheet. One power factor 10^(-att/10) on the transmit port,
+//            nothing on the reflect port.
+//   tf       Transmission factor of the sheet, on both of its faces. With R0 = |r|^2 the raw
+//            reflectance of a face, R' = R0 (1 - tf) for tf >= 0 and R0 + (1 - R0)(-tf) for tf < 0;
+//            the reflection amplitude is scaled by sqrt(R'/R0) and each transmission amplitude of
+//            that face by sqrt((1 - R')/(1 - R0)). The stack is symmetric, so both faces have the
+//            same R0 and take the same two factors.
+//   res      Permittivity resonance, as an increment. It enters the admittance and the cosine,
+//            which are interface quantities, and not the propagation index.
+struct QdLumpRef
+{
+    double T_te = 0.0, T_tm = 0.0, R_te = 0.0, R_tm = 0.0; // channel powers
+    std::complex<double> t_te, t_tm;                       // complex transmit amplitudes
+};
+
+static inline QdLumpRef qd_slab_ref_lumped(std::complex<double> eps_s, double thk,
+                                           double theta_n_rad, double f_hz,
+                                           double att_dB = 0.0, double tf = 0.0,
+                                           std::complex<double> res = std::complex<double>(0.0, 0.0))
+{
+    const double k0 = 2.0 * arma::datum::pi * f_hz / 299792458.0;
+    const std::complex<double> e_if = eps_s + res;
+    const std::complex<double> z2 = std::sqrt(e_if), n = std::sqrt(eps_s);
+    const double c1 = std::cos(theta_n_rad), s1 = std::sin(theta_n_rad);
+    const std::complex<double> c2 = std::sqrt(1.0 - (1.0 / e_if) * s1 * s1);
+    const std::complex<double> p2 = std::exp(std::complex<double>(0.0, -2.0) * k0 * n * thk * c2);
+    const std::complex<double> p1 = std::exp(std::complex<double>(0.0, -1.0) * k0 * n * thk * c2);
+    const double g = std::pow(10.0, -0.1 * att_dB);
+
+    QdLumpRef Q;
+    for (int pol = 0; pol < 2; ++pol)
+    {
+        std::complex<double> r, t12, t21;
+        if (pol == 0)
+            r = (c1 - z2 * c2) / (c1 + z2 * c2), t12 = (2.0 * c1) / (c1 + z2 * c2),
+            t21 = (2.0 * z2 * c2) / (z2 * c2 + c1);
+        else
+            r = (z2 * c1 - c2) / (z2 * c1 + c2), t12 = (2.0 * c1) / (z2 * c1 + c2),
+            t21 = (2.0 * z2 * c2) / (c2 + z2 * c1);
+
+        double R0 = std::norm(r);
+        double Rt = (tf >= 0.0) ? R0 * (1.0 - tf) : R0 + (1.0 - R0) * (-tf);
+        double rho = (R0 > 0.0) ? std::sqrt(Rt / R0) : 0.0; // on r, at either face
+        double kap2 = (1.0 - Rt) / (1.0 - R0);              // on the t12 t21 product
+
+        std::complex<double> rr = rho * r;
+        std::complex<double> den = 1.0 - rr * rr * p2;
+        std::complex<double> T = std::sqrt(g) * kap2 * t12 * t21 * p1 / den;
+        std::complex<double> R = rr - kap2 * t12 * t21 * rr * p2 / den;
+        if (pol == 0)
+            Q.t_te = T, Q.T_te = std::norm(T), Q.R_te = std::norm(R);
+        else
+            Q.t_tm = T, Q.T_tm = std::norm(T), Q.R_tm = std::norm(R);
+    }
+    return Q;
 }
 
 // Single-interface Fresnel powers, per polarization. eta1 -> eta2 at theta from the normal.
@@ -2297,12 +2394,30 @@ TEST_CASE("Diagnostic - Thin sheet composite vs analytic slab")
     // traced solid cannot do better than that floor either. The polarization-ratio columns are
     // the sharper of the two: a power error can hide behind the TE/TM average, a ratio error
     // cannot.
+    //
+    // The last row is magnetic, and is the only place a non-unit permeability reaches
+    // ray_mesh_interact's own sheet composite. ray_state_update re-resolves every sheet crossing
+    // when medium tracking is on, and its path is covered for permeability; this one serves
+    // callers without state and had never seen a magnetic material. Produce mode is one function
+    // and was measured exact at mu != 1 through the redo, so what this row measures is what is
+    // different here: this function's own material lookup into the e, f, g, h columns, and its own
+    // polarization basis, built from a real incidence plane where the redo's harness has a
+    // degenerate one. Three further things differ between the two call sites - the incidence
+    // cosine comes from the face normal rather than from fbs_angle, the displacement budget is the
+    // leg just travelled, and total reflection is handled by the ray tube rather than by a
+    // re-derived verdict - and none of them reads mu or is engaged by a sheet in air.
+    //
+    // Both ports are measured on every row, per channel and labelled. The min/max ratio above is
+    // blind to which channel is which, and so is the average. The labelled comparison is the one
+    // that would catch a basis that swapped them, and a magnetic sheet is where that matters most,
+    // because a permeability can order the two channels either way.
     const double f_hz = 1.0e9;
 
     struct Mat
     {
         const char *name;
         double a, c, thk;
+        double e = 1.0, g = 0.0; // mu = e - j 17.98 g / fGHz
     };
     const std::vector<Mat> mats = {
         {"lossless eps 5.24, 100 mm", 5.24, 0.0, 0.100},
@@ -2310,10 +2425,12 @@ TEST_CASE("Diagnostic - Thin sheet composite vs analytic slab")
         {"low eps 2.0, weak loss, 100 mm", 2.0, 0.25 / 17.98, 0.100},
         {"high eps 25.0, strong loss, 100 mm", 25.0, 2.50 / 17.98, 0.100},
         {"lossy eps 5.24, 6 mm", 5.24, 0.63 / 17.98, 0.006},
+        {"magnetic eps 5.24 - 0.63j, mu 2.10 - 0.35j, 6 mm", 5.24, 0.63 / 17.98, 0.006, 2.10, 0.35 / 17.98},
     };
 
     QD_DIAG("\n# diag: thin sheet composite vs analytic slab, 1 GHz\n");
-    QD_DIAG("material,angle,sheet_dB,ana_dB,d_dB,ratio_sheet,ratio_ana,d_ratio,arg_sheet_deg,arg_ana_te_deg,d_arg_deg,pred_k0_thk_cos\n");
+    QD_DIAG("material,angle,sheet_dB,ana_dB,d_dB,ratio_sheet,ratio_ana,d_ratio,arg_sheet_deg,arg_ana_te_deg,d_arg_deg,pred_k0_thk_cos,"
+            "d_T_te,d_T_tm,d_R_te,d_R_tm\n");
 
     for (const auto &M : mats)
     {
@@ -2330,6 +2447,15 @@ TEST_CASE("Diagnostic - Thin sheet composite vs analytic slab")
         mtl["alphaB"] = {0.0};
         mtl["fRef"] = {1.0};
         mtl["thk"] = {M.thk};
+        const bool magnetic = (M.e != 1.0 || M.g != 0.0);
+        if (magnetic) // the dielectric rows keep the map they always had
+        {
+            mtl["e"] = {M.e};
+            mtl["f"] = {0.0};
+            mtl["g"] = {M.g};
+            mtl["h"] = {0.0};
+        }
+        std::complex<double> mu_s(M.e, -17.98 * M.g / (f_hz * 1e-9));
         std::complex<double> eps_s(M.a, -17.98 * M.c / (f_hz * 1e-9));
 
         for (double thd : {0.0, 20.0, 40.0, 60.0, 70.0, 80.0, 85.0, 88.0})
@@ -2348,11 +2474,24 @@ TEST_CASE("Diagnostic - Thin sheet composite vs analytic slab")
                                             &gainN, &xprmatN, (arma::mat *)nullptr, (arma::mat *)nullptr);
 
             REQUIRE(gainN.n_elem == 1);
+
+            // The reflect port, same ray, same mesh.
+            arma::mat origR, destR, xprmatR;
+            arma::vec gainR;
+            quadriga_lib::ray_mesh_interact(0, f_hz, &orig, &dest, &mesh, &mtl_ind, &mtl,
+                                            &fbs_ind, &sbs_ind, (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                            &origR, &destR, (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                            &gainR, &xprmatR, (arma::mat *)nullptr, (arma::mat *)nullptr);
+            REQUIRE(gainR.n_elem == 1);
+            double rvv2 = xprmatR(0, 0) * xprmatR(0, 0) + xprmatR(1, 0) * xprmatR(1, 0);
+            double rhh2 = xprmatR(6, 0) * xprmatR(6, 0) + xprmatR(7, 0) * xprmatR(7, 0);
             double vv2 = xprmatN(0, 0) * xprmatN(0, 0) + xprmatN(1, 0) * xprmatN(1, 0);
             double hh2 = xprmatN(6, 0) * xprmatN(6, 0) + xprmatN(7, 0) * xprmatN(7, 0);
             double arg_vv = std::atan2(xprmatN(1, 0), xprmatN(0, 0)) * 180.0 / arma::datum::pi;
 
-            QdSlabRef R = qd_slab_ref(eps_s, M.thk, thd * arma::datum::pi / 180.0, f_hz);
+            QdSlabRef R = qd_slab_ref(eps_s, M.thk, thd * arma::datum::pi / 180.0, f_hz, mu_s);
+            double Ra_te = 0.0, Ra_tm = 0.0;
+            double Ra = qd_slab_ref_R(eps_s, M.thk, thd * arma::datum::pi / 180.0, f_hz, mu_s, &Ra_te, &Ra_tm);
             double lo_c = std::min(vv2, hh2), hi_c = std::max(vv2, hh2);
             double rc = (hi_c > 0.0) ? lo_c / hi_c : 0.0;
             // VV is the TE channel here (see the note in the interface case), so the phase has to be
@@ -2375,9 +2514,10 @@ TEST_CASE("Diagnostic - Thin sheet composite vs analytic slab")
             while (pred <= -180.0)
                 pred += 360.0;
 
-            QD_DIAG("%s,%.1f,%.6f,%.6f,%.6f,%.9f,%.9f,%.3e,%.2f,%.2f,%.2f,%.2f\n",
+            QD_DIAG("%s,%.1f,%.6f,%.6f,%.6f,%.9f,%.9f,%.3e,%.2f,%.2f,%.2f,%.2f,%.2e,%.2e,%.2e,%.2e\n",
                     M.name, thd, dB(gainN(0)), dB(R.p_avg), dB(gainN(0)) - dB(R.p_avg),
-                    rc, R.ratio, rc - R.ratio, arg_vv, arg_ref, d_arg, pred);
+                    rc, R.ratio, rc - R.ratio, arg_vv, arg_ref, d_arg, pred,
+                    vv2 - R.p_te, hh2 - R.p_tm, rvv2 - Ra_te, rhh2 - Ra_tm);
 
             CHECK(std::isfinite(gainN(0)));
             CHECK(gainN(0) >= 0.0);
@@ -2394,6 +2534,202 @@ TEST_CASE("Diagnostic - Thin sheet composite vs analytic slab")
             CHECK(std::abs(dB(gainN(0)) - dB(R.p_avg)) < 1.0e-6);
             CHECK(std::abs(rc - R.ratio) < 1.0e-9);
             CHECK(std::abs(d_arg - pred) < 1.0e-3);
+
+            // Per channel and labelled, both ports. VV is TE and HH is TM in this geometry, for the
+            // reflected direction as well as the transmitted one. The magnetic row is asserted to
+            // the bounds the plan sets for it, 1e-6 dB on the transmit port above and 1e-9 on the
+            // reflect port here; the dielectric rows meet the same bounds and are held to them.
+            CHECK(std::abs(vv2 - R.p_te) < 1.0e-9);
+            CHECK(std::abs(hh2 - R.p_tm) < 1.0e-9);
+            CHECK(std::abs(rvv2 - Ra_te) < 1.0e-9);
+            CHECK(std::abs(rhh2 - Ra_tm) < 1.0e-9);
+            CHECK(std::abs(gainR(0) - Ra) < 1.0e-9);
+
+            // The magnetic row has to be one a dielectric reference cannot pass. With mu dropped
+            // from the oracle the transmit port sits 0.077 dB to 5.94 dB away. The reflect port is
+            // compared per channel: the two averaged reflectances cross near 60 deg, where they
+            // agree to 2e-4, so the average is the wrong instrument there and the channels are not.
+            if (magnetic)
+            {
+                QdSlabRef Rd = qd_slab_ref(eps_s, M.thk, thd * arma::datum::pi / 180.0, f_hz);
+                double Rd_te = 0.0, Rd_tm = 0.0;
+                qd_slab_ref_R(eps_s, M.thk, thd * arma::datum::pi / 180.0, f_hz,
+                              std::complex<double>(1.0, 0.0), &Rd_te, &Rd_tm);
+                CHECK(std::abs(dB(gainN(0)) - dB(Rd.p_avg)) > 1.0e-2);
+                CHECK(std::max(std::abs(rvv2 - Rd_te), std::abs(rhh2 - Rd_tm)) > 1.0e-3);
+            }
+        }
+    }
+}
+
+TEST_CASE("Thin sheet - permeability and the lumped columns through ray_mesh_interact")
+{
+    // Two things the case above cannot say.
+    //
+    // The eps<->mu swap. Swapping holds n = sqrt(eps mu), and so every cosine and the propagation
+    // factor, exactly fixed and replaces z by 1/z. With air on both sides that maps every
+    // reflection and every transmission product of the Airy pair onto its opposite polarization,
+    // so the swap exchanges the TE and TM ports. The redo asserts this through a degenerate
+    // incidence plane; here the plane is real, VV is TE and HH is TM, and the exchange is a
+    // statement about this function's polarization basis that no dielectric and no power average
+    // can make. It needs no reference at all.
+    //
+    // The lumped columns. att, tf and a permittivity resonance on a sheet reach produce mode
+    // through this function's own material lookup as well as through the redo's, and no sheet in
+    // this file has ever set one of them. Each is run against qd_slab_ref_lumped on both ports.
+    const double f_hz = 1.0e9;
+    const double thk = 0.006;
+    arma::mat mesh = qd_quad_x(200.0, 0.0);
+    arma::uvec mtl_ind(2, arma::fill::value(1));
+
+    auto dB = [](double p)
+    { return (p > 0.0) ? 10.0 * std::log10(p) : -std::numeric_limits<double>::infinity(); };
+
+    struct Out
+    {
+        double vv2, hh2, gain;
+        std::complex<double> vv, hh;
+    };
+    auto run = [&](std::unordered_map<std::string, std::vector<double>> &mtl, double thd, int type)
+    {
+        arma::mat orig, dest;
+        qd_ray_at(thd, orig, dest);
+        arma::mat fbs, sbs;
+        arma::u32_vec fbs_ind, sbs_ind;
+        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+
+        arma::mat origN, destN, xprmatN;
+        arma::vec gainN;
+        quadriga_lib::ray_mesh_interact(type, f_hz, &orig, &dest, &mesh, &mtl_ind, &mtl,
+                                        &fbs_ind, &sbs_ind, (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                        &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                        &gainN, &xprmatN, (arma::mat *)nullptr, (arma::mat *)nullptr);
+        REQUIRE(gainN.n_elem == 1);
+        Out O;
+        O.vv = std::complex<double>(xprmatN(0, 0), xprmatN(1, 0));
+        O.hh = std::complex<double>(xprmatN(6, 0), xprmatN(7, 0));
+        O.vv2 = std::norm(O.vv), O.hh2 = std::norm(O.hh), O.gain = gainN(0);
+        return O;
+    };
+
+    auto base = [&](double a, double ei)
+    {
+        std::unordered_map<std::string, std::vector<double>> m;
+        m["a"] = {a};
+        m["b"] = {0.0};
+        m["c"] = {ei / 17.98};
+        m["d"] = {0.0};
+        m["att"] = {0.0};
+        m["attB"] = {0.0};
+        m["alpha"] = {0.0};
+        m["alphaB"] = {0.0};
+        m["fRef"] = {1.0};
+        m["thk"] = {thk};
+        return m;
+    };
+
+    // ------------------------------------------------------------------------------------------
+    // The swap. eps 5.24 - 0.63j with mu 2.10 - 0.35j, against eps 2.10 - 0.35j with mu 5.24 - 0.63j.
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: eps<->mu swap on a sheet through ray_mesh_interact, thk 6 mm\n");
+    QD_DIAG("angle,port,d_te_vs_tm,d_tm_vs_te,d_gain,separation\n");
+
+    auto mA = base(5.24, 0.63), mB = base(2.10, 0.35);
+    mA["e"] = {2.10}, mA["f"] = {0.0}, mA["g"] = {0.35 / 17.98}, mA["h"] = {0.0};
+    mB["e"] = {5.24}, mB["f"] = {0.0}, mB["g"] = {0.63 / 17.98}, mB["h"] = {0.0};
+
+    for (double thd : {0.0, 20.0, 45.0, 70.0, 85.0})
+        for (int type : {1, 0})
+        {
+            Out A = run(mA, thd, type), B = run(mB, thd, type);
+            double d1 = std::abs(B.hh2 - A.vv2), d2 = std::abs(B.vv2 - A.hh2);
+            double dg = std::abs(A.gain - B.gain), sep = std::abs(A.vv2 - A.hh2);
+
+            QD_DIAG("%.1f,%s,%.3e,%.3e,%.3e,%.6f\n", thd, type ? "T" : "R", d1, d2, dg, sep);
+
+            INFO("swap, angle " << thd << ", port " << (type ? "T" : "R"));
+            CHECK(d1 < 1.0e-9);
+            CHECK(d2 < 1.0e-9);
+            CHECK(dg < 1.0e-12);
+
+            // Away from normal incidence the two channels are far enough apart that the exchange
+            // is a statement and not an identity between two equal numbers.
+            if (thd > 0.0)
+                CHECK(sep > 1.0e-3);
+        }
+
+    // ------------------------------------------------------------------------------------------
+    // The lumped columns, each on a sheet of eps 5.24 - 0.63j.
+    // ------------------------------------------------------------------------------------------
+    struct Lump
+    {
+        const char *name;
+        double att, tf, resF, resQ, resS;
+    };
+    const std::vector<Lump> lumps = {
+        {"plain         ", 0.0, 0.0, 0.0, 0.0, 0.0},
+        {"att 3 dB      ", 3.0, 0.0, 0.0, 0.0, 0.0},
+        {"tf +0.5       ", 0.0, 0.5, 0.0, 0.0, 0.0},
+        {"tf -0.5       ", 0.0, -0.5, 0.0, 0.0, 0.0},
+        {"resonance     ", 0.0, 0.0, 1.2, 5.0, 0.8},
+        {"all three     ", 3.0, 0.5, 1.2, 5.0, 0.8},
+    };
+    const std::complex<double> eps_s(5.24, -0.63);
+
+    QD_DIAG("\n# diag: lumped columns on a sheet through ray_mesh_interact, eps 5.24 - 0.63j, 6 mm\n");
+    QD_DIAG("# moved_dB is the transmit gain against the plain sheet at the same angle\n");
+    QD_DIAG("column,angle,T_dB,T_ana_dB,d_T_te,d_T_tm,d_R_te,d_R_tm,moved_dB\n");
+
+    for (const auto &Lm : lumps)
+    {
+        auto mtl = base(5.24, 0.63);
+        mtl["att"] = {Lm.att};
+        mtl["tf"] = {Lm.tf};
+        mtl["tfB"] = {0.0};
+        mtl["resF"] = {Lm.resF};
+        mtl["resQ"] = {Lm.resQ};
+        mtl["resS"] = {Lm.resS};
+
+        std::complex<double> res(0.0, 0.0);
+        if (Lm.resS != 0.0)
+            res = (Lm.resS * Lm.resF * Lm.resF) /
+                  std::complex<double>(Lm.resF * Lm.resF - 1.0, (Lm.resF / Lm.resQ) * 1.0);
+
+        for (double thd : {0.0, 20.0, 40.0, 60.0, 80.0, 85.0})
+        {
+            double th = thd * arma::datum::pi / 180.0;
+            Out T = run(mtl, thd, 1), R = run(mtl, thd, 0);
+            QdLumpRef Q = qd_slab_ref_lumped(eps_s, thk, th, f_hz, Lm.att, Lm.tf, res);
+            QdLumpRef Q0 = qd_slab_ref_lumped(eps_s, thk, th, f_hz);
+            double gQ = 0.5 * (Q.T_te + Q.T_tm), gQ0 = 0.5 * (Q0.T_te + Q0.T_tm);
+
+            QD_DIAG("%s,%.1f,%.6f,%.6f,%.2e,%.2e,%.2e,%.2e,%+.4f\n", Lm.name, thd, dB(T.gain), dB(gQ),
+                    T.vv2 - Q.T_te, T.hh2 - Q.T_tm, R.vv2 - Q.R_te, R.hh2 - Q.R_tm, dB(gQ) - dB(gQ0));
+
+            INFO(Lm.name << ", angle " << thd);
+            CHECK(std::abs(dB(T.gain) - dB(gQ)) < 1.0e-6);
+            CHECK(std::abs(T.vv2 - Q.T_te) < 1.0e-9);
+            CHECK(std::abs(T.hh2 - Q.T_tm) < 1.0e-9);
+            CHECK(std::abs(R.vv2 - Q.R_te) < 1.0e-9);
+            CHECK(std::abs(R.hh2 - Q.R_tm) < 1.0e-9);
+
+            if (Lm.att == 0.0 && Lm.tf == 0.0 && Lm.resS == 0.0)
+            {
+                // At its defaults the lumped reference is the plain oracle, on both ports.
+                QdSlabRef P = qd_slab_ref(eps_s, thk, th, f_hz);
+                double Pr_te = 0.0, Pr_tm = 0.0;
+                qd_slab_ref_R(eps_s, thk, th, f_hz, std::complex<double>(1.0, 0.0), &Pr_te, &Pr_tm);
+                CHECK(std::abs(Q.t_te - P.t_te) < 1.0e-14);
+                CHECK(std::abs(Q.t_tm - P.t_tm) < 1.0e-14);
+                CHECK(std::abs(Q.R_te - Pr_te) < 1.0e-14);
+                CHECK(std::abs(Q.R_tm - Pr_tm) < 1.0e-14);
+            }
+            else
+            {
+                // And every column moves the transmit port by far more than the bound it is
+                // asserted to, so none of these rows passes on a column that was never read.
+                CHECK(std::abs(dB(gQ) - dB(gQ0)) > 1.0e-2);
+            }
         }
     }
 }
@@ -2513,24 +2849,6 @@ struct QdSheetFace
         return gainN(0);
     }
 };
-
-// Composite slab reflectance, TE/TM averaged, air | slab | air. The stack is symmetric, so the
-// internal reflection is the same at both faces and R = r (1 - phi^2) / (1 - r^2 phi^2).
-static inline double qd_slab_ref_R(std::complex<double> eps_s, double thk,
-                                   double theta_n_rad, double f_hz)
-{
-    const double k0 = 2.0 * arma::datum::pi * f_hz / 299792458.0;
-    const std::complex<double> z1(1.0, 0.0), z2 = std::sqrt(eps_s), n = std::sqrt(eps_s);
-    const double c1 = std::cos(theta_n_rad), s1 = std::sin(theta_n_rad);
-    const std::complex<double> c2 = std::sqrt(1.0 - (1.0 / eps_s) * s1 * s1);
-    const std::complex<double> phi = std::exp(std::complex<double>(0.0, -1.0) * k0 * n * thk * c2);
-    const std::complex<double> e = phi * phi;
-    const std::complex<double> r_te = (z1 * c1 - z2 * c2) / (z1 * c1 + z2 * c2);
-    const std::complex<double> r_tm = (z2 * c1 - z1 * c2) / (z2 * c1 + z1 * c2);
-    const std::complex<double> R_te = r_te * (1.0 - e) / (1.0 - r_te * r_te * e);
-    const std::complex<double> R_tm = r_tm * (1.0 - e) / (1.0 - r_tm * r_tm * e);
-    return 0.5 * (std::norm(R_te) + std::norm(R_tm));
-}
 
 TEST_CASE("Thin sheet - grazing incidence does not depend on the face")
 {

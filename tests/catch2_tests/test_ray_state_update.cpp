@@ -3133,12 +3133,15 @@ TEST_CASE("Thin sheet - the redo sits on the analytic slab at grazing incidence"
 // flux conversion are already written in z and c and need no structural change. The three arguments
 // default to 1, so every dielectric call site reads exactly as before.
 //
-// Preconditions, all met by diag_palette: no permittivity resonance, att = 0 so every
-// interface gain is 1, tf = 0 so there is no port redistribution, alpha = 0 so the only in-sheet
-// loss is the conductivity the complex index already carries, m = 0 so the mass-law route is not
-// taken, and the displacement budget is uncapped so the full thickness is replaced. Under those
-// conditions the in-slab cosine the caller passes is inert in produce mode - it reaches only
-// excess_gain, which is 1 - so this reference does not take one.
+// Three lumped columns are carried through the trailing DiagLump, which see: the interface gains,
+// the sheet's transmission factor and a permittivity resonance on any of the three media. At its
+// defaults - which is what diag_palette supplies - none of them executes anything.
+//
+// Preconditions that remain: alpha = 0 so the only in-sheet loss is the conductivity the complex
+// index already carries, m = 0 so the mass-law route is not taken, and the displacement budget is
+// uncapped so the full thickness is replaced. Under those conditions the in-slab cosine the caller
+// passes is inert in produce mode - it reaches only excess_gain, which is 1 - so this reference
+// does not take one.
 struct DiagSheet
 {
     std::complex<double> T_te, T_tm, R_te, R_tm;
@@ -3146,12 +3149,73 @@ struct DiagSheet
     std::complex<double> c_slab, c_far; // the cosines the sheet and far terms are evaluated at
 };
 
+// Permittivity resonance of a material at f_hz, written from the column definition: a complex
+// Lorentz pole resS * resF^2 / (resF^2 - f^2 + j (resF / resQ) f), all frequencies in GHz. Zero
+// where any of the three columns disables it.
+static inline std::complex<double> diag_res(double resF, double resQ, double resS, double f_hz)
+{
+    if (resF <= 0.0 || resQ <= 0.0 || resS == 0.0)
+        return std::complex<double>(0.0, 0.0);
+    double f = f_hz * 1e-9;
+    return (resS * resF * resF) / std::complex<double>(resF * resF - f * f, (resF / resQ) * f);
+}
+
+// The lumped material columns a sheet composite can carry, as the reference takes them. Every
+// field defaults to the value at which it is inert, and at those defaults both builders below
+// execute the expressions they executed before this struct existed.
+//
+//   g_slab, g_far   Interface power gains, 10^(-att/10) with the coincidence term folded in. They
+//                   multiply the transmit port only, as sqrt(g_slab * g_far). g_far is NOT gated
+//                   inside the builder: the row states what the far medium is owed - its own gain
+//                   where the wave newly enters it, 1 where the wave was already in it or leaves
+//                   into air - so the gate the library applies is measured against a statement of
+//                   the physics rather than against a copy of the test it is written as.
+//
+//   tf              The SHEET's transmission factor. tf is not a boundary admittance: it moves
+//                   energy between the reflected and the transmitted port of a boundary after the
+//                   Fresnel problem has been solved, so it has no place in the field-continuity
+//                   form and none in a characteristic matrix. It does have one in the Airy form,
+//                   which is written in per-boundary r and t, and that is the form this builder
+//                   is in. Per boundary and per channel, with R0 = |r|^2 the raw reflectance:
+//                       R' = R0 (1 - tf)             for tf >= 0, a leak out of the reflection
+//                       R' = R0 + (1 - R0) (-tf)     for tf <  0, a forced reflection
+//                       r' = r sqrt(R' / R0)         t' = t sqrt((1 - R') / (1 - R0))
+//                   Both faces of the sheet take the sheet's own tf, in both directions. The
+//                   neighbouring media's tf is not read, which is a property of produce mode and
+//                   not of the physics; the fixture records it.
+//                   Preconditions: 0 < R0 < 1 on every boundary and channel wherever tf < 0, so
+//                   no exact Brewster angle, no matched boundary and no internal total reflection.
+//
+//   res_*           Permittivity resonances, as increments. A resonance is carried by every
+//                   INTERFACE quantity - the admittance z = sqrt((eps + res)/mu) and every cosine,
+//                   since the transverse invariant is (eps + res) mu (1 - c^2) - and by no
+//                   propagation INDEX, which stays n = sqrt(eps mu). The propagation factor
+//                   exp(-j k0 n d c) therefore moves with a resonance through its cosine and not
+//                   through its index, and is unmoved only at normal incidence.
+struct DiagLump
+{
+    double g_slab = 1.0, g_far = 1.0;
+    double tf = 0.0;
+    std::complex<double> res_near{0.0, 0.0}, res_slab{0.0, 0.0}, res_far{0.0, 0.0};
+};
+
+// tf redistribution at one boundary, one channel: rescales the reflection in place and returns the
+// factor the two transmission amplitudes of that boundary take.
+static inline double diag_tf_port(std::complex<double> &r, double tf)
+{
+    double R0 = std::norm(r);
+    double Rt = (tf >= 0.0) ? R0 * (1.0 - tf) : R0 + (1.0 - R0) * (-tf);
+    r = (R0 > 0.0) ? r * std::sqrt(Rt / R0) : std::complex<double>(0.0, 0.0);
+    return std::sqrt((1.0 - Rt) / (1.0 - R0));
+}
+
 static inline DiagSheet diag_sheet_composite(std::complex<double> e_near, std::complex<double> e_slab,
                                              std::complex<double> e_far, double thk, double ct,
                                              double f_hz, bool disp_far, bool scalar,
                                              std::complex<double> mu_near = std::complex<double>(1.0, 0.0),
                                              std::complex<double> mu_slab = std::complex<double>(1.0, 0.0),
-                                             std::complex<double> mu_far = std::complex<double>(1.0, 0.0))
+                                             std::complex<double> mu_far = std::complex<double>(1.0, 0.0),
+                                             const DiagLump &lump = DiagLump())
 {
     const double k0 = 2.0 * QPI * f_hz / C0;
     auto root = [](std::complex<double> a)
@@ -3161,13 +3225,17 @@ static inline DiagSheet diag_sheet_composite(std::complex<double> e_near, std::c
         return std::sqrt(a);
     };
 
-    const std::complex<double> zn = std::sqrt(e_near / mu_near), zs = std::sqrt(e_slab / mu_slab),
-                               zf = std::sqrt(e_far / mu_far);
-    const std::complex<double> w_near = e_near * mu_near; // the transverse invariant's anchor
+    // Interface permittivities. They carry the resonance; the propagation indices below do not.
+    const std::complex<double> i_near = e_near + lump.res_near, i_slab = e_slab + lump.res_slab,
+                               i_far = e_far + lump.res_far;
+
+    const std::complex<double> zn = std::sqrt(i_near / mu_near), zs = std::sqrt(i_slab / mu_slab),
+                               zf = std::sqrt(i_far / mu_far);
+    const std::complex<double> w_near = i_near * mu_near; // the transverse invariant's anchor
     const double s2 = 1.0 - ct * ct;
     const std::complex<double> c1(ct, 0.0);
-    const std::complex<double> cs = root(1.0 - (w_near / (e_slab * mu_slab)) * s2);
-    const std::complex<double> cf = root(1.0 - (w_near / (e_far * mu_far)) * s2);
+    const std::complex<double> cs = root(1.0 - (w_near / (i_slab * mu_slab)) * s2);
+    const std::complex<double> cf = root(1.0 - (w_near / (i_far * mu_far)) * s2);
 
     DiagSheet D;
     D.c_slab = cs, D.c_far = cf;
@@ -3188,20 +3256,34 @@ static inline DiagSheet diag_sheet_composite(std::complex<double> e_near, std::c
 
     // One-way propagation across the sheet, at cs, and the host propagation it replaces, taken at
     // the host's own cosine over the same normal thickness.
+    //
+    // Both indices are resonance-excluded and both cosines are not: a resonant sheet, and a
+    // resonant host under it, propagate at sqrt(eps mu) along a cosine set by eps + res.
     const std::complex<double> phi =
         std::exp(std::complex<double>(0.0, -1.0) * k0 * std::sqrt(e_slab * mu_slab) * thk * cs);
     const std::complex<double> e_disp = disp_far ? e_far : e_near;
+    const std::complex<double> i_disp = disp_far ? i_far : i_near;
     const std::complex<double> mu_disp = disp_far ? mu_far : mu_near;
-    const std::complex<double> c_disp = root(1.0 - (w_near / (e_disp * mu_disp)) * s2);
+    const std::complex<double> c_disp = root(1.0 - (w_near / (i_disp * mu_disp)) * s2);
     const std::complex<double> phi_disp =
         std::exp(std::complex<double>(0.0, -1.0) * k0 * std::sqrt(e_disp * mu_disp) * thk * c_disp);
     const std::complex<double> phi_t = phi / phi_disp;
+
+    // The sheet's tf, on both of its faces. Skipped outright at tf = 0, so that case executes
+    // nothing it did not execute before.
+    if (lump.tf != 0.0)
+    {
+        double kn_te = diag_tf_port(r_ns_te, lump.tf), kn_tm = diag_tf_port(r_ns_tm, lump.tf);
+        double kf_te = diag_tf_port(r_sf_te, lump.tf), kf_tm = diag_tf_port(r_sf_tm, lump.tf);
+        t_ns_te *= kn_te, t_sn_te *= kn_te, t_sf_te *= kf_te;
+        t_ns_tm *= kn_tm, t_sn_tm *= kn_tm, t_sf_tm *= kf_tm;
+    }
 
     // Near -> far normal flux, per channel. Both denominators collapse to Re(z_n) * ct for a real
     // incidence cosine, so with a real near side the two channels can separate only through the far
     // medium. The gate is near == far, which is why an isolated sheet and a sheet embedded in a
     // medium both take the factor as exactly 1.
-    if (e_far != e_near || mu_far != mu_near)
+    if (e_far != e_near || mu_far != mu_near || lump.res_far != lump.res_near)
     {
         double den_te = std::real(zn * c1), den_tm = std::real(std::conj(zn) * c1);
         double num_te = std::real(zf * cf), num_tm = std::real(std::conj(zf) * cf);
@@ -3220,6 +3302,13 @@ static inline DiagSheet diag_sheet_composite(std::complex<double> e_near, std::c
     D.T_tm = D.fx_tm * t_ns_tm * t_sf_tm * phi_t / den_tm;
     D.R_te = r_ns_te + t_ns_te * t_sn_te * r_sf_te * p2 / den_te;
     D.R_tm = r_ns_tm + t_ns_tm * t_sn_tm * r_sf_tm * p2 / den_tm;
+
+    // Lumped interface gains: the transmit port, once per medium entered, never the reflect port.
+    if (lump.g_slab != 1.0 || lump.g_far != 1.0)
+    {
+        double ig = std::sqrt(lump.g_slab * lump.g_far);
+        D.T_te *= ig, D.T_tm *= ig;
+    }
     return D;
 }
 
@@ -3324,7 +3413,9 @@ struct DiagLayer
 {
     std::complex<double> e{1.0, 0.0};
     std::complex<double> mu{1.0, 0.0};
-    double d = 0.0; // normal thickness, m
+    double d = 0.0;                  // normal thickness, m
+    std::complex<double> res{0.0, 0.0}; // permittivity resonance: interface terms only, see DiagLump
+    double alpha = 0.0;              // in-medium absorption, dB per meter of path
 };
 
 // Hand-built 2x2 characteristic-matrix reference for an ordered stack of layers between two
@@ -3368,13 +3459,27 @@ struct DiagLayer
 // normal thickness, capped by disp_budget exactly as produce mode caps it. Pass disp_budget = 0.0
 // where the reference is wanted undisplaced, which is what the reflect port always is.
 //
-// Same preconditions as the two builders above: no permittivity resonance, att = tf = alpha = 0,
-// and no mass-law column, so no interface gain and no port redistribution appear.
+// A permittivity resonance is carried, per layer through DiagLayer::res and on the two half-spaces
+// through the trailing arguments, with the same split as DiagLump: the admittances and the cosines
+// read eps + res, the layer phase's index reads eps. The interface gains are an end quantity on
+// the transmit port and are left to the caller, who multiplies by sqrt of their product.
+//
+// tf has no entry here and cannot have one. This form states the boundary conditions - continuity
+// of the tangential field pair - and has no per-boundary reflection or transmission to rescale; a
+// boundary that has been through tf no longer satisfies 1 + r = t, so it is not a boundary this
+// matrix can describe. The mass-law column is not carried either.
+//
+// alpha is carried, per layer. It is a real one-way amplitude factor 10^(-alpha d / (20 |Re c|))
+// over the path through the layer, and the layer phase is where a one-way factor lives: the
+// matrix is cos and sin of delta, and the one-way propagation is exp(-j delta). The admittance
+// does not read it.
 static inline DiagSheet diag_cm_stack(std::complex<double> e_near, std::complex<double> mu_near,
                                       const std::vector<DiagLayer> &layers,
                                       std::complex<double> e_far, std::complex<double> mu_far,
                                       std::complex<double> ct, double f_hz,
-                                      bool disp_far, bool scalar, double disp_budget = -1.0)
+                                      bool disp_far, bool scalar, double disp_budget = -1.0,
+                                      std::complex<double> res_near = std::complex<double>(0.0, 0.0),
+                                      std::complex<double> res_far = std::complex<double>(0.0, 0.0))
 {
     const double k0 = 2.0 * QPI * f_hz / C0;
     auto root = [](std::complex<double> a)
@@ -3384,14 +3489,18 @@ static inline DiagSheet diag_cm_stack(std::complex<double> e_near, std::complex<
         return std::sqrt(a);
     };
 
-    const std::complex<double> w_near = e_near * mu_near; // the transverse invariant's anchor
+    // Interface permittivities carry the resonance; the layer phase's index does not.
+    const std::complex<double> i_near = e_near + res_near, i_far = e_far + res_far;
+
+    const std::complex<double> w_near = i_near * mu_near; // the transverse invariant's anchor
     const std::complex<double> s2 = 1.0 - ct * ct;
-    const std::complex<double> zn = std::sqrt(e_near / mu_near), zf = std::sqrt(e_far / mu_far);
-    const std::complex<double> cf = root(1.0 - (w_near / (e_far * mu_far)) * s2);
+    const std::complex<double> zn = std::sqrt(i_near / mu_near), zf = std::sqrt(i_far / mu_far);
+    const std::complex<double> cf = root(1.0 - (w_near / (i_far * mu_far)) * s2);
 
     DiagSheet D;
     D.c_far = cf;
-    D.c_slab = layers.empty() ? ct : root(1.0 - (w_near / (layers[0].e * layers[0].mu)) * s2);
+    D.c_slab = layers.empty() ? ct
+                              : root(1.0 - (w_near / ((layers[0].e + layers[0].res) * layers[0].mu)) * s2);
 
     std::complex<double> r_pol[2], t_pol[2];
     for (int pol = 0; pol < 2; ++pol)
@@ -3402,10 +3511,13 @@ static inline DiagSheet diag_cm_stack(std::complex<double> e_near, std::complex<
         std::complex<double> M11(1.0, 0.0), M12(0.0, 0.0), M21(0.0, 0.0), M22(1.0, 0.0);
         for (const DiagLayer &L : layers)
         {
-            std::complex<double> cj = root(1.0 - (w_near / (L.e * L.mu)) * s2);
-            std::complex<double> nj = std::sqrt(L.e * L.mu);
+            std::complex<double> ij = L.e + L.res;
+            std::complex<double> cj = root(1.0 - (w_near / (ij * L.mu)) * s2);
+            std::complex<double> nj = std::sqrt(L.e * L.mu); // resonance-excluded
             std::complex<double> dl = k0 * nj * cj * L.d;
-            std::complex<double> ej = adm(std::sqrt(L.e / L.mu), cj);
+            if (L.alpha != 0.0) // nepers of amplitude over the path d / |Re c|, into the layer phase
+                dl -= std::complex<double>(0.0, (std::log(10.0) / 20.0) * L.alpha * L.d / std::abs(std::real(cj)));
+            std::complex<double> ej = adm(std::sqrt(ij / L.mu), cj);
 
             std::complex<double> A = std::cos(dl);
             std::complex<double> B = std::complex<double>(0.0, 1.0) * std::sin(dl) / ej;
@@ -3432,7 +3544,7 @@ static inline DiagSheet diag_cm_stack(std::complex<double> e_near, std::complex<
     std::complex<double> t_tm = scalar ? t_pol[0] : (ct / cf) * t_pol[1];
 
     // The one conversion to per-channel normal flux, at the outer pair, transmit port only.
-    if (e_far != e_near || mu_far != mu_near)
+    if (e_far != e_near || mu_far != mu_near || res_far != res_near)
     {
         double den_te = std::real(zn * ct), den_tm = std::real(std::conj(zn) * ct);
         double num_te = std::real(zf * cf), num_tm = std::real(std::conj(zf) * cf);
@@ -3450,8 +3562,9 @@ static inline DiagSheet diag_cm_stack(std::complex<double> e_near, std::complex<
         t_disp = 0.0;
 
     const std::complex<double> e_d = disp_far ? e_far : e_near;
+    const std::complex<double> i_d = disp_far ? i_far : i_near;
     const std::complex<double> mu_d = disp_far ? mu_far : mu_near;
-    const std::complex<double> c_disp = root(1.0 - (w_near / (e_d * mu_d)) * s2);
+    const std::complex<double> c_disp = root(1.0 - (w_near / (i_d * mu_d)) * s2);
     const std::complex<double> phi_disp =
         std::exp(std::complex<double>(0.0, -1.0) * k0 * std::sqrt(e_d * mu_d) * t_disp * c_disp);
 
@@ -5051,4 +5164,1000 @@ TEST_CASE("Layered stack - sheet_case 4 resolves rather than killing the ray")
         CHECK(std::abs(AB.T_tm - BA.T_tm) < 1.0e-14);
         CHECK(std::abs(AB.R_te - BA.R_te) > 1.0e-3);
     }
+}
+// One row of a palette that carries the lumped columns. `ei` is the magnitude of the imaginary
+// part of eps at 1 GHz, so eps = a - j ei, the same convention diag_palette uses.
+struct LumpMtl
+{
+    double a = 1.0, ei = 0.0, thk = 0.0;
+    double att = 0.0, tf = 0.0;
+    double resF = 0.0, resQ = 0.0, resS = 0.0;
+    double alpha = 0.0, m = 0.0;
+};
+
+static inline std::unordered_map<std::string, std::vector<double>> lump_palette(const std::vector<LumpMtl> &v)
+{
+    std::unordered_map<std::string, std::vector<double>> m;
+    for (const char *k : {"a", "b", "c", "d", "thk", "att", "attB", "alpha", "alphaB", "fRef",
+                          "tf", "tfB", "resF", "resQ", "resS", "m"})
+        m[k] = std::vector<double>(v.size(), 0.0);
+    for (size_t i = 0; i < v.size(); ++i)
+    {
+        m["a"][i] = v[i].a, m["c"][i] = v[i].ei / 17.98, m["thk"][i] = v[i].thk;
+        m["att"][i] = v[i].att, m["tf"][i] = v[i].tf;
+        m["resF"][i] = v[i].resF, m["resQ"][i] = v[i].resQ, m["resS"][i] = v[i].resS;
+        m["alpha"][i] = v[i].alpha, m["m"][i] = v[i].m, m["fRef"][i] = 1.0;
+    }
+    return m;
+}
+
+// Permittivity of a LumpMtl row without its resonance, and the resonance on its own
+static inline std::complex<double> lump_eps(const LumpMtl &M, double f_hz)
+{
+    return std::complex<double>(M.a, -17.98 * (M.ei / 17.98) / (f_hz * 1e-9));
+}
+static inline std::complex<double> lump_res(const LumpMtl &M, double f_hz)
+{
+    return diag_res(M.resF, M.resQ, M.resS, f_hz);
+}
+
+TEST_CASE("Lumped columns - interface gain on the sheet, glued and embedded paths")
+{
+    // ig = sqrt(slab.interface_gain * (far_is_new ? far.interface_gain : 1)) in produce mode, with
+    // far_is_new = !far_is_air && !far.same_as(near). No sheet test has ever set att, so the branch
+    // has only ever evaluated sqrt(1 * 1).
+    //
+    // What it has to say, in the quantities it holds. An interface gain is a penetration loss owed
+    // once per medium ENTERED, which is what Material::interact_with charges for a single
+    // transmission-class crossing: the entered medium's, never the one being left. A sheet crossing
+    // enters the sheet, so it owes the sheet's. It enters the far medium as well only if the wave
+    // was not already in it:
+    //
+    //   isolated   air  | sheet | air     G_sheet             air owes nothing
+    //   entry      air  | sheet | wall    G_sheet * G_wall    the wall is entered here and nowhere else
+    //   embedded   host | sheet | host    G_sheet             the host was entered earlier and paid then
+    //   exit       host | sheet | air     G_sheet             leaving, and air owes nothing
+    //
+    // The embedded row is the one far_is_new was written for. Testing for air instead of for
+    // near == far would charge the host a second time at every sheet inside it, and the row is
+    // built so that this costs the full 5 dB of the host's column.
+    //
+    // The reference does not copy the gate. DiagLump::g_far is set by the row to what the far
+    // medium is owed, so what is measured is the gate against the table above.
+    //
+    // The reflect port owes nothing: nothing was penetrated by the part that turns around at the
+    // near face, and produce mode extends that to the whole port, including the series that did
+    // enter the sheet and came back out. That second half is a convention rather than a
+    // consequence - a traced solid charges the same echo its entry gain - and it is asserted here
+    // as what the composite does, exactly, not as what a solid would do.
+    const double f_hz = FRQ;
+    const double thk = 0.006;
+    const double L = 0.10;
+
+    const int SH = 1, SH0 = 2, WALL = 3, HOST = 4, HOST0 = 5;
+    const std::vector<LumpMtl> pal = {
+        {5.24, 0.63, thk, /*att*/ 3.0}, // 1 SH     the sheet, 3 dB
+        {5.24, 0.63, thk, 0.0},         // 2 SH0    its twin without the column
+        {1.50, 0.40, 0.0, 5.0},         // 3 WALL   a lossy solid, 5 dB
+        {1.50, 0.00, 0.0, 5.0},         // 4 HOST   a lossless solid, 5 dB
+        {1.50, 0.00, 0.0, 0.0},         // 5 HOST0  its twin without the column
+    };
+    auto mtl = lump_palette(pal);
+    auto E = [&](int idx)
+    { return (idx == 0) ? std::complex<double>(1.0, 0.0) : lump_eps(pal[(size_t)idx - 1], f_hz); };
+
+    const double G_sh = std::pow(10.0, -0.1 * 3.0), G_wall = std::pow(10.0, -0.1 * 5.0);
+
+    const uint8_t OT_SHEET_ISO = 67, OT_GLUED_ENTRY = 71, OT_GLUED_EXIT = 69;
+
+    struct Row
+    {
+        const char *name;
+        uint8_t otype;
+        unsigned nH;
+        int m2, cur, near, far;
+        bool disp_far;
+        double g_far; // what the far medium is owed
+        double lim;
+    };
+    const std::vector<Row> rows = {
+        {"isolated  air  | SH | air ", OT_SHEET_ISO, 1u, 0, 0, 0, 0, false, 1.0, 85.0},
+        {"entry     air  | SH | WALL", OT_GLUED_ENTRY, 2u, WALL, 0, 0, WALL, false, G_wall, 85.0},
+        {"embedded  HOST | SH | HOST", OT_SHEET_ISO, 1u, 0, HOST, HOST, HOST, false, 1.0, 50.0},
+        {"exit      HOST | SH | air ", OT_GLUED_EXIT, 2u, HOST, HOST, HOST, 0, true, 1.0, 50.0},
+    };
+
+    auto TM = [](const arma::mat &X)
+    { return cpx(X, 0, 0); };
+    auto TE = [](const arma::mat &X)
+    { return cpx(X, 0, 3); };
+    auto P = [](std::complex<double> v)
+    { return std::norm(v); };
+
+    QD_DIAG("\n# diag: lumped interface gain, sheet eps 5.24 - 0.63j att 3 dB, wall and host att 5 dB\n");
+    QD_DIAG("# paid_dB is the gain the composite carries against the same stack with the sheet's att\n");
+    QD_DIAG("# removed; owed_dB is what the table in the case header says the crossing owes in total\n");
+    QD_DIAG("stack,theta_n,P_te_meas,P_te_ref,P_tm_meas,P_tm_ref,d_te,d_tm,paid_dB,owed_dB,rtype\n");
+
+    for (const auto &R : rows)
+        for (double thd : {0.0, 20.0, 40.0, 50.0, 70.0, 85.0})
+        {
+            if (thd > R.lim)
+                continue;
+            double theta_n = thd * QPI / 180.0, ct = std::cos(theta_n);
+
+            auto run = [&](int sheet, int m2, int cur, int itype)
+            {
+                auto C = make1<double>(mtl, itype, R.otype, R.nH, sheet, m2, 0, cur, 0,
+                                       L, 0.5, 0.5, QPI / 2.0 - theta_n, 1.5);
+                C.run();
+                return C;
+            };
+            auto C = run(SH, R.m2, R.cur, 1);
+            auto C0 = run(SH0, R.m2, R.cur, 1); // the same crossing, sheet without the column
+
+            DiagLump Lp;
+            Lp.g_slab = G_sh, Lp.g_far = R.g_far;
+            DiagSheet D = diag_sheet_composite(E(R.near), E(SH), E(R.far), thk, ct, f_hz, R.disp_far,
+                                               false, 1.0, 1.0, 1.0, Lp);
+
+            // Hosts are lossless here, so the leg a row inside a medium closes out contributes a
+            // pure phase and the channel powers are the composite's own.
+            double p_te = P(TE(C.xprmat)), p_tm = P(TM(C.xprmat));
+            double paid = 10.0 * std::log10(p_te / P(TE(C0.xprmat)));
+            double owed = 10.0 * std::log10(G_sh * R.g_far);
+
+            QD_DIAG("%s,%.1f,%.9e,%.9e,%.9e,%.9e,%.2e,%.2e,%+.6f,%+.6f,%u\n", R.name, thd,
+                    p_te, P(D.T_te), p_tm, P(D.T_tm), p_te - P(D.T_te), p_tm - P(D.T_tm),
+                    paid, owed, (unsigned)C.resolved_type[0]);
+
+            INFO(R.name << ", theta_n " << thd);
+            REQUIRE(std::isfinite(C.gain(0)));
+            REQUIRE(C.resolved_type[0] != 0);
+
+            // Each gain owed is paid, once.
+            CHECK(std::abs(p_te - P(D.T_te)) < 1.0e-9);
+            CHECK(std::abs(p_tm - P(D.T_tm)) < 1.0e-9);
+            CHECK(std::abs((double)C.gain(0) - 0.5 * (P(D.T_te) + P(D.T_tm))) < 1.0e-9);
+            if (R.cur == 0) // nothing else multiplies the composite: pin it complex
+            {
+                CHECK(std::abs(TE(C.xprmat) - D.T_te) < 1.0e-9);
+                CHECK(std::abs(TM(C.xprmat) - D.T_tm) < 1.0e-9);
+            }
+
+            // Exact by construction: the sheet's gain is one real factor on the transmit port, so
+            // the field with and without it differ by sqrt(G_sheet) and by nothing else.
+            CHECK(std::abs(p_te / P(TE(C0.xprmat)) - G_sh) < 1.0e-14);
+            CHECK(std::abs(p_tm / P(TM(C0.xprmat)) - G_sh) < 1.0e-14);
+
+            // And the assertion above cannot pass with a gain dropped or paid twice: each is worth
+            // dB, not rounding.
+            CHECK(std::abs(p_te - P(D.T_te) / G_sh) > 1.0e-3 * p_te);
+            CHECK(std::abs(p_te - P(D.T_te) * G_sh) > 1.0e-3 * p_te);
+
+            if (R.near == HOST && R.far == HOST)
+            {
+                // The embedded sheet pays the host's gain not at all. Stated twice. Against the
+                // reference: charging it would cost the full 5 dB. And against the host's twin
+                // without the column, where it is exact by construction: with near == far the
+                // host's att column is never read, so the two runs are the same arithmetic.
+                auto Ch = run(SH, 0, HOST0, 1);
+                CHECK(std::abs(p_te - P(D.T_te) * G_wall) > 0.5 * p_te);
+                CHECK(p_te == P(TE(Ch.xprmat)));
+                CHECK(p_tm == P(TM(Ch.xprmat)));
+            }
+            if (R.far == WALL)
+            {
+                // The glued entry pays the wall's, which no other event on the path will: without
+                // it the wall's penetration loss disappears for every wall that carries a coating.
+                CHECK(std::abs(p_te - P(D.T_te) / G_wall) > 0.5 * p_te);
+            }
+
+            // The reflect port carries neither gain. Complex on the rows where the composite is
+            // the whole of what is written, and bit-identical to the sheet without the column.
+            if (R.cur == 0)
+            {
+                auto Cr = run(SH, R.m2, R.cur, 0);
+                auto Cr0 = run(SH0, R.m2, R.cur, 0);
+                CHECK(std::abs(TE(Cr.xprmat) - D.R_te) < 1.0e-9);
+                CHECK(std::abs(TM(Cr.xprmat) - D.R_tm) < 1.0e-9);
+                CHECK(TE(Cr.xprmat) == TE(Cr0.xprmat));
+                CHECK(TM(Cr.xprmat) == TM(Cr0.xprmat));
+            }
+        }
+}
+
+TEST_CASE("Lumped columns - the transmission factor on a sheet, both ports")
+{
+    // The AMP lambda in produce mode, and the apply_tf call in the two boundary lambdas that feeds
+    // it. Per boundary and per channel, with R0 the raw Fresnel reflectance and R' = apply_tf(R0):
+    //
+    //     r' = sqrt(R') exp(j arg r)        t' = t sqrt((1 - R') / (1 - R0))
+    //
+    // so the reflectance is replaced, the transmission keeps its Fresnel phase, and its power is
+    // moved by exactly what the reflection gave up or took. tf > 0 leaks, R' = R0 (1 - tf), which
+    // scales |r| by sqrt(1 - tf) whatever the angle but scales t by an amount that grows with R0
+    // and is unbounded towards grazing; tf < 0 forces, R' = R0 + (1 - R0)|tf|, which scales t by
+    // sqrt(1 - |tf|) whatever the angle. Both faces take the SHEET's tf.
+    //
+    // tf is not a boundary admittance, so the characteristic matrix cannot hold it. The Airy pair
+    // can, because it is written in exactly the per-boundary r and t that tf rescales, and
+    // diag_sheet_composite is in that form. So the reference expresses the rule in closed form and
+    // the assertion is the ordinary one. What it cannot be is independent of the rule: it is the
+    // same convention written a second time. Two statements below are independent of it.
+    //
+    //   Unitarity. In flux-normalized amplitudes a lossless boundary below its critical angle is
+    //   [[r, tau], [tau, -r]] with r and tau real and r^2 + tau^2 = 1. The rescale keeps both
+    //   phases and keeps the sum, so the boundary is still unitary, and a lossless sheet between
+    //   two unitary boundaries conserves energy per channel at any tf. Nothing in the reference is
+    //   needed to say that.
+    //
+    //   The end points. tf = +1 removes the reflection outright, so the reflect port is exactly
+    //   zero and a lossless sheet is a pure phase; tf = -1 makes both faces mirrors, so the
+    //   transmit port is exactly zero.
+    //
+    // One planned row is withdrawn. The plan asks for a tf-bearing PAIR, sheet and solid both. The
+    // composite cannot express the solid's half: the owner of both faces is the sheet, and the far
+    // medium's tf is read nowhere in produce mode. The last block measures that and asserts
+    // nothing, because the only assertion available is that a wall's tf vanishes when the wall is
+    // coated, and that is a finding to be decided rather than a property to be guarded.
+    const double f_hz = FRQ;
+    const double thk = 0.006;
+    const double L = 0.10;
+
+    const uint8_t OT_SHEET_ISO = 67, OT_GLUED_ENTRY = 71, OT_GLUED_EXIT = 69;
+    const int SH = 1, WALL = 2, HOST = 3, SHL = 4;
+
+    auto TM = [](const arma::mat &X)
+    { return cpx(X, 0, 0); };
+    auto TE = [](const arma::mat &X)
+    { return cpx(X, 0, 3); };
+
+    struct Row
+    {
+        const char *name;
+        uint8_t otype;
+        unsigned nH;
+        int m2, cur, near, far;
+        bool disp_far;
+        double lim;
+    };
+    const std::vector<Row> rows = {
+        {"isolated  air  | SH | air ", OT_SHEET_ISO, 1u, 0, 0, 0, 0, false, 85.0},
+        {"entry     air  | SH | WALL", OT_GLUED_ENTRY, 2u, WALL, 0, 0, WALL, false, 85.0},
+        {"exit      HOST | SH | air ", OT_GLUED_EXIT, 2u, HOST, HOST, HOST, 0, true, 50.0},
+    };
+
+    QD_DIAG("\n# diag: transmission factor on a 6 mm sheet, eps 5.24 - 0.63j, both ports\n");
+    QD_DIAG("# dT_dB and dR_dB are against the same crossing at tf = 0, from the reference\n");
+    QD_DIAG("stack,tf,theta_n,|T_te|,|T_tm|,|R_te|,|R_tm|,d_T,d_R,d_scalar,dT_dB,dR_dB\n");
+
+    double worst_T = 0.0, worst_R = 0.0, worst_E = 0.0;
+    for (double tf : {-1.0, -0.5, -0.25, 0.25, 0.5, 1.0})
+    {
+        const std::vector<LumpMtl> pal = {
+            {5.24, 0.63, thk, 0.0, tf}, // 1 SH    the sheet
+            {1.50, 0.40, 0.0},          // 2 WALL  a lossy solid
+            {1.50, 0.00, 0.0},          // 3 HOST  a lossless solid
+            {5.24, 0.00, thk, 0.0, tf}, // 4 SHL   a lossless sheet with the same tf
+        };
+        auto mtl = lump_palette(pal);
+        auto E = [&](int idx)
+        { return (idx == 0) ? std::complex<double>(1.0, 0.0) : lump_eps(pal[(size_t)idx - 1], f_hz); };
+
+        DiagLump Lp;
+        Lp.tf = tf;
+
+        for (const auto &R : rows)
+            for (double thd : {0.0, 20.0, 45.0, 50.0, 70.0, 85.0})
+            {
+                if (thd > R.lim)
+                    continue;
+                double theta_n = thd * QPI / 180.0, ct = std::cos(theta_n);
+
+                auto run = [&](int itype)
+                {
+                    auto C = make1<double>(mtl, itype, R.otype, R.nH, SH, R.m2, 0, R.cur, 0,
+                                           L, 0.5, 0.5, QPI / 2.0 - theta_n, 1.5);
+                    C.run();
+                    return C;
+                };
+                auto Ct = run(1), Cr = run(0);
+
+                DiagSheet D = diag_sheet_composite(E(R.near), E(SH), E(R.far), thk, ct, f_hz,
+                                                   R.disp_far, false, 1.0, 1.0, 1.0, Lp);
+                DiagSheet D0 = diag_sheet_composite(E(R.near), E(SH), E(R.far), thk, ct, f_hz,
+                                                    R.disp_far, false);
+
+                std::complex<double> t_te = TE(Ct.xprmat), t_tm = TM(Ct.xprmat);
+                std::complex<double> r_te = TE(Cr.xprmat), r_tm = TM(Cr.xprmat);
+
+                // In air nothing else multiplies either port and both are compared complex. Inside
+                // a host the transmit port picks up the phase of the leg it closes and the reflect
+                // port the host's own bookkeeping, so that row is compared in transmitted power.
+                double d_T, d_R = 0.0, d_S = 0.0;
+                if (R.cur == 0)
+                {
+                    d_T = std::max(std::abs(t_te - D.T_te), std::abs(t_tm - D.T_tm));
+                    d_R = std::max(std::abs(r_te - D.R_te), std::abs(r_tm - D.R_tm));
+
+                    // Scalar mode carries one channel, the TE / admittance form.
+                    DiagSheet Ds = diag_sheet_composite(E(R.near), E(SH), E(R.far), thk, ct, f_hz,
+                                                        R.disp_far, true, 1.0, 1.0, 1.0, Lp);
+                    auto St = run(4), Sr = run(3);
+                    d_S = std::max(std::abs(cpx(St.xprmat, 0, 0) - Ds.T_te),
+                                   std::abs(cpx(Sr.xprmat, 0, 0) - Ds.R_te));
+                }
+                else
+                    d_T = std::max(std::abs(std::norm(t_te) - std::norm(D.T_te)),
+                                   std::abs(std::norm(t_tm) - std::norm(D.T_tm)));
+
+                worst_T = std::max(worst_T, d_T), worst_R = std::max(worst_R, std::max(d_R, d_S));
+
+                double gT = 0.5 * (std::norm(D.T_te) + std::norm(D.T_tm));
+                double gT0 = 0.5 * (std::norm(D0.T_te) + std::norm(D0.T_tm));
+                double gR = 0.5 * (std::norm(D.R_te) + std::norm(D.R_tm));
+                double gR0 = 0.5 * (std::norm(D0.R_te) + std::norm(D0.R_tm));
+
+                QD_DIAG("%s,%+.2f,%.1f,%.9f,%.9f,%.9f,%.9f,%.2e,%.2e,%.2e,%+.4f,%+.4f\n",
+                        R.name, tf, thd, std::abs(t_te), std::abs(t_tm), std::abs(r_te), std::abs(r_tm),
+                        d_T, d_R, d_S,
+                        (gT > 0.0) ? 10.0 * std::log10(gT / gT0) : -999.0,
+                        (gR > 0.0) ? 10.0 * std::log10(gR / gR0) : -999.0);
+
+                INFO(R.name << ", tf " << tf << ", theta_n " << thd);
+                REQUIRE(std::isfinite(Ct.gain(0)));
+                REQUIRE(std::isfinite(Cr.gain(0)));
+
+                CHECK(d_T < 1.0e-9);
+                CHECK(d_R < 1.0e-9);
+                CHECK(d_S < 1.0e-9);
+                CHECK(std::abs((double)Ct.gain(0) - gT) < 1.0e-9);
+
+                // tf moves both ports by far more than they are asserted to, so the assertions
+                // above are not passing on a rescale that never ran. The transmit port moves least
+                // for a weak leak into a glued solid, 0.076 dB at tf = 0.25, and the reflect port
+                // least for a weak forced reflection at grazing incidence, 0.87 dB at tf = -0.25.
+                CHECK(std::abs(gT - gT0) > 1.0e-3 * gT0);
+                CHECK(std::abs(gR - gR0) > 1.0e-3 * gR0);
+
+                if (R.cur == 0)
+                {
+                    // The end points, exact by construction: sqrt(0) is 0 and every term of the
+                    // port that closes carries it.
+                    if (tf == 1.0)
+                        CHECK((double)Cr.gain(0) == 0.0);
+                    if (tf == -1.0)
+                        CHECK((double)Ct.gain(0) == 0.0);
+                }
+            }
+
+        // Unitarity, on a lossless sheet in air. No reference enters: this is a statement about
+        // the rule itself, and it is the reason the rescale has the form it has.
+        for (double thd : {0.0, 30.0, 60.0, 80.0})
+        {
+            double theta_n = thd * QPI / 180.0;
+            auto run = [&](int itype)
+            {
+                auto C = make1<double>(mtl, itype, OT_SHEET_ISO, 1u, SHL, 0, 0, 0, 0,
+                                       L, 0.5, 0.5, QPI / 2.0 - theta_n, 1.5);
+                C.run();
+                return C;
+            };
+            auto Ct = run(1), Cr = run(0);
+            double e_te = std::norm(TE(Ct.xprmat)) + std::norm(TE(Cr.xprmat));
+            double e_tm = std::norm(TM(Ct.xprmat)) + std::norm(TM(Cr.xprmat));
+            worst_E = std::max(worst_E, std::max(std::abs(e_te - 1.0), std::abs(e_tm - 1.0)));
+
+            INFO("lossless sheet, tf " << tf << ", theta_n " << thd);
+            CHECK(std::abs(e_te - 1.0) < 1.0e-12);
+            CHECK(std::abs(e_tm - 1.0) < 1.0e-12);
+            if (tf == 1.0) // no reflection at either face: the sheet is a pure phase
+                CHECK(std::abs(std::abs(TE(Ct.xprmat)) - 1.0) < 1.0e-12);
+        }
+    }
+    QD_DIAG("# worst: transmit %.3e, reflect and scalar %.3e, energy of a lossless sheet %.3e\n",
+            worst_T, worst_R, worst_E);
+
+    // The far medium's tf. A glued entry into a wall that carries one, with a sheet that does not,
+    // against the same entry with the wall's column removed. Measured and printed, not asserted;
+    // see the case header. bare_dB is what the same column is worth on the uncoated wall, from the
+    // rule Material::interact_with applies to a single crossing: the TE/TM-averaged reflectance R
+    // becomes R (1 - tf) for a leak and R + (1 - R)|tf| for a forced reflection, and the
+    // transmitted power moves by (1 - R') / (1 - R).
+    QD_DIAG("\n# diag: the far medium's tf on a glued entry, air | sheet (tf 0) | wall (tf)\n");
+    QD_DIAG("# composite_dB is what the wall's column moves the coated entry by, bare_dB what it\n");
+    QD_DIAG("# moves the uncoated wall by\n");
+    QD_DIAG("wall_tf,theta_n,composite_dB,bare_dB\n");
+    for (double wtf : {0.5, -0.5})
+        for (double thd : {0.0, 45.0})
+        {
+            double theta_n = thd * QPI / 180.0, ct = std::cos(theta_n);
+            double g[2];
+            for (int k = 0; k < 2; ++k)
+            {
+                const std::vector<LumpMtl> pal = {
+                    {5.24, 0.63, thk},                       // 1 the sheet, no tf
+                    {1.50, 0.40, 0.0, 0.0, (k ? wtf : 0.0)}, // 2 the wall
+                };
+                auto mtl = lump_palette(pal);
+                auto C = make1<double>(mtl, 1, OT_GLUED_ENTRY, 2u, 1, 2, 0, 0, 0,
+                                       L, 0.5, 0.5, QPI / 2.0 - theta_n, 1.5);
+                C.run();
+                g[k] = (double)C.gain(0);
+            }
+
+            std::complex<double> ew(1.50, -0.40), zw = std::sqrt(ew);
+            std::complex<double> cw = std::sqrt(1.0 - (1.0 / ew) * (1.0 - ct * ct));
+            double Rb = 0.5 * (std::norm((ct - zw * cw) / (ct + zw * cw)) +
+                               std::norm((zw * ct - cw) / (zw * ct + cw)));
+            double Rb_tf = (wtf >= 0.0) ? Rb * (1.0 - wtf) : Rb + (1.0 - Rb) * (-wtf);
+
+            QD_DIAG("%+.1f,%.1f,%+.6f,%+.6f\n", wtf, thd, 10.0 * std::log10(g[1] / g[0]),
+                    10.0 * std::log10((1.0 - Rb_tf) / (1.0 - Rb)));
+            CHECK(std::isfinite(g[1]));
+            CHECK(g[1] > 0.0);
+        }
+}
+
+TEST_CASE("Lumped columns - a permittivity resonance is an interface term, not an index")
+{
+    // eta_resonance is added to the permittivity wherever an INTERFACE quantity is formed - every
+    // admittance sqrt((eps + res)/mu), and every Snell ratio and cosine, since those are built from
+    // the same interface permittivity - and is left out of every propagation INDEX, which stays
+    // sqrt(eps mu). Produce mode makes that split at five sites: the in-sheet cosine, the near
+    // boundary, the far boundary, the near-to-far flux conversion and the displaced host. One test
+    // in the suite sets resF and it is not a sheet, so the split has never been evaluated with a
+    // non-zero resonance on any sheet path.
+    //
+    // The split is not "the interface terms move and the propagation factor does not". The
+    // propagation factor is exp(-j k0 n thk c) and its cosine is an interface quantity, so at
+    // oblique incidence it does move with the resonance, through c and not through n. That is what
+    // the code does and what the reference does, and the planned assertion that the propagation
+    // factor is unmoved is exact only at normal incidence. It is withdrawn in that form and made in
+    // the form the code can express, below.
+    //
+    // Three kinds of statement.
+    //
+    //   Against the reference carrying the split, 1e-9, complex wherever nothing else multiplies
+    //   the composite: a resonant sheet in air, a resonant sheet glued to a plain solid, a plain
+    //   sheet glued to a resonant solid, and a resonant sheet inside a resonant host. The last one
+    //   is what reaches the displaced-host site, where the index is the host's sqrt(eps mu) and the
+    //   cosine is the host's interface cosine.
+    //
+    //   Against the two ways of getting the split wrong, as margins: the resonance dropped, and the
+    //   resonance folded into the index as well. Either would otherwise pass a check built on a
+    //   reference with the same mistake in it. The second margin exists only where a resonant
+    //   medium is propagated through - the sheet, and the host it displaces - so the row with a
+    //   plain sheet on a resonant solid carries the first margin alone.
+    //
+    //   Without a reference at all. A lossless sheet of eps 4 whose resonance takes its interface
+    //   permittivity to exactly 1 presents no boundary to a wave in air: both reflections vanish at
+    //   every angle and in both channels, the cosine inside it is the air cosine, and what is left
+    //   of the sheet is its propagation at the index the resonance did not touch,
+    //   exp(-j k0 thk cos(theta) (2 - 1)). The interface terms followed the resonance all the way to
+    //   zero and the index did not move, which is the split in one measurement. It is also not a
+    //   wave any medium supports - an index of 2 carried along the cosine of an index of 1 - which
+    //   is worth knowing about a column that is meant for interfaces.
+    const double f_hz = FRQ;
+    const double thk = 0.006;
+    const double L = 0.10;
+    const double k0 = 2.0 * QPI * f_hz / C0;
+
+    const int SHR = 1, WALL = 2, WALLR = 3, HOSTR = 4, SH = 5, MATCH = 6;
+    const std::vector<LumpMtl> pal = {
+        {5.24, 0.63, thk, 0.0, 0.0, 1.2, 5.0, 0.8},     // 1 SHR    resonant sheet
+        {1.50, 0.40, 0.0},                              // 2 WALL   plain lossy solid
+        {1.50, 0.40, 0.0, 0.0, 0.0, 0.8, 4.0, 0.5},     // 3 WALLR  resonant lossy solid
+        {1.50, 0.00, 0.0, 0.0, 0.0, 0.8, 4.0, 0.5},     // 4 HOSTR  resonant solid, lossless index
+        {5.24, 0.63, thk},                              // 5 SH     plain sheet
+        {4.00, 0.00, thk, 0.0, 0.0, 2.0, 1.0e300, -2.25}, // 6 MATCH  eps 4, interface eps exactly 1
+    };
+    auto mtl = lump_palette(pal);
+    const std::complex<double> one(1.0, 0.0), zero(0.0, 0.0);
+    auto E = [&](int idx)
+    { return (idx == 0) ? one : lump_eps(pal[(size_t)idx - 1], f_hz); };
+    auto Rz = [&](int idx)
+    { return (idx == 0) ? zero : lump_res(pal[(size_t)idx - 1], f_hz); };
+
+    const uint8_t OT_SHEET_ISO = 67, OT_GLUED_ENTRY = 71;
+
+    auto TM = [](const arma::mat &X)
+    { return cpx(X, 0, 0); };
+    auto TE = [](const arma::mat &X)
+    { return cpx(X, 0, 3); };
+
+    struct Row
+    {
+        const char *name;
+        uint8_t otype;
+        unsigned nH;
+        int sheet, m2, cur, near, far;
+        double lim;
+    };
+    const std::vector<Row> rows = {
+        {"isolated  air   | SHR | air  ", OT_SHEET_ISO, 1u, SHR, 0, 0, 0, 0, 85.0},
+        {"entry     air   | SHR | WALL ", OT_GLUED_ENTRY, 2u, SHR, WALL, 0, 0, WALL, 85.0},
+        {"entry     air   | SH  | WALLR", OT_GLUED_ENTRY, 2u, SH, WALLR, 0, 0, WALLR, 85.0},
+        {"embedded  HOSTR | SHR | HOSTR", OT_SHEET_ISO, 1u, SHR, 0, HOSTR, HOSTR, HOSTR, 50.0},
+    };
+
+    QD_DIAG("\n# diag: permittivity resonance on the sheet paths. sheet res (%.4f, %.4f), solid res\n",
+            std::real(Rz(SHR)), std::imag(Rz(SHR)));
+    QD_DIAG("# (%.4f, %.4f) at 1 GHz. d_split is against the reference carrying the interface /\n",
+            std::real(Rz(WALLR)), std::imag(Rz(WALLR)));
+    QD_DIAG("# index split; sep_dropped and sep_folded are how far the same field sits from a\n");
+    QD_DIAG("# reference with the resonance removed, and with it folded into the index as well\n");
+    QD_DIAG("stack,theta_n,|T_te|,|T_tm|,d_split,d_refl,d_scalar,sep_dropped,sep_folded,rtype\n");
+
+    double worst = 0.0;
+    for (const auto &R : rows)
+        for (double thd : {0.0, 20.0, 40.0, 50.0, 70.0, 85.0})
+        {
+            if (thd > R.lim)
+                continue;
+            double theta_n = thd * QPI / 180.0, ct = std::cos(theta_n);
+
+            auto run = [&](int itype)
+            {
+                auto C = make1<double>(mtl, itype, R.otype, R.nH, R.sheet, R.m2, 0, R.cur, 0,
+                                       L, 0.5, 0.5, QPI / 2.0 - theta_n, 1.5);
+                C.run();
+                return C;
+            };
+            auto Ct = run(1);
+
+            DiagLump Lp;
+            Lp.res_near = Rz(R.near), Lp.res_slab = Rz(R.sheet), Lp.res_far = Rz(R.far);
+
+            // The split, and the two ways of getting it wrong.
+            DiagSheet D = diag_sheet_composite(E(R.near), E(R.sheet), E(R.far), thk, ct, f_hz, false,
+                                               false, 1.0, 1.0, 1.0, Lp);
+            DiagSheet Dd = diag_sheet_composite(E(R.near), E(R.sheet), E(R.far), thk, ct, f_hz, false,
+                                                false);
+            DiagSheet Df = diag_sheet_composite(E(R.near) + Rz(R.near), E(R.sheet) + Rz(R.sheet),
+                                                E(R.far) + Rz(R.far), thk, ct, f_hz, false, false);
+
+            std::complex<double> t_te = TE(Ct.xprmat), t_tm = TM(Ct.xprmat);
+
+            // The host of the embedded row propagates at its resonance-excluded index, which is
+            // lossless, so the leg it closes contributes a pure phase. Compared in power there.
+            auto dist = [&](const DiagSheet &X)
+            {
+                if (R.cur == 0)
+                    return std::max(std::abs(t_te - X.T_te), std::abs(t_tm - X.T_tm));
+                return std::max(std::abs(std::norm(t_te) - std::norm(X.T_te)),
+                                std::abs(std::norm(t_tm) - std::norm(X.T_tm)));
+            };
+            double d_split = dist(D), sep_d = dist(Dd), sep_f = dist(Df);
+
+            double d_refl = 0.0, d_scalar = 0.0;
+            if (R.cur == 0)
+            {
+                auto Cr = run(0);
+                d_refl = std::max(std::abs(TE(Cr.xprmat) - D.R_te), std::abs(TM(Cr.xprmat) - D.R_tm));
+
+                DiagSheet Ds = diag_sheet_composite(E(R.near), E(R.sheet), E(R.far), thk, ct, f_hz,
+                                                    false, true, 1.0, 1.0, 1.0, Lp);
+                auto St = run(4), Sr = run(3);
+                d_scalar = std::max(std::abs(cpx(St.xprmat, 0, 0) - Ds.T_te),
+                                    std::abs(cpx(Sr.xprmat, 0, 0) - Ds.R_te));
+            }
+            worst = std::max(worst, std::max(d_split, std::max(d_refl, d_scalar)));
+
+            QD_DIAG("%s,%.1f,%.9f,%.9f,%.2e,%.2e,%.2e,%.3e,%.3e,%u\n", R.name, thd,
+                    std::abs(t_te), std::abs(t_tm), d_split, d_refl, d_scalar, sep_d, sep_f,
+                    (unsigned)Ct.resolved_type[0]);
+
+            INFO(R.name << ", theta_n " << thd);
+            REQUIRE(std::isfinite(Ct.gain(0)));
+            REQUIRE(Ct.resolved_type[0] != 0);
+            CHECK(d_split < 1.0e-9);
+            CHECK(d_refl < 1.0e-9);
+            CHECK(d_scalar < 1.0e-9);
+            CHECK(std::abs((double)Ct.gain(0) - 0.5 * (std::norm(D.T_te) + std::norm(D.T_tm))) < 1.0e-9);
+
+            // The resonance dropped is excluded by a margin six orders above the bound, on every
+            // row. The resonance folded into the index is excluded wherever a resonant medium's
+            // index is in the composite at all, which is the sheet and the host it displaces. A
+            // resonant FAR half-space is not such a row: nothing propagates through a half-space,
+            // so its index appears nowhere and the two references are the same expression. That
+            // row reaches the far boundary and the flux conversion and cannot reach the split.
+            CHECK(sep_d > 1.0e-3);
+            if (R.sheet == SHR)
+                CHECK(sep_f > 1.0e-3);
+            else
+                CHECK(std::max(std::abs(D.T_te - Df.T_te), std::abs(D.T_tm - Df.T_tm)) < 1.0e-14);
+        }
+    QD_DIAG("# worst against the split reference %.3e\n", worst);
+
+    // The sheet whose interfaces the resonance removes.
+    QD_DIAG("\n# diag: resonance-matched sheet, eps 4, interface eps (%.17g, %.1e), thk 6 mm.\n",
+            std::real(E(MATCH) + Rz(MATCH)), std::imag(E(MATCH) + Rz(MATCH)));
+    QD_DIAG("# pred is -k0 thk cos(theta) (2 - 1); unmoved is what the phase would be if the cosine\n");
+    QD_DIAG("# inside the sheet were the one eps 4 gives, i.e. if the propagation factor did not\n");
+    QD_DIAG("# move with the resonance at all\n");
+    QD_DIAG("theta_n,|R_te|,|R_tm|,|T|-1,arg_T_deg,pred_deg,d_arg_deg,unmoved_deg\n");
+
+    for (double thd : {0.0, 30.0, 60.0, 85.0})
+    {
+        double theta_n = thd * QPI / 180.0, ct = std::cos(theta_n);
+        auto run = [&](int itype)
+        {
+            auto C = make1<double>(mtl, itype, OT_SHEET_ISO, 1u, MATCH, 0, 0, 0, 0,
+                                   L, 0.5, 0.5, QPI / 2.0 - theta_n, 1.5);
+            C.run();
+            return C;
+        };
+        auto Ct = run(1), Cr = run(0);
+
+        std::complex<double> t_te = TE(Ct.xprmat), t_tm = TM(Ct.xprmat);
+        double pred = -k0 * thk * ct * (2.0 - 1.0);
+        double c4 = std::sqrt(1.0 - (1.0 - ct * ct) / 4.0);
+        double unmoved = -k0 * thk * (2.0 * c4 - ct);
+
+        QD_DIAG("%.1f,%.3e,%.3e,%.3e,%.9f,%.9f,%.3e,%.9f\n", thd,
+                std::abs(TE(Cr.xprmat)), std::abs(TM(Cr.xprmat)), std::abs(t_te) - 1.0,
+                std::arg(t_te) * 180.0 / QPI, pred * 180.0 / QPI,
+                (std::arg(t_te) - pred) * 180.0 / QPI, unmoved * 180.0 / QPI);
+
+        INFO("resonance-matched sheet, theta_n " << thd);
+
+        // No boundary, at any angle, in either channel.
+        CHECK(std::abs(TE(Cr.xprmat)) < 1.0e-12);
+        CHECK(std::abs(TM(Cr.xprmat)) < 1.0e-12);
+
+        // What is left is propagation at the untouched index along the interface cosine.
+        CHECK(std::abs(std::abs(t_te) - 1.0) < 1.0e-12);
+        CHECK(std::abs(t_te - std::polar(1.0, pred)) < 1.0e-12);
+        CHECK(std::abs(t_tm - t_te) < 1.0e-12);
+
+        // At normal incidence the cosine is 1 whatever the permittivity, so there the propagation
+        // factor is unmoved outright. Away from it the two readings separate, by 5.8 deg at 60 deg.
+        if (thd == 0.0)
+            CHECK(std::abs(pred - unmoved) == 0.0);
+        else
+            CHECK(std::abs(pred - unmoved) * 180.0 / QPI > 1.0);
+    }
+}
+
+TEST_CASE("Lumped columns - an ordered stack: what the core carries and what it declines")
+{
+    // The characteristic-matrix core generalizes produce mode's two expressible columns to a
+    // stack, and declines on the three it has no expression for.
+    //
+    // Carried. The interface gains become a product, one per layer entered plus the far medium's
+    // where it is newly entered, on the transmit port only. The resonance split is made per layer:
+    // the tilted admittance and the cosine read eps + res, the layer phase's index reads eps.
+    //
+    // alpha is carried as well, folded into the layer phase as nepers over the path thk / |Re c|.
+    // It has two statements here. Against the reference, which carries it the same way. And
+    // against produce mode, with no reference at all: a sheet of eps 5.24 - 0.63j with 100 dB/m
+    // stacked on its twin without the column is 12 mm of one permittivity with no boundary in the
+    // middle, so every wave crosses both halves and the stack is the single 12 mm sheet at
+    // 50 dB/m, on both ports. One is resolved by the core and the other by produce mode.
+    //
+    // Declined. m > 0 and tf != 0 on any layer make qd_stack_resolve return false. For an ordered
+    // stack, sheet_case 4, there is nothing to fall back to and SHEET_EVENT kills the ray. That is
+    // asserted as what it is: a killed ray, on both passes, and not a number.
+    const double f_hz = FRQ;
+    const double thk = 0.006;
+    const std::complex<double> U(1.0, 0.0), e_air(1.0, 0.0);
+
+    const int A = 1, B = 2, A_ATT = 3, B_ATT = 4, A_RES = 5, B_ALPHA = 6, B_TF = 7, B_M = 8;
+    const int A_ALPHA = 9, A_THICK = 10;
+    const std::vector<LumpMtl> pal = {
+        {5.24, 0.63, thk},                              // 1 A
+        {1.50, 0.40, thk},                              // 2 B
+        {5.24, 0.63, thk, 3.0},                         // 3 A_ATT    3 dB
+        {1.50, 0.40, thk, 2.0},                         // 4 B_ATT    2 dB
+        {5.24, 0.63, thk, 0.0, 0.0, 1.2, 5.0, 0.8},     // 5 A_RES    resonant
+        {1.50, 0.40, thk, 0.0, 0.0, 0.0, 0.0, 0.0, 50.0}, // 6 B_ALPHA  50 dB/m
+        {1.50, 0.40, thk, 0.0, 0.25},                   // 7 B_TF     tf 0.25
+        {1.50, 0.40, thk, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 10.0}, // 8 B_M  mass law
+        {5.24, 0.63, thk, 0.0, 0.0, 0.0, 0.0, 0.0, 100.0},       // 9 A_ALPHA  100 dB/m
+        {5.24, 0.63, 2.0 * thk, 0.0, 0.0, 0.0, 0.0, 0.0, 50.0},  // 10 A_THICK 12 mm at 50 dB/m
+    };
+    auto mtl = lump_palette(pal);
+    auto E = [&](int idx)
+    { return lump_eps(pal[(size_t)idx - 1], f_hz); };
+    auto Rz = [&](int idx)
+    { return lump_res(pal[(size_t)idx - 1], f_hz); };
+    auto Al = [&](int idx)
+    { return pal[(size_t)idx - 1].alpha; };
+
+    const uint8_t OT_STACK_FBS = 71; // FBS layer traversed first
+    const uint8_t OT_STACK_SBS = 69; // SBS layer traversed first
+
+    auto run = [&](int itype, uint8_t otype, int m1, int m2, double th)
+    {
+        auto C = make1<double>(mtl, itype, otype, 2u, m1, m2, 0, 0, 0,
+                               0.5, 0.5, 0.5, QPI / 2.0 - th, 0.0);
+        C.run();
+        return C;
+    };
+
+    // ------------------------------------------------------------------------------------------
+    // Carried: att on both layers, a resonance in one, and alpha in one.
+    // ------------------------------------------------------------------------------------------
+    struct Carry
+    {
+        const char *name;
+        int m1, m2;  // the two faces, FBS and SBS
+        double g;    // product of the layer gains
+    };
+    const double G_A = std::pow(10.0, -0.1 * 3.0), G_B = std::pow(10.0, -0.1 * 2.0);
+    const std::vector<Carry> carried = {
+        {"att 3 dB | att 2 dB", A_ATT, B_ATT, G_A * G_B},
+        {"resonant | plain   ", A_RES, B, 1.0},
+        {"plain | alpha 50   ", A, B_ALPHA, 1.0},
+    };
+
+    QD_DIAG("\n# diag: ordered stack carrying att, a resonance and alpha, air | 6 mm | 6 mm | air.\n");
+    QD_DIAG("# paid_dB is the EM transmit gain against the same stack with neither column\n");
+    QD_DIAG("stack,order,theta_n,ref_|T|,ref_|R|,dT,dR,d_gain_T,d_gain_R,paid_dB\n");
+
+    for (const auto &S : carried)
+        for (int ord = 0; ord < 2; ++ord)
+            for (double thd : {0.0, 20.0, 45.0, 70.0})
+            {
+                double th = thd * QPI / 180.0;
+                std::complex<double> ci(std::cos(th), 0.0);
+                uint8_t ot = ord ? OT_STACK_SBS : OT_STACK_FBS;
+                int first = ord ? S.m2 : S.m1, second = ord ? S.m1 : S.m2;
+
+                std::vector<DiagLayer> lay = {{E(first), U, thk, Rz(first), Al(first)},
+                                              {E(second), U, thk, Rz(second), Al(second)}};
+                DiagSheet Xs = diag_cm_stack(e_air, U, lay, e_air, U, ci, f_hz, false, true);
+                DiagSheet Xe = diag_cm_stack(e_air, U, lay, e_air, U, ci, f_hz, false, false);
+                double ig = std::sqrt(S.g);
+
+                auto Ct = run(4, ot, S.m1, S.m2, th), Ce = run(1, ot, S.m1, S.m2, th);
+                auto Cr = run(3, ot, S.m1, S.m2, th), Cx = run(0, ot, S.m1, S.m2, th);
+                auto C0 = run(1, ot, A, B, th); // neither column
+
+                double gT = S.g * 0.5 * (std::norm(Xe.T_te) + std::norm(Xe.T_tm));
+                double gR = 0.5 * (std::norm(Xe.R_te) + std::norm(Xe.R_tm));
+                double dT = std::abs(cpx(Ct.xprmat, 0, 0) - ig * Xs.T_te);
+                double dR = std::abs(cpx(Cr.xprmat, 0, 0) - Xs.R_te);
+
+                QD_DIAG("%s,%s,%.1f,%.9f,%.9f,%.3e,%.3e,%.3e,%.3e,%+.6f\n", S.name, ord ? "2|1" : "1|2",
+                        thd, std::abs(ig * Xs.T_te), std::abs(Xs.R_te), dT, dR,
+                        std::abs((double)Ce.gain(0) - gT), std::abs((double)Cx.gain(0) - gR),
+                        10.0 * std::log10((double)Ce.gain(0) / (double)C0.gain(0)));
+
+                INFO(S.name << ", order " << (ord ? "2|1" : "1|2") << ", theta_n " << thd);
+                REQUIRE(Ct.resolved_type[0] != 0);
+                REQUIRE(Cr.resolved_type[0] != 0);
+
+                // Each layer's gain once on the transmit port, neither on the reflect port, and
+                // the resonance split per layer, scalar and EM.
+                CHECK(dT < 1.0e-9);
+                CHECK(dR < 1.0e-9);
+                CHECK(std::abs((double)Ce.gain(0) - gT) < 1.0e-9);
+                CHECK(std::abs((double)Cx.gain(0) - gR) < 1.0e-9);
+
+                if (S.g != 1.0)
+                {
+                    // Exact by construction: the gains are one real factor on the transmit port.
+                    CHECK(std::abs((double)Ce.gain(0) / (double)C0.gain(0) - S.g) < 1.0e-14);
+                    // A gain dropped, or one layer's paid twice, is worth dB.
+                    CHECK(std::abs((double)Ce.gain(0) - gT / G_A) > 1.0e-3 * gT);
+                    CHECK(std::abs((double)Ce.gain(0) - gT * G_B) > 1.0e-3 * gT);
+                }
+                else
+                {
+                    // The column moved the stack: the plain reference is excluded by a margin.
+                    DiagSheet Xp = diag_cm_stack(e_air, U, {{E(first), U, thk}, {E(second), U, thk}},
+                                                 e_air, U, ci, f_hz, false, true);
+                    CHECK(std::abs(cpx(Ct.xprmat, 0, 0) - Xp.T_te) > 1.0e-3);
+                }
+            }
+
+    // ------------------------------------------------------------------------------------------
+    // alpha against produce mode. The core's two-layer stack and produce mode's single sheet are
+    // the same object, so the two solvers are measured against each other through the library.
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: alpha, the core against produce mode. stack 6 mm at 100 dB/m | 6 mm at 0,\n");
+    QD_DIAG("# eps 5.24 - 0.63j, against one 12 mm sheet at 50 dB/m. moved_dB is what the column\n");
+    QD_DIAG("# is worth on the stack's transmit gain\n");
+    QD_DIAG("order,theta_n,|T_te|,|R_te|,d_T,d_R,moved_dB\n");
+    for (int ord = 0; ord < 2; ++ord)
+        for (double thd : {0.0, 20.0, 45.0, 70.0, 85.0})
+        {
+            double th = thd * QPI / 180.0;
+            uint8_t ot = ord ? OT_STACK_SBS : OT_STACK_FBS;
+            auto one = [&](int itype)
+            {
+                auto C = make1<double>(mtl, itype, 67, 1u, A_THICK, 0, 0, 0, 0,
+                                       0.5, 0.5, 0.5, QPI / 2.0 - th, 0.0);
+                C.run();
+                return C;
+            };
+            auto St = run(1, ot, A_ALPHA, A, th), Sr = run(0, ot, A_ALPHA, A, th);
+            auto Pt = one(1), Pr = one(0);
+            auto S0 = run(1, ot, A, B, th), Sa = run(1, ot, A, B_ALPHA, th);
+
+            double d_T = std::max(std::abs(cpx(St.xprmat, 0, 0) - cpx(Pt.xprmat, 0, 0)),
+                                  std::abs(cpx(St.xprmat, 0, 3) - cpx(Pt.xprmat, 0, 3)));
+            double d_R = std::max(std::abs(cpx(Sr.xprmat, 0, 0) - cpx(Pr.xprmat, 0, 0)),
+                                  std::abs(cpx(Sr.xprmat, 0, 3) - cpx(Pr.xprmat, 0, 3)));
+
+            QD_DIAG("%s,%.1f,%.9f,%.9f,%.3e,%.3e,%+.6f\n", ord ? "2|1" : "1|2", thd,
+                    std::abs(cpx(St.xprmat, 0, 3)), std::abs(cpx(Sr.xprmat, 0, 3)), d_T, d_R,
+                    10.0 * std::log10((double)Sa.gain(0) / (double)S0.gain(0)));
+
+            INFO("alpha against produce mode, order " << (ord ? "2|1" : "1|2") << ", theta_n " << thd);
+            REQUIRE(St.resolved_type[0] != 0);
+            REQUIRE(Pt.resolved_type[0] != 0);
+            CHECK(d_T < 1.0e-9);
+            CHECK(d_R < 1.0e-9);
+
+            // And the column is worth tenths of a dB on a stack, so neither side is passing on an
+            // alpha that was never read.
+            CHECK((double)Sa.gain(0) < 0.99 * (double)S0.gain(0));
+        }
+
+    // ------------------------------------------------------------------------------------------
+    // Declined. Each of the two columns on the second layer, both traversal orders, both passes.
+    // ------------------------------------------------------------------------------------------
+    struct Decl
+    {
+        const char *name;
+        int m2;
+    };
+    const std::vector<Decl> declined = {
+        {"tf 0.25     ", B_TF},
+        {"m 10        ", B_M},
+    };
+
+    QD_DIAG("\n# diag: ordered stack whose second sheet carries a column the core declines on.\n");
+    QD_DIAG("# gain_plain is the same stack without the column; the declining one is killed\n");
+    QD_DIAG("column,order,theta_n,gain_plain_T,gain_T,gain_R,rtype_T,rtype_R\n");
+
+    for (const auto &S : declined)
+        for (int ord = 0; ord < 2; ++ord)
+            for (double thd : {0.0, 45.0})
+            {
+                double th = thd * QPI / 180.0;
+                uint8_t ot = ord ? OT_STACK_SBS : OT_STACK_FBS;
+
+                auto C0 = run(1, ot, A, B, th);
+                auto Ct = run(1, ot, A, S.m2, th), Cr = run(0, ot, A, S.m2, th);
+                auto St = run(4, ot, A, S.m2, th);
+
+                QD_DIAG("%s,%s,%.1f,%.9f,%.9f,%.9f,%u,%u\n", S.name, ord ? "2|1" : "1|2", thd,
+                        (double)C0.gain(0), (double)Ct.gain(0), (double)Cr.gain(0),
+                        (unsigned)Ct.resolved_type[0], (unsigned)Cr.resolved_type[0]);
+
+                INFO(S.name << ", order " << (ord ? "2|1" : "1|2") << ", theta_n " << thd);
+
+                // The control resolves and carries real energy, so what follows is the column.
+                REQUIRE(C0.resolved_type[0] != 0);
+                CHECK((double)C0.gain(0) > 1.0e-3);
+
+                // Declined, not approximated: the ray is killed on both passes and in both modes.
+                check_rtype(Ct, RT_KILL);
+                check_rtype(Cr, RT_KILL);
+                check_rtype(St, RT_KILL);
+                check_kill(Ct);
+                check_kill(Cr);
+                check_kill(St);
+            }
+}
+
+TEST_CASE("Lumped columns - a bounding sheet the core declines on falls back to a half-space")
+{
+    // The other consequence of a declining core, and the quieter one. A host layer whose
+    // previous-medium word holds a sheet resolves its internal series against that sheet as a
+    // LAYER, through qd_stack_resolve. Where the sheet carries m or tf the core returns false and
+    // fresnel_r keeps the half-space reflection it computed first: no thickness, no structure,
+    // nothing behind it. That is the treatment the core was added to replace, and the ray is not
+    // killed, so nothing marks the row.
+    //
+    // What it costs is the gap between two columns of the backing table in the plan, and it is not
+    // uniformly a loss. The half-space is exact when whatever is behind the sheet has the sheet's
+    // own permittivity and is 1.560 dB off in |S| when it is air; the air-backed layer is the
+    // other way round. So a declining sheet moves a coating with air behind it from 0 to 1.560 dB
+    // of error, and a sheet with a matching solid behind it from 1.560 dB to 0. The first is the
+    // motivating geometry.
+    //
+    // The fallback is a step: the decline tests the column for being non-zero and not for
+    // mattering. alpha used to be a third such column, and 1e-6 dB/m of it - 6e-9 dB across this
+    // sheet - moved the series by the full amount. It is carried by the core now, so the alpha
+    // rows here are the guard on that: a negligible alpha has to leave the sheet a layer, on the
+    // layer series to the same bound as the sheet without it.
+    //
+    // Each declining row is asserted against the half-space series, to 1e-9, which is the
+    // statement that the core declined rather than produced a number of its own; and the
+    // half-space and layer series are asserted far enough apart that neither assertion could pass
+    // by accident.
+    const double f_hz = FRQ;
+    const double thk = 0.006;
+    const std::complex<double> U(1.0, 0.0), e_air(1.0, 0.0);
+
+    const int HOST = 1;
+    const std::vector<LumpMtl> pal = {
+        {1.50, 0.40, 0.0},                                         // 1 HOST
+        {5.24, 0.63, thk},                                         // 2 SHEET        resolves as a layer
+        {5.24, 0.63, thk, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0e-6},        // 3 SHEET alpha  1e-6 dB/m, a layer too
+        {5.24, 0.63, thk, 0.0, 0.25},                              // 4 SHEET tf     0.25
+        {5.24, 0.63, thk, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 10.0},     // 5 SHEET m      10
+        {1.5015, 0.40, thk},                                       // 6 NEAR         resolves as a layer
+        {1.5015, 0.40, thk, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0e-6},      // 7 NEAR alpha   1e-6 dB/m, a layer too
+    };
+    auto mtl = lump_palette(pal);
+    const std::complex<double> e_h = lump_eps(pal[0], f_hz);
+
+    struct Row
+    {
+        const char *name;
+        int prev;
+        bool declines;
+    };
+    const std::vector<Row> rows = {
+        {"SHEET   plain        ", 2, false},
+        {"SHEET   alpha 1e-6   ", 3, false},
+        {"SHEET   tf 0.25      ", 4, true},
+        {"SHEET   m 10         ", 5, true},
+        {"LO_NEAR plain        ", 6, false},
+        {"LO_NEAR alpha 1e-6   ", 7, false},
+    };
+
+    QD_DIAG("\n# diag: host layer bounded by a sheet the core declines on, host eps 1.50 - 0.40j.\n");
+    QD_DIAG("# S_layer is the series with the sheet resolved as a layer backed by air, S_hs the\n");
+    QD_DIAG("# series against the sheet as a half-space. cost_dB is |S_hs| against |S_layer|, which\n");
+    QD_DIAG("# is what the decline moves the host's series by when air is what is behind the sheet\n");
+    QD_DIAG("sheet,L_mm,theta_n,|S_applied|,|S_layer|,|S_hs|,d_layer,d_hs,cost_dB,rtype\n");
+
+    double worst_cost = 0.0;
+    for (const auto &R : rows)
+        for (double L : {0.05, 0.10})
+            for (double thd : {0.0, 20.0, 40.0, 50.0})
+            {
+                double theta_n = thd * QPI / 180.0;
+                const std::complex<double> e_s = lump_eps(pal[(size_t)R.prev - 1], f_hz);
+
+                auto C = make1<double>(mtl, 4, OT_EXIT, 1u, HOST, 0, R.prev, HOST, 0,
+                                       L, 0.5, 0.5, QPI / 2.0 - theta_n, /*always resolve*/ 0.0);
+                C.run();
+
+                std::complex<double> S_applied = (cpx(C.xprmat, 0, 0) / cpx(C.x_in, 0, 0)) /
+                                                 diag_close(e_h, L, theta_n, f_hz);
+
+                std::complex<double> cs(std::cos(theta_n), 0.0);
+                std::complex<double> phi = diag_phi(e_h, L, theta_n, f_hz);
+                std::complex<double> r_ahead = diag_r_slabside(e_h, e_air, cs);
+                std::complex<double> r_hs = diag_r_slabside(e_h, e_s, cs);
+                DiagSheet B = diag_cm_stack(e_h, U, {{e_s, U, thk}}, e_air, U, cs, f_hz,
+                                            false, true, /*undisplaced*/ 0.0);
+
+                std::complex<double> S_layer = 1.0 / (1.0 - r_ahead * B.R_te * phi * phi);
+                std::complex<double> S_hs = 1.0 / (1.0 - r_ahead * r_hs * phi * phi);
+                double d_layer = std::abs(S_applied - S_layer), d_hs = std::abs(S_applied - S_hs);
+                double cost = 20.0 * std::log10(std::abs(S_hs) / std::abs(S_layer));
+                if (R.declines)
+                    worst_cost = std::max(worst_cost, std::abs(cost));
+
+                QD_DIAG("%s,%.1f,%.1f,%.9f,%.9f,%.9f,%.3e,%.3e,%+.4f,%u\n", R.name, L * 1000.0, thd,
+                        std::abs(S_applied), std::abs(S_layer), std::abs(S_hs), d_layer, d_hs, cost,
+                        (unsigned)C.resolved_type[0]);
+
+                INFO(R.name << ", L " << L * 1000.0 << " mm, theta_n " << thd);
+                REQUIRE(C.resolved_type[0] != 0);
+                REQUIRE(rt_bit(C.resolved_type[0], 2)); // the host series did resolve
+                REQUIRE(std::isfinite(C.gain(0)));
+
+                // The two series are far enough apart that landing on one excludes the other.
+                CHECK(std::abs(S_hs - S_layer) > 1.0e-3);
+
+                if (R.declines)
+                    CHECK(d_hs < 1.0e-9); // the half-space, exactly as before the core
+                else
+                    CHECK(d_layer < 1.0e-9); // a layer: no column, or one the core carries
+            }
+    QD_DIAG("# worst |cost| over the declining rows %.4f dB\n", worst_cost);
+
+    // The step is at least the plan's figure for this geometry, 1.560 dB over 0 to 50 deg at 50 mm.
+    CHECK(worst_cost > 1.5);
 }
