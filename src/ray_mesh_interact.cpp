@@ -250,14 +250,14 @@ namespace
         }
 
         // In-medium gain, linear
-        double medium_gain(double dist_refract,              // In-medium distance (refracted path)
-                           double fGHz = 1.0,                // Frequency
-                           double abs_cos_theta_t = 1.0,     // Cosine of incidence angle @ FBS/VBS (refracted path)
-                           double dist_geo = 0.0,              // Geometric distance (0.0 = dist_refract)
-                           double abs_cos_theta = 0.0,         // Cosine of incidence angle @ orig (only used when dist_geo > 0)
-                           double mass_min_path = 0.0015,      // Shortest geometric path that still carries a mass-law term
-                           double mass_normal = -1.0,          // Surface-mass surrogate with the angle removed (< 0 = dist_geo * abs_cos_theta)
-                           double mass_cos = -1.0) const       // Angle factor for the mass-law term (< 0 = abs_cos_theta)
+        double medium_gain(double dist_refract,           // In-medium distance (refracted path)
+                           double fGHz = 1.0,             // Frequency
+                           double abs_cos_theta_t = 1.0,  // Cosine of incidence angle @ FBS/VBS (refracted path)
+                           double dist_geo = 0.0,         // Geometric distance (0.0 = dist_refract)
+                           double abs_cos_theta = 0.0,    // Cosine of incidence angle @ orig (only used when dist_geo > 0)
+                           double mass_min_path = 0.0015, // Shortest geometric path that still carries a mass-law term
+                           double mass_normal = -1.0,     // Surface-mass surrogate with the angle removed (< 0 = dist_geo * abs_cos_theta)
+                           double mass_cos = -1.0) const  // Angle factor for the mass-law term (< 0 = abs_cos_theta)
         {
             if (dist_geo == 0.0) // Identity fallback
                 dist_geo = dist_refract, abs_cos_theta = abs_cos_theta_t;
@@ -472,18 +472,19 @@ namespace
         // projection. Such a caller passes the recovered value through cos_theta_in and `theta` is
         // then unused. Everything below is written in that cosine and is analytic in it, so the two
         // paths are one expression and a real cos_theta_in reproduces the angle path exactly.
-        double interact_with(const Material &other,                         // Material that the path enters into / reflects of
-                             int interaction_type,                          // 0 = EM reflect, 1 = EM transmit, 2 = EM refract, 3 = scalar reflect, 4 = scalar transmit, 5 = scalar refract
-                             double theta,                                  // Incidence angle (ignored when cos_theta_in is given)
-                             double fGHz,                                   // Frequency
-                             std::complex<double> *cTE = nullptr,           // Out: E-field coefficient, R for reflection (0/3), T for transmission/refraction (1/2/4)
-                             std::complex<double> *cTM = nullptr,           // Out: M-field coefficient
-                             std::complex<double> *cos_theta2 = nullptr,    // Out: Refraction cosine (type-2 direction)
-                             std::complex<double> *eta1_div_eta2 = nullptr, // Out: eta1/eta2
-                             double *Snell_ratio = nullptr,                 // Out: sqrt|eta1*mu1 / eta2*mu2| (Snell ratio, type-2 direction)
-                             bool *total_reflection = nullptr,              // Out: Total reflection indicator
-                             bool force_tir = false,                        // Switch to force total internal reflection
-                             const std::complex<double> *cos_theta_in = nullptr) const // Incidence cosine, complex; overrides theta
+        double interact_with(const Material &other,                              // Material that the path enters into / reflects of
+                             int interaction_type,                               // 0 = EM reflect, 1 = EM transmit, 2 = EM refract, 3 = scalar reflect, 4 = scalar transmit, 5 = scalar refract
+                             double theta,                                       // Incidence angle (ignored when cos_theta_in is given)
+                             double fGHz,                                        // Frequency
+                             std::complex<double> *cTE = nullptr,                // Out: E-field coefficient, R for reflection (0/3), T for transmission/refraction (1/2/4)
+                             std::complex<double> *cTM = nullptr,                // Out: M-field coefficient
+                             std::complex<double> *cos_theta2 = nullptr,         // Out: Refraction cosine (type-2 direction)
+                             std::complex<double> *eta1_div_eta2 = nullptr,      // Out: eta1/eta2
+                             double *Snell_ratio = nullptr,                      // Out: sqrt|eta1*mu1 / eta2*mu2| (Snell ratio, type-2 direction)
+                             bool *total_reflection = nullptr,                   // Out: Total reflection indicator
+                             bool force_tir = false,                             // Switch to force total internal reflection
+                             const std::complex<double> *cos_theta_in = nullptr, // Incidence cosine, complex; overrides theta
+                             bool undeviated = false) const                      // The wave is held at an angle it was not refracted to
         {
             // Interface geometry, shared by every interaction type.
             //
@@ -538,10 +539,51 @@ namespace
             // reflection. The two forms are the same statement; they are written separately only so
             // the angle path keeps its own rounding.
             bool tir = force_tir || ((sin_theta_real >= 0.0) ? (snell * sin_theta_real >= 1.0)
-                                                            : (std::abs(eta1_d_eta2 * sin2_theta) >= 1.0));
+                                                             : (std::abs(eta1_d_eta2 * sin2_theta) >= 1.0));
 
             std::complex<double> coeff_TE, coeff_TM;
             double gain;
+
+            // A face is not judged from inside a mass-law medium by a wave that is held undeviated.
+            //
+            // A material with m > 0 is calibrated for surface impedance only, so its eta * mu is not
+            // a propagation index, and the critical angle of a face seen from inside it is formed
+            // from exactly that index. A tf leak keeps its direction, so the reverse of a leak that
+            // crossed this face at an angle is the crossing from the other side at the same angle.
+            // Judged from here that crossing is total reflection past the critical angle and passes
+            // only the flat leak; judged from there it never is and is an ordinary crossing. Same
+            // face, same media, same angle, so the two are made one number: the wave is charged what
+            // the other direction charges, with the interface gain of the medium it enters. That
+            // crossing arrives in this medium's neighbour at the angle the wave keeps, so it leaves
+            // undeviated and the verdict handed back is the one that says so.
+            //
+            // Only towards the lower index, where this side has a critical angle at all; the other
+            // direction is the ordinary crossing and is untouched. Only for a wave that was not
+            // refracted in: one the tracer bent arrives at a Snell angle, where the crossing from
+            // this side is already the reverse of its entry. And only the transmit port.
+            bool trans_class = interaction_type == 1 || interaction_type == 2 || interaction_type == 4 || interaction_type == 5;
+            if (undeviated && m > 0.0 && trans_class && std::abs(eta1_d_eta2) > 1.0)
+            {
+                gain = other.interact_with(*this, interaction_type, theta, fGHz, &coeff_TE, &coeff_TM, nullptr, nullptr,
+                                           nullptr, nullptr, false, cos_theta_in, false);
+                double s = other.interface_gain(fGHz) / interface_gain(fGHz); // the gain of the medium entered
+                gain *= s;
+                coeff_TE *= std::sqrt(s), coeff_TM *= std::sqrt(s);
+
+                if (cTE)
+                    *cTE = coeff_TE;
+                if (cTM)
+                    *cTM = coeff_TM;
+                if (cos_theta2)
+                    *cos_theta2 = ct2;
+                if (eta1_div_eta2)
+                    *eta1_div_eta2 = eta1_d_eta2;
+                if (Snell_ratio)
+                    *Snell_ratio = snell;
+                if (total_reflection)
+                    *total_reflection = true;
+                return gain;
+            }
 
             if (interaction_type < 3) // EM: types 0 (reflection), 1 (transmission), 2 (refraction)
             {
@@ -1191,8 +1233,8 @@ namespace
     inline bool qd_slab_resolve(const Material &mat_near,
                                 const Material &mat_slab,
                                 const Material &mat_far,
-                                double dist_refract,       // correction: traced refracted path; produce: normal thickness
-                                double dist_geo,           // correction: traced geometric path; produce: unused
+                                double dist_refract, // correction: traced refracted path; produce: normal thickness
+                                double dist_geo,     // correction: traced geometric path; produce: unused
                                 double abs_cos_theta_t, double abs_cos_theta,
                                 double fGHz, bool is_scalar, double eps, bool produce,
                                 std::complex<double> *T_te, std::complex<double> *T_tm,
@@ -1203,7 +1245,8 @@ namespace
                                 std::complex<double> ct_slab_exact = std::complex<double>(0.0, 0.0),
                                 std::complex<double> ct_near_exact = std::complex<double>(0.0, 0.0),
                                 const Material *back_near = nullptr, // what lies behind a sheet named as mat_near
-                                bool far_closed = false)             // produce: near | far is past its critical angle
+                                bool far_closed = false,             // produce: near | far is past its critical angle
+                                bool near_undeviated = false)        // produce: the wave in mat_near was not refracted in
     {
         // Mass-law materials carry a lumped transmission surrogate: eta/mu are calibrated for
         // surface impedance only, so the in-slab index (and hence the phase of phi) is not
@@ -1239,9 +1282,9 @@ namespace
         // Correction mode is handed genuine traced lengths and keeps them.
         const double thk_normal = produce ? dist_refract : dist_refract * abs_cos_theta_t;
         double dist_slab = dist_refract;
+        double dist_max = 1.0e30;
         if (produce)
         {
-            double dist_max = 1.0e30;
             double g1m = mat_slab.medium_gain(1.0, fGHz, 1.0, 0.0, 0.0, 1.0e300); // 1 m, mass term off
             if (g1m > 0.0)
             {
@@ -1565,21 +1608,46 @@ namespace
         // say. The transmit port has no Fresnel part left, since the near-to-far flux conversion
         // is zero. What crosses is the tf leak, and a leak that crosses the sheet pays what the
         // sheet charges. It is written as the three events a traced solid of the same material
-        // would produce, at the incidence cosine the leak keeps, because a leak is undeviated:
+        // would produce:
         //
         //     near | sheet   Material::interact_with's transmission, with the sheet's interface gain
         //     the sheet      its one-way factor below, or the mass term on the mass-law route
         //     sheet | far    Material::interact_with's transmission, with the far medium's gain
         //
-        // and no internal series. With no tf anywhere the last event is a closed port and the
-        // result is zero, as it was.
+        // Each event is evaluated at the cosine the wave has there, and that depends on how it
+        // entered the sheet.
+        //
+        // Entered as a leak, near | sheet itself past its critical angle: the wave kept the
+        // incidence cosine, and meets the far face with it as a wave held undeviated.
+        //
+        // Entered by an ordinary crossing: the wave was refracted and is at the Snell cosine. Snell
+        // is transitive, so the far face is then closed whenever the outer pair is, and it passes
+        // the flat leak of that face or, with no tf on it, nothing. Judging it at the incidence
+        // cosine instead finds it open wherever the sheet is rarer than the near medium and writes
+        // a Fresnel crossing into a medium that carries no propagating wave. The verdict is forced
+        // for that reason rather than re-derived from a complex cosine, and in scalar mode the
+        // phase of the leak is read off the far transmission formed above, whose refraction root
+        // comes from the incidence sine directly and cannot land on the growing branch.
+        //
+        // With no tf anywhere the last event is a closed port and the result is zero.
         std::complex<double> leak_te(0.0, 0.0), leak_tm(0.0, 0.0);
+        bool leak_first = false; // the wave entered the sheet as a leak
         if (produce && far_closed)
         {
             int it = is_scalar ? 4 : 1;
             std::complex<double> a_te, a_tm, b_te, b_tm;
-            mat_near.interact_with(mat_slab, it, 0.0, fGHz, &a_te, &a_tm, nullptr, nullptr, nullptr, nullptr, false, &ci);
-            mat_slab.interact_with(mat_far, it, 0.0, fGHz, &b_te, &b_tm, nullptr, nullptr, nullptr, nullptr, false, &ci);
+            mat_near.interact_with(mat_slab, it, 0.0, fGHz, &a_te, &a_tm, nullptr, nullptr, nullptr, &leak_first,
+                                   false, &ci, near_undeviated);
+            if (leak_first)
+                mat_slab.interact_with(mat_far, it, 0.0, fGHz, &b_te, &b_tm, nullptr, nullptr, nullptr, nullptr,
+                                       false, &ci, true);
+            else
+            {
+                mat_slab.interact_with(mat_far, it, 0.0, fGHz, &b_te, &b_tm, nullptr, nullptr, nullptr, nullptr,
+                                       true, &cts_exact);
+                if (is_scalar)
+                    b_te = b_tm = std::polar(std::abs(b_te), std::arg(tf_out[0]));
+            }
             leak_te = a_te * b_te, leak_tm = a_tm * b_tm;
         }
 
@@ -1740,17 +1808,40 @@ namespace
             // The leak is undeviated, so the host length it displaces was walked at the incidence
             // cosine. On the far side of a closed pair the Snell cosine above is evanescent, and
             // dividing by that decay would amplify a wave that never took it.
+            //
+            // The sheet's own factor follows the wave. One that entered by an ordinary crossing is a
+            // Fresnel wave inside the sheet: it takes phi as it stands, and what the far face
+            // reflects is summed with the series the reflect port carries, because a sheet has no
+            // interior the tracer could follow a bounce into and the energy would otherwise be
+            // dropped. One that entered as a leak kept the incidence cosine, where the Snell cosine
+            // is evanescent and phi would charge a decay it never took; it takes the form an
+            // undeviated traversal of a traced solid takes, the loss along the path and the phase of
+            // the real index on the thickness axis. Its bounces have no phase the media define, so
+            // it carries no series, as the mass-law route carries none.
+            std::complex<double> series_te(1.0, 0.0), series_tm(1.0, 0.0);
             if (far_closed)
             {
+                if (leak_first)
+                {
+                    double c_re = std::abs(std::real(ci));
+                    double d_leak = (c_re > 0.0) ? thk_n / c_re : dist_max;
+                    if (!(d_leak < dist_max))
+                        d_leak = dist_max;
+                    double gL = mat_slab.medium_gain(d_leak, fGHz, 1.0, 0.0, 0.0, 1.0e300); // mass term off
+                    phi = std::polar(std::sqrt((gL < 0.0) ? 0.0 : gL), -(omega / c0) * n_cur * thk_n * c_re);
+                }
+                else
+                    series_te = 1.0 / denom_te, series_tm = 1.0 / denom_tm;
+
                 std::complex<double> phi_dl =
                     std::exp(std::complex<double>(0.0, -1.0) * (omega / c0) * n_d * t_disp * ci);
                 phi_t = (std::abs(phi_dl) > 0.0) ? phi / phi_dl : phi;
             }
 
             if (T_te)
-                *T_te = far_closed ? leak_te * phi_t : ig * fx_te * tns_te * tsf_te * phi_t / denom_te;
+                *T_te = far_closed ? leak_te * phi_t * series_te : ig * fx_te * tns_te * tsf_te * phi_t / denom_te;
             if (T_tm)
-                *T_tm = far_closed ? leak_tm * phi_t : ig * fx_tm * tns_tm * tsf_tm * phi_t / denom_tm;
+                *T_tm = far_closed ? leak_tm * phi_t * series_tm : ig * fx_tm * tns_tm * tsf_tm * phi_t / denom_tm;
             if (R_te) // front-face reflection plus the series leaking back out through the near face
                 *R_te = -rn_te + tns_te * tsn_te * rf_te * phi2 / denom_te;
             if (R_tm)
@@ -2522,7 +2613,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         // Material indices for FBS and SBS faces (0 if no material table)
         arma::uword iMF = (p_mtl_ind && iFBS) ? p_mtl_ind[iFBS - 1] : 0;
         arma::uword iMS = (p_mtl_ind && iSBS) ? p_mtl_ind[iSBS - 1] : 0;
-        
+
         // Thin-sheet flags for FBS and SBS
         bool sheetFBS = MaterialSet.is_sheet(iMF);
         bool sheetSBS = MaterialSet.is_sheet(iMS);
@@ -2788,7 +2879,10 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         std::complex<double> cTE, cTM, cos_theta2, eta1_div_eta2;
         double eta; // Snell ratio sqrt|eta1*mu1 / eta2*mu2|
         bool total_reflection;
-        M1.interact_with(M2, interaction_type, thetaF, fGHz, &cTE, &cTM, &cos_theta2, &eta1_div_eta2, &eta, &total_reflection);
+        // The incidence angle here is the geometric one, so the wave is held undeviated by
+        // construction; ray_state_update replaces the result wherever a refracted direction exists.
+        M1.interact_with(M2, interaction_type, thetaF, fGHz, &cTE, &cTM, &cos_theta2, &eta1_div_eta2, &eta, &total_reflection,
+                         false, nullptr, true);
 
         // Direction and total reflection come from near/far, never from near/slab. Snell's law is
         // transitive - n_near*sin_near = n_slab*sin_slab = n_far*sin_far - so the net bend and the
@@ -2797,7 +2891,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         // past the air|sheet critical angle, and in scalar mode the impedance mapping readily gives
         // n < 1, which would turn an acoustic sheet into a mirror.
         if (sheet_case == 1 || sheet_case == 5)
-            total_reflection = false; // near == far: unreachable except at exact tangency, so force it off
+            total_reflection = false;        // near == far: unreachable except at exact tangency, so force it off
         bool tir_central = total_reflection; // pre-ray-tube TIR state
 
         auto SHEET_COMPOSITE = [&](bool far_closed)
@@ -2854,7 +2948,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
             qd_slab_resolve(M1, M_slab, M2, thk, 0.0, ct_slab, ct_geo,
                             fGHz, is_scalar, 0.0, true, &Tte, &Ttm, &Rte, &Rtm,
                             disp_far, disp_budget, std::complex<double>(0.0, 0.0),
-                            std::complex<double>(0.0, 0.0), nullptr, far_closed);
+                            std::complex<double>(0.0, 0.0), nullptr, far_closed, true);
 
             // Both ports come out of the one pass over the same Fresnel quantities. The reflection port
             // is its own Airy sum, not what interact_with would return for a half-space: expect real
@@ -3047,7 +3141,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
             if (sheet_resolve)
                 SHEET_COMPOSITE(true);
             else
-                M1.interact_with(M2, interaction_type, thetaF, fGHz, &cTE, &cTM, nullptr, nullptr, nullptr, nullptr, true);
+                M1.interact_with(M2, interaction_type, thetaF, fGHz, &cTE, &cTM, nullptr, nullptr, nullptr, nullptr, true, nullptr, true);
         }
 
         // Read the output ray index
@@ -3920,7 +4014,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
             double ct = abs_cos_theta_t;
             double ct2c = 1.0 - ct * ct;
             double t = std::sqrt((ct2c > 0.0) ? ct2c : 0.0) / ct; // tan of the traced in-slab angle
-            double u = t * t / (eta2 * (1.0 + t * t)); // real-index Snell start
+            double u = t * t / (eta2 * (1.0 + t * t));            // real-index Snell start
             u = (u > 1.0) ? 1.0 : u;
             for (int k = 0; k < 3; ++k)
             {
@@ -3994,8 +4088,10 @@ void quadriga_lib::ray_state_update(int interaction_type,
                                                              : std::complex<double>(0.0, 0.0);
             bool use_exact_ct = std::abs(ct_in) > 0.0;
 
+            // Without a refracted direction the wave is held at its geometric angle, as it was in
+            // ray_mesh_interact, and the two have to give the same verdict.
             MAT(Ma).interact_with(MAT(Mb), itype, theta_t, fGHz, &cTE, &cTM, &cos_t2, &e1de2, &snell, &tir,
-                                  false, use_exact_ct ? &ct_in : nullptr);
+                                  false, use_exact_ct ? &ct_in : nullptr, !use_vbs);
             typeR[5] = tir; // TIR re-evaluated at the corrected VBS angle (overrides the geometric-angle verdict)
 
             // Transition into buffer
@@ -4227,7 +4323,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
             double snell = 1.0;
             bool tir = false;
             M_near.interact_with(M_far, interaction_type, theta_t, fGHz, nullptr, nullptr,
-                                 &ct2_far, nullptr, &snell, &tir);
+                                 &ct2_far, nullptr, &snell, &tir, false, nullptr, !use_vbs);
             typeR[5] = tir;
 
             // Continuation direction. Leaving path_dirN as ray_mesh_interact wrote it replaces the
@@ -4326,7 +4422,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
                     qd_slab_resolve(M_near, M_slab, M_far, thk, 0.0, ct_slab, ct_geo,
                                     fGHz, is_scalar, 0.0, true, &Tte, &Ttm, &Rte, &Rtm,
                                     disp_far, disp_budget, std::complex<double>(0.0, 0.0), ct_near,
-                                    nullptr, tir);
+                                    nullptr, tir, !use_vbs);
 
                 // Both ports come out of the one pass. The reflection port is its own Airy sum, not the
                 // half-space Fresnel value, so expect real angular and frequency structure in it.
