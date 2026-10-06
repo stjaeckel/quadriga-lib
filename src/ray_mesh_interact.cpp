@@ -4082,16 +4082,22 @@ void quadriga_lib::ray_state_update(int interaction_type,
             if (prev_nonpar)
                 return none;
 
-            // The previous-medium word has to name the medium the current leg was ENTERED from.
-            // SHEET_EVENT writes the sheet into it, so on any leg that follows a sheet crossing the
-            // entry medium is one level further back than this can see. Decline rather than invert
-            // the wrong map: a sheet electrically matched to its host would fall through the
-            // matched-media test below and return zero anyway, while one that differs would return a
-            // number formed from the wrong pair, so the answer would otherwise depend on how many
-            // sheets the ray had already crossed. This is the same one-level-deep limit that stops a
-            // sheet | solid | sheet sandwich from resolving its second crossing.
-            if (IS_SHEET(mtl_prev))
-                return none;
+            // The previous-medium word names the medium the current leg was ENTERED from, except
+            // after a sheet crossing or a reflection off a sheet, where SHEET_EVENT wrote the sheet
+            // into it. The sheet is not the entry medium - Snell is transitive and it drops out -
+            // and the medium before it is one level further back than the state reaches.
+            //
+            // It does not have to be named. With p = e1 sin^2(theta_1) the equation solved below is
+            // |p| / |e2| = t^2 Re(sqrt(1 - p / e2))^2, and for a lossless entry medium p is real and
+            // e1 appears nowhere else: the recovered cosine is the same for every lossless medium
+            // the wave could have come from. So behind a sheet the solve runs with a unit entry
+            // permittivity, where u is p itself, and without the bound u <= 1, which belongs to
+            // air and not to the invariant. That is exact for a glued entry from air, for the far
+            // side of a sheet inside a host entered from any lossless medium, and for the second
+            // sheet of a lined wall. It is wrong only where the host was reached from a lossy
+            // medium through a sheet, whose transverse wavenumber is complex.
+            const bool behind_sheet = IS_SHEET(mtl_prev);
+            const double u_max = behind_sheet ? 1.0e30 : 1.0;
 
             // Under total reflection the direction was never bent, so there is no map to invert.
             // Normal incidence is NOT excluded: the projection and the exact value coincide there, but
@@ -4101,7 +4107,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
             if (total_reflection || abs_cos_theta_t <= 0.0 || abs_cos_theta_t > 1.0)
                 return none;
 
-            Material M_ent = MAT(mtl_prev), M_slb = MAT(mtl_current);
+            Material M_ent = MAT(behind_sheet ? 0 : mtl_prev), M_slb = MAT(mtl_current);
             std::complex<double> e1 = (M_ent.eta(fGHz) + M_ent.eta_resonance(fGHz)) * M_ent.mu(fGHz);
             std::complex<double> e2 = (M_slb.eta(fGHz) + M_slb.eta_resonance(fGHz)) * M_slb.mu(fGHz);
             if (std::abs(e2) <= 0.0)
@@ -4115,7 +4121,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
             double ct2c = 1.0 - ct * ct;
             double t = std::sqrt((ct2c > 0.0) ? ct2c : 0.0) / ct; // tan of the traced in-slab angle
             double u = t * t / (eta2 * (1.0 + t * t));            // real-index Snell start
-            u = (u > 1.0) ? 1.0 : u;
+            u = (u > u_max) ? u_max : u;
             for (int k = 0; k < 3; ++k)
             {
                 std::complex<double> w = std::sqrt(1.0 - eps_r * u);
@@ -4124,7 +4130,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 if (!(std::abs(dfu) > 1.0e-300))
                     break;
                 u -= fu / dfu;
-                u = (u < 0.0) ? 0.0 : ((u > 1.0) ? 1.0 : u);
+                u = (u < 0.0) ? 0.0 : ((u > u_max) ? u_max : u);
             }
 
             std::complex<double> arg = 1.0 - eps_r * u;
@@ -4525,7 +4531,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 // it. Where it declines, produce mode falls back to ct_geo and nothing moves.
                 //
                 // The recovery names its own entry medium: mtl_prev is the medium this leg was
-                // entered through, and it declines when that word holds a sheet instead.
+                // entered through, and behind a sheet it assumes a lossless one.
                 std::complex<double> ct_near = EXACT_IN_SLAB_COSINE();
 
                 // Thickness enters only here. Produce mode takes the normal thickness and the two
@@ -4601,11 +4607,18 @@ void quadriga_lib::ray_state_update(int interaction_type,
             // Bounding media from the tracked state. mtl_current is the near side in every case: the
             // ray is travelling in it when it reaches the sheet. The far side is that same medium for
             // an isolated sheet, the glued solid on entry, and on exit the medium the host was entered
-            // through - mtl_prev being exactly "what is on the other side of this cavity". mtl_prev is
-            // one level deep, so a sheet | solid | sheet sandwich resolves but a deeper nesting falls
-            // back to air.
+            // through - mtl_prev being exactly "what is on the other side of this cavity".
+            //
+            // That holds while mtl_prev names a medium. After a sheet crossing or a reflection off
+            // a sheet it holds that sheet, which has no volume and encloses nothing: the host was
+            // entered through a lining, or the ray is a bounce returning to the glued sheet it
+            // entered by. What lies beyond the sheet ahead is then one level further back than the
+            // state reaches, and air is taken, which is what ray_mesh_interact's own composite
+            // assumes for every glued exit. A sheet between two solids is not a geometry the
+            // intersector reports, and if one occurs the next exit corrects the current medium.
             int m_near = mtl_current;
-            int m_far = (sheet_case == 2) ? sheet_solid : ((sheet_case == 3) ? mtl_prev : mtl_current);
+            int m_far = (sheet_case == 2) ? sheet_solid
+                                          : ((sheet_case == 3) ? (IS_SHEET(mtl_prev) ? 0 : mtl_prev) : mtl_current);
             int m_next = m_far; // medium the ray travels in after the crossing
 
             // No sheet code in scope carries a deferred buffer. Flag the violation rather than guess.
@@ -4665,10 +4678,12 @@ void quadriga_lib::ray_state_update(int interaction_type,
             // to the host no longer collapses the denominator and cost the host its internal series.
             // This is the one site that can name what lies behind that sheet - m_far is still in
             // scope here - so it passes it; a later leg cannot and assumes air. Skipped without a
-            // sheet composite, because the factor is applied through cTE / cTM.
+            // sheet composite, because the factor is applied through cTE / cTM, and for a resolved
+            // ray, whose series the reflection behind it already collapsed, as APPLY_TRANSITION
+            // skips it at a bare face.
             if (mtl_current != 0 && !merge_host)
             {
-                if (have_composite)
+                if (have_composite && !resolved)
                     SLAB_AIRY_FACTOR(mtl_current, sheet_mtl, mtl_prev, m_far);
                 SCALE_BY_MEDIUM(mtl_current);
             }
@@ -4707,8 +4722,9 @@ void quadriga_lib::ray_state_update(int interaction_type,
 
             // The sheet becomes the previous medium so the next host leg reflects off it. It is a
             // boundary material here, never a traversed one: mtl_prev is only ever read as the far
-            // material of a slab resolve and for the parallelism flag. On an exit into air there is no
-            // following leg, so the ordinary convention (the medium just left) is kept instead.
+            // material of a slab resolve and for the parallelism flag. An exit into air writes it as
+            // well: nothing reads the word while the ray is in air, and should the ray turn out to
+            // be in a medium after all, the sheet is the boundary behind it.
             //
             // The wedge test is unusable for a glued entry: fbs_sbs_not_parallel compares FBS and SBS,
             // which are the sheet and the solid's near face, and they are co-located by construction.
@@ -4721,8 +4737,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
             // The boundary material behind the ray is the LAST layer it crossed, which differs from
             // sheet_mtl only for an ordered stack.
             int sheet_back = (sheet_mtl2 != 0) ? sheet_mtl2 : sheet_mtl;
-            next_prev = (m_next != 0) ? (short)((sheet_back & 0x7FFF) | (nonpar ? (int)0x8000 : 0))
-                                      : (short)(mtl_current & 0x7FFF);
+            next_prev = (short)((sheet_back & 0x7FFF) | ((m_next != 0 && nonpar) ? (int)0x8000 : 0));
 
             // A mass-law sheet crossed into a medium: flag it, so the leg that starts here knows
             // the sheet in the previous-medium word was crossed and not merely reflected off.
