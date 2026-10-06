@@ -257,7 +257,8 @@ namespace
                            double abs_cos_theta = 0.0,    // Cosine of incidence angle @ orig (only used when dist_geo > 0)
                            double mass_min_path = 0.0015, // Shortest geometric path that still carries a mass-law term
                            double mass_normal = -1.0,     // Surface-mass surrogate with the angle removed (< 0 = dist_geo * abs_cos_theta)
-                           double mass_cos = -1.0) const  // Angle factor for the mass-law term (< 0 = abs_cos_theta)
+                           double mass_cos = -1.0,        // Angle factor for the mass-law term (< 0 = abs_cos_theta)
+                           double mass_bonded = 0.0) const // Summed X0 of the bonded mass-law bodies already crossed
         {
             if (dist_geo == 0.0) // Identity fallback
                 dist_geo = dist_refract, abs_cos_theta = abs_cos_theta_t;
@@ -309,7 +310,21 @@ namespace
                 double mass_c = (mass_cos >= 0.0) ? mass_cos : abs_cos_theta;
                 double mass_arg = (fGHz / fRef) * mass_n;
                 double mass_A = (mass_arg > 0.0) ? m * std::log10(mass_arg) : 0.0;
-                if (mass_A > 0.0 && mass_c > 0.0)
+
+                // A body bonded to mass-law bodies the wave has already crossed is not a second
+                // panel. With no air gap the bodies move with one velocity, so their transfer
+                // impedances are in series and what adds is X0, not the term in dB. The plate is
+                // one body with the summed X0, and the charging telescopes: the first body crossed
+                // paid its own term, and this one pays what the plate is worth above what was
+                // paid, TL(X_run + X0) - TL(X_run). Each body contributes its X0 unclipped, so the
+                // hard zero sits on the sum. With nothing crossed before, the branch below runs
+                // exactly as it always did.
+                if (mass_bonded > 0.0)
+                {
+                    if (mass_arg > 0.0)
+                        loss += mass_TL(mass_bonded + std::pow(mass_arg, 0.05 * m), mass_c) - mass_TL(mass_bonded, mass_c);
+                }
+                else if (mass_A > 0.0 && mass_c > 0.0)
                 {
                     if (mass_c >= 1.0) // normal incidence, and the guard against a cosine over one
                         loss += mass_A;
@@ -322,6 +337,30 @@ namespace
                 }
             }
             return std::pow(10.0, -0.1 * loss);
+        }
+
+        // Impedance ratio of this body with the angle removed, X0 = ((f / fRef) M)^(m / 20), from its
+        // surface-mass surrogate M. It is 10^(A / 20) of the normal-incidence term A wherever that
+        // term is positive, and is not clipped below it. Zero for a material without the column.
+        double mass_X0(double mass_normal, double fGHz = 1.0) const
+        {
+            if (!(m > 0.0))
+                return 0.0;
+            double mass_arg = (fGHz / fRef) * mass_normal;
+            return (mass_arg > 0.0) ? std::pow(mass_arg, 0.05 * m) : 0.0;
+        }
+
+        // Mass term in dB of one plate with impedance ratio X0 at angle factor mass_c: the
+        // single-body law of medium_gain written in X0, zero below an X0 of one.
+        static double mass_TL(double X0, double mass_c)
+        {
+            if (!(X0 > 1.0) || !(mass_c > 0.0))
+                return 0.0;
+            double A = 20.0 * std::log10(X0);
+            if (mass_c >= 1.0)
+                return A;
+            double x = X0 * mass_c;
+            return A * std::log10(1.0 + x * x) / std::log10(1.0 + X0 * X0);
         }
 
         // Linear gain of the non-conductive absorption only: the alpha column, without the
@@ -560,8 +599,33 @@ namespace
             // Only towards the lower index, where this side has a critical angle at all; the other
             // direction is the ordinary crossing and is untouched. Only for a wave that was not
             // refracted in: one the tracer bent arrives at a Snell angle, where the crossing from
-            // this side is already the reverse of its entry. And only the transmit port.
+            // this side is already the reverse of its entry.
+            //
+            // The reflect port follows the same rule, or the two ports of one face do not add up:
+            // judged from inside it is a mirror past the critical angle while the transmit port
+            // passes what the other direction passes. It is the reflection the other direction
+            // sees at this cosine with its sign reversed, which is Stokes' relation for one face
+            // read from its two sides. It stays in this medium, so it carries no interface gain,
+            // and the verdict handed back is the ordinary one: a reflection has no bend to hold.
             bool trans_class = interaction_type == 1 || interaction_type == 2 || interaction_type == 4 || interaction_type == 5;
+            if (undeviated && m > 0.0 && !trans_class && std::abs(eta1_d_eta2) > 1.0)
+            {
+                gain = other.interact_with(*this, interaction_type, theta, fGHz, &coeff_TE, &coeff_TM, nullptr, nullptr,
+                                           nullptr, nullptr, false, cos_theta_in, false);
+                if (cTE)
+                    *cTE = -coeff_TE;
+                if (cTM)
+                    *cTM = -coeff_TM;
+                if (cos_theta2)
+                    *cos_theta2 = ct2;
+                if (eta1_div_eta2)
+                    *eta1_div_eta2 = eta1_d_eta2;
+                if (Snell_ratio)
+                    *Snell_ratio = snell;
+                if (total_reflection)
+                    *total_reflection = tir;
+                return gain;
+            }
             if (undeviated && m > 0.0 && trans_class && std::abs(eta1_d_eta2) > 1.0)
             {
                 gain = other.interact_with(*this, interaction_type, theta, fGHz, &coeff_TE, &coeff_TM, nullptr, nullptr,
@@ -855,8 +919,11 @@ namespace
     //             for, contributes one real amplitude factor, and starts the next segment as its
     //             incidence half-space. Nothing returns across it, so the reflect port is that of
     //             the first segment. With no coherent layer this is produce mode's mass-law route,
-    //             and like that route it displaces no host thickness. The mass terms of two
-    //             mass-law layers add in dB, the decoupled limit.
+    //             and like that route it displaces no host thickness. Mass-law layers with
+    //             no coherent layer between them are bonded and form one plate: their X0 add,
+    //             the first pays its own term and each later one what the plate is worth above
+    //             what was paid; see Material::medium_gain. mass_bonded is the X0 the wave has
+    //             already crossed in a mass-law near medium.
     //
     // alpha is carried. It is dB per meter of PATH, which produce mode applies as a real one-way
     // multiplier on phi, and the layer phase is the logarithm of that same phi: the matrix is built
@@ -875,7 +942,8 @@ namespace
                                  std::complex<double> *T_te, std::complex<double> *T_tm,
                                  std::complex<double> *R_te, std::complex<double> *R_tm,
                                  bool disp_far = false, double disp_budget = -1.0,
-                                 double mass_cos = -1.0) // real incidence cosine for a mass-law term, < 0 = |Re ci|
+                                 double mass_cos = -1.0,    // real incidence cosine for a mass-law term, < 0 = |Re ci|
+                                 double mass_bonded = 0.0)  // X0 of the bonded mass-law bodies crossed before the stack
     {
         if (n_layers < 1 || layers == nullptr)
             return false;
@@ -1056,7 +1124,7 @@ namespace
                 // Real amplitude factor of mass-law layer j, formed as produce mode forms it: the
                 // loss over the path thk / |Re c| under the same saturation cap, and the mass term
                 // from the normal thickness and the real incidence cosine.
-                auto MASS = [&](int j) -> double
+                auto MASS = [&](int j, double &x_run) -> double
                 {
                     const Material &L = MED(j);
                     double thk = layers[j - 1].thk, ct_r = std::abs(std::real(COS(j)));
@@ -1077,18 +1145,23 @@ namespace
                         dist = dist_max;
                     double mc = (mass_cos >= 0.0) ? mass_cos : std::abs(std::real(ci));
                     double mass_path = thk * mc;
-                    double g = L.medium_gain(dist, fGHz, ct_r, mass_path, 1.0, (mass_path > 0.0) ? 0.0 : 1.0e300, thk, mc);
+                    double g = L.medium_gain(dist, fGHz, ct_r, mass_path, 1.0, (mass_path > 0.0) ? 0.0 : 1.0e300, thk, mc, x_run);
+                    if (mass_path > 0.0)
+                        x_run += L.mass_X0(thk, fGHz);
                     return std::sqrt((g < 0.0) ? 0.0 : g);
                 };
 
                 std::complex<double> Tt(1.0, 0.0), Rt(0.0, 0.0);
                 int p = 0;
                 bool first = true;
+                double x_run = mass_bonded; // X0 of the plate crossed so far
                 for (int q = 1; q <= n_layers + 1; ++q)
                 {
                     bool mass = (q <= n_layers) && MED(q).m > 0.0;
                     if (q <= n_layers && !mass)
                         continue;
+                    if (q - p > 1) // a coherent layer separates what follows from the plate
+                        x_run = 0.0;
 
                     // Coherent segment between media p and q, from its far boundary inwards
                     std::complex<double> G, T, r, t, tb;
@@ -1107,7 +1180,7 @@ namespace
                     if (first)
                         Rt = G, first = false;
                     if (mass)
-                        Tt *= MASS(q);
+                        Tt *= MASS(q, x_run);
                     p = q;
                 }
                 R_out[pol] = Rt, T_out[pol] = Tt;
@@ -1246,7 +1319,8 @@ namespace
                                 std::complex<double> ct_near_exact = std::complex<double>(0.0, 0.0),
                                 const Material *back_near = nullptr, // what lies behind a sheet named as mat_near
                                 bool far_closed = false,             // produce: near | far is past its critical angle
-                                bool near_undeviated = false)        // produce: the wave in mat_near was not refracted in
+                                bool near_undeviated = false,        // produce: the wave in mat_near was not refracted in
+                                double mass_bonded = 0.0)            // produce: X0 of the bonded mass-law bodies already crossed
     {
         // Mass-law materials carry a lumped transmission surrogate: eta/mu are calibrated for
         // surface impedance only, so the in-slab index (and hence the phase of phi) is not
@@ -1674,8 +1748,11 @@ namespace
             // do carry the recovered cosine.
             double mass_path = thk_normal * abs_cos_theta;
             double mass_floor = (mass_path > 0.0) ? 0.0 : 1.0e300;
+            //
+            // A sheet reached from inside a mass-law body is bonded to it: mass_bonded is the X0
+            // that body's leg carries, and the sheet pays what the plate is worth above it.
             double gI = mat_slab.medium_gain(dist_slab, fGHz, abs_cos_theta_t, mass_path, 1.0, mass_floor,
-                                             thk_normal, abs_cos_theta);
+                                             thk_normal, abs_cos_theta, mass_bonded);
             double aI = std::sqrt((gI < 0.0) ? 0.0 : gI);
             if (T_te)
                 *T_te = far_closed ? aI * leak_te : ig * fx_te * aI * tns_te * tsf_te;
@@ -3245,7 +3322,8 @@ Batched inside/outside ray-state machine with analytic thin-slab (Fabry-Perot) r
 - Corrects the per-interaction `gainN` / `xprmatN` produced by [[ray_mesh_interact]] using a tracked
   per-ray medium state, and carries that state forward. Three signed-`short` words per ray hold the
   current medium, the previous medium, and a one-slot next-transition buffer (bit-masked: `mat = w &
-  0x7FFF`, `flag = w & 0x8000`).
+  0x7FFF`, `flag = w & 0x8000`). With its flag set the buffer word is not a medium: it marks a leg that
+  was entered by crossing a bonded mass-law body and carries that body's thickness code.
 - Implements the inside/outside state machine and overlays a closed-form thin-slab factor `S` (the Airy
   sum) so a single coefficient captures the full internal multiple-reflection series of a parallel slab
   thin enough to matter, instead of relying on the tracer to follow every internal bounce.
@@ -3323,7 +3401,9 @@ void quadriga_lib::ray_state_update(
   sheet pair, and the thin-sheet case is re-derived from
   `(code, is_sheet(FBS), is_sheet(SBS), same material)` because codes 69 and 71 are shared by three topologies.
 - **`mtl_ind_prev_in`**, **`mtl_ind_current_in`**, **`mtl_ind_buffer_in`** — State words, full ray set; `[n_ray]`,
-  read at `g`, never written. NULL reads as state `0` (outside, no flags).
+  read at `g`, never written. NULL reads as state `0` (outside, no flags). A buffer word with bit 15 set is
+  a surface-mass code written by an earlier call and is exempt from the material range check; pass the
+  words through unchanged between calls.
 - **`path_dir_prev`** — Physical ray direction entering this segment, full ray set; `[n_ray, 3]`
 - **`acc_dist_geometric`** — Accumulated geometric in-layer distance carried into this call, full ray set; `[n_ray]`.
   NULL reads as 0. Frequency-independent: built from the traced `orig`-`fbs` / `fbs`-`dest` lengths only, so a
@@ -3346,8 +3426,10 @@ void quadriga_lib::ray_state_update(
 - **`mtl_ind_prev_outN`**, **`mtl_ind_current_outN`**, **`mtl_ind_buffer_outN`** — Updated state words,
   compact set; `[n_rayN]`. `mtl_ind_prev_outN` may hold a **sheet** material index after a thin-sheet
   crossing. That is a boundary material, not a medium the ray travelled through: the previous-medium word
-  is only ever read as the far material of a slab resolve and for the parallelism flag, and a sheet is the
-  correct far material for the layer on either side of it.
+  is only ever read as the far material of a slab resolve, for the parallelism flag, and as the bonded
+  mass-law body a leg was entered through, and a sheet is the correct far material for the layer on
+  either side of it. `mtl_ind_buffer_outN` with bit 15 set carries the surface-mass code of that body
+  (0 for a sheet, a logarithmic thickness code for a traced solid) instead of a deferred medium.
   NULL skips the write. Passing all six state args NULL disables tracking —
   each interaction is corrected on its own (entry loss, TR kill, single-hit air-gap `S`); cross-interaction slab `S` and
   reflection-bounce `S` need the tracked medium.
@@ -3529,17 +3611,18 @@ void quadriga_lib::ray_state_update(int interaction_type,
     if (mtl_ind_sbsN->n_elem != 0 && arma::uword(mtl_ind_sbsN->max() & (short)0x7FFF) > cols.n_mtl)
         throw std::invalid_argument("Values in 'mtl_ind_sbs' exceed the number of materials in 'mtl_prop'.");
 
-    auto check_state_words = [&](const arma::Col<short> *v, const char *name)
+    // The buffer word under its flag bit carries a surface-mass code, not a material index
+    auto check_state_words = [&](const arma::Col<short> *v, const char *name, bool flag_is_code = false)
     {
         if (v == nullptr || v->n_elem == 0)
             return;
         for (const short *p = v->memptr(), *pe = p + v->n_elem; p < pe; ++p)
-            if (arma::uword(*p & (short)0x7FFF) > cols.n_mtl)
+            if (!(flag_is_code && (*p & (short)0x8000)) && arma::uword(*p & (short)0x7FFF) > cols.n_mtl)
                 throw std::invalid_argument(std::string("Values in '") + name + "' exceed the number of materials in 'mtl_prop'.");
     };
     check_state_words(mtl_ind_prev_in, "mtl_ind_prev_in");
     check_state_words(mtl_ind_current_in, "mtl_ind_current_in");
-    check_state_words(mtl_ind_buffer_in, "mtl_ind_buffer_in");
+    check_state_words(mtl_ind_buffer_in, "mtl_ind_buffer_in", true);
 
     if (mtl_ind_prev_in && mtl_ind_prev_in->n_elem != n_ray)
         throw std::invalid_argument("Input 'mtl_ind_prev_in' must match the number of rays in 'orig'.");
@@ -3630,6 +3713,23 @@ void quadriga_lib::ray_state_update(int interaction_type,
         int mtl_buffer = next_buffer & 0x7FFF;
         bool resolved = (next_current & 0x8000) != 0;
         bool prev_nonpar = (next_prev & 0x8000) != 0;
+
+        // The buffer word under its flag bit is not a deferred medium. It then says that the leg
+        // the ray is on was entered by crossing a bonded mass-law body, the one in the
+        // previous-medium word, and its low 15 bits carry that body's surface mass where the
+        // material table does not: zero for a sheet, whose thickness is a column, and for a
+        // traced solid a logarithmic code of the normal thickness of the leg that was closed,
+        // d = 10^(-4 + 6 (k - 1) / 32766) m for k = 1 .. 32767, which is 0.1 mm to 100 m in steps
+        // of 0.044 %. The thickness is geometric, so one code serves every frequency. It is
+        // written where a mass-law body is crossed into another medium, kept where a leg carries
+        // on, and cleared wherever a leg begins any other way, a reflection included, so a set
+        // flag always means the neighbour was crossed on this traversal. Every reader of the
+        // deferred medium sees zero while the flag is set.
+        const short buffer_word_in = next_buffer;
+        const bool mass_crossed = (next_buffer & 0x8000) != 0;
+        const int mass_code = mass_crossed ? mtl_buffer : 0;
+        if (mass_crossed)
+            mtl_buffer = 0;
 
         // Compact-set reads at i
         unsigned nH = p_no_interact[i_ray];                // No interactions
@@ -4139,6 +4239,35 @@ void quadriga_lib::ray_state_update(int interaction_type,
             return dist_fbs_dest; // Fallback
         };
 
+        // Buffer word for a leg that begins by crossing out of a mass-law solid whose closed leg
+        // had the surface-mass surrogate mass_n: the flag and the thickness code. Zero where the
+        // body carried no mass term, so that it is absent from the plate as it was from the path.
+        auto MASS_CODE = [](double mass_n) -> short
+        {
+            if (!(mass_n > 0.0))
+                return (short)0;
+            double k = 1.0 + std::round((std::log10(mass_n) + 4.0) * (32766.0 / 6.0));
+            k = (k < 1.0) ? 1.0 : ((k > 32767.0) ? 32767.0 : k);
+            return (short)((int)0x8000 | (int)k);
+        };
+
+        // Summed X0 of the bonded mass-law bodies crossed on the way into the current leg, as far
+        // as the state names them: one body, the previous medium. A sheet's surface mass is its
+        // thickness column and a solid's is decoded from the buffer word.
+        auto MASS_RUN = [&]() -> double
+        {
+            if (!mass_crossed)
+                return 0.0;
+            Material P = MAT(mtl_prev);
+            if (!(P.m > 0.0))
+                return 0.0;
+            if (IS_SHEET(mtl_prev))
+                return P.mass_X0(P.thk, fGHz);
+            if (mass_code < 1)
+                return 0.0;
+            return P.mass_X0(std::pow(10.0, -4.0 + 6.0 * (double)(mass_code - 1) / 32766.0), fGHz);
+        };
+
         // Apply medium gain and phase
         auto SCALE_BY_MEDIUM = [&](int m)
         {
@@ -4203,7 +4332,10 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 return;
             }
 
-            double g = mtl.medium_gain(dist_refract, fGHz, abs_cos_theta_t, dist_geo, abs_cos_theta);
+            // A leg entered through a bonded mass-law body pays what the plate is worth above
+            // what that body paid; see Material::medium_gain.
+            double g = mtl.medium_gain(dist_refract, fGHz, abs_cos_theta_t, dist_geo, abs_cos_theta,
+                                       0.0015, -1.0, -1.0, (mtl.m > 0.0) ? MASS_RUN() : 0.0);
             double cos2 = walk_off ? abs_cos_theta_t * abs_cos_theta_t : 1.0; // medium side, theta_t
             double cos2_geo = walk_off ? abs_cos_theta * abs_cos_theta : 1.0; // free-space side, theta_i
             double excess_phase = k0 * (n_re * dist_refract * cos2 - dist_geo * cos2_geo);
@@ -4299,7 +4431,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
         // into the same TE/TM pair. Returns false when the composite must be left exactly as
         // ray_mesh_interact wrote it.
         auto SHEET_RESOLVE = [&](int mtl_slab, int mtl_near, int mtl_far, bool disp_far,
-                                 int mtl_slab2 = 0) -> bool
+                                 int mtl_slab2 = 0, double mass_bonded = 0.0) -> bool
         {
             Material M_slab = MAT(mtl_slab), M_near = MAT(mtl_near), M_far = MAT(mtl_far);
             Material M_slab2 = MAT(mtl_slab2);
@@ -4415,14 +4547,14 @@ void quadriga_lib::ray_state_update(int interaction_type,
                                                   ? ct_near
                                                   : std::complex<double>(ct_geo, 0.0);
                     if (!qd_stack_resolve(M_near, lay, 2, M_far, ci, fGHz, is_scalar,
-                                          &Tte, &Ttm, &Rte, &Rtm, disp_far, disp_budget, ct_geo))
+                                          &Tte, &Ttm, &Rte, &Rtm, disp_far, disp_budget, ct_geo, mass_bonded))
                         return false; // malformed stack or a singular denominator; the caller decides
                 }
                 else
                     qd_slab_resolve(M_near, M_slab, M_far, thk, 0.0, ct_slab, ct_geo,
                                     fGHz, is_scalar, 0.0, true, &Tte, &Ttm, &Rte, &Rtm,
                                     disp_far, disp_budget, std::complex<double>(0.0, 0.0), ct_near,
-                                    nullptr, tir, !use_vbs);
+                                    nullptr, tir, !use_vbs, mass_bonded);
 
                 // Both ports come out of the one pass. The reflection port is its own Airy sum, not the
                 // half-space Fresnel value, so expect real angular and frequency structure in it.
@@ -4507,7 +4639,18 @@ void quadriga_lib::ray_state_update(int interaction_type,
             // The sheet sits on the side of a glued pair that is not the solid: near for a glued
             // entry, far for a glued exit. Isolated sheets have near == far and are unaffected.
             // sheet_mtl2 is zero except for an ordered stack, where it is the second layer.
-            bool have_composite = SHEET_RESOLVE(sheet_mtl, m_near, m_far, sheet_case == 3, sheet_mtl2);
+            //
+            // A sheet reached from inside a mass-law body is bonded to it. The host leg closes at
+            // this event and pays its own term below, so the sheet is handed the X0 that leg
+            // carries, with whatever the leg itself was entered through, and pays the increment.
+            double mass_host = 0.0;
+            if (mtl_current != 0)
+            {
+                Material M_host = MAT(mtl_current);
+                if (M_host.m > 0.0)
+                    mass_host = MASS_RUN() + ((dist_geo > 0.0015) ? M_host.mass_X0(dist_geo * abs_cos_theta, fGHz) : 0.0);
+            }
+            bool have_composite = SHEET_RESOLVE(sheet_mtl, m_near, m_far, sheet_case == 3, sheet_mtl2, mass_host);
 
             if (sheet_case == 4 && !have_composite)
             {
@@ -4580,7 +4723,10 @@ void quadriga_lib::ray_state_update(int interaction_type,
             int sheet_back = (sheet_mtl2 != 0) ? sheet_mtl2 : sheet_mtl;
             next_prev = (m_next != 0) ? (short)((sheet_back & 0x7FFF) | (nonpar ? (int)0x8000 : 0))
                                       : (short)(mtl_current & 0x7FFF);
-            next_buffer = (short)0;
+
+            // A mass-law sheet crossed into a medium: flag it, so the leg that starts here knows
+            // the sheet in the previous-medium word was crossed and not merely reflected off.
+            next_buffer = (m_next != 0 && MAT(sheet_back).m > 0.0) ? (short)0x8000 : (short)0;
 
             if (ray_ends && m_next != 0) // Entering or staying in a medium: refracted preload
             {
@@ -4613,9 +4759,16 @@ void quadriga_lib::ray_state_update(int interaction_type,
 
             DIST_ADD(); // Add orig-fbs/vbs segment lengths
 
+            // Buffer word for the leg that follows. A transparent transition carries the leg on
+            // and its word with it; a mass-law solid crossed into another medium leaves the
+            // surface mass of the leg closed here; everything else starts clean.
+            short buffer_next = (short)0;
+
             // Transparent transition for same material
             if (SAME(mtl_current, mtl_next)) // Make interface transparent
             {
+                if (mass_crossed)
+                    buffer_next = buffer_word_in;
                 REPLACE_BY_GAIN(1.0, true); // Maintain refracted direction, set transparent flag
                 if (preload_dest)           // Add distances: fbs-vbs (geometric) AND vbs-vdest (refracted)
                 {
@@ -4638,6 +4791,9 @@ void quadriga_lib::ray_state_update(int interaction_type,
 
                 SCALE_BY_MEDIUM(mtl_current); // Apply current medium gain and phase
 
+                if (!exit && mtl_next != 0 && MAT(mtl_current).m > 0.0 && dist_geo > 0.0015)
+                    buffer_next = MASS_CODE(dist_geo * abs_cos_theta);
+
                 if (preload_dest && exit) // exit into air: post-exit leg is unrefracted, refract == geo
                     DIST_SET(dist_fbs_dest);
                 else if (preload_dest) // entered a medium: refracted slant distance differs from geometric
@@ -4650,7 +4806,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 next_current = (short)mtl_next; // Clear resolved flag
             }
 
-            next_buffer = (short)0; // Clear buffer
+            next_buffer = buffer_next; // Clear the deferred medium
 
             if (!exit) // Set continue-inside flag
                 typeR[3] = true;

@@ -3717,8 +3717,19 @@ static inline DiagSheet diag_sc_stack(std::complex<double> e_near, std::complex<
             }
         };
 
+        // Mass-law layers with no coherent layer between them are bonded and are one plate: its
+        // impedance ratio is the sum of theirs, X0 = ((f / fRef) d)^(m / 20) each, and the plate
+        // pays the single-body term of that sum once. A lone layer keeps diag_mass_TL.
+        auto plate_TL = [&](double X)
+        {
+            if (!(X > 1.0) || !(mass_cos > 0.0))
+                return 0.0;
+            double A = 20.0 * std::log10(X), x = X * mass_cos;
+            return (mass_cos >= 1.0) ? A : A * std::log10(1.0 + x * x) / std::log10(1.0 + X * X);
+        };
         std::complex<double> Tt(1.0, 0.0), Rt(0.0, 0.0), G, T;
-        size_t p = 0;
+        size_t p = 0, run = 0; // run: mass-law layers in the plate so far
+        double X_plate = 0.0, paid_dB = 0.0;
         bool first = true;
         for (size_t q = 1; q <= N + 1; ++q)
         {
@@ -3733,7 +3744,15 @@ static inline DiagSheet diag_sc_stack(std::complex<double> e_near, std::complex<
             {
                 const DiagLayer &L = layers[q - 1];
                 double dist = L.d / std::abs(std::real(c[q]));
-                double loss_dB = L.alpha * dist + diag_mass_TL(L.m, L.fRef, f_hz, L.d, mass_cos);
+                if (q - p > 1) // a coherent layer in between: a new plate
+                    run = 0, X_plate = 0.0, paid_dB = 0.0;
+                double mass_dB;
+                if (run == 0)
+                    mass_dB = diag_mass_TL(L.m, L.fRef, f_hz, L.d, mass_cos);
+                else
+                    mass_dB = plate_TL(X_plate + std::pow((f_hz * 1e-9 / L.fRef) * L.d, 0.05 * L.m)) - paid_dB;
+                X_plate += std::pow((f_hz * 1e-9 / L.fRef) * L.d, 0.05 * L.m), paid_dB += mass_dB, ++run;
+                double loss_dB = L.alpha * dist + mass_dB;
                 Tt *= std::sqrt(diag_medium_gain(L.e * L.mu, dist, f_hz) * std::pow(10.0, -0.1 * loss_dB));
             }
             p = q;
@@ -6880,8 +6899,8 @@ TEST_CASE("Stack with a mass-law layer - resolved by segments, not killed")
     //   a lossless-permittivity stack reflects and transmits no more than it received;
     //   an air-like coherent sheet in front of a mass-law sheet is that mass-law sheet.
     //
-    // Scalar only: the mass law is an acoustic column. The two mass terms of two mass-law layers
-    // add in dB, which is the decoupled limit; a bonded pair is a separate item.
+    // Scalar only: the mass law is an acoustic column. Two mass-law layers with no coherent layer
+    // between them are bonded and pay as one plate, X0 summed; that rule has its own case.
     const double f_hz = FRQ, thk = 0.006;
     const double k0 = 2.0 * QPI * f_hz / C0;
     const std::complex<double> U(1.0, 0.0), e_air(1.0, 0.0);
@@ -7817,5 +7836,402 @@ TEST_CASE("Leak chain - each face at the cosine the wave has and the series on a
         QD_DIAG("wood panel on concrete at the air | wood face,%.6f,%+.4f,,\n", t_near, st_n);
         CHECK(std::abs(st_o) < 0.05);
         CHECK(std::abs(st_n) < 5.0); // recorded: 10 log10(0.82 / 0.28) = 4.67 dB, the wave becoming a leak
+    }
+}
+
+// One body of a bonded mass-law plate, for diag_bonded_TL: the slope, the reference frequency and
+// the normal thickness, exactly the three quantities Material::medium_gain forms its term from.
+struct DiagMass
+{
+    double m, fRef, thk;
+};
+
+// Mass term of a bonded plate, in dB, written from the column definitions. Bonded bodies move with
+// one velocity, so their transfer impedances are in series and what adds is the impedance ratio
+//     X0 = ((f / fRef) M)^(m / 20)
+// of each body, not its term in dB. The plate is then one body: A = 20 log10(sum X0), with the
+// single-body angle shape. A body contributes its X0 unclipped, so the hard zero sits on the sum;
+// a body without the column (m = 0) is absent.
+static inline double diag_bonded_TL(const std::vector<DiagMass> &bodies, double f_hz, double cosv)
+{
+    double X = 0.0;
+    for (const auto &B : bodies)
+    {
+        double arg = (f_hz * 1e-9 / B.fRef) * B.thk;
+        if (B.m > 0.0 && arg > 0.0)
+            X += std::pow(arg, 0.05 * B.m);
+    }
+    if (!(X > 1.0) || !(cosv > 0.0))
+        return 0.0;
+    double A = 20.0 * std::log10(X);
+    if (cosv >= 1.0)
+        return A;
+    double x = X * cosv;
+    return A * std::log10(1.0 + x * x) / std::log10(1.0 + X * X);
+}
+
+TEST_CASE("Bonded mass - sheet on sheet, sheet on solid and solid on solid as one plate")
+{
+    // Item 1. Two mass-law bodies within the co-location distance have no air gap, so they move as
+    // one plate and their transfer impedances add: TL = 20 log10(X01 + X02), the pair being one
+    // body in every other respect. Each body used to pay its own term, so the terms added in dB,
+    // which is the decoupled double leaf.
+    //
+    // Charging is telescoped. The first body crossed pays its own term, every later one pays
+    // TL(X_run + X_own) - TL(X_run), so no event carries a factor above one and the product over
+    // the plate is the pair. Where the second body is a traced solid it needs the first one's
+    // surface mass at its own close-out: a sheet's is its thk column, a solid's is the normal
+    // thickness of the leg just closed, which travels as a logarithmic code in the buffer word
+    // under its flag bit. That code is quantized, so the solid | solid rows are bounded at
+    // 0.01 dB and everything else at 1e-9.
+    //
+    // Two instruments. Where both bodies are one material with m = 20, X0 is linear in thickness
+    // and "one body of the summed surface mass" is a statement that does not use the rule: the
+    // pair is compared with that body through the library. Everywhere else the mass paid is
+    // isolated as a ratio against the same bodies with their mass argument taken to nothing
+    // (fRef 1e9), which leaves every face, tf and interface gain in place, and is compared with
+    // diag_bonded_TL.
+    //
+    // The ray runs on the x axis and the angle comes from fbs_angle, so a solid of normal
+    // thickness d is given the path d / cos.
+    const double f_hz = FRQ;
+    const double e_w = 2.1609e-8, e_c = 2.401e-9, tf_w = 0.2, tf_c = 0.1;
+    const double tw = 0.020, Lw = 0.10, Lc = 0.10, fR = 0.001, fZ = 1.0e9;
+    const uint8_t OT_GLUED_ENTRY = 71, OT_GLUED_EXIT = 69, OT_STACK_FBS = 71, OT_STACK_SBS = 69;
+    auto dB = [](double g)
+    { return (g > 0.0) ? 10.0 * std::log10(g) : -999.0; };
+
+    const int P8 = 1, P12 = 2, P20 = 3, P20Z = 4, WS = 5, WSF = 6, WS2 = 7, SB = 8, CONC = 9, CONCZ = 10,
+              P8Z = 11, SBZ = 12, CARPET = 13, WSZ = 14;
+    const std::vector<LumpMtl> pal = {
+        {e_w, 0.0, 0.008, 0.0, tf_w, 0.0, 0.0, 0.0, 0.0, 20.0, fR},                  // 1  P8     wood sheet, X0 8
+        {e_w, 0.0, 0.012, 0.0, tf_w, 0.0, 0.0, 0.0, 0.0, 20.0, fR},                  // 2  P12    X0 12
+        {e_w, 0.0, tw, 0.0, tf_w, 0.0, 0.0, 0.0, 0.0, 20.0, fR},                     // 3  P20    X0 20
+        {e_w, 0.0, tw, 0.0, tf_w, 0.0, 0.0, 0.0, 0.0, 20.0, fZ},                     // 4  P20Z   P20 without its mass
+        {e_w, 0.0, 0.0, 0.0, tf_w, 0.0, 0.0, 0.0, 0.0, 20.0, fR},                    // 5  WS     wood solid
+        {e_w, 0.0, 0.0, 0.0, tf_w, 0.0, 0.0, 0.0, 0.0, 20.0, fR * Lw / (Lw + tw)},   // 6  WSF    WS with P20's mass folded in
+        {e_w, 0.0, 0.0, 0.0, tf_w, 0.0, 0.0, 0.0, 0.0, 20.0, fR},                    // 7  WS2    WS under a second index
+        {e_c, 0.0, 0.012, 0.5, tf_c, 0.0, 0.0, 0.0, 0.0, 30.0, fR},                  // 8  SB     a rigid board, m 30
+        {e_c, 0.0, 0.0, 2.0, tf_c, 0.0, 0.0, 0.0, 0.0, 30.0, fR},                    // 9  CONC   concrete solid, m 30
+        {e_c, 0.0, 0.0, 2.0, tf_c, 0.0, 0.0, 0.0, 0.0, 30.0, fZ},                    // 10 CONCZ  without its mass
+        {e_w, 0.0, 0.008, 0.0, tf_w, 0.0, 0.0, 0.0, 0.0, 20.0, fZ},                  // 11 P8Z
+        {e_c, 0.0, 0.012, 0.5, tf_c, 0.0, 0.0, 0.0, 0.0, 30.0, fZ},                  // 12 SBZ
+        {2.50, 0.80, 0.010},                                                         // 13 CARPET a lossy lining, m 0
+        {e_w, 0.0, 0.0, 0.0, tf_w, 0.0, 0.0, 0.0, 0.0, 20.0, fZ},                    // 14 WSZ
+    };
+    auto mtl = lump_palette(pal);
+    mtl["attB"][(size_t)WS2 - 1] = 1.0; // att is zero, so this separates WS2 from WS and does nothing else
+
+    const std::vector<double> angles = {0.0, 30.0, 60.0, 75.0};
+    const DiagMass b_p8{20.0, fR, 0.008}, b_p20{20.0, fR, tw}, b_sb{30.0, fR, 0.012};
+    const DiagMass b_ws{20.0, fR, Lw}, b_conc{30.0, fR, Lc};
+
+    // The reference at one body is the single-body term
+    for (double thd : angles)
+    {
+        double ct = std::cos(thd * QPI / 180.0);
+        CHECK(std::abs(diag_bonded_TL({b_p20}, f_hz, ct) - diag_mass_TL(20.0, fR, f_hz, tw, ct)) < 1.0e-12);
+        CHECK(std::abs(diag_bonded_TL({b_conc}, f_hz, ct) - diag_mass_TL(30.0, fR, f_hz, Lc, ct)) < 1.0e-12);
+    }
+
+    auto stk = [&](int itype, uint8_t ot, int m1, int m2, double th)
+    {
+        auto C = make1<double>(mtl, itype, ot, 2u, m1, m2, 0, 0, 0, 0.5, 0.5, 0.5, QPI / 2.0 - th, 0.0);
+        C.run();
+        return C;
+    };
+    auto one = [&](int itype, int m1, double th)
+    {
+        auto C = make1<double>(mtl, itype, 67, 1u, m1, 0, 0, 0, 0, 0.5, 0.5, 0.5, QPI / 2.0 - th, 0.0);
+        C.run();
+        return C;
+    };
+
+    // ------------------------------------------------------------------------------------------
+    // Sheet on sheet
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: bonded mass, sheet on sheet. Wood 8 mm | wood 12 mm against one 20 mm sheet of the\n");
+    QD_DIAG("# same wood (m 20, tf 0.2), scalar, both orders. over_dB is what the stack pays above the\n");
+    QD_DIAG("# single sheet; sum_minus_pair is what adding in dB would cost\n");
+    QD_DIAG("theta_n,order,T_one_dB,T_stack_dB,over_dB,sum_minus_pair,d_T,d_R\n");
+    for (double thd : angles)
+        for (int ord = 0; ord < 2; ++ord)
+        {
+            double th = thd * QPI / 180.0, ct = std::cos(th);
+            uint8_t ot = ord ? OT_STACK_SBS : OT_STACK_FBS;
+            auto St = stk(4, ot, P8, P12, th), Sr = stk(3, ot, P8, P12, th);
+            auto Ot = one(4, P20, th), Or = one(3, P20, th);
+            double over = dB((double)Ot.gain(0)) - dB((double)St.gain(0));
+            double add = diag_mass_TL(20.0, fR, f_hz, 0.008, ct) + diag_mass_TL(20.0, fR, f_hz, 0.012, ct) -
+                         diag_mass_TL(20.0, fR, f_hz, tw, ct);
+            double d_T = std::abs(cpx(St.xprmat, 0, 0) - cpx(Ot.xprmat, 0, 0)) / std::abs(cpx(Ot.xprmat, 0, 0));
+            double d_R = std::abs(cpx(Sr.xprmat, 0, 0) - cpx(Or.xprmat, 0, 0));
+            QD_DIAG("%.1f,%s,%.4f,%.4f,%+.6f,%+.6f,%.3e,%.3e\n", thd, ord ? "2|1" : "1|2", dB((double)Ot.gain(0)),
+                    dB((double)St.gain(0)), over, add, d_T, d_R);
+            INFO("sheet on sheet, one material, order " << (ord ? "2|1" : "1|2") << ", theta_n " << thd);
+            CHECK(d_T < 1.0e-9); // one sheet of the summed surface mass, complex
+            CHECK(d_R < 1.0e-9); // the reflect port is the first face and never read the mass
+        }
+
+    QD_DIAG("\n# diag: bonded mass, sheet on sheet, two materials. Wood 8 mm (m 20, X0 8) | board 12 mm\n");
+    QD_DIAG("# (m 30, X0 41.6), tf on both. paid is the mass the stack pays, against the plate and\n");
+    QD_DIAG("# against the terms added in dB\n");
+    QD_DIAG("theta_n,order,paid_dB,plate_dB,sum_dB,paid_minus_plate\n");
+    for (double thd : angles)
+        for (int ord = 0; ord < 2; ++ord)
+        {
+            double th = thd * QPI / 180.0, ct = std::cos(th);
+            uint8_t ot = ord ? OT_STACK_SBS : OT_STACK_FBS;
+            auto St = stk(4, ot, P8, SB, th), Sz = stk(4, ot, P8Z, SBZ, th);
+            double paid = dB((double)Sz.gain(0)) - dB((double)St.gain(0));
+            double plate = diag_bonded_TL({b_p8, b_sb}, f_hz, ct);
+            double sum = diag_mass_TL(20.0, fR, f_hz, 0.008, ct) + diag_mass_TL(30.0, fR, f_hz, 0.012, ct);
+            QD_DIAG("%.1f,%s,%.6f,%.6f,%.6f,%+.3e\n", thd, ord ? "2|1" : "1|2", paid, plate, sum, paid - plate);
+            INFO("sheet on sheet, two materials, order " << (ord ? "2|1" : "1|2") << ", theta_n " << thd);
+            CHECK(std::abs(paid - plate) < 1.0e-9);
+            CHECK(std::abs(sum - plate) > 0.1); // the row can tell the two rules apart
+        }
+
+    // ------------------------------------------------------------------------------------------
+    // Sheet on a traced solid, both directions
+    // ------------------------------------------------------------------------------------------
+    // Entry is two events: the sheet crossing, then the close-out of the solid's leg at its far
+    // face, fed the three state words the crossing wrote. Exit is one event: the host leg closes
+    // and the sheet is crossed together.
+    struct Chain
+    {
+        std::complex<double> T; // sheet composite times the solid's close-out factor
+        double g;
+        int buf;
+    };
+    auto entry = [&](int sheet, int solid, double L, double th)
+    {
+        auto E1 = make1<double>(mtl, 4, OT_GLUED_ENTRY, 2u, sheet, solid, 0, 0, 0, 0.5, 0.5, 0.5, QPI / 2.0 - th, 1.5);
+        E1.run();
+        auto E2 = make1<double>(mtl, 4, OT_EXIT, 1, solid, 0, (int)E1.prev_out(0), (int)E1.cur_out(0),
+                                (int)E1.buf_out(0), L / std::cos(th), 2.0, 0.5, QPI / 2.0 - th, 1.5);
+        E2.run();
+        Chain R;
+        R.T = cpx(E1.xprmat, 0, 0) * vvf(E2);
+        R.g = std::norm(R.T), R.buf = (int)E1.buf_out(0);
+        return R;
+    };
+    auto exitc = [&](int sheet, int solid, double L, double th)
+    {
+        auto X = make1<double>(mtl, 4, OT_GLUED_EXIT, 2u, sheet, solid, 0, solid, 0, L / std::cos(th), 0.5, 0.5,
+                               QPI / 2.0 - th, 1.5);
+        X.run();
+        Chain R;
+        R.T = cpx(X.xprmat, 0, 0), R.g = (double)X.gain(0), R.buf = (int)X.buf_out(0);
+        return R;
+    };
+
+    QD_DIAG("\n# diag: bonded mass, sheet on solid, one material. Wood 20 mm sheet on 100 mm of the same wood\n");
+    QD_DIAG("# against that solid with the sheet's mass folded into its fRef (m 20), scalar. Entry is\n");
+    QD_DIAG("# air | sheet | solid and the solid's close-out; exit is solid | sheet | air\n");
+    QD_DIAG("theta_n,dir,T_folded_dB,T_pair_dB,over_dB,sum_minus_pair,d_T\n");
+    for (double thd : angles)
+        for (int dir = 0; dir < 2; ++dir)
+        {
+            double th = thd * QPI / 180.0, ct = std::cos(th);
+            Chain P = dir ? exitc(P20, WS, Lw, th) : entry(P20, WS, Lw, th);
+            Chain F = dir ? exitc(P20Z, WSF, Lw, th) : entry(P20Z, WSF, Lw, th);
+            double add = diag_mass_TL(20.0, fR, f_hz, tw, ct) + diag_mass_TL(20.0, fR, f_hz, Lw, ct) -
+                         diag_mass_TL(20.0, fR, f_hz, tw + Lw, ct);
+            double d_T = std::abs(P.T - F.T) / std::abs(F.T);
+            QD_DIAG("%.1f,%s,%.4f,%.4f,%+.6f,%+.6f,%.3e\n", thd, dir ? "exit " : "entry", dB(F.g), dB(P.g),
+                    dB(F.g) - dB(P.g), add, d_T);
+            INFO("sheet on solid, one material, " << (dir ? "exit" : "entry") << ", theta_n " << thd);
+            CHECK(d_T < 1.0e-9);
+        }
+
+    QD_DIAG("\n# diag: bonded mass, wood panel (20 mm, m 20, tf 0.2) on concrete (100 mm, m 30, tf 0.1,\n");
+    QD_DIAG("# att 2 dB), scalar. paid is the mass the pair pays in that direction\n");
+    QD_DIAG("theta_n,dir,paid_dB,plate_dB,sum_dB,paid_minus_plate\n");
+    for (double thd : angles)
+    {
+        double th = thd * QPI / 180.0, ct = std::cos(th);
+        double plate = diag_bonded_TL({b_p20, b_conc}, f_hz, ct);
+        double sum = diag_mass_TL(20.0, fR, f_hz, tw, ct) + diag_mass_TL(30.0, fR, f_hz, Lc, ct);
+        double paid_dir[2];
+        for (int dir = 0; dir < 2; ++dir)
+        {
+            Chain P = dir ? exitc(P20, CONC, Lc, th) : entry(P20, CONC, Lc, th);
+            Chain Z = dir ? exitc(P20Z, CONCZ, Lc, th) : entry(P20Z, CONCZ, Lc, th);
+            double paid = dB(Z.g) - dB(P.g);
+            paid_dir[dir] = paid;
+            QD_DIAG("%.1f,%s,%.6f,%.6f,%.6f,%+.3e\n", thd, dir ? "exit " : "entry", paid, plate, sum, paid - plate);
+            INFO("wood panel on concrete, " << (dir ? "exit" : "entry") << ", theta_n " << thd);
+            CHECK(std::abs(paid - plate) < 1.0e-9);
+        }
+        CHECK(std::abs(paid_dir[0] - paid_dir[1]) < 1.0e-9); // the two directions through the pair
+        CHECK(sum - plate > 10.0);
+    }
+
+    // A lining without the column is absent from the plate: the concrete pays its own term
+    QD_DIAG("\n# diag: an m = 0 lining on concrete (lossy 10 mm, eps 2.50 - 0.80j). The concrete's mass,\n");
+    QD_DIAG("# paid against its own term\ntheta_n,dir,paid_dB,own_dB,d\n");
+    for (double thd : angles)
+        for (int dir = 0; dir < 2; ++dir)
+        {
+            double th = thd * QPI / 180.0, ct = std::cos(th);
+            Chain P = dir ? exitc(CARPET, CONC, Lc, th) : entry(CARPET, CONC, Lc, th);
+            Chain Z = dir ? exitc(CARPET, CONCZ, Lc, th) : entry(CARPET, CONCZ, Lc, th);
+            double paid = dB(Z.g) - dB(P.g), own = diag_mass_TL(30.0, fR, f_hz, Lc, ct);
+            QD_DIAG("%.1f,%s,%.6f,%.6f,%+.3e\n", thd, dir ? "exit " : "entry", paid, own, paid - own);
+            INFO("m = 0 lining on concrete, " << (dir ? "exit" : "entry") << ", theta_n " << thd);
+            CHECK(std::abs(paid - own) < 1.0e-9);
+        }
+
+    // ------------------------------------------------------------------------------------------
+    // Solid on solid, both directions, and the leg that begins at a reflection
+    // ------------------------------------------------------------------------------------------
+    // No interface coefficient is written on these events - no refracted direction is supplied,
+    // so the one ray_mesh_interact wrote stands - and the permittivities are lossless, so the
+    // applied factor is the mass term and a phase.
+    struct Leg
+    {
+        double paid; // dB, this event
+        int prev, cur, buf;
+    };
+    auto m2m = [&](int a, int b, double d, double th, int prev, int buf)
+    {
+        auto C = make1<double>(mtl, 4, OT_M2M_M1, 2u, a, b, prev, a, buf, d / std::cos(th), 2.0, 0.0, QPI / 2.0 - th, 1.5);
+        C.run();
+        return Leg{-dB(std::norm(vvf(C))), (int)C.prev_out(0), (int)C.cur_out(0), (int)C.buf_out(0)};
+    };
+    auto far_face = [&](int itype, int b, double d, double th, int prev, int buf)
+    {
+        auto C = make1<double>(mtl, itype, OT_EXIT, 1, b, 0, prev, b, buf, d / std::cos(th), 2.0, 0.5, QPI / 2.0 - th, 1.5);
+        C.run();
+        return Leg{-dB(std::norm(vvf(C))), (int)C.prev_out(0), (int)C.cur_out(0), (int)C.buf_out(0)};
+    };
+
+    QD_DIAG("\n# diag: bonded mass, solid on solid. Wood 100 mm (m 20, X0 100) and concrete 100 mm (m 30,\n");
+    QD_DIAG("# X0 1000), and wood 60 mm | wood 40 mm against one 100 mm solid. first and second are what\n");
+    QD_DIAG("# the two close-outs pay; flag is bit 15 of the buffer word after the shared face\n");
+    QD_DIAG("pair,theta_n,first_dB,second_dB,paid_dB,plate_dB,sum_dB,paid_minus_plate,flag\n");
+    struct SS
+    {
+        const char *name;
+        int a, b;
+        double da, db;
+        DiagMass ma, mb;
+    };
+    const std::vector<SS> pairs = {
+        {"wood | concrete", WS, CONC, Lw, Lc, b_ws, b_conc},
+        {"concrete | wood", CONC, WS, Lc, Lw, b_conc, b_ws},
+        {"wood 60 | wood 40", WS, WS2, 0.06, 0.04, {20.0, fR, 0.06}, {20.0, fR, 0.04}},
+        {"wood 40 | wood 60", WS2, WS, 0.04, 0.06, {20.0, fR, 0.04}, {20.0, fR, 0.06}},
+    };
+    for (const auto &S : pairs)
+        for (double thd : angles)
+        {
+            double th = thd * QPI / 180.0, ct = std::cos(th);
+            Leg A = m2m(S.a, S.b, S.da, th, 0, 0);
+            Leg B = far_face(4, S.b, S.db, th, A.prev, A.buf);
+            double paid = A.paid + B.paid, plate = diag_bonded_TL({S.ma, S.mb}, f_hz, ct);
+            double own_a = diag_bonded_TL({S.ma}, f_hz, ct), own_b = diag_bonded_TL({S.mb}, f_hz, ct);
+            QD_DIAG("%s,%.1f,%.6f,%.6f,%.6f,%.6f,%.6f,%+.3e,%d\n", S.name, thd, A.paid, B.paid, paid, plate,
+                    own_a + own_b, paid - plate, (A.buf & 0x8000) ? 1 : 0);
+            INFO(S.name << ", theta_n " << thd);
+            CHECK(std::abs(A.paid - own_a) < 1.0e-9); // the first body crossed pays its own term
+            CHECK(std::abs(paid - plate) < 0.01);     // the thickness code is quantized
+            CHECK((A.buf & 0x8000) != 0);             // and travels under the flag
+            if (S.a == WS && S.b == WS2)              // one material: one solid of the summed thickness
+                CHECK(std::abs(paid - diag_mass_TL(20.0, fR, f_hz, 0.10, ct)) < 0.01);
+        }
+
+    QD_DIAG("\n# diag: a bounce inside the second body, wood | concrete. The reflection at the concrete's far\n");
+    QD_DIAG("# face closes the first traversal and clears the code; the way back pays the pair once more,\n");
+    QD_DIAG("# the concrete its own term and the wood the increment\n");
+    QD_DIAG("theta_n,fwd_dB,refl_buf,back_conc_dB,conc_own_dB,back_wood_dB,back_dB,plate_dB\n");
+    for (double thd : angles)
+    {
+        double th = thd * QPI / 180.0, ct = std::cos(th);
+        double plate = diag_bonded_TL({b_ws, b_conc}, f_hz, ct), own_c = diag_bonded_TL({b_conc}, f_hz, ct);
+        Leg A = m2m(WS, CONC, Lw, th, 0, 0);
+        Leg R = far_face(3, CONC, Lc, th, A.prev, A.buf);  // reflect at the far face
+        Leg C = m2m(CONC, WS, Lc, th, R.prev, R.buf);      // back through the concrete
+        Leg W = far_face(4, WS, Lw, th, C.prev, C.buf);    // and out through the wood
+        QD_DIAG("%.1f,%.6f,%d,%.6f,%.6f,%.6f,%.6f,%.6f\n", thd, A.paid + R.paid, R.buf, C.paid, own_c, W.paid,
+                C.paid + W.paid, plate);
+        INFO("bounce in the second body, theta_n " << thd);
+        CHECK(std::abs(A.paid + R.paid - plate) < 0.01); // the reflection pass closes the leg as the exit does
+        CHECK(R.buf == 0);                               // nothing bonded was crossed on the way back yet
+        CHECK(std::abs(C.paid - own_c) < 1.0e-9);        // so the stale previous medium is not read
+        CHECK(std::abs(C.paid + W.paid - plate) < 0.01);
+    }
+}
+
+TEST_CASE("Ports of a mass-law face from inside - the reflect port is the other direction's")
+{
+    // Item 3. A wave held undeviated inside a mass-law medium, at a face towards the lower index,
+    // is transmitted as the other direction transmits. Its reflection was still judged from
+    // inside, with the critical angle the transmit rule exists to avoid, so the two ports of one
+    // face added to more than one: 1.50 at 30 deg for wood | concrete.
+    //
+    // The reflect port is the reflection the other direction sees, sign reversed, which is
+    // Stokes' relation for one face read from its two sides at the cosine the wave holds. For a
+    // lossless pair it conserves, in scalar mode and on the TE/TM mean in EM; per channel in EM
+    // the bare boundary applies tf on the mean and does not conserve from either side.
+    //
+    // Through ray_mesh_interact, whose incidence angle is the geometric one, so the wave is
+    // always held undeviated there. No interface gain, so the ports are the face alone.
+    const double f_hz = FRQ;
+    const double e_w = 2.1609e-8, e_c = 2.401e-9;
+    const std::vector<LumpMtl> pal = {
+        {e_w, 0.0, 0.0, 0.0, 0.2, 0.0, 0.0, 0.0, 0.0, 20.0, 1.0}, // 1 WOOD as a solid
+        {e_c, 0.0, 0.0, 0.0, 0.1, 0.0, 0.0, 0.0, 0.0, 30.0, 1.0}, // 2 CONC as a solid
+    };
+    auto mtl = lump_palette(pal);
+    arma::mat mesh = quadriga_lib::cube<double>();
+    arma::mat cube2 = quadriga_lib::cube<double>(arma::vec{1.0}, arma::vec{0.0, 0.0, 0.0}, arma::vec{2.0, 0.0, 0.0});
+    mesh = arma::join_cols(mesh, cube2);
+    arma::uvec mtl_ind(mesh.n_rows);
+    for (arma::uword i = 0; i < mesh.n_rows; ++i)
+        mtl_ind(i) = (i < mesh.n_rows / 2) ? 1 : 2;
+
+    struct Port
+    {
+        double g;
+        std::complex<double> c;
+    };
+    auto face = [&](int itype, bool wood_to_conc, double th)
+    {
+        double dy = 0.2 * std::tan(th), xa = wood_to_conc ? 0.9 : 1.1, xb = wood_to_conc ? 1.1 : 0.9;
+        arma::mat orig = {{xa, -0.4, 0.1}}, dest = {{xb, -0.4 + dy, 0.1}};
+        arma::mat fbs, sbs;
+        arma::u32_vec fbs_ind, sbs_ind;
+        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+        arma::mat origN, destN, xprmatN;
+        arma::vec gainN;
+        quadriga_lib::ray_mesh_interact(itype, f_hz, &orig, &dest, &mesh, &mtl_ind, &mtl,
+                                        &fbs_ind, &sbs_ind, (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                        &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                        &gainN, &xprmatN);
+        REQUIRE(gainN.n_elem == 1);
+        return Port{(double)gainN(0), std::complex<double>(xprmatN(0, 0), xprmatN(1, 0))};
+    };
+
+    QD_DIAG("\n# diag: ports of the wood | concrete face from inside the wood (tf 0.2 | 0.1, lossless, no att),\n");
+    QD_DIAG("# through ray_mesh_interact. T_in and R_in are the scalar ports from the wood, R_other the\n");
+    QD_DIAG("# reflection from the concrete; d_stokes is |r_in + r_other|; sum_EM the EM gains from the wood\n");
+    QD_DIAG("theta_n,T_in,R_in,sum,R_other,d_R,d_stokes,sum_EM\n");
+    for (double thd : {0.0, 10.0, 19.0, 30.0, 45.0, 70.0})
+    {
+        double th = thd * QPI / 180.0;
+        Port T = face(4, true, th), R = face(3, true, th), Ro = face(3, false, th), To = face(4, false, th);
+        Port Te = face(1, true, th), Re = face(0, true, th);
+        double d_st = std::abs(R.c + Ro.c);
+        QD_DIAG("%.1f,%.9f,%.9f,%.9f,%.9f,%.3e,%.3e,%.9f\n", thd, T.g, R.g, T.g + R.g, Ro.g, std::abs(R.g - Ro.g),
+                d_st, Te.g + Re.g);
+        INFO("wood | concrete from inside the wood, theta_n " << thd);
+        CHECK(std::abs(T.g - To.g) < 1.0e-12);        // settled: the transmit port is the other direction's
+        CHECK(std::abs(Ro.g + To.g - 1.0) < 1.0e-12); // the concrete side conserves, today and after
+        CHECK(std::abs(T.g + R.g - 1.0) < 1.0e-12);   // and so does the wood side
+        CHECK(std::abs(R.g - Ro.g) < 1.0e-12);        // because it is the same reflectance
+        CHECK(d_st < 1.0e-12);                        // with the sign a face has from its other side
+        CHECK(std::abs(Te.g + Re.g - 1.0) < 1.0e-12); // EM, on the TE/TM mean
     }
 }
