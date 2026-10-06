@@ -1,7 +1,9 @@
-You are implementing a lightweight API wrapper for MATLAB mex to call my C++ radio channel modelling library (quadriga-lib). You will receive a documentation block for the C++ API. Your task is to implement the mex wrapper function in MATLAB that correctly calls the C++ function, handles input and output arguments, and ensures proper memory management. The mex function should be designed to be user-friendly for MATLAB users while maintaining the performance benefits of the underlying C++ library.
+You are implementing a lightweight API wrapper for MATLAB / Octave MEX to call a function of my C++ radio channel modelling library (quadriga-lib). You will receive the documentation block of the C++ function (or its name). Your task is to add the MEX wrapper in `api_mex/` and a test in `tests/mex_tests/`, following the workflow below. The wrapper converts arguments, shifts indices, allocates outputs and calls the C++ function; it should be user-friendly for MATLAB users while keeping the performance of the underlying C++ library. The C++ side is covered by `md/SPEC_CPP_API.md`, the Python wrappers by `md/SPEC_PYTHON_API.md`.
 
 # CPP API DOCUMENTATION BLOCK FORMAT
-- Each function has a 1-line short description, optional detailed notes, a Declaration block, and Inputs/Outputs/Returns sections.
+- Each function has a 1-line summary, a description as bullet list, a `## Declaration:` block, and `## Inputs:` / `## Outputs:` / `## Returns:` sections (singular when there is exactly one entry); see `md/SPEC_CPP_API.md` for the full format.
+- Arguments with a default value or accepting `nullptr` are marked `*(optional)*`; the default is visible in the Declaration.
+- Mandatory arguments are passed by reference, optional ones by pointer (default `nullptr`). Older functions pass mandatory arguments by pointer as well.
 - Array sizes follow in backticks, e.g. `[n_rx, n_tx, n_path]`.
 - All functions and classes live in the `quadriga_lib` namespace.
 - Default include: `#include "quadriga_lib.hpp"`.
@@ -15,24 +17,60 @@ You are implementing a lightweight API wrapper for MATLAB mex to call my C++ rad
 - Coordinate system: GCS = right-handed Cartesian, meters. Euler angles are intrinsic Tait-Bryan in the order (bank=x, tilt=y, heading=z), applied as Rz·Ry·Rx.
 - Speed of light/sound defaults: `299792458.0` m/s (EM), `343.0` m/s (acoustic).
 
+# REPOSITORY LAYOUT AND BUILD
+- `api_mex/<function_name>.cpp` — MEX wrappers, one file per MATLAB function. CMake globs `api_mex/*.cpp`, so a new file needs no registration in the build system.
+- `src/mex_helper_functions.hpp` (generic conversions) and `src/mex_quadriga_lib_functions.hpp` (arrayant / channel structs, `std::any` datasets) — helper functions. Read them when a signature is unclear; the lists in this document are a summary.
+- `include/*.hpp` — C++ declarations; `src/*.cpp` — C++ implementations with their documentation blocks (`/*!MD ... MD!*/`).
+- `tests/mex_tests/test_<function_name>.m` — MOxUnit tests, one file per wrapper; `tests/quadriga_lib_mex_tests.m` collects and runs all `tests/mex_tests/test*.m` files, so a new test file needs no registration.
+- `+quadriga_lib/` — the MATLAB package populated by the build: the compiled MEX files and one `.m` help file per function.
+- Generated overviews (read-only, produced by `make documentation`, never edit them; they may lag behind the sources until the documentation is rebuilt):
+  - `html_docu/quadriga_lib_api_cpp.md` — all C++ functions
+  - `html_docu/quadriga_lib_api_mex.md` — all MATLAB functions
+  - Both start with general usage notes and a "Function Index" table with the columns Function, Section and Line. The Line column is the line number at which the entry starts: read the index first, then extract only the entries you need by line range instead of reading the whole file.
+- The text in the `/*!MD ... MD!*/` block of a wrapper is reused for 3 purposes: (1) merged into the Markdown overview, (2) compiled to HTML, (3) converted into the `.m` help file of the function that provides the MATLAB `help` text (`tools/extract_matlab_comments.py`, which strips backticks and asterisks and prefixes each line with `%`). The delimiters `/*!MD`, `MD!*/`, `/*!SECTION`, `SECTION!*/` are matched literally, each on its own line.
+- Commands (Linux, from the repository root):
+  - `make matlab=ON` (or `octave=ON`) — build the library and the MEX files into `+quadriga_lib/`
+  - `make test matlab=ON` (or `octave=ON`) — additionally run the Catch2 suite and the complete MEX test suite
+  - A single test file is run from MATLAB / Octave by putting the repository root (for `+quadriga_lib`), `tests/mex_tests` and MOxUnit (`external/MOxUnit-master/MOxUnit`, then `moxunit_set_path`) on the path and calling the test function by name, e.g. `test_icosphere`. It returns silently on success and raises an error on the first failed assertion.
+- Wrappers and tests must work in both MATLAB and Octave.
+
 # WORKFLOW
-- Wrappers live in `api_mex/<function_name>.cpp`, one file per MATLAB function. CMake globs `api_mex/*.cpp`, so a new file needs no registration in the build system.
-- Helper functions live in `src/mex_helper_functions.hpp` (generic conversions) and `src/mex_quadriga_lib_functions.hpp` (arrayant / channel structs, `std::any` datasets). Read them when a signature is unclear; the lists in this document are a summary.
-- C++ declarations are in `include/*.hpp`; the C++ documentation blocks (`/*!MD ... MD!*/`) are in `src/*.cpp`.
-- Steps for a new wrapper:
-  1. Read the C++ documentation block and declaration of the function to wrap.
-  2. Read one or two existing wrappers that use the same pattern and follow them, e.g.:
-     - `icosphere.cpp` — scalar inputs, outputs of known size, optional output pointers
-     - `obj_file_read.cpp` — outputs of runtime size, index shifts, cell arrays, map-to-struct
-     - `triangle_mesh_aabb.cpp` — optional 1-based index input converted in place
-     - `get_channels_spherical.cpp` — arrayant struct inputs, 3-element position vectors
-     - `get_channels_multifreq.cpp` — multi-frequency arrayant struct arrays, 4D outputs
-     - `arrayant_rotate_pattern.cpp` — arrayant struct in / struct out, in-place modification
-     - `hdf5_write_channel.cpp`, `hdf5_read_channel.cpp` — channel structs, unstructured data
-  3. Write `api_mex/<function_name>.cpp` following the guidelines below.
-  4. Add a test `tests/mex_tests/test_<function_name>.m` (MOxUnit; the file contains one function with the same name as the file). All `tests/mex_tests/test*.m` files are picked up automatically by `tests/quadriga_lib_mex_tests.m`.
-  5. Build with `make matlab=ON` (or `octave=ON`), run tests with `make test matlab=ON`.
-- The text in the `/*!MD ... MD!*/` block is reused for 3 purposes: (1) merged into one Markdown file for all functions, (2) compiled to HTML (`make documentation`), (3) converted into an individual `.m` file per function that provides the MATLAB `help` text (`tools/extract_matlab_comments.py`, which strips backticks and asterisks and prefixes each line with `%`). The delimiters `/*!MD`, `MD!*/`, `/*!SECTION`, `SECTION!*/` are matched literally, each on its own line.
+The order differs from the C++ workflow: the wrapper is written first, the test second. The physics is already verified by the Catch2 suite of the C++ function; the MEX test exists to exercise the wrapper. The work normally happens in one session.
+
+There are two review points at which you stop, report, and wait for my answer before continuing:
+- **Review point A** (end of Phase 1) — only if there are open questions about the MATLAB interface.
+- **Review point B** (end of Phase 4) — always: the final result.
+
+## Phase 0 — What you receive
+- The documentation block of the C++ function, or its name (the block is then in `src/*.cpp` and in `html_docu/quadriga_lib_api_cpp.md`).
+- Optionally the section name and remarks on the MATLAB interface (argument names, order, what to leave out).
+
+## Phase 1 — Read the contract and fix the MATLAB interface
+- Read the C++ documentation block and the declaration in `include/`.
+- Read one or two existing wrappers that use the same pattern and follow them, e.g.:
+  - `icosphere.cpp` — scalar inputs, outputs of known size, optional output pointers
+  - `obj_file_read.cpp` — outputs of runtime size, index shifts, cell arrays, map-to-struct
+  - `triangle_mesh_aabb.cpp` — optional 1-based index input converted in place
+  - `get_channels_spherical.cpp` — arrayant struct inputs, 3-element position vectors
+  - `get_channels_multifreq.cpp` — multi-frequency arrayant struct arrays, 4D outputs
+  - `arrayant_rotate_pattern.cpp` — arrayant struct in / struct out, in-place modification
+  - `hdf5_write_channel.cpp`, `hdf5_read_channel.cpp` — channel structs, unstructured data
+- Settle before writing code: the MATLAB usage line (order and names of inputs and outputs, in/out splits); which inputs are optional and their defaults; which arguments are indices and their base on the C++ side; the size of every output and whether the wrapper can know it before the call; the helper for every argument; the section name.
+- **Review point A:** if anything in this list cannot be settled from the C++ documentation and this spec (a C++ type without helper, an unclear index base, an output order that is not obvious, logic that would have to live in the wrapper), list the open questions with your proposed answer for each, and wait. If everything is clear, state the usage line and continue.
+
+## Phase 2 — Wrapper
+- Write `api_mex/<function_name>.cpp` following the "IMPLEMENTATION GUIDELINES".
+- Build. The wrapper must compile without warnings.
+
+## Phase 3 — Test
+- Write `tests/mex_tests/test_<function_name>.m` (see "TESTS"). The test exercises the wrapper: every argument reaches the right place, indices are shifted correctly, optional arguments and defaults work, outputs have the right size and class, errors arrive in MATLAB.
+- Run the test. It is expected to pass, since the C++ function is already verified. If it fails, the cause is in the wrapper or in the test's expectation; find out which before changing either. If the failure points to the C++ function itself, stop and report it — do not work around it in the wrapper.
+
+## Phase 4 — Finish
+- The new test passes; the complete MEX test suite passes.
+- The documentation block of the wrapper is complete and matches what the wrapper does.
+- **Review point B:** report the final state: the MATLAB usage line, the test results with the actual output of the run (state which of MATLAB / Octave was used), compiler warnings if any, every deviation from the C++ interface and why, and anything that was not tested. Do not report a test as passing that was not run.
+- The Python wrapper is a separate task and is only written on request.
 
 # IMPLEMENTATION GUIDELINES
 - The mex function should be named according to the C++ function it wraps, so quadriga_lib::function_name should be wrapped by a mex function named "function_name.cpp". Exceptions (e.g. wrapping a class member function, or one MATLAB function dispatching to several C++ functions) are decided case by case.
@@ -499,6 +537,7 @@ arma::uvec *p_cluster_idx = cluster_idx.empty() ? nullptr : &cluster_idx;
 ```
 - The cluster_idx.empty() variant is preferred, but it MUST NOT be used if the C++ expects an empty argument and resizes it depending on runtime conditions (e.g. reading from a file), as this would lead to unintended nullptr being passed. In this case, the (nlhs > X) guard should be used instead, which relies on the user explicitly providing an output argument when they want to receive the output.
 - In short: outputs allocated by `qd_mex_init_output` use the `.empty()` variant; outputs returned by `qd_mex_copy2matlab` use the `(nlhs > X)` variant.
+- C++ arguments that are passed by reference (mandatory inputs and outputs in the current C++ convention) get the Armadillo object itself, not its address. For a mandatory output by reference, pre-allocate with `qd_mex_init_output` only if the user requested it; otherwise pass the local, empty object.
 - If c++ does not has the nullptr option for optional arguments or arguments are passed as reference (= c++ mandatory outputs), then simply pass the empty Armadillo object, C++ will populate it as needed, and the wrapper can discard it if the user did not request the output (i.e. simply skip the qd_mex_init_output step for that output argument)
 
 ## Call the C++ function
@@ -509,6 +548,79 @@ CALL_QD(quadriga_lib::function_name(arg1, arg2, optional_arg3, optional_output4)
 ```
 - After the C++ function call, copy all non-preallocated results to MATLAB memory as stated above
 
+# TESTS
+
+## Scope
+- The MEX test verifies the **wrapper**, not the physics. The numerical behavior of the C++ function is pinned by its Catch2 suite and is not re-derived here: no oracles for the physics, no sweeps over the parameter space.
+- What the test must show:
+  - **Data lands where it should**: every input reaches the C++ argument it belongs to, every output comes back in the documented position, with the documented size, orientation (row / column) and class.
+  - **Indices are converted correctly**: 1-based in, 1-based out, pass-through indices unchanged.
+  - **Optional arguments and defaults work**: omitted, passed as `[]`, and passed explicitly.
+  - **Output handling works**: 0 outputs up to the maximum number of outputs.
+  - **Errors are passed correctly**: wrong argument counts, the wrapper's own checks, and exceptions thrown by the C++ function arrive as MATLAB errors with the right message.
+- For this, a few small cases with known results are enough: values that can be written down by hand, or that follow from the input by construction. Use distinctive inputs (different values per element, non-square sizes, non-symmetric index lists) so that a swapped argument, a transposed array or an index off by one changes the result visibly.
+- Keep it lean: no duplicated cases, no helper layers. The test is as long as it needs to be to cover the checklist below.
+
+## File and structure
+- One file per wrapper: `tests/mex_tests/test_<function_name>.m`. It contains one main function with the same name as the file and no arguments; MOxUnit calls it as one test case:
+```
+function test_function_name
+% MEX interface test for quadriga_lib.function_name.
+% Scope: argument and output handling, index conversion, error paths.
+% Physics validation lives in the Catch2 suite (test_function_name.cpp).
+
+...
+
+end
+```
+- Local helper functions go after the `end` of the main function; every function in the file is then closed with `end`.
+- Structure the body with `%%` section comments in this order: setup, basic call and values, optional inputs, outputs, type handling, indices, errors.
+- Use other library functions for supporting tasks (`quadriga_lib.cube` for a mesh, `quadriga_lib.arrayant_generate` for an antenna, `quadriga_lib.ray_triangle_intersect` for hit indices, ...) instead of building such data by hand; `html_docu/quadriga_lib_api_mex.md` lists what is available.
+- Tests that write files use distinct file names in the working directory, delete leftovers at the start and the files at the end.
+- The code must run in MATLAB and Octave: use `strfind` (not `contains`), char arrays in single quotes (not `"strings"`), no `arguments` blocks, no functions that exist in only one of the two.
+
+## Assertions
+- MOxUnit assertion functions:
+  - `assertEqual( a, b )` — exact comparison including size and class; use it for sizes, indices, integer and logical outputs, strings, and for values that must pass through unchanged
+  - `assertElementsAlmostEqual( a, b, 'absolute', tol )` — floating-point values
+  - `assertTrue( cond )` — everything else, e.g. `assertTrue( isa(out, 'uint32') )`
+- Tolerances: `1e-14` to `1e-12` for values that are exact by construction in double, around `1e-6` where single precision is involved. The wrapper does not change values, so a tight tolerance is the norm; a loose one needs a comment.
+- Errors are checked by message substring. Define this helper once per test file as a local function:
+```
+% Assert that fn() raises an error whose message contains expected (substring).
+function assert_throws(fn, expected)
+try
+    fn();
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expected)) %#ok<STREMP>
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expected, '", GOT: "', ME.message, '"']);
+    end
+end
+end
+```
+  and call it with an anonymous function: `assert_throws( @() quadriga_lib.function_name( a, b ), 'Wrong number of input arguments.' );`
+  - An anonymous function requests at most one output. To trigger the "too many outputs" check, add a small local function that requests one output more than the wrapper allows and pass a handle to it:
+```
+function out4(varargin)
+[~, ~, ~, ~] = quadriga_lib.function_name( varargin{:} ); %#ok<ASGLU>
+end
+```
+  - Older tests spell the `try` / `catch` block out for every case; use the helper in new tests.
+
+## What every test covers
+- **Basic call**: all mandatory inputs, all outputs; check size, class and values of every output.
+- **Each optional input**: omitted, passed as `[]` (must give the same result as omitted), and passed with a non-default value that visibly changes the result. This also shows that the default in the wrapper matches the documentation.
+- **Outputs**: a call with 0 outputs must not fail; calls with fewer outputs than the maximum give the same values as the full call for the outputs that are requested (the wrapper passes `nullptr` for the others).
+- **Argument counts**: one input too many, too few mandatory inputs, one output too many → `'Wrong number of input arguments.'` / `'Wrong number of output arguments.'`.
+- **Type handling**: at least one call with non-double inputs (`single(...)`, an integer class for an index or count) gives the same result; outputs have the documented class (double unless stated; integer class for index outputs).
+- **Orientation and shape**: a vector input given as row and as column is accepted; vector outputs have the documented orientation; empty optional arrays are accepted.
+- **Indices** (if the function has index arguments): use an input in which the index matters and is not symmetric, check the result against the 1-based expectation; index outputs are 1-based (the smallest valid value is 1, not 0); a 0 in a converted index input raises the wrapper's error; pass-through indices (1-based on the C++ side, 0 = none) come back unchanged.
+- **Structs** (arrayant, channel, material properties): a struct with only the mandatory fields is accepted; an output struct has the documented fields; a round trip (output of one call as input of the next) works; a non-struct input raises an error.
+- **Errors from the wrapper**: every `mexErrMsgIdAndTxt` in the wrapper is reached by one case.
+- **Errors from C++**: at least one case in which the C++ function throws (e.g. a wrong number of columns), to show that `CALL_QD` passes the message through; match a characteristic substring of the C++ message.
+- Light sanity of the values is welcome where it is free (a known closed-form result for the simplest input); anything beyond that belongs in the Catch2 suite.
+
 # REFERENCE EXAMPLE
 
 C++ documentation block for the function `acdf`:
@@ -517,32 +629,34 @@ C++ documentation block for the function `acdf`:
 # acdf
 Calculate the empirical averaged cumulative distribution function (CDF)
 
-## Description:
 - Computes per-column empirical CDFs by histogramming into bins and taking the normalized cumulative sum
-- Averaged CDF is obtained by quantile-space averaging: for a fine probability grid, x-values from each column CDF are averaged, then mapped back to the bin grid
+- Averaged CDF is obtained by quantile-space averaging: for a fine probability grid, x-values from each column CDF are averaged,
+  then mapped back to the bin grid
 - Quantile statistics (mean and std) are reported at the 0.1, 0.2, ..., 0.9 probability levels
 - `Inf` and `NaN` values are excluded from computation
-- If `bins` points to an empty vector, equally spaced bins spanning the data range are generated and stored back; if non-empty, those bin centers are used; if `nullptr`, bins are auto-generated internally
+- If `bins` points to an empty vector, equally spaced bins spanning the data range are generated and stored back;
+  if non-empty, those bin centers are used; if `nullptr`, bins are auto-generated internally
 
 ## Declaration:
 ```
 void quadriga_lib::acdf(const arma::Mat<dtype> &data,
     arma::Col<dtype> *bins = nullptr,
-    arma::Mat<dtype> *Sh = nullptr,
-    arma::Col<dtype> *Sc = nullptr,
+    arma::Mat<dtype> *cdf_per_set = nullptr,
+    arma::Col<dtype> *cdf_avg = nullptr,
     arma::Col<dtype> *mu = nullptr,
     arma::Col<dtype> *sig = nullptr,
     arma::uword n_bins = 201);
 ```
 
-## Input Arguments:
-- **`data`** — Input data matrix; each column is one independent data set, `[n_samples, n_sets]`
-- **`bins`** *(optional)* — Bin centers; auto-generated and stored back if pointing to empty vector, used as-is if non-empty, ignored if `nullptr`, `[n_bins]`
+## Inputs:
+- **`data`** — Input data matrix; each column is one independent data set; `[n_samples, n_sets]`
+- **`bins`** *(optional)* — Bin centers; auto-generated and stored back if pointing to empty vector,
+  used as-is if non-empty, ignored if `nullptr`; `[n_bins]`
 - **`n_bins`** *(optional)* — Number of bins when auto-generating; must be >= 2; ignored when non-empty bins are provided
 
-## Output Arguments:
-- **`Sh`** *(optional)* — Individual CDFs, one per column of data, `[n_bins, n_sets]`
-- **`Sc`** *(optional)* — Averaged CDF via quantile-space averaging across data sets, `[n_bins]`
+## Outputs:
+- **`cdf_per_set`** *(optional)* — Individual CDFs, one per column of data; `[n_bins, n_sets]`
+- **`cdf_avg`** *(optional)* — Averaged CDF via quantile-space averaging across data sets; `[n_bins]`
 - **`mu`** *(optional)* — Mean of the 0.1–0.9 quantiles across data sets, `[9]`
 - **`sig`** *(optional)* — Standard deviation of the 0.1–0.9 quantiles across data sets, `[9]`
 MD!*/
@@ -575,7 +689,7 @@ Calculate the empirical averaged cumulative distribution function (CDF)
 
 ## Usage:
 ```
-[ Sh, bins_out, Sc, mu, sig ] = quadriga_lib.acdf( data, bins_in, n_bins );
+[ cdf_per_set, bins_out, cdf_avg, mu, sig ] = quadriga_lib.acdf( data, bins_in, n_bins );
 ```
 
 ## Inputs:
@@ -586,10 +700,10 @@ Calculate the empirical averaged cumulative distribution function (CDF)
   `bins_in` are provided; default: 201
 
 ## Outputs:
-- **`Sh`** — Individual CDFs; one per column of data; `[n_bins_out, n_sets]`
+- **`cdf_per_set`** — Individual CDFs; one per column of data; `[n_bins_out, n_sets]`
 - **`bins_out`** — Auto-generated bins; copy of `bins_in` when non-empty `bins_in` are provided;
   `[n_bins_out = n_bins]` or `[n_bins_out = n_bins_in]`
-- **`Sc`** — Averaged CDF via quantile-space averaging across data sets; `[n_bins_out]`
+- **`cdf_avg`** — Averaged CDF via quantile-space averaging across data sets; `[n_bins_out]`
 - **`mu`** — Mean of the 0.1–0.9 quantiles across data sets; `[9]`
 - **`sig`** — Standard deviation of the 0.1–0.9 quantiles across data sets; `[9]`
 MD!*/
@@ -611,14 +725,14 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::uword n_sets = data.n_cols;
 
     // Output allocation
-    arma::mat Sh;
-    arma::vec Sc, bins_out, mu, sig;
+    arma::mat cdf_per_set;
+    arma::vec cdf_avg, bins_out, mu, sig;
 
     if (nlhs > 0)
-        plhs[0] = qd_mex_init_output(&Sh, n_bins_out, n_sets);
+        plhs[0] = qd_mex_init_output(&cdf_per_set, n_bins_out, n_sets);
 
     if (nlhs > 2)
-        plhs[2] = qd_mex_init_output(&Sc, n_bins_out);
+        plhs[2] = qd_mex_init_output(&cdf_avg, n_bins_out);
 
     if (nlhs > 3)
         plhs[3] = qd_mex_init_output(&mu, 9);
@@ -631,15 +745,90 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         bins_out = bins_in;
 
     // Wrap optional pointers
-    arma::mat *p_Sh = Sh.empty() ? nullptr : &Sh;
-    arma::vec *p_Sc = Sc.empty() ? nullptr : &Sc;
+    arma::mat *p_cdf_per_set = cdf_per_set.empty() ? nullptr : &cdf_per_set;
+    arma::vec *p_cdf_avg = cdf_avg.empty() ? nullptr : &cdf_avg;
     arma::vec *p_mu = mu.empty() ? nullptr : &mu;
     arma::vec *p_sig = sig.empty() ? nullptr : &sig;
 
     // Call library function
-    CALL_QD(quadriga_lib::acdf<double>(data, &bins_out, p_Sh, p_Sc, p_mu, p_sig, n_bins));
+    CALL_QD(quadriga_lib::acdf<double>(data, &bins_out, p_cdf_per_set, p_cdf_avg, p_mu, p_sig, n_bins));
 
     // Copy to MATLAB
     if (nlhs > 1)
         plhs[1] = qd_mex_copy2matlab(&bins_out);
 }
+
+Test for the `acdf` wrapper, `tests/mex_tests/test_acdf.m`:
+
+```
+function test_acdf
+% MEX interface test for quadriga_lib.acdf.
+% Scope: argument and output handling, defaults, error paths.
+% Physics validation lives in the Catch2 suite (test_acdf.cpp).
+
+%% Setup: two data sets with different, known content
+data = [ (1:100)', (101:200)' ];
+
+%% Basic call, all outputs
+[ cdf_per_set, bins, cdf_avg, mu, sig ] = quadriga_lib.acdf( data );
+assertEqual( size(cdf_per_set), [201, 2] );
+assertEqual( size(bins), [201, 1] );
+assertEqual( size(cdf_avg), [201, 1] );
+assertEqual( size(mu), [9, 1] );
+assertEqual( size(sig), [9, 1] );
+assertTrue( isa(cdf_per_set, 'double') );
+assertElementsAlmostEqual( bins([1, end]), [1; 200], 'absolute', 1e-12 );   % bins span the data
+assertElementsAlmostEqual( cdf_per_set(end, :), [1, 1], 'absolute', 1e-12 );         % each CDF ends at 1
+assertTrue( cdf_per_set(101, 1) > 0.99 && cdf_per_set(100, 2) < 0.01 );                       % columns are not swapped
+
+%% Optional inputs: omitted, empty, explicit
+[ cdf_per_set2, bins2 ] = quadriga_lib.acdf( data, [], [] );
+assertEqual( cdf_per_set2, cdf_per_set );
+assertEqual( bins2, bins );
+
+[ cdf_per_set3, bins3 ] = quadriga_lib.acdf( data, [], 11 );                         % n_bins
+assertEqual( size(cdf_per_set3), [11, 2] );
+assertEqual( size(bins3), [11, 1] );
+
+bins_in = linspace( 0, 250, 26 );                                           % row vector is accepted
+[ cdf_per_set4, bins4 ] = quadriga_lib.acdf( data, bins_in, 5 );                     % n_bins is ignored
+assertEqual( size(cdf_per_set4), [26, 2] );
+assertElementsAlmostEqual( bins4, bins_in', 'absolute', 1e-14 );            % returned as column
+
+%% Outputs: none, and fewer than the maximum
+quadriga_lib.acdf( data );
+cdf_per_set5 = quadriga_lib.acdf( data );
+assertEqual( cdf_per_set5, cdf_per_set );
+[ ~, ~, cdf_avg6 ] = quadriga_lib.acdf( data );
+assertEqual( cdf_avg6, cdf_avg );
+
+%% Type handling
+cdf_per_set7 = quadriga_lib.acdf( single(data), [], uint32(201) );
+assertTrue( isa(cdf_per_set7, 'double') );
+assertElementsAlmostEqual( cdf_per_set7, cdf_per_set, 'absolute', 1e-6 );
+
+%% Errors
+assert_throws( @() quadriga_lib.acdf(), 'Wrong number of input arguments.' );
+assert_throws( @() quadriga_lib.acdf( data, [], 201, 1 ), 'Wrong number of input arguments.' );
+assert_throws( @() out6( data ), 'Wrong number of output arguments.' );
+assert_throws( @() quadriga_lib.acdf( data, [], 1 ), 'n_bins' );             % thrown by C++
+
+end
+
+% Request 6 outputs so that the nlhs > 5 guard fires
+function out6(varargin)
+[~, ~, ~, ~, ~, ~] = quadriga_lib.acdf( varargin{:} ); %#ok<ASGLU>
+end
+
+% Assert that fn() raises an error whose message contains expected (substring).
+function assert_throws(fn, expected)
+try
+    fn();
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expected)) %#ok<STREMP>
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expected, '", GOT: "', ME.message, '"']);
+    end
+end
+end
+```
