@@ -1,13 +1,15 @@
-You are implementing a lightweight Python API wrapper for pybind11 (v3) to call my C++ radio channel modelling library (quadriga-lib). You will receive either a documentation block for the C++ API and/or a MATLAB MEX wrapper that implements the same function for MATLAB. Your task is to implement the wrapper function (a regular C++ function exposed via pybind11) that correctly calls the C++ function, handles input and output arguments, and ensures proper memory management. The wrapper should be designed to be user-friendly for Python users while maintaining the performance benefits of the underlying C++ library.
+You are implementing a lightweight Python API wrapper for pybind11 (v3) to call a function of my C++ radio channel modelling library (quadriga-lib). You will receive the documentation block of the C++ function (or its name) and/or the MATLAB MEX wrapper that implements the same function for MATLAB. Your task is to add the wrapper (a regular C++ function exposed via pybind11) in `api_python/`, register it, and add a test in `tests/python_tests/`, following the workflow below. The wrapper converts arguments, allocates outputs and calls the C++ function; it should be user-friendly for Python users while keeping the performance of the underlying C++ library. The C++ side is covered by `md/SPEC_CPP_API.md`, the MEX wrappers by `md/SPEC_MATLAB_API.md`.
 
 # CPP/MEX API DOCUMENTATION BLOCK FORMAT
-- Each function has a 1-line short description, optional detailed notes, a Declaration block, and Inputs/Outputs/Returns sections.
+- Each C++ function has a 1-line summary, a description as bullet list, a `## Declaration:` block, and `## Inputs:` / `## Outputs:` / `## Returns:` sections (singular when there is exactly one entry); see `md/SPEC_CPP_API.md` for the full format. MEX wrappers have a `## Usage:` block instead of the Declaration.
+- C++ arguments with a default value or accepting `nullptr` are marked `*(optional)*`; the default is visible in the Declaration.
+- Mandatory C++ arguments are passed by reference, optional ones by pointer (default `nullptr`). Older functions pass mandatory arguments by pointer as well.
 - Array sizes follow in backticks, e.g. `[n_rx, n_tx, n_path]`.
 - All functions and classes live in the `quadriga_lib` namespace.
 - Default include: `#include "quadriga_lib.hpp"`.
 - Template parameter `dtype` is `float` or `double` unless stated.
 - Armadillo types are column-major. Shape notation `[a, b, c]` means `[rows, cols, slices]` for `arma::Cube`; `[rows, cols]` for `arma::Mat`; `[n]` for `arma::Col`/`arma::Row`.
-- Pointer arguments: `nullptr` skips optional outputs; required inputs throw on `nullptr`.
+- Pointer arguments: `nullptr` skips optional outputs (they are neither allocated nor computed); required inputs passed by pointer throw on `nullptr`.
 - Output containers are resized automatically unless they already have the correct shape; this invalidates any prior pointers into their memory.
 - Invalid inputs (shape/domain) cause a `std::invalid_argument`
 - Index conventions: 0-based unless the field is explicitly called "1-based"
@@ -15,29 +17,65 @@ You are implementing a lightweight Python API wrapper for pybind11 (v3) to call 
 - Coordinate system: GCS = right-handed Cartesian, meters. Euler angles are intrinsic Tait-Bryan in the order (bank=x, tilt=y, heading=z), applied as Rz·Ry·Rx.
 - Speed of light/sound defaults: `299792458.0` m/s (EM), `343.0` m/s (acoustic).
 
-# WORKFLOW
-- Wrappers live in `api_python/qpy_<function_name>.cpp`, one file per Python function.
+# REPOSITORY LAYOUT AND BUILD
+- `api_python/qpy_<function_name>.cpp` — Python wrappers, one file per Python function.
 - The Python module is built from 5 dispatcher files: `python_main.cpp` (top-level module, `version`, `components`) and one file per submodule: `python_arrayant.cpp`, `python_channel.cpp`, `python_tools.cpp`, `python_RTtools.cpp`. Each dispatcher `#include`s its `qpy_*.cpp` files and registers the functions with `m.def(...)`.
   - A new wrapper is NOT picked up automatically: it must be included and registered in the dispatcher of its submodule (see "pybind11 registration").
   - All wrappers of one submodule are compiled into a single translation unit. Names of wrapper functions and of `static` helper functions must therefore be unique within the submodule.
-- Helper functions live in `api_python/python_arma_adapter.hpp` (numpy / list / dict conversions) and `api_python/python_quadriga_adapter.hpp` (arrayant / channel dicts, `std::any` datasets). Read them when a signature is unclear; the lists in this document are a summary.
-- C++ declarations are in `include/*.hpp`; the C++ documentation blocks (`/*!MD ... MD!*/`) are in `src/*.cpp`; MEX wrappers are in `api_mex/*.cpp`.
-- Steps for a new wrapper:
-  1. Read the C++ documentation block and declaration of the function to wrap, and the MEX wrapper if one is given.
-  2. Read one or two existing wrappers that use the same pattern and follow them, e.g.:
-     - `qpy_acdf.cpp` — array inputs, optional array input, outputs of known and unknown size
-     - `qpy_obj_file_read.cpp` — outputs of runtime size, integer index outputs, string lists, map-to-dict
-     - `qpy_obj_file_write.cpp` — many optional inputs passed to C++ as `nullptr` when absent
-     - `qpy_calc_delay_spread.cpp` — ragged inputs as lists of arrays
-     - `qpy_arrayant_rotate_pattern.cpp` — arrayant dict in / dict out, in-place modification
-     - `qpy_get_channels_multifreq.cpp` — arrayant dicts, 3-element position vectors, 4D outputs, `complex` flag
-     - `qpy_quantize_delays.cpp` — `complex` and `stack` flags for lists of arrays
-     - `qpy_hdf5_write_channel.cpp`, `qpy_hdf5_read_channel.cpp` — channel dicts, unstructured data
-  3. Write `api_python/qpy_<function_name>.cpp` following the guidelines below.
-  4. Register the wrapper in the dispatcher of its submodule AND add the registration as a comment block at the end of the wrapper file.
-  5. Add a test `tests/python_tests/test_<function_name>.py` (`unittest`, one `test_case` class; the module is imported from `../../lib` relative to the test file — copy the header of an existing test).
-  6. Build with `make python`, run the tests with `make python_test` (`python3 -m pytest tests/python_tests -x -s`).
-- The text in the `/*!MD ... MD!*/` block is merged into one Markdown file for all functions and compiled to HTML (`make documentation`). It also serves as the reference when reading the wrapper source. The delimiters `/*!MD`, `MD!*/`, `/*!SECTION`, `SECTION!*/` are matched literally, each on its own line.
+- `api_python/python_arma_adapter.hpp` (numpy / list / dict conversions) and `api_python/python_quadriga_adapter.hpp` (arrayant / channel dicts, `std::any` datasets) — helper functions. Read them when a signature is unclear; the lists in this document are a summary.
+- `include/*.hpp` — C++ declarations; `src/*.cpp` — C++ implementations with their documentation blocks (`/*!MD ... MD!*/`); `api_mex/*.cpp` — MEX wrappers.
+- `tests/python_tests/test_<function_name>.py` — tests, one file per wrapper; pytest collects all `test_*.py` files in the folder, so a new test file needs no registration.
+- `lib/` — the compiled Python module (`quadriga_lib.cpython-*.so`) is installed here by the build; the tests import it from there.
+- Generated overviews (read-only, produced by `make documentation`, never edit them; they may lag behind the sources until the documentation is rebuilt):
+  - `html_docu/quadriga_lib_api_cpp.md` — all C++ functions
+  - `html_docu/quadriga_lib_api_python.md` — all Python functions
+  - `html_docu/quadriga_lib_api_mex.md` — all MATLAB functions
+  - Each starts with general usage notes and a "Function Index" table with the columns Function, Section and Line. The Line column is the line number at which the entry starts: read the index first, then extract only the entries you need by line range instead of reading the whole file.
+- The text in the `/*!MD ... MD!*/` block of a wrapper is merged into the Markdown overview and compiled to HTML. It also serves as the reference when reading the wrapper source. The delimiters `/*!MD`, `MD!*/`, `/*!SECTION`, `SECTION!*/` are matched literally, each on its own line.
+- Commands (Linux, from the repository root):
+  - `make python` — build the library and the Python module into `lib/`
+  - `make python_test` — run the complete Python test suite (`python3 -m pytest tests/python_tests -x -s`)
+  - `python3 -m pytest tests/python_tests/test_<function_name>.py -x -s` — run one test file; this is the normal way to iterate on one wrapper
+
+# WORKFLOW
+The order differs from the C++ workflow: the wrapper is written first, the test second. The physics is already verified by the Catch2 suite of the C++ function; the Python test exists to exercise the wrapper. The work normally happens in one session.
+
+There are two review points at which you stop, report, and wait for my answer before continuing:
+- **Review point A** (end of Phase 1) — only if there are open questions about the Python interface.
+- **Review point B** (end of Phase 4) — always: the final result.
+
+## Phase 0 — What you receive
+- The documentation block of the C++ function, or its name (the block is then in `src/*.cpp` and in `html_docu/quadriga_lib_api_cpp.md`), and/or the MEX wrapper of the same function.
+- Optionally the submodule and remarks on the Python interface (argument names, order, flags, what to leave out).
+
+## Phase 1 — Read the contract and fix the Python interface
+- Read the C++ documentation block and the declaration in `include/`, and the MEX wrapper if one is given.
+- Read one or two existing wrappers that use the same pattern and follow them, e.g.:
+  - `qpy_acdf.cpp` — array inputs, optional array input, outputs of known and unknown size
+  - `qpy_obj_file_read.cpp` — outputs of runtime size, integer index outputs, string lists, map-to-dict
+  - `qpy_obj_file_write.cpp` — many optional inputs passed to C++ as `nullptr` when absent
+  - `qpy_calc_delay_spread.cpp` — ragged inputs as lists of arrays
+  - `qpy_arrayant_rotate_pattern.cpp` — arrayant dict in / dict out, in-place modification
+  - `qpy_get_channels_multifreq.cpp` — arrayant dicts, 3-element position vectors, 4D outputs, `complex` flag
+  - `qpy_quantize_delays.cpp` — `complex` and `stack` flags for lists of arrays
+  - `qpy_hdf5_write_channel.cpp`, `qpy_hdf5_read_channel.cpp` — channel dicts, unstructured data
+- Settle before writing code: the Python name and the submodule; the usage line (order and kwarg names of the inputs, order of the returned tuple, in/out splits); which inputs are optional and their defaults; whether the `complex` and `stack` flags apply; the type of every output (array dtype, list, dict, scalar); the size of every output and whether the wrapper can know it before the call; the helper for every argument; the section name.
+- **Review point A:** if anything in this list cannot be settled from the C++ documentation, the MEX wrapper and this spec (the submodule, a C++ type without helper, an output order that is not obvious, a flag beyond `complex` / `stack`, logic that would have to live in the wrapper), list the open questions with your proposed answer for each, and wait. If everything is clear, state the usage line and continue.
+
+## Phase 2 — Wrapper and registration
+- Write `api_python/qpy_<function_name>.cpp` following the "IMPLEMENTATION GUIDELINES".
+- Register the wrapper in the dispatcher of its submodule AND add the identical registration as a comment block at the end of the wrapper file.
+- Build. The wrapper must compile without warnings.
+
+## Phase 3 — Test
+- Write `tests/python_tests/test_<function_name>.py` (see "TESTS"). The test exercises the wrapper: every argument reaches the right place under its documented keyword name, optional arguments and defaults work, the returned objects have the right order, type, shape and dtype, errors arrive as Python exceptions.
+- Run the test. It is expected to pass, since the C++ function is already verified. If it fails, the cause is in the wrapper, the registration or the test's expectation; find out which before changing anything. If the failure points to the C++ function itself, stop and report it — do not work around it in the wrapper.
+
+## Phase 4 — Finish
+- The new test passes; the complete Python test suite passes.
+- The documentation block of the wrapper is complete and matches what the wrapper does; the usage line, the wrapper signature, the dispatcher entry and the comment block name the same arguments in the same order.
+- **Review point B:** report the final state: the Python usage line and the submodule, the test results with the actual output of the run, compiler warnings if any, every deviation from the C++ interface or the MEX wrapper and why, and anything that was not tested. Do not report a test as passing that was not run.
+- The MEX wrapper is a separate task and is only written on request.
 
 # IMPLEMENTATION GUIDELINES
 
@@ -537,6 +575,98 @@ return py::make_tuple(out1_py, out2_py, out3_py, out4_py);
   - **Legacy MEX features** (separate arrayant field inputs / outputs, dummy return values of void functions) are not ported.
 - The MEX wrapper is optional context. When it is not provided, generate the Python wrapper from the C++ documentation block alone. Existing Python wrappers may differ from their MEX counterparts; do not align them unless requested.
 
+# TESTS
+
+## Scope
+- The Python test verifies the **wrapper**, not the physics. The numerical behavior of the C++ function is pinned by its Catch2 suite and is not re-derived here: no oracles for the physics, no sweeps over the parameter space.
+- What the test must show:
+  - **Data lands where it should**: every input reaches the C++ argument it belongs to, positionally and by keyword; every output comes back in the documented position of the tuple, with the documented type, shape and dtype.
+  - **Optional arguments and defaults work**: omitted, passed as `None`, and passed explicitly.
+  - **Array handling works**: the result does not depend on the memory layout or dtype of the input arrays, and inputs are not modified.
+  - **Flags work**: `complex` and `stack` change the form of the output, not its values.
+  - **Errors are passed correctly**: exceptions thrown by the C++ function and by the wrapper arrive as the right Python exception type with the right message.
+- For this, a few small cases with known results are enough: values that can be written down by hand, or that follow from the input by construction. Use distinctive inputs (different values per element, non-square shapes, non-symmetric index lists) so that a swapped argument, a transposed array or a wrong axis order changes the result visibly.
+- Keep it lean: no duplicated cases, no helper layers. The test is as long as it needs to be to cover the checklist below.
+
+## File and structure
+- One file per wrapper: `tests/python_tests/test_<function_name>.py`, built on `unittest` and run by pytest. Layout:
+```
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+# Part of quadriga-lib — see LICENSE for terms.
+
+# Python interface test for quadriga_lib.<submodule>.<function_name>.
+# Scope: argument and output handling, defaults, flags, error paths.
+# Physics validation lives in the Catch2 suite (test_<function_name>.cpp).
+
+import sys
+import os
+import unittest
+import numpy as np
+import numpy.testing as npt
+
+# Append the directory containing the package to sys.path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+package_path = os.path.join(current_dir, "../../lib")
+if package_path not in sys.path:
+    sys.path.append(package_path)
+
+import quadriga_lib
+
+
+class test_case(unittest.TestCase):
+
+    def setUp(self):
+        ...
+
+    def test_basic_call(self):
+        ...
+
+    def test_errors(self):
+        ...
+
+
+if __name__ == "__main__":
+    unittest.main()
+```
+- One class `test_case(unittest.TestCase)` per file; one method per aspect of the checklist below, named `test_<what_is_checked>`. Shared inputs are built in `setUp` or in small module-level helper functions.
+- Call the function through its full path, `quadriga_lib.<submodule>.<function_name>(...)`, as in the Usage line of the documentation.
+- Use other library functions for supporting tasks (`quadriga_lib.RTtools.cube` for a mesh, `quadriga_lib.arrayant.generate` for an antenna, `quadriga_lib.RTtools.ray_triangle_intersect` for hit indices, ...) instead of building such data by hand; `html_docu/quadriga_lib_api_python.md` lists what is available.
+- Tests that write files use `tempfile` (or distinct file names) and remove the files at the end.
+- The random generator, where used, is seeded: `rng = np.random.default_rng(0)`.
+
+## Assertions
+- `self.assertEqual(a, b)` — shapes, dtypes, lengths, strings, scalars that must match exactly, e.g. `self.assertEqual(out.shape, (201, 2))`, `self.assertEqual(out.dtype, np.float64)`
+- `self.assertIsInstance(out, tuple)` / `list` / `dict` / `np.ndarray` — types of returned objects
+- `npt.assert_array_equal(a, b)` — integer, boolean and index arrays, and values that must pass through unchanged
+- `npt.assert_allclose(a, b, atol=tol, rtol=0)` — floating-point and complex arrays; state `atol` and `rtol` explicitly
+- Tolerances: `1e-14` to `1e-12` for values that are exact by construction in double, around `1e-6` where single precision is involved. The wrapper does not change values, so a tight tolerance is the norm; a loose one needs a comment.
+- Errors: assert the exception type and a characteristic substring of the message:
+```
+with self.assertRaises(ValueError) as ctx:
+    quadriga_lib.tools.function_name(bad_input)
+self.assertIn("n_bins", str(ctx.exception))
+```
+  - `ValueError` for `std::invalid_argument`, `IndexError` for `std::out_of_range`, `RuntimeError` for `std::runtime_error`, `TypeError` when pybind11 rejects the call itself (missing mandatory argument, unknown keyword, an object that cannot be converted to the declared type).
+  - Assert the specific type. Do not use a catch-all tuple of exception types (some older tests do); if the type is not what this list predicts, that is a finding to report.
+
+## What every test covers
+- **Basic call**: all mandatory inputs; check the type of the returned object (tuple and its length for several outputs), and the type, shape, dtype and values of every output.
+- **Keyword arguments**: one call that passes every argument by keyword, using the names from the Usage line, gives the same result as the positional call. This is the check that the Usage line, the wrapper signature and the registration agree; a wrong name raises `TypeError`.
+- **Each optional input**: omitted, passed as `None` where the default is `None` (must give the same result as omitted), and passed with a non-default value that visibly changes the result. This also shows that the default in the registration matches the documentation.
+- **Array memory layout**: the same data as C-ordered array, as Fortran-ordered array (`np.asfortranarray`), and as a non-contiguous view (e.g. a slice with a step) gives the same result. This exercises both the view and the copy path of the input helpers.
+- **Array dtype**: at least one call with `float32` or integer arrays (and a plain Python list for an optional input) gives the same result as the `float64` call.
+- **Inputs are not modified**: keep a copy of the inputs before the call and compare afterwards — mandatory for wrappers that work in place on a copy (arrayant dicts, index arrays), cheap everywhere else.
+- **Output dtypes**: `float64` for real outputs, `complex128` for complex outputs; integer outputs as documented (the C++ integer type for pre-allocated outputs, `int64` for copied ones).
+- **Indices** (if the function has index arguments): they are 0-based in and out (the smallest valid value is 0), except those documented as 1-based, which pass through unchanged. Use an input in which the index matters and is not symmetric.
+- **`complex` flag** (if present): `complex=True` returns one complex array per pair; `complex=False` returns the two real arrays in its place; real and imaginary part of the complex result equal the split result. Check the length of the tuple in both cases.
+- **`stack` flag** (if present): `stack=False` returns a list with one array per entry; `stack=True` returns one array with the entry index on the last axis; the entries agree (up to zero padding for ragged data).
+- **Dicts** (arrayant, channel, material properties): a dict with only the mandatory keys is accepted; an output dict has the documented keys and shapes; a round trip (output of one call as input of the next) works; for arrayants, the single-frequency (3D) and the frequency-dependent (4D) layout are both exercised where supported.
+- **Errors from C++**: at least one case in which the C++ function throws (e.g. a wrong number of columns, an out-of-range scalar), to show that the exception type and message come through.
+- **Errors from the wrapper**: every `throw` in the wrapper itself is reached by one case.
+- **Errors from pybind11**: a missing mandatory argument and an unknown keyword raise `TypeError`.
+- Light sanity of the values is welcome where it is free (a known closed-form result for the simplest input); anything beyond that belongs in the Catch2 suite.
+
 # REFERENCE EXAMPLE
 
 C++ documentation block for the function `acdf`:
@@ -545,32 +675,34 @@ C++ documentation block for the function `acdf`:
 # acdf
 Calculate the empirical averaged cumulative distribution function (CDF)
 
-## Description:
 - Computes per-column empirical CDFs by histogramming into bins and taking the normalized cumulative sum
-- Averaged CDF is obtained by quantile-space averaging: for a fine probability grid, x-values from each column CDF are averaged, then mapped back to the bin grid
+- Averaged CDF is obtained by quantile-space averaging: for a fine probability grid, x-values from each column CDF are averaged,
+  then mapped back to the bin grid
 - Quantile statistics (mean and std) are reported at the 0.1, 0.2, ..., 0.9 probability levels
 - `Inf` and `NaN` values are excluded from computation
-- If `bins` points to an empty vector, equally spaced bins spanning the data range are generated and stored back; if non-empty, those bin centers are used; if `nullptr`, bins are auto-generated internally
+- If `bins` points to an empty vector, equally spaced bins spanning the data range are generated and stored back;
+  if non-empty, those bin centers are used; if `nullptr`, bins are auto-generated internally
 
 ## Declaration:
 ```
 void quadriga_lib::acdf(const arma::Mat<dtype> &data,
     arma::Col<dtype> *bins = nullptr,
-    arma::Mat<dtype> *Sh = nullptr,
-    arma::Col<dtype> *Sc = nullptr,
+    arma::Mat<dtype> *cdf_per_set = nullptr,
+    arma::Col<dtype> *cdf_avg = nullptr,
     arma::Col<dtype> *mu = nullptr,
     arma::Col<dtype> *sig = nullptr,
     arma::uword n_bins = 201);
 ```
 
-## Input Arguments:
-- **`data`** — Input data matrix; each column is one independent data set, `[n_samples, n_sets]`
-- **`bins`** *(optional)* — Bin centers; auto-generated and stored back if pointing to empty vector, used as-is if non-empty, ignored if `nullptr`, `[n_bins]`
+## Inputs:
+- **`data`** — Input data matrix; each column is one independent data set; `[n_samples, n_sets]`
+- **`bins`** *(optional)* — Bin centers; auto-generated and stored back if pointing to empty vector,
+  used as-is if non-empty, ignored if `nullptr`; `[n_bins]`
 - **`n_bins`** *(optional)* — Number of bins when auto-generating; must be >= 2; ignored when non-empty bins are provided
 
-## Output Arguments:
-- **`Sh`** *(optional)* — Individual CDFs, one per column of data, `[n_bins, n_sets]`
-- **`Sc`** *(optional)* — Averaged CDF via quantile-space averaging across data sets, `[n_bins]`
+## Outputs:
+- **`cdf_per_set`** *(optional)* — Individual CDFs, one per column of data; `[n_bins, n_sets]`
+- **`cdf_avg`** *(optional)* — Averaged CDF via quantile-space averaging across data sets; `[n_bins]`
 - **`mu`** *(optional)* — Mean of the 0.1–0.9 quantiles across data sets, `[9]`
 - **`sig`** *(optional)* — Standard deviation of the 0.1–0.9 quantiles across data sets, `[9]`
 MD!*/
@@ -675,4 +807,126 @@ void quadriga_lib_tools(py::module_ &m)
           py::arg("bins") = py::none(),
           py::arg("n_bins") = 201);
 }
+```
+
+Test for the `acdf` wrapper, `tests/python_tests/test_acdf.py`:
+
+```
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+# Part of quadriga-lib — see LICENSE for terms.
+
+# Python interface test for quadriga_lib.tools.acdf.
+# Scope: argument and output handling, defaults, array handling, error paths.
+# Physics validation lives in the Catch2 suite (test_acdf.cpp).
+
+import sys
+import os
+import unittest
+import numpy as np
+import numpy.testing as npt
+
+# Append the directory containing the package to sys.path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+package_path = os.path.join(current_dir, "../../lib")
+if package_path not in sys.path:
+    sys.path.append(package_path)
+
+import quadriga_lib
+
+
+class test_case(unittest.TestCase):
+
+    def setUp(self):
+        # Two data sets with different, known content; shape (100, 2)
+        self.data = np.column_stack((np.arange(1.0, 101.0), np.arange(101.0, 201.0)))
+
+    def test_basic_call(self):
+        out = quadriga_lib.tools.acdf(self.data)
+        self.assertIsInstance(out, tuple)
+        self.assertEqual(len(out), 5)
+        cdf_per_set, bins_out, cdf_avg, mu, sig = out
+
+        self.assertEqual(cdf_per_set.shape, (201, 2))
+        self.assertEqual(bins_out.shape, (201,))
+        self.assertEqual(cdf_avg.shape, (201,))
+        self.assertEqual(mu.shape, (9,))
+        self.assertEqual(sig.shape, (9,))
+        for x in out:
+            self.assertEqual(x.dtype, np.float64)
+
+        npt.assert_allclose(bins_out[[0, -1]], [1.0, 200.0], atol=1e-12, rtol=0)  # bins span the data
+        npt.assert_allclose(cdf_per_set[-1, :], [1.0, 1.0], atol=1e-12, rtol=0)   # each CDF ends at 1
+        self.assertGreater(cdf_per_set[100, 0], 0.99)                             # columns are not swapped
+        self.assertLess(cdf_per_set[99, 1], 0.01)
+
+    def test_keyword_arguments(self):
+        ref = quadriga_lib.tools.acdf(self.data, None, 11)
+        out = quadriga_lib.tools.acdf(data=self.data, bins=None, n_bins=11)
+        for a, b in zip(out, ref):
+            npt.assert_array_equal(a, b)
+
+    def test_optional_inputs(self):
+        ref = quadriga_lib.tools.acdf(self.data)
+
+        # bins = None is the same as omitted
+        out = quadriga_lib.tools.acdf(self.data, None)
+        npt.assert_array_equal(out[0], ref[0])
+
+        # n_bins changes the output size
+        cdf_per_set, bins_out, _, _, _ = quadriga_lib.tools.acdf(self.data, n_bins=11)
+        self.assertEqual(cdf_per_set.shape, (11, 2))
+        self.assertEqual(bins_out.shape, (11,))
+
+        # Explicit bins are used as-is and returned; n_bins is then ignored
+        bins = np.linspace(0.0, 250.0, 26)
+        cdf_per_set, bins_out, _, _, _ = quadriga_lib.tools.acdf(self.data, bins, 5)
+        self.assertEqual(cdf_per_set.shape, (26, 2))
+        npt.assert_allclose(bins_out, bins, atol=1e-14, rtol=0)
+
+    def test_array_layout_and_dtype(self):
+        ref = quadriga_lib.tools.acdf(self.data)
+
+        variants = [
+            np.ascontiguousarray(self.data),              # C order
+            np.asfortranarray(self.data),                 # Fortran order
+            np.repeat(self.data, 2, axis=0)[::2, :],      # non-contiguous view
+            self.data.astype(np.float32),                 # other dtype
+        ]
+        for data in variants:
+            out = quadriga_lib.tools.acdf(data)
+            self.assertEqual(out[0].dtype, np.float64)
+            npt.assert_allclose(out[0], ref[0], atol=1e-6, rtol=0)
+
+        # bins given as a plain list
+        out = quadriga_lib.tools.acdf(self.data, [0.0, 100.0, 200.0])
+        self.assertEqual(out[0].shape, (3, 2))
+
+    def test_inputs_not_modified(self):
+        data = self.data.copy()
+        bins = np.linspace(0.0, 250.0, 26)
+        bins_copy = bins.copy()
+        quadriga_lib.tools.acdf(data, bins)
+        npt.assert_array_equal(data, self.data)
+        npt.assert_array_equal(bins, bins_copy)
+
+    def test_errors(self):
+        # Thrown by C++: std::invalid_argument -> ValueError
+        with self.assertRaises(ValueError) as ctx:
+            quadriga_lib.tools.acdf(self.data, n_bins=1)
+        self.assertIn("n_bins", str(ctx.exception))
+
+        with self.assertRaises(ValueError) as ctx:
+            quadriga_lib.tools.acdf(np.zeros((0, 0)))
+        self.assertIn("data", str(ctx.exception))
+
+        # Rejected by pybind11
+        with self.assertRaises(TypeError):
+            quadriga_lib.tools.acdf()
+        with self.assertRaises(TypeError):
+            quadriga_lib.tools.acdf(self.data, no_such_argument=1)
+
+
+if __name__ == "__main__":
+    unittest.main()
 ```
