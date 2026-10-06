@@ -1117,7 +1117,10 @@ TEST_CASE("ray_state_update - mass-law material is excluded from slab resolution
     std::complex<double> close = std::sqrt(g_L) * std::exp(std::complex<double>(0.0, -k0 * (2.0 - 1.0) * L));
 
     CHECK(std::abs(vvf(C) / close - 1.0) < 1e-6); // bare close-out, S = 1
-    check_rtype(C, RT_EXIT);                      // not RT_EXIT_SLAB
+    // Not RT_EXIT_SLAB. The exit carries the undeviated bit: no refracted direction was supplied,
+    // so the wave is held at its geometric angle inside a mass-law medium and the face is charged
+    // from the far side rather than judged from inside it.
+    check_rtype(C, RT_EXIT + OT_TIR);
 
     // Teeth: without the gate this slab would have resolved to a clearly non-unit S
     std::complex<double> r = fresnel_te({4.0, 0.0}, {1.0, 0.0}, 0.0).r;
@@ -7012,6 +7015,66 @@ TEST_CASE("Stack with a mass-law layer - resolved by segments, not killed")
         }
 }
 
+// Transmit port of a sheet whose outer pair is past its critical angle, where the wave entered the
+// sheet as an ordinary Fresnel wave: the near crossing as Material::interact_with gives it, the far
+// face as the flat tf leak at the Snell cosine the wave has in the sheet, the sheet's one-way
+// factor, and the internal series the reflect port already carries. The displaced medium is air on
+// every row that calls this, taken out at the incidence cosine because the leak leaves undeviated.
+// S_te / S_tm are the series factors in power, so a row can say what the series alone is worth.
+struct DiagLeak
+{
+    std::complex<double> T_te, T_tm;
+    double S_te = 1.0, S_tm = 1.0;
+};
+static inline DiagLeak diag_leak_series(std::complex<double> e_near, std::complex<double> e_slab,
+                                        std::complex<double> e_far, double tf_near, double tf_slab,
+                                        double tf_far, double thk, double ct, double f_hz, bool scalar)
+{
+    const double k0 = 2.0 * QPI * f_hz / C0;
+    auto root = [](std::complex<double> a)
+    {
+        if (std::imag(a) == 0.0 && std::real(a) < 0.0)
+            a = std::complex<double>(std::real(a), -0.0); // decaying evanescent root
+        return std::sqrt(a);
+    };
+    double s2 = 1.0 - ct * ct;
+    std::complex<double> zn = std::sqrt(e_near), zs = std::sqrt(e_slab), zf = std::sqrt(e_far);
+    std::complex<double> cs = root(1.0 - (e_near / e_slab) * s2), cf = root(1.0 - (e_near / e_far) * s2);
+
+    // near crossing, flux-normalized, tf on the TE/TM mean in EM and on the one channel in scalar mode
+    std::complex<double> r_te = (zn * ct - zs * cs) / (zn * ct + zs * cs);
+    std::complex<double> r_tm = scalar ? r_te : (zs * ct - zn * cs) / (zs * ct + zn * cs);
+    std::complex<double> t_te = 2.0 * zn * ct / (zn * ct + zs * cs);
+    std::complex<double> t_tm = scalar ? t_te : 2.0 * zn * ct / (zs * ct + zn * cs);
+    double R0 = scalar ? std::norm(r_te) : 0.5 * (std::norm(r_te) + std::norm(r_tm));
+    double sc = std::sqrt((1.0 - diag_tf_pair(R0, tf_near, tf_slab)) / (1.0 - R0));
+    double fl_te = std::sqrt(std::real(zs * cs) / std::real(zn * ct));
+    double fl_tm = scalar ? fl_te : std::sqrt(std::real(std::conj(zs) * cs) / std::real(std::conj(zn) * ct));
+    std::complex<double> a_te = t_te * fl_te * sc, a_tm = t_tm * fl_tm * sc;
+
+    // far face from inside the sheet: closed, so the flat leak; real in EM, at arg(1 + R) in scalar mode
+    std::complex<double> f_te = (zs * cs - zf * cf) / (zs * cs + zf * cf);
+    std::complex<double> f_tm = scalar ? f_te : (zf * cs - zs * cf) / (zf * cs + zs * cf);
+    double leak = 1.0 - diag_tf_pair(1.0, tf_slab, tf_far);
+    std::complex<double> b = std::polar(std::sqrt(leak), scalar ? std::arg(1.0 + f_te) : 0.0);
+
+    std::complex<double> phi = std::exp(std::complex<double>(0.0, -1.0) * k0 * std::sqrt(e_slab) * thk * cs);
+    std::complex<double> phi_t = phi / std::exp(std::complex<double>(0.0, -k0 * thk * ct));
+
+    auto den = [&](std::complex<double> r, std::complex<double> f)
+    {
+        double Rf0 = std::norm(f);
+        std::complex<double> rn = std::polar(std::sqrt(diag_tf_pair(std::norm(r), tf_slab, tf_near)), std::arg(-r));
+        std::complex<double> rf = std::polar(std::sqrt(diag_tf_pair((Rf0 > 1.0) ? 1.0 : Rf0, tf_slab, tf_far)), std::arg(f));
+        return 1.0 - rn * rf * phi * phi;
+    };
+    DiagLeak D;
+    std::complex<double> d_te = den(r_te, f_te), d_tm = den(r_tm, f_tm);
+    D.T_te = a_te * b * phi_t / d_te, D.T_tm = a_tm * b * phi_t / d_tm;
+    D.S_te = 1.0 / std::norm(d_te), D.S_tm = 1.0 / std::norm(d_tm);
+    return D;
+}
+
 TEST_CASE("Total reflection of the outer pair - the sheet stays in the result")
 {
     // Where the near | far pair is past its critical angle SHEET_RESOLVE discarded the sheet and
@@ -7041,10 +7104,11 @@ TEST_CASE("Total reflection of the outer pair - the sheet stays in the result")
     // out at the incidence cosine because a leak is undeviated. Asserted in power and complex,
     // on lossless permittivities.
     //
-    // The chain is the traced equivalent and inherits one property of it: past the critical angle
-    // of the sheet | far face the leak crosses it as a flat leak, while the reverse direction is
-    // an ordinary Fresnel crossing, so the two directions differ. That belongs to
-    // Material::interact_with and is recorded as its own item.
+    // Each event is evaluated at the cosine the wave has there: the incidence cosine after a first
+    // crossing that was itself a leak, the Snell cosine after an ordinary one. A leak inside a
+    // mass-law sheet is not judged from inside it at the far face and is charged what the other
+    // direction charges, and a wave that entered by an ordinary crossing carries the sheet's
+    // internal series. Both have their own case; the rows here follow the same rules.
     const double f_hz = FRQ;
     const double L = 0.10;
     const uint8_t OT_GLUED_ENTRY = 71, OT_GLUED_EXIT = 69;
@@ -7184,7 +7248,12 @@ TEST_CASE("Total reflection of the outer pair - the sheet stays in the result")
             auto Et = make1<double>(mtl, 4, OT_GLUED_ENTRY, 2u, 1, 2, 0, 0, 0, L, 0.5, 0.5, QPI / 2.0 - th, 1.5);
             auto Er = make1<double>(mtl, 3, OT_GLUED_ENTRY, 2u, 1, 2, 0, 0, 0, L, 0.5, 0.5, QPI / 2.0 - th, 1.5);
             Et.run(), Er.run();
-            double x1 = cross(1.0, e_w, 0.0, tf_w, th), x2 = cross(e_w, e_c, tf_w, tf_c, th);
+            // Past the critical angle of air | wood the wave in the panel is a leak, and the panel
+            // is mass-law, so the wood | concrete face is the crossing from the concrete side at
+            // the same angle. At normal incidence everything is an ordinary crossing.
+            bool leak = std::sqrt(1.0 / e_w) * std::sin(th) >= 1.0;
+            double x1 = cross(1.0, e_w, 0.0, tf_w, th);
+            double x2 = leak ? cross(e_c, e_w, tf_c, tf_w, th) : cross(e_w, e_c, tf_w, tf_c, th);
             double ref_eT = x1 * G_w * gM * x2 * G_c, ref_eR = 1.0 - x1;
 
             // Phase of the entry leak. Each crossing keeps the phase interact_with gives it,
@@ -7198,7 +7267,8 @@ TEST_CASE("Total reflection of the outer pair - the sheet stays in the result")
                 std::complex<double> z1 = std::sqrt(e1), z2 = std::sqrt(e2);
                 return std::arg(1.0 + (z1 * c_ - z2 * c2) / (z1 * c_ + z2 * c2));
             };
-            std::complex<double> ref_eT_cx = std::polar(std::sqrt(ref_eT), arg_T(1.0, e_w, th) + arg_T(e_w, e_c, th));
+            std::complex<double> ref_eT_cx = std::polar(std::sqrt(ref_eT), arg_T(1.0, e_w, th) +
+                                                                              (leak ? arg_T(e_c, e_w, th) : arg_T(e_w, e_c, th)));
             CHECK(std::abs(cpx(Et.xprmat, 0, 0) - ref_eT_cx) < 1.0e-9 * std::sqrt(ref_eT));
 
             // Exit, from inside the wall. Concrete without its mass law, so the leg it closes is a
@@ -7239,7 +7309,7 @@ TEST_CASE("Total reflection of the outer pair - the sheet stays in the result")
         QD_DIAG("# (tf 0.5) | air, lossless throughout\ntheta_n,gain_EM,ref_EM,gain_scalar,ref_scalar,d_complex\n");
         for (double thd : {60.0, 70.0, 80.0})
         {
-            double th = thd * QPI / 180.0, ct = std::cos(th), s2 = 1.0 - ct * ct;
+            double th = thd * QPI / 180.0, ct = std::cos(th);
             auto run = [&](int itype)
             {
                 auto C = make1<double>(mtl, itype, OT_GLUED_EXIT, 2u, 1, 2, 0, 2, 0, L, 0.5, 0.5, QPI / 2.0 - th, 1.5);
@@ -7247,31 +7317,15 @@ TEST_CASE("Total reflection of the outer pair - the sheet stays in the result")
                 return C;
             };
             auto Ct = run(1), St = run(4);
-            double zh = std::sqrt(1.5), zs = std::sqrt(5.24), cs = std::sqrt(1.0 - (1.5 / 5.24) * s2);
-            double r_te = (zh * ct - zs * cs) / (zh * ct + zs * cs), r_tm = (zs * ct - zh * cs) / (zs * ct + zh * cs);
-            double Rbar = 0.5 * (r_te * r_te + r_tm * r_tm);
-            double leak = 1.0 - diag_tf_pair(1.0, tf_s, 0.0); // sheet | air at the angle the leak keeps: closed
-            double ref_em = (1.0 - diag_tf_pair(Rbar, 0.0, tf_s)) * leak;
-            double ref_sc = (1.0 - diag_tf_pair(r_te * r_te, 0.0, tf_s)) * leak;
-            // Complex. The host leg the crossing closes is a pure phase, removed with diag_close.
-            // Crossing one is real and positive for lossless media below its own critical angle;
-            // crossing two is the flat leak, real in EM and at arg(1 + R) in scalar mode; the sheet
-            // contributes its one-way phase with the displaced air taken out at the incidence
-            // cosine, since the leak is undeviated.
-            const double k0 = 2.0 * QPI * f_hz / C0;
+            // The wave enters the sheet by an ordinary crossing, so it meets the closed far face at
+            // the Snell cosine and carries the sheet's internal series; diag_leak_series is that
+            // statement. The host leg the crossing closes is a pure phase, removed with diag_close.
+            DiagLeak De = diag_leak_series(1.5, 5.24, 1.0, 0.0, tf_s, 0.0, thk, ct, f_hz, false);
+            DiagLeak Ds = diag_leak_series(1.5, 5.24, 1.0, 0.0, tf_s, 0.0, thk, ct, f_hz, true);
+            double ref_em = 0.5 * (std::norm(De.T_te) + std::norm(De.T_tm)), ref_sc = std::norm(Ds.T_te);
             std::complex<double> close = diag_close(std::complex<double>(1.5, 0.0), L, th, f_hz);
-            std::complex<double> phi = std::exp(std::complex<double>(0.0, -k0 * (zs * thk * cs - thk * ct)));
-            double t_te = 2.0 * zh * ct / (zh * ct + zs * cs), t_tm = 2.0 * zh * ct / (zs * ct + zh * cs);
-            double fl = std::sqrt(zs * cs / (zh * ct)); // normal-flux factor, one number for lossless media
-            double a_em = std::sqrt((1.0 - diag_tf_pair(Rbar, 0.0, tf_s)) / (1.0 - Rbar));
-            double a_sc = std::sqrt((1.0 - diag_tf_pair(r_te * r_te, 0.0, tf_s)) / (1.0 - r_te * r_te));
-            std::complex<double> c2a(0.0, -std::sqrt(5.24 * s2 - 1.0)); // air side of sheet | air, decaying
-            double arg2 = std::arg(1.0 + (zs * ct - c2a) / (zs * ct + c2a));
-            std::complex<double> ref_te = t_te * fl * a_em * std::sqrt(leak) * phi;
-            std::complex<double> ref_tm = t_tm * fl * a_em * std::sqrt(leak) * phi;
-            std::complex<double> ref_s = (1.0 + r_te) * fl * a_sc * std::polar(std::sqrt(leak), arg2) * phi;
-            double d_cx = std::max(std::max(std::abs(TE(Ct.xprmat) / close - ref_te), std::abs(TM(Ct.xprmat) / close - ref_tm)),
-                                   std::abs(cpx(St.xprmat, 0, 0) / close - ref_s));
+            double d_cx = std::max(std::max(std::abs(TE(Ct.xprmat) / close - De.T_te), std::abs(TM(Ct.xprmat) / close - De.T_tm)),
+                                   std::abs(cpx(St.xprmat, 0, 0) / close - Ds.T_te));
 
             QD_DIAG("%.1f,%.9f,%.9f,%.9f,%.9f,%.3e\n", thd, (double)Ct.gain(0), ref_em, (double)St.gain(0), ref_sc, d_cx);
             INFO("leak through a coated solid, theta_n " << thd);
@@ -7279,5 +7333,489 @@ TEST_CASE("Total reflection of the outer pair - the sheet stays in the result")
             CHECK(std::abs((double)St.gain(0) - ref_sc) < 1.0e-9);
             CHECK(d_cx < 1.0e-9);
         }
+    }
+}
+
+TEST_CASE("Reciprocity - glued entry against glued exit")
+{
+    // One three-medium stack resolved from both sides: air | sheet | solid entered from the air at
+    // theta_ext, and solid | sheet | air left from inside the solid along the direction a tracer
+    // holds after refracting in at that same theta_ext. The two are the same pair of waves
+    // reversed, so in per-channel normal-flux powers they owe the same number.
+    //
+    // Lossless solid. Exact: the raw amplitudes of a reciprocal stack differ by the ratio of the two
+    // outer tilted admittances, and the two flux conversions are that ratio and its inverse. This is
+    // the row that guards the conversion - with it removed the two would sit 1.76 dB apart at normal
+    // incidence.
+    //
+    // Lossy solid. Not exact, and the residual has a closed form. With eta = z c for TE and z / c
+    // for TM in the solid, exit over entry is |eta|^2 / Re(eta)^2 = sec^2(arg eta) per channel: the
+    // incident and reflected waves in a lossy medium interfere, so splitting its flux into two
+    // independent parts is not exact, and the flux form is the one that composes across a chain.
+    // That is the settled energy convention, so the residual is asserted against its closed form
+    // and recorded against a bound, never asserted to zero. The normal-incidence row is called out:
+    // no cosine enters there and the residual is sec^2(arg z) alone, 0.073946 dB for eps 1.50 - 0.40j.
+    //
+    // The host leg the exit closes is isolated by running it over L and 2 L and taking the ratio,
+    // which holds whatever cosine the composite is built at.
+    const double f_hz = FRQ;
+    const double L = 0.10;
+    auto mtl = diag_palette<double>();
+    const uint8_t OT_GLUED_ENTRY = 71, OT_GLUED_EXIT = 69;
+    const int SHEET = 3, LO = 5, LO_CLEAN = 6;
+
+    struct Row
+    {
+        const char *name;
+        int host;
+        bool lossless;
+    };
+    const std::vector<Row> rows = {{"lossless eps 1.50       ", LO_CLEAN, true}, {"lossy eps 1.50 - 0.40j  ", LO, false}};
+
+    QD_DIAG("\n# diag: glued entry / exit reciprocity, air | 6 mm eps 5.24 - 0.63j | solid, 1 GHz.\n");
+    QD_DIAG("# x_over_e_* is exit over entry in dB; ref_* is the closed form sec^2(arg eta) of the solid,\n");
+    QD_DIAG("# zero for a lossless one. d_* is the relative distance of the measured ratio from it\n");
+    QD_DIAG("solid,theta_ext,P_entry_scalar,P_exit_scalar,x_over_e_scalar_dB,ref_te_dB,ref_tm_dB,"
+            "x_over_e_gain_dB,ref_gain_dB,d_scalar,d_gain\n");
+
+    for (const auto &R : rows)
+        for (double thd : {0.0, 10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0})
+        {
+            double th = thd * QPI / 180.0;
+            std::complex<double> e_h = diag_eps(R.host, f_hz);
+            double ct = diag_traced_ct(e_h, th);              // the real projection the tracer holds
+            std::complex<double> cx = diag_ct_exact(e_h, th); // the exact complex in-solid cosine
+
+            auto enter = [&](int itype)
+            {
+                auto C = make1<double>(mtl, itype, OT_GLUED_ENTRY, 2u, SHEET, R.host, 0, 0, 0,
+                                       L, 0.5, 0.5, QPI / 2.0 - th, 1.5);
+                C.run();
+                return C;
+            };
+            auto leave = [&](int itype, double host_len)
+            {
+                auto C = make1<double>(mtl, itype, OT_GLUED_EXIT, 2u, SHEET, R.host, 0, R.host, 0,
+                                       host_len, 0.5, 0.5, QPI / 2.0 - th, 1.5);
+                C.has_path_dir = true;
+                C.path_dir_prev.zeros(1, 3);
+                C.path_dir_prev(0, 0) = ct;
+                C.path_dir_prev(0, 1) = std::sqrt(1.0 - ct * ct);
+                C.run();
+                return C;
+            };
+            auto Es = enter(4), Ee = enter(1);
+            auto Xs = leave(4, L), Xs2 = leave(4, 2.0 * L), Xe = leave(1, L);
+            REQUIRE(Es.resolved_type[0] != 0);
+            REQUIRE(Xs.resolved_type[0] != 0);
+
+            double host2 = std::norm(cpx(Xs2.xprmat, 0, 0) / cpx(Xs.xprmat, 0, 0)); // host leg over L, power
+            double Pe_s = std::norm(cpx(Es.xprmat, 0, 0)), Px_s = std::norm(cpx(Xs.xprmat, 0, 0)) / host2;
+            double Pe_te = std::norm(cpx(Ee.xprmat, 0, 3)), Pe_tm = std::norm(cpx(Ee.xprmat, 0, 0));
+            double Ge = (double)Ee.gain(0), Gx = (double)Xe.gain(0) / host2;
+
+            std::complex<double> z = std::sqrt(e_h);
+            double c_te = std::cos(std::arg(z * cx)), c_tm = std::cos(std::arg(z / cx));
+            double k_te = 1.0 / (c_te * c_te), k_tm = 1.0 / (c_tm * c_tm);
+            double ref_G = 0.5 * (Pe_te * k_te + Pe_tm * k_tm);
+            double d_s = std::abs(Px_s - Pe_s * k_te) / Pe_s, d_g = std::abs(Gx - ref_G) / Ge;
+            auto dB = [](double g)
+            { return 10.0 * std::log10(g); };
+
+            QD_DIAG("%s,%.1f,%.9f,%.9f,%+.6f,%+.6f,%+.6f,%+.6f,%+.6f,%.3e,%.3e\n", R.name, thd, Pe_s, Px_s,
+                    dB(Px_s / Pe_s), dB(k_te), dB(k_tm), dB(Gx / Ge), dB(ref_G / Ge), d_s, d_g);
+
+            INFO(R.name << ", theta_ext " << thd);
+            CHECK(std::abs(Ge - 0.5 * (Pe_te + Pe_tm)) < 1.0e-12); // the entry gain is the channel mean
+            CHECK(d_s < 1.0e-9);
+            CHECK(d_g < 1.0e-9);
+            if (R.lossless)
+            {
+                CHECK(k_te == 1.0); // the closed form is identically 1, so the two rows above read zero
+                CHECK(k_tm == 1.0);
+            }
+            else
+            {
+                // The flux-splitting residual, recorded against a bound. TE grows towards grazing
+                // and TM falls, so the bound is on the larger channel and on the mean.
+                CHECK(dB(Px_s / Pe_s) > 0.0);
+                CHECK(dB(Px_s / Pe_s) < 0.50);
+                CHECK(std::abs(dB(Gx / Ge)) < 0.25);
+                if (thd == 0.0) // no cosine enters: sec^2(arg z) and nothing else
+                {
+                    CHECK(std::abs(dB(Px_s / Pe_s) - 0.073946) < 1.0e-6);
+                    CHECK(std::abs(dB(Gx / Ge) - 0.073946) < 1.0e-6);
+                }
+            }
+        }
+}
+
+TEST_CASE("Leak reciprocity - a mass-law panel on a rigid wall as a sheet and as two traced solids")
+{
+    // A tf leak keeps its direction, so the reverse of a leak that crossed a face at theta is the
+    // crossing of that face from the other side at the same theta. Wood (eps 2.1609e-8) on concrete
+    // (eps 2.401e-9) has a Snell ratio of 3: from the wood the face is past its critical angle
+    // beyond 19.47 deg and passes only the flat leak, from the concrete it never is and is an
+    // ordinary crossing. Same face, same two media, same angle, a factor of three.
+    //
+    // The angle 19.47 deg is formed from the index of a mass-law material, which is calibrated for
+    // surface impedance only and is not a propagation index. So a face is not judged from inside a
+    // mass-law medium by a wave that is held undeviated: it is charged what the other direction
+    // charges at that angle, with the interface gain of the medium entered.
+    //
+    // Owed between the two directions, and taken out here: the interface gain of the medium newly
+    // entered. Recorded, not owed and not removed: on the sheet rows the air | wood face is the
+    // settled flat leak on entry (R0 = 1) and a Fresnel crossing on exit (R0 = 1 - 4 z cos), worth
+    // 0.010 dB. Everything else has to vanish.
+    const double f_hz = FRQ;
+    const double e_w = 2.1609e-8, e_c = 2.401e-9;
+    const double tf_w = 0.2, tf_c = 0.1, att_w = 1.0, att_c = 2.0;
+    const double G_w = std::pow(10.0, -0.1 * att_w), G_c = std::pow(10.0, -0.1 * att_c);
+    auto dB = [](double g)
+    { return (g > 0.0) ? 10.0 * std::log10(g) : -999.0; };
+
+    // ------------------------------------------------------------------------------------------
+    // As a sheet: air | wood | concrete against concrete | wood | air
+    // ------------------------------------------------------------------------------------------
+    {
+        const double thk = 0.020, L = 0.10;
+        const uint8_t OT_GLUED_ENTRY = 71, OT_GLUED_EXIT = 69;
+        const std::vector<LumpMtl> pal = {
+            {e_w, 0.0, thk, att_w, tf_w, 0.0, 0.0, 0.0, 0.0, 20.0, 0.001}, // 1 WOOD   panel, m 20
+            {e_c, 0.0, 0.0, att_c, tf_c, 0.0, 0.0, 0.0, 0.0, 30.0, 0.001}, // 2 CONC   as a wall
+            {e_c, 0.0, 0.0, att_c, tf_c},                                  // 3 CONC0  without its mass law
+        };
+        auto mtl = lump_palette(pal);
+        QD_DIAG("\n# diag: leak reciprocity as a sheet, wood panel (20 mm, tf 0.2, att 1 dB, m 20) on concrete\n");
+        QD_DIAG("# (tf 0.1, att 2 dB), scalar. e_minus_x is entry minus exit with the wall's interface gain\n");
+        QD_DIAG("# taken out; near_face is the flat first face against the Fresnel exit, the part recorded\n");
+        QD_DIAG("theta_n,entry_T_dB,exit_T_dB,e_minus_x_dB,near_face_dB,rest_dB\n");
+        for (double thd : {0.0, 10.0, 30.0, 45.0, 70.0})
+        {
+            double th = thd * QPI / 180.0, ct = std::cos(th), s2 = 1.0 - ct * ct;
+            auto Et = make1<double>(mtl, 4, OT_GLUED_ENTRY, 2u, 1, 2, 0, 0, 0, L, 0.5, 0.5, QPI / 2.0 - th, 1.5);
+            auto Xt = make1<double>(mtl, 4, OT_GLUED_EXIT, 2u, 1, 3, 0, 3, 0, L, 0.5, 0.5, QPI / 2.0 - th, 1.5);
+            Et.run(), Xt.run();
+            double d = dB((double)Et.gain(0) / G_c) - dB((double)Xt.gain(0));
+
+            // The air | wood face: flat on entry past its critical angle, Fresnel on exit at the
+            // cosine the exit holds in the wood. At normal incidence both directions are Fresnel.
+            double zw = std::sqrt(e_w), cw = std::sqrt(1.0 - (e_c / e_w) * s2), ca = std::sqrt(1.0 - e_c * s2);
+            double r = (zw * cw - ca) / (zw * cw + ca);
+            double near_face = (thd > 0.0) ? dB((1.0 - diag_tf_pair(1.0, 0.0, tf_w)) / (1.0 - diag_tf_pair(r * r, tf_w, 0.0))) : 0.0;
+
+            QD_DIAG("%.1f,%.4f,%.4f,%+.6f,%+.6f,%+.3e\n", thd, dB((double)Et.gain(0)), dB((double)Xt.gain(0)), d, near_face, d - near_face);
+            INFO("wood on concrete as a sheet, theta_n " << thd);
+            CHECK(std::abs(d) < 0.02);           // the stated bound, the recorded near-face term inside it
+            CHECK(std::abs(d - near_face) < 1.0e-9);  // and nothing else: the wood | concrete face is one number
+        }
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // As two traced solids: the wood | concrete face through ray_mesh_interact, both directions
+    // ------------------------------------------------------------------------------------------
+    {
+        // Two adjacent cubes sharing the wall at x = 1. The coefficient of an undeviated crossing
+        // is the one ray_mesh_interact writes; ray_state_update replaces it only where the tracer
+        // supplied a refracted direction, which a leak does not have.
+        const std::vector<LumpMtl> pal = {
+            {e_w, 0.0, 0.0, att_w, tf_w, 0.0, 0.0, 0.0, 0.0, 20.0, 1.0}, // 1 WOOD as a solid
+            {e_c, 0.0, 0.0, att_c, tf_c, 0.0, 0.0, 0.0, 0.0, 30.0, 1.0}, // 2 CONC as a solid
+        };
+        auto mtl = lump_palette(pal);
+        arma::mat mesh = quadriga_lib::cube<double>();
+        arma::mat cube2 = quadriga_lib::cube<double>(arma::vec{1.0}, arma::vec{0.0, 0.0, 0.0}, arma::vec{2.0, 0.0, 0.0});
+        mesh = arma::join_cols(mesh, cube2);
+        arma::uvec mtl_ind(mesh.n_rows);
+        for (arma::uword i = 0; i < mesh.n_rows; ++i)
+            mtl_ind(i) = (i < mesh.n_rows / 2) ? 1 : 2;
+
+        auto face = [&](bool wood_to_conc, double th)
+        {
+            double dy = 0.2 * std::tan(th), xa = wood_to_conc ? 0.9 : 1.1, xb = wood_to_conc ? 1.1 : 0.9;
+            arma::mat orig = {{xa, -0.4, 0.1}}, dest = {{xb, -0.4 + dy, 0.1}};
+            arma::mat fbs, sbs;
+            arma::u32_vec fbs_ind, sbs_ind;
+            quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+            arma::mat origN, destN, xprmatN;
+            arma::vec gainN;
+            quadriga_lib::ray_mesh_interact(4, f_hz, &orig, &dest, &mesh, &mtl_ind, &mtl,
+                                            &fbs_ind, &sbs_ind, (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                            &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                            &gainN, &xprmatN);
+            REQUIRE(gainN.n_elem == 1);
+            return (double)gainN(0);
+        };
+
+        QD_DIAG("\n# diag: leak reciprocity as two traced solids, the wood | concrete face through\n");
+        QD_DIAG("# ray_mesh_interact, scalar. Each direction with the interface gain of the medium it enters\n");
+        QD_DIAG("# taken out; w2c_minus_c2w has to vanish\n");
+        QD_DIAG("theta_n,wood_to_conc,conc_to_wood,w2c_minus_c2w_dB\n");
+        for (double thd : {0.0, 10.0, 30.0, 45.0, 70.0})
+        {
+            double th = thd * QPI / 180.0;
+            double wc = face(true, th) / G_c, cw = face(false, th) / G_w;
+            QD_DIAG("%.1f,%.9f,%.9f,%+.6f\n", thd, wc, cw, dB(wc) - dB(cw));
+            INFO("wood | concrete as two traced solids, theta_n " << thd);
+            CHECK(cw > 0.5);                               // the face is open from the concrete at every angle
+            CHECK(std::abs(dB(wc) - dB(cw)) < 1.0e-9);     // exact: one crossing, read from either side
+        }
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // Guard: a wave the tracer refracted into a mass-law solid is a Fresnel wave and is left alone
+    // ------------------------------------------------------------------------------------------
+    {
+        const double L = 0.10;
+        const std::vector<LumpMtl> pal = {
+            {4.0, 0.0, 0.0},                                             // 1 plain solid
+            {4.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 20.0, 1.0},    // 2 the same with a mass law, term zero at this path
+        };
+        auto mtl = lump_palette(pal);
+        for (double thd : {30.0, 60.0})
+        {
+            double th = thd * QPI / 180.0, ct = diag_traced_ct(std::complex<double>(4.0, 0.0), th);
+            auto run = [&](int M)
+            {
+                auto C = make1<double>(mtl, 4, OT_EXIT, 1, M, 0, 0, M, 0, L, 2.0, 0.5, QPI / 2.0 - th, 1.5);
+                C.has_path_dir = true;
+                C.path_dir_prev.zeros(1, 3);
+                C.path_dir_prev(0, 0) = ct;
+                C.path_dir_prev(0, 1) = std::sqrt(1.0 - ct * ct);
+                C.run();
+                return (double)C.gain(0);
+            };
+            INFO("refracted wave in a mass-law solid, theta_ext " << thd);
+            double g_plain = run(1), g_mass = run(2);
+            CHECK(g_plain > 0.1);
+            CHECK(std::abs(g_plain - g_mass) < 1.0e-12);
+        }
+    }
+}
+
+TEST_CASE("Leak chain - each face at the cosine the wave has and the series on a closed far face")
+{
+    // The transmit port of a sheet whose outer pair is past its critical angle is three events. Two
+    // things about them, and one about what follows them.
+    //
+    // The cosine. A wave that entered the sheet by an ordinary Fresnel crossing was refracted and
+    // meets the far face at the Snell cosine; by transitivity that face is then closed whenever the
+    // outer pair is, and passes the flat tf leak or nothing. Only a wave that entered as a leak
+    // kept the incidence cosine, and its one-way factor through the sheet is taken at that cosine
+    // too, not at the Snell one, which for a leak is evanescent.
+    //
+    // The series. A sheet has no interior the tracer could follow a bounce into, so what the far
+    // face reflects has to be summed here or it is lost. Where the wave is a Fresnel wave inside
+    // the sheet the series is the one the reflect port already carries. A wave that entered as a
+    // leak has no phase the media define for its bounces and keeps the three events alone, as the
+    // mass-law route does at every angle.
+    const double f_hz = FRQ;
+    const double L = 0.10;
+    const double k0 = 2.0 * QPI * f_hz / C0;
+    const uint8_t OT_GLUED_ENTRY = 71, OT_GLUED_EXIT = 69;
+    auto TM = [](const arma::mat &X)
+    { return cpx(X, 0, 0); };
+    auto TE = [](const arma::mat &X)
+    { return cpx(X, 0, 3); };
+    auto dB = [](double g)
+    { return (g > 0.0) ? 10.0 * std::log10(g) : -999.0; };
+
+    // ------------------------------------------------------------------------------------------
+    // No tf anywhere: a closed outer pair transmits nothing, whatever the sheet is
+    // ------------------------------------------------------------------------------------------
+    {
+        auto mtl = diag_palette<double>(); // 2 = eps 5.24 solid, 8 = eps 1.50 sheet, both lossless
+        QD_DIAG("\n# diag: closed outer pair with no tf, eps 5.24 | 6 mm eps 1.50 | air. The pair closes at\n");
+        QD_DIAG("# 25.9 deg, the host | sheet face at 32.3 deg; the exact transmit port is zero throughout\n");
+        QD_DIAG("theta_n,gain_EM,gain_scalar\n");
+        for (double thd : {26.0, 28.0, 30.0, 32.0, 40.0})
+        {
+            double th = thd * QPI / 180.0;
+            auto Ce = make1<double>(mtl, 1, OT_GLUED_EXIT, 2u, 8, 2, 0, 2, 0, L, 0.5, 0.5, QPI / 2.0 - th, 1.5);
+            auto Cs = make1<double>(mtl, 4, OT_GLUED_EXIT, 2u, 8, 2, 0, 2, 0, L, 0.5, 0.5, QPI / 2.0 - th, 1.5);
+            Ce.run(), Cs.run();
+            QD_DIAG("%.1f,%.9f,%.9f\n", thd, (double)Ce.gain(0), (double)Cs.gain(0));
+            INFO("closed pair, no tf, EM palette, theta_n " << thd);
+            CHECK((double)Ce.gain(0) == 0.0);
+            CHECK((double)Cs.gain(0) == 0.0);
+        }
+
+        const std::vector<LumpMtl> pal = {{0.31, 0.0, 0.010}, {0.05, 0.0, 0.0}};
+        auto mta = lump_palette(pal);
+        QD_DIAG("\n# diag: the same in the acoustic direction, air | 10 mm eps 0.31 | eps 0.05, scalar. The pair\n");
+        QD_DIAG("# closes at 12.9 deg; the sheet | far face judged at the incidence cosine only at 23.7 deg\n");
+        QD_DIAG("theta_n,gain\n");
+        for (double thd : {13.0, 15.0, 20.0, 23.0, 30.0})
+        {
+            double th = thd * QPI / 180.0;
+            auto C = make1<double>(mta, 4, OT_GLUED_ENTRY, 2u, 1, 2, 0, 0, 0, L, 0.5, 0.5, QPI / 2.0 - th, 1.5);
+            C.run();
+            QD_DIAG("%.1f,%.9f\n", thd, (double)C.gain(0));
+            INFO("closed pair, no tf, acoustic palette, theta_n " << thd);
+            CHECK((double)C.gain(0) == 0.0);
+        }
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // A coherent sheet entered by a leak: three events, the one-way factor at the incidence cosine
+    // ------------------------------------------------------------------------------------------
+    {
+        const double thk = 0.010, e_s = 0.31, e_c = 2.401e-9, tf_s = 0.3, tf_c = 0.1;
+        const std::vector<LumpMtl> pal = {{e_s, 0.0, thk, 0.0, tf_s}, {e_c, 0.0, 0.0, 0.0, tf_c}};
+        auto mtl = lump_palette(pal);
+        QD_DIAG("\n# diag: coherent lossless sheet entered by a leak, air | 10 mm eps 0.31 (tf 0.3) | rigid\n");
+        QD_DIAG("# (tf 0.1), scalar. ref is the two flat leaks; evan_dB is the Snell-cosine decay a leak\n");
+        QD_DIAG("# does not take\ntheta_n,gain,ref,gain_minus_ref_dB,evan_dB,d_complex\n");
+        for (double thd : {40.0, 45.0, 60.0, 75.0})
+        {
+            double th = thd * QPI / 180.0, ct = std::cos(th), s2 = 1.0 - ct * ct;
+            auto C = make1<double>(mtl, 4, OT_GLUED_ENTRY, 2u, 1, 2, 0, 0, 0, L, 0.5, 0.5, QPI / 2.0 - th, 1.5);
+            C.run();
+            double ref = (1.0 - diag_tf_pair(1.0, 0.0, tf_s)) * (1.0 - diag_tf_pair(1.0, tf_s, tf_c));
+            double zs = std::sqrt(e_s), zc = std::sqrt(e_c);
+            std::complex<double> c2n(0.0, -std::sqrt(s2 / e_s - 1.0)), c2f(0.0, -std::sqrt((e_s / e_c) * s2 - 1.0));
+            double arg_n = std::arg(1.0 + (ct - zs * c2n) / (ct + zs * c2n));
+            double arg_f = std::arg(1.0 + (zs * ct - zc * c2f) / (zs * ct + zc * c2f));
+            std::complex<double> ref_cx = std::polar(std::sqrt(ref), arg_n + arg_f - k0 * (zs - 1.0) * thk * ct);
+            double evan = dB(std::exp(-2.0 * k0 * thk * std::sqrt(s2 - e_s)));
+            double d_cx = std::abs(cpx(C.xprmat, 0, 0) - ref_cx);
+            QD_DIAG("%.1f,%.9f,%.9f,%+.4f,%+.4f,%.3e\n", thd, (double)C.gain(0), ref, dB((double)C.gain(0) / ref), evan, d_cx);
+            INFO("coherent sheet entered by a leak, theta_n " << thd);
+            CHECK(std::abs((double)C.gain(0) - ref) < 1.0e-9);
+            CHECK(d_cx < 1.0e-9);
+        }
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // The series on a closed far face, EM and scalar: eps 1.50 | 6 mm eps 5.24 (tf 0.5) | air
+    // ------------------------------------------------------------------------------------------
+    {
+        const double thk = 0.006, tf_s = 0.5;
+        const std::vector<LumpMtl> pal = {{5.24, 0.00, thk, 0.0, tf_s}, {1.50, 0.00, 0.0}};
+        auto mtl = lump_palette(pal);
+        const std::complex<double> e_h(1.50, 0.0), e_s(5.24, 0.0), e_a(1.0, 0.0);
+        QD_DIAG("\n# diag: leak through a coated solid with its series, eps 1.50 | 6 mm eps 5.24 (tf 0.5) | air,\n");
+        QD_DIAG("# lossless. S_dB is the series factor of the scalar channel; energy is |R|^2 + |T|^2 in scalar\n");
+        QD_DIAG("# mode, which a lossless stack owes exactly\n");
+        QD_DIAG("theta_n,gain_EM,ref_EM,gain_scalar,ref_scalar,S_dB,d_complex,energy_scalar\n");
+        for (double thd : {60.0, 70.0, 80.0})
+        {
+            double th = thd * QPI / 180.0, ct = std::cos(th);
+            auto run = [&](int itype)
+            {
+                auto C = make1<double>(mtl, itype, OT_GLUED_EXIT, 2u, 1, 2, 0, 2, 0, L, 0.5, 0.5, QPI / 2.0 - th, 1.5);
+                C.run();
+                return C;
+            };
+            auto Ct = run(1), St = run(4), Sr = run(3);
+            DiagLeak De = diag_leak_series(e_h, e_s, e_a, 0.0, tf_s, 0.0, thk, ct, f_hz, false);
+            DiagLeak Ds = diag_leak_series(e_h, e_s, e_a, 0.0, tf_s, 0.0, thk, ct, f_hz, true);
+            std::complex<double> close = diag_close(e_h, L, th, f_hz); // the host leg, a pure phase
+            double ref_em = 0.5 * (std::norm(De.T_te) + std::norm(De.T_tm)), ref_sc = std::norm(Ds.T_te);
+            double d_cx = std::max(std::max(std::abs(TE(Ct.xprmat) / close - De.T_te), std::abs(TM(Ct.xprmat) / close - De.T_tm)),
+                                   std::abs(cpx(St.xprmat, 0, 0) / close - Ds.T_te));
+            double energy = (double)St.gain(0) + (double)Sr.gain(0);
+            QD_DIAG("%.1f,%.9f,%.9f,%.9f,%.9f,%+.4f,%.3e,%.12f\n", thd, (double)Ct.gain(0), ref_em,
+                    (double)St.gain(0), ref_sc, dB(Ds.S_te), d_cx, energy);
+            INFO("leak through a coated solid with its series, theta_n " << thd);
+            CHECK(std::abs((double)Ct.gain(0) - ref_em) < 1.0e-9);
+            CHECK(std::abs((double)St.gain(0) - ref_sc) < 1.0e-9);
+            CHECK(d_cx < 1.0e-9);
+            CHECK(std::abs(energy - 1.0) < 1.0e-12); // needs no reference
+        }
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // The series on a closed far face, acoustic: an absorber without tf on a leaking rigid wall
+    // ------------------------------------------------------------------------------------------
+    {
+        const double tf_c = 0.3;
+        const std::vector<LumpMtl> pal = {
+            {2.50, 0.80, 0.010},            // 1 a dense lossy layer
+            {0.31, 0.20, 0.010},            // 2 a porous layer, rarer than air
+            {2.401e-9, 0.0, 0.0, 0.0, tf_c}, // 3 rigid wall leaking, tf 0.3
+        };
+        auto mtl = lump_palette(pal);
+        struct Row
+        {
+            const char *name;
+            int sh;
+            double lim; // the air | sheet face must be an ordinary crossing on the row
+        };
+        const std::vector<Row> rows = {{"dense  | rigid tf .3", 1, 70.0}, {"porous | rigid tf .3", 2, 20.0}};
+        QD_DIAG("\n# diag: leak into a rigid wall (tf 0.3) through a 10 mm absorber without tf, scalar,\n");
+        QD_DIAG("# air | sheet | rigid. S_dB is the series factor, the part a three-event chain leaves out\n");
+        QD_DIAG("stack,theta_n,T_dB,ref_T_dB,S_dB,d_complex\n");
+        for (const auto &R : rows)
+            for (double thd : {10.0, 20.0, 45.0, 70.0})
+            {
+                if (thd > R.lim)
+                    continue;
+                double th = thd * QPI / 180.0, ct = std::cos(th);
+                const LumpMtl &Sm = pal[(size_t)R.sh - 1];
+                auto C = make1<double>(mtl, 4, OT_GLUED_ENTRY, 2u, R.sh, 3, 0, 0, 0, L, 0.5, 0.5, QPI / 2.0 - th, 1.5);
+                C.run();
+                DiagLeak D = diag_leak_series(1.0, lump_eps(Sm, f_hz), lump_eps(pal[2], f_hz), 0.0, 0.0, tf_c,
+                                              Sm.thk, ct, f_hz, true);
+                double d_cx = std::abs(cpx(C.xprmat, 0, 0) - D.T_te);
+                QD_DIAG("%s,%.1f,%.4f,%.4f,%+.4f,%.3e\n", R.name, thd, dB((double)C.gain(0)), dB(std::norm(D.T_te)), dB(D.S_te), d_cx);
+                INFO(R.name << ", theta_n " << thd);
+                CHECK(d_cx < 1.0e-9 * std::abs(D.T_te) + 1.0e-12);
+            }
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // The step at the critical angle of the outer pair, recorded
+    // ------------------------------------------------------------------------------------------
+    {
+        // Just below, the composite; just above, the chain. With the series on both sides and the
+        // far face at one cosine on both sides, the scalar step closes. In EM a per-channel step
+        // stays: the near crossing takes tf on the TE/TM mean in the chain and per channel in the
+        // composite, which is the settled channel rule.
+        const double thk = 0.006, tf_s = 0.5;
+        const std::vector<LumpMtl> pal = {{5.24, 0.00, thk, 0.0, tf_s}, {1.50, 0.00, 0.0}};
+        auto mtl = lump_palette(pal);
+        const double thc = std::asin(std::sqrt(1.0 / 1.5)) * 180.0 / QPI, dth = 1.0e-5;
+        auto run = [&](int itype, double thd)
+        {
+            auto C = make1<double>(mtl, itype, OT_GLUED_EXIT, 2u, 1, 2, 0, 2, 0, L, 0.5, 0.5, QPI / 2.0 - thd * QPI / 180.0, 1.5);
+            C.run();
+            return C;
+        };
+        auto Sb = run(4, thc - dth), Sa = run(4, thc + dth), Eb = run(1, thc - dth), Ea = run(1, thc + dth);
+        double st_s = dB((double)Sa.gain(0)) - dB((double)Sb.gain(0));
+        double st_te = dB(std::norm(TE(Ea.xprmat))) - dB(std::norm(TE(Eb.xprmat)));
+        double st_tm = dB(std::norm(TM(Ea.xprmat))) - dB(std::norm(TM(Eb.xprmat)));
+        QD_DIAG("\n# diag: step from the composite to the leak chain at the critical angle of the outer pair,\n");
+        QD_DIAG("# above minus below in dB, +- 1e-5 deg\nstack,theta_c,step_scalar_dB,step_te_dB,step_tm_dB\n");
+        QD_DIAG("eps 1.50 | 6 mm eps 5.24 (tf 0.5) | air,%.4f,%+.4f,%+.4f,%+.4f\n", thc, st_s, st_te, st_tm);
+        CHECK(std::abs(st_s) < 0.01);
+        CHECK(std::abs(st_te) < 0.5);
+        CHECK(std::abs(st_tm) < 0.5);
+
+        // Wood on concrete. The outer pair closes at asin(z_conc) = 0.0028 deg and the air | wood
+        // face at asin(z_wood) = 0.0084 deg. Between them the wave in the wood is a refracted one
+        // near grazing and the far face is closed for it, so the first angle is continuous. At the
+        // second the wave becomes a leak and its angle in the wood drops from grazing to the
+        // incidence angle; that step is what a leak keeping its direction means and is recorded.
+        const double e_w = 2.1609e-8, e_c = 2.401e-9;
+        const std::vector<LumpMtl> pw = {
+            {e_w, 0.0, 0.020, 1.0, 0.2, 0.0, 0.0, 0.0, 0.0, 20.0, 0.001},
+            {e_c, 0.0, 0.0, 2.0, 0.1, 0.0, 0.0, 0.0, 0.0, 30.0, 0.001},
+        };
+        auto mw = lump_palette(pw);
+        auto wood = [&](double thd)
+        {
+            auto C = make1<double>(mw, 4, OT_GLUED_ENTRY, 2u, 1, 2, 0, 0, 0, L, 0.5, 0.5, QPI / 2.0 - thd * QPI / 180.0, 1.5);
+            C.run();
+            return dB((double)C.gain(0));
+        };
+        const double t_outer = std::asin(std::sqrt(e_c)) * 180.0 / QPI, t_near = std::asin(std::sqrt(e_w)) * 180.0 / QPI;
+        double st_o = wood(t_outer * (1.0 + 1.0e-6)) - wood(t_outer * (1.0 - 1.0e-6));
+        double st_n = wood(t_near * (1.0 + 1.0e-6)) - wood(t_near * (1.0 - 1.0e-6));
+        QD_DIAG("wood panel on concrete at the outer pair,%.6f,%+.4f,,\n", t_outer, st_o);
+        QD_DIAG("wood panel on concrete at the air | wood face,%.6f,%+.4f,,\n", t_near, st_n);
+        CHECK(std::abs(st_o) < 0.05);
+        CHECK(std::abs(st_n) < 5.0); // recorded: 10 log10(0.82 / 0.28) = 4.67 dB, the wave becoming a leak
     }
 }
