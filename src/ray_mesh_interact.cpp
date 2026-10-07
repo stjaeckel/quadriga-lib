@@ -22,6 +22,22 @@
 // Materials
 namespace
 {
+    // The argument of a refraction root that is real and negative up to rounding, where the root
+    // has to be the decaying one.
+    //
+    // An argument 1 - (e1 / e2) sin^2 is exactly real for two lossless media at a real angle, and
+    // the principal root of a negative real with a +0.0 imaginary part is the growing wave, so the
+    // sign of the zero is forced. Formed from a recovered complex cosine the same argument is real
+    // only up to rounding - the imaginary parts of e1 (1 - c^2) cancel to a few ulp, of either
+    // sign - and a test for an exact zero then leaves the branch to that sign: the phase of a
+    // total reflection flipped by about 180 deg between neighbouring angles. So the test is
+    // relative. A far medium with real loss has a negative imaginary part many orders above the
+    // bound and takes the principal root, which is the decaying one, as it always did.
+    inline bool qd_evanescent(const std::complex<double> &arg)
+    {
+        return std::real(arg) < 0.0 && std::abs(std::imag(arg)) <= -1.0e-9 * std::real(arg);
+    }
+
     template <typename dtype>
     struct MaterialCols
     {
@@ -563,7 +579,7 @@ namespace
             std::complex<double> ct2_arg = (sin_theta_real >= 0.0)
                                                ? (1.0 - eta1_d_eta2 * sin_theta_real * sin_theta_real)
                                                : (1.0 - eta1_d_eta2 * sin2_theta);
-            if (std::imag(ct2_arg) == 0.0 && std::real(ct2_arg) < 0.0)
+            if (qd_evanescent(ct2_arg))
                 ct2_arg = std::complex<double>(std::real(ct2_arg), -0.0); // TIR branch cut: decaying evanescent wave
             std::complex<double> ct2 = std::sqrt(ct2_arg);
             std::complex<double> z1 = std::sqrt(eta1 / mu1); // admittances sqrt(eps/mu)
@@ -963,7 +979,7 @@ namespace
 
         auto root = [](std::complex<double> a)
         {
-            if (std::imag(a) == 0.0 && std::real(a) < 0.0)
+            if (qd_evanescent(a))
                 a = std::complex<double>(std::real(a), -0.0); // decaying evanescent root
             return std::sqrt(a);
         };
@@ -1417,7 +1433,7 @@ namespace
             std::complex<double> eta_n_if = mat_near.eta(fGHz) + mat_near.eta_resonance(fGHz);
             std::complex<double> mu_n = mat_near.mu(fGHz);
             std::complex<double> arg = 1.0 - ((eta_n_if * mu_n) / (eta_s_if * mu_s)) * sin2_i;
-            if (std::imag(arg) == 0.0 && std::real(arg) < 0.0)
+            if (qd_evanescent(arg))
                 arg = std::complex<double>(std::real(arg), -0.0); // decaying evanescent root
             cts_exact = std::sqrt(arg);
         }
@@ -1444,7 +1460,7 @@ namespace
             // interact_with does. Magnitudes are unaffected (|r| = 1 either way), so this only moves
             // results that actually reach internal TIR.
             std::complex<double> ct2_arg = 1.0 - rat * sin2;
-            if (std::imag(ct2_arg) == 0.0 && std::real(ct2_arg) < 0.0)
+            if (qd_evanescent(ct2_arg))
                 ct2_arg = std::complex<double>(std::real(ct2_arg), -0.0);
             std::complex<double> cos_t2 = std::sqrt(ct2_arg);
 
@@ -1526,7 +1542,7 @@ namespace
             std::complex<double> rat = (eta_a_if * mu_a) / (eta_s_if * mu_s);
 
             std::complex<double> ct2_arg = 1.0 - rat * sin2_i;
-            if (std::imag(ct2_arg) == 0.0 && std::real(ct2_arg) < 0.0)
+            if (qd_evanescent(ct2_arg))
                 ct2_arg = std::complex<double>(std::real(ct2_arg), -0.0); // decaying evanescent root
             std::complex<double> cos_t2 = std::sqrt(ct2_arg);
 
@@ -1570,7 +1586,7 @@ namespace
             // same incidence-side sine, since Snell is transitive and the slab drops out of it.
             std::complex<double> cts = cts_exact;
             std::complex<double> cos_t2_arg = 1.0 - ((eta_n_if * mu_n) / (eta_a_if * mu_a)) * sin2_i;
-            if (std::imag(cos_t2_arg) == 0.0 && std::real(cos_t2_arg) < 0.0)
+            if (qd_evanescent(cos_t2_arg))
                 cos_t2_arg = std::complex<double>(std::real(cos_t2_arg), -0.0); // decaying evanescent root
             std::complex<double> cos_t2 = std::sqrt(cos_t2_arg);
 
@@ -1661,7 +1677,7 @@ namespace
                 std::complex<double> z_f = std::sqrt(eta_f_if / mu_f);
 
                 std::complex<double> cf_arg = 1.0 - ((eta_n_if * mu_n) / (eta_f_if * mu_f)) * sin2_i;
-                if (std::imag(cf_arg) == 0.0 && std::real(cf_arg) < 0.0)
+                if (qd_evanescent(cf_arg))
                     cf_arg = std::complex<double>(std::real(cf_arg), -0.0); // decaying evanescent root
                 std::complex<double> c_far = std::sqrt(cf_arg);
 
@@ -1870,7 +1886,7 @@ namespace
             std::complex<double> cd_arg = 1.0 - ((mat_near.eta(fGHz) + mat_near.eta_resonance(fGHz)) *
                                                  mat_near.mu(fGHz) / (eta_d * mu_d)) *
                                                     sin2_i;
-            if (std::imag(cd_arg) == 0.0 && std::real(cd_arg) < 0.0)
+            if (qd_evanescent(cd_arg))
                 cd_arg = std::complex<double>(std::real(cd_arg), -0.0);
             std::complex<double> c_disp = std::sqrt(cd_arg);
 
@@ -4152,12 +4168,17 @@ void quadriga_lib::ray_state_update(int interaction_type,
             const bool unnamed = behind_sheet || (prev_embedded && mtl_prev != 0);
             const double u_max = unnamed ? 1.0e30 : 1.0;
 
-            // Under total reflection the direction was never bent, so there is no map to invert.
+            // The hit code's total-reflection bit does not gate this. It is ray_mesh_interact's
+            // verdict on the face AHEAD at the geometric angle, and with an undeviated tracer that
+            // is the external angle, so the bit is set from sqrt|eps| sin(theta_ext) >= 1 on a
+            // face the wave crosses. What is inverted here is the bend at the face BEHIND. A wave
+            // that was not bent there, a leak, holds its geometric direction and was declined
+            // above, where the traced and the geometric cosine coincide.
             // Normal incidence is NOT excluded: the projection and the exact value coincide there, but
             // the two propagation factors do not, and declining leaves the hybrid medium_gain form in
             // place while every neighbouring angle uses the exact one. The solve handles it directly -
             // t = 0 gives u = 0 and the first residual is already zero, returning exactly 1.
-            if (total_reflection || abs_cos_theta_t <= 0.0 || abs_cos_theta_t > 1.0)
+            if (abs_cos_theta_t <= 0.0 || abs_cos_theta_t > 1.0)
                 return none;
 
             Material M_ent = MAT(unnamed ? 0 : mtl_prev), M_slb = MAT(mtl_current);
@@ -4194,7 +4215,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
             ct_slab_real_inv = (unnamed || std::imag(e1) == 0.0) && std::imag(e2) != 0.0;
 
             std::complex<double> arg = 1.0 - eps_r * u;
-            if (std::imag(arg) == 0.0 && std::real(arg) < 0.0)
+            if (qd_evanescent(arg))
                 arg = std::complex<double>(std::real(arg), -0.0); // decaying evanescent root
             return std::sqrt(arg);
         };
@@ -4226,9 +4247,57 @@ void quadriga_lib::ray_state_update(int interaction_type,
         // - geom: 0 = reflect at VBS, 2 = Snell refract at VBS (undeviated under TIR), 3 = exit (keep the traced origN->destN direction).
         auto REPLACE_BY_VBS = [&](int Ma, int Mb, int itype, int geom) -> double
         {
+            // The direction an exit into air owes, where it can be formed.
+            //
+            // ray_mesh_interact wrote the direction for this face from the geometric segment, and
+            // with an undeviated tracer that segment runs at the external angle, so its Snell bend
+            // out of the medium is applied to a direction the wave does not have: out of eps 1.50
+            // a ray that came in at 40 deg left at 51.9 deg. What bends is dir_prev. Across parallel
+            // faces the transverse invariant p of a wave from air is real and conserved, and the
+            // direction in air is sqrt(p) against sqrt(1 - p), parallel to the one it came in at.
+            // That is the construction a transition uses: the Snell ratio with the length the
+            // projection lost, and the far cosine at the recovered cosine.
+            //
+            // Written where it is exact and nowhere else: a lossless medium, where the real-angle
+            // map is the wave, and a lossy one whose cosine was recovered for a real invariant.
+            // A lossy medium whose recovery declines, a face that is closed, and a leg with no
+            // refracted direction keep what ray_mesh_interact wrote.
+            auto EXIT_DIRECTION = [&](const Material &A, const Material &B, bool real_inv, const std::complex<double> &ct_a,
+                                      double snell_ab, const std::complex<double> &cos_b, bool tir_ab) -> bool
+            {
+                if (!use_vbs || tir_ab || !(std::real(cos_b) > 0.0))
+                    return false;
+                bool lossless = std::imag((A.eta(fGHz) + A.eta_resonance(fGHz)) * A.mu(fGHz)) == 0.0 &&
+                                std::imag((B.eta(fGHz) + B.eta_resonance(fGHz)) * B.mu(fGHz)) == 0.0;
+                if (!lossless && !real_inv)
+                    return false;
+                double snell_dir = snell_ab;
+                if (real_inv)
+                    snell_dir *= std::sqrt(std::abs(1.0 - ct_a * ct_a) + std::real(ct_a) * std::real(ct_a));
+                qd_refract(dir_prev[0], dir_prev[1], dir_prev[2], N[0], N[1], N[2], snell_dir, abs_cos_theta_t, cos_b,
+                           dir_next[0], dir_next[1], dir_next[2]);
+                if (p_path_dirN)
+                    p_path_dirN[ii] = (dtype)dir_next[0],
+                    p_path_dirN[ii + n_rayN] = (dtype)dir_next[1],
+                    p_path_dirN[ii + 2 * n_rayN] = (dtype)dir_next[2];
+                return true;
+            };
+
             // A resolved path will not call SLAB_AIRY_FACTOR, so we don't need the coefficients.
+            // Its exit still owes a direction; nothing else of the event is touched.
             if (resolved)
+            {
+                if (geom == 3 && use_vbs && Ma == mtl_current)
+                {
+                    std::complex<double> c_b, c_a = EXACT_IN_SLAB_COSINE();
+                    bool have = std::abs(c_a) > 0.0, t_ab = false;
+                    double sn = 1.0;
+                    MAT(Ma).interact_with(MAT(Mb), itype, theta_t, fGHz, nullptr, nullptr, &c_b, nullptr, &sn, &t_ab,
+                                          false, have ? &c_a : nullptr, false);
+                    EXIT_DIRECTION(MAT(Ma), MAT(Mb), have && ct_slab_real_inv, c_a, sn, c_b, t_ab);
+                }
                 return dist_fbs_dest;
+            }
 
             // Compute coefficients (cTE and cTM are required by SLAB_AIRY_FACTOR, so we always compute them)
             // only cTE/cTM are needed past the fast return; the geometry outs are used only in the VBS branch
@@ -4300,8 +4369,10 @@ void quadriga_lib::ray_state_update(int interaction_type,
                     snell_dir *= std::sqrt(std::abs(1.0 - ct_in * ct_in) + std::real(ct_in) * std::real(ct_in));
                 qd_refract(dir_prev[0], dir_prev[1], dir_prev[2], N[0], N[1], N[2], snell_dir, abs_cos_theta_t, cos_t2, dir_next[0], dir_next[1], dir_next[2]);
             }
+            else if (geom == 3) // exit into air: the direction of dir_prev refracted, where it is exact
+                EXIT_DIRECTION(MAT(Ma), MAT(Mb), face_real_inv, ct_in, snell, cos_t2, tir);
 
-            if (p_path_dirN && geom != 3) // write the corrected continuation; an exit keeps the traced direction
+            if (p_path_dirN && geom != 3) // write the corrected continuation; an exit wrote its own or keeps the traced one
                 p_path_dirN[ii] = (dtype)dir_next[0],
                 p_path_dirN[ii + n_rayN] = (dtype)dir_next[1],
                 p_path_dirN[ii + 2 * n_rayN] = (dtype)dir_next[2];
@@ -4413,7 +4484,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 double s_lat = dist_refract * std::sqrt((sin_t > 0.0) ? sin_t : 0.0); // transverse walk
 
                 std::complex<double> q_arg = n_cx * n_cx * (1.0 - cs * cs);
-                if (std::imag(q_arg) == 0.0 && std::real(q_arg) < 0.0)
+                if (qd_evanescent(q_arg))
                     q_arg = std::complex<double>(std::real(q_arg), -0.0); // decaying evanescent root
                 std::complex<double> q = std::sqrt(q_arg);
 
@@ -4573,8 +4644,38 @@ void quadriga_lib::ray_state_update(int interaction_type,
             else if (tir) // no Snell direction under total reflection; any leak travels undeviated
                 dir_next[0] = dir_prev[0], dir_next[1] = dir_prev[1], dir_next[2] = dir_prev[2];
             else
+            {
+                // Out of a lossy near medium whose cosine was recovered for a real transverse
+                // invariant, the direction is the one a transition writes: the Snell ratio with
+                // the length N the projection in that medium lost, against the far cosine of the
+                // outer pair at the recovered cosine. For a far side of air that is sqrt(p)
+                // against sqrt(1 - p), the direction the wave had in air before the wall. The
+                // real-angle call above forms the far cosine from eps sin^2 at the traced angle,
+                // whose argument is complex for a lossy medium and whose real part does not fall
+                // to the external cosine towards grazing: 17.7 deg at 85 deg out of
+                // eps 1.50 - 0.40j. The verdict stays the real-angle one. Where near and far are
+                // one medium, where the recovery declines and where the medium is lossless,
+                // nothing here runs and the direction is the one it was.
+                double snell_dir = snell;
+                std::complex<double> ct2_dir = ct2_far;
+                if (mtl_near == mtl_current && mtl_far != mtl_near)
+                {
+                    std::complex<double> c_n = EXACT_IN_SLAB_COSINE(), c_f;
+                    bool t_nf = false;
+                    if (std::abs(c_n) > 0.0 && ct_slab_real_inv)
+                    {
+                        M_near.interact_with(M_far, interaction_type, theta_t, fGHz, nullptr, nullptr, &c_f, nullptr,
+                                             nullptr, &t_nf, false, &c_n, false);
+                        if (!t_nf && std::real(c_f) > 0.0)
+                        {
+                            snell_dir *= std::sqrt(std::abs(1.0 - c_n * c_n) + std::real(c_n) * std::real(c_n));
+                            ct2_dir = c_f;
+                        }
+                    }
+                }
                 qd_refract(dir_prev[0], dir_prev[1], dir_prev[2], N[0], N[1], N[2],
-                           snell, abs_cos_theta_t, ct2_far, dir_next[0], dir_next[1], dir_next[2]);
+                           snell_dir, abs_cos_theta_t, ct2_dir, dir_next[0], dir_next[1], dir_next[2]);
+            }
 
             if (p_path_dirN)
                 p_path_dirN[ii] = (dtype)dir_next[0],
