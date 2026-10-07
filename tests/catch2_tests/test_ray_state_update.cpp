@@ -8797,10 +8797,13 @@ TEST_CASE("Measurement - a host entered from a lossy solid across a bare face")
     QD_DIAG("# words the transition wrote; clean: the same event with a clean previous-medium word.\n");
     QD_DIAG("# ct_host is the traced cosine in the host, ct_one what one refraction from air would give\n");
     QD_DIAG("first,host,theta_ext,ct_host,ct_one,ref_dB,named_dB,d_named,clean_dB,d_clean,prev,rtype\n");
-    for (int host : {5, 6})
-        for (int first : {2, 1, 4})
+    // first, host. The last three put the solid with the large loss tangent in front, where the
+    // projection of the first leg is furthest from a unit vector.
+    const int pairs[9][2] = {{2, 5}, {1, 5}, {4, 5}, {2, 6}, {1, 6}, {4, 6}, {5, 1}, {5, 4}, {5, 6}};
+    for (const auto &pr : pairs)
             for (double thd : {10.0, 20.0, 40.0, 60.0, 75.0, 85.0})
             {
+                const int first = pr[0], host = pr[1];
                 double th = thd * QPI / 180.0, s2 = std::sin(th) * std::sin(th);
                 std::complex<double> e1 = diag_eps(first, f_hz), e2 = diag_eps(host, f_hz);
 
@@ -8868,11 +8871,318 @@ TEST_CASE("Measurement - a host entered from a lossy solid across a bare face")
                 INFO("first " << first << ", host " << host << ", theta_ext " << thd);
                 REQUIRE(mat_of(T.prev_out(0)) == first);
                 REQUIRE(std::isfinite(named));
-                if (first == 2) // lossless first solid: the control on the chain and on the reference
+                // Every row, the lossless first solid being the control on the chain and on the
+                // reference: the ray is not killed, the word names nothing the recovery reads, the
+                // host direction is the one a single refraction from air writes, and the chain is
+                // on the single pass.
+                CHECK(named > 0.0);
+                CHECK(std::abs(dB(named) - dB(clean)) < 1.0e-9);
+                CHECK(std::abs(std::abs(dx) - ct_one) < 1.0e-9);
+                CHECK(std::abs(dB(named) - dB(ref)) < 1.0e-6);
+                // Bit 14 of the word the transition wrote: set out of a lossy solid whose face
+                // was evaluated at the recovered cosine, clear out of a lossless one
+                CHECK((((int)T.prev_out(0) & 0x4000) != 0) == (std::imag(e1) != 0.0));
+            }
+}
+
+TEST_CASE("Recovery behind a lossy solid - EM, a second transition and a sheet inside the host")
+{
+    // The consumers of the recovered cosine the bare-face measurement does not reach. All three
+    // chains start air | first | host across bare faces with every series declined (eps 1.5), the
+    // entry from ray_mesh_interact, and are compared with the single pass at the exact cosines
+    // sqrt(1 - sin^2(theta_ext) / eps), which no layer in front changes.
+    //
+    //   EM       the exit port per channel, VV being TE and HH being TM in this frame
+    //   3 solids air | A | B | C | air: the port and the written direction of a transition out of
+    //            a leg that was itself entered from a solid, and a second leg behind a named solid
+    //   sheet    air | first | host | sheet | host | air: the composite of a sheet reached from
+    //            inside the host, both ports, and the leg behind it
+    //
+    // A lossless first solid is the control on each chain and on its reference.
+    const double f_hz = FRQ, k0 = 2.0 * QPI * f_hz / C0, thk = 0.006;
+    auto mtl = diag_palette<double>();
+    arma::mat mesh = diag_quad_x(200.0, 0.0);
+    const uint8_t OT_SHEET_ISO = 67;
+    const int SHEET = 3;
+    auto dB = [](double g)
+    { return (g > 0.0) ? 10.0 * std::log10(g) : -999.0; };
+
+    struct Ent
+    {
+        std::complex<double> te, tm; // VV and HH of the entry; scalar: both the one coefficient
+        double c, s;                 // traced cosine and sine in the first solid
+    };
+    auto entry = [&](int itype, int first, double thd) -> Ent
+    {
+        arma::mat orig, dest, fbs, sbs;
+        diag_ray_at(thd, orig, dest);
+        arma::uvec mtl_ind(mesh.n_rows, arma::fill::value((arma::uword)first));
+        arma::u32_vec fbs_ind, sbs_ind;
+        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+        arma::mat origN, destN, xprmatN, path_dirN, normal_vecN;
+        arma::vec gainN;
+        quadriga_lib::ray_mesh_interact(itype, f_hz, &orig, &dest, &mesh, &mtl_ind, &mtl,
+                                        &fbs_ind, &sbs_ind, (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                        &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                        &gainN, &xprmatN, (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                        (arma::vec *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr,
+                                        &normal_vecN, (std::vector<uint8_t> *)nullptr,
+                                        &path_dirN, true, (arma::u32_vec *)nullptr);
+        REQUIRE(path_dirN.n_rows == 1);
+        Ent E;
+        E.te = std::complex<double>(xprmatN(0, 0), xprmatN(1, 0));
+        E.tm = (itype < 3) ? std::complex<double>(xprmatN(6, 0), xprmatN(7, 0)) : E.te;
+        double nx = normal_vecN(0, 0), ny = normal_vecN(0, 1), nz = normal_vecN(0, 2);
+        E.c = std::abs(path_dirN(0, 0) * nx + path_dirN(0, 1) * ny + path_dirN(0, 2) * nz);
+        E.s = std::sqrt(std::max(0.0, 1.0 - E.c * E.c));
+        return E;
+    };
+    // One event of ray_state_update closing a leg of normal thickness L along (dx, dy). A
+    // media-to-media event takes its plane normal from the second face, reversed to oppose the ray.
+    auto event = [&](int itype, uint8_t ot, unsigned nH, int m1, int m2, int prev, int cur, int buf, double L,
+                     double th, double dx, double dy)
+    {
+        auto C = make1<double>(mtl, itype, ot, nH, m1, m2, prev, cur, buf, L, 0.5, 0.5, QPI / 2.0 - th, 1.5);
+        C.has_path_dir = true;
+        C.path_dir_prev.zeros(1, 3);
+        C.path_dir_prev(0, 0) = dx, C.path_dir_prev(0, 1) = dy;
+        C.has_path_dirN = true;
+        C.path_dirN.zeros(1, 3);
+        C.path_dirN(0, 0) = std::cos(th), C.path_dirN(0, 1) = std::sin(th);
+        if (ot == OT_M2M_M1)
+            C.normals(0, 3) = -1.0;
+        C.run();
+        return C;
+    };
+    // Power of one port at an exact cosine, per channel, and of one normal-thickness decay
+    auto port = [](std::complex<double> ea, std::complex<double> eb, std::complex<double> ca, bool scalar, double &pte, double &ptm)
+    {
+        std::complex<double> te, tm;
+        diag_port(ea, eb, ca, scalar, te, tm);
+        pte = std::norm(te), ptm = std::norm(tm);
+    };
+    auto decay = [&](std::complex<double> e, std::complex<double> c, double L)
+    { return std::exp(2.0 * k0 * std::imag(std::sqrt(e) * c) * L); };
+    const std::complex<double> e0(1.0, 0.0);
+
+    // ---- EM ---------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: recovery behind a lossy solid, EM. air | first 50 mm | host 100 mm | air, per channel,\n");
+    QD_DIAG("# chain minus the single pass at the exact cosines, dB\n");
+    QD_DIAG("first,host,theta_ext,ref_te_dB,ref_tm_dB,d_te,d_tm,rtype\n");
+    for (int host : {5, 6})
+        for (int first : {2, 1})
+            for (double thd : {40.0, 60.0, 75.0, 85.0})
+            {
+                const double L1 = 0.05, L2 = 0.10;
+                double th = thd * QPI / 180.0, s2 = std::sin(th) * std::sin(th);
+                std::complex<double> e1 = diag_eps(first, f_hz), e2 = diag_eps(host, f_hz);
+                std::complex<double> c0(std::cos(th), 0.0), c1 = std::sqrt(1.0 - s2 / e1), c2 = std::sqrt(1.0 - s2 / e2);
+                Ent E = entry(1, first, thd);
+                auto T = event(1, OT_M2M_M1, 2u, first, host, 0, first, 0, L1, th, E.c, E.s);
+                auto X = event(1, OT_EXIT, 1u, host, 0, (int)T.prev_out(0), (int)T.cur_out(0), (int)T.buf_out(0), L2, th,
+                               (double)T.path_dirN(0, 0), (double)T.path_dirN(0, 1));
+                double ch_te = std::norm(E.te * cpx(T.xprmat, 0, 0) * cpx(X.xprmat, 0, 0));
+                double ch_tm = std::norm(E.tm * cpx(T.xprmat, 0, 3) * cpx(X.xprmat, 0, 3));
+                double a[2], b[2], c[2];
+                port(e0, e1, c0, false, a[0], a[1]), port(e1, e2, c1, false, b[0], b[1]), port(e2, e0, c2, false, c[0], c[1]);
+                double dec = decay(e1, c1, L1) * decay(e2, c2, L2);
+                double r_te = a[0] * b[0] * c[0] * dec, r_tm = a[1] * b[1] * c[1] * dec;
+                QD_DIAG("%d,%d,%.1f,%.6f,%.6f,%+.6f,%+.6f,%u\n", first, host, thd, dB(r_te), dB(r_tm), dB(ch_te) - dB(r_te),
+                        dB(ch_tm) - dB(r_tm), (unsigned)X.resolved_type[0]);
+                INFO("EM, first " << first << ", host " << host << ", theta_ext " << thd);
+                CHECK(ch_te > 0.0);
+                CHECK(std::abs(dB(ch_te) - dB(r_te)) < 1.0e-6);
+                CHECK(std::abs(dB(ch_tm) - dB(r_tm)) < 1.0e-6);
+            }
+
+    // ---- Three solids -------------------------------------------------------------------------
+    QD_DIAG("\n# diag: recovery behind a lossy solid, a second transition. air | A 50 mm | B 100 mm | C 100 mm | air,\n");
+    QD_DIAG("# scalar. d_T2 is the transition B -> C alone against its port and its leg; ct_C the traced\n");
+    QD_DIAG("# cosine in C and ct_one what one refraction from air gives; d_named and d_clean the chain\n");
+    QD_DIAG("# with the last event fed the words the transition wrote and a clean previous-medium word\n");
+    QD_DIAG("A,B,C,theta_ext,ct_C,ct_one,ref_dB,d_T2,d_named,d_clean,rtype\n");
+    const int triples[4][3] = {{2, 6, 2}, {1, 5, 4}, {5, 1, 6}, {4, 5, 1}};
+    for (const auto &tr : triples)
+        for (double thd : {40.0, 60.0, 75.0, 85.0})
+        {
+            const int A = tr[0], B = tr[1], C = tr[2];
+            const double LA = 0.05, LB = 0.10, LC = 0.10;
+            double th = thd * QPI / 180.0, s2 = std::sin(th) * std::sin(th);
+            std::complex<double> eA = diag_eps(A, f_hz), eB = diag_eps(B, f_hz), eC = diag_eps(C, f_hz);
+            std::complex<double> c0(std::cos(th), 0.0), cA = std::sqrt(1.0 - s2 / eA), cB = std::sqrt(1.0 - s2 / eB),
+                                 cC = std::sqrt(1.0 - s2 / eC);
+            Ent E = entry(4, A, thd);
+            auto T1 = event(4, OT_M2M_M1, 2u, A, B, 0, A, 0, LA, th, E.c, E.s);
+            auto T2 = event(4, OT_M2M_M1, 2u, B, C, (int)T1.prev_out(0), (int)T1.cur_out(0), (int)T1.buf_out(0), LB, th,
+                            (double)T1.path_dirN(0, 0), (double)T1.path_dirN(0, 1));
+            double dx = (double)T2.path_dirN(0, 0), dy = (double)T2.path_dirN(0, 1);
+            double pw[2];
+            Rsu<double> X;
+            for (int k = 0; k < 2; ++k)
+            {
+                X = event(4, OT_EXIT, 1u, C, 0, k ? 0 : (int)T2.prev_out(0), (int)T2.cur_out(0), k ? 0 : (int)T2.buf_out(0),
+                          LC, th, dx, dy);
+                pw[k] = std::norm(E.te * cpx(T1.xprmat, 0, 0) * cpx(T2.xprmat, 0, 0) * cpx(X.xprmat, 0, 0));
+            }
+            double p01, pAB, pBC, pC0, u;
+            port(e0, eA, c0, true, p01, u), port(eA, eB, cA, true, pAB, u), port(eB, eC, cB, true, pBC, u), port(eC, e0, cC, true, pC0, u);
+            double ref = p01 * pAB * pBC * pC0 * decay(eA, cA, LA) * decay(eB, cB, LB) * decay(eC, cC, LC);
+            double d_T2 = dB(std::norm(cpx(T2.xprmat, 0, 0))) - dB(pBC * decay(eB, cB, LB));
+            double ct_one = diag_traced_ct(eC, th);
+            QD_DIAG("%d,%d,%d,%.1f,%.9f,%.9f,%.6f,%+.6f,%+.6f,%+.6f,%u\n", A, B, C, thd, std::abs(dx), ct_one, dB(ref), d_T2,
+                    dB(pw[0]) - dB(ref), dB(pw[1]) - dB(ref), (unsigned)X.resolved_type[0]);
+            INFO("three solids " << A << " | " << B << " | " << C << ", theta_ext " << thd);
+            REQUIRE(mat_of(T2.prev_out(0)) == B);
+            CHECK(pw[0] > 0.0);
+            CHECK(std::abs(d_T2) < 1.0e-6);
+            CHECK(std::abs(std::abs(dx) - ct_one) < 1.0e-9);
+            CHECK(std::abs(dB(pw[0]) - dB(pw[1])) < 1.0e-9);
+            CHECK(std::abs(dB(pw[0]) - dB(ref)) < 1.0e-6);
+        }
+
+    // ---- A sheet inside the host --------------------------------------------------------------
+    QD_DIAG("\n# diag: recovery behind a lossy solid, a sheet inside the host. air | first 50 mm | host 50 mm |\n");
+    QD_DIAG("# sheet 6 mm eps 5.24 - 0.63j | host 50 mm | air, scalar. d_ev is the sheet event against the\n");
+    QD_DIAG("# composite at the exact cosine and the host leg in front of it; d_twin the same event against\n");
+    QD_DIAG("# its twin with a clean previous-medium word; d_chain the transmitted chain end to end\n");
+    QD_DIAG("first,host,theta_ext,port,ev_dB,d_ev,d_twin,d_chain\n");
+    const std::complex<double> e_s = diag_eps(SHEET, f_hz);
+    for (int host : {5, 6})
+        for (int first : {2, 1})
+            for (double thd : {40.0, 60.0, 75.0, 85.0})
+                for (int rp = 0; rp < 2; ++rp)
                 {
-                    CHECK(std::abs(dB(named) - dB(ref)) < 1.0e-6);
-                    CHECK(std::abs(dB(named) - dB(clean)) < 1.0e-9);
+                    const double L1 = 0.05, La = 0.05, Lb = 0.05;
+                    double th = thd * QPI / 180.0, s2 = std::sin(th) * std::sin(th);
+                    std::complex<double> e1 = diag_eps(first, f_hz), e2 = diag_eps(host, f_hz);
+                    std::complex<double> c0(std::cos(th), 0.0), c1 = std::sqrt(1.0 - s2 / e1), c2 = std::sqrt(1.0 - s2 / e2);
+                    Ent E = entry(4, first, thd);
+                    auto T = event(4, OT_M2M_M1, 2u, first, host, 0, first, 0, L1, th, E.c, E.s);
+                    double dx = (double)T.path_dirN(0, 0), dy = (double)T.path_dirN(0, 1);
+                    auto S = event(rp ? 3 : 4, OT_SHEET_ISO, 1u, SHEET, 0, (int)T.prev_out(0), (int)T.cur_out(0),
+                                   (int)T.buf_out(0), La, th, dx, dy);
+                    auto S0 = event(rp ? 3 : 4, OT_SHEET_ISO, 1u, SHEET, 0, 0, (int)T.cur_out(0), 0, La, th, dx, dy);
+                    DiagSheet Ref = diag_sheet_composite_cx(e2, e_s, e2, thk, c2, f_hz, false, true);
+                    double ev = std::norm(cpx(S.xprmat, 0, 0)), tw = std::norm(cpx(S0.xprmat, 0, 0));
+                    // The reflect pass closes the host leg with the path form, the transmit pass
+                    // with the normal-thickness decay
+                    double ct_t = std::abs(dx);
+                    double leg = rp ? diag_medium_gain(e2, La / ct_t, f_hz) : decay(e2, c2, La);
+                    double ev_ref = std::norm(rp ? Ref.R_te : Ref.T_te) * leg;
+                    double d_chain = 0.0;
+                    if (!rp)
+                    {
+                        auto X = event(4, OT_EXIT, 1u, host, 0, (int)S.prev_out(0), (int)S.cur_out(0), (int)S.buf_out(0), Lb,
+                                       th, (double)S.path_dirN(0, 0), (double)S.path_dirN(0, 1));
+                        double p01, p12, p20, u;
+                        port(e0, e1, c0, true, p01, u), port(e1, e2, c1, true, p12, u), port(e2, e0, c2, true, p20, u);
+                        double ref = p01 * p12 * std::norm(Ref.T_te) * p20 * decay(e1, c1, L1) * decay(e2, c2, La + Lb);
+                        double ch = std::norm(E.te * cpx(T.xprmat, 0, 0) * cpx(S.xprmat, 0, 0) * cpx(X.xprmat, 0, 0));
+                        d_chain = dB(ch) - dB(ref);
+                    }
+                    QD_DIAG("%d,%d,%.1f,%s,%.6f,%+.6f,%+.6f,%+.6f\n", first, host, thd, rp ? "R" : "T", dB(ev), dB(ev) - dB(ev_ref),
+                            dB(ev) - dB(tw), d_chain);
+                    INFO("sheet inside the host, first " << first << ", host " << host << ", theta_ext " << thd << ", port " << rp);
+                    REQUIRE(mat_of(S.prev_out(0)) == SHEET);
+                    CHECK(std::abs(dB(ev) - dB(tw)) < 1.0e-9);
+                    CHECK(std::abs(dB(ev) - dB(ev_ref)) < 1.0e-6);
+                    CHECK(std::abs(d_chain) < 1.0e-6);
                 }
+}
+
+TEST_CASE("Recovery behind a lossy solid - a face that was evaluated at a real angle keeps the solid named")
+{
+    // Where the recovery declined on the leg in the first
+    // solid, the shared face was evaluated at a real angle in that solid, and a real angle in a
+    // lossy medium is a complex transverse invariant, e1 sin^2(theta_1). The cosine in the host is
+    // then sqrt(1 - (e1 / e2) sin^2(theta_1)), which is what the solve with the first solid named
+    // returns and what a solve for a real invariant does not.
+    //
+    //   wedge     the first solid entered from air with its faces known not parallel, so its own
+    //             recovery declines; the transition is ray_state_update's own and writes the
+    //             direction. theta is the external angle.
+    //   launched  a wave that starts inside the first solid at the real angle theta there. No
+    //             direction reaches the transition, so the direction in the host is written here
+    //             as ray_mesh_interact writes it, from qd_refract at the real angle.
+    //
+    // The last event, host | air, is compared with its port at that cosine and its traversal, with
+    // the first solid in the previous-medium word (named) and with a clean word (clean).
+    const double f_hz = FRQ, L1 = 0.05, L2 = 0.10;
+    auto mtl = diag_palette<double>();
+    const int FIRST = 1;
+    const std::complex<double> e1 = diag_eps(FIRST, f_hz), e0(1.0, 0.0);
+    auto dB = [](double g)
+    { return (g > 0.0) ? 10.0 * std::log10(g) : -999.0; };
+
+    QD_DIAG("\n# diag: measurement, a host entered across a face evaluated at a real angle in the lossy first\n");
+    QD_DIAG("# solid, eps 5.24 - 0.63j, scalar. theta is external for the wedge and inside the first solid\n");
+    QD_DIAG("# for the launched wave; |p| is the magnitude of the transverse invariant. The last event,\n");
+    QD_DIAG("# host 100 mm | air, against its port and traversal at the cosine the face was evaluated at\n");
+    QD_DIAG("route,host,theta,theta_1,|p|,ct_host,ref_dB,d_named,d_clean,prev,rtype\n");
+    for (int route = 0; route < 2; ++route)
+        for (int host : {5, 6})
+            for (double thd : (route ? std::vector<double>{10.0, 20.0, 23.0, 25.0} : std::vector<double>{40.0, 60.0, 75.0, 85.0}))
+            {
+                double th = thd * QPI / 180.0;
+                std::complex<double> e2 = diag_eps(host, f_hz);
+                double c1r, s1r, dx, dy;
+                int prev_named = FIRST;
+                if (route == 0)
+                {
+                    // traced direction in the first solid, one refraction from air
+                    c1r = diag_traced_ct(e1, th), s1r = std::sqrt(1.0 - c1r * c1r);
+                    auto T = make1<double>(mtl, 4, OT_M2M_M1, 2u, FIRST, host, (int)enc(0, true), FIRST, 0, L1, 0.5, 0.5,
+                                           QPI / 2.0 - th, 1.5);
+                    T.has_path_dir = true;
+                    T.path_dir_prev.zeros(1, 3);
+                    T.path_dir_prev(0, 0) = c1r, T.path_dir_prev(0, 1) = s1r;
+                    T.has_path_dirN = true;
+                    T.path_dirN.zeros(1, 3);
+                    T.path_dirN(0, 0) = std::cos(th), T.path_dirN(0, 1) = std::sin(th);
+                    T.normals(0, 3) = -1.0;
+                    T.run();
+                    dx = (double)T.path_dirN(0, 0), dy = (double)T.path_dirN(0, 1);
+                    prev_named = (int)T.prev_out(0);
+                    REQUIRE(mat_of(T.prev_out(0)) == FIRST);
+                }
+                else
+                    c1r = std::cos(th), s1r = std::sin(th);
+
+                // The cosine the face was evaluated at, and the direction qd_refract writes from it
+                std::complex<double> eps_r = e1 / e2, c2w = std::sqrt(1.0 - eps_r * s1r * s1r);
+                double eta = std::sqrt(std::abs(eps_r)), rr = std::real(c2w);
+                double ct_map = rr / std::sqrt((eta * s1r) * (eta * s1r) + rr * rr);
+                if (route == 1)
+                    dx = ct_map, dy = std::sqrt(1.0 - ct_map * ct_map);
+
+                double pw[2];
+                Rsu<double> X;
+                for (int k = 0; k < 2; ++k)
+                {
+                    X = make1<double>(mtl, 4, OT_EXIT, 1u, host, 0, k ? 0 : prev_named, host, 0, L2, 0.5, 0.5, QPI / 2.0 - th, 1.5);
+                    X.has_path_dir = true;
+                    X.path_dir_prev.zeros(1, 3);
+                    X.path_dir_prev(0, 0) = dx, X.path_dir_prev(0, 1) = dy;
+                    X.run();
+                    pw[k] = std::norm(cpx(X.xprmat, 0, 0));
+                }
+                std::complex<double> te, tm;
+                diag_port(e2, e0, c2w, true, te, tm);
+                double ct_h = std::abs(dx);
+                double ref = std::norm(te) * std::norm(diag_medium_vbs(e2, L2 / ct_h, ct_h, L2, c2w, f_hz));
+                QD_DIAG("%s,%d,%.1f,%.3f,%.4f,%.9f,%.6f,%+.6f,%+.6f,%d,%u\n", route ? "launched" : "wedge   ", host, thd,
+                        std::acos(c1r) * 180.0 / QPI, std::abs(e1) * s1r * s1r, ct_h, dB(ref), dB(pw[0]) - dB(ref),
+                        dB(pw[1]) - dB(ref), mat_of((short)prev_named), (unsigned)X.resolved_type[0]);
+                INFO((route ? "launched" : "wedge") << ", host " << host << ", theta " << thd);
+                CHECK(std::abs(ct_h - ct_map) < 1.0e-9); // the direction is the real-angle map
+                REQUIRE(std::isfinite(pw[0]));
+                REQUIRE(std::isfinite(pw[1]));
+                // The word carries no flag, so the recovery keeps the solid named and the event
+                // sits on the cosine the face was evaluated at. The clean column is recorded: it
+                // is what a solve for a real invariant makes of this wave.
+                CHECK((prev_named & 0x4000) == 0);
+                CHECK(pw[0] > 0.0);
+                CHECK(std::abs(dB(pw[0]) - dB(ref)) < 1.0e-6);
             }
 }
 

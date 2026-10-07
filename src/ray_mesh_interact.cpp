@@ -3731,8 +3731,9 @@ void quadriga_lib::ray_state_update(int interaction_type,
         //   word      bits 0-13                      bit 14            bit 15
         //   current   medium the ray is in           unused            resolved
         //   prev      medium the leg was entered     prev_embedded     prev_nonpar
-        //             from, or the sheet crossed
-        //             or reflected off
+        //             from, or the sheet crossed     (a sheet), or
+        //             or reflected off               prev_real_inv
+        //                                            (a solid)
         //   buffer    deferred medium                zero              clear
         //   buffer    thickness code, bits 0-14                        set: mass_crossed
         //
@@ -3740,6 +3741,13 @@ void quadriga_lib::ray_state_update(int interaction_type,
         // current medium, so what is behind it is that medium. Clear, the sheet is a lining and
         // what is behind it is air. It is written by a sheet event whose two sides are one medium
         // and travels with the word.
+        //
+        // The same bit qualifies a solid in that word, as prev_real_inv: the shared face was
+        // evaluated at the recovered cosine of a wave whose transverse invariant is real, so the
+        // wave in the current medium has a real invariant as well and the recovery solves for it
+        // without naming the solid. Clear, the face was evaluated at a real angle in the solid and
+        // the recovery inverts that. It is written by a transition out of a lossy solid and
+        // travels with the word; which of the two the bit means follows from what the word holds.
         int mtl_current = next_current & 0x3FFF;
         int mtl_prev = next_prev & 0x3FFF;
         int mtl_buffer = next_buffer & 0x7FFF;
@@ -4103,9 +4111,11 @@ void quadriga_lib::ray_state_update(int interaction_type,
         // guess, which reaches machine precision.
         //
         // Returns 0 where the recovery does not apply, which the resolve reads as "use the projection".
+        bool ct_slab_real_inv = false; // set by a solve that returns a cosine; see its end
         auto EXACT_IN_SLAB_COSINE_SOLVE = [&]() -> std::complex<double>
         {
             const std::complex<double> none(0.0, 0.0);
+            ct_slab_real_inv = false;
 
             // No real direction was supplied, so nothing was projected in the first place.
             if (!use_vbs || mtl_current < 1)
@@ -4128,11 +4138,19 @@ void quadriga_lib::ray_state_update(int interaction_type,
             // the wave could have come from. So behind a sheet the solve runs with a unit entry
             // permittivity, where u is p itself, and without the bound u <= 1, which belongs to
             // air and not to the invariant. That is exact for a glued entry from air, for the far
-            // side of a sheet inside a host entered from any lossless medium, and for the second
-            // sheet of a lined wall. It is wrong only where the host was reached from a lossy
-            // medium through a sheet, whose transverse wavenumber is complex.
+            // side of a sheet inside a host, and for the second sheet of a lined wall, however
+            // lossy the layers in front are: across parallel faces the transverse wavenumber of
+            // a wave that started in air stays real.
+            //
+            // A lossy solid in the word is the same case wherever the shared face was evaluated
+            // at such a wave's cosine, which the transition records in the word (prev_real_inv).
+            // Naming the solid there would assume a real ANGLE in it, which that wave does not
+            // have. Without the flag the face was evaluated at a real angle in the solid - the
+            // wave was launched in it, or its own faces are not parallel - the invariant is the
+            // complex e1 sin^2(theta_1), and the named form is the inverse of what was applied.
             const bool behind_sheet = IS_SHEET(mtl_prev);
-            const double u_max = behind_sheet ? 1.0e30 : 1.0;
+            const bool unnamed = behind_sheet || (prev_embedded && mtl_prev != 0);
+            const double u_max = unnamed ? 1.0e30 : 1.0;
 
             // Under total reflection the direction was never bent, so there is no map to invert.
             // Normal incidence is NOT excluded: the projection and the exact value coincide there, but
@@ -4142,7 +4160,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
             if (total_reflection || abs_cos_theta_t <= 0.0 || abs_cos_theta_t > 1.0)
                 return none;
 
-            Material M_ent = MAT(behind_sheet ? 0 : mtl_prev), M_slb = MAT(mtl_current);
+            Material M_ent = MAT(unnamed ? 0 : mtl_prev), M_slb = MAT(mtl_current);
             std::complex<double> e1 = (M_ent.eta(fGHz) + M_ent.eta_resonance(fGHz)) * M_ent.mu(fGHz);
             std::complex<double> e2 = (M_slb.eta(fGHz) + M_slb.eta_resonance(fGHz)) * M_slb.mu(fGHz);
             if (std::abs(e2) <= 0.0)
@@ -4168,6 +4186,13 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 u = (u < 0.0) ? 0.0 : ((u > u_max) ? u_max : u);
             }
 
+            // Whether the wave in this medium has a real transverse invariant and a complex
+            // cosine: solved for a real invariant, or for a real angle in a lossless entry
+            // medium, which is the same statement, and the medium itself lossy. A transition out
+            // of this leg then says so in the word it writes. Decided on the media and the state,
+            // never on a value, so it is the same at every frequency of a run.
+            ct_slab_real_inv = (unnamed || std::imag(e1) == 0.0) && std::imag(e2) != 0.0;
+
             std::complex<double> arg = 1.0 - eps_r * u;
             if (std::imag(arg) == 0.0 && std::real(arg) < 0.0)
                 arg = std::complex<double>(std::real(arg), -0.0); // decaying evanescent root
@@ -4190,6 +4215,10 @@ void quadriga_lib::ray_state_update(int interaction_type,
 
         // VBS-corrected coefficients
         std::complex<double> cTE(0.0, 0.0), cTM(0.0, 0.0);
+
+        // True where REPLACE_BY_VBS evaluated its interface at the recovered cosine of a wave with
+        // a real transverse invariant in a lossy medium. A transition writes it into the word.
+        bool face_real_inv = false;
 
         // Replace the FBS-relative interface result ray_mesh_interact wrote with the VBS-equivalent at theta_t
         // - interface coefficients (interface_gain folded inside interact_with), incoming basis from dir_in,
@@ -4228,6 +4257,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
             std::complex<double> ct_in = (Ma == mtl_current) ? EXACT_IN_SLAB_COSINE()
                                                              : std::complex<double>(0.0, 0.0);
             bool use_exact_ct = std::abs(ct_in) > 0.0;
+            face_real_inv = use_exact_ct && ct_slab_real_inv;
 
             // Without a refracted direction the wave is held at its geometric angle, as it was in
             // ray_mesh_interact, and the two have to give the same verdict.
@@ -4256,7 +4286,20 @@ void quadriga_lib::ray_state_update(int interaction_type,
             if (geom == 0) // Reflect at VBS
                 qd_reflect(dir_prev[0], dir_prev[1], dir_prev[2], N[0], N[1], N[2], dir_next[0], dir_next[1], dir_next[2]);
             else if (geom == 2 && !tir) // Snell refract at VBS (undeviated under TIR)
-                qd_refract(dir_prev[0], dir_prev[1], dir_prev[2], N[0], N[1], N[2], snell, abs_cos_theta_t, cos_t2, dir_next[0], dir_next[1], dir_next[2]);
+            {
+                // The direction in the next medium has to be the one a single refraction from
+                // air writes, tangential sqrt(p / |e2|) against Re(cos_t2) with p the transverse
+                // invariant, because that is the map the recovery inverts there and the wave in
+                // that medium does not depend on what lies in front of it. dir_prev is itself a
+                // projection: qd_refract normalized a vector of length
+                // sqrt(|sin^2| + Re(cos)^2) in this medium, which is 1 only for a real cosine,
+                // so its tangential part is short by that length. Putting the length back on the
+                // Snell ratio removes it, and no direction further on inherits it.
+                double snell_dir = snell;
+                if (face_real_inv)
+                    snell_dir *= std::sqrt(std::abs(1.0 - ct_in * ct_in) + std::real(ct_in) * std::real(ct_in));
+                qd_refract(dir_prev[0], dir_prev[1], dir_prev[2], N[0], N[1], N[2], snell_dir, abs_cos_theta_t, cos_t2, dir_next[0], dir_next[1], dir_next[2]);
+            }
 
             if (p_path_dirN && geom != 3) // write the corrected continuation; an exit keeps the traced direction
                 p_path_dirN[ii] = (dtype)dir_next[0],
@@ -4887,7 +4930,9 @@ void quadriga_lib::ray_state_update(int interaction_type,
                     DIST_SET();
 
                 // These need to be here! Same materials with different ids have to keep the entry material on next_prev for SLAB_AIRY_FACTOR
-                next_prev = (short)mtl_current;
+                // Into a medium, the word also says whether the face was evaluated at the cosine
+                // of a wave with a real transverse invariant (prev_real_inv).
+                next_prev = (short)(mtl_current | ((face_real_inv && !exit && mtl_next != 0) ? (int)0x4000 : 0));
                 next_current = (short)mtl_next; // Clear resolved flag
             }
 
