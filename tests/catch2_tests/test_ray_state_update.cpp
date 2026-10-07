@@ -9777,3 +9777,560 @@ TEST_CASE("ray_state_update - the material index is 14 bits")
         CHECK_NOTHROW(C.run());
     }
 }
+
+TEST_CASE("Recovery gate - the hit code a traced run carries")
+{
+    // Every chain fixture above hands ray_state_update a synthetic hit code, 1 for a bare exit and
+    // 69 for a glued one. A traced run does not: with the undeviated tracer a ray inside a solid
+    // travels at its external angle, ray_mesh_interact judges the exit face at that angle, and from
+    // sqrt|eps| sin(theta_ext) >= 1 its code carries the total-reflection bit, 33 and 101. That bit
+    // is a statement about the face ahead at an angle the wave does not have. The recovery inverts
+    // the bend at the face behind, and declines on it.
+    //
+    // Four instruments. The code ray_mesh_interact writes for the exit, asserted. The twin: the
+    // same event with that code and with the bit cleared, bitwise, which needs no reference. The
+    // absolute level with the real code, against the analytic slab and the composite at the exact
+    // cosine. And the two-event run through the intersector with nothing synthetic in it, for the
+    // undeviated and for the refracting tracer; the lossy rows of the refracting tracer are
+    // recorded and not asserted.
+    const double f_hz = FRQ, k0 = 2.0 * QPI * f_hz / C0, L = 0.10, thk = 0.006;
+    auto mtl = diag_palette<double>();
+    const int SHEET = 3, LOSSY = 5, DENSE = 2;
+    const std::complex<double> e_air(1.0, 0.0), e_s = diag_eps(SHEET, f_hz);
+    auto dB = [](double g)
+    { return (g > 0.0) ? 10.0 * std::log10(g) : -999.0; };
+    const std::vector<double> angles = {10.0, 20.0, 40.0, 60.0, 75.0, 85.0};
+
+    // The code ray_mesh_interact writes for an exit met along the external direction: the exit
+    // face is the back of a quad at x = 0, with a sheet face 10 um behind it for a glued exit
+    auto exit_code = [&](int itype, int host, bool glued, double thd) -> uint8_t
+    {
+        arma::mat mesh = diag_quad_x(200.0, 0.0);
+        arma::uvec mtl_ind(2, arma::fill::value((arma::uword)host));
+        if (glued)
+        {
+            mesh = arma::join_cols(mesh, diag_quad_x(200.0, -1.0e-5));
+            mtl_ind = arma::uvec{(arma::uword)host, (arma::uword)host, (arma::uword)SHEET, (arma::uword)SHEET};
+        }
+        double t = std::tan(thd * QPI / 180.0);
+        arma::mat orig{{1.0, 0.37, 0.0}}, dest{{-1.0, 0.37 + 2.0 * t, 0.0}}, fbs, sbs;
+        arma::u32_vec fbs_ind, sbs_ind;
+        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+        std::vector<uint8_t> ot;
+        quadriga_lib::ray_mesh_interact(itype, f_hz, &orig, &dest, &mesh, &mtl_ind, &mtl, &fbs_ind, &sbs_ind,
+                                        (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                        (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr, (arma::mat *)nullptr,
+                                        (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr,
+                                        (arma::vec *)nullptr, (arma::mat *)nullptr, &ot, (arma::mat *)nullptr, true,
+                                        (arma::u32_vec *)nullptr);
+        REQUIRE(ot.size() == 1);
+        return ot[0];
+    };
+    // One event closing a leg of normal thickness L along (dx, dy)
+    auto event = [&](int itype, uint8_t ot, unsigned nH, int m1, int m2, int prev, int cur, double th, double eps,
+                     double dx, double dy)
+    {
+        auto C = make1<double>(mtl, itype, ot, nH, m1, m2, prev, cur, 0, L, 0.5, 0.5, QPI / 2.0 - th, eps);
+        C.has_path_dir = true;
+        C.path_dir_prev.zeros(1, 3);
+        C.path_dir_prev(0, 0) = dx, C.path_dir_prev(0, 1) = dy;
+        C.run();
+        return C;
+    };
+    auto same = [](const Rsu<double> &A, const Rsu<double> &B)
+    {
+        for (arma::uword k = 0; k < A.xprmat.n_rows; ++k)
+            if ((double)A.xprmat(k, 0) != (double)B.xprmat(k, 0))
+                return false;
+        return (double)A.gain(0) == (double)B.gain(0);
+    };
+
+    // ------------------------------------------------------------------------------------------
+    // Bare exit
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: recovery gate, bare exit. air | slab 100 mm | air, scalar, the exit event along the\n");
+    QD_DIAG("# direction a tracer holds, series resolved. code is what ray_mesh_interact writes for that exit\n");
+    QD_DIAG("# met at the external angle. d_real and d_syn are the chain against the analytic slab with\n");
+    QD_DIAG("# that code and with code 1; twin_T, twin_R, twin_EM say whether the two runs are bit-identical\n");
+    QD_DIAG("mtl,theta_ext,code,d_real_dB,d_syn_dB,twin_T,twin_R,twin_EM,rtype\n");
+    for (int m : {5, 1, 4, 6})
+        for (double thd : angles)
+        {
+            double th = thd * QPI / 180.0;
+            std::complex<double> es = diag_eps(m, f_hz);
+            double ct = diag_traced_ct(es, th), st = std::sqrt(1.0 - ct * ct);
+            uint8_t code = exit_code(4, m, false, thd);
+            bool past = std::sqrt(std::abs(es)) * std::sin(th) >= 1.0;
+            std::complex<double> t_in, u;
+            diag_port(e_air, es, std::complex<double>(std::cos(th), 0.0), true, t_in, u);
+            auto Xr = event(4, code, 1u, m, 0, 0, m, th, 0.0, ct, st);
+            auto Xs = event(4, OT_EXIT, 1u, m, 0, 0, m, th, 0.0, ct, st);
+            auto Rr = event(3, exit_code(3, m, false, thd), 1u, m, 0, 0, m, th, 1.5, ct, st);
+            auto Rs = event(3, OT_EXIT, 1u, m, 0, 0, m, th, 1.5, ct, st);
+            auto Er = event(1, exit_code(1, m, false, thd), 1u, m, 0, 0, m, th, 1.5, ct, st);
+            auto Es = event(1, OT_EXIT, 1u, m, 0, 0, m, th, 1.5, ct, st);
+            double p_te = 0.0, p_tm = 0.0;
+            diag_slab_p_pol(es, L, th, f_hz, p_te, p_tm);
+            double d_real = dB(std::norm(t_in * cpx(Xr.xprmat, 0, 0))) - dB(p_te);
+            double d_syn = dB(std::norm(t_in * cpx(Xs.xprmat, 0, 0))) - dB(p_te);
+            QD_DIAG("%d,%.1f,%u,%+.6f,%+.6f,%d,%d,%d,%u\n", m, thd, (unsigned)code, d_real, d_syn, (int)same(Xr, Xs),
+                    (int)same(Rr, Rs), (int)same(Er, Es), (unsigned)Xr.resolved_type[0]);
+            INFO("bare exit, material " << m << ", theta_ext " << thd);
+            CHECK((int)code == (past ? 33 : 1)); // the bit is the geometric-angle verdict
+            CHECK(std::abs(d_syn) < 1.0e-6);     // the control: the synthetic code on the slab
+            CHECK(std::abs(d_real) < 1.0e-6);
+            CHECK(same(Xr, Xs));
+            CHECK(same(Rr, Rs));
+            CHECK(same(Er, Es));
+        }
+
+    // ------------------------------------------------------------------------------------------
+    // Glued exit
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: recovery gate, glued exit. host 100 mm | coating 6 mm eps 5.24 - 0.63j | air, scalar,\n");
+    QD_DIAG("# host series declined. d_T and d_R: the event with the code ray_mesh_interact writes against\n");
+    QD_DIAG("# the composite at the exact cosine times the host leg; s_T the same with code 69\n");
+    QD_DIAG("host,theta_ext,code,d_T_dB,d_R_dB,s_T_dB,twin_T,twin_R,twin_EM,rtype\n");
+    for (int host : {5, 6})
+        for (double thd : angles)
+        {
+            double th = thd * QPI / 180.0, s2 = std::sin(th) * std::sin(th);
+            std::complex<double> e2 = diag_eps(host, f_hz), c2 = std::sqrt(1.0 - s2 / e2);
+            double ct = diag_traced_ct(e2, th), st = std::sqrt(1.0 - ct * ct);
+            uint8_t code = exit_code(4, host, true, thd);
+            bool past = std::sqrt(std::abs(e2)) * std::sin(th) >= 1.0;
+            auto Tr = event(4, code, 2u, SHEET, host, 0, host, th, 1.5, ct, st);
+            auto Ts = event(4, 69, 2u, SHEET, host, 0, host, th, 1.5, ct, st);
+            auto Rr = event(3, exit_code(3, host, true, thd), 2u, SHEET, host, 0, host, th, 1.5, ct, st);
+            auto Rs = event(3, 69, 2u, SHEET, host, 0, host, th, 1.5, ct, st);
+            auto Er = event(1, exit_code(1, host, true, thd), 2u, SHEET, host, 0, host, th, 1.5, ct, st);
+            auto Es = event(1, 69, 2u, SHEET, host, 0, host, th, 1.5, ct, st);
+            DiagSheet Ref = diag_sheet_composite_cx(e2, e_s, e_air, thk, c2, f_hz, true, true);
+            // A sheet event replaces the field, so the probe feed is not in it
+            double ref_T = std::exp(2.0 * k0 * std::imag(std::sqrt(e2) * c2) * L) * std::norm(Ref.T_te);
+            // A reflect pass at a sheet closes the host leg with the path form
+            double ref_R = diag_medium_gain(e2, L / ct, f_hz) * std::norm(Ref.R_te);
+            double d_T = dB(std::norm(cpx(Tr.xprmat, 0, 0))) - dB(ref_T), d_R = dB(std::norm(cpx(Rr.xprmat, 0, 0))) - dB(ref_R);
+            double s_T = dB(std::norm(cpx(Ts.xprmat, 0, 0))) - dB(ref_T);
+            QD_DIAG("%d,%.1f,%u,%+.6f,%+.6f,%+.6f,%d,%d,%d,%u\n", host, thd, (unsigned)code, d_T, d_R, s_T, (int)same(Tr, Ts),
+                    (int)same(Rr, Rs), (int)same(Er, Es), (unsigned)Tr.resolved_type[0]);
+            INFO("glued exit, host " << host << ", theta_ext " << thd);
+            CHECK((int)code == (past ? 101 : 69));
+            CHECK(std::abs(s_T) < 1.0e-6); // the control
+            CHECK(std::abs(d_T) < 1.0e-6);
+            CHECK(std::abs(d_R) < 1.0e-6);
+            CHECK(same(Tr, Ts));
+            CHECK(same(Rr, Rs));
+            CHECK(same(Er, Es));
+        }
+
+    // ------------------------------------------------------------------------------------------
+    // A face that is closed at the recovered cosine
+    // ------------------------------------------------------------------------------------------
+    // The lossy host entered from a lossless dense solid with a transverse invariant above one:
+    // the face to air is closed, the bit is right, and the reflection is evaluated at the
+    // recovered cosine or, where the recovery declines, at the projection. The far medium's root
+    // has an argument that is real and negative up to rounding.
+    QD_DIAG("\n# diag: recovery gate, a closed face. Reflection at host | air inside eps 1.50 - 0.40j entered\n");
+    QD_DIAG("# from a lossless eps 5.24 solid, invariant p above one, scalar. arg with code 1 and with code\n");
+    QD_DIAG("# 33, with the dense solid named and with a sheet in the previous-medium word; step is the\n");
+    QD_DIAG("# change of arg_1_named from the row above\n");
+    QD_DIAG("p,ct_traced,dB_1,arg_1_named,arg_1_sheet,arg_33_named,arg_33_sheet,step,rtype\n");
+    {
+        const std::complex<double> e_d = diag_eps(DENSE, f_hz), e_l = diag_eps(LOSSY, f_hz);
+        double prev_arg = 0.0;
+        bool first = true;
+        for (double pinv = 1.10; pinv < 1.46; pinv += 0.025)
+        {
+            double s1 = std::sqrt(pinv / std::real(e_d)), th1 = std::asin(s1);
+            std::complex<double> eps_r = e_d / e_l, c2 = std::sqrt(1.0 - eps_r * s1 * s1);
+            double eta = std::sqrt(std::abs(eps_r)), r = std::real(c2);
+            double ct = r / std::sqrt((eta * s1) * (eta * s1) + r * r), st = std::sqrt(1.0 - ct * ct);
+            auto A1 = event(3, OT_EXIT, 1u, LOSSY, 0, DENSE, LOSSY, th1, 1.5, ct, st);
+            auto B1 = event(3, OT_EXIT, 1u, LOSSY, 0, SHEET, LOSSY, th1, 1.5, ct, st);
+            auto A3 = event(3, 33, 1u, LOSSY, 0, DENSE, LOSSY, th1, 1.5, ct, st);
+            auto B3 = event(3, 33, 1u, LOSSY, 0, SHEET, LOSSY, th1, 1.5, ct, st);
+            auto deg = [&](const Rsu<double> &X)
+            { return std::arg(cpx(X.xprmat, 0, 0)) * 180.0 / QPI; };
+            double step = deg(A1) - prev_arg;
+            step -= 360.0 * std::round(step / 360.0);
+            QD_DIAG("%.3f,%.9f,%.6f,%+.4f,%+.4f,%+.4f,%+.4f,%+.4f,%u\n", pinv, ct, dB(std::norm(cpx(A1.xprmat, 0, 0))), deg(A1),
+                    deg(B1), deg(A3), deg(B3), first ? 0.0 : step, (unsigned)A1.resolved_type[0]);
+            INFO("closed face, p " << pinv);
+            CHECK(std::abs(cpx(A1.xprmat, 0, 0) - cpx(B1.xprmat, 0, 0)) < 1.0e-9 * std::abs(cpx(A1.xprmat, 0, 0)));
+            CHECK(same(A1, A3)); // the bit does not move the event
+            CHECK(same(B1, B3));
+            if (!first)
+                CHECK(std::abs(step) < 45.0); // no branch flip between neighbours
+            prev_arg = deg(A1), first = false;
+        }
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // Nothing synthetic: two events through the intersector
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: recovery gate, the traced run. air | slab 100 mm | air through ray_triangle_intersect,\n");
+    QD_DIAG("# ray_mesh_interact and ray_state_update, two events, scalar, series resolved, against the\n");
+    QD_DIAG("# analytic slab. itype 4 is the undeviated tracer, 5 the refracting one. out_deg is the\n");
+    QD_DIAG("# direction written at the exit\n");
+    QD_DIAG("itype,mtl,theta_ext,code,rtype,out_deg,chain_dB,slab_dB,d_dB\n");
+    {
+        arma::mat mesh = arma::join_cols(diag_quad_x(200.0, 0.0), diag_quad_x(200.0, L));
+        mesh.row(2) = arma::rowvec{L, -200.0, -200.0, L, 200.0, -200.0, L, -200.0, 200.0}; // outward normal
+        mesh.row(3) = arma::rowvec{L, 200.0, -200.0, L, 200.0, 200.0, L, -200.0, 200.0};
+        struct Ev
+        {
+            arma::mat origN, destN, path_dirN, xpr;
+            arma::Col<short> prev, cur, buf;
+            arma::vec accg, accr;
+            uint8_t ot = 0, rt = 0;
+        };
+        auto traced = [&](int itype, int m, const arma::mat &orig, const arma::mat &dest, const Ev *in) -> Ev
+        {
+            arma::uvec mtl_ind(mesh.n_rows, arma::fill::value((arma::uword)m));
+            arma::mat fbs, sbs, fbsN, sbsN, nv;
+            arma::u32_vec nh, fi, si;
+            quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, &nh, &fi, &si);
+            Ev E;
+            arma::vec gain, fang;
+            std::vector<uint8_t> ot, rt;
+            quadriga_lib::ray_mesh_interact(itype, f_hz, &orig, &dest, &mesh, &mtl_ind, &mtl, &fi, &si, (arma::mat *)nullptr,
+                                            (arma::mat *)nullptr, &E.origN, &E.destN, &fbsN, &sbsN, &gain, &E.xpr,
+                                            (arma::mat *)nullptr, (arma::mat *)nullptr, &fang, (arma::vec *)nullptr,
+                                            (arma::vec *)nullptr, &nv, &ot, &E.path_dirN, false, (arma::u32_vec *)nullptr);
+            arma::Col<short> mf(1), ms(1);
+            mf(0) = fi(0) ? (short)m : (short)0, ms(0) = si(0) ? (short)m : (short)0;
+            quadriga_lib::ray_state_update(itype, f_hz, &orig, &dest, &fbsN, &sbsN, &nh, &fang, &nv, &ot, &mtl, &mf, &ms,
+                                           in ? &in->prev : nullptr, in ? &in->cur : nullptr, in ? &in->buf : nullptr,
+                                           in ? &in->path_dirN : nullptr, in ? &in->accg : nullptr, in ? &in->accr : nullptr,
+                                           &E.prev, &E.cur, &E.buf, &gain, &E.xpr, &E.path_dirN, &E.accg, &E.accr, &rt,
+                                           (arma::u32_vec *)nullptr, 0.0);
+            E.ot = ot[0], E.rt = rt[0];
+            return E;
+        };
+        for (int itype : {4, 5})
+            for (int m : {5, 6})
+                for (double thd : angles)
+                {
+                    double th = thd * QPI / 180.0;
+                    std::complex<double> es = diag_eps(m, f_hz);
+                    arma::mat orig, dest;
+                    diag_ray_at(thd, orig, dest);
+                    Ev A = traced(itype, m, orig, dest, nullptr);
+                    arma::mat d = A.destN - A.origN;
+                    d /= std::sqrt(d(0, 0) * d(0, 0) + d(0, 1) * d(0, 1) + d(0, 2) * d(0, 2));
+                    arma::mat dest2 = A.origN + 2.0 * d;
+                    Ev B = traced(itype, m, A.origN, dest2, &A);
+                    double ch = std::norm(cpx(A.xpr, 0, 0) * cpx(B.xpr, 0, 0));
+                    double p_te = 0.0, p_tm = 0.0;
+                    diag_slab_p_pol(es, L, th, f_hz, p_te, p_tm);
+                    double out_deg = std::atan2(std::abs(B.path_dirN(0, 1)), std::abs(B.path_dirN(0, 0))) * 180.0 / QPI;
+                    QD_DIAG("%d,%d,%.1f,%u,%u,%.4f,%.6f,%.6f,%+.6f\n", itype, m, thd, (unsigned)B.ot, (unsigned)B.rt, out_deg,
+                            dB(ch), dB(p_te), dB(ch) - dB(p_te));
+                    INFO("traced run, itype " << itype << ", material " << m << ", theta_ext " << thd);
+                    REQUIRE((B.ot & 0x1F) == 1);
+                    // The relaunch offset moves the leg by a few float ulp, so the bound is not
+                    // the 1e-6 dB of a hand-built event. The refracting tracer's lossy rows are
+                    // recorded: the recovery does not run where traced and geometric cosines agree
+                    if (itype == 4 || m == 6)
+                        CHECK(std::abs(dB(ch) - dB(p_te)) < 1.0e-3);
+                }
+    }
+}
+
+TEST_CASE("Direction - a ray leaves a parallel slab parallel to how it arrived")
+{
+    // Across parallel faces the transverse wavenumber of a wave that started in air is real and
+    // conserved, so behind any stack of layers the direction in air has tangential part sqrt(p)
+    // and normal part sqrt(1 - p) with p = sin^2(theta_ext): the direction the ray came in at.
+    //
+    // Measured at every writer of a direction into air, with the undeviated tracer, which is the
+    // mode in which ray_state_update writes one: a glued exit, a glued exit behind a sheet and
+    // behind an ordered stack inside the host, a bare exit and a bare exit of a resolved ray, the
+    // last two through the intersector because a bare exit keeps what ray_mesh_interact wrote
+    // unless ray_state_update replaces it. Lossless host as the control.
+    //
+    // d_t and d_n are the tangential and the normal component of the written unit vector minus
+    // those of the incoming one. map_t and map_n are what the real-angle map makes of the traced
+    // direction before normalization, minus sqrt(p) and sqrt(1 - p): the tangential shortfall
+    // 1 / N of the projection, and the far cosine formed at a real angle in a lossy host.
+    //
+    // Three kinds of row keep the direction they had and are pinned to it: a host whose recovery
+    // declines (no direction supplied, or faces known not parallel), which takes the real-angle
+    // map; a closed outer pair, whose leak is undeviated; and a leak through a mass-law face.
+    // The refracting tracer and the exits out of a rigid body are recorded.
+    const double f_hz = FRQ, L = 0.10;
+    auto mtl = diag_palette<double>();
+    const int SHEET = 3, SHEET2 = 8, DENSE = 2;
+    const uint8_t OT_SHEET_ISO = 67, OT_STACK = 71, OT_GLUED_EXIT = 69;
+    const std::vector<double> angles = {10.0, 20.0, 40.0, 60.0, 75.0, 85.0};
+
+    auto event = [&](int itype, uint8_t ot, unsigned nH, int m1, int m2, int prev, int cur, int buf, double th, double dx,
+                     double dy)
+    {
+        auto C = make1<double>(mtl, itype, ot, nH, m1, m2, prev, cur, buf, L, 0.5, 0.5, QPI / 2.0 - th, 1.5);
+        C.has_path_dir = true;
+        C.path_dir_prev.zeros(1, 3);
+        C.path_dir_prev(0, 0) = dx, C.path_dir_prev(0, 1) = dy;
+        C.has_path_dirN = true;
+        C.path_dirN.zeros(1, 3);
+        C.path_dirN(0, 0) = std::cos(th), C.path_dirN(0, 1) = std::sin(th);
+        C.run();
+        return C;
+    };
+    // The real-angle map out of a medium into air at the real in-medium angle (c, s), unnormalized
+    auto real_map = [](std::complex<double> e, double s, double &a, double &b)
+    {
+        a = std::sqrt(std::abs(e)) * s;
+        b = std::real(std::sqrt(1.0 - e * s * s));
+    };
+
+    // ------------------------------------------------------------------------------------------
+    // Glued exit: entered through a bare face, behind a sheet inside the host, behind a stack
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: direction, glued exit. air | host 100 mm | coating 6 mm | air, undeviated tracer, the\n");
+    QD_DIAG("# exit along the direction a tracer holds. route: bare-entered, behind a sheet inside the\n");
+    QD_DIAG("# host, behind an ordered stack inside the host. d_pass is the direction the sheet or stack\n");
+    QD_DIAG("# event hands on against the one it received\n");
+    QD_DIAG("route,host,theta_ext,out_deg,d_t,d_n,map_t,map_n,d_pass\n");
+    for (int host : {5, 6})
+        for (int route = 0; route < 3; ++route)
+            for (double thd : angles)
+            {
+                double th = thd * QPI / 180.0;
+                std::complex<double> eh = diag_eps(host, f_hz);
+                double ct = diag_traced_ct(eh, th), st = std::sqrt(1.0 - ct * ct);
+                double dx = ct, dy = st, d_pass = 0.0;
+                int prev = 0, cur = host, buf = 0;
+                if (route > 0)
+                {
+                    auto S = route == 1 ? event(4, OT_SHEET_ISO, 1u, SHEET, 0, 0, host, 0, th, ct, st)
+                                        : event(4, OT_STACK, 2u, SHEET, SHEET2, 0, host, 0, th, ct, st);
+                    REQUIRE(S.resolved_type[0] != 0);
+                    dx = (double)S.path_dirN(0, 0), dy = (double)S.path_dirN(0, 1);
+                    d_pass = std::max(std::abs(dx - ct), std::abs(dy - st));
+                    prev = (int)S.prev_out(0), cur = (int)S.cur_out(0), buf = (int)S.buf_out(0);
+                }
+                auto X = event(4, OT_GLUED_EXIT, 2u, SHEET, host, prev, cur, buf, th, dx, dy);
+                double ox = std::abs((double)X.path_dirN(0, 0)), oy = std::abs((double)X.path_dirN(0, 1));
+                double a, b;
+                real_map(eh, st, a, b);
+                QD_DIAG("%s,%d,%.1f,%.4f,%+.3e,%+.3e,%+.3e,%+.3e,%.3e\n", route == 0 ? "bare " : (route == 1 ? "sheet" : "stack"),
+                        host, thd, std::atan2(oy, ox) * 180.0 / QPI, oy - std::sin(th), ox - std::cos(th), a - std::sin(th),
+                        b - std::cos(th), d_pass);
+                INFO("glued exit, route " << route << ", host " << host << ", theta_ext " << thd);
+                CHECK(d_pass < 1.0e-12); // near == far: the event hands the direction on
+                CHECK(std::abs(oy - std::sin(th)) < 1.0e-9);
+                CHECK(std::abs(ox - std::cos(th)) < 1.0e-9);
+            }
+
+    // ------------------------------------------------------------------------------------------
+    // Rows that keep the direction they have
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: direction, glued exits that keep it. nodir: no direction supplied, the reported angle\n");
+    QD_DIAG("# is the in-medium one. wedge: faces known not parallel. Both take the real-angle map, d_map\n");
+    QD_DIAG("# against it. closed: the outer pair is closed, the leak is undeviated, d_map against dir_prev\n");
+    QD_DIAG("kind,host,theta,out_deg,d_map\n");
+    for (int host : {5, 6})
+        for (int kind = 0; kind < 2; ++kind)
+            for (double thd : {10.0, 20.0, 40.0})
+            {
+                double th = thd * QPI / 180.0;
+                std::complex<double> eh = diag_eps(host, f_hz);
+                double c_in = std::cos(th), s_in = std::sin(th); // the real in-medium angle the map reads
+                Rsu<double> X;
+                if (kind == 0)
+                {
+                    X = make1<double>(mtl, 4, OT_GLUED_EXIT, 2u, SHEET, host, 0, host, 0, L / c_in, 0.5, 0.0, QPI / 2.0 - th, 1.5);
+                    X.orig(0, 0) = X.fbs(0, 0) - L, X.orig(0, 1) = -L * std::tan(th);
+                    X.dest(0, 0) = X.fbs(0, 0) + 0.5 * c_in, X.dest(0, 1) = 0.5 * s_in;
+                    X.has_path_dirN = true;
+                    X.path_dirN.zeros(1, 3);
+                    X.path_dirN(0, 0) = c_in, X.path_dirN(0, 1) = s_in;
+                    X.run();
+                }
+                else
+                {
+                    c_in = diag_traced_ct(eh, th), s_in = std::sqrt(1.0 - c_in * c_in);
+                    X = event(4, OT_GLUED_EXIT, 2u, SHEET, host, (int)enc(0, true), host, 0, th, c_in, s_in);
+                }
+                double a, b;
+                real_map(eh, s_in, a, b);
+                double n = std::sqrt(a * a + b * b);
+                double ox = std::abs((double)X.path_dirN(0, 0)), oy = std::abs((double)X.path_dirN(0, 1));
+                double d_map = std::max(std::abs(ox - b / n), std::abs(oy - a / n));
+                QD_DIAG("%s,%d,%.1f,%.4f,%.3e\n", kind ? "wedge " : "nodir ", host, thd, std::atan2(oy, ox) * 180.0 / QPI, d_map);
+                INFO("kept, kind " << kind << ", host " << host << ", theta " << thd);
+                CHECK(d_map < 1.0e-9);
+            }
+    for (double thd : {60.0, 70.0})
+    {
+        // Launched in the lossless host past its critical angle, the dense solid named
+        double th = thd * QPI / 180.0;
+        auto X = event(4, OT_GLUED_EXIT, 2u, SHEET, 6, DENSE, 6, 0, th, std::cos(th), std::sin(th));
+        double d_map = std::max(std::abs((double)X.path_dirN(0, 0) - std::cos(th)), std::abs((double)X.path_dirN(0, 1) - std::sin(th)));
+        QD_DIAG("closed,6,%.1f,%.4f,%.3e\n", thd,
+                std::atan2(std::abs((double)X.path_dirN(0, 1)), std::abs((double)X.path_dirN(0, 0))) * 180.0 / QPI, d_map);
+        INFO("closed outer pair, theta " << thd);
+        CHECK(rt_bit(X.resolved_type[0], 5));
+        CHECK(d_map < 1.0e-12);
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // Bare exit, through the intersector
+    // ------------------------------------------------------------------------------------------
+    struct Ev
+    {
+        arma::mat origN, destN, path_dirN, xpr;
+        arma::Col<short> prev, cur, buf;
+        arma::vec accg, accr;
+        uint8_t ot = 0, rt = 0;
+        unsigned nh = 0;
+    };
+    auto traced = [&](const std::unordered_map<std::string, std::vector<double>> &pal, const arma::mat &mesh,
+                      const arma::uvec &mtl_ind, int itype, const arma::mat &orig, const arma::mat &dest, const Ev *in,
+                      double eps) -> Ev
+    {
+        arma::mat fbs, sbs, fbsN, sbsN, nv;
+        arma::u32_vec nh, fi, si;
+        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, &nh, &fi, &si);
+        Ev E;
+        arma::vec gain, fang;
+        std::vector<uint8_t> ot, rt;
+        quadriga_lib::ray_mesh_interact(itype, f_hz, &orig, &dest, &mesh, &mtl_ind, &pal, &fi, &si, (arma::mat *)nullptr,
+                                        (arma::mat *)nullptr, &E.origN, &E.destN, &fbsN, &sbsN, &gain, &E.xpr,
+                                        (arma::mat *)nullptr, (arma::mat *)nullptr, &fang, (arma::vec *)nullptr,
+                                        (arma::vec *)nullptr, &nv, &ot, &E.path_dirN, false, (arma::u32_vec *)nullptr);
+        arma::Col<short> mf(1), ms(1);
+        mf(0) = fi(0) ? (short)mtl_ind(fi(0) - 1) : (short)0, ms(0) = si(0) ? (short)mtl_ind(si(0) - 1) : (short)0;
+        quadriga_lib::ray_state_update(itype, f_hz, &orig, &dest, &fbsN, &sbsN, &nh, &fang, &nv, &ot, &pal, &mf, &ms,
+                                       in ? &in->prev : nullptr, in ? &in->cur : nullptr, in ? &in->buf : nullptr,
+                                       in ? &in->path_dirN : nullptr, in ? &in->accg : nullptr, in ? &in->accr : nullptr,
+                                       &E.prev, &E.cur, &E.buf, &gain, &E.xpr, &E.path_dirN, &E.accg, &E.accr, &rt,
+                                       (arma::u32_vec *)nullptr, eps);
+        E.ot = ot[0], E.rt = rt[0], E.nh = nh(0);
+        return E;
+    };
+    // The next segment: from where the event relaunched, 2 m along the direction it relaunched in
+    auto onward = [](const Ev &E, arma::mat &orig, arma::mat &dest)
+    {
+        arma::mat d = E.destN - E.origN;
+        d /= std::sqrt(d(0, 0) * d(0, 0) + d(0, 1) * d(0, 1) + d(0, 2) * d(0, 2));
+        orig = E.origN, dest = E.origN + 2.0 * d;
+    };
+    // A face at x with its normal along -x (flip false) or +x (flip true)
+    auto face = [](double x, bool flip) -> arma::mat
+    {
+        arma::mat m = diag_quad_x(200.0, x);
+        if (flip)
+        {
+            m.row(0) = arma::rowvec{x, -200.0, -200.0, x, 200.0, -200.0, x, -200.0, 200.0};
+            m.row(1) = arma::rowvec{x, 200.0, -200.0, x, 200.0, 200.0, x, -200.0, 200.0};
+        }
+        return m;
+    };
+
+    QD_DIAG("\n# diag: direction, bare exit. air | slab 100 mm | air through the intersector, two events, and\n");
+    QD_DIAG("# three for the resolved ray: enter, reflect at the far face with the series collapsed, leave\n");
+    QD_DIAG("# through the front face, where the ray has to leave along the mirror of how it arrived.\n");
+    QD_DIAG("# itype 4 is the undeviated tracer, 5 the refracting one, whose rows are recorded\n");
+    QD_DIAG("itype,route,mtl,theta_ext,code,rtype,out_deg,d_t,d_n\n");
+    {
+        arma::mat mesh = arma::join_cols(face(0.0, false), face(L, true));
+        for (int itype : {4, 5})
+            for (int route = 0; route < 2; ++route)
+                for (int m : {5, 6})
+                    for (double thd : angles)
+                    {
+                        double th = thd * QPI / 180.0;
+                        arma::uvec mtl_ind(mesh.n_rows, arma::fill::value((arma::uword)m));
+                        arma::mat orig, dest;
+                        diag_ray_at(thd, orig, dest);
+                        Ev A = traced(mtl, mesh, mtl_ind, itype, orig, dest, nullptr, 0.0);
+                        onward(A, orig, dest);
+                        Ev B = traced(mtl, mesh, mtl_ind, route ? 3 : itype, orig, dest, &A, 0.0);
+                        if (route)
+                        {
+                            REQUIRE(rt_bit(B.rt, 2)); // the reflection collapsed the series
+                            onward(B, orig, dest);
+                            B = traced(mtl, mesh, mtl_ind, itype, orig, dest, &B, 0.0);
+                        }
+                        double ox = std::abs(B.path_dirN(0, 0)), oy = std::abs(B.path_dirN(0, 1));
+                        QD_DIAG("%d,%s,%d,%.1f,%u,%u,%.4f,%+.3e,%+.3e\n", itype, route ? "resolved" : "through ", m, thd,
+                                (unsigned)B.ot, (unsigned)B.rt, std::atan2(oy, ox) * 180.0 / QPI, oy - std::sin(th), ox - std::cos(th));
+                        INFO("bare exit, itype " << itype << ", route " << route << ", material " << m << ", theta_ext " << thd);
+                        REQUIRE((B.ot & 0x1F) == 1);
+                        REQUIRE(mat_of(B.cur(0)) == 0);
+                        CHECK((B.path_dirN(0, 0) > 0.0) == (route == 0)); // onward, or back out of the front face
+                        if (itype == 4)
+                        {
+                            CHECK(std::abs(oy - std::sin(th)) < 1.0e-9);
+                            CHECK(std::abs(ox - std::cos(th)) < 1.0e-9);
+                        }
+                    }
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // A leak through a mass-law face
+    // ------------------------------------------------------------------------------------------
+    // Rigid materials, eps = (Z_air / Z)^2: a wave enters as a tf leak and is held undeviated.
+    // Towards the lower index it stays undeviated by the rule for a wave held in a mass-law
+    // medium, as two traced solids and through a sheet whose outer pair is closed. Towards the
+    // higher index, which every exit into air is, the crossing is the ordinary one and bends to
+    // the normal; those rows are recorded.
+    QD_DIAG("\n# diag: direction, a leak. Wood eps 2.1609e-8, concrete eps 2.401e-9, both with tf and the mass\n");
+    QD_DIAG("# column, 30 deg in, undeviated tracer. One row per event; kept says whether the row is\n");
+    QD_DIAG("# asserted undeviated (1) or recorded (0)\n");
+    QD_DIAG("stack,event,code,rtype,out_deg,d_deg,kept\n");
+    {
+        std::unordered_map<std::string, std::vector<double>> pal;
+        pal["a"] = {2.1609e-8, 2.401e-9, 2.1609e-8};
+        pal["fRef"] = {0.001, 0.001, 0.001};
+        pal["tf"] = {0.2, 0.1, 0.2};
+        pal["m"] = {20.0, 30.0, 20.0};
+        pal["thk"] = {0.0, 0.0, 0.02};
+        const int WOOD = 1, CONC = 2, PANEL = 3;
+        const double g = 1.0e-5, thd = 30.0;
+        struct Stack
+        {
+            const char *name;
+            std::vector<double> x;
+            std::vector<int> mat;
+            std::vector<bool> flip;
+            std::vector<int> kept; // per event
+        };
+        const std::vector<Stack> stacks = {
+            {"air | wood 50 | conc 50 | air  ", {0.0, 0.05, 0.05 + g, 0.10}, {WOOD, WOOD, CONC, CONC}, {false, true, false, true}, {1, 1, 0}},
+            {"air | conc 50 | wood 50 | air  ", {0.0, 0.05, 0.05 + g, 0.10}, {CONC, CONC, WOOD, WOOD}, {false, true, false, true}, {1, 0, 0}},
+            {"air | panel | conc 100 | air   ", {0.0, g, 0.10}, {PANEL, CONC, CONC}, {false, false, true}, {1, 0}},
+            {"air | conc 100 | panel | air   ", {0.0, 0.10, 0.10 + g}, {CONC, CONC, PANEL}, {false, true, true}, {1, 0}},
+            {"air | panel | air              ", {0.0}, {PANEL}, {false}, {1}},
+        };
+        for (const auto &S : stacks)
+        {
+            arma::mat mesh;
+            arma::uvec mtl_ind(2 * S.x.size());
+            for (size_t k = 0; k < S.x.size(); ++k)
+            {
+                mesh = k ? arma::join_cols(mesh, face(S.x[k], S.flip[k])) : face(S.x[k], S.flip[k]);
+                mtl_ind(2 * k) = (arma::uword)S.mat[k], mtl_ind(2 * k + 1) = (arma::uword)S.mat[k];
+            }
+            arma::mat orig, dest;
+            diag_ray_at(thd, orig, dest);
+            Ev P;
+            const Ev *in = nullptr;
+            for (size_t k = 0; k < S.kept.size(); ++k)
+            {
+                Ev E = traced(pal, mesh, mtl_ind, 4, orig, dest, in, 1.5);
+                REQUIRE(E.nh != 0);
+                double out = std::atan2(std::abs(E.path_dirN(0, 1)), std::abs(E.path_dirN(0, 0))) * 180.0 / QPI;
+                QD_DIAG("%s,%d,%u,%u,%.4f,%+.4f,%d\n", S.name, (int)k, (unsigned)E.ot, (unsigned)E.rt, out, out - thd, S.kept[k]);
+                INFO(S.name << ", event " << k);
+                if (S.kept[k])
+                    CHECK(std::abs(out - thd) < 1.0e-9);
+                onward(E, orig, dest);
+                P = E, in = &P;
+            }
+        }
+    }
+}
