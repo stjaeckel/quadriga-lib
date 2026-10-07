@@ -3510,7 +3510,7 @@ void quadriga_lib::ray_state_update(
    |   65 | 0x41 |   —  |     —   | trans, ok                  | advance to ray destination, identity interface     |
    |   69 | 0x45 |   85 |   101   | sheet, resolve, ok         | isolated sheet crossed in air                      |
    |   77 | 0x4D |   93 |   109   | sheet, resolve, inside, ok | isolated sheet crossed inside a medium (embedded)  |
-   |   71 | 0x47 |   87 |   103   | sheet, glued, resolve, ok  | glued exit, solid \| sheet \| enclosing            |
+   |   71 | 0x47 |   87 |   103   | sheet, glued, resolve, ok  | glued exit, solid \| sheet \| air                  |
    |   79 | 0x4F |   95 |   111   | sheet, glued, resolve, inside, ok | glued entry, host \| sheet \| solid         |
    Reachable composite values for reflection:<br><br>
    |  Dec | Hex  |  FIX |   TIR   | Flags set                       | Meaning                                                      |
@@ -3825,7 +3825,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
         //   0 = no sheet
         //   1 = isolated sheet, collapsed double-sided duplicate, or a corner whose SBS was dropped
         //   2 = glued entry, host | sheet | solid
-        //   3 = glued exit, solid | sheet | whatever encloses the host
+        //   3 = glued exit, solid | sheet | air
         //   4 = ordered stack of two different sheets (physics not implemented, see below)
         int sheet_case = 0, sheet_mtl = 0, sheet_solid = 0, sheet_mtl2 = 0;
         if (typeH[6])
@@ -4703,22 +4703,23 @@ void quadriga_lib::ray_state_update(int interaction_type,
 
             // Bounding media from the tracked state. mtl_current is the near side in every case: the
             // ray is travelling in it when it reaches the sheet. The far side is that same medium for
-            // an isolated sheet, the glued solid on entry, and on exit the medium the host was entered
-            // through - mtl_prev being exactly "what is on the other side of this cavity".
+            // an isolated sheet, the glued solid on entry, and air on exit.
             //
-            // That holds while mtl_prev names a medium. After a sheet crossing or a reflection off
-            // a sheet it holds that sheet, which has no volume and encloses nothing: the host was
-            // entered through a lining, or the ray is a bounce returning to the glued sheet it
-            // entered by. What lies beyond the sheet ahead is then one level further back than the
-            // state reaches, and air is taken, which is what ray_mesh_interact's own composite
-            // assumes for every glued exit. A sheet between two solids is not a geometry the
-            // intersector reports, and if one occurs the next exit corrects the current medium.
+            // Air beyond a glued exit is not read from the state. The previous-medium word names
+            // what the host was entered from, or the sheet it was entered through, and either is
+            // behind the ray: it is the mirror behind it in the host's series and nothing else. A
+            // wall of two solid layers with a coating on its far side has the first layer in that
+            // word and air beyond the coating. The medium a host was entered from lies beyond its
+            // exit sheet only for a lined body nested in that medium, which is not a use case, and
+            // a sheet between two solids is not a geometry the intersector reports; if one occurs
+            // the next exit corrects the current medium. Air is also what ray_mesh_interact's own
+            // composite assumes for every glued exit.
             int m_near = mtl_current;
-            int m_far = (sheet_case == 2) ? sheet_solid
-                                          : ((sheet_case == 3) ? (IS_SHEET(mtl_prev) ? 0 : mtl_prev) : mtl_current);
+            int m_far = (sheet_case == 2) ? sheet_solid : ((sheet_case == 3) ? 0 : mtl_current);
             int m_next = m_far; // medium the ray travels in after the crossing
 
-            // No sheet code in scope carries a deferred buffer. Flag the violation rather than guess.
+            // No sheet code in scope carries a deferred buffer. Flag the violation rather than guess:
+            // a glued exit still exits into air, and the deferred medium is dropped.
             if (mtl_buffer != 0)
                 typeR[4] = true;
 
