@@ -1621,7 +1621,7 @@ TEST_CASE("ray_state_update - scalar refraction (interaction type 5)")
         auto C = make1<double>(mtl, 5, OT_ENTRY, 1, 1, 0, 0, 0, 0, 1.0, 2.0, 0.5, QPI / 2.0, 0.15);
         C.run();
         check_keep(C);
-        check_state(C, 0, 1, 0);
+        check_state(C, 0, 1 | 0x4000, 0); // the refracting entry marks the leg as bent
         check_rtype(C, RT_ENTRY);
     }
 }
@@ -10333,4 +10333,398 @@ TEST_CASE("Direction - a ray leaves a parallel slab parallel to how it arrived")
             }
         }
     }
+}
+
+TEST_CASE("Refracting tracer - a traced bend is known from the state and the leg is exact")
+{
+    // With types 2 and 5 ray_mesh_interact bends the segment itself, so inside a solid the traced
+    // and the geometric cosine coincide and nothing can be read off their difference. That the
+    // leg follows a bend is a fact of the polyline, and the event that entered the medium knows
+    // it: bit 14 of the current-medium word, set where a type 2 or 5 event refracted into the
+    // medium, clear where it entered under total reflection, carried while the ray stays in the
+    // medium and zero in air. Every consumer of the recovered cosine then runs on that leg as it
+    // does for the undeviated tracer, and the traversal takes no walk-off, since the lateral shift
+    // is in the polyline.
+    //
+    // Everything runs through ray_triangle_intersect, ray_mesh_interact and ray_state_update.
+    // The quantity compared is the absolute transfer between the first and the last hit point,
+    // the chain coefficient with the free-space reference over the in-wall polyline put back:
+    //   - against the analytic slab at the polyline's exit point, power and phase;
+    //   - tracer 5 against tracer 4. The undeviated tracer's exact traversal carries the phase of
+    //     the refracted ray, which is the ray the refracting tracer's polyline is, so the two
+    //     absolute transfers are one number.
+    // Recorded and not asserted: the trajectory (destN - origN) out of a lossy wall, the phase of
+    // a chain through two lossy solids, where the polyline in the second solid is the one
+    // ray_mesh_interact bent, a mass-law solid the wave is refracted into, and a second frequency.
+    const double f_hz = FRQ, k0 = 2.0 * QPI * f_hz / C0, L = 0.10, gap = 1.0e-5;
+    auto mtl = diag_palette<double>();
+    const int SHEET = 3;
+    const short BENT = (short)0x4000;
+    const std::vector<double> angles = {10.0, 20.0, 40.0, 60.0, 75.0, 85.0};
+    auto dB = [](double g)
+    { return 10.0 * std::log10(g); };
+    auto deg = [](std::complex<double> z)
+    { return std::arg(z) * 180.0 / QPI; };
+
+    struct Ev
+    {
+        arma::mat origN, destN, path_dirN, xpr, fbs;
+        arma::Col<short> prev, cur, buf;
+        arma::vec accg, accr;
+        uint8_t ot = 0, rt = 0;
+        unsigned nh = 0;
+    };
+    auto traced = [&](const std::unordered_map<std::string, std::vector<double>> &pal, const arma::mat &mesh,
+                      const arma::uvec &mtl_ind, int itype, double f, const arma::mat &orig, const arma::mat &dest,
+                      const Ev *in, const Ev *in_state, double eps) -> Ev
+    {
+        // in: direction and refracted ledger; in_state: the state words and the geometric ledger,
+        // which in a multi-frequency run are the base frequency's
+        if (!in_state)
+            in_state = in;
+        arma::mat fbs, sbs, sbsN, nv;
+        arma::u32_vec nh, fi, si;
+        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, &nh, &fi, &si);
+        Ev E;
+        arma::vec gain, fang;
+        std::vector<uint8_t> ot, rt;
+        quadriga_lib::ray_mesh_interact(itype, f, &orig, &dest, &mesh, &mtl_ind, &pal, &fi, &si, (arma::mat *)nullptr,
+                                        (arma::mat *)nullptr, &E.origN, &E.destN, &E.fbs, &sbsN, &gain, &E.xpr,
+                                        (arma::mat *)nullptr, (arma::mat *)nullptr, &fang, (arma::vec *)nullptr,
+                                        (arma::vec *)nullptr, &nv, &ot, &E.path_dirN, false, (arma::u32_vec *)nullptr);
+        arma::Col<short> mf(1), ms(1);
+        mf(0) = fi(0) ? (short)mtl_ind(fi(0) - 1) : (short)0, ms(0) = si(0) ? (short)mtl_ind(si(0) - 1) : (short)0;
+        quadriga_lib::ray_state_update(itype, f, &orig, &dest, &E.fbs, &sbsN, &nh, &fang, &nv, &ot, &pal, &mf, &ms,
+                                       in ? &in_state->prev : nullptr, in ? &in_state->cur : nullptr, in ? &in_state->buf : nullptr,
+                                       in ? &in->path_dirN : nullptr, in ? &in_state->accg : nullptr, in ? &in->accr : nullptr,
+                                       &E.prev, &E.cur, &E.buf, &gain, &E.xpr, &E.path_dirN, &E.accg, &E.accr, &rt,
+                                       (arma::u32_vec *)nullptr, eps);
+        E.ot = ot[0], E.rt = rt[0], E.nh = nh(0);
+        return E;
+    };
+    auto face = [](double x, bool flip) -> arma::mat
+    {
+        arma::mat m = diag_quad_x(200.0, x);
+        if (flip)
+        {
+            m.row(0) = arma::rowvec{x, -200.0, -200.0, x, 200.0, -200.0, x, -200.0, 200.0};
+            m.row(1) = arma::rowvec{x, 200.0, -200.0, x, 200.0, 200.0, x, -200.0, 200.0};
+        }
+        return m;
+    };
+    auto build = [&](const std::vector<double> &x, const std::vector<int> &mat, const std::vector<bool> &flip, arma::uvec &mtl_ind)
+    {
+        arma::mat mesh;
+        mtl_ind.set_size(2 * x.size());
+        for (size_t k = 0; k < x.size(); ++k)
+        {
+            mesh = k ? arma::join_cols(mesh, face(x[k], flip[k])) : face(x[k], flip[k]);
+            mtl_ind(2 * k) = (arma::uword)mat[k], mtl_ind(2 * k + 1) = (arma::uword)mat[k];
+        }
+        return mesh;
+    };
+    struct Chain
+    {
+        std::complex<double> vv = 1.0, hh = 1.0; // chain coefficient, VV (TE, scalar) and HH (TM)
+        double Lin = 0.0, dy = 0.0;              // in-wall polyline length, lateral walk first to last hit
+        double out_x = 0.0, out_y = 0.0, traj = 0.0;
+        std::vector<Ev> ev;
+        bool ok = true;
+        std::complex<double> abs_vv(double k) const { return vv * std::exp(std::complex<double>(0.0, -k * Lin)); }
+    };
+    // seq: one type repeated until the ray is out, or one type per event. f_base != 0: geometry
+    // and state words at f_base, coefficient and direction at f, as ray_progress runs a band.
+    auto run = [&](const std::unordered_map<std::string, std::vector<double>> &pal, const arma::mat &mesh, const arma::uvec &mtl_ind,
+                   std::vector<int> seq, double thd, double eps, double f, double f_base) -> Chain
+    {
+        Chain C;
+        arma::mat orig, dest;
+        diag_ray_at(thd, orig, dest);
+        Ev P, Pb;
+        bool have = false, inside = false;
+        double xp = 0.0, yp = 0.0, y0 = 0.0;
+        for (int k = 0; k < 8; ++k)
+        {
+            int itype = seq.size() == 1 ? seq[0] : (k < (int)seq.size() ? seq[k] : -1);
+            if (itype < 0)
+                break;
+            Ev B = traced(pal, mesh, mtl_ind, itype, f_base != 0.0 ? f_base : f, orig, dest, have ? &Pb : nullptr, nullptr, eps);
+            if (B.nh == 0)
+                break;
+            Ev E = f_base != 0.0 ? traced(pal, mesh, mtl_ind, itype, f, orig, dest, have ? &P : nullptr, have ? &Pb : nullptr, eps) : B;
+            if (E.rt == 0)
+            {
+                C.ok = false;
+                break;
+            }
+            C.vv *= cpx(E.xpr, 0, 0), C.hh *= cpx(E.xpr, 0, (E.xpr.n_rows == 8) ? 3 : 0);
+            double fx = B.fbs(0, 0), fy = B.fbs(0, 1);
+            if (k == 0)
+                y0 = fy;
+            if (inside)
+                C.Lin += std::sqrt((fx - xp) * (fx - xp) + (fy - yp) * (fy - yp));
+            xp = fx, yp = fy, C.dy = fy - y0;
+            inside = mat_of(B.cur(0)) != 0;
+            C.out_x = std::abs(E.path_dirN(0, 0)), C.out_y = std::abs(E.path_dirN(0, 1));
+            arma::mat d = B.destN - B.origN;
+            d /= std::sqrt(d(0, 0) * d(0, 0) + d(0, 1) * d(0, 1) + d(0, 2) * d(0, 2));
+            C.traj = std::atan2(std::abs(d(0, 1)), std::abs(d(0, 0))) * 180.0 / QPI;
+            orig = B.origN, dest = B.origN + 2.0 * d;
+            P = E, Pb = B, have = true;
+            C.ev.push_back(E);
+        }
+        return C;
+    };
+    // The analytic slab, TE, complex: transmit, and the part of the reflect port that entered
+    // The thickness is the one the polyline crossed: ray_mesh_interact relaunches a few float ulp
+    // of the coordinate magnitude past the face, along the outgoing direction, so the leg is short
+    // by the normal part of that, 1e-6 m for the undeviated tracer and up to 1e-5 m for the
+    // refracting one at 85 deg, which the series of a dense slab turns into 4e-3 dB.
+    auto slab = [&](std::complex<double> es, double th, double f, bool series, double Lx, std::complex<double> &t, std::complex<double> &r_in)
+    {
+        std::complex<double> c1 = std::sqrt(1.0 - std::sin(th) * std::sin(th) / es), n = std::sqrt(es);
+        std::complex<double> a = std::cos(th), b = n * c1, r10 = (b - a) / (b + a);
+        std::complex<double> t01 = 2.0 * a / (a + b), t10 = 2.0 * b / (a + b);
+        std::complex<double> phi = std::exp(std::complex<double>(0.0, -1.0) * (2.0 * QPI * f / C0) * n * c1 * Lx);
+        std::complex<double> S = series ? 1.0 / (1.0 - r10 * r10 * phi * phi) : std::complex<double>(1.0, 0.0);
+        t = t01 * t10 * phi * S, r_in = t01 * r10 * t10 * phi * phi * S;
+    };
+
+    // ------------------------------------------------------------------------------------------
+    // Bare slab: the state, the chain against the analytic slab, the two tracers, the direction
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: refracting tracer, bare slab. air | 100 mm | air through the intersector, series resolved.\n");
+    QD_DIAG("# d_dB, ph: tracer 5 against the analytic slab at the polyline's exit point. r54: tracer 5 over 4,\n");
+    QD_DIAG("# absolute transfer. tm_dB: tracer 2, HH against the TM slab. cur: current word after the entry,\n");
+    QD_DIAG("# hex. out: path_dirN at the exit, traj: destN - origN there, deg, recorded\n");
+    QD_DIAG("mtl,theta,cur4,cur5,rt5,d_dB,ph_deg,r54_dB,r54_deg,te2_dB,tm_dB,out_deg,traj_deg\n");
+    for (int m : {5, 6, 1, 4})
+        for (double thd : angles)
+        {
+            double th = thd * QPI / 180.0;
+            arma::uvec mi;
+            arma::mat mesh = build({0.0, L}, {m, m}, {false, true}, mi);
+            Chain c4 = run(mtl, mesh, mi, {4}, thd, 0.0, f_hz, 0.0), c5 = run(mtl, mesh, mi, {5}, thd, 0.0, f_hz, 0.0);
+            Chain c2 = run(mtl, mesh, mi, {2}, thd, 0.0, f_hz, 0.0);
+            REQUIRE((c4.ok && c5.ok && c2.ok));
+            REQUIRE((c4.ev.size() == 2 && c5.ev.size() == 2 && c2.ev.size() == 2));
+            std::complex<double> t, t4, r_in;
+            slab(diag_eps(m, f_hz), th, f_hz, true, L - c5.ev[0].origN(0, 0), t, r_in);
+            slab(diag_eps(m, f_hz), th, f_hz, true, L - c4.ev[0].origN(0, 0), t4, r_in);
+            std::complex<double> q = c5.abs_vv(k0) * std::exp(std::complex<double>(0.0, k0 * std::sin(th) * c5.dy)) / t;
+            std::complex<double> r54 = (c5.abs_vv(k0) / t) / (c4.abs_vv(k0) / t4); // each over the slab it crossed
+            double p_te = 0.0, p_tm = 0.0;
+            diag_slab_p_pol(diag_eps(m, f_hz), L - c2.ev[0].origN(0, 0), th, f_hz, p_te, p_tm);
+            QD_DIAG("%d,%.1f,%04x,%04x,%u,%+.6f,%+.4f,%+.6f,%+.4f,%+.6f,%+.6f,%.4f,%.4f\n", m, thd, (unsigned)(unsigned short)c4.ev[0].cur(0),
+                    (unsigned)(unsigned short)c5.ev[0].cur(0), (unsigned)c5.ev[1].rt, dB(std::norm(q)), deg(q), dB(std::norm(r54)), deg(r54),
+                    dB(std::norm(c2.vv) / p_te), dB(std::norm(c2.hh) / p_tm), std::atan2(c5.out_y, c5.out_x) * 180.0 / QPI, c5.traj);
+            INFO("bare slab, material " << m << ", theta_ext " << thd);
+            // The state: the bent leg says so, with either refracting type, and the undeviated one never
+            CHECK(c5.ev[0].cur(0) == (short)(m | BENT));
+            CHECK(c2.ev[0].cur(0) == (short)(m | BENT));
+            CHECK(c4.ev[0].cur(0) == (short)m);
+            CHECK(c5.ev[1].cur(0) == (short)0); // zero in air
+            CHECK(c5.ev[1].prev(0) == c4.ev[1].prev(0));
+            CHECK(c5.ev[1].rt == 5); // the VBS bit keeps its meaning: the VBS is the FBS here
+            // The chain
+            CHECK(std::abs(dB(std::norm(q))) < 1.0e-3);
+            CHECK(std::abs(deg(q)) < 0.05);
+            CHECK(std::abs(dB(std::norm(r54))) < 1.0e-3);
+            CHECK(std::abs(deg(r54)) < 0.05);
+            CHECK(std::abs(dB(std::norm(c2.vv) / p_te)) < 1.0e-3);
+            CHECK(std::abs(dB(std::norm(c2.hh) / p_tm)) < 1.0e-3);
+            // The direction written at the exit is the one the ray arrived in
+            CHECK(std::abs(c5.out_y - std::sin(th)) < 1.0e-9);
+            CHECK(std::abs(c5.out_x - std::cos(th)) < 1.0e-9);
+        }
+
+    // ------------------------------------------------------------------------------------------
+    // Sheets on and in the host, and two solids: tracer 5 against tracer 4
+    // ------------------------------------------------------------------------------------------
+    struct Stack
+    {
+        const char *name;
+        std::vector<double> x;
+        std::vector<int> mat;
+        std::vector<bool> flip;
+        double eps;
+        bool phase; // the phase is asserted
+        int sheet_ev; // event after which the ray is behind a sheet inside the host, or -1
+    };
+    std::vector<Stack> stacks;
+    for (int h : {5, 6})
+    {
+        stacks.push_back({"glued_entry ", {0.0, gap, L}, {SHEET, h, h}, {false, false, true}, 0.0, true, -1});
+        stacks.push_back({"glued_exit  ", {0.0, L, L + gap}, {h, h, SHEET}, {false, true, true}, 0.0, true, -1});
+        stacks.push_back({"lined       ", {0.0, gap, L, L + gap}, {SHEET, h, h, SHEET}, {false, false, true, true}, 0.0, true, -1});
+        stacks.push_back({"sheet_inside", {0.0, 0.05, L}, {h, SHEET, h}, {false, false, true}, 0.0, true, 1});
+    }
+    for (auto P : std::vector<std::pair<int, int>>{{1, 5}, {5, 1}, {2, 5}, {2, 6}, {1, 6}})
+        stacks.push_back({"two_solids  ", {0.0, 0.05, 0.05 + gap, 0.15 + gap}, {P.first, P.first, P.second, P.second},
+                          {false, true, false, true}, 1.5, false, -1});
+    QD_DIAG("\n# diag: refracting tracer, layered walls. Tracer 5 over tracer 4, absolute transfer, scalar. Sheets:\n");
+    QD_DIAG("# series resolved. two_solids: series declined; its phase is recorded, the polyline in the second\n");
+    QD_DIAG("# solid being the one ray_mesh_interact bent. words: the last in-wall state words of tracer 5, hex\n");
+    QD_DIAG("stack,mats,theta,rt4,rt5,r54_dB,r54_deg,prev5,cur5,out_deg,traj_deg\n");
+    for (const auto &S : stacks)
+        for (double thd : angles)
+        {
+            double th = thd * QPI / 180.0;
+            arma::uvec mi;
+            arma::mat mesh = build(S.x, S.mat, S.flip, mi);
+            Chain c4 = run(mtl, mesh, mi, {4}, thd, S.eps, f_hz, 0.0), c5 = run(mtl, mesh, mi, {5}, thd, S.eps, f_hz, 0.0);
+            REQUIRE((c4.ok && c5.ok));
+            REQUIRE(c4.ev.size() == c5.ev.size());
+            size_t n = c5.ev.size();
+            std::complex<double> r54 = c5.abs_vv(k0) / c4.abs_vv(k0);
+            std::string mats, r4, r5;
+            for (int v : S.mat)
+                mats += std::to_string(v);
+            for (size_t k = 0; k < n; ++k)
+                r4 += std::to_string((unsigned)c4.ev[k].rt) + "/", r5 += std::to_string((unsigned)c5.ev[k].rt) + "/";
+            QD_DIAG("%s,%s,%.1f,%s,%s,%+.6f,%+.4f,%04x,%04x,%.4f,%.4f\n", S.name, mats.c_str(), thd, r4.c_str(), r5.c_str(), dB(std::norm(r54)),
+                    deg(r54), (unsigned)(unsigned short)c5.ev[n - 2].prev(0), (unsigned)(unsigned short)c5.ev[n - 2].cur(0),
+                    std::atan2(c5.out_y, c5.out_x) * 180.0 / QPI, c5.traj);
+            INFO(S.name << " " << mats << ", theta_ext " << thd);
+            // No reference here, so the two polylines are compared as they are, each short by its
+            // own relaunch offsets: 1.1e-3 dB on the lined lossless wall at 85 deg, below 6e-4 elsewhere
+            CHECK(std::abs(dB(std::norm(r54))) < 2.0e-3);
+            if (S.phase)
+                CHECK(std::abs(deg(r54)) < 0.05);
+            for (size_t k = 0; k < n; ++k)
+            {
+                // The words of the two tracers differ in the one bit and nowhere else, and the bit
+                // is set on every in-wall leg: carried through a sheet inside the host, written
+                // again by a transition that refracted
+                bool in_wall = mat_of(c5.ev[k].cur(0)) != 0;
+                CHECK(c5.ev[k].prev(0) == c4.ev[k].prev(0));
+                CHECK(c5.ev[k].buf(0) == c4.ev[k].buf(0));
+                CHECK(c5.ev[k].cur(0) == (short)(c4.ev[k].cur(0) | (in_wall ? BENT : (short)0)));
+                CHECK((c4.ev[k].cur(0) & BENT) == 0);
+            }
+            if (S.sheet_ev >= 0)
+                CHECK((c5.ev[(size_t)S.sheet_ev].cur(0) & BENT) != 0);
+            CHECK(std::abs(c5.out_y - std::sin(th)) < 1.0e-9);
+            CHECK(std::abs(c5.out_x - std::cos(th)) < 1.0e-9);
+        }
+
+    // ------------------------------------------------------------------------------------------
+    // Back reflection: the reflect pass does not name the tracer, the word does
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: refracting tracer, back reflection. Enter (5), reflect at the far face (3), leave by the\n");
+    QD_DIAG("# front face (5), against t01 r10 t10 phi^2 [S] at the polyline's exit point. eps 0: the reflection\n");
+    QD_DIAG("# collapses the series and the ray leaves resolved. cur: the word after the reflection, hex\n");
+    QD_DIAG("mtl,eps,theta,rt5,cur5,d_dB,ph_deg\n");
+    for (int m : {5, 6})
+        for (double eps : {1.5, 0.0})
+            for (double thd : angles)
+            {
+                double th = thd * QPI / 180.0;
+                arma::uvec mi;
+                arma::mat mesh = build({0.0, L}, {m, m}, {false, true}, mi);
+                Chain c5 = run(mtl, mesh, mi, {5, 3, 5}, thd, eps, f_hz, 0.0);
+                REQUIRE((c5.ok && c5.ev.size() == 3));
+                std::complex<double> t, r_in;
+                slab(diag_eps(m, f_hz), th, f_hz, eps == 0.0, L - c5.ev[0].origN(0, 0), t, r_in);
+                std::complex<double> q = c5.abs_vv(k0) * std::exp(std::complex<double>(0.0, k0 * std::sin(th) * c5.dy)) / r_in;
+                std::string r5;
+                for (const auto &E : c5.ev)
+                    r5 += std::to_string((unsigned)E.rt) + "/";
+                QD_DIAG("%d,%.1f,%.1f,%s,%04x,%+.6f,%+.4f\n", m, eps, thd, r5.c_str(), (unsigned)(unsigned short)c5.ev[1].cur(0), dB(std::norm(q)), deg(q));
+                INFO("back reflection, material " << m << ", eps " << eps << ", theta_ext " << thd);
+                CHECK((c5.ev[1].cur(0) & BENT) != 0); // a reflection keeps the leg's bit
+                CHECK(mat_of(c5.ev[1].cur(0)) == m);
+                CHECK(flag_of(c5.ev[1].cur(0)) == (eps == 0.0));
+                CHECK(c5.ev[2].cur(0) == (short)0);
+                CHECK(std::abs(dB(std::norm(q))) < 1.0e-3);
+                CHECK(std::abs(deg(q)) < 0.05);
+                CHECK(std::abs(c5.out_y - std::sin(th)) < 1.0e-9); // leaves along the mirror of how it arrived
+                CHECK(std::abs(c5.out_x - std::cos(th)) < 1.0e-9);
+            }
+
+    // ------------------------------------------------------------------------------------------
+    // A leak is not a bend: rigid bodies, entered under total reflection
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: refracting tracer, a leak. Wood eps 2.1609e-8, concrete eps 2.401e-9, tf and the mass column,\n");
+    QD_DIAG("# 30 deg. The entry is a total reflection, the bit stays clear and every event is the undeviated\n");
+    QD_DIAG("# tracer's. Recorded: concrete in front of wood, where the shared face leads towards the higher\n");
+    QD_DIAG("# index and bends the ray, so the wood leg is a bent one; and DENSE, eps 1.50 with m 20, a\n");
+    QD_DIAG("# mass-law solid the wave is refracted into\n");
+    QD_DIAG("stack,tracer,event,code,rtype,gain_dB,out_deg,prev,cur,buf\n");
+    {
+        std::unordered_map<std::string, std::vector<double>> pal;
+        pal["a"] = {2.1609e-8, 2.401e-9, 2.1609e-8, 1.5};
+        pal["fRef"] = {0.001, 0.001, 0.001, 0.001};
+        pal["tf"] = {0.2, 0.1, 0.2, 0.0};
+        pal["m"] = {20.0, 30.0, 20.0, 20.0};
+        pal["thk"] = {0.0, 0.0, 0.02, 0.0};
+        struct St
+        {
+            const char *name;
+            std::vector<double> x;
+            std::vector<int> mat;
+            std::vector<bool> flip;
+            bool rigid;
+        };
+        const std::vector<St> sts = {
+            {"air | wood 50 | conc 50 | air", {0.0, 0.05, 0.05 + gap, L}, {1, 1, 2, 2}, {false, true, false, true}, true},
+            {"air | conc 50 | wood 50 | air", {0.0, 0.05, 0.05 + gap, L}, {2, 2, 1, 1}, {false, true, false, true}, false},
+            {"air | panel | conc 100 | air ", {0.0, gap, L}, {3, 2, 2}, {false, false, true}, true},
+            {"air | conc 100 | panel | air ", {0.0, L, L + gap}, {2, 2, 3}, {false, true, true}, true},
+            {"air | DENSE m20 100 | air    ", {0.0, L}, {4, 4}, {false, true}, false},
+        };
+        for (const auto &S : sts)
+        {
+            arma::uvec mi;
+            arma::mat mesh = build(S.x, S.mat, S.flip, mi);
+            Chain c4 = run(pal, mesh, mi, {4}, 30.0, 1.5, f_hz, 0.0), c5 = run(pal, mesh, mi, {5}, 30.0, 1.5, f_hz, 0.0);
+            REQUIRE(c4.ev.size() == c5.ev.size());
+            for (int t = 0; t < 2; ++t)
+            {
+                const Chain &C = t ? c5 : c4;
+                for (size_t k = 0; k < C.ev.size(); ++k)
+                    QD_DIAG("%s,%d,%d,%u,%u,%+.6f,%.4f,%04x,%04x,%04x\n", S.name, t ? 5 : 4, (int)k, (unsigned)C.ev[k].ot, (unsigned)C.ev[k].rt,
+                            dB(std::norm(cpx(C.ev[k].xpr, 0, 0))),
+                            std::atan2(std::abs(C.ev[k].path_dirN(0, 1)), std::abs(C.ev[k].path_dirN(0, 0))) * 180.0 / QPI,
+                            (unsigned)(unsigned short)C.ev[k].prev(0), (unsigned)(unsigned short)C.ev[k].cur(0),
+                            (unsigned)(unsigned short)C.ev[k].buf(0));
+            }
+            if (!S.rigid)
+                continue;
+            INFO(S.name);
+            for (size_t k = 0; k < c5.ev.size(); ++k)
+            {
+                CHECK(c5.ev[k].cur(0) == c4.ev[k].cur(0)); // no bit: the wave was not bent into the body
+                CHECK(c5.ev[k].prev(0) == c4.ev[k].prev(0));
+                CHECK(c5.ev[k].buf(0) == c4.ev[k].buf(0));
+                CHECK(c5.ev[k].rt == c4.ev[k].rt);
+                CHECK(cpx(c5.ev[k].xpr, 0, 0) == cpx(c4.ev[k].xpr, 0, 0));
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // A second frequency of a run, recorded
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: refracting tracer, a second frequency. Geometry and state words at 1 GHz, coefficient and\n");
+    QD_DIAG("# direction at f1, as ray_progress runs a band. eps 1.50 - 0.40j at 1 GHz, 100 mm, against the slab at\n");
+    QD_DIAG("# f1 at the polyline's exit point. The power is asserted, the phase recorded\n");
+    QD_DIAG("f1_GHz,theta,d_dB,ph_deg,out_deg\n");
+    for (double f1 : {0.5e9, 2.0e9})
+        for (double thd : angles)
+        {
+            double th = thd * QPI / 180.0, k1 = 2.0 * QPI * f1 / C0;
+            arma::uvec mi;
+            arma::mat mesh = build({0.0, L}, {5, 5}, {false, true}, mi);
+            Chain c5 = run(mtl, mesh, mi, {5}, thd, 0.0, f1, f_hz);
+            REQUIRE((c5.ok && c5.ev.size() == 2));
+            std::complex<double> t, r_in;
+            slab(diag_eps(5, f1), th, f1, true, L - c5.ev[0].origN(0, 0), t, r_in);
+            std::complex<double> q = c5.abs_vv(k1) * std::exp(std::complex<double>(0.0, k1 * std::sin(th) * c5.dy)) / t;
+            QD_DIAG("%.1f,%.1f,%+.6f,%+.4f,%.4f\n", f1 * 1e-9, thd, dB(std::norm(q)), deg(q), std::atan2(c5.out_y, c5.out_x) * 180.0 / QPI);
+            INFO("second frequency " << f1 << ", theta_ext " << thd);
+            CHECK(std::abs(dB(std::norm(q))) < 1.0e-3);
+            CHECK(std::abs(c5.out_y - std::sin(th)) < 1.0e-9);
+            CHECK(std::abs(c5.out_x - std::cos(th)) < 1.0e-9);
+        }
 }
