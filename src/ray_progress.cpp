@@ -1153,7 +1153,10 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
                                               &prevN, &currentN, &bufferN,
                                               &gainN, &xprmatN, &path_dirN, &acc_geoN, &acc_refN,
                                               &interact_type, // Aliasing OK and deliberate
-                                              nullptr, (double)thin_slab_threshold);
+                                              nullptr, (double)thin_slab_threshold,
+                                              &origN, &destN, // the segment follows the direction written out of a lossy medium
+                                              (beam_mode ? tridir : nullptr),
+                                              (beam_mode ? &tridirN : nullptr));
 
         ensure_pre_gains();
         n_transmit = check_gains(false); // Parse gainN and build keep_ind

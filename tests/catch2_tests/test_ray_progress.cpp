@@ -58,6 +58,16 @@
 #include <unordered_map>
 #include <vector>
 
+// Diagnostic tables of the trajectory case, off unless defined
+#define QD_TEST_VERBOSE
+
+#ifdef QD_TEST_VERBOSE
+#include <cstdio>
+#define QD_DIAG(...) std::printf(__VA_ARGS__)
+#else
+#define QD_DIAG(...) ((void)0)
+#endif
+
 namespace
 {
     constexpr float FRQ = 10.0e9f;      // Reference frequency
@@ -2397,5 +2407,392 @@ TEST_CASE("ray_progress - the material count is limited by the 14-bit state inde
     {
         Cfg C = one_ray();
         CHECK_THROWS_AS(C.step(S), std::invalid_argument);
+    }
+}
+
+TEST_CASE("ray_progress - refracting tracer: the segment out of a lossy medium is the direction the wave has")
+{
+    // With refraction_mode ray_mesh_interact bends the segment at a real angle in the medium the ray
+    // leaves, and ray_state_update writes the direction the wave has into path_dir. Across parallel
+    // faces a wave from air leaves parallel to the direction it arrived in, so the launched segment,
+    // dest - orig, has to be that direction, for the spine and for the three vertex rays of a tube,
+    // and inside a second solid it has to be the direction the transition wrote.
+    //
+    // Everything runs through ray_progress, float, scalar, 1 GHz. Walls are planes normal to x; the
+    // spine crosses x = 0 at y = 0.37, off the triangulation edge. Rows that this must not move are
+    // printed with every digit of a float: lossless legs, the undeviated tracer, reflections.
+    const double PI = 3.14159265358979323846;
+    const float L = 0.10f, gap = 1.0e-5f;
+    typedef std::unordered_map<std::string, std::vector<float>> Pal;
+
+    Pal pal; // 1: eps 5.24-0.63j, 2: 5.24, 3: sheet 5.24-0.63j 6 mm, 4: 9.0-1.20j, 5: 1.50-0.40j, 6: 1.50
+    pal["a"] = {5.24f, 5.24f, 5.24f, 9.0f, 1.50f, 1.50f};
+    pal["b"] = std::vector<float>(6, 0.0f);
+    pal["c"] = {(float)(0.63 / 17.98), 0.0f, (float)(0.63 / 17.98), (float)(1.20 / 17.98), (float)(0.40 / 17.98), 0.0f};
+    pal["d"] = std::vector<float>(6, 0.0f);
+    pal["fRef"] = std::vector<float>(6, 1.0f);
+    pal["thk"] = {0.0f, 0.0f, 0.006f, 0.0f, 0.0f, 0.0f};
+
+    Pal rig; // DENSE: eps 1.50 with the mass column, a mass-law solid the wave is refracted into
+    rig["a"] = {1.5f};
+    rig["fRef"] = {0.001f};
+    rig["tf"] = {0.0f};
+    rig["m"] = {20.0f};
+    rig["thk"] = {0.0f};
+
+    struct Wall
+    {
+        arma::fmat mesh;
+        arma::uvec mi;
+    };
+    auto build = [](const std::vector<float> &x, const std::vector<int> &mat, const std::vector<bool> &flip) -> Wall
+    {
+        const float h = 200.0f;
+        Wall W;
+        W.mesh.set_size(2 * x.size(), 9);
+        W.mi.set_size(2 * x.size());
+        for (size_t k = 0; k < x.size(); ++k)
+        {
+            if (!flip[k]) // normal along -x, front side towards the source
+                W.mesh.row(2 * k) = arma::frowvec{x[k], -h, -h, x[k], -h, h, x[k], h, -h},
+                W.mesh.row(2 * k + 1) = arma::frowvec{x[k], h, -h, x[k], -h, h, x[k], h, h};
+            else
+                W.mesh.row(2 * k) = arma::frowvec{x[k], -h, -h, x[k], h, -h, x[k], -h, h},
+                W.mesh.row(2 * k + 1) = arma::frowvec{x[k], h, -h, x[k], h, h, x[k], -h, h};
+            W.mi(2 * k) = (arma::uword)mat[k], W.mi(2 * k + 1) = (arma::uword)mat[k];
+        }
+        return W;
+    };
+
+    struct Gen // the launch configuration after one call
+    {
+        arma::fmat orig, dest, dir, trivec, tridir, hit;
+        arma::Col<short> cur, prev;
+        std::vector<std::string> types;
+        arma::uword n() const { return orig.n_rows; }
+        arma::frowvec seg(arma::uword i) const
+        {
+            arma::frowvec d = dest.row(i) - orig.row(i);
+            return d / nrm3(d);
+        }
+    };
+    struct Run
+    {
+        std::vector<Gen> g;
+        arma::frowvec k;     // launched spine direction
+        arma::fmat v0;       // launched vertex directions, one per row
+    };
+    auto trace = [&](const Pal &P, const Wall &W, double thd, bool refr, int n_gen, int max_ref, float slab,
+                     bool beam, int force_gen) -> Run
+    {
+        Run R;
+        const double th = thd * PI / 180.0;
+        const float Ox = -1.0f, Oy = 0.37f - (float)std::tan(th), Oz = 0.0f, r0 = 0.1f, len = 300.0f;
+        R.k = arma::frowvec{(float)std::cos(th), (float)std::sin(th), 0.0f};
+        arma::fvec cf = {1.0e9f};
+        arma::fmat orig(1, 3), dest(1, 3), acc(1, 2, arma::fill::zeros), trivec, tridir;
+        orig.row(0) = arma::frowvec{Ox, Oy, Oz} + r0 * R.k;
+        dest.row(0) = arma::frowvec{Ox, Oy, Oz} + (r0 + len) * R.k;
+        arma::fcube pd(1, 3, 1);
+        pd.slice(0) = R.k;
+        arma::Col<short> prev(1, arma::fill::zeros), cur(1, arma::fill::zeros), buf(1, arma::fill::zeros);
+        std::vector<quadriga_lib::path> paths(1);
+        paths[0].init(0, 1, true);
+        paths[0].set_length(r0);
+        if (beam)
+        {
+            trivec.zeros(1, 9), tridir.zeros(1, 9), R.v0.zeros(3, 3);
+            arma::frowvec u = arma::cross(arma::frowvec{0.0f, 0.0f, 1.0f}, R.k);
+            u /= nrm3(u);
+            arma::frowvec v = arma::cross(R.k, u);
+            const float ha = 0.5f * (float)(PI / 180.0);
+            for (int j = 0; j < 3; ++j)
+            {
+                const float phi = (float)(2.0 * PI * (double)j / 3.0);
+                arma::frowvec vj = std::cos(ha) * R.k + std::sin(ha) * (std::cos(phi) * u + std::sin(phi) * v);
+                vj /= nrm3(vj);
+                for (int c = 0; c < 3; ++c)
+                    tridir(0, 3 * j + c) = vj(c), trivec(0, 3 * j + c) = r0 * (vj(c) - R.k(c)), R.v0(j, c) = vj(c);
+            }
+        }
+        for (int g = 0; g < n_gen; ++g)
+        {
+            std::vector<bool> ff(orig.n_rows, g == force_gen);
+            quadriga_lib::ray_progress(W.mesh, W.mi, P, cf, Ox, Oy, Oz, orig, dest, prev, cur, buf, pd, acc, paths,
+                                       beam ? &trivec : nullptr, beam ? &tridir : nullptr, nullptr, nullptr,
+                                       20, (uint8_t)max_ref, 10, (uint8_t)(force_gen >= 0 ? 2 : 0), -300.0f, 3.0f, slab, refr, true,
+                                       nullptr, nullptr, nullptr, force_gen >= 0 ? &ff : nullptr);
+            if (orig.n_rows == 0)
+                break;
+            Gen G;
+            G.orig = orig, G.dest = dest, G.dir = pd.slice(0), G.cur = cur, G.prev = prev;
+            if (beam)
+                G.trivec = trivec, G.tridir = tridir;
+            G.hit.zeros(orig.n_rows, 3);
+            for (arma::uword i = 0; i < orig.n_rows; ++i)
+            {
+                std::string ty;
+                for (auto c : paths[i].interaction_type_codes())
+                    ty += std::to_string((unsigned)c) + "/";
+                G.types.push_back(ty);
+                if (paths[i].n_seg())
+                    for (int c = 0; c < 3; ++c)
+                        G.hit(i, c) = paths[i].coord(paths[i].n_seg() - 1)[c];
+            }
+            R.g.push_back(G);
+        }
+        return R;
+    };
+    auto dmax = [](const arma::frowvec &a, const arma::frowvec &b) -> double
+    {
+        double d = 0.0;
+        for (int c = 0; c < 3; ++c)
+            d = std::max(d, (double)std::abs(a(c) - b(c)));
+        return d;
+    };
+    auto apart = [&](const arma::frowvec &a, const arma::frowvec &b) -> double // degrees, well conditioned near zero
+    {
+        double cx = (double)a(1) * b(2) - (double)a(2) * b(1), cy = (double)a(2) * b(0) - (double)a(0) * b(2),
+               cz = (double)a(0) * b(1) - (double)a(1) * b(0);
+        return std::atan2(std::sqrt(cx * cx + cy * cy + cz * cz), (double)a(0) * b(0) + (double)a(1) * b(1) + (double)a(2) * b(2)) * 180.0 / PI;
+    };
+    auto find = [](const Gen &G, const std::string &ty) -> long long
+    {
+        for (size_t i = 0; i < G.types.size(); ++i)
+            if (G.types[i] == ty)
+                return (long long)i;
+        return -1;
+    };
+    auto raw = [](const Gen &G, arma::uword i)
+    {
+        QD_DIAG("%.9g,%.9g,%.9g,%.9g,%.9g,%.9g", G.orig(i, 0), G.orig(i, 1), G.orig(i, 2), G.dest(i, 0), G.dest(i, 1), G.dest(i, 2));
+    };
+    const std::vector<double> angles = {10.0, 20.0, 40.0, 60.0, 75.0, 85.0};
+    const double TOL = 1.0e-6;
+
+    // ------------------------------------------------------------------------------------------
+    // One wall: the segment behind it against the direction the ray arrived in
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: trajectory, one wall. air | 100 mm | air through ray_progress. seg: dest - orig behind the wall,\n");
+    QD_DIAG("# dir: path_dir there, deg from the normal. d_seg, d_dir: largest component against the launched\n");
+    QD_DIAG("# direction. raw: orig and dest behind the wall, every digit\n");
+    QD_DIAG("mtl,theta,tracer,types,seg_deg,dir_deg,d_seg,d_dir,raw\n");
+    for (int m : {5, 1, 4, 6})
+        for (double thd : angles)
+            for (bool refr : {true, false})
+            {
+                Run R = trace(pal, build({0.0f, L}, {m, m}, {false, true}), thd, refr, 2, 0, 0.15f, false, -1);
+                REQUIRE(R.g.size() == 2);
+                const Gen &G = R.g[1];
+                REQUIRE(G.n() == 1);
+                arma::frowvec x = {1.0f, 0.0f, 0.0f};
+                QD_DIAG("%d,%.1f,%d,%s,%.4f,%.4f,%.3e,%.3e,", m, thd, refr ? 5 : 4, G.types[0].c_str(), apart(G.seg(0), x), apart(G.dir.row(0), x),
+                        dmax(G.seg(0), R.k), dmax(G.dir.row(0), R.k));
+                raw(G, 0);
+                QD_DIAG("\n");
+                INFO("one wall, material " << m << ", theta " << thd << ", refraction " << refr);
+                CHECK(G.cur(0) == (short)0);
+                CHECK(dmax(G.dir.row(0), R.k) < TOL);
+                CHECK(dmax(G.seg(0), R.k) < TOL);
+            }
+
+    // ------------------------------------------------------------------------------------------
+    // Two walls in a row: where and at what angle the second one is met
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: trajectory, two walls in a row, 1.9 m of air between. dy: the lateral run from the exit of\n");
+    QD_DIAG("# the first wall to the entry of the second, refracting and undeviated tracer; the two differ in\n");
+    QD_DIAG("# where they leave the first wall and in nothing else. in2: the segment inside the second wall,\n");
+    QD_DIAG("# refracting, against the direction the undeviated tracer holds there, deg\n");
+    QD_DIAG("first,theta,dy5,dy4,d_dy,in2_seg5,in2_dir4,d_in2,out2_seg5,d_out2\n");
+    for (int m : {5, 1, 6})
+        for (double thd : angles)
+        {
+            Wall W = build({0.0f, L, 2.0f, 2.0f + L}, {m, m, 5, 5}, {false, true, false, true});
+            Run R5 = trace(pal, W, thd, true, 4, 0, 0.15f, false, -1), R4 = trace(pal, W, thd, false, 4, 0, 0.15f, false, -1);
+            REQUIRE((R5.g.size() == 4 && R4.g.size() == 4));
+            double dy5 = (double)R5.g[2].hit(0, 1) - (double)R5.g[1].hit(0, 1), dy4 = (double)R4.g[2].hit(0, 1) - (double)R4.g[1].hit(0, 1);
+            arma::frowvec x = {1.0f, 0.0f, 0.0f};
+            QD_DIAG("%d,%.1f,%.6f,%.6f,%+.6f,%.4f,%.4f,%.3e,%.4f,%.3e\n", m, thd, dy5, dy4, dy5 - dy4, apart(R5.g[2].seg(0), x),
+                    apart(R4.g[2].dir.row(0), x), dmax(R5.g[2].seg(0), R4.g[2].dir.row(0)), apart(R5.g[3].seg(0), x), dmax(R5.g[3].seg(0), R5.k));
+            INFO("two walls, first " << m << ", theta " << thd);
+            CHECK(R5.g[2].hit(0, 0) == R4.g[2].hit(0, 0)); // both at x = 2
+            CHECK(std::abs(dy5 - dy4) < 2.0e-4);
+            CHECK(dmax(R5.g[2].seg(0), R4.g[2].dir.row(0)) < TOL);
+            CHECK(dmax(R5.g[3].seg(0), R5.k) < TOL);
+        }
+
+    // ------------------------------------------------------------------------------------------
+    // Two solids across a bare face: the segment in the second one
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: trajectory, two solids across a bare face, 50 mm | 100 mm. in2: the segment in the second\n");
+    QD_DIAG("# solid against path_dir there, and against the segment of the same solid entered from air, which\n");
+    QD_DIAG("# is the direction a single refraction writes. out: the segment behind the wall\n");
+    QD_DIAG("mats,theta,in2_seg,in2_dir,d_in2,d_air,out_seg,d_out,raw_in2\n");
+    for (auto P : std::vector<std::pair<int, int>>{{1, 5}, {5, 1}, {4, 5}, {1, 6}, {2, 5}, {2, 6}})
+        for (double thd : angles)
+        {
+            Run R = trace(pal, build({0.0f, 0.05f, 0.05f + gap, 0.15f + gap}, {P.first, P.first, P.second, P.second}, {false, true, false, true}),
+                          thd, true, 3, 0, 0.15f, false, -1);
+            Run A = trace(pal, build({0.0f, L}, {P.second, P.second}, {false, true}), thd, true, 1, 0, 0.15f, false, -1);
+            REQUIRE((R.g.size() == 3 && A.g.size() == 1));
+            arma::frowvec x = {1.0f, 0.0f, 0.0f};
+            QD_DIAG("%d%d,%.1f,%.4f,%.4f,%.3e,%.3e,%.4f,%.3e,", P.first, P.second, thd, apart(R.g[1].seg(0), x), apart(R.g[1].dir.row(0), x),
+                    dmax(R.g[1].seg(0), R.g[1].dir.row(0)), dmax(R.g[1].seg(0), A.g[0].seg(0)), apart(R.g[2].seg(0), x), dmax(R.g[2].seg(0), R.k));
+            raw(R.g[1], 0);
+            QD_DIAG("\n");
+            INFO("two solids " << P.first << P.second << ", theta " << thd);
+            CHECK(dmax(R.g[1].seg(0), R.g[1].dir.row(0)) < TOL);
+            CHECK(dmax(R.g[1].seg(0), A.g[0].seg(0)) < TOL);
+            CHECK(dmax(R.g[2].seg(0), R.k) < TOL);
+        }
+
+    // ------------------------------------------------------------------------------------------
+    // Sheets on and in the host
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: trajectory, sheets on and in the host. The segment behind the wall against the launched\n");
+    QD_DIAG("# direction. Lossless host: a leg behind a glued entry carries that entry's anchoring, 1.6e-6 at 85 deg\n");
+    QD_DIAG("stack,host,theta,types,seg_deg,d_seg,raw\n");
+    for (int h : {5, 6})
+        for (int s = 0; s < 4; ++s)
+            for (double thd : angles)
+            {
+                const char *name[4] = {"glued_entry ", "glued_exit  ", "lined       ", "sheet_inside"};
+                Wall W = s == 0   ? build({0.0f, gap, L}, {3, h, h}, {false, false, true})
+                         : s == 1 ? build({0.0f, L, L + gap}, {h, h, 3}, {false, true, true})
+                         : s == 2 ? build({0.0f, gap, L, L + gap}, {3, h, h, 3}, {false, false, true, true})
+                                  : build({0.0f, 0.05f, L}, {h, 3, h}, {false, false, true});
+                Run R = trace(pal, W, thd, true, s == 3 ? 3 : 2, 0, 0.15f, false, -1);
+                REQUIRE(R.g.size() == (s == 3 ? 3u : 2u));
+                const Gen &G = R.g.back();
+                arma::frowvec x = {1.0f, 0.0f, 0.0f};
+                QD_DIAG("%s,%d,%.1f,%s,%.4f,%.3e,", name[s], h, thd, G.types[0].c_str(), apart(G.seg(0), x), dmax(G.seg(0), R.k));
+                raw(G, 0);
+                QD_DIAG("\n");
+                INFO(name[s] << ", host " << h << ", theta " << thd);
+                CHECK(G.cur(0) == (short)0);
+                CHECK(dmax(G.seg(0), R.k) < (h == 5 ? TOL : 1.0e-5));
+            }
+
+    // ------------------------------------------------------------------------------------------
+    // Reflections: a ray leaving by the front face, and what the reflect pass launches
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: trajectory, reflections on, one wall. slab 0: the far-face reflection collapses the series and\n");
+    QD_DIAG("# the ray leaves resolved; slab 1: it does not. front: the ray that leaves by the front face against\n");
+    QD_DIAG("# the mirror of the launched direction. Every ray of the last generation is printed raw\n");
+    QD_DIAG("mtl,slab,theta,types,cur,seg_deg,dir_deg,d_mirror,raw\n");
+    for (int m : {5, 6})
+        for (float slab : {0.0f, 1.0f})
+            for (double thd : {20.0, 60.0, 85.0})
+            {
+                Run R = trace(pal, build({0.0f, L}, {m, m}, {false, true}), thd, true, 3, 3, slab, false, -1);
+                REQUIRE(R.g.size() == 3);
+                arma::frowvec x = {1.0f, 0.0f, 0.0f}, mir = {-R.k(0), R.k(1), R.k(2)};
+                for (size_t g = 0; g < 3; ++g)
+                    for (arma::uword i = 0; i < R.g[g].n(); ++i)
+                    {
+                        const Gen &G = R.g[g];
+                        QD_DIAG("%d,%.0f,%.1f,%s,%04x,%.4f,%.4f,%.3e,", m, slab, thd, G.types[i].c_str(), (unsigned)(unsigned short)G.cur(i),
+                                apart(G.seg(i), x), apart(G.dir.row(i), x), dmax(G.seg(i), mir));
+                        raw(G, i);
+                        QD_DIAG("\n");
+                    }
+                long long i = find(R.g[2], slab == 0.0f ? "9/141/1/" : "9/137/1/");
+                if (m == 6 && i < 0) // the lossless slab leaves with the VBS bit of the type code as it stands
+                    i = find(R.g[2], slab == 0.0f ? "9/141/5/" : "9/137/5/");
+                INFO("front-face exit, material " << m << ", slab " << slab << ", theta " << thd);
+                REQUIRE(i >= 0);
+                CHECK(dmax(R.g[2].dir.row((arma::uword)i), mir) < TOL);
+                CHECK(dmax(R.g[2].seg((arma::uword)i), mir) < TOL);
+                // An internal reflection launches the mirror of the segment it arrived on
+                long long j = find(R.g[1], slab == 0.0f ? "9/141/" : "9/137/");
+                REQUIRE(j >= 0);
+                CHECK(dmax(R.g[1].seg((arma::uword)j), R.g[1].dir.row((arma::uword)j)) < TOL);
+            }
+
+    // ------------------------------------------------------------------------------------------
+    // The ray tube
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: trajectory, the ray tube, 0.5 deg half angle. Behind one wall: each vertex direction against\n");
+    QD_DIAG("# the one it was launched in (d_v), its angle to the spine (fan, deg), and the mean of the three\n");
+    QD_DIAG("# against the segment, which is what a subdivision makes the spine of\n");
+    QD_DIAG("mtl,theta,seg_deg,d_seg,d_v0,d_v1,d_v2,fan0,fan1,fan2,mean_minus_seg_deg\n");
+    for (int m : {5, 1, 6})
+        for (double thd : {40.0, 75.0, 85.0})
+        {
+            Run R = trace(pal, build({0.0f, L}, {m, m}, {false, true}), thd, true, 2, 0, 0.15f, true, -1);
+            REQUIRE(R.g.size() == 2);
+            const Gen &G = R.g[1];
+            arma::frowvec x = {1.0f, 0.0f, 0.0f}, mean(3, arma::fill::zeros);
+            double dv[3], fan[3];
+            for (int j = 0; j < 3; ++j)
+            {
+                arma::frowvec v = G.tridir.submat(0, 3 * j, 0, 3 * j + 2);
+                dv[j] = dmax(v, R.v0.row(j)), fan[j] = apart(v, G.seg(0)), mean += v;
+            }
+            mean /= nrm3(mean);
+            QD_DIAG("%d,%.1f,%.4f,%.3e,%.3e,%.3e,%.3e,%.4f,%.4f,%.4f,%.5f\n", m, thd, apart(G.seg(0), x), dmax(G.seg(0), R.k), dv[0], dv[1], dv[2],
+                    fan[0], fan[1], fan[2], apart(mean, G.seg(0)));
+            INFO("tube, material " << m << ", theta " << thd);
+            CHECK(dmax(G.seg(0), R.k) < TOL);
+            for (int j = 0; j < 3; ++j)
+                CHECK(dv[j] < TOL);
+        }
+
+    QD_DIAG("\n# diag: trajectory, the ray tube into a second solid, 50 mm | 100 mm. Each vertex direction in the\n");
+    QD_DIAG("# second solid against the same vertex entering that solid from air\n");
+    QD_DIAG("mats,theta,d_v0,d_v1,d_v2,d_seg\n");
+    for (auto P : std::vector<std::pair<int, int>>{{1, 5}, {5, 1}, {1, 6}, {2, 5}})
+        for (double thd : {40.0, 75.0, 85.0})
+        {
+            Run R = trace(pal, build({0.0f, 0.05f, 0.05f + gap, 0.15f + gap}, {P.first, P.first, P.second, P.second}, {false, true, false, true}),
+                          thd, true, 2, 0, 0.15f, true, -1);
+            Run A = trace(pal, build({0.0f, L}, {P.second, P.second}, {false, true}), thd, true, 1, 0, 0.15f, true, -1);
+            REQUIRE((R.g.size() == 2 && A.g.size() == 1));
+            double dv[3];
+            for (int j = 0; j < 3; ++j)
+                dv[j] = dmax(R.g[1].tridir.submat(0, 3 * j, 0, 3 * j + 2), A.g[0].tridir.submat(0, 3 * j, 0, 3 * j + 2));
+            QD_DIAG("%d%d,%.1f,%.3e,%.3e,%.3e,%.3e\n", P.first, P.second, thd, dv[0], dv[1], dv[2], dmax(R.g[1].seg(0), A.g[0].seg(0)));
+            INFO("tube into a second solid " << P.first << P.second << ", theta " << thd);
+            for (int j = 0; j < 3; ++j)
+                CHECK(dv[j] < TOL);
+        }
+
+    QD_DIAG("\n# diag: trajectory, a beam split in air behind the wall. The four sub-beams against those of the\n");
+    QD_DIAG("# undeviated tracer, whose tube is the launched one: segment and path_dir\n");
+    QD_DIAG("mtl,theta,sub,seg_deg5,seg_deg4,d_seg,d_dir\n");
+    for (int m : {5, 6})
+        for (double thd : {40.0, 75.0})
+        {
+            Wall W = build({0.0f, L}, {m, m}, {false, true});
+            Run R5 = trace(pal, W, thd, true, 3, 0, 0.15f, true, 2), R4 = trace(pal, W, thd, false, 3, 0, 0.15f, true, 2);
+            REQUIRE((R5.g.size() == 3 && R4.g.size() == 3));
+            REQUIRE((R5.g[2].n() == 4 && R4.g[2].n() == 4));
+            arma::frowvec x = {1.0f, 0.0f, 0.0f};
+            for (arma::uword i = 0; i < 4; ++i)
+            {
+                QD_DIAG("%d,%.1f,%u,%.4f,%.4f,%.3e,%.3e\n", m, thd, (unsigned)i, apart(R5.g[2].seg(i), x), apart(R4.g[2].seg(i), x),
+                        dmax(R5.g[2].seg(i), R4.g[2].seg(i)), dmax(R5.g[2].dir.row(i), R4.g[2].dir.row(i)));
+                INFO("split in air, material " << m << ", theta " << thd << ", sub-beam " << i);
+                CHECK(dmax(R5.g[2].seg(i), R4.g[2].seg(i)) < TOL);
+                CHECK(dmax(R5.g[2].dir.row(i), R4.g[2].dir.row(i)) < TOL);
+            }
+        }
+
+    // ------------------------------------------------------------------------------------------
+    // Recorded: a mass-law solid the wave is refracted into (issue 15), and a second frequency
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: trajectory, recorded. DENSE, eps 1.50 with m 20, 30 deg: ray_mesh_interact holds the wave\n");
+    QD_DIAG("# undeviated in a mass-law medium, and the segment behind it is not this item's\n");
+    QD_DIAG("tracer,seg_deg,dir_deg,raw\n");
+    for (bool refr : {true, false})
+    {
+        Wall W = build({0.0f, L}, {1, 1}, {false, true});
+        Run R = trace(rig, W, 30.0, refr, 2, 0, 0.15f, false, -1);
+        REQUIRE(R.g.size() == 2);
+        arma::frowvec x = {1.0f, 0.0f, 0.0f};
+        QD_DIAG("%d,%.4f,%.4f,", refr ? 5 : 4, apart(R.g[1].seg(0), x), apart(R.g[1].dir.row(0), x));
+        raw(R.g[1], 0);
+        QD_DIAG("\n");
+        CHECK(dmax(R.g[1].dir.row(0), R.k) < TOL);
     }
 }
