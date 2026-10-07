@@ -2383,3 +2383,19 @@ TEST_CASE("ray_progress - input validation")
         }
     }
 }
+TEST_CASE("ray_progress - the material count is limited by the 14-bit state index")
+{
+    Scene S = one_cube(5.0f, 0.0f, 0.0f);
+    for (auto &kv : S.mtl_prop)
+        kv.second.resize(16383, kv.second[0]);
+    {
+        Cfg C = one_ray();
+        CHECK_NOTHROW(C.step(S));
+    }
+    for (auto &kv : S.mtl_prop)
+        kv.second.resize(16384, kv.second[0]);
+    {
+        Cfg C = one_ray();
+        CHECK_THROWS_AS(C.step(S), std::invalid_argument);
+    }
+}

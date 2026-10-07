@@ -1320,7 +1320,8 @@ namespace
                                 const Material *back_near = nullptr, // what lies behind a sheet named as mat_near
                                 bool far_closed = false,             // produce: near | far is past its critical angle
                                 bool near_undeviated = false,        // produce: the wave in mat_near was not refracted in
-                                double mass_bonded = 0.0)            // produce: X0 of the bonded mass-law bodies already crossed
+                                double mass_bonded = 0.0,            // produce: X0 of the bonded mass-law bodies already crossed
+                                const Material *back_far = nullptr)  // correction: what lies behind a sheet named as mat_far
     {
         // Mass-law materials carry a lumped transmission surrogate: eta/mu are calibrated for
         // surface impedance only, so the in-slab index (and hence the phase of phi) is not
@@ -1597,7 +1598,7 @@ namespace
         else
         {
             fresnel_r(mat_near, rn_te, rn_tm, Rn_te, Rn_tm, nullptr, back_near);
-            fresnel_r(mat_far, rf_te, rf_tm, Rf_te, Rf_tm);
+            fresnel_r(mat_far, rf_te, rf_tm, Rf_te, Rf_tm, nullptr, back_far);
         }
 
         // Interface amplitudes for the produce ports: the raw Fresnel amplitude, rescaled only by
@@ -3321,9 +3322,10 @@ Batched inside/outside ray-state machine with analytic thin-slab (Fabry-Perot) r
 
 - Corrects the per-interaction `gainN` / `xprmatN` produced by [[ray_mesh_interact]] using a tracked
   per-ray medium state, and carries that state forward. Three signed-`short` words per ray hold the
-  current medium, the previous medium, and a one-slot next-transition buffer (bit-masked: `mat = w &
-  0x7FFF`, `flag = w & 0x8000`). With its flag set the buffer word is not a medium: it marks a leg that
-  was entered by crossing a bonded mass-law body and carries that body's thickness code.
+  current medium, the previous medium, and a one-slot next-transition buffer. The material index is
+  14 bits (`mat = w & 0x3FFF`, at most 16383 materials) and bits 14 and 15 are flags. With bit 15 set
+  the buffer word is not a medium: it marks a leg that was entered by crossing a bonded mass-law body
+  and its low 15 bits carry a thickness code.
 - Implements the inside/outside state machine and overlays a closed-form thin-slab factor `S` (the Airy
   sum) so a single coefficient captures the full internal multiple-reflection series of a parallel slab
   thin enough to matter, instead of relying on the tracer to follow every internal bounce.
@@ -3403,7 +3405,16 @@ void quadriga_lib::ray_state_update(
 - **`mtl_ind_prev_in`**, **`mtl_ind_current_in`**, **`mtl_ind_buffer_in`** — State words, full ray set; `[n_ray]`,
   read at `g`, never written. NULL reads as state `0` (outside, no flags). A buffer word with bit 15 set is
   a surface-mass code written by an earlier call and is exempt from the material range check; pass the
-  words through unchanged between calls.
+  words through unchanged between calls.<br><br>
+   | Word                 | Bits 0-13                          | Bit 14                                        | Bit 15                    |
+   | -------------------- | ---------------------------------- | --------------------------------------------- | ------------------------- |
+   | `mtl_ind_current`    | medium the ray is in, 0 = air      | unused, zero                                  | resolved                  |
+   | `mtl_ind_prev`       | medium the leg was entered from, or the sheet crossed or reflected off | the sheet in this word lies inside the current medium | known non-parallel |
+   | `mtl_ind_buffer`     | deferred medium                    | zero                                          | clear                     |
+   | `mtl_ind_buffer`     | thickness code, bits 0-14          | (part of the code)                            | set: mass-crossed         |
+   Under bit 15 the code is the normal thickness of a mass-law leg closed on the way into the current
+   one: of the solid in `mtl_ind_prev`, or, where that word holds a sheet lying inside the current
+   medium, of the part of the current medium in front of that sheet. Zero means no such leg.
 - **`path_dir_prev`** — Physical ray direction entering this segment, full ray set; `[n_ray, 3]`
 - **`acc_dist_geometric`** — Accumulated geometric in-layer distance carried into this call, full ray set; `[n_ray]`.
   NULL reads as 0. Frequency-independent: built from the traced `orig`-`fbs` / `fbs`-`dest` lengths only, so a
@@ -3429,7 +3440,10 @@ void quadriga_lib::ray_state_update(
   is only ever read as the far material of a slab resolve, for the parallelism flag, and as the bonded
   mass-law body a leg was entered through, and a sheet is the correct far material for the layer on
   either side of it. `mtl_ind_buffer_outN` with bit 15 set carries the surface-mass code of that body
-  (0 for a sheet, a logarithmic thickness code for a traced solid) instead of a deferred medium.
+  (a logarithmic thickness code for a traced solid; for a sheet zero, or the thickness of the host in
+  front of a sheet that lies inside it) instead of a deferred medium. Bit 14 of `mtl_ind_prev_outN` is
+  set where the sheet in that word lies inside the current medium, so that the layer behind it is
+  backed by that medium and not by air.
   NULL skips the write. Passing all six state args NULL disables tracking —
   each interaction is corrected on its own (entry loss, TR kill, single-hit air-gap `S`); cross-interaction slab `S` and
   reflection-bounce `S` need the tracked medium.
@@ -3598,6 +3612,8 @@ void quadriga_lib::ray_state_update(int interaction_type,
 
     // Resolved material columns for the Material(cols, idx)
     MaterialCols<dtype> cols = mtl_prop ? MaterialCols<dtype>(*mtl_prop) : MaterialCols<dtype>();
+    if (cols.n_mtl > 16383) // the state words carry a 14-bit material index
+        throw std::invalid_argument("Number of materials cannot exceed 16383.");
 
     if (mtl_ind_fbsN == nullptr || mtl_ind_fbsN->n_elem != n_rayN)
         throw std::invalid_argument("Input 'mtl_ind_fbs' must match the length of 'out_typeN'.");
@@ -3611,13 +3627,16 @@ void quadriga_lib::ray_state_update(int interaction_type,
     if (mtl_ind_sbsN->n_elem != 0 && arma::uword(mtl_ind_sbsN->max() & (short)0x7FFF) > cols.n_mtl)
         throw std::invalid_argument("Values in 'mtl_ind_sbs' exceed the number of materials in 'mtl_prop'.");
 
-    // The buffer word under its flag bit carries a surface-mass code, not a material index
+    // The buffer word under its flag bit carries a surface-mass code, not a material index. The
+    // other two words carry a flag in bit 14 as well as in bit 15; the buffer word has none there,
+    // so a set bit 14 without the flag is out of range.
     auto check_state_words = [&](const arma::Col<short> *v, const char *name, bool flag_is_code = false)
     {
         if (v == nullptr || v->n_elem == 0)
             return;
+        const short mask = flag_is_code ? (short)0x7FFF : (short)0x3FFF;
         for (const short *p = v->memptr(), *pe = p + v->n_elem; p < pe; ++p)
-            if (!(flag_is_code && (*p & (short)0x8000)) && arma::uword(*p & (short)0x7FFF) > cols.n_mtl)
+            if (!(flag_is_code && (*p & (short)0x8000)) && arma::uword(*p & mask) > cols.n_mtl)
                 throw std::invalid_argument(std::string("Values in '") + name + "' exceed the number of materials in 'mtl_prop'.");
     };
     check_state_words(mtl_ind_prev_in, "mtl_ind_prev_in");
@@ -3707,24 +3726,40 @@ void quadriga_lib::ray_state_update(int interaction_type,
         short next_prev = p_prev_in ? p_prev_in[i_ray] : (short)0;
         short next_buffer = p_buf_in ? p_buf_in[i_ray] : (short)0;
 
-        // Extract current material indices and flags
-        int mtl_current = next_current & 0x7FFF;
-        int mtl_prev = next_prev & 0x7FFF;
+        // The three state words, decoded here and nowhere else. The material index is 14 bits.
+        //
+        //   word      bits 0-13                      bit 14            bit 15
+        //   current   medium the ray is in           unused            resolved
+        //   prev      medium the leg was entered     prev_embedded     prev_nonpar
+        //             from, or the sheet crossed
+        //             or reflected off
+        //   buffer    deferred medium                zero              clear
+        //   buffer    thickness code, bits 0-14                        set: mass_crossed
+        //
+        // prev_embedded qualifies a sheet in the previous-medium word: the sheet lies inside the
+        // current medium, so what is behind it is that medium. Clear, the sheet is a lining and
+        // what is behind it is air. It is written by a sheet event whose two sides are one medium
+        // and travels with the word.
+        int mtl_current = next_current & 0x3FFF;
+        int mtl_prev = next_prev & 0x3FFF;
         int mtl_buffer = next_buffer & 0x7FFF;
         bool resolved = (next_current & 0x8000) != 0;
         bool prev_nonpar = (next_prev & 0x8000) != 0;
+        const bool prev_embedded = (next_prev & 0x4000) != 0;
 
         // The buffer word under its flag bit is not a deferred medium. It then says that the leg
         // the ray is on was entered by crossing a bonded mass-law body, the one in the
-        // previous-medium word, and its low 15 bits carry that body's surface mass where the
-        // material table does not: zero for a sheet, whose thickness is a column, and for a
-        // traced solid a logarithmic code of the normal thickness of the leg that was closed,
+        // previous-medium word, and its low 15 bits carry the surface mass the material table
+        // does not: a logarithmic code of the normal thickness of a leg that was closed,
         // d = 10^(-4 + 6 (k - 1) / 32766) m for k = 1 .. 32767, which is 0.1 mm to 100 m in steps
-        // of 0.044 %. The thickness is geometric, so one code serves every frequency. It is
-        // written where a mass-law body is crossed into another medium, kept where a leg carries
-        // on, and cleared wherever a leg begins any other way, a reflection included, so a set
-        // flag always means the neighbour was crossed on this traversal. Every reader of the
-        // deferred medium sees zero while the flag is set.
+        // of 0.044 %. For a traced solid in the previous-medium word it is that solid's leg. A
+        // sheet's own thickness is a column, so for a sheet the code is zero, or, where the sheet
+        // lies inside the current medium, the leg of that medium in front of the sheet, which the
+        // leg behind it is bonded to as well. The thickness is geometric, so one code serves every
+        // frequency. It is written where a mass-law body is crossed into another medium, kept
+        // where a leg carries on, and cleared wherever a leg begins any other way, a reflection
+        // included, so a set flag always means the neighbour was crossed on this traversal. Every
+        // reader of the deferred medium sees zero while the flag is set.
         const short buffer_word_in = next_buffer;
         const bool mass_crossed = (next_buffer & 0x8000) != 0;
         const int mass_code = mass_crossed ? mtl_buffer : 0;
@@ -3734,8 +3769,8 @@ void quadriga_lib::ray_state_update(int interaction_type,
         // Compact-set reads at i
         unsigned nH = p_no_interact[i_ray];                // No interactions
         auto typeH = (qd::bits<uint8_t>)p_out_typeN[ii];   // Hit type code from ray_mesh_interact
-        int M1 = (int)(p_mtl_ind_fbs[ii] & (short)0x7FFF); // FBS material
-        int M2 = (int)(p_mtl_ind_sbs[ii] & (short)0x7FFF); // SBS material
+        int M1 = (int)(p_mtl_ind_fbs[ii] & (short)0x3FFF); // FBS material
+        int M2 = (int)(p_mtl_ind_sbs[ii] & (short)0x3FFF); // SBS material
         double theta = (double)p_fbs_angleN[ii];           // Incidence angle @ FBS
         double fGHz = (double)center_frequency * 1e-9;     // Frequency in GHz
 
@@ -4258,8 +4293,10 @@ void quadriga_lib::ray_state_update(int interaction_type,
         };
 
         // Summed X0 of the bonded mass-law bodies crossed on the way into the current leg, as far
-        // as the state names them: one body, the previous medium. A sheet's surface mass is its
-        // thickness column and a solid's is decoded from the buffer word.
+        // as the state names them. A solid in the previous-medium word is one body, its surface
+        // mass decoded from the buffer word. A sheet there is one body by its thickness column,
+        // and where it lies inside the current medium the part of that medium in front of it is a
+        // second one, of the current material and the decoded thickness.
         auto MASS_RUN = [&]() -> double
         {
             if (!mass_crossed)
@@ -4267,11 +4304,21 @@ void quadriga_lib::ray_state_update(int interaction_type,
             Material P = MAT(mtl_prev);
             if (!(P.m > 0.0))
                 return 0.0;
+            double d_code = (mass_code < 1) ? 0.0 : std::pow(10.0, -4.0 + 6.0 * (double)(mass_code - 1) / 32766.0);
             if (IS_SHEET(mtl_prev))
-                return P.mass_X0(P.thk, fGHz);
+            {
+                double X = P.mass_X0(P.thk, fGHz);
+                if (prev_embedded && d_code > 0.0)
+                {
+                    Material H = MAT(mtl_current);
+                    if (H.m > 0.0)
+                        X += H.mass_X0(d_code, fGHz);
+                }
+                return X;
+            }
             if (mass_code < 1)
                 return 0.0;
-            return P.mass_X0(std::pow(10.0, -4.0 + 6.0 * (double)(mass_code - 1) / 32766.0), fGHz);
+            return P.mass_X0(d_code, fGHz);
         };
 
         // Apply medium gain and phase
@@ -4388,12 +4435,19 @@ void quadriga_lib::ray_state_update(int interaction_type,
             // default here, which is why every other call site passes nothing.
             Material M_back = MAT(mtl_back);
 
+            // What lies behind a sheet named as mtl_far, the mirror behind the ray. Every caller
+            // passes the previous-medium word there. A sheet in it that lies inside the slab is
+            // backed by the slab; a lining is backed by air, which is the default.
+            Material M_back_far = MAT(mtl_slab);
+            bool far_in_slab = prev_embedded && mtl_far == mtl_prev && IS_SHEET(mtl_far);
+
             std::complex<double> fac_te, fac_tm;
             if (!qd_slab_resolve(MAT(mtl_near), MAT(mtl_slab), MAT(mtl_far),
                                  dist_refract, dist_geo, abs_cos_theta_t, abs_cos_theta,
                                  fGHz, is_scalar, eps, false, &fac_te, &fac_tm,
                                  nullptr, nullptr, false, -1.0, EXACT_IN_SLAB_COSINE(),
-                                 std::complex<double>(0.0, 0.0), &M_back))
+                                 std::complex<double>(0.0, 0.0), &M_back, false, false, 0.0,
+                                 far_in_slab ? &M_back_far : nullptr))
                 return false;
 
             // Scalar mode carries one port and the factor is a pure scale, so scale the stored
@@ -4704,8 +4758,11 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 if (mtl_current != 0)
                 {
                     // Terminate the internal bounce series exactly as a resolved solid does
-                    next_current = (short)((mtl_current & 0x7FFF) | (int)0x8000);
-                    next_prev = (short)((sheet_mtl & 0x7FFF) | (prev_nonpar ? (int)0x8000 : 0));
+                    // The sheet reflected off is behind the ray now. Where both of its sides are
+                    // the medium the ray is in, that medium is what backs it.
+                    next_current = (short)((mtl_current & 0x3FFF) | (int)0x8000);
+                    next_prev = (short)((sheet_mtl & 0x3FFF) | (prev_nonpar ? (int)0x8000 : 0) |
+                                        ((m_far == mtl_current) ? (int)0x4000 : 0));
                     next_buffer = (short)0;
                 }
                 return;
@@ -4718,7 +4775,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
             if (merge_host || (mtl_current == 0 && m_next == 0))
                 return;
 
-            next_current = (short)(m_next & 0x7FFF); // Clearing the resolved flag starts a new leg
+            next_current = (short)(m_next & 0x3FFF); // Clearing the resolved flag starts a new leg
 
             // The sheet becomes the previous medium so the next host leg reflects off it. It is a
             // boundary material here, never a traversed one: mtl_prev is only ever read as the far
@@ -4736,12 +4793,25 @@ void quadriga_lib::ray_state_update(int interaction_type,
 
             // The boundary material behind the ray is the LAST layer it crossed, which differs from
             // sheet_mtl only for an ordered stack.
+            //
+            // A sheet crossed inside a medium has that medium on both sides, so the leg that
+            // starts here has the sheet behind it backed by its own medium, and says so in bit 14.
             int sheet_back = (sheet_mtl2 != 0) ? sheet_mtl2 : sheet_mtl;
-            next_prev = (short)((sheet_back & 0x7FFF) | ((m_next != 0 && nonpar) ? (int)0x8000 : 0));
+            bool inside = m_next != 0 && m_next == mtl_current;
+            next_prev = (short)((sheet_back & 0x3FFF) | ((m_next != 0 && nonpar) ? (int)0x8000 : 0) |
+                                (inside ? (int)0x4000 : 0));
 
             // A mass-law sheet crossed into a medium: flag it, so the leg that starts here knows
             // the sheet in the previous-medium word was crossed and not merely reflected off.
-            next_buffer = (m_next != 0 && MAT(sheet_back).m > 0.0) ? (short)0x8000 : (short)0;
+            // Crossed inside a mass-law medium, the leg closed here is bonded to the one that
+            // starts as well, through the sheet, and its thickness travels as the code.
+            next_buffer = (short)0;
+            if (m_next != 0 && MAT(sheet_back).m > 0.0)
+            {
+                next_buffer = (short)0x8000;
+                if (inside && MAT(mtl_current).m > 0.0 && dist_geo > 0.0015)
+                    next_buffer = MASS_CODE(dist_geo * abs_cos_theta);
+            }
 
             if (ray_ends && m_next != 0) // Entering or staying in a medium: refracted preload
             {
@@ -4854,7 +4924,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 REPLACE_BY_VBS(mtl_current, mtl_next, (is_scalar ? 3 : 0), 0); // Mirror at VBS (typeR 137, 139)
                 if (SLAB_AIRY_FACTOR(mtl_current, mtl_next, mtl_prev))         // Apply thin-slab (Fabry-Perot) factor
                 {
-                    next_current = (short)((mtl_current & 0x7FFF) | (int)0x8000); // keep material, set resolved
+                    next_current = (short)((mtl_current & 0x3FFF) | (int)0x8000); // keep material, set resolved
                     typeR[2] = true;                                              // slab resolve flag
                 }
                 SCALE_BY_MEDIUM(mtl_current); // Apply medium gain and phase

@@ -152,10 +152,10 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
     if (center_frequency <= (dtype)0.0)
         throw std::invalid_argument("Center frequency must be provided in Hertz and have values > 0.");
 
-    // Material indices are carried in signed 16-bit state words by ray_state_update.
+    // Material indices are carried as 14 bits of the signed 16-bit state words by ray_state_update.
     // Range and table validation happens inside ray_mesh_interact / ray_state_update.
-    if (!mtl_ind.is_empty() && mtl_ind.max() > 32767)
-        throw std::invalid_argument("Material indices must not exceed 32767.");
+    if (!mtl_ind.is_empty() && mtl_ind.max() > 16383)
+        throw std::invalid_argument("Material indices must not exceed 16383.");
 
     // Initialize XPRMAT output
     if (xprmat && (xprmat->n_rows != nXPR || xprmat->n_cols != n_pos))
@@ -183,7 +183,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
                   << n_seg << " segments for " << MioNum(n_pos) << " positions." << std::endl;
 
     // Track the state of each path: three signed-short words per ray (see ray_state_update),
-    // mat = w & 0x7FFF (0 = outside), flag = w & 0x8000. Zero-initialized = outside.
+    // mat = w & 0x3FFF (0 = outside), flags in bits 14 and 15. Zero-initialized = outside.
     arma::Col<short> g_prev(G, arma::fill::zeros); // previous medium + non-parallel flag
     arma::Col<short> g_cur(G, arma::fill::zeros);  // current medium + resolved flag
     arma::Col<short> g_buf(G, arma::fill::zeros);  // next-transition buffer
@@ -270,7 +270,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
                         continue; // Co-located orig and dest, drop ray
 
                     // Rotate the carried refracted direction by the compressed arc bend (inside rays only)
-                    short mtl_cur = g_cur[iG] & (short)0x7FFF;
+                    short mtl_cur = g_cur[iG] & (short)0x3FFF;
                     if (mtl_cur)
                     {
                         double Ax = Uy * Vz - Uz * Vy, Ay = Uz * Vx - Ux * Vz, Az = Ux * Vy - Uy * Vx; // U x V
@@ -432,8 +432,8 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
 
                 unsigned nH = p_no_interact[iR];        // Number of mesh-hits between "orig" and "dest"
                 int typeH = int(p_hit_type[iR] & 0x1F); // geometry bits only, drop TIR (bit 5)
-                short old_cur = g_cur[iG] & (short)0x7FFF;
-                short new_cur = cur_out[iR] & (short)0x7FFF;
+                short old_cur = g_cur[iG] & (short)0x3FFF;
+                short new_cur = cur_out[iR] & (short)0x3FFF;
                 bool ray_continues = nH > 2 || (nH == 2 && (typeH == 1 || typeH == 3));
 
                 // Update segment weight with resolved gain
@@ -477,7 +477,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
                               << ", tH " << typeH
                               << ", tR " << (int)res_type[iR]
                               << ", cur " << old_cur << ((cur_out[iR] & (short)0x8000) ? "*" : "") << ">" << new_cur << ((cur_out[iR] & (short)0x8000) ? "*" : "")
-                              << ", prev " << (g_prev[iG] & (short)0x7FFF) << ">" << (prev_out[iR] & (short)0x7FFF)
+                              << ", prev " << (g_prev[iG] & (short)0x3FFF) << ">" << (prev_out[iR] & (short)0x3FFF)
                               << ", buf " << g_buf[iG] << ">" << buf_out[iR]
                               << ", P " << p_weight[iD] << " > " << seg_weight
                               << ", acc (" << g_acc_ref[iG] << ", " << g_acc_geo[iG] << ") > (" << acc_ref_out[iR] << ", " << acc_geo_out[iR] << ")"

@@ -239,7 +239,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
 ## Inputs:
 - **`mesh`** — Triangle mesh faces; see [[obj_file_read]]; `[n_mesh, 9]`
 - **`mtl_ind`** — 1-based material index per face (the `csv_ind` output of [[obj_file_read]]); `[n_mesh]`. 0 = air
-- **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [[obj_file_read]]); each value has length `n_mtl` (max 32767)
+- **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [[obj_file_read]]); each value has length `n_mtl` (max 16383)
 - **`center_frequency`** — Center frequencies in [Hz]; `[n_freq]`, 1 to 127 entries. `center_frequency[0]` is the reference frequency that defines the traced geometry
 - **`Ox`**, **`Oy`**, **`Oz`** — Point-source (transmitter) position in GCS [m]; used to recompute path length at new sub-beam origins
 - **`sub_mesh_index`** *(optional)* — Sub-mesh partition offsets for the accelerated intersect; 0-based, strictly increasing,
@@ -272,7 +272,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
 ## In/out (launch configuration, updated in place; [n_ray, …] on entry, [n_out, …] on return):
 - **`orig`** — Ray origins in GCS; `[n_ray, 3]`. Defines `n_ray`; must be non-empty
 - **`dest`** — Ray destinations in GCS; `[n_ray, 3]`
-- **`mtl_ind_prev`**, **`mtl_ind_current`**, **`mtl_ind_buffer`** — Medium-state words (bit-masked: `mat = w & 0x7FFF`, `flag = w & 0x8000`); `[n_ray]`
+- **`mtl_ind_prev`**, **`mtl_ind_current`**, **`mtl_ind_buffer`** — Medium-state words (bit-masked: `mat = w & 0x3FFF`, flags in bits 14 and 15, see [[ray_state_update]]); `[n_ray]`
 - **`path_dir_prev`** — Physical ray direction entering the current segment (unit vectors), one slice per
   frequency; `[n_ray, 3, n_freq]`. The Snell bend that defines this direction depends on the material at the
   evaluation frequency, so a dispersive medium gives a different direction in every slice. Outside a medium
@@ -359,8 +359,8 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
             n_mtl = (arma::uword)kv.second.size();
             break;
         }
-    if (n_mtl > 32767)
-        throw std::invalid_argument("Number of materials cannot exceed 32767.");
+    if (n_mtl > 16383) // the state words carry a 14-bit material index
+        throw std::invalid_argument("Number of materials cannot exceed 16383.");
     if (mtl_ind.max() > n_mtl)
         throw std::invalid_argument("Entries of 'mtl_ind' cannot exceed the number of materials.");
 
@@ -387,7 +387,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
     if (dest.n_rows != n_ray || dest.n_cols != 3)
         throw std::invalid_argument("Input 'dest' must have size [n_ray, 3].");
 
-    // Medium state words, bit-masked (mat = w & 0x7FFF, flag = w & 0x8000), so negative values are legal
+    // Medium state words, bit-masked (mat = w & 0x3FFF, flags in bits 14 and 15), so negative values are legal
     if (mtl_ind_prev.n_elem != n_ray)
         throw std::invalid_argument("Input 'mtl_ind_prev' must have n_ray elements.");
 
