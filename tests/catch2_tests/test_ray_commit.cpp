@@ -559,7 +559,7 @@ TEST_CASE("ray_commit - in-medium loss on the final leg")
 
 TEST_CASE("ray_commit - the resolved flag on air is not an in-medium state")
 {
-    // Material 0 with the resolved bit set: mat = w & 0x7FFF is zero, so no attenuation applies
+    // Material 0 with the resolved bit set: mat = w & 0x3FFF is zero, so no attenuation applies
     Scene S = one_cube(50.0f, 0.0f, 0.0f, mtl_concrete());
     Cfg C = one_ray();
 
@@ -952,6 +952,17 @@ TEST_CASE("ray_commit - input validation")
         bad = S;
         bad.mesh = bad.mesh.cols(0, 7);
         CHECK_THROWS_AS(C.commit(bad, P, out), std::invalid_argument);
+    }
+
+    SECTION("material count: the state words carry a 14-bit index")
+    {
+        Scene big = S;
+        for (auto &kv : big.mtl_prop)
+            kv.second.resize(16383, kv.second[0]);
+        CHECK_NOTHROW(C.commit(big, P, out));
+        for (auto &kv : big.mtl_prop)
+            kv.second.resize(16384, kv.second[0]);
+        CHECK_THROWS_AS(C.commit(big, P, out), std::invalid_argument);
     }
 
     SECTION("center_frequency")

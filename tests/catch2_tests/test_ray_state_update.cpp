@@ -20,7 +20,8 @@
 //  - Consequences used below: an o-i entry defers the medium loss (field kept); a no-crossing
 //    pass-through and a same-material transition reset the field to an isotropic unit interface
 //    (gain 1); a cavity exit / M2M transition / internal reflection multiplies by close * S.
-//  - State: three signed-short words (mat = w & 0x7FFF, resolved/non-parallel flag = w & 0x8000).
+//  - State: three signed-short words (mat = w & 0x3FFF, resolved/non-parallel flag = w & 0x8000,
+//    bit 14 of the previous-medium word: the sheet in it lies inside the current medium).
 //  - resolved_typeN: the bit-encoded outcome code (qd::bits<uint8_t>), see the code table below.
 //
 // Conventions:
@@ -266,7 +267,7 @@ static inline short enc(int m, bool flag)
         w.set(15);
     return w.get();
 }
-static inline int mat_of(short w) { return (int)(unsigned short)qd::bits<short>(w).tail(15); }
+static inline int mat_of(short w) { return (int)(unsigned short)qd::bits<short>(w).tail(14); }
 static inline bool flag_of(short w) { return qd::bits<short>(w).test(15); }
 
 // Col<short> from int literals without narrowing warnings
@@ -642,7 +643,7 @@ static inline Rsu<double> disp(uint8_t otype, unsigned nH, int M1, int M2,
 
 TEST_CASE("ray_state_update - state and code encoding")
 {
-    // State words: bit 15 flag, bits 0..14 material. Never arithmetic negation.
+    // State words: bit 15 flag, bit 14 a second flag, bits 0..13 material. Never arithmetic negation.
     CHECK(enc(0, true) == (short)-32768); // resolved air word is 0x8000, not -0
     CHECK(mat_of(enc(0, true)) == 0);
     CHECK(flag_of(enc(0, true)));
@@ -651,7 +652,7 @@ TEST_CASE("ray_state_update - state and code encoding")
     CHECK(flag_of(enc(5, true)));
     CHECK(mat_of(enc(5, false)) == 5);
     CHECK(!flag_of(enc(5, false)));
-    CHECK(mat_of((short)0x7FFF) == 0x7FFF);
+    CHECK(mat_of((short)0x7FFF) == 0x3FFF);
 
     // out_type / resolved_type bit reads
     CHECK(rt_bit(OT_ENTRY, 0));                    // ok
@@ -8766,5 +8767,319 @@ TEST_CASE("Recovery behind a sheet - the leg after a sheet crossing at the exact
         INFO("entry medium, p " << pinv);
         REQUIRE(std::abs(b) > 0.0);
         CHECK(d_rel < 1.0e-12);
+    }
+}
+
+TEST_CASE("Measurement - a host entered from a lossy solid across a bare face")
+{
+    // A measurement, taken before any decision. The recovery inverts the refraction map of the
+    // pair previous medium -> current medium, and every fixture that pins it enters from air or
+    // from a lossless solid. Here the host is entered from a LOSSY solid across a bare shared
+    // face, air | first | host | air, so the previous-medium word names a lossy medium.
+    //
+    // A ray that starts in air keeps a real transverse wavenumber across parallel faces however
+    // lossy the layers are, so the exact cosine in the host is sqrt(1 - sin^2(theta_ext) / eps_h)
+    // and the first solid drops out of it. The reference is the single pass through the stack at
+    // those cosines, in power, with every series declined (eps 1.5) so that nothing but the three
+    // ports and the two traversals is in the chain.
+    //
+    // The last event is run twice along the same direction: with the state words the transition
+    // wrote, which name the first solid, and with a clean previous-medium word, where the
+    // recovery solves for a real invariant with no medium named.
+    const double f_hz = FRQ, L1 = 0.05, L2 = 0.10, k0 = 2.0 * QPI * f_hz / C0;
+    auto mtl = diag_palette<double>();
+    arma::mat mesh = diag_quad_x(200.0, 0.0);
+    auto dB = [](double g)
+    { return (g > 0.0) ? 10.0 * std::log10(g) : -999.0; };
+
+    QD_DIAG("\n# diag: measurement, air | first 50 mm | host 100 mm | air across bare faces, scalar, every\n");
+    QD_DIAG("# series declined, against the single pass at the exact cosines. named: the last event with the\n");
+    QD_DIAG("# words the transition wrote; clean: the same event with a clean previous-medium word.\n");
+    QD_DIAG("# ct_host is the traced cosine in the host, ct_one what one refraction from air would give\n");
+    QD_DIAG("first,host,theta_ext,ct_host,ct_one,ref_dB,named_dB,d_named,clean_dB,d_clean,prev,rtype\n");
+    for (int host : {5, 6})
+        for (int first : {2, 1, 4})
+            for (double thd : {10.0, 20.0, 40.0, 60.0, 75.0, 85.0})
+            {
+                double th = thd * QPI / 180.0, s2 = std::sin(th) * std::sin(th);
+                std::complex<double> e1 = diag_eps(first, f_hz), e2 = diag_eps(host, f_hz);
+
+                // Entry air -> first, from ray_mesh_interact, as the traced-chain case does
+                arma::mat orig, dest, fbs, sbs;
+                diag_ray_at(thd, orig, dest);
+                arma::uvec mtl_ind(mesh.n_rows, arma::fill::value((arma::uword)first));
+                arma::u32_vec fbs_ind, sbs_ind;
+                quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+                arma::mat origN, destN, xprmatN, path_dirN, normal_vecN;
+                arma::vec gainN;
+                quadriga_lib::ray_mesh_interact(4, f_hz, &orig, &dest, &mesh, &mtl_ind, &mtl,
+                                                &fbs_ind, &sbs_ind, (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                                &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                                &gainN, &xprmatN, (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                                (arma::vec *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr,
+                                                &normal_vecN, (std::vector<uint8_t> *)nullptr,
+                                                &path_dirN, true, (arma::u32_vec *)nullptr);
+                REQUIRE(path_dirN.n_rows == 1);
+                std::complex<double> a0(xprmatN(0, 0), xprmatN(1, 0));
+                double nx = normal_vecN(0, 0), ny = normal_vecN(0, 1), nz = normal_vecN(0, 2);
+                double c1t = std::abs(path_dirN(0, 0) * nx + path_dirN(0, 1) * ny + path_dirN(0, 2) * nz);
+                double s1t = std::sqrt(std::max(0.0, 1.0 - c1t * c1t));
+
+                // Transition first -> host, in the frame make1 uses (normal along x)
+                auto T = make1<double>(mtl, 4, OT_M2M_M1, 2u, first, host, 0, first, 0, L1, 0.5, 0.5, QPI / 2.0 - th, 1.5);
+                T.has_path_dir = true;
+                T.path_dir_prev.zeros(1, 3);
+                T.path_dir_prev(0, 0) = c1t, T.path_dir_prev(0, 1) = s1t;
+                T.has_path_dirN = true;
+                T.path_dirN.zeros(1, 3);
+                T.path_dirN(0, 0) = std::cos(th), T.path_dirN(0, 1) = std::sin(th);
+                T.normals(0, 3) = -1.0; // the host's front face: its normal opposes the ray
+                T.run();
+                double dx = (double)T.path_dirN(0, 0), dy = (double)T.path_dirN(0, 1);
+
+                // Exit host -> air along the direction the transition wrote
+                std::complex<double> a2[2];
+                Rsu<double> X;
+                for (int k = 0; k < 2; ++k)
+                {
+                    X = make1<double>(mtl, 4, OT_EXIT, 1u, host, 0, k ? 0 : (int)T.prev_out(0), (int)T.cur_out(0),
+                                      k ? 0 : (int)T.buf_out(0), L2, 0.5, 0.5, QPI / 2.0 - th, 1.5);
+                    X.has_path_dir = true;
+                    X.path_dir_prev.zeros(1, 3);
+                    X.path_dir_prev(0, 0) = dx, X.path_dir_prev(0, 1) = dy;
+                    X.run();
+                    a2[k] = cpx(X.xprmat, 0, 0);
+                }
+                std::complex<double> a1 = cpx(T.xprmat, 0, 0);
+
+                // Single pass at the exact cosines, written from the media alone
+                std::complex<double> c0(std::cos(th), 0.0), c1 = std::sqrt(1.0 - s2 / e1), c2 = std::sqrt(1.0 - s2 / e2);
+                std::complex<double> z0(1.0, 0.0), z1 = std::sqrt(e1), z2 = std::sqrt(e2);
+                std::complex<double> t01 = 2.0 * z0 * c0 / (z0 * c0 + z1 * c1), t12 = 2.0 * z1 * c1 / (z1 * c1 + z2 * c2),
+                                     t20 = 2.0 * z2 * c2 / (z2 * c2 + z0 * c0);
+                double ref = std::norm(t01 * t12 * t20) *
+                             std::exp(2.0 * k0 * (std::imag(z1 * c1) * L1 + std::imag(z2 * c2) * L2));
+                double named = std::norm(a0 * a1 * a2[0]), clean = std::norm(a0 * a1 * a2[1]);
+                double ct_one = diag_traced_ct(e2, th);
+
+                QD_DIAG("%d,%d,%.1f,%.9f,%.9f,%.6f,%.6f,%+.6f,%.6f,%+.6f,%d,%u\n", first, host, thd, std::abs(dx), ct_one,
+                        dB(ref), dB(named), dB(named) - dB(ref), dB(clean), dB(clean) - dB(ref),
+                        mat_of(T.prev_out(0)), (unsigned)X.resolved_type[0]);
+                INFO("first " << first << ", host " << host << ", theta_ext " << thd);
+                REQUIRE(mat_of(T.prev_out(0)) == first);
+                REQUIRE(std::isfinite(named));
+                if (first == 2) // lossless first solid: the control on the chain and on the reference
+                {
+                    CHECK(std::abs(dB(named) - dB(ref)) < 1.0e-6);
+                    CHECK(std::abs(dB(named) - dB(clean)) < 1.0e-9);
+                }
+            }
+}
+
+TEST_CASE("Sheet inside a host - the mirror behind the ray is backed by the host")
+{
+    // The state half of the backing question. After a sheet is crossed inside a host the
+    // previous-medium word holds the sheet, and the next close-out of the host resolves it as a
+    // layer backed by air. Behind a sheet inside a host is the host. Two events: the crossing,
+    // host | sheet | host, and the bare far face of the host fed the three state words the
+    // crossing wrote. The series is the resolving run (eps 0) over the declined one (eps 1.5) and
+    // is compared with the factorized form, the sheet a layer from the characteristic matrix,
+    // once backed by the host and once by air.
+    //
+    // No path_dir is supplied, so every boundary is at the fbs cosine and the propagation factor
+    // is the hybrid form diag_phi reproduces. A coating, air | sheet | host, is the control: its
+    // sheet is backed by air and has to stay there.
+    const double f_hz = FRQ, thk = 0.006;
+    auto mtl = diag_palette<double>();
+    const std::complex<double> U(1.0, 0.0), e_air(1.0, 0.0);
+    const int HOST = 5, SHEET = 3, NEAR = 9;
+    const uint8_t OT_SHEET_ISO = 67, OT_GLUED_ENTRY = 71;
+    const std::complex<double> e_h = diag_eps(HOST, f_hz);
+
+    QD_DIAG("\n# diag: sheet inside a host, the host's series on the leg behind it. Host eps 1.50 - 0.40j,\n");
+    QD_DIAG("# sheet 6 mm, scalar. S_applied is the resolving run over the declined one; S_host has the\n");
+    QD_DIAG("# sheet behind the ray backed by the host, S_air by air. kind 0 is the sheet inside the host,\n");
+    QD_DIAG("# kind 1 the coating, whose sheet is backed by air\n");
+    QD_DIAG("kind,sheet,L_mm,theta_n,port,|S_applied|,|S_host|,|S_air|,d_host_dB,d_air_dB,|dS_host|,|dS_air|,prev\n");
+    for (int kind = 0; kind < 2; ++kind)
+        for (int sheet : {SHEET, NEAR})
+            for (double L : {0.05, 0.10})
+                for (double thd : {0.0, 20.0, 40.0, 50.0})
+                    for (int port = 0; port < 2; ++port)
+                    {
+                        double th = thd * QPI / 180.0;
+                        const std::complex<double> e_s = diag_eps(sheet, f_hz);
+                        auto A = kind ? make1<double>(mtl, 4, OT_GLUED_ENTRY, 2u, sheet, HOST, 0, 0, 0, 0.5, 0.5, 0.5,
+                                                      QPI / 2.0 - th, 1.5)
+                                      : make1<double>(mtl, 4, OT_SHEET_ISO, 1u, sheet, 0, 0, HOST, 0, L, 0.5, 0.5,
+                                                      QPI / 2.0 - th, 1.5);
+                        A.run();
+                        INFO("kind " << kind << ", sheet " << sheet << ", L " << L << ", theta_n " << thd << ", port " << port);
+                        REQUIRE(mat_of(A.cur_out(0)) == HOST);
+
+                        std::complex<double> v[2];
+                        uint8_t rt = 0;
+                        for (int k = 0; k < 2; ++k)
+                        {
+                            auto B = make1<double>(mtl, port ? 3 : 4, OT_EXIT, 1u, HOST, 0, (int)A.prev_out(0),
+                                                   (int)A.cur_out(0), (int)A.buf_out(0), L, 0.5, 0.5, QPI / 2.0 - th,
+                                                   k ? 0.0 : 1.5);
+                            B.run();
+                            v[k] = cpx(B.xprmat, 0, 0);
+                            rt = B.resolved_type[0];
+                        }
+                        REQUIRE(rt_bit(rt, 2));
+                        std::complex<double> S = v[1] / v[0];
+
+                        std::complex<double> cs(std::cos(th), 0.0);
+                        std::complex<double> phi = diag_phi(e_h, L, th, f_hz);
+                        std::complex<double> r_ahead = diag_r_slabside(e_h, e_air, cs);
+                        std::complex<double> r_host = diag_cm_stack(e_h, U, {{e_s, U, thk}}, e_h, U, cs, f_hz, false, true, 0.0).R_te;
+                        std::complex<double> r_air = diag_cm_stack(e_h, U, {{e_s, U, thk}}, e_air, U, cs, f_hz, false, true, 0.0).R_te;
+                        std::complex<double> S_host = 1.0 / (1.0 - r_ahead * r_host * phi * phi);
+                        std::complex<double> S_air = 1.0 / (1.0 - r_ahead * r_air * phi * phi);
+                        QD_DIAG("%d,%d,%.0f,%.1f,%s,%.9f,%.9f,%.9f,%+.4f,%+.4f,%.3e,%.3e,%d\n", kind, sheet, L * 1000.0, thd,
+                                port ? "R" : "T", std::abs(S), std::abs(S_host), std::abs(S_air),
+                                20.0 * std::log10(std::abs(S) / std::abs(S_host)),
+                                20.0 * std::log10(std::abs(S) / std::abs(S_air)), std::abs(S - S_host),
+                                std::abs(S - S_air), mat_of(A.prev_out(0)));
+                        CHECK(std::abs(S_host - S_air) > 1.0e-3); // the row can tell the two backings apart
+                        if (kind)
+                            CHECK(std::abs(S - S_air) < 1.0e-9); // a coating is backed by air
+                        else
+                            CHECK(std::abs(S - S_host) < 1.0e-9); // a sheet inside a host by the host
+                    }
+}
+
+TEST_CASE("Bonded mass - a mass-law sheet inside a mass-law wall")
+{
+    // Plate depth, the one case that reaches a result. A wall in two halves with a sheet between
+    // them is one plate of three bodies. The first half pays its own term and the sheet the
+    // increment, both at the crossing; the second half then knows only the sheet, so it pays
+    // almost its whole term again. What it needs is the first half's thickness, which is its own
+    // material's and travels as the thickness code.
+    //
+    // Two events: the crossing inside the wall, and the wall's bare far face fed the three state
+    // words the crossing wrote. The mass paid is the ratio against the same bodies with their
+    // mass argument taken to nothing. A sheet without the column separates the halves, by the
+    // settled rule, and is the control: each half pays its own term. Every sheet differs from its
+    // wall in permittivity; one that does not is merged into the host leg and is another case.
+    const double f_hz = FRQ;
+    const double e_w = 2.1609e-8, e_c = 2.401e-9, tf_w = 0.2, tf_c = 0.1, fR = 0.001, fZ = 1.0e9;
+    const uint8_t OT_SHEET_ISO = 67;
+    auto dB = [](double g)
+    { return (g > 0.0) ? 10.0 * std::log10(g) : -999.0; };
+    const int WS = 3, WSZ = 4, SB = 5, SBZ = 6, CONC = 7, CONCZ = 8, P20 = 9, P20Z = 10, CARPET = 11;
+    const std::vector<LumpMtl> pal = {
+        {e_w, 0.0, 0.008, 0.0, tf_w, 0.0, 0.0, 0.0, 0.0, 20.0, fR}, // 1  P8     wood sheet
+        {e_w, 0.0, 0.008, 0.0, tf_w, 0.0, 0.0, 0.0, 0.0, 20.0, fZ}, // 2  P8Z
+        {e_w, 0.0, 0.0, 0.0, tf_w, 0.0, 0.0, 0.0, 0.0, 20.0, fR},   // 3  WS     wood solid
+        {e_w, 0.0, 0.0, 0.0, tf_w, 0.0, 0.0, 0.0, 0.0, 20.0, fZ},   // 4  WSZ
+        {e_c, 0.0, 0.012, 0.5, tf_c, 0.0, 0.0, 0.0, 0.0, 30.0, fR}, // 5  SB     rigid board
+        {e_c, 0.0, 0.012, 0.5, tf_c, 0.0, 0.0, 0.0, 0.0, 30.0, fZ}, // 6  SBZ
+        {e_c, 0.0, 0.0, 2.0, tf_c, 0.0, 0.0, 0.0, 0.0, 30.0, fR},   // 7  CONC   concrete solid
+        {e_c, 0.0, 0.0, 2.0, tf_c, 0.0, 0.0, 0.0, 0.0, 30.0, fZ},   // 8  CONCZ
+        {e_w, 0.0, 0.020, 0.0, tf_w, 0.0, 0.0, 0.0, 0.0, 20.0, fR}, // 9  P20    wood sheet
+        {e_w, 0.0, 0.020, 0.0, tf_w, 0.0, 0.0, 0.0, 0.0, 20.0, fZ}, // 10 P20Z
+        {2.50, 0.80, 0.010},                                        // 11 CARPET a lossy layer, m 0
+        {1.0e-8, 0.0, 0.008, 0.0, tf_w, 0.0, 0.0, 0.0, 0.0, 20.0, fR}, // 12 D8   a denser wood sheet, m 20
+        {1.0e-8, 0.0, 0.008, 0.0, tf_w, 0.0, 0.0, 0.0, 0.0, 20.0, fZ}, // 13 D8Z
+    };
+    const int D8 = 12, D8Z = 13;
+    auto mtl = lump_palette(pal);
+
+    struct Row
+    {
+        const char *name;
+        int sheet, sheetz, wall, wallz;
+        double d1, d2;
+        DiagMass ms, mw; // sheet, and the wall per meter of thickness set below
+    };
+    const std::vector<Row> rows = {
+        {"wood 60 | dense 8 | wood 40   ", D8, D8Z, WS, WSZ, 0.06, 0.04, {20.0, fR, 0.008}, {20.0, fR, 0.0}},
+        {"wood 50 | board 12 | wood 50  ", SB, SBZ, WS, WSZ, 0.05, 0.05, {30.0, fR, 0.012}, {20.0, fR, 0.0}},
+        {"conc 50 | wood 20 | conc 50   ", P20, P20Z, CONC, CONCZ, 0.05, 0.05, {20.0, fR, 0.020}, {30.0, fR, 0.0}},
+        {"conc 30 | wood 20 | conc 70   ", P20, P20Z, CONC, CONCZ, 0.03, 0.07, {20.0, fR, 0.020}, {30.0, fR, 0.0}},
+        {"conc 50 | m=0 layer | conc 50 ", CARPET, CARPET, CONC, CONCZ, 0.05, 0.05, {0.0, fR, 0.010}, {30.0, fR, 0.0}},
+    };
+
+    QD_DIAG("\n# diag: bonded mass, a sheet inside a wall. first is what the crossing pays (the first half\n");
+    QD_DIAG("# and the sheet), second what the far face pays (the second half). plate is the three bodies\n");
+    QD_DIAG("# as one; the last row has a sheet without the column, which separates the halves\n");
+    QD_DIAG("stack,theta_n,first_dB,second_dB,paid_dB,plate_dB,sum_dB,paid_minus_plate,buf_flag\n");
+    for (const auto &R : rows)
+        for (double thd : {0.0, 30.0, 60.0, 75.0})
+        {
+            double th = thd * QPI / 180.0, ct = std::cos(th);
+            double paid_ev[2] = {0.0, 0.0};
+            int buf = 0;
+            Rsu<double> A[2];
+            for (int z = 0; z < 2; ++z)
+            {
+                int sh = z ? R.sheetz : R.sheet, wl = z ? R.wallz : R.wall;
+                A[z] = make1<double>(mtl, 4, OT_SHEET_ISO, 1u, sh, 0, 0, wl, 0, R.d1 / ct, 0.5, 0.5, QPI / 2.0 - th, 1.5);
+                A[z].run();
+                auto B = make1<double>(mtl, 4, OT_EXIT, 1u, wl, 0, (int)A[z].prev_out(0), (int)A[z].cur_out(0),
+                                       (int)A[z].buf_out(0), R.d2 / ct, 2.0, 0.5, QPI / 2.0 - th, 1.5);
+                B.run();
+                double sgn = z ? 1.0 : -1.0;
+                paid_ev[0] += sgn * dB(std::norm(cpx(A[z].xprmat, 0, 0)));
+                paid_ev[1] += sgn * dB(std::norm(vvf(B)));
+                if (!z)
+                    buf = (int)A[z].buf_out(0);
+            }
+            DiagMass h1 = R.mw, h2 = R.mw;
+            h1.thk = R.d1, h2.thk = R.d2;
+            double paid = paid_ev[0] + paid_ev[1];
+            double own1 = diag_bonded_TL({h1}, f_hz, ct), own2 = diag_bonded_TL({h2}, f_hz, ct);
+            bool massy = R.ms.m > 0.0;
+            double plate = massy ? diag_bonded_TL({h1, R.ms, h2}, f_hz, ct) : own1 + own2;
+            double sum = own1 + own2 + (massy ? diag_bonded_TL({R.ms}, f_hz, ct) : 0.0);
+            QD_DIAG("%s,%.1f,%.6f,%.6f,%.6f,%.6f,%.6f,%+.6f,%d\n", R.name, thd, paid_ev[0], paid_ev[1], paid, plate, sum,
+                    paid - plate, (buf & 0x8000) ? 1 : 0);
+            INFO(R.name << ", theta_n " << thd);
+            REQUIRE(mat_of(A[0].prev_out(0)) == R.sheet);
+            if (massy)
+            {
+                CHECK(std::abs(paid_ev[0] - diag_bonded_TL({h1, R.ms}, f_hz, ct)) < 1.0e-9); // the crossing pays two bodies
+                CHECK(std::abs(paid - plate) < 0.01);                                         // and the far face the third
+                CHECK((buf & 0x8000) != 0);
+            }
+            else
+                CHECK(std::abs(paid - plate) < 1.0e-9); // separated: each half its own term
+        }
+}
+
+TEST_CASE("ray_state_update - the material index is 14 bits")
+{
+    // Bit 14 of each state word is a flag, so a material index runs to 16383.
+    auto pal = diag_palette<double>();
+    auto big = [&](size_t n)
+    {
+        auto m = pal;
+        for (auto &kv : m)
+            kv.second.resize(n, kv.second[5]); // pad with the lossless solid, material 6
+        return m;
+    };
+    {
+        // The largest index, as the current medium, with the resolved flag beside it
+        auto m = big(16383);
+        auto C = make1<double>(m, 4, OT_EXIT, 1u, 16383, 0, 0, 16383, 0, 0.1, 0.5, 0.5, QPI / 2.0, 1.5);
+        CHECK_NOTHROW(C.run());
+        CHECK((int)C.prev_out(0) == 16383);
+        auto D = make1<double>(m, 4, OT_EXIT, 1u, 16383, 0, 0, (int)enc(16383, true), 0, 0.1, 0.5, 0.5, QPI / 2.0, 1.5);
+        CHECK_NOTHROW(D.run());
+        CHECK((int)D.prev_out(0) == 16383);
+    }
+    {
+        // One material more does not fit the index
+        auto m = big(16384);
+        auto C = make1<double>(m, 4, OT_EXIT, 1u, 6, 0, 0, 6, 0, 0.1, 0.5, 0.5, QPI / 2.0, 1.5);
+        CHECK_THROWS_AS(C.run(), std::invalid_argument);
+    }
+    {
+        // Bit 14 of the previous-medium word is a flag and not part of the index
+        auto C = make1<double>(pal, 4, OT_EXIT, 1u, 5, 0, 0x4000 | 3, 5, 0, 0.1, 0.5, 0.5, QPI / 2.0, 1.5);
+        CHECK_NOTHROW(C.run());
     }
 }

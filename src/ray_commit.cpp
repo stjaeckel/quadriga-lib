@@ -30,7 +30,7 @@ Commit the paths of a launch configuration that reach a receiver
 - Rays flagged in `subdiv_flag_in` are skipped entirely — they reappear as sub-beams in the next
   generation and would otherwise be committed twice. Subdivision is not detected internally.
 - A ray travelling inside a medium is committed with the in-layer attenuation of the final leg folded into
-  its coefficients, per frequency, via [[medium_gain]] on `mtl_ind_current & 0x7FFF`.
+  its coefficients, per frequency, via [[medium_gain]] on `mtl_ind_current & 0x3FFF`.
 - In EM mode a receive-side mirror (`VV = 1`, `HH = -1`) is applied per frequency; in SCALAR mode only the gain is applied.
 - The receiver index is written to the committed path's `iC`, 0-based. Without `point_index` it indexes
   `points` as passed in; with `point_index` it indexes the caller's original, unsegmented point list, so a
@@ -72,7 +72,7 @@ arma::uword quadriga_lib::ray_commit(
 - **`mesh`** — Faces of the triangular mesh; each row `{x1 y1 z1 x2 y2 z2 x3 y3 z3}`; `[n_mesh, 9]`. Only the
   faces named by `fbs_ind` are read, for the shading plane
 - **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [[obj_file_read]]);
-  each value has length `n_mtl` (max 32767)
+  each value has length `n_mtl` (max 16383)
 - **`center_frequency`** — Center frequencies in [Hz]; `[n_freq]`, 1 to 127 entries, must match the layout of
   `paths`. `center_frequency[0]` is the reference frequency for the gain gate
 - **`orig`** — Ray origins in GCS; `[n_ray, 3]`. Defines `n_ray`; must be non-empty
@@ -80,8 +80,8 @@ arma::uword quadriga_lib::ray_commit(
   [[ray_triangle_intersect]] for the same launch configuration
 - **`trivec`** — Beam wavefront triangle vertices relative to the ray origin; `[n_ray, 9]`
 - **`tridir`** — Vertex-ray directions, Cartesian; `[n_ray, 9]`. Need not be unit length
-- **`mtl_ind_current`** — Current medium state word, 0 = outside (bit-masked: `mat = w & 0x7FFF`,
-  `flag = w & 0x8000`); `[n_ray]`
+- **`mtl_ind_current`** — Current medium state word, 0 = outside (bit-masked: `mat = w & 0x3FFF`,
+  flags in bits 14 and 15); `[n_ray]`
 - **`rx_points`** — Receive points in 3D space; `[n_point, 3]`
 - **`sub_cloud_index`** *(optional)* — Sub-cloud partition offsets for the point cloud (see
   [[point_cloud_segmentation]]); `[n_sub]`. NULL → no partitioning
@@ -154,8 +154,8 @@ arma::uword quadriga_lib::ray_commit(const std::vector<quadriga_lib::path> &path
             n_mtl = kv.second.size();
             break;
         }
-    if (n_mtl > 32767)
-        throw std::invalid_argument("Number of materials cannot exceed 32767.");
+    if (n_mtl > 16383) // the state words carry a 14-bit material index
+        throw std::invalid_argument("Number of materials cannot exceed 16383.");
 
     // Frequencies; the path storage layout supports 1 to 127 frequencies
     const arma::uword n_freq = center_frequency.n_elem;
@@ -180,7 +180,7 @@ arma::uword quadriga_lib::ray_commit(const std::vector<quadriga_lib::path> &path
     if (fbs_ind.n_elem != n_ray)
         throw std::invalid_argument("Input 'fbs_ind' must have n_ray elements.");
 
-    // Medium state words, bit-masked (mat = w & 0x7FFF, flag = w & 0x8000), so negative values are legal
+    // Medium state words, bit-masked (mat = w & 0x3FFF, flags in bits 14 and 15), so negative values are legal
     if (mtl_ind_current.n_elem != n_ray)
         throw std::invalid_argument("Input 'mtl_ind_current' must have n_ray elements.");
 
@@ -267,7 +267,7 @@ arma::uword quadriga_lib::ray_commit(const std::vector<quadriga_lib::path> &path
             continue;
         }
 
-        if ((size_t(p_current[iR]) & 0x7FFFu) > n_mtl)
+        if ((size_t(p_current[iR]) & 0x3FFFu) > n_mtl)
         {
             bad |= 2;
             continue;
@@ -300,7 +300,7 @@ arma::uword quadriga_lib::ray_commit(const std::vector<quadriga_lib::path> &path
 
         qd::bits<uint8_t> g;
         g.set(GATE_ELIGIBLE);
-        g.assign(GATE_IN_MEDIUM, (unsigned(p_current[iR]) & 0x7FFFu) != 0u);
+        g.assign(GATE_IN_MEDIUM, (unsigned(p_current[iR]) & 0x3FFFu) != 0u);
         g.assign(GATE_HAS_FBS, iFBS != 0);
         p_gate[iR] = g;
     }
@@ -366,7 +366,7 @@ arma::uword quadriga_lib::ray_commit(const std::vector<quadriga_lib::path> &path
             float medium_g = 1.0f;
             if (g[GATE_IN_MEDIUM])
             {
-                const unsigned material = unsigned(p_current[iR] & 0x7FFFu);
+                const unsigned material = unsigned(p_current[iR] & 0x3FFFu);
                 medium_g = quadriga_lib::medium_gain(mtl_prop, material, seg_length, fRef_Hz);
             }
             if (medium_g * paths[iR].calc_gain(fRef_GHz, 0, len) <= min_gain_linear)
@@ -457,7 +457,7 @@ arma::uword quadriga_lib::ray_commit(const std::vector<quadriga_lib::path> &path
             const float Rx = p_points[i_point], Ry = p_points[i_point + n_points], Rz = p_points[i_point + 2 * n_points];
             const float dx = Rx - p_orig[iR], dy = Ry - p_orig[iR + n_ray], dz = Rz - p_orig[iR + 2 * n_ray];
             const float seg_length = std::sqrt(dx * dx + dy * dy + dz * dz);
-            const unsigned material = unsigned(p_current[iR] & 0x7FFFu);
+            const unsigned material = unsigned(p_current[iR] & 0x3FFFu);
 
             // One coefficient update per frequency: mirror and medium loss in a single call
             for (size_t i_freq = 0; i_freq < n_freq; ++i_freq)

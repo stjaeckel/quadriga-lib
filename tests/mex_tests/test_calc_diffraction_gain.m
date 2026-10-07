@@ -306,7 +306,7 @@ assert_throws( @() quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_ind
     'frequency' );                                                                 % (guess) center_freq <= 0
 mtl_ind_big = mtl_ind; mtl_ind_big(1) = 40000;
 assert_throws( @() quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_ind_big, mtl_st, 1e9, 0 ), ...
-    '32767' );                                                                     % (guess) material index > 32767
+    '16383' );                                                                     % (guess) material index > 16383
 
 end
 

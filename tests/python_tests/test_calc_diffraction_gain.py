@@ -497,7 +497,7 @@ class test_case(unittest.TestCase):
 
     def test_error_material_index_too_large(self):
         mtl_ind_big = self.mtl_ind.copy()
-        mtl_ind_big[0] = 40000  # exceeds the int16 material-index cap (32767)
+        mtl_ind_big[0] = 40000  # exceeds the 14-bit material-index cap (16383)
         with self.assertRaises(Exception):
             quadriga_lib.RTtools.calc_diffraction_gain(
                 self.orig, self.dest, self.cube, mtl_ind_big, self.mtl_prop, 1e9, 0)
