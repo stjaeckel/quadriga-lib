@@ -786,6 +786,14 @@ namespace
         Dx = Ux - a * Nx, Dy = Uy - a * Ny, Dz = Uz - a * Nz;
     }
 
+    // Relaunch offset: a few float ULP at the FBS coordinate magnitude (2^-23), so the nudge survives
+    // a store in single precision and the relaunched ray starts off the face without re-hitting it
+    inline double qd_relaunch_offset(double Fx, double Fy, double Fz)
+    {
+        double scale = std::max({std::abs(Fx), std::abs(Fy), std::abs(Fz), 1.0});
+        return 8.0 * scale * 1.1920929e-7;
+    }
+
     // Snell refraction direction: normalize(eta*u + (eta*cos_in - Re(cos_theta2))*n)
     inline void qd_refract(double Ux, double Uy, double Uz,    // Incoming direction, normalized
                            double Nx, double Ny, double Nz,    // Plane normal vector, normalized
@@ -3248,8 +3256,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
 
         // Relaunch offset: a few float ULP at the FBS coordinate magnitude, so the nudge survives the
         // dtype(origN) store and the relaunched ray starts off the face without re-hitting it
-        double scale = std::max({std::abs(Fx), std::abs(Fy), std::abs(Fz), 1.0});
-        double relaunch_offset = 8.0 * scale * 1.1920929e-7; // ~8 float ULP at this magnitude (2^-23)
+        double relaunch_offset = qd_relaunch_offset(Fx, Fy, Fz); // ~8 float ULP at this magnitude
         if (geometry_type != 0 && colocated_faces)           // Relaunch @ SBS
             SET3(p_origN, Sx + relaunch_offset * FDx, Sy + relaunch_offset * FDy, Sz + relaunch_offset * FDz);
         else // Relaunch @ FBS
@@ -3396,7 +3403,11 @@ void quadriga_lib::ray_state_update(
     arma::Col<dtype> *acc_dist_refractedN = nullptr,
     std::vector<uint8_t> *resolved_typeN = nullptr,
     const arma::u32_vec *ray_indN = nullptr,
-    double eps = 0.15);
+    double eps = 0.15,
+    arma::Mat<dtype> *origN = nullptr,
+    arma::Mat<dtype> *destN = nullptr,
+    const arma::Mat<dtype> *tridir = nullptr,
+    arma::Mat<dtype> *tridirN = nullptr);
 ```
 
 ## Inputs:
@@ -3448,6 +3459,8 @@ void quadriga_lib::ray_state_update(
   Does **not** gate a thin sheet's own series: a sheet has no interior for the tracer to re-emit into, so
   that series always resolves. `eps` still gates the host layer a sheet is embedded in.
   Default `0.15`.
+- **`tridir`** *(optional)* — Vertex-ray directions of the beam entering this segment, Cartesian, as handed to
+  [[ray_mesh_interact]]; `[n_ray, 9]`. Given together with `tridirN`; requires `origN` and `destN`
 
 ## Outputs:
 - **`mtl_ind_prev_outN`**, **`mtl_ind_current_outN`**, **`mtl_ind_buffer_outN`** — Updated state words,
@@ -3480,6 +3493,16 @@ void quadriga_lib::ray_state_update(
   state words report, and no medium gain is charged for the sheet material itself — its traversal loss and
   phase are already inside the composite. The host medium the ray was travelling in is still closed out.
 - **`path_dirN`** *(in/out)* — Continuation direction, corrected in place by the VBS construction, compact set; `[n_rayN, 3]`
+- **`origN`**, **`destN`** *(optional, in/out)* — The relaunch segment [[ray_mesh_interact]] built, compact set;
+  `[n_rayN, 3]`, given together. With a refracting type (2, 5) that segment was bent at a real angle in the
+  medium the ray leaves. Where this function writes the direction of a wave out of a lossy medium whose
+  in-medium cosine it recovered - a bare exit, a glued exit, a transition into another solid - both points
+  are put on one line along `path_dirN`, through the SBS of a co-located pair and the FBS otherwise. Every
+  other ray, and every other type, is left untouched; NULL leaves the geometry to the caller as before.
+  A caller that runs several frequencies passes them on the call that defines the geometry only.
+- **`tridirN`** *(optional, in/out)* — Vertex-ray directions leaving, Cartesian, compact set; `[n_rayN, 9]`.
+  Corrected together with `origN` and `destN`: each vertex ray gets the construction of the spine from its
+  own direction in `tridir`. If one of the three cannot be formed, the ray keeps the geometry it had.
 - **`acc_dist_geometricN`** — Accumulated geometric distance leaving this call, compact set; `[n_rayN]`. NULL skips the write.
 - **`acc_dist_refractedN`** — Accumulated refracted (VBS) distance leaving this call, compact set; `[n_rayN]`. NULL skips the write.
 - **`resolved_typeN`** *(optional)* — Resolved interaction-type code, bit-encoded (`qd::bits<uint8_t>`),
@@ -3582,7 +3605,11 @@ void quadriga_lib::ray_state_update(int interaction_type,
                                     arma::Col<dtype> *acc_dist_refractedN,
                                     std::vector<uint8_t> *resolved_typeN,
                                     const arma::u32_vec *ray_indN,
-                                    double eps)
+                                    double eps,
+                                    arma::Mat<dtype> *origN,
+                                    arma::Mat<dtype> *destN,
+                                    const arma::Mat<dtype> *tridir,
+                                    arma::Mat<dtype> *tridirN)
 {
     if (interaction_type < 0 || interaction_type > 5)
         throw std::invalid_argument("Interaction type must be either (0) EM Reflection, (1) EM Transmission, (2) EM Refraction, (3) Scalar Reflection, (4) Scalar Transmission, (5) Scalar Refraction");
@@ -3726,6 +3753,25 @@ void quadriga_lib::ray_state_update(int interaction_type,
     if (ray_indN == nullptr && n_ray != n_rayN)
         throw std::invalid_argument("Without 'ray_indN', the full and compact sets must have the same size.");
     const unsigned *p_ray_indN = ray_indN ? ray_indN->memptr() : nullptr;
+
+    // The relaunch geometry ray_mesh_interact built, corrected in place where a direction is
+    // written out of a lossy medium with a refracting type. Optional: without it nothing moves.
+    if ((origN == nullptr) != (destN == nullptr))
+        throw std::invalid_argument("In-out 'origN' and 'destN' must be provided together.");
+    if (origN && (origN->n_rows != n_rayN || origN->n_cols != 3 || destN->n_rows != n_rayN || destN->n_cols != 3))
+        throw std::invalid_argument("In-out 'origN' and 'destN' must have size [n_rayN, 3].");
+    if ((tridir == nullptr) != (tridirN == nullptr))
+        throw std::invalid_argument("Input 'tridir' and in-out 'tridirN' must be provided together.");
+    if (tridir && origN == nullptr)
+        throw std::invalid_argument("Input 'tridir' requires 'origN' and 'destN'.");
+    if (tridir && (tridir->n_rows != n_ray || tridir->n_cols != 9))
+        throw std::invalid_argument("Input 'tridir' must have size [n_ray, 9] (Cartesian).");
+    if (tridirN && (tridirN->n_rows != n_rayN || tridirN->n_cols != 9))
+        throw std::invalid_argument("In-out 'tridirN' must have size [n_rayN, 9] (Cartesian).");
+    dtype *p_origN = origN ? origN->memptr() : nullptr;
+    dtype *p_destN = destN ? destN->memptr() : nullptr;
+    const dtype *p_tridir = tridir ? tridir->memptr() : nullptr;
+    dtype *p_tridirN = tridirN ? tridirN->memptr() : nullptr;
 
 #pragma omp parallel for schedule(static)
     for (long long i_rayN = 0; i_rayN < (long long)n_rayN; ++i_rayN) // Interaction loop (compact set)
@@ -4149,7 +4195,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
         //
         // Returns 0 where the recovery does not apply, which the resolve reads as "use the projection".
         bool ct_slab_real_inv = false; // set by a solve that returns a cosine; see its end
-        auto EXACT_IN_SLAB_COSINE_SOLVE = [&]() -> std::complex<double>
+        auto EXACT_IN_SLAB_COSINE_SOLVE = [&](double ct_traced) -> std::complex<double>
         {
             const std::complex<double> none(0.0, 0.0);
             ct_slab_real_inv = false;
@@ -4199,7 +4245,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
             // the two propagation factors do not, and declining leaves the hybrid medium_gain form in
             // place while every neighbouring angle uses the exact one. The solve handles it directly -
             // t = 0 gives u = 0 and the first residual is already zero, returning exactly 1.
-            if (abs_cos_theta_t <= 0.0 || abs_cos_theta_t > 1.0)
+            if (ct_traced <= 0.0 || ct_traced > 1.0)
                 return none;
 
             Material M_ent = MAT(unnamed ? 0 : mtl_prev), M_slb = MAT(mtl_current);
@@ -4212,7 +4258,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
             if (eta2 <= 0.0 || std::abs(eps_r - 1.0) < 1.0e-12)
                 return none; // matched media: no bend to invert
 
-            double ct = abs_cos_theta_t;
+            double ct = ct_traced;
             double ct2c = 1.0 - ct * ct;
             double t = std::sqrt((ct2c > 0.0) ? ct2c : 0.0) / ct; // tan of the traced in-slab angle
             double u = t * t / (eta2 * (1.0 + t * t));            // real-index Snell start
@@ -4251,7 +4297,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
         auto EXACT_IN_SLAB_COSINE = [&]() -> std::complex<double>
         {
             if (ct_slab_exact_for != mtl_current)
-                ct_slab_exact_val = EXACT_IN_SLAB_COSINE_SOLVE(), ct_slab_exact_for = mtl_current;
+                ct_slab_exact_val = EXACT_IN_SLAB_COSINE_SOLVE(abs_cos_theta_t), ct_slab_exact_for = mtl_current;
             return ct_slab_exact_val;
         };
 
@@ -4261,6 +4307,75 @@ void quadriga_lib::ray_state_update(int interaction_type,
         // True where REPLACE_BY_VBS evaluated its interface at the recovered cosine of a wave with
         // a real transverse invariant in a lossy medium. A transition writes it into the word.
         bool face_real_inv = false;
+
+        // The geometry a direction out of a lossy medium owes.
+        //
+        // With a refracting type ray_mesh_interact built the next segment, and the three vertex
+        // rays of a tube, by refracting at a real angle in the medium the ray leaves. Where the
+        // direction written here is the one of a wave whose cosine in that medium was recovered
+        // for a real transverse invariant, the segment has to follow it: origN and destN are put
+        // on one line through the point the ray leaves at, the SBS of a co-located pair and the
+        // FBS otherwise, along dir_next. Each vertex ray is a ray of its own and gets the same
+        // construction from its own direction in the medium: its recovered cosine, the Snell
+        // ratio with the length the projection lost, the far cosine of the pair. Its footprint
+        // on the face is where it arrived and does not move.
+        //
+        // Called by the three writers of such a direction, right where they write it, so the
+        // state the recovery reads is the one the spine was solved in. All or nothing: a vertex
+        // that cannot be formed leaves the ray with the geometry it had. A lossless medium, a
+        // leak, a recovery that declines and every other type never get here.
+        auto RELAUNCH = [&](const Material &A, const Material &B, int itype)
+        {
+            if (!p_origN || (interaction_type != 2 && interaction_type != 5))
+                return;
+
+            double td[9] = {};
+            if (p_tridirN)
+            {
+                const bool keep_real_inv = ct_slab_real_inv; // the solve below rewrites it
+                bool ok = true;
+                for (int iTube = 0; iTube < 3 && ok; ++iTube)
+                {
+                    double v[3] = {(double)p_tridir[i_ray + (3 * iTube) * n_ray],
+                                   (double)p_tridir[i_ray + (3 * iTube + 1) * n_ray],
+                                   (double)p_tridir[i_ray + (3 * iTube + 2) * n_ray]};
+                    NORMALIZE(v);
+                    double cv = std::abs(v[0] * N[0] + v[1] * N[1] + v[2] * N[2]);
+                    cv = (cv > 1.0) ? 1.0 : cv;
+
+                    std::complex<double> c_a = EXACT_IN_SLAB_COSINE_SOLVE(cv), c_b;
+                    ok = std::abs(c_a) > 0.0 && ct_slab_real_inv;
+                    if (!ok)
+                        break;
+
+                    double sn = 1.0;
+                    bool t_ab = false;
+                    A.interact_with(B, itype, std::acos(cv) - 1.570796326794897, fGHz, nullptr, nullptr, &c_b, nullptr, &sn, &t_ab,
+                                    false, &c_a, false);
+                    ok = !t_ab && std::real(c_b) > 0.0;
+                    if (!ok)
+                        break;
+
+                    sn *= std::sqrt(std::abs(1.0 - c_a * c_a) + std::real(c_a) * std::real(c_a));
+                    qd_refract(v[0], v[1], v[2], N[0], N[1], N[2], sn, cv, c_b, td[3 * iTube], td[3 * iTube + 1], td[3 * iTube + 2]);
+                }
+                ct_slab_real_inv = keep_real_inv;
+                if (!ok)
+                    return;
+            }
+
+            const double *A0 = (nH >= 2 && DIST(F, S) < colocation_dist) ? S : F; // where ray_mesh_interact relaunched from
+            const double Dn[3] = {(double)p_destN[ii], (double)p_destN[ii + n_rayN], (double)p_destN[ii + 2 * n_rayN]};
+            const double len = DIST(F, Dn), off = qd_relaunch_offset(F[0], F[1], F[2]);
+            for (size_t c = 0; c < 3; ++c)
+            {
+                p_origN[ii + c * n_rayN] = (dtype)(A0[c] + off * dir_next[c]);
+                p_destN[ii + c * n_rayN] = (dtype)(A0[c] + len * dir_next[c]);
+            }
+            if (p_tridirN)
+                for (size_t c = 0; c < 9; ++c)
+                    p_tridirN[ii + c * n_rayN] = (dtype)td[c];
+        };
 
         // Replace the FBS-relative interface result ray_mesh_interact wrote with the VBS-equivalent at theta_t
         // - interface coefficients (interface_gain folded inside interact_with), incoming basis from dir_in,
@@ -4301,6 +4416,8 @@ void quadriga_lib::ray_state_update(int interaction_type,
                     p_path_dirN[ii] = (dtype)dir_next[0],
                     p_path_dirN[ii + n_rayN] = (dtype)dir_next[1],
                     p_path_dirN[ii + 2 * n_rayN] = (dtype)dir_next[2];
+                if (real_inv) // out of a lossy medium: the segment follows
+                    RELAUNCH(A, B, itype);
                 return true;
             };
 
@@ -4409,6 +4526,8 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 if (face_real_inv)
                     snell_dir *= std::sqrt(std::abs(1.0 - ct_in * ct_in) + std::real(ct_in) * std::real(ct_in));
                 qd_refract(dir_prev[0], dir_prev[1], dir_prev[2], N[0], N[1], N[2], snell_dir, abs_cos_theta_t, cos_t2, dir_next[0], dir_next[1], dir_next[2]);
+                if (face_real_inv) // out of a lossy solid: the segment in the next medium follows
+                    RELAUNCH(MAT(Ma), MAT(Mb), itype);
             }
             else if (geom == 3) // exit into air: the direction of dir_prev refracted, where it is exact
                 EXIT_DIRECTION(MAT(Ma), MAT(Mb), face_real_inv, ct_in, snell, cos_t2, tir);
@@ -4700,6 +4819,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 // nothing here runs and the direction is the one it was.
                 double snell_dir = snell;
                 std::complex<double> ct2_dir = ct2_far;
+                bool dir_real_inv = false;
                 if (mtl_near == mtl_current && mtl_far != mtl_near)
                 {
                     std::complex<double> c_n = EXACT_IN_SLAB_COSINE(), c_f;
@@ -4712,11 +4832,14 @@ void quadriga_lib::ray_state_update(int interaction_type,
                         {
                             snell_dir *= std::sqrt(std::abs(1.0 - c_n * c_n) + std::real(c_n) * std::real(c_n));
                             ct2_dir = c_f;
+                            dir_real_inv = true;
                         }
                     }
                 }
                 qd_refract(dir_prev[0], dir_prev[1], dir_prev[2], N[0], N[1], N[2],
                            snell_dir, abs_cos_theta_t, ct2_dir, dir_next[0], dir_next[1], dir_next[2]);
+                if (dir_real_inv) // a glued exit out of a lossy host: the segment follows
+                    RELAUNCH(M_near, M_far, interaction_type);
             }
 
             if (p_path_dirN)
@@ -5272,7 +5395,9 @@ template void quadriga_lib::ray_state_update(int interaction_type, float center_
                                              arma::Mat<float> *path_dirN,
                                              arma::Col<float> *acc_dist_geometricN, arma::Col<float> *acc_dist_refractedN,
                                              std::vector<uint8_t> *resolved_typeN,
-                                             const arma::u32_vec *ray_indN, double eps);
+                                             const arma::u32_vec *ray_indN, double eps,
+                                             arma::Mat<float> *origN, arma::Mat<float> *destN,
+                                             const arma::Mat<float> *tridir, arma::Mat<float> *tridirN);
 
 template void quadriga_lib::ray_state_update(int interaction_type, double center_frequency,
                                              const arma::Mat<double> *orig, const arma::Mat<double> *dest,
@@ -5291,4 +5416,6 @@ template void quadriga_lib::ray_state_update(int interaction_type, double center
                                              arma::Mat<double> *path_dirN,
                                              arma::Col<double> *acc_dist_geometricN, arma::Col<double> *acc_dist_refractedN,
                                              std::vector<uint8_t> *resolved_typeN,
-                                             const arma::u32_vec *ray_indN, double eps);
+                                             const arma::u32_vec *ray_indN, double eps,
+                                             arma::Mat<double> *origN, arma::Mat<double> *destN,
+                                             const arma::Mat<double> *tridir, arma::Mat<double> *tridirN);

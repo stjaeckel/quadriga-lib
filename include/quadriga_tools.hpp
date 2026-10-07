@@ -379,7 +379,11 @@ namespace quadriga_lib
                           arma::Col<dtype> *acc_dist_refractedN = nullptr,                     // Out: Accumulated refracted distance leaving this call, [n_rayN]
                           std::vector<uint8_t> *resolved_typeN = nullptr,                      // Out: Resolved ray type, [n_rayN]
                           const arma::u32_vec *ray_indN = nullptr,                             // rayN -> ray map; NULL = identity (ray = rayN); [n_rayN]
-                          double eps = 0.15);                                                  // Airy resolve threshold in [0, 1]; 0 = always resolve
+                          double eps = 0.15,                                                   // Airy resolve threshold in [0, 1]; 0 = always resolve
+                          arma::Mat<dtype> *origN = nullptr,                                   // In/Out: relaunch origin, corrected in place; [n_rayN, 3]
+                          arma::Mat<dtype> *destN = nullptr,                                   // In/Out: relaunch destination, corrected in place; [n_rayN, 3]
+                          const arma::Mat<dtype> *tridir = nullptr,                            // In: vertex-ray directions entering this segment, Cartesian; [n_ray, 9]
+                          arma::Mat<dtype> *tridirN = nullptr);                                // In/Out: vertex-ray directions leaving, corrected in place; [n_rayN, 9]
 
     // Calculate in-medium gain
     template <typename dtype>

@@ -10374,6 +10374,9 @@ TEST_CASE("Refracting tracer - a traced bend is known from the state and the leg
         uint8_t ot = 0, rt = 0;
         unsigned nh = 0;
     };
+    // relaunch: hand ray_state_update the geometry ray_mesh_interact built, so that the segment out of
+    // a lossy medium follows the direction it writes. Off for every table but the last one.
+    bool relaunch = false;
     auto traced = [&](const std::unordered_map<std::string, std::vector<double>> &pal, const arma::mat &mesh,
                       const arma::uvec &mtl_ind, int itype, double f, const arma::mat &orig, const arma::mat &dest,
                       const Ev *in, const Ev *in_state, double eps) -> Ev
@@ -10398,7 +10401,7 @@ TEST_CASE("Refracting tracer - a traced bend is known from the state and the leg
                                        in ? &in_state->prev : nullptr, in ? &in_state->cur : nullptr, in ? &in_state->buf : nullptr,
                                        in ? &in->path_dirN : nullptr, in ? &in_state->accg : nullptr, in ? &in->accr : nullptr,
                                        &E.prev, &E.cur, &E.buf, &gain, &E.xpr, &E.path_dirN, &E.accg, &E.accr, &rt,
-                                       (arma::u32_vec *)nullptr, eps);
+                                       (arma::u32_vec *)nullptr, eps, relaunch ? &E.origN : nullptr, relaunch ? &E.destN : nullptr);
         E.ot = ot[0], E.rt = rt[0], E.nh = nh(0);
         return E;
     };
@@ -10727,4 +10730,116 @@ TEST_CASE("Refracting tracer - a traced bend is known from the state and the leg
             CHECK(std::abs(c5.out_y - std::sin(th)) < 1.0e-9);
             CHECK(std::abs(c5.out_x - std::cos(th)) < 1.0e-9);
         }
+    // ------------------------------------------------------------------------------------------
+    // The trajectory: the segment out of a lossy medium is the direction written
+    // ------------------------------------------------------------------------------------------
+    // ray_state_update is handed origN and destN and puts them on one line through the point the
+    // ray leaves at, along the direction it writes, wherever that direction is the one of a wave
+    // out of a lossy medium whose cosine was recovered. Everything else of the event is what it
+    // was, so the chain is the one of the tables above, and the leg in a second solid now runs
+    // where the transition says the wave runs.
+    relaunch = true;
+    auto lossy = [&](int m)
+    { return std::imag(diag_eps(m, f_hz)) != 0.0; };
+    auto seg_err = [](const Ev &E) -> double // largest component of the unit segment against path_dirN
+    {
+        arma::mat d = E.destN - E.origN;
+        d /= std::sqrt(d(0, 0) * d(0, 0) + d(0, 1) * d(0, 1) + d(0, 2) * d(0, 2));
+        double e = 0.0;
+        for (int c = 0; c < 3; ++c)
+            e = std::max(e, std::abs(d(0, c) - E.path_dirN(0, c)));
+        return e;
+    };
+    QD_DIAG("\n# diag: refracting tracer, the trajectory. As the tables above, with origN and destN handed to\n");
+    QD_DIAG("# ray_state_update. traj: destN - origN behind the wall, deg. d_out: that segment against path_dirN,\n");
+    QD_DIAG("# largest component. d_in: the same for the worst event that leaves a lossy medium, the transition\n");
+    QD_DIAG("# of two solids included. d_dB, ph: the bare slab against the analytic one. r54: tracer 5 over 4.\n");
+    QD_DIAG("# rt: the resolved types, with the geometry and without\n");
+    QD_DIAG("stack,mats,theta,tracer,rt,rt_without,traj_deg,d_out,d_in,d_dB,ph_deg,r54_dB,r54_deg\n");
+    {
+        std::vector<Stack> all;
+        for (int m : {5, 6, 1, 4})
+            all.push_back({"bare        ", {0.0, L}, {m, m}, {false, true}, 0.0, true, -1});
+        for (const auto &S : stacks)
+            all.push_back(S);
+        for (const auto &S : all)
+            for (double thd : angles)
+                for (int itype : {5, 2})
+                {
+                    bool bare = S.x.size() == 2;
+                    if (itype == 2 && !bare)
+                        continue;
+                    double th = thd * QPI / 180.0;
+                    arma::uvec mi;
+                    arma::mat mesh = build(S.x, S.mat, S.flip, mi);
+                    Chain c5 = run(mtl, mesh, mi, {itype}, thd, S.eps, f_hz, 0.0);
+                    relaunch = false;
+                    Chain c4 = run(mtl, mesh, mi, {4}, thd, S.eps, f_hz, 0.0), c0 = run(mtl, mesh, mi, {itype}, thd, S.eps, f_hz, 0.0);
+                    relaunch = true;
+                    REQUIRE((c4.ok && c5.ok && c0.ok));
+                    REQUIRE((c4.ev.size() == c5.ev.size() && c0.ev.size() == c5.ev.size()));
+                    size_t n = c5.ev.size();
+                    double d_in = 0.0;
+                    for (size_t k = 1; k < n; ++k)
+                    {
+                        int left = mat_of(c5.ev[k - 1].cur(0));
+                        if (lossy(left) && mat_of(c5.ev[k].cur(0)) != left)
+                            d_in = std::max(d_in, seg_err(c5.ev[k]));
+                    }
+                    std::complex<double> r54 = c5.abs_vv(k0) / c4.abs_vv(k0), q(1.0, 0.0);
+                    if (bare)
+                    {
+                        std::complex<double> t, t4, r_in;
+                        slab(diag_eps(S.mat[0], f_hz), th, f_hz, true, L - c5.ev[0].origN(0, 0), t, r_in);
+                        slab(diag_eps(S.mat[0], f_hz), th, f_hz, true, L - c4.ev[0].origN(0, 0), t4, r_in);
+                        q = c5.abs_vv(k0) * std::exp(std::complex<double>(0.0, k0 * std::sin(th) * c5.dy)) / t;
+                        r54 = (c5.abs_vv(k0) / t) / (c4.abs_vv(k0) / t4); // each over the slab it crossed
+                    }
+                    std::string mats, r5, r0;
+                    for (int v : S.mat)
+                        mats += std::to_string(v);
+                    for (size_t k = 0; k < n; ++k)
+                        r5 += std::to_string((unsigned)c5.ev[k].rt) + "/", r0 += std::to_string((unsigned)c0.ev[k].rt) + "/";
+                    QD_DIAG("%s,%s,%.1f,%d,%s,%s,%.4f,%.3e,%.3e,%+.6f,%+.4f,%+.6f,%+.4f\n", S.name, mats.c_str(), thd, itype, r5.c_str(), r0.c_str(), c5.traj,
+                            seg_err(c5.ev[n - 1]), d_in, dB(std::norm(q)), deg(q), dB(std::norm(r54)), deg(r54));
+                    INFO("trajectory, " << S.name << " " << mats << ", theta_ext " << thd << ", type " << itype);
+                    // The segment behind the wall is the direction written, and that is the one the ray arrived in
+                    CHECK(std::abs(c5.out_y - std::sin(th)) < 1.0e-9);
+                    CHECK(std::abs(c5.out_x - std::cos(th)) < 1.0e-9);
+                    CHECK(d_in < 1.0e-9);
+                    if (lossy(mat_of(c5.ev[n - 2].cur(0))))
+                        CHECK(seg_err(c5.ev[n - 1]) < 1.0e-9);
+                    // Nothing else of an event moves: the words and the type codes. One bit follows the
+                    // geometry by its own definition: the VBS bit says that the direction the wave has
+                    // differs from the segment, which behind a lossy first solid it did and no longer does
+                    for (size_t k = 0; k < n; ++k)
+                    {
+                        CHECK(c5.ev[k].prev(0) == c0.ev[k].prev(0));
+                        CHECK(c5.ev[k].cur(0) == c0.ev[k].cur(0));
+                        CHECK(c5.ev[k].buf(0) == c0.ev[k].buf(0));
+                        CHECK((c5.ev[k].rt & 0xFD) == (c0.ev[k].rt & 0xFD));
+                        CHECK((c5.ev[k].rt & 0x02) <= (c0.ev[k].rt & 0x02));
+                        if (k > 0 && lossy(mat_of(c5.ev[k - 1].prev(0))) && mat_of(c5.ev[k - 1].prev(0)) != SHEET && mat_of(c5.ev[k - 1].cur(0)) != 0)
+                            CHECK((c5.ev[k].rt & 0x02) == 0); // the leg behind a lossy solid: the VBS is the FBS
+                    }
+                    // The chain
+                    if (itype == 5)
+                    {
+                        CHECK(std::abs(dB(std::norm(r54))) < 2.0e-3);
+                        // Two solids: the phase is recorded, as above. A lossless pair carries the
+                        // same 0.17 deg at 85 deg, so it is not the segment in the second solid.
+                        if (S.phase)
+                            CHECK(std::abs(deg(r54)) < 0.05);
+                    }
+                    if (bare)
+                    {
+                        CHECK(std::abs(dB(std::norm(q))) < 1.0e-3);
+                        CHECK(std::abs(deg(q)) < 0.05);
+                        // One wall: the events are the ones of the run without the geometry, bit for bit
+                        for (size_t k = 0; k < n; ++k)
+                            CHECK(cpx(c5.ev[k].xpr, 0, 0) == cpx(c0.ev[k].xpr, 0, 0));
+                    }
+                }
+    }
+    relaunch = false;
 }
