@@ -3424,7 +3424,7 @@ void quadriga_lib::ray_state_update(
   words through unchanged between calls.<br><br>
    | Word                 | Bits 0-13                          | Bit 14                                        | Bit 15                    |
    | -------------------- | ---------------------------------- | --------------------------------------------- | ------------------------- |
-   | `mtl_ind_current`    | medium the ray is in, 0 = air      | unused, zero                                  | resolved                  |
+   | `mtl_ind_current`    | medium the ray is in, 0 = air      | bent: the leg follows a bend traced with type 2 or 5; zero in air | resolved |
    | `mtl_ind_prev`       | medium the leg was entered from, or the sheet crossed or reflected off | the sheet in this word lies inside the current medium | known non-parallel |
    | `mtl_ind_buffer`     | deferred medium                    | zero                                          | clear                     |
    | `mtl_ind_buffer`     | thickness code, bits 0-14          | (part of the code)                            | set: mass-crossed         |
@@ -3745,7 +3745,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
         // The three state words, decoded here and nowhere else. The material index is 14 bits.
         //
         //   word      bits 0-13                      bit 14            bit 15
-        //   current   medium the ray is in           unused            resolved
+        //   current   medium the ray is in           bent              resolved
         //   prev      medium the leg was entered     prev_embedded     prev_nonpar
         //             from, or the sheet crossed     (a sheet), or
         //             or reflected off               prev_real_inv
@@ -3764,10 +3764,20 @@ void quadriga_lib::ray_state_update(int interaction_type,
         // without naming the solid. Clear, the face was evaluated at a real angle in the solid and
         // the recovery inverts that. It is written by a transition out of a lossy solid and
         // travels with the word; which of the two the bit means follows from what the word holds.
+        //
+        // bent says that the leg the ray is on follows a bend the tracer traced: the medium was
+        // entered by a refracting event (type 2 or 5) that was not a total reflection, so the
+        // segment is the refracted direction itself and the traced and the geometric cosine
+        // coincide. It is a statement about the polyline, which is bent at the base frequency
+        // and shared by every frequency of a run, as the word is. Written by the event that
+        // enters the medium, carried while the ray stays in it - a reflection, a sheet inside
+        // the medium, a transparent pass - and zero in air. The undeviated tracer never sets it.
         int mtl_current = next_current & 0x3FFF;
         int mtl_prev = next_prev & 0x3FFF;
         int mtl_buffer = next_buffer & 0x7FFF;
         bool resolved = (next_current & 0x8000) != 0;
+        const bool bent = (next_current & 0x4000) != 0 && mtl_current != 0;
+        const int bent_carry = bent ? (int)0x4000 : 0;
         bool prev_nonpar = (next_prev & 0x8000) != 0;
         const bool prev_embedded = (next_prev & 0x4000) != 0;
 
@@ -4009,6 +4019,17 @@ void quadriga_lib::ray_state_update(int interaction_type,
             }
         }
 
+        // use_vbs says that the VBS is not the FBS: the direction the wave has differs from the
+        // segment, so the geometry has to be redone from that direction. Whether the wave was
+        // bent at the face behind it is a second question, and with a tracer that bends the
+        // segment itself the cosines cannot answer it: there the state does.
+        const bool refracted = use_vbs || bent;
+
+        // The bit for a leg that begins at this event by crossing into a medium: the tracer
+        // bends, and ray_mesh_interact did bend at this face. Its verdict in the hit code is the
+        // one the segment was built on, the ray tube and the rule for a mass-law medium included.
+        const int bent_enter = ((interaction_type == 2 || interaction_type == 5) && !total_reflection) ? (int)0x4000 : 0;
+
         // Accumulated in-medium distance
         double dist_refract = p_acc_refract_in ? (double)p_acc_refract_in[i_ray] : 0.0;
         double dist_geo = p_acc_geo_in ? (double)p_acc_geo_in[i_ray] : 0.0;
@@ -4133,8 +4154,8 @@ void quadriga_lib::ray_state_update(int interaction_type,
             const std::complex<double> none(0.0, 0.0);
             ct_slab_real_inv = false;
 
-            // No real direction was supplied, so nothing was projected in the first place.
-            if (!use_vbs || mtl_current < 1)
+            // No refracted direction and no traced bend, so nothing was projected in the first place.
+            if (!refracted || mtl_current < 1)
                 return none;
 
             // The faces are not a parallel pair, so the entry face is not this face's twin and the
@@ -4265,7 +4286,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
             auto EXIT_DIRECTION = [&](const Material &A, const Material &B, bool real_inv, const std::complex<double> &ct_a,
                                       double snell_ab, const std::complex<double> &cos_b, bool tir_ab) -> bool
             {
-                if (!use_vbs || tir_ab || !(std::real(cos_b) > 0.0))
+                if (!refracted || tir_ab || !(std::real(cos_b) > 0.0))
                     return false;
                 bool lossless = std::imag((A.eta(fGHz) + A.eta_resonance(fGHz)) * A.mu(fGHz)) == 0.0 &&
                                 std::imag((B.eta(fGHz) + B.eta_resonance(fGHz)) * B.mu(fGHz)) == 0.0;
@@ -4284,8 +4305,10 @@ void quadriga_lib::ray_state_update(int interaction_type,
             };
 
             // A resolved path will not call SLAB_AIRY_FACTOR, so we don't need the coefficients.
-            // Its exit still owes a direction; nothing else of the event is touched.
-            if (resolved)
+            // Its exit still owes a direction; nothing else of the event is touched. On a bent
+            // leg the coefficient ray_mesh_interact wrote is at a real angle in the medium, and
+            // the exit is evaluated below as any other.
+            if (resolved && !bent)
             {
                 if (geom == 3 && use_vbs && Ma == mtl_current)
                 {
@@ -4331,7 +4354,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
             // Without a refracted direction the wave is held at its geometric angle, as it was in
             // ray_mesh_interact, and the two have to give the same verdict.
             MAT(Ma).interact_with(MAT(Mb), itype, theta_t, fGHz, &cTE, &cTM, &cos_t2, &e1de2, &snell, &tir,
-                                  false, use_exact_ct ? &ct_in : nullptr, !use_vbs);
+                                  false, use_exact_ct ? &ct_in : nullptr, !refracted);
             typeR[5] = tir; // TIR re-evaluated at the corrected VBS angle (overrides the geometric-angle verdict)
 
             // Transition into buffer
@@ -4346,10 +4369,28 @@ void quadriga_lib::ray_state_update(int interaction_type,
                     p_gainN[ii] = (dtype)pgain;
             }
 
-            if (!use_vbs) // Fast return
+            if (!refracted) // Fast return
                 return dist_fbs_dest;
 
-            typeR[1] = true; // Set VBS correction flag
+            // A bent leg between two lossless media: the segment is the wave, and what
+            // ray_mesh_interact wrote from it is this face at this angle. Left as it stands.
+            // A mass-law medium is not, because ray_mesh_interact held the wave undeviated in it.
+            if (!use_vbs)
+            {
+                Material A = MAT(Ma), B = MAT(Mb);
+                if (std::imag((A.eta(fGHz) + A.eta_resonance(fGHz)) * A.mu(fGHz)) == 0.0 &&
+                    std::imag((B.eta(fGHz) + B.eta_resonance(fGHz)) * B.mu(fGHz)) == 0.0 && !(A.m > 0.0) && !(B.m > 0.0))
+                {
+                    // The direction an exit writes is the one dir_prev refracts to, as for any
+                    // other leg: the segment carries the relaunch offset of the event before it.
+                    if (geom == 3)
+                        EXIT_DIRECTION(A, B, false, ct_in, snell, cos_t2, tir);
+                    return dist_fbs_dest;
+                }
+            }
+
+            if (use_vbs)
+                typeR[1] = true; // Set VBS correction flag
 
             // Update the outgoing direction based on the VBS geometry (using the refracted incoming direction)
             if (geom == 0) // Reflect at VBS
@@ -4445,7 +4486,8 @@ void quadriga_lib::ray_state_update(int interaction_type,
             // Walk-off (cos^2) only for the undeviated tracer, where it substitutes for the untraced
             // lateral shift. Genuine refraction traced the bent path, so cos2 = 1. The free-space
             // reference sits on the same thickness axis, so dist_geo carries the geometric-incidence cos^2.
-            bool walk_off = !use_vbs || refl_pass || resolved;
+            // A bent leg has its lateral shift in the polyline, on every pass.
+            bool walk_off = !bent && (!use_vbs || refl_pass || resolved);
 
             // Exact in-medium propagation, wherever the recovered cosine exists.
             //
@@ -4629,7 +4671,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
             double snell = 1.0;
             bool tir = false;
             M_near.interact_with(M_far, interaction_type, theta_t, fGHz, nullptr, nullptr,
-                                 &ct2_far, nullptr, &snell, &tir, false, nullptr, !use_vbs);
+                                 &ct2_far, nullptr, &snell, &tir, false, nullptr, !refracted);
             typeR[5] = tir;
 
             // Continuation direction. Leaving path_dirN as ray_mesh_interact wrote it replaces the
@@ -4758,7 +4800,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
                     qd_slab_resolve(M_near, M_slab, M_far, thk, 0.0, ct_slab, ct_geo,
                                     fGHz, is_scalar, 0.0, true, &Tte, &Ttm, &Rte, &Rtm,
                                     disp_far, disp_budget, std::complex<double>(0.0, 0.0), ct_near,
-                                    nullptr, tir, !use_vbs, mass_bonded);
+                                    nullptr, tir, !refracted, mass_bonded);
 
                 // Both ports come out of the one pass. The reflection port is its own Airy sum, not the
                 // half-space Fresnel value, so expect real angular and frequency structure in it.
@@ -4905,7 +4947,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
                     // Terminate the internal bounce series exactly as a resolved solid does
                     // The sheet reflected off is behind the ray now. Where both of its sides are
                     // the medium the ray is in, that medium is what backs it.
-                    next_current = (short)((mtl_current & 0x3FFF) | (int)0x8000);
+                    next_current = (short)((mtl_current & 0x3FFF) | (int)0x8000 | bent_carry);
                     next_prev = (short)((sheet_mtl & 0x3FFF) | (prev_nonpar ? (int)0x8000 : 0) |
                                         ((m_far == mtl_current) ? (int)0x4000 : 0));
                     next_buffer = (short)0;
@@ -4920,7 +4962,10 @@ void quadriga_lib::ray_state_update(int interaction_type,
             if (merge_host || (mtl_current == 0 && m_next == 0))
                 return;
 
-            next_current = (short)(m_next & 0x3FFF); // Clearing the resolved flag starts a new leg
+            // Clearing the resolved flag starts a new leg. Behind a sheet inside the medium the leg
+            // is bent if the one in front was; a glued entry says what it did itself.
+            next_current = (short)((m_next & 0x3FFF) |
+                                   ((m_next == 0) ? 0 : ((m_next == mtl_current) ? bent_carry : bent_enter)));
 
             // The sheet becomes the previous medium so the next host leg reflects off it. It is a
             // boundary material here, never a traversed one: mtl_prev is only ever read as the far
@@ -5035,7 +5080,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 // Into a medium, the word also says whether the face was evaluated at the cosine
                 // of a wave with a real transverse invariant (prev_real_inv).
                 next_prev = (short)(mtl_current | ((face_real_inv && !exit && mtl_next != 0) ? (int)0x4000 : 0));
-                next_current = (short)mtl_next; // Clear resolved flag
+                next_current = (short)(mtl_next | ((mtl_next != 0 && !exit) ? bent_enter : 0)); // Clear resolved flag
             }
 
             next_buffer = buffer_next; // Clear the deferred medium
@@ -5071,7 +5116,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 REPLACE_BY_VBS(mtl_current, mtl_next, (is_scalar ? 3 : 0), 0); // Mirror at VBS (typeR 137, 139)
                 if (SLAB_AIRY_FACTOR(mtl_current, mtl_next, mtl_prev))         // Apply thin-slab (Fabry-Perot) factor
                 {
-                    next_current = (short)((mtl_current & 0x3FFF) | (int)0x8000); // keep material, set resolved
+                    next_current = (short)((mtl_current & 0x3FFF) | (int)0x8000 | bent_carry); // keep material, set resolved
                     typeR[2] = true;                                              // slab resolve flag
                 }
                 SCALE_BY_MEDIUM(mtl_current); // Apply medium gain and phase
@@ -5104,7 +5149,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 typeR[3] = true;      // Set inside flag (typeR 9)
                 if (mtl_current == 0) // Entry from air, keep xprmat and gain unchanged
                 {
-                    next_current = (short)M1;                          // Next medium
+                    next_current = (short)(M1 | bent_enter);           // Next medium
                     bool nonpar = !ray_ends && fbs_sbs_not_parallel(); // SBS not parallel to FBS?
                     next_prev = (short)(nonpar ? (int)0x8000 : 0);     // air + flag
 

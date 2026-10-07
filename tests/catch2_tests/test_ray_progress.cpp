@@ -592,8 +592,8 @@ TEST_CASE("ray_progress - single transmission")
     CHECK((int)C.paths[0].nREF == 0);
     CHECK((int)C.paths[0].nTRA == 1);
 
-    // The state machine reports the ray as inside material 1
-    CHECK((int)C.cur(0) == 1);
+    // The state machine reports the ray as inside material 1, on a leg the refracting tracer bent
+    CHECK((int)C.cur(0) == (1 | 0x4000));
     CHECK((int)C.prev(0) == 0);
 }
 
@@ -623,7 +623,7 @@ TEST_CASE("ray_progress - reflection and transmission in one call")
 
     // Reflection stays outside, transmission enters the medium
     CHECK((int)C.cur(0) == 0);
-    CHECK((int)C.cur(1) == 1);
+    CHECK((int)C.cur(1) == (1 | 0x4000)); // with the bent bit of the refracting tracer
 
     // They leave the same point in opposite directions
     CHECK(std::abs(C.orig(0, 0) - C.orig(1, 0)) < 1e-3f);
@@ -1129,7 +1129,7 @@ TEST_CASE("ray_progress - multi-frequency")
         auto st = T.step(S, ot); // S is the concrete cube
         REQUIRE(st[3] == 1);
         REQUIRE(T.n() == 1);
-        REQUIRE((int)T.cur(0) == 1); // inside the medium
+        REQUIRE((int)T.cur(0) == (1 | 0x4000)); // inside the medium, on a bent leg
         REQUIRE(T.path_dir.n_slices == n_freq);
 
         bool any_diff = false;
@@ -1184,7 +1184,7 @@ TEST_CASE("ray_progress - medium state across a slab")
     auto s1 = C.step(S, o);
     REQUIRE(s1[3] == 1);
     REQUIRE(C.n() == 1);
-    CHECK((int)C.cur(0) == 1); // inside
+    CHECK((int)C.cur(0) == (1 | 0x4000)); // inside, on a bent leg
     CHECK((int)C.prev(0) == 0);
     CHECK(C.paths[0].n_seg() == 1);
 
