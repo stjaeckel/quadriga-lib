@@ -1044,10 +1044,10 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
         // direction slice and refracted accumulator, so a dispersive medium now bends and attenuates
         // correctly per band instead of inheriting the base-frequency Snell angle.
         //
-        // LIMITATION: with refraction_mode the traced polyline was bent at the base frequency, so at
-        // f != f0 the committed geometry is not the physical path and the per-frequency state can only
-        // describe a ray that does not exist. Undeviated tracing (types 1/4) has no such gap, because
-        // the polyline is frequency-independent and the bend lives entirely in the VBS correction.
+        // With refraction_mode the traced polyline was bent at the base frequency, and it is the one
+        // path of every frequency: at f != f0 the wave leaves a medium beside it. Each coefficient
+        // is the field of its frequency at the point the polyline leaves at, so no geometry is per
+        // frequency. Undeviated tracing (types 1/4) is the same statement with a straight polyline.
         int interaction_type = scalar_mode ? (refraction_mode ? 5 : 4) : (refraction_mode ? 2 : 1);
         if (reflect_pass)
             interaction_type = scalar_mode ? 3 : 0;
