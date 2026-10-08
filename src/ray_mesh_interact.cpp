@@ -4065,6 +4065,15 @@ void quadriga_lib::ray_state_update(int interaction_type,
             }
         }
 
+        // Cosine of the angle between the direction the wave has and the segment
+        double cos_dir_seg = 1.0;
+        if (use_vbs)
+        {
+            double G[3] = {F[0] - O[0], F[1] - O[1], F[2] - O[2]};
+            NORMALIZE(G);
+            cos_dir_seg = dir_prev[0] * G[0] + dir_prev[1] * G[1] + dir_prev[2] * G[2];
+        }
+
         // use_vbs says that the VBS is not the FBS: the direction the wave has differs from the
         // segment, so the geometry has to be redone from that direction. Whether the wave was
         // bent at the face behind it is a second question, and with a tracer that bends the
@@ -4602,11 +4611,23 @@ void quadriga_lib::ray_state_update(int interaction_type,
             double n_re = std::real(std::sqrt(mtl.eta(fGHz) * mtl.mu(fGHz)));
             double k0 = 2.0 * 3.14159265358979323846 * fGHz * 1e9 / 299792458.0;
 
-            // Walk-off (cos^2) only for the undeviated tracer, where it substitutes for the untraced
-            // lateral shift. Genuine refraction traced the bent path, so cos2 = 1. The free-space
-            // reference sits on the same thickness axis, so dist_geo carries the geometric-incidence cos^2.
-            // A bent leg has its lateral shift in the polyline, on every pass.
-            bool walk_off = !bent && (!use_vbs || refl_pass || resolved);
+            // Walk-off (cos^2) only for a wave that was not bent, a leak or a leg with no refracted
+            // direction, whose polyline is the wave. The free-space reference sits on the same
+            // thickness axis, so dist_geo carries the geometric-incidence cos^2. A wave that was
+            // bent takes the forms below on every pass, the reflect pass and a resolved ray
+            // included, so that one leg is one form whichever event closes it.
+            bool walk_off = !refracted;
+
+            // Which point the phase belongs to: the one the polyline leaves at.
+            //
+            // The path length, the delay and the free-space phase of a path are taken from the
+            // polyline, one polyline for every frequency of a run, so the coefficient owes the
+            // field where that polyline leaves the medium. The wave itself leaves beside it
+            // wherever the polyline is not the refracted ray: with the undeviated tracer always,
+            // with the refracting one at every frequency but the base one. For a plane wave the
+            // two points differ by the transverse wavenumber times the lateral distance between
+            // them, in phase only. Nothing of the geometry moves for it; use_vbs says that the
+            // two differ, and where it is clear the forms below are what they were, bit for bit.
 
             // Exact in-medium propagation, wherever the recovered cosine exists.
             //
@@ -4654,6 +4675,16 @@ void quadriga_lib::ray_state_update(int interaction_type,
                     std::exp(std::complex<double>(0.0, -1.0) * k0 * (n_cx * cs * d_norm + q * s_lat)) *
                     std::sqrt((ex < 0.0) ? 0.0 : ex);
 
+                // From the point the refracted ray leaves at to the point the polyline leaves at:
+                // the lateral walk of the polyline in place of the wave's. A phase, also where the
+                // invariant is complex, so that every magnitude stays the one of the ray.
+                if (use_vbs)
+                {
+                    double sin_i = 1.0 - abs_cos_theta * abs_cos_theta;
+                    double s_poly = dist_geo * std::sqrt((sin_i > 0.0) ? sin_i : 0.0);
+                    P *= std::exp(std::complex<double>(0.0, -1.0) * k0 * std::real(q) * (s_poly - s_lat));
+                }
+
                 // Free-space reference over the geometric length, as below
                 P *= std::exp(std::complex<double>(0.0, 1.0) * k0 * dist_geo);
                 SCALE_RAY(std::real(P), std::imag(P));
@@ -4667,6 +4698,12 @@ void quadriga_lib::ray_state_update(int interaction_type,
             double cos2 = walk_off ? abs_cos_theta_t * abs_cos_theta_t : 1.0; // medium side, theta_t
             double cos2_geo = walk_off ? abs_cos_theta * abs_cos_theta : 1.0; // free-space side, theta_i
             double excess_phase = k0 * (n_re * dist_refract * cos2 - dist_geo * cos2_geo);
+
+            // A bent wave with no recovered cosine, in a mass-law solid or where the recovery
+            // declines: the phase of the real index at the point the polyline leaves at, which is
+            // the wave vector along dir_prev times the polyline.
+            if (!walk_off && use_vbs)
+                excess_phase = k0 * (n_re * dist_geo * cos_dir_seg - dist_geo);
 
             double amp = std::sqrt(g < 0.0 ? 0.0 : g);
             SCALE_RAY(amp * std::cos(-excess_phase), amp * std::sin(-excess_phase));
