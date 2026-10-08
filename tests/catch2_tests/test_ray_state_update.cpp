@@ -10065,8 +10065,8 @@ TEST_CASE("Direction - a ray leaves a parallel slab parallel to how it arrived")
     //
     // Three kinds of row keep the direction they had and are pinned to it: a host whose recovery
     // declines (no direction supplied, or faces known not parallel), which takes the real-angle
-    // map; a closed outer pair, whose leak is undeviated; and a leak through a mass-law face.
-    // The refracting tracer and the exits out of a rigid body are recorded.
+    // map; a closed outer pair, whose leak is undeviated; and a leak through a mass-law face,
+    // at every face of the body. The refracting tracer's bare-exit rows are recorded.
     const double f_hz = FRQ, L = 0.10;
     auto mtl = diag_palette<double>();
     const int SHEET = 3, SHEET2 = 8, DENSE = 2;
@@ -10281,14 +10281,12 @@ TEST_CASE("Direction - a ray leaves a parallel slab parallel to how it arrived")
     // ------------------------------------------------------------------------------------------
     // A leak through a mass-law face
     // ------------------------------------------------------------------------------------------
-    // Rigid materials, eps = (Z_air / Z)^2: a wave enters as a tf leak and is held undeviated.
-    // Towards the lower index it stays undeviated by the rule for a wave held in a mass-law
-    // medium, as two traced solids and through a sheet whose outer pair is closed. Towards the
-    // higher index, which every exit into air is, the crossing is the ordinary one and bends to
-    // the normal; those rows are recorded.
+    // Rigid materials, eps = (Z_air / Z)^2: a wave enters as a tf leak and is held undeviated
+    // at every face of the body, towards either index: as two traced solids, through a sheet
+    // whose outer pair is closed, and at every exit into air.
     QD_DIAG("\n# diag: direction, a leak. Wood eps 2.1609e-8, concrete eps 2.401e-9, both with tf and the mass\n");
     QD_DIAG("# column, 30 deg in, undeviated tracer. One row per event; kept says whether the row is\n");
-    QD_DIAG("# asserted undeviated (1) or recorded (0)\n");
+    QD_DIAG("# asserted undeviated (1)\n");
     QD_DIAG("stack,event,code,rtype,out_deg,d_deg,kept\n");
     {
         std::unordered_map<std::string, std::vector<double>> pal;
@@ -10308,10 +10306,10 @@ TEST_CASE("Direction - a ray leaves a parallel slab parallel to how it arrived")
             std::vector<int> kept; // per event
         };
         const std::vector<Stack> stacks = {
-            {"air | wood 50 | conc 50 | air  ", {0.0, 0.05, 0.05 + g, 0.10}, {WOOD, WOOD, CONC, CONC}, {false, true, false, true}, {1, 1, 0}},
-            {"air | conc 50 | wood 50 | air  ", {0.0, 0.05, 0.05 + g, 0.10}, {CONC, CONC, WOOD, WOOD}, {false, true, false, true}, {1, 0, 0}},
-            {"air | panel | conc 100 | air   ", {0.0, g, 0.10}, {PANEL, CONC, CONC}, {false, false, true}, {1, 0}},
-            {"air | conc 100 | panel | air   ", {0.0, 0.10, 0.10 + g}, {CONC, CONC, PANEL}, {false, true, true}, {1, 0}},
+            {"air | wood 50 | conc 50 | air  ", {0.0, 0.05, 0.05 + g, 0.10}, {WOOD, WOOD, CONC, CONC}, {false, true, false, true}, {1, 1, 1}},
+            {"air | conc 50 | wood 50 | air  ", {0.0, 0.05, 0.05 + g, 0.10}, {CONC, CONC, WOOD, WOOD}, {false, true, false, true}, {1, 1, 1}},
+            {"air | panel | conc 100 | air   ", {0.0, g, 0.10}, {PANEL, CONC, CONC}, {false, false, true}, {1, 1}},
+            {"air | conc 100 | panel | air   ", {0.0, 0.10, 0.10 + g}, {CONC, CONC, PANEL}, {false, true, true}, {1, 1}},
             {"air | panel | air              ", {0.0}, {PANEL}, {false}, {1}},
         };
         for (const auto &S : stacks)
@@ -10659,10 +10657,9 @@ TEST_CASE("Refracting tracer - a traced bend is known from the state and the leg
     // A leak is not a bend: rigid bodies, entered under total reflection
     // ------------------------------------------------------------------------------------------
     QD_DIAG("\n# diag: refracting tracer, a leak. Wood eps 2.1609e-8, concrete eps 2.401e-9, tf and the mass column,\n");
-    QD_DIAG("# 30 deg. The entry is a total reflection, the bit stays clear and every event is the undeviated\n");
-    QD_DIAG("# tracer's. Recorded: concrete in front of wood, where the shared face leads towards the higher\n");
-    QD_DIAG("# index and bends the ray, so the wood leg is a bent one; and DENSE, eps 1.50 with m 20, a\n");
-    QD_DIAG("# mass-law solid the wave is refracted into\n");
+    QD_DIAG("# 30 deg. The entry is a total reflection, the wave is held at every face, the bit stays clear and\n");
+    QD_DIAG("# every event is the undeviated tracer's. Recorded: DENSE, eps 1.50 with m 20, a mass-law solid\n");
+    QD_DIAG("# the wave is refracted into\n");
     QD_DIAG("stack,tracer,event,code,rtype,gain_dB,out_deg,prev,cur,buf\n");
     {
         std::unordered_map<std::string, std::vector<double>> pal;
@@ -10681,7 +10678,7 @@ TEST_CASE("Refracting tracer - a traced bend is known from the state and the leg
         };
         const std::vector<St> sts = {
             {"air | wood 50 | conc 50 | air", {0.0, 0.05, 0.05 + gap, L}, {1, 1, 2, 2}, {false, true, false, true}, true},
-            {"air | conc 50 | wood 50 | air", {0.0, 0.05, 0.05 + gap, L}, {2, 2, 1, 1}, {false, true, false, true}, false},
+            {"air | conc 50 | wood 50 | air", {0.0, 0.05, 0.05 + gap, L}, {2, 2, 1, 1}, {false, true, false, true}, true},
             {"air | panel | conc 100 | air ", {0.0, gap, L}, {3, 2, 2}, {false, false, true}, true},
             {"air | conc 100 | panel | air ", {0.0, L, L + gap}, {2, 2, 3}, {false, true, true}, true},
             {"air | DENSE m20 100 | air    ", {0.0, L}, {4, 4}, {false, true}, false},
@@ -11796,5 +11793,315 @@ TEST_CASE("Exits and verdicts - every exit at the cosine the wave has there")
             }
             leak_prev = leak;
         }
+    }
+}
+
+TEST_CASE("Leak direction - a wave held in a mass-law body keeps its direction and a closed face hands on the wave's")
+{
+    // A mass-law body is a lumped plate with no wave inside. A wave that entered it as a tf leak
+    // is held undeviated, and a face that is charged the same from both sides at one angle is a
+    // face without a bend: the wave keeps its direction at every face, towards either index,
+    // in the segment and in path_dirN, with either tracer. A wall then transmits parallel to the
+    // direction the wave arrived in, a layered wall has one angle throughout, and the leg behind
+    // a shared face is not a bent one.
+    //
+    // A. Rigid walls through the intersector, both tracers. var now is the code. hold is the same
+    //    run with the fixture doing the holding: after an event that leaves a mass-law medium it
+    //    hands on the direction the wave came in with, relaunches along it where the tracer bends
+    //    (type 5), and clears the bent flag of the leg that begins. hold_air does so only where
+    //    the event leaves into air, and is recorded: it is the option that was not taken.
+    //    Asserted: every direction and every segment on the incidence angle, to 1e-9; no bent
+    //    flag; every event of now on hold; the refracting tracer on the undeviated one, in
+    //    every word and type code, and in every gain exactly on one wall. Scalar, so the
+    //    coefficient of an event does not read the direction it writes.
+    // B. A face under total reflection at the corrected angle hands on the direction the wave
+    //    has: a bare exit and a transition into another solid as a sheet's closed outer pair
+    //    does. The relaunched segment of the refracting tracer is recorded.
+    const double f_hz = FRQ, gap = 1.0e-5, L = 0.10;
+    auto dB = [](double g)
+    { return (g > 0.0) ? 10.0 * std::log10(g) : -999.0; };
+    typedef std::unordered_map<std::string, std::vector<double>> Pal;
+
+    struct Ev
+    {
+        arma::mat origN, destN, path_dirN, xpr, fbs;
+        arma::Col<short> prev, cur, buf;
+        arma::vec accg, accr;
+        uint8_t ot = 0, rt = 0;
+        unsigned nh = 0;
+    };
+    auto traced = [&](const Pal &pal, const arma::mat &mesh, const arma::uvec &mtl_ind, int itype, const arma::mat &orig,
+                      const arma::mat &dest, const Ev *in, double eps) -> Ev
+    {
+        arma::mat fbs, sbs, sbsN, nv;
+        arma::u32_vec nh, fi, si;
+        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, &nh, &fi, &si);
+        Ev E;
+        arma::vec gain, fang;
+        std::vector<uint8_t> ot, rt;
+        quadriga_lib::ray_mesh_interact(itype, f_hz, &orig, &dest, &mesh, &mtl_ind, &pal, &fi, &si, (arma::mat *)nullptr,
+                                        (arma::mat *)nullptr, &E.origN, &E.destN, &E.fbs, &sbsN, &gain, &E.xpr,
+                                        (arma::mat *)nullptr, (arma::mat *)nullptr, &fang, (arma::vec *)nullptr,
+                                        (arma::vec *)nullptr, &nv, &ot, &E.path_dirN, false, (arma::u32_vec *)nullptr);
+        arma::Col<short> mf(1), ms(1);
+        mf(0) = fi(0) ? (short)mtl_ind(fi(0) - 1) : (short)0, ms(0) = si(0) ? (short)mtl_ind(si(0) - 1) : (short)0;
+        quadriga_lib::ray_state_update(itype, f_hz, &orig, &dest, &E.fbs, &sbsN, &nh, &fang, &nv, &ot, &pal, &mf, &ms,
+                                       in ? &in->prev : nullptr, in ? &in->cur : nullptr, in ? &in->buf : nullptr,
+                                       in ? &in->path_dirN : nullptr, in ? &in->accg : nullptr, in ? &in->accr : nullptr,
+                                       &E.prev, &E.cur, &E.buf, &gain, &E.xpr, &E.path_dirN, &E.accg, &E.accr, &rt,
+                                       (arma::u32_vec *)nullptr, eps, &E.origN, &E.destN);
+        E.ot = ot[0], E.rt = rt[0], E.nh = nh(0);
+        return E;
+    };
+    auto face = [](double x, bool flip) -> arma::mat
+    {
+        arma::mat m = diag_quad_x(200.0, x);
+        if (flip)
+        {
+            m.row(0) = arma::rowvec{x, -200.0, -200.0, x, 200.0, -200.0, x, -200.0, 200.0};
+            m.row(1) = arma::rowvec{x, 200.0, -200.0, x, 200.0, 200.0, x, -200.0, 200.0};
+        }
+        return m;
+    };
+    auto build = [&](const std::vector<double> &x, const std::vector<int> &mat, const std::vector<bool> &flip, arma::uvec &mtl_ind)
+    {
+        arma::mat mesh;
+        mtl_ind.set_size(2 * x.size());
+        for (size_t k = 0; k < x.size(); ++k)
+        {
+            mesh = k ? arma::join_cols(mesh, face(x[k], flip[k])) : face(x[k], flip[k]);
+            mtl_ind(2 * k) = (arma::uword)mat[k], mtl_ind(2 * k + 1) = (arma::uword)mat[k];
+        }
+        return mesh;
+    };
+    auto unit = [](arma::mat d) -> arma::mat
+    {
+        d /= std::sqrt(d(0, 0) * d(0, 0) + d(0, 1) * d(0, 1) + d(0, 2) * d(0, 2));
+        return d;
+    };
+    auto ang = [](const arma::mat &d) -> double // against the x axis, which every face normal is on
+    { return std::atan2(std::abs(d(0, 1)), std::abs(d(0, 0))) * 180.0 / QPI; };
+
+    struct Row
+    {
+        std::vector<double> seg, dir, g, out;
+        std::vector<unsigned> code, rt, cur;
+        double tot = 0.0, dy = 0.0;
+        bool ok = true;
+    };
+    auto chain = [&](const Pal &pal, const arma::mat &mesh, const arma::uvec &mi, int itype, arma::mat orig, arma::mat dest,
+                     const Ev *seed, int hold) -> Row
+    {
+        Row R;
+        const std::vector<double> &mcol = pal.at("m");
+        Ev P;
+        bool have = seed != nullptr;
+        if (seed)
+            P = *seed;
+        double y0 = 0.0;
+        for (int k = 0; k < 8; ++k)
+        {
+            arma::mat sd = unit(dest - orig), wd = have ? unit(P.path_dirN) : sd;
+            Ev E = traced(pal, mesh, mi, itype, orig, dest, have ? &P : nullptr, 1.5);
+            if (E.nh == 0)
+                break;
+            int mb = have ? mat_of(P.cur(0)) : 0, ma = mat_of(E.cur(0));
+            double g = dB(std::norm(cpx(E.xpr, 0, 0)));
+            R.seg.push_back(ang(sd)), R.dir.push_back(ang(wd)), R.g.push_back(g), R.code.push_back(E.ot), R.rt.push_back(E.rt);
+            if (E.rt == 0)
+            {
+                R.ok = false;
+                break;
+            }
+            R.tot += g;
+            if (k == 0)
+                y0 = E.fbs(0, 1);
+            R.dy = E.fbs(0, 1) - y0;
+            arma::mat d = unit(E.destN - E.origN);
+            bool held = mb != 0 && mcol[(size_t)mb - 1] > 0.0 && (hold == 1 || (hold == 2 && ma == 0));
+            if (held)
+            {
+                E.path_dirN = wd;
+                if (itype == 5)
+                    d = wd;
+                if (ma != 0)
+                    E.cur(0) = (short)(E.cur(0) & ~(short)0x4000);
+            }
+            R.out.push_back(ang(E.path_dirN)), R.cur.push_back((unsigned)(unsigned short)E.cur(0));
+            // Long enough to cross every face that is left: a segment that ends inside a body
+            // preloads the ledger for a ray that ends there, and the next event would add to it
+            orig = E.origN, dest = E.origN + (1.2 / std::abs(d(0, 0))) * d;
+            P = E, have = true;
+        }
+        return R;
+    };
+
+    // ------------------------------------------------------------------------------------------
+    // A. Gains per event, the later faces at the bent and at the incidence angle
+    // ------------------------------------------------------------------------------------------
+    {
+        const int WOOD = 1, CONC = 2, PANEL = 3;
+        Pal heavy;
+        heavy["a"] = {2.1609e-8, 2.401e-9, 2.1609e-8};
+        heavy["fRef"] = {0.001, 0.001, 0.001};
+        heavy["tf"] = {0.2, 0.1, 0.2};
+        heavy["m"] = {20.0, 30.0, 20.0};
+        heavy["thk"] = {0.0, 0.0, 0.02};
+        Pal light = heavy;
+        light["fRef"] = {0.02, 0.02, 0.02};
+        struct St
+        {
+            const char *name;
+            std::vector<double> x;
+            std::vector<int> mat;
+            std::vector<bool> flip;
+        };
+        const std::vector<St> sts = {
+            {"wood 50 | conc 50              ", {0.0, 0.05, 0.05 + gap, 0.10}, {WOOD, WOOD, CONC, CONC}, {false, true, false, true}},
+            {"conc 50 | wood 50              ", {0.0, 0.05, 0.05 + gap, 0.10}, {CONC, CONC, WOOD, WOOD}, {false, true, false, true}},
+            {"panel | conc 100               ", {0.0, gap, 0.10}, {PANEL, CONC, CONC}, {false, false, true}},
+            {"conc 100 | panel               ", {0.0, 0.10, 0.10 + gap}, {CONC, CONC, PANEL}, {false, true, true}},
+            {"conc 100 / air 500 / conc 100 ", {0.0, 0.10, 0.60, 0.70}, {CONC, CONC, CONC, CONC}, {false, true, false, true}},
+            {"conc 100 / air 500 / panel|conc", {0.0, 0.10, 0.60, 0.60 + gap, 0.70}, {CONC, CONC, PANEL, CONC, CONC}, {false, true, false, false, true}},
+            {"conc 100 / air 500 / panel     ", {0.0, 0.10, 0.60}, {CONC, CONC, PANEL}, {false, true, false}},
+            {"conc|wood / air 500 / wood 50  ", {0.0, 0.05, 0.05 + gap, 0.10, 0.60, 0.65}, {CONC, CONC, WOOD, WOOD, WOOD, WOOD}, {false, true, false, true, false, true}},
+        };
+        QD_DIAG("\n# diag: leak direction, rigid walls. Wood eps 2.1609e-8 tf 0.2 m 20, concrete eps 2.401e-9 tf 0.1 m 30,\n");
+        QD_DIAG("# panel: the wood as a 20 mm sheet. pal heavy: fRef 0.001 (X0 50 and 354 at 50 mm); light: fRef 0.02 (2.5 and 3.95).\n");
+        QD_DIAG("# Through the intersector, scalar, tracer 4 undeviated and 5 refracting. var now: the code. hold: every face out of\n");
+        QD_DIAG("# a mass-law medium hands on the direction the wave came in with. hold_air: only an exit into air does.\n");
+        QD_DIAG("# Per event k: dk the angle of the direction the wave is handed in with, deg; sk the angle of the segment; gk the\n");
+        QD_DIAG("# gain in dB. tot: the sum. out: the direction after the last event. dy: lateral walk first to last hit, m\n");
+        QD_DIAG("pal,stack,tracer,var,theta,d0,s0,g0,d1,s1,g1,d2,s2,g2,d3,s3,g3,d4,s4,g4,tot_dB,out_deg,dy_m,codes,rts,curs\n");
+        double d54 = 0.0; // largest difference of an event's gain between the two tracers, dB
+        for (int ip = 0; ip < 2; ++ip)
+            for (const auto &S : sts)
+                for (double thd : {30.0, 60.0, 75.0})
+                {
+                    Row RR[2][3];
+                    for (int it = 0; it < 2; ++it)
+                        for (int hold = 0; hold < 3; ++hold)
+                        {
+                            int itype = it ? 5 : 4;
+                            arma::uvec mi;
+                            arma::mat mesh = build(S.x, S.mat, S.flip, mi), orig, dest;
+                            diag_ray_at(thd, orig, dest);
+                            RR[it][hold] = chain(ip ? light : heavy, mesh, mi, itype, orig, dest, nullptr, hold);
+                            const Row &R = RR[it][hold];
+                            INFO(S.name << ", tracer " << itype << ", theta " << thd << ", variant " << hold);
+                            REQUIRE(R.ok);
+                            QD_DIAG("%s,%s,%d,%s,%.0f", ip ? "light" : "heavy", S.name, itype, hold == 0 ? "now     " : (hold == 1 ? "hold    " : "hold_air"), thd);
+                            for (size_t k = 0; k < 5; ++k)
+                                if (k < R.g.size())
+                                    QD_DIAG(",%.4f,%.4f,%+.4f", R.dir[k], R.seg[k], R.g[k]);
+                                else
+                                    QD_DIAG(",,,");
+                            QD_DIAG(",%+.4f,%.4f,%+.5f,", R.tot, R.out.empty() ? 0.0 : R.out.back(), R.dy);
+                            for (unsigned c : R.code)
+                                QD_DIAG("%u/", c);
+                            QD_DIAG(",");
+                            for (unsigned c : R.rt)
+                                QD_DIAG("%u/", c);
+                            QD_DIAG(",");
+                            for (unsigned c : R.cur)
+                                QD_DIAG("%04x/", c);
+                            QD_DIAG("\n");
+                        }
+                    const double rad = QPI / 180.0;
+                    for (int it = 0; it < 2; ++it)
+                    {
+                        const Row &N = RR[it][0], &H = RR[it][1];
+                        INFO((ip ? "light, " : "heavy, ") << S.name << ", tracer " << (it ? 5 : 4) << ", theta " << thd);
+                        REQUIRE(N.g.size() == H.g.size());
+                        for (size_t k = 0; k < N.g.size(); ++k)
+                        {
+                            INFO("event " << k);
+                            CHECK(std::abs(N.out[k] - thd) * rad < 1.0e-9); // the direction written
+                            CHECK(std::abs(N.seg[k] - thd) * rad < 1.0e-9); // the segment the event was met on
+                            CHECK(std::abs(N.dir[k] - thd) * rad < 1.0e-9); // the direction handed in
+                            CHECK((N.cur[k] & 0x4000u) == 0u);              // no leg is a bent one
+                            CHECK(std::abs(N.g[k] - H.g[k]) < 1.0e-9);      // every face at the incidence angle
+                        }
+                    }
+                    {
+                        // The refracting tracer is the undeviated one on a rigid stack
+                        const Row &N4 = RR[0][0], &N5 = RR[1][0];
+                        const bool gapped = std::string(S.name).find('/') != std::string::npos;
+                        INFO((ip ? "light, " : "heavy, ") << S.name << ", tracer 5 on tracer 4, theta " << thd);
+                        REQUIRE(N4.g.size() == N5.g.size());
+                        for (size_t k = 0; k < N4.g.size(); ++k)
+                        {
+                            INFO("event " << k);
+                            CHECK(N5.code[k] == N4.code[k]);
+                            CHECK(N5.rt[k] == N4.rt[k]);
+                            CHECK(N5.cur[k] == N4.cur[k]);
+                            // Exact on one wall. Behind an air gap the two tracers relaunch from
+                            // points built differently and the last digit can differ: recorded
+                            if (!gapped)
+                                CHECK(N5.g[k] == N4.g[k]);
+                            d54 = std::max(d54, std::abs(N5.g[k] - N4.g[k]));
+                        }
+                        CHECK(std::abs(N5.dy - N4.dy) < 1.0e-4); // the same place, up to the relaunch offsets
+                    }
+                }
+        QD_DIAG("# largest difference of one event between tracer 5 and tracer 4, dB: %.1e\n", d54);
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // B. The direction a closed face writes
+    // ------------------------------------------------------------------------------------------
+    {
+        // diag_palette with a tenth material, RARE: eps 1, lossless, a solid. The host eps
+        // 1.50 - 0.40j is entered from the lossless eps 5.24 solid the ray is launched in, with a
+        // transverse invariant p; from p = 1 the wave is closed towards air and towards RARE.
+        const int DENSE = 2, SHEET = 3, HOST = 5, RARE = 10;
+        Pal base = diag_palette<double>();
+        for (auto &kv : base)
+            kv.second.push_back(kv.first == "a" ? 1.0 : (kv.first == "fRef" ? 1.0 : 0.0));
+        Pal with_tf = base;
+        with_tf["tf"] = std::vector<double>(10, 0.0);
+        with_tf["tf"][(size_t)SHEET - 1] = 0.5, with_tf["tf"][(size_t)RARE - 1] = 0.5;
+        const double e_d = 5.24;
+
+        QD_DIAG("\n# diag: leak direction, the direction a closed face writes. Launched in a lossless eps 5.24 solid, into host eps\n");
+        QD_DIAG("# 1.50 - 0.40j 100 mm, invariant p; then bare: host | air. glued: host | coating 6 mm | air. trans: host | RARE\n");
+        QD_DIAG("# eps 1, a solid. Through the intersector, scalar, series declined. tf: 0.5 on the coating and on RARE.\n");
+        QD_DIAG("# in: the direction the wave has in the host; seg: the segment; out: the direction written; traj: the\n");
+        QD_DIAG("# relaunched segment, all deg against the normal. tr: the total-reflection bit of the resolved type\n");
+        QD_DIAG("p,tracer,face,tf,code,rt,tr,in_deg,seg_deg,out_deg,traj_deg,gain_dB,cur\n");
+        for (double p : {0.90, 1.01, 1.04, 1.10, 1.20, 1.45})
+            for (int itype : {4, 5})
+                for (int kind = 0; kind < 3; ++kind)
+                    for (int tf = 0; tf < 2; ++tf)
+                    {
+                        arma::uvec mi;
+                        arma::mat mesh = kind == 0   ? build({0.0, gap, L}, {DENSE, HOST, HOST}, {true, false, true}, mi)
+                                         : kind == 1 ? build({0.0, gap, L, L + gap}, {DENSE, HOST, HOST, SHEET}, {true, false, true, true}, mi)
+                                                     : build({0.0, gap, L, L + gap, L + 0.05}, {DENSE, HOST, HOST, RARE, RARE}, {true, false, true, false, true}, mi);
+                        double th1 = std::asin(std::sqrt(p / e_d));
+                        arma::mat orig{{-0.05, 0.37, 0.0}}, dest{{-0.05 + 2.0 * std::cos(th1), 0.37 + 2.0 * std::sin(th1), 0.0}};
+                        Ev seed;
+                        seed.prev = arma::Col<short>{(short)0}, seed.cur = arma::Col<short>{(short)DENSE}, seed.buf = arma::Col<short>{(short)0};
+                        seed.path_dirN = unit(dest - orig), seed.accg = arma::vec{0.0}, seed.accr = arma::vec{0.0};
+                        const Pal &pal = tf ? with_tf : base;
+
+                        // Two events by hand, so that the second can be read in full
+                        Ev A = traced(pal, mesh, mi, itype, orig, dest, &seed, 1.5);
+                        REQUIRE(A.nh != 0);
+                        REQUIRE(mat_of(A.cur(0)) == HOST);
+                        arma::mat d = unit(A.destN - A.origN), o2 = A.origN, d2 = A.origN + 2.0 * d;
+                        Ev B = traced(pal, mesh, mi, itype, o2, d2, &A, 1.5);
+                        REQUIRE(B.nh != 0);
+                        QD_DIAG("%.2f,%d,%s,%d,%u,%u,%d,%.4f,%.4f,%.4f,%.4f,%+.4f,%04x\n", p, itype, kind == 0 ? "bare " : (kind == 1 ? "glued" : "trans"), tf,
+                                (unsigned)B.ot, (unsigned)B.rt, (int)rt_bit(B.rt, 5), ang(A.path_dirN), ang(d), ang(B.path_dirN),
+                                ang(B.destN - B.origN), dB(std::norm(cpx(B.xpr, 0, 0))), (unsigned)(unsigned short)B.cur(0));
+                        INFO("closed face, p " << p << ", tracer " << itype << ", face " << kind << ", tf " << tf);
+                        CHECK(rt_bit(B.rt, 5) == (p > 1.0));
+                        if (p > 1.0) // closed: the leak travels undeviated, whatever the face is
+                        {
+                            arma::mat w = unit(A.path_dirN), o = unit(B.path_dirN);
+                            CHECK(std::max(std::abs(o(0, 0) - w(0, 0)), std::abs(o(0, 1) - w(0, 1))) < 1.0e-12);
+                        }
+                    }
     }
 }
