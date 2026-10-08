@@ -11068,8 +11068,8 @@ TEST_CASE("Phase reference - a traversal carries the phase at the point the poly
                         if (!c.ok || c.ev.size() != 3 || std::norm(c.vv) == 0.0)
                         {
                             QD_DIAG("%d,%d,%.1f,%.1f,%.1f,%s,dead\n", tr, m, f1 * 1e-9, eps, thd, rt.c_str());
-                            CHECK(tr == 4); // only a resolved ray of the undeviated tracer dies here
-                            CHECK(eps == 0.0);
+                            INFO("back reflection, tracer " << tr << ", material " << m << ", f " << f1 << ", eps " << eps << ", theta_ext " << thd);
+                            CHECK(false); // no ray dies on this path: the wave crosses the front face
                             continue;
                         }
                         double Lx1 = L - c.evb[0].origN(0, 0), Lx2 = c.evb[1].origN(0, 0), tt = tan_of(c.ev[0]);
@@ -11090,14 +11090,10 @@ TEST_CASE("Phase reference - a traversal carries the phase at the point the poly
                         // Leg 1, closed on the reflect pass: the exact form, with the series where it collapsed
                         CHECK(std::abs(dB(std::norm(a1))) < 1.0e-3);
                         CHECK(std::abs(deg(a1 * std::exp(J * k1 * st * c.lat[1]))) < 0.05);
-                        // The whole path. A resolved ray of the undeviated tracer leaves through a face
-                        // evaluated at the external angle, which is not this item's; it is recorded
-                        if (tr == 5 || eps != 0.0)
-                        {
-                            CHECK(std::abs(dB(std::norm(a))) < 1.0e-3);
-                            CHECK(std::abs(deg(a * std::exp(J * k1 * st * c.dy))) < 0.05);
-                            CHECK(std::abs(deg(a2 * std::exp(J * k1 * st * c.lat[2]))) < 0.05);
-                        }
+                        // The whole path, a resolved ray of the undeviated tracer included
+                        CHECK(std::abs(dB(std::norm(a))) < 1.0e-3);
+                        CHECK(std::abs(deg(a * std::exp(J * k1 * st * c.dy))) < 0.05);
+                        CHECK(std::abs(deg(a2 * std::exp(J * k1 * st * c.lat[2]))) < 0.05);
                     }
 
     // ------------------------------------------------------------------------------------------
@@ -11312,5 +11308,493 @@ TEST_CASE("Phase reference - a traversal carries the phase at the point the poly
                 INFO("rigid half-space, mapping " << m << ", theta " << thd);
                 CHECK(std::abs(std::norm(r) - 1.0) < 1.0e-3);
             }
+    }
+}
+
+TEST_CASE("Exits and verdicts - every exit at the cosine the wave has there")
+{
+    // Every exit and every verdict is formed at the cosine the wave has at that face:
+    //   A. a resolved ray of the undeviated tracer by two more routes: reflected off a coating on
+    //      the far side (always resolved, whatever eps is), and returning across a bare face into
+    //      a first solid;
+    //   B. a bare exit behind a wedge against the glued one, through the intersector;
+    //   C. the verdict and the direction at a bare and at a glued exit, invariant p around one;
+    //   D. the reflect port of a coated lossy solid past its critical angle.
+    const double f_hz = FRQ, k0 = 2.0 * QPI * f_hz / C0, L = 0.10, thk = 0.006, gap = 1.0e-5;
+    auto mtl = diag_palette<double>();
+    const int SHEET = 3, LOSSY = 5, DENSE = 2;
+    const std::complex<double> J(0.0, 1.0);
+    typedef std::complex<double> cd;
+    auto dB = [](double g)
+    { return (g > 0.0) ? 10.0 * std::log10(g) : -999.0; };
+    auto deg = [](cd z)
+    { return std::arg(z) * 180.0 / QPI; };
+
+    struct Ev
+    {
+        arma::mat origN, destN, path_dirN, xpr, fbs;
+        arma::Col<short> prev, cur, buf;
+        arma::vec accg, accr, gain;
+        uint8_t ot = 0, rt = 0;
+        unsigned nh = 0;
+    };
+    auto traced = [&](const arma::mat &mesh, const arma::uvec &mtl_ind, int itype, const arma::mat &orig, const arma::mat &dest,
+                      const Ev *in, double eps, bool relaunch) -> Ev
+    {
+        arma::mat fbs, sbs, sbsN, nv;
+        arma::u32_vec nh, fi, si;
+        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, &nh, &fi, &si);
+        Ev E;
+        arma::vec fang;
+        std::vector<uint8_t> ot, rt;
+        quadriga_lib::ray_mesh_interact(itype, f_hz, &orig, &dest, &mesh, &mtl_ind, &mtl, &fi, &si, (arma::mat *)nullptr,
+                                        (arma::mat *)nullptr, &E.origN, &E.destN, &E.fbs, &sbsN, &E.gain, &E.xpr,
+                                        (arma::mat *)nullptr, (arma::mat *)nullptr, &fang, (arma::vec *)nullptr,
+                                        (arma::vec *)nullptr, &nv, &ot, &E.path_dirN, false, (arma::u32_vec *)nullptr);
+        arma::Col<short> mf(1), ms(1);
+        mf(0) = fi(0) ? (short)mtl_ind(fi(0) - 1) : (short)0, ms(0) = si(0) ? (short)mtl_ind(si(0) - 1) : (short)0;
+        quadriga_lib::ray_state_update(itype, f_hz, &orig, &dest, &E.fbs, &sbsN, &nh, &fang, &nv, &ot, &mtl, &mf, &ms,
+                                       in ? &in->prev : nullptr, in ? &in->cur : nullptr, in ? &in->buf : nullptr,
+                                       in ? &in->path_dirN : nullptr, in ? &in->accg : nullptr, in ? &in->accr : nullptr,
+                                       &E.prev, &E.cur, &E.buf, &E.gain, &E.xpr, &E.path_dirN, &E.accg, &E.accr, &rt,
+                                       (arma::u32_vec *)nullptr, eps, relaunch ? &E.origN : nullptr, relaunch ? &E.destN : nullptr);
+        E.ot = ot[0], E.rt = rt[0], E.nh = nh(0);
+        return E;
+    };
+    auto face = [](double x, bool flip) -> arma::mat
+    {
+        arma::mat m = diag_quad_x(200.0, x);
+        if (flip)
+        {
+            m.row(0) = arma::rowvec{x, -200.0, -200.0, x, 200.0, -200.0, x, -200.0, 200.0};
+            m.row(1) = arma::rowvec{x, 200.0, -200.0, x, 200.0, 200.0, x, -200.0, 200.0};
+        }
+        return m;
+    };
+    auto build = [&](const std::vector<double> &x, const std::vector<int> &mat, const std::vector<bool> &flip, arma::uvec &mtl_ind)
+    {
+        arma::mat mesh;
+        mtl_ind.set_size(2 * x.size());
+        for (size_t k = 0; k < x.size(); ++k)
+        {
+            mesh = k ? arma::join_cols(mesh, face(x[k], flip[k])) : face(x[k], flip[k]);
+            mtl_ind(2 * k) = (arma::uword)mat[k], mtl_ind(2 * k + 1) = (arma::uword)mat[k];
+        }
+        return mesh;
+    };
+    struct Chain
+    {
+        cd vv = 1.0;
+        double Lin = 0.0, dy = 0.0;
+        std::vector<Ev> ev;
+        std::vector<double> offy;
+        bool ok = true;
+        cd abs_vv(double k) const { return vv * std::exp(cd(0.0, -k * Lin)); }
+    };
+    auto run = [&](const arma::mat &mesh, const arma::uvec &mtl_ind, std::vector<int> seq, double thd, double eps) -> Chain
+    {
+        Chain C;
+        arma::mat orig, dest;
+        diag_ray_at(thd, orig, dest);
+        Ev P;
+        bool have = false, inside = false;
+        double xp = 0.0, yp = 0.0, y0 = 0.0;
+        for (int k = 0; k < 8; ++k)
+        {
+            int itype = seq.size() == 1 ? seq[0] : (k < (int)seq.size() ? seq[k] : -1);
+            if (itype < 0)
+                break;
+            Ev E = traced(mesh, mtl_ind, itype, orig, dest, have ? &P : nullptr, eps, itype != 0 && itype != 3);
+            if (E.nh == 0)
+                break;
+            C.ev.push_back(E);
+            if (E.rt == 0)
+            {
+                C.ok = false;
+                break;
+            }
+            C.vv *= cpx(E.xpr, 0, 0);
+            double fx = E.fbs(0, 0), fy = E.fbs(0, 1);
+            if (k == 0)
+                y0 = fy;
+            if (inside)
+                C.Lin += std::sqrt((fx - xp) * (fx - xp) + (fy - yp) * (fy - yp));
+            C.offy.push_back(std::abs(E.origN(0, 1) - fy));
+            xp = fx, yp = fy, C.dy = fy - y0;
+            inside = mat_of(E.cur(0)) != 0;
+            arma::mat d = E.destN - E.origN;
+            d /= std::sqrt(d(0, 0) * d(0, 0) + d(0, 1) * d(0, 1) + d(0, 2) * d(0, 2));
+            orig = E.origN, dest = E.origN + 2.0 * d;
+            P = E, have = true;
+        }
+        return C;
+    };
+    auto rts = [](const Chain &c)
+    {
+        std::string s;
+        for (const auto &E : c.ev)
+            s += std::to_string((unsigned)E.rt) + "/";
+        return s;
+    };
+
+    // Everything from the transverse invariant p. Admittances z c (TE) and z / c (TM); the far
+    // side is air, with the decaying root above p = 1. R is the reflect port of near | sheet | air
+    // or, without a sheet, of near | air; pT the per-channel normal-flux transmittance (TE only).
+    struct Ref
+    {
+        cd c_near, R;
+        double pT = 0.0, leg = 1.0; // leg: power decay of the host over a normal thickness
+    };
+    auto ref_of = [&](cd e_near, bool sheet, double p, bool tm, double d_host) -> Ref
+    {
+        const cd e_s = diag_eps(SHEET, f_hz);
+        Ref r;
+        r.c_near = std::sqrt(1.0 - p / e_near);
+        cd cs = std::sqrt(1.0 - p / e_s), cf = (p < 1.0) ? cd(std::sqrt(1.0 - p), 0.0) : cd(0.0, -std::sqrt(p - 1.0));
+        cd zn = std::sqrt(e_near), zs = std::sqrt(e_s);
+        cd an = tm ? zn / r.c_near : zn * r.c_near, as = tm ? zs / cs : zs * cs, af = tm ? 1.0 / cf : cf;
+        cd t;
+        if (sheet)
+        {
+            cd r1 = (an - as) / (an + as), r2 = (as - af) / (as + af), ph = std::exp(-J * k0 * zs * cs * thk);
+            r.R = (r1 + r2 * ph * ph) / (1.0 + r1 * r2 * ph * ph);
+            t = (1.0 + r1) * (1.0 + r2) * ph / (1.0 + r1 * r2 * ph * ph);
+        }
+        else
+            r.R = (an - af) / (an + af), t = 1.0 + r.R;
+        r.pT = (p < 1.0) ? std::real(af) / std::real(an) * std::norm(t) : 0.0;
+        r.leg = std::exp(2.0 * k0 * std::imag(zn * r.c_near) * d_host);
+        return r;
+    };
+
+    // ------------------------------------------------------------------------------------------
+    // A1. A resolved ray that was reflected off a coating on the far side
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: exits and verdicts, a ray reflected off a far-side coating. air | host 100 mm | coating 6 mm eps 5.24 - 0.63j |\n");
+    QD_DIAG("# air through the intersector: enter, reflect off the coating (type 3), leave by the front face. Host\n");
+    QD_DIAG("# series declined (eps 1.5); the reflection off a sheet flags the ray resolved all the same. Scalar,\n");
+    QD_DIAG("# against t01 R t10 phi^2 with R the reflect port of host | coating | air. ph_poly at the polyline's point\n");
+    QD_DIAG("tracer,host,theta,rt,d_dB,ph_poly\n");
+    for (int tr : {4, 5})
+        for (int h : {5, 6})
+            for (double thd : {10.0, 20.0, 40.0, 60.0, 75.0, 85.0})
+            {
+                double th = thd * QPI / 180.0, st = std::sin(th);
+                arma::uvec mi;
+                arma::mat mesh = build({0.0, L, L + gap}, {h, h, SHEET}, {false, true, true}, mi);
+                Chain c = run(mesh, mi, {tr, 3, tr}, thd, 1.5);
+                INFO("far-side coating, tracer " << tr << ", host " << h << ", theta_ext " << thd);
+                if (!c.ok || c.ev.size() != 3 || std::norm(c.vv) == 0.0)
+                {
+                    QD_DIAG("%d,%d,%.1f,%s,dead\n", tr, h, thd, rts(c).c_str());
+                    CHECK(false); // the wave crosses the front face
+                    continue;
+                }
+                cd eh = diag_eps(h, f_hz), zh = std::sqrt(eh);
+                Ref r = ref_of(eh, true, st * st, false, 0.0);
+                cd a0 = std::cos(th), b0 = zh * r.c_near, t01 = 2.0 * a0 / (a0 + b0), t10 = 2.0 * b0 / (a0 + b0);
+                double Lx = (L - c.ev[0].origN(0, 0)) + c.ev[1].origN(0, 0);
+                cd a = c.abs_vv(k0) / (t01 * r.R * t10 * std::exp(-J * k0 * zh * r.c_near * Lx));
+                QD_DIAG("%d,%d,%.1f,%s,%+.6f,%+.4f\n", tr, h, thd, rts(c).c_str(), dB(std::norm(a)), deg(a * std::exp(J * k0 * st * c.dy)));
+                CHECK(std::abs(dB(std::norm(a))) < 1.0e-3);
+                CHECK(std::abs(deg(a * std::exp(J * k0 * st * c.dy))) < 0.05);
+            }
+
+    // ------------------------------------------------------------------------------------------
+    // A2. A resolved ray returning across a bare face into the first solid
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: exits and verdicts, a resolved ray across a bare face into a solid. air | A 50 mm | B 100 mm | air through the\n");
+    QD_DIAG("# intersector, every series resolved (eps 0): enter A, cross into B, reflect at B | air, cross back into\n");
+    QD_DIAG("# A, leave by the front face. No reference: the undeviated tracer over the refracting one, each at its\n");
+    QD_DIAG("# polyline's exit point. rt4, rt5: the resolved types of the five events\n");
+    QD_DIAG("pair,theta,rt4,rt5,r45_dB,r45_deg\n");
+    for (auto P : std::vector<std::pair<int, int>>{{2, 5}, {1, 5}, {2, 6}, {5, 2}})
+        for (double thd : {10.0, 20.0, 40.0, 60.0, 75.0})
+        {
+            double st = std::sin(thd * QPI / 180.0);
+            arma::uvec mi;
+            arma::mat mesh = build({0.0, 0.05, 0.05 + gap, 0.15 + gap}, {P.first, P.first, P.second, P.second}, {false, true, false, true}, mi);
+            Chain c4 = run(mesh, mi, {4, 4, 3, 4, 4}, thd, 0.0), c5 = run(mesh, mi, {5, 5, 3, 5, 5}, thd, 0.0);
+            INFO("two solids, resolved, " << P.first << "|" << P.second << ", theta_ext " << thd);
+            bool dead4 = !c4.ok || c4.ev.size() != 5 || std::norm(c4.vv) == 0.0, dead5 = !c5.ok || c5.ev.size() != 5 || std::norm(c5.vv) == 0.0;
+            if (dead4 || dead5)
+            {
+                QD_DIAG("%d|%d,%.1f,%s,%s,%s\n", P.first, P.second, thd, rts(c4).c_str(), rts(c5).c_str(), dead5 ? "dead5" : "dead4");
+                CHECK(false); // no ray dies on this path with either tracer
+                continue;
+            }
+            cd r45 = (c4.abs_vv(k0) * std::exp(J * k0 * st * c4.dy)) / (c5.abs_vv(k0) * std::exp(J * k0 * st * c5.dy));
+            QD_DIAG("%d|%d,%.1f,%s,%s,%+.6f,%+.4f\n", P.first, P.second, thd, rts(c4).c_str(), rts(c5).c_str(), dB(std::norm(r45)), deg(r45));
+            CHECK(std::abs(dB(std::norm(r45))) < 2.0e-3); // two polylines, each short by its own offsets
+            CHECK(std::abs(deg(r45)) < 0.05);
+        }
+
+    // ------------------------------------------------------------------------------------------
+    // B. A wedge: the bare exit against the glued one
+    // ------------------------------------------------------------------------------------------
+    // Entry face at x = 0, exit face through (L, 0.37) with its outward normal turned by 10 deg
+    // towards +y, so the entry event sets the non-parallel flag itself and the recovery declines
+    // on the leg. Angles are against the exit normal. in: the direction the wave has; seg_in: the
+    // segment; out: the direction written; seg_out: the relaunched segment; map: the real-angle
+    // map applied to the direction the wave has; rmi: the same map applied to the segment.
+    QD_DIAG("\n# diag: exits and verdicts, a wedge. air | host | air, exit face tilted by 10 deg, through the intersector, scalar,\n");
+    QD_DIAG("# series declined. bare: a bare exit; glued: the same exit behind a 6 mm coating. Angles in deg against\n");
+    QD_DIAG("# the exit normal: in, the direction the wave has; seg_in, the segment; out, the direction written;\n");
+    QD_DIAG("# seg_out, the relaunched segment; map, the real-angle map of in; rmi, the real-angle map of seg_in.\n");
+    QD_DIAG("# prev: the previous-medium word the entry wrote. gain: the exit event, dB\n");
+    QD_DIAG("tracer,host,theta,exit,prev,rt,in,seg_in,out,seg_out,map,rmi,gain_dB\n");
+    {
+        const double a = 10.0 * QPI / 180.0, ca = std::cos(a), sa = std::sin(a), y0 = 0.37;
+        auto tilt = [&](arma::mat m, double shift)
+        {
+            for (arma::uword r = 0; r < m.n_rows; ++r)
+                for (arma::uword v = 0; v < 3; ++v)
+                {
+                    double x = m(r, 3 * v) - L, y = m(r, 3 * v + 1) - y0;
+                    m(r, 3 * v) = L + x * ca - y * sa + shift * ca, m(r, 3 * v + 1) = y0 + x * sa + y * ca + shift * sa;
+                }
+            return m;
+        };
+        auto ang = [&](double dx, double dy) // against the exit normal
+        { return std::atan2(std::abs(dy * ca - dx * sa), std::abs(dx * ca + dy * sa)) * 180.0 / QPI; };
+        auto map_of = [&](cd e, double in_deg)
+        {
+            double s = std::sin(in_deg * QPI / 180.0);
+            return std::atan2(std::sqrt(std::abs(e)) * s, std::real(std::sqrt(1.0 - e * s * s))) * 180.0 / QPI;
+        };
+        double bare_x = 0.0, bare_y = 0.0;
+        for (int tr : {4, 5})
+            for (int h : {5, 6})
+                for (double thd : {10.0, 20.0, 40.0, 60.0})
+                    for (int glued = 0; glued < 2; ++glued)
+                    {
+                        double t = std::tan(thd * QPI / 180.0);
+                        arma::mat mesh = arma::join_cols(face(0.0, false), tilt(face(L, true), 0.0));
+                        arma::uvec mi(4, arma::fill::value((arma::uword)h));
+                        if (glued)
+                        {
+                            mesh = arma::join_cols(mesh, tilt(face(L, true), gap));
+                            mi = arma::uvec{(arma::uword)h, (arma::uword)h, (arma::uword)h, (arma::uword)h, (arma::uword)SHEET, (arma::uword)SHEET};
+                        }
+                        arma::mat orig{{-1.0, y0 - t, 0.0}}, dest{{1.0, y0 + t, 0.0}};
+                        Ev A = traced(mesh, mi, tr, orig, dest, nullptr, 1.5, true);
+                        arma::mat d = A.destN - A.origN;
+                        d /= std::sqrt(d(0, 0) * d(0, 0) + d(0, 1) * d(0, 1) + d(0, 2) * d(0, 2));
+                        arma::mat dest2 = A.origN + 2.0 * d;
+                        Ev B = traced(mesh, mi, tr, A.origN, dest2, &A, 1.5, true);
+                        arma::mat d2 = B.destN - B.origN;
+                        cd eh = diag_eps(h, f_hz);
+                        double in_deg = ang(A.path_dirN(0, 0), A.path_dirN(0, 1)), seg_deg = ang(d(0, 0), d(0, 1));
+                        QD_DIAG("%d,%d,%.1f,%s,%04x,%u,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%+.4f\n", tr, h, thd, glued ? "glued" : "bare ",
+                                (unsigned)(unsigned short)A.prev(0), (unsigned)B.rt, in_deg, seg_deg, ang(B.path_dirN(0, 0), B.path_dirN(0, 1)),
+                                ang(d2(0, 0), d2(0, 1)), map_of(eh, in_deg), map_of(eh, seg_deg), dB(std::norm(cpx(B.xpr, 0, 0))));
+                        INFO("wedge, tracer " << tr << ", host " << h << ", theta_ext " << thd << ", glued " << glued);
+                        CHECK(B.nh > 0);
+                        CHECK(((unsigned short)A.prev(0) & 0x8000u) != 0u); // the entry saw the wedge
+                        if (!glued)
+                            bare_x = B.path_dirN(0, 0), bare_y = B.path_dirN(0, 1);
+                        else // a bare and a glued exit write one direction
+                            CHECK(std::max(std::abs(B.path_dirN(0, 0) - bare_x), std::abs(B.path_dirN(0, 1) - bare_y)) < 1.0e-9);
+                    }
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // C and D. The lossy host entered from a lossless dense solid, invariant p around and above one
+    // ------------------------------------------------------------------------------------------
+    // The code ray_mesh_interact writes for the exit met along the segment, which with the
+    // undeviated tracer runs at the angle the wave had in the dense solid
+    auto exit_code = [&](int itype, int host, bool glued, double th) -> uint8_t
+    {
+        arma::mat mesh = diag_quad_x(200.0, 0.0);
+        arma::uvec mtl_ind(2, arma::fill::value((arma::uword)host));
+        if (glued)
+        {
+            mesh = arma::join_cols(mesh, diag_quad_x(200.0, -1.0e-5));
+            mtl_ind = arma::uvec{(arma::uword)host, (arma::uword)host, (arma::uword)SHEET, (arma::uword)SHEET};
+        }
+        double t = std::tan(th);
+        arma::mat orig{{1.0, 0.37, 0.0}}, dest{{-1.0, 0.37 + 2.0 * t, 0.0}}, fbs, sbs;
+        arma::u32_vec fbs_ind, sbs_ind;
+        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+        std::vector<uint8_t> ot;
+        quadriga_lib::ray_mesh_interact(itype, f_hz, &orig, &dest, &mesh, &mtl_ind, &mtl, &fbs_ind, &sbs_ind,
+                                        (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                        (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr, (arma::mat *)nullptr,
+                                        (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr,
+                                        (arma::vec *)nullptr, (arma::mat *)nullptr, &ot, (arma::mat *)nullptr, true,
+                                        (arma::u32_vec *)nullptr);
+        REQUIRE(ot.size() == 1);
+        return ot[0];
+    };
+    auto event = [&](int itype, uint8_t ot, unsigned nH, int m1, int m2, int prev, int cur, double th, double dx, double dy)
+    {
+        auto C = make1<double>(mtl, itype, ot, nH, m1, m2, prev, cur, 0, L, 0.5, 0.5, QPI / 2.0 - th, 1.5);
+        C.has_path_dir = true;
+        C.path_dir_prev.zeros(1, 3);
+        C.path_dir_prev(0, 0) = dx, C.path_dir_prev(0, 1) = dy;
+        C.has_path_dirN = true;
+        C.path_dirN.zeros(1, 3);
+        C.path_dirN(0, 0) = std::cos(th), C.path_dirN(0, 1) = std::sin(th); // the undeviated tracer's
+        C.run();
+        return C;
+    };
+    const cd e_d = diag_eps(DENSE, f_hz), e_l = diag_eps(LOSSY, f_hz);
+    auto dir_of = [&](double p, double &th1, double &ct, double &st, double &N2)
+    {
+        double s1 = std::sqrt(p / std::real(e_d));
+        th1 = std::asin(s1);
+        cd c2 = std::sqrt(1.0 - p / e_l);
+        double eta = std::sqrt(std::abs(e_d / e_l)), r = std::real(c2);
+        N2 = (eta * s1) * (eta * s1) + r * r; // the squared length the projection lost
+        ct = r / std::sqrt(N2), st = std::sqrt(1.0 - ct * ct);
+    };
+
+    QD_DIAG("\n# diag: exits and verdicts, the verdict at an exit, invariant p around one. Host eps 1.50 - 0.40j 100 mm entered from a\n");
+    QD_DIAG("# lossless eps 5.24 solid, named in the previous-medium word, undeviated tracer, scalar, series declined.\n");
+    QD_DIAG("# The wave is closed towards air from p = 1. N2: the squared length the projection lost; p/N2: what the\n");
+    QD_DIAG("# real-angle test reads. Per exit: hit code, resolved type, tr = its total-reflection bit, the event\n");
+    QD_DIAG("# against the reference in dB (ref 0 above p = 1: gain printed as is), and the direction written, deg\n");
+    QD_DIAG("p,N2,p/N2,b_code,b_rt,b_tr,b_gain_dB,b_ref_dB,b_out,g_code,g_rt,g_tr,g_gain_dB,g_ref_dB,g_out\n");
+    for (double p : {0.50, 0.90, 0.95, 0.99, 1.01, 1.02, 1.03, 1.04, 1.05, 1.06, 1.08, 1.10, 1.20, 1.45})
+    {
+        double th1, ct, st, N2;
+        dir_of(p, th1, ct, st, N2);
+        uint8_t cb = exit_code(4, LOSSY, false, th1), cg = exit_code(4, LOSSY, true, th1);
+        auto Xb = event(4, cb, 1u, LOSSY, 0, DENSE, LOSSY, th1, ct, st);
+        auto Xg = event(4, cg, 2u, SHEET, LOSSY, DENSE, LOSSY, th1, ct, st);
+        Ref rb = ref_of(e_l, false, p, false, L), rg = ref_of(e_l, true, p, false, L);
+        auto out = [](const Rsu<double> &X)
+        { return std::atan2(std::abs((double)X.path_dirN(0, 1)), std::abs((double)X.path_dirN(0, 0))) * 180.0 / QPI; };
+        double gb = std::norm(cpx(Xb.xprmat, 0, 0)), gg = std::norm(cpx(Xg.xprmat, 0, 0));
+        QD_DIAG("%.2f,%.6f,%.6f,%u,%u,%d,%+.6f,%+.6f,%.4f,%u,%u,%d,%+.6f,%+.6f,%.4f\n", p, N2, p / N2,
+                (unsigned)cb, (unsigned)Xb.resolved_type[0], (int)rt_bit(Xb.resolved_type[0], 5), dB(gb), dB(rb.pT * rb.leg), out(Xb),
+                (unsigned)cg, (unsigned)Xg.resolved_type[0], (int)rt_bit(Xg.resolved_type[0], 5), dB(gg), dB(rg.pT * rg.leg), out(Xg));
+        INFO("verdict, p " << p);
+        // Closed exactly where the invariant exceeds the far medium's, bare and glued alike
+        CHECK(rt_bit(Xb.resolved_type[0], 5) == (p > 1.0));
+        CHECK(rt_bit(Xg.resolved_type[0], 5) == (p > 1.0));
+        if (p > 1.0) // a closed pair hands on the direction the wave has, and passes nothing without tf
+        {
+            CHECK(std::max(std::abs((double)Xg.path_dirN(0, 0) - ct), std::abs((double)Xg.path_dirN(0, 1) - st)) < 1.0e-12);
+            CHECK(gb == 0.0);
+            CHECK(gg == 0.0);
+        }
+        else
+        {
+            CHECK(std::abs(dB(gb) - dB(rb.pT * rb.leg)) < 1.0e-6);
+            CHECK(std::abs(dB(gg) - dB(rg.pT * rg.leg)) < 1.0e-6);
+        }
+    }
+
+    QD_DIAG("\n# diag: exits and verdicts, the reflect port of a coated lossy solid. The same host and entry, host | coating 6 mm\n");
+    QD_DIAG("# eps 5.24 - 0.63j | air, reflect pass, series declined, against the composite at the exact cosine times\n");
+    QD_DIAG("# the host leg. sc: scalar (type 3). vv, hh: the two EM channels (type 0) against the TE and the TM\n");
+    QD_DIAG("# reference; amplitudes, difference of magnitudes. bare: the same without the coating, scalar\n");
+    QD_DIAG("p,code,rt,|R_sc|,ref_te,d_sc,|vv|,d_vv_te,|hh|,ref_tm,d_hh_tm,|R_bare|,ref_bare,d_bare\n");
+    for (double p : {0.50, 0.90, 1.02, 1.04, 1.10, 1.15, 1.20, 1.25, 1.30, 1.35, 1.40, 1.45})
+    {
+        double th1, ct, st, N2;
+        dir_of(p, th1, ct, st, N2);
+        uint8_t c3 = exit_code(3, LOSSY, true, th1), c0 = exit_code(0, LOSSY, true, th1);
+        auto S = event(3, c3, 2u, SHEET, LOSSY, DENSE, LOSSY, th1, ct, st);
+        auto E = event(0, c0, 2u, SHEET, LOSSY, DENSE, LOSSY, th1, ct, st);
+        auto B = event(3, exit_code(3, LOSSY, false, th1), 1u, LOSSY, 0, DENSE, LOSSY, th1, ct, st);
+        Ref rte = ref_of(e_l, true, p, false, L), rtm = ref_of(e_l, true, p, true, L), rb = ref_of(e_l, false, p, false, L);
+        double a = std::sqrt(rte.leg);
+        double sc = std::abs(cpx(S.xprmat, 0, 0)), vv = std::abs(cpx(E.xprmat, 0, 0)), hh = std::abs(cpx(E.xprmat, 0, 3)), bb = std::abs(cpx(B.xprmat, 0, 0));
+        QD_DIAG("%.2f,%u,%u,%.9f,%.9f,%+.3e,%.9f,%+.3e,%.9f,%.9f,%+.3e,%.9f,%.9f,%+.3e\n", p, (unsigned)c3, (unsigned)S.resolved_type[0],
+                sc, a * std::abs(rte.R), sc - a * std::abs(rte.R), vv, vv - a * std::abs(rte.R), hh, a * std::abs(rtm.R),
+                hh - a * std::abs(rtm.R), bb, a * std::abs(rb.R), bb - a * std::abs(rb.R));
+        INFO("reflect port, p " << p);
+        // Scalar and TE at the exact cosine. Above p = 1.35 the three Newton steps of the recovery
+        // leave 1e-9 and more, which the table below attributes; those rows are recorded. TM past
+        // the critical angle is inside the clamp of section 5
+        if (p < 1.36)
+        {
+            CHECK(std::abs(sc - a * std::abs(rte.R)) < 1.0e-9);
+            CHECK(std::abs(vv - a * std::abs(rte.R)) < 1.0e-9);
+        }
+        CHECK(std::abs(hh - a * std::abs(rtm.R)) < ((p > 1.0) ? 5.0e-2 : 1.0e-9));
+    }
+
+    // What is left on the scalar column above p = 1.2. The recovery inverts qd_refract's map with
+    // three Newton steps from the real-index start. Written a second time here, with three steps
+    // and with twelve: u is the recovered sin^2 in the dense solid, and the event is compared with
+    // the reference at the invariant each of them gives.
+    QD_DIAG("\n# diag: exits and verdicts, the recovery above p = 1. The map inverted a second time in the fixture, three Newton\n");
+    QD_DIAG("# steps and twelve. du3, du12: the recovered invariant over the true one, minus one. d_ref: the scalar\n");
+    QD_DIAG("# reflect port of the coated host against the reference at p; d_3: against the reference at the\n");
+    QD_DIAG("# invariant three steps give\n");
+    QD_DIAG("p,du3,du12,d_ref,d_3\n");
+    for (double p : {0.50, 0.90, 0.99, 1.10, 1.20, 1.30, 1.40, 1.45})
+    {
+        double th1, ct, st, N2;
+        dir_of(p, th1, ct, st, N2);
+        cd eps_r = e_d / e_l;
+        double eta2 = std::abs(eps_r), t = st / ct;
+        auto solve = [&](int n)
+        {
+            double u = t * t / (eta2 * (1.0 + t * t));
+            u = (u > 1.0) ? 1.0 : u;
+            for (int k = 0; k < n; ++k)
+            {
+                cd w = std::sqrt(1.0 - eps_r * u);
+                double fu = eta2 * u - t * t * std::real(w) * std::real(w), dfu = eta2 + t * t * std::real(w) * std::real(eps_r / w);
+                u -= fu / dfu;
+                u = (u < 0.0) ? 0.0 : ((u > 1.0) ? 1.0 : u);
+            }
+            return u;
+        };
+        double u3 = solve(3), u12 = solve(12), u0 = p / std::real(e_d);
+        auto S = event(3, exit_code(3, LOSSY, true, th1), 2u, SHEET, LOSSY, DENSE, LOSSY, th1, ct, st);
+        Ref r0 = ref_of(e_l, true, p, false, L), r3 = ref_of(e_l, true, u3 * std::real(e_d), false, L);
+        double sc = std::abs(cpx(S.xprmat, 0, 0));
+        QD_DIAG("%.2f,%+.3e,%+.3e,%+.3e,%+.3e\n", p, u3 / u0 - 1.0, u12 / u0 - 1.0, sc - std::sqrt(r0.leg) * std::abs(r0.R),
+                sc - std::sqrt(r3.leg) * std::abs(r3.R));
+        INFO("recovery above one, p " << p);
+        CHECK(std::abs(sc - std::sqrt(r3.leg) * std::abs(r3.R)) < 1.0e-12); // nothing but the three steps
+        CHECK(std::abs(u12 / u0 - 1.0) < 1.0e-12);
+    }
+
+    // The window with a transmission factor on the pair: what the transmit port of the glued exit
+    // is where the verdict reads open on a closed wave, against where it reads closed.
+    QD_DIAG("\n# diag: exits and verdicts, the verdict window with tf. The glued exit of the table above, transmit port, with tf 0.5\n");
+    QD_DIAG("# on the coating, on the host, and on neither. tr: the total-reflection bit of the resolved type\n");
+    QD_DIAG("p,p/N2,tr,none_dB,tf_sheet_dB,tf_host_dB\n");
+    {
+        auto pal_s = mtl, pal_h = mtl;
+        pal_s["tf"] = std::vector<double>(9, 0.0), pal_h["tf"] = std::vector<double>(9, 0.0);
+        pal_s["tf"][SHEET - 1] = 0.5, pal_h["tf"][LOSSY - 1] = 0.5;
+        auto ev_pal = [&](const std::unordered_map<std::string, std::vector<double>> &pal, uint8_t ot, double th, double dx, double dy)
+        {
+            auto C = make1<double>(pal, 4, ot, 2u, SHEET, LOSSY, DENSE, LOSSY, 0, L, 0.5, 0.5, QPI / 2.0 - th, 1.5);
+            C.has_path_dir = true;
+            C.path_dir_prev.zeros(1, 3);
+            C.path_dir_prev(0, 0) = dx, C.path_dir_prev(0, 1) = dy;
+            C.run();
+            return C;
+        };
+        double leak_prev = 0.0;
+        for (double p : {0.95, 0.99, 1.01, 1.02, 1.03, 1.04, 1.05, 1.06, 1.10, 1.20})
+        {
+            double th1, ct, st, N2;
+            dir_of(p, th1, ct, st, N2);
+            uint8_t cg = exit_code(4, LOSSY, true, th1);
+            auto X0 = ev_pal(mtl, cg, th1, ct, st), Xs = ev_pal(pal_s, cg, th1, ct, st), Xh = ev_pal(pal_h, cg, th1, ct, st);
+            QD_DIAG("%.2f,%.6f,%d,%+.4f,%+.4f,%+.4f\n", p, p / N2, (int)rt_bit(Xs.resolved_type[0], 5), dB(std::norm(cpx(X0.xprmat, 0, 0))),
+                    dB(std::norm(cpx(Xs.xprmat, 0, 0))), dB(std::norm(cpx(Xh.xprmat, 0, 0))));
+            INFO("verdict window with tf, p " << p);
+            double leak = dB(std::norm(cpx(Xs.xprmat, 0, 0)));
+            CHECK(rt_bit(Xs.resolved_type[0], 5) == (p > 1.0));
+            if (p > 1.0)
+            {
+                CHECK(leak > -10.0); // the leak of the coating crosses from p = 1 on
+                if (p > 1.015)
+                    CHECK(std::abs(leak - leak_prev) < 0.5); // and has no hole
+                CHECK(std::norm(cpx(X0.xprmat, 0, 0)) == 0.0);
+                CHECK(std::norm(cpx(Xh.xprmat, 0, 0)) == 0.0);
+            }
+            leak_prev = leak;
+        }
     }
 }
