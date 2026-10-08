@@ -4403,18 +4403,15 @@ void quadriga_lib::ray_state_update(int interaction_type,
             // That is the construction a transition uses: the Snell ratio with the length the
             // projection lost, and the far cosine at the recovered cosine.
             //
-            // Written where it is exact and nowhere else: a lossless medium, where the real-angle
-            // map is the wave, and a lossy one whose cosine was recovered for a real invariant.
-            // A lossy medium whose recovery declines, a face that is closed, and a leg with no
-            // refracted direction keep what ray_mesh_interact wrote.
+            // Out of a lossy medium whose cosine was recovered for a real invariant that is exact.
+            // Where the recovery declines the Snell ratio and the far cosine are the real-angle
+            // ones, which is the wave for a lossless medium and the map a glued exit applies for
+            // a lossy one. A face that is closed and a leg with no refracted direction keep what
+            // ray_mesh_interact wrote.
             auto EXIT_DIRECTION = [&](const Material &A, const Material &B, bool real_inv, const std::complex<double> &ct_a,
                                       double snell_ab, const std::complex<double> &cos_b, bool tir_ab) -> bool
             {
                 if (!refracted || tir_ab || !(std::real(cos_b) > 0.0))
-                    return false;
-                bool lossless = std::imag((A.eta(fGHz) + A.eta_resonance(fGHz)) * A.mu(fGHz)) == 0.0 &&
-                                std::imag((B.eta(fGHz) + B.eta_resonance(fGHz)) * B.mu(fGHz)) == 0.0;
-                if (!lossless && !real_inv)
                     return false;
                 double snell_dir = snell_ab;
                 if (real_inv)
@@ -4430,23 +4427,9 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 return true;
             };
 
-            // A resolved path will not call SLAB_AIRY_FACTOR, so we don't need the coefficients.
-            // Its exit still owes a direction; nothing else of the event is touched. On a bent
-            // leg the coefficient ray_mesh_interact wrote is at a real angle in the medium, and
-            // the exit is evaluated below as any other.
-            if (resolved && !bent)
-            {
-                if (geom == 3 && use_vbs && Ma == mtl_current)
-                {
-                    std::complex<double> c_b, c_a = EXACT_IN_SLAB_COSINE();
-                    bool have = std::abs(c_a) > 0.0, t_ab = false;
-                    double sn = 1.0;
-                    MAT(Ma).interact_with(MAT(Mb), itype, theta_t, fGHz, nullptr, nullptr, &c_b, nullptr, &sn, &t_ab,
-                                          false, have ? &c_a : nullptr, false);
-                    EXIT_DIRECTION(MAT(Ma), MAT(Mb), have && ct_slab_real_inv, c_a, sn, c_b, t_ab);
-                }
-                return dist_fbs_dest;
-            }
+            // A resolved ray is evaluated as any other: what ray_mesh_interact wrote for this face
+            // was formed at the angle of the segment. Only the series is skipped for it, by the
+            // caller.
 
             // Compute coefficients (cTE and cTM are required by SLAB_AIRY_FACTOR, so we always compute them)
             // only cTE/cTM are needed past the fast return; the geometry outs are used only in the VBS branch
@@ -4828,6 +4811,19 @@ void quadriga_lib::ray_state_update(int interaction_type,
             bool tir = false;
             M_near.interact_with(M_far, interaction_type, theta_t, fGHz, nullptr, nullptr,
                                  &ct2_far, nullptr, &snell, &tir, false, nullptr, !refracted);
+
+            // Where the near medium's cosine was recovered, the verdict and the far cosine are
+            // the ones at that cosine, as at a bare face. For a lossy near medium the real-angle
+            // test reads the invariant short by the length the projection lost, and finds the
+            // pair open on a wave that is closed.
+            std::complex<double> c_n(0.0, 0.0), c_f(0.0, 0.0);
+            if (mtl_near == mtl_current && mtl_far != mtl_near)
+            {
+                c_n = EXACT_IN_SLAB_COSINE();
+                if (std::abs(c_n) > 0.0)
+                    M_near.interact_with(M_far, interaction_type, theta_t, fGHz, nullptr, nullptr, &c_f, nullptr,
+                                         nullptr, &tir, false, &c_n, false);
+            }
             typeR[5] = tir;
 
             // Continuation direction. Leaving path_dirN as ray_mesh_interact wrote it replaces the
@@ -4851,27 +4847,16 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 // real-angle call above forms the far cosine from eps sin^2 at the traced angle,
                 // whose argument is complex for a lossy medium and whose real part does not fall
                 // to the external cosine towards grazing: 17.7 deg at 85 deg out of
-                // eps 1.50 - 0.40j. The verdict stays the real-angle one. Where near and far are
-                // one medium, where the recovery declines and where the medium is lossless,
-                // nothing here runs and the direction is the one it was.
+                // eps 1.50 - 0.40j. Where near and far are one medium, where the recovery
+                // declines and where the medium is lossless, nothing here runs and the direction
+                // is the one it was.
                 double snell_dir = snell;
                 std::complex<double> ct2_dir = ct2_far;
-                bool dir_real_inv = false;
-                if (mtl_near == mtl_current && mtl_far != mtl_near)
+                bool dir_real_inv = std::abs(c_n) > 0.0 && ct_slab_real_inv && std::real(c_f) > 0.0;
+                if (dir_real_inv)
                 {
-                    std::complex<double> c_n = EXACT_IN_SLAB_COSINE(), c_f;
-                    bool t_nf = false;
-                    if (std::abs(c_n) > 0.0 && ct_slab_real_inv)
-                    {
-                        M_near.interact_with(M_far, interaction_type, theta_t, fGHz, nullptr, nullptr, &c_f, nullptr,
-                                             nullptr, &t_nf, false, &c_n, false);
-                        if (!t_nf && std::real(c_f) > 0.0)
-                        {
-                            snell_dir *= std::sqrt(std::abs(1.0 - c_n * c_n) + std::real(c_n) * std::real(c_n));
-                            ct2_dir = c_f;
-                            dir_real_inv = true;
-                        }
-                    }
+                    snell_dir *= std::sqrt(std::abs(1.0 - c_n * c_n) + std::real(c_n) * std::real(c_n));
+                    ct2_dir = c_f;
                 }
                 qd_refract(dir_prev[0], dir_prev[1], dir_prev[2], N[0], N[1], N[2],
                            snell_dir, abs_cos_theta_t, ct2_dir, dir_next[0], dir_next[1], dir_next[2]);
