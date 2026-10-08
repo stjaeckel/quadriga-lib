@@ -5081,10 +5081,11 @@ void quadriga_lib::ray_state_update(int interaction_type,
             // sheet composite, because the factor is applied through cTE / cTM, and for a resolved
             // ray, whose series the reflection behind it already collapsed, as APPLY_TRANSITION
             // skips it at a bare face.
+            bool host_summed = false; // the host's bounce series was summed at this event
             if (mtl_current != 0 && !merge_host)
             {
                 if (have_composite && !resolved)
-                    SLAB_AIRY_FACTOR(mtl_current, sheet_mtl, mtl_prev, m_far);
+                    host_summed = SLAB_AIRY_FACTOR(mtl_current, sheet_mtl, mtl_prev, m_far);
                 SCALE_BY_MEDIUM(mtl_current);
             }
 
@@ -5103,10 +5104,12 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 DIST_SET();
                 if (mtl_current != 0)
                 {
-                    // Terminate the internal bounce series exactly as a resolved solid does
+                    // Terminate the internal bounce series exactly as a resolved solid does: where
+                    // it was summed here. Where it was declined the bounces are the tracer's, and
+                    // the reflected ray is followed as it is off a bare face.
                     // The sheet reflected off is behind the ray now. Where both of its sides are
                     // the medium the ray is in, that medium is what backs it.
-                    next_current = (short)((mtl_current & 0x3FFF) | (int)0x8000 | bent_carry);
+                    next_current = (short)((mtl_current & 0x3FFF) | (host_summed ? (int)0x8000 : 0) | bent_carry);
                     next_prev = (short)((sheet_mtl & 0x3FFF) | (prev_nonpar ? (int)0x8000 : 0) |
                                         ((m_far == mtl_current) ? (int)0x4000 : 0));
                     next_buffer = (short)0;
