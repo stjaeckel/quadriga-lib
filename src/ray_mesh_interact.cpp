@@ -758,6 +758,17 @@ namespace
                 coeff_TM *= s;
             }
 
+            // A wave held undeviated in a mass-law medium keeps its direction at every face. The
+            // medium is a lumped plate with no wave inside, and this face is charged the same from
+            // both sides at one angle, so the wave has that angle on both sides. Towards the lower
+            // index the verdict above says so. Towards the higher index the crossing is the
+            // ordinary one and its Snell ratio is formed from two permittivities that are
+            // impedance mappings, so the geometry handed back is that of no bend: a Snell ratio of
+            // one and the incidence cosine, from which every caller reproduces the direction it
+            // came in with. The coefficient and the verdict are the ordinary ones.
+            if (undeviated && m > 0.0 && trans_class)
+                ct2 = ct1, eta1_d_eta2 = 1.0, snell = 1.0;
+
             if (cTE)
                 *cTE = coeff_TE;
             if (cTM)
@@ -2300,6 +2311,7 @@ void quadriga_lib::ray_mesh_interact(
 - **`path_dirN`** — Refraction-correct path direction: mirror for types 0/3, Snell direction for types 1/2/4/5; `[n_rayN, 3]`.
   For undeviated transmission (types 1/4) this is the *refracted* direction, which differs from the geometric continuation
   (along the incoming ray) used for `origN`/`destN`; it lets downstream code recover the true transmission angle.
+  Out of a mass-law medium (`m > 0`) there is no bend with any type: the wave is held undeviated at every face.
 - **`ray_indN`** — 0-based input ray index for each output ray (inverse of the internal compaction map; order-preserving); `[n_rayN]`
 
 ## See also:
@@ -4389,7 +4401,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
         // Replace the FBS-relative interface result ray_mesh_interact wrote with the VBS-equivalent at theta_t
         // - interface coefficients (interface_gain folded inside interact_with), incoming basis from dir_in,
         //   outgoing basis from the corrected continuation. In-medium magnitude/phase stay deferred to close_med.
-        // - geom: 0 = reflect at VBS, 2 = Snell refract at VBS (undeviated under TIR), 3 = exit (keep the traced origN->destN direction).
+        // - geom: 0 = reflect at VBS, 2 = Snell refract at VBS, 3 = exit into air. A face closed at the VBS angle hands on dir_prev.
         auto REPLACE_BY_VBS = [&](int Ma, int Mb, int itype, int geom) -> double
         {
             // The direction an exit into air owes, where it can be formed.
@@ -4406,8 +4418,8 @@ void quadriga_lib::ray_state_update(int interaction_type,
             // Out of a lossy medium whose cosine was recovered for a real invariant that is exact.
             // Where the recovery declines the Snell ratio and the far cosine are the real-angle
             // ones, which is the wave for a lossless medium and the map a glued exit applies for
-            // a lossy one. A face that is closed and a leg with no refracted direction keep what
-            // ray_mesh_interact wrote.
+            // a lossy one. A leg with no refracted direction keeps what ray_mesh_interact wrote,
+            // and a face that is closed hands on dir_prev, which the caller writes.
             auto EXIT_DIRECTION = [&](const Material &A, const Material &B, bool real_inv, const std::complex<double> &ct_a,
                                       double snell_ab, const std::complex<double> &cos_b, bool tir_ab) -> bool
             {
@@ -4521,10 +4533,12 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 if (face_real_inv) // out of a lossy solid: the segment in the next medium follows
                     RELAUNCH(MAT(Ma), MAT(Mb), itype);
             }
+            else if (tir) // closed at this angle: no Snell direction, any leak travels undeviated
+                dir_next[0] = dir_prev[0], dir_next[1] = dir_prev[1], dir_next[2] = dir_prev[2];
             else if (geom == 3) // exit into air: the direction of dir_prev refracted, where it is exact
                 EXIT_DIRECTION(MAT(Ma), MAT(Mb), face_real_inv, ct_in, snell, cos_t2, tir);
 
-            if (p_path_dirN && geom != 3) // write the corrected continuation; an exit wrote its own or keeps the traced one
+            if (p_path_dirN && (geom != 3 || tir)) // write the corrected continuation; an open exit wrote its own or keeps the traced one
                 p_path_dirN[ii] = (dtype)dir_next[0],
                 p_path_dirN[ii + n_rayN] = (dtype)dir_next[1],
                 p_path_dirN[ii + 2 * n_rayN] = (dtype)dir_next[2];
@@ -5225,7 +5239,8 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 // Into a medium, the word also says whether the face was evaluated at the cosine
                 // of a wave with a real transverse invariant (prev_real_inv).
                 next_prev = (short)(mtl_current | ((face_real_inv && !exit && mtl_next != 0) ? (int)0x4000 : 0));
-                next_current = (short)(mtl_next | ((mtl_next != 0 && !exit) ? bent_enter : 0)); // Clear resolved flag
+                // A leg entered out of a mass-law medium is not a bent one: the wave was held there
+                next_current = (short)(mtl_next | ((mtl_next != 0 && !exit && !(MAT(mtl_current).m > 0.0)) ? bent_enter : 0)); // Clear resolved flag
             }
 
             next_buffer = buffer_next; // Clear the deferred medium
