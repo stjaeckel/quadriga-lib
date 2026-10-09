@@ -383,7 +383,9 @@ namespace quadriga_lib
                           arma::Mat<dtype> *origN = nullptr,                                   // In/Out: relaunch origin, corrected in place; [n_rayN, 3]
                           arma::Mat<dtype> *destN = nullptr,                                   // In/Out: relaunch destination, corrected in place; [n_rayN, 3]
                           const arma::Mat<dtype> *tridir = nullptr,                            // In: vertex-ray directions entering this segment, Cartesian; [n_ray, 9]
-                          arma::Mat<dtype> *tridirN = nullptr);                                // In/Out: vertex-ray directions leaving, corrected in place; [n_rayN, 9]
+                          arma::Mat<dtype> *tridirN = nullptr,                                 // In/Out: vertex-ray directions leaving, corrected in place; [n_rayN, 9]
+                          const std::vector<uint8_t> *verdict_inN = nullptr,                   // In: 1 = sum the bounce series of this event, 0 = leave it to the tracer; NULL = decide by eps; [n_rayN]
+                          std::vector<uint8_t> *verdict_outN = nullptr);                       // Out: 1 where this call summed a bounce series; [n_rayN]
 
     // Calculate in-medium gain
     template <typename dtype>

@@ -1356,7 +1356,8 @@ namespace
                                 bool far_closed = false,             // produce: near | far is past its critical angle
                                 bool near_undeviated = false,        // produce: the wave in mat_near was not refracted in
                                 double mass_bonded = 0.0,            // produce: X0 of the bonded mass-law bodies already crossed
-                                const Material *back_far = nullptr)  // correction: what lies behind a sheet named as mat_far
+                                const Material *back_far = nullptr,  // correction: what lies behind a sheet named as mat_far
+                                bool verdict_given = false)          // correction: the caller decided to sum; eps is not read
     {
         // Mass-law materials carry a lumped transmission surrogate: eta/mu are calibrated for
         // surface impedance only, so the in-slab index (and hence the phase of phi) is not
@@ -1857,8 +1858,15 @@ namespace
             double rr_te = (Rn_te * Rf_te < 0.0) ? 0.0 : Rn_te * Rf_te;
             double rr_tm = (Rn_tm * Rf_tm < 0.0) ? 0.0 : Rn_tm * Rf_tm;
             double rho = std::sqrt(((rr_te > rr_tm) ? rr_te : rr_tm) * g2L);
-            if (rho < eps || std::abs(denom_te) < 1.0e-2 || std::abs(denom_tm) < 1.0e-2)
+            if (!verdict_given && (rho < eps || std::abs(denom_te) < 1.0e-2 || std::abs(denom_tm) < 1.0e-2))
                 return false;
+
+            // A verdict that is given cannot be handed back: the bounces are not followed. A
+            // near-pole denominator is clamped in magnitude and keeps its phase, as for a sheet.
+            if (verdict_given)
+                for (std::complex<double> *d : {&denom_te, &denom_tm})
+                    if (std::abs(*d) < 1.0e-2)
+                        *d = std::polar(1.0e-2, std::arg(*d));
         }
         else
         {
@@ -3419,7 +3427,9 @@ void quadriga_lib::ray_state_update(
     arma::Mat<dtype> *origN = nullptr,
     arma::Mat<dtype> *destN = nullptr,
     const arma::Mat<dtype> *tridir = nullptr,
-    arma::Mat<dtype> *tridirN = nullptr);
+    arma::Mat<dtype> *tridirN = nullptr,
+    const std::vector<uint8_t> *verdict_inN = nullptr,
+    std::vector<uint8_t> *verdict_outN = nullptr);
 ```
 
 ## Inputs:
@@ -3444,12 +3454,13 @@ void quadriga_lib::ray_state_update(
 - **`mtl_ind_prev_in`**, **`mtl_ind_current_in`**, **`mtl_ind_buffer_in`** — State words, full ray set; `[n_ray]`,
   read at `g`, never written. NULL reads as state `0` (outside, no flags). A buffer word with bit 15 set is
   a surface-mass code written by an earlier call and is exempt from the material range check; pass the
-  words through unchanged between calls.<br><br>
+  words through unchanged between calls. A leg that carries the followed mark forms no series: the
+  verdict of a body is taken once, at the first event that closes a leg in it.<br><br>
    | Word                 | Bits 0-13                          | Bit 14                                        | Bit 15                    |
    | -------------------- | ---------------------------------- | --------------------------------------------- | ------------------------- |
    | `mtl_ind_current`    | medium the ray is in, 0 = air      | bent: the leg follows a bend traced with type 2 or 5; zero in air | resolved |
    | `mtl_ind_prev`       | medium the leg was entered from, or the sheet crossed or reflected off | the sheet in this word lies inside the current medium | known non-parallel |
-   | `mtl_ind_buffer`     | deferred medium                    | zero                                          | clear                     |
+   | `mtl_ind_buffer`     | deferred medium                    | followed, with a zero index: the leg began at a reflection that left the series to the tracer | clear |
    | `mtl_ind_buffer`     | thickness code, bits 0-14          | (part of the code)                            | set: mass-crossed         |
    Under bit 15 the code is the normal thickness of a mass-law leg closed on the way into the current
    one: of the solid in `mtl_ind_prev`, or, where that word holds a sheet lying inside the current
@@ -3471,6 +3482,12 @@ void quadriga_lib::ray_state_update(
   Does **not** gate a thin sheet's own series: a sheet has no interior for the tracer to re-emit into, so
   that series always resolves. `eps` still gates the host layer a sheet is embedded in.
   Default `0.15`.
+- **`verdict_inN`** *(optional)* — The verdict of each event on its bounce series, as an earlier call on the
+  same events wrote it to `verdict_outN`, compact set; `[n_rayN]`. Where given, a series is summed exactly
+  where the entry is nonzero and `eps` is not read. The traced paths of a multi-frequency run are the base
+  frequency's - a reflected ray is resolved or followed as that frequency decided - so the caller hands
+  the base frequency's verdict to the call of every other frequency. A summed series near a pole is
+  clamped in magnitude instead of being re-emitted. NULL: this call decides, by `eps`.
 - **`tridir`** *(optional)* — Vertex-ray directions of the beam entering this segment, Cartesian, as handed to
   [[ray_mesh_interact]]; `[n_ray, 9]`. Given together with `tridirN`; requires `origN` and `destN`
 
@@ -3515,6 +3532,8 @@ void quadriga_lib::ray_state_update(
 - **`tridirN`** *(optional, in/out)* — Vertex-ray directions leaving, Cartesian, compact set; `[n_rayN, 9]`.
   Corrected together with `origN` and `destN`: each vertex ray gets the construction of the spine from its
   own direction in `tridir`. If one of the three cannot be formed, the ray keeps the geometry it had.
+- **`verdict_outN`** *(optional)* — Per event, 1 where this call summed a bounce series and 0 where it left the
+  bounces to the tracer, compact set; `[n_rayN]`. NULL skips the write.
 - **`acc_dist_geometricN`** — Accumulated geometric distance leaving this call, compact set; `[n_rayN]`. NULL skips the write.
 - **`acc_dist_refractedN`** — Accumulated refracted (VBS) distance leaving this call, compact set; `[n_rayN]`. NULL skips the write.
 - **`resolved_typeN`** *(optional)* — Resolved interaction-type code, bit-encoded (`qd::bits<uint8_t>`),
@@ -3621,7 +3640,9 @@ void quadriga_lib::ray_state_update(int interaction_type,
                                     arma::Mat<dtype> *origN,
                                     arma::Mat<dtype> *destN,
                                     const arma::Mat<dtype> *tridir,
-                                    arma::Mat<dtype> *tridirN)
+                                    arma::Mat<dtype> *tridirN,
+                                    const std::vector<uint8_t> *verdict_inN,
+                                    std::vector<uint8_t> *verdict_outN)
 {
     if (interaction_type < 0 || interaction_type > 5)
         throw std::invalid_argument("Interaction type must be either (0) EM Reflection, (1) EM Transmission, (2) EM Refraction, (3) Scalar Reflection, (4) Scalar Transmission, (5) Scalar Refraction");
@@ -3682,16 +3703,14 @@ void quadriga_lib::ray_state_update(int interaction_type,
     if (mtl_ind_sbsN->n_elem != 0 && arma::uword(mtl_ind_sbsN->max() & (short)0x7FFF) > cols.n_mtl)
         throw std::invalid_argument("Values in 'mtl_ind_sbs' exceed the number of materials in 'mtl_prop'.");
 
-    // The buffer word under its flag bit carries a surface-mass code, not a material index. The
-    // other two words carry a flag in bit 14 as well as in bit 15; the buffer word has none there,
-    // so a set bit 14 without the flag is out of range.
+    // The buffer word under its flag bit carries a surface-mass code, not a material index.
+    // Without it, bit 14 is the followed mark, as bit 14 of the other two words is a flag.
     auto check_state_words = [&](const arma::Col<short> *v, const char *name, bool flag_is_code = false)
     {
         if (v == nullptr || v->n_elem == 0)
             return;
-        const short mask = flag_is_code ? (short)0x7FFF : (short)0x3FFF;
         for (const short *p = v->memptr(), *pe = p + v->n_elem; p < pe; ++p)
-            if (!(flag_is_code && (*p & (short)0x8000)) && arma::uword(*p & mask) > cols.n_mtl)
+            if (!(flag_is_code && (*p & (short)0x8000)) && arma::uword(*p & (short)0x3FFF) > cols.n_mtl)
                 throw std::invalid_argument(std::string("Values in '") + name + "' exceed the number of materials in 'mtl_prop'.");
     };
     check_state_words(mtl_ind_prev_in, "mtl_ind_prev_in");
@@ -3785,6 +3804,15 @@ void quadriga_lib::ray_state_update(int interaction_type,
     const dtype *p_tridir = tridir ? tridir->memptr() : nullptr;
     dtype *p_tridirN = tridirN ? tridirN->memptr() : nullptr;
 
+    // The verdict of each event on its bounce series, handed from the base frequency of a run to
+    // the others. Optional: without it every call decides for itself.
+    if (verdict_inN && verdict_inN->size() != n_rayN)
+        throw std::invalid_argument("Input 'verdict_inN' must match the length of 'out_typeN'.");
+    const uint8_t *p_verdict_inN = verdict_inN ? verdict_inN->data() : nullptr;
+    if (verdict_outN && verdict_outN->size() != n_rayN)
+        verdict_outN->resize(n_rayN, 0);
+    uint8_t *p_verdict_outN = verdict_outN ? verdict_outN->data() : nullptr;
+
 #pragma omp parallel for schedule(static)
     for (long long i_rayN = 0; i_rayN < (long long)n_rayN; ++i_rayN) // Interaction loop (compact set)
     {
@@ -3808,7 +3836,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
         //             from, or the sheet crossed     (a sheet), or
         //             or reflected off               prev_real_inv
         //                                            (a solid)
-        //   buffer    deferred medium                zero              clear
+        //   buffer    deferred medium                followed          clear
         //   buffer    thickness code, bits 0-14                        set: mass_crossed
         //
         // prev_embedded qualifies a sheet in the previous-medium word: the sheet lies inside the
@@ -3855,7 +3883,17 @@ void quadriga_lib::ray_state_update(int interaction_type,
         const short buffer_word_in = next_buffer;
         const bool mass_crossed = (next_buffer & 0x8000) != 0;
         const int mass_code = mass_crossed ? mtl_buffer : 0;
-        if (mass_crossed)
+
+        // followed: the leg the ray is on began at a reflection inside this medium that left the
+        // bounce series to the tracer. Whether a body's series is summed or followed is one
+        // verdict, taken by the first event that closes a leg in it, where the previous-medium
+        // word names the mirror behind the ray. On a later leg that mirror is the face the ray was
+        // reflected off, which no word holds, and the pair is the one that was already judged:
+        // the leg forms no series. Written by a reflection that did not sum, in the buffer word,
+        // which every reflection clears; carried where a leg carries on; replaced by a deferred
+        // medium that has to be stored, after which the leg judges for itself again.
+        const bool followed = !mass_crossed && (next_buffer & 0x4000) != 0;
+        if (mass_crossed || followed)
             mtl_buffer = 0;
 
         // Compact-set reads at i
@@ -4732,9 +4770,17 @@ void quadriga_lib::ray_state_update(int interaction_type,
         // mode is symmetric in the two so this is harmless, but a produce-mode call from here would
         // have to swap them.
         // Returns true when the series resolved (caller sets any extra state, e.g. the reflected slab flag).
+        bool series_summed = false; // this event summed a bounce series; the verdict handed out
         auto SLAB_AIRY_FACTOR = [&](int mtl_slab, int mtl_near, int mtl_far, int mtl_back = 0) -> bool
         {
-            if (eps > 0.0 && prev_nonpar) // known wedge/edge -> re-emit (eps = 0.0 always resolves)
+            // The verdict of this event, where the caller hands it in: what the base frequency
+            // of a run decided. The paths are the base frequency's, so every other frequency
+            // sums where it summed and leaves the bounces to the tracer where it did not.
+            const bool given = p_verdict_inN != nullptr;
+            if (given && p_verdict_inN[ii] == 0)
+                return false;
+
+            if (!given && eps > 0.0 && prev_nonpar) // known wedge/edge -> re-emit (eps = 0.0 always resolves)
                 return false;
 
             // What lies behind a sheet named as mtl_near, where the caller knows it. SHEET_EVENT
@@ -4756,8 +4802,9 @@ void quadriga_lib::ray_state_update(int interaction_type,
                                  fGHz, is_scalar, eps, false, &fac_te, &fac_tm,
                                  nullptr, nullptr, false, -1.0, EXACT_IN_SLAB_COSINE(),
                                  std::complex<double>(0.0, 0.0), &M_back, false, false, 0.0,
-                                 far_in_slab ? &M_back_far : nullptr))
+                                 far_in_slab ? &M_back_far : nullptr, given))
                 return false;
+            series_summed = true;
 
             // Scalar mode carries one port and the factor is a pure scale, so scale the stored
             // xprmat in place. Rebuilding it from cTE would round-trip through dtype differently.
@@ -5084,7 +5131,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
             bool host_summed = false; // the host's bounce series was summed at this event
             if (mtl_current != 0 && !merge_host)
             {
-                if (have_composite && !resolved)
+                if (have_composite && !resolved && !followed)
                     host_summed = SLAB_AIRY_FACTOR(mtl_current, sheet_mtl, mtl_prev, m_far);
                 SCALE_BY_MEDIUM(mtl_current);
             }
@@ -5112,7 +5159,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
                     next_current = (short)((mtl_current & 0x3FFF) | (host_summed ? (int)0x8000 : 0) | bent_carry);
                     next_prev = (short)((sheet_mtl & 0x3FFF) | (prev_nonpar ? (int)0x8000 : 0) |
                                         ((m_far == mtl_current) ? (int)0x4000 : 0));
-                    next_buffer = (short)0;
+                    next_buffer = (short)(host_summed ? 0 : (int)0x4000); // not summed: followed
                 }
                 return;
             }
@@ -5204,7 +5251,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
             // Transparent transition for same material
             if (SAME(mtl_current, mtl_next)) // Make interface transparent
             {
-                if (mass_crossed)
+                if (mass_crossed || followed)
                     buffer_next = buffer_word_in;
                 REPLACE_BY_GAIN(1.0, true); // Maintain refracted direction, set transparent flag
                 if (preload_dest)           // Add distances: fbs-vbs (geometric) AND vbs-vdest (refracted)
@@ -5220,7 +5267,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
             {
                 double dist_VV = REPLACE_BY_VBS(mtl_current, mtl_next, (is_scalar ? 4 : 1), (exit ? 3 : 2));
 
-                if (!resolved) // Resolve multi-bounce series of current layer
+                if (!resolved && !followed) // Resolve multi-bounce series of current layer
                 {
                     if (SLAB_AIRY_FACTOR(mtl_current, mtl_next, mtl_prev))
                         typeR[2] = true; // Set slab resolve flag
@@ -5277,14 +5324,15 @@ void quadriga_lib::ray_state_update(int interaction_type,
             {
                 DIST_ADD();                                                    // Update distances within the current medium
                 REPLACE_BY_VBS(mtl_current, mtl_next, (is_scalar ? 3 : 0), 0); // Mirror at VBS (typeR 137, 139)
-                if (SLAB_AIRY_FACTOR(mtl_current, mtl_next, mtl_prev))         // Apply thin-slab (Fabry-Perot) factor
+                next_buffer = (short)0x4000;                                   // Clear buffer; not summed: followed
+                if (!followed && SLAB_AIRY_FACTOR(mtl_current, mtl_next, mtl_prev)) // Apply thin-slab (Fabry-Perot) factor
                 {
                     next_current = (short)((mtl_current & 0x3FFF) | (int)0x8000 | bent_carry); // keep material, set resolved
-                    typeR[2] = true;                                              // slab resolve flag
+                    next_buffer = (short)0;
+                    typeR[2] = true; // slab resolve flag
                 }
                 SCALE_BY_MEDIUM(mtl_current); // Apply medium gain and phase
                 DIST_SET();                   // Reset in-medium distance
-                next_buffer = (short)0;       // Clear buffer (match APPLY_TRANSITION)
                 typeR[3] = true;              // Set continue-inside flag (typeR 137)
             }
         }
@@ -5415,6 +5463,8 @@ void quadriga_lib::ray_state_update(int interaction_type,
             p_acc_refract_outN[ii] = (dtype)dist_refract;
         if (p_resolved_typeN)
             p_resolved_typeN[ii] = (uint8_t)typeR;
+        if (p_verdict_outN)
+            p_verdict_outN[ii] = (uint8_t)series_summed;
     }
 }
 
@@ -5437,7 +5487,8 @@ template void quadriga_lib::ray_state_update(int interaction_type, float center_
                                              std::vector<uint8_t> *resolved_typeN,
                                              const arma::u32_vec *ray_indN, double eps,
                                              arma::Mat<float> *origN, arma::Mat<float> *destN,
-                                             const arma::Mat<float> *tridir, arma::Mat<float> *tridirN);
+                                             const arma::Mat<float> *tridir, arma::Mat<float> *tridirN,
+                                             const std::vector<uint8_t> *verdict_inN, std::vector<uint8_t> *verdict_outN);
 
 template void quadriga_lib::ray_state_update(int interaction_type, double center_frequency,
                                              const arma::Mat<double> *orig, const arma::Mat<double> *dest,
@@ -5458,4 +5509,5 @@ template void quadriga_lib::ray_state_update(int interaction_type, double center
                                              std::vector<uint8_t> *resolved_typeN,
                                              const arma::u32_vec *ray_indN, double eps,
                                              arma::Mat<double> *origN, arma::Mat<double> *destN,
-                                             const arma::Mat<double> *tridir, arma::Mat<double> *tridirN);
+                                             const arma::Mat<double> *tridir, arma::Mat<double> *tridirN,
+                                             const std::vector<uint8_t> *verdict_inN, std::vector<uint8_t> *verdict_outN);

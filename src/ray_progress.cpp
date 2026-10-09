@@ -865,6 +865,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
     arma::Col<short> prevN, currentN, bufferN; // New state words
     arma::fvec acc_geoN;                       // Updated accumulated geometric distance
     arma::fvec acc_refN;                       // Updated accumulated refracted (VBS) distance
+    std::vector<uint8_t> verdictN;             // Where the base frequency summed a bounce series
 
     // Compute existing gains @ reference freq
     // calc_gain (sqrt + divide) is hoisted out of check_gains, which is serial because it
@@ -1074,7 +1075,9 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
                                                   &mtl_ind_prev, &mtl_ind_current, &mtl_ind_buffer,
                                                   &dir_f, &acc_geo, &acc_ref_f, nullptr, nullptr, nullptr,
                                                   nullptr, &xprmatN, &path_dirN, nullptr, &acc_refN,
-                                                  nullptr, nullptr, (double)thin_slab_threshold);
+                                                  nullptr, nullptr, (double)thin_slab_threshold,
+                                                  nullptr, nullptr, nullptr, nullptr,
+                                                  &verdictN); // the paths are the base frequency's, and so is the verdict on each series
 
             scatter_freq(i_freq);
 
@@ -1116,7 +1119,8 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
                                               &prevN, &currentN, &bufferN,
                                               &gainN, &xprmatN, &path_dirN, &acc_geoN, &acc_refN,
                                               &interact_type, // Aliasing OK and deliberate
-                                              nullptr, (double)thin_slab_threshold);
+                                              nullptr, (double)thin_slab_threshold,
+                                              nullptr, nullptr, nullptr, nullptr, nullptr, &verdictN);
 
         ensure_pre_gains();
         n_reflect = check_gains(true); // Parse gainN and build keep_ind
@@ -1156,7 +1160,8 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
                                               nullptr, (double)thin_slab_threshold,
                                               &origN, &destN, // the segment follows the direction written out of a lossy medium
                                               (beam_mode ? tridir : nullptr),
-                                              (beam_mode ? &tridirN : nullptr));
+                                              (beam_mode ? &tridirN : nullptr),
+                                              nullptr, &verdictN);
 
         ensure_pre_gains();
         n_transmit = check_gains(false); // Parse gainN and build keep_ind
