@@ -593,8 +593,15 @@ namespace
             // the outer pair of media gives, which is the only pair that can create or remove total
             // reflection. The two forms are the same statement; they are written separately only so
             // the angle path keeps its own rounding.
-            bool tir = force_tir || ((sin_theta_real >= 0.0) ? (snell * sin_theta_real >= 1.0)
-                                                             : (std::abs(eta1_d_eta2 * sin2_theta) >= 1.0));
+            //
+            // It is a critical angle only where the second medium is lossless. A lossy one always
+            // admits a transmitted wave, with a complex cosine, and flux_amp closes no port on it,
+            // so there the test is a statement about a magnitude and not about the wave: a porous
+            // absorber, rarer than air, turned into a mirror from 37 deg. Decided on the medium
+            // and not on a value, so it is one verdict for every frequency of a run.
+            bool tir = force_tir || (std::imag(eta2 * mu2) == 0.0 &&
+                                     ((sin_theta_real >= 0.0) ? (snell * sin_theta_real >= 1.0)
+                                                              : (std::abs(eta1_d_eta2 * sin2_theta) >= 1.0)));
 
             std::complex<double> coeff_TE, coeff_TM;
             double gain;
@@ -2226,7 +2233,8 @@ Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh 
     sheet loss on entry, the embedding medium inside, and sheet loss on exit.
 - Types 3–5 (scalar) use a single TE-only coefficient (acoustic simulation with impedance-mapped
   materials, `ε` derived from `Z`); total internal reflection is handled as in the EM path
-  (`snell·sinθ ≥ 1` ⇒ unit reflection, refraction collapses to undeviated transmission).
+  (`snell·sinθ ≥ 1` into a lossless medium ⇒ unit reflection, refraction collapses to undeviated transmission;
+  a lossy medium has no critical angle).
 - For a detailed description of the material model see <a href="http://quadriga-lib.org/formats.html">Data Formats</a>
 
 ## Declaration:
@@ -3148,8 +3156,10 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
             // Whole-tube TIR: pass through (undeviated) if the spine OR any edge is past critical.
             // Skipped where near == far, since the Snell ratio is then 1 and the test can only trip on
             // numerical tangency - which would escalate the entire tube into a mirror on the strength
-            // of a rounding artifact at the spine.
-            if (geometry_type == 2 && sheet_case != 1 && sheet_case != 4 && sheet_case != 5)
+            // of a rounding artifact at the spine. Skipped where the far medium is lossy as well: it
+            // has no critical angle, for an edge as little as for the spine.
+            if (geometry_type == 2 && sheet_case != 1 && sheet_case != 4 && sheet_case != 5 &&
+                std::imag((M2.eta(fGHz) + M2.eta_resonance(fGHz)) * M2.mu(fGHz)) == 0.0)
                 for (int i = 0; i <= 3 && !total_reflection; ++i)
                     if (eta * sin_thetaV[i] >= 1.0)
                         total_reflection = true;
@@ -4351,15 +4361,23 @@ void quadriga_lib::ray_state_update(int interaction_type,
             double t = std::sqrt((ct2c > 0.0) ? ct2c : 0.0) / ct; // tan of the traced in-slab angle
             double u = t * t / (eta2 * (1.0 + t * t));            // real-index Snell start
             u = (u > u_max) ? u_max : u;
-            for (int k = 0; k < 3; ++k)
+
+            // Newton on the map, until the step is below rounding. Three steps reach that from the
+            // real-index start wherever real-index Snell has a solution near the root; in a lossy
+            // medium rarer than the one the wave came from it has none past sqrt|eps_r| sin = 1,
+            // and towards an invariant above one the start is far as well.
+            for (int k = 0; k < 50; ++k)
             {
                 std::complex<double> w = std::sqrt(1.0 - eps_r * u);
                 double fu = eta2 * u - t * t * std::real(w) * std::real(w);
                 double dfu = eta2 + t * t * std::real(w) * std::real(eps_r / w);
                 if (!(std::abs(dfu) > 1.0e-300))
                     break;
-                u -= fu / dfu;
+                double du = fu / dfu;
+                u -= du;
                 u = (u < 0.0) ? 0.0 : ((u > u_max) ? u_max : u);
+                if (k >= 2 && std::abs(du) <= 1.0e-15 * std::abs(u))
+                    break;
             }
 
             // Whether the wave in this medium has a real transverse invariant and a complex
