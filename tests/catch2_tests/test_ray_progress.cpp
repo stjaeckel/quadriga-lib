@@ -3423,9 +3423,9 @@ TEST_CASE("Measurement - ray_progress and the mirror behind a back reflection")
 #ifdef QD_TEST_VERBOSE
     std::printf("\n# diag: mirror behind, through ray_progress. thin_slab_threshold 0.15 and 0, 20 interactions, no gain floor. The\n");
     std::printf("# summed paths against the matrix of the wall, dB; HSH against its own sum at threshold 0 with 60 interactions.\n");
-    std::printf("# n: the paths behind and in front of the wall at 0.15. Rd: for SH, the reflected sum with every path but the\n");
-    std::printf("# shortest multiplied by exp(-2j k0 cos(theta) thk), against the matrix\n");
-    std::printf("wall,a,b,tracer,theta,nT,nR,T_015,R_015,Rdeg_015,T_0,R_0,Rd_015,Rd_0\n");
+    std::printf("# n: the paths behind and in front of the wall at 0.15. SH is referenced with its coating in front of the mesh\n");
+    std::printf("# plane, where the reflect port of a glued entry puts it\n");
+    std::printf("wall,a,b,tracer,theta,nT,nR,T_015,R_015,Rdeg_015,T_0,R_0\n");
 #endif
     std::vector<Wall> walls = {{"H", 5, 0}, {"H", 6, 0}, {"HS", 5, 0}, {"HS", 6, 0}, {"SH", 5, 0}, {"SH", 6, 0}, {"AB", 2, 5}, {"AB", 2, 6}, {"HSH", 5, 0}, {"HSH", 6, 0}};
     for (const Wall &w : walls)
@@ -3447,7 +3447,8 @@ TEST_CASE("Measurement - ray_progress and the mirror behind a back reflection")
                 }
                 else
                     cm(ls, s2, 1.0, r, t);
-                const std::complex<double> D2 = std::exp(-2.0 * J * k0 * std::cos(thd * PI / 180.0) * 0.006);
+                if (std::string(w.name) == "SH")
+                    r *= std::exp(2.0 * J * k0 * std::cos(thd * PI / 180.0) * 0.006);
                 INFO("windows, wall " << w.name << ", a " << w.a << ", b " << w.b << ", refr " << refr << ", theta " << thd);
                 CHECK(D.nT >= 1);
                 // The default threshold and every series summed are one wall. A sheet inside a wall
@@ -3456,9 +3457,8 @@ TEST_CASE("Measurement - ray_progress and the mirror behind a back reflection")
                 CHECK(std::abs(dB(D.T[0] / Z.T[0])) < bound);
                 CHECK(std::abs(dB(D.R[0] / Z.R[0])) < bound);
 #ifdef QD_TEST_VERBOSE
-                std::printf("%s,%d,%d,%d,%.0f,%d,%d,%+.4f,%+.4f,%+.3f,%+.4f,%+.4f,%+.4f,%+.4f\n", w.name, w.a, w.b, refr ? 5 : 4, thd, D.nT, D.nR, dB(D.T[0] / t),
-                            dB(D.R[0] / r), deg(D.R[0] / r), dB(Z.T[0] / t), dB(Z.R[0] / r), dB((D.R1[0] + (D.R[0] - D.R1[0]) * D2) / r),
-                            dB((Z.R1[0] + (Z.R[0] - Z.R1[0]) * D2) / r));
+                std::printf("%s,%d,%d,%d,%.0f,%d,%d,%+.4f,%+.4f,%+.3f,%+.4f,%+.4f\n", w.name, w.a, w.b, refr ? 5 : 4, thd, D.nT, D.nR, dB(D.T[0] / t),
+                            dB(D.R[0] / r), deg(D.R[0] / r), dB(Z.T[0] / t), dB(Z.R[0] / r));
 #endif
             }
 
@@ -3537,9 +3537,9 @@ TEST_CASE("Measurement - ray_progress and the mirror behind a back reflection")
     // ------------------------------------------------------------------------------------------
 #ifdef QD_TEST_VERBOSE
     std::printf("\n# diag: mirror behind, a wall coated on its near side over frequency. air | coating 6 mm | host 100 | air, every\n");
-    std::printf("# series summed, undeviated tracer. The reflected sum against the matrix of the wall, dB and deg; Rd: with every\n");
-    std::printf("# path but the shortest multiplied by exp(-2j k0 cos(theta) thk); T: the transmitted sum; mis: 2 k0 cos(theta) thk, deg\n");
-    std::printf("host,fGHz,theta,mis_deg,R_dB,R_deg,Rd_dB,T_dB\n");
+    std::printf("# series summed, undeviated tracer. The reflected sum against the matrix of the wall with the coating in front of\n");
+    std::printf("# the mesh plane, dB and deg; T: the transmitted sum; mis: 2 k0 cos(theta) thk, deg\n");
+    std::printf("host,fGHz,theta,mis_deg,R_dB,R_deg,T_dB\n");
 #endif
     for (int hst : {5, 6})
         for (double fg : {0.3, 1.0, 3.0, 6.0})
@@ -3552,12 +3552,255 @@ TEST_CASE("Measurement - ray_progress and the mirror behind a back reflection")
                 Sum Z = trace(mesh, mi, thd, false, 0.0f, 0.10f, 20, -300.0f, {fg});
                 std::complex<double> r, t;
                 cm({{3, 0.006}, {hst, 0.10}}, s2, fg, r, t);
-                const std::complex<double> D2 = std::exp(-2.0 * J * k * std::cos(th) * 0.006);
+                r *= std::exp(2.0 * J * k * std::cos(th) * 0.006);
                 INFO("near coating, host " << hst << ", f " << fg << ", theta " << thd);
                 CHECK(Z.nR >= 1);
 #ifdef QD_TEST_VERBOSE
-                std::printf("%d,%.1f,%.0f,%.1f,%+.4f,%+.3f,%+.4f,%+.4f\n", hst, fg, thd, 2.0 * k * std::cos(th) * 0.006 * 180.0 / PI, dB(Z.R[0] / r), deg(Z.R[0] / r),
-                            dB((Z.R1[0] + (Z.R[0] - Z.R1[0]) * D2) / r), dB(Z.T[0] / t));
+                std::printf("%d,%.1f,%.0f,%.1f,%+.4f,%+.3f,%+.4f\n", hst, fg, thd, 2.0 * k * std::cos(th) * 0.006 * 180.0 / PI, dB(Z.R[0] / r), deg(Z.R[0] / r),
+                            dB(Z.T[0] / t));
 #endif
             }
+}
+
+TEST_CASE("ray_progress - the reflect port of a sheet lies where its transmit port puts the layer")
+{
+#ifdef _OPENMP
+    // One ray per call, many thousand calls: a thread team per call costs twenty times the work
+    struct OneThread
+    {
+        int n = omp_get_max_threads();
+        OneThread() { omp_set_num_threads(1); }
+        ~OneThread() { omp_set_num_threads(n); }
+    } one_thread;
+#endif
+    // The reflect port of a sheet owes the round trip through the part of its layer in front of
+    // the mesh plane: all of it for a coating seen from the room, half of it for a sheet with one
+    // medium on both sides. Through the tracer itself: one ray, ray_progress called until no ray
+    // is left, every path that ends in air outside the structure summed at its polyline's point.
+    // Scalar, float, undeviated and refracting tracer.
+    //   SH   coating 6 mm | host 100, a wall coated on its near side
+    //   SHS  coating 6 mm | host 100 | coating 6 mm, a wall lined on both faces
+    //   SGH  sheet 6 mm | air 30 mm | host 100, a sheet in front of a wall across an air gap
+    const double PI = 3.14159265358979323846, C0 = 299792458.0;
+    const float gap = 1.0e-5f;
+    const std::complex<double> J(0.0, 1.0);
+    typedef std::unordered_map<std::string, std::vector<float>> Pal;
+
+    Pal pal; // 1: eps 5.24-0.63j, 2: 5.24, 3: sheet 5.24-0.63j 6 mm, 4: 9.0-1.20j, 5: 1.50-0.40j, 6: 1.50
+    pal["a"] = {5.24f, 5.24f, 5.24f, 9.0f, 1.50f, 1.50f};
+    pal["b"] = std::vector<float>(6, 0.0f);
+    pal["c"] = {(float)(0.63 / 17.98), 0.0f, (float)(0.63 / 17.98), (float)(1.20 / 17.98), (float)(0.40 / 17.98), 0.0f};
+    pal["d"] = std::vector<float>(6, 0.0f);
+    pal["fRef"] = std::vector<float>(6, 1.0f);
+    pal["thk"] = {0.0f, 0.0f, 0.006f, 0.0f, 0.0f, 0.0f};
+    auto eps_of = [](int m, double fGHz) -> std::complex<double>
+    {
+        const double a[7] = {1.0, 5.24, 5.24, 5.24, 9.0, 1.50, 1.50}, im[7] = {0.0, 0.63, 0.0, 0.63, 1.20, 0.40, 0.0};
+        return std::complex<double>(a[m], -im[m] / fGHz);
+    };
+
+    auto build = [](const std::vector<float> &x, const std::vector<int> &mat, const std::vector<bool> &flip, arma::fmat &mesh, arma::uvec &mi)
+    {
+        const float h = 200.0f;
+        mesh.set_size(2 * x.size(), 9);
+        mi.set_size(2 * x.size());
+        for (size_t k = 0; k < x.size(); ++k)
+        {
+            if (!flip[k])
+                mesh.row(2 * k) = arma::frowvec{x[k], -h, -h, x[k], -h, h, x[k], h, -h},
+                mesh.row(2 * k + 1) = arma::frowvec{x[k], h, -h, x[k], -h, h, x[k], h, h};
+            else
+                mesh.row(2 * k) = arma::frowvec{x[k], -h, -h, x[k], h, -h, x[k], -h, h},
+                mesh.row(2 * k + 1) = arma::frowvec{x[k], h, -h, x[k], h, h, x[k], -h, h};
+            mi(2 * k) = (arma::uword)mat[k], mi(2 * k + 1) = (arma::uword)mat[k];
+        }
+    };
+
+    // The reference: TE, mu = 1, admittance b = sqrt(eps - sin^2), layer phase k b d; material 0 is air
+    struct Lay
+    {
+        int m;
+        double d;
+    };
+    auto cm = [&](const std::vector<Lay> &ls, double s2, double fGHz, std::complex<double> &r, std::complex<double> &t)
+    {
+        const double k = 2.0 * PI * fGHz * 1.0e9 / C0;
+        std::complex<double> m11 = 1.0, m12 = 0.0, m21 = 0.0, m22 = 1.0, h0 = std::sqrt(std::complex<double>(1.0 - s2, 0.0));
+        for (const Lay &l : ls)
+        {
+            std::complex<double> b = std::sqrt(eps_of(l.m, fGHz) - s2), dl = k * b * l.d, c = std::cos(dl), s = std::sin(dl);
+            std::complex<double> a12 = J * s / b, a21 = J * b * s;
+            std::complex<double> n11 = m11 * c + m12 * a21, n12 = m11 * a12 + m12 * c, n21 = m21 * c + m22 * a21, n22 = m21 * a12 + m22 * c;
+            m11 = n11, m12 = n12, m21 = n21, m22 = n22;
+        }
+        std::complex<double> B = m11 + m12 * h0, Cc = m21 + m22 * h0;
+        r = (h0 * B - Cc) / (h0 * B + Cc), t = 2.0 * h0 / (h0 * B + Cc);
+    };
+
+    struct Sum
+    {
+        std::complex<double> T = 0.0, R = 0.0, R1 = 0.0; // all paths; the shortest reflected one
+        int nT = 0, nR = 0;
+        size_t segR1 = 1000;
+    };
+    auto trace = [&](const arma::fmat &mesh, const arma::uvec &mi, double thd, bool refr, float slab, float x_back, int max_int, float min_gain,
+                     double fGHz) -> Sum
+    {
+        Sum S;
+        const double th = thd * PI / 180.0, st = std::sin(th), k = 2.0 * PI * fGHz * 1.0e9 / C0;
+        const float Ox = -1.0f, Oy = 0.37f - (float)std::tan(th), Oz = 0.0f, r0 = 0.1f, len = 300.0f;
+        arma::frowvec kv = {(float)std::cos(th), (float)std::sin(th), 0.0f};
+        arma::fvec cf(1);
+        cf(0) = (float)(fGHz * 1.0e9);
+        arma::fmat orig(1, 3), dest(1, 3), acc(1, 2, arma::fill::zeros);
+        orig.row(0) = arma::frowvec{Ox, Oy, Oz} + r0 * kv;
+        dest.row(0) = arma::frowvec{Ox, Oy, Oz} + (r0 + len) * kv;
+        arma::fcube pd(1, 3, 1);
+        pd.slice(0) = kv;
+        arma::Col<short> prev(1, arma::fill::zeros), cur(1, arma::fill::zeros), buf(1, arma::fill::zeros);
+        std::vector<quadriga_lib::path> paths(1);
+        paths[0].init(0, 1, true);
+        paths[0].set_length(r0);
+        for (int g = 0; g < 120; ++g)
+        {
+            quadriga_lib::ray_progress(mesh, mi, pal, cf, Ox, Oy, Oz, orig, dest, prev, cur, buf, pd, acc, paths,
+                                       nullptr, nullptr, nullptr, nullptr,
+                                       (uint8_t)max_int, 100, 100, 0, min_gain, 3.0f, slab, refr, true,
+                                       nullptr, nullptr, nullptr, nullptr);
+            if (orig.n_rows == 0)
+                break;
+            for (arma::uword i = 0; i < orig.n_rows; ++i)
+            {
+                const size_t ns = paths[i].n_seg();
+                if ((cur(i) & (short)0x3FFF) != 0 || ns != (size_t)(g + 1))
+                    continue; // inside a body, or a ray that was already collected
+                const float *first = paths[i].coord(0), *last = paths[i].coord(ns - 1);
+                const bool fwd = dest(i, 0) > orig(i, 0);
+                const bool isT = fwd && last[0] > x_back - 1.0e-3f, isR = !fwd && last[0] < 1.0e-3f;
+                if (!isT && !isR)
+                    continue; // in air between two bodies
+                double Lin = 0.0;
+                for (size_t s = 1; s < ns; ++s)
+                {
+                    const float *a = paths[i].coord(s - 1), *b = paths[i].coord(s);
+                    Lin += std::sqrt(((double)b[0] - a[0]) * ((double)b[0] - a[0]) + ((double)b[1] - a[1]) * ((double)b[1] - a[1]) +
+                                     ((double)b[2] - a[2]) * ((double)b[2] - a[2]));
+                }
+                const float *xc = paths[i].xpr_coeff(0);
+                std::complex<double> F = std::complex<double>((double)xc[0], (double)xc[1]) * std::exp(-J * k * Lin) *
+                                         std::exp(J * k * st * ((double)last[1] - (double)first[1]));
+                if (isT)
+                    S.T += F, ++S.nT;
+                else
+                {
+                    S.R += F, ++S.nR;
+                    if (ns <= S.segR1)
+                        S.R1 = F, S.segR1 = ns;
+                }
+            }
+        }
+        return S;
+    };
+    auto dB = [](std::complex<double> z)
+    { return (std::norm(z) > 0.0) ? 10.0 * std::log10(std::norm(z)) : -999.0; };
+    auto deg = [&](std::complex<double> z)
+    { return std::arg(z) * 180.0 / PI; };
+
+    // ------------------------------------------------------------------------------------------
+    // A. A wall coated on its near side and a wall lined on both faces, over frequency
+    // ------------------------------------------------------------------------------------------
+    // Where the wall reflects 10 dB less than the path off its first coating the two nearly
+    // cancel, and the row is held against that first path. A traced leg is short by the relaunch
+    // offset, which the reference does not know and which grows with frequency: the rows at
+    // 6 GHz are held at 1e-2 dB.
+#ifdef QD_TEST_VERBOSE
+    std::printf("\n# diag: reflect port, a wall coated on its near side (SH) and lined on both faces (SHS) through ray_progress.\n");
+    std::printf("# coating 6 mm, host 100, 20 interactions, no gain floor. thr: thin_slab_threshold. R_dB, R_deg: the reflected sum\n");
+    std::printf("# against the matrix of the wall with the near coating in front of the mesh plane; R_ff: its distance from that\n");
+    std::printf("# wall over the shortest reflected path; T: the transmitted sum; mis: 2 k0 cos(theta) thk, deg\n");
+    std::printf("wall,host,tracer,thr,fGHz,theta,nT,nR,mis_deg,R_dB,R_deg,R_ff,T_dB\n");
+#endif
+    for (int lined = 0; lined < 2; ++lined)
+        for (int hst : {5, 6})
+            for (int refr = 0; refr < 2; ++refr)
+                for (float thr : {0.0f, 0.15f})
+                    for (double fg : {0.3, 1.0, 3.0, 6.0})
+                        for (double thd : {10.0, 30.0, 50.0, 70.0})
+                        {
+                            if (refr && thr > 0.0f && fg != 1.0)
+                                continue;
+                            arma::fmat mesh;
+                            arma::uvec mi;
+                            std::vector<Lay> ls = {{3, 0.006}, {hst, 0.10}};
+                            if (lined)
+                                build({0.0f, gap, 0.10f + gap, 0.10f + 2.0f * gap}, {3, hst, hst, 3}, {false, false, true, true}, mesh, mi), ls.push_back({3, 0.006});
+                            else
+                                build({0.0f, gap, 0.10f + gap}, {3, hst, hst}, {false, false, true}, mesh, mi);
+                            const double th = thd * PI / 180.0, s2 = std::sin(th) * std::sin(th), k = 2.0 * PI * fg * 1.0e9 / C0;
+                            Sum Z = trace(mesh, mi, thd, refr != 0, thr, 0.10f, 20, -300.0f, fg);
+                            std::complex<double> r, t;
+                            cm(ls, s2, fg, r, t);
+                            r *= std::exp(2.0 * J * k * std::cos(th) * 0.006); // the near coating in front of the plane
+                            INFO("wall " << (lined ? "SHS" : "SH") << ", host " << hst << ", refr " << refr << ", thr " << thr << ", f " << fg << ", theta " << thd);
+                            REQUIRE((Z.nR >= 2 && Z.nT >= 1));
+                            if (std::abs(r) < 0.316 * std::abs(Z.R1))
+                                CHECK(std::abs(Z.R - r) < 5.0e-3 * std::abs(Z.R1));
+                            else
+                            {
+                                CHECK(std::abs(dB(Z.R / r)) < ((fg > 3.0) ? 1.0e-2 : 5.0e-3));
+                                CHECK(std::abs(deg(Z.R / r)) < 0.05);
+                            }
+                            CHECK(std::abs(dB(Z.T / t)) < 5.0e-3);
+#ifdef QD_TEST_VERBOSE
+                            std::printf("%s,%d,%d,%.2f,%.1f,%.0f,%d,%d,%.1f,%+.4f,%+.3f,%.2e,%+.4f\n", lined ? "SHS" : "SH", hst, refr ? 5 : 4, (double)thr, fg, thd, Z.nT,
+                                        Z.nR, 2.0 * k * std::cos(th) * 0.006 * 180.0 / PI, dB(Z.R / r), deg(Z.R / r), std::abs(Z.R - r) / std::abs(Z.R1), dB(Z.T / t));
+#endif
+                        }
+
+    // ------------------------------------------------------------------------------------------
+    // B. A sheet in front of a wall across an air gap
+    // ------------------------------------------------------------------------------------------
+    // The layer of the sheet occupies 6 mm of the air around its face, [-u, 6 mm - u]: uh centred,
+    // which is the wall the paths sum to; u0 behind the face, in the gap, and ut in front,
+    // recorded. Each wall referenced to the sheet's face. The cavity is followed bounce by
+    // bounce: with 60 interactions and a floor of -120 dB the lossless host at 70 deg and 3 GHz
+    // is 0.059 dB short, so the rows run to 110 interactions and -200 dB.
+#ifdef QD_TEST_VERBOSE
+    std::printf("\n# diag: reflect port, a sheet in front of a wall across an air gap through ray_progress. air | sheet 6 mm | air 30 mm\n");
+    std::printf("# | host 100 | air, every series summed, 110 interactions, floor -200 dB. The summed paths against the wall whose\n");
+    std::printf("# layer lies at [-u, thk - u]: uh centred, asserted; u0 behind the face and ut in front, recorded; dB and deg\n");
+    std::printf("host,tracer,fGHz,theta,nT,nR,R_uh,Rdeg_uh,T_uh,Tdeg_uh,R_u0,Rdeg_u0,T_u0,R_ut,Rdeg_ut,T_ut\n");
+#endif
+    for (int hst : {5, 6})
+        for (int refr = 0; refr < 2; ++refr)
+            for (double fg : {0.3, 1.0, 3.0, 6.0})
+                for (double thd : {10.0, 40.0, 70.0})
+                {
+                    if (refr && fg != 1.0)
+                        continue;
+                    const float g = 0.03f;
+                    arma::fmat mesh;
+                    arma::uvec mi;
+                    build({0.0f, g, g + 0.10f}, {3, hst, hst}, {false, false, true}, mesh, mi);
+                    const double th = thd * PI / 180.0, s2 = std::sin(th) * std::sin(th), ck = 2.0 * PI * fg * 1.0e9 / C0 * std::cos(th);
+                    Sum Z = trace(mesh, mi, thd, refr != 0, 0.0f, g + 0.10f, 110, -200.0f, fg);
+                    std::complex<double> rr[3], tt[3];
+                    const double uu[3] = {0.0, 0.003, 0.006};
+                    for (int q = 0; q < 3; ++q)
+                    {
+                        cm({{3, 0.006}, {0, 0.03 - 0.006 + uu[q]}, {hst, 0.10}}, s2, fg, rr[q], tt[q]);
+                        rr[q] *= std::exp(2.0 * J * ck * uu[q]), tt[q] *= std::exp(J * ck * uu[q]);
+                    }
+                    INFO("air gap, host " << hst << ", refr " << refr << ", f " << fg << ", theta " << thd);
+                    REQUIRE((Z.nR >= 2 && Z.nT >= 1));
+                    CHECK(std::abs(dB(Z.R / rr[1])) < 5.0e-3);
+                    CHECK(std::abs(deg(Z.R / rr[1])) < 0.05);
+                    CHECK(std::abs(dB(Z.T / tt[1])) < 5.0e-3);
+                    CHECK(std::abs(deg(Z.T / tt[1])) < 0.05);
+#ifdef QD_TEST_VERBOSE
+                    std::printf("%d,%d,%.1f,%.0f,%d,%d,%+.4f,%+.3f,%+.4f,%+.3f,%+.4f,%+.3f,%+.4f,%+.4f,%+.3f,%+.4f\n", hst, refr ? 5 : 4, fg, thd, Z.nT, Z.nR, dB(Z.R / rr[1]),
+                                deg(Z.R / rr[1]), dB(Z.T / tt[1]), deg(Z.T / tt[1]), dB(Z.R / rr[0]), deg(Z.R / rr[0]), dB(Z.T / tt[0]), dB(Z.R / rr[2]), deg(Z.R / rr[2]),
+                                dB(Z.T / tt[2]));
+#endif
+                }
 }
