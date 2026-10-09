@@ -34,6 +34,9 @@
 //    "e"/"f"/"g"/"h" (permeability). These are the current obj_file_read column names.
 
 #include <catch2/catch_test_macros.hpp>
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 #include "quadriga_tools.hpp"
 #include "bits.hpp"
@@ -863,7 +866,7 @@ TEST_CASE("ray_state_update - dispatch: reflection pass")
     {
         auto C = disp(OT_EXIT, 1, 4, 0, 0, 4, 0, 1.0, 2.0, 0.5, 3, 1.5);
         check_mult(C, close_at(4, 1.0), TOL);
-        check_state(C, 0, 4, 0); // no resolved flag
+        check_state(C, 0, 4, 0x4000); // no resolved flag; followed
         check_rtype(C, RT_RINT);
     }
     SECTION("internal reflection of a resolvable slab applies S and flags the ray")
@@ -1253,7 +1256,7 @@ TEST_CASE("ray_state_update - cross-pass invariance of the resolve decision")
         check_mult(T, close_at(5, L), TOL);
         check_mult(R, close_at(5, L), TOL);
         check_state(T, 5, 0, 0);
-        check_state(R, 0, 5, 0); // re-emitted, no resolved flag
+        check_state(R, 0, 5, 0x4000); // re-emitted, no resolved flag; followed
         check_rtype(T, RT_EXIT);
         check_rtype(R, RT_RINT);
     }
@@ -8171,7 +8174,7 @@ TEST_CASE("Bonded mass - sheet on sheet, sheet on solid and solid on solid as on
                 C.paid + W.paid, plate);
         INFO("bounce in the second body, theta_n " << thd);
         CHECK(std::abs(A.paid + R.paid - plate) < 0.01); // the reflection pass closes the leg as the exit does
-        CHECK(R.buf == 0);                               // nothing bonded was crossed on the way back yet
+        CHECK(R.buf == 0x4000);                          // followed, and no mass flag: nothing bonded was crossed on the way back yet
         CHECK(std::abs(C.paid - own_c) < 1.0e-9);        // so the stale previous medium is not read
         CHECK(std::abs(C.paid + W.paid - plate) < 0.01);
     }
@@ -8271,7 +8274,7 @@ TEST_CASE("Bonded mass - sheet on sheet, sheet on solid and solid on solid as on
         INFO("bounce returning to the glued sheet, theta_n " << thd);
         CHECK(std::abs(fwd - plate) < 1.0e-9);  // the way in pays the plate
         CHECK(R.prev == P20);                   // the stale sheet is still in the word
-        CHECK(R.buf == 0);                      // but it was not crossed on this traversal
+        CHECK(R.buf == 0x4000);                 // but it was not crossed on this traversal: followed, no mass flag
         CHECK(std::abs(back - plate) < 1.0e-9); // so the way back pays the plate once
         CHECK(d_bare < 1.0e-12);                // through the same exit a bare-entered solid takes
         check_state(X, P20, 0, 0);
@@ -8435,7 +8438,7 @@ TEST_CASE("Lined on both faces - a glued exit behind a sheet exits into air")
                 CHECK(a == b);         // and the exit does not know how the host was entered
                 if (port)
                 {
-                    check_state(A, R.s2, enc(HOST, false), 0); // a reflection stays in the host; its series was declined, so it is not resolved
+                    check_state(A, R.s2, enc(HOST, false), 0x4000); // a reflection stays in the host; its series was declined, so it is not resolved but followed
                     check_rtype(A, 207);
                 }
                 else
@@ -8681,7 +8684,7 @@ TEST_CASE("Layered wall - a glued exit behind a bare-entered second layer exits 
                     CHECK(a == b);         // and the exit does not know what the host was entered from
                     if (port)
                     {
-                        check_state(A, SHEET, enc(HOST, false), 0); // a reflection stays in the host; its series was declined, so it is not resolved
+                        check_state(A, SHEET, enc(HOST, false), 0x4000); // a reflection stays in the host; its series was declined, so it is not resolved but followed
                         check_rtype(A, 207);
                     }
                     else
@@ -8892,7 +8895,7 @@ TEST_CASE("Layered wall - a glued exit behind a bare-entered second layer exits 
                 CHECK(d_dir < 1.0e-9); // the direction is that of B -> air
                 check_state(Xt, SHEET, 0, 0);
                 check_rtype(Xt, 71);
-                check_state(Xr, SHEET, enc(host, false), 0); // declined: the reflected ray is the tracer's
+                check_state(Xr, SHEET, enc(host, false), 0x4000); // declined: the reflected ray is the tracer's, followed
                 check_rtype(Xr, 207);
             }
 
@@ -12828,36 +12831,517 @@ TEST_CASE("Sheet reflection - a declined series is followed and not dropped")
                     CHECK(std::abs(deg(Rinf / W.r)) < 0.05);
                 }
             }
+}
+
+TEST_CASE("Measurement - the mirror behind the ray after a back reflection")
+{
+#ifdef _OPENMP
+    // One ray per call, many thousand calls: a thread team per call costs twenty times the work
+    struct OneThread
+    {
+        int n = omp_get_max_threads();
+        OneThread() { omp_set_num_threads(1); }
+        ~OneThread() { omp_set_num_threads(n); }
+    } one_thread;
+#endif
+    // Plan item 1, measured. A series is formed from the face ahead of the ray and the one behind
+    // it, and the one behind is read from the previous-medium word. A back reflection at a bare
+    // face does not write that word. Through ray_triangle_intersect, ray_mesh_interact and
+    // ray_state_update, scalar, double, 1 GHz, both tracers. Nothing is asserted beyond sanity.
+    //
+    // Walls, all standing in air:
+    //   H    host 100                          HS   host 100 | coating 6 mm
+    //   SH   coating 6 mm | host 100           AB   A 50 | B 100, two solids across a bare face
+    //   HSH  host 50 | sheet 6 mm | host 50
+    //
+    // A. One leg at a time. The event that closes a leg which began at a back reflection at a
+    //    bare face, at eps 0 over the same at eps 1.5: the series it forms, against the form with
+    //    the mirror that is behind the ray and against the form with what the word holds. And the
+    //    threshold at which that event stops summing, found by bisection: the rho the library
+    //    formed, next to the one of the first leg in the same body.
+    // B. Every path. One ray, every reflected and transmitted ray followed until it is in air,
+    //    dead or 20 events old, summed at the polyline's point. Four runs per row: the library at
+    //    eps 0.15; the same with eps 1.5 handed to every event on a leg that began at a declined
+    //    reflection (the verdict inherited); the same with the mirror written into the word by
+    //    the fixture after a declined reflection at a bare face (the word made true); and eps 0.
+    const double gap = 1.0e-5, thk = 0.006;
+    auto mtl = diag_palette<double>();
+    const int SHEET = 3;
+    const std::complex<double> J(0.0, 1.0), e_air(1.0, 0.0);
+    typedef std::unordered_map<std::string, std::vector<double>> Pal;
+    auto dB = [](double g)
+    { return (g > 0.0) ? 10.0 * std::log10(g) : -999.0; };
+
+    struct Ev
+    {
+        arma::mat origN, destN, path_dirN, xpr, fbs;
+        arma::Col<short> prev, cur, buf;
+        arma::vec accg, accr;
+        uint8_t ot = 0, rt = 0;
+        unsigned nh = 0;
+    };
+    auto traced = [&](const Pal &pal, const arma::mat &mesh, const arma::uvec &mtl_ind, int itype, double f,
+                      const arma::mat &orig, const arma::mat &dest, const Ev *in, double eps, bool relaunch,
+                      const std::vector<uint8_t> *vin = nullptr, std::vector<uint8_t> *vout = nullptr) -> Ev
+    {
+        arma::mat fbs, sbs, sbsN, nv;
+        arma::u32_vec nh, fi, si;
+        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, &nh, &fi, &si);
+        Ev E;
+        arma::vec gain, fang;
+        std::vector<uint8_t> ot, rt;
+        quadriga_lib::ray_mesh_interact(itype, f, &orig, &dest, &mesh, &mtl_ind, &pal, &fi, &si, (arma::mat *)nullptr,
+                                        (arma::mat *)nullptr, &E.origN, &E.destN, &E.fbs, &sbsN, &gain, &E.xpr,
+                                        (arma::mat *)nullptr, (arma::mat *)nullptr, &fang, (arma::vec *)nullptr,
+                                        (arma::vec *)nullptr, &nv, &ot, &E.path_dirN, false, (arma::u32_vec *)nullptr);
+        arma::Col<short> mf(1), ms(1);
+        mf(0) = fi(0) ? (short)mtl_ind(fi(0) - 1) : (short)0, ms(0) = si(0) ? (short)mtl_ind(si(0) - 1) : (short)0;
+        quadriga_lib::ray_state_update(itype, f, &orig, &dest, &E.fbs, &sbsN, &nh, &fang, &nv, &ot, &pal, &mf, &ms,
+                                       in ? &in->prev : nullptr, in ? &in->cur : nullptr, in ? &in->buf : nullptr,
+                                       in ? &in->path_dirN : nullptr, in ? &in->accg : nullptr, in ? &in->accr : nullptr,
+                                       &E.prev, &E.cur, &E.buf, &gain, &E.xpr, &E.path_dirN, &E.accg, &E.accr, &rt,
+                                       (arma::u32_vec *)nullptr, eps, relaunch ? &E.origN : nullptr, relaunch ? &E.destN : nullptr,
+                                       (arma::mat *)nullptr, (arma::mat *)nullptr, vin, vout);
+        E.ot = ot[0], E.rt = rt[0], E.nh = nh(0);
+        return E;
+    };
+    auto face = [](double x, bool flip) -> arma::mat
+    {
+        arma::mat m = diag_quad_x(200.0, x);
+        if (flip)
+        {
+            m.row(0) = arma::rowvec{x, -200.0, -200.0, x, 200.0, -200.0, x, -200.0, 200.0};
+            m.row(1) = arma::rowvec{x, 200.0, -200.0, x, 200.0, 200.0, x, -200.0, 200.0};
+        }
+        return m;
+    };
+    auto build = [&](const std::vector<double> &x, const std::vector<int> &mat, const std::vector<bool> &flip, arma::uvec &mtl_ind)
+    {
+        arma::mat mesh;
+        mtl_ind.set_size(2 * x.size());
+        for (size_t k = 0; k < x.size(); ++k)
+        {
+            mesh = k ? arma::join_cols(mesh, face(x[k], flip[k])) : face(x[k], flip[k]);
+            mtl_ind(2 * k) = (arma::uword)mat[k], mtl_ind(2 * k + 1) = (arma::uword)mat[k];
+        }
+        return mesh;
+    };
+    struct Chain
+    {
+        std::vector<Ev> ev;
+        std::vector<double> fx, ox;
+        bool ok = true;
+        std::string words;
+    };
+    auto run = [&](const arma::mat &mesh, const arma::uvec &mtl_ind, const std::vector<int> &seq, const std::vector<double> &epsv, double thd) -> Chain
+    {
+        Chain C;
+        arma::mat orig, dest;
+        diag_ray_at(thd, orig, dest);
+        Ev P;
+        bool have = false;
+        for (size_t k = 0; k < seq.size(); ++k)
+        {
+            bool tx = seq[k] != 0 && seq[k] != 3;
+            Ev E = traced(mtl, mesh, mtl_ind, seq[k], FRQ, orig, dest, have ? &P : nullptr, epsv.size() == 1 ? epsv[0] : epsv[k], tx);
+            if (E.nh == 0 || E.rt == 0)
+            {
+                C.ok = false;
+                break;
+            }
+            char w[40];
+            std::snprintf(w, sizeof(w), "%04x.%04x.%04x/", (unsigned)(unsigned short)E.prev(0), (unsigned)(unsigned short)E.cur(0),
+                          (unsigned)(unsigned short)E.buf(0));
+            C.words += w;
+            arma::mat d = E.destN - E.origN;
+            d /= std::sqrt(d(0, 0) * d(0, 0) + d(0, 1) * d(0, 1) + d(0, 2) * d(0, 2));
+            orig = E.origN, dest = E.origN + (1.2 / std::abs(d(0, 0))) * d; // long enough to cross every face that is left
+            C.fx.push_back(E.fbs(0, 0)), C.ox.push_back(E.origN(0, 0));
+            P = E, have = true;
+            C.ev.push_back(E);
+        }
+        return C;
+    };
+
+    // The reference: TE, mu = 1, admittance b = sqrt(eps - sin^2), layer phase k b d
+    struct Lay
+    {
+        std::complex<double> e;
+        double d;
+    };
+    struct RT
+    {
+        std::complex<double> r, t;
+    };
+    auto bof = [](std::complex<double> e, double s2)
+    { return std::sqrt(e - s2); };
+    auto cm = [&](std::complex<double> en, const std::vector<Lay> &ls, std::complex<double> ef, double s2, double k) -> RT
+    {
+        std::complex<double> m11 = 1.0, m12 = 0.0, m21 = 0.0, m22 = 1.0;
+        for (const Lay &l : ls)
+        {
+            std::complex<double> b = bof(l.e, s2), dl = k * b * l.d, c = std::cos(dl), s = std::sin(dl);
+            std::complex<double> a12 = J * s / b, a21 = J * b * s;
+            std::complex<double> n11 = m11 * c + m12 * a21, n12 = m11 * a12 + m12 * c, n21 = m21 * c + m22 * a21, n22 = m21 * a12 + m22 * c;
+            m11 = n11, m12 = n12, m21 = n21, m22 = n22;
+        }
+        std::complex<double> hn = bof(en, s2), hf = bof(ef, s2), B = m11 + m12 * hf, Cc = m21 + m22 * hf;
+        RT o;
+        o.r = (hn * B - Cc) / (hn * B + Cc), o.t = 2.0 * hn / (hn * B + Cc);
+        return o;
+    };
+    auto rint = [&](std::complex<double> ea, std::complex<double> eb, double s2) // seen from a, towards b
+    { return (bof(ea, s2) - bof(eb, s2)) / (bof(ea, s2) + bof(eb, s2)); };
+    auto phi = [&](std::complex<double> e, double s2, double k, double d)
+    { return std::exp(-J * k * bof(e, s2) * d); };
+    auto unit = [](std::complex<double> r) // the clamp of section 5 on a mirror above one
+    { return (std::abs(r) > 1.0) ? r / std::abs(r) : r; };
+    const double k1 = 2.0 * QPI * FRQ / C0;
+    std::vector<double> angles;
+    for (double a = 10.0; a < 86.0; a += 5.0)
+        angles.push_back(a);
+
+    // The walls. leg: 0 = the only body, or the first one; 1 = the second
+    struct Wall
+    {
+        const char *name;
+        int a, b; // host, or first and second solid
+    };
+    auto mesh_of = [&](const std::string &w, int a, int b, arma::uvec &mi) -> arma::mat
+    {
+        if (w == "H")
+            return build({0.0, 0.10}, {a, a}, {false, true}, mi);
+        if (w == "HS")
+            return build({0.0, 0.10, 0.10 + gap}, {a, a, SHEET}, {false, true, true}, mi);
+        if (w == "SH")
+            return build({0.0, gap, 0.10 + gap}, {SHEET, a, a}, {false, false, true}, mi);
+        if (w == "AB")
+            return build({0.0, 0.05, 0.05 + gap, 0.15 + gap}, {a, a, b, b}, {false, true, false, true}, mi);
+        return build({0.0, 0.05, 0.10}, {a, SHEET, a}, {false, false, true}, mi); // HSH
+    };
 
     // ------------------------------------------------------------------------------------------
-    // C. The mirror behind the ray after a back reflection at the bare front face
+    // A. One leg at a time
     // ------------------------------------------------------------------------------------------
-    // Recorded. Enter, reflect off the coating, reflect off the front face, leave through the
-    // coating: on the last leg the mirror behind the ray is the front face, and the
-    // previous-medium word still holds the coating the first reflection wrote.
-    QD_DIAG("\n# diag: sheet reflection, the mirror behind after a back reflection at the bare front face. HS wall, eps 1.5 on\n");
-    QD_DIAG("# three events, then the exit through the coating at eps 0 over the same at eps 1.5: the series S that event\n");
-    QD_DIAG("# forms. d_face: |S - S| with the front face behind the ray; d_sheet: with the coating behind it as well.\n");
-    QD_DIAG("# rho_face, rho_sheet: sqrt(|r_behind r_ahead|^2 |phi|^4) for the two; worth_dB: 20 log |S_sheet / S_face|\n");
-    QD_DIAG("host,tracer,theta,|S|,d_face,d_sheet,rho_face,rho_sheet,worth_dB,words\n");
+    QD_DIAG("\n# diag: mirror behind, one leg. The event that closes a leg which began at a back reflection at a bare face, at\n");
+    QD_DIAG("# eps 0 over the same at eps 1.5: the series S it forms. leg: the body and the path, t a transmission, r a\n");
+    QD_DIAG("# reflection. d_true: |S - S| with the mirror that is behind the ray; d_word: with what the previous-medium word\n");
+    QD_DIAG("# holds. rho_true, rho_word: |r_ahead r_behind| |phi|^2 of the two, from the reference. rho_lib: the eps at which\n");
+    QD_DIAG("# that event stops summing, by bisection; rho_1st: the same for the first leg in that body, whose word is true.\n");
+    QD_DIAG("# worth_dB: 20 log |S_word / S_true|. win: 1 where rho_true < 0.15 <= rho_word, -1 for the reverse\n");
+    QD_DIAG("wall,a,b,leg,tracer,theta,|S|,d_true,d_word,rho_true,rho_word,rho_lib,rho_1st,worth_dB,win,words\n");
+    struct LegCase
+    {
+        const char *wall, *leg;
+        int a, b;
+        std::string seq, seq1; // t/r per event; the last event of each is the one measured
+        int body;              // which solid the leg is in: 0 = a, 1 = b
+        int ahead, behind, word; // 0 air, 1 the other solid, 2 the sheet backed by air, 3 the sheet backed by the host
+    };
+    std::vector<LegCase> legs;
+    for (int h : {5, 6})
+    {
+        legs.push_back({"HS", "host:trrt", h, 0, "trrt", "tt", 0, 2, 0, 2});
+        legs.push_back({"SH", "host:trt", h, 0, "trt", "tt", 0, 2, 0, 2});
+        legs.push_back({"HSH", "half1:trrt", h, 0, "trrt", "tt", 0, 3, 0, 3});
+        legs.push_back({"HSH", "half2:ttrt", h, 0, "ttrt", "ttt", 0, 3, 0, 3});
+    }
+    for (int b : {5, 6})
+    {
+        legs.push_back({"AB", "A:trt", 2, b, "trt", "tt", 0, 0, 1, 0});
+        legs.push_back({"AB", "B:ttrt", 2, b, "ttrt", "ttt", 1, 1, 0, 1});
+    }
+    for (const LegCase &lc : legs)
+        for (int tr : {4, 5})
+            for (double thd : angles)
+            {
+                double th = thd * QPI / 180.0, s2 = std::sin(th) * std::sin(th);
+                arma::uvec mi;
+                arma::mat mesh = mesh_of(lc.wall, lc.a, lc.b, mi);
+                auto seq_of = [&](const std::string &s)
+                {
+                    std::vector<int> q;
+                    for (char c : s)
+                        q.push_back(c == 't' ? tr : 3);
+                    return q;
+                };
+                auto last_at = [&](const std::string &s, double e, std::complex<double> &x, Chain *keep = nullptr) -> bool
+                {
+                    std::vector<double> ev(s.size(), 1.5);
+                    ev.back() = e;
+                    Chain c = run(mesh, mi, seq_of(s), ev, thd);
+                    if (!c.ok)
+                        return false;
+                    x = cpx(c.ev.back().xpr, 0, 0);
+                    if (keep)
+                        *keep = c;
+                    return true;
+                };
+                auto rho_lib = [&](const std::string &s) -> double // the eps at which the last event stops summing
+                {
+                    std::complex<double> x0, x;
+                    if (!last_at(s, 1.5, x0) || !last_at(s, 1.0e-9, x) || std::abs(x - x0) <= 1.0e-12 * std::abs(x0))
+                        return -1.0;
+                    double lo = 1.0e-9, hi = 1.5;
+                    for (int it = 0; it < 30; ++it)
+                    {
+                        double mid = 0.5 * (lo + hi);
+                        last_at(s, mid, x);
+                        if (std::abs(x - x0) > 1.0e-12 * std::abs(x0))
+                            lo = mid;
+                        else
+                            hi = mid;
+                    }
+                    return 0.5 * (lo + hi);
+                };
+                Chain c;
+                std::complex<double> x0, x1;
+                INFO("leg, wall " << lc.wall << ", " << lc.leg << ", a " << lc.a << ", b " << lc.b << ", tracer " << tr << ", theta " << thd);
+                bool ok = last_at(lc.seq, 0.0, x1, &c) && last_at(lc.seq, 1.5, x0);
+                if (!ok)
+                {
+                    QD_DIAG("%s,%d,%d,%s,%d,%.0f,dead\n", lc.wall, lc.a, lc.b, lc.leg, tr, thd);
+                    continue;
+                }
+                std::complex<double> S = x1 / x0;
+                size_t n = c.ev.size();
+                std::complex<double> eM = diag_eps(lc.body ? lc.b : lc.a, FRQ), eO = diag_eps(lc.body ? lc.a : lc.b, FRQ), eS = diag_eps(SHEET, FRQ);
+                auto mirror = [&](int kind) -> std::complex<double>
+                {
+                    if (kind == 0)
+                        return rint(eM, e_air, s2);
+                    if (kind == 1)
+                        return rint(eM, eO, s2);
+                    return unit(cm(eM, {{eS, thk}}, kind == 2 ? e_air : eM, s2, k1).r);
+                };
+                std::complex<double> pp = phi(eM, s2, k1, std::abs(c.fx[n - 1] - c.ox[n - 2]));
+                std::complex<double> ra = mirror(lc.ahead), rb = mirror(lc.behind), rw = mirror(lc.word);
+                std::complex<double> S_true = 1.0 / (1.0 - ra * rb * pp * pp), S_word = 1.0 / (1.0 - ra * rw * pp * pp);
+                double rho_t = std::abs(ra * rb) * std::norm(pp), rho_w = std::abs(ra * rw) * std::norm(pp);
+                QD_DIAG("%s,%d,%d,%s,%d,%.0f,%.6f,%.3e,%.3e,%.4f,%.4f,%.4f,%.4f,%+.4f,%d,%s\n", lc.wall, lc.a, lc.b, lc.leg, tr, thd, std::abs(S),
+                        std::abs(S - S_true), std::abs(S - S_word), rho_t, rho_w, rho_lib(lc.seq), rho_lib(lc.seq1), 2.0 * dB(std::abs(S_word / S_true)),
+                        (rho_t < 0.15 && rho_w >= 0.15) ? 1 : ((rho_w < 0.15 && rho_t >= 0.15) ? -1 : 0), c.words.c_str());
+                CHECK(std::isfinite(std::abs(S)));
+                // The verdict is inherited: a leg that begins at a declined reflection forms no
+                // series, whatever the threshold of the event that closes it
+                CHECK(x1 == x0);
+                for (size_t k = 0; k + 1 < n; ++k)
+                    if (lc.seq[k] == 'r')
+                    {
+                        // followed: the mark in the buffer word, and the ray not resolved
+                        CHECK((unsigned short)c.ev[k].buf(0) == 0x4000u);
+                        CHECK((c.ev[k].cur(0) & (short)0x8000) == 0);
+                        // a bare face leaves the previous-medium word as it was, so the recovery
+                        // reads what it read before the reflection
+                        if ((c.ev[k].rt & 0x40) == 0)
+                            CHECK(c.ev[k].prev(0) == c.ev[k - 1].prev(0));
+                    }
+            }
+
+    // ------------------------------------------------------------------------------------------
+    // C. The reflection of a wall coated on its near side, every series summed
+    // ------------------------------------------------------------------------------------------
+    // At eps 0 the wall reflects on two paths: off the coating, and enter, off the bare far face
+    // with the host's series, leave through the coating. Both at the polyline's point.
+    auto field = [&](const Chain &c, double st) -> std::complex<double>
+    {
+        std::complex<double> v = 1.0;
+        double Lin = 0.0;
+        for (size_t k = 0; k < c.ev.size(); ++k)
+        {
+            v *= cpx(c.ev[k].xpr, 0, 0);
+            if (k && mat_of(c.ev[k - 1].cur(0)) != 0)
+                Lin += std::sqrt(std::pow(c.ev[k].fbs(0, 0) - c.ev[k - 1].fbs(0, 0), 2) + std::pow(c.ev[k].fbs(0, 1) - c.ev[k - 1].fbs(0, 1), 2));
+        }
+        return v * std::exp(-J * k1 * Lin) * std::exp(J * k1 * st * (c.ev.back().fbs(0, 1) - c.ev[0].fbs(0, 1)));
+    };
+    QD_DIAG("\n# diag: mirror behind, the reflection of a wall coated on its near side. air | coating 6 mm | host 100 | air, eps 0.\n");
+    QD_DIAG("# R0: off the coating; R1: enter, off the far face, leave through the coating. R_dB, R_deg: R0 + R1 against the\n");
+    QD_DIAG("# matrix of coating | host. Rd_dB, Rd_deg: R0 + R1 exp(-2j k0 cos(theta) thk), the returning path with the air the\n");
+    QD_DIAG("# coating displaces put back twice. T_dB: enter, leave by the far face, against the matrix. R1/R0: dB\n");
+    QD_DIAG("host,tracer,theta,R1/R0_dB,R_dB,R_deg,Rd_dB,Rd_deg,T_dB,words_R1\n");
     for (int h : {5, 6})
         for (int tr : {4, 5})
             for (double thd : angles)
             {
                 double th = thd * QPI / 180.0, st = std::sin(th), s2 = st * st;
                 arma::uvec mi;
-                arma::mat mesh = build({0.0, L, L + gap}, {h, h, SHEET}, {false, true, true}, mi);
-                Chain a = run(mtl, mesh, mi, {tr, 3, 3, tr}, {1.5, 1.5, 1.5, 0.0}, thd, FRQ), b = run(mtl, mesh, mi, {tr, 3, 3, tr}, {1.5}, thd, FRQ);
-                INFO("mirror behind, host " << h << ", tracer " << tr << ", theta " << thd);
-                REQUIRE((a.ok && b.ok));
-                std::complex<double> S = cpx(a.ev[3].xpr, 0, 0) / cpx(b.ev[3].xpr, 0, 0);
-                std::complex<double> eH = diag_eps(h, FRQ), eS = diag_eps(SHEET, FRQ), pp = phi(eH, s2, k1, a.fx[3] - a.ox[2]);
-                std::complex<double> Rs = cm(eH, {{eS, thk}}, e_air, s2, k1).r, r_fr = rint(eH, e_air, s2);
-                if (std::abs(Rs) > 1.0)
-                    Rs /= std::abs(Rs); // the clamp of section 5
-                std::complex<double> S_face = 1.0 / (1.0 - r_fr * Rs * pp * pp), S_sheet = 1.0 / (1.0 - Rs * Rs * pp * pp);
-                QD_DIAG("%d,%d,%.0f,%.6f,%.3e,%.3e,%.4f,%.4f,%+.4f,%s\n", h, tr, thd, std::abs(S), std::abs(S - S_face), std::abs(S - S_sheet),
-                        std::abs(r_fr * Rs) * std::norm(pp), std::norm(Rs) * std::norm(pp), 2.0 * dB(std::abs(S_sheet / S_face)), a.words.c_str());
-                CHECK(std::isfinite(std::abs(S)));
+                arma::mat mesh = mesh_of("SH", h, 0, mi);
+                Chain c0 = run(mesh, mi, {3}, {0.0}, thd), c1 = run(mesh, mi, {tr, 3, tr}, {0.0}, thd), ct = run(mesh, mi, {tr, tr}, {0.0}, thd);
+                INFO("near coating, host " << h << ", tracer " << tr << ", theta " << thd);
+                REQUIRE((c0.ok && c1.ok && ct.ok));
+                std::complex<double> R0 = field(c0, st), R1 = field(c1, st), T = field(ct, st);
+                RT W = cm(e_air, {{diag_eps(SHEET, FRQ), thk}, {diag_eps(h, FRQ), std::abs(ct.fx[1] - ct.ox[0])}}, e_air, s2, k1);
+                std::complex<double> D2 = std::exp(-2.0 * J * k1 * std::cos(th) * thk), Ra = R0 + R1, Rd = R0 + R1 * D2;
+                QD_DIAG("%d,%d,%.0f,%+.2f,%+.4f,%+.3f,%+.6f,%+.4f,%+.6f,%s\n", h, tr, thd, dB(std::norm(R1 / R0)), dB(std::norm(Ra / W.r)),
+                        std::arg(Ra / W.r) * 180.0 / QPI, dB(std::norm(Rd / W.r)), std::arg(Rd / W.r) * 180.0 / QPI, dB(std::norm(T / W.t)), c1.words.c_str());
+                CHECK(std::isfinite(std::abs(Ra)));
             }
+
+    // ------------------------------------------------------------------------------------------
+    // B. Every path
+    // ------------------------------------------------------------------------------------------
+    struct Out
+    {
+        std::complex<double> T = 0.0, R = 0.0;
+        int nT = 0, nR = 0, n_sum = 0, n_cut = 0; // n_sum: events on a leg that began at a declined reflection and summed a series
+        double worst = 0.0;                       // the largest |20 log |S|| among them
+    };
+    struct Node
+    {
+        arma::mat orig, dest;
+        Ev P;
+        bool have = false, inside = false, followed = false;
+        double xp = 0.0, yp = 0.0, y0 = 0.0, Lin = 0.0;
+        std::complex<double> vv = 1.0;
+        int depth = 0;
+    };
+    // mode 0: the library; 1: eps 1.5 on a leg that began at a declined reflection; 2: the mirror
+    // written into the previous-medium word after a declined reflection at a bare face
+    auto walk = [&](const arma::mat &mesh, const arma::uvec &mi, int tr, double eps, int mode, double thd, int max_ev, double floor_dB,
+                    double x_back, int A, int B, bool two_solids) -> Out
+    {
+        Out O;
+        const double st = std::sin(thd * QPI / 180.0), floor_lin = std::pow(10.0, 0.1 * floor_dB);
+        std::vector<Node> stack(1);
+        diag_ray_at(thd, stack[0].orig, stack[0].dest);
+        while (!stack.empty())
+        {
+            Node Nn = stack.back();
+            stack.pop_back();
+            for (int itype : {3, tr})
+            {
+                const bool tx = itype != 3;
+                const double e_ev = (mode == 1 && Nn.followed) ? 1.5 : eps;
+                Ev E = traced(mtl, mesh, mi, itype, FRQ, Nn.orig, Nn.dest, Nn.have ? &Nn.P : nullptr, e_ev, tx);
+                if (E.nh == 0 || E.rt == 0)
+                    continue;
+                if (Nn.followed && mode != 1) // did this event sum a series?
+                {
+                    Ev D = traced(mtl, mesh, mi, itype, FRQ, Nn.orig, Nn.dest, Nn.have ? &Nn.P : nullptr, 1.5, tx);
+                    std::complex<double> S = cpx(E.xpr, 0, 0) / cpx(D.xpr, 0, 0);
+                    if (D.rt != 0 && std::abs(S - 1.0) > 1.0e-12)
+                        ++O.n_sum, O.worst = std::max(O.worst, std::abs(2.0 * dB(std::abs(S))));
+                }
+                Node M;
+                M.vv = Nn.vv * cpx(E.xpr, 0, 0);
+                double fx = E.fbs(0, 0), fy = E.fbs(0, 1);
+                M.y0 = Nn.depth ? Nn.y0 : fy;
+                M.Lin = Nn.Lin + (Nn.inside ? std::sqrt((fx - Nn.xp) * (fx - Nn.xp) + (fy - Nn.yp) * (fy - Nn.yp)) : 0.0);
+                M.xp = fx, M.yp = fy, M.depth = Nn.depth + 1;
+                const int cur = mat_of(E.cur(0));
+                M.inside = cur != 0;
+                arma::mat d = E.destN - E.origN;
+                d /= std::sqrt(d(0, 0) * d(0, 0) + d(0, 1) * d(0, 1) + d(0, 2) * d(0, 2));
+                if (!M.inside) // in air: collected
+                {
+                    std::complex<double> F = M.vv * std::exp(-J * k1 * M.Lin) * std::exp(J * k1 * st * (fy - M.y0));
+                    if (d(0, 0) > 0.0 && fx > x_back - 1.0e-3)
+                        O.T += F, ++O.nT;
+                    else if (d(0, 0) < 0.0 && fx < 1.0e-3)
+                        O.R += F, ++O.nR;
+                    continue;
+                }
+                if (M.depth >= max_ev || std::norm(M.vv) < floor_lin)
+                {
+                    ++O.n_cut;
+                    continue;
+                }
+                const bool declined_refl = !tx && (E.cur(0) & (short)0x8000) == 0;
+                M.followed = declined_refl;
+                M.P = E, M.have = true;
+                if (mode == 2 && declined_refl && (E.rt & 0x40) == 0) // a bare face: the fixture writes what the ray was reflected off
+                {
+                    int m = (two_solids && std::abs(fx - 0.05) < 1.0e-3) ? (cur == A ? B : A) : 0;
+                    M.P.prev(0) = (short)((E.prev(0) & (short)0x8000) | m | (m ? 0x4000 : 0));
+                }
+                M.orig = E.origN, M.dest = E.origN + (1.2 / std::abs(d(0, 0))) * d;
+                stack.push_back(M);
+            }
+        }
+        return O;
+    };
+
+    QD_DIAG("\n# diag: mirror behind, every path. One ray, every reflected and transmitted ray followed until it is in air, dead\n");
+    QD_DIAG("# or 20 events old, summed at the polyline's point, against the matrix of the wall (HSH: against the run at\n");
+    QD_DIAG("# eps 0 with 60 events), dB. lib: the library at eps 0.15; inh: eps 1.5 on every leg that began at a declined\n");
+    QD_DIAG("# reflection; true: the mirror written into the word after a declined reflection at a bare face; res: eps 0.\n");
+    QD_DIAG("# n: the paths behind and in front of the wall, lib. sum: the events on a leg that began at a declined reflection\n");
+    QD_DIAG("# and summed a series, lib; worth: the largest of them, dB; sum_true: the same count with the word made true.\n");
+    QD_DIAG("# cut: the rays stopped at 20 events, lib\n");
+    QD_DIAG("wall,a,b,tracer,theta,nT,nR,cut,sum,worth,sum_true,T_lib,T_inh,T_true,T_res,R_lib,R_inh,R_true,R_res,T_inh-true,R_inh-true\n");
+    std::vector<Wall> walls = {{"H", 5, 0}, {"H", 6, 0}, {"HS", 5, 0}, {"HS", 6, 0}, {"SH", 5, 0}, {"SH", 6, 0},
+                               {"AB", 2, 5}, {"AB", 2, 6}, {"HSH", 5, 0}, {"HSH", 6, 0}};
+    for (const Wall &w : walls)
+        for (int tr : {4, 5})
+            for (double thd : angles)
+            {
+                const std::string nm = w.name;
+                double s2 = std::sin(thd * QPI / 180.0) * std::sin(thd * QPI / 180.0);
+                arma::uvec mi;
+                arma::mat mesh = mesh_of(nm, w.a, w.b, mi);
+                const double x_back = (nm == "AB") ? 0.15 : 0.10;
+                const bool two = nm == "AB";
+                Out L = walk(mesh, mi, tr, 0.15, 0, thd, 20, -400.0, x_back, w.a, w.b, two);
+                Out I = walk(mesh, mi, tr, 0.15, 1, thd, 20, -400.0, x_back, w.a, w.b, two);
+                Out U = walk(mesh, mi, tr, 0.15, 2, thd, 20, -400.0, x_back, w.a, w.b, two);
+                Out Z = walk(mesh, mi, tr, 0.0, 0, thd, 20, -400.0, x_back, w.a, w.b, two);
+                std::complex<double> eA = diag_eps(w.a, FRQ), eB = diag_eps(w.b, FRQ), eS = diag_eps(SHEET, FRQ);
+                RT W;
+                if (nm == "H")
+                    W = cm(e_air, {{eA, 0.10}}, e_air, s2, k1);
+                else if (nm == "HS")
+                    W = cm(e_air, {{eA, 0.10}, {eS, thk}}, e_air, s2, k1);
+                else if (nm == "SH")
+                    W = cm(e_air, {{eS, thk}, {eA, 0.10}}, e_air, s2, k1);
+                else if (nm == "AB")
+                    W = cm(e_air, {{eA, 0.05}, {eB, 0.10}}, e_air, s2, k1);
+                else
+                {
+                    Out Z60 = walk(mesh, mi, tr, 0.0, 0, thd, 60, -400.0, x_back, w.a, w.b, two);
+                    W.t = Z60.T, W.r = Z60.R;
+                }
+                INFO("paths, wall " << nm << ", a " << w.a << ", b " << w.b << ", tracer " << tr << ", theta " << thd);
+                CHECK(L.nT >= 1);
+                QD_DIAG("%s,%d,%d,%d,%.0f,%d,%d,%d,%d,%.3f,%d,%+.4f,%+.4f,%+.4f,%+.4f,%+.4f,%+.4f,%+.4f,%+.4f,%+.1e,%+.1e\n", w.name, w.a, w.b, tr, thd,
+                        L.nT, L.nR, L.n_cut, L.n_sum, L.worst, U.n_sum, dB(std::norm(L.T / W.t)), dB(std::norm(I.T / W.t)), dB(std::norm(U.T / W.t)),
+                        dB(std::norm(Z.T / W.t)), dB(std::norm(L.R / W.r)), dB(std::norm(I.R / W.r)), dB(std::norm(U.R / W.r)), dB(std::norm(Z.R / W.r)),
+                        dB(std::norm(I.T / U.T)), dB(std::norm(I.R / U.R)));
+            }
+
+    // ------------------------------------------------------------------------------------------
+    // D. A verdict that is handed in
+    // ------------------------------------------------------------------------------------------
+    // The event that closes the first leg in a body, both passes: with the verdict "sum" handed
+    // in it is the event at eps 0 whatever eps says, with "do not sum" the event at eps 1.5, and
+    // the verdict handed out says which of the two a call was.
+    for (const char *wn : {"H", "HS", "AB"})
+        for (int h : {5, 6})
+            for (int tr : {4, 5})
+                for (int itype : {3, tr})
+                    for (double thd : {10.0, 40.0, 60.0, 75.0, 85.0})
+                    {
+                        arma::uvec mi;
+                        arma::mat mesh = mesh_of(wn, std::string(wn) == "AB" ? 2 : h, h, mi), orig, dest;
+                        diag_ray_at(thd, orig, dest);
+                        Ev E1 = traced(mtl, mesh, mi, tr, FRQ, orig, dest, nullptr, 1.5, true);
+                        arma::mat d = E1.destN - E1.origN;
+                        d /= std::sqrt(d(0, 0) * d(0, 0) + d(0, 1) * d(0, 1) + d(0, 2) * d(0, 2));
+                        orig = E1.origN, dest = E1.origN + (1.2 / std::abs(d(0, 0))) * d;
+                        const bool tx = itype != 3;
+                        const std::vector<uint8_t> yes = {1}, no = {0};
+                        std::vector<uint8_t> v0, v15, vy, vn;
+                        Ev S0 = traced(mtl, mesh, mi, itype, FRQ, orig, dest, &E1, 0.0, tx, nullptr, &v0);
+                        Ev S15 = traced(mtl, mesh, mi, itype, FRQ, orig, dest, &E1, 1.5, tx, nullptr, &v15);
+                        Ev Sy = traced(mtl, mesh, mi, itype, FRQ, orig, dest, &E1, 1.5, tx, &yes, &vy);
+                        Ev Sn = traced(mtl, mesh, mi, itype, FRQ, orig, dest, &E1, 0.0, tx, &no, &vn);
+                        INFO("verdict, wall " << wn << ", host " << h << ", tracer " << tr << ", type " << itype << ", theta " << thd);
+                        REQUIRE((S0.rt != 0 && S15.rt != 0));
+                        CHECK(cpx(S0.xpr, 0, 0) != cpx(S15.xpr, 0, 0)); // the two are told apart
+                        CHECK(cpx(Sy.xpr, 0, 0) == cpx(S0.xpr, 0, 0));
+                        CHECK(cpx(Sn.xpr, 0, 0) == cpx(S15.xpr, 0, 0));
+                        CHECK((Sy.cur(0) == S0.cur(0) && Sy.buf(0) == S0.buf(0) && Sy.prev(0) == S0.prev(0)));
+                        CHECK((Sn.cur(0) == S15.cur(0) && Sn.buf(0) == S15.buf(0) && Sn.prev(0) == S15.prev(0)));
+                        CHECK((v0[0] == 1 && v15[0] == 0 && vy[0] == 1 && vn[0] == 0));
+                    }
 }
