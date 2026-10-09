@@ -162,7 +162,7 @@ static inline QdLumpRef qd_slab_ref_lumped(std::complex<double> eps_s, double th
         std::complex<double> rr = rho * r;
         std::complex<double> den = 1.0 - rr * rr * p2;
         std::complex<double> T = std::sqrt(g) * kap2 * t12 * t21 * p1 / den;
-        std::complex<double> R = rr - kap2 * t12 * t21 * rr * p2 / den;
+        std::complex<double> R = rr - std::sqrt(g) * kap2 * t12 * t21 * rr * p2 / den; // the echo entered the sheet and paid
         if (pol == 0)
             Q.t_te = T, Q.T_te = std::norm(T), Q.R_te = std::norm(R);
         else

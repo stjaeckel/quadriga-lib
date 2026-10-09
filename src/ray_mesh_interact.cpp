@@ -931,9 +931,9 @@ namespace
     // algebraically equal but not bit-identical. The layered-stack fixture measures the two against
     // each other, so unifying them later is a checked step rather than a leap.
     //
-    // Two material columns have no matrix expression. Neither makes this decline; a stack that
-    // carries one is resolved in the scattering form instead, and a stack that carries neither
-    // takes the matrix exactly as before.
+    // Three material columns have no matrix expression, or none on the reflect port. None makes
+    // this decline; a stack that carries one is resolved in the scattering form instead, and a
+    // stack that carries none takes the matrix exactly as before.
     //
     //   tf        redistributes energy between the reflected and transmitted ports of a boundary
     //             after the Fresnel problem is solved, which is not a boundary admittance. The
@@ -948,6 +948,11 @@ namespace
     //             which needs no inverse of a closed boundary (t = 0 at tf = -1) or of an opaque
     //             layer. At one layer it is produce mode's Airy pair term for term, and at tf = 0
     //             it is the matrix product in another basis.
+    //   att       a layer's interface gain is an end factor on the transmit port, which the matrix
+    //             carries. On the reflect port it is owed by what entered that layer and came
+    //             back, once, and a matrix has no per-layer echo to charge; the recursion has,
+    //             so a stack with a gain-bearing layer takes this form as well. The series it
+    //             runs on is the one without the gain, so the transmit port is the matrix's.
     //   m > 0     a lumped acoustic surrogate whose in-layer index is not physical. Such a layer
     //             is not made coherent. It ends the coherent segment in front of it as a
     //             half-space of its own admittance, which is what its eta and mu are calibrated
@@ -988,7 +993,7 @@ namespace
             if (layers[i].mtl == nullptr || layers[i].thk < 0.0)
                 return false;
             const Material &L = *layers[i].mtl;
-            if (L.m > 0.0 || L.tf(fGHz) != 0.0)
+            if (L.m > 0.0 || L.tf(fGHz) != 0.0 || L.interface_gain(fGHz) != 1.0)
                 scattering = true;
         }
 
@@ -1198,9 +1203,13 @@ namespace
                     if (q - p > 1) // a coherent layer separates what follows from the plate
                         x_run = 0.0;
 
-                    // Coherent segment between media p and q, from its far boundary inwards
-                    std::complex<double> G, T, r, t, tb;
+                    // Coherent segment between media p and q, from its far boundary inwards. G is
+                    // the reflection the series runs on. Ge is the one the reflect port hands
+                    // out: what entered a layer and came back paid that layer's interface gain,
+                    // once, as the transmit port pays it once; the series itself pays nothing.
+                    std::complex<double> G, Ge, T, r, t, tb;
                     BND(q - 1, G, T, tb);
+                    Ge = G;
                     for (int j = q - 2; j >= p; --j)
                     {
                         std::complex<double> phi = PHI(j + 1), p2 = phi * phi;
@@ -1209,11 +1218,12 @@ namespace
                         if (!(std::abs(den) > 0.0))
                             return false;
                         T = t * phi * T / den;
+                        Ge = r + std::sqrt(MED(j + 1).interface_gain(fGHz)) * t * tb * Ge * p2 / den;
                         G = r + t * tb * G * p2 / den;
                     }
                     Tt *= T;
                     if (first)
-                        Rt = G, first = false;
+                        Rt = Ge, first = false;
                     if (mass)
                         Tt *= MASS(q, x_run);
                     p = q;
@@ -1275,14 +1285,21 @@ namespace
                                           ? std::complex<double>(1.0, 0.0) / phi_disp
                                           : std::complex<double>(1.0, 0.0);
 
+        // The reflect port is handed to a ray that turns around at the mesh plane, so it owes the
+        // round trip through the part of the stack that lies in front of that plane: half of it
+        // where one medium is on both sides, the mesh plane being the mid-plane; all of it where
+        // the stack lies in the near medium in front of a solid; none where it lies beyond.
+        std::complex<double> front = mat_far.same_as(mat_near) ? undisp
+                                                               : (disp_far ? std::complex<double>(1.0, 0.0) : undisp * undisp);
+
         if (T_te)
             *T_te = ig * fx_te * tv_te * undisp;
         if (T_tm)
             *T_tm = ig * fx_tm * tv_tm * undisp;
         if (R_te)
-            *R_te = Rv_te;
+            *R_te = front * Rv_te;
         if (R_tm)
-            *R_tm = Rv_tm;
+            *R_tm = front * Rv_tm;
         return true;
     }
 
@@ -1320,7 +1337,9 @@ namespace
     //                   transmit port carries the slab's interface gain, plus the far medium's when
     //                   the far medium is one the wave newly enters, matching what
     //                   Material::interact_with folds in for a transmission-class interaction. The
-    //                   reflect port carries neither. A caller that also passes the far medium through
+    //                   reflect port carries the slab's on the part that entered the slab, and the
+    //                   round trip through the part of the layer in front of the mesh plane. A
+    //                   caller that also passes the far medium through
     //                   separately (the layer-2 forward path of a sheet stack) must not pay that
     //                   interface gain twice.
     //                   Both boundaries are evaluated at the true complex angles, which the incidence
@@ -1516,8 +1535,10 @@ namespace
                 lay.mtl = &adj, lay.thk = adj.thk;
                 Material air_backing;
                 std::complex<double> Lr_te, Lr_tm;
+                // Seen from the slab a lining lies in the air beyond it; a sheet inside the slab
+                // has the slab on both sides and the core centres it.
                 if (qd_stack_resolve(mat_slab, &lay, 1, backing ? *backing : air_backing,
-                                     cs, fGHz, is_scalar, nullptr, nullptr, &Lr_te, &Lr_tm))
+                                     cs, fGHz, is_scalar, nullptr, nullptr, &Lr_te, &Lr_tm, true))
                     te = Lr_te, tm = is_scalar ? Lr_te : Lr_tm, layer_resolved = true;
             }
 
@@ -1653,7 +1674,7 @@ namespace
         // crossings and never appears in the composite. What the composite does owe is the obliquity
         // factor of the pair it actually spans, near to far, which is applied once below.
         std::complex<double> tns_te, tns_tm, tsn_te, tsn_tm, tsf_te, tsf_tm;
-        double ig = 1.0;
+        double ig = 1.0, ig_echo = 1.0;  // ig_echo: the sheet's own gain, on what entered it and came back
         double fx_te = 1.0, fx_tm = 1.0; // near -> far normal-flux conversion, transmit port only
         if (produce)
         {
@@ -1676,6 +1697,7 @@ namespace
             // unaffected, and solid|sheet|air gives air's interface_gain of 1.0 on either test.
             bool far_is_new = !far_is_air && !mat_far.same_as(mat_near);
             ig = std::sqrt(mat_slab.interface_gain(fGHz) * (far_is_new ? mat_far.interface_gain(fGHz) : 1.0));
+            ig_echo = std::sqrt(mat_slab.interface_gain(fGHz));
 
             // Normal-flux conversion for the transmit port, matching what Material::interact_with
             // applies to a single crossing. The composite carries the wave from the near medium into
@@ -1903,9 +1925,12 @@ namespace
             // geometry. That is the right answer for a laminate whose layers do not fit inside their
             // host, and it keeps every material crossing intact.
             //
-            // The reference belongs on the single forward pass only: phi2 in the denominator is a
-            // round trip inside the slab and must stay absolute, and the reflect port turns around at
-            // the face without displacing anything.
+            // phi2 in the denominator is a round trip inside the slab and stays absolute. The
+            // reflect port is handed to a ray that turns around at the mesh plane, so it owes the
+            // round trip through the part of the layer that lies in front of that plane: half of
+            // it where one medium is on both sides, the mesh plane being the mid-plane of the
+            // layer; all of it for a glued entry, whose layer lies in the near medium in front of
+            // the solid; none for a glued exit, whose layer lies beyond.
             const Material &disp_mtl = disp_far ? mat_far : mat_near;
             std::complex<double> eta_d = disp_mtl.eta(fGHz) + disp_mtl.eta_resonance(fGHz);
             std::complex<double> mu_d = disp_mtl.mu(fGHz);
@@ -1925,6 +1950,10 @@ namespace
             std::complex<double> phi_disp =
                 std::exp(std::complex<double>(0.0, -1.0) * (omega / c0) * n_d * t_disp * c_disp);
             std::complex<double> phi_t = (std::abs(phi_disp) > 0.0) ? phi / phi_disp : phi;
+            std::complex<double> undisp = (std::abs(phi_disp) > 0.0) ? std::complex<double>(1.0, 0.0) / phi_disp
+                                                                     : std::complex<double>(1.0, 0.0);
+            std::complex<double> front = mat_far.same_as(mat_near) ? undisp
+                                                                   : (disp_far ? std::complex<double>(1.0, 0.0) : undisp * undisp);
 
             // The leak is undeviated, so the host length it displaces was walked at the incidence
             // cosine. On the far side of a closed pair the Snell cosine above is evanescent, and
@@ -1964,9 +1993,9 @@ namespace
             if (T_tm)
                 *T_tm = far_closed ? leak_tm * phi_t * series_tm : ig * fx_tm * tns_tm * tsf_tm * phi_t / denom_tm;
             if (R_te) // front-face reflection plus the series leaking back out through the near face
-                *R_te = -rn_te + tns_te * tsn_te * rf_te * phi2 / denom_te;
+                *R_te = front * (-rn_te + ig_echo * tns_te * tsn_te * rf_te * phi2 / denom_te);
             if (R_tm)
-                *R_tm = -rn_tm + tns_tm * tsn_tm * rf_tm * phi2 / denom_tm;
+                *R_tm = front * (-rn_tm + ig_echo * tns_tm * tsn_tm * rf_tm * phi2 / denom_tm);
             return true;
         }
 
