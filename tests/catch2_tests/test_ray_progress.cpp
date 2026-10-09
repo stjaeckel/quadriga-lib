@@ -3804,3 +3804,213 @@ TEST_CASE("ray_progress - the reflect port of a sheet lies where its transmit po
 #endif
                 }
 }
+
+TEST_CASE("ray_progress - a lossy medium has no critical angle and a band takes one path")
+{
+#ifdef _OPENMP
+    // One ray per call, many thousand calls: a thread team per call costs twenty times the work
+    struct OneThread
+    {
+        int n = omp_get_max_threads();
+        OneThread() { omp_set_num_threads(1); }
+        ~OneThread() { omp_set_num_threads(n); }
+    } one_thread;
+#endif
+    // A porous medium, eps 0.31 - 0.20j / fGHz, rarer than air and lossy. It has no critical
+    // angle. The magnitude test sqrt|1 / eps| sin(theta) >= 1 would trip at 45.3 deg at 0.5 GHz,
+    // 37.4 deg at 1 GHz and 34.8 deg at 2 GHz, so a band would have its frequencies on different
+    // sides of it; the verdict on a lossy medium is decided on the medium, and every frequency
+    // of a band is what it is alone. Through the tracer itself, scalar, float: one ray,
+    // ray_progress called until no ray is left, every path that ends in air outside the
+    // structure summed at its polyline's point. The coherent sums of PW are recorded: the
+    // bounces of a leak inside the rigid wall have no phase the media define.
+    //   P    porous solid 50 mm in air, against the analytic slab
+    //   PW   porous solid 50 mm on a rigid wall with tf 0.3
+    //   SW   the same layer as a sheet on that wall
+    // First each frequency alone, then bands whose base and second frequency fall on different
+    // sides of the angle.
+    const double PI = 3.14159265358979323846, C0 = 299792458.0;
+    const float gap = 1.0e-5f;
+    const std::complex<double> J(0.0, 1.0);
+    typedef std::unordered_map<std::string, std::vector<float>> Pal;
+
+    Pal pal; // 1: porous solid, 2: porous sheet 50 mm, 3: rigid wall with tf 0.3
+    pal["a"] = {0.31f, 0.31f, 2.401e-9f};
+    pal["b"] = std::vector<float>(3, 0.0f);
+    pal["c"] = {(float)(0.20 / 17.98), (float)(0.20 / 17.98), 0.0f};
+    pal["d"] = std::vector<float>(3, 0.0f);
+    pal["fRef"] = std::vector<float>(3, 1.0f);
+    pal["thk"] = {0.0f, 0.05f, 0.0f};
+    pal["tf"] = {0.0f, 0.0f, 0.3f};
+    auto eps_p = [](double fGHz)
+    { return std::complex<double>(0.31, -0.20 / fGHz); };
+
+    auto build = [](const std::vector<float> &x, const std::vector<int> &mat, const std::vector<bool> &flip, arma::fmat &mesh, arma::uvec &mi)
+    {
+        const float h = 200.0f;
+        mesh.set_size(2 * x.size(), 9);
+        mi.set_size(2 * x.size());
+        for (size_t k = 0; k < x.size(); ++k)
+        {
+            if (!flip[k])
+                mesh.row(2 * k) = arma::frowvec{x[k], -h, -h, x[k], -h, h, x[k], h, -h},
+                mesh.row(2 * k + 1) = arma::frowvec{x[k], h, -h, x[k], -h, h, x[k], h, h};
+            else
+                mesh.row(2 * k) = arma::frowvec{x[k], -h, -h, x[k], h, -h, x[k], -h, h},
+                mesh.row(2 * k + 1) = arma::frowvec{x[k], h, -h, x[k], h, h, x[k], -h, h};
+            mi(2 * k) = (arma::uword)mat[k], mi(2 * k + 1) = (arma::uword)mat[k];
+        }
+    };
+    auto slab = [&](double d, double s2, double fGHz, std::complex<double> &r, std::complex<double> &t) // air | porous d | air
+    {
+        const double k = 2.0 * PI * fGHz * 1.0e9 / C0;
+        std::complex<double> h0 = std::sqrt(std::complex<double>(1.0 - s2, 0.0)), b = std::sqrt(eps_p(fGHz) - s2);
+        if (std::imag(b) > 0.0)
+            b = -b;
+        std::complex<double> dl = k * b * d, c = std::cos(dl), s = std::sin(dl), B = c + J * s / b * h0, Cc = J * b * s + c * h0;
+        r = (h0 * B - Cc) / (h0 * B + Cc), t = 2.0 * h0 / (h0 * B + Cc);
+    };
+
+    struct Sum
+    {
+        std::complex<double> T = 0.0, R = 0.0;
+        double Tp = 0.0, Rp = 0.0; // the power sums
+        int nT = 0, nR = 0;
+    };
+    auto trace = [&](const arma::fmat &mesh, const arma::uvec &mi, double thd, bool refr, float thr, float x_back, int max_int, float min_gain,
+                     const std::vector<double> &fGHz) -> std::vector<Sum>
+    {
+        const size_t nf = fGHz.size();
+        std::vector<Sum> S(nf);
+        const double th = thd * PI / 180.0, st = std::sin(th);
+        const float Ox = -1.0f, Oy = 0.37f - (float)std::tan(th), Oz = 0.0f, r0 = 0.1f, len = 300.0f;
+        arma::frowvec kv = {(float)std::cos(th), (float)std::sin(th), 0.0f};
+        arma::fvec cf(nf);
+        for (size_t q = 0; q < nf; ++q)
+            cf(q) = (float)(fGHz[q] * 1.0e9);
+        arma::fmat orig(1, 3), dest(1, 3), acc(1, 1 + nf, arma::fill::zeros);
+        orig.row(0) = arma::frowvec{Ox, Oy, Oz} + r0 * kv;
+        dest.row(0) = arma::frowvec{Ox, Oy, Oz} + (r0 + len) * kv;
+        arma::fcube pd(1, 3, nf);
+        for (size_t q = 0; q < nf; ++q)
+            pd.slice(q) = kv;
+        arma::Col<short> prev(1, arma::fill::zeros), cur(1, arma::fill::zeros), buf(1, arma::fill::zeros);
+        std::vector<quadriga_lib::path> paths(1);
+        paths[0].init(0, nf, true);
+        paths[0].set_length(r0);
+        for (int g = 0; g < 120; ++g)
+        {
+            quadriga_lib::ray_progress(mesh, mi, pal, cf, Ox, Oy, Oz, orig, dest, prev, cur, buf, pd, acc, paths,
+                                       nullptr, nullptr, nullptr, nullptr,
+                                       (uint8_t)max_int, 100, 100, 0, min_gain, 3.0f, thr, refr, true,
+                                       nullptr, nullptr, nullptr, nullptr);
+            if (orig.n_rows == 0)
+                break;
+            for (arma::uword i = 0; i < orig.n_rows; ++i)
+            {
+                const size_t ns = paths[i].n_seg();
+                if ((cur(i) & (short)0x3FFF) != 0 || ns != (size_t)(g + 1))
+                    continue;
+                const float *first = paths[i].coord(0), *last = paths[i].coord(ns - 1);
+                const bool fwd = dest(i, 0) > orig(i, 0);
+                const bool isT = fwd && last[0] > x_back - 1.0e-3f, isR = !fwd && last[0] < 1.0e-3f;
+                if (!isT && !isR)
+                    continue;
+                double Lin = 0.0;
+                for (size_t s = 1; s < ns; ++s)
+                {
+                    const float *a = paths[i].coord(s - 1), *b = paths[i].coord(s);
+                    Lin += std::sqrt(((double)b[0] - a[0]) * ((double)b[0] - a[0]) + ((double)b[1] - a[1]) * ((double)b[1] - a[1]) +
+                                     ((double)b[2] - a[2]) * ((double)b[2] - a[2]));
+                }
+                for (size_t q = 0; q < nf; ++q)
+                {
+                    const double k = 2.0 * PI * fGHz[q] * 1.0e9 / C0;
+                    const float *xc = paths[i].xpr_coeff(q);
+                    std::complex<double> F = std::complex<double>((double)xc[0], (double)xc[1]) * std::exp(-J * k * Lin) *
+                                             std::exp(J * k * st * ((double)last[1] - (double)first[1]));
+                    if (isT)
+                        S[q].T += F, S[q].Tp += std::norm(F), ++S[q].nT;
+                    else
+                        S[q].R += F, S[q].Rp += std::norm(F), ++S[q].nR;
+                }
+            }
+        }
+        return S;
+    };
+    auto dB = [](std::complex<double> z)
+    { return (std::norm(z) > 0.0) ? 10.0 * std::log10(std::norm(z)) : -999.0; };
+    auto pdB = [](double p)
+    { return (p > 0.0) ? 10.0 * std::log10(p) : -999.0; };
+
+    struct Geo
+    {
+        const char *name;
+        arma::fmat mesh;
+        arma::uvec mi;
+        float x_back;
+        bool analytic;
+    };
+    std::vector<Geo> geo(3);
+    geo[0].name = "P", geo[0].x_back = 0.05f, geo[0].analytic = true;
+    build({0.0f, 0.05f}, {1, 1}, {false, true}, geo[0].mesh, geo[0].mi);
+    geo[1].name = "PW", geo[1].x_back = 0.25f, geo[1].analytic = false;
+    build({0.0f, 0.05f, 0.05f + gap, 0.25f + gap}, {1, 1, 3, 3}, {false, true, false, true}, geo[1].mesh, geo[1].mi);
+    geo[2].name = "SW", geo[2].x_back = 0.2f, geo[2].analytic = false;
+    build({0.0f, gap, 0.2f + gap}, {2, 3, 3}, {false, false, true}, geo[2].mesh, geo[2].mi);
+
+#ifdef QD_TEST_VERBOSE
+    std::printf("\n# diag: lossy verdict through ray_progress, scalar, 30 interactions, floor -150 dB, thin_slab_threshold 0.15.\n");
+    std::printf("# P: porous solid 50 mm in air; PW: on a rigid wall with tf 0.3; SW: the same layer as a sheet on that wall.\n");
+    std::printf("# band: the frequencies of the run, the base first; f: the frequency of the row. T, R: the coherent sums, dB;\n");
+    std::printf("# Tp, Rp: the power sums; T_ref, R_ref: the analytic slab, P only. The test trips at 45.3 deg at 0.5 GHz,\n");
+    std::printf("# 37.4 deg at 1 GHz and 34.8 deg at 2 GHz\n");
+    std::printf("geo,tracer,band,f,theta,nT,nR,T_dB,Tp_dB,T_ref_dB,R_dB,Rp_dB,R_ref_dB\n");
+#endif
+    const std::vector<std::vector<double>> bands = {{0.5}, {1.0}, {2.0}, {1.0, 0.5}, {0.5, 1.0}, {1.0, 2.0}, {2.0, 1.0}};
+    std::map<std::string, Sum> alone; // geometry, tracer, frequency, angle
+    auto key = [](const char *g, int refr, double f, double thd)
+    { return std::string(g) + "," + std::to_string(refr) + "," + std::to_string((int)(10.0 * f)) + "," + std::to_string((int)thd); };
+    for (const Geo &G : geo)
+        for (int refr = 0; refr < 2; ++refr)
+            for (const auto &band : bands)
+                for (double thd : {30.0, 36.0, 41.0, 50.0})
+                {
+                    if (band.size() == 2 && thd != ((band[0] + band[1] < 2.0) ? 41.0 : 36.0))
+                        continue;
+                    std::vector<Sum> Z = trace(G.mesh, G.mi, thd, refr != 0, 0.15f, G.x_back, 30, -150.0f, band);
+                    const double th = thd * PI / 180.0, s2 = std::sin(th) * std::sin(th);
+                    for (size_t q = 0; q < band.size(); ++q)
+                    {
+                        std::complex<double> r = 0.0, t = 0.0;
+                        if (G.analytic)
+                            slab(0.05, s2, band[q], r, t);
+                        INFO(G.name << ", refr " << refr << ", band of " << band.size() << " based on " << band[0] << ", f " << band[q] << ", theta " << thd);
+                        CHECK(Z[q].nT >= 1);
+                        CHECK(Z[q].nR >= 1);
+                        if (G.analytic) // a traced leg is short by the relaunch offset
+                        {
+                            CHECK(std::abs(dB(Z[q].T) - dB(t)) < 5.0e-3);
+                            CHECK(std::abs(dB(Z[q].R) - dB(r)) < 5.0e-3);
+                        }
+                        if (band.size() == 1)
+                            alone[key(G.name, refr, band[q], thd)] = Z[q];
+                        else
+                        {
+                            const Sum &A = alone.at(key(G.name, refr, band[q], thd));
+                            CHECK(std::abs(pdB(Z[q].Tp) - pdB(A.Tp)) < 2.0e-3);
+                            CHECK(std::abs(pdB(Z[q].Rp) - pdB(A.Rp)) < 2.0e-3);
+                            if (G.x_back != 0.25f) // P and SW: one path through, the coherent sum as well
+                            {
+                                CHECK(std::abs(dB(Z[q].T) - dB(A.T)) < 2.0e-3);
+                                CHECK(std::abs(dB(Z[q].R) - dB(A.R)) < 2.0e-3);
+                            }
+                        }
+#ifdef QD_TEST_VERBOSE
+                        std::printf("%s,%d,%s%.1f%s,%.1f,%.0f,%d,%d,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f\n", G.name, refr ? 5 : 4, (band.size() == 2) ? ((q == 0) ? "" : (band[0] == 0.5 ? "0.5+" : (band[0] == 1.0 ? "1.0+" : "2.0+"))) : "",
+                                    (band.size() == 2 && q == 0) ? band[0] : band[q], (band.size() == 2 && q == 0) ? ((band[1] == 0.5) ? "+0.5" : (band[1] == 1.0 ? "+1.0" : "+2.0")) : "",
+                                    band[q], thd, Z[q].nT, Z[q].nR, dB(Z[q].T), pdB(Z[q].Tp), G.analytic ? dB(t) : 0.0, dB(Z[q].R), pdB(Z[q].Rp), G.analytic ? dB(r) : 0.0);
+#endif
+                    }
+                }
+}

@@ -7818,7 +7818,7 @@ TEST_CASE("Leak chain - each face at the cosine the wave has and the series on a
             int sh;
             double lim; // the air | sheet face must be an ordinary crossing on the row
         };
-        const std::vector<Row> rows = {{"dense  | rigid tf .3", 1, 70.0}, {"porous | rigid tf .3", 2, 20.0}};
+        const std::vector<Row> rows = {{"dense  | rigid tf .3", 1, 70.0}, {"porous | rigid tf .3", 2, 70.0}};
         QD_DIAG("\n# diag: leak into a rigid wall (tf 0.3) through a 10 mm absorber without tf, scalar,\n");
         QD_DIAG("# air | sheet | rigid. S_dB is the series factor, the part a three-event chain leaves out\n");
         QD_DIAG("stack,theta_n,T_dB,ref_T_dB,S_dB,d_complex\n");
@@ -11750,21 +11750,17 @@ TEST_CASE("Exits and verdicts - every exit at the cosine the wave has there")
                 sc, a * std::abs(rte.R), sc - a * std::abs(rte.R), vv, vv - a * std::abs(rte.R), hh, a * std::abs(rtm.R),
                 hh - a * std::abs(rtm.R), bb, a * std::abs(rb.R), bb - a * std::abs(rb.R));
         INFO("reflect port, p " << p);
-        // Scalar and TE at the exact cosine. Above p = 1.35 the three Newton steps of the recovery
-        // leave 1e-9 and more, which the table below attributes; those rows are recorded. TM past
-        // the critical angle is inside the clamp of section 5
-        if (p < 1.36)
-        {
-            CHECK(std::abs(sc - a * std::abs(rte.R)) < 1.0e-9);
-            CHECK(std::abs(vv - a * std::abs(rte.R)) < 1.0e-9);
-        }
+        // Scalar and TE at the exact cosine, at every invariant: the recovery runs until it has
+        // converged. TM past the critical angle is inside the clamp of section 5
+        CHECK(std::abs(sc - a * std::abs(rte.R)) < 1.0e-9);
+        CHECK(std::abs(vv - a * std::abs(rte.R)) < 1.0e-9);
         CHECK(std::abs(hh - a * std::abs(rtm.R)) < ((p > 1.0) ? 5.0e-2 : 1.0e-9));
     }
 
-    // What is left on the scalar column above p = 1.2. The recovery inverts qd_refract's map with
-    // three Newton steps from the real-index start. Written a second time here, with three steps
-    // and with twelve: u is the recovered sin^2 in the dense solid, and the event is compared with
-    // the reference at the invariant each of them gives.
+    // The recovery above p = 1. It inverts qd_refract's map by Newton from the real-index start,
+    // until the step is below rounding. Three steps, which is what it used to take, leave 2e-14
+    // at p = 1.2 and 9e-9 at 1.45. Written a second time here, with three steps and with twelve:
+    // u is the recovered sin^2 in the dense solid, and the event is on the reference at p.
     QD_DIAG("\n# diag: exits and verdicts, the recovery above p = 1. The map inverted a second time in the fixture, three Newton\n");
     QD_DIAG("# steps and twelve. du3, du12: the recovered invariant over the true one, minus one. d_ref: the scalar\n");
     QD_DIAG("# reflect port of the coated host against the reference at p; d_3: against the reference at the\n");
@@ -11796,7 +11792,7 @@ TEST_CASE("Exits and verdicts - every exit at the cosine the wave has there")
         QD_DIAG("%.2f,%+.3e,%+.3e,%+.3e,%+.3e\n", p, u3 / u0 - 1.0, u12 / u0 - 1.0, sc - std::sqrt(r0.leg) * std::abs(r0.R),
                 sc - std::sqrt(r3.leg) * std::abs(r3.R));
         INFO("recovery above one, p " << p);
-        CHECK(std::abs(sc - std::sqrt(r3.leg) * std::abs(r3.R)) < 1.0e-12); // nothing but the three steps
+        CHECK(std::abs(sc - std::sqrt(r0.leg) * std::abs(r0.R)) < 1.0e-12); // converged: on the reference at p
         CHECK(std::abs(u12 / u0 - 1.0) < 1.0e-12);
     }
 
@@ -13922,5 +13918,678 @@ TEST_CASE("Sheet reflect port - where the layer lies and what the echo pays")
                     CHECK(std::abs(deg(Rs / (O.R * half))) < 0.05);
                     CHECK(std::abs(dB(cpx(et.xpr, 0, 0) / O.T)) < 5.0e-3); // a traced leg is short by the relaunch offset
                 }
+        }
+}
+
+TEST_CASE("Lossy verdict - a lossy second medium has no critical angle")
+{
+#ifdef _OPENMP
+    // One ray per call, many thousand calls: a thread team per call costs twenty times the work
+    struct OneThread
+    {
+        int n = omp_get_max_threads();
+        OneThread() { omp_set_num_threads(1); }
+        ~OneThread() { omp_set_num_threads(n); }
+    } one_thread;
+#endif
+    // sqrt|e1 mu1 / e2 mu2| sin(theta) >= 1 is the critical angle of two lossless media. A lossy
+    // second medium has none: it always admits a transmitted wave, with a complex cosine, and the
+    // flux form closes no port on it. So the magnitude test holds where the second medium is
+    // lossless and nowhere else, and every reader of the verdict - the coefficient, the hit code,
+    // the direction, the bent flag, the ray tube, the branch of a sheet's leak chain - is
+    // continuous through the angle at which the test would trip. A rigid body of the acoustic
+    // mapping is lossless and stays closed. Through ray_triangle_intersect, ray_mesh_interact
+    // and ray_state_update; the rows of J with a loss column and all of K are recorded.
+    //
+    // A. A porous sheet in air, both ports, against the analytic slab
+    // B. A porous sheet on a rigid wall and on a leaking one, both ports
+    // C. A sheet in front of a lossy half-space rarer than air: the outer pair
+    // D. The same porous medium as a traced solid in air: per event, and every path
+    // E. The traced solid on a leaking wall against the sheet of its thickness
+    // F. ray_mesh_interact alone: the ray tube
+    // G. EM: air into the porous medium, per channel
+    // H. EM: a lossless dense solid in front of a lossy rarer one, bare and as a coating
+    const double gap = 1.0e-5;
+    const std::complex<double> J(0.0, 1.0), one(1.0, 0.0);
+    typedef std::unordered_map<std::string, std::vector<double>> Pal;
+    auto dB = [](std::complex<double> z)
+    { return (std::norm(z) > 0.0) ? 10.0 * std::log10(std::norm(z)) : -999.0; };
+    auto deg = [](std::complex<double> z)
+    { return std::arg(z) * 180.0 / QPI; };
+    auto ang = [](const arma::mat &v) // angle from the x axis, deg
+    { return std::acos(std::abs(v(0, 0)) / std::sqrt(v(0, 0) * v(0, 0) + v(0, 1) * v(0, 1) + v(0, 2) * v(0, 2))) * 180.0 / QPI; };
+
+    struct Ev
+    {
+        arma::mat origN, destN, path_dirN, xpr, xpr0, fbs, dir0; // xpr0, dir0: what ray_mesh_interact wrote
+        arma::Col<short> prev, cur, buf;
+        arma::vec accg, accr;
+        uint8_t ot = 0, rt = 0;
+        unsigned nh = 0;
+    };
+    auto traced = [&](const Pal &pal, const arma::mat &mesh, const arma::uvec &mtl_ind, int itype, double f,
+                      const arma::mat &orig, const arma::mat &dest, const Ev *in, double eps, bool relaunch) -> Ev
+    {
+        arma::mat fbs, sbs, sbsN, nv;
+        arma::u32_vec nh, fi, si;
+        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, &nh, &fi, &si);
+        Ev E;
+        arma::vec gain, fang;
+        std::vector<uint8_t> ot, rt;
+        quadriga_lib::ray_mesh_interact(itype, f, &orig, &dest, &mesh, &mtl_ind, &pal, &fi, &si, (arma::mat *)nullptr,
+                                        (arma::mat *)nullptr, &E.origN, &E.destN, &E.fbs, &sbsN, &gain, &E.xpr,
+                                        (arma::mat *)nullptr, (arma::mat *)nullptr, &fang, (arma::vec *)nullptr,
+                                        (arma::vec *)nullptr, &nv, &ot, &E.path_dirN, false, (arma::u32_vec *)nullptr);
+        E.xpr0 = E.xpr, E.dir0 = E.path_dirN, E.ot = ot[0], E.nh = nh(0);
+        arma::Col<short> mf(1), ms(1);
+        mf(0) = fi(0) ? (short)mtl_ind(fi(0) - 1) : (short)0, ms(0) = si(0) ? (short)mtl_ind(si(0) - 1) : (short)0;
+        quadriga_lib::ray_state_update(itype, f, &orig, &dest, &E.fbs, &sbsN, &nh, &fang, &nv, &ot, &pal, &mf, &ms,
+                                       in ? &in->prev : nullptr, in ? &in->cur : nullptr, in ? &in->buf : nullptr,
+                                       in ? &in->path_dirN : nullptr, in ? &in->accg : nullptr, in ? &in->accr : nullptr,
+                                       &E.prev, &E.cur, &E.buf, &gain, &E.xpr, &E.path_dirN, &E.accg, &E.accr, &rt,
+                                       (arma::u32_vec *)nullptr, eps, relaunch ? &E.origN : nullptr, relaunch ? &E.destN : nullptr);
+        E.rt = rt[0];
+        return E;
+    };
+    auto face = [](double x, bool flip) -> arma::mat
+    {
+        arma::mat m = diag_quad_x(200.0, x);
+        if (flip)
+        {
+            m.row(0) = arma::rowvec{x, -200.0, -200.0, x, 200.0, -200.0, x, -200.0, 200.0};
+            m.row(1) = arma::rowvec{x, 200.0, -200.0, x, 200.0, 200.0, x, -200.0, 200.0};
+        }
+        return m;
+    };
+    auto build = [&](const std::vector<double> &x, const std::vector<int> &mat, const std::vector<bool> &flip, arma::uvec &mtl_ind)
+    {
+        arma::mat mesh;
+        mtl_ind.set_size(2 * x.size());
+        for (size_t k = 0; k < x.size(); ++k)
+        {
+            mesh = k ? arma::join_cols(mesh, face(x[k], flip[k])) : face(x[k], flip[k]);
+            mtl_ind(2 * k) = (arma::uword)mat[k], mtl_ind(2 * k + 1) = (arma::uword)mat[k];
+        }
+        return mesh;
+    };
+    auto onward = [](const Ev &E, arma::mat &orig, arma::mat &dest)
+    {
+        arma::mat d = E.destN - E.origN;
+        d /= std::sqrt(d(0, 0) * d(0, 0) + d(0, 1) * d(0, 1) + d(0, 2) * d(0, 2));
+        orig = E.origN, dest = E.origN + (1.2 / std::abs(d(0, 0))) * d;
+        return d(0, 0);
+    };
+    // One path: the events of seq in a row, each relaunched on the segment the one before wrote
+    auto chain = [&](const Pal &pal, const arma::mat &mesh, const arma::uvec &mi, const std::vector<int> &seq, double f, double thd,
+                     const Ev *start, double eps) -> std::vector<Ev>
+    {
+        std::vector<Ev> out;
+        arma::mat o, d;
+        diag_ray_at(thd, o, d);
+        for (size_t q = 0; q < seq.size(); ++q)
+        {
+            Ev E = traced(pal, mesh, mi, seq[q], f, o, d, q ? &out[q - 1] : start, eps, seq[q] != 3 && seq[q] != 0);
+            out.push_back(E);
+            if (E.nh == 0 || E.rt == 0)
+                break;
+            onward(E, o, d);
+        }
+        return out;
+    };
+
+    // Every path, as in the reflect-port case
+    struct Out
+    {
+        std::complex<double> T = 0.0, R = 0.0;
+        int nT = 0, nR = 0, n_cut = 0;
+    };
+    struct Node
+    {
+        arma::mat orig, dest;
+        Ev P;
+        bool have = false;
+        double xp = 0.0, yp = 0.0, y0 = 0.0, Lin = 0.0, dirx = 1.0;
+        std::complex<double> vv = 1.0;
+        int depth = 0;
+    };
+    auto walk = [&](const Pal &pal, const arma::mat &mesh, const arma::uvec &mi, int tr, double f, double eps, double thd, int max_ev,
+                    double floor_dB, double x_front, double x_back) -> Out
+    {
+        Out O;
+        const double st = std::sin(thd * QPI / 180.0), floor_lin = std::pow(10.0, 0.1 * floor_dB), k = 2.0 * QPI * f / C0;
+        std::vector<Node> stack(1);
+        diag_ray_at(thd, stack[0].orig, stack[0].dest);
+        while (!stack.empty())
+        {
+            Node Nn = stack.back();
+            stack.pop_back();
+            for (int itype : {3, tr})
+            {
+                const bool tx = itype != 3;
+                Ev E = traced(pal, mesh, mi, itype, f, Nn.orig, Nn.dest, Nn.have ? &Nn.P : nullptr, eps, tx);
+                if (E.nh == 0 || E.rt == 0)
+                    continue;
+                Node M;
+                M.vv = Nn.vv * cpx(E.xpr, 0, 0);
+                double fx = E.fbs(0, 0), fy = E.fbs(0, 1);
+                M.y0 = Nn.depth ? Nn.y0 : fy;
+                M.Lin = Nn.Lin + (Nn.depth ? std::sqrt((fx - Nn.xp) * (fx - Nn.xp) + (fy - Nn.yp) * (fy - Nn.yp)) : 0.0);
+                M.xp = fx, M.yp = fy, M.depth = Nn.depth + 1;
+                M.dirx = onward(E, M.orig, M.dest);
+                if (mat_of(E.cur(0)) == 0 && ((M.dirx < 0.0 && fx < x_front + 1.0e-3) || (M.dirx > 0.0 && fx > x_back - 1.0e-3)))
+                {
+                    std::complex<double> F = M.vv * std::exp(-J * k * M.Lin) * std::exp(J * k * st * (fy - M.y0));
+                    if (M.dirx > 0.0)
+                        O.T += F, ++O.nT;
+                    else
+                        O.R += F, ++O.nR;
+                    continue;
+                }
+                if (M.depth >= max_ev || std::norm(M.vv) < floor_lin)
+                {
+                    ++O.n_cut;
+                    continue;
+                }
+                M.P = E, M.have = true;
+                stack.push_back(M);
+            }
+        }
+        return O;
+    };
+
+    // The reference: the scalar channel, admittance b = sqrt(eps - sin^2), the decaying root, layer
+    // phase k b d. It shares nothing with the library.
+    struct Lay
+    {
+        std::complex<double> e;
+        double d;
+    };
+    struct RT
+    {
+        std::complex<double> r, t;
+    };
+    auto bof = [](std::complex<double> e, double s2)
+    {
+        std::complex<double> b = std::sqrt(e - s2);
+        return (std::imag(b) > 0.0) ? -b : b;
+    };
+    auto cm = [&](const std::vector<Lay> &ls, std::complex<double> ef, double s2, double k) -> RT // from air
+    {
+        std::complex<double> m11 = 1.0, m12 = 0.0, m21 = 0.0, m22 = 1.0;
+        for (const Lay &l : ls)
+        {
+            std::complex<double> b = bof(l.e, s2), dl = k * b * l.d, c = std::cos(dl), s = std::sin(dl);
+            std::complex<double> a12 = J * s / b, a21 = J * b * s;
+            std::complex<double> n11 = m11 * c + m12 * a21, n12 = m11 * a12 + m12 * c, n21 = m21 * c + m22 * a21, n22 = m21 * a12 + m22 * c;
+            m11 = n11, m12 = n12, m21 = n21, m22 = n22;
+        }
+        std::complex<double> hn = bof(one, s2), hf = bof(ef, s2), B = m11 + m12 * hf, Cc = m21 + m22 * hf;
+        RT o;
+        o.r = (hn * B - Cc) / (hn * B + Cc), o.t = 2.0 * hn / (hn * B + Cc);
+        return o;
+    };
+
+    const double f_hz = FRQ, k1 = 2.0 * QPI * f_hz / C0, dS = 0.050;
+    const std::vector<LumpMtl> lp = {
+        {0.31, 0.20, 0.010},                    // 1 porous sheet 10 mm, rarer than air
+        {0.31, 0.20, 0.0},                      // 2 the same medium as a solid
+        {2.401e-9, 0.0, 0.0},                   // 3 rigid wall
+        {2.401e-9, 0.0, 0.0, 0.0, 0.3},         // 4 rigid wall leaking, tf 0.3
+        {0.31, 0.20, dS},                       // 5 porous sheet 50 mm
+        {2.50, 0.80, 0.010},                    // 6 dense lossy sheet 10 mm
+        {0.31, 0.20, 0.010, 0.0, 0.2},          // 7 porous sheet 10 mm with tf 0.2
+        {0.31, 0.20, 0.0, 0.0, 0.2},            // 8 porous solid with tf 0.2
+        {5.24, 0.00, 0.0},                      // 9 EM: lossless dense solid
+        {1.50, 0.40, 0.0},                      // 10 EM: lossy solid, rarer than 9
+        {1.50, 0.40, 0.006, 0.0, 0.5},          // 11 EM: the same as a 6 mm sheet with tf 0.5
+        {1.50, 0.40, 0.006},                    // 12 EM: the same as a 6 mm sheet
+        {0.50, 0.60, 0.0},                      // 13 a rarer solid with more loss, the test trips at 62.1 deg
+        {0.31, 0.60, 0.0},                      // 14 the same at 55.3 deg
+        {2.401e-9, 1.0e-10, 0.0, 0.0, 0.3},     // 15 the leaking rigid wall with a loss tangent of 0.04
+        {2.401e-9, 0.0, 0.0, 0.0, 0.3, 0.0, 0.0, 0.0, 0.0, 30.0, 0.001},     // 16 the leaking rigid wall with its mass law
+        {2.401e-9, 1.0e-10, 0.0, 0.0, 0.3, 0.0, 0.0, 0.0, 0.0, 30.0, 0.001}, // 17 with both
+    };
+    Pal mtl = lump_palette(lp);
+    const std::complex<double> eP = lump_eps(lp[1], f_hz), eW = lump_eps(lp[2], f_hz), eD = lump_eps(lp[5], f_hz);
+    const std::complex<double> eH = lump_eps(lp[8], f_hz), eL = lump_eps(lp[9], f_hz);
+    const double tc = std::asin(std::sqrt(std::abs(eP))) * 180.0 / QPI;      // where the test trips, air | porous
+    const double tcH = std::asin(std::sqrt(std::abs(eL / eH))) * 180.0 / QPI; // dense | lossy rarer
+    const double tcA = std::asin(std::sqrt(std::abs(1.0 / eH))) * 180.0 / QPI; // dense | air, a critical angle
+    QD_DIAG("\n# diag: lossy verdict. The magnitude test trips at %.4f deg for air | eps %.2f%+.2fj, at %.4f deg for\n", tc, std::real(eP), std::imag(eP), tcH);
+    QD_DIAG("# eps 5.24 | eps %.2f%+.2fj; eps 5.24 | air has its critical angle at %.4f deg\n", std::real(eL), std::imag(eL), tcA);
+    const std::vector<double> angles = {10.0, 20.0, 30.0, tc - 0.01, tc + 0.01, 45.0, 60.0, 75.0, 85.0};
+    auto dir_in = [&](std::complex<double> e1, std::complex<double> e2, double thd) // qd_refract's map, deg
+    {
+        double th = thd * QPI / 180.0, sn = std::sqrt(std::abs(e1 / e2));
+        std::complex<double> c2 = std::sqrt(1.0 - (e1 / e2) * std::sin(th) * std::sin(th));
+        return std::atan2(sn * std::sin(th), std::abs(std::real(c2))) * 180.0 / QPI;
+    };
+
+    // ------------------------------------------------------------------------------------------
+    // A. A porous sheet in air
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: lossy verdict A, porous sheet 10 mm in air, scalar, first event. T, R: the port against the analytic slab,\n");
+    QD_DIAG("# dB and deg; own: ray_mesh_interact's composite against the redo, complex difference; dir: direction written, deg\n");
+    QD_DIAG("tracer,theta,ot,rt,T_lib_dB,T_dB,T_deg,R_lib_dB,R_dB,R_deg,own_T,own_R,dir\n");
+    for (int tr : {4, 5})
+        for (double thd : angles)
+        {
+            double th = thd * QPI / 180.0, s2 = std::sin(th) * std::sin(th), c = std::cos(th);
+            arma::uvec mi;
+            arma::mat mesh = build({0.0}, {1}, {false}, mi);
+            Ev et = chain(mtl, mesh, mi, {tr}, f_hz, thd, nullptr, 0.0)[0], er = chain(mtl, mesh, mi, {3}, f_hz, thd, nullptr, 0.0)[0];
+            REQUIRE((et.nh != 0 && er.nh != 0));
+            RT W = cm({{eP, 0.010}}, one, s2, k1);
+            std::complex<double> und = std::exp(J * k1 * c * 0.010), T = cpx(et.xpr, 0, 0), R = cpx(er.xpr, 0, 0);
+            QD_DIAG("%d,%.2f,%d,%d,%.4f,%+.6f,%+.4f,%.4f,%+.6f,%+.4f,%.2e,%.2e,%.4f\n", tr, thd, (int)et.ot, (int)et.rt, dB(T), dB(T / (W.t * und)), deg(T / (W.t * und)),
+                    dB(R), dB(R / (W.r * und)), deg(R / (W.r * und)), std::abs(cpx(et.xpr0, 0, 0) - T), std::abs(cpx(er.xpr0, 0, 0) - R), ang(et.path_dirN));
+            INFO("A, tracer " << tr << ", theta " << thd);
+            CHECK((int)et.ot == 67);
+            CHECK(std::abs(T / (W.t * und) - 1.0) < 1.0e-9);
+            CHECK(std::abs(R / (W.r * und) - 1.0) < 1.0e-9);
+        }
+
+    // ------------------------------------------------------------------------------------------
+    // B. A porous sheet on a rigid wall
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: lossy verdict B, porous sheet 10 mm on a rigid wall, scalar, the glued entry. T_ref: the chain of an\n");
+    QD_DIAG("# ordinary crossing, its series summed (diag_leak_series), which has no test on the near face; dT: complex distance\n");
+    QD_DIAG("# from it over its magnitude. R_ref: the composite on the rigid backing. T_own: ray_mesh_interact's composite.\n");
+    QD_DIAG("# cur: the current word written, hex\n");
+    QD_DIAG("sheet,wall,tracer,theta,ot,rt,T_dB,T_ref_dB,dT,T_own_dB,|R|^2,ref_|R|^2,dR,dir,cur\n");
+    struct RowB
+    {
+        const char *sheet, *wall;
+        int sh, wl;
+    };
+    for (const RowB &B : std::vector<RowB>{{"porous", "rigid", 1, 3}, {"porous", "rigid tf .3", 1, 4}, {"porous tf .2", "rigid", 7, 3}, {"porous tf .2", "rigid tf .3", 7, 4}})
+        for (int tr : {4, 5})
+            for (double thd : angles)
+            {
+                if (tr == 5 && B.wl != 4)
+                    continue;
+                double th = thd * QPI / 180.0, c = std::cos(th);
+                const LumpMtl &Sm = lp[(size_t)B.sh - 1], &Wm = lp[(size_t)B.wl - 1];
+                arma::uvec mi;
+                arma::mat mesh = build({0.0, gap, 0.2 + gap}, {B.sh, B.wl, B.wl}, {false, false, true}, mi);
+                Ev et = chain(mtl, mesh, mi, {tr}, f_hz, thd, nullptr, 0.0)[0], er = chain(mtl, mesh, mi, {3}, f_hz, thd, nullptr, 0.0)[0];
+                REQUIRE((et.nh != 0 && er.nh != 0));
+                DiagLeak D = diag_leak_series(1.0, eP, eW, 0.0, Sm.tf, Wm.tf, Sm.thk, c, f_hz, true);
+                DiagLump Lq;
+                Lq.tf = Sm.tf, Lq.tf_far = Wm.tf;
+                DiagSheet Dr = diag_sheet_composite(1.0, eP, eW, Sm.thk, c, f_hz, false, true, 1.0, 1.0, 1.0, Lq);
+                std::complex<double> T = cpx(et.xpr, 0, 0), R = cpx(er.xpr, 0, 0);
+                QD_DIAG("%s,%s,%d,%.2f,%d,%d,%.4f,%.4f,%.2e,%.4f,%.6f,%.6f,%.2e,%.4f,%04x\n", B.sheet, B.wall, tr, thd, (int)et.ot, (int)et.rt, dB(T), dB(D.T_te),
+                        (std::abs(D.T_te) > 0.0) ? std::abs(T - D.T_te) / std::abs(D.T_te) : std::abs(T), dB(cpx(et.xpr0, 0, 0)), std::norm(R), std::norm(Dr.R_te),
+                        std::abs(R - Dr.R_te), ang(et.path_dirN), (unsigned)(unsigned short)et.cur(0));
+                INFO("B, " << B.sheet << " | " << B.wall << ", tracer " << tr << ", theta " << thd);
+                CHECK((int)et.ot == 103); // the outer pair air | rigid is closed, and stays so
+                CHECK(std::abs(ang(et.path_dirN) - thd) < 1.0e-9);
+                CHECK(std::abs(R - Dr.R_te) < 1.0e-9);
+                CHECK(std::abs(T - D.T_te) < 1.0e-9 * std::abs(D.T_te) + 1.0e-12); // an ordinary crossing at every angle
+                CHECK(std::abs(cpx(et.xpr0, 0, 0) - T) < 1.0e-12);                // ray_mesh_interact's own composite agrees
+            }
+
+    // ------------------------------------------------------------------------------------------
+    // C. A sheet in front of a lossy half-space rarer than air: the outer pair
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: lossy verdict C, dense lossy sheet 10 mm glued on the porous medium as a half-space, scalar. The outer pair\n");
+    QD_DIAG("# air | porous trips, the near face never does. T, R against the analytic layer on the half-space, the transmit\n");
+    QD_DIAG("# port in normal flux; dB and deg\n");
+    QD_DIAG("tracer,theta,ot,rt,T_lib_dB,T_ref_dB,T_dB,T_deg,R_lib_dB,R_dB,R_deg,T_own_dB,dir,cur\n");
+    for (int tr : {4, 5})
+        for (double thd : angles)
+        {
+            double th = thd * QPI / 180.0, s2 = std::sin(th) * std::sin(th), c = std::cos(th);
+            arma::uvec mi;
+            arma::mat mesh = build({0.0, gap, 0.5 + gap}, {6, 2, 2}, {false, false, true}, mi);
+            Ev et = chain(mtl, mesh, mi, {tr}, f_hz, thd, nullptr, 0.0)[0], er = chain(mtl, mesh, mi, {3}, f_hz, thd, nullptr, 0.0)[0];
+            REQUIRE((et.nh != 0 && er.nh != 0));
+            RT W = cm({{eD, 0.010}}, eP, s2, k1);
+            std::complex<double> und = std::exp(J * k1 * c * 0.010), T = cpx(et.xpr, 0, 0), R = cpx(er.xpr, 0, 0);
+            std::complex<double> Tr = W.t * std::sqrt(std::real(bof(eP, s2)) / c) * und, Rr = W.r * und * und;
+            QD_DIAG("%d,%.2f,%d,%d,%.4f,%.4f,%+.6f,%+.4f,%.4f,%+.6f,%+.4f,%.4f,%.4f,%04x\n", tr, thd, (int)et.ot, (int)et.rt, dB(T), dB(Tr), dB(T / Tr), deg(T / Tr),
+                    dB(R), dB(R / Rr), deg(R / Rr), dB(cpx(et.xpr0, 0, 0)), ang(et.path_dirN), (unsigned)(unsigned short)et.cur(0));
+            INFO("C, tracer " << tr << ", theta " << thd);
+            CHECK((int)et.ot == 71);
+            CHECK(std::abs(T / Tr - 1.0) < 1.0e-9);
+            CHECK(std::abs(R / Rr - 1.0) < 1.0e-9);
+            CHECK(std::abs(cpx(et.xpr0, 0, 0) - T) < 1.0e-12);
+            CHECK(std::abs(ang(et.path_dirN) - dir_in(one, eP, thd)) < 1.0e-6);
+            CHECK((unsigned)(unsigned short)et.cur(0) == ((tr == 5) ? 0x4002u : 0x0002u)); // the refracting tracer bent
+        }
+
+    // ------------------------------------------------------------------------------------------
+    // D. The porous medium as a traced solid in air
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: lossy verdict D1, porous solid 50 mm in air, scalar, per event. entry: air | porous, against the half-space\n");
+    QD_DIAG("# 1 - |r|^2 and |r|^2; exit: the event behind it. dir: direction written; seg: the segment relaunched on; d0: what\n");
+    QD_DIAG("# ray_mesh_interact wrote; deg. cur: the current word after the entry, hex\n");
+    QD_DIAG("tracer,theta,ot,rt,T_dB,T_ref_dB,|R|^2,ref_|R|^2,d0,dir,seg,cur,ot2,rt2,T2_dB,dir2,seg2\n");
+    for (int tr : {4, 5})
+        for (double thd : angles)
+        {
+            double th = thd * QPI / 180.0, s2 = std::sin(th) * std::sin(th), c = std::cos(th);
+            arma::uvec mi;
+            arma::mat mesh = build({0.0, dS}, {2, 2}, {false, true}, mi);
+            std::vector<Ev> ev = chain(mtl, mesh, mi, {tr, tr}, f_hz, thd, nullptr, 0.0);
+            Ev er = chain(mtl, mesh, mi, {3}, f_hz, thd, nullptr, 0.0)[0];
+            std::complex<double> b = bof(eP, s2), r = (c - b) / (c + b);
+            arma::mat sg = ev[0].destN - ev[0].origN;
+            QD_DIAG("%d,%.2f,%d,%d,%.4f,%.4f,%.6f,%.6f,%.4f,%.4f,%.4f,%04x", tr, thd, (int)ev[0].ot, (int)ev[0].rt, dB(cpx(ev[0].xpr, 0, 0)), 10.0 * std::log10(1.0 - std::norm(r)),
+                    std::norm(cpx(er.xpr, 0, 0)), std::norm(r), ang(ev[0].dir0), ang(ev[0].path_dirN), ang(sg), (unsigned)(unsigned short)ev[0].cur(0));
+            if (ev.size() > 1 && ev[1].nh != 0)
+            {
+                arma::mat s2g = ev[1].destN - ev[1].origN;
+                QD_DIAG(",%d,%d,%.4f,%.4f,%.4f\n", (int)ev[1].ot, (int)ev[1].rt, dB(cpx(ev[1].xpr, 0, 0)), ang(ev[1].path_dirN), ang(s2g));
+            }
+            else
+                QD_DIAG(",,,,,\n");
+            INFO("D1, tracer " << tr << ", theta " << thd);
+            CHECK((int)ev[0].ot == 3);
+            CHECK(std::abs(std::norm(cpx(ev[0].xpr, 0, 0)) - (1.0 - std::norm(r))) < 1.0e-9);
+            CHECK(std::abs(std::norm(cpx(er.xpr, 0, 0)) - std::norm(r)) < 1.0e-9);
+            CHECK(std::abs(ang(ev[0].path_dirN) - dir_in(one, eP, thd)) < 1.0e-6);
+            CHECK(std::abs(ang(sg) - ((tr == 5) ? dir_in(one, eP, thd) : thd)) < 1.0e-6);
+            CHECK((unsigned)(unsigned short)ev[0].cur(0) == ((tr == 5) ? 0x4002u : 0x0002u));
+            REQUIRE((ev.size() > 1 && ev[1].nh != 0));
+            CHECK(std::abs(ang(ev[1].path_dirN) - thd) < 1.0e-6); // out of a parallel slab as it arrived
+        }
+
+    QD_DIAG("\n# diag: lossy verdict D2, porous solid 50 mm in air, scalar, every path, 24 events, floor -150 dB. T, R: the sums\n");
+    QD_DIAG("# against the analytic slab, dB and deg; lib: the sum itself\n");
+    QD_DIAG("tracer,eps,theta,nT,nR,T_lib_dB,T_ref_dB,T_dB,T_deg,R_lib_dB,R_ref_dB,R_dB,R_deg\n");
+    for (int tr : {4, 5})
+        for (double eps : {0.0, 0.15})
+            for (double thd : angles)
+            {
+                double th = thd * QPI / 180.0, s2 = std::sin(th) * std::sin(th);
+                arma::uvec mi;
+                arma::mat mesh = build({0.0, dS}, {2, 2}, {false, true}, mi);
+                Out O = walk(mtl, mesh, mi, tr, f_hz, eps, thd, 24, -150.0, 0.0, dS);
+                RT W = cm({{eP, dS}}, one, s2, k1);
+                QD_DIAG("%d,%.2f,%.2f,%d,%d,%.4f,%.4f,%+.6f,%+.4f,%.4f,%.4f,%+.6f,%+.4f\n", tr, eps, thd, O.nT, O.nR, dB(O.T), dB(W.t), (O.nT ? dB(O.T / W.t) : -999.0),
+                        (O.nT ? deg(O.T / W.t) : 0.0), dB(O.R), dB(W.r), dB(O.R / W.r), deg(O.R / W.r));
+                INFO("D2, tracer " << tr << ", eps " << eps << ", theta " << thd);
+                CHECK(O.nT >= 1);
+                CHECK(O.nR >= 2);
+                if (O.nT >= 1)
+                {
+                    CHECK(std::abs(dB(O.T / W.t)) < 5.0e-3); // a traced leg is short by the relaunch offset
+                    CHECK(std::abs(deg(O.T / W.t)) < 0.05);
+                }
+                CHECK(std::abs(dB(O.R / W.r)) < 5.0e-3);
+                CHECK(std::abs(deg(O.R / W.r)) < 0.05);
+            }
+
+    // ------------------------------------------------------------------------------------------
+    // E. The traced solid on a leaking wall against the sheet of its thickness
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: lossy verdict E, porous 50 mm on a rigid wall with tf 0.3, scalar: as a traced solid, three events (entry,\n");
+    QD_DIAG("# porous | wall, wall | air), and as a sheet, two (glued entry, wall | air). Power of each event and of the path,\n");
+    QD_DIAG("# dB; ref: the sheet's chain of an ordinary crossing, series summed. dirW: direction in the wall, deg\n");
+    QD_DIAG("tracer,eps,theta,solid_e1,solid_e2,solid_e3,solid_path,ot1,rt1,ot2,rt2,dirW_solid,sheet_e1,sheet_e2,sheet_path,ref_e1,dirW_sheet,R_solid,R_sheet\n");
+    for (int tr : {4, 5})
+        for (double eps : {0.0, 0.15})
+            for (double thd : angles)
+            {
+                double th = thd * QPI / 180.0, c = std::cos(th);
+                arma::uvec mi, mj;
+                arma::mat mesh = build({0.0, dS, dS + gap, dS + 0.2 + gap}, {2, 2, 4, 4}, {false, true, false, true}, mi);
+                arma::mat mesh2 = build({0.0, gap, 0.2 + gap}, {5, 4, 4}, {false, false, true}, mj);
+                std::vector<Ev> so = chain(mtl, mesh, mi, {tr, tr, tr}, f_hz, thd, nullptr, eps), sh = chain(mtl, mesh2, mj, {tr, tr}, f_hz, thd, nullptr, eps);
+                Ev rs = chain(mtl, mesh, mi, {3}, f_hz, thd, nullptr, eps)[0], rh = chain(mtl, mesh2, mj, {3}, f_hz, thd, nullptr, eps)[0];
+                DiagLeak D = diag_leak_series(1.0, eP, eW, 0.0, 0.0, 0.3, dS, c, f_hz, true);
+                auto g = [&](const std::vector<Ev> &v, size_t q)
+                { return (q < v.size() && v[q].nh != 0) ? dB(cpx(v[q].xpr, 0, 0)) : -999.0; };
+                auto tot = [&](const std::vector<Ev> &v, size_t n)
+                {
+                    double s = 0.0;
+                    for (size_t q = 0; q < n; ++q)
+                        s += g(v, q);
+                    return (s < -900.0) ? -999.0 : s;
+                };
+                QD_DIAG("%d,%.2f,%.2f,%.4f,%.4f,%.4f,%.4f,%d,%d,%d,%d,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.6f,%.6f\n", tr, eps, thd, g(so, 0), g(so, 1), g(so, 2), tot(so, 3),
+                        (int)so[0].ot, (int)so[0].rt, (so.size() > 1) ? (int)so[1].ot : -1, (so.size() > 1) ? (int)so[1].rt : -1,
+                        (so.size() > 1 && so[1].nh) ? ang(so[1].path_dirN) : -1.0, g(sh, 0), g(sh, 1), tot(sh, 2), dB(D.T_te), ang(sh[0].path_dirN),
+                        std::norm(cpx(rs.xpr, 0, 0)), std::norm(cpx(rh.xpr, 0, 0)));
+                INFO("E, tracer " << tr << ", eps " << eps << ", theta " << thd);
+                const bool live = g(so, 0) > -900.0 && g(so, 1) > -900.0 && g(sh, 0) > -900.0;
+                CHECK(live); // the leak into the wall exists at every angle
+                CHECK(std::abs(g(sh, 0) - dB(D.T_te)) < 1.0e-6);
+                if (live && eps == 0.0) // series summed: the solid's two events are the sheet's one
+                    CHECK(std::abs(g(so, 0) + g(so, 1) - g(sh, 0)) < 5.0e-3);
+            }
+
+    // ------------------------------------------------------------------------------------------
+    // F. ray_mesh_interact alone: the ray tube
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: lossy verdict F, ray_mesh_interact alone with a ray tube, type 5, air | porous solid. The spine at theta,\n");
+    QD_DIAG("# two vertex rays at theta -+ 0.6 deg in the plane and one tilted out of it. gain0: without the tube\n");
+    QD_DIAG("theta,ot_tube,gain_tube_dB,ot_spine,gain_spine_dB,dir_tube,dir_spine,v1,v2,v3\n");
+    for (double thd : {tc - 3.0, tc - 0.3, tc + 0.3, tc + 3.0})
+    {
+        arma::uvec mi;
+        arma::mat mesh = build({0.0, dS}, {2, 2}, {false, true}, mi), orig, dest, fbs, sbs;
+        diag_ray_at(thd, orig, dest);
+        arma::u32_vec nh, fi, si;
+        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, &nh, &fi, &si);
+        auto dirv = [](double a, double z)
+        {
+            arma::rowvec v = {std::cos(a * QPI / 180.0), std::sin(a * QPI / 180.0), z};
+            return arma::rowvec(v / std::sqrt(v(0) * v(0) + v(1) * v(1) + v(2) * v(2)));
+        };
+        arma::mat trivec(1, 9), tridir(1, 9);
+        trivec.row(0) = arma::rowvec{0.0, 0.001, 0.0, 0.0, -0.001, 0.001, 0.0, -0.001, -0.001};
+        arma::rowvec v1 = dirv(thd + 0.6, 0.0), v2 = dirv(thd - 0.6, 0.0), v3 = dirv(thd, 0.01);
+        tridir.row(0) = arma::join_rows(arma::join_rows(v1, v2), v3);
+        arma::mat oN, dN, fN, sN, xp, tvN, tdN, pd, oN2, dN2, fN2, sN2, xp2, pd2;
+        arma::vec gn, gn2;
+        std::vector<uint8_t> ot, ot2;
+        quadriga_lib::ray_mesh_interact(5, f_hz, &orig, &dest, &mesh, &mi, &mtl, &fi, &si, &trivec, &tridir, &oN, &dN, &fN, &sN, &gn, &xp, &tvN, &tdN,
+                                        (arma::vec *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr, (arma::mat *)nullptr, &ot, &pd, false,
+                                        (arma::u32_vec *)nullptr);
+        quadriga_lib::ray_mesh_interact(5, f_hz, &orig, &dest, &mesh, &mi, &mtl, &fi, &si, (arma::mat *)nullptr, (arma::mat *)nullptr, &oN2, &dN2, &fN2,
+                                        &sN2, &gn2, &xp2, (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr,
+                                        (arma::vec *)nullptr, (arma::mat *)nullptr, &ot2, &pd2, false, (arma::u32_vec *)nullptr);
+        arma::mat w1 = tdN.cols(0, 2), w2 = tdN.cols(3, 5), w3 = tdN.cols(6, 8);
+        QD_DIAG("%.2f,%d,%.4f,%d,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f\n", thd, (int)ot[0], (gn(0) > 0.0) ? 10.0 * std::log10(gn(0)) : -999.0, (int)ot2[0],
+                (gn2(0) > 0.0) ? 10.0 * std::log10(gn2(0)) : -999.0, ang(pd), ang(pd2), ang(w1), ang(w2), ang(w3));
+        INFO("F, theta " << thd);
+        CHECK((int)ot[0] == 3); // no vertex closes a tube on a lossy medium
+        CHECK(std::abs(gn(0) - gn2(0)) < 1.0e-12);
+        CHECK(std::abs(ang(pd) - ang(pd2)) < 1.0e-9);
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // I. The recovery in a lossy solid rarer than air
+    // ------------------------------------------------------------------------------------------
+    // A wave from air leaves a parallel slab at the angle it arrived at. Where the exit direction
+    // is off, the cosine recovered in the solid is. Past the angle the real-index start of the
+    // solve is far from the root, and the solve has to run until it has converged.
+    QD_DIAG("\n# diag: lossy verdict I, a lossy solid rarer than air, 50 mm in air, scalar, entry and exit. trip: where the\n");
+    QD_DIAG("# magnitude test trips. d_dir: the direction the exit writes minus theta, deg; T, R: every path against the\n");
+    QD_DIAG("# analytic slab, dB; inside: the direction in the solid, deg\n");
+    QD_DIAG("eps,trip,tracer,theta,ot,inside,d_dir,T_dB,R_dB\n");
+    for (int m : {2, 13, 14})
+        for (int tr : {4, 5})
+        {
+            const std::complex<double> eM = lump_eps(lp[(size_t)m - 1], f_hz);
+            const double tm = std::asin(std::sqrt(std::abs(eM))) * 180.0 / QPI;
+            for (double thd : {10.0, 20.0, 30.0, 37.0, 45.0, 50.0, 55.0, 60.0, 62.0, 75.0, 85.0})
+            {
+                double th = thd * QPI / 180.0, s2 = std::sin(th) * std::sin(th);
+                arma::uvec mi;
+                arma::mat mesh = build({0.0, dS}, {m, m}, {false, true}, mi);
+                std::vector<Ev> ev = chain(mtl, mesh, mi, {tr, tr}, f_hz, thd, nullptr, 0.0);
+                REQUIRE((ev.size() == 2 && ev[1].nh != 0));
+                Out O = walk(mtl, mesh, mi, tr, f_hz, 0.0, thd, 24, -150.0, 0.0, dS);
+                RT W = cm({{eM, dS}}, one, s2, k1);
+                (void)tm;
+                QD_DIAG("%.2f%+.2fj,%.2f,%d,%.0f,%d,%.4f,%+.6f,%+.6f,%+.6f\n", std::real(eM), std::imag(eM), tm, tr, thd, (int)ev[0].ot, ang(ev[0].path_dirN),
+                        ang(ev[1].path_dirN) - thd, (O.nT ? dB(O.T / W.t) : -999.0), dB(O.R / W.r));
+                INFO("I, material " << m << ", tracer " << tr << ", theta " << thd);
+                CHECK(O.nT >= 1);
+                CHECK(std::abs(ang(ev[1].path_dirN) - thd) < 1.0e-4);
+                if (O.nT >= 1)
+                    CHECK(std::abs(dB(O.T / W.t)) < 5.0e-3);
+                CHECK(std::abs(dB(O.R / W.r)) < 5.0e-3);
+            }
+        }
+
+    // ------------------------------------------------------------------------------------------
+    // J. A rigid wall that is given a loss
+    // ------------------------------------------------------------------------------------------
+    // Rigid bodies of the acoustic mapping are lossless and closed from 0.003 deg. What a loss
+    // column on such a body does to its tf leak, under whatever the verdict is.
+    QD_DIAG("\n# diag: lossy verdict J, a rigid wall 200 mm with tf 0.3 in air, scalar, tracer 4 and 5: lossless, with a loss\n");
+    QD_DIAG("# tangent of 0.04, with its mass law (m 30), with both. Entry and exit in dB, the direction in the wall and\n");
+    QD_DIAG("# behind it in deg, the reflectance of the first face\n");
+    QD_DIAG("wall,tracer,theta,ot1,rt1,e1_dB,dir1,ot2,rt2,e2_dB,dir2,|R|^2\n");
+    for (int wl : {4, 15, 16, 17})
+        for (int tr : {4, 5})
+            for (double thd : {0.0, 10.0, 45.0, 75.0})
+            {
+                arma::uvec mi;
+                arma::mat mesh = build({0.0, 0.2}, {wl, wl}, {false, true}, mi);
+                std::vector<Ev> ev = chain(mtl, mesh, mi, {tr, tr}, f_hz, thd, nullptr, 1.0e3);
+                Ev er = chain(mtl, mesh, mi, {3}, f_hz, thd, nullptr, 1.0e3)[0];
+                const bool two = ev.size() > 1 && ev[1].nh != 0;
+                QD_DIAG("%s,%d,%.0f,%d,%d,%.4f,%.4f,%d,%d,%.4f,%.4f,%.6f\n", (wl == 4) ? "lossless" : ((wl == 15) ? "lossy" : ((wl == 16) ? "lossless m" : "lossy m")), tr, thd,
+                        (int)ev[0].ot, (int)ev[0].rt, dB(cpx(ev[0].xpr, 0, 0)), ang(ev[0].path_dirN), two ? (int)ev[1].ot : -1, two ? (int)ev[1].rt : -1,
+                        two ? dB(cpx(ev[1].xpr, 0, 0)) : -999.0, two ? ang(ev[1].path_dirN) : -1.0, std::norm(cpx(er.xpr, 0, 0)));
+                INFO("J, wall " << wl << ", tracer " << tr << ", theta " << thd);
+                if ((wl == 4 || wl == 16) && thd > 0.0) // lossless: closed from 0.003 deg, the flat leak, undeviated
+                {
+                    CHECK((int)ev[0].ot == 35);
+                    CHECK(std::abs(std::norm(cpx(ev[0].xpr, 0, 0)) - 0.3) < 1.0e-9);
+                    CHECK(std::abs(std::norm(cpx(er.xpr, 0, 0)) - 0.7) < 1.0e-9);
+                    CHECK(std::abs(ang(ev[0].path_dirN) - thd) < 1.0e-9);
+                }
+            }
+
+    // ------------------------------------------------------------------------------------------
+    // K. The direction a traced absorber and a sheet hand a mass-law wall, recorded
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: lossy verdict K, porous 50 mm on a rigid wall 200 mm with tf 0.3 and its mass law (m 30), scalar, series\n");
+    QD_DIAG("# summed. As a traced solid (entry, porous | wall, wall | air) and as a sheet (glued entry,\n");
+    QD_DIAG("# wall | air). into: the events up to the wall, dB; exit: the wall | air event with the wall's mass term, dB;\n");
+    QD_DIAG("# dirW: the direction in the wall, deg; out: the direction behind the wall, deg\n");
+    QD_DIAG("tracer,theta,solid_into,solid_exit,solid_dirW,solid_out,sheet_into,sheet_exit,sheet_dirW,sheet_out,exit_diff\n");
+    for (int tr : {4, 5})
+        for (double thd : {10.0, 20.0, 30.0, 37.0, 45.0, 60.0, 75.0, 85.0})
+        {
+            arma::uvec mi, mj;
+            arma::mat mesh = build({0.0, dS, dS + gap, dS + 0.2 + gap}, {2, 2, 16, 16}, {false, true, false, true}, mi);
+            arma::mat mesh2 = build({0.0, gap, 0.2 + gap}, {5, 16, 16}, {false, false, true}, mj);
+            std::vector<Ev> so = chain(mtl, mesh, mi, {tr, tr, tr}, f_hz, thd, nullptr, 0.0), sh = chain(mtl, mesh2, mj, {tr, tr}, f_hz, thd, nullptr, 0.0);
+            REQUIRE((so.size() == 3 && sh.size() == 2 && so[2].nh != 0 && sh[1].nh != 0));
+            double a = dB(cpx(so[0].xpr, 0, 0)) + dB(cpx(so[1].xpr, 0, 0)), b = dB(cpx(so[2].xpr, 0, 0)), c = dB(cpx(sh[0].xpr, 0, 0)), d = dB(cpx(sh[1].xpr, 0, 0));
+            QD_DIAG("%d,%.0f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%+.4f\n", tr, thd, a, b, ang(so[1].path_dirN), ang(so[2].path_dirN), c, d, ang(sh[0].path_dirN),
+                    ang(sh[1].path_dirN), b - d);
+            CHECK(std::isfinite(b - d));
+        }
+
+    // ------------------------------------------------------------------------------------------
+    // G. EM: air into the porous medium, per channel
+    // ------------------------------------------------------------------------------------------
+    auto fres = [&](std::complex<double> e1, std::complex<double> e2, double c1, std::complex<double> &rte, std::complex<double> &rtm)
+    {
+        std::complex<double> z1 = std::sqrt(e1), z2 = std::sqrt(e2), a = 1.0 - (e1 / e2) * (1.0 - c1 * c1);
+        std::complex<double> c2 = std::sqrt(a);
+        if (std::imag(c2) > 0.0)
+            c2 = -c2;
+        rte = (z1 * c1 - z2 * c2) / (z1 * c1 + z2 * c2), rtm = (z2 * c1 - z1 * c2) / (z2 * c1 + z1 * c2);
+    };
+    QD_DIAG("\n# diag: lossy verdict G, EM, air | porous solid, the entry per channel. Transmit power against 1 - |r|^2 and\n");
+    QD_DIAG("# reflect power against |r|^2 of the half-space; k0, k3: the xprmat entries VV and HH\n");
+    QD_DIAG("tracer,theta,ot,rt,T_k0_dB,T_k3_dB,ref_T_te_dB,ref_T_tm_dB,R_k0,R_k3,ref_R_te,ref_R_tm,dir,cur\n");
+    for (int tr : {1, 2})
+        for (double thd : angles)
+        {
+            double th = thd * QPI / 180.0, c = std::cos(th);
+            arma::uvec mi;
+            arma::mat mesh = build({0.0, dS}, {2, 2}, {false, true}, mi);
+            Ev et = chain(mtl, mesh, mi, {tr}, f_hz, thd, nullptr, 0.0)[0], er = chain(mtl, mesh, mi, {0}, f_hz, thd, nullptr, 0.0)[0];
+            std::complex<double> rte, rtm;
+            fres(one, eP, c, rte, rtm);
+            QD_DIAG("%d,%.2f,%d,%d,%.4f,%.4f,%.4f,%.4f,%.6f,%.6f,%.6f,%.6f,%.4f,%04x\n", tr, thd, (int)et.ot, (int)et.rt, dB(cpx(et.xpr, 0, 0)), dB(cpx(et.xpr, 0, 3)),
+                    10.0 * std::log10(1.0 - std::norm(rte)), 10.0 * std::log10(1.0 - std::norm(rtm)), std::norm(cpx(er.xpr, 0, 0)), std::norm(cpx(er.xpr, 0, 3)),
+                    std::norm(rte), std::norm(rtm), ang(et.path_dirN), (unsigned)(unsigned short)et.cur(0));
+            INFO("G, tracer " << tr << ", theta " << thd);
+            CHECK((int)et.ot == 3);
+            CHECK(std::abs(std::norm(cpx(et.xpr, 0, 0)) - (1.0 - std::norm(rte))) < 1.0e-9);
+            CHECK(std::abs(std::norm(cpx(et.xpr, 0, 3)) - (1.0 - std::norm(rtm))) < 1.0e-9);
+            CHECK(std::abs(std::norm(cpx(er.xpr, 0, 0)) - std::norm(rte)) < 1.0e-9);
+            CHECK(std::abs(std::norm(cpx(er.xpr, 0, 3)) - std::norm(rtm)) < 1.0e-9);
+            CHECK((unsigned)(unsigned short)et.cur(0) == ((tr == 2) ? 0x4002u : 0x0002u));
+        }
+
+    // ------------------------------------------------------------------------------------------
+    // H. EM: a lossless dense solid in front of a lossy rarer one
+    // ------------------------------------------------------------------------------------------
+    // The ray is launched inside the dense solid: across parallel faces from air the invariant
+    // stays below one and the test never trips on this pair. No series is summed (eps 1e3), so
+    // an event is its interface and the lossless leg it closes.
+    auto launched = [&](double thd)
+    {
+        Ev S;
+        double th = thd * QPI / 180.0;
+        S.prev = sv({0}), S.cur = sv({9}), S.buf = sv({0});
+        S.path_dirN = arma::mat{{std::cos(th), std::sin(th), 0.0}};
+        S.accg = arma::vec{0.1}, S.accr = arma::vec{0.1};
+        return S;
+    };
+    const std::vector<double> anglesH = {10.0, 20.0, tcA + 1.0, 30.0, tcH - 0.01, tcH + 0.01, 40.0, 50.0, 65.0, 80.0};
+    QD_DIAG("\n# diag: lossy verdict H1, EM, eps 5.24 | eps 1.50 - 0.40j as two solids, the wave launched in the first at theta.\n");
+    QD_DIAG("# The transition per channel against 1 - |r|^2 and |r|^2 of the half-space\n");
+    QD_DIAG("tracer,theta,ot,rt,T_k0_dB,T_k3_dB,ref_T_te_dB,ref_T_tm_dB,R_k0,R_k3,ref_R_te,ref_R_tm,d0,dir,cur,prev\n");
+    for (int tr : {1, 2})
+        for (double thd : anglesH)
+        {
+            double th = thd * QPI / 180.0, c = std::cos(th);
+            arma::uvec mi;
+            arma::mat mesh = build({0.0, gap, 0.1 + gap}, {9, 10, 10}, {true, false, true}, mi);
+            Ev S = launched(thd);
+            Ev et = chain(mtl, mesh, mi, {tr}, f_hz, thd, &S, 1.0e3)[0], er = chain(mtl, mesh, mi, {0}, f_hz, thd, &S, 1.0e3)[0];
+            REQUIRE((et.nh != 0 && er.nh != 0));
+            std::complex<double> rte, rtm;
+            fres(eH, eL, c, rte, rtm);
+            QD_DIAG("%d,%.2f,%d,%d,%.4f,%.4f,%.4f,%.4f,%.6f,%.6f,%.6f,%.6f,%.4f,%.4f,%04x,%04x\n", tr, thd, (int)et.ot, (int)et.rt, dB(cpx(et.xpr, 0, 0)), dB(cpx(et.xpr, 0, 3)),
+                    10.0 * std::log10(1.0 - std::norm(rte)), 10.0 * std::log10(1.0 - std::norm(rtm)), std::norm(cpx(er.xpr, 0, 0)), std::norm(cpx(er.xpr, 0, 3)),
+                    std::norm(rte), std::norm(rtm), ang(et.dir0), ang(et.path_dirN), (unsigned)(unsigned short)et.cur(0), (unsigned)(unsigned short)et.prev(0));
+            INFO("H1, tracer " << tr << ", theta " << thd);
+            CHECK((int)et.ot == 5);
+            CHECK(std::abs(std::norm(cpx(et.xpr, 0, 0)) - (1.0 - std::norm(rte))) < 1.0e-9);
+            CHECK(std::abs(std::norm(cpx(et.xpr, 0, 3)) - (1.0 - std::norm(rtm))) < 1.0e-9);
+            CHECK(std::abs(std::norm(cpx(er.xpr, 0, 0)) - std::norm(rte)) < 1.0e-9);
+            CHECK(std::abs(std::norm(cpx(er.xpr, 0, 3)) - std::norm(rtm)) < 1.0e-9);
+            CHECK(std::abs(ang(et.path_dirN) - dir_in(eH, eL, thd)) < 1.0e-6);
+            CHECK((unsigned)(unsigned short)et.cur(0) == ((tr == 2) ? 0x400au : 0x000au));
+        }
+
+    QD_DIAG("\n# diag: lossy verdict H2, EM, eps 5.24 | 6 mm eps 1.50 - 0.40j | air, a coated solid past the critical angle of its\n");
+    QD_DIAG("# outer pair, the wave launched in the solid. The near face trips the magnitude test at %.4f deg. Transmit port per\n", tcH);
+    QD_DIAG("# channel against the chain of an ordinary crossing with its series; reflect port per channel. tf: of the coating\n");
+    QD_DIAG("tf,theta,ot,rt,T_k0_dB,T_k3_dB,ref_T_te_dB,ref_T_tm_dB,R_k0,R_k3\n");
+    for (int sh : {11, 12})
+        for (double thd : anglesH)
+        {
+            if (thd < tcA)
+                continue;
+            double th = thd * QPI / 180.0, c = std::cos(th);
+            const LumpMtl &Sm = lp[(size_t)sh - 1];
+            arma::uvec mi;
+            arma::mat mesh = build({0.0, gap}, {9, sh}, {true, false}, mi);
+            Ev S = launched(thd);
+            Ev et = chain(mtl, mesh, mi, {1}, f_hz, thd, &S, 1.0e3)[0], er = chain(mtl, mesh, mi, {0}, f_hz, thd, &S, 1.0e3)[0];
+            REQUIRE((et.nh != 0 && er.nh != 0));
+            DiagLeak D = diag_leak_series(eH, eL, 1.0, 0.0, Sm.tf, 0.0, Sm.thk, c, f_hz, false);
+            QD_DIAG("%.1f,%.2f,%d,%d,%.4f,%.4f,%.4f,%.4f,%.6f,%.6f\n", Sm.tf, thd, (int)et.ot, (int)et.rt, dB(cpx(et.xpr, 0, 0)), dB(cpx(et.xpr, 0, 3)), dB(D.T_te), dB(D.T_tm),
+                    std::norm(cpx(er.xpr, 0, 0)), std::norm(cpx(er.xpr, 0, 3)));
+            INFO("H2, tf " << Sm.tf << ", theta " << thd);
+            CHECK((int)et.ot == 101); // eps 5.24 | air is a critical angle and stays one
+            CHECK(std::abs(std::norm(cpx(et.xpr, 0, 0)) - std::norm(D.T_te)) < 1.0e-9);
+            CHECK(std::abs(std::norm(cpx(et.xpr, 0, 3)) - std::norm(D.T_tm)) < 1.0e-9);
         }
 }
