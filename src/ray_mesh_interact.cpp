@@ -1116,11 +1116,41 @@ namespace
                 return std::sqrt((X.eta(fGHz) + X.eta_resonance(fGHz)) / X.mu(fGHz));
             };
 
+            // A mass-law layer in which the wave is evanescent - lossless, and the transverse
+            // invariant at or above its eps mu, which is the verdict Material::interact_with
+            // gives a wave that meets it - is closed on both faces. A rigid layer of the acoustic
+            // mapping is that at every practical angle. The Fresnel reflectance of such a face
+            // does not say so: next to a lossy medium it is below one although the wave in the
+            // layer carries no flux, the remainder being the interference of the incident and
+            // the reflected wave.
+            auto CLOSED = [&](int j) -> bool
+            {
+                if (j < 1 || j > n_layers || !(MED(j).m > 0.0))
+                    return false;
+                const Material &X = MED(j);
+                std::complex<double> w = (X.eta(fGHz) + X.eta_resonance(fGHz)) * X.mu(fGHz);
+                return std::imag(w) == 0.0 && std::abs((w_near / w) * s2) >= 1.0;
+            };
+
             std::complex<double> R_out[2], T_out[2];
             for (int pol = 0; pol < 2; ++pol)
             {
+                // Normal flux of the media a leak entered a closed layer from, and left it into
+                double fl_in = 1.0, fl_out = 1.0;
+
                 // Boundary j | j+1 in produce mode's amplitudes, tf folded in by the pair that
-                // forms it. A boundary neither of whose media carries tf is left exactly raw.
+                // forms it. A boundary neither of whose media carries tf is left exactly raw,
+                // unless it is the face of a closed layer.
+                //
+                // A closed face passes the flat leak a bare face passes, 1 - R' with the
+                // reflectance taken as one, and nothing where neither medium carries tf. The
+                // reflection keeps its Fresnel magnitude. The leak is a statement about normal
+                // flux, of the side that carries one, and the segments run in raw amplitudes that
+                // are converted once at the outer pair; across a closed layer there is nothing
+                // to convert through. So the flux of that side is collected here, per channel as
+                // Material::flux_amp forms it, and the transmit port is put right by the ratio
+                // below: each segment is then on flux between its own ends. Where the media on
+                // the two sides of the closed layers are one, the ratio is exactly one.
                 auto BND = [&](int j, std::complex<double> &r, std::complex<double> &t, std::complex<double> &tb)
                 {
                     const Material &A = MED(j), &B = MED(j + 1);
@@ -1136,7 +1166,9 @@ namespace
                         t = (2.0 * za * ca) / (zb * ca + za * cb);
                         tb = (2.0 * zb * cb) / (za * cb + zb * ca);
                     }
-                    if (A.tf(fGHz) == 0.0 && B.tf(fGHz) == 0.0)
+                    const bool cA = CLOSED(j), cB = CLOSED(j + 1);
+                    const bool closed = cA != cB; // a closed layer against a side that carries flux
+                    if (A.tf(fGHz) == 0.0 && B.tf(fGHz) == 0.0 && !closed)
                         return;
                     double R0 = std::norm(r);
                     double Rt = A.apply_tf_pair(B, R0, fGHz);
@@ -1144,8 +1176,20 @@ namespace
                     r = std::polar(std::sqrt(Rt), std::arg(r));
                     if (keep < 1.0e-9) // no forward Fresnel port left to scale: the flat leak
                         t = std::polar(std::sqrt(pass), std::arg(t)), tb = std::polar(std::sqrt(pass), std::arg(tb));
+                    else if (closed) // no forward port either, whatever R0 reads: the leak of a bare face
+                    {
+                        double Rc = A.apply_tf_pair(B, 1.0, fGHz);
+                        pass = (Rc < 1.0) ? 1.0 - Rc : 0.0;
+                        t = std::polar(std::sqrt(pass), std::arg(t)), tb = std::polar(std::sqrt(pass), std::arg(tb));
+                    }
                     else
                         t *= std::sqrt(pass / keep), tb *= std::sqrt(pass / keep);
+                    if (closed)
+                    {
+                        int o = cA ? j + 1 : j; // the side that carries flux
+                        double g = (pol == 0) ? std::real(ADM(o) * COS(o)) : std::real(std::conj(ADM(o)) * COS(o));
+                        (cB ? fl_in : fl_out) *= g;
+                    }
                 };
 
                 // One-way factor of coherent layer j, the same phase the matrix is built from
@@ -1236,6 +1280,8 @@ namespace
                         Tt *= MASS(q, x_run);
                     p = q;
                 }
+                if (fl_in != fl_out) // one medium on both sides of the closed layers: exactly one
+                    Tt *= (fl_in > 0.0 && fl_out > 0.0) ? std::sqrt(fl_in / fl_out) : 0.0;
                 R_out[pol] = Rt, T_out[pol] = Tt;
                 if (is_scalar)
                 {
@@ -1829,6 +1875,36 @@ namespace
             double gI = mat_slab.medium_gain(dist_slab, fGHz, abs_cos_theta_t, mass_path, 1.0, mass_floor,
                                              thk_normal, mass_c, mass_bonded);
             double aI = std::sqrt((gI < 0.0) ? 0.0 : gI);
+
+            // A sheet in which the wave is evanescent is closed on both faces: lossless, and the
+            // transverse invariant at or above its eps mu, the verdict Material::interact_with
+            // gives a wave that meets it. Each face then passes the flat leak a bare face passes,
+            // 1 - R' with the reflectance taken as one, whatever its Fresnel reflectance reads -
+            // next to a lossy medium that is below one although the wave in the sheet carries no
+            // flux, and rescaling a raw amplitude by (1 - R') / (1 - R0) there is a gain. A leak
+            // is a statement about normal flux, so the two of them are the whole of the transmit
+            // port and the near-to-far conversion, which belongs to an unbroken chain of raw
+            // amplitudes, is not applied across the sheet. A face that is flat already, between
+            // lossless media, keeps the value it had. The reflect port is not touched.
+            //
+            // A near medium that holds the wave undeviated is left as it was: the sheet behind
+            // it is entered at an angle its Snell cosine does not describe.
+            std::complex<double> w_n = (mat_near.eta(fGHz) + mat_near.eta_resonance(fGHz)) * mat_near.mu(fGHz);
+            if (!far_closed && std::imag(eta_s_if * mu_s) == 0.0 && std::abs((w_n / (eta_s_if * mu_s)) * sin2_i) >= 1.0 &&
+                !(near_undeviated && mat_near.m > 0.0))
+            {
+                double Rc_n = mat_slab.apply_tf_pair(mat_near, 1.0, fGHz), Rc_f = mat_slab.apply_tf_pair(mat_far, 1.0, fGHz);
+                double a_n = std::sqrt((Rc_n < 1.0) ? 1.0 - Rc_n : 0.0), a_f = std::sqrt((Rc_f < 1.0) ? 1.0 - Rc_f : 0.0);
+                if (!(1.0 - R0n_te < 1.0e-9))
+                    tns_te = std::polar(a_n, std::arg(tn_fwd[0]));
+                if (!(1.0 - R0n_tm < 1.0e-9))
+                    tns_tm = std::polar(a_n, std::arg(tn_fwd[1]));
+                if (!(1.0 - R0f_te < 1.0e-9))
+                    tsf_te = std::polar(a_f, std::arg(tf_out[0]));
+                if (!(1.0 - R0f_tm < 1.0e-9))
+                    tsf_tm = std::polar(a_f, std::arg(tf_out[1]));
+                fx_te = fx_tm = 1.0;
+            }
             if (T_te)
                 *T_te = far_closed ? aI * leak_te : ig * fx_te * aI * tns_te * tsf_te;
             if (T_tm)
