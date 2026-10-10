@@ -989,7 +989,7 @@ namespace
                                  std::complex<double> *T_te, std::complex<double> *T_tm,
                                  std::complex<double> *R_te, std::complex<double> *R_tm,
                                  bool disp_far = false, double disp_budget = -1.0,
-                                 double mass_cos = -1.0,    // real incidence cosine for a mass-law term, < 0 = |Re ci|
+                                 double mass_cos = -1.0,    // cosine the wave has in air, for a mass-law term, < 0 = |Re ci|
                                  double mass_bonded = 0.0)  // X0 of the bonded mass-law bodies crossed before the stack
     {
         if (n_layers < 1 || layers == nullptr)
@@ -1170,7 +1170,8 @@ namespace
 
                 // Real amplitude factor of mass-law layer j, formed as produce mode forms it: the
                 // loss over the path thk / |Re c| under the same saturation cap, and the mass term
-                // from the normal thickness and the real incidence cosine.
+                // from the normal thickness and the cosine the wave has in air, which the caller
+                // hands in as mass_cos where the near medium is not air.
                 auto MASS = [&](int j, double &x_run) -> double
                 {
                     const Material &L = MED(j);
@@ -1383,7 +1384,8 @@ namespace
                                 bool near_undeviated = false,        // produce: the wave in mat_near was not refracted in
                                 double mass_bonded = 0.0,            // produce: X0 of the bonded mass-law bodies already crossed
                                 const Material *back_far = nullptr,  // correction: what lies behind a sheet named as mat_far
-                                bool verdict_given = false)          // correction: the caller decided to sum; eps is not read
+                                bool verdict_given = false,          // correction: the caller decided to sum; eps is not read
+                                double mass_cos = -1.0)              // produce: angle factor of the mass term, < 0 = abs_cos_theta
     {
         // Mass-law materials carry a lumped transmission surrogate: eta/mu are calibrated for
         // surface impedance only, so the in-slab index (and hence the phase of phi) is not
@@ -1798,7 +1800,7 @@ namespace
             // the default floor exists to reject sub-millimeter paths in traced solids.
             //
             // The mass term is handed its two pieces separately: thk_normal is the surface-mass
-            // surrogate and abs_cos_theta is the angle factor, so the sheet and a traced solid of
+            // surrogate and mass_c is the angle factor, so the sheet and a traced solid of
             // the same normal thickness form the same argument. The geometric-distance slot keeps
             // the product thk_normal * cos, which is what the minimum-path gate reads and what the
             // zero sentinel tests; neither the quotient thk / cos nor a floor on the cosine is
@@ -1806,19 +1808,26 @@ namespace
             // as "no geometric path supplied" and would then substitute the refracted path, so the
             // term is disabled outright in that case instead.
             //
-            // Both pieces keep the real projection even where a complex incidence cosine was
-            // recovered. The surrogate and its angle factor are lumped quantities the material table
-            // is calibrated on, not wave quantities, and medium_gain takes them as real by
-            // construction; the same reasoning excludes a mass-law slab from the exact in-medium
-            // branch in SCALE_BY_MEDIUM. The two interface amplitudes above are wave quantities and
-            // do carry the recovered cosine.
-            double mass_path = thk_normal * abs_cos_theta;
+            // Both pieces are real even where a complex incidence cosine was recovered. The
+            // surrogate and its angle factor are lumped quantities the material table is calibrated
+            // on, not wave quantities, and medium_gain takes them as real by construction; the same
+            // reasoning excludes a mass-law slab from the exact in-medium branch in
+            // SCALE_BY_MEDIUM. The two interface amplitudes above are wave quantities and do carry
+            // the recovered cosine.
+            //
+            // The angle factor is the cosine the wave has in air. The plate is driven at the trace
+            // wavenumber and the term is calibrated on a plate in air, so the angle is the one the
+            // transverse invariant has there and not the one in a medium the wave was refracted
+            // into on its way. Reached from air that is abs_cos_theta; a caller that reaches the
+            // sheet from inside such a medium hands it in as mass_cos.
+            const double mass_c = (mass_cos >= 0.0) ? mass_cos : abs_cos_theta;
+            double mass_path = thk_normal * mass_c;
             double mass_floor = (mass_path > 0.0) ? 0.0 : 1.0e300;
             //
             // A sheet reached from inside a mass-law body is bonded to it: mass_bonded is the X0
             // that body's leg carries, and the sheet pays what the plate is worth above it.
             double gI = mat_slab.medium_gain(dist_slab, fGHz, abs_cos_theta_t, mass_path, 1.0, mass_floor,
-                                             thk_normal, abs_cos_theta, mass_bonded);
+                                             thk_normal, mass_c, mass_bonded);
             double aI = std::sqrt((gI < 0.0) ? 0.0 : gI);
             if (T_te)
                 *T_te = far_closed ? aI * leak_te : ig * fx_te * aI * tns_te * tsf_te;
@@ -5106,6 +5115,30 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 // exactly as it was: the two forms are algebraically equal at one layer and agree to
                 // 9.6e-16 wherever no boundary is past its critical angle, but they are not
                 // bit-identical, and produce mode's one-layer path is asserted to be.
+                // Angle factor of a mass term: the cosine the wave has in air.
+                //
+                // Reached from air, and from inside a medium that holds the wave undeviated, that
+                // is ct_geo. Behind a medium the wave was refracted into it is not: the plate is
+                // driven at the trace wavenumber, the term is calibrated on a plate in air, and
+                // the cosine in the layer in front would make one wall pay differently from its
+                // two sides and differently from the same sheets in air. It is the far cosine of
+                // near | air, at the recovered cosine where there is one and at the traced angle
+                // where the recovery declines, which is what a closed face hands a traced
+                // mass-law wall as its direction. Where the invariant has no direction in air,
+                // one or more, the term keeps the cosine the wave has here, as that direction
+                // does. The gate is on the media and the state; a leg the state does not know to
+                // be bent keeps ct_geo.
+                double ct_mass = ct_geo;
+                if (mtl_near != 0 && refracted && !(M_near.m > 0.0) && (M_slab.m > 0.0 || (mtl_slab2 != 0 && M_slab2.m > 0.0)))
+                {
+                    std::complex<double> cos_air;
+                    bool tir_air = false;
+                    M_near.interact_with(MAT(0), interaction_type, theta_t, fGHz, nullptr, nullptr, &cos_air, nullptr, nullptr, &tir_air,
+                                         false, (std::abs(ct_near) > 0.0) ? &ct_near : nullptr, false);
+                    if (!tir_air && std::real(cos_air) > 0.0)
+                        ct_mass = (std::real(cos_air) > 1.0) ? 1.0 : std::real(cos_air);
+                }
+
                 std::complex<double> Tte, Ttm, Rte, Rtm;
                 if (mtl_slab2 != 0)
                 {
@@ -5116,14 +5149,14 @@ void quadriga_lib::ray_state_update(int interaction_type,
                                                   ? ct_near
                                                   : std::complex<double>(ct_geo, 0.0);
                     if (!qd_stack_resolve(M_near, lay, 2, M_far, ci, fGHz, is_scalar,
-                                          &Tte, &Ttm, &Rte, &Rtm, disp_far, disp_budget, ct_geo, mass_bonded))
+                                          &Tte, &Ttm, &Rte, &Rtm, disp_far, disp_budget, ct_mass, mass_bonded))
                         return false; // malformed stack or a singular denominator; the caller decides
                 }
                 else
                     qd_slab_resolve(M_near, M_slab, M_far, thk, 0.0, ct_slab, ct_geo,
                                     fGHz, is_scalar, 0.0, true, &Tte, &Ttm, &Rte, &Rtm,
                                     disp_far, disp_budget, std::complex<double>(0.0, 0.0), ct_near,
-                                    nullptr, tir, !refracted, mass_bonded);
+                                    nullptr, tir, !refracted, mass_bonded, nullptr, false, ct_mass);
 
                 // Both ports come out of the one pass. The reflection port is its own Airy sum, not the
                 // half-space Fresnel value, so expect real angular and frequency structure in it.

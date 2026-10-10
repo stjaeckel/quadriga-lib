@@ -16372,8 +16372,8 @@ TEST_CASE("Unentered branches - a stack of a coherent and a mass-law layer again
     QD_DIAG("# side M: the mass-law layer met first, where the traced laminate also has an echo through the lining that a stack does\n");
     QD_DIAG("# not carry: echo_dB is that path over the reflection off the lining, and R is taken against the first path alone\n");
     QD_DIAG("# mass_cos_dB: the mass term at the cosine the wave has in the coherent layer less the term at the incidence cosine, which\n");
-    QD_DIAG("# is what a lining on the far face of a traced solid pays more than the stack; T_rest: T_dB less that\n");
-    QD_DIAG("side,mass,tracer,theta,T_stack_dB,T_dB,T_deg,R_stack_dB,R_dB,R_deg,echo_dB,mass_cos_dB,T_rest\n");
+    QD_DIAG("# is what a lining on the far face of a traced solid would pay more than the stack if its term read the cosine in the solid\n");
+    QD_DIAG("side,mass,tracer,theta,T_stack_dB,T_dB,T_deg,R_stack_dB,R_dB,R_deg,echo_dB,mass_cos_dB\n");
     for (int side = 0; side < 2; ++side)
         for (int iM : {3, 4})
             for (int tr : {4, 5})
@@ -16396,20 +16396,16 @@ TEST_CASE("Unentered branches - a stack of a coherent and a mass-law layer again
                     const double cC = std::abs(dC(0, 0)) / std::sqrt(ub::sumsq(dC));
                     const LumpMtl &Mm = lp[iM - 1];
                     const double mass_cos = side ? 0.0 : diag_mass_TL(Mm.m, Mm.fRef, f, Mm.thk, cC) - diag_mass_TL(Mm.m, Mm.fRef, f, Mm.thk, c);
-                    const double T_rest = ub::dB(Ts / Tt) - mass_cos;
-                    QD_DIAG("%s,%s,%d,%.0f,%.4f,%.6f,%.4f,%.4f,%.6f,%.4f,%.4f,%.6f,%.6f\n", side ? "M" : "C", (iM == 3) ? "26.8 dB" : "6.8 dB", tr, thd, ub::dB(Ts),
-                            ub::dB(Ts / Tt), ub::deg(Ts / Tt), ub::dB(Rs), ub::dB(Rs / Rt), ub::deg(Rs / Rt), ub::dB(R2 / R1), mass_cos, T_rest);
+                    QD_DIAG("%s,%s,%d,%.0f,%.4f,%.6f,%.4f,%.4f,%.6f,%.4f,%.4f,%.6f\n", side ? "M" : "C", (iM == 3) ? "26.8 dB" : "6.8 dB", tr, thd, ub::dB(Ts),
+                            ub::dB(Ts / Tt), ub::deg(Ts / Tt), ub::dB(Rs), ub::dB(Rs / Rt), ub::deg(Rs / Rt), ub::dB(R2 / R1), mass_cos);
                     INFO("mixed stack side " << side << " mass " << iM << " tracer " << tr << " theta " << thd);
                     // One laminate on the reflect port, from either side, and one partition
                     CHECK(std::abs(ub::dB(Rs / Rt)) < 5.0e-3);
                     CHECK(std::abs(ub::deg(Rs / Rt)) < 0.05);
                     CHECK(std::abs(ub::deg(Ts / Tt)) < 0.05);
-                    // On the transmit port the two are one where the mass-law layer is met first. Met
-                    // behind the traced solid its term is formed at the cosine in that solid, and
-                    // that is all that separates the two: recorded as mass_cos_dB, not asserted away
-                    CHECK(std::abs(T_rest) < 5.0e-3);
-                    if (side)
-                        CHECK(std::abs(ub::dB(Ts / Tt)) < 5.0e-3);
+                    // And on the transmit port, from either side: the lining behind the traced solid
+                    // forms its mass term at the cosine the wave has in air, as the stack does
+                    CHECK(std::abs(ub::dB(Ts / Tt)) < 5.0e-3);
                 }
 }
 
@@ -16645,5 +16641,235 @@ TEST_CASE("Unentered branches - a verdict handed in on a leg known not parallel 
                 CHECK(std::abs(std::abs(S) - 100.0) < 1.0e-6);
             else
                 CHECK(ub::same_bits(g.xpr, own.xpr));
+        }
+}
+
+TEST_CASE("Mass cosine - a mass-law sheet behind a refracting layer forms its term at the cosine the wave has in air")
+{
+    ub::OneThread one_thread;
+    // The mass term of a plate has an angle factor, and the angle is the one the transverse
+    // invariant has in air: the plate is driven at the trace wavenumber, and the term is
+    // calibrated on a plate in air. Behind a layer the wave was refracted into, that is the
+    // incidence cosine and not the cosine in the layer. The mass paid is taken as a ratio: the
+    // chain on a twin palette whose mass argument is taken to nothing over the chain itself,
+    // which leaves every face, tf and the m > 0 gates in place.
+    const double f = FRQ, gap = 1.0e-5;
+    const std::vector<LumpMtl> lp = {
+        {2.1609e-8, 0.0, 0.022, 0.0, 0.2, 0.0, 0.0, 0.0, 0.0, 20.0, 0.001}, // 1 mass-law sheet, 26.8 dB
+        {2.1609e-8, 0.0, 0.022, 0.0, 0.2, 0.0, 0.0, 0.0, 0.0, 20.0, 0.010}, // 2 the same near its knee, 6.8 dB
+        {2.50, 0.80, 0.0},                                                  // 3 lossy host
+        {2.50, 0.0, 0.0},                                                   // 4 lossless host
+        {0.31, 0.20, 0.0},                                                  // 5 porous host, rarer than air
+        {5.24, 0.63, 0.006},                                                // 6 coherent sheet
+        {5.24, 0.0, 0.0},                                                   // 7 dense lossless solid
+        {1.50, 0.40, 0.0},                                                  // 8 lossy host, entered from 7
+    };
+    std::vector<LumpMtl> lt = lp;
+    lt[0].fRef *= 1.0e12, lt[1].fRef *= 1.0e12;
+    const ub::Pal pal = lump_palette(lp), twin = lump_palette(lt);
+    auto TL = [&](int iM, double c) { return diag_mass_TL(lp[iM - 1].m, lp[iM - 1].fRef, f, lp[iM - 1].thk, c); };
+    auto prod = [](const std::vector<ub::Ev> &v) { std::complex<double> z = 1.0; for (const auto &e : v) z *= cpx(e.xpr, 0, 0); return z; };
+    auto cosx = [](const arma::mat &d) { return std::abs(d(0, 0)) / std::sqrt(ub::sumsq(d)); };
+    auto ang = [](const arma::mat &d) { return std::atan2(std::abs(d(0, 1)), std::abs(d(0, 0))) * 180.0 / QPI; };
+    auto hname = [](int h) { return h == 3 ? "2.50-0.80j" : (h == 4 ? "2.50" : (h == 5 ? "0.31-0.20j" : "1.50-0.40j")); };
+
+    // ------------------------------------------------------------------------------------------
+    // A. On the far face of a host, inside it, and in a stack inside it, against the sheets in air
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: mass cosine A, a mass-law sheet 22 mm reached from inside a host without the mass column, scalar, through the\n");
+    QD_DIAG("# intersector. paid: the mass paid, twin over run, dB. TL_air, TL_host: the term at the incidence cosine and at the cosine the\n");
+    QD_DIAG("# wave has in the host. air: paid by the same sheet or stack standing in air, through the library. rest: the chain on the twin,\n");
+    QD_DIAG("# dB, what a change to the mass term must not move. dir, seg: direction written and segment behind the wall less the incidence\n");
+    QD_DIAG("# angle, deg; dy: last hit point against the same host without the sheet, m (a stack with the refracting tracer is recorded)\n");
+    QD_DIAG("geom,host,mass,tracer,theta,paid,TL_air,TL_host,paid-TL_air,paid-air,rest,dir,seg,dy\n");
+    for (int geom = 0; geom < 4; ++geom)
+        for (int H : {3, 4, 5})
+            for (int iM : {1, 2})
+                for (int tr : {4, 5})
+                    for (double thd : {10.0, 30.0, 60.0})
+                    {
+                        const double d1 = 0.010, d2 = 0.012, c_air = std::cos(thd * QPI / 180.0);
+                        arma::uvec mi, m0, ma;
+                        arma::mat mesh, mesh0, mesha;
+                        const char *nm = "";
+                        if (geom == 0)
+                            mesh = ub::build({0.0, d1, d1 + gap}, {H, H, iM}, {false, true, false}, mi), mesh0 = ub::build({0.0, d1}, {H, H}, {false, true}, m0), nm = "glued exit";
+                        else if (geom == 1)
+                            mesh = ub::build({0.0, d1, d1 + d2}, {H, iM, H}, {false, false, true}, mi), mesh0 = ub::build({0.0, d1 + d2}, {H, H}, {false, true}, m0), nm = "sheet inside";
+                        else
+                            mesh = ub::build({0.0, d1, d1 + gap, d1 + gap + d2}, {H, (geom == 2) ? 6 : iM, (geom == 2) ? iM : 6, H}, {false, false, false, true}, mi),
+                            mesh0 = ub::build({0.0, d1 + gap + d2}, {H, H}, {false, true}, m0), nm = (geom == 2) ? "stack C|M inside" : "stack M|C inside";
+                        if (geom < 2)
+                            mesha = ub::face(0.0, false), ma = arma::uvec{(arma::uword)iM, (arma::uword)iM};
+                        else
+                            mesha = ub::build({0.0, gap}, {(geom == 2) ? 6 : iM, (geom == 2) ? iM : 6}, {false, false}, ma);
+                        const std::vector<int> seq = (geom == 0) ? std::vector<int>{tr, tr} : std::vector<int>{tr, tr, tr};
+                        auto a = ub::chain(pal, mesh, mi, seq, f, thd, {1.5}), b = ub::chain(twin, mesh, mi, seq, f, thd, {1.5});
+                        auto c = ub::chain(pal, mesh0, m0, {tr, tr}, f, thd, {1.5});
+                        auto sa = ub::chain(pal, mesha, ma, {tr}, f, thd, {1.5}), sb = ub::chain(twin, mesha, ma, {tr}, f, thd, {1.5});
+                        INFO("A, " << nm << ", host " << hname(H) << ", mass " << iM << ", tracer " << tr << ", theta " << thd);
+                        REQUIRE((a.size() == seq.size() && b.size() == seq.size() && c.size() == 2 && sa.size() == 1 && sb.size() == 1));
+                        const double paid = ub::dB(prod(b) / prod(a)), air = ub::dB(prod(sb) / prod(sa)), c_h = cosx(a[0].path_dirN);
+                        const ub::Ev &E = a.back();
+                        const double d_dir = ang(E.path_dirN) - thd, d_seg = ang(E.destN - E.origN) - thd, dy = E.fbs(0, 1) - c.back().fbs(0, 1);
+                        QD_DIAG("%s,%s,%s,%d,%.0f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.3e,%.3e,%.3e\n", nm, hname(H), (iM == 1) ? "26.8 dB" : "6.8 dB", tr, thd, paid, TL(iM, c_air),
+                                TL(iM, c_h), paid - TL(iM, c_air), paid - air, ub::dB(prod(b)), d_dir, d_seg, dy);
+                        CHECK(std::abs(paid - TL(iM, c_air)) < 1.0e-6); // the term at the cosine in air
+                        CHECK(std::abs(paid - air) < 1.0e-6);           // which is what the same sheets pay in air
+                        CHECK(std::abs(air - TL(iM, c_air)) < 1.0e-9);
+                        CHECK(std::abs(d_dir) < 1.0e-4); // and the wall is left in the direction it was met in
+                        if (geom < 2)
+                            CHECK(std::abs(dy) < 1.0e-9); // where the same host without the sheet is left
+                    }
+
+    // ------------------------------------------------------------------------------------------
+    // B. One wall from its two sides
+    // ------------------------------------------------------------------------------------------
+    // The laminate of the branch case, C a traced solid 10 mm with the mass-law sheet as a lining,
+    // and the stack of the two as sheets, from the side of C and from the side of M. The mass paid
+    // is one number. The whole transmission is not: recorded as d_sides, with what it reads.
+    QD_DIAG("\n# diag: mass cosine B, the laminate from its two sides, C 10 mm eps 2.50 - j ei as a traced solid with the mass-law lining, and\n");
+    QD_DIAG("# the stack of the two. paid_*: mass paid, dB, traced laminate from the C side and from the M side, stack C|M and M|C.\n");
+    QD_DIAG("# d_sides: the traced laminate's transmission from the M side over that from the C side, dB, recorded; tan2: 10 log10 tan^2 theta\n");
+    QD_DIAG("ei,mass,tracer,theta,TL_air,paid_trC,paid_trM,paid_stCM,paid_stMC,d_sides,d_sides_stack,tan2\n");
+    for (double ei : {0.80, 0.0})
+        for (int iM : {1, 2})
+            for (int tr : {4, 5})
+                for (double thd : {10.0, 30.0, 60.0})
+                {
+                    const double tC = 0.010, th = thd * QPI / 180.0;
+                    std::vector<LumpMtl> q = {lp[iM - 1], {2.50, ei, tC}, {2.50, ei, 0.0}};
+                    std::vector<LumpMtl> qt = q;
+                    qt[0].fRef *= 1.0e12;
+                    double v[2][4];
+                    for (int k = 0; k < 2; ++k)
+                    {
+                        ub::Pal P = lump_palette(k ? qt : q);
+                        arma::uvec m1, m2, m3, m4;
+                        arma::mat sCM = ub::build({0.0, gap}, {2, 1}, {false, true}, m1), sMC = ub::build({0.0, gap}, {1, 2}, {false, true}, m2);
+                        arma::mat tCs = ub::build({0.0, tC, tC + gap}, {3, 3, 1}, {false, true, false}, m3), tMs = ub::build({0.0, gap, gap + tC}, {1, 3, 3}, {false, false, true}, m4);
+                        v[k][0] = ub::dB(prod(ub::chain(P, tCs, m3, {tr, tr}, f, thd, {0.0})));
+                        v[k][1] = ub::dB(prod(ub::chain(P, tMs, m4, {tr, tr}, f, thd, {0.0})));
+                        v[k][2] = ub::dB(prod(ub::chain(P, sCM, m1, {tr}, f, thd, {0.0})));
+                        v[k][3] = ub::dB(prod(ub::chain(P, sMC, m2, {tr}, f, thd, {0.0})));
+                    }
+                    const double ref = TL(iM, std::cos(th));
+                    QD_DIAG("%.2f,%s,%d,%.0f,%.6f,%.6f,%.6f,%.6f,%.6f,%.4f,%.4f,%.4f\n", ei, (iM == 1) ? "26.8 dB" : "6.8 dB", tr, thd, ref, v[1][0] - v[0][0], v[1][1] - v[0][1],
+                            v[1][2] - v[0][2], v[1][3] - v[0][3], v[0][1] - v[0][0], v[0][3] - v[0][2], 10.0 * std::log10(std::tan(th) * std::tan(th)));
+                    INFO("B, ei " << ei << ", mass " << iM << ", tracer " << tr << ", theta " << thd);
+                    for (int j = 0; j < 4; ++j)
+                        CHECK(std::abs(v[1][j] - v[0][j] - ref) < 1.0e-6); // one mass term, from either side, traced or as a stack
+                }
+
+    // ------------------------------------------------------------------------------------------
+    // C. A wedge: the recovery declines and the cosine is the real-angle one
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: mass cosine C, a host whose exit face is tilted by 10 deg, the mass-law lining on it. Cosines against the exit normal.\n");
+    QD_DIAG("# TL_air: the term at Re sqrt(1 - eps (1 - c^2)), c the cosine the wave has in the host; TL_host: at c; word: the\n");
+    QD_DIAG("# previous-medium word the entry wrote, which carries the non-parallel flag\n");
+    QD_DIAG("host,tracer,theta,word,paid,TL_air,TL_host,paid-TL_air\n");
+    for (int H : {3, 4})
+        for (int tr : {4, 5})
+            for (double thd : {10.0, 30.0, 60.0})
+            {
+                const double al = 10.0 * QPI / 180.0, L = 0.050, nx = std::cos(al), ny = std::sin(al), y0 = 0.37 + std::tan(thd * QPI / 180.0);
+                arma::mat mesh = arma::join_cols(arma::join_cols(ub::face(0.0, false), ub::tilted(L, y0, 10.0, true)), ub::tilted(L + gap * nx, y0 + gap * ny, 10.0, false));
+                arma::uvec mi = {(arma::uword)H, (arma::uword)H, (arma::uword)H, (arma::uword)H, 1, 1};
+                auto a = ub::chain(pal, mesh, mi, {tr, tr}, f, thd, {1.5}), b = ub::chain(twin, mesh, mi, {tr, tr}, f, thd, {1.5});
+                INFO("C, host " << hname(H) << ", tracer " << tr << ", theta " << thd);
+                REQUIRE((a.size() == 2 && b.size() == 2));
+                const arma::mat &dh = a[0].path_dirN;
+                const double c_h = std::abs(dh(0, 0) * nx + dh(0, 1) * ny) / std::sqrt(ub::sumsq(dh));
+                const std::complex<double> eH(lp[H - 1].a, -lp[H - 1].ei);
+                const double c_a = std::real(std::sqrt(1.0 - eH * (1.0 - c_h * c_h))), paid = ub::dB(prod(b) / prod(a));
+                QD_DIAG("%s,%d,%.0f,%04x,%.6f,%.6f,%.6f,%.6f\n", hname(H), tr, thd, ub::w(a[0].prev(0)), paid, TL(1, c_a), TL(1, c_h), paid - TL(1, c_a));
+                CHECK((ub::w(a[0].prev(0)) & 0x8000u) != 0u);
+                CHECK(std::abs(paid - TL(1, c_a)) < 1.0e-6);
+            }
+
+    // ------------------------------------------------------------------------------------------
+    // D. An invariant across one
+    // ------------------------------------------------------------------------------------------
+    // The host is entered from the lossless eps 5.24 solid the ray is launched in. Below an
+    // invariant of one the cosine in air is sqrt(1 - p); from one on there is none and the term
+    // keeps the cosine the wave has in the host, as the direction a closed face hands on does.
+    QD_DIAG("\n# diag: mass cosine D, a host 50 mm entered from the lossless eps 5.24 solid the ray is launched in, invariant p, then the\n");
+    QD_DIAG("# mass-law sheet on its far face or inside it; the sheet event alone. TL_air at sqrt(1 - p), -1 from one on; T: that event, dB\n");
+    QD_DIAG("geom,host,tracer,p,rt,cos_host,paid,TL_host,TL_air,T_dB\n");
+    for (int geom = 0; geom < 2; ++geom)
+        for (int H : {8, 4})
+            for (int tr : {4, 5})
+                for (double p : {0.50, 0.90, 0.99, 1.01, 1.04, 1.10, 1.45})
+                {
+                    const double L = 0.050, th1 = std::asin(std::sqrt(p / 5.24));
+                    arma::uvec mi;
+                    arma::mat mesh = geom ? ub::build({0.0, gap, L, 2.0 * L}, {7, H, 1, H}, {true, false, false, true}, mi)
+                                          : ub::build({0.0, gap, L, L + gap}, {7, H, H, 1}, {true, false, true, false}, mi);
+                    arma::mat orig{{-0.05, 0.37, 0.0}}, dest{{-0.05 + 2.0 * std::cos(th1), 0.37 + 2.0 * std::sin(th1), 0.0}};
+                    ub::Ev seed;
+                    seed.prev = arma::Col<short>{(short)0}, seed.cur = arma::Col<short>{(short)7}, seed.buf = arma::Col<short>{(short)0};
+                    seed.path_dirN = (dest - orig) / std::sqrt(ub::sumsq(dest - orig)), seed.accg = arma::vec{0.0}, seed.accr = arma::vec{0.0};
+                    ub::Opt op;
+                    op.eps = 1.5, op.relaunch = true;
+                    std::complex<double> e2[2];
+                    double ch = -1.0;
+                    int rt2 = -1;
+                    for (int k = 0; k < 2; ++k)
+                    {
+                        const ub::Pal &P = k ? twin : pal;
+                        ub::Ev E1 = ub::traced<double>(P, mesh, mi, tr, f, orig, dest, &seed, op);
+                        arma::mat o, d;
+                        ub::onward(E1, o, d);
+                        ub::Ev E2 = ub::traced<double>(P, mesh, mi, tr, f, o, d, &E1, op);
+                        e2[k] = cpx(E2.xpr, 0, 0);
+                        if (!k)
+                            rt2 = E2.rt, ch = cosx(E1.path_dirN);
+                    }
+                    INFO("D, geom " << geom << ", host " << hname(H) << ", tracer " << tr << ", p " << p);
+                    REQUIRE(std::abs(e2[0]) > 0.0);
+                    const double paid = ub::dB(e2[1] / e2[0]), ca = (p < 1.0) ? std::sqrt(1.0 - p) : -1.0;
+                    QD_DIAG("%s,%s,%d,%.2f,%d,%.6f,%.6f,%.6f,%.6f,%.4f\n", geom ? "sheet inside" : "glued exit", hname(H), tr, p, rt2, ch, paid, TL(1, ch),
+                            (ca > 0.0) ? TL(1, ca) : -1.0, ub::dB(e2[0]));
+                    CHECK(std::abs(paid - TL(1, (p < 1.0) ? ca : ch)) < 1.0e-6);
+                }
+
+    // ------------------------------------------------------------------------------------------
+    // E. What keeps its cosine, and ray_mesh_interact's own result
+    // ------------------------------------------------------------------------------------------
+    // A ray inside the lossless host with no state and no direction handed in is a leg the state
+    // does not know to be bent: it keeps the cosine of its segment. ray_mesh_interact's own glued
+    // exit has no state either: with the undeviated tracer its segment runs at the external angle
+    // and the term is the one in air, with the refracting tracer it is the cosine of the bent
+    // segment, which is recorded.
+    QD_DIAG("\n# diag: mass cosine E. launched: a ray inside the lossless host at a real angle, no state, glued exit; own: what ray_mesh_interact\n");
+    QD_DIAG("# wrote for the glued exit of table A, host 2.50, before the redo. paid against the term at the cosine of the segment\n");
+    QD_DIAG("row,tracer,theta,paid,TL_seg,TL_air,paid-TL_seg,paid-TL_air\n");
+    for (int tr : {4, 5})
+        for (double thh : {10.0, 20.0, 30.0})
+        {
+            const double L = 0.050, th1 = thh * QPI / 180.0;
+            arma::uvec mi;
+            arma::mat mesh = ub::build({L, L + gap}, {4, 1}, {true, false}, mi);
+            arma::mat orig{{-0.05, 0.37, 0.0}}, dest{{-0.05 + 2.0 * std::cos(th1), 0.37 + 2.0 * std::sin(th1), 0.0}};
+            ub::Opt op;
+            op.eps = 1.5;
+            ub::Ev A = ub::traced<double>(pal, mesh, mi, tr, f, orig, dest, nullptr, op), B = ub::traced<double>(twin, mesh, mi, tr, f, orig, dest, nullptr, op);
+            const double c_h = std::cos(th1), c_s = std::sqrt(1.0 - 2.5 * (1.0 - c_h * c_h)), paid = ub::dB(cpx(B.xpr, 0, 0) / cpx(A.xpr, 0, 0));
+            QD_DIAG("launched,%d,%.0f,%.6f,%.6f,%.6f,%.6f,%.6f\n", tr, thh, paid, TL(1, c_h), TL(1, c_s), paid - TL(1, c_h), paid - TL(1, c_s));
+            INFO("E launched, tracer " << tr << ", theta " << thh);
+            CHECK(std::abs(paid - TL(1, c_h)) < 1.0e-9);
+        }
+    for (int tr : {4, 5})
+        for (double thd : {10.0, 30.0, 60.0})
+        {
+            arma::uvec mi;
+            arma::mat mesh = ub::build({0.0, 0.010, 0.010 + gap}, {4, 4, 1}, {false, true, false}, mi);
+            auto a = ub::chain(pal, mesh, mi, {tr, tr}, f, thd, {1.5}), b = ub::chain(twin, mesh, mi, {tr, tr}, f, thd, {1.5});
+            INFO("E own, tracer " << tr << ", theta " << thd);
+            REQUIRE((a.size() == 2 && b.size() == 2));
+            const double c_air = std::cos(thd * QPI / 180.0), c_seg = (tr == 4) ? c_air : cosx(a[0].path_dirN);
+            const double own = ub::dB(cpx(b[1].xpr0, 0, 0) / cpx(a[1].xpr0, 0, 0));
+            QD_DIAG("own,%d,%.0f,%.6f,%.6f,%.6f,%.6f,%.6f\n", tr, thd, own, TL(1, c_seg), TL(1, c_air), own - TL(1, c_seg), own - TL(1, c_air));
+            CHECK(std::abs(own - TL(1, c_seg)) < 1.0e-9);
         }
 }
