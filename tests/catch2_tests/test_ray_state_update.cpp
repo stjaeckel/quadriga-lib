@@ -16873,3 +16873,320 @@ TEST_CASE("Mass cosine - a mass-law sheet behind a refracting layer forms its te
             CHECK(std::abs(own - TL(1, c_seg)) < 1.0e-9);
         }
 }
+
+TEST_CASE("Closed plate - a mass-law layer the wave is evanescent in passes its two leaks and nothing else")
+{
+    ub::OneThread one_thread;
+    // A mass-law layer that is lossless and in which the wave is evanescent - a rigid layer of the
+    // acoustic mapping at every practical angle - is closed on both faces. Each face passes the
+    // tf leak a bare face passes, 1 - R' with the reflectance taken as one, whatever the Fresnel
+    // magnitude of that face is: next to a lossy medium it is below one although the wave in the
+    // layer carries no flux. The leak is a statement about normal flux, of the side that carries
+    // one, so a chain of raw amplitudes that such a layer cuts is converted to flux piece by piece
+    // and not once across the layer. Every level here is taken with the mass argument at nothing
+    // (fRef times 1e12), which leaves the faces, tf and the m > 0 gates in place; everything runs
+    // through ray_triangle_intersect, ray_mesh_interact and ray_state_update.
+    //
+    // A. The stack C | M in both orders and the laminate with C a traced solid, from both sides
+    // B. tf on the neighbour, and no tf on the layer
+    // C. The sheet event: a lining on the far face, on the near face, and the sheet inside a host
+    // D. A rigid layer with a mass-law layer that is not rigid, both orders
+    // E. Twins that must not move, with every digit
+    // F. Recorded: a mass-law layer rarer than the invariant across its critical angle, a rigid
+    //    lining on a rigid traced wall, a coherent sheet with tf rarer than its lossy host
+    const double f = FRQ, gap = 1.0e-5, tC = 0.010, BIG = 1.0e12;
+    const double tfM = 0.2;
+    auto prod = [](const std::vector<ub::Ev> &v, int k)
+    { std::complex<double> z = 1.0; for (const auto &e : v) z *= cpx(e.xpr, 0, k); return z; };
+    auto rigid = [&](double tf, double thk, double fRef)
+    { return LumpMtl{2.1609e-8, 0.0, thk, 0.0, tf, 0.0, 0.0, 0.0, 0.0, 20.0, fRef}; };
+    // Entry over exit of a lossy medium, the flux splitting sec^2(arg eta) per channel, dB
+    auto split = [](double ei, double thd, int k)
+    {
+        const std::complex<double> e(2.50, -ei);
+        const double s = std::sin(thd * QPI / 180.0);
+        const std::complex<double> c = std::sqrt(1.0 - s * s / e), z = std::sqrt(e), x = k ? std::conj(z) * c : z * c;
+        return 10.0 * std::log10(std::norm(x) / (std::real(x) * std::real(x)));
+    };
+
+    // ------------------------------------------------------------------------------------------
+    // A. Stack and traced laminate, both sides, every loss of the coherent layer
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: closed plate A, C 10 mm eps 2.50 - j ei with M rigid 22 mm tf 0.2 m 20, mass argument at nothing, through the intersector.\n");
+    QD_DIAG("# st: the stack of the two as sheets, tr: C a traced solid with M as a lining, series summed; CM: C met first. dB. k: 0 scalar / VV, 3 HH.\n");
+    QD_DIAG("# d_st, d_tr: M side over C side; split: 10 log10 sec^2(arg eta) of C in that channel, what entry and exit of a lossy medium differ by\n");
+    QD_DIAG("# paid: the mass paid by stCM with the 26.8 dB sheet, less the term at the incidence cosine (scalar rows, -1 otherwise)\n");
+    QD_DIAG("type,k,ei,theta,stCM,stMC,trC,trM,d_st,d_tr,split,d_st-split,d_tr-split,stCM-trC,stMC-trM,paid-TL\n");
+    for (int tr : {4, 5, 1, 2})
+        for (int k : {0, 3})
+        {
+            if (tr > 2 && k)
+                continue;
+            for (double thd : {10.0, 30.0, 60.0})
+            {
+                double zero_loss[4] = {0.0, 0.0, 0.0, 0.0}, tiny_loss[4] = {0.0, 0.0, 0.0, 0.0};
+                for (double ei : {0.8, 0.1, 1.0e-3, 1.0e-6, 0.0})
+                {
+                    double v[2][4];
+                    for (int tw = 0; tw < 2; ++tw) // 0: mass argument at nothing, 1: the 26.8 dB sheet
+                    {
+                        std::vector<LumpMtl> q = {rigid(tfM, 0.022, tw ? 0.001 : 0.001 * BIG), {2.50, ei, tC}, {2.50, ei, 0.0}};
+                        ub::Pal P = lump_palette(q);
+                        arma::uvec m1, m2, m3, m4;
+                        arma::mat sCM = ub::build({0.0, gap}, {2, 1}, {false, true}, m1), sMC = ub::build({0.0, gap}, {1, 2}, {false, true}, m2);
+                        arma::mat tCs = ub::build({0.0, tC, tC + gap}, {3, 3, 1}, {false, true, false}, m3), tMs = ub::build({0.0, gap, gap + tC}, {1, 3, 3}, {false, false, true}, m4);
+                        auto a = ub::chain(P, sCM, m1, {tr}, f, thd, {0.0}), b = ub::chain(P, sMC, m2, {tr}, f, thd, {0.0});
+                        auto c = ub::chain(P, tCs, m3, {tr, tr}, f, thd, {0.0}), d = ub::chain(P, tMs, m4, {tr, tr}, f, thd, {0.0});
+                        REQUIRE((a.size() == 1 && b.size() == 1 && c.size() == 2 && d.size() == 2));
+                        v[tw][0] = ub::dB(prod(a, k)), v[tw][1] = ub::dB(prod(b, k)), v[tw][2] = ub::dB(prod(c, k)), v[tw][3] = ub::dB(prod(d, k));
+                    }
+                    const double *L = v[0], sp = split(ei, thd, k), d_st = L[1] - L[0], d_tr = L[3] - L[2];
+                    const double paid = (tr > 2) ? (v[0][0] - v[1][0]) - diag_mass_TL(20.0, 0.001, f, 0.022, std::cos(thd * QPI / 180.0)) : -1.0;
+                    QD_DIAG("%d,%d,%.0e,%.0f,%.4f,%.4f,%.4f,%.4f,%.6f,%.6f,%.6f,%.2e,%.2e,%.6f,%.6f,%.2e\n", tr, k, ei, thd, L[0], L[1], L[2], L[3], d_st, d_tr, sp,
+                            d_st - sp, d_tr - sp, L[0] - L[2], L[1] - L[3], paid);
+                    INFO("A, type " << tr << ", k " << k << ", ei " << ei << ", theta " << thd);
+                    for (int j = 0; j < 4; ++j)
+                        CHECK(L[j] < 0.0); // a passive wall passes no more than it received
+                    CHECK(std::abs(d_st - sp) < 1.0e-6); // one wall from its two sides, to the flux splitting of C
+                    CHECK(std::abs(d_tr - sp) < 1.0e-5); // and so is the traced laminate, to its relaunch offsets
+                    CHECK(std::abs(L[0] - L[2]) < 5.0e-3); // and the stack is the traced laminate, from either side
+                    CHECK(std::abs(L[1] - L[3]) < 5.0e-3);
+                    if (tr > 2)
+                        CHECK(std::abs(paid) < 1.0e-6); // the mass paid is where it was
+                    for (int j = 0; j < 4; ++j)
+                    {
+                        if (ei == 1.0e-6)
+                            tiny_loss[j] = L[j];
+                        if (ei == 0.0)
+                            zero_loss[j] = L[j];
+                    }
+                }
+                INFO("A, continuity at zero loss, type " << tr << ", k " << k << ", theta " << thd);
+                for (int j = 0; j < 4; ++j)
+                    CHECK(std::abs(tiny_loss[j] - zero_loss[j]) < 1.0e-3); // ei 1e-6 against ei 0
+            }
+        }
+
+    // ------------------------------------------------------------------------------------------
+    // B. tf on the neighbour, and a layer without tf
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: closed plate B, the same four with tf on C and with no tf on M, scalar. A closed face with no tf on either side\n");
+    QD_DIAG("# passes nothing: -999 is an exact zero, and a level below -120 dB is the rounding of 1 - R0 at a lossless face\n");
+    QD_DIAG("type,tfM,tfC,ei,theta,stCM,stMC,trC,trM,d_st,split\n");
+    for (int tr : {4, 5})
+        for (double tM : {0.2, 0.0})
+            for (double tfC : {0.0, 0.3})
+                for (double ei : {0.8, 1.0e-3, 0.0})
+                    for (double thd : {10.0, 30.0, 60.0})
+                    {
+                        if (tM == 0.2 && tfC == 0.0)
+                            continue; // table A
+                        std::vector<LumpMtl> q = {rigid(tM, 0.022, 0.001 * BIG), {2.50, ei, tC, 0.0, tfC}, {2.50, ei, 0.0, 0.0, tfC}};
+                        ub::Pal P = lump_palette(q);
+                        arma::uvec m1, m2, m3, m4;
+                        arma::mat sCM = ub::build({0.0, gap}, {2, 1}, {false, true}, m1), sMC = ub::build({0.0, gap}, {1, 2}, {false, true}, m2);
+                        arma::mat tCs = ub::build({0.0, tC, tC + gap}, {3, 3, 1}, {false, true, false}, m3), tMs = ub::build({0.0, gap, gap + tC}, {1, 3, 3}, {false, false, true}, m4);
+                        auto a = ub::chain(P, sCM, m1, {tr}, f, thd, {0.0}), b = ub::chain(P, sMC, m2, {tr}, f, thd, {0.0});
+                        auto c = ub::chain(P, tCs, m3, {tr, tr}, f, thd, {0.0}), d = ub::chain(P, tMs, m4, {tr, tr}, f, thd, {0.0});
+                        // A ray that passes nothing ends at the event that closed it
+                        const double L[4] = {(a.size() == 1) ? ub::dB(prod(a, 0)) : -999.0, (b.size() == 1) ? ub::dB(prod(b, 0)) : -999.0,
+                                             (c.size() == 2) ? ub::dB(prod(c, 0)) : -999.0, (d.size() == 2) ? ub::dB(prod(d, 0)) : -999.0};
+                        const double sp = split(ei, thd, 0);
+                        QD_DIAG("%d,%.1f,%.1f,%.0e,%.0f,%.4f,%.4f,%.4f,%.4f,%.6f,%.6f\n", tr, tM, tfC, ei, thd, L[0], L[1], L[2], L[3], L[1] - L[0], sp);
+                        INFO("B, type " << tr << ", tfM " << tM << ", tfC " << tfC << ", ei " << ei << ", theta " << thd);
+                        for (int j = 0; j < 4; ++j)
+                            CHECK(L[j] < ((tM == 0.0) ? -120.0 : 0.0)); // no tf on the layer: its face to air passes nothing
+                        if (tM > 0.0)
+                            CHECK(std::abs(L[1] - L[0] - sp) < 1.0e-6);
+                    }
+
+    // ------------------------------------------------------------------------------------------
+    // C. The sheet event alone
+    // ------------------------------------------------------------------------------------------
+    // On the near face of a host the event is the two leaks and nothing else, whatever the host
+    // is. On the far face and inside the host it also closes the host leg in front of it, and the
+    // two are then one number: one sheet, one leg, one pair of leaks.
+    QD_DIAG("\n# diag: closed plate C, the sheet event of M rigid tf 0.2 on a host 10 mm: entry (near face), exit (far face), inside (12 mm of\n");
+    QD_DIAG("# host behind), series declined, scalar. leaks: 10 log10 of the two flat leaks. own: what ray_mesh_interact wrote for that event\n");
+    QD_DIAG("type,tfM,host,theta,entry,exit,inside,leaks,entry-leaks,exit-inside,own_entry,own_exit\n");
+    {
+        const double he[5][2] = {{2.50, 0.80}, {2.50, 1.0e-3}, {2.50, 0.0}, {1.50, 0.40}, {0.31, 0.20}};
+        for (int tr : {4, 5})
+            for (double tM : {0.2, 0.0})
+                for (int H = 0; H < 5; ++H)
+                    for (double thd : {10.0, 30.0, 60.0})
+                    {
+                        std::vector<LumpMtl> q = {rigid(tM, 0.022, 0.001 * BIG), {he[H][0], he[H][1], 0.0}};
+                        ub::Pal P = lump_palette(q);
+                        const double d1 = 0.010, d2 = 0.012;
+                        arma::uvec mi, mx, me;
+                        arma::mat m_in = ub::build({0.0, d1, d1 + d2}, {2, 1, 2}, {false, false, true}, mi);
+                        arma::mat m_ex = ub::build({0.0, d1, d1 + gap}, {2, 2, 1}, {false, true, false}, mx);
+                        arma::mat m_en = ub::build({0.0, gap, gap + d1}, {1, 2, 2}, {false, false, true}, me);
+                        auto a = ub::chain(P, m_en, me, {tr}, f, thd, {1.5}), b = ub::chain(P, m_ex, mx, {tr, tr}, f, thd, {1.5}), c = ub::chain(P, m_in, mi, {tr, tr}, f, thd, {1.5});
+                        REQUIRE((a.size() == 1 && b.size() == 2 && c.size() == 2));
+                        const double en = ub::dB(cpx(a[0].xpr, 0, 0)), ex = ub::dB(cpx(b[1].xpr, 0, 0)), in = ub::dB(cpx(c[1].xpr, 0, 0));
+                        const double o_en = ub::dB(cpx(a[0].xpr0, 0, 0)), o_ex = ub::dB(cpx(b[1].xpr0, 0, 0));
+                        const double leaks = (tM > 0.0) ? 10.0 * std::log10(tM * tM) : -999.0;
+                        QD_DIAG("%d,%.1f,%.2f-%.0ej,%.0f,%.4f,%.4f,%.4f,%.4f,%.2e,%.2e,%.4f,%.4f\n", tr, tM, he[H][0], he[H][1], thd, en, ex, in, leaks, en - leaks, ex - in, o_en, o_ex);
+                        INFO("C, type " << tr << ", tfM " << tM << ", host " << he[H][0] << " - " << he[H][1] << "j, theta " << thd);
+                        if (tM > 0.0)
+                        {
+                            CHECK(std::abs(en - leaks) < 1.0e-9);   // the two leaks, for any host
+                            CHECK(std::abs(o_en - leaks) < 1.0e-9); // and from ray_mesh_interact alone
+                            CHECK(std::abs(ex - in) < 1.0e-6);      // a lining and the sheet inside are one sheet
+                            CHECK(ex < leaks + 1.0e-9);             // which pays the host leg on top of its leaks
+                            CHECK(o_ex < 0.0);
+                        }
+                        else
+                        {
+                            CHECK(en < -120.0);
+                            CHECK(ex < -120.0);
+                            CHECK(in < -120.0);
+                        }
+                    }
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // D. A rigid layer with a mass-law layer that is not rigid
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: closed plate D, the stack in air of M rigid 22 mm tf 0.2 and MB eps e 12 mm m 20 tf t, mass arguments at nothing, scalar\n");
+    QD_DIAG("epsMB,tfMB,theta,M|MB,MB|M,d\n");
+    for (double eB : {1.5, 2.5})
+        for (double tB : {0.0, 0.2})
+            for (double thd : {10.0, 30.0, 60.0})
+            {
+                std::vector<LumpMtl> q = {rigid(tfM, 0.022, 0.001 * BIG), {eB, 0.0, 0.012, 0.0, tB, 0.0, 0.0, 0.0, 0.0, 20.0, 0.001 * BIG}};
+                ub::Pal P = lump_palette(q);
+                arma::uvec m1, m2;
+                arma::mat s1 = ub::build({0.0, gap}, {1, 2}, {false, true}, m1), s2 = ub::build({0.0, gap}, {2, 1}, {false, true}, m2);
+                auto a = ub::chain(P, s1, m1, {4}, f, thd, {0.0}), b = ub::chain(P, s2, m2, {4}, f, thd, {0.0});
+                REQUIRE((a.size() == 1 && b.size() == 1));
+                const double x = ub::dB(prod(a, 0)), y = ub::dB(prod(b, 0));
+                QD_DIAG("%.1f,%.1f,%.0f,%.4f,%.4f,%.6f\n", eB, tB, thd, x, y, y - x);
+                INFO("D, eps " << eB << ", tf " << tB << ", theta " << thd);
+                CHECK(std::abs(y - x) < 1.0e-9); // lossless: one wall, exactly
+                CHECK(x < 0.0);
+            }
+
+    // ------------------------------------------------------------------------------------------
+    // E. Twins that must not move
+    // ------------------------------------------------------------------------------------------
+    // Printed with every digit, so a diff of this table shows a moved bit where no assertion
+    // would: a rigid sheet in air with and without its mass term, two rigid sheets as a stack,
+    // a stack whose mass-law layer has a permittivity above one in both orders, and a rigid
+    // sheet on a rigid traced wall. The values that have a closed form are asserted on it.
+    QD_DIAG("\n# diag: closed plate E, twins, scalar, the complex coefficient with every digit\n");
+    QD_DIAG("row,type,theta,re,im\n");
+    {
+        std::vector<LumpMtl> q = {rigid(0.2, 0.022, 0.001 * BIG),                                  // 1 rigid sheet, mass at nothing
+                                  rigid(0.2, 0.022, 0.001),                                        // 2 the same, 26.8 dB
+                                  rigid(0.1, 0.012, 0.001),                                        // 3 a second rigid sheet
+                                  {2.50, 0.80, tC},                                                // 4 coherent sheet
+                                  {2.25, 0.0, 0.006, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 20.0, 0.001},   // 5 mass-law, permittivity above one
+                                  {1.50, 0.40, 0.006, 0.0, 0.3, 0.0, 0.0, 0.0, 0.0, 20.0, 0.001},  // 6 the same lossy, with tf
+                                  {2.401e-9, 0.0, 0.0, 0.0, 0.1, 0.0, 0.0, 0.0, 0.0, 20.0, 0.001}}; // 7 rigid wall, traced
+        ub::Pal P = lump_palette(q);
+        struct Row
+        {
+            const char *name;
+            std::vector<double> x;
+            std::vector<int> mat;
+            std::vector<bool> flip;
+            int n;
+        };
+        const std::vector<Row> rows = {
+            {"rigid sheet in air - no mass", {0.0}, {1}, {false}, 1},
+            {"rigid sheet in air - 26.8 dB", {0.0}, {2}, {false}, 1},
+            {"stack rigid | rigid", {0.0, gap}, {2, 3}, {false, true}, 1},
+            {"stack rigid | rigid reversed", {0.0, gap}, {3, 2}, {false, true}, 1},
+            {"stack C | ML 2.25", {0.0, gap}, {4, 5}, {false, true}, 1},
+            {"stack ML 2.25 | C", {0.0, gap}, {5, 4}, {false, true}, 1},
+            {"stack C | ML lossy tf", {0.0, gap}, {4, 6}, {false, true}, 1},
+            {"stack ML lossy tf | C", {0.0, gap}, {6, 4}, {false, true}, 1},
+            {"rigid sheet on rigid wall - entry", {0.0, gap, gap + 0.1}, {2, 7, 7}, {false, false, true}, 2},
+            {"rigid sheet on rigid wall - exit", {0.0, 0.1, 0.1 + gap}, {7, 7, 2}, {false, true, false}, 2},
+        };
+        for (const auto &R : rows)
+            for (int tr : {4, 5})
+                for (double thd : {10.0, 30.0, 60.0})
+                {
+                    arma::uvec mi;
+                    arma::mat mesh = ub::build(R.x, R.mat, R.flip, mi);
+                    auto a = ub::chain(P, mesh, mi, std::vector<int>((size_t)R.n, tr), f, thd, {1.5});
+                    REQUIRE((int)a.size() == R.n);
+                    const std::complex<double> z = prod(a, 0);
+                    QD_DIAG("%s,%d,%.0f,%.17g,%.17g\n", R.name, tr, thd, std::real(z), std::imag(z));
+                    INFO("E, " << R.name << ", type " << tr << ", theta " << thd);
+                    CHECK(std::norm(z) < 1.0);
+                    if (R.mat.size() == 1 && R.mat[0] == 1)
+                        CHECK(std::abs(std::norm(z) - 0.04) < 1.0e-12); // tf 0.2 on each face
+                }
+        // The order invariance of a stack whose mass-law layer is not closed, as it was settled
+        for (int ml : {5, 6})
+            for (double thd : {10.0, 30.0, 60.0})
+            {
+                arma::uvec m1, m2;
+                arma::mat s1 = ub::build({0.0, gap}, {4, ml}, {false, true}, m1), s2 = ub::build({0.0, gap}, {ml, 4}, {false, true}, m2);
+                auto a = ub::chain(P, s1, m1, {4}, f, thd, {1.5}), b = ub::chain(P, s2, m2, {4}, f, thd, {1.5});
+                INFO("E, order, layer " << ml << ", theta " << thd);
+                CHECK(std::abs(prod(a, 0) - prod(b, 0)) < 1.0e-14);
+            }
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // F. Recorded
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: closed plate F1, recorded: a mass-law sheet eps 0.50, 22 mm, tf 0.2, m 20 (mass at nothing) inside 10 mm + 12 mm of host,\n");
+    QD_DIAG("# closed from 45 deg; the sheet event, scalar, dB\n");
+    QD_DIAG("host,theta,event\n");
+    for (double ei : {0.8, 0.0})
+        for (double thd : {30.0, 40.0, 44.0, 44.9, 45.1, 46.0, 50.0, 60.0})
+        {
+            std::vector<LumpMtl> q = {{0.50, 0.0, 0.022, 0.0, 0.2, 0.0, 0.0, 0.0, 0.0, 20.0, 0.001 * BIG}, {2.50, ei, 0.0}};
+            ub::Pal P = lump_palette(q);
+            arma::uvec mi;
+            arma::mat mesh = ub::build({0.0, 0.010, 0.022}, {2, 1, 2}, {false, false, true}, mi);
+            auto a = ub::chain(P, mesh, mi, {4, 4}, f, thd, {1.5});
+            REQUIRE(a.size() == 2);
+            QD_DIAG("2.50-%.1fj,%.1f,%.4f\n", ei, thd, ub::dB(cpx(a[1].xpr, 0, 0)));
+            CHECK(ub::dB(cpx(a[1].xpr, 0, 0)) < 0.0);
+        }
+
+    QD_DIAG("\n# diag: closed plate F2, recorded: a rigid mass-law wall 100 mm as a traced solid with a rigid mass-law lining 50 mm on one face,\n");
+    QD_DIAG("# W wood eps 2.1609e-8 tf 0.2, K concrete eps 2.401e-9 tf 0.1, mass arguments at nothing, scalar. The wave is held in the wall and the\n");
+    QD_DIAG("# lining is entered at the Snell cosine of two impedance mappings: W | K is closed from 19.5 deg\n");
+    QD_DIAG("wall,lining,side,type,theta,ev1,ev2,total\n");
+    for (int wl = 0; wl < 2; ++wl)
+        for (int side = 0; side < 2; ++side)
+            for (int tr : {4, 5})
+                for (double thd : {10.0, 30.0, 60.0})
+                {
+                    std::vector<LumpMtl> q = {rigid(0.2, 0.022, 0.001 * BIG), rigid(0.2, 0.0, 0.001 * BIG),
+                                              {2.401e-9, 0.0, 0.050, 0.0, 0.1, 0.0, 0.0, 0.0, 0.0, 20.0, 0.001 * BIG},
+                                              {2.401e-9, 0.0, 0.0, 0.0, 0.1, 0.0, 0.0, 0.0, 0.0, 20.0, 0.001 * BIG}};
+                    ub::Pal P = lump_palette(q);
+                    const int W = wl ? 4 : 2, Ln = wl ? 1 : 3;
+                    arma::uvec mi;
+                    arma::mat mesh = side ? ub::build({0.0, gap, gap + 0.1}, {Ln, W, W}, {false, false, true}, mi) : ub::build({0.0, 0.1, 0.1 + gap}, {W, W, Ln}, {false, true, false}, mi);
+                    auto a = ub::chain(P, mesh, mi, {tr, tr}, f, thd, {1.5});
+                    REQUIRE(a.size() == 2);
+                    QD_DIAG("%s,%s,%s,%d,%.0f,%.4f,%.4f,%.4f\n", wl ? "K" : "W", wl ? "W" : "K", side ? "lining first" : "wall first", tr, thd, ub::dB(cpx(a[0].xpr, 0, 0)),
+                            ub::dB(cpx(a[1].xpr, 0, 0)), ub::dB(prod(a, 0)));
+                }
+
+    QD_DIAG("\n# diag: closed plate F3, recorded: a coherent sheet 6 mm eps 0.31 with tf, no mass column, inside 10 mm + 12 mm of eps 2.50 - j ei,\n");
+    QD_DIAG("# evanescent in the sheet from 33.8 deg; the sheet event, scalar, dB\n");
+    QD_DIAG("tf,ei,theta,event\n");
+    for (double tS : {0.5, 0.0, -0.5})
+        for (double ei : {0.8, 0.1, 1.0e-3, 1.0e-6, 0.0})
+            for (double thd : {20.0, 45.0, 60.0})
+            {
+                std::vector<LumpMtl> q = {{0.31, 0.0, 0.006, 0.0, tS}, {2.50, ei, 0.0}};
+                ub::Pal P = lump_palette(q);
+                arma::uvec mi;
+                arma::mat mesh = ub::build({0.0, 0.010, 0.022}, {2, 1, 2}, {false, false, true}, mi);
+                auto a = ub::chain(P, mesh, mi, {4, 4}, f, thd, {1.5});
+                QD_DIAG("%.1f,%.0e,%.0f,%.4f\n", tS, ei, thd, (a.size() == 2) ? ub::dB(cpx(a[1].xpr, 0, 0)) : -999.0);
+            }
+}
