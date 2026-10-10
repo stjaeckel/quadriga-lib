@@ -13939,7 +13939,7 @@ TEST_CASE("Lossy verdict - a lossy second medium has no critical angle")
     // the direction, the bent flag, the ray tube, the branch of a sheet's leak chain - is
     // continuous through the angle at which the test would trip. A rigid body of the acoustic
     // mapping is lossless and stays closed. Through ray_triangle_intersect, ray_mesh_interact
-    // and ray_state_update; the rows of J with a loss column and all of K are recorded.
+    // and ray_state_update; the rows of J with a loss column are recorded.
     //
     // A. A porous sheet in air, both ports, against the analytic slab
     // B. A porous sheet on a rigid wall and on a leaking one, both ports
@@ -14469,7 +14469,7 @@ TEST_CASE("Lossy verdict - a lossy second medium has no critical angle")
             }
 
     // ------------------------------------------------------------------------------------------
-    // K. The direction a traced absorber and a sheet hand a mass-law wall, recorded
+    // K. The direction a traced absorber and a sheet hand a mass-law wall
     // ------------------------------------------------------------------------------------------
     QD_DIAG("\n# diag: lossy verdict K, porous 50 mm on a rigid wall 200 mm with tf 0.3 and its mass law (m 30), scalar, series\n");
     QD_DIAG("# summed. As a traced solid (entry, porous | wall, wall | air) and as a sheet (glued entry,\n");
@@ -14487,7 +14487,10 @@ TEST_CASE("Lossy verdict - a lossy second medium has no critical angle")
             double a = dB(cpx(so[0].xpr, 0, 0)) + dB(cpx(so[1].xpr, 0, 0)), b = dB(cpx(so[2].xpr, 0, 0)), c = dB(cpx(sh[0].xpr, 0, 0)), d = dB(cpx(sh[1].xpr, 0, 0));
             QD_DIAG("%d,%.0f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%+.4f\n", tr, thd, a, b, ang(so[1].path_dirN), ang(so[2].path_dirN), c, d, ang(sh[0].path_dirN),
                     ang(sh[1].path_dirN), b - d);
-            CHECK(std::isfinite(b - d));
+            INFO("K, tracer " << tr << ", theta " << thd);
+            CHECK(std::abs(b - d) < 5.0e-3);                         // the wall's exit with its mass term
+            CHECK(std::abs(ang(so[1].path_dirN) - thd) < 1.0e-6);    // the direction in the wall
+            CHECK(std::abs(ang(so[2].path_dirN) - thd) < 1.0e-6);    // and behind it
         }
 
     // ------------------------------------------------------------------------------------------
@@ -14592,4 +14595,456 @@ TEST_CASE("Lossy verdict - a lossy second medium has no critical angle")
             CHECK(std::abs(std::norm(cpx(et.xpr, 0, 0)) - std::norm(D.T_te)) < 1.0e-9);
             CHECK(std::abs(std::norm(cpx(et.xpr, 0, 3)) - std::norm(D.T_tm)) < 1.0e-9);
         }
+}
+
+TEST_CASE("Leak direction - a closed face hands the wall behind a traced layer the direction the wave has in air")
+{
+#ifdef _OPENMP
+    // One ray per call, many thousand calls: a thread team per call costs twenty times the work
+    struct OneThread
+    {
+        int n = omp_get_max_threads();
+        OneThread() { omp_set_num_threads(1); }
+        ~OneThread() { omp_set_num_threads(n); }
+    } one_thread;
+#endif
+    // A leak carries the transverse wavenumber across a closed face. For a wave that came from
+    // air through parallel faces that is the incidence direction, whatever the layer in front
+    // made of the wave, and it is the same at every frequency. So a layer on a leaking wall,
+    // meshed as a traced solid, hands the wall what the same layer as a sheet hands it: the
+    // direction in the wall and behind it, the segment, the mass term and the exit event are
+    // the sheet's. Above an invariant of one no direction in air exists and the face hands on
+    // the direction the wave has. Through ray_triangle_intersect, ray_mesh_interact and
+    // ray_state_update, scalar, both tracers. The wall's series behind a solid and behind a
+    // sheet differ by the mirror behind the ray and are recorded; so is the direction behind
+    // a wall with tf and no mass column, which is the Snell bend of its mapping in every
+    // representation.
+    //
+    // A. Directions, 3 layers x 4 walls, to 85 deg
+    // B. Levels on the same rows: the events up to the wall, the wall's exit, its mass term as a
+    //    ratio against the same wall with its mass argument taken to nothing, its series as the
+    //    resolving run over the declined one
+    // C. The wall | air event behind the traced porous layer run again with what it is handed
+    //    changed one thing at a time
+    // D. A host entered from a denser solid, invariant p, in front of the leaking wall
+    // E. The ray tube at the closed face, refracting tracer
+    // S. The traced solid against the sheet, worst over the angles, with every digit
+    const double gap = 1.0e-5, f_hz = FRQ, dS = 0.050, dW = 0.200;
+    typedef std::unordered_map<std::string, std::vector<double>> Pal;
+    auto dB = [](std::complex<double> z)
+    { return (std::norm(z) > 0.0) ? 10.0 * std::log10(std::norm(z)) : -999.0; };
+    auto unit = [](arma::mat d) -> arma::mat
+    {
+        d /= std::sqrt(d(0, 0) * d(0, 0) + d(0, 1) * d(0, 1) + d(0, 2) * d(0, 2));
+        return d;
+    };
+    auto ang = [](const arma::mat &d) -> double // against the x axis, which every face normal is on
+    { return std::atan2(std::abs(d(0, 1)), std::abs(d(0, 0))) * 180.0 / QPI; };
+
+    struct Ev
+    {
+        arma::mat o, d, origN, destN, path_dirN, xpr, fbs; // o, d: the segment the event was met on
+        arma::Col<short> prev, cur, buf;
+        arma::vec accg, accr;
+        uint8_t ot = 0, rt = 0;
+        unsigned nh = 0;
+    };
+    auto traced = [&](const Pal &pal, const arma::mat &mesh, const arma::uvec &mtl_ind, int itype, const arma::mat &orig,
+                      const arma::mat &dest, const Ev *in, double eps) -> Ev
+    {
+        arma::mat fbs, sbs, sbsN, nv;
+        arma::u32_vec nh, fi, si;
+        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, &nh, &fi, &si);
+        Ev E;
+        E.o = orig, E.d = dest;
+        arma::vec gain, fang;
+        std::vector<uint8_t> ot, rt;
+        quadriga_lib::ray_mesh_interact(itype, f_hz, &orig, &dest, &mesh, &mtl_ind, &pal, &fi, &si, (arma::mat *)nullptr,
+                                        (arma::mat *)nullptr, &E.origN, &E.destN, &E.fbs, &sbsN, &gain, &E.xpr,
+                                        (arma::mat *)nullptr, (arma::mat *)nullptr, &fang, (arma::vec *)nullptr,
+                                        (arma::vec *)nullptr, &nv, &ot, &E.path_dirN, false, (arma::u32_vec *)nullptr);
+        arma::Col<short> mf(1), ms(1);
+        mf(0) = fi(0) ? (short)mtl_ind(fi(0) - 1) : (short)0, ms(0) = si(0) ? (short)mtl_ind(si(0) - 1) : (short)0;
+        quadriga_lib::ray_state_update(itype, f_hz, &orig, &dest, &E.fbs, &sbsN, &nh, &fang, &nv, &ot, &pal, &mf, &ms,
+                                       in ? &in->prev : nullptr, in ? &in->cur : nullptr, in ? &in->buf : nullptr,
+                                       in ? &in->path_dirN : nullptr, in ? &in->accg : nullptr, in ? &in->accr : nullptr,
+                                       &E.prev, &E.cur, &E.buf, &gain, &E.xpr, &E.path_dirN, &E.accg, &E.accr, &rt,
+                                       (arma::u32_vec *)nullptr, eps, &E.origN, &E.destN);
+        E.ot = ot[0], E.rt = rt[0], E.nh = nh(0);
+        return E;
+    };
+    auto face = [](double x, bool flip) -> arma::mat
+    {
+        arma::mat m = diag_quad_x(200.0, x);
+        if (flip)
+        {
+            m.row(0) = arma::rowvec{x, -200.0, -200.0, x, 200.0, -200.0, x, -200.0, 200.0};
+            m.row(1) = arma::rowvec{x, 200.0, -200.0, x, 200.0, 200.0, x, -200.0, 200.0};
+        }
+        return m;
+    };
+    auto build = [&](const std::vector<double> &x, const std::vector<int> &mat, const std::vector<bool> &flip, arma::uvec &mtl_ind)
+    {
+        arma::mat mesh;
+        mtl_ind.set_size(2 * x.size());
+        for (size_t k = 0; k < x.size(); ++k)
+        {
+            mesh = k ? arma::join_cols(mesh, face(x[k], flip[k])) : face(x[k], flip[k]);
+            mtl_ind(2 * k) = (arma::uword)mat[k], mtl_ind(2 * k + 1) = (arma::uword)mat[k];
+        }
+        return mesh;
+    };
+    // n transmit events in a row, each relaunched on the segment the one before wrote
+    auto chain = [&](const Pal &pal, const arma::mat &mesh, const arma::uvec &mi, int itype, size_t n, arma::mat o, arma::mat d,
+                     const Ev *seed, double eps) -> std::vector<Ev>
+    {
+        std::vector<Ev> out;
+        for (size_t q = 0; q < n; ++q)
+        {
+            Ev E = traced(pal, mesh, mi, itype, o, d, q ? &out[q - 1] : seed, eps);
+            out.push_back(E);
+            if (E.nh == 0 || E.rt == 0)
+                break;
+            arma::mat s = unit(E.destN - E.origN);
+            o = E.origN, d = E.origN + (1.2 / std::abs(s(0, 0))) * s;
+        }
+        return out;
+    };
+    auto g_of = [&](const std::vector<Ev> &v, size_t q)
+    { return (q < v.size() && v[q].nh != 0 && v[q].rt != 0) ? dB(cpx(v[q].xpr, 0, 0)) : -999.0; };
+    auto a_of = [&](const std::vector<Ev> &v, size_t q) // direction written, deg
+    { return (q < v.size() && v[q].nh != 0 && v[q].rt != 0) ? ang(v[q].path_dirN) : -1.0; };
+    auto s_of = [&](const std::vector<Ev> &v, size_t q) // relaunched segment, deg
+    { return (q < v.size() && v[q].nh != 0 && v[q].rt != 0) ? ang(v[q].destN - v[q].origN) : -1.0; };
+    auto df = [](double a, double b)
+    { return (a < -900.0 || b < -900.0) ? -999.0 : a - b; };
+
+    const std::vector<LumpMtl> lp = {
+        {0.31, 0.20, 0.0},                                             // 1 porous, lossy, rarer than air: solid
+        {0.31, 0.20, dS},                                              // 2 the same as a sheet
+        {1.50, 0.00, 0.0},                                             // 3 lossless dense layer: solid
+        {1.50, 0.00, dS},                                              // 4 the same as a sheet
+        {1.50, 0.40, 0.0},                                             // 5 lossy dense layer: solid
+        {1.50, 0.40, dS},                                              // 6 the same as a sheet
+        {2.401e-9, 0.0, 0.0, 0.0, 0.3, 0.0, 0.0, 0.0, 0.0, 30.0, 0.001}, // 7 rigid wall, tf 0.3, m 30
+        {2.401e-9, 0.0, 0.0, 0.0, 0.3, 0.0, 0.0, 0.0, 0.0, 30.0, 1.0e9}, // 8 the same, its mass argument taken to nothing
+        {2.401e-9, 0.0, 0.0, 0.0, 0.3},                                // 9 rigid wall, tf 0.3, no mass column
+        {5.24, 0.63, 0.0},                                             // 10 a second solid that is not rigid: dense, lossy
+        {0.20, 0.00, 0.0, 0.0, 0.5},                                   // 11 not rigid, lossless, rarer than air, tf 0.5: closed from 26.6 deg
+        {5.24, 0.00, 0.0},                                             // 12 lossless dense solid, for D
+    };
+    const Pal mtl = lump_palette(lp);
+    struct LayerT
+    {
+        const char *name;
+        int solid, sheet;
+    };
+    struct WallT
+    {
+        const char *name;
+        int w, twin; // twin: the same wall without a mass term, 0 if it has none
+    };
+    const std::vector<LayerT> layers = {{"porous 0.31-0.20j", 1, 2}, {"lossless 1.50", 3, 4}, {"lossy 1.50-0.40j", 5, 6}};
+    const std::vector<WallT> walls = {{"rigid tf m", 7, 8}, {"rigid tf", 9, 0}, {"dense 5.24-0.63j", 10, 0}, {"rare 0.20 tf", 11, 0}};
+    const std::vector<double> angles = {10.0, 20.0, 30.0, 37.0, 45.0, 60.0, 75.0, 85.0};
+
+    struct Cfg
+    {
+        std::vector<Ev> so, sh, ba; // traced solid (3 events), sheet (2), bare wall (2)
+    };
+    auto run = [&](int tr, const LayerT &Ly, int w, double thd, double eps) -> Cfg
+    {
+        Cfg C;
+        arma::uvec mi, mj, mk;
+        arma::mat m1 = build({0.0, dS, dS + gap, dS + dW + gap}, {Ly.solid, Ly.solid, w, w}, {false, true, false, true}, mi);
+        arma::mat m2 = build({0.0, gap, dW + gap}, {Ly.sheet, w, w}, {false, false, true}, mj);
+        arma::mat m3 = build({0.0, dW}, {w, w}, {false, true}, mk);
+        arma::mat o, d;
+        diag_ray_at(thd, o, d);
+        C.so = chain(mtl, m1, mi, tr, 3, o, d, nullptr, eps);
+        C.sh = chain(mtl, m2, mj, tr, 2, o, d, nullptr, eps);
+        C.ba = chain(mtl, m3, mk, tr, 2, o, d, nullptr, eps);
+        return C;
+    };
+
+    // ------------------------------------------------------------------------------------------
+    // A. Directions
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: closed-face hand-on A, directions. A layer 50 mm on a wall 200 mm, scalar, series declined, through the\n");
+    QD_DIAG("# intersector. solid: entry, layer | wall, wall | air. sheet: glued entry, wall | air. bare: the wall alone.\n");
+    QD_DIAG("# inL: the direction in the layer; inW: the direction written into the wall; segW: the segment in the wall;\n");
+    QD_DIAG("# out: the direction written behind the wall; seg: the segment behind it, all deg against the normal.\n");
+    QD_DIAG("# ot, rt: hit code and resolved type of layer | wall and of wall | air; w2: prev.cur.buf after layer | wall\n");
+    QD_DIAG("tracer,layer,wall,theta,inL,so_inW,so_segW,so_out,so_seg,sh_inW,sh_segW,sh_out,sh_seg,ba_inW,ba_out,ba_seg,ot2,rt2,ot3,rt3,w2\n");
+    std::vector<std::string> rowsB, rowsS;
+    for (int tr : {4, 5})
+        for (const LayerT &Ly : layers)
+            for (const WallT &W : walls)
+            {
+                double w_in = 0.0, w_out = 0.0, w_seg = 0.0, w_exit = 0.0, w_mass = 0.0, w_into = 0.0, w_ser = 0.0, w_bare = 0.0;
+                for (double thd : angles)
+                {
+                    Cfg D = run(tr, Ly, W.w, thd, 1.5), R = run(tr, Ly, W.w, thd, 0.0);
+                    INFO("A, tracer " << tr << ", " << Ly.name << " | " << W.name << ", theta " << thd);
+                    CHECK(D.so.size() >= 2);
+                    CHECK(D.sh.size() >= 1);
+                    const bool so3 = D.so.size() == 3;
+                    QD_DIAG("%d,%s,%s,%.0f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%d,%d,%d,%d,", tr, Ly.name, W.name, thd, a_of(D.so, 0),
+                            a_of(D.so, 1), s_of(D.so, 1), a_of(D.so, 2), s_of(D.so, 2), a_of(D.sh, 0), s_of(D.sh, 0), a_of(D.sh, 1), s_of(D.sh, 1),
+                            a_of(D.ba, 0), a_of(D.ba, 1), s_of(D.ba, 1), (D.so.size() > 1) ? (int)D.so[1].ot : -1, (D.so.size() > 1) ? (int)D.so[1].rt : -1,
+                            so3 ? (int)D.so[2].ot : -1, so3 ? (int)D.so[2].rt : -1);
+                    if (D.so.size() > 1 && D.so[1].nh != 0)
+                        QD_DIAG("%04x.%04x.%04x\n", (unsigned)(unsigned short)D.so[1].prev(0), (unsigned)(unsigned short)D.so[1].cur(0),
+                                (unsigned)(unsigned short)D.so[1].buf(0));
+                    else
+                        QD_DIAG("-\n");
+
+                    // The mass term: the wall against its twin without one, each configuration
+                    double m_so = -999.0, m_sh = -999.0, m_ba = -999.0;
+                    if (W.twin)
+                    {
+                        Cfg T = run(tr, Ly, W.twin, thd, 1.5);
+                        m_so = df(g_of(D.so, 2), g_of(T.so, 2)), m_sh = df(g_of(D.sh, 1), g_of(T.sh, 1)), m_ba = df(g_of(D.ba, 1), g_of(T.ba, 1));
+                    }
+                    char b[512];
+                    std::snprintf(b, sizeof(b), "%d,%s,%s,%.0f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f\n", tr, Ly.name, W.name, thd,
+                                  df(g_of(R.so, 0) + g_of(R.so, 1), 0.0), g_of(R.sh, 0), g_of(D.ba, 0), g_of(D.so, 2), g_of(D.sh, 1), g_of(D.ba, 1), m_so, m_sh,
+                                  m_ba, df(g_of(R.so, 2), g_of(D.so, 2)), df(g_of(R.sh, 1), g_of(D.sh, 1)), df(g_of(R.ba, 1), g_of(D.ba, 1)));
+                    rowsB.push_back(b);
+
+                    // The wall behind the traced layer is the wall behind the sheet
+                    if (W.w != 10)
+                    {
+                        REQUIRE((D.so.size() == 3 && D.sh.size() == 2 && D.so[2].rt != 0 && D.sh[1].rt != 0));
+                        CHECK(std::abs(a_of(D.so, 1) - a_of(D.sh, 0)) < 1.0e-6); // the direction in the wall
+                        CHECK(std::abs(a_of(D.so, 2) - a_of(D.sh, 1)) < 1.0e-6); // the direction behind it
+                        CHECK(std::abs(g_of(D.so, 2) - g_of(D.sh, 1)) < 1.0e-4); // the wall | air event
+                        if (W.w != 11) // rigid: a leak at every angle, the segment is the incidence line
+                        {
+                            CHECK(std::abs(a_of(D.so, 1) - thd) < 1.0e-6);
+                            CHECK(std::abs(s_of(D.so, 1) - thd) < 1.0e-6);
+                            CHECK(std::abs(s_of(D.so, 2) - s_of(D.sh, 1)) < 1.0e-6);
+                        }
+                        if (W.twin) // held through the mass-law wall, and the mass term at the incidence cosine
+                        {
+                            CHECK(std::abs(a_of(D.so, 2) - thd) < 1.0e-6);
+                            CHECK(std::abs(m_so - m_sh) < 5.0e-3);
+                            CHECK(std::abs(m_so - m_ba) < 5.0e-3);
+                        }
+                    }
+
+                    if (D.so.size() == 3 && D.sh.size() == 2 && D.so[2].rt != 0 && D.sh[1].rt != 0 && D.ba.size() == 2)
+                    {
+                        w_in = std::max(w_in, std::abs(a_of(D.so, 1) - a_of(D.sh, 0))), w_out = std::max(w_out, std::abs(a_of(D.so, 2) - a_of(D.sh, 1)));
+                        w_seg = std::max(w_seg, std::abs(s_of(D.so, 2) - s_of(D.sh, 1))), w_exit = std::max(w_exit, std::abs(g_of(D.so, 2) - g_of(D.sh, 1)));
+                        w_into = std::max(w_into, std::abs(g_of(R.so, 0) + g_of(R.so, 1) - g_of(R.sh, 0)));
+                        w_ser = std::max(w_ser, std::abs((g_of(R.so, 2) - g_of(D.so, 2)) - (g_of(R.ba, 1) - g_of(D.ba, 1))));
+                        w_bare = std::max(w_bare, std::abs(g_of(D.so, 2) - g_of(D.ba, 1)));
+                        if (W.twin)
+                            w_mass = std::max(w_mass, std::abs(m_so - m_sh));
+                    }
+                }
+                char b[512];
+                std::snprintf(b, sizeof(b), "%d,%s,%s,%.2e,%.2e,%.2e,%.2e,%.2e,%.2e,%.2e,%.2e\n", tr, Ly.name, W.name, w_in, w_out, w_seg, w_into, w_exit, w_bare, w_mass, w_ser);
+                rowsS.push_back(b);
+            }
+
+    // ------------------------------------------------------------------------------------------
+    // B. Levels
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: closed-face hand-on B, levels on the rows of A, dB. into: the events up to the wall, series summed;\n");
+    QD_DIAG("# exit: the wall | air event, series declined; mass: that event over the same wall with its mass argument taken\n");
+    QD_DIAG("# to nothing; ser: that event with the series summed over declined. -999: no such event or no such column\n");
+    QD_DIAG("tracer,layer,wall,theta,so_into,sh_into,ba_into,so_exit,sh_exit,ba_exit,so_mass,sh_mass,ba_mass,so_ser,sh_ser,ba_ser\n");
+    for (const std::string &s : rowsB)
+        QD_DIAG("%s", s.c_str());
+
+    // ------------------------------------------------------------------------------------------
+    // C. The wall | air event, with what it is handed changed one thing at a time
+    // ------------------------------------------------------------------------------------------
+    // now    the event as the chain runs it
+    // inc    handed the incidence direction; with tracer 5 also met on a segment along it
+    // dir    handed the incidence direction on the segment as it stands
+    // none   handed no direction
+    // clean  handed a clean previous-medium word
+    QD_DIAG("\n# diag: closed-face hand-on C, the wall | air event behind the traced porous layer, run again with what it is\n");
+    QD_DIAG("# handed changed. in: the direction handed in; seg: the segment it is met on; out: the direction written, deg;\n");
+    QD_DIAG("# gain in dB; mass: over the twin wall run the same way; vbs, tr: bits 1 and 5 of the resolved type; w: the\n");
+    QD_DIAG("# words handed in, prev.cur.buf\n");
+    QD_DIAG("tracer,wall,theta,var,in,seg,out,gain_dB,mass_dB,rt,vbs,tr,w\n");
+    for (int tr : {4, 5})
+        for (const WallT &W : {walls[0], walls[1]})
+            for (double thd : {10.0, 45.0, 85.0})
+            {
+                const double th = thd * QPI / 180.0;
+                const arma::mat inc{{std::cos(th), std::sin(th), 0.0}};
+                arma::uvec mi, mt;
+                arma::mat mesh = build({0.0, dS, dS + gap, dS + dW + gap}, {1, 1, W.w, W.w}, {false, true, false, true}, mi);
+                arma::mat mesh_t = build({0.0, dS, dS + gap, dS + dW + gap}, {1, 1, W.twin ? W.twin : W.w, W.twin ? W.twin : W.w}, {false, true, false, true}, mt);
+                arma::mat o, d;
+                diag_ray_at(thd, o, d);
+                std::vector<Ev> so = chain(mtl, mesh, mi, tr, 2, o, d, nullptr, 1.5), st = chain(mtl, mesh_t, mt, tr, 2, o, d, nullptr, 1.5);
+                REQUIRE((so.size() == 2 && st.size() == 2));
+                for (int var = 0; var < 5; ++var)
+                {
+                    auto third = [&](const std::vector<Ev> &v, const arma::mat &msh, const arma::uvec &mx) -> Ev
+                    {
+                        Ev P = v[1];
+                        arma::mat s = unit(P.destN - P.origN);
+                        if (var == 1 || var == 2)
+                            P.path_dirN = inc;
+                        if (var == 1 && tr == 5)
+                            s = inc;
+                        if (var == 3)
+                            P.path_dirN.zeros();
+                        if (var == 4)
+                            P.prev(0) = (short)0;
+                        arma::mat oo = P.origN, dd = P.origN + (1.2 / std::abs(s(0, 0))) * s;
+                        Ev E = traced(mtl, msh, mx, tr, oo, dd, &P, 1.5);
+                        E.prev = P.prev, E.cur = P.cur, E.buf = P.buf, E.accg = arma::vec{ang(P.path_dirN)}; // what was handed in, for the row
+                        return E;
+                    };
+                    Ev E = third(so, mesh, mi), T = third(st, mesh_t, mt);
+                    const bool ok = E.nh != 0 && E.rt != 0;
+                    QD_DIAG("%d,%s,%.0f,%s,%.4f,%.4f,%.4f,%.4f,%.4f,%d,%d,%d,%04x.%04x.%04x\n", tr, W.name, thd,
+                            var == 0 ? "now  " : (var == 1 ? "inc  " : (var == 2 ? "dir  " : (var == 3 ? "none " : "clean"))), E.accg(0), ang(E.d - E.o),
+                            ok ? ang(E.path_dirN) : -1.0, ok ? dB(cpx(E.xpr, 0, 0)) : -999.0,
+                            (ok && W.twin && T.rt != 0) ? dB(cpx(E.xpr, 0, 0)) - dB(cpx(T.xpr, 0, 0)) : -999.0, (int)E.rt, (int)rt_bit(E.rt, 1), (int)rt_bit(E.rt, 5),
+                            (unsigned)(unsigned short)E.prev(0), (unsigned)(unsigned short)E.cur(0), (unsigned)(unsigned short)E.buf(0));
+                    INFO("C, tracer " << tr << ", " << W.name << ", theta " << thd << ", variant " << var);
+                    CHECK(E.nh != 0);
+                }
+            }
+
+    // ------------------------------------------------------------------------------------------
+    // D. A host entered from a denser solid, in front of the leaking wall
+    // ------------------------------------------------------------------------------------------
+    // Launched in the lossless eps 5.24 solid with seeded state words, into the host with a
+    // transverse invariant p, then host | wall and wall | air. Below one the wave has a
+    // direction in air, asin(sqrt(p)); above one it has none.
+    QD_DIAG("\n# diag: closed-face hand-on D, a host 100 mm entered from the lossless eps 5.24 solid the ray is launched in,\n");
+    QD_DIAG("# invariant p, then the rigid wall 200 mm with tf 0.3, with and without m. inH: the direction in the host;\n");
+    QD_DIAG("# air: asin(sqrt(p)), the direction that invariant has in air; inW: written into the wall; segW: the segment\n");
+    QD_DIAG("# in the wall; out: written behind the wall; g2, g3: host | wall and wall | air, dB\n");
+    QD_DIAG("host,wall,p,tracer,inH,air,inW,segW,out,g2_dB,g3_dB,ot2,rt2,ot3,rt3,w2\n");
+    for (int host : {5, 3})
+        for (const WallT &W : {walls[0], walls[1]})
+            for (double p : {0.50, 0.90, 0.99, 1.01, 1.04, 1.10, 1.45})
+                for (int tr : {4, 5})
+                {
+                    const double L = 0.10, th1 = std::asin(std::sqrt(p / 5.24));
+                    arma::uvec mi;
+                    arma::mat mesh = build({0.0, gap, L, L + gap, L + dW + gap}, {12, host, host, W.w, W.w}, {true, false, true, false, true}, mi);
+                    arma::mat orig{{-0.05, 0.37, 0.0}}, dest{{-0.05 + 2.0 * std::cos(th1), 0.37 + 2.0 * std::sin(th1), 0.0}};
+                    Ev seed;
+                    seed.prev = arma::Col<short>{(short)0}, seed.cur = arma::Col<short>{(short)12}, seed.buf = arma::Col<short>{(short)0};
+                    seed.path_dirN = unit(dest - orig), seed.accg = arma::vec{0.0}, seed.accr = arma::vec{0.0};
+                    std::vector<Ev> v = chain(mtl, mesh, mi, tr, 3, orig, dest, &seed, 1.5);
+                    INFO("D, host " << host << ", " << W.name << ", p " << p << ", tracer " << tr);
+                    REQUIRE(v.size() >= 2);
+                    const bool three = v.size() == 3;
+                    if (p > 1.0) // no direction in air: the direction the wave has
+                        CHECK(std::abs(a_of(v, 1) - a_of(v, 0)) < 1.0e-9);
+                    else
+                    {
+                        const double air = std::asin(std::sqrt(p)) * 180.0 / QPI;
+                        CHECK(std::abs(a_of(v, 1) - air) < 1.0e-6);
+                        if (tr == 5) // the segment follows, and the mass-law wall holds it
+                        {
+                            CHECK(std::abs(s_of(v, 1) - air) < 1.0e-6);
+                            if (W.twin)
+                                CHECK(std::abs(a_of(v, 2) - air) < 1.0e-6);
+                        }
+                    }
+                    QD_DIAG("%s,%s,%.2f,%d,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%d,%d,%d,%d,", host == 5 ? "1.50-0.40j" : "1.50", W.name, p, tr, a_of(v, 0),
+                            (p < 1.0) ? std::asin(std::sqrt(p)) * 180.0 / QPI : -1.0, a_of(v, 1), s_of(v, 1), a_of(v, 2), g_of(v, 1), g_of(v, 2),
+                            (v.size() > 1) ? (int)v[1].ot : -1, (v.size() > 1) ? (int)v[1].rt : -1, three ? (int)v[2].ot : -1, three ? (int)v[2].rt : -1);
+                    if (v.size() > 1 && v[1].nh != 0)
+                        QD_DIAG("%04x.%04x.%04x\n", (unsigned)(unsigned short)v[1].prev(0), (unsigned)(unsigned short)v[1].cur(0), (unsigned)(unsigned short)v[1].buf(0));
+                    else
+                        QD_DIAG("-\n");
+                }
+
+    // ------------------------------------------------------------------------------------------
+    // E. The ray tube at the closed face
+    // ------------------------------------------------------------------------------------------
+    // Entry and layer | wall with a tube, type 5, the geometry handed to ray_state_update as
+    // ray_progress hands it. Each vertex ray against the direction it was launched in.
+    QD_DIAG("\n# diag: closed-face hand-on E, the ray tube, refracting tracer, layer 50 mm on the rigid wall with tf 0.3 and m 30.\n");
+    QD_DIAG("# Two vertex rays at theta -+ 0.6 deg in the plane, one tilted out of it. Per ray: the angle it was launched at, in\n");
+    QD_DIAG("# the layer, and in the wall, deg against the normal; sp: the spine\n");
+    QD_DIAG("layer,theta,sp_air,sp_layer,sp_wall,v1_air,v1_layer,v1_wall,v2_air,v2_layer,v2_wall,v3_air,v3_layer,v3_wall,ot2,rt2\n");
+    auto ang3 = [](double x, double y, double z)
+    { return std::atan2(std::sqrt(y * y + z * z), std::abs(x)) * 180.0 / QPI; };
+    for (const LayerT &Ly : layers)
+        for (double thd : {10.0, 45.0, 75.0})
+        {
+            arma::uvec mi;
+            arma::mat mesh = build({0.0, dS, dS + gap, dS + dW + gap}, {Ly.solid, Ly.solid, 7, 7}, {false, true, false, true}, mi);
+            arma::mat o, d;
+            diag_ray_at(thd, o, d);
+            auto dirv = [](double a, double z)
+            {
+                arma::rowvec v = {std::cos(a * QPI / 180.0), std::sin(a * QPI / 180.0), z};
+                return arma::rowvec(v / std::sqrt(v(0) * v(0) + v(1) * v(1) + v(2) * v(2)));
+            };
+            arma::mat trivec(1, 9), tridir(1, 9);
+            trivec.row(0) = arma::rowvec{0.0, 0.001, 0.0, 0.0, -0.001, 0.001, 0.0, -0.001, -0.001};
+            tridir.row(0) = arma::join_rows(arma::join_rows(dirv(thd + 0.6, 0.0), dirv(thd - 0.6, 0.0)), dirv(thd, 0.01));
+            const arma::mat launched = tridir;
+
+            struct Tb
+            {
+                arma::mat origN, destN, dirN, tvN, tdN, xpr;
+                arma::Col<short> prev, cur, buf;
+                arma::vec accg, accr;
+                uint8_t ot = 0, rt = 0;
+            };
+            auto step = [&](const arma::mat &oo, const arma::mat &dd, const arma::mat &tv, const arma::mat &td, const Tb *in) -> Tb
+            {
+                arma::mat fbs, sbs, fbsN, sbsN, nv;
+                arma::u32_vec nh, fi, si;
+                quadriga_lib::ray_triangle_intersect(&oo, &dd, &mesh, &fbs, &sbs, &nh, &fi, &si);
+                Tb E;
+                arma::vec gain, fang;
+                std::vector<uint8_t> ot, rt;
+                quadriga_lib::ray_mesh_interact(5, f_hz, &oo, &dd, &mesh, &mi, &mtl, &fi, &si, &tv, &td, &E.origN, &E.destN, &fbsN, &sbsN, &gain, &E.xpr,
+                                                &E.tvN, &E.tdN, &fang, (arma::vec *)nullptr, (arma::vec *)nullptr, &nv, &ot, &E.dirN, false,
+                                                (arma::u32_vec *)nullptr);
+                arma::Col<short> mf(1), ms(1);
+                mf(0) = fi(0) ? (short)mi(fi(0) - 1) : (short)0, ms(0) = si(0) ? (short)mi(si(0) - 1) : (short)0;
+                quadriga_lib::ray_state_update(5, f_hz, &oo, &dd, &fbsN, &sbsN, &nh, &fang, &nv, &ot, &mtl, &mf, &ms, in ? &in->prev : nullptr,
+                                               in ? &in->cur : nullptr, in ? &in->buf : nullptr, in ? &in->dirN : nullptr, in ? &in->accg : nullptr,
+                                               in ? &in->accr : nullptr, &E.prev, &E.cur, &E.buf, &gain, &E.xpr, &E.dirN, &E.accg, &E.accr, &rt,
+                                               (arma::u32_vec *)nullptr, 1.5, &E.origN, &E.destN, &td, &E.tdN);
+                E.ot = ot[0], E.rt = rt[0];
+                return E;
+            };
+            Tb A = step(o, d, trivec, tridir, nullptr);
+            arma::mat s1 = unit(A.destN - A.origN), o2 = A.origN, d2 = A.origN + (1.2 / std::abs(s1(0, 0))) * s1;
+            Tb B = step(o2, d2, A.tvN, A.tdN, &A);
+            arma::mat s2 = unit(B.destN - B.origN);
+            QD_DIAG("%s,%.0f,%.4f,%.4f,%.4f", Ly.name, thd, thd, ang3(s1(0, 0), s1(0, 1), s1(0, 2)), ang3(s2(0, 0), s2(0, 1), s2(0, 2)));
+            for (arma::uword v = 0; v < 3; ++v)
+                QD_DIAG(",%.4f,%.4f,%.4f", ang3(launched(0, 3 * v), launched(0, 3 * v + 1), launched(0, 3 * v + 2)),
+                        ang3(A.tdN(0, 3 * v), A.tdN(0, 3 * v + 1), A.tdN(0, 3 * v + 2)), ang3(B.tdN(0, 3 * v), B.tdN(0, 3 * v + 1), B.tdN(0, 3 * v + 2)));
+            QD_DIAG(",%d,%d\n", (int)B.ot, (int)B.rt);
+            INFO("E, " << Ly.name << ", theta " << thd);
+            CHECK(B.rt != 0);
+            CHECK(std::abs(ang3(s2(0, 0), s2(0, 1), s2(0, 2)) - thd) < 1.0e-6);
+            for (arma::uword v = 0; v < 3; ++v) // each vertex ray continues in the direction it was launched in
+                CHECK(std::abs(ang3(B.tdN(0, 3 * v), B.tdN(0, 3 * v + 1), B.tdN(0, 3 * v + 2)) -
+                               ang3(launched(0, 3 * v), launched(0, 3 * v + 1), launched(0, 3 * v + 2))) < 1.0e-6);
+        }
+
+    // ------------------------------------------------------------------------------------------
+    // S. The traced solid against the sheet, worst over the angles
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: closed-face hand-on S, the traced solid against the sheet, worst over 10 to 85 deg. in: direction in the\n");
+    QD_DIAG("# wall; out: direction behind it; seg: the segment behind it, deg. into: the events up to the wall, series\n");
+    QD_DIAG("# summed; exit: the wall | air event; bare: that event against the bare wall's; mass: the wall's mass term, dB;\n");
+    QD_DIAG("# ser: the wall's series behind the solid against the bare wall's, dB\n");
+    QD_DIAG("tracer,layer,wall,in,out,seg,into,exit,bare,mass,ser\n");
+    for (const std::string &q : rowsS)
+        QD_DIAG("%s", q.c_str());
 }

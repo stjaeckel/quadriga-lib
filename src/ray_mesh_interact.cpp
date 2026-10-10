@@ -4426,10 +4426,12 @@ void quadriga_lib::ray_state_update(int interaction_type,
         // ratio with the length the projection lost, the far cosine of the pair. Its footprint
         // on the face is where it arrived and does not move.
         //
-        // Called by the three writers of such a direction, right where they write it, so the
-        // state the recovery reads is the one the spine was solved in. All or nothing: a vertex
-        // that cannot be formed leaves the ray with the geometry it had. A lossless medium, a
-        // leak, a recovery that declines and every other type never get here.
+        // Called by the writers of such a direction, right where they write it, so the state the
+        // recovery reads is the one the spine was solved in. All or nothing: a vertex that cannot
+        // be formed leaves the ray with the geometry it had. A leak behind a closed face gets the
+        // same construction with air as the far medium, out of a lossless medium as well. An
+        // open face out of a lossless medium, a recovery that declines and every other type
+        // never get here.
         auto RELAUNCH = [&](const Material &A, const Material &B, int itype)
         {
             if (!p_origN || (interaction_type != 2 && interaction_type != 5))
@@ -4450,7 +4452,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
                     cv = (cv > 1.0) ? 1.0 : cv;
 
                     std::complex<double> c_a = EXACT_IN_SLAB_COSINE_SOLVE(cv), c_b;
-                    ok = std::abs(c_a) > 0.0 && ct_slab_real_inv;
+                    ok = std::abs(c_a) > 0.0;
                     if (!ok)
                         break;
 
@@ -4486,7 +4488,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
         // Replace the FBS-relative interface result ray_mesh_interact wrote with the VBS-equivalent at theta_t
         // - interface coefficients (interface_gain folded inside interact_with), incoming basis from dir_in,
         //   outgoing basis from the corrected continuation. In-medium magnitude/phase stay deferred to close_med.
-        // - geom: 0 = reflect at VBS, 2 = Snell refract at VBS, 3 = exit into air. A face closed at the VBS angle hands on dir_prev.
+        // - geom: 0 = reflect at VBS, 2 = Snell refract at VBS, 3 = exit into air. A face closed at the VBS angle hands on the leak's direction.
         auto REPLACE_BY_VBS = [&](int Ma, int Mb, int itype, int geom) -> double
         {
             // The direction an exit into air owes, where it can be formed.
@@ -4504,9 +4506,9 @@ void quadriga_lib::ray_state_update(int interaction_type,
             // Where the recovery declines the Snell ratio and the far cosine are the real-angle
             // ones, which is the wave for a lossless medium and the map a glued exit applies for
             // a lossy one. A leg with no refracted direction keeps what ray_mesh_interact wrote,
-            // and a face that is closed hands on dir_prev, which the caller writes.
+            // and a face that is closed hands on the direction of the leak, below.
             auto EXIT_DIRECTION = [&](const Material &A, const Material &B, bool real_inv, const std::complex<double> &ct_a,
-                                      double snell_ab, const std::complex<double> &cos_b, bool tir_ab) -> bool
+                                      double snell_ab, const std::complex<double> &cos_b, bool tir_ab, bool leak = false) -> bool
             {
                 if (!refracted || tir_ab || !(std::real(cos_b) > 0.0))
                     return false;
@@ -4519,7 +4521,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
                     p_path_dirN[ii] = (dtype)dir_next[0],
                     p_path_dirN[ii + n_rayN] = (dtype)dir_next[1],
                     p_path_dirN[ii + 2 * n_rayN] = (dtype)dir_next[2];
-                if (real_inv) // out of a lossy medium: the segment follows
+                if (real_inv || leak) // out of a lossy medium, and a leak out of any: the segment follows
                     RELAUNCH(A, B, itype);
                 return true;
             };
@@ -4563,6 +4565,29 @@ void quadriga_lib::ray_state_update(int interaction_type,
                                   false, use_exact_ct ? &ct_in : nullptr, !refracted);
             typeR[5] = tir; // TIR re-evaluated at the corrected VBS angle (overrides the geometric-angle verdict)
 
+            // The direction a closed face hands on.
+            //
+            // What crosses a closed face is a leak, and a leak carries the transverse wavenumber
+            // and nothing else of the wave in this medium. Where that wavenumber has a direction
+            // in air, an invariant below one, that is the direction: for a wave that came from
+            // air through parallel faces the one it arrived in, at every frequency, which is what
+            // the same layer as a sheet hands the wall behind it. It is the direction an exit
+            // into air writes, so it is written by that construction with air as the far medium.
+            // Where it has none - an invariant of one or more, a leg with no refracted
+            // direction - the face hands on the direction the wave has.
+            auto LEAK_DIRECTION = [&]()
+            {
+                dir_next[0] = dir_prev[0], dir_next[1] = dir_prev[1], dir_next[2] = dir_prev[2];
+                if (Mb == 0)
+                    return;
+                std::complex<double> cos_air;
+                double snell_air = 1.0;
+                bool tir_air = false;
+                MAT(Ma).interact_with(MAT(0), itype, theta_t, fGHz, nullptr, nullptr, &cos_air, nullptr, &snell_air, &tir_air,
+                                      false, use_exact_ct ? &ct_in : nullptr, false);
+                EXIT_DIRECTION(MAT(Ma), MAT(0), face_real_inv, ct_in, snell_air, cos_air, tir_air, true);
+            };
+
             // Transition into buffer
             if (!use_vbs && mtl_buffer && Mb == mtl_buffer && !SAME(mtl_buffer, M1))
             {
@@ -4591,6 +4616,14 @@ void quadriga_lib::ray_state_update(int interaction_type,
                     // other leg: the segment carries the relaunch offset of the event before it.
                     if (geom == 3)
                         EXIT_DIRECTION(A, B, false, ct_in, snell, cos_t2, tir);
+                    else if (geom == 2 && tir) // closed: the segment is the wave in A, the leak is not
+                    {
+                        LEAK_DIRECTION();
+                        if (p_path_dirN)
+                            p_path_dirN[ii] = (dtype)dir_next[0],
+                            p_path_dirN[ii + n_rayN] = (dtype)dir_next[1],
+                            p_path_dirN[ii + 2 * n_rayN] = (dtype)dir_next[2];
+                    }
                     return dist_fbs_dest;
                 }
             }
@@ -4618,8 +4651,8 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 if (face_real_inv) // out of a lossy solid: the segment in the next medium follows
                     RELAUNCH(MAT(Ma), MAT(Mb), itype);
             }
-            else if (tir) // closed at this angle: no Snell direction, any leak travels undeviated
-                dir_next[0] = dir_prev[0], dir_next[1] = dir_prev[1], dir_next[2] = dir_prev[2];
+            else if (tir) // closed at this angle: no Snell direction, the leak keeps its transverse wavenumber
+                LEAK_DIRECTION();
             else if (geom == 3) // exit into air: the direction of dir_prev refracted, where it is exact
                 EXIT_DIRECTION(MAT(Ma), MAT(Mb), face_real_inv, ct_in, snell, cos_t2, tir);
 
