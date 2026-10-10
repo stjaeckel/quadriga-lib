@@ -15048,3 +15048,509 @@ TEST_CASE("Leak direction - a closed face hands the wall behind a traced layer t
     for (const std::string &q : rowsS)
         QD_DIAG("%s", q.c_str());
 }
+
+TEST_CASE("Bonded mass - the plate at any depth where the slopes agree")
+{
+#ifdef _OPENMP
+    // One ray per call, many thousand calls: a thread team per call costs twenty times the work
+    struct OneThread
+    {
+        int n = omp_get_max_threads();
+        OneThread() { omp_set_num_threads(1); }
+        ~OneThread() { omp_set_num_threads(n); }
+    } one_thread;
+#endif
+    // Plate depth. A leg learns what it is bonded to from the previous-medium word and the buffer
+    // word, which name one body behind the ray, or two where that body is a sheet inside the
+    // current medium. Bodies of one slope m are, at every frequency, one thicker body of one of
+    // them, so the thickness code carries that equivalent thickness and the plate is exact at
+    // any depth where the slopes agree. A body of another slope that the words do not name is
+    // left out, so a stack of mixed slopes is exact from the side on which the bodies that have
+    // to be folded agree, and pays more from the other; those rows are recorded, as are a
+    // deferred medium, which displaces the code, and an equivalent thickness above the 100 m the
+    // code reaches. A mass-law sheet with its mass-law host's permittivity cuts the host leg like
+    // any other sheet. Event by event through ray_triangle_intersect, ray_mesh_interact and
+    // ray_state_update, scalar, both tracers. The mass an event paid is its gain against the same event on a palette whose mass
+    // arguments are taken to nothing (every fRef times 1e12), which leaves every face, tf and state word in
+    // place. The reference is diag_bonded_TL over the bodies in the order they are crossed, and
+    // per event the increment the plate takes there.
+    //
+    // A. Every stack, both directions, far above and near the knee, to 75 deg
+    // S. The same, worst over tracers and angles
+    // B. A bounce: the forward traversal closed by a reflection, and the way back
+    // C. A band: each frequency alone, and whether its state words are the base frequency's
+    const double gap = 1.0e-5;
+    typedef std::unordered_map<std::string, std::vector<double>> Pal;
+    auto dBz = [](std::complex<double> z)
+    { return (std::norm(z) > 0.0) ? 10.0 * std::log10(std::norm(z)) : -999.0; };
+    auto unit = [](arma::mat d) -> arma::mat
+    {
+        d /= std::sqrt(d(0, 0) * d(0, 0) + d(0, 1) * d(0, 1) + d(0, 2) * d(0, 2));
+        return d;
+    };
+
+    struct Ev
+    {
+        arma::mat origN, destN, path_dirN, xpr, fbs;
+        arma::Col<short> prev, cur, buf;
+        arma::vec accg, accr;
+        uint8_t ot = 0, rt = 0;
+        unsigned nh = 0;
+    };
+    auto traced = [&](const Pal &pal, const arma::mat &mesh, const arma::uvec &mtl_ind, int itype, double f_hz, const arma::mat &orig,
+                      const arma::mat &dest, const Ev *in) -> Ev
+    {
+        arma::mat fbs, sbs, sbsN, nv;
+        arma::u32_vec nh, fi, si;
+        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, &nh, &fi, &si);
+        Ev E;
+        arma::vec gain, fang;
+        std::vector<uint8_t> ot, rt;
+        quadriga_lib::ray_mesh_interact(itype, f_hz, &orig, &dest, &mesh, &mtl_ind, &pal, &fi, &si, (arma::mat *)nullptr,
+                                        (arma::mat *)nullptr, &E.origN, &E.destN, &E.fbs, &sbsN, &gain, &E.xpr,
+                                        (arma::mat *)nullptr, (arma::mat *)nullptr, &fang, (arma::vec *)nullptr,
+                                        (arma::vec *)nullptr, &nv, &ot, &E.path_dirN, false, (arma::u32_vec *)nullptr);
+        arma::Col<short> mf(1), ms(1);
+        mf(0) = fi(0) ? (short)mtl_ind(fi(0) - 1) : (short)0, ms(0) = si(0) ? (short)mtl_ind(si(0) - 1) : (short)0;
+        quadriga_lib::ray_state_update(itype, f_hz, &orig, &dest, &E.fbs, &sbsN, &nh, &fang, &nv, &ot, &pal, &mf, &ms,
+                                       in ? &in->prev : nullptr, in ? &in->cur : nullptr, in ? &in->buf : nullptr,
+                                       in ? &in->path_dirN : nullptr, in ? &in->accg : nullptr, in ? &in->accr : nullptr,
+                                       &E.prev, &E.cur, &E.buf, &gain, &E.xpr, &E.path_dirN, &E.accg, &E.accr, &rt,
+                                       (arma::u32_vec *)nullptr, 1.5, &E.origN, &E.destN);
+        E.ot = ot[0], E.rt = rt[0], E.nh = nh(0);
+        return E;
+    };
+    auto face = [](double x, bool flip) -> arma::mat
+    {
+        arma::mat m = diag_quad_x(200.0, x);
+        if (flip)
+        {
+            m.row(0) = arma::rowvec{x, -200.0, -200.0, x, 200.0, -200.0, x, -200.0, 200.0};
+            m.row(1) = arma::rowvec{x, 200.0, -200.0, x, 200.0, 200.0, x, -200.0, 200.0};
+        }
+        return m;
+    };
+
+    // A stack along x as tokens: O / C open and close a solid, S is a sheet, N / n open and close
+    // an object nested in the solid the ray is in, g advances by d. Faces with no advance between
+    // them are co-located, a gap apart, and are one event.
+    struct Tok
+    {
+        char k;
+        int mat;
+        double d;
+    };
+    auto O = [](int m) { return Tok{'O', m, 0.0}; };
+    auto C = [](int m) { return Tok{'C', m, 0.0}; };
+    auto S = [](int m) { return Tok{'S', m, 0.0}; };
+    auto N = [](int m) { return Tok{'N', m, 0.0}; };
+    auto n = [](int m) { return Tok{'n', m, 0.0}; };
+    auto G = [](double d) { return Tok{'g', 0, d}; };
+    auto reversed = [](std::vector<Tok> t)
+    {
+        std::reverse(t.begin(), t.end());
+        for (Tok &q : t)
+            q.k = (q.k == 'O') ? 'C' : ((q.k == 'C') ? 'O' : ((q.k == 'N') ? 'n' : ((q.k == 'n') ? 'N' : q.k)));
+        return t;
+    };
+    auto build = [&](const std::vector<Tok> &t, arma::uvec &mtl_ind, size_t &n_ev) -> arma::mat
+    {
+        arma::mat mesh;
+        std::vector<int> mats;
+        double x = 0.0;
+        bool last_face = false;
+        n_ev = 0;
+        for (const Tok &q : t)
+        {
+            if (q.k == 'g')
+            {
+                x += q.d, last_face = false;
+                continue;
+            }
+            if (last_face)
+                x += gap;
+            else
+                ++n_ev;
+            arma::mat f = face(x, q.k == 'C' || q.k == 'n');
+            mesh = mats.empty() ? f : arma::join_cols(mesh, f);
+            mats.push_back(q.mat), last_face = true;
+        }
+        mtl_ind.set_size(2 * mats.size());
+        for (size_t k = 0; k < mats.size(); ++k)
+            mtl_ind(2 * k) = (arma::uword)mats[k], mtl_ind(2 * k + 1) = (arma::uword)mats[k];
+        return mesh;
+    };
+
+    // The palette. Solids and sheets of the acoustic mapping: rigid, lossless, a tf leak and the
+    // mass column. X0 = ((f / fRef) d)^(m / 20), so with fRef 0.001 at 1 GHz a 100 mm body of
+    // m 20 has X0 100. heavy: that; light: fRef 0.05, the same body at X0 2; twin: every fRef
+    // times 1e12, so no body has a mass term and the bodies keep their ratios.
+    const double fR = 0.001;
+    const int A20 = 1, B20 = 2, C20 = 3, A30 = 4, B30 = 5, C30 = 6, PL = 7, BR20 = 8, BR30 = 9, S20 = 10, S30 = 11, L20 = 12, L30 = 13,
+              HS = 14, D20 = 15, T20 = 16, T30 = 17, E20 = 18, F20 = 19, G20 = 20, HS30 = 21;
+    const std::vector<LumpMtl> base = {
+        {2.401e-9, 0.0, 0.0, 0.0, 0.10, 0.0, 0.0, 0.0, 0.0, 20.0, fR},    // 1  A20
+        {2.1609e-8, 0.0, 0.0, 0.0, 0.20, 0.0, 0.0, 0.0, 0.0, 20.0, fR},   // 2  B20
+        {6.0e-9, 0.0, 0.0, 0.0, 0.15, 0.0, 0.0, 0.0, 0.0, 20.0, fR},      // 3  C20
+        {2.401e-9, 0.0, 0.0, 0.0, 0.10, 0.0, 0.0, 0.0, 0.0, 30.0, fR},    // 4  A30
+        {2.1609e-8, 0.0, 0.0, 0.0, 0.20, 0.0, 0.0, 0.0, 0.0, 30.0, fR},   // 5  B30
+        {6.0e-9, 0.0, 0.0, 0.0, 0.15, 0.0, 0.0, 0.0, 0.0, 30.0, fR},      // 6  C30
+        {1.2e-8, 0.0, 0.0, 0.0, 0.20, 0.0, 0.0, 0.0, 0.0, 20.0, fR},      // 7  PL    plaster, solid
+        {4.0e-9, 0.0, 0.0, 0.0, 0.10, 0.0, 0.0, 0.0, 0.0, 20.0, fR},      // 8  BR20  brick, solid
+        {4.0e-9, 0.0, 0.0, 0.0, 0.10, 0.0, 0.0, 0.0, 0.0, 30.0, fR},      // 9  BR30
+        {1.0e-8, 0.0, 0.012, 0.0, 0.20, 0.0, 0.0, 0.0, 0.0, 20.0, fR},    // 10 S20   sheet 12 mm
+        {1.5e-9, 0.0, 0.012, 0.0, 0.10, 0.0, 0.0, 0.0, 0.0, 30.0, fR},    // 11 S30   sheet 12 mm
+        {5.0e-9, 0.0, 0.015, 0.0, 0.15, 0.0, 0.0, 0.0, 0.0, 20.0, fR},    // 12 L20   lining 15 mm
+        {5.0e-9, 0.0, 0.015, 0.0, 0.15, 0.0, 0.0, 0.0, 0.0, 30.0, fR},    // 13 L30   lining 15 mm
+        {2.1609e-8, 0.0, 0.008, 0.0, 0.20, 0.0, 0.0, 0.0, 0.0, 20.0, fR}, // 14 HS    sheet 8 mm with B20's permittivity: merged
+        {3.0e-9, 0.0, 0.0, 0.0, 0.10, 0.0, 0.0, 0.0, 0.0, 20.0, fR},      // 15 D20   an object nested in a wall
+        {7.0e-9, 0.0, 0.008, 0.0, 0.15, 0.0, 0.0, 0.0, 0.0, 20.0, fR},    // 16 T20   second sheet of a stack, 8 mm
+        {7.0e-9, 0.0, 0.008, 0.0, 0.15, 0.0, 0.0, 0.0, 0.0, 30.0, fR},    // 17 T30
+        {8.0e-9, 0.0, 0.0, 0.0, 0.10, 0.0, 0.0, 0.0, 0.0, 20.0, 0.4 * fR}, // 18 E20   2.5 times the surface mass per thickness
+        {9.0e-9, 0.0, 0.0, 0.0, 0.10, 0.0, 0.0, 0.0, 0.0, 20.0, 0.01 * fR}, // 19 F20   a hundred times
+        {1.1e-8, 0.0, 0.0, 0.0, 0.20, 0.0, 0.0, 0.0, 0.0, 20.0, 100.0 * fR}, // 20 G20   a hundredth
+        {2.1609e-8, 0.0, 0.008, 0.0, 0.20, 0.0, 0.0, 0.0, 0.0, 30.0, fR}, // 21 HS30  sheet 8 mm with B30's permittivity: merged
+    };
+    auto pal_of = [&](double fRef_scale, bool twin) -> Pal
+    {
+        std::vector<LumpMtl> v = base;
+        for (LumpMtl &M : v)
+            M.fRef = twin ? M.fRef * 1.0e12 : M.fRef * fRef_scale; // the twin keeps the ratios between the bodies
+        return lump_palette(v);
+    };
+    const Pal p_twin = pal_of(1.0, true);
+    struct Regime
+    {
+        const char *name;
+        double scale;
+        Pal pal;
+    };
+    const std::vector<Regime> regimes = {{"heavy", 1.0, pal_of(1.0, false)}, {"light", 50.0, pal_of(50.0, false)}};
+
+    // The bodies of a stack in the order they are crossed, each with the event that pays it
+    struct Body
+    {
+        DiagMass M;
+        size_t ev;
+        bool sheet;
+    };
+    auto bodies = [&](const std::vector<Tok> &t, double scale) -> std::vector<Body>
+    {
+        std::vector<Body> out;
+        auto mass = [&](int mat, double d)
+        { return DiagMass{base[(size_t)mat - 1].m, base[(size_t)mat - 1].fRef * scale, d}; };
+        int cur = 0, pend = 0;
+        double leg = 0.0;
+        size_t ev = 0;
+        bool last_face = false, any = false;
+        for (const Tok &q : t)
+        {
+            if (q.k == 'g')
+            {
+                if (cur)
+                    leg += q.d;
+                last_face = false;
+                continue;
+            }
+            if (!last_face && any)
+                ++ev;
+            last_face = true, any = true;
+            if (q.k == 'O')
+            {
+                if (cur)
+                    pend = q.mat; // overlapping: deferred until the solid the ray is in is left
+                else
+                    cur = q.mat, leg = 0.0;
+            }
+            else if (q.k == 'C')
+            {
+                if (q.mat != cur)
+                    continue;
+                if (leg > 0.0)
+                    out.push_back({mass(cur, leg), ev, false});
+                cur = pend, pend = 0, leg = 0.0;
+            }
+            else if (q.k == 'S')
+            {
+                if (cur && leg > 0.0)
+                    out.push_back({mass(cur, leg), ev, false}), leg = 0.0;
+                out.push_back({mass(q.mat, base[(size_t)q.mat - 1].thk), ev, true});
+            }
+        }
+        return out;
+    };
+
+    // The events of one path: types[k] is the interaction type of event k
+    auto chain = [&](const Pal &pal, const arma::mat &mesh, const arma::uvec &mi, const std::vector<int> &types, double thd, double f_hz) -> std::vector<Ev>
+    {
+        std::vector<Ev> out;
+        arma::mat o, d;
+        diag_ray_at(thd, o, d);
+        for (size_t q = 0; q < types.size(); ++q)
+        {
+            Ev E = traced(pal, mesh, mi, types[q], f_hz, o, d, q ? &out[q - 1] : nullptr);
+            out.push_back(E);
+            if (E.nh == 0 || E.rt == 0)
+                break;
+            arma::mat s = unit(E.destN - E.origN);
+            o = E.origN, d = E.origN + (1.2 / std::abs(s(0, 0))) * s;
+        }
+        return out;
+    };
+    auto words = [](const Ev &E)
+    {
+        char b[32];
+        std::snprintf(b, sizeof(b), "%04x.%04x.%04x", (unsigned)(unsigned short)E.prev(0), (unsigned)(unsigned short)E.cur(0),
+                      (unsigned)(unsigned short)E.buf(0));
+        return std::string(b);
+    };
+    // Mass paid per event, dB: the twin over the run
+    auto paid_of = [&](const std::vector<Ev> &r, const std::vector<Ev> &t, std::vector<double> &p) -> bool
+    {
+        p.assign(r.size(), 0.0);
+        if (r.size() != t.size())
+            return false;
+        for (size_t q = 0; q < r.size(); ++q)
+        {
+            if (r[q].nh == 0 || r[q].rt == 0 || t[q].nh == 0 || t[q].rt == 0)
+                return false;
+            if (r[q].prev(0) != t[q].prev(0) || r[q].cur(0) != t[q].cur(0) || r[q].buf(0) != t[q].buf(0))
+                return false;
+            p[q] = dBz(cpx(t[q].xpr, 0, 0)) - dBz(cpx(r[q].xpr, 0, 0));
+        }
+        return true;
+    };
+    auto X_of = [](const DiagMass &B, double f_hz)
+    {
+        double arg = (f_hz * 1e-9 / B.fRef) * B.thk;
+        return (B.m > 0.0 && arg > 0.0) ? std::pow(arg, 0.05 * B.m) : 0.0;
+    };
+    (void)X_of;
+
+    struct Stack
+    {
+        const char *name;
+        std::vector<Tok> t;
+        int exact; // bit 0: the plate as named, bit 1: from the other side; clear: recorded
+    };
+    const std::vector<Stack> stacks = {
+        {"A20 100 | B20 100 | C20 100", {O(A20), G(0.1), C(A20), O(B20), G(0.1), C(B20), O(C20), G(0.1), C(C20)}, 3},
+        {"A20 30 | B20 100 | C20 200", {O(A20), G(0.03), C(A20), O(B20), G(0.1), C(B20), O(C20), G(0.2), C(C20)}, 3},
+        {"A20 100 | B20 13 | C20 100", {O(A20), G(0.1), C(A20), O(B20), G(0.013), C(B20), O(C20), G(0.1), C(C20)}, 3},
+        {"A30 60 | B30 100 | C30 30", {O(A30), G(0.06), C(A30), O(B30), G(0.1), C(B30), O(C30), G(0.03), C(C30)}, 3},
+        {"A20 100 | B20 100 | C30 50", {O(A20), G(0.1), C(A20), O(B20), G(0.1), C(B20), O(C30), G(0.05), C(C30)}, 1},
+        {"A20 100 | B30 50 | C20 100", {O(A20), G(0.1), C(A20), O(B30), G(0.05), C(B30), O(C20), G(0.1), C(C20)}, 0},
+        {"A20 50 | B20 50 | C20 50 | A20 50", {O(A20), G(0.05), C(A20), O(B20), G(0.05), C(B20), O(C20), G(0.05), C(C20), O(A20), G(0.05), C(A20)}, 3},
+        {"plaster 15 | brick20 115 | plaster 15", {O(PL), G(0.015), C(PL), O(BR20), G(0.115), C(BR20), O(PL), G(0.015), C(PL)}, 3},
+        {"plaster 15 | brick30 115 | plaster 15", {O(PL), G(0.015), C(PL), O(BR30), G(0.115), C(BR30), O(PL), G(0.015), C(PL)}, 0},
+        {"lining L20 > A20 100 | B20 100", {S(L20), O(A20), G(0.1), C(A20), O(B20), G(0.1), C(B20)}, 3},
+        {"lining L20 > B20 60 | S20 | B20 40", {S(L20), O(B20), G(0.06), S(S20), G(0.04), C(B20)}, 3},
+        {"lining L20 > B20 60 | S30 | B20 40", {S(L20), O(B20), G(0.06), S(S30), G(0.04), C(B20)}, 3},
+        {"lining L30 > B20 60 | S20 | B20 40", {S(L30), O(B20), G(0.06), S(S20), G(0.04), C(B20)}, 2},
+        {"A20 100 | B20 60 | S20 | B20 40", {O(A20), G(0.1), C(A20), O(B20), G(0.06), S(S20), G(0.04), C(B20)}, 3},
+        {"B20 60 | S20 T20 | B20 40", {O(B20), G(0.06), S(S20), S(T20), G(0.04), C(B20)}, 3},
+        {"B20 60 | S20 T30 | B20 40", {O(B20), G(0.06), S(S20), S(T30), G(0.04), C(B20)}, 1},
+        {"B20 60 | S30 T20 | B20 40", {O(B20), G(0.06), S(S30), S(T20), G(0.04), C(B20)}, 2},
+        {"deferred: A20 100 | C20 100 [D20 100] C20 100", {O(A20), G(0.1), C(A20), O(C20), G(0.1), N(D20), G(0.1), n(D20), G(0.1), C(C20)}, 2},
+        {"deferred: lining L20 > A20 100 [B20 100 A20 100] B20 100", {S(L20), O(A20), G(0.1), O(B20), G(0.1), C(A20), G(0.1), C(B20)}, 2},
+        {"merged: B20 60 | HS 8 | B20 40", {O(B20), G(0.06), S(HS), G(0.04), C(B20)}, 3},
+        {"merged: A20 100 | B20 60 | HS 8 | B20 40", {O(A20), G(0.1), C(A20), O(B20), G(0.06), S(HS), G(0.04), C(B20)}, 3},
+        {"merged: B30 60 | HS30 8 | B30 40", {O(B30), G(0.06), S(HS30), G(0.04), C(B30)}, 3},
+        {"fRef: A20 100 | E20 60 | C20 100", {O(A20), G(0.1), C(A20), O(E20), G(0.06), C(E20), O(C20), G(0.1), C(C20)}, 3},
+        {"fRef: F20 100 | G20 10 | C20 100", {O(F20), G(0.1), C(F20), O(G20), G(0.01), C(G20), O(C20), G(0.1), C(C20)}, 2},
+    };
+    const std::vector<double> angles = {0.0, 30.0, 60.0, 75.0};
+    const size_t NE = 6;
+
+    // ------------------------------------------------------------------------------------------
+    // A. Every stack
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: plate depth A. Bonded mass-law stacks through the intersector, scalar, transmit events only. dir: f as\n");
+    QD_DIAG("# named, r from the other side. plate: diag_bonded_TL of every body; sum: the bodies' own terms added in dB;\n");
+    QD_DIAG("# paid: the mass the events paid; over: paid - plate; rest: the chain without its mass. p0..: paid per event; s0..: what the plate takes at that\n");
+    QD_DIAG("# event, its increment over the bodies crossed before; w0..: prev.cur.buf written by that event. -: no event\n");
+    QD_DIAG("stack,dir,regime,tracer,theta,plate,sum,paid,over,rest");
+    for (size_t q = 0; q < NE; ++q)
+        QD_DIAG(",p%d", (int)q);
+    for (size_t q = 0; q < NE; ++q)
+        QD_DIAG(",s%d", (int)q);
+    for (size_t q = 0; q < NE; ++q)
+        QD_DIAG(",w%d", (int)q);
+    QD_DIAG("\n");
+    std::vector<std::string> rowsS;
+    for (const Stack &St : stacks)
+        for (int rev = 0; rev < 2; ++rev)
+        {
+            const std::vector<Tok> tk = rev ? reversed(St.t) : St.t;
+            arma::uvec mi;
+            size_t n_ev = 0;
+            arma::mat mesh = build(tk, mi, n_ev);
+            for (const Regime &Rg : regimes)
+            {
+                const std::vector<Body> bd = bodies(tk, Rg.scale);
+                double w_max = -1.0e9, w_min = 1.0e9, at0 = 0.0, w_sum = 0.0;
+                for (int tr : {4, 5})
+                    for (double thd : angles)
+                    {
+                        const double ct = std::cos(thd * QPI / 180.0);
+                        std::vector<Ev> r = chain(Rg.pal, mesh, mi, std::vector<int>(n_ev, tr), thd, FRQ);
+                        std::vector<Ev> t = chain(p_twin, mesh, mi, std::vector<int>(n_ev, tr), thd, FRQ);
+                        std::vector<double> p;
+                        const bool ok = paid_of(r, t, p) && r.size() == n_ev && (r.back().cur(0) & (short)0x3FFF) == 0;
+                        INFO("A, " << St.name << ", dir " << rev << ", " << Rg.name << ", tracer " << tr << ", theta " << thd);
+                        CHECK(ok);
+                        std::vector<DiagMass> all;
+                        std::vector<double> should(NE, 0.0);
+                        double plate = 0.0, sum = 0.0, paid = 0.0;
+                        for (const Body &B : bd)
+                        {
+                            all.push_back(B.M);
+                            const double pl = diag_bonded_TL(all, FRQ, ct);
+                            if (B.ev < NE)
+                                should[B.ev] += pl - plate;
+                            plate = pl, sum += diag_bonded_TL({B.M}, FRQ, ct);
+                        }
+                        for (double v : p)
+                            paid += v;
+                        double rest = 0.0; // the chain without its mass, dB
+                        for (size_t q = 0; ok && q < t.size(); ++q)
+                            rest += dBz(cpx(t[q].xpr, 0, 0));
+                        QD_DIAG("%s,%s,%s,%d,%.0f,%.4f,%.4f,%.4f,%+.4f,%.6f", St.name, rev ? "r" : "f", Rg.name, tr, thd, plate, sum, ok ? paid : -999.0,
+                                ok ? paid - plate : -999.0, ok ? rest : -999.0);
+                        for (size_t q = 0; q < NE; ++q)
+                            (ok && q < p.size()) ? QD_DIAG(",%.4f", p[q]) : QD_DIAG(",-");
+                        for (size_t q = 0; q < NE; ++q)
+                            (q < n_ev) ? QD_DIAG(",%.4f", should[q]) : QD_DIAG(",-");
+                        for (size_t q = 0; q < NE; ++q)
+                            (q < r.size()) ? QD_DIAG(",%s", words(r[q]).c_str()) : QD_DIAG(",-");
+                        QD_DIAG("\n");
+                        if (ok && ((St.exact >> rev) & 1)) // the plate, to the code's quantization
+                            CHECK(std::abs(paid - plate) < 0.01);
+                        if (ok)
+                        {
+                            w_max = std::max(w_max, paid - plate), w_min = std::min(w_min, paid - plate);
+                            if (thd == 0.0 && tr == 4)
+                                at0 = paid - plate, w_sum = sum - plate;
+                        }
+                    }
+                char b[256];
+                std::snprintf(b, sizeof(b), "%s,%s,%s,%+.4f,%+.4f,%+.4f,%+.4f\n", St.name, rev ? "r" : "f", Rg.name, at0, w_max, w_min, w_sum);
+                rowsS.push_back(b);
+            }
+        }
+
+    QD_DIAG("\n# diag: plate depth S. over0: paid - plate at normal incidence; max, min: its range over both tracers and 0 to\n");
+    QD_DIAG("# 75 deg; sum0: what adding the bodies in dB would be over the plate at normal incidence\n");
+    QD_DIAG("stack,dir,regime,over0,max,min,sum0\n");
+    for (const std::string &s : rowsS)
+        QD_DIAG("%s", s.c_str());
+
+    // ------------------------------------------------------------------------------------------
+    // B. A bounce
+    // ------------------------------------------------------------------------------------------
+    // Forward to event refl, reflected there, and back out through the front. Each traversal
+    // pays the plate of the bodies it crossed, by the settled rule: conv is twice that.
+    QD_DIAG("\n# diag: plate depth B, a bounce, heavy. refl: the event that reflects, counted from 0; fwd, back: the mass paid up\n");
+    QD_DIAG("# to and including the reflection, and after it; plate: the bodies crossed up to the reflection as one plate,\n");
+    QD_DIAG("# which each traversal owes. p0..: paid per event; w0..: prev.cur.buf written by that event\n");
+    QD_DIAG("stack,dir,refl,tracer,theta,plate,fwd,back,fwd_over,back_over");
+    const size_t NB = 8;
+    for (size_t q = 0; q < NB; ++q)
+        QD_DIAG(",p%d", (int)q);
+    for (size_t q = 0; q < NB; ++q)
+        QD_DIAG(",w%d", (int)q);
+    QD_DIAG("\n");
+    struct Bounce
+    {
+        size_t stack;
+        int rev;
+        size_t refl;
+    };
+    const std::vector<Bounce> bounces = {{0, 0, 3}, {0, 0, 2}, {2, 0, 3}, {4, 0, 3}, {4, 1, 3}, {7, 0, 3}, {9, 0, 2}, {9, 1, 2}, {10, 0, 2}, {10, 1, 2}, {13, 0, 3}};
+    for (const Bounce &Bn : bounces)
+    {
+        const Stack &St = stacks[Bn.stack];
+        const std::vector<Tok> tk = Bn.rev ? reversed(St.t) : St.t;
+        arma::uvec mi;
+        size_t n_ev = 0;
+        arma::mat mesh = build(tk, mi, n_ev);
+        const std::vector<Body> bd = bodies(tk, 1.0);
+        for (int tr : {4, 5})
+            for (double thd : {0.0, 60.0})
+            {
+                const double ct = std::cos(thd * QPI / 180.0);
+                std::vector<int> types(2 * Bn.refl + 1, tr);
+                types[Bn.refl] = 3;
+                std::vector<Ev> r = chain(regimes[0].pal, mesh, mi, types, thd, FRQ), t = chain(p_twin, mesh, mi, types, thd, FRQ);
+                std::vector<double> p;
+                const bool ok = paid_of(r, t, p) && r.size() == types.size();
+                INFO("B, " << St.name << ", dir " << Bn.rev << ", refl " << Bn.refl << ", tracer " << tr << ", theta " << thd);
+                CHECK(ok);
+                std::vector<DiagMass> all;
+                for (const Body &B : bd) // a sheet the ray is reflected off is not crossed
+                    if (B.ev < Bn.refl || (B.ev == Bn.refl && !B.sheet))
+                        all.push_back(B.M);
+                const double plate = diag_bonded_TL(all, FRQ, ct);
+                double fwd = 0.0, back = 0.0;
+                for (size_t q = 0; q < p.size(); ++q)
+                    (q <= Bn.refl ? fwd : back) += p[q];
+                if (ok && ((St.exact >> Bn.rev) & 1)) // each traversal pays the plate of the bodies it crossed
+                    CHECK(std::abs(fwd - plate) < 0.01);
+                if (ok && ((St.exact >> (1 - Bn.rev)) & 1))
+                    CHECK(std::abs(back - plate) < 0.01);
+                QD_DIAG("%s,%s,%d,%d,%.0f,%.4f,%.4f,%.4f,%+.4f,%+.4f", St.name, Bn.rev ? "r" : "f", (int)Bn.refl, tr, thd, plate, ok ? fwd : -999.0,
+                        ok ? back : -999.0, ok ? fwd - plate : -999.0, ok ? back - plate : -999.0);
+                for (size_t q = 0; q < NB; ++q)
+                    (ok && q < p.size()) ? QD_DIAG(",%.4f", p[q]) : QD_DIAG(",-");
+                for (size_t q = 0; q < NB; ++q)
+                    (q < r.size()) ? QD_DIAG(",%s", words(r[q]).c_str()) : QD_DIAG(",-");
+                QD_DIAG("\n");
+            }
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // C. A band
+    // ------------------------------------------------------------------------------------------
+    // The state words of a run are the base frequency's. Each frequency is run alone here, and
+    // its words are compared with those of 1 GHz: whatever differs could not be shared.
+    QD_DIAG("\n# diag: plate depth C, a band, heavy at 1 GHz, tracer 4. Each frequency run alone. same: 1 where every state word\n");
+    QD_DIAG("# of the chain is the one 1 GHz writes\n");
+    QD_DIAG("stack,dir,f_GHz,theta,plate,paid,over,same\n");
+    for (size_t is : {(size_t)0, (size_t)1, (size_t)4, (size_t)5, (size_t)8, (size_t)10, (size_t)12, (size_t)14})
+        for (int rev = 0; rev < 2; ++rev)
+        {
+            const Stack &St = stacks[is];
+            const std::vector<Tok> tk = rev ? reversed(St.t) : St.t;
+            arma::uvec mi;
+            size_t n_ev = 0;
+            arma::mat mesh = build(tk, mi, n_ev);
+            const std::vector<Body> bd = bodies(tk, 1.0);
+            for (double thd : {0.0, 60.0})
+            {
+                const double ct = std::cos(thd * QPI / 180.0);
+                std::vector<Ev> r0 = chain(regimes[0].pal, mesh, mi, std::vector<int>(n_ev, 4), thd, FRQ);
+                for (double fG : {0.25, 1.0, 4.0})
+                {
+                    std::vector<Ev> r = chain(regimes[0].pal, mesh, mi, std::vector<int>(n_ev, 4), thd, fG * 1.0e9);
+                    std::vector<Ev> t = chain(p_twin, mesh, mi, std::vector<int>(n_ev, 4), thd, fG * 1.0e9);
+                    std::vector<double> p;
+                    const bool ok = paid_of(r, t, p) && r.size() == n_ev && r0.size() == n_ev;
+                    INFO("C, " << St.name << ", dir " << rev << ", f " << fG << ", theta " << thd);
+                    CHECK(ok);
+                    std::vector<DiagMass> all;
+                    for (const Body &B : bd)
+                        all.push_back(B.M);
+                    const double plate = diag_bonded_TL(all, fG * 1.0e9, ct);
+                    double paid = 0.0;
+                    bool same = ok;
+                    for (size_t q = 0; ok && q < n_ev; ++q)
+                        paid += p[q], same = same && r[q].prev(0) == r0[q].prev(0) && r[q].cur(0) == r0[q].cur(0) && r[q].buf(0) == r0[q].buf(0);
+                    QD_DIAG("%s,%s,%.2f,%.0f,%.4f,%.4f,%+.4f,%d\n", St.name, rev ? "r" : "f", fG, thd, plate, ok ? paid : -999.0, ok ? paid - plate : -999.0,
+                            (int)same);
+                    CHECK(same); // the words are shared by every frequency of a run
+                    if (ok && ((St.exact >> rev) & 1))
+                        CHECK(std::abs(paid - plate) < 0.01);
+                }
+            }
+        }
+}

@@ -3914,8 +3914,9 @@ void quadriga_lib::ray_state_update(int interaction_type,
         // of 0.044 %. For a traced solid in the previous-medium word it is that solid's leg. A
         // sheet's own thickness is a column, so for a sheet the code is zero, or, where the sheet
         // lies inside the current medium, the leg of that medium in front of the sheet, which the
-        // leg behind it is bonded to as well. The thickness is geometric, so one code serves every
-        // frequency. It is written where a mass-law body is crossed into another medium, kept
+        // leg behind it is bonded to as well. Bonded bodies crossed before that leg which have its
+        // slope m are in the thickness too, as what they are worth in its material; see MASS_FOLD.
+        // The thickness is geometric, so one code serves every frequency. It is written where a mass-law body is crossed into another medium, kept
         // where a leg carries on, and cleared wherever a leg begins any other way, a reflection
         // included, so a set flag always means the neighbour was crossed on this traversal. Every
         // reader of the deferred medium sees zero while the flag is set.
@@ -4719,6 +4720,42 @@ void quadriga_lib::ray_state_update(int interaction_type,
             return P.mass_X0(d_code, fGHz);
         };
 
+        // Normal thickness of material R that has the X0 of a leg of R with normal thickness d
+        // together with the bonded bodies crossed before it, as far as the state names them and
+        // they have R's slope m. With one slope, X0 = ((f / fRef) d)^(m / 20) of every body has
+        // the same power of the frequency, so the summed X0 is that of one body of R at every
+        // frequency: each thickness is scaled by fRef_R / fRef, and the m / 20 powers add. No
+        // frequency enters, which is what lets the result travel as the thickness code. A body of
+        // another slope has no such thickness and is left out, as every body behind the one the
+        // state names was before. extra is the first layer of an ordered stack, which the
+        // previous-medium word will not hold.
+        auto MASS_FOLD = [&](int R, double d, int extra = 0) -> double
+        {
+            Material Rm = MAT(R);
+            double p = 0.05 * Rm.m, s = std::pow(d, p);
+            auto ADD = [&](const Material &B, double thk)
+            {
+                if (B.m == Rm.m && thk > 0.0)
+                    s += std::pow(thk * Rm.fRef / B.fRef, p);
+            };
+            if (extra != 0)
+                ADD(MAT(extra), MAT(extra).thk);
+            if (mass_crossed)
+            {
+                Material P = MAT(mtl_prev);
+                double d_code = (mass_code < 1) ? 0.0 : std::pow(10.0, -4.0 + 6.0 * (double)(mass_code - 1) / 32766.0);
+                if (!IS_SHEET(mtl_prev))
+                    ADD(P, d_code);
+                else
+                {
+                    ADD(P, P.thk);
+                    if (prev_embedded)
+                        ADD(MAT(mtl_current), d_code);
+                }
+            }
+            return std::pow(s, 1.0 / p);
+        };
+
         // Apply medium gain and phase
         auto SCALE_BY_MEDIUM = [&](int m)
         {
@@ -5171,8 +5208,14 @@ void quadriga_lib::ray_state_update(int interaction_type,
             // reflected ray carries no energy either way. Restricted to a single layer as well: an
             // ordered stack is not transparent because its first layer happens to be, and merging on
             // that test would carry the leg through while discarding the second sheet entirely.
+            //
+            // A mass-law sheet in a mass-law host is not merged. Such a host has no series to
+            // protect, and a leg carried through would pay its own term at the far side without
+            // the sheet in its plate. Cut at the sheet, the two halves and the sheet are the three
+            // bonded bodies of any other sheet inside a wall.
             bool merge_host = !refl_pass && sheet_case != 4 && mtl_current != 0 &&
-                              m_next == mtl_current && TRANSPARENT_TO(sheet_mtl, mtl_current);
+                              m_next == mtl_current && TRANSPARENT_TO(sheet_mtl, mtl_current) &&
+                              !(MAT(mtl_current).m > 0.0 && MAT(sheet_mtl).m > 0.0);
 
             DIST_ADD(); // Advance the host leg up to the sheet
 
@@ -5283,13 +5326,14 @@ void quadriga_lib::ray_state_update(int interaction_type,
             // A mass-law sheet crossed into a medium: flag it, so the leg that starts here knows
             // the sheet in the previous-medium word was crossed and not merely reflected off.
             // Crossed inside a mass-law medium, the leg closed here is bonded to the one that
-            // starts as well, through the sheet, and its thickness travels as the code.
+            // starts as well, through the sheet, and its thickness travels as the code, with
+            // what that leg was entered through and the first layer of an ordered stack.
             next_buffer = (short)0;
             if (m_next != 0 && MAT(sheet_back).m > 0.0)
             {
                 next_buffer = (short)0x8000;
                 if (inside && MAT(mtl_current).m > 0.0 && dist_geo > 0.0015)
-                    next_buffer = MASS_CODE(dist_geo * abs_cos_theta);
+                    next_buffer = MASS_CODE(MASS_FOLD(mtl_current, dist_geo * abs_cos_theta, (sheet_mtl2 != 0) ? sheet_mtl : 0));
             }
 
             if (ray_ends && m_next != 0) // Entering or staying in a medium: refracted preload
@@ -5325,7 +5369,8 @@ void quadriga_lib::ray_state_update(int interaction_type,
 
             // Buffer word for the leg that follows. A transparent transition carries the leg on
             // and its word with it; a mass-law solid crossed into another medium leaves the
-            // surface mass of the leg closed here; everything else starts clean.
+            // surface mass of the leg closed here and of what it was bonded to; everything else
+            // starts clean.
             short buffer_next = (short)0;
 
             // Transparent transition for same material
@@ -5356,7 +5401,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 SCALE_BY_MEDIUM(mtl_current); // Apply current medium gain and phase
 
                 if (!exit && mtl_next != 0 && MAT(mtl_current).m > 0.0 && dist_geo > 0.0015)
-                    buffer_next = MASS_CODE(dist_geo * abs_cos_theta);
+                    buffer_next = MASS_CODE(MASS_FOLD(mtl_current, dist_geo * abs_cos_theta));
 
                 if (preload_dest && exit) // exit into air: post-exit leg is unrefracted, refract == geo
                     DIST_SET(dist_fbs_dest);

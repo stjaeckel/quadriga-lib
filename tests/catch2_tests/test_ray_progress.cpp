@@ -4195,3 +4195,236 @@ TEST_CASE("ray_progress - the wall behind a traced layer is met at the incidence
                     }
                 }
 }
+
+TEST_CASE("ray_progress - the bonded plate at any depth where the slopes agree")
+{
+#ifdef _OPENMP
+    // One ray per call, many thousand calls: a thread team per call costs twenty times the work
+    struct OneThread
+    {
+        int n = omp_get_max_threads();
+        OneThread() { omp_set_num_threads(1); }
+        ~OneThread() { omp_set_num_threads(n); }
+    } one_thread;
+#endif
+    // Plate depth through the tracer. Bonded mass-law stacks, rigid and lossless with a tf leak,
+    // scalar, float, one ray until none is left, both tracers, alone and in a band. The mass a
+    // stack paid is the strongest path behind it against the same path on a palette whose mass
+    // arguments are taken to nothing (fRef 1e9), per frequency; the reference is the plate of
+    // every body from the column definitions. Asserted: the plate at any depth where the slopes
+    // agree, and from the side on which they agree where they do not; a frequency of a band
+    // pays what it pays alone, since the state words of a run are the base frequency's.
+    const double PI = 3.14159265358979323846;
+    const float gap = 1.0e-5f;
+    typedef std::unordered_map<std::string, std::vector<float>> Pal;
+
+    // 1 A20, 2 B20, 3 C20, 4 C30, 5 plaster, 6 brick, 7 lining L20 15 mm, 8 sheet S20 12 mm, 9 sheet HS 8 mm with B20's permittivity
+    const std::vector<float> eps = {2.401e-9f, 2.1609e-8f, 6.0e-9f, 6.0e-9f, 1.2e-8f, 4.0e-9f, 5.0e-9f, 1.0e-8f, 2.1609e-8f};
+    const std::vector<float> tfv = {0.10f, 0.20f, 0.15f, 0.15f, 0.20f, 0.10f, 0.15f, 0.20f, 0.20f};
+    const std::vector<float> thk = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.015f, 0.012f, 0.008f};
+    const std::vector<float> mv = {20.0f, 20.0f, 20.0f, 30.0f, 20.0f, 20.0f, 20.0f, 20.0f, 20.0f};
+    const double fR = 0.001;
+    auto pal_of = [&](bool twin) -> Pal
+    {
+        Pal p;
+        p["a"] = eps, p["b"] = std::vector<float>(eps.size(), 0.0f), p["c"] = std::vector<float>(eps.size(), 0.0f);
+        p["d"] = std::vector<float>(eps.size(), 0.0f), p["thk"] = thk, p["tf"] = tfv, p["m"] = mv;
+        p["fRef"] = std::vector<float>(eps.size(), twin ? 1.0e9f : (float)fR);
+        return p;
+    };
+    const Pal pal = pal_of(false), pal_twin = pal_of(true);
+
+    // A stack along x as tokens: O / C open and close a solid, S a sheet, g advances by d
+    struct Tok
+    {
+        char k;
+        int mat;
+        float d;
+    };
+    auto O = [](int m) { return Tok{'O', m, 0.0f}; };
+    auto C = [](int m) { return Tok{'C', m, 0.0f}; };
+    auto S = [](int m) { return Tok{'S', m, 0.0f}; };
+    auto G = [](float d) { return Tok{'g', 0, d}; };
+    struct Geo
+    {
+        arma::fmat mesh;
+        arma::uvec mi;
+        float x_back = 0.0f;
+        std::vector<std::array<double, 3>> body; // m, fRef, normal thickness
+    };
+    auto build = [&](std::vector<Tok> t, bool rev) -> Geo
+    {
+        if (rev)
+        {
+            std::reverse(t.begin(), t.end());
+            for (Tok &q : t)
+                q.k = (q.k == 'O') ? 'C' : ((q.k == 'C') ? 'O' : q.k);
+        }
+        Geo g;
+        std::vector<float> xs;
+        std::vector<int> mats;
+        std::vector<bool> flip;
+        float x = 0.0f, leg = 0.0f;
+        int cur = 0;
+        bool last_face = false;
+        for (const Tok &q : t)
+        {
+            if (q.k == 'g')
+            {
+                x += q.d, last_face = false;
+                if (cur)
+                    leg += q.d;
+                continue;
+            }
+            if (last_face)
+                x += gap;
+            xs.push_back(x), mats.push_back(q.mat), flip.push_back(q.k == 'C'), last_face = true;
+            if (q.k != 'O' && cur && leg > 0.0f)
+                g.body.push_back({(double)mv[(size_t)cur - 1], fR, (double)leg}), leg = 0.0f;
+            if (q.k == 'O')
+                cur = q.mat, leg = 0.0f;
+            else if (q.k == 'C')
+                cur = 0;
+            else
+                g.body.push_back({(double)mv[(size_t)q.mat - 1], fR, (double)thk[(size_t)q.mat - 1]});
+        }
+        g.x_back = x;
+        const float h = 200.0f;
+        g.mesh.set_size(2 * xs.size(), 9);
+        g.mi.set_size(2 * xs.size());
+        for (size_t k = 0; k < xs.size(); ++k)
+        {
+            if (!flip[k])
+                g.mesh.row(2 * k) = arma::frowvec{xs[k], -h, -h, xs[k], -h, h, xs[k], h, -h},
+                g.mesh.row(2 * k + 1) = arma::frowvec{xs[k], h, -h, xs[k], -h, h, xs[k], h, h};
+            else
+                g.mesh.row(2 * k) = arma::frowvec{xs[k], -h, -h, xs[k], h, -h, xs[k], -h, h},
+                g.mesh.row(2 * k + 1) = arma::frowvec{xs[k], h, -h, xs[k], h, h, xs[k], -h, h};
+            g.mi(2 * k) = (arma::uword)mats[k], g.mi(2 * k + 1) = (arma::uword)mats[k];
+        }
+        return g;
+    };
+    // The plate of every body, from the column definitions
+    auto plate_of = [](const Geo &g, double fGHz, double ct)
+    {
+        double X = 0.0;
+        for (const auto &b : g.body)
+            X += std::pow((fGHz / b[1]) * b[2], 0.05 * b[0]);
+        if (!(X > 1.0))
+            return 0.0;
+        const double A = 20.0 * std::log10(X), x = X * ct;
+        return (ct >= 1.0) ? A : A * std::log10(1.0 + x * x) / std::log10(1.0 + X * X);
+    };
+
+    // The strongest path behind the wall, power per frequency, and the number of paths
+    auto trace = [&](const Pal &pl, const Geo &g, double thd, bool refr, const std::vector<double> &fGHz, int &nT) -> std::vector<double>
+    {
+        const size_t nf = fGHz.size();
+        std::vector<double> T1(nf, 0.0);
+        nT = 0;
+        const double th = thd * PI / 180.0;
+        const float Ox = -1.0f, Oy = 0.37f - (float)std::tan(th), Oz = 0.0f, r0 = 0.1f, len = 300.0f;
+        arma::frowvec kv = {(float)std::cos(th), (float)std::sin(th), 0.0f};
+        arma::fvec cf(nf);
+        for (size_t q = 0; q < nf; ++q)
+            cf(q) = (float)(fGHz[q] * 1.0e9);
+        arma::fmat orig(1, 3), dest(1, 3), acc(1, 1 + nf, arma::fill::zeros);
+        orig.row(0) = arma::frowvec{Ox, Oy, Oz} + r0 * kv;
+        dest.row(0) = arma::frowvec{Ox, Oy, Oz} + (r0 + len) * kv;
+        arma::fcube pd(1, 3, nf);
+        for (size_t q = 0; q < nf; ++q)
+            pd.slice(q) = kv;
+        arma::Col<short> prev(1, arma::fill::zeros), cur(1, arma::fill::zeros), buf(1, arma::fill::zeros);
+        std::vector<quadriga_lib::path> paths(1);
+        paths[0].init(0, nf, true);
+        paths[0].set_length(r0);
+        for (int it = 0; it < 40; ++it)
+        {
+            quadriga_lib::ray_progress(g.mesh, g.mi, pl, cf, Ox, Oy, Oz, orig, dest, prev, cur, buf, pd, acc, paths,
+                                       nullptr, nullptr, nullptr, nullptr,
+                                       (uint8_t)12, 100, 100, 0, -250.0f, 3.0f, 0.15f, refr, true,
+                                       nullptr, nullptr, nullptr, nullptr);
+            if (orig.n_rows == 0)
+                break;
+            for (arma::uword i = 0; i < orig.n_rows; ++i)
+            {
+                const size_t ns = paths[i].n_seg();
+                if ((cur(i) & (short)0x3FFF) != 0 || ns != (size_t)(it + 1))
+                    continue;
+                const float *last = paths[i].coord(ns - 1);
+                if (!(dest(i, 0) > orig(i, 0) && last[0] > g.x_back - 1.0e-3f))
+                    continue;
+                ++nT;
+                for (size_t q = 0; q < nf; ++q)
+                {
+                    const float *xc = paths[i].xpr_coeff(q);
+                    T1[q] = std::max(T1[q], (double)xc[0] * xc[0] + (double)xc[1] * xc[1]);
+                }
+            }
+        }
+        return T1;
+    };
+    auto pdB = [](double p)
+    { return (p > 0.0) ? 10.0 * std::log10(p) : -999.0; };
+
+    struct Stack
+    {
+        const char *name;
+        std::vector<Tok> t;
+        int exact; // bit 0: the plate as named, bit 1: from the other side; clear: recorded
+    };
+    const std::vector<Stack> stacks = {
+        {"A20 100 | B20 100 | C20 100", {O(1), G(0.1f), C(1), O(2), G(0.1f), C(2), O(3), G(0.1f), C(3)}, 3},
+        {"A20 100 | B20 13 | C20 100", {O(1), G(0.1f), C(1), O(2), G(0.013f), C(2), O(3), G(0.1f), C(3)}, 3},
+        {"A20 100 | B20 100 | C30 50", {O(1), G(0.1f), C(1), O(2), G(0.1f), C(2), O(4), G(0.05f), C(4)}, 1},
+        {"plaster 15 | brick 115 | plaster 15", {O(5), G(0.015f), C(5), O(6), G(0.115f), C(6), O(5), G(0.015f), C(5)}, 3},
+        {"lining L20 > B20 60 | S20 | B20 40", {S(7), O(2), G(0.06f), S(8), G(0.04f), C(2)}, 3},
+        {"merged: B20 60 | HS 8 | B20 40", {O(2), G(0.06f), S(9), G(0.04f), C(2)}, 3},
+    };
+
+#ifdef QD_TEST_VERBOSE
+    std::printf("\n# diag: plate depth through ray_progress, scalar, float, 12 interactions. dir: f as named, r from the other side.\n");
+    std::printf("# band: the frequencies of the run in GHz, the base first; f: the frequency of the row. plate: every body as one\n");
+    std::printf("# plate; paid: the strongest path behind the stack against the same path without the mass arguments, dB;\n");
+    std::printf("# over: paid - plate; nT: paths behind the stack\n");
+    std::printf("stack,dir,tracer,band,f,theta,nT,plate,paid,over\n");
+#endif
+    const std::vector<std::vector<double>> bands = {{1.0}, {0.25}, {4.0}, {1.0, 0.25}, {1.0, 4.0}, {0.25, 1.0}, {4.0, 1.0}};
+    std::map<std::string, double> alone;
+    for (const Stack &St : stacks)
+        for (int rev = 0; rev < 2; ++rev)
+        {
+            const Geo g = build(St.t, rev != 0);
+            for (int refr = 0; refr < 2; ++refr)
+                for (const auto &band : bands)
+                    for (double thd : {0.0, 60.0})
+                    {
+                        int nT = 0, nZ = 0;
+                        const std::vector<double> T = trace(pal, g, thd, refr != 0, band, nT), Z = trace(pal_twin, g, thd, refr != 0, band, nZ);
+                        for (size_t q = 0; q < band.size(); ++q)
+                        {
+                            const double paid = pdB(Z[q]) - pdB(T[q]), plate = plate_of(g, band[q], std::cos(thd * PI / 180.0));
+                            INFO(St.name << ", dir " << rev << ", refr " << refr << ", band of " << band.size() << " based on " << band[0] << ", f " << band[q] << ", theta " << thd);
+                            CHECK(nT >= 1);
+                            CHECK(nZ >= 1);
+                            const std::string key = std::string(St.name) + "," + std::to_string(rev) + "," + std::to_string(refr) + "," +
+                                                    std::to_string((int)(100.0 * band[q])) + "," + std::to_string((int)thd);
+                            if (band.size() == 1)
+                                alone[key] = paid;
+                            else // a frequency of a band pays what it pays alone
+                                CHECK(std::abs(paid - alone.at(key)) < 2.0e-3);
+                            if ((St.exact >> rev) & 1)
+                                CHECK(std::abs(paid - plate) < 0.01);
+#ifdef QD_TEST_VERBOSE
+                            char bn[32];
+                            if (band.size() == 2)
+                                std::snprintf(bn, sizeof(bn), "%.2f+%.2f", band[0], band[1]);
+                            else
+                                std::snprintf(bn, sizeof(bn), "%.2f", band[0]);
+                            std::printf("%s,%s,%d,%s,%.2f,%.0f,%d,%.4f,%.4f,%+.4f\n", St.name, rev ? "r" : "f", refr ? 5 : 4, bn, band[q], thd, nT, plate, paid,
+                                        paid - plate);
+#endif
+                        }
+                    }
+        }
+}
