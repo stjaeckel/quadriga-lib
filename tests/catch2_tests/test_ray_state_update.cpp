@@ -15554,3 +15554,1096 @@ TEST_CASE("Bonded mass - the plate at any depth where the slopes agree")
             }
         }
 }
+
+// ================================================================================================
+// Branches that had a guard and no row: the displacement budget, float, a corner with a sheet,
+// the core's loss cap, ray_mesh_interact's own composite, a mixed stack, the followed mark and the
+// resolved flag across abutting, nested and overlapping bodies, a verdict handed in, and a sheet
+// without the mass column in a mass-law host. Every chain runs through ray_triangle_intersect,
+// ray_mesh_interact and ray_state_update, one ray per call.
+// ================================================================================================
+namespace ub
+{
+    typedef std::unordered_map<std::string, std::vector<double>> Pal;
+    struct Ev
+    {
+        arma::mat origN, destN, path_dirN, xpr, xpr0, fbs, sbs, dir0, tridirN; // xpr0, dir0: what ray_mesh_interact wrote
+        arma::Col<short> prev, cur, buf;
+        arma::vec accg, accr;
+        uint8_t ot = 0, rt = 0, vout = 0;
+        unsigned nh = 0;
+    };
+    struct Opt
+    {
+        double eps = 1.5;
+        bool relaunch = false;                       // hand origN and destN to ray_state_update
+        const std::vector<uint8_t> *vin = nullptr;   // verdict_inN
+        const arma::mat *trivec = nullptr, *tridir = nullptr;
+    };
+    struct OneThread
+    {
+#ifdef _OPENMP
+        int n = omp_get_max_threads();
+        OneThread() { omp_set_num_threads(1); }
+        ~OneThread() { omp_set_num_threads(n); }
+#endif
+    };
+
+    // One event at dtype T; everything is handed in and returned in double
+    template <typename T>
+    static Ev traced(const Pal &pal, const arma::mat &mesh, const arma::uvec &mtl_ind, int itype, double f,
+                     const arma::mat &orig, const arma::mat &dest, const Ev *in, const Opt &opt = Opt())
+    {
+        typedef arma::Mat<T> M;
+        typedef arma::Col<T> V;
+        std::unordered_map<std::string, std::vector<T>> p;
+        for (const auto &kv : pal)
+            p[kv.first] = std::vector<T>(kv.second.begin(), kv.second.end());
+        M o = arma::conv_to<M>::from(orig), d = arma::conv_to<M>::from(dest), ms = arma::conv_to<M>::from(mesh);
+        M fbs, sbs, oN, dN, fN, sN, xp, nv, pd, tv, td, tvN, tdN;
+        V gain, fang;
+        arma::u32_vec nh, fi, si;
+        std::vector<uint8_t> ot, rt, vo;
+        quadriga_lib::ray_triangle_intersect<T>(&o, &d, &ms, &fbs, &sbs, &nh, &fi, &si);
+        const bool tube = opt.trivec && opt.tridir;
+        if (tube)
+            tv = arma::conv_to<M>::from(*opt.trivec), td = arma::conv_to<M>::from(*opt.tridir);
+        quadriga_lib::ray_mesh_interact<T>(itype, (T)f, &o, &d, &ms, &mtl_ind, &p, &fi, &si, tube ? &tv : nullptr, tube ? &td : nullptr,
+                                           &oN, &dN, &fN, &sN, &gain, &xp, tube ? &tvN : nullptr, tube ? &tdN : nullptr, &fang, nullptr,
+                                           nullptr, &nv, &ot, &pd, false, nullptr);
+        Ev E;
+        E.xpr0 = arma::conv_to<arma::mat>::from(xp), E.dir0 = arma::conv_to<arma::mat>::from(pd), E.ot = ot[0], E.nh = nh(0);
+        arma::Col<short> mf(1), m2(1);
+        mf(0) = fi(0) ? (short)mtl_ind(fi(0) - 1) : (short)0, m2(0) = si(0) ? (short)mtl_ind(si(0) - 1) : (short)0;
+        M pin;
+        V ag, ar, ago, aro;
+        if (in)
+            pin = arma::conv_to<M>::from(in->path_dirN), ag = arma::conv_to<V>::from(in->accg), ar = arma::conv_to<V>::from(in->accr);
+        quadriga_lib::ray_state_update<T>(itype, (T)f, &o, &d, &fN, &sN, &nh, &fang, &nv, &ot, &p, &mf, &m2,
+                                          in ? &in->prev : nullptr, in ? &in->cur : nullptr, in ? &in->buf : nullptr,
+                                          in ? &pin : nullptr, in ? &ag : nullptr, in ? &ar : nullptr,
+                                          &E.prev, &E.cur, &E.buf, &gain, &xp, &pd, &ago, &aro, &rt, nullptr, opt.eps,
+                                          opt.relaunch ? &oN : nullptr, opt.relaunch ? &dN : nullptr,
+                                          (opt.relaunch && tube) ? &td : nullptr, (opt.relaunch && tube) ? &tdN : nullptr, opt.vin, &vo);
+        E.origN = arma::conv_to<arma::mat>::from(oN), E.destN = arma::conv_to<arma::mat>::from(dN);
+        E.fbs = arma::conv_to<arma::mat>::from(fN), E.sbs = arma::conv_to<arma::mat>::from(sN);
+        E.xpr = arma::conv_to<arma::mat>::from(xp), E.path_dirN = arma::conv_to<arma::mat>::from(pd);
+        E.accg = arma::conv_to<arma::vec>::from(ago), E.accr = arma::conv_to<arma::vec>::from(aro);
+        if (tube)
+            E.tridirN = arma::conv_to<arma::mat>::from(tdN);
+        E.rt = rt[0], E.vout = vo.empty() ? (uint8_t)0 : vo[0];
+        return E;
+    }
+
+    // A face in the plane x = const, its normal towards -x, or towards +x when flipped
+    static arma::mat face(double x, bool flip)
+    {
+        arma::mat m = diag_quad_x(200.0, x);
+        if (flip)
+        {
+            m.row(0) = arma::rowvec{x, -200.0, -200.0, x, 200.0, -200.0, x, -200.0, 200.0};
+            m.row(1) = arma::rowvec{x, 200.0, -200.0, x, 200.0, 200.0, x, -200.0, 200.0};
+        }
+        return m;
+    }
+    // A face through (px, py, 0) whose normal is turned by alpha about z from the x axis
+    static arma::mat tilted(double px, double py, double alpha_deg, bool flip)
+    {
+        double a = alpha_deg * QPI / 180.0, tx = -std::sin(a), ty = std::cos(a), h = 200.0;
+        arma::rowvec A = {px - h * tx, py - h * ty, -h}, B = {px - h * tx, py - h * ty, h}, C = {px + h * tx, py + h * ty, -h}, D = {px + h * tx, py + h * ty, h};
+        arma::mat m(2, 9);
+        if (!flip)
+            m.row(0) = arma::join_rows(arma::join_rows(A, B), C), m.row(1) = arma::join_rows(arma::join_rows(C, B), D);
+        else
+            m.row(0) = arma::join_rows(arma::join_rows(A, C), B), m.row(1) = arma::join_rows(arma::join_rows(C, D), B);
+        return m;
+    }
+    static arma::mat build(const std::vector<double> &x, const std::vector<int> &mat, const std::vector<bool> &flip, arma::uvec &mtl_ind)
+    {
+        arma::mat mesh;
+        mtl_ind.set_size(2 * x.size());
+        for (size_t k = 0; k < x.size(); ++k)
+        {
+            mesh = k ? arma::join_cols(mesh, face(x[k], flip[k])) : face(x[k], flip[k]);
+            mtl_ind(2 * k) = (arma::uword)mat[k], mtl_ind(2 * k + 1) = (arma::uword)mat[k];
+        }
+        return mesh;
+    }
+    static double sumsq(const arma::mat &a);
+    // The next segment: along the one the event wrote, far enough to cross every face that is left
+    static double onward(const Ev &E, arma::mat &orig, arma::mat &dest)
+    {
+        arma::mat d = E.destN - E.origN;
+        d /= std::sqrt(d(0, 0) * d(0, 0) + d(0, 1) * d(0, 1) + d(0, 2) * d(0, 2));
+        orig = E.origN, dest = E.origN + (1.2 / std::abs(d(0, 0))) * d;
+        return d(0, 0);
+    }
+    // A path: one event per entry of seq, each on the segment the one before wrote
+    template <typename T>
+    static std::vector<Ev> chain_t(const Pal &pal, const arma::mat &mesh, const arma::uvec &mi, const std::vector<int> &seq, double f, double thd,
+                                   const std::vector<double> &eps, const Ev *start = nullptr)
+    {
+        std::vector<Ev> out;
+        arma::mat o, d;
+        diag_ray_at(thd, o, d);
+        for (size_t q = 0; q < seq.size(); ++q)
+        {
+            Opt op;
+            op.eps = eps[(q < eps.size()) ? q : eps.size() - 1];
+            op.relaunch = seq[q] != 3 && seq[q] != 0;
+            out.push_back(traced<T>(pal, mesh, mi, seq[q], f, o, d, q ? &out[q - 1] : start, op));
+            if (out.back().nh == 0 || out.back().rt == 0)
+                break;
+            onward(out.back(), o, d);
+        }
+        return out;
+    }
+    static std::vector<Ev> chain(const Pal &pal, const arma::mat &mesh, const arma::uvec &mi, const std::vector<int> &seq, double f, double thd,
+                                 const std::vector<double> &eps, const Ev *start = nullptr)
+    {
+        return chain_t<double>(pal, mesh, mi, seq, f, thd, eps, start);
+    }
+    // The field of a path at the point its polyline ends at, referenced to the point it began at
+    static std::complex<double> at_point(const std::vector<Ev> &c, double f, double thd)
+    {
+        std::complex<double> v = 1.0;
+        double Lin = 0.0;
+        for (size_t q = 0; q < c.size(); ++q)
+        {
+            v *= cpx(c[q].xpr, 0, 0);
+            if (q)
+                Lin += std::sqrt(ub::sumsq(c[q].fbs - c[q - 1].fbs));
+        }
+        const double k = 2.0 * QPI * f / C0, dy = c.back().fbs(0, 1) - c.front().fbs(0, 1);
+        return v * std::exp(std::complex<double>(0.0, -k * Lin)) * std::exp(std::complex<double>(0.0, k * std::sin(thd * QPI / 180.0) * dy));
+    }
+    static double sumsq(const arma::mat &a)
+    {
+        double v = 0.0;
+        for (arma::uword i = 0; i < a.n_elem; ++i)
+            v += a(i) * a(i);
+        return v;
+    }
+    static bool same_bits(const arma::mat &a, const arma::mat &b)
+    {
+        return a.n_elem == b.n_elem && std::memcmp(a.memptr(), b.memptr(), a.n_elem * sizeof(double)) == 0;
+    }
+    static double dB(std::complex<double> z) { return (std::norm(z) > 0.0) ? 10.0 * std::log10(std::norm(z)) : -999.0; }
+    static double deg(std::complex<double> z) { return std::arg(z) * 180.0 / QPI; }
+    static unsigned w(short s) { return (unsigned)(unsigned short)s; }
+}
+
+TEST_CASE("Unentered branches - a corner with a sheet is the sheet alone once the state is kept")
+{
+    ub::OneThread one_thread;
+    // A sheet that meets another face at an angle, within the co-location distance along the ray.
+    // ray_mesh_interact drops the second face and clears the co-location and corner bits; the redo
+    // re-derives an isolated sheet from the material indices. So with the state kept the event is
+    // the sheet without its neighbour, bit for bit, whatever the neighbour is. What
+    // ray_mesh_interact wrote itself is recorded: it is the bare face of a half-space of the
+    // sheet's material, not the composite. A sheet as the second face is dropped altogether.
+    const std::vector<LumpMtl> lp = {
+        {5.24, 0.63, 0.006}, // 1 sheet 6 mm
+        {1.50, 0.40, 0.0},   // 2 solid
+        {2.50, 0.80, 0.010}, // 3 a second sheet 10 mm
+    };
+    ub::Pal pal = lump_palette(lp);
+    QD_DIAG("\n# diag: corner with a sheet, scalar, 1 GHz, second face 0.3 mm further along the ray and tilted by 40 deg.\n");
+    QD_DIAG("# own: what ray_mesh_interact wrote, redo: after ray_state_update; d_own, d_redo: complex distance to the same first face alone\n");
+    QD_DIAG("config,theta,type,nh,ot,rt,own_dB,redo_dB,d_own,d_redo,redo_bits,words,origN_x\n");
+    for (double thd : {20.0, 50.0})
+    {
+        double th = thd * QPI / 180.0, hy = 0.37 + std::tan(th);
+        double px = 3.0e-4 * std::cos(th), py = hy + 3.0e-4 * std::sin(th);
+        arma::mat o, d;
+        diag_ray_at(thd, o, d);
+        struct Cfg
+        {
+            const char *name;
+            arma::mat mesh;
+            std::vector<int> mats;
+            int twin;
+        };
+        std::vector<Cfg> cfg;
+        cfg.push_back({"sheet alone", ub::face(0.0, false), {1}, -1});
+        cfg.push_back({"sheet | sheet 3", arma::join_cols(ub::face(0.0, false), ub::tilted(px, py, 40.0, false)), {1, 3}, 0});
+        cfg.push_back({"sheet | solid front-hit", arma::join_cols(ub::face(0.0, false), ub::tilted(px, py, 40.0, false)), {1, 2}, 0});
+        cfg.push_back({"sheet | solid back-hit", arma::join_cols(ub::face(0.0, false), ub::tilted(px, py, 40.0, true)), {1, 2}, 0});
+        cfg.push_back({"sheet back-hit alone", ub::face(0.0, true), {1}, -1});
+        cfg.push_back({"sheet back-hit | solid", arma::join_cols(ub::face(0.0, true), ub::tilted(px, py, 40.0, false)), {1, 2}, 4});
+        cfg.push_back({"solid alone", ub::face(0.0, false), {2}, -1});
+        cfg.push_back({"solid | sheet", arma::join_cols(ub::face(0.0, false), ub::tilted(px, py, 40.0, false)), {2, 1}, 6});
+        std::vector<ub::Ev> keep[2];
+        for (size_t q = 0; q < cfg.size(); ++q)
+            for (int it : {4, 3})
+            {
+                arma::uvec mi(cfg[q].mesh.n_rows);
+                for (arma::uword r = 0; r < mi.n_elem; ++r)
+                    mi(r) = (arma::uword)cfg[q].mats[r / 2];
+                ub::Opt op;
+                op.eps = 0.0;
+                ub::Ev E = ub::traced<double>(pal, cfg[q].mesh, mi, it, FRQ, o, d, nullptr, op);
+                keep[it == 3].push_back(E);
+                const bool has_twin = cfg[q].twin >= 0;
+                const ub::Ev &W = keep[it == 3][has_twin ? cfg[q].twin : q];
+                std::complex<double> a = cpx(E.xpr0, 0, 0), b = cpx(E.xpr, 0, 0);
+                const bool bits = ub::same_bits(E.xpr, W.xpr), sheet_first = cfg[q].mats[0] != 2;
+                QD_DIAG("%s,%.0f,%d,%u,%d,%d,%.4f,%.4f,%.3e,%.3e,%d,%04x.%04x.%04x,%.3e\n", cfg[q].name, thd, it, E.nh, (int)E.ot, (int)E.rt,
+                        ub::dB(a), ub::dB(b), std::abs(a - cpx(W.xpr0, 0, 0)), std::abs(b - cpx(W.xpr, 0, 0)), (int)bits,
+                        ub::w(E.prev(0)), ub::w(E.cur(0)), ub::w(E.buf(0)), E.origN(0, 0));
+                INFO("corner " << cfg[q].name << " theta " << thd << " type " << it);
+                REQUIRE(E.nh >= 1);
+                CHECK(bits);               // the redo is the first face alone
+                CHECK(E.rt == W.rt);
+                CHECK(E.prev(0) == W.prev(0));
+                CHECK(E.cur(0) == W.cur(0));
+                CHECK(E.buf(0) == W.buf(0));
+                if (has_twin)
+                {
+                    CHECK(E.nh >= 2);
+                    CHECK((E.ot & 0x1C) == 0);                 // co-location, same-direction and corner bits are cleared
+                    CHECK(((E.ot & 0x40) != 0) == sheet_first); // the sheet bit says whether the face that is kept is the sheet
+                    if (it != 3)
+                        CHECK(E.origN(0, 0) > 1.0e-4); // relaunched behind the face that was dropped
+                    if (!sheet_first)
+                        CHECK(ub::same_bits(E.xpr0, W.xpr0)); // a sheet as second face leaves no trace at all
+                }
+                if (sheet_first)
+                {
+                    CHECK(E.rt == ((it == 3) ? 197 : 69));
+                    CHECK((E.prev(0) == 0 && E.cur(0) == 0 && E.buf(0) == 0));
+                }
+            }
+    }
+}
+
+TEST_CASE("Unentered branches - the displacement budget caps what a sheet takes back out of its host")
+{
+    ub::OneThread one_thread;
+    // A sheet inside a host takes its thickness of host back out of the transit, and the budget
+    // limits that to 80 % of the host the event can see, because taking a medium out is a
+    // division. A sheet thicker than its host is not a valid geometry, but nothing stops a mesh
+    // from holding one, so the rows run past it: thk / L from 0.1 to 3 in a 10 mm host.
+    //
+    // The composite is isolated as the ratio of the event to the same event with a 1 mm sheet:
+    // the host leg and the state are the same in both. The reference is diag_cm_stack with the
+    // budget the event has, formed here from the points of the event. The mirror the host's series
+    // takes on the leg behind the sheet is the same layer with no budget.
+    const double L = 0.010, f = FRQ, k0 = 2.0 * QPI * f / C0;
+    const std::complex<double> J(0.0, 1.0);
+    const std::vector<double> thk = {0.001, 0.005, 0.0079, 0.0081, 0.009, 0.010, 0.015, 0.030};
+    std::vector<LumpMtl> lp = {{1.50, 0.40, 0.0}};
+    for (double t : thk)
+        lp.push_back({5.24, 0.63, t});
+    for (double t : thk)
+        lp.push_back({1.50, 0.00, t});
+    ub::Pal pal = lump_palette(lp);
+    const std::complex<double> eH = lump_eps(lp[0], f), nH = std::sqrt(eH);
+
+    QD_DIAG("\n# diag: displacement budget, a sheet inside 10 mm of eps 1.50-0.40j, scalar, both tracers. T, R: the composite over the\n");
+    QD_DIAG("# 1 mm sheet's against diag_cm_stack with the budget, complex. budget_over_L: the budget of the event over the host's\n");
+    QD_DIAG("# thickness. uncap_dB, uncap_deg: the capped transmit port over the uncapped one. chain_dB: entry, sheet and exit, series\n");
+    QD_DIAG("# declined; summed_dB: with the exit's series summed. S: the host's series on the leg behind the sheet against the layer\n");
+    QD_DIAG("# mirror with no budget; mirror: that mirror's magnitude before the clamp\n");
+    QD_DIAG("sheet,tracer,theta,thk_over_L,budget_over_L,cap,T,R,uncap_dB,uncap_deg,chain_dB,summed_dB,S,mirror\n");
+    for (int fam = 0; fam < 2; ++fam)
+        for (int tr : {4, 5})
+            for (double thd : {20.0, 45.0, 70.0, 85.0})
+            {
+                const double th = thd * QPI / 180.0, s2 = std::sin(th) * std::sin(th);
+                const std::complex<double> ct = std::sqrt(1.0 - s2 / eH);
+                std::complex<double> T1, R1, Tr1, Rr1;
+                for (size_t q = 0; q < thk.size(); ++q)
+                {
+                    const int iS = 2 + fam * (int)thk.size() + (int)q;
+                    const std::complex<double> eS = lump_eps(lp[iS - 1], f);
+                    arma::uvec mi;
+                    arma::mat mesh = ub::build({0.0, 0.5 * L, L}, {1, iS, 1}, {false, false, true}, mi);
+                    arma::mat o, d;
+                    diag_ray_at(thd, o, d);
+                    ub::Opt dec, sum;
+                    dec.relaunch = sum.relaunch = true, sum.eps = 0.0;
+                    ub::Ev E0 = ub::traced<double>(pal, mesh, mi, tr, f, o, d, nullptr, dec);
+                    ub::onward(E0, o, d);
+                    ub::Ev Et = ub::traced<double>(pal, mesh, mi, tr, f, o, d, &E0, dec), Er = ub::traced<double>(pal, mesh, mi, 3, f, o, d, &E0);
+                    arma::mat o2, d2;
+                    ub::onward(Et, o2, d2);
+                    ub::Ev X0 = ub::traced<double>(pal, mesh, mi, tr, f, o2, d2, &Et, dec), X1 = ub::traced<double>(pal, mesh, mi, tr, f, o2, d2, &Et, sum);
+                    REQUIRE((E0.nh && Et.nh == 2 && Er.nh == 2 && X0.nh));
+
+                    // The budget of the event: 80 % of the host it sees, the leg behind it along the
+                    // direction the wave has and the gap ahead along the segment, times the traced cosine
+                    const double dx = std::abs(E0.path_dirN(0, 0)), leg = (0.5 * L - o(0, 0)) / dx;
+                    const double gapS = std::sqrt(ub::sumsq(Et.sbs - Et.fbs)), budget = 0.8 * (leg + gapS) * dx;
+                    DiagLayer lay;
+                    lay.e = eS, lay.d = thk[q];
+                    DiagSheet W = diag_cm_stack(eH, 1.0, {lay}, eH, 1.0, ct, f, false, true, budget);
+                    DiagSheet U = diag_cm_stack(eH, 1.0, {lay}, eH, 1.0, ct, f, false, true);
+                    std::complex<double> T = cpx(Et.xpr, 0, 0), R = cpx(Er.xpr, 0, 0);
+                    if (q == 0)
+                        T1 = T, R1 = R, Tr1 = W.T_te, Rr1 = W.R_te;
+                    const double dT = std::abs(T / T1 - W.T_te / Tr1), dR = std::abs(R / R1 - W.R_te / Rr1);
+                    const bool cap = budget < thk[q];
+                    const std::complex<double> ch = cpx(E0.xpr, 0, 0) * T * cpx(X0.xpr, 0, 0), chs = cpx(E0.xpr, 0, 0) * T * cpx(X1.xpr, 0, 0);
+
+                    // The series on the leg behind the sheet: the sheet a layer backed by the host, centred, no budget
+                    DiagSheet Mr = diag_cm_stack(eH, 1.0, {lay}, eH, 1.0, ct, f, true, true);
+                    std::complex<double> rb = Mr.R_te;
+                    const double mir = std::abs(rb);
+                    if (mir > 1.0)
+                        rb /= mir;
+                    const std::complex<double> ra = (nH * ct - std::cos(th)) / (nH * ct + std::cos(th));
+                    const double dleg = L - Et.origN(0, 0);
+                    const std::complex<double> Sref = 1.0 / (1.0 - ra * rb * std::exp(-2.0 * J * k0 * nH * ct * dleg));
+                    const double dS = std::abs(cpx(X1.xpr, 0, 0) / cpx(X0.xpr, 0, 0) - Sref);
+
+                    QD_DIAG("%s,%d,%.0f,%.2f,%.4f,%d,%.3e,%.3e,%.6f,%.4f,%.4f,%.4f,%.3e,%.6f\n", fam ? "1.50" : "5.24-0.63j", tr, thd, thk[q] / L, budget / L,
+                            (int)cap, dT, dR, ub::dB(W.T_te / U.T_te), ub::deg(W.T_te / U.T_te), ub::dB(ch), ub::dB(chs), dS, mir);
+                    INFO("budget sheet " << fam << " tracer " << tr << " theta " << thd << " thk/L " << thk[q] / L);
+                    CHECK(dT < 1.0e-9);
+                    CHECK(dR < 1.0e-9);
+                    CHECK(dS < 1.0e-9);
+                    CHECK(std::isfinite(std::norm(T)));
+                    CHECK(std::isfinite(std::norm(R)));
+                    CHECK((Et.rt == 77 && Er.rt == 205));
+                    // Graceful where the sheet does not fit: the wall passes less than it received
+                    CHECK(std::norm(ch) < 1.0);
+                    CHECK(std::norm(chs) < 1.0);
+                    CHECK(mir < 1.0); // no mirror on these rows reaches the clamp
+                    // What the event sees of its host. With the refracting tracer that is the host;
+                    // with the undeviated one the gap ahead is the segment at the external angle
+                    // times the traced cosine, so the budget is above 80 % of the host
+                    if (tr == 5)
+                        CHECK(std::abs(budget / L - 0.8) < 1.0e-3);
+                    else
+                        CHECK(budget / L > 0.8);
+                }
+            }
+
+    // An ordered stack inside a host goes to the core, which caps the same way. The second face of
+    // the hit is then the other sheet, so the host the event sees is the leg behind it alone, and
+    // the stack is capped at 80 % of that leg although it needs half its thickness of it.
+    QD_DIAG("\n# diag: displacement budget, an ordered stack eps 5.24-0.63j | eps 2.50-0.80j inside eps 1.50-0.40j, scalar. front_mm:\n");
+    QD_DIAG("# host in front of the stack's face; fits: the stack's half thickness is less than that. T, R as above, against\n");
+    QD_DIAG("# diag_cm_stack with the budget over the 0.5 + 0.5 mm stack's. uncap_dB, uncap_deg: the capped transmit port over the\n");
+    QD_DIAG("# uncapped one, which is what the cap takes off a stack that fits\n");
+    QD_DIAG("host_mm,front_mm,stack_mm,tracer,theta,budget_mm,fits,cap,T,R,uncap_dB,uncap_deg,chain_dB\n");
+    struct Sk
+    {
+        double Lh, xs, ta, tb;
+    };
+    const std::vector<Sk> sk = {{0.010, 0.005, 0.0005, 0.0005}, {0.010, 0.005, 0.002, 0.001}, {0.010, 0.005, 0.003, 0.002}, {0.010, 0.005, 0.006, 0.003},
+                                {0.100, 0.010, 0.0005, 0.0005}, {0.100, 0.010, 0.004, 0.003}, {0.100, 0.010, 0.006, 0.006}, {0.100, 0.050, 0.0005, 0.0005}, {0.100, 0.050, 0.006, 0.006}};
+    std::vector<LumpMtl> lq = {{1.50, 0.40, 0.0}};
+    for (const Sk &K : sk)
+        lq.push_back({5.24, 0.63, K.ta}), lq.push_back({2.50, 0.80, K.tb});
+    ub::Pal pal_q = lump_palette(lq);
+    for (int tr : {4, 5})
+        for (double thd : {20.0, 60.0})
+        {
+            const double th = thd * QPI / 180.0, s2 = std::sin(th) * std::sin(th);
+            const std::complex<double> ct = std::sqrt(1.0 - s2 / eH);
+            std::complex<double> T1, R1, Tr1, Rr1;
+            for (size_t q = 0; q < sk.size(); ++q)
+            {
+                const Sk &K = sk[q];
+                const int iA = 2 + 2 * (int)q, iB = iA + 1;
+                arma::uvec mi;
+                arma::mat mesh = ub::build({0.0, K.xs, K.xs + 1.0e-5, K.Lh}, {1, iA, iB, 1}, {false, false, true, true}, mi);
+                arma::mat o, d;
+                diag_ray_at(thd, o, d);
+                ub::Opt dec;
+                dec.relaunch = true;
+                ub::Ev E0 = ub::traced<double>(pal_q, mesh, mi, tr, f, o, d, nullptr, dec);
+                ub::onward(E0, o, d);
+                ub::Ev Et = ub::traced<double>(pal_q, mesh, mi, tr, f, o, d, &E0, dec), Er = ub::traced<double>(pal_q, mesh, mi, 3, f, o, d, &E0);
+                arma::mat o2, d2;
+                ub::onward(Et, o2, d2);
+                ub::Ev X0 = ub::traced<double>(pal_q, mesh, mi, tr, f, o2, d2, &Et, dec);
+                REQUIRE((E0.nh && Et.nh >= 2 && Er.nh >= 2 && X0.nh));
+                const double dx = std::abs(E0.path_dirN(0, 0)), leg = (K.xs - o(0, 0)) / dx;
+                const double gapS = std::sqrt(ub::sumsq(Et.sbs - Et.fbs)), budget = 0.8 * (leg + gapS) * dx;
+                std::vector<DiagLayer> lay = {lump_layer(lq[iA - 1], f), lump_layer(lq[iB - 1], f)};
+                DiagSheet W = diag_cm_stack(eH, 1.0, lay, eH, 1.0, ct, f, false, true, budget);
+                DiagSheet U = diag_cm_stack(eH, 1.0, lay, eH, 1.0, ct, f, false, true);
+                std::complex<double> T = cpx(Et.xpr, 0, 0), R = cpx(Er.xpr, 0, 0);
+                if (K.ta == 0.0005) // the thin stack of this host and position
+                    T1 = T, R1 = R, Tr1 = W.T_te, Rr1 = W.R_te;
+                const double dT = std::abs(T / T1 - W.T_te / Tr1), dR = std::abs(R / R1 - W.R_te / Rr1), tt = K.ta + K.tb;
+                const bool cap = budget < tt, fits = 0.5 * tt < K.xs && 0.5 * tt < K.Lh - K.xs;
+                const std::complex<double> ch = cpx(E0.xpr, 0, 0) * T * cpx(X0.xpr, 0, 0);
+                QD_DIAG("%.0f,%.0f,%.1f,%d,%.0f,%.4f,%d,%d,%.3e,%.3e,%.6f,%.4f,%.4f\n", 1e3 * K.Lh, 1e3 * K.xs, 1e3 * tt, tr, thd, 1e3 * budget, (int)fits,
+                        (int)cap, dT, dR, ub::dB(W.T_te / U.T_te), ub::deg(W.T_te / U.T_te), ub::dB(ch));
+                INFO("stack budget, host " << K.Lh << " front " << K.xs << " stack " << tt << " tracer " << tr << " theta " << thd);
+                CHECK((Et.rt == 77 && Er.rt == 205));
+                CHECK(dT < 1.0e-9);
+                CHECK(dR < 1.0e-9);
+                CHECK(std::norm(ch) < 1.0);
+                CHECK(budget < 0.81 * K.xs / std::cos(th) * dx + 1.0e-4); // the leg in front, and not the host behind
+            }
+        }
+}
+
+TEST_CASE("Unentered branches - the core's loss cap is a floor on the transmit port and leaves the reflect port alone")
+{
+    ub::OneThread one_thread;
+    // qd_stack_resolve caps each layer's phase at 46.05 Np of imaginary part, 400 dB one way,
+    // because the matrix is built from cos and sin of that phase. Below the cap the core is the
+    // uncapped reference on both ports. Above it the reflect port is still the reference, and the
+    // transmit port stands at the floor: the reference raised by what the cap took off.
+    const double f = FRQ, k0 = 2.0 * QPI * f / C0, cap_Np = 46.05, tM = 0.001, gap = 1.0e-5, thd = 30.0;
+    const double th = thd * QPI / 180.0, s2 = std::sin(th) * std::sin(th);
+    const std::complex<double> J(0.0, 1.0);
+    const std::vector<double> loss_dB = {100.0, 300.0, 390.0, 399.0, 401.0, 450.0, 600.0, 2000.0};
+    std::vector<LumpMtl> lp = {
+        {2.50, 0.00, 0.002},                // 1 a coherent partner layer
+        {2.50, 0.00, 0.002, 0.0, 0.2},      // 2 the same with tf, which takes the scattering form
+        {1.50, 0.40, 0.0},                  // 3 a host
+    };
+    for (double a : loss_dB)
+    {
+        double Np = a / 8.685889638, E = 2.0 * (Np / (k0 * tM)) * (Np / (k0 * tM));
+        lp.push_back({1.0, E, tM});
+    }
+    ub::Pal pal = lump_palette(lp);
+
+    QD_DIAG("\n# diag: the core's loss cap, 1 mm layer of eps 1 - jE with a 2 mm eps 2.50 layer, stack in air, 30 deg, scalar.\n");
+    QD_DIAG("# loss_dB: one-way loss of the layer at this angle. R: reflect port against diag_cm_stack (form m) or diag_sc_stack (form s),\n");
+    QD_DIAG("# complex. T_dB: transmit port. dT: below the cap relative to the reference, above it the level in dB against the reference\n");
+    QD_DIAG("# raised by what the cap took off\n");
+    QD_DIAG("form,order,loss_dB,capped,R,T_dB,dT\n");
+    for (int form = 0; form < 2; ++form)
+        for (int order = 0; order < 2; ++order)
+            for (size_t q = 0; q < loss_dB.size(); ++q)
+            {
+                const int iP = form ? 2 : 1, iM = 4 + (int)q;
+                const std::complex<double> eM = lump_eps(lp[iM - 1], f);
+                const double Np = -std::imag(k0 * std::sqrt(eM) * std::sqrt(1.0 - s2 / eM) * tM);
+                arma::uvec mi;
+                arma::mat mesh = ub::build({0.0, gap}, {order ? iP : iM, order ? iM : iP}, {false, true}, mi);
+                arma::mat o, d;
+                diag_ray_at(thd, o, d);
+                ub::Ev Et = ub::traced<double>(pal, mesh, mi, 4, f, o, d, nullptr), Er = ub::traced<double>(pal, mesh, mi, 3, f, o, d, nullptr);
+                REQUIRE((Et.nh == 2 && Er.nh == 2));
+                std::vector<DiagLayer> lay = {lump_layer(lp[(order ? iP : iM) - 1], f), lump_layer(lp[(order ? iM : iP) - 1], f)};
+                DiagSheet W = form ? diag_sc_stack(1.0, 1.0, 0.0, lay, 1.0, 1.0, 0.0, std::cos(th), f, false, true)
+                                   : diag_cm_stack(1.0, 1.0, lay, 1.0, 1.0, std::cos(th), f, false, true);
+                std::complex<double> T = cpx(Et.xpr, 0, 0), R = cpx(Er.xpr, 0, 0);
+                const bool capped = Np > cap_Np;
+                const double dR = std::abs(R - W.R_te);
+                const double dT = capped ? std::abs(ub::dB(T / W.T_te) - 8.685889638 * (Np - cap_Np)) : std::abs(T - W.T_te) / std::abs(W.T_te);
+                QD_DIAG("%s,%s,%.2f,%d,%.3e,%.2f,%.3e\n", form ? "s" : "m", order ? "P|M" : "M|P", 8.685889638 * Np, (int)capped, dR, ub::dB(T), dT);
+                INFO("loss cap form " << form << " order " << order << " loss " << loss_dB[q]);
+                CHECK((Et.rt == 69 && Er.rt == 197));
+                CHECK(dR < 1.0e-12);
+                CHECK(dT < (capped ? 1.0e-6 : 1.0e-9));
+                CHECK(std::isfinite(std::norm(T)));
+                CHECK(std::isfinite(std::norm(R)));
+            }
+
+    // As the mirror of a host's series: an opaque lining on the far face of a traced solid. The
+    // mirror is the half-space of the lining's material, whatever is behind it.
+    QD_DIAG("\n# diag: the same layer as a lining on the far face of 100 mm of eps 1.50-0.40j, reflect pass, 30 deg: the host's series,\n");
+    QD_DIAG("# eps 0 over eps 1.5, against the series whose mirror is the layer backed by air (S_layer) and the half-space of the\n");
+    QD_DIAG("# layer's material (S_half)\n");
+    QD_DIAG("loss_dB,capped,abs_S,S_layer,S_half\n");
+    const std::complex<double> eH = lump_eps(lp[2], f), nH = std::sqrt(eH), ct = std::sqrt(1.0 - s2 / eH);
+    for (size_t q = 0; q < loss_dB.size(); ++q)
+    {
+        const int iM = 4 + (int)q;
+        const std::complex<double> eM = lump_eps(lp[iM - 1], f), nM = std::sqrt(eM), cM = std::sqrt(1.0 - s2 / eM);
+        const double Np = -std::imag(k0 * nM * cM * tM);
+        arma::uvec mi;
+        arma::mat mesh = ub::build({0.0, 0.100, 0.100 + gap}, {3, 3, iM}, {false, true, false}, mi);
+        auto c0 = ub::chain(pal, mesh, mi, {4, 3}, f, thd, {1.5, 1.5}), c1 = ub::chain(pal, mesh, mi, {4, 3}, f, thd, {1.5, 0.0});
+        REQUIRE((c0.size() == 2 && c1.size() == 2));
+        const std::complex<double> S = cpx(c1[1].xpr, 0, 0) / cpx(c0[1].xpr, 0, 0);
+        DiagLayer lay = lump_layer(lp[iM - 1], f);
+        std::complex<double> rl = diag_cm_stack(eH, 1.0, {lay}, 1.0, 1.0, ct, f, true, true).R_te;
+        std::complex<double> rh = (nH * ct - nM * cM) / (nH * ct + nM * cM);
+        const std::complex<double> rb = (nH * ct - std::cos(th)) / (nH * ct + std::cos(th));
+        const std::complex<double> ph2 = std::exp(-2.0 * J * k0 * nH * ct * (0.100 - c0[0].origN(0, 0)));
+        const double dl = std::abs(S - 1.0 / (1.0 - rl * rb * ph2)), dh = std::abs(S - 1.0 / (1.0 - rh * rb * ph2));
+        QD_DIAG("%.2f,%d,%.6f,%.3e,%.3e\n", 8.685889638 * Np, (int)(Np > cap_Np), std::abs(S), dl, dh);
+        INFO("loss cap mirror, loss " << loss_dB[q]);
+        CHECK((c1[1].rt & 0x04) != 0);
+        CHECK(dl < 1.0e-9);
+        CHECK(dh < 1.0e-9);
+    }
+}
+
+TEST_CASE("Unentered branches - a sheet without the mass column of its mass-law host's permittivity is merged")
+{
+    ub::OneThread one_thread;
+    // The merge of a matched sheet into its host leg is switched off only where host and sheet
+    // both carry the mass column. A matched sheet without it is no boundary and no body: the
+    // host stays one leg and pays the mass term of its whole thickness, where a sheet of another
+    // permittivity cuts it into two bodies that pay in dB. The mass paid is the run over its twin
+    // whose fRef takes the mass argument to nothing.
+    const double f = FRQ, Lw = 0.100;
+    const std::vector<LumpMtl> lp = {
+        {2.401e-9, 0.0, 0.0, 0.0, 0.3, 0.0, 0.0, 0.0, 0.0, 30.0, 0.001}, // 1 rigid wall, tf 0.3, m 30
+        {2.401e-9, 0.0, 0.0, 0.0, 0.3, 0.0, 0.0, 0.0, 0.0, 30.0, 1.0e9}, // 2 its twin without a mass argument
+        {2.401e-9, 0.0, 0.008},                                          // 3 a sheet of the wall's permittivity, no mass column
+        {2.1609e-8, 0.0, 0.008},                                         // 4 a sheet of another permittivity, no mass column
+    };
+    ub::Pal pal = lump_palette(lp);
+    QD_DIAG("\n# diag: a sheet without the mass column inside 100 mm of a rigid mass-law wall, scalar. paid: mass term the chain pays, the\n");
+    QD_DIAG("# run over its twin without a mass argument; TL: the term of one body of the thickness crossed. d_alone: the chain against\n");
+    QD_DIAG("# the wall without the sheet, dB. words: prev.cur.buf after the entry and after the sheet\n");
+    QD_DIAG("tracer,theta,sheet,rt,paid_dB,TL_dB,paid_minus_TL,d_alone_dB,words_in,words_out\n");
+    for (int tr : {4, 5})
+        for (double thd : {0.0, 10.0, 30.0, 60.0})
+        {
+            const double cth = std::cos(thd * QPI / 180.0);
+            double lvl[3][2], dleg = 0.0;
+            ub::Ev Ein, Esh[3];
+            for (int s = 0; s < 3; ++s)   // 0 the wall alone, 1 with the matched sheet, 2 with the other sheet
+                for (int tw = 0; tw < 2; ++tw)
+                {
+                    arma::uvec mi;
+                    arma::mat mesh = s ? ub::build({0.0, 0.5 * Lw, Lw}, {1 + tw, 2 + s, 1 + tw}, {false, false, true}, mi)
+                                       : ub::build({0.0, Lw}, {1 + tw, 1 + tw}, {false, true}, mi);
+                    auto c = ub::chain(pal, mesh, mi, s ? std::vector<int>{tr, tr, tr} : std::vector<int>{tr, tr}, f, thd, {1.5});
+                    REQUIRE(c.size() == (s ? 3u : 2u));
+                    std::complex<double> v = 1.0;
+                    for (const auto &E : c)
+                        v *= cpx(E.xpr, 0, 0);
+                    lvl[s][tw] = ub::dB(v);
+                    if (tw == 0)
+                    {
+                        dleg = Lw - c[0].origN(0, 0), Ein = c[0];
+                        if (s)
+                            Esh[s] = c[1];
+                    }
+                }
+            const double TL = diag_mass_TL(30.0, 0.001, f, dleg, cth);
+            for (int s = 0; s < 3; ++s)
+            {
+                const double paid = lvl[s][1] - lvl[s][0];
+                QD_DIAG("%d,%.0f,%s,%d,%.6f,%.6f,%.3e,%.3e,%04x.%04x.%04x,%04x.%04x.%04x\n", tr, thd, s ? (s == 1 ? "matched" : "other") : "none",
+                        s ? (int)Esh[s].rt : 0, paid, TL, paid - TL, lvl[s][0] - lvl[0][0], ub::w(Ein.prev(0)), ub::w(Ein.cur(0)), ub::w(Ein.buf(0)),
+                        s ? ub::w(Esh[s].prev(0)) : 0u, s ? ub::w(Esh[s].cur(0)) : 0u, s ? ub::w(Esh[s].buf(0)) : 0u);
+                INFO("merged sheet, tracer " << tr << " theta " << thd << " stack " << s);
+                if (s < 2)
+                    CHECK(std::abs(paid - TL) < 1.0e-3); // one body of the whole thickness
+                if (s == 1)
+                {
+                    CHECK(std::abs(lvl[1][0] - lvl[0][0]) < 1.0e-3); // the wall with the sheet is the wall
+                    CHECK((Esh[1].prev(0) == Ein.prev(0) && Esh[1].cur(0) == Ein.cur(0) && Esh[1].buf(0) == Ein.buf(0))); // the leg carries on
+                }
+                if (s == 2)
+                    CHECK(paid - TL > 10.0); // another permittivity separates the halves, which then pay in dB
+            }
+        }
+}
+
+TEST_CASE("Unentered branches - sheet and stack and slab series at float against double")
+{
+    ub::OneThread one_thread;
+    // The composite, the core and the slab series are computed in double and written to dtype, and
+    // the positions a chain runs on are the dtype's. The same chains at float and at double,
+    // event by event: every hit code, resolved type and state word equal, and every coefficient
+    // within what single-precision positions and a single-precision palette leave.
+    const double f = FRQ, gap = 1.0e-5;
+    const std::vector<LumpMtl> lp = {
+        {1.50, 0.40, 0.0},   // 1 solid
+        {5.24, 0.63, 0.006}, // 2 sheet 6 mm
+        {2.50, 0.80, 0.010}, // 3 second sheet 10 mm
+    };
+    ub::Pal pal = lump_palette(lp);
+    struct St
+    {
+        const char *name;
+        std::vector<double> x;
+        std::vector<int> mat;
+        std::vector<bool> flip;
+        std::vector<std::vector<int>> seq; // 1 = the transmit type of the row, 3 = reflect
+    };
+    const std::vector<St> stacks = {
+        {"sheet in air", {0.0}, {2}, {false}, {{1}, {3}}},
+        {"glued entry", {0.0, gap, 0.100}, {2, 1, 1}, {false, false, true}, {{1, 1}, {3}}},
+        {"glued exit", {0.0, 0.100, 0.100 + gap}, {1, 1, 2}, {false, true, false}, {{1, 1}, {1, 3, 1}}},
+        {"sheet inside", {0.0, 0.050, 0.100}, {1, 2, 1}, {false, false, true}, {{1, 1, 1}, {1, 3, 1}}},
+        {"ordered stack", {0.0, gap}, {2, 3}, {false, true}, {{1}, {3}}},
+        {"bare slab", {0.0, 0.100}, {1, 1}, {false, true}, {{1, 1}, {1, 3, 1}}},
+    };
+    QD_DIAG("\n# diag: float against double, the same chain event by event, every series summed. rel: largest distance of an xprmat\n");
+    QD_DIAG("# entry over the largest entry of that event, worst event of the path; codes: hit code, resolved type and the three\n");
+    QD_DIAG("# words equal on every event\n");
+    QD_DIAG("stack,type,path,theta,events,rel,chain_dB,d_chain_dB,codes\n");
+    double worst = 0.0;
+    for (const St &S : stacks)
+        for (int tr : {4, 5, 1, 2})
+            for (size_t ip = 0; ip < S.seq.size(); ++ip)
+                for (double thd : {0.0, 30.0, 60.0, 80.0})
+                {
+                    arma::uvec mi;
+                    arma::mat mesh = ub::build(S.x, S.mat, S.flip, mi);
+                    std::vector<int> seq;
+                    for (int t : S.seq[ip])
+                        seq.push_back((t == 3) ? ((tr == 4 || tr == 5) ? 3 : 0) : tr);
+                    auto cd = ub::chain_t<double>(pal, mesh, mi, seq, f, thd, {0.0}), cf = ub::chain_t<float>(pal, mesh, mi, seq, f, thd, {0.0});
+                    REQUIRE((cd.size() == seq.size() && cf.size() == seq.size()));
+                    double rel = 0.0, pd = 1.0, pf = 1.0;
+                    bool codes = true;
+                    for (size_t q = 0; q < cd.size(); ++q)
+                    {
+                        double scale = arma::abs(cd[q].xpr).max(), dist = arma::abs(cf[q].xpr - cd[q].xpr).max();
+                        rel = std::max(rel, dist / scale);
+                        codes = codes && cd[q].ot == cf[q].ot && cd[q].rt == cf[q].rt && cd[q].prev(0) == cf[q].prev(0) &&
+                                cd[q].cur(0) == cf[q].cur(0) && cd[q].buf(0) == cf[q].buf(0);
+                        pd *= ub::sumsq(cd[q].xpr), pf *= ub::sumsq(cf[q].xpr);
+                    }
+                    worst = std::max(worst, rel);
+                    QD_DIAG("%s,%d,%zu,%.0f,%zu,%.3e,%.4f,%.3e,%d\n", S.name, tr, ip, thd, cd.size(), rel, 10.0 * std::log10(pd), 10.0 * std::log10(pf / pd), (int)codes);
+                    INFO("float " << S.name << " type " << tr << " path " << ip << " theta " << thd);
+                    CHECK(codes);
+                    CHECK(rel < 1.0e-4);
+                }
+    QD_DIAG("# worst %.3e\n", worst);
+}
+
+TEST_CASE("Unentered branches - ray_mesh_interact's own glued composite against the redo")
+{
+    ub::OneThread one_thread;
+    // What ray_mesh_interact writes for a glued pair serves a caller without state; with the state
+    // kept the redo replaces it. From air the two are handed the same media and the same cosine,
+    // so they have to be one number: under a closed outer pair on the transmit port, for a sheet
+    // entered as a leak and for one entered by an ordinary crossing, and with att, tf and a
+    // resonance on the sheet and on the wall behind it. A glued exit is reached with a seeded
+    // state, a ray launched inside a lossless solid; there the redo also closes the host leg, a
+    // phase common to every entry. A tube with one edge past the critical angle is the last table.
+    const double f = FRQ, gap = 1.0e-5;
+    const std::vector<LumpMtl> lp = {
+        {2.1609e-8, 0.0, 0.022, 3.0, 0.2, 0.0, 0.0, 0.0, 0.0, 20.0, 0.001}, // 1 wood panel 22 mm, att 3 dB, tf 0.2, mass law
+        {2.401e-9, 0.0, 0.0, 2.0, 0.1, 0.0, 0.0, 0.0, 0.0, 30.0, 0.001},    // 2 concrete, att 2 dB, tf 0.1, mass law
+        {0.31, 0.0, 0.010, 0.0, 0.2},                                       // 3 lossless sheet rarer than air, tf 0.2
+        {2.401e-9, 0.0, 0.0, 0.0, 0.3},                                     // 4 rigid wall, tf 0.3
+        {5.24, 0.63, 0.006, 3.0, 0.3, 2.0, 5.0, 0.5},                       // 5 sheet with att, tf and a resonance
+        {1.50, 0.40, 0.0, 2.0, -0.2},                                       // 6 solid with att and a forcing tf
+        {5.24, 0.00, 0.0},                                                  // 7 lossless dense solid
+        {1.50, 0.40, 0.006, 0.0, 0.5},                                      // 8 coating 6 mm, tf 0.5
+        {2.50, 0.80, 0.010},                                                // 9 lossy sheet 10 mm
+        {0.50, 0.00, 0.0},                                                  // 10 lossless solid rarer than air: critical angle 45 deg
+    };
+    ub::Pal pal = lump_palette(lp);
+
+    QD_DIAG("\n# diag: ray_mesh_interact's own glued entry against the redo, from air. own: largest distance of an xprmat entry, complex.\n");
+    QD_DIAG("# ref: the scalar port against diag_leak_series (closed pair, ordinary crossing) or diag_sheet_composite with its lumped\n");
+    QD_DIAG("# columns (open pair); -1 where neither applies\n");
+    QD_DIAG("stack,type,theta,ot,rt,lib_dB,own,ref\n");
+    struct St
+    {
+        const char *name;
+        int sheet, wall;
+    };
+    for (const St &S : {St{"wood panel | concrete", 1, 2}, St{"eps 0.31 tf 0.2 | rigid tf 0.3", 3, 4}, St{"lumped sheet | lumped solid", 5, 6}})
+        for (int it : {4, 5, 3, 1, 0})
+            for (double thd : {0.0, 10.0, 30.0, 45.0, 70.0})
+            {
+                const double th = thd * QPI / 180.0;
+                arma::uvec mi;
+                arma::mat mesh = ub::build({0.0, gap}, {S.sheet, S.wall}, {false, false}, mi);
+                arma::mat o, d;
+                diag_ray_at(thd, o, d);
+                ub::Opt op;
+                op.relaunch = it != 3 && it != 0;
+                ub::Ev E = ub::traced<double>(pal, mesh, mi, it, f, o, d, nullptr, op);
+                REQUIRE(E.nh == 2);
+                const double own = arma::abs(E.xpr - E.xpr0).max();
+                const LumpMtl &Ms = lp[S.sheet - 1], &Mw = lp[S.wall - 1];
+                const std::complex<double> eS = lump_eps(Ms, f), eW = lump_eps(Mw, f), lib = cpx(E.xpr, 0, 0);
+                double ref = -1.0;
+                if (it >= 4 && S.sheet == 3 && (E.ot & 0x20) != 0 && std::sin(th) * std::sin(th) < 0.31) // closed pair, an ordinary crossing into the sheet
+                    ref = std::abs(lib - diag_leak_series(1.0, eS, eW, 0.0, Ms.tf, Mw.tf, Ms.thk, std::cos(th), f, true).T_te);
+                if (it >= 3 && S.sheet == 5)
+                {
+                    DiagLump Lp;
+                    Lp.g_slab = std::pow(10.0, -0.1 * Ms.att), Lp.g_far = std::pow(10.0, -0.1 * Mw.att);
+                    Lp.tf = Ms.tf, Lp.tf_far = Mw.tf, Lp.res_slab = lump_res(Ms, f);
+                    DiagSheet W = diag_sheet_composite(1.0, eS, eW, Ms.thk, std::cos(th), f, false, true, 1.0, 1.0, 1.0, Lp);
+                    ref = std::abs(lib - ((it == 3) ? W.R_te : W.T_te));
+                }
+                QD_DIAG("%s,%d,%.0f,%d,%d,%.4f,%.3e,%.3e\n", S.name, it, thd, (int)E.ot, (int)E.rt, ub::dB(lib), own, ref);
+                INFO("own glued entry " << S.name << " type " << it << " theta " << thd);
+                CHECK(own < 1.0e-12);
+                if (ref >= 0.0)
+                    CHECK(ref < 1.0e-9);
+                if (S.sheet != 5 && thd > 0.0)
+                    CHECK((E.ot & 0x20) != 0); // the outer pair is closed on these rows
+            }
+
+    QD_DIAG("\n# diag: ray_mesh_interact's own glued exit, eps 5.24 | 6 mm eps 1.50-0.40j tf 0.5 | air, EM, ray launched in the solid;\n");
+    QD_DIAG("# critical angle of the outer pair 25.9 deg. mag: largest distance of an entry's magnitude; leg: the redo over the own\n");
+    QD_DIAG("# coefficient, HH against VV, which is the host leg the redo closes and has to be one number\n");
+    QD_DIAG("type,theta,ot,rt,VV_dB,HH_dB,mag,leg\n");
+    for (int it : {1, 2, 0})
+        for (double thd : {15.0, 22.0, 30.0, 45.0})
+        {
+            arma::uvec mi;
+            arma::mat mesh = ub::build({0.0, gap}, {7, 8}, {true, false}, mi);
+            arma::mat o, d;
+            diag_ray_at(thd, o, d);
+            ub::Ev seed;
+            seed.prev = sv({0}), seed.cur = sv({7}), seed.buf = sv({0});
+            seed.path_dirN = (d - o) / std::sqrt(ub::sumsq(d - o));
+            seed.accg = arma::vec{0.0}, seed.accr = arma::vec{0.0};
+            ub::Ev E = ub::traced<double>(pal, mesh, mi, it, f, o, d, &seed);
+            REQUIRE(E.nh == 2);
+            const std::complex<double> v0 = cpx(E.xpr0, 0, 0), v1 = cpx(E.xpr, 0, 0), h0 = cpx(E.xpr0, 0, 3), h1 = cpx(E.xpr, 0, 3);
+            double mag = 0.0;
+            for (int q = 0; q < 4; ++q)
+                mag = std::max(mag, std::abs(std::abs(cpx(E.xpr, 0, q)) - std::abs(cpx(E.xpr0, 0, q))));
+            const double leg = (std::abs(v0) > 1.0e-12 && std::abs(h0) > 1.0e-12) ? std::abs(v1 / v0 - h1 / h0) : 0.0;
+            QD_DIAG("%d,%.0f,%d,%d,%.4f,%.4f,%.3e,%.3e\n", it, thd, (int)E.ot, (int)E.rt, ub::dB(v1), ub::dB(h1), mag, leg);
+            INFO("own glued exit type " << it << " theta " << thd);
+            CHECK(mag < 1.0e-12);
+            CHECK(leg < 1.0e-12);
+        }
+
+    QD_DIAG("\n# diag: a ray tube with one edge past the critical angle of the outer pair, air | 10 mm eps 2.50-0.80j | eps 0.50, 45 deg,\n");
+    QD_DIAG("# type 5, tube 0.6 deg wide. own_dB: ray_mesh_interact's transmit port; redo_dB: after ray_state_update; t4: the redo\n");
+    QD_DIAG("# against the undeviated tracer's event without a tube, largest distance of an entry; seg, dir: angle of the relaunched\n");
+    QD_DIAG("# segment and of the written direction, deg\n");
+    QD_DIAG("theta,ot,ot_no_tube,rt,rt_4,own_dB,redo_dB,t4,seg,dir,dir_4,cur,cur_4\n");
+    auto ang = [](const arma::mat &v)
+    { return std::atan2(std::sqrt(v(0, 1) * v(0, 1) + v(0, 2) * v(0, 2)), std::abs(v(0, 0))) * 180.0 / QPI; };
+    for (double thd : {43.0, 44.6, 46.0})
+    {
+        arma::uvec mi;
+        arma::mat mesh = ub::build({0.0, gap}, {9, 10}, {false, false}, mi);
+        arma::mat o, d;
+        diag_ray_at(thd, o, d);
+        auto dirv = [](double a, double z)
+        {
+            arma::rowvec v = {std::cos(a * QPI / 180.0), std::sin(a * QPI / 180.0), z};
+            return arma::rowvec(v / std::sqrt(v(0) * v(0) + v(1) * v(1) + v(2) * v(2)));
+        };
+        arma::mat trivec(1, 9), tridir(1, 9);
+        trivec.row(0) = arma::rowvec{0.0, 0.001, 0.0, 0.0, -0.001, 0.001, 0.0, -0.001, -0.001};
+        tridir.row(0) = arma::join_rows(arma::join_rows(dirv(thd + 0.6, 0.0), dirv(thd - 0.6, 0.0)), dirv(thd, 0.01));
+        ub::Opt tube, plain;
+        tube.trivec = &trivec, tube.tridir = &tridir, tube.relaunch = true, plain.relaunch = true;
+        ub::Ev E = ub::traced<double>(pal, mesh, mi, 5, f, o, d, nullptr, tube), N5 = ub::traced<double>(pal, mesh, mi, 5, f, o, d, nullptr, plain);
+        ub::Ev E4 = ub::traced<double>(pal, mesh, mi, 4, f, o, d, nullptr);
+        REQUIRE(E.nh == 2);
+        const double t4 = arma::abs(E.xpr - E4.xpr).max();
+        QD_DIAG("%.1f,%d,%d,%d,%d,%.4f,%.4f,%.3e,%.4f,%.4f,%.4f,%04x,%04x\n", thd, (int)E.ot, (int)N5.ot, (int)E.rt, (int)E4.rt, ub::dB(cpx(E.xpr0, 0, 0)),
+                ub::dB(cpx(E.xpr, 0, 0)), t4, ang(E.destN - E.origN), ang(E.path_dirN), ang(E4.path_dirN), ub::w(E.cur(0)), ub::w(E4.cur(0)));
+        INFO("tube edge, theta " << thd);
+        // Whatever the tube did to the hit code, the redo is the undeviated tracer's event
+        CHECK(ub::same_bits(E.xpr, E4.xpr));
+        CHECK(E.rt == E4.rt);
+        CHECK(std::abs(ang(E.path_dirN) - ang(E4.path_dirN)) < 1.0e-9);
+        if (thd > 44.0 && thd < 45.0) // the spine is open and one edge is not
+        {
+            CHECK(((E.ot & 0x20) != 0 && (N5.ot & 0x20) == 0));   // the edge closes the whole tube
+            CHECK(std::norm(cpx(E.xpr0, 0, 0)) == 0.0);            // and a caller without state gets the leak chain: nothing, with no tf
+            CHECK(std::norm(cpx(E.xpr, 0, 0)) > 0.1);              // where the redo has the composite of the open pair
+            CHECK(E.cur(0) == E4.cur(0));                          // on a leg that is not flagged bent
+            CHECK(std::abs(ang(E.destN - E.origN) - thd) < 1.0e-6); // because the segment was not bent
+        }
+        else
+            CHECK(arma::abs(E.xpr - E.xpr0).max() < 1.0e-12);
+    }
+}
+
+TEST_CASE("Unentered branches - a stack of a coherent and a mass-law layer against the laminate meshed as a solid with a lining")
+{
+    ub::OneThread one_thread;
+    // A stack is centred over its coherent thickness, and a mass-law layer has none: the coherent
+    // layer lies about the mesh plane and the mass-law layer on its far face. That is the laminate
+    // whose coherent layer is a traced solid of that thickness with the mass-law layer as a lining
+    // on one face, with the stack's plane in the middle of the solid. The traced laminate runs
+    // through other code: a glued sheet event and the solid's own series. Paths are taken to the
+    // point their polyline ends at; the reflected ones are referenced to the stack's plane.
+    const double f = FRQ, gap = 1.0e-5, tC = 0.010, k = 2.0 * QPI * f / C0;
+    const std::complex<double> J(0.0, 1.0);
+    const std::vector<LumpMtl> lp = {
+        {2.50, 0.80, tC},                                                    // 1 the coherent layer as a sheet
+        {2.50, 0.80, 0.0},                                                   // 2 the same as a solid
+        {2.1609e-8, 0.0, 0.022, 0.0, 0.2, 0.0, 0.0, 0.0, 0.0, 20.0, 0.001},  // 3 mass-law layer, 26.8 dB
+        {2.1609e-8, 0.0, 0.022, 0.0, 0.2, 0.0, 0.0, 0.0, 0.0, 20.0, 0.010},  // 4 the same near its knee, 6.8 dB
+    };
+    ub::Pal pal = lump_palette(lp);
+    QD_DIAG("\n# diag: stack coherent | mass-law against the traced solid with a lining, scalar, undeviated and refracting tracer, every\n");
+    QD_DIAG("# series summed. T, R: the stack's port over the traced laminate's, dB and deg. side C: the coherent layer met first;\n");
+    QD_DIAG("# side M: the mass-law layer met first, where the traced laminate also has an echo through the lining that a stack does\n");
+    QD_DIAG("# not carry: echo_dB is that path over the reflection off the lining, and R is taken against the first path alone\n");
+    QD_DIAG("# mass_cos_dB: the mass term at the cosine the wave has in the coherent layer less the term at the incidence cosine, which\n");
+    QD_DIAG("# is what a lining on the far face of a traced solid pays more than the stack; T_rest: T_dB less that\n");
+    QD_DIAG("side,mass,tracer,theta,T_stack_dB,T_dB,T_deg,R_stack_dB,R_dB,R_deg,echo_dB,mass_cos_dB,T_rest\n");
+    for (int side = 0; side < 2; ++side)
+        for (int iM : {3, 4})
+            for (int tr : {4, 5})
+                for (double thd : {10.0, 30.0, 60.0})
+                {
+                    const double c = std::cos(thd * QPI / 180.0);
+                    arma::uvec ms, mt;
+                    arma::mat mesh_s = side ? ub::build({0.0, gap}, {iM, 1}, {false, true}, ms) : ub::build({0.0, gap}, {1, iM}, {false, true}, ms);
+                    arma::mat mesh_t = side ? ub::build({0.0, gap, gap + tC}, {iM, 2, 2}, {false, false, true}, mt)
+                                            : ub::build({0.0, tC, tC + gap}, {2, 2, iM}, {false, true, false}, mt);
+                    auto sT = ub::chain(pal, mesh_s, ms, {tr}, f, thd, {0.0}), sR = ub::chain(pal, mesh_s, ms, {3}, f, thd, {0.0});
+                    auto tT = ub::chain(pal, mesh_t, mt, {tr, tr}, f, thd, {0.0}), tR1 = ub::chain(pal, mesh_t, mt, {3}, f, thd, {0.0});
+                    auto tR2 = ub::chain(pal, mesh_t, mt, {tr, 3, tr}, f, thd, {0.0});
+                    REQUIRE((sT.size() == 1 && sR.size() == 1 && tT.size() == 2 && tR1.size() == 1 && tR2.size() == 3));
+                    const std::complex<double> Ts = cpx(sT[0].xpr, 0, 0) * std::exp(-J * k * c * tC), Rs = cpx(sR[0].xpr, 0, 0);
+                    const std::complex<double> Tt = ub::at_point(tT, f, thd), R1 = ub::at_point(tR1, f, thd), R2 = ub::at_point(tR2, f, thd);
+                    const std::complex<double> Rt = (side ? R1 : R1 + R2) * std::exp(J * k * c * tC);
+                    // The cosine the wave has in the coherent layer, off the direction the entry wrote
+                    const arma::mat &dC = tT[0].path_dirN;
+                    const double cC = std::abs(dC(0, 0)) / std::sqrt(ub::sumsq(dC));
+                    const LumpMtl &Mm = lp[iM - 1];
+                    const double mass_cos = side ? 0.0 : diag_mass_TL(Mm.m, Mm.fRef, f, Mm.thk, cC) - diag_mass_TL(Mm.m, Mm.fRef, f, Mm.thk, c);
+                    const double T_rest = ub::dB(Ts / Tt) - mass_cos;
+                    QD_DIAG("%s,%s,%d,%.0f,%.4f,%.6f,%.4f,%.4f,%.6f,%.4f,%.4f,%.6f,%.6f\n", side ? "M" : "C", (iM == 3) ? "26.8 dB" : "6.8 dB", tr, thd, ub::dB(Ts),
+                            ub::dB(Ts / Tt), ub::deg(Ts / Tt), ub::dB(Rs), ub::dB(Rs / Rt), ub::deg(Rs / Rt), ub::dB(R2 / R1), mass_cos, T_rest);
+                    INFO("mixed stack side " << side << " mass " << iM << " tracer " << tr << " theta " << thd);
+                    // One laminate on the reflect port, from either side, and one partition
+                    CHECK(std::abs(ub::dB(Rs / Rt)) < 5.0e-3);
+                    CHECK(std::abs(ub::deg(Rs / Rt)) < 0.05);
+                    CHECK(std::abs(ub::deg(Ts / Tt)) < 0.05);
+                    // On the transmit port the two are one where the mass-law layer is met first. Met
+                    // behind the traced solid its term is formed at the cosine in that solid, and
+                    // that is all that separates the two: recorded as mass_cos_dB, not asserted away
+                    CHECK(std::abs(T_rest) < 5.0e-3);
+                    if (side)
+                        CHECK(std::abs(ub::dB(Ts / Tt)) < 5.0e-3);
+                }
+}
+
+TEST_CASE("Unentered branches - the followed mark and the resolved flag across abutting and nested and overlapping bodies")
+{
+    ub::OneThread one_thread;
+    // A leg that began at a reflection carries what that reflection decided: the followed mark in
+    // the buffer word where the series was left to the tracer, the resolved flag where it was
+    // summed. Three ways such a leg meets a face that is not the end of its body.
+    //   A. A wall meshed as two abutting blocks of one material. The shared face is a transparent
+    //      transition, the mark is carried, and the wall is the wall meshed as one block.
+    //   B. An object nested in the wall. Its medium is stored over the mark, and the event that
+    //      closes the leg judges its series for itself: the recorded limitation.
+    //   C. A body that overlaps the wall. A resolved ray that leaves the wall into it has the
+    //      coefficient of the two faces of the hit rewritten to wall | body like any other ray,
+    //      and forms no series.
+    const double f = FRQ, gap = 1.0e-5;
+    const std::vector<LumpMtl> lp = {
+        {1.50, 0.40, 0.0},               // 1 lossy host
+        {1.50, 0.40, 0.0},               // 2 the same material under a second index
+        {1.50, 0.00, 0.0},               // 3 lossless host
+        {1.50, 0.00, 0.0},               // 4 the same under a second index
+        {5.24, 0.00, 0.0},               // 5 a lossless dense object
+        {2.401e-9, 0.0, 0.0, 0.0, 0.3},  // 6 rigid, tf 0.3, no mass column
+        {2.1609e-8, 0.0, 0.0, 0.0, 0.2}, // 7 rigid of another impedance, tf 0.2
+    };
+    ub::Pal pal = lump_palette(lp);
+    auto words = [](const ub::Ev &E)
+    {
+        char b[32];
+        std::snprintf(b, sizeof(b), "%04x.%04x.%04x", ub::w(E.prev(0)), ub::w(E.cur(0)), ub::w(E.buf(0)));
+        return std::string(b);
+    };
+    auto prod = [](const std::vector<ub::Ev> &c)
+    {
+        std::complex<double> v = 1.0;
+        for (const auto &E : c)
+            v *= cpx(E.xpr, 0, 0);
+        return v;
+    };
+
+    QD_DIAG("\n# diag: followed mark A, a wall of two abutting 50 mm blocks against one 100 mm block, enter, reflect at the far face\n");
+    QD_DIAG("# with the series declined, leave by the front face. d_dB, d_deg: the path against the one-block wall. bits: the last event\n");
+    QD_DIAG("# at eps 0 against eps 1.5. w_refl, w_cross: prev.cur.buf after the reflection and after the crossing back\n");
+    QD_DIAG("blocks,tracer,theta,rt_cross,d_dB,d_deg,bits,w_refl,w_cross\n");
+    for (const std::pair<int, int> &B : {std::pair<int, int>{1, 1}, {1, 2}, {3, 4}})
+        for (int tr : {4, 5})
+            for (double thd : {20.0, 60.0})
+            {
+                arma::uvec ma, m1;
+                arma::mat mesh_a = ub::build({0.0, 0.050, 0.050 + gap, 0.100}, {B.first, B.first, B.second, B.second}, {false, true, false, true}, ma);
+                arma::mat mesh_1 = ub::build({0.0, 0.100}, {B.first, B.first}, {false, true}, m1);
+                auto ca = ub::chain(pal, mesh_a, ma, {tr, tr, 3, tr, tr}, f, thd, {1.5}), cb = ub::chain(pal, mesh_a, ma, {tr, tr, 3, tr, tr}, f, thd, {1.5, 1.5, 1.5, 1.5, 0.0});
+                auto c1 = ub::chain(pal, mesh_1, m1, {tr, 3, tr}, f, thd, {1.5});
+                REQUIRE((ca.size() == 5 && cb.size() == 5 && c1.size() == 3));
+                const std::complex<double> q = prod(ca) / prod(c1);
+                const bool bits = ub::same_bits(ca[4].xpr, cb[4].xpr);
+                QD_DIAG("%d|%d,%d,%.0f,%d,%.3e,%.4f,%d,%s,%s\n", B.first, B.second, tr, thd, (int)ca[3].rt, ub::dB(q), ub::deg(q), (int)bits, words(ca[2]).c_str(), words(ca[3]).c_str());
+                INFO("mark A blocks " << B.first << "|" << B.second << " tracer " << tr << " theta " << thd);
+                CHECK(ub::w(ca[2].buf(0)) == 0x4000u);               // the reflection left the series to the tracer
+                CHECK(ub::w(ca[3].buf(0)) == 0x4000u);               // and the shared face carries the mark
+                CHECK((ca[3].rt & ~0x10) == 73);                     // a same-medium pass
+                CHECK(((ca[3].rt & 0x10) != 0) == (B.first != B.second)); // with the fix-flag where the two blocks have two indices
+                CHECK(ca[3].prev(0) == ca[2].prev(0));
+                CHECK(bits);                                         // so the leg forms no series
+                CHECK(std::abs(ub::dB(q)) < 2.0e-3);
+                CHECK(std::abs(ub::deg(q)) < 0.05);
+            }
+
+    QD_DIAG("\n# diag: followed mark B, a 20 mm eps 5.24 object nested in the middle of 100 mm of host, the same path. S_dB: the series\n");
+    QD_DIAG("# the last event forms, eps 0 over eps 1.5; twin: the same without the object, which forms none\n");
+    QD_DIAG("host,tracer,theta,rt_in,rt_out,w_refl,w_in,w_out,S_dB,S_deg,twin_bits\n");
+    for (int iH : {1, 3})
+        for (int tr : {4, 5})
+            for (double thd : {20.0, 60.0})
+            {
+                arma::uvec mn, m1;
+                arma::mat mesh_n = ub::build({0.0, 0.040, 0.060, 0.100}, {iH, 5, 5, iH}, {false, false, true, true}, mn);
+                arma::mat mesh_1 = ub::build({0.0, 0.100}, {iH, iH}, {false, true}, m1);
+                const std::vector<int> seq = {tr, tr, tr, 3, tr, tr, tr};
+                auto ca = ub::chain(pal, mesh_n, mn, seq, f, thd, {1.5}), cb = ub::chain(pal, mesh_n, mn, seq, f, thd, {1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 0.0});
+                auto t0 = ub::chain(pal, mesh_1, m1, {tr, 3, tr}, f, thd, {1.5}), t1 = ub::chain(pal, mesh_1, m1, {tr, 3, tr}, f, thd, {1.5, 1.5, 0.0});
+                REQUIRE((ca.size() == 7 && cb.size() == 7 && t0.size() == 3 && t1.size() == 3));
+                const std::complex<double> S = cpx(cb[6].xpr, 0, 0) / cpx(ca[6].xpr, 0, 0);
+                const bool twin = ub::same_bits(t0[2].xpr, t1[2].xpr);
+                QD_DIAG("%d,%d,%.0f,%d,%d,%s,%s,%s,%.4f,%.4f,%d\n", iH, tr, thd, (int)ca[4].rt, (int)ca[5].rt, words(ca[3]).c_str(), words(ca[4]).c_str(),
+                        words(ca[5]).c_str(), ub::dB(S), ub::deg(S), (int)twin);
+                INFO("mark B host " << iH << " tracer " << tr << " theta " << thd);
+                CHECK(ub::w(ca[3].buf(0)) == 0x4000u); // marked at the reflection
+                CHECK(ca[4].rt == 72);                 // the nested object is deferred
+                CHECK(ca[4].buf(0) == 5);              // and its medium replaces the mark
+                CHECK(ca[5].buf(0) == 0);              // which does not come back when the object is left
+                CHECK(twin);                           // without the object the leg forms no series
+                CHECK(std::abs(S - 1.0) > 1.0e-3);     // with it the leg judges for itself: the recorded limitation
+            }
+
+    QD_DIAG("\n# diag: resolved flag C, a body from -50 mm to 30 mm overlapping a wall from 0 to 100 mm, every series summed: enter the\n");
+    QD_DIAG("# body, cross into the wall, reflect at its far face, come back and leave the wall into the body. The crossing back\n");
+    QD_DIAG("# against the same crossing where the body ends at the wall's face: d_dB, d_deg. bits: that event at eps 0 against 1.5\n");
+    QD_DIAG("wall|body,tracer,theta,rt,rt_abut,d_dB,d_deg,bits,w_before,w_after\n");
+    // level: the row is asserted in dB; point: also in phase. With the refracting tracer
+    // ray_mesh_interact bends the segment at the face of a deferred body as if it were entered
+    // from air, so the two polylines differ inside the overlap and each coefficient is the field
+    // at its own. The rigid rows carry no mass column, where an exit is written along the normal
+    // (the recorded limitation), and are recorded.
+    struct Ov
+    {
+        int a, b, tr;
+        double thd;
+        bool level, point;
+    };
+    for (const Ov &V : {Ov{3, 5, 5, 30.0, true, false}, Ov{3, 5, 5, 60.0, true, false}, Ov{1, 5, 4, 0.0, true, true}, Ov{3, 5, 4, 0.0, true, true},
+                        Ov{1, 5, 5, 30.0, true, false}, Ov{6, 7, 4, 30.0, false, false}, Ov{6, 7, 5, 60.0, false, false}})
+    {
+        arma::uvec mo, mb;
+        arma::mat mesh_o = ub::build({-0.050, 0.0, 0.030, 0.100}, {V.b, V.a, V.b, V.a}, {false, false, true, true}, mo);
+        arma::mat mesh_b = ub::build({-0.050, 0.0, gap, 0.100}, {V.b, V.b, V.a, V.a}, {false, true, false, true}, mb);
+        const std::vector<int> so = {V.tr, V.tr, V.tr, 3, V.tr, V.tr, V.tr}, sb = {V.tr, V.tr, 3, V.tr, V.tr};
+        auto co = ub::chain(pal, mesh_o, mo, so, f, V.thd, {0.0}), ce = ub::chain(pal, mesh_o, mo, so, f, V.thd, {0.0, 0.0, 0.0, 0.0, 0.0, 1.5, 0.0});
+        auto cb = ub::chain(pal, mesh_b, mb, sb, f, V.thd, {0.0});
+        REQUIRE((co.size() == 7 && ce.size() == 7 && cb.size() == 5));
+        const std::complex<double> q = cpx(co[5].xpr, 0, 0) / cpx(cb[3].xpr, 0, 0);
+        const bool bits = ub::same_bits(co[5].xpr, ce[5].xpr);
+        QD_DIAG("%d|%d,%d,%.0f,%d,%d,%.3e,%.4f,%d,%s,%s\n", V.a, V.b, V.tr, V.thd, (int)co[5].rt, (int)cb[3].rt, ub::dB(q), ub::deg(q), (int)bits,
+                words(co[4]).c_str(), words(co[5]).c_str());
+        INFO("resolved C wall " << V.a << " body " << V.b << " tracer " << V.tr << " theta " << V.thd);
+        CHECK((ub::w(co[3].cur(0)) & 0x8000u) != 0);  // the reflection summed the wall's series
+        CHECK((ub::w(co[4].cur(0)) & 0x8000u) != 0);  // the body's face met from inside the wall keeps the flag
+        CHECK(co[4].buf(0) == V.b);                   // and defers the body
+        CHECK(mat_of(co[5].cur(0)) == V.b);           // the wall's own face then leads into it
+        CHECK((ub::w(co[5].cur(0)) & 0x8000u) == 0);
+        CHECK(co[5].buf(0) == 0);
+        CHECK(bits);                                  // a resolved ray forms no series
+        if (V.level)
+            CHECK(std::abs(ub::dB(q)) < 2.0e-3);
+        if (V.point)
+            CHECK(std::abs(ub::deg(q)) < 0.05);
+    }
+}
+
+TEST_CASE("Unentered branches - a verdict handed in on a leg known not parallel and near a pole")
+{
+    ub::OneThread one_thread;
+    // Where a verdict is handed in the series is summed exactly where it says. Two gates a call
+    // deciding for itself reads are then not read: the known-non-parallel flag of the leg, and
+    // the pole, where a denominator below 1e-2 is clamped in magnitude instead of the bounces
+    // being handed back. The first cannot be reached by a caller that uses one threshold for a
+    // run: the base frequency sums on such a leg only at a threshold of zero, where the gate is
+    // not read without a verdict either. Its rows set the flag by hand.
+    const double gap = 1.0e-5;
+    const std::complex<double> J(0.0, 1.0);
+    const std::vector<LumpMtl> lp = {
+        {1.50, 0.40, 0.0},   // 1 lossy solid
+        {1.0e4, 0.0, 0.0},   // 2 lossless and very dense: its faces reflect 0.993 from inside at 80 deg
+    };
+    ub::Pal pal = lump_palette(lp);
+    (void)gap;
+    const std::vector<uint8_t> v1 = {1}, v0 = {0};
+
+    QD_DIAG("\n# diag: a verdict on a leg flagged not parallel, 100 mm of eps 1.50-0.40j, 30 deg, the event that closes the leg.\n");
+    QD_DIAG("# sum: verdict 1 at eps 0.15 against no verdict at eps 0; decline: verdict 0 at eps 0 against no verdict at eps 0.15;\n");
+    QD_DIAG("# bitwise. S_dB: what the series is worth on that event\n");
+    QD_DIAG("tracer,pass,sum_bits,decline_bits,vout_sum,vout_decline,S_dB\n");
+    for (int tr : {4, 5})
+        for (int it : {tr, 3})
+        {
+            arma::uvec mi;
+            arma::mat mesh = ub::build({0.0, 0.100}, {1, 1}, {false, true}, mi);
+            arma::mat o, d;
+            diag_ray_at(30.0, o, d);
+            ub::Opt en;
+            en.relaunch = true;
+            ub::Ev E0 = ub::traced<double>(pal, mesh, mi, tr, FRQ, o, d, nullptr, en);
+            ub::onward(E0, o, d);
+            E0.prev(0) = (short)(ub::w(E0.prev(0)) | 0x8000u); // the leg is known not parallel
+            auto run = [&](double eps, const std::vector<uint8_t> *v)
+            {
+                ub::Opt op;
+                op.eps = eps, op.vin = v, op.relaunch = it != 3;
+                return ub::traced<double>(pal, mesh, mi, it, FRQ, o, d, &E0, op);
+            };
+            ub::Ev a = run(0.15, nullptr), b = run(0.15, &v1), c = run(0.0, nullptr), e = run(0.0, &v0);
+            auto same = [](const ub::Ev &x, const ub::Ev &y)
+            { return ub::same_bits(x.xpr, y.xpr) && x.prev(0) == y.prev(0) && x.cur(0) == y.cur(0) && x.buf(0) == y.buf(0) && x.rt == y.rt; };
+            const std::complex<double> S = cpx(b.xpr, 0, 0) / cpx(a.xpr, 0, 0);
+            QD_DIAG("%d,%s,%d,%d,%d,%d,%.4f\n", tr, (it == 3) ? "reflect" : "transmit", (int)same(b, c), (int)same(e, a), (int)b.vout, (int)e.vout, ub::dB(S));
+            INFO("verdict on a non-parallel leg, tracer " << tr << " type " << it);
+            CHECK(same(b, c));
+            CHECK(same(e, a));
+            CHECK((b.vout == 1 && c.vout == 1 && a.vout == 0 && e.vout == 0));
+            CHECK(std::abs(S - 1.0) > 1.0e-3);
+        }
+
+    QD_DIAG("\n# diag: a verdict near a pole, 20 mm of lossless eps 1e4 at 80 deg, the frequency tuned to a resonance of the leg and\n");
+    QD_DIAG("# detuned by psi rad of round-trip phase. den: the Airy denominator from the media. given: verdict 1; own: no verdict at\n");
+    QD_DIAG("# eps 0, which near the pole hands the bounces back. abs_S: the series the verdict run applies; S: against the Airy series\n");
+    QD_DIAG("# with its denominator clamped at 1e-2; off_dB: the clamped series against the exact one\n");
+    QD_DIAG("pass,psi,f_GHz,den,vout_given,vout_own,own_declines,abs_S,S,off_dB\n");
+    for (int it : {4, 3})
+        for (double psi : {0.0, 0.003, 0.008, 0.5})
+        {
+            const double thd = 80.0, th = thd * QPI / 180.0, s2 = std::sin(th) * std::sin(th), Ls = 0.020;
+            arma::uvec mi;
+            arma::mat mesh = ub::build({0.0, Ls}, {2, 2}, {false, true}, mi);
+            arma::mat o, d;
+            diag_ray_at(thd, o, d);
+            ub::Ev G = ub::traced<double>(pal, mesh, mi, 4, FRQ, o, d, nullptr); // the geometry does not depend on the frequency
+            const double dl = Ls - G.origN(0, 0), b = std::sqrt(1.0e4 - s2), c = std::cos(th);
+            const double N = std::round(2.0 * b * dl * FRQ / C0), fN = N * C0 / (2.0 * b * dl), f = fN * (1.0 + psi / (2.0 * QPI * N));
+            const double rs = (b - c) / (b + c), k = 2.0 * QPI * f / C0;
+            const std::complex<double> den = 1.0 - rs * rs * std::exp(-2.0 * J * k * b * dl);
+            ub::Ev E0 = ub::traced<double>(pal, mesh, mi, 4, f, o, d, nullptr);
+            arma::mat o1, d1;
+            ub::onward(E0, o1, d1);
+            auto run = [&](double eps, const std::vector<uint8_t> *v)
+            {
+                ub::Opt op;
+                op.eps = eps, op.vin = v;
+                return ub::traced<double>(pal, mesh, mi, it, f, o1, d1, &E0, op);
+            };
+            ub::Ev g = run(0.15, &v1), own = run(0.0, nullptr), dec = run(1.5, nullptr);
+            const std::complex<double> S = cpx(g.xpr, 0, 0) / cpx(dec.xpr, 0, 0);
+            const bool pole = std::abs(den) < 1.0e-2, own_dec = ub::same_bits(own.xpr, dec.xpr);
+            const std::complex<double> Sref = 1.0 / (pole ? std::polar(1.0e-2, std::arg(den)) : den);
+            QD_DIAG("%s,%.3f,%.9f,%.6f,%d,%d,%d,%.6f,%.3e,%.4f\n", (it == 3) ? "reflect" : "transmit", psi, f * 1e-9, std::abs(den), (int)g.vout, (int)own.vout,
+                    (int)own_dec, std::abs(S), std::abs(S - Sref) / std::abs(Sref), ub::dB(S * den));
+            INFO("verdict near a pole, type " << it << " psi " << psi);
+            CHECK(g.vout == 1);
+            CHECK(own.vout == (pole ? 0 : 1));
+            CHECK(own_dec == pole);
+            CHECK(std::abs(S - Sref) / std::abs(Sref) < 1.0e-6);
+            if (pole)
+                CHECK(std::abs(std::abs(S) - 100.0) < 1.0e-6);
+            else
+                CHECK(ub::same_bits(g.xpr, own.xpr));
+        }
+}
