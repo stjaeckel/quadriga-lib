@@ -17190,3 +17190,332 @@ TEST_CASE("Closed plate - a mass-law layer the wave is evanescent in passes its 
                 QD_DIAG("%.1f,%.0e,%.0f,%.4f\n", tS, ei, thd, (a.size() == 2) ? ub::dB(cpx(a[1].xpr, 0, 0)) : -999.0);
             }
 }
+
+TEST_CASE("Held lining - a mass-law sheet behind a wave held in a mass-law wall is the same wall as its traced solid")
+{
+    ub::OneThread one_thread;
+    // A wave inside a rigid mass-law wall is held undeviated: it is a leak, it keeps the incidence
+    // angle, and a face towards the lower index is charged what the other direction charges. A
+    // mass-law sheet on the far face of such a wall, inside it, or a stack of two inside it, is a
+    // later face of the same wall and is met the same way: near | sheet and sheet | far through
+    // Material::interact_with with the wave held, at the incidence cosine, and the mass term. The
+    // reference needs no formula: the same bodies meshed as traced solids, which are held today.
+    //
+    // The rule is taken towards the lower index, the gate of the undeviated rule. Towards the
+    // higher index the sheet keeps the Snell cosine of the two mappings and its rows must not
+    // move; they are printed with every digit in table G.
+    //
+    // Every level is taken with the mass argument at nothing (fRef times 1e12), which leaves the
+    // faces, tf and the m > 0 gates in place; through ray_triangle_intersect, ray_mesh_interact
+    // and ray_state_update.
+    //
+    // A. A rigid lining on the far face, towards the lower index: both sides and the solid twin
+    // B. The same with types 1 and 2, per channel
+    // C. A rigid sheet inside a rigid wall against three solids
+    // D. The reflect port the held wave sees, against the face of the solid twin
+    // E. Two rigid sheets inside a rigid wall, every order, against four solids
+    // F. The mass paid
+    // G. Twins that must not move, with every digit
+    // H. Recorded: what the rule does not reach
+    const double f = FRQ, g = 1.0e-5, BIG = 1.0e12;
+    auto pal = [&](double fr)
+    {
+        std::vector<LumpMtl> q = {
+            {2.1609e-8, 0.0, 0.022, 0.0, 0.2, 0.0, 0.0, 0.0, 0.0, 20.0, 0.001 * fr}, // 1 Ws wood, sheet
+            {2.1609e-8, 0.0, 0.0, 0.0, 0.2, 0.0, 0.0, 0.0, 0.0, 20.0, 0.001 * fr},   // 2 W
+            {2.401e-9, 0.0, 0.050, 0.0, 0.1, 0.0, 0.0, 0.0, 0.0, 20.0, 0.001 * fr},  // 3 Ks concrete, sheet
+            {2.401e-9, 0.0, 0.0, 0.0, 0.1, 0.0, 0.0, 0.0, 0.0, 20.0, 0.001 * fr},    // 4 K
+            {9.604e-9, 0.0, 0.030, 0.0, 0.15, 0.0, 0.0, 0.0, 0.0, 20.0, 0.001 * fr}, // 5 Ts a third rigid body, sheet
+            {9.604e-9, 0.0, 0.0, 0.0, 0.15, 0.0, 0.0, 0.0, 0.0, 20.0, 0.001 * fr},   // 6 T
+            {2.1609e-8, 0.0, 0.0, 0.0, 0.2},                                         // 7 W0 wood without the mass column
+            {2.25, 0.0, 0.006, 0.0, 0.3, 0.0, 0.0, 0.0, 0.0, 20.0, 0.001 * fr},      // 8 MLs mass-law, not rigid, sheet
+            {2.25, 0.0, 0.0, 0.0, 0.3, 0.0, 0.0, 0.0, 0.0, 20.0, 0.001 * fr},        // 9 ML
+            {2.401e-9, 0.0, 0.050, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 20.0, 0.001 * fr},  // 10 Kns concrete without tf, sheet
+            {2.401e-9, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 20.0, 0.001 * fr},    // 11 Kn
+            {2.50, 0.80, 0.010},                                                     // 12 Cs coherent, sheet
+            {2.50, 0.80, 0.0},                                                       // 13 C
+            {0.31, 0.20, 0.010},                                                     // 14 As porous, sheet
+            {0.31, 0.20, 0.0}};                                                      // 15 A
+        return lump_palette(q);
+    };
+    const ub::Pal P0 = pal(BIG), P1 = pal(1.0);
+    struct Body
+    {
+        const char *name;
+        int sheet, solid;
+        double thk;
+    };
+    const Body Wb = {"W", 1, 2, 0.022}, Kb = {"K", 3, 4, 0.050}, Tb = {"T", 5, 6, 0.030}, W0b = {"W0", 0, 7, 0.022}, MLb = {"ML", 8, 9, 0.006},
+               Knb = {"Kn", 10, 11, 0.050}, Cb = {"C", 12, 13, 0.010}, Ab = {"A", 14, 15, 0.010};
+    const bool F = false, T = true;
+    auto prod = [](const std::vector<ub::Ev> &v, int k)
+    { std::complex<double> z = 1.0; for (const auto &e : v) z *= cpx(e.xpr, 0, k); return z; };
+    // A chain that ends early passed nothing
+    auto level = [&](const ub::Pal &P, const arma::mat &mesh, const arma::uvec &mi, int n, int tr, double thd, int k)
+    {
+        auto a = ub::chain(P, mesh, mi, std::vector<int>((size_t)n, tr), f, thd, {1.5});
+        return ((int)a.size() == n) ? prod(a, k) : std::complex<double>(0.0, 0.0);
+    };
+    // Wall X 100 mm with Y on one face: 0 the lining met last, 1 met first, 2 and 3 the same two as traced solids
+    auto lined = [&](const Body &X, const Body &Y, int form, arma::uvec &mi, int &n)
+    {
+        n = (form < 2) ? 2 : 3;
+        if (form == 0)
+            return ub::build({0.0, 0.1, 0.1 + g}, {X.solid, X.solid, Y.sheet}, {F, T, F}, mi);
+        if (form == 1)
+            return ub::build({0.0, g, g + 0.1}, {Y.sheet, X.solid, X.solid}, {F, F, T}, mi);
+        if (form == 2)
+            return ub::build({0.0, 0.1, 0.1 + g, 0.1 + g + Y.thk}, {X.solid, X.solid, Y.solid, Y.solid}, {F, T, F, T}, mi);
+        return ub::build({0.0, Y.thk, Y.thk + g, Y.thk + g + 0.1}, {Y.solid, Y.solid, X.solid, X.solid}, {F, T, F, T}, mi);
+    };
+    // X 50 mm, Y, X 50 mm: 0 Y a sheet inside, 1 three solids
+    auto inside = [&](const Body &X, const Body &Y, int form, arma::uvec &mi, int &n)
+    {
+        n = form ? 4 : 3;
+        if (form == 0)
+            return ub::build({0.0, 0.05, 0.1}, {X.solid, Y.sheet, X.solid}, {F, F, T}, mi);
+        const double a = 0.05, b = a + g, c = b + Y.thk, d = c + g;
+        return ub::build({0.0, a, b, c, d, d + 0.05}, {X.solid, X.solid, Y.solid, Y.solid, X.solid, X.solid}, {F, T, F, T, F, T}, mi);
+    };
+    // X 50 mm, Y and Z, X 50 mm: 0 an ordered stack of two sheets, 1 four solids
+    auto stacked = [&](const Body &X, const Body &Y, const Body &Z, int form, arma::uvec &mi, int &n)
+    {
+        n = form ? 5 : 3;
+        if (form == 0)
+            return ub::build({0.0, 0.05, 0.05 + g, 0.1}, {X.solid, Y.sheet, Z.sheet, X.solid}, {F, F, T, T}, mi);
+        const double a = 0.05, b = a + g, c = b + Y.thk, d = c + g, e = d + Z.thk, h = e + g;
+        return ub::build({0.0, a, b, c, d, e, h, h + 0.05}, {X.solid, X.solid, Y.solid, Y.solid, Z.solid, Z.solid, X.solid, X.solid}, {F, T, F, T, F, T, F, T}, mi);
+    };
+
+    // ------------------------------------------------------------------------------------------
+    // A. The lining, towards the lower index
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: held lining A, a rigid mass-law wall 100 mm with a rigid mass-law lining rarer by its mapping, mass at nothing, scalar, dB.\n");
+    QD_DIAG("# W eps 2.1609e-8 tf 0.2, T eps 9.604e-9 tf 0.15, K eps 2.401e-9 tf 0.1. wall, lining: the side met first, the lining a sheet;\n");
+    QD_DIAG("# sol_w, sol_l: the same two as traced solids. d_twin: wall - sol_w; d_sides: wall - lining, the flat first faces of the two bodies\n");
+    QD_DIAG("pair,type,theta,wall,lining,sol_w,sol_l,d_twin,d_sides\n");
+    for (const auto &pr : std::vector<std::pair<Body, Body>>{{Wb, Kb}, {Tb, Kb}, {Wb, Tb}})
+        for (int tr : {4, 5})
+        {
+            double prev = 0.0, prev_th = -1.0;
+            for (double thd : {0.0, 10.0, 19.0, 19.4, 19.6, 20.0, 29.9, 30.1, 41.7, 41.9, 45.0, 60.0, 75.0})
+            {
+                double L[4];
+                for (int form = 0; form < 4; ++form)
+                {
+                    arma::uvec mi;
+                    int n;
+                    arma::mat mesh = lined(pr.first, pr.second, form, mi, n);
+                    L[form] = ub::dB(level(P0, mesh, mi, n, tr, thd, 0));
+                }
+                QD_DIAG("%s | %s,%d,%.1f,%.4f,%.4f,%.4f,%.4f,%+.6f,%+.6f\n", pr.first.name, pr.second.name, tr, thd, L[0], L[1], L[2], L[3], L[0] - L[2], L[0] - L[1]);
+                INFO("A, " << pr.first.name << " | " << pr.second.name << ", type " << tr << ", theta " << thd);
+                for (int j = 0; j < 4; ++j)
+                    CHECK(L[j] < 0.0);                    // a passive wall passes no more than it received
+                CHECK(std::abs(L[0] - L[2]) < 1.0e-3);    // the lining is its traced solid
+                CHECK(std::abs(L[0] - L[1]) < 0.02);      // one transmission from the two sides, to the flat first face
+                if (prev_th >= 0.0 && thd - prev_th < 0.5) // across the critical angle of the pair: no step
+                    CHECK(std::abs(L[0] - prev) < 0.01);
+                prev = L[0], prev_th = thd;
+            }
+        }
+
+    // ------------------------------------------------------------------------------------------
+    // B. Types 1 and 2, per channel
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: held lining B, W 100 mm | K lining with types 1 and 2, VV (k 0) and HH (k 3), dB. The mass column has no meaning in EM\n");
+    QD_DIAG("# and is not forbidden there; the row says that the rule is one rule per channel\n");
+    QD_DIAG("type,k,theta,wall,lining,sol_w,sol_l,d_twin\n");
+    for (int tr : {1, 2})
+        for (int k : {0, 3})
+            for (double thd : {10.0, 30.0, 60.0})
+            {
+                double L[4];
+                for (int form = 0; form < 4; ++form)
+                {
+                    arma::uvec mi;
+                    int n;
+                    arma::mat mesh = lined(Wb, Kb, form, mi, n);
+                    L[form] = ub::dB(level(P0, mesh, mi, n, tr, thd, k));
+                }
+                QD_DIAG("%d,%d,%.0f,%.4f,%.4f,%.4f,%.4f,%+.6f\n", tr, k, thd, L[0], L[1], L[2], L[3], L[0] - L[2]);
+                INFO("B, type " << tr << ", k " << k << ", theta " << thd);
+                CHECK(L[0] < 0.0);
+                CHECK(std::abs(L[0] - L[2]) < 1.0e-3);
+            }
+
+    // ------------------------------------------------------------------------------------------
+    // C. A rigid sheet inside a rigid wall
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: held lining C, X 50 mm | Y | X 50 mm, Y a sheet inside the wall and Y a traced solid, mass at nothing, scalar, dB\n");
+    QD_DIAG("wall,sheet,type,theta,sheet_dB,solids_dB,d_twin\n");
+    for (const auto &pr : std::vector<std::pair<Body, Body>>{{Wb, Kb}, {Tb, Kb}, {Wb, Tb}})
+        for (int tr : {4, 5})
+            for (double thd : {0.0, 10.0, 19.0, 20.0, 30.0, 45.0, 60.0, 75.0})
+            {
+                double L[2];
+                for (int form = 0; form < 2; ++form)
+                {
+                    arma::uvec mi;
+                    int n;
+                    arma::mat mesh = inside(pr.first, pr.second, form, mi, n);
+                    L[form] = ub::dB(level(P0, mesh, mi, n, tr, thd, 0));
+                }
+                QD_DIAG("%s,%s,%d,%.0f,%.4f,%.4f,%+.6f\n", pr.first.name, pr.second.name, tr, thd, L[0], L[1], L[0] - L[1]);
+                INFO("C, " << pr.first.name << " | " << pr.second.name << ", type " << tr << ", theta " << thd);
+                CHECK(L[0] < 0.0);
+                CHECK(std::abs(L[0] - L[1]) < 1.0e-3);
+            }
+
+    // ------------------------------------------------------------------------------------------
+    // D. The reflect port
+    // ------------------------------------------------------------------------------------------
+    // Enter the wall, reflect at the face the lining, the sheet or the stack sits on. The solid
+    // twin reflects off the same plane, so the two are compared in the complex plane.
+    QD_DIAG("\n# diag: held lining D, the reflect port of the event the held wave meets, against the same face of the solid twin: |R|^2 in dB\n");
+    QD_DIAG("# and |R - R_twin|. lining: W 100 | K; inside: W 50 | K | W 50; stack: W 50 | K T | W 50, whose twin is the W | K face\n");
+    QD_DIAG("geom,type,k,theta,R_dB,twin_dB,abs_d\n");
+    for (int geo = 0; geo < 3; ++geo)
+        for (int tr : {4, 1})
+            for (int k : {0, 3})
+            {
+                if (tr > 2 && k)
+                    continue;
+                for (double thd : {10.0, 30.0, 60.0})
+                {
+                    arma::uvec m1, m2;
+                    int n;
+                    arma::mat sh = (geo == 0) ? lined(Wb, Kb, 0, m1, n) : ((geo == 1) ? inside(Wb, Kb, 0, m1, n) : stacked(Wb, Kb, Tb, 0, m1, n));
+                    arma::mat so = (geo == 0) ? lined(Wb, Kb, 2, m2, n) : ((geo == 1) ? inside(Wb, Kb, 1, m2, n) : stacked(Wb, Kb, Tb, 1, m2, n));
+                    auto a = ub::chain(P0, sh, m1, {tr, tr - 1}, f, thd, {1.5}), b = ub::chain(P0, so, m2, {tr, tr - 1}, f, thd, {1.5});
+                    REQUIRE((a.size() == 2 && b.size() == 2));
+                    const std::complex<double> R = cpx(a[1].xpr, 0, k), Rt = cpx(b[1].xpr, 0, k);
+                    QD_DIAG("%s,%d,%d,%.0f,%.4f,%.4f,%.3e\n", geo == 0 ? "lining" : (geo == 1 ? "inside" : "stack"), tr, k, thd, ub::dB(R), ub::dB(Rt), std::abs(R - Rt));
+                    INFO("D, geom " << geo << ", type " << tr << ", k " << k << ", theta " << thd);
+                    CHECK(std::abs(R - Rt) < 1.0e-4);
+                }
+            }
+
+    // ------------------------------------------------------------------------------------------
+    // E. Two rigid sheets inside a rigid wall
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: held lining E, X 50 mm | Y Z | X 50 mm, Y and Z an ordered stack of two sheets and the two as traced solids, mass at\n");
+    QD_DIAG("# nothing, scalar, dB. rev: the stack in the other order, which is the wall from its other side\n");
+    QD_DIAG("stack,type,theta,stack_dB,solids_dB,rev_dB,d_twin,d_rev\n");
+    {
+        const Body B3[3] = {Wb, Kb, Tb};
+        for (int x = 0; x < 3; ++x)
+            for (int sw = 0; sw < 2; ++sw)
+                for (int tr : {4, 5})
+                    for (double thd : {0.0, 10.0, 19.0, 20.0, 30.0, 60.0, 75.0})
+                    {
+                        const Body &X = B3[x], &Y = B3[(x + 1 + sw) % 3], &Z = B3[(x + 2 - sw) % 3];
+                        arma::uvec m1, m2, m3;
+                        int n1, n2, n3;
+                        arma::mat s1 = stacked(X, Y, Z, 0, m1, n1), s2 = stacked(X, Y, Z, 1, m2, n2), s3 = stacked(X, Z, Y, 0, m3, n3);
+                        const double L0 = ub::dB(level(P0, s1, m1, n1, tr, thd, 0)), L1 = ub::dB(level(P0, s2, m2, n2, tr, thd, 0)), L2 = ub::dB(level(P0, s3, m3, n3, tr, thd, 0));
+                        QD_DIAG("%s | %s %s | %s,%d,%.0f,%.4f,%.4f,%.4f,%+.6f,%+.6f\n", X.name, Y.name, Z.name, X.name, tr, thd, L0, L1, L2, L0 - L1, L0 - L2);
+                        INFO("E, " << X.name << " | " << Y.name << " " << Z.name << ", type " << tr << ", theta " << thd);
+                        CHECK(L0 < 0.0);
+                        CHECK(std::abs(L0 - L1) < 1.0e-3); // the stack is its traced solids
+                        CHECK(std::abs(L0 - L2) < 1.0e-3); // and one wall in both orders
+                    }
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // F. The mass paid
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: held lining F, the mass paid, the chain with the mass argument at nothing over the chain with fRef 1 MHz, dB, scalar.\n");
+    QD_DIAG("# W 100 | K lining from both sides, W 50 | K | W 50 and W 50 | K T | W 50. Printed with every digit: a change to the faces must not move it\n");
+    QD_DIAG("geom,theta,paid\n");
+    for (int geo = 0; geo < 4; ++geo)
+    {
+        double side[2][4];
+        int q = 0;
+        for (double thd : {0.0, 30.0, 60.0, 75.0})
+        {
+            arma::uvec mi;
+            int n;
+            arma::mat mesh = (geo < 2) ? lined(Wb, Kb, geo, mi, n) : ((geo == 2) ? inside(Wb, Kb, 0, mi, n) : stacked(Wb, Kb, Tb, 0, mi, n));
+            const std::complex<double> z0 = level(P0, mesh, mi, n, 4, thd, 0), z1 = level(P1, mesh, mi, n, 4, thd, 0);
+            const double paid = ub::dB(z0) - ub::dB(z1);
+            QD_DIAG("%s,%.0f,%.17g\n", geo == 0 ? "lining wall first" : (geo == 1 ? "lining first" : (geo == 2 ? "inside" : "stack")), thd, paid);
+            INFO("F, geom " << geo << ", theta " << thd);
+            CHECK(paid > 20.0); // 100 mm and 50 mm at 1 GHz against 1 MHz: a term worth something
+            if (geo < 2)
+                side[geo][q] = paid;
+            if (geo == 1)
+                CHECK(std::abs(side[0][q] - side[1][q]) < 0.01); // the plate from its two sides, to the thickness code
+            ++q;
+        }
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // G. Twins that must not move
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: held lining G, twins, scalar, the complex chain coefficient with every digit. Towards the higher index, a wall without\n");
+    QD_DIAG("# the mass column, a lining met first, a mass-law lining that is not rigid, every solid twin\n");
+    QD_DIAG("row,type,theta,re,im\n");
+    {
+        struct Row
+        {
+            const char *name;
+            int kind; // 0 lined, 1 inside
+            Body X, Y;
+            int form;
+        };
+        const std::vector<Row> rows = {
+            {"K 100 | W lining - wall first", 0, Kb, Wb, 0}, {"K 100 | W lining - lining first", 0, Kb, Wb, 1}, {"K 100 | W - solids", 0, Kb, Wb, 2},
+            {"K 50 | W | K 50 - inside", 1, Kb, Wb, 0},      {"W 100 | K lining - lining first", 0, Wb, Kb, 1}, {"W 100 | K - solids", 0, Wb, Kb, 2},
+            {"K | W 100 - solids", 0, Wb, Kb, 3},            {"W0 100 | K lining - wall first", 0, W0b, Kb, 0}, {"W0 100 | K lining - lining first", 0, W0b, Kb, 1},
+            {"W 100 | ML lining - wall first", 0, Wb, MLb, 0}, {"W 100 | ML lining - lining first", 0, Wb, MLb, 1}, {"W 50 | ML | W 50 - inside", 1, Wb, MLb, 0},
+            {"W 50 | K | W 50 - solids", 1, Wb, Kb, 1},
+        };
+        for (const auto &R : rows)
+            for (int tr : {4, 5})
+                for (double thd : {10.0, 30.0, 60.0})
+                {
+                    arma::uvec mi;
+                    int n;
+                    arma::mat mesh = R.kind ? inside(R.X, R.Y, R.form, mi, n) : lined(R.X, R.Y, R.form, mi, n);
+                    const std::complex<double> z = level(P0, mesh, mi, n, tr, thd, 0);
+                    QD_DIAG("%s,%d,%.0f,%.17g,%.17g\n", R.name, tr, thd, std::real(z), std::imag(z));
+                    INFO("G, " << R.name << ", type " << tr << ", theta " << thd);
+                    CHECK(std::norm(z) < 1.0);
+                    CHECK(std::norm(z) > 0.0);
+                }
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // H. Recorded
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: held lining H, recorded, what the rule does not reach. wall, lining: the side met first; sol_w: the two as traced solids,\n");
+    QD_DIAG("# wall first; -999: nothing passed. Towards the higher index the sheet keeps the Snell cosine of two mappings (K | W, W | ML);\n");
+    QD_DIAG("# a lining without tf passes the Fresnel exit of a held wave and nothing from its own side (W | Kn), the flat first face;\n");
+    QD_DIAG("# a layer without the mass column behind a held wave is entered at the Snell cosine of the wall's mapping as a sheet and held\n");
+    QD_DIAG("# at the incidence angle as a traced solid (W | C, W | A)\n");
+    QD_DIAG("pair,type,k,theta,wall,lining,sol_w,d_sides,d_twin\n");
+    for (const auto &pr : std::vector<std::pair<Body, Body>>{{Kb, Wb}, {Wb, MLb}, {Wb, Knb}, {Wb, Cb}, {Wb, Ab}})
+        for (int tr : {4, 1})
+            for (int k : {0, 3})
+            {
+                if (tr > 2 && k)
+                    continue;
+                for (double thd : {10.0, 30.0, 60.0, 75.0})
+                {
+                    double L[3];
+                    for (int form = 0; form < 3; ++form)
+                    {
+                        arma::uvec mi;
+                        int n;
+                        arma::mat mesh = lined(pr.first, pr.second, form, mi, n);
+                        auto a = ub::chain(P0, mesh, mi, std::vector<int>((size_t)n, tr), f, thd, {0.0});
+                        L[form] = ((int)a.size() == n) ? ub::dB(prod(a, k)) : -999.0;
+                    }
+                    QD_DIAG("%s | %s,%d,%d,%.0f,%.4f,%.4f,%.4f,%+.4f,%+.4f\n", pr.first.name, pr.second.name, tr, k, thd, L[0], L[1], L[2], L[0] - L[1], L[0] - L[2]);
+                    INFO("H, " << pr.first.name << " | " << pr.second.name << ", type " << tr << ", k " << k << ", theta " << thd);
+                    for (int j = 0; j < 3; ++j)
+                        CHECK(L[j] < 0.0); // recorded, and bounded: nothing here passes more than it received
+                }
+            }
+}

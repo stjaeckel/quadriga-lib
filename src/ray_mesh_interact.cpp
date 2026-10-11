@@ -990,7 +990,8 @@ namespace
                                  std::complex<double> *R_te, std::complex<double> *R_tm,
                                  bool disp_far = false, double disp_budget = -1.0,
                                  double mass_cos = -1.0,    // cosine the wave has in air, for a mass-law term, < 0 = |Re ci|
-                                 double mass_bonded = 0.0)  // X0 of the bonded mass-law bodies crossed before the stack
+                                 double mass_bonded = 0.0,  // X0 of the bonded mass-law bodies crossed before the stack
+                                 bool near_undeviated = false) // the wave in mat_near was not refracted in
     {
         if (n_layers < 1 || layers == nullptr)
             return false;
@@ -1002,6 +1003,86 @@ namespace
             const Material &L = *layers[i].mtl;
             if (L.m > 0.0 || L.tf(fGHz) != 0.0 || L.interface_gain(fGHz) != 1.0)
                 scattering = true;
+        }
+
+        // A stack of mass-law layers reached by a wave that is held undeviated in a mass-law
+        // medium - two rigid sheets inside a rigid wall - is a run of later faces of that wall.
+        // The wave is a leak, it keeps the incidence cosine at every face, and each face is the
+        // crossing Material::interact_with forms for a held wave, with the interface gain of the
+        // medium entered; each layer adds its mass term. That is what the same bodies do as
+        // traced solids. The cosines of the segments below are Snell cosines of permittivities
+        // that are impedance mappings, and do not describe this wave.
+        //
+        // Taken where every layer carries the mass column and a face leads towards the lower
+        // index, which is where the undeviated rule has anything to say; decided on the media.
+        if (near_undeviated && mat_near.m > 0.0)
+        {
+            auto W = [&](const Material &X) -> std::complex<double>
+            { return (X.eta(fGHz) + X.eta_resonance(fGHz)) * X.mu(fGHz); };
+            bool all_mass = true, to_lower = false;
+            const Material *A = &mat_near;
+            for (int i = 0; i < n_layers; ++i)
+            {
+                const Material &L = *layers[i].mtl;
+                all_mass = all_mass && L.m > 0.0;
+                to_lower = to_lower || std::abs(W(*A) / W(L)) > 1.0;
+                A = &L;
+            }
+            to_lower = to_lower || std::abs(W(*A) / W(mat_far)) > 1.0;
+            if (all_mass && to_lower)
+            {
+                const int it = is_scalar ? 4 : 1;
+                const double ct_r = std::abs(std::real(ci));
+                const double mc = (mass_cos >= 0.0) ? mass_cos : ct_r;
+                std::complex<double> t_te(1.0, 0.0), t_tm(1.0, 0.0), a_te, a_tm;
+                double x_run = mass_bonded, amp = 1.0;
+                A = &mat_near;
+                for (int i = 0; i <= n_layers; ++i)
+                {
+                    const Material &B = (i < n_layers) ? *layers[i].mtl : mat_far;
+                    A->interact_with(B, it, 0.0, fGHz, &a_te, &a_tm, nullptr, nullptr, nullptr, nullptr, false, &ci, true);
+                    t_te *= a_te, t_tm *= a_tm;
+                    if (i < n_layers) // the mass term, formed as for a single mass-law sheet
+                    {
+                        double thk = layers[i].thk, dist_max = 1.0e30;
+                        double g1m = B.medium_gain(1.0, fGHz, 1.0, 0.0, 0.0, 1.0e300);
+                        if (g1m > 0.0)
+                        {
+                            double rate = -10.0 * std::log10(g1m);
+                            if (rate > 0.0)
+                                dist_max = 400.0 / rate;
+                        }
+                        else
+                            dist_max = 0.0;
+                        if (dist_max < thk)
+                            dist_max = thk;
+                        double dist = (ct_r > 0.0) ? thk / ct_r : dist_max;
+                        if (!(dist < dist_max))
+                            dist = dist_max;
+                        double mass_path = thk * mc;
+                        double gm = B.medium_gain(dist, fGHz, ct_r, mass_path, 1.0, (mass_path > 0.0) ? 0.0 : 1.0e300, thk, mc, x_run);
+                        if (mass_path > 0.0)
+                            x_run += B.mass_X0(thk, fGHz);
+                        amp *= std::sqrt((gm < 0.0) ? 0.0 : gm);
+                    }
+                    A = &B;
+                }
+                // The far medium's interface gain is owed only where it is newly entered
+                if (!mat_far.same_as(Material()) && mat_far.same_as(mat_near))
+                    amp /= std::sqrt(mat_far.interface_gain(fGHz));
+                std::complex<double> r_te, r_tm;
+                mat_near.interact_with(*layers[0].mtl, is_scalar ? 3 : 0, 0.0, fGHz, &r_te, &r_tm, nullptr, nullptr, nullptr, nullptr,
+                                       false, &ci, true);
+                if (T_te)
+                    *T_te = amp * t_te;
+                if (T_tm)
+                    *T_tm = amp * t_tm;
+                if (R_te) // a mass-law layer displaces nothing, so the port has no reference plane to move
+                    *R_te = r_te;
+                if (R_tm)
+                    *R_tm = r_tm;
+                return true;
+            }
         }
 
         const double c0 = 299792458.0;
@@ -1887,8 +1968,10 @@ namespace
             // amplitudes, is not applied across the sheet. A face that is flat already, between
             // lossless media, keeps the value it had. The reflect port is not touched.
             //
-            // A near medium that holds the wave undeviated is left as it was: the sheet behind
-            // it is entered at an angle its Snell cosine does not describe.
+            // A near medium that holds the wave undeviated does not take this block: the sheet
+            // behind it is entered at an angle its Snell cosine does not describe. Towards the
+            // lower index it takes the held branch below; towards the higher index it is left
+            // on the composite, whose Snell cosine is real there.
             std::complex<double> w_n = (mat_near.eta(fGHz) + mat_near.eta_resonance(fGHz)) * mat_near.mu(fGHz);
             if (!far_closed && std::imag(eta_s_if * mu_s) == 0.0 && std::abs((w_n / (eta_s_if * mu_s)) * sin2_i) >= 1.0 &&
                 !(near_undeviated && mat_near.m > 0.0))
@@ -1904,6 +1987,48 @@ namespace
                 if (!(1.0 - R0f_tm < 1.0e-9))
                     tsf_tm = std::polar(a_f, std::arg(tf_out[1]));
                 fx_te = fx_tm = 1.0;
+            }
+            // A sheet behind a wave that is held undeviated in a mass-law medium, towards the lower
+            // index: a later face of the same wall. The wave is a leak and keeps the incidence
+            // cosine, so the sheet is the leak chain's own branch for a sheet entered by a leak:
+            // near | sheet and sheet | far through Material::interact_with with the wave held,
+            // each with the interface gain of the medium it enters, and the mass term. The near
+            // face is then charged what the other direction charges, and the wall is one wall
+            // from its two sides and the same wall with the sheet meshed as a traced solid. The
+            // composite above would enter the sheet at the Snell cosine of two impedance
+            // mappings, where both faces are flat leaks past the critical angle of the pair and
+            // the near-to-far conversion, 1 / Re(z cos) of a mapping, multiplies them.
+            //
+            // The reflect port follows, as at a bare face: the reflection the other direction
+            // sees at this cosine with its sign reversed, so the two ports of the near face add
+            // up. The three gates are those of the undeviated rule, decided on the media and on
+            // the direction the tracer holds.
+            if (near_undeviated && mat_near.m > 0.0 && std::abs(w_n / (eta_s_if * mu_s)) > 1.0)
+            {
+                std::complex<double> h_te, h_tm;
+                if (!far_closed)
+                {
+                    int it = is_scalar ? 4 : 1;
+                    std::complex<double> a_te, a_tm, b_te, b_tm;
+                    mat_near.interact_with(mat_slab, it, 0.0, fGHz, &a_te, &a_tm, nullptr, nullptr, nullptr, nullptr, false, &ci, true);
+                    mat_slab.interact_with(mat_far, it, 0.0, fGHz, &b_te, &b_tm, nullptr, nullptr, nullptr, nullptr, false, &ci, true);
+                    // The far medium's interface gain is owed only where it is newly entered
+                    double un = (!far_is_air && mat_far.same_as(mat_near)) ? 1.0 / std::sqrt(mat_far.interface_gain(fGHz)) : 1.0;
+                    h_te = (aI * un) * a_te * b_te, h_tm = (aI * un) * a_tm * b_tm;
+                }
+                else
+                    h_te = aI * leak_te, h_tm = aI * leak_tm;
+                std::complex<double> r_te, r_tm;
+                mat_near.interact_with(mat_slab, is_scalar ? 3 : 0, 0.0, fGHz, &r_te, &r_tm, nullptr, nullptr, nullptr, nullptr, false, &ci, true);
+                if (T_te)
+                    *T_te = h_te;
+                if (T_tm)
+                    *T_tm = h_tm;
+                if (R_te)
+                    *R_te = r_te;
+                if (R_tm)
+                    *R_tm = r_tm;
+                return true;
             }
             if (T_te)
                 *T_te = far_closed ? aI * leak_te : ig * fx_te * aI * tns_te * tsf_te;
@@ -5225,7 +5350,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
                                                   ? ct_near
                                                   : std::complex<double>(ct_geo, 0.0);
                     if (!qd_stack_resolve(M_near, lay, 2, M_far, ci, fGHz, is_scalar,
-                                          &Tte, &Ttm, &Rte, &Rtm, disp_far, disp_budget, ct_mass, mass_bonded))
+                                          &Tte, &Ttm, &Rte, &Rtm, disp_far, disp_budget, ct_mass, mass_bonded, !refracted))
                         return false; // malformed stack or a singular denominator; the caller decides
                 }
                 else
