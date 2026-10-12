@@ -1,0 +1,7 @@
+quantity,3d,6d_two_maps
+max_cdf_deviation_single_run_worst_of_20,0.0191,0.0211
+max_cdf_deviation_mean_over_runs,0.0021,0.0011
+rms_of_sample_mean,0.0187,0.0186
+mean_of_sample_std,1.0009,0.9984
+mean_skewness,0.0014,0.0014
+mean_kurtosis,3.0030,2.9852
