@@ -830,3 +830,14 @@ the test fails there with the same two numbers, so the failure predates this wor
   `sos_preset` (WI-5). Test-side corrections that did not change an expectation of the function under
   test: an ambiguous initialiser and BLAS-dependent expressions in the Catch2 tests, the three MEX test
   corrections above.
+
+
+## Re-creation of the 2018 paper (2026-10-12)
+
+On request the numeric results of the paper `html_docu/publications/2018_sum_of_sinusoids.md` were re-run
+with the library. Scripts, results and the comparison are in `tools/sos_port/`; the report is
+`tools/sos_port/SOS_PAPER_REPRODUCTION.md`. Main points: `sos_calc_mse` reproduces the ASE values of the
+paper on the `qd_sos` tables within 0.05 dB; 3-D tables are equal or better (up to 3.4 dB at 1000
+sinusoids); 2-D tables for the exponential ACF fall 2.5 to 4.7 dB short at 2000 sinusoids, cause not
+established; the dip of the estimated ACF below the desired one in Fig. 4 of the paper is the removal of
+the cube mean by the Pearson coefficient, the same effect as in WI-1.
