@@ -1,0 +1,11 @@
+quantity,value
+map_mean,0.0289
+map_std,0.9782
+map_min,-3.526
+map_max,3.371
+std_of_map_mean_200_phase_sets,0.0977
+sqrt_mean_pair_acf_target,0.0944
+acf_xy_max_abs_err_in_disc,0.0688
+acf_xy_rms_err_in_disc,0.0159
+acf_xy_ase_dB_in_disc,-35.99
+acf_xy_max_abs_outside_disc_to_2Dmax,0.1351

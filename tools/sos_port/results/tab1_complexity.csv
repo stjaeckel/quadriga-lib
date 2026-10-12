@@ -1,0 +1,9 @@
+case,N,n_pos,n_gen,ms_per_call,ns_per_output_value,ns_per_value_and_sinusoid
+sos_val,256,100000,1,46.341,463.41,1.8102
+sos_val,1024,100000,1,180.659,1806.59,1.7642
+sos_val,256,10000,20,6.807,34.03,0.1329
+sos_val,256,1000,2288,75.440,32.97,0.1288
+sos_init_phases,256,,2288,4.493,,
+memory_bytes_frequencies_double,256,,,6144,,
+memory_bytes_phases_double_2288_generators,256,,2288,4685824,,
+max_threads,16,,,,,
