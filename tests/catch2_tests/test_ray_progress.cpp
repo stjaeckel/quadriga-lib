@@ -4783,7 +4783,10 @@ TEST_CASE("ray_progress - a coherent sheet with tf that is rarer than the invari
                         INFO("rare sheet, " << (scalar ? "scalar" : "EM") << ", refr " << refr << ", cfg " << cfg << ", theta " << thd << ", ei " << losses[q]);
                         CHECK(O.found);       // the wave tunnels: the path is there, with either sign of tf
                         CHECK(A[q] < 1.0e-4); // and carries no more than was launched
-                        CHECK(B[q] < 1.0e-4);
+                        if (scalar || cfg != 2)
+                            CHECK(B[q] < 1.0e-4);
+                        else // tf on the traced host: its bare faces apply tf on the TE/TM mean, so the wall is bounded on the mean
+                            CHECK(0.5 * (std::pow(10.0, 0.1 * A[q]) + std::pow(10.0, 0.1 * B[q])) < 1.0 + 1.0e-4);
                         CHECK(A[q] > -40.0);
                     }
                     INFO("rare sheet, continuity at zero loss, scalar " << scalar << ", refr " << refr << ", cfg " << cfg << ", theta " << thd);
@@ -4934,4 +4937,165 @@ TEST_CASE("ray_progress - a coherent sheet rarer than the invariant without tf t
                 CHECK(std::abs(A[3] - A[4]) < 1.0e-2); // ei 1e-6 against ei 0
                 CHECK(std::abs(B[3] - B[4]) < 1.0e-2);
             }
+}
+
+TEST_CASE("ray_progress - a coherent sheet with tf creates nothing and has no gate on the invariant")
+{
+#ifdef _OPENMP
+    struct OneThread
+    {
+        int n = omp_get_max_threads();
+        OneThread() { omp_set_num_threads(1); }
+        ~OneThread() { omp_set_num_threads(n); }
+    } one_thread;
+#endif
+    // A coherent sheet with tf - no mass column, EM materials - alone in air, as a lining on the
+    // near face of 10 mm of the lossless eps 2.50 and inside 10 mm + 12 mm of it. One ray through
+    // ray_progress, float, 1 GHz, both tracers, scalar and EM; ray_progress is called until no
+    // ray is left, with every series summed and 60 interactions - the two halves of a wall with a
+    // sheet inside it are coupled by paths, which converge slowly for a lossless wall towards
+    // grazing, 1.0076 after 20 interactions at 73 deg -, and every path that ends in air is summed at its
+    // polyline's point, behind the wall into T and in front of it into R. With nothing lossy but
+    // the sheet, and tf on the sheet alone, the two sums are the two ports of the wall and
+    // together carry no more than was launched, in each channel. tf on a traced host is left out
+    // on purpose: its bare faces apply tf on the TE/TM mean, so a wall with it is bounded on the
+    // mean and not per channel.
+    const double PI = 3.14159265358979323846, C0 = 299792458.0;
+    const float gap = 1.0e-5f;
+    const std::complex<double> J(0.0, 1.0);
+    typedef std::unordered_map<std::string, std::vector<float>> Pal;
+    struct Sum
+    {
+        std::complex<double> T[2] = {0.0, 0.0}, R[2] = {0.0, 0.0}; // VV / scalar, HH
+        int nT = 0, nR = 0;
+    };
+    // wall 0: the sheet alone; 1: sheet | host 10 mm; 2: host 10 mm | sheet | host 12 mm
+    auto trace = [&](int wall, double a, double ei, double thk, double tS, double thd, bool refr, bool scalar) -> Sum
+    {
+        Pal pal; // 1 the sheet, 2 the host
+        pal["a"] = {(float)a, 2.50f};
+        pal["b"] = {0.0f, 0.0f};
+        pal["c"] = {(float)(ei / 17.98), 0.0f};
+        pal["d"] = {0.0f, 0.0f};
+        pal["fRef"] = {1.0f, 1.0f};
+        pal["thk"] = {(float)thk, 0.0f};
+        pal["tf"] = {(float)tS, 0.0f};
+        std::vector<float> x;
+        std::vector<int> mat;
+        std::vector<bool> flip;
+        if (wall == 0)
+            x = {0.0f}, mat = {1}, flip = {false};
+        else if (wall == 1)
+            x = {0.0f, gap, gap + 0.010f}, mat = {1, 2, 2}, flip = {false, false, true};
+        else
+            x = {0.0f, 0.010f, 0.022f}, mat = {2, 1, 2}, flip = {false, false, true};
+        const float h = 200.0f, x_back = x.back();
+        arma::fmat mesh(2 * x.size(), 9);
+        arma::uvec mi(2 * x.size());
+        for (size_t k = 0; k < x.size(); ++k)
+        {
+            if (!flip[k])
+                mesh.row(2 * k) = arma::frowvec{x[k], -h, -h, x[k], -h, h, x[k], h, -h}, mesh.row(2 * k + 1) = arma::frowvec{x[k], h, -h, x[k], -h, h, x[k], h, h};
+            else
+                mesh.row(2 * k) = arma::frowvec{x[k], -h, -h, x[k], h, -h, x[k], -h, h}, mesh.row(2 * k + 1) = arma::frowvec{x[k], h, -h, x[k], h, h, x[k], -h, h};
+            mi(2 * k) = (arma::uword)mat[k], mi(2 * k + 1) = (arma::uword)mat[k];
+        }
+        Sum S;
+        const double th = thd * PI / 180.0, st = std::sin(th), k = 2.0 * PI * 1.0e9 / C0;
+        const float Ox = -1.0f, Oy = 0.37f - (float)std::tan(th), Oz = 0.0f, r0 = 0.1f, len = 300.0f;
+        arma::frowvec kv = {(float)std::cos(th), (float)std::sin(th), 0.0f};
+        arma::fvec cf(1);
+        cf(0) = 1.0e9f;
+        arma::fmat orig(1, 3), dest(1, 3), acc(1, 2, arma::fill::zeros);
+        orig.row(0) = arma::frowvec{Ox, Oy, Oz} + r0 * kv, dest.row(0) = arma::frowvec{Ox, Oy, Oz} + (r0 + len) * kv;
+        arma::fcube pd(1, 3, 1);
+        pd.slice(0) = kv;
+        arma::Col<short> prev(1, arma::fill::zeros), cur(1, arma::fill::zeros), buf(1, arma::fill::zeros);
+        std::vector<quadriga_lib::path> paths(1);
+        paths[0].init(0, 1, scalar);
+        paths[0].set_length(r0);
+        for (int g = 0; g < 130; ++g)
+        {
+            quadriga_lib::ray_progress(mesh, mi, pal, cf, Ox, Oy, Oz, orig, dest, prev, cur, buf, pd, acc, paths, nullptr, nullptr, nullptr, nullptr,
+                                       (uint8_t)60, 100, 100, 0, -300.0f, 3.0f, 0.0f, refr, scalar, nullptr, nullptr, nullptr, nullptr);
+            if (orig.n_rows == 0)
+                break;
+            for (arma::uword i = 0; i < orig.n_rows; ++i)
+            {
+                const size_t ns = paths[i].n_seg();
+                if ((cur(i) & (short)0x3FFF) != 0 || ns != (size_t)(g + 1))
+                    continue; // inside the host, or a ray that was already collected
+                const float *first = paths[i].coord(0), *last = paths[i].coord(ns - 1);
+                const bool fwd = dest(i, 0) > orig(i, 0);
+                const bool isT = fwd && last[0] > x_back - 1.0e-3f, isR = !fwd && last[0] < 1.0e-3f;
+                if (!isT && !isR)
+                    continue;
+                double Lin = 0.0;
+                for (size_t s = 1; s < ns; ++s)
+                {
+                    const float *p = paths[i].coord(s - 1), *q = paths[i].coord(s);
+                    Lin += std::sqrt(((double)q[0] - p[0]) * ((double)q[0] - p[0]) + ((double)q[1] - p[1]) * ((double)q[1] - p[1]) + ((double)q[2] - p[2]) * ((double)q[2] - p[2]));
+                }
+                const float *xc = paths[i].xpr_coeff(0);
+                const std::complex<double> ph = std::exp(-J * k * Lin) * std::exp(J * k * st * ((double)last[1] - (double)first[1]));
+                for (int c = 0; c < (scalar ? 1 : 2); ++c)
+                    (isT ? S.T[c] : S.R[c]) += std::complex<double>((double)xc[6 * c], (double)xc[6 * c + 1]) * ph;
+                ++(isT ? S.nT : S.nR);
+            }
+        }
+        return S;
+    };
+    auto dB = [](double p) { return (p > 0.0) ? 10.0 * std::log10(p) : -999.0; };
+
+    QD_DIAG("\n# diag: ray_progress sheet tf A, a coherent sheet with tf alone in air (0), on 10 mm of eps 2.50 (1) and inside 10 mm + 12 mm of it (2),\n");
+    QD_DIAG("# every path summed, series summed, float. T, R: dB; sum: T + R in power. scalar: one channel; EM: VV and HH\n");
+    QD_DIAG("sheet,mm,tf,wall,mode,tracer,theta,nT,nR,T,R,sum,T_hh,R_hh,sum_hh\n");
+    struct Sh
+    {
+        double a, ei, thk, tf;
+        std::vector<double> th;
+    };
+    const std::vector<Sh> sheets = {
+        {0.31, 0.20, 0.006, 0.5, {20.0, 37.0, 60.0}}, {0.31, 0.20, 0.001, 0.9, {20.0, 37.0}}, {0.90, 0.20, 0.006, 0.9, {45.0, 60.0}},
+        {5.24, 0.63, 0.025, -0.5, {45.0, 67.0}},     {0.90, 0.20, 0.006, -0.5, {0.0, 45.0}},  {0.90, 0.0, 0.001, 0.5, {60.0, 73.0}},
+        {0.31, 0.0, 0.006, 0.5, {20.0, 45.0}},       {5.24, 0.0, 0.006, -0.5, {20.0, 60.0}},
+    };
+    for (const Sh &S : sheets)
+        for (int wall = 0; wall < 3; ++wall)
+            for (bool scalar : {true, false})
+                for (bool refr : {false, true})
+                    for (double thd : S.th)
+                    {
+                        Sum Z = trace(wall, S.a, S.ei, S.thk, S.tf, thd, refr, scalar);
+                        const double T = std::norm(Z.T[0]), R = std::norm(Z.R[0]), Th = std::norm(Z.T[1]), Rh = std::norm(Z.R[1]);
+                        QD_DIAG("%.2f-%.2fj,%.0f,%.1f,%d,%s,%d,%.0f,%d,%d,%.4f,%.4f,%.6f,%.4f,%.4f,%.6f\n", S.a, S.ei, 1.0e3 * S.thk, S.tf, wall, scalar ? "scalar" : "EM", refr ? 5 : 4, thd, Z.nT,
+                                Z.nR, dB(T), dB(R), T + R, dB(Th), dB(Rh), Th + Rh);
+                        INFO("sheet " << S.a << " - " << S.ei << "j, " << 1.0e3 * S.thk << " mm, tf " << S.tf << ", wall " << wall << ", scalar " << scalar << ", refr " << refr << ", theta " << thd);
+                        CHECK((Z.nT >= 1 && Z.nR >= 1));
+                        CHECK(T + R < 1.0 + 2.0e-3); // the wall creates nothing, in each channel
+                        CHECK(Th + Rh < 1.0 + 2.0e-3);
+                        if (S.ei == 0.0)
+                        {
+                            CHECK(T + R > 1.0 - 5.0e-3); // and a lossless wall loses nothing, tunnelling or not
+                            if (!scalar)
+                                CHECK(Th + Rh > 1.0 - 5.0e-3);
+                        }
+                    }
+
+    QD_DIAG("\n# diag: ray_progress sheet tf B, the transmitted sum about the angle at which the sheet becomes rarer than the invariant, neighbours\n");
+    QD_DIAG("# 0.02 deg apart, dB. Porous: eps 0.31 - 0.20j 6 mm with tf 0.5, 37.40 deg; the other: eps 0.90 - 0.20j 6 mm with tf 0.9, 73.78 deg\n");
+    QD_DIAG("sheet,wall,mode,tracer,theta_a,theta_b,T_a,T_b,step,step_hh\n");
+    for (int w = 0; w < 2; ++w)
+        for (int wall : {0, 2})
+            for (bool scalar : {true, false})
+                for (bool refr : {false, true})
+                {
+                    const double a = w ? 0.90 : 0.31, tS = w ? 0.9 : 0.5, ta = w ? 73.77 : 37.39, tb = w ? 73.79 : 37.41;
+                    Sum A = trace(wall, a, 0.20, 0.006, tS, ta, refr, scalar), B = trace(wall, a, 0.20, 0.006, tS, tb, refr, scalar);
+                    const double st = dB(std::norm(B.T[0])) - dB(std::norm(A.T[0])), sh = scalar ? 0.0 : dB(std::norm(B.T[1])) - dB(std::norm(A.T[1]));
+                    QD_DIAG("%.2f-0.20j,%d,%s,%d,%.2f,%.2f,%.4f,%.4f,%+.5f,%+.5f\n", a, wall, scalar ? "scalar" : "EM", refr ? 5 : 4, ta, tb, dB(std::norm(A.T[0])), dB(std::norm(B.T[0])), st, sh);
+                    INFO("step, sheet " << a << ", wall " << wall << ", scalar " << scalar << ", refr " << refr);
+                    CHECK(std::abs(st) < 0.01); // no step where the sheet becomes rarer than the invariant
+                    CHECK(std::abs(sh) < 0.01);
+                }
 }
