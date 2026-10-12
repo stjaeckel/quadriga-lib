@@ -26,6 +26,10 @@
 #include <random>
 #include <stdexcept>
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 // Diagnostic output. Comment out to silence the tables. The assertions run either way.
 #define QD_TEST_VERBOSE
 
@@ -358,6 +362,11 @@ TEST_CASE("sos_remove_bias - input validation")
         CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(freq, p, empty), std::invalid_argument);
         CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(f2, p, pos), std::invalid_argument);
         CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(freq, p, pos, &rows, no_mat, &acf, &dist), std::invalid_argument); // Same map needs pairs
+        // pos_b with more columns than freq, on the same map and on two maps
+        arma::mat p2 = pos.cols(0, 1), pb = phase_b;
+        CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(f2, p, p2, &pos_b, no_mat, &acf, &dist), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(f2, p, p2, &pos_b, &pb), std::invalid_argument);
+        CHECK_NOTHROW(quadriga_lib::sos_remove_bias(f2, p, p2, &p2, &pb));
     }
     SECTION("phase_b")
     {
@@ -371,6 +380,25 @@ TEST_CASE("sos_remove_bias - input validation")
         arma::mat p = phase;
         CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(freq, p, pos, &pos_b), std::invalid_argument);
         CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(freq, p, pos, &pos_b, no_mat, &acf, &bad), std::invalid_argument);
+        // Non-finite table
+        arma::vec inf_dist = dist;
+        inf_dist(50) = arma::datum::inf;
+        CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(freq, p, pos, &pos_b, no_mat, &acf, &inf_dist), std::invalid_argument);
+        // An ACF value of -1 or below makes the normalisation of the pair singular
+        arma::vec minus_one = acf, below = acf;
+        minus_one(7) = -1.0, below(7) = -1.2;
+        CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(freq, p, pos, &pos_b, no_mat, &minus_one, &dist), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(freq, p, pos, &pos_b, no_mat, &below, &dist), std::invalid_argument);
+        CHECK(arma::approx_equal(p, phase, "absdiff", 0.0));
+    }
+    SECTION("phase_b is the same object as phase")
+    {
+        // One matrix for both devices would be corrected twice, and the second correction undoes the first
+        arma::mat p = phase, pb = phase;
+        CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(freq, p, pos, &pos_b, &p), std::invalid_argument);
+        CHECK(arma::approx_equal(p, phase, "absdiff", 0.0));
+        // Two matrices with equal values are two maps with the same phases and are accepted
+        CHECK_NOTHROW(quadriga_lib::sos_remove_bias(freq, p, pos, &pos_b, &pb));
     }
     SECTION("freq_scale_b")
     {
@@ -378,11 +406,132 @@ TEST_CASE("sos_remove_bias - input validation")
         CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(freq, p, pos, &pos_b, &pb, no_vec, no_vec, no_mat, no_mat, 0.0), std::invalid_argument);
         CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(freq, p, pos, &pos_b, no_mat, &acf, &dist, no_mat, no_mat, 2.0), std::invalid_argument);
         CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(freq, p, pos, no_mat, no_mat, no_vec, no_vec, no_mat, no_mat, 2.0), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(freq, p, pos, &pos_b, &pb, no_vec, no_vec, no_mat, no_mat, std::nan("")), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(freq, p, pos, &pos_b, &pb, no_vec, no_vec, no_mat, no_mat, arma::datum::inf), std::invalid_argument);
     }
     SECTION("a failed call leaves the phases untouched")
     {
         arma::mat p = phase, empty;
         CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(freq, p, empty), std::invalid_argument);
         CHECK(arma::approx_equal(p, phase, "absdiff", 0.0));
+    }
+}
+
+TEST_CASE("sos_remove_bias - a generator whose mean is zero for every offset is left unchanged")
+{
+    // One sinusoid with a wavelength of 4 m, positions at 0 and 2 m: the two values are s and -s for every
+    // phase, z = ( 1 + exp( j·pi ) ) / 2 is zero up to the rounding of pi, and abs(Z) = 6e-17 is below the
+    // threshold of 1e-14 · n_coeff. The phases, also one outside [-pi, pi), must come back bit-identical.
+    arma::mat freq = {{0.25, 0.0, 0.0}}, pos = {{0.0, 0.0, 0.0}, {2.0, 0.0, 0.0}};
+    arma::mat phase = {{5.0, -0.3, 0.0}}, given = phase, offset(1, 1), before;
+    offset.fill(9.0);
+
+    quadriga_lib::sos_remove_bias(freq, phase, pos, (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr, &offset, &before);
+    REQUIRE(offset.n_rows == 3);
+    REQUIRE(offset.n_cols == 1);
+    REQUIRE(before.n_rows == 3);
+    QD_DIAG("\n# diag: sos_remove_bias below the threshold: offsets %g %g %g, means %.3e %.3e %.3e\n", offset(0), offset(1), offset(2), before(0), before(1), before(2));
+    for (arma::uword g = 0; g < 3; ++g)
+    {
+        INFO("generator " << g);
+        CHECK(offset(g, 0) == 0.0);
+        CHECK(phase(0, g) == given(0, g));
+        CHECK(std::abs(before(g, 0)) < 1e-15);
+    }
+
+    // One position more and the mean is no longer zero for every offset: the generator is corrected
+    arma::mat pos3 = {{0.0, 0.0, 0.0}, {2.0, 0.0, 0.0}, {0.7, 0.0, 0.0}};
+    phase = given;
+    quadriga_lib::sos_remove_bias(freq, phase, pos3, (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr, &offset);
+    CHECK(std::abs(offset(0, 0)) > 1e-3);
+    CHECK(phase(0, 0) != given(0, 0));
+    CHECK(std::abs(mean_val(freq, phase, 0, pos3)) < 1e-14);
+}
+
+TEST_CASE("sos_remove_bias - phases outside the interval come back inside it")
+{
+    // The same generators with 20 rad added to every phase. A common phase offset is what the function
+    // solves for, and its zeros are pi apart: the total offset 20 + offset_shifted equals the offset of
+    // the unshifted input modulo pi, and the corrected phases of the two calls agree modulo pi. The
+    // corrected phases are wrapped into [-pi, pi).
+    arma::mat freq = rnd(48, 3, -0.05, 0.05, 30), phase0 = rnd(48, 4, -pi, pi, 31), pos = positions(40, 60.0, 32);
+    arma::mat inside = phase0, shifted = phase0 + 20.0, off_in, off_sh;
+    quadriga_lib::sos_remove_bias(freq, inside, pos, (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr, &off_in);
+    quadriga_lib::sos_remove_bias(freq, shifted, pos, (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr, &off_sh);
+    REQUIRE(off_sh.n_rows == 4);
+    QD_DIAG("\n# diag: sos_remove_bias input shifted by 20 rad: output %.4f to %.4f\n", shifted.min(), shifted.max());
+    CHECK(shifted.min() >= -pi);
+    CHECK(shifted.max() < pi);
+    CHECK(shifted.max() - shifted.min() > 5.0);
+    for (arma::uword g = 0; g < 4; ++g)
+    {
+        INFO("generator " << g);
+        CHECK(std::abs(mean_val(freq, shifted, g, pos)) < 1e-13);
+        CHECK(std::abs(off_sh(g, 0)) <= 0.5 * pi + 1e-12);
+        CHECK(diff_mod_pi(20.0 + off_sh(g, 0), off_in(g, 0)) < 1e-12);
+        for (arma::uword n = 0; n < 48; ++n)
+            CHECK(diff_mod_pi(shifted(n, g), inside(n, g)) < 1e-12);
+    }
+}
+
+TEST_CASE("sos_remove_bias - devices with different numbers of position columns equal zero-padded positions")
+{
+    arma::mat freq = rnd(30, 3, -0.05, 0.05, 33), phase0 = rnd(30, 3, -pi, pi, 34), phase_b0 = rnd(30, 3, -pi, pi, 35);
+    arma::mat pa3 = rnd(25, 3, -30.0, 30.0, 36), pb3 = rnd(25, 3, -30.0, 30.0, 37);
+    arma::vec dist = arma::regspace(0.0, 1.0, 50.0), acf = arma::exp(-dist / 10.0);
+
+    for (int mode = 1; mode <= 2; ++mode)
+        for (arma::uword ca = 1; ca <= 3; ++ca)
+            for (arma::uword cb = 1; cb <= 3; ++cb)
+            {
+                arma::mat pa_pad = pa3, pb_pad = pb3;
+                for (arma::uword c = ca; c < 3; ++c)
+                    pa_pad.col(c).zeros();
+                for (arma::uword c = cb; c < 3; ++c)
+                    pb_pad.col(c).zeros();
+                arma::mat pa = pa3.cols(0, ca - 1), pb = pb3.cols(0, cb - 1);
+                arma::mat ph = phase0, phb = phase_b0, ph_ref = phase0, phb_ref = phase_b0, off, off_ref, mean, mean_ref;
+                quadriga_lib::sos_remove_bias(freq, ph, pa, &pb, mode == 2 ? &phb : (arma::mat *)nullptr, &acf, &dist, &off, &mean, mode == 2 ? 0.7 : 1.0);
+                quadriga_lib::sos_remove_bias(freq, ph_ref, pa_pad, &pb_pad, mode == 2 ? &phb_ref : (arma::mat *)nullptr, &acf, &dist, &off_ref, &mean_ref, mode == 2 ? 0.7 : 1.0);
+                INFO("mode " << mode << ", columns " << ca << " and " << cb);
+                REQUIRE(off.n_cols == (arma::uword)mode);
+                CHECK(arma::abs(ph - phase0).max() > 1e-3);
+                CHECK(arma::approx_equal(ph, ph_ref, "absdiff", 0.0));
+                CHECK(arma::approx_equal(phb, phb_ref, "absdiff", 0.0));
+                CHECK(arma::approx_equal(off, off_ref, "absdiff", 0.0));
+                CHECK(arma::approx_equal(mean, mean_ref, "absdiff", 0.0));
+            }
+}
+
+TEST_CASE("sos_remove_bias - results do not depend on the number of threads")
+{
+    // 1000 positions and 100 sinusoids: the sums over the positions run in a parallel loop over the sinusoids
+    arma::mat freq = rnd(100, 3, -0.05, 0.05, 38), phase0 = rnd(100, 7, -pi, pi, 39), phase_b0 = rnd(100, 7, -pi, pi, 40);
+    arma::mat pos = positions(1000, 300.0, 41), pos_b = positions(1000, 300.0, 42);
+    arma::vec dist = arma::regspace(0.0, 1.0, 50.0), acf = arma::exp(-dist / 10.0);
+
+    for (int mode = 0; mode <= 2; ++mode)
+    {
+        arma::mat ph[2], phb[2], off[2], mean[2];
+        for (int run = 0; run < 2; ++run)
+        {
+            ph[run] = phase0, phb[run] = phase_b0;
+#ifdef _OPENMP
+            int n_threads = omp_get_max_threads();
+            if (run == 1)
+                omp_set_num_threads(1);
+#endif
+            quadriga_lib::sos_remove_bias(freq, ph[run], pos, mode == 0 ? (arma::mat *)nullptr : &pos_b, mode == 2 ? &phb[run] : (arma::mat *)nullptr,
+                                          &acf, &dist, &off[run], &mean[run], mode == 2 ? 0.7 : 1.0);
+#ifdef _OPENMP
+            omp_set_num_threads(n_threads);
+#endif
+        }
+        INFO("mode " << mode);
+        CHECK(arma::abs(ph[0] - phase0).max() > 1e-3);
+        CHECK(arma::approx_equal(ph[0], ph[1], "absdiff", 0.0));
+        CHECK(arma::approx_equal(phb[0], phb[1], "absdiff", 0.0));
+        CHECK(arma::approx_equal(off[0], off[1], "absdiff", 0.0));
+        CHECK(arma::approx_equal(mean[0], mean[1], "absdiff", 0.0));
     }
 }

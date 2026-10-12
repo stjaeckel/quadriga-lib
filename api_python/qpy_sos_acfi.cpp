@@ -24,7 +24,7 @@ val = quadriga_lib.sos.acfi( acf, dist, d )
 
 ## Inputs:
 - **`acf`** — Target ACF; at least 2 elements; `(n_acf,)`
-- **`dist`** — Sample points of the ACF; must start at 0 and increase strictly; `(n_acf,)`
+- **`dist`** — Sample points of the ACF; must start at 0, increase strictly and be finite; `(n_acf,)`
 - **`d`** — Distances; must be >= 0; `(n_d,)`
 
 ## Output:
@@ -55,6 +55,6 @@ py::array_t<double> sos_acfi(const py::array_t<double> &acf,
 
 // pybind11 declaration:
 // m.def("acfi", &sos_acfi,
-//       py::arg("acf"),
-//       py::arg("dist"),
-//       py::arg("d"));
+//       py::arg("acf").none(false),
+//       py::arg("dist").none(false),
+//       py::arg("d").none(false));

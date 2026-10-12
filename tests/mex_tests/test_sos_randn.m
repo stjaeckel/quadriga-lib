@@ -40,9 +40,11 @@ assertElementsAlmostEqual( val4(:, 2), ref4, 'absolute', 1e-12 );
 val5 = quadriga_lib.sos_randn( dd, pos, pos_b, dd, [], 7 );                         % equal distances: same map
 assertEqual( val5, val4 );
 
-% Two devices, different decorrelation distance for generator 2: two maps, phases from column n_gen + 2
+% Two devices, different decorrelation distance for generator 2: two maps; the phases of the second device
+% come from a second stream with the seed + 2^62, which is exact only as int64
+phase_b = quadriga_lib.sos_init_phases( 256, 3, int64(7) + int64(4611686018427387904) );
 val6 = quadriga_lib.sos_randn( dd, pos, pos_b, [5, 8, 0], [], 7 );
-ref6 = quadriga_lib.sos_val( freq, phase(:, 2), pos, pos_b, phase(:, 5), [], [], 20/8, false );
+ref6 = quadriga_lib.sos_val( freq, phase(:, 2), pos, pos_b, phase_b(:, 2), [], [], 20/8, false );
 assertElementsAlmostEqual( val6(:, 2), ref6, 'absolute', 1e-12 );
 assertEqual( val6(:, [1, 3]), val4(:, [1, 3]) );
 
@@ -61,6 +63,8 @@ assert_throws( @() out2( dd, pos ), 'Wrong number of output arguments.' );
 assert_throws( @() quadriga_lib.sos_randn( [5, -1], pos ), 'dist_decorr' );                     % thrown by C++
 assert_throws( @() quadriga_lib.sos_randn( dd, pos, [], dd ), 'dist_decorr_b' );                % thrown by C++
 assert_throws( @() quadriga_lib.sos_randn( dd, pos, [], [], 'Comb300' ), 'name' );              % thrown by C++
+assert_throws( @() quadriga_lib.sos_randn( dd, pos, [], [], [], NaN ), 'Input ''seed''' );            % wrapper
+assert_throws( @() quadriga_lib.sos_randn( dd, pos, [], [], [], -2 ), 'seed' );                        % thrown by C++
 
 end
 

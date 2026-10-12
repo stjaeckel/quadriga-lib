@@ -34,17 +34,25 @@ Remove the sample mean of sum-of-sinusoids generators over a set of positions
   mean of the combined, normalised value; `acf` and `dist` are required
 - Two devices on different maps (`pos_b` and `phase_b` given): each device is treated on its own, `phase`
   with `pos` and `phase_b` with `pos_b` and the frequencies `freq · freq_scale_b`; two offsets per generator.
-  The mean of the combined value is then zero as well
+  The mean of the combined value is then zero as well. `phase_b` must not be the same object as `phase`:
+  one matrix cannot hold two corrections
 - Effect on the statistics: the result is the field conditioned on a zero mean over the positions. The
   variance at a position drops from 1 to `1 - c^2 / v`, where `v` is the variance of the sample mean and
   `c` the mean ACF between that position and all positions; on average over the positions the loss is at
   least `v`. It is small only if the positions spread over many decorrelation distances. For positions
   within about one decorrelation distance most of the variance is removed
+- Rule of thumb, measured for 200 positions in a square with the edge `L` and the decorrelation distance
+  `d` (`Comb256`): the variance drops by 74 % for `L = d`, 44 % for `L = 2·d`, 14 % for `L = 5·d`, 5 % for
+  `L = 10·d`, 2.5 % for `L = 20·d` and less than 1 % from `L = 50·d` on
 - The zero mean holds for exactly these positions and frequencies. It is lost when the phases are used
   with other frequencies (another decorrelation distance) or positions
 - The mean of the Uniform output of [[sos_val]] is not exactly 0.5 afterwards
 - Phases are returned in the interval from -pi (included) to pi (excluded). A generator whose `abs(Z)` is
-  below `1e-14 · n_coeff` already has a zero mean for every offset and is left unchanged
+  below `1e-14 · n_coeff` already has a zero mean for every offset and is left unchanged, also if its
+  phases lie outside that interval
+- Two devices on the same map need an ACF above -1 at all sample points, as in [[sos_val]]
+- The sums over the positions are computed in parallel over the sinusoids; the result does not depend
+  on the number of threads
 
 ## Declaration:
 ```
@@ -71,9 +79,11 @@ void quadriga_lib::sos_remove_bias(
   `[n_pos_b, 1]`, `[n_pos_b, 2]` or `[n_pos_b, 3]` as for `pos`; `n_pos_b = n_pos` for the same map, any
   number for different maps
 - **`phase_b`** *(optional)* — Phases of the second device in [rad]; requires `pos_b`; omitted or empty =
-  same map; updated in-place; `[n_coeff, n_gen]`
-- **`acf`** *(optional)* — Target ACF; required for two devices on the same map; `[n_acf]`
-- **`dist`** *(optional)* — Sample points of the ACF in [m]; must start at 0 and increase strictly; `[n_acf]`
+  same map; updated in-place; not the same object as `phase`; `[n_coeff, n_gen]`
+- **`acf`** *(optional)* — Target ACF; required for two devices on the same map, must then be > -1;
+  `[n_acf]`
+- **`dist`** *(optional)* — Sample points of the ACF in [m]; must start at 0, increase strictly and be
+  finite; `[n_acf]`
 - **`freq_scale_b`** *(optional)* — Frequency scale of the second device, i.e. decorrelation distance of
   the first device divided by that of the second; must be > 0; other than 1 requires `phase_b`
 
@@ -121,6 +131,8 @@ void quadriga_lib::sos_remove_bias(const arma::Mat<dtype> &freq,
     {
         if (!two_devices)
             throw std::invalid_argument("Input 'phase_b' requires 'pos_b'.");
+        if (phase_b == &phase)
+            throw std::invalid_argument("Input 'phase_b' cannot be the same object as 'phase'.");
         if (phase_b->n_rows != phase.n_rows || phase_b->n_cols != phase.n_cols)
             throw std::invalid_argument("Input 'phase_b' must have the same size as 'phase'.");
     }
@@ -134,7 +146,7 @@ void quadriga_lib::sos_remove_bias(const arma::Mat<dtype> &freq,
             throw std::invalid_argument("Number of rows in 'pos_b' does not match number of rows in 'pos'.");
         if (acf == nullptr || dist == nullptr || acf->is_empty() || dist->is_empty())
             throw std::invalid_argument("Inputs 'acf' and 'dist' are required for two devices on the same map.");
-        qd_sos_check_acf(*acf, *dist);
+        qd_sos_check_acf_same_map(*acf, *dist);
     }
 
     const arma::uword n_gen = phase.n_cols, n_col = two_maps ? 2 : 1;
@@ -143,32 +155,42 @@ void quadriga_lib::sos_remove_bias(const arma::Mat<dtype> &freq,
     const double two_pi = 6.283185307179586, pi = 3.141592653589793, amp = std::sqrt(2.0 / (double)n_coeff);
 
     // z_n = sum over the positions of weight · exp( j·2·pi · scale · f_n·x ), added to (zr, zi)
+    // Parallel over the sinusoids: each z_n is summed by one thread in the order of the positions
+    const long long n_coeff_ll = (long long)n_coeff;
     auto accumulate = [&](const arma::Mat<dtype> &p, double scale, const double *weight, std::vector<double> &zr, std::vector<double> &zi)
     {
-        for (arma::uword n = 0; n < n_coeff; ++n)
+        const arma::uword n_rows = p.n_rows, n_cols = p.n_cols;
+        const dtype *p0 = p.colptr(0), *p1 = (n_cols > 1) ? p.colptr(1) : nullptr, *p2 = (n_cols > 2) ? p.colptr(2) : nullptr;
+        double *pzr = zr.data(), *pzi = zi.data();
+#pragma omp parallel for if (n_coeff * n_rows > 4096)
+        for (long long i_coeff = 0; i_coeff < n_coeff_ll; ++i_coeff)
         {
+            const arma::uword n = (arma::uword)i_coeff;
             double fx = scale * (double)freq.at(n, 0), fy = (freq.n_cols > 1) ? scale * (double)freq.at(n, 1) : 0.0;
             double fz = (freq.n_cols > 2) ? scale * (double)freq.at(n, 2) : 0.0, re = 0.0, im = 0.0;
-            for (arma::uword i = 0; i < p.n_rows; ++i)
+            for (arma::uword i = 0; i < n_rows; ++i)
             {
-                double t = fx * (double)p.at(i, 0);
-                if (p.n_cols > 1)
-                    t += fy * (double)p.at(i, 1);
-                if (p.n_cols > 2)
-                    t += fz * (double)p.at(i, 2);
+                double t = fx * (double)p0[i];
+                if (p1 != nullptr)
+                    t += fy * (double)p1[i];
+                if (p2 != nullptr)
+                    t += fz * (double)p2[i];
                 t -= std::floor(t + 0.5);
                 re += weight[i] * std::cos(two_pi * t), im += weight[i] * std::sin(two_pi * t);
             }
-            zr[n] += re, zi[n] += im;
+            pzr[n] += re, pzi[n] += im;
         }
     };
 
     // Offset for each generator of 'ph' from (zr, zi); applies it and reports offset and mean
     arma::mat off(n_gen, n_col), mean(n_gen, n_col);
+    const long long n_gen_ll = (long long)n_gen;
     auto correct = [&](arma::Mat<dtype> &ph, const std::vector<double> &zr, const std::vector<double> &zi, arma::uword col)
     {
-        for (arma::uword g = 0; g < n_gen; ++g)
+#pragma omp parallel for if (n_coeff * n_gen > 4096)
+        for (long long i_gen = 0; i_gen < n_gen_ll; ++i_gen)
         {
+            const arma::uword g = (arma::uword)i_gen;
             dtype *p = ph.colptr(g);
             double Zr = 0.0, Zi = 0.0;
             for (arma::uword n = 0; n < n_coeff; ++n)

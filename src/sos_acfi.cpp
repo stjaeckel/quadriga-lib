@@ -20,6 +20,7 @@ Target ACF at given distances
 - Distances beyond the last sample point return the last value of the table
 - The same rule is applied by [[sos_val]] and [[sos_remove_bias]] for two devices on the same map
 - An empty `d` returns an empty `val`
+- `val` may be the same object as `acf`, `dist` or `d`
 
 ## Declaration:
 ```
@@ -32,7 +33,7 @@ void quadriga_lib::sos_acfi(
 
 ## Inputs:
 - **`acf`** — Target ACF; at least 2 elements; `[n_acf]`
-- **`dist`** — Sample points of the ACF in [m]; must start at 0 and increase strictly; `[n_acf]`
+- **`dist`** — Sample points of the ACF in [m]; must start at 0, increase strictly and be finite; `[n_acf]`
 - **`d`** — Distances in [m]; must be >= 0; `[n_d]`
 
 ## Output:
@@ -53,10 +54,12 @@ void quadriga_lib::sos_acfi(const arma::Col<dtype> &acf,
         if (!(d.at(i) >= (dtype)0.0))
             throw std::invalid_argument("Input 'd' must be >= 0.");
 
+    // The table is copied before the output is resized, so that 'val' may be the same object as an input
+    const arma::vec acf_d = arma::conv_to<arma::vec>::from(acf), dist_d = arma::conv_to<arma::vec>::from(dist);
+
     if (val.n_elem != d.n_elem)
         val.set_size(d.n_elem);
 
-    const arma::vec acf_d = arma::conv_to<arma::vec>::from(acf), dist_d = arma::conv_to<arma::vec>::from(dist);
     for (arma::uword i = 0; i < d.n_elem; ++i)
         val.at(i) = (dtype)qd_sos_acf_interp(acf_d.memptr(), dist_d.memptr(), acf_d.n_elem, (double)d.at(i));
 }

@@ -42,6 +42,11 @@ Find the frequencies of a sum-of-sinusoids generator for a given ACF
   others; the tables of [[sos_preset]] were made with 300
 - `freq_min` and `freq_max` limit the magnitude of the frequency along the direction of each sinusoid;
   0 selects the default: no lower limit, and `15 / max(dist)` as upper limit
+- The search grid has `( freq_max - freq_min ) · max(dist) / 0.1 + 1` points, and its cosines are stored for
+  all sample points. It must not have more than 100000 points (the default has 151), which limits
+  `freq_max - freq_min` to less than `10000 / max(dist)`
+- The function runs on one thread
+- `ase` and `test_dir` may be the same objects as `acf` or `dist`
 - `test_dir` and the reported error use the same test directions as [[sos_calc_mse]] with the same `n_dir`
 - All computations are done in double precision for both instantiations
 - A seed >= 0 makes the result repeatable on one platform. The search takes accept/reject decisions, so a
@@ -68,7 +73,7 @@ void quadriga_lib::sos_generate(
 
 ## Inputs:
 - **`acf`** — Target ACF; at least 2 elements; `[n_acf]`
-- **`dist`** — Sample points of the ACF in [m]; must start at 0 and increase strictly; `[n_acf]`
+- **`dist`** — Sample points of the ACF in [m]; must start at 0, increase strictly and be finite; `[n_acf]`
 - **`n_coeff`** — Number of sinusoids; must be > 0
 - **`n_dim`** *(optional)* — Number of dimensions; 1, 2 or 3
 - **`uniform_smp`** *(optional)* — Regular (`true`) or random (`false`) directions of the sinusoids
@@ -77,7 +82,7 @@ void quadriga_lib::sos_generate(
   (`false`)
 - **`freq_min`** *(optional)* — Lower limit of the frequency magnitude in [1/m]; must be >= 0; 0 = none
 - **`freq_max`** *(optional)* — Upper limit of the frequency magnitude in [1/m]; must be >= 0 and, if not 0,
-  larger than `freq_min`; 0 = `15 / max(dist)`
+  larger than `freq_min`; 0 = `15 / max(dist)`; limited by the size of the search grid, see above
 - **`seed`** *(optional)* — Seed; must be >= -1; `-1` seeds from the system random device
 
 ## Outputs:
@@ -122,6 +127,10 @@ void quadriga_lib::sos_generate(const arma::Col<dtype> &acf,
     const double f_hi = (freq_max != (dtype)0.0) ? (double)freq_max : 15.0 / d_max, f_lo = (double)freq_min;
     if (!(f_hi > f_lo))
         throw std::invalid_argument("Input 'freq_max' (or its default) must be larger than 'freq_min'.");
+    // The cosines of the search grid are stored for all sample points; the presets use 150 grid points
+    const double n_grid_d = std::floor((f_hi * d_max - f_lo * d_max) / 0.1 + 1.0e-9) + 1.0;
+    if (!(n_grid_d <= 100000.0))
+        throw std::invalid_argument("Input 'freq_max' is too large: the search grid of ( freq_max - freq_min ) · max(dist) / 0.1 points cannot exceed 100000.");
     if (seed < -1)
         throw std::invalid_argument("Input 'seed' must be >= -1.");
 

@@ -19,6 +19,8 @@ Spatially correlated random values on a regular grid
 - The number of grid vectors given must not exceed the number of columns of `freq`; a `y` or `z`
   that is `None` or empty means a single sample at 0 on that axis
 - `z` can be given without `y` if `freq` has 3 columns
+- The values are those of [[sos_val]] at the grid points, bit for bit; kernels, accuracy and the
+  Uniform mapping are described there
 
 ## Usage:
 ```
@@ -26,8 +28,8 @@ map = quadriga_lib.sos.map( freq, phase, x, y, z, uniform, use_kernel )
 ```
 
 ## Inputs:
-- **`freq`** — Frequencies in [1/m]; `n_dim` = 1, 2 or 3; `(n_coeff, n_dim)`
-- **`phase`** — Phases in [rad]; one column per generator; `(n_coeff, n_gen)`
+- **`freq`** — Frequencies; `n_dim` = 1, 2 or 3; `(n_coeff, n_dim)`
+- **`phase`** — Phases; one column per generator; `(n_coeff, n_gen)`
 - **`x`** — Grid points on the x-axis; `(nx,)`
 - **`y`** — Grid points on the y-axis; requires `n_dim >= 2`; `None` = one sample at 0, `ny = 1`;
   `(ny,)`; default: `None`
@@ -79,9 +81,9 @@ py::array_t<double> sos_map(const py::array_t<double> &freq,
 
 // pybind11 declaration:
 // m.def("map", &sos_map,
-//       py::arg("freq"),
-//       py::arg("phase"),
-//       py::arg("x"),
+//       py::arg("freq").none(false),
+//       py::arg("phase").none(false),
+//       py::arg("x").none(false),
 //       py::arg("y") = py::none(),
 //       py::arg("z") = py::none(),
 //       py::arg("uniform") = false,

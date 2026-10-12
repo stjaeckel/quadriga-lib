@@ -283,6 +283,12 @@ TEST_CASE("sos_generate - input validation")
         CHECK_THROWS_AS(quadriga_lib::sos_generate(one, dist, 4, freq), std::invalid_argument);
         CHECK_THROWS_AS(quadriga_lib::sos_generate(acf, start, 4, freq), std::invalid_argument);
         CHECK_THROWS_AS(quadriga_lib::sos_generate(acf, order, 4, freq), std::invalid_argument);
+        // Non-finite table: before the fix an Inf sample point ended in std::length_error
+        arma::vec inf_dist = dist, nan_acf = acf;
+        inf_dist(20) = arma::datum::inf, nan_acf(3) = std::nan("");
+        CHECK_THROWS_AS(quadriga_lib::sos_generate(acf, inf_dist, 4, freq, no_vec, no_mat, 3, true, 5, true, 0.0, 1.0, 1), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_generate(acf, inf_dist, 4, freq), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_generate(nan_acf, dist, 4, freq), std::invalid_argument);
     }
     SECTION("n_coeff")
     {
@@ -305,8 +311,158 @@ TEST_CASE("sos_generate - input validation")
         // The lower limit must also stay below the default upper limit of 15 / 20 = 0.75 / m
         CHECK_THROWS_AS(quadriga_lib::sos_generate(acf, dist, 4, freq, no_vec, no_mat, 3, true, 5, true, 0.8, 0.0, 1), std::invalid_argument);
     }
+    SECTION("freq_max: the search grid is limited to 100000 points")
+    {
+        // The grid has ( freq_max - freq_min ) · max(dist) / 0.1 + 1 points; max(dist) = 20 m.
+        // 499.99 / m gives 99999 points and is accepted (one sinusoid in 1-D keeps it short), 500.01 / m is rejected.
+        arma::vec d3 = {0.0, 10.0, 20.0}, a3 = {1.0, 0.5, 0.2};
+        CHECK_NOTHROW(quadriga_lib::sos_generate(a3, d3, 1, freq, no_vec, no_mat, 1, true, 1, true, 0.0, 499.99, 1));
+        CHECK_THROWS_AS(quadriga_lib::sos_generate(a3, d3, 1, freq, no_vec, no_mat, 1, true, 1, true, 0.0, 500.01, 1), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_generate(a3, d3, 1, freq, no_vec, no_mat, 1, true, 1, true, 0.0, 1.0e6, 1), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_generate(a3, d3, 1, freq, no_vec, no_mat, 1, true, 1, true, 0.0, 1.0e300, 1), std::invalid_argument);
+        // The lower limit counts: 600 / m is fine with a lower limit of 200 / m
+        CHECK_NOTHROW(quadriga_lib::sos_generate(a3, d3, 1, freq, no_vec, no_mat, 1, true, 1, true, 200.0, 600.0, 1));
+    }
+    SECTION("a failed call leaves the outputs untouched")
+    {
+        arma::mat keep(2, 2);
+        keep.fill(7.0);
+        arma::vec ase(3);
+        ase.fill(7.0);
+        CHECK_THROWS_AS(quadriga_lib::sos_generate(acf, dist, 0, keep, &ase), std::invalid_argument);
+        CHECK(keep.n_rows == 2);
+        CHECK(keep(1, 1) == 7.0);
+        CHECK(ase.n_elem == 3);
+    }
     SECTION("seed")
     {
         CHECK_THROWS_AS(quadriga_lib::sos_generate(acf, dist, 4, freq, no_vec, no_mat, 3, true, 5, true, 0.0, 0.0, -2), std::invalid_argument);
     }
+}
+
+TEST_CASE("sos_generate - with unequal sample spacing the reported error is the error of the returned table")
+{
+    // Sample points 0, 0.52, 1.08, ... 49.92 m with a growing step. The search then evaluates one cosine per
+    // sample point instead of advancing by a rotation, which is valid for equal steps only; using the
+    // rotation here would report an error that the returned table does not have.
+    arma::vec dist(40), acf(40);
+    for (arma::uword i = 0; i < 40; ++i)
+        dist(i) = 0.02 * (double)(i * i) + 0.5 * (double)i, acf(i) = std::exp(-dist(i) / 10.0);
+
+    QD_DIAG("\n# diag: sos_generate unequal sample spacing\nn_dim,random_init,passes,final_ase,oracle,diff\n");
+    for (arma::uword n_dim = 1; n_dim <= 3; ++n_dim)
+        for (bool random_init : {true, false})
+        {
+            arma::mat freq;
+            arma::vec ase;
+            quadriga_lib::sos_generate(acf, dist, 16, freq, &ase, (arma::mat *)nullptr, n_dim, true, 7, random_init, 0.0, 0.0, 4);
+            REQUIRE(freq.n_rows == 16);
+            REQUIRE(freq.n_cols == n_dim);
+            REQUIRE(ase.n_elem >= 1);
+            double ref = ref_mse_dir(freq, acf, dist, 7), last = ase(ase.n_elem - 1);
+            QD_DIAG("%llu,%d,%llu,%.6e,%.6e,%.2e\n", (unsigned long long)n_dim, (int)random_init, (unsigned long long)ase.n_elem, last, ref, last - ref);
+            INFO("n_dim " << n_dim << ", random_init " << random_init);
+            // Cosines evaluated directly on both sides: equal to the rounding of sums of about 300 terms
+            CHECK(std::abs(last - ref) < 1e-13);
+            CHECK(last < 3e-2);
+            CHECK(arma::abs(freq).max() > 1e-3);
+            for (arma::uword i = 1; i < ase.n_elem; ++i)
+                CHECK(ase(i) <= ase(i - 1));
+        }
+}
+
+TEST_CASE("sos_generate - the iteration stops by the documented rules")
+{
+    // Documented: stop after a pass that changes nothing or lowers the error by less than a factor of 1e-6,
+    // at the latest after 1000 passes. Stated on the error sequence: every pass but the last lowers the
+    // error by at least 1e-6 of its value before the pass; unless the limit of 1000 passes ended the run,
+    // the last pass lowers it by less than that. This holds on every platform, whichever rule ends a run.
+    arma::vec dist = arma::regspace(0.0, 1.0, 40.0), acf = arma::exp(-dist / 10.0);
+
+    arma::uword n_limit = 0, n_gain = 0, n_nothing = 0;
+    QD_DIAG("\n# diag: sos_generate termination\nn_dim,random_init,n_coeff,passes,last_gain_rel,ended_by\n");
+    for (arma::uword n_dim = 1; n_dim <= 3; ++n_dim)
+        for (bool random_init : {true, false})
+            for (arma::uword n_coeff : {4, 24})
+            {
+                arma::mat freq;
+                arma::vec ase;
+                quadriga_lib::sos_generate(acf, dist, n_coeff, freq, &ase, (arma::mat *)nullptr, n_dim, true, 7, random_init, 0.0, 0.0, 3);
+                const arma::uword n = ase.n_elem;
+                REQUIRE(n >= 1);
+                INFO("n_dim " << n_dim << ", random_init " << random_init << ", n_coeff " << n_coeff << ", passes " << n);
+                CHECK(n <= 1000);
+                for (arma::uword i = 1; i + 1 < n; ++i)
+                    CHECK(ase(i - 1) - ase(i) >= 1.0e-6 * ase(i - 1));
+                double last_gain = (n > 1) ? (ase(n - 2) - ase(n - 1)) / ase(n - 2) : 0.0;
+                if (n > 1 && n < 1000)
+                    CHECK(last_gain < 1.0e-6);
+                const char *ended = (n == 1000) ? "limit" : (last_gain > 0.0 ? "gain below 1e-6" : "nothing changed");
+                n_limit += (n == 1000) ? 1 : 0, n_gain += (n < 1000 && last_gain > 0.0) ? 1 : 0, n_nothing += (n < 1000 && last_gain == 0.0) ? 1 : 0;
+                QD_DIAG("%llu,%d,%llu,%llu,%.3e,%s\n", (unsigned long long)n_dim, (int)random_init, (unsigned long long)n_coeff, (unsigned long long)n, last_gain, ended);
+            }
+    // On the platform this was written on the 12 runs end 2 times at the limit, 2 times by the gain rule and
+    // 8 times without a change. Which rule ends a run can differ between math libraries, so only the
+    // presence of the two regular endings is asserted.
+    QD_DIAG("ended by: limit %llu, gain %llu, nothing changed %llu\n", (unsigned long long)n_limit, (unsigned long long)n_gain, (unsigned long long)n_nothing);
+    CHECK(n_gain >= 1);
+    CHECK(n_nothing >= 1);
+}
+
+TEST_CASE("sos_generate - the smallest problem runs: one sinusoid, two samples, one test direction")
+{
+    arma::vec acf = {1.0, 0.5}, dist = {0.0, 10.0}, ase;
+    arma::mat freq, test_dir;
+    quadriga_lib::sos_generate(acf, dist, 1, freq, &ase, &test_dir, 3, true, 1, true, 0.0, 0.0, 1);
+    REQUIRE(freq.n_rows == 1);
+    REQUIRE(freq.n_cols == 3);
+    REQUIRE(ase.n_elem >= 1);
+    REQUIRE(test_dir.n_rows == 1);
+    REQUIRE(test_dir.n_cols == 2);
+    double ref = ref_mse_dir(freq, acf, dist, 1), last = ase(ase.n_elem - 1);
+    QD_DIAG("\n# diag: sos_generate smallest problem: %llu passes, error %.3e, oracle %.3e\n", (unsigned long long)ase.n_elem, last, ref);
+    CHECK(std::abs(last - ref) < 1e-13);
+    // One cosine can meet the single value 0.5 at 10 m exactly; the step refinement stops at 1e-6 periods
+    CHECK(last < 1e-9);
+    CHECK(freq.is_finite());
+    CHECK(arma::abs(freq).max() > 1e-3);
+}
+
+TEST_CASE("sos_generate - with few test directions the result fits those directions and is worse in others")
+{
+    // 3 test directions in 3-D. The error on these 3 directions is what the search minimises; on 101 other
+    // directions the same table is worse. Measured ratios for the three seeds: 3.4 to 3.9.
+    arma::vec dist = arma::regspace(0.0, 1.0, 40.0), acf = arma::exp(-dist / 10.0);
+    QD_DIAG("\n# diag: sos_generate fitted with 3 test directions\nseed,error_3_dir,error_101_dir,ratio\n");
+    for (arma::sword seed = 1; seed <= 3; ++seed)
+    {
+        arma::mat freq;
+        arma::vec ase;
+        quadriga_lib::sos_generate(acf, dist, 24, freq, &ase, (arma::mat *)nullptr, 3, true, 3, true, 0.0, 0.0, seed);
+        REQUIRE(freq.n_rows == 24);
+        double fit = ref_mse_dir(freq, acf, dist, 3), other = ref_mse_dir(freq, acf, dist, 101);
+        QD_DIAG("%lld,%.3e,%.3e,%.2f\n", (long long)seed, fit, other, other / fit);
+        INFO("seed " << seed);
+        CHECK(std::abs(ase(ase.n_elem - 1) - fit) < 1e-10);
+        CHECK(other > 1.5 * fit);
+    }
+}
+
+TEST_CASE("sos_generate - an output may be the same object as an input")
+{
+    arma::vec dist = arma::regspace(0.0, 1.0, 40.0), acf = arma::exp(-dist / 10.0);
+    arma::mat ref, freq;
+    arma::vec ref_ase;
+    quadriga_lib::sos_generate(acf, dist, 12, ref, &ref_ase, (arma::mat *)nullptr, 3, true, 7, true, 0.0, 0.0, 5);
+    REQUIRE(ref.n_rows == 12);
+    CHECK(arma::abs(ref).max() > 1e-3);
+
+    // ase is 'acf' (41 elements, resized to the number of passes); then ase is 'dist'
+    arma::vec a = acf, d = dist;
+    quadriga_lib::sos_generate(a, dist, 12, freq, &a, (arma::mat *)nullptr, 3, true, 7, true, 0.0, 0.0, 5);
+    CHECK(arma::approx_equal(freq, ref, "absdiff", 0.0));
+    CHECK(arma::approx_equal(a, ref_ase, "absdiff", 0.0));
+    quadriga_lib::sos_generate(acf, d, 12, freq, &d, (arma::mat *)nullptr, 3, true, 7, true, 0.0, 0.0, 5);
+    CHECK(arma::approx_equal(freq, ref, "absdiff", 0.0));
+    CHECK(arma::approx_equal(d, ref_ase, "absdiff", 0.0));
 }

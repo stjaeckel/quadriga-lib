@@ -28,7 +28,8 @@ class test_case(unittest.TestCase):
         self.pos = np.array([[0.0, 0.0, 0.0], [3.0, 0.0, 0.0], [0.0, 4.0, 1.5], [100.0, -50.0, 2.0]])
         self.pos_b = self.pos[:, [1, 0, 2]] + 1.0
 
-        # The documented composition: preset, phases with 2 n_gen columns, evaluation; here for generator 1 (20 m)
+        # The documented composition: preset, phases, evaluation; here for generator 1 (20 m). A second device
+        # on its own map draws its phases from a second stream with the seed + 2^62.
         self.freq, self.acf, self.dist = quadriga_lib.sos.preset("Comb256", 20.0)
         self.phase = quadriga_lib.sos.init_phases(256, 6, 7)
 
@@ -90,9 +91,10 @@ class test_case(unittest.TestCase):
         val5 = quadriga_lib.sos.randi(self.dd, self.pos, 6, self.pos_b, self.dd, seed=7)
         npt.assert_array_equal(val5, val4)
 
-        # Another distance for generator 1: two maps, phases of the second device from column n_gen + 1
+        # Another distance for generator 1: two maps, phases of the second device from the second stream
+        phase_b = quadriga_lib.sos.init_phases(256, 3, 7 + 2**62)
         val6 = quadriga_lib.sos.randi(self.dd, self.pos, 6, self.pos_b, [5.0, 8.0, 0.0], seed=7)
-        npt.assert_allclose(val6[:, 1], self.oracle(1, pos_b=self.pos_b, phase_b=self.phase[:, 4],
+        npt.assert_allclose(val6[:, 1], self.oracle(1, pos_b=self.pos_b, phase_b=phase_b[:, 1],
                                                     freq_scale_b=20.0 / 8.0), atol=1e-12, rtol=0)
         npt.assert_array_equal(val6[:, [0, 2]], val4[:, [0, 2]])
 
@@ -156,6 +158,26 @@ class test_case(unittest.TestCase):
             quadriga_lib.sos.randi(self.dd)
         with self.assertRaises(TypeError):
             quadriga_lib.sos.randi(self.dd, self.pos, 6, no_such_argument=1)
+
+    def test_none_for_mandatory_arrays(self):
+        # None for a mandatory array is rejected by pybind11; it must not be read as one value of NaN
+        args = [self.dd, self.pos, 6]
+        quadriga_lib.sos.randi(*args)
+        for i in range(2):
+            bad = list(args)
+            bad[i] = None
+            with self.assertRaises(TypeError):
+                quadriga_lib.sos.randi(*bad)
+
+    def test_one_dimensional_pos(self):
+        # A 1-D array is a column: three positions on the x-axis, not one position {x, y, z}
+        p = np.array([3.0, 4.0, 1.5])
+        val = quadriga_lib.sos.randi(self.dd, p, 6, seed=7)
+        self.assertEqual(val.shape, (3, 3))
+        npt.assert_array_equal(val, quadriga_lib.sos.randi(self.dd, p.reshape(3, 1), 6, seed=7))
+        one = quadriga_lib.sos.randi(self.dd, p.reshape(1, 3), 6, seed=7)
+        self.assertEqual(one.shape, (1, 3))
+        self.assertTrue(np.max(np.abs(one[0, :] - val[0, :])) > 0)  # {3, 4, 1.5} is not {3, 0, 0}
 
 
 if __name__ == "__main__":

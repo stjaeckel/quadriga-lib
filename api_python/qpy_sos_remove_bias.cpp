@@ -39,7 +39,13 @@ Remove the sample mean of sum-of-sinusoids generators over a set of positions
   variance is removed
 - The zero mean holds for exactly these positions and frequencies. It is lost when the phases are
   used with other frequencies (another decorrelation distance) or positions
-- Phases are returned in the interval from -pi (included) to pi (excluded)
+- Rule of thumb, measured for 200 positions in a square with the edge `L` and the decorrelation
+  distance `d` (`Comb256`): the variance drops by 74 % for `L = d`, 44 % for `L = 2·d`, 14 % for
+  `L = 5·d`, 5 % for `L = 10·d`, 2.5 % for `L = 20·d` and less than 1 % from `L = 50·d` on
+- Phases are returned in the interval from -pi (included) to pi (excluded). A generator whose
+  `abs(Z)` is below `1e-14 · n_coeff` already has a zero mean for every offset and is returned
+  unchanged, also if its phases lie outside that interval
+- Two devices on the same map need an ACF above -1 at all sample points, as in [[sos_val]]
 - The input arrays `phase_in` and `phase_b_in` are not modified; the corrected phases are new arrays
 - An optional array that is `None` or empty counts as not given
 
@@ -50,28 +56,30 @@ phase_out, phase_b_out, offset, mean_before = quadriga_lib.sos.remove_bias( freq
 ```
 
 ## Inputs:
-- **`freq`** — Frequencies in [1/m]; `n_dim` = 1, 2 or 3; `(n_coeff, n_dim)`
-- **`phase_in`** — Phases in [rad]; one column per generator; `(n_coeff, n_gen)`
+- **`freq`** — Frequencies; `n_dim` = 1, 2 or 3; `(n_coeff, n_dim)`
+- **`phase_in`** — Phases; one column per generator; `(n_coeff, n_gen)`
 - **`pos`** — Positions of the first device; one row per position; the number of columns sets the
   number of dimensions: `(n_pos, 1)` = `(x)`, `(n_pos, 2)` = `(x, y)` or `(n_pos, 3)` = `(x, y, z)`;
-  coordinates that are not given are 0; not more columns than `freq`
+  coordinates that are not given are 0; not more columns than `freq`; a 1-D array is one column,
+  i.e. one x-coordinate per position
 - **`pos_b`** — Positions of the second device; `None` = one device; `(n_pos_b, 1)`, `(n_pos_b, 2)`
   or `(n_pos_b, 3)` as for `pos`; `n_pos_b = n_pos` for the same map, any number for different
   maps; default: `None`
-- **`phase_b_in`** — Phases of the second device in [rad]; requires `pos_b`; `None` = same map;
+- **`phase_b_in`** — Phases of the second device; requires `pos_b`; `None` = same map;
   `(n_coeff, n_gen)`; default: `None`
-- **`acf`** — Target ACF; required for two devices on the same map; `(n_acf,)`; default: `None`
-- **`dist`** — Sample points of the ACF; must start at 0 and increase strictly; `(n_acf,)`;
+- **`acf`** — Target ACF; required for two devices on the same map, must then be > -1; `(n_acf,)`;
+  default: `None`
+- **`dist`** — Sample points of the ACF; must start at 0, increase strictly and be finite; `(n_acf,)`;
   default: `None`
 - **`freq_scale_b`** — Frequency scale of the second device, i.e. decorrelation distance of the
   first device divided by that of the second; must be > 0; other than 1 requires `phase_b_in`;
   default: 1.0
 
 ## Outputs:
-- **`phase_out`** — Corrected phases in [rad]; `(n_coeff, n_gen)`
-- **`phase_b_out`** — Corrected phases of the second device in [rad]; `(n_coeff, n_gen)`; `None` if
+- **`phase_out`** — Corrected phases; `(n_coeff, n_gen)`
+- **`phase_b_out`** — Corrected phases of the second device; `(n_coeff, n_gen)`; `None` if
   `phase_b_in` was not given
-- **`offset`** — Offsets added to the phases in [rad]; `(n_gen, 1)`, or `(n_gen, 2)` with
+- **`offset`** — Offsets added to the phases; `(n_gen, 1)`, or `(n_gen, 2)` with
   `phase_b_in` (column 0: `phase_in`, column 1: `phase_b_in`)
 - **`mean_before`** — Sample mean before the correction; `(n_gen, 1)`: mean of the values of
   [[sos_val]] for the given arguments; with `phase_b_in` `(n_gen, 2)`: mean of the field of each
@@ -123,9 +131,9 @@ py::tuple sos_remove_bias(const py::array_t<double> &freq,
 
 // pybind11 declaration:
 // m.def("remove_bias", &sos_remove_bias,
-//       py::arg("freq"),
-//       py::arg("phase_in"),
-//       py::arg("pos"),
+//       py::arg("freq").none(false),
+//       py::arg("phase_in").none(false),
+//       py::arg("pos").none(false),
 //       py::arg("pos_b") = py::none(),
 //       py::arg("phase_b_in") = py::none(),
 //       py::arg("acf") = py::none(),

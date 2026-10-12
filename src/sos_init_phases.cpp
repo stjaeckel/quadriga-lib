@@ -24,6 +24,10 @@ Draw random phases for a set of sum-of-sinusoids generators
 - The matrix is filled column by column from one stream: for the same seed, column `g` does not depend on
   `n_gen`
 - For `dtype = float` the values are rounded from double; a value that rounds to pi is returned as -pi
+- A seed stands for a set of phases. Generators that use phases of the same seed with different
+  frequencies (another decorrelation distance or preset) produce related fields, which are equal at the
+  coordinate origin and correlated around it; draw independent quantities as columns of one call or with
+  different seeds
 
 ## Declaration:
 ```

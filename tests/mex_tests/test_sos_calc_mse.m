@@ -63,6 +63,11 @@ assert_throws( @() out6( freq, acf, dist ), 'Wrong number of output arguments.' 
 assert_throws( @() quadriga_lib.sos_calc_mse( freq, acf, dist(1:5) ), 'dist' );       % thrown by C++
 assert_throws( @() quadriga_lib.sos_calc_mse( freq, acf, dist, 0 ), 'n_dir' );        % thrown by C++
 
+% n_dir is validated by the wrapper before the conversion to an unsigned type
+assert_throws( @() quadriga_lib.sos_calc_mse( freq, acf, dist, -1 ), 'Input ''n_dir'' must be a finite number >= 1' );
+assert_throws( @() quadriga_lib.sos_calc_mse( freq, acf, dist, NaN ), 'Input ''n_dir'' must be a finite number >= 1' );
+assert_throws( @() quadriga_lib.sos_calc_mse( freq, acf, dist, Inf ), 'Input ''n_dir'' must be a finite number >= 1' );
+
 end
 
 % Request 6 outputs so that the output-count guard fires

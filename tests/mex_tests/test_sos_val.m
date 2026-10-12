@@ -68,6 +68,25 @@ assert_throws( @() quadriga_lib.sos_val( freq, phase(1, :), pos ), 'phase' );   
 assert_throws( @() quadriga_lib.sos_val( freq, phase, pos, pos_b ), 'acf' );                           % thrown by C++
 assert_throws( @() quadriga_lib.sos_val( freq, phase, pos, pos_b, [], acf, dist, 2 ), 'freq_scale_b' ); % thrown by C++
 assert_throws( @() quadriga_lib.sos_val( freq, phase, pos, [], [], [], [], [], [], 3 ), 'use_kernel' ); % thrown by C++
+assert_throws( @() quadriga_lib.sos_val( freq, phase, pos, pos_b, [], [1, -1, -1], dist ), 'acf' );           % thrown by C++
+
+%% Type handling of the shared MEX helpers, pinned as it is today so that a change is noticed
+% Complex arrays are accepted without an error or warning. Their values are not usable: MATLAB R2024a
+% hands the helper interleaved data, so real and imaginary parts are read as consecutive real elements
+% (Octave keeps the parts apart). Only the acceptance and the size are pinned, the values differ per host.
+vc = quadriga_lib.sos_val( freq, phase, complex(pos, pos + 1), [], [], [], [], [], [], 1 );
+assertEqual( size(vc), [3, 2] );
+assertTrue( isreal(vc) );
+% Integer classes other than (u)int32 and (u)int64, and logical arrays, are rejected
+assert_throws( @() quadriga_lib.sos_val( freq, phase, uint8(pos) ), 'Unsupported data type.' );
+assert_throws( @() quadriga_lib.sos_val( freq, phase, pos > 0 ), 'Unsupported data type.' );
+vi = quadriga_lib.sos_val( freq, phase, int32(pos), [], [], [], [], [], [], 1 );
+assertEqual( vi, quadriga_lib.sos_val( freq, phase, pos, [], [], [], [], [], [], 1 ) );
+% Scalars: complex and uint8 are rejected, non-integer values are truncated
+assert_throws( @() quadriga_lib.sos_val( freq, phase, pos, pos_b, phase, [], [], complex(1, 1) ), 'Complex datatypes are not supported.' );
+assert_throws( @() quadriga_lib.sos_val( freq, phase, pos, [], [], [], [], [], [], uint8(1) ), 'unsupported data type' );
+vk = quadriga_lib.sos_val( freq, phase, pos, [], [], [], [], [], [], 1.7 );    % use_kernel = 1
+assertEqual( vk, quadriga_lib.sos_val( freq, phase, pos, [], [], [], [], [], [], 1 ) );
 
 end
 

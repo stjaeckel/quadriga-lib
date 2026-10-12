@@ -26,6 +26,10 @@ ACF produced by a set of sinusoids
 - `n_dim = 3`: on the x-y, x-z and y-z plane (slices 0, 1, 2); `[n_grid, n_grid, 3]`; the row index belongs
   to the second axis of the plane, the column index to the first
 - Only the sample points `dist` are used, not the ACF values
+- `R(-dx) = R(dx)`: each plane is point-symmetric about its center. One half is computed and the other
+  half is its mirror image, so the symmetry is exact
+- Equally spaced has the meaning given in [[sos_acf_2d]]
+- `dist_2d` may be the same object as `dist`
 
 ## Declaration:
 ```
@@ -38,8 +42,8 @@ void quadriga_lib::sos_acf_approx(
 
 ## Inputs:
 - **`freq`** — Frequencies in [1/m]; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
-- **`dist`** — Sample points of the ACF in [m]; must start at 0 and be equally spaced; at least 2 elements;
-  `[n_acf]`
+- **`dist`** — Sample points of the ACF in [m]; must start at 0, be equally spaced and finite; at least
+  2 elements; `[n_acf]`
 
 ## Outputs:
 - **`acf_approx`** — Approximated ACF; size depends on `n_dim`, see above
@@ -64,6 +68,9 @@ void quadriga_lib::sos_acf_approx(const arma::Mat<dtype> &freq,
         throw std::invalid_argument("Input 'dist' must have at least 2 elements.");
     if (dist.at(0) != (dtype)0.0)
         throw std::invalid_argument("Input 'dist' must start at 0.");
+    for (arma::uword i = 0; i < dist.n_elem; ++i)
+        if (!std::isfinite((double)dist.at(i)))
+            throw std::invalid_argument("Input 'dist' must be finite.");
     if (!(dist.at(dist.n_elem - 1) > (dtype)0.0) || !qd_sos_equally_spaced(dist))
         throw std::invalid_argument("Input 'dist' must be equally spaced.");
 
@@ -83,14 +90,19 @@ void quadriga_lib::sos_acf_approx(const arma::Mat<dtype> &freq,
     for (arma::uword d = 0; d < n_dim; ++d)
     {
         C[d].resize(n_coeff * n_grid), S[d].resize(n_coeff * n_grid);
-        for (arma::uword k = 0; k < n_grid; ++k)
+        double *pc = C[d].data(), *ps = S[d].data();
+        const dtype *pf = freq.colptr(d);
+        const long long n_grid_ll = (long long)n_grid;
+#pragma omp parallel for if (n_coeff * n_grid > 4096)
+        for (long long i_grid = 0; i_grid < n_grid_ll; ++i_grid)
         {
-            double xk = (double)((long long)k - half) * step;
+            const arma::uword k = (arma::uword)i_grid;
+            double xk = (double)(i_grid - half) * step;
             for (arma::uword n = 0; n < n_coeff; ++n)
             {
-                double t = (double)freq.at(n, d) * xk;
+                double t = (double)pf[n] * xk;
                 t -= std::floor(t + 0.5);
-                C[d][k * n_coeff + n] = std::cos(two_pi * t), S[d][k * n_coeff + n] = std::sin(two_pi * t);
+                pc[k * n_coeff + n] = std::cos(two_pi * t), ps[k * n_coeff + n] = std::sin(two_pi * t);
             }
         }
     }
@@ -111,7 +123,8 @@ void quadriga_lib::sos_acf_approx(const arma::Mat<dtype> &freq,
     {
         // Slice 0: x-y, slice 1: x-z, slice 2: y-z; the first axis runs along the columns
         const arma::uword first[3] = {0, 0, 1}, second[3] = {1, 2, 2};
-        const long long n_grid_ll = (long long)n_grid;
+        // R(-dx) = R(dx): the columns up to the center are computed, the others are their mirror image
+        const long long n_half_ll = half + 1;
         for (arma::uword s = 0; s < n_slices; ++s)
         {
             const double *Ca = C[first[s]].data(), *Sa = S[first[s]].data();
@@ -119,7 +132,7 @@ void quadriga_lib::sos_acf_approx(const arma::Mat<dtype> &freq,
             dtype *out = acf_approx.slice_memptr(s);
 
 #pragma omp parallel for
-            for (long long i_col = 0; i_col < n_grid_ll; ++i_col)
+            for (long long i_col = 0; i_col < n_half_ll; ++i_col)
             {
                 const arma::uword c = (arma::uword)i_col;
                 const double *ca = &Ca[c * n_coeff], *sa = &Sa[c * n_coeff];
@@ -132,6 +145,9 @@ void quadriga_lib::sos_acf_approx(const arma::Mat<dtype> &freq,
                     out[c * n_grid + r] = (dtype)(acc * scale);
                 }
             }
+            for (arma::uword c = (arma::uword)n_half_ll; c < n_grid; ++c)
+                for (arma::uword r = 0; r < n_grid; ++r)
+                    out[c * n_grid + r] = out[(n_grid - 1 - c) * n_grid + (n_grid - 1 - r)];
         }
     }
 

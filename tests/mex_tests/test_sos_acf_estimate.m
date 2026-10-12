@@ -45,6 +45,13 @@ assert_throws( @() quadriga_lib.sos_acf_estimate( freq, phase, bins, 150, [], []
 assert_throws( @() out4( freq, phase, bins, 150, acf, dist, 1 ), 'Wrong number of output arguments.' );
 assert_throws( @() quadriga_lib.sos_acf_estimate( freq(:, 1:2), phase, bins, 150 ), 'freq' );       % thrown by C++
 assert_throws( @() quadriga_lib.sos_acf_estimate( freq, phase, bins, 1 ), 'n_pos' );                % thrown by C++
+
+% n_pos and the seed are validated by the wrapper before the conversion to an integer type
+assert_throws( @() quadriga_lib.sos_acf_estimate( freq, phase, bins, -1 ), 'Input ''n_pos'' must be a finite number >= 1' );
+assert_throws( @() quadriga_lib.sos_acf_estimate( freq, phase, bins, NaN ), 'Input ''n_pos'' must be a finite number >= 1' );
+assert_throws( @() quadriga_lib.sos_acf_estimate( freq, phase, bins, 0 ), 'Input ''n_pos'' must be a finite number >= 1' );
+assert_throws( @() quadriga_lib.sos_acf_estimate( freq, phase, bins, 150, [], [], NaN ), 'Input ''seed''' );
+assert_throws( @() quadriga_lib.sos_acf_estimate( freq, phase, [bins(1:end-1), Inf], 150 ), 'bins' );  % thrown by C++
 assert_throws( @() dual_without_acf( freq, phase, bins ), 'acf' );                                  % thrown by C++
 
 end

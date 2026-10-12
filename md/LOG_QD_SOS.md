@@ -841,3 +841,337 @@ paper on the `qd_sos` tables within 0.05 dB; 3-D tables are equal or better (up 
 sinusoids); 2-D tables for the exponential ACF fall 2.5 to 4.7 dB short at 2000 sinusoids, cause not
 established; the dip of the estimated ACF below the desired one in Fig. 4 of the paper is the removal of
 the cube mean by the Pearson coefficient, the same effect as in WI-1.
+
+
+## Fixes after the review (2026-10-12)
+
+Implementation of `md/PLAN_QD_SOS_FIXES.md` (work items W0 to W7) on branch `qd-sos`, starting from commit
+9392703 with a clean working tree. Nothing was committed. Identifiers B, P, D and F are those of
+`md/REVIEW_QD_SOS.md` and of the plan. All builds were made out of tree in the session scratch space with
+gcc 12, as `make` selects it; `build_linux/`, `lib/` and `+quadriga_lib/` of the repository were not used.
+
+Changed: 76 files, all inside the list of section 2 of the plan (`git status`): 13 of `src/sos_*.cpp`
+(not `sos_preset.cpp`), the `qd_sos_*` block of `src/quadriga_lib_helper_functions.hpp`, comments of
+`include/quadriga_sos.hpp`, the 14 MEX wrappers, the 14 Python wrappers and `python_sos.cpp`, 11 Catch2,
+8 MEX and 12 Python test files, and this log. `html_docu/` was regenerated for the check and restored.
+
+### W0 Baseline
+
+| Suite | Build | Result before any change |
+|---|---|---|
+| Catch2 `sos_*` | gcc 12, AVX2 | `All tests passed (35608 assertions in 78 test cases)` |
+| MEX `test_sos_*`, MATLAB R2024a | gcc 12, AVX2 | 14 of 14 passed |
+| Python `-k sos` | gcc 12, AVX2 | `87 passed, 624 deselected` |
+
+Reference outputs for the bit-identity checks: a scratch program (`refdump.cpp`) calls every SOS function
+over the grid of section 5 of the plan (`n_gen` = 1, 3, 7, 8, 9, 20, 400; `n_coeff` = 1, 16, 17, 128, 1024;
+`n_pos` = 1, 7, 8, 9, 1003; both kernels; three device modes; Normal and Uniform; `float` and `double`)
+and prints one FNV-1a hash of the raw output bytes per call: 6383 lines, of which 4200 are `sos_val`. The
+baseline was the same for 1 and 32 threads. A copy of the baseline library was kept for the timings.
+
+### W1 Defects in the C++ library
+
+Each test was added first and seen to fail for the stated reason (11 of 85 cases, 29 assertions failed
+before the fixes).
+
+| # | Change | Test |
+|---|---|---|
+| B3 | `qd_sos_equally_spaced`: tolerance `max( 1e-4 · step, 4 · eps(dtype) · dist.back() )` | `sos_acf_2d - long tables in single precision count as equally spaced` (501, 2001, 5001 samples through `sos_calc_mse`, `sos_acf_approx`, `sos_acf_2d`; a table that is off by 0.3 of a step is still rejected) |
+| B4, F3 | Inputs are read or copied before any output is resized: `sos_acfi`, `sos_acf_2d`, `sos_acf_estimate` changed; `sos_acf_approx`, `sos_calc_mse`, `sos_generate`, `sos_randn/rand/randi` were already safe | one "may be the same object" case per function, see the list under F3 below |
+| B5 | Both kernels allocate their per-thread buffers before the parallel region (one block, one slice per thread, `num_threads` fixed to the count the block was sized for); a failed `_mm_malloc` throws `std::bad_alloc` | scratch reproduction of the review under `ulimit -v`: before, exit 139 (AVX2) and 134 (GENERIC); after, `std::bad_alloc caught` for both kernels at limits of 3, 2 and 1.5 GB. Not a Catch2 case: it needs a memory limit on the process |
+| B6 | `qd_sos_check_acf` requires a finite last sample point (with the strict increase all are finite); `sos_acf_approx` requires finite `dist`; `sos_acf_estimate` finite `bins` | validation sections in `sos_acfi`, `sos_acf_2d`, `sos_acf_approx`, `sos_acf_estimate`, `sos_calc_mse`, `sos_generate`, `sos_val`, `sos_remove_bias` |
+| B7, F4 | New helper `qd_sos_check_acf_same_map`: `std::invalid_argument` for an ACF value <= -1 in the same-map mode of `sos_val` and `sos_remove_bias` and in `sos_acf_estimate` with `acf_est_dual` | validation sections of the three functions; -0.999 is accepted and gives finite values; on two maps the table is not checked |
+| B8, F5 | `sos_generate` throws `std::invalid_argument` when the search grid would have more than 100000 points; the arithmetic of the search is unchanged | `freq_max` 499.99 / m (99999 points) accepted, 500.01, 1e6 and 1e300 rejected, with `max(dist)` = 20 m |
+| B9, F6 | `sos_remove_bias` throws when `phase_b` is the same object as `phase` | validation section; two matrices with equal values are accepted |
+| F9 | Unchanged behaviour, now pinned | `sos_calc_mse - a perfect fit returns +Inf` (1-D, 2-D, 3-D, `float`) |
+
+F3, aliasing of outputs with inputs:
+- Safe, documented and tested: `sos_acfi` (`val` with `acf`, `dist`, `d`), `sos_acf_2d` (`dist_2d` with `acf`,
+  `dist`), `sos_acf_approx` (`dist_2d` with `dist`), `sos_calc_mse` (`acf_tail` with `acf` or `dist`, `test_dir`
+  with `freq`), `sos_acf_estimate` (all three outputs with `acf`, `dist`, `bins`, `phase`), `sos_generate`
+  (`ase` with `acf` or `dist`), `sos_randn`, `sos_rand`, `sos_randi` (`val` with `pos` or `pos_b`).
+- Restriction kept and documented: `sos_val` (`val` must not be an input; with P1 the kernel writes into
+  `val` and reads the position columns of a `double` input in place). `sos_remove_bias`: `phase_b` must not
+  be `phase` (F6).
+- Not applicable: `sos_map` (the output is a vector of cubes), `sos_preset`, `sos_init_phases`.
+
+### W2 Defects in the wrappers
+
+- B1, B10 (F1): every SOS MEX wrapper that reads a count (`n_coeff`, `n_gen`, `n_dim`, `n_dir`, `n_pos`,
+  `imax`) reads it as `double` through a file-local helper `qd_mex_sos_count` and rejects NaN, Inf, negative
+  values and zero with `Input '<name>' must be a finite number >= 1.`; non-integer values are truncated as
+  before. `src/mex_helper_functions.hpp` is untouched.
+- Addition to F1: seeds get the same treatment in `qd_mex_sos_seed` (6 wrappers). A floating-point seed is
+  checked for NaN and Inf before the cast, which was undefined behaviour that happened to end in the
+  library's "must be >= -1"; integer classes are passed on unchanged, so an `int64` seed above 2^53 stays
+  exact. This is needed for the documented second stream of W5 (`seed + 2^62`).
+- B2 (F2): `py::arg(...).none(false)` for the 30 mandatory arrays of 12 functions in `python_sos.cpp`
+  (`preset` and `init_phases` have none); `None` now raises `TypeError`.
+- MEX tests: negative, NaN, Inf, empty and non-integer counts and seeds in `sos_randi`, `sos_init_phases`,
+  `sos_generate`, `sos_calc_mse`, `sos_acf_estimate`, `sos_randn`, `sos_rand`; type handling of the shared
+  helpers in `test_sos_val.m`.
+- Python tests: `test_none_for_mandatory_arrays` in all 12 files (12 failed before the fix), and
+  `test_one_dimensional_pos` for `randn`, `rand`, `randi`, `remove_bias` (present behaviour; `val` had it).
+  C order against Fortran order was already covered by `test_array_layout_and_dtype` in every file.
+- **Finding that differs from the review (1.2, "MEX type handling"):** complex input arrays are not read
+  with the imaginary part dropped. Under MATLAB R2024a the shared array helpers receive interleaved data
+  and read real and imaginary parts as consecutive real elements: `sos_val` with `complex(pos, pos+1)`
+  evaluates the positions (0,2,0), (1,0,1), (1,1,0) instead of `pos`, without an error. The cause is in
+  `src/mex_helper_functions.hpp` (not to be edited here) and affects all MEX wrappers of the library.
+  `test_sos_val.m` therefore pins only what holds in MATLAB and Octave: the call is accepted and returns a
+  real `[3, 2]` array. `uint8` and logical arrays are rejected ("Unsupported data type."), `int32` arrays
+  are converted, complex and `uint8` scalars are rejected, `use_kernel = 1.7` is 1: all pinned.
+
+### W3 Remaining test gaps
+
+Catch2 cases of the SOS files: 78 before, 108 now. Added beyond W1 and W2, by row of review 2.2:
+
+- `sos_val`: NaN and Inf coordinates (NaN at that position only, others bit-identical, both kernels);
+  AVX2 against GENERIC at 1e7, 1e8 and 1e9 periods (3.9e-7, 3.4e-7, 1.8e-6 against a bound of 9.1e-6) and
+  for `Comb1024` (3.4e-7 and 3.5e-7 against 1.8e-5); different column counts of `pos` and `pos_b` against
+  zero-padded positions, both modes, both kernels, bit-identical; unavailable kernel (`sos_val` and
+  `sos_map`, runs in the build without AVX2); `freq_scale_b` NaN and Inf; thread independence in the
+  two-device modes, Normal and Uniform; `float` against the `double` call on the same input values
+  (largest difference 1.1e-7 against the limit of 2e-6 of the plan).
+- `sos_randn`, `sos_rand`, `sos_randi`: non-finite `dist_decorr` and `dist_decorr_b`; similarity of nearby
+  positions in separate calls with one seed (rms difference 0.0143 at 0.1 m against 0.014 expected from
+  the ACF, 4.7 with another seed); failed call leaves the output untouched; two-map values against `n_gen`
+  after W5.
+- `sos_remove_bias`: the "left unchanged" branch (one sinusoid, positions half a wavelength apart: offsets
+  0, phases bit-identical including one of 5.0 rad, means below 1e-16); input shifted by 20 rad comes back
+  inside [-pi, pi) (-3.1227 to 3.0037); `pos_b` with too many columns; fewer columns against zero-padded
+  positions in both two-device modes; thread independence.
+- `sos_generate`: unequal sample spacing against the brute-force oracle (6 configurations, differences
+  0 to 3e-17); the stop rules stated on the error sequence (every pass but the last gains at least 1e-6,
+  the last one less unless 1000 passes were reached; 2 runs end at the limit, 2 by the gain rule, 8 without
+  a change); the smallest problem (1 sinusoid, 2 samples, 1 direction: 2 passes, error 1.9e-11); few test
+  directions (error on 101 directions 3.4 to 3.9 times the error on the 3 fitted ones).
+- `sos_preset`: checksums of the 12 stored tables (sum and sum of squares of the signed frequencies,
+  recovered by projecting each row on its lattice direction; relative 1e-15; largest deviation in the test
+  2e-16). The regeneration test now also covers the three tables with 256 sinusoids.
+- Statement D of review 2.2 (seeds of all tables): all 12 tables were regenerated once with the documented
+  settings and seeds on the baseline library. Largest absolute difference to the shipped table: 2.8e-17,
+  5.6e-17, 2.8e-17, 1.1e-16 (Exp), 1.4e-17 four times (Gauss), 2.1e-17 four times (Comb). The 512 and
+  1024 tables take 62 s and are not part of the suite.
+
+One expectation of a new test was wrong and was corrected before it ever passed: the test with phases
+shifted by 20 rad first expected the same offset as for the unshifted phases. A common shift is itself a
+phase offset, so the offsets differ by 20 rad modulo pi; the test now asserts that. No existing
+expectation or tolerance was changed in W1 to W4.
+
+### W4 Speed-ups
+
+After W4 all 6383 reference hashes were identical to the baseline, for 1 and for 32 threads.
+
+| # | Change |
+|---|---|
+| P1 | `sos_val`: for `double` the kernel writes into `val`; for `float` into one temporary. Position columns of a `double` input are used in place. Weights, combination of two devices, normalisation, `erfc` mapping and the conversion to `float` run in parallel over fixed ranges of 4096 elements. Arrays of output size alive: 1 (`double`, one device), 2 (`double`, two devices); for `float` these are temporaries in double precision and the output in single precision comes on top |
+| P2 | `sos_remove_bias`: parallel loop over the sinusoids in the sums over the positions, and over the generators in the correction |
+| P3 | AVX2 kernel reworked: weights packed per group of 8 generators, named accumulators with the group size as template parameter, positions in tiles of up to 16 blocks. The remaining 1 to 7 generators form one group of exactly that size (8 instantiations), so no generator is padded. Arithmetic per (position, generator) unchanged |
+| P4 | GENERIC kernel: 4 generators per pass over the sinusoids |
+| P5 | `sos_calc_mse`: test directions in parallel. The squared errors are stored per direction and sample point and added serially in the old order. This is stricter than "per-direction sums added in order", which would have changed the last bits |
+| P6 | `sos_randn` and friends: a call whose generators all share one pair of decorrelation distances is evaluated into the output (`double`); second-device phases are only copied when used; the remaining copies run in parallel. `sos_map`: cubes that lie in one block of memory (one generator, or the 4-D array of the MEX and Python wrappers) are filled in place, otherwise the copy runs in parallel |
+| P7 | `sos_acf_estimate`: the pairs of a block of rows are searched in parallel into a buffer and added row by row in the old order. Block size `min(256, n, 1.5e6 / n)` rows, independent of the thread count |
+| P8 | `sos_acf_approx`: columns up to the center are computed, the rest is their point mirror image. The 1-D case is unchanged |
+
+Tile size of P3: 64, 128, 256 and 512 kB of cosines and sines per tile gave the same times within 2 %
+(8 to 2288 generators, 128 to 1024 sinusoids, 1 and 16 threads); the gain comes from the packed weights
+and the accumulators. 128 kB was kept. With fewer than 8 generators the tile is one block.
+
+Tests added for the new paths: every group size of both kernels (`sos_val - the value of a generator
+does not depend on the number of generators of the call`, 1 to 18 generators, 300 positions); thread
+independence of `sos_remove_bias`, `sos_calc_mse`, `sos_acf_estimate` and of the two-device modes of
+`sos_val`; exact point symmetry of `sos_acf_approx`; `sos_map` with cubes in one block.
+
+Timings. AMD Ryzen 9 5950X, gcc 12, `-O3`, AVX2. One process per measurement and thread count, fastest
+call of at least 3 after a warm-up call (`bench_acc.cpp` in the scratch space, after the pattern of
+`bench_kernels.cpp`). "Before" is a copy of the library as built in W0, "after" the final library; both
+were run back to back, twice, and the faster of the two runs is listed. The machine is shared: its load
+average was 1.0 and 1.4 at the start of the two runs, and single values of the first run were up to 25 %
+slower than in the second. 400 generators, 256 sinusoids (`Comb256`) and 100,000 positions unless stated.
+
+| Call | Threads | Before [ms] | After [ms] | Ratio |
+|---|---|---|---|---|
+| sos_val, val pre-sized, 400 gen, N 256, 1e5 pos | 16 | 121.9 | 34.1 | 3.58 |
+| sos_val, val empty, same | 16 | 252.0 | 68.5 | 3.68 |
+| sos_val, uniform = true, same | 16 | 1275.8 | 117.8 | 10.83 |
+| sos_val, two devices, same map, same | 16 | 260.0 | 136.4 | 1.91 |
+| sos_val, two devices, two maps, same | 16 | 245.7 | 129.2 | 1.90 |
+| sos_val<float>, same | 16 | 120.1 | 92.8 | 1.29 |
+| AVX2 kernel alone, same | 16 | 51.4 | 32.3 | 1.59 |
+| sos_val GENERIC, 400 gen, N 256, 5000 pos | 16 | 27.7 | 14.2 | 1.95 |
+| GENERIC kernel alone, 400 gen, N 256, 5000 pos | 16 | 24.9 | 12.6 | 1.98 |
+| sos_remove_bias, 400 gen, N 256, 1e5 pos | 16 | 643.5 | 43.3 | 14.85 |
+| sos_remove_bias, same map, same | 16 | 1280.0 | 85.9 | 14.89 |
+| sos_val, 1 gen, N 256, 1e6 pos | 16 | 36.8 | 22.9 | 1.61 |
+| sos_val, 20 gen, N 256, 1e5 pos | 16 | 5.6 | 3.6 | 1.53 |
+| sos_val, 400 gen, N 1024, 2e4 pos | 16 | 72.7 | 29.9 | 2.43 |
+| sos_randn, 8 equal distances, 1e5 pos | 16 | 6.8 | 2.8 | 2.44 |
+| sos_randn, 8 different distances, 1e5 pos | 16 | 25.5 | 18.5 | 1.38 |
+| sos_map, 501 x 201 grid, 20 gen | 16 | 16.8 | 8.2 | 2.05 |
+| sos_calc_mse, Comb1024, 300 directions | 16 | 534.5 | 36.5 | 14.66 |
+| sos_acf_approx, Comb1024 | 16 | 145.5 | 65.7 | 2.21 |
+| sos_acf_estimate, n_pos 5000 | 16 | 1352.2 | 200.7 | 6.74 |
+| sos_val, val pre-sized, 400 gen, N 256, 1e5 pos | 1 | 869.6 | 439.7 | 1.98 |
+| sos_val, val empty, same | 1 | 990.7 | 584.9 | 1.69 |
+| sos_val, uniform = true, same | 1 | 1984.1 | 1596.6 | 1.24 |
+| sos_val, two devices, same map, same | 1 | 1744.7 | 1085.5 | 1.61 |
+| sos_val, two devices, two maps, same | 1 | 1814.6 | 1062.5 | 1.71 |
+| sos_val<float>, same | 1 | 856.0 | 612.7 | 1.40 |
+| AVX2 kernel alone, same | 1 | 669.5 | 440.7 | 1.52 |
+| sos_val GENERIC, 400 gen, N 256, 5000 pos | 1 | 350.2 | 173.8 | 2.02 |
+| GENERIC kernel alone, 400 gen, N 256, 5000 pos | 1 | 350.5 | 170.6 | 2.05 |
+| sos_remove_bias, 400 gen, N 256, 1e5 pos | 1 | 633.7 | 622.5 | 1.02 |
+| sos_remove_bias, same map, same | 1 | 1273.4 | 1239.2 | 1.03 |
+| sos_val, 1 gen, N 256, 1e6 pos | 1 | 347.3 | 321.4 | 1.08 |
+| sos_val, 20 gen, N 256, 1e5 pos | 1 | 61.0 | 50.9 | 1.20 |
+| sos_val, 400 gen, N 1024, 2e4 pos | 1 | 633.0 | 356.6 | 1.78 |
+| sos_randn, 8 equal distances, 1e5 pos | 1 | 46.5 | 37.6 | 1.24 |
+| sos_randn, 8 different distances, 1e5 pos | 1 | 270.2 | 256.8 | 1.05 |
+| sos_map, 501 x 201 grid, 20 gen | 1 | 72.4 | 52.8 | 1.37 |
+| sos_calc_mse, Comb1024, 300 directions | 1 | 532.8 | 529.7 | 1.01 |
+| sos_acf_approx, Comb1024 | 1 | 1330.1 | 694.7 | 1.91 |
+| sos_acf_estimate, n_pos 5000 | 1 | 1415.5 | 1410.4 | 1.00 |
+
+Against section 5 of the plan:
+
+| Call | Review, before | Expected after | Measured before | Measured after |
+|---|---|---|---|---|
+| `sos_val`, `val` pre-sized, 16 threads | 121 ms | about 55 ms with P1, about 30 ms with P3 | 121.9 ms | 34.1 ms |
+| `sos_val`, `val` empty, 16 threads | 264 ms | as above | 252.0 ms | 68.5 ms |
+| `sos_val`, `uniform = true`, 16 threads | 1250 ms | about 140 ms | 1275.8 ms | 117.8 ms |
+| `sos_val`, 1 thread | 839 ms | about 690 ms with P1, about 440 ms with P3 | 869.6 ms | 439.7 ms |
+| GENERIC kernel, 1 thread, 5000 positions | 369 ms | about 195 ms | 350.5 ms | 170.6 ms |
+| `sos_remove_bias`, 16 threads | 633 ms | about 50 ms | 643.5 ms | 43.3 ms |
+| `sos_val`, 1 generator, 1,000,000 positions, 1 thread | 346 ms | not slower | 347.3 ms | 321.4 ms |
+
+- `val` empty, 16 threads: 68.5 ms instead of the expected 30 to 55 ms. The difference to the pre-sized
+  call (34 ms) is the first touch of the 320 MB the call has to allocate for its output; the temporary
+  that used to be allocated on top of it is gone. A caller that reuses `val` gets 34 ms.
+- `float`, 16 threads: 120 to 93 ms only. The kernel computes in double, so the `float` call still has one
+  temporary of 320 MB, which is allocated and touched in every call.
+- AVX2 kernel by number of generators, 1 thread, before to after in ms (256 sinusoids; measured during
+  W4 at a load average of 3.7): 1 generator and
+  1e6 positions 330 to 320; 2 and 4e5: 138 to 133; 3 and 3e5: 102 to 102; 4 and 2e5: 69.6 to 70.6; 7 and
+  1e5: 41.1 to 37.6; 8: 40.8 to 37.4; 9: 45.9 to 40.7; 20: 60.3 to 51.2; 400 and 128 sinusoids: 363 to 217;
+  2288 and 2e4 positions: 784 to 467. Four generators are 1.4 % slower in two runs, which is within the
+  scatter of that measurement; no count is slower by more. A first version with remainder groups of 4, 2
+  and 1 was 3 % slower for 3 generators and was replaced by one group of the exact size.
+- Without a gain on one thread, as expected: `sos_remove_bias`, `sos_calc_mse`, `sos_acf_estimate`
+  (parallel loops only).
+- `sos_acf_estimate`: 6.7 times at 16 threads, not the 14 times of the review. The pairs are added one by
+  one in the old order to keep the result bit-identical; that part is serial.
+- `sos_acf_approx`: 1.9 times on one thread from P8. At 16 threads the cosine tables, which were computed
+  by one thread, then dominated (149 to 103 ms); their loop was made parallel as well (66 ms).
+
+### W5 Decision F7
+
+- A second device on its own map now takes column `g` of `sos_init_phases( n_coeff, n_gen, seed_b )`.
+  Rule: `seed_b` is the seed with bit 62 flipped, i.e. `seed + 2^62` for seeds below 2^62. It is never
+  negative and never equal to the seed. For `seed = -1` both streams are random. The second stream is only
+  drawn when a generator needs it.
+- Reference hashes after W5: 160 of the 162 two-map lines changed (the two others are single integers of
+  `sos_randi` that happen to be equal); all other 6221 lines are identical to the baseline.
+- Tests: the composition oracle of `test_sos_rand.cpp` and the two-map lines of the MEX and Python tests of
+  `randn`, `rand`, `randi` use the second stream (MATLAB: `int64(7) + int64(4611686018427387904)`); new case
+  "on two maps the value of a generator does not depend on the number of generators".
+
+### W6 Documentation
+
+- Introductions (C++, MATLAB, Python), written from one template so that they stay parallel: definition of
+  the decorrelation distance; the seed paragraph (F8, D5); "20 generators take less than twice as long as
+  one" instead of "little more" (D8); a guide to the presets with the measured fit; rule of thumb for
+  `sos_remove_bias`; coordinates and precision; threads and memory; Python: 1-D positions.
+- Examples: `pos_new`, `pos_tx`, `pos_rx` are defined; no variable is declared twice (`val_all`, `val_uni`,
+  `grid`, `dist_own`, `acf_own`, `freq_own`); the Python example no longer assigns to `map`. All 12 blocks
+  were extracted from the sources and run as written: the four C++ blocks pasted into one `main` compile
+  with `-Wall -Wextra` without a warning; C++, MATLAB and Python print the documented sizes and 34.85 dB.
+- D1, D2: the bound between the kernels is stated with its range (about 1e9 periods) and "typically below
+  1e-6"; the header no longer says 1e-5. D3: Uniform values are in [0, 1], limits included. D4: what a seed
+  fixes (phases on all platforms) and what depends on the kernel. D6: the sentence on the unchanged
+  generator is in all three APIs. D7: header comment of `sos_calc_mse` corrected. D9: see F3.
+- New limits and errors are documented in all three APIs: ACF > -1 (F4), the search grid of 100000 points
+  (F5), `phase_b` not `phase` (F6, C++), the second stream (F7), +Inf for a perfect fit (F9), finite sample
+  points and bins, the meaning of "equally spaced".
+- Units in the MEX and Python blocks: `[1/m]` and `[rad]` are dropped like `[m]`, as their specs ask;
+  `[dB]` stays. The first bullet of `sos_val` says once that the frequencies are in cycles per meter.
+- Line lengths: the three C++ output lines and the MEX usage line are wrapped; a script over all 45 blocks
+  finds no line above the limit (MEX introduction excepted, F10), no `*` or `|` in running text and no
+  unresolved link.
+- `make documentation` ran without error; the three generated API files were read in the SOS section;
+  `html_docu/` was restored with `git checkout -- html_docu`.
+- The rule of thumb for `sos_remove_bias` uses numbers measured in this session with `Comb256` (200
+  positions in a square with edge L: loss of variance 74 % at L = d, 44 % at 2·d, 14 % at 5·d, 5 % at 10·d,
+  2.5 % at 20·d, below 1 % from 50·d). The figures quoted in review 4.4 (3 to 5 % at 20·d and more) come
+  from the old tables with sinusoids near zero frequency.
+
+### Final state
+
+All runs below are on the final working tree, with gcc 12 and MATLAB R2024a.
+
+| Build | Suite | Output of the run |
+|---|---|---|
+| AVX2 | Catch2, complete | `All tests passed (1196758 assertions in 1038 test cases)` |
+| AVX2 | Catch2, `sos_*` | `All tests passed (39461 assertions in 108 test cases)` |
+| AVX2 | MEX, complete | 61 of 62 passed; `test_ray_mesh_interact` line 113 fails as on the committed code |
+| AVX2 | MEX, `test_sos_*` | 14 of 14 passed |
+| AVX2 | Python, complete | `726 passed, 1 skipped, 37 subtests passed` |
+| AVX2 | Python, `-k sos` | `103 passed, 624 deselected` |
+| no AVX2 | Catch2, complete | `All tests passed (1196509 assertions in 1038 test cases)` |
+| no AVX2 | Catch2, `sos_*` | `All tests passed (39230 assertions in 108 test cases)` |
+| no AVX2 | MEX, complete | 61 of 62 passed; `test_ray_mesh_interact` line 113 |
+| no AVX2 | MEX, `test_sos_*` | 14 of 14 passed |
+| no AVX2 | Python, complete | `724 passed, 3 skipped, 37 subtests passed` (the 2 further skips are AVX2 cases of `test_ray_point_intersect.py`) |
+| no AVX2 | Python, `-k sos` | `103 passed, 624 deselected` |
+| AVX2, `-fsanitize=address,undefined`, leak check on | Catch2, `sos_*` | `All tests passed (39461 assertions in 108 test cases)`, no sanitizer report |
+| AVX2, system compiler, Octave 11.1 | MEX, `test_sos_*` | 14 of 14 passed (not asked for by the plan) |
+
+- Compiler warnings: none. All SOS sources, wrappers and tests were recompiled in both builds and the logs
+  searched for "warning".
+- Bit-identity on the final tree, 1 and 32 threads: 6223 of 6383 reference hashes equal the baseline; the
+  160 others are the two-map values of W5. This covers the three 128 tables regenerated by `sos_generate`,
+  whose hashes are unchanged.
+- `git status`: 76 modified files, all in the list of section 2 of the plan; `include/quadriga_sos.hpp`
+  differs from the committed file in comments only (checked with the comments stripped);
+  `src/sos_preset.cpp` is unchanged.
+
+### Deviations from the plan, and what was not done
+
+Deviations:
+- P7: the pairs are merged one by one in the old order instead of as sums per block of rows. Sums per block
+  reach the 14 times of the review but change the last bits against the present serial sum, which section 5
+  of the plan excludes. Measured: 6.7 times at 16 threads. If bit-identity with the old values is not
+  needed for this offline tool, block sums are a small change.
+- P5: squared errors are stored and added in the old order, not as per-direction sums, for the same reason.
+- P3: one remainder group of exactly 1 to 7 generators instead of narrower paths of fixed widths; the tile
+  size has no measurable effect on this machine.
+- Parallel loops beyond the plan, all with unchanged results: the weights in `sos_val`, the correction per
+  generator in `sos_remove_bias`, the tail measure of `sos_calc_mse`, the cosine tables of `sos_acf_approx`.
+- F1 was extended to seeds in the MEX wrappers (see W2).
+- `sos_map` now checks the availability of the AVX2 kernel itself, before it resizes the output, so that a
+  failed call leaves the output untouched; it includes `quadriga_lib.hpp` for that.
+- The checksums of W3 are taken on the stored values as recovered from the output of `sos_preset`, since
+  the tables are file-local.
+- `sos_val`, `val` empty, 16 threads: 68.5 ms against an expectation of 30 to 55 ms (see the timings).
+- The numbers of the rule of thumb for `sos_remove_bias` were measured anew and differ from review 4.4.
+
+Not done:
+- The headings of the Python blocks stay `sos_val` and so on, although the functions are exposed as
+  `quadriga_lib.sos.val` (review 4.2, last point). Renaming them to `val`, `map`, `rand` would change every
+  link and anchor of the section and put ambiguous names into the function index; the introduction
+  explains the mapping. To be decided by Stephan.
+- The tables with 512 and 1024 sinusoids are not regenerated in the suite (62 s); done once, see W3.
+- The complex-array handling of the shared MEX helpers was not changed (outside section 2); only pinned
+  and reported, see W2. Octave drops the imaginary part, MATLAB R2024a reads garbage.
+- The lower limit of 1e-5 m of the first bin of `sos_acf_estimate` and the dependence of `sos_randi` on the
+  kernel remain without a test; the second is documented.
+- MSVC, macOS and ARM were not available.
+
+### Header comments shortened (2026-10-12, on request after the report)
+
+`include/quadriga_sos.hpp`: the block of shared conventions, the long comment blocks above the declarations
+and the "MATLAB:" usage lines were removed. Each function keeps 1 to 3 lines above its declaration and the
+comments next to its arguments; 296 lines became 186. The header comments that W6 had corrected (lines 34,
+84 to 86, 217 of the old file) are gone with them; the corrected statements remain in the documentation
+blocks of `src/sos_*.cpp`. Declarations are unchanged (compared with the comments stripped). Rebuilt
+without warnings; Catch2 `sos_*`: `All tests passed (39461 assertions in 108 test cases)`.

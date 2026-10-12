@@ -32,6 +32,9 @@ Approximation error of the ACF of a set of sinusoids
   The target is 0 there; sinusoids with a frequency near zero show up as a plateau of height
   `n_low / n_coeff`, which adds a constant offset to all values of a large area
 - All outputs are always computed, including the 2-D grids behind `mse_core` and `mse_all`
+- A perfect fit has a mean squared error of 0 and is returned as `inf`; this happens for a target
+  that the sinusoids reproduce exactly at all sample points
+- Equally spaced has the meaning given in [[sos_acf_2d]]
 
 ## Usage:
 ```
@@ -39,9 +42,9 @@ mse, mse_core, mse_all, acf_tail, test_dir = quadriga_lib.sos.calc_mse( freq, ac
 ```
 
 ## Inputs:
-- **`freq`** — Frequencies in [1/m]; `n_dim` = 1, 2 or 3; `(n_coeff, n_dim)`
+- **`freq`** — Frequencies; `n_dim` = 1, 2 or 3; `(n_coeff, n_dim)`
 - **`acf`** — Target ACF; at least 2 elements; `(n_acf,)`
-- **`dist`** — Sample points of the ACF; must start at 0 and be equally spaced; `(n_acf,)`
+- **`dist`** — Sample points of the ACF; must start at 0, be equally spaced and finite; `(n_acf,)`
 - **`n_dir`** — Number of test directions; `int`; must be > 0; ignored for `n_dim = 1`; default: 10
 
 ## Outputs:
@@ -49,7 +52,7 @@ mse, mse_core, mse_all, acf_tail, test_dir = quadriga_lib.sos.calc_mse( freq, ac
 - **`mse_core`** — Error within the core radius in [dB]; `float`
 - **`mse_all`** — Error on the complete grid in [dB]; `float`
 - **`acf_tail`** — Approximated ACF beyond the fitted range; `(4,)`
-- **`test_dir`** — Test directions in [rad]; `(n_dir, 2)` with columns `(azimuth, elevation)` for
+- **`test_dir`** — Test directions; `(n_dir, 2)` with columns `(azimuth, elevation)` for
   `n_dim = 3`; `(n_dir, 1)` with the azimuth for `n_dim = 2`; empty `(0, 0)` for `n_dim = 1`
 
 ## See also:
@@ -84,7 +87,7 @@ py::tuple sos_calc_mse(const py::array_t<double> &freq,
 
 // pybind11 declaration:
 // m.def("calc_mse", &sos_calc_mse,
-//       py::arg("freq"),
-//       py::arg("acf"),
-//       py::arg("dist"),
+//       py::arg("freq").none(false),
+//       py::arg("acf").none(false),
+//       py::arg("dist").none(false),
 //       py::arg("n_dir") = 10);

@@ -20,6 +20,10 @@ Draw random phases for a set of sum-of-sinusoids generators
   A seed >= 0 gives the same phases on all platforms; the random state of numpy is not used
 - The matrix is filled column by column from one stream: for the same seed, column `g` does not
   depend on `n_gen`
+- A seed stands for a set of phases. Generators that use phases of the same seed with different
+  frequencies (another decorrelation distance or preset) produce related fields, which are equal
+  at the coordinate origin and correlated around it; draw independent quantities as columns of
+  one call or with different seeds
 
 ## Usage:
 ```
@@ -33,7 +37,7 @@ phase = quadriga_lib.sos.init_phases( n_coeff, n_gen, seed )
   device and gives different phases on each call; default: -1
 
 ## Output:
-- **`phase`** — Phases in [rad]; `(n_coeff, n_gen)`
+- **`phase`** — Phases; `(n_coeff, n_gen)`
 
 ## See also:
 - [[sos_val]] (evaluates the generators)

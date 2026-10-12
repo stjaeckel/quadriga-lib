@@ -3,7 +3,9 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_sos.hpp"
+#include "quadriga_lib.hpp"
 
+#include <cstdint>
 #include <cstring>
 #include <stdexcept>
 #include <vector>
@@ -22,6 +24,11 @@ Spatially correlated random values on a regular grid
 - The number of grid vectors given must not exceed the number of columns of `freq`; an omitted or empty
   `y` or `z` means a single sample at 0 on that axis
 - `z` can be given without `y` if `freq` has 3 columns
+- The values are those of [[sos_val]] at the grid points, bit for bit; kernels, accuracy and the Uniform
+  mapping are described there
+- Cubes of the correct size keep their memory. If they lie one after the other in memory (one block of
+  `n_gen` cubes, as the MATLAB and Python interfaces allocate it), the values are computed in place;
+  otherwise they are computed in a matrix `[ny·nx·nz, n_gen]` and copied
 
 ## Declaration:
 ```
@@ -84,6 +91,8 @@ void quadriga_lib::sos_map(const arma::Mat<dtype> &freq,
         throw std::invalid_argument("Input 'z' requires 'freq' to have 3 columns.");
     if (use_kernel < 0 || use_kernel > 2)
         throw std::invalid_argument("Input 'use_kernel' must be 0, 1 or 2.");
+    if (use_kernel == 2 && !quadriga_lib::quadriga_lib_has_AVX2())
+        throw std::invalid_argument("AVX2 kernel requested but not available (compile with BUILD_WITH_AVX2 and run on AVX2-capable CPU).");
 
     const arma::uword nx = x.n_elem, ny = has_y ? y->n_elem : 1, nz = has_z ? z->n_elem : 1, n_gen = phase.n_cols;
 
@@ -102,16 +111,31 @@ void quadriga_lib::sos_map(const arma::Mat<dtype> &freq,
                     pos.at(i, 2) = z->at(iz);
             }
 
-    arma::Mat<dtype> val;
-    quadriga_lib::sos_val<dtype>(freq, phase, pos, val, nullptr, nullptr, nullptr, nullptr, (dtype)1.0, uniform, use_kernel);
-
     if (map.size() != n_gen)
         map.resize(n_gen);
     for (arma::uword g = 0; g < n_gen; ++g)
-    {
         if (map[g].n_rows != ny || map[g].n_cols != nx || map[g].n_slices != nz)
             map[g].set_size(ny, nx, nz);
-        std::memcpy(map[g].memptr(), val.colptr(g), n_pos * sizeof(dtype));
+
+    // Cubes that lie one after the other in memory (a single cube, or a 4-D array that a wrapper allocated
+    // as one block) are the columns of one matrix [n_pos, n_gen]: the values are computed in place.
+    bool one_block = true;
+    for (arma::uword g = 1; g < n_gen; ++g)
+        one_block = one_block && (std::uintptr_t)map[g].memptr() == (std::uintptr_t)map[0].memptr() + g * n_pos * sizeof(dtype);
+
+    if (one_block)
+    {
+        arma::Mat<dtype> val(map[0].memptr(), n_pos, n_gen, false, true);
+        quadriga_lib::sos_val<dtype>(freq, phase, pos, val, nullptr, nullptr, nullptr, nullptr, (dtype)1.0, uniform, use_kernel);
+    }
+    else
+    {
+        arma::Mat<dtype> val;
+        quadriga_lib::sos_val<dtype>(freq, phase, pos, val, nullptr, nullptr, nullptr, nullptr, (dtype)1.0, uniform, use_kernel);
+        const long long n_gen_ll = (long long)n_gen;
+#pragma omp parallel for if (n_pos * n_gen > 65536)
+        for (long long g = 0; g < n_gen_ll; ++g)
+            std::memcpy(map[(arma::uword)g].memptr(), val.colptr((arma::uword)g), n_pos * sizeof(dtype));
     }
 }
 

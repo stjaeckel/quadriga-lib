@@ -175,6 +175,25 @@ class test_case(unittest.TestCase):
         with self.assertRaises(TypeError):
             quadriga_lib.sos.remove_bias(self.freq, self.phase, self.pos, phase_b=self.phase_b)  # the name is phase_b_in
 
+    def test_none_for_mandatory_arrays(self):
+        # None for a mandatory array is rejected by pybind11; it must not be read as one value of NaN
+        args = [self.freq, self.phase, self.pos]
+        quadriga_lib.sos.remove_bias(*args)
+        for i in range(3):
+            bad = list(args)
+            bad[i] = None
+            with self.assertRaises(TypeError):
+                quadriga_lib.sos.remove_bias(*bad)
+
+    def test_one_dimensional_pos(self):
+        # A 1-D array is a column: three positions on the x-axis, not one position {x, y, z}
+        p = np.array([3.0, 14.0, 31.5])
+        out = quadriga_lib.sos.remove_bias(self.freq, self.phase, p)
+        ref = quadriga_lib.sos.remove_bias(self.freq, self.phase, p.reshape(3, 1))
+        for a, b in zip(out, ref):
+            npt.assert_array_equal(a, b)
+        npt.assert_allclose(self.mean(self.freq, out[0], p.reshape(3, 1)), 0.0, atol=1e-13, rtol=0)
+
 
 if __name__ == "__main__":
     unittest.main()

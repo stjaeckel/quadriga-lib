@@ -592,6 +592,29 @@ TEST_CASE("sos_val - results are repeatable and do not depend on the number of t
         CHECK(arma::abs(a).max() > 0.5);
         CHECK(arma::approx_equal(a, b, "absdiff", 0.0));
         CHECK(arma::approx_equal(a, c, "absdiff", 0.0));
+
+        // Two devices, on the same map and on two maps, Normal and Uniform: the combination, the
+        // normalisation and the mapping run in parallel loops as well
+        arma::mat pos_b = rnd(1000, 3, -500.0, 500.0, 139), phase_b = rnd(100, 7, -pi, pi, 140);
+        arma::vec dist = arma::regspace(0.0, 1.0, 50.0), acf = arma::exp(-dist / 10.0);
+        for (int mode = 1; mode <= 2; ++mode)
+            for (bool uniform : {false, true})
+            {
+                arma::mat all, one;
+                const arma::mat *pb = (mode == 2) ? &phase_b : nullptr;
+                quadriga_lib::sos_val(freq, phase, pos, all, &pos_b, pb, &acf, &dist, mode == 2 ? 1.5 : 1.0, uniform, kernel);
+#ifdef _OPENMP
+                omp_set_num_threads(1);
+#endif
+                quadriga_lib::sos_val(freq, phase, pos, one, &pos_b, pb, &acf, &dist, mode == 2 ? 1.5 : 1.0, uniform, kernel);
+#ifdef _OPENMP
+                omp_set_num_threads(n_threads);
+#endif
+                INFO("mode " << mode << ", uniform " << uniform);
+                REQUIRE(all.n_rows == 1000);
+                CHECK(all.max() - all.min() > 0.5);
+                CHECK(arma::approx_equal(all, one, "absdiff", 0.0));
+            }
     }
 }
 
@@ -659,11 +682,28 @@ TEST_CASE("sos_val - input validation")
         CHECK_THROWS_AS(quadriga_lib::sos_val(freq, phase, pos, val, &pos_b, no_mat, &acf), std::invalid_argument);
         CHECK_THROWS_AS(quadriga_lib::sos_val(freq, phase, pos, val, &pos_b, no_mat, &acf, &bad_dist), std::invalid_argument);
         CHECK_THROWS_AS(quadriga_lib::sos_val(freq, phase, pos, val, &pos_b, no_mat, &acf, &short_dist), std::invalid_argument);
+        // Non-finite table
+        arma::vec inf_dist = {0.0, 1.0, arma::datum::inf}, nan_acf = {1.0, std::nan(""), 0.2};
+        CHECK_THROWS_AS(quadriga_lib::sos_val(freq, phase, pos, val, &pos_b, no_mat, &acf, &inf_dist), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_val(freq, phase, pos, val, &pos_b, no_mat, &nan_acf, &dist), std::invalid_argument);
+    }
+    SECTION("acf values of -1 or below on the same map")
+    {
+        // The normalisation 1 / sqrt( 2 + 2·A ) is singular at A = -1 and undefined below
+        arma::vec minus_one = {1.0, -1.0, -1.0}, below = {1.0, 0.0, -1.5}, near = {1.0, -0.999, -0.999};
+        CHECK_THROWS_AS(quadriga_lib::sos_val(freq, phase, pos, val, &pos_b, no_mat, &minus_one, &dist), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_val(freq, phase, pos, val, &pos_b, no_mat, &below, &dist), std::invalid_argument);
+        CHECK_NOTHROW(quadriga_lib::sos_val(freq, phase, pos, val, &pos_b, no_mat, &near, &dist));
+        CHECK(val.is_finite());
+        // On two maps the table is not used and not checked
+        CHECK_NOTHROW(quadriga_lib::sos_val(freq, phase, pos, val, &pos_b, &phase_b, &minus_one, &dist));
     }
     SECTION("freq_scale_b")
     {
         CHECK_THROWS_AS(quadriga_lib::sos_val(freq, phase, pos, val, &pos_b, &phase_b, no_vec, no_vec, 0.0), std::invalid_argument);
         CHECK_THROWS_AS(quadriga_lib::sos_val(freq, phase, pos, val, &pos_b, &phase_b, no_vec, no_vec, -1.0), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_val(freq, phase, pos, val, &pos_b, &phase_b, no_vec, no_vec, std::nan("")), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_val(freq, phase, pos, val, &pos_b, &phase_b, no_vec, no_vec, arma::datum::inf), std::invalid_argument);
         // A scale other than 1 on one map is rejected
         CHECK_THROWS_AS(quadriga_lib::sos_val(freq, phase, pos, val, &pos_b, no_mat, &acf, &dist, 2.0), std::invalid_argument);
         CHECK_THROWS_AS(quadriga_lib::sos_val(freq, phase, pos, val, no_mat, no_mat, no_vec, no_vec, 2.0), std::invalid_argument);
@@ -673,6 +713,14 @@ TEST_CASE("sos_val - input validation")
         CHECK_THROWS_AS(quadriga_lib::sos_val(freq, phase, pos, val, no_mat, no_mat, no_vec, no_vec, 1.0, false, 3), std::invalid_argument);
         CHECK_THROWS_AS(quadriga_lib::sos_val(freq, phase, pos, val, no_mat, no_mat, no_vec, no_vec, 1.0, false, -1), std::invalid_argument);
     }
+    SECTION("a kernel that is not available")
+    {
+        // Runs in a build without AVX2 or on a CPU without it; with AVX2 the same call must work
+        if (!has_avx2())
+            CHECK_THROWS_AS(quadriga_lib::sos_val(freq, phase, pos, val, no_mat, no_mat, no_vec, no_vec, 1.0, false, 2), std::invalid_argument);
+        else
+            CHECK_NOTHROW(quadriga_lib::sos_val(freq, phase, pos, val, no_mat, no_mat, no_vec, no_vec, 1.0, false, 2));
+    }
     SECTION("a failed call leaves the output untouched")
     {
         arma::mat keep(2, 2);
@@ -681,5 +729,194 @@ TEST_CASE("sos_val - input validation")
         CHECK_THROWS_AS(quadriga_lib::sos_val(freq, phase, empty, keep), std::invalid_argument);
         CHECK(keep.n_rows == 2);
         CHECK(keep(1, 1) == 7.0);
+    }
+}
+
+TEST_CASE("sos_val - a NaN or Inf coordinate gives NaN at that position only")
+{
+    // 19 positions: three AVX2 blocks, the bad positions share their blocks with good ones
+    arma::mat freq = rnd(40, 3, -0.3, 0.3, 50), phase = rnd(40, 5, -pi, pi, 51), pos = rnd(19, 3, -80.0, 80.0, 52), bad = pos;
+    bad(3, 1) = std::nan(""), bad(7, 0) = arma::datum::inf, bad(12, 2) = -arma::datum::inf;
+
+    for (int kernel = 1; kernel <= (has_avx2() ? 2 : 1); ++kernel)
+    {
+        arma::mat ref, val;
+        quadriga_lib::sos_val(freq, phase, pos, ref, (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr, 1.0, false, kernel);
+        quadriga_lib::sos_val(freq, phase, bad, val, (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr, 1.0, false, kernel);
+        REQUIRE(val.n_rows == 19);
+        REQUIRE(val.n_cols == 5);
+        arma::uword n_nan = 0, n_same = 0;
+        for (arma::uword p = 0; p < 19; ++p)
+            for (arma::uword g = 0; g < 5; ++g)
+            {
+                if (p == 3 || p == 7 || p == 12)
+                    n_nan += std::isnan(val(p, g)) ? 1 : 0;
+                else
+                    n_same += (val(p, g) == ref(p, g)) ? 1 : 0;
+            }
+        INFO("kernel " << kernel);
+        CHECK(n_nan == 15);
+        CHECK(n_same == 80); // Bit-identical to the call without the bad positions
+        CHECK(arma::abs(ref).max() > 0.5);
+    }
+}
+
+TEST_CASE("sos_val - the AVX2 kernel stays within its bound up to 1e9 periods from the origin")
+{
+    if (!has_avx2())
+        return;
+
+    // Components of 0.1 / m at an offset of 1e10 m: the argument f·x is about 1e9 periods per axis. A double
+    // of that size resolves 1.2e-7 periods, and the two kernels round the sum of the three products
+    // differently (fused multiply-add in AVX2), so each of the N terms differs by up to about 1e-6 rad.
+    // With random signs the sum differs by about sqrt(2) · 5e-7; the bound of the kernel still holds.
+    // Further out it does not: the documentation limits the statement to about 1e9 periods.
+    const arma::uword n_coeff = 256;
+    arma::mat freq = rnd(n_coeff, 3, -0.1, 0.1, 53), phase = rnd(n_coeff, 4, -pi, pi, 54);
+
+    QD_DIAG("\n# diag: sos_val AVX2 against GENERIC far from the origin, N = %llu, bound %.2e\n", (unsigned long long)n_coeff, tol_avx2(n_coeff));
+    QD_DIAG("offset_m,periods,max_abs_diff\n");
+    for (double offset : {1e8, 1e9, 1e10})
+    {
+        arma::mat pos = rnd(64, 3, -50.0, 50.0, 55) + offset, a, b;
+        quadriga_lib::sos_val(freq, phase, pos, a, (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr, 1.0, false, 1);
+        quadriga_lib::sos_val(freq, phase, pos, b, (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr, 1.0, false, 2);
+        REQUIRE(a.n_elem == 256);
+        double mx = arma::abs(a - b).max();
+        QD_DIAG("%.0e,%.0e,%.3e\n", offset, 0.1 * offset, mx);
+        INFO("offset " << offset);
+        CHECK(mx < tol_avx2(n_coeff));
+        CHECK(arma::abs(a).max() > 0.5);
+        CHECK(a.is_finite());
+    }
+}
+
+TEST_CASE("sos_val - the AVX2 kernel stays within its bound for the largest preset")
+{
+    if (!has_avx2())
+        return;
+
+    // 1024 sinusoids are the case with the loosest bound, 4e-7 · sqrt(2048) = 1.8e-5
+    QD_DIAG("\n# diag: sos_val AVX2 against GENERIC, Comb1024, bound %.2e\ndist_decorr,max_abs_diff\n", tol_avx2(1024));
+    for (double d : {10.0, 1.0})
+    {
+        arma::mat freq, phase = rnd(1024, 6, -pi, pi, 56), pos = rnd(200, 3, -500.0, 500.0, 57), a, b;
+        quadriga_lib::sos_preset("Comb1024", freq, (arma::vec *)nullptr, (arma::vec *)nullptr, d);
+        quadriga_lib::sos_val(freq, phase, pos, a, (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr, 1.0, false, 1);
+        quadriga_lib::sos_val(freq, phase, pos, b, (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr, 1.0, false, 2);
+        REQUIRE(a.n_elem == 1200);
+        double mx = arma::abs(a - b).max();
+        QD_DIAG("%.0f,%.3e\n", d, mx);
+        INFO("dist_decorr " << d);
+        CHECK(mx < tol_avx2(1024));
+        CHECK(arma::abs(a).max() > 0.5);
+    }
+}
+
+TEST_CASE("sos_val - two devices with different numbers of position columns equal zero-padded positions")
+{
+    arma::mat freq = rnd(30, 3, -0.2, 0.2, 58), phase = rnd(30, 5, -pi, pi, 59), phase_b = rnd(30, 5, -pi, pi, 60);
+    arma::mat pa3 = rnd(13, 3, -30.0, 30.0, 61), pb3 = rnd(13, 3, -30.0, 30.0, 62);
+    arma::vec dist = arma::regspace(0.0, 1.0, 50.0), acf = arma::exp(-dist / 10.0);
+
+    for (int kernel = 1; kernel <= (has_avx2() ? 2 : 1); ++kernel)
+        for (int mode = 1; mode <= 2; ++mode)
+            for (arma::uword ca = 1; ca <= 3; ++ca)
+                for (arma::uword cb = 1; cb <= 3; ++cb)
+                {
+                    // Padded: all three columns, the ones not given set to 0
+                    arma::mat pa_pad = pa3, pb_pad = pb3;
+                    for (arma::uword c = ca; c < 3; ++c)
+                        pa_pad.col(c).zeros();
+                    for (arma::uword c = cb; c < 3; ++c)
+                        pb_pad.col(c).zeros();
+                    arma::mat pa = pa3.cols(0, ca - 1), pb = pb3.cols(0, cb - 1), val, ref;
+                    const arma::mat *ph_b = (mode == 2) ? &phase_b : nullptr;
+                    quadriga_lib::sos_val(freq, phase, pa, val, &pb, ph_b, &acf, &dist, mode == 2 ? 0.7 : 1.0, false, kernel);
+                    quadriga_lib::sos_val(freq, phase, pa_pad, ref, &pb_pad, ph_b, &acf, &dist, mode == 2 ? 0.7 : 1.0, false, kernel);
+                    INFO("kernel " << kernel << ", mode " << mode << ", columns " << ca << " and " << cb);
+                    REQUIRE(val.n_rows == 13);
+                    CHECK(arma::abs(ref).max() > 0.3);
+                    CHECK(arma::approx_equal(val, ref, "absdiff", 0.0));
+                }
+}
+
+TEST_CASE("sos_val - the float instantiation is the double computation on the float inputs")
+{
+    // The float call converts its inputs to double, computes as the double call does and rounds the result.
+    // Compared with the double call on exactly the same (float) input values, only the rounding of the
+    // output remains: half a float spacing of a value up to 4, i.e. 2.4e-7. This separates the computation
+    // from the rounding of the inputs, which the case "float agrees with double" has to allow for.
+    arma::fmat ff = arma::conv_to<arma::fmat>::from(rnd(50, 3, -0.3, 0.3, 63)), pf = arma::conv_to<arma::fmat>::from(rnd(50, 4, -pi, pi, 64));
+    arma::fmat pbf = arma::conv_to<arma::fmat>::from(rnd(50, 4, -pi, pi, 65));
+    arma::fmat paf = arma::conv_to<arma::fmat>::from(rnd(21, 3, -100.0, 100.0, 66)), pbpf = arma::conv_to<arma::fmat>::from(rnd(21, 3, -100.0, 100.0, 67));
+    arma::fvec af = {1.0f, 0.6f, 0.3f, 0.1f}, df = {0.0f, 2.0f, 5.0f, 20.0f};
+    arma::mat fd = arma::conv_to<arma::mat>::from(ff), pd = arma::conv_to<arma::mat>::from(pf), pbd = arma::conv_to<arma::mat>::from(pbf);
+    arma::mat pad = arma::conv_to<arma::mat>::from(paf), pbpd = arma::conv_to<arma::mat>::from(pbpf);
+    arma::vec ad = arma::conv_to<arma::vec>::from(af), dd = arma::conv_to<arma::vec>::from(df);
+    const float scale_f = 0.7f;
+
+    QD_DIAG("\n# diag: sos_val float against the double call on the float inputs\nkernel,mode,uniform,max_abs_diff\n");
+    for (int kernel = 1; kernel <= (has_avx2() ? 2 : 1); ++kernel)
+        for (int mode = 0; mode < 3; ++mode)
+            for (bool uniform : {false, true})
+            {
+                arma::fmat vf;
+                arma::mat vd;
+                if (mode == 0)
+                {
+                    quadriga_lib::sos_val(ff, pf, paf, vf, (arma::fmat *)nullptr, (arma::fmat *)nullptr, (arma::fvec *)nullptr, (arma::fvec *)nullptr, 1.0f, uniform, kernel);
+                    quadriga_lib::sos_val(fd, pd, pad, vd, (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr, 1.0, uniform, kernel);
+                }
+                else if (mode == 1)
+                {
+                    quadriga_lib::sos_val(ff, pf, paf, vf, &pbpf, (arma::fmat *)nullptr, &af, &df, 1.0f, uniform, kernel);
+                    quadriga_lib::sos_val(fd, pd, pad, vd, &pbpd, (arma::mat *)nullptr, &ad, &dd, 1.0, uniform, kernel);
+                }
+                else
+                {
+                    quadriga_lib::sos_val(ff, pf, paf, vf, &pbpf, &pbf, (arma::fvec *)nullptr, (arma::fvec *)nullptr, scale_f, uniform, kernel);
+                    quadriga_lib::sos_val(fd, pd, pad, vd, &pbpd, &pbd, (arma::vec *)nullptr, (arma::vec *)nullptr, (double)scale_f, uniform, kernel);
+                }
+                REQUIRE(vf.n_rows == 21);
+                REQUIRE(vf.n_cols == 4);
+                double mx = arma::abs(arma::conv_to<arma::mat>::from(vf) - vd).max();
+                QD_DIAG("%d,%d,%d,%.3e\n", kernel, mode, (int)uniform, mx);
+                INFO("kernel " << kernel << ", mode " << mode << ", uniform " << uniform);
+                CHECK(mx < 2e-6);
+                CHECK(vd.max() - vd.min() > 0.3);
+            }
+}
+
+TEST_CASE("sos_val - the value of a generator does not depend on the number of generators of the call")
+{
+    // The AVX2 kernel accumulates the generators in groups of 8 with one smaller group for the remaining
+    // 1 to 7, the GENERIC kernel in groups of 4. 1 to 18 generators cover every group size and several
+    // groups; 300 positions cross the tiles of 16 blocks in which the AVX2 kernel walks the positions and
+    // end in an incomplete block. Every column must be bit-identical to its own single-generator call.
+    arma::mat freq = rnd(33, 3, -0.3, 0.3, 70), phase = rnd(33, 18, -pi, pi, 71), pos = rnd(300, 3, -80.0, 80.0, 72);
+
+    for (int kernel = 1; kernel <= (has_avx2() ? 2 : 1); ++kernel)
+    {
+        arma::mat single(300, 18);
+        for (arma::uword g = 0; g < 18; ++g)
+        {
+            arma::mat one, ph = phase.col(g);
+            quadriga_lib::sos_val(freq, ph, pos, one, (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr, 1.0, false, kernel);
+            REQUIRE(one.n_rows == 300);
+            single.col(g) = one;
+        }
+        CHECK(arma::abs(single).max() > 0.5);
+
+        arma::uword n_equal = 0;
+        for (arma::uword n_gen = 1; n_gen <= 18; ++n_gen)
+        {
+            arma::mat val, ph = phase.cols(0, n_gen - 1);
+            quadriga_lib::sos_val(freq, ph, pos, val, (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr, 1.0, false, kernel);
+            REQUIRE(val.n_cols == n_gen);
+            n_equal += arma::approx_equal(val, single.cols(0, n_gen - 1), "absdiff", 0.0) ? 1 : 0;
+        }
+        INFO("kernel " << kernel);
+        CHECK(n_equal == 18);
     }
 }

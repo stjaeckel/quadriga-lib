@@ -6,6 +6,22 @@
 #include "quadriga_lib.hpp"
 #include "mex_helper_functions.hpp"
 
+#include <cmath>
+#include <string>
+
+// Count argument: read as double, so that a negative or non-finite value is rejected with the name of the
+// argument instead of wrapping around in the conversion to an unsigned type. Non-integer values are truncated.
+static arma::uword qd_mex_sos_count(const mxArray *input, const char *name, double default_value)
+{
+    const double v = qd_mex_get_scalar<double>(input, name, default_value);
+    if (!(v >= 1.0) || !(v < 9.0e18))
+    {
+        const std::string msg = std::string("Input '") + name + "' must be a finite number >= 1.";
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", msg.c_str());
+    }
+    return (arma::uword)v;
+}
+
 /*!SECTION
 Sum-of-sinusoids random number generator
 SECTION!*/
@@ -33,16 +49,20 @@ Approximation error of the ACF of a set of sinusoids
   The target is 0 there; sinusoids with a frequency near zero show up as a plateau of height
   `n_low / n_coeff`, which adds a constant offset to all values of a large area
 - `mse_core` and `mse_all` need the 2-D grids and are only computed when requested
+- A perfect fit has a mean squared error of 0 and is returned as `Inf`; this happens for a target
+  that the sinusoids reproduce exactly at all sample points
+- Equally spaced has the meaning given in [[sos_acf_2d]]
 
 ## Usage:
 ```
-[ mse, mse_core, mse_all, acf_tail, test_dir ] = quadriga_lib.sos_calc_mse( freq, acf, dist, n_dir );
+[ mse, mse_core, mse_all, acf_tail, test_dir ] = quadriga_lib.sos_calc_mse( freq, acf, dist, ...
+    n_dir );
 ```
 
 ## Inputs:
-- **`freq`** — Frequencies in [1/m]; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
+- **`freq`** — Frequencies; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
 - **`acf`** — Target ACF; at least 2 elements; `[n_acf]`
-- **`dist`** — Sample points of the ACF; must start at 0 and be equally spaced; `[n_acf]`
+- **`dist`** — Sample points of the ACF; must start at 0, be equally spaced and finite; `[n_acf]`
 - **`n_dir`** — Number of test directions; must be > 0; ignored for `n_dim = 1`; default: 10
 
 ## Outputs:
@@ -50,7 +70,7 @@ Approximation error of the ACF of a set of sinusoids
 - **`mse_core`** — Error within the core radius in [dB]; scalar
 - **`mse_all`** — Error on the complete grid in [dB]; scalar
 - **`acf_tail`** — Approximated ACF beyond the fitted range; column vector; `[4]`
-- **`test_dir`** — Test directions in [rad]; `[n_dir, 2]` with columns `{azimuth, elevation}` for
+- **`test_dir`** — Test directions; `[n_dir, 2]` with columns `{azimuth, elevation}` for
   `n_dim = 3`; `[n_dir, 1]` with the azimuth for `n_dim = 2`; empty for `n_dim = 1`
 
 ## See also:
@@ -70,7 +90,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::mat freq = qd_mex_get_Mat<double>(prhs[0]);
     const arma::vec acf = qd_mex_get_Col<double>(prhs[1]);
     const arma::vec dist = qd_mex_get_Col<double>(prhs[2]);
-    const arma::uword n_dir = (nrhs < 4) ? 10 : qd_mex_get_scalar<arma::uword>(prhs[3], "n_dir", 10);
+    const arma::uword n_dir = (nrhs < 4) ? 10 : qd_mex_sos_count(prhs[3], "n_dir", 10.0);
 
     // Wrap optional pointers
     double mse = 0.0, mse_core = 0.0, mse_all = 0.0;

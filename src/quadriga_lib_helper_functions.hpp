@@ -533,6 +533,10 @@ inline void qd_coeff_combine(const dtype *pVrr, const dtype *pVri, // RX V-pol p
     }
 }
 
+// ---- Helpers of the sum-of-sinusoids functions (sos_*.cpp) ----
+#include <algorithm>
+#include <limits>
+
 // Random stream of the sum-of-sinusoids functions
 // A seed >= 0 gives the same stream on all platforms, -1 seeds from the system random device
 static inline std::mt19937_64 qd_sos_rng(arma::sword seed)
@@ -590,17 +594,32 @@ static inline void qd_sos_check_acf(const arma::Col<dtype> &acf, const arma::Col
     for (arma::uword i = 1; i < dist.n_elem; ++i)
         if (!(p[i] > p[i - 1]))
             throw std::invalid_argument("Input 'dist' must increase strictly.");
+    if (!std::isfinite((double)p[dist.n_elem - 1]))
+        throw std::invalid_argument("Input 'dist' must be finite.");
     for (arma::uword i = 0; i < acf.n_elem; ++i)
         if (!std::isfinite((double)acf.at(i)))
             throw std::invalid_argument("Input 'acf' must be finite.");
 }
 
+// Validate an ACF table for two devices on the same map, throws std::invalid_argument
+// The combined value is divided by sqrt( 2 + 2·A ), so the ACF must stay above -1
+template <typename dtype>
+static inline void qd_sos_check_acf_same_map(const arma::Col<dtype> &acf, const arma::Col<dtype> &dist)
+{
+    qd_sos_check_acf(acf, dist);
+    for (arma::uword i = 0; i < acf.n_elem; ++i)
+        if (!(acf.at(i) > (dtype)-1.0))
+            throw std::invalid_argument("Input 'acf' must be > -1 for two devices on the same map.");
+}
+
 // Check that the sample points of an ACF table are equally spaced
+// Tolerance: 1e-4 of the step, but not less than 4 spacings of dtype at the last sample point, which is
+// what the rounding of the sample points themselves can amount to in a long single-precision table
 template <typename dtype>
 static inline bool qd_sos_equally_spaced(const arma::Col<dtype> &dist)
 {
     double step = (double)dist.at(dist.n_elem - 1) / (double)(dist.n_elem - 1);
-    double tol = 1.0e-4 * step;
+    double tol = std::max(1.0e-4 * step, 4.0 * (double)std::numeric_limits<dtype>::epsilon() * (double)dist.at(dist.n_elem - 1));
     for (arma::uword i = 0; i < dist.n_elem; ++i)
         if (std::abs((double)dist.at(i) - (double)i * step) > tol)
             return false;

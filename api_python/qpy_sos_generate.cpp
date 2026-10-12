@@ -32,6 +32,10 @@ Find the frequencies of a sum-of-sinusoids generator for a given ACF
   (see `acf_tail` of [[sos_calc_mse]]). To prevent this, set `freq_min`
 - `freq_min` and `freq_max` limit the magnitude of the frequency along the direction of each
   sinusoid; 0 selects the default: no lower limit, and `15 / max(dist)` as upper limit
+- The search grid has `( freq_max - freq_min ) · max(dist) / 0.1 + 1` points, and its cosines are
+  stored for all sample points. It must not have more than 100000 points (the default has 151),
+  which limits `freq_max - freq_min` to less than `10000 / max(dist)`
+- The function runs on one thread
 - Use enough test directions: with few (e.g. 10) the result fits those directions and is worse
   in others; the predefined tables of [[sos_preset]] were made with 300
 - A seed >= 0 makes the result repeatable on one platform. The search takes accept/reject
@@ -46,7 +50,7 @@ freq, ase, test_dir = quadriga_lib.sos.generate( acf, dist, n_coeff, n_dim, unif
 
 ## Inputs:
 - **`acf`** — Target ACF; at least 2 elements; `(n_acf,)`
-- **`dist`** — Sample points of the ACF; must start at 0 and increase strictly; `(n_acf,)`
+- **`dist`** — Sample points of the ACF; must start at 0, increase strictly and be finite; `(n_acf,)`
 - **`n_coeff`** — Number of sinusoids; `int`; must be > 0
 - **`n_dim`** — Number of dimensions; `int`; 1, 2 or 3; default: 3
 - **`uniform_smp`** — Regular (`True`) or random (`False`) directions of the sinusoids;
@@ -54,17 +58,18 @@ freq, ase, test_dir = quadriga_lib.sos.generate( acf, dist, n_coeff, n_dim, unif
 - **`n_dir`** — Number of test directions; `int`; must be > 0; ignored for `n_dim = 1`; default: 10
 - **`random_init`** — Start from random frequencies (`True`) or build up sinusoid by sinusoid
   (`False`); default: `True`
-- **`freq_min`** — Lower limit of the frequency magnitude in [1/m]; must be >= 0; 0 = none;
+- **`freq_min`** — Lower limit of the frequency magnitude; must be >= 0; 0 = none;
   default: 0.0
-- **`freq_max`** — Upper limit of the frequency magnitude in [1/m]; must be >= 0 and, if not 0,
-  larger than `freq_min`; 0 = `15 / max(dist)`; default: 0.0
+- **`freq_max`** — Upper limit of the frequency magnitude; must be >= 0 and, if not 0,
+  larger than `freq_min`; 0 = `15 / max(dist)`; limited by the size of the search
+  grid, see above; default: 0.0
 - **`seed`** — Seed; `int`; must be >= -1; -1 seeds from the system random device; default: -1
 
 ## Outputs:
-- **`freq`** — Frequencies in [1/m]; `(n_coeff, n_dim)`
+- **`freq`** — Frequencies; `(n_coeff, n_dim)`
 - **`ase`** — Mean squared error over the test directions after each pass, linear scale;
   `(n_pass,)`
-- **`test_dir`** — Test directions in [rad]; `(n_dir, 2)` with columns `(azimuth, elevation)` for
+- **`test_dir`** — Test directions; `(n_dir, 2)` with columns `(azimuth, elevation)` for
   `n_dim = 3`; `(n_dir, 1)` with the azimuth for `n_dim = 2`; empty `(0, 0)` for `n_dim = 1`
 
 ## See also:
@@ -105,8 +110,8 @@ py::tuple sos_generate(const py::array_t<double> &acf,
 
 // pybind11 declaration:
 // m.def("generate", &sos_generate,
-//       py::arg("acf"),
-//       py::arg("dist"),
+//       py::arg("acf").none(false),
+//       py::arg("dist").none(false),
 //       py::arg("n_coeff"),
 //       py::arg("n_dim") = 3,
 //       py::arg("uniform_smp") = true,

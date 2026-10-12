@@ -114,4 +114,86 @@ TEST_CASE("sos_acf_2d - input validation")
         CHECK_THROWS_AS(quadriga_lib::sos_acf_2d(acf, start, a2), std::invalid_argument);
         CHECK_THROWS_AS(quadriga_lib::sos_acf_2d(acf, uneven, a2), std::invalid_argument);
     }
+    SECTION("non-finite table")
+    {
+        arma::vec inf_dist = {0.0, 1.0, arma::datum::inf}, nan_dist = {0.0, std::nan(""), 2.0}, nan_acf = {1.0, std::nan(""), 0.25};
+        CHECK_THROWS_AS(quadriga_lib::sos_acf_2d(acf, inf_dist, a2), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_acf_2d(acf, nan_dist, a2), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_acf_2d(nan_acf, dist, a2), std::invalid_argument);
+    }
+    SECTION("a failed call leaves the outputs untouched")
+    {
+        arma::vec uneven = {0.0, 1.0, 3.0}, axis(2);
+        axis.fill(7.0);
+        a2.set_size(2, 2);
+        a2.fill(7.0);
+        CHECK_THROWS_AS(quadriga_lib::sos_acf_2d(acf, uneven, a2, &axis), std::invalid_argument);
+        CHECK(a2.n_rows == 2);
+        CHECK(a2(1, 1) == 7.0);
+        CHECK(axis.n_elem == 2);
+    }
+}
+
+TEST_CASE("sos_acf_2d - long tables in single precision count as equally spaced")
+{
+    // 5001 samples with 0.01 m spacing. In float the sample points near 50 m are 3.8e-6 m apart, which is
+    // more than 1e-4 of the step: the rounding of the sample points must not make the table "unequal".
+    // Checked on the axis only (the full grid has 4e8 points): n = 501 gives a grid of 2001 x 2001.
+    for (arma::uword n : {501, 2001, 5001})
+    {
+        arma::fvec dist(n), acf(n);
+        for (arma::uword i = 0; i < n; ++i)
+            dist(i) = (float)(0.01 * (double)i), acf(i) = (float)std::exp(-0.01 * (double)i / 10.0);
+        arma::vec dist_d(n), acf_d(n);
+        for (arma::uword i = 0; i < n; ++i)
+            dist_d(i) = 0.01 * (double)i, acf_d(i) = std::exp(-0.01 * (double)i / 10.0);
+
+        // sos_calc_mse and sos_acf_approx use the same test and are cheap for one sinusoid in 1-D
+        arma::fmat freq(1, 1);
+        freq(0, 0) = 0.01f;
+        arma::mat freq_d(1, 1);
+        freq_d(0, 0) = (double)freq(0, 0);
+        INFO("n_acf " << n);
+        float mse = 0.0f;
+        CHECK_NOTHROW(mse = quadriga_lib::sos_calc_mse(freq, acf, dist));
+        double mse_d = quadriga_lib::sos_calc_mse(freq_d, acf_d, dist_d);
+        CHECK(std::abs((double)mse - mse_d) < 1e-3);
+        arma::fcube approx;
+        CHECK_NOTHROW(quadriga_lib::sos_acf_approx(freq, dist, approx));
+        CHECK(approx.n_rows == 4 * n - 3);
+        if (n == 501)
+        {
+            arma::fmat a2;
+            arma::fvec axis;
+            CHECK_NOTHROW(quadriga_lib::sos_acf_2d(acf, dist, a2, &axis));
+            REQUIRE(a2.n_rows == 2001);
+            CHECK(std::abs(a2(1000, 1500) - acf(500)) < 1e-6f);
+            CHECK(std::abs(axis(2000) - 10.0f) < 1e-5f);
+        }
+    }
+
+    // A table that is unequal by more than the rounding is still rejected, in float and in double
+    arma::fvec bad(5001), acf(5001, arma::fill::ones);
+    for (arma::uword i = 0; i < 5001; ++i)
+        bad(i) = (float)(0.01 * (double)i);
+    bad(2500) += 0.003f;
+    arma::fmat freq(1, 1, arma::fill::ones);
+    CHECK_THROWS_AS(quadriga_lib::sos_calc_mse(freq, acf, bad), std::invalid_argument);
+}
+
+TEST_CASE("sos_acf_2d - the axis output may be the same object as an input")
+{
+    arma::vec acf = {1.0, 0.5, 0.25}, dist = {0.0, 1.5, 3.0}, ref_axis;
+    arma::mat ref, a, b;
+    quadriga_lib::sos_acf_2d(acf, dist, ref, &ref_axis);
+    REQUIRE(ref_axis.n_elem == 9);
+
+    arma::vec d = dist, c = acf;
+    quadriga_lib::sos_acf_2d(acf, d, a, &d); // dist_2d is 'dist'
+    quadriga_lib::sos_acf_2d(c, dist, b, &c); // dist_2d is 'acf'
+    CHECK(arma::approx_equal(a, ref, "absdiff", 0.0));
+    CHECK(arma::approx_equal(b, ref, "absdiff", 0.0));
+    CHECK(arma::approx_equal(d, ref_axis, "absdiff", 0.0));
+    CHECK(arma::approx_equal(c, ref_axis, "absdiff", 0.0));
+    CHECK(std::abs(ref_axis(8) - 6.0) < 1e-14);
 }

@@ -35,6 +35,11 @@ Approximation error of the ACF of a set of sinusoids
   target is 0 there; sinusoids with a frequency near zero show up as a plateau of height
   `n_low / n_coeff`, which adds a constant offset to all values of a large area
 - `mse_core` and `mse_all` need the 2-D grids and are only computed when requested
+- A perfect fit has a mean squared error of 0 and is returned as +Inf dB; this happens for a target that
+  the sinusoids reproduce exactly at all sample points, e.g. sinusoids at zero frequency and a target of 1
+- The test directions are evaluated in parallel; the result does not depend on the number of threads
+- Equally spaced has the meaning given in [[sos_acf_2d]]
+- `acf_tail` and `test_dir` may be the same objects as inputs
 
 ## Declaration:
 ```
@@ -52,7 +57,7 @@ dtype quadriga_lib::sos_calc_mse(
 ## Inputs:
 - **`freq`** — Frequencies in [1/m]; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
 - **`acf`** — Target ACF; at least 2 elements; `[n_acf]`
-- **`dist`** — Sample points of the ACF in [m]; must start at 0 and be equally spaced; `[n_acf]`
+- **`dist`** — Sample points of the ACF in [m]; must start at 0, be equally spaced and finite; `[n_acf]`
 - **`n_dir`** *(optional)* — Number of test directions; must be > 0; ignored for `n_dim = 1`
 
 ## Outputs:
@@ -121,13 +126,24 @@ dtype quadriga_lib::sos_calc_mse(const arma::Mat<dtype> &freq,
         return acc / (double)n_coeff;
     };
 
-    double err = 0.0;
-    for (arma::uword t = 0; t < n_test; ++t)
+    // Squared errors of all test directions in parallel; they are then added in a fixed order, so that the
+    // result does not depend on the number of threads
+    arma::mat sq(n_acf, n_test, arma::fill::none);
+    const long long n_test_ll = (long long)n_test;
+#pragma omp parallel for if (n_test > 1)
+    for (long long i_test = 0; i_test < n_test_ll; ++i_test)
+    {
+        const arma::uword t = (arma::uword)i_test;
+        double *p = sq.colptr(t);
         for (arma::uword s = 0; s < n_acf; ++s)
         {
             double e = (double)acf.at(s) - acf_dir(t, (double)dist.at(s));
-            err += e * e;
+            p[s] = e * e;
         }
+    }
+    double err = 0.0;
+    for (arma::uword i = 0; i < sq.n_elem; ++i)
+        err += sq.at(i);
     const double mse = -10.0 * std::log10(err / (double)(n_test * n_acf));
 
     if (mse_core != nullptr || mse_all != nullptr)
@@ -183,11 +199,16 @@ dtype quadriga_lib::sos_calc_mse(const arma::Mat<dtype> &freq,
         if (acf_tail->n_elem != 4)
             acf_tail->set_size(4);
         const double mult[4] = {2.0, 4.0, 10.0, 20.0};
+        arma::mat tail(n_test, 4, arma::fill::none);
+#pragma omp parallel for if (n_test > 1)
+        for (long long i_test = 0; i_test < n_test_ll; ++i_test)
+            for (arma::uword k = 0; k < 4; ++k)
+                tail.at((arma::uword)i_test, k) = acf_dir((arma::uword)i_test, mult[k] * d_max);
         for (arma::uword k = 0; k < 4; ++k)
         {
             double acc = 0.0;
             for (arma::uword t = 0; t < n_test; ++t)
-                acc += acf_dir(t, mult[k] * d_max);
+                acc += tail.at(t, k);
             acf_tail->at(k) = (dtype)(acc / (double)n_test);
         }
     }
