@@ -17519,3 +17519,226 @@ TEST_CASE("Held lining - a mass-law sheet behind a wave held in a mass-law wall 
                 }
             }
 }
+
+TEST_CASE("Stack geometry - an ordered stack leaves the ray on the line it arrived on")
+{
+    ub::OneThread one_thread;
+    // Two co-located sheets of different material are one event with one medium on both sides.
+    // The transverse wavenumber and the medium are what they were in front, so the ray goes on
+    // along the line it arrived on, whatever the layers are, whichever comes first and however
+    // the two normals are turned; each vertex ray of a tube keeps its direction. With types 2
+    // and 5 ray_mesh_interact builds the segment and the tube, and with every type its own
+    // path_dirN. Through ray_triangle_intersect, ray_mesh_interact and ray_state_update, double.
+    //   C1, C2, L   coherent sheets, no tf and no mass column: the EM rows
+    //   R, N, Q     a rigid mass-law sheet, a mass-law sheet that is not rigid, a rigid sheet
+    //               with tf and no mass column: types 1 and 2 on these are not EM materials
+    const double f = FRQ, gap = 1.0e-5;
+    const std::vector<LumpMtl> lp = {
+        {5.24, 0.63, 0.006},                                                // 1 C1
+        {1.50, 0.40, 0.006},                                                // 2 C2
+        {2.1609e-8, 0.0, 0.022, 0.0, 0.2, 0.0, 0.0, 0.0, 0.0, 20.0, 0.001}, // 3 R
+        {1.50, 0.0, 0.022, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 20.0, 0.001},      // 4 N
+        {2.50, 0.0, 0.0},                                                   // 5 H, lossless host
+        {2.50, 0.80, 0.0},                                                  // 6 Hl, lossy host
+        {2.50, 0.0, 0.003},                                                 // 7 L
+        {2.1609e-8, 0.0, 0.022, 0.0, 0.2},                                  // 8 Q
+    };
+    const ub::Pal pal = lump_palette(lp);
+    const char *mn[] = {"air", "C1", "C2", "R", "N", "H", "Hl", "L", "Q"};
+    const std::vector<std::pair<bool, bool>> flips = {{false, true}, {false, false}, {true, true}, {true, false}};
+    const char *fn[] = {"front|back", "front|front", "back|back", "back|front"};
+    auto unit = [](arma::mat d) { d /= std::sqrt(ub::sumsq(d)); return d; };
+    auto dmax = [](const arma::mat &a, const arma::mat &b) { double v = 0.0; for (arma::uword i = 0; i < 3; ++i) v = std::max(v, std::abs(a(0, i) - b(0, i))); return v; };
+    auto ang = [](const arma::mat &d) { return std::atan2(std::sqrt(d(0, 1) * d(0, 1) + d(0, 2) * d(0, 2)), std::abs(d(0, 0))) * 180.0 / QPI; };
+    auto sig = [](const arma::mat &x) { double v = 0.0; for (arma::uword i = 0; i < x.n_elem; ++i) v += 0.731 * (double)(i + 1) * x(i); return v; };
+    auto fan = [](const arma::mat &u, arma::mat &tv, arma::mat &td) // three vertex rays about the spine
+    {
+        const double e[3][3] = {{0.0, 0.004, 0.0}, {0.0, -0.002, 0.0035}, {0.0, -0.002, -0.0035}};
+        tv.zeros(1, 9), td.zeros(1, 9);
+        for (int k = 0; k < 3; ++k)
+        {
+            double v[3] = {u(0, 0) + e[k][0], u(0, 1) + e[k][1], u(0, 2) + e[k][2]};
+            const double n = std::sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+            for (int c = 0; c < 3; ++c)
+                td(0, 3 * k + c) = v[c] / n;
+        }
+    };
+    const double TOL = 1.0e-9;
+
+    // ------------------------------------------------------------------------------------------
+    // A. In air, one event: every pair, every orientation of the two normals, every type
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: stack geometry A, two co-located sheets in air, one event with a tube. seg, own: the segment and ray_mesh_interact's own\n");
+    QD_DIAG("# path_dirN, deg from the normal. Largest component of a unit-vector difference: e_seg the segment against the direction\n");
+    QD_DIAG("# written, e_in against the incoming direction, e_own the own path_dirN against the incoming direction, e_tube the vertex\n");
+    QD_DIAG("# rays against the directions they arrived in. bits: origN, destN and tridirN are those of type 1 or 4, bitwise (recorded)\n");
+    QD_DIAG("pair,normals,type,theta,ot,rt,seg,own,e_seg,e_in,e_own,e_tube,bits\n");
+    for (auto pr : std::vector<std::pair<int, int>>{{1, 2}, {2, 1}, {1, 3}, {3, 1}, {4, 1}, {7, 1}, {8, 1}})
+        for (size_t q = 0; q < flips.size(); ++q)
+            for (int it : {2, 5, 1, 4})
+                for (double thd : {10.0, 30.0, 60.0})
+                {
+                    arma::uvec mi;
+                    arma::mat mesh = ub::build({0.0, gap}, {pr.first, pr.second}, {flips[q].first, flips[q].second}, mi), o, d, tv, td;
+                    diag_ray_at(thd, o, d);
+                    const arma::mat u = unit(d - o);
+                    fan(u, tv, td);
+                    ub::Opt op;
+                    op.relaunch = true, op.trivec = &tv, op.tridir = &td;
+                    const ub::Ev E = ub::traced<double>(pal, mesh, mi, it, f, o, d, nullptr, op);
+                    const ub::Ev E1 = ub::traced<double>(pal, mesh, mi, (it == 2 || it == 1) ? 1 : 4, f, o, d, nullptr, op);
+                    const arma::mat seg = unit(E.destN - E.origN);
+                    double e_tube = 0.0;
+                    for (int k = 0; k < 3; ++k)
+                        e_tube = std::max(e_tube, dmax(E.tridirN.cols(3 * k, 3 * k + 2), td.cols(3 * k, 3 * k + 2)));
+                    const double e_seg = dmax(seg, unit(E.path_dirN)), e_in = dmax(seg, u), e_own = dmax(unit(E.dir0), u);
+                    const bool bits = ub::same_bits(E.origN, E1.origN) && ub::same_bits(E.destN, E1.destN) && ub::same_bits(E.tridirN, E1.tridirN);
+                    QD_DIAG("%s|%s,%s,%d,%.0f,%u,%u,%.4f,%.4f,%.3e,%.3e,%.3e,%.3e,%d\n", mn[pr.first], mn[pr.second], fn[q], it, thd, (unsigned)E.ot, (unsigned)E.rt,
+                            ang(seg), ang(E.dir0), e_seg, e_in, e_own, e_tube, (int)bits);
+                    INFO("A, " << mn[pr.first] << "|" << mn[pr.second] << ", " << fn[q] << ", type " << it << ", theta " << thd);
+                    CHECK(E.rt == 69);
+                    CHECK(e_seg < TOL);  // the segment is the direction written
+                    CHECK(e_in < TOL);   // which is the one the ray arrived in
+                    CHECK(e_own < TOL);  // and what a caller without state is handed
+                    CHECK(e_tube < TOL); // each vertex ray in the direction it arrived in
+                }
+
+    // ------------------------------------------------------------------------------------------
+    // B. Inside a host, and where the next wall is met
+    // ------------------------------------------------------------------------------------------
+    // Host 22 mm with the stack in its middle, entered across a bare face or through a glued
+    // sheet L, and a 50 mm eps 2.50 wall 0.5 m behind. The twin has the first layer alone in
+    // place of the stack: a single sheet, which leaves the ray where it was. A leg behind a
+    // glued entry carries that entry's anchoring, so there the stack is held to the line of the
+    // segment it was reached on, and to the direction written at the size of the anchoring.
+    QD_DIAG("\n# diag: stack geometry B, the stack in the middle of 22 mm of host, a 50 mm eps 2.50 wall 0.5 m behind, five events (six behind\n");
+    QD_DIAG("# a glued entry is not: the glued entry is one event). e_stk, e_stk_in: the segment behind the stack against the direction\n");
+    QD_DIAG("# written and against the segment it was reached on; e_exit: the segment behind the host against the direction written;\n");
+    QD_DIAG("# rt_exit, rt_twin: resolved type of that exit and of the twin's. dy_wall: where the wall is met against the twin with the first layer alone, m; e_wall:\n");
+    QD_DIAG("# the segment inside the wall against the twin's; dL: the chain level against the undeviated tracer's, dB\n");
+    QD_DIAG("host,entry,stack,normals,type,theta,seg_stk,seg_exit,e_stk,e_stk_in,e_exit,rt_exit,rt_twin,dy_wall,e_wall,dL,codes\n");
+    for (int H : {5, 6})
+        for (int glued : {0, 1})
+            for (auto pr : std::vector<std::pair<int, int>>{{1, 2}, {2, 1}, {1, 3}})
+                for (size_t q = 0; q < 2; ++q)
+                    for (int it : {2, 5})
+                        for (double thd : {30.0, 60.0})
+                        {
+                            const double d1 = 0.011;
+                            auto wall = [&](bool stack, arma::uvec &mi)
+                            {
+                                std::vector<double> x;
+                                std::vector<int> m;
+                                std::vector<bool> fl;
+                                if (glued)
+                                    x.push_back(-d1 - gap), m.push_back(7), fl.push_back(false);
+                                x.push_back(-d1), m.push_back(H), fl.push_back(false);
+                                x.push_back(0.0), m.push_back(pr.first), fl.push_back(flips[q].first);
+                                if (stack)
+                                    x.push_back(gap), m.push_back(pr.second), fl.push_back(flips[q].second);
+                                x.push_back(d1), m.push_back(H), fl.push_back(true);
+                                x.push_back(0.5), m.push_back(5), fl.push_back(false), x.push_back(0.55), m.push_back(5), fl.push_back(true);
+                                return ub::build(x, m, fl, mi);
+                            };
+                            arma::uvec mi, m1;
+                            const arma::mat mesh = wall(true, mi), mesh1 = wall(false, m1);
+                            const auto c = ub::chain(pal, mesh, mi, std::vector<int>(5, it), f, thd, {1.5});
+                            const auto t = ub::chain(pal, mesh1, m1, std::vector<int>(5, it), f, thd, {1.5});
+                            const auto s = ub::chain(pal, mesh, mi, std::vector<int>(5, (it == 2) ? 1 : 4), f, thd, {1.5});
+                            INFO("B, host " << mn[H] << ", glued " << glued << ", " << mn[pr.first] << "|" << mn[pr.second] << ", " << fn[q] << ", type " << it << ", theta " << thd);
+                            std::string codes;
+                            for (const auto &e : c)
+                                codes += std::to_string((unsigned)e.ot) + "/" + std::to_string((unsigned)e.rt) + " ";
+                            REQUIRE((t.size() == 5 && s.size() == 5));
+                            CHECK(c.size() == 5); // the bent segment can miss an event: a chain that ends early is the defect
+                            if (c.size() != 5)
+                            {
+                                QD_DIAG("%s,%s,%s|%s,%s,%d,%.0f,chain of %zu events,%s\n", mn[H], glued ? "glued" : "bare", mn[pr.first], mn[pr.second], fn[q], it, thd, c.size(), codes.c_str());
+                                continue;
+                            }
+                            std::complex<double> zc = 1.0, zs = 1.0;
+                            for (size_t k = 0; k < 5; ++k)
+                                zc *= cpx(c[k].xpr, 0, 0), zs *= cpx(s[k].xpr, 0, 0);
+                            const arma::mat sg1 = unit(c[1].destN - c[1].origN), sg2 = unit(c[2].destN - c[2].origN);
+                            const double e_stk = dmax(sg1, unit(c[1].path_dirN)), e_stk_in = dmax(sg1, unit(c[0].destN - c[0].origN));
+                            const double e_exit = dmax(sg2, unit(c[2].path_dirN)), dyw = c[3].fbs(0, 1) - t[3].fbs(0, 1);
+                            const double e_wall = dmax(unit(c[3].destN - c[3].origN), unit(t[3].destN - t[3].origN)), dL = ub::dB(zc) - ub::dB(zs);
+                            QD_DIAG("%s,%s,%s|%s,%s,%d,%.0f,%.4f,%.4f,%.3e,%.3e,%.3e,%u,%u,%.3e,%.3e,%+.6f,%s\n", mn[H], glued ? "glued" : "bare", mn[pr.first], mn[pr.second], fn[q], it, thd,
+                                    ang(sg1), ang(sg2), e_stk, e_stk_in, e_exit, (unsigned)c[2].rt, (unsigned)t[2].rt, dyw, e_wall, dL, codes.c_str());
+                            CHECK(e_stk_in < TOL);                 // on the line it was reached on
+                            CHECK(e_stk < (glued ? 2.0e-4 : TOL)); // which is the direction written
+                            CHECK(e_exit < (glued ? 2.0e-4 : TOL));
+                            CHECK(c[2].rt == t[2].rt); // the exit behind the stack is the exit behind a single sheet
+                            if (!glued)                // behind a glued entry that entry's anchoring can set the bit, for the twin as well
+                                CHECK((c[2].rt & 2) == 0); // behind the stack the wave's direction is the segment again
+                            CHECK(std::abs(dyw) < (glued ? 1.0e-6 : TOL)); // the next wall is met where the single sheet meets it
+                            CHECK(e_wall < (glued ? 2.0e-4 : TOL));
+                            CHECK(std::abs(dL) < 1.0e-3); // and with the level of the undeviated tracer
+                        }
+
+    // ------------------------------------------------------------------------------------------
+    // C. Twins that must not move, with every digit
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: stack geometry C1, what must not move: origN, destN and a weighted sum of tridirN with every digit. A single sheet, a\n");
+    QD_DIAG("# collapsed duplicate, a glued entry, a bare entry with every type, and the stack with types 1, 4, 0 and 3\n");
+    QD_DIAG("what,type,theta,ot,rt,origN_x,origN_y,origN_z,destN_x,destN_y,destN_z,tube\n");
+    for (int w = 0; w < 5; ++w)
+        for (int it : {1, 2, 4, 5, 0, 3})
+            for (double thd : {30.0, 60.0})
+            {
+                if (w == 4 && (it == 2 || it == 5))
+                    continue;
+                arma::uvec mi;
+                arma::mat mesh, o, d, tv, td;
+                const char *nm = "";
+                if (w == 0)
+                    mesh = ub::build({0.0}, {1}, {false}, mi), nm = "C1 alone";
+                else if (w == 1)
+                    mesh = ub::build({0.0, gap}, {1, 1}, {false, true}, mi), nm = "C1|C1";
+                else if (w == 2)
+                    mesh = ub::build({0.0, gap, 0.1}, {1, 6, 6}, {false, false, true}, mi), nm = "C1 on Hl";
+                else if (w == 3)
+                    mesh = ub::build({0.0, 0.1}, {6, 6}, {false, true}, mi), nm = "Hl";
+                else
+                    mesh = ub::build({0.0, gap}, {1, 2}, {false, true}, mi), nm = "C1|C2";
+                diag_ray_at(thd, o, d);
+                fan(unit(d - o), tv, td);
+                ub::Opt op;
+                op.relaunch = (it != 0 && it != 3), op.trivec = &tv, op.tridir = &td;
+                const ub::Ev E = ub::traced<double>(pal, mesh, mi, it, f, o, d, nullptr, op);
+                QD_DIAG("%s,%d,%.0f,%u,%u,%.17g,%.17g,%.17g,%.17g,%.17g,%.17g,%.17g\n", nm, it, thd, (unsigned)E.ot, (unsigned)E.rt, E.origN(0, 0), E.origN(0, 1), E.origN(0, 2),
+                        E.destN(0, 0), E.destN(0, 1), E.destN(0, 2), sig(E.tridirN));
+                CHECK(E.rt != 0);
+            }
+
+    // The stack event itself, on a ray out of the horizontal plane so that the basis of an EM
+    // coefficient shows. The redo's coefficient, both codes and the words are printed with every
+    // digit. What ray_mesh_interact wrote is printed for types 1, 4 and 5; with type 2 it is
+    // written in the basis of the outgoing direction and is type 1's once that is the incoming one.
+    QD_DIAG("\n# diag: stack geometry C2, the stack event on a ray out of the horizontal plane, with every digit. xpr: the redo's coefficient\n");
+    QD_DIAG("# as a weighted sum; own: ray_mesh_interact's (not printed for type 2); d_own: the own coefficient against that of type 1 or 4,\n");
+    QD_DIAG("# largest entry\n");
+    QD_DIAG("stack,normals,type,theta,ot,rt,prev.cur.buf,xpr,own,d_own\n");
+    for (auto pr : std::vector<std::pair<int, int>>{{1, 2}, {2, 1}})
+        for (size_t q = 0; q < flips.size(); ++q)
+            for (int it : {1, 2, 4, 5})
+                for (double thd : {30.0, 60.0})
+                {
+                    arma::uvec mi;
+                    const arma::mat mesh = ub::build({0.0, gap}, {pr.first, pr.second}, {flips[q].first, flips[q].second}, mi);
+                    const arma::mat o = {{-1.0, 0.37, 0.2}}, d = {{1.0, 0.37 + 2.0 * std::tan(thd * QPI / 180.0), 1.5}};
+                    const ub::Ev E = ub::traced<double>(pal, mesh, mi, it, f, o, d, nullptr), E1 = ub::traced<double>(pal, mesh, mi, (it < 3) ? 1 : 4, f, o, d, nullptr);
+                    double d_own = 0.0;
+                    for (arma::uword i = 0; i < E.xpr0.n_elem; ++i)
+                        d_own = std::max(d_own, std::abs(E.xpr0(i) - E1.xpr0(i)));
+                    QD_DIAG("%s|%s,%s,%d,%.0f,%u,%u,%u.%u.%u,%.17g,", mn[pr.first], mn[pr.second], fn[q], it, thd, (unsigned)E.ot, (unsigned)E.rt, ub::w(E.prev(0)), ub::w(E.cur(0)),
+                            ub::w(E.buf(0)), sig(E.xpr));
+                    if (it == 2)
+                        QD_DIAG("-,%.3e\n", d_own);
+                    else
+                        QD_DIAG("%.17g,%.3e\n", sig(E.xpr0), d_own);
+                    INFO("C2, " << mn[pr.first] << "|" << mn[pr.second] << ", " << fn[q] << ", type " << it << ", theta " << thd);
+                    CHECK(E.rt == 69);
+                    CHECK(d_own < 1.0e-12); // one own coefficient for the bent and the undeviated type
+                }
+}

@@ -3375,14 +3375,17 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
                         total_reflection = true;
         }
 
-        // Outgoing spine direction. No sheet special case is needed here: with near == far the interface
-        // call returned eta = 1 and cos_theta2 = cos_theta, so the refraction branch reproduces the
-        // incoming direction and cases 1/4/5 land undeviated on their own.
+        // Outgoing spine direction. An isolated sheet and a collapsed duplicate need no special case:
+        // with near == far the interface call returned eta = 1 and cos_theta2 = cos_theta, so the
+        // refraction branch reproduces the incoming direction. An ordered stack does: its interface
+        // call saw the legacy pair of its two layers, which is not near | far. It has one medium on
+        // both sides, so the spine, the tube and path_dirN keep the incoming direction.
+        const bool no_bend = sheet_case == 4;
         if (geometry_type == 0) // Reflection, normalized by default
             qd_reflect(ODx, ODy, ODz, Nx, Ny, Nz, FDx, FDy, FDz);
-        else if (geometry_type == 1 || total_reflection) // Transmission without refraction
-            FDx = ODx, FDy = ODy, FDz = ODz;             // New path direction = same as incoming ray, already normalized
-        else                                             // Refraction
+        else if (geometry_type == 1 || total_reflection || no_bend) // Transmission without refraction
+            FDx = ODx, FDy = ODy, FDz = ODz;                        // New path direction = same as incoming ray, already normalized
+        else                                                        // Refraction
             qd_refract(ODx, ODy, ODz, Nx, Ny, Nz, eta, abs_cos_theta, cos_theta2, FDx, FDy, FDz);
 
         // Update origin and direction of the ray tube vertices
@@ -3446,7 +3449,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
                     Tx = Wx - Fx, Ty = Wy - Fy, Tz = Wz - Fz;
 
                     // Vertex ray directions remains the same for Transmission
-                    if (geometry_type == 2 && !total_reflection) // Refraction (skipped when the whole tube passes through under TIR)
+                    if (geometry_type == 2 && !total_reflection && !no_bend) // Refraction (skipped when the whole tube passes through under TIR)
                     {
                         std::complex<double> cos_theta2V = std::sqrt(1.0 - eta1_div_eta2 * sin_thetaV[iTube + 1] * sin_thetaV[iTube + 1]);
                         qd_refract(Vx, Vy, Vz, Nx, Ny, Nz, eta, cos_thetaV[iTube + 1], cos_theta2V, Vx, Vy, Vz);
@@ -3545,7 +3548,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         if (p_path_dirN)
         {
             double PDx = FDx, PDy = FDy, PDz = FDz;
-            if (geometry_type == 1 && !tir_central) // spine Snell; under spine TIR there is no Snell direction
+            if (geometry_type == 1 && !tir_central && !no_bend) // spine Snell; under spine TIR there is no Snell direction
                 qd_refract(ODx, ODy, ODz, Nx, Ny, Nz, eta, abs_cos_theta, cos_theta2, PDx, PDy, PDz);
             SET3(p_path_dirN, PDx, PDy, PDz);
         }
