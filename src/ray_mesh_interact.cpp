@@ -421,13 +421,14 @@ namespace
         // Combined transmission-factor reflection for a two-medium interface (symmetric in the two media).
         // tf+ = max(tf,0) leaks reflection energy into transmission; tf- = max(-tf,0) forces reflection.
         // Reduces to apply_tf at an air boundary (other side tf = 0); stays in [0,1]; tf = -1 on either
-        // face gives R_eff = 1.
-        double apply_tf_pair(const Material &other, double R0, double fGHz = 1.0) const
+        // face gives R_eff = 1. clamp = false keeps a raw reflectance above one, for the face of a
+        // sheet that is rarer than the transverse invariant; see AMP in qd_slab_resolve.
+        double apply_tf_pair(const Material &other, double R0, double fGHz = 1.0, bool clamp = true) const
         {
             double tfX = tf(fGHz), tfY = other.tf(fGHz);
             double tfXp = (tfX > 0.0) ? tfX : 0.0, tfXm = (tfX < 0.0) ? -tfX : 0.0;
             double tfYp = (tfY > 0.0) ? tfY : 0.0, tfYm = (tfY < 0.0) ? -tfY : 0.0;
-            R0 = (R0 < 0.0) ? 0.0 : ((R0 > 1.0) ? 1.0 : R0);
+            R0 = (R0 < 0.0) ? 0.0 : ((R0 > 1.0 && clamp) ? 1.0 : R0);
             double R_leak = R0 * (1.0 - tfXp) * (1.0 - tfYp);
             double tfm = (tfXm > tfYm) ? tfXm : tfYm;
             return R_leak + (1.0 - R_leak) * tfm;
@@ -1244,7 +1245,8 @@ namespace
                 // the two sides of the closed layers are one, the ratio is exactly one.
                 //
                 // The face of a layer that is rarer than the invariant takes the rescale in the
-                // form that holds past a critical angle; see AMP in qd_slab_resolve.
+                // form that holds past a critical angle, on the raw reflectance; see AMP in
+                // qd_slab_resolve.
                 auto BND = [&](int j, std::complex<double> &r, std::complex<double> &t, std::complex<double> &tb)
                 {
                     const Material &A = MED(j), &B = MED(j + 1);
@@ -1265,7 +1267,7 @@ namespace
                     if (A.tf(fGHz) == 0.0 && B.tf(fGHz) == 0.0 && !closed)
                         return;
                     double R0 = std::norm(r);
-                    double Rt = A.apply_tf_pair(B, R0, fGHz);
+                    double Rt = A.apply_tf_pair(B, R0, fGHz, closed || !(RARE(j) || RARE(j + 1)));
                     double keep = 1.0 - R0, pass = (Rt < 1.0) ? 1.0 - Rt : 0.0;
                     const std::complex<double> r2 = r * r;
                     r = std::polar(std::sqrt(Rt), std::arg(r));
@@ -1727,6 +1729,10 @@ namespace
         // the same to stay equivalent to one. Correction mode keeps the slab-side view, because
         // ray_state_update's angle comes from real ray geometry and its result must not move.
         std::complex<double> r2n[2], r2f[2]; // squared raw reflection of the near and the far face, [te, tm]
+        // A coherent sheet that is rarer than the transverse invariant: the wave in it is evanescent,
+        // or for a lossy sheet strongly damped, and what crosses it tunnels; see AMP below.
+        const bool rare = produce && !(mat_slab.m > 0.0) && std::abs(((mat_near.eta(fGHz) + mat_near.eta_resonance(fGHz)) * mat_near.mu(fGHz) /
+                                                                    (eta_s_if * mu_s)) * sin2_i) >= 1.0;
         auto fresnel_r_near = [&](std::complex<double> &r_te, std::complex<double> &r_tm,
                                   double &Ra_te, double &Ra_tm,
                                   double &R0_te, double &R0_tm, // raw, pre-tf, for the amplitude scale
@@ -1748,8 +1754,8 @@ namespace
             std::complex<double> tm = is_scalar ? te : (z_s * ci - z_a * cos_t2) / (z_s * ci + z_a * cos_t2);
             R0_te = std::norm(te), R0_tm = std::norm(tm);
             r2n[0] = te * te, r2n[1] = tm * tm;
-            Ra_te = mat_slab.apply_tf_pair(mat_near, R0_te, fGHz); // the pair that forms the face
-            Ra_tm = mat_slab.apply_tf_pair(mat_near, R0_tm, fGHz);
+            Ra_te = mat_slab.apply_tf_pair(mat_near, R0_te, fGHz, !rare); // the pair that forms the face
+            Ra_tm = mat_slab.apply_tf_pair(mat_near, R0_tm, fGHz, !rare);
 
             // Returned as the slab-side reflection, so that rn keeps one meaning throughout: the
             // internal series and the front port then differ only by the Stokes sign.
@@ -1793,8 +1799,8 @@ namespace
             std::complex<double> tm = is_scalar ? te : (z_a * cts - z_s * cos_t2) / (z_a * cts + z_s * cos_t2);
             R0_te = std::norm(te), R0_tm = std::norm(tm);
             r2f[0] = te * te, r2f[1] = tm * tm;
-            Ra_te = mat_slab.apply_tf_pair(mat_far, R0_te, fGHz); // the pair that forms the face
-            Ra_tm = mat_slab.apply_tf_pair(mat_far, R0_tm, fGHz);
+            Ra_te = mat_slab.apply_tf_pair(mat_far, R0_te, fGHz, !rare || far_closed); // the pair that forms the face
+            Ra_tm = mat_slab.apply_tf_pair(mat_far, R0_tm, fGHz, !rare || far_closed);
             r_te = std::polar(std::sqrt(Ra_te), std::arg(te));
             r_tm = std::polar(std::sqrt(Ra_tm), std::arg(tm));
 
@@ -1848,7 +1854,11 @@ namespace
             // step where that loss is zero. There the relation is kept in the complex reflection,
             // tm >= 0 handing in the forcing part: the tunnelled wave stays, tf scales it as it
             // scales a propagating one, and both end points of tf hold. The gate is the sheet,
-            // lossy or not, and tf on the pair; a face without tf keeps the branches below.
+            // lossy or not, with or without tf: at tf = 0 the form is the raw amplitude, which is
+            // what the characteristic matrix carries, so a sheet without tf tunnels as well. It is
+            // formed on the raw reflectance. Seen from a lossy medium the TM reflectance of such a
+            // face exceeds one, and clamped the sheet would be off the matrix; a closed far face
+            // keeps the clamp, as a traced solid holds a closed face at one.
             auto AMP = [](double R_tf, double R0, const std::complex<double> &t,
                           const std::complex<double> &r2, double tm) -> std::complex<double>
             {
@@ -1859,11 +1869,8 @@ namespace
                     return std::polar(std::sqrt((R_tf < 1.0) ? 1.0 - R_tf : 0.0), std::arg(t));
                 return t * std::sqrt(((R_tf < 1.0) ? 1.0 - R_tf : 0.0) / keep);
             };
-            const bool rare = !(mat_slab.m > 0.0) && std::abs(((mat_near.eta(fGHz) + mat_near.eta_resonance(fGHz)) * mat_near.mu(fGHz) /
-                                                               (eta_s_if * mu_s)) * sin2_i) >= 1.0;
-            const double stf = mat_slab.tf(fGHz);
-            const double cn = (rare && (stf != 0.0 || mat_near.tf(fGHz) != 0.0)) ? mat_slab.apply_tf_pair(mat_near, 0.0, fGHz) : -1.0;
-            const double cf = (rare && (stf != 0.0 || mat_far.tf(fGHz) != 0.0)) ? mat_slab.apply_tf_pair(mat_far, 0.0, fGHz) : -1.0;
+            const double cn = rare ? mat_slab.apply_tf_pair(mat_near, 0.0, fGHz) : -1.0;
+            const double cf = rare ? mat_slab.apply_tf_pair(mat_far, 0.0, fGHz) : -1.0;
             tns_te = AMP(Rn_te, R0n_te, tn_fwd[0], r2n[0], cn), tns_tm = AMP(Rn_tm, R0n_tm, tn_fwd[1], r2n[1], cn); // near -> slab
             tsn_te = AMP(Rn_te, R0n_te, tn_bwd[0], r2n[0], cn), tsn_tm = AMP(Rn_tm, R0n_tm, tn_bwd[1], r2n[1], cn); // slab -> near
             tsf_te = AMP(Rf_te, R0f_te, tf_out[0], r2f[0], cf), tsf_tm = AMP(Rf_tm, R0f_tm, tf_out[1], r2f[1], cf); // slab -> far
