@@ -1,7 +1,7 @@
 ---
 title: "MATLAB / Octave API Documentation for Quadriga-Lib v0.12.2"
 author: "Stephan Jaeckel"
-date: "09.10.2026"
+date: "12.10.2026"
 lang: en-US
 ---
 
@@ -96,10 +96,10 @@ lang: en-US
 | [sos_map](#sos_map) | Sum-of-sinusoids random number generator | 2817 |
 | [sos_preset](#sos_preset) | Sum-of-sinusoids random number generator | 2852 |
 | [sos_rand](#sos_rand) | Sum-of-sinusoids random number generator | 2891 |
-| [sos_randi](#sos_randi) | Sum-of-sinusoids random number generator | 2938 |
-| [sos_randn](#sos_randn) | Sum-of-sinusoids random number generator | 2986 |
-| [sos_remove_bias](#sos_remove_bias) | Sum-of-sinusoids random number generator | 3032 |
-| [sos_val](#sos_val) | Sum-of-sinusoids random number generator | 3099 |
+| [sos_randi](#sos_randi) | Sum-of-sinusoids random number generator | 2941 |
+| [sos_randn](#sos_randn) | Sum-of-sinusoids random number generator | 2992 |
+| [sos_remove_bias](#sos_remove_bias) | Sum-of-sinusoids random number generator | 3041 |
+| [sos_val](#sos_val) | Sum-of-sinusoids random number generator | 3110 |
 
 ---
 
@@ -2916,10 +2916,12 @@ val = quadriga_lib.sos_rand( dist_decorr, pos, pos_b, dist_decorr_b, preset, see
 
 ### Inputs:
 - **`dist_decorr`** — Decorrelation distances; one generator per entry; must be >= 0; `[n_gen]`
-- **`pos`** — Positions of the first device; rows are `{x, y, z}`; 1 to 3 columns;
-  `[n_pos, n_dim_pos]`
+- **`pos`** — Positions of the first device; one row per position; the number of columns sets the
+  number of dimensions: `[n_pos, 1]` = `{x}`, `[n_pos, 2]` = `{x, y}` or `[n_pos, 3]` = `{x, y, z}`;
+  coordinates that are not given are 0
 - **`pos_b`** *(optional)* — Positions of the second device; omitted or empty = one device;
-  1 to 3 columns; `[n_pos, n_dim_pos_b]`
+  `[n_pos, 1]`, `[n_pos, 2]` or `[n_pos, 3]` as for `pos`; the number of columns may differ from
+  `pos`
 - **`dist_decorr_b`** *(optional)* — Decorrelation distances of the second device; requires
   `pos_b`; must be >= 0; omitted or empty = same as `dist_decorr`; `[n_gen]`
 - **`preset`** — Name of the preset, see [sos_preset](#sos_preset); string; default: 'Comb256'
@@ -2927,7 +2929,8 @@ val = quadriga_lib.sos_rand( dist_decorr, pos, pos_b, dist_decorr_b, preset, see
   default: -1
 
 ### Output:
-- **`val`** — Values, approximately Uniform distributed between 0 and 1; one row per position, one column per generator; `[n_pos, n_gen]`
+- **`val`** — Values, approximately Uniform distributed between 0 and 1; one row per position, one
+  column per generator; `[n_pos, n_gen]`
 
 ### See also:
 - [sos_val](#sos_val) (evaluation with given frequencies and phases)
@@ -2963,11 +2966,13 @@ val = quadriga_lib.sos_randi( dist_decorr, pos, imax, pos_b, dist_decorr_b, pres
 
 ### Inputs:
 - **`dist_decorr`** — Decorrelation distances; one generator per entry; must be >= 0; `[n_gen]`
-- **`pos`** — Positions of the first device; rows are `{x, y, z}`; 1 to 3 columns;
-  `[n_pos, n_dim_pos]`
+- **`pos`** — Positions of the first device; one row per position; the number of columns sets the
+  number of dimensions: `[n_pos, 1]` = `{x}`, `[n_pos, 2]` = `{x, y}` or `[n_pos, 3]` = `{x, y, z}`;
+  coordinates that are not given are 0
 - **`imax`** — Largest value; must be > 0
 - **`pos_b`** *(optional)* — Positions of the second device; omitted or empty = one device;
-  1 to 3 columns; `[n_pos, n_dim_pos_b]`
+  `[n_pos, 1]`, `[n_pos, 2]` or `[n_pos, 3]` as for `pos`; the number of columns may differ from
+  `pos`
 - **`dist_decorr_b`** *(optional)* — Decorrelation distances of the second device; requires
   `pos_b`; must be >= 0; omitted or empty = same as `dist_decorr`; `[n_gen]`
 - **`preset`** — Name of the preset, see [sos_preset](#sos_preset); string; default: 'Comb256'
@@ -2975,7 +2980,8 @@ val = quadriga_lib.sos_randi( dist_decorr, pos, imax, pos_b, dist_decorr_b, pres
   default: -1
 
 ### Output:
-- **`val`** — Integer values from 1 to `imax`, each with approximately the same probability; returned as double; one row per position, one column per generator; `[n_pos, n_gen]`
+- **`val`** — Integer values from 1 to `imax`, each with approximately the same probability;
+  returned as double; one row per position, one column per generator; `[n_pos, n_gen]`
 
 ### See also:
 - [sos_val](#sos_val) (evaluation with given frequencies and phases)
@@ -3010,10 +3016,12 @@ val = quadriga_lib.sos_randn( dist_decorr, pos, pos_b, dist_decorr_b, preset, se
 
 ### Inputs:
 - **`dist_decorr`** — Decorrelation distances; one generator per entry; must be >= 0; `[n_gen]`
-- **`pos`** — Positions of the first device; rows are `{x, y, z}`; 1 to 3 columns;
-  `[n_pos, n_dim_pos]`
+- **`pos`** — Positions of the first device; one row per position; the number of columns sets the
+  number of dimensions: `[n_pos, 1]` = `{x}`, `[n_pos, 2]` = `{x, y}` or `[n_pos, 3]` = `{x, y, z}`;
+  coordinates that are not given are 0
 - **`pos_b`** *(optional)* — Positions of the second device; omitted or empty = one device;
-  1 to 3 columns; `[n_pos, n_dim_pos_b]`
+  `[n_pos, 1]`, `[n_pos, 2]` or `[n_pos, 3]` as for `pos`; the number of columns may differ from
+  `pos`
 - **`dist_decorr_b`** *(optional)* — Decorrelation distances of the second device; requires
   `pos_b`; must be >= 0; omitted or empty = same as `dist_decorr`; `[n_gen]`
 - **`preset`** — Name of the preset, see [sos_preset](#sos_preset); string; default: 'Comb256'
@@ -3021,7 +3029,8 @@ val = quadriga_lib.sos_randn( dist_decorr, pos, pos_b, dist_decorr_b, preset, se
   default: -1
 
 ### Output:
-- **`val`** — Values, approximately Normal distributed with zero mean and unit variance; one row per position, one column per generator; `[n_pos, n_gen]`
+- **`val`** — Values, approximately Normal distributed with zero mean and unit variance; one row
+  per position, one column per generator; `[n_pos, n_gen]`
 
 ### See also:
 - [sos_val](#sos_val) (evaluation with given frequencies and phases)
@@ -3069,10 +3078,12 @@ Remove the sample mean of sum-of-sinusoids generators over a set of positions
 ### Inputs:
 - **`freq`** — Frequencies in [1/m]; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
 - **`phase_in`** — Phases in [rad]; one column per generator; `[n_coeff, n_gen]`
-- **`pos`** — Positions of the first device; rows are `{x, y, z}`; `n_dim_pos` from 1 to `n_dim`;
-  `[n_pos, n_dim_pos]`
+- **`pos`** — Positions of the first device; one row per position; the number of columns sets the
+  number of dimensions: `[n_pos, 1]` = `{x}`, `[n_pos, 2]` = `{x, y}` or `[n_pos, 3]` = `{x, y, z}`;
+  coordinates that are not given are 0; not more columns than `freq`
 - **`pos_b`** *(optional)* — Positions of the second device; omitted or empty = one device;
-  `[n_pos_b, n_dim_pos_b]`; `n_pos_b = n_pos` for the same map, any number for different maps
+  `[n_pos_b, 1]`, `[n_pos_b, 2]` or `[n_pos_b, 3]` as for `pos`; `n_pos_b = n_pos` for the same map,
+  any number for different maps
 - **`phase_b_in`** *(optional)* — Phases of the second device in [rad]; requires `pos_b`; omitted
   or empty = same map; `[n_coeff, n_gen]`
 - **`acf`** *(optional)* — Target ACF; required for two devices on the same map; `[n_acf]`
@@ -3107,8 +3118,8 @@ Spatially correlated random values at given positions
   frequencies were fitted to; with many sinusoids the values are approximately Normal distributed
 - All generators of one call share the frequencies; each column of `phase` is one generator. The
   sines and cosines of the positions are computed once and reused for all generators
-- Positions are given as rows `{x, y, z}`; they may have fewer columns than `freq`; missing
-  coordinates are 0
+- Positions are given as one row per position with the columns `{x, y, z}`; they may have fewer
+  columns than `freq`; missing coordinates are 0
 - One device (`pos_b` omitted): `val = s(pos)`
 - Two devices on the same map (`pos_b` given, `phase_b` omitted): both devices use `phase`;
   `val = ( s(pos) + s(pos_b) ) / sqrt( 2 + 2·A(D) )`, where `D` is the distance between `pos` and
@@ -3136,9 +3147,12 @@ val = quadriga_lib.sos_val( freq, phase, pos, pos_b, phase_b, acf, dist, freq_sc
 ### Inputs:
 - **`freq`** — Frequencies in [1/m]; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
 - **`phase`** — Phases in [rad]; one column per generator; `[n_coeff, n_gen]`
-- **`pos`** — Positions of the first device; `n_dim_pos` from 1 to `n_dim`; `[n_pos, n_dim_pos]`
+- **`pos`** — Positions of the first device; one row per position; the number of columns sets the
+  number of dimensions: `[n_pos, 1]` = `{x}`, `[n_pos, 2]` = `{x, y}` or `[n_pos, 3]` = `{x, y, z}`;
+  coordinates that are not given are 0; not more columns than `freq`
 - **`pos_b`** *(optional)* — Positions of the second device; omitted or empty = one device;
-  `[n_pos, n_dim_pos_b]`
+  `[n_pos, 1]`, `[n_pos, 2]` or `[n_pos, 3]` as for `pos`; the number of columns may differ from
+  `pos`
 - **`phase_b`** *(optional)* — Phases of the second device in [rad]; requires `pos_b`; omitted or
   empty = same map; `[n_coeff, n_gen]`
 - **`acf`** *(optional)* — Target ACF; required for two devices on the same map; `[n_acf]`

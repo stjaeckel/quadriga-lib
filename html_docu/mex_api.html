@@ -3816,8 +3816,8 @@ val = quadriga_lib.sos_rand( dist_decorr, pos, pos_b, dist_decorr_b, preset, see
 <b>Inputs:</b><br>
 <ul>
 <li><b><code>dist_decorr</code></b> — Decorrelation distances; one generator per entry; must be >= 0; <code>[n_gen]</code></li>
-<li><b><code>pos</code></b> — Positions of the first device; rows are <code>{x, y, z}</code>; 1 to 3 columns; <code>[n_pos, n_dim_pos]</code></li>
-<li><b><code>pos_b</code></b> <i>(optional)</i> — Positions of the second device; omitted or empty = one device; 1 to 3 columns; <code>[n_pos, n_dim_pos_b]</code></li>
+<li><b><code>pos</code></b> — Positions of the first device; one row per position; the number of columns sets the number of dimensions: <code>[n_pos, 1]</code> = <code>{x}</code>, <code>[n_pos, 2]</code> = <code>{x, y}</code> or <code>[n_pos, 3]</code> = <code>{x, y, z}</code>; coordinates that are not given are 0</li>
+<li><b><code>pos_b</code></b> <i>(optional)</i> — Positions of the second device; omitted or empty = one device; <code>[n_pos, 1]</code>, <code>[n_pos, 2]</code> or <code>[n_pos, 3]</code> as for <code>pos</code>; the number of columns may differ from <code>pos</code></li>
 <li><b><code>dist_decorr_b</code></b> <i>(optional)</i> — Decorrelation distances of the second device; requires <code>pos_b</code>; must be >= 0; omitted or empty = same as <code>dist_decorr</code>; <code>[n_gen]</code></li>
 <li><b><code>preset</code></b> — Name of the preset, see <a href="#sos_preset">sos_preset</a>; string; default: 'Comb256'</li>
 <li><b><code>seed</code></b> — Seed of the phases; must be >= -1; -1 seeds from the system random device; default: -1</li>
@@ -3859,9 +3859,9 @@ val = quadriga_lib.sos_randi( dist_decorr, pos, imax, pos_b, dist_decorr_b, pres
 <b>Inputs:</b><br>
 <ul>
 <li><b><code>dist_decorr</code></b> — Decorrelation distances; one generator per entry; must be >= 0; <code>[n_gen]</code></li>
-<li><b><code>pos</code></b> — Positions of the first device; rows are <code>{x, y, z}</code>; 1 to 3 columns; <code>[n_pos, n_dim_pos]</code></li>
+<li><b><code>pos</code></b> — Positions of the first device; one row per position; the number of columns sets the number of dimensions: <code>[n_pos, 1]</code> = <code>{x}</code>, <code>[n_pos, 2]</code> = <code>{x, y}</code> or <code>[n_pos, 3]</code> = <code>{x, y, z}</code>; coordinates that are not given are 0</li>
 <li><b><code>imax</code></b> — Largest value; must be > 0</li>
-<li><b><code>pos_b</code></b> <i>(optional)</i> — Positions of the second device; omitted or empty = one device; 1 to 3 columns; <code>[n_pos, n_dim_pos_b]</code></li>
+<li><b><code>pos_b</code></b> <i>(optional)</i> — Positions of the second device; omitted or empty = one device; <code>[n_pos, 1]</code>, <code>[n_pos, 2]</code> or <code>[n_pos, 3]</code> as for <code>pos</code>; the number of columns may differ from <code>pos</code></li>
 <li><b><code>dist_decorr_b</code></b> <i>(optional)</i> — Decorrelation distances of the second device; requires <code>pos_b</code>; must be >= 0; omitted or empty = same as <code>dist_decorr</code>; <code>[n_gen]</code></li>
 <li><b><code>preset</code></b> — Name of the preset, see <a href="#sos_preset">sos_preset</a>; string; default: 'Comb256'</li>
 <li><b><code>seed</code></b> — Seed of the phases; must be >= -1; -1 seeds from the system random device; default: -1</li>
@@ -3902,8 +3902,8 @@ val = quadriga_lib.sos_randn( dist_decorr, pos, pos_b, dist_decorr_b, preset, se
 <b>Inputs:</b><br>
 <ul>
 <li><b><code>dist_decorr</code></b> — Decorrelation distances; one generator per entry; must be >= 0; <code>[n_gen]</code></li>
-<li><b><code>pos</code></b> — Positions of the first device; rows are <code>{x, y, z}</code>; 1 to 3 columns; <code>[n_pos, n_dim_pos]</code></li>
-<li><b><code>pos_b</code></b> <i>(optional)</i> — Positions of the second device; omitted or empty = one device; 1 to 3 columns; <code>[n_pos, n_dim_pos_b]</code></li>
+<li><b><code>pos</code></b> — Positions of the first device; one row per position; the number of columns sets the number of dimensions: <code>[n_pos, 1]</code> = <code>{x}</code>, <code>[n_pos, 2]</code> = <code>{x, y}</code> or <code>[n_pos, 3]</code> = <code>{x, y, z}</code>; coordinates that are not given are 0</li>
+<li><b><code>pos_b</code></b> <i>(optional)</i> — Positions of the second device; omitted or empty = one device; <code>[n_pos, 1]</code>, <code>[n_pos, 2]</code> or <code>[n_pos, 3]</code> as for <code>pos</code>; the number of columns may differ from <code>pos</code></li>
 <li><b><code>dist_decorr_b</code></b> <i>(optional)</i> — Decorrelation distances of the second device; requires <code>pos_b</code>; must be >= 0; omitted or empty = same as <code>dist_decorr</code>; <code>[n_gen]</code></li>
 <li><b><code>preset</code></b> — Name of the preset, see <a href="#sos_preset">sos_preset</a>; string; default: 'Comb256'</li>
 <li><b><code>seed</code></b> — Seed of the phases; must be >= -1; -1 seeds from the system random device; default: -1</li>
@@ -3947,8 +3947,8 @@ Remove the sample mean of sum-of-sinusoids generators over a set of positions
 <ul>
 <li><b><code>freq</code></b> — Frequencies in [1/m]; <code>n_dim</code> = 1, 2 or 3; <code>[n_coeff, n_dim]</code></li>
 <li><b><code>phase_in</code></b> — Phases in [rad]; one column per generator; <code>[n_coeff, n_gen]</code></li>
-<li><b><code>pos</code></b> — Positions of the first device; rows are <code>{x, y, z}</code>; <code>n_dim_pos</code> from 1 to <code>n_dim</code>; <code>[n_pos, n_dim_pos]</code></li>
-<li><b><code>pos_b</code></b> <i>(optional)</i> — Positions of the second device; omitted or empty = one device; <code>[n_pos_b, n_dim_pos_b]</code>; <code>n_pos_b = n_pos</code> for the same map, any number for different maps</li>
+<li><b><code>pos</code></b> — Positions of the first device; one row per position; the number of columns sets the number of dimensions: <code>[n_pos, 1]</code> = <code>{x}</code>, <code>[n_pos, 2]</code> = <code>{x, y}</code> or <code>[n_pos, 3]</code> = <code>{x, y, z}</code>; coordinates that are not given are 0; not more columns than <code>freq</code></li>
+<li><b><code>pos_b</code></b> <i>(optional)</i> — Positions of the second device; omitted or empty = one device; <code>[n_pos_b, 1]</code>, <code>[n_pos_b, 2]</code> or <code>[n_pos_b, 3]</code> as for <code>pos</code>; <code>n_pos_b = n_pos</code> for the same map, any number for different maps</li>
 <li><b><code>phase_b_in</code></b> <i>(optional)</i> — Phases of the second device in [rad]; requires <code>pos_b</code>; omitted or empty = same map; <code>[n_coeff, n_gen]</code></li>
 <li><b><code>acf</code></b> <i>(optional)</i> — Target ACF; required for two devices on the same map; <code>[n_acf]</code></li>
 <li><b><code>dist</code></b> <i>(optional)</i> — Sample points of the ACF; must start at 0 and increase strictly; <code>[n_acf]</code></li>
@@ -3976,7 +3976,7 @@ Spatially correlated random values at given positions
 <li>Sum-of-sinusoids generator: at position <code>x</code> a generator with <code>n_coeff</code> sinusoids produces <code>s(x) = sqrt(2/n_coeff) · sum_n cos( 2·pi · f_n·x + phi_n )</code>, with the frequencies <code>f_n</code> (rows of <code>freq</code>) and the phases <code>phi_n</code> (one column of <code>phase</code>)</li>
 <li>For uniformly random phases, <code>s</code> has zero mean, unit variance and the autocorrelation function (ACF) <code>(1/n_coeff) · sum_n cos( 2·pi · f_n·dx )</code>, which approximates the target ACF the frequencies were fitted to; with many sinusoids the values are approximately Normal distributed</li>
 <li>All generators of one call share the frequencies; each column of <code>phase</code> is one generator. The sines and cosines of the positions are computed once and reused for all generators</li>
-<li>Positions are given as rows <code>{x, y, z}</code>; they may have fewer columns than <code>freq</code>; missing coordinates are 0</li>
+<li>Positions are given as one row per position with the columns <code>{x, y, z}</code>; they may have fewer columns than <code>freq</code>; missing coordinates are 0</li>
 <li>One device (<code>pos_b</code> omitted): <code>val = s(pos)</code></li>
 <li>Two devices on the same map (<code>pos_b</code> given, <code>phase_b</code> omitted): both devices use <code>phase</code>; <code>val = ( s(pos) + s(pos_b) ) / sqrt( 2 + 2·A(D) )</code>, where <code>D</code> is the distance between <code>pos</code> and <code>pos_b</code> and <code>A</code> the target ACF interpolated as in <a href="#sos_acfi">sos_acfi</a>; <code>acf</code> and <code>dist</code> are required. The value does not change when the two devices swap their positions</li>
 <li>Two devices on different maps (<code>pos_b</code> and <code>phase_b</code> given): <code>val = ( s_a(pos) + s_b(pos_b) ) / sqrt(2)</code>; <code>s_b</code> uses <code>phase_b</code> and the frequencies <code>freq · freq_scale_b</code>; <code>acf</code> and <code>dist</code> are ignored</li>
@@ -3997,8 +3997,8 @@ val = quadriga_lib.sos_val( freq, phase, pos, pos_b, phase_b, acf, dist, freq_sc
 <ul>
 <li><b><code>freq</code></b> — Frequencies in [1/m]; <code>n_dim</code> = 1, 2 or 3; <code>[n_coeff, n_dim]</code></li>
 <li><b><code>phase</code></b> — Phases in [rad]; one column per generator; <code>[n_coeff, n_gen]</code></li>
-<li><b><code>pos</code></b> — Positions of the first device; <code>n_dim_pos</code> from 1 to <code>n_dim</code>; <code>[n_pos, n_dim_pos]</code></li>
-<li><b><code>pos_b</code></b> <i>(optional)</i> — Positions of the second device; omitted or empty = one device; <code>[n_pos, n_dim_pos_b]</code></li>
+<li><b><code>pos</code></b> — Positions of the first device; one row per position; the number of columns sets the number of dimensions: <code>[n_pos, 1]</code> = <code>{x}</code>, <code>[n_pos, 2]</code> = <code>{x, y}</code> or <code>[n_pos, 3]</code> = <code>{x, y, z}</code>; coordinates that are not given are 0; not more columns than <code>freq</code></li>
+<li><b><code>pos_b</code></b> <i>(optional)</i> — Positions of the second device; omitted or empty = one device; <code>[n_pos, 1]</code>, <code>[n_pos, 2]</code> or <code>[n_pos, 3]</code> as for <code>pos</code>; the number of columns may differ from <code>pos</code></li>
 <li><b><code>phase_b</code></b> <i>(optional)</i> — Phases of the second device in [rad]; requires <code>pos_b</code>; omitted or empty = same map; <code>[n_coeff, n_gen]</code></li>
 <li><b><code>acf</code></b> <i>(optional)</i> — Target ACF; required for two devices on the same map; <code>[n_acf]</code></li>
 <li><b><code>dist</code></b> <i>(optional)</i> — Sample points of the ACF; must start at 0 and increase strictly; <code>[n_acf]</code></li>
