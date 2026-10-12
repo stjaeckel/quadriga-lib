@@ -4681,3 +4681,113 @@ TEST_CASE("ray_progress - an ordered stack leaves the ray on the line it arrived
                         }
                 }
 }
+
+TEST_CASE("ray_progress - a coherent sheet with tf that is rarer than the invariant passes no more than it received")
+{
+#ifdef _OPENMP
+    struct OneThread
+    {
+        int n = omp_get_max_threads();
+        OneThread() { omp_set_num_threads(1); }
+        ~OneThread() { omp_set_num_threads(n); }
+    } one_thread;
+#endif
+    // A wall of 10 mm + 12 mm of eps 2.50 - j ei with a sheet of 6 mm eps 0.31 in it, which is past
+    // its critical angle from 33.83 deg, and tf on the sheet or on the host. One ray through
+    // ray_progress, float, a band of 1 and 2 GHz, no reflections followed: the path behind the wall
+    // is its entry, the sheet and its exit. A passive wall passes no more than it received, at
+    // every loss of the host, continuously as the loss goes to zero. EM materials: tf, no mass column.
+    const double PI = 3.14159265358979323846;
+    typedef std::unordered_map<std::string, std::vector<float>> Pal;
+    struct Out
+    {
+        bool found = false;
+        double p[2] = {-999.0, -999.0}; // dB per frequency, VV; and HH in EM
+        double h[2] = {-999.0, -999.0};
+    };
+    auto trace = [&](double ei, double tS, double tH, double thd, bool refr, bool scalar) -> Out
+    {
+        Pal pal; // 1 the sheet, 2 the host
+        pal["a"] = {0.31f, 2.50f};
+        pal["b"] = {0.0f, 0.0f};
+        pal["c"] = {0.0f, (float)(ei / 17.98)};
+        pal["d"] = {1.0f, 1.0f};
+        pal["fRef"] = {1.0f, 1.0f};
+        pal["thk"] = {0.006f, 0.0f};
+        pal["tf"] = {(float)tS, (float)tH};
+        const float h = 200.0f, xs[3] = {0.0f, 0.010f, 0.022f};
+        const int mat[3] = {2, 1, 2};
+        arma::fmat mesh(6, 9);
+        arma::uvec mi(6);
+        for (int k = 0; k < 3; ++k)
+        {
+            const float x = xs[k];
+            if (k < 2)
+                mesh.row(2 * k) = arma::frowvec{x, -h, -h, x, -h, h, x, h, -h}, mesh.row(2 * k + 1) = arma::frowvec{x, h, -h, x, -h, h, x, h, h};
+            else
+                mesh.row(2 * k) = arma::frowvec{x, -h, -h, x, h, -h, x, -h, h}, mesh.row(2 * k + 1) = arma::frowvec{x, h, -h, x, h, h, x, -h, h};
+            mi(2 * k) = (arma::uword)mat[k], mi(2 * k + 1) = (arma::uword)mat[k];
+        }
+        const size_t nf = 2;
+        const double th = thd * PI / 180.0;
+        const float Ox = -1.0f, Oy = 0.37f - (float)std::tan(th), Oz = 0.0f, r0 = 0.1f, len = 300.0f;
+        arma::frowvec k = {(float)std::cos(th), (float)std::sin(th), 0.0f};
+        arma::fvec cf = {1.0e9f, 2.0e9f};
+        arma::fmat orig(1, 3), dest(1, 3), acc(1, 1 + nf, arma::fill::zeros);
+        orig.row(0) = arma::frowvec{Ox, Oy, Oz} + r0 * k, dest.row(0) = arma::frowvec{Ox, Oy, Oz} + (r0 + len) * k;
+        arma::fcube pd(1, 3, nf);
+        for (size_t q = 0; q < nf; ++q)
+            pd.slice(q) = k;
+        arma::Col<short> prev(1, arma::fill::zeros), cur(1, arma::fill::zeros), buf(1, arma::fill::zeros);
+        std::vector<quadriga_lib::path> paths(1);
+        paths[0].init(0, nf, scalar);
+        paths[0].set_length(r0);
+        Out O;
+        for (int g = 0; g < 5; ++g)
+        {
+            quadriga_lib::ray_progress(mesh, mi, pal, cf, Ox, Oy, Oz, orig, dest, prev, cur, buf, pd, acc, paths, nullptr, nullptr, nullptr, nullptr,
+                                       20, (uint8_t)0, 10, (uint8_t)0, -300.0f, 3.0f, 0.15f, refr, scalar);
+            if (orig.n_rows == 0)
+                break;
+            if (cur(0) == 0 && paths[0].n_seg() == 3) // in air behind the wall
+            {
+                O.found = true;
+                for (size_t q = 0; q < nf; ++q)
+                {
+                    const float *xc = paths[0].xpr_coeff(q);
+                    O.p[q] = 10.0 * std::log10((double)xc[0] * xc[0] + (double)xc[1] * xc[1] + 1.0e-300);
+                    if (!scalar)
+                        O.h[q] = 10.0 * std::log10((double)xc[6] * xc[6] + (double)xc[7] * xc[7] + 1.0e-300);
+                }
+                break;
+            }
+        }
+        return O;
+    };
+    QD_DIAG("\n# diag: ray_progress rare sheet, air | 10 mm eps 2.50 - j ei | S 6 mm eps 0.31 | 12 mm | air, the transmitted path, dB, float.\n");
+    QD_DIAG("# tf on the sheet or on the host. scalar: P at 1 and 2 GHz; EM: VV and HH at 1 GHz\n");
+    QD_DIAG("mode,tracer,tf_on,tf,theta,ei,found,P_1GHz,P_2GHz_or_HH\n");
+    const double losses[5] = {0.8, 0.1, 1.0e-3, 1.0e-6, 0.0};
+    for (bool scalar : {true, false})
+        for (bool refr : {true, false})
+            for (int cfg = 0; cfg < 3; ++cfg) // sheet 0.5, sheet -0.5, host 0.5
+                for (double thd : {45.0, 60.0})
+                {
+                    const double tS = (cfg == 0) ? 0.5 : ((cfg == 1) ? -0.5 : 0.0), tH = (cfg == 2) ? 0.5 : 0.0;
+                    double A[5], B[5];
+                    for (int q = 0; q < 5; ++q)
+                    {
+                        Out O = trace(losses[q], tS, tH, thd, refr, scalar);
+                        A[q] = O.p[0], B[q] = scalar ? O.p[1] : O.h[0];
+                        QD_DIAG("%s,%d,%s,%.1f,%.0f,%.0e,%d,%.4f,%.4f\n", scalar ? "scalar" : "EM", refr ? 5 : 4, cfg == 2 ? "host" : "sheet", cfg == 2 ? tH : tS, thd, losses[q], (int)O.found, A[q], B[q]);
+                        INFO("rare sheet, " << (scalar ? "scalar" : "EM") << ", refr " << refr << ", cfg " << cfg << ", theta " << thd << ", ei " << losses[q]);
+                        CHECK(O.found);       // the wave tunnels: the path is there, with either sign of tf
+                        CHECK(A[q] < 1.0e-4); // and carries no more than was launched
+                        CHECK(B[q] < 1.0e-4);
+                        CHECK(A[q] > -40.0);
+                    }
+                    INFO("rare sheet, continuity at zero loss, scalar " << scalar << ", refr " << refr << ", cfg " << cfg << ", theta " << thd);
+                    CHECK(std::abs(A[3] - A[4]) < 1.0e-2); // ei 1e-6 against ei 0
+                    CHECK(std::abs(B[3] - B[4]) < 1.0e-2);
+                }
+}

@@ -3242,6 +3242,21 @@ static inline double diag_tf_port(std::complex<double> &r, double tf, double tf_
     return (1.0 - R0 > 1.0e-9) ? std::sqrt((1.0 - Rt) / (1.0 - R0)) : 0.0;
 }
 
+// The same boundary where the sheet is rarer than the transverse invariant. The wave in the sheet
+// is evanescent, or strongly damped, and tunnels, so 1 - R0 is not what the face passes and the
+// quotient above is a gain. What the rule stands for is a relation between the two crossings of
+// one face, t' t'_b = (1 - tf-) (1 - r_leak^2) with r_leak^2 = (1 - tfA+) (1 - tfB+) r^2, and it is
+// kept in the complex reflection. For a real reflection below one this is the factor above.
+static inline std::complex<double> diag_tf_port_rare(std::complex<double> &r, double tf, double tf_other = 0.0)
+{
+    const double ap = (tf > 0.0) ? tf : 0.0, am = (tf < 0.0) ? -tf : 0.0;
+    const double bp = (tf_other > 0.0) ? tf_other : 0.0, bm = (tf_other < 0.0) ? -tf_other : 0.0;
+    const std::complex<double> r2 = r * r;
+    const double R0 = std::norm(r), Rt = diag_tf_pair(R0, tf, tf_other);
+    r = (R0 > 0.0) ? r * std::sqrt(Rt / R0) : std::complex<double>(0.0, 0.0);
+    return std::sqrt((1.0 - ((am > bm) ? am : bm)) * (1.0 - (1.0 - ap) * (1.0 - bp) * r2) / (1.0 - r2));
+}
+
 static inline DiagSheet diag_sheet_composite(std::complex<double> e_near, std::complex<double> e_slab,
                                              std::complex<double> e_far, double thk, double ct,
                                              double f_hz, bool disp_far, bool scalar,
@@ -3304,7 +3319,19 @@ static inline DiagSheet diag_sheet_composite(std::complex<double> e_near, std::c
 
     // The sheet's tf, on both of its faces. Skipped outright at tf = 0, so that case executes
     // nothing it did not execute before.
-    if (lump.tf != 0.0 || lump.tf_near != 0.0 || lump.tf_far != 0.0)
+    if ((lump.tf != 0.0 || lump.tf_near != 0.0 || lump.tf_far != 0.0) && std::abs((w_near / (i_slab * mu_slab)) * s2) >= 1.0)
+    {
+        // A sheet rarer than the invariant: each face whose pair carries tf, in the continued form
+        const bool n = lump.tf != 0.0 || lump.tf_near != 0.0, fr = lump.tf != 0.0 || lump.tf_far != 0.0;
+        const std::complex<double> one(1.0, 0.0);
+        std::complex<double> kn_te = n ? diag_tf_port_rare(r_ns_te, lump.tf, lump.tf_near) : one,
+                             kn_tm = n ? diag_tf_port_rare(r_ns_tm, lump.tf, lump.tf_near) : one;
+        std::complex<double> kf_te = fr ? diag_tf_port_rare(r_sf_te, lump.tf, lump.tf_far) : one,
+                             kf_tm = fr ? diag_tf_port_rare(r_sf_tm, lump.tf, lump.tf_far) : one;
+        t_ns_te *= kn_te, t_sn_te *= kn_te, t_sf_te *= kf_te;
+        t_ns_tm *= kn_tm, t_sn_tm *= kn_tm, t_sf_tm *= kf_tm;
+    }
+    else if (lump.tf != 0.0 || lump.tf_near != 0.0 || lump.tf_far != 0.0)
     {
         double kn_te = diag_tf_port(r_ns_te, lump.tf, lump.tf_near),
                kn_tm = diag_tf_port(r_ns_tm, lump.tf, lump.tf_near);
@@ -17741,4 +17768,328 @@ TEST_CASE("Stack geometry - an ordered stack leaves the ray on the line it arriv
                     CHECK(E.rt == 69);
                     CHECK(d_own < 1.0e-12); // one own coefficient for the bent and the undeviated type
                 }
+}
+
+TEST_CASE("Rare sheet - a coherent sheet with tf that is rarer than the invariant passes no more than it received")
+{
+    ub::OneThread one_thread;
+    // A sheet without the mass column whose permittivity is below the transverse invariant carries
+    // an evanescent wave, or for a lossy sheet a strongly damped one, and the Fresnel reflectance
+    // of its faces is close to one for a reason that is not a missing forward port: the wave
+    // tunnels. The pair rule rescales a raw amplitude by (1 - R') / (1 - R0), which there is a
+    // gain: 20 dB per decade of whatever loss keeps 1 - R0 off zero, the host's or the sheet's
+    // own, and a step where it is zero. The rule continued past the critical angle keeps the
+    // relation the rescale stands for below it, t' t'_b = (1 - tf-) (1 - r_leak^2), written in the
+    // complex reflection, so the tunnelled wave stays and tf acts on it as it acts on a
+    // propagating one. Everything runs through ray_triangle_intersect, ray_mesh_interact and
+    // ray_state_update. S is 6 mm of eps 0.31 - j es, past its critical angle from 33.83 deg in
+    // every medium entered from air. These are EM materials: tf, no mass column.
+    //
+    // A. The sheet inside a host: every loss of the host, both signs of tf, tf on the host, scalar and EM
+    // B. The sheet with a loss of its own, inside a host and in air
+    // C. The sheet as a lining, on the near and on the far face of a host
+    // D. The core: the sheet in an ordered stack, both orders, in air and inside the host
+    // E. Under a closed outer pair: the reflect port; the leak chain with every digit
+    // F. Twins that must not move, with every digit
+    const double f = FRQ, gap = 1.0e-5, d1 = 0.010, d2 = 0.012, ZERO = 1.0e-9;
+    const double losses[5] = {0.8, 0.1, 1.0e-3, 1.0e-6, 0.0};
+    auto lin = [](double x) { return std::pow(10.0, 0.1 * x); };
+    auto lvl = [](const std::vector<ub::Ev> &v, size_t n, int k) { return (v.size() == n) ? ub::dB(cpx(v[n - 1].xpr, 0, k)) : -999.0; };
+    auto refl = [](int tr) { return (tr == 4 || tr == 5) ? 3 : 0; };
+    // The sheet event inside a host, 10 mm in front and 12 mm behind: both ports, with the host leg in front
+    auto inside = [&](const ub::Pal &P, int tr, double thd, int k, double &T, double &R)
+    {
+        arma::uvec mi;
+        arma::mat mesh = ub::build({0.0, d1, d1 + d2}, {2, 1, 2}, {false, false, true}, mi);
+        T = lvl(ub::chain(P, mesh, mi, {tr, tr}, f, thd, {1.5}), 2, k), R = lvl(ub::chain(P, mesh, mi, {tr, refl(tr)}, f, thd, {1.5}), 2, k);
+    };
+
+    // ------------------------------------------------------------------------------------------
+    // A. Inside a host
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: rare sheet A, S 6 mm eps 0.31 inside 10 mm + 12 mm of eps 2.50 - j ei, the sheet event with its host leg, dB.\n");
+    QD_DIAG("# tf: on the sheet, or on the host where the sheet has none. k: 0 scalar / VV (TE), 3 HH (TM). sum: T + R, linear\n");
+    QD_DIAG("type,k,tf_on,tf,theta,ei,T,R,sum\n");
+    for (int tr : {4, 5, 1, 2})
+        for (int k : {0, 3})
+        {
+            if (tr > 2 && k)
+                continue;
+            for (int cfg = 0; cfg < 4; ++cfg) // sheet 0.5, sheet 0.1, sheet -0.5, host 0.5
+                for (double thd : {45.0, 60.0, 75.0})
+                {
+                    const double tS = (cfg == 0) ? 0.5 : ((cfg == 1) ? 0.1 : ((cfg == 2) ? -0.5 : 0.0)), tH = (cfg == 3) ? 0.5 : 0.0;
+                    double Tl[5], Rl[5];
+                    for (int q = 0; q < 5; ++q)
+                    {
+                        ub::Pal P = lump_palette({{0.31, 0.0, 0.006, 0.0, tS}, {2.50, losses[q], 0.0, 0.0, tH}});
+                        inside(P, tr, thd, k, Tl[q], Rl[q]);
+                        QD_DIAG("%d,%d,%s,%.1f,%.0f,%.0e,%.4f,%.4f,%.6f\n", tr, k, cfg == 3 ? "host" : "sheet", cfg == 3 ? tH : tS, thd, losses[q], Tl[q], Rl[q], lin(Tl[q]) + lin(Rl[q]));
+                        INFO("A, type " << tr << ", k " << k << ", cfg " << cfg << ", theta " << thd << ", ei " << losses[q]);
+                        CHECK(Tl[q] < ZERO); // no more than it received, on either port and on their sum
+                        CHECK(Rl[q] < ZERO);
+                        CHECK(lin(Tl[q]) + lin(Rl[q]) < 1.0 + 1.0e-9);
+                    }
+                    INFO("A, continuity at zero loss, type " << tr << ", k " << k << ", cfg " << cfg << ", theta " << thd);
+                    CHECK(std::abs(Tl[3] - Tl[4]) < 1.0e-3); // ei 1e-6 against ei 0
+                    CHECK(std::abs(Rl[3] - Rl[4]) < 1.0e-3);
+                }
+        }
+
+    QD_DIAG("\n# diag: rare sheet A2, tf to zero, the same event at 45 deg, EM type 1. In a lossy host the TE channel of the sheet without tf is the\n");
+    QD_DIAG("# tunnelled wave and a tf of 1e-9 has to sit on it. TM and the lossless host read nothing without tf: the flat branch, recorded\n");
+    QD_DIAG("ei,tf,T_te,R_te,T_tm,R_tm\n");
+    for (double ei : {0.8, 1.0e-3, 0.0})
+    {
+        double T0 = 0.0, R0 = 0.0;
+        for (double tS : {0.0, 1.0e-9, -1.0e-9, 1.0e-3, -1.0e-3, 0.1, -0.1})
+        {
+            ub::Pal P = lump_palette({{0.31, 0.0, 0.006, 0.0, tS}, {2.50, ei, 0.0}});
+            double T, R, Tm, Rm;
+            inside(P, 1, 45.0, 0, T, R), inside(P, 1, 45.0, 3, Tm, Rm);
+            QD_DIAG("%.0e,%.0e,%.4f,%.4f,%.4f,%.4f\n", ei, tS, T, R, Tm, Rm);
+            if (tS == 0.0)
+                T0 = T, R0 = R;
+            INFO("A2, ei " << ei << ", tf " << tS);
+            CHECK(T < ZERO);
+            CHECK(Tm < ZERO);
+            if (ei > 0.0 && std::abs(tS) == 1.0e-9)
+            {
+                CHECK(std::abs(T - T0) < 1.0e-6); // continuous in tf at zero, where the row without tf tunnels
+                CHECK(std::abs(R - R0) < 1.0e-6);
+            }
+            if (ei > 0.0 && std::abs(tS) > 0.0)
+                CHECK(T > -3.0); // and the tunnelled wave is not dropped for a small tf
+        }
+    }
+
+    QD_DIAG("\n# diag: rare sheet A3, across the critical angle of the sheet, 33.83 deg, tf 0.5 on the sheet, scalar\n");
+    QD_DIAG("ei,theta,T,R,sum\n");
+    for (double ei : {0.8, 1.0e-3, 0.0})
+    {
+        double Tb = 0.0;
+        for (double thd : {33.0, 33.80, 33.87, 34.5, 36.0})
+        {
+            ub::Pal P = lump_palette({{0.31, 0.0, 0.006, 0.0, 0.5}, {2.50, ei, 0.0}});
+            double T, R;
+            inside(P, 4, thd, 0, T, R);
+            QD_DIAG("%.0e,%.2f,%.4f,%.4f,%.6f\n", ei, thd, T, R, lin(T) + lin(R));
+            INFO("A3, ei " << ei << ", theta " << thd);
+            CHECK(T < ZERO);
+            CHECK(lin(T) + lin(R) < 1.0 + 1.0e-9); // the two ports of one sheet
+            if (thd == 33.80)
+                Tb = T;
+            if (thd == 33.87)
+                CHECK(std::abs(T - Tb) < 0.5); // no step where the wave in the sheet becomes evanescent
+        }
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // B. A loss of its own
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: rare sheet B, S 6 mm eps 0.31 - j es with tf, inside eps 2.50 - 0.80j, inside eps 2.50, and alone in air, scalar, dB.\n");
+    QD_DIAG("# sum is recorded: for a lossy sheet with tf the two ports are not bounded by one together, which is an issue of its own\n");
+    QD_DIAG("where,tf,theta,es,T,R,sum\n");
+    for (int where = 0; where < 3; ++where)
+        for (double tS : {0.5, -0.5})
+            for (double thd : {45.0, 60.0})
+            {
+                double Tl[5], Rl[5];
+                const double es[5] = {0.2, 1.0e-2, 1.0e-3, 1.0e-6, 0.0};
+                for (int q = 0; q < 5; ++q)
+                {
+                    ub::Pal P = lump_palette({{0.31, es[q], 0.006, 0.0, tS}, {2.50, where == 0 ? 0.8 : 0.0, 0.0}});
+                    if (where < 2)
+                        inside(P, 4, thd, 0, Tl[q], Rl[q]);
+                    else
+                    {
+                        arma::uvec mi;
+                        arma::mat mesh = ub::build({0.0}, {1}, {false}, mi);
+                        Tl[q] = lvl(ub::chain(P, mesh, mi, {4}, f, thd, {1.5}), 1, 0), Rl[q] = lvl(ub::chain(P, mesh, mi, {3}, f, thd, {1.5}), 1, 0);
+                    }
+                    QD_DIAG("%s,%.1f,%.0f,%.0e,%.4f,%.4f,%.6f\n", where == 0 ? "host 2.50-0.80j" : (where == 1 ? "host 2.50" : "air"), tS, thd, es[q], Tl[q], Rl[q], lin(Tl[q]) + lin(Rl[q]));
+                    INFO("B, where " << where << ", tf " << tS << ", theta " << thd << ", es " << es[q]);
+                    CHECK(Tl[q] < ZERO);
+                    CHECK(Rl[q] < ZERO);
+                }
+                INFO("B, continuity at zero loss of the sheet, where " << where << ", tf " << tS << ", theta " << thd);
+                CHECK(std::abs(Tl[3] - Tl[4]) < 1.0e-3);
+                CHECK(std::abs(Rl[3] - Rl[4]) < 1.0e-3);
+            }
+
+    // ------------------------------------------------------------------------------------------
+    // C. The sheet as a lining
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: rare sheet C, S 6 mm eps 0.31 with tf as a lining of 10 mm eps 2.50 - j ei: entry, on the near face (one event), and\n");
+    QD_DIAG("# exit, on the far face (the second event, with the host leg), series declined, scalar, dB. own: ray_mesh_interact's entry\n");
+    QD_DIAG("type,tf,theta,ei,entry,exit,entry_R,exit_R,own_entry,exit-entry\n");
+    for (int tr : {4, 5})
+        for (double tS : {0.5, -0.5})
+            for (double thd : {45.0, 60.0})
+            {
+                double En[5], Ex[5];
+                for (int q = 0; q < 5; ++q)
+                {
+                    ub::Pal P = lump_palette({{0.31, 0.0, 0.006, 0.0, tS}, {2.50, losses[q], 0.0}});
+                    arma::uvec mx, me;
+                    arma::mat m_ex = ub::build({0.0, d1, d1 + gap}, {2, 2, 1}, {false, true, false}, mx);
+                    arma::mat m_en = ub::build({0.0, gap, gap + d1}, {1, 2, 2}, {false, false, true}, me);
+                    auto a = ub::chain(P, m_en, me, {tr}, f, thd, {1.5});
+                    En[q] = lvl(a, 1, 0), Ex[q] = lvl(ub::chain(P, m_ex, mx, {tr, tr}, f, thd, {1.5}), 2, 0);
+                    const double EnR = lvl(ub::chain(P, m_en, me, {3}, f, thd, {1.5}), 1, 0), ExR = lvl(ub::chain(P, m_ex, mx, {tr, 3}, f, thd, {1.5}), 2, 0);
+                    const double own = a.empty() ? -999.0 : ub::dB(cpx(a[0].xpr0, 0, 0));
+                    QD_DIAG("%d,%.1f,%.0f,%.0e,%.4f,%.4f,%.4f,%.4f,%.4f,%.6f\n", tr, tS, thd, losses[q], En[q], Ex[q], EnR, ExR, own, Ex[q] - En[q]);
+                    INFO("C, type " << tr << ", tf " << tS << ", theta " << thd << ", ei " << losses[q]);
+                    CHECK(En[q] < ZERO);
+                    CHECK(Ex[q] < ZERO);
+                    CHECK(EnR < ZERO);
+                    CHECK(ExR < ZERO);
+                    CHECK(En[q] > -30.0); // the lining tunnels, with either sign of tf
+                    CHECK(std::abs(own - En[q]) < 1.0e-9); // the two public functions agree on a glued entry
+                    if (losses[q] == 0.0)
+                        CHECK(std::abs(Ex[q] - En[q]) < 1.0e-6); // a lossless lined wall is one wall from its two sides
+                }
+                INFO("C, continuity at zero loss, type " << tr << ", tf " << tS << ", theta " << thd);
+                CHECK(std::abs(En[3] - En[4]) < 1.0e-3);
+                CHECK(std::abs(Ex[3] - Ex[4]) < 1.0e-3);
+            }
+
+    // ------------------------------------------------------------------------------------------
+    // D. The core
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: rare sheet D, the ordered stack of S 6 mm eps 0.31 with tf and C 10 mm eps 2.50 - j ei without, both orders, in air (one\n");
+    QD_DIAG("# event) and inside 10 mm + 12 mm of eps 2.50 - j ei (the stack event with its host leg), scalar, dB\n");
+    QD_DIAG("where,tf,theta,ei,S|C,C|S,d\n");
+    for (int where = 0; where < 2; ++where)
+        for (double tS : {0.5, -0.5})
+            for (double thd : {45.0, 60.0})
+            {
+                double L[5][2];
+                for (int q = 0; q < 5; ++q)
+                {
+                    ub::Pal P = lump_palette({{0.31, 0.0, 0.006, 0.0, tS}, {2.50, losses[q], 0.0}, {2.50, losses[q], 0.010}});
+                    for (int ord = 0; ord < 2; ++ord)
+                    {
+                        arma::uvec mi;
+                        const int m1 = ord ? 3 : 1, m2 = ord ? 1 : 3;
+                        if (where == 0)
+                        {
+                            arma::mat mesh = ub::build({0.0, gap}, {m1, m2}, {false, true}, mi);
+                            L[q][ord] = lvl(ub::chain(P, mesh, mi, {4}, f, thd, {1.5}), 1, 0);
+                        }
+                        else
+                        {
+                            arma::mat mesh = ub::build({0.0, d1, d1 + gap, d1 + gap + d2}, {2, m1, m2, 2}, {false, false, true, true}, mi);
+                            L[q][ord] = lvl(ub::chain(P, mesh, mi, {4, 4}, f, thd, {1.5}), 2, 0);
+                        }
+                    }
+                    QD_DIAG("%s,%.1f,%.0f,%.0e,%.4f,%.4f,%.2e\n", where ? "in host" : "in air", tS, thd, losses[q], L[q][0], L[q][1], L[q][1] - L[q][0]);
+                    INFO("D, where " << where << ", tf " << tS << ", theta " << thd << ", ei " << losses[q]);
+                    CHECK(L[q][0] < ZERO);
+                    CHECK(L[q][1] < ZERO);
+                    CHECK(L[q][0] > -30.0);
+                    CHECK(std::abs(L[q][1] - L[q][0]) < 1.0e-9); // the transmit port of a stack does not read the order of its layers
+                }
+                INFO("D, continuity at zero loss, where " << where << ", tf " << tS << ", theta " << thd);
+                CHECK(std::abs(L[3][0] - L[4][0]) < 1.0e-3);
+                CHECK(std::abs(L[3][1] - L[4][1]) < 1.0e-3);
+            }
+
+    // ------------------------------------------------------------------------------------------
+    // E. Under a closed outer pair
+    // ------------------------------------------------------------------------------------------
+    // The transmit port is the leak chain and does not move: it is printed with every digit. The
+    // reflect port is the composite, whose echo crosses the near face twice.
+    QD_DIAG("\n# diag: rare sheet E, S 10 mm eps 0.31 - j es with tf 0.5 on a rigid wall eps 2.401e-9 with tf tW, the glued entry, scalar.\n");
+    QD_DIAG("# R: the reflect port, dB. T_re, T_im: the leak chain, with every digit\n");
+    QD_DIAG("tW,theta,es,R,T_re,T_im\n");
+    for (double tW : {0.0, 0.3})
+        for (double thd : {45.0, 60.0})
+        {
+            double Rl[5];
+            const double es[5] = {0.2, 1.0e-2, 1.0e-3, 1.0e-6, 0.0};
+            for (int q = 0; q < 5; ++q)
+            {
+                ub::Pal P = lump_palette({{0.31, es[q], 0.010, 0.0, 0.5}, {2.401e-9, 0.0, 0.0, 0.0, tW}});
+                arma::uvec me;
+                arma::mat m_en = ub::build({0.0, gap, gap + 0.1}, {1, 2, 2}, {false, false, true}, me);
+                auto a = ub::chain(P, m_en, me, {4}, f, thd, {1.5});
+                Rl[q] = lvl(ub::chain(P, m_en, me, {3}, f, thd, {1.5}), 1, 0);
+                const std::complex<double> t = a.empty() ? std::complex<double>(0.0, 0.0) : cpx(a[0].xpr, 0, 0);
+                QD_DIAG("%.1f,%.0f,%.0e,%.4f,%.17g,%.17g\n", tW, thd, es[q], Rl[q], std::real(t), std::imag(t));
+                INFO("E, tW " << tW << ", theta " << thd << ", es " << es[q]);
+                CHECK(Rl[q] < ZERO);
+                CHECK(std::norm(t) < 1.0);
+            }
+            INFO("E, continuity at zero loss of the sheet, tW " << tW << ", theta " << thd);
+            CHECK(std::abs(Rl[3] - Rl[4]) < 1.0e-3);
+        }
+
+    // ------------------------------------------------------------------------------------------
+    // F. Twins that must not move
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: rare sheet F, twins, the complex coefficient of the sheet event with every digit, scalar and EM (VV, HH).\n");
+    QD_DIAG("# A sheet denser than the invariant, a rare sheet without tf anywhere, a rare sheet below its critical angle, a mass-law sheet,\n");
+    QD_DIAG("# a closed mass-law layer and the leak chain of a closed outer pair\n");
+    QD_DIAG("row,type,port,theta,re,im,re_hh,im_hh\n");
+    {
+        const double BIG = 1.0e12;
+        ub::Pal P = lump_palette({{5.24, 0.63, 0.006, 0.0, 0.5},                                             // 1 dense lossy sheet with tf
+                                  {5.24, 0.0, 0.006, 0.0, -0.5},                                             // 2 dense lossless sheet, tf below zero
+                                  {0.31, 0.0, 0.006},                                                        // 3 rare sheet without tf
+                                  {0.31, 0.0, 0.006, 0.0, 0.5},                                              // 4 rare sheet with tf
+                                  {0.50, 0.0, 0.022, 0.0, 0.2, 0.0, 0.0, 0.0, 0.0, 20.0, 0.001 * BIG},       // 5 rare mass-law sheet
+                                  {2.1609e-8, 0.0, 0.022, 0.0, 0.2, 0.0, 0.0, 0.0, 0.0, 20.0, 0.001 * BIG},  // 6 rigid mass-law sheet
+                                  {2.50, 0.80, 0.0},                                                         // 7 lossy host
+                                  {2.50, 0.0, 0.0},                                                          // 8 lossless host
+                                  {1.50, 0.40, 0.0, 0.0, 0.5},                                               // 9 host with tf
+                                  {2.401e-9, 0.0, 0.0, 0.0, 0.3},                                            // 10 rigid wall
+                                  {0.31, 0.20, 0.006, 0.0, 0.5}});                                           // 11 porous sheet with tf
+        struct Row
+        {
+            const char *name;
+            int sheet, host; // host 0: the sheet alone in air; host < 0: the sheet glued on the near face of -host
+            std::vector<double> th;
+        };
+        const std::vector<Row> rows = {
+            {"dense lossy tf 0.5 in air", 1, 0, {20.0, 45.0, 60.0}},
+            {"dense lossy tf 0.5 inside lossy host", 1, 7, {20.0, 45.0, 60.0}},
+            {"dense lossless tf -0.5 inside lossless host", 2, 8, {20.0, 45.0, 60.0}},
+            {"dense lossy tf 0.5 inside host with tf", 1, 9, {20.0, 45.0, 60.0}},
+            {"rare no tf inside lossy host", 3, 7, {20.0, 45.0, 60.0}},
+            {"rare no tf inside lossless host", 3, 8, {20.0, 45.0, 60.0}},
+            {"rare no tf in air", 3, 0, {20.0, 45.0, 60.0}},
+            {"rare tf 0.5 below its critical angle - lossy host", 4, 7, {10.0, 20.0, 30.0}},
+            {"rare tf 0.5 below its critical angle - in air", 4, 0, {10.0, 20.0, 30.0}},
+            {"porous tf 0.5 below its critical angle - in air", 11, 0, {10.0, 20.0, 30.0}},
+            {"rare mass-law tf 0.2 inside lossy host", 5, 7, {20.0, 45.0, 60.0}},
+            {"rigid mass-law tf 0.2 inside lossy host", 6, 7, {20.0, 45.0, 60.0}},
+            {"leak chain - rare tf 0.5 on rigid wall", 4, -10, {45.0, 60.0}},
+            {"leak chain - porous tf 0.5 on rigid wall", 11, -10, {45.0, 60.0}},
+        };
+        for (const auto &R : rows)
+            for (int tr : {4, 1})
+                for (int port = 0; port < 2; ++port)
+                {
+                    if (R.host < 0 && port)
+                        continue; // the reflect port under a closed outer pair is table E
+                    for (double thd : R.th)
+                    {
+                        arma::uvec mi;
+                        arma::mat mesh;
+                        std::vector<int> seq;
+                        const int last = port ? refl(tr) : tr;
+                        if (R.host == 0)
+                            mesh = ub::build({0.0}, {R.sheet}, {false}, mi), seq = {last};
+                        else if (R.host < 0)
+                            mesh = ub::build({0.0, gap, gap + 0.1}, {R.sheet, -R.host, -R.host}, {false, false, true}, mi), seq = {last};
+                        else
+                            mesh = ub::build({0.0, d1, d1 + d2}, {R.host, R.sheet, R.host}, {false, false, true}, mi), seq = {tr, last};
+                        auto a = ub::chain(P, mesh, mi, seq, f, thd, {1.5});
+                        const bool ok = a.size() == seq.size();
+                        const std::complex<double> z = ok ? cpx(a.back().xpr, 0, 0) : 0.0, zh = (ok && tr == 1) ? cpx(a.back().xpr, 0, 3) : 0.0;
+                        QD_DIAG("%s,%d,%s,%.0f,%.17g,%.17g,%.17g,%.17g\n", R.name, tr, port ? "R" : "T", thd, std::real(z), std::imag(z), std::real(zh), std::imag(zh));
+                    }
+                }
+    }
 }
