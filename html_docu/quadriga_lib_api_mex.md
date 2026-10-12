@@ -86,20 +86,20 @@ lang: en-US
 | [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 2459 |
 | [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 2483 |
 | [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 2510 |
-| [sos_acf_2d](#sos_acf_2d) | Sum-of-sinusoids random number generator | 2546 |
-| [sos_acf_approx](#sos_acf_approx) | Sum-of-sinusoids random number generator | 2574 |
-| [sos_acf_estimate](#sos_acf_estimate) | Sum-of-sinusoids random number generator | 2606 |
-| [sos_acfi](#sos_acfi) | Sum-of-sinusoids random number generator | 2655 |
-| [sos_calc_mse](#sos_calc_mse) | Sum-of-sinusoids random number generator | 2679 |
-| [sos_generate](#sos_generate) | Sum-of-sinusoids random number generator | 2726 |
-| [sos_init_phases](#sos_init_phases) | Sum-of-sinusoids random number generator | 2787 |
-| [sos_map](#sos_map) | Sum-of-sinusoids random number generator | 2817 |
-| [sos_preset](#sos_preset) | Sum-of-sinusoids random number generator | 2852 |
-| [sos_rand](#sos_rand) | Sum-of-sinusoids random number generator | 2891 |
-| [sos_randi](#sos_randi) | Sum-of-sinusoids random number generator | 2941 |
-| [sos_randn](#sos_randn) | Sum-of-sinusoids random number generator | 2992 |
-| [sos_remove_bias](#sos_remove_bias) | Sum-of-sinusoids random number generator | 3041 |
-| [sos_val](#sos_val) | Sum-of-sinusoids random number generator | 3110 |
+| [sos_acf_2d](#sos_acf_2d) | Sum-of-sinusoids random number generator | 2652 |
+| [sos_acf_approx](#sos_acf_approx) | Sum-of-sinusoids random number generator | 2680 |
+| [sos_acf_estimate](#sos_acf_estimate) | Sum-of-sinusoids random number generator | 2712 |
+| [sos_acfi](#sos_acfi) | Sum-of-sinusoids random number generator | 2761 |
+| [sos_calc_mse](#sos_calc_mse) | Sum-of-sinusoids random number generator | 2785 |
+| [sos_generate](#sos_generate) | Sum-of-sinusoids random number generator | 2832 |
+| [sos_init_phases](#sos_init_phases) | Sum-of-sinusoids random number generator | 2893 |
+| [sos_map](#sos_map) | Sum-of-sinusoids random number generator | 2923 |
+| [sos_preset](#sos_preset) | Sum-of-sinusoids random number generator | 2958 |
+| [sos_rand](#sos_rand) | Sum-of-sinusoids random number generator | 2997 |
+| [sos_randi](#sos_randi) | Sum-of-sinusoids random number generator | 3047 |
+| [sos_randn](#sos_randn) | Sum-of-sinusoids random number generator | 3098 |
+| [sos_remove_bias](#sos_remove_bias) | Sum-of-sinusoids random number generator | 3147 |
+| [sos_val](#sos_val) | Sum-of-sinusoids random number generator | 3216 |
 
 ---
 
@@ -2541,6 +2541,112 @@ Reorganize a 3D triangular mesh into spatially clustered sub-meshes for faster p
 ---
 
 # Sum-of-sinusoids random number generator
+
+These functions generate **spatially correlated random numbers**: values that are random, but similar at
+nearby positions. Two positions that are much closer than the *decorrelation distance* get almost the same
+value, two positions that are far apart get independent values. Typical uses are shadow fading maps and
+the spatially consistent parameters of the 3GPP TR 38.901 channel model.
+
+The values are a sum of sinusoids, `s(x) = sqrt(2/N) · sum_n cos( 2·pi · f_n·x + phi_n )`. The frequencies
+`f_n` set how the correlation falls with the distance, i.e. the autocorrelation function (ACF). The random
+phases `phi_n` select one realisation of the random field. The generator needs no map and no grid:
+positions can be anywhere, in 1, 2 or 3 dimensions, and the same phases always give the same field.
+
+**Quick start**
+[sos_randn](#sos_randn) sets up the generators, draws the phases and returns the values in one call. [sos_rand](#sos_rand)
+and [sos_randi](#sos_randi) do the same for Uniform and integer values.
+
+```
+% 1000 positions; one row per position, columns are [x, y, z] in meters
+pos = rand(1000, 3) * 100;
+
+% One independent generator per decorrelation distance: 10 m and 50 m
+dist_decorr = [10, 50];
+
+% Normal distributed values with zero mean and unit variance, size [1000, 2]
+val = quadriga_lib.sos_randn(dist_decorr, pos, [], [], 'Comb256', 42);
+
+% Uniform values between 0 and 1, and integers from 1 to 6
+uni  = quadriga_lib.sos_rand(dist_decorr, pos, [], [], 'Comb256', 42);
+dice = quadriga_lib.sos_randi(dist_decorr, pos, 6, [], [], 'Comb256', 42);
+```
+
+The last argument is the seed. With the same seed, a later call returns the same field, also at other
+positions. Without a seed every call gives a new field. The functions have their own random stream; the
+state of `rand` and `randn` in MATLAB or Octave has no effect on them.
+
+**Keeping a generator**
+A generator is two matrices: the frequencies from [sos_preset](#sos_preset) and the phases from [sos_init_phases](#sos_init_phases).
+[sos_val](#sos_val) evaluates them. Each column of the phase matrix is one independent generator, and evaluating
+many generators in one call costs little more than evaluating one.
+
+```
+% Frequencies of a predefined generator for a decorrelation distance of 10 m
+[freq, acf, dist] = quadriga_lib.sos_preset('Comb256', 10);
+
+% Phases of 20 generators; each column is one independent random field
+phase = quadriga_lib.sos_init_phases(size(freq, 1), 20, 42);
+
+% Values of all 20 generators at the positions, size [n_pos, 20]
+val = quadriga_lib.sos_val(freq, phase, pos);
+
+% The same fields at other positions, at any later time
+val_new = quadriga_lib.sos_val(freq, phase, pos_new);
+
+% Uniform distributed output
+uni = quadriga_lib.sos_val(freq, phase, pos, [], [], [], [], [], true);
+
+% Map on a regular grid, size [n_y, n_x, 1, 20]
+x = 0:0.5:250;  y = 0:0.5:100;
+map = quadriga_lib.sos_map(freq, phase, x, y);
+imagesc(x, y, map(:, :, 1, 1));  axis xy;
+```
+
+- **Positions:** one row per position, `[n_pos, 3]`. Results have one row per position and one column per
+  generator, `[n_pos, n_gen]`.
+- **Presets:** `Exp`, `Gauss` and `Comb`, each with 128, 256, 512 or 1024 sinusoids, e.g. `'Exp512'`. `Exp`
+  is the exponential ACF `exp(-d/d0)`, `Gauss` is `exp(-(d/d0)^2)`, and `Comb` follows `Gauss` up to the
+  decorrelation distance `d0` and `Exp` beyond it. More sinusoids follow the ACF more closely and take
+  proportionally longer. `'Comb256'` is a good default.
+- **Both ends mobile:** if a value belongs to a link between two moving devices, pass both positions.
+  The value then changes smoothly when either device moves.
+
+```
+% One value per pair of positions, size [n_pos, 20]
+val_link = quadriga_lib.sos_val(freq, phase, pos_tx, pos_rx, [], acf, dist);
+```
+
+- **Mean over an area:** the values at positions that lie within a few decorrelation distances of each
+  other are similar, so their average is not zero for a single realisation. This is how a correlated
+  field behaves. [sos_remove_bias](#sos_remove_bias) can force the average to zero if an application needs it.
+
+**Own autocorrelation functions**
+[sos_generate](#sos_generate) finds the frequencies for any ACF that is given as a table over the distance, and
+[sos_calc_mse](#sos_calc_mse) reports how well the result fits. The table should reach to about 5 decorrelation
+distances.
+
+```
+% Target ACF from 0 to 5 decorrelation distances, here a Gaussian shape with 5 m
+dist = 0:0.125:24.875;
+acf  = exp(-(dist / 5).^2);
+
+% 256 sinusoids in 3-D, 300 test directions, wavelengths up to 20 decorrelation distances (100 m)
+freq = quadriga_lib.sos_generate(acf, dist, 256, 3, true, 300, true, 0.01, 0, 1);
+
+% Approximation error in dB, larger is better; about 35 dB for this example
+mse = quadriga_lib.sos_calc_mse(freq, acf, dist);
+```
+
+The result is used like a preset: draw phases with [sos_init_phases](#sos_init_phases) and evaluate with [sos_val](#sos_val). To
+change the decorrelation distance afterwards, divide the frequencies and multiply the distances by the
+same factor.
+
+**Reference**
+S. Jaeckel, L. Raschkowski, F. Burkhardt, L. Thiele; "Efficient Sum-of-Sinusoids-Based Spatial Consistency
+for the 3GPP New-Radio Channel Model"; 2018 IEEE Globecom Workshops (GC Wkshps); 2018; Available:
+<a target="_blank" rel="noopener noreferrer" href="https://ieeexplore.ieee.org/document/8644265">IEEE Xplore</a> (Original version),
+<a target="_blank" rel="noopener noreferrer" href="publications/2018_sum_of_sinusoids.pdf">PDF version</a>,
+<a target="_blank" rel="noopener noreferrer" href="publications/2018_sum_of_sinusoids.md">Markdown version</a>
 
 ---
 ## sos_acf_2d
