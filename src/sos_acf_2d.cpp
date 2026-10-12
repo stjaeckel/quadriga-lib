@@ -22,6 +22,9 @@ Target ACF on a 2-D grid
   `n_grid = 4·n_acf - 3`, the center is element `2·n_acf - 2` (0-based)
 - Linear interpolation of the table at the radial distance; 0 at radial distances above `Dmax`
 - The result is the reference for [[sos_acf_approx]]
+- Equally spaced means that every sample point lies within 1e-4 of the step from its place on the regular
+  axis; for long single-precision tables the rounding of the sample points themselves is allowed for
+- `dist_2d` may be the same object as `acf` or `dist`
 
 ## Declaration:
 ```
@@ -34,7 +37,7 @@ void quadriga_lib::sos_acf_2d(
 
 ## Inputs:
 - **`acf`** — Target ACF; at least 2 elements; `[n_acf]`
-- **`dist`** — Sample points of the ACF in [m]; must start at 0 and be equally spaced; `[n_acf]`
+- **`dist`** — Sample points of the ACF in [m]; must start at 0, be equally spaced and finite; `[n_acf]`
 
 ## Outputs:
 - **`acf_2d`** — ACF on the grid; `[n_grid, n_grid]`
@@ -60,6 +63,10 @@ void quadriga_lib::sos_acf_2d(const arma::Col<dtype> &acf,
     const double step = (double)dist.at(n_acf - 1) / (double)(n_acf - 1);
     const long long half = 2 * (long long)n_acf - 2, i_max = (long long)n_acf - 1;
 
+    // The table is copied before the outputs are resized, so that 'dist_2d' may be the same object as an input
+    const arma::vec acf_d = arma::conv_to<arma::vec>::from(acf);
+    const double *pa = acf_d.memptr();
+
     if (acf_2d.n_rows != n_grid || acf_2d.n_cols != n_grid)
         acf_2d.set_size(n_grid, n_grid);
 
@@ -74,9 +81,9 @@ void quadriga_lib::sos_acf_2d(const arma::Col<dtype> &acf,
             {
                 long long i = (long long)std::floor(r);
                 if (i >= i_max)
-                    v = (double)acf.at((arma::uword)i_max);
+                    v = pa[i_max];
                 else
-                    v = (double)acf.at((arma::uword)i) + (r - (double)i) * ((double)acf.at((arma::uword)i + 1) - (double)acf.at((arma::uword)i));
+                    v = pa[i] + (r - (double)i) * (pa[i + 1] - pa[i]);
             }
             col[ir + half] = (dtype)v;
         }

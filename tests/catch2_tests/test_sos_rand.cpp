@@ -5,8 +5,9 @@
 // Verification suite for quadriga_lib::sos_randn, sos_rand and sos_randi.
 //
 // Pins down: the documented composition (preset, phases, evaluation) including the assignment of phase
-// columns, the replacement of a zero decorrelation distance, the choice between one map and two maps,
-// the mapping to Uniform and integer values, the distributions, seeds, sizes, float and double, input
+// columns and the second phase stream of a device on its own map, the replacement of a zero
+// decorrelation distance, the choice between one map and two maps, the mapping to Uniform and integer
+// values, the distributions, seeds and what a seed does and does not fix, sizes, float and double, input
 // validation.
 // It leaves the values of the generator, the tables and the phase stream to their own suites.
 // Oracles:
@@ -58,8 +59,11 @@ namespace
         arma::mat freq, phase, val;
         arma::vec acf, dist;
         quadriga_lib::sos_preset(preset, freq, &acf, &dist, d_a);
-        quadriga_lib::sos_init_phases(freq.n_rows, 2 * n_gen, phase, seed);
-        arma::mat ph_a = phase.col(g), ph_b = phase.col(n_gen + g);
+        // Phases: one stream per device, the second one seeded with seed + 2^62 (bit 62 flipped)
+        arma::mat phase_b;
+        quadriga_lib::sos_init_phases(freq.n_rows, n_gen, phase, seed);
+        quadriga_lib::sos_init_phases(freq.n_rows, n_gen, phase_b, seed + ((arma::sword)1 << 62));
+        arma::mat ph_a = phase.col(g), ph_b = phase_b.col(g);
         if (pos_b == nullptr)
             quadriga_lib::sos_val(freq, ph_a, pos, val, (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr, 1.0, uniform);
         else if (d_a == d_b)
@@ -323,6 +327,11 @@ TEST_CASE("sos_randn, sos_rand, sos_randi - input validation")
         CHECK_THROWS_AS(quadriga_lib::sos_randn(neg, pos, val), std::invalid_argument);
         CHECK_THROWS_AS(quadriga_lib::sos_rand(neg, pos, val), std::invalid_argument);
         CHECK_THROWS_AS(quadriga_lib::sos_randi(neg, pos, 3, val), std::invalid_argument);
+        arma::vec nan = {5.0, std::nan("")}, inf = {arma::datum::inf, 20.0};
+        CHECK_THROWS_AS(quadriga_lib::sos_randn(nan, pos, val), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_randn(inf, pos, val), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_rand(inf, pos, val), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_randi(nan, pos, 3, val), std::invalid_argument);
     }
     SECTION("pos")
     {
@@ -342,6 +351,9 @@ TEST_CASE("sos_randn, sos_rand, sos_randi - input validation")
         CHECK_THROWS_AS(quadriga_lib::sos_randn(dd, pos, val, no_mat, &db), std::invalid_argument); // Needs pos_b
         CHECK_THROWS_AS(quadriga_lib::sos_randn(dd, pos, val, &pos_b, &size), std::invalid_argument);
         CHECK_THROWS_AS(quadriga_lib::sos_randn(dd, pos, val, &pos_b, &neg), std::invalid_argument);
+        arma::vec nan = {5.0, std::nan("")}, inf = {5.0, arma::datum::inf};
+        CHECK_THROWS_AS(quadriga_lib::sos_randn(dd, pos, val, &pos_b, &nan), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_randn(dd, pos, val, &pos_b, &inf), std::invalid_argument);
     }
     SECTION("preset")
     {
@@ -354,5 +366,120 @@ TEST_CASE("sos_randn, sos_rand, sos_randi - input validation")
     SECTION("imax")
     {
         CHECK_THROWS_AS(quadriga_lib::sos_randi(dd, pos, 0, val), std::invalid_argument);
+    }
+    SECTION("a failed call leaves the output untouched")
+    {
+        arma::mat keep(2, 2), empty;
+        keep.fill(7.0);
+        CHECK_THROWS_AS(quadriga_lib::sos_randn(dd, empty, keep), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_randn(dd, pos, keep, no_mat, no_vec, "Comb300"), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_randi(dd, pos, 0, keep), std::invalid_argument);
+        CHECK(keep.n_rows == 2);
+        CHECK(keep(1, 1) == 7.0);
+    }
+}
+
+TEST_CASE("sos_randn, sos_rand - nearby positions get similar values in separate calls with the same seed")
+{
+    // Second call 0.1 m away from the first, decorrelation distance 10 m. The difference of the field over a
+    // displacement dx has the variance 2·( 1 - R(dx) ); for the Comb ACF R(0.1 m) = exp( -1e-4 ), which gives a
+    // standard deviation of 0.014. The limit is 7 standard deviations. With another seed the two calls are
+    // independent fields and differ by the order of 1.
+    arma::vec dd = {10.0, 10.0, 10.0};
+    arma::mat pos = rnd(200, 3, -300.0, 300.0, 30), near = pos, a, b, c, ua, ub;
+    near.col(0) += 0.06, near.col(1) -= 0.08; // 0.1 m
+
+    quadriga_lib::sos_randn(dd, pos, a, (arma::mat *)nullptr, (arma::vec *)nullptr, "Comb256", 5);
+    quadriga_lib::sos_randn(dd, near, b, (arma::mat *)nullptr, (arma::vec *)nullptr, "Comb256", 5);
+    quadriga_lib::sos_randn(dd, near, c, (arma::mat *)nullptr, (arma::vec *)nullptr, "Comb256", 6);
+    quadriga_lib::sos_rand(dd, pos, ua, (arma::mat *)nullptr, (arma::vec *)nullptr, "Comb256", 5);
+    quadriga_lib::sos_rand(dd, near, ub, (arma::mat *)nullptr, (arma::vec *)nullptr, "Comb256", 5);
+    REQUIRE(a.n_rows == 200);
+    REQUIRE(b.n_cols == 3);
+
+    double same = arma::abs(a - b).max(), other = arma::abs(a - c).max(), uni = arma::abs(ua - ub).max(), rms = 0.0;
+    for (arma::uword i = 0; i < a.n_elem; ++i)
+        rms += (a(i) - b(i)) * (a(i) - b(i)) / (double)a.n_elem;
+    rms = std::sqrt(rms);
+    QD_DIAG("\n# diag: sos_randn at positions 0.1 m apart: same seed max %.4f, rms %.4f (expected 0.014), other seed max %.3f, Uniform max %.4f\n", same, rms, other, uni);
+    CHECK(same < 0.1);
+    CHECK(rms < 0.03);
+    CHECK(rms > 0.005); // The positions did move
+    CHECK(other > 1.0);
+    CHECK(uni < 0.04); // The Normal density is at most 0.4, so the Uniform values differ by at most 0.4 times as much
+    CHECK(arma::abs(a).max() > 1.0);
+}
+
+
+TEST_CASE("sos_randn, sos_rand, sos_randi - on two maps the value of a generator does not depend on the number of generators")
+{
+    // The second device draws its phases from its own stream, sos_init_phases( n_coeff, n_gen, seed + 2^62 ),
+    // so generator g has the same phases for both devices whatever follows it in the call
+    arma::vec dd4 = {5.0, 20.0, 12.0, 7.0}, db4 = {9.0, 8.0, 12.0, 30.0}; // Generator 2 stays on one map
+    arma::mat pa = rnd(40, 3, -60.0, 60.0, 40), pb = rnd(40, 3, -60.0, 60.0, 41);
+
+    arma::mat n4, u4, i4;
+    quadriga_lib::sos_randn(dd4, pa, n4, &pb, &db4, "Comb256", 9);
+    quadriga_lib::sos_rand(dd4, pa, u4, &pb, &db4, "Comb256", 9);
+    quadriga_lib::sos_randi(dd4, pa, 1000, i4, &pb, &db4, "Comb256", 9);
+    REQUIRE(n4.n_cols == 4);
+    CHECK(arma::abs(n4).max() > 0.5);
+
+    for (arma::uword n_gen = 1; n_gen <= 3; ++n_gen)
+    {
+        arma::vec dd = dd4.head(n_gen), db = db4.head(n_gen);
+        arma::mat n, u, i;
+        quadriga_lib::sos_randn(dd, pa, n, &pb, &db, "Comb256", 9);
+        quadriga_lib::sos_rand(dd, pa, u, &pb, &db, "Comb256", 9);
+        quadriga_lib::sos_randi(dd, pa, 1000, i, &pb, &db, "Comb256", 9);
+        REQUIRE(n.n_cols == n_gen);
+        INFO("n_gen " << n_gen);
+        // The generators of a call are evaluated in groups of equal decorrelation distances and each value
+        // is independent of its group, so the columns are bit-identical
+        CHECK(arma::approx_equal(n, n4.cols(0, n_gen - 1), "absdiff", 0.0));
+        CHECK(arma::approx_equal(u, u4.cols(0, n_gen - 1), "absdiff", 0.0));
+        CHECK(arma::approx_equal(i, i4.cols(0, n_gen - 1), "absdiff", 0.0));
+    }
+
+    // The two streams differ: a generator on two maps with equal positions is not twice the same field.
+    // With the same phases for both devices the value would be sqrt(2) times the single-device value.
+    arma::vec d1 = {10.0}, d1b = {10.5};
+    arma::mat one, two;
+    quadriga_lib::sos_randn(d1, pa, one, (arma::mat *)nullptr, (arma::vec *)nullptr, "Comb256", 9);
+    quadriga_lib::sos_randn(d1, pa, two, &pa, &d1b, "Comb256", 9);
+    CHECK(arma::abs(two - std::sqrt(2.0) * one).max() > 0.5);
+
+    // Without a seed both streams are random
+    arma::mat r1, r2;
+    quadriga_lib::sos_randn(dd4, pa, r1, &pb, &db4);
+    quadriga_lib::sos_randn(dd4, pa, r2, &pb, &db4);
+    CHECK(arma::abs(r1.col(0) - r2.col(0)).max() > 0.05);
+}
+
+TEST_CASE("sos_randn, sos_rand, sos_randi - the output may be the same object as a position matrix")
+{
+    // 3 generators and 3 position columns: the output has the size of the input and is not reallocated,
+    // 5 generators: it is resized. Both must give the values of a call with a separate output.
+    arma::mat pos = rnd(50, 3, -60.0, 60.0, 50), pos_b = rnd(50, 3, -60.0, 60.0, 51);
+    for (arma::uword n_gen : {3, 5})
+    {
+        arma::vec dd(n_gen), db(n_gen);
+        for (arma::uword g = 0; g < n_gen; ++g)
+            dd(g) = 5.0 + 3.0 * (double)g, db(g) = (g == 1) ? 30.0 : dd(g); // Generator 1 on two maps
+        arma::mat ref_n, ref_u, ref_i;
+        quadriga_lib::sos_randn(dd, pos, ref_n, &pos_b, &db, "Comb128", 3);
+        quadriga_lib::sos_rand(dd, pos, ref_u, &pos_b, &db, "Comb128", 3);
+        quadriga_lib::sos_randi(dd, pos, 9, ref_i, &pos_b, &db, "Comb128", 3);
+        REQUIRE(ref_n.n_cols == n_gen);
+        CHECK(arma::abs(ref_n).max() > 0.5);
+
+        INFO("n_gen " << n_gen);
+        arma::mat a = pos, b = pos_b, c = pos;
+        quadriga_lib::sos_randn(dd, a, a, &pos_b, &db, "Comb128", 3); // val is 'pos'
+        CHECK(arma::approx_equal(a, ref_n, "absdiff", 0.0));
+        quadriga_lib::sos_rand(dd, pos, b, &b, &db, "Comb128", 3); // val is 'pos_b'
+        CHECK(arma::approx_equal(b, ref_u, "absdiff", 0.0));
+        quadriga_lib::sos_randi(dd, c, 9, c, &pos_b, &db, "Comb128", 3);
+        CHECK(arma::approx_equal(c, ref_i, "absdiff", 0.0));
     }
 }

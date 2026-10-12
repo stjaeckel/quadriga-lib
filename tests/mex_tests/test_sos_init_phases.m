@@ -48,6 +48,21 @@ assert_throws( @() quadriga_lib.sos_init_phases( 0, 3, 42 ), 'n_coeff' );       
 assert_throws( @() quadriga_lib.sos_init_phases( 7, 0, 42 ), 'n_gen' );         % thrown by C++
 assert_throws( @() quadriga_lib.sos_init_phases( 7, 3, -2 ), 'seed' );          % thrown by C++
 
+% Counts and the seed are validated by the wrapper before the conversion to an integer type
+assert_throws( @() quadriga_lib.sos_init_phases( -1 ), 'Input ''n_coeff'' must be a finite number >= 1' );
+assert_throws( @() quadriga_lib.sos_init_phases( NaN ), 'Input ''n_coeff'' must be a finite number >= 1' );
+assert_throws( @() quadriga_lib.sos_init_phases( [] ), 'Input ''n_coeff'' must be a finite number >= 1' );
+assert_throws( @() quadriga_lib.sos_init_phases( 7, -1 ), 'Input ''n_gen'' must be a finite number >= 1' );
+assert_throws( @() quadriga_lib.sos_init_phases( 7, Inf ), 'Input ''n_gen'' must be a finite number >= 1' );
+assert_throws( @() quadriga_lib.sos_init_phases( 7, 3, NaN ), 'Input ''seed''' );
+assert_throws( @() quadriga_lib.sos_init_phases( 7, 3, Inf ), 'Input ''seed''' );
+assert_throws( @() quadriga_lib.sos_init_phases( 7, 3, -Inf ), 'Input ''seed''' );
+
+%% Non-integer scalars are truncated
+assertEqual( quadriga_lib.sos_init_phases( 7.9, 3.9, 42.9 ), phase );
+p5 = quadriga_lib.sos_init_phases( 7, 3, -1.5 );                               % truncated to -1: random seed
+assertTrue( max(abs(p5(:) - phase(:))) > 1e-6 );
+
 end
 
 % Request 2 outputs so that the output-count guard fires

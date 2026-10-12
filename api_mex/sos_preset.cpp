@@ -40,7 +40,7 @@ Frequencies and ACF of a predefined sum-of-sinusoids generator
 - **`dist_decorr`** — Decorrelation distance; must be > 0; default: 10
 
 ## Outputs:
-- **`freq`** — Frequencies in [1/m]; `[n_coeff, 3]`
+- **`freq`** — Frequencies; `[n_coeff, 3]`
 - **`acf`** — Target ACF; `[200]`
 - **`dist`** — Sample points of the ACF; `[200]`
 

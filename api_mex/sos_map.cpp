@@ -20,6 +20,8 @@ Spatially correlated random values on a regular grid
 - The number of grid vectors given must not exceed the number of columns of `freq`; an omitted or
   empty `y` or `z` means a single sample at 0 on that axis
 - `z` can be given without `y` if `freq` has 3 columns
+- The values are those of [[sos_val]] at the grid points, bit for bit; kernels, accuracy and the
+  Uniform mapping are described there
 
 ## Usage:
 ```
@@ -27,8 +29,8 @@ map = quadriga_lib.sos_map( freq, phase, x, y, z, uniform, use_kernel );
 ```
 
 ## Inputs:
-- **`freq`** — Frequencies in [1/m]; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
-- **`phase`** — Phases in [rad]; one column per generator; `[n_coeff, n_gen]`
+- **`freq`** — Frequencies; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
+- **`phase`** — Phases; one column per generator; `[n_coeff, n_gen]`
 - **`x`** — Grid points on the x-axis; `[nx]`
 - **`y`** *(optional)* — Grid points on the y-axis; requires `n_dim >= 2`; omitted or empty = one
   sample at 0, `ny = 1`; `[ny]`

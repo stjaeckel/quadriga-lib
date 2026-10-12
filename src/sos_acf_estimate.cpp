@@ -12,6 +12,13 @@
 #include <stdexcept>
 #include <vector>
 
+// One position pair that falls into a bin: second position, bin, distance
+struct qd_sos_pair
+{
+    arma::uword j, bin;
+    double dist;
+};
+
 /*!SECTION
 Sum-of-sinusoids random number generator
 SECTION!*/
@@ -36,6 +43,10 @@ Monte-Carlo estimate of the ACF of one generator
   Two links form a pair if the distance between their first devices falls into the bin and the distance
   between their second devices does not exceed the upper limit of the bin; requires `acf` and `dist`
 - The estimate describes one realisation; it scatters around the ACF of the sinusoids
+- The pairs are searched in parallel and added in a fixed order; the result does not depend on the number
+  of threads. Run time and memory: `2·n_pos^2` pairs for one device, at most 36 MB for the pairs of a block
+  of rows
+- The outputs may be the same objects as inputs
 
 ## Declaration:
 ```
@@ -55,10 +66,12 @@ void quadriga_lib::sos_acf_estimate(
 ## Inputs:
 - **`freq`** — Frequencies in [1/m]; `[n_coeff, 3]`
 - **`phase`** — Phases of the generator in [rad]; `[n_coeff]`
-- **`bins`** — Bin centers in [m]; must be >= 0 and increase strictly; at least 2 elements; `[n_bin]`
+- **`bins`** — Bin centers in [m]; must be >= 0, increase strictly and be finite; at least 2 elements;
+  `[n_bin]`
 - **`n_pos`** — Number of random positions per device; must be > 1
-- **`acf`** *(optional)* — Target ACF; required for `acf_est_dual`; `[n_acf]`
-- **`dist`** *(optional)* — Sample points of the ACF in [m]; must start at 0 and increase strictly; `[n_acf]`
+- **`acf`** *(optional)* — Target ACF; required for `acf_est_dual`, must then be > -1; `[n_acf]`
+- **`dist`** *(optional)* — Sample points of the ACF in [m]; must start at 0, increase strictly and be
+  finite; `[n_acf]`
 - **`seed`** *(optional)* — Seed for the positions; must be >= -1; `-1` seeds from the system random device
 
 ## Outputs:
@@ -96,6 +109,8 @@ void quadriga_lib::sos_acf_estimate(const arma::Mat<dtype> &freq,
     for (arma::uword i = 1; i < bins.n_elem; ++i)
         if (!(bins.at(i) > bins.at(i - 1)))
             throw std::invalid_argument("Input 'bins' must increase strictly.");
+    if (!std::isfinite((double)bins.at(bins.n_elem - 1)))
+        throw std::invalid_argument("Input 'bins' must be finite.");
     if (n_pos < 2)
         throw std::invalid_argument("Input 'n_pos' must be > 1.");
     if (seed < -1)
@@ -104,7 +119,7 @@ void quadriga_lib::sos_acf_estimate(const arma::Mat<dtype> &freq,
     {
         if (acf == nullptr || dist == nullptr || acf->is_empty() || dist->is_empty())
             throw std::invalid_argument("Inputs 'acf' and 'dist' are required for output 'acf_est_dual'.");
-        qd_sos_check_acf(*acf, *dist);
+        qd_sos_check_acf_same_map(*acf, *dist);
     }
 
     const arma::uword n_bin = bins.n_elem;
@@ -162,22 +177,59 @@ void quadriga_lib::sos_acf_estimate(const arma::Mat<dtype> &freq,
     };
 
     // The GENERIC kernel is used: this is an offline tool and its result should not depend on the CPU
+    // All inputs are copied before the first output is resized, so that an output may be the same object as an input
     const arma::mat freq_d = arma::conv_to<arma::mat>::from(freq), phase_d = arma::conv_to<arma::mat>::from(phase);
+    arma::vec acf_d, dist_d;
+    if (acf_est_dual != nullptr)
+        acf_d = arma::conv_to<arma::vec>::from(*acf), dist_d = arma::conv_to<arma::vec>::from(*dist);
     arma::mat val;
     quadriga_lib::sos_val<double>(freq_d, phase_d, pos, val, nullptr, nullptr, nullptr, nullptr, 1.0, false, 1);
 
-    std::vector<double> acc(7 * n_bin, 0.0);
-    for (arma::uword i = 0; i < n_all; ++i)
-        for (arma::uword j = i + 1; j < n_all; ++j)
+    // Sums over all pairs (i, j > i) of the first n_rows positions. Finding the pairs of a row (distance and
+    // bin) is the expensive part and runs in parallel for a block of rows, each row writing its pairs to its
+    // own part of a buffer. The pairs are then added row by row, i.e. in the order of the plain double loop,
+    // so that the sums do not depend on the number of threads. The block size depends on n_rows only.
+    const arma::uword block = std::max<arma::uword>(1, std::min<arma::uword>(std::min<arma::uword>(256, n_all), 1500000 / n_all));
+    std::vector<qd_sos_pair> pairs(block * n_all);
+    std::vector<arma::uword> n_pairs(block);
+    const double *pv = nullptr;
+    auto pair_sums = [&](arma::uword n_rows, bool dual, std::vector<double> &acc)
+    {
+        std::fill(acc.begin(), acc.end(), 0.0);
+        for (arma::uword r0 = 0; r0 < n_rows; r0 += block)
         {
-            double d = distance(i, j);
-            arma::uword b = find_bin(d);
-            if (b < n_bin)
+            const long long r1 = (long long)std::min(n_rows, r0 + block);
+#pragma omp parallel for if (n_rows > 256)
+            for (long long i_row = (long long)r0; i_row < r1; ++i_row)
             {
-                double x = val.at(i, 0), y = val.at(j, 0), *a = &acc[7 * b];
-                a[0] += 1.0, a[1] += x, a[2] += y, a[3] += x * x, a[4] += y * y, a[5] += x * y, a[6] += d;
+                const arma::uword i = (arma::uword)i_row;
+                qd_sos_pair *p = &pairs[(i - r0) * n_all];
+                arma::uword n = 0;
+                for (arma::uword j = i + 1; j < n_rows; ++j)
+                {
+                    double d = distance(i, j);
+                    arma::uword b = find_bin(d);
+                    if (b < n_bin && (!dual || distance(n_pos + i, n_pos + j) <= upper[b]))
+                        p[n].j = j, p[n].bin = b, p[n].dist = d, ++n;
+                }
+                n_pairs[i - r0] = n;
+            }
+            for (arma::uword i = r0; i < (arma::uword)r1; ++i)
+            {
+                const qd_sos_pair *p = &pairs[(i - r0) * n_all];
+                const double x = pv[i];
+                for (arma::uword k = 0; k < n_pairs[i - r0]; ++k)
+                {
+                    double y = pv[p[k].j], *a = &acc[7 * p[k].bin];
+                    a[0] += 1.0, a[1] += x, a[2] += y, a[3] += x * x, a[4] += y * y, a[5] += x * y, a[6] += p[k].dist;
+                }
             }
         }
+    };
+
+    std::vector<double> acc(7 * n_bin);
+    pv = val.memptr();
+    pair_sums(n_all, false, acc);
 
     if (acf_est.n_elem != n_bin)
         acf_est.set_size(n_bin);
@@ -194,22 +246,11 @@ void quadriga_lib::sos_acf_estimate(const arma::Mat<dtype> &freq,
 
     if (acf_est_dual != nullptr)
     {
-        const arma::vec acf_d = arma::conv_to<arma::vec>::from(*acf), dist_d = arma::conv_to<arma::vec>::from(*dist);
         const arma::mat pos_a = pos.rows(0, n_pos - 1), pos_b = pos.rows(n_pos, n_all - 1);
         quadriga_lib::sos_val<double>(freq_d, phase_d, pos_a, val, &pos_b, nullptr, &acf_d, &dist_d, 1.0, false, 1);
 
-        std::fill(acc.begin(), acc.end(), 0.0);
-        for (arma::uword i = 0; i < n_pos; ++i)
-            for (arma::uword j = i + 1; j < n_pos; ++j)
-            {
-                double d = distance(i, j);
-                arma::uword b = find_bin(d);
-                if (b < n_bin && distance(n_pos + i, n_pos + j) <= upper[b])
-                {
-                    double x = val.at(i, 0), y = val.at(j, 0), *a = &acc[7 * b];
-                    a[0] += 1.0, a[1] += x, a[2] += y, a[3] += x * x, a[4] += y * y, a[5] += x * y, a[6] += d;
-                }
-            }
+        pv = val.memptr();
+        pair_sums(n_pos, true, acc);
 
         if (acf_est_dual->n_elem != n_bin)
             acf_est_dual->set_size(n_bin);

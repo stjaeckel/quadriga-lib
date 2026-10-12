@@ -63,6 +63,21 @@ assert_throws( @() quadriga_lib.sos_generate( acf, dist, 0 ), 'n_coeff' );      
 assert_throws( @() quadriga_lib.sos_generate( acf, dist, 2, 4 ), 'n_dim' );                  % thrown by C++
 assert_throws( @() quadriga_lib.sos_generate( acf, dist(1:5), 2 ), 'dist' );                 % thrown by C++
 
+% Counts and the seed are validated by the wrapper before the conversion to an integer type
+assert_throws( @() quadriga_lib.sos_generate( acf, dist, -1, 1 ), 'Input ''n_coeff'' must be a finite number >= 1' );
+assert_throws( @() quadriga_lib.sos_generate( acf, dist, NaN, 1 ), 'Input ''n_coeff'' must be a finite number >= 1' );
+assert_throws( @() quadriga_lib.sos_generate( acf, dist, 2, -1 ), 'Input ''n_dim'' must be a finite number >= 1' );
+assert_throws( @() quadriga_lib.sos_generate( acf, dist, 2, 0 ), 'Input ''n_dim'' must be a finite number >= 1' );
+assert_throws( @() quadriga_lib.sos_generate( acf, dist, 2, 1, true, -1 ), 'Input ''n_dir'' must be a finite number >= 1' );
+assert_throws( @() quadriga_lib.sos_generate( acf, dist, 2, 1, true, 0 ), 'Input ''n_dir'' must be a finite number >= 1' );
+assert_throws( @() quadriga_lib.sos_generate( acf, dist, 2, 1, true, 10, true, 0, 0, NaN ), 'Input ''seed''' );
+assert_throws( @() quadriga_lib.sos_generate( acf, dist, 2, 1, true, 10, true, 0, 1e6 ), 'freq_max' );   % thrown by C++
+
+%% Non-integer counts are truncated
+f1 = quadriga_lib.sos_generate( acf, dist, 2.9, 1.9, true, 10.9, true, 0, 0, 3.9 );
+f2 = quadriga_lib.sos_generate( acf, dist, 2, 1, true, 10, true, 0, 0, 3 );
+assertEqual( f1, f2 );
+
 end
 
 % Request 4 outputs so that the output-count guard fires

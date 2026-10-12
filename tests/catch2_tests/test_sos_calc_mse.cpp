@@ -23,6 +23,10 @@
 #include <random>
 #include <stdexcept>
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 // Diagnostic output. Comment out to silence the tables. The assertions run either way.
 #define QD_TEST_VERBOSE
 
@@ -310,9 +314,101 @@ TEST_CASE("sos_calc_mse - input validation")
         CHECK_THROWS_AS(quadriga_lib::sos_calc_mse(freq, short_acf, dist), std::invalid_argument);
         CHECK_THROWS_AS(quadriga_lib::sos_calc_mse(freq, acf, uneven), std::invalid_argument);
         CHECK_THROWS_AS(quadriga_lib::sos_calc_mse(freq, acf, start), std::invalid_argument);
+        // Non-finite table
+        arma::vec inf_dist = dist, nan_dist = dist, nan_acf = acf;
+        inf_dist(5) = arma::datum::inf, nan_dist(2) = std::nan(""), nan_acf(2) = std::nan("");
+        CHECK_THROWS_AS(quadriga_lib::sos_calc_mse(freq, acf, inf_dist), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_calc_mse(freq, acf, nan_dist), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_calc_mse(freq, nan_acf, dist), std::invalid_argument);
     }
     SECTION("n_dir")
     {
         CHECK_THROWS_AS(quadriga_lib::sos_calc_mse(freq, acf, dist, (double *)nullptr, (double *)nullptr, (arma::vec *)nullptr, (arma::mat *)nullptr, 0), std::invalid_argument);
     }
+}
+
+TEST_CASE("sos_calc_mse - a perfect fit returns +Inf")
+{
+    // Sinusoids at zero frequency have the ACF 1 at all distances; with a target of 1 the error along the
+    // test directions is exactly 0 and -10·log10(0) is +Inf. This is the documented result, not a cap.
+    arma::vec dist = arma::regspace(0.0, 2.0, 10.0), acf(dist.n_elem, arma::fill::ones);
+    for (arma::uword n_dim = 1; n_dim <= 3; ++n_dim)
+    {
+        arma::mat freq(4, n_dim, arma::fill::zeros);
+        double core = 0.0, all = 0.0;
+        double mse = quadriga_lib::sos_calc_mse(freq, acf, dist, &core, &all);
+        QD_DIAG("\n# diag: sos_calc_mse perfect fit, n_dim %llu: mse %f, core %f, all %f\n", (unsigned long long)n_dim, mse, core, all);
+        INFO("n_dim " << n_dim);
+        CHECK(std::isinf(mse));
+        CHECK(mse > 0.0);
+        // The grids reach beyond the last sample point, where the target is 0 and the sinusoids are 1
+        CHECK(std::isfinite(all));
+        if (n_dim == 1)
+            CHECK((std::isinf(core) && core > 0.0)); // Equals the return value in 1-D
+        else
+            CHECK(std::isfinite(core)); // The core radius of n_acf steps reaches one step beyond the table
+    }
+
+    arma::fvec df = arma::conv_to<arma::fvec>::from(dist), af(dist.n_elem, arma::fill::ones);
+    arma::fmat ff(4, 3, arma::fill::zeros);
+    float mf = quadriga_lib::sos_calc_mse(ff, af, df);
+    CHECK((std::isinf(mf) && mf > 0.0f));
+}
+
+TEST_CASE("sos_calc_mse - an output may be the same object as an input")
+{
+    arma::vec dist = arma::regspace(0.0, 2.0, 10.0), acf = arma::exp(-dist / 4.0);
+    arma::mat freq = rnd(12, 3, -0.15, 0.15, 60);
+
+    double core = 0.0, all = 0.0, core1 = 0.0, all1 = 0.0;
+    arma::vec tail;
+    arma::mat dir;
+    double ref = quadriga_lib::sos_calc_mse(freq, acf, dist, &core, &all, &tail, &dir, 7);
+
+    // acf_tail is 'acf' (6 elements, resized to 4), test_dir is 'freq'
+    arma::vec a = acf;
+    arma::mat f = freq;
+    double mse = quadriga_lib::sos_calc_mse(f, a, dist, &core1, &all1, &a, &f, 7);
+    CHECK(mse == ref);
+    CHECK(core1 == core);
+    CHECK(all1 == all);
+    REQUIRE(a.n_elem == 4);
+    CHECK(arma::approx_equal(a, tail, "absdiff", 0.0));
+    REQUIRE(f.n_rows == 7);
+    CHECK(arma::approx_equal(f, dir, "absdiff", 0.0));
+
+    // acf_tail is 'dist'
+    arma::vec d = dist;
+    mse = quadriga_lib::sos_calc_mse(freq, acf, d, &core1, &all1, &d, (arma::mat *)nullptr, 7);
+    CHECK(mse == ref);
+    CHECK(core1 == core);
+    CHECK(arma::approx_equal(d, tail, "absdiff", 0.0));
+}
+
+TEST_CASE("sos_calc_mse - results do not depend on the number of threads")
+{
+    // The test directions are evaluated in parallel and summed in a fixed order
+    arma::vec dist = arma::regspace(0.0, 2.0, 10.0), acf = arma::exp(-dist / 4.0);
+    arma::mat freq = rnd(40, 3, -0.15, 0.15, 70);
+
+    double mse[2], core[2], all[2];
+    arma::vec tail[2];
+    for (int run = 0; run < 2; ++run)
+    {
+#ifdef _OPENMP
+        int n_threads = omp_get_max_threads();
+        if (run == 1)
+            omp_set_num_threads(1);
+#endif
+        mse[run] = quadriga_lib::sos_calc_mse(freq, acf, dist, &core[run], &all[run], &tail[run], (arma::mat *)nullptr, 97);
+#ifdef _OPENMP
+        omp_set_num_threads(n_threads);
+#endif
+    }
+    CHECK(mse[0] > 1.0);
+    CHECK(mse[0] == mse[1]);
+    CHECK(core[0] == core[1]);
+    CHECK(all[0] == all[1]);
+    CHECK(arma::approx_equal(tail[0], tail[1], "absdiff", 0.0));
+    CHECK(std::abs(mse[0] + 10.0 * std::log10(ref_mse_dir(freq, acf, dist, 97))) < 1e-9);
 }

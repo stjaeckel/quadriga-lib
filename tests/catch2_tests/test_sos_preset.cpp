@@ -220,20 +220,23 @@ TEST_CASE("sos_preset - the documented generation gives tables of the same quali
     // platforms; the difference is printed. Asserted is what must hold everywhere: the regenerated table
     // has the same directions and limits and a fit within 1.5 dB of the shipped table (the spread of the
     // fit over 48 seeds was 1.5 to 3 dB for the 128 tables).
-    for (arma::uword i : {0, 4, 8})
+    // The tables with 128 and 256 sinusoids are regenerated here (6 s on one core). Those with 512 and 1024
+    // take another 60 s; they were regenerated once, on 2026-10-12, with a largest difference of 1.1e-16
+    // (md/LOG_QD_SOS.md) and are pinned by the checksums below.
+    for (arma::uword i : {0, 1, 4, 5, 8, 9})
     {
         const Preset &p = presets[i];
         arma::mat freq, regen;
         arma::vec acf, dist;
         quadriga_lib::sos_preset(p.name, freq, &acf, &dist);
-        REQUIRE(freq.n_rows == 128);
-        quadriga_lib::sos_generate(acf, dist, 128, regen, (arma::vec *)nullptr, (arma::mat *)nullptr, 3, true, 300, true, 0.005, 15.0 / 49.75, p.seed);
-        REQUIRE(regen.n_rows == 128);
+        REQUIRE(freq.n_rows == p.n_coeff);
+        quadriga_lib::sos_generate(acf, dist, p.n_coeff, regen, (arma::vec *)nullptr, (arma::mat *)nullptr, 3, true, 300, true, 0.005, 15.0 / 49.75, p.seed);
+        REQUIRE(regen.n_rows == p.n_coeff);
 
         double mse_ship = quadriga_lib::sos_calc_mse(freq, acf, dist, (double *)nullptr, (double *)nullptr, (arma::vec *)nullptr, (arma::mat *)nullptr, 100);
         double mse_regen = quadriga_lib::sos_calc_mse(regen, acf, dist, (double *)nullptr, (double *)nullptr, (arma::vec *)nullptr, (arma::mat *)nullptr, 100);
         double mx = arma::abs(regen - freq).max(), max_cross = 0.0;
-        for (arma::uword n = 0; n < 128; ++n)
+        for (arma::uword n = 0; n < p.n_coeff; ++n)
         {
             // Same direction per sinusoid: the cross product of the two rows vanishes
             double cx = freq(n, 1) * regen(n, 2) - freq(n, 2) * regen(n, 1), cy = freq(n, 2) * regen(n, 0) - freq(n, 0) * regen(n, 2);
@@ -302,5 +305,55 @@ TEST_CASE("sos_preset - input validation")
     {
         CHECK_THROWS_AS(quadriga_lib::sos_preset("Comb256", freq, (arma::vec *)nullptr, (arma::vec *)nullptr, 0.0), std::invalid_argument);
         CHECK_THROWS_AS(quadriga_lib::sos_preset("Comb256", freq, (arma::vec *)nullptr, (arma::vec *)nullptr, -10.0), std::invalid_argument);
+    }
+}
+
+TEST_CASE("sos_preset - the stored tables have the recorded checksums")
+{
+    // The quality checks above accept any table that fits well enough, so a changed digit in a stored value
+    // would pass them. Here the stored values are recovered from the output for 10 m (signed frequency of
+    // sinusoid n = its row of 'freq' projected on direction n of the lattice, written out below) and their
+    // sum and sum of squares are compared with the values recorded on 2026-10-12 from the shipped tables.
+    // Tolerance: 1e-15 relative, for the sum relative to the sum of the magnitudes (the signs cancel). The
+    // recovery costs about 3 roundings per value of 1e-16 relative each, so a change of one value in its
+    // 13th significant digit or above is found.
+    struct Checksum
+    {
+        const char *name;
+        double sum, sum_sq;
+    };
+    const Checksum checksums[12] = {
+        {"Exp128", -1.1755402660477672, 0.52583332308168751},
+        {"Exp256", 0.88464156886416656, 1.3262291202441001},
+        {"Exp512", -2.3764133012248845, 3.4268328544980253},
+        {"Exp1024", -0.39260313311863704, 9.0433012007154794},
+        {"Gauss128", -0.031945837392546278, 0.18176846417403708},
+        {"Gauss256", 0.63440497652643635, 0.37392721771931497},
+        {"Gauss512", -0.28576905590346352, 0.76676763658347047},
+        {"Gauss1024", 0.63041768449333779, 1.5367689503845079},
+        {"Comb128", 0.71261646207751705, 0.19244971340848105},
+        {"Comb256", -0.62463800916330869, 0.40855176059174952},
+        {"Comb512", 0.49710400165227242, 0.82900975893720374},
+        {"Comb1024", 1.6375798044747341, 1.6694938051669446}};
+
+    QD_DIAG("\n# diag: sos_preset checksums of the stored values\npreset,sum,recorded,rel_diff,sum_sq,recorded,rel_diff\n");
+    for (const Checksum &c : checksums)
+    {
+        arma::mat freq;
+        quadriga_lib::sos_preset(c.name, freq);
+        const arma::uword n_coeff = freq.n_rows;
+        double sum = 0.0, sum_sq = 0.0, sum_abs = 0.0;
+        for (arma::uword n = 0; n < n_coeff; ++n)
+        {
+            // Direction n of the spiral lattice: sin(elevation) = (n + 0.5) / n_coeff, azimuth = n · pi · (3 - sqrt(5))
+            double el = std::asin(((double)n + 0.5) / (double)n_coeff), az = (double)n * pi * (3.0 - std::sqrt(5.0));
+            double v = freq(n, 0) * std::cos(az) * std::cos(el) + freq(n, 1) * std::sin(az) * std::cos(el) + freq(n, 2) * std::sin(el);
+            sum += v, sum_sq += v * v, sum_abs += std::abs(v);
+        }
+        double d1 = std::abs(sum - c.sum) / sum_abs, d2 = std::abs(sum_sq - c.sum_sq) / c.sum_sq;
+        QD_DIAG("%s,%.17g,%.17g,%.1e,%.17g,%.17g,%.1e\n", c.name, sum, c.sum, d1, sum_sq, c.sum_sq, d2);
+        INFO(c.name);
+        CHECK(d1 < 1e-15);
+        CHECK(d2 < 1e-15);
     }
 }

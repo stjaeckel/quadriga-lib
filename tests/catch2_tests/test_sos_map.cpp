@@ -233,4 +233,79 @@ TEST_CASE("sos_map - input validation")
     {
         CHECK_THROWS_AS(quadriga_lib::sos_map(freq, phase, x, map, &y, &z, false, 3), std::invalid_argument);
     }
+    SECTION("a kernel that is not available")
+    {
+        // Runs in a build without AVX2 or on a CPU without it; with AVX2 the same call must work
+        if (!quadriga_lib::quadriga_lib_has_AVX2())
+            CHECK_THROWS_AS(quadriga_lib::sos_map(freq, phase, x, map, &y, &z, false, 2), std::invalid_argument);
+        else
+            CHECK_NOTHROW(quadriga_lib::sos_map(freq, phase, x, map, &y, &z, false, 2));
+    }
+    SECTION("a failed call leaves the output untouched")
+    {
+        std::vector<arma::cube> keep(1);
+        keep[0].set_size(2, 2, 2);
+        keep[0].fill(7.0);
+        arma::vec empty;
+        CHECK_THROWS_AS(quadriga_lib::sos_map(freq, phase, empty, keep), std::invalid_argument);
+        REQUIRE(keep.size() == 1);
+        CHECK(keep[0].n_slices == 2);
+        CHECK(keep[0](1, 1, 1) == 7.0);
+    }
+}
+
+TEST_CASE("sos_map - cubes that share one block of memory are filled in place")
+{
+    // The MEX and Python wrappers allocate the 4-D output as one block and hand the function cubes that
+    // alias it. The function then evaluates into that block; the result must be the same as for separate
+    // cubes, the cubes must keep their memory, and nothing around the block may be written.
+    arma::mat freq = rnd(9, 3, -0.3, 0.3, 11), phase = rnd(9, 3, -pi, pi, 12);
+    arma::vec x = {-3.0, 0.5, 7.0, 9.0}, y = {2.0, -4.5}, z = {1.0, 6.0, -2.0};
+    const arma::uword n_pos = 4 * 2 * 3, n_gen = 3;
+
+    std::vector<arma::cube> ref;
+    quadriga_lib::sos_map(freq, phase, x, ref, &y, &z, false, 1);
+    REQUIRE(ref.size() == n_gen);
+    CHECK(arma::abs(ref[2]).max() > 0.3);
+
+    // One guard value before and after the block
+    arma::vec block(n_pos * n_gen + 2);
+    block.fill(77.0);
+    std::vector<arma::cube> map;
+    map.reserve(n_gen); // A cube that aliases memory is copied when it is moved, so the vector must not grow
+    for (arma::uword g = 0; g < n_gen; ++g)
+        map.emplace_back(block.memptr() + 1 + g * n_pos, 2, 4, 3, false, true);
+    REQUIRE(map[2].memptr() == block.memptr() + 1 + 2 * n_pos);
+
+    for (bool uniform : {false, true})
+    {
+        std::vector<arma::cube> sep;
+        quadriga_lib::sos_map(freq, phase, x, sep, &y, &z, uniform, 1);
+        quadriga_lib::sos_map(freq, phase, x, map, &y, &z, uniform, 1);
+        REQUIRE(map.size() == n_gen);
+        for (arma::uword g = 0; g < n_gen; ++g)
+        {
+            INFO("uniform " << uniform << ", generator " << g);
+            CHECK(map[g].memptr() == block.memptr() + 1 + g * n_pos);
+            CHECK(arma::approx_equal(map[g], sep[g], "absdiff", 0.0));
+        }
+        CHECK(block(0) == 77.0);
+        CHECK(block(n_pos * n_gen + 1) == 77.0);
+    }
+
+    // Float
+    arma::fmat ff = arma::conv_to<arma::fmat>::from(freq), pf = arma::conv_to<arma::fmat>::from(phase);
+    arma::fvec xf = arma::conv_to<arma::fvec>::from(x), yf = arma::conv_to<arma::fvec>::from(y), zf = arma::conv_to<arma::fvec>::from(z);
+    arma::fvec fblock(n_pos * n_gen);
+    std::vector<arma::fcube> fmap, fsep;
+    fmap.reserve(n_gen);
+    for (arma::uword g = 0; g < n_gen; ++g)
+        fmap.emplace_back(fblock.memptr() + g * n_pos, 2, 4, 3, false, true);
+    quadriga_lib::sos_map(ff, pf, xf, fsep, &yf, &zf, false, 1);
+    quadriga_lib::sos_map(ff, pf, xf, fmap, &yf, &zf, false, 1);
+    for (arma::uword g = 0; g < n_gen; ++g)
+    {
+        CHECK(fmap[g].memptr() == fblock.memptr() + g * n_pos);
+        CHECK(arma::approx_equal(fmap[g], fsep[g], "absdiff", 0.0f));
+    }
 }

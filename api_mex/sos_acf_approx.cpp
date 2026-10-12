@@ -23,6 +23,8 @@ ACF produced by a set of sinusoids
 - `n_dim = 3`: on the x-y, x-z and y-z plane (pages 1, 2, 3); `[n_grid, n_grid, 3]`; the row index
   belongs to the second axis of the plane, the column index to the first
 - Only the sample points `dist` are used, not the ACF values
+- `R(-dx) = R(dx)`: each plane is point-symmetric about its center, exactly
+- Equally spaced has the meaning given in [[sos_acf_2d]]
 
 ## Usage:
 ```
@@ -30,9 +32,9 @@ ACF produced by a set of sinusoids
 ```
 
 ## Inputs:
-- **`freq`** — Frequencies in [1/m]; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
-- **`dist`** — Sample points of the ACF; must start at 0 and be equally spaced; at least 2
-  elements; `[n_acf]`
+- **`freq`** — Frequencies; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
+- **`dist`** — Sample points of the ACF; must start at 0, be equally spaced and finite; at least
+  2 elements; `[n_acf]`
 
 ## Outputs:
 - **`acf_approx`** — Approximated ACF; size depends on `n_dim`, see above

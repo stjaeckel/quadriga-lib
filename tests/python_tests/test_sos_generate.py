@@ -154,6 +154,16 @@ class test_case(unittest.TestCase):
         with self.assertRaises(TypeError):
             quadriga_lib.sos.generate(self.acf, self.dist, 2, no_such_argument=1)
 
+    def test_none_for_mandatory_arrays(self):
+        # None for a mandatory array is rejected by pybind11; it must not be read as one value of NaN
+        args = [self.acf, self.dist, 2, 1]
+        quadriga_lib.sos.generate(*args)
+        for i in range(2):
+            bad = list(args)
+            bad[i] = None
+            with self.assertRaises(TypeError):
+                quadriga_lib.sos.generate(*bad)
+
 
 if __name__ == "__main__":
     unittest.main()

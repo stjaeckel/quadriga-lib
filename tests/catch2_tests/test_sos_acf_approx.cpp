@@ -15,6 +15,7 @@
 
 #include "quadriga_sos.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <stdexcept>
 
@@ -172,5 +173,70 @@ TEST_CASE("sos_acf_approx - input validation")
         CHECK_THROWS_AS(quadriga_lib::sos_acf_approx(freq, one, ro), std::invalid_argument);
         CHECK_THROWS_AS(quadriga_lib::sos_acf_approx(freq, start, ro), std::invalid_argument);
         CHECK_THROWS_AS(quadriga_lib::sos_acf_approx(freq, uneven, ro), std::invalid_argument);
+    }
+    SECTION("non-finite dist")
+    {
+        // A NaN passes every comparison of the spacing test, an Inf at the end gives an infinite step
+        arma::vec nan_mid = {0.0, std::nan(""), 4.0, 6.0}, nan_end = {0.0, 2.0, 4.0, std::nan("")}, inf_end = {0.0, 2.0, 4.0, arma::datum::inf};
+        arma::vec two_nan = {0.0, std::nan("")}, two_inf = {0.0, arma::datum::inf};
+        CHECK_THROWS_AS(quadriga_lib::sos_acf_approx(freq, nan_mid, ro), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_acf_approx(freq, nan_end, ro), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_acf_approx(freq, inf_end, ro), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_acf_approx(freq, two_nan, ro), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_acf_approx(freq, two_inf, ro), std::invalid_argument);
+    }
+    SECTION("a failed call leaves the outputs untouched")
+    {
+        arma::vec uneven = {0.0, 1.0, 3.0}, axis(2);
+        axis.fill(7.0);
+        ro.set_size(2, 2, 2);
+        ro.fill(7.0);
+        CHECK_THROWS_AS(quadriga_lib::sos_acf_approx(freq, uneven, ro, &axis), std::invalid_argument);
+        CHECK(ro.n_slices == 2);
+        CHECK(ro(1, 1, 1) == 7.0);
+        CHECK(axis.n_elem == 2);
+    }
+}
+
+TEST_CASE("sos_acf_approx - the axis output may be the same object as dist")
+{
+    arma::mat freq = {{0.03, 0.05, -0.02}, {-0.07, 0.01, 0.04}};
+    arma::vec dist = {0.0, 2.0, 4.0, 6.0}, ref_axis, d = dist;
+    arma::cube ref, ro;
+    quadriga_lib::sos_acf_approx(freq, dist, ref, &ref_axis);
+    quadriga_lib::sos_acf_approx(freq, d, ro, &d);
+    REQUIRE(d.n_elem == 13);
+    CHECK(arma::approx_equal(d, ref_axis, "absdiff", 0.0));
+    CHECK(arma::approx_equal(ro, ref, "absdiff", 0.0));
+}
+
+TEST_CASE("sos_acf_approx - the planes are point-symmetric to the last bit")
+{
+    // R(-dx) = R(dx). The half of each plane beyond the center column is the mirror image of the other
+    // half, so the symmetry is exact, and the mirrored values still match the oracle.
+    arma::mat freq = {{0.031, 0.052, -0.023}, {-0.071, 0.013, 0.044}, {0.017, -0.066, 0.029}, {0.11, 0.07, -0.13}};
+    arma::vec dist = arma::regspace(0.0, 0.7, 6.3), axis;
+    for (arma::uword n_dim = 2; n_dim <= 3; ++n_dim)
+    {
+        arma::mat f = freq.cols(0, n_dim - 1);
+        arma::cube ro;
+        quadriga_lib::sos_acf_approx(f, dist, ro, &axis);
+        const arma::uword n = ro.n_rows;
+        REQUIRE(n == 37);
+        REQUIRE(ro.n_cols == 37);
+        arma::uword n_asym = 0;
+        double max_err = 0.0;
+        const arma::uword first[3] = {0, 0, 1}, second[3] = {1, 2, 2};
+        for (arma::uword s = 0; s < ro.n_slices; ++s)
+            for (arma::uword c = 0; c < n; ++c)
+                for (arma::uword r = 0; r < n; ++r)
+                {
+                    n_asym += (ro(r, c, s) == ro(n - 1 - r, n - 1 - c, s)) ? 0 : 1;
+                    max_err = std::max(max_err, std::abs(ro(r, c, s) - ref_acf(f, first[s], axis(c), second[s], axis(r))));
+                }
+        INFO("n_dim " << n_dim);
+        CHECK(n_asym == 0);
+        CHECK(max_err < 1e-12);
+        CHECK(std::abs(ro(3, 30, 0) - ro(3, 6, 0)) > 1e-3); // Point symmetry is not a mirror along one axis
     }
 }

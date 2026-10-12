@@ -25,7 +25,7 @@ val = quadriga_lib.sos_acfi( acf, dist, d );
 
 ## Inputs:
 - **`acf`** — Target ACF; at least 2 elements; `[n_acf]`
-- **`dist`** — Sample points of the ACF; must start at 0 and increase strictly; `[n_acf]`
+- **`dist`** — Sample points of the ACF; must start at 0, increase strictly and be finite; `[n_acf]`
 - **`d`** — Distances; must be >= 0; `[n_d]`
 
 ## Output:

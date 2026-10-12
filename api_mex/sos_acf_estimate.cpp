@@ -6,6 +6,37 @@
 #include "quadriga_lib.hpp"
 #include "mex_helper_functions.hpp"
 
+#include <cmath>
+#include <string>
+
+// Count argument: read as double, so that a negative or non-finite value is rejected with the name of the
+// argument instead of wrapping around in the conversion to an unsigned type. Non-integer values are truncated.
+static arma::uword qd_mex_sos_count(const mxArray *input, const char *name, double default_value)
+{
+    const double v = qd_mex_get_scalar<double>(input, name, default_value);
+    if (!(v >= 1.0) || !(v < 9.0e18))
+    {
+        const std::string msg = std::string("Input '") + name + "' must be a finite number >= 1.";
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", msg.c_str());
+    }
+    return (arma::uword)v;
+}
+
+// Seed: a floating-point value is checked before the conversion to an integer type, so that NaN and Inf are
+// rejected; non-integer values are truncated. Integer classes are read as they are (seeds above 2^53 are
+// exact only as int64 or uint64). Values below -1 are left to the library to reject.
+static arma::sword qd_mex_sos_seed(const mxArray *input)
+{
+    if (mxIsDouble(input) || mxIsSingle(input))
+    {
+        const double v = qd_mex_get_scalar<double>(input, "seed", -1.0);
+        if (!(v > -9.0e18) || !(v < 9.0e18))
+            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'seed' must be a finite number >= -1.");
+        return (arma::sword)v;
+    }
+    return qd_mex_get_scalar<arma::sword>(input, "seed", -1);
+}
+
 /*!SECTION
 Sum-of-sinusoids random number generator
 SECTION!*/
@@ -32,6 +63,7 @@ Monte-Carlo estimate of the ACF of one generator
   devices falls into the bin and the distance between their second devices does not exceed the
   upper limit of the bin; requires `acf` and `dist`
 - The estimate describes one realisation; it scatters around the ACF of the sinusoids
+- Run time grows with `n_pos^2`; the result does not depend on the number of threads
 
 ## Usage:
 ```
@@ -40,13 +72,15 @@ Monte-Carlo estimate of the ACF of one generator
 ```
 
 ## Inputs:
-- **`freq`** — Frequencies in [1/m]; `[n_coeff, 3]`
-- **`phase`** — Phases of the generator in [rad]; `[n_coeff]`
-- **`bins`** — Bin centers; must be >= 0 and increase strictly; at least 2 elements; `[n_bin]`
+- **`freq`** — Frequencies; `[n_coeff, 3]`
+- **`phase`** — Phases of the generator; `[n_coeff]`
+- **`bins`** — Bin centers; must be >= 0, increase strictly and be finite; at least 2
+  elements; `[n_bin]`
 - **`n_pos`** — Number of random positions per device; must be > 1
-- **`acf`** *(optional)* — Target ACF; required for `acf_est_dual`; `[n_acf]`
-- **`dist`** *(optional)* — Sample points of the ACF; must start at 0 and increase strictly;
+- **`acf`** *(optional)* — Target ACF; required for `acf_est_dual`, must then be > -1;
   `[n_acf]`
+- **`dist`** *(optional)* — Sample points of the ACF; must start at 0, increase strictly and be
+  finite; `[n_acf]`
 - **`seed`** — Seed for the positions; must be >= -1; -1 seeds from the system random device;
   default: -1
 
@@ -72,10 +106,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::mat freq = qd_mex_get_Mat<double>(prhs[0]);
     const arma::vec phase = qd_mex_get_Col<double>(prhs[1]);
     const arma::vec bins = qd_mex_get_Col<double>(prhs[2]);
-    const arma::uword n_pos = qd_mex_get_scalar<arma::uword>(prhs[3], "n_pos", 0);
+    const arma::uword n_pos = qd_mex_sos_count(prhs[3], "n_pos", 0.0);
     const arma::vec acf = (nrhs < 5) ? arma::vec() : qd_mex_get_Col<double>(prhs[4]);
     const arma::vec dist = (nrhs < 6) ? arma::vec() : qd_mex_get_Col<double>(prhs[5]);
-    const arma::sword seed = (nrhs < 7) ? -1 : qd_mex_get_scalar<arma::sword>(prhs[6], "seed", -1);
+    const arma::sword seed = (nrhs < 7) ? -1 : qd_mex_sos_seed(prhs[6]);
 
     // Output allocation
     arma::vec acf_est, dist_est, acf_est_dual;

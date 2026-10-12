@@ -33,6 +33,7 @@ Monte-Carlo estimate of the ACF of one generator
 - `acf_est_dual` is computed if `acf` or `dist` is given, and is `None` if both are omitted; giving
   only one of the two is an error
 - The estimate describes one realisation; it scatters around the ACF of the sinusoids
+- Run time grows with `n_pos^2`; the result does not depend on the number of threads
 
 ## Usage:
 ```
@@ -41,12 +42,14 @@ acf_est, dist_est, acf_est_dual = quadriga_lib.sos.acf_estimate( freq, phase, bi
 ```
 
 ## Inputs:
-- **`freq`** — Frequencies in [1/m]; `(n_coeff, 3)`
-- **`phase`** — Phases of the generator in [rad]; `(n_coeff,)` or `(n_coeff, 1)`
-- **`bins`** — Bin centers; must be >= 0 and increase strictly; at least 2 elements; `(n_bin,)`
+- **`freq`** — Frequencies; `(n_coeff, 3)`
+- **`phase`** — Phases of the generator; `(n_coeff,)` or `(n_coeff, 1)`
+- **`bins`** — Bin centers; must be >= 0, increase strictly and be finite; at least 2
+  elements; `(n_bin,)`
 - **`n_pos`** — Number of random positions per device; `int`; must be > 1
-- **`acf`** — Target ACF; required for `acf_est_dual`; `(n_acf,)`; default: `None`
-- **`dist`** — Sample points of the ACF; must start at 0 and increase strictly; `(n_acf,)`;
+- **`acf`** — Target ACF; required for `acf_est_dual`, must then be > -1;
+  `(n_acf,)`; default: `None`
+- **`dist`** — Sample points of the ACF; must start at 0, increase strictly and be finite; `(n_acf,)`;
   default: `None`
 - **`seed`** — Seed for the positions; `int`; must be >= -1; -1 seeds from the system random device;
   default: -1
@@ -102,9 +105,9 @@ py::tuple sos_acf_estimate(const py::array_t<double> &freq,
 
 // pybind11 declaration:
 // m.def("acf_estimate", &sos_acf_estimate,
-//       py::arg("freq"),
-//       py::arg("phase"),
-//       py::arg("bins"),
+//       py::arg("freq").none(false),
+//       py::arg("phase").none(false),
+//       py::arg("bins").none(false),
 //       py::arg("n_pos"),
 //       py::arg("acf") = py::none(),
 //       py::arg("dist") = py::none(),
