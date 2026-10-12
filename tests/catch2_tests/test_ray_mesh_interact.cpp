@@ -116,11 +116,14 @@ static inline double qd_slab_ref_R(std::complex<double> eps_s, double thk,
 //
 //   att_dB   Penetration loss of the sheet. One power factor 10^(-att/10) on the transmit port,
 //            nothing on the reflect port.
-//   tf       Transmission factor of the sheet, on both of its faces. With R0 = |r|^2 the raw
-//            reflectance of a face, R' = R0 (1 - tf) for tf >= 0 and R0 + (1 - R0)(-tf) for tf < 0;
-//            the reflection amplitude is scaled by sqrt(R'/R0) and each transmission amplitude of
-//            that face by sqrt((1 - R')/(1 - R0)). The stack is symmetric, so both faces have the
-//            same R0 and take the same two factors.
+//   tf       Transmission factor of the sheet, on both of its faces: an ideal transformer of real
+//            ratio at each face, which for a symmetric stack is the same sheet with its tilted
+//            admittance scaled by nu and its phase thickness untouched. With x0 the modulus of the
+//            admittance ratio sheet / air and rm = (1 - x0) / (1 + x0), the pair rule
+//            R' = rm^2 (1 - tf) for tf >= 0 and rm^2 + (1 - rm^2)(-tf) for tf < 0 gives the modulus
+//            the ratio is moved to, x = (1 - s) / (1 + s) with s = sqrt(R') at the sign of rm, and
+//            nu = x / x0. For a lossless sheet below its critical angle that is the pair rule on
+//            the reflectance of each face.
 //   res      Permittivity resonance, as an increment. It enters the admittance and the cosine,
 //            which are interface quantities, and not the propagation index.
 struct QdLumpRef
@@ -154,12 +157,23 @@ static inline QdLumpRef qd_slab_ref_lumped(std::complex<double> eps_s, double th
             r = (z2 * c1 - c2) / (z2 * c1 + c2), t12 = (2.0 * c1) / (z2 * c1 + c2),
             t21 = (2.0 * z2 * c2) / (c2 + z2 * c1);
 
-        double R0 = std::norm(r);
-        double Rt = (tf >= 0.0) ? R0 * (1.0 - tf) : R0 + (1.0 - R0) * (-tf);
-        double rho = (R0 > 0.0) ? std::sqrt(Rt / R0) : 0.0; // on r, at either face
-        double kap2 = (1.0 - Rt) / (1.0 - R0);              // on the t12 t21 product
+        std::complex<double> rr = r, kap2(1.0, 0.0); // the reflection of either face, and the factor on the t12 t21 product
+        if (tf != 0.0)
+        {
+            const std::complex<double> beta = (1.0 - r) / (1.0 + r);
+            const double x0 = std::abs(beta), rm = (1.0 - x0) / (1.0 + x0);
+            const double Rt = (tf >= 0.0) ? rm * rm * (1.0 - tf) : rm * rm + (1.0 - rm * rm) * (-tf);
+            const double s = (rm < 0.0) ? -std::sqrt(Rt) : std::sqrt(Rt);
+            if (1.0 + s > 0.0)
+            {
+                const double nu = ((1.0 - s) / (1.0 + s)) / x0;
+                rr = (1.0 - nu * beta) / (1.0 + nu * beta);
+                kap2 = (1.0 - rr * rr) / (1.0 - r * r);
+            }
+            else
+                rr = -1.0, kap2 = 0.0;
+        }
 
-        std::complex<double> rr = rho * r;
         std::complex<double> den = 1.0 - rr * rr * p2;
         std::complex<double> T = std::sqrt(g) * kap2 * t12 * t21 * p1 / den;
         std::complex<double> R = rr - std::sqrt(g) * kap2 * t12 * t21 * rr * p2 / den; // the echo entered the sheet and paid
