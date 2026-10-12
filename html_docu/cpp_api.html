@@ -87,6 +87,7 @@
 <li><a href="#c2d4d113">Channel statistics</a></li>
 <li><a href="#40522dfe">Math functions</a></li>
 <li><a href="#386370db">Site-specific simulation tools</a></li>
+<li><a href="#2d15ed9b">Sum-of-sinusoids random number generator</a></li>
 </ul>
 <br>
 <b>Array antenna class</b><br><br>
@@ -230,6 +231,24 @@
   <tr><td><a href="#triangle_mesh_split">triangle_mesh_split</a></td><td>Split a 3D triangular mesh into two sub-meshes along a given axis</td></tr>
   <tr><td><a href="#write_png">write_png</a></td><td>Write a data matrix to a color-coded PNG file</td></tr>
   <tr><td><a href="#xpr_update">xpr_update</a></td><td>Thread a polarization transfer (Jones) matrix along a ray path</td></tr>
+</tbody></table><br>
+
+<b>Sum-of-sinusoids random number generator</b><br><br>
+<table style="border-collapse: separate; border-spacing: 20px 0;"><tbody>
+  <tr><td><a href="#sos_acf_2d">sos_acf_2d</a></td><td>Target ACF on a 2-D grid</td></tr>
+  <tr><td><a href="#sos_acf_approx">sos_acf_approx</a></td><td>ACF produced by a set of sinusoids</td></tr>
+  <tr><td><a href="#sos_acf_estimate">sos_acf_estimate</a></td><td>Monte-Carlo estimate of the ACF of one generator</td></tr>
+  <tr><td><a href="#sos_acfi">sos_acfi</a></td><td>Target ACF at given distances</td></tr>
+  <tr><td><a href="#sos_calc_mse">sos_calc_mse</a></td><td>Approximation error of the ACF of a set of sinusoids</td></tr>
+  <tr><td><a href="#sos_generate">sos_generate</a></td><td>Find the frequencies of a sum-of-sinusoids generator for a given ACF</td></tr>
+  <tr><td><a href="#sos_init_phases">sos_init_phases</a></td><td>Draw random phases for a set of sum-of-sinusoids generators</td></tr>
+  <tr><td><a href="#sos_map">sos_map</a></td><td>Spatially correlated random values on a regular grid</td></tr>
+  <tr><td><a href="#sos_preset">sos_preset</a></td><td>Frequencies and ACF of a predefined sum-of-sinusoids generator</td></tr>
+  <tr><td><a href="#sos_rand">sos_rand</a></td><td>Spatially correlated Uniform distributed random numbers</td></tr>
+  <tr><td><a href="#sos_randi">sos_randi</a></td><td>Spatially correlated integer random numbers</td></tr>
+  <tr><td><a href="#sos_randn">sos_randn</a></td><td>Spatially correlated Normal distributed random numbers</td></tr>
+  <tr><td><a href="#sos_remove_bias">sos_remove_bias</a></td><td>Remove the sample mean of sum-of-sinusoids generators over a set of positions</td></tr>
+  <tr><td><a href="#sos_val">sos_val</a></td><td>Spatially correlated random values at given positions</td></tr>
 </tbody></table><br>
 
 <hr class="greyline"><br><br>
@@ -4711,7 +4730,7 @@ Linear gain of a ray traversing a homogeneous lossy medium
 <ul>
 <li>Conductivity-based loss from the complex permittivity model of ITU-R P.2040-1: <code>ε_r = a·(f/fRef)^b</code>, <code>σ = c·(f/fRef)^d</code>. These give an attenuation length <code>Δ</code> and a per-meter power loss <code>8.686 / Δ</code> dB/m.</li>
 <li>Distance absorption of the form <code>α·(f/fRef)^αB</code> dB/m, intended to model excess loss not captured by <code>σ</code> (e.g. foliage, scattering media).</li>
-<li>An acoustic mass-law term <code>m·log10((f/fRef)·dist)</code> dB, added once (not per meter) when <code>m &gt; 0</code>, <code>dist</code> exceeds ~1.5 mm, and the term is positive; <code>m</code> is the mass-law slope in dB/decade.</li>
+<li>An acoustic mass-law term <code>A = m·log10((f/fRef)·dist)</code> dB, added once (not per meter) when <code>m &gt; 0</code>, <code>dist</code> exceeds ~1.5 mm, and the term is positive; <code>m</code> is the mass-law slope in dB/decade. At oblique incidence the term carries the mass law's angle shape, <code>A·log10(1 + x²)/log10(1 + X₀²)</code> with <code>X₀ = 10^(A/20)</code> and <code>x = X₀·cos θ</code>, which is <code>A</code> at normal incidence, tapers to zero at tangency, and has an angle slope of 20 dB/decade of <code>cos θ</code> independent of <code>m</code>. This entry point supplies <code>cos θ = 1</code> and therefore returns <code>A</code> unchanged.</li>
 </ul>
 </li>
 <li>The penetration-loss columns (<code>att</code>, <code>attB</code>) of <code>mtl_prop</code> are not used — they describe thin-slab transmission loss, not propagation through a finite-thickness medium.</li>
@@ -5225,7 +5244,7 @@ Commit the paths of a launch configuration that reach a receiver
 <li>A pair is committed when the receiver is not shaded by the ray's own first-bounce face, the total path length stays below <code>max_path_length</code>, and the gain at <code>center_frequency[0]</code> stays above <code>min_gain_dB</code>.</li>
 <li>Shading is a half-space test against the plane of the first-bounce face: the receiver must lie on the same side of that plane as the ray origin. The face is treated as an infinite plane, so a receiver just past the edge of a small face is conservatively dropped.</li>
 <li>Rays flagged in <code>subdiv_flag_in</code> are skipped entirely — they reappear as sub-beams in the next generation and would otherwise be committed twice. Subdivision is not detected internally.</li>
-<li>A ray travelling inside a medium is committed with the in-layer attenuation of the final leg folded into its coefficients, per frequency, via <a href="#medium_gain">medium_gain</a> on <code>mtl_ind_current &amp; 0x7FFF</code>.</li>
+<li>A ray travelling inside a medium is committed with the in-layer attenuation of the final leg folded into its coefficients, per frequency, via <a href="#medium_gain">medium_gain</a> on <code>mtl_ind_current &amp; 0x3FFF</code>.</li>
 <li>In EM mode a receive-side mirror (<code>VV = 1</code>, <code>HH = -1</code>) is applied per frequency; in SCALAR mode only the gain is applied.</li>
 <li>The receiver index is written to the committed path's <code>iC</code>, 0-based. Without <code>point_index</code> it indexes <code>points</code> as passed in; with <code>point_index</code> it indexes the caller's original, unsegmented point list, so a cloud reordered by <a href="#point_cloud_segmentation">point_cloud_segmentation</a> needs no remapping afterwards.</li>
 <li>Padding points inserted by <a href="#point_cloud_segmentation">point_cloud_segmentation</a> for SIMD alignment sit at the center of their sub-cloud AABB and are therefore hit often. They are dropped when <code>point_index</code> is supplied and committed as if they were receivers when it is not.</li>
@@ -5260,13 +5279,13 @@ arma::uword quadriga_lib::ray_commit(
 <ul>
 <li><b><code>paths</code></b> — In-flight per-ray <a href="#path">path</a> objects; <code>[n_ray]</code>. Frequency count and layout define those of the committed paths; not modified</li>
 <li><b><code>mesh</code></b> — Faces of the triangular mesh; each row <code>{x1 y1 z1 x2 y2 z2 x3 y3 z3}</code>; <code>[n_mesh, 9]</code>. Only the faces named by <code>fbs_ind</code> are read, for the shading plane</li>
-<li><b><code>mtl_prop</code></b> — Material properties keyed by column name (the <code>csv_prop</code> output of <a href="#obj_file_read">obj_file_read</a>); each value has length <code>n_mtl</code> (max 32767)</li>
+<li><b><code>mtl_prop</code></b> — Material properties keyed by column name (the <code>csv_prop</code> output of <a href="#obj_file_read">obj_file_read</a>); each value has length <code>n_mtl</code> (max 16383)</li>
 <li><b><code>center_frequency</code></b> — Center frequencies in [Hz]; <code>[n_freq]</code>, 1 to 127 entries, must match the layout of <code>paths</code>. <code>center_frequency[0]</code> is the reference frequency for the gain gate</li>
 <li><b><code>orig</code></b> — Ray origins in GCS; <code>[n_ray, 3]</code>. Defines <code>n_ray</code>; must be non-empty</li>
 <li><b><code>fbs_ind</code></b> — 1-based index of the first intersected mesh element, 0 = no hit; <code>[n_ray]</code>. Obtained from <a href="#ray_triangle_intersect">ray_triangle_intersect</a> for the same launch configuration</li>
 <li><b><code>trivec</code></b> — Beam wavefront triangle vertices relative to the ray origin; <code>[n_ray, 9]</code></li>
 <li><b><code>tridir</code></b> — Vertex-ray directions, Cartesian; <code>[n_ray, 9]</code>. Need not be unit length</li>
-<li><b><code>mtl_ind_current</code></b> — Current medium state word, 0 = outside (bit-masked: <code>mat = w &amp; 0x7FFF</code>, <code>flag = w &amp; 0x8000</code>); <code>[n_ray]</code></li>
+<li><b><code>mtl_ind_current</code></b> — Current medium state word, 0 = outside (bit-masked: <code>mat = w &amp; 0x3FFF</code>, flags in bits 14 and 15); <code>[n_ray]</code></li>
 <li><b><code>rx_points</code></b> — Receive points in 3D space; <code>[n_point, 3]</code></li>
 <li><b><code>sub_cloud_index</code></b> <i>(optional)</i> — Sub-cloud partition offsets for the point cloud (see <a href="#point_cloud_segmentation">point_cloud_segmentation</a>); <code>[n_sub]</code>. NULL → no partitioning</li>
 <li><b><code>point_index</code></b> <i>(optional)</i> — 1-based map from each row of <code>points</code> back to the caller's original point list, 0 = padding inserted for SIMD alignment; <code>[n_point]</code>. Pass the <code>forward_index</code> output of <a href="#point_cloud_segmentation">point_cloud_segmentation</a> for the same cloud — not <code>reverse_index</code>, which runs the other way and has length <code>n_point</code> of the <i>unsegmented</i> cloud. Padded rows are skipped and <code>iC</code> is written in the original indexing. NULL → <code>points</code> is used as passed in and <code>iC</code> indexes it directly</li>
@@ -5618,7 +5637,7 @@ geometry alone, so air is assumed on any side the mesh does not name, which is o
 ray is in air. <a href="#ray_state_update">ray_state_update</a> holds the tracked medium and re-resolves the composite against the
 real bounding pair whenever medium tracking is enabled; without it, the air-bounded result stands.
 </li>
-<li><b><code>path_dirN</code></b> — Refraction-correct path direction: mirror for types 0/3, Snell direction for types 1/2/4/5; <code>[n_rayN, 3]</code>. For undeviated transmission (types 1/4) this is the <i>refracted</i> direction, which differs from the geometric continuation (along the incoming ray) used for <code>origN</code>/<code>destN</code>; it lets downstream code recover the true transmission angle.</li>
+<li><b><code>path_dirN</code></b> — Refraction-correct path direction: mirror for types 0/3, Snell direction for types 1/2/4/5; <code>[n_rayN, 3]</code>. For undeviated transmission (types 1/4) this is the <i>refracted</i> direction, which differs from the geometric continuation (along the incoming ray) used for <code>origN</code>/<code>destN</code>; it lets downstream code recover the true transmission angle. Out of a mass-law medium (<code>m &gt; 0</code>) there is no bend with any type: the wave is held undeviated at every face.</li>
 <li><b><code>ray_indN</code></b> — 0-based input ray index for each output ray (inverse of the internal compaction map; order-preserving); <code>[n_rayN]</code></li>
 </ul>
 
@@ -5745,7 +5764,7 @@ std::array&lt;unsigned, 4&gt; quadriga_lib::ray_progress(
 <ul>
 <li><b><code>mesh</code></b> — Triangle mesh faces; see <a href="#obj_file_read">obj_file_read</a>; <code>[n_mesh, 9]</code></li>
 <li><b><code>mtl_ind</code></b> — 1-based material index per face (the <code>csv_ind</code> output of <a href="#obj_file_read">obj_file_read</a>); <code>[n_mesh]</code>. 0 = air</li>
-<li><b><code>mtl_prop</code></b> — Material properties keyed by column name (the <code>csv_prop</code> output of <a href="#obj_file_read">obj_file_read</a>); each value has length <code>n_mtl</code> (max 32767)</li>
+<li><b><code>mtl_prop</code></b> — Material properties keyed by column name (the <code>csv_prop</code> output of <a href="#obj_file_read">obj_file_read</a>); each value has length <code>n_mtl</code> (max 16383)</li>
 <li><b><code>center_frequency</code></b> — Center frequencies in [Hz]; <code>[n_freq]</code>, 1 to 127 entries. <code>center_frequency[0]</code> is the reference frequency that defines the traced geometry</li>
 <li><b><code>Ox</code></b>, <b><code>Oy</code></b>, <b><code>Oz</code></b> — Point-source (transmitter) position in GCS [m]; used to recompute path length at new sub-beam origins</li>
 <li><b><code>sub_mesh_index</code></b> <i>(optional)</i> — Sub-mesh partition offsets for the accelerated intersect; 0-based, strictly increasing, first entry 0; passed to <a href="#ray_triangle_intersect">ray_triangle_intersect</a>; <code>[n_sub]</code>. NULL → no partitioning</li>
@@ -5769,7 +5788,7 @@ std::array&lt;unsigned, 4&gt; quadriga_lib::ray_progress(
 <ul>
 <li><b><code>orig</code></b> — Ray origins in GCS; <code>[n_ray, 3]</code>. Defines <code>n_ray</code>; must be non-empty</li>
 <li><b><code>dest</code></b> — Ray destinations in GCS; <code>[n_ray, 3]</code></li>
-<li><b><code>mtl_ind_prev</code></b>, <b><code>mtl_ind_current</code></b>, <b><code>mtl_ind_buffer</code></b> — Medium-state words (bit-masked: <code>mat = w &amp; 0x7FFF</code>, <code>flag = w &amp; 0x8000</code>); <code>[n_ray]</code></li>
+<li><b><code>mtl_ind_prev</code></b>, <b><code>mtl_ind_current</code></b>, <b><code>mtl_ind_buffer</code></b> — Medium-state words (bit-masked: <code>mat = w &amp; 0x3FFF</code>, flags in bits 14 and 15, see <a href="#ray_state_update">ray_state_update</a>); <code>[n_ray]</code></li>
 <li><b><code>path_dir_prev</code></b> — Physical ray direction entering the current segment (unit vectors), one slice per frequency; <code>[n_ray, 3, n_freq]</code>. The Snell bend that defines this direction depends on the material at the evaluation frequency, so a dispersive medium gives a different direction in every slice. Outside a medium all slices hold the same geometric direction</li>
 <li><b><code>acc_dist</code></b> — Accumulated in-layer distance; <code>[n_ray, 1 + n_freq]</code>; col 0 = geometric distance, col <code>1+f</code> = refracted distance at frequency <code>f</code>. The geometric column is shared because the traced polyline is the base-frequency geometry by construction; only the refracted length varies with frequency</li>
 <li><b><code>paths</code></b> — Per-ray <a href="#path">path</a> objects; <code>n_ray</code> entries. Frequency count and layout must match <code>center_frequency</code> and <code>scalar_mode</code>. Terminated paths are freed; surviving paths carry the appended interaction segment and the updated polarization product</li>
@@ -5806,10 +5825,10 @@ std::array&lt;unsigned, 4&gt; quadriga_lib::ray_progress(
 <hr class="thin">
 Batched inside/outside ray-state machine with analytic thin-slab (Fabry-Perot) resolution
 <ul>
-<li>Corrects the per-interaction <code>gainN</code> / <code>xprmatN</code> produced by <a href="#ray_mesh_interact">ray_mesh_interact</a> using a tracked per-ray medium state, and carries that state forward. Three signed-<code>short</code> words per ray hold the current medium, the previous medium, and a one-slot next-transition buffer (bit-masked: `mat = w & 0x7FFF<code>, </code>flag = w & 0x8000`).</li>
+<li>Corrects the per-interaction <code>gainN</code> / <code>xprmatN</code> produced by <a href="#ray_mesh_interact">ray_mesh_interact</a> using a tracked per-ray medium state, and carries that state forward. Three signed-<code>short</code> words per ray hold the current medium, the previous medium, and a one-slot next-transition buffer. The material index is 14 bits (<code>mat = w &amp; 0x3FFF</code>, at most 16383 materials) and bits 14 and 15 are flags. With bit 15 set the buffer word is not a medium: it marks a leg that was entered by crossing a bonded mass-law body and its low 15 bits carry a thickness code.</li>
 <li>Implements the inside/outside state machine and overlays a closed-form thin-slab factor <code>S</code> (the Airy sum) so a single coefficient captures the full internal multiple-reflection series of a parallel slab thin enough to matter, instead of relying on the tracer to follow every internal bounce.</li>
 <li>Called twice per interaction by the ray tracer: once for the reflection pass (<code>interaction_type</code> 0 or 3) and once for the transmission/refraction pass (<code>interaction_type</code> 1, 2, 4, 5). With <code>S</code> suppressed (the survival gate re-emits) the transmission/refraction path reproduces <a href="#calc_diffraction_gain">calc_diffraction_gain</a></li>
-<li>Thin sheets: a <code>thk &gt; 0</code> crossing arrives from <a href="#ray_mesh_interact">ray_mesh_interact</a> already resolved as one atomic three-medium event, but with its bounding media guessed from face geometry alone — air on any side the mesh did not name. This function supplies the media the tracked state actually reports and re-resolves the composite against them, which matters for every sheet that does not sit in air: a sheet embedded in a medium is bounded by that medium on both sides, and the wrong pair moves both Fresnel boundaries, the internal series and the lumped interface gain at once. The sheet material never becomes the current medium; it is recorded in the previous-medium word so the host layer on the far side reflects off it.</li>
+<li>Thin sheets: a <code>thk &gt; 0</code> crossing arrives from <a href="#ray_mesh_interact">ray_mesh_interact</a> already resolved as one atomic three-medium event, but with its bounding media guessed from face geometry alone — air on any side the mesh did not name. This function supplies the media the tracked state actually reports and re-resolves the composite against them, which matters for every sheet that does not sit in air: a sheet embedded in a medium is bounded by that medium on both sides, and the wrong pair moves both Fresnel boundaries, the internal series and the lumped interface gain at once. The sheet material never becomes the current medium; it is recorded in the previous-medium word so the host layer on the far side reflects off it — except where the sheet and the host are the same medium electrically, in which case the sheet is not a boundary at all, the host layer is carried through it uninterrupted, and its series resolves once over the whole path rather than collapsing at a face that does not reflect. The total-reflection verdict and the continuation direction are re-derived here too, at the corrected angle, for the same reason <a href="#ray_state_update">ray_state_update</a> re-derives them for a traced solid: an undeviated tracer inside a medium travels at its external angle, so the hit code's geometric-angle verdict turns a glued exit into a mirror past the internal critical angle, and leaving <code>path_dirN</code> unchanged would hand the next interaction a geometric direction where a refracted one is required.</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -5844,7 +5863,13 @@ void quadriga_lib::ray_state_update(
     arma::Col&lt;dtype&gt; *acc_dist_refractedN = nullptr,
     std::vector&lt;uint8_t&gt; *resolved_typeN = nullptr,
     const arma::u32_vec *ray_indN = nullptr,
-    double eps = 0.15);
+    double eps = 0.15,
+    arma::Mat&lt;dtype&gt; *origN = nullptr,
+    arma::Mat&lt;dtype&gt; *destN = nullptr,
+    const arma::Mat&lt;dtype&gt; *tridir = nullptr,
+    arma::Mat&lt;dtype&gt; *tridirN = nullptr,
+    const std::vector&lt;uint8_t&gt; *verdict_inN = nullptr,
+    std::vector&lt;uint8_t&gt; *verdict_outN = nullptr);
 </pre>
 
 <b>Inputs:</b><br>
@@ -5859,20 +5884,61 @@ void quadriga_lib::ray_state_update(
 <li><b><code>out_typeN</code></b> — Interaction type code from <a href="#ray_mesh_interact">ray_mesh_interact</a>, compact set; <code>[n_rayN]</code>. Bit 5 is stripped and re-evaluated at the VBS angle; bit 6 (thin sheet) is dispatched on and is <i>not</i> stripped, so the sheet codes 65 / 67 / 69 / 71 / 79 take their own path ahead of the solid state machine.</li>
 <li><b><code>mtl_prop</code></b> — Material properties keyed by column name (the <code>csv_prop</code> output of <a href="#obj_file_read">obj_file_read</a>). The <code>thk</code> column is read here as well as in <a href="#ray_mesh_interact">ray_mesh_interact</a>; it selects the thin-sheet path.</li>
 <li><b><code>mtl_ind_fbsN</code></b>, <b><code>mtl_ind_sbsN</code></b> — Material indices M1 / M2 of the FBS / SBS faces, compact set; <code>[n_rayN]</code> (0 = air). <code>mtl_ind_sbsN</code> is load-bearing beyond media-to-media: it carries the second face of a glued or duplicate sheet pair, and the thin-sheet case is re-derived from <code>(code, is_sheet(FBS), is_sheet(SBS), same material)</code> because codes 69 and 71 are shared by three topologies.</li>
-<li><b><code>mtl_ind_prev_in</code></b>, <b><code>mtl_ind_current_in</code></b>, <b><code>mtl_ind_buffer_in</code></b> — State words, full ray set; <code>[n_ray]</code>, read at <code>g</code>, never written. NULL reads as state <code>0</code> (outside, no flags).</li>
+<li><b><code>mtl_ind_prev_in</code></b>, <b><code>mtl_ind_current_in</code></b>, <b><code>mtl_ind_buffer_in</code></b> — State words, full ray set; <code>[n_ray]</code>, read at <code>g</code>, never written. NULL reads as state <code>0</code> (outside, no flags). A buffer word with bit 15 set is a surface-mass code written by an earlier call and is exempt from the material range check; pass the words through unchanged between calls. A leg that carries the followed mark forms no series: the verdict of a body is taken once, at the first event that closes a leg in it.<br><br>
+<table class="md">
+<tr>
+  <th>Word</th>
+  <th>Bits 0-13</th>
+  <th>Bit 14</th>
+  <th>Bit 15</th>
+</tr>
+<tr>
+  <td><code>mtl_ind_current</code></td>
+  <td>medium the ray is in, 0 = air</td>
+  <td>bent: the leg follows a bend traced with type 2 or 5; zero in air</td>
+  <td>resolved</td>
+</tr>
+<tr>
+  <td><code>mtl_ind_prev</code></td>
+  <td>medium the leg was entered from, or the sheet crossed or reflected off</td>
+  <td>the sheet in this word lies inside the current medium</td>
+  <td>known non-parallel</td>
+</tr>
+<tr>
+  <td><code>mtl_ind_buffer</code></td>
+  <td>deferred medium</td>
+  <td>followed, with a zero index: the leg began at a reflection that left the series to the tracer</td>
+  <td>clear</td>
+</tr>
+<tr>
+  <td><code>mtl_ind_buffer</code></td>
+  <td>thickness code, bits 0-14</td>
+  <td>(part of the code)</td>
+  <td>set: mass-crossed</td>
+</tr>
+</table>
+Under bit 15 the code is the normal thickness of a mass-law leg closed on the way into the current
+one: of the solid in <code>mtl_ind_prev</code>, or, where that word holds a sheet lying inside the current
+medium, of the part of the current medium in front of that sheet. Zero means no such leg.
+</li>
 <li><b><code>path_dir_prev</code></b> — Physical ray direction entering this segment, full ray set; <code>[n_ray, 3]</code></li>
 <li><b><code>acc_dist_geometric</code></b> — Accumulated geometric in-layer distance carried into this call, full ray set; <code>[n_ray]</code>. NULL reads as 0. Frequency-independent: built from the traced <code>orig</code>-<code>fbs</code> / <code>fbs</code>-<code>dest</code> lengths only, so a multi-frequency caller keeps a single shared instance.</li>
 <li><b><code>acc_dist_refracted</code></b> — Accumulated refracted (VBS) in-layer distance carried into this call, full ray set; <code>[n_ray]</code>. NULL reads as 0. Frequency-dependent, since the Snell bend that defines it follows the material at <code>center_frequency</code>, so a multi-frequency caller keeps one instance per frequency. The two inputs are independent; either may be NULL.</li>
 <li><b><code>ray_indN</code></b> — Compact-to-full ray index map; <code>[n_rayN]</code> to <code>[n_ray]</code>; NULL = identity (<code>n_ray == n_rayN</code>)</li>
 <li><b><code>eps</code></b> <i>(optional)</i> — Thin-slab (Fabry-Pérot) resolve threshold on the round-trip in-slab amplitude <code>ρ</code> (<code>ρ ∈ [0, 1]</code>): the closed-form Airy factor is applied when <code>ρ ≥ eps</code> and the series is re-emitted to the tracer when <code>ρ &amp;lt; eps</code> (weak / fast-decaying slabs). <code>eps = 0</code> always resolves (for callers that cannot re-emit, e.g. <a href="#calc_diffraction_gain">calc_diffraction_gain</a>); <code>eps ≥ 1</code> always re-emits (resolution disabled). A near-pole <code>S</code> or a known non-parallel slab re-emits regardless of <code>eps</code>. Does <b>not</b> gate a thin sheet's own series: a sheet has no interior for the tracer to re-emit into, so that series always resolves. <code>eps</code> still gates the host layer a sheet is embedded in. Default <code>0.15</code>.</li>
+<li><b><code>verdict_inN</code></b> <i>(optional)</i> — The verdict of each event on its bounce series, as an earlier call on the same events wrote it to <code>verdict_outN</code>, compact set; <code>[n_rayN]</code>. Where given, a series is summed exactly where the entry is nonzero and <code>eps</code> is not read. The traced paths of a multi-frequency run are the base frequency's - a reflected ray is resolved or followed as that frequency decided - so the caller hands the base frequency's verdict to the call of every other frequency. A summed series near a pole is clamped in magnitude instead of being re-emitted. NULL: this call decides, by <code>eps</code>.</li>
+<li><b><code>tridir</code></b> <i>(optional)</i> — Vertex-ray directions of the beam entering this segment, Cartesian, as handed to <a href="#ray_mesh_interact">ray_mesh_interact</a>; <code>[n_ray, 9]</code>. Given together with <code>tridirN</code>; requires <code>origN</code> and <code>destN</code></li>
 </ul>
 
 <b>Outputs:</b><br>
 <ul>
-<li><b><code>mtl_ind_prev_outN</code></b>, <b><code>mtl_ind_current_outN</code></b>, <b><code>mtl_ind_buffer_outN</code></b> — Updated state words, compact set; <code>[n_rayN]</code>. <code>mtl_ind_prev_outN</code> may hold a <b>sheet</b> material index after a thin-sheet crossing. That is a boundary material, not a medium the ray travelled through: the previous-medium word is only ever read as the far material of a slab resolve and for the parallelism flag, and a sheet is the correct far material for the layer on either side of it. NULL skips the write. Passing all six state args NULL disables tracking — each interaction is corrected on its own (entry loss, TR kill, single-hit air-gap <code>S</code>); cross-interaction slab <code>S</code> and reflection-bounce <code>S</code> need the tracked medium.</li>
+<li><b><code>mtl_ind_prev_outN</code></b>, <b><code>mtl_ind_current_outN</code></b>, <b><code>mtl_ind_buffer_outN</code></b> — Updated state words, compact set; <code>[n_rayN]</code>. <code>mtl_ind_prev_outN</code> may hold a <b>sheet</b> material index after a thin-sheet crossing. That is a boundary material, not a medium the ray travelled through: the previous-medium word is only ever read as the far material of a slab resolve, for the parallelism flag, and as the bonded mass-law body a leg was entered through, and a sheet is the correct far material for the layer on either side of it. <code>mtl_ind_buffer_outN</code> with bit 15 set carries the surface-mass code of that body (a logarithmic thickness code for a traced solid; for a sheet zero, or the thickness of the host in front of a sheet that lies inside it) instead of a deferred medium. Bit 14 of <code>mtl_ind_prev_outN</code> is set where the sheet in that word lies inside the current medium, so that the layer behind it is backed by that medium and not by air. NULL skips the write. Passing all six state args NULL disables tracking — each interaction is corrected on its own (entry loss, TR kill, single-hit air-gap <code>S</code>); cross-interaction slab <code>S</code> and reflection-bounce <code>S</code> need the tracked medium.</li>
 <li><b><code>gainN</code></b> <i>(in/out)</i> — Per-interaction linear power gain, updated in place; <code>[n_rayN]</code>. Kept consistent with <code>xprmatN</code> at every write. A killed ray (<code>resolved_typeN == 0</code>) yields <code>gainN = 0</code> together with an all-zero <code>xprmatN</code>.</li>
-<li><b><code>xprmatN</code></b> <i>(in/out)</i> — Polarization transfer matrix, updated in place; <code>[8, n_rayN]</code> for EM mode, <code>[2, n_rayN]</code> for scalar mode. Same layout and basis convention as in <a href="#ray_mesh_interact">ray_mesh_interact</a>, but with the medium closed out: on return it additionally contains the in-medium attenuation and excess phase of the traversed segment and, when the resolve bit of <code>resolved_typeN</code> is set, the closed-form thin-slab (Airy) factor <code>S</code> covering the full internal multiple-reflection series. FSPL / spreading loss remains excluded, so the matrix is the complete per-interaction Jones factor and can be left-multiplied directly into a per-path product. When the series is re-emitted instead (<code>ρ &amp;lt; eps</code>, resolve bit clear), the matrix carries only the first-pass coefficient and the remaining bounces arrive as separate interactions. On a thin-sheet crossing the matrix is <i>replaced</i> by the composite re-resolved for the bounding media the state words report, and no medium gain is charged for the sheet material itself — its traversal loss and phase are already inside the composite. The host medium the ray was travelling in is still closed out.</li>
+<li><b><code>xprmatN</code></b> <i>(in/out)</i> — Polarization transfer matrix, updated in place; <code>[8, n_rayN]</code> for EM mode, <code>[2, n_rayN]</code> for scalar mode. Same layout and basis convention as in <a href="#ray_mesh_interact">ray_mesh_interact</a>, but with the medium closed out: on return it additionally contains the in-medium attenuation and excess phase of the traversed segment and, when the resolve bit of <code>resolved_typeN</code> is set, the closed-form thin-slab (Airy) factor <code>S</code> covering the full internal multiple-reflection series. <code>S</code> is applied per polarization and is a pure series factor — the interface coefficients it multiplies are the ones <a href="#ray_mesh_interact">ray_mesh_interact</a> already wrote, and no magnitude conversion is applied on top of them. FSPL / spreading loss remains excluded, so the matrix is the complete per-interaction Jones factor and can be left-multiplied directly into a per-path product. When the series is re-emitted instead (<code>ρ &amp;lt; eps</code>, resolve bit clear), the matrix carries only the first-pass coefficient and the remaining bounces arrive as separate interactions. On a thin-sheet crossing the matrix is <i>replaced</i> by the composite re-resolved for the bounding media the state words report, and no medium gain is charged for the sheet material itself — its traversal loss and phase are already inside the composite. The host medium the ray was travelling in is still closed out.</li>
 <li><b><code>path_dirN</code></b> <i>(in/out)</i> — Continuation direction, corrected in place by the VBS construction, compact set; <code>[n_rayN, 3]</code></li>
+<li><b><code>origN</code></b>, <b><code>destN</code></b> <i>(optional, in/out)</i> — The relaunch segment <a href="#ray_mesh_interact">ray_mesh_interact</a> built, compact set; <code>[n_rayN, 3]</code>, given together. With a refracting type (2, 5) that segment was bent at a real angle in the medium the ray leaves. Where this function writes the direction of a wave out of a lossy medium whose in-medium cosine it recovered - a bare exit, a glued exit, a transition into another solid - both points are put on one line along <code>path_dirN</code>, through the SBS of a co-located pair and the FBS otherwise. Every other ray, and every other type, is left untouched; NULL leaves the geometry to the caller as before. A caller that runs several frequencies passes them on the call that defines the geometry only.</li>
+<li><b><code>tridirN</code></b> <i>(optional, in/out)</i> — Vertex-ray directions leaving, Cartesian, compact set; <code>[n_rayN, 9]</code>. Corrected together with <code>origN</code> and <code>destN</code>: each vertex ray gets the construction of the spine from its own direction in <code>tridir</code>. If one of the three cannot be formed, the ray keeps the geometry it had.</li>
+<li><b><code>verdict_outN</code></b> <i>(optional)</i> — Per event, 1 where this call summed a bounce series and 0 where it left the bounces to the tracer, compact set; <code>[n_rayN]</code>. NULL skips the write.</li>
 <li><b><code>acc_dist_geometricN</code></b> — Accumulated geometric distance leaving this call, compact set; <code>[n_rayN]</code>. NULL skips the write.</li>
 <li><b><code>acc_dist_refractedN</code></b> — Accumulated refracted (VBS) distance leaving this call, compact set; <code>[n_rayN]</code>. NULL skips the write.</li>
 <li><b><code>resolved_typeN</code></b> <i>(optional)</i> — Resolved interaction-type code, bit-encoded (<code>qd::bits&lt;uint8_t&gt;</code>), compact set; <code>[n_rayN]</code>. 0 = ray killed. NULL skips the write.<br><br>
@@ -6089,7 +6155,9 @@ Reachable composite values for transmission / refraction:<br><br>
   <td class="c">87</td>
   <td class="c">103</td>
   <td>sheet, glued, resolve, ok</td>
-  <td>glued exit, solid \ sheet \ enclosing</td>
+  <td>glued exit, solid \</td>
+  <td>sheet \</td>
+  <td>air</td>
 </tr>
 <tr>
   <td class="c">79</td>
@@ -6097,7 +6165,9 @@ Reachable composite values for transmission / refraction:<br><br>
   <td class="c">95</td>
   <td class="c">111</td>
   <td>sheet, glued, resolve, inside, ok</td>
-  <td>glued entry, host \ sheet \ solid</td>
+  <td>glued entry, host \</td>
+  <td>sheet \</td>
+  <td>solid</td>
 </tr>
 </table>
 Reachable composite values for reflection:<br><br>
@@ -6690,6 +6760,693 @@ xpr_update(M, &amp;U, &amp;g, false, true, true, &amp;idx);     // full chain st
 <b>See also:</b><br>
 <ul>
 <li><a href="#calc_diffraction_gain">calc_diffraction_gain</a> (produces <code>xprmat</code> in this exact layout)</li>
+</ul>
+
+<hr class="greyline"><br><br>
+<span id="2d15ed9b" class="qd-section"><b>Sum-of-sinusoids random number generator</b></span><br>
+<br>
+<hr class="greyline"><br>
+<span id="sos_acf_2d" class="qd-func"><b>sos_acf_2d</b></span><br>
+<hr class="thin">
+Target ACF on a 2-D grid
+<ul>
+<li>Evaluates a rotationally symmetric autocorrelation function (ACF), given as a table over the distance, on a square grid</li>
+<li>Grid axis: from <code>-2·Dmax</code> to <code>2·Dmax</code> with the spacing of <code>dist</code>, where <code>Dmax</code> is the last sample point; <code>n_grid = 4·n_acf - 3</code>, the center is element <code>2·n_acf - 2</code> (0-based)</li>
+<li>Linear interpolation of the table at the radial distance; 0 at radial distances above <code>Dmax</code></li>
+<li>The result is the reference for <a href="#sos_acf_approx">sos_acf_approx</a></li>
+</ul>
+
+<b>Declaration:</b><br>
+<pre>
+void quadriga_lib::sos_acf_2d(
+    const arma::Col&lt;dtype&gt; &amp;acf,
+    const arma::Col&lt;dtype&gt; &amp;dist,
+    arma::Mat&lt;dtype&gt; &amp;acf_2d,
+    arma::Col&lt;dtype&gt; *dist_2d = nullptr);
+</pre>
+
+<b>Inputs:</b><br>
+<ul>
+<li><b><code>acf</code></b> — Target ACF; at least 2 elements; <code>[n_acf]</code></li>
+<li><b><code>dist</code></b> — Sample points of the ACF in [m]; must start at 0 and be equally spaced; <code>[n_acf]</code></li>
+</ul>
+
+<b>Outputs:</b><br>
+<ul>
+<li><b><code>acf_2d</code></b> — ACF on the grid; <code>[n_grid, n_grid]</code></li>
+<li><b><code>dist_2d</code></b> <i>(optional)</i> — Grid axis in [m]; <code>[n_grid]</code></li>
+</ul>
+
+<b>See also:</b><br>
+<ul>
+<li><a href="#sos_acf_approx">sos_acf_approx</a> (ACF produced by a set of sinusoids on the same grid)</li>
+<li><a href="#sos_calc_mse">sos_calc_mse</a> (difference between the two)</li>
+</ul>
+
+<hr class="greyline"><br>
+<span id="sos_acf_approx" class="qd-func"><b>sos_acf_approx</b></span><br>
+<hr class="thin">
+ACF produced by a set of sinusoids
+<ul>
+<li>Autocorrelation function (ACF) of the values of <a href="#sos_val">sos_val</a> over uniformly random phases: <code>R(dx) = (1/n_coeff) · sum_n cos( 2·pi · f_n·dx )</code></li>
+<li>Evaluated on the grid axis of <a href="#sos_acf_2d">sos_acf_2d</a>: from <code>-2·Dmax</code> to <code>2·Dmax</code> with the spacing of <code>dist</code>, <code>n_grid = 4·n_acf - 3</code></li>
+<li><code>n_dim = 1</code>: along the axis; <code>[n_grid, 1, 1]</code></li>
+<li><code>n_dim = 2</code>: on the x-y plane; <code>[n_grid, n_grid, 1]</code>; element <code>(iy, ix)</code></li>
+<li><code>n_dim = 3</code>: on the x-y, x-z and y-z plane (slices 0, 1, 2); <code>[n_grid, n_grid, 3]</code>; the row index belongs to the second axis of the plane, the column index to the first</li>
+<li>Only the sample points <code>dist</code> are used, not the ACF values</li>
+</ul>
+
+<b>Declaration:</b><br>
+<pre>
+void quadriga_lib::sos_acf_approx(
+    const arma::Mat&lt;dtype&gt; &amp;freq,
+    const arma::Col&lt;dtype&gt; &amp;dist,
+    arma::Cube&lt;dtype&gt; &amp;acf_approx,
+    arma::Col&lt;dtype&gt; *dist_2d = nullptr);
+</pre>
+
+<b>Inputs:</b><br>
+<ul>
+<li><b><code>freq</code></b> — Frequencies in [1/m]; <code>n_dim</code> = 1, 2 or 3; <code>[n_coeff, n_dim]</code></li>
+<li><b><code>dist</code></b> — Sample points of the ACF in [m]; must start at 0 and be equally spaced; at least 2 elements; <code>[n_acf]</code></li>
+</ul>
+
+<b>Outputs:</b><br>
+<ul>
+<li><b><code>acf_approx</code></b> — Approximated ACF; size depends on <code>n_dim</code>, see above</li>
+<li><b><code>dist_2d</code></b> <i>(optional)</i> — Grid axis in [m]; <code>[n_grid]</code></li>
+</ul>
+
+<b>See also:</b><br>
+<ul>
+<li><a href="#sos_acf_2d">sos_acf_2d</a> (target ACF on the same grid)</li>
+<li><a href="#sos_calc_mse">sos_calc_mse</a> (difference between the two)</li>
+</ul>
+
+<hr class="greyline"><br>
+<span id="sos_acf_estimate" class="qd-func"><b>sos_acf_estimate</b></span><br>
+<hr class="thin">
+Monte-Carlo estimate of the ACF of one generator
+<ul>
+<li>Estimates the autocorrelation function (ACF) of one realisation of a generator from its values at random positions, without using the frequencies other than through <a href="#sos_val">sos_val</a></li>
+<li>Draws <code>2·n_pos</code> positions, uniformly in a cube with half edge <code>0.4·max(bins)</code> around the origin, evaluates the generator there, and for each distance bin computes the correlation coefficient between the two values of all position pairs whose distance falls into the bin</li>
+<li>Positions: a matrix <code>[2·n_pos, 3]</code> is filled column by column (all x, then all y, then all z) with <code>( 2·u - 1 ) · 0.4·max(bins)</code>, where <code>u</code> comes from the random stream described in <a href="#sos_init_phases">sos_init_phases</a></li>
+<li>Bin <code>n</code> covers the distances from the midpoint between <code>bins(n-1)</code> and <code>bins(n)</code> (excluded) to the midpoint between <code>bins(n)</code> and <code>bins(n+1)</code> (included). The first bin starts at 1e-5 m, the last bin ends half a mean bin spacing above <code>bins(end)</code></li>
+<li>Bins with fewer than 6 pairs return NaN in all outputs</li>
+<li><code>acf_est_dual</code>: the same for two devices on the same map. The first <code>n_pos</code> positions are the first device, the second <code>n_pos</code> positions the second device, and the value of a link is <a href="#sos_val">sos_val</a> with both positions. Two links form a pair if the distance between their first devices falls into the bin and the distance between their second devices does not exceed the upper limit of the bin; requires <code>acf</code> and <code>dist</code></li>
+<li>The estimate describes one realisation; it scatters around the ACF of the sinusoids</li>
+</ul>
+
+<b>Declaration:</b><br>
+<pre>
+void quadriga_lib::sos_acf_estimate(
+    const arma::Mat&lt;dtype&gt; &amp;freq,
+    const arma::Col&lt;dtype&gt; &amp;phase,
+    const arma::Col&lt;dtype&gt; &amp;bins,
+    arma::uword n_pos,
+    arma::Col&lt;dtype&gt; &amp;acf_est,
+    arma::Col&lt;dtype&gt; *dist_est = nullptr,
+    arma::Col&lt;dtype&gt; *acf_est_dual = nullptr,
+    const arma::Col&lt;dtype&gt; *acf = nullptr,
+    const arma::Col&lt;dtype&gt; *dist = nullptr,
+    arma::sword seed = -1);
+</pre>
+
+<b>Inputs:</b><br>
+<ul>
+<li><b><code>freq</code></b> — Frequencies in [1/m]; <code>[n_coeff, 3]</code></li>
+<li><b><code>phase</code></b> — Phases of the generator in [rad]; <code>[n_coeff]</code></li>
+<li><b><code>bins</code></b> — Bin centers in [m]; must be >= 0 and increase strictly; at least 2 elements; <code>[n_bin]</code></li>
+<li><b><code>n_pos</code></b> — Number of random positions per device; must be > 1</li>
+<li><b><code>acf</code></b> <i>(optional)</i> — Target ACF; required for <code>acf_est_dual</code>; <code>[n_acf]</code></li>
+<li><b><code>dist</code></b> <i>(optional)</i> — Sample points of the ACF in [m]; must start at 0 and increase strictly; <code>[n_acf]</code></li>
+<li><b><code>seed</code></b> <i>(optional)</i> — Seed for the positions; must be >= -1; <code>-1</code> seeds from the system random device</li>
+</ul>
+
+<b>Outputs:</b><br>
+<ul>
+<li><b><code>acf_est</code></b> — Estimated ACF; <code>[n_bin]</code></li>
+<li><b><code>dist_est</code></b> <i>(optional)</i> — Mean distance of the pairs in each bin in [m]; <code>[n_bin]</code></li>
+<li><b><code>acf_est_dual</code></b> <i>(optional)</i> — Estimated ACF for two devices on the same map; <code>[n_bin]</code></li>
+</ul>
+
+<b>See also:</b><br>
+<ul>
+<li><a href="#sos_acf_approx">sos_acf_approx</a> (ACF of the sinusoids in closed form)</li>
+<li><a href="#sos_val">sos_val</a> (evaluation of the generator)</li>
+</ul>
+
+<hr class="greyline"><br>
+<span id="sos_acfi" class="qd-func"><b>sos_acfi</b></span><br>
+<hr class="thin">
+Target ACF at given distances
+<ul>
+<li>Linear interpolation of the autocorrelation function (ACF) given as a table</li>
+<li>Distances beyond the last sample point return the last value of the table</li>
+<li>The same rule is applied by <a href="#sos_val">sos_val</a> and <a href="#sos_remove_bias">sos_remove_bias</a> for two devices on the same map</li>
+<li>An empty <code>d</code> returns an empty <code>val</code></li>
+</ul>
+
+<b>Declaration:</b><br>
+<pre>
+void quadriga_lib::sos_acfi(
+    const arma::Col&lt;dtype&gt; &amp;acf,
+    const arma::Col&lt;dtype&gt; &amp;dist,
+    const arma::Col&lt;dtype&gt; &amp;d,
+    arma::Col&lt;dtype&gt; &amp;val);
+</pre>
+
+<b>Inputs:</b><br>
+<ul>
+<li><b><code>acf</code></b> — Target ACF; at least 2 elements; <code>[n_acf]</code></li>
+<li><b><code>dist</code></b> — Sample points of the ACF in [m]; must start at 0 and increase strictly; <code>[n_acf]</code></li>
+<li><b><code>d</code></b> — Distances in [m]; must be >= 0; <code>[n_d]</code></li>
+</ul>
+
+<b>Output:</b><br>
+<ul>
+<li><b><code>val</code></b> — ACF at the distances <code>d</code>; <code>[n_d]</code></li>
+</ul>
+
+<b>See also:</b><br>
+<ul>
+<li><a href="#sos_preset">sos_preset</a> (ACF tables of the predefined models)</li>
+</ul>
+
+<hr class="greyline"><br>
+<span id="sos_calc_mse" class="qd-func"><b>sos_calc_mse</b></span><br>
+<hr class="thin">
+Approximation error of the ACF of a set of sinusoids
+<ul>
+<li>Compares the autocorrelation function (ACF) produced by the sinusoids, <code>R(dx) = (1/n_coeff) · sum_n cos( 2·pi · f_n·dx )</code>, with the target ACF</li>
+<li>All errors are returned as <code>-10·log10( mean squared error )</code>; larger is better</li>
+<li>Return value: error along the test directions on the sample points <code>dist</code>. <code>n_dim = 1</code>: one direction; <code>n_dim = 2</code>: <code>n_dir</code> directions equally spaced on the half circle, azimuth <code>pi · i / n_dir</code>; <code>n_dim = 3</code>: <code>n_dir</code> directions on a spiral (Fibonacci) lattice on the upper hemisphere, <code>sin(elevation) = ( i + 0.5 ) / n_dir</code>, azimuth <code>i · pi · ( 3 - sqrt(5) )</code>. A direction and its opposite give the same ACF</li>
+<li><code>mse_core</code>: error on the grid of <a href="#sos_acf_approx">sos_acf_approx</a> against <a href="#sos_acf_2d">sos_acf_2d</a>, for the grid points within a radius of <code>n_acf</code> grid steps around the center; for <code>n_dim = 3</code> the mean squared error is averaged over the three planes</li>
+<li><code>mse_all</code>: same on the complete grid, which extends to <code>2·Dmax</code> and has a target of 0 beyond <code>Dmax</code></li>
+<li>For <code>n_dim = 1</code>, <code>mse_core</code> is evaluated on the sample points <code>dist</code>, <code>mse_all</code> on the axis from <code>-2·Dmax</code> to <code>2·Dmax</code>, and the return value equals <code>mse_core</code></li>
+<li><code>acf_tail</code>: approximated ACF, averaged over the test directions, at 2, 4, 10 and 20 times <code>Dmax</code>. The target is 0 there; sinusoids with a frequency near zero show up as a plateau of height <code>n_low / n_coeff</code>, which adds a constant offset to all values of a large area</li>
+<li><code>mse_core</code> and <code>mse_all</code> need the 2-D grids and are only computed when requested</li>
+</ul>
+
+<b>Declaration:</b><br>
+<pre>
+dtype quadriga_lib::sos_calc_mse(
+    const arma::Mat&lt;dtype&gt; &amp;freq,
+    const arma::Col&lt;dtype&gt; &amp;acf,
+    const arma::Col&lt;dtype&gt; &amp;dist,
+    dtype *mse_core = nullptr,
+    dtype *mse_all = nullptr,
+    arma::Col&lt;dtype&gt; *acf_tail = nullptr,
+    arma::Mat&lt;dtype&gt; *test_dir = nullptr,
+    arma::uword n_dir = 10);
+</pre>
+
+<b>Inputs:</b><br>
+<ul>
+<li><b><code>freq</code></b> — Frequencies in [1/m]; <code>n_dim</code> = 1, 2 or 3; <code>[n_coeff, n_dim]</code></li>
+<li><b><code>acf</code></b> — Target ACF; at least 2 elements; <code>[n_acf]</code></li>
+<li><b><code>dist</code></b> — Sample points of the ACF in [m]; must start at 0 and be equally spaced; <code>[n_acf]</code></li>
+<li><b><code>n_dir</code></b> <i>(optional)</i> — Number of test directions; must be > 0; ignored for <code>n_dim = 1</code></li>
+</ul>
+
+<b>Outputs:</b><br>
+<ul>
+<li><b><code>mse_core</code></b> <i>(optional)</i> — Error within the core radius in [dB]</li>
+<li><b><code>mse_all</code></b> <i>(optional)</i> — Error on the complete grid in [dB]</li>
+<li><b><code>acf_tail</code></b> <i>(optional)</i> — Approximated ACF beyond the fitted range; <code>[4]</code></li>
+<li><b><code>test_dir</code></b> <i>(optional)</i> — Test directions in [rad]; <code>[n_dir, 2]</code> with columns <code>{azimuth, elevation}</code> for <code>n_dim = 3</code>; <code>[n_dir, 1]</code> with the azimuth for <code>n_dim = 2</code>; empty for <code>n_dim = 1</code></li>
+</ul>
+
+<b>Returns:</b><br>
+<ul>
+<li>Error along the test directions in [dB]</li>
+</ul>
+
+<b>See also:</b><br>
+<ul>
+<li><a href="#sos_generate">sos_generate</a> (finds the frequencies; minimises the error returned here)</li>
+<li><a href="#sos_acf_approx">sos_acf_approx</a>, <a href="#sos_acf_2d">sos_acf_2d</a> (the two grids that are compared)</li>
+</ul>
+
+<hr class="greyline"><br>
+<span id="sos_generate" class="qd-func"><b>sos_generate</b></span><br>
+<hr class="thin">
+Find the frequencies of a sum-of-sinusoids generator for a given ACF
+<ul>
+<li>Searches <code>n_coeff</code> frequencies such that the autocorrelation function (ACF) of the sinusoids, <code>R(dx) = (1/n_coeff) · sum_n cos( 2·pi · f_n·dx )</code>, approximates the target ACF in all directions</li>
+<li>Each sinusoid has a fixed direction and a signed frequency along it. <code>n_dim = 1</code>: no direction; <code>n_dim = 2</code>: directions on the half circle; <code>n_dim = 3</code>: directions on the upper hemisphere. <code>uniform_smp = true</code> places them regularly (equally spaced azimuth, spiral lattice, as the test directions of <a href="#sos_calc_mse">sos_calc_mse</a>), <code>false</code> draws them at random</li>
+<li>Iteration: in each pass every sinusoid is re-fitted once. Its frequency is chosen to fit the residual between the target and the contribution of all other sinusoids along its own direction: coarse search over a grid with a spacing of <code>0.1 / max(dist)</code>, then a step refinement. The new frequency is kept only if the mean squared error over the test directions decreases. The iteration stops after a pass that changes nothing or lowers the error by less than a factor of 1e-6, or after 1000 passes</li>
+<li><code>random_init = true</code> starts from uniformly random frequencies; <code>false</code> builds the set up sinusoid by sinusoid in the first pass</li>
+<li>The fit covers the range of <code>dist</code> only. The ACF of the result beyond the last sample point is not controlled; sinusoids with a frequency near zero keep it above zero at all larger distances (see <code>acf_tail</code> of <a href="#sos_calc_mse">sos_calc_mse</a>). To prevent this, set <code>freq_min</code>; the tables of <a href="#sos_preset">sos_preset</a> use <code>0.05 / d</code> with the decorrelation distance <code>d</code></li>
+<li>Use enough test directions: with few (e.g. 10) the result fits those directions and is worse in others; the tables of <a href="#sos_preset">sos_preset</a> were made with 300</li>
+<li><code>freq_min</code> and <code>freq_max</code> limit the magnitude of the frequency along the direction of each sinusoid; 0 selects the default: no lower limit, and <code>15 / max(dist)</code> as upper limit</li>
+<li><code>test_dir</code> and the reported error use the same test directions as <a href="#sos_calc_mse">sos_calc_mse</a> with the same <code>n_dir</code></li>
+<li>All computations are done in double precision for both instantiations</li>
+<li>A seed >= 0 makes the result repeatable on one platform. The search takes accept/reject decisions, so a difference in the last bit of the input or of the math library can lead to another table of equivalent quality</li>
+</ul>
+
+<b>Declaration:</b><br>
+<pre>
+void quadriga_lib::sos_generate(
+    const arma::Col&lt;dtype&gt; &amp;acf,
+    const arma::Col&lt;dtype&gt; &amp;dist,
+    arma::uword n_coeff,
+    arma::Mat&lt;dtype&gt; &amp;freq,
+    arma::Col&lt;dtype&gt; *ase = nullptr,
+    arma::Mat&lt;dtype&gt; *test_dir = nullptr,
+    arma::uword n_dim = 3,
+    bool uniform_smp = true,
+    arma::uword n_dir = 10,
+    bool random_init = true,
+    dtype freq_min = 0.0,
+    dtype freq_max = 0.0,
+    arma::sword seed = -1);
+</pre>
+
+<b>Inputs:</b><br>
+<ul>
+<li><b><code>acf</code></b> — Target ACF; at least 2 elements; <code>[n_acf]</code></li>
+<li><b><code>dist</code></b> — Sample points of the ACF in [m]; must start at 0 and increase strictly; <code>[n_acf]</code></li>
+<li><b><code>n_coeff</code></b> — Number of sinusoids; must be > 0</li>
+<li><b><code>n_dim</code></b> <i>(optional)</i> — Number of dimensions; 1, 2 or 3</li>
+<li><b><code>uniform_smp</code></b> <i>(optional)</i> — Regular (<code>true</code>) or random (<code>false</code>) directions of the sinusoids</li>
+<li><b><code>n_dir</code></b> <i>(optional)</i> — Number of test directions; must be > 0; ignored for <code>n_dim = 1</code></li>
+<li><b><code>random_init</code></b> <i>(optional)</i> — Start from random frequencies (<code>true</code>) or build up sinusoid by sinusoid (<code>false</code>)</li>
+<li><b><code>freq_min</code></b> <i>(optional)</i> — Lower limit of the frequency magnitude in [1/m]; must be >= 0; 0 = none</li>
+<li><b><code>freq_max</code></b> <i>(optional)</i> — Upper limit of the frequency magnitude in [1/m]; must be >= 0 and, if not 0, larger than <code>freq_min</code>; 0 = <code>15 / max(dist)</code></li>
+<li><b><code>seed</code></b> <i>(optional)</i> — Seed; must be >= -1; <code>-1</code> seeds from the system random device</li>
+</ul>
+
+<b>Outputs:</b><br>
+<ul>
+<li><b><code>freq</code></b> — Frequencies in [1/m]; <code>[n_coeff, n_dim]</code></li>
+<li><b><code>ase</code></b> <i>(optional)</i> — Mean squared error over the test directions after each pass, linear scale; <code>[n_pass]</code></li>
+<li><b><code>test_dir</code></b> <i>(optional)</i> — Test directions in [rad]; <code>[n_dir, 2]</code> with columns <code>{azimuth, elevation}</code> for <code>n_dim = 3</code>; <code>[n_dir, 1]</code> with the azimuth for <code>n_dim = 2</code>; empty for <code>n_dim = 1</code></li>
+</ul>
+
+<b>See also:</b><br>
+<ul>
+<li><a href="#sos_calc_mse">sos_calc_mse</a> (error of a frequency table)</li>
+<li><a href="#sos_preset">sos_preset</a> (precomputed tables)</li>
+</ul>
+
+<hr class="greyline"><br>
+<span id="sos_init_phases" class="qd-func"><b>sos_init_phases</b></span><br>
+<hr class="thin">
+Draw random phases for a set of sum-of-sinusoids generators
+<ul>
+<li>Each column of <code>phase</code> is one realisation of the random field of a generator; see <a href="#sos_val">sos_val</a></li>
+<li>Values are uniform in the interval from -pi (included) to pi (excluded)</li>
+<li>Random stream: <code>std::mt19937_64</code> seeded with <code>seed</code>; each value is <code>2·pi · ( u - 0.5 )</code>, where <code>u</code> is the upper 53 bits of one generator output divided by 2^53; no distribution class of the standard library is used, so a seed >= 0 gives the same phases on all platforms</li>
+<li>The matrix is filled column by column from one stream: for the same seed, column <code>g</code> does not depend on <code>n_gen</code></li>
+<li>For <code>dtype = float</code> the values are rounded from double; a value that rounds to pi is returned as -pi</li>
+</ul>
+
+<b>Declaration:</b><br>
+<pre>
+void quadriga_lib::sos_init_phases(
+    arma::uword n_coeff,
+    arma::uword n_gen,
+    arma::Mat&lt;dtype&gt; &amp;phase,
+    arma::sword seed = -1);
+</pre>
+
+<b>Inputs:</b><br>
+<ul>
+<li><b><code>n_coeff</code></b> — Number of sinusoids; must be > 0</li>
+<li><b><code>n_gen</code></b> — Number of generators; must be > 0</li>
+<li><b><code>seed</code></b> <i>(optional)</i> — Seed of the random stream; must be >= -1; <code>-1</code> seeds from the system random device and gives different phases on each call</li>
+</ul>
+
+<b>Output:</b><br>
+<ul>
+<li><b><code>phase</code></b> — Phases in [rad]; <code>[n_coeff, n_gen]</code></li>
+</ul>
+
+<b>See also:</b><br>
+<ul>
+<li><a href="#sos_val">sos_val</a> (evaluates the generators)</li>
+<li><a href="#sos_preset">sos_preset</a> (frequencies that belong to the phases)</li>
+</ul>
+
+<hr class="greyline"><br>
+<span id="sos_map" class="qd-func"><b>sos_map</b></span><br>
+<hr class="thin">
+Spatially correlated random values on a regular grid
+<ul>
+<li>Evaluates the generators of <a href="#sos_val">sos_val</a> for one device at all combinations of the grid vectors</li>
+<li>Output in meshgrid order: element <code>(iy, ix, iz)</code> of a cube belongs to the position <code>{x(ix), y(iy), z(iz)}</code></li>
+<li>One cube per generator, i.e. per column of <code>phase</code></li>
+<li>The number of grid vectors given must not exceed the number of columns of <code>freq</code>; an omitted or empty <code>y</code> or <code>z</code> means a single sample at 0 on that axis</li>
+<li><code>z</code> can be given without <code>y</code> if <code>freq</code> has 3 columns</li>
+</ul>
+
+<b>Declaration:</b><br>
+<pre>
+void quadriga_lib::sos_map(
+    const arma::Mat&lt;dtype&gt; &amp;freq,
+    const arma::Mat&lt;dtype&gt; &amp;phase,
+    const arma::Col&lt;dtype&gt; &amp;x,
+    std::vector&lt;arma::Cube&lt;dtype&gt;&gt; &amp;map,
+    const arma::Col&lt;dtype&gt; *y = nullptr,
+    const arma::Col&lt;dtype&gt; *z = nullptr,
+    bool uniform = false,
+    int use_kernel = 0);
+</pre>
+
+<b>Inputs:</b><br>
+<ul>
+<li><b><code>freq</code></b> — Frequencies in [1/m]; <code>n_dim</code> = 1, 2 or 3; <code>[n_coeff, n_dim]</code></li>
+<li><b><code>phase</code></b> — Phases in [rad]; one column per generator; <code>[n_coeff, n_gen]</code></li>
+<li><b><code>x</code></b> — Grid points on the x-axis in [m]; <code>[nx]</code></li>
+<li><b><code>y</code></b> <i>(optional)</i> — Grid points on the y-axis in [m]; requires <code>n_dim &gt;= 2</code>; omitted = one sample at 0, <code>ny = 1</code>; <code>[ny]</code></li>
+<li><b><code>z</code></b> <i>(optional)</i> — Grid points on the z-axis in [m]; requires <code>n_dim = 3</code>; omitted = one sample at 0, <code>nz = 1</code>; <code>[nz]</code></li>
+<li><b><code>uniform</code></b> <i>(optional)</i> — Output distribution: <code>false</code> = Normal(0,1), <code>true</code> = Uniform between 0 and 1</li>
+<li><b><code>use_kernel</code></b> <i>(optional)</i> — Compute kernel: 0 = auto (AVX2 if available), 1 = GENERIC, 2 = AVX2; throws if the requested kernel is unavailable</li>
+</ul>
+
+<b>Output:</b><br>
+<ul>
+<li><b><code>map</code></b> — Values; vector of length <code>n_gen</code> with one cube of size <code>[ny, nx, nz]</code> per generator</li>
+</ul>
+
+<b>See also:</b><br>
+<ul>
+<li><a href="#sos_val">sos_val</a> (evaluation at arbitrary positions, two devices)</li>
+</ul>
+
+<hr class="greyline"><br>
+<span id="sos_preset" class="qd-func"><b>sos_preset</b></span><br>
+<hr class="thin">
+Frequencies and ACF of a predefined sum-of-sinusoids generator
+<ul>
+<li>Returns a precomputed frequency table for <a href="#sos_val">sos_val</a> together with the autocorrelation function (ACF) it was fitted to</li>
+<li>Presets: <code>Exp128</code>, <code>Exp256</code>, <code>Exp512</code>, <code>Exp1024</code>, <code>Gauss128</code>, <code>Gauss256</code>, <code>Gauss512</code>, <code>Gauss1024</code>, <code>Comb128</code>, <code>Comb256</code>, <code>Comb512</code>, <code>Comb1024</code>. The number is the number of sinusoids, <code>n_coeff</code>. The name is matched exactly, including upper and lower case</li>
+<li>ACF types, with the distance <code>D</code> and the decorrelation distance <code>d</code>: <code>Exp</code>: <code>R = exp( -D/d )</code>; <code>Gauss</code>: <code>R = exp( -(D/d)^2 )</code>; <code>Comb</code>: <code>Gauss</code> for <code>D &lt;= d</code>, <code>Exp</code> beyond. All three have <code>R(d) = exp(-1)</code></li>
+<li>The ACF is returned as a table with 200 samples from 0 to <code>4.975·d</code> in steps of <code>0.025·d</code></li>
+<li>The tables are stored for <code>d = 10 m</code>. For another decorrelation distance the distances are multiplied by <code>d/10</code> and the frequencies by <code>10/d</code></li>
+<li>All tables are 3-dimensional and can be used with positions of 1, 2 or 3 columns</li>
+<li>How the tables were made: <a href="#sos_generate">sos_generate</a> with the 200-sample ACF for 10 m, <code>n_dim = 3</code>, <code>uniform_smp = true</code>, <code>n_dir = 300</code>, <code>random_init = true</code>, <code>freq_min = 0.005</code>, <code>freq_max = 15 / 49.75</code>, and the seeds 39, 3, 2, 5 (Exp), 13, 32, 6, 21 (Gauss), 13, 25, 37, 47 (Comb) for 128, 256, 512 and 1024 sinusoids. Sinusoid <code>n</code> points in direction <code>n</code> of the spiral lattice described in <a href="#sos_calc_mse">sos_calc_mse</a></li>
+<li>The lower frequency limit means that no sinusoid has a wavelength above 20 decorrelation distances. The ACF of the tables therefore stays near zero beyond the fitted range (magnitude below 0.015 at 10, 20, 50 and 100 decorrelation distances), and the mean of the generator over a large area is not offset by sinusoids of nearly zero frequency</li>
+</ul>
+
+<b>Declaration:</b><br>
+<pre>
+void quadriga_lib::sos_preset(
+    const std::string &amp;name,
+    arma::Mat&lt;dtype&gt; &amp;freq,
+    arma::Col&lt;dtype&gt; *acf = nullptr,
+    arma::Col&lt;dtype&gt; *dist = nullptr,
+    dtype dist_decorr = 10.0);
+</pre>
+
+<b>Inputs:</b><br>
+<ul>
+<li><b><code>name</code></b> — Name of the preset, e.g. <code>"Comb256"</code></li>
+<li><b><code>dist_decorr</code></b> <i>(optional)</i> — Decorrelation distance in [m]; must be > 0</li>
+</ul>
+
+<b>Outputs:</b><br>
+<ul>
+<li><b><code>freq</code></b> — Frequencies in [1/m]; <code>[n_coeff, 3]</code></li>
+<li><b><code>acf</code></b> <i>(optional)</i> — Target ACF; <code>[200]</code></li>
+<li><b><code>dist</code></b> <i>(optional)</i> — Sample points of the ACF in [m]; <code>[200]</code></li>
+</ul>
+
+<b>See also:</b><br>
+<ul>
+<li><a href="#sos_init_phases">sos_init_phases</a> (random phases for the generator)</li>
+<li><a href="#sos_val">sos_val</a> (evaluation)</li>
+<li><a href="#sos_generate">sos_generate</a> (frequencies for other ACFs)</li>
+</ul>
+
+<hr class="greyline"><br>
+<span id="sos_rand" class="qd-func"><b>sos_rand</b></span><br>
+<hr class="thin">
+Spatially correlated Uniform distributed random numbers
+<ul>
+<li>Convenience function: sets up one sum-of-sinusoids generator per entry of <code>dist_decorr</code> from a preset, draws its phases and evaluates it at the given positions; see <a href="#sos_val">sos_val</a> for the model</li>
+<li>The generators are independent of each other and may have different decorrelation distances</li>
+<li>Phases: <code>sos_init_phases( n_coeff, 2·n_gen, seed )</code>; generator <code>g</code> uses column <code>g</code>, and column <code>n_gen + g</code> for a second device on its own map. The phases of the first device therefore do not depend on whether a second device is given</li>
+<li>A decorrelation distance of 0 is replaced by 0.1 m</li>
+<li>One device (<code>pos_b</code> omitted): values of the generator at <code>pos</code></li>
+<li>Two devices, same decorrelation distance (<code>dist_decorr_b</code> omitted, or equal to <code>dist_decorr</code> for that generator): both devices are on the same map, the value does not change when they swap positions</li>
+<li>Two devices, different decorrelation distances: each device has its own map; the value is the sum of both maps divided by <code>sqrt(2)</code></li>
+<li>The Normal distributed value <code>s</code> of the generator is mapped to <code>0.5 · erfc( -s / sqrt(2) )</code></li>
+<li>Each call with <code>seed = -1</code> gives a new realisation; with a seed >= 0 the same positions always give the same values, and nearby positions give similar values in separate calls with the same seed</li>
+</ul>
+
+<b>Declaration:</b><br>
+<pre>
+void quadriga_lib::sos_rand(
+    const arma::Col&lt;dtype&gt; &amp;dist_decorr,
+    const arma::Mat&lt;dtype&gt; &amp;pos,
+    arma::Mat&lt;dtype&gt; &amp;val,
+    const arma::Mat&lt;dtype&gt; *pos_b = nullptr,
+    const arma::Col&lt;dtype&gt; *dist_decorr_b = nullptr,
+    const std::string &amp;preset = "Comb256",
+    arma::sword seed = -1);
+</pre>
+
+<b>Inputs:</b><br>
+<ul>
+<li><b><code>dist_decorr</code></b> — Decorrelation distances in [m]; one generator per entry; must be >= 0; <code>[n_gen]</code></li>
+<li><b><code>pos</code></b> — Positions of the first device in [m]; rows are <code>{x, y, z}</code>; 1 to 3 columns; <code>[n_pos, n_dim_pos]</code></li>
+<li><b><code>pos_b</code></b> <i>(optional)</i> — Positions of the second device in [m]; omitted or empty = one device; 1 to 3 columns; <code>[n_pos, n_dim_pos_b]</code></li>
+<li><b><code>dist_decorr_b</code></b> <i>(optional)</i> — Decorrelation distances of the second device in [m]; requires <code>pos_b</code>; must be >= 0; omitted or empty = same as <code>dist_decorr</code>; <code>[n_gen]</code></li>
+<li><b><code>preset</code></b> <i>(optional)</i> — Name of the preset, see <a href="#sos_preset">sos_preset</a></li>
+<li><b><code>seed</code></b> <i>(optional)</i> — Seed of the phases; must be >= -1; <code>-1</code> seeds from the system random device</li>
+</ul>
+
+<b>Output:</b><br>
+<ul>
+<li><b><code>val</code></b> — Values, approximately Uniform distributed between 0 and 1; one row per position, one column per generator; <code>[n_pos, n_gen]</code></li>
+</ul>
+
+<b>See also:</b><br>
+<ul>
+<li><a href="#sos_val">sos_val</a> (evaluation with given frequencies and phases)</li>
+<li><a href="#sos_preset">sos_preset</a>, <a href="#sos_init_phases">sos_init_phases</a> (the two steps this function combines)</li>
+<li><a href="#sos_randn">sos_randn</a>, <a href="#sos_randi">sos_randi</a> (Normal and integer values)</li>
+</ul>
+
+<hr class="greyline"><br>
+<span id="sos_randi" class="qd-func"><b>sos_randi</b></span><br>
+<hr class="thin">
+Spatially correlated integer random numbers
+<ul>
+<li>Convenience function: sets up one sum-of-sinusoids generator per entry of <code>dist_decorr</code> from a preset, draws its phases and evaluates it at the given positions; see <a href="#sos_val">sos_val</a> for the model</li>
+<li>The generators are independent of each other and may have different decorrelation distances</li>
+<li>Phases: <code>sos_init_phases( n_coeff, 2·n_gen, seed )</code>; generator <code>g</code> uses column <code>g</code>, and column <code>n_gen + g</code> for a second device on its own map. The phases of the first device therefore do not depend on whether a second device is given</li>
+<li>A decorrelation distance of 0 is replaced by 0.1 m</li>
+<li>One device (<code>pos_b</code> omitted): values of the generator at <code>pos</code></li>
+<li>Two devices, same decorrelation distance (<code>dist_decorr_b</code> omitted, or equal to <code>dist_decorr</code> for that generator): both devices are on the same map, the value does not change when they swap positions</li>
+<li>Two devices, different decorrelation distances: each device has its own map; the value is the sum of both maps divided by <code>sqrt(2)</code></li>
+<li>The Uniform value <code>u</code> of <a href="#sos_rand">sos_rand</a> is mapped to <code>ceil( u · imax )</code>, limited to 1 ... <code>imax</code></li>
+<li>Each call with <code>seed = -1</code> gives a new realisation; with a seed >= 0 the same positions always give the same values, and nearby positions give similar values in separate calls with the same seed</li>
+</ul>
+
+<b>Declaration:</b><br>
+<pre>
+void quadriga_lib::sos_randi(
+    const arma::Col&lt;dtype&gt; &amp;dist_decorr,
+    const arma::Mat&lt;dtype&gt; &amp;pos,
+    arma::uword imax,
+    arma::Mat&lt;dtype&gt; &amp;val,
+    const arma::Mat&lt;dtype&gt; *pos_b = nullptr,
+    const arma::Col&lt;dtype&gt; *dist_decorr_b = nullptr,
+    const std::string &amp;preset = "Comb256",
+    arma::sword seed = -1);
+</pre>
+
+<b>Inputs:</b><br>
+<ul>
+<li><b><code>dist_decorr</code></b> — Decorrelation distances in [m]; one generator per entry; must be >= 0; <code>[n_gen]</code></li>
+<li><b><code>pos</code></b> — Positions of the first device in [m]; rows are <code>{x, y, z}</code>; 1 to 3 columns; <code>[n_pos, n_dim_pos]</code></li>
+<li><b><code>imax</code></b> — Largest value; must be > 0</li>
+<li><b><code>pos_b</code></b> <i>(optional)</i> — Positions of the second device in [m]; omitted or empty = one device; 1 to 3 columns; <code>[n_pos, n_dim_pos_b]</code></li>
+<li><b><code>dist_decorr_b</code></b> <i>(optional)</i> — Decorrelation distances of the second device in [m]; requires <code>pos_b</code>; must be >= 0; omitted or empty = same as <code>dist_decorr</code>; <code>[n_gen]</code></li>
+<li><b><code>preset</code></b> <i>(optional)</i> — Name of the preset, see <a href="#sos_preset">sos_preset</a></li>
+<li><b><code>seed</code></b> <i>(optional)</i> — Seed of the phases; must be >= -1; <code>-1</code> seeds from the system random device</li>
+</ul>
+
+<b>Output:</b><br>
+<ul>
+<li><b><code>val</code></b> — Integer values from 1 to <code>imax</code>, each with approximately the same probability; one row per position, one column per generator; <code>[n_pos, n_gen]</code></li>
+</ul>
+
+<b>See also:</b><br>
+<ul>
+<li><a href="#sos_val">sos_val</a> (evaluation with given frequencies and phases)</li>
+<li><a href="#sos_preset">sos_preset</a>, <a href="#sos_init_phases">sos_init_phases</a> (the two steps this function combines)</li>
+<li><a href="#sos_randn">sos_randn</a>, <a href="#sos_rand">sos_rand</a> (Normal and Uniform values)</li>
+</ul>
+
+<hr class="greyline"><br>
+<span id="sos_randn" class="qd-func"><b>sos_randn</b></span><br>
+<hr class="thin">
+Spatially correlated Normal distributed random numbers
+<ul>
+<li>Convenience function: sets up one sum-of-sinusoids generator per entry of <code>dist_decorr</code> from a preset, draws its phases and evaluates it at the given positions; see <a href="#sos_val">sos_val</a> for the model</li>
+<li>The generators are independent of each other and may have different decorrelation distances</li>
+<li>Phases: <code>sos_init_phases( n_coeff, 2·n_gen, seed )</code>; generator <code>g</code> uses column <code>g</code>, and column <code>n_gen + g</code> for a second device on its own map. The phases of the first device therefore do not depend on whether a second device is given</li>
+<li>A decorrelation distance of 0 is replaced by 0.1 m</li>
+<li>One device (<code>pos_b</code> omitted): values of the generator at <code>pos</code></li>
+<li>Two devices, same decorrelation distance (<code>dist_decorr_b</code> omitted, or equal to <code>dist_decorr</code> for that generator): both devices are on the same map, the value does not change when they swap positions</li>
+<li>Two devices, different decorrelation distances: each device has its own map; the value is the sum of both maps divided by <code>sqrt(2)</code></li>
+<li>Each call with <code>seed = -1</code> gives a new realisation; with a seed >= 0 the same positions always give the same values, and nearby positions give similar values in separate calls with the same seed</li>
+</ul>
+
+<b>Declaration:</b><br>
+<pre>
+void quadriga_lib::sos_randn(
+    const arma::Col&lt;dtype&gt; &amp;dist_decorr,
+    const arma::Mat&lt;dtype&gt; &amp;pos,
+    arma::Mat&lt;dtype&gt; &amp;val,
+    const arma::Mat&lt;dtype&gt; *pos_b = nullptr,
+    const arma::Col&lt;dtype&gt; *dist_decorr_b = nullptr,
+    const std::string &amp;preset = "Comb256",
+    arma::sword seed = -1);
+</pre>
+
+<b>Inputs:</b><br>
+<ul>
+<li><b><code>dist_decorr</code></b> — Decorrelation distances in [m]; one generator per entry; must be >= 0; <code>[n_gen]</code></li>
+<li><b><code>pos</code></b> — Positions of the first device in [m]; rows are <code>{x, y, z}</code>; 1 to 3 columns; <code>[n_pos, n_dim_pos]</code></li>
+<li><b><code>pos_b</code></b> <i>(optional)</i> — Positions of the second device in [m]; omitted or empty = one device; 1 to 3 columns; <code>[n_pos, n_dim_pos_b]</code></li>
+<li><b><code>dist_decorr_b</code></b> <i>(optional)</i> — Decorrelation distances of the second device in [m]; requires <code>pos_b</code>; must be >= 0; omitted or empty = same as <code>dist_decorr</code>; <code>[n_gen]</code></li>
+<li><b><code>preset</code></b> <i>(optional)</i> — Name of the preset, see <a href="#sos_preset">sos_preset</a></li>
+<li><b><code>seed</code></b> <i>(optional)</i> — Seed of the phases; must be >= -1; <code>-1</code> seeds from the system random device</li>
+</ul>
+
+<b>Output:</b><br>
+<ul>
+<li><b><code>val</code></b> — Values, approximately Normal distributed with zero mean and unit variance; one row per position, one column per generator; <code>[n_pos, n_gen]</code></li>
+</ul>
+
+<b>See also:</b><br>
+<ul>
+<li><a href="#sos_val">sos_val</a> (evaluation with given frequencies and phases)</li>
+<li><a href="#sos_preset">sos_preset</a>, <a href="#sos_init_phases">sos_init_phases</a> (the two steps this function combines)</li>
+<li><a href="#sos_rand">sos_rand</a>, <a href="#sos_randi">sos_randi</a> (Uniform and integer values)</li>
+</ul>
+
+<hr class="greyline"><br>
+<span id="sos_remove_bias" class="qd-func"><b>sos_remove_bias</b></span><br>
+<hr class="thin">
+Remove the sample mean of sum-of-sinusoids generators over a set of positions
+<ul>
+<li>One realisation of a spatially correlated random field has a non-zero mean over a finite set of positions. Its variance over the realisations is the mean of the autocorrelation function (ACF) over all pairs of positions, which is much larger than <code>1 / n_pos</code> when the positions lie within a few decorrelation distances of each other. This is a property of any correlated field, not an error of the generator</li>
+<li>This function adds one offset to all phases of a generator such that the mean of the Normal distributed values of <a href="#sos_val">sos_val</a> over the given positions becomes zero</li>
+<li>Closed form, no iteration: with <code>z_n = mean over the positions of exp( j·2·pi · f_n·x )</code> and <code>Z = sum_n z_n · exp( j·phi_n )</code>, the mean is <code>sqrt(2/n_coeff) · Re( exp( j·offset ) · Z )</code>, which vanishes for <code>offset = pi/2 - arg(Z)</code> and for that value minus pi; the one with the smaller magnitude is applied, so the offset lies between -pi/2 and pi/2</li>
+<li>One device (<code>pos_b</code> omitted): one offset per generator</li>
+<li>Two devices on the same map (<code>pos_b</code> given, <code>phase_b</code> omitted): one offset per generator that zeroes the mean of the combined, normalised value; <code>acf</code> and <code>dist</code> are required</li>
+<li>Two devices on different maps (<code>pos_b</code> and <code>phase_b</code> given): each device is treated on its own, <code>phase</code> with <code>pos</code> and <code>phase_b</code> with <code>pos_b</code> and the frequencies <code>freq · freq_scale_b</code>; two offsets per generator. The mean of the combined value is then zero as well</li>
+<li>Effect on the statistics: the result is the field conditioned on a zero mean over the positions. The variance at a position drops from 1 to <code>1 - c^2 / v</code>, where <code>v</code> is the variance of the sample mean and <code>c</code> the mean ACF between that position and all positions; on average over the positions the loss is at least <code>v</code>. It is small only if the positions spread over many decorrelation distances. For positions within about one decorrelation distance most of the variance is removed</li>
+<li>The zero mean holds for exactly these positions and frequencies. It is lost when the phases are used with other frequencies (another decorrelation distance) or positions</li>
+<li>The mean of the Uniform output of <a href="#sos_val">sos_val</a> is not exactly 0.5 afterwards</li>
+<li>Phases are returned in the interval from -pi (included) to pi (excluded). A generator whose <code>abs(Z)</code> is below <code>1e-14 · n_coeff</code> already has a zero mean for every offset and is left unchanged</li>
+</ul>
+
+<b>Declaration:</b><br>
+<pre>
+void quadriga_lib::sos_remove_bias(
+    const arma::Mat&lt;dtype&gt; &amp;freq,
+    arma::Mat&lt;dtype&gt; &amp;phase,
+    const arma::Mat&lt;dtype&gt; &amp;pos,
+    const arma::Mat&lt;dtype&gt; *pos_b = nullptr,
+    arma::Mat&lt;dtype&gt; *phase_b = nullptr,
+    const arma::Col&lt;dtype&gt; *acf = nullptr,
+    const arma::Col&lt;dtype&gt; *dist = nullptr,
+    arma::Mat&lt;dtype&gt; *offset = nullptr,
+    arma::Mat&lt;dtype&gt; *mean_before = nullptr,
+    dtype freq_scale_b = 1.0);
+</pre>
+
+<b>Inputs:</b><br>
+<ul>
+<li><b><code>freq</code></b> — Frequencies in [1/m]; <code>n_dim</code> = 1, 2 or 3; <code>[n_coeff, n_dim]</code></li>
+<li><b><code>phase</code></b> — Phases in [rad]; one column per generator; updated in-place; <code>[n_coeff, n_gen]</code></li>
+<li><b><code>pos</code></b> — Positions of the first device in [m]; rows are <code>{x, y, z}</code>; <code>n_dim_pos</code> from 1 to <code>n_dim</code>; <code>[n_pos, n_dim_pos]</code></li>
+<li><b><code>pos_b</code></b> <i>(optional)</i> — Positions of the second device in [m]; omitted or empty = one device; <code>[n_pos_b, n_dim_pos_b]</code>; <code>n_pos_b = n_pos</code> for the same map, any number for different maps</li>
+<li><b><code>phase_b</code></b> <i>(optional)</i> — Phases of the second device in [rad]; requires <code>pos_b</code>; omitted or empty = same map; updated in-place; <code>[n_coeff, n_gen]</code></li>
+<li><b><code>acf</code></b> <i>(optional)</i> — Target ACF; required for two devices on the same map; <code>[n_acf]</code></li>
+<li><b><code>dist</code></b> <i>(optional)</i> — Sample points of the ACF in [m]; must start at 0 and increase strictly; <code>[n_acf]</code></li>
+<li><b><code>freq_scale_b</code></b> <i>(optional)</i> — Frequency scale of the second device, i.e. decorrelation distance of the first device divided by that of the second; must be > 0; other than 1 requires <code>phase_b</code></li>
+</ul>
+
+<b>Outputs:</b><br>
+<ul>
+<li><b><code>offset</code></b> <i>(optional)</i> — Offsets added to the phases in [rad]; <code>[n_gen, 1]</code>, or <code>[n_gen, 2]</code> with <code>phase_b</code> (column 0: <code>phase</code>, column 1: <code>phase_b</code>)</li>
+<li><b><code>mean_before</code></b> <i>(optional)</i> — Sample mean before the correction; <code>[n_gen, 1]</code>: mean of the values of <a href="#sos_val">sos_val</a> for the given arguments; with <code>phase_b</code> <code>[n_gen, 2]</code>: mean of the field of each device on its own positions, the mean of the combined value being their sum divided by <code>sqrt(2)</code></li>
+</ul>
+
+<b>See also:</b><br>
+<ul>
+<li><a href="#sos_val">sos_val</a> (the values whose mean is removed)</li>
+</ul>
+
+<hr class="greyline"><br>
+<span id="sos_val" class="qd-func"><b>sos_val</b></span><br>
+<hr class="thin">
+Spatially correlated random values at given positions
+<ul>
+<li>Sum-of-sinusoids generator: at position <code>x</code> a generator with <code>n_coeff</code> sinusoids produces <code>s(x) = sqrt(2/n_coeff) · sum_n cos( 2·pi · f_n·x + phi_n )</code>, with the frequencies <code>f_n</code> (rows of <code>freq</code>) and the phases <code>phi_n</code> (one column of <code>phase</code>)</li>
+<li>For uniformly random phases, <code>s</code> has zero mean, unit variance and the autocorrelation function (ACF) <code>(1/n_coeff) · sum_n cos( 2·pi · f_n·dx )</code>, which approximates the target ACF the frequencies were fitted to; with many sinusoids the values are approximately Normal distributed</li>
+<li>All generators of one call share the frequencies; each column of <code>phase</code> is one generator. The sines and cosines of the positions are computed once and reused for all generators</li>
+<li>Positions may have fewer columns than <code>freq</code>; missing coordinates are 0</li>
+<li>One device (<code>pos_b</code> omitted): <code>val = s(pos)</code></li>
+<li>Two devices on the same map (<code>pos_b</code> given, <code>phase_b</code> omitted): both devices use <code>phase</code>; <code>val = ( s(pos) + s(pos_b) ) / sqrt( 2 + 2·A(D) )</code>, where <code>D</code> is the distance between <code>pos</code> and <code>pos_b</code> and <code>A</code> the target ACF interpolated as in <a href="#sos_acfi">sos_acfi</a>; <code>acf</code> and <code>dist</code> are required. The value does not change when the two devices swap their positions</li>
+<li>Two devices on different maps (<code>pos_b</code> and <code>phase_b</code> given): <code>val = ( s_a(pos) + s_b(pos_b) ) / sqrt(2)</code>; <code>s_b</code> uses <code>phase_b</code> and the frequencies <code>freq · freq_scale_b</code>; <code>acf</code> and <code>dist</code> are ignored</li>
+<li>The mode follows from the arguments only; phase values are never compared. Passing the same matrix as <code>phase</code> and <code>phase_b</code> selects the two-map formula</li>
+<li><code>freq_scale_b</code> other than 1 requires <code>phase_b</code>: one map with two decorrelation distances has no consistent ACF</li>
+<li><code>uniform = true</code> maps the values to <code>0.5 · erfc( -val / sqrt(2) )</code>, which is uniform between 0 and 1 as far as <code>val</code> is Normal distributed</li>
+<li>Kernels: GENERIC computes in double precision. AVX2 reduces the argument <code>f_n·x</code> to one period in double precision, evaluates sine and cosine in single precision and accumulates in double precision; its values differ from GENERIC by less than <code>4e-7 · sqrt( 2·n_coeff )</code>, at any distance from the origin</li>
+<li>The value at a position does not depend on the other positions or generators of the call, nor on the number of threads</li>
+<li><code>val</code> must not be the same object as an input</li>
+</ul>
+
+<b>Declaration:</b><br>
+<pre>
+void quadriga_lib::sos_val(
+    const arma::Mat&lt;dtype&gt; &amp;freq,
+    const arma::Mat&lt;dtype&gt; &amp;phase,
+    const arma::Mat&lt;dtype&gt; &amp;pos,
+    arma::Mat&lt;dtype&gt; &amp;val,
+    const arma::Mat&lt;dtype&gt; *pos_b = nullptr,
+    const arma::Mat&lt;dtype&gt; *phase_b = nullptr,
+    const arma::Col&lt;dtype&gt; *acf = nullptr,
+    const arma::Col&lt;dtype&gt; *dist = nullptr,
+    dtype freq_scale_b = 1.0,
+    bool uniform = false,
+    int use_kernel = 0);
+</pre>
+
+<b>Inputs:</b><br>
+<ul>
+<li><b><code>freq</code></b> — Frequencies in [1/m]; <code>n_dim</code> = 1, 2 or 3; <code>[n_coeff, n_dim]</code></li>
+<li><b><code>phase</code></b> — Phases in [rad]; one column per generator; <code>[n_coeff, n_gen]</code></li>
+<li><b><code>pos</code></b> — Positions of the first device in [m]; rows are <code>{x, y, z}</code>; <code>n_dim_pos</code> from 1 to <code>n_dim</code>; <code>[n_pos, n_dim_pos]</code></li>
+<li><b><code>pos_b</code></b> <i>(optional)</i> — Positions of the second device in [m]; omitted or empty = one device; <code>[n_pos, n_dim_pos_b]</code>, <code>n_dim_pos_b</code> from 1 to <code>n_dim</code></li>
+<li><b><code>phase_b</code></b> <i>(optional)</i> — Phases of the second device in [rad]; requires <code>pos_b</code>; omitted or empty = same map; <code>[n_coeff, n_gen]</code></li>
+<li><b><code>acf</code></b> <i>(optional)</i> — Target ACF; required for two devices on the same map; <code>[n_acf]</code></li>
+<li><b><code>dist</code></b> <i>(optional)</i> — Sample points of the ACF in [m]; must start at 0 and increase strictly; <code>[n_acf]</code></li>
+<li><b><code>freq_scale_b</code></b> <i>(optional)</i> — Frequency scale of the second device, i.e. decorrelation distance of the first device divided by that of the second; must be > 0</li>
+<li><b><code>uniform</code></b> <i>(optional)</i> — Output distribution: <code>false</code> = Normal(0,1), <code>true</code> = Uniform between 0 and 1</li>
+<li><b><code>use_kernel</code></b> <i>(optional)</i> — Compute kernel: 0 = auto (AVX2 if available), 1 = GENERIC, 2 = AVX2; throws if the requested kernel is unavailable</li>
+</ul>
+
+<b>Output:</b><br>
+<ul>
+<li><b><code>val</code></b> — Values; one row per position, one column per generator; <code>[n_pos, n_gen]</code></li>
+</ul>
+
+<b>See also:</b><br>
+<ul>
+<li><a href="#sos_preset">sos_preset</a> (frequencies and ACF of the predefined models)</li>
+<li><a href="#sos_init_phases">sos_init_phases</a> (random phases)</li>
+<li><a href="#sos_map">sos_map</a> (evaluation on a grid)</li>
+<li><a href="#sos_randn">sos_randn</a> (generator set-up and evaluation in one call)</li>
 </ul>
 
     <!-- CONTENT END -->
