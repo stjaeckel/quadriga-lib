@@ -5,7 +5,7 @@
 <ul><li><a target="_blank" rel="noopener noreferrer" href="quadriga_lib_api_mex.md">quadriga_lib_api_mex.md</a></li></ul>
 <br>
 
-<b># General usage notes</b>
+<b>General usage notes</b>
 <ul>
 <li>Each function has a 1-line short description, optional detailed notes, a Usage block, and Inputs/Outputs sections.</li>
 <li>Array sizes follow in backticks, e.g. <code>[n_rx, n_tx, n_path]</code>.</li>
