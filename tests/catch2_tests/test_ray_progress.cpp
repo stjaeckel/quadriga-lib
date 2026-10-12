@@ -4428,3 +4428,256 @@ TEST_CASE("ray_progress - the bonded plate at any depth where the slopes agree")
                     }
         }
 }
+
+TEST_CASE("ray_progress - an ordered stack leaves the ray on the line it arrived on")
+{
+#ifdef _OPENMP
+    struct OneThread
+    {
+        int n = omp_get_max_threads();
+        OneThread() { omp_set_num_threads(1); }
+        ~OneThread() { omp_set_num_threads(n); }
+    } one_thread;
+#endif
+    // Two co-located sheets of different material have one medium on both sides, so behind them
+    // the ray goes on along the line it arrived on, with the default tracer as with the
+    // undeviated one, and the next wall is met where a single sheet in their place lets it be
+    // met. Through ray_progress, float, scalar, a band of 1 and 2 GHz; the materials carry
+    // neither tf nor the mass column. Rows that must not move are printed with every digit.
+    const double PI = 3.14159265358979323846;
+    typedef std::unordered_map<std::string, std::vector<float>> Pal;
+    Pal pal; // 1 C1 sheet 5.24-0.63j 6 mm, 2 C2 sheet 1.50-0.40j 6 mm, 3 solid 2.50, 4 solid 2.50-0.80j
+    pal["a"] = {5.24f, 1.50f, 2.50f, 2.50f};
+    pal["b"] = std::vector<float>(4, 0.0f);
+    pal["c"] = {(float)(0.63 / 17.98), (float)(0.40 / 17.98), 0.0f, (float)(0.80 / 17.98)};
+    pal["d"] = std::vector<float>(4, 1.0f);
+    pal["fRef"] = std::vector<float>(4, 1.0f);
+    pal["thk"] = {0.006f, 0.006f, 0.0f, 0.0f};
+    struct Wall
+    {
+        arma::fmat mesh;
+        arma::uvec mi;
+    };
+    auto build = [](const std::vector<float> &x, const std::vector<int> &mat, const std::vector<bool> &flip) -> Wall
+    {
+        const float h = 200.0f;
+        Wall W;
+        W.mesh.set_size(2 * x.size(), 9), W.mi.set_size(2 * x.size());
+        for (size_t k = 0; k < x.size(); ++k)
+        {
+            if (!flip[k])
+                W.mesh.row(2 * k) = arma::frowvec{x[k], -h, -h, x[k], -h, h, x[k], h, -h}, W.mesh.row(2 * k + 1) = arma::frowvec{x[k], h, -h, x[k], -h, h, x[k], h, h};
+            else
+                W.mesh.row(2 * k) = arma::frowvec{x[k], -h, -h, x[k], h, -h, x[k], -h, h}, W.mesh.row(2 * k + 1) = arma::frowvec{x[k], h, -h, x[k], h, h, x[k], -h, h};
+            W.mi(2 * k) = (arma::uword)mat[k], W.mi(2 * k + 1) = (arma::uword)mat[k];
+        }
+        return W;
+    };
+    struct Gen // the launch configuration after one call
+    {
+        arma::fmat orig, dest, hit, tridir;
+        arma::fcube dir;
+        arma::Col<short> cur;
+        std::vector<std::string> types;
+        std::vector<std::vector<double>> pw; // per ray, per frequency, dB
+        arma::frowvec seg(arma::uword i) const
+        {
+            arma::frowvec d = dest.row(i) - orig.row(i);
+            return d / nrm3(d);
+        }
+    };
+    arma::frowvec k_launch;
+    auto trace = [&](const Wall &W, double thd, bool refr, int n_gen, int max_ref, bool beam, int force_gen) -> std::vector<Gen>
+    {
+        std::vector<Gen> out;
+        const size_t nf = 2;
+        const double th = thd * PI / 180.0;
+        const float Ox = -1.0f, Oy = 0.37f - (float)std::tan(th), Oz = 0.0f, r0 = 0.1f, len = 300.0f;
+        arma::frowvec k = {(float)std::cos(th), (float)std::sin(th), 0.0f};
+        k_launch = k;
+        arma::fvec cf = {1.0e9f, 2.0e9f};
+        arma::fmat orig(1, 3), dest(1, 3), acc(1, 1 + nf, arma::fill::zeros), trivec, tridir;
+        orig.row(0) = arma::frowvec{Ox, Oy, Oz} + r0 * k, dest.row(0) = arma::frowvec{Ox, Oy, Oz} + (r0 + len) * k;
+        arma::fcube pd(1, 3, nf);
+        for (size_t q = 0; q < nf; ++q)
+            pd.slice(q) = k;
+        arma::Col<short> prev(1, arma::fill::zeros), cur(1, arma::fill::zeros), buf(1, arma::fill::zeros);
+        std::vector<quadriga_lib::path> paths(1);
+        paths[0].init(0, nf, true);
+        paths[0].set_length(r0);
+        if (beam)
+        {
+            trivec.zeros(1, 9), tridir.zeros(1, 9);
+            arma::frowvec u = arma::cross(arma::frowvec{0.0f, 0.0f, 1.0f}, k);
+            u /= nrm3(u);
+            arma::frowvec v = arma::cross(k, u);
+            const float ha = 0.5f * (float)(PI / 180.0);
+            for (int j = 0; j < 3; ++j)
+            {
+                const float phi = (float)(2.0 * PI * (double)j / 3.0);
+                arma::frowvec vj = std::cos(ha) * k + std::sin(ha) * (std::cos(phi) * u + std::sin(phi) * v);
+                vj /= nrm3(vj);
+                for (int c = 0; c < 3; ++c)
+                    tridir(0, 3 * j + c) = vj(c), trivec(0, 3 * j + c) = r0 * (vj(c) - k(c));
+            }
+        }
+        for (int g = 0; g < n_gen; ++g)
+        {
+            std::vector<bool> ff(orig.n_rows, g == force_gen);
+            quadriga_lib::ray_progress(W.mesh, W.mi, pal, cf, Ox, Oy, Oz, orig, dest, prev, cur, buf, pd, acc, paths,
+                                       beam ? &trivec : nullptr, beam ? &tridir : nullptr, nullptr, nullptr,
+                                       20, (uint8_t)max_ref, 10, (uint8_t)(force_gen >= 0 ? 2 : 0), -300.0f, 3.0f, 0.15f, refr, true,
+                                       nullptr, nullptr, nullptr, force_gen >= 0 ? &ff : nullptr);
+            if (orig.n_rows == 0)
+                break;
+            Gen G;
+            G.orig = orig, G.dest = dest, G.dir = pd, G.cur = cur;
+            if (beam)
+                G.tridir = tridir;
+            G.hit.zeros(orig.n_rows, 3);
+            for (arma::uword i = 0; i < orig.n_rows; ++i)
+            {
+                std::string ty;
+                for (auto c : paths[i].interaction_type_codes())
+                    ty += std::to_string((unsigned)c) + "/";
+                G.types.push_back(ty);
+                if (paths[i].n_seg())
+                    for (int c = 0; c < 3; ++c)
+                        G.hit(i, c) = paths[i].coord(paths[i].n_seg() - 1)[c];
+                std::vector<double> p;
+                for (size_t q = 0; q < nf; ++q)
+                {
+                    const float *xc = paths[i].xpr_coeff(q);
+                    p.push_back(10.0 * std::log10((double)xc[0] * xc[0] + (double)xc[1] * xc[1] + 1.0e-300));
+                }
+                G.pw.push_back(p);
+            }
+            out.push_back(G);
+        }
+        return out;
+    };
+    auto dmax = [](const arma::frowvec &a, const arma::frowvec &b) -> double
+    {
+        double d = 0.0;
+        for (int c = 0; c < 3; ++c)
+            d = std::max(d, (double)std::abs(a(c) - b(c)));
+        return d;
+    };
+    auto ang = [&](const arma::frowvec &d) { return std::atan2(std::sqrt((double)d(1) * d(1) + (double)d(2) * d(2)), std::abs((double)d(0))) * 180.0 / PI; };
+    const char *sn[] = {"C1|C2", "C2|C1", "C1 alone", "C2 alone"};
+    // s 0, 1: the stack in its two orders; 2, 3: its first layer alone. nrm 0: normals outward, 1: both towards the source
+    auto wall = [&](int H, int s, int nrm) -> Wall
+    {
+        const float gap = 1.0e-5f, x0 = H ? 0.011f : 0.0f;
+        std::vector<float> x;
+        std::vector<int> m;
+        std::vector<bool> fl;
+        if (H)
+            x.push_back(0.0f), m.push_back(H), fl.push_back(false);
+        x.push_back(x0), m.push_back((s == 0 || s == 2) ? 1 : 2), fl.push_back(false);
+        if (s < 2)
+            x.push_back(x0 + gap), m.push_back(s == 0 ? 2 : 1), fl.push_back(nrm == 0);
+        if (H)
+            x.push_back(0.022f), m.push_back(H), fl.push_back(true);
+        x.push_back(0.5f), m.push_back(3), fl.push_back(false), x.push_back(0.55f), m.push_back(3), fl.push_back(true);
+        return build(x, m, fl);
+    };
+    const double TOL = 1.0e-6;
+
+    // ------------------------------------------------------------------------------------------
+    // A. The transmitted path: behind the stack, at the wall behind it and behind that wall
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: stack trajectory A, the stack in air (host 0) or in the middle of 22 mm of eps 2.50 (3) or 2.50-0.80j (4), a 50 mm\n");
+    QD_DIAG("# eps 2.50 wall behind at x = 0.5 m; the transmitted path, no reflections. seg, dir: segment and path_dir behind the stack's\n");
+    QD_DIAG("# wall, deg; e_seg, e_dir0, e_dir1: against the launched direction, largest component, the direction at 1 and 2 GHz.\n");
+    QD_DIAG("# dy_wall: where the wall behind is met against the twin with the first layer alone, m; e_in: the segment inside that wall\n");
+    QD_DIAG("# against the twin's; e_out: the segment behind it against the launched direction; dP0, dP1: the path's power behind it\n");
+    QD_DIAG("# against the undeviated tracer's, dB, at 1 and 2 GHz\n");
+    QD_DIAG("host,stack,normals,theta,types,seg,dir,e_seg,e_dir0,e_dir1,dy_wall,e_in,e_out,dP0,dP1\n");
+    for (int H : {0, 3, 4})
+        for (int s = 0; s < 2; ++s)
+            for (int nrm = 0; nrm < 2; ++nrm)
+                for (double thd : {30.0, 60.0})
+                {
+                    const int n = H ? 5 : 3, ia = H ? 2 : 0; // calls until the path is behind the far wall; the call that leaves the stack's wall
+                    auto G = trace(wall(H, s, nrm), thd, true, n, 0, false, -1), T = trace(wall(H, s + 2, nrm), thd, true, n, 0, false, -1);
+                    auto U = trace(wall(H, s, nrm), thd, false, n, 0, false, -1);
+                    INFO("A, host " << H << ", " << sn[s] << ", normals " << nrm << ", theta " << thd);
+                    REQUIRE((T.size() == (size_t)n && U.size() == (size_t)n));
+                    CHECK(G.size() == (size_t)n);
+                    if (G.size() != (size_t)n || G[n - 1].orig.n_rows != 1)
+                    {
+                        QD_DIAG("%d,%s,%s,%.0f,path lost after %zu calls\n", H, sn[s], nrm ? "front|front" : "front|back", thd, G.size());
+                        continue;
+                    }
+                    const Gen &A = G[ia], &B = G[ia + 1], &C = G[ia + 2];
+                    const double e_seg = dmax(A.seg(0), k_launch), e0 = dmax(A.dir.slice(0).row(0), k_launch), e1 = dmax(A.dir.slice(1).row(0), k_launch);
+                    const double dyw = (double)B.hit(0, 1) - (double)T[ia + 1].hit(0, 1), e_in = dmax(B.seg(0), T[ia + 1].seg(0)), e_out = dmax(C.seg(0), k_launch);
+                    const double dP0 = C.pw[0][0] - U[n - 1].pw[0][0], dP1 = C.pw[0][1] - U[n - 1].pw[0][1];
+                    QD_DIAG("%d,%s,%s,%.0f,%s,%.4f,%.4f,%.3e,%.3e,%.3e,%.3e,%.3e,%.3e,%+.4f,%+.4f\n", H, sn[s], nrm ? "front|front" : "front|back", thd, C.types[0].c_str(),
+                            ang(A.seg(0)), ang(A.dir.slice(0).row(0)), e_seg, e0, e1, dyw, e_in, e_out, dP0, dP1);
+                    CHECK(A.cur(0) == (short)0);
+                    CHECK(e_seg < TOL);
+                    CHECK(e0 < TOL);
+                    CHECK(e1 < TOL);
+                    CHECK(std::abs(dyw) < 1.0e-5); // float coordinates of order one
+                    CHECK(e_in < TOL);
+                    CHECK(e_out < TOL);
+                    CHECK(std::abs(dP0) < 1.0e-2);
+                    CHECK(std::abs(dP1) < 1.0e-2);
+                }
+
+    // ------------------------------------------------------------------------------------------
+    // B. A beam, split in air behind the stack
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: stack trajectory B, a beam of 0.5 deg half angle through the stack in air, split in the call after it. n: sub-beams,\n");
+    QD_DIAG("# refracting and undeviated tracer; e_seg, e_tube: every sub-beam's segment and vertex rays against the undeviated tracer's,\n");
+    QD_DIAG("# largest component; seg_min, seg_max: the sub-beams' segments, deg\n");
+    QD_DIAG("stack,normals,theta,n5,n4,e_seg,e_tube,seg_min,seg_max\n");
+    for (int s = 0; s < 2; ++s)
+        for (int nrm = 0; nrm < 2; ++nrm)
+            for (double thd : {30.0, 60.0})
+            {
+                auto G = trace(wall(0, s, nrm), thd, true, 2, 0, true, 1), U = trace(wall(0, s, nrm), thd, false, 2, 0, true, 1);
+                INFO("B, " << sn[s] << ", normals " << nrm << ", theta " << thd);
+                REQUIRE((G.size() == 2 && U.size() == 2));
+                const arma::uword n5 = G[1].orig.n_rows, n4 = U[1].orig.n_rows;
+                double e_seg = 0.0, e_tube = 0.0, lo = 1.0e9, hi = -1.0e9;
+                for (arma::uword i = 0; i < std::min(n5, n4); ++i)
+                {
+                    e_seg = std::max(e_seg, dmax(G[1].seg(i), U[1].seg(i)));
+                    for (int j = 0; j < 3; ++j)
+                        e_tube = std::max(e_tube, dmax(G[1].tridir.row(i).cols(3 * j, 3 * j + 2), U[1].tridir.row(i).cols(3 * j, 3 * j + 2)));
+                    lo = std::min(lo, ang(G[1].seg(i))), hi = std::max(hi, ang(G[1].seg(i)));
+                }
+                QD_DIAG("%s,%s,%.0f,%u,%u,%.3e,%.3e,%.4f,%.4f\n", sn[s], nrm ? "front|front" : "front|back", thd, (unsigned)n5, (unsigned)n4, e_seg, e_tube, lo, hi);
+                CHECK(n5 == n4);
+                CHECK(e_seg < TOL);
+                CHECK(e_tube < TOL);
+            }
+
+    // ------------------------------------------------------------------------------------------
+    // C. What must not move, with every digit of a float
+    // ------------------------------------------------------------------------------------------
+    QD_DIAG("\n# diag: stack trajectory C, raw. Every ray after the first two calls with one reflection allowed: a single sheet with both\n");
+    QD_DIAG("# tracers, the stack with the undeviated tracer, and of the stack with the refracting tracer the reflected ray alone\n");
+    QD_DIAG("host,stack,tracer,theta,call,types,orig_x,orig_y,orig_z,dest_x,dest_y,dest_z,P0,P1\n");
+    for (int H : {0, 4})
+        for (int s = 0; s < 3; ++s)
+            for (bool refr : {true, false})
+                for (double thd : {30.0, 60.0})
+                {
+                    auto G = trace(wall(H, s, 0), thd, refr, 2, 1, false, -1);
+                    REQUIRE(G.size() == 2);
+                    for (size_t g = 0; g < 2; ++g)
+                        for (arma::uword i = 0; i < G[g].orig.n_rows; ++i)
+                        {
+                            const std::string &ty = G[g].types[i];
+                            const bool refl_only = ty == "197/" || ty == "9/205/" || ty == "129/" || ty == "9/";
+                            if (s < 2 && refr && !refl_only)
+                                continue;
+                            QD_DIAG("%d,%s,%d,%.0f,%zu,%s,%.9g,%.9g,%.9g,%.9g,%.9g,%.9g,%.6f,%.6f\n", H, sn[s], refr ? 5 : 4, thd, g, ty.c_str(), G[g].orig(i, 0), G[g].orig(i, 1),
+                                    G[g].orig(i, 2), G[g].dest(i, 0), G[g].dest(i, 1), G[g].dest(i, 2), G[g].pw[i][0], G[g].pw[i][1]);
+                        }
+                }
+}
