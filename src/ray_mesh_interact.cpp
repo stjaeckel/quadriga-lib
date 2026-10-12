@@ -1213,6 +1213,16 @@ namespace
                 return std::imag(w) == 0.0 && std::abs((w_near / w) * s2) >= 1.0;
             };
 
+            // A coherent layer that is rarer than the transverse invariant: the wave in it is
+            // evanescent, or for a lossy layer strongly damped, and what crosses it tunnels.
+            auto RARE = [&](int j) -> bool
+            {
+                if (j < 1 || j > n_layers || MED(j).m > 0.0)
+                    return false;
+                const Material &X = MED(j);
+                return std::abs((w_near / ((X.eta(fGHz) + X.eta_resonance(fGHz)) * X.mu(fGHz))) * s2) >= 1.0;
+            };
+
             std::complex<double> R_out[2], T_out[2];
             for (int pol = 0; pol < 2; ++pol)
             {
@@ -1232,6 +1242,9 @@ namespace
                 // Material::flux_amp forms it, and the transmit port is put right by the ratio
                 // below: each segment is then on flux between its own ends. Where the media on
                 // the two sides of the closed layers are one, the ratio is exactly one.
+                //
+                // The face of a layer that is rarer than the invariant takes the rescale in the
+                // form that holds past a critical angle; see AMP in qd_slab_resolve.
                 auto BND = [&](int j, std::complex<double> &r, std::complex<double> &t, std::complex<double> &tb)
                 {
                     const Material &A = MED(j), &B = MED(j + 1);
@@ -1254,8 +1267,15 @@ namespace
                     double R0 = std::norm(r);
                     double Rt = A.apply_tf_pair(B, R0, fGHz);
                     double keep = 1.0 - R0, pass = (Rt < 1.0) ? 1.0 - Rt : 0.0;
+                    const std::complex<double> r2 = r * r;
                     r = std::polar(std::sqrt(Rt), std::arg(r));
-                    if (keep < 1.0e-9) // no forward Fresnel port left to scale: the flat leak
+                    if (!closed && R0 > 0.0 && std::abs(1.0 - r2) > 1.0e-12 && (RARE(j) || RARE(j + 1)))
+                    {
+                        double tm = A.apply_tf_pair(B, 0.0, fGHz);
+                        std::complex<double> c = std::sqrt(((1.0 - tm) - (Rt - tm) * (r2 / R0)) / (1.0 - r2));
+                        t *= c, tb *= c;
+                    }
+                    else if (keep < 1.0e-9) // no forward Fresnel port left to scale: the flat leak
                         t = std::polar(std::sqrt(pass), std::arg(t)), tb = std::polar(std::sqrt(pass), std::arg(tb));
                     else if (closed) // no forward port either, whatever R0 reads: the leak of a bare face
                     {
@@ -1706,6 +1726,7 @@ namespace
         // A traced solid evaluates its entry interface from the incidence side, so a sheet has to do
         // the same to stay equivalent to one. Correction mode keeps the slab-side view, because
         // ray_state_update's angle comes from real ray geometry and its result must not move.
+        std::complex<double> r2n[2], r2f[2]; // squared raw reflection of the near and the far face, [te, tm]
         auto fresnel_r_near = [&](std::complex<double> &r_te, std::complex<double> &r_tm,
                                   double &Ra_te, double &Ra_tm,
                                   double &R0_te, double &R0_tm, // raw, pre-tf, for the amplitude scale
@@ -1726,6 +1747,7 @@ namespace
             std::complex<double> te = (z_a * ci - z_s * cos_t2) / (z_a * ci + z_s * cos_t2);
             std::complex<double> tm = is_scalar ? te : (z_s * ci - z_a * cos_t2) / (z_s * ci + z_a * cos_t2);
             R0_te = std::norm(te), R0_tm = std::norm(tm);
+            r2n[0] = te * te, r2n[1] = tm * tm;
             Ra_te = mat_slab.apply_tf_pair(mat_near, R0_te, fGHz); // the pair that forms the face
             Ra_tm = mat_slab.apply_tf_pair(mat_near, R0_tm, fGHz);
 
@@ -1770,6 +1792,7 @@ namespace
             std::complex<double> te = (z_s * cts - z_a * cos_t2) / (z_s * cts + z_a * cos_t2);
             std::complex<double> tm = is_scalar ? te : (z_a * cts - z_s * cos_t2) / (z_a * cts + z_s * cos_t2);
             R0_te = std::norm(te), R0_tm = std::norm(tm);
+            r2f[0] = te * te, r2f[1] = tm * tm;
             Ra_te = mat_slab.apply_tf_pair(mat_far, R0_te, fGHz); // the pair that forms the face
             Ra_tm = mat_slab.apply_tf_pair(mat_far, R0_tm, fGHz);
             r_te = std::polar(std::sqrt(Ra_te), std::arg(te));
@@ -1814,16 +1837,36 @@ namespace
         double fx_te = 1.0, fx_tm = 1.0; // near -> far normal-flux conversion, transmit port only
         if (produce)
         {
-            auto AMP = [](double R_tf, double R0, const std::complex<double> &t) -> std::complex<double>
+            //
+            // The rescale by (1 - R') / (1 - R0) stands for a relation between the two crossings of
+            // one face, t' t'_b = (1 - tf-) (1 - r_leak^2), with r_leak the reflection after the
+            // leaking part of tf and tf- its forcing part. Between lossless media below the critical
+            // angle the reflection is real and the two are one expression. In a sheet that is rarer
+            // than the transverse invariant the wave is evanescent, or strongly damped, and
+            // tunnels: R0 is then near one although the sheet passes the wave, 1 - R0 is whatever
+            // loss the sheet or its neighbour has, and the quotient is a gain without bound, with a
+            // step where that loss is zero. There the relation is kept in the complex reflection,
+            // tm >= 0 handing in the forcing part: the tunnelled wave stays, tf scales it as it
+            // scales a propagating one, and both end points of tf hold. The gate is the sheet,
+            // lossy or not, and tf on the pair; a face without tf keeps the branches below.
+            auto AMP = [](double R_tf, double R0, const std::complex<double> &t,
+                          const std::complex<double> &r2, double tm) -> std::complex<double>
             {
+                if (tm >= 0.0 && R0 > 0.0 && std::abs(1.0 - r2) > 1.0e-12)
+                    return t * std::sqrt(((1.0 - tm) - (R_tf - tm) * (r2 / R0)) / (1.0 - r2));
                 double keep = 1.0 - R0;
                 if (keep < 1.0e-9) // TIR or grazing: no forward port left to scale
                     return std::polar(std::sqrt((R_tf < 1.0) ? 1.0 - R_tf : 0.0), std::arg(t));
                 return t * std::sqrt(((R_tf < 1.0) ? 1.0 - R_tf : 0.0) / keep);
             };
-            tns_te = AMP(Rn_te, R0n_te, tn_fwd[0]), tns_tm = AMP(Rn_tm, R0n_tm, tn_fwd[1]); // near -> slab
-            tsn_te = AMP(Rn_te, R0n_te, tn_bwd[0]), tsn_tm = AMP(Rn_tm, R0n_tm, tn_bwd[1]); // slab -> near
-            tsf_te = AMP(Rf_te, R0f_te, tf_out[0]), tsf_tm = AMP(Rf_tm, R0f_tm, tf_out[1]); // slab -> far
+            const bool rare = !(mat_slab.m > 0.0) && std::abs(((mat_near.eta(fGHz) + mat_near.eta_resonance(fGHz)) * mat_near.mu(fGHz) /
+                                                               (eta_s_if * mu_s)) * sin2_i) >= 1.0;
+            const double stf = mat_slab.tf(fGHz);
+            const double cn = (rare && (stf != 0.0 || mat_near.tf(fGHz) != 0.0)) ? mat_slab.apply_tf_pair(mat_near, 0.0, fGHz) : -1.0;
+            const double cf = (rare && (stf != 0.0 || mat_far.tf(fGHz) != 0.0)) ? mat_slab.apply_tf_pair(mat_far, 0.0, fGHz) : -1.0;
+            tns_te = AMP(Rn_te, R0n_te, tn_fwd[0], r2n[0], cn), tns_tm = AMP(Rn_tm, R0n_tm, tn_fwd[1], r2n[1], cn); // near -> slab
+            tsn_te = AMP(Rn_te, R0n_te, tn_bwd[0], r2n[0], cn), tsn_tm = AMP(Rn_tm, R0n_tm, tn_bwd[1], r2n[1], cn); // slab -> near
+            tsf_te = AMP(Rf_te, R0f_te, tf_out[0], r2f[0], cf), tsf_tm = AMP(Rf_tm, R0f_tm, tf_out[1], r2f[1], cf); // slab -> far
 
             // The far medium's lumped interface_gain is owed only when the wave actually enters a new
             // medium, which is what Material::interact_with folds in for a transmission-class
