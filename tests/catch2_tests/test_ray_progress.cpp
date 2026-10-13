@@ -5243,3 +5243,125 @@ TEST_CASE("ray_progress - a traced solid with tf creates nothing")
                         }
                     }
 }
+
+TEST_CASE("ray_progress - a wall with a stack inside it is on its matrix with the paths of a single sheet")
+{
+#ifdef _OPENMP
+    struct OneThread
+    {
+        int n = omp_get_max_threads();
+        OneThread() { omp_set_num_threads(1); }
+        ~OneThread() { omp_set_num_threads(n); }
+    } one_thread;
+#endif
+    // air | host 50 | 6 mm eps 5.24-0.63j, 6 mm eps 2.50 | host 50 | air. The leg behind the stack
+    // sums its series against both layers, so with every series summed the wall costs the paths
+    // of a wall with one sheet inside it. One ray, ray_progress called until none is left, every
+    // path that ends in air summed at its polyline's point, scalar, float, 1 GHz, 20 interactions
+    // and a gain floor of -140 dB, against the TE matrix of host 44 | 6 | 6 | host 44.
+    const double PI = 3.14159265358979323846, C0 = 299792458.0;
+    const float gap = 1.0e-5f;
+    const std::complex<double> J(0.0, 1.0);
+    typedef std::unordered_map<std::string, std::vector<float>> Pal;
+    const double a[5] = {1.0, 5.24, 2.50, 1.50, 1.50}, im[5] = {0.0, 0.63, 0.0, 0.40, 0.0}, tk[5] = {0.0, 0.006, 0.006, 0.0, 0.0};
+    Pal pal;
+    for (const char *k : {"a", "b", "c", "d", "fRef", "thk"})
+        pal[k] = std::vector<float>(4, 0.0f);
+    for (int m = 1; m <= 4; ++m)
+        pal["a"][m - 1] = (float)a[m], pal["c"][m - 1] = (float)(im[m] / 17.98), pal["fRef"][m - 1] = 1.0f, pal["thk"][m - 1] = (float)tk[m];
+    const double k0 = 2.0 * PI * 1.0e9 / C0;
+#ifdef QD_TEST_VERBOSE
+    std::printf("\n# diag: ray_progress stack wall, air | host 50 | 6 mm eps 5.24-0.63j, 6 mm eps 2.50 | host 50 | air, one ray, 20 interactions,\n");
+    std::printf("# floor -140 dB. thr: thin_slab_threshold. nT, nR: paths behind and in front; rays: rays launched over all calls. T, R: the\n");
+    std::printf("# summed paths against the matrix of the wall, dB\n");
+    std::printf("host,tracer,theta,thr,nT,nR,rays,T,R\n");
+#endif
+    for (int host : {3, 4})
+        for (int refr = 0; refr < 2; ++refr)
+            for (double thd : {20.0, 60.0, 85.0})
+                for (float thr : {0.0f, 0.15f})
+                {
+                    arma::fmat mesh(8, 9);
+                    arma::uvec mi(8);
+                    const float x[4] = {0.0f, 0.05f, 0.05f + gap, 0.10f + gap}, hh = 200.0f;
+                    const int mat[4] = {host, 1, 2, host};
+                    for (int k = 0; k < 4; ++k)
+                    {
+                        if (k < 2)
+                            mesh.row(2 * k) = arma::frowvec{x[k], -hh, -hh, x[k], -hh, hh, x[k], hh, -hh}, mesh.row(2 * k + 1) = arma::frowvec{x[k], hh, -hh, x[k], -hh, hh, x[k], hh, hh};
+                        else
+                            mesh.row(2 * k) = arma::frowvec{x[k], -hh, -hh, x[k], hh, -hh, x[k], -hh, hh}, mesh.row(2 * k + 1) = arma::frowvec{x[k], hh, -hh, x[k], hh, hh, x[k], -hh, hh};
+                        mi(2 * k) = (arma::uword)mat[k], mi(2 * k + 1) = (arma::uword)mat[k];
+                    }
+                    const double th = thd * PI / 180.0, st = std::sin(th);
+                    const float Ox = -1.0f, Oy = 0.37f - (float)std::tan(th), Oz = 0.0f, r0 = 0.1f, len = 300.0f;
+                    arma::frowvec kv = {(float)std::cos(th), (float)std::sin(th), 0.0f};
+                    arma::fvec cf(1);
+                    cf(0) = 1.0e9f;
+                    arma::fmat orig(1, 3), dest(1, 3), acc(1, 2, arma::fill::zeros);
+                    orig.row(0) = arma::frowvec{Ox, Oy, Oz} + r0 * kv, dest.row(0) = arma::frowvec{Ox, Oy, Oz} + (r0 + len) * kv;
+                    arma::fcube pd(1, 3, 1);
+                    pd.slice(0) = kv;
+                    arma::Col<short> prev(1, arma::fill::zeros), cur(1, arma::fill::zeros), buf(1, arma::fill::zeros);
+                    std::vector<quadriga_lib::path> paths(1);
+                    paths[0].init(0, 1, true);
+                    paths[0].set_length(r0);
+                    std::complex<double> Ts = 0.0, Rs = 0.0;
+                    int nT = 0, nR = 0;
+                    long rays = 0;
+                    for (int g = 0; g < 30; ++g)
+                    {
+                        quadriga_lib::ray_progress(mesh, mi, pal, cf, Ox, Oy, Oz, orig, dest, prev, cur, buf, pd, acc, paths, nullptr, nullptr, nullptr, nullptr,
+                                                   (uint8_t)20, 100, 100, 0, -140.0f, 3.0f, thr, refr != 0, true, nullptr, nullptr, nullptr, nullptr);
+                        if (orig.n_rows == 0)
+                            break;
+                        rays += (long)orig.n_rows;
+                        for (arma::uword i = 0; i < orig.n_rows; ++i)
+                        {
+                            const size_t ns = paths[i].n_seg();
+                            if ((cur(i) & (short)0x3FFF) != 0 || ns != (size_t)(g + 1))
+                                continue;
+                            double Lin = 0.0;
+                            for (size_t s2 = 1; s2 < ns; ++s2)
+                            {
+                                const float *p = paths[i].coord(s2 - 1), *q = paths[i].coord(s2);
+                                Lin += std::sqrt(((double)q[0] - p[0]) * ((double)q[0] - p[0]) + ((double)q[1] - p[1]) * ((double)q[1] - p[1]) +
+                                                 ((double)q[2] - p[2]) * ((double)q[2] - p[2]));
+                            }
+                            const float *first = paths[i].coord(0), *last = paths[i].coord(ns - 1), *xc = paths[i].xpr_coeff(0);
+                            const bool fwd = dest(i, 0) > orig(i, 0);
+                            std::complex<double> F = std::complex<double>((double)xc[0], (double)xc[1]) * std::exp(-J * k0 * Lin) *
+                                                     std::exp(J * k0 * st * ((double)last[1] - (double)first[1]));
+                            if (fwd && last[0] > 0.099f)
+                                Ts += F, ++nT;
+                            else if (!fwd && last[0] < 1.0e-3f)
+                                Rs += F, ++nR;
+                        }
+                    }
+                    // The TE matrix of the wall, admittance b = sqrt(eps - sin^2)
+                    std::complex<double> m11 = 1.0, m12 = 0.0, m21 = 0.0, m22 = 1.0, h0 = std::cos(th);
+                    const int lm[4] = {host, 1, 2, host};
+                    const double ld[4] = {0.044, 0.006, 0.006, 0.044};
+                    for (int k = 0; k < 4; ++k)
+                    {
+                        std::complex<double> b = std::sqrt(std::complex<double>(a[lm[k]], -im[lm[k]]) - st * st), dl = k0 * b * ld[k], c = std::cos(dl), s = std::sin(dl);
+                        std::complex<double> a12 = J * s / b, a21 = J * b * s;
+                        std::complex<double> n11 = m11 * c + m12 * a21, n12 = m11 * a12 + m12 * c, n21 = m21 * c + m22 * a21, n22 = m21 * a12 + m22 * c;
+                        m11 = n11, m12 = n12, m21 = n21, m22 = n22;
+                    }
+                    std::complex<double> B = m11 + m12 * h0, Cc = m21 + m22 * h0, r = (h0 * B - Cc) / (h0 * B + Cc), t = 2.0 * h0 / (h0 * B + Cc);
+                    const double dT = 10.0 * std::log10(std::norm(Ts / t)), dR = 10.0 * std::log10(std::norm(Rs / r));
+#ifdef QD_TEST_VERBOSE
+                    std::printf("%s,%d,%.0f,%.2f,%d,%d,%ld,%+.4f,%+.4f\n", (host == 3) ? "1.50-0.40j" : "1.50", refr ? 5 : 4, thd, (double)thr, nT, nR, rays, dT, dR);
+#endif
+                    INFO("stack wall, host " << host << ", refr " << refr << ", theta " << thd << ", thr " << thr);
+                    CHECK(nT >= 1);
+                    if (thr == 0.0f) // every series summed: the paths of a sheet inside a wall, on the matrix
+                    {
+                        CHECK(nT <= 6);
+                        CHECK(rays <= 40);
+                        CHECK(std::abs(dT) < 2.0e-2);
+                        CHECK(std::abs(dR) < 1.0e-2);
+                    }
+                }
+}
