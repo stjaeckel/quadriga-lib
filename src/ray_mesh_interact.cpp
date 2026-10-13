@@ -453,6 +453,30 @@ namespace
             return std::sqrt((1.0 - Rm) / x0) * (1.0 + u) / D;
         }
 
+        // tf at a face that has a wave on one side only. What is behind a closed face is a
+        // reactance: it reflects everything and carries no flux, so a transformer has nothing to
+        // hand a flux to. The leak is a matched resistive pad in front of that reactance, formed
+        // on the modulus of the immittance of the side the wave is on, as tf_face forms its ratio
+        // on a modulus. A pad is a real element: the face creates nothing whatever is in front
+        // of it, a lossy medium or a sheet the wave is evanescent in, and what it passes is what
+        // it absorbs. In front of a lossless medium that carries a wave it is the pair rule on a
+        // reflectance of one, sqrt(R') on the Fresnel reflection and 1 - R' of the flux; where
+        // the far wave goes to grazing it is the limit of tf_face, so a face has no step at its
+        // critical angle. r: the raw reflection in, the reflection out. y: the immittance of the
+        // incidence side that r is written in, z c for TE and the scalar type, conj(z) c for TM.
+        // Returns the amplitude the face passes per unit forward amplitude, in normal flux over
+        // flux_in. Only the reactance of the far side is read, so a verdict that is forced closes
+        // the face as well. A pair without tf, and one at tf = -1, is left raw and passes nothing.
+        double closed_face(const Material &B, double fGHz, std::complex<double> &r, const std::complex<double> &y, double flux_in) const
+        {
+            double s = std::sqrt(apply_tf_pair(B, 1.0, fGHz)), nu = (1.0 - s) / (1.0 + s), a = std::abs(y);
+            std::complex<double> e = y / a, b(0.0, std::imag(e * (1.0 - r) / (1.0 + r))), w = (nu + b) / (1.0 + nu * b);
+            if (!(nu > 0.0) || !(a > 0.0) || !std::isfinite(std::imag(b)))
+                return 0.0;
+            r = (e - w) / (e + w);
+            return (flux_in > 0.0) ? std::abs(1.0 + r) * std::sqrt(std::real(w) * a / flux_in) : 0.0;
+        }
+
         // Check whether two materials are the same
         bool same_as(const Material &other) const
         {
@@ -695,9 +719,13 @@ namespace
             // tf at a bare boundary. A face with a wave behind it is the transformer of a coherent
             // sheet, per channel: the normal flux is continuous whatever the two media are, so a
             // traced solid and the same layer as a sheet are one wall. A closed face has no wave
-            // behind it: its reflectance is one, the pair rule leaves 1 - R' as a flat leak, and
-            // the leak travels undeviated.
-            double R_closed = apply_tf_pair(other, 1.0, fGHz), s_te = 0.0, s_tm = 0.0;
+            // behind it and takes the pad of closed_face: in front of a lossless medium the pair
+            // rule on a reflectance of one, 1 - R' as a flat leak, and the leak travels undeviated.
+            // A mass-law medium has no wave inside, and its side of the face is a real immittance.
+            double s_te = 0.0, s_tm = 0.0;
+            std::complex<double> y_te = z1 * ct1, y_tm = std::conj(z1) * ct1;
+            if (m > 0.0)
+                y_te = std::abs(y_te), y_tm = std::abs(y_tm);
             if (!tir && trans_class)
                 flux_amp(z1, z2, ct1, ct2, s_te, s_tm); // s_tm unused in scalar mode, one channel
             if (interaction_type < 3) // EM: types 0 (reflection), 1 (transmission), 2 (refraction)
@@ -705,10 +733,11 @@ namespace
                 // Fresnel reflection and transmission (TE/TM), ITU-R P.2040-1 eq. (31) and (32)
                 std::complex<double> R_TE = (z1 * ct1 - z2 * ct2) / (z1 * ct1 + z2 * ct2), T_TE = (2.0 * z1 * ct1) / (z1 * ct1 + z2 * ct2);
                 std::complex<double> R_TM = (z2 * ct1 - z1 * ct2) / (z2 * ct1 + z1 * ct2), T_TM = (2.0 * z1 * ct1) / (z2 * ct1 + z1 * ct2);
-                if (tir && trans_class)
-                    coeff_TE = coeff_TM = std::sqrt(1.0 - R_closed);
-                else if (tir)
-                    coeff_TE = R_TE * std::sqrt(R_closed), coeff_TM = R_TM * std::sqrt(R_closed);
+                if (tir)
+                {
+                    double k_te = closed_face(other, fGHz, R_TE, y_te, std::real(y_te)), k_tm = closed_face(other, fGHz, R_TM, y_tm, std::real(y_tm));
+                    coeff_TE = trans_class ? k_te : R_TE, coeff_TM = trans_class ? k_tm : R_TM;
+                }
                 else
                 {
                     std::complex<double> c_te = tf_face(other, fGHz, R_TE), c_tm = tf_face(other, fGHz, R_TM);
@@ -720,7 +749,10 @@ namespace
             {
                 std::complex<double> R = (z1 * ct1 - z2 * ct2) / (z1 * ct1 + z2 * ct2), T = 1.0 + R; // pressure coefficients
                 if (tir)
-                    coeff_TE = std::polar(std::sqrt(trans_class ? 1.0 - R_closed : R_closed), std::arg(trans_class ? T : R));
+                {
+                    double k = closed_face(other, fGHz, R, y_te, std::real(y_te));
+                    coeff_TE = std::polar(trans_class ? k : std::sqrt((std::norm(R) < 1.0) ? std::norm(R) : 1.0), std::arg(trans_class ? T : R)); // the clamp, as on a sheet
+                }
                 else
                 {
                     std::complex<double> c = tf_face(other, fGHz, R);
@@ -1198,15 +1230,16 @@ namespace
                 // forms it. A boundary neither of whose media carries tf is left exactly raw,
                 // unless it is the face of a closed layer.
                 //
-                // A closed face passes the flat leak a bare face passes, 1 - R' with the
-                // reflectance taken as one, and nothing where neither medium carries tf. The
-                // reflection keeps its Fresnel magnitude. The leak is a statement about normal
-                // flux, of the side that carries one, and the segments run in raw amplitudes that
-                // are converted once at the outer pair; across a closed layer there is nothing
-                // to convert through. So the flux of that side is collected here, per channel as
+                // A closed layer has no wave inside and carries a leak as a flux. Seen from a
+                // coherent side its face is the pad of closed_face, which hands that flux over
+                // directly, and nothing where neither medium carries tf. Seen from a mass-law side
+                // it passes the flat leak, 1 - R' with the reflectance taken as one, a statement
+                // about the normal flux of that side: the segments run in raw amplitudes that are
+                // converted once at the outer pair, and across a closed layer there is nothing to
+                // convert through, so the flux of that side is collected here, per channel as
                 // Material::flux_amp forms it, and the transmit port is put right by the ratio
-                // below: each segment is then on flux between its own ends. Where the media on
-                // the two sides of the closed layers are one, the ratio is exactly one.
+                // below. Where the media on the two sides of the closed layers are one mass-law
+                // medium, the ratio is exactly one.
                 //
                 // The face of a coherent layer is a transformer; see tf_face.
                 auto BND = [&](int j, std::complex<double> &r, std::complex<double> &t, std::complex<double> &tb)
@@ -1232,6 +1265,18 @@ namespace
                     {
                         std::complex<double> c = A.tf_face(B, fGHz, r);
                         t *= c, tb *= c;
+                        return;
+                    }
+                    // A closed layer seen from a side that carries a wave is the pad of a closed face:
+                    // its reflection as that side sees it, with the clamp; on the way in the flux it
+                    // passes, on the way out the reverse, the amplitude that flux launches.
+                    const Material &W = cB ? A : B;
+                    if (closed && !(W.m > 0.0))
+                    {
+                        std::complex<double> yw = (pol == 0) ? (cB ? za * ca : zb * cb) : (cB ? std::conj(za) * ca : std::conj(zb) * cb), rw = cB ? r : -r;
+                        double k = W.closed_face(cB ? B : A, fGHz, rw, yw, 1.0);
+                        rw = std::polar((std::norm(rw) > 1.0) ? 1.0 : std::abs(rw), std::arg(rw));
+                        r = cB ? rw : -rw, t = std::polar(cB ? k : k / std::abs(yw), std::arg(t));
                         return;
                     }
                     double R0 = std::norm(r);
@@ -1662,8 +1707,8 @@ namespace
             }
 
             // tf of the boundary, as Material::interact_with applies it to the face the tracer
-            // meets: the pair rule where the face is closed, the transformer where it is open, or a
-            // series that is summed and one that is followed are two walls.
+            // meets: the pad where the face is closed, with the clamp, the transformer where it is
+            // open, or a series that is summed and one that is followed are two walls.
             if (layer_resolved)
             {
                 Material no_tf;
@@ -1672,8 +1717,8 @@ namespace
             }
             else if (std::imag(eta_a_if * mu_a) == 0.0 && std::abs(rat * sin2) >= 1.0) // closed, as interact_with judges it
             {
-                Ra_te = mat_slab.apply_tf_pair(adj, std::norm(te), fGHz);
-                Ra_tm = mat_slab.apply_tf_pair(adj, std::norm(tm), fGHz);
+                mat_slab.closed_face(adj, fGHz, te, z1 * cs, 1.0), mat_slab.closed_face(adj, fGHz, tm, is_scalar ? z1 * cs : std::conj(z1) * cs, 1.0);
+                Ra_te = (std::norm(te) > 1.0) ? 1.0 : std::norm(te), Ra_tm = (std::norm(tm) > 1.0) ? 1.0 : std::norm(tm);
             }
             else
             {
@@ -1698,6 +1743,15 @@ namespace
         // A coherent sheet carries a wave, propagating or tunnelling, and tf on its faces is a
         // transformer; a mass-law sheet carries none and keeps the pair rule on the reflectance.
         const bool wave = produce && !(mat_slab.m > 0.0);
+        // A mass-law sheet in which the wave is evanescent is closed on both faces: lossless, and
+        // the transverse invariant at or above its eps mu, the verdict Material::interact_with
+        // gives a wave that meets it. Its near face is the pad of a closed face. A near medium
+        // that holds the wave undeviated meets the sheet at an angle its Snell cosine does not
+        // describe and is not judged here.
+        std::complex<double> w_n = (mat_near.eta(fGHz) + mat_near.eta_resonance(fGHz)) * mat_near.mu(fGHz);
+        const bool shut = produce && mat_slab.m > 0.0 && std::imag(eta_s_if * mu_s) == 0.0 && std::abs((w_n / (eta_s_if * mu_s)) * sin2_i) >= 1.0 &&
+                          !(near_undeviated && mat_near.m > 0.0);
+        double k_te = 0.0, k_tm = 0.0; // what that face passes of the incident flux
         auto fresnel_r_near = [&](std::complex<double> &r_te, std::complex<double> &r_tm,
                                   double &Ra_te, double &Ra_tm,
                                   double &R0_te, double &R0_tm, // raw, pre-tf, for the amplitude scale
@@ -1718,9 +1772,12 @@ namespace
             std::complex<double> te = (z_a * ci - z_s * cos_t2) / (z_a * ci + z_s * cos_t2);
             std::complex<double> tm = is_scalar ? te : (z_s * ci - z_a * cos_t2) / (z_s * ci + z_a * cos_t2);
             std::complex<double> c_te = wave ? mat_near.tf_face(mat_slab, fGHz, te) : 1.0, c_tm = wave ? mat_near.tf_face(mat_slab, fGHz, tm) : 1.0;
+            if (shut)
+                k_te = mat_near.closed_face(mat_slab, fGHz, te, z_a * ci, std::real(z_a * ci)),
+                k_tm = mat_near.closed_face(mat_slab, fGHz, tm, is_scalar ? z_a * ci : std::conj(z_a) * ci, std::real(is_scalar ? z_a * ci : std::conj(z_a) * ci));
             R0_te = std::norm(te), R0_tm = std::norm(tm);
-            Ra_te = wave ? R0_te : mat_slab.apply_tf_pair(mat_near, R0_te, fGHz); // the pair that forms the face
-            Ra_tm = wave ? R0_tm : mat_slab.apply_tf_pair(mat_near, R0_tm, fGHz);
+            Ra_te = (wave || shut) ? ((shut && R0_te > 1.0) ? 1.0 : R0_te) : mat_slab.apply_tf_pair(mat_near, R0_te, fGHz); // the pair that forms the face
+            Ra_tm = (wave || shut) ? ((shut && R0_tm > 1.0) ? 1.0 : R0_tm) : mat_slab.apply_tf_pair(mat_near, R0_tm, fGHz);
 
             // Returned as the slab-side reflection, so that rn keeps one meaning throughout: the
             // internal series and the front port then differ only by the Stokes sign.
@@ -1763,17 +1820,27 @@ namespace
 
             std::complex<double> te = (z_s * cts - z_a * cos_t2) / (z_s * cts + z_a * cos_t2);
             std::complex<double> tm = is_scalar ? te : (z_a * cts - z_s * cos_t2) / (z_a * cts + z_s * cos_t2);
-            const bool wf = wave && !far_closed; // a closed far face keeps the pair rule, as a traced solid's does
-            std::complex<double> c_te = wf ? mat_slab.tf_face(mat_far, fGHz, te) : 1.0, c_tm = wf ? mat_slab.tf_face(mat_far, fGHz, tm) : 1.0;
-            R0_te = std::norm(te), R0_tm = std::norm(tm);
-            Ra_te = wf ? R0_te : mat_slab.apply_tf_pair(mat_far, R0_te, fGHz); // the pair that forms the face
-            Ra_tm = wf ? R0_tm : mat_slab.apply_tf_pair(mat_far, R0_tm, fGHz);
-            r_te = std::polar(std::sqrt(Ra_te), std::arg(te));
-            r_tm = std::polar(std::sqrt(Ra_tm), std::arg(tm));
-
             t_out[0] = (2.0 * z_s * cts) / (z_s * cts + z_a * cos_t2);
             t_out[1] = is_scalar ? t_out[0] : (2.0 * z_s * cts) / (z_a * cts + z_s * cos_t2);
-            t_out[0] *= c_te, t_out[1] *= c_tm;
+
+            // tf at the far face of a coherent sheet: the transformer where the far medium carries a
+            // wave, the pad of a closed face where it does not. The pad hands back what the face
+            // passes of the incident flux, so the transmit port is formed as on any other sheet and
+            // the two ports are one rule. A closed face keeps the clamp.
+            if (wave && far_closed)
+            {
+                std::complex<double> z_n = std::sqrt(eta_n_if / mu_n);
+                t_out[0] = std::polar(mat_slab.closed_face(mat_far, fGHz, te, z_s * cts, std::real(z_n * ci)), is_scalar ? std::arg(t_out[0]) : 0.0);
+                t_out[1] = is_scalar ? t_out[0] : mat_slab.closed_face(mat_far, fGHz, tm, std::conj(z_s) * cts, std::real(std::conj(z_n) * ci));
+                tm = is_scalar ? te : tm;
+            }
+            else if (wave)
+                t_out[0] *= mat_slab.tf_face(mat_far, fGHz, te), t_out[1] *= mat_slab.tf_face(mat_far, fGHz, tm);
+            R0_te = std::norm(te), R0_tm = std::norm(tm);
+            Ra_te = wave ? ((far_closed && R0_te > 1.0) ? 1.0 : R0_te) : mat_slab.apply_tf_pair(mat_far, R0_te, fGHz); // the pair that forms the face
+            Ra_tm = wave ? ((far_closed && R0_tm > 1.0) ? 1.0 : R0_tm) : mat_slab.apply_tf_pair(mat_far, R0_tm, fGHz);
+            r_te = std::polar(std::sqrt(Ra_te), std::arg(te));
+            r_tm = std::polar(std::sqrt(Ra_tm), std::arg(tm));
         };
 
         std::complex<double> rn_te, rn_tm, rf_te, rf_tm;
@@ -1844,8 +1911,9 @@ namespace
             // With near == far the factor is identically 1, so an isolated sheet, a collapsed
             // duplicate and a sheet embedded in one medium are all untouched. Only the glued cases
             // move. Snell is transitive, so the cosine in the far medium follows from the incidence
-            // sine and the slab drops out of it.
-            if (!mat_far.same_as(mat_near))
+            // sine and the slab drops out of it. A closed far face carries no flux to convert to:
+            // what it passes is already over the incident flux.
+            if (!mat_far.same_as(mat_near) && !far_closed)
             {
                 std::complex<double> eta_n_if = mat_near.eta(fGHz) + mat_near.eta_resonance(fGHz);
                 std::complex<double> mu_n = mat_near.mu(fGHz);
@@ -1869,41 +1937,29 @@ namespace
             }
         }
 
-        // Transmit port where the outer pair is past its critical angle.
+        // A mass-law sheet where the outer pair is past its critical angle.
         //
         // Total reflection of near | far says that no Fresnel wave propagates in the far medium,
-        // and nothing about the sheet. The reflect port is untouched by it: the wave enters the
-        // sheet, turns around at the far face and comes back, which the expressions below already
-        // say. The transmit port has no Fresnel part left, since the near-to-far flux conversion
-        // is zero. What crosses is the tf leak, and a leak that crosses the sheet pays what the
-        // sheet charges. It is written as the three events a traced solid of the same material
-        // would produce:
+        // and nothing about the sheet. A mass-law sheet has no wave inside, so what crosses is
+        // the leak of its two faces, written as the two crossings a traced solid of the same
+        // material would produce, with the mass term between them:
         //
         //     near | sheet   Material::interact_with's transmission, with the sheet's interface gain
-        //     the sheet      its one-way factor below, or the mass term on the mass-law route
         //     sheet | far    Material::interact_with's transmission, with the far medium's gain
         //
-        // Each event is evaluated at the cosine the wave has there, and that depends on how it
-        // entered the sheet.
-        //
-        // Entered as a leak, near | sheet itself past its critical angle: the wave kept the
-        // incidence cosine, and meets the far face with it as a wave held undeviated.
-        //
-        // Entered by an ordinary crossing: the wave was refracted and is at the Snell cosine. Snell
-        // is transitive, so the far face is then closed whenever the outer pair is, and it passes
-        // the flat leak of that face or, with no tf on it, nothing. Judging it at the incidence
-        // cosine instead finds it open wherever the sheet is rarer than the near medium and writes
-        // a Fresnel crossing into a medium that carries no propagating wave. The verdict is forced
-        // for that reason rather than re-derived from a complex cosine, and in scalar mode the
-        // phase of the leak is read off the far transmission formed above, whose refraction root
-        // comes from the incidence sine directly and cannot land on the growing branch.
-        //
-        // With no tf anywhere the last event is a closed port and the result is zero.
+        // Each is evaluated at the cosine the wave has there. Entered as a leak, near | sheet
+        // itself past its critical angle, the wave kept the incidence cosine and meets the far
+        // face with it as a wave held undeviated. Entered by an ordinary crossing it is at the
+        // Snell cosine, where the far face is closed whenever the outer pair is; the verdict is
+        // forced rather than re-derived from a complex cosine, and in scalar mode the phase of
+        // the leak is read off the far transmission formed above. With no tf anywhere the last
+        // event is a closed port and the result is zero. A coherent sheet needs none of this:
+        // its far face is the pad of a closed face and its transmit port the composite's.
         std::complex<double> leak_te(0.0, 0.0), leak_tm(0.0, 0.0);
-        bool leak_first = false; // the wave entered the sheet as a leak
-        if (produce && far_closed)
+        if (produce && far_closed && mat_slab.m > 0.0)
         {
             int it = is_scalar ? 4 : 1;
+            bool leak_first = false; // the wave entered the sheet as a leak
             std::complex<double> a_te, a_tm, b_te, b_tm;
             mat_near.interact_with(mat_slab, it, 0.0, fGHz, &a_te, &a_tm, nullptr, nullptr, nullptr, &leak_first,
                                    false, &ci, near_undeviated);
@@ -1957,35 +2013,21 @@ namespace
                                              thk_normal, mass_c, mass_bonded);
             double aI = std::sqrt((gI < 0.0) ? 0.0 : gI);
 
-            // A sheet in which the wave is evanescent is closed on both faces: lossless, and the
-            // transverse invariant at or above its eps mu, the verdict Material::interact_with
-            // gives a wave that meets it. Each face then passes the flat leak a bare face passes,
-            // 1 - R' with the reflectance taken as one, whatever its Fresnel reflectance reads -
-            // next to a lossy medium that is below one although the wave in the sheet carries no
-            // flux, and rescaling a raw amplitude by (1 - R') / (1 - R0) there is a gain. A leak
-            // is a statement about normal flux, so the two of them are the whole of the transmit
-            // port and the near-to-far conversion, which belongs to an unbroken chain of raw
-            // amplitudes, is not applied across the sheet. A face that is flat already, between
-            // lossless media, keeps the value it had. The reflect port is not touched.
-            //
-            // A near medium that holds the wave undeviated does not take this block: the sheet
-            // behind it is entered at an angle its Snell cosine does not describe. Towards the
-            // lower index it takes the held branch below; towards the higher index it is left
-            // on the composite, whose Snell cosine is real there.
-            std::complex<double> w_n = (mat_near.eta(fGHz) + mat_near.eta_resonance(fGHz)) * mat_near.mu(fGHz);
-            if (!far_closed && std::imag(eta_s_if * mu_s) == 0.0 && std::abs((w_n / (eta_s_if * mu_s)) * sin2_i) >= 1.0 &&
-                !(near_undeviated && mat_near.m > 0.0))
+            // A closed sheet passes what its near face passes, the pad of a closed face, and what
+            // that flux launches behind its far face, the reverse of the pad the far medium sees.
+            // A leak is a statement about normal flux, so the two of them are the whole of the
+            // transmit port and the near-to-far conversion, which belongs to an unbroken chain of
+            // raw amplitudes, is not applied across the sheet.
+            if (shut)
             {
-                double Rc_n = mat_slab.apply_tf_pair(mat_near, 1.0, fGHz), Rc_f = mat_slab.apply_tf_pair(mat_far, 1.0, fGHz);
-                double a_n = std::sqrt((Rc_n < 1.0) ? 1.0 - Rc_n : 0.0), a_f = std::sqrt((Rc_f < 1.0) ? 1.0 - Rc_f : 0.0);
-                if (!(1.0 - R0n_te < 1.0e-9))
-                    tns_te = std::polar(a_n, std::arg(tn_fwd[0]));
-                if (!(1.0 - R0n_tm < 1.0e-9))
-                    tns_tm = std::polar(a_n, std::arg(tn_fwd[1]));
-                if (!(1.0 - R0f_te < 1.0e-9))
-                    tsf_te = std::polar(a_f, std::arg(tf_out[0]));
-                if (!(1.0 - R0f_tm < 1.0e-9))
-                    tsf_tm = std::polar(a_f, std::arg(tf_out[1]));
+                std::complex<double> eta_f = mat_far.eta(fGHz) + mat_far.eta_resonance(fGHz), mu_f = mat_far.mu(fGHz);
+                std::complex<double> z_f = std::sqrt(eta_f / mu_f), c_f = std::sqrt(1.0 - (w_n / (eta_f * mu_f)) * sin2_i);
+                std::complex<double> y_fe = z_f * c_f, y_fm = is_scalar ? y_fe : std::conj(z_f) * c_f;
+                std::complex<double> q_te = -std::polar(std::sqrt(R0f_te), std::arg(rf_te)), q_tm = -std::polar(std::sqrt(R0f_tm), std::arg(rf_tm)); // raw, seen from behind
+                double a_te = mat_far.closed_face(mat_slab, fGHz, q_te, y_fe, std::norm(y_fe) / std::real(y_fe));
+                double a_tm = mat_far.closed_face(mat_slab, fGHz, q_tm, y_fm, std::norm(y_fm) / std::real(y_fm));
+                tns_te = std::polar(k_te, std::arg(tn_fwd[0])), tns_tm = std::polar(k_tm, std::arg(tn_fwd[1]));
+                tsf_te = std::polar(a_te, std::arg(tf_out[0])), tsf_tm = std::polar(a_tm, std::arg(tf_out[1]));
                 fx_te = fx_tm = 1.0;
             }
             // A sheet behind a wave that is held undeviated in a mass-law medium, towards the lower
@@ -2172,43 +2214,21 @@ namespace
             std::complex<double> front = mat_far.same_as(mat_near) ? undisp
                                                                    : (disp_far ? std::complex<double>(1.0, 0.0) : undisp * undisp);
 
-            // The leak is undeviated, so the host length it displaces was walked at the incidence
-            // cosine. On the far side of a closed pair the Snell cosine above is evanescent, and
-            // dividing by that decay would amplify a wave that never took it.
-            //
-            // The sheet's own factor follows the wave. One that entered by an ordinary crossing is a
-            // Fresnel wave inside the sheet: it takes phi as it stands, and what the far face
-            // reflects is summed with the series the reflect port carries, because a sheet has no
-            // interior the tracer could follow a bounce into and the energy would otherwise be
-            // dropped. One that entered as a leak kept the incidence cosine, where the Snell cosine
-            // is evanescent and phi would charge a decay it never took; it takes the form an
-            // undeviated traversal of a traced solid takes, the loss along the path and the phase of
-            // the real index on the thickness axis. Its bounces have no phase the media define, so
-            // it carries no series, as the mass-law route carries none.
-            std::complex<double> series_te(1.0, 0.0), series_tm(1.0, 0.0);
+            // Past the critical angle of the outer pair the far side carries no wave: the host
+            // length the sheet displaces was walked at the incidence cosine, and on the far side
+            // of a closed pair the Snell cosine above is evanescent, where dividing by that decay
+            // would amplify.
             if (far_closed)
             {
-                if (leak_first)
-                {
-                    double c_re = std::abs(std::real(ci));
-                    double d_leak = (c_re > 0.0) ? thk_n / c_re : dist_max;
-                    if (!(d_leak < dist_max))
-                        d_leak = dist_max;
-                    double gL = mat_slab.medium_gain(d_leak, fGHz, 1.0, 0.0, 0.0, 1.0e300); // mass term off
-                    phi = std::polar(std::sqrt((gL < 0.0) ? 0.0 : gL), -(omega / c0) * n_cur * thk_n * c_re);
-                }
-                else
-                    series_te = 1.0 / denom_te, series_tm = 1.0 / denom_tm;
-
                 std::complex<double> phi_dl =
                     std::exp(std::complex<double>(0.0, -1.0) * (omega / c0) * n_d * t_disp * ci);
                 phi_t = (std::abs(phi_dl) > 0.0) ? phi / phi_dl : phi;
             }
 
             if (T_te)
-                *T_te = far_closed ? leak_te * phi_t * series_te : ig * fx_te * tns_te * tsf_te * phi_t / denom_te;
+                *T_te = ig * fx_te * tns_te * tsf_te * phi_t / denom_te;
             if (T_tm)
-                *T_tm = far_closed ? leak_tm * phi_t * series_tm : ig * fx_tm * tns_tm * tsf_tm * phi_t / denom_tm;
+                *T_tm = ig * fx_tm * tns_tm * tsf_tm * phi_t / denom_tm;
             if (R_te) // front-face reflection plus the series leaking back out through the near face
                 *R_te = front * (-rn_te + ig_echo * tns_te * tsn_te * rf_te * phi2 / denom_te);
             if (R_tm)
@@ -3507,8 +3527,8 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         }
 
         // Re-evaluate coefficients if the ray tube introduced TIR (type-2 tube vertices).
-        // A glued sheet keeps its composite: the reflect port stands as it is and the transmit port
-        // becomes the leak chain, exactly as for a spine past its critical angle. It can only fire
+        // A glued sheet keeps its composite, formed with its far side closed, exactly as for a
+        // spine past its critical angle. It can only fire
         // for cases 2/3, where near and far differ; the cases where near == far never reach it.
         if (total_reflection != tir_central)
         {
@@ -5264,9 +5284,9 @@ void quadriga_lib::ray_state_update(int interaction_type,
             // forced-TIR near | far result was written instead, a bare mirror on the reflect pass
             // and the outer pair's tf leak on the transmit pass, which dropped the sheet's loss,
             // its tf, its interface gain and its mass term. Under the acoustic mapping that is
-            // every sheet on a rigid wall at every angle. The composite's reflect port needs no
-            // forward port in the far medium and is used as it stands; the transmit port is the
-            // leak chain qd_slab_resolve forms when told the far side is closed.
+            // every sheet on a rigid wall at every angle. qd_slab_resolve is told that the far
+            // side is closed: the far face of a coherent sheet is then the pad of a closed face
+            // on both ports, and a mass-law sheet passes the leaks of its two faces.
             {
                 // In-slab propagation angle. Only the refraction cosine is used; the coefficients and
                 // the TIR verdict of this near|sheet interface are deliberately discarded for the

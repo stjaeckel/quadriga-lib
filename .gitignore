@@ -23,3 +23,5 @@ tools/extract_html_mex_api.py
 deploy.py
 include/quadriga_lib_config.hpp
 version.tmp
+test.txt
+md/sheet_solid*.md
