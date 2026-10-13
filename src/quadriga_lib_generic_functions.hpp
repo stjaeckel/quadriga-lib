@@ -118,4 +118,15 @@ void qd_DFT_GENERIC(const dtype *__restrict CFr,    // Channel coefficients, rea
     }
 }
 
+// Sum-of-sinusoids evaluation, double precision
+// val(p, g) = sum_n wc(n, g) · cos( 2·pi · t ) - ws(n, g) · sin( 2·pi · t ), t = fx(n)·px(p) + fy(n)·py(p) + fz(n)·pz(p)
+// The argument t is reduced to one period before the trigonometric functions are evaluated
+void qd_SOS_GENERIC(const double *fx, const double *fy, const double *fz, // Frequencies in [1/m], length n_coeff
+                    const double *wc, const double *ws,                   // Weights a·cos(phase), a·sin(phase), Size [n_coeff, n_gen]
+                    const size_t n_coeff,                                 // Number of sinusoids
+                    const size_t n_gen,                                   // Number of generators
+                    const double *px, const double *py, const double *pz, // Positions in [m], length n_pos
+                    const size_t n_pos,                                   // Number of positions
+                    double *val);                                         // Output: Values, Size [n_pos, n_gen], uninitialized
+
 #endif

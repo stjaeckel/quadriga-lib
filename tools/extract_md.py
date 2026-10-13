@@ -133,8 +133,8 @@ def clean_md(text):
     # Convert <a href="#target">text</a>  →  [text](#target)
     text = re.sub(r'<a\s+href="(#[^"]*)">(.*?)</a>', r"[\2](\1)", text)
 
-    # Convert [[target]]  →  [target](#target)
-    text = re.sub(r"\[\[(.*?)\]\]", r"[\1](#\1)", text)
+    # Convert [[target]]  →  [target](#slug), with the anchor a renderer derives from the heading of the target
+    text = re.sub(r"\[\[(.*?)\]\]", lambda m: f"[{m.group(1)}](#{slugify(m.group(1))})", text)
 
     # Strip <br> / <br/> / <br />  →  just a newline (or blank if already at EOL)
     text = re.sub(r"<br\s*/?>", "", text)

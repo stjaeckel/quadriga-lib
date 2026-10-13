@@ -488,6 +488,57 @@ Consequences of the decisions for that session:
 - The bias handling changes according to the outcome of work item 1.
 
 
+### 9.1 Result of the library session (2026-10-09)
+
+Header `include/quadriga_sos.hpp`, documentation section "Sum-of-sinusoids random number generator".
+Positions are `[n_pos, n_dim]` (rows are positions) and results `[n_pos, n_gen]`; the MATLAB class uses
+`[3, n_pos]` and `[n_gen, n_pos]`, so its shell has to transpose.
+
+| C++ function | MATLAB usage | Replaces |
+|---|---|---|
+| `sos_preset` | `[ freq, acf, dist ] = quadriga_lib.sos_preset( name, dist_decorr )` | `set_acf`, `set.dist_decorr` |
+| `sos_init_phases` | `phase = quadriga_lib.sos_init_phases( n_coeff, n_gen, seed )` | `init` |
+| `sos_acfi` | `val = quadriga_lib.sos_acfi( acf, dist, d )` | `acfi` |
+| `sos_val` | `val = quadriga_lib.sos_val( freq, phase, pos, pos_b, phase_b, acf, dist, freq_scale_b, uniform, use_kernel )` | `val` |
+| `sos_map` | `map = quadriga_lib.sos_map( freq, phase, x, y, z, uniform, use_kernel )` | `map` |
+| `sos_randn` | `val = quadriga_lib.sos_randn( dist_decorr, pos, pos_b, dist_decorr_b, preset, seed )` | `randn` |
+| `sos_rand` | `val = quadriga_lib.sos_rand( dist_decorr, pos, pos_b, dist_decorr_b, preset, seed )` | `rand` |
+| `sos_randi` | `val = quadriga_lib.sos_randi( dist_decorr, pos, imax, pos_b, dist_decorr_b, preset, seed )` | `randi` |
+| `sos_remove_bias` | `[ phase_out, phase_b_out, offset, mean_before ] = quadriga_lib.sos_remove_bias( freq, phase_in, pos, pos_b, phase_b_in, acf, dist, freq_scale_b )` | `remove_bias` |
+| `sos_acf_2d` | `[ acf_2d, dist_2d ] = quadriga_lib.sos_acf_2d( acf, dist )` | `acf_2d` |
+| `sos_acf_approx` | `[ acf_approx, dist_2d ] = quadriga_lib.sos_acf_approx( freq, dist )` | `acf_approx` |
+| `sos_calc_mse` | `[ mse, mse_core, mse_all, acf_tail, test_dir ] = quadriga_lib.sos_calc_mse( freq, acf, dist, n_dir )` | `calc_mse` |
+| `sos_acf_estimate` | `[ acf_est, dist_est, acf_est_dual ] = quadriga_lib.sos_acf_estimate( freq, phase, bins, n_pos, acf, dist, seed )` | `acf_estimate` |
+| `sos_generate` | `[ freq, ase, test_dir ] = quadriga_lib.sos_generate( acf, dist, n_coeff, n_dim, uniform_smp, n_dir, random_init, freq_min, freq_max, seed )` | `generate` |
+
+What the integration session has to decide or change in QuaDRiGa-NG:
+
+- **Preset names.** The presets are `Exp128`, `Exp256`, `Exp512`, `Exp1024` and the same for `Gauss` and
+  `Comb`. `Comb300`, the default of `qd_sos` and of `simpar.autocorrelation_function`, no longer exists;
+  the nearest is `Comb256`. Scenario and test files that name a preset need a mapping.
+- **Two device modes are chosen by the arguments.** One phase matrix means both devices on the same map
+  (DS, KF, SF, XPR, delays), two phase matrices mean two maps (ASD/ASA, ESD/ESA with swapped columns).
+  The comparison of the phase columns with a tolerance of 1e-6 in `val` is gone.
+- **Two decorrelation distances** (`set_scenario`, LOS state with `SC_lambda_rx ~= SC_lambda_tx`) are two
+  maps with independent phases. `sos_rand` does this by itself when `dist_decorr_b` is given.
+- **`UniformForced`** is not available. `set_scenario` already does the remapping itself.
+- **Bias.** With the new tables the constant offset of the old tables (standard deviation 0.08 to 0.18 on
+  every generator, whatever the size of the drop) is gone. What remains is the mean of a correlated field
+  over a finite drop. `sos_remove_bias` is exact (closed form) but conditions the field: it removes
+  variance, most of it when the drop is not much larger than the decorrelation distance. Decide whether
+  `init_sos` still calls it and from how many positions. If it does: set up the reciprocity (swap of
+  the phase columns) first and correct afterwards; a correction is valid only for the frequencies and
+  positions it was computed with. In dual mobility the swapped angular-spread generators cannot all be
+  corrected by offsets; with two maps `sos_remove_bias` zeroes each device on its own positions.
+- **Batching.** `sos_val` takes one phase column per generator. The builder should keep the phases of a
+  generator array as one matrix `[n_coeff, n_gen]` per decorrelation distance.
+- **Values change.** New tables, new random stream (not MATLAB's `rand`), double precision. Tests that
+  compare with stored numbers have to be reviewed; tests that assert statistics should keep passing.
+- **Seeds.** The library functions take a seed and do not use MATLAB's global random stream. To keep
+  `set_rand_state` working, the MATLAB shell can draw the seed (or the phases themselves) with `rand`
+  and pass them in.
+
+
 ## 10. Notes from reading the MATLAB code
 
 Things the library session should know before it starts; none of them is a decision.
