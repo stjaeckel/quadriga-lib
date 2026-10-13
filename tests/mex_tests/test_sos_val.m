@@ -71,12 +71,10 @@ assert_throws( @() quadriga_lib.sos_val( freq, phase, pos, [], [], [], [], [], [
 assert_throws( @() quadriga_lib.sos_val( freq, phase, pos, pos_b, [], [1, -1, -1], dist ), 'acf' );           % thrown by C++
 
 %% Type handling of the shared MEX helpers, pinned as it is today so that a change is noticed
-% Complex arrays are accepted without an error or warning. Their values are not usable: MATLAB R2024a
-% hands the helper interleaved data, so real and imaginary parts are read as consecutive real elements
-% (Octave keeps the parts apart). Only the acceptance and the size are pinned, the values differ per host.
-vc = quadriga_lib.sos_val( freq, phase, complex(pos, pos + 1), [], [], [], [], [], [], 1 );
-assertEqual( size(vc), [3, 2] );
-assertTrue( isreal(vc) );
+% Complex arrays are rejected, also when their class matches the type the wrapper reads in place
+assert_throws( @() quadriga_lib.sos_val( freq, phase, complex(pos, pos + 1) ), 'Complex datatypes are not supported.' );
+assert_throws( @() quadriga_lib.sos_val( freq, complex(phase, 1), pos ), 'Complex datatypes are not supported.' );
+assert_throws( @() quadriga_lib.sos_val( freq, phase, complex(single(pos), 1) ), 'Complex datatypes are not supported.' );
 % Integer classes other than (u)int32 and (u)int64, and logical arrays, are rejected
 assert_throws( @() quadriga_lib.sos_val( freq, phase, uint8(pos) ), 'Unsupported data type.' );
 assert_throws( @() quadriga_lib.sos_val( freq, phase, pos > 0 ), 'Unsupported data type.' );
