@@ -433,6 +433,26 @@ namespace
             return R_leak + (1.0 - R_leak) * tfm;
         }
 
+        // tf at a face that has a wave on both sides is an ideal transformer of real ratio: it scales the
+        // tangential field by k and its partner by 1/k, so the normal flux is continuous whatever the
+        // two media are, lossy or evanescent, and the face creates nothing. The ratio is set by the
+        // pair rule on the modulus x0 of the admittance ratio of the two sides; where that ratio is
+        // real it is the pair rule on the reflectance itself. r: the raw reflection in, the reflection
+        // out. Returns the one scale of both crossings. At an exact match of the two sides a forced
+        // reflection has no side to move away from, and the medium that forces less sees it negative,
+        // so the face is one face from its two sides.
+        std::complex<double> tf_face(const Material &B, double fGHz, std::complex<double> &r) const
+        {
+            std::complex<double> u = (1.0 - r) / (1.0 + r);
+            double x0 = std::abs(u);
+            if ((tf(fGHz) == 0.0 && B.tf(fGHz) == 0.0) || !(x0 > 0.0) || std::isinf(x0))
+                return 1.0;
+            double rm = (1.0 - x0) / (1.0 + x0), Rm = apply_tf_pair(B, rm * rm, fGHz), s = (rm < 0.0 || (rm == 0.0 && tf(fGHz) > B.tf(fGHz))) ? -std::sqrt(Rm) : std::sqrt(Rm);
+            std::complex<double> D = (1.0 + s) + (u / x0) * (1.0 - s);
+            r = ((1.0 + s) - (u / x0) * (1.0 - s)) / D;
+            return std::sqrt((1.0 - Rm) / x0) * (1.0 + u) / D;
+        }
+
         // Check whether two materials are the same
         bool same_as(const Material &other) const
         {
@@ -672,87 +692,41 @@ namespace
                 return gain;
             }
 
+            // tf at a bare boundary. A face with a wave behind it is the transformer of a coherent
+            // sheet, per channel: the normal flux is continuous whatever the two media are, so a
+            // traced solid and the same layer as a sheet are one wall. A closed face has no wave
+            // behind it: its reflectance is one, the pair rule leaves 1 - R' as a flat leak, and
+            // the leak travels undeviated.
+            double R_closed = apply_tf_pair(other, 1.0, fGHz), s_te = 0.0, s_tm = 0.0;
+            if (!tir && trans_class)
+                flux_amp(z1, z2, ct1, ct2, s_te, s_tm); // s_tm unused in scalar mode, one channel
             if (interaction_type < 3) // EM: types 0 (reflection), 1 (transmission), 2 (refraction)
             {
-                // Fresnel reflection (TE/TM), ITU-R P.2040-1 eq. (31); under TIR the interface is a perfect mirror
-                std::complex<double> R_TE = (z1 * ct1 - z2 * ct2) / (z1 * ct1 + z2 * ct2);
-                std::complex<double> R_TM = (z2 * ct1 - z1 * ct2) / (z2 * ct1 + z1 * ct2);
-                double reflectance = tir ? 1.0 : 0.5 * (std::norm(R_TE) + std::norm(R_TM));
-
-                // reflectance is the TE/TM average, which is what the returned gain is defined to be
-                // for a reflection. It does not distort the per-channel split there: the coefficients
-                // below are rescaled by one factor common to both channels, so their ratio is the raw
-                // Fresnel one throughout, and at tf = 0 that factor is identically 1. tf redistributes
-                // energy between the reflected and transmitted ports and is polarization-agnostic by
-                // design; if it is ever made polarization-dependent, this average is the first thing
-                // that has to change. The transmission branch below no longer rescales by an averaged
-                // quantity at all - each channel carries its own obliquity factor - and reads the
-                // average only through tf.
-
-                if (interaction_type == 0) // EM reflection: tf-adjusted reflectance
+                // Fresnel reflection and transmission (TE/TM), ITU-R P.2040-1 eq. (31) and (32)
+                std::complex<double> R_TE = (z1 * ct1 - z2 * ct2) / (z1 * ct1 + z2 * ct2), T_TE = (2.0 * z1 * ct1) / (z1 * ct1 + z2 * ct2);
+                std::complex<double> R_TM = (z2 * ct1 - z1 * ct2) / (z2 * ct1 + z1 * ct2), T_TM = (2.0 * z1 * ct1) / (z2 * ct1 + z1 * ct2);
+                if (tir && trans_class)
+                    coeff_TE = coeff_TM = std::sqrt(1.0 - R_closed);
+                else if (tir)
+                    coeff_TE = R_TE * std::sqrt(R_closed), coeff_TM = R_TM * std::sqrt(R_closed);
+                else
                 {
-                    gain = apply_tf_pair(other, reflectance, fGHz);
-                    if (reflectance > 0.0) // rescale the Fresnel R coefficients to carry tf
-                    {
-                        double s = std::sqrt(gain / reflectance);
-                        coeff_TE = R_TE * s, coeff_TM = R_TM * s;
-                    }
-                    else // tf < 0 created reflection at a zero-reflectance interface -> flat coefficients
-                        coeff_TE = coeff_TM = std::complex<double>(std::sqrt(gain), 0.0);
+                    std::complex<double> c_te = tf_face(other, fGHz, R_TE), c_tm = tf_face(other, fGHz, R_TM);
+                    coeff_TE = trans_class ? T_TE * (s_te * c_te) : R_TE, coeff_TM = trans_class ? T_TM * (s_tm * c_tm) : R_TM;
                 }
-                else // EM transmission (1) or refraction (2): one branch, one convention
-                {
-                    double R_eff = apply_tf_pair(other, reflectance, fGHz);
-
-                    if (tir) // no Fresnel forward port; any tf leak travels undeviated, flat coefficients
-                    {
-                        gain = 1.0 - R_eff;
-                        coeff_TE = coeff_TM = std::complex<double>(std::sqrt(gain), 0.0);
-                    }
-                    else
-                    {
-                        // Fresnel transmission, ITU-R P.2040-1 eq. (32)
-                        std::complex<double> T_TE = (2.0 * z1 * ct1) / (z1 * ct1 + z2 * ct2);
-                        std::complex<double> T_TM = (2.0 * z1 * ct1) / (z2 * ct1 + z1 * ct2);
-
-                        // tf redistributes between the ports and is not per-channel, so it enters as
-                        // one scale on top of the per-channel flux amplitudes. It is 1 at tf = 0.
-                        double tf_scale = (reflectance < 1.0) ? (1.0 - R_eff) / (1.0 - reflectance) : 0.0;
-                        double s_te = 0.0, s_tm = 0.0;
-                        flux_amp(z1, z2, ct1, ct2, s_te, s_tm);
-                        double a = std::sqrt(tf_scale);
-                        coeff_TE = T_TE * (s_te * a);
-                        coeff_TM = T_TM * (s_tm * a);
-                        gain = 0.5 * (std::norm(coeff_TE) + std::norm(coeff_TM));
-                    }
-                }
+                gain = 0.5 * (std::norm(coeff_TE) + std::norm(coeff_TM));
             }
             else // Scalar (acoustic): types 3 (reflection), 4 (transmission), 5 (refraction)
             {
-                std::complex<double> R = (z1 * ct1 - z2 * ct2) / (z1 * ct1 + z2 * ct2);
-                double reflectance = tir ? 1.0 : std::norm(R);
-                double R_eff = apply_tf_pair(other, reflectance, fGHz);
-                std::complex<double> T = 1.0 + R; // pressure transmission coefficient
-
-                if (interaction_type == 3) // Scalar reflection: tf-adjusted reflectance
+                std::complex<double> R = (z1 * ct1 - z2 * ct2) / (z1 * ct1 + z2 * ct2), T = 1.0 + R; // pressure coefficients
+                if (tir)
+                    coeff_TE = std::polar(std::sqrt(trans_class ? 1.0 - R_closed : R_closed), std::arg(trans_class ? T : R));
+                else
                 {
-                    gain = R_eff;
-                    coeff_TE = std::polar(std::sqrt(gain), std::arg(R));
+                    std::complex<double> c = tf_face(other, fGHz, R);
+                    coeff_TE = trans_class ? T * (s_te * c) : R;
                 }
-                else if (tir) // Transmission (4) or refraction (5) with no forward port: flat tf leak
-                {
-                    gain = 1.0 - R_eff;
-                    coeff_TE = std::polar(std::sqrt(gain), std::arg(T));
-                }
-                else // Scalar transmission (4) and refraction (5): one branch, one convention
-                {
-                    double tf_scale = (reflectance < 1.0) ? (1.0 - R_eff) / (1.0 - reflectance) : 0.0;
-                    double s_te = 0.0, s_tm = 0.0;
-                    flux_amp(z1, z2, ct1, ct2, s_te, s_tm); // s_tm unused, one channel
-                    coeff_TE = T * (s_te * std::sqrt(tf_scale));
-                    gain = std::norm(coeff_TE);
-                }
-                coeff_TM = coeff_TE;
+                coeff_TM = coeff_TE, gain = std::norm(coeff_TE);
             }
 
             // Transmission-class interactions (1, 2, 4, 5) cross a thin interface: fold in the interface gain
@@ -946,7 +920,7 @@ namespace
     //             after the Fresnel problem is solved, which is not a boundary admittance. The
     //             scattering form has the per-boundary r and t it rescales: each boundary a | b is
     //             the two-port (r, t_ab, t_ba, -r) in the amplitudes produce mode uses, rescaled
-    //             by the two media that form it - qd_tf_face at the face of a coherent layer,
+    //             by the two media that form it - tf_face at the face of a coherent layer,
     //             apply_tf_pair at a mass-law one - so a boundary shared by two sheets has no
     //             single owner, and each layer is the one-way factor phi. The
     //             product of the wave-transfer matrices B_1 P_1 B_2 ... B_{N+1} is evaluated by
@@ -982,24 +956,6 @@ namespace
     //
     // Returns false when it declines. ci is the incidence cosine in mat_near, complex wherever that
     // medium is a traced solid, exactly as produce mode's ct_near_exact.
-    // tf at the face of a coherent layer is an ideal transformer of real ratio: it scales the
-    // tangential field by k and its partner by 1/k, so the normal flux is continuous whatever the
-    // two media are, lossy or evanescent, and the face creates nothing. The ratio is set by the
-    // pair rule on the modulus x0 of the admittance ratio of the two sides; where that ratio is
-    // real it is the pair rule on the reflectance itself. r: the raw reflection in, the reflection
-    // out. Returns the one scale of both crossings.
-    inline std::complex<double> qd_tf_face(const Material &A, const Material &B, double fGHz, std::complex<double> &r)
-    {
-        std::complex<double> u = (1.0 - r) / (1.0 + r);
-        double x0 = std::abs(u);
-        if ((A.tf(fGHz) == 0.0 && B.tf(fGHz) == 0.0) || !(x0 > 0.0) || std::isinf(x0))
-            return 1.0;
-        double rm = (1.0 - x0) / (1.0 + x0), Rm = A.apply_tf_pair(B, rm * rm, fGHz), s = (rm < 0.0) ? -std::sqrt(Rm) : std::sqrt(Rm);
-        std::complex<double> D = (1.0 + s) + (u / x0) * (1.0 - s);
-        r = ((1.0 + s) - (u / x0) * (1.0 - s)) / D;
-        return std::sqrt((1.0 - Rm) / x0) * (1.0 + u) / D;
-    }
-
     inline bool qd_stack_resolve(const Material &mat_near,
                                  const QdLayer *layers, int n_layers,
                                  const Material &mat_far,
@@ -1252,7 +1208,7 @@ namespace
                 // below: each segment is then on flux between its own ends. Where the media on
                 // the two sides of the closed layers are one, the ratio is exactly one.
                 //
-                // The face of a coherent layer is a transformer; see qd_tf_face.
+                // The face of a coherent layer is a transformer; see tf_face.
                 auto BND = [&](int j, std::complex<double> &r, std::complex<double> &t, std::complex<double> &tb)
                 {
                     const Material &A = MED(j), &B = MED(j + 1);
@@ -1274,7 +1230,7 @@ namespace
                         return;
                     if (!closed && !(j >= 1 && A.m > 0.0) && !(j < n_layers && B.m > 0.0))
                     {
-                        std::complex<double> c = qd_tf_face(A, B, fGHz, r);
+                        std::complex<double> c = A.tf_face(B, fGHz, r);
                         t *= c, tb *= c;
                         return;
                     }
@@ -1705,18 +1661,24 @@ namespace
                     te = Lr_te, tm = is_scalar ? Lr_te : Lr_tm, layer_resolved = true;
             }
 
-            // tf of the boundary: both media that form it, symmetrically. With no tf on the
-            // neighbour this is the slab's own apply_tf, bit for bit.
+            // tf of the boundary, as Material::interact_with applies it to the face the tracer
+            // meets: the pair rule where the face is closed, the transformer where it is open, or a
+            // series that is summed and one that is followed are two walls.
             if (layer_resolved)
             {
                 Material no_tf;
                 Ra_te = no_tf.apply_tf(std::norm(te), fGHz);
                 Ra_tm = no_tf.apply_tf(std::norm(tm), fGHz);
             }
-            else
+            else if (std::imag(eta_a_if * mu_a) == 0.0 && std::abs(rat * sin2) >= 1.0) // closed, as interact_with judges it
             {
                 Ra_te = mat_slab.apply_tf_pair(adj, std::norm(te), fGHz);
                 Ra_tm = mat_slab.apply_tf_pair(adj, std::norm(tm), fGHz);
+            }
+            else
+            {
+                mat_slab.tf_face(adj, fGHz, te), mat_slab.tf_face(adj, fGHz, tm);
+                Ra_te = std::norm(te), Ra_tm = std::norm(tm);
             }
             r_te = std::polar(std::sqrt(Ra_te), std::arg(te));
             r_tm = std::polar(std::sqrt(Ra_tm), std::arg(tm));
@@ -1755,7 +1717,7 @@ namespace
 
             std::complex<double> te = (z_a * ci - z_s * cos_t2) / (z_a * ci + z_s * cos_t2);
             std::complex<double> tm = is_scalar ? te : (z_s * ci - z_a * cos_t2) / (z_s * ci + z_a * cos_t2);
-            std::complex<double> c_te = wave ? qd_tf_face(mat_near, mat_slab, fGHz, te) : 1.0, c_tm = wave ? qd_tf_face(mat_near, mat_slab, fGHz, tm) : 1.0;
+            std::complex<double> c_te = wave ? mat_near.tf_face(mat_slab, fGHz, te) : 1.0, c_tm = wave ? mat_near.tf_face(mat_slab, fGHz, tm) : 1.0;
             R0_te = std::norm(te), R0_tm = std::norm(tm);
             Ra_te = wave ? R0_te : mat_slab.apply_tf_pair(mat_near, R0_te, fGHz); // the pair that forms the face
             Ra_tm = wave ? R0_tm : mat_slab.apply_tf_pair(mat_near, R0_tm, fGHz);
@@ -1802,7 +1764,7 @@ namespace
             std::complex<double> te = (z_s * cts - z_a * cos_t2) / (z_s * cts + z_a * cos_t2);
             std::complex<double> tm = is_scalar ? te : (z_a * cts - z_s * cos_t2) / (z_a * cts + z_s * cos_t2);
             const bool wf = wave && !far_closed; // a closed far face keeps the pair rule, as a traced solid's does
-            std::complex<double> c_te = wf ? qd_tf_face(mat_slab, mat_far, fGHz, te) : 1.0, c_tm = wf ? qd_tf_face(mat_slab, mat_far, fGHz, tm) : 1.0;
+            std::complex<double> c_te = wf ? mat_slab.tf_face(mat_far, fGHz, te) : 1.0, c_tm = wf ? mat_slab.tf_face(mat_far, fGHz, tm) : 1.0;
             R0_te = std::norm(te), R0_tm = std::norm(tm);
             Ra_te = wf ? R0_te : mat_slab.apply_tf_pair(mat_far, R0_te, fGHz); // the pair that forms the face
             Ra_tm = wf ? R0_tm : mat_slab.apply_tf_pair(mat_far, R0_tm, fGHz);
@@ -2266,8 +2228,8 @@ namespace
         //
         // The averaging in interact_with never distorted a channel ratio, and after the energy
         // convention change there is no averaged rescale left in the transmission branch at all:
-        // each channel carries its own normal-flux obliquity factor, and the TE/TM average enters
-        // only through tf, which is polarization-agnostic by design. And even if a per-channel
+        // each channel carries its own normal-flux obliquity factor, and tf is per channel as
+        // well. And even if a per-channel
         // conversion were needed here, corr divides by a TWO-interface single pass while
         // ray_state_update corrects one interaction at a time, so the port in hand carries one
         // interface, not two.
