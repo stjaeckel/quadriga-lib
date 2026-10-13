@@ -6565,11 +6565,9 @@ TEST_CASE("Neighbour tf - each face of a sheet is owed by the pair of media that
     //
     // The limit. A sheet whose permittivity is its host's is not a boundary on the host side, so
     // an air-like sheet on a tf-bearing wall has to be the bare tf-bearing wall. That is asserted
-    // against the bare boundary written from Material::interact_with's rule: complex in scalar
-    // mode, complex per channel at normal incidence in EM, and on the TE/TM mean in EM at oblique
-    // incidence. Per channel at oblique incidence the two cannot agree and are not asked to: the
-    // bare boundary rescales by the TE/TM-averaged reflectance and the composite per channel, and
-    // both conventions are settled.
+    // against the bare boundary written from Material::interact_with's rule, the transformer of
+    // a face with a wave behind it: complex in scalar mode and complex per channel in EM, for a
+    // lossless and for a lossy wall.
     const double f_hz = FRQ, thk = 0.006, L = 0.10;
     const double k0 = 2.0 * QPI * f_hz / C0;
     const uint8_t OT_GLUED_ENTRY = 71, OT_GLUED_EXIT = 69;
@@ -6676,11 +6674,10 @@ TEST_CASE("Neighbour tf - each face of a sheet is owed by the pair of media that
     }
     QD_DIAG("# worst: control rows %.3e, rows with a tf-bearing neighbour %.3e\n", worst_ctl, worst_nb);
 
-    // The limit: an air-like sheet on a tf-bearing wall against the bare tf-bearing wall. Exact
-    // for a lossless wall, where the face of the composite and the bare boundary are one rule.
-    // For a lossy wall the face of the composite is a transformer and the bare boundary keeps the
-    // pair rule on its reflectance, so the two part; recorded until the bare boundary is taken up.
-    QD_DIAG("\n# diag: air | sheet eps 1 (6 mm) | wall eps 1.50 - j ei (tf) against the bare wall; the rows of the lossy wall are recorded\n");
+    // The limit: an air-like sheet on a tf-bearing wall against the bare tf-bearing wall. The
+    // face of the composite and the bare boundary are one rule, the transformer of a face with a
+    // wave behind it, per channel, for a lossless and for a lossy wall.
+    QD_DIAG("\n# diag: air | sheet eps 1 (6 mm) | wall eps 1.50 - j ei (tf) against the bare wall, the transformer per channel\n");
     QD_DIAG("wall_ei,wall_tf,theta_n,d_scalar_T,d_scalar_R,d_gain_T,d_gain_R,d_chan,moved_dB\n");
     for (double wei : {0.0, 0.40})
       for (double wtf : {0.5, -0.5})
@@ -6701,36 +6698,33 @@ TEST_CASE("Neighbour tf - each face of a sheet is owed by the pair of media that
                 return C;
             };
 
-            // The bare boundary air | wall, from the rule Material::interact_with applies
+            // The bare boundary air | wall, from the rule Material::interact_with applies: the
+            // transformer of an open face, per channel
             std::complex<double> ew = lump_eps(pal[1], f_hz), zw = std::sqrt(ew);
             std::complex<double> cw = std::sqrt(1.0 - (1.0 / ew) * (1.0 - ct * ct));
             std::complex<double> r_te = (ct - zw * cw) / (ct + zw * cw), r_tm = (zw * ct - cw) / (zw * ct + cw);
             std::complex<double> t_te = 2.0 * ct / (ct + zw * cw), t_tm = 2.0 * ct / (zw * ct + cw);
             double s_te = std::sqrt(std::real(zw * cw) / ct), s_tm = std::sqrt(std::real(std::conj(zw) * cw) / ct);
-            double R0 = std::norm(r_te), Rp = diag_tf_pair(R0, 0.0, wtf);
-            double Rbar = 0.5 * (std::norm(r_te) + std::norm(r_tm)), Rbar_p = diag_tf_pair(Rbar, 0.0, wtf);
+            std::complex<double> q_te = r_te, q_tm = r_tm;
+            std::complex<double> c_te = diag_tf_face(q_te, 0.0, wtf), c_tm = diag_tf_face(q_tm, 0.0, wtf);
 
             // The layer lies in the air in front of the wall, so the wall is on the mesh plane and
             // the reflect port is the bare wall's, phase included
             std::complex<double> back(1.0, 0.0);
-            std::complex<double> Ts_ref = (1.0 + r_te) * s_te * std::sqrt((1.0 - Rp) / (1.0 - R0));
-            std::complex<double> Rs_ref = std::polar(std::sqrt(Rp), std::arg(r_te)) * back;
+            std::complex<double> Ts_ref = (1.0 + r_te) * s_te * c_te;
+            std::complex<double> Rs_ref = q_te * back;
 
             auto St = run(4, 2), Sr = run(3, 2), Ct = run(1, 2), Cr = run(0, 2), C0 = run(1, 3);
             double d_sT = std::abs(cpx(St.xprmat, 0, 0) - Ts_ref), d_sR = std::abs(cpx(Sr.xprmat, 0, 0) - Rs_ref);
-            double d_gT = std::abs((double)Ct.gain(0) - (1.0 - Rbar_p)), d_gR = std::abs((double)Cr.gain(0) - Rbar_p);
-            double d_ch = 0.0;
-            if (thd == 0.0) // one reflectance, so the mean and the channel rule are the same statement
-            {
-                double k = std::sqrt((1.0 - Rp) / (1.0 - R0));
-                d_ch = std::max(std::max(std::abs(TE(Ct.xprmat) - t_te * s_te * k), std::abs(TM(Ct.xprmat) - t_tm * s_tm * k)),
-                                std::max(std::abs(TE(Cr.xprmat) - std::polar(std::sqrt(Rp), std::arg(r_te)) * back),
-                                         std::abs(TM(Cr.xprmat) - std::polar(std::sqrt(Rp), std::arg(r_tm)) * back)));
-            }
+            double d_gT = std::abs((double)Ct.gain(0) - 0.5 * (std::norm(t_te * s_te * c_te) + std::norm(t_tm * s_tm * c_tm)));
+            double d_gR = std::abs((double)Cr.gain(0) - 0.5 * (std::norm(q_te) + std::norm(q_tm)));
+            double d_ch = std::max(std::abs(TE(Ct.xprmat) - t_te * s_te * c_te), std::abs(TM(Ct.xprmat) - t_tm * s_tm * c_tm));
+            if (thd > 0.0) // the EM reflect port at exactly normal incidence has its own basis
+                d_ch = std::max(d_ch, std::max(std::abs(TE(Cr.xprmat) - q_te * back), std::abs(TM(Cr.xprmat) - q_tm * back)));
             QD_DIAG("%.2f,%+.1f,%.1f,%.2e,%.2e,%.2e,%.2e,%.2e,%+.6f\n", wei, wtf, thd, d_sT, d_sR, d_gT, d_gR, d_ch,
                     10.0 * std::log10((double)Ct.gain(0) / (double)C0.gain(0)));
             INFO("limit, wall ei " << wei << ", wall tf " << wtf << ", theta_n " << thd);
-            const double lim = (wei == 0.0) ? 1.0e-9 : 0.5;
+            const double lim = 1.0e-9;
             CHECK(d_sT < lim);
             CHECK(d_sR < lim);
             CHECK(d_gT < lim);
@@ -6986,7 +6980,8 @@ TEST_CASE("Stack with tf - the scattering form against its reference, produce mo
                     std::complex<double> cs(std::cos(theta_n), 0.0);
                     std::complex<double> phi = diag_phi(e_h, Lh, theta_n, f_hz);
                     std::complex<double> r_ahead = diag_r_slabside(e_h, e_air, cs), r_ahead0 = r_ahead;
-                    diag_tf_port(r_ahead, H.tf, 0.0);
+                    if (H.tf != 0.0)
+                        diag_tf_face(r_ahead, H.tf, 0.0); // an open bare face: the transformer, as its mirror
                     DiagSheet B = diag_sc_stack(e_h, U, H.tf, {lump_layer(Sm, f_hz)}, e_air, U, 0.0, cs, f_hz,
                                                 false, true, /*undisplaced*/ 0.0);
                     DiagSheet B0 = diag_cm_stack(e_h, U, {{e_s, U, thk}}, e_air, U, cs, f_hz, false, true, 0.0);
@@ -7160,7 +7155,8 @@ TEST_CASE("Stack with a mass-law layer - resolved by segments, not killed")
 }
 
 // Transmit port of a sheet whose outer pair is past its critical angle, where the wave entered the
-// sheet as an ordinary Fresnel wave: the near crossing as Material::interact_with gives it, the far
+// sheet as an ordinary Fresnel wave: the near crossing as Material::interact_with gives it (the
+// transformer of a face with a wave behind it, in normal flux), the far
 // face as the flat tf leak at the Snell cosine the wave has in the sheet, the sheet's one-way
 // factor, and the internal series the reflect port already carries. The displaced medium is air on
 // every row that calls this, taken out at the incidence cosine because the leak leaves undeviated.
@@ -7185,16 +7181,17 @@ static inline DiagLeak diag_leak_series(std::complex<double> e_near, std::comple
     std::complex<double> zn = std::sqrt(e_near), zs = std::sqrt(e_slab), zf = std::sqrt(e_far);
     std::complex<double> cs = root(1.0 - (e_near / e_slab) * s2), cf = root(1.0 - (e_near / e_far) * s2);
 
-    // near crossing, flux-normalized, tf on the TE/TM mean in EM and on the one channel in scalar mode
+    // near crossing, flux-normalized; the face has a wave behind it and tf is a transformer, per channel
     std::complex<double> r_te = (zn * ct - zs * cs) / (zn * ct + zs * cs);
     std::complex<double> r_tm = scalar ? r_te : (zs * ct - zn * cs) / (zs * ct + zn * cs);
     std::complex<double> t_te = 2.0 * zn * ct / (zn * ct + zs * cs);
     std::complex<double> t_tm = scalar ? t_te : 2.0 * zn * ct / (zs * ct + zn * cs);
-    double R0 = scalar ? std::norm(r_te) : 0.5 * (std::norm(r_te) + std::norm(r_tm));
-    double sc = std::sqrt((1.0 - diag_tf_pair(R0, tf_near, tf_slab)) / (1.0 - R0));
+    std::complex<double> q_te = r_te, q_tm = r_tm;
+    const bool near_tf = tf_near != 0.0 || tf_slab != 0.0;
+    std::complex<double> c_te = near_tf ? diag_tf_face(q_te, tf_near, tf_slab) : 1.0, c_tm = near_tf ? diag_tf_face(q_tm, tf_near, tf_slab) : 1.0;
     double fl_te = std::sqrt(std::real(zs * cs) / std::real(zn * ct));
     double fl_tm = scalar ? fl_te : std::sqrt(std::real(std::conj(zs) * cs) / std::real(std::conj(zn) * ct));
-    std::complex<double> a_te = t_te * fl_te * sc, a_tm = t_tm * fl_tm * sc;
+    std::complex<double> a_te = t_te * fl_te * c_te, a_tm = t_tm * fl_tm * c_tm;
 
     // far face from inside the sheet: closed, so the flat leak; real in EM, at arg(1 + R) in scalar mode
     std::complex<double> f_te = (zs * cs - zf * cf) / (zs * cs + zf * cf);
@@ -7915,9 +7912,8 @@ TEST_CASE("Leak chain - each face at the cosine the wave has and the series on a
     // ------------------------------------------------------------------------------------------
     {
         // Just below, the composite; just above, the chain. With the series on both sides and the
-        // far face at one cosine on both sides, the scalar step closes. In EM a per-channel step
-        // stays: the near crossing takes tf on the TE/TM mean in the chain and per channel in the
-        // composite, which is the settled channel rule.
+        // far face at one cosine on both sides, the scalar step closes. In EM the near crossing
+        // is per channel in the chain as in the composite, and the table records what is left.
         const double thk = 0.006, tf_s = 0.5;
         const std::vector<LumpMtl> pal = {{5.24, 0.00, thk, 0.0, tf_s}, {1.50, 0.00, 0.0}};
         auto mtl = lump_palette(pal);
@@ -8403,8 +8399,8 @@ TEST_CASE("Ports of a mass-law face from inside - the reflect port is the other 
     //
     // The reflect port is the reflection the other direction sees, sign reversed, which is
     // Stokes' relation for one face read from its two sides at the cosine the wave holds. For a
-    // lossless pair it conserves, in scalar mode and on the TE/TM mean in EM; per channel in EM
-    // the bare boundary applies tf on the mean and does not conserve from either side.
+    // lossless pair it conserves, in scalar mode and in EM; the EM row is asserted on the
+    // TE/TM mean.
     //
     // Through ray_mesh_interact, whose incidence angle is the geometric one, so the wave is
     // always held undeviated there. No interface gain, so the ports are the face alone.
@@ -19068,4 +19064,289 @@ TEST_CASE("Sheet tf - the face of a coherent sheet with tf creates nothing and h
                         QD_DIAG("%s,%d,%s,%.0f,%.17g,%.17g,%.17g,%.17g\n", R.name, tr, port ? "R" : "T", thd, std::real(z), std::imag(z), std::real(zh), std::imag(zh));
                     }
     }
+}
+
+// Every path of one ray through a wall: both passes at every event, through ray_triangle_intersect,
+// ray_mesh_interact and ray_state_update, each event on the segment the one before wrote, collected
+// where the ray is back in air and summed at its polyline's point, in front of the wall into R and
+// behind it into T. eps 0 sums every series, eps 1.5 follows every bounce. inc: the sum of the path
+// powers, which no interference enters.
+namespace bf
+{
+    struct Acc
+    {
+        std::complex<double> T[2], R[2]; // scalar or VV, HH
+        int nT = 0, nR = 0;
+        double drop = 0.0, inc[2] = {0.0, 0.0};
+    };
+    static void walk(const ub::Pal &pal, const arma::mat &mesh, const arma::uvec &mi, int tr, double f, double thd, double eps, const ub::Ev *in,
+                     const arma::mat &o, const arma::mat &d, std::complex<double> a0, std::complex<double> a1, double Lin, double y0, int depth,
+                     int maxdepth, Acc &A)
+    {
+        const double k = 2.0 * QPI * f / C0;
+        for (int it : {tr, (tr > 2) ? 3 : 0})
+        {
+            ub::Opt op;
+            op.eps = eps, op.relaunch = (it == tr);
+            ub::Ev E = ub::traced<double>(pal, mesh, mi, it, f, o, d, in, op);
+            if (E.nh == 0 || E.rt == 0)
+                continue;
+            std::complex<double> c0 = cpx(E.xpr, 0, 0), c1 = (tr > 2) ? c0 : cpx(E.xpr, 0, 3);
+            std::complex<double> b0 = a0 * c0, b1 = a1 * c1;
+            double L2 = Lin + (in ? std::sqrt(ub::sumsq(E.fbs - in->fbs)) : 0.0), yy0 = in ? y0 : E.fbs(0, 1);
+            if ((E.cur(0) & 0x3FFF) == 0)
+            {
+                std::complex<double> ph = std::exp(std::complex<double>(0.0, -k * L2)) *
+                                          std::exp(std::complex<double>(0.0, k * std::sin(thd * QPI / 180.0) * (E.fbs(0, 1) - yy0)));
+                const bool fwd = (E.destN(0, 0) - E.origN(0, 0)) > 0.0;
+                (fwd ? A.T[0] : A.R[0]) += b0 * ph, (fwd ? A.T[1] : A.R[1]) += b1 * ph, ++(fwd ? A.nT : A.nR);
+                A.inc[0] += std::norm(b0), A.inc[1] += std::norm(b1);
+                continue;
+            }
+            if (depth + 1 >= maxdepth || std::max(std::norm(b0), std::norm(b1)) < 1.0e-24)
+            {
+                A.drop += std::max(std::norm(b0), std::norm(b1));
+                continue;
+            }
+            arma::mat o2, d2;
+            ub::onward(E, o2, d2);
+            walk(pal, mesh, mi, tr, f, thd, eps, &E, o2, d2, b0, b1, L2, yy0, depth + 1, maxdepth, A);
+        }
+    }
+}
+
+TEST_CASE("Bare tf - a bare face with tf is a transformer where it is open and a flat leak where it is closed")
+{
+    ub::OneThread one_thread;
+    // tf at a bare boundary, the face of a traced solid. A face with a wave behind it is the ideal
+    // transformer the face of a coherent sheet is, per channel, and the mirrors of the solid's
+    // series follow it; a closed face keeps the flat leak. Measured as the two ports of a wall,
+    // each a sum over every path, with the series summed and with every bounce followed.
+    typedef std::complex<double> cd;
+    const double f = FRQ, gap = 1.0e-5;
+    auto dB = [](double p) { return (p > 0.0) ? 10.0 * std::log10(p) : -999.0; };
+    auto mk = [](double a, double ei, double thk, double tf, double m = 0.0, double fRef = 1.0e9) {
+        LumpMtl L;
+        L.a = a, L.ei = ei, L.thk = thk, L.tf = tf, L.m = m, L.fRef = fRef;
+        return L;
+    };
+    auto ports = [&](const ub::Pal &P, const arma::mat &mesh, const arma::uvec &mi, int tr, double thd, bool follow, int maxdepth = 400) {
+        bf::Acc A;
+        arma::mat o, d;
+        diag_ray_at(thd, o, d);
+        bf::walk(P, mesh, mi, tr, f, thd, follow ? 1.5 : 0.0, nullptr, o, d, 1.0, 1.0, 0.0, 0.0, 0, maxdepth, A);
+        return A;
+    };
+    auto event = [&](const ub::Pal &P, const arma::mat &mesh, const arma::uvec &mi, int it, double thd, int k) -> cd {
+        arma::mat o, d;
+        diag_ray_at(thd, o, d);
+        ub::Ev E = ub::traced<double>(P, mesh, mi, it, f, o, d, nullptr);
+        return (E.nh == 0 || E.rt == 0) ? cd(0.0, 0.0) : cpx(E.xpr, 0, k);
+    };
+    struct Mt
+    {
+        const char *name;
+        double a, ei;
+    };
+    const std::vector<Mt> mats = {{"5.24-0.63j", 5.24, 0.63}, {"2.50-0.80j", 2.50, 0.80}, {"1.50-0.40j", 1.50, 0.40}, {"0.90-0.20j", 0.90, 0.20},
+                                  {"0.31-0.20j", 0.31, 0.20}, {"5.24", 5.24, 0.0},        {"2.50", 2.50, 0.0}};
+
+    QD_DIAG("\n# diag: bare tf A, one traced solid with tf in air, both ports as sums over every path, series summed (sum) and every bounce\n");
+    QD_DIAG("# followed (fol). Worst T + R over 0 to 85 deg and 1, 6, 50 mm, with its row; above: rows above 1.0005 of 18. Scalar: one channel\n");
+    QD_DIAG("solid,tf,type,mode,worst,at_mm,at_deg,above,worst_hh,at_mm,at_deg,above_hh,least\n");
+    for (const Mt &M : mats)
+        for (double tf : {0.5, 0.9, -0.5})
+            for (int tr : {4, 5, 1, 2})
+                for (int follow = 0; follow < 2; ++follow)
+                {
+                    double w[2] = {0.0, 0.0}, wl[2] = {0.0, 0.0}, wt[2] = {0.0, 0.0}, least = 1.0e300;
+                    int above[2] = {0, 0};
+                    for (double L : {0.001, 0.006, 0.050})
+                        for (double thd : {0.0, 20.0, 45.0, 60.0, 75.0, 85.0})
+                        {
+                            ub::Pal P = lump_palette({mk(M.a, M.ei, 0.0, tf)});
+                            arma::uvec mi;
+                            arma::mat mesh = ub::build({0.0, L}, {1, 1}, {false, true}, mi);
+                            bf::Acc A = ports(P, mesh, mi, tr, thd, follow != 0);
+                            for (int c = 0; c < ((tr > 2) ? 1 : 2); ++c)
+                            {
+                                const double s = std::norm(A.T[c]) + std::norm(A.R[c]);
+                                if (s > w[c])
+                                    w[c] = s, wl[c] = L, wt[c] = thd;
+                                above[c] += (s > 1.0005);
+                                least = std::min(least, s);
+                                INFO("solid " << M.name << ", tf " << tf << ", type " << tr << ", follow " << follow << ", " << 1.0e3 * L << " mm, theta " << thd << ", channel " << c);
+                                CHECK(s < 1.0005); // the solid passes and returns no more than it received, in each channel
+                                if (M.ei == 0.0)
+                                    CHECK(s > 0.999); // and a lossless one loses nothing
+                            }
+                        }
+                    QD_DIAG("%s,%.1f,%d,%s,%.6g,%.0f,%.0f,%d,%.6g,%.0f,%.0f,%d,%.6f\n", M.name, tf, tr, follow ? "fol" : "sum", w[0], 1.0e3 * wl[0], wt[0], above[0], w[1],
+                            1.0e3 * wl[1], wt[1], above[1], least);
+                }
+
+    QD_DIAG("\n# diag: bare tf B, one face, air | solid with tf, the entry event: transmitted and reflected power per channel, EM (VV, HH) and\n");
+    QD_DIAG("# scalar. 66.4 deg is the Brewster angle of eps 5.24: the last column is recorded there, a forced reflection in HH\n");
+    QD_DIAG("solid,tf,theta,T_vv,R_vv,sum_vv,T_hh,R_hh,sum_hh,T_sc,R_sc,sum_sc\n");
+    for (const Mt &M : mats)
+        for (double tf : {0.5, 0.9, -0.5})
+            for (double thd : {20.0, 60.0, 66.4, 75.0})
+            {
+                ub::Pal P = lump_palette({mk(M.a, M.ei, 0.0, tf)});
+                arma::uvec mi;
+                arma::mat mesh = ub::build({0.0}, {1}, {false}, mi);
+                const double Tv = std::norm(event(P, mesh, mi, 1, thd, 0)), Rv = std::norm(event(P, mesh, mi, 0, thd, 0));
+                const double Th = std::norm(event(P, mesh, mi, 1, thd, 3)), Rh = std::norm(event(P, mesh, mi, 0, thd, 3));
+                const double Ts = std::norm(event(P, mesh, mi, 4, thd, 0)), Rs = std::norm(event(P, mesh, mi, 3, thd, 0));
+                QD_DIAG("%s,%.1f,%.1f,%.6f,%.6f,%.9f,%.6f,%.6f,%.9f,%.6f,%.6f,%.9f\n", M.name, tf, thd, Tv, Rv, Tv + Rv, Th, Rh, Th + Rh, Ts, Rs, Ts + Rs);
+                INFO("face, solid " << M.name << ", tf " << tf << ", theta " << thd);
+                // Seen from a lossless medium a face passes what it does not reflect, in each channel
+                CHECK(std::abs(Tv + Rv - 1.0) < 1.0e-9);
+                CHECK(std::abs(Th + Rh - 1.0) < 1.0e-9);
+                CHECK(std::abs(Ts + Rs - 1.0) < 1.0e-9);
+            }
+
+    QD_DIAG("\n# diag: bare tf C, a layer with tf in air as a traced solid (every path, series summed) against the same layer as a sheet, dB,\n");
+    QD_DIAG("# 6 mm. d: solid less sheet. Scalar and EM (VV, HH). 65 deg and not 60: eps 0.90 - 0.20j has an admittance ratio of modulus\n");
+    QD_DIAG("# one at 60 deg, where rounding decides the side of a forced face (table H)\n");
+    QD_DIAG("layer,tf,type,theta,T_solid,T_sheet,d_T,R_solid,R_sheet,d_R,d_T_hh,d_R_hh\n");
+    for (const Mt &M : mats)
+        for (double tf : {0.5, -0.5})
+            for (int tr : {4, 1})
+                for (double thd : {10.0, 30.0, 45.0, 65.0, 75.0})
+                {
+                    const double L = 0.006;
+                    ub::Pal P = lump_palette({mk(M.a, M.ei, 0.0, tf), mk(M.a, M.ei, L, tf)});
+                    arma::uvec mi, ms;
+                    arma::mat mesh = ub::build({0.0, L}, {1, 1}, {false, true}, mi), sheet = ub::build({0.0}, {2}, {false}, ms);
+                    bf::Acc A = ports(P, mesh, mi, tr, thd, false), B = ports(P, sheet, ms, tr, thd, false);
+                    double d[4];
+                    for (int c = 0; c < 2; ++c)
+                        d[2 * c] = dB(std::norm(A.T[c])) - dB(std::norm(B.T[c])), d[2 * c + 1] = dB(std::norm(A.R[c])) - dB(std::norm(B.R[c]));
+                    QD_DIAG("%s,%.1f,%d,%.0f,%.4f,%.4f,%+.5f,%.4f,%.4f,%+.5f,%+.5f,%+.5f\n", M.name, tf, tr, thd, dB(std::norm(A.T[0])), dB(std::norm(B.T[0])), d[0],
+                            dB(std::norm(A.R[0])), dB(std::norm(B.R[0])), d[1], d[2], d[3]);
+                    INFO("solid against sheet, " << M.name << ", tf " << tf << ", type " << tr << ", theta " << thd);
+                    for (int q = 0; q < ((tr > 2) ? 2 : 4); ++q)
+                        if (q % 2 == 0 || std::norm(q < 2 ? B.R[0] : B.R[1]) > 1.0e-4) // a reflect port near a null has no level to compare
+                            CHECK(std::abs(d[q]) < 2.0e-3);                                // one wall, at the relaunch bound
+                }
+
+    QD_DIAG("\n# diag: bare tf D, a sheet of air (eps 1, 6 mm) on a wall with tf against the bare wall, the entry event, both ports: the\n");
+    QD_DIAG("# largest distance in the complex plane over scalar, VV and HH\n");
+    QD_DIAG("wall,tf,theta,d_T,d_R\n");
+    for (const Mt &M : mats)
+        for (double tf : {0.5, -0.5})
+            for (double thd : {0.0, 20.0, 45.0, 70.0})
+            {
+                ub::Pal P = lump_palette({mk(M.a, M.ei, 0.0, tf), mk(1.0, 0.0, 0.006, 0.0)});
+                arma::uvec mb, mg;
+                arma::mat bare = ub::build({0.0}, {1}, {false}, mb), glued = ub::build({0.0, gap}, {2, 1}, {false, false}, mg);
+                double dT = 0.0, dR = 0.0;
+                for (int tr : {4, 1})
+                    for (int k : {0, 3})
+                        if (tr == 1 || k == 0)
+                        {
+                            dT = std::max(dT, std::abs(event(P, glued, mg, tr, thd, k) - event(P, bare, mb, tr, thd, k)));
+                            if (thd > 0.0 || tr == 4) // the EM reflect port at exactly normal incidence has its own basis
+                                dR = std::max(dR, std::abs(event(P, glued, mg, tr - 1, thd, k) - event(P, bare, mb, tr - 1, thd, k)));
+                        }
+                QD_DIAG("%s,%.1f,%.0f,%.2e,%.2e\n", M.name, tf, thd, dT, dR);
+                INFO("sheet of air on " << M.name << ", tf " << tf << ", theta " << thd);
+                CHECK(dT < 1.0e-9); // a sheet of air on a wall is the wall
+                CHECK(dR < 1.0e-9);
+            }
+
+    QD_DIAG("\n# diag: bare tf E, the acoustic main road: a rigid wall 200 mm, eps 2.401e-9, with tf, without the mass column and with m 30,\n");
+    QD_DIAG("# scalar, tracer 4 and 5. R: reflectance of the first face; T: what enters; both with every digit\n");
+    QD_DIAG("m,tf,type,theta,R,T,R+tf-1,T-tf\n");
+    for (double m : {0.0, 30.0})
+        for (double tf : {0.1, 0.3, 0.9})
+            for (int tr : {4, 5})
+                for (double thd : {10.0, 45.0, 75.0, 85.0})
+                {
+                    ub::Pal P = lump_palette({mk(2.401e-9, 0.0, 0.0, tf, m, 1.0e-3)});
+                    arma::uvec mi;
+                    arma::mat mesh = ub::build({0.0, 0.2}, {1, 1}, {false, true}, mi);
+                    const double R = std::norm(event(P, mesh, mi, 3, thd, 0)), T = std::norm(event(P, mesh, mi, tr, thd, 0));
+                    QD_DIAG("%.0f,%.1f,%d,%.0f,%.17g,%.17g,%.2e,%.2e\n", m, tf, tr, thd, R, T, R + tf - 1.0, T - tf);
+                    INFO("rigid wall, m " << m << ", tf " << tf << ", type " << tr << ", theta " << thd);
+                    CHECK(std::abs(R + tf - 1.0) < 1.0e-12); // closed: one minus its leak
+                    CHECK(std::abs(T - tf) < 1.0e-12);       // and the leak, flat
+                }
+
+    QD_DIAG("\n# diag: bare tf F, a rigid wall with a loss column, which is not a valid material: eps 2.401e-9 (1 - j tan), tf 0.3, 200 mm, no\n");
+    QD_DIAG("# mass column, scalar. R: reflectance of the first face; chain: entry and exit together, dB. It has to fail gracefully\n");
+    QD_DIAG("tan,type,theta,R,chain_dB\n");
+    for (double td : {0.0, 1.0e-6, 1.0e-3, 0.04})
+        for (int tr : {4, 5})
+            for (double thd : {10.0, 45.0, 75.0})
+            {
+                ub::Pal P = lump_palette({mk(2.401e-9, 2.401e-9 * td, 0.0, 0.3)});
+                arma::uvec mi;
+                arma::mat mesh = ub::build({0.0, 0.2}, {1, 1}, {false, true}, mi);
+                auto a = ub::chain(P, mesh, mi, {tr, tr}, f, thd, {1.5});
+                const double R = std::norm(event(P, mesh, mi, 3, thd, 0));
+                const double c = (a.size() == 2) ? std::norm(cpx(a[0].xpr, 0, 0)) * std::norm(cpx(a[1].xpr, 0, 0)) : 0.0;
+                QD_DIAG("%.0e,%d,%.0f,%.6f,%.4f\n", td, tr, thd, R, dB(c));
+                INFO("rigid wall with loss " << td << ", type " << tr << ", theta " << thd);
+                CHECK(std::isfinite(c));
+                CHECK(c < 1.0 + 1.0e-9); // no amplification
+                CHECK(R < 1.0 + 1.0e-9);
+            }
+
+    QD_DIAG("\n# diag: bare tf G, a forced reflection at a face between two media of one permittivity, lossless eps 2.50, tf -0.5 on the\n");
+    QD_DIAG("# host: behind a 6 mm coating without tf (every path, series summed), and behind a 20 mm solid without tf (16 events).\n");
+    QD_DIAG("# other: the permittivity of the coating or of the first solid. scalar\n");
+    QD_DIAG("wall,other,theta,T,R,sum,dropped\n");
+    for (int wall = 0; wall < 2; ++wall)
+        for (double e2 : {2.5, 2.5001, 2.6})
+            for (double thd : {0.0, 45.0, 60.0})
+            {
+                ub::Pal P = lump_palette({mk(2.5, 0.0, 0.0, -0.5), mk(e2, 0.0, wall ? 0.0 : 0.006, 0.0)});
+                arma::uvec mi;
+                arma::mat mesh = wall ? ub::build({0.0, 0.02, 0.02 + gap, 0.04 + gap}, {2, 2, 1, 1}, {false, true, false, true}, mi)
+                                      : ub::build({0.0, gap, gap + 0.006}, {2, 1, 1}, {false, false, true}, mi);
+                bf::Acc A = ports(P, mesh, mi, 4, thd, false, wall ? 16 : 400);
+                const double T = std::norm(A.T[0]), R = std::norm(A.R[0]);
+                QD_DIAG("%s,%.4f,%.0f,%.6f,%.6f,%.6f,%.1e\n", wall ? "two solids" : "coated", e2, thd, T, R, T + R, A.drop);
+                INFO("matched face, wall " << wall << ", other " << e2 << ", theta " << thd);
+                CHECK(std::abs(T + R - 1.0) < 2.0e-3); // a lossless wall, matched exactly or not
+            }
+
+    QD_DIAG("\n# diag: bare tf H, recorded: 6 mm of eps 0.90 - 0.20j with tf < 0 in air about 60 deg, where the admittance ratio of a face\n");
+    QD_DIAG("# has modulus one in the scalar and TE channel and a forced face changes side: as a traced solid (every path, series summed)\n");
+    QD_DIAG("# and as a sheet, T and R in dB, scalar. At 60 deg exactly rounding decides the side\n");
+    QD_DIAG("tf,as,T_59.99,T_60.00,T_60.01,step_T,R_59.99,R_60.00,R_60.01,step_R\n");
+    for (double tf : {-0.1, -0.5, -0.9, 0.5})
+        for (int sh = 0; sh < 2; ++sh)
+        {
+            ub::Pal P = lump_palette({mk(0.90, 0.20, 0.0, tf), mk(0.90, 0.20, 0.006, tf)});
+            arma::uvec mi;
+            arma::mat mesh = sh ? ub::build({0.0}, {2}, {false}, mi) : ub::build({0.0, 0.006}, {1, 1}, {false, true}, mi);
+            double T[3], R[3];
+            for (int q = 0; q < 3; ++q)
+            {
+                bf::Acc A = ports(P, mesh, mi, 4, 59.99 + 0.01 * q, false);
+                T[q] = dB(std::norm(A.T[0])), R[q] = dB(std::norm(A.R[0]));
+                CHECK((T[q] < 2.0e-3 && R[q] < 2.0e-3)); // each port at most 0 dB on both sides of the step
+            }
+            QD_DIAG("%.1f,%s,%.4f,%.4f,%.4f,%+.4f,%.4f,%.4f,%.4f,%+.4f\n", tf, sh ? "sheet" : "solid", T[0], T[1], T[2], T[2] - T[0], R[0], R[1], R[2], R[2] - R[0]);
+        }
+
+    QD_DIAG("\n# diag: bare tf T, twins, what must not move: a solid without tf in air, every path, series summed, the two ports with every\n");
+    QD_DIAG("# digit, and the entry event of a rigid wall\n");
+    QD_DIAG("row,type,theta,T_re,T_im,R_re,R_im,T_hh_re,T_hh_im,R_hh_re,R_hh_im\n");
+    for (const Mt &M : mats)
+        for (int tr : {4, 5, 1, 2})
+            for (double thd : {20.0, 60.0, 80.0})
+            {
+                ub::Pal P = lump_palette({mk(M.a, M.ei, 0.0, 0.0)});
+                arma::uvec mi;
+                arma::mat mesh = ub::build({0.0, 0.006}, {1, 1}, {false, true}, mi);
+                bf::Acc A = ports(P, mesh, mi, tr, thd, false);
+                QD_DIAG("no tf %s,%d,%.0f,%.17g,%.17g,%.17g,%.17g,%.17g,%.17g,%.17g,%.17g\n", M.name, tr, thd, A.T[0].real(), A.T[0].imag(), A.R[0].real(), A.R[0].imag(),
+                        A.T[1].real(), A.T[1].imag(), A.R[1].real(), A.R[1].imag());
+                CHECK(std::norm(A.T[0]) + std::norm(A.R[0]) < 1.0005);
+                CHECK(std::norm(A.T[1]) + std::norm(A.R[1]) < 1.0005);
+            }
 }
