@@ -10,11 +10,11 @@ Sum-of-sinusoids random number generator
 SECTION!*/
 
 /*!MD
-# sos_randn
+# sos.randn
 Spatially correlated Normal distributed random numbers
 
 - Convenience function: sets up one sum-of-sinusoids generator per entry of `dist_decorr` from a
-  preset, draws its phases and evaluates it at the given positions; see [[sos_val]] for the model
+  preset, draws its phases and evaluates it at the given positions; see [[sos.val]] for the model
 - The generators are independent of each other and may have different decorrelation distances
 - Phases: generator `g` uses column `g` of `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed )`.
   A second device on its own map uses column `g` of a second stream,
@@ -32,7 +32,7 @@ Spatially correlated Normal distributed random numbers
 - Each call with `seed = -1` gives a new realisation. With a seed >= 0 the phases are the same on
   all platforms: the same positions give the same values and nearby positions similar values,
   also in separate calls. The kernel is chosen automatically, so values from machines with and
-  without AVX2 differ by the tolerance stated in [[sos_val]]. The random state of numpy is not used
+  without AVX2 differ by the tolerance stated in [[sos.val]]. The random state of numpy is not used
 - A seed selects the phases, not the field: calls with the same seed but other decorrelation
   distances or another preset return related fields, equal at the coordinate origin and
   correlated around it. Use different seeds, or several entries of `dist_decorr` in one call, for
@@ -54,7 +54,7 @@ val = quadriga_lib.sos.randn( dist_decorr, pos, pos_b, dist_decorr_b, preset, se
   `(n_pos, 3)` as for `pos`; the number of columns may differ from `pos`; default: `None`
 - **`dist_decorr_b`** — Decorrelation distances of the second device; requires `pos_b`; must be
   >= 0; `None` = same as `dist_decorr`; `(n_gen,)`; default: `None`
-- **`preset`** — Name of the preset, see [[sos_preset]]; `str`; default: "Comb256"
+- **`preset`** — Name of the preset, see [[sos.preset]]; `str`; default: "Comb256"
 - **`seed`** — Seed of the phases; `int`; must be >= -1; -1 seeds from the system random device;
   default: -1
 
@@ -63,9 +63,9 @@ val = quadriga_lib.sos.randn( dist_decorr, pos, pos_b, dist_decorr_b, preset, se
   per position, one column per generator; `(n_pos, n_gen)`
 
 ## See also:
-- [[sos_val]] (evaluation with given frequencies and phases)
-- [[sos_preset]], [[sos_init_phases]] (the two steps this function combines)
-- [[sos_rand]], [[sos_randi]] (Uniform and integer values)
+- [[sos.val]] (evaluation with given frequencies and phases)
+- [[sos.preset]], [[sos.init_phases]] (the two steps this function combines)
+- [[sos.rand]], [[sos.randi]] (Uniform and integer values)
 MD!*/
 
 py::array_t<double> sos_randn(const py::array_t<double> &dist_decorr,

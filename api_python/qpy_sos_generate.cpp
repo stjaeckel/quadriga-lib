@@ -10,7 +10,7 @@ Sum-of-sinusoids random number generator
 SECTION!*/
 
 /*!MD
-# sos_generate
+# sos.generate
 Find the frequencies of a sum-of-sinusoids generator for a given ACF
 
 - Searches `n_coeff` frequencies such that the autocorrelation function (ACF) of the sinusoids,
@@ -18,7 +18,7 @@ Find the frequencies of a sum-of-sinusoids generator for a given ACF
 - Each sinusoid has a fixed direction and a signed frequency along it. `n_dim = 1`: no direction;
   `n_dim = 2`: directions on the half circle; `n_dim = 3`: directions on the upper hemisphere.
   `uniform_smp = True` places them regularly (equally spaced azimuth, spiral lattice, as the test
-  directions of [[sos_calc_mse]]), `False` draws them at random
+  directions of [[sos.calc_mse]]), `False` draws them at random
 - Iteration: in each pass every sinusoid is re-fitted once. Its frequency is chosen to fit the
   residual between the target and the contribution of all other sinusoids along its own direction:
   coarse search over a grid with a spacing of `0.1 / max(dist)`, then a step refinement. The new
@@ -29,7 +29,7 @@ Find the frequencies of a sum-of-sinusoids generator for a given ACF
   sinusoid by sinusoid in the first pass
 - The fit covers the range of `dist` only. The ACF of the result beyond the last sample point is
   not controlled; sinusoids with a frequency near zero keep it above zero at all larger distances
-  (see `acf_tail` of [[sos_calc_mse]]). To prevent this, set `freq_min`
+  (see `acf_tail` of [[sos.calc_mse]]). To prevent this, set `freq_min`
 - `freq_min` and `freq_max` limit the magnitude of the frequency along the direction of each
   sinusoid; 0 selects the default: no lower limit, and `15 / max(dist)` as upper limit
 - The search grid has `( freq_max - freq_min ) · max(dist) / 0.1 + 1` points, and its cosines are
@@ -37,7 +37,7 @@ Find the frequencies of a sum-of-sinusoids generator for a given ACF
   which limits `freq_max - freq_min` to less than `10000 / max(dist)`
 - The function runs on one thread
 - Use enough test directions: with few (e.g. 10) the result fits those directions and is worse
-  in others; the predefined tables of [[sos_preset]] were made with 300
+  in others; the predefined tables of [[sos.preset]] were made with 300
 - A seed >= 0 makes the result repeatable on one platform. The search takes accept/reject
   decisions, so a difference in the last bit of the input or of the math library can lead to
   another table of equivalent quality
@@ -73,8 +73,8 @@ freq, ase, test_dir = quadriga_lib.sos.generate( acf, dist, n_coeff, n_dim, unif
   `n_dim = 3`; `(n_dir, 1)` with the azimuth for `n_dim = 2`; empty `(0, 0)` for `n_dim = 1`
 
 ## See also:
-- [[sos_calc_mse]] (error of a frequency table)
-- [[sos_preset]] (precomputed tables)
+- [[sos.calc_mse]] (error of a frequency table)
+- [[sos.preset]] (precomputed tables)
 MD!*/
 
 py::tuple sos_generate(const py::array_t<double> &acf,

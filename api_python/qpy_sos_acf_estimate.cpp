@@ -10,7 +10,7 @@ Sum-of-sinusoids random number generator
 SECTION!*/
 
 /*!MD
-# sos_acf_estimate
+# sos.acf_estimate
 Monte-Carlo estimate of the ACF of one generator
 
 - Estimates the autocorrelation function (ACF) of one realisation of a generator from its values at
@@ -20,14 +20,14 @@ Monte-Carlo estimate of the ACF of one generator
   between the two values of all position pairs whose distance falls into the bin
 - Positions: an array `(2·n_pos, 3)` is filled column by column (all x, then all y, then all z)
   with `( 2·u - 1 ) · 0.4·max(bins)`, where `u` comes from the random stream described in
-  [[sos_init_phases]]
+  [[sos.init_phases]]
 - Bin `n` covers the distances from the midpoint between `bins[n-1]` and `bins[n]` (excluded) to
   the midpoint between `bins[n]` and `bins[n+1]` (included). The first bin starts at 1e-5 m, the
   last bin ends half a mean bin spacing above `bins[-1]`
 - Bins with fewer than 6 pairs return NaN in all outputs
 - `acf_est_dual`: the same for two devices on the same map. The first `n_pos` positions are the
   first device, the second `n_pos` positions the second device, and the value of a link is
-  [[sos_val]] with both positions. Two links form a pair if the distance between their first
+  [[sos.val]] with both positions. Two links form a pair if the distance between their first
   devices falls into the bin and the distance between their second devices does not exceed the
   upper limit of the bin; requires `acf` and `dist`
 - `acf_est_dual` is computed if `acf` or `dist` is given, and is `None` if both are omitted; giving
@@ -61,8 +61,8 @@ acf_est, dist_est, acf_est_dual = quadriga_lib.sos.acf_estimate( freq, phase, bi
   and `dist` were not given
 
 ## See also:
-- [[sos_acf_approx]] (ACF of the sinusoids in closed form)
-- [[sos_val]] (evaluation of the generator)
+- [[sos.acf_approx]] (ACF of the sinusoids in closed form)
+- [[sos.val]] (evaluation of the generator)
 MD!*/
 
 py::tuple sos_acf_estimate(const py::array_t<double> &freq,

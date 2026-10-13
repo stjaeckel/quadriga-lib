@@ -10,12 +10,12 @@ Sum-of-sinusoids random number generator
 SECTION!*/
 
 /*!MD
-# sos_acf_approx
+# sos.acf_approx
 ACF produced by a set of sinusoids
 
-- Autocorrelation function (ACF) of the values of [[sos_val]] over uniformly random phases:
+- Autocorrelation function (ACF) of the values of [[sos.val]] over uniformly random phases:
   `R(dx) = (1/n_coeff) · sum_n cos( 2·pi · f_n·dx )`
-- Evaluated on the grid axis of [[sos_acf_2d]]: from `-2·Dmax` to `2·Dmax` with the spacing of
+- Evaluated on the grid axis of [[sos.acf_2d]]: from `-2·Dmax` to `2·Dmax` with the spacing of
   `dist`, `n_grid = 4·n_acf - 3`
 - The output is always 3-dimensional
 - `n_dim = 1`: along the axis; `(n_grid, 1, 1)`
@@ -24,7 +24,7 @@ ACF produced by a set of sinusoids
   the row index belongs to the second axis of the plane, the column index to the first
 - Only the sample points `dist` are used, not the ACF values
 - `R(-dx) = R(dx)`: each plane is point-symmetric about its center, exactly
-- Equally spaced has the meaning given in [[sos_acf_2d]]
+- Equally spaced has the meaning given in [[sos.acf_2d]]
 
 ## Usage:
 ```
@@ -41,8 +41,8 @@ acf_approx, dist_2d = quadriga_lib.sos.acf_approx( freq, dist )
 - **`dist_2d`** — Grid axis; `(n_grid,)`
 
 ## See also:
-- [[sos_acf_2d]] (target ACF on the same grid)
-- [[sos_calc_mse]] (difference between the two)
+- [[sos.acf_2d]] (target ACF on the same grid)
+- [[sos.calc_mse]] (difference between the two)
 MD!*/
 
 py::tuple sos_acf_approx(const py::array_t<double> &freq,

@@ -10,10 +10,10 @@ Sum-of-sinusoids random number generator
 SECTION!*/
 
 /*!MD
-# sos_preset
+# sos.preset
 Frequencies and ACF of a predefined sum-of-sinusoids generator
 
-- Returns a precomputed frequency table for [[sos_val]] together with the autocorrelation
+- Returns a precomputed frequency table for [[sos.val]] together with the autocorrelation
   function (ACF) it was fitted to
 - Presets: "Exp128", "Exp256", "Exp512", "Exp1024", "Gauss128", "Gauss256", "Gauss512",
   "Gauss1024", "Comb128", "Comb256", "Comb512", "Comb1024". The number is the number of
@@ -44,9 +44,9 @@ freq, acf, dist = quadriga_lib.sos.preset( name, dist_decorr )
 - **`dist`** — Sample points of the ACF; `(200,)`
 
 ## See also:
-- [[sos_init_phases]] (random phases for the generator)
-- [[sos_val]] (evaluation)
-- [[sos_generate]] (frequencies for other ACFs)
+- [[sos.init_phases]] (random phases for the generator)
+- [[sos.val]] (evaluation)
+- [[sos.generate]] (frequencies for other ACFs)
 MD!*/
 
 py::tuple sos_preset(const std::string &name,

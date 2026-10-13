@@ -22,13 +22,12 @@ phases `phi_n` select one realisation of the random field. The generator needs n
 positions can be anywhere, in 1, 2 or 3 dimensions, and the same frequencies and phases always give the
 same field.<br><br>
 
-The functions are in the submodule `quadriga_lib.sos` and are called without the prefix `sos_` that their
-names have in this documentation: [[sos_val]] is `quadriga_lib.sos.val`. In the examples, `np` is
-numpy.<br><br>
+The functions are in the submodule `quadriga_lib.sos`: [[sos.val]] is called as `quadriga_lib.sos.val`. In the
+examples, `np` is numpy.<br><br>
 
 **Quick start**<br>
-[[sos_randn]] sets up the generators, draws the phases and returns the values in one call. [[sos_rand]]
-and [[sos_randi]] do the same for Uniform and integer values.
+[[sos.randn]] sets up the generators, draws the phases and returns the values in one call. [[sos.rand]]
+and [[sos.randi]] do the same for Uniform and integer values.
 
 ```
 # 1000 positions; one row per position, columns are (x, y, z) in meters
@@ -55,8 +54,8 @@ Quantities that must be independent of each other, such as shadow fading and del
 different seeds, or one call with one entry of `dist_decorr` per quantity: the generators of one call are
 independent.<br><br>
 **Keeping a generator**<br>
-A generator is two arrays: the frequencies from [[sos_preset]] and the phases from [[sos_init_phases]].
-[[sos_val]] evaluates them. Each column of the phase array is one independent generator. Evaluating many
+A generator is two arrays: the frequencies from [[sos.preset]] and the phases from [[sos.init_phases]].
+[[sos.val]] evaluates them. Each column of the phase array is one independent generator. Evaluating many
 generators in one call is much cheaper than one call per generator, because the sines and cosines of the
 positions are shared: 20 generators take less than twice as long as one.
 
@@ -90,7 +89,7 @@ quadriga_lib.tools.write_png("map.png", grid[:, :, 0, 0])
 - **Presets:** `Exp`, `Gauss` and `Comb`, each with 128, 256, 512 or 1024 sinusoids, e.g. `"Exp512"`. `Exp`
   is the exponential ACF `exp(-d/d0)`, `Gauss` is `exp(-(d/d0)^2)`, and `Comb` follows `Gauss` up to the
   decorrelation distance `d0` and `Exp` beyond it. Each doubling of the number of sinusoids doubles the
-  computing time and lowers the error of the ACF by 3 to 4 dB: [[sos_calc_mse]] reports 28, 31, 34 and
+  computing time and lowers the error of the ACF by 3 to 4 dB: [[sos.calc_mse]] reports 28, 31, 34 and
   38 dB for `Exp128` to `Exp1024` and 31, 35, 39 and 42 dB for `Comb128` to `Comb1024`. `"Comb256"` is a
   good default; take a larger table if the shape of the ACF matters, a smaller one if speed does.
 - **Both ends mobile:** if a value belongs to a link between two moving devices, pass both positions.
@@ -105,22 +104,22 @@ val_link = quadriga_lib.sos.val(freq, phase, pos_tx, pos_rx, acf=acf, dist=dist)
 
 - **Mean over an area:** the values at positions that lie within a few decorrelation distances of each
   other are similar, so their average is not zero for a single realisation. This is how a correlated
-  field behaves. [[sos_remove_bias]] can force the average to zero if an application needs it. This
+  field behaves. [[sos.remove_bias]] can force the average to zero if an application needs it. This
   removes variance: for 200 positions in a square with an edge of 20 decorrelation distances 2.5 %, for
   an edge of 5 decorrelation distances 14 %, for 2 already 44 %. It is meant for positions that spread
   over many decorrelation distances.
 - **Coordinates:** use local coordinates. The argument `f_n·x` of a sinusoid is computed in double
   precision and is known to about 1e-16 of its size, so the values lose accuracy with the distance from
   the origin counted in wavelengths. Up to 1e9 wavelengths (more than 1e9 m for a decorrelation distance
-  of 10 m) the results stay within the tolerance stated in [[sos_val]].
+  of 10 m) the results stay within the tolerance stated in [[sos.val]].
 - **Threads and memory:** the functions that take noticeable time use the OpenMP threads of the process,
-  except [[sos_generate]], which runs on one thread. No result depends on the number of threads.
-  [[sos_val]] computes in its output: it needs no further memory of that size for one device and one more
+  except [[sos.generate]], which runs on one thread. No result depends on the number of threads.
+  [[sos.val]] computes in its output: it needs no further memory of that size for one device and one more
   array of that size for two devices.
 
 **Own autocorrelation functions**<br>
-[[sos_generate]] finds the frequencies for any ACF that is given as a table over the distance, and
-[[sos_calc_mse]] reports how well the result fits. The table should reach to about 5 decorrelation
+[[sos.generate]] finds the frequencies for any ACF that is given as a table over the distance, and
+[[sos.calc_mse]] reports how well the result fits. The table should reach to about 5 decorrelation
 distances.
 
 ```
@@ -135,7 +134,7 @@ freq_own, ase, test_dir = quadriga_lib.sos.generate(acf_own, dist_own, 256, n_di
 mse, mse_core, mse_all, acf_tail, test_dir = quadriga_lib.sos.calc_mse(freq_own, acf_own, dist_own)
 ```
 
-The result is used like a preset: draw phases with [[sos_init_phases]] and evaluate with [[sos_val]]. To
+The result is used like a preset: draw phases with [[sos.init_phases]] and evaluate with [[sos.val]]. To
 change the decorrelation distance afterwards, divide the frequencies and multiply the distances by the
 same factor.<br><br>
 
@@ -148,7 +147,7 @@ for the 3GPP New-Radio Channel Model"; 2018 IEEE Globecom Workshops (GC Wkshps);
 SECTION_DESC!*/
 
 /*!MD
-# sos_val
+# sos.val
 Spatially correlated random values at given positions
 
 - Sum-of-sinusoids generator: at position `x` a generator with `n_coeff` sinusoids produces
@@ -164,7 +163,7 @@ Spatially correlated random values at given positions
 - One device (`pos_b` omitted): `val = s(pos)`
 - Two devices on the same map (`pos_b` given, `phase_b` omitted): both devices use `phase`;
   `val = ( s(pos) + s(pos_b) ) / sqrt( 2 + 2·A(D) )`, where `D` is the distance between `pos` and
-  `pos_b` and `A` the target ACF interpolated as in [[sos_acfi]]; `acf` and `dist` are required.
+  `pos_b` and `A` the target ACF interpolated as in [[sos.acfi]]; `acf` and `dist` are required.
   The value does not change when the two devices swap their positions
 - Two devices on different maps (`pos_b` and `phase_b` given):
   `val = ( s_a(pos) + s_b(pos_b) ) / sqrt(2)`; `s_b` uses `phase_b` and the frequencies
@@ -221,10 +220,10 @@ val = quadriga_lib.sos.val( freq, phase, pos, pos_b, phase_b, acf, dist, freq_sc
 - **`val`** — Values; one row per position, one column per generator; `(n_pos, n_gen)`
 
 ## See also:
-- [[sos_preset]] (frequencies and ACF of the predefined models)
-- [[sos_init_phases]] (random phases)
-- [[sos_map]] (evaluation on a grid)
-- [[sos_randn]] (generator set-up and evaluation in one call)
+- [[sos.preset]] (frequencies and ACF of the predefined models)
+- [[sos.init_phases]] (random phases)
+- [[sos.map]] (evaluation on a grid)
+- [[sos.randn]] (generator set-up and evaluation in one call)
 MD!*/
 
 py::array_t<double> sos_val(const py::array_t<double> &freq,

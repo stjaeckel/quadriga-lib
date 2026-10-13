@@ -730,6 +730,39 @@ TEST_CASE("sos_val - input validation")
         CHECK(keep.n_rows == 2);
         CHECK(keep(1, 1) == 7.0);
     }
+    SECTION("the output cannot be an input")
+    {
+        // 'val' is resized and written while the inputs are read. Each input in turn is passed as output;
+        // the call must throw and leave that matrix as it was. A copy with the same values is accepted.
+        arma::mat f = freq, ph = phase, p = pos, pb = pos_b, phb = phase_b;
+        CHECK_THROWS_AS(quadriga_lib::sos_val(f, phase, pos, f), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_val(freq, ph, pos, ph), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_val(freq, phase, p, p), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_val(freq, phase, pos, pb, &pb, &phase_b), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_val(freq, phase, pos, phb, &pos_b, &phb), std::invalid_argument);
+        CHECK(arma::approx_equal(f, freq, "absdiff", 0.0));
+        CHECK(arma::approx_equal(ph, phase, "absdiff", 0.0));
+        CHECK(arma::approx_equal(p, pos, "absdiff", 0.0));
+        CHECK(arma::approx_equal(pb, pos_b, "absdiff", 0.0));
+        CHECK(arma::approx_equal(phb, phase_b, "absdiff", 0.0));
+
+        // The ACF table: a column vector is a matrix and can be passed as output
+        arma::vec a = acf, d = dist;
+        CHECK_THROWS_AS(quadriga_lib::sos_val<double>(freq, phase, pos, a, &pos_b, no_mat, &a, &dist), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_val<double>(freq, phase, pos, d, &pos_b, no_mat, &acf, &d), std::invalid_argument);
+        CHECK(arma::approx_equal(a, acf, "absdiff", 0.0));
+        CHECK(arma::approx_equal(d, dist, "absdiff", 0.0));
+
+        // Another matrix object on the memory of the positions
+        arma::mat view(p.memptr(), p.n_rows, p.n_cols, false, true);
+        CHECK_THROWS_AS(quadriga_lib::sos_val(freq, phase, p, view), std::invalid_argument);
+        CHECK(arma::approx_equal(p, pos, "absdiff", 0.0));
+
+        arma::mat out = pos;
+        CHECK_NOTHROW(quadriga_lib::sos_val(freq, phase, pos, out));
+        CHECK(out.n_rows == pos.n_rows);
+        CHECK(out.n_cols == phase.n_cols);
+    }
 }
 
 TEST_CASE("sos_val - a NaN or Inf coordinate gives NaN at that position only")
