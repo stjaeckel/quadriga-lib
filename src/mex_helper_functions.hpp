@@ -161,17 +161,14 @@ inline std::string qd_mex_get_string(const mxArray *input, std::string default_v
     return data;
 }
 
+// The reinterpret functions use the MATLAB data in place. Complex arrays are rejected (qd_mex_get_dims): their
+// data is stored interleaved or in two blocks, depending on the host, and cannot be read as a real array.
+
 // Reinterpret MATLAB Array to Armadillo Column Vector
 template <typename dtype>
 inline arma::Col<dtype> qd_mex_reinterpret_Col(const mxArray *input, bool create_copy = false)
 {
-    size_t n_dim = (size_t)mxGetNumberOfDimensions(input); // Number of dimensions - either 2, 3 or 4
-    const mwSize *dims = mxGetDimensions(input);           // Read number of elements elements per dimension
-    size_t d1 = (size_t)dims[0];                           // Number of elements on first dimension
-    size_t d2 = (size_t)dims[1];                           // Number of elements on second dimension
-    size_t d3 = n_dim < 3 ? 1 : (size_t)dims[2];           // Number of elements on third dimension
-    size_t d4 = n_dim < 4 ? 1 : (size_t)dims[3];           // Number of elements on fourth dimension
-    size_t n_data = d1 * d2 * d3 * d4;
+    auto [d1, d2, d3, d4, n_data] = qd_mex_get_dims(input); // Rejects complex input
 
     if (n_data == 0)
         return arma::Col<dtype>();
@@ -183,13 +180,7 @@ inline arma::Col<dtype> qd_mex_reinterpret_Col(const mxArray *input, bool create
 template <typename dtype>
 inline arma::Mat<dtype> qd_mex_reinterpret_Mat(const mxArray *input, bool create_copy = false)
 {
-    size_t n_dim = (size_t)mxGetNumberOfDimensions(input); // Number of dimensions - either 2, 3 or 4
-    const mwSize *dims = mxGetDimensions(input);           // Read number of elements elements per dimension
-    size_t d1 = (size_t)dims[0];                           // Number of elements on first dimension
-    size_t d2 = (size_t)dims[1];                           // Number of elements on second dimension
-    size_t d3 = n_dim < 3 ? 1 : (size_t)dims[2];           // Number of elements on third dimension
-    size_t d4 = n_dim < 4 ? 1 : (size_t)dims[3];           // Number of elements on fourth dimension
-    size_t n_data = d1 * d2 * d3 * d4;
+    auto [d1, d2, d3, d4, n_data] = qd_mex_get_dims(input); // Rejects complex input
 
     if (n_data == 0)
         return arma::Mat<dtype>();
@@ -201,14 +192,9 @@ inline arma::Mat<dtype> qd_mex_reinterpret_Mat(const mxArray *input, bool create
 template <typename dtype>
 inline arma::Cube<dtype> qd_mex_reinterpret_Cube(const mxArray *input, bool create_copy = false)
 {
-    size_t n_dim = (size_t)mxGetNumberOfDimensions(input); // Number of dimensions - either 2 or 3
-    const mwSize *dims = mxGetDimensions(input);           // Read number of elements elements per dimension
-    size_t d1 = (size_t)dims[0];                           // Number of elements on first dimension
-    size_t d2 = (size_t)dims[1];                           // Number of elements on second dimension
-    size_t d3 = n_dim < 3 ? 1 : (size_t)dims[2];           // Number of elements on third dimension
-    size_t d4 = n_dim < 4 ? 1 : (size_t)dims[3];           // Number of elements on fourth dimension
+    auto [d1, d2, d3, d4, n_data] = qd_mex_get_dims(input); // Rejects complex input
 
-    if (d1 * d2 * d3 * d4 == 0)
+    if (n_data == 0)
         return arma::Cube<dtype>();
 
     return arma::Cube<dtype>((dtype *)mxGetData(input), d1, d2, d3 * d4, create_copy, !create_copy);
@@ -217,13 +203,8 @@ inline arma::Cube<dtype> qd_mex_reinterpret_Cube(const mxArray *input, bool crea
 template <typename dtype>
 inline std::vector<arma::Cube<dtype>> qd_mex_reinterpret_CubeVec(const mxArray *input, bool create_copy = false)
 {
-    size_t n_dim = (size_t)mxGetNumberOfDimensions(input);
-    const mwSize *dims = mxGetDimensions(input);
-    size_t d1 = (size_t)dims[0];
-    size_t d2 = (size_t)dims[1];
-    size_t d3 = n_dim < 3 ? 1 : (size_t)dims[2];
-    size_t d4 = n_dim < 4 ? 1 : (size_t)dims[3];
-    if (d1 * d2 * d3 * d4 == 0)
+    auto [d1, d2, d3, d4, n_data] = qd_mex_get_dims(input); // Rejects complex input
+    if (n_data == 0)
         return {};
 
     dtype *data = (dtype *)mxGetData(input);

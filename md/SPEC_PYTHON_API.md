@@ -19,7 +19,7 @@ You are implementing a lightweight Python API wrapper for pybind11 (v3) to call 
 
 # REPOSITORY LAYOUT AND BUILD
 - `api_python/qpy_<function_name>.cpp` — Python wrappers, one file per Python function.
-- The Python module is built from 5 dispatcher files: `python_main.cpp` (top-level module, `version`, `components`) and one file per submodule: `python_arrayant.cpp`, `python_channel.cpp`, `python_tools.cpp`, `python_RTtools.cpp`. Each dispatcher `#include`s its `qpy_*.cpp` files and registers the functions with `m.def(...)`.
+- The Python module is built from 6 dispatcher files: `python_main.cpp` (top-level module, `version`, `components`) and one file per submodule: `python_arrayant.cpp`, `python_channel.cpp`, `python_tools.cpp`, `python_RTtools.cpp`, `python_sos.cpp`. Each dispatcher `#include`s its `qpy_*.cpp` files and registers the functions with `m.def(...)`.
   - A new wrapper is NOT picked up automatically: it must be included and registered in the dispatcher of its submodule (see "pybind11 registration").
   - All wrappers of one submodule are compiled into a single translation unit. Names of wrapper functions and of `static` helper functions must therefore be unique within the submodule.
 - `api_python/python_arma_adapter.hpp` (numpy / list / dict conversions) and `api_python/python_quadriga_adapter.hpp` (arrayant / channel dicts, `std::any` datasets) — helper functions. Read them when a signature is unclear; the lists in this document are a summary.
@@ -86,7 +86,7 @@ There are two review points at which you stop, report, and wait for my answer be
 - The heading of the documentation block and the Usage line always use the name exposed to Python.
 
 ## Submodules
-- The dispatcher registers each wrapper with one of the submodules (`arrayant`, `channel`, `tools`, `RTtools`). From Python, the user calls e.g. `quadriga_lib.tools.acdf(...)`.
+- The dispatcher registers each wrapper with one of the submodules (`arrayant`, `channel`, `tools`, `RTtools`, `sos`). From Python, the user calls e.g. `quadriga_lib.tools.acdf(...)`.
 - The submodule usually follows from the section of the C++ documentation block:
 
 | Section in the C++ documentation | Submodule |
@@ -97,9 +97,11 @@ There are two review points at which you stop, report, and wait for my answer be
 | Math functions | `tools` |
 | Miscellaneous / Tools | `tools` |
 | Site-specific simulation tools | `RTtools` |
+| Sum-of-sinusoids random number generator | `sos` |
 | Channel generation functions | not clear (`arrayant` or `channel`): ask |
 
 - If the submodule is not clear from the C++ documentation, ask.
+- Submodule `sos`: the wrapper of `quadriga_lib::sos_<name>` is the C++ function `sos_<name>` in `qpy_sos_<name>.cpp`, exposed as `quadriga_lib.sos.<name>` (prefix dropped, as for `arrayant`). The heading of its documentation block keeps the prefix (`# sos_<name>`, linked as `[[sos_<name>]]`), because `generate` would collide with the array antenna function of that name; the Usage line shows the call without the prefix.
 
 ## Index and dtype conventions
 - C++ and Python both use 0-based indices, so no conversion is performed in either direction. Indices documented as "1-based" in the C++ documentation remain 1-based in Python (the user provides 1-based and gets 1-based back).
@@ -336,13 +338,14 @@ py::object qd_python_any2numpy(const std::any &dset);
 Section name from C++ documentation block
 SECTION!*/
 ```
-- Section names currently in use: "Array antenna functions", "Channel functions", "Channel generation functions", "Channel statistics", "Math functions", "Miscellaneous / Tools", "Site-specific simulation tools". The name must match exactly to end up in the same group.
+- Section names currently in use: "Array antenna functions", "Channel functions", "Channel generation functions", "Channel statistics", "Math functions", "Miscellaneous / Tools", "Site-specific simulation tools", "Sum-of-sinusoids random number generator". The name must match exactly to end up in the same group.
 - The section name is not the Python submodule (see "Submodules").
 
 ## Documentation block
 - Included as a comment block immediately before the wrapper function definition.
 - Block starts with `/*!MD` and ends with `MD!*/`.
 - First line after `/*!MD` is the function name as exposed to Python (kept as-is, lowercase), followed by a 1-line summary on the next line.
+  - If the C++ name carries a prefix that the Python submodule replaces, the heading is the submodule and the name joined by a dot: `sos_val` is exposed as `quadriga_lib.sos.val` and headed `# sos.val`; cross-references are written `[[sos.val]]`. This keeps the heading equal to what the user types and avoids clashes between bare names of different sections (e.g. `generate`).
 - The bullet-point description follows after one empty line — there is no `## Description:` heading.
 - The 1-line summary should be identical to the C++/MEX documentation block.
 - Each bullet contains one concise fact.
@@ -544,7 +547,7 @@ return py::make_tuple(out1_py, out2_py, out3_py, out4_py);
 - The order in the tuple must match the order in the `## Usage:` line of the documentation.
 
 ## pybind11 registration
-- Register the wrapper in the dispatcher file of its submodule (`python_arrayant.cpp`, `python_channel.cpp`, `python_tools.cpp`, `python_RTtools.cpp`; `python_main.cpp` for top-level functions):
+- Register the wrapper in the dispatcher file of its submodule (`python_arrayant.cpp`, `python_channel.cpp`, `python_tools.cpp`, `python_RTtools.cpp`, `python_sos.cpp`; `python_main.cpp` for top-level functions):
   1. Add `#include "qpy_function_name.cpp"` to the include list at the top of the dispatcher.
   2. Add the `m.def(...)` call inside the `quadriga_lib_<submodule>(py::module_ &m)` function.
 - In addition, repeat the same registration as a comment block at the end of the wrapper file, so that the wrapper file documents its own Python signature:

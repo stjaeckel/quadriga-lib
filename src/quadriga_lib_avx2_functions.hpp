@@ -91,4 +91,16 @@ void qd_coeff_combine_avx2(const dtype *__restrict pVrr, const dtype *__restrict
 // Check for AVX2 availability at runtime
 bool runtime_AVX2_Check();
 
+// AVX2 accelerated sum-of-sinusoids evaluation
+// val(p, g) = sum_n wc(n, g) · cos( 2·pi · t ) - ws(n, g) · sin( 2·pi · t ), t = fx(n)·px(p) + fy(n)·py(p) + fz(n)·pz(p)
+// The argument t is computed and reduced to one period in double precision, sine and cosine are evaluated in
+// single precision, the sum is accumulated in double precision; no alignment requirements
+void qd_SOS_AVX2(const double *fx, const double *fy, const double *fz, // Frequencies in [1/m], length n_coeff
+                 const double *wc, const double *ws,                   // Weights a·cos(phase), a·sin(phase), Size [n_coeff, n_gen]
+                 const size_t n_coeff,                                 // Number of sinusoids
+                 const size_t n_gen,                                   // Number of generators
+                 const double *px, const double *py, const double *pz, // Positions in [m], length n_pos
+                 const size_t n_pos,                                   // Number of positions
+                 double *val);                                         // Output: Values, Size [n_pos, n_gen], uninitialized
+
 #endif

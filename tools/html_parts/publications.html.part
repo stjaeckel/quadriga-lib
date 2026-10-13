@@ -2,6 +2,11 @@
 <br><br>
 
 <ul>
+<li>S. Jaeckel, L. Raschkowski, F. Burkhardt, L. Thiele; "Efficient Sum-of-Sinusoids-Based Spatial Consistency for the 3GPP New-Radio Channel Model"; 2018 IEEE Globecom Workshops (GC Wkshps); 2018; <br>Available: 
+<a target="_blank" rel="noopener noreferrer" href="https://ieeexplore.ieee.org/document/8644265">IEEE Xplore</a> (Original version), 
+<a target="_blank" rel="noopener noreferrer" href="publications/2018_sum_of_sinusoids.pdf">PDF version</a>, 
+<a target="_blank" rel="noopener noreferrer" href="publications/2018_sum_of_sinusoids.md">Markdown version</a><br><br></li>
+
 <li>S. Jaeckel; "A modern C++ framework for the IEEE indoor channel models"; IEEE 802.11-25/2318r0; Tech. Rep., 2025; <br>Available: 
 <a target="_blank" rel="noopener noreferrer" href="https://mentor.ieee.org/802.11/dcn/25/11-25-2318-00-0ucm-a-modern-c-framework-for-the-ieee-indoor-channel-models.docx">IEEE Mentor</a> (Original .docx version), 
 <a target="_blank" rel="noopener noreferrer" href="publications/11-25-2318-00-0ucm-a-modern-cpp-framework-for-the-ieee-indoor-channel-models.pdf">PDF version</a>, 
