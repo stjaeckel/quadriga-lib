@@ -165,11 +165,14 @@
 
 <b>Channel generation functions</b><br><br>
 <table style="border-collapse: separate; border-spacing: 20px 0;"><tbody>
+  <tr><td><a href="#conf_file_list">conf_file_list</a></td><td>List the scenarios defined by the conf files in a set of directories</td></tr>
+  <tr><td><a href="#conf_file_read">conf_file_read</a></td><td>Read and validate a QuaDRiGa scenario configuration file</td></tr>
   <tr><td><a href="#get_channels_ieee_indoor">get_channels_ieee_indoor</a></td><td>Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models</td></tr>
   <tr><td><a href="#get_channels_irs">get_channels_irs</a></td><td>Calculate MIMO channel coefficients for IRS-assisted communication</td></tr>
   <tr><td><a href="#get_channels_multifreq">get_channels_multifreq</a></td><td>Compute channel coefficients for spherical waves across multiple frequencies</td></tr>
   <tr><td><a href="#get_channels_planar">get_channels_planar</a></td><td>Calculate MIMO channel coefficients for planar wave paths</td></tr>
   <tr><td><a href="#get_channels_spherical">get_channels_spherical</a></td><td>Calculate MIMO channel coefficients and delays for spherical wave propagation</td></tr>
+  <tr><td><a href="#scenpar_validate">scenpar_validate</a></td><td>Validate scenario parameters and complete them with default values</td></tr>
 </tbody></table><br>
 
 <b>Channel statistics</b><br><br>
@@ -3297,6 +3300,127 @@ quadriga_lib::quantize_delays(&amp;cre, &amp;cim, &amp;dl, &amp;cre_q, &amp;cim_
 <span id="6f9553d7" class="qd-section"><b>Channel generation functions</b></span><br>
 <br>
 <hr class="greyline"><br>
+<span id="conf_file_list" class="qd-func"><b>conf_file_list</b></span><br>
+<hr class="thin">
+List the scenarios defined by the conf files in a set of directories
+<ul>
+<li>Lists the files whose name ends in <code>.conf</code> (case-sensitive) in each directory, not recursive. The scenario name is the file name without this extension.</li>
+<li>Directories are processed in the given order, the files of one directory in byte-wise sorted order of their names (digits before upper case before lower case)</li>
+<li>A file whose name was already found in an earlier directory is skipped completely, so the first directory wins. This allows a local folder to override the files of a shared folder.</li>
+<li>With <code>parse_shortnames = true</code> each file is read and one entry is added right after the file for every line <code>ShortName = name</code> that is not a comment. Other lines are not examined.</li>
+<li>Throws <code>std::invalid_argument</code> if a short name equals an earlier entry, if a file name equals an earlier short name, or if the value of a <code>ShortName</code> line is not one name of the characters <code>A-Z</code>, <code>a-z</code>, <code>0-9</code>, <code>_</code></li>
+<li>Throws <code>std::runtime_error</code> if a listed file cannot be opened for reading the short names</li>
+<li>A directory that does not exist or is not a directory is skipped; an empty string is the current directory</li>
+<li>A failed call leaves the outputs untouched</li>
+</ul>
+
+<b>Declaration:</b><br>
+<pre>
+arma::uword quadriga_lib::conf_file_list(
+    const std::vector&lt;std::string&gt; &amp;dirs,
+    std::vector&lt;std::string&gt; &amp;scenarios,
+    std::vector&lt;std::string&gt; *file_names = nullptr,
+    std::vector&lt;std::string&gt; *file_dirs = nullptr,
+    bool parse_shortnames = true);
+</pre>
+
+<b>Inputs:</b><br>
+<ul>
+<li><b><code>dirs</code></b> — Directories, searched in this order; can be empty</li>
+<li><b><code>parse_shortnames</code></b> <i>(optional)</i> — <code>true</code>: read the files and add their short names; <code>false</code>: list the files only, which is faster</li>
+</ul>
+
+<b>Outputs:</b><br>
+<ul>
+<li><b><code>scenarios</code></b> — Scenario names and short names; previous content is discarded; <code>[n_scen]</code></li>
+<li><b><code>file_names</code></b> <i>(optional)</i> — File name including <code>.conf</code> for each entry; <code>[n_scen]</code></li>
+<li><b><code>file_dirs</code></b> <i>(optional)</i> — Directory of the file for each entry, exactly as given in <code>dirs</code>; <code>[n_scen]</code></li>
+</ul>
+
+<b>Returns:</b><br>
+<ul>
+<li>Number of entries, <code>n_scen</code></li>
+</ul>
+
+<b>See also:</b><br>
+<ul>
+<li><a href="#conf_file_read">conf_file_read</a> (read one of the files)</li>
+</ul>
+
+<hr class="greyline"><br>
+<span id="conf_file_read" class="qd-func"><b>conf_file_read</b></span><br>
+<hr class="thin">
+Read and validate a QuaDRiGa scenario configuration file
+<ul>
+<li>A conf file is a text file with one <code>Key = value</code> assignment per line; <code>%</code> starts a comment; blank lines are allowed; line ends can be LF or CRLF; space and tab are white space</li>
+<li>Keys are case-sensitive names of the characters <code>A-Z</code>, <code>a-z</code>, <code>0-9</code> and <code>_</code>; there are four kinds:
+<ul>
+<li>Scenario parameters: <code>n_key = 166</code> numeric keys with one number each, returned in <code>scenpar</code>. Keys that are not in the file have their default value. The names and their order are returned in <code>key_order</code>.</li>
+<li><code>SubpathMethod</code>: one of the words <code>legacy</code>, <code>Laplacian</code>, <code>mmMAGIC</code>; default <code>legacy</code></li>
+<li>Path-loss parameters: every key that starts with <code>PL_</code>. <code>PL_model</code> has one name as value. All others have one or more numbers separated by white space and are returned in <code>plpar</code> without the prefix.</li>
+<li><code>ShortName</code>: an alias for the scenario, one name; can occur several times</li>
+</ul>
+</li>
+<li>Any other key is ignored and reported in <code>ignored_keys</code>; its value is not examined</li>
+<li>A key that is stated more than once has its last value</li>
+<li>Numbers are decimal with an optional sign, an optional decimal point and an optional exponent (<code>e</code> or <code>E</code>), for example <code>-6.28</code>, <code>.5</code>, <code>6.2e-07</code>; <code>Inf</code>, <code>+Inf</code> and <code>-Inf</code> are accepted in any case</li>
+<li>Elevation angles are used throughout (+90 deg is up); no key refers to a zenith angle</li>
+<li>The 166 keys are the 139 numeric keys of QuaDRiGa and 27 keys for 3GPP TR 38.901 v19.5.0. With their default of 0 the new keys have no effect.</li>
+<li>The 28 correlation keys (<code>asD_ds</code> to <code>xpr_esa</code>) define the symmetric matrix <code>lsp_xcorr</code> with unit diagonal</li>
+<li>Throws <code>std::runtime_error</code> if the file cannot be opened</li>
+<li>Throws <code>std::invalid_argument</code> with file name and line number for a line that is not blank, not a comment and not a well-formed assignment: no <code>=</code>, more or less than one name before the <code>=</code>, a missing value, a word where a number is required or the reverse, a second value or other text after the value, <code>NaN</code>, complex numbers, a <code>PL_</code> key without a name</li>
+<li>With <code>validate = true</code>, a value that fails the checks of <a href="#scenpar_validate">scenpar_validate</a> is an error as well</li>
+<li>A correlation matrix that is not positive definite is not an error; it is reported by the return value</li>
+<li>The file is parsed and checked completely before any output is written; a failed call leaves all outputs untouched</li>
+</ul>
+
+<b>Declaration:</b><br>
+<pre>
+bool quadriga_lib::conf_file_read(
+    const std::string &amp;fn,
+    std::unordered_map&lt;std::string, double&gt; &amp;scenpar,
+    std::string *subpath_method = nullptr,
+    std::string *pl_model = nullptr,
+    std::unordered_map&lt;std::string, std::vector&lt;double&gt;&gt; *plpar = nullptr,
+    arma::mat *lsp_xcorr = nullptr,
+    std::vector&lt;std::string&gt; *key_order = nullptr,
+    std::vector&lt;std::string&gt; *pl_order = nullptr,
+    std::vector&lt;std::string&gt; *short_names = nullptr,
+    std::vector&lt;std::string&gt; *ignored_keys = nullptr,
+    bool validate = true);
+</pre>
+
+<b>Inputs:</b><br>
+<ul>
+<li><b><code>fn</code></b> — Path to the conf file</li>
+<li><b><code>validate</code></b> <i>(optional)</i> — <code>true</code>: apply the value checks of <a href="#scenpar_validate">scenpar_validate</a>; <code>false</code>: only the line grammar is checked</li>
+</ul>
+
+<b>Outputs:</b><br>
+<ul>
+<li><b><code>scenpar</code></b> — Numeric scenario parameters; previous content is discarded; <code>n_key = 166</code> entries</li>
+<li><b><code>subpath_method</code></b> <i>(optional)</i> — Value of <code>SubpathMethod</code>; <code>legacy</code> if not in the file</li>
+<li><b><code>pl_model</code></b> <i>(optional)</i> — Value of <code>PL_model</code>; empty if not in the file</li>
+<li><b><code>plpar</code></b> <i>(optional)</i> — Path-loss parameters; keys without the prefix <code>PL_</code>; <code>PL_model</code> is not included; empty if the file has no such key; <code>n_pl</code> entries with one or more values each</li>
+<li><b><code>lsp_xcorr</code></b> <i>(optional)</i> — LSP cross-correlation matrix; order of rows and columns: DS, KF, SF, ASD, ASA, ESD, ESA, XPR; <code>[8, 8]</code></li>
+<li><b><code>key_order</code></b> <i>(optional)</i> — Canonical order of the keys in <code>scenpar</code>: the QuaDRiGa order without <code>SubpathMethod</code> (its position is between elements 105 and 106, 0-based), then the 27 new keys; <code>[n_key]</code></li>
+<li><b><code>pl_order</code></b> <i>(optional)</i> — Keys of <code>plpar</code> in the order of their first occurrence in the file; <code>[n_pl]</code></li>
+<li><b><code>short_names</code></b> <i>(optional)</i> — Values of all <code>ShortName</code> lines in file order</li>
+<li><b><code>ignored_keys</code></b> <i>(optional)</i> — Unknown keys, each once, in the order of their first occurrence</li>
+</ul>
+
+<b>Returns:</b><br>
+<ul>
+<li><code>true</code> if <code>lsp_xcorr</code> is positive definite, i.e. correlated LSPs can be generated from it</li>
+</ul>
+
+<b>See also:</b><br>
+<ul>
+<li><a href="#scenpar_validate">scenpar_validate</a> (value checks, defaults and the list of validation rules)</li>
+<li><a href="#conf_file_list">conf_file_list</a> (find the conf files in a set of directories)</li>
+</ul>
+
+<hr class="greyline"><br>
 <span id="get_channels_ieee_indoor" class="qd-func"><b>get_channels_ieee_indoor</b></span><br>
 <hr class="thin">
 Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models
@@ -3719,6 +3843,67 @@ void quadriga_lib::get_channels_spherical(
 <li><a href="#arrayant">arrayant</a> (antenna array class)</li>
 <li><a href="#baseband_freq_response">baseband_freq_response</a> (for calculating the frequency response)</li>
 <li><a href="#quantize_delays">quantize_delays</a> (for mapping delays to a fixed grid)</li>
+</ul>
+
+<hr class="greyline"><br>
+<span id="scenpar_validate" class="qd-func"><b>scenpar_validate</b></span><br>
+<hr class="thin">
+Validate scenario parameters and complete them with default values
+<ul>
+<li>Checks a set of QuaDRiGa scenario parameters that did not come from a conf file and adds every missing key with its default value, so that <code>scenpar</code> has all <code>n_key = 166</code> entries on return</li>
+<li>An empty <code>scenpar</code> returns the complete default parameter set</li>
+<li>A set with the 139 numeric keys of QuaDRiGa is completed with the 27 keys for 3GPP TR 38.901 v19.5.0, which have no effect at their default of 0</li>
+<li>A name in <code>scenpar</code> that is not one of the 166 keys is an error, also with <code>validate = false</code></li>
+<li>Value checks with <code>validate = true</code>; <code>NaN</code> is an error for every key:
+<ul>
+<li>Integer and > 0: <code>NumClusters</code>, <code>NumSubPaths</code></li>
+<li>Finite and > 0: <code>r_DS</code></li>
+<li>Finite and >= 0: the 8 decorrelation distances (<code>DS_lambda</code> ... <code>XPR_lambda</code>), <code>SC_lambda</code>, <code>absTOA_lambda</code>, <code>PerClusterDS</code>, <code>PerClusterDS_min</code>, <code>PerClusterAS_D</code>, <code>PerClusterAS_A</code>, <code>PerClusterES_D</code>, <code>PerClusterES_A</code>, <code>LNS_ksi</code>, <code>LOS_scatter_radius</code>, <code>GR_enabled</code>, <code>LSP_fc_min</code>, <code>EoD_offset_b</code>, <code>EoD_offset_hcl</code>, <code>PerClusterDS_fc_min</code>, <code>PerClusterES_D_scale</code>, <code>absTOA_Lmax</code>, <code>NF_alpha</code>, <code>NF_beta</code>, <code>SNS_sigma</code>, <code>SNS_A</code>, <code>SNS_B</code>, <code>SNS_R</code>, <code>SNS_delta_var</code>, <code>PolVar_sigma</code></li>
+<li>Integer and >= 0: <code>NumClusters_min</code>, <code>NF_k1</code></li>
+<li>In the range from 0 to 1: <code>SNS_mu</code></li>
+<li>In the range from -1 to 1: the 28 correlations (<code>asD_ds</code> to <code>xpr_esa</code>)</li>
+<li>All other keys accept any value including <code>Inf</code> and <code>-Inf</code></li>
+<li><code>NumClusters_min</code> must not exceed <code>NumClusters</code></li>
+<li><code>NF_alpha</code> and <code>NF_beta</code> must be both 0 or both > 0</li>
+<li><code>subpath_method</code> must be <code>legacy</code>, <code>Laplacian</code> or <code>mmMAGIC</code></li>
+</ul>
+</li>
+<li>With <code>validate = false</code> no value is checked: <code>NaN</code> and any <code>subpath_method</code> are accepted</li>
+<li>The symmetric matrix <code>lsp_xcorr</code> is built from the 28 correlation keys and has a unit diagonal. It is tested by a Cholesky factorization. A matrix that is not positive definite is not an error.</li>
+<li>Throws <code>std::invalid_argument</code>; a failed call leaves <code>scenpar</code> and the outputs untouched</li>
+</ul>
+
+<b>Declaration:</b><br>
+<pre>
+bool quadriga_lib::scenpar_validate(
+    std::unordered_map&lt;std::string, double&gt; &amp;scenpar,
+    const std::string &amp;subpath_method = "legacy",
+    arma::mat *lsp_xcorr = nullptr,
+    std::vector&lt;std::string&gt; *key_order = nullptr,
+    bool validate = true);
+</pre>
+
+<b>Inputs:</b><br>
+<ul>
+<li><b><code>scenpar</code></b> — Numeric scenario parameters; updated in-place: given values are kept, missing keys are added with their default; <code>n_key = 166</code> entries on return</li>
+<li><b><code>subpath_method</code></b> <i>(optional)</i> — Value of <code>SubpathMethod</code>, the only parameter that is not numeric</li>
+<li><b><code>validate</code></b> <i>(optional)</i> — <code>false</code>: only complete with defaults, no value checks</li>
+</ul>
+
+<b>Outputs:</b><br>
+<ul>
+<li><b><code>lsp_xcorr</code></b> <i>(optional)</i> — LSP cross-correlation matrix; order of rows and columns: DS, KF, SF, ASD, ASA, ESD, ESA, XPR; <code>[8, 8]</code></li>
+<li><b><code>key_order</code></b> <i>(optional)</i> — Canonical order of the keys in <code>scenpar</code>: the QuaDRiGa order without <code>SubpathMethod</code> (its position is between elements 105 and 106, 0-based), then the 27 new keys; <code>[n_key]</code></li>
+</ul>
+
+<b>Returns:</b><br>
+<ul>
+<li><code>true</code> if <code>lsp_xcorr</code> is positive definite (all 8 pivots of the factorization are > 0); <code>false</code> also if it contains <code>NaN</code></li>
+</ul>
+
+<b>See also:</b><br>
+<ul>
+<li><a href="#conf_file_read">conf_file_read</a> (read the parameters from a conf file)</li>
 </ul>
 
 <hr class="greyline"><br><br>

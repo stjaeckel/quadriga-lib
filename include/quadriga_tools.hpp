@@ -7,6 +7,7 @@
 
 #include <armadillo>
 #include <string>
+#include <unordered_map>
 #include <vector>
 #include <cmath>
 #include <cstring>
@@ -510,6 +511,40 @@ namespace quadriga_lib
                     bool normalize = false,                   // Normalize result after updating (only n_rayU updated columns, ignores rest)
                     bool apply_gain = false,                  // If true, read gain from *gain and apply it to xprmat after normalization
                     const arma::uvec *ray_index = nullptr);   // Optional rayU to ray mapping; default: 1:1 (n_ray == n_rayU)
+
+    // ---- Scenario parameters ----
+
+    // Read and validate a QuaDRiGa scenario configuration file
+    // - Returns true if the LSP cross-correlation matrix is positive definite
+    // - 'scenpar' always holds all n_key numeric keys; keys not in the file have their default value
+    bool conf_file_read(const std::string &fn,                                                 // Path to the .conf file
+                        std::unordered_map<std::string, double> &scenpar,                      // Output: Numeric scenario parameters, n_key entries
+                        std::string *subpath_method = nullptr,                                 // Optional output: Value of 'SubpathMethod'
+                        std::string *pl_model = nullptr,                                       // Optional output: Value of 'PL_model', empty if not in file
+                        std::unordered_map<std::string, std::vector<double>> *plpar = nullptr, // Optional output: Path-loss parameters, keys without "PL_"
+                        arma::mat *lsp_xcorr = nullptr,                                        // Optional output: LSP cross-correlation matrix, [8, 8]
+                        std::vector<std::string> *key_order = nullptr,                         // Optional output: Canonical order of the scenpar keys, [n_key]
+                        std::vector<std::string> *pl_order = nullptr,                          // Optional output: plpar keys in file order
+                        std::vector<std::string> *short_names = nullptr,                       // Optional output: Values of 'ShortName' in file order
+                        std::vector<std::string> *ignored_keys = nullptr,                      // Optional output: Keys in the file that are not known
+                        bool validate = true);                                                 // Apply the value checks of 'scenpar_validate'
+
+    // Validate scenario parameters and complete them with default values
+    // - Returns true if the LSP cross-correlation matrix is positive definite
+    // - An empty 'scenpar' returns the complete default parameter set
+    bool scenpar_validate(std::unordered_map<std::string, double> &scenpar, // In/out: Missing keys are added with their default
+                          const std::string &subpath_method = "legacy",     // Value of 'SubpathMethod'
+                          arma::mat *lsp_xcorr = nullptr,                   // Optional output: LSP cross-correlation matrix, [8, 8]
+                          std::vector<std::string> *key_order = nullptr,    // Optional output: Canonical order of the scenpar keys, [n_key]
+                          bool validate = true);                            // false: only complete with defaults, no value checks
+
+    // List the scenarios defined by the conf files in a set of directories
+    // - Returns the number of entries, n_scen
+    arma::uword conf_file_list(const std::vector<std::string> &dirs,           // Directories, searched in this order, not recursive
+                               std::vector<std::string> &scenarios,            // Output: Scenario names and short names, [n_scen]
+                               std::vector<std::string> *file_names = nullptr, // Optional output: File name incl. ".conf" per entry, [n_scen]
+                               std::vector<std::string> *file_dirs = nullptr,  // Optional output: Directory per entry, as given in 'dirs', [n_scen]
+                               bool parse_shortnames = true);                  // Read the files and add their short names
 
 }
 
