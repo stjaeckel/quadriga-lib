@@ -27,131 +27,134 @@ lang: en-US
 
 | Function | Section | Line |
 | --- | --- | --- |
-| [arrayant](#arrayant) | Array antenna class | 161 |
-| [.append](#append) | Array antenna class | 212 |
-| [.calc_beamwidth_deg](#calc_beamwidth_deg) | Array antenna class | 234 |
-| [.calc_directivity_dBi](#calc_directivity_dbi) | Array antenna class | 266 |
-| [.combine_pattern](#combine_pattern) | Array antenna class | 287 |
-| [.copy_element](#copy_element) | Array antenna class | 312 |
-| [.export_obj_file](#export_obj_file) | Array antenna class | 332 |
-| [.interpolate](#interpolate) | Array antenna class | 362 |
-| [.is_valid](#is_valid) | Array antenna class | 414 |
-| [.qdant_write](#qdant_write) | Array antenna class | 432 |
-| [.remove_zeros](#remove_zeros) | Array antenna class | 459 |
-| [.rotate_pattern](#rotate_pattern) | Array antenna class | 475 |
-| [.set_size](#set_size) | Array antenna class | 511 |
-| [arrayant_combine_pattern_multi](#arrayant_combine_pattern_multi) | Array antenna functions | 537 |
-| [arrayant_concat_multi](#arrayant_concat_multi) | Array antenna functions | 571 |
-| [arrayant_copy_element_multi](#arrayant_copy_element_multi) | Array antenna functions | 605 |
-| [arrayant_interpolate_multi](#arrayant_interpolate_multi) | Array antenna functions | 645 |
-| [arrayant_is_valid_multi](#arrayant_is_valid_multi) | Array antenna functions | 704 |
-| [arrayant_rotate_pattern_multi](#arrayant_rotate_pattern_multi) | Array antenna functions | 731 |
-| [arrayant_set_element_pos_multi](#arrayant_set_element_pos_multi) | Array antenna functions | 763 |
-| [generate_arrayant_3GPP](#generate_arrayant_3gpp) | Array antenna functions | 789 |
-| [generate_arrayant_custom](#generate_arrayant_custom) | Array antenna functions | 839 |
-| [generate_arrayant_dipole](#generate_arrayant_dipole) | Array antenna functions | 864 |
-| [generate_arrayant_half_wave_dipole](#generate_arrayant_half_wave_dipole) | Array antenna functions | 881 |
-| [generate_arrayant_multibeam](#generate_arrayant_multibeam) | Array antenna functions | 898 |
-| [generate_arrayant_omni](#generate_arrayant_omni) | Array antenna functions | 952 |
-| [generate_arrayant_ula](#generate_arrayant_ula) | Array antenna functions | 969 |
-| [generate_arrayant_xpol](#generate_arrayant_xpol) | Array antenna functions | 997 |
-| [generate_speaker](#generate_speaker) | Array antenna functions | 1014 |
-| [qdant_read](#qdant_read) | Array antenna functions | 1089 |
-| [qdant_read_multi](#qdant_read_multi) | Array antenna functions | 1115 |
-| [qdant_write_multi](#qdant_write_multi) | Array antenna functions | 1142 |
-| [channel](#channel) | Channel class | 1171 |
-| [.add_paths](#add_paths) | Channel class | 1218 |
-| [.calc_effective_path_gain](#calc_effective_path_gain) | Channel class | 1256 |
-| [.write_paths_to_obj_file](#write_paths_to_obj_file) | Channel class | 1275 |
-| [any_type_id](#any_type_id) | Channel functions | 1316 |
-| [baseband_freq_response](#baseband_freq_response) | Channel functions | 1359 |
-| [baseband_freq_response_multi](#baseband_freq_response_multi) | Channel functions | 1402 |
-| [baseband_freq_response_vec](#baseband_freq_response_vec) | Channel functions | 1450 |
-| [get_HDF5_version](#get_hdf5_version) | Channel functions | 1488 |
-| [hdf5_create](#hdf5_create) | Channel functions | 1500 |
-| [hdf5_read_channel](#hdf5_read_channel) | Channel functions | 1530 |
-| [hdf5_read_dset](#hdf5_read_dset) | Channel functions | 1562 |
-| [hdf5_read_dset_names](#hdf5_read_dset_names) | Channel functions | 1598 |
-| [hdf5_read_layout](#hdf5_read_layout) | Channel functions | 1632 |
-| [hdf5_reshape_layout](#hdf5_reshape_layout) | Channel functions | 1658 |
-| [hdf5_write](#hdf5_write) | Channel functions | 1686 |
-| [hdf5_write_dset](#hdf5_write_dset) | Channel functions | 1726 |
-| [path](#path) | Channel functions | 1765 |
-| [qrt_file_append](#qrt_file_append) | Channel functions | 1886 |
-| [qrt_file_init](#qrt_file_init) | Channel functions | 1922 |
-| [qrt_file_parse](#qrt_file_parse) | Channel functions | 1960 |
-| [qrt_file_read](#qrt_file_read) | Channel functions | 2008 |
-| [qrt_file_read_raw](#qrt_file_read_raw) | Channel functions | 2105 |
-| [qrt_read_cache_init](#qrt_read_cache_init) | Channel functions | 2142 |
-| [quantize_delays](#quantize_delays) | Channel functions | 2181 |
-| [get_channels_ieee_indoor](#get_channels_ieee_indoor) | Channel generation functions | 2243 |
-| [get_channels_irs](#get_channels_irs) | Channel generation functions | 2324 |
-| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 2418 |
-| [get_channels_planar](#get_channels_planar) | Channel generation functions | 2486 |
-| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 2554 |
-| [acdf](#acdf) | Channel statistics | 2630 |
-| [calc_angular_spreads_sphere](#calc_angular_spreads_sphere) | Channel statistics | 2665 |
-| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 2707 |
-| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 2759 |
-| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 2792 |
-| [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | 2827 |
-| [fast_acos](#fast_acos) | Math functions | 2860 |
-| [fast_asin](#fast_asin) | Math functions | 2879 |
-| [fast_atan2](#fast_atan2) | Math functions | 2898 |
-| [fast_cart2geo](#fast_cart2geo) | Math functions | 2919 |
-| [fast_geo2cart](#fast_geo2cart) | Math functions | 2952 |
-| [fast_sincos](#fast_sincos) | Math functions | 2997 |
-| [fast_slerp](#fast_slerp) | Math functions | 3018 |
-| [interp_2D](#interp_2d) | Math functions | 3053 |
-| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 3117 |
-| [colormap](#colormap) | Site-specific simulation tools | 3195 |
-| [combine_irs_coord](#combine_irs_coord) | Site-specific simulation tools | 3214 |
-| [coord2path](#coord2path) | Site-specific simulation tools | 3257 |
-| [cube](#cube) | Site-specific simulation tools | 3295 |
-| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 3328 |
-| [icosphere](#icosphere) | Site-specific simulation tools | 3372 |
-| [interface_gain](#interface_gain) | Site-specific simulation tools | 3406 |
-| [medium_gain](#medium_gain) | Site-specific simulation tools | 3442 |
-| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 3483 |
-| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 3525 |
-| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 3592 |
-| [obj_overlap_test](#obj_overlap_test) | Site-specific simulation tools | 3659 |
-| [path_to_tube](#path_to_tube) | Site-specific simulation tools | 3690 |
-| [plane](#plane) | Site-specific simulation tools | 3718 |
-| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 3754 |
-| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 3783 |
-| [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 3822 |
-| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 3858 |
-| [ray_commit](#ray_commit) | Site-specific simulation tools | 3894 |
-| [ray_init](#ray_init) | Site-specific simulation tools | 3999 |
-| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 4092 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 4254 |
-| [ray_progress](#ray_progress) | Site-specific simulation tools | 4302 |
-| [ray_state_update](#ray_state_update) | Site-specific simulation tools | 4445 |
-| [ray_subdivide_flag](#ray_subdivide_flag) | Site-specific simulation tools | 4690 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 4751 |
-| [refractive_index](#refractive_index) | Site-specific simulation tools | 4799 |
-| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 4831 |
-| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 4889 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 4919 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 4947 |
-| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 4988 |
-| [write_png](#write_png) | Site-specific simulation tools | 5023 |
-| [xpr_update](#xpr_update) | Site-specific simulation tools | 5049 |
-| [sos_acf_2d](#sos_acf_2d) | Sum-of-sinusoids random number generator | 5290 |
-| [sos_acf_approx](#sos_acf_approx) | Sum-of-sinusoids random number generator | 5325 |
-| [sos_acf_estimate](#sos_acf_estimate) | Sum-of-sinusoids random number generator | 5365 |
-| [sos_acfi](#sos_acfi) | Sum-of-sinusoids random number generator | 5425 |
-| [sos_calc_mse](#sos_calc_mse) | Sum-of-sinusoids random number generator | 5455 |
-| [sos_generate](#sos_generate) | Sum-of-sinusoids random number generator | 5516 |
-| [sos_init_phases](#sos_init_phases) | Sum-of-sinusoids random number generator | 5596 |
-| [sos_map](#sos_map) | Sum-of-sinusoids random number generator | 5635 |
-| [sos_preset](#sos_preset) | Sum-of-sinusoids random number generator | 5682 |
-| [sos_rand](#sos_rand) | Sum-of-sinusoids random number generator | 5730 |
-| [sos_randi](#sos_randi) | Sum-of-sinusoids random number generator | 5791 |
-| [sos_randn](#sos_randn) | Sum-of-sinusoids random number generator | 5855 |
-| [sos_remove_bias](#sos_remove_bias) | Sum-of-sinusoids random number generator | 5915 |
-| [sos_val](#sos_val) | Sum-of-sinusoids random number generator | 5998 |
+| [arrayant](#arrayant) | Array antenna class | 164 |
+| [.append](#append) | Array antenna class | 215 |
+| [.calc_beamwidth_deg](#calc_beamwidth_deg) | Array antenna class | 237 |
+| [.calc_directivity_dBi](#calc_directivity_dbi) | Array antenna class | 269 |
+| [.combine_pattern](#combine_pattern) | Array antenna class | 290 |
+| [.copy_element](#copy_element) | Array antenna class | 315 |
+| [.export_obj_file](#export_obj_file) | Array antenna class | 335 |
+| [.interpolate](#interpolate) | Array antenna class | 365 |
+| [.is_valid](#is_valid) | Array antenna class | 417 |
+| [.qdant_write](#qdant_write) | Array antenna class | 435 |
+| [.remove_zeros](#remove_zeros) | Array antenna class | 462 |
+| [.rotate_pattern](#rotate_pattern) | Array antenna class | 478 |
+| [.set_size](#set_size) | Array antenna class | 514 |
+| [arrayant_combine_pattern_multi](#arrayant_combine_pattern_multi) | Array antenna functions | 540 |
+| [arrayant_concat_multi](#arrayant_concat_multi) | Array antenna functions | 574 |
+| [arrayant_copy_element_multi](#arrayant_copy_element_multi) | Array antenna functions | 608 |
+| [arrayant_interpolate_multi](#arrayant_interpolate_multi) | Array antenna functions | 648 |
+| [arrayant_is_valid_multi](#arrayant_is_valid_multi) | Array antenna functions | 707 |
+| [arrayant_rotate_pattern_multi](#arrayant_rotate_pattern_multi) | Array antenna functions | 734 |
+| [arrayant_set_element_pos_multi](#arrayant_set_element_pos_multi) | Array antenna functions | 766 |
+| [generate_arrayant_3GPP](#generate_arrayant_3gpp) | Array antenna functions | 792 |
+| [generate_arrayant_custom](#generate_arrayant_custom) | Array antenna functions | 842 |
+| [generate_arrayant_dipole](#generate_arrayant_dipole) | Array antenna functions | 867 |
+| [generate_arrayant_half_wave_dipole](#generate_arrayant_half_wave_dipole) | Array antenna functions | 884 |
+| [generate_arrayant_multibeam](#generate_arrayant_multibeam) | Array antenna functions | 901 |
+| [generate_arrayant_omni](#generate_arrayant_omni) | Array antenna functions | 955 |
+| [generate_arrayant_ula](#generate_arrayant_ula) | Array antenna functions | 972 |
+| [generate_arrayant_xpol](#generate_arrayant_xpol) | Array antenna functions | 1000 |
+| [generate_speaker](#generate_speaker) | Array antenna functions | 1017 |
+| [qdant_read](#qdant_read) | Array antenna functions | 1092 |
+| [qdant_read_multi](#qdant_read_multi) | Array antenna functions | 1118 |
+| [qdant_write_multi](#qdant_write_multi) | Array antenna functions | 1145 |
+| [channel](#channel) | Channel class | 1174 |
+| [.add_paths](#add_paths) | Channel class | 1221 |
+| [.calc_effective_path_gain](#calc_effective_path_gain) | Channel class | 1259 |
+| [.write_paths_to_obj_file](#write_paths_to_obj_file) | Channel class | 1278 |
+| [any_type_id](#any_type_id) | Channel functions | 1319 |
+| [baseband_freq_response](#baseband_freq_response) | Channel functions | 1362 |
+| [baseband_freq_response_multi](#baseband_freq_response_multi) | Channel functions | 1405 |
+| [baseband_freq_response_vec](#baseband_freq_response_vec) | Channel functions | 1453 |
+| [get_HDF5_version](#get_hdf5_version) | Channel functions | 1491 |
+| [hdf5_create](#hdf5_create) | Channel functions | 1503 |
+| [hdf5_read_channel](#hdf5_read_channel) | Channel functions | 1533 |
+| [hdf5_read_dset](#hdf5_read_dset) | Channel functions | 1565 |
+| [hdf5_read_dset_names](#hdf5_read_dset_names) | Channel functions | 1601 |
+| [hdf5_read_layout](#hdf5_read_layout) | Channel functions | 1635 |
+| [hdf5_reshape_layout](#hdf5_reshape_layout) | Channel functions | 1661 |
+| [hdf5_write](#hdf5_write) | Channel functions | 1689 |
+| [hdf5_write_dset](#hdf5_write_dset) | Channel functions | 1729 |
+| [path](#path) | Channel functions | 1768 |
+| [qrt_file_append](#qrt_file_append) | Channel functions | 1889 |
+| [qrt_file_init](#qrt_file_init) | Channel functions | 1925 |
+| [qrt_file_parse](#qrt_file_parse) | Channel functions | 1963 |
+| [qrt_file_read](#qrt_file_read) | Channel functions | 2011 |
+| [qrt_file_read_raw](#qrt_file_read_raw) | Channel functions | 2108 |
+| [qrt_read_cache_init](#qrt_read_cache_init) | Channel functions | 2145 |
+| [quantize_delays](#quantize_delays) | Channel functions | 2184 |
+| [conf_file_list](#conf_file_list) | Channel generation functions | 2246 |
+| [conf_file_read](#conf_file_read) | Channel generation functions | 2290 |
+| [get_channels_ieee_indoor](#get_channels_ieee_indoor) | Channel generation functions | 2363 |
+| [get_channels_irs](#get_channels_irs) | Channel generation functions | 2444 |
+| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 2538 |
+| [get_channels_planar](#get_channels_planar) | Channel generation functions | 2606 |
+| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 2674 |
+| [scenpar_validate](#scenpar_validate) | Channel generation functions | 2746 |
+| [acdf](#acdf) | Channel statistics | 2809 |
+| [calc_angular_spreads_sphere](#calc_angular_spreads_sphere) | Channel statistics | 2844 |
+| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 2886 |
+| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 2938 |
+| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 2971 |
+| [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | 3006 |
+| [fast_acos](#fast_acos) | Math functions | 3039 |
+| [fast_asin](#fast_asin) | Math functions | 3058 |
+| [fast_atan2](#fast_atan2) | Math functions | 3077 |
+| [fast_cart2geo](#fast_cart2geo) | Math functions | 3098 |
+| [fast_geo2cart](#fast_geo2cart) | Math functions | 3131 |
+| [fast_sincos](#fast_sincos) | Math functions | 3176 |
+| [fast_slerp](#fast_slerp) | Math functions | 3197 |
+| [interp_2D](#interp_2d) | Math functions | 3232 |
+| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 3296 |
+| [colormap](#colormap) | Site-specific simulation tools | 3374 |
+| [combine_irs_coord](#combine_irs_coord) | Site-specific simulation tools | 3393 |
+| [coord2path](#coord2path) | Site-specific simulation tools | 3436 |
+| [cube](#cube) | Site-specific simulation tools | 3474 |
+| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 3507 |
+| [icosphere](#icosphere) | Site-specific simulation tools | 3551 |
+| [interface_gain](#interface_gain) | Site-specific simulation tools | 3585 |
+| [medium_gain](#medium_gain) | Site-specific simulation tools | 3621 |
+| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 3662 |
+| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 3704 |
+| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 3771 |
+| [obj_overlap_test](#obj_overlap_test) | Site-specific simulation tools | 3838 |
+| [path_to_tube](#path_to_tube) | Site-specific simulation tools | 3869 |
+| [plane](#plane) | Site-specific simulation tools | 3897 |
+| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 3933 |
+| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 3962 |
+| [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 4001 |
+| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 4037 |
+| [ray_commit](#ray_commit) | Site-specific simulation tools | 4073 |
+| [ray_init](#ray_init) | Site-specific simulation tools | 4178 |
+| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 4271 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 4433 |
+| [ray_progress](#ray_progress) | Site-specific simulation tools | 4481 |
+| [ray_state_update](#ray_state_update) | Site-specific simulation tools | 4624 |
+| [ray_subdivide_flag](#ray_subdivide_flag) | Site-specific simulation tools | 4869 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 4930 |
+| [refractive_index](#refractive_index) | Site-specific simulation tools | 4978 |
+| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 5010 |
+| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 5068 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 5098 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 5126 |
+| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 5167 |
+| [write_png](#write_png) | Site-specific simulation tools | 5202 |
+| [xpr_update](#xpr_update) | Site-specific simulation tools | 5228 |
+| [sos_acf_2d](#sos_acf_2d) | Sum-of-sinusoids random number generator | 5469 |
+| [sos_acf_approx](#sos_acf_approx) | Sum-of-sinusoids random number generator | 5504 |
+| [sos_acf_estimate](#sos_acf_estimate) | Sum-of-sinusoids random number generator | 5544 |
+| [sos_acfi](#sos_acfi) | Sum-of-sinusoids random number generator | 5604 |
+| [sos_calc_mse](#sos_calc_mse) | Sum-of-sinusoids random number generator | 5634 |
+| [sos_generate](#sos_generate) | Sum-of-sinusoids random number generator | 5695 |
+| [sos_init_phases](#sos_init_phases) | Sum-of-sinusoids random number generator | 5775 |
+| [sos_map](#sos_map) | Sum-of-sinusoids random number generator | 5814 |
+| [sos_preset](#sos_preset) | Sum-of-sinusoids random number generator | 5861 |
+| [sos_rand](#sos_rand) | Sum-of-sinusoids random number generator | 5909 |
+| [sos_randi](#sos_randi) | Sum-of-sinusoids random number generator | 5970 |
+| [sos_randn](#sos_randn) | Sum-of-sinusoids random number generator | 6034 |
+| [sos_remove_bias](#sos_remove_bias) | Sum-of-sinusoids random number generator | 6094 |
+| [sos_val](#sos_val) | Sum-of-sinusoids random number generator | 6177 |
 
 ---
 
@@ -2240,6 +2243,123 @@ quadriga_lib::quantize_delays(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, 5.0e-9, 48
 # Channel generation functions
 
 ---
+## conf_file_list
+List the scenarios defined by the conf files in a set of directories
+
+- Lists the files whose name ends in `.conf` (case-sensitive) in each directory, not recursive. The
+  scenario name is the file name without this extension.
+- Directories are processed in the given order, the files of one directory in byte-wise sorted order of their
+  names (digits before upper case before lower case)
+- A file whose name was already found in an earlier directory is skipped completely, so the first directory
+  wins. This allows a local folder to override the files of a shared folder.
+- With `parse_shortnames = true` each file is read and one entry is added right after the file for every
+  line `ShortName = name` that is not a comment. Other lines are not examined.
+- Throws `std::invalid_argument` if a short name equals an earlier entry, if a file name equals an earlier
+  short name, or if the value of a `ShortName` line is not one name of the characters `A-Z`, `a-z`, `0-9`, `_`
+- Throws `std::runtime_error` if a listed file cannot be opened for reading the short names
+- A directory that does not exist or is not a directory is skipped; an empty string is the current directory
+- A failed call leaves the outputs untouched
+
+### Declaration:
+```
+arma::uword quadriga_lib::conf_file_list(
+    const std::vector<std::string> &dirs,
+    std::vector<std::string> &scenarios,
+    std::vector<std::string> *file_names = nullptr,
+    std::vector<std::string> *file_dirs = nullptr,
+    bool parse_shortnames = true);
+```
+
+### Inputs:
+- **`dirs`** — Directories, searched in this order; can be empty
+- **`parse_shortnames`** *(optional)* — `true`: read the files and add their short names; `false`: list the
+  files only, which is faster
+
+### Outputs:
+- **`scenarios`** — Scenario names and short names; previous content is discarded; `[n_scen]`
+- **`file_names`** *(optional)* — File name including `.conf` for each entry; `[n_scen]`
+- **`file_dirs`** *(optional)* — Directory of the file for each entry, exactly as given in `dirs`; `[n_scen]`
+
+### Returns:
+- Number of entries, `n_scen`
+
+### See also:
+- [conf_file_read](#conf_file_read) (read one of the files)
+
+---
+## conf_file_read
+Read and validate a QuaDRiGa scenario configuration file
+
+- A conf file is a text file with one `Key = value` assignment per line; `%` starts a comment; blank lines
+  are allowed; line ends can be LF or CRLF; space and tab are white space
+- Keys are case-sensitive names of the characters `A-Z`, `a-z`, `0-9` and `_`; there are four kinds:
+  - Scenario parameters: `n_key = 166` numeric keys with one number each, returned in `scenpar`. Keys that
+    are not in the file have their default value. The names and their order are returned in `key_order`.
+  - `SubpathMethod`: one of the words `legacy`, `Laplacian`, `mmMAGIC`; default `legacy`
+  - Path-loss parameters: every key that starts with `PL_`. `PL_model` has one name as value. All others
+    have one or more numbers separated by white space and are returned in `plpar` without the prefix.
+  - `ShortName`: an alias for the scenario, one name; can occur several times
+- Any other key is ignored and reported in `ignored_keys`; its value is not examined
+- A key that is stated more than once has its last value
+- Numbers are decimal with an optional sign, an optional decimal point and an optional exponent (`e` or
+  `E`), for example `-6.28`, `.5`, `6.2e-07`; `Inf`, `+Inf` and `-Inf` are accepted in any case
+- Elevation angles are used throughout (+90 deg is up); no key refers to a zenith angle
+- The 166 keys are the 139 numeric keys of QuaDRiGa and 27 keys for 3GPP TR 38.901 v19.5.0. With their
+  default of 0 the new keys have no effect.
+- The 28 correlation keys (`asD_ds` to `xpr_esa`) define the symmetric matrix `lsp_xcorr` with unit diagonal
+- Throws `std::runtime_error` if the file cannot be opened
+- Throws `std::invalid_argument` with file name and line number for a line that is not blank, not a comment
+  and not a well-formed assignment: no `=`, more or less than one name before the `=`, a missing value, a
+  word where a number is required or the reverse, a second value or other text after the value, `NaN`,
+  complex numbers, a `PL_` key without a name
+- With `validate = true`, a value that fails the checks of [scenpar_validate](#scenpar_validate) is an error as well
+- A correlation matrix that is not positive definite is not an error; it is reported by the return value
+- The file is parsed and checked completely before any output is written; a failed call leaves all
+  outputs untouched
+
+### Declaration:
+```
+bool quadriga_lib::conf_file_read(
+    const std::string &fn,
+    std::unordered_map<std::string, double> &scenpar,
+    std::string *subpath_method = nullptr,
+    std::string *pl_model = nullptr,
+    std::unordered_map<std::string, std::vector<double>> *plpar = nullptr,
+    arma::mat *lsp_xcorr = nullptr,
+    std::vector<std::string> *key_order = nullptr,
+    std::vector<std::string> *pl_order = nullptr,
+    std::vector<std::string> *short_names = nullptr,
+    std::vector<std::string> *ignored_keys = nullptr,
+    bool validate = true);
+```
+
+### Inputs:
+- **`fn`** — Path to the conf file
+- **`validate`** *(optional)* — `true`: apply the value checks of [scenpar_validate](#scenpar_validate); `false`: only the line
+  grammar is checked
+
+### Outputs:
+- **`scenpar`** — Numeric scenario parameters; previous content is discarded; `n_key = 166` entries
+- **`subpath_method`** *(optional)* — Value of `SubpathMethod`; `legacy` if not in the file
+- **`pl_model`** *(optional)* — Value of `PL_model`; empty if not in the file
+- **`plpar`** *(optional)* — Path-loss parameters; keys without the prefix `PL_`; `PL_model` is not included;
+  empty if the file has no such key; `n_pl` entries with one or more values each
+- **`lsp_xcorr`** *(optional)* — LSP cross-correlation matrix; order of rows and columns: DS, KF, SF, ASD, ASA,
+  ESD, ESA, XPR; `[8, 8]`
+- **`key_order`** *(optional)* — Canonical order of the keys in `scenpar`: the QuaDRiGa order without
+  `SubpathMethod` (its position is between elements 105 and 106, 0-based), then the 27 new keys; `[n_key]`
+- **`pl_order`** *(optional)* — Keys of `plpar` in the order of their first occurrence in the file; `[n_pl]`
+- **`short_names`** *(optional)* — Values of all `ShortName` lines in file order
+- **`ignored_keys`** *(optional)* — Unknown keys, each once, in the order of their first occurrence
+
+### Returns:
+- `true` if `lsp_xcorr` is positive definite, i.e. correlated LSPs can be generated from it
+
+### See also:
+- [scenpar_validate](#scenpar_validate) (value checks, defaults and the list of validation rules)
+- [conf_file_list](#conf_file_list) (find the conf files in a set of directories)
+
+---
 ## get_channels_ieee_indoor
 Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models
 
@@ -2621,6 +2741,65 @@ void quadriga_lib::get_channels_spherical(
 - [arrayant](#arrayant) (antenna array class)
 - [baseband_freq_response](#baseband_freq_response) (for calculating the frequency response)
 - [quantize_delays](#quantize_delays) (for mapping delays to a fixed grid)
+
+---
+## scenpar_validate
+Validate scenario parameters and complete them with default values
+
+- Checks a set of QuaDRiGa scenario parameters that did not come from a conf file and adds every missing key
+  with its default value, so that `scenpar` has all `n_key = 166` entries on return
+- An empty `scenpar` returns the complete default parameter set
+- A set with the 139 numeric keys of QuaDRiGa is completed with the 27 keys for 3GPP TR 38.901 v19.5.0, which
+  have no effect at their default of 0
+- A name in `scenpar` that is not one of the 166 keys is an error, also with `validate = false`
+- Value checks with `validate = true`; `NaN` is an error for every key:
+  - Integer and > 0: `NumClusters`, `NumSubPaths`
+  - Finite and > 0: `r_DS`
+  - Finite and >= 0: the 8 decorrelation distances (`DS_lambda` ... `XPR_lambda`), `SC_lambda`,
+    `absTOA_lambda`, `PerClusterDS`, `PerClusterDS_min`, `PerClusterAS_D`, `PerClusterAS_A`, `PerClusterES_D`,
+    `PerClusterES_A`, `LNS_ksi`, `LOS_scatter_radius`, `GR_enabled`, `LSP_fc_min`, `EoD_offset_b`,
+    `EoD_offset_hcl`, `PerClusterDS_fc_min`, `PerClusterES_D_scale`, `absTOA_Lmax`, `NF_alpha`, `NF_beta`,
+    `SNS_sigma`, `SNS_A`, `SNS_B`, `SNS_R`, `SNS_delta_var`, `PolVar_sigma`
+  - Integer and >= 0: `NumClusters_min`, `NF_k1`
+  - In the range from 0 to 1: `SNS_mu`
+  - In the range from -1 to 1: the 28 correlations (`asD_ds` to `xpr_esa`)
+  - All other keys accept any value including `Inf` and `-Inf`
+  - `NumClusters_min` must not exceed `NumClusters`
+  - `NF_alpha` and `NF_beta` must be both 0 or both > 0
+  - `subpath_method` must be `legacy`, `Laplacian` or `mmMAGIC`
+- With `validate = false` no value is checked: `NaN` and any `subpath_method` are accepted
+- The symmetric matrix `lsp_xcorr` is built from the 28 correlation keys and has a unit diagonal. It is
+  tested by a Cholesky factorization. A matrix that is not positive definite is not an error.
+- Throws `std::invalid_argument`; a failed call leaves `scenpar` and the outputs untouched
+
+### Declaration:
+```
+bool quadriga_lib::scenpar_validate(
+    std::unordered_map<std::string, double> &scenpar,
+    const std::string &subpath_method = "legacy",
+    arma::mat *lsp_xcorr = nullptr,
+    std::vector<std::string> *key_order = nullptr,
+    bool validate = true);
+```
+
+### Inputs:
+- **`scenpar`** — Numeric scenario parameters; updated in-place: given values are kept, missing keys are
+  added with their default; `n_key = 166` entries on return
+- **`subpath_method`** *(optional)* — Value of `SubpathMethod`, the only parameter that is not numeric
+- **`validate`** *(optional)* — `false`: only complete with defaults, no value checks
+
+### Outputs:
+- **`lsp_xcorr`** *(optional)* — LSP cross-correlation matrix; order of rows and columns: DS, KF, SF, ASD, ASA,
+  ESD, ESA, XPR; `[8, 8]`
+- **`key_order`** *(optional)* — Canonical order of the keys in `scenpar`: the QuaDRiGa order without
+  `SubpathMethod` (its position is between elements 105 and 106, 0-based), then the 27 new keys; `[n_key]`
+
+### Returns:
+- `true` if `lsp_xcorr` is positive definite (all 8 pivots of the factorization are > 0); `false` also if it
+  contains `NaN`
+
+### See also:
+- [conf_file_read](#conf_file_read) (read the parameters from a conf file)
 
 ---
 
