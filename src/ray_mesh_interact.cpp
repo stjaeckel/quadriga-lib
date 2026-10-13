@@ -979,7 +979,8 @@ namespace
                                  std::complex<double> *T_te, std::complex<double> *T_tm,
                                  std::complex<double> *R_te, std::complex<double> *R_tm,
                                  bool disp_far = false,        // the stack lies on the far side (glued exit)
-                                 double disp_budget = -1.0,    // max normal thickness it may replace, < 0 = all
+                                 double host_near = -1.0,      // displaced medium in front of the mesh plane, normal thickness, < 0 = unbounded
+                                 double host_far = -1.0,       // the same behind it
                                  double mass_cos = -1.0,       // cosine the wave has in air, for a mass-law term, < 0 = |Re ci|
                                  double mass_bonded = 0.0,     // X0 of the bonded mass-law bodies crossed before the stack
                                  bool near_undeviated = false, // the wave in mat_near was not refracted in
@@ -1264,27 +1265,35 @@ namespace
         // The displaced medium. A sheet has no world-space thickness, so it stands for a layer
         // that occupies its thickness of whatever it sits in: the tracer walked that length as
         // that medium, and it comes back out here. Which medium is the side of a glued pair
-        // that is not the solid. How much is capped by disp_budget, because taking a medium
-        // back out is a division, by its loss as much as its phase, and a sheet thicker than
-        // its host would amplify. A mass-law layer displaces nothing. On a closed far side
-        // the length was walked at the incidence cosine; the Snell cosine there is evanescent.
+        // that is not the solid. Where the layer lies about the mesh plane: half of it on either
+        // side where one medium is on both sides, the mesh plane being the mid-plane; all of it
+        // in front where it lies in the near medium in front of a solid; all of it behind for a
+        // glued exit. Each part takes no more than the host on its side, because taking a
+        // medium back out is a division, by its loss as much as its phase: the composite is
+        // then a wall of the layer between what is left of the host, on every port. A mass-law
+        // layer displaces nothing. On a closed far side the length was walked at the incidence
+        // cosine; the Snell cosine there is evanescent.
         double t_tot = 0.0;
         for (int i = 0; i < n_layers; ++i)
             if (!(layers[i].mtl->m > 0.0))
                 t_tot += layers[i].thk;
-        double t_disp = (disp_budget >= 0.0 && disp_budget < t_tot) ? disp_budget : t_tot;
-        if (t_disp < 0.0)
-            t_disp = 0.0;
+        double u_near = mat_far.same_as(mat_near) ? 0.5 * t_tot : (disp_far ? 0.0 : t_tot), u_far = t_tot - u_near;
+        if (host_near >= 0.0 && host_near < u_near)
+            u_near = host_near;
+        if (host_far >= 0.0 && host_far < u_far)
+            u_far = host_far;
         const int d = disp_far ? n_layers + 1 : 0;
         std::complex<double> c_disp = far_closed ? ci : COS(d);
-        std::complex<double> phi_disp = std::exp(std::complex<double>(0.0, -1.0) * k0 * std::sqrt(MED(d).eta(fGHz) * MED(d).mu(fGHz)) * t_disp * c_disp);
-        std::complex<double> undisp = (std::abs(phi_disp) > 0.0) ? std::complex<double>(1.0, 0.0) / phi_disp : std::complex<double>(1.0, 0.0);
+        auto UNDISP = [&](double t) -> std::complex<double>
+        {
+            std::complex<double> phi = std::exp(std::complex<double>(0.0, -1.0) * k0 * std::sqrt(MED(d).eta(fGHz) * MED(d).mu(fGHz)) * t * c_disp);
+            return (std::abs(phi) > 0.0) ? std::complex<double>(1.0, 0.0) / phi : std::complex<double>(1.0, 0.0);
+        };
 
-        // The reflect port is handed to a ray that turns around at the mesh plane, so it owes the
-        // round trip through the part of the stack that lies in front of that plane: half of it
-        // where one medium is on both sides, the mesh plane being the mid-plane; all of it where
-        // the stack lies in the near medium in front of a solid; none where it lies beyond.
-        std::complex<double> front = mat_far.same_as(mat_near) ? undisp : (disp_far ? std::complex<double>(1.0, 0.0) : undisp * undisp);
+        // The transmit port takes the displaced medium out over both parts. The reflect port is
+        // handed to a ray that turns around at the mesh plane, so it owes the round trip through
+        // the part in front of that plane.
+        std::complex<double> undisp = UNDISP(u_near + u_far), front = UNDISP(2.0 * u_near);
 
         if (T_te)
             *T_te = ig * fx_te * T_out[0] * undisp;
@@ -1321,7 +1330,8 @@ namespace
                                 const Material *back_near = nullptr, // what lies behind a sheet named as mat_near
                                 const Material *back_far = nullptr,  // what lies behind a sheet named as mat_far
                                 bool verdict_given = false,          // the caller decided to sum; eps is not read
-                                const Material *near2 = nullptr)     // second layer of an ordered stack named as mat_near
+                                const Material *near2 = nullptr,     // second layer of an ordered stack named as mat_near
+                                const Material *far2 = nullptr)      // the same for mat_far
     {
         // A mass-law material carries a lumped transmission surrogate: its eta and mu are
         // calibrated for surface impedance only, so the in-slab index is not physical and the
@@ -1368,7 +1378,7 @@ namespace
             if (adj.thk > 0.0 && !(adj.m > 0.0))
             {
                 // Seen from the slab a lining lies in the air beyond it; a sheet inside the slab
-                // has the slab on both sides and the solver centres it.
+                // has the slab on both sides and the solver centres it, within the leg.
                 QdLayer lay[2];
                 lay[0].mtl = &adj, lay[0].thk = adj.thk;
                 if (adj2)
@@ -1376,7 +1386,7 @@ namespace
                 Material air_backing;
                 std::complex<double> Lr_te, Lr_tm;
                 if (qd_stack_resolve(mat_slab, lay, adj2 ? 2 : 1, backing ? *backing : air_backing,
-                                     cs, fGHz, is_scalar, nullptr, nullptr, &Lr_te, &Lr_tm, true))
+                                     cs, fGHz, is_scalar, nullptr, nullptr, &Lr_te, &Lr_tm, true, dist_refract * abs_cos_theta_t))
                 {
                     r_te = Lr_te, r_tm = is_scalar ? Lr_te : Lr_tm;
                     return;
@@ -1390,7 +1400,7 @@ namespace
 
         std::complex<double> rn_te, rn_tm, rf_te, rf_tm;
         fresnel_r(mat_near, rn_te, rn_tm, back_near, (near2 && !(near2->m > 0.0)) ? near2 : nullptr);
-        fresnel_r(mat_far, rf_te, rf_tm, back_far, nullptr);
+        fresnel_r(mat_far, rf_te, rf_tm, back_far, (far2 && !(far2->m > 0.0)) ? far2 : nullptr);
 
         // One-way propagation factor. With the recovered cosine it is exp(-j k0 n thk c), index
         // and cosine complex, over the normal thickness the traced path covers, with only the
@@ -2474,16 +2484,10 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
             // complex in-slab cosine.
             double ct_geo = abs_cos_theta;
 
-            // Displacement side and budget. The sheet sits on whichever side of a glued pair is not
-            // the solid, which is the far side only for a glued exit. The budget is what this
-            // function can see of the medium being displaced - the leg it has just travelled - and it
-            // only matters when that medium is lossy. ray_state_update redoes this with the tracked
-            // state and a two-sided budget whenever medium tracking is on; this is the provisional
-            // value for the untracked path.
+            // Displacement side. The sheet sits on whichever side of a glued pair is not the solid,
+            // which is the far side only for a glued exit. The medium displaced is air in every
+            // case this function resolves, and air is not capped.
             bool disp_far = (sheet_case == 3);
-            const Material &M_disp = disp_far ? M2 : M1;
-            double disp_budget = M_disp.same_as(Material()) ? -1.0 : 0.8 * OF_length * ct_geo;
-
 
             // Angle factor of a mass term: the cosine the wave has in air. Reached from air that
             // is ct_geo. A lining left from inside a solid with types 2 and 5 is reached along the
@@ -2503,7 +2507,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
             lay[0].mtl = &M_slab, lay[0].thk = M_slab.thk, lay[1].mtl = &M_slab2, lay[1].thk = M_slab2.thk;
             std::complex<double> Tte, Ttm, Rte, Rtm;
             if (!qd_stack_resolve(M1, lay, (sheet_case == 4) ? 2 : 1, M2, std::complex<double>(ct_geo, 0.0), fGHz, is_scalar,
-                                  &Tte, &Ttm, &Rte, &Rtm, disp_far, disp_budget, ct_mass, 0.0, true, far_closed))
+                                  &Tte, &Ttm, &Rte, &Rtm, disp_far, -1.0, -1.0, ct_mass, 0.0, true, far_closed))
                 Tte = Ttm = Rte = Rtm = 0.0; // a singular denominator: nothing is handed on
 
             // Both ports come out of the one pass over the same Fresnel quantities. The reflection port
@@ -2887,7 +2891,7 @@ void quadriga_lib::ray_state_update(
    | -------------------- | ---------------------------------- | --------------------------------------------- | ------------------------- |
    | `mtl_ind_current`    | medium the ray is in, 0 = air      | bent: the leg follows a bend traced with type 2 or 5; zero in air | resolved |
    | `mtl_ind_prev`       | medium the leg was entered from, or the sheet crossed or reflected off | the sheet in this word lies inside the current medium | known non-parallel |
-   | `mtl_ind_buffer`     | deferred medium                    | followed, with a zero index: the leg began at a reflection that left the series to the tracer | clear |
+   | `mtl_ind_buffer`     | deferred medium                    | followed, with a zero index: the leg began at a reflection that left the series to the tracer. With an index: the layer of an ordered stack behind the ray that the previous-medium word does not name | clear |
    | `mtl_ind_buffer`     | thickness code, bits 0-14          | (part of the code)                            | set: mass-crossed         |
    Under bit 15 the code is the normal thickness of a mass-law leg closed on the way into the current
    one: of the solid in `mtl_ind_prev`, or, where that word holds a sheet lying inside the current
@@ -3131,7 +3135,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
         throw std::invalid_argument("Values in 'mtl_ind_sbs' exceed the number of materials in 'mtl_prop'.");
 
     // The buffer word under its flag bit carries a surface-mass code, not a material index.
-    // Without it, bit 14 is the followed mark, as bit 14 of the other two words is a flag.
+    // Without it, bit 14 is the followed mark, or with an index the other layer of a stack behind the ray.
     auto check_state_words = [&](const arma::Col<short> *v, const char *name, bool flag_is_code = false)
     {
         if (v == nullptr || v->n_elem == 0)
@@ -3263,7 +3267,9 @@ void quadriga_lib::ray_state_update(int interaction_type,
         //             from, or the sheet crossed     (a sheet), or
         //             or reflected off               prev_real_inv
         //                                            (a solid)
-        //   buffer    deferred medium                followed          clear
+        //   buffer    deferred medium, or with       followed          clear
+        //             the mark the other layer of
+        //             an ordered stack behind
         //   buffer    thickness code, bits 0-14                        set: mass_crossed
         //
         // prev_embedded qualifies a sheet in the previous-medium word: the sheet lies inside the
@@ -3320,8 +3326,13 @@ void quadriga_lib::ray_state_update(int interaction_type,
         // the leg forms no series. Written by a reflection that did not sum, in the buffer word,
         // which every reflection clears; carried where a leg carries on; replaced by a deferred
         // medium that has to be stored, after which the leg judges for itself again.
-        const bool followed = !mass_crossed && (next_buffer & 0x4000) != 0;
-        if (mass_crossed || followed)
+        //
+        // With an index beside it the mark is not one: the leg began by crossing an ordered stack,
+        // the index is the layer of that stack the previous-medium word does not name, and the leg
+        // judges its series against both.
+        const int stack_behind = (!mass_crossed && (next_buffer & 0x4000) != 0) ? (int)(next_buffer & 0x3FFF) : 0;
+        const bool followed = !mass_crossed && (next_buffer & 0x4000) != 0 && stack_behind == 0;
+        if (mass_crossed || followed || stack_behind != 0)
             mtl_buffer = 0;
 
         // Compact-set reads at i
@@ -4300,11 +4311,12 @@ void quadriga_lib::ray_state_update(int interaction_type,
             bool far_in_slab = prev_embedded && mtl_far == mtl_prev && IS_SHEET(mtl_far);
 
             std::complex<double> fac_te, fac_tm;
-            Material M_near2 = MAT(sheet_mtl2); // the second layer of an ordered stack ahead
+            Material M_near2 = MAT(sheet_mtl2), M_far2 = MAT(stack_behind); // the second layer of an ordered stack ahead, and behind
             if (!qd_slab_resolve(MAT(mtl_near), MAT(mtl_slab), MAT(mtl_far),
                                  dist_refract, dist_geo, abs_cos_theta_t, abs_cos_theta,
                                  fGHz, is_scalar, eps, &fac_te, &fac_tm, EXACT_IN_SLAB_COSINE(),
-                                 &M_back, far_in_slab ? &M_back_far : nullptr, given, (sheet_case == 4) ? &M_near2 : nullptr))
+                                 &M_back, far_in_slab ? &M_back_far : nullptr, given, (sheet_case == 4) ? &M_near2 : nullptr,
+                                 (far_in_slab && stack_behind != 0) ? &M_far2 : nullptr))
                 return false;
             series_summed = true;
 
@@ -4440,18 +4452,19 @@ void quadriga_lib::ray_state_update(int interaction_type,
             // side is closed: the far face of a coherent sheet is then the pad of a closed face
             // on both ports, and a mass-law sheet passes the leaks of its two faces.
             {
-                // How much of the displaced medium may be taken back out. Air costs nothing to
-                // displace and cannot amplify, so it is uncapped. For a real medium the cap is 80% of
-                // the host path the tracer can see around the crossing - what it has already travelled
-                // plus the gap ahead, when the intersector reported a second face - which leaves at
-                // least a tenth of the host on either side of the sheet. A laminate whose layers do not
-                // fit inside their host keeps every crossing and simply comes out longer.
-                double disp_budget = -1.0;
+                // How much of the displaced medium there is to take back out, as a normal thickness
+                // on either side of the mesh plane. In front it is the leg the ray is on. Behind it
+                // is the gap along the segment to the second face of the hit, or to the destination.
+                // Where the second face is co-located - an ordered stack, a duplicate - nothing says
+                // what lies behind, and the leg in front is taken for both sides. Air costs nothing
+                // to displace and is not capped. A layer that does not fit its host keeps its
+                // thickness and the wall comes out longer than the mesh.
+                double host_near = -1.0, host_far = -1.0;
                 const Material &M_disp = disp_far ? M_far : M_near;
                 if (!M_disp.same_as(Material()))
                 {
-                    double host_seen = dist_orig_vbs + ((nH >= 2) ? DIST(F, S) : dist_fbs_dest);
-                    disp_budget = 0.8 * host_seen * abs_cos_theta_t;
+                    host_near = dist_refract * abs_cos_theta_t;
+                    host_far = typeH[2] ? host_near : ((nH >= 2) ? DIST(F, S) : dist_fbs_dest) * abs_cos_theta;
                 }
 
                 // No grazing clamp, matching ray_mesh_interact. A fixed extent-to-thickness ratio
@@ -4504,7 +4517,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 lay[0].mtl = &M_slab, lay[0].thk = thk, lay[1].mtl = &M_slab2, lay[1].thk = thk2;
                 std::complex<double> Tte, Ttm, Rte, Rtm;
                 if (!qd_stack_resolve(M_near, lay, (mtl_slab2 != 0) ? 2 : 1, M_far, (std::abs(ct_near) > 0.0) ? ct_near : std::complex<double>(ct_geo, 0.0),
-                                      fGHz, is_scalar, &Tte, &Ttm, &Rte, &Rtm, disp_far, disp_budget, ct_mass, mass_bonded, !refracted, tir))
+                                      fGHz, is_scalar, &Tte, &Ttm, &Rte, &Rtm, disp_far, host_near, host_far, ct_mass, mass_bonded, !refracted, tir))
                     return false; // a singular denominator; the caller decides
 
                 // Both ports come out of the one pass. The reflection port is its own Airy sum, not the
@@ -4710,8 +4723,8 @@ void quadriga_lib::ray_state_update(int interaction_type,
             // starts as well, through the sheet, and its thickness travels as the code, with
             // what that leg was entered through and the first layer of an ordered stack.
             // Behind an ordered stack whose last layer is coherent the mirror behind the ray is
-            // both layers, and the word names one: the leg forms no series and is followed.
-            next_buffer = (short)((sheet_mtl2 != 0 && m_next != 0 && !(MAT(sheet_back).m > 0.0)) ? (int)0x4000 : 0);
+            // both layers, and the previous-medium word names one: the other goes here.
+            next_buffer = (short)((sheet_mtl2 != 0 && m_next != 0 && !(MAT(sheet_back).m > 0.0)) ? ((int)0x4000 | sheet_mtl) : 0);
             if (m_next != 0 && MAT(sheet_back).m > 0.0)
             {
                 next_buffer = (short)0x8000;
@@ -4759,7 +4772,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
             // Transparent transition for same material
             if (SAME(mtl_current, mtl_next)) // Make interface transparent
             {
-                if (mass_crossed || followed)
+                if (mass_crossed || followed || stack_behind != 0)
                     buffer_next = buffer_word_in;
                 REPLACE_BY_GAIN(1.0, true); // Maintain refracted direction, set transparent flag
                 if (preload_dest)           // Add distances: fbs-vbs (geometric) AND vbs-vdest (refracted)

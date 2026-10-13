@@ -15894,15 +15894,18 @@ TEST_CASE("Unentered branches - a corner with a sheet is the sheet alone once th
 TEST_CASE("Unentered branches - the displacement budget caps what a sheet takes back out of its host")
 {
     ub::OneThread one_thread;
-    // A sheet inside a host takes its thickness of host back out of the transit, and the budget
-    // limits that to 80 % of the host the event can see, because taking a medium out is a
-    // division. A sheet thicker than its host is not a valid geometry, but nothing stops a mesh
-    // from holding one, so the rows run past it: thk / L from 0.1 to 3 in a 10 mm host.
+    // A sheet inside a host takes its thickness of host back out of the transit: half of it on
+    // either side of the mesh plane, and on each side no more than the host that lies there,
+    // because taking a medium out is a division. The transmit port, the reflect port and the
+    // mirror of the host's series place the layer alike, so a capped sheet is still one wall. A
+    // sheet thicker than its host is not a valid geometry, but nothing stops a mesh from holding
+    // one, so the rows run past it: thk / L from 0.1 to 3 in a 10 mm host.
     //
     // The composite is isolated as the ratio of the event to the same event with a 1 mm sheet:
-    // the host leg and the state are the same in both. The reference is diag_cm_stack with the
-    // budget the event has, formed here from the points of the event. The mirror the host's series
-    // takes on the leg behind the sheet is the same layer with no budget.
+    // the host leg and the state are the same in both. The reference is diag_cm_stack with what
+    // the two sides allow, formed here from the points of the event as normal thicknesses: the
+    // transmit port over both parts, the reflect port over twice the part in front, the mirror on
+    // the leg behind the sheet over twice what that leg allows.
     const double L = 0.010, f = FRQ, k0 = 2.0 * QPI * f / C0;
     const std::complex<double> J(0.0, 1.0);
     const std::vector<double> thk = {0.001, 0.005, 0.0079, 0.0081, 0.009, 0.010, 0.015, 0.030};
@@ -15915,10 +15918,10 @@ TEST_CASE("Unentered branches - the displacement budget caps what a sheet takes 
     const std::complex<double> eH = lump_eps(lp[0], f), nH = std::sqrt(eH);
 
     QD_DIAG("\n# diag: displacement budget, a sheet inside 10 mm of eps 1.50-0.40j, scalar, both tracers. T, R: the composite over the\n");
-    QD_DIAG("# 1 mm sheet's against diag_cm_stack with the budget, complex. budget_over_L: the budget of the event over the host's\n");
+    QD_DIAG("# 1 mm sheet's against diag_cm_stack capped per side, complex. budget_over_L: what the two sides allow over the host's\n");
     QD_DIAG("# thickness. uncap_dB, uncap_deg: the capped transmit port over the uncapped one. chain_dB: entry, sheet and exit, series\n");
     QD_DIAG("# declined; summed_dB: with the exit's series summed. S: the host's series on the leg behind the sheet against the layer\n");
-    QD_DIAG("# mirror with no budget; mirror: that mirror's magnitude before the clamp\n");
+    QD_DIAG("# mirror capped by its leg; mirror: that mirror's magnitude\n");
     QD_DIAG("sheet,tracer,theta,thk_over_L,budget_over_L,cap,T,R,uncap_dB,uncap_deg,chain_dB,summed_dB,S,mirror\n");
     for (int fam = 0; fam < 2; ++fam)
         for (int tr : {4, 5})
@@ -15945,29 +15948,29 @@ TEST_CASE("Unentered branches - the displacement budget caps what a sheet takes 
                     ub::Ev X0 = ub::traced<double>(pal, mesh, mi, tr, f, o2, d2, &Et, dec), X1 = ub::traced<double>(pal, mesh, mi, tr, f, o2, d2, &Et, sum);
                     REQUIRE((E0.nh && Et.nh == 2 && Er.nh == 2 && X0.nh));
 
-                    // The budget of the event: 80 % of the host it sees, the leg behind it along the
-                    // direction the wave has and the gap ahead along the segment, times the traced cosine
-                    const double dx = std::abs(E0.path_dirN(0, 0)), leg = (0.5 * L - o(0, 0)) / dx;
-                    const double gapS = std::sqrt(ub::sumsq(Et.sbs - Et.fbs)), budget = 0.8 * (leg + gapS) * dx;
+                    // What the event sees, as normal thicknesses: the leg in front, and the gap ahead
+                    // to the second face of the hit. Each half of the sheet takes no more than its side
+                    const double hf = 0.5 * L - o(0, 0), hb = std::abs(Et.sbs(0, 0) - Et.fbs(0, 0));
+                    const double un = std::min(0.5 * thk[q], hf), ubk = std::min(0.5 * thk[q], hb), budget = un + ubk;
                     DiagLayer lay;
                     lay.e = eS, lay.d = thk[q];
                     DiagSheet W = diag_cm_stack(eH, 1.0, {lay}, eH, 1.0, ct, f, false, true, budget);
+                    DiagSheet WR = diag_cm_stack(eH, 1.0, {lay}, eH, 1.0, ct, f, false, true, 2.0 * un);
                     DiagSheet U = diag_cm_stack(eH, 1.0, {lay}, eH, 1.0, ct, f, false, true);
                     std::complex<double> T = cpx(Et.xpr, 0, 0), R = cpx(Er.xpr, 0, 0);
                     if (q == 0)
-                        T1 = T, R1 = R, Tr1 = W.T_te, Rr1 = W.R_te;
-                    const double dT = std::abs(T / T1 - W.T_te / Tr1), dR = std::abs(R / R1 - W.R_te / Rr1);
+                        T1 = T, R1 = R, Tr1 = W.T_te, Rr1 = WR.R_te;
+                    const double dT = std::abs(T / T1 - W.T_te / Tr1), dR = std::abs(R / R1 - WR.R_te / Rr1);
                     const bool cap = budget < thk[q];
                     const std::complex<double> ch = cpx(E0.xpr, 0, 0) * T * cpx(X0.xpr, 0, 0), chs = cpx(E0.xpr, 0, 0) * T * cpx(X1.xpr, 0, 0);
 
-                    // The series on the leg behind the sheet: the sheet a layer backed by the host, centred, no budget
-                    DiagSheet Mr = diag_cm_stack(eH, 1.0, {lay}, eH, 1.0, ct, f, true, true);
-                    std::complex<double> rb = Mr.R_te;
-                    const double mir = std::abs(rb);
-                    if (mir > 1.0)
-                        rb /= mir;
-                    const std::complex<double> ra = (nH * ct - std::cos(th)) / (nH * ct + std::cos(th));
+                    // The series on the leg behind the sheet: the sheet a layer backed by the host, centred,
+                    // the half on this side capped by the leg
                     const double dleg = L - Et.origN(0, 0);
+                    DiagSheet Mr = diag_cm_stack(eH, 1.0, {lay}, eH, 1.0, ct, f, true, true, 2.0 * std::min(0.5 * thk[q], dleg));
+                    const std::complex<double> rb = Mr.R_te;
+                    const double mir = std::abs(rb);
+                    const std::complex<double> ra = (nH * ct - std::cos(th)) / (nH * ct + std::cos(th));
                     const std::complex<double> Sref = 1.0 / (1.0 - ra * rb * std::exp(-2.0 * J * k0 * nH * ct * dleg));
                     const double dS = std::abs(cpx(X1.xpr, 0, 0) / cpx(X0.xpr, 0, 0) - Sref);
 
@@ -15983,31 +15986,25 @@ TEST_CASE("Unentered branches - the displacement budget caps what a sheet takes 
                     // Graceful where the sheet does not fit: the wall passes less than it received
                     CHECK(std::norm(ch) < 1.0);
                     CHECK(std::norm(chs) < 1.0);
-                    CHECK(mir < 1.0); // no mirror on these rows reaches the clamp
-                    // What the event sees of its host. With the refracting tracer that is the host;
-                    // with the undeviated one the gap ahead is the segment at the external angle
-                    // times the traced cosine, so the budget is above 80 % of the host
-                    if (tr == 5)
-                        CHECK(std::abs(budget / L - 0.8) < 1.0e-3);
-                    else
-                        CHECK(budget / L > 0.8);
+                    CHECK(mir < 1.0);
                 }
             }
 
-    // An ordered stack inside a host goes to the core, which caps the same way. The second face of
-    // the hit is then the other sheet, so the host the event sees is the leg behind it alone, and
-    // the stack is capped at 80 % of that leg although it needs half its thickness of it.
+    // An ordered stack inside a host. The second face of the hit is the other sheet, so nothing
+    // says what lies behind, and the leg in front is taken for both sides: a stack whose half
+    // thickness fits that leg is not capped.
     QD_DIAG("\n# diag: displacement budget, an ordered stack eps 5.24-0.63j | eps 2.50-0.80j inside eps 1.50-0.40j, scalar. front_mm:\n");
     QD_DIAG("# host in front of the stack's face; fits: the stack's half thickness is less than that. T, R as above, against\n");
-    QD_DIAG("# diag_cm_stack with the budget over the 0.5 + 0.5 mm stack's. uncap_dB, uncap_deg: the capped transmit port over the\n");
-    QD_DIAG("# uncapped one, which is what the cap takes off a stack that fits\n");
+    QD_DIAG("# diag_cm_stack capped per side over the 0.5 + 0.5 mm stack's. budget_mm: twice what the leg in front allows of half the\n");
+    QD_DIAG("# stack. uncap_dB, uncap_deg: the capped transmit port over the uncapped one, zero for a stack that fits\n");
     QD_DIAG("host_mm,front_mm,stack_mm,tracer,theta,budget_mm,fits,cap,T,R,uncap_dB,uncap_deg,chain_dB\n");
     struct Sk
     {
         double Lh, xs, ta, tb;
     };
     const std::vector<Sk> sk = {{0.010, 0.005, 0.0005, 0.0005}, {0.010, 0.005, 0.002, 0.001}, {0.010, 0.005, 0.003, 0.002}, {0.010, 0.005, 0.006, 0.003},
-                                {0.100, 0.010, 0.0005, 0.0005}, {0.100, 0.010, 0.004, 0.003}, {0.100, 0.010, 0.006, 0.006}, {0.100, 0.050, 0.0005, 0.0005}, {0.100, 0.050, 0.006, 0.006}};
+                                {0.100, 0.010, 0.0005, 0.0005}, {0.100, 0.010, 0.004, 0.003}, {0.100, 0.010, 0.006, 0.006}, {0.100, 0.050, 0.0005, 0.0005}, {0.100, 0.050, 0.006, 0.006},
+                                {0.100, 0.090, 0.0005, 0.0005}, {0.100, 0.090, 0.006, 0.006}, {0.010, 0.002, 0.0005, 0.0005}, {0.010, 0.002, 0.006, 0.006}};
     std::vector<LumpMtl> lq = {{1.50, 0.40, 0.0}};
     for (const Sk &K : sk)
         lq.push_back({5.24, 0.63, K.ta}), lq.push_back({2.50, 0.80, K.tb});
@@ -16035,15 +16032,14 @@ TEST_CASE("Unentered branches - the displacement budget caps what a sheet takes 
                 ub::onward(Et, o2, d2);
                 ub::Ev X0 = ub::traced<double>(pal_q, mesh, mi, tr, f, o2, d2, &Et, dec);
                 REQUIRE((E0.nh && Et.nh >= 2 && Er.nh >= 2 && X0.nh));
-                const double dx = std::abs(E0.path_dirN(0, 0)), leg = (K.xs - o(0, 0)) / dx;
-                const double gapS = std::sqrt(ub::sumsq(Et.sbs - Et.fbs)), budget = 0.8 * (leg + gapS) * dx;
+                const double tt = K.ta + K.tb, budget = 2.0 * std::min(0.5 * tt, K.xs - o(0, 0));
                 std::vector<DiagLayer> lay = {lump_layer(lq[iA - 1], f), lump_layer(lq[iB - 1], f)};
                 DiagSheet W = diag_cm_stack(eH, 1.0, lay, eH, 1.0, ct, f, false, true, budget);
                 DiagSheet U = diag_cm_stack(eH, 1.0, lay, eH, 1.0, ct, f, false, true);
                 std::complex<double> T = cpx(Et.xpr, 0, 0), R = cpx(Er.xpr, 0, 0);
                 if (K.ta == 0.0005) // the thin stack of this host and position
                     T1 = T, R1 = R, Tr1 = W.T_te, Rr1 = W.R_te;
-                const double dT = std::abs(T / T1 - W.T_te / Tr1), dR = std::abs(R / R1 - W.R_te / Rr1), tt = K.ta + K.tb;
+                const double dT = std::abs(T / T1 - W.T_te / Tr1), dR = std::abs(R / R1 - W.R_te / Rr1);
                 const bool cap = budget < tt, fits = 0.5 * tt < K.xs && 0.5 * tt < K.Lh - K.xs;
                 const std::complex<double> ch = cpx(E0.xpr, 0, 0) * T * cpx(X0.xpr, 0, 0);
                 QD_DIAG("%.0f,%.0f,%.1f,%d,%.0f,%.4f,%d,%d,%.3e,%.3e,%.6f,%.4f,%.4f\n", 1e3 * K.Lh, 1e3 * K.xs, 1e3 * tt, tr, thd, 1e3 * budget, (int)fits,
@@ -16053,7 +16049,10 @@ TEST_CASE("Unentered branches - the displacement budget caps what a sheet takes 
                 CHECK(dT < 1.0e-9);
                 CHECK(dR < 1.0e-9);
                 CHECK(std::norm(ch) < 1.0);
-                CHECK(budget < 0.81 * K.xs / std::cos(th) * dx + 1.0e-4); // the leg in front, and not the host behind
+                CHECK(std::isfinite(std::norm(T)));
+                CHECK(std::isfinite(std::norm(R)));
+                if (fits) // on the uncapped reference
+                    CHECK(!cap);
             }
         }
 }
@@ -20086,12 +20085,13 @@ TEST_CASE("One solver - a sheet and a stack are one sum and no mirror is clamped
                 }
     }
 
-    // G: an ordered stack inside a host. The mirror ahead of the host's leg is both layers; the leg behind is followed
+    // G: an ordered stack inside a host. The mirror of the host's series is both layers, ahead of the leg in front and behind the leg behind
     QD_DIAG("\n# diag: one solver G, air | host 20 mm | 6 mm eps 5.24-0.63j, 6 mm eps 2.50 | host 30 mm | air, scalar. S: the host's series\n");
     QD_DIAG("# on the leg in front of the stack, eps 0 over eps 1.5; d_2: against the series whose mirror ahead is both layers backed by the\n");
-    QD_DIAG("# host; d_1: against the first layer alone. buf: the buffer word behind the stack. bits: the event that closes the leg behind\n");
-    QD_DIAG("# at eps 0 and at 1.5, bitwise. dT, dR: every path, every series summed, the two ports over the matrix of the wall, dB\n");
-    QD_DIAG("host,theta,abs_S,d_2,d_1,buf,bits,nT,dT,dR\n");
+    QD_DIAG("# host; d_1: against the first layer alone. buf: the buffer word behind the stack, the mark with the layer the previous-medium\n");
+    QD_DIAG("# word does not name. b_2, b_1: the same series on the leg behind, against both layers and against the last one alone. dT, dR:\n");
+    QD_DIAG("# every path, every series summed, the two ports over the matrix of the wall, dB\n");
+    QD_DIAG("host,theta,abs_S,d_2,d_1,buf,b_2,b_1,nT,dT,dR\n");
     for (const auto &h : std::vector<std::pair<double, double>>{{1.5, 0.4}, {2.5, 0.8}})
         for (double thd : {10.0, 30.0, 60.0})
         {
@@ -20111,7 +20111,10 @@ TEST_CASE("One solver - a sheet and a stack are one sum and no mirror is clamped
             // the leg behind the stack
             auto b0 = ub::chain(P, mesh, mi, {4, 4, 4}, f, thd, {1.5, 1.5, 0.0}), b1 = ub::chain(P, mesh, mi, {4, 4, 4}, f, thd, {1.5, 1.5, 1.5});
             REQUIRE((b0.size() == 3 && b1.size() == 3));
-            const bool bits = ub::same_bits(b0[2].xpr, b1[2].xpr);
+            const cd Sb = cpx(b0[2].xpr, 0, 0) / cpx(b1[2].xpr, 0, 0), phb = std::exp(-J * k0 * bH * (d1 + G + d2 - b0[1].origN(0, 0)));
+            const cd q_2 = diag_cm_stack(eH, U, {{e2, U, t2}, {e1, U, t1}}, eH, U, cH, f, false, true).R_te;
+            const cd q_1 = diag_cm_stack(eH, U, {{e2, U, t2}}, eH, U, cH, f, false, true).R_te;
+            const cd Sb2 = 1.0 / (1.0 - r_b * q_2 * phb * phb), Sb1 = 1.0 / (1.0 - r_b * q_1 * phb * phb);
             // every path
             arma::mat o, d;
             diag_ray_at(thd, o, d);
@@ -20120,13 +20123,15 @@ TEST_CASE("One solver - a sheet and a stack are one sum and no mirror is clamped
             const double tS = t1 + t2;
             DiagSheet W = diag_cm_stack(U, U, {{eH, U, d1 - 0.5 * tS}, {e1, U, t1}, {e2, U, t2}, {eH, U, d2 - 0.5 * tS}}, U, U, std::cos(th), f, false, true);
             const double dT = dBp(std::norm(A.T[0])) - dBp(std::norm(W.T_te)), dR = dBp(std::norm(A.R[0])) - dBp(std::norm(W.R_te));
-            QD_DIAG("%g-%gj,%.0f,%.6f,%.3e,%.3e,%04x,%d,%d,%+.4f,%+.4f\n", h.first, h.second, thd, std::abs(S), std::abs(S - S2), std::abs(S - S1),
-                    ub::w(a0[1].buf(0)), (int)bits, A.nT, dT, dR);
+            QD_DIAG("%g-%gj,%.0f,%.6f,%.3e,%.3e,%04x,%.3e,%.3e,%d,%+.4f,%+.4f\n", h.first, h.second, thd, std::abs(S), std::abs(S - S2), std::abs(S - S1),
+                    ub::w(a0[1].buf(0)), std::abs(Sb - Sb2), std::abs(Sb - Sb1), A.nT, dT, dR);
             INFO("G, host " << h.first << "-" << h.second << "j, theta " << thd);
             CHECK(std::abs(S - S2) < 1.0e-6);  // the relaunch offset of the leg is in L
             CHECK(std::abs(S - S1) > 1.0e-4);  // and the two mirrors are told apart
-            CHECK(a0[1].buf(0) == (short)0x4000); // the state names one layer of the mirror behind: the leg is followed
-            CHECK(bits);
+            CHECK(a0[1].buf(0) == (short)(0x4000 | 2)); // the previous-medium word names the last layer, the buffer word the first
+            CHECK(std::abs(Sb - Sb2) < 1.0e-6);         // so the leg behind sums against both
+            CHECK(std::abs(Sb - Sb1) > 1.0e-4);
+            CHECK(A.nT <= 8); // and its bounces are no rays
             CHECK(std::abs(dT) < 5.0e-3); // four layers on the characteristic matrix, as a sum of paths
             CHECK(std::abs(dR) < 1.0e-2);
         }
@@ -20154,4 +20159,72 @@ TEST_CASE("One solver - a sheet and a stack are one sum and no mirror is clamped
         QD_DIAG("%d,%d,%d,%.3e\n", n, opp, same, worst);
         CHECK(opp == n);
     }
+}
+
+TEST_CASE("Budget - a sheet or a stack inside a host is one wall on every port whether it is capped or not")
+{
+    ub::OneThread one_thread;
+    // The cap per side is a placement: the layer between what is left of the host on either side.
+    // A wall of lossless media then returns what it received, whatever the sheet's thickness is,
+    // and a sheet or a stack that fits is the wall air | host Lf - h | layers | host Lb - h | air.
+    // Every path, every series summed, scalar, both tracers, 20 and 60 deg.
+    const double f = FRQ;
+    struct Geo
+    {
+        double Lf, Lb, tot;
+    };
+    auto walls = [&](const char *tag, const std::vector<LumpMtl> &lp, const std::vector<Geo> &geo, bool lossless, double bound) {
+        const int nlay = (int)lp.size() - 1;
+        const std::complex<double> eH = lump_eps(lp[0], f);
+        for (const Geo &g : geo)
+            for (int tr : {4, 5})
+                for (double thd : {20.0, 60.0})
+                {
+                    std::vector<LumpMtl> q = lp;
+                    std::vector<DiagLayer> wall(1);
+                    const double h = 0.5 * g.tot, th = thd * QPI / 180.0;
+                    wall[0].e = eH, wall[0].d = std::max(0.0, g.Lf - h);
+                    for (int k = 1; k <= nlay; ++k)
+                        q[k].thk = g.tot * ((nlay == 1) ? 1.0 : ((k == 1) ? 0.6 : 0.4)), wall.push_back(lump_layer(q[k], f));
+                    wall.push_back(wall[0]), wall.back().d = std::max(0.0, g.Lb - h);
+                    ub::Pal P = lump_palette(q);
+                    arma::uvec mi;
+                    arma::mat mesh = (nlay == 1) ? ub::build({0.0, g.Lf, g.Lf + g.Lb}, {1, 2, 1}, {false, false, true}, mi)
+                                                 : ub::build({0.0, g.Lf, g.Lf + 1.0e-5, g.Lf + g.Lb + 1.0e-5}, {1, 2, 3, 1}, {false, false, true, true}, mi);
+                    arma::mat o, d;
+                    diag_ray_at(thd, o, d);
+                    bf::Acc A;
+                    bf::walk(P, mesh, mi, tr, f, thd, 0.0, nullptr, o, d, 1.0, 1.0, 0.0, 0.0, 0, 26, A);
+                    DiagSheet W = diag_cm_stack(1.0, 1.0, wall, 1.0, 1.0, std::cos(th), f, false, true);
+                    const double pT = std::norm(A.T[0]), pR = std::norm(A.R[0]), sum = pT + pR;
+                    const bool fits = h < g.Lf && h < g.Lb;
+                    const double dT = 10.0 * std::log10(pT / std::norm(W.T_te)), dR = 10.0 * std::log10(pR / std::norm(W.R_te));
+                    QD_DIAG("%s,%d,%.0f+%.0f,%.0f,%d,%.0f,%d,%d,%.6f,%+.4f,%+.4f,%.1e\n", tag, nlay, 1e3 * g.Lf, 1e3 * g.Lb, 1e3 * g.tot, tr, thd, (int)fits, A.nT, sum,
+                            fits ? dT : 0.0, fits ? dR : 0.0, A.drop);
+                    INFO("walls " << tag << " layers " << nlay << " Lf " << g.Lf << " Lb " << g.Lb << " tot " << g.tot << " tracer " << tr << " theta " << thd);
+                    CHECK(std::isfinite(sum));
+                    if (bound > 0.0)
+                        CHECK(sum < bound);
+                    if (lossless)
+                        CHECK(sum > 0.999);
+                    if (fits && bound > 0.0)
+                    {
+                        CHECK(std::abs(dT) < 5.0e-3);
+                        CHECK(std::abs(dR) < 1.0e-2);
+                    }
+                    if (bound > 0.0)
+                        CHECK(A.nT < 40); // the leg behind a stack is summed, and no path is cut
+                }
+    };
+    QD_DIAG("\n# diag: one wall, a sheet (1 layer) or an ordered stack (2 layers, 60 %% and 40 %%) of thickness tot inside a host, front + back mm.\n");
+    QD_DIAG("# lossless: eps 5.24 | eps 2.50 in eps 1.50. offcentre: a sheet of eps 1.50 in eps 1.50-0.40j that does not fit. long: recorded,\n");
+    QD_DIAG("# eps 1.50 | eps 1.60 in eps 1.50-0.40j, a stack thicker than its whole host met from the long side, which nothing in the event\n");
+    QD_DIAG("# can know. sum: both ports, every path. dT, dR: against the wall where the layers fit, dB. drop: power the walk cut\n");
+    QD_DIAG("family,layers,host_mm,tot_mm,tracer,theta,fits,nT,sum,dT,dR,drop\n");
+    const std::vector<Geo> g1 = {{0.05, 0.05, 0.012}, {0.005, 0.005, 0.005}, {0.01, 0.09, 0.012}, {0.09, 0.01, 0.012}, {0.005, 0.005, 0.009},
+                                 {0.01, 0.09, 0.030}, {0.09, 0.01, 0.030}, {0.005, 0.005, 0.015}, {0.01, 0.09, 0.120}};
+    walls("lossless", {{1.50, 0.0, 0.0}, {5.24, 0.0, 0.001}, {2.50, 0.0, 0.001}}, g1, true, 1.0 + 1.0e-4);
+    walls("lossless", {{1.50, 0.0, 0.0}, {5.24, 0.0, 0.001}}, g1, true, 1.0 + 1.0e-4);
+    walls("offcentre", {{1.50, 0.40, 0.0}, {1.50, 0.0, 0.001}}, {{0.09, 0.01, 0.090}, {0.09, 0.01, 0.110}, {0.01, 0.09, 0.140}}, false, 1.0);
+    walls("long", {{1.50, 0.40, 0.0}, {1.50, 0.0, 0.001}, {1.60, 0.0, 0.001}}, {{0.09, 0.01, 0.110}, {0.09, 0.01, 0.140}}, false, 0.0);
 }
