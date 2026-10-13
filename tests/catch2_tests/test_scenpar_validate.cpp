@@ -4,7 +4,7 @@
 
 // Verification suite for quadriga_lib::scenpar_validate.
 //
-// Pins down: completion of a parameter set with defaults (empty map, 139-key legacy map), rejection
+// Pins down: completion of a parameter set with defaults (empty map, 138-key legacy map), rejection
 // of unknown names, the value checks per validation class for a set that did not come from a file,
 // the 'validate = false' mode, the LSP cross-correlation matrix and the positive-definite flag.
 // Left to other suites: the file grammar and the same value checks through a file
@@ -41,8 +41,8 @@ namespace
     const double INF = std::numeric_limits<double>::infinity();
     const double QNAN = std::numeric_limits<double>::quiet_NaN();
 
-    // Oracle: canonical key order. The 139 numeric legacy keys are typed from the struct(...) call in
-    // QuaDRiGa's set_scenario_table.m (without 'SubpathMethod'), the 27 new keys from section 7.2 of the plan.
+    // Oracle: canonical key order. The 138 numeric legacy keys are typed from the struct(...) call in
+    // QuaDRiGa's set_scenario_table.m (without 'SubpathMethod' and 'GR_epsilon'), the 27 new keys from section 7.2 of the plan.
     const std::vector<std::string> &ref_key_order()
     {
         static const std::vector<std::string> k = {
@@ -61,7 +61,7 @@ namespace
         "XPR_alpha", "XPR_delta", "XPR_kappa", "XPR_tau", "XPR_beta", "r_DS", "PerClusterDS",
         "PerClusterDS_gamma", "PerClusterDS_min", "PerClusterAS_D", "PerClusterAS_A", "PerClusterES_D",
         "PerClusterES_A", "absTOA_mu", "absTOA_sigma", "absTOA_lambda", "LOS_scatter_radius", "SC_lambda",
-        "LNS_ksi", "GR_enabled", "GR_epsilon", "asD_ds", "asA_ds", "asA_sf", "asD_sf", "ds_sf", "asD_asA",
+        "LNS_ksi", "GR_enabled", "asD_ds", "asA_ds", "asA_sf", "asD_sf", "ds_sf", "asD_asA",
         "asD_kf", "asA_kf", "ds_kf", "sf_kf", "esD_ds", "esA_ds", "esA_sf", "esD_sf", "esD_esA", "esD_asD",
         "esD_asA", "esA_asD", "esA_asA", "esD_kf", "esA_kf", "xpr_ds", "xpr_kf", "xpr_sf", "xpr_asd",
         "xpr_asa", "xpr_esd", "xpr_esa",
@@ -118,7 +118,7 @@ namespace
     // Exact comparison that treats equal infinities as equal
     bool same(double a, double b) { return a == b; }
 
-    // Number of entries of 'sp' that differ from the default oracle; -1 if the key set is not the 166 keys
+    // Number of entries of 'sp' that differ from the default oracle; -1 if the key set is not the 165 keys
     int n_not_default(const std::unordered_map<std::string, double> &sp, const std::string &except = "")
     {
         if (sp.size() != ref_key_order().size())
@@ -147,7 +147,7 @@ namespace
         CHECK(sp.size() == 1); // a failed call does not complete the set
 
         CHECK_NOTHROW(quadriga_lib::scenpar_validate(sp, "legacy", nullptr, nullptr, false));
-        CHECK(sp.size() == 166);
+        CHECK(sp.size() == 165);
         CHECK((sp[key] == value || (value != value && sp[key] != sp[key])));
     }
 
@@ -158,12 +158,12 @@ namespace
         spmap sp;
         sp[key] = value;
         CHECK_NOTHROW(quadriga_lib::scenpar_validate(sp));
-        CHECK(sp.size() == 166);
+        CHECK(sp.size() == 165);
         CHECK(sp[key] == value);
     }
 }
 
-TEST_CASE("scenpar_validate - an empty map returns the 166 default values")
+TEST_CASE("scenpar_validate - an empty map returns the 165 default values")
 {
     spmap sp;
     arma::mat X;
@@ -172,7 +172,7 @@ TEST_CASE("scenpar_validate - an empty map returns the 166 default values")
     bool ok = quadriga_lib::scenpar_validate(sp, "legacy", &X, &order);
 
     CHECK(ok);
-    CHECK(sp.size() == 166);
+    CHECK(sp.size() == 165);
     CHECK(n_not_default(sp) == 0);
     CHECK(order == ref_key_order());
     REQUIRE((X.n_rows == 8 && X.n_cols == 8));
@@ -191,39 +191,39 @@ TEST_CASE("scenpar_validate - an empty map returns the 166 default values")
     CHECK(sp2 == sp);
 }
 
-TEST_CASE("scenpar_validate - a legacy set with 139 numeric keys passes and grows to 166")
+TEST_CASE("scenpar_validate - a legacy set with 138 numeric keys passes and grows to 165")
 {
-    // Distinct, valid, non-default values for the 139 legacy keys:
+    // Distinct, valid, non-default values for the 138 legacy keys:
     // integers for the two counts, small correlations, positive values elsewhere
     spmap sp, given;
-    for (int i = 0; i < 139; ++i)
+    for (int i = 0; i < 138; ++i)
     {
         const std::string &k = ref_key_order()[i];
         double v = 0.5 + 0.25 * i;
         if (k == "NumClusters" || k == "NumSubPaths")
             v = 30.0 + i;
-        if (i >= 111) // the 28 correlations
-            v = 0.001 * (i - 110);
+        if (i >= 110) // the 28 correlations
+            v = 0.001 * (i - 109);
         sp[k] = v;
     }
     given = sp;
-    REQUIRE(sp.size() == 139);
+    REQUIRE(sp.size() == 138);
 
     arma::mat X;
     bool ok = quadriga_lib::scenpar_validate(sp, "mmMAGIC", &X);
 
     CHECK(ok);
-    CHECK(sp.size() == 166);
+    CHECK(sp.size() == 165);
     int n_kept = 0, n_new_default = 0;
-    for (int i = 0; i < 166; ++i)
+    for (int i = 0; i < 165; ++i)
     {
         const std::string &k = ref_key_order()[i];
-        if (i < 139 && sp.count(k) && sp[k] == given[k])
+        if (i < 138 && sp.count(k) && sp[k] == given[k])
             ++n_kept;
-        if (i >= 139 && sp.count(k) && sp[k] == 0.0)
+        if (i >= 138 && sp.count(k) && sp[k] == 0.0)
             ++n_new_default;
     }
-    CHECK(n_kept == 139);        // given values are not changed
+    CHECK(n_kept == 138);        // given values are not changed
     CHECK(n_new_default == 27);  // the 27 new keys are added with default 0
 
     // The matrix is built from the given correlations
@@ -356,7 +356,7 @@ TEST_CASE("scenpar_validate - value checks per validation class")
 
     SECTION("real and unchecked keys accept any value except NaN")
     {
-        // Every key that is in none of the bounded classes: the 35 'real' and 54 unchecked legacy keys
+        // Every key that is in none of the bounded classes: the 35 'real' and 53 unchecked legacy keys
         // and the 10 new 'real' keys
         const std::vector<std::string> bounded = {
             "NumClusters", "NumSubPaths", "r_DS", "PerClusterAS_D", "PerClusterAS_A", "PerClusterES_D",
@@ -366,10 +366,10 @@ TEST_CASE("scenpar_validate - value checks per validation class")
             "PerClusterDS_fc_min", "PerClusterES_D_scale", "absTOA_Lmax", "NumClusters_min", "NF_k1", "NF_alpha",
             "NF_beta", "SNS_mu", "SNS_sigma", "SNS_A", "SNS_B", "SNS_R", "SNS_delta_var", "PolVar_sigma"};
         int n = 0;
-        for (int i = 0; i < 166; ++i)
+        for (int i = 0; i < 165; ++i)
         {
             const std::string &k = ref_key_order()[i];
-            bool is_bounded = (i >= 111 && i < 139); // correlations
+            bool is_bounded = (i >= 110 && i < 138); // correlations
             for (const std::string &b : bounded)
                 is_bounded = is_bounded || b == k;
             if (is_bounded)
@@ -379,7 +379,7 @@ TEST_CASE("scenpar_validate - value checks per validation class")
             accepts(k, INF);
             accepts(k, -INF);
         }
-        CHECK(n == 35 + 54 + 10);
+        CHECK(n == 35 + 53 + 10);
     }
 
     SECTION("correlation in [-1, 1], the 7 xpr_ keys included (Q13)")
@@ -453,8 +453,8 @@ TEST_CASE("scenpar_validate - input validation")
     SECTION("valid baseline")
     {
         CHECK_NOTHROW(quadriga_lib::scenpar_validate(sp, "legacy", &X, &order));
-        CHECK(sp.size() == 166);
-        CHECK(order.size() == 166);
+        CHECK(sp.size() == 165);
+        CHECK(order.size() == 165);
         CHECK((X.n_rows == 8 && X.n_cols == 8));
     }
 
@@ -466,6 +466,13 @@ TEST_CASE("scenpar_validate - input validation")
         CHECK(sp.size() == 2); // nothing was written
         CHECK(order == std::vector<std::string>{"marker"});
         CHECK((X.n_rows == 2 && X.n_cols == 2 && X(1, 1) == 7.0));
+    }
+
+    SECTION("the legacy key 'GR_epsilon' is not supported")
+    {
+        sp["GR_epsilon"] = 10.0;
+        CHECK_THROWS_AS(quadriga_lib::scenpar_validate(sp), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::scenpar_validate(sp, "legacy", nullptr, nullptr, false), std::invalid_argument);
     }
 
     SECTION("'SubpathMethod' is not a numeric key")

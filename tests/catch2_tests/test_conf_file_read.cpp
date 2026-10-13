@@ -47,8 +47,8 @@ namespace
     const double INF = std::numeric_limits<double>::infinity();
     const double QNAN = std::numeric_limits<double>::quiet_NaN();
 
-    // Oracle: canonical key order. The 139 numeric legacy keys are typed from the struct(...) call in
-    // QuaDRiGa's set_scenario_table.m (without 'SubpathMethod'), the 27 new keys from section 7.2 of the plan.
+    // Oracle: canonical key order. The 138 numeric legacy keys are typed from the struct(...) call in
+    // QuaDRiGa's set_scenario_table.m (without 'SubpathMethod' and 'GR_epsilon'), the 27 new keys from section 7.2 of the plan.
     const std::vector<std::string> &ref_key_order()
     {
         static const std::vector<std::string> k = {
@@ -67,7 +67,7 @@ namespace
         "XPR_alpha", "XPR_delta", "XPR_kappa", "XPR_tau", "XPR_beta", "r_DS", "PerClusterDS",
         "PerClusterDS_gamma", "PerClusterDS_min", "PerClusterAS_D", "PerClusterAS_A", "PerClusterES_D",
         "PerClusterES_A", "absTOA_mu", "absTOA_sigma", "absTOA_lambda", "LOS_scatter_radius", "SC_lambda",
-        "LNS_ksi", "GR_enabled", "GR_epsilon", "asD_ds", "asA_ds", "asA_sf", "asD_sf", "ds_sf", "asD_asA",
+        "LNS_ksi", "GR_enabled", "asD_ds", "asA_ds", "asA_sf", "asD_sf", "ds_sf", "asD_asA",
         "asD_kf", "asA_kf", "ds_kf", "sf_kf", "esD_ds", "esA_ds", "esA_sf", "esD_sf", "esD_esA", "esD_asD",
         "esD_asA", "esA_asD", "esA_asA", "esD_kf", "esA_kf", "xpr_ds", "xpr_kf", "xpr_sf", "xpr_asd",
         "xpr_asa", "xpr_esd", "xpr_esa",
@@ -124,7 +124,7 @@ namespace
     // Exact comparison that treats equal infinities as equal
     bool same(double a, double b) { return a == b; }
 
-    // Number of entries of 'sp' that differ from the default oracle; -1 if the key set is not the 166 keys
+    // Number of entries of 'sp' that differ from the default oracle; -1 if the key set is not the 165 keys
     int n_not_default(const std::unordered_map<std::string, double> &sp, const std::string &except = "")
     {
         if (sp.size() != ref_key_order().size())
@@ -215,12 +215,12 @@ namespace
         "asD_sf = -0.5\nasA_sf = -0.5\nesA_sf = -0.8\nesD_asD = 0.5\nesD_asA = -0.3\nesA_asA = 0.4\n";
 }
 
-TEST_CASE("conf_file_read - an empty file gives the 166 default values")
+TEST_CASE("conf_file_read - an empty file gives the 165 default values")
 {
     conf_out r = read_text("");
 
     CHECK(r.ok); // the default correlation matrix is the identity
-    CHECK(r.scenpar.size() == 166);
+    CHECK(r.scenpar.size() == 165);
     CHECK(n_not_default(r.scenpar) == 0);
     CHECK(same(val(r, "ES_D_mu_min"), -INF));
     CHECK(r.subpath_method == "legacy");
@@ -230,7 +230,7 @@ TEST_CASE("conf_file_read - an empty file gives the 166 default values")
     CHECK(r.short_names.empty());
     CHECK(r.ignored_keys.empty());
 
-    REQUIRE(r.key_order.size() == 166);
+    REQUIRE(r.key_order.size() == 165);
     CHECK(r.key_order == ref_key_order());
     CHECK(r.key_order[105] == "absTOA_lambda"); // 'SubpathMethod' is legacy field 107, between these two
     CHECK(r.key_order[106] == "LOS_scatter_radius");
@@ -324,12 +324,13 @@ TEST_CASE("conf_file_read - unknown keys are ignored and reported once in file o
                            "ShortName = Xy\n"
                            "PL_A = 3\n"
                            "XPL_A = 3\n"
-                           "My_PL_key = 3\n"); // Q7: 'PL_' in the middle is not a path-loss key
+                           "My_PL_key = 3\n"        // Q7: 'PL_' in the middle is not a path-loss key
+                           "GR_epsilon = 1+1e7j\n"); // legacy key that is not supported; its value is not examined
 
-    CHECK(r.ignored_keys == std::vector<std::string>{"Zeta_unknown", "Alpha_unknown", "ds_mu", "XPL_A", "My_PL_key"});
+    CHECK(r.ignored_keys == std::vector<std::string>{"Zeta_unknown", "Alpha_unknown", "ds_mu", "XPL_A", "My_PL_key", "GR_epsilon"});
     CHECK(same(val(r, "DS_mu"), -7.0));
     CHECK(n_not_default(r.scenpar) == 1);
-    CHECK(r.scenpar.size() == 166); // unknown keys do not enter scenpar
+    CHECK(r.scenpar.size() == 165); // unknown keys do not enter scenpar
     CHECK(r.plpar.size() == 1);
     CHECK(r.plpar.count("A") == 1);
 }
@@ -553,7 +554,7 @@ TEST_CASE("conf_file_read - value checks per validation class")
     SECTION("unchecked legacy keys: any value, Inf included")
     {
         const char *keys[] = {"DS_omega", "AS_D_epsilon", "AS_A_zeta", "ES_D_alpha", "ES_A_kappa", "SF_tau",
-                              "KF_beta", "XPR_omega", "GR_epsilon"};
+                              "KF_beta", "XPR_omega"};
         for (const char *k : keys)
         {
             accepts(std::string(k) + " = -123.5");
