@@ -44,7 +44,8 @@ struct qd_scenpar_key
 static const double QD_INF = std::numeric_limits<double>::infinity();
 
 // Key table: the single source of truth for names, canonical order, defaults and validation classes
-// - 139 numeric legacy keys in the order of QuaDRiGa's 'set_scenario_table.m', then the 27 keys for TR 38.901 v19.5.0
+// - 138 numeric legacy keys in the order of QuaDRiGa's 'set_scenario_table.m', then the 27 keys for TR 38.901 v19.5.0
+// - The legacy key 'GR_epsilon' is not supported: a real value has no use, the relative permittivity of the ground is complex
 // - 'SubpathMethod' is the only string key and is not part of the table; its legacy position is field 107
 // - LSP order of the cross-correlation matrix: DS, KF, SF, ASD, ASA, ESD, ESA, XPR
 static const qd_scenpar_key qd_scenpar_keys[] = {
@@ -158,7 +159,6 @@ static const qd_scenpar_key qd_scenpar_keys[] = {
     {"SC_lambda", 0.0, QD_NONNEG, -1, -1},
     {"LNS_ksi", 3.0, QD_NONNEG, -1, -1},
     {"GR_enabled", 0.0, QD_NONNEG, -1, -1},
-    {"GR_epsilon", 0.0, QD_ANY, -1, -1},
     {"asD_ds", 0.0, QD_CORR, 0, 3},
     {"asA_ds", 0.0, QD_CORR, 0, 4},
     {"asA_sf", 0.0, QD_CORR, 2, 4},
@@ -492,7 +492,7 @@ Read and validate a QuaDRiGa scenario configuration file
 - A conf file is a text file with one `Key = value` assignment per line; `%` starts a comment; blank lines
   are allowed; line ends can be LF or CRLF; space and tab are white space
 - Keys are case-sensitive names of the characters `A-Z`, `a-z`, `0-9` and `_`; there are four kinds:
-  - Scenario parameters: `n_key = 166` numeric keys with one number each, returned in `scenpar`. Keys that
+  - Scenario parameters: `n_key = 165` numeric keys with one number each, returned in `scenpar`. Keys that
     are not in the file have their default value. The names and their order are returned in `key_order`.
   - `SubpathMethod`: one of the words `legacy`, `Laplacian`, `mmMAGIC`; default `legacy`
   - Path-loss parameters: every key that starts with `PL_`. `PL_model` has one name as value. All others
@@ -503,8 +503,10 @@ Read and validate a QuaDRiGa scenario configuration file
 - Numbers are decimal with an optional sign, an optional decimal point and an optional exponent (`e` or
   `E`), for example `-6.28`, `.5`, `6.2e-07`; `Inf`, `+Inf` and `-Inf` are accepted in any case
 - Elevation angles are used throughout (+90 deg is up); no key refers to a zenith angle
-- The 166 keys are the 139 numeric keys of QuaDRiGa and 27 keys for 3GPP TR 38.901 v19.5.0. With their
+- The 165 keys are 138 numeric keys of QuaDRiGa and 27 keys for 3GPP TR 38.901 v19.5.0. With their
   default of 0 the new keys have no effect.
+- The QuaDRiGa key `GR_epsilon` (fixed relative permittivity of the ground) is not supported and is
+  reported in `ignored_keys` like any other unknown key; the permittivity is complex and is set in the simulation
 - The 28 correlation keys (`asD_ds` to `xpr_esa`) define the symmetric matrix `lsp_xcorr` with unit diagonal
 - Throws `std::runtime_error` if the file cannot be opened
 - Throws `std::invalid_argument` with file name and line number for a line that is not blank, not a comment
@@ -538,7 +540,7 @@ bool quadriga_lib::conf_file_read(
   grammar is checked
 
 ## Outputs:
-- **`scenpar`** — Numeric scenario parameters; previous content is discarded; `n_key = 166` entries
+- **`scenpar`** — Numeric scenario parameters; previous content is discarded; `n_key = 165` entries
 - **`subpath_method`** *(optional)* — Value of `SubpathMethod`; `legacy` if not in the file
 - **`pl_model`** *(optional)* — Value of `PL_model`; empty if not in the file
 - **`plpar`** *(optional)* — Path-loss parameters; keys without the prefix `PL_`; `PL_model` is not included;
@@ -689,11 +691,12 @@ bool quadriga_lib::conf_file_read(const std::string &fn,
 Validate scenario parameters and complete them with default values
 
 - Checks a set of QuaDRiGa scenario parameters that did not come from a conf file and adds every missing key
-  with its default value, so that `scenpar` has all `n_key = 166` entries on return
+  with its default value, so that `scenpar` has all `n_key = 165` entries on return
 - An empty `scenpar` returns the complete default parameter set
-- A set with the 139 numeric keys of QuaDRiGa is completed with the 27 keys for 3GPP TR 38.901 v19.5.0, which
+- A set with the 138 numeric keys of QuaDRiGa is completed with the 27 keys for 3GPP TR 38.901 v19.5.0, which
   have no effect at their default of 0
-- A name in `scenpar` that is not one of the 166 keys is an error, also with `validate = false`
+- A name in `scenpar` that is not one of the 165 keys is an error, also with `validate = false`; this includes
+  the QuaDRiGa key `GR_epsilon`, which is not supported
 - Value checks with `validate = true`; `NaN` is an error for every key:
   - Integer and > 0: `NumClusters`, `NumSubPaths`
   - Finite and > 0: `r_DS`
@@ -726,7 +729,7 @@ bool quadriga_lib::scenpar_validate(
 
 ## Inputs:
 - **`scenpar`** — Numeric scenario parameters; updated in-place: given values are kept, missing keys are
-  added with their default; `n_key = 166` entries on return
+  added with their default; `n_key = 165` entries on return
 - **`subpath_method`** *(optional)* — Value of `SubpathMethod`, the only parameter that is not numeric
 - **`validate`** *(optional)* — `false`: only complete with defaults, no value checks
 

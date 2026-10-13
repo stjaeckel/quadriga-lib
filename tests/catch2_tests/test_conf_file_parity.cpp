@@ -16,6 +16,9 @@
 // the config folder or the reference file is missing. The reference must be regenerated when a conf file
 // in QuaDRiGa-NG changes.
 //
+// 'GR_epsilon' is in the MATLAB struct but is not a key of the C++ reader. The reference value must be 0 (the
+// MATLAB default) for every file; the key is then left out of the comparison.
+//
 // Known exception: 'TwoRayGR.conf' has the line 'GR_enabled = 1;'. MATLAB reads 1, the C++ reader rejects
 // the trailing ';' (clean grammar). Until the file is fixed, the case accepts that this one file throws
 // and compares all others.
@@ -97,6 +100,11 @@ TEST_CASE("Diagnostic - conf_file_read parity with QuaDRiGa on the shipped conf 
             else if (tag == "sp")
             {
                 is >> key >> text;
+                if (key == "GR_epsilon") // not supported by the C++ reader; no shipped file states it
+                {
+                    REQUIRE(std::strtod(text.c_str(), nullptr) == 0.0);
+                    continue;
+                }
                 ref.back().sp_keys.push_back(key);
                 ref.back().sp_vals.push_back(std::strtod(text.c_str(), nullptr));
             }
@@ -139,7 +147,7 @@ TEST_CASE("Diagnostic - conf_file_read parity with QuaDRiGa on the shipped conf 
     for (const ref_scen &r : ref)
     {
         INFO("scenario " << r.name);
-        REQUIRE(r.sp_keys.size() == 139);
+        REQUIRE(r.sp_keys.size() == 138);
         REQUIRE(r.xc.size() == 64);
 
         std::unordered_map<std::string, double> sp;
@@ -162,11 +170,11 @@ TEST_CASE("Diagnostic - conf_file_read parity with QuaDRiGa on the shipped conf 
         }
         ++n_compared;
 
-        // scenpar: the 139 legacy values, in the MATLAB field order, and 27 new keys at their default 0
+        // scenpar: the 138 legacy values, in the MATLAB field order, and 27 new keys at their default 0
         int n_sp = 0;
-        REQUIRE(sp.size() == 166);
-        REQUIRE(key_order.size() == 166);
-        for (size_t i = 0; i < 139; ++i)
+        REQUIRE(sp.size() == 165);
+        REQUIRE(key_order.size() == 165);
+        for (size_t i = 0; i < 138; ++i)
         {
             if (key_order[i] != r.sp_keys[i] || !(sp[key_order[i]] == r.sp_vals[i]))
             {
@@ -175,7 +183,7 @@ TEST_CASE("Diagnostic - conf_file_read parity with QuaDRiGa on the shipped conf 
                         sp[key_order[i]], r.sp_keys[i].c_str(), r.sp_vals[i]);
             }
         }
-        for (size_t i = 139; i < 166; ++i)
+        for (size_t i = 138; i < 165; ++i)
             if (sp[key_order[i]] != 0.0)
                 ++n_sp;
         if (subpath_method != r.subpath_method)
