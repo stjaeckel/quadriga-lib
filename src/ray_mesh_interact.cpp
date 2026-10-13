@@ -410,18 +410,9 @@ namespace
             return (v < -1.0) ? -1.0 : ((v > 1.0) ? 1.0 : v);
         }
 
-        // Redistribute physical reflection energy R0 in [0,1] by tf in [-1,1], keeping refl + trans = 1
-        double apply_tf(double R0, double fGHz = 1.0) const
-        {
-            double tf_val = tf(fGHz);
-            R0 = (R0 < 0.0) ? 0.0 : ((R0 > 1.0) ? 1.0 : R0); // guard against resonance overshoot
-            return (tf_val >= 0.0) ? R0 * (1.0 - tf_val) : R0 + (1.0 - R0) * (-tf_val);
-        }
-
         // Combined transmission-factor reflection for a two-medium interface (symmetric in the two media).
         // tf+ = max(tf,0) leaks reflection energy into transmission; tf- = max(-tf,0) forces reflection.
-        // Reduces to apply_tf at an air boundary (other side tf = 0); stays in [0,1]; tf = -1 on either
-        // face gives R_eff = 1.
+        // Stays in [0,1]; tf = -1 on either face gives R_eff = 1.
         double apply_tf_pair(const Material &other, double R0, double fGHz = 1.0) const
         {
             double tfX = tf(fGHz), tfY = other.tf(fGHz);
@@ -438,16 +429,17 @@ namespace
         // two media are, lossy or evanescent, and the face creates nothing. The ratio is set by the
         // pair rule on the modulus x0 of the admittance ratio of the two sides; where that ratio is
         // real it is the pair rule on the reflectance itself. r: the raw reflection in, the reflection
-        // out. Returns the one scale of both crossings. At an exact match of the two sides a forced
+        // out. Returns the one scale of both crossings. At a match of the two sides a forced
         // reflection has no side to move away from, and the medium that forces less sees it negative,
-        // so the face is one face from its two sides.
+        // so the face is one face from its two sides. The match is taken within rounding: the two
+        // sides form the ratio from two spellings of one cosine.
         std::complex<double> tf_face(const Material &B, double fGHz, std::complex<double> &r) const
         {
             std::complex<double> u = (1.0 - r) / (1.0 + r);
             double x0 = std::abs(u);
             if ((tf(fGHz) == 0.0 && B.tf(fGHz) == 0.0) || !(x0 > 0.0) || std::isinf(x0))
                 return 1.0;
-            double rm = (1.0 - x0) / (1.0 + x0), Rm = apply_tf_pair(B, rm * rm, fGHz), s = (rm < 0.0 || (rm == 0.0 && tf(fGHz) > B.tf(fGHz))) ? -std::sqrt(Rm) : std::sqrt(Rm);
+            double rm = (1.0 - x0) / (1.0 + x0), Rm = apply_tf_pair(B, rm * rm, fGHz), s = ((std::abs(rm) <= 1.0e-9) ? (tf(fGHz) > B.tf(fGHz)) : (rm < 0.0)) ? -std::sqrt(Rm) : std::sqrt(Rm);
             std::complex<double> D = (1.0 + s) + (u / x0) * (1.0 - s);
             r = ((1.0 + s) - (u / x0) * (1.0 - s)) / D;
             return std::sqrt((1.0 - Rm) / x0) * (1.0 + u) / D;
@@ -751,7 +743,7 @@ namespace
                 if (tir)
                 {
                     double k = closed_face(other, fGHz, R, y_te, std::real(y_te));
-                    coeff_TE = std::polar(trans_class ? k : std::sqrt((std::norm(R) < 1.0) ? std::norm(R) : 1.0), std::arg(trans_class ? T : R)); // the clamp, as on a sheet
+                    coeff_TE = trans_class ? std::polar(k, std::arg(T)) : R;
                 }
                 else
                 {
@@ -910,84 +902,75 @@ namespace
         double thk = 0.0;
     };
 
-    // 2x2 characteristic-matrix resolve for an ordered stack of layers between two half-spaces.
+    // Real amplitude factor of a mass-law layer of normal thickness thk: the loss over the path
+    // thk / ct_r under a saturation cap - both the alpha column and the conductivity term are
+    // dB-linear in the path, and past the length at which the layer is opaque nothing downstream
+    // can move - and the mass term from the normal thickness and the cosine the wave has in air.
+    // x_run is the X0 of the bonded plate crossed so far and takes this layer's.
+    inline double qd_mass_amp(const Material &L, double thk, double ct_r, double mass_c, double fGHz, double &x_run)
+    {
+        double dist_max = 1.0e30;
+        double g1m = L.medium_gain(1.0, fGHz, 1.0, 0.0, 0.0, 1.0e300); // 1 m, mass term off
+        if (g1m > 0.0)
+        {
+            double rate = -10.0 * std::log10(g1m); // dB per meter
+            if (rate > 0.0)
+                dist_max = 400.0 / rate;
+        }
+        else
+            dist_max = 0.0; // opaque within a meter
+        if (dist_max < thk)
+            dist_max = thk;
+        double dist = (ct_r > 0.0) ? thk / ct_r : dist_max;
+        if (!(dist < dist_max)) // also catches inf and NaN
+            dist = dist_max;
+        double mass_path = thk * mass_c; // zero at exact tangency, where the term is switched off
+        double g = L.medium_gain(dist, fGHz, ct_r, mass_path, 1.0, (mass_path > 0.0) ? 0.0 : 1.0e300, thk, mass_c, x_run);
+        if (mass_path > 0.0)
+            x_run += L.mass_X0(thk, fGHz);
+        return std::sqrt((g < 0.0) ? 0.0 : g);
+    }
+
+    // Composite of an ordered list of layers between two half-spaces: one sheet, or a stack of
+    // sheets. A sheet has zero world-space thickness, so there is nowhere for the tracer to re-emit
+    // into and the internal series is summed here, in one event. Both public functions call it.
+    // Returns absolute transmit and reflect coefficients; false when it declines.
     //
-    // Why a matrix rather than another Airy sum. An Airy sum is a statement about one layer with a
-    // half-space on either side. Two layers couple through reflections between non-adjacent
-    // boundaries, and those do not factor into a product of per-layer series. The matrix carries the
-    // whole stack in one pass and is exact for any layer count.
+    // Per medium the admittance is z = sqrt(eps/mu) and the index is n = sqrt(eps mu), and every
+    // cosine comes from the transverse invariant eps mu (1 - c^2), which is conserved across every
+    // boundary and is fixed by the incidence cosine ci in the near medium, complex wherever that
+    // medium is a traced solid. A permittivity resonance enters every admittance and cosine and
+    // no propagation index.
     //
-    // The variables are the ones the rest of this file already uses. Per medium the admittance is
-    // z = sqrt(eps/mu) and the index is n = sqrt(eps mu), and every cosine comes from the transverse
-    // invariant eps mu (1 - c^2), which is conserved across every boundary and is fixed by the
-    // incidence cosine in the near medium. Per polarization the tilted admittance is
+    // Each boundary a | b is a two-port (r, t_ab, t_ba, -r) in raw Fresnel amplitudes, in the form
+    // Material::interact_with writes them, and each coherent layer the one-way factor phi. The
+    // product is evaluated by recursion from the far end,
+    //     G_j = r_j + t_j tb_j G_{j+1} phi^2 / (1 + r_j G_{j+1} phi^2)
+    //     T_j = t_j phi T_{j+1} / (1 + r_j G_{j+1} phi^2)
+    // which is the characteristic matrix of the stack in another basis, needs no inverse of a
+    // closed boundary or of an opaque layer, and reduces to the Airy pair at one layer. What
+    // propagates is amplitude, not flux: the conversion to per-channel normal flux is applied
+    // once, at the outer pair, on the transmit port. Nothing is clamped: a reflection above one
+    // seen from a lossy medium is the Fresnel value, and the sum is the exact one.
     //
-    //     eta_TE = z c        eta_TM = z / c
-    //
-    // which are the groupings Material::interact_with is written in: its TE reflection is
-    // (eta1 - eta2)/(eta1 + eta2) exactly, and dividing its TM reflection through by c1 c2 turns it
-    // into (eta2 - eta1)/(eta2 + eta1). So the library's TM reflection is minus the admittance-form
-    // one and its TM transmission carries an extra c1/c2; both conversions are applied at the ends
-    // below, and the c1/c2 telescopes over the stack because the intermediate cosines cancel.
-    //
-    // What propagates is the tangential field pair, not flux: tangential E and H are continuous
-    // across every boundary while normal flux decays inside a lossy layer. So the product runs in
-    // amplitudes and the conversion to per-channel normal flux is applied once, at the outer pair,
-    // on the transmit port. Inside the product the intermediate admittances cancel identically,
-    // which is the same statement qd_slab_resolve makes for one layer when it keeps the raw Fresnel
-    // amplitudes.
-    //
-    // At one layer this reduces to the Airy pair produce mode returns, term for term, including the
-    // Stokes sign on the near reflection, the flux conversion, the lumped interface gains and the
-    // displaced host. Produce mode is deliberately NOT routed through here: its one-layer path is
-    // asserted bit-identical to its pre-change form over 31104 rows, and the two forms are
-    // algebraically equal but not bit-identical. The layered-stack fixture measures the two against
-    // each other, so unifying them later is a checked step rather than a leap.
-    //
-    // Three material columns have no matrix expression, or none on the reflect port. None makes
-    // this decline; a stack that carries one is resolved in the scattering form instead, and a
-    // stack that carries none takes the matrix exactly as before.
-    //
-    //   tf        redistributes energy between the reflected and transmitted ports of a boundary
-    //             after the Fresnel problem is solved, which is not a boundary admittance. The
-    //             scattering form has the per-boundary r and t it rescales: each boundary a | b is
-    //             the two-port (r, t_ab, t_ba, -r) in the amplitudes produce mode uses, rescaled
-    //             by the two media that form it - tf_face at the face of a coherent layer,
-    //             apply_tf_pair at a mass-law one - so a boundary shared by two sheets has no
-    //             single owner, and each layer is the one-way factor phi. The
-    //             product of the wave-transfer matrices B_1 P_1 B_2 ... B_{N+1} is evaluated by
-    //             recursion from the far end,
-    //                 G_j = r_j + t_j tb_j G_{j+1} phi^2 / (1 + r_j G_{j+1} phi^2)
-    //                 T_j = t_j phi T_{j+1} / (1 + r_j G_{j+1} phi^2)
-    //             which needs no inverse of a closed boundary (t = 0 at tf = -1) or of an opaque
-    //             layer. At one layer it is produce mode's Airy pair term for term, and at tf = 0
-    //             it is the matrix product in another basis.
-    //   att       a layer's interface gain is an end factor on the transmit port, which the matrix
-    //             carries. On the reflect port it is owed by what entered that layer and came
-    //             back, once, and a matrix has no per-layer echo to charge; the recursion has,
-    //             so a stack with a gain-bearing layer takes this form as well. The series it
-    //             runs on is the one without the gain, so the transmit port is the matrix's.
+    //   tf        per boundary, by the two media that form it: the transformer of tf_face at the
+    //             face of a coherent layer, the pad of closed_face where nothing propagates
+    //             behind the face, the pair rule on the reflectance at an open mass-law face.
+    //   att       one gain per layer entered on the transmit port, and the far medium's where it
+    //             is newly entered. On the reflect port a layer's gain is owed by what entered
+    //             that layer and came back, once: the second recursion Ge.
+    //   alpha     dB per meter of path thk / |Re c|, a real factor on phi.
     //   m > 0     a lumped acoustic surrogate whose in-layer index is not physical. Such a layer
-    //             is not made coherent. It ends the coherent segment in front of it as a
-    //             half-space of its own admittance, which is what its eta and mu are calibrated
-    //             for, contributes one real amplitude factor, and starts the next segment as its
-    //             incidence half-space. Nothing returns across it, so the reflect port is that of
-    //             the first segment. With no coherent layer this is produce mode's mass-law route,
-    //             and like that route it displaces no host thickness. Mass-law layers with
-    //             no coherent layer between them are bonded and form one plate: their X0 add,
-    //             the first pays its own term and each later one what the plate is worth above
-    //             what was paid; see Material::medium_gain. mass_bonded is the X0 the wave has
-    //             already crossed in a mass-law near medium.
-    //
-    // alpha is carried. It is dB per meter of PATH, which produce mode applies as a real one-way
-    // multiplier on phi, and the layer phase is the logarithm of that same phi: the matrix is built
-    // from cos and sin of delta, and phi = exp(-j delta). So the multiplier goes into the imaginary
-    // part of delta, over the same path thk / |Re c| produce mode forms, and the one-layer reduction
-    // then reproduces produce mode's alpha term for term. The tilted admittance does not read it,
-    // since alpha is a propagation loss and not an interface quantity.
-    //
-    // Returns false when it declines. ci is the incidence cosine in mat_near, complex wherever that
-    // medium is a traced solid, exactly as produce mode's ct_near_exact.
+    //             is not made coherent: it ends the coherent segment in front of it as a
+    //             half-space of its own admittance, contributes one real amplitude factor, and
+    //             starts the next segment as its incidence half-space. Nothing returns across
+    //             it, and it displaces no host thickness. Mass-law layers with no coherent layer
+    //             between them are one plate; see Material::medium_gain.
+    //   far_closed  near | far is past its critical angle, which only a sheet glued to a solid
+    //             reaches: an ordered stack has one medium on both sides. The far face of a
+    //             coherent sheet is then the pad of a closed face, which hands back what it
+    //             passes of the incident flux, and a mass-law sheet passes the two crossings a
+    //             traced solid of its material would.
     inline bool qd_stack_resolve(const Material &mat_near,
                                  const QdLayer *layers, int n_layers,
                                  const Material &mat_far,
@@ -995,84 +978,51 @@ namespace
                                  double fGHz, bool is_scalar,
                                  std::complex<double> *T_te, std::complex<double> *T_tm,
                                  std::complex<double> *R_te, std::complex<double> *R_tm,
-                                 bool disp_far = false, double disp_budget = -1.0,
-                                 double mass_cos = -1.0,    // cosine the wave has in air, for a mass-law term, < 0 = |Re ci|
-                                 double mass_bonded = 0.0,  // X0 of the bonded mass-law bodies crossed before the stack
-                                 bool near_undeviated = false) // the wave in mat_near was not refracted in
+                                 bool disp_far = false,        // the stack lies on the far side (glued exit)
+                                 double disp_budget = -1.0,    // max normal thickness it may replace, < 0 = all
+                                 double mass_cos = -1.0,       // cosine the wave has in air, for a mass-law term, < 0 = |Re ci|
+                                 double mass_bonded = 0.0,     // X0 of the bonded mass-law bodies crossed before the stack
+                                 bool near_undeviated = false, // the wave in mat_near was not refracted in
+                                 bool far_closed = false)      // near | far is past its critical angle
     {
         if (n_layers < 1 || layers == nullptr)
             return false;
-        bool scattering = mat_near.tf(fGHz) != 0.0 || mat_far.tf(fGHz) != 0.0;
         for (int i = 0; i < n_layers; ++i)
-        {
             if (layers[i].mtl == nullptr || layers[i].thk < 0.0)
                 return false;
-            const Material &L = *layers[i].mtl;
-            if (L.m > 0.0 || L.tf(fGHz) != 0.0 || L.interface_gain(fGHz) != 1.0)
-                scattering = true;
-        }
+        const int it = is_scalar ? 4 : 1;
+        const double mc = (mass_cos >= 0.0) ? mass_cos : std::abs(std::real(ci));
+
+        // Medium j: 0 is the near half-space, 1 .. n_layers the layers, n_layers + 1 the far one
+        auto MED = [&](int j) -> const Material &
+        { return (j == 0) ? mat_near : ((j > n_layers) ? mat_far : *layers[j - 1].mtl); };
+        auto W = [&](int j) -> std::complex<double>
+        { return (MED(j).eta(fGHz) + MED(j).eta_resonance(fGHz)) * MED(j).mu(fGHz); };
+        auto ADM = [&](int j) -> std::complex<double>
+        { return std::sqrt((MED(j).eta(fGHz) + MED(j).eta_resonance(fGHz)) / MED(j).mu(fGHz)); };
 
         // A stack of mass-law layers reached by a wave that is held undeviated in a mass-law
-        // medium - two rigid sheets inside a rigid wall - is a run of later faces of that wall.
-        // The wave is a leak, it keeps the incidence cosine at every face, and each face is the
-        // crossing Material::interact_with forms for a held wave, with the interface gain of the
-        // medium entered; each layer adds its mass term. That is what the same bodies do as
-        // traced solids. The cosines of the segments below are Snell cosines of permittivities
-        // that are impedance mappings, and do not describe this wave.
-        //
-        // Taken where every layer carries the mass column and a face leads towards the lower
-        // index, which is where the undeviated rule has anything to say; decided on the media.
+        // medium - a rigid sheet on or inside a rigid wall - is a run of later faces of that
+        // wall. The wave is a leak, it keeps the incidence cosine at every face, and each face is
+        // the crossing Material::interact_with forms for a held wave, with the interface gain of
+        // the medium entered; each layer adds its mass term. That is what the same bodies do as
+        // traced solids. Taken where every layer carries the mass column and a face leads
+        // towards the lower index, which is where the undeviated rule has anything to say.
         if (near_undeviated && mat_near.m > 0.0)
         {
-            auto W = [&](const Material &X) -> std::complex<double>
-            { return (X.eta(fGHz) + X.eta_resonance(fGHz)) * X.mu(fGHz); };
             bool all_mass = true, to_lower = false;
-            const Material *A = &mat_near;
-            for (int i = 0; i < n_layers; ++i)
-            {
-                const Material &L = *layers[i].mtl;
-                all_mass = all_mass && L.m > 0.0;
-                to_lower = to_lower || std::abs(W(*A) / W(L)) > 1.0;
-                A = &L;
-            }
-            to_lower = to_lower || std::abs(W(*A) / W(mat_far)) > 1.0;
+            for (int j = 1; j <= n_layers + 1; ++j)
+                all_mass = all_mass && (j > n_layers || MED(j).m > 0.0), to_lower = to_lower || std::abs(W(j - 1) / W(j)) > 1.0;
             if (all_mass && to_lower)
             {
-                const int it = is_scalar ? 4 : 1;
-                const double ct_r = std::abs(std::real(ci));
-                const double mc = (mass_cos >= 0.0) ? mass_cos : ct_r;
                 std::complex<double> t_te(1.0, 0.0), t_tm(1.0, 0.0), a_te, a_tm;
                 double x_run = mass_bonded, amp = 1.0;
-                A = &mat_near;
-                for (int i = 0; i <= n_layers; ++i)
+                for (int j = 1; j <= n_layers + 1; ++j)
                 {
-                    const Material &B = (i < n_layers) ? *layers[i].mtl : mat_far;
-                    A->interact_with(B, it, 0.0, fGHz, &a_te, &a_tm, nullptr, nullptr, nullptr, nullptr, false, &ci, true);
+                    MED(j - 1).interact_with(MED(j), it, 0.0, fGHz, &a_te, &a_tm, nullptr, nullptr, nullptr, nullptr, false, &ci, true);
                     t_te *= a_te, t_tm *= a_tm;
-                    if (i < n_layers) // the mass term, formed as for a single mass-law sheet
-                    {
-                        double thk = layers[i].thk, dist_max = 1.0e30;
-                        double g1m = B.medium_gain(1.0, fGHz, 1.0, 0.0, 0.0, 1.0e300);
-                        if (g1m > 0.0)
-                        {
-                            double rate = -10.0 * std::log10(g1m);
-                            if (rate > 0.0)
-                                dist_max = 400.0 / rate;
-                        }
-                        else
-                            dist_max = 0.0;
-                        if (dist_max < thk)
-                            dist_max = thk;
-                        double dist = (ct_r > 0.0) ? thk / ct_r : dist_max;
-                        if (!(dist < dist_max))
-                            dist = dist_max;
-                        double mass_path = thk * mc;
-                        double gm = B.medium_gain(dist, fGHz, ct_r, mass_path, 1.0, (mass_path > 0.0) ? 0.0 : 1.0e300, thk, mc, x_run);
-                        if (mass_path > 0.0)
-                            x_run += B.mass_X0(thk, fGHz);
-                        amp *= std::sqrt((gm < 0.0) ? 0.0 : gm);
-                    }
-                    A = &B;
+                    if (j <= n_layers)
+                        amp *= qd_mass_amp(MED(j), layers[j - 1].thk, std::abs(std::real(ci)), mc, fGHz, x_run);
                 }
                 // The far medium's interface gain is owed only where it is newly entered
                 if (!mat_far.same_as(Material()) && mat_far.same_as(mat_near))
@@ -1092,320 +1042,211 @@ namespace
             }
         }
 
-        const double c0 = 299792458.0;
-        const double omega = 2.0 * 3.14159265358979323846 * fGHz * 1e9;
-        const double k0 = omega / c0;
-
+        const double k0 = 2.0 * 3.14159265358979323846 * fGHz * 1e9 / 299792458.0;
         auto root = [](std::complex<double> a)
         {
             if (qd_evanescent(a))
                 a = std::complex<double>(std::real(a), -0.0); // decaying evanescent root
             return std::sqrt(a);
         };
-
-        // Interface permittivities carry the resonance, the propagation index does not. That split
-        // is the one the rest of this file applies at five separate sites: a permittivity resonance
-        // is an interface effect rather than a propagation one.
-        std::complex<double> eta_n = mat_near.eta(fGHz) + mat_near.eta_resonance(fGHz);
-        std::complex<double> mu_n = mat_near.mu(fGHz);
-        std::complex<double> eta_f = mat_far.eta(fGHz) + mat_far.eta_resonance(fGHz);
-        std::complex<double> mu_f = mat_far.mu(fGHz);
-
-        const std::complex<double> w_near = eta_n * mu_n; // anchors the transverse invariant
         const std::complex<double> s2 = 1.0 - ci * ci;
-        const std::complex<double> z_n = std::sqrt(eta_n / mu_n);
-        const std::complex<double> z_f = std::sqrt(eta_f / mu_f);
-        const std::complex<double> c_far = root(1.0 - (w_near / (eta_f * mu_f)) * s2);
+        auto COS = [&](int j) -> std::complex<double>
+        { return (j == 0) ? ci : root(1.0 - (W(0) / W(j)) * s2); };
+        const std::complex<double> z_n = ADM(0), z_f = ADM(n_layers + 1), c_far = COS(n_layers + 1);
 
-        // One-way loss cap, in nepers of amplitude. cos and sin of a complex phase grow like
-        // exp(|Im|), where the Airy form's phi decayed instead, so an opaque layer would overflow
-        // the product rather than vanish from it. 46.05 Np is 400 dB, the same opacity floor produce
-        // mode caps its path length at, so nothing a propagating wave can reach is touched.
-        const double dl_im_cap = 46.05;
+        // A mass-law layer in which the wave is evanescent - lossless, and the transverse
+        // invariant at or above its eps mu, which is the verdict Material::interact_with gives a
+        // wave that meets it - is closed on both faces. The Fresnel reflectance of such a face
+        // does not say so: next to a lossy medium it is below one although the layer carries no
+        // flux, the remainder being the interference of the incident and the reflected wave.
+        auto CLOSED = [&](int j) -> bool
+        { return j >= 1 && j <= n_layers && MED(j).m > 0.0 && std::imag(W(j)) == 0.0 && std::abs((W(0) / W(j)) * s2) >= 1.0; };
 
-        std::complex<double> r_pol[2], t_pol[2];
-        for (int pol = 0; pol < 2 && !scattering; ++pol)
+        // A mass-law sheet whose far side is closed has no wave inside and none behind it. What
+        // crosses is the leak of its two faces, written as the two crossings a traced solid of
+        // its material would produce, each at the cosine the wave has there: entered as a leak
+        // it kept the incidence cosine and meets the far face held; entered by an ordinary
+        // crossing it is at the Snell cosine, where the far face is closed whenever the outer
+        // pair is, so the verdict is forced, and in scalar mode the phase is the raw crossing's.
+        const bool leak_chain = far_closed && n_layers == 1 && layers[0].mtl->m > 0.0;
+        std::complex<double> leak[2];
+        if (leak_chain)
         {
-            std::complex<double> M11(1.0, 0.0), M12(0.0, 0.0), M21(0.0, 0.0), M22(1.0, 0.0);
-            for (int i = 0; i < n_layers; ++i)
+            const Material &S = *layers[0].mtl;
+            bool leak_first = false;
+            std::complex<double> cS = COS(1), a_te, a_tm, b_te, b_tm;
+            mat_near.interact_with(S, it, 0.0, fGHz, &a_te, &a_tm, nullptr, nullptr, nullptr, &leak_first, false, &ci, near_undeviated);
+            if (leak_first)
+                S.interact_with(mat_far, it, 0.0, fGHz, &b_te, &b_tm, nullptr, nullptr, nullptr, nullptr, false, &ci, true);
+            else
             {
-                const Material &L = *layers[i].mtl;
-                std::complex<double> eta_L = L.eta(fGHz) + L.eta_resonance(fGHz);
-                std::complex<double> mu_L = L.mu(fGHz);
-                std::complex<double> c_L = root(1.0 - (w_near / (eta_L * mu_L)) * s2);
-                std::complex<double> n_L = std::sqrt(L.eta(fGHz) * mu_L); // resonance-excluded
-                std::complex<double> y_L = (pol == 0) ? (std::sqrt(eta_L / mu_L) * c_L)
-                                                      : (std::sqrt(eta_L / mu_L) / c_L);
-
-                std::complex<double> dl = k0 * n_L * c_L * layers[i].thk;
-
-                // The alpha column, as nepers of amplitude over the path thk / |Re c|. At a
-                // vanishing cosine the path is unbounded and the layer is opaque, which the cap
-                // below expresses.
-                double a_dB = L.alpha * std::pow(fGHz / L.fRef, L.alphaB); // dB per meter
-                if (a_dB > 0.0)
-                {
-                    double ct_r = std::abs(std::real(c_L));
-                    double a_Np = (ct_r > 0.0) ? 0.05 * std::log(10.0) * a_dB * layers[i].thk / ct_r
-                                               : dl_im_cap;
-                    dl -= std::complex<double>(0.0, a_Np);
-                }
-                if (std::imag(dl) < -dl_im_cap)
-                    dl = std::complex<double>(std::real(dl), -dl_im_cap);
-                else if (std::imag(dl) > dl_im_cap)
-                    dl = std::complex<double>(std::real(dl), dl_im_cap);
-
-                std::complex<double> A = std::cos(dl);
-                std::complex<double> B = std::complex<double>(0.0, 1.0) * std::sin(dl) / y_L;
-                std::complex<double> C = std::complex<double>(0.0, 1.0) * y_L * std::sin(dl);
-                std::complex<double> D = std::cos(dl);
-
-                std::complex<double> m11 = M11 * A + M12 * C, m12 = M11 * B + M12 * D;
-                std::complex<double> m21 = M21 * A + M22 * C, m22 = M21 * B + M22 * D;
-                M11 = m11, M12 = m12, M21 = m21, M22 = m22;
+                S.interact_with(mat_far, it, 0.0, fGHz, &b_te, &b_tm, nullptr, nullptr, nullptr, nullptr, true, &cS);
+                if (is_scalar)
+                    b_te = b_tm = std::polar(std::abs(b_te), std::arg((2.0 * ADM(1) * cS) / (ADM(1) * cS + z_f * c_far)));
             }
+            double x_run = mass_bonded, aI = qd_mass_amp(S, layers[0].thk, std::abs(std::real(cS)), mc, fGHz, x_run);
+            leak[0] = aI * a_te * b_te, leak[1] = aI * a_tm * b_tm;
+        }
 
-            std::complex<double> y0 = (pol == 0) ? (z_n * ci) : (z_n / ci);
-            std::complex<double> ys = (pol == 0) ? (z_f * c_far) : (z_f / c_far);
-            std::complex<double> Bv = M11 + M12 * ys, Cv = M21 + M22 * ys;
-            std::complex<double> den = y0 * Bv + Cv;
-            if (!(std::abs(den) > 0.0))
-                return false;
-            r_pol[pol] = (y0 * Bv - Cv) / den;
-            t_pol[pol] = 2.0 * y0 / den;
+        std::complex<double> R_out[2], T_out[2];
+        for (int pol = 0; pol < 2; ++pol)
+        {
+            // Normal flux of the media a leak entered a closed layer from, and left it into
+            double fl_in = 1.0, fl_out = 1.0;
 
+            // Boundary j | j+1, tf folded in by the pair that forms it. A boundary neither of
+            // whose media carries tf is left exactly raw, unless nothing propagates behind it.
+            //
+            // A closed layer has no wave inside and carries a leak as a flux. Seen from a
+            // coherent side its face is the pad of closed_face, which hands that flux over
+            // directly, and nothing where neither medium carries tf. Seen from a mass-law side
+            // it passes the flat leak, 1 - R' with the reflectance taken as one, a statement
+            // about the normal flux of that side: the segments run in raw amplitudes that are
+            // converted once at the outer pair, and across a closed layer there is nothing to
+            // convert through, so the flux of that side is collected here and the transmit port
+            // is put right by the ratio below.
+            auto BND = [&](int j, std::complex<double> &r, std::complex<double> &t, std::complex<double> &tb)
+            {
+                const Material &A = MED(j), &B = MED(j + 1);
+                std::complex<double> za = ADM(j), zb = ADM(j + 1), ca = COS(j), cb = COS(j + 1);
+                if (pol == 0)
+                {
+                    std::complex<double> a = za * ca, b = zb * cb;
+                    r = (a - b) / (a + b), t = (2.0 * a) / (a + b), tb = (2.0 * b) / (b + a);
+                }
+                else
+                {
+                    r = (zb * ca - za * cb) / (zb * ca + za * cb);
+                    t = (2.0 * za * ca) / (zb * ca + za * cb);
+                    tb = (2.0 * zb * cb) / (za * cb + zb * ca);
+                }
+                // The far face of a coherent sheet on a closed far side: the pad, over the
+                // incident flux, real in EM and with the phase of the raw crossing in scalar mode
+                if (far_closed && j == n_layers && !(A.m > 0.0))
+                {
+                    double k = A.closed_face(B, fGHz, r, (pol == 0) ? za * ca : std::conj(za) * ca,
+                                             std::real((pol == 0) ? z_n * ci : std::conj(z_n) * ci));
+                    t = std::polar(k, is_scalar ? std::arg(t) : 0.0);
+                    return;
+                }
+                const bool cA = CLOSED(j), cB = CLOSED(j + 1);
+                const bool closed = cA != cB; // a closed layer against a side that carries flux
+                if (A.tf(fGHz) == 0.0 && B.tf(fGHz) == 0.0 && !closed)
+                    return;
+                if (!closed && !(j >= 1 && A.m > 0.0) && !(j < n_layers && B.m > 0.0)) // the face of a coherent layer
+                {
+                    std::complex<double> c = A.tf_face(B, fGHz, r);
+                    t *= c, tb *= c;
+                    return;
+                }
+                // A closed layer seen from a side that carries a wave is the pad of a closed face:
+                // on the way in the flux it passes, on the way out the reverse, the amplitude that
+                // flux launches.
+                const Material &V = cB ? A : B;
+                if (closed && !(V.m > 0.0))
+                {
+                    std::complex<double> yw = (pol == 0) ? (cB ? za * ca : zb * cb) : (cB ? std::conj(za) * ca : std::conj(zb) * cb), rw = cB ? r : -r;
+                    double k = V.closed_face(cB ? B : A, fGHz, rw, yw, 1.0);
+                    r = cB ? rw : -rw, t = std::polar(cB ? k : k / std::abs(yw), std::arg(t));
+                    return;
+                }
+                double R0 = std::norm(r);
+                double Rt = A.apply_tf_pair(B, R0, fGHz);
+                double keep = 1.0 - R0, pass = (Rt < 1.0) ? 1.0 - Rt : 0.0;
+                r = std::polar(std::sqrt(Rt), std::arg(r));
+                if (keep < 1.0e-9) // no forward Fresnel port left to scale: the flat leak
+                    t = std::polar(std::sqrt(pass), std::arg(t)), tb = std::polar(std::sqrt(pass), std::arg(tb));
+                else if (closed) // no forward port either, whatever R0 reads: the leak of a bare face
+                {
+                    double Rc = A.apply_tf_pair(B, 1.0, fGHz);
+                    pass = (Rc < 1.0) ? 1.0 - Rc : 0.0;
+                    t = std::polar(std::sqrt(pass), std::arg(t)), tb = std::polar(std::sqrt(pass), std::arg(tb));
+                }
+                else
+                    t *= std::sqrt(pass / keep), tb *= std::sqrt(pass / keep);
+                if (closed)
+                {
+                    int o = cA ? j + 1 : j; // the side that carries flux
+                    double g = (pol == 0) ? std::real(ADM(o) * COS(o)) : std::real(std::conj(ADM(o)) * COS(o));
+                    (cB ? fl_in : fl_out) *= g;
+                }
+            };
+
+            // One-way factor of coherent layer j: exp(-j k0 n thk c), index and cosine complex,
+            // times the alpha column over the path thk / |Re c|. A wave that does not advance in
+            // the layer has no path, and the layer is opaque to it.
+            auto PHI = [&](int j) -> std::complex<double>
+            {
+                const Material &L = MED(j);
+                std::complex<double> c_L = COS(j);
+                double thk = layers[j - 1].thk, a_dB = L.alpha * std::pow(fGHz / L.fRef, L.alphaB);
+                double a_Np = (a_dB > 0.0 && thk > 0.0) ? 0.05 * std::log(10.0) * a_dB * thk / std::abs(std::real(c_L)) : 0.0;
+                return std::exp(std::complex<double>(0.0, -1.0) * k0 * std::sqrt(L.eta(fGHz) * L.mu(fGHz)) * c_L * thk - a_Np);
+            };
+
+            std::complex<double> Tt(1.0, 0.0), Rt(0.0, 0.0);
+            int p = 0;
+            double x_run = mass_bonded; // X0 of the plate crossed so far
+            for (int q = 1; q <= n_layers + 1; ++q)
+            {
+                bool mass = (q <= n_layers) && MED(q).m > 0.0;
+                if (q <= n_layers && !mass)
+                    continue;
+                if (q - p > 1) // a coherent layer separates what follows from the plate
+                    x_run = 0.0;
+
+                // Coherent segment between media p and q, from its far boundary inwards. G is
+                // the reflection the series runs on. Ge is the one the reflect port hands
+                // out: what entered a layer and came back paid that layer's interface gain,
+                // once, as the transmit port pays it once; the series itself pays nothing.
+                std::complex<double> G, Ge, T, r, t, tb;
+                BND(q - 1, G, T, tb);
+                Ge = G;
+                for (int j = q - 2; j >= p; --j)
+                {
+                    std::complex<double> phi = PHI(j + 1), p2 = phi * phi;
+                    BND(j, r, t, tb);
+                    std::complex<double> den = 1.0 + r * G * p2;
+                    if (!(std::abs(den) > 0.0))
+                        return false;
+                    T = t * phi * T / den;
+                    Ge = r + std::sqrt(MED(j + 1).interface_gain(fGHz)) * t * tb * Ge * p2 / den;
+                    G = r + t * tb * G * p2 / den;
+                }
+                Tt *= T;
+                if (p == 0)
+                    Rt = Ge;
+                if (mass)
+                    Tt *= qd_mass_amp(MED(q), layers[q - 1].thk, std::abs(std::real(COS(q))), mc, fGHz, x_run);
+                p = q;
+            }
+            if (fl_in != fl_out) // one medium on both sides of the closed layers: exactly one
+                Tt *= (fl_in > 0.0 && fl_out > 0.0) ? std::sqrt(fl_in / fl_out) : 0.0;
+            R_out[pol] = Rt, T_out[pol] = leak_chain ? leak[pol] : Tt;
             if (is_scalar) // one channel, the TE / admittance form, as everywhere else in this file
             {
-                r_pol[1] = r_pol[0], t_pol[1] = t_pol[0];
+                R_out[1] = R_out[0], T_out[1] = T_out[0];
                 break;
             }
         }
-
-        std::complex<double> Rv_te = r_pol[0];
-        std::complex<double> Rv_tm = is_scalar ? r_pol[0] : -r_pol[1];
-        std::complex<double> tv_te = t_pol[0];
-        std::complex<double> tv_tm = is_scalar ? t_pol[0] : (ci / c_far) * t_pol[1];
-
-        if (scattering)
+        if (leak_chain) // interact_with wrote the gains and the flux of its two crossings
         {
-            // Medium j: 0 is the near half-space, 1 .. n_layers the layers, n_layers + 1 the far one
-            auto MED = [&](int j) -> const Material &
-            { return (j == 0) ? mat_near : ((j > n_layers) ? mat_far : *layers[j - 1].mtl); };
-            auto COS = [&](int j) -> std::complex<double>
-            {
-                if (j == 0)
-                    return ci;
-                const Material &X = MED(j);
-                return root(1.0 - (w_near / ((X.eta(fGHz) + X.eta_resonance(fGHz)) * X.mu(fGHz))) * s2);
-            };
-            auto ADM = [&](int j) -> std::complex<double>
-            {
-                const Material &X = MED(j);
-                return std::sqrt((X.eta(fGHz) + X.eta_resonance(fGHz)) / X.mu(fGHz));
-            };
-
-            // A mass-law layer in which the wave is evanescent - lossless, and the transverse
-            // invariant at or above its eps mu, which is the verdict Material::interact_with
-            // gives a wave that meets it - is closed on both faces. A rigid layer of the acoustic
-            // mapping is that at every practical angle. The Fresnel reflectance of such a face
-            // does not say so: next to a lossy medium it is below one although the wave in the
-            // layer carries no flux, the remainder being the interference of the incident and
-            // the reflected wave.
-            auto CLOSED = [&](int j) -> bool
-            {
-                if (j < 1 || j > n_layers || !(MED(j).m > 0.0))
-                    return false;
-                const Material &X = MED(j);
-                std::complex<double> w = (X.eta(fGHz) + X.eta_resonance(fGHz)) * X.mu(fGHz);
-                return std::imag(w) == 0.0 && std::abs((w_near / w) * s2) >= 1.0;
-            };
-
-            std::complex<double> R_out[2], T_out[2];
-            for (int pol = 0; pol < 2; ++pol)
-            {
-                // Normal flux of the media a leak entered a closed layer from, and left it into
-                double fl_in = 1.0, fl_out = 1.0;
-
-                // Boundary j | j+1 in produce mode's amplitudes, tf folded in by the pair that
-                // forms it. A boundary neither of whose media carries tf is left exactly raw,
-                // unless it is the face of a closed layer.
-                //
-                // A closed layer has no wave inside and carries a leak as a flux. Seen from a
-                // coherent side its face is the pad of closed_face, which hands that flux over
-                // directly, and nothing where neither medium carries tf. Seen from a mass-law side
-                // it passes the flat leak, 1 - R' with the reflectance taken as one, a statement
-                // about the normal flux of that side: the segments run in raw amplitudes that are
-                // converted once at the outer pair, and across a closed layer there is nothing to
-                // convert through, so the flux of that side is collected here, per channel as
-                // Material::flux_amp forms it, and the transmit port is put right by the ratio
-                // below. Where the media on the two sides of the closed layers are one mass-law
-                // medium, the ratio is exactly one.
-                //
-                // The face of a coherent layer is a transformer; see tf_face.
-                auto BND = [&](int j, std::complex<double> &r, std::complex<double> &t, std::complex<double> &tb)
-                {
-                    const Material &A = MED(j), &B = MED(j + 1);
-                    std::complex<double> za = ADM(j), zb = ADM(j + 1), ca = COS(j), cb = COS(j + 1);
-                    if (pol == 0)
-                    {
-                        std::complex<double> a = za * ca, b = zb * cb;
-                        r = (a - b) / (a + b), t = (2.0 * a) / (a + b), tb = (2.0 * b) / (b + a);
-                    }
-                    else
-                    {
-                        r = (zb * ca - za * cb) / (zb * ca + za * cb);
-                        t = (2.0 * za * ca) / (zb * ca + za * cb);
-                        tb = (2.0 * zb * cb) / (za * cb + zb * ca);
-                    }
-                    const bool cA = CLOSED(j), cB = CLOSED(j + 1);
-                    const bool closed = cA != cB; // a closed layer against a side that carries flux
-                    if (A.tf(fGHz) == 0.0 && B.tf(fGHz) == 0.0 && !closed)
-                        return;
-                    if (!closed && !(j >= 1 && A.m > 0.0) && !(j < n_layers && B.m > 0.0))
-                    {
-                        std::complex<double> c = A.tf_face(B, fGHz, r);
-                        t *= c, tb *= c;
-                        return;
-                    }
-                    // A closed layer seen from a side that carries a wave is the pad of a closed face:
-                    // its reflection as that side sees it, with the clamp; on the way in the flux it
-                    // passes, on the way out the reverse, the amplitude that flux launches.
-                    const Material &W = cB ? A : B;
-                    if (closed && !(W.m > 0.0))
-                    {
-                        std::complex<double> yw = (pol == 0) ? (cB ? za * ca : zb * cb) : (cB ? std::conj(za) * ca : std::conj(zb) * cb), rw = cB ? r : -r;
-                        double k = W.closed_face(cB ? B : A, fGHz, rw, yw, 1.0);
-                        rw = std::polar((std::norm(rw) > 1.0) ? 1.0 : std::abs(rw), std::arg(rw));
-                        r = cB ? rw : -rw, t = std::polar(cB ? k : k / std::abs(yw), std::arg(t));
-                        return;
-                    }
-                    double R0 = std::norm(r);
-                    double Rt = A.apply_tf_pair(B, R0, fGHz);
-                    double keep = 1.0 - R0, pass = (Rt < 1.0) ? 1.0 - Rt : 0.0;
-                    r = std::polar(std::sqrt(Rt), std::arg(r));
-                    if (keep < 1.0e-9) // no forward Fresnel port left to scale: the flat leak
-                        t = std::polar(std::sqrt(pass), std::arg(t)), tb = std::polar(std::sqrt(pass), std::arg(tb));
-                    else if (closed) // no forward port either, whatever R0 reads: the leak of a bare face
-                    {
-                        double Rc = A.apply_tf_pair(B, 1.0, fGHz);
-                        pass = (Rc < 1.0) ? 1.0 - Rc : 0.0;
-                        t = std::polar(std::sqrt(pass), std::arg(t)), tb = std::polar(std::sqrt(pass), std::arg(tb));
-                    }
-                    else
-                        t *= std::sqrt(pass / keep), tb *= std::sqrt(pass / keep);
-                    if (closed)
-                    {
-                        int o = cA ? j + 1 : j; // the side that carries flux
-                        double g = (pol == 0) ? std::real(ADM(o) * COS(o)) : std::real(std::conj(ADM(o)) * COS(o));
-                        (cB ? fl_in : fl_out) *= g;
-                    }
-                };
-
-                // One-way factor of coherent layer j, the same phase the matrix is built from
-                auto PHI = [&](int j) -> std::complex<double>
-                {
-                    const Material &L = MED(j);
-                    std::complex<double> c_L = COS(j);
-                    std::complex<double> dl = k0 * std::sqrt(L.eta(fGHz) * L.mu(fGHz)) * c_L * layers[j - 1].thk;
-                    double a_dB = L.alpha * std::pow(fGHz / L.fRef, L.alphaB);
-                    if (a_dB > 0.0)
-                    {
-                        double ct_r = std::abs(std::real(c_L));
-                        dl -= std::complex<double>(0.0, (ct_r > 0.0) ? 0.05 * std::log(10.0) * a_dB * layers[j - 1].thk / ct_r
-                                                                     : dl_im_cap);
-                    }
-                    if (std::imag(dl) < -dl_im_cap)
-                        dl = std::complex<double>(std::real(dl), -dl_im_cap);
-                    else if (std::imag(dl) > dl_im_cap)
-                        dl = std::complex<double>(std::real(dl), dl_im_cap);
-                    return std::exp(std::complex<double>(0.0, -1.0) * dl);
-                };
-
-                // Real amplitude factor of mass-law layer j, formed as produce mode forms it: the
-                // loss over the path thk / |Re c| under the same saturation cap, and the mass term
-                // from the normal thickness and the cosine the wave has in air, which the caller
-                // hands in as mass_cos where the near medium is not air.
-                auto MASS = [&](int j, double &x_run) -> double
-                {
-                    const Material &L = MED(j);
-                    double thk = layers[j - 1].thk, ct_r = std::abs(std::real(COS(j)));
-                    double dist_max = 1.0e30;
-                    double g1m = L.medium_gain(1.0, fGHz, 1.0, 0.0, 0.0, 1.0e300);
-                    if (g1m > 0.0)
-                    {
-                        double rate = -10.0 * std::log10(g1m);
-                        if (rate > 0.0)
-                            dist_max = 400.0 / rate;
-                    }
-                    else
-                        dist_max = 0.0;
-                    if (dist_max < thk)
-                        dist_max = thk;
-                    double dist = (ct_r > 0.0) ? thk / ct_r : dist_max;
-                    if (!(dist < dist_max))
-                        dist = dist_max;
-                    double mc = (mass_cos >= 0.0) ? mass_cos : std::abs(std::real(ci));
-                    double mass_path = thk * mc;
-                    double g = L.medium_gain(dist, fGHz, ct_r, mass_path, 1.0, (mass_path > 0.0) ? 0.0 : 1.0e300, thk, mc, x_run);
-                    if (mass_path > 0.0)
-                        x_run += L.mass_X0(thk, fGHz);
-                    return std::sqrt((g < 0.0) ? 0.0 : g);
-                };
-
-                std::complex<double> Tt(1.0, 0.0), Rt(0.0, 0.0);
-                int p = 0;
-                bool first = true;
-                double x_run = mass_bonded; // X0 of the plate crossed so far
-                for (int q = 1; q <= n_layers + 1; ++q)
-                {
-                    bool mass = (q <= n_layers) && MED(q).m > 0.0;
-                    if (q <= n_layers && !mass)
-                        continue;
-                    if (q - p > 1) // a coherent layer separates what follows from the plate
-                        x_run = 0.0;
-
-                    // Coherent segment between media p and q, from its far boundary inwards. G is
-                    // the reflection the series runs on. Ge is the one the reflect port hands
-                    // out: what entered a layer and came back paid that layer's interface gain,
-                    // once, as the transmit port pays it once; the series itself pays nothing.
-                    std::complex<double> G, Ge, T, r, t, tb;
-                    BND(q - 1, G, T, tb);
-                    Ge = G;
-                    for (int j = q - 2; j >= p; --j)
-                    {
-                        std::complex<double> phi = PHI(j + 1), p2 = phi * phi;
-                        BND(j, r, t, tb);
-                        std::complex<double> den = 1.0 + r * G * p2;
-                        if (!(std::abs(den) > 0.0))
-                            return false;
-                        T = t * phi * T / den;
-                        Ge = r + std::sqrt(MED(j + 1).interface_gain(fGHz)) * t * tb * Ge * p2 / den;
-                        G = r + t * tb * G * p2 / den;
-                    }
-                    Tt *= T;
-                    if (first)
-                        Rt = Ge, first = false;
-                    if (mass)
-                        Tt *= MASS(q, x_run);
-                    p = q;
-                }
-                if (fl_in != fl_out) // one medium on both sides of the closed layers: exactly one
-                    Tt *= (fl_in > 0.0 && fl_out > 0.0) ? std::sqrt(fl_in / fl_out) : 0.0;
-                R_out[pol] = Rt, T_out[pol] = Tt;
-                if (is_scalar)
-                {
-                    R_out[1] = R_out[0], T_out[1] = T_out[0];
-                    break;
-                }
-            }
-            Rv_te = R_out[0], Rv_tm = R_out[1], tv_te = T_out[0], tv_tm = T_out[1];
+            if (T_te)
+                *T_te = T_out[0];
+            if (T_tm)
+                *T_tm = T_out[1];
+            if (R_te)
+                *R_te = R_out[0];
+            if (R_tm)
+                *R_tm = R_out[1];
+            return true;
         }
 
-        // The one conversion to per-channel normal flux, at the outer pair, transmit port only. The
-        // gate is near == far, so an isolated stack, a stack embedded in one medium and a collapsed
-        // duplicate all take it as exactly 1, matching produce mode.
+        // The one conversion to per-channel normal flux, at the outer pair, transmit port only.
+        // With near == far it is exactly 1, and a closed far side carries no flux to convert to:
+        // what its pad passes is already over the incident flux.
         double fx_te = 1.0, fx_tm = 1.0;
-        if (!mat_far.same_as(mat_near))
+        if (!mat_far.same_as(mat_near) && !far_closed)
         {
             Material::flux_amp(z_n, z_f, ci, c_far, fx_te, fx_tm);
             if (is_scalar)
@@ -1413,22 +1254,20 @@ namespace
         }
 
         // Lumped interface gains: one per layer entered, plus the far medium's when the wave enters
-        // a medium it was not already in. The generalization of produce mode's ig to a stack.
-        bool far_is_air = mat_far.same_as(Material());
-        bool far_is_new = !far_is_air && !mat_far.same_as(mat_near);
+        // a medium it was not already in.
+        bool far_is_new = !mat_far.same_as(Material()) && !mat_far.same_as(mat_near);
         double ig2 = far_is_new ? mat_far.interface_gain(fGHz) : 1.0;
         for (int i = 0; i < n_layers; ++i)
             ig2 *= layers[i].mtl->interface_gain(fGHz);
         double ig = std::sqrt((ig2 < 0.0) ? 0.0 : ig2);
 
-        // The displaced host, over the stack's TOTAL normal thickness. A stack of sheets has no
-        // world-space thickness either, so the tracer walked the whole of it as the host medium and
-        // the transmit port owes the same division a single sheet owes. disp_budget caps it exactly
-        // as it caps a single sheet, which matters more here: a two-layer stack reaches a budget a
-        // one-layer one would not.
-        //
-        // A mass-law layer displaces nothing, as a single mass-law sheet displaces nothing: it has
-        // no in-layer phase to set against the host's.
+        // The displaced medium. A sheet has no world-space thickness, so it stands for a layer
+        // that occupies its thickness of whatever it sits in: the tracer walked that length as
+        // that medium, and it comes back out here. Which medium is the side of a glued pair
+        // that is not the solid. How much is capped by disp_budget, because taking a medium
+        // back out is a division, by its loss as much as its phase, and a sheet thicker than
+        // its host would amplify. A mass-law layer displaces nothing. On a closed far side
+        // the length was walked at the incidence cosine; the Snell cosine there is evanescent.
         double t_tot = 0.0;
         for (int i = 0; i < n_layers; ++i)
             if (!(layers[i].mtl->m > 0.0))
@@ -1436,220 +1275,81 @@ namespace
         double t_disp = (disp_budget >= 0.0 && disp_budget < t_tot) ? disp_budget : t_tot;
         if (t_disp < 0.0)
             t_disp = 0.0;
-
-        const Material &disp_mtl = disp_far ? mat_far : mat_near;
-        std::complex<double> eta_d = disp_mtl.eta(fGHz) + disp_mtl.eta_resonance(fGHz);
-        std::complex<double> mu_d = disp_mtl.mu(fGHz);
-        std::complex<double> n_d = std::sqrt(disp_mtl.eta(fGHz) * mu_d); // resonance-excluded
-        std::complex<double> c_disp = root(1.0 - (w_near / (eta_d * mu_d)) * s2);
-        std::complex<double> phi_disp =
-            std::exp(std::complex<double>(0.0, -1.0) * k0 * n_d * t_disp * c_disp);
-        std::complex<double> undisp = (std::abs(phi_disp) > 0.0)
-                                          ? std::complex<double>(1.0, 0.0) / phi_disp
-                                          : std::complex<double>(1.0, 0.0);
+        const int d = disp_far ? n_layers + 1 : 0;
+        std::complex<double> c_disp = far_closed ? ci : COS(d);
+        std::complex<double> phi_disp = std::exp(std::complex<double>(0.0, -1.0) * k0 * std::sqrt(MED(d).eta(fGHz) * MED(d).mu(fGHz)) * t_disp * c_disp);
+        std::complex<double> undisp = (std::abs(phi_disp) > 0.0) ? std::complex<double>(1.0, 0.0) / phi_disp : std::complex<double>(1.0, 0.0);
 
         // The reflect port is handed to a ray that turns around at the mesh plane, so it owes the
         // round trip through the part of the stack that lies in front of that plane: half of it
         // where one medium is on both sides, the mesh plane being the mid-plane; all of it where
         // the stack lies in the near medium in front of a solid; none where it lies beyond.
-        std::complex<double> front = mat_far.same_as(mat_near) ? undisp
-                                                               : (disp_far ? std::complex<double>(1.0, 0.0) : undisp * undisp);
+        std::complex<double> front = mat_far.same_as(mat_near) ? undisp : (disp_far ? std::complex<double>(1.0, 0.0) : undisp * undisp);
 
         if (T_te)
-            *T_te = ig * fx_te * tv_te * undisp;
+            *T_te = ig * fx_te * T_out[0] * undisp;
         if (T_tm)
-            *T_tm = ig * fx_tm * tv_tm * undisp;
+            *T_tm = ig * fx_tm * T_out[1] * undisp;
         if (R_te)
-            *R_te = front * Rv_te;
+            *R_te = front * R_out[0];
         if (R_tm)
-            *R_tm = front * Rv_tm;
+            *R_tm = front * R_out[1];
         return true;
     }
 
-    // Analytic thin-slab (Fabry-Perot) resolve for a near | slab | far stack. Shared by both public
-    // functions in this file: ray_state_update corrects coefficients it has already written, while
-    // ray_mesh_interact produces them outright, because a sheet has zero world-space thickness and
-    // there is nowhere for the tracer to re-emit to.
+    // Series factor of a traced solid, near | slab | far: S = 1 / (1 - rn rf phi^2) per channel.
+    // ray_state_update corrects a coefficient it has already written, and the port it holds
+    // carries the Fresnel coefficient of its own interface, so S is the whole of what is owed.
+    // In scalar mode both outputs carry the same factor. The form is symmetric in near and far,
+    // which is why the caller may pass "the interface ahead of the ray / the one it entered
+    // through". dist_refract and dist_geo are the traced path lengths through the layer.
     //
-    // Direction convention: mat_near is the medium the incident wave arrives from, mat_far the medium
-    // the transmitted wave leaves into. Correction mode is symmetric in the two - near and far appear
-    // only as rn*rf, Rn*Rf and (1-Rn)*(1-Rf) - which is why ray_state_update may pass them in its own
-    // "interface ahead of the ray / interface it entered through" order. Produce mode is NOT
-    // symmetric: the reflect port and the interface gains both depend on which side the wave is on.
+    // Both boundaries are evaluated from the slab side, at the exact complex in-slab cosine
+    // where the caller recovered it (ct_slab_exact) and at the real traced angle otherwise, as
+    // Material::interact_with evaluates the face the tracer meets: a series that is summed and
+    // one that is followed are then one wall.
     //
-    // abs_cos_theta_t is the in-slab propagation cosine and abs_cos_theta the incidence cosine at
-    // the outer face, in both modes. The two length arguments differ by mode:
-    //
-    //   produce == false: dist_refract and dist_geo are the traced path lengths through the layer,
-    //                     refracted and geometric, exactly as the tracer measured them.
-    //   produce == true : dist_refract is the sheet's NORMAL thickness and dist_geo is unused. A
-    //                     sheet has no traced path, so the caller has nothing to measure and the one
-    //                     quotient the traversal needs, thk / cos, is formed here instead. It used to
-    //                     be formed by the caller under a geometric floor on the cosine; see the
-    //                     saturation note at the top of the body for why that floor is gone.
-    //
-    // produce == false: T_te / T_tm are the per-channel series factor S, and nothing else. The port
-    //                   the caller holds already carries the per-channel Fresnel coefficient of its
-    //                   own interface, so no magnitude conversion is owed. In scalar mode both outputs
-    //                   carry the same factor, because the caller scales a stored xprmat in place
-    //                   instead of rebuilding it from cTE. Both boundaries are evaluated at the real
-    //                   in-slab angle, unless the caller supplies ct_slab_exact - the exact complex
-    //                   value recovered from the traced direction - in which case both boundaries and
-    //                   the propagation factor use that instead.
-    // produce == true : T_te / T_tm and R_te / R_tm are absolute composite coefficients. The
-    //                   transmit port carries the slab's interface gain, plus the far medium's when
-    //                   the far medium is one the wave newly enters, matching what
-    //                   Material::interact_with folds in for a transmission-class interaction. The
-    //                   reflect port carries the slab's on the part that entered the slab, and the
-    //                   round trip through the part of the layer in front of the mesh plane. A
-    //                   caller that also passes the far medium through
-    //                   separately (the layer-2 forward path of a sheet stack) must not pay that
-    //                   interface gain twice.
-    //                   Both boundaries are evaluated at the true complex angles, which the incidence
-    //                   angle alone determines - nothing propagates geometrically inside a sheet, so
-    //                   there is no real direction to project onto. The interface amplitudes are the
-    //                   raw Fresnel ones, rescaled only by the tf redistribution, so that a chain of
-    //                   crossings telescopes into the correct end-to-end amplitude, and the
-    //                   propagation factor is exp(-j k0 n thk cos_theta_slab) with both quantities
-    //                   complex - magnitude and phase out of one expression, with only the alpha
-    //                   column drawn from the material on top. The transmit port also subtracts the
-    //                   propagation of the medium it displaces over the same thickness, since the
-    //                   tracer walked that length as that medium and the rest of the path already
-    //                   carries it. Together these put the composite on the exact analytic slab at
-    //                   every angle. disp_far and disp_budget control the displacement, see below.
-    //
-    // Returns false only in correction mode, meaning "did not resolve, let the tracer follow the
-    // bounces". Produce mode always resolves.
+    // Returns false for "did not resolve, let the tracer follow the bounces".
     inline bool qd_slab_resolve(const Material &mat_near,
                                 const Material &mat_slab,
                                 const Material &mat_far,
-                                double dist_refract, // correction: traced refracted path; produce: normal thickness
-                                double dist_geo,     // correction: traced geometric path; produce: unused
+                                double dist_refract, double dist_geo,
                                 double abs_cos_theta_t, double abs_cos_theta,
-                                double fGHz, bool is_scalar, double eps, bool produce,
-                                std::complex<double> *T_te, std::complex<double> *T_tm,
-                                std::complex<double> *R_te = nullptr,
-                                std::complex<double> *R_tm = nullptr,
-                                bool disp_far = false,     // sheet sits on the far side (glued exit)
-                                double disp_budget = -1.0, // max normal thickness it may replace, < 0 = all
+                                double fGHz, bool is_scalar, double eps,
+                                std::complex<double> *S_te, std::complex<double> *S_tm,
                                 std::complex<double> ct_slab_exact = std::complex<double>(0.0, 0.0),
-                                std::complex<double> ct_near_exact = std::complex<double>(0.0, 0.0),
                                 const Material *back_near = nullptr, // what lies behind a sheet named as mat_near
-                                bool far_closed = false,             // produce: near | far is past its critical angle
-                                bool near_undeviated = false,        // produce: the wave in mat_near was not refracted in
-                                double mass_bonded = 0.0,            // produce: X0 of the bonded mass-law bodies already crossed
-                                const Material *back_far = nullptr,  // correction: what lies behind a sheet named as mat_far
-                                bool verdict_given = false,          // correction: the caller decided to sum; eps is not read
-                                double mass_cos = -1.0)              // produce: angle factor of the mass term, < 0 = abs_cos_theta
+                                const Material *back_far = nullptr,  // what lies behind a sheet named as mat_far
+                                bool verdict_given = false,          // the caller decided to sum; eps is not read
+                                const Material *near2 = nullptr)     // second layer of an ordered stack named as mat_near
     {
-        // Mass-law materials carry a lumped transmission surrogate: eta/mu are calibrated for
-        // surface impedance only, so the in-slab index (and hence the phase of phi) is not
-        // physical and the internal series must not be resummed. Correction mode re-emits; the
-        // tracer follows the bounces and each traversal pays medium_gain once. Produce mode has no
-        // interior to re-emit into and takes the incoherent route below instead.
-        if (!produce && mat_slab.m > 0.0)
+        // A mass-law material carries a lumped transmission surrogate: its eta and mu are
+        // calibrated for surface impedance only, so the in-slab index is not physical and the
+        // internal series must not be resummed. The tracer follows the bounces.
+        if (mat_slab.m > 0.0)
             return false;
 
-        const double c0 = 299792458.0;
-        const double omega = 2.0 * 3.14159265358979323846 * fGHz * 1e9;
-
-        bool far_is_air = mat_far.same_as(Material());
+        const double k0 = 2.0 * 3.14159265358979323846 * fGHz * 1e9 / 299792458.0;
         std::complex<double> eta_s_if = mat_slab.eta(fGHz) + mat_slab.eta_resonance(fGHz);
         std::complex<double> mu_s = mat_slab.mu(fGHz);
-        double n_cur = std::real(std::sqrt(mat_slab.eta(fGHz) * mu_s)); // resonance-excluded slab index
+        std::complex<double> n_cx = std::sqrt(mat_slab.eta(fGHz) * mu_s); // resonance-excluded slab index
 
-        // Traversal geometry, in the form the rest of the function needs.
-        //
-        // The physics is written in the normal thickness and a cosine: the propagation factor is
-        // exp(-j k0 n thk_normal cos_slab) and the mass-law term is thk_normal * cos_theta. Neither
-        // diverges at any angle. The path length thk / cos does diverge, and it is the only quantity
-        // here that can, so it is formed once and only where a genuine path length is owed - the
-        // alpha column and the mass-law conductivity term.
-        //
-        // Both of those are dB-linear in the path, so the quotient saturates: past the length at
-        // which the layer is opaque nothing downstream can move. dist_max is that length, read off
-        // the material's own loss per meter, and it is never shorter than the normal thickness so the
-        // cap cannot reach a result at any angle a propagating wave has. It depends on the material
-        // and the frequency and on no geometry at all, which is what a geometric floor on the cosine
-        // could not offer.
-        //
-        // Correction mode is handed genuine traced lengths and keeps them.
-        const double thk_normal = produce ? dist_refract : dist_refract * abs_cos_theta_t;
-        double dist_slab = dist_refract;
-        double dist_max = 1.0e30;
-        if (produce)
-        {
-            double g1m = mat_slab.medium_gain(1.0, fGHz, 1.0, 0.0, 0.0, 1.0e300); // 1 m, mass term off
-            if (g1m > 0.0)
-            {
-                double rate = -10.0 * std::log10(g1m); // dB per meter
-                if (rate > 0.0)
-                    dist_max = 400.0 / rate;
-            }
-            else
-                dist_max = 0.0; // opaque within a meter
-            if (dist_max < thk_normal)
-                dist_max = thk_normal;
-
-            dist_slab = (abs_cos_theta_t > 0.0) ? thk_normal / abs_cos_theta_t : dist_max;
-            if (!(dist_slab < dist_max)) // also catches inf and NaN
-                dist_slab = dist_max;
-        }
-        // Slab-side propagation cosine for correction mode. The tracer's direction is real, so
-        // normally only the real projection of it is available and every boundary gets re-derived from
-        // that projection - including the entry boundary, whose coefficient ray_mesh_interact had
-        // already applied exactly. The Airy denominator then sums a series against a coefficient the
-        // path never carried. When the caller has recovered the exact complex value by inverting the
-        // refraction map it passes it here, and both boundaries and the propagation factor use it.
         bool have_exact_ct = std::abs(ct_slab_exact) > 0.0;
-        std::complex<double> cs = have_exact_ct ? ct_slab_exact
-                                                : std::complex<double>(abs_cos_theta_t, 0.0);
-        std::complex<double> sin2 = 1.0 - cs * cs; // in-slab sine (fbs_angleN convention)
+        std::complex<double> cs = have_exact_ct ? ct_slab_exact : std::complex<double>(abs_cos_theta_t, 0.0);
+        std::complex<double> sin2 = 1.0 - cs * cs;
 
-        // Incidence cosine in the near medium, produce mode only.
+        // Reflection at slab | adjacent seen from the slab.
         //
-        // abs_cos_theta is a real angle and is what a face hit supplies. A sheet reached from inside
-        // a traced medium has no real incidence cosine: the propagation cosine there is complex and
-        // the tracer's direction carries only its real projection. Such a caller passes the
-        // recovered value through ct_near_exact, and the projection is then unused. Every expression
-        // below is analytic in it, so a real value reproduces the angle path exactly; where the
-        // caller supplies nothing, sin2_i keeps the real spelling verbatim so nothing moves.
+        // A sheet named as a bounding medium is a layer of finite thickness, not a half-space,
+        // and an ordered stack is both of its layers: the solver above resolves them, with what
+        // lies behind where the caller knows it and air where it does not, and its composite
+        // already carries the tf of every face. A mass-law sheet keeps the half-space value:
+        // its reflect port is its near interface and nothing else.
         //
-        // Correction mode never reads either of these. Its angle comes from real ray geometry and
-        // its result must not move.
-        bool have_exact_ci = std::abs(ct_near_exact) > 0.0;
-        std::complex<double> ci = have_exact_ci ? ct_near_exact
-                                                : std::complex<double>(abs_cos_theta, 0.0);
-        std::complex<double> sin2_i =
-            have_exact_ci ? (1.0 - ci * ci)
-                          : std::complex<double>(1.0 - abs_cos_theta * abs_cos_theta, 0.0);
-
-        // Exact complex in-slab cosine, derived from the incidence cosine in the near medium.
-        // Produce mode holds that cosine, so nothing has to be projected onto a real direction: the
-        // far boundary and the propagation factor both use this. Snell is transitive, so with the
-        // recovered near-side cosine this is the same value a bare entry | slab crossing would have
-        // used, and the host drops out of it. Correction mode has only the traced real angle and
-        // keeps the real form throughout.
-        std::complex<double> cts_exact(1.0, 0.0);
-        if (produce)
-        {
-            std::complex<double> eta_n_if = mat_near.eta(fGHz) + mat_near.eta_resonance(fGHz);
-            std::complex<double> mu_n = mat_near.mu(fGHz);
-            std::complex<double> arg = 1.0 - ((eta_n_if * mu_n) / (eta_s_if * mu_s)) * sin2_i;
-            if (qd_evanescent(arg))
-                arg = std::complex<double>(std::real(arg), -0.0); // decaying evanescent root
-            cts_exact = std::sqrt(arg);
-        }
-
-        // Fresnel TE/TM amplitude reflection at slab|adjacent from the slab side, tf folded into |r|.
-        // t_out returns the raw Fresnel transmission amplitude for the slab -> adjacent crossing; only
-        // its phase is used, since tf redistributes energy between the ports and the raw magnitude is
-        // no longer the transmitted one.
-        auto fresnel_r = [&](const Material &adj,
-                             std::complex<double> &r_te, std::complex<double> &r_tm,
-                             double &Ra_te, double &Ra_tm,
-                             std::complex<double> *t_out = nullptr, // [te, tm] slab -> adjacent
-                             const Material *backing = nullptr)     // what lies behind adj if it is a sheet
+        // A bare boundary takes tf as Material::interact_with applies it: the pad where the
+        // face is closed, the transformer where it is open.
+        auto fresnel_r = [&](const Material &adj, std::complex<double> &r_te, std::complex<double> &r_tm,
+                             const Material *backing, const Material *adj2)
         {
             std::complex<double> eta_a_if = adj.eta(fGHz) + adj.eta_resonance(fGHz);
             std::complex<double> mu_a = adj.mu(fGHz);
@@ -1657,613 +1357,70 @@ namespace
             std::complex<double> z2 = std::sqrt(eta_a_if / mu_a);
             std::complex<double> rat = (eta_s_if * mu_s) / (eta_a_if * mu_a);
 
-            // Past the internal critical angle the argument is negative real and the principal root
-            // is the growing evanescent wave, which flips the sign of the internal reflection phase
-            // under the exp(-i k d) convention phi uses below. Force the decaying root, exactly as
-            // interact_with does. Magnitudes are unaffected (|r| = 1 either way), so this only moves
-            // results that actually reach internal TIR.
             std::complex<double> ct2_arg = 1.0 - rat * sin2;
-            if (qd_evanescent(ct2_arg))
-                ct2_arg = std::complex<double>(std::real(ct2_arg), -0.0);
-            std::complex<double> cos_t2 = std::sqrt(ct2_arg);
-
-            std::complex<double> te = (z1 * cs - z2 * cos_t2) / (z1 * cs + z2 * cos_t2);
-            std::complex<double> tm = is_scalar ? te : (z2 * cs - z1 * cos_t2) / (z2 * cs + z1 * cos_t2);
-
-            // A sheet named as a bounding medium is a layer of finite thickness, not a half-space.
-            // Reading only its eta and mu says the wave enters it and never comes back, which is
-            // exact only if whatever sits behind the sheet has the sheet's own permittivity. For a
-            // sheet electrically close to the slab it is worse than inexact: the half-space
-            // reflection goes to zero, the Airy denominator collapses to 1, and the slab loses its
-            // internal series, when physically the wave passes through the sheet almost unimpeded
-            // and still reflects off the boundary behind it.
-            //
-            // The backing is what the state format cannot always name. Where the caller knows it,
-            // it passes it; where it does not, air is assumed. Air is the right default for the
-            // motivating geometry, a coating on the room side of a wall, and it is what the
-            // characteristic-matrix reference in the fixture encodes. Naming it from the state
-            // rather than assuming it is its own open item.
-            //
-            // The layer reflection already carries tf: the core applies the pair rule at the
-            // slab | sheet face and at the sheet | backing face, so nothing is redistributed a
-            // second time here and only the [0, 1] guard remains.
-            //
-            // A mass-law sheet is the exception and keeps the half-space value. That is not a
-            // fallback: its reflect port is its near interface and nothing else, by the mass-law
-            // convention - no series, nothing returning from behind it - which is exactly what
-            // produce mode returns for the same sheet.
-            bool layer_resolved = false;
-            if (adj.thk > 0.0 && !(adj.m > 0.0))
-            {
-                QdLayer lay;
-                lay.mtl = &adj, lay.thk = adj.thk;
-                Material air_backing;
-                std::complex<double> Lr_te, Lr_tm;
-                // Seen from the slab a lining lies in the air beyond it; a sheet inside the slab
-                // has the slab on both sides and the core centres it.
-                if (qd_stack_resolve(mat_slab, &lay, 1, backing ? *backing : air_backing,
-                                     cs, fGHz, is_scalar, nullptr, nullptr, &Lr_te, &Lr_tm, true))
-                    te = Lr_te, tm = is_scalar ? Lr_te : Lr_tm, layer_resolved = true;
-            }
-
-            // tf of the boundary, as Material::interact_with applies it to the face the tracer
-            // meets: the pad where the face is closed, with the clamp, the transformer where it is
-            // open, or a series that is summed and one that is followed are two walls.
-            if (layer_resolved)
-            {
-                Material no_tf;
-                Ra_te = no_tf.apply_tf(std::norm(te), fGHz);
-                Ra_tm = no_tf.apply_tf(std::norm(tm), fGHz);
-            }
-            else if (std::imag(eta_a_if * mu_a) == 0.0 && std::abs(rat * sin2) >= 1.0) // closed, as interact_with judges it
-            {
-                mat_slab.closed_face(adj, fGHz, te, z1 * cs, 1.0), mat_slab.closed_face(adj, fGHz, tm, is_scalar ? z1 * cs : std::conj(z1) * cs, 1.0);
-                Ra_te = (std::norm(te) > 1.0) ? 1.0 : std::norm(te), Ra_tm = (std::norm(tm) > 1.0) ? 1.0 : std::norm(tm);
-            }
-            else
-            {
-                mat_slab.tf_face(adj, fGHz, te), mat_slab.tf_face(adj, fGHz, tm);
-                Ra_te = std::norm(te), Ra_tm = std::norm(tm);
-            }
-            r_te = std::polar(std::sqrt(Ra_te), std::arg(te));
-            r_tm = std::polar(std::sqrt(Ra_tm), std::arg(tm));
-
-            if (t_out) // ITU-R P.2040-1 eq. (32) with the slab as the incidence medium
-                t_out[0] = (2.0 * z1 * cs) / (z1 * cs + z2 * cos_t2),
-                t_out[1] = is_scalar ? t_out[0] : (2.0 * z1 * cs) / (z2 * cs + z1 * cos_t2);
-        };
-
-        // The near interface seen from the incidence side, at the true incidence angle rather than at
-        // the real-projected in-slab angle. The two views are reciprocal only for a lossless slab: in a
-        // lossy one the in-slab refraction cosine is complex, and dropping its imaginary part costs
-        // exact reciprocity - by 3 % at 80 deg for sigma = 0.02 S/m, far more for a conductive slab.
-        // A traced solid evaluates its entry interface from the incidence side, so a sheet has to do
-        // the same to stay equivalent to one. Correction mode keeps the slab-side view, because
-        // ray_state_update's angle comes from real ray geometry and its result must not move.
-        // A coherent sheet carries a wave, propagating or tunnelling, and tf on its faces is a
-        // transformer; a mass-law sheet carries none and keeps the pair rule on the reflectance.
-        const bool wave = produce && !(mat_slab.m > 0.0);
-        // A mass-law sheet in which the wave is evanescent is closed on both faces: lossless, and
-        // the transverse invariant at or above its eps mu, the verdict Material::interact_with
-        // gives a wave that meets it. Its near face is the pad of a closed face. A near medium
-        // that holds the wave undeviated meets the sheet at an angle its Snell cosine does not
-        // describe and is not judged here.
-        std::complex<double> w_n = (mat_near.eta(fGHz) + mat_near.eta_resonance(fGHz)) * mat_near.mu(fGHz);
-        const bool shut = produce && mat_slab.m > 0.0 && std::imag(eta_s_if * mu_s) == 0.0 && std::abs((w_n / (eta_s_if * mu_s)) * sin2_i) >= 1.0 &&
-                          !(near_undeviated && mat_near.m > 0.0);
-        double k_te = 0.0, k_tm = 0.0; // what that face passes of the incident flux
-        auto fresnel_r_near = [&](std::complex<double> &r_te, std::complex<double> &r_tm,
-                                  double &Ra_te, double &Ra_tm,
-                                  double &R0_te, double &R0_tm, // raw, pre-tf, for the amplitude scale
-                                  std::complex<double> *t_fwd,  // [te, tm] near -> slab
-                                  std::complex<double> *t_bwd)  // [te, tm] slab -> near
-        {
-            std::complex<double> eta_a_if = mat_near.eta(fGHz) + mat_near.eta_resonance(fGHz);
-            std::complex<double> mu_a = mat_near.mu(fGHz);
-            std::complex<double> z_a = std::sqrt(eta_a_if / mu_a);
-            std::complex<double> z_s = std::sqrt(eta_s_if / mu_s);
-            std::complex<double> rat = (eta_a_if * mu_a) / (eta_s_if * mu_s);
-
-            std::complex<double> ct2_arg = 1.0 - rat * sin2_i;
             if (qd_evanescent(ct2_arg))
                 ct2_arg = std::complex<double>(std::real(ct2_arg), -0.0); // decaying evanescent root
             std::complex<double> cos_t2 = std::sqrt(ct2_arg);
 
-            std::complex<double> te = (z_a * ci - z_s * cos_t2) / (z_a * ci + z_s * cos_t2);
-            std::complex<double> tm = is_scalar ? te : (z_s * ci - z_a * cos_t2) / (z_s * ci + z_a * cos_t2);
-            std::complex<double> c_te = wave ? mat_near.tf_face(mat_slab, fGHz, te) : 1.0, c_tm = wave ? mat_near.tf_face(mat_slab, fGHz, tm) : 1.0;
-            if (shut)
-                k_te = mat_near.closed_face(mat_slab, fGHz, te, z_a * ci, std::real(z_a * ci)),
-                k_tm = mat_near.closed_face(mat_slab, fGHz, tm, is_scalar ? z_a * ci : std::conj(z_a) * ci, std::real(is_scalar ? z_a * ci : std::conj(z_a) * ci));
-            R0_te = std::norm(te), R0_tm = std::norm(tm);
-            Ra_te = (wave || shut) ? ((shut && R0_te > 1.0) ? 1.0 : R0_te) : mat_slab.apply_tf_pair(mat_near, R0_te, fGHz); // the pair that forms the face
-            Ra_tm = (wave || shut) ? ((shut && R0_tm > 1.0) ? 1.0 : R0_tm) : mat_slab.apply_tf_pair(mat_near, R0_tm, fGHz);
+            r_te = (z1 * cs - z2 * cos_t2) / (z1 * cs + z2 * cos_t2);
+            r_tm = is_scalar ? r_te : (z2 * cs - z1 * cos_t2) / (z2 * cs + z1 * cos_t2);
 
-            // Returned as the slab-side reflection, so that rn keeps one meaning throughout: the
-            // internal series and the front port then differ only by the Stokes sign.
-            r_te = std::polar(std::sqrt(Ra_te), std::arg(-te));
-            r_tm = std::polar(std::sqrt(Ra_tm), std::arg(-tm));
-
-            t_fwd[0] = (2.0 * z_a * ci) / (z_a * ci + z_s * cos_t2);
-            t_fwd[1] = is_scalar ? t_fwd[0] : (2.0 * z_a * ci) / (z_s * ci + z_a * cos_t2);
-            t_bwd[0] = (2.0 * z_s * cos_t2) / (z_s * cos_t2 + z_a * ci);
-            t_bwd[1] = is_scalar ? t_bwd[0] : (2.0 * z_s * cos_t2) / (z_a * cos_t2 + z_s * ci);
-            t_fwd[0] *= c_te, t_fwd[1] *= c_tm, t_bwd[0] *= c_te, t_bwd[1] *= c_tm;
-        };
-
-        // The far interface at the true complex in-slab cosine rather than at its real projection.
-        // Produce mode holds the real incidence angle in the near medium, so the in-slab cosine follows
-        // from Snell with nothing projected away, and Snell is transitive: the cosine in the far medium
-        // depends only on the near and far media, not on the slab between them. Dropping the imaginary
-        // part here was worth 2 dB at 85 deg for a 10 cm concrete slab and is the whole of the sheet's
-        // remaining error at grazing incidence. Correction mode keeps the real-angle path above,
-        // because ray_state_update's angle comes from real ray geometry and its result must not move.
-        auto fresnel_r_far = [&](std::complex<double> &r_te, std::complex<double> &r_tm,
-                                 double &Ra_te, double &Ra_tm,
-                                 double &R0_te, double &R0_tm, // raw, pre-tf, for the amplitude scale
-                                 std::complex<double> *t_out)  // [te, tm] slab -> far
-        {
-            std::complex<double> eta_n_if = mat_near.eta(fGHz) + mat_near.eta_resonance(fGHz);
-            std::complex<double> mu_n = mat_near.mu(fGHz);
-            std::complex<double> eta_a_if = mat_far.eta(fGHz) + mat_far.eta_resonance(fGHz);
-            std::complex<double> mu_a = mat_far.mu(fGHz);
-            std::complex<double> z_s = std::sqrt(eta_s_if / mu_s);
-            std::complex<double> z_a = std::sqrt(eta_a_if / mu_a);
-
-            // In-slab cosine from the hoisted value; the cosine in the far medium follows from the
-            // same incidence-side sine, since Snell is transitive and the slab drops out of it.
-            std::complex<double> cts = cts_exact;
-            std::complex<double> cos_t2_arg = 1.0 - ((eta_n_if * mu_n) / (eta_a_if * mu_a)) * sin2_i;
-            if (qd_evanescent(cos_t2_arg))
-                cos_t2_arg = std::complex<double>(std::real(cos_t2_arg), -0.0); // decaying evanescent root
-            std::complex<double> cos_t2 = std::sqrt(cos_t2_arg);
-
-            std::complex<double> te = (z_s * cts - z_a * cos_t2) / (z_s * cts + z_a * cos_t2);
-            std::complex<double> tm = is_scalar ? te : (z_a * cts - z_s * cos_t2) / (z_a * cts + z_s * cos_t2);
-            t_out[0] = (2.0 * z_s * cts) / (z_s * cts + z_a * cos_t2);
-            t_out[1] = is_scalar ? t_out[0] : (2.0 * z_s * cts) / (z_a * cts + z_s * cos_t2);
-
-            // tf at the far face of a coherent sheet: the transformer where the far medium carries a
-            // wave, the pad of a closed face where it does not. The pad hands back what the face
-            // passes of the incident flux, so the transmit port is formed as on any other sheet and
-            // the two ports are one rule. A closed face keeps the clamp.
-            if (wave && far_closed)
+            if (adj.thk > 0.0 && !(adj.m > 0.0))
             {
-                std::complex<double> z_n = std::sqrt(eta_n_if / mu_n);
-                t_out[0] = std::polar(mat_slab.closed_face(mat_far, fGHz, te, z_s * cts, std::real(z_n * ci)), is_scalar ? std::arg(t_out[0]) : 0.0);
-                t_out[1] = is_scalar ? t_out[0] : mat_slab.closed_face(mat_far, fGHz, tm, std::conj(z_s) * cts, std::real(std::conj(z_n) * ci));
-                tm = is_scalar ? te : tm;
+                // Seen from the slab a lining lies in the air beyond it; a sheet inside the slab
+                // has the slab on both sides and the solver centres it.
+                QdLayer lay[2];
+                lay[0].mtl = &adj, lay[0].thk = adj.thk;
+                if (adj2)
+                    lay[1].mtl = adj2, lay[1].thk = adj2->thk;
+                Material air_backing;
+                std::complex<double> Lr_te, Lr_tm;
+                if (qd_stack_resolve(mat_slab, lay, adj2 ? 2 : 1, backing ? *backing : air_backing,
+                                     cs, fGHz, is_scalar, nullptr, nullptr, &Lr_te, &Lr_tm, true))
+                {
+                    r_te = Lr_te, r_tm = is_scalar ? Lr_te : Lr_tm;
+                    return;
+                }
             }
-            else if (wave)
-                t_out[0] *= mat_slab.tf_face(mat_far, fGHz, te), t_out[1] *= mat_slab.tf_face(mat_far, fGHz, tm);
-            R0_te = std::norm(te), R0_tm = std::norm(tm);
-            Ra_te = wave ? ((far_closed && R0_te > 1.0) ? 1.0 : R0_te) : mat_slab.apply_tf_pair(mat_far, R0_te, fGHz); // the pair that forms the face
-            Ra_tm = wave ? ((far_closed && R0_tm > 1.0) ? 1.0 : R0_tm) : mat_slab.apply_tf_pair(mat_far, R0_tm, fGHz);
-            r_te = std::polar(std::sqrt(Ra_te), std::arg(te));
-            r_tm = std::polar(std::sqrt(Ra_tm), std::arg(tm));
+            if (std::imag(eta_a_if * mu_a) == 0.0 && std::abs(rat * sin2) >= 1.0) // closed, as interact_with judges it
+                mat_slab.closed_face(adj, fGHz, r_te, z1 * cs, 1.0), mat_slab.closed_face(adj, fGHz, r_tm, is_scalar ? z1 * cs : std::conj(z1) * cs, 1.0);
+            else
+                mat_slab.tf_face(adj, fGHz, r_te), mat_slab.tf_face(adj, fGHz, r_tm);
         };
 
         std::complex<double> rn_te, rn_tm, rf_te, rf_tm;
-        std::complex<double> tn_fwd[2], tn_bwd[2], tf_out[2];
-        double Rn_te = 0.0, Rn_tm = 0.0, Rf_te = 0.0, Rf_tm = 0.0;
-        double R0n_te = 0.0, R0n_tm = 0.0, R0f_te = 0.0, R0f_tm = 0.0;
-        if (produce)
-        {
-            fresnel_r_near(rn_te, rn_tm, Rn_te, Rn_tm, R0n_te, R0n_tm, tn_fwd, tn_bwd);
-            fresnel_r_far(rf_te, rf_tm, Rf_te, Rf_tm, R0f_te, R0f_tm, tf_out);
-        }
-        else
-        {
-            fresnel_r(mat_near, rn_te, rn_tm, Rn_te, Rn_tm, nullptr, back_near);
-            fresnel_r(mat_far, rf_te, rf_tm, Rf_te, Rf_tm, nullptr, back_far);
-        }
+        fresnel_r(mat_near, rn_te, rn_tm, back_near, (near2 && !(near2->m > 0.0)) ? near2 : nullptr);
+        fresnel_r(mat_far, rf_te, rf_tm, back_far, nullptr);
 
-        // Interface amplitudes for the produce ports: the raw Fresnel amplitude, rescaled only by
-        // whatever tf redistributes between the reflected and transmitted ports.
-        //
-        // The magnitude used to be sqrt(1 - R). That is not the normal-flux transmittance, which is
-        // Re(z2 c2)/Re(z1 c1) |t|^2 per channel; the two coincide only when the incidence medium is
-        // lossless, and neither of the two internal crossings here has a lossless incidence side.
-        // It is also not the single-pass amplitude of a two-interface stack: |t12 * t21| differs
-        // from (1 - |r|^2) by the phase between z1*c1 and z2*c2. Measured against an exact transfer
-        // matrix, that one substitution was the entire residual of the sheet composite - 0.0156 dB
-        // at normal incidence for lossy concrete, against 2.5e-5 dB from every other approximation
-        // here combined.
-        //
-        // The raw amplitudes stay, because the intermediate slab flux cancels between the two
-        // crossings and never appears in the composite. What the composite does owe is the obliquity
-        // factor of the pair it actually spans, near to far, which is applied once below.
-        std::complex<double> tns_te, tns_tm, tsn_te, tsn_tm, tsf_te, tsf_tm;
-        double ig = 1.0, ig_echo = 1.0;  // ig_echo: the sheet's own gain, on what entered it and came back
-        double fx_te = 1.0, fx_tm = 1.0; // near -> far normal-flux conversion, transmit port only
-        if (produce)
-        {
-            // A mass-law sheet rescales by (1 - R') / (1 - R0), or passes the flat leak where a
-            // face has no forward port. The amplitudes of a coherent sheet are final as they stand:
-            // its reflectance after tf is the raw one of the transformed face, so the factor is one.
-            auto AMP = [&](double R_tf, double R0, const std::complex<double> &t) -> std::complex<double>
-            {
-                double keep = 1.0 - R0;
-                if (wave || !(keep < 1.0e-9))
-                    return wave ? t : t * std::sqrt(((R_tf < 1.0) ? 1.0 - R_tf : 0.0) / keep);
-                return std::polar(std::sqrt((R_tf < 1.0) ? 1.0 - R_tf : 0.0), std::arg(t)); // TIR or grazing: no forward port left to scale
-            };
-            tns_te = AMP(Rn_te, R0n_te, tn_fwd[0]), tns_tm = AMP(Rn_tm, R0n_tm, tn_fwd[1]); // near -> slab
-            tsn_te = AMP(Rn_te, R0n_te, tn_bwd[0]), tsn_tm = AMP(Rn_tm, R0n_tm, tn_bwd[1]); // slab -> near
-            tsf_te = AMP(Rf_te, R0f_te, tf_out[0]), tsf_tm = AMP(Rf_tm, R0f_tm, tf_out[1]); // slab -> far
-
-            // The far medium's lumped interface_gain is owed only when the wave actually enters a new
-            // medium, which is what Material::interact_with folds in for a transmission-class
-            // interaction. Testing for air was a proxy for that, and the proxy fails for a sheet
-            // embedded in a medium: with near == far the ray was already inside the far medium and
-            // must not pay its entry loss a second time. Air-bounded and air|sheet|solid stacks are
-            // unaffected, and solid|sheet|air gives air's interface_gain of 1.0 on either test.
-            bool far_is_new = !far_is_air && !mat_far.same_as(mat_near);
-            ig = std::sqrt(mat_slab.interface_gain(fGHz) * (far_is_new ? mat_far.interface_gain(fGHz) : 1.0));
-            ig_echo = std::sqrt(mat_slab.interface_gain(fGHz));
-
-            // Normal-flux conversion for the transmit port, matching what Material::interact_with
-            // applies to a single crossing. The composite carries the wave from the near medium into
-            // the far one, so it owes that pair's obliquity factor exactly once; the flux inside the
-            // slab cancels between the two internal crossings and never enters. The reflect port
-            // turns around in the near medium, where the factor is 1, and is left alone.
-            //
-            // With near == far the factor is identically 1, so an isolated sheet, a collapsed
-            // duplicate and a sheet embedded in one medium are all untouched. Only the glued cases
-            // move. Snell is transitive, so the cosine in the far medium follows from the incidence
-            // sine and the slab drops out of it. A closed far face carries no flux to convert to:
-            // what it passes is already over the incident flux.
-            if (!mat_far.same_as(mat_near) && !far_closed)
-            {
-                std::complex<double> eta_n_if = mat_near.eta(fGHz) + mat_near.eta_resonance(fGHz);
-                std::complex<double> mu_n = mat_near.mu(fGHz);
-                std::complex<double> eta_f_if = mat_far.eta(fGHz) + mat_far.eta_resonance(fGHz);
-                std::complex<double> mu_f = mat_far.mu(fGHz);
-                std::complex<double> z_n = std::sqrt(eta_n_if / mu_n);
-                std::complex<double> z_f = std::sqrt(eta_f_if / mu_f);
-
-                std::complex<double> cf_arg = 1.0 - ((eta_n_if * mu_n) / (eta_f_if * mu_f)) * sin2_i;
-                if (qd_evanescent(cf_arg))
-                    cf_arg = std::complex<double>(std::real(cf_arg), -0.0); // decaying evanescent root
-                std::complex<double> c_far = std::sqrt(cf_arg);
-
-                // The denominator is the incidence-side normal flux, Re(z_n c_n) per channel. It has
-                // to be the same real number the crossing that entered the near medium put in its
-                // numerator, or the pair does not telescope; that is what makes the recovered cosine
-                // matter here and not only in the amplitudes.
-                Material::flux_amp(z_n, z_f, ci, c_far, fx_te, fx_tm);
-                if (is_scalar)
-                    fx_tm = fx_te;
-            }
-        }
-
-        // A mass-law sheet where the outer pair is past its critical angle.
-        //
-        // Total reflection of near | far says that no Fresnel wave propagates in the far medium,
-        // and nothing about the sheet. A mass-law sheet has no wave inside, so what crosses is
-        // the leak of its two faces, written as the two crossings a traced solid of the same
-        // material would produce, with the mass term between them:
-        //
-        //     near | sheet   Material::interact_with's transmission, with the sheet's interface gain
-        //     sheet | far    Material::interact_with's transmission, with the far medium's gain
-        //
-        // Each is evaluated at the cosine the wave has there. Entered as a leak, near | sheet
-        // itself past its critical angle, the wave kept the incidence cosine and meets the far
-        // face with it as a wave held undeviated. Entered by an ordinary crossing it is at the
-        // Snell cosine, where the far face is closed whenever the outer pair is; the verdict is
-        // forced rather than re-derived from a complex cosine, and in scalar mode the phase of
-        // the leak is read off the far transmission formed above. With no tf anywhere the last
-        // event is a closed port and the result is zero. A coherent sheet needs none of this:
-        // its far face is the pad of a closed face and its transmit port the composite's.
-        std::complex<double> leak_te(0.0, 0.0), leak_tm(0.0, 0.0);
-        if (produce && far_closed && mat_slab.m > 0.0)
-        {
-            int it = is_scalar ? 4 : 1;
-            bool leak_first = false; // the wave entered the sheet as a leak
-            std::complex<double> a_te, a_tm, b_te, b_tm;
-            mat_near.interact_with(mat_slab, it, 0.0, fGHz, &a_te, &a_tm, nullptr, nullptr, nullptr, &leak_first,
-                                   false, &ci, near_undeviated);
-            if (leak_first)
-                mat_slab.interact_with(mat_far, it, 0.0, fGHz, &b_te, &b_tm, nullptr, nullptr, nullptr, nullptr,
-                                       false, &ci, true);
-            else
-            {
-                mat_slab.interact_with(mat_far, it, 0.0, fGHz, &b_te, &b_tm, nullptr, nullptr, nullptr, nullptr,
-                                       true, &cts_exact);
-                if (is_scalar)
-                    b_te = b_tm = std::polar(std::abs(b_te), std::arg(tf_out[0]));
-            }
-            leak_te = a_te * b_te, leak_tm = a_tm * b_tm;
-        }
-
-        if (produce && mat_slab.m > 0.0) // Incoherent route for mass-law slabs
-        {
-            // No series and no in-slab phase, but the two interface phases are genuine surface
-            // effects and are kept. mass_min_path = 0.0 because a thin sheet is a real traversal;
-            // the default floor exists to reject sub-millimeter paths in traced solids.
-            //
-            // The mass term is handed its two pieces separately: thk_normal is the surface-mass
-            // surrogate and mass_c is the angle factor, so the sheet and a traced solid of
-            // the same normal thickness form the same argument. The geometric-distance slot keeps
-            // the product thk_normal * cos, which is what the minimum-path gate reads and what the
-            // zero sentinel tests; neither the quotient thk / cos nor a floor on the cosine is
-            // formed anywhere. At exact tangency the product is zero, which medium_gain would read
-            // as "no geometric path supplied" and would then substitute the refracted path, so the
-            // term is disabled outright in that case instead.
-            //
-            // Both pieces are real even where a complex incidence cosine was recovered. The
-            // surrogate and its angle factor are lumped quantities the material table is calibrated
-            // on, not wave quantities, and medium_gain takes them as real by construction; the same
-            // reasoning excludes a mass-law slab from the exact in-medium branch in
-            // SCALE_BY_MEDIUM. The two interface amplitudes above are wave quantities and do carry
-            // the recovered cosine.
-            //
-            // The angle factor is the cosine the wave has in air. The plate is driven at the trace
-            // wavenumber and the term is calibrated on a plate in air, so the angle is the one the
-            // transverse invariant has there and not the one in a medium the wave was refracted
-            // into on its way. Reached from air that is abs_cos_theta; a caller that reaches the
-            // sheet from inside such a medium hands it in as mass_cos.
-            const double mass_c = (mass_cos >= 0.0) ? mass_cos : abs_cos_theta;
-            double mass_path = thk_normal * mass_c;
-            double mass_floor = (mass_path > 0.0) ? 0.0 : 1.0e300;
-            //
-            // A sheet reached from inside a mass-law body is bonded to it: mass_bonded is the X0
-            // that body's leg carries, and the sheet pays what the plate is worth above it.
-            double gI = mat_slab.medium_gain(dist_slab, fGHz, abs_cos_theta_t, mass_path, 1.0, mass_floor,
-                                             thk_normal, mass_c, mass_bonded);
-            double aI = std::sqrt((gI < 0.0) ? 0.0 : gI);
-
-            // A closed sheet passes what its near face passes, the pad of a closed face, and what
-            // that flux launches behind its far face, the reverse of the pad the far medium sees.
-            // A leak is a statement about normal flux, so the two of them are the whole of the
-            // transmit port and the near-to-far conversion, which belongs to an unbroken chain of
-            // raw amplitudes, is not applied across the sheet.
-            if (shut)
-            {
-                std::complex<double> eta_f = mat_far.eta(fGHz) + mat_far.eta_resonance(fGHz), mu_f = mat_far.mu(fGHz);
-                std::complex<double> z_f = std::sqrt(eta_f / mu_f), c_f = std::sqrt(1.0 - (w_n / (eta_f * mu_f)) * sin2_i);
-                std::complex<double> y_fe = z_f * c_f, y_fm = is_scalar ? y_fe : std::conj(z_f) * c_f;
-                std::complex<double> q_te = -std::polar(std::sqrt(R0f_te), std::arg(rf_te)), q_tm = -std::polar(std::sqrt(R0f_tm), std::arg(rf_tm)); // raw, seen from behind
-                double a_te = mat_far.closed_face(mat_slab, fGHz, q_te, y_fe, std::norm(y_fe) / std::real(y_fe));
-                double a_tm = mat_far.closed_face(mat_slab, fGHz, q_tm, y_fm, std::norm(y_fm) / std::real(y_fm));
-                tns_te = std::polar(k_te, std::arg(tn_fwd[0])), tns_tm = std::polar(k_tm, std::arg(tn_fwd[1]));
-                tsf_te = std::polar(a_te, std::arg(tf_out[0])), tsf_tm = std::polar(a_tm, std::arg(tf_out[1]));
-                fx_te = fx_tm = 1.0;
-            }
-            // A sheet behind a wave that is held undeviated in a mass-law medium, towards the lower
-            // index: a later face of the same wall. The wave is a leak and keeps the incidence
-            // cosine, so the sheet is the leak chain's own branch for a sheet entered by a leak:
-            // near | sheet and sheet | far through Material::interact_with with the wave held,
-            // each with the interface gain of the medium it enters, and the mass term. The near
-            // face is then charged what the other direction charges, and the wall is one wall
-            // from its two sides and the same wall with the sheet meshed as a traced solid. The
-            // composite above would enter the sheet at the Snell cosine of two impedance
-            // mappings, where both faces are flat leaks past the critical angle of the pair and
-            // the near-to-far conversion, 1 / Re(z cos) of a mapping, multiplies them.
-            //
-            // The reflect port follows, as at a bare face: the reflection the other direction
-            // sees at this cosine with its sign reversed, so the two ports of the near face add
-            // up. The three gates are those of the undeviated rule, decided on the media and on
-            // the direction the tracer holds.
-            if (near_undeviated && mat_near.m > 0.0 && std::abs(w_n / (eta_s_if * mu_s)) > 1.0)
-            {
-                std::complex<double> h_te, h_tm;
-                if (!far_closed)
-                {
-                    int it = is_scalar ? 4 : 1;
-                    std::complex<double> a_te, a_tm, b_te, b_tm;
-                    mat_near.interact_with(mat_slab, it, 0.0, fGHz, &a_te, &a_tm, nullptr, nullptr, nullptr, nullptr, false, &ci, true);
-                    mat_slab.interact_with(mat_far, it, 0.0, fGHz, &b_te, &b_tm, nullptr, nullptr, nullptr, nullptr, false, &ci, true);
-                    // The far medium's interface gain is owed only where it is newly entered
-                    double un = (!far_is_air && mat_far.same_as(mat_near)) ? 1.0 / std::sqrt(mat_far.interface_gain(fGHz)) : 1.0;
-                    h_te = (aI * un) * a_te * b_te, h_tm = (aI * un) * a_tm * b_tm;
-                }
-                else
-                    h_te = aI * leak_te, h_tm = aI * leak_tm;
-                std::complex<double> r_te, r_tm;
-                mat_near.interact_with(mat_slab, is_scalar ? 3 : 0, 0.0, fGHz, &r_te, &r_tm, nullptr, nullptr, nullptr, nullptr, false, &ci, true);
-                if (T_te)
-                    *T_te = h_te;
-                if (T_tm)
-                    *T_tm = h_tm;
-                if (R_te)
-                    *R_te = r_te;
-                if (R_tm)
-                    *R_tm = r_tm;
-                return true;
-            }
-            if (T_te)
-                *T_te = far_closed ? aI * leak_te : ig * fx_te * aI * tns_te * tsf_te;
-            if (T_tm)
-                *T_tm = far_closed ? aI * leak_tm : ig * fx_tm * aI * tns_tm * tsf_tm;
-            if (R_te) // Stokes reversal: the near interface seen from the incidence side
-                *R_te = -rn_te;
-            if (R_tm)
-                *R_tm = -rn_tm;
-            return true;
-        }
-
-        // One-way in-slab propagation factor phi, polarization-independent.
-        //
-        // Correction mode keeps the hybrid form: magnitude from medium_gain over the traced path
-        // length, phase from the real index and the real projected cosine. Its angle comes from real
-        // ray geometry and its result must not move.
-        //
-        // Produce mode takes both from one expression, exp(-j k0 n thk cos_theta_slab), with the index
-        // and the cosine complex. Nothing propagates geometrically inside a sheet, so there is no real
-        // direction the cosine has to be projected onto, and the incidence angle alone determines it.
-        // The hybrid was the last term in the sheet's error budget once the interface amplitudes were
-        // corrected: worth up to 0.039 dB at grazing incidence on a low-permittivity slab, and
-        // removing it puts the composite on the analytic value at every angle.
-        //
-        // The conductivity loss lives inside n, so medium_gain must not supply it a second time; only
-        // the alpha column is drawn from the material. The mass-law term cannot arrive here at all -
-        // a mass-law slab returned through the incoherent route above. The index stays
-        // resonance-excluded while the cosine does not, preserving the split the rest of this file
-        // uses: a permittivity resonance is an interface effect, not a propagation one.
+        // One-way propagation factor. With the recovered cosine it is exp(-j k0 n thk c), index
+        // and cosine complex, over the normal thickness the traced path covers, with only the
+        // alpha column drawn from the material. Without one it is the hybrid: the magnitude from
+        // medium_gain over the traced path, the phase from the real index and the real cosine.
         std::complex<double> phi_1;
-        if (produce)
+        if (have_exact_ct)
         {
-            std::complex<double> n_cx = std::sqrt(mat_slab.eta(fGHz) * mu_s); // complex, resonance-excluded
-            double ex = mat_slab.excess_gain(dist_slab, fGHz);                // alpha only, no conductivity
-            phi_1 = std::exp(std::complex<double>(0.0, -1.0) * (omega / c0) * n_cx * thk_normal * cts_exact) *
-                    std::sqrt((ex < 0.0) ? 0.0 : ex);
-        }
-        else if (have_exact_ct)
-        {
-            // Same exact form as produce mode. The normal thickness is pure geometry - the traced path
-            // times the traced cosine - and only the phase and loss across it use the recovered angle.
-            std::complex<double> n_cx = std::sqrt(mat_slab.eta(fGHz) * mu_s); // resonance-excluded
-            double ex = mat_slab.excess_gain(dist_slab, fGHz);                // alpha only
-            phi_1 = std::exp(std::complex<double>(0.0, -1.0) * (omega / c0) * n_cx * thk_normal * cs) *
-                    std::sqrt((ex < 0.0) ? 0.0 : ex);
+            double ex = mat_slab.excess_gain(dist_refract, fGHz); // alpha only, no conductivity
+            phi_1 = std::exp(std::complex<double>(0.0, -1.0) * k0 * n_cx * (dist_refract * abs_cos_theta_t) * cs) * std::sqrt((ex < 0.0) ? 0.0 : ex);
         }
         else
         {
             double gL = mat_slab.medium_gain(dist_refract, fGHz, abs_cos_theta_t, dist_geo, abs_cos_theta);
-            double abs_phi = std::sqrt((gL < 0.0) ? 0.0 : gL);
-            double arg_phi = -(omega / c0) * n_cur * dist_refract * abs_cos_theta_t * abs_cos_theta_t;
-            phi_1 = std::polar(abs_phi, arg_phi);
+            phi_1 = std::polar(std::sqrt((gL < 0.0) ? 0.0 : gL), -k0 * std::real(n_cx) * dist_refract * abs_cos_theta_t * abs_cos_theta_t);
         }
-
         std::complex<double> phi2 = phi_1 * phi_1;
 
-        std::complex<double> denom_te = std::complex<double>(1.0, 0.0) - rn_te * rf_te * phi2;
-        std::complex<double> denom_tm = std::complex<double>(1.0, 0.0) - rn_tm * rf_tm * phi2;
+        // Survival gate on the stronger polarization: a weak series is left to the tracer
+        double g2L = mat_slab.medium_gain(2.0 * dist_refract, fGHz, abs_cos_theta_t, 2.0 * dist_geo, abs_cos_theta);
+        double rr_te = std::norm(rn_te * rf_te), rr_tm = std::norm(rn_tm * rf_tm);
+        double rho = std::sqrt(((rr_te > rr_tm) ? rr_te : rr_tm) * ((g2L < 0.0) ? 0.0 : g2L));
+        if (!verdict_given && rho < eps)
+            return false;
 
-        if (!produce)
-        {
-            // Survival gate (stronger polarization) + near-pole clamp (either) -> re-emit
-            double g2L = mat_slab.medium_gain(2.0 * dist_refract, fGHz, abs_cos_theta_t, 2.0 * dist_geo, abs_cos_theta);
-            g2L = (g2L < 0.0) ? 0.0 : g2L;
-            double rr_te = (Rn_te * Rf_te < 0.0) ? 0.0 : Rn_te * Rf_te;
-            double rr_tm = (Rn_tm * Rf_tm < 0.0) ? 0.0 : Rn_tm * Rf_tm;
-            double rho = std::sqrt(((rr_te > rr_tm) ? rr_te : rr_tm) * g2L);
-            if (!verdict_given && (rho < eps || std::abs(denom_te) < 1.0e-2 || std::abs(denom_tm) < 1.0e-2))
-                return false;
-
-            // A verdict that is given cannot be handed back: the bounces are not followed. A
-            // near-pole denominator is clamped in magnitude and keeps its phase, as for a sheet.
-            if (verdict_given)
-                for (std::complex<double> *d : {&denom_te, &denom_tm})
-                    if (std::abs(*d) < 1.0e-2)
-                        *d = std::polar(1.0e-2, std::arg(*d));
-        }
-        else
-        {
-            // Neither bail-out has a sheet equivalent: there is no interior to re-emit into, so a
-            // near-pole denominator is clamped in magnitude and keeps its phase, and the weak-slab
-            // gate is dropped - a weak slab simply resolves close to its single-pass value.
-            auto CLAMP_POLE = [](std::complex<double> &d)
-            {
-                if (std::abs(d) < 1.0e-2)
-                    d = std::polar(1.0e-2, std::arg(d));
-            };
-            CLAMP_POLE(denom_te), CLAMP_POLE(denom_tm);
-
-            std::complex<double> phi = phi_1;
-
-            // Displacement reference for the transmit port.
-            //
-            // A sheet has zero geometric thickness, so it stands for a real layer that OCCUPIES thk of
-            // whatever medium it sits in. The tracer walked that length as that medium, and the rest of
-            // the path already carries it, so it has to come back out here or the same length is
-            // counted twice. Without this a 10 cm pane modelled as a quad comes out 10 cm of optical
-            // path too long, which is exactly the k0*thk*cos(theta_i) offset it was measured at.
-            //
-            // WHICH medium is the one the sheet physically sits in, not the one it is attached to. For
-            // a glued pair that is the side which is not the solid: an absorber on a concrete wall
-            // occupies room air, so entering the room-air side it is the near medium, and leaving
-            // through the wall it is the far one. An isolated sheet has near == far and the choice does
-            // not arise.
-            //
-            // HOW MUCH is capped by disp_budget, because taking a medium back out is a division - by
-            // its loss as much as its phase - and a sheet thicker than the host it sits in would
-            // amplify rather than attenuate. Past the cap the sheet still carries its full thickness
-            // and only the replacement is limited, so the path simply comes out longer than the
-            // geometry. That is the right answer for a laminate whose layers do not fit inside their
-            // host, and it keeps every material crossing intact.
-            //
-            // phi2 in the denominator is a round trip inside the slab and stays absolute. The
-            // reflect port is handed to a ray that turns around at the mesh plane, so it owes the
-            // round trip through the part of the layer that lies in front of that plane: half of
-            // it where one medium is on both sides, the mesh plane being the mid-plane of the
-            // layer; all of it for a glued entry, whose layer lies in the near medium in front of
-            // the solid; none for a glued exit, whose layer lies beyond.
-            const Material &disp_mtl = disp_far ? mat_far : mat_near;
-            std::complex<double> eta_d = disp_mtl.eta(fGHz) + disp_mtl.eta_resonance(fGHz);
-            std::complex<double> mu_d = disp_mtl.mu(fGHz);
-            std::complex<double> n_d = std::sqrt(disp_mtl.eta(fGHz) * mu_d); // resonance-excluded, as above
-            std::complex<double> cd_arg = 1.0 - ((mat_near.eta(fGHz) + mat_near.eta_resonance(fGHz)) *
-                                                 mat_near.mu(fGHz) / (eta_d * mu_d)) *
-                                                    sin2_i;
-            if (qd_evanescent(cd_arg))
-                cd_arg = std::complex<double>(std::real(cd_arg), -0.0);
-            std::complex<double> c_disp = std::sqrt(cd_arg);
-
-            double thk_n = thk_normal; // sheet thickness along the normal
-            double t_disp = (disp_budget >= 0.0 && disp_budget < thk_n) ? disp_budget : thk_n;
-            if (t_disp < 0.0)
-                t_disp = 0.0;
-
-            std::complex<double> phi_disp =
-                std::exp(std::complex<double>(0.0, -1.0) * (omega / c0) * n_d * t_disp * c_disp);
-            std::complex<double> phi_t = (std::abs(phi_disp) > 0.0) ? phi / phi_disp : phi;
-            std::complex<double> undisp = (std::abs(phi_disp) > 0.0) ? std::complex<double>(1.0, 0.0) / phi_disp
-                                                                     : std::complex<double>(1.0, 0.0);
-            std::complex<double> front = mat_far.same_as(mat_near) ? undisp
-                                                                   : (disp_far ? std::complex<double>(1.0, 0.0) : undisp * undisp);
-
-            // Past the critical angle of the outer pair the far side carries no wave: the host
-            // length the sheet displaces was walked at the incidence cosine, and on the far side
-            // of a closed pair the Snell cosine above is evanescent, where dividing by that decay
-            // would amplify.
-            if (far_closed)
-            {
-                std::complex<double> phi_dl =
-                    std::exp(std::complex<double>(0.0, -1.0) * (omega / c0) * n_d * t_disp * ci);
-                phi_t = (std::abs(phi_dl) > 0.0) ? phi / phi_dl : phi;
-            }
-
-            if (T_te)
-                *T_te = ig * fx_te * tns_te * tsf_te * phi_t / denom_te;
-            if (T_tm)
-                *T_tm = ig * fx_tm * tns_tm * tsf_tm * phi_t / denom_tm;
-            if (R_te) // front-face reflection plus the series leaking back out through the near face
-                *R_te = front * (-rn_te + ig_echo * tns_te * tsn_te * rf_te * phi2 / denom_te);
-            if (R_tm)
-                *R_tm = front * (-rn_tm + ig_echo * tns_tm * tsn_tm * rf_tm * phi2 / denom_tm);
-            return true;
-        }
-
-        // Correction mode returns the series factor and nothing else. The port the caller holds
-        // already carries the per-channel Fresnel coefficient of its own interface, so S is the whole
-        // of what is owed here.
-        //
-        // This used to be S * sqrt(Tsp * corr), with corr = 1 / (Tn_avg * Tf_avg), on the reasoning
-        // that Material::interact_with hands over an AVERAGED two-interface magnitude that has to be
-        // converted back to a per-channel one. Both halves of that reasoning are wrong, and the pair
-        // was measured emitting exactly |T_X|^2 * |S_X|^2 * Tsp_X - the per-channel transmittance
-        // applied a second time on top of a port that already carried it.
-        //
-        // The averaging in interact_with never distorted a channel ratio, and after the energy
-        // convention change there is no averaged rescale left in the transmission branch at all:
-        // each channel carries its own normal-flux obliquity factor, and tf is per channel as
-        // well. And even if a per-channel
-        // conversion were needed here, corr divides by a TWO-interface single pass while
-        // ray_state_update corrects one interaction at a time, so the port in hand carries one
-        // interface, not two.
-        //
-        // The two branches now agree except for the scalar duplication: scalar mode carries one port
-        // and the caller scales a stored xprmat in place rather than rebuilding it from cTE, so both
-        // outputs get the same factor.
-        std::complex<double> S_te = std::complex<double>(1.0, 0.0) / denom_te;
-        std::complex<double> S_tm = is_scalar ? S_te : std::complex<double>(1.0, 0.0) / denom_tm;
-
-        if (T_te)
-            *T_te = S_te;
-        if (T_tm)
-            *T_tm = S_tm;
+        std::complex<double> S_te_v = 1.0 / (1.0 - rn_te * rf_te * phi2), S_tm_v = 1.0 / (1.0 - rn_tm * rf_tm * phi2);
+        if (S_te)
+            *S_te = S_te_v;
+        if (S_tm)
+            *S_tm = is_scalar ? S_te_v : S_tm_v;
         return true;
     }
 }
@@ -3224,14 +2381,19 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         // media on either side of the sheet - near and far - and the sheet itself goes into M_slab.
         // material_to_material plays no part in the sheet branches; the pair is one atomic crossing,
         // not a transition between two traced media.
-        Material M1, M2, M_slab;
-        bool sheet_resolve = false; // coefficients come from qd_slab_resolve instead of interact_with
-        if (sheet_case == 1 || sheet_case == 5)
+        Material M1, M2, M_slab, M_slab2;
+        bool sheet_resolve = false; // coefficients come from qd_stack_resolve instead of interact_with
+        const bool one_medium = sheet_case == 1 || sheet_case == 4 || sheet_case == 5 || (sheet_case == 6 && sheetFBS);
+        if (one_medium)
         {
-            // Isolated sheet, or a collapsed double-sided duplicate: the same medium sits on both
-            // sides, so near = far = air. The sheet material never reaches interact_with - it enters
-            // only through the slab resolve, which is what makes its normal orientation irrelevant.
-            M_slab = Material(MaterialSet, iMF);
+            // An isolated sheet, a collapsed double-sided duplicate, an ordered stack and a sheet
+            // at a corner, which is the sheet alone: the same medium sits on both sides, so
+            // near = far = air. The sheet material never reaches interact_with - it enters only
+            // through the composite, which is what makes its normal orientation irrelevant. A
+            // stack is traversed in the order bit 1 carries.
+            M_slab = Material(MaterialSet, (sheet_case == 4 && !front_eff) ? iMS : iMF);
+            if (sheet_case == 4)
+                M_slab2 = Material(MaterialSet, front_eff ? iMS : iMF);
             sheet_resolve = true;
         }
         else if (sheet_case == 2 || sheet_case == 3)
@@ -3279,19 +2441,12 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         // direction at all. Reading them off interact_with(near, sheet) would invent total reflection
         // past the air|sheet critical angle, and in scalar mode the impedance mapping readily gives
         // n < 1, which would turn an acoustic sheet into a mirror.
-        if (sheet_case == 1 || sheet_case == 5)
+        if (one_medium)
             total_reflection = false;        // near == far: unreachable except at exact tangency, so force it off
         bool tir_central = total_reflection; // pre-ray-tube TIR state
 
         auto SHEET_COMPOSITE = [&](bool far_closed)
         {
-            double thk = M_slab.thk;
-
-            // In-slab propagation angle. Only cos_theta2 is used; the coefficients and the TIR verdict
-            // of this near|sheet interface are deliberately thrown away for the reason just given.
-            std::complex<double> ct2_slab;
-            M1.interact_with(M_slab, interaction_type, thetaF, fGHz, nullptr, nullptr, &ct2_slab, nullptr, nullptr, nullptr);
-
             // A thin sheet is a laterally infinite layer, which is what the rest of the composite
             // already assumes: plane-wave Fresnel boundaries and a plane-parallel internal series.
             // There is no grazing clamp.
@@ -3315,11 +2470,9 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
             // averaged, so a per-ray walk-off test resolves geometry below the scale on which the
             // transfer function is defined.
             //
-            // Nothing diverges without it: qd_slab_resolve is written in the normal thickness and the
-            // complex in-slab cosine, and forms the one quotient that can grow under a loss-saturation
-            // cap of its own.
+            // Nothing diverges without it: qd_stack_resolve is written in the normal thickness and the
+            // complex in-slab cosine.
             double ct_geo = abs_cos_theta;
-            double ct_slab = std::abs(std::real(ct2_slab));
 
             // Displacement side and budget. The sheet sits on whichever side of a glued pair is not
             // the solid, which is the far side only for a glued exit. The budget is what this
@@ -3331,13 +2484,27 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
             const Material &M_disp = disp_far ? M2 : M1;
             double disp_budget = M_disp.same_as(Material()) ? -1.0 : 0.8 * OF_length * ct_geo;
 
-            // Thickness enters only here. Produce mode takes the normal thickness and the two
-            // cosines and owns every length it derives from them; the geometric-path slot is unused.
+
+            // Angle factor of a mass term: the cosine the wave has in air. Reached from air that
+            // is ct_geo. A lining left from inside a solid with types 2 and 5 is reached along the
+            // bent segment, and the cosine in air is the far cosine of solid | air at that angle.
+            double ct_mass = ct_geo;
+            if (geometry_type == 2 && sheet_case == 3 && M_slab.m > 0.0 && !(M1.m > 0.0))
+            {
+                std::complex<double> cos_air;
+                bool tir_air = false;
+                M1.interact_with(Material(), interaction_type, thetaF, fGHz, nullptr, nullptr, &cos_air, nullptr, nullptr, &tir_air);
+                if (!tir_air && std::real(cos_air) > 0.0)
+                    ct_mass = (std::real(cos_air) > 1.0) ? 1.0 : std::real(cos_air);
+            }
+
+            // The wave is held undeviated by construction: the incidence angle is the geometric one.
+            QdLayer lay[2];
+            lay[0].mtl = &M_slab, lay[0].thk = M_slab.thk, lay[1].mtl = &M_slab2, lay[1].thk = M_slab2.thk;
             std::complex<double> Tte, Ttm, Rte, Rtm;
-            qd_slab_resolve(M1, M_slab, M2, thk, 0.0, ct_slab, ct_geo,
-                            fGHz, is_scalar, 0.0, true, &Tte, &Ttm, &Rte, &Rtm,
-                            disp_far, disp_budget, std::complex<double>(0.0, 0.0),
-                            std::complex<double>(0.0, 0.0), nullptr, far_closed, true);
+            if (!qd_stack_resolve(M1, lay, (sheet_case == 4) ? 2 : 1, M2, std::complex<double>(ct_geo, 0.0), fGHz, is_scalar,
+                                  &Tte, &Ttm, &Rte, &Rtm, disp_far, disp_budget, ct_mass, 0.0, true, far_closed))
+                Tte = Ttm = Rte = Rtm = 0.0; // a singular denominator: nothing is handed on
 
             // Both ports come out of the one pass over the same Fresnel quantities. The reflection port
             // is its own Airy sum, not what interact_with would return for a half-space: expect real
@@ -3388,22 +2555,19 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
             // numerical tangency - which would escalate the entire tube into a mirror on the strength
             // of a rounding artifact at the spine. Skipped where the far medium is lossy as well: it
             // has no critical angle, for an edge as little as for the spine.
-            if (geometry_type == 2 && sheet_case != 1 && sheet_case != 4 && sheet_case != 5 &&
+            if (geometry_type == 2 && !one_medium &&
                 std::imag((M2.eta(fGHz) + M2.eta_resonance(fGHz)) * M2.mu(fGHz)) == 0.0)
                 for (int i = 0; i <= 3 && !total_reflection; ++i)
                     if (eta * sin_thetaV[i] >= 1.0)
                         total_reflection = true;
         }
 
-        // Outgoing spine direction. An isolated sheet and a collapsed duplicate need no special case:
-        // with near == far the interface call returned eta = 1 and cos_theta2 = cos_theta, so the
-        // refraction branch reproduces the incoming direction. An ordered stack does: its interface
-        // call saw the legacy pair of its two layers, which is not near | far. It has one medium on
-        // both sides, so the spine, the tube and path_dirN keep the incoming direction.
-        const bool no_bend = sheet_case == 4;
+        // Outgoing spine direction. A sheet with one medium on both sides needs no special case:
+        // the interface call returned eta = 1 and cos_theta2 = cos_theta, so the refraction branch
+        // reproduces the incoming direction.
         if (geometry_type == 0) // Reflection, normalized by default
             qd_reflect(ODx, ODy, ODz, Nx, Ny, Nz, FDx, FDy, FDz);
-        else if (geometry_type == 1 || total_reflection || no_bend) // Transmission without refraction
+        else if (geometry_type == 1 || total_reflection) // Transmission without refraction
             FDx = ODx, FDy = ODy, FDz = ODz;                        // New path direction = same as incoming ray, already normalized
         else                                                        // Refraction
             qd_refract(ODx, ODy, ODz, Nx, Ny, Nz, eta, abs_cos_theta, cos_theta2, FDx, FDy, FDz);
@@ -3469,7 +2633,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
                     Tx = Wx - Fx, Ty = Wy - Fy, Tz = Wz - Fz;
 
                     // Vertex ray directions remains the same for Transmission
-                    if (geometry_type == 2 && !total_reflection && !no_bend) // Refraction (skipped when the whole tube passes through under TIR)
+                    if (geometry_type == 2 && !total_reflection) // Refraction (skipped when the whole tube passes through under TIR)
                     {
                         std::complex<double> cos_theta2V = std::sqrt(1.0 - eta1_div_eta2 * sin_thetaV[iTube + 1] * sin_thetaV[iTube + 1]);
                         qd_refract(Vx, Vy, Vz, Nx, Ny, Nz, eta, cos_thetaV[iTube + 1], cos_theta2V, Vx, Vy, Vz);
@@ -3526,17 +2690,8 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
             }
         }
 
-        // Re-evaluate coefficients if the ray tube introduced TIR (type-2 tube vertices).
-        // A glued sheet keeps its composite, formed with its far side closed, exactly as for a
-        // spine past its critical angle. It can only fire
-        // for cases 2/3, where near and far differ; the cases where near == far never reach it.
-        if (total_reflection != tir_central)
-        {
-            if (sheet_resolve)
-                SHEET_COMPOSITE(true);
-            else
-                M1.interact_with(M2, interaction_type, thetaF, fGHz, &cTE, &cTM, nullptr, nullptr, nullptr, nullptr, true, nullptr, true);
-        }
+        // A tube with an edge past the critical angle passes undeviated as a whole. The coefficient
+        // stays the spine's: the verdict was taken for the geometry of the tube, not for the wave.
 
         // Read the output ray index
         if (i_rayN >= n_rayN) // Just to be sure to avoid any segfaults
@@ -3568,7 +2723,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         if (p_path_dirN)
         {
             double PDx = FDx, PDy = FDy, PDz = FDz;
-            if (geometry_type == 1 && !tir_central && !no_bend) // spine Snell; under spine TIR there is no Snell direction
+            if (geometry_type == 1 && !tir_central) // spine Snell; under spine TIR there is no Snell direction
                 qd_refract(ODx, ODy, ODz, Nx, Ny, Nz, eta, abs_cos_theta, cos_theta2, PDx, PDy, PDz);
             SET3(p_path_dirN, PDx, PDy, PDz);
         }
@@ -4221,7 +3376,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
         //   1 = isolated sheet, collapsed double-sided duplicate, or a corner whose SBS was dropped
         //   2 = glued entry, host | sheet | solid
         //   3 = glued exit, solid | sheet | air
-        //   4 = ordered stack of two different sheets (physics not implemented, see below)
+        //   4 = ordered stack of two different sheets, traversed in the order bit 1 carries
         int sheet_case = 0, sheet_mtl = 0, sheet_solid = 0, sheet_mtl2 = 0;
         if (typeH[6])
         {
@@ -5115,10 +4270,8 @@ void quadriga_lib::ray_state_update(int interaction_type,
         // The returned factor folds the per-polarization Airy phase into xprmat so TE and TM carry
         // their own slab retardation (and the resulting depolarization) while the total power gain
         // stays at the TE/TM-averaged value.
-        // Argument order is historical: mtl_near is the interface ahead of the ray, mtl_far the one
-        // it entered through - the reverse of qd_slab_resolve's incidence-side convention. Correction
-        // mode is symmetric in the two so this is harmless, but a produce-mode call from here would
-        // have to swap them.
+        // mtl_near is the interface ahead of the ray, mtl_far the one it entered through; the series
+        // is symmetric in the two.
         // Returns true when the series resolved (caller sets any extra state, e.g. the reflected slab flag).
         bool series_summed = false; // this event summed a bounce series; the verdict handed out
         auto SLAB_AIRY_FACTOR = [&](int mtl_slab, int mtl_near, int mtl_far, int mtl_back = 0) -> bool
@@ -5147,12 +4300,11 @@ void quadriga_lib::ray_state_update(int interaction_type,
             bool far_in_slab = prev_embedded && mtl_far == mtl_prev && IS_SHEET(mtl_far);
 
             std::complex<double> fac_te, fac_tm;
+            Material M_near2 = MAT(sheet_mtl2); // the second layer of an ordered stack ahead
             if (!qd_slab_resolve(MAT(mtl_near), MAT(mtl_slab), MAT(mtl_far),
                                  dist_refract, dist_geo, abs_cos_theta_t, abs_cos_theta,
-                                 fGHz, is_scalar, eps, false, &fac_te, &fac_tm,
-                                 nullptr, nullptr, false, -1.0, EXACT_IN_SLAB_COSINE(),
-                                 std::complex<double>(0.0, 0.0), &M_back, false, false, 0.0,
-                                 far_in_slab ? &M_back_far : nullptr, given))
+                                 fGHz, is_scalar, eps, &fac_te, &fac_tm, EXACT_IN_SLAB_COSINE(),
+                                 &M_back, far_in_slab ? &M_back_far : nullptr, given, (sheet_case == 4) ? &M_near2 : nullptr))
                 return false;
             series_summed = true;
 
@@ -5185,7 +4337,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
         // solid but reached from inside another medium has that medium on its near side. Getting it
         // wrong is not a small error: it moves both Fresnel boundaries, the Airy denominator that
         // couples them, and the lumped interface gain, all at once. This function is the first place
-        // that knows the answer, which is why qd_slab_resolve sits at file scope instead of being a
+        // that knows the answer, which is why qd_stack_resolve sits at file scope instead of being a
         // lambda inside ray_mesh_interact.
         //
         // The incidence angle is theta_t rather than the FBS angle, so the redo also carries the same
@@ -5284,16 +4436,10 @@ void quadriga_lib::ray_state_update(int interaction_type,
             // forced-TIR near | far result was written instead, a bare mirror on the reflect pass
             // and the outer pair's tf leak on the transmit pass, which dropped the sheet's loss,
             // its tf, its interface gain and its mass term. Under the acoustic mapping that is
-            // every sheet on a rigid wall at every angle. qd_slab_resolve is told that the far
+            // every sheet on a rigid wall at every angle. qd_stack_resolve is told that the far
             // side is closed: the far face of a coherent sheet is then the pad of a closed face
             // on both ports, and a mass-law sheet passes the leaks of its two faces.
             {
-                // In-slab propagation angle. Only the refraction cosine is used; the coefficients and
-                // the TIR verdict of this near|sheet interface are deliberately discarded for the
-                // reason just given.
-                std::complex<double> ct2_slab;
-                M_near.interact_with(M_slab, interaction_type, theta_t, fGHz, nullptr, nullptr, &ct2_slab, nullptr, nullptr, nullptr);
-
                 // How much of the displaced medium may be taken back out. Air costs nothing to
                 // displace and cannot amplify, so it is uncapped. For a real medium the cap is 80% of
                 // the host path the tracer can see around the crossing - what it has already travelled
@@ -5317,28 +4463,18 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 // it currently does not. The sheet is a laterally infinite layer in both functions;
                 // the note at the corresponding site in ray_mesh_interact gives the measurements.
                 double ct_geo = abs_cos_theta_t;
-                double ct_slab = std::abs(std::real(ct2_slab));
 
                 // Incidence cosine in the near medium. ct_geo is the real projection qd_refract left
                 // behind, which is a genuine incidence cosine only while the ray arrives from air.
                 // Where the near medium is a traced solid the recovery returns the complex value the
-                // path actually carried, and produce mode then builds both boundaries, the internal
+                // path actually carried, and the solver then builds every boundary, the internal
                 // series, the displaced-host propagation and the near-to-far flux conversion from
-                // it. Where it declines, produce mode falls back to ct_geo and nothing moves.
+                // it. Where it declines, the solver is handed ct_geo.
                 //
                 // The recovery names its own entry medium: mtl_prev is the medium this leg was
                 // entered through, and behind a sheet it assumes a lossless one.
                 std::complex<double> ct_near = EXACT_IN_SLAB_COSINE();
 
-                // Thickness enters only here. Produce mode takes the normal thickness and the two
-                // cosines; the geometric-path slot is unused.
-                //
-                // An ordered stack goes to the characteristic-matrix core instead, because two
-                // layers couple through reflections between non-adjacent boundaries and those do not
-                // factor into a product of per-layer series. The single-sheet call below is left
-                // exactly as it was: the two forms are algebraically equal at one layer and agree to
-                // 9.6e-16 wherever no boundary is past its critical angle, but they are not
-                // bit-identical, and produce mode's one-layer path is asserted to be.
                 // Angle factor of a mass term: the cosine the wave has in air.
                 //
                 // Reached from air, and from inside a medium that holds the wave undeviated, that
@@ -5363,24 +4499,13 @@ void quadriga_lib::ray_state_update(int interaction_type,
                         ct_mass = (std::real(cos_air) > 1.0) ? 1.0 : std::real(cos_air);
                 }
 
+                // One sheet or an ordered stack, in one call. Thickness enters only here.
+                QdLayer lay[2];
+                lay[0].mtl = &M_slab, lay[0].thk = thk, lay[1].mtl = &M_slab2, lay[1].thk = thk2;
                 std::complex<double> Tte, Ttm, Rte, Rtm;
-                if (mtl_slab2 != 0)
-                {
-                    QdLayer lay[2];
-                    lay[0].mtl = &M_slab, lay[0].thk = thk;
-                    lay[1].mtl = &M_slab2, lay[1].thk = thk2;
-                    std::complex<double> ci = (std::abs(ct_near) > 0.0)
-                                                  ? ct_near
-                                                  : std::complex<double>(ct_geo, 0.0);
-                    if (!qd_stack_resolve(M_near, lay, 2, M_far, ci, fGHz, is_scalar,
-                                          &Tte, &Ttm, &Rte, &Rtm, disp_far, disp_budget, ct_mass, mass_bonded, !refracted))
-                        return false; // malformed stack or a singular denominator; the caller decides
-                }
-                else
-                    qd_slab_resolve(M_near, M_slab, M_far, thk, 0.0, ct_slab, ct_geo,
-                                    fGHz, is_scalar, 0.0, true, &Tte, &Ttm, &Rte, &Rtm,
-                                    disp_far, disp_budget, std::complex<double>(0.0, 0.0), ct_near,
-                                    nullptr, tir, !refracted, mass_bonded, nullptr, false, ct_mass);
+                if (!qd_stack_resolve(M_near, lay, (mtl_slab2 != 0) ? 2 : 1, M_far, (std::abs(ct_near) > 0.0) ? ct_near : std::complex<double>(ct_geo, 0.0),
+                                      fGHz, is_scalar, &Tte, &Ttm, &Rte, &Rtm, disp_far, disp_budget, ct_mass, mass_bonded, !refracted, tir))
+                    return false; // a singular denominator; the caller decides
 
                 // Both ports come out of the one pass. The reflection port is its own Airy sum, not the
                 // half-space Fresnel value, so expect real angular and frequency structure in it.
@@ -5416,12 +4541,11 @@ void quadriga_lib::ray_state_update(int interaction_type,
         // rebuilds xprmat from cTE / cTM, and those only exist once the sheet has been resolved.
         auto SHEET_EVENT = [&]()
         {
-            // Ordered stack, sheet_case 4. The two sheets are one atomic crossing resolved by the
-            // characteristic-matrix core, in the order the hit code carries. Both sides of the pair
+            // Ordered stack, sheet_case 4. The two sheets are one atomic crossing, resolved in one
+            // call in the order the hit code carries. Both sides of the pair
             // are the medium the ray is travelling in, so near == far, the flux conversion is 1, and
-            // the stack displaces its whole thickness of that medium. Where the core declines - a
-            // lumped column it cannot express - the ray is killed, which is what this case did
-            // unconditionally before.
+            // the stack displaces its whole thickness of that medium. Where the solver declines - a
+            // singular denominator - the ray is killed.
             bool ray_ends = nH == 1 || (nH == 2 && typeH[2]);
 
             // Bounding media from the tracked state. mtl_current is the near side in every case: the
@@ -5457,8 +4581,8 @@ void quadriga_lib::ray_state_update(int interaction_type,
             // sheet's own composite is applied here.
             //
             // This stays a special case rather than the general fix. A sheet that merely fails the
-            // transparency test still splits the layer, and it is the characteristic-matrix core
-            // below that keeps the split honest by resolving the sheet as a layer rather than as a
+            // transparency test still splits the layer, and it is qd_stack_resolve that keeps the
+            // split honest by resolving the sheet as a layer rather than as a
             // half-space; the merge only avoids doing that work where there is provably no boundary.
             //
             // Restricted to the transmission pass, because a matched sheet reflects nothing and the
@@ -5494,7 +4618,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
 
             if (sheet_case == 4 && !have_composite)
             {
-                KILL_RAY(); // no stack physics available, and no legacy result worth keeping
+                KILL_RAY(); // a singular stack: nothing to hand on
                 return;
             }
 
@@ -5585,7 +4709,9 @@ void quadriga_lib::ray_state_update(int interaction_type,
             // Crossed inside a mass-law medium, the leg closed here is bonded to the one that
             // starts as well, through the sheet, and its thickness travels as the code, with
             // what that leg was entered through and the first layer of an ordered stack.
-            next_buffer = (short)0;
+            // Behind an ordered stack whose last layer is coherent the mirror behind the ray is
+            // both layers, and the word names one: the leg forms no series and is followed.
+            next_buffer = (short)((sheet_mtl2 != 0 && m_next != 0 && !(MAT(sheet_back).m > 0.0)) ? (int)0x4000 : 0);
             if (m_next != 0 && MAT(sheet_back).m > 0.0)
             {
                 next_buffer = (short)0x8000;

@@ -1823,19 +1823,22 @@ TEST_CASE("Ray-Mesh Interact - Ray-tube TIR straddle forces whole-tube pass-thro
     run(tridir_clean);
     CHECK(gainN(0) > 0.1);
     CHECK(vnorm(dir(destN - origN) - incoming) > 1e-2);
+    const double gain_spine = gainN(0);
 
     // Straddle: one edge at 60 deg (eps=1.5 critical ~54.7 deg) -> whole tube passes through undeviated
     arma::mat tridir_straddle = arma::mat{{60.0, 0.0, 45.0, 0.0, 45.0, 0.0}} * deg2rad;
     run(tridir_straddle);
     CHECK(arma::approx_equal(dir(destN - origN), incoming, "absdiff", 1e-5)); // undeviated
-    CHECK(std::abs(gainN(0)) < 1e-6);                                         // tf=0 -> forced TIR, no power
+    CHECK(std::abs(gainN(0) - gain_spine) < 1e-12);                           // the coefficient stays the spine's: the verdict is the tube's
 
-    // Same straddle with tf = 0.5: still undeviated, now carries 1 - R_eff = 0.5
+    // Same straddle with tf = 0.5: still undeviated, with the spine's coefficient
     mtl_matrix_to_map<double>(mtl_prop, mtl_ind, mtl_map);
     set_tf<double>(mtl_map, 0.5, 0.0);
+    run(tridir_clean);
+    const double gain_spine_tf = gainN(0);
     run(tridir_straddle);
     CHECK(arma::approx_equal(dir(destN - origN), incoming, "absdiff", 1e-5));
-    CHECK(std::abs(gainN(0) - 0.5) < 1e-6);
+    CHECK(std::abs(gainN(0) - gain_spine_tf) < 1e-12);
 }
 
 TEST_CASE("Ray-Mesh Interact - path_dirN collapses to undeviated under spine TIR")
