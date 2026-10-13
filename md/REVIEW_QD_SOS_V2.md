@@ -15,7 +15,7 @@ those of v1 and of the plan.
 - Speed against a build of the old commit: `sos_val` 836 to 430 ms on one thread, 116 to 33 ms on 16
   (400 generators); no generator count is slower. The numbers of `md/LOG_QD_SOS.md` are confirmed.
 - Found in the commit and resolved since (section 8): a stray `test.txt`, stale `html_docu/`, a
-  use-after-free in `sos_val` when `val` is `pos`. Still open: the MEX helpers misread complex arrays.
+  use-after-free in `sos_val` when `val` is `pos`, complex arrays misread by the shared MEX helpers.
 - Documentation rules are met and all 12 example blocks run as written.
 
 Marks: **[M]** measured in this session, **[R]** reproduced with a scratch program or script, **[C]** read
@@ -79,7 +79,7 @@ Traps of v1 section 1.2:
 | N1 | resolved | `test.txt` at the repository root is part of commit 99f8ff5: 7332 lines of Catch2 output of a run without AVX2 ("1196509 assertions in 1038 test cases"). It is outside the file list of the plan and not mentioned in the log, which counts 76 files; the commit has 77 [M] |
 | N2 | resolved | `html_docu/` was not regenerated, as the plan asked. The published API files still describe the old behaviour: `quadriga_lib_api_cpp.md` has "column `n_gen + g`" three times and the example with the undefined `pos_new` [M]. They need `make documentation` before a release |
 | N3 | resolved | `sos_val` with `val` being the same object as `pos`: heap-use-after-free in `qd_SOS_GENERIC` (`sos_val_generic.cpp:47`) when the output has another size than `pos`, reported by ASan; without the sanitizer the call returns values that are off by up to 3.3 [R]. In v1 this call worked. The restriction is documented and was decided (F3), but the misuse is now undefined behaviour without a message. A comparison of addresses (`&val == &pos`, `pos_b`, `phase`, `phase_b`, `freq`) that throws `std::invalid_argument` costs nothing and turns it into an error |
-| N4 | low, outside this port | Correction of v1: complex input arrays are not read with the imaginary part dropped. In MATLAB R2024a the shared helpers read the interleaved data as consecutive real numbers: `sos_val` with `complex(pos, pos+1)` returns exactly the values of the positions (0,2,0), (1,0,1), (1,1,0) [R]. The log found this; v1 had only checked that the call returns. The cause is in `src/mex_helper_functions.hpp` and concerns every MEX wrapper that takes an array |
+| N4 | resolved | Correction of v1: complex input arrays are not read with the imaginary part dropped. In MATLAB R2024a the shared helpers read the interleaved data as consecutive real numbers: `sos_val` with `complex(pos, pos+1)` returns exactly the values of the positions (0,2,0), (1,0,1), (1,1,0) [R]. The log found this; v1 had only checked that the call returns. The cause is in `src/mex_helper_functions.hpp` and concerns every MEX wrapper that takes an array |
 | N5 | cosmetic | The file-local helpers `qd_mex_sos_count` and `qd_mex_sos_seed` are repeated in 7 wrapper files. Unavoidable under "do not edit the shared helper"; one more reason to move the check there |
 | N6 | cosmetic | `src/quadriga_lib_helper_functions.hpp` now has `#include <algorithm>` and `<limits>` in the middle of the file, above the `qd_sos_*` block |
 
@@ -231,8 +231,6 @@ the old and the new library when another job holds the cores).
 ## 7. Not checked
 
 - MSVC, macOS, ARM, Octave.
-- The complete Catch2, MEX and Python suites in the build without AVX2 (the log reports them as passing;
-  here only the SOS parts were run without AVX2).
 - 16-thread timings of the functions other than `sos_val` on an idle machine.
 - The regeneration of the tables with 512 and 1024 sinusoids (62 s, reported in the log).
 - The generated files in `html_docu/` at commit 99f8ff5, because they had not been regenerated. After the
@@ -251,6 +249,7 @@ Changes made in the working tree on top of commit 99f8ff5, on request.
 | N2 | `html_docu/` regenerated with `make documentation` (by Stephan, and again after the changes below) |
 | N3 | `sos_val` compares the output with all seven inputs after validation and throws `std::invalid_argument("Output 'val' cannot be the same object as an input.")`. A second matrix object on the memory of an input is caught as well. `val` is left unchanged. The documentation bullet says that the call throws |
 | Python headings | The 14 Python entries are headed `sos.val`, `sos.randn` and so on, and cross-references are written `[[sos.val]]`. The sentence about the `sos_` prefix in the introduction is replaced. `md/SPEC_PYTHON_API.md` has the rule |
+| N4 | The four functions `qd_mex_reinterpret_Col`, `_Mat`, `_Cube` and `_CubeVec` of `src/mex_helper_functions.hpp`, which use MATLAB data in place when its class matches, read their dimensions through `qd_mex_get_dims` like the converting functions do. That function rejects complex input ("Complex datatypes are not supported."). Before, only the converting path had the check, so a complex `double` array passed and a complex `single` array did not. This concerns every MEX wrapper that takes an array |
 | Markdown links | `tools/extract_md.py` builds the target of a cross-link with the slug it already uses for the index (one line). Needed for names with a dot |
 
 Verification [M, R]:
@@ -261,17 +260,29 @@ Verification [M, R]:
   (39480 assertions in 108 test cases)`. The `sos_val` cases under ASan and UBSan: no report. The
   reproduction of N3 now ends with the exception. The 8853 output hashes of section 3 are unchanged, so valid
   calls return the same values.
-- Not re-run after the N3 change: the MEX and Python suites. Their wrappers allocate the output themselves
-  and cannot reach the check.
+- MEX and Python suites on the final working tree, all four builds rebuilt without warnings; the MEX file
+  and both Python modules contain the new check:
+  - MEX, complete, MATLAB R2024a, gcc 12, AVX2: 61 of 62 passed; `test_ray_mesh_interact` line 113 fails as
+    before
+  - MEX, complete, gcc 12, no AVX2: 61 of 62 passed; same failure
+  - Python, complete, gcc 15, AVX2: `726 passed, 1 skipped`; SOS only: `103 passed`
+  - Python, complete, gcc 15, no AVX2: `724 passed, 3 skipped`
+- Complete Catch2 suite on the final working tree: gcc 12 with AVX2 `All tests passed (1196777 assertions in
+  1038 test cases)`; gcc 15 without AVX2 `All tests passed (1196528 assertions in 1038 test cases)`
 - Dotted headings: `python_api.html` has 14 entries with the ids `sos.*` and 100 links to them, none
   unresolved; `quadriga_lib_api_python.md` has 14 headings and 100 links, none unresolved. Only documentation
   blocks of `api_python/qpy_sos_*.cpp` changed, no code.
 - Tool change: the generated MEX files are unchanged. In `quadriga_lib_api_cpp.md` two lines changed, the
   links to the member function `.calc_directivity_dBi`, whose target is now the lower-case anchor of its
   heading; that link did not resolve before.
+- N4: complex `double` and `single` arrays are rejected by `sos_val`, `sos_acfi`, `sos_map`,
+  `calc_delay_spread` and `cart2geo` in MATLAB R2024a and in Octave 11.1; real input gives the values as
+  before. `test_sos_val.m` asserts the error instead of the acceptance it had pinned. No other MEX test
+  passes a complex array to a wrapper. Complete MEX suite after the change, MEX files rebuilt without
+  warnings: MATLAB R2024a with AVX2 61 of 62, without AVX2 61 of 62, Octave 11.1 with AVX2 (system compiler)
+  61 of 62; the failure is `test_ray_mesh_interact` line 113 in all three. Python suites unchanged (726
+  passed, 1 skipped; 724 passed, 3 skipped).
 
 Still open:
-
-- N4, complex arrays in the shared MEX helpers (`src/mex_helper_functions.hpp`), outside this port.
 - N5 and N6 (cosmetic).
 - The points of section 7.
