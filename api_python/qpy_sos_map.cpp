@@ -10,16 +10,16 @@ Sum-of-sinusoids random number generator
 SECTION!*/
 
 /*!MD
-# sos_map
+# sos.map
 Spatially correlated random values on a regular grid
 
-- Evaluates the generators of [[sos_val]] for one device at all combinations of the grid vectors
+- Evaluates the generators of [[sos.val]] for one device at all combinations of the grid vectors
 - Output in meshgrid order: element `[iy, ix, iz, g]` belongs to the position
   `(x[ix], y[iy], z[iz])` and to generator `g`, i.e. column `g` of `phase`
 - The number of grid vectors given must not exceed the number of columns of `freq`; a `y` or `z`
   that is `None` or empty means a single sample at 0 on that axis
 - `z` can be given without `y` if `freq` has 3 columns
-- The values are those of [[sos_val]] at the grid points, bit for bit; kernels, accuracy and the
+- The values are those of [[sos.val]] at the grid points, bit for bit; kernels, accuracy and the
   Uniform mapping are described there
 
 ## Usage:
@@ -44,7 +44,7 @@ map = quadriga_lib.sos.map( freq, phase, x, y, z, uniform, use_kernel )
 - **`map`** — Values; `(ny, nx, nz, n_gen)`
 
 ## See also:
-- [[sos_val]] (evaluation at arbitrary positions, two devices)
+- [[sos.val]] (evaluation at arbitrary positions, two devices)
 MD!*/
 
 py::array_t<double> sos_map(const py::array_t<double> &freq,

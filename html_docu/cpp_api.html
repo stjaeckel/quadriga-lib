@@ -6767,13 +6767,15 @@ xpr_update(M, &amp;U, &amp;g, false, true, true, &amp;idx);     // full chain st
 <br>
 These functions generate <b>spatially correlated random numbers</b>: values that are random, but similar at 
 nearby positions. Two positions that are much closer than the <i>decorrelation distance</i> get almost the same 
-value, two positions that are far apart get independent values. Typical uses are shadow fading maps and 
-the spatially consistent parameters of the 3GPP TR 38.901 channel model.<br><br> 
+value, two positions that are far apart get independent values. The decorrelation distance is the distance 
+at which the correlation has fallen to <code>exp(-1)</code>, about 0.37. Typical uses are shadow fading maps and the 
+spatially consistent parameters of the 3GPP TR 38.901 channel model.<br><br> 
  
 The values are a sum of sinusoids, <code>s(x) = sqrt(2/N) · sum_n cos( 2·pi · f_n·x + phi_n )</code>. The frequencies 
 <code>f_n</code> set how the correlation falls with the distance, i.e. the autocorrelation function (ACF). The random 
 phases <code>phi_n</code> select one realisation of the random field. The generator needs no map and no grid: 
-positions can be anywhere, in 1, 2 or 3 dimensions, and the same phases always give the same field.<br><br> 
+positions can be anywhere, in 1, 2 or 3 dimensions, and the same frequencies and phases always give the 
+same field.<br><br> 
  
 <b>Quick start</b><br> 
 <a href="#sos_randn">sos_randn</a> sets up the generators, draws the phases and returns the values in one call. <a href="#sos_rand">sos_rand</a> 
@@ -6799,13 +6801,19 @@ quadriga_lib::sos_rand&lt;double&gt;(dist_decorr, pos, uni, nullptr, nullptr, "C
 quadriga_lib::sos_randi&lt;double&gt;(dist_decorr, pos, 6, dice, nullptr, nullptr, "Comb256", 42);
 </pre>
  
-The last argument is the seed. With the same seed, a later call returns the same field, also at other 
-positions. Without a seed every call gives a new field.<br><br> 
+The last argument is the seed. With the same seed, decorrelation distances and preset, a later call returns the same 
+field, also at other positions. Without a seed every call gives a new field.<br><br> 
  
+A seed selects a set of phases, not a field. Calls with the same seed but another decorrelation distance or 
+another preset return related fields: they are equal at the coordinate origin and correlated around it. 
+Quantities that must be independent of each other, such as shadow fading and delay spread, therefore need 
+different seeds, or one call with one entry of <code>dist_decorr</code> per quantity: the generators of one call are 
+independent.<br><br> 
 <b>Keeping a generator</b><br> 
 A generator is two matrices: the frequencies from <a href="#sos_preset">sos_preset</a> and the phases from <a href="#sos_init_phases">sos_init_phases</a>. 
-<a href="#sos_val">sos_val</a> evaluates them. Each column of the phase matrix is one independent generator, and evaluating 
-many generators in one call costs little more than evaluating one. 
+<a href="#sos_val">sos_val</a> evaluates them. Each column of the phase matrix is one independent generator. Evaluating many 
+generators in one call is much cheaper than one call per generator, because the sines and cosines of the 
+positions are shared: 20 generators take less than twice as long as one. 
  
 <pre>
 // Frequencies of a predefined generator for a decorrelation distance of 10 m
@@ -6817,36 +6825,39 @@ quadriga_lib::sos_preset&lt;double&gt;("Comb256", freq, &amp;acf, &amp;dist, 10.
 arma::mat phase;
 quadriga_lib::sos_init_phases&lt;double&gt;(freq.n_rows, 20, phase, 42);
 
-// Values of all 20 generators at the positions, size [n_pos, 20]
-arma::mat val;
-quadriga_lib::sos_val(freq, phase, pos, val);
+// Values of all 20 generators at the positions, size [1000, 20]
+arma::mat val_all;
+quadriga_lib::sos_val(freq, phase, pos, val_all);
 
 // The same fields at other positions, at any later time
-arma::mat val_new;
+arma::mat pos_new = pos + 2.5, val_new;
 quadriga_lib::sos_val(freq, phase, pos_new, val_new);
 
 // Uniform distributed output
-arma::mat uni;
-quadriga_lib::sos_val&lt;double&gt;(freq, phase, pos, uni, nullptr, nullptr, nullptr, nullptr, 1.0, true);
+arma::mat val_uni;
+quadriga_lib::sos_val&lt;double&gt;(freq, phase, pos, val_uni, nullptr, nullptr, nullptr, nullptr, 1.0, true);
 
 // Map on a regular grid, one cube of size [n_y, n_x, 1] per generator
 arma::vec x = arma::regspace(0.0, 0.5, 250.0), y = arma::regspace(0.0, 0.5, 100.0);
-std::vector&lt;arma::cube&gt; map;
-quadriga_lib::sos_map&lt;double&gt;(freq, phase, x, map, &amp;y);
+std::vector&lt;arma::cube&gt; grid;
+quadriga_lib::sos_map&lt;double&gt;(freq, phase, x, grid, &amp;y);
 </pre>
  
 <ul>
-<li><b>Presets:</b> <code>Exp</code>, <code>Gauss</code> and <code>Comb</code>, each with 128, 256, 512 or 1024 sinusoids, e.g. <code>"Exp512"</code>. <code>Exp</code> is the exponential ACF <code>exp(-d/d0)</code>, <code>Gauss</code> is <code>exp(-(d/d0)^2)</code>, and <code>Comb</code> follows <code>Gauss</code> up to the decorrelation distance <code>d0</code> and <code>Exp</code> beyond it. More sinusoids follow the ACF more closely and take proportionally longer. <code>"Comb256"</code> is a good default.</li>
+<li><b>Presets:</b> <code>Exp</code>, <code>Gauss</code> and <code>Comb</code>, each with 128, 256, 512 or 1024 sinusoids, e.g. <code>"Exp512"</code>. <code>Exp</code> is the exponential ACF <code>exp(-d/d0)</code>, <code>Gauss</code> is <code>exp(-(d/d0)^2)</code>, and <code>Comb</code> follows <code>Gauss</code> up to the decorrelation distance <code>d0</code> and <code>Exp</code> beyond it. Each doubling of the number of sinusoids doubles the computing time and lowers the error of the ACF by 3 to 4 dB: <a href="#sos_calc_mse">sos_calc_mse</a> reports 28, 31, 34 and 38 dB for <code>Exp128</code> to <code>Exp1024</code> and 31, 35, 39 and 42 dB for <code>Comb128</code> to <code>Comb1024</code>. <code>"Comb256"</code> is a good default; take a larger table if the shape of the ACF matters, a smaller one if speed does.</li>
 <li><b>Both ends mobile:</b> if a value belongs to a link between two moving devices, pass both positions. The value then changes smoothly when either device moves.</li>
 </ul>
 <pre>
-// One value per pair of positions, size [n_pos, 20]
-arma::mat val_link;
+// Positions of the two ends of 1000 links; one value per link and generator, size [1000, 20]
+arma::mat pos_tx = pos, pos_rx(1000, 3, arma::fill::randu), val_link;
+pos_rx *= 100.0;
 quadriga_lib::sos_val&lt;double&gt;(freq, phase, pos_tx, val_link, &amp;pos_rx, nullptr, &amp;acf, &amp;dist);
 </pre>
  
 <ul>
-<li><b>Mean over an area:</b> the values at positions that lie within a few decorrelation distances of each other are similar, so their average is not zero for a single realisation. This is how a correlated field behaves. <a href="#sos_remove_bias">sos_remove_bias</a> can force the average to zero if an application needs it.</li>
+<li><b>Mean over an area:</b> the values at positions that lie within a few decorrelation distances of each other are similar, so their average is not zero for a single realisation. This is how a correlated field behaves. <a href="#sos_remove_bias">sos_remove_bias</a> can force the average to zero if an application needs it. This removes variance: for 200 positions in a square with an edge of 20 decorrelation distances 2.5 %, for an edge of 5 decorrelation distances 14 %, for 2 already 44 %. It is meant for positions that spread over many decorrelation distances.</li>
+<li><b>Coordinates:</b> use local coordinates. The argument <code>f_n·x</code> of a sinusoid is computed in double precision and is known to about 1e-16 of its size, so the values lose accuracy with the distance from the origin counted in wavelengths. Up to 1e9 wavelengths (more than 1e9 m for a decorrelation distance of 10 m) the results stay within the tolerance stated in <a href="#sos_val">sos_val</a>. The <code>float</code> versions of the functions read positions in single precision, i.e. rounded to about 1 mm at a distance of 10 km.</li>
+<li><b>Threads and memory:</b> the functions that take noticeable time use the OpenMP threads of the process, except <a href="#sos_generate">sos_generate</a>, which runs on one thread. No result depends on the number of threads. <a href="#sos_val">sos_val</a> computes in its output: for <code>double</code> it needs no further memory of that size for one device and one more array of that size for two devices; for <code>float</code> one array in double precision is added.</li>
 </ul>
 <b>Own autocorrelation functions</b><br> 
 <a href="#sos_generate">sos_generate</a> finds the frequencies for any ACF that is given as a table over the distance, and 
@@ -6855,15 +6866,16 @@ distances.
  
 <pre>
 // Target ACF from 0 to 5 decorrelation distances, here a Gaussian shape with 5 m
-arma::vec dist = arma::regspace(0.0, 0.125, 24.875);
-arma::vec acf = arma::exp(-arma::square(dist / 5.0));
+arma::vec dist_own = arma::regspace(0.0, 0.125, 24.875);
+arma::vec acf_own = arma::exp(-arma::square(dist_own / 5.0));
 
 // 256 sinusoids in 3-D, 300 test directions, wavelengths up to 20 decorrelation distances (100 m)
-arma::mat freq;
-quadriga_lib::sos_generate&lt;double&gt;(acf, dist, 256, freq, nullptr, nullptr, 3, true, 300, true, 0.01, 0.0, 1);
+arma::mat freq_own;
+quadriga_lib::sos_generate&lt;double&gt;(acf_own, dist_own, 256, freq_own, nullptr, nullptr, 3, true, 300, true,
+                                   0.01, 0.0, 1);
 
 // Approximation error in dB, larger is better; about 35 dB for this example
-double mse = quadriga_lib::sos_calc_mse(freq, acf, dist);
+double mse = quadriga_lib::sos_calc_mse(freq_own, acf_own, dist_own);
 </pre>
  
 The result is used like a preset: draw phases with <a href="#sos_init_phases">sos_init_phases</a> and evaluate with <a href="#sos_val">sos_val</a>. To 
@@ -6885,6 +6897,8 @@ Target ACF on a 2-D grid
 <li>Grid axis: from <code>-2·Dmax</code> to <code>2·Dmax</code> with the spacing of <code>dist</code>, where <code>Dmax</code> is the last sample point; <code>n_grid = 4·n_acf - 3</code>, the center is element <code>2·n_acf - 2</code> (0-based)</li>
 <li>Linear interpolation of the table at the radial distance; 0 at radial distances above <code>Dmax</code></li>
 <li>The result is the reference for <a href="#sos_acf_approx">sos_acf_approx</a></li>
+<li>Equally spaced means that every sample point lies within 1e-4 of the step from its place on the regular axis; for long single-precision tables the rounding of the sample points themselves is allowed for</li>
+<li><code>dist_2d</code> may be the same object as <code>acf</code> or <code>dist</code></li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -6899,7 +6913,7 @@ void quadriga_lib::sos_acf_2d(
 <b>Inputs:</b><br>
 <ul>
 <li><b><code>acf</code></b> — Target ACF; at least 2 elements; <code>[n_acf]</code></li>
-<li><b><code>dist</code></b> — Sample points of the ACF in [m]; must start at 0 and be equally spaced; <code>[n_acf]</code></li>
+<li><b><code>dist</code></b> — Sample points of the ACF in [m]; must start at 0, be equally spaced and finite; <code>[n_acf]</code></li>
 </ul>
 
 <b>Outputs:</b><br>
@@ -6925,6 +6939,9 @@ ACF produced by a set of sinusoids
 <li><code>n_dim = 2</code>: on the x-y plane; <code>[n_grid, n_grid, 1]</code>; element <code>(iy, ix)</code></li>
 <li><code>n_dim = 3</code>: on the x-y, x-z and y-z plane (slices 0, 1, 2); <code>[n_grid, n_grid, 3]</code>; the row index belongs to the second axis of the plane, the column index to the first</li>
 <li>Only the sample points <code>dist</code> are used, not the ACF values</li>
+<li><code>R(-dx) = R(dx)</code>: each plane is point-symmetric about its center. One half is computed and the other half is its mirror image, so the symmetry is exact</li>
+<li>Equally spaced has the meaning given in <a href="#sos_acf_2d">sos_acf_2d</a></li>
+<li><code>dist_2d</code> may be the same object as <code>dist</code></li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -6939,7 +6956,7 @@ void quadriga_lib::sos_acf_approx(
 <b>Inputs:</b><br>
 <ul>
 <li><b><code>freq</code></b> — Frequencies in [1/m]; <code>n_dim</code> = 1, 2 or 3; <code>[n_coeff, n_dim]</code></li>
-<li><b><code>dist</code></b> — Sample points of the ACF in [m]; must start at 0 and be equally spaced; at least 2 elements; <code>[n_acf]</code></li>
+<li><b><code>dist</code></b> — Sample points of the ACF in [m]; must start at 0, be equally spaced and finite; at least 2 elements; <code>[n_acf]</code></li>
 </ul>
 
 <b>Outputs:</b><br>
@@ -6966,6 +6983,8 @@ Monte-Carlo estimate of the ACF of one generator
 <li>Bins with fewer than 6 pairs return NaN in all outputs</li>
 <li><code>acf_est_dual</code>: the same for two devices on the same map. The first <code>n_pos</code> positions are the first device, the second <code>n_pos</code> positions the second device, and the value of a link is <a href="#sos_val">sos_val</a> with both positions. Two links form a pair if the distance between their first devices falls into the bin and the distance between their second devices does not exceed the upper limit of the bin; requires <code>acf</code> and <code>dist</code></li>
 <li>The estimate describes one realisation; it scatters around the ACF of the sinusoids</li>
+<li>The pairs are searched in parallel and added in a fixed order; the result does not depend on the number of threads. Run time and memory: <code>2·n_pos^2</code> pairs for one device, at most 36 MB for the pairs of a block of rows</li>
+<li>The outputs may be the same objects as inputs</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -6987,10 +7006,10 @@ void quadriga_lib::sos_acf_estimate(
 <ul>
 <li><b><code>freq</code></b> — Frequencies in [1/m]; <code>[n_coeff, 3]</code></li>
 <li><b><code>phase</code></b> — Phases of the generator in [rad]; <code>[n_coeff]</code></li>
-<li><b><code>bins</code></b> — Bin centers in [m]; must be >= 0 and increase strictly; at least 2 elements; <code>[n_bin]</code></li>
+<li><b><code>bins</code></b> — Bin centers in [m]; must be >= 0, increase strictly and be finite; at least 2 elements; <code>[n_bin]</code></li>
 <li><b><code>n_pos</code></b> — Number of random positions per device; must be > 1</li>
-<li><b><code>acf</code></b> <i>(optional)</i> — Target ACF; required for <code>acf_est_dual</code>; <code>[n_acf]</code></li>
-<li><b><code>dist</code></b> <i>(optional)</i> — Sample points of the ACF in [m]; must start at 0 and increase strictly; <code>[n_acf]</code></li>
+<li><b><code>acf</code></b> <i>(optional)</i> — Target ACF; required for <code>acf_est_dual</code>, must then be > -1; <code>[n_acf]</code></li>
+<li><b><code>dist</code></b> <i>(optional)</i> — Sample points of the ACF in [m]; must start at 0, increase strictly and be finite; <code>[n_acf]</code></li>
 <li><b><code>seed</code></b> <i>(optional)</i> — Seed for the positions; must be >= -1; <code>-1</code> seeds from the system random device</li>
 </ul>
 
@@ -7016,6 +7035,7 @@ Target ACF at given distances
 <li>Distances beyond the last sample point return the last value of the table</li>
 <li>The same rule is applied by <a href="#sos_val">sos_val</a> and <a href="#sos_remove_bias">sos_remove_bias</a> for two devices on the same map</li>
 <li>An empty <code>d</code> returns an empty <code>val</code></li>
+<li><code>val</code> may be the same object as <code>acf</code>, <code>dist</code> or <code>d</code></li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -7030,7 +7050,7 @@ void quadriga_lib::sos_acfi(
 <b>Inputs:</b><br>
 <ul>
 <li><b><code>acf</code></b> — Target ACF; at least 2 elements; <code>[n_acf]</code></li>
-<li><b><code>dist</code></b> — Sample points of the ACF in [m]; must start at 0 and increase strictly; <code>[n_acf]</code></li>
+<li><b><code>dist</code></b> — Sample points of the ACF in [m]; must start at 0, increase strictly and be finite; <code>[n_acf]</code></li>
 <li><b><code>d</code></b> — Distances in [m]; must be >= 0; <code>[n_d]</code></li>
 </ul>
 
@@ -7057,6 +7077,10 @@ Approximation error of the ACF of a set of sinusoids
 <li>For <code>n_dim = 1</code>, <code>mse_core</code> is evaluated on the sample points <code>dist</code>, <code>mse_all</code> on the axis from <code>-2·Dmax</code> to <code>2·Dmax</code>, and the return value equals <code>mse_core</code></li>
 <li><code>acf_tail</code>: approximated ACF, averaged over the test directions, at 2, 4, 10 and 20 times <code>Dmax</code>. The target is 0 there; sinusoids with a frequency near zero show up as a plateau of height <code>n_low / n_coeff</code>, which adds a constant offset to all values of a large area</li>
 <li><code>mse_core</code> and <code>mse_all</code> need the 2-D grids and are only computed when requested</li>
+<li>A perfect fit has a mean squared error of 0 and is returned as +Inf dB; this happens for a target that the sinusoids reproduce exactly at all sample points, e.g. sinusoids at zero frequency and a target of 1</li>
+<li>The test directions are evaluated in parallel; the result does not depend on the number of threads</li>
+<li>Equally spaced has the meaning given in <a href="#sos_acf_2d">sos_acf_2d</a></li>
+<li><code>acf_tail</code> and <code>test_dir</code> may be the same objects as inputs</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -7076,7 +7100,7 @@ dtype quadriga_lib::sos_calc_mse(
 <ul>
 <li><b><code>freq</code></b> — Frequencies in [1/m]; <code>n_dim</code> = 1, 2 or 3; <code>[n_coeff, n_dim]</code></li>
 <li><b><code>acf</code></b> — Target ACF; at least 2 elements; <code>[n_acf]</code></li>
-<li><b><code>dist</code></b> — Sample points of the ACF in [m]; must start at 0 and be equally spaced; <code>[n_acf]</code></li>
+<li><b><code>dist</code></b> — Sample points of the ACF in [m]; must start at 0, be equally spaced and finite; <code>[n_acf]</code></li>
 <li><b><code>n_dir</code></b> <i>(optional)</i> — Number of test directions; must be > 0; ignored for <code>n_dim = 1</code></li>
 </ul>
 
@@ -7111,6 +7135,9 @@ Find the frequencies of a sum-of-sinusoids generator for a given ACF
 <li>The fit covers the range of <code>dist</code> only. The ACF of the result beyond the last sample point is not controlled; sinusoids with a frequency near zero keep it above zero at all larger distances (see <code>acf_tail</code> of <a href="#sos_calc_mse">sos_calc_mse</a>). To prevent this, set <code>freq_min</code>; the tables of <a href="#sos_preset">sos_preset</a> use <code>0.05 / d</code> with the decorrelation distance <code>d</code></li>
 <li>Use enough test directions: with few (e.g. 10) the result fits those directions and is worse in others; the tables of <a href="#sos_preset">sos_preset</a> were made with 300</li>
 <li><code>freq_min</code> and <code>freq_max</code> limit the magnitude of the frequency along the direction of each sinusoid; 0 selects the default: no lower limit, and <code>15 / max(dist)</code> as upper limit</li>
+<li>The search grid has <code>( freq_max - freq_min ) · max(dist) / 0.1 + 1</code> points, and its cosines are stored for all sample points. It must not have more than 100000 points (the default has 151), which limits <code>freq_max - freq_min</code> to less than <code>10000 / max(dist)</code></li>
+<li>The function runs on one thread</li>
+<li><code>ase</code> and <code>test_dir</code> may be the same objects as <code>acf</code> or <code>dist</code></li>
 <li><code>test_dir</code> and the reported error use the same test directions as <a href="#sos_calc_mse">sos_calc_mse</a> with the same <code>n_dir</code></li>
 <li>All computations are done in double precision for both instantiations</li>
 <li>A seed >= 0 makes the result repeatable on one platform. The search takes accept/reject decisions, so a difference in the last bit of the input or of the math library can lead to another table of equivalent quality</li>
@@ -7137,14 +7164,14 @@ void quadriga_lib::sos_generate(
 <b>Inputs:</b><br>
 <ul>
 <li><b><code>acf</code></b> — Target ACF; at least 2 elements; <code>[n_acf]</code></li>
-<li><b><code>dist</code></b> — Sample points of the ACF in [m]; must start at 0 and increase strictly; <code>[n_acf]</code></li>
+<li><b><code>dist</code></b> — Sample points of the ACF in [m]; must start at 0, increase strictly and be finite; <code>[n_acf]</code></li>
 <li><b><code>n_coeff</code></b> — Number of sinusoids; must be > 0</li>
 <li><b><code>n_dim</code></b> <i>(optional)</i> — Number of dimensions; 1, 2 or 3</li>
 <li><b><code>uniform_smp</code></b> <i>(optional)</i> — Regular (<code>true</code>) or random (<code>false</code>) directions of the sinusoids</li>
 <li><b><code>n_dir</code></b> <i>(optional)</i> — Number of test directions; must be > 0; ignored for <code>n_dim = 1</code></li>
 <li><b><code>random_init</code></b> <i>(optional)</i> — Start from random frequencies (<code>true</code>) or build up sinusoid by sinusoid (<code>false</code>)</li>
 <li><b><code>freq_min</code></b> <i>(optional)</i> — Lower limit of the frequency magnitude in [1/m]; must be >= 0; 0 = none</li>
-<li><b><code>freq_max</code></b> <i>(optional)</i> — Upper limit of the frequency magnitude in [1/m]; must be >= 0 and, if not 0, larger than <code>freq_min</code>; 0 = <code>15 / max(dist)</code></li>
+<li><b><code>freq_max</code></b> <i>(optional)</i> — Upper limit of the frequency magnitude in [1/m]; must be >= 0 and, if not 0, larger than <code>freq_min</code>; 0 = <code>15 / max(dist)</code>; limited by the size of the search grid, see above</li>
 <li><b><code>seed</code></b> <i>(optional)</i> — Seed; must be >= -1; <code>-1</code> seeds from the system random device</li>
 </ul>
 
@@ -7171,6 +7198,7 @@ Draw random phases for a set of sum-of-sinusoids generators
 <li>Random stream: <code>std::mt19937_64</code> seeded with <code>seed</code>; each value is <code>2·pi · ( u - 0.5 )</code>, where <code>u</code> is the upper 53 bits of one generator output divided by 2^53; no distribution class of the standard library is used, so a seed >= 0 gives the same phases on all platforms</li>
 <li>The matrix is filled column by column from one stream: for the same seed, column <code>g</code> does not depend on <code>n_gen</code></li>
 <li>For <code>dtype = float</code> the values are rounded from double; a value that rounds to pi is returned as -pi</li>
+<li>A seed stands for a set of phases. Generators that use phases of the same seed with different frequencies (another decorrelation distance or preset) produce related fields, which are equal at the coordinate origin and correlated around it; draw independent quantities as columns of one call or with different seeds</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -7210,6 +7238,8 @@ Spatially correlated random values on a regular grid
 <li>One cube per generator, i.e. per column of <code>phase</code></li>
 <li>The number of grid vectors given must not exceed the number of columns of <code>freq</code>; an omitted or empty <code>y</code> or <code>z</code> means a single sample at 0 on that axis</li>
 <li><code>z</code> can be given without <code>y</code> if <code>freq</code> has 3 columns</li>
+<li>The values are those of <a href="#sos_val">sos_val</a> at the grid points, bit for bit; kernels, accuracy and the Uniform mapping are described there</li>
+<li>Cubes of the correct size keep their memory. If they lie one after the other in memory (one block of <code>n_gen</code> cubes, as the MATLAB and Python interfaces allocate it), the values are computed in place; otherwise they are computed in a matrix <code>[ny·nx·nz, n_gen]</code> and copied</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -7298,13 +7328,15 @@ Spatially correlated Uniform distributed random numbers
 <ul>
 <li>Convenience function: sets up one sum-of-sinusoids generator per entry of <code>dist_decorr</code> from a preset, draws its phases and evaluates it at the given positions; see <a href="#sos_val">sos_val</a> for the model</li>
 <li>The generators are independent of each other and may have different decorrelation distances</li>
-<li>Phases: <code>sos_init_phases( n_coeff, 2·n_gen, seed )</code>; generator <code>g</code> uses column <code>g</code>, and column <code>n_gen + g</code> for a second device on its own map. The phases of the first device therefore do not depend on whether a second device is given</li>
+<li>Phases: generator <code>g</code> uses column <code>g</code> of <code>sos_init_phases( n_coeff, n_gen, seed )</code>. A second device on its own map uses column <code>g</code> of a second stream, <code>sos_init_phases( n_coeff, n_gen, seed_b )</code>, where <code>seed_b</code> is the seed with bit 62 flipped, i.e. <code>seed + 2^62</code> for seeds below 2^62; for <code>seed = -1</code> both streams are random. The phases of a generator therefore depend neither on the number of generators nor on whether a second device is given</li>
 <li>A decorrelation distance of 0 is replaced by 0.1 m</li>
 <li>One device (<code>pos_b</code> omitted): values of the generator at <code>pos</code></li>
 <li>Two devices, same decorrelation distance (<code>dist_decorr_b</code> omitted, or equal to <code>dist_decorr</code> for that generator): both devices are on the same map, the value does not change when they swap positions</li>
 <li>Two devices, different decorrelation distances: each device has its own map; the value is the sum of both maps divided by <code>sqrt(2)</code></li>
 <li>The Normal distributed value <code>s</code> of the generator is mapped to <code>0.5 · erfc( -s / sqrt(2) )</code></li>
-<li>Each call with <code>seed = -1</code> gives a new realisation; with a seed >= 0 the same positions always give the same values, and nearby positions give similar values in separate calls with the same seed</li>
+<li>Each call with <code>seed = -1</code> gives a new realisation. With a seed >= 0 the phases are the same on all platforms: the same positions give the same values and nearby positions similar values, also in separate calls. The kernel is chosen automatically, so values from machines with and without AVX2 differ by the tolerance stated in <a href="#sos_val">sos_val</a></li>
+<li>A seed selects the phases, not the field: calls with the same seed but other decorrelation distances or another preset return related fields, equal at the coordinate origin and correlated around it. Use different seeds, or several entries of <code>dist_decorr</code> in one call, for quantities that must be independent</li>
+<li><code>val</code> may be the same object as <code>pos</code> or <code>pos_b</code></li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -7348,13 +7380,15 @@ Spatially correlated integer random numbers
 <ul>
 <li>Convenience function: sets up one sum-of-sinusoids generator per entry of <code>dist_decorr</code> from a preset, draws its phases and evaluates it at the given positions; see <a href="#sos_val">sos_val</a> for the model</li>
 <li>The generators are independent of each other and may have different decorrelation distances</li>
-<li>Phases: <code>sos_init_phases( n_coeff, 2·n_gen, seed )</code>; generator <code>g</code> uses column <code>g</code>, and column <code>n_gen + g</code> for a second device on its own map. The phases of the first device therefore do not depend on whether a second device is given</li>
+<li>Phases: generator <code>g</code> uses column <code>g</code> of <code>sos_init_phases( n_coeff, n_gen, seed )</code>. A second device on its own map uses column <code>g</code> of a second stream, <code>sos_init_phases( n_coeff, n_gen, seed_b )</code>, where <code>seed_b</code> is the seed with bit 62 flipped, i.e. <code>seed + 2^62</code> for seeds below 2^62; for <code>seed = -1</code> both streams are random. The phases of a generator therefore depend neither on the number of generators nor on whether a second device is given</li>
 <li>A decorrelation distance of 0 is replaced by 0.1 m</li>
 <li>One device (<code>pos_b</code> omitted): values of the generator at <code>pos</code></li>
 <li>Two devices, same decorrelation distance (<code>dist_decorr_b</code> omitted, or equal to <code>dist_decorr</code> for that generator): both devices are on the same map, the value does not change when they swap positions</li>
 <li>Two devices, different decorrelation distances: each device has its own map; the value is the sum of both maps divided by <code>sqrt(2)</code></li>
 <li>The Uniform value <code>u</code> of <a href="#sos_rand">sos_rand</a> is mapped to <code>ceil( u · imax )</code>, limited to 1 ... <code>imax</code></li>
-<li>Each call with <code>seed = -1</code> gives a new realisation; with a seed >= 0 the same positions always give the same values, and nearby positions give similar values in separate calls with the same seed</li>
+<li>Each call with <code>seed = -1</code> gives a new realisation. With a seed >= 0 the phases are the same on all platforms: the same positions give the same values and nearby positions similar values, also in separate calls. The kernel is chosen automatically, so values from machines with and without AVX2 differ by the tolerance stated in <a href="#sos_val">sos_val</a>, and an integer can then differ by 1 where the Uniform value lies at a step</li>
+<li>A seed selects the phases, not the field: calls with the same seed but other decorrelation distances or another preset return related fields, equal at the coordinate origin and correlated around it. Use different seeds, or several entries of <code>dist_decorr</code> in one call, for quantities that must be independent</li>
+<li><code>val</code> may be the same object as <code>pos</code> or <code>pos_b</code></li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -7400,12 +7434,14 @@ Spatially correlated Normal distributed random numbers
 <ul>
 <li>Convenience function: sets up one sum-of-sinusoids generator per entry of <code>dist_decorr</code> from a preset, draws its phases and evaluates it at the given positions; see <a href="#sos_val">sos_val</a> for the model</li>
 <li>The generators are independent of each other and may have different decorrelation distances</li>
-<li>Phases: <code>sos_init_phases( n_coeff, 2·n_gen, seed )</code>; generator <code>g</code> uses column <code>g</code>, and column <code>n_gen + g</code> for a second device on its own map. The phases of the first device therefore do not depend on whether a second device is given</li>
+<li>Phases: generator <code>g</code> uses column <code>g</code> of <code>sos_init_phases( n_coeff, n_gen, seed )</code>. A second device on its own map uses column <code>g</code> of a second stream, <code>sos_init_phases( n_coeff, n_gen, seed_b )</code>, where <code>seed_b</code> is the seed with bit 62 flipped, i.e. <code>seed + 2^62</code> for seeds below 2^62; for <code>seed = -1</code> both streams are random. The phases of a generator therefore depend neither on the number of generators nor on whether a second device is given</li>
 <li>A decorrelation distance of 0 is replaced by 0.1 m</li>
 <li>One device (<code>pos_b</code> omitted): values of the generator at <code>pos</code></li>
 <li>Two devices, same decorrelation distance (<code>dist_decorr_b</code> omitted, or equal to <code>dist_decorr</code> for that generator): both devices are on the same map, the value does not change when they swap positions</li>
 <li>Two devices, different decorrelation distances: each device has its own map; the value is the sum of both maps divided by <code>sqrt(2)</code></li>
-<li>Each call with <code>seed = -1</code> gives a new realisation; with a seed >= 0 the same positions always give the same values, and nearby positions give similar values in separate calls with the same seed</li>
+<li>Each call with <code>seed = -1</code> gives a new realisation. With a seed >= 0 the phases are the same on all platforms: the same positions give the same values and nearby positions similar values, also in separate calls. The kernel is chosen automatically, so values from machines with and without AVX2 differ by the tolerance stated in <a href="#sos_val">sos_val</a></li>
+<li>A seed selects the phases, not the field: calls with the same seed but other decorrelation distances or another preset return related fields, equal at the coordinate origin and correlated around it. Use different seeds, or several entries of <code>dist_decorr</code> in one call, for quantities that must be independent</li>
+<li><code>val</code> may be the same object as <code>pos</code> or <code>pos_b</code></li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -7452,11 +7488,14 @@ Remove the sample mean of sum-of-sinusoids generators over a set of positions
 <li>Closed form, no iteration: with <code>z_n = mean over the positions of exp( j·2·pi · f_n·x )</code> and <code>Z = sum_n z_n · exp( j·phi_n )</code>, the mean is <code>sqrt(2/n_coeff) · Re( exp( j·offset ) · Z )</code>, which vanishes for <code>offset = pi/2 - arg(Z)</code> and for that value minus pi; the one with the smaller magnitude is applied, so the offset lies between -pi/2 and pi/2</li>
 <li>One device (<code>pos_b</code> omitted): one offset per generator</li>
 <li>Two devices on the same map (<code>pos_b</code> given, <code>phase_b</code> omitted): one offset per generator that zeroes the mean of the combined, normalised value; <code>acf</code> and <code>dist</code> are required</li>
-<li>Two devices on different maps (<code>pos_b</code> and <code>phase_b</code> given): each device is treated on its own, <code>phase</code> with <code>pos</code> and <code>phase_b</code> with <code>pos_b</code> and the frequencies <code>freq · freq_scale_b</code>; two offsets per generator. The mean of the combined value is then zero as well</li>
+<li>Two devices on different maps (<code>pos_b</code> and <code>phase_b</code> given): each device is treated on its own, <code>phase</code> with <code>pos</code> and <code>phase_b</code> with <code>pos_b</code> and the frequencies <code>freq · freq_scale_b</code>; two offsets per generator. The mean of the combined value is then zero as well. <code>phase_b</code> must not be the same object as <code>phase</code>: one matrix cannot hold two corrections</li>
 <li>Effect on the statistics: the result is the field conditioned on a zero mean over the positions. The variance at a position drops from 1 to <code>1 - c^2 / v</code>, where <code>v</code> is the variance of the sample mean and <code>c</code> the mean ACF between that position and all positions; on average over the positions the loss is at least <code>v</code>. It is small only if the positions spread over many decorrelation distances. For positions within about one decorrelation distance most of the variance is removed</li>
+<li>Rule of thumb, measured for 200 positions in a square with the edge <code>L</code> and the decorrelation distance <code>d</code> (<code>Comb256</code>): the variance drops by 74 % for <code>L = d</code>, 44 % for <code>L = 2·d</code>, 14 % for <code>L = 5·d</code>, 5 % for <code>L = 10·d</code>, 2.5 % for <code>L = 20·d</code> and less than 1 % from <code>L = 50·d</code> on</li>
 <li>The zero mean holds for exactly these positions and frequencies. It is lost when the phases are used with other frequencies (another decorrelation distance) or positions</li>
 <li>The mean of the Uniform output of <a href="#sos_val">sos_val</a> is not exactly 0.5 afterwards</li>
-<li>Phases are returned in the interval from -pi (included) to pi (excluded). A generator whose <code>abs(Z)</code> is below <code>1e-14 · n_coeff</code> already has a zero mean for every offset and is left unchanged</li>
+<li>Phases are returned in the interval from -pi (included) to pi (excluded). A generator whose <code>abs(Z)</code> is below <code>1e-14 · n_coeff</code> already has a zero mean for every offset and is left unchanged, also if its phases lie outside that interval</li>
+<li>Two devices on the same map need an ACF above -1 at all sample points, as in <a href="#sos_val">sos_val</a></li>
+<li>The sums over the positions are computed in parallel over the sinusoids; the result does not depend on the number of threads</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -7480,9 +7519,9 @@ void quadriga_lib::sos_remove_bias(
 <li><b><code>phase</code></b> — Phases in [rad]; one column per generator; updated in-place; <code>[n_coeff, n_gen]</code></li>
 <li><b><code>pos</code></b> — Positions of the first device in [m]; one row per position; the number of columns sets the number of dimensions: <code>[n_pos, 1]</code> = <code>{x}</code>, <code>[n_pos, 2]</code> = <code>{x, y}</code> or <code>[n_pos, 3]</code> = <code>{x, y, z}</code>; coordinates that are not given are 0; not more columns than <code>freq</code></li>
 <li><b><code>pos_b</code></b> <i>(optional)</i> — Positions of the second device in [m]; omitted or empty = one device; <code>[n_pos_b, 1]</code>, <code>[n_pos_b, 2]</code> or <code>[n_pos_b, 3]</code> as for <code>pos</code>; <code>n_pos_b = n_pos</code> for the same map, any number for different maps</li>
-<li><b><code>phase_b</code></b> <i>(optional)</i> — Phases of the second device in [rad]; requires <code>pos_b</code>; omitted or empty = same map; updated in-place; <code>[n_coeff, n_gen]</code></li>
-<li><b><code>acf</code></b> <i>(optional)</i> — Target ACF; required for two devices on the same map; <code>[n_acf]</code></li>
-<li><b><code>dist</code></b> <i>(optional)</i> — Sample points of the ACF in [m]; must start at 0 and increase strictly; <code>[n_acf]</code></li>
+<li><b><code>phase_b</code></b> <i>(optional)</i> — Phases of the second device in [rad]; requires <code>pos_b</code>; omitted or empty = same map; updated in-place; not the same object as <code>phase</code>; <code>[n_coeff, n_gen]</code></li>
+<li><b><code>acf</code></b> <i>(optional)</i> — Target ACF; required for two devices on the same map, must then be > -1; <code>[n_acf]</code></li>
+<li><b><code>dist</code></b> <i>(optional)</i> — Sample points of the ACF in [m]; must start at 0, increase strictly and be finite; <code>[n_acf]</code></li>
 <li><b><code>freq_scale_b</code></b> <i>(optional)</i> — Frequency scale of the second device, i.e. decorrelation distance of the first device divided by that of the second; must be > 0; other than 1 requires <code>phase_b</code></li>
 </ul>
 
@@ -7511,10 +7550,15 @@ Spatially correlated random values at given positions
 <li>Two devices on different maps (<code>pos_b</code> and <code>phase_b</code> given): <code>val = ( s_a(pos) + s_b(pos_b) ) / sqrt(2)</code>; <code>s_b</code> uses <code>phase_b</code> and the frequencies <code>freq · freq_scale_b</code>; <code>acf</code> and <code>dist</code> are ignored</li>
 <li>The mode follows from the arguments only; phase values are never compared. Passing the same matrix as <code>phase</code> and <code>phase_b</code> selects the two-map formula</li>
 <li><code>freq_scale_b</code> other than 1 requires <code>phase_b</code>: one map with two decorrelation distances has no consistent ACF</li>
-<li><code>uniform = true</code> maps the values to <code>0.5 · erfc( -val / sqrt(2) )</code>, which is uniform between 0 and 1 as far as <code>val</code> is Normal distributed</li>
-<li>Kernels: GENERIC computes in double precision. AVX2 reduces the argument <code>f_n·x</code> to one period in double precision, evaluates sine and cosine in single precision and accumulates in double precision; its values differ from GENERIC by less than <code>4e-7 · sqrt( 2·n_coeff )</code>, at any distance from the origin</li>
+<li>Two devices on the same map need an ACF above -1 at all sample points, because the value is divided by <code>sqrt( 2 + 2·A(D) )</code></li>
+<li><code>uniform = true</code> maps the values to <code>0.5 · erfc( -val / sqrt(2) )</code>, which is uniform between 0 and 1 as far as <code>val</code> is Normal distributed. The limits 0 and 1 are included: a value far out in the tail is rounded to them, for <code>dtype = float</code> every value above 5.4 gives 1</li>
+<li>Kernels: GENERIC computes in double precision. AVX2 reduces the argument <code>f_n·x</code> to one period in double precision, evaluates sine and cosine in single precision and accumulates in double precision; its values differ from GENERIC by less than <code>4e-7 · sqrt( 2·n_coeff )</code>, typically by less than 1e-6</li>
+<li>Accuracy far from the origin: the argument <code>f_n·x</code> is known to about 1e-16 of its size. The bound between the kernels holds up to about 1e9 periods of the sinusoids; beyond that both kernels lose accuracy at the same rate, and from 2^53 periods on every position returns the value at the origin</li>
+<li>A NaN or infinite coordinate gives NaN at that position and does not affect other positions</li>
 <li>The value at a position does not depend on the other positions or generators of the call, nor on the number of threads</li>
-<li><code>val</code> must not be the same object as an input</li>
+<li>For <code>dtype = float</code> the inputs are converted to double, the computation is the same and the result is rounded to single precision</li>
+<li>Memory: for <code>dtype = double</code> the values are computed in <code>val</code>; two devices need one more array of the size of <code>val</code>, and <code>dtype = float</code> one array of that size in double precision</li>
+<li><code>val</code> cannot be the same object as an input, nor use the memory of one: it is resized and written while the inputs are read. Such a call throws and leaves <code>val</code> unchanged</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -7540,8 +7584,8 @@ void quadriga_lib::sos_val(
 <li><b><code>pos</code></b> — Positions of the first device in [m]; one row per position; the number of columns sets the number of dimensions: <code>[n_pos, 1]</code> = <code>{x}</code>, <code>[n_pos, 2]</code> = <code>{x, y}</code> or <code>[n_pos, 3]</code> = <code>{x, y, z}</code>; coordinates that are not given are 0; not more columns than <code>freq</code></li>
 <li><b><code>pos_b</code></b> <i>(optional)</i> — Positions of the second device in [m]; omitted or empty = one device; <code>[n_pos, 1]</code>, <code>[n_pos, 2]</code> or <code>[n_pos, 3]</code> as for <code>pos</code>; the number of columns may differ from <code>pos</code></li>
 <li><b><code>phase_b</code></b> <i>(optional)</i> — Phases of the second device in [rad]; requires <code>pos_b</code>; omitted or empty = same map; <code>[n_coeff, n_gen]</code></li>
-<li><b><code>acf</code></b> <i>(optional)</i> — Target ACF; required for two devices on the same map; <code>[n_acf]</code></li>
-<li><b><code>dist</code></b> <i>(optional)</i> — Sample points of the ACF in [m]; must start at 0 and increase strictly; <code>[n_acf]</code></li>
+<li><b><code>acf</code></b> <i>(optional)</i> — Target ACF; required for two devices on the same map, must then be > -1; <code>[n_acf]</code></li>
+<li><b><code>dist</code></b> <i>(optional)</i> — Sample points of the ACF in [m]; must start at 0, increase strictly and be finite; <code>[n_acf]</code></li>
 <li><b><code>freq_scale_b</code></b> <i>(optional)</i> — Frequency scale of the second device, i.e. decorrelation distance of the first device divided by that of the second; must be > 0</li>
 <li><b><code>uniform</code></b> <i>(optional)</i> — Output distribution: <code>false</code> = Normal(0,1), <code>true</code> = Uniform between 0 and 1</li>
 <li><b><code>use_kernel</code></b> <i>(optional)</i> — Compute kernel: 0 = auto (AVX2 if available), 1 = GENERIC, 2 = AVX2; throws if the requested kernel is unavailable</li>

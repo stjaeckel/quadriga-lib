@@ -10,7 +10,7 @@ Sum-of-sinusoids random number generator
 SECTION!*/
 
 /*!MD
-# sos_calc_mse
+# sos.calc_mse
 Approximation error of the ACF of a set of sinusoids
 
 - Compares the autocorrelation function (ACF) produced by the sinusoids,
@@ -21,7 +21,7 @@ Approximation error of the ACF of a set of sinusoids
   `n_dim = 3`: `n_dir` directions on a spiral (Fibonacci) lattice on the upper hemisphere,
   `sin(elevation) = ( i + 0.5 ) / n_dir`, azimuth `i · pi · ( 3 - sqrt(5) )`, with `i` counted
   from 0. A direction and its opposite give the same ACF
-- `mse_core`: error on the grid of [[sos_acf_approx]] against [[sos_acf_2d]], for the grid points
+- `mse_core`: error on the grid of [[sos.acf_approx]] against [[sos.acf_2d]], for the grid points
   within a radius of `n_acf` grid steps around the center; for `n_dim = 3` the mean squared error
   is averaged over the three planes
 - `mse_all`: same on the complete grid, which extends to `2·Dmax` and has a target of 0 beyond
@@ -34,7 +34,7 @@ Approximation error of the ACF of a set of sinusoids
 - All outputs are always computed, including the 2-D grids behind `mse_core` and `mse_all`
 - A perfect fit has a mean squared error of 0 and is returned as `inf`; this happens for a target
   that the sinusoids reproduce exactly at all sample points
-- Equally spaced has the meaning given in [[sos_acf_2d]]
+- Equally spaced has the meaning given in [[sos.acf_2d]]
 
 ## Usage:
 ```
@@ -56,8 +56,8 @@ mse, mse_core, mse_all, acf_tail, test_dir = quadriga_lib.sos.calc_mse( freq, ac
   `n_dim = 3`; `(n_dir, 1)` with the azimuth for `n_dim = 2`; empty `(0, 0)` for `n_dim = 1`
 
 ## See also:
-- [[sos_generate]] (finds the frequencies; minimises the error returned here)
-- [[sos_acf_approx]], [[sos_acf_2d]] (the two grids that are compared)
+- [[sos.generate]] (finds the frequencies; minimises the error returned here)
+- [[sos.acf_approx]], [[sos.acf_2d]] (the two grids that are compared)
 MD!*/
 
 py::tuple sos_calc_mse(const py::array_t<double> &freq,

@@ -10,7 +10,7 @@ Sum-of-sinusoids random number generator
 SECTION!*/
 
 /*!MD
-# sos_remove_bias
+# sos.remove_bias
 Remove the sample mean of sum-of-sinusoids generators over a set of positions
 
 - One realisation of a spatially correlated random field has a non-zero mean over a finite set of
@@ -19,7 +19,7 @@ Remove the sample mean of sum-of-sinusoids generators over a set of positions
   a few decorrelation distances of each other. This is a property of any correlated field, not an
   error of the generator
 - This function adds one offset to all phases of a generator such that the mean of the Normal
-  distributed values of [[sos_val]] over the given positions becomes zero
+  distributed values of [[sos.val]] over the given positions becomes zero
 - Closed form, no iteration: with `z_n = mean over the positions of exp( j·2·pi · f_n·x )` and
   `Z = sum_n z_n · exp( j·phi_n )`, the mean is `sqrt(2/n_coeff) · Re( exp( j·offset ) · Z )`,
   which vanishes for `offset = pi/2 - arg(Z)` and for that value minus pi; the one with the
@@ -45,7 +45,7 @@ Remove the sample mean of sum-of-sinusoids generators over a set of positions
 - Phases are returned in the interval from -pi (included) to pi (excluded). A generator whose
   `abs(Z)` is below `1e-14 · n_coeff` already has a zero mean for every offset and is returned
   unchanged, also if its phases lie outside that interval
-- Two devices on the same map need an ACF above -1 at all sample points, as in [[sos_val]]
+- Two devices on the same map need an ACF above -1 at all sample points, as in [[sos.val]]
 - The input arrays `phase_in` and `phase_b_in` are not modified; the corrected phases are new arrays
 - An optional array that is `None` or empty counts as not given
 
@@ -82,11 +82,11 @@ phase_out, phase_b_out, offset, mean_before = quadriga_lib.sos.remove_bias( freq
 - **`offset`** — Offsets added to the phases; `(n_gen, 1)`, or `(n_gen, 2)` with
   `phase_b_in` (column 0: `phase_in`, column 1: `phase_b_in`)
 - **`mean_before`** — Sample mean before the correction; `(n_gen, 1)`: mean of the values of
-  [[sos_val]] for the given arguments; with `phase_b_in` `(n_gen, 2)`: mean of the field of each
+  [[sos.val]] for the given arguments; with `phase_b_in` `(n_gen, 2)`: mean of the field of each
   device on its own positions, the mean of the combined value being their sum divided by `sqrt(2)`
 
 ## See also:
-- [[sos_val]] (the values whose mean is removed)
+- [[sos.val]] (the values whose mean is removed)
 MD!*/
 
 py::tuple sos_remove_bias(const py::array_t<double> &freq,

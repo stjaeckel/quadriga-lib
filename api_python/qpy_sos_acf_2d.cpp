@@ -10,7 +10,7 @@ Sum-of-sinusoids random number generator
 SECTION!*/
 
 /*!MD
-# sos_acf_2d
+# sos.acf_2d
 Target ACF on a 2-D grid
 
 - Evaluates a rotationally symmetric autocorrelation function (ACF), given as a table over the
@@ -18,7 +18,7 @@ Target ACF on a 2-D grid
 - Grid axis: from `-2·Dmax` to `2·Dmax` with the spacing of `dist`, where `Dmax` is the last sample
   point; `n_grid = 4·n_acf - 3`, the center is at index `2·n_acf - 2`
 - Linear interpolation of the table at the radial distance; 0 at radial distances above `Dmax`
-- The result is the reference for [[sos_acf_approx]]
+- The result is the reference for [[sos.acf_approx]]
 - Equally spaced means that every sample point lies within 1e-4 of the step from its place on
   the regular axis
 
@@ -36,8 +36,8 @@ acf_2d, dist_2d = quadriga_lib.sos.acf_2d( acf, dist )
 - **`dist_2d`** — Grid axis; `(n_grid,)`
 
 ## See also:
-- [[sos_acf_approx]] (ACF produced by a set of sinusoids on the same grid)
-- [[sos_calc_mse]] (difference between the two)
+- [[sos.acf_approx]] (ACF produced by a set of sinusoids on the same grid)
+- [[sos.calc_mse]] (difference between the two)
 MD!*/
 
 py::tuple sos_acf_2d(const py::array_t<double> &acf,

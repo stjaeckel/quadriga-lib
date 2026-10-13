@@ -301,7 +301,8 @@ Spatially correlated random values at given positions
   rounded to single precision
 - Memory: for `dtype = double` the values are computed in `val`; two devices need one more array of the
   size of `val`, and `dtype = float` one array of that size in double precision
-- `val` must not be the same object as an input: it is resized and written before the inputs are read
+- `val` cannot be the same object as an input, nor use the memory of one: it is resized and written while
+  the inputs are read. Such a call throws and leaves `val` unchanged
 
 ## Declaration:
 ```
@@ -401,6 +402,13 @@ void quadriga_lib::sos_val(const arma::Mat<dtype> &freq,
             throw std::invalid_argument("Inputs 'acf' and 'dist' are required for two devices on the same map.");
         qd_sos_check_acf_same_map(*acf, *dist);
     }
+
+    // The output is resized and written while the inputs are still read, so it cannot be one of them:
+    // neither the same object nor a matrix on the same memory
+    const arma::Mat<dtype> *inputs[7] = {&freq, &phase, &pos, pos_b, phase_b, acf, dist};
+    for (const arma::Mat<dtype> *in : inputs)
+        if (in != nullptr && (in == &val || (val.memptr() != nullptr && in->memptr() == val.memptr())))
+            throw std::invalid_argument("Output 'val' cannot be the same object as an input.");
 
     // kernel: 1 = GENERIC, 2 = AVX2
     int kernel = 1;

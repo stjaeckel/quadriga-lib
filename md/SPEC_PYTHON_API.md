@@ -345,6 +345,7 @@ SECTION!*/
 - Included as a comment block immediately before the wrapper function definition.
 - Block starts with `/*!MD` and ends with `MD!*/`.
 - First line after `/*!MD` is the function name as exposed to Python (kept as-is, lowercase), followed by a 1-line summary on the next line.
+  - If the C++ name carries a prefix that the Python submodule replaces, the heading is the submodule and the name joined by a dot: `sos_val` is exposed as `quadriga_lib.sos.val` and headed `# sos.val`; cross-references are written `[[sos.val]]`. This keeps the heading equal to what the user types and avoids clashes between bare names of different sections (e.g. `generate`).
 - The bullet-point description follows after one empty line — there is no `## Description:` heading.
 - The 1-line summary should be identical to the C++/MEX documentation block.
 - Each bullet contains one concise fact.

@@ -10,10 +10,10 @@ Sum-of-sinusoids random number generator
 SECTION!*/
 
 /*!MD
-# sos_init_phases
+# sos.init_phases
 Draw random phases for a set of sum-of-sinusoids generators
 
-- Each column of `phase` is one realisation of the random field of a generator; see [[sos_val]]
+- Each column of `phase` is one realisation of the random field of a generator; see [[sos.val]]
 - Values are uniform in the interval from -pi (included) to pi (excluded)
 - Random stream: 64-bit Mersenne Twister (`std::mt19937_64`) seeded with `seed`; each value is
   `2·pi · ( u - 0.5 )`, where `u` is the upper 53 bits of one generator output divided by 2^53.
@@ -40,8 +40,8 @@ phase = quadriga_lib.sos.init_phases( n_coeff, n_gen, seed )
 - **`phase`** — Phases; `(n_coeff, n_gen)`
 
 ## See also:
-- [[sos_val]] (evaluates the generators)
-- [[sos_preset]] (frequencies that belong to the phases)
+- [[sos.val]] (evaluates the generators)
+- [[sos.preset]] (frequencies that belong to the phases)
 MD!*/
 
 py::array_t<double> sos_init_phases(arma::uword n_coeff,

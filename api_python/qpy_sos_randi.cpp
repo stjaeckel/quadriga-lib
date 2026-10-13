@@ -10,11 +10,11 @@ Sum-of-sinusoids random number generator
 SECTION!*/
 
 /*!MD
-# sos_randi
+# sos.randi
 Spatially correlated integer random numbers
 
 - Convenience function: sets up one sum-of-sinusoids generator per entry of `dist_decorr` from a
-  preset, draws its phases and evaluates it at the given positions; see [[sos_val]] for the model
+  preset, draws its phases and evaluates it at the given positions; see [[sos.val]] for the model
 - The generators are independent of each other and may have different decorrelation distances
 - Phases: generator `g` uses column `g` of `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed )`.
   A second device on its own map uses column `g` of a second stream,
@@ -29,11 +29,11 @@ Spatially correlated integer random numbers
   swap positions
 - Two devices, different decorrelation distances: each device has its own map; the value is the
   sum of both maps divided by `sqrt(2)`
-- The Uniform value `u` of [[sos_rand]] is mapped to `ceil( u · imax )`, limited to 1 ... `imax`
+- The Uniform value `u` of [[sos.rand]] is mapped to `ceil( u · imax )`, limited to 1 ... `imax`
 - Each call with `seed = -1` gives a new realisation. With a seed >= 0 the phases are the same on
   all platforms: the same positions give the same values and nearby positions similar values,
   also in separate calls. The kernel is chosen automatically, so values from machines with and
-  without AVX2 differ by the tolerance stated in [[sos_val]], and an integer can then differ by 1
+  without AVX2 differ by the tolerance stated in [[sos.val]], and an integer can then differ by 1
   where the Uniform value lies at a step. The random state of numpy is not used
 - A seed selects the phases, not the field: calls with the same seed but other decorrelation
   distances or another preset return related fields, equal at the coordinate origin and
@@ -57,7 +57,7 @@ val = quadriga_lib.sos.randi( dist_decorr, pos, imax, pos_b, dist_decorr_b, pres
   `(n_pos, 3)` as for `pos`; the number of columns may differ from `pos`; default: `None`
 - **`dist_decorr_b`** — Decorrelation distances of the second device; requires `pos_b`; must be
   >= 0; `None` = same as `dist_decorr`; `(n_gen,)`; default: `None`
-- **`preset`** — Name of the preset, see [[sos_preset]]; `str`; default: "Comb256"
+- **`preset`** — Name of the preset, see [[sos.preset]]; `str`; default: "Comb256"
 - **`seed`** — Seed of the phases; `int`; must be >= -1; -1 seeds from the system random device;
   default: -1
 
@@ -66,9 +66,9 @@ val = quadriga_lib.sos.randi( dist_decorr, pos, imax, pos_b, dist_decorr_b, pres
   returned as `float64`; one row per position, one column per generator; `(n_pos, n_gen)`
 
 ## See also:
-- [[sos_val]] (evaluation with given frequencies and phases)
-- [[sos_preset]], [[sos_init_phases]] (the two steps this function combines)
-- [[sos_randn]], [[sos_rand]] (Normal and Uniform values)
+- [[sos.val]] (evaluation with given frequencies and phases)
+- [[sos.preset]], [[sos.init_phases]] (the two steps this function combines)
+- [[sos.randn]], [[sos.rand]] (Normal and Uniform values)
 MD!*/
 
 py::array_t<double> sos_randi(const py::array_t<double> &dist_decorr,
