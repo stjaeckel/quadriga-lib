@@ -124,8 +124,8 @@ static inline double qd_slab_ref_R(std::complex<double> eps_s, double thk,
 //            the ratio is moved to, x = (1 - s) / (1 + s) with s = sqrt(R') at the sign of rm, and
 //            nu = x / x0. For a lossless sheet below its critical angle that is the pair rule on
 //            the reflectance of each face.
-//   res      Permittivity resonance, as an increment. It enters the admittance and the cosine,
-//            which are interface quantities, and not the propagation index.
+//   res      Permittivity resonance, as an increment. It is part of the permittivity: the
+//            admittance, the cosine and the propagation index all read it.
 struct QdLumpRef
 {
     double T_te = 0.0, T_tm = 0.0, R_te = 0.0, R_tm = 0.0; // channel powers
@@ -139,7 +139,7 @@ static inline QdLumpRef qd_slab_ref_lumped(std::complex<double> eps_s, double th
 {
     const double k0 = 2.0 * arma::datum::pi * f_hz / 299792458.0;
     const std::complex<double> e_if = eps_s + res;
-    const std::complex<double> z2 = std::sqrt(e_if), n = std::sqrt(eps_s);
+    const std::complex<double> z2 = std::sqrt(e_if), n = std::sqrt(e_if);
     const double c1 = std::cos(theta_n_rad), s1 = std::sin(theta_n_rad);
     const std::complex<double> c2 = std::sqrt(1.0 - (1.0 / e_if) * s1 * s1);
     const std::complex<double> p2 = std::exp(std::complex<double>(0.0, -2.0) * k0 * n * thk * c2);
@@ -3311,5 +3311,44 @@ TEST_CASE("Thin sheet - mass-law angle dependence")
         double Rb = F.run(mesh, half, thd, 0, 2.0 * F.m);
         INFO("reflect port, angle " << thd);
         CHECK(std::abs(Ra - Rb) < 1.0e-12);
+    }
+}
+
+TEST_CASE("Resonance - the public index and in-medium gain carry the permittivity pole")
+{
+    // A Lorentz pole in the permittivity is part of the medium. refractive_index is Re sqrt(eps + pole) and medium_gain
+    // charges the pole's loss along the path: a lossy pole is the same medium as a conductivity of that size. A pole
+    // strong enough to take Re(eps) below zero gives a finite gain, the rate 8.686 k0 |Im n| dB per meter.
+    const double f = 1.0e9, fG = 1.0, k0 = 2.0 * 3.14159265358979323846 * f / 299792458.0, L = 0.1;
+    auto pal = [](double a, double c, double rF, double rQ, double rS)
+    {
+        std::unordered_map<std::string, std::vector<double>> m;
+        m["a"] = {a}, m["c"] = {c}, m["fRef"] = {1.0}, m["resF"] = {rF}, m["resQ"] = {rQ}, m["resS"] = {rS};
+        return m;
+    };
+    auto pole = [](double rF, double rQ, double rS, double fq) // the Lorentz pole from the column definition
+    { return (rS * rF * rF) / std::complex<double>(rF * rF - fq * fq, (rF / rQ) * fq); };
+    struct Row
+    {
+        const char *name;
+        double a, rF, rQ, rS;
+    };
+    QD_DIAG("\n# diag: the public index and in-medium gain of a resonant medium over 100 mm at 1 GHz. n: refractive_index against\n");
+    QD_DIAG("# Re sqrt(eps + pole); g: medium_gain against the conductivity twin where eps + pole has a positive real part, else\n");
+    QD_DIAG("# against 10^(-0.8686 k0 |Im n| L)\n");
+    QD_DIAG("medium,eps_re,eps_im,n,d_n,g_dB,d_g_dB\n");
+    for (const Row &r : {Row{"lossless -2", 4.0, 2.0, 1.0e300, -1.5}, Row{"lossy -2.5j", 4.0, 1.0, 5.0, 0.5}, Row{"strong", 2.5, 0.8, 30.0, 2.0}})
+    {
+        const std::complex<double> e = r.a + pole(r.rF, r.rQ, r.rS, fG);
+        auto M = pal(r.a, 0.0, r.rF, r.rQ, r.rS);
+        const double n = quadriga_lib::refractive_index<double>(M, 1, f), g = quadriga_lib::medium_gain<double>(M, 1, L, f);
+        const double n_ref = std::real(std::sqrt(e));
+        const double g_ref = (std::real(e) > 0.0) ? quadriga_lib::medium_gain<double>(pal(std::real(e), std::max(0.0, -std::imag(e)) / 17.98, 0.0, 0.0, 0.0), 1, L, f)
+                                                  : std::pow(10.0, -0.1 * 8.686 * k0 * std::abs(std::imag(std::sqrt(e))) * L);
+        QD_DIAG("%s,%.6f,%.6f,%.9f,%.3e,%.6f,%.3e\n", r.name, std::real(e), std::imag(e), n, std::abs(n - n_ref), 10.0 * std::log10(g), std::abs(10.0 * std::log10(g / g_ref)));
+        INFO("resonant medium " << r.name);
+        CHECK(std::abs(n - n_ref) < 1.0e-12);
+        CHECK(std::isfinite(g));
+        CHECK(std::abs(10.0 * std::log10(g / g_ref)) < 1.0e-4); // the library takes k0 through the ITU constant 0.0477135
     }
 }

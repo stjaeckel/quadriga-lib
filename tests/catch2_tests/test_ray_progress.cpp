@@ -5365,3 +5365,123 @@ TEST_CASE("ray_progress - a wall with a stack inside it is on its matrix with th
                     }
                 }
 }
+
+TEST_CASE("ray_progress - a resonant solid is its medium at every frequency of a band")
+{
+#ifdef _OPENMP
+    struct OneThread
+    {
+        int n = omp_get_max_threads();
+        OneThread() { omp_set_num_threads(1); }
+        ~OneThread() { omp_set_num_threads(n); }
+    } one_thread;
+#endif
+    // air | 37.5 mm of eps 4 with a Lorentz pole | air, one ray, ray_progress called until none is left, every series
+    // summed, every path that ends in air summed at its polyline's point per frequency, scalar, float. The geometry is
+    // traced once at the first frequency of the band; each frequency is on the TE matrix of the medium eps 4 + pole(f),
+    // whichever frequency is the base. Poles: resF 2 GHz resS -1.5 resQ 1e30 (lossless to 1e-30, -2 at 1 GHz), and resF 1 GHz
+    // resQ 5 resS 0.5 (-2.5j at 1 GHz).
+    const double PI = 3.14159265358979323846, C0 = 299792458.0, d = 0.0375;
+    const std::complex<double> J(0.0, 1.0);
+    typedef std::unordered_map<std::string, std::vector<float>> Pal;
+    const double rF[2] = {2.0, 1.0}, rQ[2] = {1.0e30, 5.0}, rS[2] = {-1.5, 0.5};
+    auto pole = [&](int p, double fG) // the Lorentz pole from the column definition
+    { return (rS[p] * rF[p] * rF[p]) / std::complex<double>(rF[p] * rF[p] - fG * fG, (rF[p] / rQ[p]) * fG); };
+#ifdef QD_TEST_VERBOSE
+    std::printf("\n# diag: ray_progress, a resonant solid 37.5 mm in air, a band traced at its first frequency. pole: 0 lossless, 1 lossy.\n");
+    std::printf("# T, R: the summed paths against the TE matrix of eps 4 + pole(f), dB and deg; sum: both ports\n");
+    std::printf("pole,tracer,theta,base,f,nT,T_dB,T_deg,R_dB,R_deg,sum\n");
+#endif
+    for (int p = 0; p < 2; ++p)
+        for (int refr = 0; refr < 2; ++refr)
+            for (double thd : {30.0, 60.0})
+                for (int band = 0; band < 2; ++band)
+                {
+                    const std::vector<double> fq = band ? std::vector<double>{0.8, 1.0} : std::vector<double>{1.0, 0.8, 1.25};
+                    const size_t nf = fq.size();
+                    Pal pal;
+                    for (const char *key : {"a", "b", "c", "d", "fRef", "thk", "resF", "resQ", "resS"})
+                        pal[key] = std::vector<float>(1, 0.0f);
+                    pal["a"][0] = 4.0f, pal["fRef"][0] = 1.0f, pal["resF"][0] = (float)rF[p], pal["resQ"][0] = (float)rQ[p], pal["resS"][0] = (float)rS[p];
+                    arma::fmat mesh(4, 9);
+                    arma::uvec mi(4, arma::fill::ones);
+                    const float hh = 200.0f, x1 = (float)d;
+                    mesh.row(0) = arma::frowvec{0.0f, -hh, -hh, 0.0f, -hh, hh, 0.0f, hh, -hh}, mesh.row(1) = arma::frowvec{0.0f, hh, -hh, 0.0f, -hh, hh, 0.0f, hh, hh};
+                    mesh.row(2) = arma::frowvec{x1, -hh, -hh, x1, hh, -hh, x1, -hh, hh}, mesh.row(3) = arma::frowvec{x1, hh, -hh, x1, hh, hh, x1, -hh, hh};
+                    const double th = thd * PI / 180.0, st = std::sin(th);
+                    const float Ox = -1.0f, Oy = 0.37f - (float)std::tan(th), Oz = 0.0f, r0 = 0.1f, len = 300.0f;
+                    arma::frowvec kv = {(float)std::cos(th), (float)std::sin(th), 0.0f};
+                    arma::fvec cf(nf);
+                    for (size_t q = 0; q < nf; ++q)
+                        cf(q) = (float)(fq[q] * 1.0e9);
+                    arma::fmat orig(1, 3), dest(1, 3), acc(1, 1 + nf, arma::fill::zeros);
+                    orig.row(0) = arma::frowvec{Ox, Oy, Oz} + r0 * kv, dest.row(0) = arma::frowvec{Ox, Oy, Oz} + (r0 + len) * kv;
+                    arma::fcube pd(1, 3, nf);
+                    for (size_t q = 0; q < nf; ++q)
+                        pd.slice(q) = kv;
+                    arma::Col<short> prev(1, arma::fill::zeros), cur(1, arma::fill::zeros), buf(1, arma::fill::zeros);
+                    std::vector<quadriga_lib::path> paths(1);
+                    paths[0].init(0, nf, true);
+                    paths[0].set_length(r0);
+                    std::vector<std::complex<double>> Ts(nf, 0.0), Rs(nf, 0.0);
+                    int nT = 0;
+                    for (int g = 0; g < 30; ++g)
+                    {
+                        quadriga_lib::ray_progress(mesh, mi, pal, cf, Ox, Oy, Oz, orig, dest, prev, cur, buf, pd, acc, paths, nullptr, nullptr, nullptr, nullptr,
+                                                   (uint8_t)20, 100, 100, 0, -140.0f, 3.0f, 0.0f, refr != 0, true, nullptr, nullptr, nullptr, nullptr);
+                        if (orig.n_rows == 0)
+                            break;
+                        for (arma::uword i = 0; i < orig.n_rows; ++i)
+                        {
+                            const size_t ns = paths[i].n_seg();
+                            if ((cur(i) & (short)0x3FFF) != 0 || ns != (size_t)(g + 1))
+                                continue;
+                            double Lin = 0.0;
+                            for (size_t s2 = 1; s2 < ns; ++s2)
+                            {
+                                const float *a = paths[i].coord(s2 - 1), *b = paths[i].coord(s2);
+                                Lin += std::sqrt(((double)b[0] - a[0]) * ((double)b[0] - a[0]) + ((double)b[1] - a[1]) * ((double)b[1] - a[1]) +
+                                                 ((double)b[2] - a[2]) * ((double)b[2] - a[2]));
+                            }
+                            const float *first = paths[i].coord(0), *last = paths[i].coord(ns - 1);
+                            const bool fwd = dest(i, 0) > orig(i, 0);
+                            if (fwd && last[0] > x1 - 1.0e-3f)
+                                ++nT;
+                            for (size_t q = 0; q < nf; ++q)
+                            {
+                                const double k0 = 2.0 * PI * fq[q] * 1.0e9 / C0;
+                                const float *xc = paths[i].xpr_coeff(q);
+                                std::complex<double> F = std::complex<double>((double)xc[0], (double)xc[1]) * std::exp(-J * k0 * Lin) *
+                                                         std::exp(J * k0 * st * ((double)last[1] - (double)first[1]));
+                                if (fwd && last[0] > x1 - 1.0e-3f)
+                                    Ts[q] += F;
+                                else if (!fwd && last[0] < 1.0e-3f)
+                                    Rs[q] += F;
+                            }
+                        }
+                    }
+                    for (size_t q = 0; q < nf; ++q)
+                    {
+                        // The TE matrix of one layer of eps 4 + pole(f), admittance b = sqrt(eps - sin^2)
+                        const double k0 = 2.0 * PI * fq[q] * 1.0e9 / C0;
+                        std::complex<double> b = std::sqrt(4.0 + pole(p, fq[q]) - st * st), h0 = std::cos(th);
+                        if (std::imag(b) > 0.0)
+                            b = -b;
+                        std::complex<double> dl = k0 * b * d, c = std::cos(dl), s = std::sin(dl), m11 = c, m12 = J * s / b, m21 = J * b * s, m22 = c;
+                        std::complex<double> B = m11 + m12 * h0, Cc = m21 + m22 * h0, r = (h0 * B - Cc) / (h0 * B + Cc), t = 2.0 * h0 / (h0 * B + Cc);
+                        const double dT = 10.0 * std::log10(std::norm(Ts[q] / t)), aT = std::arg(Ts[q] / t) * 180.0 / PI;
+                        const double dR = 10.0 * std::log10(std::norm(Rs[q] / r)), aR = std::arg(Rs[q] / r) * 180.0 / PI;
+                        const double sm = std::norm(Ts[q]) + std::norm(Rs[q]);
+#ifdef QD_TEST_VERBOSE
+                        std::printf("%d,%d,%.0f,%.2f,%.2f,%d,%+.4f,%+.3f,%+.4f,%+.3f,%.5f\n", p, refr ? 5 : 4, thd, fq[0], fq[q], nT, dT, aT, dR, aR, sm);
+#endif
+                        INFO("resonant solid, pole " << p << ", refr " << refr << ", theta " << thd << ", base " << fq[0] << ", f " << fq[q]);
+                        CHECK(nT >= 1);
+                        CHECK(std::abs(dT) < 1.0e-3);
+                        CHECK(std::abs(aT) < 1.0e-2);
+                        CHECK(std::abs(dR) < 1.0e-3);
+                        CHECK(std::abs(aR) < 1.0e-2);
+                        CHECK(sm < 1.0 + 1.0e-4);
+                    }
+                }
+}

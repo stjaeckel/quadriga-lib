@@ -236,14 +236,18 @@ namespace
             tfB = cols.tfB ? (double)cols.tfB[i] : tfB;
         }
 
-        // Relative permittivity
+        // Relative permittivity, with its resonance: a complex Lorentz pole, inactive unless
+        // resF > 0, resQ > 0 and resS != 0. One permittivity at a face and in propagation.
         std::complex<double> eta(double fGHz = 1.0) const
         {
             double f_rel = fGHz / fRef;
             double eta_r = a * std::pow(f_rel, b);
             double sigma = c * std::pow(f_rel, d);
             double eta_i = -17.98 * sigma / fGHz;
-            return std::complex<double>(eta_r, eta_i);
+            std::complex<double> pole(0.0, 0.0);
+            if (resF > 0.0 && resQ > 0.0 && resS != 0.0)
+                pole = (resS * resF * resF) / std::complex<double>(resF * resF - fGHz * fGHz, (resF / resQ) * fGHz);
+            return std::complex<double>(eta_r, eta_i) + pole;
         }
 
         // Relative permeability
@@ -253,16 +257,6 @@ namespace
             double mu_r = e * std::pow(f_rel, f);
             double sigma_m = g * std::pow(f_rel, h);
             return std::complex<double>(mu_r, -17.98 * sigma_m / fGHz);
-        }
-
-        // Permittivity resonance (acoustic): complex Lorentz pole added to the interface (Fresnel)
-        std::complex<double> eta_resonance(double fGHz = 1.0) const
-        {
-            if (resF <= 0.0 || resQ <= 0.0 || resS == 0.0)
-                return std::complex<double>(0.0, 0.0);
-            double resF2 = resF * resF;
-            std::complex<double> denom(resF2 - fGHz * fGHz, (resF / resQ) * fGHz);
-            return (resS * resF2) / denom;
         }
 
         // In-medium gain, linear
@@ -279,13 +273,8 @@ namespace
             if (dist_geo == 0.0) // Identity fallback
                 dist_geo = dist_refract, abs_cos_theta = abs_cos_theta_t;
 
-            std::complex<double> eta_val = eta(fGHz) * mu(fGHz);
-            double er = std::real(eta_val);
-            double tan_delta = std::imag(eta_val) / er;
-            double cos_delta = 1.0 / std::sqrt(1.0 + tan_delta * tan_delta);
-            double Delta = 2.0 * cos_delta / (1.0 - cos_delta);
-            Delta = std::sqrt(Delta) * 0.0477135 / (fGHz * std::sqrt(er));
-            double loss = dist_refract * 8.686 / Delta;
+            // ITU-R P.2040 attenuation rate, 8.686 k0 |Im n| dB per meter
+            double loss = dist_refract * 8.686 * fGHz * std::abs(std::imag(std::sqrt(eta(fGHz) * mu(fGHz)))) / 0.0477135;
             loss += dist_refract * alpha * std::pow(fGHz / fRef, alphaB);
 
             // The mass-law floor guards traced solids, where a sub-millimeter path is a meshing
@@ -601,8 +590,8 @@ namespace
                 sin2_theta = std::complex<double>(sin_theta_real * sin_theta_real, 0.0);
             }
 
-            std::complex<double> eta1 = eta(fGHz) + eta_resonance(fGHz); // incidence medium (this)
-            std::complex<double> eta2 = other.eta(fGHz) + other.eta_resonance(fGHz);
+            std::complex<double> eta1 = eta(fGHz); // incidence medium (this)
+            std::complex<double> eta2 = other.eta(fGHz);
             std::complex<double> mu1 = mu(fGHz);
             std::complex<double> mu2 = other.mu(fGHz);
 
@@ -939,8 +928,7 @@ namespace
     // Per medium the admittance is z = sqrt(eps/mu) and the index is n = sqrt(eps mu), and every
     // cosine comes from the transverse invariant eps mu (1 - c^2), which is conserved across every
     // boundary and is fixed by the incidence cosine ci in the near medium, complex wherever that
-    // medium is a traced solid. A permittivity resonance enters every admittance and cosine and
-    // no propagation index.
+    // medium is a traced solid.
     //
     // Each boundary a | b is a two-port (r, t_ab, t_ba, -r) in raw Fresnel amplitudes, in the form
     // Material::interact_with writes them, and each coherent layer the one-way factor phi. The
@@ -998,9 +986,9 @@ namespace
         auto MED = [&](int j) -> const Material &
         { return (j == 0) ? mat_near : ((j > n_layers) ? mat_far : *layers[j - 1].mtl); };
         auto W = [&](int j) -> std::complex<double>
-        { return (MED(j).eta(fGHz) + MED(j).eta_resonance(fGHz)) * MED(j).mu(fGHz); };
+        { return MED(j).eta(fGHz) * MED(j).mu(fGHz); };
         auto ADM = [&](int j) -> std::complex<double>
-        { return std::sqrt((MED(j).eta(fGHz) + MED(j).eta_resonance(fGHz)) / MED(j).mu(fGHz)); };
+        { return std::sqrt(MED(j).eta(fGHz) / MED(j).mu(fGHz)); };
 
         // A stack of mass-law layers reached by a wave that is held undeviated in a mass-law
         // medium - a rigid sheet on or inside a rigid wall - is a run of later faces of that
@@ -1182,7 +1170,7 @@ namespace
                 std::complex<double> c_L = COS(j);
                 double thk = layers[j - 1].thk, a_dB = L.alpha * std::pow(fGHz / L.fRef, L.alphaB);
                 double a_Np = (a_dB > 0.0 && thk > 0.0) ? 0.05 * std::log(10.0) * a_dB * thk / std::abs(std::real(c_L)) : 0.0;
-                return std::exp(std::complex<double>(0.0, -1.0) * k0 * std::sqrt(L.eta(fGHz) * L.mu(fGHz)) * c_L * thk - a_Np);
+                return std::exp(std::complex<double>(0.0, -1.0) * k0 * std::sqrt(W(j)) * c_L * thk - a_Np);
             };
 
             std::complex<double> Tt(1.0, 0.0), Rt(0.0, 0.0);
@@ -1286,7 +1274,7 @@ namespace
         std::complex<double> c_disp = far_closed ? ci : COS(d);
         auto UNDISP = [&](double t) -> std::complex<double>
         {
-            std::complex<double> phi = std::exp(std::complex<double>(0.0, -1.0) * k0 * std::sqrt(MED(d).eta(fGHz) * MED(d).mu(fGHz)) * t * c_disp);
+            std::complex<double> phi = std::exp(std::complex<double>(0.0, -1.0) * k0 * std::sqrt(W(d)) * t * c_disp);
             return (std::abs(phi) > 0.0) ? std::complex<double>(1.0, 0.0) / phi : std::complex<double>(1.0, 0.0);
         };
 
@@ -1340,9 +1328,9 @@ namespace
             return false;
 
         const double k0 = 2.0 * 3.14159265358979323846 * fGHz * 1e9 / 299792458.0;
-        std::complex<double> eta_s_if = mat_slab.eta(fGHz) + mat_slab.eta_resonance(fGHz);
+        std::complex<double> eta_s_if = mat_slab.eta(fGHz);
         std::complex<double> mu_s = mat_slab.mu(fGHz);
-        std::complex<double> n_cx = std::sqrt(mat_slab.eta(fGHz) * mu_s); // resonance-excluded slab index
+        std::complex<double> n_cx = std::sqrt(eta_s_if * mu_s);
 
         bool have_exact_ct = std::abs(ct_slab_exact) > 0.0;
         std::complex<double> cs = have_exact_ct ? ct_slab_exact : std::complex<double>(abs_cos_theta_t, 0.0);
@@ -1361,7 +1349,7 @@ namespace
         auto fresnel_r = [&](const Material &adj, std::complex<double> &r_te, std::complex<double> &r_tm,
                              const Material *backing, const Material *adj2)
         {
-            std::complex<double> eta_a_if = adj.eta(fGHz) + adj.eta_resonance(fGHz);
+            std::complex<double> eta_a_if = adj.eta(fGHz);
             std::complex<double> mu_a = adj.mu(fGHz);
             std::complex<double> z1 = std::sqrt(eta_s_if / mu_s);
             std::complex<double> z2 = std::sqrt(eta_a_if / mu_a);
@@ -1558,9 +1546,8 @@ Real refractive index of a homogeneous medium
 
 - Returns `n = Re(sqrt(ε_r · μ_r))`, the real part of the complex refractive index, using the
   ITU-R P.2040-1 permittivity model `ε_r = a·(f/fRef)^b` together with the relative permeability `μ_r`.
-- Only the bulk (base) permittivity is used. The coincidence / resonance features
-  (`coiF`, `coiQ`, `coiA`, `resF`, ...) are excluded, since they model a thin-interface surface
-  effect, not bulk propagation, and must not enter the geometric refraction index.
+- A permittivity resonance (`resF`, `resQ`, `resS`) is part of `ε_r`. The coincidence feature
+  (`coiF`, `coiQ`, `coiA`) is excluded: it is a penetration loss at an interface, not bulk propagation.
 - Air (`iM = 0`) returns `1`.
 
 ## Declaration:
@@ -1596,7 +1583,7 @@ dtype quadriga_lib::refractive_index(const std::unordered_map<std::string, std::
         throw std::invalid_argument("Material index out of bound.");
     Material M(cols, iM);
     double fGHz = (double)center_frequency * 1e-9;
-    return (dtype)std::real(std::sqrt(M.eta(fGHz) * M.mu(fGHz))); // base eta, no resonance term
+    return (dtype)std::real(std::sqrt(M.eta(fGHz) * M.mu(fGHz)));
 }
 
 template float quadriga_lib::refractive_index(const std::unordered_map<std::string, std::vector<float>> &mtl_prop, arma::uword iM, float center_frequency);
@@ -2560,7 +2547,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
             // of a rounding artifact at the spine. Skipped where the far medium is lossy as well: it
             // has no critical angle, for an edge as little as for the spine.
             if (geometry_type == 2 && !one_medium &&
-                std::imag((M2.eta(fGHz) + M2.eta_resonance(fGHz)) * M2.mu(fGHz)) == 0.0)
+                std::imag(M2.eta(fGHz) * M2.mu(fGHz)) == 0.0)
                 for (int i = 0; i <= 3 && !total_reflection; ++i)
                     if (eta * sin_thetaV[i] >= 1.0)
                         total_reflection = true;
@@ -3365,9 +3352,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
         auto TRANSPARENT_TO = [&](int a, int b) -> bool
         {
             Material A = MAT(a), B = MAT(b);
-            std::complex<double> ea = A.eta(fGHz) + A.eta_resonance(fGHz);
-            std::complex<double> eb = B.eta(fGHz) + B.eta_resonance(fGHz);
-            std::complex<double> ma = A.mu(fGHz), mb = B.mu(fGHz);
+            std::complex<double> ea = A.eta(fGHz), eb = B.eta(fGHz), ma = A.mu(fGHz), mb = B.mu(fGHz);
             double se = std::abs(ea) + std::abs(eb), sm = std::abs(ma) + std::abs(mb);
             return std::abs(ea - eb) <= 1.0e-9 * ((se > 0.0) ? se : 1.0) &&
                    std::abs(ma - mb) <= 1.0e-9 * ((sm > 0.0) ? sm : 1.0);
@@ -3747,8 +3732,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 return none;
 
             Material M_ent = MAT(unnamed ? 0 : mtl_prev), M_slb = MAT(mtl_current);
-            std::complex<double> e1 = (M_ent.eta(fGHz) + M_ent.eta_resonance(fGHz)) * M_ent.mu(fGHz);
-            std::complex<double> e2 = (M_slb.eta(fGHz) + M_slb.eta_resonance(fGHz)) * M_slb.mu(fGHz);
+            std::complex<double> e1 = M_ent.eta(fGHz) * M_ent.mu(fGHz), e2 = M_slb.eta(fGHz) * M_slb.mu(fGHz);
             if (std::abs(e2) <= 0.0)
                 return none;
             std::complex<double> eps_r = e1 / e2; // qd_refract's eta1_div_eta2
@@ -4009,8 +3993,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
             if (!use_vbs)
             {
                 Material A = MAT(Ma), B = MAT(Mb);
-                if (std::imag((A.eta(fGHz) + A.eta_resonance(fGHz)) * A.mu(fGHz)) == 0.0 &&
-                    std::imag((B.eta(fGHz) + B.eta_resonance(fGHz)) * B.mu(fGHz)) == 0.0 && !(A.m > 0.0) && !(B.m > 0.0))
+                if (std::imag(A.eta(fGHz) * A.mu(fGHz)) == 0.0 && std::imag(B.eta(fGHz) * B.mu(fGHz)) == 0.0 && !(A.m > 0.0) && !(B.m > 0.0))
                 {
                     // The direction an exit writes is the one dir_prev refracts to, as for any
                     // other leg: the segment carries the relaunch offset of the event before it.
@@ -4211,7 +4194,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
 
             if (std::abs(cs) > 0.0)
             {
-                std::complex<double> n_cx = std::sqrt(mtl.eta(fGHz) * mtl.mu(fGHz)); // resonance-excluded
+                std::complex<double> n_cx = std::sqrt(mtl.eta(fGHz) * mtl.mu(fGHz));
                 double d_norm = dist_refract * abs_cos_theta_t;                      // normal thickness
                 double sin_t = 1.0 - abs_cos_theta_t * abs_cos_theta_t;
                 double s_lat = dist_refract * std::sqrt((sin_t > 0.0) ? sin_t : 0.0); // transverse walk

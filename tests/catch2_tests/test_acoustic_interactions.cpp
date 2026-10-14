@@ -112,10 +112,10 @@ TEST_CASE("Acoustic - frequency mapping round-trip")
     CHECK(AC2RF == Approx(874636.0).epsilon(1e-4));
 }
 
-// Test 2 - refractive_index uses the base permittivity only
-// The bulk index is n = Re(sqrt(eta_base * mu)); resonance and coincidence are surface effects and
-// must not leak into it.
-TEST_CASE("Acoustic - refractive_index base permittivity only")
+// Test 2 - refractive_index carries the permittivity resonance and not the coincidence feature
+// The bulk index is n = Re(sqrt(eta * mu)) with a resonance pole part of eta; the coincidence feature
+// is an interface penetration loss and must not leak into it.
+TEST_CASE("Acoustic - refractive_index carries the resonance, not the coincidence")
 {
     double fRef_GHz = ac2rf(1000.0) / 1.0e9;
 
@@ -138,16 +138,21 @@ TEST_CASE("Acoustic - refractive_index base permittivity only")
     mtl_disp["fRef"] = {fRef_GHz};
     CHECK(quadriga_lib::refractive_index<double>(mtl_disp, 1, ac2rf(2000.0)) == Approx(4.0).epsilon(1e-9));
 
-    // Adding resonance and coincidence poles must not change the index.
-    std::unordered_map<std::string, std::vector<double>> mtl_res = mtl4;
+    // A coincidence feature does not change the index.
+    std::unordered_map<std::string, std::vector<double>> mtl_coi = mtl4;
+    mtl_coi["coiF"] = {ac2rf(2000.0) / 1.0e9};
+    mtl_coi["coiQ"] = {5.0};
+    mtl_coi["coiA"] = {-6.0};
+    CHECK(quadriga_lib::refractive_index<double>(mtl_coi, 1, ac2rf(1000.0)) ==
+          Approx(quadriga_lib::refractive_index<double>(mtl4, 1, ac2rf(1000.0))).epsilon(1e-12));
+
+    // A resonance does: at resF the pole is -j resS resQ, so eps = 4 - 4j.
+    std::unordered_map<std::string, std::vector<double>> mtl_res = mtl_coi;
     mtl_res["resF"] = {ac2rf(1000.0) / 1.0e9};
     mtl_res["resQ"] = {8.0};
     mtl_res["resS"] = {0.5};
-    mtl_res["coiF"] = {ac2rf(2000.0) / 1.0e9};
-    mtl_res["coiQ"] = {5.0};
-    mtl_res["coiA"] = {-6.0};
     CHECK(quadriga_lib::refractive_index<double>(mtl_res, 1, ac2rf(1000.0)) ==
-          Approx(quadriga_lib::refractive_index<double>(mtl4, 1, ac2rf(1000.0))).epsilon(1e-12));
+          Approx(std::real(std::sqrt(std::complex<double>(4.0, -4.0)))).epsilon(1e-12));
 }
 
 // Test 3 - medium_gain in-medium loss (mass law, excess absorption)
