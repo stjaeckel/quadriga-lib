@@ -10,6 +10,7 @@ import sys
 import os
 import copy
 import glob
+import pathlib
 import tempfile
 import unittest
 import numpy as np
@@ -158,6 +159,31 @@ class test_case(unittest.TestCase):
         # A single str is one short name
         self.assertEqual(self.write_text({}, short_names="Ta"), self.write_text({}, short_names=["Ta"]))
 
+    def test_write_defaults_flag_types(self):
+        # None selects the default (False); bool and numpy.bool_ are accepted; anything else is a TypeError
+        ref = self.write_text(self.scenpar)
+        self.assertEqual(self.write_text(self.scenpar, write_defaults=None), ref)
+        self.assertEqual(self.write_text(self.scenpar, write_defaults=np.bool_(False)), ref)
+        self.assertEqual(self.write_text(self.scenpar, write_defaults=np.bool_(True)),
+                         self.write_text(self.scenpar, write_defaults=True))
+        for value in ["yes", 1, 0]:
+            with self.assertRaises(TypeError) as ctx:
+                quadriga_lib.tools.conf_file_write(self.fn, self.scenpar, write_defaults=value)
+            self.assertIn("Input 'write_defaults' must be a bool or None.", str(ctx.exception))
+
+    def test_path_like(self):
+        # str, bytes and os.PathLike write the same file
+        ref = self.write_text(self.scenpar, self.plpar)
+        for fn in [pathlib.Path(self.fn), os.fsencode(self.fn)]:
+            os.remove(self.fn)
+            quadriga_lib.tools.conf_file_write(fn, self.scenpar, self.plpar)
+            with open(self.fn) as f:
+                self.assertEqual(f.read(), ref)
+        for fn in [5, None]:
+            with self.assertRaises(TypeError) as ctx:
+                quadriga_lib.tools.conf_file_write(fn, self.scenpar)
+            self.assertIn("Input 'fn' must be a str or path-like object.", str(ctx.exception))
+
     def test_plpar_order(self):
         # The dict order is the write order; 'model' can be at any position of the input dict
         plpar = {"A": [4.0], "model": "logdist", "B": [1.0, 2.5, -3.0]}
@@ -223,6 +249,15 @@ class test_case(unittest.TestCase):
         check(ValueError, "line break", {}, ref="a\nb")
         check(ValueError, "at most 10 entries", {}, ref_sec=["a"] * 11)
         check(ValueError, "valid_range", {}, valid_range=np.ones((2, 4)))
+        check(ValueError, "Entries of 'short_names' must be distinct.", {}, short_names=["Ab", "Cd", "Ab"])
+
+        # A line break in the file name: no file
+        for name in ["conf_file_write_x\nKF_mu = 5 %.conf", "conf_file_write_x\rKF_mu = 5 %.conf"]:
+            fn = os.path.join(self.tmp.name, name)
+            with self.assertRaises(ValueError) as ctx:
+                quadriga_lib.tools.conf_file_write(fn, {})
+            self.assertIn("Input 'fn' must not contain a line break in the file name.", str(ctx.exception))
+            self.assertFalse(os.path.exists(fn))
 
         # Thrown by C++: std::runtime_error -> RuntimeError
         with self.assertRaises(RuntimeError) as ctx:

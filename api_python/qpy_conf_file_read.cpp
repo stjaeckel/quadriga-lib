@@ -13,28 +13,32 @@ SECTION!*/
 Read and validate a QuaDRiGa scenario configuration file
 
 - A conf file is a text file with one `Key = value` assignment per line; `%` starts a comment; blank
-  lines are allowed; line ends can be LF or CRLF; space and tab are white space
+  lines are allowed; line ends can be LF or CRLF; space and tab are white space; a UTF-8 byte order mark at the
+  start of the file is skipped
 - Keys are case-sensitive names of the characters `A-Z`, `a-z`, `0-9` and `_`; there are four kinds:
   - Scenario parameters: 165 numeric keys with one number each. Keys that are not in the file have
     their default value.
   - `SubpathMethod`: one of the words `legacy`, `Laplacian`, `mmMAGIC`; default `legacy`
   - Path-loss parameters: every key that starts with `PL_`. `PL_model` has one name as value. All
     others have one or more numbers separated by white space.
-  - `ShortName`: an alias for the scenario, one name; can occur several times
+  - `ShortName`: an alias for the scenario, one name; can occur several times with different values
 - Any other key is ignored and reported in `ignored_keys`; its value is not examined
 - A key that is stated more than once has its last value
 - Numbers are decimal with an optional sign, an optional decimal point and an optional exponent
   (`e` or `E`), for example `-6.28`, `.5`, `6.2e-07`; `Inf`, `+Inf` and `-Inf` are accepted in any case
+- A number beyond the range of a double (`1e400`) is an error "out of range"; a number below the smallest
+  subnormal reads as `0` (or `-0`)
+- Numbers are read independent of the locale (the decimal point is always `.`)
 - Elevation angles are used throughout (+90 deg is up); no key refers to a zenith angle
 - The 165 numeric keys are 138 keys of QuaDRiGa and 27 keys for 3GPP TR 38.901 v19.5.0. With their
   default of 0 the new keys have no effect.
 - The QuaDRiGa key `GR_epsilon` (fixed relative permittivity of the ground) is not supported and is
   reported in `ignored_keys`; the permittivity is complex and is set in the simulation
-- Raises `RuntimeError` if the file cannot be opened
+- Raises `RuntimeError` if the file cannot be opened or is a directory
 - Raises `ValueError` with file name and line number for a line that is not blank, not a comment and
   not a well-formed assignment: no `=`, more or less than one name before the `=`, a missing value, a
   word where a number is required or the reverse, a second value or other text after the value, `NaN`,
-  complex numbers, a `PL_` key without a name
+  complex numbers, a number out of range, a `PL_` key without a name, a `ShortName` value stated twice
 - With `validate = True`, a value that fails the checks of [[scenpar_validate]] is an error as well
 - A correlation matrix that is not positive definite is not an error; see `lsp_xcorr_chk`
 
@@ -45,9 +49,9 @@ scenpar, plpar, lsp_xcorr, lsp_xcorr_chk, short_names, ignored_keys = \
 ```
 
 ## Inputs:
-- **`fn`** — Path to the conf file
+- **`fn`** — Path to the conf file; str, bytes or path-like object (e.g. `pathlib.Path`)
 - **`validate`** — `True`: apply the value checks of [[scenpar_validate]]; `False`: only the line
-  grammar is checked; default: True
+  grammar is checked; bool or `numpy.bool_`; default: True; `None` selects the default
 
 ## Outputs:
 - **`scenpar`** — Scenario parameters; dict with 166 entries in the QuaDRiGa order: the 138 numeric
@@ -69,9 +73,13 @@ scenpar, plpar, lsp_xcorr, lsp_xcorr_chk, short_names, ignored_keys = \
 - [[conf_file_write]] (write a conf file)
 MD!*/
 
-py::tuple conf_file_read(const std::string &fn,
-                         bool validate)
+py::tuple conf_file_read(py::object fn,
+                         py::handle validate)
 {
+    // Read inputs
+    const std::string fn_s = qd_python_path(fn, "fn");
+    const bool validate_b = qd_python_flag(validate, true, "validate");
+
     // Output allocation
     std::unordered_map<std::string, double> scenpar;
     std::unordered_map<std::string, std::vector<double>> plpar;
@@ -82,9 +90,9 @@ py::tuple conf_file_read(const std::string &fn,
     auto lsp_xcorr_py = qd_python_init_output((arma::uword)8, (arma::uword)8, &lsp_xcorr);
 
     // Call library function
-    const bool lsp_xcorr_chk = quadriga_lib::conf_file_read(fn, scenpar, &subpath_method, &pl_model, &plpar,
+    const bool lsp_xcorr_chk = quadriga_lib::conf_file_read(fn_s, scenpar, &subpath_method, &pl_model, &plpar,
                                                             &lsp_xcorr, &key_order, &pl_order, &short_names,
-                                                            &ignored_keys, validate);
+                                                            &ignored_keys, validate_b);
 
     // Scenario parameters: numeric keys in canonical order, 'SubpathMethod' at its QuaDRiGa position
     auto scenpar_py = qd_python_scenpar2dict(scenpar, subpath_method, key_order);

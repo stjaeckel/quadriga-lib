@@ -7,8 +7,10 @@ function test_conf_file_write
 %% Setup: distinct values of several classes, a path-loss struct with a column vector
 fn = 'test_conf_file_write_mex.conf';
 fn2 = 'test_conf_file_write_mex2.conf';
+fn_nl = [ 'test_conf_file_write_mex_x', char(10), 'KF_mu = 5 %.conf' ];   % line break in the file name
 if exist( fn, 'file' ); delete( fn ); end
 if exist( fn2, 'file' ); delete( fn2 ); end
+if exist( fn_nl, 'file' ); delete( fn_nl ); end
 
 s = struct( 'DS_mu', -7.25, 'NumClusters', int32(12), 'SubpathMethod', 'mmMAGIC', 'ds_kf', single(-0.5), ...
     'LNS_ksi', 0, 'PolVar_sigma', 3, 'DS_omega', 0.1 + 0.2, 'GR_enabled', true );
@@ -97,6 +99,12 @@ assertEqual( sp4.SC_lambda, 50 );
 assertEqual( pl4.A, [20, 30] );
 assertEqual( numel( strfind( fileread( fn ), 'NumSubPaths =' ) ), 1 );   % write_defaults = 1
 
+%% Path-loss fields: row and column vectors are accepted and written in their element order
+quadriga_lib.conf_file_write( fn, s, struct( 'A', [1, 2, 3], 'B', [4; 5; 6] ) );
+[ ~, pl7 ] = quadriga_lib.conf_file_read( fn );
+assertEqual( pl7.A, [1, 2, 3] );
+assertEqual( pl7.B, [4, 5, 6] );
+
 %% Errors from the wrapper
 assert_throws( @() quadriga_lib.conf_file_write( fn ), 'Wrong number of input arguments.' );
 assert_throws( @() quadriga_lib.conf_file_write( fn, s, pl, {}, '', {}, [], false, 1 ), ...
@@ -113,6 +121,10 @@ assert_throws( @() quadriga_lib.conf_file_write( fn, s, struct( 'A', 1 + 2i ) ),
     'Field ''A'' must be a real numeric vector.' );
 assert_throws( @() quadriga_lib.conf_file_write( fn, s, struct( 'A', true ) ), ...
     'Field ''A'' must be a real numeric vector.' );
+assert_throws( @() quadriga_lib.conf_file_write( fn, s, struct( 'A', [1, 2; 3, 4] ) ), ...
+    'Field ''A'' must be a real numeric vector.' );                    % a matrix is not a vector
+assert_throws( @() quadriga_lib.conf_file_write( fn, s, struct( 'A', ones(1, 1, 2) ) ), ...
+    'Field ''A'' must be a real numeric vector.' );
 assert_throws( @() quadriga_lib.conf_file_write( fn, struct( 'NumClusters', uint8(7) ) ), ...
     'unsupported data type' );                                         % 8- and 16-bit classes
 assert_throws( @() quadriga_lib.conf_file_write( fn, s, [], 5 ), ...
@@ -128,7 +140,10 @@ assert_throws( @() quadriga_lib.conf_file_write( fn, struct( 'NumClusters', 0 ) 
 assert_throws( @() quadriga_lib.conf_file_write( fn, s, struct( 'A', [] ) ), 'has no value' );
 assert_throws( @() quadriga_lib.conf_file_write( fn, s, [], {}, '', repmat( {'x'}, 1, 11 ) ), 'at most 10' );
 assert_throws( @() quadriga_lib.conf_file_write( fn, s, [], {}, '', {}, ones(3, 2) ), 'size [4, 2]' );
+assert_throws( @() quadriga_lib.conf_file_write( fn, s, [], {'Ab', 'Cd', 'Ab'} ), 'must be distinct' );
 assertTrue( ~exist( fn, 'file' ) );
+assert_throws( @() quadriga_lib.conf_file_write( fn_nl, s ), 'line break in the file name' );
+assertTrue( ~exist( fn_nl, 'file' ) );
 
 if exist( fn2, 'file' ); delete( fn2 ); end
 

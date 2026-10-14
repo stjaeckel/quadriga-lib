@@ -116,6 +116,21 @@ assert_throws( @() quadriga_lib.conf_file_read( 'test_conf_file_read_mex_missing
 write_file( fn_bad, { 'DS_sigma = 0.3', 'DS_mu = abc' } );                  % grammar error, thrown by C++
 assert_throws( @() quadriga_lib.conf_file_read( fn_bad ), 'line 2' );
 assert_throws( @() quadriga_lib.conf_file_read( fn_bad, false ), 'DS_mu' );
+write_file( fn_bad, { 'DS_sigma = 0.3', 'DS_mu = 1e400' } );                % beyond the range of a double
+assert_throws( @() quadriga_lib.conf_file_read( fn_bad ), 'line 2: Value of ''DS_mu'' is out of range.' );
+
+% Errors of the shared helpers and of C++ carry the identifier of the library
+assert_identifier( @() quadriga_lib.conf_file_read( 5 ), 'quadriga_lib:CPPerror' );
+assert_identifier( @() quadriga_lib.conf_file_read( fn_bad ), 'quadriga_lib:CPPerror' );
+
+%% A UTF-8 byte order mark at the start of the file is skipped
+fid = fopen( fn_bad, 'w' );
+fwrite( fid, uint8( [ 239, 187, 191, double('DS_mu = -7.25'), 10, double('ShortName = Bm'), 10 ] ) );
+fclose( fid );
+[ scenpar13, ~, ~, ~, short_names13, ignored_keys13 ] = quadriga_lib.conf_file_read( fn_bad );
+assertEqual( scenpar13.DS_mu, -7.25 );
+assertEqual( short_names13, {'Bm'} );
+assertTrue( isempty(ignored_keys13) );
 
 delete( fn );
 delete( fn_bad );
@@ -134,6 +149,18 @@ end
 % Request 7 outputs so that the nlhs > 6 guard fires
 function out7(varargin)
 [~, ~, ~, ~, ~, ~, ~] = quadriga_lib.conf_file_read( varargin{:} ); %#ok<ASGLU>
+end
+
+% Assert that fn() raises an error with the identifier 'id'.
+function assert_identifier(fn, id)
+try
+    fn();
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if ~strcmp(ME.identifier, id)
+        error('moxunit:exceptionNotRaised', ['EXPECTED ID: "', id, '", GOT: "', ME.identifier, '"']);
+    end
+end
 end
 
 % Assert that fn() raises an error whose message contains expected (substring).

@@ -85,77 +85,77 @@ lang: en-US
 | [qrt_read_cache_init](#qrt_read_cache_init) | Channel functions | 2146 |
 | [quantize_delays](#quantize_delays) | Channel functions | 2185 |
 | [conf_file_list](#conf_file_list) | Channel generation functions | 2247 |
-| [conf_file_read](#conf_file_read) | Channel generation functions | 2291 |
-| [conf_file_write](#conf_file_write) | Channel generation functions | 2367 |
-| [get_channels_ieee_indoor](#get_channels_ieee_indoor) | Channel generation functions | 2444 |
-| [get_channels_irs](#get_channels_irs) | Channel generation functions | 2525 |
-| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 2619 |
-| [get_channels_planar](#get_channels_planar) | Channel generation functions | 2687 |
-| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 2755 |
-| [scenpar_validate](#scenpar_validate) | Channel generation functions | 2827 |
-| [acdf](#acdf) | Channel statistics | 2891 |
-| [calc_angular_spreads_sphere](#calc_angular_spreads_sphere) | Channel statistics | 2926 |
-| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 2968 |
-| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 3020 |
-| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 3053 |
-| [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | 3088 |
-| [fast_acos](#fast_acos) | Math functions | 3121 |
-| [fast_asin](#fast_asin) | Math functions | 3140 |
-| [fast_atan2](#fast_atan2) | Math functions | 3159 |
-| [fast_cart2geo](#fast_cart2geo) | Math functions | 3180 |
-| [fast_geo2cart](#fast_geo2cart) | Math functions | 3213 |
-| [fast_sincos](#fast_sincos) | Math functions | 3258 |
-| [fast_slerp](#fast_slerp) | Math functions | 3279 |
-| [interp_2D](#interp_2d) | Math functions | 3314 |
-| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 3378 |
-| [colormap](#colormap) | Site-specific simulation tools | 3456 |
-| [combine_irs_coord](#combine_irs_coord) | Site-specific simulation tools | 3475 |
-| [coord2path](#coord2path) | Site-specific simulation tools | 3518 |
-| [cube](#cube) | Site-specific simulation tools | 3556 |
-| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 3589 |
-| [icosphere](#icosphere) | Site-specific simulation tools | 3633 |
-| [interface_gain](#interface_gain) | Site-specific simulation tools | 3667 |
-| [medium_gain](#medium_gain) | Site-specific simulation tools | 3703 |
-| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 3744 |
-| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 3786 |
-| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 3853 |
-| [obj_overlap_test](#obj_overlap_test) | Site-specific simulation tools | 3920 |
-| [path_to_tube](#path_to_tube) | Site-specific simulation tools | 3951 |
-| [plane](#plane) | Site-specific simulation tools | 3979 |
-| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 4015 |
-| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 4044 |
-| [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 4083 |
-| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 4119 |
-| [ray_commit](#ray_commit) | Site-specific simulation tools | 4155 |
-| [ray_init](#ray_init) | Site-specific simulation tools | 4260 |
-| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 4353 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 4515 |
-| [ray_progress](#ray_progress) | Site-specific simulation tools | 4563 |
-| [ray_state_update](#ray_state_update) | Site-specific simulation tools | 4706 |
-| [ray_subdivide_flag](#ray_subdivide_flag) | Site-specific simulation tools | 4951 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 5012 |
-| [refractive_index](#refractive_index) | Site-specific simulation tools | 5060 |
-| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 5092 |
-| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 5150 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 5180 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 5208 |
-| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 5249 |
-| [write_png](#write_png) | Site-specific simulation tools | 5284 |
-| [xpr_update](#xpr_update) | Site-specific simulation tools | 5310 |
-| [sos_acf_2d](#sos_acf_2d) | Sum-of-sinusoids random number generator | 5551 |
-| [sos_acf_approx](#sos_acf_approx) | Sum-of-sinusoids random number generator | 5586 |
-| [sos_acf_estimate](#sos_acf_estimate) | Sum-of-sinusoids random number generator | 5626 |
-| [sos_acfi](#sos_acfi) | Sum-of-sinusoids random number generator | 5686 |
-| [sos_calc_mse](#sos_calc_mse) | Sum-of-sinusoids random number generator | 5716 |
-| [sos_generate](#sos_generate) | Sum-of-sinusoids random number generator | 5777 |
-| [sos_init_phases](#sos_init_phases) | Sum-of-sinusoids random number generator | 5857 |
-| [sos_map](#sos_map) | Sum-of-sinusoids random number generator | 5896 |
-| [sos_preset](#sos_preset) | Sum-of-sinusoids random number generator | 5943 |
-| [sos_rand](#sos_rand) | Sum-of-sinusoids random number generator | 5991 |
-| [sos_randi](#sos_randi) | Sum-of-sinusoids random number generator | 6052 |
-| [sos_randn](#sos_randn) | Sum-of-sinusoids random number generator | 6116 |
-| [sos_remove_bias](#sos_remove_bias) | Sum-of-sinusoids random number generator | 6176 |
-| [sos_val](#sos_val) | Sum-of-sinusoids random number generator | 6259 |
+| [conf_file_read](#conf_file_read) | Channel generation functions | 2294 |
+| [conf_file_write](#conf_file_write) | Channel generation functions | 2374 |
+| [get_channels_ieee_indoor](#get_channels_ieee_indoor) | Channel generation functions | 2460 |
+| [get_channels_irs](#get_channels_irs) | Channel generation functions | 2541 |
+| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 2635 |
+| [get_channels_planar](#get_channels_planar) | Channel generation functions | 2703 |
+| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 2771 |
+| [scenpar_validate](#scenpar_validate) | Channel generation functions | 2843 |
+| [acdf](#acdf) | Channel statistics | 2908 |
+| [calc_angular_spreads_sphere](#calc_angular_spreads_sphere) | Channel statistics | 2943 |
+| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 2985 |
+| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 3037 |
+| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 3070 |
+| [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | 3105 |
+| [fast_acos](#fast_acos) | Math functions | 3138 |
+| [fast_asin](#fast_asin) | Math functions | 3157 |
+| [fast_atan2](#fast_atan2) | Math functions | 3176 |
+| [fast_cart2geo](#fast_cart2geo) | Math functions | 3197 |
+| [fast_geo2cart](#fast_geo2cart) | Math functions | 3230 |
+| [fast_sincos](#fast_sincos) | Math functions | 3275 |
+| [fast_slerp](#fast_slerp) | Math functions | 3296 |
+| [interp_2D](#interp_2d) | Math functions | 3331 |
+| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 3395 |
+| [colormap](#colormap) | Site-specific simulation tools | 3473 |
+| [combine_irs_coord](#combine_irs_coord) | Site-specific simulation tools | 3492 |
+| [coord2path](#coord2path) | Site-specific simulation tools | 3535 |
+| [cube](#cube) | Site-specific simulation tools | 3573 |
+| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 3606 |
+| [icosphere](#icosphere) | Site-specific simulation tools | 3650 |
+| [interface_gain](#interface_gain) | Site-specific simulation tools | 3684 |
+| [medium_gain](#medium_gain) | Site-specific simulation tools | 3720 |
+| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 3761 |
+| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 3803 |
+| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 3870 |
+| [obj_overlap_test](#obj_overlap_test) | Site-specific simulation tools | 3937 |
+| [path_to_tube](#path_to_tube) | Site-specific simulation tools | 3968 |
+| [plane](#plane) | Site-specific simulation tools | 3996 |
+| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 4032 |
+| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 4061 |
+| [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 4100 |
+| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 4136 |
+| [ray_commit](#ray_commit) | Site-specific simulation tools | 4172 |
+| [ray_init](#ray_init) | Site-specific simulation tools | 4277 |
+| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 4370 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 4532 |
+| [ray_progress](#ray_progress) | Site-specific simulation tools | 4580 |
+| [ray_state_update](#ray_state_update) | Site-specific simulation tools | 4723 |
+| [ray_subdivide_flag](#ray_subdivide_flag) | Site-specific simulation tools | 4968 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 5029 |
+| [refractive_index](#refractive_index) | Site-specific simulation tools | 5077 |
+| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 5109 |
+| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 5167 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 5197 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 5225 |
+| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 5266 |
+| [write_png](#write_png) | Site-specific simulation tools | 5301 |
+| [xpr_update](#xpr_update) | Site-specific simulation tools | 5327 |
+| [sos_acf_2d](#sos_acf_2d) | Sum-of-sinusoids random number generator | 5568 |
+| [sos_acf_approx](#sos_acf_approx) | Sum-of-sinusoids random number generator | 5603 |
+| [sos_acf_estimate](#sos_acf_estimate) | Sum-of-sinusoids random number generator | 5643 |
+| [sos_acfi](#sos_acfi) | Sum-of-sinusoids random number generator | 5703 |
+| [sos_calc_mse](#sos_calc_mse) | Sum-of-sinusoids random number generator | 5733 |
+| [sos_generate](#sos_generate) | Sum-of-sinusoids random number generator | 5794 |
+| [sos_init_phases](#sos_init_phases) | Sum-of-sinusoids random number generator | 5874 |
+| [sos_map](#sos_map) | Sum-of-sinusoids random number generator | 5913 |
+| [sos_preset](#sos_preset) | Sum-of-sinusoids random number generator | 5960 |
+| [sos_rand](#sos_rand) | Sum-of-sinusoids random number generator | 6008 |
+| [sos_randi](#sos_randi) | Sum-of-sinusoids random number generator | 6069 |
+| [sos_randn](#sos_randn) | Sum-of-sinusoids random number generator | 6133 |
+| [sos_remove_bias](#sos_remove_bias) | Sum-of-sinusoids random number generator | 6193 |
+| [sos_val](#sos_val) | Sum-of-sinusoids random number generator | 6276 |
 
 ---
 
@@ -2247,18 +2247,21 @@ quadriga_lib::quantize_delays(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, 5.0e-9, 48
 ## conf_file_list
 List the scenarios defined by the conf files in a set of directories
 
-- Lists the files whose name ends in `.conf` (case-sensitive) in each directory, not recursive. The
-  scenario name is the file name without this extension.
+- Lists the regular files and symbolic links to regular files whose name ends in `.conf` (case-sensitive) and
+  is longer than `.conf`, not recursive. The scenario name is the file name without this extension, whatever
+  characters it has.
 - Directories are processed in the given order, the files of one directory in byte-wise sorted order of their
   names (digits before upper case before lower case)
 - A file whose name was already found in an earlier directory is skipped completely, so the first directory
   wins. This allows a local folder to override the files of a shared folder.
 - With `parse_shortnames = true` each file is read and one entry is added right after the file for every
-  line `ShortName = name` that is not a comment. Other lines are not examined.
+  line `ShortName = name` that is not a comment. Other lines are not examined; a UTF-8 byte order mark at the
+  start of the file is skipped.
 - Throws `std::invalid_argument` if a short name equals an earlier entry, if a file name equals an earlier
   short name, or if the value of a `ShortName` line is not one name of the characters `A-Z`, `a-z`, `0-9`, `_`
 - Throws `std::runtime_error` if a listed file cannot be opened for reading the short names
-- A directory that does not exist or is not a directory is skipped; an empty string is the current directory
+- A directory that does not exist, is not a directory or cannot be listed is skipped; an empty string is the
+  current directory
 - A failed call leaves the outputs untouched
 
 ### Declaration:
@@ -2292,29 +2295,33 @@ arma::uword quadriga_lib::conf_file_list(
 Read and validate a QuaDRiGa scenario configuration file
 
 - A conf file is a text file with one `Key = value` assignment per line; `%` starts a comment; blank lines
-  are allowed; line ends can be LF or CRLF; space and tab are white space
+  are allowed; line ends can be LF or CRLF; space and tab are white space; a UTF-8 byte order mark at the start
+  of the file is skipped
 - Keys are case-sensitive names of the characters `A-Z`, `a-z`, `0-9` and `_`; there are four kinds:
   - Scenario parameters: `n_key = 165` numeric keys with one number each, returned in `scenpar`. Keys that
     are not in the file have their default value. The names and their order are returned in `key_order`.
   - `SubpathMethod`: one of the words `legacy`, `Laplacian`, `mmMAGIC`; default `legacy`
   - Path-loss parameters: every key that starts with `PL_`. `PL_model` has one name as value. All others
     have one or more numbers separated by white space and are returned in `plpar` without the prefix.
-  - `ShortName`: an alias for the scenario, one name; can occur several times
+  - `ShortName`: an alias for the scenario, one name; can occur several times with different values
 - Any other key is ignored and reported in `ignored_keys`; its value is not examined
 - A key that is stated more than once has its last value
 - Numbers are decimal with an optional sign, an optional decimal point and an optional exponent (`e` or
   `E`), for example `-6.28`, `.5`, `6.2e-07`; `Inf`, `+Inf` and `-Inf` are accepted in any case
+- A number beyond the range of a double (`1e400`) is an error "out of range"; a number below the smallest
+  subnormal reads as `0` (or `-0`)
+- Numbers are read independent of the global locale (the decimal point is always `.`)
 - Elevation angles are used throughout (+90 deg is up); no key refers to a zenith angle
 - The 165 keys are 138 numeric keys of QuaDRiGa and 27 keys for 3GPP TR 38.901 v19.5.0. With their
   default of 0 the new keys have no effect.
 - The QuaDRiGa key `GR_epsilon` (fixed relative permittivity of the ground) is not supported and is
   reported in `ignored_keys` like any other unknown key; the permittivity is complex and is set in the simulation
 - The 28 correlation keys (`asD_ds` to `xpr_esa`) define the symmetric matrix `lsp_xcorr` with unit diagonal
-- Throws `std::runtime_error` if the file cannot be opened
+- Throws `std::runtime_error` if the file cannot be opened or is a directory
 - Throws `std::invalid_argument` with file name and line number for a line that is not blank, not a comment
   and not a well-formed assignment: no `=`, more or less than one name before the `=`, a missing value, a
   word where a number is required or the reverse, a second value or other text after the value, `NaN`,
-  complex numbers, a `PL_` key without a name
+  complex numbers, a number out of range, a `PL_` key without a name, a `ShortName` value stated twice
 - With `validate = true`, a value that fails the checks of [scenpar_validate](#scenpar_validate) is an error as well
 - A correlation matrix that is not positive definite is not an error; it is reported by the return value
 - The file is parsed and checked completely before any output is written; a failed call leaves all
@@ -2352,8 +2359,8 @@ bool quadriga_lib::conf_file_read(
 - **`key_order`** *(optional)* — Canonical order of the keys in `scenpar`: the QuaDRiGa order without
   `SubpathMethod` (its position is between elements 105 and 106, 0-based), then the 27 new keys; `[n_key]`
 - **`pl_order`** *(optional)* — Keys of `plpar` in the order of their first occurrence in the file; `[n_pl]`
-- **`short_names`** *(optional)* — Values of all `ShortName` lines in file order
-- **`ignored_keys`** *(optional)* — Unknown keys, each once, in the order of their first occurrence
+- **`short_names`** *(optional)* — Values of all `ShortName` lines in file order; `[n_short]`
+- **`ignored_keys`** *(optional)* — Unknown keys, each once, in the order of their first occurrence; `[n_ignored]`
 
 ### Returns:
 - `true` if `lsp_xcorr` is positive definite, i.e. correlated LSPs can be generated from it
@@ -2382,23 +2389,32 @@ Write a QuaDRiGa scenario configuration file
 - Within a section, keys are grouped into paragraphs separated by a blank line; correlations are written in the
   row order of the matrix, all other keys in the order of `key_order`; `SubpathMethod` stands before
   `LOS_scatter_radius`
+- The overview formula of an LSP shows its mean and STD with the frequency, distance, height and elevation terms;
+  with `LSP_fc_min > 0` the frequency is written as `max( fGHz, fc_min )`; the ESD line also has the terms of
+  `ES_D_mu_A` to `ES_D_mu_D` and, if `ES_D_mu_min` is not `-Inf`, the lower limit of the mean
 - Each line is `name = value % comment`, with the name padded to 19 and the value to 13 characters. The comment
   states the unit; for the mean and STD of an LSP it adds the reference point of the frequency, distance, height
   and elevation terms, e.g. `@ 1 GHz`.
 - The path-loss section has the formula blocks of the model (`logdist`, `dual_slope`, `nlos`, `tripple_slope`),
   the line `PL_model`, then the keys of `plpar` with the prefix `PL_`; known keys have a comment that can depend on
   the model; several values of one key are separated by a space
-- Numbers are written with the fewest significant digits (15 to 17) that [conf_file_read](#conf_file_read) reads back to the same
-  double, independent of the global locale; `Inf` and `-Inf` are written as such, `-0` is kept
+- Numbers are written with up to 15 significant digits, or with 16 or 17 where 15 do not read back to the same
+  double in [conf_file_read](#conf_file_read), independent of the global locale; `Inf` and `-Inf` are written as such, `-0` is
+  kept
 - With `write_defaults = false` a key is written only if its value differs from the default, compared bit for bit;
   `SubpathMethod` only if it is not `legacy`; a section without a written key is left out
 - With `write_defaults = true` all 165 keys and `SubpathMethod` are written
-- Validation before the file is opened: the value checks of [scenpar_validate](#scenpar_validate) (unknown keys, `NaN`, classes,
-  `subpath_method`); `pl_model` empty or one name; `plpar` keys are names other than `model`, each with at least
-  one value and no `NaN`; `pl_order` names each key of `plpar` once; short names are names; `ref` and `ref_sec`
-  have no line break; `ref_sec` has at most 10 entries; `valid_range` is empty or `[4, 2]`
-- Throws `std::invalid_argument` for invalid input; a failed check does not create or change a file
-- Throws `std::runtime_error` if the file cannot be opened for writing; an existing file is overwritten
+- Validation before the file is opened: the file name has no line break; the value checks of [scenpar_validate](#scenpar_validate)
+  (unknown keys, `NaN`, classes, `subpath_method`); `pl_model` empty or one name; `plpar` keys are names other
+  than `model`, each with at least one value and no `NaN`; `pl_order` names each key of `plpar` once; short names
+  are names and distinct; `ref` and `ref_sec` have no line break; `ref_sec` has at most 10 entries; `valid_range`
+  is empty or `[4, 2]`
+- The text is written to a temporary file in the same directory, which must be writable, and then renamed to
+  `fn`; a symbolic link `fn` is written through
+- A failed call does not create a file and leaves an existing file unchanged; an existing file is replaced and
+  keeps its permissions
+- Throws `std::invalid_argument` for invalid input; `std::runtime_error` if the file cannot be opened or written,
+  or if `fn` exists and is not a regular file that can be opened for writing
 - Every file written passes [conf_file_read](#conf_file_read) with `validate = true` and without ignored keys
 
 ### Declaration:
@@ -2835,14 +2851,14 @@ Validate scenario parameters and complete them with default values
 - A name in `scenpar` that is not one of the 165 keys is an error, also with `validate = false`; this includes
   the QuaDRiGa key `GR_epsilon`, which is not supported
 - Value checks with `validate = true`; `NaN` is an error for every key:
-  - Integer and > 0: `NumClusters`, `NumSubPaths`
+  - Integer from 1 to 1000: `NumClusters`, `NumSubPaths`
   - Finite and > 0: `r_DS`
   - Finite and >= 0: the 8 decorrelation distances (`DS_lambda` ... `XPR_lambda`), `SC_lambda`,
     `absTOA_lambda`, `PerClusterDS`, `PerClusterDS_min`, `PerClusterAS_D`, `PerClusterAS_A`, `PerClusterES_D`,
     `PerClusterES_A`, `LNS_ksi`, `LOS_scatter_radius`, `GR_enabled`, `LSP_fc_min`, `EoD_offset_b`,
     `EoD_offset_hcl`, `PerClusterDS_fc_min`, `PerClusterES_D_scale`, `absTOA_Lmax`, `NF_alpha`, `NF_beta`,
     `SNS_sigma`, `SNS_A`, `SNS_B`, `SNS_R`, `SNS_delta_var`, `PolVar_sigma`
-  - Integer and >= 0: `NumClusters_min`, `NF_k1`
+  - Integer from 0 to 1000: `NumClusters_min`, `NF_k1`
   - In the range from 0 to 1: `SNS_mu`
   - In the range from -1 to 1: the 28 correlations (`asD_ds` to `xpr_esa`)
   - All other keys accept any value including `Inf` and `-Inf`
@@ -2882,6 +2898,7 @@ bool quadriga_lib::scenpar_validate(
 
 ### See also:
 - [conf_file_read](#conf_file_read) (read the parameters from a conf file)
+- [conf_file_write](#conf_file_write) (applies the same checks before writing)
 
 ---
 

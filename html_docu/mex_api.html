@@ -1876,12 +1876,12 @@ Map path delays to a fixed tap grid using two-tap power-weighted interpolation
 <hr class="thin">
 List the scenarios defined by the conf files in a set of directories
 <ul>
-<li>Lists the files whose name ends in <code>.conf</code> (case-sensitive) in each directory, not recursive. The scenario name is the file name without this extension.</li>
+<li>Lists the regular files and symbolic links to regular files whose name ends in <code>.conf</code> (case-sensitive) and is longer than <code>.conf</code>, not recursive. The scenario name is the file name without this extension, whatever characters it has.</li>
 <li>Directories are processed in the given order, the files of one directory in byte-wise sorted order of their names (digits before upper case before lower case)</li>
 <li>A file whose name was already found in an earlier directory is skipped completely, so the first directory wins. This allows a local folder to override the files of a shared folder.</li>
-<li>With <code>parse_shortnames = true</code> each file is read and one entry is added right after the file for every line <code>ShortName = name</code> that is not a comment. Other lines are not examined.</li>
+<li>With <code>parse_shortnames = true</code> each file is read and one entry is added right after the file for every line <code>ShortName = name</code> that is not a comment. Other lines are not examined; a UTF-8 byte order mark at the start of the file is skipped.</li>
 <li>An error is raised if a short name equals an earlier entry, if a file name equals an earlier short name, if the value of a <code>ShortName</code> line is not one name of the characters <code>A-Z</code>, <code>a-z</code>, <code>0-9</code>, <code>_</code>, or if a listed file cannot be opened for reading the short names</li>
-<li>A directory that does not exist or is not a directory is skipped</li>
+<li>A directory that does not exist, is not a directory or cannot be listed is skipped</li>
 <li>An empty string <code>''</code> is the current directory</li>
 </ul>
 
@@ -1913,22 +1913,24 @@ List the scenarios defined by the conf files in a set of directories
 <hr class="thin">
 Read and validate a QuaDRiGa scenario configuration file
 <ul>
-<li>A conf file is a text file with one <code>Key = value</code> assignment per line; <code>%</code> starts a comment; blank lines are allowed; line ends can be LF or CRLF; space and tab are white space</li>
+<li>A conf file is a text file with one <code>Key = value</code> assignment per line; <code>%</code> starts a comment; blank lines are allowed; line ends can be LF or CRLF; space and tab are white space; a UTF-8 byte order mark at the start of the file is skipped</li>
 <li>Keys are case-sensitive names of the characters <code>A-Z</code>, <code>a-z</code>, <code>0-9</code> and <code>_</code>; there are four kinds:
 <ul>
 <li>Scenario parameters: 165 numeric keys with one number each. Keys that are not in the file have their default value.</li>
 <li><code>SubpathMethod</code>: one of the words <code>legacy</code>, <code>Laplacian</code>, <code>mmMAGIC</code>; default <code>legacy</code></li>
 <li>Path-loss parameters: every key that starts with <code>PL_</code>. <code>PL_model</code> has one name as value. All others have one or more numbers separated by white space.</li>
-<li><code>ShortName</code>: an alias for the scenario, one name; can occur several times</li>
+<li><code>ShortName</code>: an alias for the scenario, one name; can occur several times with different values</li>
 </ul>
 </li>
 <li>Any other key is ignored and reported in <code>ignored_keys</code>; its value is not examined</li>
 <li>A key that is stated more than once has its last value</li>
 <li>Numbers are decimal with an optional sign, an optional decimal point and an optional exponent (<code>e</code> or <code>E</code>), for example <code>-6.28</code>, <code>.5</code>, <code>6.2e-07</code>; <code>Inf</code>, <code>+Inf</code> and <code>-Inf</code> are accepted in any case</li>
+<li>A number beyond the range of a double (<code>1e400</code>) is an error "out of range"; a number below the smallest subnormal reads as <code>0</code> (or <code>-0</code>)</li>
+<li>Numbers are read independent of the locale (the decimal point is always <code>.</code>)</li>
 <li>Elevation angles are used throughout (+90 deg is up); no key refers to a zenith angle</li>
 <li>The 165 numeric keys are 138 keys of QuaDRiGa and 27 keys for 3GPP TR 38.901 v19.5.0. With their default of 0 the new keys have no effect.</li>
 <li>The QuaDRiGa key <code>GR_epsilon</code> (fixed relative permittivity of the ground) is not supported and is reported in <code>ignored_keys</code>; the permittivity is complex and is set in the simulation</li>
-<li>An error is raised if the file cannot be opened, and, with file name and line number, for a line that is not blank, not a comment and not a well-formed assignment: no <code>=</code>, more or less than one name before the <code>=</code>, a missing value, a word where a number is required or the reverse, a second value or other text after the value, <code>NaN</code>, complex numbers, a <code>PL_</code> key without a name</li>
+<li>An error is raised if the file cannot be opened or is a directory, and, with file name and line number, for a line that is not blank, not a comment and not a well-formed assignment: no <code>=</code>, more or less than one name before the <code>=</code>, a missing value, a word where a number is required or the reverse, a second value or other text after the value, <code>NaN</code>, complex numbers, a number out of range, a <code>PL_</code> key without a name, a <code>ShortName</code> value stated twice</li>
 <li>With <code>validate = true</code>, a value that fails the checks of <a href="#scenpar_validate">scenpar_validate</a> is an error as well</li>
 <li>A correlation matrix that is not positive definite is not an error; see <code>lsp_xcorr_chk</code></li>
 </ul>
@@ -1951,14 +1953,15 @@ Read and validate a QuaDRiGa scenario configuration file
 <li><b><code>plpar</code></b> — Path-loss parameters; struct with the field <code>model</code> (string, only if the file states <code>PL_model</code>) followed by one field per <code>PL_</code> key in file order, named without the prefix <code>PL_</code>; each is a row vector with one or more values; <code>[]</code> if the file has no <code>PL_</code> key</li>
 <li><b><code>lsp_xcorr</code></b> — LSP cross-correlation matrix; symmetric with unit diagonal; order of rows and columns: DS, KF, SF, ASD, ASA, ESD, ESA, XPR; <code>[8, 8]</code></li>
 <li><b><code>lsp_xcorr_chk</code></b> — <code>true</code> if <code>lsp_xcorr</code> is positive definite, i.e. correlated LSPs can be generated from it; logical</li>
-<li><b><code>short_names</code></b> — Values of all <code>ShortName</code> lines in file order; cell array of strings; <code>[n, 1]</code></li>
-<li><b><code>ignored_keys</code></b> — Unknown keys, each once, in the order of their first occurrence; cell array of strings; <code>[n, 1]</code></li>
+<li><b><code>short_names</code></b> — Values of all <code>ShortName</code> lines in file order; cell array of strings; <code>[n_short, 1]</code></li>
+<li><b><code>ignored_keys</code></b> — Unknown keys, each once, in the order of their first occurrence; cell array of strings; <code>[n_ignored, 1]</code></li>
 </ul>
 
 <b>See also:</b><br>
 <ul>
 <li><a href="#scenpar_validate">scenpar_validate</a> (value checks, defaults and the list of validation rules)</li>
 <li><a href="#conf_file_list">conf_file_list</a> (find the conf files in a set of directories)</li>
+<li><a href="#conf_file_write">conf_file_write</a> (write a conf file)</li>
 </ul>
 
 <hr class="greyline"><br>
@@ -1974,13 +1977,15 @@ Write a QuaDRiGa scenario configuration file
 <li>The entries 1 to 8 are those of QuaDRiGa, so its 8 section references can be passed unchanged</li>
 </ul>
 </li>
+<li>The overview formula of an LSP shows its mean and STD with the frequency, distance, height and elevation terms; with <code>LSP_fc_min &gt; 0</code> the frequency is written as <code>max( fGHz, fc_min )</code>; the ESD line also has the terms of <code>ES_D_mu_A</code> to <code>ES_D_mu_D</code> and, if <code>ES_D_mu_min</code> is not <code>-Inf</code>, the lower limit of the mean</li>
 <li>Each line is <code>name = value % comment</code>, aligned in columns; the comment states the unit</li>
 <li>The path-loss section has the formula blocks of the model (<code>logdist</code>, <code>dual_slope</code>, <code>nlos</code>, <code>tripple_slope</code>), the line <code>PL_model</code>, then the fields of <code>plpar</code> in struct order with the prefix <code>PL_</code>; several values of one field are written on one line</li>
-<li>Numbers are written with the fewest significant digits (15 to 17) that <a href="#conf_file_read">conf_file_read</a> reads back to the same double; <code>Inf</code> and <code>-Inf</code> are written as such</li>
+<li>Numbers are written with up to 15 significant digits, or with 16 or 17 where 15 do not read back to the same double in <a href="#conf_file_read">conf_file_read</a>; <code>Inf</code> and <code>-Inf</code> are written as such</li>
 <li>With <code>write_defaults = false</code> a field is written only if its value differs from the default; <code>SubpathMethod</code> only if it is not <code>legacy</code>; a section without a written field is left out</li>
 <li>With <code>write_defaults = true</code> all 165 numeric fields and <code>SubpathMethod</code> are written</li>
-<li>The inputs are checked with the rules of <a href="#scenpar_validate">scenpar_validate</a> before the file is opened: unknown fields (including <code>GR_epsilon</code>), <code>NaN</code>, values outside their range and a wrong <code>SubpathMethod</code> are errors. Further errors: a <code>model</code> that is not one name, an empty or <code>NaN</code> path-loss value, short names that are not one name, line breaks in <code>ref</code> or <code>ref_sec</code>, more than 10 entries in <code>ref_sec</code>, a <code>valid_range</code> that is not empty and not <code>[4, 2]</code>.</li>
-<li>A failed call does not create or change a file; an existing file is overwritten</li>
+<li>The inputs are checked with the rules of <a href="#scenpar_validate">scenpar_validate</a> before the file is opened: unknown fields (including <code>GR_epsilon</code>), <code>NaN</code>, values outside their range and a wrong <code>SubpathMethod</code> are errors. Further errors: a line break in the file name, a <code>model</code> that is not one name, an empty or <code>NaN</code> path-loss value, short names that are not one name or not distinct, line breaks in <code>ref</code> or <code>ref_sec</code>, more than 10 entries in <code>ref_sec</code>, a <code>valid_range</code> that is not empty and not <code>[4, 2]</code>.</li>
+<li>The text is written to a temporary file in the same directory, which must be writable, and then renamed to <code>fn</code>; a symbolic link <code>fn</code> is written through</li>
+<li>A failed call does not create a file and leaves an existing file unchanged; an existing file is replaced and keeps its permissions</li>
 <li>Every file written passes <a href="#conf_file_read">conf_file_read</a> with <code>validate = true</code> and without ignored keys</li>
 </ul>
 
@@ -1994,8 +1999,8 @@ quadriga_lib.conf_file_write( fn, scenpar, plpar, short_names, ref, ref_sec, val
 <ul>
 <li><b><code>fn</code></b> — Path of the conf file to write; string</li>
 <li><b><code>scenpar</code></b> — Scenario parameters; struct with any subset of the 166 fields returned by <a href="#conf_file_read">conf_file_read</a>; numeric fields are real scalars of class double, single, int32, uint32, int64, uint64 or logical; <code>SubpathMethod</code> is a string; missing fields have their default; <code>[]</code> writes the default set</li>
-<li><b><code>plpar</code></b> <i>(optional)</i> — Path-loss parameters; struct with the field <code>model</code> (string) and one real vector of class double, single, int32, uint32, int64 or uint64 per further field, named without the prefix <code>PL_</code>, as returned by <a href="#conf_file_read">conf_file_read</a>; written in struct order; if omitted or <code>[]</code>, no path-loss section</li>
-<li><b><code>short_names</code></b> <i>(optional)</i> — Short names of the scenario; cell array of strings or one string; each one name of the characters <code>A-Z</code>, <code>a-z</code>, <code>0-9</code>, <code>_</code></li>
+<li><b><code>plpar</code></b> <i>(optional)</i> — Path-loss parameters; struct with the field <code>model</code> (string) and one real vector (row or column) of class double, single, int32, uint32, int64 or uint64 per further field, named without the prefix <code>PL_</code>, as returned by <a href="#conf_file_read">conf_file_read</a>; a matrix is an error; written in struct order; if omitted or <code>[]</code>, no path-loss section</li>
+<li><b><code>short_names</code></b> <i>(optional)</i> — Short names of the scenario; cell array of strings or one string; each one name of the characters <code>A-Z</code>, <code>a-z</code>, <code>0-9</code>, <code>_</code>; distinct</li>
 <li><b><code>ref</code></b> — Literature reference; written in the header and before each non-empty entry of <code>ref_sec</code>; string; default: no reference</li>
 <li><b><code>ref_sec</code></b> <i>(optional)</i> — Reference per section, numbered as listed above; cell array of up to 10 strings; an empty or missing entry writes no reference</li>
 <li><b><code>valid_range</code></b> <i>(optional)</i> — Validity range, written as comment; rows: frequency in GHz, distance, BS height, MT height in m; columns: lower and upper end, one value is written if both are equal; a row with <code>NaN</code> is not written; <code>[4, 2]</code></li>
@@ -2392,10 +2397,10 @@ Validate scenario parameters and complete them with default values
 <li>A field that is not one of the 166 names is an error, also with <code>validate = false</code>; this includes the QuaDRiGa field <code>GR_epsilon</code>, which is not supported</li>
 <li>Value checks with <code>validate = true</code>; <code>NaN</code> is an error for every field:
 <ul>
-<li>Integer and > 0: <code>NumClusters</code>, <code>NumSubPaths</code></li>
+<li>Integer from 1 to 1000: <code>NumClusters</code>, <code>NumSubPaths</code></li>
 <li>Finite and > 0: <code>r_DS</code></li>
 <li>Finite and >= 0: the 8 decorrelation distances (<code>DS_lambda</code> ... <code>XPR_lambda</code>), <code>SC_lambda</code>, <code>absTOA_lambda</code>, <code>PerClusterDS</code>, <code>PerClusterDS_min</code>, <code>PerClusterAS_D</code>, <code>PerClusterAS_A</code>, <code>PerClusterES_D</code>, <code>PerClusterES_A</code>, <code>LNS_ksi</code>, <code>LOS_scatter_radius</code>, <code>GR_enabled</code>, <code>LSP_fc_min</code>, <code>EoD_offset_b</code>, <code>EoD_offset_hcl</code>, <code>PerClusterDS_fc_min</code>, <code>PerClusterES_D_scale</code>, <code>absTOA_Lmax</code>, <code>NF_alpha</code>, <code>NF_beta</code>, <code>SNS_sigma</code>, <code>SNS_A</code>, <code>SNS_B</code>, <code>SNS_R</code>, <code>SNS_delta_var</code>, <code>PolVar_sigma</code></li>
-<li>Integer and >= 0: <code>NumClusters_min</code>, <code>NF_k1</code></li>
+<li>Integer from 0 to 1000: <code>NumClusters_min</code>, <code>NF_k1</code></li>
 <li>In the range from 0 to 1: <code>SNS_mu</code></li>
 <li>In the range from -1 to 1: the 28 correlations (<code>asD_ds</code> to <code>xpr_esa</code>)</li>
 <li>All other numeric fields accept any value including <code>Inf</code> and <code>-Inf</code></li>
@@ -2429,6 +2434,7 @@ Validate scenario parameters and complete them with default values
 <b>See also:</b><br>
 <ul>
 <li><a href="#conf_file_read">conf_file_read</a> (read the parameters from a conf file)</li>
+<li><a href="#conf_file_write">conf_file_write</a> (applies the same checks before writing)</li>
 </ul>
 
 <hr class="greyline"><br><br>

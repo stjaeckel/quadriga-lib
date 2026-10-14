@@ -8,8 +8,10 @@
 
 import sys
 import os
+import pathlib
 import tempfile
 import unittest
+import numpy as np
 
 # Append the directory containing the package to sys.path
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -68,6 +70,35 @@ class test_case(unittest.TestCase):
         self.assertEqual(scenarios, ["B", "a", "C"])
         self.assertEqual(file_names, ["B.conf", "a.conf", "C.conf"])
         self.assertEqual(file_dirs, [self.d1, self.d1, self.d2])
+
+    def test_parse_shortnames_flag_types(self):
+        # None selects the default (True); bool and numpy.bool_ are accepted; anything else is a TypeError
+        ref = quadriga_lib.tools.conf_file_list([self.d1, self.d2])
+        self.assertEqual(quadriga_lib.tools.conf_file_list([self.d1, self.d2], None), ref)
+        self.assertEqual(quadriga_lib.tools.conf_file_list([self.d1, self.d2], parse_shortnames=None), ref)
+        self.assertEqual(quadriga_lib.tools.conf_file_list([self.d1, self.d2], np.bool_(True)), ref)
+        self.assertEqual(quadriga_lib.tools.conf_file_list([self.d1, self.d2], np.bool_(False)),
+                         quadriga_lib.tools.conf_file_list([self.d1, self.d2], False))
+        for value in ["yes", 1, 0]:
+            with self.assertRaises(TypeError) as ctx:
+                quadriga_lib.tools.conf_file_list([self.d1, self.d2], value)
+            self.assertIn("Input 'parse_shortnames' must be a bool or None.", str(ctx.exception))
+
+    def test_dirs_path_like(self):
+        # pathlib.Path and bytes, alone and in a list, give the same result; file_dirs holds the str form
+        ref = quadriga_lib.tools.conf_file_list([self.d1, self.d2])
+        p1, p2 = pathlib.Path(self.d1), pathlib.Path(self.d2)
+        for dirs in [[p1, p2], (p1, self.d2), [os.fsencode(self.d1), p2]]:
+            out = quadriga_lib.tools.conf_file_list(dirs)
+            self.assertEqual(out[0], ref[0])
+            self.assertEqual(out[1], ref[1])
+            self.assertEqual(out[2], ref[2])
+            for d in out[2]:
+                self.assertIsInstance(d, str)
+        out = quadriga_lib.tools.conf_file_list(p1)
+        self.assertEqual(out, quadriga_lib.tools.conf_file_list(self.d1))
+        self.assertEqual(out[2], [str(p1)] * len(out[2]))
+        self.assertEqual(quadriga_lib.tools.conf_file_list(os.fsencode(self.d1)), out)
 
     def test_dirs_forms(self):
         # One str is one directory; a tuple works like a list

@@ -13,7 +13,8 @@
 // reference behaviour is QuaDRiGa's supported_scenarios.m with the changes Q9 and Q10 of the plan.
 //
 // Conventions: every case builds its own directories 'test_conf_file_list_*' in the working directory
-// and removes them. Names are sorted byte-wise, so digits come before upper case before lower case.
+// and removes them; no two cases use the same name (Q12). Names are sorted byte-wise, so digits come before
+// upper case before lower case.
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -68,7 +69,7 @@ namespace
 
 TEST_CASE("conf_file_list - files ending in .conf are listed in byte-wise sorted order")
 {
-    tmp_dir d("test_conf_file_list_a");
+    tmp_dir d("test_conf_file_list_sorted");
     d.add("b.conf");
     d.add("A.conf");
     d.add("a.conf");
@@ -102,7 +103,7 @@ TEST_CASE("conf_file_list - files ending in .conf are listed in byte-wise sorted
 
 TEST_CASE("conf_file_list - short names follow their file, comments do not define one")
 {
-    tmp_dir d("test_conf_file_list_a");
+    tmp_dir d("test_conf_file_list_short");
     d.add("UMa_LOS.conf", "% ShortName = InComment\nDS_mu = -7 % ShortName = AfterValue\nShortName = Ul % x\n");
     d.add("UMa_NLOS.conf", "ShortName=Un\r\nDS_mu = -6\r\n\tShortName\t=\tUn2\r\n");
     d.add("Plain.conf", "DS_mu = -6\n");
@@ -128,7 +129,7 @@ TEST_CASE("conf_file_list - short names follow their file, comments do not defin
 
 TEST_CASE("conf_file_list - a file name defined by an earlier directory is skipped completely")
 {
-    tmp_dir a("test_conf_file_list_a"), b("test_conf_file_list_b");
+    tmp_dir a("test_conf_file_list_shadow_a"), b("test_conf_file_list_shadow_b");
     a.add("X.conf", "ShortName = Xs\n");
     a.add("Z.conf");
     b.add("X.conf", "ShortName = Other\n"); // shadowed: neither the file nor its short name is listed (Q10)
@@ -165,7 +166,7 @@ TEST_CASE("conf_file_list - a file name defined by an earlier directory is skipp
 
 TEST_CASE("conf_file_list - directories that do not exist are skipped")
 {
-    tmp_dir a("test_conf_file_list_a");
+    tmp_dir a("test_conf_file_list_skip_a");
     a.add("X.conf");
     a.add("plain_file");
 
@@ -183,7 +184,7 @@ TEST_CASE("conf_file_list - directories that do not exist are skipped")
     {
         arma::uword n = 99;
         CHECK_NOTHROW(n = quadriga_lib::conf_file_list(
-                          {"test_conf_file_list_missing", a.name + "/plain_file", a.name, a.name + "/X.conf"},
+                          {"test_conf_file_list_no_such_dir", a.name + "/plain_file", a.name, a.name + "/X.conf"},
                           scen, &files, &dirs));
         CHECK(n == 1);
         CHECK(scen == strvec{"X"});
@@ -192,7 +193,7 @@ TEST_CASE("conf_file_list - directories that do not exist are skipped")
 
     SECTION("directory without conf files")
     {
-        tmp_dir e("test_conf_file_list_b");
+        tmp_dir e("test_conf_file_list_skip_b");
         CHECK(quadriga_lib::conf_file_list({e.name}, scen) == 0);
         CHECK(scen.empty());
     }
@@ -245,7 +246,7 @@ TEST_CASE("conf_file_list - an empty string is the current directory")
 
 TEST_CASE("conf_file_list - input validation")
 {
-    tmp_dir a("test_conf_file_list_a"), b("test_conf_file_list_b");
+    tmp_dir a("test_conf_file_list_valid_a"), b("test_conf_file_list_valid_b");
     a.add("M.conf", "ShortName = Ms\n");
     a.add("N.conf", "ShortName = Ns\n");
 
@@ -308,4 +309,72 @@ TEST_CASE("conf_file_list - input validation")
         CHECK_THROWS_AS(quadriga_lib::conf_file_list({a.name}, scen), std::invalid_argument);
         CHECK(scen == marker);
     }
+}
+
+TEST_CASE("conf_file_list - a listed file that cannot be read is an error only when its short names are read")
+{
+    tmp_dir d("test_conf_file_list_unreadable");
+    d.add("A.conf", "ShortName = As\n");
+    d.add("B.conf", "ShortName = Bs\n");
+    const std::string fn = d.name + "/B.conf";
+    std::filesystem::permissions(fn, std::filesystem::perms::none);
+
+    // Skipped where the permissions are not enforced (running as root, Windows)
+    const bool readable = std::ifstream(fn).is_open();
+    if (readable)
+    {
+        std::filesystem::permissions(fn, std::filesystem::perms::owner_all);
+        SKIP("file permissions are not enforced");
+    }
+
+    strvec scen = {"marker"}, files = {"marker"}, dirs = {"marker"};
+    CHECK_THROWS_AS(quadriga_lib::conf_file_list({d.name}, scen, &files, &dirs), std::runtime_error);
+    CHECK(scen == strvec{"marker"}); // outputs untouched
+    CHECK(files == strvec{"marker"});
+    CHECK(dirs == strvec{"marker"});
+
+    // Without reading the short names the file is listed
+    CHECK_NOTHROW(quadriga_lib::conf_file_list({d.name}, scen, &files, &dirs, false));
+    CHECK(scen == strvec{"A", "B"});
+    CHECK(files == strvec{"A.conf", "B.conf"});
+
+    std::filesystem::permissions(fn, std::filesystem::perms::owner_all);
+}
+
+TEST_CASE("conf_file_list - a symbolic link to a regular file is listed, other links are skipped")
+{
+    tmp_dir d("test_conf_file_list_links"), t("test_conf_file_list_links_target");
+    t.add("Real.conf", "ShortName = Rs\n");
+    std::filesystem::create_directory(t.name + "/Dir.conf");
+    const std::filesystem::path target = std::filesystem::absolute(t.name);
+
+    // Skipped where symbolic links cannot be created (Windows without the privilege)
+    std::error_code ec1, ec2, ec3;
+    std::filesystem::create_symlink(target / "Real.conf", d.name + "/Link.conf", ec1);
+    std::filesystem::create_symlink(target / "Missing.conf", d.name + "/Dangling.conf", ec2);
+    std::filesystem::create_directory_symlink(target / "Dir.conf", d.name + "/DirLink.conf", ec3);
+    if (ec1 || ec2 || ec3)
+        SKIP("symbolic links cannot be created");
+
+    strvec scen, files, dirs;
+    arma::uword n = quadriga_lib::conf_file_list({d.name}, scen, &files, &dirs);
+    print_list("symbolic links", scen, files, dirs);
+    CHECK(n == 2);
+    CHECK(scen == strvec{"Link", "Rs"}); // the short name is read through the link
+    CHECK(files == strvec{"Link.conf", "Link.conf"});
+    CHECK(dirs == strvec(2, d.name));
+}
+
+TEST_CASE("conf_file_list - a UTF-8 byte order mark before the first short name is skipped")
+{
+    // Decision Q1, as in conf_file_read: EF BB BF at the start of the file is removed
+    tmp_dir d("test_conf_file_list_bom");
+    d.add("Bom.conf", "\xEF\xBB\xBF"
+                      "ShortName = Bs\nShortName = Bt\n");
+    d.add("Plain.conf", "\xEF\xBB\xBF% comment\nShortName = Ps\n");
+
+    strvec scen, files;
+    quadriga_lib::conf_file_list({d.name}, scen, &files);
+    print_list("byte order mark", scen, files, strvec(scen.size(), d.name));
+    CHECK(scen == strvec{"Bom", "Bs", "Bt", "Plain", "Ps"});
 }

@@ -21,14 +21,14 @@ Validate scenario parameters and complete them with default values
 - A key that is not one of the 166 names is an error, also with `validate = False`; this includes
   the QuaDRiGa key `GR_epsilon`, which is not supported
 - Value checks with `validate = True`; `NaN` is an error for every key:
-  - Integer and > 0: `NumClusters`, `NumSubPaths`
+  - Integer from 1 to 1000: `NumClusters`, `NumSubPaths`
   - Finite and > 0: `r_DS`
   - Finite and >= 0: the 8 decorrelation distances (`DS_lambda` ... `XPR_lambda`), `SC_lambda`,
     `absTOA_lambda`, `PerClusterDS`, `PerClusterDS_min`, `PerClusterAS_D`, `PerClusterAS_A`,
     `PerClusterES_D`, `PerClusterES_A`, `LNS_ksi`, `LOS_scatter_radius`, `GR_enabled`, `LSP_fc_min`,
     `EoD_offset_b`, `EoD_offset_hcl`, `PerClusterDS_fc_min`, `PerClusterES_D_scale`, `absTOA_Lmax`,
     `NF_alpha`, `NF_beta`, `SNS_sigma`, `SNS_A`, `SNS_B`, `SNS_R`, `SNS_delta_var`, `PolVar_sigma`
-  - Integer and >= 0: `NumClusters_min`, `NF_k1`
+  - Integer from 0 to 1000: `NumClusters_min`, `NF_k1`
   - In the range from 0 to 1: `SNS_mu`
   - In the range from -1 to 1: the 28 correlations (`asD_ds` to `xpr_esa`)
   - All other numeric keys accept any value including `Inf` and `-Inf`
@@ -49,7 +49,8 @@ scenpar_out, lsp_xcorr, lsp_xcorr_chk = quadriga_lib.tools.scenpar_validate( sce
 - **`scenpar_in`** — Scenario parameters; dict with any subset of the 166 keys returned by
   [[conf_file_read]]; numeric values are real scalars (int, float, bool or a numpy value with one
   element); `SubpathMethod` is a str; `None` or `{}` returns the default set; default: None
-- **`validate`** — `False`: only complete with defaults, no value checks; default: True
+- **`validate`** — `False`: only complete with defaults, no value checks; bool or `numpy.bool_`;
+  default: True; `None` selects the default
 
 ## Outputs:
 - **`scenpar_out`** — Complete scenario parameters; given values are kept, missing keys have their
@@ -62,14 +63,16 @@ scenpar_out, lsp_xcorr, lsp_xcorr_chk = quadriga_lib.tools.scenpar_validate( sce
 
 ## See also:
 - [[conf_file_read]] (read the parameters from a conf file)
+- [[conf_file_write]] (applies the same checks before writing)
 MD!*/
 
 py::tuple scenpar_validate(py::handle scenpar_in,
-                           bool validate)
+                           py::handle validate)
 {
     // Read inputs: dict of real scalars and the str entry 'SubpathMethod'
     std::string subpath_method;
     auto scenpar = qd_python_dict2scenpar(scenpar_in, subpath_method, "scenpar_in");
+    const bool validate_b = qd_python_flag(validate, true, "validate");
 
     // Output allocation
     std::vector<std::string> key_order;
@@ -79,7 +82,7 @@ py::tuple scenpar_validate(py::handle scenpar_in,
 
     // Call library function; completes 'scenpar' in place (a copy, the input dict is not changed)
     const bool lsp_xcorr_chk = quadriga_lib::scenpar_validate(scenpar, subpath_method, &lsp_xcorr, &key_order,
-                                                              validate);
+                                                              validate_b);
 
     // Scenario parameters: numeric keys in canonical order, 'SubpathMethod' at its QuaDRiGa position
     auto scenpar_out_py = qd_python_scenpar2dict(scenpar, subpath_method, key_order);

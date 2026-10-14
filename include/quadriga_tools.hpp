@@ -547,7 +547,8 @@ namespace quadriga_lib
                                bool parse_shortnames = true);                  // Read the files and add their short names
 
     // Write a QuaDRiGa scenario configuration file
-    // - All inputs are validated and the complete text is composed before the file is opened; an existing file is overwritten
+    // - All inputs are validated and the complete text is composed before the file is opened; an existing file is replaced;
+    //   a failed call leaves it unchanged
     // - Numbers are written with the fewest digits (15 to 17) that 'conf_file_read' reads back bit-exact
     // - The scenario name in the header comment is the file name without the extension ".conf"
     void conf_file_write(const std::string &fn,                                                       // Path of the .conf file to write

@@ -322,6 +322,9 @@ TEST_CASE("scenpar_validate - value checks per validation class")
         {
             accepts(k, 1.0);
             accepts(k, 40.0);
+            accepts(k, 1000.0); // Q11: upper bound 1000
+            rejects_value(k, 1001.0);
+            rejects_value(k, 1e300);
             rejects_value(k, 0.0);
             rejects_value(k, -1.0);
             rejects_value(k, 2.5);
@@ -408,11 +411,38 @@ TEST_CASE("scenpar_validate - value checks per validation class")
         accepts("NumClusters_min", 6.0);
         accepts("NF_k1", 0.0);
         accepts("NF_k1", 4.0);
+        accepts("NF_k1", 1000.0); // Q11: upper bound 1000
+        rejects_value("NF_k1", 1001.0);
         rejects_value("NumClusters_min", 1.5);
         rejects_value("NumClusters_min", -1.0);
         rejects_value("NF_k1", 0.5);
         rejects_value("NF_k1", -1.0);
         rejects_value("NF_k1", INF);
+    }
+
+    SECTION("the bound 1000 of the counts is named in the message (Q11)")
+    {
+        // NumClusters_min = 1001 also exceeds NumClusters = 1000; the class check comes first and names the bound
+        auto message = [](spmap sp) -> std::string
+        {
+            try
+            {
+                quadriga_lib::scenpar_validate(sp);
+            }
+            catch (const std::invalid_argument &e)
+            {
+                return e.what();
+            }
+            return "<no error>";
+        };
+        CHECK(message({{"NumClusters", 1000.0}, {"NumClusters_min", 1000.0}}) == "<no error>");
+        CHECK(message({{"NumClusters", 1000.0}, {"NumClusters_min", 1001.0}}) ==
+              "Value of 'NumClusters_min' must be an integer from 0 to 1000.");
+        CHECK(message({{"NumSubPaths", 1001.0}}) == "Value of 'NumSubPaths' must be an integer from 1 to 1000.");
+        CHECK(message({{"NumClusters", 0.0}}) == "Value of 'NumClusters' must be an integer from 1 to 1000.");
+        CHECK(message({{"NF_k1", -1.0}}) == "Value of 'NF_k1' must be an integer from 0 to 1000.");
+        QD_DIAG("\n# diag: scenpar_validate count bound: %s\n",
+                message({{"NumClusters", 1000.0}, {"NumClusters_min", 1001.0}}).c_str());
     }
 
     SECTION("cross-key checks")

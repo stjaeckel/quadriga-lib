@@ -15,27 +15,33 @@ SECTION!*/
 Read and validate a QuaDRiGa scenario configuration file
 
 - A conf file is a text file with one `Key = value` assignment per line; `%` starts a comment; blank
-  lines are allowed; line ends can be LF or CRLF; space and tab are white space
+  lines are allowed; line ends can be LF or CRLF; space and tab are white space; a UTF-8 byte order
+  mark at the start of the file is skipped
 - Keys are case-sensitive names of the characters `A-Z`, `a-z`, `0-9` and `_`; there are four kinds:
   - Scenario parameters: 165 numeric keys with one number each. Keys that are not in the file have
     their default value.
   - `SubpathMethod`: one of the words `legacy`, `Laplacian`, `mmMAGIC`; default `legacy`
   - Path-loss parameters: every key that starts with `PL_`. `PL_model` has one name as value. All
     others have one or more numbers separated by white space.
-  - `ShortName`: an alias for the scenario, one name; can occur several times
+  - `ShortName`: an alias for the scenario, one name; can occur several times with different values
 - Any other key is ignored and reported in `ignored_keys`; its value is not examined
 - A key that is stated more than once has its last value
 - Numbers are decimal with an optional sign, an optional decimal point and an optional exponent
-  (`e` or `E`), for example `-6.28`, `.5`, `6.2e-07`; `Inf`, `+Inf` and `-Inf` are accepted in any case
+  (`e` or `E`), for example `-6.28`, `.5`, `6.2e-07`; `Inf`, `+Inf` and `-Inf` are accepted
+  in any case
+- A number beyond the range of a double (`1e400`) is an error "out of range"; a number below the
+  smallest subnormal reads as `0` (or `-0`)
+- Numbers are read independent of the locale (the decimal point is always `.`)
 - Elevation angles are used throughout (+90 deg is up); no key refers to a zenith angle
 - The 165 numeric keys are 138 keys of QuaDRiGa and 27 keys for 3GPP TR 38.901 v19.5.0. With their
   default of 0 the new keys have no effect.
 - The QuaDRiGa key `GR_epsilon` (fixed relative permittivity of the ground) is not supported and is
   reported in `ignored_keys`; the permittivity is complex and is set in the simulation
-- An error is raised if the file cannot be opened, and, with file name and line number, for a line
-  that is not blank, not a comment and not a well-formed assignment: no `=`, more or less than one
-  name before the `=`, a missing value, a word where a number is required or the reverse, a second
-  value or other text after the value, `NaN`, complex numbers, a `PL_` key without a name
+- An error is raised if the file cannot be opened or is a directory, and, with file name and line
+  number, for a line that is not blank, not a comment and not a well-formed assignment: no `=`, more
+  or less than one name before the `=`, a missing value, a word where a number is required or the
+  reverse, a second value or other text after the value, `NaN`, complex numbers, a number out of
+  range, a `PL_` key without a name, a `ShortName` value stated twice
 - With `validate = true`, a value that fails the checks of [[scenpar_validate]] is an error as well
 - A correlation matrix that is not positive definite is not an error; see `lsp_xcorr_chk`
 
@@ -55,19 +61,21 @@ Read and validate a QuaDRiGa scenario configuration file
   numeric keys of QuaDRiGa with `SubpathMethod` (string) as field 107, then the 27 new keys; all
   numeric fields are scalars
 - **`plpar`** — Path-loss parameters; struct with the field `model` (string, only if the file states
-  `PL_model`) followed by one field per `PL_` key in file order, named without the prefix `PL_`; each
-  is a row vector with one or more values; `[]` if the file has no `PL_` key
+  `PL_model`) followed by one field per `PL_` key in file order, named without the prefix `PL_`;
+  each is a row vector with one or more values; `[]` if the file has no `PL_` key
 - **`lsp_xcorr`** — LSP cross-correlation matrix; symmetric with unit diagonal; order of rows and
   columns: DS, KF, SF, ASD, ASA, ESD, ESA, XPR; `[8, 8]`
 - **`lsp_xcorr_chk`** — `true` if `lsp_xcorr` is positive definite, i.e. correlated LSPs can be
   generated from it; logical
-- **`short_names`** — Values of all `ShortName` lines in file order; cell array of strings; `[n, 1]`
-- **`ignored_keys`** — Unknown keys, each once, in the order of their first occurrence; cell array of
-  strings; `[n, 1]`
+- **`short_names`** — Values of all `ShortName` lines in file order; cell array of strings;
+  `[n_short, 1]`
+- **`ignored_keys`** — Unknown keys, each once, in the order of their first occurrence; cell array
+  of strings; `[n_ignored, 1]`
 
 ## See also:
 - [[scenpar_validate]] (value checks, defaults and the list of validation rules)
 - [[conf_file_list]] (find the conf files in a set of directories)
+- [[conf_file_write]] (write a conf file)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
