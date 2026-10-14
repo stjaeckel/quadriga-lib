@@ -9,6 +9,9 @@
 #include "mex_helper_functions.hpp"
 #include "quadriga_lib.hpp"
 
+#include <algorithm>
+#include <unordered_map>
+
 inline mxArray *qd_mex_arrayant2struct(const quadriga_lib::arrayant<double> &ant)
 {
     std::vector<std::string> fields = {"e_theta_re", "e_theta_im", "e_phi_re", "e_phi_im",
@@ -364,6 +367,130 @@ inline std::vector<quadriga_lib::channel<double>> qd_mex_struct2channel(const mx
     }
 
     return chan;
+}
+
+// 1x1 struct of QuaDRiGa scenario parameters -> map of the numeric values and the string 'SubpathMethod'
+// - Every field except 'SubpathMethod' must be a real numeric or logical scalar; 'SubpathMethod' must be a string
+// - Field names are not checked here, quadriga_lib::scenpar_validate rejects unknown names
+// - Empty input ([] or a struct without fields) gives an empty map; 'subpath_method' is "legacy" if not in the struct
+// - 'var_name' is used in the error message for a wrong input type
+inline std::unordered_map<std::string, double> qd_mex_struct2scenpar(const mxArray *input, std::string &subpath_method,
+                                                                     const std::string &var_name = "scenpar")
+{
+    std::unordered_map<std::string, double> scenpar;
+    subpath_method = "legacy";
+    if (mxIsEmpty(input))
+        return scenpar;
+
+    if (!mxIsStruct(input) || mxGetNumberOfElements(input) != 1)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", ("Input '" + var_name + "' must be a 1x1 struct.").c_str());
+
+    const int n_fields = mxGetNumberOfFields(input);
+    for (int f = 0; f < n_fields; ++f)
+    {
+        const std::string name = mxGetFieldNameByNumber(input, f);
+        const mxArray *data = mxGetFieldByNumber(input, 0, f);
+        if (name == "SubpathMethod")
+        {
+            if (data == nullptr || !mxIsChar(data))
+                mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Field 'SubpathMethod' must be a string.");
+            subpath_method = qd_mex_get_string(data);
+        }
+        else
+        {
+            if (data == nullptr || mxGetNumberOfElements(data) != 1 || mxIsComplex(data) ||
+                !(mxIsNumeric(data) || mxIsLogical(data)))
+                mexErrMsgIdAndTxt("quadriga_lib:CPPerror", ("Field '" + name + "' must be a real numeric scalar.").c_str());
+            scenpar[name] = qd_mex_get_scalar<double>(data, name);
+        }
+    }
+    return scenpar;
+}
+
+// Map of QuaDRiGa scenario parameters -> 1x1 struct of double scalars
+// - Fields in the order of 'key_order', with the string field 'SubpathMethod' inserted before 'LOS_scatter_radius'
+//   (its QuaDRiGa position); every name in 'key_order' must be in 'scenpar'
+inline mxArray *qd_mex_scenpar2struct(const std::unordered_map<std::string, double> &scenpar,
+                                      const std::string &subpath_method,
+                                      const std::vector<std::string> &key_order)
+{
+    std::vector<std::string> fields = key_order;
+    fields.insert(std::find(fields.begin(), fields.end(), "LOS_scatter_radius"), "SubpathMethod");
+    mxArray *output = qd_mex_make_struct(fields);
+    for (const auto &key : key_order)
+        qd_mex_set_field(output, key, qd_mex_copy2matlab(&scenpar.at(key)));
+    qd_mex_set_field(output, "SubpathMethod", mxCreateString(subpath_method.c_str()));
+    return output;
+}
+
+// 1x1 struct of QuaDRiGa path-loss parameters -> map of the numeric values, the model and the field order
+// - The field 'model' must be a string; it is returned in 'pl_model' (empty if the struct has no such field)
+// - Every other field must be a real numeric vector (empty, a scalar, a row or a column) of the classes that
+//   qd_mex_typecast_Col reads
+// - 'pl_order' lists the numeric fields in struct order
+// - Empty input ([] or a struct without fields) gives an empty map, empty 'pl_model' and empty 'pl_order'
+// - 'var_name' is used in the error message for a wrong input type
+inline std::unordered_map<std::string, std::vector<double>> qd_mex_struct2plpar(const mxArray *input,
+                                                                               std::string &pl_model,
+                                                                               std::vector<std::string> &pl_order,
+                                                                               const std::string &var_name = "plpar")
+{
+    std::unordered_map<std::string, std::vector<double>> plpar;
+    pl_model.clear();
+    pl_order.clear();
+    if (mxIsEmpty(input))
+        return plpar;
+
+    if (!mxIsStruct(input) || mxGetNumberOfElements(input) != 1)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", ("Input '" + var_name + "' must be a 1x1 struct.").c_str());
+
+    const int n_fields = mxGetNumberOfFields(input);
+    for (int f = 0; f < n_fields; ++f)
+    {
+        const std::string name = mxGetFieldNameByNumber(input, f);
+        const mxArray *data = mxGetFieldByNumber(input, 0, f);
+        if (name == "model")
+        {
+            if (data == nullptr || !mxIsChar(data))
+                mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Field 'model' must be a string.");
+            pl_model = qd_mex_get_string(data);
+        }
+        else
+        {
+            if (data == nullptr || mxIsComplex(data) || !mxIsNumeric(data) || mxGetNumberOfDimensions(data) > 2 ||
+                (mxGetM(data) > 1 && mxGetN(data) > 1))
+                mexErrMsgIdAndTxt("quadriga_lib:CPPerror", ("Field '" + name + "' must be a real numeric vector.").c_str());
+            const arma::vec values = qd_mex_typecast_Col<double>(data, name);
+            plpar[name] = std::vector<double>(values.begin(), values.end());
+            pl_order.push_back(name);
+        }
+    }
+    return plpar;
+}
+
+// QuaDRiGa path-loss parameters -> 1x1 struct, or [] if 'pl_model' and 'pl_order' are both empty
+// - Field 'model' (string) first if 'pl_model' is not empty, then one row vector per key in the order of 'pl_order';
+//   every name in 'pl_order' must be in 'plpar'
+inline mxArray *qd_mex_plpar2struct(const std::string &pl_model,
+                                    const std::unordered_map<std::string, std::vector<double>> &plpar,
+                                    const std::vector<std::string> &pl_order)
+{
+    if (pl_model.empty() && pl_order.empty())
+        return mxCreateDoubleMatrix(0, 0, mxREAL);
+
+    std::vector<std::string> fields;
+    if (!pl_model.empty())
+        fields.push_back("model");
+    fields.insert(fields.end(), pl_order.begin(), pl_order.end());
+    mxArray *output = qd_mex_make_struct(fields);
+    if (!pl_model.empty())
+        qd_mex_set_field(output, "model", mxCreateString(pl_model.c_str()));
+    for (const auto &key : pl_order)
+    {
+        const arma::rowvec values(plpar.at(key));
+        qd_mex_set_field(output, key, qd_mex_copy2matlab(&values));
+    }
+    return output;
 }
 
 inline mxArray *qd_mex_any2matlab(const std::any &dset)

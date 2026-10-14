@@ -74,7 +74,7 @@ inline mxClassID qd_mex_class_id()
 inline std::array<size_t, 5> qd_mex_get_dims(const mxArray *input)
 {
     if (mxIsComplex(input))
-        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Complex datatypes are not supported.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Complex datatypes are not supported.");
     size_t n_dim = (size_t)mxGetNumberOfDimensions(input);
     const mwSize *dims = mxGetDimensions(input);
     size_t d1 = (size_t)dims[0];
@@ -95,7 +95,7 @@ inline dtype qd_mex_get_scalar(const mxArray *input, std::string var_name = "", 
         return default_value;
 
     if (mxIsComplex(input))
-        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Complex datatypes are not supported.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Complex datatypes are not supported.");
 
     // Assign the MATLAB data to the correct pointer
     if (mxIsDouble(input))
@@ -134,11 +134,11 @@ inline dtype qd_mex_get_scalar(const mxArray *input, std::string var_name = "", 
         return dtype(*tmp);
     }
     else if (var_name.empty())
-        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Unsupported data type.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Unsupported data type.");
     else
     {
         std::string error_message = "Input '" + var_name + "' has an unsupported data type.";
-        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", error_message.c_str());
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", error_message.c_str());
     }
 
     return default_value;
@@ -152,7 +152,7 @@ inline std::string qd_mex_get_string(const mxArray *input, std::string default_v
         return default_value;
 
     if (!mxIsClass(input, "char"))
-        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Input must be a string (character array)");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input must be a string (character array)");
 
     auto chr = mxArrayToString(input);
     std::string data = std::string(chr);
@@ -235,7 +235,7 @@ inline std::any qd_mex_anycast(const mxArray *input, std::string var_name = "", 
     size_t d34 = d3 * d4, n_data = d1 * d2 * d34;
 
     if (mxIsComplex(input))
-        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Complex datatypes are not supported.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Complex datatypes are not supported.");
 
     if (n_data == 0) // Return empty
         return std::any();
@@ -322,11 +322,11 @@ inline std::any qd_mex_anycast(const mxArray *input, std::string var_name = "", 
 
     // Throw error if type is not supported
     if (var_name.empty())
-        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Unsupported data type.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Unsupported data type.");
     else
     {
         std::string error_message = "Input '" + var_name + "' has an unsupported data type.";
-        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", error_message.c_str());
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", error_message.c_str());
     }
 
     return std::any();
@@ -358,7 +358,7 @@ inline void qd_mex_copy_convert(const mxArray *input, dtype *ptr, size_t n_data,
     else
     {
         std::string msg = var_name.empty() ? "Unsupported data type." : "Input '" + var_name + "' has an unsupported data type.";
-        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", msg.c_str());
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", msg.c_str());
     }
 }
 
@@ -372,7 +372,7 @@ inline arma::Col<dtype> qd_mex_typecast_Col(const mxArray *input, std::string va
     if (n_elem != 0 && n_data != n_elem)
     {
         std::string msg = var_name.empty() ? "Incorrect number of elements." : "Input '" + var_name + "' has incorrect number of elements.";
-        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", msg.c_str());
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", msg.c_str());
     }
     arma::Col<dtype> output(n_data, arma::fill::none);
     qd_mex_copy_convert<dtype>(input, output.memptr(), n_data, var_name);
@@ -440,7 +440,7 @@ inline std::vector<arma::Cube<dtype>> qd_mex_typecast_CubeVec(const mxArray *inp
     else
     {
         std::string msg = var_name.empty() ? "Unsupported data type." : "Input '" + var_name + "' has an unsupported data type.";
-        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", msg.c_str());
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", msg.c_str());
     }
 
     return output;
@@ -522,7 +522,7 @@ inline mxArray *qd_mex_copy2matlab(const dtype *input) // Scalar
     else if (typeid(dtype).name() == typeid(long long).name())
         classID = mxINT64_CLASS;
     else
-        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Unsupported datatype.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Unsupported datatype.");
 
     mxArray *output = mxCreateNumericMatrix(1, 1, classID, mxREAL);
     std::memcpy((dtype *)mxGetData(output), input, sizeof(dtype));
@@ -546,7 +546,7 @@ inline mxArray *qd_mex_copy2matlab(const arma::Row<dtype> *input) // Row Vector
     else if (typeid(dtype).name() == typeid(long long).name())
         classID = mxINT64_CLASS;
     else
-        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Unsupported datatype.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Unsupported datatype.");
 
     mxArray *output = mxCreateNumericMatrix(1, (mwSize)input->n_elem, classID, mxREAL);
     std::memcpy((dtype *)mxGetData(output), input->memptr(), sizeof(dtype) * input->n_elem);
@@ -573,7 +573,7 @@ inline mxArray *qd_mex_copy2matlab(const arma::Col<dtype> *input, // Column Vect
     else if (typeid(dtype).name() == typeid(long long).name())
         classID = mxINT64_CLASS;
     else
-        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Unsupported datatype.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Unsupported datatype.");
 
     if (input->empty())
         return mxCreateNumericMatrix(0, 0, classID, mxREAL);
@@ -612,7 +612,7 @@ inline mxArray *qd_mex_copy2matlab(const arma::Mat<dtype> *input, // Matrix
     else if (typeid(dtype).name() == typeid(long long).name())
         classID = mxINT64_CLASS;
     else
-        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Unsupported datatype.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Unsupported datatype.");
 
     if (input->empty())
         return mxCreateNumericMatrix(0, 0, classID, mxREAL);
@@ -653,7 +653,7 @@ inline mxArray *qd_mex_copy2matlab(const arma::Cube<dtype> *input, // Cube
     else if (typeid(dtype).name() == typeid(long long).name())
         classID = mxINT64_CLASS;
     else
-        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Unsupported datatype.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Unsupported datatype.");
 
     if (input->empty())
         return mxCreateNumericMatrix(0, 0, classID, mxREAL);
@@ -691,7 +691,7 @@ inline mxArray *qd_mex_copy2matlab(const std::vector<std::string> *strings)
 inline mxArray *qd_mex_copy2matlab(const std::vector<bool> *bools)
 {
     if (!bools)
-        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Null std::vector<bool> pointer.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Null std::vector<bool> pointer.");
 
     const size_t n_obj = bools->size();
 
@@ -733,7 +733,7 @@ inline mxArray *qd_mex_vector2matlab(const std::vector<arma::Col<dtype>> *input,
     else if (typeid(dtype).name() == typeid(long long).name())
         classID = mxINT64_CLASS;
     else
-        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Unsupported datatype.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Unsupported datatype.");
 
     if (input->empty())
         return mxCreateNumericMatrix(0, 0, classID, mxREAL);
@@ -800,7 +800,7 @@ inline mxArray *qd_mex_vector2matlab(const std::vector<arma::Mat<dtype>> *input,
     else if (typeid(dtype).name() == typeid(long long).name())
         classID = mxINT64_CLASS;
     else
-        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Unsupported datatype.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Unsupported datatype.");
 
     if (input->empty())
         return mxCreateNumericMatrix(0, 0, classID, mxREAL);
@@ -874,7 +874,7 @@ inline mxArray *qd_mex_vector2matlab(const std::vector<arma::Cube<dtype>> *input
     else if (typeid(dtype).name() == typeid(long long).name())
         classID = mxINT64_CLASS;
     else
-        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Unsupported datatype.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Unsupported datatype.");
 
     if (input->empty())
         return mxCreateNumericMatrix(0, 0, classID, mxREAL);
@@ -947,7 +947,7 @@ std::vector<arma::Col<dtype>> qd_mex_matlab2vector_Col(const mxArray *input, siz
     size_t n_data = d1 * d2 * d3 * d4;
 
     if (mxIsComplex(input))
-        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Complex datatypes are not supported.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Complex datatypes are not supported.");
 
     if (n_data == 0) // Return empty std::vector
         return std::vector<arma::Col<dtype>>();
@@ -975,7 +975,7 @@ std::vector<arma::Col<dtype>> qd_mex_matlab2vector_Col(const mxArray *input, siz
     else if (mxIsClass(input, "int64"))
         T = 6, ptr_ll = (long long *)mxGetData(input);
     else
-        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Unsupported data type.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Unsupported data type.");
 
     // Convert data to armadillo output
     auto output = std::vector<arma::Col<dtype>>();
@@ -1092,7 +1092,7 @@ std::vector<arma::Col<dtype>> qd_mex_matlab2vector_Col(const mxArray *input, siz
             output.push_back(tmp);
         }
     else
-        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Armadillo object dimensions must be 0,1,2 or 3");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Armadillo object dimensions must be 0,1,2 or 3");
 
     return output;
 }
@@ -1111,7 +1111,7 @@ std::vector<arma::Mat<dtype>> qd_mex_matlab2vector_Mat(const mxArray *input, siz
     size_t n_data = d1 * d2 * d3 * d4;
 
     if (mxIsComplex(input))
-        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Complex datatypes are not supported.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Complex datatypes are not supported.");
 
     if (n_data == 0) // Return empty std::vector
         return std::vector<arma::Mat<dtype>>();
@@ -1139,7 +1139,7 @@ std::vector<arma::Mat<dtype>> qd_mex_matlab2vector_Mat(const mxArray *input, siz
     else if (mxIsClass(input, "int64"))
         T = 6, ptr_ll = (long long *)mxGetData(input);
     else
-        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Unsupported data type.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Unsupported data type.");
 
     // Convert data to armadillo output
     auto output = std::vector<arma::Mat<dtype>>();
@@ -1256,7 +1256,7 @@ std::vector<arma::Mat<dtype>> qd_mex_matlab2vector_Mat(const mxArray *input, siz
             output.push_back(tmp);
         }
     else
-        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Armadillo object dimensions must be 0,1,2 or 3");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Armadillo object dimensions must be 0,1,2 or 3");
 
     return output;
 }
@@ -1275,7 +1275,7 @@ std::vector<arma::Cube<dtype>> qd_mex_matlab2vector_Cube(const mxArray *input, s
     size_t n_data = d1 * d2 * d3 * d4;
 
     if (mxIsComplex(input))
-        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Complex datatypes are not supported.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Complex datatypes are not supported.");
 
     if (n_data == 0) // Return empty std::vector
         return std::vector<arma::Cube<dtype>>();
@@ -1303,7 +1303,7 @@ std::vector<arma::Cube<dtype>> qd_mex_matlab2vector_Cube(const mxArray *input, s
     else if (mxIsClass(input, "int64"))
         T = 6, ptr_ll = (long long *)mxGetData(input);
     else
-        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Unsupported data type.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Unsupported data type.");
 
     // Convert data to armadillo output
     auto output = std::vector<arma::Cube<dtype>>();
@@ -1420,7 +1420,7 @@ std::vector<arma::Cube<dtype>> qd_mex_matlab2vector_Cube(const mxArray *input, s
             output.push_back(tmp);
         }
     else
-        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Armadillo object dimensions must be 0,1,2 or 3");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Armadillo object dimensions must be 0,1,2 or 3");
 
     return output;
 }
@@ -1431,7 +1431,7 @@ std::vector<bool> qd_mex_matlab2vector_Bool(const mxArray *input)
     std::vector<bool> output;
 
     if (mxIsComplex(input))
-        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Complex datatypes are not supported.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Complex datatypes are not supported.");
 
     const size_t n_data = (size_t)mxGetNumberOfElements(input);
     if (n_data == 0) // Return empty
@@ -1471,7 +1471,7 @@ std::vector<bool> qd_mex_matlab2vector_Bool(const mxArray *input)
     else if (mxIsClass(input, "int64"))
         T = 6, ptr_ll = (long long *)mxGetData(input);
     else
-        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Unsupported data type.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Unsupported data type.");
 
     // Convert types
     if (T == 1)
