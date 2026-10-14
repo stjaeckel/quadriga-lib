@@ -39,6 +39,9 @@ struct qd_scenpar_key
     double def;           // Default value
     qd_scenpar_class cls; // Validation class
     signed char row, col; // Position in the upper triangle of the LSP cross-correlation matrix, -1 = none
+    unsigned char sec;    // Section in a written conf file, see 'qd_conf_sections'
+    unsigned char par;    // Paragraph within the section; written in table order, separated by a blank line
+    const char *comment;  // Comment after the value in a written conf file, with the unit in brackets
 };
 
 static const double QD_INF = std::numeric_limits<double>::infinity();
@@ -49,172 +52,172 @@ static const double QD_INF = std::numeric_limits<double>::infinity();
 // - 'SubpathMethod' is the only string key and is not part of the table; its legacy position is field 107
 // - LSP order of the cross-correlation matrix: DS, KF, SF, ASD, ASA, ESD, ESA, XPR
 static const qd_scenpar_key qd_scenpar_keys[] = {
-    {"NumClusters", 6.0, QD_INT_POS, -1, -1},
-    {"NumSubPaths", 20.0, QD_INT_POS, -1, -1},
-    {"DS_mu", -6.0, QD_REAL, -1, -1},
-    {"DS_sigma", 0.5, QD_REAL, -1, -1},
-    {"DS_lambda", 20.0, QD_NONNEG, -1, -1},
-    {"DS_omega", 0.0, QD_ANY, -1, -1},
-    {"DS_gamma", 0.0, QD_REAL, -1, -1},
-    {"DS_epsilon", 0.0, QD_ANY, -1, -1},
-    {"DS_zeta", 0.0, QD_ANY, -1, -1},
-    {"DS_alpha", 0.0, QD_ANY, -1, -1},
-    {"DS_delta", 0.0, QD_REAL, -1, -1},
-    {"DS_kappa", 0.0, QD_ANY, -1, -1},
-    {"DS_tau", 0.0, QD_ANY, -1, -1},
-    {"DS_beta", 0.0, QD_ANY, -1, -1},
-    {"AS_D_mu", 1.0, QD_REAL, -1, -1},
-    {"AS_D_sigma", 0.2, QD_REAL, -1, -1},
-    {"AS_D_lambda", 20.0, QD_NONNEG, -1, -1},
-    {"AS_D_omega", 0.0, QD_ANY, -1, -1},
-    {"AS_D_gamma", 0.0, QD_REAL, -1, -1},
-    {"AS_D_epsilon", 0.0, QD_ANY, -1, -1},
-    {"AS_D_zeta", 0.0, QD_ANY, -1, -1},
-    {"AS_D_alpha", 0.0, QD_ANY, -1, -1},
-    {"AS_D_delta", 0.0, QD_REAL, -1, -1},
-    {"AS_D_kappa", 0.0, QD_ANY, -1, -1},
-    {"AS_D_tau", 0.0, QD_ANY, -1, -1},
-    {"AS_D_beta", 0.0, QD_ANY, -1, -1},
-    {"AS_A_mu", 1.0, QD_REAL, -1, -1},
-    {"AS_A_sigma", 0.2, QD_REAL, -1, -1},
-    {"AS_A_lambda", 20.0, QD_NONNEG, -1, -1},
-    {"AS_A_omega", 0.0, QD_ANY, -1, -1},
-    {"AS_A_gamma", 0.0, QD_REAL, -1, -1},
-    {"AS_A_epsilon", 0.0, QD_ANY, -1, -1},
-    {"AS_A_zeta", 0.0, QD_ANY, -1, -1},
-    {"AS_A_alpha", 0.0, QD_ANY, -1, -1},
-    {"AS_A_delta", 0.0, QD_REAL, -1, -1},
-    {"AS_A_kappa", 0.0, QD_ANY, -1, -1},
-    {"AS_A_tau", 0.0, QD_ANY, -1, -1},
-    {"AS_A_beta", 0.0, QD_ANY, -1, -1},
-    {"ES_D_mu", 0.3, QD_REAL, -1, -1},
-    {"ES_D_sigma", 0.2, QD_REAL, -1, -1},
-    {"ES_D_lambda", 20.0, QD_NONNEG, -1, -1},
-    {"ES_D_omega", 0.0, QD_ANY, -1, -1},
-    {"ES_D_gamma", 0.0, QD_REAL, -1, -1},
-    {"ES_D_epsilon", 0.0, QD_ANY, -1, -1},
-    {"ES_D_zeta", 0.0, QD_ANY, -1, -1},
-    {"ES_D_alpha", 0.0, QD_ANY, -1, -1},
-    {"ES_D_delta", 0.0, QD_REAL, -1, -1},
-    {"ES_D_kappa", 0.0, QD_ANY, -1, -1},
-    {"ES_D_tau", 0.0, QD_ANY, -1, -1},
-    {"ES_D_beta", 0.0, QD_ANY, -1, -1},
-    {"ES_D_mu_A", 0.0, QD_REAL, -1, -1},
-    {"ES_D_mu_min", -QD_INF, QD_REAL, -1, -1},
-    {"ES_A_mu", 0.3, QD_REAL, -1, -1},
-    {"ES_A_sigma", 0.2, QD_REAL, -1, -1},
-    {"ES_A_lambda", 20.0, QD_NONNEG, -1, -1},
-    {"ES_A_omega", 0.0, QD_ANY, -1, -1},
-    {"ES_A_gamma", 0.0, QD_REAL, -1, -1},
-    {"ES_A_epsilon", 0.0, QD_ANY, -1, -1},
-    {"ES_A_zeta", 0.0, QD_ANY, -1, -1},
-    {"ES_A_alpha", 0.0, QD_ANY, -1, -1},
-    {"ES_A_delta", 0.0, QD_REAL, -1, -1},
-    {"ES_A_kappa", 0.0, QD_ANY, -1, -1},
-    {"ES_A_tau", 0.0, QD_ANY, -1, -1},
-    {"ES_A_beta", 0.0, QD_ANY, -1, -1},
-    {"SF_sigma", 8.0, QD_REAL, -1, -1},
-    {"SF_lambda", 20.0, QD_NONNEG, -1, -1},
-    {"SF_omega", 0.0, QD_ANY, -1, -1},
-    {"SF_delta", 0.0, QD_REAL, -1, -1},
-    {"SF_kappa", 0.0, QD_ANY, -1, -1},
-    {"SF_tau", 0.0, QD_ANY, -1, -1},
-    {"SF_beta", 0.0, QD_ANY, -1, -1},
-    {"KF_mu", 0.0, QD_REAL, -1, -1},
-    {"KF_sigma", 0.0, QD_REAL, -1, -1},
-    {"KF_lambda", 20.0, QD_NONNEG, -1, -1},
-    {"KF_omega", 0.0, QD_ANY, -1, -1},
-    {"KF_gamma", 0.0, QD_REAL, -1, -1},
-    {"KF_epsilon", 0.0, QD_ANY, -1, -1},
-    {"KF_zeta", 0.0, QD_ANY, -1, -1},
-    {"KF_alpha", 0.0, QD_ANY, -1, -1},
-    {"KF_delta", 0.0, QD_REAL, -1, -1},
-    {"KF_kappa", 0.0, QD_ANY, -1, -1},
-    {"KF_tau", 0.0, QD_ANY, -1, -1},
-    {"KF_beta", 0.0, QD_ANY, -1, -1},
-    {"XPR_mu", 0.0, QD_REAL, -1, -1},
-    {"XPR_sigma", 10.0, QD_REAL, -1, -1},
-    {"XPR_lambda", 20.0, QD_NONNEG, -1, -1},
-    {"XPR_omega", 0.0, QD_ANY, -1, -1},
-    {"XPR_gamma", 0.0, QD_REAL, -1, -1},
-    {"XPR_epsilon", 0.0, QD_ANY, -1, -1},
-    {"XPR_zeta", 0.0, QD_ANY, -1, -1},
-    {"XPR_alpha", 0.0, QD_ANY, -1, -1},
-    {"XPR_delta", 0.0, QD_REAL, -1, -1},
-    {"XPR_kappa", 0.0, QD_ANY, -1, -1},
-    {"XPR_tau", 0.0, QD_ANY, -1, -1},
-    {"XPR_beta", 0.0, QD_ANY, -1, -1},
-    {"r_DS", 2.0, QD_POS, -1, -1},
-    {"PerClusterDS", 0.0, QD_NONNEG, -1, -1},
-    {"PerClusterDS_gamma", 0.0, QD_REAL, -1, -1},
-    {"PerClusterDS_min", 0.0, QD_NONNEG, -1, -1},
-    {"PerClusterAS_D", 0.0, QD_NONNEG, -1, -1},
-    {"PerClusterAS_A", 0.0, QD_NONNEG, -1, -1},
-    {"PerClusterES_D", 0.0, QD_NONNEG, -1, -1},
-    {"PerClusterES_A", 0.0, QD_NONNEG, -1, -1},
-    {"absTOA_mu", -100.0, QD_REAL, -1, -1},
-    {"absTOA_sigma", 0.0, QD_REAL, -1, -1},
-    {"absTOA_lambda", 0.0, QD_NONNEG, -1, -1},
-    {"LOS_scatter_radius", 0.0, QD_NONNEG, -1, -1},
-    {"SC_lambda", 0.0, QD_NONNEG, -1, -1},
-    {"LNS_ksi", 3.0, QD_NONNEG, -1, -1},
-    {"GR_enabled", 0.0, QD_NONNEG, -1, -1},
-    {"asD_ds", 0.0, QD_CORR, 0, 3},
-    {"asA_ds", 0.0, QD_CORR, 0, 4},
-    {"asA_sf", 0.0, QD_CORR, 2, 4},
-    {"asD_sf", 0.0, QD_CORR, 2, 3},
-    {"ds_sf", 0.0, QD_CORR, 0, 2},
-    {"asD_asA", 0.0, QD_CORR, 3, 4},
-    {"asD_kf", 0.0, QD_CORR, 1, 3},
-    {"asA_kf", 0.0, QD_CORR, 1, 4},
-    {"ds_kf", 0.0, QD_CORR, 0, 1},
-    {"sf_kf", 0.0, QD_CORR, 1, 2},
-    {"esD_ds", 0.0, QD_CORR, 0, 5},
-    {"esA_ds", 0.0, QD_CORR, 0, 6},
-    {"esA_sf", 0.0, QD_CORR, 2, 6},
-    {"esD_sf", 0.0, QD_CORR, 2, 5},
-    {"esD_esA", 0.0, QD_CORR, 5, 6},
-    {"esD_asD", 0.0, QD_CORR, 3, 5},
-    {"esD_asA", 0.0, QD_CORR, 4, 5},
-    {"esA_asD", 0.0, QD_CORR, 3, 6},
-    {"esA_asA", 0.0, QD_CORR, 4, 6},
-    {"esD_kf", 0.0, QD_CORR, 1, 5},
-    {"esA_kf", 0.0, QD_CORR, 1, 6},
-    {"xpr_ds", 0.0, QD_CORR, 0, 7},
-    {"xpr_kf", 0.0, QD_CORR, 1, 7},
-    {"xpr_sf", 0.0, QD_CORR, 2, 7},
-    {"xpr_asd", 0.0, QD_CORR, 3, 7},
-    {"xpr_asa", 0.0, QD_CORR, 4, 7},
-    {"xpr_esd", 0.0, QD_CORR, 5, 7},
-    {"xpr_esa", 0.0, QD_CORR, 6, 7},
+    {"NumClusters", 6.0, QD_INT_POS, -1, -1, 3, 1, "number of clusters"},
+    {"NumSubPaths", 20.0, QD_INT_POS, -1, -1, 3, 1, "number of paths per (NLOS) cluster"},
+    {"DS_mu", -6.0, QD_REAL, -1, -1, 0, 1, "delay spread [log10(s)]"},
+    {"DS_sigma", 0.5, QD_REAL, -1, -1, 0, 1, "delay spread STD [log10(s)]"},
+    {"DS_lambda", 20.0, QD_NONNEG, -1, -1, 1, 1, "DS decorrelation distance [m]"},
+    {"DS_omega", 0.0, QD_ANY, -1, -1, 0, 1, "reference frequency offset for the DS [GHz]"},
+    {"DS_gamma", 0.0, QD_REAL, -1, -1, 0, 1, "freq.-dep. of DS [log10(s)/log10(GHz)]"},
+    {"DS_epsilon", 0.0, QD_ANY, -1, -1, 0, 1, "TX-RX 2D dist.-dep. of DS [log10(s)/log10(m)]"},
+    {"DS_zeta", 0.0, QD_ANY, -1, -1, 0, 1, "TX height-dep. of DS [log10(s)/log10(m)]"},
+    {"DS_alpha", 0.0, QD_ANY, -1, -1, 0, 1, "elevation-dep. of DS [log10(s)/log10(rad)]"},
+    {"DS_delta", 0.0, QD_REAL, -1, -1, 0, 1, "freq.-dep. of DS STD [log10(s)/log10(GHz)]"},
+    {"DS_kappa", 0.0, QD_ANY, -1, -1, 0, 1, "TX-RX 2D dist.-dep. of DS STD [log10(s)/log10(m)]"},
+    {"DS_tau", 0.0, QD_ANY, -1, -1, 0, 1, "TX height-dep. of DS STD [log10(s)/log10(m)]"},
+    {"DS_beta", 0.0, QD_ANY, -1, -1, 0, 1, "elevation-dep. of DS STD [log10(s)/log10(rad)]"},
+    {"AS_D_mu", 1.0, QD_REAL, -1, -1, 0, 4, "azimuth of departure angle spread [log10(deg)]"},
+    {"AS_D_sigma", 0.2, QD_REAL, -1, -1, 0, 4, "azimuth of departure angle spread STD [log10(deg)]"},
+    {"AS_D_lambda", 20.0, QD_NONNEG, -1, -1, 1, 1, "ASD decorrelation distance [m]"},
+    {"AS_D_omega", 0.0, QD_ANY, -1, -1, 0, 4, "reference frequency offset for the ASD [GHz]"},
+    {"AS_D_gamma", 0.0, QD_REAL, -1, -1, 0, 4, "freq.-dep. of ASD [log10(deg)/log10(GHz)]"},
+    {"AS_D_epsilon", 0.0, QD_ANY, -1, -1, 0, 4, "TX-RX 2D dist.-dep. of ASD [log10(deg)/log10(m)]"},
+    {"AS_D_zeta", 0.0, QD_ANY, -1, -1, 0, 4, "TX height-dep. of ASD [log10(deg)/log10(m)]"},
+    {"AS_D_alpha", 0.0, QD_ANY, -1, -1, 0, 4, "elevation-dep. of ASD [log10(deg)/log10(rad)]"},
+    {"AS_D_delta", 0.0, QD_REAL, -1, -1, 0, 4, "freq.-dep. of ASD STD [log10(deg)/log10(GHz)]"},
+    {"AS_D_kappa", 0.0, QD_ANY, -1, -1, 0, 4, "TX-RX 2D dist.-dep. of ASD STD [log10(deg)/log10(m)]"},
+    {"AS_D_tau", 0.0, QD_ANY, -1, -1, 0, 4, "TX height-dep. of ASD STD [log10(deg)/log10(m)]"},
+    {"AS_D_beta", 0.0, QD_ANY, -1, -1, 0, 4, "elevation-dep. of ASD STD [log10(deg)/log10(rad)]"},
+    {"AS_A_mu", 1.0, QD_REAL, -1, -1, 0, 5, "azimuth of arrival angle spread [log10(deg)]"},
+    {"AS_A_sigma", 0.2, QD_REAL, -1, -1, 0, 5, "azimuth of arrival angle spread STD [log10(deg)]"},
+    {"AS_A_lambda", 20.0, QD_NONNEG, -1, -1, 1, 1, "ASA decorrelation distance [m]"},
+    {"AS_A_omega", 0.0, QD_ANY, -1, -1, 0, 5, "reference frequency offset for the ASA [GHz]"},
+    {"AS_A_gamma", 0.0, QD_REAL, -1, -1, 0, 5, "freq.-dep. of ASA [log10(deg)/log10(GHz)]"},
+    {"AS_A_epsilon", 0.0, QD_ANY, -1, -1, 0, 5, "TX-RX 2D dist.-dep. of ASA [log10(deg)/log10(m)]"},
+    {"AS_A_zeta", 0.0, QD_ANY, -1, -1, 0, 5, "TX height-dep. of ASA [log10(deg)/log10(m)]"},
+    {"AS_A_alpha", 0.0, QD_ANY, -1, -1, 0, 5, "elevation-dep. of ASA [log10(deg)/log10(rad)]"},
+    {"AS_A_delta", 0.0, QD_REAL, -1, -1, 0, 5, "freq.-dep. of ASA STD [log10(deg)/log10(GHz)]"},
+    {"AS_A_kappa", 0.0, QD_ANY, -1, -1, 0, 5, "TX-RX 2D dist.-dep. of ASA STD [log10(deg)/log10(m)]"},
+    {"AS_A_tau", 0.0, QD_ANY, -1, -1, 0, 5, "TX height-dep. of ASA STD [log10(deg)/log10(m)]"},
+    {"AS_A_beta", 0.0, QD_ANY, -1, -1, 0, 5, "elevation-dep. of ASA STD [log10(deg)/log10(rad)]"},
+    {"ES_D_mu", 0.3, QD_REAL, -1, -1, 0, 6, "elevation of departure angle spread [log10(deg)]"},
+    {"ES_D_sigma", 0.2, QD_REAL, -1, -1, 0, 6, "elevation of departure angle spread STD [log10(deg)]"},
+    {"ES_D_lambda", 20.0, QD_NONNEG, -1, -1, 1, 1, "ESD decorrelation distance [m]"},
+    {"ES_D_omega", 0.0, QD_ANY, -1, -1, 0, 6, "reference frequency offset for the ESD [GHz]"},
+    {"ES_D_gamma", 0.0, QD_REAL, -1, -1, 0, 6, "freq.-dep. of ESD [log10(deg)/log10(GHz)]"},
+    {"ES_D_epsilon", 0.0, QD_ANY, -1, -1, 0, 6, "TX-RX 2D dist.-dep. of ESD [log10(deg)/log10(m)]"},
+    {"ES_D_zeta", 0.0, QD_ANY, -1, -1, 0, 6, "TX height-dep. of ESD [log10(deg)/log10(m)]"},
+    {"ES_D_alpha", 0.0, QD_ANY, -1, -1, 0, 6, "elevation-dep. of ESD [log10(deg)/log10(rad)]"},
+    {"ES_D_delta", 0.0, QD_REAL, -1, -1, 0, 6, "freq.-dep. of ESD STD [log10(deg)/log10(GHz)]"},
+    {"ES_D_kappa", 0.0, QD_ANY, -1, -1, 0, 6, "TX-RX 2D dist.-dep. of ESD STD [log10(deg)/log10(m)]"},
+    {"ES_D_tau", 0.0, QD_ANY, -1, -1, 0, 6, "TX height-dep. of ESD STD [log10(deg)/log10(m)]"},
+    {"ES_D_beta", 0.0, QD_ANY, -1, -1, 0, 6, "elevation-dep. of ESD STD [log10(deg)/log10(rad)]"},
+    {"ES_D_mu_A", 0.0, QD_REAL, -1, -1, 0, 6, "TX-RX 2D dist.-dep. of ESD [log10(deg)/km]"},
+    {"ES_D_mu_min", -QD_INF, QD_REAL, -1, -1, 0, 6, "minimum ESD reference value [log10(deg)]"},
+    {"ES_A_mu", 0.3, QD_REAL, -1, -1, 0, 7, "elevation of arrival angle spread [log10(deg)]"},
+    {"ES_A_sigma", 0.2, QD_REAL, -1, -1, 0, 7, "elevation of arrival angle spread STD [log10(deg)]"},
+    {"ES_A_lambda", 20.0, QD_NONNEG, -1, -1, 1, 1, "ESA decorrelation distance [m]"},
+    {"ES_A_omega", 0.0, QD_ANY, -1, -1, 0, 7, "reference frequency offset for the ESA [GHz]"},
+    {"ES_A_gamma", 0.0, QD_REAL, -1, -1, 0, 7, "freq.-dep. of ESA [log10(deg)/log10(GHz)]"},
+    {"ES_A_epsilon", 0.0, QD_ANY, -1, -1, 0, 7, "TX-RX 2D dist.-dep. of ESA [log10(deg)/log10(m)]"},
+    {"ES_A_zeta", 0.0, QD_ANY, -1, -1, 0, 7, "TX height-dep. of ESA [log10(deg)/log10(m)]"},
+    {"ES_A_alpha", 0.0, QD_ANY, -1, -1, 0, 7, "elevation-dep. of ESA [log10(deg)/log10(rad)]"},
+    {"ES_A_delta", 0.0, QD_REAL, -1, -1, 0, 7, "freq.-dep. of ESA STD [log10(deg)/log10(GHz)]"},
+    {"ES_A_kappa", 0.0, QD_ANY, -1, -1, 0, 7, "TX-RX 2D dist.-dep. of ESA STD [log10(deg)/log10(m)]"},
+    {"ES_A_tau", 0.0, QD_ANY, -1, -1, 0, 7, "TX height-dep. of ESA STD [log10(deg)/log10(m)]"},
+    {"ES_A_beta", 0.0, QD_ANY, -1, -1, 0, 7, "elevation-dep. of ESA STD [log10(deg)/log10(rad)]"},
+    {"SF_sigma", 8.0, QD_REAL, -1, -1, 0, 3, "Shadow Fading STD [dB]"},
+    {"SF_lambda", 20.0, QD_NONNEG, -1, -1, 1, 1, "SF decorrelation distance [m]"},
+    {"SF_omega", 0.0, QD_ANY, -1, -1, 0, 3, "reference frequency offset for the SF [GHz]"},
+    {"SF_delta", 0.0, QD_REAL, -1, -1, 0, 3, "freq.-dep. of SF STD [dB/log10(GHz)]"},
+    {"SF_kappa", 0.0, QD_ANY, -1, -1, 0, 3, "TX-RX 2D dist.-dep. of SF STD [dB/log10(m)]"},
+    {"SF_tau", 0.0, QD_ANY, -1, -1, 0, 3, "TX height-dep. of SF STD [dB/log10(m)]"},
+    {"SF_beta", 0.0, QD_ANY, -1, -1, 0, 3, "elevation-dep. of SF STD [dB/log10(rad)]"},
+    {"KF_mu", 0.0, QD_REAL, -1, -1, 0, 2, "Ricean K-factor [dB]"},
+    {"KF_sigma", 0.0, QD_REAL, -1, -1, 0, 2, "Ricean K-factor STD [dB]"},
+    {"KF_lambda", 20.0, QD_NONNEG, -1, -1, 1, 1, "KF decorrelation distance [m]"},
+    {"KF_omega", 0.0, QD_ANY, -1, -1, 0, 2, "reference frequency offset for the KF [GHz]"},
+    {"KF_gamma", 0.0, QD_REAL, -1, -1, 0, 2, "freq.-dep. of KF [dB/log10(GHz)]"},
+    {"KF_epsilon", 0.0, QD_ANY, -1, -1, 0, 2, "TX-RX 2D dist.-dep. of KF [dB/log10(m)]"},
+    {"KF_zeta", 0.0, QD_ANY, -1, -1, 0, 2, "TX height-dep. of KF [dB/log10(m)]"},
+    {"KF_alpha", 0.0, QD_ANY, -1, -1, 0, 2, "elevation-dep. of KF [dB/log10(rad)]"},
+    {"KF_delta", 0.0, QD_REAL, -1, -1, 0, 2, "freq.-dep. of KF STD [dB/log10(GHz)]"},
+    {"KF_kappa", 0.0, QD_ANY, -1, -1, 0, 2, "TX-RX 2D dist.-dep. of KF STD [dB/log10(m)]"},
+    {"KF_tau", 0.0, QD_ANY, -1, -1, 0, 2, "TX height-dep. of KF STD [dB/log10(m)]"},
+    {"KF_beta", 0.0, QD_ANY, -1, -1, 0, 2, "elevation-dep. of KF STD [dB/log10(rad)]"},
+    {"XPR_mu", 0.0, QD_REAL, -1, -1, 0, 8, "cross-polarization ratio [dB]"},
+    {"XPR_sigma", 10.0, QD_REAL, -1, -1, 0, 8, "cross-polarization ratio STD [dB]"},
+    {"XPR_lambda", 20.0, QD_NONNEG, -1, -1, 1, 1, "XPR decorrelation distance [m]"},
+    {"XPR_omega", 0.0, QD_ANY, -1, -1, 0, 8, "reference frequency offset for the XPR [GHz]"},
+    {"XPR_gamma", 0.0, QD_REAL, -1, -1, 0, 8, "freq.-dep. of XPR [dB/log10(GHz)]"},
+    {"XPR_epsilon", 0.0, QD_ANY, -1, -1, 0, 8, "TX-RX 2D dist.-dep. of XPR [dB/log10(m)]"},
+    {"XPR_zeta", 0.0, QD_ANY, -1, -1, 0, 8, "TX height-dep. of XPR [dB/log10(m)]"},
+    {"XPR_alpha", 0.0, QD_ANY, -1, -1, 0, 8, "elevation-dep. of XPR [dB/log10(rad)]"},
+    {"XPR_delta", 0.0, QD_REAL, -1, -1, 0, 8, "freq.-dep. of XPR STD [dB/log10(GHz)]"},
+    {"XPR_kappa", 0.0, QD_ANY, -1, -1, 0, 8, "TX-RX 2D dist.-dep. of XPR STD [dB/log10(m)]"},
+    {"XPR_tau", 0.0, QD_ANY, -1, -1, 0, 8, "TX height-dep. of XPR STD [dB/log10(m)]"},
+    {"XPR_beta", 0.0, QD_ANY, -1, -1, 0, 8, "elevation-dep. of XPR STD [dB/log10(rad)]"},
+    {"r_DS", 2.0, QD_POS, -1, -1, 3, 2, "delay scaling factor"},
+    {"PerClusterDS", 0.0, QD_NONNEG, -1, -1, 3, 3, "cluster delay spread [ns]"},
+    {"PerClusterDS_gamma", 0.0, QD_REAL, -1, -1, 3, 3, "freq.-dep. of cluster delay spread [ns/log10(GHz)]"},
+    {"PerClusterDS_min", 0.0, QD_NONNEG, -1, -1, 3, 3, "minimum cluster delay spread [ns]"},
+    {"PerClusterAS_D", 0.0, QD_NONNEG, -1, -1, 3, 3, "cluster azimuth of departure angle spread [deg]"},
+    {"PerClusterAS_A", 0.0, QD_NONNEG, -1, -1, 3, 3, "cluster azimuth of arrival angle spread [deg]"},
+    {"PerClusterES_D", 0.0, QD_NONNEG, -1, -1, 3, 3, "cluster elevation of departure angle spread [deg]"},
+    {"PerClusterES_A", 0.0, QD_NONNEG, -1, -1, 3, 3, "cluster elevation of arrival angle spread [deg]"},
+    {"absTOA_mu", -100.0, QD_REAL, -1, -1, 6, 1, "absolute time of arrival offset reference value [log10(s)]"},
+    {"absTOA_sigma", 0.0, QD_REAL, -1, -1, 6, 1, "absolute time of arrival offset reference STD [log10(s)]"},
+    {"absTOA_lambda", 0.0, QD_NONNEG, -1, -1, 6, 1, "absolute time of arrival offset decorrelation distance [m]"},
+    {"LOS_scatter_radius", 0.0, QD_NONNEG, -1, -1, 3, 1, "not used"},
+    {"SC_lambda", 0.0, QD_NONNEG, -1, -1, 4, 1, "decorrelation distance [m]; 0 = disabled"},
+    {"LNS_ksi", 3.0, QD_NONNEG, -1, -1, 3, 2, "per cluster shadowing STD [dB]"},
+    {"GR_enabled", 0.0, QD_NONNEG, -1, -1, 5, 1, "Enables the explicit ground reflection model"},
+    {"asD_ds", 0.0, QD_CORR, 0, 3, 2, 1, "DS vs. ASD"},
+    {"asA_ds", 0.0, QD_CORR, 0, 4, 2, 1, "DS vs. ASA"},
+    {"asA_sf", 0.0, QD_CORR, 2, 4, 2, 1, "SF vs. ASA"},
+    {"asD_sf", 0.0, QD_CORR, 2, 3, 2, 1, "SF vs. ASD"},
+    {"ds_sf", 0.0, QD_CORR, 0, 2, 2, 1, "DS vs. SF"},
+    {"asD_asA", 0.0, QD_CORR, 3, 4, 2, 1, "ASD vs. ASA"},
+    {"asD_kf", 0.0, QD_CORR, 1, 3, 2, 1, "KF vs. ASD"},
+    {"asA_kf", 0.0, QD_CORR, 1, 4, 2, 1, "KF vs. ASA"},
+    {"ds_kf", 0.0, QD_CORR, 0, 1, 2, 1, "DS vs. KF"},
+    {"sf_kf", 0.0, QD_CORR, 1, 2, 2, 1, "KF vs. SF"},
+    {"esD_ds", 0.0, QD_CORR, 0, 5, 2, 1, "DS vs. ESD"},
+    {"esA_ds", 0.0, QD_CORR, 0, 6, 2, 1, "DS vs. ESA"},
+    {"esA_sf", 0.0, QD_CORR, 2, 6, 2, 1, "SF vs. ESA"},
+    {"esD_sf", 0.0, QD_CORR, 2, 5, 2, 1, "SF vs. ESD"},
+    {"esD_esA", 0.0, QD_CORR, 5, 6, 2, 1, "ESD vs. ESA"},
+    {"esD_asD", 0.0, QD_CORR, 3, 5, 2, 1, "ASD vs. ESD"},
+    {"esD_asA", 0.0, QD_CORR, 4, 5, 2, 1, "ASA vs. ESD"},
+    {"esA_asD", 0.0, QD_CORR, 3, 6, 2, 1, "ASD vs. ESA"},
+    {"esA_asA", 0.0, QD_CORR, 4, 6, 2, 1, "ASA vs. ESA"},
+    {"esD_kf", 0.0, QD_CORR, 1, 5, 2, 1, "KF vs. ESD"},
+    {"esA_kf", 0.0, QD_CORR, 1, 6, 2, 1, "KF vs. ESA"},
+    {"xpr_ds", 0.0, QD_CORR, 0, 7, 2, 1, "DS vs. XPR"},
+    {"xpr_kf", 0.0, QD_CORR, 1, 7, 2, 1, "KF vs. XPR"},
+    {"xpr_sf", 0.0, QD_CORR, 2, 7, 2, 1, "SF vs. XPR"},
+    {"xpr_asd", 0.0, QD_CORR, 3, 7, 2, 1, "ASD vs. XPR"},
+    {"xpr_asa", 0.0, QD_CORR, 4, 7, 2, 1, "ASA vs. XPR"},
+    {"xpr_esd", 0.0, QD_CORR, 5, 7, 2, 1, "ESD vs. XPR"},
+    {"xpr_esa", 0.0, QD_CORR, 6, 7, 2, 1, "ESA vs. XPR"},
     // New keys for 3GPP TR 38.901 v19.5.0
-    {"LSP_fc_min", 0.0, QD_NONNEG, -1, -1},
-    {"ES_D_mu_B", 0.0, QD_REAL, -1, -1},
-    {"ES_D_mu_C", 0.0, QD_REAL, -1, -1},
-    {"ES_D_mu_D", 0.0, QD_REAL, -1, -1},
-    {"EoD_offset_e", 0.0, QD_REAL, -1, -1},
-    {"EoD_offset_e_gamma", 0.0, QD_REAL, -1, -1},
-    {"EoD_offset_a", 0.0, QD_REAL, -1, -1},
-    {"EoD_offset_a_gamma", 0.0, QD_REAL, -1, -1},
-    {"EoD_offset_b", 0.0, QD_NONNEG, -1, -1},
-    {"EoD_offset_c", 0.0, QD_REAL, -1, -1},
-    {"EoD_offset_c_gamma", 0.0, QD_REAL, -1, -1},
-    {"EoD_offset_c_hUT", 0.0, QD_REAL, -1, -1},
-    {"EoD_offset_hcl", 0.0, QD_NONNEG, -1, -1},
-    {"PerClusterDS_fc_min", 0.0, QD_NONNEG, -1, -1},
-    {"PerClusterES_D_scale", 0.0, QD_NONNEG, -1, -1},
-    {"absTOA_Lmax", 0.0, QD_NONNEG, -1, -1},
-    {"NumClusters_min", 0.0, QD_INT_NONNEG, -1, -1},
-    {"NF_k1", 0.0, QD_INT_NONNEG, -1, -1},
-    {"NF_alpha", 0.0, QD_NONNEG, -1, -1},
-    {"NF_beta", 0.0, QD_NONNEG, -1, -1},
-    {"SNS_mu", 0.0, QD_UNIT, -1, -1},
-    {"SNS_sigma", 0.0, QD_NONNEG, -1, -1},
-    {"SNS_A", 0.0, QD_NONNEG, -1, -1},
-    {"SNS_B", 0.0, QD_NONNEG, -1, -1},
-    {"SNS_R", 0.0, QD_NONNEG, -1, -1},
-    {"SNS_delta_var", 0.0, QD_NONNEG, -1, -1},
-    {"PolVar_sigma", 0.0, QD_NONNEG, -1, -1},
+    {"LSP_fc_min", 0.0, QD_NONNEG, -1, -1, 0, 9, "lower limit of fc for the frequency-dependent terms [GHz]"},
+    {"ES_D_mu_B", 0.0, QD_REAL, -1, -1, 0, 6, "RX height-dep. of ESD [log10(deg)/m]"},
+    {"ES_D_mu_C", 0.0, QD_REAL, -1, -1, 0, 6, "dep. of ESD on abs(hUT - hBS) [log10(deg)/m]"},
+    {"ES_D_mu_D", 0.0, QD_REAL, -1, -1, 0, 6, "dep. of ESD on max(hUT - hBS, 0) [log10(deg)/m]"},
+    {"EoD_offset_e", 0.0, QD_REAL, -1, -1, 8, 1, "constant of the EoD offset [deg]; TR value with opposite sign"},
+    {"EoD_offset_e_gamma", 0.0, QD_REAL, -1, -1, 8, 1, "freq.-dep. of the constant [deg/log10(GHz)]; TR value with opposite sign"},
+    {"EoD_offset_a", 0.0, QD_REAL, -1, -1, 8, 1, "distance exponent"},
+    {"EoD_offset_a_gamma", 0.0, QD_REAL, -1, -1, 8, 1, "freq.-dep. of the distance exponent [1/log10(GHz)]"},
+    {"EoD_offset_b", 0.0, QD_NONNEG, -1, -1, 8, 1, "minimum 2D distance [m]; 0 = no power term"},
+    {"EoD_offset_c", 0.0, QD_REAL, -1, -1, 8, 1, "constant of the exponent"},
+    {"EoD_offset_c_gamma", 0.0, QD_REAL, -1, -1, 8, 1, "freq.-dep. of the exponent [1/log10(GHz)]"},
+    {"EoD_offset_c_hUT", 0.0, QD_REAL, -1, -1, 8, 1, "RX height-dep. of the exponent [1/m]"},
+    {"EoD_offset_hcl", 0.0, QD_NONNEG, -1, -1, 8, 1, "clutter height [m] of the geometric EoD offset; 0 = disabled"},
+    {"PerClusterDS_fc_min", 0.0, QD_NONNEG, -1, -1, 3, 3, "lower limit of fc for the cluster delay spread [GHz]"},
+    {"PerClusterES_D_scale", 0.0, QD_NONNEG, -1, -1, 3, 3, "cluster ESD as fraction of 10^(ESD mean); 0 = use PerClusterES_D"},
+    {"absTOA_Lmax", 0.0, QD_NONNEG, -1, -1, 6, 1, "largest room dimension L [m]; the excess delay is bounded by 2L/c; 0 = no bound"},
+    {"NumClusters_min", 0.0, QD_INT_NONNEG, -1, -1, 3, 1, "lower end of the cluster-count range, counted like NumClusters"},
+    {"NF_k1", 0.0, QD_INT_NONNEG, -1, -1, 9, 1, "number of strongest clusters with scaling factor 1"},
+    {"NF_alpha", 0.0, QD_NONNEG, -1, -1, 9, 1, "parameter alpha of the Beta distribution"},
+    {"NF_beta", 0.0, QD_NONNEG, -1, -1, 9, 1, "parameter beta of the Beta distribution"},
+    {"SNS_mu", 0.0, QD_UNIT, -1, -1, 9, 2, "mean of the probability Pr_sns"},
+    {"SNS_sigma", 0.0, QD_NONNEG, -1, -1, 9, 2, "STD of the probability Pr_sns"},
+    {"SNS_A", 0.0, QD_NONNEG, -1, -1, 9, 2, "visibility region parameter A"},
+    {"SNS_B", 0.0, QD_NONNEG, -1, -1, 9, 2, "visibility region parameter B"},
+    {"SNS_R", 0.0, QD_NONNEG, -1, -1, 9, 2, "visibility region parameter R [dB]"},
+    {"SNS_delta_var", 0.0, QD_NONNEG, -1, -1, 9, 2, "variance of the visibility region parameter delta"},
+    {"PolVar_sigma", 0.0, QD_NONNEG, -1, -1, 9, 3, "STD of the polarization variability powers [dB]"},
 };
 
 static const arma::uword qd_scenpar_n_key = sizeof(qd_scenpar_keys) / sizeof(qd_scenpar_keys[0]);
@@ -481,6 +484,171 @@ static bool qd_conf_parse_number(const std::string &s, double &v)
     return !is.fail();
 }
 
+// Values of a parameter set in table order; keys that are not in 'scenpar' have their default
+// - 'given' (optional, qd_scenpar_n_key elements) marks the keys that are in 'scenpar'
+// - Throws std::invalid_argument for a name that is not in the key table
+static void qd_scenpar_values(const std::unordered_map<std::string, double> &scenpar, double *val, bool *given = nullptr)
+{
+    for (arma::uword i = 0; i < qd_scenpar_n_key; ++i)
+    {
+        val[i] = qd_scenpar_keys[i].def;
+        if (given != nullptr)
+            given[i] = false;
+    }
+    for (const auto &entry : scenpar)
+    {
+        const arma::uword ind = qd_scenpar_find(entry.first);
+        if (ind == qd_scenpar_n_key)
+            throw std::invalid_argument("Unknown key '" + entry.first + "' in 'scenpar'.");
+        val[ind] = entry.second;
+        if (given != nullptr)
+            given[ind] = true;
+    }
+}
+
+// Sections of a written conf file; the index is the position in 'ref_sec', the write order is 'qd_conf_section_order'
+static const char *qd_conf_sections[] = {
+    "Large scale distributions",
+    "Large-Scale fading decorrelation distances",
+    "Inter-parameter correlations",
+    "Model parameters",
+    "Decorrelation distance for the small-scale fading spatial consistency",
+    "Parameters for the ground reflection extension",
+    "Absolute time of arrival offset",
+    "Path-loss model",
+    "EoD offset (elevation of departure, TR: ZOD offset)",
+    "Optional modelling components"};
+
+static const unsigned char qd_conf_section_order[] = {0, 1, 2, 3, 8, 4, 5, 6, 9, 7};
+static const unsigned char QD_CONF_SEC_CORR = 2, QD_CONF_SEC_MODEL = 3, QD_CONF_SEC_PL = 7, QD_CONF_N_SEC = 10;
+
+// LSPs in the order of the cross-correlation matrix: key prefix, label, name of the random variable
+static const char *qd_conf_lsp[8][3] = {{"DS", "DS", "Xds"}, {"KF", "KF", "Xkf"}, {"SF", "SF", "Xsf"},
+                                        {"AS_D", "ASD", "Xasd"}, {"AS_A", "ASA", "Xasa"}, {"ES_D", "ESD", "Xesd"},
+                                        {"ES_A", "ESA", "Xesa"}, {"XPR", "XPR", "Xxpr"}};
+
+// Comments of the path-loss keys; the first row whose name matches and whose model is empty or equal to 'PL_model' wins
+static const char *qd_conf_pl_comments[][3] = {
+    {"A", "constant", "Reference PL in [dB]"},
+    {"A", "", "TX-RX 3D dist.-dep. of the PL [dB/log10(m)]"},
+    {"A1", "nlos", "TX-RX 3D dist.-dep. of the LOS-PL before break-point [dB/log10(m)]"},
+    {"A1", "", "TX-RX 3D dist.-dep. of the PL before break-point [dB/log10(m)]"},
+    {"A2", "nlos", "TX-RX 3D dist.-dep. of the LOS-PL after break-point [dB/log10(m)]"},
+    {"A2", "", "TX-RX 3D dist.-dep. of the PL after break-point [dB/log10(m)]"},
+    {"A3", "", "TX-RX 3D dist.-dep. of the PL after second break-point [dB/log10(m)]"},
+    {"An", "", "TX-RX 3D dist.-dep. of NLOS-PL [dB/log10(m)]"},
+    {"B", "nlos", "Reference LOS-PL in [dB] @ 1 GHz, 1 m TX-RX dist."},
+    {"B", "", "Reference PL in [dB] @ 1 GHz, 1 m TX-RX dist."},
+    {"Bn", "", "Reference NLOS-PL in [dB] @ 1 GHz, 1 m TX-RX dist."},
+    {"C", "nlos", "Freq.-dep. of the LOS-PL in [dB/log10(GHz)]"},
+    {"C", "", "Freq.-dep. of the PL in [dB/log10(GHz)]"},
+    {"Cn", "", "Freq.-dep. of the NLOS-PL in [dB/log10(GHz)]"},
+    {"D", "nlos", "TX-RX 3D dist.-dep. of LOS-PL [dB/m]"},
+    {"D", "satellite", "Elevation angle dep. of PL [dB/rad]"},
+    {"D", "", "TX-RX 3D dist.-dep. of PL [dB/m]"},
+    {"Dn", "", "TX height-dep. of the NLOS-PL in [dB/log10(m)]"},
+    {"D1n", "", "TX height-dep. of the NLOS-PL in [dB/log10(m)/m]"},
+    {"D2n", "", "TX height-dep. of the NLOS-PL in [dB/log10(m)/m^2]"},
+    {"D3n", "", "TX height-dep. of the NLOS-PL in [dB/m]"},
+    {"E", "", "Breakpoint scaling factor"},
+    {"E1", "", "Breakpoint scaling factor for first BP in [s/m]"},
+    {"E2", "", "Breakpoint scaling factor for second BP in [s/m]"},
+    {"En", "", "RX height-dep. of the NLOS-PL in [dB/log10(m)]"},
+    {"E1n", "", "RX height-dep. of the NLOS-PL in [dB/log10(m)/m]"},
+    {"E2n", "", "RX height-dep. of the NLOS-PL in [dB/log10(m)/m^2]"},
+    {"E3n", "", "RX height-dep. of the NLOS-PL in [dB/m]"},
+    {"Fn", "", "Combined TX-height and freq.-dep. of the NLOS-PL in [dB/(log10(m)*log10(GHz))]"},
+    {"G1n", "", "RX height-dep. of the NLOS-PL on the square of the MT height [dB/(log10(m))^2]"},
+    {"G2n", "", "RX height-dep. factor"},
+    {"hE", "", "Environment height in [m]"},
+    {"hE1", "", "Environment height for first BP in [m]"},
+    {"hE2", "", "Environment height for second BP in [m]"},
+    {"sig1", "", "Shadow Fading STD before breakpoint [dB]"},
+    {"sig2", "", "Shadow Fading STD after breakpoint [dB]"},
+    {"sig3", "", "Shadow Fading STD after second breakpoint [dB]"},
+    {"usePLa", "", "Enable/disable attenuation by atmospheric gases"}};
+
+// Formula blocks of the path-loss section, written in this order; first entry: the models, each enclosed in '|'
+static const char *qd_conf_pl_formulas[][2] = {
+    {"|logdist|",
+     "% Formula for Hata pathloss model:\n"
+     "% (Distance in meters, frequency in GHz)\n"
+     "%\n"
+     "%    PL = A * log10( d3D ) + B + C * log10( fGHz )\n"},
+    {"|dual_slope|nlos|",
+     "% Formula for dual-slope (LOS) pathloss model:\n"
+     "% (Distance in meters, frequency in GHz)\n"
+     "%\n"
+     "%     PL = PL1 for d2D <= dBP | PL2 for d2D > dBP\n"
+     "%    PL1 = A1 * log10( d3D ) + B + C * log10( fGHz ) + D * d3D\n"
+     "%    PL2 = PL1( dBP ) + A2 * log10( d3D / dBP )\n"
+     "%    dBP = E * ( hBS-hE ) * ( hMS-hE ) * fGHz\n"},
+    {"|tripple_slope|",
+     "% Formula for triple-slope (LOS+GR) pathloss model:\n"
+     "% (Distance in meters, frequency in GHz)\n"
+     "%\n"
+     "%     PL = PL1 for d2D <= dBP1 | PL2 for dBP1 < d2D <= dBP2 | PL3 for d2D > dBP2\n"
+     "%    PL1 = A1 * log10( d3D ) + B + C * log10( fGHz ) + D * d3D\n"
+     "%    PL2 = PL1( dBP1 ) + A2 * log10( d3D / dBP1 )\n"
+     "%    PL3 = PL2( dBP2 ) + A3 * log10( d3D / dBP2 )\n"
+     "%   dBP1 = E1 * ( hBS-hE1 ) * ( hMS-hE1 ) * fGHz\n"
+     "%   dBP2 = E2 * ( hBS-hE2 ) * ( hMS-hE2 ) * fGHz\n"},
+    {"|nlos|",
+     "% Formula for 3GPP NLOS pathloss model:\n"
+     "% (Distances and heights in meters, frequency in GHz)\n"
+     "%\n"
+     "%    PLn =  An * log10( d3D )\n"
+     "%        +  Bn\n"
+     "%        +  Cn * log10( fGHz )\n"
+     "%        +  Dn * log10( hBS )\n"
+     "%        + D1n * log10( hBS ) / hBS\n"
+     "%        + D2n * log10( hBS ) / hBS^2\n"
+     "%        + D3n * hBS\n"
+     "%        +  En * log10( hUT )\n"
+     "%        + E1n * log10( hUT ) / hUT\n"
+     "%        + E2n * log10( hUT ) / hUT^2\n"
+     "%        + E3n * hUT\n"
+     "%        +  Fn * log10( hBS ) * log10( d3d )\n"
+     "%        + G1n * log10^2( G2n * hUT )\n"
+     "%\n"
+     "%     PL = max( PL_LOS, PLn )\n"}};
+
+// Number text that 'qd_conf_parse_number' reads back to the same double: the fewest of 15, 16, 17 significant digits
+static std::string qd_conf_number(double v)
+{
+    if (std::isinf(v))
+        return v < 0.0 ? "-Inf" : "Inf";
+    std::string s;
+    for (int prec = 15; prec <= 17; ++prec)
+    {
+        std::ostringstream os;
+        os.imbue(std::locale::classic());
+        os.precision(prec);
+        os << v;
+        s = os.str();
+        double w;
+        if (qd_conf_parse_number(s, w) && std::memcmp(&v, &w, sizeof(double)) == 0)
+            break;
+    }
+    return s; // 17 digits always read back for a correctly rounding parser
+}
+
+// One assignment line: name padded to 19 characters, value padded to 13, comment
+static std::string qd_conf_line(const std::string &name, const std::string &value, const std::string &comment)
+{
+    const std::string v = (!value.empty() && value[0] == '-') ? value : " " + value;
+    std::string s = name + " = " + std::string(name.size() < 19 ? 19 - name.size() : 0, ' ') + v;
+    if (!comment.empty())
+        s += std::string(v.size() < 13 ? 13 - v.size() : 0, ' ') + " % " + comment;
+    return s + "\n";
+}
+
+// True if 's' contains a line break
+static bool qd_conf_has_newline(const std::string &s)
+{
+    return s.find('\n') != std::string::npos || s.find('\r') != std::string::npos;
+}
+
 /*!SECTION
 Channel generation functions
 SECTION!*/
@@ -559,6 +727,7 @@ bool quadriga_lib::conf_file_read(
 ## See also:
 - [[scenpar_validate]] (value checks, defaults and the list of validation rules)
 - [[conf_file_list]] (find the conf files in a set of directories)
+- [[conf_file_write]] (write a conf file)
 MD!*/
 
 bool quadriga_lib::conf_file_read(const std::string &fn,
@@ -755,17 +924,7 @@ bool quadriga_lib::scenpar_validate(std::unordered_map<std::string, double> &sce
 {
     double val[sizeof(qd_scenpar_keys) / sizeof(qd_scenpar_keys[0])];
     bool given[sizeof(qd_scenpar_keys) / sizeof(qd_scenpar_keys[0])];
-    for (arma::uword i = 0; i < qd_scenpar_n_key; ++i)
-        val[i] = qd_scenpar_keys[i].def, given[i] = false;
-
-    for (const auto &entry : scenpar)
-    {
-        const arma::uword ind = qd_scenpar_find(entry.first);
-        if (ind == qd_scenpar_n_key)
-            throw std::invalid_argument("Unknown key '" + entry.first + "' in 'scenpar'.");
-        val[ind] = entry.second;
-        given[ind] = true;
-    }
+    qd_scenpar_values(scenpar, val, given);
 
     if (validate)
         qd_scenpar_check(val, subpath_method);
@@ -904,4 +1063,344 @@ arma::uword quadriga_lib::conf_file_list(const std::vector<std::string> &dirs,
         *file_dirs = l_file_dirs;
 
     return (arma::uword)scenarios.size();
+}
+
+/*!MD
+# conf_file_write
+Write a QuaDRiGa scenario configuration file
+
+- Writes scenario parameters, path-loss parameters and short names in the layout of the conf files shipped with
+  QuaDRiGa, so that [[conf_file_read]] returns the same values bit for bit
+- Header: `% Config file for scenario "name"` with the file name without the extension `.conf`, then the
+  reference `ref`, the validity range and one line `ShortName = name` per short name
+- Up to 10 sections follow, each with a header and, if the entry of `ref_sec` is not empty, a line
+  `% See: ref; ref_sec`. Index in `ref_sec` and write order:
+  - 0: Large scale distributions, with an overview formula per LSP; 1: Large-Scale fading decorrelation distances;
+    2: Inter-parameter correlations, with the correlation matrix as comment; 3: Model parameters;
+    8: EoD offset; 4: Decorrelation distance for the small-scale fading spatial consistency;
+    5: Parameters for the ground reflection extension; 6: Absolute time of arrival offset;
+    9: Optional modelling components; 7: Path-loss model
+  - The indices 0 to 7 are those of QuaDRiGa, so its 8 section references can be passed unchanged
+- Within a section, keys are grouped into paragraphs separated by a blank line; correlations are written in the
+  row order of the matrix, all other keys in the order of `key_order`; `SubpathMethod` stands before
+  `LOS_scatter_radius`
+- Each line is `name = value % comment`, with the name padded to 19 and the value to 13 characters. The comment
+  states the unit; for the mean and STD of an LSP it adds the reference point of the frequency, distance, height
+  and elevation terms, e.g. `@ 1 GHz`.
+- The path-loss section has the formula blocks of the model (`logdist`, `dual_slope`, `nlos`, `tripple_slope`),
+  the line `PL_model`, then the keys of `plpar` with the prefix `PL_`; known keys have a comment that can depend on
+  the model; several values of one key are separated by a space
+- Numbers are written with the fewest significant digits (15 to 17) that [[conf_file_read]] reads back to the same
+  double, independent of the global locale; `Inf` and `-Inf` are written as such, `-0` is kept
+- With `write_defaults = false` a key is written only if its value differs from the default, compared bit for bit;
+  `SubpathMethod` only if it is not `legacy`; a section without a written key is left out
+- With `write_defaults = true` all 165 keys and `SubpathMethod` are written
+- Validation before the file is opened: the value checks of [[scenpar_validate]] (unknown keys, `NaN`, classes,
+  `subpath_method`); `pl_model` empty or one name; `plpar` keys are names other than `model`, each with at least
+  one value and no `NaN`; `pl_order` names each key of `plpar` once; short names are names; `ref` and `ref_sec`
+  have no line break; `ref_sec` has at most 10 entries; `valid_range` is empty or `[4, 2]`
+- Throws `std::invalid_argument` for invalid input; a failed check does not create or change a file
+- Throws `std::runtime_error` if the file cannot be opened for writing; an existing file is overwritten
+- Every file written passes [[conf_file_read]] with `validate = true` and without ignored keys
+
+## Declaration:
+```
+void quadriga_lib::conf_file_write(
+    const std::string &fn,
+    const std::unordered_map<std::string, double> &scenpar,
+    const std::string &subpath_method = "legacy",
+    const std::string &pl_model = "",
+    const std::unordered_map<std::string, std::vector<double>> *plpar = nullptr,
+    const std::vector<std::string> *pl_order = nullptr,
+    const std::vector<std::string> *short_names = nullptr,
+    const std::string &ref = "",
+    const std::vector<std::string> *ref_sec = nullptr,
+    const arma::mat *valid_range = nullptr,
+    bool write_defaults = false);
+```
+
+## Inputs:
+- **`fn`** — Path of the conf file to write
+- **`scenpar`** — Numeric scenario parameters; any subset of the `n_key = 165` keys of [[conf_file_read]]; missing
+  keys have their default
+- **`subpath_method`** *(optional)* — Value of `SubpathMethod`: `legacy`, `Laplacian` or `mmMAGIC`
+- **`pl_model`** *(optional)* — Value of `PL_model`; one name; empty: not written
+- **`plpar`** *(optional)* — Path-loss parameters; keys without the prefix `PL_`, one or more values each; `[n_pl]`
+- **`pl_order`** *(optional)* — Order in which the keys of `plpar` are written; must name each key once; omitted:
+  sorted by name; `[n_pl]`
+- **`short_names`** *(optional)* — Values of the `ShortName` lines, one name each
+- **`ref`** *(optional)* — Literature reference; written in the header and before each non-empty entry of
+  `ref_sec`; one line
+- **`ref_sec`** *(optional)* — Reference per section, indexed as listed above; one line each; an empty or missing
+  entry writes no reference; up to `n_sec = 10` entries
+- **`valid_range`** *(optional)* — Validity range, written as comment; rows: frequency in GHz, distance, BS
+  height, MT height in m; columns: lower and upper end, one value is written if both are equal; a row with `NaN`
+  is not written; empty: no validity range; `[4, 2]`
+- **`write_defaults`** *(optional)* — `true`: write all keys; `false`: write only keys that differ from their default
+
+## See also:
+- [[conf_file_read]] (read the file back)
+- [[scenpar_validate]] (value checks and defaults)
+MD!*/
+
+void quadriga_lib::conf_file_write(const std::string &fn,
+                                   const std::unordered_map<std::string, double> &scenpar,
+                                   const std::string &subpath_method,
+                                   const std::string &pl_model,
+                                   const std::unordered_map<std::string, std::vector<double>> *plpar,
+                                   const std::vector<std::string> *pl_order,
+                                   const std::vector<std::string> *short_names,
+                                   const std::string &ref,
+                                   const std::vector<std::string> *ref_sec,
+                                   const arma::mat *valid_range,
+                                   bool write_defaults)
+{
+    // Input validation
+    if (fn.empty())
+        throw std::invalid_argument("Input 'fn' cannot be empty.");
+
+    double val[sizeof(qd_scenpar_keys) / sizeof(qd_scenpar_keys[0])];
+    qd_scenpar_values(scenpar, val);
+    qd_scenpar_check(val, subpath_method);
+
+    if (!pl_model.empty() && !qd_conf_is_name(pl_model))
+        throw std::invalid_argument("Input 'pl_model' must be empty or one name.");
+
+    std::vector<std::string> pl_keys; // Path-loss keys in write order
+    if (plpar != nullptr)
+        for (const auto &entry : *plpar)
+        {
+            if (!qd_conf_is_name(entry.first) || entry.first == "model")
+                throw std::invalid_argument("Key '" + entry.first + "' in 'plpar' is not a valid parameter name.");
+            if (entry.second.empty())
+                throw std::invalid_argument("Key '" + entry.first + "' in 'plpar' has no value.");
+            for (double v : entry.second)
+                if (std::isnan(v))
+                    throw std::invalid_argument("Value of '" + entry.first + "' in 'plpar' must not be NaN.");
+            pl_keys.push_back(entry.first);
+        }
+
+    if (pl_order == nullptr)
+        std::sort(pl_keys.begin(), pl_keys.end());
+    else
+    {
+        std::unordered_set<std::string> seen;
+        for (const auto &key : *pl_order)
+            if (plpar == nullptr || plpar->count(key) == 0 || !seen.insert(key).second)
+                throw std::invalid_argument("Input 'pl_order' must name each key of 'plpar' once.");
+        if (seen.size() != pl_keys.size())
+            throw std::invalid_argument("Input 'pl_order' must name each key of 'plpar' once.");
+        pl_keys = *pl_order;
+    }
+
+    if (short_names != nullptr)
+        for (const auto &name : *short_names)
+            if (!qd_conf_is_name(name))
+                throw std::invalid_argument("Entries of 'short_names' must be one name each.");
+
+    if (qd_conf_has_newline(ref))
+        throw std::invalid_argument("Input 'ref' must not contain a line break.");
+    if (ref_sec != nullptr)
+    {
+        if (ref_sec->size() > QD_CONF_N_SEC)
+            throw std::invalid_argument("Input 'ref_sec' can have at most 10 entries.");
+        for (const auto &s : *ref_sec)
+            if (qd_conf_has_newline(s))
+                throw std::invalid_argument("Entries of 'ref_sec' must not contain a line break.");
+    }
+
+    if (valid_range != nullptr && !valid_range->empty() && (valid_range->n_rows != 4 || valid_range->n_cols != 2))
+        throw std::invalid_argument("Input 'valid_range' must have size [4, 2].");
+
+    // Header: scenario name, reference, validity range, short names
+    std::string scenario = std::filesystem::path(fn).filename().string();
+    if (scenario.size() > 5 && scenario.compare(scenario.size() - 5, 5, ".conf") == 0)
+        scenario.resize(scenario.size() - 5);
+
+    std::string out = "% Config file for scenario \"" + scenario + "\"\n";
+    if (!ref.empty())
+        out += "% See: " + ref + "\n";
+
+    if (valid_range != nullptr && !valid_range->empty())
+    {
+        const char *label[4][2] = {{"% Valid frequency range:        ", " GHz\n"},
+                                   {"% Valid distance range:         ", " m\n"},
+                                   {"% Valid BS antenna height:      ", " m\n"},
+                                   {"% Valid MT antenna height:      ", " m\n"}};
+        std::string block;
+        for (arma::uword r = 0; r < 4; ++r)
+        {
+            const double lo = valid_range->at(r, 0), hi = valid_range->at(r, 1);
+            if (!std::isnan(lo) && !std::isnan(hi))
+                block += label[r][0] + qd_conf_number(lo) + (lo == hi ? "" : " to " + qd_conf_number(hi)) + label[r][1];
+        }
+        if (!block.empty())
+            out += "\n" + block;
+    }
+
+    if (short_names != nullptr && !short_names->empty())
+    {
+        out += "\n";
+        for (const auto &name : *short_names)
+            out += qd_conf_line("ShortName", name, "You can use this short name to load the file");
+    }
+
+    // Value of a key, 0 if the name is not in the table (SF has no mean and no mean-related keys)
+    auto get = [&val](const std::string &name)
+    {
+        const arma::uword i = qd_scenpar_find(name);
+        return i == qd_scenpar_n_key ? 0.0 : val[i];
+    };
+
+    // Overview term: m ± g · log10( omega + fGHz ) ± e · log10( d2D ) ± z · log10( hBS ) ± a · log10( alpha_rad )
+    auto term = [](double m, double g, double omega, double e, double z, double a)
+    {
+        std::string s = qd_conf_number(m);
+        auto add = [&s](double c, const std::string &var)
+        {
+            if (c != 0.0)
+                s += (c < 0.0 ? " - " : " + ") + qd_conf_number(std::abs(c)) + " * log10( " + var + " )";
+        };
+        add(g, omega != 0.0 ? qd_conf_number(omega) + " + fGHz" : "fGHz");
+        add(e, "d2D"), add(z, "hBS"), add(a, "alpha_rad");
+        return s;
+    };
+
+    // Reference point of an LSP mean or STD that depends on frequency, distance, height or elevation
+    auto at_suffix = [&get](const std::string &name)
+    {
+        for (const auto &lsp : qd_conf_lsp)
+        {
+            const std::string p = lsp[0];
+            const bool mu = name == p + "_mu";
+            if (!mu && name != p + "_sigma")
+                continue;
+            std::string s;
+            if (get(p + (mu ? "_gamma" : "_delta")) != 0.0)
+                s += ", " + qd_conf_number(1.0 - get(p + "_omega")) + " GHz";
+            if (get(p + (mu ? "_epsilon" : "_kappa")) != 0.0)
+                s += ", 1 m TX-RX dist.";
+            if (get(p + (mu ? "_zeta" : "_tau")) != 0.0)
+                s += ", 1 m TX height";
+            if (get(p + (mu ? "_alpha" : "_beta")) != 0.0)
+                s += ", 57.3 deg elevation";
+            return s.empty() ? s : " @" + s.substr(1);
+        }
+        return std::string();
+    };
+
+    // Sections: a key is written if its value differs from the default (bit-wise, so that -0 is kept)
+    const bool write_subpath = write_defaults || subpath_method != "legacy";
+    const arma::uword i_los = qd_scenpar_find("LOS_scatter_radius");
+    double X[64];
+    qd_scenpar_xcorr(val, X);
+
+    for (unsigned char sec : qd_conf_section_order)
+    {
+        std::string body; // Section content after the header
+        if (sec == QD_CONF_SEC_PL)
+        {
+            if (pl_model.empty() && pl_keys.empty())
+                continue;
+            for (const auto &f : qd_conf_pl_formulas)
+                if (!pl_model.empty() && std::strstr(f[0], ("|" + pl_model + "|").c_str()) != nullptr)
+                    body += std::string(f[1]) + "\n";
+            if (!pl_model.empty())
+                body += qd_conf_line("PL_model", pl_model, "");
+            for (const auto &key : pl_keys)
+            {
+                std::string value, comment;
+                for (double v : plpar->at(key))
+                    value += (value.empty() ? "" : " ") + qd_conf_number(v);
+                for (const auto &c : qd_conf_pl_comments)
+                    if (key == c[0] && (c[1][0] == 0 || pl_model == c[1]))
+                    {
+                        comment = c[2];
+                        break;
+                    }
+                body += qd_conf_line("PL_" + key, value, comment);
+            }
+        }
+        else
+        {
+            // Keys of the section, sorted by paragraph, matrix position (correlations) and table order;
+            // 'SubpathMethod' (index n_key) stands right before 'LOS_scatter_radius'
+            struct entry
+            {
+                unsigned par, rc;
+                arma::uword ord, ind;
+            };
+            std::vector<entry> list;
+            for (arma::uword i = 0; i < qd_scenpar_n_key; ++i)
+            {
+                const qd_scenpar_key &k = qd_scenpar_keys[i];
+                if (k.sec == sec && (write_defaults || std::memcmp(&val[i], &k.def, sizeof(double)) != 0))
+                    list.push_back({k.par, k.row < 0 ? 0u : unsigned(k.row * 8 + k.col), 2 * i, i});
+            }
+            if (sec == QD_CONF_SEC_MODEL && write_subpath)
+                list.push_back({qd_scenpar_keys[i_los].par, 0, 2 * i_los - 1, qd_scenpar_n_key});
+            if (list.empty())
+                continue;
+            std::sort(list.begin(), list.end(), [](const entry &a, const entry &b)
+                      { return a.par != b.par ? a.par < b.par : (a.rc != b.rc ? a.rc < b.rc : a.ord < b.ord); });
+
+            if (sec == 0) // Overview of the LSP distributions
+                for (const auto &lsp : qd_conf_lsp)
+                {
+                    const std::string p = lsp[0], label = lsp[1];
+                    body += "% " + label + std::string(4 - label.size(), ' ') + "= ";
+                    if (p != "SF")
+                        body += term(get(p + "_mu"), get(p + "_gamma"), get(p + "_omega"), get(p + "_epsilon"),
+                                     get(p + "_zeta"), get(p + "_alpha")) + " + ";
+                    body += std::string(lsp[2]) + " * ( " +
+                            term(get(p + "_sigma"), get(p + "_delta"), get(p + "_omega"), get(p + "_kappa"),
+                                 get(p + "_tau"), get(p + "_beta")) + " )\n";
+                }
+
+            if (sec == QD_CONF_SEC_CORR) // Correlation matrix with 2 significant digits in columns of 7 characters
+            {
+                body += "%         DS     KF     SF     ASD    ASA    ESD    ESA    XPR\n";
+                for (int r = 0; r < 8; ++r)
+                {
+                    body += r == 3 ? "% R = |  " : "%     |  ";
+                    for (int c = 0; c < 8; ++c)
+                    {
+                        std::ostringstream os;
+                        os.imbue(std::locale::classic());
+                        os.precision(2);
+                        os << X[c * 8 + r];
+                        const std::string t = os.str()[0] == '-' ? os.str() : " " + os.str();
+                        body += t + std::string(t.size() < 7 ? 7 - t.size() : 0, ' ');
+                    }
+                    body += "| " + std::string(qd_conf_lsp[r][1]) + "\n";
+                }
+            }
+
+            for (size_t n = 0; n < list.size(); ++n)
+            {
+                if (n == 0 ? !body.empty() : list[n].par != list[n - 1].par)
+                    body += "\n";
+                const arma::uword i = list[n].ind;
+                if (i == qd_scenpar_n_key)
+                    body += qd_conf_line("SubpathMethod", subpath_method, "subpath mapping method (legacy, Laplacian or mmMAGIC)");
+                else
+                    body += qd_conf_line(qd_scenpar_keys[i].name, qd_conf_number(val[i]),
+                                         qd_scenpar_keys[i].comment + at_suffix(qd_scenpar_keys[i].name));
+            }
+        }
+
+        const std::string rule = "% " + std::string(98, '=') + "\n";
+        out += "\n" + rule + "% " + qd_conf_sections[sec] + "\n";
+        if (ref_sec != nullptr && sec < ref_sec->size() && !(*ref_sec)[sec].empty())
+            out += "% See: " + (ref.empty() ? "" : ref + "; ") + (*ref_sec)[sec] + "\n";
+        out += rule + "\n" + body;
+    }
+
+    // All checks passed and the text is complete, write the file
+    std::ofstream file(fn, std::ios::out | std::ios::binary | std::ios::trunc);
+    if (!file.is_open())
+        throw std::runtime_error("Cannot open file '" + fn + "' for writing.");
+    file << out;
+    if (!file.good())
+        throw std::runtime_error("Cannot write file '" + fn + "'.");
 }

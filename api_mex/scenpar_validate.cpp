@@ -4,9 +4,7 @@
 
 #include "mex.h"
 #include "quadriga_lib.hpp"
-#include "mex_helper_functions.hpp"
-
-#include <algorithm>
+#include "mex_quadriga_lib_functions.hpp"
 
 /*!SECTION
 Channel generation functions
@@ -75,33 +73,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read inputs: 1x1 struct of real numeric scalars and the string field 'SubpathMethod'
-    std::unordered_map<std::string, double> scenpar;
     std::string subpath_method = "legacy";
-    if (nrhs > 0 && !mxIsEmpty(prhs[0]))
-    {
-        if (!mxIsStruct(prhs[0]) || mxGetNumberOfElements(prhs[0]) != 1)
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'scenpar_in' must be a 1x1 struct.");
-
-        const int n_fields = mxGetNumberOfFields(prhs[0]);
-        for (int f = 0; f < n_fields; ++f)
-        {
-            const std::string name = mxGetFieldNameByNumber(prhs[0], f);
-            const mxArray *data = mxGetFieldByNumber(prhs[0], 0, f);
-            if (name == "SubpathMethod")
-            {
-                if (data == nullptr || !mxIsChar(data))
-                    mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Field 'SubpathMethod' must be a string.");
-                subpath_method = qd_mex_get_string(data);
-            }
-            else
-            {
-                if (data == nullptr || mxGetNumberOfElements(data) != 1 || mxIsComplex(data) ||
-                    !(mxIsNumeric(data) || mxIsLogical(data)))
-                    mexErrMsgIdAndTxt("quadriga_lib:CPPerror", ("Field '" + name + "' must be a real numeric scalar.").c_str());
-                scenpar[name] = qd_mex_get_scalar<double>(data, name);
-            }
-        }
-    }
+    std::unordered_map<std::string, double> scenpar;
+    if (nrhs > 0)
+        scenpar = qd_mex_struct2scenpar(prhs[0], subpath_method, "scenpar_in");
     const bool validate = (nrhs < 2) ? true : qd_mex_get_scalar<bool>(prhs[1], "validate", true);
 
     // Output allocation
@@ -119,12 +94,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     CALL_QD(lsp_xcorr_chk = quadriga_lib::scenpar_validate(scenpar, subpath_method, p_lsp_xcorr, &key_order, validate));
 
     // Scenario parameters: numeric keys in canonical order, 'SubpathMethod' at its QuaDRiGa position
-    std::vector<std::string> fields = key_order;
-    fields.insert(std::find(fields.begin(), fields.end(), "LOS_scatter_radius"), "SubpathMethod");
-    plhs[0] = qd_mex_make_struct(fields);
-    for (const auto &key : key_order)
-        qd_mex_set_field(plhs[0], key, qd_mex_copy2matlab(&scenpar.at(key)));
-    qd_mex_set_field(plhs[0], "SubpathMethod", mxCreateString(subpath_method.c_str()));
+    plhs[0] = qd_mex_scenpar2struct(scenpar, subpath_method, key_order);
 
     if (nlhs > 2)
         plhs[2] = mxCreateLogicalScalar(lsp_xcorr_chk);

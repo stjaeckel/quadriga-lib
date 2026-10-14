@@ -196,7 +196,7 @@ Two derived quantities belong to the parameter set and are computed in `qd_build
 | Q15 | A non-positive-definite correlation matrix is not an error at load time. | Keep. It is reported through the return value. |
 
 Every change turns input that is wrong today into an error. None changes the result for a file that
-is well formed. The parity test in WI-5 proves this for the 91 shipped files.
+is well formed. The parity test of WI-5 showed this for the 91 shipped files (since removed, see WI-5).
 
 The parser works on bytes. It strips a trailing `\r`, treats space and tab as white space, and does
 not decode comment text.
@@ -511,6 +511,13 @@ Parser, validator, lister. No regular-expression library is needed: the grammar 
 hand-written scanner over one line.
 
 ### WI-5 Parity with MATLAB on the 91 shipped files
+
+Status (2026-10-14): done and removed. The parity test ran in the sessions of commits 338eaa0 and 3690107
+and last passed on 2026-10-14 with the reader of 3690107: every value of 90 files equal to MATLAB, no ignored
+keys, the same lister entries; `TwoRayGR.conf` is rejected by the reader (`GR_enabled = 1;`, clean
+grammar). The test, the MATLAB script and the reference file were then deleted, because quadriga-lib must
+not depend on QuaDRiGa-NG: no path to it in the sources and no data derived from its files. The rules below
+describe what the removed test did.
 
 This is the acceptance test for "drop-in". It is a test case named `"Diagnostic - ..."` that runs only
 if the directory `/sjc/QuaDRiGa-NG/quadriga_src/config` exists and is skipped otherwise.

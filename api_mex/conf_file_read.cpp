@@ -4,9 +4,7 @@
 
 #include "mex.h"
 #include "quadriga_lib.hpp"
-#include "mex_helper_functions.hpp"
-
-#include <algorithm>
+#include "mex_quadriga_lib_functions.hpp"
 
 /*!SECTION
 Channel generation functions
@@ -105,14 +103,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                                                          &key_order, &pl_order, p_short_names, p_ignored_keys, validate));
 
     // Scenario parameters: numeric keys in canonical order, 'SubpathMethod' at its QuaDRiGa position
-    {
-        std::vector<std::string> fields = key_order;
-        fields.insert(std::find(fields.begin(), fields.end(), "LOS_scatter_radius"), "SubpathMethod");
-        plhs[0] = qd_mex_make_struct(fields);
-        for (const auto &key : key_order)
-            qd_mex_set_field(plhs[0], key, qd_mex_copy2matlab(&scenpar.at(key)));
-        qd_mex_set_field(plhs[0], "SubpathMethod", mxCreateString(subpath_method.c_str()));
-    }
+    plhs[0] = qd_mex_scenpar2struct(scenpar, subpath_method, key_order);
 
     // Path-loss parameters: model first, then the numeric keys in file order as row vectors
     if (nlhs > 1)
