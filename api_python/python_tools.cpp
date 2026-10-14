@@ -16,6 +16,10 @@ namespace py = pybind11;
 #include "qpy_calc_rician_k_factor.cpp"
 #include "qpy_calc_cross_polarization_ratio.cpp"
 #include "qpy_geo2cart.cpp"
+#include "qpy_conf_file_read.cpp"
+#include "qpy_conf_file_write.cpp"
+#include "qpy_scenpar_validate.cpp"
+#include "qpy_conf_file_list.cpp"
 
 void quadriga_lib_tools(py::module_ &m)
 {
@@ -75,4 +79,26 @@ void quadriga_lib_tools(py::module_ &m)
           py::arg("len") = py::none(),
           py::arg("combine") = true,
           py::arg("use_kernel") = 1);
+
+    m.def("conf_file_read", &conf_file_read,
+          py::arg("fn"),
+          py::arg("validate") = true);
+
+    m.def("conf_file_write", &conf_file_write,
+          py::arg("fn"),
+          py::arg("scenpar"),
+          py::arg("plpar") = py::none(),
+          py::arg("short_names") = py::none(),
+          py::arg("ref") = py::none(),
+          py::arg("ref_sec") = py::none(),
+          py::arg("valid_range") = py::none(),
+          py::arg("write_defaults") = false);
+
+    m.def("scenpar_validate", &scenpar_validate,
+          py::arg("scenpar_in") = py::none(),
+          py::arg("validate") = true);
+
+    m.def("conf_file_list", &conf_file_list,
+          py::arg("dirs"),
+          py::arg("parse_shortnames") = true);
 }

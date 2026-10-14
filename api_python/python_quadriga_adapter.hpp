@@ -693,4 +693,182 @@ static py::object qd_python_any2numpy(const std::any &dset)
 #undef QD_PY_ANY_ARR
 }
 
+// -------------------------------- Flags and paths --------------------------------
+
+// Python flag -> bool
+// - None gives 'default_value'; Python bool and numpy.bool_ give their value
+// - Anything else (also int and str) throws py::type_error naming the input 'name'
+static bool qd_python_flag(const py::handle &value, bool default_value, const std::string &name)
+{
+    if (value.is_none())
+        return default_value;
+    if (py::isinstance<py::bool_>(value) || py::isinstance(value, py::module_::import("numpy").attr("bool_")))
+    {
+        const int res = PyObject_IsTrue(value.ptr());
+        if (res < 0)
+            throw py::error_already_set();
+        return res == 1;
+    }
+    throw py::type_error("Input '" + name + "' must be a bool or None.");
+}
+
+// Python path -> std::string; returns false if 'value' is not a path
+// - str and bytes as they are; an object with '__fspath__' is converted with os.fspath first
+static bool qd_python_try_path(const py::handle &value, std::string &path)
+{
+    py::object v = py::reinterpret_borrow<py::object>(value);
+    if (!py::isinstance<py::str>(v) && !py::isinstance<py::bytes>(v) && py::hasattr(v, "__fspath__"))
+        v = py::module_::import("os").attr("fspath")(v);
+    if (!py::isinstance<py::str>(v) && !py::isinstance<py::bytes>(v))
+        return false;
+    path = py::cast<std::string>(v);
+    return true;
+}
+
+// Python path (str, bytes or os.PathLike) -> std::string; anything else throws py::type_error naming the input 'name'
+static std::string qd_python_path(const py::handle &value, const std::string &name)
+{
+    std::string path;
+    if (!qd_python_try_path(value, path))
+        throw py::type_error("Input '" + name + "' must be a str or path-like object.");
+    return path;
+}
+
+// -------------------------------- Scenario parameters --------------------------------
+
+// Read a dict value as a C-contiguous double array
+// - Accepts Python numbers and numpy scalars or arrays of the kinds bool, int, uint and float
+// - str, None, complex values and anything numpy cannot convert throw std::invalid_argument with 'error_msg'
+static py::array_t<double, py::array::c_style | py::array::forcecast> qd_python_real_array(const py::handle &value,
+                                                                                          const std::string &error_msg)
+{
+    py::array arr = py::array::ensure(value);
+    if (!arr)
+        throw std::invalid_argument(error_msg);
+    const char kind = arr.dtype().kind();
+    if (kind != 'b' && kind != 'i' && kind != 'u' && kind != 'f')
+        throw std::invalid_argument(error_msg);
+    return py::array_t<double, py::array::c_style | py::array::forcecast>::ensure(arr);
+}
+
+// Dict of QuaDRiGa scenario parameters -> map of the numeric values and the str 'SubpathMethod'
+// - Every entry except 'SubpathMethod' must be a real scalar (one element); 'SubpathMethod' must be a str
+// - Key names are not checked here, quadriga_lib::scenpar_validate rejects unknown names
+// - None or an empty dict gives an empty map; 'subpath_method' is "legacy" if not in the dict
+// - 'var_name' is used in the error messages
+static std::unordered_map<std::string, double> qd_python_dict2scenpar(const py::handle &obj,
+                                                                      std::string &subpath_method,
+                                                                      const std::string &var_name = "scenpar")
+{
+    std::unordered_map<std::string, double> scenpar;
+    subpath_method = "legacy";
+    if (obj.is_none())
+        return scenpar;
+    if (!py::isinstance<py::dict>(obj))
+        throw std::invalid_argument("Input '" + var_name + "' must be a dict or None.");
+
+    for (auto item : py::reinterpret_borrow<py::dict>(obj))
+    {
+        if (!py::isinstance<py::str>(item.first))
+            throw std::invalid_argument("Keys of '" + var_name + "' must be str.");
+        const std::string name = py::cast<std::string>(item.first);
+        if (name == "SubpathMethod")
+        {
+            if (!py::isinstance<py::str>(item.second))
+                throw std::invalid_argument("Entry 'SubpathMethod' of '" + var_name + "' must be a str.");
+            subpath_method = py::cast<std::string>(item.second);
+        }
+        else
+        {
+            const std::string error_msg = "Entry '" + name + "' of '" + var_name + "' must be a real scalar.";
+            const auto values = qd_python_real_array(item.second, error_msg);
+            if (values.size() != 1)
+                throw std::invalid_argument(error_msg);
+            scenpar[name] = *values.data();
+        }
+    }
+    return scenpar;
+}
+
+// Map of QuaDRiGa scenario parameters -> dict of float values
+// - Keys in the order of 'key_order', with the str entry 'SubpathMethod' inserted before 'LOS_scatter_radius'
+//   (its QuaDRiGa position); every name in 'key_order' must be in 'scenpar'
+static py::dict qd_python_scenpar2dict(const std::unordered_map<std::string, double> &scenpar,
+                                       const std::string &subpath_method,
+                                       const std::vector<std::string> &key_order)
+{
+    py::dict output;
+    for (const auto &key : key_order)
+    {
+        if (key == "LOS_scatter_radius")
+            output["SubpathMethod"] = subpath_method;
+        output[py::str(key)] = scenpar.at(key);
+    }
+    if (!output.contains("SubpathMethod"))
+        output["SubpathMethod"] = subpath_method;
+    return output;
+}
+
+// Dict of QuaDRiGa path-loss parameters -> map of the numeric values, the model and the key order
+// - The entry 'model' must be a str; it is returned in 'pl_model' (empty if the dict has no such entry)
+// - Every other entry must be a real scalar, list or 1D array
+// - 'pl_order' lists the numeric entries in dict order
+// - None or an empty dict gives an empty map, empty 'pl_model' and empty 'pl_order'
+// - 'var_name' is used in the error messages
+static std::unordered_map<std::string, std::vector<double>> qd_python_dict2plpar(const py::handle &obj,
+                                                                                std::string &pl_model,
+                                                                                std::vector<std::string> &pl_order,
+                                                                                const std::string &var_name = "plpar")
+{
+    std::unordered_map<std::string, std::vector<double>> plpar;
+    pl_model.clear();
+    pl_order.clear();
+    if (obj.is_none())
+        return plpar;
+    if (!py::isinstance<py::dict>(obj))
+        throw std::invalid_argument("Input '" + var_name + "' must be a dict or None.");
+
+    for (auto item : py::reinterpret_borrow<py::dict>(obj))
+    {
+        if (!py::isinstance<py::str>(item.first))
+            throw std::invalid_argument("Keys of '" + var_name + "' must be str.");
+        const std::string name = py::cast<std::string>(item.first);
+        if (name == "model")
+        {
+            if (!py::isinstance<py::str>(item.second))
+                throw std::invalid_argument("Entry 'model' of '" + var_name + "' must be a str.");
+            pl_model = py::cast<std::string>(item.second);
+        }
+        else
+        {
+            const std::string error_msg = "Entry '" + name + "' of '" + var_name +
+                                          "' must be a real scalar or 1D array.";
+            const auto values = qd_python_real_array(item.second, error_msg);
+            if (values.ndim() > 1)
+                throw std::invalid_argument(error_msg);
+            plpar[name] = std::vector<double>(values.data(), values.data() + values.size());
+            pl_order.push_back(name);
+        }
+    }
+    return plpar;
+}
+
+// QuaDRiGa path-loss parameters -> dict, empty if 'pl_model' and 'pl_order' are both empty
+// - Entry 'model' (str) first if 'pl_model' is not empty, then one 1D array per key in the order of 'pl_order';
+//   every name in 'pl_order' must be in 'plpar'
+static py::dict qd_python_plpar2dict(const std::string &pl_model,
+                                     const std::unordered_map<std::string, std::vector<double>> &plpar,
+                                     const std::vector<std::string> &pl_order)
+{
+    py::dict output;
+    if (!pl_model.empty())
+        output["model"] = pl_model;
+    for (const auto &key : pl_order)
+    {
+        const arma::vec values(plpar.at(key));
+        output[py::str(key)] = qd_python_copy2numpy(&values);
+    }
+    return output;
+}
+
 #endif
