@@ -546,6 +546,22 @@ namespace quadriga_lib
                                std::vector<std::string> *file_dirs = nullptr,  // Optional output: Directory per entry, as given in 'dirs', [n_scen]
                                bool parse_shortnames = true);                  // Read the files and add their short names
 
+    // Write a QuaDRiGa scenario configuration file
+    // - All inputs are validated and the complete text is composed before the file is opened; an existing file is overwritten
+    // - Numbers are written with the fewest digits (15 to 17) that 'conf_file_read' reads back bit-exact
+    // - The scenario name in the header comment is the file name without the extension ".conf"
+    void conf_file_write(const std::string &fn,                                                       // Path of the .conf file to write
+                         const std::unordered_map<std::string, double> &scenpar,                      // Numeric scenario parameters, any subset of the n_key keys; missing keys have their default
+                         const std::string &subpath_method = "legacy",                                // Value of 'SubpathMethod'
+                         const std::string &pl_model = "",                                            // Value of 'PL_model', empty: not written
+                         const std::unordered_map<std::string, std::vector<double>> *plpar = nullptr, // Optional input: Path-loss parameters, keys without "PL_", [n_pl]
+                         const std::vector<std::string> *pl_order = nullptr,                          // Optional input: Order of the plpar keys, [n_pl]; nullptr: sorted by name
+                         const std::vector<std::string> *short_names = nullptr,                       // Optional input: Values of 'ShortName'
+                         const std::string &ref = "",                                                 // Literature reference for the header, empty: none
+                         const std::vector<std::string> *ref_sec = nullptr,                           // Optional input: Reference per section, up to n_sec = 10 entries, empty entry: none
+                         const arma::mat *valid_range = nullptr,                                      // Optional input: Validity range of frequency [GHz], distance, BS height, MT height [m], [4, 2]
+                         bool write_defaults = false);                                                // true: write all keys; false: only keys whose value differs from the default
+
 }
 
 #endif
