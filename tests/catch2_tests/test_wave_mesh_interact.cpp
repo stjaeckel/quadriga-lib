@@ -2,466 +2,11 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-#include <catch2/catch_test_macros.hpp>
+// ray_mesh_interact, wave.
 
-#include "quadriga_tools.hpp"
+#include "ray_test_helpers.hpp"
 
-#include <iostream>
-#include <algorithm>
-#include <cmath>
-#include <complex>
-#include <limits>
-#include <unordered_map>
-#include <vector>
-#include <string>
-#include <cstdint>
-
-// Diagnostic output for the thin-sheet / slab work. Uncomment to print the tables. The
-// assertions in the diagnostic cases run either way and only check sanity, so leaving this
-// commented costs nothing but the printing.
-#define QD_TEST_VERBOSE
-
-#ifdef QD_TEST_VERBOSE
-#include <cstdio>
-#define QD_DIAG(...) std::printf(__VA_ARGS__)
-#else
-#define QD_DIAG(...) ((void)0)
-#endif
-
-// Exact analytic slab, complex angles throughout, per polarization:
-//   T = t12 t23 phi / (1 - r12 r23 phi^2),  phi = exp(-j k0 n d cos(theta_slab))
-// Independent of every library internal. This is the oracle both the thin-sheet composite and
-// the traced solid are measured against, and it is the only way to tell which of the two moved
-// when they disagree.
-//
-// Permeability enters through three substitutions and nowhere else: the admittance is
-// z = sqrt(eps/mu), the Snell ratio is a ratio of eps*mu products, and the propagation index is
-// n = sqrt(eps*mu). Air is on both sides, so the near-side product is 1 and z1 does not move. The
-// Fresnel groupings and the Airy assembly are already written in z and c. mu_s defaults to 1, where
-// all three reduce to the dielectric expressions they replace.
-struct QdSlabRef
-{
-    double p_te = 0.0, p_tm = 0.0, p_avg = 0.0, ratio = 0.0; // powers and min/max channel ratio
-    std::complex<double> t_te, t_tm;                         // complex amplitudes
-    std::complex<double> ct_slab;                            // complex in-slab cosine
-};
-
-static inline QdSlabRef qd_slab_ref(std::complex<double> eps_s, double thk,
-                                    double theta_n_rad, double f_hz,
-                                    std::complex<double> mu_s = std::complex<double>(1.0, 0.0))
-{
-    const double k0 = 2.0 * arma::datum::pi * f_hz / 299792458.0;
-    const std::complex<double> z1(1.0, 0.0), z2 = std::sqrt(eps_s / mu_s), n = std::sqrt(eps_s * mu_s);
-    const double c1 = std::cos(theta_n_rad), s1 = std::sin(theta_n_rad);
-    const std::complex<double> c2 = std::sqrt(1.0 - (1.0 / (eps_s * mu_s)) * s1 * s1);
-    const std::complex<double> phi = std::exp(std::complex<double>(0.0, -1.0) * k0 * n * thk * c2);
-
-    QdSlabRef R;
-    R.ct_slab = c2;
-    for (int pol = 0; pol < 2; ++pol)
-    {
-        std::complex<double> r, t12, t21;
-        if (pol == 0) // TE
-            r = (z1 * c1 - z2 * c2) / (z1 * c1 + z2 * c2),
-            t12 = (2.0 * z1 * c1) / (z1 * c1 + z2 * c2),
-            t21 = (2.0 * z2 * c2) / (z2 * c2 + z1 * c1);
-        else // TM
-            r = (z2 * c1 - z1 * c2) / (z2 * c1 + z1 * c2),
-            t12 = (2.0 * z1 * c1) / (z2 * c1 + z1 * c2),
-            t21 = (2.0 * z2 * c2) / (z1 * c2 + z2 * c1);
-        std::complex<double> T = t12 * t21 * phi / (1.0 - r * r * phi * phi);
-        if (pol == 0)
-            R.t_te = T, R.p_te = std::norm(T);
-        else
-            R.t_tm = T, R.p_tm = std::norm(T);
-    }
-    R.p_avg = 0.5 * (R.p_te + R.p_tm);
-    double lo = std::min(R.p_te, R.p_tm), hi = std::max(R.p_te, R.p_tm);
-    R.ratio = (hi > 0.0) ? lo / hi : 0.0;
-    return R;
-}
-
-// Composite slab reflectance, TE/TM averaged, air | slab | air. The stack is symmetric, so the
-// internal reflection is the same at both faces and R = r (1 - phi^2) / (1 - r^2 phi^2).
-//
-// Carries permeability through the same three substitutions as qd_slab_ref, and returns the two
-// channels separately where asked: the average cannot tell TE from TM, and for a magnetic sheet
-// which of the two is the larger is exactly what is under test.
-static inline double qd_slab_ref_R(std::complex<double> eps_s, double thk,
-                                   double theta_n_rad, double f_hz,
-                                   std::complex<double> mu_s = std::complex<double>(1.0, 0.0),
-                                   double *R_te_out = nullptr, double *R_tm_out = nullptr)
-{
-    const double k0 = 2.0 * arma::datum::pi * f_hz / 299792458.0;
-    const std::complex<double> z1(1.0, 0.0), z2 = std::sqrt(eps_s / mu_s), n = std::sqrt(eps_s * mu_s);
-    const double c1 = std::cos(theta_n_rad), s1 = std::sin(theta_n_rad);
-    const std::complex<double> c2 = std::sqrt(1.0 - (1.0 / (eps_s * mu_s)) * s1 * s1);
-    const std::complex<double> phi = std::exp(std::complex<double>(0.0, -1.0) * k0 * n * thk * c2);
-    const std::complex<double> e = phi * phi;
-    const std::complex<double> r_te = (z1 * c1 - z2 * c2) / (z1 * c1 + z2 * c2);
-    const std::complex<double> r_tm = (z2 * c1 - z1 * c2) / (z2 * c1 + z1 * c2);
-    const std::complex<double> R_te = r_te * (1.0 - e) / (1.0 - r_te * r_te * e);
-    const std::complex<double> R_tm = r_tm * (1.0 - e) / (1.0 - r_tm * r_tm * e);
-    if (R_te_out)
-        *R_te_out = std::norm(R_te);
-    if (R_tm_out)
-        *R_tm_out = std::norm(R_tm);
-    return 0.5 * (std::norm(R_te) + std::norm(R_tm));
-}
-
-// The analytic slab with the lumped material columns a sheet can carry, air | sheet | air, both
-// ports, per polarization. Written separately from qd_slab_ref so that the oracle everything else
-// is measured against stays the plain Airy pair; at its defaults this reproduces it, which the
-// fixture asserts rather than assumes.
-//
-//   att_dB   Penetration loss of the sheet. One power factor 10^(-att/10) on the transmit port,
-//            nothing on the reflect port.
-//   tf       Transmission factor of the sheet, on both of its faces: an ideal transformer of real
-//            ratio at each face, which for a symmetric stack is the same sheet with its tilted
-//            admittance scaled by nu and its phase thickness untouched. With x0 the modulus of the
-//            admittance ratio sheet / air and rm = (1 - x0) / (1 + x0), the pair rule
-//            R' = rm^2 (1 - tf) for tf >= 0 and rm^2 + (1 - rm^2)(-tf) for tf < 0 gives the modulus
-//            the ratio is moved to, x = (1 - s) / (1 + s) with s = sqrt(R') at the sign of rm, and
-//            nu = x / x0. For a lossless sheet below its critical angle that is the pair rule on
-//            the reflectance of each face.
-//   res      Permittivity resonance, as an increment. It is part of the permittivity: the
-//            admittance, the cosine and the propagation index all read it.
-struct QdLumpRef
-{
-    double T_te = 0.0, T_tm = 0.0, R_te = 0.0, R_tm = 0.0; // channel powers
-    std::complex<double> t_te, t_tm;                       // complex transmit amplitudes
-};
-
-static inline QdLumpRef qd_slab_ref_lumped(std::complex<double> eps_s, double thk,
-                                           double theta_n_rad, double f_hz,
-                                           double att_dB = 0.0, double tf = 0.0,
-                                           std::complex<double> res = std::complex<double>(0.0, 0.0))
-{
-    const double k0 = 2.0 * arma::datum::pi * f_hz / 299792458.0;
-    const std::complex<double> e_if = eps_s + res;
-    const std::complex<double> z2 = std::sqrt(e_if), n = std::sqrt(e_if);
-    const double c1 = std::cos(theta_n_rad), s1 = std::sin(theta_n_rad);
-    const std::complex<double> c2 = std::sqrt(1.0 - (1.0 / e_if) * s1 * s1);
-    const std::complex<double> p2 = std::exp(std::complex<double>(0.0, -2.0) * k0 * n * thk * c2);
-    const std::complex<double> p1 = std::exp(std::complex<double>(0.0, -1.0) * k0 * n * thk * c2);
-    const double g = std::pow(10.0, -0.1 * att_dB);
-
-    QdLumpRef Q;
-    for (int pol = 0; pol < 2; ++pol)
-    {
-        std::complex<double> r, t12, t21;
-        if (pol == 0)
-            r = (c1 - z2 * c2) / (c1 + z2 * c2), t12 = (2.0 * c1) / (c1 + z2 * c2),
-            t21 = (2.0 * z2 * c2) / (z2 * c2 + c1);
-        else
-            r = (z2 * c1 - c2) / (z2 * c1 + c2), t12 = (2.0 * c1) / (z2 * c1 + c2),
-            t21 = (2.0 * z2 * c2) / (c2 + z2 * c1);
-
-        std::complex<double> rr = r, kap2(1.0, 0.0); // the reflection of either face, and the factor on the t12 t21 product
-        if (tf != 0.0)
-        {
-            const std::complex<double> beta = (1.0 - r) / (1.0 + r);
-            const double x0 = std::abs(beta), rm = (1.0 - x0) / (1.0 + x0);
-            const double Rt = (tf >= 0.0) ? rm * rm * (1.0 - tf) : rm * rm + (1.0 - rm * rm) * (-tf);
-            const double s = (rm < 0.0) ? -std::sqrt(Rt) : std::sqrt(Rt);
-            if (1.0 + s > 0.0)
-            {
-                const double nu = ((1.0 - s) / (1.0 + s)) / x0;
-                rr = (1.0 - nu * beta) / (1.0 + nu * beta);
-                kap2 = (1.0 - rr * rr) / (1.0 - r * r);
-            }
-            else
-                rr = -1.0, kap2 = 0.0;
-        }
-
-        std::complex<double> den = 1.0 - rr * rr * p2;
-        std::complex<double> T = std::sqrt(g) * kap2 * t12 * t21 * p1 / den;
-        std::complex<double> R = rr - std::sqrt(g) * kap2 * t12 * t21 * rr * p2 / den; // the echo entered the sheet and paid
-        if (pol == 0)
-            Q.t_te = T, Q.T_te = std::norm(T), Q.R_te = std::norm(R);
-        else
-            Q.t_tm = T, Q.T_tm = std::norm(T), Q.R_tm = std::norm(R);
-    }
-    return Q;
-}
-
-// Single-interface Fresnel powers, per polarization. eta1 -> eta2 at theta from the normal.
-struct QdIfaceRef
-{
-    double R_te = 0.0, R_tm = 0.0, T_te = 0.0, T_tm = 0.0;
-    double R_avg = 0.0, T_avg = 0.0;
-    double obl_te = 0.0, obl_tm = 0.0;          // normal-flux obliquity factor, per polarization
-    double F_te = 0.0, F_tm = 0.0, F_avg = 0.0; // per-channel normal-flux transmittance
-};
-
-static inline QdIfaceRef qd_iface_ref(std::complex<double> e1, std::complex<double> e2, double theta_n_rad)
-{
-    const std::complex<double> z1 = std::sqrt(e1), z2 = std::sqrt(e2);
-    const double c1 = std::cos(theta_n_rad), s1 = std::sin(theta_n_rad);
-
-    // Past the critical angle the argument is negative real and the principal root is the growing
-    // evanescent wave. Force the decaying root, as the library does, so that a medium -> air
-    // reference stays comparable above critical. For a complex e2 the argument never lands on the
-    // negative real axis and this is inert.
-    std::complex<double> ct2_arg = 1.0 - (e1 / e2) * s1 * s1;
-    if (std::imag(ct2_arg) == 0.0 && std::real(ct2_arg) < 0.0)
-        ct2_arg = std::complex<double>(std::real(ct2_arg), -0.0);
-    const std::complex<double> c2 = std::sqrt(ct2_arg);
-
-    QdIfaceRef F;
-    F.R_te = std::norm((z1 * c1 - z2 * c2) / (z1 * c1 + z2 * c2));
-    F.R_tm = std::norm((z2 * c1 - z1 * c2) / (z2 * c1 + z1 * c2));
-    F.T_te = std::norm((2.0 * z1 * c1) / (z1 * c1 + z2 * c2));
-    F.T_tm = std::norm((2.0 * z1 * c1) / (z2 * c1 + z1 * c2));
-    F.R_avg = 0.5 * (F.R_te + F.R_tm);
-    F.T_avg = 0.5 * (F.T_te + F.T_tm);
-
-    // Normal-flux transmittance. The time-averaged normal Poynting component of a plane wave is
-    // proportional to |E|^2 Re(z c) for TE and to |E|^2 Re(conj(z) c) for TM, with z = sqrt(eps/mu),
-    // so the obliquity factor in front of |t|^2 is not the same in the two channels once z is
-    // complex. F_X equals 1 - R_X identically when the incidence medium is lossless, at any angle
-    // and for any complex e2; it does not when the incidence medium is lossy, where it is also not
-    // bounded by 1.
-    F.obl_te = std::real(z2 * c2) / std::real(z1 * c1);
-    F.obl_tm = std::real(std::conj(z2) * c2) / std::real(std::conj(z1) * c1);
-    F.F_te = F.obl_te * F.T_te;
-    F.F_tm = F.obl_tm * F.T_tm;
-    F.F_avg = 0.5 * (F.F_te + F.F_tm);
-    return F;
-}
-
-// Two coplanar triangles spanning +-half in y and z at x = x0, normal along -x. Built by hand
-// rather than through plane() so the face extent - which drives the thin-sheet grazing clamp - is
-// set explicitly and independently of the builder's conventions.
-//
-// The winding matters and is easy to get wrong. ray_mesh_interact forms
-// thetaF = acos(OD . N) - pi/2, so a normal pointing ALONG the ray gives thetaF < 0, which is a
-// back-side hit: the face material becomes M1 and the interaction is medium -> air, not air ->
-// medium. With the rays below travelling towards +x the normal has to point at -x. The shared
-// triangulation edge runs along y + z = 0, so a ray in the z = 0 plane must not cross at y = 0.
-static inline arma::mat qd_quad_x(double half, double x0)
-{
-    arma::mat m(2, 9);
-    m.row(0) = arma::rowvec{x0, -half, -half, x0, -half, half, x0, half, -half};
-    m.row(1) = arma::rowvec{x0, half, -half, x0, -half, half, x0, half, half};
-    return m;
-}
-
-// The same square as qd_quad_x, meshed as 2 * n^2 triangles instead of 2. Same plane, same normal
-// orientation, same material - only the triangulation differs. Every cell is split on the same
-// diagonal as the parent quad, so the winding and therefore the normal direction are unchanged.
-static inline arma::mat qd_quad_x_sub(double half, double x0, int n)
-{
-    arma::mat m((arma::uword)(2 * n * n), 9);
-    double step = 2.0 * half / (double)n;
-    arma::uword row = 0;
-    for (int iy = 0; iy < n; ++iy)
-        for (int iz = 0; iz < n; ++iz)
-        {
-            double y0 = -half + step * (double)iy, y1 = y0 + step;
-            double z0 = -half + step * (double)iz, z1 = z0 + step;
-            m.row(row++) = arma::rowvec{x0, y0, z0, x0, y0, z1, x0, y1, z0};
-            m.row(row++) = arma::rowvec{x0, y1, z0, x0, y0, z1, x0, y1, z1};
-        }
-    return m;
-}
-
-// The same square as qd_quad_x with the winding reversed, so the normal points along +x. A ray
-// travelling towards +x then produces thetaF < 0, which is a back-side hit: the face material
-// becomes M1 and the crossing is medium -> air. That is the same trick ray_mesh_interact uses to
-// recover the incidence medium without any state. The triangulation edge is unchanged, so the
-// rays from qd_ray_at clear it exactly as they do for the front-side quad.
-static inline arma::mat qd_quad_x_rev(double half, double x0)
-{
-    arma::mat m(2, 9);
-    m.row(0) = arma::rowvec{x0, -half, -half, x0, half, -half, x0, -half, half};
-    m.row(1) = arma::rowvec{x0, half, -half, x0, half, half, x0, -half, half};
-    return m;
-}
-
-// TX at (-1, 0, 0), RX placed so the ray crosses the plane x = 0 at the given angle from the
-// face normal. The crossing point moves with the angle, which is what keeps it off the shared
-// triangulation edge at normal incidence.
-static inline void qd_ray_at(double theta_n_deg, arma::mat &orig, arma::mat &dest)
-{
-    double t = std::tan(theta_n_deg * arma::datum::pi / 180.0);
-    orig = arma::mat{{-1.0, 0.37, 0.0}};
-    dest = arma::mat{{1.0, 0.37 + 2.0 * t, 0.0}};
-}
-
-
-// Function to calculate the gain
-static inline double calc_transition_gain(int interaction_type,       // (0) Reflection, (1) Transmission, (2) Refraction
-                                          double incidence_angle_deg, // Angle between face normal and ray (as in ITU P.2040-1) (degree)
-                                          double dist1,               // Medium 1 travel distance (meters)
-                                          double dist2,               // Medium 2 travel distance (meters) OR distance after reflection
-                                          std::complex<double> eta1,  // relative permittivity of medium 1
-                                          std::complex<double> eta2)  // relative permittivity of medium 2
-{
-    double deg2rad = arma::datum::pi / 180.0;
-
-    // Calculate gain from ITU-R P.2040:
-    double cos_th = std::cos(incidence_angle_deg * deg2rad); // Incidence on boundary
-    double sin_th = std::sqrt(1.0 - cos_th * cos_th);        // Trigonometric identity
-    std::complex<double> cos_th2 = std::sqrt(1.0 - eta1 / eta2 * sin_th * sin_th);
-
-    // Medium 1 loss
-    double tan_delta = std::imag(eta1) / std::real(eta1); // Loss tangent, Rec. ITU-R P.2040-1, eq. (13)
-    double cos_delta = std::cos(std::atan(tan_delta));
-    double Delta = 2.0 * cos_delta / (1.0 - cos_delta);
-    Delta = std::sqrt(Delta) * 0.0477135 / (10.0 * std::sqrt(std::real(eta1)));
-    double A = 8.686 * dist1 / Delta;                // Attenuation in db/m, ITU-R P.2040-1, eq. (26)
-    double medium_1_gain = std::pow(10.0, -0.1 * A); // Gain caused by conductive medium in linear scale
-
-    // Medium 2 loss
-    if (interaction_type != 0) // Use eta1 for reflection
-    {
-        tan_delta = std::imag(eta2) / std::real(eta2); // Loss tangent, Rec. ITU-R P.2040-1, eq. (13)
-        cos_delta = std::cos(std::atan(tan_delta));
-        Delta = 2.0 * cos_delta / (1.0 - cos_delta);
-        Delta = std::sqrt(Delta) * 0.0477135 / (10.0 * std::sqrt(std::real(eta2)));
-    }
-    A = 8.686 * dist2 / Delta;                       // Attenuation in db/m, ITU-R P.2040-1, eq. (26)
-    double medium_2_gain = std::pow(10.0, -0.1 * A); // Gain caused by conductive medium in linear scale
-
-    eta1 = std::sqrt(eta1);
-    eta2 = std::sqrt(eta2);
-
-    // Reflection coefficients
-    std::complex<double> R_te = (eta1 * cos_th - eta2 * cos_th2) / (eta1 * cos_th + eta2 * cos_th2);
-    std::complex<double> R_tm = (eta2 * cos_th - eta1 * cos_th2) / (eta2 * cos_th + eta1 * cos_th2);
-
-    // Transmission coefficients
-    std::complex<double> T_te = (2.0 * eta1 * cos_th) / (eta1 * cos_th + eta2 * cos_th2);
-    std::complex<double> T_tm = (2.0 * eta1 * cos_th) / (eta2 * cos_th + eta1 * cos_th2);
-
-    double reflection_gain = 0.5 * (std::norm(R_te) + std::norm(R_tm));
-    double refraction_gain = 0.5 * (std::norm(T_te) + std::norm(T_tm));
-
-    double total_gain = 0.0;
-    if (interaction_type == 0) // Refection
-        total_gain = medium_1_gain * reflection_gain * medium_2_gain;
-    else if (interaction_type == 1) // Transmission
-        total_gain = medium_1_gain * (1.0 - reflection_gain) * medium_2_gain;
-    else if (interaction_type == 2) // Refraction
-        total_gain = medium_1_gain * refraction_gain * medium_2_gain;
-
-    return total_gain;
-}
-
-// mu-aware reference Fresnel: an independent oracle for the e,f,g,h (permeability) path.
-// Mirrors calc_transition_gain but with the index ratio formed from eps*mu, the TE/scalar
-// quantity replaced by the admittance sqrt(eps/mu), and the in-medium loss driven by the
-// product eps*mu (= n^2). At mu = 1 it reduces exactly to calc_transition_gain.
-static inline double calc_transition_gain_mu(int interaction_type,
-                                             double incidence_angle_deg,
-                                             double dist1, double dist2,
-                                             std::complex<double> eta1, std::complex<double> eta2,
-                                             std::complex<double> mu1, std::complex<double> mu2)
-{
-    double deg2rad = arma::datum::pi / 180.0;
-    double cos_th = std::cos(incidence_angle_deg * deg2rad);
-    double sin_th = std::sqrt(1.0 - cos_th * cos_th);
-
-    std::complex<double> ratio = (eta1 * mu1) / (eta2 * mu2); // (n1/n2)^2
-    std::complex<double> cos_th2 = std::sqrt(1.0 - ratio * sin_th * sin_th);
-
-    // In-medium loss from Im(sqrt(eps*mu)) via the ITU attenuation distance (10 GHz test freq)
-    auto bulk_gain = [](std::complex<double> em, double dist)
-    {
-        double tan_delta = std::imag(em) / std::real(em);
-        double cos_delta = std::cos(std::atan(tan_delta));
-        double Delta = 2.0 * cos_delta / (1.0 - cos_delta);
-        Delta = std::sqrt(Delta) * 0.0477135 / (10.0 * std::sqrt(std::real(em)));
-        return std::pow(10.0, -0.1 * (8.686 * dist / Delta));
-    };
-    std::complex<double> em1 = eta1 * mu1;
-    std::complex<double> em2 = (interaction_type != 0) ? eta2 * mu2 : em1;
-    double medium_1_gain = bulk_gain(em1, dist1);
-    double medium_2_gain = bulk_gain(em2, dist2);
-
-    std::complex<double> Y1 = std::sqrt(eta1 / mu1); // TE/scalar admittance
-    std::complex<double> Y2 = std::sqrt(eta2 / mu2);
-
-    std::complex<double> R_te = (Y1 * cos_th - Y2 * cos_th2) / (Y1 * cos_th + Y2 * cos_th2);
-    std::complex<double> R_tm = (Y2 * cos_th - Y1 * cos_th2) / (Y2 * cos_th + Y1 * cos_th2);
-    std::complex<double> T_te = (2.0 * Y1 * cos_th) / (Y1 * cos_th + Y2 * cos_th2);
-    std::complex<double> T_tm = (2.0 * Y1 * cos_th) / (Y2 * cos_th + Y1 * cos_th2);
-
-    double reflection_gain = 0.5 * (std::norm(R_te) + std::norm(R_tm));
-    double refraction_gain = 0.5 * (std::norm(T_te) + std::norm(T_tm));
-
-    if (interaction_type == 0)
-        return medium_1_gain * reflection_gain * medium_2_gain;
-    else if (interaction_type == 1)
-        return medium_1_gain * (1.0 - reflection_gain) * medium_2_gain;
-    return medium_1_gain * refraction_gain * medium_2_gain; // interaction_type == 2
-}
-
-// Append constant permeability columns e,f,g,h to an existing material map (assumes a
-// uniform mu across the deduplicated materials, which is all the mu tests below need).
-template <typename dtype>
-static inline void set_mu(std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
-                          dtype e, dtype f, dtype g, dtype h)
-{
-    size_t nm = mtl_prop.at("a").size();
-    mtl_prop["e"] = std::vector<dtype>(nm, e);
-    mtl_prop["f"] = std::vector<dtype>(nm, f);
-    mtl_prop["g"] = std::vector<dtype>(nm, g);
-    mtl_prop["h"] = std::vector<dtype>(nm, h);
-}
-
-// Append a constant transmission-factor column (tf, tfB) to an existing material map.
-template <typename dtype>
-static inline void set_tf(std::unordered_map<std::string, std::vector<dtype>> &mtl_prop, dtype tf, dtype tfB = (dtype)0)
-{
-    size_t nm = mtl_prop.at("a").size();
-    mtl_prop["tf"] = std::vector<dtype>(nm, tf);
-    mtl_prop["tfB"] = std::vector<dtype>(nm, tfB);
-}
-
-// Convert a per-face material matrix [n_face, 9] with columns
-// {a,b,c,d,att,attB,alpha,alphaB,fRef} into the new (mtl_ind, mtl_prop-map) pair.
-// Identical rows are deduplicated, so mtl_ind/mtl_prop match what obj_file_read would emit.
-template <typename dtype>
-static inline void mtl_matrix_to_map(const arma::Mat<dtype> &M,
-                                     arma::uvec &mtl_ind,
-                                     std::unordered_map<std::string, std::vector<dtype>> &mtl_prop)
-{
-    static const char *names[9] = {"a", "b", "c", "d", "att", "attB", "alpha", "alphaB", "fRef"};
-    const arma::uword n_face = M.n_rows;
-
-    mtl_ind.set_size(n_face);
-    std::vector<arma::uword> uniq; // row index of each distinct material
-    for (arma::uword f = 0; f < n_face; ++f)
-    {
-        arma::uword m = 0;
-        bool found = false;
-        for (; m < uniq.size(); ++m)
-            if (arma::approx_equal(M.row(f), M.row(uniq[m]), "absdiff", (dtype)0))
-            {
-                found = true;
-                break;
-            }
-        if (!found)
-        {
-            m = (arma::uword)uniq.size();
-            uniq.push_back(f);
-        }
-        mtl_ind(f) = m + 1;
-    }
-
-    mtl_prop.clear();
-    for (int c = 0; c < 9; ++c)
-    {
-        std::vector<dtype> col(uniq.size());
-        for (size_t m = 0; m < uniq.size(); ++m)
-            col[m] = M.at(uniq[m], c);
-        mtl_prop[names[c]] = std::move(col);
-    }
-}
-
-TEST_CASE("Ray-Mesh Interact - Air to Air (x-z plane)")
+TEST_CASE("Ray-Mesh Interact - Air to Air (x-z plane)", "[wave]")
 {
     // Blender-style 2x2x2 cube centered at the origin, 12 triangles, outward normals
     arma::mat cube = quadriga_lib::cube<double>();
@@ -601,7 +146,7 @@ TEST_CASE("Ray-Mesh Interact - Air to Air (x-z plane)")
     CHECK(arma::approx_equal(tridir_sphN, T * deg2rad, "absdiff", 1e-6));
 }
 
-TEST_CASE("Ray-Mesh Interact - Air to Dielectric Medium (x-z plane)")
+TEST_CASE("Ray-Mesh Interact - Air to Dielectric Medium (x-z plane)", "[wave]")
 {
     arma::mat cube = quadriga_lib::cube<double>();
 
@@ -727,7 +272,7 @@ TEST_CASE("Ray-Mesh Interact - Air to Dielectric Medium (x-z plane)")
     U = {1.0 - G};
     CHECK(arma::approx_equal(gainN, U, "absdiff", 1e-6));
 
-    // The obliquity factor is exactly the ratio the undeviated type used to apply as a rescale
+    // The obliquity factor is exactly (1 - G) / H
     CHECK(std::abs((1.0 - G) / H - obl) < 1e-9);
 
     // Bending the ray does not change the energy the interface passes, so the coefficients are the
@@ -744,7 +289,7 @@ TEST_CASE("Ray-Mesh Interact - Air to Dielectric Medium (x-z plane)")
     CHECK(arma::approx_equal(tridirN, T, "absdiff", 1e-6));
 }
 
-TEST_CASE("Ray-Mesh Interact - Dielectric Medium to Air (x-y plane, float)")
+TEST_CASE("Ray-Mesh Interact - Dielectric Medium to Air (x-y plane, float)", "[wave]")
 {
     arma::fmat cube = quadriga_lib::cube<float>();
 
@@ -905,7 +450,7 @@ TEST_CASE("Ray-Mesh Interact - Dielectric Medium to Air (x-y plane, float)")
     CHECK(arma::approx_equal(xprmatN.t(), T, "absdiff", 1e-5));
 }
 
-TEST_CASE("Ray-Mesh Interact - Medium to Medium (x-y plane, double)")
+TEST_CASE("Ray-Mesh Interact - Medium to Medium (x-y plane, double)", "[wave]")
 {
     // Two adjacent cubes; the second is the first shifted +2 in x (shared wall at x = 1)
     arma::mat msh = quadriga_lib::cube<double>();
@@ -1023,7 +568,7 @@ TEST_CASE("Ray-Mesh Interact - Medium to Medium (x-y plane, double)")
     CHECK(arma::approx_equal(tridirN, T, "absdiff", 1e-6));
 }
 
-TEST_CASE("Ray-Mesh Interact - Conductive to Dielectric (x-y plane, double)")
+TEST_CASE("Ray-Mesh Interact - Conductive to Dielectric (x-y plane, double)", "[wave]")
 {
     // Two adjacent cubes; conductive medium 1, dielectric medium 2, shared wall at x = 1
     arma::mat msh = quadriga_lib::cube<double>();
@@ -1093,8 +638,8 @@ TEST_CASE("Ray-Mesh Interact - Conductive to Dielectric (x-y plane, double)")
     T = {{std::real(R_te), std::imag(R_te), 0.0, 0.0, 0.0, 0.0, std::real(R_tm), std::imag(R_tm)}};
     CHECK(arma::approx_equal(xprmatN.t(), T, "absdiff", 1e-6));
 
-    // The in-medium conductivity attenuation the interaction gain used to carry now lives in
-    // medium_gain(): verify it reproduces the ITU P.2040-1 conductive loss over the in-slab path.
+    // The in-medium conductivity attenuation lives in medium_gain(): verify it reproduces the
+    // ITU P.2040-1 conductive loss over the in-slab path.
     double thickness = std::sqrt(2.0 * 0.5 * 0.5) + 0.001;
     double tan_delta = std::imag(eta1) / std::real(eta1); // Loss tangent, ITU-R P.2040-1, eq. (13)
     double cos_delta = std::cos(std::atan(tan_delta));
@@ -1137,7 +682,7 @@ TEST_CASE("Ray-Mesh Interact - Conductive to Dielectric (x-y plane, double)")
     CHECK(arma::approx_equal(xprmatN.t(), T, "absdiff", 1e-3));
 }
 
-TEST_CASE("Ray-Mesh Interact - fRef parameterization equivalence")
+TEST_CASE("Ray-Mesh Interact - fRef parameterization equivalence", "[wave]")
 {
     arma::mat cube = quadriga_lib::cube<double>();
 
@@ -1186,7 +731,7 @@ TEST_CASE("Ray-Mesh Interact - fRef parameterization equivalence")
     CHECK(arma::approx_equal(destNa, destNb, "absdiff", 1e-12));
 }
 
-TEST_CASE("Ray-Mesh Interact - Penetration loss frequency scaling")
+TEST_CASE("Ray-Mesh Interact - Penetration loss frequency scaling", "[wave]")
 {
     arma::mat cube = quadriga_lib::cube<double>();
 
@@ -1222,7 +767,7 @@ TEST_CASE("Ray-Mesh Interact - Penetration loss frequency scaling")
     CHECK(arma::approx_equal(gainN, U, "absdiff", 1e-12));
 }
 
-TEST_CASE("Ray-Mesh Interact - Alpha in-medium absorption (medium_gain)")
+TEST_CASE("Ray-Mesh Interact - Alpha in-medium absorption (medium_gain)", "[wave]")
 {
     arma::mat cube = quadriga_lib::cube<double>();
 
@@ -1269,7 +814,7 @@ TEST_CASE("Ray-Mesh Interact - Alpha in-medium absorption (medium_gain)")
     CHECK(std::abs(quadriga_lib::medium_gain(mtl_map, 1, thickness, 10.0e9) - alpha_loss) < 1e-9);
 }
 
-TEST_CASE("Ray-Mesh Interact - Permeability defaults to 1 (backward compatible)")
+TEST_CASE("Ray-Mesh Interact - Permeability defaults to 1 (backward compatible)", "[wave]")
 {
     arma::mat cube = quadriga_lib::cube<double>();
     double deg2rad = arma::datum::pi / 180.0;
@@ -1315,7 +860,7 @@ TEST_CASE("Ray-Mesh Interact - Permeability defaults to 1 (backward compatible)"
     CHECK(arma::approx_equal(g1, U, "absdiff", 1e-9));
 }
 
-TEST_CASE("Ray-Mesh Interact - Permeability decouples reflection from refraction")
+TEST_CASE("Ray-Mesh Interact - Permeability decouples reflection from refraction", "[wave]")
 {
     arma::mat cube = quadriga_lib::cube<double>();
     double deg2rad = arma::datum::pi / 180.0;
@@ -1365,7 +910,7 @@ TEST_CASE("Ray-Mesh Interact - Permeability decouples reflection from refraction
     CHECK(arma::approx_equal(gB, UB, "absdiff", 1e-9));
 }
 
-TEST_CASE("Ray-Mesh Interact - Permeability impedance-matches a dense medium")
+TEST_CASE("Ray-Mesh Interact - Permeability impedance-matches a dense medium", "[wave]")
 {
     arma::mat cube = quadriga_lib::cube<double>();
 
@@ -1407,7 +952,7 @@ TEST_CASE("Ray-Mesh Interact - Permeability impedance-matches a dense medium")
     CHECK(arma::approx_equal(g, U, "absdiff", 1e-9)); // unmatched -> ((1-2)/(1+2))^2
 }
 
-TEST_CASE("Ray-Mesh Interact - eps<->mu swap leaves reflected power invariant")
+TEST_CASE("Ray-Mesh Interact - eps<->mu swap leaves reflected power invariant", "[wave]")
 {
     // Swapping eps and mu preserves n = sqrt(eps*mu) and, at normal incidence, |R|, so the
     // reflected power must be identical. Tripwire: if the Fresnel term reverts to sqrt(eps),
@@ -1445,7 +990,7 @@ TEST_CASE("Ray-Mesh Interact - eps<->mu swap leaves reflected power invariant")
     CHECK(gA(0) > 1e-6); // non-trivial reflection, so the equality is not vacuous
 }
 
-TEST_CASE("Ray-Mesh Interact - Permeability drives in-medium loss (medium_gain)")
+TEST_CASE("Ray-Mesh Interact - Permeability drives in-medium loss (medium_gain)", "[wave]")
 {
     arma::mat cube = quadriga_lib::cube<double>();
     double deg2rad = arma::datum::pi / 180.0;
@@ -1486,13 +1031,13 @@ TEST_CASE("Ray-Mesh Interact - Permeability drives in-medium loss (medium_gain)"
     arma::vec U = {refl_only};
     CHECK(arma::approx_equal(g, U, "absdiff", 1e-9));
 
-    double bulk = full / refl_only; // loss factor the gain used to carry
+    double bulk = full / refl_only; // the loss factor medium_gain carries
     CHECK(std::abs(quadriga_lib::medium_gain(map, 1, thickness, 10.0e9) - bulk) < 1e-9);
     CHECK(bulk < 0.7); // mu attenuates the path; this factor is exactly 1 if the loss feed
                        // reverts to eps (which is real here)
 }
 
-TEST_CASE("Ray-Mesh Interact - path_dirN direction contract (45° dielectric, x-z plane)")
+TEST_CASE("Ray-Mesh Interact - path_dirN direction contract (45° dielectric, x-z plane)", "[wave]")
 {
     arma::mat cube = quadriga_lib::cube<double>();
 
@@ -1570,7 +1115,7 @@ TEST_CASE("Ray-Mesh Interact - path_dirN direction contract (45° dielectric, x-
     CHECK(arma::approx_equal(dir(destN - origN), incoming, "absdiff", 1e-6));
 }
 
-TEST_CASE("Ray-Mesh Interact - ray_indN compaction round-trip")
+TEST_CASE("Ray-Mesh Interact - ray_indN compaction round-trip", "[wave]")
 {
     arma::mat cube = quadriga_lib::cube<double>();
 
@@ -1635,7 +1180,7 @@ TEST_CASE("Ray-Mesh Interact - ray_indN compaction round-trip")
     }
 }
 
-TEST_CASE("Ray-Mesh Interact - Scalar interactions (types 3/4/5) gains, invariant, interface gain")
+TEST_CASE("Ray-Mesh Interact - Scalar interactions (types 3/4/5) gains, invariant, interface gain", "[wave]")
 {
     arma::mat cube = quadriga_lib::cube<double>();
     double deg2rad = arma::datum::pi / 180.0;
@@ -1720,7 +1265,7 @@ TEST_CASE("Ray-Mesh Interact - Scalar interactions (types 3/4/5) gains, invarian
     CHECK(arma::approx_equal(dir(destN - origN), incoming, "absdiff", 1e-5));
 }
 
-TEST_CASE("Ray-Mesh Interact - Transmission factor splits reflection/transmission energy")
+TEST_CASE("Ray-Mesh Interact - Transmission factor splits reflection/transmission energy", "[wave]")
 {
     arma::mat cube = quadriga_lib::cube<double>();
     arma::mat orig = {{0.5, 0.1, 0.0}};
@@ -1787,7 +1332,7 @@ TEST_CASE("Ray-Mesh Interact - Transmission factor splits reflection/transmissio
     CHECK(std::abs(gainN(0) - 0.5 * ce) < 1e-6);
 }
 
-TEST_CASE("Ray-Mesh Interact - Ray-tube TIR straddle forces whole-tube pass-through")
+TEST_CASE("Ray-Mesh Interact - Ray-tube TIR straddle forces whole-tube pass-through", "[wave]")
 {
     arma::mat cube = quadriga_lib::cube<double>();
     double deg2rad = arma::datum::pi / 180.0;
@@ -1841,7 +1386,7 @@ TEST_CASE("Ray-Mesh Interact - Ray-tube TIR straddle forces whole-tube pass-thro
     CHECK(std::abs(gainN(0) - gain_spine_tf) < 1e-12);
 }
 
-TEST_CASE("Ray-Mesh Interact - path_dirN collapses to undeviated under spine TIR")
+TEST_CASE("Ray-Mesh Interact - path_dirN collapses to undeviated under spine TIR", "[wave]")
 {
     arma::mat cube = quadriga_lib::cube<double>();
     arma::mat orig = {{0.5, 0.1, 0.0}};
@@ -1891,7 +1436,7 @@ TEST_CASE("Ray-Mesh Interact - path_dirN collapses to undeviated under spine TIR
     CHECK(arma::approx_equal(path_dirN.row(0), mirror, "absdiff", 1e-6));
 }
 
-TEST_CASE("Ray-Mesh Interact - Spherical ray-tube keeps undeviated directions on pass-through")
+TEST_CASE("Ray-Mesh Interact - Spherical ray-tube keeps undeviated directions on pass-through", "[wave]")
 {
     arma::mat cube = quadriga_lib::cube<double>();
     double deg2rad = arma::datum::pi / 180.0;
@@ -1928,7 +1473,7 @@ TEST_CASE("Ray-Mesh Interact - Spherical ray-tube keeps undeviated directions on
     CHECK(arma::approx_equal(tridirN, tridir, "absdiff", 1e-6));
 }
 
-TEST_CASE("Ray-Mesh Interact - Public helpers: refractive_index, interface_gain, medium_gain")
+TEST_CASE("Ray-Mesh Interact - Public helpers: refractive_index, interface_gain, medium_gain", "[wave]")
 {
     // refractive_index = Re(sqrt(eps_r * mu_r)); air (medium 0) is 1
     {
@@ -1954,6 +1499,17 @@ TEST_CASE("Ray-Mesh Interact - Public helpers: refractive_index, interface_gain,
         set_mu<double>(map, 4.0, 0.0, 0.0, 0.0); // eps = 4, mu = 4 -> n = 4 (mu participates)
         CHECK(std::abs(quadriga_lib::refractive_index(map, 1, 10.0e9) - 4.0) < 1e-9);
     }
+    {
+        // dispersion through b: eps = a (f / fRef)^b; at 2 fRef, eps = 4 * 4 = 16 -> n = 4
+        std::unordered_map<std::string, std::vector<double>> map;
+        map["a"] = {4.0}, map["b"] = {2.0}, map["fRef"] = {5.0};
+        CHECK(std::abs(quadriga_lib::refractive_index(map, 1, 10.0e9) - 4.0) < 1e-9);
+
+        // a coincidence feature is an interface loss and leaves the index alone
+        std::unordered_map<std::string, std::vector<double>> coi = map;
+        coi["coiF"] = {20.0}, coi["coiQ"] = {5.0}, coi["coiA"] = {-6.0};
+        CHECK(std::abs(quadriga_lib::refractive_index(coi, 1, 10.0e9) - quadriga_lib::refractive_index(map, 1, 10.0e9)) < 1e-12);
+    }
 
     // interface_gain: att = 6 dB @ 2 GHz, attB = 1 -> 30 dB @ 10 GHz -> 1e-3; air is 1
     {
@@ -1976,7 +1532,7 @@ TEST_CASE("Ray-Mesh Interact - Public helpers: refractive_index, interface_gain,
     }
 }
 
-TEST_CASE("Ray-Mesh Interact - out_typeN bit encoding")
+TEST_CASE("Ray-Mesh Interact - out_typeN bit encoding", "[wave]")
 {
     arma::mat origN, destN;
     arma::vec gainN;
@@ -2096,7 +1652,7 @@ TEST_CASE("Ray-Mesh Interact - out_typeN bit encoding")
     }
 }
 
-TEST_CASE("Ray-Mesh Interact - compact = false keeps missed rays in place")
+TEST_CASE("Ray-Mesh Interact - compact = false keeps missed rays in place", "[wave]")
 {
     arma::mat cube = quadriga_lib::cube<double>();
 
@@ -2150,15 +1706,8 @@ TEST_CASE("Ray-Mesh Interact - compact = false keeps missed rays in place")
     CHECK(gainN(0) < 1.0);
     CHECK(gainN(2) < 1.0);
 }
-// ================================================================================================
-// Diagnostics for the thin-sheet / slab work.
-//
-// These cases exist to produce numbers, not to gate the build. Each prints a table under
-// QD_TEST_VERBOSE and asserts only sanity (finite, energy-conserving), so they stay green while
-// the divergences they measure are still open.
-// ================================================================================================
 
-TEST_CASE("Diagnostic - Interface energy split per polarization")
+TEST_CASE("Diagnostic - Interface energy split per polarization", "[wave]")
 {
     // Where the averaged reflectance enters. Material::interact_with builds its gain from
     // 0.5*(|R_TE|^2 + |R_TM|^2) and rescales both Fresnel coefficients by one common factor to
@@ -2242,7 +1791,7 @@ TEST_CASE("Diagnostic - Interface energy split per polarization")
         }
 }
 
-TEST_CASE("Diagnostic - Transmission convention baseline, single interface")
+TEST_CASE("Diagnostic - Transmission convention baseline, single interface", "[wave]")
 {
     // Absolute per-type level at one interface, which nothing else in either suite prints. Every
     // other table here measures a ratio or a composite: a ratio is nearly blind to the obliquity
@@ -2271,7 +1820,7 @@ TEST_CASE("Diagnostic - Transmission convention baseline, single interface")
     //
     // The acceptance test is |d_flux_dB| < 1e-9 for all four types in both directions, with the
     // total-reflection rows excluded. d_raw_dB is kept as a printed column: it is the size of the
-    // obliquity factor and records what the raw-amplitude convention used to report.
+    // obliquity factor.
     const double f_hz = 1.0e9;
     const double fGHz = f_hz * 1e-9;
 
@@ -2404,7 +1953,7 @@ TEST_CASE("Diagnostic - Transmission convention baseline, single interface")
     }
 }
 
-TEST_CASE("Diagnostic - Thin sheet composite vs analytic slab")
+TEST_CASE("Diagnostic - Thin sheet composite vs analytic slab", "[wave]")
 {
     // The sheet composite is produced in one atomic event and should equal the exact analytic
     // slab. Any residual here is the floor on how close the sheet can get to physics, and the
@@ -2579,7 +2128,7 @@ TEST_CASE("Diagnostic - Thin sheet composite vs analytic slab")
     }
 }
 
-TEST_CASE("Thin sheet - permeability and the lumped columns through ray_mesh_interact")
+TEST_CASE("Thin sheet - permeability and the lumped columns through ray_mesh_interact", "[wave]")
 {
     // Two things the case above cannot say.
     //
@@ -2751,7 +2300,7 @@ TEST_CASE("Thin sheet - permeability and the lumped columns through ray_mesh_int
     }
 }
 
-TEST_CASE("Diagnostic - In-slab cosine projection, two ways")
+TEST_CASE("Diagnostic - In-slab cosine projection, two ways", "[wave]")
 {
     // The sheet path takes the in-slab cosine as |Re(cos_theta2)|. The traced solid gets it from
     // path_dirN, which qd_refract produced by normalizing a vector built from Re(cos_theta2) -
@@ -2816,66 +2365,14 @@ TEST_CASE("Diagnostic - In-slab cosine projection, two ways")
     }
 }
 
-// Shared fixture for the grazing cases below: one 6 mm lossy sheet, one ray per angle, either
-// port. The reach shrinks with the angle so the crossing stays on the face at every angle instead
-// of walking off a small one and reporting -inf for a geometric reason.
-struct QdSheetFace
-{
-    double f_hz = 1.0e9;
-    double thk = 0.006;
-
-    std::unordered_map<std::string, std::vector<double>> mtl() const
-    {
-        std::unordered_map<std::string, std::vector<double>> m;
-        m["a"] = {5.24};
-        m["b"] = {0.0};
-        m["c"] = {0.63 / 17.98};
-        m["d"] = {0.0};
-        m["att"] = {0.0};
-        m["attB"] = {0.0};
-        m["alpha"] = {0.0};
-        m["alphaB"] = {0.0};
-        m["fRef"] = {1.0};
-        m["thk"] = {thk};
-        return m;
-    }
-
-    double run(arma::mat &mesh, double half, double thd, int type) const
-    {
-        arma::uvec mtl_ind(mesh.n_rows, arma::fill::value(1));
-        auto mp = mtl();
-
-        double t = std::tan(thd * arma::datum::pi / 180.0);
-        double y0 = 0.3 * half;
-        double reach = (t > 1.0e-6) ? 0.4 * half / t : half;
-        arma::mat orig = arma::mat{{-reach, y0, 0.0}};
-        arma::mat dest = arma::mat{{reach, y0 + 2.0 * reach * t, 0.0}};
-
-        arma::mat fbs, sbs;
-        arma::u32_vec fbs_ind, sbs_ind;
-        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
-        if (fbs_ind.n_elem == 0 || fbs_ind(0) == 0)
-            return std::numeric_limits<double>::quiet_NaN();
-
-        arma::mat origN, destN, xprmatN;
-        arma::vec gainN;
-        quadriga_lib::ray_mesh_interact(type, f_hz, &orig, &dest, &mesh, &mtl_ind, &mp,
-                                        &fbs_ind, &sbs_ind, (arma::mat *)nullptr, (arma::mat *)nullptr,
-                                        &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr,
-                                        &gainN, &xprmatN, (arma::mat *)nullptr, (arma::mat *)nullptr);
-        return gainN(0);
-    }
-};
-
-TEST_CASE("Thin sheet - grazing incidence does not depend on the face")
+TEST_CASE("Thin sheet - grazing incidence does not depend on the face", "[wave]")
 {
     // A thin sheet is a laterally infinite layer, so the triangle it was cut from does not enter the
-    // composite and the composite is the analytic slab at every angle up to tangency. This replaces
-    // the clamp-threshold case: the grazing clamp used to floor the incidence cosine at
-    // thk / sqrt(thk^2 + ext^2), which froze the whole interface at the onset angle. On the 57 mm
-    // face below that meant a constant -3.315 dB of transmission from 83.95 deg onward, 28.8 dB
-    // above the slab at 89.9 deg, with the reflected port held at 0.473 where the slab reflects
-    // 0.997.
+    // composite and the composite is the analytic slab at every angle up to tangency. A floor on
+    // the incidence cosine at thk / sqrt(thk^2 + ext^2) would freeze the whole interface at the
+    // onset angle: on the 57 mm face below, a constant -3.315 dB of transmission from 83.95 deg
+    // onward, 28.8 dB above the slab at 89.9 deg, with the reflected port held at 0.473 where the
+    // slab reflects 0.997.
     //
     // Both ports are checked. Grazing incidence turns a pane into a mirror, so the reflected port is
     // where the freeze did the most damage in absolute energy, and it is held to the same bound as
@@ -2887,8 +2384,7 @@ TEST_CASE("Thin sheet - grazing incidence does not depend on the face")
     { return (p > 0.0) ? 10.0 * std::log10(p) : -std::numeric_limits<double>::infinity(); };
 
     QD_DIAG("\n# diag: thin sheet at grazing incidence, large face versus small face, thk 6 mm\n");
-    QD_DIAG("# large face longest edge 565.7 m, small face 0.0566 m; the old clamp engaged past\n");
-    QD_DIAG("# 89.9994 deg and 83.95 deg respectively\n");
+    QD_DIAG("# large face longest edge 565.7 m, small face 0.0566 m\n");
     QD_DIAG("angle,T_large_dB,T_small_dB,T_ana_dB,R_large_dB,R_small_dB,R_ana_dB,sum_large,sum_ana\n");
 
     for (double thd : {60.0, 80.0, 85.0, 88.0, 89.0, 89.5, 89.9, 89.99, 89.999})
@@ -2923,7 +2419,7 @@ TEST_CASE("Thin sheet - grazing incidence does not depend on the face")
     }
 }
 
-TEST_CASE("Thin sheet - mesh subdivision invariance")
+TEST_CASE("Thin sheet - mesh subdivision invariance", "[wave]")
 {
     // The same plane, the same rays, the same material, meshed two ways: as two triangles and as
     // 2 * 65^2. No coefficient may notice. The grazing clamp did notice, because it read the longest
@@ -2979,7 +2475,7 @@ TEST_CASE("Thin sheet - mesh subdivision invariance")
     }
 }
 
-TEST_CASE("Diagnostic - Derived lengths and the tangency limit")
+TEST_CASE("Diagnostic - Derived lengths and the tangency limit", "[wave]")
 {
     // What the clamp was said to be guarding against, printed unclamped.
     //
@@ -3042,279 +2538,7 @@ TEST_CASE("Diagnostic - Derived lengths and the tangency limit")
     }
 }
 
-// Closed-form oracle for the incoherent mass-law composite, air | sheet | air, real lossless
-// permittivity, att = alpha = tf = 0, no resonance. Shares no code with the library.
-//
-// A sheet whose material carries m > 0 takes the incoherent route in qd_slab_resolve produce
-// mode: no internal series, no in-slab phase, the near interface evaluated at the incidence
-// cosine and the far one at the in-slab cosine, and one lumped mass-law power factor. With tf = 0
-// the amplitude rescale is the identity, and with air on both sides the near-to-far flux
-// conversion and the lumped interface gain are both unity, so the transmit port is the product of
-// the two raw Fresnel transmission amplitudes times the square root of the mass gain.
-struct QdMassRef
-{
-    double base = 0.0; // composite transmitted power with the mass term removed
-    double refl = 0.0; // reflect port: the bare near interface, Stokes-reversed
-    double cts = 0.0;  // in-slab cosine
-};
-
-static inline QdMassRef qd_mass_ref(double eps_s, double thd)
-{
-    const double th = thd * arma::datum::pi / 180.0;
-    const double c1 = std::cos(th), s1 = std::sin(th);
-    const double zs = std::sqrt(eps_s);
-    const double cts = std::sqrt(1.0 - (1.0 / eps_s) * s1 * s1);
-
-    const double tn_te = 2.0 * c1 / (c1 + zs * cts);
-    const double tn_tm = 2.0 * c1 / (zs * c1 + cts);
-    const double tf_te = 2.0 * zs * cts / (zs * cts + c1);
-    const double tf_tm = 2.0 * zs * cts / (cts + zs * c1);
-
-    const double r_te = (c1 - zs * cts) / (c1 + zs * cts);
-    const double r_tm = (zs * c1 - cts) / (zs * c1 + cts);
-
-    QdMassRef R;
-    R.cts = cts;
-    R.base = 0.5 * (tn_te * tf_te * tn_te * tf_te + tn_tm * tf_tm * tn_tm * tf_tm);
-    R.refl = 0.5 * (r_te * r_te + r_tm * r_tm);
-    return R;
-}
-
-// The mass-law transmission loss in dB. arg is (f/fRef) times the surface-mass surrogate with the
-// angle removed, which for a sheet is the normal thickness.
-//
-// The normal-incidence term A is the material table's own value and the angle carries the mass
-// law's shape normalized to it, so the two endpoints are exact: A at normal incidence and zero at
-// tangency. The asymptotic angle slope is 20 dB per decade of the cosine, independent of m.
-static inline double qd_mass_TL(double m, double arg, double ct)
-{
-    if (m <= 0.0 || arg <= 0.0 || ct <= 0.0)
-        return 0.0;
-    double A = m * std::log10(arg);
-    if (A <= 0.0)
-        return 0.0;
-    if (ct >= 1.0)
-        return A;
-    double X0 = std::pow(arg, 0.05 * m);
-    double x = X0 * ct;
-    return A * std::log10(1.0 + x * x) / std::log10(1.0 + X0 * X0);
-}
-
-// The superseded form, with the angle inside the same logarithm as the frequency and the result
-// clipped at zero. Its angle slope is m rather than 20 and it cuts the term off at arg * ct = 1.
-// Kept because the two forms must agree exactly at normal incidence, which is asserted below, and
-// because the diagnostic table records what the change is worth at each angle.
-static inline double qd_mass_TL_clipped(double m, double arg, double ct)
-{
-    if (m <= 0.0 || arg <= 0.0 || ct <= 0.0)
-        return 0.0;
-    double v = m * std::log10(arg * ct);
-    return (v > 0.0) ? v : 0.0;
-}
-
-// One 12.5 mm mass-law sheet, one ray per angle, either port. fRef carries the frequency scale so
-// that the mass term lands in a realistic range; every other exponent column is zero, so fRef
-// reaches nothing else. The permittivity is real and lossless and alpha is zero, which leaves the
-// mass term as the only contribution to medium_gain and lets it be read off the composite.
-struct QdMassSheet
-{
-    double f_hz = 1.0e9;
-    double fRef = 1.0e-4; // GHz
-    double thk = 0.0125;  // m
-    double eps = 5.24;
-    double m = 12.0; // dB/decade, deliberately not 20 so the angle slope is distinguishable
-
-    double arg() const { return (f_hz * 1.0e-9 / fRef) * thk; } // 125.0
-
-    std::unordered_map<std::string, std::vector<double>> mtl(double m_val) const
-    {
-        std::unordered_map<std::string, std::vector<double>> mp;
-        mp["a"] = {eps};
-        mp["b"] = {0.0};
-        mp["c"] = {0.0};
-        mp["d"] = {0.0};
-        mp["att"] = {0.0};
-        mp["attB"] = {0.0};
-        mp["alpha"] = {0.0};
-        mp["alphaB"] = {0.0};
-        mp["fRef"] = {fRef};
-        mp["thk"] = {thk};
-        mp["m"] = {m_val};
-        return mp;
-    }
-
-    double run(arma::mat &mesh, double half, double thd, int type, double m_val) const
-    {
-        arma::uvec mtl_ind(mesh.n_rows, arma::fill::value(1));
-        auto mp = mtl(m_val);
-
-        double t = std::tan(thd * arma::datum::pi / 180.0);
-        double y0 = 0.3 * half;
-        double reach = (t > 1.0e-6) ? 0.4 * half / t : half;
-        arma::mat orig = arma::mat{{-reach, y0, 0.0}};
-        arma::mat dest = arma::mat{{reach, y0 + 2.0 * reach * t, 0.0}};
-
-        arma::mat fbs, sbs;
-        arma::u32_vec fbs_ind, sbs_ind;
-        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
-        if (fbs_ind.n_elem == 0 || fbs_ind(0) == 0)
-            return std::numeric_limits<double>::quiet_NaN();
-
-        arma::mat origN, destN, xprmatN;
-        arma::vec gainN;
-        quadriga_lib::ray_mesh_interact(type, f_hz, &orig, &dest, &mesh, &mtl_ind, &mp,
-                                        &fbs_ind, &sbs_ind, (arma::mat *)nullptr, (arma::mat *)nullptr,
-                                        &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr,
-                                        &gainN, &xprmatN, (arma::mat *)nullptr, (arma::mat *)nullptr);
-        return gainN(0);
-    }
-};
-
-TEST_CASE("Thin sheet - mass-law angle dependence")
-{
-    // The mass term is the only angle-dependent quantity in the sheet composite that is not a
-    // Fresnel amplitude. The case divides the measured composite by the hand-built Fresnel product,
-    // which leaves the mass gain alone, and compares the result with the closed form.
-    //
-    // A sheet whose material carries m > 0 takes the incoherent route in qd_slab_resolve produce
-    // mode: no internal series, no in-slab phase, the near interface at the incidence cosine and
-    // the far one at the in-slab cosine, and one lumped mass-law power factor. With tf = 0 the
-    // amplitude rescale is the identity, and with air on both sides the near-to-far flux conversion
-    // and the lumped interface gain are both unity, so the transmit port is the product of the two
-    // raw Fresnel transmission amplitudes times the square root of the mass gain.
-    const QdMassSheet F;
-    const double half = 200.0;
-    arma::mat mesh = qd_quad_x(half, 0.0);
-
-    auto dB = [](double p)
-    { return (p > 0.0) ? 10.0 * std::log10(p) : -std::numeric_limits<double>::infinity(); };
-
-    const double arg = F.arg();
-    const double A0 = F.m * std::log10(arg);           // normal-incidence term
-    const double X0 = std::pow(arg, 0.05 * F.m);       // = 10^(A0/20)
-    const double ct_knee = 1.0 / X0;                   // x = 1
-    const double ct_clip = 1.0 / arg;                  // superseded form: term reaches zero here
-    const double th_knee = std::acos(ct_knee) * 180.0 / arma::datum::pi;
-    const double th_clip = std::acos(ct_clip) * 180.0 / arma::datum::pi;
-
-    QD_DIAG("\n# diag: mass-law angle dependence, sheet thk 12.5 mm, eps 5.24, m 12 dB/decade\n");
-    QD_DIAG("# (f/fRef) * thk = %.4f; knee at %.6f deg; the superseded form cut the term off at %.6f deg\n",
-            arg, th_knee, th_clip);
-    QD_DIAG("angle,cos,base_dB,T_dB,TL_meas_dB,TL_dB,TL_superseded_dB,d_dB,R_meas,R_ref\n");
-
-    double tl_prev = 1.0e300;
-    double tl_at[2] = {0.0, 0.0}; // 30 deg and 60 deg, for the slope check
-
-    const double sweep[] = {0.0, 15.0, 30.0, 45.0, 60.0, 70.0, 78.0, 80.0,
-                            85.0, 88.0, 89.0, 89.5, 89.6, 89.75, 89.9};
-
-    for (double thd : sweep)
-    {
-        double ct = std::cos(thd * arma::datum::pi / 180.0);
-        QdMassRef Rf = qd_mass_ref(F.eps, thd);
-
-        double T = F.run(mesh, half, thd, 1, F.m);
-        double R = F.run(mesh, half, thd, 0, F.m);
-
-        INFO("angle " << thd);
-        REQUIRE(std::isfinite(T));
-        REQUIRE(std::isfinite(R));
-        CHECK(T >= 0.0);
-        CHECK(R >= 0.0);
-        CHECK(R <= 1.0);
-
-        double tl_meas = dB(Rf.base) - dB(T); // the mass term, read off the composite
-        double tl_want = qd_mass_TL(F.m, arg, ct);
-        double tl_old = qd_mass_TL_clipped(F.m, arg, ct);
-
-        QD_DIAG("%.4f,%.6e,%.6f,%.6f,%.6f,%.6f,%.6f,%.3e,%.9f,%.9f\n",
-                thd, ct, dB(Rf.base), dB(T), tl_meas, tl_want, tl_old, tl_meas - tl_want, R, Rf.refl);
-
-        // The composite as a whole, which pins the incoherent route and the mass term together.
-        CHECK(std::abs(dB(T) - (dB(Rf.base) - tl_want)) < 1.0e-6);
-
-        // The mass term on its own.
-        CHECK(std::abs(tl_meas - tl_want) < 1.0e-6);
-
-        // The reflect port of a mass-law sheet is the bare near interface, Stokes-reversed. It
-        // carries no mass term and no internal series, so it is a single-interface Fresnel value at
-        // every angle.
-        CHECK(std::abs(R - Rf.refl) < 1.0e-9);
-
-        // The term never grows with the angle and is never a gain.
-        CHECK(tl_meas >= -1.0e-9);
-        CHECK(tl_meas <= tl_prev + 1.0e-9);
-        tl_prev = tl_meas;
-
-        if (thd == 30.0)
-            tl_at[0] = tl_meas;
-        if (thd == 60.0)
-            tl_at[1] = tl_meas;
-    }
-
-    // Angle slope, taken between two rows well inside the mass-controlled region. The cosine enters
-    // through the fluid admittance rather than through the panel, so the slope is 20 dB per decade
-    // and does not follow the fitted m. It approaches 20 from below by the saturation gap, which is
-    // 0.05 dB at 60 deg for this material. The superseded form read exactly m = 12 here.
-    double c30 = std::cos(30.0 * arma::datum::pi / 180.0);
-    double c60 = std::cos(60.0 * arma::datum::pi / 180.0);
-    double slope = (tl_at[0] - tl_at[1]) / (std::log10(c30) - std::log10(c60));
-    QD_DIAG("# angle slope, 30 to 60 deg: %.6f dB per decade of cos(theta)\n", slope);
-    CHECK(slope > 19.5);
-    CHECK(slope < 20.0);
-
-    // Normal incidence is untouched. The angle law is anchored on the material table's own value,
-    // so it agrees exactly with the superseded form at theta = 0. This is what keeps the public
-    // medium_gain entry point, and every table calibrated through it, bit-identical.
-    {
-        double T = F.run(mesh, half, 0.0, 1, F.m);
-        QdMassRef Rf = qd_mass_ref(F.eps, 0.0);
-        double tl = dB(Rf.base) - dB(T);
-        CHECK(std::abs(tl - qd_mass_TL_clipped(F.m, arg, 1.0)) < 1.0e-9);
-    }
-
-    // There is no cutoff in angle. The knee sits where x = 1, which is fixed by m, the frequency
-    // and the surface mass, and by no geometry. The term there is A * log10(2) / log10(1 + X0^2),
-    // which is 10 * log10(2) up to the normalization.
-    {
-        double want = A0 * std::log10(2.0) / std::log10(1.0 + X0 * X0);
-        double T = F.run(mesh, half, th_knee, 1, F.m);
-        QdMassRef Rf = qd_mass_ref(F.eps, th_knee);
-        double tl = dB(Rf.base) - dB(T);
-        INFO("knee at " << th_knee << " deg");
-        CHECK(std::abs(tl - want) < 1.0e-6);
-        CHECK(std::abs(want - 10.0 * std::log10(2.0)) < 0.01);
-    }
-
-    // Past the knee the term tapers rather than switching off: still positive at 89.9 deg, and
-    // decaying as the square of the cosine.
-    {
-        double T = F.run(mesh, half, 89.9, 1, F.m);
-        QdMassRef Rf = qd_mass_ref(F.eps, 89.9);
-        double tl = dB(Rf.base) - dB(T);
-        CHECK(tl > 0.0);
-        CHECK(tl < 0.05);
-
-        double T2 = F.run(mesh, half, 89.95, 1, F.m);
-        QdMassRef Rf2 = qd_mass_ref(F.eps, 89.95);
-        double tl2 = dB(Rf2.base) - dB(T2);
-        CHECK(tl2 > 0.0);
-        CHECK(tl2 < tl);
-        CHECK(std::abs(tl / tl2 - 4.0) < 0.05); // cos halves, the term quarters
-    }
-
-    // The mass term is a transmission surrogate and must not reach the reflect port. Doubling m
-    // leaves the reflected gain bit-identical.
-    for (double thd : {30.0, 70.0, 85.0, 89.9})
-    {
-        double Ra = F.run(mesh, half, thd, 0, F.m);
-        double Rb = F.run(mesh, half, thd, 0, 2.0 * F.m);
-        INFO("reflect port, angle " << thd);
-        CHECK(std::abs(Ra - Rb) < 1.0e-12);
-    }
-}
-
-TEST_CASE("Resonance - the public index and in-medium gain carry the permittivity pole")
+TEST_CASE("Resonance - the public index and in-medium gain carry the permittivity pole", "[wave]")
 {
     // A Lorentz pole in the permittivity is part of the medium. refractive_index is Re sqrt(eps + pole) and medium_gain
     // charges the pole's loss along the path: a lossy pole is the same medium as a conductivity of that size. A pole
@@ -3351,4 +2575,277 @@ TEST_CASE("Resonance - the public index and in-medium gain carry the permittivit
         CHECK(std::isfinite(g));
         CHECK(std::abs(10.0 * std::log10(g / g_ref)) < 1.0e-4); // the library takes k0 through the ITU constant 0.0477135
     }
+}
+
+// Test 4 - interface_gain penetration loss and coincidence
+// interface_gain is the standalone interface term: a frequency-scaled penetration loss att plus an
+// optional coincidence Lorentzian, clamped so it never becomes gain.
+TEST_CASE("Acoustic - interface_gain penetration and coincidence", "[wave]")
+{
+    double fRef_GHz = ac2rf(1000.0) / 1.0e9;
+    double coiF_GHz = ac2rf(2000.0) / 1.0e9;
+
+    // Closed-form interface reference (att power-law + coincidence Lorentzian, clamped at >= 0 dB).
+    auto ref_if_gain = [&](double f_ac, double att, double attB, double coiQ, double coiA)
+    {
+        double fGHz = ac2rf(f_ac) / 1.0e9;
+        double dB = att * std::pow(fGHz / fRef_GHz, attB);
+        if (coiA != 0.0)
+        {
+            double x = coiQ * (fGHz - coiF_GHz) / coiF_GHz;
+            dB += coiA / (1.0 + x * x);
+        }
+        return dB < 0.0 ? 1.0 : std::pow(10.0, -0.1 * dB);
+    };
+
+    // Coincidence dip: 10 dB baseline with a -6 dB dip at 2 kHz, Q = 5.
+    std::unordered_map<std::string, std::vector<double>> mtl_dip;
+    mtl_dip["att"] = {10.0};
+    mtl_dip["coiF"] = {coiF_GHz};
+    mtl_dip["coiQ"] = {5.0};
+    mtl_dip["coiA"] = {-6.0};
+    mtl_dip["fRef"] = {fRef_GHz};
+
+    // At coincidence the net loss is 10 - 6 = 4 dB.
+    CHECK(quadriga_lib::interface_gain<double>(mtl_dip, 1, ac2rf(2000.0)) ==
+          Approx(std::pow(10.0, -0.1 * 4.0)).epsilon(1e-6));
+    CHECK(quadriga_lib::interface_gain<double>(mtl_dip, 1, ac2rf(2000.0)) ==
+          Approx(ref_if_gain(2000.0, 10.0, 0.0, 5.0, -6.0)).epsilon(1e-6));
+
+    // The dip raises transmission at coincidence relative to off-band.
+    CHECK(quadriga_lib::interface_gain<double>(mtl_dip, 1, ac2rf(2000.0)) >
+          quadriga_lib::interface_gain<double>(mtl_dip, 1, ac2rf(1000.0)));
+    CHECK(quadriga_lib::interface_gain<double>(mtl_dip, 1, ac2rf(2000.0)) >
+          quadriga_lib::interface_gain<double>(mtl_dip, 1, ac2rf(4000.0)));
+
+    // Coincidence stop-band: positive coiA increases loss at coiF.
+    std::unordered_map<std::string, std::vector<double>> mtl_stop;
+    mtl_stop["att"] = {3.0};
+    mtl_stop["coiF"] = {coiF_GHz};
+    mtl_stop["coiQ"] = {5.0};
+    mtl_stop["coiA"] = {6.0};
+    mtl_stop["fRef"] = {fRef_GHz};
+    CHECK(quadriga_lib::interface_gain<double>(mtl_stop, 1, ac2rf(2000.0)) <
+          quadriga_lib::interface_gain<double>(mtl_stop, 1, ac2rf(1000.0)));
+
+    // Clamp: a dip deeper than the baseline cannot turn into gain -> clamps to unity.
+    std::unordered_map<std::string, std::vector<double>> mtl_clamp;
+    mtl_clamp["att"] = {2.0};
+    mtl_clamp["coiF"] = {coiF_GHz};
+    mtl_clamp["coiQ"] = {5.0};
+    mtl_clamp["coiA"] = {-6.0};
+    mtl_clamp["fRef"] = {fRef_GHz};
+    CHECK(quadriga_lib::interface_gain<double>(mtl_clamp, 1, ac2rf(2000.0)) == Approx(1.0).epsilon(1e-9));
+
+    // Penetration loss scales with frequency via attB: att ~ (f/fRef)^1 doubles at 2*fRef.
+    std::unordered_map<std::string, std::vector<double>> mtl_attB;
+    mtl_attB["att"] = {6.0};
+    mtl_attB["attB"] = {1.0};
+    mtl_attB["fRef"] = {fRef_GHz};
+    CHECK(quadriga_lib::interface_gain<double>(mtl_attB, 1, ac2rf(2000.0)) ==
+          Approx(std::pow(10.0, -0.1 * 12.0)).epsilon(1e-6));
+}
+
+// Test 6 - convergence to the scalar reference when acoustic terms are absent
+// Adding acoustic columns that are all zero must be a structural no-op: reflection, transmission,
+// gain, polarization coefficient, and diffracted path must be identical bit-for-bit.
+TEST_CASE("Acoustic - convergence with acoustic terms absent", "[wave]")
+{
+    arma::mat cube_mesh = quadriga_lib::cube<double>({}, {}, {0.0, 0.0, 0.001});
+
+    arma::uvec mtl_ind, mtl_ind2;
+    std::unordered_map<std::string, std::vector<double>> mtl, mtl2;
+    single_material({{"a", 2.5}, {"c", 0.02}, {"fRef", 1.0}}, mtl_ind, mtl);
+    single_material({{"a", 2.5}, {"c", 0.02}, {"fRef", 1.0}, {"m", 0.0}, {"resF", 0.0}, {"resQ", 0.0}, {"resS", 0.0}, {"coiF", 0.0}, {"coiQ", 0.0}, {"coiA", 0.0}},
+                    mtl_ind2, mtl2);
+
+    double f = 3.0e9;
+
+    // ray_mesh_interact: scalar reflection (3) and transmission (4) at 45 deg on the west face.
+    arma::mat orig = {{-1.5, 0.0, 0.0}}, dest = {{0.0, 0.0, 1.5}};
+    for (int itype : {3, 4})
+    {
+        double g1 = rmi_gain(itype, f, orig, dest, cube_mesh, mtl_ind, mtl);
+        double g2 = rmi_gain(itype, f, orig, dest, cube_mesh, mtl_ind2, mtl2);
+        INFO("interaction_type " << itype);
+        CHECK(g1 == Approx(g2).epsilon(1e-12));
+    }
+
+    // calc_diffraction_gain (scalar): gain, xprmat and coord must all match.
+    arma::mat dorig = {{-10.0, 0.0, 0.5}}, ddest = {{0.5, 0.0, 0.5}};
+    arma::vec g1, g2;
+    arma::mat x1, x2;
+    arma::cube c1, c2;
+    quadriga_lib::calc_diffraction_gain<double>(dorig, ddest, cube_mesh, mtl_ind, mtl, f, 3,
+                                                &g1, &x1, &c1, 0, nullptr, 0, 0, true, 1.0);
+    quadriga_lib::calc_diffraction_gain<double>(dorig, ddest, cube_mesh, mtl_ind2, mtl2, f, 3,
+                                                &g2, &x2, &c2, 0, nullptr, 0, 0, true, 1.0);
+    CHECK(arma::approx_equal(g1, g2, "absdiff", 1e-12));
+    CHECK(arma::approx_equal(x1, x2, "absdiff", 1e-12));
+    CHECK(arma::approx_equal(c1, c2, "absdiff", 1e-12));
+}
+
+// Test 8 - scalar total internal reflection at oblique incidence
+// Going from a dense medium (air, eps = 1) into a lighter one (eps < 1), reflection follows the
+// closed-form scalar curve across the angle sweep and becomes total past the critical angle:
+// reflection saturates at unity and transmission collapses to zero.
+TEST_CASE("Acoustic - scalar total internal reflection", "[wave]")
+{
+    arma::mat cube_mesh = quadriga_lib::cube<double>({}, {}, {0.0, 0.0, 0.001});
+    double fRef_GHz = ac2rf(1000.0) / 1.0e9;
+    double a_light = 0.25; // critical angle where sin(theta) = sqrt(a) = 0.5 -> 30 deg from normal
+
+    arma::uvec mtl_ind;
+    std::unordered_map<std::string, std::vector<double>> mtl;
+    single_material({{"a", a_light}, {"fRef", fRef_GHz}}, mtl_ind, mtl); // att = 0 -> interface_gain = 1
+
+    double f = ac2rf(4000.0);
+    double deg2rad = arma::datum::pi / 180.0;
+
+    // Build a ray that hits the west face (x = -1) near its center at a chosen incidence angle from
+    // the face normal. Direction (cos, sin, 0) gives |dir . normal| = cos(theta).
+    auto gains_at = [&](double theta_deg, double &g_refl, double &g_trans)
+    {
+        double th = theta_deg * deg2rad;
+        double dx = std::cos(th), dy = std::sin(th);
+        double t_cross = 9.0 / dx; // travel from x = -10 to x = -1
+        double y0 = -t_cross * dy; // so the crossing lands at y ~ 0
+        arma::mat orig = {{-10.0, y0, 0.0}};
+        arma::mat dest = {{-10.0 + 40.0 * dx, y0 + 40.0 * dy, 0.0}};
+        g_refl = rmi_gain(3, f, orig, dest, cube_mesh, mtl_ind, mtl);
+        g_trans = rmi_gain(4, f, orig, dest, cube_mesh, mtl_ind, mtl);
+    };
+
+    for (double th : {0.0, 20.0, 40.0, 60.0})
+    {
+        double gr, gt;
+        gains_at(th, gr, gt);
+        double ref_R = ref_scalar_reflection_gain(std::complex<double>(1.0, 0.0),
+                                                  std::complex<double>(a_light, 0.0), th);
+        INFO("theta = " << th << " deg, ref_R = " << ref_R);
+        CHECK(gr == Approx(ref_R).epsilon(1e-4));      // reflected power matches the closed form
+        CHECK(gt == Approx(1.0 - ref_R).margin(1e-4)); // energy-conserving transmission
+    }
+
+    // Explicit total-internal-reflection band: 60 deg is well past the 30 deg critical angle.
+    double gr, gt;
+    gains_at(60.0, gr, gt);
+    CHECK(gr == Approx(1.0).epsilon(1e-6)); // unit reflection
+    CHECK(gt == Approx(0.0).margin(1e-6));  // no transmission
+
+    // Below the critical angle the interface still transmits.
+    gains_at(20.0, gr, gt);
+    CHECK(gr < 1.0);
+    CHECK(gt > 0.0);
+}
+
+// Test 9 - pass-through calibration against an explicit interface x medium x interface composition
+// A single ray through a thin slab (thin-slab resolution disabled, eps = 1) equals the naive
+// single-pass product of the entry interface, the in-medium loss over the thickness, and the exit
+// interface. This ties calc_diffraction_gain's integrated result to the isolated term functions.
+TEST_CASE("Acoustic - pass-through calibration", "[wave]")
+{
+    double t = 0.1, L = 20.0, d = 50.0; // thin slab, large faces, distant endpoints (normal ray)
+    arma::mat slab = quadriga_lib::cube<double>({t / 2.0, L, L + 0.001});
+    double f = ac2rf(4000.0);
+    double fRef_GHz = ac2rf(1000.0) / 1.0e9;
+
+    // Staged single-ray transmission: entry (o -> i) * medium(thickness) * exit (i -> o).
+    auto rmi_chain = [&](double a, double att, double alpha)
+    {
+        arma::uvec mtl_ind;
+        std::unordered_map<std::string, std::vector<double>> mtl;
+        single_material({{"a", a}, {"att", att}, {"alpha", alpha}, {"fRef", fRef_GHz}}, mtl_ind, mtl);
+
+        arma::mat oA = {{-d, 0.0, 0.0}}, dA = {{d, 0.0, 0.0}};
+        double g_entry = rmi_gain(4, f, oA, dA, slab, mtl_ind, mtl);
+
+        arma::mat oB = {{-t / 2.0 + 1e-4, 0.0, 0.0}}, dB = {{d, 0.0, 0.0}};
+        double g_exit = rmi_gain(4, f, oB, dB, slab, mtl_ind, mtl);
+
+        double g_med = quadriga_lib::medium_gain<double>(mtl, 1, t, f); // normal incidence -> path = t
+        return g_entry * g_med * g_exit;
+    };
+
+    // calc_diffraction_gain, single ray (lod = 0), thin-slab resolution disabled (eps = 1) so it
+    // matches the naive single-pass chain rather than summing internal multiple reflections.
+    auto cdg = [&](double a, double att, double alpha)
+    {
+        arma::uvec mtl_ind;
+        std::unordered_map<std::string, std::vector<double>> mtl;
+        single_material({{"a", a}, {"att", att}, {"alpha", alpha}, {"fRef", fRef_GHz}}, mtl_ind, mtl);
+        arma::mat orig = {{-d, 0.0, 0.0}}, dest = {{d, 0.0, 0.0}};
+        arma::vec gain;
+        quadriga_lib::calc_diffraction_gain<double>(orig, dest, slab, mtl_ind, mtl, f, 0,
+                                                    &gain, nullptr, nullptr, 0, nullptr, 0, 0, true, 1.0);
+        return gain(0);
+    };
+
+    struct Case
+    {
+        const char *name;
+        double a, att, alpha;
+    };
+    std::vector<Case> cases = {
+        {"dense absorber", 4.0, 3.0, 20.0},
+        {"light reflector", 0.3, 12.0, 8.0},
+    };
+
+    for (const auto &C : cases)
+    {
+        INFO("case: " << C.name);
+
+        double g_chain = rmi_chain(C.a, C.att, C.alpha);
+        double g_cdg = cdg(C.a, C.att, C.alpha);
+        CHECK(g_cdg > 0.0);
+        CHECK(std::abs(10.0 * std::log10(g_cdg / g_chain)) < 0.05); // agree to well under 0.05 dB
+
+        // Excess absorption is applied over the full thickness in both engines: switching alpha off
+        // raises the gain by exactly alpha * t [dB].
+        double g_chain0 = rmi_chain(C.a, C.att, 0.0);
+        double g_cdg0 = cdg(C.a, C.att, 0.0);
+        CHECK(-10.0 * std::log10(g_cdg / g_cdg0) == Approx(C.alpha * t).margin(0.05));
+        CHECK(-10.0 * std::log10(g_chain / g_chain0) == Approx(C.alpha * t).epsilon(1e-6));
+
+        // Penetration loss is live: enabling it strictly lowers the transmission.
+        double g_cdg_noatt = cdg(C.a, 0.0, 0.0);
+        CHECK(g_cdg0 < g_cdg_noatt);
+    }
+}
+
+// Test 10 - embedded material counted once (calc_diffraction_gain)
+// A smaller cube interpenetrating a larger one, sharing zero permittivity contrast so no reflections
+// occur, isolates the penetration loss of the embedded material. Crossing it must charge that loss
+// exactly once: 12 dB versus 6 dB is a factor of 10^0.6 in gain.
+TEST_CASE("Acoustic - embedded material counted once", "[wave]")
+{
+    arma::mat A = quadriga_lib::cube<double>({}, {}, {0.0, 0.0, 0.001});
+    arma::mat B = quadriga_lib::cube<double>({0.4}, {0.0, 0.0, 0.0}, {0.8, 0.0, 0.001});
+    arma::mat mesh = arma::join_vert(A, B);
+
+    arma::uvec mtl_ind(mesh.n_rows);
+    mtl_ind.head(A.n_rows).ones();  // outer cube -> material 1
+    mtl_ind.tail(B.n_rows).fill(2); // embedded cube -> material 2
+
+    double f = ac2rf(4000.0);
+    double fRef_GHz = ac2rf(1000.0) / 1.0e9;
+
+    arma::mat orig = {{-10.0, 0.15, 0.1}}, dest = {{1.5, 0.15, 0.1}};
+
+    auto run_att = [&](double att_B)
+    {
+        std::unordered_map<std::string, std::vector<double>> mtl;
+        mtl["a"] = {4.0, 4.0};     // zero permittivity contrast -> no reflections, att isolated
+        mtl["att"] = {0.0, att_B}; // only the embedded cube attenuates
+        mtl["fRef"] = {fRef_GHz, fRef_GHz};
+        arma::vec gain;
+        quadriga_lib::calc_diffraction_gain<double>(orig, dest, mesh, mtl_ind, mtl, f, 0,
+                                                    &gain, nullptr, nullptr, 0, nullptr, 0, 0, true, 1.0);
+        return gain(0);
+    };
+
+    double g6 = run_att(6.0);
+    double g12 = run_att(12.0);
+    CHECK(g6 > 0.0);
+    CHECK(g6 / g12 == Approx(std::pow(10.0, 0.6)).epsilon(1e-3));
 }

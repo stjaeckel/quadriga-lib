@@ -5,7 +5,7 @@
 // Verification suite for the public ray_commit API.
 //
 // ray_commit is a gate-and-append stage, not a physics kernel: the beam-point geometry is pinned by
-// test_ray_point_intersect, the material model by test_ray_mesh_interact, and the path storage by
+// test_ray_point_intersect, the material model by test_wave_mesh_interact, and the path storage by
 // test_path. This suite asserts the things only ray_commit can get wrong:
 //
 //   the gates      length, gain, shading, subdivision, direct-path, segment count

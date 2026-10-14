@@ -1,0 +1,368 @@
+file,case,l0,l1,lines,asserts,dur,out,cls,mass,mass_rigid,mtl_m0,scalar,em,porous,tables,mass_tables,funcs,target
+test_acoustic_interactions.cpp,Acoustic - frequency mapping round-trip,99,113,15,16,0.0,0,wave,0,0,0,0,0,0,0,0,,(stays)
+test_acoustic_interactions.cpp,"Acoustic - refractive_index carries the resonance, not the coincidence",118,156,39,5,0.0,0,wave,0,0,5,0,0,0,0,0,ri,(stays)
+test_acoustic_interactions.cpp,Acoustic - medium_gain in-medium loss,161,212,52,6,0.0,0,acoustic,4,0,4,0,0,0,0,0,mg,(stays)
+test_acoustic_interactions.cpp,Acoustic - interface_gain penetration and coincidence,217,281,65,7,0.0,0,wave,0,0,10,0,0,0,0,0,ig,(stays)
+test_acoustic_interactions.cpp,Acoustic - permittivity resonance absorption peak,286,317,32,3,0.001,0,wave,0,0,4,1,0,0,0,0,rti rmi[3] cube,(stays)
+test_acoustic_interactions.cpp,Acoustic - convergence with acoustic terms absent,322,356,35,5,0.103,0,wave,0,0,152,1,0,0,0,0,rti rmi[34] rsu[4] mg cdg cube,(stays)
+test_acoustic_interactions.cpp,Acoustic - convergence away from spectral features,361,388,28,2,0.0,0,wave,0,0,6,1,0,0,0,0,rti rmi[34] rsu[4] mg cdg cube,(stays)
+test_acoustic_interactions.cpp,Acoustic - scalar total internal reflection,394,442,49,12,0.001,0,wave,0,0,12,1,0,0,0,0,rti rmi[34] cube,(stays)
+test_acoustic_interactions.cpp,Acoustic - pass-through calibration,448,516,69,10,0.001,0,wave,0,0,48,1,0,1,0,0,rti rmi[4] rsu[4] mg cdg cube,(stays)
+test_acoustic_interactions.cpp,Acoustic - embedded material counted once,522,553,32,2,0.0,0,wave,0,0,46,1,0,0,0,0,rmi[4] rsu[4] cdg cube,(stays)
+test_acoustic_interactions.cpp,Acoustic - thin-slab Fabry-Perot resolution,561,609,49,14,0.001,0,wave,0,0,72,1,0,0,0,0,rmi[4] rsu[4] cdg cube,(stays)
+test_baseband_freq_response_multi.cpp,baseband_freq_response_multi - Error handling,89,187,99,9,0.0,0,wave,0,0,0,0,0,0,0,0,bfrm,(stays)
+test_baseband_freq_response_multi.cpp,baseband_freq_response_multi - Zero paths,193,216,24,8,0.0,0,wave,0,0,0,0,0,0,0,0,bfrm,(stays)
+test_baseband_freq_response_multi.cpp,"baseband_freq_response_multi - Single freq, single path, zero delay, no phase removal",223,248,26,7,0.0,0,wave,0,0,0,0,0,0,0,0,bfrm,(stays)
+test_baseband_freq_response_multi.cpp,"baseband_freq_response_multi - Single freq, nonzero delay, no phase removal",255,281,27,6,0.0,0,wave,0,0,0,0,0,0,0,0,bfrm,(stays)
+test_baseband_freq_response_multi.cpp,"baseband_freq_response_multi - Two-path superposition, no phase removal",288,319,32,8,0.0,0,wave,0,0,0,0,0,0,0,0,bfrm,(stays)
+test_baseband_freq_response_multi.cpp,"baseband_freq_response_multi - SLERP magnitude interpolation, no phase removal",325,356,32,10,0.0,0,wave,0,0,0,0,0,0,0,0,bfrm,(stays)
+test_baseband_freq_response_multi.cpp,baseband_freq_response_multi - Constant extrapolation outside input range,362,395,34,5,0.0,0,wave,0,0,0,0,0,0,0,0,bfrm,(stays)
+test_baseband_freq_response_multi.cpp,baseband_freq_response_multi - remove_delay_phase correctness,403,438,36,66,0.0,0,wave,0,0,0,0,0,0,0,0,bfrm,(stays)
+test_baseband_freq_response_multi.cpp,baseband_freq_response_multi - remove_delay_phase multi-path,444,499,56,32,0.0,0,wave,0,0,0,0,0,0,0,0,bfrm,(stays)
+test_baseband_freq_response_multi.cpp,baseband_freq_response_multi - Phase unwrapping across pi boundary,505,551,47,3,0.0,0,wave,0,0,0,0,0,0,0,0,bfrm,(stays)
+test_baseband_freq_response_multi.cpp,baseband_freq_response_multi - Spherical wave delays,557,595,39,11,0.0,0,wave,0,0,0,0,0,0,0,0,bfrm,(stays)
+test_baseband_freq_response_multi.cpp,baseband_freq_response_multi - 2x2 MIMO,601,632,32,7,0.0,0,wave,0,0,0,0,0,0,0,0,bfrm,(stays)
+test_baseband_freq_response_multi.cpp,baseband_freq_response_multi - Complex output consistency,638,667,30,17,0.0,0,wave,0,0,0,0,0,0,0,0,bfrm,(stays)
+test_baseband_freq_response_multi.cpp,baseband_freq_response_multi - Selective output pointers,673,712,40,7,0.0,0,wave,0,0,0,0,0,0,0,0,bfrm,(stays)
+test_baseband_freq_response_multi.cpp,baseband_freq_response_multi - Float precision,718,743,26,4,0.0,0,wave,0,0,0,0,0,0,0,0,bfrm,(stays)
+test_baseband_freq_response_multi.cpp,"baseband_freq_response_multi - Three input frequencies, segment selection",749,781,33,3,0.0,0,wave,0,0,0,0,0,0,0,0,bfrm,(stays)
+test_baseband_freq_response_multi.cpp,baseband_freq_response_multi - Consistency with baseband_freq_response,789,862,74,34,0.0,0,wave,0,0,0,0,0,0,0,0,bfrm baseband_freq_response,(stays)
+test_baseband_freq_response_multi.cpp,baseband_freq_response_multi - remove_delay_phase with spherical delays,868,913,46,32,0.0,0,wave,0,0,0,0,0,0,0,0,bfrm,(stays)
+test_baseband_freq_response_multi.cpp,baseband_freq_response_multi - Frequency-dependent envelope with baked phase,920,968,49,192,0.0,0,wave,0,0,0,0,0,0,0,0,bfrm,(stays)
+test_baseband_freq_response_multi.cpp,baseband_freq_response_multi - Output auto-resize,974,999,26,9,0.0,0,wave,0,0,0,0,0,0,0,0,bfrm,(stays)
+test_baseband_freq_response_multi.cpp,baseband_freq_response_multi - Acoustic scenario large delay,1006,1043,38,7,0.0,0,wave,0,0,0,0,0,0,0,0,bfrm,(stays)
+test_calc_diffraction_gain.cpp,Calc Diffraction Gain,137,202,66,12,0.033,0,wave,0,0,10,0,1,0,0,0,rmi[1] rsu[1] mg cdg cube,(stays)
+test_calc_diffraction_gain.cpp,Calc Diffraction Gain - Alpha in-medium absorption,206,226,21,1,0.0,0,wave,0,0,2,0,1,0,0,0,rmi[1] rsu[1] mg cdg cube,(stays)
+test_calc_diffraction_gain.cpp,Calc Diffraction Gain - Penetration loss frequency scaling,230,248,19,1,0.0,0,wave,0,0,2,0,1,0,0,0,rmi[1] rsu[1] mg cdg cube,(stays)
+test_calc_diffraction_gain.cpp,Calc Diffraction Gain - fRef parameterization equivalence,253,275,23,1,0.0,0,wave,0,0,148,0,1,0,0,0,rmi[1] rsu[1] mg cdg cube,(stays)
+test_calc_diffraction_gain.cpp,Calc Diffraction Gain - Scalar mode,281,329,49,7,0.0,0,wave,0,0,8,1,1,0,0,0,rmi[14] rsu[14] mg cdg cube,(stays)
+test_calc_diffraction_gain.cpp,Calc Diffraction Gain - xprmat identity on clear path,342,380,39,11,0.0,0,wave,0,0,0,1,1,0,0,0,rmi[14] rsu[14] cdg cube,(stays)
+test_calc_diffraction_gain.cpp,Calc Diffraction Gain - xprmat normal incidence carries no depolarization,386,423,38,7,0.002,0,wave,0,0,2,0,1,0,0,0,rmi[1] rsu[1] mg cdg cube,(stays)
+test_calc_diffraction_gain.cpp,Calc Diffraction Gain - xprmat oblique depolarization,431,479,49,9,0.0,0,wave,0,0,2,0,1,0,0,0,rmi[1] rsu[1] mg cdg cube,(stays)
+test_calc_diffraction_gain.cpp,Calc Diffraction Gain - Fabry-Perot thin-slab resolution,487,535,49,5,0.001,0,wave,0,0,24,0,1,0,0,0,rmi[1] rsu[1] cdg cube,(stays)
+test_calc_diffraction_gain.cpp,Calc Diffraction Gain - Refraction in-medium path length,542,585,44,3,0.001,0,wave,0,0,14,1,0,0,0,0,rmi[4] rsu[4] cdg cube,(stays)
+test_calc_diffraction_gain.cpp,Calc Diffraction Gain - Multi-material stack,594,626,33,1,0.0,0,wave,0,0,19,0,1,0,0,0,rmi[1] rsu[1] cdg cube,(stays)
+test_calc_diffraction_gain.cpp,Calc Diffraction Gain - Zero material index is transparent,632,660,29,2,0.0,0,wave,0,0,6,0,1,0,0,0,rmi[1] rsu[1] cdg cube,(stays)
+test_calc_diffraction_gain.cpp,Calc Diffraction Gain - Input validation,665,704,40,7,0.0,0,wave,0,0,0,0,0,0,0,0,cdg cube,(stays)
+test_calc_diffraction_gain.cpp,Calc Diffraction Gain - Float instantiation,709,732,24,1,0.0,0,wave,0,0,2,0,1,0,0,0,rmi[1] rsu[1] mg cdg cube,(stays)
+test_calc_diffraction_gain.cpp,Calc Diffraction Gain - FSPL EM mode on clear path,806,830,25,3,0.0,0,wave,0,0,0,0,1,0,0,0,rmi[1] rsu[1] cdg cube,(stays)
+test_calc_diffraction_gain.cpp,Calc Diffraction Gain - FSPL is separable from material loss,835,861,27,9,0.001,0,wave,0,0,588,0,1,0,0,0,rmi[1] rsu[1] cdg cube,(stays)
+test_calc_diffraction_gain.cpp,Calc Diffraction Gain - FSPL distance scaling and multi-position,865,890,26,6,0.0,0,wave,0,0,0,0,1,0,0,0,rmi[1] rsu[1] cdg cube,(stays)
+test_calc_diffraction_gain.cpp,Calc Diffraction Gain - FSPL scalar mode with air absorption,895,939,45,7,0.0,0,wave,0,0,0,1,1,0,0,0,rmi[14] rsu[14] cdg cube,(stays)
+test_calc_diffraction_gain.cpp,Calc Diffraction Gain - Propagation phase on clear path,944,985,42,11,0.0,0,wave,0,0,0,1,1,0,0,0,rmi[14] rsu[14] cdg cube,(stays)
+test_calc_diffraction_gain.cpp,Calc Diffraction Gain - Propagation phase wraps at one wavelength,989,1024,36,4,0.0,0,wave,0,0,0,1,1,0,0,0,rmi[14] rsu[14] cdg cube,(stays)
+test_calc_diffraction_gain.cpp,Calc Diffraction Gain - Propagation phase composes with material phase,1029,1065,37,9,0.0,0,wave,0,0,4,0,1,0,0,0,rmi[1] rsu[1] mg cdg cube,(stays)
+test_calc_diffraction_gain.cpp,Calc Diffraction Gain - apply_fspl and apply_phase are independent,1069,1108,40,7,0.0,0,wave,0,0,456,0,1,0,0,0,rmi[1] rsu[1] cdg cube,(stays)
+test_calc_diffraction_gain.cpp,Calc Diffraction Gain - Co-located TX and RX is finite,1112,1133,22,4,0.0,0,wave,0,0,0,0,1,0,0,0,rmi[1] rsu[1] cdg cube,(stays)
+test_calc_diffraction_gain.cpp,Calc Diffraction Gain - Float instantiation with FSPL and phase,1138,1169,32,4,0.0,0,wave,0,0,0,0,1,0,0,0,rmi[1] rsu[1] cdg cube,(stays)
+test_gains.cpp,"Gains - FSPL matches qrt_file_read, EM mode",88,149,62,34,0.142,0,wave,0,0,0,0,1,0,0,0,rmi[1] rsu[1] cdg cube qrt qrt_file_init qrt_file_append,(stays)
+test_gains.cpp,"Gains - FSPL matches qrt_file_read, scalar mode",155,224,70,26,0.002,0,wave,0,0,0,1,0,0,0,0,rmi[4] rsu[4] cdg cube qrt qrt_file_init qrt_file_append,(stays)
+test_gains.cpp,"Gains - Phase matches get_channels_spherical, EM mode",236,335,100,24,0.001,0,wave,0,0,24,0,1,0,0,0,rmi[1] rsu[1] cdg cube gcs generate_arrayant_omni,(stays)
+test_gains.cpp,"Gains - Phase matches get_channels_multifreq, scalar mode",343,460,118,32,0.001,0,wave,0,0,24,1,0,0,0,0,rmi[4] rsu[4] cdg cube gcm generate_arrayant_omni,(stays)
+test_gains.cpp,Gains - Acoustic and EM phase use different wave speeds,465,505,41,5,0.001,0,wave,0,0,0,1,1,0,0,0,rmi[14] rsu[14] cdg cube,(stays)
+test_get_channels_multifreq.cpp,Multifreq - Empty TX array throws,26,40,15,1,0.0,0,wave,0,0,0,0,0,0,0,0,gcm generate_arrayant_omni,(stays)
+test_get_channels_multifreq.cpp,Multifreq - Empty RX array throws,42,57,16,1,0.0,0,wave,0,0,0,0,0,0,0,0,gcm generate_arrayant_omni,(stays)
+test_get_channels_multifreq.cpp,Multifreq - Empty freq_in throws,59,74,16,1,0.0,0,wave,0,0,0,0,0,0,0,0,gcm generate_arrayant_omni,(stays)
+test_get_channels_multifreq.cpp,Multifreq - Empty freq_out throws,76,91,16,1,0.001,0,wave,0,0,0,0,0,0,0,0,gcm generate_arrayant_omni,(stays)
+test_get_channels_multifreq.cpp,Multifreq - Mismatched path_gain size throws,93,110,18,1,0.0,0,wave,0,0,0,0,0,0,0,0,gcm generate_arrayant_omni,(stays)
+test_get_channels_multifreq.cpp,Multifreq - M with wrong row count throws,112,128,17,1,0.0,0,wave,0,0,0,0,0,0,0,0,gcm generate_arrayant_omni,(stays)
+test_get_channels_multifreq.cpp,Multifreq - Non-positive propagation speed throws,130,147,18,1,0.0,0,wave,0,0,0,0,0,0,0,0,gcm generate_arrayant_omni,(stays)
+test_get_channels_multifreq.cpp,Multifreq - Output vector and cube dimensions,153,181,29,15,0.004,0,wave,0,0,0,0,0,0,0,0,gcm generate_arrayant_omni,(stays)
+test_get_channels_multifreq.cpp,Multifreq - Fake LOS adds extra path slice,183,202,20,1,0.007,0,wave,0,0,0,0,0,0,0,0,gcm generate_arrayant_omni,(stays)
+test_get_channels_multifreq.cpp,"Multifreq - Matches get_channels_spherical for single freq, single entry",208,259,52,4,0.026,0,wave,0,0,0,0,0,0,0,0,gcm gcs generate_arrayant_omni,(stays)
+test_get_channels_multifreq.cpp,Multifreq - Speed of sound produces correct acoustic delays,265,297,33,2,0.012,0,wave,0,0,0,0,0,0,0,0,gcm generate_arrayant_omni,(stays)
+test_get_channels_multifreq.cpp,Multifreq - Radio vs acoustic delays differ by speed ratio,299,327,29,1,0.006,0,wave,0,0,0,0,0,0,0,0,gcm generate_arrayant_omni,(stays)
+test_get_channels_multifreq.cpp,Multifreq - Scalar M (2 rows) produces same VV result as full M (8 rows),333,366,34,3,0.0,0,wave,0,0,0,0,0,0,0,0,gcm generate_arrayant_omni,(stays)
+test_get_channels_multifreq.cpp,Multifreq - Path gain linearly interpolated across frequency,372,397,26,1,0.0,0,wave,0,0,0,0,0,0,0,0,gcm generate_arrayant_omni,(stays)
+test_get_channels_multifreq.cpp,Multifreq - M interpolated with SLERP (phase rotation),399,424,26,2,0.0,0,wave,0,0,0,0,0,0,0,0,gcm generate_arrayant_omni,(stays)
+test_get_channels_multifreq.cpp,Multifreq - Extrapolation clamps path gain and M,430,461,32,1,0.0,0,wave,0,0,0,0,0,0,0,0,gcm generate_arrayant_omni,(stays)
+test_get_channels_multifreq.cpp,Multifreq - Multiple output frequencies produce correct count and finite values,467,491,25,61,0.0,0,wave,0,0,0,0,0,0,0,0,gcm generate_arrayant_omni,(stays)
+test_get_channels_multifreq.cpp,Multifreq - GHz antenna with frequency-dependent pattern,497,531,35,3,0.004,0,wave,0,0,0,0,0,0,0,0,gcm generate_arrayant_omni,(stays)
+test_get_channels_multifreq.cpp,Multifreq - Acoustic 2-way speaker with omni microphone (documentation example),537,590,54,16,0.001,0,wave,0,0,0,0,0,0,0,0,gcm generate_speaker generate_arrayant_omni,(stays)
+test_get_channels_multifreq.cpp,"Multifreq - Acoustic woofer dominates at low freq, tweeter at high freq",592,629,38,2,0.001,0,wave,0,0,0,0,0,0,0,0,gcm generate_speaker generate_arrayant_omni,(stays)
+test_get_channels_multifreq.cpp,Multifreq - Full polarimetric Jones with cross-pol coupling,635,670,36,4,0.001,0,wave,0,0,0,0,0,0,0,0,gcm generate_arrayant_xpol generate_arrayant_omni,(stays)
+test_get_channels_multifreq.cpp,Multifreq - TX orientation rotates pattern,676,710,35,4,0.001,0,wave,0,0,0,0,0,0,0,0,gcm generate_arrayant_xpol generate_arrayant_omni,(stays)
+test_get_channels_multifreq.cpp,Multifreq - Different frequencies produce different phases,716,746,31,3,0.0,0,wave,0,0,0,0,0,0,0,0,gcm generate_arrayant_omni,(stays)
+test_get_channels_multifreq.cpp,Multifreq - LOS and NLOS paths have different delays,752,783,32,3,0.0,0,wave,0,0,0,0,0,0,0,0,gcm generate_arrayant_omni,(stays)
+test_get_channels_multifreq.cpp,Multifreq - 2x2 MIMO output dimensions and element scaling,789,824,36,4,0.001,0,wave,0,0,0,0,0,0,0,0,gcm generate_arrayant_omni,(stays)
+test_get_channels_multifreq.cpp,Multifreq - Float template compiles and runs,830,849,20,4,0.0,0,wave,0,0,0,0,0,0,0,0,gcm generate_arrayant_omni,(stays)
+test_get_channels_multifreq.cpp,Multifreq - Zero output frequency disables phase rotation,855,876,22,2,0.0,0,wave,0,0,0,0,0,0,0,0,gcm generate_arrayant_omni,(stays)
+test_get_channels_multifreq.cpp,Multifreq - Multiple freq_in entries with varying path gain,882,909,28,3,0.0,0,wave,0,0,0,0,0,0,0,0,gcm generate_arrayant_omni,(stays)
+test_get_channels_multifreq.cpp,"Multifreq - Absolute delay includes LOS, relative subtracts it",915,941,27,2,0.0,0,wave,0,0,0,0,0,0,0,0,gcm generate_arrayant_omni,(stays)
+test_get_channels_multifreq.cpp,"Multifreq - Sweep: amplitude stable, phase varies with frequency",947,971,25,9,0.001,0,wave,0,0,0,0,0,0,0,0,gcm generate_arrayant_omni,(stays)
+test_get_channels_multifreq.cpp,Multifreq - Pre-allocated output vectors are reused,977,1008,32,2,0.0,0,wave,0,0,0,0,0,0,0,0,gcm generate_arrayant_omni,(stays)
+test_get_channels_multifreq.cpp,Multifreq - Acoustic single-bounce produces NLOS delay > LOS,1014,1043,30,3,0.0,0,wave,0,0,0,0,0,0,0,0,gcm generate_arrayant_omni,(stays)
+test_get_channels_multifreq.cpp,Multifreq - Air absorption increases with frequency (acoustic),1049,1078,30,2,0.0,0,wave,0,0,0,0,0,0,0,0,gcm generate_arrayant_omni,(stays)
+test_get_channels_multifreq.cpp,Multifreq - Frequency-dependent coupling produces different coefficients,1084,1125,42,2,0.001,0,wave,0,0,0,0,0,0,0,0,gcm generate_arrayant_omni,(stays)
+test_get_channels_multifreq.cpp,Multifreq - Reversed freq_out order gives consistent results,1131,1159,29,4,0.0,0,wave,0,0,0,0,0,0,0,0,gcm generate_arrayant_omni,(stays)
+test_get_channels_multifreq.cpp,Multifreq - Unsorted freq_in is not clamped to first entry,1168,1220,53,9,0.0,0,wave,0,0,0,0,0,0,0,0,gcm generate_arrayant_omni,(stays)
+test_obj_file_write.cpp,Test OBJ File Write - Mesh round-trip (geometry only),113,163,51,16,0.011,0,wave,0,0,0,0,0,0,0,0,objr objw,(stays)
+test_obj_file_write.cpp,Test OBJ File Write - vert_list / face_ind round-trip,165,191,27,5,0.0,0,wave,0,0,0,0,0,0,0,0,objr objw,(stays)
+test_obj_file_write.cpp,Test OBJ File Write - Materials round-trip,193,268,76,13,0.03,0,wave,0,0,0,0,0,0,0,0,objr objw,(stays)
+test_obj_file_write.cpp,Test OBJ File Write - BSDF round-trip,270,314,45,4,0.011,0,wave,0,0,0,0,0,0,0,0,objr objw,(stays)
+test_obj_file_write.cpp,Test OBJ File Write - Multiple objects,316,358,43,9,0.013,0,wave,0,0,0,0,0,0,0,0,objr objw,(stays)
+test_obj_file_write.cpp,Test OBJ File Write - Error handling,360,430,71,10,0.008,0,wave,0,0,0,0,0,0,0,0,objw,(stays)
+test_obj_file_write.cpp,Test OBJ File Write - Outputs only (empty filename),432,448,17,6,0.008,0,wave,0,0,0,0,0,0,0,0,objw,(stays)
+test_obj_file_write.cpp,Test OBJ File Write - CSV material table round-trip,450,509,60,10,0.008,0,wave,0,0,0,0,0,0,0,0,objr objw,(stays)
+test_obj_file_write.cpp,"Test OBJ File Write - CSV columns, defaults and validation",511,604,94,9,0.027,0,wave,0,0,0,0,0,0,0,0,objw,(stays)
+test_obj_file_write.cpp,Test OBJ File Write - Duplicate material names,606,795,190,50,0.043,0,wave,0,0,0,0,0,0,0,0,objr objw,(stays)
+test_obj_file_write.cpp,Test OBJ File Write - Separate by loose parts,797,933,137,29,0.034,0,wave,0,0,0,0,0,0,0,0,objr objw,(stays)
+test_obj_file_write.cpp,Test OBJ File Write - Vertex welding,935,1009,75,11,0.061,0,wave,0,0,0,0,0,0,0,0,objw,(stays)
+test_point_inside_mesh.cpp,Test Point inside Mesh,8,50,43,15,0.059,0,wave,0,0,0,0,1,0,0,0,rmi[0] pim,(stays)
+test_ray_commit.cpp,ray_commit - a receiver on the beam axis is committed,288,319,32,16,0.026,0,wave,0,0,0,0,0,0,0,0,commit cube,(stays)
+test_ray_commit.cpp,ray_commit - a receiver outside the beam tube is not committed,321,332,12,2,0.0,0,wave,0,0,0,0,0,0,0,0,commit cube,(stays)
+test_ray_commit.cpp,ray_commit - a receiver behind the ray is not committed,334,343,10,1,0.001,0,wave,0,0,0,0,0,0,0,0,commit cube,(stays)
+test_ray_commit.cpp,ray_commit - several receivers on one ray,345,361,17,22,0.0,0,wave,0,0,0,0,0,0,0,0,commit cube,(stays)
+test_ray_commit.cpp,ray_commit - shading by the first-bounce face,367,384,18,4,0.0,0,wave,0,0,0,0,0,0,0,0,rti commit cube,(stays)
+test_ray_commit.cpp,ray_commit - a ray that misses the mesh shades nothing,386,395,10,1,0.0,0,wave,0,0,0,0,0,0,0,0,commit cube,(stays)
+test_ray_commit.cpp,ray_commit - max_path_length gate,397,417,21,4,0.0,0,wave,0,0,0,0,0,0,0,0,commit cube,(stays)
+test_ray_commit.cpp,ray_commit - min_gain_dB gate,419,435,17,2,0.0,0,wave,0,0,0,0,0,0,0,0,commit cube,(stays)
+test_ray_commit.cpp,ray_commit - subdiv_flag_in excludes flagged rays,437,465,29,5,0.0,0,wave,0,0,0,0,0,0,0,0,commit cube,(stays)
+test_ray_commit.cpp,ray_commit - ignore_direct_path drops transmission-only arrivals,467,490,24,3,0.001,0,wave,0,0,0,0,0,0,0,0,commit cube,(stays)
+test_ray_commit.cpp,ray_commit - the receive-side mirror is applied in EM mode,496,518,23,8,0.002,0,wave,0,0,0,0,0,0,0,0,commit cube xprc,(stays)
+test_ray_commit.cpp,ray_commit - scalar layout carries no mirror,520,534,15,4,0.0,0,wave,0,0,0,0,0,0,0,0,commit cube xprc,(stays)
+test_ray_commit.cpp,ray_commit - in-medium loss on the final leg,536,558,23,4,0.0,0,wave,0,0,3,0,0,0,0,0,mg commit cube,(stays)
+test_ray_commit.cpp,ray_commit - the resolved flag on air is not an in-medium state,560,576,17,3,0.0,0,wave,0,0,0,0,0,0,0,0,commit cube,(stays)
+test_ray_commit.cpp,ray_commit - every frequency slot is updated,578,603,26,9,0.0,0,wave,0,0,7,0,0,0,0,0,mg commit cube xprc,(stays)
+test_ray_commit.cpp,"ray_commit - results are appended, not overwritten",609,624,16,5,0.0,0,wave,0,0,0,0,0,0,0,0,commit cube,(stays)
+test_ray_commit.cpp,ray_commit - nothing is appended when no pair survives,626,641,16,5,0.0,0,wave,0,0,0,0,0,0,0,0,commit cube,(stays)
+test_ray_commit.cpp,ray_commit - repeated calls are deterministic,643,671,29,10096,0.001,0,wave,0,0,0,0,0,0,0,0,commit cube,(stays)
+test_ray_commit.cpp,ray_commit - the pair list spans more than one block,677,708,32,800000,0.072,0,wave,0,0,0,0,0,0,0,0,commit cube,(stays)
+test_ray_commit.cpp,ray_commit - sub-cloud partitioning does not change the result,710,736,27,130,0.012,0,wave,0,0,0,0,0,0,0,0,commit cube,(stays)
+test_ray_commit.cpp,ray_commit - point_index drops padding rows,742,769,28,5,0.0,0,wave,0,0,0,0,0,0,0,0,commit cube,(stays)
+test_ray_commit.cpp,ray_commit - point_index remaps iC into the original ordering,771,792,22,19,0.0,0,wave,0,0,0,0,0,0,0,0,commit cube,(stays)
+test_ray_commit.cpp,ray_commit - point_index agrees with point_cloud_segmentation,794,827,34,256,0.002,0,wave,0,0,0,0,0,0,0,0,commit cube point_cloud_segmentation,(stays)
+test_ray_commit.cpp,ray_commit - padding is committed when point_index is omitted,829,855,27,2,0.0,0,wave,0,0,0,0,0,0,0,0,commit cube point_cloud_segmentation,(stays)
+test_ray_commit.cpp,ray_commit - min_no_segments gate,861,889,29,6,0.0,0,wave,0,0,0,0,0,0,0,0,commit cube,(stays)
+test_ray_commit.cpp,ray_commit - min_no_segments and ignore_direct_path are independent gates,891,928,38,4,0.0,0,wave,0,0,0,0,0,0,0,0,commit cube,(stays)
+test_ray_commit.cpp,ray_commit - input validation,934,1099,166,28,0.006,0,wave,0,0,0,0,0,0,0,0,commit cube,(stays)
+test_ray_init.cpp,ray_init - Ray count quantization,68,88,21,10,0.0,0,wave,0,0,0,0,0,0,0,0,init,(stays)
+test_ray_init.cpp,ray_init - Output shapes,90,134,45,19,0.0,0,wave,0,0,0,0,0,0,0,0,init,(stays)
+test_ray_init.cpp,ray_init - Geometry invariants (no mesh),136,173,38,11,0.0,0,wave,0,0,0,0,0,0,0,0,init,(stays)
+test_ray_init.cpp,ray_init - max_path_length floor,175,192,18,4,0.001,0,wave,0,0,0,0,0,0,0,0,init,(stays)
+test_ray_init.cpp,ray_init - Path initialization,194,222,29,644,0.001,0,wave,0,0,0,0,0,0,0,0,init,(stays)
+test_ray_init.cpp,ray_init - Optional (NULL) outputs,224,241,18,3,0.0,0,wave,0,0,0,0,0,0,0,0,init,(stays)
+test_ray_init.cpp,ray_init - Error cases,243,274,32,4,0.0,0,wave,0,0,0,0,0,0,0,0,init,(stays)
+test_ray_init.cpp,ray_init - Launch sphere sizing with mesh,276,307,32,6,0.0,0,wave,0,0,0,0,0,0,0,0,init cube,(stays)
+test_ray_init.cpp,ray_init - Launch sphere sizing with points only,309,333,25,8,0.0,0,wave,0,0,0,0,0,0,0,0,init,(stays)
+test_ray_init.cpp,ray_init - Nearest of mesh and points wins,335,355,21,7,0.001,0,wave,0,0,0,0,0,0,0,0,init cube,(stays)
+test_ray_init.cpp,ray_init - Launch sphere fallback and clamp with points,357,370,14,5,0.0,0,wave,0,0,0,0,0,0,0,0,init,(stays)
+test_ray_init.cpp,ray_init - Points do not disturb the other outputs,372,409,38,189,0.0,0,wave,0,0,0,0,0,0,0,0,init,(stays)
+test_ray_init.cpp,ray_init - Sub-mesh acceleration does not change the launch sphere,410,436,27,10,0.001,0,wave,0,0,0,0,0,0,0,0,init cube triangle_mesh_segmentation triangle_mesh_aabb,(stays)
+test_ray_init.cpp,ray_init - Sub-mesh acceleration alongside receive points,438,460,23,5,0.003,0,wave,0,0,0,0,0,0,0,0,init cube triangle_mesh_segmentation triangle_mesh_aabb,(stays)
+test_ray_init.cpp,ray_init - Sub-mesh and aabb error cases,462,533,72,11,0.004,0,wave,0,0,0,0,0,0,0,0,init cube,(stays)
+test_ray_mesh_interact.cpp,Ray-Mesh Interact - Air to Air (x-z plane),464,602,139,23,0.0,0,wave,0,0,3,0,1,0,0,0,rti rmi[01] cube,test_wave_mesh_interact
+test_ray_mesh_interact.cpp,Ray-Mesh Interact - Air to Dielectric Medium (x-z plane),604,745,142,22,0.0,0,wave,0,0,3,0,1,0,0,0,rti rmi[012] cube,test_wave_mesh_interact
+test_ray_mesh_interact.cpp,"Ray-Mesh Interact - Dielectric Medium to Air (x-y plane, float)",747,906,160,26,0.0,0,wave,0,0,6,0,1,0,0,0,rti rmi[012] cube,test_wave_mesh_interact
+test_ray_mesh_interact.cpp,"Ray-Mesh Interact - Medium to Medium (x-y plane, double)",908,1024,117,14,0.0,0,wave,0,0,4,0,1,0,0,0,rti rmi[02] cube,test_wave_mesh_interact
+test_ray_mesh_interact.cpp,"Ray-Mesh Interact - Conductive to Dielectric (x-y plane, double)",1026,1138,113,9,0.0,0,wave,0,0,5,0,1,0,0,0,rti rmi[02] mg cube,test_wave_mesh_interact
+test_ray_mesh_interact.cpp,Ray-Mesh Interact - fRef parameterization equivalence,1140,1187,48,4,0.0,0,wave,0,0,2,0,1,0,0,0,rti rmi[2] cube,test_wave_mesh_interact
+test_ray_mesh_interact.cpp,Ray-Mesh Interact - Penetration loss frequency scaling,1189,1223,35,1,0.0,0,wave,0,0,1,0,1,0,0,0,rti rmi[1] cube,test_wave_mesh_interact
+test_ray_mesh_interact.cpp,Ray-Mesh Interact - Alpha in-medium absorption (medium_gain),1225,1270,46,2,0.0,0,wave,0,0,2,0,1,0,0,0,rti rmi[0] mg cube,test_wave_mesh_interact
+test_ray_mesh_interact.cpp,Ray-Mesh Interact - Permeability defaults to 1 (backward compatible),1272,1316,45,13,0.0,0,wave,0,0,7,0,1,0,0,0,rti rmi[012] cube,test_wave_mesh_interact
+test_ray_mesh_interact.cpp,Ray-Mesh Interact - Permeability decouples reflection from refraction,1318,1366,49,5,0.0,0,wave,0,0,4,0,1,0,0,0,rti rmi[02] cube,test_wave_mesh_interact
+test_ray_mesh_interact.cpp,Ray-Mesh Interact - Permeability impedance-matches a dense medium,1368,1408,41,3,0.0,0,wave,0,0,3,0,1,0,0,0,rti rmi[01] cube,test_wave_mesh_interact
+test_ray_mesh_interact.cpp,Ray-Mesh Interact - eps<->mu swap leaves reflected power invariant,1410,1446,37,2,0.0,0,wave,0,0,2,0,1,0,0,0,rti rmi[0] cube,test_wave_mesh_interact
+test_ray_mesh_interact.cpp,Ray-Mesh Interact - Permeability drives in-medium loss (medium_gain),1448,1493,46,3,0.0,0,wave,0,0,2,0,1,0,0,0,rti rmi[0] mg cube,test_wave_mesh_interact
+test_ray_mesh_interact.cpp,"Ray-Mesh Interact - path_dirN direction contract (45° dielectric, x-z plane)",1495,1571,77,14,0.0,0,wave,0,0,5,1,1,0,0,0,rti rmi[01234] cube,test_wave_mesh_interact
+test_ray_mesh_interact.cpp,Ray-Mesh Interact - ray_indN compaction round-trip,1573,1636,64,9,0.002,0,wave,0,0,5,0,1,0,0,0,rti rmi[1] cube,test_wave_mesh_interact
+test_ray_mesh_interact.cpp,"Ray-Mesh Interact - Scalar interactions (types 3/4/5) gains, invariant, interface gain",1638,1721,84,11,0.001,0,wave,0,0,7,1,0,0,0,0,rti rmi[345] cube,test_wave_mesh_interact
+test_ray_mesh_interact.cpp,Ray-Mesh Interact - Transmission factor splits reflection/transmission energy,1723,1788,66,12,0.0,0,wave,0,0,7,0,1,0,0,0,rti rmi[01] cube,test_wave_mesh_interact
+test_ray_mesh_interact.cpp,Ray-Mesh Interact - Ray-tube TIR straddle forces whole-tube pass-through,1790,1842,53,6,0.0,0,wave,0,0,4,0,1,0,0,0,rti rmi[2] cube,test_wave_mesh_interact
+test_ray_mesh_interact.cpp,Ray-Mesh Interact - path_dirN collapses to undeviated under spine TIR,1844,1892,49,11,0.0,0,wave,0,0,6,1,1,0,0,0,rti rmi[012345] cube,test_wave_mesh_interact
+test_ray_mesh_interact.cpp,Ray-Mesh Interact - Spherical ray-tube keeps undeviated directions on pass-through,1894,1929,36,2,0.0,0,wave,0,0,2,0,1,0,0,0,rti rmi[12] cube,test_wave_mesh_interact
+test_ray_mesh_interact.cpp,"Ray-Mesh Interact - Public helpers: refractive_index, interface_gain, medium_gain",1931,1977,47,8,0.0,0,wave,0,0,5,0,0,0,0,0,mg ig ri,test_wave_mesh_interact
+test_ray_mesh_interact.cpp,Ray-Mesh Interact - out_typeN bit encoding,1979,2097,119,11,0.0,0,wave,0,0,5,0,1,0,0,0,rti rmi[01] cube,test_wave_mesh_interact
+test_ray_mesh_interact.cpp,Ray-Mesh Interact - compact = false keeps missed rays in place,2099,2152,54,15,0.0,0,wave,0,0,2,0,1,0,0,0,rti rmi[0] cube,test_wave_mesh_interact
+test_ray_mesh_interact.cpp,Diagnostic - Interface energy split per polarization,2161,2243,83,112,0.0,17,wave,0,0,14,0,1,0,1,0,rti rmi[02],test_wave_mesh_interact
+test_ray_mesh_interact.cpp,"Diagnostic - Transmission convention baseline, single interface",2245,2405,161,1672,0.003,197,wave,0,0,192,1,1,0,1,0,rti rmi[1245],test_wave_mesh_interact
+test_ray_mesh_interact.cpp,Diagnostic - Thin sheet composite vs analytic slab,2407,2580,174,640,0.001,51,wave,0,0,96,0,1,0,1,0,rti rmi[01],test_wave_mesh_interact
+test_ray_mesh_interact.cpp,Thin sheet - permeability and the lumped columns through ray_mesh_interact,2582,2752,171,364,0.006,53,wave,0,0,92,0,1,0,2,0,rti rmi[01],test_wave_mesh_interact
+test_ray_mesh_interact.cpp,"Diagnostic - In-slab cosine projection, two ways",2754,2817,64,28,0.0,10,wave,0,0,7,0,1,0,1,0,rti rmi[1],test_wave_mesh_interact
+test_ray_mesh_interact.cpp,Thin sheet - grazing incidence does not depend on the face,2870,2924,55,90,0.001,14,wave,0,0,36,0,1,0,1,0,rti rmi[01],test_wave_mesh_interact
+test_ray_mesh_interact.cpp,Thin sheet - mesh subdivision invariance,2926,2980,55,49,0.004,10,wave,0,0,24,0,1,0,1,0,rti rmi[01],test_wave_mesh_interact
+test_ray_mesh_interact.cpp,Diagnostic - Derived lengths and the tangency limit,2982,3043,62,42,0.0,16,wave,0,0,8,0,1,0,2,0,rti rmi[01],test_wave_mesh_interact
+test_ray_mesh_interact.cpp,Thin sheet - mass-law angle dependence,3173,3315,143,164,0.001,20,acoustic,42,0,0,0,1,0,1,1,rti rmi[01],test_acoustic_mesh_interact
+test_ray_mesh_interact.cpp,Resonance - the public index and in-medium gain carry the permittivity pole,3317,3354,38,9,0.0,8,wave,0,0,8,0,0,0,1,0,mg ri,test_wave_mesh_interact
+test_ray_progress.cpp,ray_progress - single reflection,541,581,41,38,0.002,0,wave,0,0,1,0,1,0,0,0,rmi[0] rsu[0] prog cube,test_wave_progress
+test_ray_progress.cpp,ray_progress - single transmission,583,611,29,33,0.001,0,wave,0,0,1,0,1,0,0,0,rmi[2] rsu[2] prog cube,test_wave_progress
+test_ray_progress.cpp,ray_progress - reflection and transmission in one call,613,644,32,37,0.001,0,wave,0,0,2,0,1,0,0,0,rmi[02] rsu[02] prog cube,test_wave_progress
+test_ray_progress.cpp,ray_progress - no hit terminates the trace,646,668,23,21,0.0,0,wave,0,0,0,0,0,0,0,0,prog cube,test_wave_progress
+test_ray_progress.cpp,ray_progress - every ray hits but none survives the gain gate,670,691,22,20,0.001,0,wave,0,0,2,0,1,0,0,0,rmi[02] rsu[02] prog cube,test_wave_progress
+test_ray_progress.cpp,ray_progress - max_no_interactions = 0 disables tracing,693,707,15,17,0.0,0,wave,0,0,0,0,0,0,0,0,prog cube,test_wave_progress
+test_ray_progress.cpp,ray_progress - reflection and transmission passes can be switched off,713,749,37,60,0.005,0,wave,0,0,2,0,1,0,0,0,rmi[02] rsu[02] prog cube,test_wave_progress
+test_ray_progress.cpp,ray_progress - per-ray counters gate the next generation,751,812,62,40,0.004,0,wave,0,0,12,0,1,0,0,0,rmi[02] rsu[02] prog cube,test_wave_progress
+test_ray_progress.cpp,ray_progress - beam subdivision,818,872,55,84,0.002,0,wave,0,0,0,0,0,0,0,0,prog cube,test_wave_progress
+test_ray_progress.cpp,ray_progress - subdivision requires beam data and a positive limit,874,919,46,10,0.003,0,wave,0,0,8,0,1,0,0,0,rmi[02] rsu[02] prog cube,test_wave_progress
+test_ray_progress.cpp,ray_progress - every ray subdivided,921,948,28,127,0.0,0,wave,0,0,0,0,0,0,0,0,prog cube,test_wave_progress
+test_ray_progress.cpp,ray_progress - beam buffers survive the assembly,950,984,35,105,0.0,0,wave,0,0,32,0,1,0,0,0,rmi[02] rsu[02] prog cube,test_wave_progress
+test_ray_progress.cpp,ray_progress - compaction preserves per-ray results,990,1058,69,26414,0.005,0,wave,0,0,904,0,1,0,0,0,rmi[0] rsu[0] prog cube,test_wave_progress
+test_ray_progress.cpp,ray_progress - the reported hit count is independent of subdivision,1060,1088,29,4,0.001,0,wave,0,0,675,0,1,0,0,0,rmi[0] rsu[0] prog cube,test_wave_progress
+test_ray_progress.cpp,ray_progress - multi-frequency,1094,1161,68,25,0.0,0,wave,0,0,12,0,1,0,0,0,rmi[02] rsu[02] prog cube,test_wave_progress
+test_ray_progress.cpp,ray_progress - scalar layout,1163,1185,23,25,0.003,0,wave,0,0,2,1,0,0,0,0,rmi[3] rsu[3] prog cube,test_wave_progress
+test_ray_progress.cpp,ray_progress - medium state across a slab,1187,1220,34,15,0.001,0,wave,0,0,8,0,1,0,0,0,rmi[2] rsu[2] prog cube,test_wave_progress
+test_ray_progress.cpp,ray_progress - sub-mesh partitioning does not change the result,1222,1260,39,138,0.001,0,wave,0,0,128,0,1,0,0,0,rmi[02] rsu[02] prog cube,test_wave_progress
+test_ray_progress.cpp,ray_progress - a trace terminates and respects its limits,1266,1305,40,3334,0.001,0,wave,0,0,2594,0,1,0,0,0,rmi[02] rsu[02] prog cube,test_wave_progress
+test_ray_progress.cpp,ray_progress - repeated calls are deterministic,1307,1347,41,1031,0.002,0,wave,0,0,720,0,1,0,0,0,rmi[02] rsu[02] prog cube,test_wave_progress
+test_ray_progress.cpp,ray_progress - accumulated path length,1349,1389,41,9,0.0,0,wave,0,0,8,0,1,0,0,0,rmi[2] rsu[2] prog cube,test_wave_progress
+test_ray_progress.cpp,ray_progress - delegated intersection matches the internal one,1395,1494,100,4722,0.009,0,wave,0,0,1602,0,1,0,0,0,rti rmi[02] rsu[02] prog cube,test_wave_progress
+test_ray_progress.cpp,ray_progress - delegated intersection across a multi-generation trace,1496,1533,38,3831,0.002,0,wave,0,0,5188,0,1,0,0,0,rti rmi[02] rsu[02] prog cube,test_wave_progress
+test_ray_progress.cpp,ray_progress - delegated intersection ignores the acceleration structure,1535,1561,27,458,0.0,0,wave,0,0,128,0,1,0,0,0,rti rmi[02] rsu[02] prog cube,test_wave_progress
+test_ray_progress.cpp,ray_progress - delegated intersection with max_no_interactions = 0,1563,1581,19,18,0.0,0,wave,0,0,0,0,0,0,0,0,rti prog cube,test_wave_progress
+test_ray_progress.cpp,ray_progress - delegated intersection validation,1583,1636,54,11,0.005,0,wave,0,0,0,0,1,0,0,0,rti rmi[0] prog cube,test_wave_progress
+test_ray_progress.cpp,ray_progress - delegated subdivision flag matches the internal one,1642,1773,132,7996,0.008,0,wave,0,0,2104,0,1,0,0,0,rti rmi[02] rsu[02] prog subf cube,test_wave_progress
+test_ray_progress.cpp,ray_progress - the delegated flag count is the reported n_subdiv,1775,1810,36,176,0.0,0,wave,0,0,170,0,1,0,0,0,rti rmi[02] rsu[02] prog subf cube,test_wave_progress
+test_ray_progress.cpp,ray_progress - the delegated flag overrides the geometry,1812,1854,43,72,0.007,0,wave,0,0,1,0,1,0,0,0,rti rmi[0] rsu[0] prog subf cube,test_wave_progress
+test_ray_progress.cpp,ray_progress - delegated subdivision flag across a multi-generation trace,1856,1895,40,12046,0.006,0,wave,0,0,15312,0,1,0,0,0,rti rmi[02] rsu[02] prog subf cube,test_wave_progress
+test_ray_progress.cpp,ray_progress - delegated subdivision flag validation,1897,1941,45,10,0.009,0,wave,0,0,2,0,1,0,0,0,rti rmi[02] rsu[02] prog subf cube,test_wave_progress
+test_ray_progress.cpp,ray_progress - a flagged ray that misses the mesh is still subdivided,1953,1992,40,53,0.0,0,wave,0,0,0,0,0,0,0,0,rti prog subf cube,test_wave_progress
+test_ray_progress.cpp,ray_progress - the end-of-trace signal accounts for subdivision,1994,2028,35,58,0.001,0,wave,0,0,0,0,0,0,0,0,prog cube,test_wave_progress
+test_ray_progress.cpp,ray_progress - a flagged ray past its subdivision limit is still subdivided,2030,2069,40,14,0.001,0,wave,0,0,0,0,0,0,0,0,rti prog subf cube,test_wave_progress
+test_ray_progress.cpp,ray_progress - a flagged ray inside a medium inherits its propagation state,2071,2115,45,27,0.001,0,wave,0,0,0,0,0,0,0,0,rti prog subf cube,test_wave_progress
+test_ray_progress.cpp,ray_progress - the outside-a-medium branch still recomputes and clears,2117,2152,36,30,0.0,0,wave,0,0,0,0,0,0,0,0,prog cube,test_wave_progress
+test_ray_progress.cpp,ray_progress - hit and subdivision counts are independent,2154,2205,52,560,0.0,0,wave,0,0,24,0,1,0,0,0,rti rmi[0] rsu[0] prog cube,test_wave_progress
+test_ray_progress.cpp,ray_progress - input validation,2211,2398,188,44,0.007,0,wave,0,0,20,0,1,0,0,0,rmi[02] rsu[02] prog cube,test_wave_progress
+test_ray_progress.cpp,ray_progress - the material count is limited by the 14-bit state index,2399,2414,16,2,0.0,0,wave,0,0,2,0,1,0,0,0,rmi[02] rsu[02] prog cube,test_wave_progress
+test_ray_progress.cpp,ray_progress - refracting tracer: the segment out of a lossy medium is the direction the wave has,2416,2801,386,827,0.032,297,mixed,17,0,3477,1,0,0,9,1,rmi[345] rsu[345] prog,test_acoustic_progress
+test_ray_progress.cpp,Measurement - ray_progress follows the coupling between the series of a layered wall,2803,3042,240,864,1.383,398,wave,0,0,1165837,1,0,0,2,0,rmi[345] rsu[345] prog xprc,test_wave_progress
+test_ray_progress.cpp,ray_progress - a declined series at a sheet is followed and not dropped,3044,3245,202,184,0.125,69,wave,0,0,66526,1,0,0,2,0,rmi[345] rsu[345] prog xprc,test_wave_progress
+test_ray_progress.cpp,Measurement - ray_progress and the mirror behind a back reflection,3247,3563,317,1628,1.673,529,wave,0,0,5107165,1,0,0,4,0,rmi[345] rsu[345] prog xprc,test_wave_progress
+test_ray_progress.cpp,ray_progress - the reflect port of a sheet lies where its transmit port puts the layer,3565,3806,242,979,8.951,249,wave,0,0,18907444,1,0,0,2,0,rmi[345] rsu[345] prog xprc,test_wave_progress
+test_ray_progress.cpp,ray_progress - a lossy medium has no critical angle and a band takes one path,3808,4016,209,480,0.037,127,wave,0,0,78766,1,0,1,1,0,rmi[345] rsu[345] prog xprc,test_wave_progress
+test_ray_progress.cpp,ray_progress - the wall behind a traced layer is met at the incidence angle at every frequency of a band,4018,4197,180,1080,0.052,403,acoustic,21862,21862,69384,1,0,1,1,1,rmi[345] rsu[345] prog xprc,test_acoustic_progress
+test_ray_progress.cpp,ray_progress - the bonded plate at any depth where the slopes agree,4199,4430,232,1924,0.752,534,acoustic,4446072,4446072,0,1,0,0,1,1,rmi[345] rsu[345] prog xprc,test_acoustic_progress
+test_ray_progress.cpp,ray_progress - an ordered stack leaves the ray on the line it arrived on,4432,4683,252,320,0.009,129,wave,0,0,4992,1,0,0,3,0,rmi[345] rsu[345] prog xprc,test_wave_progress
+test_ray_progress.cpp,ray_progress - a coherent sheet with tf that is rarer than the invariant passes no more than it received,4685,4796,112,528,0.008,124,wave,0,0,4776,1,1,0,1,0,rmi[1245] rsu[1245] prog xprc,test_wave_progress
+test_ray_progress.cpp,ray_progress - a coherent sheet rarer than the invariant without tf tunnels,4798,4940,143,344,0.008,64,wave,0,0,4840,1,1,0,2,0,rmi[1245] rsu[1245] prog xprc,test_wave_progress
+test_ray_progress.cpp,ray_progress - a coherent sheet with tf creates nothing and has no gate on the invariant,4942,5100,159,752,0.101,228,wave,0,0,60951,1,1,1,2,0,rmi[012345] rsu[012345] prog xprc,test_wave_progress
+test_ray_progress.cpp,ray_progress - a traced solid with tf creates nothing,5102,5245,144,908,0.086,233,wave,0,0,73161,1,1,0,1,0,rmi[012345] rsu[012345] prog xprc,test_wave_progress
+test_ray_progress.cpp,ray_progress - a wall with a stack inside it is on its matrix with the paths of a single sheet,5247,5367,121,72,0.028,29,wave,0,0,75385,1,0,0,1,0,rmi[345] rsu[345] prog xprc,test_wave_progress
+test_ray_progress.cpp,ray_progress - a resonant solid is its medium at every frequency of a band,5369,5487,119,240,0.002,44,wave,0,0,840,1,0,0,1,0,rmi[345] rsu[345] prog xprc,test_wave_progress
+test_ray_state_update.cpp,ray_state_update - state and code encoding,647,669,23,17,0.0,0,wave,0,0,0,0,0,0,0,0,,test_wave_state_update_spec
+test_ray_state_update.cpp,ray_state_update - dispatch: o-i entry family,671,704,34,25,0.024,0,wave,0,0,0,1,0,0,0,0,rsu[4],test_wave_state_update_spec
+test_ray_state_update.cpp,ray_state_update - dispatch: i-o exit family,706,752,47,35,0.008,0,wave,0,0,26,1,0,0,0,0,rsu[4],test_wave_state_update_spec
+test_ray_state_update.cpp,ray_state_update - dispatch: material-to-material family,754,786,33,23,0.002,0,wave,0,0,30,1,0,0,0,0,rsu[4],test_wave_state_update_spec
+test_ray_state_update.cpp,ray_state_update - dispatch: corner families,788,826,39,29,0.003,0,wave,0,0,14,1,0,0,0,0,rsu[4],test_wave_state_update_spec
+test_ray_state_update.cpp,ray_state_update - dispatch: no crossing and unmatched codes,828,851,24,21,0.002,0,wave,0,0,0,1,0,0,0,0,rsu[4],test_wave_state_update_spec
+test_ray_state_update.cpp,ray_state_update - dispatch: reflection pass,853,890,38,31,0.002,0,wave,0,0,8,1,1,0,0,0,rsu[03],test_wave_state_update_spec
+test_ray_state_update.cpp,ray_state_update - flag semantics,892,938,47,22,0.002,0,wave,0,0,8,1,0,0,0,0,rsu[34],test_wave_state_update_spec
+test_ray_state_update.cpp,ray_state_update - Airy factor against the closed form,940,992,53,33,0.002,0,wave,0,0,20,1,0,0,0,0,rsu[4],test_wave_state_update_spec
+test_ray_state_update.cpp,ray_state_update - survival gate thresholds on eps,994,1047,54,40,0.002,0,wave,0,0,24,1,0,0,0,0,rsu[4],test_wave_state_update_spec
+test_ray_state_update.cpp,ray_state_update - lossy medium feeds |phi| from medium_gain,1049,1093,45,3,0.0,0,wave,0,0,12,1,0,0,0,0,rsu[4],test_wave_state_update_spec
+test_ray_state_update.cpp,ray_state_update - mass-law material is excluded from slab resolution,1095,1132,38,3,0.0,0,acoustic,8,0,0,1,0,0,0,0,rsu[4],test_acoustic_state_update
+test_ray_state_update.cpp,ray_state_update - transmission factor folds into the resolved gain,1134,1160,27,4,0.0,0,wave,0,0,4,1,0,0,0,0,rsu[4],test_wave_state_update_spec
+test_ray_state_update.cpp,ray_state_update - resolve clamp near the Airy pole,1162,1217,56,19,0.002,0,wave,0,0,12,1,0,0,0,0,rsu[4],test_wave_state_update_spec
+test_ray_state_update.cpp,ray_state_update - cross-pass invariance of the resolve decision,1219,1263,45,28,0.001,0,wave,0,0,16,1,0,0,0,0,rsu[34],test_wave_state_update_spec
+test_ray_state_update.cpp,ray_state_update - a resolved ray passes an exit transparently,1265,1280,16,8,0.0,0,wave,0,0,6,1,0,0,0,0,rsu[34],test_wave_state_update_spec
+test_ray_state_update.cpp,ray_state_update - gain consistency and batch determinism,1313,1378,66,44,0.002,0,wave,0,0,22,1,1,0,0,0,rsu[14],test_wave_state_update_spec
+test_ray_state_update.cpp,ray_state_update - optional arguments,1380,1465,86,34,0.003,0,wave,0,0,4,1,0,0,0,0,rsu[4],test_wave_state_update_spec
+test_ray_state_update.cpp,ray_state_update - gain operation semantics and probe handling,1467,1515,49,23,0.002,0,wave,0,0,0,1,1,0,0,0,rsu[14],test_wave_state_update_spec
+test_ray_state_update.cpp,ray_state_update - energy conservation of a lossless slab,1517,1559,43,14,0.0,0,wave,0,0,10,1,0,0,0,0,rsu[34],test_wave_state_update_spec
+test_ray_state_update.cpp,ray_state_update - energy safety of a lossy slab,1561,1601,41,4,0.0,0,wave,0,0,10,1,0,0,0,0,rsu[34],test_wave_state_update_spec
+test_ray_state_update.cpp,ray_state_update - scalar refraction (interaction type 5),1603,1630,28,17,0.001,0,wave,0,0,8,1,0,0,0,0,rsu[45],test_wave_state_update_spec
+test_ray_state_update.cpp,ray_state_update - path direction correction (VBS),1632,1672,41,7,0.002,0,wave,0,0,7,1,0,0,0,0,rsu[34],test_wave_state_update_spec
+test_ray_state_update.cpp,ray_state_update - accumulated distance ledger,1674,1745,72,11,0.002,0,wave,0,0,16,1,0,0,0,0,rsu[4],test_wave_state_update_spec
+test_ray_state_update.cpp,ray_state_update - permeability affects the refractive index,1747,1762,16,3,0.0,0,wave,0,0,4,1,0,0,0,0,rsu[4],test_wave_state_update_spec
+test_ray_state_update.cpp,ray_state_update - resonance and coincidence material columns,1764,1797,34,2,0.001,0,wave,0,0,12,1,0,0,0,0,rsu[4],test_wave_state_update_spec
+test_ray_state_update.cpp,ray_state_update - type parity between double and float,1869,1873,5,70,0.001,0,wave,0,0,36,1,1,0,0,0,rsu[134],test_wave_state_update_spec
+test_ray_state_update.cpp,ray_state_update - ray_ind mapping and read-only inputs,1875,1949,75,29,0.0,0,wave,0,0,10,1,0,0,0,0,rsu[4],test_wave_state_update_spec
+test_ray_state_update.cpp,ray_state_update - input validation,1968,2272,305,138,0.014,0,wave,0,0,0,1,1,0,0,0,rsu[012345],test_wave_state_update_spec
+test_ray_state_update.cpp,Diagnostic - Slab factor per polarization,2624,2714,91,24,0.0,10,wave,0,0,24,0,1,0,1,0,rsu[1],test_wave_state_update_sheet
+test_ray_state_update.cpp,Diagnostic - Entry boundary evaluated at two angles,2716,2842,127,15,0.0,15,wave,0,0,56,1,0,0,1,0,rsu[4],test_wave_state_update_sheet
+test_ray_state_update.cpp,Diagnostic - Series collapse when the previous medium matches the slab,2844,2897,54,32,0.0,19,wave,0,0,72,1,0,0,1,0,rsu[4],test_wave_state_update_sheet
+test_ray_state_update.cpp,Diagnostic - Host layer carried through a matched sheet,2899,2965,67,20,0.0,7,wave,0,0,38,1,0,0,1,0,rsu[4],test_wave_state_update_sheet
+test_ray_state_update.cpp,Diagnostic - Excess-phase walk-off convention,2967,3062,96,29,0.0,9,wave,0,0,24,1,0,0,1,0,rsu[4],test_wave_state_update_sheet
+test_ray_state_update.cpp,Thin sheet - the redo sits on the analytic slab at grazing incidence,3064,3114,51,27,0.0,13,wave,0,0,9,0,1,0,1,0,rsu[1],test_wave_state_update_sheet
+test_ray_state_update.cpp,Glued sheet - the near-to-far flux conversion,3897,4066,170,473,0.001,70,wave,0,0,251,0,1,0,2,0,rsu[01],test_wave_state_update_sheet
+test_ray_state_update.cpp,Sheet in a medium - the composite at the exact in-medium cosine,4068,4301,234,400,0.002,27,wave,0,0,1158,1,1,0,1,0,rsu[0134],test_wave_state_update_sheet
+test_ray_state_update.cpp,Exit boundary - the port at the recovered angle,4303,4413,111,84,0.001,33,wave,0,0,288,1,1,0,1,0,rsu[14],test_wave_state_update_sheet
+test_ray_state_update.cpp,Traced solid - air | slab | air chain against the analytic slab,4415,4521,107,144,0.001,32,wave,0,0,168,1,0,0,1,0,rti rmi[4] rsu[4],test_wave_state_update_sheet
+test_ray_state_update.cpp,Permeability - the traced solid and a magnetic layer in a stack,4523,4817,295,188,0.001,41,wave,0,0,233,1,1,0,3,0,rti rmi[4] rsu[0134],test_wave_state_update_sheet
+test_ray_state_update.cpp,Layered stack - the characteristic-matrix reference against the single-layer oracles,4827,4942,116,161,0.0,74,wave,0,0,0,0,0,0,1,0,,test_wave_state_update_sheet
+test_ray_state_update.cpp,"Permeability - the sheet, stack and glued paths",4944,5236,293,336,0.001,90,wave,0,0,42,0,1,0,4,0,rsu[01],test_wave_state_update_sheet
+test_ray_state_update.cpp,Layered stack - a host layer bounded by a sheet,5238,5366,129,98,0.001,23,wave,0,0,80,1,0,0,1,0,rsu[4],test_wave_state_update_sheet
+test_ray_state_update.cpp,Layered stack - sheet_case 4 resolves rather than killing the ray,5368,5490,123,70,0.001,13,wave,0,0,128,1,1,0,1,0,rsu[0134],test_wave_state_update_sheet
+test_ray_state_update.cpp,"Lumped columns - interface gain on the sheet, glued and embedded paths",5537,5702,166,270,0.001,25,wave,0,0,284,0,1,0,1,0,rsu[01],test_wave_state_update_sheet
+test_ray_state_update.cpp,"Lumped columns - the transmission factor on a sheet, both ports",5704,5951,248,860,0.005,110,wave,0,0,912,1,1,0,2,0,rsu[0134],test_wave_state_update_sheet
+test_ray_state_update.cpp,Lumped columns - a permittivity resonance is part of the medium on the sheet paths,5953,6130,178,170,0.001,38,wave,0,0,200,1,1,0,2,0,rsu[0134],test_wave_state_update_sheet
+test_ray_state_update.cpp,"Lumped columns - an ordered stack: what the core carries, by matrix and by scattering",6132,6383,252,314,0.005,55,mixed,32,0,788,1,1,0,3,1,rsu[0134],test_mixed_state_update_a
+test_ray_state_update.cpp,"Lumped columns - a bounding sheet: tf is a layer, a mass-law sheet a half-space",6385,6506,122,241,0.001,55,acoustic,8,0,232,1,0,0,1,1,rsu[4],test_acoustic_state_update
+test_ray_state_update.cpp,Neighbour tf - each face of a sheet is owed by the pair of media that form it,6517,6697,181,260,0.004,97,wave,0,0,1072,1,1,0,2,0,rsu[0134],test_wave_state_update_sheet
+test_ray_state_update.cpp,"Stack with tf - the scattering form against its reference, produce mode and itself",6699,6964,266,758,0.009,176,wave,0,0,2460,1,1,0,4,0,rsu[0134],test_wave_state_update_sheet
+test_ray_state_update.cpp,"Stack with a mass-law layer - resolved by segments, not killed",6966,7118,153,284,0.002,64,acoustic,280,0,256,1,0,0,3,3,rsu[34],test_acoustic_state_update
+test_ray_state_update.cpp,Total reflection of the outer pair - the sheet stays in the result,7183,7440,258,97,0.001,47,mixed,45,45,194,1,1,1,4,1,rsu[0134],test_mixed_state_update_a
+test_ray_state_update.cpp,Reciprocity - glued entry against glued exit,7442,7554,113,137,0.001,23,wave,0,0,534,1,1,0,1,0,rsu[14],test_wave_state_update_sheet
+test_ray_state_update.cpp,Leak reciprocity - a mass-law panel on a rigid wall as a sheet and as two traced solids,7556,7697,142,34,0.001,20,acoustic,57,45,37,1,0,0,2,2,rti rmi[4] rsu[4] cube,test_acoustic_state_update
+test_ray_state_update.cpp,Leak chain - each face at the cosine the wave has and the series on a closed far face,7699,7925,227,48,0.001,54,mixed,12,12,212,1,1,1,6,1,rsu[134],test_mixed_state_update_a
+test_ray_state_update.cpp,"Bonded mass - sheet on sheet, sheet on solid and solid on solid as one plate",7958,8353,396,220,0.003,121,acoustic,1204,1204,40,1,0,0,10,10,rsu[34],test_acoustic_state_update
+test_ray_state_update.cpp,Ports of a mass-law face from inside - the reflect port is the other direction's,8355,8425,71,72,0.001,11,acoustic,72,72,0,1,1,0,1,1,rti rmi[0134] cube,test_acoustic_state_update
+test_ray_state_update.cpp,Lined on both faces - a glued exit behind a sheet exits into air,8427,8679,253,356,0.005,120,wave,0,0,1840,1,1,0,5,0,rsu[0134],test_wave_state_update_sheet
+test_ray_state_update.cpp,Layered wall - a glued exit behind a bare-entered second layer exits into air,8681,9063,383,808,0.005,177,wave,0,0,3009,1,1,0,7,0,rti rmi[4] rsu[0134],test_wave_state_update_sheet
+test_ray_state_update.cpp,Recovery behind a sheet - the leg after a sheet crossing at the exact in-medium cosine,9065,9239,175,96,0.001,65,wave,0,0,694,1,0,0,3,0,rsu[4],test_wave_state_update_sheet
+test_ray_state_update.cpp,Measurement - a host entered from a lossy solid across a bare face,9241,9354,114,432,0.002,60,wave,0,0,1446,1,0,0,1,0,rti rmi[4] rsu[4],test_wave_state_update_sheet
+test_ray_state_update.cpp,"Recovery behind a lossy solid - EM, a second transition and a sheet inside the host",9356,9557,202,336,0.004,80,wave,0,0,2288,1,1,0,3,0,rti rmi[14] rsu[134],test_wave_state_update_sheet
+test_ray_state_update.cpp,Recovery behind a lossy solid - a face that was evaluated at a real angle keeps the solid named,9559,9653,95,104,0.001,22,wave,0,0,279,1,0,0,1,0,rsu[4],test_wave_state_update_sheet
+test_ray_state_update.cpp,Sheet inside a host - the mirror behind the ray is backed by the host,9655,9729,75,256,0.003,70,wave,0,0,1120,1,0,0,1,0,rsu[34],test_wave_state_update_sheet
+test_ray_state_update.cpp,Bonded mass - a mass-law sheet inside a mass-law wall,9731,9828,98,72,0.001,25,acoustic,768,768,40,1,0,0,1,1,rsu[4],test_acoustic_state_update
+test_ray_state_update.cpp,ray_state_update - the material index is 14 bits,9830,9862,33,6,0.001,0,wave,0,0,11,1,0,0,0,0,rsu[4],test_wave_state_update_sheet
+test_ray_state_update.cpp,Recovery gate - the hit code a traced run carries,9864,10122,259,437,0.005,98,wave,0,0,2124,1,1,0,4,0,rti rmi[1345] rsu[1345],test_wave_state_update_chain
+test_ray_state_update.cpp,Direction - a ray leaves a parallel slab parallel to how it arrived,10124,10417,294,386,0.004,131,mixed,66,66,1258,1,0,0,4,1,rti rmi[345] rsu[345],test_mixed_state_update_a
+test_ray_state_update.cpp,Refracting tracer - a traced bend is known from the state and the leg is exact,10419,10928,510,4579,0.043,322,mixed,145,128,9912,1,1,0,6,1,rti rmi[2345] rsu[2345],test_mixed_state_update_a
+test_ray_state_update.cpp,Phase reference - a traversal carries the phase at the point the polyline leaves at,10930,11384,455,1454,0.042,424,mixed,516,216,7522,1,0,1,7,1,rti rmi[345] rsu[345],test_mixed_state_update_a
+test_ray_state_update.cpp,Exits and verdicts - every exit at the cosine the wave has there,11386,11868,483,409,0.042,162,wave,0,0,3466,1,1,0,7,0,rti rmi[0345] rsu[0345],test_wave_state_update_chain
+test_ray_state_update.cpp,Leak direction - a wave held in a mass-law body keeps its direction and a closed face hands on the wave's,11870,12178,309,2916,0.061,376,mixed,4644,4644,1756,1,0,0,2,1,rti rmi[45] rsu[45],test_mixed_state_update_a
+test_ray_state_update.cpp,Measurement - the mirror behind a second solid and behind a sheet inside a wall,12180,12611,432,690,0.052,192,mixed,165,0,21525,1,0,0,5,1,rti rmi[345] rsu[345],test_mixed_state_update_b
+test_ray_state_update.cpp,Sheet reflection - a declined series is followed and not dropped,12613,12902,290,528,0.029,134,wave,0,0,6114,1,0,0,2,0,rti rmi[345] rsu[345],test_wave_state_update_chain
+test_ray_state_update.cpp,Measurement - the mirror behind the ray after a back reflection,12904,13415,512,3464,8.8,791,wave,0,0,12615766,1,0,0,3,0,rti rmi[345] rsu[345],test_wave_state_update_chain
+test_ray_state_update.cpp,Sheet reflect port - where the layer lies and what the echo pays,13417,13946,530,1374,0.17,335,wave,0,0,165750,1,0,1,7,0,rti rmi[345] rsu[345],test_wave_state_update_chain
+test_ray_state_update.cpp,Lossy verdict - a lossy second medium has no critical angle,13948,14622,675,1758,0.01,417,mixed,397,397,7096,1,1,1,14,2,rti rmi[012345] rsu[012345],test_mixed_state_update_b
+test_ray_state_update.cpp,Leak direction - a closed face hands the wall behind a traced layer the direction the wave has in air,14624,15074,451,1639,0.02,568,acoustic,3937,3937,17508,1,0,1,6,4,rti rmi[45] rsu[45],test_acoustic_state_update
+test_ray_state_update.cpp,Bonded mass - the plate at any depth where the slopes agree,15076,15580,505,1736,0.042,1023,acoustic,66824,66824,0,1,0,0,4,3,rti rmi[345] rsu[345],test_acoustic_state_update
+test_ray_state_update.cpp,Unentered branches - a corner with a sheet is the sheet alone once the state is kept,15760,15843,84,346,0.0,36,wave,0,0,56,1,0,0,1,0,rti rmi[34] rsu[34],test_wave_state_update_branch
+test_ray_state_update.cpp,Unentered branches - the displacement budget caps what a sheet takes back out of its host,15845,16009,165,1692,0.008,193,wave,0,0,8026,1,0,0,2,0,rti rmi[345] rsu[345],test_wave_state_update_branch
+test_ray_state_update.cpp,Unentered branches - the core's loss cap is a floor on the transmit port and leaves the reflect port alone,16011,16097,87,224,0.001,51,wave,0,0,688,1,0,0,2,0,rti rmi[34] rsu[34],test_wave_state_update_branch
+test_ray_state_update.cpp,Unentered branches - a sheet without the mass column of its mass-law host's permittivity is merged,16099,16163,65,88,0.001,29,acoustic,518,518,160,1,0,0,1,1,rti rmi[45] rsu[45],test_acoustic_state_update
+test_ray_state_update.cpp,Unentered branches - sheet and stack and slab series at float against double,16165,16229,65,576,0.007,198,wave,0,0,4004,1,1,0,1,0,rti rmi[012345] rsu[012345],test_wave_state_update_branch
+test_ray_state_update.cpp,Unentered branches - ray_mesh_interact's own glued composite against the redo,16231,16374,144,264,0.001,106,mixed,115,115,383,1,1,0,3,1,rti rmi[012345] rsu[012345],test_mixed_state_update_b
+test_ray_state_update.cpp,Unentered branches - a stack of a coherent and a mass-law layer against the laminate meshed as a solid with a lining,16376,16434,59,120,0.002,32,acoustic,408,408,758,1,0,0,1,1,rti rmi[345] rsu[345],test_acoustic_state_update
+test_ray_state_update.cpp,Unentered branches - the followed mark and the resolved flag across abutting and nested and overlapping bodies,16436,16571,136,227,0.003,41,wave,0,0,2047,1,0,0,3,0,rti rmi[345] rsu[345],test_wave_state_update_branch
+test_ray_state_update.cpp,Unentered branches - a verdict handed in on a leg known not parallel and near a pole,16573,16668,96,60,0.0,23,wave,0,0,256,1,0,0,2,0,rti rmi[345] rsu[345],test_wave_state_update_branch
+test_ray_state_update.cpp,Mass cosine - a mass-law sheet behind a refracting layer forms its term at the cosine the wave has in air,16670,16898,229,1054,0.016,273,acoustic,3796,3796,10988,1,0,1,5,5,rti rmi[45] rsu[45],test_acoustic_state_update
+test_ray_state_update.cpp,Closed plate - a mass-law layer the wave is evanescent in passes its two leaks and nothing else,16900,17222,323,1742,0.019,394,mixed,5102,4782,8165,1,1,0,8,7,rti rmi[1245] rsu[1245],test_mixed_state_update_b
+test_ray_state_update.cpp,Held lining - a mass-law sheet behind a wave held in a mass-law wall is the same wall as its traced solid,17224,17555,332,1292,0.021,438,acoustic,23319,23025,468,1,1,1,8,8,rti rmi[012345] rsu[012345],test_acoustic_state_update
+test_ray_state_update.cpp,Stack geometry - an ordered stack leaves the ray on the line it arrived on,17557,17778,222,2776,0.022,574,mixed,1664,1280,16004,1,1,0,4,2,rti rmi[012345] rsu[012345],test_mixed_state_update_b
+test_ray_state_update.cpp,Rare sheet - a coherent sheet with tf that is rarer than the invariant passes no more than it received,17780,18102,323,1672,0.024,740,mixed,96,48,16347,1,1,1,8,1,rti rmi[012345] rsu[012345],test_mixed_state_update_b
+test_ray_state_update.cpp,Flat branch - a coherent sheet rarer than the invariant without tf tunnels on the characteristic matrix,18104,18521,418,1614,0.026,582,mixed,150,150,16168,1,1,0,8,2,rti rmi[012345] rsu[012345],test_mixed_state_update_b
+test_ray_state_update.cpp,Sheet tf - the face of a coherent sheet with tf creates nothing and has no gate on the invariant,18523,19035,513,36846,0.284,1125,mixed,424,424,159202,1,1,1,8,3,rti rmi[0134] rsu[0134],test_mixed_state_update_b
+test_ray_state_update.cpp,Bare tf - a bare face with tf is a transformer where it is open and a flat leak where it is closed,19086,19320,235,6991,1.189,669,mixed,48,48,962547,1,1,0,9,1,rti rmi[012345] rsu[012345],test_mixed_state_update_b
+test_ray_state_update.cpp,Scalar closed face - a lossy box on a rigid wall reflects no more than it received and is its sheet,19322,19451,130,816,0.044,182,wave,0,0,50037,1,1,1,3,0,rti rmi[01345] rsu[01345],test_wave_state_update_branch
+test_ray_state_update.cpp,Closed face - tf at a closed face is a pad and the two ports of a sheet on it add up,19495,19879,385,25275,0.31,771,mixed,54414,54384,206673,1,1,0,8,7,rti rmi[0134] rsu[0134],test_mixed_state_update_b
+test_ray_state_update.cpp,One solver - a sheet and a stack are one sum and no mirror is clamped,19881,20113,233,1248,0.014,299,wave,0,0,13240,1,1,0,6,0,rti rmi[0134] rsu[0134],test_wave_state_update_branch
+test_ray_state_update.cpp,Budget - a sheet or a stack inside a host is one wall on every port whether it is capped or not,20115,20181,67,412,0.036,98,wave,0,0,39180,1,0,0,1,0,rti rmi[345] rsu[345],test_wave_state_update_branch
+test_ray_state_update.cpp,Resonant medium - a permittivity resonance is part of the medium a wave crosses and travels in,20183,20350,168,4256,0.745,1744,wave,0,0,611966,1,1,0,4,0,rti rmi[012345] rsu[012345],test_wave_state_update_branch
+test_ray_subdivide_flag.cpp,ray_subdivide_flag - edge length matches the closed form,283,299,17,25,0.012,0,wave,0,0,0,0,0,0,0,0,rti subf cube,(stays)
+test_ray_subdivide_flag.cpp,ray_subdivide_flag - edge length scales with propagation distance,301,325,25,11,0.0,0,wave,0,0,0,0,0,0,0,0,rti subf cube,(stays)
+test_ray_subdivide_flag.cpp,ray_subdivide_flag - decision boundary,327,342,16,6,0.0,0,wave,0,0,0,0,0,0,0,0,rti subf cube,(stays)
+test_ray_subdivide_flag.cpp,ray_subdivide_flag - a partial face hit always splits,344,369,26,6,0.001,0,wave,0,0,0,0,0,0,0,0,rti subf cube,(stays)
+test_ray_subdivide_flag.cpp,ray_subdivide_flag - rays that miss the mesh are never flagged,371,388,18,8,0.0,0,wave,0,0,0,0,0,0,0,0,rti subf cube,(stays)
+test_ray_subdivide_flag.cpp,ray_subdivide_flag - agrees with the edge length reported by ray_mesh_interact,394,436,43,266,0.0,0,wave,0,0,256,0,1,0,0,0,rti rmi[0] subf cube,(stays)
+test_ray_subdivide_flag.cpp,ray_subdivide_flag - the footprint does not depend on the interaction or the material,438,470,33,133,0.0,0,wave,0,0,640,0,1,0,0,0,rti rmi[012] subf cube,(stays)
+test_ray_subdivide_flag.cpp,ray_subdivide_flag - state gates,476,543,68,20,0.01,0,wave,0,0,0,0,0,0,0,0,rti subf cube,(stays)
+test_ray_subdivide_flag.cpp,ray_subdivide_flag - gates are applied per ray,545,573,29,66,0.0,0,wave,0,0,0,0,0,0,0,0,rti subf cube,(stays)
+test_ray_subdivide_flag.cpp,ray_subdivide_flag - the parallel and serial paths agree,579,618,40,71,0.004,0,wave,0,0,0,0,0,0,0,0,rti subf cube,(stays)
+test_ray_subdivide_flag.cpp,ray_subdivide_flag - input validation,624,725,102,32,0.004,0,wave,0,0,0,0,0,0,0,0,rti subf cube,(stays)
+test_sheet_vs_solid.cpp,Mesh builder conventions,453,477,25,0,0.0,0,wave,0,0,0,0,0,0,0,0,cube,(stays)
+test_sheet_vs_solid.cpp,Analytic reference reduces to the Airy sum,479,518,40,12,0.0,0,wave,0,0,0,0,0,0,0,0,,(stays)
+test_sheet_vs_solid.cpp,"Isolated sheet vs traced solid, 10 cm concrete",524,553,30,61,0.0,0,wave,0,0,98,0,1,0,0,0,rmi[1] rsu[1] objr cdg cube,(stays)
+test_sheet_vs_solid.cpp,"Lossless slab, sheet vs solid",559,588,30,1,0.0,0,wave,0,0,98,0,1,0,0,0,rmi[1] rsu[1] objr cdg cube,(stays)
+test_sheet_vs_solid.cpp,"Material sweep, sheet vs solid",594,641,48,1,0.001,0,wave,0,0,490,0,1,0,0,0,rmi[1] rsu[1] objr cdg cube,(stays)
+test_sheet_vs_solid.cpp,"Thickness sweep, sheet vs solid",647,679,33,1,0.001,0,wave,0,0,294,0,1,0,0,0,rmi[1] rsu[1] objr cdg cube,(stays)
+test_sheet_vs_solid.cpp,Collapsed duplicate equals a single sheet,685,725,41,2,0.0,0,wave,0,0,100,0,1,0,0,0,rmi[1] rsu[1] objr cdg,(stays)
+test_sheet_vs_solid.cpp,Corner with sheet degrades to a single hit,731,783,53,1,0.0,0,wave,0,0,4,0,1,0,0,0,rmi[1] rsu[1] objr cdg,(stays)
+test_sheet_vs_solid.cpp,Glued sheet equals a solid of the summed thickness,789,856,68,70,0.0,0,wave,0,0,315,0,1,0,0,0,rmi[1] rsu[1] objr cdg cube,(stays)
+test_sheet_vs_solid.cpp,Sheet embedded in a solid equals a solid of the summed thickness,862,934,73,30,0.001,0,wave,0,0,550,0,1,0,0,0,rmi[1] rsu[1] objr cdg cube,(stays)
+test_sheet_vs_solid.cpp,Ordered stack of two different sheets is killed,940,970,31,4,0.0,0,wave,0,0,32,0,1,0,0,0,rmi[1] rsu[1] objr cdg,(stays)
+test_sheet_vs_solid.cpp,Interface gain is applied once on each path,976,1029,54,1,0.0,0,wave,0,0,196,0,1,0,0,0,rmi[1] rsu[1] objr cdg cube,(stays)
+test_sheet_vs_solid.cpp,"Grazing incidence, sheet vs solid",1035,1076,42,10,0.0,0,wave,0,0,50,0,1,0,0,0,rmi[1] rsu[1] objr cdg cube,(stays)
+test_sheet_vs_solid.cpp,"Acoustic sheet, mass-law route",1082,1126,45,20,0.0,0,acoustic,98,0,98,1,0,0,0,0,rmi[4] rsu[4] objr cdg cube,(stays)
+test_sheet_vs_solid.cpp,thk = 0 is identical to no sheet at all,1132,1158,27,1,0.0,0,wave,0,0,156,0,1,0,0,0,rmi[1] rsu[1] objr cdg cube,(stays)
