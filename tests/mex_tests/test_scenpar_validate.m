@@ -98,12 +98,28 @@ assert_throws( @() quadriga_lib.scenpar_validate( struct('DS_mu_typo', 1) ), 'Un
 assert_throws( @() quadriga_lib.scenpar_validate( struct('DS_mu_typo', 1), false ), 'Unknown key ''DS_mu_typo''' );
 assert_throws( @() quadriga_lib.scenpar_validate( struct('GR_epsilon', 10) ), 'Unknown key ''GR_epsilon''' );     % not supported
 assert_throws( @() quadriga_lib.scenpar_validate( struct('DS_mu', NaN) ), 'DS_mu' );
+assert_throws( @() quadriga_lib.scenpar_validate( struct('NumClusters', 1001) ), 'from 1 to 1000' );
+
+% Errors of the shared helpers carry the identifier of the library
+assert_identifier( @() quadriga_lib.scenpar_validate( struct('NumClusters', int8(7)) ), 'quadriga_lib:CPPerror' );
 
 end
 
 % Request 4 outputs so that the nlhs > 3 guard fires
 function out4x(varargin)
 [~, ~, ~, ~] = quadriga_lib.scenpar_validate( varargin{:} ); %#ok<ASGLU>
+end
+
+% Assert that fn() raises an error with the identifier 'id'.
+function assert_identifier(fn, id)
+try
+    fn();
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if ~strcmp(ME.identifier, id)
+        error('moxunit:exceptionNotRaised', ['EXPECTED ID: "', id, '", GOT: "', ME.identifier, '"']);
+    end
+end
 end
 
 % Assert that fn() raises an error whose message contains expected (substring).

@@ -14,18 +14,20 @@ SECTION!*/
 # CONF_FILE_LIST
 List the scenarios defined by the conf files in a set of directories
 
-- Lists the files whose name ends in `.conf` (case-sensitive) in each directory, not recursive. The
-  scenario name is the file name without this extension.
+- Lists the regular files and symbolic links to regular files whose name ends in `.conf`
+  (case-sensitive) and is longer than `.conf`, not recursive. The scenario name is the file name
+  without this extension, whatever characters it has.
 - Directories are processed in the given order, the files of one directory in byte-wise sorted order
   of their names (digits before upper case before lower case)
 - A file whose name was already found in an earlier directory is skipped completely, so the first
   directory wins. This allows a local folder to override the files of a shared folder.
 - With `parse_shortnames = true` each file is read and one entry is added right after the file for
-  every line `ShortName = name` that is not a comment. Other lines are not examined.
+  every line `ShortName = name` that is not a comment. Other lines are not examined; a UTF-8 byte
+  order mark at the start of the file is skipped.
 - An error is raised if a short name equals an earlier entry, if a file name equals an earlier short
-  name, if the value of a `ShortName` line is not one name of the characters `A-Z`, `a-z`, `0-9`, `_`,
-  or if a listed file cannot be opened for reading the short names
-- A directory that does not exist or is not a directory is skipped
+  name, if the value of a `ShortName` line is not one name of the characters `A-Z`, `a-z`, `0-9`,
+  `_`, or if a listed file cannot be opened for reading the short names
+- A directory that does not exist, is not a directory or cannot be listed is skipped
 - An empty string `''` is the current directory
 
 ## Usage:
@@ -41,7 +43,8 @@ List the scenarios defined by the conf files in a set of directories
 
 ## Outputs:
 - **`scenarios`** — Scenario names and short names; cell array of strings; `[n_scen, 1]`
-- **`file_names`** — File name including `.conf` for each entry; cell array of strings; `[n_scen, 1]`
+- **`file_names`** — File name including `.conf` for each entry; cell array of strings;
+  `[n_scen, 1]`
 - **`file_dirs`** — Directory of the file for each entry, exactly as given in `dirs`; cell array of
   strings; `[n_scen, 1]`
 

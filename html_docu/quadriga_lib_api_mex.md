@@ -54,56 +54,56 @@ lang: en-US
 | [qrt_file_read](#qrt_file_read) | Channel functions | 1144 |
 | [quantize_delays](#quantize_delays) | Channel functions | 1203 |
 | [conf_file_list](#conf_file_list) | Channel generation functions | 1247 |
-| [conf_file_read](#conf_file_read) | Channel generation functions | 1285 |
-| [conf_file_write](#conf_file_write) | Channel generation functions | 1344 |
-| [get_channels_ieee_indoor](#get_channels_ieee_indoor) | Channel generation functions | 1409 |
-| [get_channels_irs](#get_channels_irs) | Channel generation functions | 1482 |
-| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 1548 |
-| [get_channels_planar](#get_channels_planar) | Channel generation functions | 1597 |
-| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 1648 |
-| [scenpar_validate](#scenpar_validate) | Channel generation functions | 1702 |
-| [acdf](#acdf) | Channel statistics | 1760 |
-| [calc_angular_spread](#calc_angular_spread) | Channel statistics | 1791 |
-| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 1831 |
-| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 1873 |
-| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 1901 |
-| [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | 1931 |
-| [cart2geo](#cart2geo) | Math functions | 1953 |
-| [fast_sincos](#fast_sincos) | Math functions | 1980 |
-| [geo2cart](#geo2cart) | Math functions | 2008 |
-| [interp](#interp) | Math functions | 2048 |
-| [version](#version) | Miscellaneous / Tools | 2079 |
-| [write_png](#write_png) | Miscellaneous / Tools | 2096 |
-| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 2120 |
-| [cube](#cube) | Site-specific simulation tools | 2185 |
-| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 2218 |
-| [icosphere](#icosphere) | Site-specific simulation tools | 2256 |
-| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 2282 |
-| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 2330 |
-| [plane](#plane) | Site-specific simulation tools | 2382 |
-| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 2419 |
-| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 2446 |
-| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 2473 |
-| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 2502 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 2599 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 2639 |
-| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 2679 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 2703 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 2730 |
-| [sos_acf_2d](#sos_acf_2d) | Sum-of-sinusoids random number generator | 2896 |
-| [sos_acf_approx](#sos_acf_approx) | Sum-of-sinusoids random number generator | 2926 |
-| [sos_acf_estimate](#sos_acf_estimate) | Sum-of-sinusoids random number generator | 2960 |
-| [sos_acfi](#sos_acfi) | Sum-of-sinusoids random number generator | 3012 |
-| [sos_calc_mse](#sos_calc_mse) | Sum-of-sinusoids random number generator | 3036 |
-| [sos_generate](#sos_generate) | Sum-of-sinusoids random number generator | 3087 |
-| [sos_init_phases](#sos_init_phases) | Sum-of-sinusoids random number generator | 3153 |
-| [sos_map](#sos_map) | Sum-of-sinusoids random number generator | 3187 |
-| [sos_preset](#sos_preset) | Sum-of-sinusoids random number generator | 3224 |
-| [sos_rand](#sos_rand) | Sum-of-sinusoids random number generator | 3263 |
-| [sos_randi](#sos_randi) | Sum-of-sinusoids random number generator | 3321 |
-| [sos_randn](#sos_randn) | Sum-of-sinusoids random number generator | 3381 |
-| [sos_remove_bias](#sos_remove_bias) | Sum-of-sinusoids random number generator | 3438 |
-| [sos_val](#sos_val) | Sum-of-sinusoids random number generator | 3514 |
+| [conf_file_read](#conf_file_read) | Channel generation functions | 1288 |
+| [conf_file_write](#conf_file_write) | Channel generation functions | 1355 |
+| [get_channels_ieee_indoor](#get_channels_ieee_indoor) | Channel generation functions | 1428 |
+| [get_channels_irs](#get_channels_irs) | Channel generation functions | 1501 |
+| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 1567 |
+| [get_channels_planar](#get_channels_planar) | Channel generation functions | 1616 |
+| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 1667 |
+| [scenpar_validate](#scenpar_validate) | Channel generation functions | 1721 |
+| [acdf](#acdf) | Channel statistics | 1781 |
+| [calc_angular_spread](#calc_angular_spread) | Channel statistics | 1812 |
+| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 1852 |
+| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 1894 |
+| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 1922 |
+| [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | 1952 |
+| [cart2geo](#cart2geo) | Math functions | 1974 |
+| [fast_sincos](#fast_sincos) | Math functions | 2001 |
+| [geo2cart](#geo2cart) | Math functions | 2029 |
+| [interp](#interp) | Math functions | 2069 |
+| [version](#version) | Miscellaneous / Tools | 2100 |
+| [write_png](#write_png) | Miscellaneous / Tools | 2117 |
+| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 2141 |
+| [cube](#cube) | Site-specific simulation tools | 2206 |
+| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 2239 |
+| [icosphere](#icosphere) | Site-specific simulation tools | 2277 |
+| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 2303 |
+| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 2351 |
+| [plane](#plane) | Site-specific simulation tools | 2403 |
+| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 2440 |
+| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 2467 |
+| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 2494 |
+| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 2523 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 2620 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 2660 |
+| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 2700 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 2724 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 2751 |
+| [sos_acf_2d](#sos_acf_2d) | Sum-of-sinusoids random number generator | 2917 |
+| [sos_acf_approx](#sos_acf_approx) | Sum-of-sinusoids random number generator | 2947 |
+| [sos_acf_estimate](#sos_acf_estimate) | Sum-of-sinusoids random number generator | 2981 |
+| [sos_acfi](#sos_acfi) | Sum-of-sinusoids random number generator | 3033 |
+| [sos_calc_mse](#sos_calc_mse) | Sum-of-sinusoids random number generator | 3057 |
+| [sos_generate](#sos_generate) | Sum-of-sinusoids random number generator | 3108 |
+| [sos_init_phases](#sos_init_phases) | Sum-of-sinusoids random number generator | 3174 |
+| [sos_map](#sos_map) | Sum-of-sinusoids random number generator | 3208 |
+| [sos_preset](#sos_preset) | Sum-of-sinusoids random number generator | 3245 |
+| [sos_rand](#sos_rand) | Sum-of-sinusoids random number generator | 3284 |
+| [sos_randi](#sos_randi) | Sum-of-sinusoids random number generator | 3342 |
+| [sos_randn](#sos_randn) | Sum-of-sinusoids random number generator | 3402 |
+| [sos_remove_bias](#sos_remove_bias) | Sum-of-sinusoids random number generator | 3459 |
+| [sos_val](#sos_val) | Sum-of-sinusoids random number generator | 3535 |
 
 ---
 
@@ -1247,18 +1247,20 @@ Map path delays to a fixed tap grid using two-tap power-weighted interpolation
 ## conf_file_list
 List the scenarios defined by the conf files in a set of directories
 
-- Lists the files whose name ends in `.conf` (case-sensitive) in each directory, not recursive. The
-  scenario name is the file name without this extension.
+- Lists the regular files and symbolic links to regular files whose name ends in `.conf`
+  (case-sensitive) and is longer than `.conf`, not recursive. The scenario name is the file name
+  without this extension, whatever characters it has.
 - Directories are processed in the given order, the files of one directory in byte-wise sorted order
   of their names (digits before upper case before lower case)
 - A file whose name was already found in an earlier directory is skipped completely, so the first
   directory wins. This allows a local folder to override the files of a shared folder.
 - With `parse_shortnames = true` each file is read and one entry is added right after the file for
-  every line `ShortName = name` that is not a comment. Other lines are not examined.
+  every line `ShortName = name` that is not a comment. Other lines are not examined; a UTF-8 byte
+  order mark at the start of the file is skipped.
 - An error is raised if a short name equals an earlier entry, if a file name equals an earlier short
-  name, if the value of a `ShortName` line is not one name of the characters `A-Z`, `a-z`, `0-9`, `_`,
-  or if a listed file cannot be opened for reading the short names
-- A directory that does not exist or is not a directory is skipped
+  name, if the value of a `ShortName` line is not one name of the characters `A-Z`, `a-z`, `0-9`,
+  `_`, or if a listed file cannot be opened for reading the short names
+- A directory that does not exist, is not a directory or cannot be listed is skipped
 - An empty string `''` is the current directory
 
 ### Usage:
@@ -1274,7 +1276,8 @@ List the scenarios defined by the conf files in a set of directories
 
 ### Outputs:
 - **`scenarios`** — Scenario names and short names; cell array of strings; `[n_scen, 1]`
-- **`file_names`** — File name including `.conf` for each entry; cell array of strings; `[n_scen, 1]`
+- **`file_names`** — File name including `.conf` for each entry; cell array of strings;
+  `[n_scen, 1]`
 - **`file_dirs`** — Directory of the file for each entry, exactly as given in `dirs`; cell array of
   strings; `[n_scen, 1]`
 
@@ -1286,27 +1289,33 @@ List the scenarios defined by the conf files in a set of directories
 Read and validate a QuaDRiGa scenario configuration file
 
 - A conf file is a text file with one `Key = value` assignment per line; `%` starts a comment; blank
-  lines are allowed; line ends can be LF or CRLF; space and tab are white space
+  lines are allowed; line ends can be LF or CRLF; space and tab are white space; a UTF-8 byte order
+  mark at the start of the file is skipped
 - Keys are case-sensitive names of the characters `A-Z`, `a-z`, `0-9` and `_`; there are four kinds:
   - Scenario parameters: 165 numeric keys with one number each. Keys that are not in the file have
     their default value.
   - `SubpathMethod`: one of the words `legacy`, `Laplacian`, `mmMAGIC`; default `legacy`
   - Path-loss parameters: every key that starts with `PL_`. `PL_model` has one name as value. All
     others have one or more numbers separated by white space.
-  - `ShortName`: an alias for the scenario, one name; can occur several times
+  - `ShortName`: an alias for the scenario, one name; can occur several times with different values
 - Any other key is ignored and reported in `ignored_keys`; its value is not examined
 - A key that is stated more than once has its last value
 - Numbers are decimal with an optional sign, an optional decimal point and an optional exponent
-  (`e` or `E`), for example `-6.28`, `.5`, `6.2e-07`; `Inf`, `+Inf` and `-Inf` are accepted in any case
+  (`e` or `E`), for example `-6.28`, `.5`, `6.2e-07`; `Inf`, `+Inf` and `-Inf` are accepted
+  in any case
+- A number beyond the range of a double (`1e400`) is an error "out of range"; a number below the
+  smallest subnormal reads as `0` (or `-0`)
+- Numbers are read independent of the locale (the decimal point is always `.`)
 - Elevation angles are used throughout (+90 deg is up); no key refers to a zenith angle
 - The 165 numeric keys are 138 keys of QuaDRiGa and 27 keys for 3GPP TR 38.901 v19.5.0. With their
   default of 0 the new keys have no effect.
 - The QuaDRiGa key `GR_epsilon` (fixed relative permittivity of the ground) is not supported and is
   reported in `ignored_keys`; the permittivity is complex and is set in the simulation
-- An error is raised if the file cannot be opened, and, with file name and line number, for a line
-  that is not blank, not a comment and not a well-formed assignment: no `=`, more or less than one
-  name before the `=`, a missing value, a word where a number is required or the reverse, a second
-  value or other text after the value, `NaN`, complex numbers, a `PL_` key without a name
+- An error is raised if the file cannot be opened or is a directory, and, with file name and line
+  number, for a line that is not blank, not a comment and not a well-formed assignment: no `=`, more
+  or less than one name before the `=`, a missing value, a word where a number is required or the
+  reverse, a second value or other text after the value, `NaN`, complex numbers, a number out of
+  range, a `PL_` key without a name, a `ShortName` value stated twice
 - With `validate = true`, a value that fails the checks of [scenpar_validate](#scenpar_validate) is an error as well
 - A correlation matrix that is not positive definite is not an error; see `lsp_xcorr_chk`
 
@@ -1326,19 +1335,21 @@ Read and validate a QuaDRiGa scenario configuration file
   numeric keys of QuaDRiGa with `SubpathMethod` (string) as field 107, then the 27 new keys; all
   numeric fields are scalars
 - **`plpar`** — Path-loss parameters; struct with the field `model` (string, only if the file states
-  `PL_model`) followed by one field per `PL_` key in file order, named without the prefix `PL_`; each
-  is a row vector with one or more values; `[]` if the file has no `PL_` key
+  `PL_model`) followed by one field per `PL_` key in file order, named without the prefix `PL_`;
+  each is a row vector with one or more values; `[]` if the file has no `PL_` key
 - **`lsp_xcorr`** — LSP cross-correlation matrix; symmetric with unit diagonal; order of rows and
   columns: DS, KF, SF, ASD, ASA, ESD, ESA, XPR; `[8, 8]`
 - **`lsp_xcorr_chk`** — `true` if `lsp_xcorr` is positive definite, i.e. correlated LSPs can be
   generated from it; logical
-- **`short_names`** — Values of all `ShortName` lines in file order; cell array of strings; `[n, 1]`
-- **`ignored_keys`** — Unknown keys, each once, in the order of their first occurrence; cell array of
-  strings; `[n, 1]`
+- **`short_names`** — Values of all `ShortName` lines in file order; cell array of strings;
+  `[n_short, 1]`
+- **`ignored_keys`** — Unknown keys, each once, in the order of their first occurrence; cell array
+  of strings; `[n_ignored, 1]`
 
 ### See also:
 - [scenpar_validate](#scenpar_validate) (value checks, defaults and the list of validation rules)
 - [conf_file_list](#conf_file_list) (find the conf files in a set of directories)
+- [conf_file_write](#conf_file_write) (write a conf file)
 
 ---
 ## conf_file_write
@@ -1356,21 +1367,29 @@ Write a QuaDRiGa scenario configuration file
     fading spatial consistency; 6: Parameters for the ground reflection extension; 7: Absolute
     time of arrival offset; 10: Optional modelling components; 8: Path-loss model
   - The entries 1 to 8 are those of QuaDRiGa, so its 8 section references can be passed unchanged
+- The overview formula of an LSP shows its mean and STD with the frequency, distance, height and
+  elevation terms; with `LSP_fc_min > 0` the frequency is written as `max( fGHz, fc_min )`; the
+  ESD line also has the terms of `ES_D_mu_A` to `ES_D_mu_D` and, if `ES_D_mu_min` is not `-Inf`,
+  the lower limit of the mean
 - Each line is `name = value % comment`, aligned in columns; the comment states the unit
 - The path-loss section has the formula blocks of the model (`logdist`, `dual_slope`, `nlos`,
   `tripple_slope`), the line `PL_model`, then the fields of `plpar` in struct order with the prefix
   `PL_`; several values of one field are written on one line
-- Numbers are written with the fewest significant digits (15 to 17) that [conf_file_read](#conf_file_read) reads
-  back to the same double; `Inf` and `-Inf` are written as such
+- Numbers are written with up to 15 significant digits, or with 16 or 17 where 15 do not read back
+  to the same double in [conf_file_read](#conf_file_read); `Inf` and `-Inf` are written as such
 - With `write_defaults = false` a field is written only if its value differs from the default;
   `SubpathMethod` only if it is not `legacy`; a section without a written field is left out
 - With `write_defaults = true` all 165 numeric fields and `SubpathMethod` are written
 - The inputs are checked with the rules of [scenpar_validate](#scenpar_validate) before the file is opened: unknown
   fields (including `GR_epsilon`), `NaN`, values outside their range and a wrong `SubpathMethod`
-  are errors. Further errors: a `model` that is not one name, an empty or `NaN` path-loss value,
-  short names that are not one name, line breaks in `ref` or `ref_sec`, more than 10 entries in
-  `ref_sec`, a `valid_range` that is not empty and not `[4, 2]`.
-- A failed call does not create or change a file; an existing file is overwritten
+  are errors. Further errors: a line break in the file name, a `model` that is not one name, an
+  empty or `NaN` path-loss value, short names that are not one name or not distinct, line breaks
+  in `ref` or `ref_sec`, more than 10 entries in `ref_sec`, a `valid_range` that is not empty and
+  not `[4, 2]`.
+- The text is written to a temporary file in the same directory, which must be writable, and then
+  renamed to `fn`; a symbolic link `fn` is written through
+- A failed call does not create a file and leaves an existing file unchanged; an existing file is
+  replaced and keeps its permissions
 - Every file written passes [conf_file_read](#conf_file_read) with `validate = true` and without ignored keys
 
 ### Usage:
@@ -1386,11 +1405,11 @@ quadriga_lib.conf_file_write( fn, scenpar, plpar, short_names, ref, ref_sec, val
   int64, uint64 or logical; `SubpathMethod` is a string; missing fields have their default; `[]`
   writes the default set
 - **`plpar`** *(optional)* — Path-loss parameters; struct with the field `model` (string) and one
-  real vector of class double, single, int32, uint32, int64 or uint64 per further field, named
-  without the prefix `PL_`, as returned by [conf_file_read](#conf_file_read); written in struct order; if omitted
-  or `[]`, no path-loss section
+  real vector (row or column) of class double, single, int32, uint32, int64 or uint64 per further
+  field, named without the prefix `PL_`, as returned by [conf_file_read](#conf_file_read); a matrix is an error;
+  written in struct order; if omitted or `[]`, no path-loss section
 - **`short_names`** *(optional)* — Short names of the scenario; cell array of strings or one string;
-  each one name of the characters `A-Z`, `a-z`, `0-9`, `_`
+  each one name of the characters `A-Z`, `a-z`, `0-9`, `_`; distinct
 - **`ref`** — Literature reference; written in the header and before each non-empty entry of
   `ref_sec`; string; default: no reference
 - **`ref_sec`** *(optional)* — Reference per section, numbered as listed above; cell array of up to
@@ -1711,14 +1730,15 @@ Validate scenario parameters and complete them with default values
 - A field that is not one of the 166 names is an error, also with `validate = false`; this includes
   the QuaDRiGa field `GR_epsilon`, which is not supported
 - Value checks with `validate = true`; `NaN` is an error for every field:
-  - Integer and > 0: `NumClusters`, `NumSubPaths`
+  - Integer from 1 to 1000: `NumClusters`, `NumSubPaths`
   - Finite and > 0: `r_DS`
   - Finite and >= 0: the 8 decorrelation distances (`DS_lambda` ... `XPR_lambda`), `SC_lambda`,
     `absTOA_lambda`, `PerClusterDS`, `PerClusterDS_min`, `PerClusterAS_D`, `PerClusterAS_A`,
-    `PerClusterES_D`, `PerClusterES_A`, `LNS_ksi`, `LOS_scatter_radius`, `GR_enabled`, `LSP_fc_min`,
-    `EoD_offset_b`, `EoD_offset_hcl`, `PerClusterDS_fc_min`, `PerClusterES_D_scale`, `absTOA_Lmax`,
-    `NF_alpha`, `NF_beta`, `SNS_sigma`, `SNS_A`, `SNS_B`, `SNS_R`, `SNS_delta_var`, `PolVar_sigma`
-  - Integer and >= 0: `NumClusters_min`, `NF_k1`
+    `PerClusterES_D`, `PerClusterES_A`, `LNS_ksi`, `LOS_scatter_radius`, `GR_enabled`,
+    `LSP_fc_min`, `EoD_offset_b`, `EoD_offset_hcl`, `PerClusterDS_fc_min`, `PerClusterES_D_scale`,
+    `absTOA_Lmax`, `NF_alpha`, `NF_beta`, `SNS_sigma`, `SNS_A`, `SNS_B`, `SNS_R`, `SNS_delta_var`,
+    `PolVar_sigma`
+  - Integer from 0 to 1000: `NumClusters_min`, `NF_k1`
   - In the range from 0 to 1: `SNS_mu`
   - In the range from -1 to 1: the 28 correlations (`asD_ds` to `xpr_esa`)
   - All other numeric fields accept any value including `Inf` and `-Inf`
@@ -1746,11 +1766,12 @@ Validate scenario parameters and complete them with default values
   `SubpathMethod` (string) as field 107, then the 27 new keys; all numeric fields are double scalars
 - **`lsp_xcorr`** — LSP cross-correlation matrix; order of rows and columns: DS, KF, SF, ASD, ASA,
   ESD, ESA, XPR; `[8, 8]`
-- **`lsp_xcorr_chk`** — `true` if `lsp_xcorr` is positive definite; `false` also if it contains `NaN`;
-  logical
+- **`lsp_xcorr_chk`** — `true` if `lsp_xcorr` is positive definite; `false` also if it contains
+  `NaN`; logical
 
 ### See also:
 - [conf_file_read](#conf_file_read) (read the parameters from a conf file)
+- [conf_file_write](#conf_file_write) (applies the same checks before writing)
 
 ---
 

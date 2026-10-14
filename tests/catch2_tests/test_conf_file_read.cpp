@@ -16,15 +16,18 @@
 // literal correctly, so the same literal gives the same double.
 //
 // Conventions: every case writes its own file 'test_conf_file_read_*.conf' into the working directory
-// and removes it. Angles in the files are elevation angles, as everywhere in QuaDRiGa.
+// and removes it; the name of the file of 'read_text' contains the name of the test case, so that cases
+// can run in parallel processes. Angles in the files are elevation angles, as everywhere in QuaDRiGa.
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/interfaces/catch_interfaces_capture.hpp>
 
 #include "quadriga_tools.hpp"
 
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <limits>
 #include <stdexcept>
@@ -172,12 +175,39 @@ namespace
         return r;
     }
 
+    // File name for the current test case: 'test_' and the case name with every character other than
+    // A-Z, a-z, 0-9 replaced by '_' (Q12: cases running in parallel processes do not share a file)
+    std::string case_file()
+    {
+        std::string name = Catch::getResultCapture().getCurrentTestName();
+        for (char &c : name)
+            if (!((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')))
+                c = '_';
+        return "test_" + name + ".conf";
+    }
+
     // Write 'content' to a file, read it with all outputs, remove the file
     conf_out read_text(const std::string &content, bool validate = true)
     {
-        tmp_file f("test_conf_file_read_tmp.conf", content);
+        tmp_file f(case_file(), content);
         return read_all(f.fn, validate);
     }
+
+    // Message of the std::invalid_argument for 'content'; "<no error>" if the file is accepted
+    std::string read_error(const std::string &content, bool validate = true)
+    {
+        try
+        {
+            read_text(content, validate);
+        }
+        catch (const std::invalid_argument &e)
+        {
+            return e.what();
+        }
+        return "<no error>";
+    }
+
+    bool bits_equal(double a, double b) { return std::memcmp(&a, &b, sizeof(double)) == 0; }
 
     // Value of a key, NaN if the key is missing
     double val(const conf_out &r, const std::string &key)
@@ -504,6 +534,10 @@ TEST_CASE("conf_file_read - value checks per validation class")
     {
         accepts("NumClusters = 1");
         accepts("NumSubPaths = 2e1");
+        accepts("NumClusters = 1000"); // Q11: upper bound 1000
+        accepts("NumSubPaths = 1e3");
+        rejects_value("NumClusters = 1001");
+        rejects_value("NumSubPaths = 1e4");
         rejects_value("NumClusters = 0");
         rejects_value("NumClusters = -3");
         rejects_value("NumClusters = 1.5");
@@ -589,11 +623,32 @@ TEST_CASE("conf_file_read - value checks per validation class")
         accepts("NumClusters_min = 0");
         accepts("NumClusters_min = 6"); // equal to the default of NumClusters
         accepts("NF_k1 = 4");
+        accepts("NF_k1 = 1000"); // Q11: upper bound 1000
+        accepts("NumClusters = 1000\nNumClusters_min = 1000");
+        rejects_value("NF_k1 = 1001");
         rejects_value("NumClusters_min = 2.5");
         rejects_value("NumClusters_min = -1");
         rejects_value("NF_k1 = 0.5");
         rejects_value("NF_k1 = -2");
         rejects_value("NF_k1 = Inf");
+    }
+
+    SECTION("the bound of the counts is reported with the line (Q11)")
+    {
+        std::string m = read_error("DS_mu = -7\nNumSubPaths = 1001\n");
+        QD_DIAG("\n# diag: conf_file_read count bound: %s\n", m.c_str());
+        CHECK(m.find("line 2") != std::string::npos);
+        CHECK(m.find("'NumSubPaths' must be an integer from 1 to 1000") != std::string::npos);
+
+        // The class check of NumClusters_min comes before the cross-key check with NumClusters
+        m = read_error("NumClusters = 1000\nNumClusters_min = 1001\n");
+        QD_DIAG("# diag: conf_file_read count bound: %s\n", m.c_str());
+        CHECK(m.find("line 2") != std::string::npos);
+        CHECK(m.find("'NumClusters_min' must be an integer from 0 to 1000") != std::string::npos);
+
+        m = read_error("NF_k1 = 1001\n");
+        CHECK(m.find("line 1") != std::string::npos);
+        CHECK(m.find("'NF_k1' must be an integer from 0 to 1000") != std::string::npos);
     }
 
     SECTION("NumClusters_min must not exceed NumClusters")
@@ -636,6 +691,13 @@ TEST_CASE("conf_file_read - input validation")
     {
         std::unordered_map<std::string, double> sp;
         CHECK_THROWS_AS(quadriga_lib::conf_file_read("test_conf_file_read_missing.conf", sp), std::runtime_error);
+
+        // T3: a directory is not a file, also when its name ends in '.conf'
+        const std::string dir = "test_conf_file_read_dir.conf";
+        std::filesystem::remove_all(dir);
+        std::filesystem::create_directory(dir);
+        CHECK_THROWS_AS(quadriga_lib::conf_file_read(dir, sp), std::runtime_error);
+        std::filesystem::remove_all(dir);
     }
 
     SECTION("numbers outside the grammar (Q5)")
@@ -876,4 +938,114 @@ TEST_CASE("conf_file_read - optional outputs alone and together, stale content i
     CHECK(again.scenpar == all.scenpar);
     CHECK(again.plpar == all.plpar);
     CHECK(again.ok == all.ok);
+}
+
+TEST_CASE("conf_file_read - a number beyond the range of a double is an error, below it reads as 0")
+{
+    // Decision Q2: overflow is the error "is out of range"; underflow gives the value of strtod in the C locale,
+    // i.e. the nearest subnormal or a signed 0. Oracles: numeric_limits and the bit patterns of +0 and -0;
+    // 2.4703282292062328e-324 lies just above half of the smallest subnormal and rounds up to it,
+    // 2.4703282292062327e-324 lies just below and rounds to 0; 1.7976931348623159e308 lies above the midpoint between
+    // the largest double and 2^1024 and rounds to infinity.
+    SECTION("overflow, both modes")
+    {
+        const char *lines[] = {"DS_mu = 1e400", "DS_mu = -1e400", "DS_mu = 1e99999999999999999999",
+                               "DS_mu = 1.8e308", "PL_A = 1 1e400", "DS_mu = 1.7976931348623159e308"};
+        QD_DIAG("\n# diag: conf_file_read overflow messages\n");
+        for (const char *line : lines)
+            for (bool validate : {true, false})
+            {
+                INFO("line: " << line << ", validate " << validate);
+                const std::string m = read_error(std::string("% c\n") + line + "\n", validate);
+                if (validate)
+                    QD_DIAG("%s: %s\n", line, m.c_str());
+                CHECK(m.find("line 2") != std::string::npos);
+                CHECK(m.find("is out of range.") != std::string::npos);
+                CHECK(m.find(line[0] == 'P' ? "'PL_A'" : "'DS_mu'") != std::string::npos);
+            }
+    }
+
+    SECTION("underflow and the ends of the range")
+    {
+        const double denorm = std::numeric_limits<double>::denorm_min(), dmax = std::numeric_limits<double>::max();
+        struct num_case
+        {
+            const char *text;
+            double ref;
+        };
+        const num_case cases[] = {{"1e-400", 0.0}, {"-1e-400", -0.0}, {"4.9e-324", denorm},
+                                  {"2.4703282292062328e-324", denorm}, {"2.4703282292062327e-324", 0.0},
+                                  {"-2.4703282292062327e-324", -0.0}, {"1e-310", 1e-310},
+                                  {"0.000000000000000000001e-310", 0.0}, {"1.7976931348623157e308", dmax},
+                                  {"-1.7976931348623157e308", -dmax}, {"0e999999999999", 0.0}};
+        QD_DIAG("\n# diag: conf_file_read underflow and range ends\n");
+        QD_DIAG("text,value,ref,signbit,bits_equal\n");
+        for (const auto &c : cases)
+        {
+            INFO("text " << c.text);
+            conf_out r;
+            REQUIRE_NOTHROW(r = read_text(std::string("DS_mu = ") + c.text + "\nPL_A = " + c.text + " 1\n"));
+            const double v = val(r, "DS_mu");
+            QD_DIAG("%s,%.17g,%.17g,%d,%d\n", c.text, v, c.ref, (int)std::signbit(v), (int)bits_equal(v, c.ref));
+            CHECK(bits_equal(v, c.ref));
+            REQUIRE(r.plpar.count("A") == 1);
+            REQUIRE(r.plpar["A"].size() == 2);
+            CHECK(bits_equal(r.plpar["A"][0], c.ref));
+        }
+    }
+}
+
+TEST_CASE("conf_file_read - a UTF-8 byte order mark at the start of the file is skipped")
+{
+    // Decision Q1: the three bytes EF BB BF are removed from the start of line 1 only
+    conf_out r = read_text("\xEF\xBB\xBF% comment\nDS_mu = -7\n");
+    CHECK(same(val(r, "DS_mu"), -7.0));
+    CHECK(n_not_default(r.scenpar) == 1);
+    CHECK(r.ignored_keys.empty());
+
+    r = read_text("\xEF\xBB\xBF"
+                  "DS_mu = -7\r\n");
+    CHECK(same(val(r, "DS_mu"), -7.0));
+    CHECK(n_not_default(r.scenpar) == 1);
+    CHECK(r.ignored_keys.empty());
+
+    r = read_text("\xEF\xBB\xBF"); // the mark alone is an empty file
+    CHECK(n_not_default(r.scenpar) == 0);
+
+    // A mark in a later line is not skipped
+    for (bool validate : {true, false})
+    {
+        const std::string m = read_error("DS_mu = -7\n\xEF\xBB\xBF"
+                                         "DS_sigma = 0.3\n",
+                                         validate);
+        QD_DIAG("\n# diag: conf_file_read BOM in line 2: %s\n", m.c_str());
+        CHECK(m.find("line 2") != std::string::npos);
+    }
+
+    // Only the complete mark is skipped
+    CHECK(read_error("\xEF\xBB"
+                     "DS_mu = -7\n")
+              .find("line 1") != std::string::npos);
+}
+
+TEST_CASE("conf_file_read - a short name stated twice in one file is an error")
+{
+    // Decision Q3: grammar level, so in both modes; the error names the line of the repetition
+    for (bool validate : {true, false})
+    {
+        INFO("validate " << validate);
+        std::string m = read_error("ShortName = Ab\nShortName = Ab\n", validate);
+        QD_DIAG("\n# diag: conf_file_read repeated short name: %s\n", m.c_str());
+        CHECK(m.find("line 2") != std::string::npos);
+        CHECK(m.find("ShortName 'Ab' is stated twice.") != std::string::npos);
+
+        m = read_error("ShortName = Ab\nShortName = Cd\nDS_mu = -7\nShortName = Cd % again\n", validate);
+        CHECK(m.find("line 4") != std::string::npos);
+        CHECK(m.find("'Cd'") != std::string::npos);
+
+        // Distinct names pass; names differ in case
+        conf_out r;
+        CHECK_NOTHROW(r = read_text("ShortName = Ab\nShortName = AB\nShortName = Cd\n", validate));
+        CHECK(r.short_names == std::vector<std::string>{"Ab", "AB", "Cd"});
+    }
 }

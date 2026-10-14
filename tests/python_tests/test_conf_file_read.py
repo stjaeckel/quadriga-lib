@@ -9,6 +9,7 @@
 import sys
 import os
 import glob
+import pathlib
 import tempfile
 import unittest
 import numpy as np
@@ -140,6 +141,69 @@ class test_case(unittest.TestCase):
         # validate = False only checks the grammar
         scenpar = quadriga_lib.tools.conf_file_read(fn, False)[0]
         self.assertEqual(scenpar["r_DS"], -1.0)
+
+    def test_validate_flag_types(self):
+        # None selects the default (True); bool and numpy.bool_ are accepted; anything else is a TypeError
+        fn = self.write("conf_file_read_invalid.conf", "r_DS = -1\n")
+        for args, kwargs in [((fn, None), {}), ((fn,), {"validate": None}), ((fn, np.bool_(True)), {})]:
+            with self.assertRaises(ValueError) as ctx:
+                quadriga_lib.tools.conf_file_read(*args, **kwargs)
+            self.assertIn("r_DS", str(ctx.exception))
+        self.assertEqual(quadriga_lib.tools.conf_file_read(fn, np.bool_(False))[0]["r_DS"], -1.0)
+
+        ref = quadriga_lib.tools.conf_file_read(self.fn)
+        out = quadriga_lib.tools.conf_file_read(self.fn, None)
+        self.assertEqual(out[0], ref[0])
+        npt.assert_array_equal(out[2], ref[2])
+        self.assertEqual(out[3:], ref[3:])
+
+        for value in ["yes", 1, 0, 1.0]:
+            with self.assertRaises(TypeError) as ctx:
+                quadriga_lib.tools.conf_file_read(fn, value)
+            self.assertIn("Input 'validate' must be a bool or None.", str(ctx.exception))
+
+    def test_path_like(self):
+        # str, bytes and os.PathLike give the same result
+        class fspath_only:
+            def __init__(self, path):
+                self.path = path
+
+            def __fspath__(self):
+                return self.path
+
+        ref = quadriga_lib.tools.conf_file_read(self.fn)
+        for fn in [pathlib.Path(self.fn), os.fsencode(self.fn), fspath_only(self.fn), fspath_only(os.fsencode(self.fn))]:
+            out = quadriga_lib.tools.conf_file_read(fn)
+            self.assertEqual(out[0], ref[0])
+            self.assertEqual(list(out[1]), list(ref[1]))
+            npt.assert_array_equal(out[2], ref[2])
+            self.assertEqual(out[3:], ref[3:])
+        self.assertEqual(quadriga_lib.tools.conf_file_read(fn=pathlib.Path(self.fn))[0], ref[0])
+
+        for fn in [5, None, [self.fn]]:
+            with self.assertRaises(TypeError) as ctx:
+                quadriga_lib.tools.conf_file_read(fn)
+            self.assertIn("Input 'fn' must be a str or path-like object.", str(ctx.exception))
+
+    def test_byte_order_mark_and_range(self):
+        # A UTF-8 byte order mark at the start of the file is skipped
+        fn = os.path.join(self.tmp.name, "conf_file_read_bom.conf")
+        with open(fn, "wb") as f:
+            f.write(b"\xef\xbb\xbfDS_mu = -7.25\nShortName = Bm\n")
+        scenpar, _, _, _, short_names, ignored_keys = quadriga_lib.tools.conf_file_read(fn)
+        self.assertEqual(scenpar["DS_mu"], -7.25)
+        self.assertEqual(short_names, ["Bm"])
+        self.assertEqual(ignored_keys, [])
+
+        # A number beyond the range of a double is an error, below it reads as 0
+        fn = self.write("conf_file_read_range.conf", "DS_sigma = 0.3\nDS_mu = 1e400\n")
+        with self.assertRaises(ValueError) as ctx:
+            quadriga_lib.tools.conf_file_read(fn)
+        self.assertIn("line 2: Value of 'DS_mu' is out of range.", str(ctx.exception))
+        fn = self.write("conf_file_read_underflow.conf", "DS_mu = -1e-400\n")
+        value = quadriga_lib.tools.conf_file_read(fn)[0]["DS_mu"]
+        self.assertEqual(value, 0.0)
+        self.assertTrue(np.signbit(value))
 
     def test_empty_outputs(self):
         # No PL_ key, no short name, no unknown key: empty dict and empty lists

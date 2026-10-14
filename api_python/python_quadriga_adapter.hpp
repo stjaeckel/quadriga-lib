@@ -693,6 +693,47 @@ static py::object qd_python_any2numpy(const std::any &dset)
 #undef QD_PY_ANY_ARR
 }
 
+// -------------------------------- Flags and paths --------------------------------
+
+// Python flag -> bool
+// - None gives 'default_value'; Python bool and numpy.bool_ give their value
+// - Anything else (also int and str) throws py::type_error naming the input 'name'
+static bool qd_python_flag(const py::handle &value, bool default_value, const std::string &name)
+{
+    if (value.is_none())
+        return default_value;
+    if (py::isinstance<py::bool_>(value) || py::isinstance(value, py::module_::import("numpy").attr("bool_")))
+    {
+        const int res = PyObject_IsTrue(value.ptr());
+        if (res < 0)
+            throw py::error_already_set();
+        return res == 1;
+    }
+    throw py::type_error("Input '" + name + "' must be a bool or None.");
+}
+
+// Python path -> std::string; returns false if 'value' is not a path
+// - str and bytes as they are; an object with '__fspath__' is converted with os.fspath first
+static bool qd_python_try_path(const py::handle &value, std::string &path)
+{
+    py::object v = py::reinterpret_borrow<py::object>(value);
+    if (!py::isinstance<py::str>(v) && !py::isinstance<py::bytes>(v) && py::hasattr(v, "__fspath__"))
+        v = py::module_::import("os").attr("fspath")(v);
+    if (!py::isinstance<py::str>(v) && !py::isinstance<py::bytes>(v))
+        return false;
+    path = py::cast<std::string>(v);
+    return true;
+}
+
+// Python path (str, bytes or os.PathLike) -> std::string; anything else throws py::type_error naming the input 'name'
+static std::string qd_python_path(const py::handle &value, const std::string &name)
+{
+    std::string path;
+    if (!qd_python_try_path(value, path))
+        throw py::type_error("Input '" + name + "' must be a str or path-like object.");
+    return path;
+}
+
 // -------------------------------- Scenario parameters --------------------------------
 
 // Read a dict value as a C-contiguous double array

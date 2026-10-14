@@ -8,7 +8,8 @@
 // headers, overview formulas, correlation matrix, paragraphs, column alignment, comments with units, path-loss
 // comments and formula blocks per model), the number format, which keys are written with and without
 // 'write_defaults', the order of the path-loss keys, the round trip of the conf files in data/config, overwriting,
-// and the input validation.
+// the safe write (a failed write leaves an existing file unchanged), the independence of the global locale, and the
+// input validation.
 // Left to other suites: the grammar and the value checks of the reader (test_conf_file_read,
 // test_scenpar_validate).
 //
@@ -28,17 +29,25 @@
 #include "quadriga_tools.hpp"
 
 #include <algorithm>
+#include <clocale>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <limits>
+#include <locale>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <vector>
+
+#if defined(__linux__)
+#include <csignal>
+#include <sys/resource.h>
+#include <unistd.h>
+#endif
 
 // Diagnostic output. Comment out to silence the tables. The assertions run either way.
 #define QD_TEST_VERBOSE
@@ -226,6 +235,16 @@ namespace
         return "<none>";
     }
 
+    // Overview line of an LSP in section 0, e.g. "% ESD = ...", without the line end; "<none>" if missing
+    std::string overview_line(const std::string &text, const std::string &label)
+    {
+        const std::string start = "% " + label + std::string(4 - label.size(), ' ') + "= ";
+        for (const auto &l : lines_of(text))
+            if (l.compare(0, start.size(), start) == 0)
+                return l;
+        return "<none>";
+    }
+
     // Number of assignment lines in a text
     int n_assignments(const std::string &text)
     {
@@ -342,12 +361,12 @@ TEST_CASE("conf_file_write - layout of a written file")
         "% See: Test reference; Table 1\n"
         "% ==================================================================================================\n"
         "\n"
-        "% DS  = -6.28 - 0.204 * log10( 0.5 + fGHz ) + 0.1 * log10( d2D ) + Xds * ( 0.39 + 0.02 * log10( 0.5 + fGHz ) )\n"
+        "% DS  = -6.28 - 0.204 * log10( 0.5 + max( fGHz, 6 ) ) + 0.1 * log10( d2D ) + Xds * ( 0.39 + 0.02 * log10( 0.5 + max( fGHz, 6 ) ) )\n"
         "% KF  = -100 + Xkf * ( 0 )\n"
         "% SF  = Xsf * ( 6 )\n"
         "% ASD = 1 + Xasd * ( 0.2 )\n"
         "% ASA = 1 + Xasa * ( 0.2 )\n"
-        "% ESD = 0.9 + Xesd * ( 0.2 )\n"
+        "% ESD = max( -0.5, 0.9 - 2.1 * d2D / 1000 - 0.01 * hUT ) + Xesd * ( 0.2 )\n"
         "% ESA = 0.3 + Xesa * ( 0.2 )\n"
         "% XPR = 7 + Xxpr * ( 3 )\n"
         "\n"
@@ -824,6 +843,14 @@ TEST_CASE("conf_file_write - input validation")
         rejects([&]() { quadriga_lib::conf_file_write("", sp); });
         CHECK_THROWS_AS(quadriga_lib::conf_file_write("test_conf_file_write_no_such_dir/x.conf", sp), std::runtime_error);
         CHECK(!std::filesystem::exists("test_conf_file_write_no_such_dir"));
+
+        // B2: a line break in the file name would end the header comment
+        for (const char *name : {"test_conf_file_write_x\nKF_mu = 5 %.conf", "test_conf_file_write_x\rKF_mu = 5 %.conf"})
+        {
+            tmp_name t(name);
+            CHECK_THROWS_AS(quadriga_lib::conf_file_write(name, sp), std::invalid_argument);
+            CHECK(!file_exists(name));
+        }
     }
 
     SECTION("scenpar")
@@ -835,6 +862,11 @@ TEST_CASE("conf_file_write - input validation")
         rejects([&]() { quadriga_lib::conf_file_write(f.fn, {{"ds_kf", 1.5}}); });        // class correlation
         rejects([&]() { quadriga_lib::conf_file_write(f.fn, {{"DS_lambda", INF}}); });    // class finite >= 0
         rejects([&]() { quadriga_lib::conf_file_write(f.fn, {{"NF_alpha", 1.0}}); });     // NF_alpha without NF_beta
+        rejects([&]() { quadriga_lib::conf_file_write(f.fn, {{"NumClusters", 1001.0}}); }); // Q11: bound 1000
+        rejects([&]() { quadriga_lib::conf_file_write(f.fn, {{"NumSubPaths", 1001.0}}); });
+        rejects([&]() { quadriga_lib::conf_file_write(f.fn, {{"NF_k1", 1001.0}}); });
+        CHECK_NOTHROW(quadriga_lib::conf_file_write(f.fn, {{"NumClusters", 1000.0}, {"NumSubPaths", 1000.0},
+                                                           {"NumClusters_min", 1000.0}, {"NF_k1", 1000.0}}));
     }
 
     SECTION("subpath_method")
@@ -868,9 +900,11 @@ TEST_CASE("conf_file_write - input validation")
 
     SECTION("short_names")
     {
-        const std::vector<std::string> space = {"A b"}, empty = {""};
-        for (const auto *s : {&space, &empty})
+        const std::vector<std::string> space = {"A b"}, empty = {""}, twice = {"Ab", "Cd", "Ab"}; // Q3: distinct
+        for (const auto *s : {&space, &empty, &twice})
             rejects([&]() { quadriga_lib::conf_file_write(f.fn, sp, "legacy", "", nullptr, nullptr, s); });
+        const std::vector<std::string> case_differs = {"Ab", "AB"};
+        CHECK_NOTHROW(quadriga_lib::conf_file_write(f.fn, sp, "legacy", "", nullptr, nullptr, &case_differs));
     }
 
     SECTION("ref and ref_sec")
@@ -891,4 +925,247 @@ TEST_CASE("conf_file_write - input validation")
         CHECK_NOTHROW(quadriga_lib::conf_file_write(f.fn, sp, "legacy", "", nullptr, nullptr, nullptr, "", nullptr, &r0));
         CHECK_NOTHROW(quadriga_lib::conf_file_write(f.fn, sp, "legacy", "", nullptr, nullptr, nullptr, "", nullptr, &r42));
     }
+}
+
+TEST_CASE("conf_file_write - the ESD overview line shows the distance and height terms and the minimum")
+{
+    // Oracle: the lines typed by hand from the rule of Q10: the terms of ES_D_mu_A ... ES_D_mu_D follow the
+    // log10 terms with the same sign style; max( mu_min, mean ) only if ES_D_mu_min is not -Inf; with
+    // LSP_fc_min > 0 the frequency is written as max( fGHz, fc_min ), in the mean and in the STD term.
+    tmp_name f("test_conf_file_write_esd.conf");
+
+    SECTION("height terms, no minimum")
+    {
+        quadriga_lib::conf_file_write(f.fn, {{"ES_D_mu", 1.2}, {"ES_D_gamma", 0.1}, {"ES_D_mu_C", 0.05},
+                                             {"ES_D_mu_D", -0.03}});
+        const std::string text = slurp(f.fn);
+        QD_DIAG("\n# diag: conf_file_write ESD overview\n%s\n%s\n", overview_line(text, "ESD").c_str(),
+                overview_line(text, "DS").c_str());
+        CHECK(overview_line(text, "ESD") ==
+              "% ESD = 1.2 + 0.1 * log10( fGHz ) + 0.05 * abs( hUT - hBS ) - 0.03 * max( hUT - hBS, 0 ) + Xesd * ( 0.2 )");
+        CHECK(overview_line(text, "DS") == "% DS  = -6 + Xds * ( 0.5 )");
+    }
+
+    SECTION("minimum, distance term and lower frequency limit")
+    {
+        quadriga_lib::conf_file_write(f.fn, {{"ES_D_mu", 1.2}, {"ES_D_gamma", 0.1}, {"ES_D_delta", -0.02},
+                                             {"ES_D_mu_A", 0.5}, {"ES_D_mu_min", 0.25}, {"LSP_fc_min", 2.5}});
+        const std::string text = slurp(f.fn);
+        QD_DIAG("%s\n", overview_line(text, "ESD").c_str());
+        CHECK(overview_line(text, "ESD") == "% ESD = max( 0.25, 1.2 + 0.1 * log10( max( fGHz, 2.5 ) ) + 0.5 * d2D / "
+                                            "1000 ) + Xesd * ( 0.2 - 0.02 * log10( max( fGHz, 2.5 ) ) )");
+        CHECK(overview_line(text, "ESA") == "% ESA = 0.3 + Xesa * ( 0.2 )");
+    }
+
+    SECTION("a minimum without other terms")
+    {
+        quadriga_lib::conf_file_write(f.fn, {{"ES_D_mu_min", -0.0}, {"ES_D_mu_B", 0.2}});
+        CHECK(overview_line(slurp(f.fn), "ESD") == "% ESD = max( -0, 0.3 + 0.2 * hUT ) + Xesd * ( 0.2 )");
+    }
+}
+
+TEST_CASE("conf_file_write - a failed write leaves an existing file unchanged")
+{
+#if !defined(__linux__)
+    SKIP("needs Linux: file size limit and /dev/full");
+#else
+    // Decision B1: the text goes to a temporary file in the same directory, which is renamed over the target
+    // only after it was closed without error. A failed call leaves an existing file unchanged and no temporary
+    // file behind. The write error is provoked by a file size limit of 2048 bytes (SIGXFSZ ignored, so that
+    // write() fails with EFBIG); the limit is lifted before any assertion, since it also applies to a
+    // redirected stdout.
+    const std::string dir = "test_conf_file_write_fail_dir";
+    std::filesystem::remove_all(dir);
+    std::filesystem::create_directory(dir);
+    const std::string fn = dir + "/test_conf_file_write_fail.conf";
+    const std::string old_content = "% older content that must survive\nDS_mu = -7\n";
+
+    // Number of files in 'dir' whose name contains ".tmp"
+    auto n_tmp = [&dir]()
+    {
+        int n = 0;
+        for (const auto &e : std::filesystem::directory_iterator(dir))
+            n += e.path().filename().string().find(".tmp") != std::string::npos ? 1 : 0;
+        return n;
+    };
+
+    const std::unordered_map<std::string, double> sp = {{"DS_mu", -7.5}, {"KF_mu", 3.0}, {"XPR_mu", 8.0}};
+    std::unordered_map<std::string, std::vector<double>> pl; // 60 keys: about 3.4 KB, less than the stream buffer
+    for (int i = 0; i < 60; ++i)
+        pl["K" + std::to_string(i)] = {1.0 / 3.0};
+
+    QD_DIAG("\n# diag: conf_file_write under a file size limit of 2048 bytes\n");
+    QD_DIAG("write_defaults,text_bytes,runtime_error,other_error,old_content_kept,n_tmp\n");
+    for (bool wd : {false, true})
+    {
+        INFO("write_defaults " << wd);
+
+        // Size of the text without a limit
+        quadriga_lib::conf_file_write(fn, sp, "legacy", "", &pl, nullptr, nullptr, "", nullptr, nullptr, wd);
+        const size_t n_bytes = slurp(fn).size();
+        REQUIRE(n_bytes > 2048);
+
+        put(fn, old_content);
+        bool runtime_error = false, other_error = false;
+        {
+            struct rlimit old_limit, limit;
+            getrlimit(RLIMIT_FSIZE, &old_limit);
+            limit = old_limit;
+            limit.rlim_cur = 2048;
+            void (*old_handler)(int) = std::signal(SIGXFSZ, SIG_IGN);
+            setrlimit(RLIMIT_FSIZE, &limit);
+            try
+            {
+                quadriga_lib::conf_file_write(fn, sp, "legacy", "", &pl, nullptr, nullptr, "", nullptr, nullptr, wd);
+            }
+            catch (const std::runtime_error &)
+            {
+                runtime_error = true;
+            }
+            catch (...)
+            {
+                other_error = true;
+            }
+            setrlimit(RLIMIT_FSIZE, &old_limit);
+            std::signal(SIGXFSZ, old_handler);
+        }
+        const bool kept = slurp(fn) == old_content;
+        QD_DIAG("%d,%zu,%d,%d,%d,%d\n", (int)wd, n_bytes, (int)runtime_error, (int)other_error, (int)kept, n_tmp());
+        CHECK(runtime_error);
+        CHECK(!other_error);
+        CHECK(kept);
+        CHECK(n_tmp() == 0);
+    }
+
+    // A device without space: the temporary file cannot be created next to it
+    if (std::filesystem::exists("/dev/full") && geteuid() != 0)
+    {
+        CHECK_THROWS_AS(quadriga_lib::conf_file_write("/dev/full", sp), std::runtime_error);
+        CHECK_THROWS_AS(quadriga_lib::conf_file_write("/dev/full", sp, "legacy", "", nullptr, nullptr, nullptr, "",
+                                                      nullptr, nullptr, true),
+                        std::runtime_error);
+    }
+
+    // A read-only existing file is not replaced (skipped where the permission is not enforced)
+    const std::string fn_ro = dir + "/test_conf_file_write_ro.conf";
+    put(fn_ro, old_content);
+    std::filesystem::permissions(fn_ro, std::filesystem::perms::owner_read);
+    if (!std::ofstream(fn_ro, std::ios::app).is_open())
+    {
+        CHECK_THROWS_AS(quadriga_lib::conf_file_write(fn_ro, sp), std::runtime_error);
+        CHECK(slurp(fn_ro) == old_content);
+        CHECK(n_tmp() == 0);
+    }
+    std::filesystem::permissions(fn_ro, std::filesystem::perms::owner_read | std::filesystem::perms::owner_write);
+
+    // A read-only directory: no new file (skipped where the permission is not enforced)
+    const std::string dir_ro = dir + "/ro";
+    std::filesystem::create_directory(dir_ro);
+    std::filesystem::permissions(dir_ro, std::filesystem::perms::owner_read | std::filesystem::perms::owner_exec);
+    if (!std::ofstream(dir_ro + "/probe").is_open())
+    {
+        CHECK_THROWS_AS(quadriga_lib::conf_file_write(dir_ro + "/x.conf", sp), std::runtime_error);
+        CHECK(!std::filesystem::exists(dir_ro + "/x.conf"));
+    }
+    std::filesystem::permissions(dir_ro, std::filesystem::perms::owner_all);
+
+    // An existing file is replaced and keeps its permission bits; a new file gets those of std::ofstream
+    const std::string fn_perm = dir + "/test_conf_file_write_perm.conf";
+    const auto rw = std::filesystem::perms::owner_read | std::filesystem::perms::owner_write;
+    put(fn_perm, old_content);
+    std::filesystem::permissions(fn_perm, rw);
+    CHECK_NOTHROW(quadriga_lib::conf_file_write(fn_perm, sp));
+    CHECK(std::filesystem::status(fn_perm).permissions() == rw);
+    CHECK(read_back(fn_perm).scenpar.at("XPR_mu") == 8.0);
+
+    const std::string fn_new = dir + "/test_conf_file_write_new.conf", fn_ref = dir + "/reference_file";
+    put(fn_ref, "x");
+    CHECK_NOTHROW(quadriga_lib::conf_file_write(fn_new, sp));
+    CHECK(std::filesystem::status(fn_new).permissions() == std::filesystem::status(fn_ref).permissions());
+
+    // A symbolic link is written through: the link stays, its target gets the text
+    std::error_code ec;
+    std::filesystem::create_symlink("test_conf_file_write_target.conf", dir + "/link.conf", ec);
+    if (!ec)
+    {
+        put(dir + "/test_conf_file_write_target.conf", old_content);
+        CHECK_NOTHROW(quadriga_lib::conf_file_write(dir + "/link.conf", sp));
+        CHECK(std::filesystem::is_symlink(dir + "/link.conf"));
+        CHECK(read_back(dir + "/test_conf_file_write_target.conf").scenpar.at("XPR_mu") == 8.0);
+    }
+
+    // A symbolic link to itself cannot be resolved
+    std::filesystem::create_symlink("loop.conf", dir + "/loop.conf", ec);
+    if (!ec)
+        CHECK_THROWS_AS(quadriga_lib::conf_file_write(dir + "/loop.conf", sp), std::runtime_error);
+    CHECK(n_tmp() == 0);
+
+    std::filesystem::remove_all(dir);
+#endif
+}
+
+TEST_CASE("conf_file_write - numbers do not depend on the global locale")
+{
+    // Oracle: the same file read and written in the classic locale; values compared bit for bit, texts exactly.
+    // The locale must have a decimal comma, so that a locale-dependent conversion would read '-6.28' as -6.
+    tmp_name f_in("test_conf_file_write_locale_in.conf"), f_out("test_conf_file_write_locale_out.conf");
+    put(f_in.fn, "DS_mu = -6.28\nDS_lambda = 1.5e3\nDS_sigma = .25\nPL_A = -6.28 1.5e3 .25\n");
+
+    const conf_data c = read_back(f_in.fn);
+    write_data(f_out.fn, c, true);
+    const std::string text_c = slurp(f_out.fn);
+    CHECK(c.scenpar.at("DS_mu") == -6.28);
+    CHECK(c.scenpar.at("DS_lambda") == 1500.0);
+    CHECK(c.scenpar.at("DS_sigma") == 0.25);
+
+    // Switch both the C and the C++ global locale; restored when 'guard' goes out of scope, also on an exception
+    struct locale_guard
+    {
+        std::string c_name = std::setlocale(LC_ALL, nullptr);
+        std::locale cpp_locale;
+        ~locale_guard()
+        {
+            std::setlocale(LC_ALL, c_name.c_str());
+            std::locale::global(cpp_locale);
+        }
+    };
+
+    std::string used, decimal_point, text_l;
+    conf_data l;
+    {
+        locale_guard guard;
+        for (const char *name : {"de_DE.UTF-8", "de_DE.utf8", "en_DK.UTF-8", "en_DK.utf8", "German_Germany.1252"})
+        {
+            try
+            {
+                std::locale loc(name);
+                if (std::setlocale(LC_ALL, name) == nullptr)
+                    continue;
+                std::locale::global(loc);
+                used = name;
+                break;
+            }
+            catch (const std::runtime_error &)
+            {
+            }
+        }
+        if (!used.empty())
+        {
+            char buf[16];
+            std::snprintf(buf, sizeof(buf), "%.1f", 1.5);
+            decimal_point = buf;
+            l = read_back(f_in.fn);
+            write_data(f_out.fn, l, true);
+            text_l = slurp(f_out.fn);
+        }
+    }
+    if (used.empty())
+        SKIP("no locale with a decimal comma is installed");
+
+    QD_DIAG("\n# diag: conf_file_write locale '%s', 1.5 printed as '%s', texts equal %d\n", used.c_str(),
+            decimal_point.c_str(), (int)(text_l == text_c));
+    CHECK(decimal_point == "1,5"); // the locale is a decimal-comma locale
+    CHECK(differences(c, l).empty());
+    CHECK(text_l == text_c);
+    CHECK(text_c.find("-6.28") != std::string::npos);
 }

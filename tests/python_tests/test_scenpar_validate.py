@@ -82,6 +82,26 @@ class test_case(unittest.TestCase):
         npt.assert_array_equal(out[1], ref[1])
         self.assertEqual(out[2], ref[2])
 
+    def test_validate_flag_types(self):
+        # None selects the default (True); bool and numpy.bool_ are accepted; anything else is a TypeError
+        bad = {"r_DS": -1.0}
+        for args, kwargs in [((bad, None), {}), ((bad,), {"validate": None}), ((bad, np.bool_(True)), {})]:
+            with self.assertRaises(ValueError) as ctx:
+                quadriga_lib.tools.scenpar_validate(*args, **kwargs)
+            self.assertIn("r_DS", str(ctx.exception))
+        self.assertEqual(quadriga_lib.tools.scenpar_validate(bad, np.bool_(False))[0]["r_DS"], -1.0)
+
+        ref = quadriga_lib.tools.scenpar_validate(self.scenpar)
+        out = quadriga_lib.tools.scenpar_validate(self.scenpar, None)
+        self.assertEqual(out[0], ref[0])
+        npt.assert_array_equal(out[1], ref[1])
+        self.assertEqual(out[2], ref[2])
+
+        for value in ["yes", 1, 0.0]:
+            with self.assertRaises(TypeError) as ctx:
+                quadriga_lib.tools.scenpar_validate(bad, value)
+            self.assertIn("Input 'validate' must be a bool or None.", str(ctx.exception))
+
     def test_validate(self):
         # Default is validate = True
         bad = {"DS_mu": np.nan, "SubpathMethod": "foo"}

@@ -23,14 +23,15 @@ Validate scenario parameters and complete them with default values
 - A field that is not one of the 166 names is an error, also with `validate = false`; this includes
   the QuaDRiGa field `GR_epsilon`, which is not supported
 - Value checks with `validate = true`; `NaN` is an error for every field:
-  - Integer and > 0: `NumClusters`, `NumSubPaths`
+  - Integer from 1 to 1000: `NumClusters`, `NumSubPaths`
   - Finite and > 0: `r_DS`
   - Finite and >= 0: the 8 decorrelation distances (`DS_lambda` ... `XPR_lambda`), `SC_lambda`,
     `absTOA_lambda`, `PerClusterDS`, `PerClusterDS_min`, `PerClusterAS_D`, `PerClusterAS_A`,
-    `PerClusterES_D`, `PerClusterES_A`, `LNS_ksi`, `LOS_scatter_radius`, `GR_enabled`, `LSP_fc_min`,
-    `EoD_offset_b`, `EoD_offset_hcl`, `PerClusterDS_fc_min`, `PerClusterES_D_scale`, `absTOA_Lmax`,
-    `NF_alpha`, `NF_beta`, `SNS_sigma`, `SNS_A`, `SNS_B`, `SNS_R`, `SNS_delta_var`, `PolVar_sigma`
-  - Integer and >= 0: `NumClusters_min`, `NF_k1`
+    `PerClusterES_D`, `PerClusterES_A`, `LNS_ksi`, `LOS_scatter_radius`, `GR_enabled`,
+    `LSP_fc_min`, `EoD_offset_b`, `EoD_offset_hcl`, `PerClusterDS_fc_min`, `PerClusterES_D_scale`,
+    `absTOA_Lmax`, `NF_alpha`, `NF_beta`, `SNS_sigma`, `SNS_A`, `SNS_B`, `SNS_R`, `SNS_delta_var`,
+    `PolVar_sigma`
+  - Integer from 0 to 1000: `NumClusters_min`, `NF_k1`
   - In the range from 0 to 1: `SNS_mu`
   - In the range from -1 to 1: the 28 correlations (`asD_ds` to `xpr_esa`)
   - All other numeric fields accept any value including `Inf` and `-Inf`
@@ -58,11 +59,12 @@ Validate scenario parameters and complete them with default values
   `SubpathMethod` (string) as field 107, then the 27 new keys; all numeric fields are double scalars
 - **`lsp_xcorr`** — LSP cross-correlation matrix; order of rows and columns: DS, KF, SF, ASD, ASA,
   ESD, ESA, XPR; `[8, 8]`
-- **`lsp_xcorr_chk`** — `true` if `lsp_xcorr` is positive definite; `false` also if it contains `NaN`;
-  logical
+- **`lsp_xcorr_chk`** — `true` if `lsp_xcorr` is positive definite; `false` also if it contains
+  `NaN`; logical
 
 ## See also:
 - [[conf_file_read]] (read the parameters from a conf file)
+- [[conf_file_write]] (applies the same checks before writing)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

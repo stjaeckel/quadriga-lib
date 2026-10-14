@@ -88,6 +88,46 @@ The key names `PerClusterDS_fc_min` and `PerClusterES_D_scale`, like all names i
 proposals. Review point A is the place to rename them.
 
 
+## Record of later changes
+
+Changes after this plan was written. The sections below are not rewritten; where they differ, this record
+holds.
+
+- `GR_epsilon` dropped (3690107): the key table has 138 + 27 = 165 numeric keys, the MEX struct and the Python
+  dict 166 fields with `SubpathMethod`. In a file the key is ignored and reported in `ignored_keys`; in
+  `scenpar_validate` and `conf_file_write` it is an unknown name and an error. Sections 4.2, 6, 7.1, WI-3 and 9
+  still count it (`n_key = 166`, "grows from 140 to 167 fields").
+- `conf_file_write` added (e525c7b), a fourth public function, with the decisions of its review point A: a key is
+  written only if its value differs from the default (bit for bit), a section without a written key is left out,
+  the sections "EoD offset" and "Optional modelling components" are new, numbers read back bit for bit.
+- MEX wrappers of `conf_file_read`, `scenpar_validate` and `conf_file_list` (3690107) and of `conf_file_write`
+  (ad7a9a4); Python wrappers of all four in `quadriga_lib.tools` (145f163).
+- The parity test of WI-5 was removed (e525c7b), see the status note of WI-5.
+- Decisions of 2026-10-14 on the review `md/REVIEW_CONF_FILE.md`, implemented by `md/PLAN_CONF_FILE_FIXES.md`:
+  - B1: `conf_file_write` writes a temporary file in the same directory and renames it over the target; a
+    failed call never changes an existing file and leaves no file behind; an existing file keeps its
+    permissions. An existing target that is not a regular file (directory, device, FIFO) is an error.
+  - B2: a line break in the file name of `conf_file_write` is an error.
+  - B3: Python flags (`validate`, `parse_shortnames`, `write_defaults`): `None` selects the default, `bool` and
+    `numpy.bool_` are accepted, anything else is a `TypeError`.
+  - Q1: a UTF-8 byte order mark at the start of a file is skipped (reader and lister).
+  - Q2: a number beyond the range of a double is the error "is out of range"; below the smallest subnormal it
+    reads as the signed 0 that `strtod` gives in the C locale. The conversion stays a stream with the classic
+    locale (the fallback of the plan): `std::from_chars` for `double` needs `GLIBCXX_3.4.29`, which the
+    libstdc++ of MATLAB R2024a does not have, so the MEX files could not be loaded (decided 2026-10-14).
+  - Q3: a `ShortName` value stated twice in one file is an error of the reader (both `validate` modes);
+    `conf_file_write` rejects duplicate short names.
+  - Q4: Python `fn` and `dirs` accept `str`, `bytes` and `os.PathLike`.
+  - Q5: the shared MEX helpers raise `quadriga_lib:CPPerror` (was `MATLAB:unexpectedCPPexception`).
+  - Q6: a MEX `plpar` field must be a vector.
+  - Q7: kept; the scenario name of the lister is the file name without `.conf`, whatever characters it has.
+  - Q8: kept; a directory that cannot be listed is skipped like a missing one.
+  - Q10: the ESD overview comment of a written file shows `ES_D_mu_A` to `ES_D_mu_D` and the lower limit
+    `ES_D_mu_min`; with `LSP_fc_min > 0` the frequency is written as `max( fGHz, fc_min )`.
+  - Q11: `NumClusters` and `NumSubPaths` are integers from 1 to 1000, `NumClusters_min` and `NF_k1` from 0 to 1000.
+  - Q12: test cases do not share temporary file names.
+
+
 ## 4. Background: the format and the MATLAB parser
 
 ### 4.1 File format

@@ -26,21 +26,29 @@ Write a QuaDRiGa scenario configuration file
     fading spatial consistency; 6: Parameters for the ground reflection extension; 7: Absolute
     time of arrival offset; 10: Optional modelling components; 8: Path-loss model
   - The entries 1 to 8 are those of QuaDRiGa, so its 8 section references can be passed unchanged
+- The overview formula of an LSP shows its mean and STD with the frequency, distance, height and
+  elevation terms; with `LSP_fc_min > 0` the frequency is written as `max( fGHz, fc_min )`; the
+  ESD line also has the terms of `ES_D_mu_A` to `ES_D_mu_D` and, if `ES_D_mu_min` is not `-Inf`,
+  the lower limit of the mean
 - Each line is `name = value % comment`, aligned in columns; the comment states the unit
 - The path-loss section has the formula blocks of the model (`logdist`, `dual_slope`, `nlos`,
   `tripple_slope`), the line `PL_model`, then the fields of `plpar` in struct order with the prefix
   `PL_`; several values of one field are written on one line
-- Numbers are written with the fewest significant digits (15 to 17) that [[conf_file_read]] reads
-  back to the same double; `Inf` and `-Inf` are written as such
+- Numbers are written with up to 15 significant digits, or with 16 or 17 where 15 do not read back
+  to the same double in [[conf_file_read]]; `Inf` and `-Inf` are written as such
 - With `write_defaults = false` a field is written only if its value differs from the default;
   `SubpathMethod` only if it is not `legacy`; a section without a written field is left out
 - With `write_defaults = true` all 165 numeric fields and `SubpathMethod` are written
 - The inputs are checked with the rules of [[scenpar_validate]] before the file is opened: unknown
   fields (including `GR_epsilon`), `NaN`, values outside their range and a wrong `SubpathMethod`
-  are errors. Further errors: a `model` that is not one name, an empty or `NaN` path-loss value,
-  short names that are not one name, line breaks in `ref` or `ref_sec`, more than 10 entries in
-  `ref_sec`, a `valid_range` that is not empty and not `[4, 2]`.
-- A failed call does not create or change a file; an existing file is overwritten
+  are errors. Further errors: a line break in the file name, a `model` that is not one name, an
+  empty or `NaN` path-loss value, short names that are not one name or not distinct, line breaks
+  in `ref` or `ref_sec`, more than 10 entries in `ref_sec`, a `valid_range` that is not empty and
+  not `[4, 2]`.
+- The text is written to a temporary file in the same directory, which must be writable, and then
+  renamed to `fn`; a symbolic link `fn` is written through
+- A failed call does not create a file and leaves an existing file unchanged; an existing file is
+  replaced and keeps its permissions
 - Every file written passes [[conf_file_read]] with `validate = true` and without ignored keys
 
 ## Usage:
@@ -56,11 +64,11 @@ quadriga_lib.conf_file_write( fn, scenpar, plpar, short_names, ref, ref_sec, val
   int64, uint64 or logical; `SubpathMethod` is a string; missing fields have their default; `[]`
   writes the default set
 - **`plpar`** *(optional)* — Path-loss parameters; struct with the field `model` (string) and one
-  real vector of class double, single, int32, uint32, int64 or uint64 per further field, named
-  without the prefix `PL_`, as returned by [[conf_file_read]]; written in struct order; if omitted
-  or `[]`, no path-loss section
+  real vector (row or column) of class double, single, int32, uint32, int64 or uint64 per further
+  field, named without the prefix `PL_`, as returned by [[conf_file_read]]; a matrix is an error;
+  written in struct order; if omitted or `[]`, no path-loss section
 - **`short_names`** *(optional)* — Short names of the scenario; cell array of strings or one string;
-  each one name of the characters `A-Z`, `a-z`, `0-9`, `_`
+  each one name of the characters `A-Z`, `a-z`, `0-9`, `_`; distinct
 - **`ref`** — Literature reference; written in the header and before each non-empty entry of
   `ref_sec`; string; default: no reference
 - **`ref_sec`** *(optional)* — Reference per section, numbered as listed above; cell array of up to

@@ -425,8 +425,8 @@ inline mxArray *qd_mex_scenpar2struct(const std::unordered_map<std::string, doub
 
 // 1x1 struct of QuaDRiGa path-loss parameters -> map of the numeric values, the model and the field order
 // - The field 'model' must be a string; it is returned in 'pl_model' (empty if the struct has no such field)
-// - Every other field must be a real numeric array of the classes that qd_mex_typecast_Col reads; it is read as a
-//   vector in memory order
+// - Every other field must be a real numeric vector (empty, a scalar, a row or a column) of the classes that
+//   qd_mex_typecast_Col reads
 // - 'pl_order' lists the numeric fields in struct order
 // - Empty input ([] or a struct without fields) gives an empty map, empty 'pl_model' and empty 'pl_order'
 // - 'var_name' is used in the error message for a wrong input type
@@ -457,7 +457,8 @@ inline std::unordered_map<std::string, std::vector<double>> qd_mex_struct2plpar(
         }
         else
         {
-            if (data == nullptr || mxIsComplex(data) || !mxIsNumeric(data))
+            if (data == nullptr || mxIsComplex(data) || !mxIsNumeric(data) || mxGetNumberOfDimensions(data) > 2 ||
+                (mxGetM(data) > 1 && mxGetN(data) > 1))
                 mexErrMsgIdAndTxt("quadriga_lib:CPPerror", ("Field '" + name + "' must be a real numeric vector.").c_str());
             const arma::vec values = qd_mex_typecast_Col<double>(data, name);
             plpar[name] = std::vector<double>(values.begin(), values.end());

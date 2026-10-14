@@ -5,16 +5,19 @@
 #include "quadriga_tools.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <limits>
 #include <locale>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <system_error>
+#include <thread>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -26,8 +29,8 @@ enum qd_scenpar_class : unsigned char
     QD_REAL,       // Any value except NaN; same rule as QD_ANY, kept apart to mirror the MATLAB reference
     QD_NONNEG,     // Finite and >= 0
     QD_POS,        // Finite and > 0
-    QD_INT_POS,    // Integer and > 0
-    QD_INT_NONNEG, // Integer and >= 0
+    QD_INT_POS,    // Integer from 1 to 1000
+    QD_INT_NONNEG, // Integer from 0 to 1000
     QD_CORR,       // In [-1, 1]
     QD_UNIT        // In [0, 1]
 };
@@ -244,9 +247,9 @@ static const char *qd_scenpar_check_value(qd_scenpar_class cls, double v)
     case QD_POS:
         return (v > 0.0 && std::isfinite(v)) ? nullptr : "must be finite and > 0";
     case QD_INT_POS:
-        return (v > 0.0 && std::isfinite(v) && std::floor(v) == v) ? nullptr : "must be an integer > 0";
+        return (v >= 1.0 && v <= 1000.0 && std::floor(v) == v) ? nullptr : "must be an integer from 1 to 1000";
     case QD_INT_NONNEG:
-        return (v >= 0.0 && std::isfinite(v) && std::floor(v) == v) ? nullptr : "must be an integer >= 0";
+        return (v >= 0.0 && v <= 1000.0 && std::floor(v) == v) ? nullptr : "must be an integer from 0 to 1000";
     case QD_CORR:
         return (v >= -1.0 && v <= 1.0) ? nullptr : "must be in the range from -1 to 1";
     case QD_UNIT:
@@ -261,12 +264,10 @@ static const char *qd_scenpar_check_value(qd_scenpar_class cls, double v)
 static void qd_scenpar_check(const double *val, const std::string &subpath_method,
                              const std::string &fn = "", const arma::uword *line = nullptr, arma::uword subpath_line = 0)
 {
+    // From the reader a failing key always has a line: defaults pass every check, the cross-key checks name a key
+    // that was set in the file
     auto where = [&fn](arma::uword ln) -> std::string
-    {
-        if (fn.empty())
-            return "";
-        return ln == 0 ? fn + ": " : fn + ", line " + std::to_string(ln) + ": ";
-    };
+    { return fn.empty() ? "" : fn + ", line " + std::to_string(ln) + ": "; };
 
     for (arma::uword i = 0; i < qd_scenpar_n_key; ++i)
     {
@@ -373,7 +374,8 @@ static std::string qd_conf_trim(const std::string &s, size_t b, size_t e)
     return s.substr(b, e - b);
 }
 
-// Split a file into lines at '\n' and remove one trailing '\r' per line
+// Split a file into lines at '\n' and remove one trailing '\r' per line; a UTF-8 byte order mark at the start of the
+// file is removed
 static std::vector<std::string> qd_conf_read_lines(const std::string &fn)
 {
     std::error_code ec;
@@ -389,6 +391,8 @@ static std::vector<std::string> qd_conf_read_lines(const std::string &fn)
             line.pop_back();
         lines.push_back(line);
     }
+    if (!lines.empty() && lines[0].compare(0, 3, "\xEF\xBB\xBF") == 0)
+        lines[0].erase(0, 3);
     return lines;
 }
 
@@ -434,9 +438,22 @@ static std::vector<std::string> qd_conf_tokens(const std::string &value)
     return tok;
 }
 
+// Result of 'qd_conf_parse_number'
+enum qd_conf_num : unsigned char
+{
+    QD_NUM_OK,      // A number; 'v' is set
+    QD_NUM_INVALID, // Not a number by the grammar
+    QD_NUM_RANGE    // Beyond the range of a double
+};
+
 // Parse one number token: [+-] digits [. digits] [e|E [+-] digits], with at least one digit before the
-// exponent, or [+-] Inf in any case. Returns false for anything else (NaN, complex, hex, trailing text).
-static bool qd_conf_parse_number(const std::string &s, double &v)
+// exponent, or [+-] Inf in any case; anything else (NaN, complex, hex, trailing text) is QD_NUM_INVALID
+// - A number beyond the range of a double is QD_NUM_RANGE; a number below the smallest subnormal is the 0 with its
+//   sign, which is what strtod returns in the C locale
+// - 'v' is written only for QD_NUM_OK
+// - The conversion uses a stream with the classic locale, not std::from_chars: in libstdc++ the double overload of
+//   from_chars needs GLIBCXX_3.4.29, which the libstdc++ shipped with MATLAB R2024a does not provide
+static qd_conf_num qd_conf_parse_number(const std::string &s, double &v)
 {
     const size_t n = s.size();
     size_t i = 0;
@@ -448,40 +465,65 @@ static bool qd_conf_parse_number(const std::string &s, double &v)
         (s[i + 2] == 'f' || s[i + 2] == 'F'))
     {
         v = negative ? -QD_INF : QD_INF;
-        return true;
+        return QD_NUM_OK;
     }
 
+    // Decimal order of the first non-zero digit: digits before the point counted from it, minus the zeros after
+    // the point before it; plus the exponent (saturated)
+    long long order = 0;
+    bool nonzero = false;
     size_t n_digit = 0;
     while (i < n && s[i] >= '0' && s[i] <= '9')
+    {
+        nonzero = nonzero || s[i] != '0';
+        order += nonzero ? 1 : 0;
         ++i, ++n_digit;
+    }
     if (i < n && s[i] == '.')
     {
         ++i;
         while (i < n && s[i] >= '0' && s[i] <= '9')
+        {
+            nonzero = nonzero || s[i] != '0';
+            order -= nonzero ? 0 : 1;
             ++i, ++n_digit;
+        }
     }
     if (n_digit == 0)
-        return false;
+        return QD_NUM_INVALID;
 
     if (i < n && (s[i] == 'e' || s[i] == 'E'))
     {
         ++i;
+        bool negative_exp = false;
         if (i < n && (s[i] == '+' || s[i] == '-'))
-            ++i;
+            negative_exp = s[i++] == '-';
         size_t n_exp = 0;
+        long long exp = 0;
         while (i < n && s[i] >= '0' && s[i] <= '9')
+        {
+            exp = std::min(exp * 10 + (s[i] - '0'), 1000000000LL);
             ++i, ++n_exp;
+        }
         if (n_exp == 0)
-            return false;
+            return QD_NUM_INVALID;
+        order += negative_exp ? -exp : exp;
     }
     if (i != n)
-        return false;
+        return QD_NUM_INVALID;
 
-    // The text is a plain decimal number; convert it independent of the global locale
+    // The text is a plain decimal number; convert it independent of the global locale. The stream fails on
+    // overflow (LWG 23) and returns the value of strtod on underflow.
     std::istringstream is(s);
     is.imbue(std::locale::classic());
-    is >> v;
-    return !is.fail();
+    double w = 0.0;
+    is >> w;
+    if (!is.fail())
+    {
+        v = w;
+        return QD_NUM_OK;
+    }
+    return (nonzero && order > 0) ? QD_NUM_RANGE : QD_NUM_INVALID;
 }
 
 // Values of a parameter set in table order; keys that are not in 'scenpar' have their default
@@ -507,7 +549,7 @@ static void qd_scenpar_values(const std::unordered_map<std::string, double> &sce
 }
 
 // Sections of a written conf file; the index is the position in 'ref_sec', the write order is 'qd_conf_section_order'
-static const char *qd_conf_sections[] = {
+static const char *const qd_conf_sections[] = {
     "Large scale distributions",
     "Large-Scale fading decorrelation distances",
     "Inter-parameter correlations",
@@ -523,12 +565,12 @@ static const unsigned char qd_conf_section_order[] = {0, 1, 2, 3, 8, 4, 5, 6, 9,
 static const unsigned char QD_CONF_SEC_CORR = 2, QD_CONF_SEC_MODEL = 3, QD_CONF_SEC_PL = 7, QD_CONF_N_SEC = 10;
 
 // LSPs in the order of the cross-correlation matrix: key prefix, label, name of the random variable
-static const char *qd_conf_lsp[8][3] = {{"DS", "DS", "Xds"}, {"KF", "KF", "Xkf"}, {"SF", "SF", "Xsf"},
-                                        {"AS_D", "ASD", "Xasd"}, {"AS_A", "ASA", "Xasa"}, {"ES_D", "ESD", "Xesd"},
-                                        {"ES_A", "ESA", "Xesa"}, {"XPR", "XPR", "Xxpr"}};
+static const char *const qd_conf_lsp[8][3] = {{"DS", "DS", "Xds"}, {"KF", "KF", "Xkf"}, {"SF", "SF", "Xsf"},
+                                              {"AS_D", "ASD", "Xasd"}, {"AS_A", "ASA", "Xasa"}, {"ES_D", "ESD", "Xesd"},
+                                              {"ES_A", "ESA", "Xesa"}, {"XPR", "XPR", "Xxpr"}};
 
 // Comments of the path-loss keys; the first row whose name matches and whose model is empty or equal to 'PL_model' wins
-static const char *qd_conf_pl_comments[][3] = {
+static const char *const qd_conf_pl_comments[][3] = {
     {"A", "constant", "Reference PL in [dB]"},
     {"A", "", "TX-RX 3D dist.-dep. of the PL [dB/log10(m)]"},
     {"A1", "nlos", "TX-RX 3D dist.-dep. of the LOS-PL before break-point [dB/log10(m)]"},
@@ -569,7 +611,7 @@ static const char *qd_conf_pl_comments[][3] = {
     {"usePLa", "", "Enable/disable attenuation by atmospheric gases"}};
 
 // Formula blocks of the path-loss section, written in this order; first entry: the models, each enclosed in '|'
-static const char *qd_conf_pl_formulas[][2] = {
+static const char *const qd_conf_pl_formulas[][2] = {
     {"|logdist|",
      "% Formula for Hata pathloss model:\n"
      "% (Distance in meters, frequency in GHz)\n"
@@ -627,7 +669,7 @@ static std::string qd_conf_number(double v)
         os << v;
         s = os.str();
         double w;
-        if (qd_conf_parse_number(s, w) && std::memcmp(&v, &w, sizeof(double)) == 0)
+        if (qd_conf_parse_number(s, w) == QD_NUM_OK && std::memcmp(&v, &w, sizeof(double)) == 0)
             break;
     }
     return s; // 17 digits always read back for a correctly rounding parser
@@ -658,29 +700,33 @@ SECTION!*/
 Read and validate a QuaDRiGa scenario configuration file
 
 - A conf file is a text file with one `Key = value` assignment per line; `%` starts a comment; blank lines
-  are allowed; line ends can be LF or CRLF; space and tab are white space
+  are allowed; line ends can be LF or CRLF; space and tab are white space; a UTF-8 byte order mark at the start
+  of the file is skipped
 - Keys are case-sensitive names of the characters `A-Z`, `a-z`, `0-9` and `_`; there are four kinds:
   - Scenario parameters: `n_key = 165` numeric keys with one number each, returned in `scenpar`. Keys that
     are not in the file have their default value. The names and their order are returned in `key_order`.
   - `SubpathMethod`: one of the words `legacy`, `Laplacian`, `mmMAGIC`; default `legacy`
   - Path-loss parameters: every key that starts with `PL_`. `PL_model` has one name as value. All others
     have one or more numbers separated by white space and are returned in `plpar` without the prefix.
-  - `ShortName`: an alias for the scenario, one name; can occur several times
+  - `ShortName`: an alias for the scenario, one name; can occur several times with different values
 - Any other key is ignored and reported in `ignored_keys`; its value is not examined
 - A key that is stated more than once has its last value
 - Numbers are decimal with an optional sign, an optional decimal point and an optional exponent (`e` or
   `E`), for example `-6.28`, `.5`, `6.2e-07`; `Inf`, `+Inf` and `-Inf` are accepted in any case
+- A number beyond the range of a double (`1e400`) is an error "out of range"; a number below the smallest
+  subnormal reads as `0` (or `-0`)
+- Numbers are read independent of the global locale (the decimal point is always `.`)
 - Elevation angles are used throughout (+90 deg is up); no key refers to a zenith angle
 - The 165 keys are 138 numeric keys of QuaDRiGa and 27 keys for 3GPP TR 38.901 v19.5.0. With their
   default of 0 the new keys have no effect.
 - The QuaDRiGa key `GR_epsilon` (fixed relative permittivity of the ground) is not supported and is
   reported in `ignored_keys` like any other unknown key; the permittivity is complex and is set in the simulation
 - The 28 correlation keys (`asD_ds` to `xpr_esa`) define the symmetric matrix `lsp_xcorr` with unit diagonal
-- Throws `std::runtime_error` if the file cannot be opened
+- Throws `std::runtime_error` if the file cannot be opened or is a directory
 - Throws `std::invalid_argument` with file name and line number for a line that is not blank, not a comment
   and not a well-formed assignment: no `=`, more or less than one name before the `=`, a missing value, a
   word where a number is required or the reverse, a second value or other text after the value, `NaN`,
-  complex numbers, a `PL_` key without a name
+  complex numbers, a number out of range, a `PL_` key without a name, a `ShortName` value stated twice
 - With `validate = true`, a value that fails the checks of [[scenpar_validate]] is an error as well
 - A correlation matrix that is not positive definite is not an error; it is reported by the return value
 - The file is parsed and checked completely before any output is written; a failed call leaves all
@@ -718,8 +764,8 @@ bool quadriga_lib::conf_file_read(
 - **`key_order`** *(optional)* — Canonical order of the keys in `scenpar`: the QuaDRiGa order without
   `SubpathMethod` (its position is between elements 105 and 106, 0-based), then the 27 new keys; `[n_key]`
 - **`pl_order`** *(optional)* — Keys of `plpar` in the order of their first occurrence in the file; `[n_pl]`
-- **`short_names`** *(optional)* — Values of all `ShortName` lines in file order
-- **`ignored_keys`** *(optional)* — Unknown keys, each once, in the order of their first occurrence
+- **`short_names`** *(optional)* — Values of all `ShortName` lines in file order; `[n_short]`
+- **`ignored_keys`** *(optional)* — Unknown keys, each once, in the order of their first occurrence; `[n_ignored]`
 
 ## Returns:
 - `true` if `lsp_xcorr` is positive definite, i.e. correlated LSPs can be generated from it
@@ -754,7 +800,17 @@ bool quadriga_lib::conf_file_read(const std::string &fn,
     arma::uword subpath_line = 0;
     std::unordered_map<std::string, std::vector<double>> l_plpar;
     std::vector<std::string> l_pl_order, l_short_names, l_ignored_keys;
-    std::unordered_set<std::string> ignored_set;
+    std::unordered_set<std::string> ignored_set, short_set;
+
+    // Number of a key, with the error message for a text that is not a number or out of range
+    auto number = [](const std::string &text, double &v, const std::string &where, const std::string &key)
+    {
+        const qd_conf_num res = qd_conf_parse_number(text, v);
+        if (res == QD_NUM_RANGE)
+            throw std::invalid_argument(where + "Value of '" + key + "' is out of range.");
+        if (res != QD_NUM_OK)
+            throw std::invalid_argument(where + "Value of '" + key + "' is not a number.");
+    };
 
     std::string key, value;
     for (arma::uword i_line = 0; i_line < lines.size(); ++i_line)
@@ -773,6 +829,8 @@ bool quadriga_lib::conf_file_read(const std::string &fn,
         {
             if (!qd_conf_is_name(value))
                 throw std::invalid_argument(where + "Value of 'ShortName' must be one name.");
+            if (!short_set.insert(value).second)
+                throw std::invalid_argument(where + "ShortName '" + value + "' is stated twice.");
             l_short_names.push_back(value);
         }
         else if (key.compare(0, 3, "PL_") == 0)
@@ -795,8 +853,7 @@ bool quadriga_lib::conf_file_read(const std::string &fn,
 
             std::vector<double> v(tok.size());
             for (size_t i = 0; i < tok.size(); ++i)
-                if (!qd_conf_parse_number(tok[i], v[i]))
-                    throw std::invalid_argument(where + "Value of '" + key + "' is not a number.");
+                number(tok[i], v[i], where, key);
 
             if (l_plpar.count(name) == 0)
                 l_pl_order.push_back(name);
@@ -820,8 +877,7 @@ bool quadriga_lib::conf_file_read(const std::string &fn,
             }
             if (value.empty())
                 throw std::invalid_argument(where + "Value of '" + key + "' is missing.");
-            if (!qd_conf_parse_number(value, val[ind]))
-                throw std::invalid_argument(where + "Value of '" + key + "' is not a number.");
+            number(value, val[ind], where, key);
             val_line[ind] = i_line + 1;
         }
     }
@@ -867,14 +923,14 @@ Validate scenario parameters and complete them with default values
 - A name in `scenpar` that is not one of the 165 keys is an error, also with `validate = false`; this includes
   the QuaDRiGa key `GR_epsilon`, which is not supported
 - Value checks with `validate = true`; `NaN` is an error for every key:
-  - Integer and > 0: `NumClusters`, `NumSubPaths`
+  - Integer from 1 to 1000: `NumClusters`, `NumSubPaths`
   - Finite and > 0: `r_DS`
   - Finite and >= 0: the 8 decorrelation distances (`DS_lambda` ... `XPR_lambda`), `SC_lambda`,
     `absTOA_lambda`, `PerClusterDS`, `PerClusterDS_min`, `PerClusterAS_D`, `PerClusterAS_A`, `PerClusterES_D`,
     `PerClusterES_A`, `LNS_ksi`, `LOS_scatter_radius`, `GR_enabled`, `LSP_fc_min`, `EoD_offset_b`,
     `EoD_offset_hcl`, `PerClusterDS_fc_min`, `PerClusterES_D_scale`, `absTOA_Lmax`, `NF_alpha`, `NF_beta`,
     `SNS_sigma`, `SNS_A`, `SNS_B`, `SNS_R`, `SNS_delta_var`, `PolVar_sigma`
-  - Integer and >= 0: `NumClusters_min`, `NF_k1`
+  - Integer from 0 to 1000: `NumClusters_min`, `NF_k1`
   - In the range from 0 to 1: `SNS_mu`
   - In the range from -1 to 1: the 28 correlations (`asD_ds` to `xpr_esa`)
   - All other keys accept any value including `Inf` and `-Inf`
@@ -914,6 +970,7 @@ bool quadriga_lib::scenpar_validate(
 
 ## See also:
 - [[conf_file_read]] (read the parameters from a conf file)
+- [[conf_file_write]] (applies the same checks before writing)
 MD!*/
 
 bool quadriga_lib::scenpar_validate(std::unordered_map<std::string, double> &scenpar,
@@ -946,18 +1003,21 @@ bool quadriga_lib::scenpar_validate(std::unordered_map<std::string, double> &sce
 # conf_file_list
 List the scenarios defined by the conf files in a set of directories
 
-- Lists the files whose name ends in `.conf` (case-sensitive) in each directory, not recursive. The
-  scenario name is the file name without this extension.
+- Lists the regular files and symbolic links to regular files whose name ends in `.conf` (case-sensitive) and
+  is longer than `.conf`, not recursive. The scenario name is the file name without this extension, whatever
+  characters it has.
 - Directories are processed in the given order, the files of one directory in byte-wise sorted order of their
   names (digits before upper case before lower case)
 - A file whose name was already found in an earlier directory is skipped completely, so the first directory
   wins. This allows a local folder to override the files of a shared folder.
 - With `parse_shortnames = true` each file is read and one entry is added right after the file for every
-  line `ShortName = name` that is not a comment. Other lines are not examined.
+  line `ShortName = name` that is not a comment. Other lines are not examined; a UTF-8 byte order mark at the
+  start of the file is skipped.
 - Throws `std::invalid_argument` if a short name equals an earlier entry, if a file name equals an earlier
   short name, or if the value of a `ShortName` line is not one name of the characters `A-Z`, `a-z`, `0-9`, `_`
 - Throws `std::runtime_error` if a listed file cannot be opened for reading the short names
-- A directory that does not exist or is not a directory is skipped; an empty string is the current directory
+- A directory that does not exist, is not a directory or cannot be listed is skipped; an empty string is the
+  current directory
 - A failed call leaves the outputs untouched
 
 ## Declaration:
@@ -1084,23 +1144,32 @@ Write a QuaDRiGa scenario configuration file
 - Within a section, keys are grouped into paragraphs separated by a blank line; correlations are written in the
   row order of the matrix, all other keys in the order of `key_order`; `SubpathMethod` stands before
   `LOS_scatter_radius`
+- The overview formula of an LSP shows its mean and STD with the frequency, distance, height and elevation terms;
+  with `LSP_fc_min > 0` the frequency is written as `max( fGHz, fc_min )`; the ESD line also has the terms of
+  `ES_D_mu_A` to `ES_D_mu_D` and, if `ES_D_mu_min` is not `-Inf`, the lower limit of the mean
 - Each line is `name = value % comment`, with the name padded to 19 and the value to 13 characters. The comment
   states the unit; for the mean and STD of an LSP it adds the reference point of the frequency, distance, height
   and elevation terms, e.g. `@ 1 GHz`.
 - The path-loss section has the formula blocks of the model (`logdist`, `dual_slope`, `nlos`, `tripple_slope`),
   the line `PL_model`, then the keys of `plpar` with the prefix `PL_`; known keys have a comment that can depend on
   the model; several values of one key are separated by a space
-- Numbers are written with the fewest significant digits (15 to 17) that [[conf_file_read]] reads back to the same
-  double, independent of the global locale; `Inf` and `-Inf` are written as such, `-0` is kept
+- Numbers are written with up to 15 significant digits, or with 16 or 17 where 15 do not read back to the same
+  double in [[conf_file_read]], independent of the global locale; `Inf` and `-Inf` are written as such, `-0` is
+  kept
 - With `write_defaults = false` a key is written only if its value differs from the default, compared bit for bit;
   `SubpathMethod` only if it is not `legacy`; a section without a written key is left out
 - With `write_defaults = true` all 165 keys and `SubpathMethod` are written
-- Validation before the file is opened: the value checks of [[scenpar_validate]] (unknown keys, `NaN`, classes,
-  `subpath_method`); `pl_model` empty or one name; `plpar` keys are names other than `model`, each with at least
-  one value and no `NaN`; `pl_order` names each key of `plpar` once; short names are names; `ref` and `ref_sec`
-  have no line break; `ref_sec` has at most 10 entries; `valid_range` is empty or `[4, 2]`
-- Throws `std::invalid_argument` for invalid input; a failed check does not create or change a file
-- Throws `std::runtime_error` if the file cannot be opened for writing; an existing file is overwritten
+- Validation before the file is opened: the file name has no line break; the value checks of [[scenpar_validate]]
+  (unknown keys, `NaN`, classes, `subpath_method`); `pl_model` empty or one name; `plpar` keys are names other
+  than `model`, each with at least one value and no `NaN`; `pl_order` names each key of `plpar` once; short names
+  are names and distinct; `ref` and `ref_sec` have no line break; `ref_sec` has at most 10 entries; `valid_range`
+  is empty or `[4, 2]`
+- The text is written to a temporary file in the same directory, which must be writable, and then renamed to
+  `fn`; a symbolic link `fn` is written through
+- A failed call does not create a file and leaves an existing file unchanged; an existing file is replaced and
+  keeps its permissions
+- Throws `std::invalid_argument` for invalid input; `std::runtime_error` if the file cannot be opened or written,
+  or if `fn` exists and is not a regular file that can be opened for writing
 - Every file written passes [[conf_file_read]] with `validate = true` and without ignored keys
 
 ## Declaration:
@@ -1159,6 +1228,13 @@ void quadriga_lib::conf_file_write(const std::string &fn,
     if (fn.empty())
         throw std::invalid_argument("Input 'fn' cannot be empty.");
 
+    // Scenario name in the header: the file name without the extension ".conf"
+    std::string scenario = std::filesystem::path(fn).filename().string();
+    if (scenario.size() > 5 && scenario.compare(scenario.size() - 5, 5, ".conf") == 0)
+        scenario.resize(scenario.size() - 5);
+    if (qd_conf_has_newline(scenario))
+        throw std::invalid_argument("Input 'fn' must not contain a line break in the file name.");
+
     double val[sizeof(qd_scenpar_keys) / sizeof(qd_scenpar_keys[0])];
     qd_scenpar_values(scenpar, val);
     qd_scenpar_check(val, subpath_method);
@@ -1194,9 +1270,16 @@ void quadriga_lib::conf_file_write(const std::string &fn,
     }
 
     if (short_names != nullptr)
+    {
+        std::unordered_set<std::string> seen;
         for (const auto &name : *short_names)
+        {
             if (!qd_conf_is_name(name))
                 throw std::invalid_argument("Entries of 'short_names' must be one name each.");
+            if (!seen.insert(name).second)
+                throw std::invalid_argument("Entries of 'short_names' must be distinct.");
+        }
+    }
 
     if (qd_conf_has_newline(ref))
         throw std::invalid_argument("Input 'ref' must not contain a line break.");
@@ -1213,10 +1296,6 @@ void quadriga_lib::conf_file_write(const std::string &fn,
         throw std::invalid_argument("Input 'valid_range' must have size [4, 2].");
 
     // Header: scenario name, reference, validity range, short names
-    std::string scenario = std::filesystem::path(fn).filename().string();
-    if (scenario.size() > 5 && scenario.compare(scenario.size() - 5, 5, ".conf") == 0)
-        scenario.resize(scenario.size() - 5);
-
     std::string out = "% Config file for scenario \"" + scenario + "\"\n";
     if (!ref.empty())
         out += "% See: " + ref + "\n";
@@ -1252,17 +1331,23 @@ void quadriga_lib::conf_file_write(const std::string &fn,
         return i == qd_scenpar_n_key ? 0.0 : val[i];
     };
 
+    // Frequency in the overview formulas; with 'LSP_fc_min' > 0 lower frequencies are raised to it
+    const double fc_min = get("LSP_fc_min");
+    const std::string f_ghz = fc_min > 0.0 ? "max( fGHz, " + qd_conf_number(fc_min) + " )" : "fGHz";
+
+    // Append the term ± abs(c) · var to 's'; nothing if c is 0
+    auto add = [](std::string &s, double c, const std::string &var)
+    {
+        if (c != 0.0)
+            s += (c < 0.0 ? " - " : " + ") + qd_conf_number(std::abs(c)) + " * " + var;
+    };
+
     // Overview term: m ± g · log10( omega + fGHz ) ± e · log10( d2D ) ± z · log10( hBS ) ± a · log10( alpha_rad )
-    auto term = [](double m, double g, double omega, double e, double z, double a)
+    auto term = [&add, &f_ghz](double m, double g, double omega, double e, double z, double a)
     {
         std::string s = qd_conf_number(m);
-        auto add = [&s](double c, const std::string &var)
-        {
-            if (c != 0.0)
-                s += (c < 0.0 ? " - " : " + ") + qd_conf_number(std::abs(c)) + " * log10( " + var + " )";
-        };
-        add(g, omega != 0.0 ? qd_conf_number(omega) + " + fGHz" : "fGHz");
-        add(e, "d2D"), add(z, "hBS"), add(a, "alpha_rad");
+        add(s, g, "log10( " + (omega != 0.0 ? qd_conf_number(omega) + " + " : std::string()) + f_ghz + " )");
+        add(s, e, "log10( d2D )"), add(s, z, "log10( hBS )"), add(s, a, "log10( alpha_rad )");
         return s;
     };
 
@@ -1350,8 +1435,19 @@ void quadriga_lib::conf_file_write(const std::string &fn,
                     const std::string p = lsp[0], label = lsp[1];
                     body += "% " + label + std::string(4 - label.size(), ' ') + "= ";
                     if (p != "SF")
-                        body += term(get(p + "_mu"), get(p + "_gamma"), get(p + "_omega"), get(p + "_epsilon"),
-                                     get(p + "_zeta"), get(p + "_alpha")) + " + ";
+                    {
+                        std::string mean = term(get(p + "_mu"), get(p + "_gamma"), get(p + "_omega"),
+                                                get(p + "_epsilon"), get(p + "_zeta"), get(p + "_alpha"));
+                        if (p == "ES_D") // Distance and height terms and the lower limit of the ESD mean
+                        {
+                            add(mean, get("ES_D_mu_A"), "d2D / 1000"), add(mean, get("ES_D_mu_B"), "hUT");
+                            add(mean, get("ES_D_mu_C"), "abs( hUT - hBS )");
+                            add(mean, get("ES_D_mu_D"), "max( hUT - hBS, 0 )");
+                            if (get("ES_D_mu_min") != -QD_INF)
+                                mean = "max( " + qd_conf_number(get("ES_D_mu_min")) + ", " + mean + " )";
+                        }
+                        body += mean + " + ";
+                    }
                     body += std::string(lsp[2]) + " * ( " +
                             term(get(p + "_sigma"), get(p + "_delta"), get(p + "_omega"), get(p + "_kappa"),
                                  get(p + "_tau"), get(p + "_beta")) + " )\n";
@@ -1396,11 +1492,55 @@ void quadriga_lib::conf_file_write(const std::string &fn,
         out += rule + "\n" + body;
     }
 
-    // All checks passed and the text is complete, write the file
-    std::ofstream file(fn, std::ios::out | std::ios::binary | std::ios::trunc);
+    // All checks passed and the text is complete. It is written to a temporary file in the same directory, which
+    // replaces the target only after it was closed without error; a failed call leaves an existing file unchanged.
+    std::error_code ec;
+    std::filesystem::path target = fn;
+    if (std::filesystem::is_symlink(target, ec)) // Write through the link
+    {
+        target = std::filesystem::weakly_canonical(target, ec);
+        if (ec)
+            throw std::runtime_error("Cannot open file '" + fn + "' for writing.");
+    }
+
+    // An existing target must be a regular file that can be opened for writing; opening it to append changes nothing
+    const std::filesystem::file_status status = std::filesystem::status(target, ec);
+    const bool exists = std::filesystem::exists(status);
+    if (exists && (!std::filesystem::is_regular_file(status) ||
+                   !std::ofstream(target, std::ios::out | std::ios::app).is_open()))
+        throw std::runtime_error("Cannot open file '" + fn + "' for writing.");
+
+    // Temporary name: the target name, ".tmp" and a hex token of the time and the thread
+    auto hex = [](unsigned long long x)
+    {
+        std::string h;
+        do
+            h.insert(h.begin(), "0123456789abcdef"[x & 15ULL]);
+        while ((x >>= 4) != 0);
+        return h;
+    };
+    const unsigned long long t_now = (unsigned long long)std::chrono::steady_clock::now().time_since_epoch().count();
+    const unsigned long long t_id = (unsigned long long)std::hash<std::thread::id>()(std::this_thread::get_id());
+    const std::filesystem::path tmp = target.string() + ".tmp" + hex(t_now) + hex(t_id);
+
+    std::ofstream file(tmp, std::ios::out | std::ios::binary | std::ios::trunc);
     if (!file.is_open())
         throw std::runtime_error("Cannot open file '" + fn + "' for writing.");
     file << out;
-    if (!file.good())
+    file.close();
+    if (file.fail())
+    {
+        std::filesystem::remove(tmp, ec);
         throw std::runtime_error("Cannot write file '" + fn + "'.");
+    }
+
+    if (exists) // Keep the permissions of the replaced file
+        std::filesystem::permissions(tmp, status.permissions(), ec);
+
+    std::filesystem::rename(tmp, target, ec);
+    if (ec)
+    {
+        std::filesystem::remove(tmp, ec);
+        throw std::runtime_error("Cannot write file '" + fn + "'.");
+    }
 }
