@@ -6162,7 +6162,7 @@ void quadriga_lib::ray_state_update(
 <tr>
   <td><code>mtl_ind_buffer</code></td>
   <td>deferred medium</td>
-  <td>followed, with a zero index: the leg began at a reflection that left the series to the tracer</td>
+  <td>followed, with a zero index: the leg began at a reflection that left the series to the tracer. With an index: the layer of an ordered stack behind the ray that the previous-medium word does not name</td>
   <td>clear</td>
 </tr>
 <tr>
@@ -6646,7 +6646,7 @@ void quadriga_lib::ray_triangle_intersect(
 Real refractive index of a homogeneous medium
 <ul>
 <li>Returns <code>n = Re(sqrt(ε_r · μ_r))</code>, the real part of the complex refractive index, using the ITU-R P.2040-1 permittivity model <code>ε_r = a·(f/fRef)^b</code> together with the relative permeability <code>μ_r</code>.</li>
-<li>Only the bulk (base) permittivity is used. The coincidence / resonance features (<code>coiF</code>, <code>coiQ</code>, <code>coiA</code>, <code>resF</code>, ...) are excluded, since they model a thin-interface surface effect, not bulk propagation, and must not enter the geometric refraction index.</li>
+<li>A permittivity resonance (<code>resF</code>, <code>resQ</code>, <code>resS</code>) is part of <code>ε_r</code>. The coincidence feature (<code>coiF</code>, <code>coiQ</code>, <code>coiA</code>) is excluded: it is a penetration loss at an interface, not bulk propagation.</li>
 <li>Air (<code>iM = 0</code>) returns <code>1</code>.</li>
 </ul>
 

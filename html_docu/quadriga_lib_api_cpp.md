@@ -135,27 +135,27 @@ lang: en-US
 | [ray_subdivide_flag](#ray_subdivide_flag) | Site-specific simulation tools | 4968 |
 | [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 5029 |
 | [refractive_index](#refractive_index) | Site-specific simulation tools | 5077 |
-| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 5109 |
-| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 5167 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 5197 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 5225 |
-| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 5266 |
-| [write_png](#write_png) | Site-specific simulation tools | 5301 |
-| [xpr_update](#xpr_update) | Site-specific simulation tools | 5327 |
-| [sos_acf_2d](#sos_acf_2d) | Sum-of-sinusoids random number generator | 5568 |
-| [sos_acf_approx](#sos_acf_approx) | Sum-of-sinusoids random number generator | 5603 |
-| [sos_acf_estimate](#sos_acf_estimate) | Sum-of-sinusoids random number generator | 5643 |
-| [sos_acfi](#sos_acfi) | Sum-of-sinusoids random number generator | 5703 |
-| [sos_calc_mse](#sos_calc_mse) | Sum-of-sinusoids random number generator | 5733 |
-| [sos_generate](#sos_generate) | Sum-of-sinusoids random number generator | 5794 |
-| [sos_init_phases](#sos_init_phases) | Sum-of-sinusoids random number generator | 5874 |
-| [sos_map](#sos_map) | Sum-of-sinusoids random number generator | 5913 |
-| [sos_preset](#sos_preset) | Sum-of-sinusoids random number generator | 5960 |
-| [sos_rand](#sos_rand) | Sum-of-sinusoids random number generator | 6008 |
-| [sos_randi](#sos_randi) | Sum-of-sinusoids random number generator | 6069 |
-| [sos_randn](#sos_randn) | Sum-of-sinusoids random number generator | 6133 |
-| [sos_remove_bias](#sos_remove_bias) | Sum-of-sinusoids random number generator | 6193 |
-| [sos_val](#sos_val) | Sum-of-sinusoids random number generator | 6276 |
+| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 5108 |
+| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 5166 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 5196 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 5224 |
+| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 5265 |
+| [write_png](#write_png) | Site-specific simulation tools | 5300 |
+| [xpr_update](#xpr_update) | Site-specific simulation tools | 5326 |
+| [sos_acf_2d](#sos_acf_2d) | Sum-of-sinusoids random number generator | 5567 |
+| [sos_acf_approx](#sos_acf_approx) | Sum-of-sinusoids random number generator | 5602 |
+| [sos_acf_estimate](#sos_acf_estimate) | Sum-of-sinusoids random number generator | 5642 |
+| [sos_acfi](#sos_acfi) | Sum-of-sinusoids random number generator | 5702 |
+| [sos_calc_mse](#sos_calc_mse) | Sum-of-sinusoids random number generator | 5732 |
+| [sos_generate](#sos_generate) | Sum-of-sinusoids random number generator | 5793 |
+| [sos_init_phases](#sos_init_phases) | Sum-of-sinusoids random number generator | 5873 |
+| [sos_map](#sos_map) | Sum-of-sinusoids random number generator | 5912 |
+| [sos_preset](#sos_preset) | Sum-of-sinusoids random number generator | 5959 |
+| [sos_rand](#sos_rand) | Sum-of-sinusoids random number generator | 6007 |
+| [sos_randi](#sos_randi) | Sum-of-sinusoids random number generator | 6068 |
+| [sos_randn](#sos_randn) | Sum-of-sinusoids random number generator | 6132 |
+| [sos_remove_bias](#sos_remove_bias) | Sum-of-sinusoids random number generator | 6192 |
+| [sos_val](#sos_val) | Sum-of-sinusoids random number generator | 6275 |
 
 ---
 
@@ -4820,7 +4820,7 @@ void quadriga_lib::ray_state_update(
    | -------------------- | ---------------------------------- | --------------------------------------------- | ------------------------- |
    | `mtl_ind_current`    | medium the ray is in, 0 = air      | bent: the leg follows a bend traced with type 2 or 5; zero in air | resolved |
    | `mtl_ind_prev`       | medium the leg was entered from, or the sheet crossed or reflected off | the sheet in this word lies inside the current medium | known non-parallel |
-   | `mtl_ind_buffer`     | deferred medium                    | followed, with a zero index: the leg began at a reflection that left the series to the tracer | clear |
+   | `mtl_ind_buffer`     | deferred medium                    | followed, with a zero index: the leg began at a reflection that left the series to the tracer. With an index: the layer of an ordered stack behind the ray that the previous-medium word does not name | clear |
    | `mtl_ind_buffer`     | thickness code, bits 0-14          | (part of the code)                            | set: mass-crossed         |
    Under bit 15 the code is the normal thickness of a mass-law leg closed on the way into the current
    one: of the solid in `mtl_ind_prev`, or, where that word holds a sheet lying inside the current
@@ -5079,9 +5079,8 @@ Real refractive index of a homogeneous medium
 
 - Returns `n = Re(sqrt(ε_r · μ_r))`, the real part of the complex refractive index, using the
   ITU-R P.2040-1 permittivity model `ε_r = a·(f/fRef)^b` together with the relative permeability `μ_r`.
-- Only the bulk (base) permittivity is used. The coincidence / resonance features
-  (`coiF`, `coiQ`, `coiA`, `resF`, ...) are excluded, since they model a thin-interface surface
-  effect, not bulk propagation, and must not enter the geometric refraction index.
+- A permittivity resonance (`resF`, `resQ`, `resS`) is part of `ε_r`. The coincidence feature
+  (`coiF`, `coiQ`, `coiA`) is excluded: it is a penetration loss at an interface, not bulk propagation.
 - Air (`iM = 0`) returns `1`.
 
 ### Declaration:
