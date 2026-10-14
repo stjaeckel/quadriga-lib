@@ -48,7 +48,8 @@ Validate scenario parameters and complete them with default values
 
 ## Inputs:
 - **`scenpar_in`** *(optional)* — Scenario parameters; struct with any subset of the 166 fields;
-  numeric fields can have any real numeric class; if omitted or empty, the default set is returned
+  numeric fields are real scalars of class double, single, int32, uint32, int64, uint64 or
+  logical; if omitted or empty, the default set is returned
 - **`validate`** — `false`: only complete with defaults, no value checks; default: true
 
 ## Outputs:

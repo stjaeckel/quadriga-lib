@@ -107,25 +107,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Path-loss parameters: model first, then the numeric keys in file order as row vectors
     if (nlhs > 1)
-    {
-        if (pl_model.empty() && pl_order.empty())
-            plhs[1] = mxCreateDoubleMatrix(0, 0, mxREAL);
-        else
-        {
-            std::vector<std::string> fields;
-            if (!pl_model.empty())
-                fields.push_back("model");
-            fields.insert(fields.end(), pl_order.begin(), pl_order.end());
-            plhs[1] = qd_mex_make_struct(fields);
-            if (!pl_model.empty())
-                qd_mex_set_field(plhs[1], "model", mxCreateString(pl_model.c_str()));
-            for (const auto &key : pl_order)
-            {
-                const arma::rowvec values(plpar.at(key));
-                qd_mex_set_field(plhs[1], key, qd_mex_copy2matlab(&values));
-            }
-        }
-    }
+        plhs[1] = qd_mex_plpar2struct(pl_model, plpar, pl_order);
 
     if (nlhs > 3)
         plhs[3] = mxCreateLogicalScalar(lsp_xcorr_chk);
