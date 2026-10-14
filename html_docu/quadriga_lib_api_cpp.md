@@ -1,7 +1,7 @@
 ---
 title: "C++ API Documentation for Quadriga-Lib v0.12.2"
 author: "Stephan Jaeckel"
-date: "13.10.2026"
+date: "14.10.2026"
 lang: en-US
 ---
 
@@ -27,134 +27,135 @@ lang: en-US
 
 | Function | Section | Line |
 | --- | --- | --- |
-| [arrayant](#arrayant) | Array antenna class | 164 |
-| [.append](#append) | Array antenna class | 215 |
-| [.calc_beamwidth_deg](#calc_beamwidth_deg) | Array antenna class | 237 |
-| [.calc_directivity_dBi](#calc_directivity_dbi) | Array antenna class | 269 |
-| [.combine_pattern](#combine_pattern) | Array antenna class | 290 |
-| [.copy_element](#copy_element) | Array antenna class | 315 |
-| [.export_obj_file](#export_obj_file) | Array antenna class | 335 |
-| [.interpolate](#interpolate) | Array antenna class | 365 |
-| [.is_valid](#is_valid) | Array antenna class | 417 |
-| [.qdant_write](#qdant_write) | Array antenna class | 435 |
-| [.remove_zeros](#remove_zeros) | Array antenna class | 462 |
-| [.rotate_pattern](#rotate_pattern) | Array antenna class | 478 |
-| [.set_size](#set_size) | Array antenna class | 514 |
-| [arrayant_combine_pattern_multi](#arrayant_combine_pattern_multi) | Array antenna functions | 540 |
-| [arrayant_concat_multi](#arrayant_concat_multi) | Array antenna functions | 574 |
-| [arrayant_copy_element_multi](#arrayant_copy_element_multi) | Array antenna functions | 608 |
-| [arrayant_interpolate_multi](#arrayant_interpolate_multi) | Array antenna functions | 648 |
-| [arrayant_is_valid_multi](#arrayant_is_valid_multi) | Array antenna functions | 707 |
-| [arrayant_rotate_pattern_multi](#arrayant_rotate_pattern_multi) | Array antenna functions | 734 |
-| [arrayant_set_element_pos_multi](#arrayant_set_element_pos_multi) | Array antenna functions | 766 |
-| [generate_arrayant_3GPP](#generate_arrayant_3gpp) | Array antenna functions | 792 |
-| [generate_arrayant_custom](#generate_arrayant_custom) | Array antenna functions | 842 |
-| [generate_arrayant_dipole](#generate_arrayant_dipole) | Array antenna functions | 867 |
-| [generate_arrayant_half_wave_dipole](#generate_arrayant_half_wave_dipole) | Array antenna functions | 884 |
-| [generate_arrayant_multibeam](#generate_arrayant_multibeam) | Array antenna functions | 901 |
-| [generate_arrayant_omni](#generate_arrayant_omni) | Array antenna functions | 955 |
-| [generate_arrayant_ula](#generate_arrayant_ula) | Array antenna functions | 972 |
-| [generate_arrayant_xpol](#generate_arrayant_xpol) | Array antenna functions | 1000 |
-| [generate_speaker](#generate_speaker) | Array antenna functions | 1017 |
-| [qdant_read](#qdant_read) | Array antenna functions | 1092 |
-| [qdant_read_multi](#qdant_read_multi) | Array antenna functions | 1118 |
-| [qdant_write_multi](#qdant_write_multi) | Array antenna functions | 1145 |
-| [channel](#channel) | Channel class | 1174 |
-| [.add_paths](#add_paths) | Channel class | 1221 |
-| [.calc_effective_path_gain](#calc_effective_path_gain) | Channel class | 1259 |
-| [.write_paths_to_obj_file](#write_paths_to_obj_file) | Channel class | 1278 |
-| [any_type_id](#any_type_id) | Channel functions | 1319 |
-| [baseband_freq_response](#baseband_freq_response) | Channel functions | 1362 |
-| [baseband_freq_response_multi](#baseband_freq_response_multi) | Channel functions | 1405 |
-| [baseband_freq_response_vec](#baseband_freq_response_vec) | Channel functions | 1453 |
-| [get_HDF5_version](#get_hdf5_version) | Channel functions | 1491 |
-| [hdf5_create](#hdf5_create) | Channel functions | 1503 |
-| [hdf5_read_channel](#hdf5_read_channel) | Channel functions | 1533 |
-| [hdf5_read_dset](#hdf5_read_dset) | Channel functions | 1565 |
-| [hdf5_read_dset_names](#hdf5_read_dset_names) | Channel functions | 1601 |
-| [hdf5_read_layout](#hdf5_read_layout) | Channel functions | 1635 |
-| [hdf5_reshape_layout](#hdf5_reshape_layout) | Channel functions | 1661 |
-| [hdf5_write](#hdf5_write) | Channel functions | 1689 |
-| [hdf5_write_dset](#hdf5_write_dset) | Channel functions | 1729 |
-| [path](#path) | Channel functions | 1768 |
-| [qrt_file_append](#qrt_file_append) | Channel functions | 1889 |
-| [qrt_file_init](#qrt_file_init) | Channel functions | 1925 |
-| [qrt_file_parse](#qrt_file_parse) | Channel functions | 1963 |
-| [qrt_file_read](#qrt_file_read) | Channel functions | 2011 |
-| [qrt_file_read_raw](#qrt_file_read_raw) | Channel functions | 2108 |
-| [qrt_read_cache_init](#qrt_read_cache_init) | Channel functions | 2145 |
-| [quantize_delays](#quantize_delays) | Channel functions | 2184 |
-| [conf_file_list](#conf_file_list) | Channel generation functions | 2246 |
-| [conf_file_read](#conf_file_read) | Channel generation functions | 2290 |
-| [get_channels_ieee_indoor](#get_channels_ieee_indoor) | Channel generation functions | 2363 |
-| [get_channels_irs](#get_channels_irs) | Channel generation functions | 2444 |
-| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 2538 |
-| [get_channels_planar](#get_channels_planar) | Channel generation functions | 2606 |
-| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 2674 |
-| [scenpar_validate](#scenpar_validate) | Channel generation functions | 2746 |
-| [acdf](#acdf) | Channel statistics | 2809 |
-| [calc_angular_spreads_sphere](#calc_angular_spreads_sphere) | Channel statistics | 2844 |
-| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 2886 |
-| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 2938 |
-| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 2971 |
-| [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | 3006 |
-| [fast_acos](#fast_acos) | Math functions | 3039 |
-| [fast_asin](#fast_asin) | Math functions | 3058 |
-| [fast_atan2](#fast_atan2) | Math functions | 3077 |
-| [fast_cart2geo](#fast_cart2geo) | Math functions | 3098 |
-| [fast_geo2cart](#fast_geo2cart) | Math functions | 3131 |
-| [fast_sincos](#fast_sincos) | Math functions | 3176 |
-| [fast_slerp](#fast_slerp) | Math functions | 3197 |
-| [interp_2D](#interp_2d) | Math functions | 3232 |
-| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 3296 |
-| [colormap](#colormap) | Site-specific simulation tools | 3374 |
-| [combine_irs_coord](#combine_irs_coord) | Site-specific simulation tools | 3393 |
-| [coord2path](#coord2path) | Site-specific simulation tools | 3436 |
-| [cube](#cube) | Site-specific simulation tools | 3474 |
-| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 3507 |
-| [icosphere](#icosphere) | Site-specific simulation tools | 3551 |
-| [interface_gain](#interface_gain) | Site-specific simulation tools | 3585 |
-| [medium_gain](#medium_gain) | Site-specific simulation tools | 3621 |
-| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 3662 |
-| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 3704 |
-| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 3771 |
-| [obj_overlap_test](#obj_overlap_test) | Site-specific simulation tools | 3838 |
-| [path_to_tube](#path_to_tube) | Site-specific simulation tools | 3869 |
-| [plane](#plane) | Site-specific simulation tools | 3897 |
-| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 3933 |
-| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 3962 |
-| [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 4001 |
-| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 4037 |
-| [ray_commit](#ray_commit) | Site-specific simulation tools | 4073 |
-| [ray_init](#ray_init) | Site-specific simulation tools | 4178 |
-| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 4271 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 4433 |
-| [ray_progress](#ray_progress) | Site-specific simulation tools | 4481 |
-| [ray_state_update](#ray_state_update) | Site-specific simulation tools | 4624 |
-| [ray_subdivide_flag](#ray_subdivide_flag) | Site-specific simulation tools | 4869 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 4930 |
-| [refractive_index](#refractive_index) | Site-specific simulation tools | 4978 |
-| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 5010 |
-| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 5068 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 5098 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 5126 |
-| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 5167 |
-| [write_png](#write_png) | Site-specific simulation tools | 5202 |
-| [xpr_update](#xpr_update) | Site-specific simulation tools | 5228 |
-| [sos_acf_2d](#sos_acf_2d) | Sum-of-sinusoids random number generator | 5469 |
-| [sos_acf_approx](#sos_acf_approx) | Sum-of-sinusoids random number generator | 5504 |
-| [sos_acf_estimate](#sos_acf_estimate) | Sum-of-sinusoids random number generator | 5544 |
-| [sos_acfi](#sos_acfi) | Sum-of-sinusoids random number generator | 5604 |
-| [sos_calc_mse](#sos_calc_mse) | Sum-of-sinusoids random number generator | 5634 |
-| [sos_generate](#sos_generate) | Sum-of-sinusoids random number generator | 5695 |
-| [sos_init_phases](#sos_init_phases) | Sum-of-sinusoids random number generator | 5775 |
-| [sos_map](#sos_map) | Sum-of-sinusoids random number generator | 5814 |
-| [sos_preset](#sos_preset) | Sum-of-sinusoids random number generator | 5861 |
-| [sos_rand](#sos_rand) | Sum-of-sinusoids random number generator | 5909 |
-| [sos_randi](#sos_randi) | Sum-of-sinusoids random number generator | 5970 |
-| [sos_randn](#sos_randn) | Sum-of-sinusoids random number generator | 6034 |
-| [sos_remove_bias](#sos_remove_bias) | Sum-of-sinusoids random number generator | 6094 |
-| [sos_val](#sos_val) | Sum-of-sinusoids random number generator | 6177 |
+| [arrayant](#arrayant) | Array antenna class | 165 |
+| [.append](#append) | Array antenna class | 216 |
+| [.calc_beamwidth_deg](#calc_beamwidth_deg) | Array antenna class | 238 |
+| [.calc_directivity_dBi](#calc_directivity_dbi) | Array antenna class | 270 |
+| [.combine_pattern](#combine_pattern) | Array antenna class | 291 |
+| [.copy_element](#copy_element) | Array antenna class | 316 |
+| [.export_obj_file](#export_obj_file) | Array antenna class | 336 |
+| [.interpolate](#interpolate) | Array antenna class | 366 |
+| [.is_valid](#is_valid) | Array antenna class | 418 |
+| [.qdant_write](#qdant_write) | Array antenna class | 436 |
+| [.remove_zeros](#remove_zeros) | Array antenna class | 463 |
+| [.rotate_pattern](#rotate_pattern) | Array antenna class | 479 |
+| [.set_size](#set_size) | Array antenna class | 515 |
+| [arrayant_combine_pattern_multi](#arrayant_combine_pattern_multi) | Array antenna functions | 541 |
+| [arrayant_concat_multi](#arrayant_concat_multi) | Array antenna functions | 575 |
+| [arrayant_copy_element_multi](#arrayant_copy_element_multi) | Array antenna functions | 609 |
+| [arrayant_interpolate_multi](#arrayant_interpolate_multi) | Array antenna functions | 649 |
+| [arrayant_is_valid_multi](#arrayant_is_valid_multi) | Array antenna functions | 708 |
+| [arrayant_rotate_pattern_multi](#arrayant_rotate_pattern_multi) | Array antenna functions | 735 |
+| [arrayant_set_element_pos_multi](#arrayant_set_element_pos_multi) | Array antenna functions | 767 |
+| [generate_arrayant_3GPP](#generate_arrayant_3gpp) | Array antenna functions | 793 |
+| [generate_arrayant_custom](#generate_arrayant_custom) | Array antenna functions | 843 |
+| [generate_arrayant_dipole](#generate_arrayant_dipole) | Array antenna functions | 868 |
+| [generate_arrayant_half_wave_dipole](#generate_arrayant_half_wave_dipole) | Array antenna functions | 885 |
+| [generate_arrayant_multibeam](#generate_arrayant_multibeam) | Array antenna functions | 902 |
+| [generate_arrayant_omni](#generate_arrayant_omni) | Array antenna functions | 956 |
+| [generate_arrayant_ula](#generate_arrayant_ula) | Array antenna functions | 973 |
+| [generate_arrayant_xpol](#generate_arrayant_xpol) | Array antenna functions | 1001 |
+| [generate_speaker](#generate_speaker) | Array antenna functions | 1018 |
+| [qdant_read](#qdant_read) | Array antenna functions | 1093 |
+| [qdant_read_multi](#qdant_read_multi) | Array antenna functions | 1119 |
+| [qdant_write_multi](#qdant_write_multi) | Array antenna functions | 1146 |
+| [channel](#channel) | Channel class | 1175 |
+| [.add_paths](#add_paths) | Channel class | 1222 |
+| [.calc_effective_path_gain](#calc_effective_path_gain) | Channel class | 1260 |
+| [.write_paths_to_obj_file](#write_paths_to_obj_file) | Channel class | 1279 |
+| [any_type_id](#any_type_id) | Channel functions | 1320 |
+| [baseband_freq_response](#baseband_freq_response) | Channel functions | 1363 |
+| [baseband_freq_response_multi](#baseband_freq_response_multi) | Channel functions | 1406 |
+| [baseband_freq_response_vec](#baseband_freq_response_vec) | Channel functions | 1454 |
+| [get_HDF5_version](#get_hdf5_version) | Channel functions | 1492 |
+| [hdf5_create](#hdf5_create) | Channel functions | 1504 |
+| [hdf5_read_channel](#hdf5_read_channel) | Channel functions | 1534 |
+| [hdf5_read_dset](#hdf5_read_dset) | Channel functions | 1566 |
+| [hdf5_read_dset_names](#hdf5_read_dset_names) | Channel functions | 1602 |
+| [hdf5_read_layout](#hdf5_read_layout) | Channel functions | 1636 |
+| [hdf5_reshape_layout](#hdf5_reshape_layout) | Channel functions | 1662 |
+| [hdf5_write](#hdf5_write) | Channel functions | 1690 |
+| [hdf5_write_dset](#hdf5_write_dset) | Channel functions | 1730 |
+| [path](#path) | Channel functions | 1769 |
+| [qrt_file_append](#qrt_file_append) | Channel functions | 1890 |
+| [qrt_file_init](#qrt_file_init) | Channel functions | 1926 |
+| [qrt_file_parse](#qrt_file_parse) | Channel functions | 1964 |
+| [qrt_file_read](#qrt_file_read) | Channel functions | 2012 |
+| [qrt_file_read_raw](#qrt_file_read_raw) | Channel functions | 2109 |
+| [qrt_read_cache_init](#qrt_read_cache_init) | Channel functions | 2146 |
+| [quantize_delays](#quantize_delays) | Channel functions | 2185 |
+| [conf_file_list](#conf_file_list) | Channel generation functions | 2247 |
+| [conf_file_read](#conf_file_read) | Channel generation functions | 2291 |
+| [conf_file_write](#conf_file_write) | Channel generation functions | 2367 |
+| [get_channels_ieee_indoor](#get_channels_ieee_indoor) | Channel generation functions | 2444 |
+| [get_channels_irs](#get_channels_irs) | Channel generation functions | 2525 |
+| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 2619 |
+| [get_channels_planar](#get_channels_planar) | Channel generation functions | 2687 |
+| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 2755 |
+| [scenpar_validate](#scenpar_validate) | Channel generation functions | 2827 |
+| [acdf](#acdf) | Channel statistics | 2891 |
+| [calc_angular_spreads_sphere](#calc_angular_spreads_sphere) | Channel statistics | 2926 |
+| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 2968 |
+| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 3020 |
+| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 3053 |
+| [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | 3088 |
+| [fast_acos](#fast_acos) | Math functions | 3121 |
+| [fast_asin](#fast_asin) | Math functions | 3140 |
+| [fast_atan2](#fast_atan2) | Math functions | 3159 |
+| [fast_cart2geo](#fast_cart2geo) | Math functions | 3180 |
+| [fast_geo2cart](#fast_geo2cart) | Math functions | 3213 |
+| [fast_sincos](#fast_sincos) | Math functions | 3258 |
+| [fast_slerp](#fast_slerp) | Math functions | 3279 |
+| [interp_2D](#interp_2d) | Math functions | 3314 |
+| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 3378 |
+| [colormap](#colormap) | Site-specific simulation tools | 3456 |
+| [combine_irs_coord](#combine_irs_coord) | Site-specific simulation tools | 3475 |
+| [coord2path](#coord2path) | Site-specific simulation tools | 3518 |
+| [cube](#cube) | Site-specific simulation tools | 3556 |
+| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 3589 |
+| [icosphere](#icosphere) | Site-specific simulation tools | 3633 |
+| [interface_gain](#interface_gain) | Site-specific simulation tools | 3667 |
+| [medium_gain](#medium_gain) | Site-specific simulation tools | 3703 |
+| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 3744 |
+| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 3786 |
+| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 3853 |
+| [obj_overlap_test](#obj_overlap_test) | Site-specific simulation tools | 3920 |
+| [path_to_tube](#path_to_tube) | Site-specific simulation tools | 3951 |
+| [plane](#plane) | Site-specific simulation tools | 3979 |
+| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 4015 |
+| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 4044 |
+| [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 4083 |
+| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 4119 |
+| [ray_commit](#ray_commit) | Site-specific simulation tools | 4155 |
+| [ray_init](#ray_init) | Site-specific simulation tools | 4260 |
+| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 4353 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 4515 |
+| [ray_progress](#ray_progress) | Site-specific simulation tools | 4563 |
+| [ray_state_update](#ray_state_update) | Site-specific simulation tools | 4706 |
+| [ray_subdivide_flag](#ray_subdivide_flag) | Site-specific simulation tools | 4951 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 5012 |
+| [refractive_index](#refractive_index) | Site-specific simulation tools | 5060 |
+| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 5092 |
+| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 5150 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 5180 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 5208 |
+| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 5249 |
+| [write_png](#write_png) | Site-specific simulation tools | 5284 |
+| [xpr_update](#xpr_update) | Site-specific simulation tools | 5310 |
+| [sos_acf_2d](#sos_acf_2d) | Sum-of-sinusoids random number generator | 5551 |
+| [sos_acf_approx](#sos_acf_approx) | Sum-of-sinusoids random number generator | 5586 |
+| [sos_acf_estimate](#sos_acf_estimate) | Sum-of-sinusoids random number generator | 5626 |
+| [sos_acfi](#sos_acfi) | Sum-of-sinusoids random number generator | 5686 |
+| [sos_calc_mse](#sos_calc_mse) | Sum-of-sinusoids random number generator | 5716 |
+| [sos_generate](#sos_generate) | Sum-of-sinusoids random number generator | 5777 |
+| [sos_init_phases](#sos_init_phases) | Sum-of-sinusoids random number generator | 5857 |
+| [sos_map](#sos_map) | Sum-of-sinusoids random number generator | 5896 |
+| [sos_preset](#sos_preset) | Sum-of-sinusoids random number generator | 5943 |
+| [sos_rand](#sos_rand) | Sum-of-sinusoids random number generator | 5991 |
+| [sos_randi](#sos_randi) | Sum-of-sinusoids random number generator | 6052 |
+| [sos_randn](#sos_randn) | Sum-of-sinusoids random number generator | 6116 |
+| [sos_remove_bias](#sos_remove_bias) | Sum-of-sinusoids random number generator | 6176 |
+| [sos_val](#sos_val) | Sum-of-sinusoids random number generator | 6259 |
 
 ---
 
@@ -2293,7 +2294,7 @@ Read and validate a QuaDRiGa scenario configuration file
 - A conf file is a text file with one `Key = value` assignment per line; `%` starts a comment; blank lines
   are allowed; line ends can be LF or CRLF; space and tab are white space
 - Keys are case-sensitive names of the characters `A-Z`, `a-z`, `0-9` and `_`; there are four kinds:
-  - Scenario parameters: `n_key = 166` numeric keys with one number each, returned in `scenpar`. Keys that
+  - Scenario parameters: `n_key = 165` numeric keys with one number each, returned in `scenpar`. Keys that
     are not in the file have their default value. The names and their order are returned in `key_order`.
   - `SubpathMethod`: one of the words `legacy`, `Laplacian`, `mmMAGIC`; default `legacy`
   - Path-loss parameters: every key that starts with `PL_`. `PL_model` has one name as value. All others
@@ -2304,8 +2305,10 @@ Read and validate a QuaDRiGa scenario configuration file
 - Numbers are decimal with an optional sign, an optional decimal point and an optional exponent (`e` or
   `E`), for example `-6.28`, `.5`, `6.2e-07`; `Inf`, `+Inf` and `-Inf` are accepted in any case
 - Elevation angles are used throughout (+90 deg is up); no key refers to a zenith angle
-- The 166 keys are the 139 numeric keys of QuaDRiGa and 27 keys for 3GPP TR 38.901 v19.5.0. With their
+- The 165 keys are 138 numeric keys of QuaDRiGa and 27 keys for 3GPP TR 38.901 v19.5.0. With their
   default of 0 the new keys have no effect.
+- The QuaDRiGa key `GR_epsilon` (fixed relative permittivity of the ground) is not supported and is
+  reported in `ignored_keys` like any other unknown key; the permittivity is complex and is set in the simulation
 - The 28 correlation keys (`asD_ds` to `xpr_esa`) define the symmetric matrix `lsp_xcorr` with unit diagonal
 - Throws `std::runtime_error` if the file cannot be opened
 - Throws `std::invalid_argument` with file name and line number for a line that is not blank, not a comment
@@ -2339,7 +2342,7 @@ bool quadriga_lib::conf_file_read(
   grammar is checked
 
 ### Outputs:
-- **`scenpar`** — Numeric scenario parameters; previous content is discarded; `n_key = 166` entries
+- **`scenpar`** — Numeric scenario parameters; previous content is discarded; `n_key = 165` entries
 - **`subpath_method`** *(optional)* — Value of `SubpathMethod`; `legacy` if not in the file
 - **`pl_model`** *(optional)* — Value of `PL_model`; empty if not in the file
 - **`plpar`** *(optional)* — Path-loss parameters; keys without the prefix `PL_`; `PL_model` is not included;
@@ -2358,6 +2361,84 @@ bool quadriga_lib::conf_file_read(
 ### See also:
 - [scenpar_validate](#scenpar_validate) (value checks, defaults and the list of validation rules)
 - [conf_file_list](#conf_file_list) (find the conf files in a set of directories)
+- [conf_file_write](#conf_file_write) (write a conf file)
+
+---
+## conf_file_write
+Write a QuaDRiGa scenario configuration file
+
+- Writes scenario parameters, path-loss parameters and short names in the layout of the conf files shipped with
+  QuaDRiGa, so that [conf_file_read](#conf_file_read) returns the same values bit for bit
+- Header: `% Config file for scenario "name"` with the file name without the extension `.conf`, then the
+  reference `ref`, the validity range and one line `ShortName = name` per short name
+- Up to 10 sections follow, each with a header and, if the entry of `ref_sec` is not empty, a line
+  `% See: ref; ref_sec`. Index in `ref_sec` and write order:
+  - 0: Large scale distributions, with an overview formula per LSP; 1: Large-Scale fading decorrelation distances;
+    2: Inter-parameter correlations, with the correlation matrix as comment; 3: Model parameters;
+    8: EoD offset; 4: Decorrelation distance for the small-scale fading spatial consistency;
+    5: Parameters for the ground reflection extension; 6: Absolute time of arrival offset;
+    9: Optional modelling components; 7: Path-loss model
+  - The indices 0 to 7 are those of QuaDRiGa, so its 8 section references can be passed unchanged
+- Within a section, keys are grouped into paragraphs separated by a blank line; correlations are written in the
+  row order of the matrix, all other keys in the order of `key_order`; `SubpathMethod` stands before
+  `LOS_scatter_radius`
+- Each line is `name = value % comment`, with the name padded to 19 and the value to 13 characters. The comment
+  states the unit; for the mean and STD of an LSP it adds the reference point of the frequency, distance, height
+  and elevation terms, e.g. `@ 1 GHz`.
+- The path-loss section has the formula blocks of the model (`logdist`, `dual_slope`, `nlos`, `tripple_slope`),
+  the line `PL_model`, then the keys of `plpar` with the prefix `PL_`; known keys have a comment that can depend on
+  the model; several values of one key are separated by a space
+- Numbers are written with the fewest significant digits (15 to 17) that [conf_file_read](#conf_file_read) reads back to the same
+  double, independent of the global locale; `Inf` and `-Inf` are written as such, `-0` is kept
+- With `write_defaults = false` a key is written only if its value differs from the default, compared bit for bit;
+  `SubpathMethod` only if it is not `legacy`; a section without a written key is left out
+- With `write_defaults = true` all 165 keys and `SubpathMethod` are written
+- Validation before the file is opened: the value checks of [scenpar_validate](#scenpar_validate) (unknown keys, `NaN`, classes,
+  `subpath_method`); `pl_model` empty or one name; `plpar` keys are names other than `model`, each with at least
+  one value and no `NaN`; `pl_order` names each key of `plpar` once; short names are names; `ref` and `ref_sec`
+  have no line break; `ref_sec` has at most 10 entries; `valid_range` is empty or `[4, 2]`
+- Throws `std::invalid_argument` for invalid input; a failed check does not create or change a file
+- Throws `std::runtime_error` if the file cannot be opened for writing; an existing file is overwritten
+- Every file written passes [conf_file_read](#conf_file_read) with `validate = true` and without ignored keys
+
+### Declaration:
+```
+void quadriga_lib::conf_file_write(
+    const std::string &fn,
+    const std::unordered_map<std::string, double> &scenpar,
+    const std::string &subpath_method = "legacy",
+    const std::string &pl_model = "",
+    const std::unordered_map<std::string, std::vector<double>> *plpar = nullptr,
+    const std::vector<std::string> *pl_order = nullptr,
+    const std::vector<std::string> *short_names = nullptr,
+    const std::string &ref = "",
+    const std::vector<std::string> *ref_sec = nullptr,
+    const arma::mat *valid_range = nullptr,
+    bool write_defaults = false);
+```
+
+### Inputs:
+- **`fn`** — Path of the conf file to write
+- **`scenpar`** — Numeric scenario parameters; any subset of the `n_key = 165` keys of [conf_file_read](#conf_file_read); missing
+  keys have their default
+- **`subpath_method`** *(optional)* — Value of `SubpathMethod`: `legacy`, `Laplacian` or `mmMAGIC`
+- **`pl_model`** *(optional)* — Value of `PL_model`; one name; empty: not written
+- **`plpar`** *(optional)* — Path-loss parameters; keys without the prefix `PL_`, one or more values each; `[n_pl]`
+- **`pl_order`** *(optional)* — Order in which the keys of `plpar` are written; must name each key once; omitted:
+  sorted by name; `[n_pl]`
+- **`short_names`** *(optional)* — Values of the `ShortName` lines, one name each
+- **`ref`** *(optional)* — Literature reference; written in the header and before each non-empty entry of
+  `ref_sec`; one line
+- **`ref_sec`** *(optional)* — Reference per section, indexed as listed above; one line each; an empty or missing
+  entry writes no reference; up to `n_sec = 10` entries
+- **`valid_range`** *(optional)* — Validity range, written as comment; rows: frequency in GHz, distance, BS
+  height, MT height in m; columns: lower and upper end, one value is written if both are equal; a row with `NaN`
+  is not written; empty: no validity range; `[4, 2]`
+- **`write_defaults`** *(optional)* — `true`: write all keys; `false`: write only keys that differ from their default
+
+### See also:
+- [conf_file_read](#conf_file_read) (read the file back)
+- [scenpar_validate](#scenpar_validate) (value checks and defaults)
 
 ---
 ## get_channels_ieee_indoor
@@ -2747,11 +2828,12 @@ void quadriga_lib::get_channels_spherical(
 Validate scenario parameters and complete them with default values
 
 - Checks a set of QuaDRiGa scenario parameters that did not come from a conf file and adds every missing key
-  with its default value, so that `scenpar` has all `n_key = 166` entries on return
+  with its default value, so that `scenpar` has all `n_key = 165` entries on return
 - An empty `scenpar` returns the complete default parameter set
-- A set with the 139 numeric keys of QuaDRiGa is completed with the 27 keys for 3GPP TR 38.901 v19.5.0, which
+- A set with the 138 numeric keys of QuaDRiGa is completed with the 27 keys for 3GPP TR 38.901 v19.5.0, which
   have no effect at their default of 0
-- A name in `scenpar` that is not one of the 166 keys is an error, also with `validate = false`
+- A name in `scenpar` that is not one of the 165 keys is an error, also with `validate = false`; this includes
+  the QuaDRiGa key `GR_epsilon`, which is not supported
 - Value checks with `validate = true`; `NaN` is an error for every key:
   - Integer and > 0: `NumClusters`, `NumSubPaths`
   - Finite and > 0: `r_DS`
@@ -2784,7 +2866,7 @@ bool quadriga_lib::scenpar_validate(
 
 ### Inputs:
 - **`scenpar`** — Numeric scenario parameters; updated in-place: given values are kept, missing keys are
-  added with their default; `n_key = 166` entries on return
+  added with their default; `n_key = 165` entries on return
 - **`subpath_method`** *(optional)* — Value of `SubpathMethod`, the only parameter that is not numeric
 - **`validate`** *(optional)* — `false`: only complete with defaults, no value checks
 
