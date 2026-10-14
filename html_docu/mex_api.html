@@ -122,11 +122,15 @@
 
 <b>Channel generation functions</b><br><br>
 <table style="border-collapse: separate; border-spacing: 20px 0;"><tbody>
+  <tr><td><a href="#conf_file_list">conf_file_list</a></td><td>List the scenarios defined by the conf files in a set of directories</td></tr>
+  <tr><td><a href="#conf_file_read">conf_file_read</a></td><td>Read and validate a QuaDRiGa scenario configuration file</td></tr>
+  <tr><td><a href="#conf_file_write">conf_file_write</a></td><td>Write a QuaDRiGa scenario configuration file</td></tr>
   <tr><td><a href="#get_channels_ieee_indoor">get_channels_ieee_indoor</a></td><td>Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models</td></tr>
   <tr><td><a href="#get_channels_irs">get_channels_irs</a></td><td>Calculate MIMO channel coefficients for IRS-assisted communication</td></tr>
   <tr><td><a href="#get_channels_multifreq">get_channels_multifreq</a></td><td>Compute channel coefficients for spherical waves across multiple frequencies</td></tr>
   <tr><td><a href="#get_channels_planar">get_channels_planar</a></td><td>Calculate MIMO channel coefficients for planar wave paths</td></tr>
   <tr><td><a href="#get_channels_spherical">get_channels_spherical</a></td><td>Calculate MIMO channel coefficients and delays for spherical wave propagation</td></tr>
+  <tr><td><a href="#scenpar_validate">scenpar_validate</a></td><td>Validate scenario parameters and complete them with default values</td></tr>
 </tbody></table><br>
 
 <b>Channel statistics</b><br><br>
@@ -1868,6 +1872,143 @@ Map path delays to a fixed tap grid using two-tap power-weighted interpolation
 <span id="6f9553d7" class="qd-section"><b>Channel generation functions</b></span><br>
 <br>
 <hr class="greyline"><br>
+<span id="conf_file_list" class="qd-func"><b>conf_file_list</b></span><br>
+<hr class="thin">
+List the scenarios defined by the conf files in a set of directories
+<ul>
+<li>Lists the files whose name ends in <code>.conf</code> (case-sensitive) in each directory, not recursive. The scenario name is the file name without this extension.</li>
+<li>Directories are processed in the given order, the files of one directory in byte-wise sorted order of their names (digits before upper case before lower case)</li>
+<li>A file whose name was already found in an earlier directory is skipped completely, so the first directory wins. This allows a local folder to override the files of a shared folder.</li>
+<li>With <code>parse_shortnames = true</code> each file is read and one entry is added right after the file for every line <code>ShortName = name</code> that is not a comment. Other lines are not examined.</li>
+<li>An error is raised if a short name equals an earlier entry, if a file name equals an earlier short name, if the value of a <code>ShortName</code> line is not one name of the characters <code>A-Z</code>, <code>a-z</code>, <code>0-9</code>, <code>_</code>, or if a listed file cannot be opened for reading the short names</li>
+<li>A directory that does not exist or is not a directory is skipped</li>
+<li>An empty string <code>''</code> is the current directory</li>
+</ul>
+
+<b>Usage:</b><br>
+<pre>
+[ scenarios, file_names, file_dirs ] = quadriga_lib.conf_file_list( dirs, parse_shortnames );
+</pre>
+
+<b>Inputs:</b><br>
+<ul>
+<li><b><code>dirs</code></b> — Directories, searched in this order; one string or a cell array of strings; an empty cell array lists nothing</li>
+<li><b><code>parse_shortnames</code></b> — <code>true</code>: read the files and add their short names; <code>false</code>: list the files only, which is faster; default: true</li>
+</ul>
+
+<b>Outputs:</b><br>
+<ul>
+<li><b><code>scenarios</code></b> — Scenario names and short names; cell array of strings; <code>[n_scen, 1]</code></li>
+<li><b><code>file_names</code></b> — File name including <code>.conf</code> for each entry; cell array of strings; <code>[n_scen, 1]</code></li>
+<li><b><code>file_dirs</code></b> — Directory of the file for each entry, exactly as given in <code>dirs</code>; cell array of strings; <code>[n_scen, 1]</code></li>
+</ul>
+
+<b>See also:</b><br>
+<ul>
+<li><a href="#conf_file_read">conf_file_read</a> (read one of the files)</li>
+</ul>
+
+<hr class="greyline"><br>
+<span id="conf_file_read" class="qd-func"><b>conf_file_read</b></span><br>
+<hr class="thin">
+Read and validate a QuaDRiGa scenario configuration file
+<ul>
+<li>A conf file is a text file with one <code>Key = value</code> assignment per line; <code>%</code> starts a comment; blank lines are allowed; line ends can be LF or CRLF; space and tab are white space</li>
+<li>Keys are case-sensitive names of the characters <code>A-Z</code>, <code>a-z</code>, <code>0-9</code> and <code>_</code>; there are four kinds:
+<ul>
+<li>Scenario parameters: 165 numeric keys with one number each. Keys that are not in the file have their default value.</li>
+<li><code>SubpathMethod</code>: one of the words <code>legacy</code>, <code>Laplacian</code>, <code>mmMAGIC</code>; default <code>legacy</code></li>
+<li>Path-loss parameters: every key that starts with <code>PL_</code>. <code>PL_model</code> has one name as value. All others have one or more numbers separated by white space.</li>
+<li><code>ShortName</code>: an alias for the scenario, one name; can occur several times</li>
+</ul>
+</li>
+<li>Any other key is ignored and reported in <code>ignored_keys</code>; its value is not examined</li>
+<li>A key that is stated more than once has its last value</li>
+<li>Numbers are decimal with an optional sign, an optional decimal point and an optional exponent (<code>e</code> or <code>E</code>), for example <code>-6.28</code>, <code>.5</code>, <code>6.2e-07</code>; <code>Inf</code>, <code>+Inf</code> and <code>-Inf</code> are accepted in any case</li>
+<li>Elevation angles are used throughout (+90 deg is up); no key refers to a zenith angle</li>
+<li>The 165 numeric keys are 138 keys of QuaDRiGa and 27 keys for 3GPP TR 38.901 v19.5.0. With their default of 0 the new keys have no effect.</li>
+<li>The QuaDRiGa key <code>GR_epsilon</code> (fixed relative permittivity of the ground) is not supported and is reported in <code>ignored_keys</code>; the permittivity is complex and is set in the simulation</li>
+<li>An error is raised if the file cannot be opened, and, with file name and line number, for a line that is not blank, not a comment and not a well-formed assignment: no <code>=</code>, more or less than one name before the <code>=</code>, a missing value, a word where a number is required or the reverse, a second value or other text after the value, <code>NaN</code>, complex numbers, a <code>PL_</code> key without a name</li>
+<li>With <code>validate = true</code>, a value that fails the checks of <a href="#scenpar_validate">scenpar_validate</a> is an error as well</li>
+<li>A correlation matrix that is not positive definite is not an error; see <code>lsp_xcorr_chk</code></li>
+</ul>
+
+<b>Usage:</b><br>
+<pre>
+[ scenpar, plpar, lsp_xcorr, lsp_xcorr_chk, short_names, ignored_keys ] = ...
+    quadriga_lib.conf_file_read( fn, validate );
+</pre>
+
+<b>Inputs:</b><br>
+<ul>
+<li><b><code>fn</code></b> — Path to the conf file; string</li>
+<li><b><code>validate</code></b> — <code>true</code>: apply the value checks of <a href="#scenpar_validate">scenpar_validate</a>; <code>false</code>: only the line grammar is checked; default: true</li>
+</ul>
+
+<b>Outputs:</b><br>
+<ul>
+<li><b><code>scenpar</code></b> — Scenario parameters; struct with 166 fields in the QuaDRiGa field order: the 138 numeric keys of QuaDRiGa with <code>SubpathMethod</code> (string) as field 107, then the 27 new keys; all numeric fields are scalars</li>
+<li><b><code>plpar</code></b> — Path-loss parameters; struct with the field <code>model</code> (string, only if the file states <code>PL_model</code>) followed by one field per <code>PL_</code> key in file order, named without the prefix <code>PL_</code>; each is a row vector with one or more values; <code>[]</code> if the file has no <code>PL_</code> key</li>
+<li><b><code>lsp_xcorr</code></b> — LSP cross-correlation matrix; symmetric with unit diagonal; order of rows and columns: DS, KF, SF, ASD, ASA, ESD, ESA, XPR; <code>[8, 8]</code></li>
+<li><b><code>lsp_xcorr_chk</code></b> — <code>true</code> if <code>lsp_xcorr</code> is positive definite, i.e. correlated LSPs can be generated from it; logical</li>
+<li><b><code>short_names</code></b> — Values of all <code>ShortName</code> lines in file order; cell array of strings; <code>[n, 1]</code></li>
+<li><b><code>ignored_keys</code></b> — Unknown keys, each once, in the order of their first occurrence; cell array of strings; <code>[n, 1]</code></li>
+</ul>
+
+<b>See also:</b><br>
+<ul>
+<li><a href="#scenpar_validate">scenpar_validate</a> (value checks, defaults and the list of validation rules)</li>
+<li><a href="#conf_file_list">conf_file_list</a> (find the conf files in a set of directories)</li>
+</ul>
+
+<hr class="greyline"><br>
+<span id="conf_file_write" class="qd-func"><b>conf_file_write</b></span><br>
+<hr class="thin">
+Write a QuaDRiGa scenario configuration file
+<ul>
+<li>Writes scenario parameters, path-loss parameters and short names in the layout of the conf files shipped with QuaDRiGa, so that <a href="#conf_file_read">conf_file_read</a> returns the same values bit for bit</li>
+<li>Header: <code>% Config file for scenario "name"</code> with the file name without the extension <code>.conf</code>, then the reference <code>ref</code>, the validity range and one line <code>ShortName = name</code> per short name</li>
+<li>Up to 10 sections follow, each with a header and, if the entry of <code>ref_sec</code> is not empty, a line <code>% See: ref; ref_sec</code>. Entry in <code>ref_sec</code> and write order:
+<ul>
+<li>1: Large scale distributions, with an overview formula per LSP; 2: Large-Scale fading decorrelation distances; 3: Inter-parameter correlations, with the correlation matrix as comment; 4: Model parameters; 9: EoD offset; 5: Decorrelation distance for the small-scale fading spatial consistency; 6: Parameters for the ground reflection extension; 7: Absolute time of arrival offset; 10: Optional modelling components; 8: Path-loss model</li>
+<li>The entries 1 to 8 are those of QuaDRiGa, so its 8 section references can be passed unchanged</li>
+</ul>
+</li>
+<li>Each line is <code>name = value % comment</code>, aligned in columns; the comment states the unit</li>
+<li>The path-loss section has the formula blocks of the model (<code>logdist</code>, <code>dual_slope</code>, <code>nlos</code>, <code>tripple_slope</code>), the line <code>PL_model</code>, then the fields of <code>plpar</code> in struct order with the prefix <code>PL_</code>; several values of one field are written on one line</li>
+<li>Numbers are written with the fewest significant digits (15 to 17) that <a href="#conf_file_read">conf_file_read</a> reads back to the same double; <code>Inf</code> and <code>-Inf</code> are written as such</li>
+<li>With <code>write_defaults = false</code> a field is written only if its value differs from the default; <code>SubpathMethod</code> only if it is not <code>legacy</code>; a section without a written field is left out</li>
+<li>With <code>write_defaults = true</code> all 165 numeric fields and <code>SubpathMethod</code> are written</li>
+<li>The inputs are checked with the rules of <a href="#scenpar_validate">scenpar_validate</a> before the file is opened: unknown fields (including <code>GR_epsilon</code>), <code>NaN</code>, values outside their range and a wrong <code>SubpathMethod</code> are errors. Further errors: a <code>model</code> that is not one name, an empty or <code>NaN</code> path-loss value, short names that are not one name, line breaks in <code>ref</code> or <code>ref_sec</code>, more than 10 entries in <code>ref_sec</code>, a <code>valid_range</code> that is not empty and not <code>[4, 2]</code>.</li>
+<li>A failed call does not create or change a file; an existing file is overwritten</li>
+<li>Every file written passes <a href="#conf_file_read">conf_file_read</a> with <code>validate = true</code> and without ignored keys</li>
+</ul>
+
+<b>Usage:</b><br>
+<pre>
+quadriga_lib.conf_file_write( fn, scenpar, plpar, short_names, ref, ref_sec, valid_range, ...
+    write_defaults );
+</pre>
+
+<b>Inputs:</b><br>
+<ul>
+<li><b><code>fn</code></b> — Path of the conf file to write; string</li>
+<li><b><code>scenpar</code></b> — Scenario parameters; struct with any subset of the 166 fields returned by <a href="#conf_file_read">conf_file_read</a>; numeric fields are real scalars of class double, single, int32, uint32, int64, uint64 or logical; <code>SubpathMethod</code> is a string; missing fields have their default; <code>[]</code> writes the default set</li>
+<li><b><code>plpar</code></b> <i>(optional)</i> — Path-loss parameters; struct with the field <code>model</code> (string) and one real vector of class double, single, int32, uint32, int64 or uint64 per further field, named without the prefix <code>PL_</code>, as returned by <a href="#conf_file_read">conf_file_read</a>; written in struct order; if omitted or <code>[]</code>, no path-loss section</li>
+<li><b><code>short_names</code></b> <i>(optional)</i> — Short names of the scenario; cell array of strings or one string; each one name of the characters <code>A-Z</code>, <code>a-z</code>, <code>0-9</code>, <code>_</code></li>
+<li><b><code>ref</code></b> — Literature reference; written in the header and before each non-empty entry of <code>ref_sec</code>; string; default: no reference</li>
+<li><b><code>ref_sec</code></b> <i>(optional)</i> — Reference per section, numbered as listed above; cell array of up to 10 strings; an empty or missing entry writes no reference</li>
+<li><b><code>valid_range</code></b> <i>(optional)</i> — Validity range, written as comment; rows: frequency in GHz, distance, BS height, MT height in m; columns: lower and upper end, one value is written if both are equal; a row with <code>NaN</code> is not written; <code>[4, 2]</code></li>
+<li><b><code>write_defaults</code></b> — <code>true</code>: write all fields; <code>false</code>: write only fields that differ from their default; default: false</li>
+</ul>
+
+<b>See also:</b><br>
+<ul>
+<li><a href="#conf_file_read">conf_file_read</a> (read the file back)</li>
+<li><a href="#scenpar_validate">scenpar_validate</a> (value checks and defaults)</li>
+</ul>
+
+<hr class="greyline"><br>
 <span id="get_channels_ieee_indoor" class="qd-func"><b>get_channels_ieee_indoor</b></span><br>
 <hr class="thin">
 Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models
@@ -2237,6 +2378,57 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
 <li><a href="#arrayant_generate">arrayant_generate</a> (antenna array generator)</li>
 <li><a href="#baseband_freq_response">baseband_freq_response</a> (for calculating the frequency response)</li>
 <li><a href="#quantize_delays">quantize_delays</a> (for mapping delays to a fixed grid)</li>
+</ul>
+
+<hr class="greyline"><br>
+<span id="scenpar_validate" class="qd-func"><b>scenpar_validate</b></span><br>
+<hr class="thin">
+Validate scenario parameters and complete them with default values
+<ul>
+<li>Checks a struct of QuaDRiGa scenario parameters that did not come from a conf file and adds every missing field with its default value, so that <code>scenpar_out</code> always has all 166 fields</li>
+<li>An empty input (<code>[]</code> or a struct without fields) returns the complete default parameter set</li>
+<li>A struct with the fields of QuaDRiGa is completed with the 27 fields for 3GPP TR 38.901 v19.5.0, which have no effect at their default of 0</li>
+<li>All fields are real numeric scalars, except <code>SubpathMethod</code>, which is a string</li>
+<li>A field that is not one of the 166 names is an error, also with <code>validate = false</code>; this includes the QuaDRiGa field <code>GR_epsilon</code>, which is not supported</li>
+<li>Value checks with <code>validate = true</code>; <code>NaN</code> is an error for every field:
+<ul>
+<li>Integer and > 0: <code>NumClusters</code>, <code>NumSubPaths</code></li>
+<li>Finite and > 0: <code>r_DS</code></li>
+<li>Finite and >= 0: the 8 decorrelation distances (<code>DS_lambda</code> ... <code>XPR_lambda</code>), <code>SC_lambda</code>, <code>absTOA_lambda</code>, <code>PerClusterDS</code>, <code>PerClusterDS_min</code>, <code>PerClusterAS_D</code>, <code>PerClusterAS_A</code>, <code>PerClusterES_D</code>, <code>PerClusterES_A</code>, <code>LNS_ksi</code>, <code>LOS_scatter_radius</code>, <code>GR_enabled</code>, <code>LSP_fc_min</code>, <code>EoD_offset_b</code>, <code>EoD_offset_hcl</code>, <code>PerClusterDS_fc_min</code>, <code>PerClusterES_D_scale</code>, <code>absTOA_Lmax</code>, <code>NF_alpha</code>, <code>NF_beta</code>, <code>SNS_sigma</code>, <code>SNS_A</code>, <code>SNS_B</code>, <code>SNS_R</code>, <code>SNS_delta_var</code>, <code>PolVar_sigma</code></li>
+<li>Integer and >= 0: <code>NumClusters_min</code>, <code>NF_k1</code></li>
+<li>In the range from 0 to 1: <code>SNS_mu</code></li>
+<li>In the range from -1 to 1: the 28 correlations (<code>asD_ds</code> to <code>xpr_esa</code>)</li>
+<li>All other numeric fields accept any value including <code>Inf</code> and <code>-Inf</code></li>
+<li><code>NumClusters_min</code> must not exceed <code>NumClusters</code></li>
+<li><code>NF_alpha</code> and <code>NF_beta</code> must be both 0 or both > 0</li>
+<li><code>SubpathMethod</code> must be <code>legacy</code>, <code>Laplacian</code> or <code>mmMAGIC</code></li>
+</ul>
+</li>
+<li>With <code>validate = false</code> no value is checked: <code>NaN</code> and any <code>SubpathMethod</code> are accepted</li>
+<li>The symmetric matrix <code>lsp_xcorr</code> is built from the 28 correlation fields and has a unit diagonal. It is tested by a Cholesky factorization. A matrix that is not positive definite is not an error.</li>
+</ul>
+
+<b>Usage:</b><br>
+<pre>
+[ scenpar_out, lsp_xcorr, lsp_xcorr_chk ] = quadriga_lib.scenpar_validate( scenpar_in, validate );
+</pre>
+
+<b>Inputs:</b><br>
+<ul>
+<li><b><code>scenpar_in</code></b> <i>(optional)</i> — Scenario parameters; struct with any subset of the 166 fields; numeric fields are real scalars of class double, single, int32, uint32, int64, uint64 or logical; if omitted or empty, the default set is returned</li>
+<li><b><code>validate</code></b> — <code>false</code>: only complete with defaults, no value checks; default: true</li>
+</ul>
+
+<b>Outputs:</b><br>
+<ul>
+<li><b><code>scenpar_out</code></b> — Complete scenario parameters; given values are kept, missing fields have their default; struct with 166 fields in the QuaDRiGa field order: the 138 numeric keys of QuaDRiGa with <code>SubpathMethod</code> (string) as field 107, then the 27 new keys; all numeric fields are double scalars</li>
+<li><b><code>lsp_xcorr</code></b> — LSP cross-correlation matrix; order of rows and columns: DS, KF, SF, ASD, ASA, ESD, ESA, XPR; <code>[8, 8]</code></li>
+<li><b><code>lsp_xcorr_chk</code></b> — <code>true</code> if <code>lsp_xcorr</code> is positive definite; <code>false</code> also if it contains <code>NaN</code>; logical</li>
+</ul>
+
+<b>See also:</b><br>
+<ul>
+<li><a href="#conf_file_read">conf_file_read</a> (read the parameters from a conf file)</li>
 </ul>
 
 <hr class="greyline"><br><br>

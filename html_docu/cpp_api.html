@@ -167,6 +167,7 @@
 <table style="border-collapse: separate; border-spacing: 20px 0;"><tbody>
   <tr><td><a href="#conf_file_list">conf_file_list</a></td><td>List the scenarios defined by the conf files in a set of directories</td></tr>
   <tr><td><a href="#conf_file_read">conf_file_read</a></td><td>Read and validate a QuaDRiGa scenario configuration file</td></tr>
+  <tr><td><a href="#conf_file_write">conf_file_write</a></td><td>Write a QuaDRiGa scenario configuration file</td></tr>
   <tr><td><a href="#get_channels_ieee_indoor">get_channels_ieee_indoor</a></td><td>Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models</td></tr>
   <tr><td><a href="#get_channels_irs">get_channels_irs</a></td><td>Calculate MIMO channel coefficients for IRS-assisted communication</td></tr>
   <tr><td><a href="#get_channels_multifreq">get_channels_multifreq</a></td><td>Compute channel coefficients for spherical waves across multiple frequencies</td></tr>
@@ -3355,7 +3356,7 @@ Read and validate a QuaDRiGa scenario configuration file
 <li>A conf file is a text file with one <code>Key = value</code> assignment per line; <code>%</code> starts a comment; blank lines are allowed; line ends can be LF or CRLF; space and tab are white space</li>
 <li>Keys are case-sensitive names of the characters <code>A-Z</code>, <code>a-z</code>, <code>0-9</code> and <code>_</code>; there are four kinds:
 <ul>
-<li>Scenario parameters: <code>n_key = 166</code> numeric keys with one number each, returned in <code>scenpar</code>. Keys that are not in the file have their default value. The names and their order are returned in <code>key_order</code>.</li>
+<li>Scenario parameters: <code>n_key = 165</code> numeric keys with one number each, returned in <code>scenpar</code>. Keys that are not in the file have their default value. The names and their order are returned in <code>key_order</code>.</li>
 <li><code>SubpathMethod</code>: one of the words <code>legacy</code>, <code>Laplacian</code>, <code>mmMAGIC</code>; default <code>legacy</code></li>
 <li>Path-loss parameters: every key that starts with <code>PL_</code>. <code>PL_model</code> has one name as value. All others have one or more numbers separated by white space and are returned in <code>plpar</code> without the prefix.</li>
 <li><code>ShortName</code>: an alias for the scenario, one name; can occur several times</li>
@@ -3365,7 +3366,8 @@ Read and validate a QuaDRiGa scenario configuration file
 <li>A key that is stated more than once has its last value</li>
 <li>Numbers are decimal with an optional sign, an optional decimal point and an optional exponent (<code>e</code> or <code>E</code>), for example <code>-6.28</code>, <code>.5</code>, <code>6.2e-07</code>; <code>Inf</code>, <code>+Inf</code> and <code>-Inf</code> are accepted in any case</li>
 <li>Elevation angles are used throughout (+90 deg is up); no key refers to a zenith angle</li>
-<li>The 166 keys are the 139 numeric keys of QuaDRiGa and 27 keys for 3GPP TR 38.901 v19.5.0. With their default of 0 the new keys have no effect.</li>
+<li>The 165 keys are 138 numeric keys of QuaDRiGa and 27 keys for 3GPP TR 38.901 v19.5.0. With their default of 0 the new keys have no effect.</li>
+<li>The QuaDRiGa key <code>GR_epsilon</code> (fixed relative permittivity of the ground) is not supported and is reported in <code>ignored_keys</code> like any other unknown key; the permittivity is complex and is set in the simulation</li>
 <li>The 28 correlation keys (<code>asD_ds</code> to <code>xpr_esa</code>) define the symmetric matrix <code>lsp_xcorr</code> with unit diagonal</li>
 <li>Throws <code>std::runtime_error</code> if the file cannot be opened</li>
 <li>Throws <code>std::invalid_argument</code> with file name and line number for a line that is not blank, not a comment and not a well-formed assignment: no <code>=</code>, more or less than one name before the <code>=</code>, a missing value, a word where a number is required or the reverse, a second value or other text after the value, <code>NaN</code>, complex numbers, a <code>PL_</code> key without a name</li>
@@ -3398,7 +3400,7 @@ bool quadriga_lib::conf_file_read(
 
 <b>Outputs:</b><br>
 <ul>
-<li><b><code>scenpar</code></b> — Numeric scenario parameters; previous content is discarded; <code>n_key = 166</code> entries</li>
+<li><b><code>scenpar</code></b> — Numeric scenario parameters; previous content is discarded; <code>n_key = 165</code> entries</li>
 <li><b><code>subpath_method</code></b> <i>(optional)</i> — Value of <code>SubpathMethod</code>; <code>legacy</code> if not in the file</li>
 <li><b><code>pl_model</code></b> <i>(optional)</i> — Value of <code>PL_model</code>; empty if not in the file</li>
 <li><b><code>plpar</code></b> <i>(optional)</i> — Path-loss parameters; keys without the prefix <code>PL_</code>; <code>PL_model</code> is not included; empty if the file has no such key; <code>n_pl</code> entries with one or more values each</li>
@@ -3418,6 +3420,69 @@ bool quadriga_lib::conf_file_read(
 <ul>
 <li><a href="#scenpar_validate">scenpar_validate</a> (value checks, defaults and the list of validation rules)</li>
 <li><a href="#conf_file_list">conf_file_list</a> (find the conf files in a set of directories)</li>
+<li><a href="#conf_file_write">conf_file_write</a> (write a conf file)</li>
+</ul>
+
+<hr class="greyline"><br>
+<span id="conf_file_write" class="qd-func"><b>conf_file_write</b></span><br>
+<hr class="thin">
+Write a QuaDRiGa scenario configuration file
+<ul>
+<li>Writes scenario parameters, path-loss parameters and short names in the layout of the conf files shipped with QuaDRiGa, so that <a href="#conf_file_read">conf_file_read</a> returns the same values bit for bit</li>
+<li>Header: <code>% Config file for scenario "name"</code> with the file name without the extension <code>.conf</code>, then the reference <code>ref</code>, the validity range and one line <code>ShortName = name</code> per short name</li>
+<li>Up to 10 sections follow, each with a header and, if the entry of <code>ref_sec</code> is not empty, a line <code>% See: ref; ref_sec</code>. Index in <code>ref_sec</code> and write order:
+<ul>
+<li>0: Large scale distributions, with an overview formula per LSP; 1: Large-Scale fading decorrelation distances; 2: Inter-parameter correlations, with the correlation matrix as comment; 3: Model parameters; 8: EoD offset; 4: Decorrelation distance for the small-scale fading spatial consistency; 5: Parameters for the ground reflection extension; 6: Absolute time of arrival offset; 9: Optional modelling components; 7: Path-loss model</li>
+<li>The indices 0 to 7 are those of QuaDRiGa, so its 8 section references can be passed unchanged</li>
+</ul>
+</li>
+<li>Within a section, keys are grouped into paragraphs separated by a blank line; correlations are written in the row order of the matrix, all other keys in the order of <code>key_order</code>; <code>SubpathMethod</code> stands before <code>LOS_scatter_radius</code></li>
+<li>Each line is <code>name = value % comment</code>, with the name padded to 19 and the value to 13 characters. The comment states the unit; for the mean and STD of an LSP it adds the reference point of the frequency, distance, height and elevation terms, e.g. <code>@ 1 GHz</code>.</li>
+<li>The path-loss section has the formula blocks of the model (<code>logdist</code>, <code>dual_slope</code>, <code>nlos</code>, <code>tripple_slope</code>), the line <code>PL_model</code>, then the keys of <code>plpar</code> with the prefix <code>PL_</code>; known keys have a comment that can depend on the model; several values of one key are separated by a space</li>
+<li>Numbers are written with the fewest significant digits (15 to 17) that <a href="#conf_file_read">conf_file_read</a> reads back to the same double, independent of the global locale; <code>Inf</code> and <code>-Inf</code> are written as such, <code>-0</code> is kept</li>
+<li>With <code>write_defaults = false</code> a key is written only if its value differs from the default, compared bit for bit; <code>SubpathMethod</code> only if it is not <code>legacy</code>; a section without a written key is left out</li>
+<li>With <code>write_defaults = true</code> all 165 keys and <code>SubpathMethod</code> are written</li>
+<li>Validation before the file is opened: the value checks of <a href="#scenpar_validate">scenpar_validate</a> (unknown keys, <code>NaN</code>, classes, <code>subpath_method</code>); <code>pl_model</code> empty or one name; <code>plpar</code> keys are names other than <code>model</code>, each with at least one value and no <code>NaN</code>; <code>pl_order</code> names each key of <code>plpar</code> once; short names are names; <code>ref</code> and <code>ref_sec</code> have no line break; <code>ref_sec</code> has at most 10 entries; <code>valid_range</code> is empty or <code>[4, 2]</code></li>
+<li>Throws <code>std::invalid_argument</code> for invalid input; a failed check does not create or change a file</li>
+<li>Throws <code>std::runtime_error</code> if the file cannot be opened for writing; an existing file is overwritten</li>
+<li>Every file written passes <a href="#conf_file_read">conf_file_read</a> with <code>validate = true</code> and without ignored keys</li>
+</ul>
+
+<b>Declaration:</b><br>
+<pre>
+void quadriga_lib::conf_file_write(
+    const std::string &amp;fn,
+    const std::unordered_map&lt;std::string, double&gt; &amp;scenpar,
+    const std::string &amp;subpath_method = "legacy",
+    const std::string &amp;pl_model = "",
+    const std::unordered_map&lt;std::string, std::vector&lt;double&gt;&gt; *plpar = nullptr,
+    const std::vector&lt;std::string&gt; *pl_order = nullptr,
+    const std::vector&lt;std::string&gt; *short_names = nullptr,
+    const std::string &amp;ref = "",
+    const std::vector&lt;std::string&gt; *ref_sec = nullptr,
+    const arma::mat *valid_range = nullptr,
+    bool write_defaults = false);
+</pre>
+
+<b>Inputs:</b><br>
+<ul>
+<li><b><code>fn</code></b> — Path of the conf file to write</li>
+<li><b><code>scenpar</code></b> — Numeric scenario parameters; any subset of the <code>n_key = 165</code> keys of <a href="#conf_file_read">conf_file_read</a>; missing keys have their default</li>
+<li><b><code>subpath_method</code></b> <i>(optional)</i> — Value of <code>SubpathMethod</code>: <code>legacy</code>, <code>Laplacian</code> or <code>mmMAGIC</code></li>
+<li><b><code>pl_model</code></b> <i>(optional)</i> — Value of <code>PL_model</code>; one name; empty: not written</li>
+<li><b><code>plpar</code></b> <i>(optional)</i> — Path-loss parameters; keys without the prefix <code>PL_</code>, one or more values each; <code>[n_pl]</code></li>
+<li><b><code>pl_order</code></b> <i>(optional)</i> — Order in which the keys of <code>plpar</code> are written; must name each key once; omitted: sorted by name; <code>[n_pl]</code></li>
+<li><b><code>short_names</code></b> <i>(optional)</i> — Values of the <code>ShortName</code> lines, one name each</li>
+<li><b><code>ref</code></b> <i>(optional)</i> — Literature reference; written in the header and before each non-empty entry of <code>ref_sec</code>; one line</li>
+<li><b><code>ref_sec</code></b> <i>(optional)</i> — Reference per section, indexed as listed above; one line each; an empty or missing entry writes no reference; up to <code>n_sec = 10</code> entries</li>
+<li><b><code>valid_range</code></b> <i>(optional)</i> — Validity range, written as comment; rows: frequency in GHz, distance, BS height, MT height in m; columns: lower and upper end, one value is written if both are equal; a row with <code>NaN</code> is not written; empty: no validity range; <code>[4, 2]</code></li>
+<li><b><code>write_defaults</code></b> <i>(optional)</i> — <code>true</code>: write all keys; <code>false</code>: write only keys that differ from their default</li>
+</ul>
+
+<b>See also:</b><br>
+<ul>
+<li><a href="#conf_file_read">conf_file_read</a> (read the file back)</li>
+<li><a href="#scenpar_validate">scenpar_validate</a> (value checks and defaults)</li>
 </ul>
 
 <hr class="greyline"><br>
@@ -3850,10 +3915,10 @@ void quadriga_lib::get_channels_spherical(
 <hr class="thin">
 Validate scenario parameters and complete them with default values
 <ul>
-<li>Checks a set of QuaDRiGa scenario parameters that did not come from a conf file and adds every missing key with its default value, so that <code>scenpar</code> has all <code>n_key = 166</code> entries on return</li>
+<li>Checks a set of QuaDRiGa scenario parameters that did not come from a conf file and adds every missing key with its default value, so that <code>scenpar</code> has all <code>n_key = 165</code> entries on return</li>
 <li>An empty <code>scenpar</code> returns the complete default parameter set</li>
-<li>A set with the 139 numeric keys of QuaDRiGa is completed with the 27 keys for 3GPP TR 38.901 v19.5.0, which have no effect at their default of 0</li>
-<li>A name in <code>scenpar</code> that is not one of the 166 keys is an error, also with <code>validate = false</code></li>
+<li>A set with the 138 numeric keys of QuaDRiGa is completed with the 27 keys for 3GPP TR 38.901 v19.5.0, which have no effect at their default of 0</li>
+<li>A name in <code>scenpar</code> that is not one of the 165 keys is an error, also with <code>validate = false</code>; this includes the QuaDRiGa key <code>GR_epsilon</code>, which is not supported</li>
 <li>Value checks with <code>validate = true</code>; <code>NaN</code> is an error for every key:
 <ul>
 <li>Integer and > 0: <code>NumClusters</code>, <code>NumSubPaths</code></li>
@@ -3885,7 +3950,7 @@ bool quadriga_lib::scenpar_validate(
 
 <b>Inputs:</b><br>
 <ul>
-<li><b><code>scenpar</code></b> — Numeric scenario parameters; updated in-place: given values are kept, missing keys are added with their default; <code>n_key = 166</code> entries on return</li>
+<li><b><code>scenpar</code></b> — Numeric scenario parameters; updated in-place: given values are kept, missing keys are added with their default; <code>n_key = 165</code> entries on return</li>
 <li><b><code>subpath_method</code></b> <i>(optional)</i> — Value of <code>SubpathMethod</code>, the only parameter that is not numeric</li>
 <li><b><code>validate</code></b> <i>(optional)</i> — <code>false</code>: only complete with defaults, no value checks</li>
 </ul>
