@@ -98,30 +98,30 @@ is the coordinator's suggestion from the hunt.
 
 | Item | WP | Question | Options | Recommended | Decision |
 |---|---|---|---|---|---|
-| B-001 | 02 | When `hdf5_write` rewrites a slot, are old `par_*` fields of that slot kept? | (a) slot is replaced completely (b) existing `par_*` fields are kept unless rewritten | (a) | |
-| B-002 | 03 | Small negative delays in `quantize_delays` (normal output of `get_channels_spherical` with relative delays) | (a) clamp delays above `-tap_spacing/2` to tap 0, throw below (b) throw for any negative delay | (a), and document in `get_channels_spherical` that relative per-element delays can be slightly negative | |
-| B-007 | 09 | NaN / Inf angles in `arrayant::interpolate` | (a) NaN output, no exception (b) throw `invalid_argument` | (a) | |
-| B-012 | 10 | qdant writer magnitude floor (-100 dB absolute) | (a) write all finite dB values, -Inf only for exact zeros (b) floor relative to the element peak | (a) | |
-| B-019 | 04 | `baseband_freq_response_multi` with relative delays | (a) document that absolute delays are required (b) add an argument for the LOS delay (c) change the phase convention of `get_channels_*` | (a) | |
-| B-023 | 11 | IEEE indoor uplink: conjugate (current) or reciprocal transpose | (a) transpose only (reciprocity, like `get_channels_spherical`) (b) keep conjugation, document it | (a) | |
-| B-041 | 10 | `qdant_write` without a layout replaces a custom layout | (a) keep the existing layout node (b) keep current behaviour and document it | (b) | |
-| B-045 | 10 | `combine_pattern` for acoustic arrays | (a) add an optional `propagation_speed` argument (default 299792458) in C++, MEX, Python (b) document the limitation | (a) | |
-| B-047 | 10 | `generate_arrayant_multibeam` default M, N | (a) header to 1, 1 (as docs and wrappers) (b) docs and wrappers to 2, 2 | (a) | |
-| B-052 | 02 | `hdf5_write` rewriting a slot grows the file | (a) delete the old group link, document that space is not reclaimed (b) document only | (a) | |
-| B-060 | 17 | `calc_effective_path_gain`: comment says "average", code sums | (a) fix the comment (b) divide by `n_rx * n_tx` | (a) | |
-| B-069 | 04 | Naming of the cross-polarisation rows of `M` | (a) one convention written out in words ("rows 2-3: response of the H port to a V input") in all docs, XPR columns checked against it (b) other | (a) | |
-| B-070 | 13 | `calc_diffraction_gain` C++ frequency in scalar mode | (a) document the EM-equivalent frequency (b) convert inside C++ and drop the wrapper conversion | (a) | |
-| B-074 | 08 | Invalid `use_kernel` values | (a) throw for values outside the documented set, and for 2 without AVX2 (as `sos_val`) (b) document "falls back to auto/generic" | (a) | |
-| B-077 | 12 | `obj_overlap_test` with an empty mesh | (a) return an empty result (b) throw | (a) | |
-| B-082 | 12 | `cube` / `plane` with a negative scale | (a) swap the winding so normals stay outward / +z (b) reject negative scales | (a) | |
-| B-087 | 15 | Multibeam element beamwidth default in MATLAB / Python | (a) wrappers pass 120 (docs and C++ default) (b) docs to 90 | (a) | |
-| B-088 | 15 | `calc_angular_spread` defaults (wrapping, bank angle) | (a) wrappers follow C++ (on, on) (b) C++ follows the wrappers (off, off) | user's call: which one existing scripts rely on | |
-| B-091 | 15 | MEX `get_channels_irs` `i_irs` base | (a) 1-based per `md/SPEC_MATLAB_API.md` (breaking) (b) 0-based, documented | (a) | |
-| B-092 | 15 | MEX `arrayant_qdant_read(fn)` without `id` | (a) keep reading all entries, validate that they form a frequency set, document the difference to Python (b) read ID 1 like Python | (a) | |
-| B-095 | 15 | Diffraction level of detail 7 | (a) public: document 1-7 everywhere, wrappers take the `coord` size from C++ (b) not public: reject 7 in C++ | (a) | |
-| B-098 | 05 | Python `view = true` | (a) document as "fast contiguous copy" now (b) real aliasing (audit, GIL notes in the item) | (a) now, (b) as a later separate task | |
-| B-099 | 05 | Python kwarg names `sub_cloud_index`, `map_to_itu_materials` | (a) docs follow the registered names (b) registration follows the docs (breaking) | (a) | |
-| B-113 | 15 | 0 paths with `add_fake_los_path` | (a) C++ returns the fake LOS path (all APIs agree with today's MEX) (b) MEX calls C++ and throws like C++ | (a) | |
+| B-001 | 02 | When `hdf5_write` rewrites a slot, are old `par_*` fields of that slot kept? | (a) slot is replaced completely (b) existing `par_*` fields are kept unless rewritten | (a) | (a) slot replaced completely (2026-10-15) |
+| B-002 | 03 | Small negative delays in `quantize_delays` (normal output of `get_channels_spherical` with relative delays) | (a) clamp delays above `-tap_spacing/2` to tap 0, throw below (b) throw for any negative delay | (a), and document in `get_channels_spherical` that relative per-element delays can be slightly negative | (a) clamp above -tap_spacing/2 to tap 0, throw below; document negative relative delays in get_channels_spherical (2026-10-15) |
+| B-007 | 09 | NaN / Inf angles in `arrayant::interpolate` | (a) NaN output, no exception (b) throw `invalid_argument` | (a) | (a) NaN output, no exception (2026-10-15) |
+| B-012 | 10 | qdant writer magnitude floor (-100 dB absolute) | (a) write all finite dB values, -Inf only for exact zeros (b) floor relative to the element peak | (a) | (a) write all finite dB values, -Inf only for exact zeros (2026-10-15) |
+| B-019 | 04 | `baseband_freq_response_multi` with relative delays | (a) document that absolute delays are required (b) add an argument for the LOS delay (c) change the phase convention of `get_channels_*` | (a) | (a) document that use_absolute_delays = true is required (2026-10-15) |
+| B-023 | 11 | IEEE indoor uplink: conjugate (current) or reciprocal transpose | (a) transpose only (reciprocity, like `get_channels_spherical`) (b) keep conjugation, document it | (a) | (a) transpose only (reciprocity); fix code, comment at line 710 and the test "IEEE Chan - Reciprocity"; list as a behaviour change (2026-10-15) |
+| B-041 | 10 | `qdant_write` without a layout replaces a custom layout | (a) keep the existing layout node (b) keep current behaviour and document it | (b) | (b) keep current behaviour, document it (2026-10-15) |
+| B-045 | 10 | `combine_pattern` for acoustic arrays | (a) add an optional `propagation_speed` argument (default 299792458) in C++, MEX, Python (b) document the limitation | (a) | (a) optional propagation_speed argument, default 299792458, in C++, MEX, Python (2026-10-15) |
+| B-047 | 10 | `generate_arrayant_multibeam` default M, N | (a) header to 1, 1 (as docs and wrappers) (b) docs and wrappers to 2, 2 | (a) | (a) header defaults to 1, 1 (2026-10-15) |
+| B-052 | 02 | `hdf5_write` rewriting a slot grows the file | (a) delete the old group link, document that space is not reclaimed (b) document only | (a) | (a) delete the old group link, document that space is reclaimed only by h5repack (2026-10-15) |
+| B-060 | 17 | `calc_effective_path_gain`: comment says "average", code sums | (a) fix the comment (b) divide by `n_rx * n_tx` | (a) | (a) fix the comment to 'sum' (2026-10-15) |
+| B-069 | 04 | Naming of the cross-polarisation rows of `M` | (a) one convention written out in words ("rows 2-3: response of the H port to a V input") in all docs, XPR columns checked against it (b) other | (a) | Global convention: M is the 2x2 Jones matrix (rows = RX polarisation V/H, columns = TX polarisation V/H) stored column-major as in MATLAB, i.e. rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx), Re/Im interleaved. This matches the measured code behaviour; fix every doc and label that says otherwise, and check the XPR columns of calc_cross_polarization_ratio against it (2026-10-15) |
+| B-070 | 13 | `calc_diffraction_gain` C++ frequency in scalar mode | (a) document the EM-equivalent frequency (b) convert inside C++ and drop the wrapper conversion | (a) | (b) C++ takes the acoustic frequency and converts internally; drop the conversion in the MEX and Python wrappers; API change for C++ callers (2026-10-15) |
+| B-074 | 08 | Invalid `use_kernel` values | (a) throw for values outside the documented set, and for 2 without AVX2 (as `sos_val`) (b) document "falls back to auto/generic" | (a) | (a) throw for values outside the documented set, and for 2 without AVX2 (2026-10-15) |
+| B-077 | 12 | `obj_overlap_test` with an empty mesh | (a) return an empty result (b) throw | (a) | (a) return an empty result (2026-10-15) |
+| B-082 | 12 | `cube` / `plane` with a negative scale | (a) swap the winding so normals stay outward / +z (b) reject negative scales | (a) | Mirror Blender: when a negative scale is applied to the mesh, Blender swaps the winding so normals stay outward / +z (checked with Blender 5.2.2, Object > Apply > Scale: cube scale (-1,1,1) and (1,1,-2) give 6 of 6 outward faces, plane scale (-1,1,1) gives normal z = +4). So: (a) swap the winding when the scale product is negative (2026-10-15) |
+| B-087 | 15 | Multibeam element beamwidth default in MATLAB / Python | (a) wrappers pass 120 (docs and C++ default) (b) docs to 90 | (a) | (a) wrappers pass 120 deg (docs and C++ default) (2026-10-15) |
+| B-088 | 15 | `calc_angular_spread` defaults (wrapping, bank angle) | (a) wrappers follow C++ (on, on) (b) C++ follows the wrappers (off, off) | user's call: which one existing scripts rely on | (b) C++ follows the wrappers: wrapping off, bank angle off by default; behaviour change for C++ callers (2026-10-15) |
+| B-091 | 15 | MEX `get_channels_irs` `i_irs` base | (a) 1-based per `md/SPEC_MATLAB_API.md` (breaking) (b) 0-based, documented | (a) | (a) 1-based per md/SPEC_MATLAB_API.md: default 1, reject 0; breaking for MATLAB callers (2026-10-15) |
+| B-092 | 15 | MEX `arrayant_qdant_read(fn)` without `id` | (a) keep reading all entries, validate that they form a frequency set, document the difference to Python (b) read ID 1 like Python | (a) | (a) keep reading all entries, validate that they form a frequency set, document the difference to Python (2026-10-15) |
+| B-095 | 15 | Diffraction level of detail 7 | (a) public: document 1-7 everywhere, wrappers take the `coord` size from C++ (b) not public: reject 7 in C++ | (a) | (a) public: document 1-7 everywhere, wrappers take the coord size from C++ (2026-10-15) |
+| B-098 | 05 | Python `view = true` | (a) document as "fast contiguous copy" now (b) real aliasing (audit, GIL notes in the item) | (a) now, (b) as a later separate task | (b) real aliasing now, in WP-05: switch to copy_aux_mem = false with the audit of all wrappers and the GIL / lifetime notes of the item (2026-10-15) |
+| B-099 | 05 | Python kwarg names `sub_cloud_index`, `map_to_itu_materials` | (a) docs follow the registered names (b) registration follows the docs (breaking) | (a) | (a) docs follow the registered names (2026-10-15) |
+| B-113 | 15 | 0 paths with `add_fake_los_path` | (a) C++ returns the fake LOS path (all APIs agree with today's MEX) (b) MEX calls C++ and throws like C++ | (a) | (a) C++ returns the zero-power fake LOS path (with the correct delay) for 0 paths; all APIs agree (2026-10-15) |
 
 ## 5. Work packages
 
@@ -181,7 +181,10 @@ acceptance checks beyond section 3.1. Severities in brackets.
   `api_python/python_quadriga_adapter.hpp`, `api_python/qpy_arrayant_interpolate.cpp`,
   `api_python/qpy_baseband_freq_response.cpp`, `api_python/qpy_qrt_file_read.cpp`, `api_python/qpy_hdf5_*.cpp`,
   documentation blocks of the named wrappers.
-- Notes: decisions B-098, B-099. Rebuild with `make python`-equivalent into `lib/` (the build of the Baseline section).
+- Notes: decisions B-098, B-099. B-098 was decided as real aliasing (`copy_aux_mem = false`) now: audit every wrapper
+  for writes into `view = true` inputs (area G found none), keep list entries referenced while the GIL is released in
+  `get_channels_spherical` batch mode, handle read-only arrays; this is the largest item of the package. Rebuild into
+  `lib/` (the build of the Baseline section).
 - Acceptance: an ASan build of the Python module (as area G built it: `build_linux/scratch/hunt/G/asan_mod`) runs the
   Python suite without reports.
 
@@ -255,7 +258,9 @@ acceptance checks beyond section 3.1. Severities in brackets.
 - Files: `src/update_xpr.cpp`, `src/path_to_tube.cpp`, `src/combine_irs_coord.cpp`, `src/baseband_freq_response.cpp`
   (B-062), `src/qd_tools_calc_delay_spread.cpp`, `src/qd_tools_acdf.cpp`, `src/calc_diffraction_gain.cpp` (doc),
   `src/interp.cpp`.
-- Notes: decision B-070. B-083 timing under `flock /tmp/bench.lock` at low load.
+- Notes: decision B-070 (convert the acoustic frequency inside C++; remove the conversion from
+  `api_mex/calc_diffraction_gain.cpp` and `api_python/qpy_calc_diffraction_gain.cpp`; API change for C++ callers).
+  B-083 timing under `flock /tmp/bench.lock` at low load.
 
 ### WP-14 OBJ, MTL, PNG and Mitsuba writers/readers
 
@@ -272,8 +277,10 @@ acceptance checks beyond section 3.1. Severities in brackets.
   `api_mex/arrayant_qdant_read.cpp`, `api_mex/calc_diffraction_gain.cpp`, `api_mex/generate_diffraction_paths.cpp`,
   `api_python/qpy_calc_diffraction_gain.cpp`, `src/generate_diffraction_paths.cpp`, `api_mex/get_channels_*.cpp`,
   `src/get_channels_*.cpp` (B-113), `api_mex/arrayant_rotate_pattern.cpp`.
-- Notes: decisions B-087, B-088, B-091, B-092, B-095, B-113. Several are breaking changes for MATLAB or Python users;
-  list them in the log for the release notes.
+- Notes: decisions B-087, B-088, B-091, B-092, B-095, B-113. B-088 changes the C++ defaults of
+  `calc_angular_spread` (`include/quadriga_tools.hpp`, `src/qd_tools_calc_angular_spread.cpp`) to wrapping off and
+  bank angle off; the wrappers stay. Several items are breaking changes (B-087 for MATLAB/Python, B-088 for C++,
+  B-091 for MATLAB); list them in the log for the release notes.
 
 ### WP-16 Sum of sinusoids, small items
 
@@ -343,7 +350,7 @@ unexpected changes in the diff; proposed `md/bugs.md` updates; anything the next
 
 | WP | Items | Status | Commit |
 |---|---|---|---|
-| WP-00 | decisions (section 4) | open | - |
+| WP-00 | decisions (section 4) | done 2026-10-15 | - |
 | WP-01 | 11 | open | - |
 | WP-02 | 8 | open | - |
 | WP-03 | 4 | open | - |
