@@ -11,7 +11,9 @@ measured. It is the reference for the wave side and stands on its own. The mass-
 magnetic media, porous absorbers, rigid permittivities of the acoustic mapping that carry no `m`.
 EM types (0 reflect, 1 transmit, 2 refract) and scalar types (3, 4, 5) run the same physics; the
 scalar types use the TE / admittance form. **Every material with `m > 0` is acoustic** and is out
-of scope here; section 9 lists where that add-on attaches.
+of scope here; section 9 lists where that add-on attaches. The M9 leaf cases in
+`test_acoustic_leaf.cpp` are `[acoustic]` although two of them evaluate wave media only and the others
+wave media on a mass-law wall: they guard the acoustic route of `md/acoustic.md` 2.8.
 
 The wave side has **one small open convention**, the path the `alpha` column is charged over in a
 layer that tunnels (section 8a); everything else is settled. It is the regression guard while the
@@ -22,8 +24,8 @@ First step of every session, from the repository root:
 ```
 cmake --build build_linux --parallel
 ./build_linux/test_bin "[wave]" > test_wave.txt          # All tests passed (165110 assertions in 179 test cases)
-./build_linux/test_bin "[acoustic]" > test_acoustic.txt  # All tests passed (32697 assertions in 46 test cases)
-./build_linux/test_bin > test.txt                        # All tests passed (1307356 assertions in 1132 test cases)
+./build_linux/test_bin "[acoustic]" > test_acoustic.txt  # All tests passed (36705 assertions in 51 test cases)
+./build_linux/test_bin > test.txt                        # All tests passed (1311364 assertions in 1137 test cases)
 ```
 
 The three baselines are untracked (`.gitignore`: `test*.txt`). A change is diffed against them. The
@@ -418,7 +420,8 @@ Every one of these is gated on `m > 0` (or on a mass-law medium in the state) an
   mass cosine; `APPLY_TRANSITION` writes no bent flag out of a mass-law medium.
 
 A change on the acoustic side must keep these gates: the `[wave]` baseline and the stored twins are
-the check that it did.
+the check that it did. The acoustic route M9 (`md/acoustic.md` 2.8) rests on the wave media of the
+two-parameter mapping, so a change on the wave side is checked against `test_acoustic_leaf.cpp` too.
 
 ## 10. Rules for changes
 
