@@ -57,14 +57,17 @@ namespace
         const dtype *alpha = nullptr;  // In-medium absorption at fRef, dB/m
         const dtype *alphaB = nullptr; // Frequency exponent for alpha
         const dtype *m = nullptr;      // Mass-law transmission slope, dB/decade
-        const dtype *resF = nullptr;   // Permittivity resonance frequency, GHz
-        const dtype *resQ = nullptr;   // Permittivity resonance quality factor
-        const dtype *resS = nullptr;   // Permittivity resonance strength
-        const dtype *coiF = nullptr;   // Coincidence frequency, GHz
-        const dtype *coiQ = nullptr;   // Coincidence quality factor
+        const dtype *resF = nullptr;   // Resonance frequency, GHz (a permittivity pole; with m, the plate's resonance)
+        const dtype *resQ = nullptr;   // Resonance quality factor
+        const dtype *resS = nullptr;   // Resonance strength (with m, its sign selects the form)
+        const dtype *coiF = nullptr;   // Coincidence frequency, GHz (with m, the plate's bending stiffness)
+        const dtype *coiQ = nullptr;   // Coincidence quality factor (with m, 1 / loss factor)
         const dtype *coiA = nullptr;   // Coincidence loss amplitude, dB
         const dtype *tf = nullptr;     // Transmission factor at fRef
         const dtype *tfB = nullptr;    // Frequency exponent for tf
+        const dtype *tfP = nullptr;    // Resonant peak added to tf
+        const dtype *tfF = nullptr;    // Frequency of that peak, GHz
+        const dtype *tfQ = nullptr;    // Quality factor of that peak
 
         MaterialCols() = default; // All pointers stay nullptr
 
@@ -120,6 +123,9 @@ namespace
             coiA = resolve("coiA");
             tf = resolve("tf");
             tfB = resolve("tfB");
+            tfP = resolve("tfP");
+            tfF = resolve("tfF");
+            tfQ = resolve("tfQ");
 
             // Physical sanity: reject corrupt input rather than silently clamping it. Loss-like terms must
             // be non-negative (a negative would be gain); material constants must be positive. Reported
@@ -151,6 +157,8 @@ namespace
             require(resQ, "resQ", false);   // resonance Q >= 0 (0 disables)
             require(coiF, "coiF", false);   // coincidence frequency >= 0 (0 disables)
             require(coiQ, "coiQ", false);   // coincidence Q >= 0
+            require(tfF, "tfF", false);     // tf peak frequency >= 0 (0 disables)
+            require(tfQ, "tfQ", false);     // tf peak Q >= 0
         }
 
         // Flag for a "thin-sheet" material
@@ -188,14 +196,17 @@ namespace
         double alpha = 0.0;  // In-medium absorption at fRef, dB/m
         double alphaB = 0.0; // Frequency exponent for alpha
         double m = 0.0;      // Mass-law transmission slope, dB/decade
-        double resF = 0.0;   // Permittivity resonance frequency, GHz
-        double resQ = 0.0;   // Permittivity resonance quality factor
-        double resS = 0.0;   // Permittivity resonance strength
-        double coiF = 0.0;   // Coincidence frequency, GHz
-        double coiQ = 0.0;   // Coincidence quality factor
+        double resF = 0.0;   // Resonance frequency, GHz (a permittivity pole; with m, the plate's resonance)
+        double resQ = 0.0;   // Resonance quality factor
+        double resS = 0.0;   // Resonance strength (with m, its sign selects the form)
+        double coiF = 0.0;   // Coincidence frequency, GHz (with m, the plate's bending stiffness)
+        double coiQ = 0.0;   // Coincidence quality factor (with m, 1 / loss factor)
         double coiA = 0.0;   // Coincidence loss amplitude, dB
         double tfR = 0.0;    // Transmission factor at fRef
         double tfB = 0.0;    // Frequency exponent for tf
+        double tfP = 0.0;    // Resonant peak added to tf
+        double tfF = 0.0;    // Frequency of that peak, GHz
+        double tfQ = 0.0;    // Quality factor of that peak
 
         Material() = default; // All pointers stay nullptr
 
@@ -234,10 +245,14 @@ namespace
             coiA = cols.coiA ? (double)cols.coiA[i] : coiA;
             tfR = cols.tf ? (double)cols.tf[i] : tfR;
             tfB = cols.tfB ? (double)cols.tfB[i] : tfB;
+            tfP = cols.tfP ? (double)cols.tfP[i] : tfP;
+            tfF = cols.tfF ? (double)cols.tfF[i] : tfF;
+            tfQ = cols.tfQ ? (double)cols.tfQ[i] : tfQ;
         }
 
         // Relative permittivity, with its resonance: a complex Lorentz pole, inactive unless
-        // resF > 0, resQ > 0 and resS != 0. One permittivity at a face and in propagation.
+        // resF > 0, resQ > 0 and resS != 0. One permittivity at a face and in propagation. A mass-law
+        // body has no wave inside: its resonance is the plate's and acts in mass_X0.
         std::complex<double> eta(double fGHz = 1.0) const
         {
             double f_rel = fGHz / fRef;
@@ -245,7 +260,7 @@ namespace
             double sigma = c * std::pow(f_rel, d);
             double eta_i = -17.98 * sigma / fGHz;
             std::complex<double> pole(0.0, 0.0);
-            if (resF > 0.0 && resQ > 0.0 && resS != 0.0)
+            if (resF > 0.0 && resQ > 0.0 && resS != 0.0 && !(m > 0.0))
                 pole = (resS * resF * resF) / std::complex<double>(resF * resF - fGHz * fGHz, (resF / resQ) * fGHz);
             return std::complex<double>(eta_r, eta_i) + pole;
         }
@@ -309,37 +324,16 @@ namespace
             // The angle dependence has no cutoff. It tapers to zero and is never negative, and its
             // knee sits at x = 1, fixed by m, the frequency and the surface mass, and by no
             // geometry.
+            //
+            // A body bonded to mass-law bodies the wave has already crossed is not a second panel. With
+            // no air gap the bodies move with one velocity, so their transfer impedances are in series
+            // and what adds is X0, not the term in dB: this body pays what the plate is worth above what
+            // was paid, TL(X_run + X0) - TL(X_run), which with nothing crossed before is its own term.
+            // Each body contributes its X0 unclipped, so the hard zero sits on the sum.
             if (m > 0.0 && dist_geo > mass_min_path)
             {
-                double mass_n = (mass_normal >= 0.0) ? mass_normal : dist_geo * abs_cos_theta;
                 double mass_c = (mass_cos >= 0.0) ? mass_cos : abs_cos_theta;
-                double mass_arg = (fGHz / fRef) * mass_n;
-                double mass_A = (mass_arg > 0.0) ? m * std::log10(mass_arg) : 0.0;
-
-                // A body bonded to mass-law bodies the wave has already crossed is not a second
-                // panel. With no air gap the bodies move with one velocity, so their transfer
-                // impedances are in series and what adds is X0, not the term in dB. The plate is
-                // one body with the summed X0, and the charging telescopes: the first body crossed
-                // paid its own term, and this one pays what the plate is worth above what was
-                // paid, TL(X_run + X0) - TL(X_run). Each body contributes its X0 unclipped, so the
-                // hard zero sits on the sum. With nothing crossed before, the branch below runs
-                // exactly as it always did.
-                if (mass_bonded > 0.0)
-                {
-                    if (mass_arg > 0.0)
-                        loss += mass_TL(mass_bonded + std::pow(mass_arg, 0.05 * m), mass_c) - mass_TL(mass_bonded, mass_c);
-                }
-                else if (mass_A > 0.0 && mass_c > 0.0)
-                {
-                    if (mass_c >= 1.0) // normal incidence, and the guard against a cosine over one
-                        loss += mass_A;
-                    else
-                    {
-                        double X0 = std::pow(mass_arg, 0.05 * m); // = 10^(mass_A/20)
-                        double x = X0 * mass_c;
-                        loss += mass_A * std::log10(1.0 + x * x) / std::log10(1.0 + X0 * X0);
-                    }
-                }
+                loss += mass_TL(mass_bonded + mass_X0((mass_normal >= 0.0) ? mass_normal : dist_geo * abs_cos_theta, fGHz, mass_c), mass_c) - mass_TL(mass_bonded, mass_c);
             }
             return std::pow(10.0, -0.1 * loss);
         }
@@ -347,12 +341,29 @@ namespace
         // Impedance ratio of this body with the angle removed, X0 = ((f / fRef) M)^(m / 20), from its
         // surface-mass surrogate M. It is 10^(A / 20) of the normal-incidence term A wherever that
         // term is positive, and is not clipped below it. Zero for a material without the column.
-        double mass_X0(double mass_normal, double fGHz = 1.0) const
+        //
+        // Two impedances of the plate are in series with its mass, both at the cosine c the wave has
+        // in air. A resonance with resS > 0 - the mass-air-mass resonance of a double unit, a leaf on
+        // its cavity - is the spring of the cavity, stiffer by 1 / c^2, so the dip moves up as 1 / c:
+        // X0 min(1, |1 - (f c/resF)^2 + j f c / (resF resQ)|), taken as the dip it makes and no more,
+        // since a built unit is bridged at its edge and away from the dip insulates as one plate. With
+        // resS < 0 it is the panel's own first mode, a stiffness below it that raises the term:
+        // X0 |1 - (resF/f)^2 - j resF / (f resQ)|. The bending stiffness of the plate (coiF its
+        // coincidence frequency, 1 / coiQ its loss factor) at the trace wavenumber puts the
+        // coincidence dip of a diffuse field into the angle: X0 |1 - (f/coiF)^2 sin^4 (1 + j / coiQ)|.
+        double mass_X0(double mass_normal, double fGHz = 1.0, double mass_c = 1.0) const
         {
             if (!(m > 0.0))
                 return 0.0;
             double mass_arg = (fGHz / fRef) * mass_normal;
-            return (mass_arg > 0.0) ? std::pow(mass_arg, 0.05 * m) : 0.0;
+            double x = fGHz * mass_c / resF, y = resF / fGHz, res = 1.0;
+            if (resF > 0.0 && resQ > 0.0 && resS > 0.0)
+                res = std::min(1.0, std::abs(std::complex<double>(1.0 - x * x, x / resQ)));
+            else if (resF > 0.0 && resQ > 0.0 && resS < 0.0)
+                res = std::abs(std::complex<double>(1.0 - y * y, -y / resQ));
+            double s2 = 1.0 - mass_c * mass_c, w = (coiF > 0.0) ? (fGHz / coiF) * (fGHz / coiF) * s2 * s2 : 0.0;
+            double coi = (coiF > 0.0 && coiQ > 0.0) ? std::abs(std::complex<double>(1.0 - w, -w / coiQ)) : 1.0;
+            return (mass_arg > 0.0) ? std::pow(mass_arg, 0.05 * m) * res * coi : 0.0;
         }
 
         // Mass term in dB of one plate with impedance ratio X0 at angle factor mass_c: the
@@ -392,10 +403,17 @@ namespace
             return std::pow(10.0, -0.1 * loss);
         }
 
-        // Transmission factor at fGHz, clamped to [-1, 1]
+        // Transmission factor at fGHz, clamped to [-1, 1]: a power law, and a resonant peak where tfP
+        // and tfF are set (a panel moving on its mounting, a leaf on its cavity: the room-side absorption
+        // of a mass-law face peaks there)
         double tf(double fGHz = 1.0) const
         {
             double v = tfR * std::pow(fGHz / fRef, tfB);
+            if (tfP != 0.0 && tfF > 0.0)
+            {
+                double x = tfQ * (fGHz - tfF) / tfF;
+                v += tfP / (1.0 + x * x);
+            }
             return (v < -1.0) ? -1.0 : ((v > 1.0) ? 1.0 : v);
         }
 
@@ -448,9 +466,9 @@ namespace
         // Returns the amplitude the face passes per unit forward amplitude, in normal flux over
         // flux_in. Only the reactance of the far side is read, so a verdict that is forced closes
         // the face as well. A pair without tf, and one at tf = -1, is left raw and passes nothing.
-        double closed_face(const Material &B, double fGHz, std::complex<double> &r, const std::complex<double> &y, double flux_in) const
+        double closed_face(const Material &B, double fGHz, std::complex<double> &r, const std::complex<double> &y, double flux_in, bool pass_all = false) const
         {
-            double s = std::sqrt(apply_tf_pair(B, 1.0, fGHz)), nu = (1.0 - s) / (1.0 + s), a = std::abs(y);
+            double s = pass_all ? 0.0 : std::sqrt(apply_tf_pair(B, 1.0, fGHz)), nu = (1.0 - s) / (1.0 + s), a = std::abs(y);
             std::complex<double> e = y / a, b(0.0, std::imag(e * (1.0 - r) / (1.0 + r))), w = (nu + b) / (1.0 + nu * b);
             if (!(nu > 0.0) || !(a > 0.0) || !std::isfinite(std::imag(b)))
                 return 0.0;
@@ -483,7 +501,10 @@ namespace
                    coiQ == other.coiQ &&
                    coiA == other.coiA &&
                    tfR == other.tfR &&
-                   tfB == other.tfB;
+                   tfB == other.tfB &&
+                   tfP == other.tfP &&
+                   tfF == other.tfF &&
+                   tfQ == other.tfQ;
         }
 
         // Per-channel normal-flux obliquity, returned as an amplitude factor.
@@ -631,70 +652,41 @@ namespace
             std::complex<double> coeff_TE, coeff_TM;
             double gain;
 
-            // A face is not judged from inside a mass-law medium by a wave that is held undeviated.
-            //
-            // A material with m > 0 is calibrated for surface impedance only, so its eta * mu is not
-            // a propagation index, and the critical angle of a face seen from inside it is formed
-            // from exactly that index. A tf leak keeps its direction, so the reverse of a leak that
-            // crossed this face at an angle is the crossing from the other side at the same angle.
-            // Judged from here that crossing is total reflection past the critical angle and passes
-            // only the flat leak; judged from there it never is and is an ordinary crossing. Same
-            // face, same media, same angle, so the two are made one number: the wave is charged what
-            // the other direction charges, with the interface gain of the medium it enters. That
-            // crossing arrives in this medium's neighbour at the angle the wave keeps, so it leaves
-            // undeviated and the verdict handed back is the one that says so.
-            //
-            // Only towards the lower index, where this side has a critical angle at all; the other
-            // direction is the ordinary crossing and is untouched. Only for a wave that was not
-            // refracted in: one the tracer bent arrives at a Snell angle, where the crossing from
-            // this side is already the reverse of its entry.
-            //
-            // The reflect port follows the same rule, or the two ports of one face do not add up:
-            // judged from inside it is a mirror past the critical angle while the transmit port
-            // passes what the other direction passes. It is the reflection the other direction
-            // sees at this cosine with its sign reversed, which is Stokes' relation for one face
-            // read from its two sides. It stays in this medium, so it carries no interface gain,
-            // and the verdict handed back is the ordinary one: a reflection has no bend to hold.
+            // A wave held undeviated in a mass-law medium is a leak in a lumped plate: the plate has no
+            // wave inside, its permittivity is an impedance mapping and its transmission is its own term
+            // (Material::medium_gain). Every face such a wave meets leads out of the plate or into the
+            // next body bonded to it, and what reaches the face passes: in normal flux, with the
+            // interface gain of the medium entered. Nothing is reflected back into the plate. The
+            // wave keeps the angle it has, so the geometry handed back is that of no bend. Not into a
+            // wave medium that is closed for the wave, which carries no flux: that face is the pad.
             bool trans_class = interaction_type == 1 || interaction_type == 2 || interaction_type == 4 || interaction_type == 5;
-            if (undeviated && m > 0.0 && !trans_class && std::abs(eta1_d_eta2) > 1.0)
+            // Out of a plate into a wave medium the held wave carries the transverse invariant it had in
+            // air: it is refracted as from air, and it is closed where air would be past that medium's
+            // critical angle.
+            if (undeviated && m > 0.0 && !(other.m > 0.0))
             {
-                gain = other.interact_with(*this, interaction_type, theta, fGHz, &coeff_TE, &coeff_TM, nullptr, nullptr,
-                                           nullptr, nullptr, false, cos_theta_in, false);
+                eta1_d_eta2 = 1.0 / (eta2 * mu2), snell = std::sqrt(std::abs(eta1_d_eta2));
+                std::complex<double> a = 1.0 - eta1_d_eta2 * sin2_theta;
+                ct2 = std::sqrt(qd_evanescent(a) ? std::complex<double>(std::real(a), -0.0) : a);
+                tir = std::imag(eta2 * mu2) == 0.0 && std::abs(eta1_d_eta2 * sin2_theta) >= 1.0;
+            }
+            if (undeviated && m > 0.0 && (other.m > 0.0 || !tir))
+            {
+                double ig = trans_class ? other.interface_gain(fGHz) : 0.0;
                 if (cTE)
-                    *cTE = -coeff_TE;
+                    *cTE = std::sqrt(ig);
                 if (cTM)
-                    *cTM = -coeff_TM;
+                    *cTM = std::sqrt(ig);
+                const bool bend = !trans_class || !(other.m > 0.0);
                 if (cos_theta2)
-                    *cos_theta2 = ct2;
+                    *cos_theta2 = bend ? ct2 : ct1;
                 if (eta1_div_eta2)
-                    *eta1_div_eta2 = eta1_d_eta2;
+                    *eta1_div_eta2 = bend ? eta1_d_eta2 : 1.0;
                 if (Snell_ratio)
-                    *Snell_ratio = snell;
+                    *Snell_ratio = bend ? snell : 1.0;
                 if (total_reflection)
                     *total_reflection = tir;
-                return gain;
-            }
-            if (undeviated && m > 0.0 && trans_class && std::abs(eta1_d_eta2) > 1.0)
-            {
-                gain = other.interact_with(*this, interaction_type, theta, fGHz, &coeff_TE, &coeff_TM, nullptr, nullptr,
-                                           nullptr, nullptr, false, cos_theta_in, false);
-                double s = other.interface_gain(fGHz) / interface_gain(fGHz); // the gain of the medium entered
-                gain *= s;
-                coeff_TE *= std::sqrt(s), coeff_TM *= std::sqrt(s);
-
-                if (cTE)
-                    *cTE = coeff_TE;
-                if (cTM)
-                    *cTM = coeff_TM;
-                if (cos_theta2)
-                    *cos_theta2 = ct2;
-                if (eta1_div_eta2)
-                    *eta1_div_eta2 = eta1_d_eta2;
-                if (Snell_ratio)
-                    *Snell_ratio = snell;
-                if (total_reflection)
-                    *total_reflection = true;
-                return gain;
+                return ig;
             }
 
             // tf at a bare boundary. A face with a wave behind it is the transformer of a coherent
@@ -742,6 +734,11 @@ namespace
                 coeff_TM = coeff_TE, gain = std::norm(coeff_TE);
             }
 
+            // A mass-law body is a lumped plate whose permittivity is an impedance mapping: no tracer bends
+            // into it, the wave keeps the angle it has (and Material::medium_gain forms its term there).
+            if (trans_class && other.m > 0.0)
+                ct2 = ct1, eta1_d_eta2 = 1.0, snell = 1.0;
+
             // Transmission-class interactions (1, 2, 4, 5) cross a thin interface: fold in the interface gain
             if (interaction_type == 1 || interaction_type == 2 || interaction_type == 4 || interaction_type == 5)
             {
@@ -751,17 +748,6 @@ namespace
                 coeff_TE *= s;
                 coeff_TM *= s;
             }
-
-            // A wave held undeviated in a mass-law medium keeps its direction at every face. The
-            // medium is a lumped plate with no wave inside, and this face is charged the same from
-            // both sides at one angle, so the wave has that angle on both sides. Towards the lower
-            // index the verdict above says so. Towards the higher index the crossing is the
-            // ordinary one and its Snell ratio is formed from two permittivities that are
-            // impedance mappings, so the geometry handed back is that of no bend: a Snell ratio of
-            // one and the incidence cosine, from which every caller reproduces the direction it
-            // came in with. The coefficient and the verdict are the ordinary ones.
-            if (undeviated && m > 0.0 && trans_class)
-                ct2 = ct1, eta1_d_eta2 = 1.0, snell = 1.0;
 
             if (cTE)
                 *cTE = coeff_TE;
@@ -910,14 +896,22 @@ namespace
             dist_max = 0.0; // opaque within a meter
         if (dist_max < thk)
             dist_max = thk;
-        double dist = (ct_r > 0.0) ? thk / ct_r : dist_max;
+        double dist = (mass_c > 0.0) ? thk / mass_c : dist_max; // the held path: the wave keeps the angle it has in air
         if (!(dist < dist_max)) // also catches inf and NaN
             dist = dist_max;
         double mass_path = thk * mass_c; // zero at exact tangency, where the term is switched off
         double g = L.medium_gain(dist, fGHz, ct_r, mass_path, 1.0, (mass_path > 0.0) ? 0.0 : 1.0e300, thk, mass_c, x_run);
         if (mass_path > 0.0)
-            x_run += L.mass_X0(thk, fGHz);
+            x_run += L.mass_X0(thk, fGHz, mass_c);
         return std::sqrt((g < 0.0) ? 0.0 : g);
+    }
+
+    // What a closed mass-law plate passes in all: a plate whose outer faces absorb at least a and
+    // whose bodies have the term tau passes the incoherent series of the face and the plate,
+    // a tau / (a + tau - a tau): tau where tau << a, never more than either, and it reflects 1 - a.
+    inline double qd_plate(double a, double tau)
+    {
+        return (a > 0.0 && tau > 0.0) ? a * tau / (a + tau - a * tau) : 0.0;
     }
 
     // Composite of an ordered list of layers between two half-spaces: one sheet, or a stack of
@@ -972,7 +966,8 @@ namespace
                                  double mass_cos = -1.0,       // cosine the wave has in air, for a mass-law term, < 0 = |Re ci|
                                  double mass_bonded = 0.0,     // X0 of the bonded mass-law bodies crossed before the stack
                                  bool near_undeviated = false, // the wave in mat_near was not refracted in
-                                 bool far_closed = false)      // near | far is past its critical angle
+                                 bool far_closed = false,      // near | far is past its critical angle
+                                 double plate_a = -1.0)        // absorption of the face a held plate was entered through, < 0 = unknown
     {
         if (n_layers < 1 || layers == nullptr)
             return false;
@@ -995,14 +990,13 @@ namespace
         // wall. The wave is a leak, it keeps the incidence cosine at every face, and each face is
         // the crossing Material::interact_with forms for a held wave, with the interface gain of
         // the medium entered; each layer adds its mass term. That is what the same bodies do as
-        // traced solids. Taken where every layer carries the mass column and a face leads
-        // towards the lower index, which is where the undeviated rule has anything to say.
+        // traced solids. Taken where every layer carries the mass column.
         if (near_undeviated && mat_near.m > 0.0)
         {
-            bool all_mass = true, to_lower = false;
-            for (int j = 1; j <= n_layers + 1; ++j)
-                all_mass = all_mass && (j > n_layers || MED(j).m > 0.0), to_lower = to_lower || std::abs(W(j - 1) / W(j)) > 1.0;
-            if (all_mass && to_lower)
+            bool all_mass = true;
+            for (int j = 1; j <= n_layers; ++j)
+                all_mass = all_mass && MED(j).m > 0.0;
+            if (all_mass)
             {
                 std::complex<double> t_te(1.0, 0.0), t_tm(1.0, 0.0), a_te, a_tm;
                 double x_run = mass_bonded, amp = 1.0;
@@ -1012,6 +1006,17 @@ namespace
                     t_te *= a_te, t_tm *= a_tm;
                     if (j <= n_layers)
                         amp *= qd_mass_amp(MED(j), layers[j - 1].thk, std::abs(std::real(ci)), mc, fGHz, x_run);
+                }
+                // Into a medium without the mass column the plate is left here, and it passes in all
+                // what a plate of its two outer faces passes
+                if (!(mat_far.m > 0.0))
+                {
+                    const Material &L = *layers[n_layers - 1].mtl;
+                    std::complex<double> o_te, o_tm;
+                    double a_out = mat_far.interact_with(L, it, 0.0, fGHz, &o_te, &o_tm, nullptr, nullptr, nullptr, nullptr, false, &ci) / L.interface_gain(fGHz);
+                    double a_in = (plate_a >= 0.0) ? plate_a : a_out, tau = std::pow(10.0, -0.1 * Material::mass_TL(mass_bonded, mc)) * amp * amp;
+                    if (a_in > 0.0 && tau > 0.0)
+                        amp *= std::sqrt(qd_plate(std::min(a_in, a_out), tau) / (a_in * tau));
                 }
                 // The far medium's interface gain is owed only where it is newly entered
                 if (!mat_far.same_as(Material()) && mat_far.same_as(mat_near))
@@ -1065,16 +1070,17 @@ namespace
             bool leak_first = false;
             std::complex<double> cS = COS(1), a_te, a_tm, b_te, b_tm;
             mat_near.interact_with(S, it, 0.0, fGHz, &a_te, &a_tm, nullptr, nullptr, nullptr, &leak_first, false, &ci, near_undeviated);
-            if (leak_first)
-                S.interact_with(mat_far, it, 0.0, fGHz, &b_te, &b_tm, nullptr, nullptr, nullptr, nullptr, false, &ci, true);
-            else
-            {
-                S.interact_with(mat_far, it, 0.0, fGHz, &b_te, &b_tm, nullptr, nullptr, nullptr, nullptr, true, &cS);
-                if (is_scalar)
-                    b_te = b_tm = std::polar(std::abs(b_te), std::arg((2.0 * ADM(1) * cS) / (ADM(1) * cS + z_f * c_far)));
-            }
+            S.interact_with(mat_far, it, 0.0, fGHz, &b_te, &b_tm, nullptr, nullptr, nullptr, nullptr, !(mat_far.m > 0.0), leak_first ? &ci : &cS, true);
             double x_run = mass_bonded, aI = qd_mass_amp(S, layers[0].thk, std::abs(std::real(cS)), mc, fGHz, x_run);
             leak[0] = aI * a_te * b_te, leak[1] = aI * a_tm * b_tm;
+            if (!(mat_near.m > 0.0) && !(mat_far.m > 0.0)) // the sheet is the whole plate: the plate rule of its two faces
+            {
+                const double tau = aI * aI, gS = S.interface_gain(fGHz), gF = mat_far.interface_gain(fGHz); // the gains interact_with folded in
+                const double a[2] = {std::norm(a_te) / gS, std::norm(a_tm) / gS}, b[2] = {std::norm(b_te) / gF, std::norm(b_tm) / gF};
+                for (int pol = 0; pol < 2; ++pol)
+                    if (a[pol] > 0.0 && b[pol] > 0.0 && tau > 0.0)
+                        leak[pol] *= std::sqrt(qd_plate(std::min(a[pol], b[pol]), tau) / (a[pol] * b[pol] * tau));
+            }
         }
 
         std::complex<double> R_out[2], T_out[2];
@@ -1082,6 +1088,13 @@ namespace
         {
             // Normal flux of the media a leak entered a closed layer from, and left it into
             double fl_in = 1.0, fl_out = 1.0;
+            double a_run = -1.0, tau_run = 1.0, a_entry = -1.0; // absorption of the first face of a plate, its bodies' term, the last entry face
+            // The last face of a plate, out of a mass-law layer into a side without the mass column, and what it
+            // passes besides what reached it: the plate rule over what the entry face passed
+            auto PLATE_OUT = [&](int j)
+            { return (j >= 1 || near_undeviated) && j <= n_layers && MED(j).m > 0.0 && !(MED(j + 1).m > 0.0); };
+            auto PLATE_FIX = [&](double a_out)
+            { return (a_run > 0.0 && tau_run > 0.0) ? std::sqrt(qd_plate(std::min(a_run, a_out), tau_run) / (a_run * tau_run)) : 1.0; };
 
             // Boundary j | j+1, tf folded in by the pair that forms it. A boundary neither of
             // whose media carries tf is left exactly raw, unless nothing propagates behind it.
@@ -1120,45 +1133,60 @@ namespace
                 }
                 const bool cA = CLOSED(j), cB = CLOSED(j + 1);
                 const bool closed = cA != cB; // a closed layer against a side that carries flux
+                if (!closed && A.m > 0.0 && B.m > 0.0) // inside one plate: what reaches it passes, nothing is reflected
+                {
+                    std::complex<double> ya = (pol == 0) ? za * ca : std::conj(za) * ca, yb = (pol == 0) ? zb * cb : std::conj(zb) * cb;
+                    double k = cA ? 1.0 : std::sqrt(std::real(ya) / std::real(yb)); // two closed layers carry the leak as a flux
+                    r = 0.0, t = std::polar(k, std::arg(t)), tb = std::polar(1.0 / k, std::arg(tb));
+                    return;
+                }
+                if (!closed && (PLATE_OUT(j) || (j + 1 <= n_layers && B.m > 0.0 && !(A.m > 0.0)))) // an open outer face of a plate
+                {
+                    std::complex<double> c = A.tf_face(B, fGHz, r), ya = (pol == 0) ? za * ca : std::conj(za) * ca, yb = (pol == 0) ? zb * cb : std::conj(zb) * cb;
+                    t *= c, tb *= c;
+                    if (!PLATE_OUT(j)) // the first face: what it passes into the plate
+                    {
+                        a_entry = std::norm(t) * std::real(yb) / std::real(ya);
+                        return;
+                    }
+                    // the last face: what reached it passes, put right by the plate rule
+                    double k = (std::real(yb) > 0.0) ? std::sqrt(std::real(ya) / std::real(yb)) : 0.0;
+                    t = std::polar(k * PLATE_FIX(std::norm(tb) * std::real(ya) / std::real(yb)), std::arg(t));
+                    return;
+                }
                 if (A.tf(fGHz) == 0.0 && B.tf(fGHz) == 0.0 && !closed)
                     return;
-                if (!closed && !(j >= 1 && A.m > 0.0) && !(j < n_layers && B.m > 0.0)) // the face of a coherent layer
+                if (!closed) // an open face, of a coherent or a mass-law layer
                 {
                     std::complex<double> c = A.tf_face(B, fGHz, r);
                     t *= c, tb *= c;
                     return;
                 }
-                // A closed layer seen from a side that carries a wave is the pad of a closed face:
-                // on the way in the flux it passes, on the way out the reverse, the amplitude that
-                // flux launches.
+                // A closed layer seen from a side that carries a wave is the pad of a closed face: on
+                // the way in the flux it passes, on the way out everything that reached it, the
+                // amplitude that flux launches. Seen from the reflect side the face keeps its pad.
                 const Material &V = cB ? A : B;
-                if (closed && !(V.m > 0.0))
+                if (!(V.m > 0.0))
                 {
-                    std::complex<double> yw = (pol == 0) ? (cB ? za * ca : zb * cb) : (cB ? std::conj(za) * ca : std::conj(zb) * cb), rw = cB ? r : -r;
-                    double k = V.closed_face(cB ? B : A, fGHz, rw, yw, 1.0);
+                    std::complex<double> yw = (pol == 0) ? (cB ? za * ca : zb * cb) : (cB ? std::conj(za) * ca : std::conj(zb) * cb), rw = cB ? r : -r, rp = rw;
+                    double k = V.closed_face(cB ? B : A, fGHz, rw, yw, 1.0), kp = V.closed_face(cB ? B : A, fGHz, rp, yw, 1.0, true);
+                    double a_face = (kp > 0.0) ? (k / kp) * (k / kp) : 0.0;
+                    if (cB)
+                        a_entry = a_face;
+                    else // the plate's last face: it passes in all what a plate of its two faces passes
+                        k = kp * PLATE_FIX(a_face);
                     r = cB ? rw : -rw, t = std::polar(cB ? k : k / std::abs(yw), std::arg(t));
                     return;
                 }
-                double R0 = std::norm(r);
-                double Rt = A.apply_tf_pair(B, R0, fGHz);
-                double keep = 1.0 - R0, pass = (Rt < 1.0) ? 1.0 - Rt : 0.0;
-                r = std::polar(std::sqrt(Rt), std::arg(r));
-                if (keep < 1.0e-9) // no forward Fresnel port left to scale: the flat leak
-                    t = std::polar(std::sqrt(pass), std::arg(t)), tb = std::polar(std::sqrt(pass), std::arg(tb));
-                else if (closed) // no forward port either, whatever R0 reads: the leak of a bare face
-                {
-                    double Rc = A.apply_tf_pair(B, 1.0, fGHz);
-                    pass = (Rc < 1.0) ? 1.0 - Rc : 0.0;
-                    t = std::polar(std::sqrt(pass), std::arg(t)), tb = std::polar(std::sqrt(pass), std::arg(tb));
-                }
-                else
-                    t *= std::sqrt(pass / keep), tb *= std::sqrt(pass / keep);
-                if (closed)
-                {
-                    int o = cA ? j + 1 : j; // the side that carries flux
-                    double g = (pol == 0) ? std::real(ADM(o) * COS(o)) : std::real(std::conj(ADM(o)) * COS(o));
-                    (cB ? fl_in : fl_out) *= g;
-                }
+                // Against a mass-law side the face is inside one plate: it passes everything and
+                // reflects nothing, a statement about the normal flux of that side: the segments run
+                // in raw amplitudes that are converted once at the outer pair, and across a closed
+                // layer there is nothing to convert through, so the flux of that side is collected
+                // here and the transmit port is put right by the ratio below.
+                r = 0.0, t = std::polar(1.0, std::arg(t)), tb = std::polar(1.0, std::arg(tb));
+                int o = cA ? j + 1 : j; // the side that carries flux
+                double g = (pol == 0) ? std::real(ADM(o) * COS(o)) : std::real(std::conj(ADM(o)) * COS(o));
+                (cB ? fl_in : fl_out) *= g;
             };
 
             // One-way factor of coherent layer j: exp(-j k0 n thk c), index and cosine complex,
@@ -1191,6 +1219,8 @@ namespace
                 std::complex<double> G, Ge, T, r, t, tb;
                 BND(q - 1, G, T, tb);
                 Ge = G;
+                if (mass && (q - p > 1 || p == 0 || !(MED(p).m > 0.0)))
+                    a_run = a_entry, tau_run = 1.0;
                 for (int j = q - 2; j >= p; --j)
                 {
                     std::complex<double> phi = PHI(j + 1), p2 = phi * phi;
@@ -1206,7 +1236,11 @@ namespace
                 if (p == 0)
                     Rt = Ge;
                 if (mass)
-                    Tt *= qd_mass_amp(MED(q), layers[q - 1].thk, std::abs(std::real(COS(q))), mc, fGHz, x_run);
+                {
+                    double amp = qd_mass_amp(MED(q), layers[q - 1].thk, std::abs(std::real(COS(q))), mc, fGHz, x_run);
+                    tau_run *= amp * amp;
+                    Tt *= amp;
+                }
                 p = q;
             }
             if (fl_in != fl_out) // one medium on both sides of the closed layers: exactly one
@@ -4088,18 +4122,18 @@ void quadriga_lib::ray_state_update(int interaction_type,
             double d_code = (mass_code < 1) ? 0.0 : std::pow(10.0, -4.0 + 6.0 * (double)(mass_code - 1) / 32766.0);
             if (IS_SHEET(mtl_prev))
             {
-                double X = P.mass_X0(P.thk, fGHz);
+                double X = P.mass_X0(P.thk, fGHz, abs_cos_theta);
                 if (prev_embedded && d_code > 0.0)
                 {
                     Material H = MAT(mtl_current);
                     if (H.m > 0.0)
-                        X += H.mass_X0(d_code, fGHz);
+                        X += H.mass_X0(d_code, fGHz, abs_cos_theta);
                 }
                 return X;
             }
             if (mass_code < 1)
                 return 0.0;
-            return P.mass_X0(d_code, fGHz);
+            return P.mass_X0(d_code, fGHz, abs_cos_theta);
         };
 
         // Normal thickness of material R that has the X0 of a leg of R with normal thickness d
@@ -4137,6 +4171,25 @@ void quadriga_lib::ray_state_update(int interaction_type,
             }
             return std::pow(s, 1.0 / p);
         };
+
+        // The absorption of a face of a plate of material C seen from medium P: what it passes of the flux
+        // that meets it, without the interface gain. The face the current plate was entered through: from
+        // the previous medium; for a later body of a bonded plate the face of the body before it from air;
+        // behind a sheet inside the current body that body's own face from air (one level, as the state).
+        auto PLATE_ABS = [&](const Material &P, const Material &C) -> double
+        {
+            std::complex<double> e_te, e_tm;
+            double ig = C.interface_gain(fGHz), g = P.interact_with(C, is_scalar ? 4 : 1, theta_t, fGHz, &e_te, &e_tm);
+            return (ig > 0.0) ? g / ig : 0.0;
+        };
+        auto PLATE_IN = [&](const Material &C) -> double
+        {
+            Material P = MAT(mtl_prev);
+            if (IS_SHEET(mtl_prev) && prev_embedded) // a sheet inside the current body: the body's own face
+                return PLATE_ABS(MAT(0), C);
+            return (P.m > 0.0) ? PLATE_ABS(MAT(0), P) : PLATE_ABS(P, C);
+        };
+        int plate_out = -1; // the medium without the mass column a held plate is left into at this event
 
         // Apply medium gain and phase
         auto SCALE_BY_MEDIUM = [&](int m)
@@ -4229,6 +4282,16 @@ void quadriga_lib::ray_state_update(int interaction_type,
             // what that body paid; see Material::medium_gain.
             double g = mtl.medium_gain(dist_refract, fGHz, abs_cos_theta_t, dist_geo, abs_cos_theta,
                                        0.0015, -1.0, -1.0, (mtl.m > 0.0) ? MASS_RUN() : 0.0);
+
+            // The leg on which a held plate is left: the plate passes in all what a plate of its two
+            // outer faces passes, its entry face having passed a_in and its earlier bodies their terms.
+            if (mtl.m > 0.0 && !refracted && plate_out >= 0 && m == mtl_current)
+            {
+                double a_in = PLATE_IN(mtl), a_out = PLATE_ABS(MAT(plate_out), mtl);
+                double tau = std::pow(10.0, -0.1 * Material::mass_TL(MASS_RUN(), abs_cos_theta)) * g;
+                if (a_in > 0.0 && tau > 0.0)
+                    g *= qd_plate(std::min(a_in, a_out), tau) / (a_in * tau);
+            }
             double cos2 = walk_off ? abs_cos_theta_t * abs_cos_theta_t : 1.0; // medium side, theta_t
             double cos2_geo = walk_off ? abs_cos_theta * abs_cos_theta : 1.0; // free-space side, theta_i
             double excess_phase = k0 * (n_re * dist_refract * cos2 - dist_geo * cos2_geo);
@@ -4500,7 +4563,8 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 lay[0].mtl = &M_slab, lay[0].thk = thk, lay[1].mtl = &M_slab2, lay[1].thk = thk2;
                 std::complex<double> Tte, Ttm, Rte, Rtm;
                 if (!qd_stack_resolve(M_near, lay, (mtl_slab2 != 0) ? 2 : 1, M_far, (std::abs(ct_near) > 0.0) ? ct_near : std::complex<double>(ct_geo, 0.0),
-                                      fGHz, is_scalar, &Tte, &Ttm, &Rte, &Rtm, disp_far, host_near, host_far, ct_mass, mass_bonded, !refracted, tir))
+                                      fGHz, is_scalar, &Tte, &Ttm, &Rte, &Rtm, disp_far, host_near, host_far, ct_mass, mass_bonded, !refracted, tir,
+                                      (M_near.m > 0.0 && !refracted) ? PLATE_IN(M_near) : -1.0))
                     return false; // a singular denominator; the caller decides
 
                 // Both ports come out of the one pass. The reflection port is its own Airy sum, not the
@@ -4608,7 +4672,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
             {
                 Material M_host = MAT(mtl_current);
                 if (M_host.m > 0.0)
-                    mass_host = MASS_RUN() + ((dist_geo > 0.0015) ? M_host.mass_X0(dist_geo * abs_cos_theta, fGHz) : 0.0);
+                    mass_host = MASS_RUN() + ((dist_geo > 0.0015) ? M_host.mass_X0(dist_geo * abs_cos_theta, fGHz, abs_cos_theta) : 0.0);
             }
             bool have_composite = SHEET_RESOLVE(sheet_mtl, m_near, m_far, sheet_case == 3, sheet_mtl2, mass_host);
 
@@ -4633,6 +4697,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
             {
                 if (have_composite && !resolved && !followed)
                     host_summed = SLAB_AIRY_FACTOR(mtl_current, sheet_mtl, mtl_prev, m_far);
+                plate_out = (refl_pass || MAT(sheet_mtl).m > 0.0) ? -1 : sheet_mtl;
                 SCALE_BY_MEDIUM(mtl_current);
             }
 
@@ -4674,7 +4739,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
             // Clearing the resolved flag starts a new leg. Behind a sheet inside the medium the leg
             // is bent if the one in front was; a glued entry says what it did itself.
             next_current = (short)((m_next & 0x3FFF) |
-                                   ((m_next == 0) ? 0 : ((m_next == mtl_current) ? bent_carry : bent_enter)));
+                                   ((m_next == 0) ? 0 : ((m_next == mtl_current) ? bent_carry : ((MAT(m_next).m > 0.0) ? 0 : bent_enter))));
 
             // The sheet becomes the previous medium so the next host leg reflects off it. It is a
             // boundary material here, never a traversed one: mtl_prev is only ever read as the far
@@ -4777,6 +4842,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
                         typeR[2] = true; // Set slab resolve flag
                 }
 
+                plate_out = exit ? 0 : ((MAT(mtl_next).m > 0.0) ? -1 : mtl_next);
                 SCALE_BY_MEDIUM(mtl_current); // Apply current medium gain and phase
 
                 if (!exit && mtl_next != 0 && MAT(mtl_current).m > 0.0 && dist_geo > 0.0015)
@@ -4794,7 +4860,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 // of a wave with a real transverse invariant (prev_real_inv).
                 next_prev = (short)(mtl_current | ((face_real_inv && !exit && mtl_next != 0) ? (int)0x4000 : 0));
                 // A leg entered out of a mass-law medium is not a bent one: the wave was held there
-                next_current = (short)(mtl_next | ((mtl_next != 0 && !exit && !(MAT(mtl_current).m > 0.0)) ? bent_enter : 0)); // Clear resolved flag
+                next_current = (short)(mtl_next | ((mtl_next != 0 && !exit && !(MAT(mtl_next).m > 0.0)) ? bent_enter : 0)); // Clear resolved flag
             }
 
             next_buffer = buffer_next; // Clear the deferred medium
@@ -4864,7 +4930,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 typeR[3] = true;      // Set inside flag (typeR 9)
                 if (mtl_current == 0) // Entry from air, keep xprmat and gain unchanged
                 {
-                    next_current = (short)(M1 | bent_enter);           // Next medium
+                    next_current = (short)(M1 | ((MAT(M1).m > 0.0) ? 0 : bent_enter));           // Next medium
                     bool nonpar = !ray_ends && fbs_sbs_not_parallel(); // SBS not parallel to FBS?
                     next_prev = (short)(nonpar ? (int)0x8000 : 0);     // air + flag
 

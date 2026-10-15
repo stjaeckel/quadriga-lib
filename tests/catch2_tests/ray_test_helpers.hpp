@@ -1697,10 +1697,15 @@ static inline double diag_mass_TL(double m, double fRef_GHz, double f_hz, double
 //
 // A mass-law layer, m > 0, is not a coherent layer: no series and no in-layer phase. It ends the
 // coherent segment in front of it as a half-space of its own admittance, contributes one real
-// amplitude factor - the conductivity loss over d / |Re c|, its alpha, and the mass term at the
-// real incidence cosine mass_cos - and starts the next segment as its incidence half-space.
-// Nothing returns across it, so the reflect port is that of the first segment alone. With no
-// coherent layer at all this is the mass-law route of a single sheet.
+// amplitude factor - the conductivity loss and its alpha over d / mass_cos, the path the held wave
+// takes, and the mass term at the real incidence cosine mass_cos - and starts the next segment as
+// its incidence half-space. Nothing returns across it, so the reflect port is that of the first
+// segment alone. Mass-law layers with no coherent layer between them are one plate (the plate rule,
+// md/acoustic.md 10 N1): its faces are the transformer, the faces inside it pass what reaches them and
+// reflect nothing, its first face passes a (its flux transmittance), and its last face puts the whole
+// right so that the plate passes a tau / (a + tau - a tau), a the smaller of what its two outer faces
+// pass, tau the product of its layers' factors. With no coherent layer at all this is the mass-law
+// route of a single sheet.
 //
 // End quantities as in diag_cm_stack: one flux conversion at the outer pair, and the displaced
 // host over the COHERENT thickness only, since a mass-law sheet displaces nothing. Interface gains
@@ -1748,6 +1753,7 @@ static inline DiagSheet diag_sc_stack(std::complex<double> e_near, std::complex<
     for (int pol = 0; pol < 2; ++pol)
     {
         bool tm = (pol == 1) && !scalar;
+        double a_entry = -1.0, a_run = -1.0, tau_run = 1.0; // what the plate's first face passed, and its layers' factors
         auto bnd = [&](size_t j, std::complex<double> &r, std::complex<double> &t, std::complex<double> &tb)
         {
             std::complex<double> a = z[j] * c[j], b = z[j + 1] * c[j + 1];
@@ -1758,16 +1764,27 @@ static inline DiagSheet diag_sc_stack(std::complex<double> e_near, std::complex<
                 std::complex<double> p = z[j + 1] * c[j], q = z[j] * c[j + 1];
                 r = (p - q) / (p + q), t = 2.0 * a / (p + q), tb = 2.0 * b / (p + q);
             }
-            const bool mass = (j >= 1 && layers[j - 1].m > 0.0) || (j < N && layers[j].m > 0.0);
-            if ((tfm[j] != 0.0 || tfm[j + 1] != 0.0) && mass)
+            const bool mA = j >= 1 && layers[j - 1].m > 0.0, mB = j < N && layers[j].m > 0.0;
+            const std::complex<double> ya = tm ? std::conj(z[j]) * c[j] : a, yb = tm ? std::conj(z[j + 1]) * c[j + 1] : b;
+            if (mA && mB) // inside one plate: what reaches the face passes, nothing is reflected
             {
-                double k = diag_tf_port(r, tfm[j], tfm[j + 1]);
-                t *= k, tb *= k;
+                const double k = std::sqrt(std::real(ya) / std::real(yb));
+                r = 0.0, t = std::polar(k, std::arg(t)), tb = std::polar(1.0 / k, std::arg(tb));
+                return;
             }
-            else if (tfm[j] != 0.0 || tfm[j + 1] != 0.0)
+            if (tfm[j] != 0.0 || tfm[j + 1] != 0.0)
             {
                 std::complex<double> k = diag_tf_face(r, tfm[j], tfm[j + 1]);
                 t *= k, tb *= k;
+            }
+            if (mB) // the plate's first face: what it passes into the plate
+                a_entry = std::norm(t) * std::real(yb) / std::real(ya);
+            else if (mA) // its last face: what reached it passes, put right by the plate rule
+            {
+                const double k = (std::real(yb) > 0.0) ? std::sqrt(std::real(ya) / std::real(yb)) : 0.0;
+                const double a_out = std::norm(tb) * std::real(ya) / std::real(yb), am = std::min(a_run, a_out);
+                const double fix = (a_run > 0.0 && tau_run > 0.0) ? std::sqrt((am * tau_run / (am + tau_run - am * tau_run)) / (a_run * tau_run)) : 1.0;
+                t = std::polar(k * fix, std::arg(t));
             }
         };
         // Coherent segment between media p and q, layers p+1 .. q-1
@@ -1817,10 +1834,12 @@ static inline DiagSheet diag_sc_stack(std::complex<double> e_near, std::complex<
             Tt *= T;
             if (first)
                 Rt = G, first = false;
+            if (mass && (q - p > 1 || p == 0 || !(layers[p - 1].m > 0.0))) // a plate begins
+                a_run = a_entry, tau_run = 1.0;
             if (mass)
             {
                 const DiagLayer &L = layers[q - 1];
-                double dist = L.d / std::abs(std::real(c[q]));
+                double dist = L.d / mass_cos; // the held path
                 if (q - p > 1) // a coherent layer in between: a new plate
                     run = 0, X_plate = 0.0, paid_dB = 0.0;
                 double mass_dB;
@@ -1830,7 +1849,9 @@ static inline DiagSheet diag_sc_stack(std::complex<double> e_near, std::complex<
                     mass_dB = plate_TL(X_plate + std::pow((f_hz * 1e-9 / L.fRef) * L.d, 0.05 * L.m)) - paid_dB;
                 X_plate += std::pow((f_hz * 1e-9 / L.fRef) * L.d, 0.05 * L.m), paid_dB += mass_dB, ++run;
                 double loss_dB = L.alpha * dist + mass_dB;
-                Tt *= std::sqrt(diag_medium_gain((L.e + L.res) * L.mu, dist, f_hz) * std::pow(10.0, -0.1 * loss_dB));
+                const double g = diag_medium_gain((L.e + L.res) * L.mu, dist, f_hz) * std::pow(10.0, -0.1 * loss_dB);
+                tau_run *= g;
+                Tt *= std::sqrt(g);
             }
             p = q;
         }

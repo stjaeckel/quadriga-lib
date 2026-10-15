@@ -22,8 +22,8 @@ First step of every session, from the repository root:
 ```
 cmake --build build_linux --parallel
 ./build_linux/test_bin "[wave]" > test_wave.txt          # All tests passed (165110 assertions in 179 test cases)
-./build_linux/test_bin "[acoustic]" > test_acoustic.txt  # All tests passed (31856 assertions in 35 test cases)
-./build_linux/test_bin > test.txt                        # All tests passed (1298332 assertions in 1073 test cases)
+./build_linux/test_bin "[acoustic]" > test_acoustic.txt  # All tests passed (32697 assertions in 46 test cases)
+./build_linux/test_bin > test.txt                        # All tests passed (1307356 assertions in 1132 test cases)
 ```
 
 The three baselines are untracked (`.gitignore`: `test*.txt`). A change is diffed against them. The

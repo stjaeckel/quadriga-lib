@@ -562,9 +562,9 @@ TEST_CASE("Test OBJ File Write - CSV columns, defaults and validation")
         std::getline(f, row);
         f.close();
 
-        CHECK(header == "name,a,b,c,d,e,f,g,h,att,attB,alpha,alphaB,fRef,m,resF,resQ,resS,coiF,coiQ,coiA,tf,tfB,zzz");
+        CHECK(header == "name,a,b,c,d,e,f,g,h,att,attB,alpha,alphaB,fRef,m,resF,resQ,resS,coiF,coiQ,coiA,tf,tfB,tfP,tfF,tfQ,zzz");
         // a=1, e=1, fRef=1 by default; c=0.05 and tf=2 from csv_prop; rest 0; zzz=7 last
-        CHECK(row == "slab,1,0,0.05,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,2,0,7");
+        CHECK(row == "slab,1,0,0.05,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,2,0,0,0,0,7");
 
         std::remove("cube.obj");
         std::remove("cube.mtl");
