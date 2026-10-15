@@ -839,7 +839,7 @@ void quadriga_lib::obj_file_write(const std::string &fn,
         static const std::vector<std::string> kOrder = {
             "a", "b", "c", "d", "e", "f", "g", "h",
             "att", "attB", "alpha", "alphaB", "fRef", "m",
-            "resF", "resQ", "resS", "coiF", "coiQ", "coiA", "tf", "tfB"};
+            "resF", "resQ", "resS", "coiF", "coiQ", "coiA", "tf", "tfB", "tfP", "tfF", "tfQ"};
 
         auto default_for = [](const std::string &col) -> dtype
         {

@@ -507,3 +507,637 @@ The expressibility tables per class on a formula copy confirmed against the walk
 through `ray_progress`; the window rows of B4/B4m and the A11 form; M4a/M4b on glass and gypsum coincidence; A10 with
 N5; the invariants per variant; A2, A3, A4, A5, A7 re-examined (A4 and A6 are closed by the M1 core as built; A7 is
 half in it).
+
+## 3. Phase 3 — references, expressibility, decisions
+
+Scratch: `build_linux/scratch/a1/p3` (`README.txt` lists every file). No code in `src` or `tests` was touched.
+
+### 3.0 First step
+
+`cmake --build build_linux --parallel` was current. Baselines from the repository root: `[wave]` **165110 assertions in
+179 test cases**, `[acoustic]` **31856 in 35**, whole suite **1306515 in 1121**, all passed. The candidates were
+regenerated (`wi/mkc.py`: R2, R1h, R1m 5041 lines, M2 5033, B4 5000, B4m 5001, B4s 5006, M4a 4998, M4b 5016, against
+5016) and rebuilt (`wi/bld1.sh`: `tc_<v>` with the case listener, `w_<v>` the walker). The plain copy `rmi_id`
+reproduces `test.txt` (the seed line only). `[wave]` under every candidate: 165110 assertions in 179 cases passed, **0
+rows moved** against the plain copy (`wi/c_wave_<v>.txt`), the stored twins asserted.
+
+### 3.1 First-principles references for the bands without a measurement (step 0)
+
+**Method** (`p3/fp.py`; every number below is printed by a script in `p3`). A plate in a rigid baffle between two
+half-spaces of air, plane waves, the constants of section 1:
+
+- plate impedance at the trace wavenumber: thin (Kirchhoff, as in phase 1) or thick (Mindlin: shear with correction
+  5/6 and rotary inertia, `Z = jωm − j·κGh·k²(D*k² − ρIω²)/(ω(D*k² + κGh − ρIω²))`, complex moduli `(1 + jη)`);
+- loss factor: constant (phase 1), or internal plus the coupling loss into the frame, `η = η_int + m′/(C_e·√f)`
+  (the 1/√f law of coupling losses: Craik, Applied Acoustics 14 (1981), abstract only; `C_e` fitted);
+- **INF**: the infinite plate, field 0–78° (phase 1); **FIN**: the finite a × b plate, the forced wave windowed to the
+  plate and radiated by the Rayleigh integral on both faces (spatial windowing, Villot et al., JSV 245 (2001) 433;
+  `τ(θ, φ) = 4Z₀²σ/(cos θ·|Z_p + 2Z₀σ|²)`), diffuse 0–90°; **MOD**: the modal sum of the simply supported a × b plate
+  (thin-plate modes) under each plane wave, radiated by the same Rayleigh integral with every cross term, light fluid
+  (light panels: each mode also loses its own radiation);
+- lab sizes: Riverbank 4.37 × 2.84 m (BIA TN 5A, RD066); AGC 1.23 × 1.48 m; boards 1.2 × 2.4 m; **the NRC wall size
+  is not in the Warnock paper's text** (a scan), the Riverbank size is used;
+- bands: three (FIN, INF) or sixteen (MOD) frequencies per third octave, octaves as energy means of thirds.
+
+**Checks of the numerics** (`t_fp.py`, `heavy_modal.out`): the windowed σ tends to 1/cos θ (1.0019 / 0.9994 at 0° for
+2 m / 8 m plates, 2.0425 / 1.9859 at 60°); FIN and MOD, two independent computations, agree on 4 mm glass within
+0.1 dB (18.46 / 18.35 dB at 125 Hz, 27.24 / 27.35 dB at 500 Hz); on the heavy walls from about 500 Hz up (concrete 1 kHz
+third 59.2 / 60.9 dB). A first FIN run with 24 incidence angles missed the narrow coincidence peak (thirds jumping by
+up to 25 dB above 1 kHz); σ is now taken on 48 angles and interpolated onto 4000, where the plate impedance is
+evaluated, and INF uses 4000 angles.
+
+**Why the phase 1 models miss the measured heavy walls** (`heavy.out`, thirds 100–5000 Hz, rms of model − measured;
+best fit of the loss parameters per form):
+
+| form | concrete 152 | brick 95 | brick 203 | block 190 |
+| --- | --- | --- | --- | --- |
+| INF, η constant (phase 1) | 8.63 | 4.28 | 6.52 | 6.49 |
+| INF, η_int + m′/(C_e√f) | 6.41 | 2.89 | 4.69 | 4.59 |
+| FIN, η constant | 8.36 | 4.77 | 6.72 | 6.44 |
+| FIN, η_int + m′/(C_e√f) | 6.04 | 3.18 | 4.38 | 4.32 |
+| FIN, Mindlin, η_int + m′/(C_e√f) | 5.19 | 2.79 | 3.18 | 3.34 |
+
+Each candidate acts where physics says it should, none closes the gap:
+
+- **Coupling loss into the frame** is the largest single effect: it raises the coincidence region (more loss) and
+  lowers the slope above it from 9 to 7.5 dB per octave (η falls as 1/√f). Fitted `C_e` 400 / 600 / 1500 / 300; with
+  `η_int` 0 in every best fit. Implied η at 125 Hz 0.078 / 0.028 / 0.024 / 0.067, at 4 kHz 0.014 / 0.005 / 0.004 / 0.012
+  (`etas.out`).
+- **Finite size** removes the infinite plate's grazing waves (no 78° cap needed) and lifts the coincidence region of
+  the windowed form by −0.7 to +1.9 dB at 125 Hz (INF → FIN with the coupling loss); the modal sum lifts it more (concrete third 125 Hz: FIN 32.7, MOD 42.0, measured
+  43.2 dB) but is dominated by single modes there: about one mode per third octave at 125 Hz on 152 mm concrete, so
+  neighbouring thirds of the modal sum differ by 5–10 dB (concrete 42.0 / 35.6 dB at 125 / 160 Hz).
+- **Thick plate** (Mindlin, elastic shear modulus) lowers the highest octaves by 1.5–3 dB (concrete 4 kHz 74.0 →
+  72.2 dB); the thin-plate limit (free bending wavelength three thicknesses, Ljunggren 1991, abstract) lies near the
+  top of the range for these walls with their elastic constants.
+- **Modal behaviour below the first modes** (f₁₁ 47.2 / 32.4 / 51.9 / 41.5 Hz): stiffness control and dips at single
+  modes in the 31.5 and 63 Hz octaves (table below), not one dip at one mode.
+
+**The best physical form against the measured octaves** (`spread.out`; FIN Mindlin, elastic shear, fitted `C_e`;
+MOD+FIN = the modal sum below 400 Hz in its place):
+
+| wall | form | 125 | 250 | 500 | 1k | 2k | 4k |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| concrete 152 | FIN | **−7.1** | **−4.6** | −1.7 | +2.5 | **+3.9** | **+7.3** |
+| | MOD+FIN | **−5.3** | −3.0 | −1.4 | +2.5 | **+3.9** | **+7.3** |
+| brick 95 | FIN | −1.6 | **−4.0** | +0.2 | +1.0 | +0.5 | +1.4 |
+| | MOD+FIN | **−5.6** | **−3.1** | −0.6 | +1.0 | +0.5 | +1.4 |
+| brick 203 | FIN | **−6.1** | −1.0 | +0.2 | +2.6 | +2.1 | +2.6 |
+| | MOD+FIN | **−5.2** | +0.9 | +0.4 | +2.6 | +2.1 | +2.6 |
+| block 190 | FIN | **−3.5** | **−4.9** | +0.9 | +2.9 | **+3.1** | +2.1 |
+| | MOD+FIN | −2.4 | −2.8 | +2.2 | +2.9 | **+3.1** | +2.1 |
+
+Bold: outside the guideline of about ±3 dB. **The physical model does not reach the measured heavy walls within the
+guideline**: it is 4–7 dB low in the coincidence region (125–250 Hz) on three of four walls and 4–7 dB high on
+concrete from 2 kHz.
+
+**What closes it is not physical** (`heavy2.out`): with the shear modulus as a free factor `g` (G = g·E/(2(1 + ν))) the
+windowed form fits every wall (rms 1.01 / 2.46 / 1.52 / 2.07 dB, octave residuals within −2.7 … +3.5 dB), but with g
+0.05 for cast concrete (a homogeneous solid whose shear modulus follows from E and ν) and a loss factor of **0.62 at
+125 Hz** for concrete and 0.32 for the block (`etas.out`), against 0.02–0.08 for the physical fits. And these fits do
+not survive the modal sum: with MOD below 400 Hz they read +4.4 / +6.0 dB (concrete 125 / 250 Hz) and +7.0 dB (brick
+203 at 250 Hz). For masonry a softer shear (joints, hollow cores) is plausible, g 0.1 is not sourced.
+
+Two readings of the residual pattern, neither tested here: the 1978 concrete measurement may be limited by the
+facility at the top (RD066 gives STC 57 for 152 mm and 58 for 203 mm, where the mass ratio alone is worth about 2.5 dB
+more; and the thirds 2.5–3.15 kHz are flat, 63.9 / 63.7 dB), and laboratory values below 200 Hz depend on the rooms'
+modal fields; both would make the measurement, not the model, the outlier. Neither changes the verdict: the
+measurement is the reference (P1).
+
+**The spread of the model forms in the bands without a measurement** (the four forms of each wall: FIN and MOD+FIN,
+each with the elastic and with the fitted shear; `spread.out`):
+
+| | 31.5 Hz | 63 Hz | 8 kHz |
+| --- | --- | --- | --- |
+| concrete 152 | 38.0 … 49.8 (11.8) | 31.7 … 42.8 (11.1) | 70.4 … 77.6 (7.2) |
+| brick 95 | 21.0 … 33.8 (12.8) | 28.3 … 36.5 (8.2) | 66.1 … 68.2 (2.1) |
+| brick 203 | 40.1 … 44.6 (4.5) | 27.9 … 41.8 (13.9) | 70.2 … 72.4 (2.2) |
+| block 190 | 27.8 … 37.7 (9.9) | 30.0 … 37.6 (7.6) | 66.8 … 70.2 (3.4) |
+
+The one independent check, the block wall's measured thirds 63 / 80 / 100 Hz (36.0 / 33.8 / 35.5 dB): the forms read
+−0.7 … +1.7 dB at 63 Hz, −5.1 … +4.6 dB at 80 Hz, +1.5 … +3.2 dB at 100 Hz. The 63 Hz third is met by every form; the
+80 Hz third separates the modal sum (−5.1 dB, a mode) from the windowed form (+4.2 dB, no modes) by 9 dB.
+
+**Light panels** (`light.out`, `spread.out`): the infinite plate stays on EN 12758 within 2.5 dB (125 Hz–4 kHz, η 0.015
+fitted in phase 1); the finite forms within 2.5 dB for 4 mm and within 3.9 dB for 6 mm (125 Hz +3.9 FIN, 2 kHz −3.9).
+In the octaves without a measurement:
+
+| | 31.5 Hz | 63 Hz | 8 kHz |
+| --- | --- | --- | --- |
+| glass 4 mm, 1.23 × 1.48 m | 5.1 … 18.6 (13.5) | 9.3 … 16.0 (6.7) | 37.0 … 37.2 |
+| glass 6 mm, 1.23 × 1.48 m | 7.4 … 18.8 (11.4) | 12.3 … 20.5 (8.2) | 43.0 … 43.2 |
+| gypsum 12.5, 1.2 × 2.4 m | 4.3 … 12.1 (7.8) | 8.3 … 13.5 (5.2) | 34.0 … 34.1 |
+| plywood 18, 1.2 × 2.4 m | 2.3 … 14.0 (11.7) | 9.8 … 15.5 (5.7) | 42.8 … 43.0 |
+
+The windowed finite pane is 7.8–11.2 dB above the infinite plate at 31.5 Hz: a pane small against the wavelength
+(10.9 m at 31.5 Hz) radiates weakly; the modal sum lies on either side (plywood 2.3 dB, below the infinite plate:
+its first mode at 22.3 Hz). **The low octaves of a panel are a property of its size**, as A11 says of its
+modes, and no column carries a size. 8 kHz is well determined (spread ≤ 0.2 dB).
+
+**Absorption below 125 Hz** (`light.out`, `low.out`):
+
+- A pane: the infinite plate with a mounting resistance r_m·ωm′ fitted to the measured 125 / 250 Hz octaves reaches
+  at most 0.158 / 0.084 (4 mm, r_m = 1, the best of 0 … 3) where 0.35 / 0.25 is measured (window glass), 0.110 / 0.057
+  where 0.18 / 0.06 (6 mm). The measured low-frequency absorption of glass is not an infinite pane on a resistance;
+  its extrapolation to 31.5 / 63 Hz (0.46 / 0.28 for 4 mm on that model) has no validated reference.
+- A lining (board over a cavity on a wall): the leaf-over-cavity model with a fitted mounting resistance of report
+  1.10 (peak 0.278 at 150 Hz on 25 mm, 1.08 octaves); below the peak it falls to 0.005 at 63 Hz and 0.000 at 31.5 Hz
+  (r_m 0.2), above the peak it is a model, not a measurement, at every band.
+- Heavy walls: what the infinite plate passes and dissipates is 0.001–0.109 at 31.5 Hz and 0.002–0.053 at 63 Hz
+  (`mat.out`, with the first mode); the measured surfaces
+  absorb 0.01–0.02 at 125 Hz with nothing known below.
+- Porous layer (11 kPa·s/m²): Miki stays positive below Delany–Bazley's range: 0.003 / 0.013 (20 mm), 0.006 / 0.021
+  (30 mm) at 31.5 / 63 Hz; Delany–Bazley is negative there (−0.007 / −0.004). Spread about 0.02 in α.
+
+### 3.2 Stop
+
+The brief's condition for stopping after step 0 holds: **the heavy-wall model does not reach the measured bands within
+the guideline**, with physical or sourced constants (concrete −7.1 / +7.3 dB, brick 203 −6.1 dB, block −4.9 dB,
+brick 95 −4.0 dB in single octaves). The form that does reach them needs a shear modulus 10–20 times below the elastic
+one and, for concrete, a loss factor of 0.62, and fails again by up to 7 dB once the finite wall's modes replace the
+windowed wave below 400 Hz. Steps 1–7 (the expressibility tables, the invariants, A10, A11, N7, the re-examination and
+the decision proposals) were not started, so that no knob of the library is fitted to a reference that is not
+validated.
+
+What the analysis does give, for the decision on how to continue:
+
+1. In the measured bands (125 Hz–4 kHz) nothing changes: the measurement is the reference (P1), and the expressibility
+   test can run there as planned.
+2. 8 kHz: well determined for light panels (spread ≤ 0.2 dB); 2.1–7.2 dB for heavy walls (concrete widest).
+3. 31.5 and 63 Hz: no validated reference for any class. Spreads 4.5–13.9 dB (heavy walls) and 5.2–13.5 dB (light
+   panels) between forms that all describe the same physics; the light panels' low octaves depend on the pane's size;
+   the one measured heavy-wall point (block, 63 Hz third) is met by every form within 1.7 dB, its 80 Hz neighbour
+   separates them by 9 dB.
+4. Absorption below 125 Hz: no validated reference for panes; porous layers within about 0.02; heavy walls and
+   linings only from models.
+
+Options (yours to choose): (a) run the expressibility test on 125 Hz–4 kHz (measured) and 8 kHz (light panels), and
+carry 31.5 / 63 Hz with the spreads above as their tolerance; (b) take the guideline in the low octaves from the
+spread (about ±5 to ±7 dB) and a size class per panel (a lab-size pane, a room-size wall) as the reference geometry;
+(c) look for measured low-frequency data first (laboratory TL down to 50 Hz exists for some walls, e.g. NRC reports of
+the kind Warnock's Fig. 1 came from); (d) accept the fitted-shear form as an empirical description of masonry only
+(two to three fitted quantities per wall), not of concrete.
+
+### 3.3 Decisions after step 0 (Stephan, 2026-10-15)
+
+Recorded in `md/acoustic.md` 10 (P6–P8): the reflect side first (absorption per octave, A10, the reflection phase as
+the new open item A12 with N7), then transmission with looser tolerances; bands without a measurement take the model
+spread of 3.1 as their tolerance. One check of a practical reference below 125 Hz (`p3/flat.py` → `flat.out`): the
+measured 125 Hz octave of each heavy wall, carried down flat, lies inside the model spread at 63 Hz for all four walls
+and at 31.5 Hz for three (brick 203: 2.8 dB below the lowest form); it is also what the one measured wall shows (block:
+35.1 dB at 125 Hz, 36.0 / 33.8 dB in the thirds 63 / 80 Hz).
+
+### 3.4 The reflect side first: absorption per octave (P6)
+
+Rig `p3/ab`, `p3/por`, `p3/ph`. A rigid mass-law face reflects `R = 1 − tf`, flat in angle, in both mappings and under
+every candidate (`p3/ph/ph1.out`: |r| 0.9486 for `tf` 0.1 at every angle; M1 keeps the entry face, report 2.4). Its
+room-side absorption is therefore `tf(f)`, a power law clamped at one.
+
+**`tf` power law against the measured rows** (`ab/absfit.out`, minimax; 31.5 / 63 Hz: the band between the flat
+continuation of 125 Hz and the model of 3.1; guideline ±0.05):
+
+| class | row | max \|resid\| |
+| --- | --- | --- |
+| 1 | window glass (MHA) / 6 mm glass / door | 0.045 / 0.008 / 0.033 |
+| 1 | plasterboard on frame, 100 mm (falls, then rises) | 0.051 |
+| 2 | smooth concrete / brickwork / porous blocks | 0.009 / 0.007 / 0.028 |
+| 3 | double glazing | 0.038 |
+| 5 | **plasterboard on 25 mm battens** (peak at 250 Hz) | **0.084** |
+| 5 | wooden lining on frame | 0.047 |
+| 5 | **cork board on battens** (peak at 500 Hz) | **0.228** |
+| 6 | plaster on masonry | 0.008 |
+
+Every monotone row is reachable today; the peaked rows are A10 (3.8).
+
+**Class 4, a porous layer on a hard wall** (`por/cmp_id.out`): 20 mm of Delany–Bazley (11 kPa·s/m²) with exact
+per-frequency columns in the two-parameter mapping (`ε = n·z`, `μ = n/z`), glued on a 152 mm concrete wall, through the
+walker against the exact layer on a hard wall:
+
+| octave | 125 | 250 | 500 | 1k | 2k | 4k |
+| --- | --- | --- | --- | --- | --- | --- |
+| exact (field 0–78°) | 0.014 | 0.084 | 0.244 | 0.476 | 0.703 | 0.859 |
+| wall in the **one-parameter** mapping | **0.403** | **0.390** | **0.426** | 0.537 | 0.713 | 0.879 |
+| wall in the **two-parameter** mapping | 0.015 | 0.084 | 0.244 | 0.476 | 0.703 | 0.859 |
+
+Per angle the two-parameter backing is within 0.003 of the exact layer everywhere; the one-parameter backing is off by up
+to 0.53 (125 Hz, 60°): its reflection phase of 2θ (3.5) turns a thin absorber into a strong one at oblique incidence.
+
+**Can the library's power-law columns reach the measured absorber?** (`ab/porfit.out`: `a, b, c, d` for ε, `e, f, g,
+h` for μ, fitted to Knauf TP 120 A, 31.5 / 63 Hz: the band between Delany–Bazley clipped at zero and Miki): **20 mm within
+±0.025, 30 mm within ±0.032 in every octave 31.5 Hz–8 kHz**, on the two-parameter backing; confirmed through the walker at
+125 / 500 / 2000 Hz within 0.001 per angle (field 0.1042 / 0.4959 / 0.8652 against the formula's 0.1047 / 0.4962 /
+0.8653). Class 4 needs no code, only the two-parameter mapping on the wall behind it (A12).
+
+### 3.5 A12 and N7: the reflection phase and the two-parameter mapping
+
+**The phase of a rigid face** (`ph/ph1.out`, one face through `ray_mesh_interact`, scalar):
+
+| mapping | 1° | 10° | 45° | 60° | 85° | 89° |
+| --- | --- | --- | --- | --- | --- | --- |
+| one-parameter (today), glass / concrete / gypsum, with or without `tf`, half-space or sheet | 2.0° | 20.0° | 90.0° | 120.0° | 170.0° | 178.0° |
+| two-parameter, glass | 0 (open) | 0.009° | 0.055° | 0.095° | 0.628° | 3.1° |
+| two-parameter, gypsum | 0 (open) | 0.012° | 0.194° | 0.340° | 2.25° | 11.3° |
+
+The two-parameter mapping gives the fluid-physics phase of a hard wall; `tf` does not change it (|r| 0.9486 for `tf`
+0.1, no step at the critical angle). A panel absorber's own phase (12.5 mm board on 25 mm air, the model of 1.10,
+`ab/liningphase.out`) swings from −18° to +15° through its resonance, which the pad (phase of the face) does not carry.
+
+**Air | water** (N7, water is m = 0, every candidate identical): through a traced run (`n7/w_*.out`) the two-parameter
+mapping is exact for both tracers, T and R within 1.7e-7 dB of the fluid reference at every angle, critical angle between
+13.37° and 13.38°; the one-parameter mapping passes nothing from 5° (reference −29.9 dB). Through `ray_progress` with a
+band of four frequencies (`rp/cmp_w.py`): T within 7.2e-5 dB (float path storage), R within 2.3e-7 dB, both tracers,
+every frequency.
+
+**Rigid materials in the two-parameter mapping** (`n7/n7_*.out`, 500 Hz, 4 mm glass and 12.5 mm gypsum, sheet and
+traced solid, across 3.48° / 9.44°): no step at the critical angle in today's copy or any candidate (within 0.05 dB);
+the level differs from the one-parameter mapping by at most 0.09 dB. But **today a traced rigid solid below its new
+critical angle lets tracer 5 refract into it: 23.7 dB (glass, 3.47°) and 28.6 dB (gypsum, 9.43°) from its type-4 twin**;
+under every M1 copy (no tracer bends into a mass-law body) the difference is 0.000 dB and both ports stay below 0.93.
+
+### 3.6 Transmission: what each variant can reach
+
+Rig `p3/tl`. The rule: **`tf` stays at the class's absorption fit** (3.4), only the transmission knobs move: level
+(`fRef`), slope (`m`), `att` / `attB`, a resonance (`res*`: + the dip of B4m, − the single-panel form of B4s), the
+bending stiffness (M4a: `coiF`, `coiQ` in X0), a negative coincidence dip (M4b). References: measured octaves 125 Hz–4 kHz;
+31.5 / 63 Hz and 8 kHz the model spread of 3.1 (P7); gypsum and plywood the model spread in every octave; double units,
+the lining on dabs and plaster one face only 125 Hz–4 kHz.
+
+**The formula copy** (`tl/libac.py`) against the walker (`tl/cmp_chk.py`, walls that switch every term on, sheet and
+traced solid, types 4 / 5, five angles, four frequencies): R1hX / R1mX within 0.0022 dB, R2X within 0.099 dB (the open
+face at exactly 0°), R within 0.0008 dB; today's rules with the new X0 (X) within 0.20 dB as a sheet, its traced solid
+1.32 dB off (the followed bounces). Fits at 192 angles × 6 frequencies per third, re-evaluated at 768 × 12; knobs
+bounded to physical ranges (coincidence 30 Hz–20 kHz, Q 1–300; resonance 10 Hz–1 kHz, Q 0.3–50): a first unbounded
+run put a block wall's coincidence at 0.88 Hz, a sub-degree feature the 48-angle fit could not see and the walker did
+(`tl/alias.out`, 3 to 15 dB between samplings).
+
+**Worst octave residual over the 13 constructions** (`tl/rmb_chk.out`, `tl/dense_chk.out`, dB):
+
+| knobs | today (`tf²·τ`) | R2 (`a·τ`) | R1h | R1m |
+| --- | --- | --- | --- | --- |
+| level, slope, `att` | — | — | 6.16 | — |
+| level, slope, `att` + resonance (B4s) | — | — | 4.89 | — |
+| level, slope, `att` + bending (M4a) | — | — | 4.67 | — |
+| **+ resonance + bending** (bounded) | **6.13** (gypsum) | **1.78** | **2.51** | **2.50** |
+| + resonance + bending + M4b | 4.23 (6 mm glass) | 3.73 | 2.66 | 1.98 |
+
+Per construction under R1h with resonance and bending (`rmb_chk.out`): glass 4 mm 0.51, glass 6 mm 1.68, gypsum 1.60,
+plywood 1.32, concrete 0.87, brick 95 0.21, brick 203 0.80, block 1.02, 4-16-4 0.71, triple 0.77, furred lining 1.70,
+lining on dabs 2.51, plaster one face 0.09. The fitted coincidence frequencies of the light panels and units land on the
+physical ones (glass 4 / 6 mm 2825 / 1938 Hz against 2989 / 1993 Hz, gypsum 2602 against 2500, plywood 1105 against
+1146, the units 3167 / 2697 Hz against the 4 mm pane's 2989): M4a is the bending stiffness of the plate model, not a
+fitted shape. On heavy walls `coiF` is not physical (49 to 5188 Hz): there the knob shapes the slope.
+
+**Through the walker** (`tl/conf_cmp_rm.out`, R1hF, 96 angles, one frequency per third): walker and formula within
+0.0014 dB, sheet and traced solid equal, every construction within 2.3 dB except the block wall at 4 / 8 kHz (11.4 / 9.5
+dB, its unbounded knobs: the 0.88 Hz coincidence above). **Through `ray_progress`** (`rp/band_R1hF.chk`, fitted glass,
+concrete, 4-16-4, sheet and traced solid, both tracers, 0 / 30 / 60°): a band of six frequencies equals its single
+frequencies bit for bit, the traced solid passes in one path.
+
+So: **today's rule cannot carry both sides** (with `tf` at the measured absorption it misses the light panels by 2.5 to
+6.1 dB whatever else is set); **every M1 rule with resonance and bending stiffness reaches all 13 constructions within the
+guideline; M4b is not needed**.
+
+### 3.7 Invariants per variant (`p3/inv`)
+
+Scan: glass 4 mm and gypsum in both mappings, concrete, brick 203, the double unit (every term on: `tf` law, `coi*`, a
+single-panel or double-unit resonance), wood | concrete as two solids, sheet on solid and stack, both directions; types
+1, 2, 4, 5; 22 angles 0–85° across every critical angle; 63 Hz–4 kHz; summed and followed (24,640 rows per variant).
+
+| | R2X | R1hX | R1mX | R1hG |
+| --- | --- | --- | --- | --- |
+| max T + R | 0.994 | 0.99945 | **1.0000016** (48 rows, wood \| concrete at 63–250 Hz, 70°: min(a, τ) = a) | 0.99945 |
+| sheet on traced solid, scalar | 0.002 dB | 0.002 dB | 0.002 dB | 0.002 dB |
+| step across the critical angle, scalar | ≤ 0.121 dB | ≤ 0.004 dB | ≤ 0.001 dB | ≤ 0.004 dB |
+| reciprocity of wood \| concrete | 0.001 dB | 0.001 dB | 0.001 dB | 0.001 dB |
+| summed / followed; tracer 5 / 4 | 0.000 / 0.000 | 0.000 / 0.000 | 0.000 / 0.000 | 0.000 / 0.000 |
+| `[wave]` and twins | not run | not run | not run | **0 rows** (R2, R1h, R1m alone: 0 rows, 3.0) |
+| lines (against 5016) | 5036 | 5036 | 5036 | 5044 |
+
+EM types on the two-parameter gypsum: the open face below 9.44° splits TE and TM (traced 1.23e-5 / 1.76e-5 at 9.43°),
+0.86 dB between sheet and solid there, and a 0.86 dB step at 9.43° / 9.45°; no EM type is acoustic. Today's copy did not finish the scan: with no internal
+summation in a mass-law body the walker's tree explodes on a light pane (documented limitation, `md/acoustic.md` 2.5).
+
+**Suite cost** (whole suite against the plain copy): R1hF 15 cases / 2,159 assertions (the same as R1h in phase 2);
+**R1hG 15 / 2,153**, 19,041 rows moved; `[acoustic]` R1hF against R1h: 151 rows in 9 already failing cases (the X0
+rounding rows, the exit fix, 3.9). Passing cases with moved rows under R1hG: *Leak direction* (289 + 88 rows: levels
+printed, directions asserted; the wall behind a traced layer −68.90 → −50.87 dB, no second leak), *ray_progress - the
+wall behind a traced layer* (198), *Closed face* (39), *Lossy verdict - the mass-law part* (32), and eight more with 1–24
+rows (`wi/attr_R1hG.txt`).
+
+### 3.8 A10 and A11
+
+**A10** (`ab/a10fit.out`, `ab/a10tl.out`; formula level, field 0–78°, max |resid| in α):
+
+| row | today | (a) max(tf, τ), B4s | (a) max(tf, τ), B4 | (b) peak on `tf` |
+| --- | --- | --- | --- | --- |
+| plasterboard on 25 mm battens | 0.084 | 0.015 | 0.082 | **0.005** |
+| wooden lining | 0.047 | 0.036 | 0.044 | **0.013** |
+| plasterboard on frame | 0.051 | 0.017 | 0.013 | **0.012** |
+| window glass | 0.045 | 0.025 | 0.028 | **0.017** |
+| double glazing | 0.038 | 0.007 | 0.030 | **0.004** |
+| cork board on battens | 0.228 | 0.063 | 0.228 | 0.076 |
+
+(a) ties the absorption to the transmission again: the τ that gives window glass its 0.35 at 125 Hz is its transmission,
+**TL 6.7 / 8.9 dB at 125 / 250 Hz against EN 12758's 17 / 20** (and +11.4 dB at 4 kHz). For a lining glued on a wall
+it would also need the board's own τ inside a bonded plate, which the plate rule sums away. (b) reaches every lining and
+pane row and leaves transmission alone. (c), a wave medium with a pole, was not measured. **What a lining is in the
+library**: one sheet on the wall's face (a cavity cannot be meshed into a glued pair, and a meshed double leaf has no
+mass-spring resonance, section 3 item 5 of `md/acoustic.md`), its absorption from its own `tf` columns, its transmission
+the lined wall as one material (3.6: furred board and board on dabs within 1.7 / 2.5 dB with resonance and bending);
+the bonded plate rule would add only its mass.
+
+**A11** (`tl/a11.out`): with the model spread as tolerance the low octaves are mostly reachable without the
+single-panel form; gypsum is not (4.6 / 4.8 dB outside its band at 31.5 / 63 Hz with level, slope and `att`; 0.8 / 1.6
+with B4s). The fits with a free sign use both forms, and not stably: unbounded (`tl/a11.out`) 8 constructions chose the
+single-panel form and 5 the dip, bounded (`tl/rmb_chk.out`) 5 and 8, with different constructions. The data do not pin
+the form; both shape the low end. A panel's first mode is a property of its size (3.1); a material row can carry a size class (a row per pane
+size), a column cannot.
+
+### 3.9 N6: the open items under M1
+
+- **A defect of the M1 build, found here (A2)**: a coherent lining (m = 0) glued on the far face of a rigid wall read
+  10 dB below its lined side under R1hX (−49.61 against −39.66 dB at 10°): `PLATE_OUT` is defined for layers 1…n only,
+  so the wall's own face (the near half-space) stayed the transformer and passed `tf` while `ray_state_update` already
+  paid the plate rule. **Exit fix** (one condition in `PLATE_OUT`, 0 lines): −39.57 dB.
+- **A2** (`n6/a2.out`, lining 10 mm `eps 2.50 − 0.80j` and `0.31 − 0.20j` on a 100 mm rigid wall, tf 0.1, 10–75°):
+  behind a held wave the lining is entered with the wall's impedance mapping as invariant (sheet) or unrefracted
+  (traced). **R1hG** (the held exit into a wave medium judged and bent by the invariant of air, the bent flag written
+  there, +8 lines): sheet and traced layer equal (≤ 0.01 dB), tracer 5 equal to 4 (0.00 dB, after writing the flag;
+  4.97 dB without it), the dense traced layer no longer passes nothing from 60°. The two sides of the wall differ by
+  0.06–1.34 dB (dense) and up to 2.78 / 4.57 dB (porous, one / two-parameter wall, 75°), the exit side higher: the
+  wave convention for a lossy medium (`md/wave.md` 8, flux splitting `sec²(arg η)`); today 4.29 / 10.08 dB. The solver
+  half (layer cosines behind a held near medium from the air invariant, R1hXf) breaks the porous sheet at 60–75°
+  (−26.95 / −17.87 against −37.10 / −33.32 dB) and is not proposed.
+- **A3** (`n6/a3.out`, 22 mm rigid mass-law panel, `alpha` 100 dB/m): the sheet pays the 400 dB cap from 10° on, its
+  traced solid 2.22 / 2.52 / 4.31 dB at 10 / 30 / 60°. **A3 fix** (`qd_mass_amp` charges `alpha` over thk / cos in air,
+  the held path, 0 lines; replaces `56dfb05`): sheet = traced solid at every angle and tracer (2.19 / 2.22 / 2.52 / 4.31 /
+  11.74 dB at 0–80°). The tunnelling coherent layer of `md/wave.md` 8a is not touched (m = 0).
+- **A4, A6**: closed by the M1 core (report 2.4); confirmed in every M1 scan (reciprocity 0.001 dB, no pair rule at a
+  mass-law face).
+- **A5** (`n6/a5.out`): a bonded pair pays both bodies' `att` in dB (3 + 3 = 6.00 dB) as two solids, sheet on solid and
+  stack, today and under R1hF. A convention.
+- **A7**: the core holds every tracer in a mass-law body. The phase rows (*Phase reference … the mass-law part*, `dense`
+  = a non-rigid mass-law body, `eps 1.50`, m 20) read +0.37 / +1.51 / +6.26° at 10 / 20 / 40° against a **refracted**
+  reference, and under R1h (phase 2) and R1hF **NaN from 60°**: the held wave was judged at the exit by the body's own
+  invariant (√1.5 · sin 60° = 1.06, closed) and passed nothing from 55°. R1hG judges the held exit by the air invariant:
+  finite, +15.2 / +26.2 / +36.4° at 60 / 75 / 85° against the refracted reference. The rigid rows stay within 0.0000°.
+
+**The three M1 residuals of report 2.5**: (1) the state one level deep (3.01 dB, four bodies K | T W | K): closing it
+needs state the ray does not have; accepted limitation. (2) A non-rigid mass-law layer beside a lossy coherent layer,
+0.11–0.20 dB: R1hF reduces the residual column slightly (6.3e-2 → 5.2e-2 at 70°, *Stack with a mass-law layer*); no
+acoustic material of section 1 is non-rigid; accepted limitation. (3) The phase rows: the test's refracted reference for
+a body M1 holds; a restatement, not a defect, once the NaN rows are fixed (R1hG).
+
+### 3.10 Decision proposals
+
+Each item: what happens now, what would change, the rows that move, the option.
+
+**N1, the M1 rule.** Now a rigid sheet passes `tf² × mass term`: `tf`, the room-side absorption, also scales the
+transmission twice, so no setting gives a pane its measured absorption and its measured transmission loss (today's
+rule misses them by 2.5 to 6.1 dB with `tf` held at the absorption, 3.6). Under M1 the plate passes `F(a, τ)` and
+reflects `1 − a`: absorption and transmission are set by different columns. All three rules reach all 13 constructions
+(R2 1.78, R1h 2.51, R1m 2.50 dB). R2 (`a·τ`) keeps `a` in the transmission (painting a wall would change its TL);
+R1m sits exactly on the passivity bound and exceeds it by 1.6e-6 in 48 scan rows; R1h (`a·τ/(a + τ − a·τ)`) is smooth,
+strictly passive (max T + R 0.99945), equal to τ wherever τ ≪ a. **Proposal: R1h.** Suite: 15 cases / ~2,150
+assertions, every one restating a convention of `md/acoustic.md` 2 (report 2.6). Replaces `b484257`, `b2ce6cd`,
+`ab77976`, `841d0d1`, `807a1d6`, `aecaf04`, `6998b10`, `4d00299` (report 2.4).
+
+**N2, M2.** Part of the M1 core for every held body (inner and last faces reflect nothing); no separate switch. The
+traced solid then passes in one path (3.6) and the A1 bounce at a sharp resonance is gone with the pole (N3).
+**Proposal: with N1.**
+
+**N3, M3 and `res*` on a mass-law material.** Now `res*` is a permittivity pole, which makes a rigid body lossy, never
+closed, and lets it create energy (A1; on the walls of 3.6 today's sheet and its traced solid differ by up to 143 dB (4 mm glass, single-panel resonance, 4 kHz, 80°), 99 dB (concrete), 76 dB (the double unit)). Proposed: the pole
+leaves the permittivity of a mass-law material and acts in X0 (B4s): **`resS > 0` the dip of a double unit or lining
+(B4m, capped at one), `resS < 0` the panel's own first mode (stiffness below `resF`)**; the fitted values (bounded R1h, 3.6) are not a guidance yet: the double units chose the single-panel sign at 226 / 231 Hz (Q 1.9 / 3.1), the linings 45 / 240 Hz (Q 1.0 / 2.6, both signs), the light panels 10–121 Hz (Q 2.8–17.6); the sign a fit chooses changes between fit runs (3.8). Lines: part
+of the X0 block (R1hX 5036, the plate rule 5041 without it). Replaces the pole in `eta()` for m > 0 (`74d6d9b`) and the
+mass block (`b2ce6cd`). **Proposal: B4s.**
+
+**N4, coincidence.** M4a (the bending stiffness of the plate model in X0: `coiF` the coincidence frequency, `1/coiQ`
+the loss factor) is the decisive knob for light panels and units (4 mm glass 4.8 → 0.5 dB, 3.6) and recovers their
+physical coincidence frequencies. M4b (a negative `coiA` without an `att` baseline) is not needed (worst 2.51 dB without
+it) and moves nothing in the suite (N4 marker, phase 2). **Proposal: M4a; drop M4b; rule of use: `coiA` = 0 on a
+mass-law material** (the Lorentzian in `interface_gain` keeps its wave meaning).
+
+**N5.** Measured in phase 2 (every traced entry has its second hit); its only use was A10(a), which is not proposed.
+**Closed, no change.**
+
+**N6.** A2: R1hG (+8 lines) and the exit fix (0 lines); the two sides of a lossy lining stay on the wave convention
+(record under `md/wave.md` 8). A3: the held path in `qd_mass_amp` (0 lines); the wave half (8a) stays open, it moves no
+row. A4, A6: closed by N1. A5: keep the sum, rule of use (one `att` per bonded run). A7: closed by N1 + R1hG; the
+`dense` phase rows are restated to the held reference. A8 low priority, A9 last.
+
+**N7 and A12, the two-parameter mapping.** Now every rigid face reflects with a phase of 2θ, a porous absorber on a wall
+absorbs up to 0.39 too much at 125 Hz, water is closed from 0.016°. With `ε = n·z`, `μ = n/z` (columns only, no code):
+water exact (traced and band), a hard wall's phase within 0.1° to 60°, the absorber within 0.003. Consequence: a rigid
+sheet is open below 3.5–9.4°; no step there under any copy; today a traced rigid solid lets tracer 5 refract in (23.7 /
+28.6 dB), under M1 not. **Proposal: the two-parameter mapping for every acoustic material, with N1.** What it does not
+give: the phase of a resonant panel (±18° through its resonance, 3.5), which needs a surface impedance the columns do
+not carry: recorded under A12.
+
+**A10.** (a) rejected (window TL 10 dB low). (b) a resonant peak on the absorption reaches every lining and pane row
+within 0.017 (cork 0.076); it needs three numbers (height, frequency, width). Options: three new columns, or the mass-law
+meaning of `coi*` / `res*` shared with N3 / N4 (conflicts: a pane uses `coi*` for bending and `res*` for its mode).
+**Proposal: (b) with three new columns; your decision on the columns.**
+
+**A11.** **Proposal: keep both forms of `res*` (N3)**; the low-octave reference is the spread (P7); a panel's size is a
+row, not a column.
+
+**The machine as measured** (R1hG): R1h + B4s + M4a (+ M4b, inert at `coiA` = 0) + exit fix + A3 fix + the held exit by
+the air invariant; **5044 lines (+28)**; `[wave]` 0 rows, twins asserted; whole suite 15 cases / 2,153 assertions.
+
+## 4. The fixtures for the decisions (2026-10-15)
+
+Decided (`md/acoustic.md` 10): N1 R1h; N2–N7 as proposed in 3.10; A10 with three new columns `tfP`, `tfF`, `tfQ`
+(`tf(f) = tfR·(f/fRef)^tfB + tfP / (1 + (tfQ·(f − tfF)/tfF)²)`, clamped as before; unknown keys are ignored by today's
+library, so the fixtures run on it). Eleven new cases, appended to `test_acoustic_state_update.cpp` (10) and
+`test_acoustic_progress.cpp` (1), every reference written from the column definitions, every traced row through
+`ray_triangle_intersect`, `ray_mesh_interact` and `ray_state_update` (`bf::walk`, `cf::walk`) or through
+`ray_progress`, `ub::OneThread` in each. Measured against today's library and against the candidate copy R1hH (R1hG of
+3.9 plus the A10 columns, `wi/mkc.py R1hH`, **5064 lines, +48 against 5016**, of which 20 for the columns), `p4/fxsum.out`:
+
+| case | decision | today: failed / assertions, largest deviation | R1hH |
+| --- | --- | --- | --- |
+| *Plate rule - a rigid mass-law panel passes the incoherent series …* | N1, N7 | 166 / 320, T 37.17 dB off the rule (two leaks), R 0.040 dB | passes; 0.0022 dB, 0.0008 dB |
+| *Plate rule - a wall bonded of two mass-law bodies …* | N1 | 18 / 36, T 18.93 dB off the rule | passes; 0.0007 dB, directions 0.001 dB |
+| *Plate rule - a traced mass-law body passes in one path …* | N2 | 12 / 24, up to 9 paths behind the body | passes; 1 path, followed = summed |
+| *Resonance - on a mass-law material res\* is the plate's resonance …* | N3 | 168 / 168, T 15.68 dB off, R 0.06 where 1 − tf is 0.95 (the pole) | passes; 0.0071 dB, 1.1e-4 |
+| *Coincidence - on a mass-law material coiF and coiQ are the bending stiffness …* | N4 | 40 / 40, T 55.74 dB off | passes; 0.0022 dB |
+| *Two-parameter mapping - air \| water, a hard wall's phase, a porous layer …* | N7, A12, A7 | 2 / 53: tracer 5 against 4 below the critical angle, 27.81 dB; water, the wall's phase and the porous layer hold today (guards) | passes; 0 dB |
+| *Held exit - a lining behind a rigid wall is the same as its traced layer …* | A2 | 14 / 48, sheet against traced layer 951 dB (the dense layer passes nothing from 60°) | passes; 0.015 dB, tracers equal |
+| *Held path - alpha on a lumped plate …* | A3 | 8 / 20, sheet against traced solid 397.8 dB (the cap) | passes; 0.001 dB |
+| *Held exit - a non-rigid mass-law body holds every tracer …* | A7 | 4 / 8, tracer 5 against 4 6.80 dB (0.04 / 0.45 / 2.91 / 6.80 at 10 / 30 / 60 / 75°) | passes; 0 dB |
+| *Absorption peak - tfP, tfF and tfQ …* | A10 | 80 / 80, α 0.25 below the peak, T 25.98 dB off | passes; 0, 0.001 dB |
+| *ray_progress - the plate rule and the absorption peak at every frequency of a band* | N1, A10 | 80 / 120, α 0.25, T 26 dB; band = alone today | passes; band = alone |
+
+Two references were corrected after a first run against R1hH, both my statements, not the copy's: the hard wall's
+phase is now asserted against the fluid interface of the mapping (152 mm concrete reads 0.104° at 60° and reflects
+1 − 4z = 0.99982 at 0°; the 0.1° and 0.9999 bounds had come from glass), and at exactly 0° the rigid face is open (report
+2.4), so the absorption peak's reference there carries the pair rule's Fresnel term (+0.0011). A first version of the
+non-rigid case passed today because its mass term was zero (X0 0.1); `fRef` 0.01 GHz gives X0 10.
+
+**Nothing else moved** (today's library with the new test files): `[wave]` 165110 / 179, the seed line only; the 35
+existing `[acoustic]` cases print exactly as before; the whole suite 1132 cases, 11 failing, 592 failed assertions,
+every one in a new case, no existing row moved. `[acoustic]` is now 32773 assertions in 46 cases.
+
+**What the source change will cost** (R1hH, whole suite with the new cases): 15 cases / 2,153 assertions fail, the 15
+existing cases of report 2.6 (largest: *Bonded mass - the plate at any depth* 6,166 rows, *Mass cosine* 4,055,
+*ray_progress - the bonded plate* 4,364, *Closed plate* 1,049), 24,569 rows moved (`wi/attr_R1hH.txt`); the 11 new cases
+pass. Each failing assertion restates a convention the decisions replace (the two leaks, the followed bounce, the pair
+rule's reference, the separable mass factor, the refracted phase of a non-rigid body); they are restated with the
+source change.
+
+## 5. The source change (2026-10-15)
+
+Decided: R1h, N2–N7 as proposed, A10 with three new columns (`md/acoustic.md` 10). Fixtures first (section 4), then
+the source. Not committed.
+
+### 5.0 State
+
+| run | before (bb336dc) | after |
+| --- | --- | --- |
+| `[wave]` | 165110 / 179 | **165110 / 179**, all passed, every line of `test_wave.txt` identical (the seed line only); the stored twins are asserted inside it |
+| `[acoustic]` | 31856 / 35 | **32697 / 46**, all passed |
+| whole suite | 1306515 / 1121 | **1307356 / 1132**, all passed |
+
+The lines that differ between the whole-suite run and `test.txt` are exactly the lines that differ in `[acoustic]`
+(3352 each, the summary line included); no case outside `[acoustic]` printed anything else. The baselines in the
+repository root are replaced; the old ones are in `build_linux/scratch/a1/p6/old_baselines/`.
+
+### 5.1 What is in `src/ray_mesh_interact.cpp`
+
+**5082 lines against 5016** (+230 / −164 by `git diff --stat`). The copy R1hH of section 4 (5064) with the
+resonance and bending factors combined in `mass_X0` (B4s with both forms of `res*`, M4a; M4b not built), 10 lines of
+comment (the columns `resF` … `coiQ`, `tfP` … `tfQ`, `eta()`, `mass_X0`, `tf()`, the held exit), `require(tfF ≥ 0)`,
+`require(tfQ ≥ 0)`, and the leak-chain fix of 5.2 (+8). In one list:
+
+- the plate rule (N1) in the solver (`PLATE_OUT`, `PLATE_FIX`, `qd_plate`), at a traced plate's exit (`PLATE_IN`,
+  `PLATE_ABS`) and in the leak chain; the pair rule and its clamp are gone from mass-law faces (A6);
+- M2: a face inside a plate passes what reaches it and reflects nothing;
+- the exit fix (`PLATE_OUT` includes the near half-space of a held run), A3 (`alpha` over `thk / mass_c`), the held
+  exit into a wave medium judged and bent by the invariant of air, with the bent flag (A2, A7);
+- `res*` and `coiF` / `coiQ` of a mass-law material in `mass_X0`, the pole removed from `eta()` where `m > 0` (N3, N4);
+- `tfP`, `tfF`, `tfQ` (A10).
+
+**The OBJ / API column lists** (`src/obj_file_write.cpp`, `api_python/qpy_obj_file_read.cpp`, `api_mex/obj_file_read.cpp`)
+now list `tfP`, `tfF`, `tfQ` after `tfB`. They fix only the order: the readers always passed every CSV column through
+and the writer wrote unknown columns after the canonical ones (alphabetically), so a material file could carry the
+peak before; now the columns sit in canonical position and `csv_write_defaults` writes them (default 0). The expected
+header and default row of the three writer tests (C++, Python, MATLAB) gained the three columns. Measured: C++ OBJ
+cases 261 assertions in 17 cases; Python `test_obj_file_write` and `test_obj_file_read` 16 tests; MATLAB the same two,
+passed (scratch builds `build_linux/scratch/api` and, with g++-12 for MATLAB's libstdc++ (GLIBCXX ≤ 3.4.30),
+`build_linux/scratch/api12`).
+
+### 5.2 Found while restating: the leak chain kept the product
+
+*Leak reciprocity* failed by 12.17–12.47 dB at 10°–70° once its two directions were the same plate (a wood panel glued on
+concrete without its mass law, 5.3). Fitting the rows: the entry passed `a·τ·b·G_w·G_c` exactly, both faces
+multiplied. The branch is the leak chain (`qd_sheet_resolve`, `leak_chain`): a mass-law sheet whose far side the wave
+cannot enter passes "the two crossings a traced solid would produce", and the traced solid now pays the plate rule at
+its exit, so the chain no longer equalled it. R1hH did not touch it.
+
+The fix (+8 lines): where neither neighbour carries the mass column (the sheet is the whole plate), each channel is put
+on `a·τ / (a + τ − a·τ)` with `a = min(a_in, b)`, `a_in` and `b` the two crossings' flux over the interface gain
+`interact_with` folds in (a first version without that division lost `G_w`, `G_c`, measured, corrected). Where a
+neighbour carries the column the plate goes on and is paid elsewhere (the outer-pair entry, 5.3).
+
+What it moves, measured against a what-if without it (`p6/rmi_noleak.cpp`, `[acoustic]`, three tables, nothing else):
+
+| table | rows | before → after |
+| --- | --- | --- |
+| *leak reciprocity as a sheet* | 5 | entry over exit 12.47 / 12.46 / 12.43 / 12.17 dB at 10° / 30° / 45° / 70° → 0.00013 / 0.00017 / 0.00024 / 0.00094 dB (the flat first face, recorded) |
+| *mass cosine D* | 8 | the glued exit behind `eps 1.50 − 0.40j` above an invariant of one: −0.39 dB at 1.01 … −1.83 dB at 1.45. The sheet there has no `tf`; its first face passes 1.013–1.525 in flux (the lossy medium's split), the far face 1, so the rule takes one. The traced convention (`a_out` from the far side, 1.318) would give −1.82 dB |
+| *held lining G* (twins) | 6 | `W0 100 | K lining`, lining first: amplitude × 1.889 (+5.53 dB = −10 log10 0.28, the second face's leak), phase unchanged. The two orders through W0 now have the same magnitude (0.1416 / 0.1416 at 10°, 0.1416 / 0.1414 at 30°, 0.1415 / 0.1414 at 60°, within 0.012 dB), 5.5 dB apart before |
+
+### 5.3 The restated cases
+
+Every existing case that failed under the change was restated to the decided convention (none weakened; the
+references written from the rule, the values measured). 13 cases changed, one renamed (*Closed plate - … passes the
+plate rule of its two faces*, was *… passes its two leaks and nothing else*), the helper `diag_sc_stack` (mass-law
+branch on the plate rule), and 5 in this step (after the summary of 5.0's first run):
+
+| case | old convention | now |
+| --- | --- | --- |
+| *Total reflection of the outer pair … - the mass-law part* | entry and exit each a product of crossings | entry: the first face `a` times the panel's term, the rest at the wall's far face; exit (wall without mass law): the plate rule with `a = min(1 − Rn, 1 − Rf)`, the far face open at the wood's cosine. Exact (1e-9). Entry +0.86 dB at 0° … +2.55 dB at 70°, exit +7.80 … +9.18 dB; reflections and the phase unchanged |
+| *Phase reference … - the mass-law part* | the dense body (`eps 1.50`, m 20) refracted into | held (A7): the walk-off reference for both bodies, 0.0000° in every row (was +0.37° … +36.4°). Tracer 5 against 4 on the dense body: equal to 4.7e-15 relative (rounding) |
+| *Leak reciprocity …* | entry over CONC (m 30) against exit from CONC0 | the same plate both ways (wood on CONC0); the difference is the recorded flat first face through the rule, to 1e-13 |
+| *ray_state_update - mass-law material is excluded from slab resolution* | type 33 at 0° (the undeviated bit) | type 1 at 0° and at 0.1° (A7) |
+| *Ports of a mass-law face from inside …* | (passed) | stated: inside one plate T = 1, R = 0 from both sides (+12 assertions) |
+| *Closed face …*, G | "its two leaks" | the plate's first face, T = 0.5 exactly (+3 assertions) |
+| *Leak chain … - the mass-law part* | the step at the air \| wood critical angle recorded (< 5 dB, 4.67) | no step: both angles < 1e-3 dB (0.0000) |
+
+Recorded rather than asserted (no power travels them): the level of the way back in *Bonded mass - sheet on sheet …*
+(the bounce returning to the glued sheet, and the bounce inside the second body). The comments of the 11 new cases
+that described bb336dc as "today" now say "at bb336dc".
+
+### 5.4 Every moved table
+
+Against `old_baselines/test_acoustic.txt`: 61 tables moved, 17 are new (the 11 new cases and 6 restated ones), 2
+were replaced by restated tables (*plate depth S*, *plate depth B*). By cause, the largest change in the table's unit:
+
+**The plate rule (N1), transmit levels.** A plate passes about `τ` where `τ ≪ a`, no longer `τ` times its faces'
+absorption; a sheet glued on a mass-law wall pays its first face and its own term and the rest at the wall's far face.
+- *closed-face hand-on* (through `ray_progress`, 198 / 396 rows): the power behind the 200 mm wall with `tf` 0.3 +8.1
+  to +10.5 dB, 2 to 7 fewer paths behind it (M2); B 48 / 192, C 30 / 60, D 6 / 56: the wall's exit +9.9 to +10.5 dB.
+- *lossy verdict* J and K (16 + 16): the lossless 200 mm wall's exit +10.45 dB (the second face's 0.3), K +9.07 to
+  +10.06 dB. J with a loss tangent of 0.04 (recorded in the case: a rigid body given a loss is open and reflects
+  1.000000 from 10° on): the exit event that created +18.8 to +68.3 dB is now −0.05 to −0.0002 dB and the direction in
+  the wall is held (88.81° → the incidence angle), so the path is −87.95 dB at 10° … −101.76 dB at 75° (was −69.1 …
+  −33.5 dB); at 0° +10.45 dB as lossless.
+- *leak direction, rigid walls* (288): wood 50 \| concrete 50 heavy, total −68.90 → −50.87 dB (the two outer faces' −6.99
+  and −10.00 dB and the inner face's −1.04 dB); the exit event can exceed one (+8.85 dB on *refracting tracer, a leak*,
+  `air | conc 50 | wood 50 | air`): the plate's exit gives back the first face's absorption (5.5).
+- *bonded mass* tables (sheet on sheet, sheet on solid, solid between two sheets, panel on concrete, solid on solid,
+  sheet inside a wall, three bodies): levels +7.0 to +14.0 dB, the sheet and stack forms moving together (`d_T` stays
+  1e-16 … 1e-13); the restated ones with new columns (`rule_dB`, `paid_dB`).
+- *held lining* A, B, C, F: A +7.10 to +10.62 dB, `W | K` −17.83 → −9.99 dB (one plate with the mass at nothing passes its face, `a` = 0.1),
+  C −15.68 → −6.98 dB, F the mass paid 43.52 → 33.53 dB; D: the reflect port of the held wave at the lining −7.36 dB → none
+  (M2); E (restated): the depth of the state, `d_twin` up to 3.01 dB; H: K \| W −17.86 → −10.00 dB, W \| Kn from −45 to
+  −53 dB → nothing from either side, W \| C and W \| A on their twins from the wall's side (scalar 0.0003 / 0.0007 dB; was
+  0.63 dB at 10° and nothing at 75° for W \| C, up to 2.17 dB for W \| A).
+- *closed plate* A (90 rows, +6.99 dB, the face 0.2 charged once), B (+3.57 to +4.18 dB), C (restated), D (+4.47 to
+  +7.98 dB), F1 (the
+  sheet event −2.45 → −1.41 dB at 30°, the step at 45° 3.20 → 1.64 dB); *closed face* F (+6.99 dB), G (0.325 → 0.5).
+- *mass cosine* A (`rest`: the chain apart from the term, −14.79 → −0.67 dB, the faces no longer charged on top of `τ`),
+  D (the leak chain, 5.2); *a sheet without the mass column inside 100 mm of a rigid mass-law wall* (`paid` 60.00 →
+  54.77 dB, the rule with `a` = 0.3; `paid − TL` 5e-12).
+- *stack coherent \| mass-law against the traced solid with a lining* (24): the level +9.4 to +14.5 dB, stack and
+  laminate together (their difference unchanged); the laminate's echo through the lining crosses the plate twice,
+  +18.7 to +29.1 dB (−92.27 → −64.09 dB below the reflection at 10°); *ordered stack with a mass-law layer* (32 / 40): `ref |T|` +0.10 (the
+  helper on the rule), library on it to 1e-16; *the mass term in a stack* (restated); *mass-law reference at one layer*
+  (|T| +0.067 dB at 0° … +1.18 dB at 70°, `d_T` 1e-16); *ordered stack whose second sheet carries m* (`gain_T`
+  +0.0058, `d_T` 2e-16); *ray_mesh_interact's own glued entry* (+0.86 to +2.55 dB, own = redo exactly);
+  *wood panel on concrete* (5.3).
+
+**M2, nothing reflected back.** *a bounce returning to the glued sheet* (the way back 60.17 → 53.19 dB of mass,
+recorded, it carries nothing), *a bounce inside the second body*, *ports of the wood \| concrete face from inside* (T 1,
+R 0), *held lining* D, the path counts above.
+
+**The held exit and A7.** *trajectory DENSE* (the segment 24.09° → 30.00°, held), *phase reference* (5.3), *refracting
+tracer, a leak* (18 / 24: levels as above, state words unchanged), *closed-face hand-on S* (`bare`: the wall's exit behind
+a lossy layer against the bare wall's exit 3e-6 → 1.39 dB porous, 0.54 dB `eps 1.50 − 0.40j`; the exit divides by the
+absorption of the face the plate was entered by, which behind a lossy layer is not the bare face's `tf`; sheet against
+traced solid unchanged, 3.1e-6), *step from the open to the closed far face* (4.67 → 0.0000 dB).
+
+**Twins with every digit** (the same causes in complex form): *held lining G* (78), *closed plate E* (60), *rare sheet F*
+(8 / 12), *sheet tf H* (12 / 24), *closed face H* (9 / 24).
+
+**Rounding only:** *mass cosine B* (11 / 24, the sign of a printed zero), *stack geometry B* (2 / 32, the sign of a
+printed zero), the residual columns of the stack tables (1e-17 … 1e-16).
+
+**Restated tables** (header changed): *mass-law angle dependence*, *plate depth through ray_progress*, *plate depth* A
+and C, *the mass term in a stack*, the five *bonded mass* tables with new columns, *an m = 0 lining on concrete*,
+*closed plate C*.
+
+### 5.5 What the change leaves (recorded in `md/acoustic.md` 7)
+
+- **An event can pass more than one.** A plate's exit gives back the absorption of its first face (`a_in`), up to
+  `1 / a_in` (+8.85 dB measured on wood \| concrete). The path never exceeds the rule, but `ray_progress` stops a
+  continuation below `min_gain_dB` (default −140 dB) on the running gain, which inside a plate is up to
+  `−10 log10 a_in` below the level the path will have (10 dB for `tf` 0.1, 20 dB for `tf` 0.01): a path that ends within
+  that margin above the threshold can be cut. Not measured on a scene.
+- The state one level deep (+3.02 / −3.01 dB on one slope, 3.01 dB in *Held lining* E), mixed slopes up to +7.66 dB.
+- A non-rigid mass-law layer beside a lossy coherent layer depends on the order (0.107 / 0.127 / 0.201 dB).
+- The lossy medium's flux split: the two sides of a lossy lining 0.07–1.38 dB (dense) and 0.52–2.70 dB (porous) apart,
+  the wall's side higher.
+- The closed step of a non-rigid mass-law layer at 45°: 1.64 dB.

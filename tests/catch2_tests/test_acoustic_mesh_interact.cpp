@@ -125,15 +125,11 @@ struct QdMassSheet
 TEST_CASE("Thin sheet - mass-law angle dependence", "[acoustic]")
 {
     // The mass term is the only angle-dependent quantity in the sheet composite that is not a
-    // Fresnel amplitude. The case divides the measured composite by the hand-built Fresnel product,
-    // which leaves the mass gain alone, and compares the result with the closed form.
-    //
-    // A sheet whose material carries m > 0 takes the incoherent route in qd_slab_resolve produce
-    // mode: no internal series, no in-slab phase, the near interface at the incidence cosine and
-    // the far one at the in-slab cosine, and one lumped mass-law power factor. With tf = 0 the
-    // amplitude rescale is the identity, and with air on both sides the near-to-far flux conversion
-    // and the lumped interface gain are both unity, so the transmit port is the product of the two
-    // raw Fresnel transmission amplitudes times the square root of the mass gain.
+    // Fresnel amplitude. A mass-law sheet is one plate: its first face passes what it absorbs, the
+    // flux transmittance a = 1 - r^2 of air | sheet, and the plate passes the incoherent series of
+    // the face and its term, a tau / (a + tau - a tau) (the plate rule, md/acoustic.md 10 N1). Scalar,
+    // the acoustic types. The case inverts the rule, tau = T a / (a - T + a T), which leaves the mass
+    // term alone, and compares it with the closed form.
     const QdMassSheet F;
     const double half = 200.0;
     arma::mat mesh = qd_quad_x(half, 0.0);
@@ -149,8 +145,21 @@ TEST_CASE("Thin sheet - mass-law angle dependence", "[acoustic]")
 
     QD_DIAG("\n# diag: mass-law angle dependence, sheet thk 12.5 mm, eps 5.24, m 12 dB/decade\n");
     QD_DIAG("# (f/fRef) * thk = %.4f; knee at %.6f deg\n", arg, th_knee);
-    QD_DIAG("angle,cos,base_dB,T_dB,TL_meas_dB,TL_dB,d_dB,R_meas,R_ref\n");
+    QD_DIAG("angle,cos,a,T_dB,TL_meas_dB,TL_dB,d_dB,R_meas,R_ref\n");
 
+    // the face of air | sheet, scalar (TE form): its reflectance, and the mass term read off a
+    // transmit port through the plate rule
+    auto face_R = [&](double thd)
+    {
+        QdMassRef Rf = qd_mass_ref(F.eps, thd);
+        double ct = std::cos(thd * arma::datum::pi / 180.0), zc = std::sqrt(F.eps) * Rf.cts, r = (ct - zc) / (ct + zc);
+        return r * r;
+    };
+    auto tl_of = [&](double T, double thd)
+    {
+        double a = 1.0 - face_R(thd);
+        return -dB(T * a / (a - T + a * T));
+    };
     double tl_prev = 1.0e300;
     double tl_at[2] = {0.0, 0.0}; // 30 deg and 60 deg, for the slope check
 
@@ -160,10 +169,10 @@ TEST_CASE("Thin sheet - mass-law angle dependence", "[acoustic]")
     for (double thd : sweep)
     {
         double ct = std::cos(thd * arma::datum::pi / 180.0);
-        QdMassRef Rf = qd_mass_ref(F.eps, thd);
+        const double Rface = face_R(thd), a = 1.0 - Rface;
 
-        double T = F.run(mesh, half, thd, 1, F.m);
-        double R = F.run(mesh, half, thd, 0, F.m);
+        double T = F.run(mesh, half, thd, 4, F.m);
+        double R = F.run(mesh, half, thd, 3, F.m);
 
         INFO("angle " << thd);
         REQUIRE(std::isfinite(T));
@@ -172,22 +181,21 @@ TEST_CASE("Thin sheet - mass-law angle dependence", "[acoustic]")
         CHECK(R >= 0.0);
         CHECK(R <= 1.0);
 
-        double tl_meas = dB(Rf.base) - dB(T); // the mass term, read off the composite
-        double tl_want = qd_mass_TL(F.m, arg, ct);
+        double tl_meas = tl_of(T, thd); // the mass term, read off the composite through the plate rule
+        double tl_want = qd_mass_TL(F.m, arg, ct), tau_want = std::pow(10.0, -0.1 * tl_want);
 
         QD_DIAG("%.4f,%.6e,%.6f,%.6f,%.6f,%.6f,%.3e,%.9f,%.9f\n",
-                thd, ct, dB(Rf.base), dB(T), tl_meas, tl_want, tl_meas - tl_want, R, Rf.refl);
+                thd, ct, a, dB(T), tl_meas, tl_want, tl_meas - tl_want, R, Rface);
 
-        // The composite as a whole, which pins the incoherent route and the mass term together.
-        CHECK(std::abs(dB(T) - (dB(Rf.base) - tl_want)) < 1.0e-6);
+        // The composite as a whole, which pins the plate rule and the mass term together.
+        CHECK(std::abs(dB(T) - dB(a * tau_want / (a + tau_want - a * tau_want))) < 1.0e-6);
 
         // The mass term on its own.
         CHECK(std::abs(tl_meas - tl_want) < 1.0e-6);
 
-        // The reflect port of a mass-law sheet is the bare near interface, Stokes-reversed. It
-        // carries no mass term and no internal series, so it is a single-interface Fresnel value at
-        // every angle.
-        CHECK(std::abs(R - Rf.refl) < 1.0e-9);
+        // The reflect port of a mass-law sheet is the bare near interface. It carries no mass term
+        // and no internal series, so it is a single-interface Fresnel value at every angle.
+        CHECK(std::abs(R - Rface) < 1.0e-9);
 
         // The term never grows with the angle and is never a gain.
         CHECK(tl_meas >= -1.0e-9);
@@ -215,9 +223,8 @@ TEST_CASE("Thin sheet - mass-law angle dependence", "[acoustic]")
     // This is what keeps the public medium_gain entry point, and every table calibrated through it,
     // on the column definition.
     {
-        double T = F.run(mesh, half, 0.0, 1, F.m);
-        QdMassRef Rf = qd_mass_ref(F.eps, 0.0);
-        double tl = dB(Rf.base) - dB(T);
+        double T = F.run(mesh, half, 0.0, 4, F.m);
+        double tl = tl_of(T, 0.0);
         CHECK(std::abs(tl - std::max(0.0, F.m * std::log10(arg))) < 1.0e-9);
     }
 
@@ -226,9 +233,8 @@ TEST_CASE("Thin sheet - mass-law angle dependence", "[acoustic]")
     // which is 10 * log10(2) up to the normalization.
     {
         double want = A0 * std::log10(2.0) / std::log10(1.0 + X0 * X0);
-        double T = F.run(mesh, half, th_knee, 1, F.m);
-        QdMassRef Rf = qd_mass_ref(F.eps, th_knee);
-        double tl = dB(Rf.base) - dB(T);
+        double T = F.run(mesh, half, th_knee, 4, F.m);
+        double tl = tl_of(T, th_knee);
         INFO("knee at " << th_knee << " deg");
         CHECK(std::abs(tl - want) < 1.0e-6);
         CHECK(std::abs(want - 10.0 * std::log10(2.0)) < 0.01);
@@ -237,15 +243,13 @@ TEST_CASE("Thin sheet - mass-law angle dependence", "[acoustic]")
     // Past the knee the term tapers rather than switching off: still positive at 89.9 deg, and
     // decaying as the square of the cosine.
     {
-        double T = F.run(mesh, half, 89.9, 1, F.m);
-        QdMassRef Rf = qd_mass_ref(F.eps, 89.9);
-        double tl = dB(Rf.base) - dB(T);
+        double T = F.run(mesh, half, 89.9, 4, F.m);
+        double tl = tl_of(T, 89.9);
         CHECK(tl > 0.0);
         CHECK(tl < 0.05);
 
-        double T2 = F.run(mesh, half, 89.95, 1, F.m);
-        QdMassRef Rf2 = qd_mass_ref(F.eps, 89.95);
-        double tl2 = dB(Rf2.base) - dB(T2);
+        double T2 = F.run(mesh, half, 89.95, 4, F.m);
+        double tl2 = tl_of(T2, 89.95);
         CHECK(tl2 > 0.0);
         CHECK(tl2 < tl);
         CHECK(std::abs(tl / tl2 - 4.0) < 0.05); // cos halves, the term quarters
@@ -255,8 +259,8 @@ TEST_CASE("Thin sheet - mass-law angle dependence", "[acoustic]")
     // leaves the reflected gain bit-identical.
     for (double thd : {30.0, 70.0, 85.0, 89.9})
     {
-        double Ra = F.run(mesh, half, thd, 0, F.m);
-        double Rb = F.run(mesh, half, thd, 0, 2.0 * F.m);
+        double Ra = F.run(mesh, half, thd, 3, F.m);
+        double Rb = F.run(mesh, half, thd, 3, 2.0 * F.m);
         INFO("reflect port, angle " << thd);
         CHECK(std::abs(Ra - Rb) < 1.0e-12);
     }
