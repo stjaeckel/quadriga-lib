@@ -405,13 +405,14 @@ namespace
 
         // Transmission factor at fGHz, clamped to [-1, 1]: a power law, and a resonant peak where tfP
         // and tfF are set (a panel moving on its mounting, a leaf on its cavity: the room-side absorption
-        // of a mass-law face peaks there)
+        // of a mass-law face peaks there). The peak is the lumped resonator's, symmetric in log frequency
+        // and zero at both ends; tfQ is the absorber's Q_alpha. Every caller's frequency is positive.
         double tf(double fGHz = 1.0) const
         {
             double v = tfR * std::pow(fGHz / fRef, tfB);
             if (tfP != 0.0 && tfF > 0.0)
             {
-                double x = tfQ * (fGHz - tfF) / tfF;
+                double x = tfQ * (fGHz / tfF - tfF / fGHz);
                 v += tfP / (1.0 + x * x);
             }
             return (v < -1.0) ? -1.0 : ((v > 1.0) ? 1.0 : v);
@@ -4869,7 +4870,13 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 typeR[3] = true;
         };
 
-        if (refl_pass) // Reflection pass, interaction_type {0, 3}
+        // Only a glued exit leaves the ray in air with a sheet in the previous-medium word (an isolated sheet in air
+        // writes neither). Meeting a body from inside after it, the ray was in that body: the sheet lay between two
+        // bodies, of which the intersector reported two faces (A21, md/wave.md 8). Nothing of it is real.
+        const int hit = (int)typeH & ~32;
+        if (mtl_current == 0 && IS_SHEET(mtl_prev) && (hit == 1 || hit == 5 || hit == 7 || hit == 13 || hit == 21 || hit == 29))
+            KILL_RAY();
+        else if (refl_pass) // Reflection pass, interaction_type {0, 3}
         {
             typeR[7] = true; // Set reflection flag
 

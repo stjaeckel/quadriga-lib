@@ -100,9 +100,12 @@ namespace lw
     // ---- the traced run ----
     // cf::walk without the recursion (a followed series of a lossless box needs thousands of events, and one stack
     // frame per event overflows the default stack): every path of one ray through ray_triangle_intersect,
-    // ray_mesh_interact and ray_state_update, both passes at every event, collected where the ray is in air or has
-    // entered the sink medium, into T where it runs towards +x. Scalar types. ev: traced events with a hit; a path
-    // weaker than floor in power is dropped and counted in drop.
+    // ray_mesh_interact and ray_state_update, both passes at every event, collected where the ray is in air outside
+    // the structure's x range or has entered the sink medium, into T where it runs towards +x. A ray the state puts in
+    // air inside that range is followed on: a sheet between two bodies (A21) leaves the wave in air inside the second
+    // body, and collecting it there would hide what the library does next. Scalar types (reflect pass type 3), or EM
+    // types 1 / 2 (reflect pass type 0) on one channel of xprmat, ch 0 (TE) or 3 (TM). ev: traced events with a hit; a
+    // path weaker than floor in power is dropped and counted in drop.
     struct Acc
     {
         cd T = 0.0, R = 0.0;
@@ -110,7 +113,7 @@ namespace lw
         double drop = 0.0;
     };
     static Acc walk(const ub::Pal &P, const arma::mat &mesh, const arma::uvec &mi, int tr, double f, double thd, double eps, int sink, int maxdepth,
-                    double floor = 1.0e-24)
+                    double floor = 1.0e-24, int ch = 0)
     {
         struct Node
         {
@@ -122,6 +125,8 @@ namespace lw
             int depth = 0;
         };
         const double k = 2.0 * QPI * f / C0, kt = k * std::sin(thd * QPI / 180.0);
+        const arma::mat X = arma::join_rows(mesh.col(0), mesh.col(3), mesh.col(6));
+        const double xmin = X.min(), xmax = X.max(); // the structure's x range
         Acc A;
         std::vector<Node> todo(1);
         diag_ray_at(thd, todo[0].o, todo[0].d);
@@ -129,7 +134,7 @@ namespace lw
         {
             Node n = std::move(todo.back());
             todo.pop_back();
-            for (int it : {tr, 3})
+            for (int it : {tr, tr < 3 ? 0 : 3})
             {
                 ub::Opt op;
                 op.eps = eps, op.relaunch = (it == tr);
@@ -137,13 +142,14 @@ namespace lw
                 if (E.nh == 0 || E.rt == 0)
                     continue;
                 ++A.ev;
-                const cd b = n.a * cpx(E.xpr, 0, 0);
+                const cd b = n.a * cpx(E.xpr, 0, ch);
                 const double L2 = n.L + (n.has_in ? std::sqrt(ub::sumsq(E.fbs - n.in.fbs)) : 0.0), yy0 = n.has_in ? n.y0 : E.fbs(0, 1);
                 const int cur = E.cur(0) & 0x3FFF;
-                if (cur == 0 || cur == sink)
+                const bool fwd = (E.destN(0, 0) - E.origN(0, 0)) > 0.0;
+                if ((cur == 0 && (fwd ? E.fbs(0, 0) >= xmax - 1.0e-6 : E.fbs(0, 0) <= xmin + 1.0e-6)) || (sink != 0 && cur == sink))
                 {
                     const cd ph = std::exp(cd(0.0, -k * L2)) * std::exp(cd(0.0, kt * (E.fbs(0, 1) - yy0)));
-                    ((E.destN(0, 0) - E.origN(0, 0)) > 0.0 ? A.T : A.R) += b * ph;
+                    (fwd ? A.T : A.R) += b * ph;
                     continue;
                 }
                 if (n.depth + 1 >= maxdepth || std::norm(b) < floor)
@@ -544,4 +550,87 @@ TEST_CASE("Leaf - a porous fill at the back of the box is the transfer matrix of
                 CHECK(std::abs(std::norm(S.R) - std::norm(rr)) < 5.0e-4);
                 CHECK(S.drop < 1.0e-12);
             }
+}
+
+TEST_CASE("Sheet between two bodies - nothing is created and the wave left in air inside the far body is killed", "[acoustic]")
+{
+    // A21 (md/acoustic.md 6). A porous sheet co-located with the exit face of a box of near-air material and the entry
+    // face of a wall: box 0 to 10 mm | sheet 15 mm | wall from 10 mm, faces in the plane x = 10 mm in the order box exit,
+    // sheet, wall entry. The intersector reports two of the three tied faces, by mesh order; here the box's exit and the
+    // sheet, a glued exit with air assumed beyond it (md/wave.md 6), so the wave is left in air inside the wall. Before
+    // the change the summed series created energy (R 42 at 125 Hz, 60 deg, on an m = 0 wall) and the wall's exit face,
+    // met from inside, was taken as an exit into air; in EM the same (R + T 42.19 TE, 14.46 TM). Asserted, scalar types 4
+    // and 5 on both walls, EM type 1 per channel (TE, TM) on the m = 0 wall, the faces as dielectrics: R + T <= 1, summed
+    // and followed, and the ray killed at the wall's exit face (both passes); the premise, the glued-exit hit code at the
+    // triple face.
+    // Recorded, not asserted: R against air 10 mm | porous 15 mm | the concrete half-space; the event at the triple face
+    // stays the box | sheet | air port, which only loses energy. The porous layer as a traced body glued on the wall is
+    // the form that works (the fill case above). Wave media only (m = 0 wall), and the same on a mass-law wall.
+    ub::OneThread one_thread;
+    const double x1 = 0.010;
+    lw::Mtl F; // the rock wool of the fill case (Miki 32.8 kPa s/m2), as a 15 mm sheet
+    F.a = 1.31823, F.b = -0.0125593, F.c = 0.00481048, F.d = 1.80573, F.e = 0.823363, F.f = 0.0954384, F.g = 0.221513, F.h = -0.0150261;
+    F.fRef = 1000.0 * lw::GHZ, F.thk = 0.015;
+    QD_DIAG("\n# diag: box 10 mm | porous sheet 15 mm | wall, the sheet co-located with box exit and wall entry, against the fluid layers\n");
+    QD_DIAG("wall,type,mode,f_Hz,theta,R,T,R+T,R_ref,events,drop\n");
+    for (int mass : {0, 1})
+    {
+        lw::Mtl W = lw::wall(0.0); // two-parameter concrete, tf 0; m 20 (mass-law) or m 0 (a wave medium)
+        if (!mass)
+            W.m = 0.0, W.fRef = 1.0;
+        const ub::Pal P = lw::pal({W, lw::air_body(), F});
+        arma::uvec mi;
+        const arma::mat mesh = ub::build({0.0, x1, x1, x1, 0.6}, {2, 2, 3, 1, 1}, {false, true, false, false, true}, mi);
+        struct Run
+        {
+            int tr, ch;
+            const char *name;
+        };
+        std::vector<Run> runs = {{4, 0, "4"}, {5, 0, "5"}};
+        if (!mass) // EM on the dielectric configuration: type 1, its reflect pass type 0, TE and TM
+            runs.push_back({1, 0, "1 TE"}), runs.push_back({1, 3, "1 TM"});
+        for (const Run &r : runs)
+            for (int mode : {0, 1})
+                for (double fa : {125.0, 1000.0})
+                    for (double thd : {0.0, 60.0})
+                    {
+                        const double k0 = 2.0 * QPI * fa / 343.0;
+                        const lw::cd rr = lw::stack({{1.0, 1.0, x1}, lw::layer(F, fa, F.thk)}, W.a, W.e, 0.0, k0, thd).r;
+                        lw::Acc S = lw::walk(P, mesh, mi, r.tr, fa * lw::GHZ * 1.0e9, thd, mode ? 1.5 : 0.0, 1, 4000, mode ? 1.0e-12 : 1.0e-24, r.ch);
+                        const double rt = std::norm(S.R) + std::norm(S.T);
+                        QD_DIAG("%s,%s,%s,%.0f,%.0f,%.6f,%.6f,%.6f,%.6f,%ld,%.1e\n", mass ? "m20" : "m0", r.name, mode ? "fol" : "sum", fa, thd, std::norm(S.R),
+                                std::norm(S.T), rt, std::norm(rr), S.ev, S.drop);
+                        INFO((mass ? "mass-law wall" : "m = 0 wall") << ", type " << r.name << (mode ? ", followed, " : ", summed, ") << fa << " Hz, " << thd << " deg");
+                        CHECK(rt <= 1.0 + 1.0e-6);
+                    }
+        // The kill: event 1 enters the box, event 2 is the triple face (transmit), event 3 the wall's exit face met by
+        // the wave the state puts in air
+        for (int tr : {4, 5, 1})
+        {
+            if (tr == 1 && mass)
+                continue;
+            for (double thd : {0.0, 60.0})
+            {
+                const double f = 125.0 * lw::GHZ * 1.0e9;
+                arma::mat o, d, o2, d2, o3, d3;
+                diag_ray_at(thd, o, d);
+                ub::Opt op;
+                op.eps = 0.0, op.relaunch = true;
+                const ub::Ev E1 = ub::traced<double>(P, mesh, mi, tr, f, o, d, nullptr, op);
+                ub::onward(E1, o2, d2);
+                const ub::Ev E2 = ub::traced<double>(P, mesh, mi, tr, f, o2, d2, &E1, op);
+                ub::onward(E2, o3, d3);
+                INFO((mass ? "mass-law wall" : "m = 0 wall") << ", type " << tr << ", " << thd << " deg");
+                CHECK((int)E2.ot == 69); // the glued exit, box | sheet | air
+                CHECK((E2.cur(0) & 0x3FFF) == 0);
+                for (int it : {tr, tr < 3 ? 0 : 3})
+                {
+                    const ub::Ev E3 = ub::traced<double>(P, mesh, mi, it, f, o3, d3, &E2, op);
+                    INFO("pass type " << it << ", hit code " << (int)E3.ot << ", resolved " << (int)E3.rt);
+                    CHECK(E3.nh > 0);
+                    CHECK((int)E3.rt == 0);
+                }
+            }
+        }
+    }
 }

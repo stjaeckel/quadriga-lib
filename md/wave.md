@@ -13,7 +13,10 @@ EM types (0 reflect, 1 transmit, 2 refract) and scalar types (3, 4, 5) run the s
 scalar types use the TE / admittance form. **Every material with `m > 0` is acoustic** and is out
 of scope here; section 9 lists where that add-on attaches. The M9 leaf cases in
 `test_acoustic_leaf.cpp` are `[acoustic]` although two of them evaluate wave media only and the others
-wave media on a mass-law wall: they guard the acoustic route of `md/acoustic.md` 2.8.
+wave media on a mass-law wall: they guard the acoustic route of `md/acoustic.md` 2.8. So does *Sheet between two
+bodies - nothing is created and the wave left in air inside the far body is killed*, which evaluates wave media on an
+`m = 0` wall and guards the kill of section 6 for the scalar types and for EM (type 1 with its reflect pass, TE and
+TM, the faces as dielectrics).
 
 The wave side has **one small open convention**, the path the `alpha` column is charged over in a
 layer that tunnels (section 8a); everything else is settled. It is the regression guard while the
@@ -24,8 +27,8 @@ First step of every session, from the repository root:
 ```
 cmake --build build_linux --parallel
 ./build_linux/test_bin "[wave]" > test_wave.txt          # All tests passed (165110 assertions in 179 test cases)
-./build_linux/test_bin "[acoustic]" > test_acoustic.txt  # All tests passed (36705 assertions in 51 test cases)
-./build_linux/test_bin > test.txt                        # All tests passed (1311364 assertions in 1137 test cases)
+./build_linux/test_bin "[acoustic]" > test_acoustic.txt  # All tests passed (36813 assertions in 52 test cases)
+./build_linux/test_bin > test.txt                        # All tests passed (1311472 assertions in 1138 test cases)
 ```
 
 The three baselines are untracked (`.gitignore`: `test*.txt`). A change is diffed against them. The
@@ -265,9 +268,14 @@ abutting and nested and overlapping bodies*.
 **A sheet in the previous-medium word** is a boundary, never a medium. Readers: the host's series
 (the mirror behind the ray: a layer backed by air, or by the host under the inside flag; both layers
 under the stack code), the recovery (no medium named), and nothing for a glued exit, which always
-exits into air. Asserted in: *Sheet inside a host - the mirror behind the ray is backed by the host*;
+exits into air. Only a glued exit leaves the ray in air with a sheet in the word (an isolated sheet in
+air writes no word); a ray in that state that meets a body from inside (an exit-class hit code: 1, 5,
+7, 13, 21, 29 and their total-reflection variants) was in that body, the sheet lay between two
+bodies (section 8), and the ray is killed, every type. Asserted in: *Sheet inside a host - the mirror behind the ray is backed by the host*;
 *Lined on both faces - a glued exit behind a sheet exits into air*; *Layered wall - a glued exit
-behind a bare-entered second layer exits into air*; *Layered stack - a host layer bounded by a sheet*.
+behind a bare-entered second layer exits into air*; *Layered stack - a host layer bounded by a sheet*;
+*Sheet between two bodies - nothing is created and the wave left in air inside the far body is killed*
+(`test_acoustic_leaf.cpp`).
 
 ## 7. Series, paths and verdicts
 
@@ -347,7 +355,22 @@ None has a fix in sight or one worth its cost. Sizes are measured.
 
 **State, depth and directions**
 - `mtl_prev` is one level deep. Air is assumed beyond every glued exit (a lined body nested in
-  another medium is not a use case). Behind a stack inside a host the mirror is the last layer (with
+  another medium is not a use case).
+- A sheet between two bodies (body | sheet | body, three co-located faces; A21 in `md/acoustic.md` 6)
+  builds, but the intersector reports two of the three faces, chosen by mesh order, so the physics
+  depends on the order of a tie, in every type: box exit and sheet reported, a glued exit into air;
+  box exit and far entry, the sheet ignored; sheet and far entry, the glued entry from the host, exact
+  (the fluid layers within 1e-6 in TE and scalar). In the first order the wave the state puts in air
+  inside the far body used to create energy where the series was summed: R + T up to 42.19 (scalar
+  and EM TE) and 14.46 (EM TM) for an air box, a 15 mm porous sheet and an `m = 0` wall, and
+  `ray_progress` ran away with a leaf in front. Since 2026-10-16 the ray is killed where it meets the
+  far body from inside (section 6), every type, and R + T ≤ 0.902 over the variants measured
+  (`md/m5_a21_report.md` 3.5); what remains loses energy only: the reflect port of box | sheet | air
+  (R 0.154 for 0.994 at 125 Hz), or the bare body | body face. A sheet glued on the far body's back
+  face is met as air | sheet | air (code 69, nothing created). The same kill takes a legitimate glued
+  exit followed by a face met from behind (open or flipped geometry); not seen in the repository
+  scenes, which have no glued sheets, and not measured on a real scene. A full resolve needs the
+  third face from the intersector or `ray_progress`. Behind a stack inside a host the mirror is the last layer (with
   the stack code: both). A wave two solids deep behind a launched wave or a wedge takes the named
   solve; a reflection off a sheet replaces the name. The followed mark and the stack code share the
   buffer word with the deferred medium: a nested object met on such a leg replaces them (series
@@ -502,6 +525,9 @@ to zero (1e-6 against 0) for a branch taken on a value; `tf` ±1e-9 against none
 - Run a relinked binary from the repository root (cases open `tests/data` relatively). Never two
   suites at once; check with `ps`; wrap probes in `timeout`.
 - One ray at a time costs twenty times the work without `ub::OneThread`.
+- `bf::walk` and `cf::walk` collect a path wherever the state says air; a geometry that leaves the
+  wave in air inside a body (a sheet between two bodies) needs `lw::walk`'s rule
+  (`test_acoustic_leaf.cpp`): air collected only outside the structure's x range.
 - A segment that ends inside a body preloads the ledger and a fixture that relaunches by hand adds
   the leg again: segments must reach past every remaining face (a 2 m segment ends inside a 200 mm
   slab at 85°).

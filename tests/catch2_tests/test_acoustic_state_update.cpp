@@ -5905,12 +5905,14 @@ TEST_CASE("Held exit - a non-rigid mass-law body holds every tracer and passes a
 
 TEST_CASE("Absorption peak - tfP, tfF and tfQ add a resonant peak to the room-side absorption of a mass-law face", "[acoustic]")
 {
-    // A10: tf(f) = tfR (f/fRef)^tfB + tfP / (1 + (tfQ (f - tfF)/tfF)^2), clamped as before. A rigid mass-law
-    // panel absorbs it on its room side (R = 1 - tf) and passes the plate rule with it (N1), as a sheet
-    // and as a traced solid. A lining of plasterboard on battens: floor 0.05, peak 0.25 at 150 Hz, Q 1.5.
-    // At bb336dc the three columns were not read: the face absorbed the floor alone.
+    // A10 on the lumped-resonator law (M5): tf(f) = tfR (f/fRef)^tfB + tfP / (1 + (tfQ (f/tfF - tfF/f))^2),
+    // clamped as before, tfQ the absorber's Q_alpha. A rigid mass-law panel absorbs it on its room side
+    // (R = 1 - tf) and passes the plate rule with it (N1), as a sheet and as a traced solid. A lining of
+    // plasterboard on battens: floor 0.05, peak 0.25 at 150 Hz, Q_alpha 0.75 (the width near the peak that
+    // tfQ 1.5 had on the linear detuning of 4720a92). At bb336dc the three columns were not read: the face
+    // absorbed the floor alone.
     ub::OneThread one_thread;
-    const double a = 8.1817e-08, thk = 0.0125, fRef = 1.6644e-04, tf0 = 0.05, tfP = 0.25, tfF_hz = 150.0, tfQ = 1.5;
+    const double a = 8.1817e-08, thk = 0.0125, fRef = 1.6644e-04, tf0 = 0.05, tfP = 0.25, tfF_hz = 150.0, tfQ = 0.75;
     QD_DIAG("\n# diag: the absorption peak of a 12.5 mm board, sheet (S) and traced solid (X), scalar\n");
     QD_DIAG("kind,type,f_Hz,theta,alpha,alpha_ref,T_dB,T_rule_dB\n");
     for (int kind = 0; kind < 2; ++kind)
@@ -5922,7 +5924,7 @@ TEST_CASE("Absorption peak - tfP, tfF and tfQ add a resonant peak to the room-si
             for (double f_hz : {63.0, 150.0, 250.0, 500.0, 1000.0})
                 for (double thd : {0.0, 45.0})
                 {
-                    const double fG = f_hz * r1::FMAP, f = fG * 1.0e9, c = std::cos(thd * QPI / 180.0), x = tfQ * (f_hz - tfF_hz) / tfF_hz;
+                    const double fG = f_hz * r1::FMAP, f = fG * 1.0e9, c = std::cos(thd * QPI / 180.0), x = tfQ * (f_hz / tfF_hz - tfF_hz / f_hz);
                     double ar = std::min(1.0, tf0 + tfP / (1.0 + x * x));
                     if (thd == 0.0) // exactly at normal incidence the rigid face is open: the pair rule R0 (1 - tf), R0 its Fresnel reflectance
                         ar = 1.0 - (1.0 - ar) * std::pow((1.0 - std::sqrt(a)) / (1.0 + std::sqrt(a)), 2.0);
