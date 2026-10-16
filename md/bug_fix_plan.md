@@ -81,8 +81,11 @@ Named in section 5 under "Acceptance" (fuzz re-runs, MATLAB R2026a exit, timings
 `md/bugs.md` keeps every item and its reproduction; IDs never change. After each committed work package:
 
 - Add a status line as the first bullet of each item's section:
-  `- Status: fixed in <commit> (WP-xx)` / `partly fixed in <commit> (WP-xx): <what remains>` /
-  `won't fix (<reason>, decided <date>)` / `documented (<commit>)` / `open`.
+  `- Status: fixed (WP-xx)` / `partly fixed (WP-xx): <what remains>` /
+  `won't fix (<reason>, decided <date>)` / `documented (WP-xx)` / `open`.
+  The update of `md/bugs.md` and this plan goes into the work package's own commit, which cannot name its own hash;
+  the commit hash is therefore recorded only in the Status table of section 7, filled in at the next manager update
+  (`git log --grep '^WP-xx:'` finds it).
 - Add a "Status" column to the summary table (after "Mark") and keep the counts line of the summary table current
   ("open: n, fixed: n, ...").
 - If a fix changed the analysis (cause, severity, scope), correct the item text and say so in one sentence.
@@ -149,6 +152,13 @@ acceptance checks beyond section 3.1. Severities in brackets.
 - File: `src/qd_channel_hdf5.cpp` (plus documentation in `include/quadriga_channel.hpp`).
 - Notes: B-001 and B-051 interact (error printing switched off hides the failure); introduce a checked read helper
   (rank, extents, return codes) once and use it everywhere (B-013); decisions B-001, B-052.
+- Notes after WP-01: decision B-001 (a) contradicts the test proposed in `md/bugs.md` B-001 and the "expected a=1 b=2"
+  of its repro: after `hdf5_write` rewrites a slot, only the new channel's `par_*` fields are there. B-001 and B-052
+  together mean: rewriting a slot deletes the old group link and writes a fresh group. B-015 is the last ASan report of
+  the Catch2 suite besides the excluded `ray_progress`; after WP-02 the ASan suite must show only `ray_progress`.
+  B-051 removes `H5close()`: re-check the R2026a exit (B-029, repro `F-1`). The 11 crash and 20 hang inputs of the
+  phase-0 HDF5 campaign are in `build_linux/scratch/hunt/fuzz/out/hdf5/{main,cmp}/{crashes,hangs}/`; replay them
+  against the fixed harness, and fuzz into a new output directory (do not overwrite `out/hdf5`).
 - Acceptance: re-run the HDF5 AFL harness for 15 minutes (`build_linux/scratch/hunt/fuzz/`, rebuild `build_afl_plain`
   and `build_afl_cmplog` first): no crash. The HDF5 cases of the ASan suite are clean.
 
@@ -186,7 +196,9 @@ acceptance checks beyond section 3.1. Severities in brackets.
   `get_channels_spherical` batch mode, handle read-only arrays; this is the largest item of the package. Rebuild into
   `lib/` (the build of the Baseline section).
 - Acceptance: an ASan build of the Python module (as area G built it: `build_linux/scratch/hunt/G/asan_mod`) runs the
-  Python suite without reports.
+  Python suite without reports. Build it with `bash build_linux/scratch/fix/build_asan_mod.sh [jobs]` (written in
+  WP-01, about 50 s; needs an up-to-date `build_asan`). Positive control: before the B-004 fix, repro `G-1` reports a
+  heap-use-after-free with this module.
 
 ### WP-06 MEX helpers
 
@@ -240,7 +252,9 @@ acceptance checks beyond section 3.1. Severities in brackets.
   part of B-065 goes with WP-13 if simpler, note it in the log).
 - Files: `src/get_channels_ieee_indoor.cpp`, `src/ieee_channel_model_functions.hpp`,
   `tests/catch2_tests/test_qd_ieee_chan.cpp` (B-023 changes the pinned behaviour).
-- Notes: decision B-023.
+- Notes: decision B-023. WP-01 (B-063) changed `tests/catch2_tests/test_qd_ieee_chan.cpp` lines 301 and 318: `d` is
+  now a copy (`arma::mat(ptr, 16, 13)` / `(ptr, 16, 12)`), no longer a strict alias of `chan[0].delay[0]`; start from
+  these lines.
 
 ### WP-12 Geometry
 
@@ -293,6 +307,9 @@ acceptance checks beyond section 3.1. Severities in brackets.
 
 - Items: B-060 [S3], B-102 [S4], B-104 [S4], B-106 [S4], B-108 [S4], B-115 [S4], and any documentation parts that
   earlier packages left open (the manager lists them in the prompt).
+- Left open by earlier packages: `CMakeLists.txt:498` (MATLAB API section) still says MATLAB links quadriga_static "to
+  avoid conflicts with MATLAB's own bundled libhdf5.so"; the static link does not separate the HDF5 libraries, the
+  different soname of the system HDF5 does (see the comment at `CMakeLists.txt:196`, rewritten in WP-01).
 - Files: header comments in `include/*.hpp`, documentation blocks in `src/`, `api_mex/`, `api_python/`; dead code
   (`src/avx_mathfun.h`, `arma::mt19937_64_instance`); `src/runtime_AVX2_Check_avx2.cpp` (FMA / XGETBV check).
 - Then: `make documentation` once; full verification of the Baseline section (all suites, both sanitizer builds,
@@ -351,8 +368,8 @@ unexpected changes in the diff; proposed `md/bugs.md` updates; anything the next
 | WP | Items | Status | Commit |
 |---|---|---|---|
 | WP-00 | decisions (section 4) | done 2026-10-15 | - |
-| WP-01 | 11 | open | - |
-| WP-02 | 8 | open | - |
+| WP-01 | 11 | done 2026-10-16 (11 of 11 fixed) | commit `WP-01: quick wins ...` (hash at next update) |
+| WP-02 | 8 | worker prompt issued 2026-10-16 | - |
 | WP-03 | 4 | open | - |
 | WP-04 | 5 | open | - |
 | WP-05 | 12 | open | - |

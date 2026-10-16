@@ -339,32 +339,39 @@ std::vector<bool> quadriga_lib::get_channels_irs(const arrayant<dtype> *tx_array
     delay->set_size(n_rx, n_tx, i_path);
 
     arma::uword n_bytes = n_rx * n_tx * i_path * sizeof(dtype);
-    std::memcpy(coeff_re->memptr(), coeff_re_local.memptr(), n_bytes);
-    std::memcpy(coeff_im->memptr(), coeff_im_local.memptr(), n_bytes);
-    std::memcpy(delay->memptr(), delay_local.memptr(), n_bytes);
+    if (n_bytes) // No memcpy for empty outputs (null data pointer)
+    {
+        std::memcpy(coeff_re->memptr(), coeff_re_local.memptr(), n_bytes);
+        std::memcpy(coeff_im->memptr(), coeff_im_local.memptr(), n_bytes);
+        std::memcpy(delay->memptr(), delay_local.memptr(), n_bytes);
+    }
 
     if (aod != nullptr)
     {
         aod->set_size(n_rx, n_tx, i_path);
-        std::memcpy(aod->memptr(), aod_local.memptr(), n_bytes);
+        if (n_bytes)
+            std::memcpy(aod->memptr(), aod_local.memptr(), n_bytes);
     }
 
     if (eod != nullptr)
     {
         eod->set_size(n_rx, n_tx, i_path);
-        std::memcpy(eod->memptr(), eod_local.memptr(), n_bytes);
+        if (n_bytes)
+            std::memcpy(eod->memptr(), eod_local.memptr(), n_bytes);
     }
 
     if (aoa != nullptr)
     {
         aoa->set_size(n_rx, n_tx, i_path);
-        std::memcpy(aoa->memptr(), aoa_local.memptr(), n_bytes);
+        if (n_bytes)
+            std::memcpy(aoa->memptr(), aoa_local.memptr(), n_bytes);
     }
 
     if (eoa != nullptr)
     {
         eoa->set_size(n_rx, n_tx, i_path);
-        std::memcpy(eoa->memptr(), eoa_local.memptr(), n_bytes);
+        if (n_bytes)
+            std::memcpy(eoa->memptr(), eoa_local.memptr(), n_bytes);
     }
 
     return keep_path;

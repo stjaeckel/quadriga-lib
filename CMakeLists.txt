@@ -193,9 +193,17 @@ if(BUILD_MATLAB) # Detect MATLAB MEX headers
     endif()
 endif()
 
-if(BUILD_MATLAB) # MATLAB requires static lib (HDF5 version clash due to MALTABs own libhdf5.so)
+# MATLAB MEX files link the static quadriga library, so they do not depend on a libquadriga.so at run time.
+# HDF5 is linked as found: a system HDF5 (find_package) is linked as a shared library (e.g. Debian/Ubuntu
+# libhdf5_serial.so.310, whose soname differs from MATLAB's bundled libhdf5.so.310, so both can be loaded side
+# by side); HDF5_PATH or BUILD_HDF5 link a static libhdf5.a into every MEX file. On Linux, the MEX files are
+# linked with -z nodelete (see the MATLAB API section below): the thread-safe HDF5 creates pthread keys with
+# destructors that it never deletes, and MATLAB R2026a unloads MEX files at exit or on "clear mex"; if HDF5 were
+# unmapped with them, the exiting thread would call a destructor in unmapped code and MATLAB would crash. A MEX
+# file therefore stays mapped once loaded, and a rebuilt MEX file is only picked up after a MATLAB restart.
+if(BUILD_MATLAB)
     set(BUILD_STATIC_LIB ON)
-    message(STATUS "MATLAB enabled: forcing BUILD_STATIC_LIB=ON (HDF5 isolation)")
+    message(STATUS "MATLAB enabled: forcing BUILD_STATIC_LIB=ON (MEX files link libquadriga.a)")
 endif()
 
 if (BUILD_OCTAVE) # Detect Octave
@@ -524,6 +532,8 @@ if(BUILD_MATLAB)
                 VERBATIM
             )
         else()
+            # -z nodelete keeps the MEX file and the HDF5 library it loads mapped after MATLAB unloads the MEX file
+            # (dangling HDF5 pthread-key destructors crash MATLAB R2026a at exit otherwise; see BUILD_MATLAB above)
             set(mex_output "${MEX_OUTPUT_DIR}/${mex_basename}.mexa64")
             add_custom_command(
                 OUTPUT ${mex_output}
@@ -532,6 +542,7 @@ if(BUILD_MATLAB)
                         -I${MATLAB_MEX_INCLUDE_DIR} -I${CMAKE_SOURCE_DIR}/include -I${CMAKE_SOURCE_DIR}/src -I${ARMADILLO_INCLUDE_DIRS}
                         ${mex_src} ${MEX_COMPAT_SHIM} $<TARGET_FILE:quadriga_static> ${HDF5_LINK_LIBS} ${CUDA_MEX_LINK_LIBS} -lgomp
                         -Wl,--version-script,${MATLAB_MEX_VERSION_SCRIPT} -Wl,--no-undefined-version -Wl,--unresolved-symbols=ignore-all
+                        -Wl,-z,nodelete
                         -o ${mex_output}
                 DEPENDS ${mex_deps}
                 COMMENT "Building MATLAB MEX file ${mex_basename}.mexa64"

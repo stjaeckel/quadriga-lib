@@ -115,7 +115,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             ant.coupling_im = qd_mex_get_Mat<double>(prhs[12]);
 
         if (nrhs > 13)
-            ant.center_frequency = qd_mex_get_scalar<double>(prhs[13]);
+            ant.center_frequency = qd_mex_get_scalar<double>(prhs[13], "center_freq", 299792458.0);
 
         if (nrhs > 14)
             ant.name = qd_mex_get_string(prhs[14]);

@@ -1537,30 +1537,35 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
                     }
                 }
             }
+        }
 
-            if (aod)
-            {
-                aod->set_size(no_path);
+        // Copy the angles (no memcpy for 0 paths: the empty matrices have no data pointer)
+        if (aod)
+        {
+            aod->set_size(no_path);
+            if (no_path)
                 std::memcpy(aod->memptr(), path_angles.colptr(0), no_path * sizeof(dtype));
-            }
+        }
 
-            if (eod)
-            {
-                eod->set_size(no_path);
+        if (eod)
+        {
+            eod->set_size(no_path);
+            if (no_path)
                 std::memcpy(eod->memptr(), path_angles.colptr(1), no_path * sizeof(dtype));
-            }
+        }
 
-            if (aoa)
-            {
-                aoa->set_size(no_path);
+        if (aoa)
+        {
+            aoa->set_size(no_path);
+            if (no_path)
                 std::memcpy(aoa->memptr(), path_angles.colptr(2), no_path * sizeof(dtype));
-            }
+        }
 
-            if (eoa)
-            {
-                eoa->set_size(no_path);
+        if (eoa)
+        {
+            eoa->set_size(no_path);
+            if (no_path)
                 std::memcpy(eoa->memptr(), path_angles.colptr(3), no_path * sizeof(dtype));
-            }
         }
     }
 }

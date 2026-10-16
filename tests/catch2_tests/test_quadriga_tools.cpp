@@ -482,3 +482,19 @@ TEST_CASE("Quadriga tools - coord2path example")
     T = {{10, 5, 0}, {0, 0, 0}, {0, 2, 0}};
     CHECK(arma::approx_equal(coords[1], T, "absdiff", 1e-12));
 }
+
+TEST_CASE("Quadriga tools - Point cloud split of identical points")
+{
+    // B-080: a failed split returns a negative value, leaves the outputs unchanged, and does not leak
+    arma::mat points(1000, 3, arma::fill::ones);
+    arma::mat pointsA = {{1.0, 2.0, 3.0}}, pointsB = {{4.0, 5.0, 6.0}};
+    arma::mat A0 = pointsA, B0 = pointsB;
+
+    int res = quadriga_lib::point_cloud_split(&points, &pointsA, &pointsB);
+    CHECK(res < 0);
+    CHECK(arma::approx_equal(pointsA, A0, "absdiff", 0.0));
+    CHECK(arma::approx_equal(pointsB, B0, "absdiff", 0.0));
+
+    for (int axis = 1; axis <= 3; ++axis)
+        CHECK(quadriga_lib::point_cloud_split(&points, &pointsA, &pointsB, axis) == -axis);
+}

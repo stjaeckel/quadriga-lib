@@ -976,7 +976,10 @@ static void qd_python_copy2arma(const dtype *src, const std::array<size_t, 9> &s
     dtype *dst = output.memptr();
 
     if (shape[6] == 1)
-        std::memcpy(dst, src, shape[8]);
+    {
+        if (shape[8]) // No memcpy for empty arrays (null data pointer)
+            std::memcpy(dst, src, shape[8]);
+    }
     else
         for (size_t is = 0; is < ns; ++is)
             for (size_t ic = 0; ic < nc; ++ic)

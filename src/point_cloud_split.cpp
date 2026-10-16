@@ -4,6 +4,8 @@
 
 #include "quadriga_tools.hpp"
 
+#include <vector>
+
 /*!SECTION
 Site-specific simulation tools
 SECTION!*/
@@ -90,7 +92,7 @@ int quadriga_lib::point_cloud_split(const arma::Mat<dtype> *points,
           z_max = (axis == 3) ? aabb.at(0, 4) + (dtype)0.5 * z : aabb.at(0, 5);
 
     // Determine all points that are outside box A
-    bool *isB = new bool[n_points_t](); // Init to false
+    std::vector<char> isB(n_points_t, 0); // Init to false
 
     for (size_t i_val = 0; i_val < n_values_t; ++i_val)
     {
@@ -158,7 +160,6 @@ int quadriga_lib::point_cloud_split(const arma::Mat<dtype> *points,
         }
     }
 
-    delete[] isB;
     return axis;
 }
 

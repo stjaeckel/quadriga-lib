@@ -34,127 +34,128 @@ How to read the items:
 ## Summary table
 
 Items: 118 (S1: 5, S2: 31, S3: 64, S4: 18).
+Status: open: 107, fixed: 11, partly fixed: 0, won't fix: 0, documented: 0 (after WP-01).
 
-| ID | Title | Area | Kind | Severity | Mark |
-|---|---|---|---|---|---|
-| [B-001](#b-001) | `hdf5_write` silently drops the `par_*` data when the slot already holds a `Data` group | B channel, file I/O | 1 defect | S1 | [R] |
-| [B-002](#b-002) | `quantize_delays` segfaults on a negative delay, including the slightly negative relative delays that `get_channels_spherical` returns | B channel, file I/O | 1 defect | S1 | [R] |
-| [B-003](#b-003) | `get_channels_spherical`, `_multifreq` and `_irs` ignore `path_length` for NLOS paths: delays and phases too short | C channel gen., tools | 1 defect | S1 | [R] |
-| [B-004](#b-004) | Python `tools.geo2cart` / `tools.cart2geo` with separate inputs read freed memory: wrong values, segfault | G Python layer | 1 defect | S1 | [R] |
-| [B-005](#b-005) | Python HDF5 writers ignore numpy strides for 1-D and (n,1) arrays: wrong data written, heap over-read | G Python layer | 1 defect | S1 | [R] |
-| [B-006](#b-006) | AVX2 antenna interpolation reads up to 56 bytes past the angle matrices (per-element angles, n_out not a multiple of 8) | A arrayant | 1 defect | S2 | [R] |
-| [B-007](#b-007) | Generic antenna interpolation reads before the pattern buffer for NaN or infinite angles | A arrayant | 1 defect | S2 | [R] |
-| [B-008](#b-008) | `arrayant::append` builds a wrong coupling matrix, and segfaults when `coupling_im` is empty | A arrayant | 1 defect | S2 | [R] |
-| [B-009](#b-009) | `arrayant::rotate_pattern` loses coupling, centre frequency and name | A arrayant | 1 defect | S2 | [R] |
-| [B-010](#b-010) | `arrayant::calc_beamwidth_deg` is wrong when the main lobe wraps ±180° or points towards a pole | A arrayant | 1 defect | S2 | [R] |
-| [B-011](#b-011) | `generate_arrayant_multibeam` with a beam towards el = ±90° returns wrong ports (pol 1) or segfaults (pol 2, 3) | A arrayant | 1 defect | S2 | [R] |
-| [B-012](#b-012) | qdant writer drops every pattern sample below -100 dB absolute power; a whole low-level element reads back as zeros | A arrayant | 1 defect | S2 | [R] |
-| [B-013](#b-013) | `hdf5_read_channel`: a malformed HDF5 file overflows heap and stack buffers (sizes taken from attributes, not from the datasets) | B channel, file I/O | 1 defect | S2 | [R] |
-| [B-014](#b-014) | HDF5 storage layout: `nx*ny*nz*nw` wraps in 32 bits; `hdf5_write` then reads and writes past the index buffer | B channel, file I/O | 1 defect | S2 | [R] |
-| [B-015](#b-015) | `hdf5_write` copies 256 bytes from the channel name: heap memory ends up in the file; names of 256+ characters over-read on reading | B channel, file I/O | 1 defect | S2 | [R] |
-| [B-016](#b-016) | `qrt_file_read` (C++) fills `aod`, `eod`, `aoa`, `eoa` only when `path_gain` or `path_length` is also requested | B channel, file I/O | 1 defect | S2 | [R] |
-| [B-017](#b-017) | `qrt_file_append` corrupts the file when a CIR orientation is non-zero in double but rounds to 0 in float | B channel, file I/O | 1 defect | S2 | [R] |
-| [B-018](#b-018) | OBJ round trip loses "no material": faces with `mtl_ind = 0` inherit the previous material | B channel, file I/O | 1 defect | S2 | [R] |
-| [B-019](#b-019) | `baseband_freq_response_multi` gives wrong phases for `get_channels_*` output with the default relative delays | C channel gen., tools | 1 defect | S2 | [R] |
-| [B-020](#b-020) | `baseband_freq_response`: phase computed in single precision, error grows with delay × bandwidth (both builds) | C channel gen., tools | 1 defect | S2 | [R] |
-| [B-021](#b-021) | IEEE indoor model: `n_floors > 0` shifts all tap delays (3-D path length minus 2-D distance) | C channel gen., tools | 1 defect | S2 | [R] |
-| [B-022](#b-022) | IEEE indoor model prunes taps with an absolute power threshold after path loss (taps vanish with distance, floors, walls) | C channel gen., tools | 1 defect | S2 | [R] |
-| [B-023](#b-023) | IEEE indoor model uplink conjugates the channel (Doppler sign reversed), unlike the reciprocity of `get_channels_spherical` (user decision) | C channel gen., tools | 3 cross-API | S2 | [R] |
-| [B-024](#b-024) | `xpr_update`: data race when `ray_index` contains duplicates (wrong, non-deterministic result with threads) | C channel gen., tools | 1 defect | S2 | [R] |
-| [B-025](#b-025) | `path_to_tube`: NaN vertices when interior path points are collinear | C channel gen., tools | 1 defect | S2 | [R] |
-| [B-026](#b-026) | AVX2 sin/cos returns values far outside [-1, 1], ±inf or NaN for large arguments (fast_sincos, fast_geo2cart, baseband_freq_response) | D geometry, math | 1 defect | S2 | [R] |
-| [B-027](#b-027) | `point_inside_mesh` misclassifies points 5 cm from a face at UTM-like coordinates in AVX2 builds (float ray–triangle kernel) | D geometry, math | 1 defect | S2 | [R] |
-| [B-028](#b-028) | `obj_overlap_test` misses a clear overlap when vertices of the penetrating object lie on extensions of the other object's face planes | D geometry, math | 1 defect | S2 | [R] |
-| [B-029](#b-029) | MATLAB R2026a segfaults at exit after any HDF5 MEX call (the unloaded thread-safe libhdf5 leaves a dangling pthread-key destructor) | F MEX layer | 1 defect | S2 | [R] |
-| [B-030](#b-030) | MEX: sparse inputs are read as dense arrays (wrong values, heap over-read) in every wrapper | F MEX layer | 1 defect | S2 | [R] |
-| [B-031](#b-031) | MEX `qrt_file_read` (`i_cir`) and `hdf5_read_channel` (`snap`) modify the caller's uint64 variable in place | F MEX layer | 1 defect | S2 | [R] |
-| [B-032](#b-032) | MEX `channel_export_obj_file` segfaults when `no_interact` has fewer snapshots than the coefficients | F MEX layer | 1 defect | S2 | [R] |
-| [B-033](#b-033) | MEX `qd_mex_get_strings` dereferences empty cell elements: `cell(1,1)` as a name list crashes MATLAB R2026a | F MEX layer | 1 defect | S2 | [R] |
-| [B-034](#b-034) | MEX helpers convert NaN, negative, fractional and out-of-range numbers to integers without checks: crashes, bad_alloc, silent truncation, wrapped seeds | F MEX layer | 1 defect | S2 | [R] |
-| [B-035](#b-035) | Python `arrayant.interpolate(local_angles=True)` without `dist=True` returns uninitialised memory | G Python layer | 1 defect | S2 | [R] |
-| [B-036](#b-036) | Python `channel.baseband_freq_response`: an exception inside the OpenMP region aborts the interpreter | G Python layer | 1 defect | S2 | [R] |
-| [B-037](#b-037) | AVX2 antenna interpolation returns 0 where all four corner amplitudes are below 1.19e-7 (generic interpolates) | A arrayant | 1 defect | S3 | [R] |
-| [B-038](#b-038) | qdant writer stores element positions, coupling and pattern values with only 6 significant digits | A arrayant | 1 defect | S3 | [R] |
-| [B-039](#b-039) | `qdant_write_multi` deletes an existing file before it validates its input | A arrayant | 1 defect | S3 | [R] |
-| [B-040](#b-040) | `qdant_read(fn, 1)` returns another entry without error when the file has no ID 1 | A arrayant | 1 defect | S3 | [R] |
-| [B-041](#b-041) | `arrayant::qdant_write` without a layout replaces an existing custom layout in the file (user decision) | A arrayant | 2 doc | S3 | [R] |
-| [B-042](#b-042) | A 138-byte qdant file makes the reader allocate 4.7 GB and fail with `std::bad_alloc` | A arrayant | 1 defect | S3 | [R] |
-| [B-043](#b-043) | `arrayant` default constructor leaves `check_ptr` uninitialised; the quick `is_valid()` can pass an invalid object | A arrayant | 1 defect | S3 | [R] |
-| [B-044](#b-044) | ULA and 3GPP generators keep the custom pattern's element positions and coupling, contrary to the docs | A arrayant | 2 doc | S3 | [R] |
-| [B-045](#b-045) | `combine_pattern` and `arrayant_combine_pattern_multi` hard-code the speed of light (acoustic arrays combined without position phase) | A arrayant | 1 defect | S3 | [R] |
-| [B-046](#b-046) | `remove_zeros` and `calc_directivity_dBi` use absolute power thresholds (low-level patterns lose data or report 0 dBi) | A arrayant | 1 defect | S3 | [R] |
-| [B-047](#b-047) | `generate_arrayant_multibeam` defaults M = N = 2 in the header, 1 in the docs and both wrappers | A arrayant | 3 cross-API | S3 | [C] |
-| [B-048](#b-048) | QRT readers trust header and path counts: a 136-byte file returns 20 million zero paths or allocates GBs | B channel, file I/O | 1 defect | S3 | [R, M] |
-| [B-049](#b-049) | `qrt_file_read` truncates `i_cir` / `i_orig` to 32 bits before the range check | B channel, file I/O | 1 defect | S3 | [R] |
-| [B-050](#b-050) | HDF5 write/read round trip changes data (empty snapshots, missing frequency, 1-element vectors, empty strings, long names) | B channel, file I/O | 1 defect | S3 | [R] |
-| [B-051](#b-051) | HDF5 functions call `H5close()`, switch off error printing process-wide, and leak handles and memory on error paths | B channel, file I/O | 1 defect | S3 | [R] |
-| [B-052](#b-052) | `hdf5_write` "overwrites" a slot by adding a new group; the file grows with every rewrite | B channel, file I/O | 2 doc | S3 | [R] |
-| [B-053](#b-053) | `hdf5_read_dset` returns a variable-length string as 8 bytes of a heap pointer, and leaks it | B channel, file I/O | 1 defect | S3 | [R] |
-| [B-054](#b-054) | `quantize_delays` builds dense vectors over the absolute delay range: a 20 ms offset makes it 4000 times slower | B channel, file I/O | 4 performance | S3 | [M] |
-| [B-055](#b-055) | `quantize_delays` gives wrong results when the outputs alias the inputs (undocumented) | B channel, file I/O | 1 defect | S3 | [R] |
-| [B-056](#b-056) | `mitsuba_xml_file_write` is quadratic in the number of vertices per object | B channel, file I/O | 4 performance | S3 | [M] |
-| [B-057](#b-057) | OBJ reader: CRLF `.mtl` files lose their materials; face indices unchecked when only `face_ind` is requested; no-output call skips validation | B channel, file I/O | 1 defect | S3 | [R] |
-| [B-058](#b-058) | `write_png`: constant, NaN or inverted-range data trigger a NaN-to-integer cast and all pixels get the last colour; an empty matrix writes an invalid PNG | B channel, file I/O | 1 defect | S3 | [R] |
-| [B-059](#b-059) | `channel::add_paths` accepts inconsistent counts and leaves an invalid object; `qrt_file_read` accepts any `normalize_M` | B channel, file I/O | 1 defect | S3 | [R] |
-| [B-060](#b-060) | Channel and file-I/O header comments contradict the code (index bases, `calc_effective_path_gain` "average", `normalize_M` column power) | B channel, file I/O | 2 doc | S3 | [R, C] |
-| [B-061](#b-061) | `combine_irs_coord`: no shape check on `interact_coord_1/2`, heap over-read | C channel gen., tools | 1 defect | S3 | [R] |
-| [B-062](#b-062) | `baseband_freq_response`: `aligned_alloc` with sizes that are not a multiple of 32 (generic build) and unchecked NULL return | C channel gen., tools | 1 defect | S3 | [R] |
-| [B-063](#b-063) | Test defect: `test_qd_ieee_chan.cpp:318` reads past the delay cube (hidden in the full ASan suite run) | C channel gen., tools | 1 defect | S3 | [R] |
-| [B-064](#b-064) | IEEE indoor model: `XPR_NLOS_linear = 0` gives NaN coefficients | C channel gen., tools | 1 defect | S3 | [R] |
-| [B-065](#b-065) | Unchecked float-to-integer casts (UB) for non-finite `observation_time` and tiny `quantize` | C channel gen., tools | 1 defect | S3 | [R] |
-| [B-066](#b-066) | `calc_delay_spread` with `granularity`: memory n_cir × global delay span / granularity (800 MB for 100 paths) | C channel gen., tools | 4 performance | S3 | [M] |
-| [B-067](#b-067) | `acdf`: all-NaN data sets bias the averaged CDF; unsorted user bins are accepted | C channel gen., tools | 1 defect | S3 | [R] |
-| [B-068](#b-068) | Docs of `add_fake_los_path` do not match the code: always one extra path; a present LOS is moved to slot 0 and a zero path is left behind | C channel gen., tools | 2 doc | S3 | [R] |
-| [B-069](#b-069) | Naming of the cross-polarisation rows of `M` is inconsistent; `calc_cross_polarization_ratio` V/H columns are ambiguous (user decision) | C channel gen., tools | 2 doc | S3 | [R] |
-| [B-070](#b-070) | `calc_diffraction_gain` (C++) scalar mode expects an electromagnetic-equivalent frequency, the docs say the speed of sound is used | C channel gen., tools | 2 doc | S3 | [R] |
-| [B-071](#b-071) | `ray_triangle_intersect`: AVX2 and generic kernels swap `fbs_ind`/`sbs_ind` for hits at equal distance (shared edge or vertex) | D geometry, math | 1 defect | S3 | [R] |
-| [B-072](#b-072) | `ray_triangle_intersect`: the AABB slab test rejects rays with dz = 0 in the plane z = Zmin/Zmax (x and y are accepted) | D geometry, math | 1 defect | S3 | [R] |
-| [B-073](#b-073) | `ray_point_intersect` requires sub-clouds aligned to 8 only in AVX2 builds; the default `point_cloud_segmentation` output makes it throw | D geometry, math | 3 cross-API | S3 | [R] |
-| [B-074](#b-074) | Invalid `use_kernel` values are accepted silently; `use_kernel = 2` does not throw in builds without AVX2 (confirms item 1.7 of the Python fix plan) | D geometry, math | 2 doc | S3 | [R] |
-| [B-075](#b-075) | AVX2 `fast_atan2` / `fast_cart2geo`: NaN becomes π/4, (inf, inf) gives NaN, tiny or huge double vectors give elevation 0; two doc claims are wrong | D geometry, math | 1 defect | S3 | [R] |
-| [B-076](#b-076) | AVX2 `fast_slerp` fast path: error 3e-6 (about 50 ULP, documented ~5) and each lane's result depends on its neighbours | D geometry, math | 1 defect | S3 | [R] |
-| [B-077](#b-077) | `obj_overlap_test` crashes on an empty mesh | D geometry, math | 1 defect | S3 | [R] |
-| [B-078](#b-078) | `subdivide_triangles` (and `icosphere`, `cube`, `plane`): unchecked overflow of the face count leads to writes through a null pointer | D geometry, math | 1 defect | S3 | [R] |
-| [B-079](#b-079) | An output that aliases an input gives wrong results (`ray_triangle_intersect` with `fbs = &orig`, `subdivide_triangles` in place) | D geometry, math | 1 defect | S3 | [R] |
-| [B-080](#b-080) | `point_cloud_split` leaks its work buffer on every failed split | D geometry, math | 1 defect | S3 | [R] |
-| [B-081](#b-081) | `obj_overlap_test` docs call `obj_ind` 1-based and "the output of `obj_file_read`", which is 0-based; IDs are returned as given | D geometry, math | 2 doc | S3 | [R] |
-| [B-082](#b-082) | `icosphere(radius = 0)` returns NaN; `cube` / `plane` with a negative scale return inward / -z normals, contrary to the docs | D geometry, math | 1 defect | S3 | [R] |
-| [B-083](#b-083) | `interp` 1-D/2-D index search is O(n·m): 4 s for 160 000 samples | D geometry, math | 4 performance | S3 | [M] |
-| [B-084](#b-084) | `obj_overlap_test`: reason strings are non-deterministic (unseeded shuffle, thread count), and a flag array is read outside its critical section | D geometry, math | 1 defect | S3 | [R, C] |
-| [B-085](#b-085) | MEX `fast_sincos(x, [])` returns cos instead of sin; the single-precision output is undocumented | F MEX layer | 1 defect | S3 | [R] |
-| [B-086](#b-086) | MEX `arrayant_qdant_write` (separate inputs) writes `center_freq = NaN` for `[]` instead of the documented 299792458 | F MEX layer | 1 defect | S3 | [R] |
-| [B-087](#b-087) | `arrayant_generate('multibeam')` uses a 90° element beamwidth by default in MATLAB and Python; docs (and the C++ default) say 120° | F MEX layer | 3 cross-API | S3 | [R] |
-| [B-088](#b-088) | `calc_angular_spread` defaults differ: MATLAB and Python disable wrapping and the bank angle, C++ enables both | F MEX layer | 3 cross-API | S3 | [R] |
-| [B-089](#b-089) | `triangle_mesh_segmentation` pads `mtl_ind_out` with material 1 in MATLAB, with 0 ("no material") in C++ and Python | F MEX layer | 3 cross-API | S3 | [R] |
-| [B-090](#b-090) | MEX `baseband_freq_response` with `carrier_freq`: descending carriers are rejected, duplicate carriers give silent NaN (Python handles both) | F MEX layer | 3 cross-API | S3 | [R] |
-| [B-091](#b-091) | MEX `get_channels_irs` `i_irs` is 0-based, against the 1-based rule of the MATLAB spec; the doc does not say which | F MEX layer | 2 doc | S3 | [R] |
-| [B-092](#b-092) | `arrayant_qdant_read(fn)` returns every entry as a struct array in MATLAB, Python's default reads ID 1 | F MEX layer | 3 cross-API | S3 | [R] |
-| [B-093](#b-093) | MEX: arrays with more than 4 dimensions are silently truncated; a 4-D dataset written with `hdf5_write_dset` comes back 3-D | F MEX layer | 1 defect | S3 | [R] |
-| [B-094](#b-094) | MEX: index value 0 is not rejected in several wrappers (silent wrong result or a misleading error) | F MEX layer | 1 defect | S3 | [R] |
-| [B-095](#b-095) | Diffraction level of detail 7: accepted by C++, empty `coord` in MATLAB, internal error in Python, rejected by MATLAB `generate_diffraction_paths`, documented as 0-6 | F MEX layer | 3 cross-API | S3 | [R] |
-| [B-096](#b-096) | Python `qrt_file_read`: an exception in the main loop while the reader thread runs calls `std::terminate` | G Python layer | 1 defect | S3 | [R] |
-| [B-097](#b-097) | Python HDF5 writers reject numpy scalars, 0-d arrays and non-native dtypes that the docs list as supported | G Python layer | 3 cross-API | S3 | [R] |
-| [B-098](#b-098) | Python adapter `view = true` always copies (confirms item 1.1 of `md/python_fix_plan_v00.md`) | G Python layer | 2 doc | S3 | [R] |
-| [B-099](#b-099) | Python: documented kwargs `sub_cloud_index` and `map_to_itu_materials` raise `TypeError` | G Python layer | 2 doc | S3 | [R] |
-| [B-100](#b-100) | Python: invalid input accepted silently (2-D positions, short `interact_coord`, 4-D arrayant without `center_freq`) | G Python layer | 1 defect | S3 | [R] |
-| [B-101](#b-101) | `arrayant::copy_element` ignores `read_only`; an empty destination gives an Armadillo-internal error | A arrayant | 1 defect | S4 | [R] |
-| [B-102](#b-102) | Arrayant documentation typos and misleading statements; latent int32 offsets and a vertex sentinel (grouped) | A arrayant | 2 doc | S4 | [C] |
-| [B-103](#b-103) | `quantize_delays` docs: `fix_taps` 1 and 2 give `[1, 1, n_taps]` delays only for shared input | B channel, file I/O | 2 doc | S4 | [R] |
-| [B-104](#b-104) | Channel and file-I/O documentation and message nits (grouped) | B channel, file I/O | 2 doc | S4 | [R, C] |
-| [B-105](#b-105) | `memcpy` with a null pointer and size 0 (formal UB) in `get_channels_irs` and in the Python list adapter | C channel gen., tools | 1 defect | S4 | [R] |
-| [B-106](#b-106) | Docs and code of `path_to_tube`, `qd_path` and `calc_diffraction_gain` debug output disagree (grouped) | C channel gen., tools | 2 doc | S4 | [R, C] |
-| [B-107](#b-107) | `interp`: a NaN query returns the first data value; clamped extrapolation is undocumented | D geometry, math | 2 doc | S4 | [R] |
-| [B-108](#b-108) | Geometry documentation and validation nits (index-map directions, 9-column check, precision claim, header typos; dead code; CPU check) | D geometry, math | 2 doc | S4 | [R, C] |
-| [B-109](#b-109) | `sos_val` / `sos_remove_bias`: an output that partially overlaps an input is accepted and gives wrong values (docs promise an error) | E SOS | 2 doc | S4 | [R] |
-| [B-110](#b-110) | `sos_randn` / `sos_rand` / `sos_randi` report an unknown preset as "Input 'name' ...", an argument they do not have | E SOS | 2 doc | S4 | [R] |
-| [B-111](#b-111) | `md/SPEC_PYTHON_API.md` gives two contradicting rules for the headings of the `sos` entries | E SOS | 2 doc | S4 | [C] |
-| [B-112](#b-112) | MEX `qrt_file_read` returns `interact_type` as uint8; the doc says uint32 | F MEX layer | 2 doc | S4 | [R] |
-| [B-113](#b-113) | MEX `get_channels_*` with 0 paths and `add_fake_los_path` return a zero path with delay 0, where C++ throws | F MEX layer | 3 cross-API | S4 | [R] |
-| [B-114](#b-114) | MEX `arrayant_rotate_pattern`: struct arrays reject usage 3 and 4 (Python maps them); a call without output argument errors | F MEX layer | 3 cross-API | S4 | [R] |
-| [B-115](#b-115) | MEX documentation, error IDs and latent helper defects (grouped) | F MEX layer | 2 doc | S4 | [R, C] |
-| [B-116](#b-116) | Python `hdf5_create_file` returns uint32 although the wrapper builds int64 (confirms item 1.3 of the Python fix plan) | G Python layer | 2 doc | S4 | [R] |
-| [B-117](#b-117) | Python output dtypes and shapes differ from the docs (`qdant_read`, `point_inside_mesh`, `generate_speaker`, `get_ieee_indoor`) | G Python layer | 2 doc | S4 | [R] |
-| [B-118](#b-118) | Python single-frequency arrayant dict: a 1-element `center_freq` array gives a numpy DeprecationWarning, 2 elements an unclear error | G Python layer | 3 cross-API | S4 | [R] |
+| ID | Title | Area | Kind | Severity | Mark | Status |
+|---|---|---|---|---|---|---|
+| [B-001](#b-001) | `hdf5_write` silently drops the `par_*` data when the slot already holds a `Data` group | B channel, file I/O | 1 defect | S1 | [R] | open |
+| [B-002](#b-002) | `quantize_delays` segfaults on a negative delay, including the slightly negative relative delays that `get_channels_spherical` returns | B channel, file I/O | 1 defect | S1 | [R] | open |
+| [B-003](#b-003) | `get_channels_spherical`, `_multifreq` and `_irs` ignore `path_length` for NLOS paths: delays and phases too short | C channel gen., tools | 1 defect | S1 | [R] | open |
+| [B-004](#b-004) | Python `tools.geo2cart` / `tools.cart2geo` with separate inputs read freed memory: wrong values, segfault | G Python layer | 1 defect | S1 | [R] | open |
+| [B-005](#b-005) | Python HDF5 writers ignore numpy strides for 1-D and (n,1) arrays: wrong data written, heap over-read | G Python layer | 1 defect | S1 | [R] | open |
+| [B-006](#b-006) | AVX2 antenna interpolation reads up to 56 bytes past the angle matrices (per-element angles, n_out not a multiple of 8) | A arrayant | 1 defect | S2 | [R] | open |
+| [B-007](#b-007) | Generic antenna interpolation reads before the pattern buffer for NaN or infinite angles | A arrayant | 1 defect | S2 | [R] | open |
+| [B-008](#b-008) | `arrayant::append` builds a wrong coupling matrix, and segfaults when `coupling_im` is empty | A arrayant | 1 defect | S2 | [R] | open |
+| [B-009](#b-009) | `arrayant::rotate_pattern` loses coupling, centre frequency and name | A arrayant | 1 defect | S2 | [R] | open |
+| [B-010](#b-010) | `arrayant::calc_beamwidth_deg` is wrong when the main lobe wraps ±180° or points towards a pole | A arrayant | 1 defect | S2 | [R] | open |
+| [B-011](#b-011) | `generate_arrayant_multibeam` with a beam towards el = ±90° returns wrong ports (pol 1) or segfaults (pol 2, 3) | A arrayant | 1 defect | S2 | [R] | open |
+| [B-012](#b-012) | qdant writer drops every pattern sample below -100 dB absolute power; a whole low-level element reads back as zeros | A arrayant | 1 defect | S2 | [R] | open |
+| [B-013](#b-013) | `hdf5_read_channel`: a malformed HDF5 file overflows heap and stack buffers (sizes taken from attributes, not from the datasets) | B channel, file I/O | 1 defect | S2 | [R] | open |
+| [B-014](#b-014) | HDF5 storage layout: `nx*ny*nz*nw` wraps in 32 bits; `hdf5_write` then reads and writes past the index buffer | B channel, file I/O | 1 defect | S2 | [R] | open |
+| [B-015](#b-015) | `hdf5_write` copies 256 bytes from the channel name: heap memory ends up in the file; names of 256+ characters over-read on reading | B channel, file I/O | 1 defect | S2 | [R] | open |
+| [B-016](#b-016) | `qrt_file_read` (C++) fills `aod`, `eod`, `aoa`, `eoa` only when `path_gain` or `path_length` is also requested | B channel, file I/O | 1 defect | S2 | [R] | fixed (WP-01) |
+| [B-017](#b-017) | `qrt_file_append` corrupts the file when a CIR orientation is non-zero in double but rounds to 0 in float | B channel, file I/O | 1 defect | S2 | [R] | open |
+| [B-018](#b-018) | OBJ round trip loses "no material": faces with `mtl_ind = 0` inherit the previous material | B channel, file I/O | 1 defect | S2 | [R] | open |
+| [B-019](#b-019) | `baseband_freq_response_multi` gives wrong phases for `get_channels_*` output with the default relative delays | C channel gen., tools | 1 defect | S2 | [R] | open |
+| [B-020](#b-020) | `baseband_freq_response`: phase computed in single precision, error grows with delay × bandwidth (both builds) | C channel gen., tools | 1 defect | S2 | [R] | open |
+| [B-021](#b-021) | IEEE indoor model: `n_floors > 0` shifts all tap delays (3-D path length minus 2-D distance) | C channel gen., tools | 1 defect | S2 | [R] | open |
+| [B-022](#b-022) | IEEE indoor model prunes taps with an absolute power threshold after path loss (taps vanish with distance, floors, walls) | C channel gen., tools | 1 defect | S2 | [R] | open |
+| [B-023](#b-023) | IEEE indoor model uplink conjugates the channel (Doppler sign reversed), unlike the reciprocity of `get_channels_spherical` (user decision) | C channel gen., tools | 3 cross-API | S2 | [R] | open |
+| [B-024](#b-024) | `xpr_update`: data race when `ray_index` contains duplicates (wrong, non-deterministic result with threads) | C channel gen., tools | 1 defect | S2 | [R] | open |
+| [B-025](#b-025) | `path_to_tube`: NaN vertices when interior path points are collinear | C channel gen., tools | 1 defect | S2 | [R] | open |
+| [B-026](#b-026) | AVX2 sin/cos returns values far outside [-1, 1], ±inf or NaN for large arguments (fast_sincos, fast_geo2cart, baseband_freq_response) | D geometry, math | 1 defect | S2 | [R] | open |
+| [B-027](#b-027) | `point_inside_mesh` misclassifies points 5 cm from a face at UTM-like coordinates in AVX2 builds (float ray–triangle kernel) | D geometry, math | 1 defect | S2 | [R] | open |
+| [B-028](#b-028) | `obj_overlap_test` misses a clear overlap when vertices of the penetrating object lie on extensions of the other object's face planes | D geometry, math | 1 defect | S2 | [R] | open |
+| [B-029](#b-029) | MATLAB R2026a segfaults at exit after any HDF5 MEX call (the unloaded thread-safe libhdf5 leaves a dangling pthread-key destructor) | F MEX layer | 1 defect | S2 | [R] | fixed (WP-01) |
+| [B-030](#b-030) | MEX: sparse inputs are read as dense arrays (wrong values, heap over-read) in every wrapper | F MEX layer | 1 defect | S2 | [R] | open |
+| [B-031](#b-031) | MEX `qrt_file_read` (`i_cir`) and `hdf5_read_channel` (`snap`) modify the caller's uint64 variable in place | F MEX layer | 1 defect | S2 | [R] | fixed (WP-01) |
+| [B-032](#b-032) | MEX `channel_export_obj_file` segfaults when `no_interact` has fewer snapshots than the coefficients | F MEX layer | 1 defect | S2 | [R] | open |
+| [B-033](#b-033) | MEX `qd_mex_get_strings` dereferences empty cell elements: `cell(1,1)` as a name list crashes MATLAB R2026a | F MEX layer | 1 defect | S2 | [R] | open |
+| [B-034](#b-034) | MEX helpers convert NaN, negative, fractional and out-of-range numbers to integers without checks: crashes, bad_alloc, silent truncation, wrapped seeds | F MEX layer | 1 defect | S2 | [R] | open |
+| [B-035](#b-035) | Python `arrayant.interpolate(local_angles=True)` without `dist=True` returns uninitialised memory | G Python layer | 1 defect | S2 | [R] | open |
+| [B-036](#b-036) | Python `channel.baseband_freq_response`: an exception inside the OpenMP region aborts the interpreter | G Python layer | 1 defect | S2 | [R] | open |
+| [B-037](#b-037) | AVX2 antenna interpolation returns 0 where all four corner amplitudes are below 1.19e-7 (generic interpolates) | A arrayant | 1 defect | S3 | [R] | open |
+| [B-038](#b-038) | qdant writer stores element positions, coupling and pattern values with only 6 significant digits | A arrayant | 1 defect | S3 | [R] | open |
+| [B-039](#b-039) | `qdant_write_multi` deletes an existing file before it validates its input | A arrayant | 1 defect | S3 | [R] | fixed (WP-01) |
+| [B-040](#b-040) | `qdant_read(fn, 1)` returns another entry without error when the file has no ID 1 | A arrayant | 1 defect | S3 | [R] | open |
+| [B-041](#b-041) | `arrayant::qdant_write` without a layout replaces an existing custom layout in the file (user decision) | A arrayant | 2 doc | S3 | [R] | open |
+| [B-042](#b-042) | A 138-byte qdant file makes the reader allocate 4.7 GB and fail with `std::bad_alloc` | A arrayant | 1 defect | S3 | [R] | open |
+| [B-043](#b-043) | `arrayant` default constructor leaves `check_ptr` uninitialised; the quick `is_valid()` can pass an invalid object | A arrayant | 1 defect | S3 | [R] | fixed (WP-01) |
+| [B-044](#b-044) | ULA and 3GPP generators keep the custom pattern's element positions and coupling, contrary to the docs | A arrayant | 2 doc | S3 | [R] | open |
+| [B-045](#b-045) | `combine_pattern` and `arrayant_combine_pattern_multi` hard-code the speed of light (acoustic arrays combined without position phase) | A arrayant | 1 defect | S3 | [R] | open |
+| [B-046](#b-046) | `remove_zeros` and `calc_directivity_dBi` use absolute power thresholds (low-level patterns lose data or report 0 dBi) | A arrayant | 1 defect | S3 | [R] | open |
+| [B-047](#b-047) | `generate_arrayant_multibeam` defaults M = N = 2 in the header, 1 in the docs and both wrappers | A arrayant | 3 cross-API | S3 | [C] | open |
+| [B-048](#b-048) | QRT readers trust header and path counts: a 136-byte file returns 20 million zero paths or allocates GBs | B channel, file I/O | 1 defect | S3 | [R, M] | open |
+| [B-049](#b-049) | `qrt_file_read` truncates `i_cir` / `i_orig` to 32 bits before the range check | B channel, file I/O | 1 defect | S3 | [R] | open |
+| [B-050](#b-050) | HDF5 write/read round trip changes data (empty snapshots, missing frequency, 1-element vectors, empty strings, long names) | B channel, file I/O | 1 defect | S3 | [R] | open |
+| [B-051](#b-051) | HDF5 functions call `H5close()`, switch off error printing process-wide, and leak handles and memory on error paths | B channel, file I/O | 1 defect | S3 | [R] | open |
+| [B-052](#b-052) | `hdf5_write` "overwrites" a slot by adding a new group; the file grows with every rewrite | B channel, file I/O | 2 doc | S3 | [R] | open |
+| [B-053](#b-053) | `hdf5_read_dset` returns a variable-length string as 8 bytes of a heap pointer, and leaks it | B channel, file I/O | 1 defect | S3 | [R] | open |
+| [B-054](#b-054) | `quantize_delays` builds dense vectors over the absolute delay range: a 20 ms offset makes it 4000 times slower | B channel, file I/O | 4 performance | S3 | [M] | open |
+| [B-055](#b-055) | `quantize_delays` gives wrong results when the outputs alias the inputs (undocumented) | B channel, file I/O | 1 defect | S3 | [R] | open |
+| [B-056](#b-056) | `mitsuba_xml_file_write` is quadratic in the number of vertices per object | B channel, file I/O | 4 performance | S3 | [M] | open |
+| [B-057](#b-057) | OBJ reader: CRLF `.mtl` files lose their materials; face indices unchecked when only `face_ind` is requested; no-output call skips validation | B channel, file I/O | 1 defect | S3 | [R] | open |
+| [B-058](#b-058) | `write_png`: constant, NaN or inverted-range data trigger a NaN-to-integer cast and all pixels get the last colour; an empty matrix writes an invalid PNG | B channel, file I/O | 1 defect | S3 | [R] | open |
+| [B-059](#b-059) | `channel::add_paths` accepts inconsistent counts and leaves an invalid object; `qrt_file_read` accepts any `normalize_M` | B channel, file I/O | 1 defect | S3 | [R] | open |
+| [B-060](#b-060) | Channel and file-I/O header comments contradict the code (index bases, `calc_effective_path_gain` "average", `normalize_M` column power) | B channel, file I/O | 2 doc | S3 | [R, C] | open |
+| [B-061](#b-061) | `combine_irs_coord`: no shape check on `interact_coord_1/2`, heap over-read | C channel gen., tools | 1 defect | S3 | [R] | open |
+| [B-062](#b-062) | `baseband_freq_response`: `aligned_alloc` with sizes that are not a multiple of 32 (generic build) and unchecked NULL return | C channel gen., tools | 1 defect | S3 | [R] | open |
+| [B-063](#b-063) | Test defect: `test_qd_ieee_chan.cpp:318` reads past the delay cube (hidden in the full ASan suite run) | C channel gen., tools | 1 defect | S3 | [R] | fixed (WP-01) |
+| [B-064](#b-064) | IEEE indoor model: `XPR_NLOS_linear = 0` gives NaN coefficients | C channel gen., tools | 1 defect | S3 | [R] | open |
+| [B-065](#b-065) | Unchecked float-to-integer casts (UB) for non-finite `observation_time` and tiny `quantize` | C channel gen., tools | 1 defect | S3 | [R] | open |
+| [B-066](#b-066) | `calc_delay_spread` with `granularity`: memory n_cir × global delay span / granularity (800 MB for 100 paths) | C channel gen., tools | 4 performance | S3 | [M] | open |
+| [B-067](#b-067) | `acdf`: all-NaN data sets bias the averaged CDF; unsorted user bins are accepted | C channel gen., tools | 1 defect | S3 | [R] | open |
+| [B-068](#b-068) | Docs of `add_fake_los_path` do not match the code: always one extra path; a present LOS is moved to slot 0 and a zero path is left behind | C channel gen., tools | 2 doc | S3 | [R] | open |
+| [B-069](#b-069) | Naming of the cross-polarisation rows of `M` is inconsistent; `calc_cross_polarization_ratio` V/H columns are ambiguous (user decision) | C channel gen., tools | 2 doc | S3 | [R] | open |
+| [B-070](#b-070) | `calc_diffraction_gain` (C++) scalar mode expects an electromagnetic-equivalent frequency, the docs say the speed of sound is used | C channel gen., tools | 2 doc | S3 | [R] | open |
+| [B-071](#b-071) | `ray_triangle_intersect`: AVX2 and generic kernels swap `fbs_ind`/`sbs_ind` for hits at equal distance (shared edge or vertex) | D geometry, math | 1 defect | S3 | [R] | open |
+| [B-072](#b-072) | `ray_triangle_intersect`: the AABB slab test rejects rays with dz = 0 in the plane z = Zmin/Zmax (x and y are accepted) | D geometry, math | 1 defect | S3 | [R] | open |
+| [B-073](#b-073) | `ray_point_intersect` requires sub-clouds aligned to 8 only in AVX2 builds; the default `point_cloud_segmentation` output makes it throw | D geometry, math | 3 cross-API | S3 | [R] | open |
+| [B-074](#b-074) | Invalid `use_kernel` values are accepted silently; `use_kernel = 2` does not throw in builds without AVX2 (confirms item 1.7 of the Python fix plan) | D geometry, math | 2 doc | S3 | [R] | open |
+| [B-075](#b-075) | AVX2 `fast_atan2` / `fast_cart2geo`: NaN becomes π/4, (inf, inf) gives NaN, tiny or huge double vectors give elevation 0; two doc claims are wrong | D geometry, math | 1 defect | S3 | [R] | open |
+| [B-076](#b-076) | AVX2 `fast_slerp` fast path: error 3e-6 (about 50 ULP, documented ~5) and each lane's result depends on its neighbours | D geometry, math | 1 defect | S3 | [R] | open |
+| [B-077](#b-077) | `obj_overlap_test` crashes on an empty mesh | D geometry, math | 1 defect | S3 | [R] | open |
+| [B-078](#b-078) | `subdivide_triangles` (and `icosphere`, `cube`, `plane`): unchecked overflow of the face count leads to writes through a null pointer | D geometry, math | 1 defect | S3 | [R] | open |
+| [B-079](#b-079) | An output that aliases an input gives wrong results (`ray_triangle_intersect` with `fbs = &orig`, `subdivide_triangles` in place) | D geometry, math | 1 defect | S3 | [R] | open |
+| [B-080](#b-080) | `point_cloud_split` leaks its work buffer on every failed split | D geometry, math | 1 defect | S3 | [R] | fixed (WP-01) |
+| [B-081](#b-081) | `obj_overlap_test` docs call `obj_ind` 1-based and "the output of `obj_file_read`", which is 0-based; IDs are returned as given | D geometry, math | 2 doc | S3 | [R] | open |
+| [B-082](#b-082) | `icosphere(radius = 0)` returns NaN; `cube` / `plane` with a negative scale return inward / -z normals, contrary to the docs | D geometry, math | 1 defect | S3 | [R] | open |
+| [B-083](#b-083) | `interp` 1-D/2-D index search is O(n·m): 4 s for 160 000 samples | D geometry, math | 4 performance | S3 | [M] | open |
+| [B-084](#b-084) | `obj_overlap_test`: reason strings are non-deterministic (unseeded shuffle, thread count), and a flag array is read outside its critical section | D geometry, math | 1 defect | S3 | [R, C] | open |
+| [B-085](#b-085) | MEX `fast_sincos(x, [])` returns cos instead of sin; the single-precision output is undocumented | F MEX layer | 1 defect | S3 | [R] | fixed (WP-01) |
+| [B-086](#b-086) | MEX `arrayant_qdant_write` (separate inputs) writes `center_freq = NaN` for `[]` instead of the documented 299792458 | F MEX layer | 1 defect | S3 | [R] | fixed (WP-01) |
+| [B-087](#b-087) | `arrayant_generate('multibeam')` uses a 90° element beamwidth by default in MATLAB and Python; docs (and the C++ default) say 120° | F MEX layer | 3 cross-API | S3 | [R] | open |
+| [B-088](#b-088) | `calc_angular_spread` defaults differ: MATLAB and Python disable wrapping and the bank angle, C++ enables both | F MEX layer | 3 cross-API | S3 | [R] | open |
+| [B-089](#b-089) | `triangle_mesh_segmentation` pads `mtl_ind_out` with material 1 in MATLAB, with 0 ("no material") in C++ and Python | F MEX layer | 3 cross-API | S3 | [R] | open |
+| [B-090](#b-090) | MEX `baseband_freq_response` with `carrier_freq`: descending carriers are rejected, duplicate carriers give silent NaN (Python handles both) | F MEX layer | 3 cross-API | S3 | [R] | open |
+| [B-091](#b-091) | MEX `get_channels_irs` `i_irs` is 0-based, against the 1-based rule of the MATLAB spec; the doc does not say which | F MEX layer | 2 doc | S3 | [R] | open |
+| [B-092](#b-092) | `arrayant_qdant_read(fn)` returns every entry as a struct array in MATLAB, Python's default reads ID 1 | F MEX layer | 3 cross-API | S3 | [R] | open |
+| [B-093](#b-093) | MEX: arrays with more than 4 dimensions are silently truncated; a 4-D dataset written with `hdf5_write_dset` comes back 3-D | F MEX layer | 1 defect | S3 | [R] | open |
+| [B-094](#b-094) | MEX: index value 0 is not rejected in several wrappers (silent wrong result or a misleading error) | F MEX layer | 1 defect | S3 | [R] | open |
+| [B-095](#b-095) | Diffraction level of detail 7: accepted by C++, empty `coord` in MATLAB, internal error in Python, rejected by MATLAB `generate_diffraction_paths`, documented as 0-6 | F MEX layer | 3 cross-API | S3 | [R] | open |
+| [B-096](#b-096) | Python `qrt_file_read`: an exception in the main loop while the reader thread runs calls `std::terminate` | G Python layer | 1 defect | S3 | [R] | open |
+| [B-097](#b-097) | Python HDF5 writers reject numpy scalars, 0-d arrays and non-native dtypes that the docs list as supported | G Python layer | 3 cross-API | S3 | [R] | open |
+| [B-098](#b-098) | Python adapter `view = true` always copies (confirms item 1.1 of `md/python_fix_plan_v00.md`) | G Python layer | 2 doc | S3 | [R] | open |
+| [B-099](#b-099) | Python: documented kwargs `sub_cloud_index` and `map_to_itu_materials` raise `TypeError` | G Python layer | 2 doc | S3 | [R] | open |
+| [B-100](#b-100) | Python: invalid input accepted silently (2-D positions, short `interact_coord`, 4-D arrayant without `center_freq`) | G Python layer | 1 defect | S3 | [R] | open |
+| [B-101](#b-101) | `arrayant::copy_element` ignores `read_only`; an empty destination gives an Armadillo-internal error | A arrayant | 1 defect | S4 | [R] | open |
+| [B-102](#b-102) | Arrayant documentation typos and misleading statements; latent int32 offsets and a vertex sentinel (grouped) | A arrayant | 2 doc | S4 | [C] | open |
+| [B-103](#b-103) | `quantize_delays` docs: `fix_taps` 1 and 2 give `[1, 1, n_taps]` delays only for shared input | B channel, file I/O | 2 doc | S4 | [R] | open |
+| [B-104](#b-104) | Channel and file-I/O documentation and message nits (grouped) | B channel, file I/O | 2 doc | S4 | [R, C] | open |
+| [B-105](#b-105) | `memcpy` with a null pointer and size 0 (formal UB) in `get_channels_irs` and in the Python list adapter | C channel gen., tools | 1 defect | S4 | [R] | fixed (WP-01) |
+| [B-106](#b-106) | Docs and code of `path_to_tube`, `qd_path` and `calc_diffraction_gain` debug output disagree (grouped) | C channel gen., tools | 2 doc | S4 | [R, C] | open |
+| [B-107](#b-107) | `interp`: a NaN query returns the first data value; clamped extrapolation is undocumented | D geometry, math | 2 doc | S4 | [R] | open |
+| [B-108](#b-108) | Geometry documentation and validation nits (index-map directions, 9-column check, precision claim, header typos; dead code; CPU check) | D geometry, math | 2 doc | S4 | [R, C] | open |
+| [B-109](#b-109) | `sos_val` / `sos_remove_bias`: an output that partially overlaps an input is accepted and gives wrong values (docs promise an error) | E SOS | 2 doc | S4 | [R] | open |
+| [B-110](#b-110) | `sos_randn` / `sos_rand` / `sos_randi` report an unknown preset as "Input 'name' ...", an argument they do not have | E SOS | 2 doc | S4 | [R] | open |
+| [B-111](#b-111) | `md/SPEC_PYTHON_API.md` gives two contradicting rules for the headings of the `sos` entries | E SOS | 2 doc | S4 | [C] | open |
+| [B-112](#b-112) | MEX `qrt_file_read` returns `interact_type` as uint8; the doc says uint32 | F MEX layer | 2 doc | S4 | [R] | fixed (WP-01) |
+| [B-113](#b-113) | MEX `get_channels_*` with 0 paths and `add_fake_los_path` return a zero path with delay 0, where C++ throws | F MEX layer | 3 cross-API | S4 | [R] | open |
+| [B-114](#b-114) | MEX `arrayant_rotate_pattern`: struct arrays reject usage 3 and 4 (Python maps them); a call without output argument errors | F MEX layer | 3 cross-API | S4 | [R] | open |
+| [B-115](#b-115) | MEX documentation, error IDs and latent helper defects (grouped) | F MEX layer | 2 doc | S4 | [R, C] | open |
+| [B-116](#b-116) | Python `hdf5_create_file` returns uint32 although the wrapper builds int64 (confirms item 1.3 of the Python fix plan) | G Python layer | 2 doc | S4 | [R] | open |
+| [B-117](#b-117) | Python output dtypes and shapes differ from the docs (`qdant_read`, `point_inside_mesh`, `generate_speaker`, `get_ieee_indoor`) | G Python layer | 2 doc | S4 | [R] | open |
+| [B-118](#b-118) | Python single-frequency arrayant dict: a 1-element `center_freq` array gives a numpy DeprecationWarning, 2 elements an unclear error | G Python layer | 3 cross-API | S4 | [R] | open |
 
 ## Baseline
 
@@ -192,6 +193,9 @@ miscompilation by the LAF split-compare passes, not a library defect. The campai
 | generic (`build_generic/test_bin`) | `All tests passed (1307356 assertions in 1132 test cases)` | 245 s | 3.2 / 31.7 (the AFL build ran at the same time) |
 | ASan + UBSan gcc-12 | `All tests passed (1307605 assertions in 1132 test cases)`, sanitizer reports below | 346 s | 24.8 / 2.3 |
 | ASan + UBSan gcc-15 | `All tests passed (1307605 assertions in 1132 test cases)`, same reports | 203 s | 5.3 / 6.8 |
+| after WP-01: base | `All tests passed (1307644 assertions in 1137 test cases)` | 49 s | 1.6 / 6.5 |
+| after WP-01: generic | `All tests passed (1307395 assertions in 1137 test cases)` | 39 s | 6.5 / 8.3 |
+| after WP-01: ASan + UBSan gcc-12, `suppress_equal_pcs=0` | `All tests passed (1307644 assertions in 1137 test cases)`; reports: B-015 (`test_hdf_functions.cpp:114`, `:350`) and the excluded `ray_progress` UBSan reports (`test_wave_progress.cpp:301`), nothing else, no leak | 323 s | 7.1 / 5.8 |
 
 Run commands: `flock /tmp/quadriga-fixes-suite.lock build_linux/test_bin` (output
 `build_linux/scratch/hunt/base_test.txt`); the sanitizer runs with
@@ -232,6 +236,7 @@ GNUmakefile default is `avx2 = OFF`, so a default `make` gives MEX files without
 | Octave 11.1.0 | `FAILED (passed=65, failure=1)`: `test_ray_mesh_interact:113`, 0.98485 vs 0.69639 (excluded code) | 1.6 s | 21.5 |
 | MATLAB R2024a | same, 65 of 66, same failure | 6.4 s | 17.6 |
 | MATLAB R2026a | same, 65 of 66, then **MATLAB crashes with a segmentation violation at exit**, exit code 137, crash dump `~/matlab_crash_dump.878185-1` | 10.9 s | 21.5 |
+| after WP-01: Octave 11.1, R2024a, R2026a | 65 of 66 in each, same excluded failure; R2026a exits with 0, no crash dump (B-029 fixed) | - | 2 |
 
 The R2026a crash is B-029. A single `quadriga_lib.version` call does not crash R2026a at
 exit (2 of 2 runs).
@@ -241,6 +246,8 @@ exit (2 of 2 runs).
 `PYTHONPATH=/sjc/quadriga-lib-fixes/lib OMP_NUM_THREADS=8 python3 -m pytest tests/python_tests -q -p no:cacheprovider`:
 `762 passed, 1 skipped, 37 subtests passed in 2.55s` (load 9.5 before, 11.7 after). The skip is
 `test_ray_point_intersect.py:403` (CUDA kernel not available). Module version string `0.12.2_AVX2`.
+
+After WP-01: `762 passed, 1 skipped, 37 subtests passed in 1.85s`.
 
 ### Fuzzing (AFL++ 4.33c)
 
@@ -561,6 +568,7 @@ What was not covered, or only partly:
 
 ## B-001: `hdf5_write` silently drops the `par_*` data when the slot already holds a `Data` group
 
+- Status: open
 - Severity: S1, because it is data loss in a writer in normal use: unstructured parameters written with `hdf5_write` are lost (or old values survive) without an error.
 - Kind: wrong result (writer data loss)
 - Mark: [R]
@@ -645,6 +653,7 @@ case 2 (expected x=99): par fields read back: x=1
 
 ## B-002: `quantize_delays` segfaults on a negative delay, including the slightly negative relative delays that `get_channels_spherical` returns
 
+- Status: open
 - Severity: S1, because it crashes on valid input in normal use: `get_channels_spherical` with its default relative delays returns negative delays for some element pairs of a rotated array (here 16 of 64, down to -6.3e-11 s), and passing that output to `quantize_delays` segfaults, also from Python.
 - Kind: crash (memory, UB)
 - Mark: [R]
@@ -817,6 +826,7 @@ exit code 139
 
 ## B-003: `get_channels_spherical`, `_multifreq` and `_irs` ignore `path_length` for NLOS paths: delays and phases too short
 
+- Status: open
 - Severity: S1, because paths with more than two interactions (the normal output of `qrt_file_read` / `coord2path`: FBS = first, LBS = last interaction, `path_length` = full length) silently get the delay and phase of the shortest TX-FBS-LBS-RX polyline, which is wrong on valid input in normal use.
 - Kind: wrong result
 - Mark: [R]
@@ -887,6 +897,7 @@ get_channels_multifreq: delay*c = 140.000000 m (expected 156.568542)
 
 ## B-004: Python `tools.geo2cart` / `tools.cart2geo` with separate inputs read freed memory: wrong values, segfault
 
+- Status: open
 - Severity: S1, because an ordinary call with separate coordinate arrays of 17 or more elements silently returns wrong values, and large inputs crash the interpreter.
 - Kind: memory (use after free) / wrong result
 - Mark: [R]
@@ -959,6 +970,7 @@ n=100000 in a subprocess: return code -11 (-11 = SIGSEGV)
 
 ## B-005: Python HDF5 writers ignore numpy strides for 1-D and (n,1) arrays: wrong data written, heap over-read
 
+- Status: open
 - Severity: S1, because ordinary numpy slices (`x[::2]`, `y[:, 1:2]`, `x[::-1]`) are written to the file as the wrong values without any error, which is data loss in a writer; the reversed case also reads past the heap buffer.
 - Kind: wrong result (writer data loss) / memory
 - Mark: [R]
@@ -1035,6 +1047,7 @@ SUMMARY: AddressSanitizer: heap-buffer-overflow (/usr/lib/x86_64-linux-gnu/libhd
 
 ## B-006: AVX2 antenna interpolation reads up to 56 bytes past the angle matrices (per-element angles, n_out not a multiple of 8)
 
+- Status: open
 - Severity: S2, because every `get_channels_spherical(..., use_avx2 = true)` call (and the MEX `use_avx2` flag) with a number of element pairs that is not a multiple of 8 reads past a heap buffer; the values are discarded, so results are right, but the read can fault at a page boundary. `use_avx2` is off by default.
 - Kind: memory (heap over-read)
 - Mark: [R]
@@ -1113,6 +1126,7 @@ exit code 1
 
 ## B-007: Generic antenna interpolation reads before the pattern buffer for NaN or infinite angles
 
+- Status: open
 - Severity: S2, because a NaN or infinite angle (unchecked input) makes the public `arrayant::interpolate` and everything built on it read out of bounds; the output is NaN, so no wrong value is visible, but it is undefined behaviour.
 - Kind: UB / memory (heap under-read)
 - Mark: [R]
@@ -1179,6 +1193,7 @@ exit code 1
 
 ## B-008: `arrayant::append` builds a wrong coupling matrix, and segfaults when `coupling_im` is empty
 
+- Status: open
 - Severity: S2, because appending any array whose number of ports differs from its number of elements (multibeam without weights applied, a 2-element/1-port array) silently produces a wrong coupling matrix and so wrong channels; a state that `is_valid` accepts (empty `coupling_im`) crashes.
 - Kind: wrong result / crash
 - Mark: [R]
@@ -1260,6 +1275,7 @@ exit code 1
 
 ## B-009: `arrayant::rotate_pattern` loses coupling, centre frequency and name
 
+- Status: open
 - Severity: S2, because a rotated copy of an array with port coupling or a non-default frequency is silently wrong (ports become elements, frequency resets to the default).
 - Kind: wrong result
 - Mark: [R]
@@ -1322,6 +1338,7 @@ in place + grid update: n_ports=2
 
 ## B-010: `arrayant::calc_beamwidth_deg` is wrong when the main lobe wraps ±180° or points towards a pole
 
+- Status: open
 - Severity: S2, because any element pointing backwards or towards the zenith gets a meaningless beamwidth on valid input.
 - Kind: wrong result
 - Mark: [R]
@@ -1382,6 +1399,7 @@ pointing to zenith: bw_az=360.00 bw_el=44.62 point=(-108.0, 90.0)
 
 ## B-011: `generate_arrayant_multibeam` with a beam towards el = ±90° returns wrong ports (pol 1) or segfaults (pol 2, 3)
 
+- Status: open
 - Severity: S2, because a valid beam direction gives a silently wrong array for pol = 1 and a crash for pol = 2 and 3.
 - Kind: crash / wrong result
 - Mark: [R]
@@ -1449,6 +1467,7 @@ exit code 1
 
 ## B-012: qdant writer drops every pattern sample below -100 dB absolute power; a whole low-level element reads back as zeros
 
+- Status: open
 - Severity: S2: data loss in a writer (S1 by the letter of the scale), but only for samples below an absolute field amplitude of 1e-5, so whole elements are lost only when a pattern is scaled to a very low absolute level; the floor is undocumented.
 - Kind: wrong result (writer data loss)
 - Mark: [R]
@@ -1510,6 +1529,7 @@ sample 3e-6 read back as 0
 
 ## B-013: `hdf5_read_channel`: a malformed HDF5 file overflows heap and stack buffers (sizes taken from attributes, not from the datasets)
 
+- Status: open
 - Severity: S2, because reading a malformed or foreign HDF5 file corrupts memory (heap and stack buffer overflows, segfault in the release build); valid files written by the library are not affected.
 - Kind: memory (heap and stack buffer overflow, uninitialised data)
 - Mark: [R] (crafted files; also found by the phase-0 AFL campaign: 11 crash inputs, all at lines 1838/1839 and 1880/1881)
@@ -1625,6 +1645,7 @@ exit code 139
 
 ## B-014: HDF5 storage layout: `nx*ny*nz*nw` wraps in 32 bits; `hdf5_write` then reads and writes past the index buffer
 
+- Status: open
 - Severity: S2, because a layout with more than 2^32 slots is accepted and a later write corrupts memory (segfault in the release build); such layouts are unusual but nothing rejects them.
 - Kind: memory (integer overflow)
 - Mark: [R]
@@ -1706,6 +1727,7 @@ hdf5_write(ix=0, iy=2) returned 0
 
 ## B-015: `hdf5_write` copies 256 bytes from the channel name: heap memory ends up in the file; names of 256+ characters over-read on reading
 
+- Status: open
 - Severity: S2, because every HDF5 write reads past the end of the name string (undefined behaviour) and stores up to 255 bytes of unrelated process memory (heap pointers, other data) in the file.
 - Kind: memory (heap over-read, information leak into the file)
 - Mark: [R] (also in the phase-0 sanitizer suite: `H5Awrite` READ of size 256, "HDF - Minimal Test", `tests/catch2_tests/test_hdf_functions.cpp:114`)
@@ -1803,6 +1825,7 @@ READ of size 257 at 0x73b150bfc2c0 thread T0
 
 ## B-016: `qrt_file_read` (C++) fills `aod`, `eod`, `aoa`, `eoa` only when `path_gain` or `path_length` is also requested
 
+- Status: fixed (WP-01)
 - Severity: S2, because a C++ caller who requests only the angles silently keeps the previous contents of the output vectors; the MEX and Python wrappers always request `path_length` and are not affected.
 - Kind: wrong result (stale output), UB for 0 paths
 - Mark: [R]
@@ -1865,6 +1888,7 @@ aod with path_length: 2 element(s)
 
 ## B-017: `qrt_file_append` corrupts the file when a CIR orientation is non-zero in double but rounds to 0 in float
 
+- Status: open
 - Severity: S2, because a valid input (an orientation column of tiny values such as 1e-50 rad) leads to a corrupted QRT file: shifted TX positions, lost paths, zero CIR positions, without an error.
 - Kind: wrong result (writer data corruption)
 - Mark: [R]
@@ -1998,6 +2022,7 @@ build_linux/scratch/hunt/final/B-007/p11_v6.qrt: version 6, no_orig 3, no_cir 3,
 
 ## B-018: OBJ round trip loses "no material": faces with `mtl_ind = 0` inherit the previous material
 
+- Status: open
 - Severity: S2, because writing and reading a mesh changes its materials without an error whenever a face without material follows one with material.
 - Kind: wrong result (writer data loss)
 - Mark: [R]
@@ -2114,6 +2139,7 @@ Output of the phase-2 re-run (`bash run.sh`):
 
 ## B-019: `baseband_freq_response_multi` gives wrong phases for `get_channels_*` output with the default relative delays
 
+- Status: open
 - Severity: S2, because the documented combination ("`remove_delay_phase` must be true for output from `get_channels_multifreq`") returns phases off by up to π when the channels were generated with the default `use_absolute_delays = false`; magnitudes are right.
 - Kind: wrong result
 - Mark: [R]
@@ -2188,6 +2214,7 @@ use_absolute_delays = 0: max |H_multi - H_true| = 2.000e+00, max ||H_multi| - |H
 
 ## B-020: `baseband_freq_response`: phase computed in single precision, error grows with delay × bandwidth (both builds)
 
+- Status: open
 - Severity: S2, because valid long delays (absolute delays, km links, satellites) give visibly wrong frequency responses: 0.064 at 2 ms, 0.31 at 120 ms for 100 MHz bandwidth; the documentation mentions single precision but not this.
 - Kind: wrong result
 - Mark: [R]
@@ -2256,6 +2283,7 @@ tau = 0.12   s: |H| = 1            |H - H_exact| = 0.313
 
 ## B-021: IEEE indoor model: `n_floors > 0` shifts all tap delays (3-D path length minus 2-D distance)
 
+- Status: open
 - Severity: S2, because any multi-floor scenario gets all taps delayed by a few to tens of ns, so the first tap is not at 0.
 - Kind: wrong result
 - Mark: [R]
@@ -2310,6 +2338,7 @@ model B, 5 m, n_floors = 4: delay of tap 0 = 26.685 ns, tap 1 = 36.685 ns (expec
 
 ## B-022: IEEE indoor model prunes taps with an absolute power threshold after path loss (taps vanish with distance, floors, walls)
 
+- Status: open
 - Severity: S2, because the number of taps (and so the delay spread) shrinks with distance and wall/floor loss, and in strong-loss cases all taps vanish and the call fails with a misleading error.
 - Kind: wrong result
 - Mark: [R]
@@ -2382,6 +2411,7 @@ model F, SF = 0, d =   100 m, 4 floors: exception: Inputs 'aod', 'eod', 'aoa', '
 
 ## B-023: IEEE indoor model uplink conjugates the channel (Doppler sign reversed), unlike the reciprocity of `get_channels_spherical` (user decision)
 
+- Status: open
 - Severity: S2, because with a moving station the uplink channel has the opposite Doppler sign of a reciprocal channel; it is consistent with its own test, so the user must decide which convention is intended.
 - Kind: wrong result / cross-function inconsistency
 - Mark: [R]
@@ -2446,6 +2476,7 @@ phase step per snapshot of path 1: downlink -0.1480 rad, uplink +0.1480 rad
 
 ## B-024: `xpr_update`: data race when `ray_index` contains duplicates (wrong, non-deterministic result with threads)
 
+- Status: open
 - Severity: S2, because duplicate indices are allowed by the documentation (only `ray_index < n_ray` is required) and give a wrong, run-to-run different result as soon as the update count reaches the OpenMP threshold.
 - Kind: race
 - Mark: [R]
@@ -2505,6 +2536,7 @@ Output of the phase-2 re-run (`bash run.sh`):
 
 ## B-025: `path_to_tube`: NaN vertices when interior path points are collinear
 
+- Status: open
 - Severity: S2, because straight multi-point paths (e.g. transmission through a wall) are common, and the NaN mesh breaks the OBJ export of channels.
 - Kind: wrong result
 - Mark: [R]
@@ -2558,6 +2590,7 @@ Output of the phase-2 re-run (`bash run.sh`):
 
 ## B-026: AVX2 sin/cos returns values far outside [-1, 1], ±inf or NaN for large arguments (fast_sincos, fast_geo2cart, baseband_freq_response)
 
+- Status: open
 - Severity: S2, because the AVX2 kernel differs from the generic one far beyond rounding on valid finite input; `baseband_freq_response` reaches it with long delays (e.g. 2 s gives |H| = 1.6e11 instead of 1, 5 s gives NaN).
 - Kind: wrong result (AVX2 differs from generic)
 - Mark: [R]
@@ -2699,6 +2732,7 @@ tau = 5      s: |H| = 1            |H - H_exact| = 1.78
 
 ## B-027: `point_inside_mesh` misclassifies points 5 cm from a face at UTM-like coordinates in AVX2 builds (float ray–triangle kernel)
 
+- Status: open
 - Severity: S2, because the result is wrong for valid double input in a common setting (scenes in UTM coordinates) and depends on the build; the documentation says nothing about single precision.
 - Kind: wrong result (AVX2 differs from generic)
 - Mark: [R]
@@ -2776,6 +2810,7 @@ offset (5e+06, 5e+06): 0 of 12 points misclassified
 
 ## B-028: `obj_overlap_test` misses a clear overlap when vertices of the penetrating object lie on extensions of the other object's face planes
 
+- Status: open
 - Severity: S2, because the overlap checker silently reports "no overlap" for a clear volumetric overlap on valid input; vertices on face-plane extensions are common in axis-aligned building scenes.
 - Kind: wrong result
 - Mark: [R]
@@ -2863,6 +2898,7 @@ control: base vertices off the planes (0.05)  -> 2 overlapping objects [3D Inter
 
 ## B-029: MATLAB R2026a segfaults at exit after any HDF5 MEX call (the unloaded thread-safe libhdf5 leaves a dangling pthread-key destructor)
 
+- Status: fixed (WP-01)
 - Severity: S2, because every R2026a session that read or wrote an HDF5 file through quadriga-lib ends with a segmentation violation, a crash dump and exit code 137 (results already computed are fine, but `-batch` jobs report failure); R2024a and Octave are not affected.
 - Kind: crash
 - Mark: [R] (found in phase 0: the MEX suite in R2026a ended with a segfault after all tests had finished)
@@ -2963,6 +2999,7 @@ __clone3 + 44 in section .text of /usr/lib/x86_64-linux-gnu/libc.so.6
 
 ## B-030: MEX: sparse inputs are read as dense arrays (wrong values, heap over-read) in every wrapper
 
+- Status: open
 - Severity: S2, because a sparse argument (common in MATLAB code) silently gives wrong numbers and reads past the heap buffer in every wrapper.
 - Kind: memory / wrong result
 - Mark: [R] (heap over-read shown with an ASan what-if build of one MEX file for Octave)
@@ -3044,10 +3081,11 @@ READ of size 8 at 0x796954f2a0b8 thread T10 (QThread)
 
 ## B-031: MEX `qrt_file_read` (`i_cir`) and `hdf5_read_channel` (`snap`) modify the caller's uint64 variable in place
 
+- Status: fixed (WP-01)
 - Severity: S2, because the wrapper silently changes a user variable (and every MATLAB copy sharing its data), so the next call with the same variable reads wrong data.
 - Kind: wrong result / UB (write into an input)
 - Mark: [R]
-- Where: `api_mex/qrt_file_read.cpp:83` (`qd_mex_get_Col<arma::uword>(prhs[1])` without copy), then `:104` `i_cir -= 1`; `api_mex/hdf5_read_channel.cpp:149` (`snap`, no copy), then `:166-170` `--s`. Both break the rule of `md/SPEC_MATLAB_API.md` "Index inputs that get converted MUST be read with copy = true".
+- Where: `api_mex/qrt_file_read.cpp:83` (`qd_mex_get_Col<arma::uword>(prhs[1])` without copy), then `:104` `i_cir -= 1`; `api_mex/hdf5_read_channel.cpp:119` (`snap`, no copy; corrected in WP-01, the item first said 149), then `:166-170` `--s`. Both break the rule of `md/SPEC_MATLAB_API.md` "Index inputs that get converted MUST be read with copy = true".
 
 **What happens.** `i_cir = uint64([1 2])` is `[0 1]` after `qrt_file_read`, and so is its copy `keep`; `snap = uint64([2 3])` becomes `[1 2]` after `hdf5_read_channel`, and a second call with the same variable returns snapshots 1-2 instead of 2-3. Same in Octave and R2024a. (For `double` input the helpers convert into a new buffer, so ordinary calls are not affected.)
 
@@ -3106,12 +3144,13 @@ hdf5_read_channel: snap after call = [1 2], copy "keep" = [1 2] (expected [2 3])
 new crash dumps: 
 ```
 
-**Proposed fix.** `qd_mex_get_Col<arma::uword>(prhs[1], true)` in `api_mex/qrt_file_read.cpp:83` and `qd_mex_get_Col<arma::uword>(prhs[5], true)` in `api_mex/hdf5_read_channel.cpp:149`.
+**Proposed fix.** `qd_mex_get_Col<arma::uword>(prhs[1], true)` in `api_mex/qrt_file_read.cpp:83` and `qd_mex_get_Col<arma::uword>(prhs[5], true)` in `api_mex/hdf5_read_channel.cpp:119`.
 
 **Test for the fix session.** MOxUnit: pass `uint64` indices, keep a copy, assert both unchanged after the call, and two calls return the same data.
 
 ## B-032: MEX `channel_export_obj_file` segfaults when `no_interact` has fewer snapshots than the coefficients
 
+- Status: open
 - Severity: S2, because an easy input mistake (e.g. `[]` for `no_interact`) kills the MATLAB or Octave session.
 - Kind: crash (out-of-bounds `std::vector` access)
 - Mark: [R]
@@ -3180,6 +3219,7 @@ new crash dumps: /home/stephan/matlab_crash_dump.719873-1
 
 ## B-033: MEX `qd_mex_get_strings` dereferences empty cell elements: `cell(1,1)` as a name list crashes MATLAB R2026a
 
+- Status: open
 - Severity: S2, because a valid MATLAB value (a cell array with unset elements) crashes MATLAB.
 - Kind: crash (NULL dereference)
 - Mark: [R] in R2026a; Octave does not crash (its `mxGetCell` returns an empty array)
@@ -3248,6 +3288,7 @@ new crash dumps: /home/stephan/matlab_crash_dump.720262-1
 
 ## B-034: MEX helpers convert NaN, negative, fractional and out-of-range numbers to integers without checks: crashes, bad_alloc, silent truncation, wrapped seeds
 
+- Status: open
 - Severity: S2, because invalid but easy-to-type input (`-1`, `NaN`) crashes MATLAB and Octave; the other effects (silent truncation, a uint64 seed that silently becomes "random") are S3 on their own.
 - Kind: UB / crash / invalid input accepted
 - Mark: [R]
@@ -3401,6 +3442,7 @@ python seed 18446744073709551615 TypeError
 
 ## B-035: Python `arrayant.interpolate(local_angles=True)` without `dist=True` returns uninitialised memory
 
+- Status: open
 - Severity: S2, because a documented option combination returns garbage for the local angles and `gamma` without an error.
 - Kind: wrong result (uninitialised output)
 - Mark: [R]
@@ -3454,6 +3496,7 @@ dist + local_angles: azimuth_loc = [-0.6 -0.2 -1.7 -0.6 -0.2 -1.7] (expected)
 
 ## B-036: Python `channel.baseband_freq_response`: an exception inside the OpenMP region aborts the interpreter
 
+- Status: open
 - Severity: S2, because one invalid argument (an unsorted `freq_in`) kills the Python process with `std::terminate` instead of raising an exception.
 - Kind: crash (exception safety)
 - Mark: [R]
@@ -3505,6 +3548,7 @@ exit code 134
 
 ## B-037: AVX2 antenna interpolation returns 0 where all four corner amplitudes are below 1.19e-7 (generic interpolates)
 
+- Status: open
 - Severity: S3: the AVX2 kernel differs from the generic one beyond rounding (S2 by the letter of the scale), but only for patterns whose absolute field amplitude is below 1.2e-7 (-138 dB) around the query; in deep nulls of normalised patterns the difference is a tiny value against 0.
 - Kind: wrong result (AVX2 differs from generic)
 - Mark: [R]
@@ -3573,6 +3617,7 @@ scale 1e-08: generic V_re/s = 2.354853 2.019394 1.292355   avx2 V_re/s = 0.00000
 
 ## B-038: qdant writer stores element positions, coupling and pattern values with only 6 significant digits
 
+- Status: open
 - Severity: S3, because the precision loss is silent but small: 0.2 mm on a 123 m element position, about 1e-6 relative on coupling and magnitudes, far coarser phases than the 1e-5° the code intends.
 - Kind: wrong result (precision)
 - Mark: [R]
@@ -3633,6 +3678,7 @@ coupling_re  : 0.123456789 -> 0.123457000
 
 ## B-039: `qdant_write_multi` deletes an existing file before it validates its input
 
+- Status: fixed (WP-01)
 - Severity: S3, because invalid input destroys the user's existing file, while the documentation says all entries are validated first.
 - Kind: wrong result (data loss on invalid input) / doc
 - Mark: [R]
@@ -3695,6 +3741,7 @@ after: file exists = 0
 
 ## B-040: `qdant_read(fn, 1)` returns another entry without error when the file has no ID 1
 
+- Status: open
 - Severity: S3, because the request is accepted and a different antenna is returned.
 - Kind: wrong result
 - Mark: [R]
@@ -3756,6 +3803,7 @@ read id=1 from a file with ids {2,3}: returned 'two' (no error)
 
 ## B-041: `arrayant::qdant_write` without a layout replaces an existing custom layout in the file (user decision)
 
+- Status: open
 - Severity: S3, because appending an antenna silently discards a layout the user wrote before; this may be intended, but the documentation does not say so.
 - Kind: doc / wrong result
 - Mark: [R]
@@ -3817,6 +3865,7 @@ layout after appending id 4 without layout:
 
 ## B-042: A 138-byte qdant file makes the reader allocate 4.7 GB and fail with `std::bad_alloc`
 
+- Status: open
 - Severity: S3, because unchecked file input leads to an unbounded allocation and an unclear exception type instead of a clean error.
 - Kind: resource (unbounded allocation)
 - Mark: [R]
@@ -3876,6 +3925,7 @@ max RSS 4690260 kB
 
 ## B-043: `arrayant` default constructor leaves `check_ptr` uninitialised; the quick `is_valid()` can pass an invalid object
 
+- Status: fixed (WP-01)
 - Severity: S3, because reading indeterminate pointers is undefined behaviour, and a stale value lets a never-validated, invalid arrayant pass the quick check; the full check (`is_valid(false)`) is not affected.
 - Kind: UB
 - Mark: [R]
@@ -3942,6 +3992,7 @@ call 2: is_valid() = ''   is_valid(false) = 'Values of 'azimuth_grid' must be so
 
 ## B-044: ULA and 3GPP generators keep the custom pattern's element positions and coupling, contrary to the docs
 
+- Status: open
 - Severity: S3, because the documentation says these are ignored; the code keeps them, and in the ULA case the coupling becomes inconsistent (neither identity nor replicated).
 - Kind: doc / wrong result
 - Mark: [R]
@@ -4008,6 +4059,7 @@ ULA coupling_re:
 
 ## B-045: `combine_pattern` and `arrayant_combine_pattern_multi` hard-code the speed of light (acoustic arrays combined without position phase)
 
+- Status: open
 - Severity: S3, because the acoustic multi-driver workflow (`generate_speaker`, `set_element_pos_multi`, `concat_multi`, `combine_pattern_multi`) silently ignores the driver spacing; there is no `propagation_speed` argument, unlike `get_channels_multifreq`.
 - Kind: wrong result / doc
 - Mark: [R]
@@ -4065,6 +4117,7 @@ Output of the phase-2 re-run (`bash run.sh`):
 
 ## B-046: `remove_zeros` and `calc_directivity_dBi` use absolute power thresholds (low-level patterns lose data or report 0 dBi)
 
+- Status: open
 - Severity: S3, because valid but low-level patterns lose non-zero samples or become empty (`rotate_pattern` with a grid update calls `remove_zeros`), and directivity changes with the pattern scale.
 - Kind: wrong result
 - Mark: [R]
@@ -4125,6 +4178,7 @@ scale 1e-08: directivity = 0.000 dBi, remove_zeros -> 0 x 0 (input 37 x 73)
 
 ## B-047: `generate_arrayant_multibeam` defaults M = N = 2 in the header, 1 in the docs and both wrappers
 
+- Status: open
 - Severity: S3, because a C++ call that relies on the defaults gets a 2×2 array while the documentation and the MATLAB/Python wrappers say 1×1.
 - Kind: doc / cross-API
 - Mark: [C]
@@ -4138,6 +4192,7 @@ scale 1e-08: directivity = 0.000 dBi, remove_zeros -> 0 x 0 (input 37 x 73)
 
 ## B-048: QRT readers trust header and path counts: a 136-byte file returns 20 million zero paths or allocates GBs
 
+- Status: open
 - Severity: S3, because unchecked counts in a malformed file lead to accepted-but-wrong results and multi-GB allocations instead of an error; no memory corruption was found.
 - Kind: resource / invalid input accepted
 - Mark: [R] results, [M] memory and time; [C] for the uninitialised values at the end
@@ -4267,6 +4322,7 @@ load after: 1.61 5.68 8.31 1/2786 713088
 
 ## B-049: `qrt_file_read` truncates `i_cir` / `i_orig` to 32 bits before the range check
 
+- Status: open
 - Severity: S3, because an out-of-range index is accepted (returns another CIR without paths) or rejected with Armadillo's internal message, depending on the cache.
 - Kind: invalid input accepted
 - Mark: [R]
@@ -4383,6 +4439,7 @@ Output of the phase-2 re-run (`bash run.sh`):
 
 ## B-050: HDF5 write/read round trip changes data (empty snapshots, missing frequency, 1-element vectors, empty strings, long names)
 
+- Status: open
 - Severity: S3, because the round trip alters sizes and types in edge cases without an error (the numeric values of normal channels survive).
 - Kind: wrong result (round trip)
 - Mark: [R]
@@ -4555,6 +4612,7 @@ dset names read back: 11 of 11
 
 ## B-051: HDF5 functions call `H5close()`, switch off error printing process-wide, and leak handles and memory on error paths
 
+- Status: open
 - Severity: S3, because a program that uses HDF5 itself loses its open handles after any quadriga-lib HDF5 call, and error paths leak; no library-internal data is corrupted.
 - Kind: resource / side effects
 - Mark: [R]
@@ -4671,6 +4729,7 @@ SUMMARY: AddressSanitizer: 36 byte(s) leaked in 3 allocation(s).
 
 ## B-052: `hdf5_write` "overwrites" a slot by adding a new group; the file grows with every rewrite
 
+- Status: open
 - Severity: S3, because the documentation says the slot is overwritten, while the old data stays in the file and the file grows linearly (160 kB to 792 kB over 5 rewrites of one slot); the read result is correct.
 - Kind: doc / resource
 - Mark: [R]
@@ -4743,6 +4802,7 @@ write 4 to slot 0: rc=1, file size 792324 bytes, slot 0 -> channel_5
 
 ## B-053: `hdf5_read_dset` returns a variable-length string as 8 bytes of a heap pointer, and leaks it
 
+- Status: open
 - Severity: S3, because strings written by other tools (variable-length is the default of h5py and MATLAB) are returned as garbage and the buffer leaks.
 - Kind: wrong result / leak
 - Mark: [R]
@@ -4827,6 +4887,7 @@ SUMMARY: AddressSanitizer: 29 byte(s) leaked in 1 allocation(s).
 
 ## B-054: `quantize_delays` builds dense vectors over the absolute delay range: a 20 ms offset makes it 4000 times slower
 
+- Status: open
 - Severity: S3, because it is a clear performance defect: the same channel shifted by 20 ms takes seconds instead of a millisecond (absolute delays are a documented option of the channel functions).
 - Kind: performance
 - Mark: [M]
@@ -4898,6 +4959,7 @@ load after: 1.50 5.14 8.01 1/2762 713575
 
 ## B-055: `quantize_delays` gives wrong results when the outputs alias the inputs (undocumented)
 
+- Status: open
 - Severity: S3, because an in-place call silently returns a wrong first tap; aliasing is neither supported nor documented as excluded.
 - Kind: wrong result (aliasing)
 - Mark: [R]
@@ -5000,6 +5062,7 @@ aliased outputs:  coeff_re taps = 0 0.5 0.5 0.32 0.68
 
 ## B-056: `mitsuba_xml_file_write` is quadratic in the number of vertices per object
 
+- Status: open
 - Severity: S3, because it is a clear performance defect: 80 000 faces take 5.9 s (and 4× the faces take about 15× the time).
 - Kind: performance
 - Mark: [M]
@@ -5088,6 +5151,7 @@ load after: 1.57 5.03 7.95 1/2779 713700
 
 ## B-057: OBJ reader: CRLF `.mtl` files lose their materials; face indices unchecked when only `face_ind` is requested; no-output call skips validation
 
+- Status: open
 - Severity: S3, because invalid or Windows-style input is accepted with wrong results (materials missing, out-of-range or wrapped indices) instead of being read correctly or rejected.
 - Kind: wrong result / invalid input accepted
 - Mark: [R]
@@ -5209,6 +5273,7 @@ Output of the phase-2 re-run (`bash run.sh`):
 
 ## B-058: `write_png`: constant, NaN or inverted-range data trigger a NaN-to-integer cast and all pixels get the last colour; an empty matrix writes an invalid PNG
 
+- Status: open
 - Severity: S3, because edge input gives a wrong image (all maximum colour, also for log input that the docs map to the minimum colour), undefined behaviour, or an undecodable file, without an error.
 - Kind: wrong result / UB
 - Mark: [R] (UBSan as a what-if: the unchanged `src/write_png.cpp` compiled into the probe with `-fsanitize=undefined,float-cast-overflow`)
@@ -5298,6 +5363,7 @@ empty 0x0                          -> no exception from write_png; decoding the 
 
 ## B-059: `channel::add_paths` accepts inconsistent counts and leaves an invalid object; `qrt_file_read` accepts any `normalize_M`
 
+- Status: open
 - Severity: S3, because invalid input is accepted without an error (and in the first case leaves the object in a state that `is_valid` rejects).
 - Kind: invalid input accepted
 - Mark: [R]
@@ -5390,6 +5456,7 @@ Output of the phase-2 re-run (`bash run.sh`):
 
 ## B-060: Channel and file-I/O header comments contradict the code (index bases, `calc_effective_path_gain` "average", `normalize_M` column power)
 
+- Status: open
 - Severity: S3, because these comments would lead a user to a wrong call or a wrong interpretation (index bases off by one, a sum read as an average).
 - Kind: doc
 - Mark: [R] for the two measured items, [C] for the index-base items
@@ -5485,6 +5552,7 @@ Output of the phase-2 re-run (`bash run.sh`):
 
 ## B-061: `combine_irs_coord`: no shape check on `interact_coord_1/2`, heap over-read
 
+- Status: open
 - Severity: S3, because invalid input (coordinates with fewer rows or columns than `no_interact` implies) is accepted and read out of bounds instead of rejected.
 - Kind: memory
 - Mark: [R]
@@ -5543,6 +5611,7 @@ SUMMARY: AddressSanitizer: heap-buffer-overflow /usr/include/x86_64-linux-gnu/bi
 
 ## B-062: `baseband_freq_response`: `aligned_alloc` with sizes that are not a multiple of 32 (generic build) and unchecked NULL return
 
+- Status: open
 - Severity: S3, because (a) is undefined behaviour under C11 before DR 460 and fails on some C libraries, and (b) turns an allocation failure into a segfault; both need unusual conditions on glibc.
 - Kind: UB / crash
 - Mark: [R]
@@ -5621,10 +5690,11 @@ exit code 139
 
 ## B-063: Test defect: `test_qd_ieee_chan.cpp:318` reads past the delay cube (hidden in the full ASan suite run)
 
-- Severity: S3, because it is an out-of-bounds read in the test, not in the library; the checks on the extra column compare garbage and the case still passes.
+- Status: fixed (WP-01)
+- Severity: S3, because it is an out-of-bounds read in the test, not in the library; no check reads the extra column, so the case still passes.
 - Kind: memory (test code)
 - Mark: [R]
-- Where: `tests/catch2_tests/test_qd_ieee_chan.cpp:318`: `chan[1]` has 12 paths (the test itself checks 12 at line 248), but line 318 maps `delay[0]` as 16×13.
+- Where: `tests/catch2_tests/test_qd_ieee_chan.cpp:318`: `chan[1]` has 12 paths (the test itself checks 12 at line 248), but line 318 maps `delay[0]` as 16×13. Corrected in WP-01: `d` is declared at line 301 as a strict alias (`false, true`) of `chan[0].delay[0]`, so line 318 copy-assigns 16×13 values of `chan[1]` into `chan[0]`'s delay memory (the over-read), and `d *= 1e9` scaled `chan[0].delay` in place.
 
 **What happens.** `build_asan/test_bin "IEEE Chan*"` reports a heap-buffer-overflow, "READ of size 1664 ... 0 bytes after 1536-byte region", at test line 318, and the cases still pass. The full-suite sanitizer run of phase 0 did not show it: with ASan's default `suppress_equal_pcs=1`, a report at the same program counter as an earlier one is dropped, and the HDF5 over-read (B-015) is caught in the same ASan `memcpy` interceptor and runs first. `run.sh` shows the case alone, the HDF5 case followed by the IEEE case (only the HDF5 report), and the same pair with `suppress_equal_pcs=0` (both).
 
@@ -5669,12 +5739,13 @@ All tests passed (313 assertions in 2 test cases)
 All tests passed (313 assertions in 2 test cases)
 ```
 
-**Proposed fix.** Change 13 to 12 at `tests/catch2_tests/test_qd_ieee_chan.cpp:318`. Run sanitizer suites with `suppress_equal_pcs=0`.
+**Proposed fix.** Change 13 to 12 at `tests/catch2_tests/test_qd_ieee_chan.cpp:318`. Run sanitizer suites with `suppress_equal_pcs=0`. (WP-01: changing only the 13 makes Armadillo throw, because the strict alias cannot be resized; lines 301 and 318 now build copies.)
 
 **Test for the fix session.** The ASan suite (with `suppress_equal_pcs=0`) is clean for "IEEE Chan*".
 
 ## B-064: IEEE indoor model: `XPR_NLOS_linear = 0` gives NaN coefficients
 
+- Status: open
 - Severity: S3, because an edge input (pure cross-polarisation) is accepted and gives NaN instead of an error or a valid channel.
 - Kind: wrong result
 - Mark: [R]
@@ -5726,6 +5797,7 @@ XPR_NLOS_linear = 0: NaN in coeff_re = 12 of 13, sum(path_gain) = -nan
 
 ## B-065: Unchecked float-to-integer casts (UB) for non-finite `observation_time` and tiny `quantize`
 
+- Status: open
 - Severity: S3, because invalid input reaches undefined behaviour (the results are returned without an error or fail with an unrelated message).
 - Kind: UB
 - Mark: [R] (what-if builds with `-fsanitize=float-cast-overflow`, sources unchanged), [C] for `calc_delay_spread`
@@ -5803,6 +5875,7 @@ azimuth spread with quantize = 1e-8 deg: 0.374807 (no error)
 
 ## B-066: `calc_delay_spread` with `granularity`: memory n_cir × global delay span / granularity (800 MB for 100 paths)
 
+- Status: open
 - Severity: S3, because a clear performance (memory) defect: 50 CIRs with 2 paths each and a 1 ms delay span at 1 ns granularity need 0.8 GB.
 - Kind: performance (memory)
 - Mark: [M] (maximum RSS; not a timing)
@@ -5853,6 +5926,7 @@ max RSS = 807456 kB, wall = 0.73 s
 
 ## B-067: `acdf`: all-NaN data sets bias the averaged CDF; unsorted user bins are accepted
 
+- Status: open
 - Severity: S3, because an empty (all-NaN) data set distorts the average silently, and invalid bins give a wrong CDF without an error.
 - Kind: wrong result / invalid input accepted
 - Mark: [R]
@@ -5910,6 +5984,7 @@ unsorted bins {50,0,99,25}: cdf = 0.51 0.51 0.51 1 (no error)
 
 ## B-068: Docs of `add_fake_los_path` do not match the code: always one extra path; a present LOS is moved to slot 0 and a zero path is left behind
 
+- Status: open
 - Severity: S3, because a user reading "added when no LOS is present" expects n_path outputs when a LOS exists, but always gets n_path + 1 with a zero path in the middle.
 - Kind: doc
 - Mark: [R]
@@ -5964,6 +6039,7 @@ Output of the phase-2 re-run (`bash run.sh`):
 
 ## B-069: Naming of the cross-polarisation rows of `M` is inconsistent; `calc_cross_polarization_ratio` V/H columns are ambiguous (user decision)
 
+- Status: open
 - Severity: S3, because the same rows are called "VH" in one place and "HV" in another, so users can build `M` or read the XPR columns the wrong way round.
 - Kind: doc
 - Mark: [R]
@@ -6028,6 +6104,7 @@ calc_cross_polarization_ratio, M rows 0,2,6 = 1,0.5,1: V-XPR = inf, H-XPR = 4
 
 ## B-070: `calc_diffraction_gain` (C++) scalar mode expects an electromagnetic-equivalent frequency, the docs say the speed of sound is used
 
+- Status: open
 - Severity: S3, because a C++ user passing the acoustic frequency gets a wavelength 870 000 times too long and wrong diffraction phases; the MEX and Python wrappers convert internally, so only C++ callers are affected.
 - Kind: doc / cross-API
 - Mark: [R]
@@ -6085,6 +6162,7 @@ scalar mode, center_frequency = 8.74636e+08: phase of xprmat = -3.1416 rad (expe
 
 ## B-071: `ray_triangle_intersect`: AVX2 and generic kernels swap `fbs_ind`/`sbs_ind` for hits at equal distance (shared edge or vertex)
 
+- Status: open
 - Severity: S3, because the hit positions agree, but the reported first/second triangle (and so its material or object) differs between builds for rays through shared edges or vertices, which are common in synthetic grids.
 - Kind: wrong result (kernel inconsistency)
 - Mark: [R]
@@ -6140,6 +6218,7 @@ use_kernel=2 (AVX2): no_interact=2 fbs_ind=2 sbs_ind=1
 
 ## B-072: `ray_triangle_intersect`: the AABB slab test rejects rays with dz = 0 in the plane z = Zmin/Zmax (x and y are accepted)
 
+- Status: open
 - Severity: S3, because only boundary hits are affected, but the result depends on the axis and contradicts the edge-inclusive triangle test of the same function.
 - Kind: wrong result
 - Mark: [R]
@@ -6205,6 +6284,7 @@ dy=0, ray in plane y=Ymin          kernel 2: fbs_ind computed AABB = 1, enlarged
 
 ## B-073: `ray_point_intersect` requires sub-clouds aligned to 8 only in AVX2 builds; the default `point_cloud_segmentation` output makes it throw
 
+- Status: open
 - Severity: S3, because the same call works with the generic library and throws with the AVX2 library, and the alignment rule is not documented.
 - Kind: cross-build inconsistency / doc
 - Mark: [R]
@@ -6280,6 +6360,7 @@ use_kernel=0: OK, total hits 2999
 
 ## B-074: Invalid `use_kernel` values are accepted silently; `use_kernel = 2` does not throw in builds without AVX2 (confirms item 1.7 of the Python fix plan)
 
+- Status: open
 - Severity: S3, because invalid input is accepted without an error; `md/SPEC_CPP_API.md` requires a throw for an unavailable kernel and for out-of-range values, and the documentation says "2 = AVX2 (throws if unavailable)".
 - Kind: doc / validation
 - Mark: [R]
@@ -6403,6 +6484,7 @@ geo2cart use_kernel=-1: accepted, result shape (3, 2, 2)
 
 ## B-075: AVX2 `fast_atan2` / `fast_cart2geo`: NaN becomes π/4, (inf, inf) gives NaN, tiny or huge double vectors give elevation 0; two doc claims are wrong
 
+- Status: open
 - Severity: S3, because it needs non-finite or extreme input, but NaN silently turns into a plausible angle in the AVX2 build.
 - Kind: wrong result (AVX2 differs from generic) / doc
 - Mark: [R]
@@ -6479,6 +6561,7 @@ fast_cart2geo(1e+20,1e+20,1e+20): az=0.7853982  el=0.6154797  len=1.732051e+20
 
 ## B-076: AVX2 `fast_slerp` fast path: error 3e-6 (about 50 ULP, documented ~5) and each lane's result depends on its neighbours
 
+- Status: open
 - Severity: S3, because the error is small but ten times the documented bound and non-local: identical inputs give different outputs depending on the other 7 lanes.
 - Kind: wrong result / doc
 - Mark: [R]
@@ -6555,6 +6638,7 @@ lane 7 phi=1.0, lanes 0-6 phi=0.005  lane 0: Xr=0.999996901 Xi=0.002499998 |X|=1
 
 ## B-077: `obj_overlap_test` crashes on an empty mesh
 
+- Status: open
 - Severity: S3, because degenerate but plausible input (an OBJ without faces) is accepted and crashes instead of returning or throwing.
 - Kind: crash
 - Mark: [R]
@@ -6623,6 +6707,7 @@ SUMMARY: AddressSanitizer: SEGV /sjc/quadriga-lib-fixes/src/obj_overlap_test.cpp
 
 ## B-078: `subdivide_triangles` (and `icosphere`, `cube`, `plane`): unchecked overflow of the face count leads to writes through a null pointer
 
+- Status: open
 - Severity: S3, because invalid input (a subdivision count around 2^32, or a negative value converted by the MEX helpers, see B-034) is accepted and crashes.
 - Kind: UB / memory
 - Mark: [R]
@@ -6690,6 +6775,7 @@ SUMMARY: AddressSanitizer: SEGV /sjc/quadriga-lib-fixes/src/subdivide_triangles.
 
 ## B-079: An output that aliases an input gives wrong results (`ray_triangle_intersect` with `fbs = &orig`, `subdivide_triangles` in place)
 
+- Status: open
 - Severity: S3, because advancing rays in place (`fbs = &orig`) is a natural call and silently gives a wrong second hit; `md/SPEC_CPP_API.md` ("Outputs") requires aliasing support or a documented exclusion.
 - Kind: wrong result (aliasing) / doc
 - Mark: [R]
@@ -6750,6 +6836,7 @@ subdivide_triangles in place: max |diff to out-of-place| = 1 (expected 0)
 
 ## B-080: `point_cloud_split` leaks its work buffer on every failed split
 
+- Status: fixed (WP-01)
 - Severity: S3, because it leaks n_points bytes per failure, and `point_cloud_segmentation` hits it repeatedly for clusters that cannot be split (e.g. identical points).
 - Kind: leak
 - Mark: [R]
@@ -6808,6 +6895,7 @@ SUMMARY: AddressSanitizer: 1000 byte(s) leaked in 1 allocation(s).
 
 ## B-081: `obj_overlap_test` docs call `obj_ind` 1-based and "the output of `obj_file_read`", which is 0-based; IDs are returned as given
 
+- Status: open
 - Severity: S3, because a user following the documentation misreads the returned IDs by one.
 - Kind: doc
 - Mark: [R]
@@ -6866,6 +6954,7 @@ obj_ind ids {1, 2} -> returned: 1 2
 
 ## B-082: `icosphere(radius = 0)` returns NaN; `cube` / `plane` with a negative scale return inward / -z normals, contrary to the docs
 
+- Status: open
 - Severity: S3, because degenerate input is accepted without an error and the result contradicts the documentation ("outward-facing normals", "normals point in +z").
 - Kind: wrong result / validation
 - Mark: [R]
@@ -6942,6 +7031,7 @@ plane scale {-1,1}: normal z of face 0 = -4
 
 ## B-083: `interp` 1-D/2-D index search is O(n·m): 4 s for 160 000 samples
 
+- Status: open
 - Severity: S3, because it is a clear performance defect for long series, which a binary search or a merge walk makes negligible.
 - Kind: performance
 - Mark: [M] (the re-run below ran under `flock /tmp/bench.lock` at a 1-minute load of 1.59; the 160 000 point is from phase 1 at a load of 10.5 and is provisional)
@@ -7001,6 +7091,7 @@ load after: 1.59 3.61 6.94 1/2770 715722
 
 ## B-084: `obj_overlap_test`: reason strings are non-deterministic (unseeded shuffle, thread count), and a flag array is read outside its critical section
 
+- Status: open
 - Severity: S3, because the returned IDs are deterministic, but the reasons vary between calls and thread counts (`md/SPEC_CPP_API.md`: results must not depend on the thread count; random numbers only through an explicit seed); the flag race is formal UB that only affects an early skip.
 - Kind: determinism / race
 - Mark: [R] non-determinism; [C] race (a TSan build of the library was not allowed)
@@ -7073,6 +7164,7 @@ distinct reason vectors over 6 calls: 5
 
 ## B-085: MEX `fast_sincos(x, [])` returns cos instead of sin; the single-precision output is undocumented
 
+- Status: fixed (WP-01)
 - Severity: S3, because `[]`, documented as "use the default", flips the result to cosine.
 - Kind: wrong result / doc
 - Mark: [R]
@@ -7122,6 +7214,7 @@ class(fast_sincos(double x)) = single
 
 ## B-086: MEX `arrayant_qdant_write` (separate inputs) writes `center_freq = NaN` for `[]` instead of the documented 299792458
 
+- Status: fixed (WP-01)
 - Severity: S3, because the documented default is not applied and NaN is written to the file.
 - Kind: wrong result / doc
 - Mark: [R]
@@ -7169,6 +7262,7 @@ center_freq read back = NaN (documented default 299792458)
 
 ## B-087: `arrayant_generate('multibeam')` uses a 90° element beamwidth by default in MATLAB and Python; docs (and the C++ default) say 120°
 
+- Status: open
 - Severity: S3, because the documented default is not what is computed (max difference 0.48 in the pattern), in both wrappers.
 - Kind: doc / cross-API
 - Mark: [R]
@@ -7231,6 +7325,7 @@ Python default vs 90 : max diff 0
 
 ## B-088: `calc_angular_spread` defaults differ: MATLAB and Python disable wrapping and the bank angle, C++ enables both
 
+- Status: open
 - Severity: S3, because the same default call gives different spreads in C++ (1.678) and MATLAB/Python (1.627).
 - Kind: cross-API
 - Mark: [R]
@@ -7309,6 +7404,7 @@ Python default                 as=1.627282 es=0.190512
 
 ## B-089: `triangle_mesh_segmentation` pads `mtl_ind_out` with material 1 in MATLAB, with 0 ("no material") in C++ and Python
 
+- Status: open
 - Severity: S3, because padding faces get a real material in MATLAB only, and an input 0 ("no material") underflows on the way.
 - Kind: cross-API
 - Mark: [R] (also seen by area G)
@@ -7365,6 +7461,7 @@ Python mtl_ind_out = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 0, 0, 0, 0]
 
 ## B-090: MEX `baseband_freq_response` with `carrier_freq`: descending carriers are rejected, duplicate carriers give silent NaN (Python handles both)
 
+- Status: open
 - Severity: S3, because valid carrier lists are rejected or give silent NaN in MATLAB, while Python handles them.
 - Kind: cross-API / wrong result
 - Mark: [R]
@@ -7434,6 +7531,7 @@ two equal carriers: error: 'freq_out' values must span a positive range.
 
 ## B-091: MEX `get_channels_irs` `i_irs` is 0-based, against the 1-based rule of the MATLAB spec; the doc does not say which
 
+- Status: open
 - Severity: S3, because a MATLAB user who passes 1 for the first codebook port silently gets the second.
 - Kind: doc / spec
 - Mark: [R]
@@ -7493,6 +7591,7 @@ i_irs=2: error: get_channels_irs: IRS codebook index out of bound.
 
 ## B-092: `arrayant_qdant_read(fn)` returns every entry as a struct array in MATLAB, Python's default reads ID 1
 
+- Status: open
 - Severity: S3, because the same default call differs between the APIs, and MATLAB returns a struct array of unrelated antennas, which its own convention treats as a frequency-dependent model.
 - Kind: cross-API
 - Mark: [R]
@@ -7551,6 +7650,7 @@ Python qdant_read(fn): single dict, e_theta_re shape (19, 37, 1)
 
 ## B-093: MEX: arrays with more than 4 dimensions are silently truncated; a 4-D dataset written with `hdf5_write_dset` comes back 3-D
 
+- Status: open
 - Severity: S3, because invalid input is accepted with data loss and without an error.
 - Kind: wrong result (invalid input accepted)
 - Mark: [R]
@@ -7600,6 +7700,7 @@ hdf5_write_dset rand(2,3,4,2) -> read back size [2 3 8]
 
 ## B-094: MEX: index value 0 is not rejected in several wrappers (silent wrong result or a misleading error)
 
+- Status: open
 - Severity: S3, because an invalid 1-based index is accepted with a wrong answer or rejected with a misleading message.
 - Kind: wrong result / unclear error
 - Mark: [R]
@@ -7650,6 +7751,7 @@ arrayant_interpolate element=0 -> arrayant_interpolate: Element indices 'i_eleme
 
 ## B-095: Diffraction level of detail 7: accepted by C++, empty `coord` in MATLAB, internal error in Python, rejected by MATLAB `generate_diffraction_paths`, documented as 0-6
 
+- Status: open
 - Severity: S3, because the same value gives four different behaviours across functions and APIs, including an Armadillo-internal error in Python, and the documented range does not match any of them.
 - Kind: cross-API / doc
 - Mark: [R]
@@ -7762,6 +7864,7 @@ empty orig/dest: ValueError At least one of 'xprmat' or 'update' must be non-emp
 
 ## B-096: Python `qrt_file_read`: an exception in the main loop while the reader thread runs calls `std::terminate`
 
+- Status: open
 - Severity: S3, because it needs an exception in the converting loop (in practice an allocation failure for a very large request), but the result is a process abort instead of `MemoryError`.
 - Kind: crash (exception safety)
 - Mark: [R]
@@ -7817,6 +7920,7 @@ exit code 134
 
 ## B-097: Python HDF5 writers reject numpy scalars, 0-d arrays and non-native dtypes that the docs list as supported
 
+- Status: open
 - Severity: S3, because valid data is rejected with "unsupported type" (and `bool` is silently stored as int64); nothing is corrupted.
 - Kind: cross-API / invalid rejection
 - Mark: [R]
@@ -7873,6 +7977,7 @@ python_bool     written, read back 1
 
 ## B-098: Python adapter `view = true` always copies (confirms item 1.1 of `md/python_fix_plan_v00.md`)
 
+- Status: open
 - Severity: S3, because docs and spec promise zero-copy input where the code copies (a clear performance and documentation defect); the values are correct.
 - Kind: doc / performance
 - Mark: [R]
@@ -7937,6 +8042,7 @@ memptr == numpy data (Col, Mat, Cube, vecCube) with view=true, strict=true: (Fal
 
 ## B-099: Python: documented kwargs `sub_cloud_index` and `map_to_itu_materials` raise `TypeError`
 
+- Status: open
 - Severity: S3, because a user who follows the documentation gets `TypeError`.
 - Kind: doc
 - Mark: [R]
@@ -7992,6 +8098,7 @@ mitsuba_xml_file_write(map_to_itu_materials=) -> TypeError: mitsuba_xml_file_wri
 
 ## B-100: Python: invalid input accepted silently (2-D positions, short `interact_coord`, 4-D arrayant without `center_freq`)
 
+- Status: open
 - Severity: S3, because invalid input is accepted without an error and gives a result that looks valid.
 - Kind: wrong result (invalid input accepted)
 - Mark: [R]
@@ -8053,6 +8160,7 @@ Output of the phase-2 re-run (`bash run.sh`):
 
 ## B-101: `arrayant::copy_element` ignores `read_only`; an empty destination gives an Armadillo-internal error
 
+- Status: open
 - Severity: S4, because the effects are an unenforced flag and an unclear error message.
 - Kind: doc / error message
 - Mark: [R]
@@ -8118,6 +8226,7 @@ copy_element with empty destination: 'Mat::max(): object has no elements'
 
 ## B-102: Arrayant documentation typos and misleading statements; latent int32 offsets and a vertex sentinel (grouped)
 
+- Status: open
 - Severity: S4, because these are typos, misleading comments or code paths that are not reachable in practice.
 - Kind: doc / dead code
 - Mark: [C]
@@ -8138,6 +8247,7 @@ copy_element with empty destination: 'Mat::max(): object has no elements'
 
 ## B-103: `quantize_delays` docs: `fix_taps` 1 and 2 give `[1, 1, n_taps]` delays only for shared input
 
+- Status: open
 - Severity: S4, because only the documented output shape is incomplete.
 - Kind: doc
 - Mark: [R]
@@ -8240,6 +8350,7 @@ per-antenna input, fix_taps=2: delay_quant size 2x2x6
 
 ## B-104: Channel and file-I/O documentation and message nits (grouped)
 
+- Status: open
 - Severity: S4, because these are cosmetic or minor documentation mismatches.
 - Kind: doc
 - Mark: [R] for items 2 and 6 (shown in the outputs of B-057 line (f) and B-056), [C] for the rest
@@ -8262,6 +8373,7 @@ per-antenna input, fix_taps=2: delay_quant size 2x2x6
 
 ## B-105: `memcpy` with a null pointer and size 0 (formal UB) in `get_channels_irs` and in the Python list adapter
 
+- Status: fixed (WP-01)
 - Severity: S4, because the length is 0, so no memory is touched; it is undefined behaviour only by the letter of the standard and shows up as UBSan noise.
 - Kind: UB
 - Mark: [R]
@@ -8338,6 +8450,7 @@ calc_delay_spread([empty]) -> ValueError Delay and power vectors must not be emp
 
 ## B-106: Docs and code of `path_to_tube`, `qd_path` and `calc_diffraction_gain` debug output disagree (grouped)
 
+- Status: open
 - Severity: S4, because these are stale or misleading comments and a debug-only code path.
 - Kind: doc
 - Mark: [R] for items 1 and 2, [C] for item 3
@@ -8430,6 +8543,7 @@ sizeof(path) = 56 (doc: 64-byte header); interaction codes = 2
 
 ## B-107: `interp`: a NaN query returns the first data value; clamped extrapolation is undocumented
 
+- Status: open
 - Severity: S4, because a NaN query becomes a valid-looking number and the documentation does not mention clamping.
 - Kind: doc / wrong result on NaN
 - Mark: [R]
@@ -8482,6 +8596,7 @@ xo = nan  -> 0
 
 ## B-108: Geometry documentation and validation nits (index-map directions, 9-column check, precision claim, header typos; dead code; CPU check)
 
+- Status: open
 - Severity: S4, because these are misleading wording, a confusing error message, dead code or a robustness gap on unusual CPUs.
 - Kind: doc / dead code / robustness
 - Mark: [R] for items 1 and 2, [C] for the rest
@@ -8555,6 +8670,7 @@ reverse_index (len 4): 3 0 2 1   -> points row j = pointsR row reverse_index(j)
 
 ## B-109: `sos_val` / `sos_remove_bias`: an output that partially overlaps an input is accepted and gives wrong values (docs promise an error)
 
+- Status: open
 - Severity: S4, because it needs a hand-built Armadillo matrix on foreign memory that starts inside an input, which no wrapper can produce; the documentation promises an exception, the call silently returns values off by up to 0.92.
 - Kind: doc / invalid input accepted
 - Mark: [R]
@@ -8632,6 +8748,7 @@ Output of the phase-2 re-run (`bash run.sh`):
 
 ## B-110: `sos_randn` / `sos_rand` / `sos_randi` report an unknown preset as "Input 'name' ...", an argument they do not have
 
+- Status: open
 - Severity: S4, because only the error message names the wrong argument; the call is rejected correctly in all three APIs.
 - Kind: doc (error message)
 - Mark: [R]
@@ -8688,6 +8805,7 @@ python sos.randn: ValueError Input 'name' is not a known preset.
 
 ## B-111: `md/SPEC_PYTHON_API.md` gives two contradicting rules for the headings of the `sos` entries
 
+- Status: open
 - Severity: S4, because only the spec is inconsistent; the code follows the later rule.
 - Kind: doc
 - Mark: [C] (checked with `sed -n 104p md/SPEC_PYTHON_API.md; sed -n 348p md/SPEC_PYTHON_API.md` and `grep -c "^# sos\." api_python/qpy_sos_*.cpp`, one per file)
@@ -8701,6 +8819,7 @@ python sos.randn: ValueError Input 'name' is not a known preset.
 
 ## B-112: MEX `qrt_file_read` returns `interact_type` as uint8; the doc says uint32
 
+- Status: fixed (WP-01)
 - Severity: S4, because only the documented type is wrong.
 - Kind: doc
 - Mark: [R]
@@ -8744,6 +8863,7 @@ class(interact_type{1}) = uint8 (doc: uint32)
 
 ## B-113: MEX `get_channels_*` with 0 paths and `add_fake_los_path` return a zero path with delay 0, where C++ throws
 
+- Status: open
 - Severity: S4, because it is an error-behaviour difference on an edge case (and the returned delay ignores `use_absolute_delays`).
 - Kind: cross-API
 - Mark: [R]
@@ -8814,6 +8934,7 @@ C++ spherical -> Missing data for any of: fbs_pos, lbs_pos, path_gain, path_leng
 
 ## B-114: MEX `arrayant_rotate_pattern`: struct arrays reject usage 3 and 4 (Python maps them); a call without output argument errors
 
+- Status: open
 - Severity: S4, because it is an API inconsistency on a less used path.
 - Kind: cross-API
 - Mark: [R]
@@ -8877,6 +8998,7 @@ Python multi usage=3: OK, e_theta_re shape (19, 37, 2, 2)
 
 ## B-115: MEX documentation, error IDs and latent helper defects (grouped)
 
+- Status: open
 - Severity: S4, because these are documentation errors, a non-standard error ID, typos and latent defects without a current caller.
 - Kind: doc / dead code
 - Mark: [R] for items a-e (in the repro), [C] for the rest
@@ -8955,6 +9077,7 @@ Output of the phase-2 re-run (`bash run.sh`):
 
 ## B-116: Python `hdf5_create_file` returns uint32 although the wrapper builds int64 (confirms item 1.3 of the Python fix plan)
 
+- Status: open
 - Severity: S4, because only the dtype of a correct result is affected.
 - Kind: doc / cross-API (dtype)
 - Mark: [R]
@@ -8996,6 +9119,7 @@ hdf5_create_file returns [2 1 1 1] uint32 (wrapper builds int64; declared return
 
 ## B-117: Python output dtypes and shapes differ from the docs (`qdant_read`, `point_inside_mesh`, `generate_speaker`, `get_ieee_indoor`)
 
+- Status: open
 - Severity: S4, because only documentation is wrong; the values are right.
 - Kind: doc
 - Mark: [R]
@@ -9046,6 +9170,7 @@ get_ieee_indoor center_frequency: array([5.25e+09]) (doc: scalar); extra key ini
 
 ## B-118: Python single-frequency arrayant dict: a 1-element `center_freq` array gives a numpy DeprecationWarning, 2 elements an unclear error
 
+- Status: open
 - Severity: S4, because it is a warning today (an error in a future numpy) and an unclear message for wrong input.
 - Kind: cross-API
 - Mark: [R]

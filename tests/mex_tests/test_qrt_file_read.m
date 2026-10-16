@@ -271,4 +271,19 @@ catch ME
     end
 end
 
+% ---------- qrt_file_read: uint64 i_cir is not modified by the call ----------
+i_cir = uint64([1 2]); keep = i_cir;
+[~, ~, ~, ~, ~, ~, ~, pg_a] = quadriga_lib.qrt_file_read(fn, i_cir, 1, true, 1);
+assertEqual(i_cir, uint64([1 2]));
+assertEqual(keep, uint64([1 2]));
+[~, ~, ~, ~, ~, ~, ~, pg_b] = quadriga_lib.qrt_file_read(fn, i_cir, 1, true, 1);
+assertEqual(pg_b, pg_a);
+[~, ~, ~, ~, ~, ~, ~, pg_c] = quadriga_lib.qrt_file_read(fn, [1 2], 1, true, 1);
+assertEqual(pg_c, pg_a);
+
+% ---------- qrt_file_read: interact_type is uint8 ----------
+out = cell(1, 18);
+[out{:}] = quadriga_lib.qrt_file_read(fn5, 1);
+assertTrue(isa(out{18}{1}, 'uint8'));
+
 end

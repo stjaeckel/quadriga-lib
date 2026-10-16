@@ -29,7 +29,7 @@ namespace quadriga_lib
         arma::Mat<dtype> coupling_im;                // Coupling matrix, imaginary part; [n_elements, n_ports]
         dtype center_frequency = dtype(299792458.0); // Center frequency
         bool read_only = false;                      // Prevent member functions from writing to the properties
-        dtype *check_ptr[9];                         // Data pointers for quick validation
+        dtype *check_ptr[9] = {};                    // Data pointers for quick validation
         arrayant() {};                               // Default constructor
 
         // Functions to determine the size of the array antenna properties

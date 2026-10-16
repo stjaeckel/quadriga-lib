@@ -298,7 +298,7 @@ TEST_CASE("IEEE Chan - B + 3user + Floors and Distances")
     CHECK(arma::all(arma::abs(arma::vectorise(A) - 1.0) < 1e-12));
 
     // Check delays
-    auto d = arma::mat(chan[0].delay[0].memptr(), 4 * 4, 13, false, true);
+    auto d = arma::mat(chan[0].delay[0].memptr(), 4 * 4, 13);
     d *= 1e9;
 
     CHECK(arma::all(arma::abs(d.col(0) - 0.0) < 1.5));
@@ -315,7 +315,7 @@ TEST_CASE("IEEE Chan - B + 3user + Floors and Distances")
     CHECK(arma::all(arma::abs(d.col(11) - 70.0) < 1.5));
     CHECK(arma::all(arma::abs(d.col(12) - 80.0) < 1.5));
 
-    d = arma::mat(chan[1].delay[0].memptr(), 4 * 4, 13, false, true);
+    d = arma::mat(chan[1].delay[0].memptr(), 4 * 4, 12);
     d *= 1e9;
 
     CHECK(arma::all(arma::abs(d.col(0) - 0.0) < 1.5));
