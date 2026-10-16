@@ -681,6 +681,7 @@ if (ENABLE_TESTS)
     target_include_directories(test_bin PRIVATE
         ${QUADRIGA_CORE_INCLUDES}
         ${CATCH2_INCLUDE_DIR}
+        ${HDF5_INCLUDE_DIRS} # HDF5 tests patch files with the HDF5 C API
     )
 
     target_link_libraries(test_bin PRIVATE ${QUADRIGA_LINK_TARGET} ${CATCH2_LIB})
