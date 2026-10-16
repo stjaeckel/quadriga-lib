@@ -62,4 +62,12 @@ x = single(1000*linspace(-10*pi,10*pi,2000));
 [s,c] = quadriga_lib.fast_sincos(x);
 assert_close(s, sin(x), 2e-2);
 assert_close(c, cos(x), 2e-2);
+
+%% Empty cos_only uses the default (sine)
+x = [0.1 0.5 1];
+s0 = quadriga_lib.fast_sincos(x);
+s1 = quadriga_lib.fast_sincos(x, []);
+assertTrue(isequal(s1, s0));
+assertTrue(isa(s1, 'single'));
+assert_close(s1, sin(x), 1e-6);
 end

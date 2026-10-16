@@ -304,6 +304,18 @@ assertEqual(chanR.coeff_re, double(single(coeff_re(:, :, :, [3, 2, 1]))));
 assertEqual(chanR.coeff_im, double(single(coeff_im(:, :, :, [3, 2, 1]))));
 assertEqual(chanR.delay,    double(single(delay_4d(:, :, :, [3, 2, 1]))));
 
+% uint64 snap input is not modified by the call, a second call returns the same data
+tst = tst + 1; if tst > run_tests; return; end
+if verbose; disp("Test: uint64 snap unchanged"); end
+snap = uint64([2, 3]); keep = snap;
+chanR = quadriga_lib.hdf5_read_channel(fn, 3, 1, 1, 1, snap);
+assertEqual(snap, uint64([2, 3]));
+assertEqual(keep, uint64([2, 3]));
+assertEqual(chanR.coeff_re, double(single(coeff_re(:, :, :, [2, 3]))));
+chanR2 = quadriga_lib.hdf5_read_channel(fn, 3, 1, 1, 1, snap);
+assertEqual(chanR2.coeff_re, chanR.coeff_re);
+assertEqual(chanR2.delay, chanR.delay);
+
 % Snapshot index out of bounds
 tst = tst + 1; if tst > run_tests; return; end
 if verbose; disp("Test: Snapshot out of bounds"); end

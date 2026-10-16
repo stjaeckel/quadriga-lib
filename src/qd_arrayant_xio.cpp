@@ -20,7 +20,8 @@ Write a vector of arrayant objects to a single QDANT file
 
 - Writes each entry in `arrayant_vec` to a QDANT file with sequential 1-based IDs using .[[qdant_write]].
 - Auto-generates a `[n_entries, 1]` layout matrix with entries `1, 2, ..., n_entries`.
-- Deletes any existing file before writing; all entries are validated first.
+- All entries are validated first; an existing file is deleted only after the validation passed, then rewritten.
+  Invalid input throws and leaves an existing file unchanged.
 - Primary use case: frequency-dependent models where each arrayant holds a pattern at one frequency via `center_frequency`.
 
 ## Declaration:
@@ -50,10 +51,6 @@ void quadriga_lib::qdant_write_multi(const std::string &fn,
     if (fn.empty())
         throw std::invalid_argument("qdant_write_multi: Filename cannot be empty.");
 
-    // Remove existing file to start fresh
-    if (std::filesystem::exists(fn))
-        std::filesystem::remove(fn);
-
     arma::uword n_entries = (arma::uword)arrayant_vec.size();
 
     // Validate all entries before writing anything
@@ -63,6 +60,10 @@ void quadriga_lib::qdant_write_multi(const std::string &fn,
         if (!err.empty())
             throw std::invalid_argument("qdant_write_multi: Entry " + std::to_string(i) + " is invalid: " + err);
     }
+
+    // Remove existing file to start fresh (only after all entries passed the validation)
+    if (std::filesystem::exists(fn))
+        std::filesystem::remove(fn);
 
     // Write all entries without layout (layout validation requires all IDs to exist)
     for (arma::uword i = 0; i < n_entries; ++i)

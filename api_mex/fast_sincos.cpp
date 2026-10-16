@@ -19,7 +19,7 @@ Compute elementwise approximate sine and/or cosine of a vector
 - Either `s` or `c` may be `nullptr` to skip that computation
 - Works on vectors, matrices, and 3-D arrays
 - Accepts any numeric input class; best performance with single precision
-- Outputs are always single precision
+- Outputs are always single precision, also for double input
 - Request one or two outputs to control which results are returned
 - With one output, set the optional `cos_only` flag to `true` to return cosine instead of sine
 
@@ -32,11 +32,11 @@ c = quadriga_lib.fast_sincos(x, true);
 
 ## Inputs:
 - **`x`** (input) — Input angles; radians; `[n_elem]`
-- **`cos_only`** — Forsingle output: `true` returns `cos(x)`; false returns `sin(x)`; default: false
+- **`cos_only`** — For a single output: `true` returns `cos(x)`; `false` or `[]` returns `sin(x)`; default: false
 
 ## Outputs:
-- **`s`** — sin(x); `[n_elem]`
-- **`c`** — cos(x); `[n_elem]`
+- **`s`** — sin(x); single; `[n_elem]`
+- **`c`** — cos(x); single; `[n_elem]`
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
@@ -74,7 +74,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::uword n_elem = use_double_input ? Xd.n_elem : Xs.n_elem;
 
     // Check if we want to get only the cosine
-    bool cos_only = (nrhs < 2) ? false : qd_mex_get_scalar<bool>(prhs[1], "cosineOnly");
+    bool cos_only = (nrhs < 2) ? false : qd_mex_get_scalar<bool>(prhs[1], "cosineOnly", false);
 
     // Allocate memory for the outputs
     arma::fcube P, Q;
