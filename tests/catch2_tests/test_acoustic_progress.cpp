@@ -595,14 +595,14 @@ TEST_CASE("ray_progress - refracting tracer: the segment out of a lossy medium i
 
 TEST_CASE("ray_progress - the plate rule and the absorption peak at every frequency of a band", "[acoustic]")
 {
-    // N1 and A10 through the tracer: a 12.5 mm board (rigid, m 20, tf 0.05 with a peak tfP 0.25 at 150 Hz,
-    // tfQ 1.5) as a sheet and as a traced solid, scalar, float, one ray until none is left, a band of five
-    // frequencies on the base frequency's geometry. Each frequency: the room side absorbs tf(f), the plate
-    // passes a tau / (a + tau - a tau); and the band equals each frequency run alone. At bb336dc the peak
-    // columns were not read and the plate passed tf^2 tau.
+    // N1 and A10 through the tracer: a 12.5 mm board (rigid, m 20, tf 0.05 with a peak tfP 0.25 at 150 Hz on the
+    // lumped-resonator law, M5, tfQ = Q_alpha 0.75) as a sheet and as a traced solid, scalar, float, one ray until
+    // none is left, a band of five frequencies on the base frequency's geometry. Each frequency: the room side
+    // absorbs tf(f), the plate passes a tau / (a + tau - a tau); and the band equals each frequency run alone. At
+    // bb336dc the peak columns were not read and the plate passed tf^2 tau.
     ub::OneThread one_thread;
     const double PI = 3.14159265358979323846, FMAP = 299792458.0 / 343.0 * 1.0e-9;
-    const double a = 8.1817e-08, thk = 0.0125, fRef = 1.6644e-04, tf0 = 0.05, tfP = 0.25, tfF_hz = 150.0, tfQ = 1.5;
+    const double a = 8.1817e-08, thk = 0.0125, fRef = 1.6644e-04, tf0 = 0.05, tfP = 0.25, tfF_hz = 150.0, tfQ = 0.75;
     typedef std::unordered_map<std::string, std::vector<float>> Pal;
     auto mass_TL = [](double X0, double c)
     {
@@ -686,7 +686,7 @@ TEST_CASE("ray_progress - the plate rule and the absorption peak at every freque
                 for (size_t q = 0; q < band.size(); ++q)
                 {
                     TR A = trace(kind == 0, thd, refr, {band[q]})[0];
-                    const double fG = band[q] * FMAP, c = std::cos(thd * PI / 180.0), x = tfQ * (band[q] - tfF_hz) / tfF_hz;
+                    const double fG = band[q] * FMAP, c = std::cos(thd * PI / 180.0), x = tfQ * (band[q] / tfF_hz - tfF_hz / band[q]);
                     const double ar = std::min(1.0, tf0 + tfP / (1.0 + x * x)), tau = std::pow(10.0, -0.1 * mass_TL((fG / fRef) * thk, c));
                     const double Tr = ar * tau / (ar + tau - ar * tau);
                     QD_DIAG("%s,%d,%.0f,%.0f,%.5f,%.5f,%.3f,%.3f,%+.2e\n", kind ? "X" : "S", refr ? 5 : 4, thd, band[q], 1.0 - B[q].R, ar, pdB(B[q].T), pdB(Tr),
