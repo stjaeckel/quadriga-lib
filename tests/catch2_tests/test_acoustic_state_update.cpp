@@ -5903,37 +5903,346 @@ TEST_CASE("Held exit - a non-rigid mass-law body holds every tracer and passes a
     }
 }
 
+// M6: the peak of a mass-law face as a locally reacting face, written from the column definitions. The series
+// impedance of a resonator per Z0, zeta = R' + j (1 + R') |tfQ| (f/tfF - tfF/f), with tfP = 4 R' / (1 + R')^2: the
+// over-damped root R' >= 1, or the under-damped one 1/R' where tfQ < 0; tfP above one is R' = 1. It reflects
+// (zeta c - 1)/(zeta c + 1) at the cosine c in air (TE and the scalar type), (zeta/c - 1)/(zeta/c + 1) for TM; the
+// power-law part tf is a matched pad in front of it, |r|^2 = (1 - tf) |r_zeta|^2.
+namespace m6t
+{
+    typedef std::complex<double> cd;
+    static cd zeta(double tfP, double tfF, double tfQ, double f)
+    {
+        const double a = std::min(tfP, 1.0), hi = ((2.0 - a) + 2.0 * std::sqrt(1.0 - a)) / a, Rp = (tfQ < 0.0) ? 1.0 / hi : hi;
+        return cd(Rp, (1.0 + Rp) * std::abs(tfQ) * (f / tfF - tfF / f));
+    }
+    static cd r_face(cd z, double c, bool tm = false)
+    {
+        const cd w = tm ? z / c : z * c;
+        return (w - 1.0) / (w + 1.0);
+    }
+    // The board of the peak cases: 12.5 mm, m 20, tf 0.05 with a peak 0.25 at 150 Hz, Q_alpha 0.75, in the one-parameter
+    // mapping or as gypsum in the two-parameter one; thk 0 for a traced solid
+    static ub::Pal board(double a, double mu, double thk, double tfQ, double tf0 = 0.05, double tfP = 0.25)
+    {
+        std::vector<LumpMtl> lp = {{a, 0.0, thk, 0.0, tf0, 0.0, 0.0, 0.0, 0.0, 20.0, 1.6644e-04}};
+        ub::Pal P = lump_palette(lp);
+        r1::col(P, "e", {mu}), r1::col(P, "tfP", {tfP}), r1::col(P, "tfF", {150.0 * r1::FMAP}), r1::col(P, "tfQ", {tfQ});
+        return P;
+    }
+    // Every path of one ray through a wall (bf::walk, eps 0 sums every series): R and T at their polyline's point, R
+    // referenced to the first face, channel 0 the scalar type or VV, 1 HH
+    static bf::Acc walk(const ub::Pal &P, const std::vector<double> &x, const std::vector<int> &mat, const std::vector<bool> &flip, int tr, double f,
+                        double thd)
+    {
+        arma::uvec mi;
+        arma::mat mesh = ub::build(x, mat, flip, mi), o, d;
+        diag_ray_at(thd, o, d);
+        bf::Acc A;
+        bf::walk(P, mesh, mi, tr, f, thd, 0.0, nullptr, o, d, 1.0, 1.0, 0.0, 0.0, 0, 200, A);
+        return A;
+    }
+}
+
 TEST_CASE("Absorption peak - tfP, tfF and tfQ add a resonant peak to the room-side absorption of a mass-law face", "[acoustic]")
 {
-    // A10 on the lumped-resonator law (M5): tf(f) = tfR (f/fRef)^tfB + tfP / (1 + (tfQ (f/tfF - tfF/f))^2),
-    // clamped as before, tfQ the absorber's Q_alpha. A rigid mass-law panel absorbs it on its room side
-    // (R = 1 - tf) and passes the plate rule with it (N1), as a sheet and as a traced solid. A lining of
-    // plasterboard on battens: floor 0.05, peak 0.25 at 150 Hz, Q_alpha 0.75 (the width near the peak that
-    // tfQ 1.5 had on the linear detuning of 4720a92). At bb336dc the three columns were not read: the face
-    // absorbed the floor alone.
+    // A10 on the lumped-resonator law (M5) and the face as its series impedance (M6, namespace m6t above). A rigid
+    // mass-law panel absorbs 1 - (1 - tf)|r_zeta(theta)|^2 on its room side, which at normal incidence is the law
+    // tfR (f/fRef)^tfB + tfP / (1 + (tfQ (f/tfF - tfF/f))^2) less tf times the peak, and passes the plate rule with
+    // that absorption at the angle (N1), as a sheet and as a traced solid, in the one- and the two-parameter mapping. A
+    // lining of plasterboard on battens: floor 0.05, peak 0.25 at 150 Hz, Q_alpha 0.75. Before M6 the face absorbed the
+    // law at every angle, and exactly at normal incidence the rigid face was open (the pair rule on its Fresnel R0); at
+    // bb336dc the three columns were not read: the face absorbed the floor alone.
     ub::OneThread one_thread;
-    const double a = 8.1817e-08, thk = 0.0125, fRef = 1.6644e-04, tf0 = 0.05, tfP = 0.25, tfF_hz = 150.0, tfQ = 0.75;
-    QD_DIAG("\n# diag: the absorption peak of a 12.5 mm board, sheet (S) and traced solid (X), scalar\n");
-    QD_DIAG("kind,type,f_Hz,theta,alpha,alpha_ref,T_dB,T_rule_dB\n");
-    for (int kind = 0; kind < 2; ++kind)
+    const double thk = 0.0125, fRef = 1.6644e-04, tf0 = 0.05, tfP = 0.25, tfF_hz = 150.0, tfQ = 0.75;
+    struct Map
     {
-        std::vector<LumpMtl> lp = {{a, 0.0, kind ? 0.0 : thk, 0.0, tf0, 0.0, 0.0, 0.0, 0.0, 20.0, fRef}};
-        ub::Pal P = lump_palette(lp);
-        r1::col(P, "tfP", {tfP}), r1::col(P, "tfF", {tfF_hz * r1::FMAP}), r1::col(P, "tfQ", {tfQ});
-        for (int tr : {4, 5})
-            for (double f_hz : {63.0, 150.0, 250.0, 500.0, 1000.0})
-                for (double thd : {0.0, 45.0})
-                {
-                    const double fG = f_hz * r1::FMAP, f = fG * 1.0e9, c = std::cos(thd * QPI / 180.0), x = tfQ * (f_hz / tfF_hz - tfF_hz / f_hz);
-                    double ar = std::min(1.0, tf0 + tfP / (1.0 + x * x));
-                    if (thd == 0.0) // exactly at normal incidence the rigid face is open: the pair rule R0 (1 - tf), R0 its Fresnel reflectance
-                        ar = 1.0 - (1.0 - ar) * std::pow((1.0 - std::sqrt(a)) / (1.0 + std::sqrt(a)), 2.0);
-                    const double Tr = r1::plate(ar, std::pow(10.0, -0.1 * r1::mass_TL((fG / fRef) * thk, c)));
-                    r1::Out W = kind ? r1::wall(P, {0.0, thk}, {1, 1}, {false, true}, tr, f, thd) : r1::wall(P, {0.0}, {1}, {false}, tr, f, thd);
-                    QD_DIAG("%s,%d,%.0f,%.0f,%.5f,%.5f,%.3f,%.3f\n", kind ? "X" : "S", tr, f_hz, thd, 1.0 - W.R, ar, r1::dB(W.T), r1::dB(Tr));
-                    INFO((kind ? "traced" : "sheet") << ", type " << tr << ", " << f_hz << " Hz, " << thd << " deg");
-                    CHECK(std::abs((1.0 - W.R) - ar) < 1.0e-3);
-                    CHECK(std::abs(r1::dB(W.T) - r1::dB(Tr)) < 0.01);
-                }
+        const char *name;
+        double a, mu;
+    };
+    QD_DIAG("\n# diag: the absorption peak of a 12.5 mm board, sheet (S) and traced solid (X), scalar, one- and two-parameter mapping\n");
+    QD_DIAG("map,kind,type,f_Hz,theta,alpha,alpha_ref,T_dB,T_rule_dB\n");
+    double dA = 0.0, dT = 0.0;
+    for (const Map &mp : std::vector<Map>{{"one", 8.1817e-08, 1.0}, {"two", 4.6908e-05, 573.33}})
+        for (int kind = 0; kind < 2; ++kind)
+        {
+            const ub::Pal P = m6t::board(mp.a, mp.mu, kind ? 0.0 : thk, tfQ);
+            for (int tr : {4, 5})
+                for (double f_hz : {63.0, 150.0, 250.0, 500.0, 1000.0})
+                    for (double thd : {0.0, 45.0})
+                    {
+                        const double fG = f_hz * r1::FMAP, f = fG * 1.0e9, c = std::cos(thd * QPI / 180.0);
+                        const double ar = 1.0 - (1.0 - tf0) * std::norm(m6t::r_face(m6t::zeta(tfP, tfF_hz, tfQ, f_hz), c));
+                        const double Tr = r1::plate(ar, std::pow(10.0, -0.1 * r1::mass_TL((fG / fRef) * thk, c)));
+                        r1::Out W = kind ? r1::wall(P, {0.0, thk}, {1, 1}, {false, true}, tr, f, thd) : r1::wall(P, {0.0}, {1}, {false}, tr, f, thd);
+                        QD_DIAG("%s,%s,%d,%.0f,%.0f,%.5f,%.5f,%.3f,%.3f\n", mp.name, kind ? "X" : "S", tr, f_hz, thd, 1.0 - W.R, ar, r1::dB(W.T), r1::dB(Tr));
+                        dA = std::max(dA, std::abs((1.0 - W.R) - ar)), dT = std::max(dT, std::abs(r1::dB(W.T) - r1::dB(Tr)));
+                        INFO(mp.name << "-parameter " << (kind ? "traced" : "sheet") << ", type " << tr << ", " << f_hz << " Hz, " << thd << " deg");
+                        CHECK(std::abs((1.0 - W.R) - ar) < 1.0e-12);
+                        CHECK(std::abs(r1::dB(W.T) - r1::dB(Tr)) < 2.0e-3);
+                    }
+        }
+    QD_DIAG("# max |alpha - ref| %.2e, max |T - rule| %.2e dB\n", dA, dT);
+}
+
+TEST_CASE("Absorption peak - a peaked face is its series impedance in magnitude and phase from 0 to 85 deg, as a sheet and as a traced solid, on both branches", "[acoustic]")
+{
+    // M6 (md/acoustic.md 4, A12): a mass-law face with a peak (m > 0, tfP > 0, tfF > 0) reflects as the locally reacting
+    // face of namespace m6t, with its phase and its angle dependence, behind the pad of its power-law part. The board of
+    // the peak cases, one- and two-parameter mapping (gypsum), sheet (S) and traced solid (X), every row through
+    // ray_triangle_intersect, ray_mesh_interact and ray_state_update (bf::walk; type 3 one event):
+    //   A  the scalar types 4, 5, 3 on both branches (tfQ 0.75 and -0.75: tfQ < 0 is accepted), 63 Hz to 1 kHz, 0 to 85
+    //      deg, against sqrt(1 - tf) r_zeta, and R + T <= 1;
+    //   B  a 1/96-octave sweep at 0 deg, 75 to 300 Hz: the phase extremes at the frequencies the reference puts them
+    //      (-4.117 deg at 83.58 Hz, +4.117 deg at 269.21 Hz);
+    //   C  tfP 1.0 and 1.2: R' = 1 on both branches, the two equal;
+    //   D  EM type 1: VV (zeta c - 1)/(zeta c + 1), HH -(zeta/c - 1)/(zeta/c + 1) (a rigid face reflects -1 in HH),
+    //      from 10 deg (at normal incidence the plane of incidence and the channels' basis are not defined);
+    //   E  the gate: a wave medium (m 0, eps 2.50, 100 mm traced) with the same columns keeps the flat pad, the
+    //      transformer of a coherent layer at each face on the pair rule, R and |T|^2 against that layer written here
+    //      (within 2.9e-6; R + T reads up to 1 + 1.15e-6 on this traced dielectric, the same before M6);
+    //   F  behind a 10 mm lining (eps 2.50 - 0.80j) glued and traced on the board wall (tf 0): the face is met against
+    //      the lining's immittance, the transfer matrix of a locally reacting face behind a layer;
+    //   G  a sweep of +-0.05 deg in 0.001 deg at the critical angle of the two-parameter board: on zeta, and no step.
+    // Before M6 the face reflected sqrt(1 - tf) with the bare face's phase (2 theta in the one-parameter mapping),
+    // tfQ < 0 was refused (a failed check here, not an abort), and behind a lining the pad was matched to it.
+    typedef std::complex<double> cd;
+    ub::OneThread one_thread;
+    const double thk = 0.0125, tf0 = 0.05, tfP = 0.25, F = 150.0;
+    struct Map
+    {
+        const char *name;
+        double a, mu;
+    };
+    const std::vector<Map> maps = {{"one", 8.1817e-08, 1.0}, {"two", 4.6908e-05, 573.33}};
+    auto deg = [](cd z)
+    { return std::arg(z) * 180.0 / QPI; };
+    // the walk, with a palette that today's library may refuse (tfQ < 0): a failed check, and the row reads NaN
+    auto WALK = [&](const ub::Pal &P, const std::vector<double> &x, const std::vector<int> &mat, const std::vector<bool> &flip, int tr, double f, double thd)
+    {
+        bf::Acc A;
+        A.R[0] = A.R[1] = A.T[0] = A.T[1] = cd(std::nan(""), 0.0);
+        CHECK_NOTHROW(A = m6t::walk(P, x, mat, flip, tr, f, thd));
+        return A;
+    };
+    auto R3 = [&](const ub::Pal &P, const std::vector<double> &x, const std::vector<int> &mat, const std::vector<bool> &flip, double f, double thd)
+    {
+        cd R(std::nan(""), 0.0);
+        arma::uvec mi;
+        arma::mat mesh = ub::build(x, mat, flip, mi), o, d;
+        diag_ray_at(thd, o, d);
+        ub::Opt op;
+        op.eps = 0.0;
+        CHECK_NOTHROW(R = cpx(ub::traced<double>(P, mesh, mi, 3, f, o, d, nullptr, op).xpr, 0, 0));
+        return R;
+    };
+    double mA = 0.0, mRT = 0.0, mB = 0.0, mC = 0.0, mD = 0.0, mDRT = 0.0, mE = 0.0, mET = 0.0, mERT = 0.0, mFH = 0.0, mFX = 0.0, mG = 0.0, mGs = 0.0;
+
+    QD_DIAG("\n# diag: A, the peaked board as its series impedance, |R| and phase against the reference\n");
+    QD_DIAG("map,kind,tfQ,type,f_Hz,theta,R_abs,R_deg,ref_abs,ref_deg,dR,R+T\n");
+    for (const Map &mp : maps)
+        for (double q : {0.75, -0.75})
+            for (int kind = 0; kind < 2; ++kind)
+            {
+                ub::Pal P;
+                CHECK_NOTHROW(P = m6t::board(mp.a, mp.mu, kind ? 0.0 : thk, q));
+                const std::vector<double> x = kind ? std::vector<double>{0.0, thk} : std::vector<double>{0.0};
+                const std::vector<int> mt = kind ? std::vector<int>{1, 1} : std::vector<int>{1};
+                const std::vector<bool> fl = kind ? std::vector<bool>{false, true} : std::vector<bool>{false};
+                for (int tr : {4, 5, 3})
+                    for (double f_hz : {63.0, 150.0, 250.0, 1000.0})
+                        for (double thd : {0.0, 10.0, 30.0, 45.0, 60.0, 75.0, 85.0})
+                        {
+                            const double f = f_hz * r1::FMAP * 1.0e9, c = std::cos(thd * QPI / 180.0);
+                            const cd ref = std::sqrt(1.0 - tf0) * m6t::r_face(m6t::zeta(tfP, F, q, f_hz), c);
+                            cd R;
+                            double rt = 0.0;
+                            if (tr == 3)
+                                R = R3(P, x, mt, fl, f, thd);
+                            else
+                            {
+                                bf::Acc W = WALK(P, x, mt, fl, tr, f, thd);
+                                R = W.R[0], rt = std::norm(W.R[0]) + std::norm(W.T[0]);
+                            }
+                            QD_DIAG("%s,%s,%+.2f,%d,%.0f,%.0f,%.6f,%+.4f,%.6f,%+.4f,%.1e,%.6f\n", mp.name, kind ? "X" : "S", q, tr, f_hz, thd, std::abs(R), deg(R),
+                                    std::abs(ref), deg(ref), std::abs(R - ref), rt);
+                            mA = std::max(mA, std::abs(R - ref)), mRT = std::max(mRT, rt);
+                            INFO("A " << mp.name << "-parameter " << (kind ? "traced" : "sheet") << ", tfQ " << q << ", type " << tr << ", " << f_hz << " Hz, " << thd << " deg");
+                            CHECK(std::abs(R - ref) < 1.0e-12);
+                            CHECK(rt <= 1.0);
+                        }
+            }
+
+    QD_DIAG("\n# diag: B, the phase extremes on a 1/96-octave sweep at 0 deg, one-parameter sheet, over-damped\n");
+    {
+        const ub::Pal P = m6t::board(maps[0].a, 1.0, thk, 0.75);
+        int iL[2] = {0, 0}, iR[2] = {0, 0};
+        double pL[2] = {1e9, -1e9}, pR[2] = {1e9, -1e9};
+        std::vector<double> fs;
+        for (int k = 0; k <= 192; ++k)
+            fs.push_back(75.0 * std::pow(2.0, k / 96.0));
+        for (size_t k = 0; k < fs.size(); ++k)
+        {
+            const cd R = m6t::walk(P, {0.0}, {1}, {false}, 4, fs[k] * r1::FMAP * 1.0e9, 0.0).R[0];
+            const cd ref = std::sqrt(1.0 - tf0) * m6t::r_face(m6t::zeta(tfP, F, 0.75, fs[k]), 1.0);
+            mB = std::max(mB, std::abs(R - ref));
+            if (deg(R) < pL[0])
+                pL[0] = deg(R), iL[0] = (int)k;
+            if (deg(R) > pL[1])
+                pL[1] = deg(R), iL[1] = (int)k;
+            if (deg(ref) < pR[0])
+                pR[0] = deg(ref), iR[0] = (int)k;
+            if (deg(ref) > pR[1])
+                pR[1] = deg(ref), iR[1] = (int)k;
+        }
+        QD_DIAG("extreme,f_Hz,phase_deg,ref_f_Hz,ref_phase_deg,d_deg\nmin,%.2f,%+.4f,%.2f,%+.4f,%.1e\nmax,%.2f,%+.4f,%.2f,%+.4f,%.1e\n", fs[iL[0]], pL[0], fs[iR[0]],
+                pR[0], std::abs(pL[0] - pR[0]), fs[iL[1]], pL[1], fs[iR[1]], pR[1], std::abs(pL[1] - pR[1]));
+        for (int e = 0; e < 2; ++e)
+        {
+            INFO("B, the phase " << (e ? "maximum" : "minimum"));
+            CHECK(iL[e] == iR[e]);
+            CHECK(std::abs(pL[e] - pR[e]) < 1.0e-12);
+        }
+        CHECK(mB < 1.0e-12);
     }
+
+    QD_DIAG("\n# diag: C, tfP 1.0 and 1.2 on both branches (R' = 1), one-parameter sheet, type 4\n");
+    QD_DIAG("f_Hz,theta,R_1.0_over,R_1.0_under,R_1.2_over,ref,max_d\n");
+    for (double f_hz : {100.0, 150.0, 225.0})
+        for (double thd : {0.0, 45.0, 85.0})
+        {
+            const double f = f_hz * r1::FMAP * 1.0e9;
+            const cd ref = std::sqrt(1.0 - tf0) * m6t::r_face(m6t::zeta(1.0, F, 0.75, f_hz), std::cos(thd * QPI / 180.0));
+            cd R[4];
+            int k = 0;
+            for (double p : {1.0, 1.2})
+                for (double q : {0.75, -0.75})
+                {
+                    ub::Pal P;
+                    CHECK_NOTHROW(P = m6t::board(maps[0].a, 1.0, thk, q, tf0, p));
+                    R[k++] = WALK(P, {0.0}, {1}, {false}, 4, f, thd).R[0];
+                }
+            double d = 0.0;
+            for (const cd &r : R)
+                d = std::max(d, std::abs(r - ref));
+            mC = std::max(mC, d);
+            QD_DIAG("%.0f,%.0f,%.6f,%.6f,%.6f,%.6f,%.1e\n", f_hz, thd, std::abs(R[0]), std::abs(R[1]), std::abs(R[2]), std::abs(ref), d);
+            INFO("C, " << f_hz << " Hz, " << thd << " deg");
+            CHECK(d < 1.0e-12);
+        }
+
+    QD_DIAG("\n# diag: D, EM type 1 on the peaked board, VV against (zeta c - 1)/(zeta c + 1), HH against -(zeta/c - 1)/(zeta/c + 1)\n");
+    QD_DIAG("map,kind,f_Hz,theta,VV_abs,VV_ref_abs,HH_abs,HH_ref_abs,dVV,dHH,RT_VV,RT_HH\n");
+    for (const Map &mp : maps)
+        for (int kind = 0; kind < 2; ++kind)
+        {
+            const ub::Pal P = m6t::board(mp.a, mp.mu, kind ? 0.0 : thk, 0.75);
+            for (double f_hz : {63.0, 150.0, 250.0})
+                for (double thd : {10.0, 30.0, 45.0, 60.0, 75.0, 85.0})
+                {
+                    const double c = std::cos(thd * QPI / 180.0);
+                    const cd z = m6t::zeta(tfP, F, 0.75, f_hz), rv = std::sqrt(1.0 - tf0) * m6t::r_face(z, c), rh = -std::sqrt(1.0 - tf0) * m6t::r_face(z, c, true);
+                    bf::Acc W = kind ? m6t::walk(P, {0.0, thk}, {1, 1}, {false, true}, 1, f_hz * r1::FMAP * 1.0e9, thd)
+                                     : m6t::walk(P, {0.0}, {1}, {false}, 1, f_hz * r1::FMAP * 1.0e9, thd);
+                    const double rt0 = std::norm(W.R[0]) + std::norm(W.T[0]), rt1 = std::norm(W.R[1]) + std::norm(W.T[1]);
+                    QD_DIAG("%s,%s,%.0f,%.0f,%.6f,%.6f,%.6f,%.6f,%.1e,%.1e,%.6f,%.6f\n", mp.name, kind ? "X" : "S", f_hz, thd, std::abs(W.R[0]), std::abs(rv),
+                            std::abs(W.R[1]), std::abs(rh), std::abs(W.R[0] - rv), std::abs(W.R[1] - rh), rt0, rt1);
+                    mD = std::max(mD, std::max(std::abs(W.R[0] - rv), std::abs(W.R[1] - rh))), mDRT = std::max(mDRT, std::max(rt0, rt1));
+                    INFO("D " << mp.name << "-parameter " << (kind ? "traced" : "sheet") << ", " << f_hz << " Hz, " << thd << " deg");
+                    CHECK(std::abs(W.R[0] - rv) < 1.0e-12);
+                    CHECK(std::abs(W.R[1] - rh) < 1.0e-12);
+                    CHECK(rt0 <= 1.0);
+                    CHECK(rt1 <= 1.0);
+                }
+        }
+
+    QD_DIAG("\n# diag: E, the gate: a wave medium (m 0, eps 2.50, 100 mm traced) with tf 0.05 and the peak keeps the flat pad\n");
+    QD_DIAG("type,f_Hz,theta,R_abs,R_deg,ref_abs,ref_deg,T2,T2_ref,R+T\n");
+    {
+        const double h = 0.1;
+        for (double f_hz : {63.0, 150.0})
+        {
+            std::vector<LumpMtl> lp = {{2.5, 0.0, 0.0, 0.0, tf0}};
+            ub::Pal P = lump_palette(lp);
+            r1::col(P, "tfP", {tfP}), r1::col(P, "tfF", {F * r1::FMAP}), r1::col(P, "tfQ", {0.75});
+            const double x = 0.75 * (f_hz / F - F / f_hz), tf = tf0 + tfP / (1.0 + x * x), f = f_hz * r1::FMAP * 1.0e9, k0 = 2.0 * QPI * f / C0;
+            for (int tr : {4, 5})
+                for (double thd : {0.0, 30.0, 60.0})
+                {
+                    // the layer: each face the transformer of the pair rule, R' = (1 - tf) r^2 on the Fresnel r
+                    const double c1 = std::cos(thd * QPI / 180.0), s1 = std::sin(thd * QPI / 180.0);
+                    const cd n = std::sqrt(cd(2.5, 0.0)), c2 = std::sqrt(1.0 - s1 * s1 / 2.5), r = (c1 - n * c2) / (c1 + n * c2), b = (1.0 - r) / (1.0 + r);
+                    const double x0 = std::abs(b), rm = (1.0 - x0) / (1.0 + x0), s = (rm < 0.0 ? -1.0 : 1.0) * std::sqrt(rm * rm * (1.0 - tf)), nu = ((1.0 - s) / (1.0 + s)) / x0;
+                    const cd rr = (1.0 - nu * b) / (1.0 + nu * b), p2 = std::exp(cd(0.0, -2.0) * k0 * n * h * c2);
+                    const double tt = 1.0 - std::norm(rr);
+                    const cd ref = rr - tt * rr * p2 / (1.0 - rr * rr * p2);
+                    const double T2ref = std::norm(tt / (1.0 - rr * rr * p2));
+                    bf::Acc W = m6t::walk(P, {0.0, h}, {1, 1}, {false, true}, tr, f, thd);
+                    const double rt = std::norm(W.R[0]) + std::norm(W.T[0]);
+                    QD_DIAG("%d,%.0f,%.0f,%.6f,%+.4f,%.6f,%+.4f,%.6f,%.6f,%.6f\n", tr, f_hz, thd, std::abs(W.R[0]), deg(W.R[0]), std::abs(ref), deg(ref), std::norm(W.T[0]),
+                            T2ref, rt);
+                    mE = std::max(mE, std::abs(W.R[0] - ref)), mET = std::max(mET, std::abs(std::norm(W.T[0]) - T2ref)), mERT = std::max(mERT, rt);
+                    INFO("E, type " << tr << ", " << f_hz << " Hz, " << thd << " deg");
+                    CHECK(std::abs(W.R[0] - ref) < 8.0e-6);
+                    CHECK(std::abs(std::norm(W.T[0]) - T2ref) < 8.0e-6);
+                    CHECK(rt <= 1.0 + 3.0e-6); // the traced dielectric reads 1 + 1.15e-6 at most, before M6 as after
+                }
+        }
+    }
+
+    QD_DIAG("\n# diag: F, behind a 10 mm lining (eps 2.50 - 0.80j), glued (H, the plane of the wall face) and traced (X), type 4\n");
+    QD_DIAG("kind,f_Hz,theta,R_abs,R_deg,ref_abs,ref_deg,dR\n");
+    {
+        const double h = 0.01;
+        const cd eL(2.5, -0.8);
+        for (double f_hz : {100.0, 150.0, 250.0})
+        {
+            const double f = f_hz * r1::FMAP * 1.0e9, k0 = 2.0 * QPI * f / C0;
+            for (int kind = 0; kind < 2; ++kind)
+            {
+                std::vector<LumpMtl> lp = {{2.5, 0.0, kind ? 0.0 : h}, {maps[0].a, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 20.0, 1.6644e-04}};
+                ub::Pal P = lump_palette(lp);
+                r1::col(P, "c", {0.8 * f_hz * r1::FMAP / 17.98, 0.0}), r1::col(P, "tfP", {0.0, tfP}), r1::col(P, "tfF", {0.0, F * r1::FMAP}), r1::col(P, "tfQ", {0.0, 0.75});
+                for (double thd : {0.0, 30.0, 60.0, 75.0})
+                {
+                    const double c = std::cos(thd * QPI / 180.0), s2 = 1.0 - c * c;
+                    cd cL = std::sqrt(1.0 - s2 / eL);
+                    cL = (std::imag(cL) > 0.0) ? -cL : cL;
+                    const cd yL = std::sqrt(eL) * cL, z = m6t::zeta(tfP, F, 0.75, f_hz), rf = (yL - 1.0 / z) / (yL + 1.0 / z), r01 = (c - yL) / (c + yL);
+                    const cd ph = std::exp(cd(0.0, -2.0) * k0 * std::sqrt(eL) * cL * h), ref = (r01 + rf * ph) / (1.0 + r01 * rf * ph);
+                    cd R = kind ? m6t::walk(P, {0.0, h, h, h + 0.1}, {1, 1, 2, 2}, {false, true, false, true}, 4, f, thd).R[0]
+                                : m6t::walk(P, {0.0, 0.0, 0.1}, {1, 2, 2}, {false, false, true}, 4, f, thd).R[0] * std::exp(cd(0.0, -2.0) * k0 * h * c);
+                    QD_DIAG("%s,%.0f,%.0f,%.6f,%+.4f,%.6f,%+.4f,%.1e\n", kind ? "X" : "H", f_hz, thd, std::abs(R), deg(R), std::abs(ref), deg(ref), std::abs(R - ref));
+                    (kind ? mFX : mFH) = std::max(kind ? mFX : mFH, std::abs(R - ref));
+                    INFO("F " << (kind ? "traced" : "glued") << ", " << f_hz << " Hz, " << thd << " deg");
+                    CHECK(std::abs(R - ref) < (kind ? 1.0e-4 : 1.0e-12));
+                }
+            }
+        }
+    }
+
+    QD_DIAG("\n# diag: G, +-0.05 deg at the critical angle of the two-parameter board (open below it), 150 Hz, type 4\n");
+    {
+        const double tc = std::asin(std::sqrt(maps[1].a * maps[1].mu)) * 180.0 / QPI, f = 150.0 * r1::FMAP * 1.0e9;
+        for (int kind = 0; kind < 2; ++kind)
+        {
+            const ub::Pal P = m6t::board(maps[1].a, maps[1].mu, kind ? 0.0 : thk, 0.75);
+            cd prev(0.0, 0.0);
+            for (int k = -50; k <= 50; ++k)
+            {
+                const double thd = tc + 0.001 * k;
+                const cd R = kind ? m6t::walk(P, {0.0, thk}, {1, 1}, {false, true}, 4, f, thd).R[0] : m6t::walk(P, {0.0}, {1}, {false}, 4, f, thd).R[0];
+                const cd ref = std::sqrt(1.0 - tf0) * m6t::r_face(m6t::zeta(tfP, F, 0.75, 150.0), std::cos(thd * QPI / 180.0));
+                mG = std::max(mG, std::abs(R - ref));
+                if (k > -50)
+                    mGs = std::max(mGs, std::abs(R - prev));
+                prev = R;
+            }
+        }
+        QD_DIAG("critical_deg,max_dR,max_step\n%.4f,%.1e,%.1e\n", tc, mG, mGs);
+        CHECK(mG < 1.0e-12);
+        CHECK(mGs < 1.0e-6);
+    }
+    QD_DIAG("# maxima: A %.1e (R+T %.6f), B %.1e, C %.1e, D %.1e (R+T %.6f), E %.1e / %.1e (R+T %.6f), F glued %.1e traced %.1e, G %.1e step %.1e\n", mA,
+            mRT, mB, mC, mD, mDRT, mE, mET, mERT, mFH, mFX, mG, mGs);
 }

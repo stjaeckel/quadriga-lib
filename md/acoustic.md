@@ -21,7 +21,7 @@ closed-form evaluation made for this document, "measured here" a run of the libr
 sources (section 9) and sets no parameter.
 
 First step: `md/wave.md`, section 0. The acoustic half:
-`./build_linux/test_bin "[acoustic]" > test_acoustic.txt` → `All tests passed (36813 assertions in 52 test cases)`.
+`./build_linux/test_bin "[acoustic]" > test_acoustic.txt` → `All tests passed (39371 assertions in 54 test cases)`.
 Its cases are in `test_acoustic_mesh_interact.cpp`, `test_acoustic_progress.cpp`,
 `test_acoustic_state_update.cpp` and `test_acoustic_leaf.cpp` (the leaves of 2.8); 18 of them are "<name> - the mass-law part" of a wave case. The appendix
 lists every case with the section that states it. The machine described in section 2 is the one after
@@ -161,8 +161,13 @@ lossless medium where the face is closed (every rigid face from 0.003°, one-par
 critical angle, two-parameter), the transformer's `1 − R′` where it is open (a rigid face exactly at normal
 incidence: `1 − (1 − tf)·R0`, `R0` its Fresnel reflectance), and next to a lossy medium the flux the pad
 hands over. A face without `tf` absorbs nothing and the plate passes nothing; rule of use: `tf` is set
-together with `m`. `tf` may carry a resonant peak (2.6). A face between two bodies of the plate passes
-everything and reflects nothing.
+together with `m`. Where `tf` carries a peak the face is its series impedance (2.6) and absorbs
+`1 − (1 − tf)·|r_ζ(θ)|²`, so `a` depends on the angle: over-damped it rises toward grazing, and the plate passes
+more there. The 12.5 mm board of 2.6 passes within 0.06 dB of the flat absorption at 0°, 1.07 dB more at 60° and
+6.35 dB more at 85° (63 Hz); field-incidence TL per octave falls by at most 0.96 dB on the board and by 0.21 / 0.17 dB
+on 4 mm glass and 4-16-4 with peaked faces (the library on the formula copy of report 3.6 to 0.0000 dB,
+`md/m6_report.md` 0.5). None of the 13 transmission fits of report 3.6 carries a peak. A face between two bodies of
+the plate passes everything and reflects nothing.
 
 **Where it is paid.** The first face passes `a_in`; each body's leg pays its telescoped term (2.2); the face
 out of the plate into a medium without the mass column pays the rest, `F(min(a_in, a_out), τ) / (a_in·τ)`.
@@ -254,21 +259,52 @@ and behind a sheet inside a wall - the mass-law part*.
 
     tf(f) = tfR·(f/fRef)^tfB + tfP / (1 + (tfQ·(f/tfF − tfF/f))²)
 
-clamped to `[−1, 1]` as before; `tfF ≥ 0`, `tfQ ≥ 0` are required, and the peak acts where `tfP ≠ 0` and
-`tfF > 0`. The peak is the lumped resonator's (M5, built 2026-10-16; 3.2): symmetric in log frequency, zero at both
-ends, `tfQ` the absorber's `Q_α`. Near the peak it equals the linear detuning of 4720a92,
+clamped to `[−1, 1]` as before; `tfF ≥ 0` is required (`tfQ` may be negative: the branch, below), and the peak acts
+where `tfP ≠ 0` and `tfF > 0`. The peak is the lumped resonator's (M5, built 2026-10-16; 3.2): symmetric in log
+frequency, zero at both ends, `|tfQ|` the absorber's `Q_α`. Near the peak it equals the linear detuning of 4720a92,
 `tfP / (1 + (tfQ′·(f − tfF)/tfF)²)`, with `tfQ′ = 2·Q_α`; that form kept a floor of `tfP/(1 + tfQ′²)` as `f → 0`.
-A 12.5 mm board on battens (floor 0.05, peak 0.25 at 150 Hz, `Q_α` 0.75) absorbs the formula exactly as sheet and
-traced solid and passes the plate rule within 0.001 dB, and through `ray_progress` every frequency of a band equals
-its single-frequency run. Its peak part at band centers, measured through the library: 0.020 / 0.079 / 0.232 / 0.152
-/ 0.040 at 31.5 / 63 / 125 / 250 / 500 Hz (on the linear detuning with `tfQ` 1.5: 0.104 / 0.142 / 0.235 / 0.125 /
-0.019; `md/m5_a21_report.md` 1.2). A material CSV carries the three columns like any other; the OBJ writer's
+A 12.5 mm board on battens (floor 0.05, peak 0.25 at 150 Hz, `Q_α` 0.75) absorbed the formula at every angle under M5
+(238444d), as sheet and traced solid, and passed the plate rule within 0.001 dB; through `ray_progress` every
+frequency of a band equals its single-frequency run. Its peak part at band centers: 0.020 / 0.079 / 0.232 / 0.152 /
+0.040 at 31.5 / 63 / 125 / 250 / 500 Hz (on the linear detuning with `tfQ` 1.5: 0.104 / 0.142 / 0.235 / 0.125 /
+0.019; `md/m5_a21_report.md` 1.2).
+
+**A peaked face is a locally reacting face** (M6, built 2026-10-16, `md/m6_report.md`). Where a mass-law face carries
+a peak (`m > 0`, `tfP > 0`, `tfF > 0`) the peak is the series impedance of a resonator per `Z₀`,
+
+    ζ = R′ + j·(1 + R′)·|tfQ|·(f/tfF − tfF/f),   tfP = 4R′/(1 + R′)²,
+
+over-damped (`R′ ≥ 1`) by default, under-damped (`1/R′`) where `tfQ < 0`; `tfP` above one is `R′ = 1`, where the two
+branches meet. `ζ` replaces the reactance of the bare face (the mapping's calibration of a hard wall), behind a
+matched pad of the power-law part, and is met against the immittance of the side the wave is on: in air
+`r = (ζ c − 1)/(ζ c + 1)` at the cosine `c`, the TM channel of EM types `(ζ/c − 1)/(ζ/c + 1)` (an impedance boundary),
+and `|r|² = (1 − tf)·|r_ζ|²`. At normal incidence in air it absorbs the law above less `tf` times the peak
+(`tf + α_peak − tf·α_peak`: 0.2875 against 0.3000 at 150 Hz on the board). The face is the same on both sides of a
+critical angle (no step: 1.9e-7 between neighbors 0.001° apart at the two-parameter critical angle) and in both
+mappings. A wave medium (`m = 0`) with a peak keeps the transformer of the flat law, and a negative peak forces
+reflection as before; without that gate a peaked wave medium created energy (R + T 1.36, `md/m6_report.md` 0.3).
+
+Measured on the board (`md/m6_report.md` 0.1, 0.4): over-damped (`R′` 13.93) the phase runs from −4.12° at 83.6 Hz to
++4.12° at 269.2 Hz at 0° (±5.83° at 45°, ±8.26° at 60°, 1/96-octave sweep), `r` +0.844 at the peak; under-damped
+(`R′` 0.0718) the phase passes through 180° at 150 Hz, `r` −0.844. The over-damped face absorbs more toward grazing
+(0.288 / 0.319 / 0.467 / 0.991 at 0° / 30° / 60° / 85°, 150 Hz), the under-damped one less (0.288 / 0.259 / 0.177 /
+0.074): the random-incidence value (Paris 0°–90°) is 0.420 and 0.214 against the same `α₀` 0.288 (9). Behind a lining
+the face is met against the lining's immittance, the transfer matrix of a locally reacting face behind a layer
+(within 6.2e-13 glued, 3.4e-5 traced, dense `eps 2.50 − 0.80j`): a face of fixed impedance whatever lies in front (A20
+for the peak). A panel over a partitioned cavity (`cot(k₀d)`, no cosine inside) is the lumped `ζ` within 0.012 in
+`|r|` and 0.0021 in the Paris value per octave to 1 kHz on 25 to 100 mm of cavity; an unpartitioned cavity is M9's
+(2.8). Asserted in: *Absorption peak - a peaked face is its series impedance in magnitude and phase from 0 to 85 deg,
+as a sheet and as a traced solid, on both branches* (both mappings, types 4, 5, 3 and EM type 1, the gate, the
+lining, the critical angle); *Absorption peak - tfP, tfF and tfQ add a resonant peak to the room-side absorption of a
+mass-law face* and *ray_progress - the plate rule and the absorption peak at every frequency of a band* (restated:
+the absorption at the angle and the plate rule with it); *ray_progress - the random-incidence absorption of a peaked
+lining is the Paris integral of its series impedance* (within 4.3e-6 of the closed form). A material CSV carries the three columns like any other; the OBJ writer's
 canonical order and the Python / MATLAB readers' key order list them after `tfB`. Asserted in: *Absorption peak -
 tfP, tfF and tfQ add a resonant peak to the room-side absorption of a mass-law face*; *ray_progress - the plate rule
 and the absorption peak at every frequency of a band*.
 
-A rigid face reflects `R = 1 − tf` at every angle, in both mappings (|r| 0.9486 for `tf` 0.1, report 3.4);
-`tf` does not change the phase of the face (report 3.5). The coefficient type this makes `tf` is in 3.1.
+A rigid face without a peak reflects `R = 1 − tf` at every angle, in both mappings (|r| 0.9486 for `tf` 0.1, report
+3.4); that `tf` does not change the phase of the face (report 3.5). The coefficient type this makes `tf` is in 3.1.
 
 Rule of use: a rigid body carries the mass column, and `tf` is set together with `m`. A rigid permittivity
 without `m` is a wave medium (`md/wave.md`, section 8). A rigid body is lossless: a loss column opens its
@@ -280,7 +316,7 @@ recorded). `coiA = 0` on a mass-law material; one `att` per bonded run (A5).
 
 | quantity (per band) | column | settable on its own | round-1 evidence |
 | --- | --- | --- | --- |
-| room-side absorption of a rigid face | `tf`, `tfB` (power law), `tfP`, `tfF`, `tfQ` (a resonant peak) | yes | monotone rows within 0.051 in α (report 3.4); the peak on the resonator law: every lining and pane row within 0.017, cork board 0.047 (report 3.8 refitted, `md/m5_a21_report.md` 1.2) |
+| room-side absorption of a rigid face | `tf`, `tfB` (power law), `tfP`, `tfF`, `tfQ` (a resonant peak) | yes | monotone rows within 0.051 in α (report 3.4); the peak on the resonator law: every lining and pane row within 0.017, cork board 0.047 (report 3.8 refitted, `md/m5_a21_report.md` 1.2); as a locally reacting face (M6) the same residuals on the Paris target (`md/m6_report.md` 0.6) |
 | transmission level | `fRef` with `thk` | yes: the plate passes about `τ` where `τ ≪ a` | 13 constructions within 2.51 dB with the rows below (report 3.6) |
 | transmission slope | `m` | yes | fitted 1.64 to 35.13 (`p3/tl/rmb_chk.out`) |
 | coincidence dip | `coiF`, `coiQ` (bending stiffness in `X₀`), `coiA = 0` | yes | light panels at their physical `f_c` (2825 / 1938 Hz against 2989 / 1993 Hz for 4 / 6 mm glass); on heavy walls `coiF` is not physical, 49 to 5188 Hz (report 3.6) |
@@ -289,7 +325,7 @@ recorded). `coiA = 0` on a mass-law material; one `att` per bonded run (A5).
 | extra loss per entry (frame, seals) | `att`, `attB` | yes; one per bonded run (A5) | fitted 0 to 5.44 dB |
 | porous and empirical absorbers | `a`–`h`, `alpha` (wave media) in the two-parameter mapping | yes (`md/wave.md`; section 1) | Knauf TP 120 A within ±0.025 (20 mm), ±0.032 (30 mm), 31.5 Hz–8 kHz (report 3.4) |
 | bonded layers | the plate rule | yes | 2.3 |
-| reflection phase of a hard wall | the two-parameter mapping (N7) | yes | within 0.1° to 60° (report 3.5); the phase of the pad and of a resonant absorber is open (A12) |
+| reflection phase of a hard wall, of a resonant face | the two-parameter mapping (N7); `tfP`, `tfF`, `tfQ` as a series impedance (M6, 2.6) | yes | within 0.1° to 60° (report 3.5); a peaked face on its series impedance to 1e-12 (*Absorption peak - a peaked face is its series impedance in magnitude and phase from 0 to 85 deg, as a sheet and as a traced solid, on both branches*); a flat pad keeps the bare face's phase |
 
 ### 2.8 Leaves as wave-medium sheets
 
@@ -375,12 +411,12 @@ of ISO 354, which includes edge diffraction and the non-diffuse incidence of rea
 
 | quantity | physics requires | today | status | candidate |
 | --- | --- | --- | --- | --- |
-| absorption per octave of a rigid face | for energy tracing a random-incidence coefficient per band; normal-incidence coefficients give the largest errors [Jeong_2012_BoundaryConditionsPhasedGA, Sec. V-VI] | `tf` power law and peak (2.6), `R = 1 − tf` | expressible; report 3.4 (monotone rows within 0.051); peaked rows within 0.017, cork 0.047, on the resonator law (report 3.8 refitted, `md/m5_a21_report.md` 1.2) | M5 (built) |
-| the coefficient type `tf` is | `α_st ≤ 0.951` for a locally reacting surface, reached at a normalized impedance of 1.567 [Jeong_2009_AngularDistributionCorrection, Sec. I]; `α_s` exceeds `α_st` by 0.1 to 0.35 at mid frequencies for porous layers [Dupont_2023_SoundFieldSynthesis, Sec. 4.3]; ISO 11654 caps practical coefficients at 1.00 [Balint_2023_HundredYearDebate, p. 19] | `R = 1 − tf` at every angle, so `tf` is `α(θ)` at every angle and equals `α₀`, `α_st` and the field value at once; `tf` up to one | expressible for a random-incidence reference; a Sabine reference has to be converted before it is a `tf` (A13) | — |
-| angle dependence of a locally reacting face | `α(θ) = 1 − \|R(θ)\|²`, `R(θ) = (Z_s cos θ − ρ₀c₀)/(Z_s cos θ + ρ₀c₀)` [Savioja_2015_GeometricalModeling, Eqs. 4-5]; for a high-impedance face `α_st` exceeds `α₀` by up to a factor of about 1.7 (impedances 40 / 10 / 4: `α₀` 0.10 / 0.33 / 0.64, `α_st` 0.17 / 0.49 / 0.79) [Jeong_2012_BoundaryConditionsPhasedGA, Table I]; angle-dependent coefficients improve accuracy only marginally over angle-independent ones (Jeong et al. in [Savioja_2015_GeometricalModeling, p. 719]); measured `α(θ)` exists for two surfaces only [Aspoeck_2020_BRAS, Sec. 3.2.1] | flat in angle | partial (energy right on average, no angle shape); the literature gives this little weight | M6 for resonant faces |
+| absorption per octave of a rigid face | for energy tracing a random-incidence coefficient per band; normal-incidence coefficients give the largest errors [Jeong_2012_BoundaryConditionsPhasedGA, Sec. V-VI] | `tf` power law, `R = 1 − tf`; a peak as a locally reacting face (2.6) | expressible; report 3.4 (monotone rows within 0.051); peaked rows within 0.017, cork 0.047, on the resonator law (report 3.8 refitted, `md/m5_a21_report.md` 1.2), and on their Paris targets as locally reacting faces with the same residuals (`md/m6_report.md` 0.6) | M5, M6 (built) |
+| the coefficient type `tf` is | `α_st ≤ 0.951` for a locally reacting surface, reached at a normalized impedance of 1.567 [Jeong_2009_AngularDistributionCorrection, Sec. I]; `α_s` exceeds `α_st` by 0.1 to 0.35 at mid frequencies for porous layers [Dupont_2023_SoundFieldSynthesis, Sec. 4.3]; ISO 11654 caps practical coefficients at 1.00 [Balint_2023_HundredYearDebate, p. 19] | `R = 1 − tf` at every angle, so `tf` without a peak is `α(θ)` at every angle and equals `α₀`, `α_st` and the field value at once; `tf` up to one. A peak is a locally reacting face (2.6): the law gives its `α₀`, and its random-incidence value is the Paris integral of the face (0.420 against `α₀` 0.288 on the board of 2.6, over-damped) | expressible for a random-incidence reference; a Sabine reference has to be converted before it is a `tf` (A13); a peaked row is fitted on the Paris integral (9) | — |
+| angle dependence of a locally reacting face | `α(θ) = 1 − \|R(θ)\|²`, `R(θ) = (Z_s cos θ − ρ₀c₀)/(Z_s cos θ + ρ₀c₀)` [Savioja_2015_GeometricalModeling, Eqs. 4-5]; for a high-impedance face `α_st` exceeds `α₀` by up to a factor of about 1.7 (impedances 40 / 10 / 4: `α₀` 0.10 / 0.33 / 0.64, `α_st` 0.17 / 0.49 / 0.79) [Jeong_2012_BoundaryConditionsPhasedGA, Table I]; angle-dependent coefficients improve accuracy only marginally over angle-independent ones (Jeong et al. in [Savioja_2015_GeometricalModeling, p. 719]); measured `α(θ)` exists for two surfaces only [Aspoeck_2020_BRAS, Sec. 3.2.1] | flat in angle for `tf` without a peak; a peaked face is this locally reacting face (M6, 2.6) | expressible for resonant faces (*Absorption peak - a peaked face is its series impedance in magnitude and phase from 0 to 85 deg, as a sheet and as a traced solid, on both branches*); partial for a flat `tf` (energy right on average, no angle shape), which the literature gives little weight | M6 (built) |
 | a porous layer on a rigid backing, extended reaction | an equivalent fluid (`Z_c`, `k`) per frequency; the angle enters through the refracted wavenumber in the layer [Pind_2020_ExtendedReactingDG, Sec. II]; local reaction under-predicts on a rigid backing, error below 10 % (eight-octave mean) above 120 / 100 / 60 / 40 mm for 5 / 9 / 22 / 40 kPa·s/m² [Jeong_2011_LocalReactionGuideline, Sec. 4] | a coherent layer of a wave medium (`m = 0`, columns `a`–`h`) on a rigid mass-law wall, two-parameter mapping: extended reaction by construction | expressible; *Two-parameter mapping* (within 0.0008 in α at 0° to 80°); report 3.4 (within 0.003 per angle; the one-parameter backing off by up to 0.53 at 125 Hz, 60°) | M8 |
 | a porous layer over an air gap | a transfer matrix with the angle-dependent cavity impedance `−jρ₀c₀·cot(k₀d₀ cos θ)/cos θ` [Pind_2020_ExtendedReactingDG, Sec. II; Masovic_2021_RoomAcousticsNotes, Sec. 8.4]; behind a gap local reaction over-predicts below 4 kHz, and per band local and extended reaction differ by 0.14 to 0.31 at 63 and 125 Hz for 10 mm of 40 kPa·s/m² over 150 to 350 mm [Jeong_2011_LocalReactionGuideline, Figs. 9-10]; one panel tripled `α_p` at 125 Hz with a 150 mm larger cavity [Ecophon_2021_MasterBrochure] | a leaf glued on a meshed box of air with a porous body at its back (2.8) | a leaf with the fill at the back expressible (*Leaf - a porous fill at the back of the box is the transfer matrix of leaf, air, fill and wall*: within 2.6e-5 of the matrix of its columns); a porous layer directly behind a leaf with air behind it not expressible (no finite path sum, 2.8); a porous layer over a gap without a leaf not measured | M9 |
-| a panel over an unpartitioned cavity | the peak moves by more than two octaves with incidence angle; a honeycomb partition removes the shift [Toyoda_2011_HoneycombPanelAbsorbers, Fig. 2]; an MPP curve shifts up by about `1/cos θ` [Maa_1987_MPPWideband, Eq. 27] | `tf` peak at `tfF` at every angle; the transmission dip (`resS > 0`) does move as `1/c` (2.1); or the leaf as a wave-medium sheet over the cavity (M9) | as a `tf` peak partial (a partitioned cavity expressible, an open one not); as a wave-medium leaf on a box of air expressible with the angle shift (2.8; *Leaf - a leaf on a box of air is the transfer matrix of leaf and cavity at every angle*: the 12.5 mm board on 25 mm peaks at 128.4 / 148.6 / 182.4 / 258.8 Hz at 0° / 30° / 45° / 60° on a 1/96-octave sweep, on the transfer-matrix reference within 6.5e-5 in R; A18's 125 / 160 / 200 / 250 Hz were the nearest points of a 14-frequency grid) | M9 |
+| a panel over an unpartitioned cavity | the peak moves by more than two octaves with incidence angle; a honeycomb partition removes the shift [Toyoda_2011_HoneycombPanelAbsorbers, Fig. 2]; an MPP curve shifts up by about `1/cos θ` [Maa_1987_MPPWideband, Eq. 27] | `tf` peak at `tfF` at every angle (a locally reacting face, M6: the partitioned cavity); the transmission dip (`resS > 0`) does move as `1/c` (2.1); or the leaf as a wave-medium sheet over the cavity (M9) | as a `tf` peak partial (a partitioned cavity expressible, an open one not); as a wave-medium leaf on a box of air expressible with the angle shift (2.8; *Leaf - a leaf on a box of air is the transfer matrix of leaf and cavity at every angle*: the 12.5 mm board on 25 mm peaks at 128.4 / 148.6 / 182.4 / 258.8 Hz at 0° / 30° / 45° / 60° on a 1/96-octave sweep, on the transfer-matrix reference within 6.5e-5 in R; A18's 125 / 160 / 200 / 250 Hz were the nearest points of a 14-frequency grid) | M9 |
 | perforated facing on a porous layer | nearly angle independent: equal absorption at 0°, 45° and 78° for a perforated gypsum ceiling [Hengst_2020_GelochteAkustikdecke] | flat `tf` | expressible | — |
 | the edge effect of a finite absorber | `α_s = α_∞ + β·E`, `E` the free edge per area, 1.13 to 1.29 m⁻¹ for ISO samples [Vercammen_2012_SampleSize, Eq. 1]; `β` about 0.11 / 0.21 / 0.19 / 0.12 / 0.06 at 200 / 320 / 500 / 1000 / 2000 Hz for 50 mm mineral wool [Kuhl_1960_EdgeEffect] | a meshed panel absorbs its `tf` per face area; no edge term | not expressible as a material property; a small panel's excess can be carried in its `tf` | — (a parameter rule, A13) |
 
@@ -395,10 +431,10 @@ as a shape, `α₀/α_max = 1 / (1 + (Q_α·(f/f₀ − f₀/f))²)` with `Q_α 
 
 | quantity | physics requires | today | status | candidate |
 | --- | --- | --- | --- | --- |
-| peak shape in frequency | the law above: symmetric in log frequency, zero at both ends, `f²` below the peak and `f⁻²` above it | the law, `tfP / (1 + (tfQ·(f/tfF − tfF/f))²)` with `tfQ` = `Q_α` (M5, built 2026-10-16). Before: the linear detuning `tfP / (1 + (tfQ·(f − tfF)/tfF)²)`, equal near the peak for `tfQ = 2·Q_α`, wide below and narrow above, with a floor of `tfP/(1 + tfQ²)` as `f → 0`. The board of *Absorption peak* (0.25 at 150 Hz), measured through the library at band centers, law with `Q_α` 0.75 against the old form with `tfQ` 1.5: 0.020 / 0.104 at 31.5 Hz, 0.079 / 0.142 at 63 Hz, 0.232 / 0.235 at 125 Hz, 0.152 / 0.125 at 250 Hz, 0.040 / 0.019 at 500 Hz (`md/m5_a21_report.md` 1.2) | expressible; *Absorption peak - tfP, tfF and tfQ add a resonant peak to the room-side absorption of a mass-law face*; the six peaked rows of report 3.8 refitted on the law: within 0.017, cork board 0.047 (0.070 on the old form, converged; report 3.8 gave 0.076); Paris 0°–90° and field 0°–78° equal for a `tf` face (flat in angle) | — (M5 built) |
+| peak shape in frequency | the law above: symmetric in log frequency, zero at both ends, `f²` below the peak and `f⁻²` above it | the law, `tfP / (1 + (tfQ·(f/tfF − tfF/f))²)` with `tfQ` = `Q_α` (M5, built 2026-10-16). Before: the linear detuning `tfP / (1 + (tfQ·(f − tfF)/tfF)²)`, equal near the peak for `tfQ = 2·Q_α`, wide below and narrow above, with a floor of `tfP/(1 + tfQ²)` as `f → 0`. The board of *Absorption peak* (0.25 at 150 Hz), measured through the library at band centers, law with `Q_α` 0.75 against the old form with `tfQ` 1.5: 0.020 / 0.104 at 31.5 Hz, 0.079 / 0.142 at 63 Hz, 0.232 / 0.235 at 125 Hz, 0.152 / 0.125 at 250 Hz, 0.040 / 0.019 at 500 Hz (`md/m5_a21_report.md` 1.2) | expressible; *Absorption peak - tfP, tfF and tfQ add a resonant peak to the room-side absorption of a mass-law face*; the six peaked rows of report 3.8 refitted on the law: within 0.017, cork board 0.047 (0.070 on the old form, converged; report 3.8 gave 0.076); Paris 0°–90° and field 0°–78° equal for a flat `tf` face; for a peaked face (M6) they differ, by up to 0.017 per octave on the six refitted rows (`md/m6_report.md` 0.6) | — (M5 built) |
 | peak frequency of a membrane | `f₀ = (c₀/2π)·√(ρ₀/(m″d))` [Masovic_2021_RoomAcousticsNotes, Eq. 8.58], the constant 59.9 (60) with adiabatic air, about 50.6 with porous fill (isothermal) [review 4.2]; the 50 form with errors up to 10 % for either [Oldfield_2006_ImprovedMembraneAbsorbers, Eqs. 2.30-2.31]; measured peaks of 3 mm plywood 1.1 to 1.6 times the 60 value [Sakagami_2007_NonUniformCavity, Sec. 2.2]; edge clamping 1.24 and 1.54 times [Oldfield_2006_ImprovedMembraneAbsorbers, Sec. 4.4.2]; measured resonances 0.7 to 1.6 times the model [review 6.4] | `tfF` and `resF` are free numbers; under M9 the leaf on a box of its real depth (2.8) | expressible; the constant is a rule for deriving the column (A19, revised); under M9 the angle shift lifts the random-incidence peak 1.24 to 1.30 times above `f₀`, and the framed chamber peaks read 0.80 to 1.11 (A19) | — |
 | height and width | `α_max` from `R′`, width from `Q_α`; light, deep resonators broad, heavy panels over shallow cavities narrow [Kristl_2023_Verbundplattenresonatoren, Sec. 3.1]; a loose porous layer of flow resistivity `Ξ` and thickness `d_a` adds about `Ξ·d_a/3` [Kristl_2023_Verbundplattenresonatoren, Sec. 3.1] | `tfP`, `tfQ` | expressible | — (`tfQ` is `Q_α` since M5) |
-| the reflection phase of a resonant absorber | the complex `R` of the series impedance: a 12.5 mm board on 25 mm air swings from −18° to +15° through its resonance (model, report 3.5) | the pad carries the phase of the bare face | not expressible (A12) | M6 |
+| the reflection phase of a resonant absorber | the complex `R` of the series impedance: a 12.5 mm board on 25 mm air swings from −18° to +15° through its resonance (model, report 3.5) | the phase of the face's series impedance (M6, built 2026-10-16; 2.6): ±4.12° on the board of 2.6 over-damped, through 180° under-damped | expressible; *Absorption peak - a peaked face is its series impedance in magnitude and phase from 0 to 85 deg, as a sheet and as a traced solid, on both branches* | — (M6 built) |
 | microperforated panel | Maa's model from hole radius, panel thickness, perforation ratio; half-absorption band about two octaves [Randeberg_2000_PerforatedPanelAbsorbers, Eqs. 2.49-2.52]; measured MPP ceilings peak near 0.75 at 160 / 400 / 630 / 800 Hz for 400 / 200 / 100 / 50 mm cavities [Fuchs_2006_MPPReview, Fig. 4]; double and triple MPPs widen the band to three and four octaves (modeled) [Cobo_2019_MultipleLayerMPPReview, Sec. 3]; a perforate is an equivalent fluid layer with porosity the perforation ratio, `σ = 8η/(φr²)`, `Λ = Λ′ = r` [Atalla_2007_PerforatedPlatesJCA, Sec. 2] | a `tf` peak; or a wave-medium sheet over a cavity | partial: the peak expressible (one band of about two octaves), the angle shift not (M7), the layer form not measured | M5 (built), M7, M9 |
 | level dependence | linear behavior ends near a peak pressure difference of about 10 Pa across an MPP, stated as 114 dB [Maa_1987_MPPWideband, Eq. 15]; orifices become nonlinear near 5 m/s [Randeberg_2000_PerforatedPanelAbsorbers, Sec. 2.3.2] | the tracer is linear | not expressible (section 5) | — |
 | gypsum cavity walls | `α(f) = 0.44·(f_MAM/f)² + α_r` above `f_MAM = 1900·√((m₁ + m₂)/(m₁m₂d))` (1362 with fill), `α_r` 0.045 single, 0.06 double or filled, validated from 80 Hz [Bradley_1997_GypsumCavityAbsorption, Eqs. 1-3] | `tfR` with `tfB = 0` for `α_r`, the peak's upper flank (falling as `f⁻²` in both forms) for the first term | expressible above `f_MAM`; not measured | M5 (built) |
@@ -471,7 +507,7 @@ scope (section 5).
 | phase in a pressure-based tracer | the complex `R(θ)` of the boundary; neglecting the phase raised level errors by up to about 2.4 dB in phased beam tracing against BEM [Jeong_2012_BoundaryConditionsPhasedGA, Sec. V-VI]; phase in early reflections improves mid-frequency accuracy (Jeong et al. in [Savioja_2015_GeometricalModeling, p. 719]) | every path carries a complex amplitude | expressible | — |
 | a hard wall | a phase near zero at every angle | the two-parameter mapping: 0.009° at 10°, 0.104° at 60° (concrete), 3.1° at 89° (glass) (report 3.5) | expressible; *Two-parameter mapping* | M8 |
 | a porous layer on a wall | the phase of the layer impedance | the coherent layer (3.1) | expressible | — |
-| the pad of a rigid face (`1 − tf`) and a resonant absorber | the phase of the face's impedance; ±18° through a panel absorber's resonance (model, report 3.5) | the pad keeps the reactance of the bare face (`Material::closed_face`), `tf` sets its resistance only | not expressible | M6 |
+| the pad of a rigid face (`1 − tf`) and a resonant absorber | the phase of the face's impedance; ±18° through a panel absorber's resonance (model, report 3.5) | a resonant (peaked) face: the phase of its series impedance (M6, 2.6); a flat pad keeps the reactance of the bare face (`Material::closed_face`), `tf` sets its resistance only | expressible for locally reacting resonant faces, every type (*Absorption peak - a peaked face is its series impedance in magnitude and phase from 0 to 85 deg, as a sheet and as a traced solid, on both branches*); a flat pad has the hard wall's phase | M6 (built) |
 | finite-size reflection | a finite-size reflection coefficient reduced phased-GA errors at low frequency and degraded them above the Schroeder frequency [Jeong_2013_ReflectionAbsorptionCoefficients, Sec. 2-3] | — | not expressible; not proposed | — |
 
 ### 3.9 The modal region
@@ -482,8 +518,8 @@ so 31.5 to 125 Hz is modal there.
 
 | quantity | physics requires | today | status | candidate |
 | --- | --- | --- | --- | --- |
-| modes from a coherent tracer | complex impedance boundaries; a phase-carrying ray method reproduced the lowest modes of a rectangular room, 3 to 5 % reverberation-time deviation at 125 Hz for real impedance, lowest-mode peaks under-estimated [Prislan_2017_RayTracingExtendedReaction, Conclusion] | coherent paths with complex boundary factors; wavelengths of 5.4 m (63 Hz) and 10.9 m (31.5 Hz) against room size (report 1.9) | partial: the boundary phase of hard walls and porous layers is right (3.8), that of resonant faces is not; not measured on a room | M6 |
-| energy storage of a resonator | a plate absorber tuned within 0.1 Hz of a room mode gave a beating decay [Nell_2019_TieffrequenteAbsorption, Sec. 6.3]; an energy tracer with per-band `α` cannot represent this coupling [review 6.5] | a frequency-domain tracer carries a resonator through its complex reflection factor | not expressible today (the pad is real in its resistance only); with M6 the factor exists; the coupling then rests on the reflection order traced | M6 |
+| modes from a coherent tracer | complex impedance boundaries; a phase-carrying ray method reproduced the lowest modes of a rectangular room, 3 to 5 % reverberation-time deviation at 125 Hz for real impedance, lowest-mode peaks under-estimated [Prislan_2017_RayTracingExtendedReaction, Conclusion] | coherent paths with complex boundary factors; wavelengths of 5.4 m (63 Hz) and 10.9 m (31.5 Hz) against room size (report 1.9) | partial: the boundary phase of hard walls, porous layers and locally reacting resonant faces is right (3.8); not measured on a room | M6 (built) |
+| energy storage of a resonator | a plate absorber tuned within 0.1 Hz of a room mode gave a beating decay [Nell_2019_TieffrequenteAbsorption, Sec. 6.3]; an energy tracer with per-band `α` cannot represent this coupling [review 6.5] | a frequency-domain tracer carries a resonator through its complex reflection factor | the factor exists (M6, 2.6); the coupling rests on the reflection order traced; not measured on a room | M6 (built) |
 | position-dependent low-frequency absorption | one absorber gave about 1.07 and 0.43 to 0.67 at two modes 0.5 Hz apart [Nell_TIP_TieftonAbsorber, Table 8, Sec. 7.1]; edge and corner placements read 1.20 to 1.77 in situ [Huber_2018_AufnahmeraumTieffrequent, Table 1] and 4 to 6 per face area [Fuchs_2020_BreitbandSchallabsorber, Bild 5]; these describe a placement in a modal field and are not material properties [review 6.2] | a coherent field forms them from the geometry | expressible as a field result; such values must not enter `tf` (A13) | — |
 
 ## 4. Candidate changes to the machine
@@ -557,6 +593,18 @@ none of these candidates needs a state bit.
 - Priority: high (A12 is a priority, P8). Depends on M5.
 - Decided (Stephan, 2026-10-15, after A18): lower priority, for locally reacting peaks only (a partitioned
   cavity, a face known from catalog data); an unpartitioned construction with a known build is M9.
+- Built (2026-10-16, `md/m6_report.md`), the design of phase 0 as decided (section 10): D1 `ζ` met against the
+  immittance of the side the wave is on (local reaction: the transfer matrix of the face behind a lining; the cosine in
+  air alone was off by up to 0.68 in `|r|` there and created energy behind a porous lining); D2 `ζ` replaces the bare
+  face's reactance (combined with it, the one-parameter mapping brought back its `2θ` phase and almost no absorption);
+  D3 the power-law part a matched pad in front of `ζ` (folded into the resistance it cannot be built: `ζ`'s reactance
+  bounds the absorption; added in α it is no element); D4 gated on `m > 0` (a peaked wave medium created energy without
+  it), EM TE `ζ·c`, TM `ζ/c`; D5 `tfQ < 0` the under-damped root, the `require` on `tfQ` removed, `R′` from
+  `min(tfP, 1)`. In `Material`: `peaked()`, `zeta()`, the load of `closed_face` and the open face of `tf_face`;
+  `src/ray_mesh_interact.cpp` 5132 lines against 5089. The six peaked rows reach their Paris targets with the residuals
+  of M5 (window glass 0.0132, plasterboard on frame 0.0171, double glazing 0.0075, battens 0.0056, wooden lining
+  0.0101, cork 0.0476, over-damped); their field values 0°–78° differ from the Paris values by up to 0.017 per octave. The 13 transmission
+  fits of report 3.6 carry no peak and do not move. Asserted in the four cases of 2.6.
 
 **M7 — the cavity's angle shift on the peak** (addition).
 - What: for a panel over an unpartitioned cavity the peak sits at `tfF/c` (the cosine in air), flagged by a
@@ -734,11 +782,11 @@ not the material model's to carry.
 | --- | --- | --- | --- |
 | A8 | A deferred medium displaces the thickness code: a nested or overlapping object met on a leg that carries a code replaces it, and the leg pays its own term in full | +37.50 dB (a solid on a wall with an object nested in it), +23.10 dB (a lining on a solid overlapping a second one), from one side only; +25.8 / +11.6 dB at 75° | low priority; a freed bit could flag "an object pending"; may be dropped |
 | A9 | `html_docu/quadriga_lib_material_model.md` is out of date (the three `tf` rules, the closed layer, the held wave, the mass cosine, the plate rule, the state layout) | a document | after the machine is settled |
-| A12 | The reflection phase. Closed for a hard wall and a porous layer by N7 (3.8). Open: the phase of the pad `1 − tf` and of a resonant absorber | ±18° through a panel absorber's resonance (model, report 3.5); level errors up to 2.4 dB without phase [Jeong_2012_BoundaryConditionsPhasedGA] | priority (P8); M6 |
-| A13 | The coefficient type of a `tf` reference. `tf` is a random-incidence coefficient (3.1). Round 1's absorption rows were compilation values of unstated type (report 1.2), its averages field incidence 0° to 78° (report 1.1). Sabine values above one, edge effects and placement values are no `tf` | `α_s` above `α_st` by 0.1 to 0.35 for porous layers at mid frequencies [Dupont_2023_SoundFieldSynthesis]; by 0.12 on average for 50 mm mineral wool [Jeong_2013_ReflectionAbsorptionCoefficients, Sec. 4-5] | analyzed (2026-10-15, `ac2/a13.py`, `a13.out`) on three materials with an independent random-incidence reference (glass wool and PU foam 50 mm, chamber against sound-field synthesis [Dupont_2023_SoundFieldSynthesis]; rock wool 50 mm, chamber against tube [Kosten_1960_InternationalComparison]), every band with a reference: (a) the chamber value capped at one, max 0.273, rms 0.139, mean +0.109; (c) `β·E` [Kuhl_1960_EdgeEffect; review 7.2], max 0.112 (the foam; 0.053 on the two wools), rms 0.041; (b) Jeong's conversion [Jeong_2013_ReflectionAbsorptionCoefficients] with Thomasson's field impedance of a 3 × 4 m sample [Thomasson_1980_AbsorptionCoefficient, Eq. 26] and one Miki σ per product, extended reaction, max 0.057, rms 0.031, mean −0.010 (local reaction rms 0.039; without the finite-size term rms 0.049 and σ two to three times too high). Decided 2026-10-15 (section 10): a tiered rule. Sample size checked (`ac2/a13b.out`): Kosten's rock wool as 4, 8 and 12 m² (shapes taken as 2 × 2, 2 × 4, 3 × 4 m) converts to one curve, spread at most 0.010, within 0.039 of the tube; `β·E` with each sample's edge per area is up to 0.083 off at 4 m². Found with A14: the conversion holds only where the model family fits the product and the sample is mounted as the model assumes (a flush patch); where σ is measured, the fitted σ is the check (PU foam 10.3 against 10.6 kPa·s/m², glass wool 19.0 against 13.1, polyester 65.5 against 15.0, framed stone wool 51.7 against 30.3). Proposal: add that check to the rule; a conversion whose σ is off by more than about 1.5 times is marked, not used |
+| A12 | The reflection phase. Closed for a hard wall and a porous layer by N7 (3.8), and for a locally reacting resonant face of every type by M6 (built 2026-10-16, 2.6: the face's series impedance, TE and the scalar types `ζ·c`, TM `ζ/c`). What remains: a flat `tf` (no peak) keeps the hard wall's phase and is flat in angle (section 7); a panel over an unpartitioned cavity takes the M9 route (2.8) | ±18° through a panel absorber's resonance (model, report 3.5); ±4.12° on the board of 2.6 over-damped, through 180° under-damped; level errors up to 2.4 dB without phase [Jeong_2012_BoundaryConditionsPhasedGA] | closed for locally reacting resonant faces (M6); the flat pad as stated |
+| A13 | The coefficient type of a `tf` reference. `tf` is a random-incidence coefficient (3.1). Round 1's absorption rows were compilation values of unstated type (report 1.2), its averages field incidence 0° to 78° (report 1.1). Sabine values above one, edge effects and placement values are no `tf` | `α_s` above `α_st` by 0.1 to 0.35 for porous layers at mid frequencies [Dupont_2023_SoundFieldSynthesis]; by 0.12 on average for 50 mm mineral wool [Jeong_2013_ReflectionAbsorptionCoefficients, Sec. 4-5] | analyzed (2026-10-15, `ac2/a13.py`, `a13.out`) on three materials with an independent random-incidence reference (glass wool and PU foam 50 mm, chamber against sound-field synthesis [Dupont_2023_SoundFieldSynthesis]; rock wool 50 mm, chamber against tube [Kosten_1960_InternationalComparison]), every band with a reference: (a) the chamber value capped at one, max 0.273, rms 0.139, mean +0.109; (c) `β·E` [Kuhl_1960_EdgeEffect; review 7.2], max 0.112 (the foam; 0.053 on the two wools), rms 0.041; (b) Jeong's conversion [Jeong_2013_ReflectionAbsorptionCoefficients] with Thomasson's field impedance of a 3 × 4 m sample [Thomasson_1980_AbsorptionCoefficient, Eq. 26] and one Miki σ per product, extended reaction, max 0.057, rms 0.031, mean −0.010 (local reaction rms 0.039; without the finite-size term rms 0.049 and σ two to three times too high). Decided 2026-10-15 (section 10): a tiered rule. Sample size checked (`ac2/a13b.out`): Kosten's rock wool as 4, 8 and 12 m² (shapes taken as 2 × 2, 2 × 4, 3 × 4 m) converts to one curve, spread at most 0.010, within 0.039 of the tube; `β·E` with each sample's edge per area is up to 0.083 off at 4 m². Found with A14: the conversion holds only where the model family fits the product and the sample is mounted as the model assumes (a flush patch); where σ is measured, the fitted σ is the check (PU foam 10.3 against 10.6 kPa·s/m², glass wool 19.0 against 13.1, polyester 65.5 against 15.0, framed stone wool 51.7 against 30.3). Proposal: add that check to the rule; a conversion whose σ is off by more than about 1.5 times is marked, not used. Since M6 a peaked face is locally reacting, so its field (0°–78°) and Paris (0°–90°) values differ (by up to 0.017 per octave on the six refitted rows, and a Paris fit misses its targets by up to 0.062 in the field value, `md/m6_report.md` 0.6): the coefficient type of a peaked row's reference matters, and its target is the Paris integral (9) |
 | A14 | The class-4 reference. The Knauf TP 120 A catalog values (`α_s` 0.11 / 0.26 / 0.52 / 0.70 / 0.84 / 0.95) are not a 20 mm layer of its declared 11 kPa·s/m² on a rigid backing: as a finite 3 × 4 m sample that layer reads 0.43 / 0.58 / 0.71 at 500 Hz / 1 kHz / 2 kHz, and (b) needs σ ≈ 85 kPa·s/m² to fit (mounting not stated, report 1.5) | `ac2/a13.out` | the machine reaches every random-incidence target within 0.003 to 0.010 in α (Paris 0°–90°; the glass wool's sound-field-synthesis curve within 0.010), confirmed through the walker within 0.0013 per angle (`ac2/a14.out`, `a14w.out`); the capped chamber values of the glass wool (about 1.0) stay 0.077 out of reach. Decided 2026-10-15 (section 10): class 4 on the glass wool 50 mm of [Dupont_2023_SoundFieldSynthesis] (its random-incidence curve measured, no conversion). The two Scrosati rows (`ac2/a13b.out`) do not convert: the polyester mat 17.8 mm (unframed) fits only with σ 65.5 kPa·s/m² against the measured 15.0, the Miki model at the measured σ missing its chamber values by up to 0.13 (Miki is fitted to mineral wool; polyester follows other regressions [Hurrell_2020_PolymericFibres, Sec. 4.3]); the stone wool 105 mm sat in an 18 mm plywood frame, which the flush-patch model does not describe (σ 51.7 against 30.3, the model at the measured σ up to 0.22 off). Proposal: both rows out until a polyester model and a framed-sample model exist |
 | A19 | The membrane and cavity constant for `tfF` and `resF`: 60, about 50 with fill, about 80 in Sharp's model; edge clamping raises `f₀` 1.2 to 1.5 times | [Oldfield_2006_ImprovedMembraneAbsorbers; Shearer_2016_AbsorptionBelow100Hz; review 7.2, 9.10] | analyzed (2026-10-15, `ac2/a19.py`, `a19.out`) on 10 measured resonances with their construction ([Shearer_2016_AbsorptionBelow100Hz; Sakagami_2007_NonUniformCavity; Oldfield_2006_ImprovedMembraneAbsorbers; Nell_2019_TieffrequenteAbsorption]; the design values of [Kristl_2023_Verbundplattenresonatoren, Table 4.1] are computed with 60 and left out). Free edges (a loudspeaker surround, a free-floating plate; n = 3): measured over 60/50 (60 empty, 50 filled) 0.81 to 1.10, geometric mean 0.99; over 60 always 0.82. Framed and clamped edges (n = 7): over 60/50 1.06 to 1.84, mean 1.34. With 60/50 and a factor 1.34 on framed edges all 10 within ×/1.19 rms, worst 0.80 and 1.38. Decided 2026-10-15 (section 10). **Revised 2026-10-15 after M9 phase 0 (section 10):** the framed factor 1.34 was mostly the `1/cos θ` angle shift of an unpartitioned cavity under diffuse incidence. A leaf on a box of its full depth (2.8), at random incidence, reads 1.11 / 1.07 / 0.80 / 0.99 against the framed chamber peaks (Shearer empty; Sakagami 30 / 90 / 150 mm; geometric mean 0.98) and 1.03 against Shearer filled; a box shallower by 1/1.34² reads 1.05 to 1.49 (mean 1.30). Rule: the measured `f₀` first; else 60 empty, 50 filled; edge stiffening noted only for small clamped panels (Oldfield, normal incidence, 1.24 / 1.54) |
-| A20 | A wall's `tf` behind a porous fill. The library forms the pad on the immittance of the medium in front (2.3: next to a lossy medium the flux the pad hands over), so the wall absorbs according to what lies against it; the alternative is an absorption fixed as seen from air; physically a wall has a fixed surface impedance | the board on 25 mm of fill (Miki, 25.1 kPa·s/m²) on a wall with `tf` 0.02: the library within 4.3e-5 of the pad on the modulus of the fill's impedance, 0.040 in R off the pad referred to air (M9 phase 0, F1) | open; the fixtures use `tf` 0 behind a fill (section 10) |
+| A20 | A wall's `tf` behind a porous fill. The library forms the pad on the immittance of the medium in front (2.3: next to a lossy medium the flux the pad hands over), so the wall absorbs according to what lies against it; the alternative is an absorption fixed as seen from air; physically a wall has a fixed surface impedance | the board on 25 mm of fill (Miki, 25.1 kPa·s/m²) on a wall with `tf` 0.02: the library within 4.3e-5 of the pad on the modulus of the fill's impedance, 0.040 in R off the pad referred to air (M9 phase 0, F1) | closed for the peak by M6 (2.6: a peaked face is a fixed series impedance met against whatever lies in front, the transfer matrix behind a lining); open for the power-law part of `tf`, still a pad matched to the medium in front; the fixtures use `tf` 0 behind a fill (section 10) |
 | A21 | A sheet co-located with the exit face of one body and the entry face of the next (body \| sheet \| body). The intersector reports two of the three faces, by mesh order (a tie): box exit + sheet → a glued exit into air, the wave left "in air" inside the far body; box exit + far entry → body \| body, the sheet ignored; sheet + far entry → the glued entry from the host, exact (the fluid layers to 6 digits). **Narrowed 2026-10-16** (`md/m5_a21_report.md`): a ray a glued exit left in air that meets a body from inside is killed, every type (`md/wave.md` 6, 8); energy creation and the `ray_progress` runaway are closed | before: R up to 42.19 (scalar and EM TE) and 14.46 (EM TM), R + T 1.075 with a mass-law body in front; `ray_progress` at threshold 1.0 ran away (12.7 GB in 300 s, leaf on an `m = 0` wall). After: R + T ≤ 0.902 over 8 variants, six orders, scalar and EM. Left: the reflect port of box \| sheet \| air (R 0.154 for 0.994 at 125 Hz, 0°) or the sheet ignored (R 1.000 for 0.745 at 1 kHz), by mesh order; a sheet glued on the far body's back face is met as air \| sheet \| air (code 69, not killed, R + T ≤ 0.48, nothing created) | open: the order dependence needs the intersector or `ray_progress` to report the third face (outside `ray_mesh_interact.cpp`); open: how often a glued exit is followed by a face met from inside in a real scene (the repository scenes have no glued sheets; their isolated sheets never meet the condition). Rule of use: a porous layer between a box and a wall is a traced body (2.8) |
 
 **Proposed (for a decision)**
@@ -792,7 +840,22 @@ not the material model's to carry.
 - The level of a held chain has no reference but its solid twin; the crossings are formed from impedance
   mappings.
 - `ray_mesh_interact`'s own mass-law lining is approximate in a lossy host (the redo with state is exact).
-- A rigid face's absorption is flat in angle (2.6, 3.1).
+- A rigid face's absorption is flat in angle, except a peaked face's (2.6, 3.1).
+- A followed bounce series behind a traced lining rarer than air can diverge on a peaked face: the one-parameter porous
+  lining `eps 0.31 − 0.20j` (10 mm) on the peaked board wall, at 85° and 31.5 / 63 Hz, R + T 10.8 / 151 followed, where
+  M5 converges. The face's reflection in the lining's frame exceeds one (1.04 to 1.09: the in-layer immittance is
+  mostly reactive, −67° to −82°, the lossy-medium convention of `md/wave.md` 8); summed rows stay below one (0.99867)
+  and are the transfer matrix. Behind two-parameter rock wool the candidate converges where M5's followed series
+  diverged (4.0e14 at 125 Hz, 10°); `ray_progress` runs neither away nor above one there (`md/m6_report.md` 1.0, 2.4).
+- At exactly the critical angle of a lossless lining rarer than air (eps 0.5, 45.000°), traced in front of a mass-law
+  wall, R + T reads 1.0005 (1.0002 under M5) at that one angle and 1.000000 past it; the glued sheet stays below one.
+- `ray_progress` with tracer 4 under-transmits out of a summed lossy lining rarer than air, traced in front of a held
+  mass-law wall (one-parameter mapping only): on the peaked board at 85° it hands 0.00126 in power to the path through
+  the wall against 0.0774 for tracer 5 and the walker (both tracers), so R + T is 0.065 / 0.044 low at 31.5 / 63 Hz;
+  under M5 the same leg carries 2.6e-5 against 3.5e-3, invisible because M5's face passes little at 85°. The lining's
+  series is summed (`ρ` 1.006 / 1.029); the cause is not traced (`md/m6_report.md` 2.4, S1).
+- A peak set on a non-rigid mass-law body makes its face the series impedance: `eps 1.50`, `m` 20 with the board's peak
+  reflects 0.844 at 150 Hz, 0°, where its Fresnel face with the flat pad read 0.085. No use case.
 
 ## 8. Side findings
 
@@ -900,7 +963,11 @@ measurements later; this test shows that the knobs exist.
 - **Procedure:** for each class, fit the knobs on a formula copy of the library (the window's sits on the walker
   to 0.011 dB); confirm the best fit through the walker as sheet and as traced solid, and through `ray_progress`
   as a band. Report the residual per band, today and per candidate of section 4. An absorption reference is
-  compared with the Paris integral over 0° to 90° of the face (A13).
+  compared with the Paris integral over 0° to 90° of the face (A13). A peaked face is locally reacting (2.6): its
+  Paris value is not its `α₀` (`tools/acoustic/paris_cf.py`). By the mass relation `1 + R′ = ωm″/(Q_α·Z₀)` the
+  default branch (over-damped) fits four of the six peaked rows of report 3.8 physically; double glazing needs
+  `tfQ < 0` (16.1 kg/m² under-damped against 182 kg/m² over-damped, at the same residual 0.0075;
+  `md/m6_report.md` 0.6).
 - **Invariants per candidate:** both ports at most one, sheet on solid at the relaunch bound, no step in angle, a
   band on its single frequencies, the `[wave]` baseline and twins untouched, line counts.
 
@@ -1026,6 +1093,26 @@ bodies - nothing is created and the wave left in air inside the far body is kill
 1 (TE and TM, the faces as dielectrics); `lw::walk` takes EM types on one channel. `[acoustic]` 36813 assertions in 52
 cases, whole suite 1311472 in 1138; `[wave]` identical, the stored twins unchanged.
 
+**Taken (Stephan, 2026-10-16), after M6 phase 0 to 2 (`md/m6_report.md`):**
+
+- M6 as recommended: D1 `ζ` met against the incidence side's immittance (equal to `ζ·c` in air); D2 `ζ` replaces the
+  bare face's reactance; D3 the power-law part is the existing pad in front of `ζ` (0° absorbs `tf + α₀ − tf·α₀`); D4
+  the gate `m > 0 && tfP > 0 && tfF > 0` (a wave medium and a negative peak stay on M5), EM TE `ζ·c` and TM `ζ/c` with a
+  `tm` flag in `closed_face` and `tf_face`; D5 `tfQ < 0` selects `1/R′`, the `require` on `tfQ` removed, `R′` from
+  `min(tfP, 1)`.
+- Fixtures: both peak cases restated (the first in both mappings, the plate rule with `a(θ)`), the phase case and the
+  random-incidence case new; references from `ζ` in the tests; bounds 2 to 3 times the measured maxima, never below
+  1e-12 (rounding-level maxima move with the compiler, FMA contraction and libm).
+- The findings of the checks C1 and S1 go to section 7, no new item; `ray_state_update`'s description of `eps`
+  (`ρ` is not bounded by one; a round trip at or above one is always summed) and `md/wave.md` 8 corrected; the peak
+  columns in `tools/acoustic/band_probe.cpp`, and `tools/acoustic/paris_cf.py`.
+
+**Built (2026-10-16)**: M6 in `Material` (`src/ray_mesh_interact.cpp` 5132 lines against 5089), the two peak cases
+restated, two cases new (*Absorption peak - a peaked face is its series impedance in magnitude and phase from 0 to 85
+deg, as a sheet and as a traced solid, on both branches*; *ray_progress - the random-incidence absorption of a peaked
+lining is the Paris integral of its series impedance*). `[acoustic]` 39371 assertions in 54 cases, whole suite
+1314030 in 1140; `[wave]` identical, the stored twins unchanged.
+
 **Round history** (detail in the report and in `build_linux/scratch/i47/NOTES.md`):
 
 - What was entangled before round 1 (the window analysis, i47, against a thin-plate impedance model of 4 mm,
@@ -1121,6 +1208,7 @@ its validation as `check`; `band_probe.cpp`, a band through `ray_progress` on a 
 | *Unentered branches - ray_mesh_interact's own glued composite against the redo - the mass-law part* | 2.3, 7 |
 | *Held path - alpha on a lumped plate is charged over the path the held wave takes* | 2.3 |
 | *ray_progress - the plate rule and the absorption peak at every frequency of a band* | 2.3, 2.6, 3.2 |
+| *ray_progress - the random-incidence absorption of a peaked lining is the Paris integral of its series impedance* | 2.6, 3.1, 9 |
 | *Held exit - a lining behind a rigid wall is the same as its traced layer, for every tracer* | 2.4 |
 | *Held exit - a non-rigid mass-law body holds every tracer and passes at every angle* | 2.4 |
 | *Held lining - a mass-law sheet behind a wave held in a mass-law wall is the same wall as its traced solid* | 2.4, 2.5, 7 |
@@ -1135,7 +1223,8 @@ its validation as `check`; `band_probe.cpp`, a band through `ray_progress` on a 
 | *Plate rule - a traced mass-law body passes in one path: nothing is reflected back into it* | 2.5 |
 | *ray_state_update - mass-law material is excluded from slab resolution* | 2.5 |
 | *Measurement - the mirror behind a second solid and behind a sheet inside a wall - the mass-law part* | 2.5 |
-| *Absorption peak - tfP, tfF and tfQ add a resonant peak to the room-side absorption of a mass-law face* | 2.6, 3.2 |
+| *Absorption peak - tfP, tfF and tfQ add a resonant peak to the room-side absorption of a mass-law face* | 2.3, 2.6, 3.2 |
+| *Absorption peak - a peaked face is its series impedance in magnitude and phase from 0 to 85 deg, as a sheet and as a traced solid, on both branches* | 2.6, 2.7, 3.1, 3.2, 3.8, 6 (A12) |
 | *Lossy verdict - a lossy second medium has no critical angle - the mass-law part* | 2.6 |
 | *Two-parameter mapping - air \| water, a hard wall's phase, a porous layer on it and every tracer below its critical angle* | 1, 3.8 |
 | *Leaf - a wave-medium sheet in the two-parameter mapping is a limp leaf* | 1, 2.8, 3.4 |
