@@ -124,17 +124,26 @@ private:
     bool saved_ = false;
 };
 
-// Throw if an HDF5 call failed while writing
-static inline void qHDF_check(herr_t status, const std::string &what)
+// Throw if an HDF5 call failed while writing: "HDF5 error: <what>" or "HDF5 error: <what> '<name>'"
+// (the message is only built on failure)
+[[noreturn]] static void qHDF_write_error(const char *what, const char *name)
 {
-    if (status < 0)
-        throw std::runtime_error("HDF5 error: " + what);
+    std::string msg = std::string("HDF5 error: ") + what;
+    if (name != nullptr)
+        msg += std::string(" '") + name + "'";
+    throw std::runtime_error(msg);
 }
 
-static inline qHDF_id qHDF_check(qHDF_id id, const std::string &what)
+static inline void qHDF_check(herr_t status, const char *what, const char *name = nullptr)
+{
+    if (status < 0)
+        qHDF_write_error(what, name);
+}
+
+static inline qHDF_id qHDF_check(qHDF_id id, const char *what, const char *name = nullptr)
 {
     if (!id.valid())
-        throw std::runtime_error("HDF5 error: " + what);
+        qHDF_write_error(what, name);
     return id;
 }
 
@@ -188,11 +197,19 @@ static inline bool qHDF_link_exists(hid_t loc, const std::string &name)
     return H5Lexists(loc, name.c_str(), H5P_DEFAULT) > 0;
 }
 
+// Size of an open file in bytes; 0 if it cannot be determined (then every non-empty dataset fails the storage check)
+static inline unsigned long long qHDF_file_size(hid_t file_id)
+{
+    hsize_t file_size = 0;
+    return H5Fget_filesize(file_id, &file_size) < 0 ? 0ULL : (unsigned long long)file_size;
+}
+
 // Checks that a dataset holds data for every element it declares, so that a crafted file cannot make the reader
 // allocate memory for data that is not there. Contiguous and compact datasets must have storage for every element;
 // chunked datasets may be compressed, their storage is allowed to be smaller by up to a factor of 65536. The storage
-// size is read from the file and is therefore also checked against the size of the file.
-static inline bool qHDF_storage_ok(hid_t dset_id, hid_t type_id, unsigned long long n_elem)
+// size is read from the file and is therefore also checked against the size of the file ('file_size', queried once
+// per open file). The layout is only queried when the storage is smaller than the declared data.
+static inline bool qHDF_storage_ok(hid_t dset_id, hid_t type_id, unsigned long long n_elem, unsigned long long file_size)
 {
     if (n_elem == 0)
         return true;
@@ -200,20 +217,20 @@ static inline bool qHDF_storage_ok(hid_t dset_id, hid_t type_id, unsigned long l
     unsigned long long n_bytes = 0;
     if (type_size == 0 || __builtin_mul_overflow(n_elem, (unsigned long long)type_size, &n_bytes))
         return false;
+
+    // The storage size comes from the file itself; it cannot exceed the size of the file
+    unsigned long long storage = (unsigned long long)H5Dget_storage_size(dset_id);
+    if (storage > file_size)
+        return false;
+    if (storage >= n_bytes) // Enough for every layout
+        return true;
+
     qHDF_id dcpl(H5Dget_create_plist(dset_id), H5Pclose);
     if (!dcpl.valid())
         return false;
     H5D_layout_t layout = H5Pget_layout(dcpl);
-    unsigned long long storage = (unsigned long long)H5Dget_storage_size(dset_id);
-
-    // The storage size comes from the file itself; it cannot exceed the size of the file
-    qHDF_id file(H5Iget_file_id(dset_id), H5Fclose);
-    hsize_t file_size = 0;
-    if (!file.valid() || H5Fget_filesize(file, &file_size) < 0 || storage > (unsigned long long)file_size)
-        return false;
-
     if (layout == H5D_CONTIGUOUS || layout == H5D_COMPACT)
-        return storage >= n_bytes;
+        return false;
     if (layout == H5D_CHUNKED)
         return storage != 0 && storage >= n_bytes / 65536ULL;
     return layout == H5D_VIRTUAL;
@@ -226,24 +243,27 @@ static constexpr unsigned long long qHDF_ANY = ~0ULL;
 class qHDF_dataset
 {
 public:
-    qHDF_dataset(hid_t loc, const std::string &name, std::initializer_list<unsigned long long> expected) : name_(name)
+    qHDF_dataset(hid_t loc, const char *name, std::initializer_list<unsigned long long> expected, unsigned long long file_size)
+        : name_(name)
     {
         if (expected.size() > 3)
             throw std::invalid_argument("Internal error: rank > 3.");
-        dset_ = qHDF_id(H5Dopen2(loc, name.c_str(), H5P_DEFAULT), H5Dclose);
+        dset_ = qHDF_id(H5Dopen2(loc, name, H5P_DEFAULT), H5Dclose);
         if (!dset_.valid())
             fail("is missing or cannot be opened");
         qHDF_id space(H5Dget_space(dset_), H5Sclose);
-        if (!space.valid() || H5Sget_simple_extent_type(space) != H5S_SIMPLE)
-            fail("has no simple dataspace");
-        int rank = H5Sget_simple_extent_ndims(space);
+        hsize_t dims[H5S_MAX_RANK];
+        int rank = space.valid() ? H5Sget_simple_extent_dims(space, dims, nullptr) : -1; // Gives the rank as well
         if (rank != (int)expected.size())
+        {
+            if (rank < 0 || H5Sget_simple_extent_type(space) != H5S_SIMPLE)
+                fail("has no simple dataspace");
             fail("has " + std::to_string(rank) + " dimensions, expected " + std::to_string(expected.size()));
-        if (rank > 0 && H5Sget_simple_extent_dims(space, dims_, nullptr) < 0)
-            fail("has unreadable extents");
+        }
         int i = 0;
         for (auto e : expected)
         {
+            dims_[i] = dims[i];
             if (e != qHDF_ANY && (unsigned long long)dims_[i] != e)
                 fail("has extent " + std::to_string((unsigned long long)dims_[i]) + " in dimension " + std::to_string(i) +
                      ", expected " + std::to_string(e));
@@ -255,27 +275,41 @@ public:
         H5T_class_t type_class = type.valid() ? H5Tget_class(type) : H5T_NO_CLASS;
         if (type_class != H5T_FLOAT && type_class != H5T_INTEGER)
             fail("is not numeric");
-        if (!qHDF_storage_ok(dset_, type, n_elem_))
+        if (!qHDF_storage_ok(dset_, type, n_elem_, file_size))
             fail("declares more elements than the file contains");
+        stored_as_float_ = H5Tequal(type, H5T_NATIVE_FLOAT) > 0;
     }
     unsigned long long dim(int i) const { return (unsigned long long)dims_[i]; }
     unsigned long long n_elem() const { return n_elem_; }
     template <typename T>
     void read(T *out) const // 'out' must hold n_elem() values; HDF5 converts the stored type to T
     {
-        if (n_elem_ != 0 && H5Dread(dset_, qHDF_mem_type<T>(), H5S_ALL, H5S_ALL, H5P_DEFAULT, out) < 0)
+        if (n_elem_ == 0)
+            return;
+        if constexpr (std::is_same<T, double>::value)
+            if (stored_as_float_) // Single precision (as written by the library): read without HDF5 type conversion
+            {
+                std::unique_ptr<float[]> buffer(new float[(size_t)n_elem_]);
+                if (H5Dread(dset_, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, buffer.get()) < 0)
+                    fail("cannot be read");
+                for (unsigned long long n = 0; n < n_elem_; ++n)
+                    out[n] = (double)buffer[n];
+                return;
+            }
+        if (H5Dread(dset_, qHDF_mem_type<T>(), H5S_ALL, H5S_ALL, H5P_DEFAULT, out) < 0)
             fail("cannot be read");
     }
 
 private:
     [[noreturn]] void fail(const std::string &what) const
     {
-        throw std::invalid_argument("Malformed HDF5 file: dataset '" + name_ + "' " + what + ".");
+        throw std::invalid_argument("Malformed HDF5 file: dataset '" + std::string(name_) + "' " + what + ".");
     }
-    std::string name_;
+    const char *name_;
     qHDF_id dset_;
     hsize_t dims_[3] = {1, 1, 1};
     unsigned long long n_elem_ = 0;
+    bool stored_as_float_ = false;
 };
 
 // Read a numeric attribute that holds exactly 'n' values. Returns false if it does not exist and is not required;
@@ -285,22 +319,30 @@ static bool qHDF_read_attr(hid_t loc, const char *name, T *out, hssize_t n = 1, 
 {
     auto fail = [&](const std::string &what)
     { throw std::invalid_argument("Malformed HDF5 file: attribute '" + std::string(name) + "' " + what + "."); };
-    if (H5Aexists(loc, name) <= 0)
-    {
-        if (required)
-            fail("is missing");
-        return false;
-    }
     qHDF_id attr(H5Aopen(loc, name, H5P_DEFAULT), H5Aclose);
-    if (!attr.valid())
+    if (!attr.valid()) // Only on failure: tell a missing attribute from one that cannot be opened
+    {
+        if (H5Aexists(loc, name) <= 0)
+        {
+            if (required)
+                fail("is missing");
+            return false;
+        }
         fail("cannot be opened");
-    qHDF_id space(H5Aget_space(attr), H5Sclose);
-    if (!space.valid() || H5Sget_simple_extent_npoints(space) != n)
-        fail("must have " + std::to_string(n) + (n == 1 ? " value" : " values"));
+    }
+    // Fast path: a numeric type whose stored data has the size of exactly 'n' values (the stored size of an attribute
+    // is the number of values times the type size). Otherwise the checks below run one by one for the message.
     qHDF_id type(H5Aget_type(attr), H5Tclose);
     H5T_class_t type_class = type.valid() ? H5Tget_class(type) : H5T_NO_CLASS;
-    if (type_class != H5T_FLOAT && type_class != H5T_INTEGER)
-        fail("is not numeric");
+    bool is_numeric = type_class == H5T_FLOAT || type_class == H5T_INTEGER;
+    if (!is_numeric || (unsigned long long)H5Aget_storage_size(attr) != (unsigned long long)n * (unsigned long long)H5Tget_size(type))
+    {
+        qHDF_id space(H5Aget_space(attr), H5Sclose);
+        if (!space.valid() || H5Sget_simple_extent_npoints(space) != n)
+            fail("must have " + std::to_string(n) + (n == 1 ? " value" : " values"));
+        if (!is_numeric)
+            fail("is not numeric");
+    }
     if (H5Aread(attr, qHDF_mem_type<T>(), out) < 0)
         fail("cannot be read");
     return true;
@@ -309,12 +351,16 @@ static bool qHDF_read_attr(hid_t loc, const char *name, T *out, hssize_t n = 1, 
 // Read the channel name: a fixed-length string of at most 256 bytes; an empty name if the attribute is missing
 static std::string qHDF_read_name(hid_t loc)
 {
-    if (H5Aexists(loc, "Name") <= 0)
-        return std::string();
     const std::string msg = "Malformed HDF5 file: attribute 'Name' ";
     qHDF_id attr(H5Aopen(loc, "Name", H5P_DEFAULT), H5Aclose);
-    qHDF_id type(attr.valid() ? H5Aget_type(attr) : H5I_INVALID_HID, H5Tclose);
-    qHDF_id space(attr.valid() ? H5Aget_space(attr) : H5I_INVALID_HID, H5Sclose);
+    if (!attr.valid()) // Only on failure: tell a missing attribute from one that cannot be opened
+    {
+        if (H5Aexists(loc, "Name") <= 0)
+            return std::string();
+        throw std::invalid_argument(msg + "cannot be opened.");
+    }
+    qHDF_id type(H5Aget_type(attr), H5Tclose);
+    qHDF_id space(H5Aget_space(attr), H5Sclose);
     if (!type.valid() || !space.valid())
         throw std::invalid_argument(msg + "cannot be opened.");
     if (H5Tget_class(type) != H5T_STRING || H5Tis_variable_str(type) != 0 || H5Tget_size(type) > 256 ||
@@ -332,28 +378,28 @@ static void qHDF_create_attr(hid_t loc, const char *name, hid_t type, hsize_t n,
     qHDF_id space = qHDF_check(qHDF_id(n == 0 ? H5Screate(H5S_SCALAR) : H5Screate_simple(1, &n, nullptr), H5Sclose),
                                "cannot create dataspace");
     qHDF_id attr = qHDF_check(qHDF_id(H5Acreate2(loc, name, type, space, H5P_DEFAULT, H5P_DEFAULT), H5Aclose),
-                              "cannot create attribute '" + std::string(name) + "'");
-    qHDF_check(H5Awrite(attr, type, data), "cannot write attribute '" + std::string(name) + "'");
+                              "cannot create attribute", name);
+    qHDF_check(H5Awrite(attr, type, data), "cannot write attribute", name);
 }
 
 // Write the value of an existing attribute
 static void qHDF_write_attr(hid_t loc, const char *name, hid_t mem_type, const void *data)
 {
     qHDF_id attr = qHDF_check(qHDF_id(H5Aopen(loc, name, H5P_DEFAULT), H5Aclose),
-                              "cannot open attribute '" + std::string(name) + "'");
-    qHDF_check(H5Awrite(attr, mem_type, data), "cannot write attribute '" + std::string(name) + "'");
+                              "cannot open attribute", name);
+    qHDF_check(H5Awrite(attr, mem_type, data), "cannot write attribute", name);
 }
 
 // Create a numeric dataset of rank 1-3 ('dims' in HDF5 order, slowest dimension first) and write 'n_elem' values
-static void qHDF_write_dset(hid_t loc, const std::string &name, hid_t file_type, hid_t mem_type,
+static void qHDF_write_dset(hid_t loc, const char *name, hid_t file_type, hid_t mem_type,
                             int rank, const hsize_t *dims, const void *data, unsigned long long n_elem)
 {
     qHDF_id space = qHDF_check(qHDF_id(rank == 0 ? H5Screate(H5S_SCALAR) : H5Screate_simple(rank, dims, nullptr), H5Sclose),
                                "cannot create dataspace");
-    qHDF_id dset = qHDF_check(qHDF_id(H5Dcreate2(loc, name.c_str(), file_type, space, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT), H5Dclose),
-                              "cannot create dataset '" + name + "'");
+    qHDF_id dset = qHDF_check(qHDF_id(H5Dcreate2(loc, name, file_type, space, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT), H5Dclose),
+                              "cannot create dataset", name);
     if (n_elem != 0)
-        qHDF_check(H5Dwrite(dset, mem_type, H5S_ALL, H5S_ALL, H5P_DEFAULT, data), "cannot write dataset '" + name + "'");
+        qHDF_check(H5Dwrite(dset, mem_type, H5S_ALL, H5S_ALL, H5P_DEFAULT, data), "cannot write dataset", name);
 }
 
 // Write single-precision data from a float or a double array
@@ -364,9 +410,9 @@ static void qHDF_write_float(hid_t loc, const char *name, int rank, const hsize_
         qHDF_write_dset(loc, name, H5T_NATIVE_FLOAT, H5T_NATIVE_FLOAT, rank, dims, data, n_elem);
     else
     {
-        std::vector<float> buffer((size_t)n_elem);
-        qHDF_cast_to_float(data, buffer.data(), n_elem);
-        qHDF_write_dset(loc, name, H5T_NATIVE_FLOAT, H5T_NATIVE_FLOAT, rank, dims, buffer.data(), n_elem);
+        std::unique_ptr<float[]> buffer(new float[(size_t)n_elem]); // Not zeroed: every value is set below
+        qHDF_cast_to_float(data, buffer.get(), n_elem);
+        qHDF_write_dset(loc, name, H5T_NATIVE_FLOAT, H5T_NATIVE_FLOAT, rank, dims, buffer.get(), n_elem);
     }
 }
 
@@ -378,12 +424,12 @@ struct qHDF_index
 };
 
 // Read the storage layout ('ChannelDims') and, if requested, the index ('Order') of an open file
-static qHDF_index qHDF_read_index(hid_t file_id, bool read_order = true)
+static qHDF_index qHDF_read_index(hid_t file_id, unsigned long long file_size, bool read_order = true)
 {
     qHDF_index idx;
     try
     {
-        qHDF_dataset channel_dims(file_id, "ChannelDims", {4});
+        qHDF_dataset channel_dims(file_id, "ChannelDims", {4}, file_size);
         channel_dims.read(idx.dims);
         if (!read_order)
             return idx;
@@ -394,7 +440,7 @@ static qHDF_index qHDF_read_index(hid_t file_id, bool read_order = true)
             if ((n_order *= (unsigned long long)d) > (unsigned long long)UINT_MAX)
                 throw std::invalid_argument("");
 
-        qHDF_dataset order(file_id, "Order", {n_order});
+        qHDF_dataset order(file_id, "Order", {n_order}, file_size);
         idx.order.resize((size_t)n_order);
         order.read(idx.order.data());
     }
@@ -438,9 +484,9 @@ static long long qHDF_slot(const qHDF_index &idx, unsigned ix, unsigned iy, unsi
 }
 
 // Channel ID stored at a slot; 0 if the slot is empty or outside the layout
-static unsigned qHDF_channel_id(hid_t file_id, unsigned ix, unsigned iy, unsigned iz, unsigned iw)
+static unsigned qHDF_channel_id(hid_t file_id, unsigned long long file_size, unsigned ix, unsigned iy, unsigned iz, unsigned iw)
 {
-    qHDF_index idx = qHDF_read_index(file_id);
+    qHDF_index idx = qHDF_read_index(file_id, file_size);
     long long slot = qHDF_slot(idx, ix, iy, iz, iw);
     return slot < 0 ? 0 : idx.order[(size_t)slot];
 }
@@ -485,7 +531,7 @@ static qHDF_id qHDF_create_channel_group(hid_t file_id, unsigned channel_id)
 {
     const std::string name = qHDF_group_name(channel_id);
     qHDF_id group = qHDF_check(qHDF_id(H5Gcreate2(file_id, name.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT), H5Gclose),
-                               "cannot create group '" + name + "'");
+                               "cannot create group", name.c_str());
     unsigned zero = 0;
     int zero_int = 0;
     float nan3[3] = {NAN, NAN, NAN}, zero3[3] = {0.0f, 0.0f, 0.0f};
@@ -597,71 +643,79 @@ static void qHDF_write_par(hid_t group_id, const std::string &par_name, const st
         const std::string *str = std::any_cast<std::string>(par_data);
         qHDF_id type = qHDF_check(qHDF_id(H5Tcopy(H5T_C_S1), H5Tclose), "cannot create string type");
         qHDF_check(H5Tset_size(type, std::max(str->size(), (size_t)1)), "cannot set string size");
-        qHDF_write_dset(group_id, par_name, type, type, 0, nullptr, str->c_str(), 1);
+        qHDF_write_dset(group_id, par_name.c_str(), type, type, 0, nullptr, str->c_str(), 1);
         return;
     }
 
     hid_t type = qHDF_par_type(datatype_id);
     hsize_t dims[3] = {1, 1, 1};
     if (datatype_id < 20) // Scalars
-        qHDF_write_dset(group_id, par_name, type, type, 0, dims, dataptr, 1);
+        qHDF_write_dset(group_id, par_name.c_str(), type, type, 0, dims, dataptr, 1);
     else if (datatype_id < 30) // Matrices
     {
         dims[0] = (hsize_t)dims_arma[1], dims[1] = (hsize_t)dims_arma[0];
-        qHDF_write_dset(group_id, par_name, type, type, 2, dims, dataptr, dims_arma[0] * dims_arma[1]);
+        qHDF_write_dset(group_id, par_name.c_str(), type, type, 2, dims, dataptr, dims_arma[0] * dims_arma[1]);
     }
     else if (datatype_id < 40) // Cubes
     {
         dims[0] = (hsize_t)dims_arma[2], dims[1] = (hsize_t)dims_arma[1], dims[2] = (hsize_t)dims_arma[0];
-        qHDF_write_dset(group_id, par_name, type, type, 3, dims, dataptr, dims_arma[0] * dims_arma[1] * dims_arma[2]);
+        qHDF_write_dset(group_id, par_name.c_str(), type, type, 3, dims, dataptr, dims_arma[0] * dims_arma[1] * dims_arma[2]);
     }
     else // Column and row vectors
     {
         dims[0] = (hsize_t)dims_arma[0];
-        qHDF_write_dset(group_id, par_name, type, type, 1, dims, dataptr, dims_arma[0]);
+        qHDF_write_dset(group_id, par_name.c_str(), type, type, 1, dims, dataptr, dims_arma[0]);
+    }
+}
+
+// Callback of H5Literate: collect the link names of a group
+static herr_t qHDF_collect_link_name(hid_t, const char *name, const H5L_info_t *, void *names)
+{
+    try
+    {
+        static_cast<std::vector<std::string> *>(names)->emplace_back(name);
+        return 0;
+    }
+    catch (...)
+    {
+        return -1;
     }
 }
 
 // Names of the unstructured datasets in a group that start with 'prefix' (returned without the prefix), appended to
 // 'par_names'; in creation order if the group tracks it (groups written by this library do), otherwise in name order.
-// Returns the number of names found.
-static unsigned long long qHDF_read_par_names(hid_t group_id, std::vector<std::string> *par_names, const std::string &prefix)
+// With 'datasets_only = false', links to other objects are listed too (the caller then skips them when it fails to
+// open them as datasets). Returns the number of names found.
+static unsigned long long qHDF_read_par_names(hid_t group_id, std::vector<std::string> *par_names, const std::string &prefix,
+                                              bool datasets_only = true)
 {
-    H5G_info_t group_info;
-    if (H5Gget_info(group_id, &group_info) < 0)
-        throw std::invalid_argument("Failed to get group info.");
-
-    H5_index_t index_type = H5_INDEX_NAME;
+    // All names in one pass (names of any length); a group that does not track the creation order makes the
+    // first H5Literate fail
+    std::vector<std::string> names;
+    hsize_t position = 0;
+    if (H5Literate(group_id, H5_INDEX_CRT_ORDER, H5_ITER_INC, &position, qHDF_collect_link_name, &names) < 0)
     {
-        qHDF_id gcpl(H5Gget_create_plist(group_id), H5Pclose);
-        unsigned flags = 0;
-        if (gcpl.valid() && H5Pget_link_creation_order(gcpl, &flags) >= 0 && (flags & H5P_CRT_ORDER_TRACKED))
-            index_type = H5_INDEX_CRT_ORDER;
+        names.clear(), position = 0;
+        if (H5Literate(group_id, H5_INDEX_NAME, H5_ITER_INC, &position, qHDF_collect_link_name, &names) < 0)
+            throw std::invalid_argument("Failed to get group info.");
     }
 
     unsigned long long n_found = 0;
-    for (hsize_t i = 0; i < group_info.nlinks; ++i)
+    for (const std::string &name : names)
     {
-        // Names of any length: query the length first
-        ssize_t name_length = H5Lget_name_by_idx(group_id, ".", index_type, H5_ITER_INC, i, nullptr, 0, H5P_DEFAULT);
-        if (name_length < 0)
-            throw std::invalid_argument("Failed to get group info.");
-        std::vector<char> name_buffer((size_t)name_length + 1, 0);
-        if (H5Lget_name_by_idx(group_id, ".", index_type, H5_ITER_INC, i, name_buffer.data(), name_buffer.size(), H5P_DEFAULT) < 0)
-            throw std::invalid_argument("Failed to get group info.");
-        const std::string name(name_buffer.data());
-
-        // Only datasets are listed
-        qHDF_id object(H5Oopen(group_id, name.c_str(), H5P_DEFAULT), H5Oclose);
-        if (!object.valid() || H5Iget_type(object) != H5I_DATASET)
+        if (name.compare(0, prefix.length(), prefix) != 0)
             continue;
 
-        if (name.compare(0, prefix.length(), prefix) == 0)
+        if (datasets_only) // Only datasets are listed
         {
-            if (par_names != nullptr)
-                par_names->push_back(name.substr(prefix.length()));
-            ++n_found;
+            qHDF_id object(H5Oopen(group_id, name.c_str(), H5P_DEFAULT), H5Oclose);
+            if (!object.valid() || H5Iget_type(object) != H5I_DATASET)
+                continue;
         }
+
+        if (par_names != nullptr)
+            par_names->push_back(name.substr(prefix.length()));
+        ++n_found;
     }
     return n_found;
 }
@@ -704,18 +758,19 @@ static std::any qHDF_read_numeric(hid_t dset_id, int rank, const hsize_t *dims, 
 // - Fixed-length strings are returned without trailing NUL bytes; variable-length strings (h5py, MATLAB) are copied
 //   and their buffer is freed
 // - Throws std::invalid_argument if a supported dataset cannot be read
-static std::any qHDF_read_data(hid_t group_id, const std::string &dataset_name)
+static std::any qHDF_read_data(hid_t group_id, const std::string &dataset_name, unsigned long long file_size,
+                               bool check_exists = true)
 {
-    if (!qHDF_link_exists(group_id, dataset_name))
+    if (check_exists && !qHDF_link_exists(group_id, dataset_name)) // Not needed for names just listed
         return std::any();
     qHDF_id dset(H5Dopen2(group_id, dataset_name.c_str(), H5P_DEFAULT), H5Dclose);
     if (!dset.valid()) // Not a dataset
         return std::any();
 
-    const std::string msg = "Malformed HDF5 file: unstructured dataset '" + dataset_name + "' ";
+    auto msg = [&](const char *what) { return "Malformed HDF5 file: unstructured dataset '" + dataset_name + "' " + what; };
     qHDF_id type(H5Dget_type(dset), H5Tclose), space(H5Dget_space(dset), H5Sclose);
     if (!type.valid() || !space.valid())
-        throw std::invalid_argument(msg + "cannot be opened.");
+        throw std::invalid_argument(msg("cannot be opened."));
 
     int rank = 0;
     hsize_t dims[3] = {1, 1, 1};
@@ -726,14 +781,14 @@ static std::any qHDF_read_data(hid_t group_id, const std::string &dataset_name)
         if (rank < 1 || rank > 3)
             return std::any(); // Unsupported shape
         if (H5Sget_simple_extent_dims(space, dims, nullptr) < 0)
-            throw std::invalid_argument(msg + "has unreadable extents.");
+            throw std::invalid_argument(msg("has unreadable extents."));
     }
     else if (space_class != H5S_SCALAR)
         return std::any();
 
     unsigned long long n_elem = 1ULL;
     if (!qHDF_product(dims, rank, &n_elem))
-        throw std::invalid_argument(msg + "is too large.");
+        throw std::invalid_argument(msg("is too large."));
 
     H5T_class_t type_class = H5Tget_class(type);
     if (type_class == H5T_STRING)
@@ -743,25 +798,25 @@ static std::any qHDF_read_data(hid_t group_id, const std::string &dataset_name)
 
         htri_t is_variable = H5Tis_variable_str(type);
         if (is_variable < 0)
-            throw std::invalid_argument(msg + "has an unreadable string type.");
+            throw std::invalid_argument(msg("has an unreadable string type."));
         if (is_variable > 0)
         {
             qHDF_id mem_type(H5Tcopy(H5T_C_S1), H5Tclose);
             if (!mem_type.valid() || H5Tset_size(mem_type, H5T_VARIABLE) < 0 || H5Tset_cset(mem_type, H5Tget_cset(type)) < 0)
-                throw std::invalid_argument(msg + "has an unsupported string type.");
+                throw std::invalid_argument(msg("has an unsupported string type."));
             char *ptr = nullptr;
             if (H5Dread(dset, mem_type, H5S_ALL, H5S_ALL, H5P_DEFAULT, &ptr) < 0)
-                throw std::invalid_argument(msg + "cannot be read.");
+                throw std::invalid_argument(msg("cannot be read."));
             std::unique_ptr<char, herr_t (*)(void *)> owner(ptr, H5free_memory);
             return ptr == nullptr ? std::string() : std::string(ptr);
         }
 
         size_t size = H5Tget_size(type);
-        if (size == 0 || !qHDF_storage_ok(dset, type, 1))
-            throw std::invalid_argument(msg + "declares more data than the file contains.");
+        if (size == 0 || !qHDF_storage_ok(dset, type, 1, file_size))
+            throw std::invalid_argument(msg("declares more data than the file contains."));
         std::string value(size, '\0');
         if (H5Dread(dset, type, H5S_ALL, H5S_ALL, H5P_DEFAULT, &value[0]) < 0)
-            throw std::invalid_argument(msg + "cannot be read.");
+            throw std::invalid_argument(msg("cannot be read."));
         while (!value.empty() && value.back() == '\0')
             value.pop_back();
         return value;
@@ -782,8 +837,8 @@ static std::any qHDF_read_data(hid_t group_id, const std::string &dataset_name)
     if (kind < 0)
         return std::any(); // Unsupported type
 
-    if (!qHDF_storage_ok(dset, type, n_elem))
-        throw std::invalid_argument(msg + "declares more elements than the file contains.");
+    if (!qHDF_storage_ok(dset, type, n_elem, file_size))
+        throw std::invalid_argument(msg("declares more elements than the file contains."));
 
     switch (kind)
     {
@@ -805,30 +860,25 @@ static std::any qHDF_read_data(hid_t group_id, const std::string &dataset_name)
 // Indices of the snapshot groups 'Snap_<i>' (i < n_snapshots) of a channel group, sorted
 static std::vector<unsigned> qHDF_snapshot_groups(hid_t group_id, unsigned n_snapshots)
 {
-    std::vector<unsigned> snaps;
-    H5G_info_t group_info;
-    if (H5Gget_info(group_id, &group_info) < 0)
+    // All link names in one pass
+    std::vector<std::string> names;
+    hsize_t position = 0;
+    if (H5Literate(group_id, H5_INDEX_NAME, H5_ITER_INC, &position, qHDF_collect_link_name, &names) < 0)
         throw std::invalid_argument("Malformed HDF5 file: the channel group cannot be listed.");
-    for (hsize_t i = 0; i < group_info.nlinks; ++i)
+
+    std::vector<unsigned> snaps;
+    for (const std::string &name : names)
     {
-        ssize_t name_length = H5Lget_name_by_idx(group_id, ".", H5_INDEX_NAME, H5_ITER_INC, i, nullptr, 0, H5P_DEFAULT);
-        if (name_length < 0)
-            throw std::invalid_argument("Malformed HDF5 file: the channel group cannot be listed.");
-        if (name_length < 6 || name_length > 15) // "Snap_" and 1 to 10 digits
-            continue;
-        char name[16] = {0};
-        if (H5Lget_name_by_idx(group_id, ".", H5_INDEX_NAME, H5_ITER_INC, i, name, sizeof(name), H5P_DEFAULT) < 0)
-            throw std::invalid_argument("Malformed HDF5 file: the channel group cannot be listed.");
-        if (std::strncmp(name, "Snap_", 5) != 0)
+        if (name.size() < 6 || name.size() > 15 || name.compare(0, 5, "Snap_") != 0) // "Snap_" and 1 to 10 digits
             continue;
         unsigned long long value = 0;
         bool is_number = true;
-        for (const char *p = name + 5; *p != 0; ++p)
-            if (*p < '0' || *p > '9')
+        for (size_t p = 5; p < name.size(); ++p)
+            if (name[p] < '0' || name[p] > '9')
                 is_number = false;
             else
-                value = value * 10ULL + (unsigned long long)(*p - '0');
-        if (is_number && value < (unsigned long long)n_snapshots && std::to_string(value) == std::string(name + 5))
+                value = value * 10ULL + (unsigned long long)(name[p] - '0');
+        if (is_number && value < (unsigned long long)n_snapshots && std::to_string(value) == name.substr(5))
             snaps.push_back((unsigned)value);
     }
     std::sort(snaps.begin(), snaps.end());
@@ -946,7 +996,7 @@ static void qHDF_write_channel_data(hid_t group_id, const quadriga_lib::channel<
         {
             const std::string snap_name = "Snap_" + std::to_string(i);
             snap_group = qHDF_check(qHDF_id(H5Gcreate2(group_id, snap_name.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT), H5Gclose),
-                                    "cannot create group '" + snap_name + "'");
+                                    "cannot create group", snap_name.c_str());
             snap_id = snap_group;
         }
 
@@ -1064,7 +1114,7 @@ void quadriga_lib::hdf5_create(std::string fn, unsigned nx, unsigned ny, unsigne
     unsigned version = 2;
     qHDF_write_dset(file, "Version", H5T_NATIVE_UINT, H5T_NATIVE_UINT, 0, nullptr, &version, 1);
 
-    qHDF_check(file.close(), "cannot close file '" + fn + "'");
+    qHDF_check(file.close(), "cannot close file", fn.c_str());
 }
 
 /*!MD
@@ -1101,7 +1151,7 @@ arma::u32_vec quadriga_lib::hdf5_read_layout(std::string fn, arma::u32_vec *chan
 
     qHDF_error_guard error_guard;
     qHDF_id file = qHDF_open_file(fn, H5F_ACC_RDONLY);
-    qHDF_index idx = qHDF_read_index(file, channelID != nullptr);
+    qHDF_index idx = qHDF_read_index(file, qHDF_file_size(file), channelID != nullptr);
 
     arma::u32_vec ChannelDims = {idx.dims[0], idx.dims[1], idx.dims[2], idx.dims[3]};
     if (channelID != nullptr)
@@ -1193,7 +1243,7 @@ int quadriga_lib::hdf5_write(const quadriga_lib::channel<dtype> *ch, std::string
     qHDF_id file = qHDF_open_file(fn, H5F_ACC_RDWR, "Error opening file. It may be opened by another program.");
 
     // Slot and its current channel ID (0 = empty)
-    qHDF_index idx = qHDF_read_index(file);
+    qHDF_index idx = qHDF_read_index(file, qHDF_file_size(file));
     const long long slot = qHDF_slot(idx, ix, iy, iz, iw);
     if (slot < 0)
         throw std::invalid_argument("Index out of bound.");
@@ -1227,7 +1277,7 @@ int quadriga_lib::hdf5_write(const quadriga_lib::channel<dtype> *ch, std::string
         qHDF_check(H5Ldelete(file, qHDF_group_name(old_channel_index).c_str(), H5P_DEFAULT),
                    "cannot delete the old data of the slot");
 
-    qHDF_check(file.close(), "cannot close file '" + fn + "'");
+    qHDF_check(file.close(), "cannot close file", fn.c_str());
     return old_channel_index != 0 ? 1 : 0;
 }
 
@@ -1288,7 +1338,8 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(std::string fn, uns
     qHDF_id file = qHDF_open_file(fn, H5F_ACC_RDONLY);
 
     // Get channel ID
-    const unsigned channel_index = qHDF_channel_id(file, ix, iy, iz, iw);
+    const unsigned long long file_size = qHDF_file_size(file);
+    const unsigned channel_index = qHDF_channel_id(file, file_size, ix, iy, iz, iw);
     if (channel_index == 0)
         return quadriga_lib::channel<dtype>();
 
@@ -1302,10 +1353,10 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(std::string fn, uns
         const std::string prefix = "par_";
         std::vector<std::string> available_par;
         qHDF_id data = qHDF_open_data_group(group);
-        qHDF_read_par_names(data, &available_par, prefix);
+        qHDF_read_par_names(data, &available_par, prefix, false); // Non-datasets give an empty std::any below
         for (std::string &name : available_par)
         {
-            std::any val = qHDF_read_data(data, prefix + name);
+            std::any val = qHDF_read_data(data, prefix + name, file_size, false);
             if (quadriga_lib::any_type_id(&val) > 0)
                 c.par_names.push_back(name), c.par_data.push_back(std::move(val));
         }
@@ -1330,7 +1381,7 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(std::string fn, uns
     // Center frequency in [Hz]: dataset of length [n_snap] or scalar attribute (NaN = not set, read back empty)
     if (qHDF_link_exists(group, "CenterFrequency"))
     {
-        qHDF_dataset dset(group, "CenterFrequency", {n_snap});
+        qHDF_dataset dset(group, "CenterFrequency", {n_snap}, file_size);
         c.center_frequency.set_size((arma::uword)n_snap);
         dset.read(c.center_frequency.memptr());
     }
@@ -1346,7 +1397,7 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(std::string fn, uns
     {
         if (qHDF_link_exists(group, name))
         {
-            qHDF_dataset dset(group, name, {n_snap, 3});
+            qHDF_dataset dset(group, name, {n_snap, 3}, file_size);
             value.set_size(3, (arma::uword)n_snap);
             dset.read(value.memptr());
         }
@@ -1406,7 +1457,7 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(std::string fn, uns
         // Channel coefficients, vector (n_snap) of tensors of size [n_rx, n_tx, n_path]
         if (qHDF_link_exists(snap_id, "coeff_re"))
         {
-            qHDF_dataset dset_re(snap_id, "coeff_re", {np, n_tx, n_rx}), dset_im(snap_id, "coeff_im", {np, n_tx, n_rx});
+            qHDF_dataset dset_re(snap_id, "coeff_re", {np, n_tx, n_rx}, file_size), dset_im(snap_id, "coeff_im", {np, n_tx, n_rx}, file_size);
             for (unsigned j = j_coeff; j < i; ++j)
                 c.coeff_re.push_back(arma::Cube<dtype>(n_rx_arma, n_tx_arma, 0ULL)),
                     c.coeff_im.push_back(arma::Cube<dtype>(n_rx_arma, n_tx_arma, 0ULL));
@@ -1424,7 +1475,7 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(std::string fn, uns
         // Path delays in seconds, vector (n_snap) of tensors of size [n_rx, n_tx, n_path] or [1, 1, n_path]
         if (qHDF_link_exists(snap_id, "delay"))
         {
-            qHDF_dataset dset(snap_id, "delay", {np, qHDF_ANY, qHDF_ANY});
+            qHDF_dataset dset(snap_id, "delay", {np, qHDF_ANY, qHDF_ANY}, file_size);
             const arma::uword n_tx_local = (arma::uword)dset.dim(1), n_rx_local = (arma::uword)dset.dim(2);
 
             for (unsigned j = j_delay; j < i; ++j)
@@ -1439,7 +1490,7 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(std::string fn, uns
         // Path gain before antenna patterns, vector (n_snap) of vectors of length [n_path]
         if (qHDF_link_exists(snap_id, "path_gain"))
         {
-            qHDF_dataset dset(snap_id, "path_gain", {np});
+            qHDF_dataset dset(snap_id, "path_gain", {np}, file_size);
             for (unsigned j = j_path_gain; j < i; ++j)
                 c.path_gain.push_back(arma::Col<dtype>());
             j_path_gain = i + 1;
@@ -1452,7 +1503,7 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(std::string fn, uns
         // Absolute path length from TX to RX phase center, vector (n_snap) of vectors of length [n_path]
         if (qHDF_link_exists(snap_id, "path_length"))
         {
-            qHDF_dataset dset(snap_id, "path_length", {np});
+            qHDF_dataset dset(snap_id, "path_length", {np}, file_size);
             for (unsigned j = j_path_length; j < i; ++j)
                 c.path_length.push_back(arma::Col<dtype>());
             j_path_length = i + 1;
@@ -1465,7 +1516,7 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(std::string fn, uns
         // Polarization transfer function, vector (n_snap) of matrices of size [8, n_path], interleaved complex
         if (qHDF_link_exists(snap_id, "path_polarization"))
         {
-            qHDF_dataset dset(snap_id, "path_polarization", {np, 8});
+            qHDF_dataset dset(snap_id, "path_polarization", {np, 8}, file_size);
             for (unsigned j = j_path_polarization; j < i; ++j)
                 c.path_polarization.push_back(arma::Mat<dtype>(8ULL, 0ULL));
             j_path_polarization = i + 1;
@@ -1478,7 +1529,7 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(std::string fn, uns
         // Departure and arrival angles, vector (n_snap) of matrices of size [n_path, 4], {AOD, EOD, AOA, EOA}
         if (qHDF_link_exists(snap_id, "path_angles"))
         {
-            qHDF_dataset dset(snap_id, "path_angles", {4, np});
+            qHDF_dataset dset(snap_id, "path_angles", {4, np}, file_size);
             for (unsigned j = j_path_angles; j < i; ++j)
                 c.path_angles.push_back(arma::Mat<dtype>(0, 4));
             j_path_angles = i + 1;
@@ -1491,7 +1542,7 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(std::string fn, uns
         // First-bounce scatterer positions, matrices of size [3, n_path]
         if (qHDF_link_exists(snap_id, "path_fbs_pos"))
         {
-            qHDF_dataset dset(snap_id, "path_fbs_pos", {np, 3});
+            qHDF_dataset dset(snap_id, "path_fbs_pos", {np, 3}, file_size);
             for (unsigned j = j_path_fbs_pos; j < i; ++j)
                 c.path_fbs_pos.push_back(arma::Mat<dtype>(3ULL, 0ULL));
             j_path_fbs_pos = i + 1;
@@ -1504,7 +1555,7 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(std::string fn, uns
         // Last-bounce scatterer positions, matrices of size [3, n_path]
         if (qHDF_link_exists(snap_id, "path_lbs_pos"))
         {
-            qHDF_dataset dset(snap_id, "path_lbs_pos", {np, 3});
+            qHDF_dataset dset(snap_id, "path_lbs_pos", {np, 3}, file_size);
             for (unsigned j = j_path_lbs_pos; j < i; ++j)
                 c.path_lbs_pos.push_back(arma::Mat<dtype>(3, 0));
             j_path_lbs_pos = i + 1;
@@ -1517,7 +1568,7 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(std::string fn, uns
         // Number interaction points of a path with the environment, 0 = LOS, and their coordinates [3, sum]
         if (qHDF_link_exists(snap_id, "no_interact"))
         {
-            qHDF_dataset dset(snap_id, "no_interact", {np});
+            qHDF_dataset dset(snap_id, "no_interact", {np}, file_size);
             for (unsigned j = j_no_interact; j < i; ++j)
                 c.no_interact.push_back(arma::u32_vec()), c.interact_coord.push_back(arma::Mat<dtype>(3ULL, 0ULL));
             j_no_interact = i + 1;
@@ -1532,7 +1583,7 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(std::string fn, uns
             arma::Mat<dtype> val;
             if (n_coord != 0)
             {
-                qHDF_dataset dset_coord(snap_id, "interact_coord", {n_coord, 3});
+                qHDF_dataset dset_coord(snap_id, "interact_coord", {n_coord, 3}, file_size);
                 val.set_size(3ULL, (arma::uword)n_coord);
                 dset_coord.read(val.memptr());
             }
@@ -1621,7 +1672,7 @@ void quadriga_lib::hdf5_reshape_layout(std::string fn, unsigned nx, unsigned ny,
 
     // Open file for writing
     qHDF_id file = qHDF_open_file(fn, H5F_ACC_RDWR);
-    qHDF_index idx = qHDF_read_index(file, false);
+    qHDF_index idx = qHDF_read_index(file, qHDF_file_size(file), false);
 
     unsigned long long n_data_old = 0;
     try
@@ -1641,7 +1692,7 @@ void quadriga_lib::hdf5_reshape_layout(std::string fn, unsigned nx, unsigned ny,
     qHDF_check(H5Dwrite(dset, H5T_NATIVE_UINT32, H5S_ALL, H5S_ALL, H5P_DEFAULT, ChannelDims), "cannot write 'ChannelDims'");
     dset.reset();
 
-    qHDF_check(file.close(), "cannot close file '" + fn + "'");
+    qHDF_check(file.close(), "cannot close file", fn.c_str());
 }
 
 /*!MD
@@ -1702,7 +1753,8 @@ std::any quadriga_lib::hdf5_read_dset(std::string fn, std::string par_name,
     qHDF_id file = qHDF_open_file(fn, H5F_ACC_RDONLY);
 
     // Get channel ID
-    const unsigned channel_index = qHDF_channel_id(file, ix, iy, iz, iw);
+    const unsigned long long file_size = qHDF_file_size(file);
+    const unsigned channel_index = qHDF_channel_id(file, file_size, ix, iy, iz, iw);
     if (channel_index == 0)
         return std::any();
 
@@ -1711,7 +1763,7 @@ std::any quadriga_lib::hdf5_read_dset(std::string fn, std::string par_name,
     if (!qHDF_link_exists(group, "Data"))
         return std::any();
     qHDF_id data = qHDF_open_data_group(group);
-    return qHDF_read_data(data, prefix + par_name);
+    return qHDF_read_data(data, prefix + par_name, file_size);
 }
 
 /*!MD
@@ -1763,7 +1815,8 @@ arma::uword quadriga_lib::hdf5_read_dset_names(std::string fn, std::vector<std::
     qHDF_id file = qHDF_open_file(fn, H5F_ACC_RDONLY);
 
     // Get channel ID
-    const unsigned channel_index = qHDF_channel_id(file, ix, iy, iz, iw);
+    const unsigned long long file_size = qHDF_file_size(file);
+    const unsigned channel_index = qHDF_channel_id(file, file_size, ix, iy, iz, iw);
     if (channel_index == 0)
         return 0ULL;
 
@@ -1837,7 +1890,7 @@ void quadriga_lib::hdf5_write_dset(std::string fn, std::string par_name, const s
     qHDF_id file = qHDF_open_file(fn, H5F_ACC_RDWR);
 
     // Slot and its channel ID; an empty slot gets a new group
-    qHDF_index idx = qHDF_read_index(file);
+    qHDF_index idx = qHDF_read_index(file, qHDF_file_size(file));
     const long long slot = qHDF_slot(idx, ix, iy, iz, iw);
     if (slot < 0)
         throw std::invalid_argument("Index out of bound.");
@@ -1857,5 +1910,5 @@ void quadriga_lib::hdf5_write_dset(std::string fn, std::string par_name, const s
         remove_on_error.release();
     }
 
-    qHDF_check(file.close(), "cannot close file '" + fn + "'");
+    qHDF_check(file.close(), "cannot close file", fn.c_str());
 }
