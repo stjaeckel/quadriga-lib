@@ -280,7 +280,7 @@ behind a bare-entered second layer exits into air*; *Layered stack - a host laye
 ## 7. Series, paths and verdicts
 
 **A layered wall is a sum of paths.** A traced body is resolved on its own, its series
-`1/(1 − r_behind·r_ahead·φ²)` with what bounds it taken as it stands; what a neighbouring solid
+`1/(1 − r_behind·r_ahead·φ²)` with what bounds it taken as it stands; what a neighboring solid
 returns arrives as further paths, one per order, `3 + 4n` events. The first path is not the wall; the
 sum is. Asserted in: *Measurement - the mirror behind a second solid and behind a sheet inside a wall*
 (wave half); *Measurement - ray_progress follows the coupling between the series of a layered wall*;
@@ -327,7 +327,7 @@ None has a fix in sight or one worth its cost. Sizes are measured.
   as a sheet and as a solid. Exactly at the tie a sheet reads a value of its own (−9.61 dB between
   −0.18 and −1.22 dB): its two faces form the ratio from two spellings of the sine. A single point.
 - Across the critical angle of a sheet's outer pair there is the square-root cusp of the far cosine
-  and no step: two neighbours 0.02° apart differ by 0.1 to 1.2 dB, as the exact composite does.
+  and no step: two neighbors 0.02° apart differ by 0.1 to 1.2 dB, as the exact composite does.
 - Exactly at its critical angle a lossless sheet without `tf` is 0/0 and the solver declines; the
   event keeps what `ray_mesh_interact` wrote, and an ordered stack kills the ray. A single point.
 - A rigid permittivity without the mass column is a wave medium: as a sheet it tunnels (22 mm of
