@@ -158,7 +158,6 @@ namespace
             require(coiF, "coiF", false);   // coincidence frequency >= 0 (0 disables)
             require(coiQ, "coiQ", false);   // coincidence Q >= 0
             require(tfF, "tfF", false);     // tf peak frequency >= 0 (0 disables)
-            require(tfQ, "tfQ", false);     // tf peak Q >= 0
         }
 
         // Flag for a "thin-sheet" material
@@ -406,11 +405,13 @@ namespace
         // Transmission factor at fGHz, clamped to [-1, 1]: a power law, and a resonant peak where tfP
         // and tfF are set (a panel moving on its mounting, a leaf on its cavity: the room-side absorption
         // of a mass-law face peaks there). The peak is the lumped resonator's, symmetric in log frequency
-        // and zero at both ends; tfQ is the absorber's Q_alpha. Every caller's frequency is positive.
-        double tf(double fGHz = 1.0) const
+        // and zero at both ends; |tfQ| is the absorber's Q_alpha. Every caller's frequency is positive.
+        // Where a mass-law face carries a positive peak the face is its series impedance (zeta, below), whose
+        // normal-incidence absorption is this law; peak = false gives the power-law part alone.
+        double tf(double fGHz = 1.0, bool peak = true) const
         {
             double v = tfR * std::pow(fGHz / fRef, tfB);
-            if (tfP != 0.0 && tfF > 0.0)
+            if (peak && tfP != 0.0 && tfF > 0.0)
             {
                 double x = tfQ * (fGHz / tfF - tfF / fGHz);
                 v += tfP / (1.0 + x * x);
@@ -420,16 +421,30 @@ namespace
 
         // Combined transmission-factor reflection for a two-medium interface (symmetric in the two media).
         // tf+ = max(tf,0) leaks reflection energy into transmission; tf- = max(-tf,0) forces reflection.
-        // Stays in [0,1]; tf = -1 on either face gives R_eff = 1.
-        double apply_tf_pair(const Material &other, double R0, double fGHz = 1.0) const
+        // Stays in [0,1]; tf = -1 on either face gives R_eff = 1. bg: a peaked side contributes its
+        // power-law part only, the pad in front of its series impedance.
+        double apply_tf_pair(const Material &other, double R0, double fGHz = 1.0, bool bg = false) const
         {
-            double tfX = tf(fGHz), tfY = other.tf(fGHz);
+            double tfX = tf(fGHz, !(bg && peaked())), tfY = other.tf(fGHz, !(bg && other.peaked()));
             double tfXp = (tfX > 0.0) ? tfX : 0.0, tfXm = (tfX < 0.0) ? -tfX : 0.0;
             double tfYp = (tfY > 0.0) ? tfY : 0.0, tfYm = (tfY < 0.0) ? -tfY : 0.0;
             R0 = (R0 < 0.0) ? 0.0 : ((R0 > 1.0) ? 1.0 : R0);
             double R_leak = R0 * (1.0 - tfXp) * (1.0 - tfYp);
             double tfm = (tfXm > tfYm) ? tfXm : tfYm;
             return R_leak + (1.0 - R_leak) * tfm;
+        }
+
+        // A peaked mass-law face is a locally reacting face (a panel on a partitioned cavity, a face known
+        // from catalog data): its peak is the series impedance per Z0 of a resonator,
+        // zeta = R' + j (1 + R') |tfQ| (f/tfF - tfF/f) with tfP = 4 R' / (1 + R')^2, over-damped (R' >= 1), or
+        // under-damped (1/R') where tfQ < 0; tfP above one is R' = 1. At normal incidence in air it absorbs the
+        // peak of tf. Gated on m: a wave medium keeps the transformer, and a negative peak forces reflection.
+        bool peaked() const { return m > 0.0 && tfP > 0.0 && tfF > 0.0; }
+        std::complex<double> zeta(double fGHz) const
+        {
+            double a = std::min(tfP, 1.0), Rp = ((2.0 - a) + 2.0 * std::sqrt(1.0 - a)) / a;
+            Rp = (tfQ < 0.0) ? 1.0 / Rp : Rp;
+            return {Rp, (1.0 + Rp) * std::abs(tfQ) * (fGHz / tfF - tfF / fGHz)};
         }
 
         // tf at a face that has a wave on both sides is an ideal transformer of real ratio: it scales the
@@ -440,9 +455,18 @@ namespace
         // out. Returns the one scale of both crossings. At a match of the two sides a forced
         // reflection has no side to move away from, and the medium that forces less sees it negative,
         // so the face is one face from its two sides. The match is taken within rounding: the two
-        // sides form the ratio from two spellings of one cosine.
-        std::complex<double> tf_face(const Material &B, double fGHz, std::complex<double> &r) const
+        // sides form the ratio from two spellings of one cosine. A peaked B replaces the bare face by its
+        // series impedance on both sides of a critical angle: given y, the immittance of the side the wave
+        // is on (closed_face), r is the face's reflection and the scale what the face absorbs over what the
+        // raw crossing passes (tm: the TM channel).
+        std::complex<double> tf_face(const Material &B, double fGHz, std::complex<double> &r, const std::complex<double> *y = nullptr, bool tm = false) const
         {
+            if (y && B.peaked())
+            {
+                double R0 = std::norm(r);
+                closed_face(B, fGHz, r, *y, 1.0, false, tm);
+                return (R0 < 1.0) ? std::sqrt(std::max(0.0, 1.0 - std::norm(r)) / (1.0 - R0)) : 0.0;
+            }
             std::complex<double> u = (1.0 - r) / (1.0 + r);
             double x0 = std::abs(u);
             if ((tf(fGHz) == 0.0 && B.tf(fGHz) == 0.0) || !(x0 > 0.0) || std::isinf(x0))
@@ -462,16 +486,24 @@ namespace
         // it absorbs. In front of a lossless medium that carries a wave it is the pair rule on a
         // reflectance of one, sqrt(R') on the Fresnel reflection and 1 - R' of the flux; where
         // the far wave goes to grazing it is the limit of tf_face, so a face has no step at its
-        // critical angle. r: the raw reflection in, the reflection out. y: the immittance of the
+        // critical angle. A peaked B is a locally reacting face: its series impedance replaces the reactance
+        // of the bare face, behind the pad of the power-law part, and is met against y, whatever lies in
+        // front: as the admittance 1/zeta for TE and the scalar type ((zeta c - 1)/(zeta c + 1) in air), as
+        // the impedance zeta for TM (tm; (zeta/c - 1)/(zeta/c + 1) in air, the impedance boundary).
+        // r: the raw reflection in, the reflection out. y: the immittance of the
         // incidence side that r is written in, z c for TE and the scalar type, conj(z) c for TM.
         // Returns the amplitude the face passes per unit forward amplitude, in normal flux over
         // flux_in. Only the reactance of the far side is read, so a verdict that is forced closes
         // the face as well. A pair without tf, and one at tf = -1, is left raw and passes nothing.
-        double closed_face(const Material &B, double fGHz, std::complex<double> &r, const std::complex<double> &y, double flux_in, bool pass_all = false) const
+        double closed_face(const Material &B, double fGHz, std::complex<double> &r, const std::complex<double> &y, double flux_in, bool pass_all = false, bool tm = false) const
         {
-            double s = pass_all ? 0.0 : std::sqrt(apply_tf_pair(B, 1.0, fGHz)), nu = (1.0 - s) / (1.0 + s), a = std::abs(y);
-            std::complex<double> e = y / a, b(0.0, std::imag(e * (1.0 - r) / (1.0 + r))), w = (nu + b) / (1.0 + nu * b);
-            if (!(nu > 0.0) || !(a > 0.0) || !std::isfinite(std::imag(b)))
+            const bool pk = B.peaked();
+            double s = pass_all ? 0.0 : std::sqrt(apply_tf_pair(B, 1.0, fGHz, pk)), nu = (1.0 - s) / (1.0 + s), a = std::abs(y);
+            std::complex<double> e = y / a, b(0.0, std::imag(e * (1.0 - r) / (1.0 + r)));
+            if (pk && a > 0.0)
+                b = tm ? B.zeta(fGHz) * std::norm(std::sqrt(eta(fGHz) / mu(fGHz))) / a : 1.0 / (B.zeta(fGHz) * a);
+            std::complex<double> w = (nu + b) / (1.0 + nu * b);
+            if ((!(nu > 0.0) && !pk) || !(a > 0.0) || !std::isfinite(std::abs(b)))
                 return 0.0;
             r = (e - w) / (e + w);
             return (flux_in > 0.0) ? std::abs(1.0 + r) * std::sqrt(std::real(w) * a / flux_in) : 0.0;
@@ -709,12 +741,12 @@ namespace
                 std::complex<double> R_TM = (z2 * ct1 - z1 * ct2) / (z2 * ct1 + z1 * ct2), T_TM = (2.0 * z1 * ct1) / (z2 * ct1 + z1 * ct2);
                 if (tir)
                 {
-                    double k_te = closed_face(other, fGHz, R_TE, y_te, std::real(y_te)), k_tm = closed_face(other, fGHz, R_TM, y_tm, std::real(y_tm));
+                    double k_te = closed_face(other, fGHz, R_TE, y_te, std::real(y_te)), k_tm = closed_face(other, fGHz, R_TM, y_tm, std::real(y_tm), false, true);
                     coeff_TE = trans_class ? k_te : R_TE, coeff_TM = trans_class ? k_tm : R_TM;
                 }
                 else
                 {
-                    std::complex<double> c_te = tf_face(other, fGHz, R_TE), c_tm = tf_face(other, fGHz, R_TM);
+                    std::complex<double> c_te = tf_face(other, fGHz, R_TE, &y_te), c_tm = tf_face(other, fGHz, R_TM, &y_tm, true);
                     coeff_TE = trans_class ? T_TE * (s_te * c_te) : R_TE, coeff_TM = trans_class ? T_TM * (s_tm * c_tm) : R_TM;
                 }
                 gain = 0.5 * (std::norm(coeff_TE) + std::norm(coeff_TM));
@@ -729,7 +761,7 @@ namespace
                 }
                 else
                 {
-                    std::complex<double> c = tf_face(other, fGHz, R);
+                    std::complex<double> c = tf_face(other, fGHz, R, &y_te);
                     coeff_TE = trans_class ? T * (s_te * c) : R;
                 }
                 coeff_TM = coeff_TE, gain = std::norm(coeff_TE);
@@ -1108,6 +1140,12 @@ namespace
             // converted once at the outer pair, and across a closed layer there is nothing to
             // convert through, so the flux of that side is collected here and the transmit port
             // is put right by the ratio below.
+            // The transformer of an open face, a peaked face seen from the side that is not the plate
+            auto TF_FACE = [&](const Material &A, const Material &B, std::complex<double> &r, const std::complex<double> &ya, const std::complex<double> &yb)
+            {
+                std::complex<double> rb = -r;
+                return (A.peaked() && !B.peaked()) ? B.tf_face(A, fGHz, rb, &yb, pol == 1) : A.tf_face(B, fGHz, r, &ya, pol == 1);
+            };
             auto BND = [&](int j, std::complex<double> &r, std::complex<double> &t, std::complex<double> &tb)
             {
                 const Material &A = MED(j), &B = MED(j + 1);
@@ -1128,7 +1166,7 @@ namespace
                 if (far_closed && j == n_layers && !(A.m > 0.0))
                 {
                     double k = A.closed_face(B, fGHz, r, (pol == 0) ? za * ca : std::conj(za) * ca,
-                                             std::real((pol == 0) ? z_n * ci : std::conj(z_n) * ci));
+                                             std::real((pol == 0) ? z_n * ci : std::conj(z_n) * ci), false, pol == 1);
                     t = std::polar(k, is_scalar ? std::arg(t) : 0.0);
                     return;
                 }
@@ -1143,7 +1181,7 @@ namespace
                 }
                 if (!closed && (PLATE_OUT(j) || (j + 1 <= n_layers && B.m > 0.0 && !(A.m > 0.0)))) // an open outer face of a plate
                 {
-                    std::complex<double> c = A.tf_face(B, fGHz, r), ya = (pol == 0) ? za * ca : std::conj(za) * ca, yb = (pol == 0) ? zb * cb : std::conj(zb) * cb;
+                    std::complex<double> ya = (pol == 0) ? za * ca : std::conj(za) * ca, yb = (pol == 0) ? zb * cb : std::conj(zb) * cb, c = TF_FACE(A, B, r, ya, yb);
                     t *= c, tb *= c;
                     if (!PLATE_OUT(j)) // the first face: what it passes into the plate
                     {
@@ -1159,7 +1197,7 @@ namespace
                     return;
                 if (!closed) // an open face, of a coherent or a mass-law layer
                 {
-                    std::complex<double> c = A.tf_face(B, fGHz, r);
+                    std::complex<double> c = TF_FACE(A, B, r, (pol == 0) ? za * ca : std::conj(za) * ca, (pol == 0) ? zb * cb : std::conj(zb) * cb);
                     t *= c, tb *= c;
                     return;
                 }
@@ -1170,7 +1208,7 @@ namespace
                 if (!(V.m > 0.0))
                 {
                     std::complex<double> yw = (pol == 0) ? (cB ? za * ca : zb * cb) : (cB ? std::conj(za) * ca : std::conj(zb) * cb), rw = cB ? r : -r, rp = rw;
-                    double k = V.closed_face(cB ? B : A, fGHz, rw, yw, 1.0), kp = V.closed_face(cB ? B : A, fGHz, rp, yw, 1.0, true);
+                    double k = V.closed_face(cB ? B : A, fGHz, rw, yw, 1.0, false, pol == 1), kp = V.closed_face(cB ? B : A, fGHz, rp, yw, 1.0, true, pol == 1);
                     double a_face = (kp > 0.0) ? (k / kp) * (k / kp) : 0.0;
                     if (cB)
                         a_entry = a_face;
@@ -1416,9 +1454,12 @@ namespace
                 }
             }
             if (std::imag(eta_a_if * mu_a) == 0.0 && std::abs(rat * sin2) >= 1.0) // closed, as interact_with judges it
-                mat_slab.closed_face(adj, fGHz, r_te, z1 * cs, 1.0), mat_slab.closed_face(adj, fGHz, r_tm, is_scalar ? z1 * cs : std::conj(z1) * cs, 1.0);
+                mat_slab.closed_face(adj, fGHz, r_te, z1 * cs, 1.0), mat_slab.closed_face(adj, fGHz, r_tm, is_scalar ? z1 * cs : std::conj(z1) * cs, 1.0, false, !is_scalar);
             else
-                mat_slab.tf_face(adj, fGHz, r_te), mat_slab.tf_face(adj, fGHz, r_tm);
+            {
+                std::complex<double> y_te = z1 * cs, y_tm = is_scalar ? y_te : std::conj(z1) * cs;
+                mat_slab.tf_face(adj, fGHz, r_te, &y_te), mat_slab.tf_face(adj, fGHz, r_tm, &y_tm, !is_scalar);
+            }
         };
 
         std::complex<double> rn_te, rn_tm, rf_te, rf_tm;
@@ -2928,10 +2969,12 @@ void quadriga_lib::ray_state_update(
   independent; either may be NULL.
 - **`ray_indN`** — Compact-to-full ray index map; `[n_rayN]` to `[n_ray]`; NULL = identity (`n_ray == n_rayN`)
 - **`eps`** *(optional)* — Thin-slab (Fabry-Pérot) resolve threshold on the round-trip in-slab
-  amplitude `ρ` (`ρ ∈ [0, 1]`): the closed-form Airy factor is applied when `ρ ≥ eps` and the series
-  is re-emitted to the tracer when `ρ < eps` (weak / fast-decaying slabs). `eps = 0` always resolves
-  (for callers that cannot re-emit, e.g. [[calc_diffraction_gain]]); `eps ≥ 1` always re-emits
-  (resolution disabled). A near-pole `S` or a known non-parallel slab re-emits regardless of `eps`.
+  amplitude `ρ = |r_near·r_far|·|φ|²` (`ρ ≥ 0`, not bounded by one: next to a lossy or evanescent layer
+  a face can reflect more than one in amplitude): the closed-form Airy factor is applied when `ρ ≥ eps`
+  and the series is re-emitted to the tracer when `ρ < eps` (weak / fast-decaying slabs). `eps = 0`
+  always resolves (for callers that cannot re-emit, e.g. [[calc_diffraction_gain]]); `eps ≥ 1`
+  re-emits every series whose `ρ` is below one, and a round trip at or above one is always resolved.
+  A near-pole `S` or a known non-parallel slab re-emits regardless of `eps`.
   Does **not** gate a thin sheet's own series: a sheet has no interior for the tracer to re-emit into, so
   that series always resolves. `eps` still gates the host layer a sheet is embedded in.
   Default `0.15`.

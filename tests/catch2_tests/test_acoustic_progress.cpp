@@ -595,11 +595,13 @@ TEST_CASE("ray_progress - refracting tracer: the segment out of a lossy medium i
 
 TEST_CASE("ray_progress - the plate rule and the absorption peak at every frequency of a band", "[acoustic]")
 {
-    // N1 and A10 through the tracer: a 12.5 mm board (rigid, m 20, tf 0.05 with a peak tfP 0.25 at 150 Hz on the
-    // lumped-resonator law, M5, tfQ = Q_alpha 0.75) as a sheet and as a traced solid, scalar, float, one ray until
-    // none is left, a band of five frequencies on the base frequency's geometry. Each frequency: the room side
-    // absorbs tf(f), the plate passes a tau / (a + tau - a tau); and the band equals each frequency run alone. At
-    // bb336dc the peak columns were not read and the plate passed tf^2 tau.
+    // N1, A10 and M6 through the tracer: a 12.5 mm board (rigid, m 20, tf 0.05 with a peak tfP 0.25 at 150 Hz, tfQ =
+    // Q_alpha 0.75) as a sheet and as a traced solid, scalar, float, one ray until none is left, a band of five
+    // frequencies on the base frequency's geometry. Each frequency: the room side is the locally reacting face of the
+    // peak (M6), the series impedance zeta = R' + j (1 + R') tfQ (f/tfF - tfF/f) with tfP = 4 R'/(1 + R')^2 (R' >= 1),
+    // reflecting (zeta c - 1)/(zeta c + 1) behind the pad of tf, so it absorbs a = 1 - (1 - tf)|r_zeta|^2 at the cosine c;
+    // the plate passes a tau / (a + tau - a tau); and the band equals each frequency run alone. Before M6 the face
+    // absorbed the M5 law at every angle; at bb336dc the peak columns were not read and the plate passed tf^2 tau.
     ub::OneThread one_thread;
     const double PI = 3.14159265358979323846, FMAP = 299792458.0 / 343.0 * 1.0e-9;
     const double a = 8.1817e-08, thk = 0.0125, fRef = 1.6644e-04, tf0 = 0.05, tfP = 0.25, tfF_hz = 150.0, tfQ = 0.75;
@@ -678,6 +680,7 @@ TEST_CASE("ray_progress - the plate rule and the absorption peak at every freque
     const std::vector<double> band = {150.0, 63.0, 250.0, 500.0, 1000.0};
     QD_DIAG("\n# diag: ray_progress, a 12.5 mm board with an absorption peak, sheet (S) and traced solid (X), scalar, float\n");
     QD_DIAG("kind,tracer,theta,f_Hz,alpha,alpha_ref,T_dB,T_rule_dB,band_minus_alone_dB\n");
+    double mA = 0.0, mT = 0.0, mB = 0.0;
     for (int kind = 0; kind < 2; ++kind)
         for (bool refr : {false, true})
             for (double thd : {20.0, 50.0})
@@ -686,15 +689,152 @@ TEST_CASE("ray_progress - the plate rule and the absorption peak at every freque
                 for (size_t q = 0; q < band.size(); ++q)
                 {
                     TR A = trace(kind == 0, thd, refr, {band[q]})[0];
-                    const double fG = band[q] * FMAP, c = std::cos(thd * PI / 180.0), x = tfQ * (band[q] / tfF_hz - tfF_hz / band[q]);
-                    const double ar = std::min(1.0, tf0 + tfP / (1.0 + x * x)), tau = std::pow(10.0, -0.1 * mass_TL((fG / fRef) * thk, c));
+                    const double fG = band[q] * FMAP, c = std::cos(thd * PI / 180.0), Rp = ((2.0 - tfP) + 2.0 * std::sqrt(1.0 - tfP)) / tfP;
+                    const std::complex<double> z(Rp, (1.0 + Rp) * tfQ * (band[q] / tfF_hz - tfF_hz / band[q]));
+                    const double ar = 1.0 - (1.0 - tf0) * std::norm((z * c - 1.0) / (z * c + 1.0)), tau = std::pow(10.0, -0.1 * mass_TL((fG / fRef) * thk, c));
                     const double Tr = ar * tau / (ar + tau - ar * tau);
                     QD_DIAG("%s,%d,%.0f,%.0f,%.5f,%.5f,%.3f,%.3f,%+.2e\n", kind ? "X" : "S", refr ? 5 : 4, thd, band[q], 1.0 - B[q].R, ar, pdB(B[q].T), pdB(Tr),
                             pdB(B[q].T) - pdB(A.T));
                     INFO((kind ? "traced" : "sheet") << ", tracer " << (refr ? 5 : 4) << ", " << thd << " deg, " << band[q] << " Hz");
-                    CHECK(std::abs((1.0 - B[q].R) - ar) < 1.0e-3);
-                    CHECK(std::abs(pdB(B[q].T) - pdB(Tr)) < 0.02);
+                    mA = std::max(mA, std::abs((1.0 - B[q].R) - ar)), mT = std::max(mT, std::abs(pdB(B[q].T) - pdB(Tr))), mB = std::max(mB, std::abs(pdB(B[q].T) - pdB(A.T)));
+                    CHECK(std::abs((1.0 - B[q].R) - ar) < 1.5e-7);
+                    CHECK(std::abs(pdB(B[q].T) - pdB(Tr)) < 1.5e-3);
                     CHECK(std::abs(pdB(B[q].T) - pdB(A.T)) < 1.0e-4);
                 }
             }
+    QD_DIAG("# max |alpha - ref| %.2e, max |T - rule| %.2e dB, max band - alone %.2e dB\n", mA, mT, mB);
+}
+
+TEST_CASE("ray_progress - the random-incidence absorption of a peaked lining is the Paris integral of its series impedance", "[acoustic]")
+{
+    // M6 and the fit target of md/acoustic.md 9: a peaked face is locally reacting, so its random-incidence absorption is
+    // the Paris integral of 1 - |r(theta)|^2 with weight sin 2 theta over 0 to 90 deg, not its normal-incidence value. The
+    // row plasterboard on 25 mm battens (report 3.8) refitted on M6 (md/m6_report.md 0.6, the power-law pad in front of the
+    // over-damped zeta): tf 0.0933 at 1 kHz with tfB 0.1423, tfP 0.2869 at 181.6 Hz, tfQ 1.319, on a rigid mass-law face
+    // (two-parameter concrete, m 20), as a sheet (200 mm) and as a traced solid, tracer 4, float, one ray per angle until
+    // none is left, 27 thirds from 25 Hz to 10 kHz in one band, 48 Gauss-Legendre angles. Octave = mean of its three
+    // thirds. Reference: the closed form of the Paris integral of a locally reacting face of impedance zeta,
+    //   P = (8 r/|z|^2) (1 - (r/|z|^2) ln(1 + 2 r + |z|^2) + ((r^2 - x^2)/(x |z|^2)) atan(x/(1 + r))), z = r + j x,
+    // and the pad: alpha = tf + (1 - tf) P. Recorded: the row's targets. Before M6 the face absorbed the M5 law at every
+    // angle, and the octaves read up to 0.084 below.
+    ub::OneThread one_thread;
+    const double PI = 3.14159265358979323846, FMAP = 299792458.0 / 343.0 * 1.0e-9;
+    const double a = 3.850e-6, mu = 1901.0, fRef = 5.0212e-5, t1k = 0.09332, tB = 0.1423, tfP = 0.2869, tfF_hz = 181.6, tfQ = 1.319, H = 0.2;
+    const double tfR = t1k * std::pow(fRef / (1000.0 * FMAP), tB);
+    typedef std::unordered_map<std::string, std::vector<float>> Pal;
+    const std::vector<double> OCT = {31.5, 63, 125, 250, 500, 1000, 2000, 4000, 8000};
+    std::vector<double> f3;
+    for (double fc : OCT)
+        for (int k = -1; k <= 1; ++k)
+            f3.push_back(fc * std::pow(2.0, k / 3.0));
+    // 48-point Gauss-Legendre on 0 to 90 deg, weights times sin 2 theta, normalized
+    const int NG = 48;
+    std::vector<double> th(NG), w(NG);
+    double ws = 0.0;
+    for (int i = 0; i < NG; ++i)
+    {
+        double x = std::cos(PI * (i + 0.75) / (NG + 0.5)), dp = 0.0;
+        for (int it = 0; it < 100; ++it)
+        {
+            double p0 = 1.0, p1 = x;
+            for (int n = 2; n <= NG; ++n)
+            {
+                const double p2 = ((2.0 * n - 1.0) * x * p1 - (n - 1.0) * p0) / n;
+                p0 = p1, p1 = p2;
+            }
+            dp = NG * (x * p1 - p0) / (x * x - 1.0);
+            const double dx = p1 / dp;
+            x -= dx;
+            if (std::abs(dx) < 1.0e-15)
+                break;
+        }
+        th[i] = 45.0 * (x + 1.0), w[i] = 2.0 / ((1.0 - x * x) * dp * dp) * std::sin(2.0 * th[i] * PI / 180.0), ws += w[i];
+    }
+    for (double &v : w)
+        v /= ws;
+    // the reflected power per frequency of one ray through ray_progress, every path back in air in front of the face
+    auto trace = [&](bool sheet, double thd) -> std::vector<double>
+    {
+        const size_t nf = f3.size();
+        Pal pal;
+        pal["a"] = {(float)a}, pal["e"] = {(float)mu}, pal["fRef"] = {(float)fRef}, pal["thk"] = {sheet ? (float)H : 0.0f}, pal["m"] = {20.0f};
+        pal["tf"] = {(float)tfR}, pal["tfB"] = {(float)tB}, pal["tfP"] = {(float)tfP}, pal["tfF"] = {(float)(tfF_hz * FMAP)}, pal["tfQ"] = {(float)tfQ};
+        const float h = 200.0f, xb = sheet ? 0.0f : (float)H;
+        std::vector<float> x = sheet ? std::vector<float>{0.0f} : std::vector<float>{0.0f, xb};
+        arma::fmat mesh(2 * x.size(), 9);
+        arma::uvec mi(2 * x.size(), arma::fill::ones);
+        for (size_t k = 0; k < x.size(); ++k)
+            if (k == 0)
+                mesh.row(2 * k) = arma::frowvec{x[k], -h, -h, x[k], -h, h, x[k], h, -h}, mesh.row(2 * k + 1) = arma::frowvec{x[k], h, -h, x[k], -h, h, x[k], h, h};
+            else
+                mesh.row(2 * k) = arma::frowvec{x[k], -h, -h, x[k], h, -h, x[k], -h, h}, mesh.row(2 * k + 1) = arma::frowvec{x[k], h, -h, x[k], h, h, x[k], -h, h};
+        const double t = thd * PI / 180.0;
+        const float Ox = -1.0f, Oy = 0.37f - (float)std::tan(t), Oz = 0.0f, r0 = 0.1f, len = 300.0f;
+        arma::frowvec kv = {(float)std::cos(t), (float)std::sin(t), 0.0f};
+        arma::fvec cf(nf);
+        for (size_t q = 0; q < nf; ++q)
+            cf(q) = (float)(f3[q] * FMAP * 1.0e9);
+        arma::fmat orig(1, 3), dest(1, 3), acc(1, 1 + nf, arma::fill::zeros);
+        orig.row(0) = arma::frowvec{Ox, Oy, Oz} + r0 * kv, dest.row(0) = arma::frowvec{Ox, Oy, Oz} + (r0 + len) * kv;
+        arma::fcube pd(1, 3, nf);
+        for (size_t q = 0; q < nf; ++q)
+            pd.slice(q) = kv;
+        arma::Col<short> prev(1, arma::fill::zeros), cur(1, arma::fill::zeros), buf(1, arma::fill::zeros);
+        std::vector<quadriga_lib::path> paths(1);
+        paths[0].init(0, nf, true);
+        paths[0].set_length(r0);
+        std::vector<double> R(nf, 0.0);
+        for (int g = 0; g < 40; ++g)
+        {
+            quadriga_lib::ray_progress(mesh, mi, pal, cf, Ox, Oy, Oz, orig, dest, prev, cur, buf, pd, acc, paths, nullptr, nullptr, nullptr, nullptr,
+                                       (uint8_t)12, 100, 100, 0, -250.0f, 3.0f, 0.15f, false, true, nullptr, nullptr, nullptr, nullptr);
+            if (orig.n_rows == 0)
+                break;
+            for (arma::uword i = 0; i < orig.n_rows; ++i)
+            {
+                const size_t ns = paths[i].n_seg();
+                if ((cur(i) & (short)0x3FFF) != 0 || ns != (size_t)(g + 1) || dest(i, 0) > orig(i, 0) || paths[i].coord(ns - 1)[0] >= 1.0e-3f)
+                    continue;
+                for (size_t q = 0; q < nf; ++q)
+                {
+                    const float *xc = paths[i].xpr_coeff(q);
+                    R[q] += (double)xc[0] * xc[0] + (double)xc[1] * xc[1];
+                }
+            }
+        }
+        return R;
+    };
+    // the reference: the pad of the power law in front of the Paris integral of zeta, per third
+    auto paris = [&](double f)
+    {
+        const double Rp = ((2.0 - tfP) + 2.0 * std::sqrt(1.0 - tfP)) / tfP, r = Rp, x = (1.0 + Rp) * tfQ * (f / tfF_hz - tfF_hz / f), a2 = r * r + x * x;
+        const double P = (8.0 * r / a2) * (1.0 - (r / a2) * std::log(1.0 + 2.0 * r + a2) + ((r * r - x * x) / (x * a2)) * std::atan(x / (1.0 + r)));
+        const double t = std::min(1.0, std::max(0.0, tfR * std::pow(f * FMAP / fRef, tB)));
+        return t + (1.0 - t) * P;
+    };
+    const std::vector<double> TGT = {std::nan(""), std::nan(""), 0.31, 0.33, 0.14, 0.10, 0.10, 0.12, 0.12}; // the row, 125 Hz to 4 kHz; 8 kHz as 4 kHz
+    QD_DIAG("\n# diag: plasterboard on 25 mm battens on M6, Paris 0-90 deg through ray_progress, octaves, against the closed form\n");
+    QD_DIAG("kind,f_Hz,paris,paris_ref,d,target\n");
+    double mP = 0.0;
+    for (int kind = 0; kind < 2; ++kind)
+    {
+        std::vector<double> al(f3.size(), 0.0);
+        for (int i = 0; i < NG; ++i)
+        {
+            std::vector<double> R = trace(kind == 0, th[i]);
+            for (size_t q = 0; q < f3.size(); ++q)
+                al[q] += w[i] * (1.0 - R[q]);
+        }
+        for (size_t o = 0; o < OCT.size(); ++o)
+        {
+            double v = 0.0, ref = 0.0;
+            for (int k = 0; k < 3; ++k)
+                v += al[3 * o + k] / 3.0, ref += paris(f3[3 * o + k]) / 3.0;
+            QD_DIAG("%s,%.1f,%.6f,%.6f,%.1e,%.3f\n", kind ? "X" : "S", OCT[o], v, ref, std::abs(v - ref), TGT[o]);
+            mP = std::max(mP, std::abs(v - ref));
+            INFO((kind ? "traced" : "sheet") << ", octave " << OCT[o] << " Hz");
+            CHECK(std::abs(v - ref) < 1.2e-5);
+        }
+    }
+    QD_DIAG("# max |Paris - closed form| %.2e\n", mP);
 }

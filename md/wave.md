@@ -27,8 +27,8 @@ First step of every session, from the repository root:
 ```
 cmake --build build_linux --parallel
 ./build_linux/test_bin "[wave]" > test_wave.txt          # All tests passed (165110 assertions in 179 test cases)
-./build_linux/test_bin "[acoustic]" > test_acoustic.txt  # All tests passed (36813 assertions in 52 test cases)
-./build_linux/test_bin > test.txt                        # All tests passed (1311472 assertions in 1138 test cases)
+./build_linux/test_bin "[acoustic]" > test_acoustic.txt  # All tests passed (39371 assertions in 54 test cases)
+./build_linux/test_bin > test.txt                        # All tests passed (1314030 assertions in 1140 test cases)
 ```
 
 The three baselines are untracked (`.gitignore`: `test*.txt`). A change is diffed against them. The
@@ -348,8 +348,10 @@ None has a fix in sight or one worth its cost. Sizes are measured.
   one either: a lossless rare solid with `tf` and no mass column reads 1.02 to 1.69 at 45° to 85°.
 - A followed bounce series can diverge where the summed one is exact: in a lossy layer rarer than air
   between strong reflectors the round trip `|r1 r2 φ²|` reaches 1.19 (6 mm of `eps 0.31 − 0.20j`
-  behind a coating at 85°). Through `ray_progress` such a leg is always summed; two such cavities
-  coupled have no finite path sum (+6.4 to +88.6 dB above the matrix at 60° to 85°).
+  behind a coating at 85°). Through `ray_progress` such a leg is summed wherever its round trip
+  `ρ = |r1 r2|·|φ|²` reaches `thin_slab_threshold`, and a round trip above one always does (the gate in
+  `qd_slab_resolve`, at a threshold of 1 as well); two such cavities coupled have no finite path sum (+6.4 to +88.6 dB
+  above the matrix at 60° to 85°).
 - A negative `resS` is a gain medium (2.11 on the two ports of a 37.5 mm sheet of `ε` 4 with `resS`
   −0.5 at normal incidence). Nothing validates `resS`.
 
