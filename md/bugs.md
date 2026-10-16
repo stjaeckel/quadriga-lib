@@ -200,6 +200,8 @@ miscompilation by the LAF split-compare passes, not a library defect. The campai
 | after WP-02 round 1: base | `All tests passed (1307922 assertions in 1144 test cases)` | 40 s | 1.7 / 1.4 |
 | after WP-02 round 1: generic | `All tests passed (1307673 assertions in 1144 test cases)` | 46 s | 1.4 / 6.0 |
 | after WP-02 round 1: ASan + UBSan gcc-12, `suppress_equal_pcs=0` | `All tests passed (1307922 assertions in 1144 test cases)`; reports: only the excluded `ray_progress` UBSan reports (`test_wave_progress.cpp:301`), no ASan report, no leak | 317 s | 5.1 / 2.5 |
+| after WP-02 round 2: base / generic | `All tests passed (1307922 assertions in 1144 test cases)` / `(1307673 assertions in 1144 test cases)` | 92 s / 40 s | 3.0 / 18.3, 18.3 / 9.9 |
+| after WP-02 round 2: ASan + UBSan gcc-12, `suppress_equal_pcs=0` | `All tests passed (1307922 assertions in 1144 test cases)`; only the excluded `ray_progress` reports, no leak | 322 s | 8.5 / 2.6 |
 
 Run commands: `flock /tmp/quadriga-fixes-suite.lock build_linux/test_bin` (output
 `build_linux/scratch/hunt/base_test.txt`); the sanitizer runs with
@@ -242,6 +244,7 @@ GNUmakefile default is `avx2 = OFF`, so a default `make` gives MEX files without
 | MATLAB R2026a | same, 65 of 66, then **MATLAB crashes with a segmentation violation at exit**, exit code 137, crash dump `~/matlab_crash_dump.878185-1` | 10.9 s | 21.5 |
 | after WP-01: Octave 11.1, R2024a, R2026a | 65 of 66 in each, same excluded failure; R2026a exits with 0, no crash dump (B-029 fixed) | - | 2 |
 | after WP-02 round 1: Octave 11.1, R2024a, R2026a | 65 of 66 in each, same excluded failure; R2026a exits with 0, no crash dump | - | 1-2 |
+| after WP-02 round 2: Octave 11.1, R2026a | 65 of 66 in each, same excluded failure; R2026a exits with 0, no crash dump | - | 2-3 |
 
 The R2026a crash is B-029. A single `quadriga_lib.version` call does not crash R2026a at
 exit (2 of 2 runs).
@@ -252,7 +255,7 @@ exit (2 of 2 runs).
 `762 passed, 1 skipped, 37 subtests passed in 2.55s` (load 9.5 before, 11.7 after). The skip is
 `test_ray_point_intersect.py:403` (CUDA kernel not available). Module version string `0.12.2_AVX2`.
 
-After WP-01: `762 passed, 1 skipped, 37 subtests passed in 1.85s`. After WP-02 round 1: `762 passed, 1 skipped, 37 subtests passed in 1.80s` (the Python suite has no HDF5 tests).
+After WP-01: `762 passed, 1 skipped, 37 subtests passed in 1.85s`. After WP-02 round 1: `762 passed, 1 skipped, 37 subtests passed in 1.80s` (the Python suite has no HDF5 tests). After WP-02 round 2: the same.
 
 ### Fuzzing (AFL++ 4.33c)
 

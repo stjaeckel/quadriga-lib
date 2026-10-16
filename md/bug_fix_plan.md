@@ -125,7 +125,7 @@ is the coordinator's suggestion from the hunt.
 | B-098 | 05 | Python `view = true` | (a) document as "fast contiguous copy" now (b) real aliasing (audit, GIL notes in the item) | (a) now, (b) as a later separate task | (b) real aliasing now, in WP-05: switch to copy_aux_mem = false with the audit of all wrappers and the GIL / lifetime notes of the item (2026-10-15) |
 | B-099 | 05 | Python kwarg names `sub_cloud_index`, `map_to_itu_materials` | (a) docs follow the registered names (b) registration follows the docs (breaking) | (a) | (a) docs follow the registered names (2026-10-15) |
 | B-113 | 15 | 0 paths with `add_fake_los_path` | (a) C++ returns the fake LOS path (all APIs agree with today's MEX) (b) MEX calls C++ and throws like C++ | (a) | (a) C++ returns the zero-power fake LOS path (with the correct delay) for 0 paths; all APIs agree (2026-10-15) |
-| WP-02 | 02 | Reads are 24-35% slower after the WP-02 rewrite (manager's benchmark; writes 35-38% faster); most of it is the per-dataset storage check | (a) accept and commit (b) round 2: make the check cheap, keep every check | (b) | (b) round 2; accept when both reads are within 10% of the old code (2026-10-16) |
+| WP-02 | 02 | Reads are 24-35% slower after the WP-02 rewrite (manager's benchmark; writes 35-38% faster); most of it is the per-dataset storage check | (a) accept and commit (b) round 2: make the check cheap, keep every check | (b) | (b) round 2; accept when both reads are within 10% of the old code (2026-10-16); result: W2 1.03-1.04, W4 1.01-1.03, writes 0.55-0.97 of the old time (manager, load 2.1-2.9) |
 | B-050 | 02 | Empty `tx_orientation` / `rx_orientation` read back as 3x1 zeros | (a) keep and document (b) marker attribute, read back empty (changes MATLAB/Python output) | (a) | (a) keep the current behaviour, documented; B-050 counts as fixed (2026-10-16) |
 | B-119 | - | HDF5 1.14.6 itself misbehaves on crafted files (`H5Fopen` 4 GB zero-fill, `H5Gopen2` 2^64-byte request) | (a) record as an item, won't fix (b) mitigate | (a) | (a) recorded as B-119, won't fix (upstream) (2026-10-16) |
 
@@ -162,6 +162,9 @@ acceptance checks beyond section 3.1. Severities in brackets.
   B-051 removes `H5close()`: re-check the R2026a exit (B-029, repro `F-1`). The 11 crash and 20 hang inputs of the
   phase-0 HDF5 campaign are in `build_linux/scratch/hunt/fuzz/out/hdf5/{main,cmp}/{crashes,hangs}/`; replay them
   against the fixed harness, and fuzz into a new output directory (do not overwrite `out/hdf5`).
+- HDF5 timing for later work: `bash build_linux/scratch/fix/WP-02/manager/bench/run_bench.sh` compares the current
+  `src/qd_channel_hdf5.cpp` with 3a7c2cc (7 workloads, single thread, under `flock /tmp/bench.lock`; valid at load < 4).
+  After WP-02: reads 1.01-1.04, writes 0.55-0.97 of the 3a7c2cc time.
 - Acceptance: re-run the HDF5 AFL harness for 15 minutes (`build_linux/scratch/hunt/fuzz/`, rebuild `build_afl_plain`
   and `build_afl_cmplog` first): no crash. The HDF5 cases of the ASan suite are clean.
 
@@ -378,7 +381,7 @@ unexpected changes in the diff; proposed `md/bugs.md` updates; anything the next
 |---|---|---|---|
 | WP-00 | decisions (section 4) | done 2026-10-15 | - |
 | WP-01 | 11 | done 2026-10-16 (11 of 11 fixed) | 3a7c2cc |
-| WP-02 | 8 | round 1 committed 2026-10-16 (8 of 8 fixed; reads 24-35% slower); round 2 (read speed) prompt issued | round 1: commit `WP-02 round 1: ...` (hash at next update) |
+| WP-02 | 8 | done 2026-10-16 (8 of 8 fixed; round 2: reads back to the old speed) | round 1 e8f4edc; round 2: commit `WP-02 round 2: ...` (hash at next update) |
 | WP-03 | 4 | open | - |
 | WP-04 | 5 | open | - |
 | WP-05 | 12 | open | - |
