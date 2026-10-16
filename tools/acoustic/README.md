@@ -7,6 +7,7 @@ review in `/home/stephan/accoustic_research` (`references/index.csv`).
 | file | what it does | used for |
 | --- | --- | --- |
 | `sabine_to_random.py` | Reverberation-chamber (Sabine) absorption to random incidence by Jeong's method: one Miki flow resistivity per product, fitted so that a finite sample (Thomasson's field impedance of the rectangular patch) reproduces the chamber octaves; the output is the Paris integral (0°–90°) of the infinite layer. Also the edge correction `β·E` for mineral wool. | the A13 rule for a `tf` reference and the class-4 rows (`md/acoustic.md` 6, 9) |
+| `check_docs.py` | Mechanical checks of `md/acoustic.md` and `md/wave.md`: table column counts, source keys against the review's index, every `[acoustic]` case named, the quoted suite counts against the baseline files, American spelling. Run from the repository root; exit code 1 on a failure. | the review of every worker phase that touches the documents (`md/acoustic_manager.md`) |
 | `band_probe.cpp`, `build_band_probe.sh`, `band_probe_example.in` | One ray through `ray_progress` with a band of frequencies, materials and plane faces given on stdin; T and R summed over every path that ends outside the structure. | checking that a band equals its single frequencies, and a construction against a transfer matrix (`md/acoustic.md` 2.8) |
 
 ## sabine_to_random.py
