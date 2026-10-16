@@ -125,6 +125,9 @@ is the coordinator's suggestion from the hunt.
 | B-098 | 05 | Python `view = true` | (a) document as "fast contiguous copy" now (b) real aliasing (audit, GIL notes in the item) | (a) now, (b) as a later separate task | (b) real aliasing now, in WP-05: switch to copy_aux_mem = false with the audit of all wrappers and the GIL / lifetime notes of the item (2026-10-15) |
 | B-099 | 05 | Python kwarg names `sub_cloud_index`, `map_to_itu_materials` | (a) docs follow the registered names (b) registration follows the docs (breaking) | (a) | (a) docs follow the registered names (2026-10-15) |
 | B-113 | 15 | 0 paths with `add_fake_los_path` | (a) C++ returns the fake LOS path (all APIs agree with today's MEX) (b) MEX calls C++ and throws like C++ | (a) | (a) C++ returns the zero-power fake LOS path (with the correct delay) for 0 paths; all APIs agree (2026-10-15) |
+| WP-02 | 02 | Reads are 24-35% slower after the WP-02 rewrite (manager's benchmark; writes 35-38% faster); most of it is the per-dataset storage check | (a) accept and commit (b) round 2: make the check cheap, keep every check | (b) | (b) round 2; accept when both reads are within 10% of the old code (2026-10-16) |
+| B-050 | 02 | Empty `tx_orientation` / `rx_orientation` read back as 3x1 zeros | (a) keep and document (b) marker attribute, read back empty (changes MATLAB/Python output) | (a) | (a) keep the current behaviour, documented; B-050 counts as fixed (2026-10-16) |
+| B-119 | - | HDF5 1.14.6 itself misbehaves on crafted files (`H5Fopen` 4 GB zero-fill, `H5Gopen2` 2^64-byte request) | (a) record as an item, won't fix (b) mitigate | (a) | (a) recorded as B-119, won't fix (upstream) (2026-10-16) |
 
 ## 5. Work packages
 
@@ -199,6 +202,10 @@ acceptance checks beyond section 3.1. Severities in brackets.
   Python suite without reports. Build it with `bash build_linux/scratch/fix/build_asan_mod.sh [jobs]` (written in
   WP-01, about 50 s; needs an up-to-date `build_asan`). Positive control: before the B-004 fix, repro `G-1` reports a
   heap-use-after-free with this module.
+- Notes after WP-02: `tests/python_tests` has no HDF5 tests at all; add round-trip tests for the Python HDF5 writers and
+  readers in this package. Since WP-02, a 1-element vector read with `hdf5_read_dset` comes back as a numpy array of
+  shape `(1,)`, not a Python scalar (also from old files). Open question from WP-02: a `(1, 1)` numpy array written with
+  `hdf5_write_dset` reads back with shape `(1,)`; find out whether the Python writer flattens it.
 
 ### WP-06 MEX helpers
 
@@ -310,6 +317,8 @@ acceptance checks beyond section 3.1. Severities in brackets.
 - Left open by earlier packages: `CMakeLists.txt:498` (MATLAB API section) still says MATLAB links quadriga_static "to
   avoid conflicts with MATLAB's own bundled libhdf5.so"; the static link does not separate the HDF5 libraries, the
   different soname of the system HDF5 does (see the comment at `CMakeLists.txt:196`, rewritten in WP-01).
+- From WP-02: `include/quadriga_channel.hpp` (`hdf5_write` block) says a new file is created with `nx = 65535`; the
+  default is 65536. `src/qd_channel_hdf5.cpp`: the message "Error creating file. It may be already opened already.".
 - Files: header comments in `include/*.hpp`, documentation blocks in `src/`, `api_mex/`, `api_python/`; dead code
   (`src/avx_mathfun.h`, `arma::mt19937_64_instance`); `src/runtime_AVX2_Check_avx2.cpp` (FMA / XGETBV check).
 - Then: `make documentation` once; full verification of the Baseline section (all suites, both sanitizer builds,
@@ -368,8 +377,8 @@ unexpected changes in the diff; proposed `md/bugs.md` updates; anything the next
 | WP | Items | Status | Commit |
 |---|---|---|---|
 | WP-00 | decisions (section 4) | done 2026-10-15 | - |
-| WP-01 | 11 | done 2026-10-16 (11 of 11 fixed) | commit `WP-01: quick wins ...` (hash at next update) |
-| WP-02 | 8 | worker prompt issued 2026-10-16 | - |
+| WP-01 | 11 | done 2026-10-16 (11 of 11 fixed) | 3a7c2cc |
+| WP-02 | 8 | round 1 committed 2026-10-16 (8 of 8 fixed; reads 24-35% slower); round 2 (read speed) prompt issued | round 1: commit `WP-02 round 1: ...` (hash at next update) |
 | WP-03 | 4 | open | - |
 | WP-04 | 5 | open | - |
 | WP-05 | 12 | open | - |
@@ -511,3 +520,4 @@ Repro folders are under `build_linux/scratch/hunt/final/`; run `bash build_linux
 | B-116 | S4 | WP-05 | `G-12` | Python `hdf5_create_file` returns uint32 although the wrapper builds int64 (confirms item 1.3 of the Python fix plan) |
 | B-117 | S4 | WP-05 | `G-13` | Python output dtypes and shapes differ from the docs (`qdant_read`, `point_inside_mesh`, `generate_speaker`, `get_ieee_indoor`) |
 | B-118 | S4 | WP-05 | `G-15` | Python single-frequency arrayant dict: a 1-element `center_freq` array gives a numpy DeprecationWarning, 2 elements an unclear error |
+| B-119 | S4 | - | `B-119` | Crafted HDF5 files make HDF5 1.14.6 itself zero-fill about 4 GB in `H5Fopen` or request a 2^64-byte allocation in `H5Gopen2` (upstream; won't fix) |

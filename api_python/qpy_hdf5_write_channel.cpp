@@ -16,7 +16,9 @@ Write one or more channel objects to an HDF5 file
 - `chan` may also be a single dict, in which case one channel is written
 - Optional unstructured data (`par`) can be passed as a matching list of dicts (or a single dict)
 - Creates the file with a default layout if it does not exist; appends to existing files otherwise
-- A warning is issued if any selected slot already contains data (it is overwritten)
+- A warning is issued if any selected slot already contains data. That slot is replaced completely: its old
+  structured data and all its unstructured datasets (also those written with [[hdf5_write_dset]]) are removed.
+  The file does not shrink; use `h5repack` to reclaim the space of the removed data
 - Structured data is stored in single precision regardless of the input precision
 - Unstructured datasets retain their numpy dtype and shape
 - Each scalar index input is broadcast to all channels; each vector index must have one entry per channel

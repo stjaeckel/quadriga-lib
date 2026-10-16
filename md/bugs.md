@@ -33,12 +33,12 @@ How to read the items:
 
 ## Summary table
 
-Items: 118 (S1: 5, S2: 31, S3: 64, S4: 18).
-Status: open: 107, fixed: 11, partly fixed: 0, won't fix: 0, documented: 0 (after WP-01).
+Items: 119 (S1: 5, S2: 31, S3: 64, S4: 19); B-119 was found during the fixes (WP-02).
+Status: open: 99, fixed: 19, partly fixed: 0, won't fix: 1, documented: 0 (after WP-02 round 1).
 
 | ID | Title | Area | Kind | Severity | Mark | Status |
 |---|---|---|---|---|---|---|
-| [B-001](#b-001) | `hdf5_write` silently drops the `par_*` data when the slot already holds a `Data` group | B channel, file I/O | 1 defect | S1 | [R] | open |
+| [B-001](#b-001) | `hdf5_write` silently drops the `par_*` data when the slot already holds a `Data` group | B channel, file I/O | 1 defect | S1 | [R] | fixed (WP-02) |
 | [B-002](#b-002) | `quantize_delays` segfaults on a negative delay, including the slightly negative relative delays that `get_channels_spherical` returns | B channel, file I/O | 1 defect | S1 | [R] | open |
 | [B-003](#b-003) | `get_channels_spherical`, `_multifreq` and `_irs` ignore `path_length` for NLOS paths: delays and phases too short | C channel gen., tools | 1 defect | S1 | [R] | open |
 | [B-004](#b-004) | Python `tools.geo2cart` / `tools.cart2geo` with separate inputs read freed memory: wrong values, segfault | G Python layer | 1 defect | S1 | [R] | open |
@@ -50,9 +50,9 @@ Status: open: 107, fixed: 11, partly fixed: 0, won't fix: 0, documented: 0 (afte
 | [B-010](#b-010) | `arrayant::calc_beamwidth_deg` is wrong when the main lobe wraps ±180° or points towards a pole | A arrayant | 1 defect | S2 | [R] | open |
 | [B-011](#b-011) | `generate_arrayant_multibeam` with a beam towards el = ±90° returns wrong ports (pol 1) or segfaults (pol 2, 3) | A arrayant | 1 defect | S2 | [R] | open |
 | [B-012](#b-012) | qdant writer drops every pattern sample below -100 dB absolute power; a whole low-level element reads back as zeros | A arrayant | 1 defect | S2 | [R] | open |
-| [B-013](#b-013) | `hdf5_read_channel`: a malformed HDF5 file overflows heap and stack buffers (sizes taken from attributes, not from the datasets) | B channel, file I/O | 1 defect | S2 | [R] | open |
-| [B-014](#b-014) | HDF5 storage layout: `nx*ny*nz*nw` wraps in 32 bits; `hdf5_write` then reads and writes past the index buffer | B channel, file I/O | 1 defect | S2 | [R] | open |
-| [B-015](#b-015) | `hdf5_write` copies 256 bytes from the channel name: heap memory ends up in the file; names of 256+ characters over-read on reading | B channel, file I/O | 1 defect | S2 | [R] | open |
+| [B-013](#b-013) | `hdf5_read_channel`: a malformed HDF5 file overflows heap and stack buffers (sizes taken from attributes, not from the datasets) | B channel, file I/O | 1 defect | S2 | [R] | fixed (WP-02) |
+| [B-014](#b-014) | HDF5 storage layout: `nx*ny*nz*nw` wraps in 32 bits; `hdf5_write` then reads and writes past the index buffer | B channel, file I/O | 1 defect | S2 | [R] | fixed (WP-02) |
+| [B-015](#b-015) | `hdf5_write` copies 256 bytes from the channel name: heap memory ends up in the file; names of 256+ characters over-read on reading | B channel, file I/O | 1 defect | S2 | [R] | fixed (WP-02) |
 | [B-016](#b-016) | `qrt_file_read` (C++) fills `aod`, `eod`, `aoa`, `eoa` only when `path_gain` or `path_length` is also requested | B channel, file I/O | 1 defect | S2 | [R] | fixed (WP-01) |
 | [B-017](#b-017) | `qrt_file_append` corrupts the file when a CIR orientation is non-zero in double but rounds to 0 in float | B channel, file I/O | 1 defect | S2 | [R] | open |
 | [B-018](#b-018) | OBJ round trip loses "no material": faces with `mtl_ind = 0` inherit the previous material | B channel, file I/O | 1 defect | S2 | [R] | open |
@@ -87,10 +87,10 @@ Status: open: 107, fixed: 11, partly fixed: 0, won't fix: 0, documented: 0 (afte
 | [B-047](#b-047) | `generate_arrayant_multibeam` defaults M = N = 2 in the header, 1 in the docs and both wrappers | A arrayant | 3 cross-API | S3 | [C] | open |
 | [B-048](#b-048) | QRT readers trust header and path counts: a 136-byte file returns 20 million zero paths or allocates GBs | B channel, file I/O | 1 defect | S3 | [R, M] | open |
 | [B-049](#b-049) | `qrt_file_read` truncates `i_cir` / `i_orig` to 32 bits before the range check | B channel, file I/O | 1 defect | S3 | [R] | open |
-| [B-050](#b-050) | HDF5 write/read round trip changes data (empty snapshots, missing frequency, 1-element vectors, empty strings, long names) | B channel, file I/O | 1 defect | S3 | [R] | open |
-| [B-051](#b-051) | HDF5 functions call `H5close()`, switch off error printing process-wide, and leak handles and memory on error paths | B channel, file I/O | 1 defect | S3 | [R] | open |
-| [B-052](#b-052) | `hdf5_write` "overwrites" a slot by adding a new group; the file grows with every rewrite | B channel, file I/O | 2 doc | S3 | [R] | open |
-| [B-053](#b-053) | `hdf5_read_dset` returns a variable-length string as 8 bytes of a heap pointer, and leaks it | B channel, file I/O | 1 defect | S3 | [R] | open |
+| [B-050](#b-050) | HDF5 write/read round trip changes data (empty snapshots, missing frequency, 1-element vectors, empty strings, long names) | B channel, file I/O | 1 defect | S3 | [R] | fixed (WP-02) |
+| [B-051](#b-051) | HDF5 functions call `H5close()`, switch off error printing process-wide, and leak handles and memory on error paths | B channel, file I/O | 1 defect | S3 | [R] | fixed (WP-02) |
+| [B-052](#b-052) | `hdf5_write` "overwrites" a slot by adding a new group; the file grows with every rewrite | B channel, file I/O | 2 doc | S3 | [R] | fixed (WP-02) |
+| [B-053](#b-053) | `hdf5_read_dset` returns a variable-length string as 8 bytes of a heap pointer, and leaks it | B channel, file I/O | 1 defect | S3 | [R] | fixed (WP-02) |
 | [B-054](#b-054) | `quantize_delays` builds dense vectors over the absolute delay range: a 20 ms offset makes it 4000 times slower | B channel, file I/O | 4 performance | S3 | [M] | open |
 | [B-055](#b-055) | `quantize_delays` gives wrong results when the outputs alias the inputs (undocumented) | B channel, file I/O | 1 defect | S3 | [R] | open |
 | [B-056](#b-056) | `mitsuba_xml_file_write` is quadratic in the number of vertices per object | B channel, file I/O | 4 performance | S3 | [M] | open |
@@ -156,6 +156,7 @@ Status: open: 107, fixed: 11, partly fixed: 0, won't fix: 0, documented: 0 (afte
 | [B-116](#b-116) | Python `hdf5_create_file` returns uint32 although the wrapper builds int64 (confirms item 1.3 of the Python fix plan) | G Python layer | 2 doc | S4 | [R] | open |
 | [B-117](#b-117) | Python output dtypes and shapes differ from the docs (`qdant_read`, `point_inside_mesh`, `generate_speaker`, `get_ieee_indoor`) | G Python layer | 2 doc | S4 | [R] | open |
 | [B-118](#b-118) | Python single-frequency arrayant dict: a 1-element `center_freq` array gives a numpy DeprecationWarning, 2 elements an unclear error | G Python layer | 3 cross-API | S4 | [R] | open |
+| [B-119](#b-119) | Crafted HDF5 files make HDF5 1.14.6 itself zero-fill about 4 GB in `H5Fopen` or request a 2^64-byte allocation in `H5Gopen2` (upstream, not quadriga-lib code) | B channel, file I/O | 1 defect | S4 | [R] | won't fix (upstream HDF5) |
 
 ## Baseline
 
@@ -196,6 +197,9 @@ miscompilation by the LAF split-compare passes, not a library defect. The campai
 | after WP-01: base | `All tests passed (1307644 assertions in 1137 test cases)` | 49 s | 1.6 / 6.5 |
 | after WP-01: generic | `All tests passed (1307395 assertions in 1137 test cases)` | 39 s | 6.5 / 8.3 |
 | after WP-01: ASan + UBSan gcc-12, `suppress_equal_pcs=0` | `All tests passed (1307644 assertions in 1137 test cases)`; reports: B-015 (`test_hdf_functions.cpp:114`, `:350`) and the excluded `ray_progress` UBSan reports (`test_wave_progress.cpp:301`), nothing else, no leak | 323 s | 7.1 / 5.8 |
+| after WP-02 round 1: base | `All tests passed (1307922 assertions in 1144 test cases)` | 40 s | 1.7 / 1.4 |
+| after WP-02 round 1: generic | `All tests passed (1307673 assertions in 1144 test cases)` | 46 s | 1.4 / 6.0 |
+| after WP-02 round 1: ASan + UBSan gcc-12, `suppress_equal_pcs=0` | `All tests passed (1307922 assertions in 1144 test cases)`; reports: only the excluded `ray_progress` UBSan reports (`test_wave_progress.cpp:301`), no ASan report, no leak | 317 s | 5.1 / 2.5 |
 
 Run commands: `flock /tmp/quadriga-fixes-suite.lock build_linux/test_bin` (output
 `build_linux/scratch/hunt/base_test.txt`); the sanitizer runs with
@@ -237,6 +241,7 @@ GNUmakefile default is `avx2 = OFF`, so a default `make` gives MEX files without
 | MATLAB R2024a | same, 65 of 66, same failure | 6.4 s | 17.6 |
 | MATLAB R2026a | same, 65 of 66, then **MATLAB crashes with a segmentation violation at exit**, exit code 137, crash dump `~/matlab_crash_dump.878185-1` | 10.9 s | 21.5 |
 | after WP-01: Octave 11.1, R2024a, R2026a | 65 of 66 in each, same excluded failure; R2026a exits with 0, no crash dump (B-029 fixed) | - | 2 |
+| after WP-02 round 1: Octave 11.1, R2024a, R2026a | 65 of 66 in each, same excluded failure; R2026a exits with 0, no crash dump | - | 1-2 |
 
 The R2026a crash is B-029. A single `quadriga_lib.version` call does not crash R2026a at
 exit (2 of 2 runs).
@@ -247,7 +252,7 @@ exit (2 of 2 runs).
 `762 passed, 1 skipped, 37 subtests passed in 2.55s` (load 9.5 before, 11.7 after). The skip is
 `test_ray_point_intersect.py:403` (CUDA kernel not available). Module version string `0.12.2_AVX2`.
 
-After WP-01: `762 passed, 1 skipped, 37 subtests passed in 1.85s`.
+After WP-01: `762 passed, 1 skipped, 37 subtests passed in 1.85s`. After WP-02 round 1: `762 passed, 1 skipped, 37 subtests passed in 1.80s` (the Python suite has no HDF5 tests).
 
 ### Fuzzing (AFL++ 4.33c)
 
@@ -568,7 +573,7 @@ What was not covered, or only partly:
 
 ## B-001: `hdf5_write` silently drops the `par_*` data when the slot already holds a `Data` group
 
-- Status: open
+- Status: fixed (WP-02)
 - Severity: S1, because it is data loss in a writer in normal use: unstructured parameters written with `hdf5_write` are lost (or old values survive) without an error.
 - Kind: wrong result (writer data loss)
 - Mark: [R]
@@ -649,7 +654,7 @@ case 2 (expected x=99): par fields read back: x=1
 
 **Proposed fix.** Open `Data` if it exists; to overwrite, delete an existing `par_<name>` link before writing it (or always create a fresh group); check the results of `H5Gcreate2`/`H5Dcreate2` and throw. File: `src/qd_channel_hdf5.cpp`. Decide (and document) whether the old `par` fields of a slot are kept when the channel is rewritten.
 
-**Test for the fix session.** Catch2: `hdf5_write_dset("a")` then `hdf5_write` with par "b" reads back both a and b; writing a parameter-only channel twice reads back `x = 99`.
+**Test for the fix session.** Catch2: `hdf5_write_dset("a")` then `hdf5_write` with par "b" reads back both a and b; writing a parameter-only channel twice reads back `x = 99`. (Superseded by decision B-001 (a): after the rewrite only b is there; the repro's "expected a=1 b=2" is the old expectation. WP-02 tests b only.)
 
 ## B-002: `quantize_delays` segfaults on a negative delay, including the slightly negative relative delays that `get_channels_spherical` returns
 
@@ -1529,7 +1534,7 @@ sample 3e-6 read back as 0
 
 ## B-013: `hdf5_read_channel`: a malformed HDF5 file overflows heap and stack buffers (sizes taken from attributes, not from the datasets)
 
-- Status: open
+- Status: fixed (WP-02)
 - Severity: S2, because reading a malformed or foreign HDF5 file corrupts memory (heap and stack buffer overflows, segfault in the release build); valid files written by the library are not affected.
 - Kind: memory (heap and stack buffer overflow, uninitialised data)
 - Mark: [R] (crafted files; also found by the phase-0 AFL campaign: 11 crash inputs, all at lines 1838/1839 and 1880/1881)
@@ -1645,7 +1650,7 @@ exit code 139
 
 ## B-014: HDF5 storage layout: `nx*ny*nz*nw` wraps in 32 bits; `hdf5_write` then reads and writes past the index buffer
 
-- Status: open
+- Status: fixed (WP-02)
 - Severity: S2, because a layout with more than 2^32 slots is accepted and a later write corrupts memory (segfault in the release build); such layouts are unusual but nothing rejects them.
 - Kind: memory (integer overflow)
 - Mark: [R]
@@ -1727,7 +1732,7 @@ hdf5_write(ix=0, iy=2) returned 0
 
 ## B-015: `hdf5_write` copies 256 bytes from the channel name: heap memory ends up in the file; names of 256+ characters over-read on reading
 
-- Status: open
+- Status: fixed (WP-02)
 - Severity: S2, because every HDF5 write reads past the end of the name string (undefined behaviour) and stores up to 255 bytes of unrelated process memory (heap pointers, other data) in the file.
 - Kind: memory (heap over-read, information leak into the file)
 - Mark: [R] (also in the phase-0 sanitizer suite: `H5Awrite` READ of size 256, "HDF - Minimal Test", `tests/catch2_tests/test_hdf_functions.cpp:114`)
@@ -4439,7 +4444,7 @@ Output of the phase-2 re-run (`bash run.sh`):
 
 ## B-050: HDF5 write/read round trip changes data (empty snapshots, missing frequency, 1-element vectors, empty strings, long names)
 
-- Status: open
+- Status: fixed (WP-02); empty `tx_orientation` / `rx_orientation` still read back as 3x1 zeros, kept and documented by decision (2026-10-16)
 - Severity: S3, because the round trip alters sizes and types in edge cases without an error (the numeric values of normal channels survive).
 - Kind: wrong result (round trip)
 - Mark: [R]
@@ -4612,7 +4617,7 @@ dset names read back: 11 of 11
 
 ## B-051: HDF5 functions call `H5close()`, switch off error printing process-wide, and leak handles and memory on error paths
 
-- Status: open
+- Status: fixed (WP-02)
 - Severity: S3, because a program that uses HDF5 itself loses its open handles after any quadriga-lib HDF5 call, and error paths leak; no library-internal data is corrupted.
 - Kind: resource / side effects
 - Mark: [R]
@@ -4729,7 +4734,7 @@ SUMMARY: AddressSanitizer: 36 byte(s) leaked in 3 allocation(s).
 
 ## B-052: `hdf5_write` "overwrites" a slot by adding a new group; the file grows with every rewrite
 
-- Status: open
+- Status: fixed (WP-02)
 - Severity: S3, because the documentation says the slot is overwritten, while the old data stays in the file and the file grows linearly (160 kB to 792 kB over 5 rewrites of one slot); the read result is correct.
 - Kind: doc / resource
 - Mark: [R]
@@ -4802,7 +4807,7 @@ write 4 to slot 0: rc=1, file size 792324 bytes, slot 0 -> channel_5
 
 ## B-053: `hdf5_read_dset` returns a variable-length string as 8 bytes of a heap pointer, and leaks it
 
-- Status: open
+- Status: fixed (WP-02)
 - Severity: S3, because strings written by other tools (variable-length is the default of h5py and MATLAB) are returned as garbage and the buffer leaks.
 - Kind: wrong result / leak
 - Mark: [R]
@@ -9432,3 +9437,98 @@ Command: `bash build_linux/scratch/hunt/doc/rerun_all.sh`, which runs every `fin
 | G-9 | 0 | 0s | 1.60 |
 
 The exit code is that of the script; expected crashes are caught inside it (`|| echo "exit code ..."`). MATLAB crash dumps written by the re-run: `/home/stephan/matlab_crash_dump.716408-1`, `/home/stephan/matlab_crash_dump.716734-1`, `/home/stephan/matlab_crash_dump.717816-1`, `/home/stephan/matlab_crash_dump.719873-1`, `/home/stephan/matlab_crash_dump.720262-1`.
+
+## Items found during the fixes
+
+## B-119: Crafted HDF5 files make HDF5 1.14.6 itself zero-fill about 4 GB in `H5Fopen` or request a 2^64-byte allocation in `H5Gopen2` (upstream, not quadriga-lib code)
+
+- Status: won't fix (upstream HDF5 1.14.6; the library cannot check a file before HDF5 parses it, decided 2026-10-16)
+- Severity: S4, because only crafted or corrupted files trigger it, quadriga-lib code is not involved, and after WP-02 the
+  library ends both cases with a clean `std::invalid_argument`; the cost is time and memory (12.7 s and 4.2 GB peak for a
+  10 kB file).
+- Kind: resource (in a dependency)
+- Mark: [R] (found by the WP-02 AFL campaign and the manager's corpus replay, 2026-10-16)
+- Where: HDF5 1.14.6 (system `libhdf5_serial.so.310`): `H5Fopen` → `H5F__super_read` → `H5FD_read` → `memset` (worker's
+  gdb trace in `md/fix_logs/WP-02.md`); `H5Gopen2` → `H5G__open_name` → `H5O_obj_type` → `H5O_protect` → `H5C_protect`.
+  quadriga-lib calls: every HDF5 reader opens the file; `qHDF_open_channel_group` (`src/qd_channel_hdf5.cpp:456` after
+  WP-02) opens the channel group named in the storage index.
+
+**What happens.** (1) A 10 kB file with a crafted superblock: each `H5Fopen` reads and zero-fills about 4 GB; the
+harness opens the file 7 times, 12.7 s, 4.2 GB peak RSS, then every call ends in "Storage index in HDF file is
+corrupted.". The pre-WP-02 library behaves the same (14.0 s, 4.2 GB). (2) Two files with a crafted object header: HDF5
+requests an allocation of `0xffffffff00000430` bytes while opening the channel group. With glibc `malloc` the request
+fails and HDF5 returns an error; the library throws "Storage index in HDF file is corrupted." (before WP-02 it returned
+silently). Under ASan with the default `allocator_may_return_null=0` the process aborts; AFL runs ASan with
+`allocator_may_return_null=1`, so the campaign did not report these inputs as crashes.
+
+**Reproduce.**
+
+Folder `build_linux/scratch/hunt/final/B-119/`. The three inputs are binary AFL outputs (10 kB each) and cannot be
+shown here; they are identified by the SHA-256 sums in the output below and are also kept in
+`build_linux/scratch/fix/WP-02/afl/out/hdf5/main/hangs/id:000000,...`, `.../main/queue/id:000006,...` and
+`.../cmp/queue/id:000003,...`.
+
+`run.sh` (run from anywhere with `bash build_linux/scratch/hunt/final/B-119/run.sh`; it changes to the worktree root itself):
+```bash
+#!/bin/bash
+# B-119: crafted HDF5 files make HDF5 1.14.6 itself zero-fill ~4 GB in H5Fopen, or request a ~2^64-byte allocation in
+# H5Gopen2. Inputs found by the WP-02 AFL campaign. Uses the HDF5 fuzz harness (hunt/fuzz/fz_hdf5.cpp) twice:
+# a release build against build_linux/libquadriga.a, and the existing ASan harness hunt/fuzz/bin/fz_hdf5.
+cd /sjc/quadriga-lib-fixes
+D=build_linux/scratch/hunt/final/B-119
+F=build_linux/scratch/hunt/fuzz
+mkdir -p $F/work
+g++-12 -std=c++17 -O2 -fopenmp -DARMA_DONT_USE_BLAS -DARMA_DONT_USE_LAPACK -I include -I src -I $F $F/fz_hdf5.cpp -o $D/fz_release build_linux/libquadriga.a $(pkg-config --cflags --libs hdf5) || echo "build failed"
+sha256sum $D/*.bin | sed 's#  .*/#  #'
+echo "== (1) release harness, H5Fopen input: wall time and peak memory"
+/usr/bin/time -f "   %e s wall, %M kB peak RSS" $D/fz_release $D/h5fopen_zero_fill.bin 2>&1 | grep -E 'EXC|wall' | sort | uniq -c
+echo "== (2) release harness, H5Gopen2 inputs (glibc malloc fails, the library throws)"
+for f in $D/h5gopen_huge_alloc_*.bin; do echo "   $(basename $f):"; $D/fz_release $f 2>&1 | sort | uniq -c; done
+echo "== (3) ASan harness, first H5Gopen2 input: allocation request and frames (unsymbolized, resolved below)"
+out=$(ASAN_OPTIONS=symbolize=0:detect_leaks=0 timeout 60 $F/bin/fz_hdf5 $D/h5gopen_huge_alloc_1.bin 2>&1)
+echo "$out" | grep -m1 'requested allocation size' | cut -c1-150
+for a in $(echo "$out" | grep -oE 'libhdf5_serial.so.310\+0x[0-9a-f]+' | sed 's/.*+//' | head -10); do
+  s=$(gdb -batch -ex "info symbol $a" /usr/lib/x86_64-linux-gnu/libhdf5_serial.so.310 2>/dev/null | tail -1); echo "   libhdf5 $a: $s"; done
+c=$(echo "$out" | grep -oE 'fz_hdf5\+0x[0-9a-f]+' | sed 's/.*+//' | head -2 | tail -1)
+echo "   first caller in quadriga-lib: $(addr2line -f -C -e $F/bin/fz_hdf5 $c | paste -s -d' ' | cut -c1-140)"
+```
+
+Output (`bash run.sh`, 2026-10-16, library of the WP-02 work tree):
+```text
+061c4a41545e5be8e00877322f6520de6e25d2d8df96b7b68445197acc9de79a  h5fopen_zero_fill.bin
+3f0c8e82de8d28a56d86b77a346efd866600632653926447a9bc3d610c0a1b79  h5gopen_huge_alloc_1.bin
+a8e3bf5444eed09616f04a34dad0edc265805f49f6c1ef1715d072c2d268024b  h5gopen_huge_alloc_2.bin
+== (1) release harness, H5Fopen input: wall time and peak memory
+      1    12.67 s wall, 4210140 kB peak RSS
+      1 EXC0: Storage index in HDF file is corrupted.
+      3 EXC1: Storage index in HDF file is corrupted.
+      3 EXC2: Storage index in HDF file is corrupted.
+== (2) release harness, H5Gopen2 inputs (glibc malloc fails, the library throws)
+   h5gopen_huge_alloc_1.bin:
+      1 EXC1: Storage index in HDF file is corrupted.
+      1 EXC2: Storage index in HDF file is corrupted.
+   h5gopen_huge_alloc_2.bin:
+      1 EXC1: Storage index in HDF file is corrupted.
+      1 EXC2: Storage index in HDF file is corrupted.
+== (3) ASan harness, first H5Gopen2 input: allocation request and frames (unsymbolized, resolved below)
+==570133==ERROR: AddressSanitizer: requested allocation size 0xffffffff00000430 (0xffffffff00001430 after adjustments for alignment, red zones etc.) e
+   libhdf5 0x87062: H5C_protect + 242 in section .text
+   libhdf5 0x65bf0: H5AC_protect + 80 in section .text
+   libhdf5 0x1c3100: H5O_protect + 480 in section .text
+   libhdf5 0x1c5377: H5O_obj_type + 71 in section .text
+   libhdf5 0x1502a3: H5G__open_name + 115 in section .text
+   libhdf5 0x30a12a: H5VL__native_group_open + 58 in section .text
+   libhdf5 0x2f6dde: No symbol matches 0x2f6dde.
+   libhdf5 0x30060a: H5VL_group_open + 90 in section .text
+   libhdf5 0x1423ae: No symbol matches 0x1423ae.
+   libhdf5 0x1425f3: H5Gopen2 + 115 in section .text
+   first caller in quadriga-lib: qHDF_open_channel_group(long, unsigned int) /sjc/quadriga-lib-fixes/src/qd_channel_hdf5.cpp:456
+```
+
+**Cause.** HDF5 trusts sizes in the superblock and in object headers when it reads them; quadriga-lib only passes the
+file name and a group name.
+
+**Proposed fix.** None in quadriga-lib. Options if it ever matters: report upstream; open files through a custom
+file driver that rejects reads beyond the file size; run untrusted files in a separate process with a memory limit.
+
+**Test for the fix session.** None (won't fix).
