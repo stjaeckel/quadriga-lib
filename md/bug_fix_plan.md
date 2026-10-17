@@ -72,6 +72,14 @@ package (a second worker session, "WP-xx, round 2"), not for the next one.
 7. Report to the user: per item fixed / partly / not fixed, with the evidence; suite numbers; anything the worker
    changed beyond the work package.
 
+### 3.1a Commit messages (rule of 2026-10-17, from WP-04 on)
+
+The files in `md/` are deleted once all bugs are fixed, so commit messages must stand on their own. A commit message
+(subject and body) does not refer to any document in `md/` or to its content: no bug IDs (B-xxx), no work-package
+numbers (WP-xx), no "decision (a)", no "worker log", no file paths under `md/`. It describes what changed in the code,
+why (the defect in plain words), behaviour changes for users, and the test and benchmark results. The commit itself
+may still contain the `md/` files. Earlier commits (WP-01 to WP-03) are not rewritten.
+
 ### 3.2 Extra checks per package
 
 Named in section 5 under "Acceptance" (fuzz re-runs, MATLAB R2026a exit, timings).
@@ -85,7 +93,7 @@ Named in section 5 under "Acceptance" (fuzz re-runs, MATLAB R2026a exit, timings
   `won't fix (<reason>, decided <date>)` / `documented (WP-xx)` / `open`.
   The update of `md/bugs.md` and this plan goes into the work package's own commit, which cannot name its own hash;
   the commit hash is therefore recorded only in the Status table of section 7, filled in at the next manager update
-  (`git log --grep '^WP-xx:'` finds it).
+  (the user names the hash, or it is the commit right after the previous package's hash in `git log`).
 - Add a "Status" column to the summary table (after "Mark") and keep the counts line of the summary table current
   ("open: n, fixed: n, ...").
 - If a fix changed the analysis (cause, severity, scope), correct the item text and say so in one sentence.
