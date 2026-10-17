@@ -1218,3 +1218,94 @@ TEST_CASE("Multifreq - Unsorted freq_in is not clamped to first entry")
     CHECK(std::abs(amp(2) - a_ref) > 1e-6);
     CHECK(std::abs(amp(3) - a_ref) > 1e-6);
 }
+
+// ================================================================================================
+// WP-04: path_length of NLOS paths (B-003), add_fake_los_path layout (B-068)
+// ================================================================================================
+
+TEST_CASE("Multifreq - NLOS delay and phase follow path_length (B-003)")
+{
+    // Geometry of B-003: TX (0,0,0), RX (100,0,0), 3-bounce path via (30,40,0), (50,60,0), (70,40,0);
+    // full length 156.5685 m, geometric TX-FBS-LBS-RX polyline 140 m
+    const double C = 299792458.0;
+    auto va = wrap_single(quadriga_lib::generate_arrayant_omni<double>(10.0));
+    arma::u32_vec no_int = {3};
+    arma::mat coord = {{30.0, 50.0, 70.0}, {40.0, 60.0, 40.0}, {0.0, 0.0, 0.0}};
+    arma::vec len;
+    arma::mat fbs, lbs;
+    quadriga_lib::coord2path<double>(0, 0, 0, 100, 0, 0, &no_int, &coord, &len, &fbs, &lbs);
+    const double L_true = 100.0 + 40.0 * std::sqrt(2.0);
+    REQUIRE(std::abs(len(0) - L_true) < 1e-9);
+
+    arma::mat pg(1, 1, arma::fill::ones);
+    arma::cube M(8, 1, 1, arma::fill::zeros);
+    M(0, 0, 0) = 1.0, M(6, 0, 0) = -1.0;
+    arma::vec fi = {3.0e9}, fo = {2.9e9, 3.0e9, 3.1e9};
+
+    for (double L : {0.0, 120.0, L_true, 300.0})
+    {
+        const double L_exp = (L < 140.0) ? 140.0 : L;
+        arma::vec pl = {L};
+        std::vector<arma::cube> cr, ci, dl;
+        quadriga_lib::get_channels_multifreq<double>(va, va, 0, 0, 0, 0, 0, 0, 100, 0, 0, 0, 0, 0,
+                                                     fbs, lbs, pg, pl, M, fi, fo, cr, ci, dl, true, false);
+        for (arma::uword f = 0; f < fo.n_elem; ++f)
+        {
+            const double k = 2.0 * arma::datum::pi * fo(f) / C;
+            CHECK(std::abs(dl[f](0) * C - L_exp) < 1e-6);
+            CHECK(std::abs(cr[f](0) - std::cos(k * L_exp)) < 1e-6);
+            CHECK(std::abs(ci[f](0) + std::sin(k * L_exp)) < 1e-6);
+        }
+
+        // Relative delays subtract the TX-RX distance (100 m)
+        quadriga_lib::get_channels_multifreq<double>(va, va, 0, 0, 0, 0, 0, 0, 100, 0, 0, 0, 0, 0,
+                                                     fbs, lbs, pg, pl, M, fi, fo, cr, ci, dl, false, false);
+        CHECK(std::abs(dl[0](0) * C - (L_exp - 100.0)) < 1e-6);
+    }
+
+    // Acoustic propagation speed: the same lengths, delay = length / 343
+    arma::vec pl = {L_true};
+    std::vector<arma::cube> cr, ci, dl;
+    quadriga_lib::get_channels_multifreq<double>(va, va, 0, 0, 0, 0, 0, 0, 100, 0, 0, 0, 0, 0,
+                                                 fbs, lbs, pg, pl, M, fi, fo, cr, ci, dl, true, false, 343.0);
+    CHECK(std::abs(dl[0](0) * 343.0 - L_true) < 1e-6);
+}
+
+TEST_CASE("Multifreq - add_fake_los_path layout (B-068)")
+{
+    // Always one extra output path; slot 0 holds the LOS path (zero power if none was found);
+    // if a LOS path was present, its original slot holds a zero-power path.
+    const double C = 299792458.0;
+    auto va = wrap_single(quadriga_lib::generate_arrayant_omni<double>(10.0));
+    arma::mat F(3, 3); // TX (0,0,0), RX (50,0,0)
+    F.col(0) = arma::vec({20, 20, 0}), F.col(2) = arma::vec({30, -25, 0});
+    arma::mat pg = arma::vec({0.5, 1.0, 0.25});
+    arma::cube M(8, 3, 1, arma::fill::zeros);
+    M.slice(0).row(0).fill(1.0), M.slice(0).row(6).fill(-1.0);
+    arma::vec PL = {0.0, 50.0, 0.0}, fi = {1e9}, fo = {1e9};
+    std::vector<arma::cube> cr, ci, dl;
+
+    // Case 1: LOS path at input index 1
+    F.col(1) = arma::vec({25, 0, 0});
+    quadriga_lib::get_channels_multifreq<double>(va, va, 0, 0, 0, 0, 0, 0, 50, 0, 0, 0, 0, 0, F, F, pg, PL, M, fi, fo,
+                                                 cr, ci, dl, true, true);
+    REQUIRE(cr[0].n_slices == 4);
+    arma::vec p = arma::vectorise(arma::square(cr[0]) + arma::square(ci[0]));
+    CHECK(std::abs(p(0) - 1.0) < 1e-9);
+    CHECK(std::abs(p(1) - 0.5) < 1e-9);
+    CHECK(p(2) == 0.0);
+    CHECK(std::abs(p(3) - 0.25) < 1e-9);
+    CHECK(std::abs(dl[0](0) * C - 50.0) < 1e-6);
+
+    // Case 2: no LOS path
+    F.col(1) = arma::vec({25, 10, 0});
+    quadriga_lib::get_channels_multifreq<double>(va, va, 0, 0, 0, 0, 0, 0, 50, 0, 0, 0, 0, 0, F, F, pg, PL, M, fi, fo,
+                                                 cr, ci, dl, true, true);
+    REQUIRE(cr[0].n_slices == 4);
+    p = arma::vectorise(arma::square(cr[0]) + arma::square(ci[0]));
+    CHECK(p(0) == 0.0);
+    CHECK(std::abs(p(1) - 0.5) < 1e-9);
+    CHECK(std::abs(p(2) - 1.0) < 1e-9);
+    CHECK(std::abs(p(3) - 0.25) < 1e-9);
+    CHECK(std::abs(dl[0](0) * C - 50.0) < 1e-6);
+}

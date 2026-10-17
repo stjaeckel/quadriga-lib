@@ -33,14 +33,14 @@ How to read the items:
 
 ## Summary table
 
-Items: 119 (S1: 5, S2: 31, S3: 64, S4: 19); B-119 was found during the fixes (WP-02).
-Status: open: 95, fixed: 23, partly fixed: 0, won't fix: 1, documented: 0 (after WP-03).
+Items: 121 (S1: 5, S2: 31, S3: 66, S4: 19); B-119 to B-121 were found during the fixes (WP-02, WP-04).
+Status: open: 92, fixed: 25, partly fixed: 0, won't fix: 1, documented: 3 (after WP-04).
 
 | ID | Title | Area | Kind | Severity | Mark | Status |
 |---|---|---|---|---|---|---|
 | [B-001](#b-001) | `hdf5_write` silently drops the `par_*` data when the slot already holds a `Data` group | B channel, file I/O | 1 defect | S1 | [R] | fixed (WP-02) |
 | [B-002](#b-002) | `quantize_delays` segfaults on a negative delay, including the slightly negative relative delays that `get_channels_spherical` returns | B channel, file I/O | 1 defect | S1 | [R] | fixed (WP-03) |
-| [B-003](#b-003) | `get_channels_spherical`, `_multifreq` and `_irs` ignore `path_length` for NLOS paths: delays and phases too short | C channel gen., tools | 1 defect | S1 | [R] | open |
+| [B-003](#b-003) | `get_channels_spherical`, `_multifreq` and `_irs` ignore `path_length` for NLOS paths: delays and phases too short | C channel gen., tools | 1 defect | S1 | [R] | fixed (WP-04) |
 | [B-004](#b-004) | Python `tools.geo2cart` / `tools.cart2geo` with separate inputs read freed memory: wrong values, segfault | G Python layer | 1 defect | S1 | [R] | open |
 | [B-005](#b-005) | Python HDF5 writers ignore numpy strides for 1-D and (n,1) arrays: wrong data written, heap over-read | G Python layer | 1 defect | S1 | [R] | open |
 | [B-006](#b-006) | AVX2 antenna interpolation reads up to 56 bytes past the angle matrices (per-element angles, n_out not a multiple of 8) | A arrayant | 1 defect | S2 | [R] | open |
@@ -56,8 +56,8 @@ Status: open: 95, fixed: 23, partly fixed: 0, won't fix: 1, documented: 0 (after
 | [B-016](#b-016) | `qrt_file_read` (C++) fills `aod`, `eod`, `aoa`, `eoa` only when `path_gain` or `path_length` is also requested | B channel, file I/O | 1 defect | S2 | [R] | fixed (WP-01) |
 | [B-017](#b-017) | `qrt_file_append` corrupts the file when a CIR orientation is non-zero in double but rounds to 0 in float | B channel, file I/O | 1 defect | S2 | [R] | open |
 | [B-018](#b-018) | OBJ round trip loses "no material": faces with `mtl_ind = 0` inherit the previous material | B channel, file I/O | 1 defect | S2 | [R] | open |
-| [B-019](#b-019) | `baseband_freq_response_multi` gives wrong phases for `get_channels_*` output with the default relative delays | C channel gen., tools | 1 defect | S2 | [R] | open |
-| [B-020](#b-020) | `baseband_freq_response`: phase computed in single precision, error grows with delay × bandwidth (both builds) | C channel gen., tools | 1 defect | S2 | [R] | open |
+| [B-019](#b-019) | `baseband_freq_response_multi` gives wrong phases for `get_channels_*` output with the default relative delays | C channel gen., tools | 1 defect | S2 | [R] | documented (WP-04) |
+| [B-020](#b-020) | `baseband_freq_response`: phase computed in single precision, error grows with delay × bandwidth (both builds) | C channel gen., tools | 1 defect | S2 | [R] | fixed (WP-04) |
 | [B-021](#b-021) | IEEE indoor model: `n_floors > 0` shifts all tap delays (3-D path length minus 2-D distance) | C channel gen., tools | 1 defect | S2 | [R] | open |
 | [B-022](#b-022) | IEEE indoor model prunes taps with an absolute power threshold after path loss (taps vanish with distance, floors, walls) | C channel gen., tools | 1 defect | S2 | [R] | open |
 | [B-023](#b-023) | IEEE indoor model uplink conjugates the channel (Doppler sign reversed), unlike the reciprocity of `get_channels_spherical` (user decision) | C channel gen., tools | 3 cross-API | S2 | [R] | open |
@@ -105,8 +105,8 @@ Status: open: 95, fixed: 23, partly fixed: 0, won't fix: 1, documented: 0 (after
 | [B-065](#b-065) | Unchecked float-to-integer casts (UB) for non-finite `observation_time` and tiny `quantize` | C channel gen., tools | 1 defect | S3 | [R] | open |
 | [B-066](#b-066) | `calc_delay_spread` with `granularity`: memory n_cir × global delay span / granularity (800 MB for 100 paths) | C channel gen., tools | 4 performance | S3 | [M] | open |
 | [B-067](#b-067) | `acdf`: all-NaN data sets bias the averaged CDF; unsorted user bins are accepted | C channel gen., tools | 1 defect | S3 | [R] | open |
-| [B-068](#b-068) | Docs of `add_fake_los_path` do not match the code: always one extra path; a present LOS is moved to slot 0 and a zero path is left behind | C channel gen., tools | 2 doc | S3 | [R] | open |
-| [B-069](#b-069) | Naming of the cross-polarisation rows of `M` is inconsistent; `calc_cross_polarization_ratio` V/H columns are ambiguous (user decision) | C channel gen., tools | 2 doc | S3 | [R] | open |
+| [B-068](#b-068) | Docs of `add_fake_los_path` do not match the code: always one extra path; a present LOS is moved to slot 0 and a zero path is left behind | C channel gen., tools | 2 doc | S3 | [R] | documented (WP-04) |
+| [B-069](#b-069) | Naming of the cross-polarisation rows of `M` is inconsistent; `calc_cross_polarization_ratio` V/H columns are ambiguous (user decision) | C channel gen., tools | 2 doc | S3 | [R] | documented (WP-04) |
 | [B-070](#b-070) | `calc_diffraction_gain` (C++) scalar mode expects an electromagnetic-equivalent frequency, the docs say the speed of sound is used | C channel gen., tools | 2 doc | S3 | [R] | open |
 | [B-071](#b-071) | `ray_triangle_intersect`: AVX2 and generic kernels swap `fbs_ind`/`sbs_ind` for hits at equal distance (shared edge or vertex) | D geometry, math | 1 defect | S3 | [R] | open |
 | [B-072](#b-072) | `ray_triangle_intersect`: the AABB slab test rejects rays with dz = 0 in the plane z = Zmin/Zmax (x and y are accepted) | D geometry, math | 1 defect | S3 | [R] | open |
@@ -157,6 +157,8 @@ Status: open: 95, fixed: 23, partly fixed: 0, won't fix: 1, documented: 0 (after
 | [B-117](#b-117) | Python output dtypes and shapes differ from the docs (`qdant_read`, `point_inside_mesh`, `generate_speaker`, `get_ieee_indoor`) | G Python layer | 2 doc | S4 | [R] | open |
 | [B-118](#b-118) | Python single-frequency arrayant dict: a 1-element `center_freq` array gives a numpy DeprecationWarning, 2 elements an unclear error | G Python layer | 3 cross-API | S4 | [R] | open |
 | [B-119](#b-119) | Crafted HDF5 files make HDF5 1.14.6 itself zero-fill about 4 GB in `H5Fopen` or request a 2^64-byte allocation in `H5Gopen2` (upstream, not quadriga-lib code) | B channel, file I/O | 1 defect | S4 | [R] | won't fix (upstream HDF5) |
+| [B-120](#b-120) | `calc_cross_polarization_ratio`: the circular XPR columns report 0 (fully cross-polar) for the LOS matrix that `get_channels_*` treats as co-polar, and are defined per transmit polarisation while the linear columns are per receive polarisation | C channel gen., tools | 1 defect | S3 | [R] | open |
+| [B-121](#b-121) | Test defect: `test_bin` is compiled without `BUILD_WITH_AVX2`, so the AVX2-vs-generic cases of the ray-triangle and ray-point kernel tests never run | D geometry, math | 1 defect | S3 | [R] | open |
 
 ## Baseline
 
@@ -205,6 +207,9 @@ miscompilation by the LAF split-compare passes, not a library defect. The campai
 | after WP-03: base | `All tests passed (1332501 assertions in 1151 test cases)` (round 2; round 1: 1332491 / 1150) | 148 s (8 threads) | 26.1 / 31.8 |
 | after WP-03 round 1: generic | `All tests passed (1332242 assertions in 1150 test cases)` (not re-run for round 2, which changed one message and documentation) | 40 s | 3.5 / 4.5 |
 | after WP-03 round 1: ASan + UBSan gcc-12, `suppress_equal_pcs=0` | `All tests passed (1332491 assertions in 1150 test cases)`; only the excluded `ray_progress` reports, no leak (not re-run for round 2) | 317 s | 3.8 / 1.6 |
+| after WP-04: base | `All tests passed (1332667 assertions in 1162 test cases)` | 113 s (12 threads) | 13.3 / 36.3 |
+| after WP-04: generic | `All tests passed (1332418 assertions in 1162 test cases)` | 88 s (12 threads) | 36.3 / 25.1 |
+| after WP-04: ASan + UBSan gcc-12, `suppress_equal_pcs=0` | `All tests passed (1332667 assertions in 1162 test cases)`; only the excluded `ray_progress` reports, no leak | 428 s (8 threads) | 21.4 / 1.5 |
 
 Run commands: `flock /tmp/quadriga-fixes-suite.lock build_linux/test_bin` (output
 `build_linux/scratch/hunt/base_test.txt`); the sanitizer runs with
@@ -249,6 +254,7 @@ GNUmakefile default is `avx2 = OFF`, so a default `make` gives MEX files without
 | after WP-02 round 1: Octave 11.1, R2024a, R2026a | 65 of 66 in each, same excluded failure; R2026a exits with 0, no crash dump | - | 1-2 |
 | after WP-02 round 2: Octave 11.1, R2026a | 65 of 66 in each, same excluded failure; R2026a exits with 0, no crash dump | - | 2-3 |
 | after WP-03 round 1: Octave 11.1, R2026a | 65 of 66 in each, same excluded failure; R2026a exits with 0, no crash dump (round 2: only `test_quantize_delays` in Octave, OK) | - | 2-4 |
+| after WP-04: Octave 11.1, R2026a | 65 of 66 in each, same excluded failure; R2026a exits with 0, no crash dump | - | 15-36 |
 
 The R2026a crash is B-029. A single `quadriga_lib.version` call does not crash R2026a at
 exit (2 of 2 runs).
@@ -259,7 +265,7 @@ exit (2 of 2 runs).
 `762 passed, 1 skipped, 37 subtests passed in 2.55s` (load 9.5 before, 11.7 after). The skip is
 `test_ray_point_intersect.py:403` (CUDA kernel not available). Module version string `0.12.2_AVX2`.
 
-After WP-01: `762 passed, 1 skipped, 37 subtests passed in 1.85s`. After WP-02 round 1: `762 passed, 1 skipped, 37 subtests passed in 1.80s` (the Python suite has no HDF5 tests). After WP-02 round 2: the same. After WP-03 round 1: `763 passed, 1 skipped, 37 subtests passed` (round 2: `test_quantize_delays.py`, 23 passed).
+After WP-01: `762 passed, 1 skipped, 37 subtests passed in 1.85s`. After WP-02 round 1: `762 passed, 1 skipped, 37 subtests passed in 1.80s` (the Python suite has no HDF5 tests). After WP-02 round 2: the same. After WP-03 round 1: `763 passed, 1 skipped, 37 subtests passed` (round 2: `test_quantize_delays.py`, 23 passed). After WP-04: `764 passed, 1 skipped, 37 subtests passed`.
 
 ### Fuzzing (AFL++ 4.33c)
 
@@ -840,7 +846,7 @@ Added after WP-03: the negative delays are not always small. They reach about (h
 
 ## B-003: `get_channels_spherical`, `_multifreq` and `_irs` ignore `path_length` for NLOS paths: delays and phases too short
 
-- Status: open
+- Status: fixed (WP-04)
 - Severity: S1, because paths with more than two interactions (the normal output of `qrt_file_read` / `coord2path`: FBS = first, LBS = last interaction, `path_length` = full length) silently get the delay and phase of the shortest TX-FBS-LBS-RX polyline, which is wrong on valid input in normal use.
 - Kind: wrong result
 - Mark: [R]
@@ -2153,7 +2159,7 @@ Output of the phase-2 re-run (`bash run.sh`):
 
 ## B-019: `baseband_freq_response_multi` gives wrong phases for `get_channels_*` output with the default relative delays
 
-- Status: open
+- Status: documented (WP-04)
 - Severity: S2, because the documented combination ("`remove_delay_phase` must be true for output from `get_channels_multifreq`") returns phases off by up to π when the channels were generated with the default `use_absolute_delays = false`; magnitudes are right.
 - Kind: wrong result
 - Mark: [R]
@@ -2228,7 +2234,7 @@ use_absolute_delays = 0: max |H_multi - H_true| = 2.000e+00, max ||H_multi| - |H
 
 ## B-020: `baseband_freq_response`: phase computed in single precision, error grows with delay × bandwidth (both builds)
 
-- Status: open
+- Status: fixed (WP-04)
 - Severity: S2, because valid long delays (absolute delays, km links, satellites) give visibly wrong frequency responses: 0.064 at 2 ms, 0.31 at 120 ms for 100 MHz bandwidth; the documentation mentions single precision but not this.
 - Kind: wrong result
 - Mark: [R]
@@ -5998,7 +6004,7 @@ unsorted bins {50,0,99,25}: cdf = 0.51 0.51 0.51 1 (no error)
 
 ## B-068: Docs of `add_fake_los_path` do not match the code: always one extra path; a present LOS is moved to slot 0 and a zero path is left behind
 
-- Status: open
+- Status: documented (WP-04)
 - Severity: S3, because a user reading "added when no LOS is present" expects n_path outputs when a LOS exists, but always gets n_path + 1 with a zero path in the middle.
 - Kind: doc
 - Mark: [R]
@@ -6053,7 +6059,7 @@ Output of the phase-2 re-run (`bash run.sh`):
 
 ## B-069: Naming of the cross-polarisation rows of `M` is inconsistent; `calc_cross_polarization_ratio` V/H columns are ambiguous (user decision)
 
-- Status: open
+- Status: documented (WP-04); circular XPR columns split off as B-120
 - Severity: S3, because the same rows are called "VH" in one place and "HV" in another, so users can build `M` or read the XPR columns the wrong way round.
 - Kind: doc
 - Mark: [R]
@@ -9541,3 +9547,145 @@ file name and a group name.
 file driver that rejects reads beyond the file size; run untrusted files in a separate process with a memory limit.
 
 **Test for the fix session.** None (won't fix).
+
+## B-120: `calc_cross_polarization_ratio`: the circular XPR columns report 0 (fully cross-polar) for the LOS matrix that `get_channels_*` treats as co-polar, and are defined per transmit polarisation while the linear columns are per receive polarisation
+
+- Status: open
+- Severity: S3, because the circular XPR of every LOS-dominated channel from the ray tracer or `get_channels_*` is reported inverted (co and cross swapped), so circular-polarisation studies read the wrong ratio; the linear columns are not affected.
+- Kind: wrong result
+- Mark: [R] (found by the WP-04 worker while documenting B-069; repro re-run by the manager, 2026-10-17)
+- Where: `src/qd_tools_calc_xpr.cpp`, circular columns 3-5 (transform of `M` to the L/R basis); the Catch2 case "calc_cross_polarization_ratio - Circular polarization identity check" (`tests/catch2_tests/test_calc_cross_polarization_ratio.cpp:124`) pins the 0 and explains it as "a single reflection reverses handedness".
+
+**What happens.** The library's LOS matrix is `M = diag(1, -1)` (rows 0-1 = 1, rows 6-7 = -1: the receive-side mirror of `ray_commit.cpp`, used in the `get_channels_*` tests). With an LHCP pattern (V, H) = (1, j)/sqrt 2 at both ends, `get_channels_spherical` gives |c| = 1 (opposite patterns: 0), i.e. a co-polar link. `calc_cross_polarization_ratio` with the same `M` and `include_los = true` returns circular XPR 0 (LHCP 0, RHCP 0). In addition, the code comment calls column 4 "LHCP XPR (transmit L, co = LL, cross = RL)", an XPR per transmit polarisation, while columns 1-2 are per receive polarisation (documented in WP-04); the handedness convention of the L/R transform (`E_L = (E_V - jE_H)/sqrt 2` or `(E_V + jE_H)/sqrt 2`) is not documented.
+
+**Reproduce.**
+
+Folder `build_linux/scratch/hunt/final/B-120/` (from the WP-04 worker's `build_linux/scratch/fix/WP-04/circular/circ.cpp`).
+
+`repro.cpp`:
+```cpp
+// WP-04 B-069 check: circular polarisation with get_channels_spherical vs the circular columns of calc_cross_polarization_ratio
+#include "quadriga_lib.hpp"
+#include <cstdio>
+#include <cmath>
+int main()
+{
+    auto a = quadriga_lib::generate_arrayant_omni<double>(10.0); // (V, H) = (1, j) / sqrt 2
+    a.e_theta_re *= std::sqrt(0.5);
+    a.e_phi_im = a.e_theta_re;
+    a.e_phi_re.zeros();
+    auto b = a; // (V, H) = (1, -j) / sqrt 2
+    b.e_phi_im *= -1.0;
+    arma::mat F = arma::vec({50.0, 0.0, 0.0}); // LOS
+    arma::vec g = {1.0}, L = {100.0};
+    arma::mat M = arma::vec({1.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0}); // LOS matrix of get_channels_* / ray_commit
+    arma::cube cr, ci, dl;
+    quadriga_lib::get_channels_spherical<double>(&a, &a, 0, 0, 0, 0, 0, 0, 100, 0, 0, 0, 0, 0, &F, &F, &g, &L, &M, &cr, &ci, &dl, 0.0);
+    printf("get_channels_spherical, LOS M = diag(1,-1): same circular pattern at TX and RX: |c| = %.3f\n", std::hypot(cr(0), ci(0)));
+    quadriga_lib::get_channels_spherical<double>(&a, &b, 0, 0, 0, 0, 0, 0, 100, 0, 0, 0, 0, 0, &F, &F, &g, &L, &M, &cr, &ci, &dl, 0.0);
+    printf("get_channels_spherical, LOS M = diag(1,-1): opposite circular patterns: |c| = %.3f\n", std::hypot(cr(0), ci(0)));
+    std::vector<arma::vec> pw = {{1.0}}, pl = {{100.0}};
+    std::vector<arma::mat> Mv = {M};
+    arma::mat tx = arma::vec({0.0, 0.0, 0.0}), rx = arma::vec({100.0, 0.0, 0.0}), xpr;
+    quadriga_lib::calc_cross_polarization_ratio<double>(pw, Mv, pl, tx, rx, &xpr, nullptr, true);
+    printf("calc_cross_polarization_ratio, same M, include_los: circular XPR = %g, LHCP = %g, RHCP = %g\n", xpr(0, 3), xpr(0, 4), xpr(0, 5));
+    return 0;
+}
+```
+
+`run.sh` (run from anywhere with `bash build_linux/scratch/hunt/final/B-120/run.sh`; it changes to the worktree root itself):
+```bash
+#!/bin/bash
+# B-120: circular XPR columns of calc_cross_polarization_ratio vs get_channels_spherical for the LOS matrix diag(1, -1)
+cd /sjc/quadriga-lib-fixes
+D=build_linux/scratch/hunt/final/B-120
+g++-12 -std=c++17 -O2 -fopenmp -DARMA_DONT_USE_BLAS -DARMA_DONT_USE_LAPACK -I include -I src "$D/repro.cpp" -o "$D/repro" build_linux/libquadriga.a $(pkg-config --cflags --libs hdf5) || echo "build failed"
+OMP_NUM_THREADS=1 "$D/repro" || echo "exit code $?"
+```
+
+Output (`bash run.sh`, 2026-10-17, library of the WP-04 work tree):
+```text
+get_channels_spherical, LOS M = diag(1,-1): same circular pattern at TX and RX: |c| = 1.000
+get_channels_spherical, LOS M = diag(1,-1): opposite circular patterns: |c| = 0.000
+calc_cross_polarization_ratio, same M, include_los: circular XPR = 0, LHCP = 0, RHCP = 0
+```
+
+**Cause.** Probably the circular transform assumes an `M` without the receive-side mirror, so for `M` from `get_channels_*` or the ray tracer the co- and cross-polar terms are swapped; to be confirmed in the fix session.
+
+**Proposed fix.** Define the handedness convention and the per-receive (or per-transmit) meaning of the circular columns consistently with the linear ones and with `get_channels_*`, fix the transform, and correct the pinned test. Behaviour change of columns 3-5. File: `src/qd_tools_calc_xpr.cpp` (and the MEX / Python blocks).
+
+**Test for the fix session.** Catch2: for `M = diag(1, -1)` the circular XPR is infinite (co-polar), consistent with `get_channels_spherical` for circular patterns at both ends; a reflection matrix gives the expected handedness change.
+
+## B-121: Test defect: `test_bin` is compiled without `BUILD_WITH_AVX2`, so the AVX2-vs-generic cases of the ray-triangle and ray-point kernel tests never run
+
+- Status: open
+- Severity: S3, because the only tests that compare the AVX2 ray kernels with the generic ones have never run, so differences such as B-071 went unnoticed; the library itself is built with AVX2.
+- Kind: test defect
+- Mark: [R] (found by the WP-04 worker; confirmed by the manager, 2026-10-17)
+- Where: `CMakeLists.txt` (test_bin target, around line 679-698: no `BUILD_WITH_AVX2` definition, while `quadriga_static` has `-DBUILD_WITH_AVX2=1`); `tests/catch2_tests/test_ray_triangle_intersect_internal.cpp:8, 370` and `tests/catch2_tests/test_ray_point_intersect_internal.cpp:9, 304, 589` (`#ifdef BUILD_WITH_AVX2`).
+
+**What happens.** "RTI Internal - AVX2 comparison" is not compiled into `test_bin` at all; "RPI Internal - Simple Mode (AVX2 vs GENERIC)" and "RPI Internal - Dense Grid (AVX2 vs GENERIC)" are listed but their bodies are compiled out, so they pass with no assertions. No other test file uses `BUILD_WITH_AVX2`.
+
+**Reproduce.**
+
+Folder `build_linux/scratch/hunt/final/B-121/`.
+
+`run.sh` (run from anywhere with `bash build_linux/scratch/hunt/final/B-121/run.sh`; it changes to the worktree root itself):
+```bash
+#!/bin/bash
+# B-121: test_bin is compiled without BUILD_WITH_AVX2, so the AVX2-vs-generic cases of the ray kernel tests are compiled out
+cd /sjc/quadriga-lib-fixes
+echo "== BUILD_WITH_AVX2 in the compile flags: library / test_bin"
+grep -c 'BUILD_WITH_AVX2' build_linux/CMakeFiles/quadriga_static.dir/flags.make
+grep -c 'BUILD_WITH_AVX2' build_linux/CMakeFiles/test_bin.dir/flags.make
+echo "== test files that depend on it"
+grep -n '#ifdef BUILD_WITH_AVX2' tests/catch2_tests/*.cpp
+echo "== test cases of the two files that test_bin knows (tags of all cases in those files)"
+for f in test_ray_triangle_intersect_internal test_ray_point_intersect_internal; do
+  n_src=$(grep -c '^TEST_CASE' tests/catch2_tests/$f.cpp)
+  echo "$f.cpp: $n_src TEST_CASE lines in the source"
+done
+build_linux/test_bin --list-tests 2>/dev/null | grep -i -E 'avx2' | head -20
+echo "(test cases listed above with AVX2 in the name: these are the ones that run)"
+echo "== the listed RPI AVX2 cases run with an empty body (no assertions)"
+for t in "RPI Internal - Simple Mode (AVX2 vs GENERIC)" "RPI Internal - Dense Grid (AVX2 vs GENERIC)"; do
+  echo "$t: $(flock /tmp/quadriga-fixes-suite.lock build_linux/test_bin "$t" 2>&1 | grep -E "assertions|test cases" | tr "\n" " ")"
+done
+echo "== the RTI AVX2 case is not in test_bin at all"
+build_linux/test_bin --list-tests 2>/dev/null | grep -c 'RTI Internal - AVX2 comparison'
+```
+
+Output (`bash run.sh`, 2026-10-17):
+```text
+== BUILD_WITH_AVX2 in the compile flags: library / test_bin
+1
+0
+== test files that depend on it
+tests/catch2_tests/test_ray_point_intersect_internal.cpp:9:#ifdef BUILD_WITH_AVX2
+tests/catch2_tests/test_ray_point_intersect_internal.cpp:304:#ifdef BUILD_WITH_AVX2
+tests/catch2_tests/test_ray_point_intersect_internal.cpp:589:#ifdef BUILD_WITH_AVX2
+tests/catch2_tests/test_ray_triangle_intersect_internal.cpp:8:#ifdef BUILD_WITH_AVX2
+tests/catch2_tests/test_ray_triangle_intersect_internal.cpp:370:#ifdef BUILD_WITH_AVX2
+== test cases of the two files that test_bin knows (tags of all cases in those files)
+test_ray_triangle_intersect_internal.cpp: 9 TEST_CASE lines in the source
+test_ray_point_intersect_internal.cpp: 13 TEST_CASE lines in the source
+  fast_atan2 - Large vector (exercises OpenMP and AVX2 bulk path)
+  RPI Internal - Simple Mode (AVX2 vs GENERIC)
+  RPI Internal - Dense Grid (AVX2 vs GENERIC)
+  sos_val - the AVX2 kernel agrees with GENERIC at any distance from the origin
+  sos_val - the automatic kernel is AVX2 when available
+  sos_val - the AVX2 kernel stays within its bound up to 1e9 periods from the
+  sos_val - the AVX2 kernel stays within its bound for the largest preset
+(test cases listed above with AVX2 in the name: these are the ones that run)
+== the listed RPI AVX2 cases run with an empty body (no assertions)
+RPI Internal - Simple Mode (AVX2 vs GENERIC): test cases: 1 | 1 passed assertions: - none - 
+RPI Internal - Dense Grid (AVX2 vs GENERIC): test cases: 1 | 1 passed assertions: - none - 
+== the RTI AVX2 case is not in test_bin at all
+0
+```
+
+**Cause.** The test sources check the macro, but only the library target defines it.
+
+**Proposed fix.** Define `BUILD_WITH_AVX2` for `test_bin` exactly when the library is built with AVX2 (same CMake condition); compile the AVX2 test parts with the kernel's flags if they call the intrinsics directly; keep the run-time `quadriga_lib_has_AVX2()` guard. Expect the newly running cases to expose B-071. File: `CMakeLists.txt`.
+
+**Test for the fix session.** `test_bin --list-tests` contains "RTI Internal - AVX2 comparison", and the three AVX2 cases report assertions; the case counts of the suite go up accordingly.

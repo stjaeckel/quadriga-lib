@@ -30,7 +30,9 @@ Compute the baseband frequency response of a MIMO channel
 - `delay` may be broadcast: a `(1, 1, n_path)` item applies the same delays to every RX/TX pair;
   for multi-freq a 3D delay item is reused for all input frequencies
 - `snap` selects a 0-based subset of snapshots; omitted processes all snapshots
-- Internal arithmetic is single-precision; double inputs are narrowed to float, results widened back
+- single-freq: the phase `bandwidth · pilot_grid · delay` (in cycles) is computed in double precision and reduced to
+  one period before sin / cos are evaluated in single precision; coefficients and sums are single precision, double
+  inputs are narrowed to float, results widened back; multi-freq computes in double precision
 
 ## Usage:
 ```
@@ -65,9 +67,11 @@ hmat = quadriga_lib.channel.baseband_freq_response( coeff_re=cre, coeff_im=cim, 
   single-freq input used together with `freq_out` as the phase reference; default: `None`
 - **`freq_out`** — Absolute output carrier frequencies in Hz; 1D array of length `n_carrier`;
   required for multi-freq input; may replace `bandwidth` + `pilot_grid` for single-freq; default: `None`
-- **`remove_delay_phase`** — If `True`, undo the delay-induced phase baked in by the channel
-  generator before SLERP, then re-apply it analytically per output carrier; multi-freq only;
-  default: `True`
+- **`remove_delay_phase`** — If `True`, undo the delay-induced phase baked in by the channel generator before SLERP,
+  then re-apply it analytically per output carrier; multi-freq only; needs channels generated with
+  `use_absolute_delays = True`: the coefficients of `get_channels_*` carry the phase of the absolute path length also
+  when `delay` is relative, and with relative delays the phase of the TX-RX distance is interpolated across `freq_in`,
+  which gives wrong phases (magnitudes stay right); default: `True`
 
 ## Outputs:
 - **`hmat`** — Complex frequency-domain channel matrix; shape `(n_rx, n_tx, n_carrier, n_out)`,

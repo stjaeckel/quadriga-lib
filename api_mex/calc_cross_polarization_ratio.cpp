@@ -17,10 +17,16 @@ Calculate the cross-polarization ratio (XPR) for linear and circular polarizatio
 - Computes aggregate XPR from polarization transfer matrices using the total-power-ratio method: co-pol 
   and cross-pol powers are summed across all qualifying paths per CIR, and XPR is their ratio
 - XPR is computed in both the linear V/H basis and the circular LHCP/RHCP basis via the Jones matrix transform `M_circ = T * M_lin * T^-1`
-- LOS paths are identified by comparing path length against the direct TX-RX distance `dTR`; paths with 
-  `path_length < dTR + window_size` are excluded by default
-- Polarization transfer matrix `M` is stored column-major with interleaved real/imaginary parts, 8 rows per path:
-  `[Re(M_vv); Im(M_vv); Re(M_vh); Im(M_vh); Re(M_hv); Im(M_hv); Re(M_hh); Im(M_hh)]`
+- LOS paths are identified by comparing path length against the direct TX-RX distance `dTR`; paths with
+  `path_length <= dTR + window_size` are excluded by default
+- Polarization transfer matrix `M` is the 2x2 Jones matrix (rows = RX polarisation V/H, columns = TX polarisation
+  V/H), stored column-major with interleaved real/imaginary parts, 8 rows per path: rows 1-2 = (V rx, V tx),
+  rows 3-4 = (H rx, V tx), rows 5-6 = (V rx, H tx), rows 7-8 = (H rx, H tx). Below, `M_<rx><tx>` names an entry by its
+  receive and transmit polarisation: `M_vv` = rows 1-2, `M_hv` = rows 3-4, `M_vh` = rows 5-6, `M_hh` = rows 7-8
+- V-XPR and H-XPR are ratios per receive polarisation: V-XPR is the power received in V from V transmission over
+  the power received in V from H transmission; H-XPR likewise for the H receive polarisation
+- The circular entries are `M_LL = (M_vv + M_hh + j(M_vh - M_hv)) / 2`, `M_RL = (M_vv - M_hh - j(M_vh + M_hv)) / 2`,
+  `M_LR = (M_vv - M_hh + j(M_vh + M_hv)) / 2`, `M_RR = (M_vv + M_hh - j(M_vh - M_hv)) / 2`
 - Normalization of `M` does not affect XPR (cancels in the ratio) but does affect `pg`
 - If cross-pol power is zero and co-pol is positive, XPR is set to infinity; if both are zero, XPR is set to 0
 - TX/RX positions may be fixed `[3, 1]` or mobile `[3, n_cir]`
@@ -37,15 +43,16 @@ Calculate the cross-polarization ratio (XPR) for linear and circular polarizatio
 - **`tx_pos`** — Transmitter position [x; y; z]; `[3, 1]` (fixed) or `[3, n_cir]` (mobile)
 - **`rx_pos`** — Receiver position [x; y; z]; `[3, 1]` (fixed) or `[3, n_cir]` (mobile)
 - **`include_los`** — If true, includes LOS and near-LOS paths in the XPR calculation; default: false
-- **`window_size`** — LOS exclusion window; paths within `dTR + window_size` are excluded when `include_los = false`; default: 0.01
+- **`window_size`** — LOS exclusion window; paths with `path_length <= dTR + window_size` are excluded when
+  `include_los = false`; default: 0.01
 
 ## Outputs:
 - **`xpr`** — XPR on linear scale; `[n_cir, 6]`; columns:<br><br>
    | Col | Description                                                     |
    | :-: | --------------------------------------------------------------- |
    | 1   | Aggregate linear XPR (total V+H co-pol / total V+H cross-pol)   |
-   | 2   | V-XPR: sum(abs(M_vv)^2) / sum(abs(M_hv)^2)                      |
-   | 3   | H-XPR: sum(abs(M_hh)^2) / sum(abs(M_vh)^2)                      |
+   | 2   | V-XPR: sum(abs(M_vv)^2) / sum(abs(M_vh)^2) (receive V)          |
+   | 3   | H-XPR: sum(abs(M_hh)^2) / sum(abs(M_hv)^2) (receive H)          |
    | 4   | Aggregate circular XPR (total L+R co-pol / total L+R cross-pol) |
    | 5   | LHCP XPR: sum(abs(M_LL)^2) / sum(abs(M_RL)^2)                   |
    | 6   | RHCP XPR: sum(abs(M_RR)^2) / sum(abs(M_LR)^2)                   |
