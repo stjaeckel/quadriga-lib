@@ -180,7 +180,7 @@ TEST_CASE("ray_progress - the wall behind a traced layer is met at the incidence
                 }
 }
 
-TEST_CASE("ray_progress - the bonded plate at any depth where the slopes agree", "[acoustic]")
+TEST_CASE("ray_progress - the bonded plate at any depth", "[acoustic]")
 {
     // One ray per call, many thousand calls: a thread team per call costs twenty times the work
     ub::OneThread one_thread;
@@ -190,9 +190,9 @@ TEST_CASE("ray_progress - the bonded plate at any depth where the slopes agree",
     // arguments are taken to nothing (fRef 1e9), per frequency. The stack is one plate: on the twin
     // it passes a, the smaller absorption of its two outer faces (their tf), and with its mass
     // a tau / (a + tau - a tau) (the plate rule, md/acoustic.md 10 N1), tau the plate of every body
-    // from the column definitions. Asserted: what the rule pays above a, at any depth where the
-    // slopes agree, and from the side on which they agree where they do not; a frequency of a band
-    // pays what it pays alone, since the state words of a run are the base frequency's.
+    // from the column definitions. Asserted: what the rule pays above a, at any depth (M10: the mass
+    // column is a switch, so C30 keeps m 30 and pays as m 20, and every stack is of one slope); a
+    // frequency of a band pays what it pays alone, since the state words of a run are the base frequency's.
     const double PI = 3.14159265358979323846;
     const float gap = 1.0e-5f;
     typedef std::unordered_map<std::string, std::vector<float>> Pal;
@@ -290,7 +290,7 @@ TEST_CASE("ray_progress - the bonded plate at any depth where the slopes agree",
     {
         double X = 0.0;
         for (const auto &b : g.body)
-            X += std::pow((fGHz / b[1]) * b[2], 0.05 * b[0]);
+            X += (b[0] > 0.0) ? (fGHz / b[1]) * b[2] : 0.0; // X0 = (f / fRef) M, the mass law at any m > 0
         if (!(X > 1.0))
             return 0.0;
         const double A = 20.0 * std::log10(X), x = X * ct;
@@ -358,11 +358,11 @@ TEST_CASE("ray_progress - the bonded plate at any depth where the slopes agree",
     // previous-medium word names the body before it, whose face stands in for the stack's first one
     // (md/acoustic.md 7). Where that face absorbs more than the first (A20 100 | B20 | C20 as named,
     // the lining as named) or less (plaster | brick | plaster) the level is off by the ratio, at most
-    // 3.01 dB in this palette, and the row is recorded with that bound; mixed slopes as before.
+    // 3.01 dB in this palette, and the row is recorded with that bound.
     const std::vector<Stack> stacks = {
         {"A20 100 | B20 100 | C20 100", {O(1), G(0.1f), C(1), O(2), G(0.1f), C(2), O(3), G(0.1f), C(3)}, 2},
         {"A20 100 | B20 13 | C20 100", {O(1), G(0.1f), C(1), O(2), G(0.013f), C(2), O(3), G(0.1f), C(3)}, 2},
-        {"A20 100 | B20 100 | C30 50", {O(1), G(0.1f), C(1), O(2), G(0.1f), C(2), O(4), G(0.05f), C(4)}, 0},
+        {"A20 100 | B20 100 | C30 50", {O(1), G(0.1f), C(1), O(2), G(0.1f), C(2), O(4), G(0.05f), C(4)}, 2},
         {"plaster 15 | brick 115 | plaster 15", {O(5), G(0.015f), C(5), O(6), G(0.115f), C(6), O(5), G(0.015f), C(5)}, 0},
         {"lining L20 > B20 60 | S20 | B20 40", {S(7), O(2), G(0.06f), S(8), G(0.04f), C(2)}, 2},
         {"merged: B20 60 | HS 8 | B20 40", {O(2), G(0.06f), S(9), G(0.04f), C(2)}, 3},
@@ -404,7 +404,7 @@ TEST_CASE("ray_progress - the bonded plate at any depth where the slopes agree",
                             // (0.0106 dB for B20)
                             if ((St.exact >> rev) & 1)
                                 CHECK(std::abs(paid - rule) < 0.02);
-                            else if (St.t[2].mat != 4 && St.t.back().mat != 4) // the depth of the state, the slopes agreeing
+                            else // the depth of the state
                                 CHECK(std::abs(paid - rule) < 3.02);
 #ifdef QD_TEST_VERBOSE
                             char bn[32];

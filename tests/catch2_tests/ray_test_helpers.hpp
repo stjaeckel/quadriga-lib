@@ -1665,19 +1665,20 @@ static inline DiagSheet diag_cm_stack(std::complex<double> e_near, std::complex<
     return D;
 }
 
-// The mass-law term of Material::medium_gain, in dB, written from the column definition:
-//     A  = m log10((f / fRef) M)        X0 = ((f / fRef) M)^(m / 20)
+// The mass-law term of Material::medium_gain, in dB, written from the column definition (md/acoustic.md
+// 2.1, M10: m > 0 switches the limp mass law on, 20 dB per decade, whatever its value):
+//     X0 = (f / fRef) M        A = 20 log10 X0
 //     TL = A log10(1 + (X0 c)^2) / log10(1 + X0^2)
 // with M the normal thickness and c the real incidence cosine. Zero below an argument of one.
 static inline double diag_mass_TL(double m, double fRef_GHz, double f_hz, double thk, double cosv)
 {
     double arg = (f_hz * 1e-9 / fRef_GHz) * thk;
-    double A = (m > 0.0 && arg > 0.0) ? m * std::log10(arg) : 0.0;
+    double A = (m > 0.0 && arg > 0.0) ? 20.0 * std::log10(arg) : 0.0;
     if (!(A > 0.0) || !(cosv > 0.0))
         return 0.0;
     if (cosv >= 1.0)
         return A;
-    double X0 = std::pow(arg, 0.05 * m), x = X0 * cosv;
+    double X0 = arg, x = X0 * cosv;
     return A * std::log10(1.0 + x * x) / std::log10(1.0 + X0 * X0);
 }
 
@@ -1812,7 +1813,7 @@ static inline DiagSheet diag_sc_stack(std::complex<double> e_near, std::complex<
         };
 
         // Mass-law layers with no coherent layer between them are bonded and are one plate: its
-        // impedance ratio is the sum of theirs, X0 = ((f / fRef) d)^(m / 20) each, and the plate
+        // impedance ratio is the sum of theirs, X0 = (f / fRef) d each (M10: one slope), and the plate
         // pays the single-body term of that sum once. A lone layer keeps diag_mass_TL.
         auto plate_TL = [&](double X)
         {
@@ -1846,8 +1847,8 @@ static inline DiagSheet diag_sc_stack(std::complex<double> e_near, std::complex<
                 if (run == 0)
                     mass_dB = diag_mass_TL(L.m, L.fRef, f_hz, L.d, mass_cos);
                 else
-                    mass_dB = plate_TL(X_plate + std::pow((f_hz * 1e-9 / L.fRef) * L.d, 0.05 * L.m)) - paid_dB;
-                X_plate += std::pow((f_hz * 1e-9 / L.fRef) * L.d, 0.05 * L.m), paid_dB += mass_dB, ++run;
+                    mass_dB = plate_TL(X_plate + (f_hz * 1e-9 / L.fRef) * L.d) - paid_dB;
+                X_plate += (f_hz * 1e-9 / L.fRef) * L.d, paid_dB += mass_dB, ++run;
                 double loss_dB = L.alpha * dist + mass_dB;
                 const double g = diag_medium_gain((L.e + L.res) * L.mu, dist, f_hz) * std::pow(10.0, -0.1 * loss_dB);
                 tau_run *= g;

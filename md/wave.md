@@ -26,9 +26,9 @@ First step of every session, from the repository root:
 
 ```
 cmake --build build_linux --parallel
-./build_linux/test_bin "[wave]" > test_wave.txt          # All tests passed (165110 assertions in 179 test cases)
-./build_linux/test_bin "[acoustic]" > test_acoustic.txt  # All tests passed (39371 assertions in 54 test cases)
-./build_linux/test_bin > test.txt                        # All tests passed (1314030 assertions in 1140 test cases)
+./build_linux/test_bin "[wave]" > test_wave.txt          # All tests passed (165258 assertions in 180 test cases)
+./build_linux/test_bin "[acoustic]" > test_acoustic.txt  # All tests passed (40050 assertions in 56 test cases)
+./build_linux/test_bin > test.txt                        # All tests passed (1314857 assertions in 1143 test cases)
 ```
 
 The three baselines are untracked (`.gitignore`: `test*.txt`). A change is diffed against them. The
@@ -140,14 +140,26 @@ materials carry `m`).
 
 ## 4. The other lumped columns on wave media
 
-- **`att` and the coincidence term** (`interface_gain`): owed once per medium entered. Sheet
-  transmit port: `sqrt(G_sheet·(far is new ? G_far : 1))`. Reflect port: the sheet's gain once, on
-  what entered the sheet and came back (the solver's second recursion `Ge`), never the far medium's.
-  A sheet in air and its traced solid are one wall on both ports. A negative total loss returns a
-  gain of one. Asserted in: *Lumped columns - interface gain on the sheet, glued and embedded
-  paths*; *Sheet reflect port - where the layer lies and what the echo pays*; *Acoustic -
-  interface_gain penetration and coincidence*; *Ray-Mesh Interact - Penetration loss frequency
-  scaling*.
+- **`att`** (`interface_gain`, the penetration loss `att·(f/fRef)^attB` alone): owed once per medium
+  entered. Sheet transmit port: `sqrt(G_sheet·(far is new ? G_far : 1))`. Reflect port: the sheet's
+  gain once, on what entered the sheet and came back (the solver's second recursion `Ge`), never the
+  far medium's. A sheet in air and its traced solid are one wall on both ports. A negative total loss
+  returns a gain of one. Asserted in: *Lumped columns - interface gain on the sheet, glued and
+  embedded paths*; *Sheet reflect port - where the layer lies and what the echo pays*; *Acoustic -
+  interface_gain is the penetration loss alone; a coiA column is ignored*; *Ray-Mesh Interact -
+  Penetration loss frequency scaling*.
+- **Coincidence columns on a wave medium**: none act. The coincidence Lorentzian `coiA` of the
+  interface gain was removed on 2026-10-17 (`md/acoustic.md` 4, D2-b: an angle-free Lorentzian in dB
+  is no physical element), the only wave change of that round; `coiF` / `coiQ` are the bending
+  stiffness of a mass-law plate and act only where `m > 0`. A material table that still carries a
+  `coiA` column loads (the reader hands every column on) and the column changes nothing: a wave
+  medium as traced solid and as sheet, EM type 1 and scalar types 4 / 5, passes and reflects bitwise
+  what it does without the column. Asserted in: *Coincidence column - a table that carries coiA loads
+  and the column changes nothing*; *Ray-Mesh Interact - Public helpers: refractive_index,
+  interface_gain, medium_gain* (index and interface gain at `coiF`); *ray_state_update - a resonance
+  shifts the slab factor, coincidence columns leave a wave medium alone* (the exit at coincidence,
+  bitwise). Before the removal those three cases asserted the Lorentzian; their `[wave]` rows print
+  nothing, and every other `[wave]` row and the stored twins are unchanged.
 - **`alpha`**: dB per meter of path, a real one-way factor on `φ` over `d/|Re c|`; where the wave
   does not advance in a layer (`Re c = 0`) the layer is opaque to it. Asserted in: *Ray-Mesh Interact
   - Alpha in-medium absorption (medium_gain)*; *Stack with tf*.

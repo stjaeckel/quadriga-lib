@@ -56,13 +56,12 @@ namespace
         const dtype *attB = nullptr;   // Frequency exponent for att
         const dtype *alpha = nullptr;  // In-medium absorption at fRef, dB/m
         const dtype *alphaB = nullptr; // Frequency exponent for alpha
-        const dtype *m = nullptr;      // Mass-law transmission slope, dB/decade
+        const dtype *m = nullptr;      // Mass-law switch (> 0: the mass law, 20 dB/decade)
         const dtype *resF = nullptr;   // Resonance frequency, GHz (a permittivity pole; with m, the plate's resonance)
         const dtype *resQ = nullptr;   // Resonance quality factor
         const dtype *resS = nullptr;   // Resonance strength (with m, its sign selects the form)
         const dtype *coiF = nullptr;   // Coincidence frequency, GHz (with m, the plate's bending stiffness)
         const dtype *coiQ = nullptr;   // Coincidence quality factor (with m, 1 / loss factor)
-        const dtype *coiA = nullptr;   // Coincidence loss amplitude, dB
         const dtype *tf = nullptr;     // Transmission factor at fRef
         const dtype *tfB = nullptr;    // Frequency exponent for tf
         const dtype *tfP = nullptr;    // Resonant peak added to tf
@@ -120,7 +119,6 @@ namespace
             resS = resolve("resS");
             coiF = resolve("coiF");
             coiQ = resolve("coiQ");
-            coiA = resolve("coiA");
             tf = resolve("tf");
             tfB = resolve("tfB");
             tfP = resolve("tfP");
@@ -152,7 +150,7 @@ namespace
             require(thk, "thk", false);     // thickness >= 0
             require(att, "att", false);     // penetration loss >= 0
             require(alpha, "alpha", false); // in-medium absorption >= 0
-            require(m, "m", false);         // mass-law slope >= 0
+            require(m, "m", false);         // mass-law switch >= 0
             require(resF, "resF", false);   // resonance frequency >= 0 (0 disables)
             require(resQ, "resQ", false);   // resonance Q >= 0 (0 disables)
             require(coiF, "coiF", false);   // coincidence frequency >= 0 (0 disables)
@@ -194,13 +192,12 @@ namespace
         double attB = 0.0;   // Frequency exponent for att
         double alpha = 0.0;  // In-medium absorption at fRef, dB/m
         double alphaB = 0.0; // Frequency exponent for alpha
-        double m = 0.0;      // Mass-law transmission slope, dB/decade
+        double m = 0.0;      // Mass-law switch (> 0: the mass law, 20 dB/decade)
         double resF = 0.0;   // Resonance frequency, GHz (a permittivity pole; with m, the plate's resonance)
         double resQ = 0.0;   // Resonance quality factor
         double resS = 0.0;   // Resonance strength (with m, its sign selects the form)
         double coiF = 0.0;   // Coincidence frequency, GHz (with m, the plate's bending stiffness)
         double coiQ = 0.0;   // Coincidence quality factor (with m, 1 / loss factor)
-        double coiA = 0.0;   // Coincidence loss amplitude, dB
         double tfR = 0.0;    // Transmission factor at fRef
         double tfB = 0.0;    // Frequency exponent for tf
         double tfP = 0.0;    // Resonant peak added to tf
@@ -241,7 +238,6 @@ namespace
             resS = cols.resS ? (double)cols.resS[i] : resS;
             coiF = cols.coiF ? (double)cols.coiF[i] : coiF;
             coiQ = cols.coiQ ? (double)cols.coiQ[i] : coiQ;
-            coiA = cols.coiA ? (double)cols.coiA[i] : coiA;
             tfR = cols.tf ? (double)cols.tf[i] : tfR;
             tfB = cols.tfB ? (double)cols.tfB[i] : tfB;
             tfP = cols.tfP ? (double)cols.tfP[i] : tfP;
@@ -297,12 +293,9 @@ namespace
             //
             // The panel's transfer impedance and the fluid's wave admittance enter the transmission
             // coefficient as one product, x = Z_panel * cos(theta) / (2 z0), so the term is a
-            // function of that single argument and carries two slopes that are not the same
-            // quantity. The panel side carries the fitted slope m, in dB per decade of frequency
-            // and of surface mass. The angle side carries 20 dB per decade of cos(theta), which
-            // comes from the fluid admittance rather than from the panel and therefore does not
-            // follow m. They were tied together while the angle sat inside the same logarithm as
-            // the frequency; mass_normal and mass_cos separate them.
+            // function of that single argument: 20 dB per decade of frequency and of surface mass on
+            // the panel side, 20 dB per decade of cos(theta) from the fluid admittance on the other.
+            // mass_normal and mass_cos keep them apart.
             //
             // mass_normal is the surface-mass surrogate with the angle removed and mass_cos is the
             // angle factor. A caller supplying neither gets dist_geo * abs_cos_theta as the
@@ -321,8 +314,7 @@ namespace
             // the term is worth anything.
             //
             // The angle dependence has no cutoff. It tapers to zero and is never negative, and its
-            // knee sits at x = 1, fixed by m, the frequency and the surface mass, and by no
-            // geometry.
+            // knee sits at x = 1, fixed by the frequency and the surface mass, and by no geometry.
             //
             // A body bonded to mass-law bodies the wave has already crossed is not a second panel. With
             // no air gap the bodies move with one velocity, so their transfer impedances are in series
@@ -337,9 +329,10 @@ namespace
             return std::pow(10.0, -0.1 * loss);
         }
 
-        // Impedance ratio of this body with the angle removed, X0 = ((f / fRef) M)^(m / 20), from its
-        // surface-mass surrogate M. It is 10^(A / 20) of the normal-incidence term A wherever that
-        // term is positive, and is not clipped below it. Zero for a material without the column.
+        // Impedance ratio of this body with the angle removed, X0 = (f / fRef) M, from its surface-mass
+        // surrogate M: the limp mass law, 20 dB per decade, m > 0 switching it on. It is 10^(A / 20) of
+        // the normal-incidence term A wherever that term is positive, and is not clipped below it.
+        // Zero for a material without the column.
         //
         // Two impedances of the plate are in series with its mass, both at the cosine c the wave has
         // in air. A resonance with resS > 0 - the mass-air-mass resonance of a double unit, a leaf on
@@ -362,7 +355,7 @@ namespace
                 res = std::abs(std::complex<double>(1.0 - y * y, -y / resQ));
             double s2 = 1.0 - mass_c * mass_c, w = (coiF > 0.0) ? (fGHz / coiF) * (fGHz / coiF) * s2 * s2 : 0.0;
             double coi = (coiF > 0.0 && coiQ > 0.0) ? std::abs(std::complex<double>(1.0 - w, -w / coiQ)) : 1.0;
-            return (mass_arg > 0.0) ? std::pow(mass_arg, 0.05 * m) * res * coi : 0.0;
+            return (mass_arg > 0.0) ? mass_arg * res * coi : 0.0;
         }
 
         // Mass term in dB of one plate with impedance ratio X0 at angle factor mass_c: the
@@ -392,11 +385,6 @@ namespace
         double interface_gain(double fGHz = 1.0) const
         {
             double loss = att * std::pow(fGHz / fRef, attB);
-            if (coiF > 0.0 && coiA != 0.0)
-            {
-                double x = coiQ * (fGHz - coiF) / coiF;
-                loss += coiA / (1.0 + x * x);
-            }
             if (loss < 0.0)
                 return 1.0;
             return std::pow(10.0, -0.1 * loss);
@@ -532,7 +520,6 @@ namespace
                    resS == other.resS &&
                    coiF == other.coiF &&
                    coiQ == other.coiQ &&
-                   coiA == other.coiA &&
                    tfR == other.tfR &&
                    tfB == other.tfB &&
                    tfP == other.tfP &&
@@ -592,7 +579,7 @@ namespace
         // 'this' is the medium the ray travels in (incidence side, medium 1); 'other' is the medium it enters into / reflects off (medium 2).
         // Computes the ITU-R P.2040-1 interface coefficients and returns the interface power gain.
         // For transmission/refraction (1/2/4/5), the returned gain and cTE/cTM include the entered medium's lumped
-        // interface_gain (att + coincidence); reflection (0/3) does not. 0.5*(|cTE|^2 + |cTM|^2) == gain in all cases.
+        // interface_gain (att); reflection (0/3) does not. 0.5*(|cTE|^2 + |cTM|^2) == gain in all cases.
         //
         // Energy convention. A transmitted coefficient carries the per-channel normal-flux amplitude,
         // the raw Fresnel amplitude times sqrt of its own obliquity factor; see flux_amp above. The
@@ -1513,11 +1500,11 @@ Linear gain of a ray traversing a homogeneous lossy medium
     `σ = c·(f/fRef)^d`. These give an attenuation length `Δ` and a per-meter power loss `8.686 / Δ` dB/m.
   - Distance absorption of the form `α·(f/fRef)^αB` dB/m, intended to model excess loss not captured
     by `σ` (e.g. foliage, scattering media).
-  - An acoustic mass-law term `A = m·log10((f/fRef)·dist)` dB, added once (not per meter) when `m > 0`,
-    `dist` exceeds ~1.5 mm, and the term is positive; `m` is the mass-law slope in dB/decade. At oblique
+  - An acoustic mass-law term `A = 20·log10((f/fRef)·dist)` dB, added once (not per meter) when `m > 0`,
+    `dist` exceeds ~1.5 mm, and the term is positive; `m > 0` switches the mass law on, 20 dB per decade. At oblique
     incidence the term carries the mass law's angle shape, `A·log10(1 + x²)/log10(1 + X₀²)` with
     `X₀ = 10^(A/20)` and `x = X₀·cos θ`, which is `A` at normal incidence, tapers to zero at tangency,
-    and has an angle slope of 20 dB/decade of `cos θ` independent of `m`. This entry point supplies
+    and has an angle slope of 20 dB/decade of `cos θ`. This entry point supplies
     `cos θ = 1` and therefore returns `A` unchanged.
 - The penetration-loss columns (`att`, `attB`) of `mtl_prop` are not used — they describe
   thin-slab transmission loss, not propagation through a finite-thickness medium.
@@ -1571,13 +1558,13 @@ Linear gain of a wave crossing a thin interface (lumped penetration loss)
 - Computes `g = 10^(-A/10)`, where `A` [dB] is the lumped transmission loss applied once when a
   ray enters a material (the air-to-material or material-to-material front-side crossing). It is
   independent of path length and is applied on top of the Fresnel interface term `1 - abs(R)²`:
-  - Power-law penetration loss `att·(f/fRef)^attB` (e.g. 3GPP TR 38.901 building-entry loss).
-  - An optional Lorentzian coincidence feature `coiA / (1 + (coiQ·(f - coiF)/coiF)²)`, active only
-    when `coiF > 0` and `coiA != 0`; negative `coiA` is a transmission dip (acoustic coincidence),
-    positive `coiA` a stop-band. The total is clamped to `>= 0`.
+  - Power-law penetration loss `att·(f/fRef)^attB` (e.g. 3GPP TR 38.901 building-entry loss),
+    clamped to `>= 0`.
 - The reflection / conductivity columns (`a`, `b`, `c`, `d`) and the in-medium columns
   (`alpha`, `alphaB`, `m`) of `mtl_prop` are not used here — the Fresnel reflection is handled by
-  the caller and the distance-dependent loss by [[medium_gain]].
+  the caller and the distance-dependent loss by [[medium_gain]]. Coincidence is no interface loss:
+  `coiF`, `coiQ` are the bending stiffness of a mass-law plate (`m > 0`) and act in its mass term. A
+  `coiA` column of an older table is read and ignored.
 
 ## Declaration:
 ```
@@ -1622,8 +1609,8 @@ Real refractive index of a homogeneous medium
 
 - Returns `n = Re(sqrt(ε_r · μ_r))`, the real part of the complex refractive index, using the
   ITU-R P.2040-1 permittivity model `ε_r = a·(f/fRef)^b` together with the relative permeability `μ_r`.
-- A permittivity resonance (`resF`, `resQ`, `resS`) is part of `ε_r`. The coincidence feature
-  (`coiF`, `coiQ`, `coiA`) is excluded: it is a penetration loss at an interface, not bulk propagation.
+- A permittivity resonance (`resF`, `resQ`, `resS`) is part of `ε_r`. The coincidence columns
+  (`coiF`, `coiQ`) are excluded: they are the bending stiffness of a mass-law plate, not bulk propagation.
 - Air (`iM = 0`) returns `1`.
 
 ## Declaration:
@@ -3373,8 +3360,8 @@ void quadriga_lib::ray_state_update(int interaction_type,
         // of 0.044 %. For a traced solid in the previous-medium word it is that solid's leg. A
         // sheet's own thickness is a column, so for a sheet the code is zero, or, where the sheet
         // lies inside the current medium, the leg of that medium in front of the sheet, which the
-        // leg behind it is bonded to as well. Bonded bodies crossed before that leg which have its
-        // slope m are in the thickness too, as what they are worth in its material; see MASS_FOLD.
+        // leg behind it is bonded to as well. Bonded bodies crossed before that leg are in the
+        // thickness too, as what they are worth in its material; see MASS_FOLD.
         // The thickness is geometric, so one code serves every frequency. It is written where a mass-law body is crossed into another medium, kept
         // where a leg carries on, and cleared wherever a leg begins any other way, a reflection
         // included, so a set flag always means the neighbour was crossed on this traversal. Every
@@ -4181,22 +4168,19 @@ void quadriga_lib::ray_state_update(int interaction_type,
         };
 
         // Normal thickness of material R that has the X0 of a leg of R with normal thickness d
-        // together with the bonded bodies crossed before it, as far as the state names them and
-        // they have R's slope m. With one slope, X0 = ((f / fRef) d)^(m / 20) of every body has
-        // the same power of the frequency, so the summed X0 is that of one body of R at every
-        // frequency: each thickness is scaled by fRef_R / fRef, and the m / 20 powers add. No
-        // frequency enters, which is what lets the result travel as the thickness code. A body of
-        // another slope has no such thickness and is left out, as every body behind the one the
-        // state names was before. extra is the first layer of an ordered stack, which the
-        // previous-medium word will not hold.
+        // together with the bonded bodies crossed before it, as far as the state names them:
+        // X0 = (f / fRef) d of every body is linear in its thickness, so the summed X0 is that of one
+        // body of R at every frequency, each thickness scaled by fRef_R / fRef. No frequency enters,
+        // which is what lets the result travel as the thickness code. extra is the first layer of an
+        // ordered stack, which the previous-medium word will not hold.
         auto MASS_FOLD = [&](int R, double d, int extra = 0) -> double
         {
             Material Rm = MAT(R);
-            double p = 0.05 * Rm.m, s = std::pow(d, p);
+            double s = d;
             auto ADD = [&](const Material &B, double thk)
             {
-                if (B.m == Rm.m && thk > 0.0)
-                    s += std::pow(thk * Rm.fRef / B.fRef, p);
+                if (B.m > 0.0 && thk > 0.0)
+                    s += thk * Rm.fRef / B.fRef;
             };
             if (extra != 0)
                 ADD(MAT(extra), MAT(extra).thk);
@@ -4213,7 +4197,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
                         ADD(MAT(mtl_current), d_code);
                 }
             }
-            return std::pow(s, 1.0 / p);
+            return s;
         };
 
         // The absorption of a face of a plate of material C seen from medium P: what it passes of the flux
