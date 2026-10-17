@@ -72,16 +72,19 @@ assert_throws( @() quadriga_lib.sos_randi( dd, pos, 0 ), 'imax' );              
 
 % imax is validated by the wrapper before the conversion to an unsigned type: a negative or non-finite
 % value used to wrap around and return values around 1e18
-assert_throws( @() quadriga_lib.sos_randi( dd, pos, -3 ), 'Input ''imax'' must be a finite number >= 1' );
-assert_throws( @() quadriga_lib.sos_randi( dd, pos, NaN ), 'Input ''imax'' must be a finite number >= 1' );
-assert_throws( @() quadriga_lib.sos_randi( dd, pos, Inf ), 'Input ''imax'' must be a finite number >= 1' );
-assert_throws( @() quadriga_lib.sos_randi( dd, pos, [] ), 'Input ''imax'' must be a finite number >= 1' );
+assert_cpp_error( @() quadriga_lib.sos_randi( dd, pos, -3 ), 'Input ''imax'' must be an integer >= 1.' );
+assert_cpp_error( @() quadriga_lib.sos_randi( dd, pos, NaN ), 'Input ''imax'' must be an integer >= 1.' );
+assert_cpp_error( @() quadriga_lib.sos_randi( dd, pos, Inf ), 'Input ''imax'' must be an integer >= 1.' );
+assert_cpp_error( @() quadriga_lib.sos_randi( dd, pos, [] ), 'Input ''imax'' must be an integer >= 1.' );
 assert_throws( @() quadriga_lib.sos_randi( dd, pos, 0.5 ), 'imax' );
 assert_throws( @() quadriga_lib.sos_randi( dd, pos, 6, [], [], [], NaN ), 'Input ''seed''' );
 assert_throws( @() quadriga_lib.sos_randi( dd, pos, 6, [], [], [], -2 ), 'seed' );                 % thrown by C++
 
-%% Non-integer scalars are truncated, a vector for a scalar uses its first element
-assertEqual( quadriga_lib.sos_randi( dd, pos, 6.9, [], [], [], 7.9 ), val );
+%% Non-integer scalars are rejected, a vector for a scalar uses its first element
+assert_cpp_error( @() quadriga_lib.sos_randi( dd, pos, 6.9, [], [], [], 7 ), 'Input ''imax'' must be an integer >= 1.' );
+assert_cpp_error( @() quadriga_lib.sos_randi( dd, pos, 6, [], [], [], 7.9 ), ...
+    'Input ''seed'' must be an integer from -1 to 9223372036854775807.' );
+assertEqual( quadriga_lib.sos_randi( dd, pos, 6.0, [], [], [], 7.0 ), val );
 assertEqual( quadriga_lib.sos_randi( dd, pos, [6, 2], [], [], [], 7 ), val );
 
 end
@@ -99,6 +102,19 @@ try
 catch ME
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expected)) %#ok<STREMP>
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expected, '", GOT: "', ME.message, '"']);
+    end
+end
+end
+
+% Assert that fn() raises quadriga_lib:CPPerror with a message that contains expected (substring).
+function assert_cpp_error(fn, expected)
+try
+    fn();
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if ~strcmp(ME.identifier, 'quadriga_lib:CPPerror') || isempty(strfind(ME.message, expected)) %#ok<STREMP>
+        error('moxunit:exceptionNotRaised', ['EXPECTED: quadriga_lib:CPPerror "', expected, '", GOT: ', ...
+            ME.identifier, ' "', ME.message, '"']);
     end
 end
 end

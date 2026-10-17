@@ -76,26 +76,30 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     const arma::mat mesh = (nrhs < 2) ? arma::mat() : qd_mex_get_Mat<double>(prhs[1]);
 
-    arma::uvec obj_ind = (nrhs < 3) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[2], true);
-    if (!obj_ind.is_empty())
-        obj_ind -= 1;
+    // Object index: MATLAB 1-based -> C++ 0-based (copy so we don't mutate caller memory)
+    arma::uvec obj_ind = (nrhs < 3) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[2], true, "obj_ind");
+    if (arma::any(obj_ind == 0))
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Entries in 'obj_ind' cannot be 0 (1-based index).");
+    obj_ind -= 1;
 
-    arma::uvec mtl_ind = (nrhs < 4) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[3]);
-    std::vector<std::string> obj_names = (nrhs < 5) ? std::vector<std::string>() : qd_mex_get_strings(prhs[4]);
-    std::vector<std::string> mtl_names = (nrhs < 6) ? std::vector<std::string>() : qd_mex_get_strings(prhs[5]);
+    // mtl_ind is 1-based on both sides (0 = no material): no shift intended
+    arma::uvec mtl_ind = (nrhs < 4) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[3], false, "mtl_ind");
+    std::vector<std::string> obj_names = (nrhs < 5) ? std::vector<std::string>() : qd_mex_get_strings(prhs[4], "obj_names");
+    std::vector<std::string> mtl_names = (nrhs < 6) ? std::vector<std::string>() : qd_mex_get_strings(prhs[5], "mtl_names");
     const arma::mat vert_list = (nrhs < 7) ? arma::mat() : qd_mex_get_Mat<double>(prhs[6]);
 
     // Copy face_ind so we can convert MATLAB 1-based indices to C++ 0-based
-    arma::umat face_ind = (nrhs < 8) ? arma::umat() : qd_mex_get_Mat<arma::uword>(prhs[7], true);
-    if (!face_ind.is_empty())
-        face_ind -= 1;
+    arma::umat face_ind = (nrhs < 8) ? arma::umat() : qd_mex_get_Mat<arma::uword>(prhs[7], true, "face_ind");
+    if (arma::any(arma::vectorise(face_ind) == 0))
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Entries in 'face_ind' cannot be 0 (1-based index).");
+    face_ind -= 1;
 
     const arma::mat bsdf = (nrhs < 9) ? arma::mat() : qd_mex_get_Mat<double>(prhs[8]);
     const double threshold = (nrhs < 10) ? 0.001 : qd_mex_get_scalar<double>(prhs[9], "threshold", 0.001);
 
     // CSV material-table inputs (EM/acoustic side). csv_ind is 1-based on both sides (0 = no material).
-    arma::uvec csv_ind = (nrhs < 11) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[10]);
-    std::vector<std::string> csv_names = (nrhs < 12) ? std::vector<std::string>() : qd_mex_get_strings(prhs[11]);
+    arma::uvec csv_ind = (nrhs < 11) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[10], false, "csv_ind");
+    std::vector<std::string> csv_names = (nrhs < 12) ? std::vector<std::string>() : qd_mex_get_strings(prhs[11], "csv_names");
     std::unordered_map<std::string, std::vector<double>> csv_prop;
     if (nrhs >= 13)
         csv_prop = qd_mex_struct2map<double>(prhs[12]);

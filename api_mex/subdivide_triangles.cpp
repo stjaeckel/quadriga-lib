@@ -48,7 +48,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::uword n_div = (nrhs < 2) ? 1 : qd_mex_get_scalar<arma::uword>(prhs[1], "n_div", 1);
 
     // Material index: MATLAB 1-based -> C++ 0-based (copy so we don't mutate caller memory)
-    arma::uvec mtl_ind = (nrhs < 3) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[2], true);
+    arma::uvec mtl_ind = (nrhs < 3) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[2], true, "mtl_ind_in");
     if (!mtl_ind.is_empty())
         mtl_ind -= 1;
 

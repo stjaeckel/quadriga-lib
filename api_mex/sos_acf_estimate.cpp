@@ -9,32 +9,17 @@
 #include <cmath>
 #include <string>
 
-// Count argument: read as double, so that a negative or non-finite value is rejected with the name of the
-// argument instead of wrapping around in the conversion to an unsigned type. Non-integer values are truncated.
+// Count argument: read as double, so that a negative, non-finite or non-integer value is rejected with the name of
+// the argument instead of wrapping around in the conversion to an unsigned type.
 static arma::uword qd_mex_sos_count(const mxArray *input, const char *name, double default_value)
 {
     const double v = qd_mex_get_scalar<double>(input, name, default_value);
-    if (!(v >= 1.0) || !(v < 9.0e18))
+    if (!(v >= 1.0) || !(v < 9.0e18) || v != std::floor(v))
     {
-        const std::string msg = std::string("Input '") + name + "' must be a finite number >= 1.";
+        const std::string msg = std::string("Input '") + name + "' must be an integer >= 1.";
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", msg.c_str());
     }
     return (arma::uword)v;
-}
-
-// Seed: a floating-point value is checked before the conversion to an integer type, so that NaN and Inf are
-// rejected; non-integer values are truncated. Integer classes are read as they are (seeds above 2^53 are
-// exact only as int64 or uint64). Values below -1 are left to the library to reject.
-static arma::sword qd_mex_sos_seed(const mxArray *input)
-{
-    if (mxIsDouble(input) || mxIsSingle(input))
-    {
-        const double v = qd_mex_get_scalar<double>(input, "seed", -1.0);
-        if (!(v > -9.0e18) || !(v < 9.0e18))
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'seed' must be a finite number >= -1.");
-        return (arma::sword)v;
-    }
-    return qd_mex_get_scalar<arma::sword>(input, "seed", -1);
 }
 
 /*!SECTION
@@ -81,8 +66,8 @@ Monte-Carlo estimate of the ACF of one generator
   `[n_acf]`
 - **`dist`** *(optional)* — Sample points of the ACF; must start at 0, increase strictly and be
   finite; `[n_acf]`
-- **`seed`** — Seed for the positions; must be >= -1; -1 seeds from the system random device;
-  default: -1
+- **`seed`** — Seed for the positions; integer from -1 to 2^63-1; -1 seeds from the system random
+  device; default: -1
 
 ## Outputs:
 - **`acf_est`** — Estimated ACF; column vector; `[n_bin]`
@@ -109,7 +94,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::uword n_pos = qd_mex_sos_count(prhs[3], "n_pos", 0.0);
     const arma::vec acf = (nrhs < 5) ? arma::vec() : qd_mex_get_Col<double>(prhs[4]);
     const arma::vec dist = (nrhs < 6) ? arma::vec() : qd_mex_get_Col<double>(prhs[5]);
-    const arma::sword seed = (nrhs < 7) ? -1 : qd_mex_sos_seed(prhs[6]);
+    const arma::sword seed = (nrhs < 7) ? -1 : qd_mex_get_seed(prhs[6]);
 
     // Output allocation
     arma::vec acf_est, dist_est, acf_est_dual;

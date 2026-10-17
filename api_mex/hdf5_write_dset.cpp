@@ -22,6 +22,7 @@ Write a single unstructured dataset to an HDF5 file
   same slot replaces the slot completely, including the datasets written with this function
 - Supported types: string, scalar, vector (row or column), 2D matrix, and 3D array; numeric element
   types: single, double, int32, uint32, int64, uint64
+- Arrays with more than 3 dimensions, sparse and complex arrays are rejected
 - Row vectors are stored as column vectors
 
 ## Usage:
@@ -54,7 +55,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Read inputs
     const std::string fn = qd_mex_get_string(prhs[0]);
-    const arma::Col<unsigned> location = qd_mex_get_Col<unsigned>(prhs[1]);
+    const arma::Col<unsigned> location = qd_mex_get_Col<unsigned>(prhs[1], false, "location");
     const std::string name = qd_mex_get_string(prhs[2]);
     const std::string prefix = (nrhs < 5) ? std::string("par_") : qd_mex_get_string(prhs[4], "par_");
 

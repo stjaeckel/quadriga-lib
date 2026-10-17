@@ -102,7 +102,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nrhs >= 8 && !mxIsEmpty(prhs[7]))
     {
         has_isnap = true;
-        arma::uvec idx = qd_mex_get_Col<arma::uword>(prhs[7]);
+        arma::uvec idx = qd_mex_get_Col<arma::uword>(prhs[7], false, "i_snap");
         if (!(idx.n_elem == 1 && idx[0] == 0))
         {
             if (idx.min() < 1)

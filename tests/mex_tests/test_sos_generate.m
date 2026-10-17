@@ -64,17 +64,22 @@ assert_throws( @() quadriga_lib.sos_generate( acf, dist, 2, 4 ), 'n_dim' );     
 assert_throws( @() quadriga_lib.sos_generate( acf, dist(1:5), 2 ), 'dist' );                 % thrown by C++
 
 % Counts and the seed are validated by the wrapper before the conversion to an integer type
-assert_throws( @() quadriga_lib.sos_generate( acf, dist, -1, 1 ), 'Input ''n_coeff'' must be a finite number >= 1' );
-assert_throws( @() quadriga_lib.sos_generate( acf, dist, NaN, 1 ), 'Input ''n_coeff'' must be a finite number >= 1' );
-assert_throws( @() quadriga_lib.sos_generate( acf, dist, 2, -1 ), 'Input ''n_dim'' must be a finite number >= 1' );
-assert_throws( @() quadriga_lib.sos_generate( acf, dist, 2, 0 ), 'Input ''n_dim'' must be a finite number >= 1' );
-assert_throws( @() quadriga_lib.sos_generate( acf, dist, 2, 1, true, -1 ), 'Input ''n_dir'' must be a finite number >= 1' );
-assert_throws( @() quadriga_lib.sos_generate( acf, dist, 2, 1, true, 0 ), 'Input ''n_dir'' must be a finite number >= 1' );
+assert_cpp_error( @() quadriga_lib.sos_generate( acf, dist, -1, 1 ), 'Input ''n_coeff'' must be an integer >= 1.' );
+assert_cpp_error( @() quadriga_lib.sos_generate( acf, dist, NaN, 1 ), 'Input ''n_coeff'' must be an integer >= 1.' );
+assert_cpp_error( @() quadriga_lib.sos_generate( acf, dist, 2, -1 ), 'Input ''n_dim'' must be an integer >= 1.' );
+assert_cpp_error( @() quadriga_lib.sos_generate( acf, dist, 2, 0 ), 'Input ''n_dim'' must be an integer >= 1.' );
+assert_cpp_error( @() quadriga_lib.sos_generate( acf, dist, 2, 1, true, -1 ), 'Input ''n_dir'' must be an integer >= 1.' );
+assert_cpp_error( @() quadriga_lib.sos_generate( acf, dist, 2, 1, true, 0 ), 'Input ''n_dir'' must be an integer >= 1.' );
 assert_throws( @() quadriga_lib.sos_generate( acf, dist, 2, 1, true, 10, true, 0, 0, NaN ), 'Input ''seed''' );
 assert_throws( @() quadriga_lib.sos_generate( acf, dist, 2, 1, true, 10, true, 0, 1e6 ), 'freq_max' );   % thrown by C++
 
-%% Non-integer counts are truncated
-f1 = quadriga_lib.sos_generate( acf, dist, 2.9, 1.9, true, 10.9, true, 0, 0, 3.9 );
+%% Non-integer counts and seeds are rejected, integer-valued doubles are accepted
+assert_cpp_error( @() quadriga_lib.sos_generate( acf, dist, 2.9, 1 ), 'Input ''n_coeff'' must be an integer >= 1.' );
+assert_cpp_error( @() quadriga_lib.sos_generate( acf, dist, 2, 1.9 ), 'Input ''n_dim'' must be an integer >= 1.' );
+assert_cpp_error( @() quadriga_lib.sos_generate( acf, dist, 2, 1, true, 10.9 ), 'Input ''n_dir'' must be an integer >= 1.' );
+assert_cpp_error( @() quadriga_lib.sos_generate( acf, dist, 2, 1, true, 10, true, 0, 0, 3.9 ), ...
+    'Input ''seed'' must be an integer from -1 to 9223372036854775807.' );
+f1 = quadriga_lib.sos_generate( acf, dist, 2.0, 1.0, true, 10.0, true, 0, 0, 3.0 );
 f2 = quadriga_lib.sos_generate( acf, dist, 2, 1, true, 10, true, 0, 0, 3 );
 assertEqual( f1, f2 );
 
@@ -93,6 +98,19 @@ try
 catch ME
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expected)) %#ok<STREMP>
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expected, '", GOT: "', ME.message, '"']);
+    end
+end
+end
+
+% Assert that fn() raises quadriga_lib:CPPerror with a message that contains expected (substring).
+function assert_cpp_error(fn, expected)
+try
+    fn();
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if ~strcmp(ME.identifier, 'quadriga_lib:CPPerror') || isempty(strfind(ME.message, expected)) %#ok<STREMP>
+        error('moxunit:exceptionNotRaised', ['EXPECTED: quadriga_lib:CPPerror "', expected, '", GOT: ', ...
+            ME.identifier, ' "', ME.message, '"']);
     end
 end
 end

@@ -64,9 +64,9 @@ assert_throws( @() quadriga_lib.sos_calc_mse( freq, acf, dist(1:5) ), 'dist' ); 
 assert_throws( @() quadriga_lib.sos_calc_mse( freq, acf, dist, 0 ), 'n_dir' );        % thrown by C++
 
 % n_dir is validated by the wrapper before the conversion to an unsigned type
-assert_throws( @() quadriga_lib.sos_calc_mse( freq, acf, dist, -1 ), 'Input ''n_dir'' must be a finite number >= 1' );
-assert_throws( @() quadriga_lib.sos_calc_mse( freq, acf, dist, NaN ), 'Input ''n_dir'' must be a finite number >= 1' );
-assert_throws( @() quadriga_lib.sos_calc_mse( freq, acf, dist, Inf ), 'Input ''n_dir'' must be a finite number >= 1' );
+assert_cpp_error( @() quadriga_lib.sos_calc_mse( freq, acf, dist, -1 ), 'Input ''n_dir'' must be an integer >= 1.' );
+assert_cpp_error( @() quadriga_lib.sos_calc_mse( freq, acf, dist, NaN ), 'Input ''n_dir'' must be an integer >= 1.' );
+assert_cpp_error( @() quadriga_lib.sos_calc_mse( freq, acf, dist, Inf ), 'Input ''n_dir'' must be an integer >= 1.' );
 
 end
 
@@ -83,6 +83,19 @@ try
 catch ME
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expected)) %#ok<STREMP>
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expected, '", GOT: "', ME.message, '"']);
+    end
+end
+end
+
+% Assert that fn() raises quadriga_lib:CPPerror with a message that contains expected (substring).
+function assert_cpp_error(fn, expected)
+try
+    fn();
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if ~strcmp(ME.identifier, 'quadriga_lib:CPPerror') || isempty(strfind(ME.message, expected)) %#ok<STREMP>
+        error('moxunit:exceptionNotRaised', ['EXPECTED: quadriga_lib:CPPerror "', expected, '", GOT: ', ...
+            ME.identifier, ' "', ME.message, '"']);
     end
 end
 end

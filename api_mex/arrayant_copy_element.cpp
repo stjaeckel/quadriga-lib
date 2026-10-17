@@ -59,8 +59,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         ant = qd_mex_struct2arrayant(prhs[0], true, true);
 
     // Read source and destination indices (1-based -> 0-based)
-    arma::uvec source = qd_mex_get_Col<arma::uword>(prhs[1], true);
-    arma::uvec dest = qd_mex_get_Col<arma::uword>(prhs[2], true);
+    arma::uvec source = qd_mex_get_Col<arma::uword>(prhs[1], true, "source_element");
+    arma::uvec dest = qd_mex_get_Col<arma::uword>(prhs[2], true, "dest_element");
 
     if (source.n_elem == 0 || dest.n_elem == 0)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "'source_element' and 'dest_element' cannot be empty.");

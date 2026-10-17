@@ -65,7 +65,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::mat mesh = qd_mex_get_Mat<double>(prhs[2]);
 
     // Optional inputs
-    arma::u32_vec sub_mesh_index = (nrhs < 4) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[3], true);
+    arma::u32_vec sub_mesh_index = (nrhs < 4) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[3], true, "sub_mesh_index");
     arma::mat aabb = (nrhs < 5) ? arma::mat() : qd_mex_get_Mat<double>(prhs[4]);
     int use_kernel = (nrhs < 6) ? 0 : qd_mex_get_scalar<int>(prhs[5], "use_kernel", 0);
     int gpu_id = (nrhs < 7) ? 0 : qd_mex_get_scalar<int>(prhs[6], "gpu_id", 0);

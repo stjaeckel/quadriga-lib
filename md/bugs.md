@@ -34,7 +34,7 @@ How to read the items:
 ## Summary table
 
 Items: 121 (S1: 5, S2: 31, S3: 66, S4: 19); B-119 to B-121 were found during the fixes (WP-02, WP-04).
-Status: open: 80, fixed: 35, partly fixed: 0, won't fix: 1, documented: 5 (after WP-05).
+Status: open: 74, fixed: 41, partly fixed: 0, won't fix: 1, documented: 5 (after WP-06).
 
 | ID | Title | Area | Kind | Severity | Mark | Status |
 |---|---|---|---|---|---|---|
@@ -67,11 +67,11 @@ Status: open: 80, fixed: 35, partly fixed: 0, won't fix: 1, documented: 5 (after
 | [B-027](#b-027) | `point_inside_mesh` misclassifies points 5 cm from a face at UTM-like coordinates in AVX2 builds (float ray–triangle kernel) | D geometry, math | 1 defect | S2 | [R] | open |
 | [B-028](#b-028) | `obj_overlap_test` misses a clear overlap when vertices of the penetrating object lie on extensions of the other object's face planes | D geometry, math | 1 defect | S2 | [R] | open |
 | [B-029](#b-029) | MATLAB R2026a segfaults at exit after any HDF5 MEX call (the unloaded thread-safe libhdf5 leaves a dangling pthread-key destructor) | F MEX layer | 1 defect | S2 | [R] | fixed (WP-01) |
-| [B-030](#b-030) | MEX: sparse inputs are read as dense arrays (wrong values, heap over-read) in every wrapper | F MEX layer | 1 defect | S2 | [R] | open |
+| [B-030](#b-030) | MEX: sparse inputs are read as dense arrays (wrong values, heap over-read) in every wrapper | F MEX layer | 1 defect | S2 | [R] | fixed (WP-06) |
 | [B-031](#b-031) | MEX `qrt_file_read` (`i_cir`) and `hdf5_read_channel` (`snap`) modify the caller's uint64 variable in place | F MEX layer | 1 defect | S2 | [R] | fixed (WP-01) |
-| [B-032](#b-032) | MEX `channel_export_obj_file` segfaults when `no_interact` has fewer snapshots than the coefficients | F MEX layer | 1 defect | S2 | [R] | open |
-| [B-033](#b-033) | MEX `qd_mex_get_strings` dereferences empty cell elements: `cell(1,1)` as a name list crashes MATLAB R2026a | F MEX layer | 1 defect | S2 | [R] | open |
-| [B-034](#b-034) | MEX helpers convert NaN, negative, fractional and out-of-range numbers to integers without checks: crashes, bad_alloc, silent truncation, wrapped seeds | F MEX layer | 1 defect | S2 | [R] | open |
+| [B-032](#b-032) | MEX `channel_export_obj_file` segfaults when `no_interact` has fewer snapshots than the coefficients | F MEX layer | 1 defect | S2 | [R] | fixed (WP-06) |
+| [B-033](#b-033) | MEX `qd_mex_get_strings` dereferences empty cell elements: `cell(1,1)` as a name list crashes MATLAB R2026a | F MEX layer | 1 defect | S2 | [R] | fixed (WP-06) |
+| [B-034](#b-034) | MEX helpers convert NaN, negative, fractional and out-of-range numbers to integers without checks: crashes, bad_alloc, silent truncation, wrapped seeds | F MEX layer | 1 defect | S2 | [R] | fixed (WP-06) |
 | [B-035](#b-035) | Python `arrayant.interpolate(local_angles=True)` without `dist=True` returns uninitialised memory | G Python layer | 1 defect | S2 | [R] | fixed (WP-05) |
 | [B-036](#b-036) | Python `channel.baseband_freq_response`: an exception inside the OpenMP region aborts the interpreter | G Python layer | 1 defect | S2 | [R] | fixed (WP-05) |
 | [B-037](#b-037) | AVX2 antenna interpolation returns 0 where all four corner amplitudes are below 1.19e-7 (generic interpolates) | A arrayant | 1 defect | S3 | [R] | open |
@@ -130,8 +130,8 @@ Status: open: 80, fixed: 35, partly fixed: 0, won't fix: 1, documented: 5 (after
 | [B-090](#b-090) | MEX `baseband_freq_response` with `carrier_freq`: descending carriers are rejected, duplicate carriers give silent NaN (Python handles both) | F MEX layer | 3 cross-API | S3 | [R] | open |
 | [B-091](#b-091) | MEX `get_channels_irs` `i_irs` is 0-based, against the 1-based rule of the MATLAB spec; the doc does not say which | F MEX layer | 2 doc | S3 | [R] | open |
 | [B-092](#b-092) | `arrayant_qdant_read(fn)` returns every entry as a struct array in MATLAB, Python's default reads ID 1 | F MEX layer | 3 cross-API | S3 | [R] | open |
-| [B-093](#b-093) | MEX: arrays with more than 4 dimensions are silently truncated; a 4-D dataset written with `hdf5_write_dset` comes back 3-D | F MEX layer | 1 defect | S3 | [R] | open |
-| [B-094](#b-094) | MEX: index value 0 is not rejected in several wrappers (silent wrong result or a misleading error) | F MEX layer | 1 defect | S3 | [R] | open |
+| [B-093](#b-093) | MEX: arrays with more than 4 dimensions are silently truncated; a 4-D dataset written with `hdf5_write_dset` comes back 3-D | F MEX layer | 1 defect | S3 | [R] | fixed (WP-06) |
+| [B-094](#b-094) | MEX: index value 0 is not rejected in several wrappers (silent wrong result or a misleading error) | F MEX layer | 1 defect | S3 | [R] | fixed (WP-06) |
 | [B-095](#b-095) | Diffraction level of detail 7: accepted by C++, empty `coord` in MATLAB, internal error in Python, rejected by MATLAB `generate_diffraction_paths`, documented as 0-6 | F MEX layer | 3 cross-API | S3 | [R] | open |
 | [B-096](#b-096) | Python `qrt_file_read`: an exception in the main loop while the reader thread runs calls `std::terminate` | G Python layer | 1 defect | S3 | [R] | fixed (WP-05) |
 | [B-097](#b-097) | Python HDF5 writers reject numpy scalars, 0-d arrays and non-native dtypes that the docs list as supported | G Python layer | 3 cross-API | S3 | [R] | fixed (WP-05) |
@@ -255,6 +255,7 @@ GNUmakefile default is `avx2 = OFF`, so a default `make` gives MEX files without
 | after WP-02 round 2: Octave 11.1, R2026a | 65 of 66 in each, same excluded failure; R2026a exits with 0, no crash dump | - | 2-3 |
 | after WP-03 round 1: Octave 11.1, R2026a | 65 of 66 in each, same excluded failure; R2026a exits with 0, no crash dump (round 2: only `test_quantize_delays` in Octave, OK) | - | 2-4 |
 | after WP-04: Octave 11.1, R2026a | 65 of 66 in each, same excluded failure; R2026a exits with 0, no crash dump | - | 15-36 |
+| after WP-06: Octave 11.1, R2024a, R2026a | 65 of 66 in each, same excluded failure; R2026a exits with 0, no crash dump. Malformed-input sweep (77 wrappers x 16 argument lists x nout 0/1/3, Octave): no crash. WP-06 changed only the MEX layer; Catch2 and pytest were not re-run | - | 12 |
 
 The R2026a crash is B-029. A single `quadriga_lib.version` call does not crash R2026a at
 exit (2 of 2 runs).
@@ -3019,7 +3020,7 @@ __clone3 + 44 in section .text of /usr/lib/x86_64-linux-gnu/libc.so.6
 
 ## B-030: MEX: sparse inputs are read as dense arrays (wrong values, heap over-read) in every wrapper
 
-- Status: open
+- Status: fixed (WP-06)
 - Severity: S2, because a sparse argument (common in MATLAB code) silently gives wrong numbers and reads past the heap buffer in every wrapper.
 - Kind: memory / wrong result
 - Mark: [R] (heap over-read shown with an ASan what-if build of one MEX file for Octave)
@@ -3170,7 +3171,7 @@ new crash dumps:
 
 ## B-032: MEX `channel_export_obj_file` segfaults when `no_interact` has fewer snapshots than the coefficients
 
-- Status: open
+- Status: fixed (WP-06)
 - Severity: S2, because an easy input mistake (e.g. `[]` for `no_interact`) kills the MATLAB or Octave session.
 - Kind: crash (out-of-bounds `std::vector` access)
 - Mark: [R]
@@ -3239,7 +3240,7 @@ new crash dumps: /home/stephan/matlab_crash_dump.719873-1
 
 ## B-033: MEX `qd_mex_get_strings` dereferences empty cell elements: `cell(1,1)` as a name list crashes MATLAB R2026a
 
-- Status: open
+- Status: fixed (WP-06); unset cell elements and `[]` elements are rejected (Octave stores `cell(1,1)` as `[]`), `''` is allowed
 - Severity: S2, because a valid MATLAB value (a cell array with unset elements) crashes MATLAB.
 - Kind: crash (NULL dereference)
 - Mark: [R] in R2026a; Octave does not crash (its `mxGetCell` returns an empty array)
@@ -3308,7 +3309,7 @@ new crash dumps: /home/stephan/matlab_crash_dump.720262-1
 
 ## B-034: MEX helpers convert NaN, negative, fractional and out-of-range numbers to integers without checks: crashes, bad_alloc, silent truncation, wrapped seeds
 
-- Status: open
+- Status: fixed (WP-06) on the MEX side; very large `n_div` still overflows in the C++ `icosphere` (B-078, WP-12)
 - Severity: S2, because invalid but easy-to-type input (`-1`, `NaN`) crashes MATLAB and Octave; the other effects (silent truncation, a uint64 seed that silently becomes "random") are S3 on their own.
 - Kind: UB / crash / invalid input accepted
 - Mark: [R]
@@ -7670,7 +7671,7 @@ Python qdant_read(fn): single dict, e_theta_re shape (19, 37, 1)
 
 ## B-093: MEX: arrays with more than 4 dimensions are silently truncated; a 4-D dataset written with `hdf5_write_dset` comes back 3-D
 
-- Status: open
+- Status: fixed (WP-06)
 - Severity: S3, because invalid input is accepted with data loss and without an error.
 - Kind: wrong result (invalid input accepted)
 - Mark: [R]
@@ -7720,7 +7721,7 @@ hdf5_write_dset rand(2,3,4,2) -> read back size [2 3 8]
 
 ## B-094: MEX: index value 0 is not rejected in several wrappers (silent wrong result or a misleading error)
 
-- Status: open
+- Status: fixed (WP-06); zero checks only where the wrapper converts to a 0-based C++ index (`obj_ind` is 0-based in C++)
 - Severity: S3, because an invalid 1-based index is accepted with a wrong answer or rejected with a misleading message.
 - Kind: wrong result / unclear error
 - Mark: [R]

@@ -89,7 +89,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::mat orig = qd_mex_get_Mat<double>(prhs[0]);
     const arma::mat dest = qd_mex_get_Mat<double>(prhs[1]);
     const arma::mat mesh = qd_mex_get_Mat<double>(prhs[2]);
-    const arma::uvec mtl_ind = qd_mex_get_Col<arma::uword>(prhs[3]);
+    const arma::uvec mtl_ind = qd_mex_get_Col<arma::uword>(prhs[3], false, "mtl_ind");
 
     // Material properties: MATLAB struct -> std::unordered_map<std::string, std::vector<double>>
     auto mtl_prop = qd_mex_struct2map<double>(prhs[4]);
@@ -97,7 +97,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     double center_freq = qd_mex_get_scalar<double>(prhs[5], "center_frequency", 1.0e9);
     int lod = (nrhs < 7) ? 2 : qd_mex_get_scalar<int>(prhs[6], "lod", 2);
     int verbose = (nrhs < 8) ? 0 : qd_mex_get_scalar<int>(prhs[7], "verbose", 0);
-    arma::u32_vec sub_mesh_index = (nrhs < 9) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[8], true);
+    arma::u32_vec sub_mesh_index = (nrhs < 9) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[8], true, "sub_mesh_index");
 
     if (!sub_mesh_index.empty() && arma::any(sub_mesh_index == 0))
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Entries in 'sub_mesh_index' cannot be 0 (1-based index).");

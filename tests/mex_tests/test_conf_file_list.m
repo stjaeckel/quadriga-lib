@@ -74,7 +74,8 @@ assert_throws( @() quadriga_lib.conf_file_list( da, true, 1 ), 'Wrong number of 
 assert_throws( @() out4( da ), 'Wrong number of output arguments.' );
 assert_throws( @() quadriga_lib.conf_file_list( 5 ), 'Input ''dirs'' must be a string or a cell array of strings.' );
 assert_throws( @() quadriga_lib.conf_file_list( [] ), 'Input ''dirs'' must be a string or a cell array of strings.' );
-assert_throws( @() quadriga_lib.conf_file_list( { da, 5 } ), 'must be a string' );
+assert_cpp_error( @() quadriga_lib.conf_file_list( { da, 5 } ), 'Cell element 2 of ''dirs'' is not a string.' );
+assert_cpp_error( @() quadriga_lib.conf_file_list( { da, [] } ), 'Cell element 2 of ''dirs'' is not a string.' );
 write_file( [db, '/C.conf'], { 'ShortName = Xs' } );                        % short name of a/X.conf, thrown by C++
 assert_throws( @() quadriga_lib.conf_file_list( { da, db } ), 'ambiguous' );
 assertEqual( quadriga_lib.conf_file_list( { da, db }, false ), {'X'; 'b'; 'A'; 'C'} );
@@ -120,6 +121,19 @@ try
 catch ME
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expected)) %#ok<STREMP>
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expected, '", GOT: "', ME.message, '"']);
+    end
+end
+end
+
+% Assert that fn() raises quadriga_lib:CPPerror with a message that contains expected (substring).
+function assert_cpp_error(fn, expected)
+try
+    fn();
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if ~strcmp(ME.identifier, 'quadriga_lib:CPPerror') || isempty(strfind(ME.message, expected)) %#ok<STREMP>
+        error('moxunit:exceptionNotRaised', ['EXPECTED: quadriga_lib:CPPerror "', expected, '", GOT: ', ...
+            ME.identifier, ' "', ME.message, '"']);
     end
 end
 end
