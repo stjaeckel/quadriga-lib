@@ -37,7 +37,7 @@ quadriga_lib.RTtools.mitsuba_xml_file_write( fn, vert_list, face_ind, obj_ind, m
 - **`obj_names`** — Object names; list of strings; length must equal `max(obj_ind) + 1`
 - **`mtl_names`** — Material names; list of strings; length must be ≥ `max(mtl_ind)` (1-based, so material `w` → `mtl_names[w-1]`)
 - **`bsdf`** *(optional)* — BSDF material parameters per material; ignored by Sionna RT, used only by Mitsuba renderer; see [[obj_file_read]] for field definitions; `(mtl_names.size(), 17)`
-- **`map_to_itu_materials`** *(optional)* — If `true`, maps material names to ITU presets recognised by Sionna RT
+- **`map_to_itu`** *(optional)* — If `true`, maps material names to ITU presets recognised by Sionna RT
 
 ## See also:
 - [[obj_file_read]] (source for mesh data and BSDF field layout)

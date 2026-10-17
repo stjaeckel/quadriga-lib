@@ -14,7 +14,17 @@ package_path = os.path.join(current_dir, '../../lib')
 if package_path not in sys.path:
     sys.path.append(package_path)
 
+import subprocess
+import quadriga_lib
 from quadriga_lib import channel
+
+
+def module_dir():
+    """Directory to put on PYTHONPATH so that a subprocess imports the same quadriga_lib module."""
+    path = os.path.abspath(quadriga_lib.__file__)
+    if os.path.basename(path).startswith('__init__.'):
+        path = os.path.dirname(path)
+    return os.path.dirname(path)
 
 # Test data files (mirror the C++ tests)
 FN_V4 = os.path.join(current_dir, '../data/test.qrt')
@@ -246,6 +256,36 @@ class test_case(unittest.TestCase):
         # CIR index out of range -> IndexError from the wrapper bounds check
         with self.assertRaisesRegex(IndexError, "CIR index exceeds"):
             channel.qrt_file_read(FN_V4, [999], 0, True, 1)
+
+
+    # ------------------------------------------------------------------
+    # An exception in the converting loop while the reader thread runs must
+    # reach Python (B-096); before the fix std::terminate aborted the process.
+    # The address space of the subprocess is capped so that an allocation fails.
+    # ------------------------------------------------------------------
+    @unittest.skipIf('asan' in os.environ.get('LD_PRELOAD', ''),
+                     'RLIMIT_AS cannot make allocations fail under AddressSanitizer')
+    def test_read_exception_while_reader_thread_runs(self):
+        code = (
+            "import resource, numpy as np, quadriga_lib as q\n"
+            "def vm():\n"
+            "    for l in open('/proc/self/status'):\n"
+            "        if l.startswith('VmSize'): return int(l.split()[1]) * 1024\n"
+            "cir = np.zeros(400000, dtype=np.uint64)\n"
+            "lim = vm() + 300 * 2**20\n"
+            "resource.setrlimit(resource.RLIMIT_AS, (lim, lim))\n"
+            "try:\n"
+            "    q.channel.qrt_file_read(%r, i_cir=cir)\n"
+            "    print('returned')\n"
+            "except MemoryError:\n"
+            "    print('MemoryError')\n"
+            "print('alive')\n" % os.path.abspath(FN_V4))
+        env = dict(os.environ)
+        env['PYTHONPATH'] = module_dir()
+        env['OMP_NUM_THREADS'] = '1'
+        r = subprocess.run([sys.executable, '-c', code], capture_output=True, text=True, env=env, timeout=600)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(r.stdout.splitlines(), ['MemoryError', 'alive'], r.stdout + r.stderr)
 
 
 if __name__ == '__main__':

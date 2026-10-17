@@ -41,7 +41,7 @@ data = quadriga_lib.arrayant.qdant_read( fn, id=0 )
   - `center_freq` — Center frequency in Hz; scalar for a single entry, `(n_freq,)` when reading multiple entries
   - `coupling_re`, `coupling_im` — Coupling matrices; `(n_elements, n_ports)`, or
     `(n_elements, n_ports, n_freq)` when reading multiple entries with per-entry coupling
-  - `layout` — Matrix of element IDs describing how the entries are arranged in the file; uint32
+  - `layout` — Matrix of element IDs describing how the entries are arranged in the file; int64
 
 ## See also:
 - [[qdant_write]] (for writing QDANT data)

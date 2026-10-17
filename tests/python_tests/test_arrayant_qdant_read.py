@@ -114,6 +114,20 @@ class test_case(unittest.TestCase):
         npt.assert_almost_equal(data["coupling_im"], np.array([[1 / np.sqrt(2), 0],[-2,0]]), decimal=13)
 
         os.remove('test.qdant')
-            
+
+    def test_layout_dtype(self):
+        """layout is returned as int64 (B-117)."""
+        import tempfile, shutil
+        d = tempfile.mkdtemp()
+        try:
+            fn = os.path.join(d, 'a.qdant')
+            arrayant.qdant_write(fn, arrayant.generate('omni'))
+            r = arrayant.qdant_read(fn)
+            self.assertEqual(r['layout'].dtype, np.int64)
+            npt.assert_array_equal(r['layout'], [[1]])
+        finally:
+            shutil.rmtree(d, ignore_errors=True)
+
+
 if __name__ == '__main__':
     unittest.main()

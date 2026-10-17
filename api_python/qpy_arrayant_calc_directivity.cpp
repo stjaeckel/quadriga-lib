@@ -42,7 +42,7 @@ py::array_t<double> arrayant_calc_directivity(const py::dict &arrayant,
                                               py::handle element)
 {
     // Parse arrayant (handles 3D single-freq and 4D multi-freq pattern arrays uniformly)
-    const auto ant_multi = qd_python_dict2arrayant_multi(arrayant, true, false, true);
+    const auto ant_multi = qd_python_dict2arrayant_multi(arrayant, true, false, true, false);
     const size_t n_freq = ant_multi.size();
     const arma::uword n_elements = ant_multi[0].e_theta_re.n_slices;
 

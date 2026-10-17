@@ -14,7 +14,9 @@ Read a single unstructured dataset from an HDF5 file
 
 - Reads one user-defined dataset from the slot addressed by the 0-based indices `(ix, iy, iz, iw)`
 - The dataset is looked up under `'par_' + name` — the `par_` prefix is prepended internally
-- The returned type and shape are defined by the dataset's HDF5 dataspace
+- The returned type and shape are defined by the dataset's HDF5 dataspace: a scalar dataset gives a Python
+  number, a vector a numpy array of shape `(n,)` (also with a single element), a matrix or 3D array a numpy array
+  of the stored shape
 - Returns `None` if the dataset does not exist at the requested slot
 - Supported types: str, scalar, vector, 2D array, and 3D array
 

@@ -128,5 +128,13 @@ class test_case(unittest.TestCase):
             npt.assert_allclose(got[1:], 0.0, rtol=0, atol=0)
 
 
+    def test_documented_kwargs(self):
+        """The kwarg names of the documentation are accepted (B-099)."""
+        pts = np.random.default_rng(0).normal(size=(20, 3))
+        a = RTtools.point_cloud_aabb(pts, sub_cloud_ind=np.array([0, 10], dtype=np.uint32), vec_size=1)
+        self.assertEqual(a.shape, (2, 6))
+        npt.assert_allclose(a[0, ::2], pts[:10].min(axis=0))
+
+
 if __name__ == '__main__':
     unittest.main()

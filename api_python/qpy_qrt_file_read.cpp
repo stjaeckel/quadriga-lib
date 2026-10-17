@@ -86,6 +86,30 @@ struct qd_qrt_slot
     std::vector<uint8_t> interact_type;
 };
 
+// Stops and joins the reader thread when the main loop ends, also by an exception: the destructor of a joinable
+// std::thread calls std::terminate
+struct qd_qrt_reader_guard
+{
+    std::thread &reader;
+    std::mutex &mtx;
+    std::condition_variable &cv;
+    bool &stop;
+
+    void join()
+    {
+        if (!reader.joinable())
+            return;
+        {
+            std::lock_guard<std::mutex> lk(mtx);
+            stop = true;
+        }
+        cv.notify_all();
+        py::gil_scoped_release release; // The reader never takes the GIL
+        reader.join();
+    }
+    ~qd_qrt_reader_guard() { join(); }
+};
+
 py::tuple qrt_file_read(const std::string &fn,
                         py::handle cir,
                         arma::uword orig,
@@ -129,6 +153,7 @@ py::tuple qrt_file_read(const std::string &fn,
     arma::uword n_produced = 0ULL; // Number of slots filled by the reader
     arma::uword n_consumed = 0ULL; // Number of slots converted by the main thread
     bool reader_failed = false;
+    bool stop_reader = false; // Set by the main thread when it is done or stops early (exception)
     std::string reader_error;
 
     // Reader thread: owns the file stream and the cache, never touches Python objects
@@ -139,7 +164,9 @@ py::tuple qrt_file_read(const std::string &fn,
             // Wait until a free slot is available
             {
                 std::unique_lock<std::mutex> lk(mtx);
-                cv.wait(lk, [&] { return n_produced - n_consumed < 2ULL; });
+                cv.wait(lk, [&] { return n_produced - n_consumed < 2ULL || stop_reader; });
+                if (stop_reader)
+                    return;
             }
 
             try
@@ -166,6 +193,7 @@ py::tuple qrt_file_read(const std::string &fn,
             }
             cv.notify_all();
         } });
+    qd_qrt_reader_guard reader_guard{reader, mtx, cv, stop_reader};
 
     // Main thread: converts the filled slots to numpy, holds the GIL
     for (arma::uword i_out = 0ULL; i_out < no_out; ++i_out)
@@ -211,10 +239,7 @@ py::tuple qrt_file_read(const std::string &fn,
     }
 
     // Join the reader before touching the stream or reporting errors
-    {
-        py::gil_scoped_release release;
-        reader.join();
-    }
+    reader_guard.join();
 
     stream.close();
 

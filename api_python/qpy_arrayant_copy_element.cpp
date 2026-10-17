@@ -60,7 +60,7 @@ py::dict arrayant_copy_element(const py::dict &arrayant,
         throw std::invalid_argument("When copying multiple elements, 'source_element' and 'dest_element' must have the same length.");
 
     // Parse the (possibly frequency-dependent) input antenna (copy)
-    auto ant = qd_python_dict2arrayant_multi(arrayant, false, false, true);
+    auto ant = qd_python_dict2arrayant_multi(arrayant, false, false, true, false);
 
     // Apply the copy to every frequency entry
     if (source.n_elem == 1)

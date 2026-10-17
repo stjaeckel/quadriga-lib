@@ -49,8 +49,10 @@ py::object geo2cart(const py::array_t<double> &az,
                     bool combine,
                     int use_kernel)
 {
-    // Read inputs into flat angle/length vectors
+    // Read inputs into flat angle/length vectors; in separate mode these alias az_a, el_a, len_a, which must
+    // therefore live in function scope
     arma::vec az_v, el_v, len_v;
+    arma::mat az_a, el_a, len_a;
     arma::uword n = 0, m = 0, n_val = 0;
     bool have_len = false;
 
@@ -72,9 +74,9 @@ py::object geo2cart(const py::array_t<double> &az,
     }
     else // Separate inputs: az, el, and optional len
     {
-        auto az_a = qd_python_numpy2arma_Mat<double>(az, true);
-        auto el_a = qd_python_numpy2arma_Mat<double>(el, true);
-        auto len_a = qd_python_numpy2arma_Mat<double>(len, true); // None -> empty
+        az_a = qd_python_numpy2arma_Mat<double>(az, true);
+        el_a = qd_python_numpy2arma_Mat<double>(el, true);
+        len_a = qd_python_numpy2arma_Mat<double>(len, true); // None -> empty
 
         if (az_a.n_elem == 0 || el_a.n_rows != az_a.n_rows || el_a.n_cols != az_a.n_cols)
             throw std::invalid_argument("Separate inputs 'az' and 'el' must be non-empty and have the same shape.");

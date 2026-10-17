@@ -101,7 +101,7 @@ ant = quadriga_lib.arrayant.generate('multibeam', M=6, N=6, freq=3.7e9, pol=1, \
    | `element_pos`    | Element (x,y,z) positions in meters             | `[3, n_elements]`                      |
    | `coupling_re`    | Coupling matrix, real part                      | `[n_elements, n_ports]`                |
    | `coupling_im`    | Coupling matrix, imaginary part                 | `[n_elements, n_ports]`                |
-   | `center_freq`    | Center frequency in Hz                          | scalar                                 |
+   | `center_freq`    | Center frequency in Hz; inputs accept `(1,)`    | scalar                                 |
    | `name`           | Name of the array antenna object                | string                                 |
 MD!*/
 

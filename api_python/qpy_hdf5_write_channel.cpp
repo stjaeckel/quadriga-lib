@@ -20,7 +20,7 @@ Write one or more channel objects to an HDF5 file
   structured data and all its unstructured datasets (also those written with [[hdf5_write_dset]]) are removed.
   The file does not shrink; use `h5repack` to reclaim the space of the removed data
 - Structured data is stored in single precision regardless of the input precision
-- Unstructured datasets retain their numpy dtype and shape
+- Unstructured datasets retain their numpy dtype and shape; supported types as in [[hdf5_write_dset]]
 - Each scalar index input is broadcast to all channels; each vector index must have one entry per channel
 - If the file does not exist, the layout is `[max(len(chan), max(ix)+1), max(iy)+1, max(iz)+1, max(iw)+1]`
 - Channel dict field layout matches [[hdf5_read_channel]]

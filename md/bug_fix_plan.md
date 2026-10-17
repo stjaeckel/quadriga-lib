@@ -330,6 +330,8 @@ acceptance checks beyond section 3.1. Severities in brackets.
   `api_mex/arrayant_qdant_read.cpp`, `api_mex/calc_diffraction_gain.cpp`, `api_mex/generate_diffraction_paths.cpp`,
   `api_python/qpy_calc_diffraction_gain.cpp`, `src/generate_diffraction_paths.cpp`, `api_mex/get_channels_*.cpp`,
   `src/get_channels_*.cpp` (B-113), `api_mex/arrayant_rotate_pattern.cpp`.
+- Notes after WP-05: Python `hdf5_write_channel` and `hdf5_read_layout` still return uint32, while `hdf5_create_file`
+  returns int64 since WP-05 (B-116); align them with the integer-output rule of the Python spec.
 - Notes: decisions B-087, B-088, B-091, B-092, B-095, B-113. B-088 changes the C++ defaults of
   `calc_angular_spread` (`include/quadriga_tools.hpp`, `src/qd_tools_calc_angular_spread.cpp`) to wrapping off and
   bank angle off; the wrappers stay. Several items are breaking changes (B-087 for MATLAB/Python, B-088 for C++,
@@ -423,8 +425,8 @@ unexpected changes in the diff; proposed `md/bugs.md` updates; anything the next
 | WP-01 | 11 | done 2026-10-16 (11 of 11 fixed) | 3a7c2cc |
 | WP-02 | 8 | done 2026-10-16 (8 of 8 fixed; round 2: reads back to the old speed) | e8f4edc (round 1), 94a8f33 (round 2) |
 | WP-03 | 4 | done 2026-10-17 (4 of 4 fixed; round 2: limit documented, message points to absolute delays) | 9e5af26 |
-| WP-04 | 5 | done 2026-10-17 (B-003, B-020 fixed; B-019, B-068, B-069 documented; B-120, B-121 found) | commit `WP-04: ...` (hash at next update) |
-| WP-05 | 12 | open | - |
+| WP-04 | 5 | done 2026-10-17 (B-003, B-020 fixed; B-019, B-068, B-069 documented; B-120, B-121 found) | 4e2cf89 |
+| WP-05 | 12 | done 2026-10-17 (10 fixed, B-099 and B-117 documented) | commit after 07a1712 (hash at next update) |
 | WP-06 | 6 | open | - |
 | WP-07 | 4 | open | - |
 | WP-08 | 5 | open | - |
