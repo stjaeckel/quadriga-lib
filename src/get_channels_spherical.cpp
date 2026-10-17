@@ -29,7 +29,11 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
 - Interpolates antenna patterns for both arrays, accounting for element positions and array orientation (bank/tilt/heading Euler angles).
 - Polarization coupling is applied via the 8-row transfer matrix `M` (interleaved Re/Im for VV, VH, HV, HH components).
 - If `center_frequency == 0`, phase calculation is disabled and only delays are computed.
-- If `use_absolute_delays == false`, the minimum delay (LOS delay) is subtracted from all paths.
+- If `use_absolute_delays == false`, the LOS delay between the TX and RX phase centres is subtracted from all paths.
+  Delays are per element pair, so pairs that are closer to each other than the phase centres get negative delays,
+  down to about -(half the TX array size + half the RX array size) / speed of light (both arrays endfire).
+  [[quantize_delays]] maps delays above `-tap_spacing / 2` to tap 0 and rejects lower ones (at 5 ns taps: half sizes
+  adding up to more than about 0.75 m); use `use_absolute_delays = true` in that case.
 - If `add_fake_los_path == true`, a zero-power LOS path is prepended when no LOS path is detected.
 
 ## Declaration:

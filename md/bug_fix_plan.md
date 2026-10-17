@@ -128,6 +128,7 @@ is the coordinator's suggestion from the hunt.
 | WP-02 | 02 | Reads are 24-35% slower after the WP-02 rewrite (manager's benchmark; writes 35-38% faster); most of it is the per-dataset storage check | (a) accept and commit (b) round 2: make the check cheap, keep every check | (b) | (b) round 2; accept when both reads are within 10% of the old code (2026-10-16); result: W2 1.03-1.04, W4 1.01-1.03, writes 0.55-0.97 of the old time (manager, load 2.1-2.9) |
 | B-050 | 02 | Empty `tx_orientation` / `rx_orientation` read back as 3x1 zeros | (a) keep and document (b) marker attribute, read back empty (changes MATLAB/Python output) | (a) | (a) keep the current behaviour, documented; B-050 counts as fixed (2026-10-16) |
 | B-119 | - | HDF5 1.14.6 itself misbehaves on crafted files (`H5Fopen` 4 GB zero-fill, `H5Gopen2` 2^64-byte request) | (a) record as an item, won't fix (b) mitigate | (a) | (a) recorded as B-119, won't fix (upstream) (2026-10-16) |
+| B-002 | 03 | Relative delays of acoustic arrays and of radio arrays of about 1.5 m and more go below -tap_spacing/2 and throw (manager's check of WP-03: a 5 cm microphone pair at 48 kHz already throws) | (a) keep: tapped delay line emulators need non-negative delays; document the limit and point to absolute delays (b) clamp all negative delays (c) allow negative taps | (c) | (a) keep the decision; document the limit in quantize_delays and get_channels_*, and the error message points to use_absolute_delays (2026-10-17) |
 
 ## 5. Work packages
 
@@ -184,6 +185,10 @@ acceptance checks beyond section 3.1. Severities in brackets.
 - Files: `src/get_channels_spherical.cpp`, `src/get_channels_multifreq.cpp`, `src/get_channels_irs.cpp`,
   `src/baseband_freq_response.cpp`, `src/baseband_freq_response_avx2.cpp`, `src/quadriga_lib_generic_functions.hpp`,
   documentation of `get_channels_*` and `calc_cross_polarization_ratio` (C++, MEX, Python).
+- Notes after WP-03: run the full checks (generic, ASan, MATLAB); WP-03 round 2 ran only targeted tests. WP-03
+  changed only documentation in the `get_channels_*` files (delay notes in C++, MEX, Python); keep those notes true
+  when B-003 changes the delays. Add the "Performance" section to the prompt (section 5, "Performance check in worker
+  prompts").
 - Notes: B-003 changes results of every NLOS path whose `path_length` exceeds the polyline; check the existing tests
   that pin delays and the MEX/Python tests. B-020 (phase in double) also removes the baseband route into B-026.
   Decisions B-019, B-069.
@@ -320,6 +325,9 @@ acceptance checks beyond section 3.1. Severities in brackets.
 - Left open by earlier packages: `CMakeLists.txt:498` (MATLAB API section) still says MATLAB links quadriga_static "to
   avoid conflicts with MATLAB's own bundled libhdf5.so"; the static link does not separate the HDF5 libraries, the
   different soname of the system HDF5 does (see the comment at `CMakeLists.txt:196`, rewritten in WP-01).
+- From WP-03: `src/qd_channel_quantize_delays.cpp`: a NaN `power_exponent` passes the `<= 0` check and gives NaN
+  coefficients (reject it); the short parameter comments of `quantize_delays` in `include/quadriga_channel.hpp`
+  (around line 368) do not mention the valid delay range or the shape rule.
 - From WP-02: `include/quadriga_channel.hpp` (`hdf5_write` block) says a new file is created with `nx = 65535`; the
   default is 65536. `src/qd_channel_hdf5.cpp`: the message "Error creating file. It may be already opened already.".
 - Files: header comments in `include/*.hpp`, documentation blocks in `src/`, `api_mex/`, `api_python/`; dead code
@@ -327,6 +335,14 @@ acceptance checks beyond section 3.1. Severities in brackets.
 - Then: `make documentation` once; full verification of the Baseline section (all suites, both sanitizer builds,
   MEX in Octave, MATLAB R2024a and R2026a, Python, 15 minutes of AFL per reader) recorded as the final row in
   `md/bugs.md`.
+
+### Performance check in worker prompts
+
+From WP-03 on, the manager adds a "Performance" section (as in the WP-03 prompt) to every package that changes
+computation code: WP-04, WP-08, WP-09, WP-12, WP-13. The worker builds an old-vs-new benchmark of the changed source
+file before the first change (same flags, same library, alternating runs under `flock /tmp/bench.lock`, output
+checksums), measures after each design step, and meets the limits (typically 1.05 of old) before it reports. Packages
+that change only I/O, wrappers or documentation get no such section.
 
 ## 6. Templates
 
@@ -381,8 +397,8 @@ unexpected changes in the diff; proposed `md/bugs.md` updates; anything the next
 |---|---|---|---|
 | WP-00 | decisions (section 4) | done 2026-10-15 | - |
 | WP-01 | 11 | done 2026-10-16 (11 of 11 fixed) | 3a7c2cc |
-| WP-02 | 8 | done 2026-10-16 (8 of 8 fixed; round 2: reads back to the old speed) | round 1 e8f4edc; round 2: commit `WP-02 round 2: ...` (hash at next update) |
-| WP-03 | 4 | open | - |
+| WP-02 | 8 | done 2026-10-16 (8 of 8 fixed; round 2: reads back to the old speed) | e8f4edc (round 1), 94a8f33 (round 2) |
+| WP-03 | 4 | done 2026-10-17 (4 of 4 fixed; round 2: limit documented, message points to absolute delays) | commit `WP-03: ...` (hash at next update) |
 | WP-04 | 5 | open | - |
 | WP-05 | 12 | open | - |
 | WP-06 | 6 | open | - |

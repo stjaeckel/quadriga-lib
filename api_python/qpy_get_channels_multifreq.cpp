@@ -23,6 +23,12 @@ Compute channel coefficients for spherical waves across multiple frequencies
 - `M` accepts 8 rows (full polarimetric: ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH) or 2 rows (scalar pressure: ReVV, ImVV only)
 - `propagation_speed` supports EM (speed of light, default) and acoustic (343 m/s) simulations
 - `n_path_out = n_path + 1` if `add_fake_los_path` else `n_path`
+- If `use_absolute_delays` is false, the LOS delay between the TX and RX phase centres is subtracted from all paths;
+  per-element delays can then be negative, down to about -(half the TX array size + half the RX array size) /
+  `propagation_speed` (both arrays endfire). [[quantize_delays]] rejects delays at or below `-tap_spacing / 2`. For
+  acoustics (`propagation_speed` about 343 m/s) that happens for practically every array: at 48 kHz taps, half sizes
+  adding up to more than about 3.6 mm (a 5 cm microphone pair already exceeds it); for radio at 5 ns taps, about
+  0.75 m. Use `use_absolute_delays = true` in that case
 - `complex=True` returns one combined complex coefficient array `coeff`; `complex=False` (default) returns
   separate real `coeff_re` and `coeff_im` via a zero-copy fast path
 

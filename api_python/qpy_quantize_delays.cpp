@@ -28,6 +28,17 @@ Map path delays to a fixed tap grid using two-tap power-weighted interpolation
 - Input `delay` items may be per-antenna `(n_rx, n_tx, n_path)` or shared `(1, 1, n_path)`;
   shared delays are expanded internally when `fix_taps` is 0 or 3
 - Output arrays are zero-padded along the tap dimension so that all snapshots share the same `n_taps`
+- Delays must be non-negative, as for a tapped delay line, with a tolerance of `tap_spacing / 2`: delays in
+  `(-tap_spacing / 2, 0)` are treated as 0, so all of their power goes to tap 0. Delays at or below
+  `-tap_spacing / 2` raise `ValueError`, as do NaN, Inf and delays of 2^31 taps or more (`delay / tap_spacing < 2^31`,
+  e.g. 10.7 s at 5 ns or 12.4 h at 48 kHz)
+- Relative delays (`use_absolute_delays = false` in [[get_channels_spherical]], [[get_channels_multifreq]] and
+  [[get_channels_planar]]) are negative for element pairs that are closer to each other than the phase centres, by up
+  to about (half the TX array size + half the RX array size) / propagation speed (both arrays endfire). They stay
+  above `-tap_spacing / 2` only while these half sizes add up to less than `tap_spacing / 2` times the propagation
+  speed: about 0.75 m for radio at 5 ns taps, but only about 3.6 mm for sound at 48 kHz taps, i.e. practically every
+  acoustic array. In those cases use absolute delays (`use_absolute_delays = true`)
+- Run time and memory depend on the number of paths and taps, not on the absolute delay values
 
 ## Usage:
 ```
@@ -44,9 +55,10 @@ coeff_q, delay_q = quadriga_lib.channel.quantize_delays( coeff=coeff, delay=dela
   default: `None`
 - **`coeff_im`** — Imaginary part of channel coefficients; same layout as `coeff_re`; default: `None`
 - **`delay`** — Path delays in seconds; list of length `n_snap`; each item `(n_rx, n_tx, n_path)` or
-  shared `(1, 1, n_path)`
-- **`tap_spacing`** — Delay bin spacing in seconds; 5 ns corresponds to 200 MHz sampling rate;
-  default: 5e-9
+  shared `(1, 1, n_path)`; non-negative with a tolerance of `tap_spacing / 2`, finite, below
+  `2^31 * tap_spacing`
+- **`tap_spacing`** — Delay bin spacing in seconds, positive and finite; 5 ns corresponds to 200 MHz
+  sampling rate; default: 5e-9
 - **`max_no_taps`** — Maximum number of output taps; 0 = unlimited; default: 48
 - **`power_exponent`** — Interpolation exponent α; default: 1.0
 - **`fix_taps`** — Delay grid sharing mode; 0 = per tx-rx pair and snapshot, 1 = single shared grid,
@@ -66,8 +78,8 @@ coeff_q, delay_q = quadriga_lib.channel.quantize_delays( coeff=coeff, delay=dela
 - **`coeff_im_q`** — Output coefficients, imaginary part; returned when `complex` is `False`; same
   shape as `coeff_re_q`
 - **`delay_q`** — Output delays in seconds; list of `(n_rx, n_tx, n_taps)` or `(1, 1, n_taps)` when
-  `stack` is `False`, else `(n_rx, n_tx, n_taps, n_snap)` or `(1, 1, n_taps, n_snap)` depending on
-  `fix_taps`
+  `stack` is `False`, else `(n_rx, n_tx, n_taps, n_snap)` or `(1, 1, n_taps, n_snap)`; the `(1, 1, ...)`
+  shape only for shared delay input with `fix_taps` 1 or 2
 MD!*/
 
 py::tuple quantize_delays(const py::object &coeff_re,
