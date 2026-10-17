@@ -31,7 +31,8 @@ arrayant_out = quadriga_lib.arrayant.combine_pattern( arrayant, freq, azimuth_gr
 ```
 
 ## Inputs:
-- **`arrayant`** — Dict with the array antenna data; keys as documented in [[generate]]
+- **`arrayant`** — Dict with the array antenna data; keys as documented in [[generate]]; 4D pattern fields
+  require `center_freq` with one value per frequency entry `(n_freq,)`
 - **`freq`** — Alternative center frequency in Hz; scalar or 1D array; if given, the pattern is
   recomputed at each value; if `None`, each input entry's `center_freq` is used; a scalar `<= 0`
   is treated as not given; default: `None`
@@ -60,7 +61,7 @@ py::dict arrayant_combine_pattern(const py::dict &arrayant,
     const auto elevation_grid_a = qd_python_numpy2arma_Col<double>(elevation_grid, true);
 
     // Optional frequency override: accepts a scalar or a 1D array.
-    arma::vec freq_a = qd_python_numpy2arma_Col<double>(freq, true);
+    arma::vec freq_a = qd_python_numpy2arma_Col<double>(freq, false); // Copy: may be reset below
     if (freq_a.n_elem == 1 && freq_a[0] <= 0.0)
         freq_a.reset();
 

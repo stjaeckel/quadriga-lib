@@ -46,12 +46,14 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
 - If `fbs_pos` is a `list` of arrays, the function switches to batch mode and processes `n_out` snapshots
   in one call, distributing the snapshots over all available cores (OpenMP).
 - The path inputs `fbs_pos`, `lbs_pos`, `path_gain`, `path_length` and `M` are then lists of length `n_out`,
-  matching the output format of [[qrt_file_read]]; list entries are aliased, not copied.
+  matching the output format of [[qrt_file_read]]; list entries that are Fortran-contiguous float64 arrays (as
+  returned by [[qrt_file_read]]) are read in place, other entries are copied.
 - The position and orientation inputs are `(3, n_out)` arrays with one column per snapshot; a `(3,)` array
   or a single-column `(3, 1)` array is applied to all snapshots.
 - All outputs are returned as lists of length `n_out`, one entry per snapshot.
 - Snapshots without any path produce an empty output entry with `n_path = 0`.
-- Batch mode releases the GIL while processing, so it can be combined with Python threads.
+- Batch mode releases the GIL while processing, so it can be combined with Python threads. The function keeps
+  references to all input arrays until it returns, but other threads must not write into them meanwhile.
 
 ## Usage:
 ```
@@ -118,35 +120,53 @@ static bool qd_is_array_list(const py::handle &h)
     return lst.size() == 0 || py::isinstance<py::array>(lst[0]);
 }
 
-// Alias the entries of a list of numpy arrays, the array data itself is not copied
-static std::vector<arma::Mat<double>> qd_alias_list_Mat(const py::handle &h)
+// Alias the entries of a list of numpy arrays, the array data itself is not copied (entries that are not
+// Fortran-contiguous float64 arrays are copied). Every entry is added to 'keep_alive': the aliased memory must stay
+// valid while the GIL is released, even if another thread removes the entry from the list.
+static std::vector<arma::Mat<double>> qd_alias_list_Mat(const py::handle &h, std::vector<py::object> &keep_alive)
 {
     py::list lst = py::reinterpret_borrow<py::list>(h);
     std::vector<arma::Mat<double>> out;
     out.reserve(lst.size());
     for (auto item : lst)
-        out.push_back(qd_python_numpy2arma_Mat<double>(item, true));
+    {
+        keep_alive.push_back(py::reinterpret_borrow<py::object>(item));
+        out.push_back(qd_python_numpy2arma_Mat<double>(keep_alive.back(), true));
+    }
     return out;
 }
 
-static std::vector<arma::Col<double>> qd_alias_list_Col(const py::handle &h)
+static std::vector<arma::Col<double>> qd_alias_list_Col(const py::handle &h, std::vector<py::object> &keep_alive)
 {
     py::list lst = py::reinterpret_borrow<py::list>(h);
     std::vector<arma::Col<double>> out;
     out.reserve(lst.size());
     for (auto item : lst)
-        out.push_back(qd_python_numpy2arma_Col<double>(item, true));
+    {
+        keep_alive.push_back(py::reinterpret_borrow<py::object>(item));
+        out.push_back(qd_python_numpy2arma_Col<double>(keep_alive.back(), true));
+    }
     return out;
 }
 
-static std::vector<arma::Cube<double>> qd_alias_list_Cube(const py::handle &h)
+static std::vector<arma::Cube<double>> qd_alias_list_Cube(const py::handle &h, std::vector<py::object> &keep_alive)
 {
     py::list lst = py::reinterpret_borrow<py::list>(h);
     std::vector<arma::Cube<double>> out;
     out.reserve(lst.size());
     for (auto item : lst)
-        out.push_back(qd_python_numpy2arma_Cube<double>(item, true));
+    {
+        keep_alive.push_back(py::reinterpret_borrow<py::object>(item));
+        out.push_back(qd_python_numpy2arma_Cube<double>(keep_alive.back(), true));
+    }
     return out;
+}
+
+// Add all values of an arrayant dict to 'keep_alive' (the antenna patterns are aliased, see above)
+static void qd_keep_dict_values(const py::dict &dict, std::vector<py::object> &keep_alive)
+{
+    for (auto item : dict)
+        keep_alive.push_back(py::reinterpret_borrow<py::object>(item.second));
 }
 
 // Select the column of a (3, n_out) matrix belonging to a snapshot, a single column applies to all snapshots
@@ -173,6 +193,11 @@ py::tuple get_channels_spherical(const py::dict &ant_tx,
                                  const bool complex,
                                  const arma::uword freq)
 {
+    // References to every aliased Python array, held until the function returns (the GIL is released below)
+    std::vector<py::object> keep_alive;
+    qd_keep_dict_values(ant_tx, keep_alive);
+    qd_keep_dict_values(ant_rx, keep_alive);
+
     // Parse the antenna arrays and center frequencies, common to both code paths
     const auto ant_tx_a = qd_python_dict2arrayant(ant_tx, true);
     const auto ant_rx_a = qd_python_dict2arrayant(ant_rx, true);
@@ -189,11 +214,11 @@ py::tuple get_channels_spherical(const py::dict &ant_tx,
             throw std::invalid_argument("Inputs 'fbs_pos', 'lbs_pos', 'path_gain', 'path_length' and 'M' must all be lists.");
 
         // Alias the list entries, no path data is copied
-        const auto fbs_pos_a = qd_alias_list_Mat(fbs_pos);
-        const auto lbs_pos_a = qd_alias_list_Mat(lbs_pos);
-        const auto path_gain_a = qd_alias_list_Mat(path_gain);
-        const auto path_length_a = qd_alias_list_Col(path_length);
-        const auto M_a = qd_alias_list_Cube(M);
+        const auto fbs_pos_a = qd_alias_list_Mat(fbs_pos, keep_alive);
+        const auto lbs_pos_a = qd_alias_list_Mat(lbs_pos, keep_alive);
+        const auto path_gain_a = qd_alias_list_Mat(path_gain, keep_alive);
+        const auto path_length_a = qd_alias_list_Col(path_length, keep_alive);
+        const auto M_a = qd_alias_list_Cube(M, keep_alive);
 
         const arma::uword n_out = (arma::uword)fbs_pos_a.size();
 

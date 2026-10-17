@@ -34,15 +34,15 @@ How to read the items:
 ## Summary table
 
 Items: 121 (S1: 5, S2: 31, S3: 66, S4: 19); B-119 to B-121 were found during the fixes (WP-02, WP-04).
-Status: open: 92, fixed: 25, partly fixed: 0, won't fix: 1, documented: 3 (after WP-04).
+Status: open: 80, fixed: 35, partly fixed: 0, won't fix: 1, documented: 5 (after WP-05).
 
 | ID | Title | Area | Kind | Severity | Mark | Status |
 |---|---|---|---|---|---|---|
 | [B-001](#b-001) | `hdf5_write` silently drops the `par_*` data when the slot already holds a `Data` group | B channel, file I/O | 1 defect | S1 | [R] | fixed (WP-02) |
 | [B-002](#b-002) | `quantize_delays` segfaults on a negative delay, including the slightly negative relative delays that `get_channels_spherical` returns | B channel, file I/O | 1 defect | S1 | [R] | fixed (WP-03) |
 | [B-003](#b-003) | `get_channels_spherical`, `_multifreq` and `_irs` ignore `path_length` for NLOS paths: delays and phases too short | C channel gen., tools | 1 defect | S1 | [R] | fixed (WP-04) |
-| [B-004](#b-004) | Python `tools.geo2cart` / `tools.cart2geo` with separate inputs read freed memory: wrong values, segfault | G Python layer | 1 defect | S1 | [R] | open |
-| [B-005](#b-005) | Python HDF5 writers ignore numpy strides for 1-D and (n,1) arrays: wrong data written, heap over-read | G Python layer | 1 defect | S1 | [R] | open |
+| [B-004](#b-004) | Python `tools.geo2cart` / `tools.cart2geo` with separate inputs read freed memory: wrong values, segfault | G Python layer | 1 defect | S1 | [R] | fixed (WP-05) |
+| [B-005](#b-005) | Python HDF5 writers ignore numpy strides for 1-D and (n,1) arrays: wrong data written, heap over-read | G Python layer | 1 defect | S1 | [R] | fixed (WP-05) |
 | [B-006](#b-006) | AVX2 antenna interpolation reads up to 56 bytes past the angle matrices (per-element angles, n_out not a multiple of 8) | A arrayant | 1 defect | S2 | [R] | open |
 | [B-007](#b-007) | Generic antenna interpolation reads before the pattern buffer for NaN or infinite angles | A arrayant | 1 defect | S2 | [R] | open |
 | [B-008](#b-008) | `arrayant::append` builds a wrong coupling matrix, and segfaults when `coupling_im` is empty | A arrayant | 1 defect | S2 | [R] | open |
@@ -72,8 +72,8 @@ Status: open: 92, fixed: 25, partly fixed: 0, won't fix: 1, documented: 3 (after
 | [B-032](#b-032) | MEX `channel_export_obj_file` segfaults when `no_interact` has fewer snapshots than the coefficients | F MEX layer | 1 defect | S2 | [R] | open |
 | [B-033](#b-033) | MEX `qd_mex_get_strings` dereferences empty cell elements: `cell(1,1)` as a name list crashes MATLAB R2026a | F MEX layer | 1 defect | S2 | [R] | open |
 | [B-034](#b-034) | MEX helpers convert NaN, negative, fractional and out-of-range numbers to integers without checks: crashes, bad_alloc, silent truncation, wrapped seeds | F MEX layer | 1 defect | S2 | [R] | open |
-| [B-035](#b-035) | Python `arrayant.interpolate(local_angles=True)` without `dist=True` returns uninitialised memory | G Python layer | 1 defect | S2 | [R] | open |
-| [B-036](#b-036) | Python `channel.baseband_freq_response`: an exception inside the OpenMP region aborts the interpreter | G Python layer | 1 defect | S2 | [R] | open |
+| [B-035](#b-035) | Python `arrayant.interpolate(local_angles=True)` without `dist=True` returns uninitialised memory | G Python layer | 1 defect | S2 | [R] | fixed (WP-05) |
+| [B-036](#b-036) | Python `channel.baseband_freq_response`: an exception inside the OpenMP region aborts the interpreter | G Python layer | 1 defect | S2 | [R] | fixed (WP-05) |
 | [B-037](#b-037) | AVX2 antenna interpolation returns 0 where all four corner amplitudes are below 1.19e-7 (generic interpolates) | A arrayant | 1 defect | S3 | [R] | open |
 | [B-038](#b-038) | qdant writer stores element positions, coupling and pattern values with only 6 significant digits | A arrayant | 1 defect | S3 | [R] | open |
 | [B-039](#b-039) | `qdant_write_multi` deletes an existing file before it validates its input | A arrayant | 1 defect | S3 | [R] | fixed (WP-01) |
@@ -133,11 +133,11 @@ Status: open: 92, fixed: 25, partly fixed: 0, won't fix: 1, documented: 3 (after
 | [B-093](#b-093) | MEX: arrays with more than 4 dimensions are silently truncated; a 4-D dataset written with `hdf5_write_dset` comes back 3-D | F MEX layer | 1 defect | S3 | [R] | open |
 | [B-094](#b-094) | MEX: index value 0 is not rejected in several wrappers (silent wrong result or a misleading error) | F MEX layer | 1 defect | S3 | [R] | open |
 | [B-095](#b-095) | Diffraction level of detail 7: accepted by C++, empty `coord` in MATLAB, internal error in Python, rejected by MATLAB `generate_diffraction_paths`, documented as 0-6 | F MEX layer | 3 cross-API | S3 | [R] | open |
-| [B-096](#b-096) | Python `qrt_file_read`: an exception in the main loop while the reader thread runs calls `std::terminate` | G Python layer | 1 defect | S3 | [R] | open |
-| [B-097](#b-097) | Python HDF5 writers reject numpy scalars, 0-d arrays and non-native dtypes that the docs list as supported | G Python layer | 3 cross-API | S3 | [R] | open |
-| [B-098](#b-098) | Python adapter `view = true` always copies (confirms item 1.1 of `md/python_fix_plan_v00.md`) | G Python layer | 2 doc | S3 | [R] | open |
-| [B-099](#b-099) | Python: documented kwargs `sub_cloud_index` and `map_to_itu_materials` raise `TypeError` | G Python layer | 2 doc | S3 | [R] | open |
-| [B-100](#b-100) | Python: invalid input accepted silently (2-D positions, short `interact_coord`, 4-D arrayant without `center_freq`) | G Python layer | 1 defect | S3 | [R] | open |
+| [B-096](#b-096) | Python `qrt_file_read`: an exception in the main loop while the reader thread runs calls `std::terminate` | G Python layer | 1 defect | S3 | [R] | fixed (WP-05) |
+| [B-097](#b-097) | Python HDF5 writers reject numpy scalars, 0-d arrays and non-native dtypes that the docs list as supported | G Python layer | 3 cross-API | S3 | [R] | fixed (WP-05) |
+| [B-098](#b-098) | Python adapter `view = true` always copies (confirms item 1.1 of `md/python_fix_plan_v00.md`) | G Python layer | 2 doc | S3 | [R] | fixed (WP-05) |
+| [B-099](#b-099) | Python: documented kwargs `sub_cloud_index` and `map_to_itu_materials` raise `TypeError` | G Python layer | 2 doc | S3 | [R] | documented (WP-05) |
+| [B-100](#b-100) | Python: invalid input accepted silently (2-D positions, short `interact_coord`, 4-D arrayant without `center_freq`) | G Python layer | 1 defect | S3 | [R] | fixed (WP-05) |
 | [B-101](#b-101) | `arrayant::copy_element` ignores `read_only`; an empty destination gives an Armadillo-internal error | A arrayant | 1 defect | S4 | [R] | open |
 | [B-102](#b-102) | Arrayant documentation typos and misleading statements; latent int32 offsets and a vertex sentinel (grouped) | A arrayant | 2 doc | S4 | [C] | open |
 | [B-103](#b-103) | `quantize_delays` docs: `fix_taps` 1 and 2 give `[1, 1, n_taps]` delays only for shared input | B channel, file I/O | 2 doc | S4 | [R] | fixed (WP-03) |
@@ -153,9 +153,9 @@ Status: open: 92, fixed: 25, partly fixed: 0, won't fix: 1, documented: 3 (after
 | [B-113](#b-113) | MEX `get_channels_*` with 0 paths and `add_fake_los_path` return a zero path with delay 0, where C++ throws | F MEX layer | 3 cross-API | S4 | [R] | open |
 | [B-114](#b-114) | MEX `arrayant_rotate_pattern`: struct arrays reject usage 3 and 4 (Python maps them); a call without output argument errors | F MEX layer | 3 cross-API | S4 | [R] | open |
 | [B-115](#b-115) | MEX documentation, error IDs and latent helper defects (grouped) | F MEX layer | 2 doc | S4 | [R, C] | open |
-| [B-116](#b-116) | Python `hdf5_create_file` returns uint32 although the wrapper builds int64 (confirms item 1.3 of the Python fix plan) | G Python layer | 2 doc | S4 | [R] | open |
-| [B-117](#b-117) | Python output dtypes and shapes differ from the docs (`qdant_read`, `point_inside_mesh`, `generate_speaker`, `get_ieee_indoor`) | G Python layer | 2 doc | S4 | [R] | open |
-| [B-118](#b-118) | Python single-frequency arrayant dict: a 1-element `center_freq` array gives a numpy DeprecationWarning, 2 elements an unclear error | G Python layer | 3 cross-API | S4 | [R] | open |
+| [B-116](#b-116) | Python `hdf5_create_file` returns uint32 although the wrapper builds int64 (confirms item 1.3 of the Python fix plan) | G Python layer | 2 doc | S4 | [R] | fixed (WP-05) |
+| [B-117](#b-117) | Python output dtypes and shapes differ from the docs (`qdant_read`, `point_inside_mesh`, `generate_speaker`, `get_ieee_indoor`) | G Python layer | 2 doc | S4 | [R] | documented (WP-05) |
+| [B-118](#b-118) | Python single-frequency arrayant dict: a 1-element `center_freq` array gives a numpy DeprecationWarning, 2 elements an unclear error | G Python layer | 3 cross-API | S4 | [R] | fixed (WP-05) |
 | [B-119](#b-119) | Crafted HDF5 files make HDF5 1.14.6 itself zero-fill about 4 GB in `H5Fopen` or request a 2^64-byte allocation in `H5Gopen2` (upstream, not quadriga-lib code) | B channel, file I/O | 1 defect | S4 | [R] | won't fix (upstream HDF5) |
 | [B-120](#b-120) | `calc_cross_polarization_ratio`: the circular XPR columns report 0 (fully cross-polar) for the LOS matrix that `get_channels_*` treats as co-polar, and are defined per transmit polarisation while the linear columns are per receive polarisation | C channel gen., tools | 1 defect | S3 | [R] | open |
 | [B-121](#b-121) | Test defect: `test_bin` is compiled without `BUILD_WITH_AVX2`, so the AVX2-vs-generic cases of the ray-triangle and ray-point kernel tests never run | D geometry, math | 1 defect | S3 | [R] | open |
@@ -265,7 +265,7 @@ exit (2 of 2 runs).
 `762 passed, 1 skipped, 37 subtests passed in 2.55s` (load 9.5 before, 11.7 after). The skip is
 `test_ray_point_intersect.py:403` (CUDA kernel not available). Module version string `0.12.2_AVX2`.
 
-After WP-01: `762 passed, 1 skipped, 37 subtests passed in 1.85s`. After WP-02 round 1: `762 passed, 1 skipped, 37 subtests passed in 1.80s` (the Python suite has no HDF5 tests). After WP-02 round 2: the same. After WP-03 round 1: `763 passed, 1 skipped, 37 subtests passed` (round 2: `test_quantize_delays.py`, 23 passed). After WP-04: `764 passed, 1 skipped, 37 subtests passed`.
+After WP-01: `762 passed, 1 skipped, 37 subtests passed in 1.85s`. After WP-02 round 1: `762 passed, 1 skipped, 37 subtests passed in 1.80s` (the Python suite has no HDF5 tests). After WP-02 round 2: the same. After WP-03 round 1: `763 passed, 1 skipped, 37 subtests passed` (round 2: `test_quantize_delays.py`, 23 passed). After WP-04: `764 passed, 1 skipped, 37 subtests passed`. After WP-05: `789 passed, 1 skipped, 37 subtests passed` (25 new cases, new file `test_hdf5_functions.py`); against the ASan + UBSan module (`build_linux/scratch/fix/build_asan_mod.sh`): `788 passed, 2 skipped`, no report. WP-05 changed only `api_python/` and `tests/python_tests/`; Catch2 and MEX were not re-run.
 
 ### Fuzzing (AFL++ 4.33c)
 
@@ -917,7 +917,7 @@ get_channels_multifreq: delay*c = 140.000000 m (expected 156.568542)
 
 ## B-004: Python `tools.geo2cart` / `tools.cart2geo` with separate inputs read freed memory: wrong values, segfault
 
-- Status: open
+- Status: fixed (WP-05)
 - Severity: S1, because an ordinary call with separate coordinate arrays of 17 or more elements silently returns wrong values, and large inputs crash the interpreter.
 - Kind: memory (use after free) / wrong result
 - Mark: [R]
@@ -990,7 +990,7 @@ n=100000 in a subprocess: return code -11 (-11 = SIGSEGV)
 
 ## B-005: Python HDF5 writers ignore numpy strides for 1-D and (n,1) arrays: wrong data written, heap over-read
 
-- Status: open
+- Status: fixed (WP-05)
 - Severity: S1, because ordinary numpy slices (`x[::2]`, `y[:, 1:2]`, `x[::-1]`) are written to the file as the wrong values without any error, which is data loss in a writer; the reversed case also reads past the heap buffer.
 - Kind: wrong result (writer data loss) / memory
 - Mark: [R]
@@ -3462,7 +3462,7 @@ python seed 18446744073709551615 TypeError
 
 ## B-035: Python `arrayant.interpolate(local_angles=True)` without `dist=True` returns uninitialised memory
 
-- Status: open
+- Status: fixed (WP-05)
 - Severity: S2, because a documented option combination returns garbage for the local angles and `gamma` without an error.
 - Kind: wrong result (uninitialised output)
 - Mark: [R]
@@ -3516,7 +3516,7 @@ dist + local_angles: azimuth_loc = [-0.6 -0.2 -1.7 -0.6 -0.2 -1.7] (expected)
 
 ## B-036: Python `channel.baseband_freq_response`: an exception inside the OpenMP region aborts the interpreter
 
-- Status: open
+- Status: fixed (WP-05)
 - Severity: S2, because one invalid argument (an unsorted `freq_in`) kills the Python process with `std::terminate` instead of raising an exception.
 - Kind: crash (exception safety)
 - Mark: [R]
@@ -7884,7 +7884,7 @@ empty orig/dest: ValueError At least one of 'xprmat' or 'update' must be non-emp
 
 ## B-096: Python `qrt_file_read`: an exception in the main loop while the reader thread runs calls `std::terminate`
 
-- Status: open
+- Status: fixed (WP-05)
 - Severity: S3, because it needs an exception in the converting loop (in practice an allocation failure for a very large request), but the result is a process abort instead of `MemoryError`.
 - Kind: crash (exception safety)
 - Mark: [R]
@@ -7940,7 +7940,7 @@ exit code 134
 
 ## B-097: Python HDF5 writers reject numpy scalars, 0-d arrays and non-native dtypes that the docs list as supported
 
-- Status: open
+- Status: fixed (WP-05); Python bool is stored as an integer, documented
 - Severity: S3, because valid data is rejected with "unsupported type" (and `bool` is silently stored as int64); nothing is corrupted.
 - Kind: cross-API / invalid rejection
 - Mark: [R]
@@ -7997,7 +7997,7 @@ python_bool     written, read back 1
 
 ## B-098: Python adapter `view = true` always copies (confirms item 1.1 of `md/python_fix_plan_v00.md`)
 
-- Status: open
+- Status: fixed (WP-05)
 - Severity: S3, because docs and spec promise zero-copy input where the code copies (a clear performance and documentation defect); the values are correct.
 - Kind: doc / performance
 - Mark: [R]
@@ -8062,7 +8062,7 @@ memptr == numpy data (Col, Mat, Cube, vecCube) with view=true, strict=true: (Fal
 
 ## B-099: Python: documented kwargs `sub_cloud_index` and `map_to_itu_materials` raise `TypeError`
 
-- Status: open
+- Status: documented (WP-05): the docs use the registered names `sub_cloud_ind` and `map_to_itu`
 - Severity: S3, because a user who follows the documentation gets `TypeError`.
 - Kind: doc
 - Mark: [R]
@@ -8118,7 +8118,7 @@ mitsuba_xml_file_write(map_to_itu_materials=) -> TypeError: mitsuba_xml_file_wri
 
 ## B-100: Python: invalid input accepted silently (2-D positions, short `interact_coord`, 4-D arrayant without `center_freq`)
 
-- Status: open
+- Status: fixed (WP-05); `center_freq` is required for 4-D arrayant dicts only where the frequency selects data (`interpolate`, `combine_pattern`, `get_channels_multifreq`, `qdant_write`)
 - Severity: S3, because invalid input is accepted without an error and gives a result that looks valid.
 - Kind: wrong result (invalid input accepted)
 - Mark: [R]
@@ -9097,7 +9097,7 @@ Output of the phase-2 re-run (`bash run.sh`):
 
 ## B-116: Python `hdf5_create_file` returns uint32 although the wrapper builds int64 (confirms item 1.3 of the Python fix plan)
 
-- Status: open
+- Status: fixed (WP-05)
 - Severity: S4, because only the dtype of a correct result is affected.
 - Kind: doc / cross-API (dtype)
 - Mark: [R]
@@ -9139,7 +9139,7 @@ hdf5_create_file returns [2 1 1 1] uint32 (wrapper builds int64; declared return
 
 ## B-117: Python output dtypes and shapes differ from the docs (`qdant_read`, `point_inside_mesh`, `generate_speaker`, `get_ieee_indoor`)
 
-- Status: open
+- Status: documented (WP-05): the docs give the produced dtypes and shapes; `generate_speaker` with one frequency keeps 3-D fields
 - Severity: S4, because only documentation is wrong; the values are right.
 - Kind: doc
 - Mark: [R]
@@ -9190,7 +9190,7 @@ get_ieee_indoor center_frequency: array([5.25e+09]) (doc: scalar); extra key ini
 
 ## B-118: Python single-frequency arrayant dict: a 1-element `center_freq` array gives a numpy DeprecationWarning, 2 elements an unclear error
 
-- Status: open
+- Status: fixed (WP-05)
 - Severity: S4, because it is a warning today (an error in a future numpy) and an unclear message for wrong input.
 - Kind: cross-API
 - Mark: [R]

@@ -66,7 +66,7 @@ py::dict arrayant_rotate_pattern(const py::dict &arrayant,
     const arma::uvec element_ind = qd_python_numpy2arma_Col<arma::uword>(element, true);
 
     // Parse the (possibly frequency-dependent) antenna
-    auto ant_vec = qd_python_dict2arrayant_multi(arrayant, false, false, true);
+    auto ant_vec = qd_python_dict2arrayant_multi(arrayant, false, false, true, false);
 
     if (ant_vec.size() > 1) // Frequency-dependent: rotate every entry
     {

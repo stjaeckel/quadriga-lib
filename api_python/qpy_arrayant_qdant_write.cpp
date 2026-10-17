@@ -33,7 +33,8 @@ arrayant.quadriga_lib.qdant_write( fn, arrayant )
 ## Inputs:
 - **`fn`** — Output QDANT filename; str; must not be empty
 - **`arrayant`** — Dict with the array antenna data; keys as in [[generate]]; pattern fields may
-  be 3D `(n_elevation, n_azimuth, n_elements)` or 4D `(n_elevation, n_azimuth, n_elements, n_freq)`
+  be 3D `(n_elevation, n_azimuth, n_elements)` or 4D `(n_elevation, n_azimuth, n_elements, n_freq)`; 4D input
+  requires `center_freq` with one value per frequency entry `(n_freq,)`
 - **`id`** — Target 1-based ID of the entry inside the file; `0` appends after the highest
   existing ID (or 1 if the file does not exist); ignored for 4D input; default: 0
 - **`layout`** — uint32 matrix organizing multiple antenna IDs within the file; must reference

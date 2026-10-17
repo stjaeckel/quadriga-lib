@@ -492,5 +492,42 @@ class TestGetChannelsPlanar(unittest.TestCase):
         self.assertEqual(str(ctx.exception), "Input 'tx_pos' has incorrect number of elements.")
 
 
+    # -------------------------------------------------------------------------
+    # Input checks (B-100 (a), B-118)
+    # -------------------------------------------------------------------------
+
+    def _planar_args(self):
+        return (np.zeros(1), np.zeros(1), np.zeros(1), np.zeros(1), np.ones(1), np.ones(1) * 10,
+                np.array([[1.0, 0, 0, 0, 0, 0, 1, 0]]).T, np.zeros(3), np.zeros(3), np.array([10.0, 0, 0]), np.zeros(3))
+
+    def test_position_with_more_than_3_elements_raises(self):
+        o = arrayant.generate('omni')
+        args = list(self._planar_args())
+        for i in (7, 8, 9, 10):  # tx_pos, tx_orientation, rx_pos, rx_orientation
+            bad = list(args)
+            bad[i] = np.array([[0.0, 50.0], [0.0, 0.0], [10.0, 10.0]])  # (3, 2), documented (3,)
+            with self.assertRaises(ValueError):
+                arrayant.get_channels_planar(o, o, *bad)
+        args[7] = np.array([[0.0], [0.0], [0.0]])  # (3, 1) has 3 elements and is accepted
+        arrayant.get_channels_planar(o, o, *args)
+
+    def test_center_freq_array_single_frequency(self):
+        import warnings
+        o = arrayant.generate('omni')
+        with warnings.catch_warnings():
+            warnings.simplefilter('error')
+            o['center_freq'] = 2e9
+            ref = arrayant.get_channels_planar(o, o, *self._planar_args())
+            for cf in (np.array([2e9]), np.array(2e9), np.float32(2e9), [2e9], 2000000000):
+                o['center_freq'] = cf
+                r = arrayant.get_channels_planar(o, o, *self._planar_args())
+                for k in range(len(ref)):
+                    npt.assert_array_equal(r[k], ref[k])
+        for cf in (np.array([2e9, 3e9]), np.array([]), None):
+            o['center_freq'] = cf
+            with self.assertRaises(ValueError):
+                arrayant.get_channels_planar(o, o, *self._planar_args())
+
+
 if __name__ == '__main__':
     unittest.main()

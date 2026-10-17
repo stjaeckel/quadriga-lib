@@ -40,7 +40,8 @@ quadriga_lib.channel.channel_export_obj_file( fn, max_no_paths, gain_max, gain_m
 - **`no_interact`** — Number of interaction points of each path with the environment; uint32;
   either a `list` of `n_snap` arrays of shape `(n_path,)`, or an ndarray `(n_path, n_snap)`
 - **`interact_coord`** — Interaction coordinates; either a `list` of `n_snap` arrays of shape
-  `(3, sum(no_interact))`, or an ndarray `(3, max(sum(no_interact)), n_snap)`
+  `(3, sum(no_interact))`, or an ndarray `(3, max(sum(no_interact)), n_snap)`; fewer than `sum(no_interact)`
+  columns in a snapshot raise an error
 - **`center_freq`** — Center frequency in Hz; ndarray `(n_snap,)` or scalar
 - **`coeff`** — Channel coefficients, complex valued; either a `list` of `n_snap` arrays of shape
   `(n_rx, n_tx, n_path)`, or an ndarray `(n_rx, n_tx, n_path, n_snap)`; provide this or
@@ -143,6 +144,9 @@ void channel_export_obj_file(const std::string &fn,
     {
         c.delay.push_back(arma::cube(c.coeff_re[i].n_rows, c.coeff_re[i].n_cols, c.coeff_re[i].n_slices));
         unsigned sum_no_int = arma::sum(c.no_interact[i]);
+        if (sum_no_int != 0 && (c.interact_coord[i].n_rows != 3 || c.interact_coord[i].n_cols < sum_no_int))
+            throw std::invalid_argument("Snapshot " + std::to_string(i) + ": 'interact_coord' must have 3 rows and at least " +
+                                        "sum(no_interact) = " + std::to_string(sum_no_int) + " columns.");
         c.interact_coord[i] = arma::resize(c.interact_coord[i], 3, sum_no_int);
     }
 

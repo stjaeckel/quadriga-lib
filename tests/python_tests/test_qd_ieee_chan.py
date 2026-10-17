@@ -624,5 +624,16 @@ class test_case(unittest.TestCase):
                 np.stack([_path_gain_at(ch_l, s) for s in range(n_snap)], axis=-1))
             
 
+    def test_output_keys_and_center_frequency_shape(self):
+        """center_frequency is an array of shape (1,); initial_position is returned (B-117)."""
+        ant = arrayant.generate('omni')
+        c = channel.get_ieee_indoor(ant, ant, 'B', seed=1)[0]
+        self.assertIsInstance(c['center_frequency'], np.ndarray)
+        self.assertEqual(c['center_frequency'].shape, (1,))
+        self.assertIn('initial_position', c)
+        self.assertEqual(set(c.keys()), {'name', 'tx_position', 'rx_position', 'tx_orientation', 'rx_orientation',
+                                         'coeff', 'delay', 'path_gain', 'center_frequency', 'initial_position'})
+
+
 if __name__ == '__main__':
     unittest.main()

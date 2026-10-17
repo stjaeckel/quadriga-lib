@@ -46,8 +46,10 @@ py::object cart2geo(const py::array_t<double> &cart,
                     bool combine,
                     int use_kernel)
 {
-    // Read inputs into flat coordinate vectors
+    // Read inputs into flat coordinate vectors; in separate mode these alias x_a, y_a, z_a, which must
+    // therefore live in function scope
     arma::vec cx, cy, cz;
+    arma::mat x_a, y_a, z_a;
     arma::uword n = 0, m = 0, n_val = 0;
 
     if (y.is_none() && z.is_none()) // Combined input: cart is (3, n, m)
@@ -66,15 +68,15 @@ py::object cart2geo(const py::array_t<double> &cart,
     }
     else // Separate inputs: cart is x, plus y and z
     {
-        auto cart_a = qd_python_numpy2arma_Mat<double>(cart, true);
-        auto y_a = qd_python_numpy2arma_Mat<double>(y, true);
-        auto z_a = qd_python_numpy2arma_Mat<double>(z, true);
+        x_a = qd_python_numpy2arma_Mat<double>(cart, true);
+        y_a = qd_python_numpy2arma_Mat<double>(y, true);
+        z_a = qd_python_numpy2arma_Mat<double>(z, true);
 
-        if (cart_a.n_elem == 0 || y_a.n_elem != cart_a.n_elem || z_a.n_elem != cart_a.n_elem)
+        if (x_a.n_elem == 0 || y_a.n_elem != x_a.n_elem || z_a.n_elem != x_a.n_elem)
             throw std::invalid_argument("Separate inputs 'x', 'y', 'z' must be non-empty and equal in size.");
 
-        n = cart_a.n_rows, m = cart_a.n_cols, n_val = cart_a.n_elem;
-        cx = arma::vec(cart_a.memptr(), n_val, false, true);
+        n = x_a.n_rows, m = x_a.n_cols, n_val = x_a.n_elem;
+        cx = arma::vec(x_a.memptr(), n_val, false, true);
         cy = arma::vec(y_a.memptr(), n_val, false, true);
         cz = arma::vec(z_a.memptr(), n_val, false, true);
     }

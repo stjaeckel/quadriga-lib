@@ -32,14 +32,14 @@ storage_space = quadriga_lib.channel.hdf5_create_file( fn, nx, ny, nz, nw )
 - **`nw`** — Number of elements on the w-dimension; default: 1
 
 ## Outputs:
-- **`storage_space`** — Storage dimensions used by the new file, `[nx, ny, nz, nw]`; `(4,)`
+- **`storage_space`** — Storage dimensions used by the new file, `[nx, ny, nz, nw]`; `(4,)`; int64
 
 ## See also:
 - [[hdf5_write_channel]] (for writing channel data)
 - [[hdf5_write_dset]] (for writing arbitrary unstructured data)
 MD!*/
 
-py::array_t<unsigned> hdf5_create_file(const std::string &fn, unsigned nx, unsigned ny, unsigned nz, unsigned nw)
+py::array_t<py::ssize_t> hdf5_create_file(const std::string &fn, unsigned nx, unsigned ny, unsigned nz, unsigned nw)
 {
     // Fail if file already exists - hdf5_read_layout returns [0,0,0,0] if the file is missing
     arma::u32_vec existing = quadriga_lib::hdf5_read_layout(fn);

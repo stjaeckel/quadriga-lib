@@ -710,6 +710,77 @@ class TestEdgeCases(unittest.TestCase):
         # Slices must be identical (single-freq duplication)
         npt.assert_almost_equal(vr[:, :, 0], vr[:, :, 1], decimal=14)
 
+    def test_local_angles_without_dist(self):
+        """local_angles=True alone returns the same local angles as dist=True, local_angles=True (B-035)."""
+        ant = arrayant.generate('3gpp', M=1, N=2, pol=1, res=10.0)
+        az = np.array([[0.1, 0.5, -1.0]])
+        el = np.array([[0.0, 0.2, -0.3]])
+        ori = np.array([[0.0], [0.0], [0.7]])
+        ref = arrayant.interpolate(ant, az, el, orientation=ori, dist=True, local_angles=True)
+        for _ in range(3):
+            r = arrayant.interpolate(ant, az, el, orientation=ori, local_angles=True)
+            self.assertEqual(len(r), 7)
+            for k in range(4):
+                npt.assert_array_equal(r[k], ref[k])
+            npt.assert_array_equal(r[4], ref[5])  # azimuth_loc
+            npt.assert_array_equal(r[5], ref[6])  # elevation_loc
+            npt.assert_array_equal(r[6], ref[7])  # gamma
+        npt.assert_allclose(r[4][0], az[0] - 0.7, atol=1e-6)
+        rc = arrayant.interpolate(ant, az, el, orientation=ori, local_angles=True, complex=True)
+        self.assertEqual(len(rc), 5)
+        npt.assert_array_equal(rc[2], ref[5])
+
+    def test_input_memory_layouts_give_equal_results(self):
+        """F-order, C-order, float32 and sliced angle inputs give the same result, with and without
+        fast_access (inputs are aliased only when they are F-contiguous float64, B-098)."""
+        ant = arrayant.generate('3gpp', M=2, N=2, pol=2, res=5.0)
+        n_out = ant['e_theta_re'].shape[2]
+        rng = np.random.default_rng(3)
+        az = rng.uniform(-np.pi, np.pi, (n_out, 50)).astype(np.float32).astype(np.float64)
+        el = rng.uniform(-1.5, 1.5, (n_out, 50)).astype(np.float32).astype(np.float64)
+        ori = np.array([[0.1], [0.2], [0.3]])
+        ref = arrayant.interpolate(ant, np.asfortranarray(az), np.asfortranarray(el), orientation=ori,
+                                   dist=True, fast_access=True)
+        big_az = np.zeros((n_out, 100)); big_az[:, ::2] = az
+        big_el = np.zeros((n_out, 100)); big_el[:, ::2] = el
+        variants = {
+            'C-order': (np.ascontiguousarray(az), np.ascontiguousarray(el)),
+            'float32': (az.astype(np.float32), el.astype(np.float32)),
+            'sliced': (big_az[:, ::2], big_el[:, ::2]),
+            'negative strides': (np.flip(np.ascontiguousarray(az[:, ::-1]), axis=1),
+                                 np.flip(np.ascontiguousarray(el[::-1, ::-1]), axis=(0, 1))),
+            'list': (az.tolist(), el.tolist()),
+        }
+        ant_c = {k: (np.ascontiguousarray(v) if isinstance(v, np.ndarray) else v) for k, v in ant.items()}
+        for name, (a, e) in variants.items():
+            for fast in (True, False):
+                r = arrayant.interpolate(ant, a, e, orientation=ori, dist=True, fast_access=fast)
+                for k in range(5):
+                    npt.assert_array_equal(r[k], ref[k], err_msg="%s, fast_access=%s" % (name, fast))
+            r = arrayant.interpolate(ant_c, a, e, orientation=ori, dist=True)
+            for k in range(5):
+                npt.assert_array_equal(r[k], ref[k], err_msg="%s, C-order pattern" % name)
+        # The inputs are not modified
+        npt.assert_array_equal(variants['sliced'][0], az)
+        with self.assertRaises(ValueError):
+            arrayant.interpolate(ant_c, az, el, fast_access=True)
+
+
+    def test_multi_freq_without_center_freq_raises(self):
+        """A 4D arrayant dict needs center_freq with one value per entry (B-100)."""
+        s = arrayant.generate_speaker(frequencies=np.array([500.0, 1000.0, 2000.0]), angular_resolution=10)
+        az, el = np.array([[0.1]]), np.array([[0.2]])
+        ref = arrayant.interpolate(s, az, el)[0].ravel()
+        self.assertGreater(np.ptp(ref), 1e-3)
+        for cf in ('del', 1000.0, np.array([500.0, 1000.0])):
+            t = dict(s)
+            if isinstance(cf, str):
+                del t['center_freq']
+            else:
+                t['center_freq'] = cf
+            with self.assertRaises(ValueError):
+                arrayant.interpolate(t, az, el)
+
 
 if __name__ == '__main__':
     unittest.main()

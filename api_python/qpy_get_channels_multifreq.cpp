@@ -55,7 +55,8 @@ coeff, delay = quadriga_lib.arrayant.get_channels_multifreq( ..., complex=True )
 ```
 
 ## Inputs:
-- **`ant_tx`** — Multi-frequency TX arrayant dict; pattern fields 3D `(n_el, n_az, n_elem)` or 4D `(n_el, n_az, n_elem, n_freq)`; see [[generate]]
+- **`ant_tx`** — Multi-frequency TX arrayant dict; pattern fields 3D `(n_el, n_az, n_elem)` or 4D `(n_el, n_az, n_elem, n_freq)`; see [[generate]];
+  4D input requires `center_freq` with one value per frequency entry `(n_freq,)`
 - **`ant_rx`** — RX arrayant dict; same format as `ant_tx`
 - **`fbs_pos`** — First-bounce scatterer positions; `(3, n_path)`
 - **`lbs_pos`** — Last-bounce scatterer positions; `(3, n_path)`

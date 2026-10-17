@@ -14,7 +14,7 @@ SECTION!*/
 Compute the axis-aligned bounding boxes (AABB) of a 3D point cloud
 
 - Each row of the output contains `{x_min, x_max, y_min, y_max, z_min, z_max}` for one sub-cloud
-- If `sub_cloud_index` is empty or omitted, the entire input is treated as a single cloud; last
+- If `sub_cloud_ind` is empty or omitted, the entire input is treated as a single cloud; last
   index spans to end of `points`
 - Output row count is zero-padded to the nearest multiple of `vec_size`; padding rows are zeros
 
@@ -25,7 +25,7 @@ aabb = quadriga_lib.RTtools.point_cloud_aabb( points, sub_cloud_ind, vec_size )
 
 ## Input Arguments:
 - **`points`** — 3D point coordinates; `(n_points, 3)`
-- **`sub_cloud_index`** *(optional)* — 0-based row indices marking the start of each sub-cloud;
+- **`sub_cloud_ind`** *(optional)* — 0-based row indices marking the start of each sub-cloud;
   use [[point_cloud_segmentation]] to generate; uint32; `(n_sub,)`
 - **`vec_size`** *(optional)* — SIMD alignment padding factor (e.g. 4, 8, 16); default: 1
 
