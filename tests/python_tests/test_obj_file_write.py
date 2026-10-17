@@ -344,11 +344,11 @@ class test_case(unittest.TestCase):
         lines = read_lines(csv_obj_fn)
         npt.assert_equal(
             lines[0],
-            "name,a,b,c,d,e,f,g,h,att,attB,alpha,alphaB,fRef,m,resF,resQ,resS,coiF,coiQ,coiA,tf,tfB,tfP,tfF,tfQ,zzz",
+            "name,a,b,c,d,e,f,g,h,att,attB,alpha,alphaB,fRef,m,resF,resQ,resS,coiF,coiQ,tf,tfB,tfP,tfF,tfQ,zzz",
         )
         npt.assert_equal(
             lines[1],
-            "slab,1,0,0.05,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,2,0,0,0,0,7",
+            "slab,1,0,0.05,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,7",
         )
         _rm(fn)
         _rm(mtl_fn)

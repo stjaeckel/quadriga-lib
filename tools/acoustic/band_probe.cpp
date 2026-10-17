@@ -9,7 +9,7 @@
 // a box of air; the fixture is "ray_progress - a leaf on a box of air at every frequency of a band".
 //
 // stdin, one line per run: tag itype theta maxdepth start sink nm (a b c d e f g h thk tf tfB m fRef resF resQ resS att
-// coiF coiQ coiA alpha tfP tfF tfQ)*nm nf (x mat flip)*nf thr maxint floor_dB nfreq f_1 .. f_nfreq
+// coiF coiQ alpha tfP tfF tfQ)*nm nf (x mat flip)*nf thr maxint floor_dB nfreq f_1 .. f_nfreq
 //   itype 4 or 5; theta in degrees; maxdepth, start and sink are read and ignored; materials are numbered from 1 in
 //   the order given (columns as in Material, ray_mesh_interact.cpp); thr the thin_slab_threshold, maxint the
 //   interaction cap (at most 255), floor_dB the gain floor; frequencies in acoustic Hz (mapped by 8.7403e5).
@@ -28,7 +28,7 @@ int main()
     const double PI = 3.14159265358979323846, C0 = 299792458.0, FMAP = 8.7403e5;
     const std::complex<double> J(0.0, 1.0);
     typedef std::unordered_map<std::string, std::vector<float>> Pal;
-    const char *COLS[] = {"a", "b", "c", "d", "e", "f", "g", "h", "thk", "tf", "tfB", "m", "fRef", "resF", "resQ", "resS", "att", "coiF", "coiQ", "coiA", "alpha", "tfP", "tfF", "tfQ"};
+    const char *COLS[] = {"a", "b", "c", "d", "e", "f", "g", "h", "thk", "tf", "tfB", "m", "fRef", "resF", "resQ", "resS", "att", "coiF", "coiQ", "alpha", "tfP", "tfF", "tfQ"};
     printf("P,tag,theta,tracer,f_base,f,nT,nR,rays,events,Tre,Tim,Rre,Rim\n");
     std::string line;
     while (std::getline(std::cin, line))

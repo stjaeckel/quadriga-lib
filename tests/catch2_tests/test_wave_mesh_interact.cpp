@@ -1505,10 +1505,12 @@ TEST_CASE("Ray-Mesh Interact - Public helpers: refractive_index, interface_gain,
         map["a"] = {4.0}, map["b"] = {2.0}, map["fRef"] = {5.0};
         CHECK(std::abs(quadriga_lib::refractive_index(map, 1, 10.0e9) - 4.0) < 1e-9);
 
-        // a coincidence feature is an interface loss and leaves the index alone
+        // coincidence columns on a wave medium leave the index and the interface gain alone: coiF / coiQ act
+        // only on a mass-law plate (in X0), and a coiA column is no column (D2-b), read and ignored
         std::unordered_map<std::string, std::vector<double>> coi = map;
-        coi["coiF"] = {20.0}, coi["coiQ"] = {5.0}, coi["coiA"] = {-6.0};
+        coi["coiF"] = {20.0}, coi["coiQ"] = {5.0}, coi["coiA"] = {6.0};
         CHECK(std::abs(quadriga_lib::refractive_index(coi, 1, 10.0e9) - quadriga_lib::refractive_index(map, 1, 10.0e9)) < 1e-12);
+        CHECK(quadriga_lib::interface_gain(coi, 1, 20.0e9) == quadriga_lib::interface_gain(map, 1, 20.0e9)); // at coiF
     }
 
     // interface_gain: att = 6 dB @ 2 GHz, attB = 1 -> 30 dB @ 10 GHz -> 1e-3; air is 1
@@ -2580,62 +2582,36 @@ TEST_CASE("Resonance - the public index and in-medium gain carry the permittivit
 // Test 4 - interface_gain penetration loss and coincidence
 // interface_gain is the standalone interface term: a frequency-scaled penetration loss att plus an
 // optional coincidence Lorentzian, clamped so it never becomes gain.
-TEST_CASE("Acoustic - interface_gain penetration and coincidence", "[wave]")
+TEST_CASE("Acoustic - interface_gain is the penetration loss alone; a coiA column is ignored", "[wave]")
 {
+    // interface_gain is att (f / fRef)^attB, clamped at >= 0 dB. The coincidence Lorentzian coiA is removed
+    // (D2-b): coincidence on a mass-law plate is coiF / coiQ in X0, and an angle-free Lorentzian in dB is no
+    // physical element. A table that still carries coiF, coiQ and coiA gives the penetration loss alone, at
+    // coincidence and off it, for a dip (coiA < 0), a stop-band (coiA > 0) and a dip deeper than the loss.
     double fRef_GHz = ac2rf(1000.0) / 1.0e9;
     double coiF_GHz = ac2rf(2000.0) / 1.0e9;
 
-    // Closed-form interface reference (att power-law + coincidence Lorentzian, clamped at >= 0 dB).
-    auto ref_if_gain = [&](double f_ac, double att, double attB, double coiQ, double coiA)
+    // Closed-form interface reference: the att power law, clamped at >= 0 dB.
+    auto ref_if_gain = [&](double f_ac, double att, double attB)
     {
         double fGHz = ac2rf(f_ac) / 1.0e9;
         double dB = att * std::pow(fGHz / fRef_GHz, attB);
-        if (coiA != 0.0)
-        {
-            double x = coiQ * (fGHz - coiF_GHz) / coiF_GHz;
-            dB += coiA / (1.0 + x * x);
-        }
         return dB < 0.0 ? 1.0 : std::pow(10.0, -0.1 * dB);
     };
 
-    // Coincidence dip: 10 dB baseline with a -6 dB dip at 2 kHz, Q = 5.
-    std::unordered_map<std::string, std::vector<double>> mtl_dip;
-    mtl_dip["att"] = {10.0};
-    mtl_dip["coiF"] = {coiF_GHz};
-    mtl_dip["coiQ"] = {5.0};
-    mtl_dip["coiA"] = {-6.0};
-    mtl_dip["fRef"] = {fRef_GHz};
-
-    // At coincidence the net loss is 10 - 6 = 4 dB.
-    CHECK(quadriga_lib::interface_gain<double>(mtl_dip, 1, ac2rf(2000.0)) ==
-          Approx(std::pow(10.0, -0.1 * 4.0)).epsilon(1e-6));
-    CHECK(quadriga_lib::interface_gain<double>(mtl_dip, 1, ac2rf(2000.0)) ==
-          Approx(ref_if_gain(2000.0, 10.0, 0.0, 5.0, -6.0)).epsilon(1e-6));
-
-    // The dip raises transmission at coincidence relative to off-band.
-    CHECK(quadriga_lib::interface_gain<double>(mtl_dip, 1, ac2rf(2000.0)) >
-          quadriga_lib::interface_gain<double>(mtl_dip, 1, ac2rf(1000.0)));
-    CHECK(quadriga_lib::interface_gain<double>(mtl_dip, 1, ac2rf(2000.0)) >
-          quadriga_lib::interface_gain<double>(mtl_dip, 1, ac2rf(4000.0)));
-
-    // Coincidence stop-band: positive coiA increases loss at coiF.
-    std::unordered_map<std::string, std::vector<double>> mtl_stop;
-    mtl_stop["att"] = {3.0};
-    mtl_stop["coiF"] = {coiF_GHz};
-    mtl_stop["coiQ"] = {5.0};
-    mtl_stop["coiA"] = {6.0};
-    mtl_stop["fRef"] = {fRef_GHz};
-    CHECK(quadriga_lib::interface_gain<double>(mtl_stop, 1, ac2rf(2000.0)) <
-          quadriga_lib::interface_gain<double>(mtl_stop, 1, ac2rf(1000.0)));
-
-    // Clamp: a dip deeper than the baseline cannot turn into gain -> clamps to unity.
-    std::unordered_map<std::string, std::vector<double>> mtl_clamp;
-    mtl_clamp["att"] = {2.0};
-    mtl_clamp["coiF"] = {coiF_GHz};
-    mtl_clamp["coiQ"] = {5.0};
-    mtl_clamp["coiA"] = {-6.0};
-    mtl_clamp["fRef"] = {fRef_GHz};
-    CHECK(quadriga_lib::interface_gain<double>(mtl_clamp, 1, ac2rf(2000.0)) == Approx(1.0).epsilon(1e-9));
+    for (double coiA : {-6.0, 6.0, -12.0})
+        for (double att : {10.0, 3.0, 2.0})
+        {
+            std::unordered_map<std::string, std::vector<double>> mtl, bare;
+            mtl["att"] = {att}, mtl["coiF"] = {coiF_GHz}, mtl["coiQ"] = {5.0}, mtl["coiA"] = {coiA}, mtl["fRef"] = {fRef_GHz};
+            bare["att"] = {att}, bare["fRef"] = {fRef_GHz};
+            for (double f_ac : {1000.0, 2000.0, 4000.0})
+            {
+                INFO("att " << att << " dB, coiA " << coiA << " dB, " << f_ac << " Hz");
+                CHECK(quadriga_lib::interface_gain<double>(mtl, 1, ac2rf(f_ac)) == Approx(ref_if_gain(f_ac, att, 0.0)).epsilon(1e-12));
+                CHECK(quadriga_lib::interface_gain<double>(mtl, 1, ac2rf(f_ac)) == quadriga_lib::interface_gain<double>(bare, 1, ac2rf(f_ac)));
+            }
+        }
 
     // Penetration loss scales with frequency via attB: att ~ (f/fRef)^1 doubles at 2*fRef.
     std::unordered_map<std::string, std::vector<double>> mtl_attB;
@@ -2644,6 +2620,58 @@ TEST_CASE("Acoustic - interface_gain penetration and coincidence", "[wave]")
     mtl_attB["fRef"] = {fRef_GHz};
     CHECK(quadriga_lib::interface_gain<double>(mtl_attB, 1, ac2rf(2000.0)) ==
           Approx(std::pow(10.0, -0.1 * 12.0)).epsilon(1e-6));
+}
+
+TEST_CASE("Coincidence column - a table that carries coiA loads and the column changes nothing", "[wave]")
+{
+    // D2-b: coiA is no column. A material table written before still carries it; it loads (the reader is
+    // name-keyed and hands every column on) and the column is ignored: a wave medium as a traced solid and
+    // as a sheet passes and reflects exactly what it does without the column, bitwise, at the coincidence
+    // frequency the column names (3 GHz), EM type 1 (both channels) and scalar types 4 and 5. The mass-law
+    // part is in the acoustic cases.
+    ub::OneThread one_thread;
+    const char *FN = "coiA_table_wave.csv";
+    const char *HEADER = "name,a,c,att,fRef,thk,coiF,coiQ,coiA";
+    const char *ROWS = "air,1,0,0,1,0,0,0,0\nslab,2.5,0.02,3,1,0,3,5,6\nsheet,2.5,0.02,3,1,0.01,3,5,6\n";
+
+    // a table with a coiA column, read through obj_file_read (table only, name-keyed, schema-blind)
+    std::unordered_map<std::string, std::vector<double>> pal;
+    {
+        std::ofstream csv(FN);
+        REQUIRE(csv.is_open());
+        csv << HEADER << "\n" << ROWS;
+        csv.close();
+        arma::uvec csv_ind;
+        std::vector<std::string> csv_names;
+        REQUIRE_NOTHROW(quadriga_lib::obj_file_read<double>("", nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                                                            FN, &csv_ind, &csv_names, &pal));
+        std::remove(FN);
+        REQUIRE(csv_names.size() == 3);
+        REQUIRE(pal.count("coiA") == 1); // the column is read and handed on
+    }
+    std::unordered_map<std::string, std::vector<double>> bare = pal;
+    bare.erase("coiA");
+
+    const double f = 3.0e9;
+    CHECK(quadriga_lib::interface_gain(pal, 2, f) == quadriga_lib::interface_gain(bare, 2, f));
+    CHECK(quadriga_lib::interface_gain(pal, 3, f) == quadriga_lib::interface_gain(bare, 3, f));
+    for (int kind = 0; kind < 2; ++kind) // 0 traced solid 0.2 m, 1 sheet 10 mm
+        for (int tr : {1, 4, 5})
+            for (double thd : {0.0, 30.0, 60.0})
+            {
+                arma::uvec mi;
+                arma::mat mesh = kind ? ub::build({0.0}, {3}, {false}, mi) : ub::build({0.0, 0.2}, {2, 2}, {false, true}, mi), o, d;
+                diag_ray_at(thd, o, d);
+                bf::Acc A, B;
+                bf::walk(pal, mesh, mi, tr, f, thd, 0.0, nullptr, o, d, 1.0, 1.0, 0.0, 0.0, 0, 60, A);
+                bf::walk(bare, mesh, mi, tr, f, thd, 0.0, nullptr, o, d, 1.0, 1.0, 0.0, 0.0, 0, 60, B);
+                INFO((kind ? "sheet" : "traced solid") << ", type " << tr << ", " << thd << " deg");
+                CHECK(A.nT == B.nT);
+                CHECK(A.nR == B.nR);
+                CHECK((A.T[0] == B.T[0] && A.T[1] == B.T[1]));
+                CHECK((A.R[0] == B.R[0] && A.R[1] == B.R[1]));
+                CHECK(std::norm(A.T[0]) > 1.0e-6); // the row is not passing on nothing
+            }
 }
 
 // Test 6 - convergence to the scalar reference when acoustic terms are absent

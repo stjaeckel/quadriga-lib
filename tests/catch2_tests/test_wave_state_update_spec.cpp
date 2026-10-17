@@ -1053,7 +1053,7 @@ TEST_CASE("ray_state_update - permeability affects the refractive index", "[wave
     check_mult(C, expect, TOL);
 }
 
-TEST_CASE("ray_state_update - resonance and coincidence material columns", "[wave]")
+TEST_CASE("ray_state_update - a resonance shifts the slab factor, coincidence columns leave a wave medium alone", "[wave]")
 {
     // Engagement tripwires for the new material features.
     SECTION("a permittivity resonance shifts the resolved slab factor")
@@ -1074,17 +1074,24 @@ TEST_CASE("ray_state_update - resonance and coincidence material columns", "[wav
         Cr.run();
         CHECK(std::abs(vvf(Cb) - vvf(Cr)) > 1e-3);
     }
-    SECTION("coincidence columns are accepted without error")
+    SECTION("coincidence columns leave a wave medium alone")
     {
+        // coiF / coiQ act only on a mass-law plate (in X0); a coiA column is no column (D2-b), read and ignored:
+        // the exit at coincidence is the exit without the three columns, bitwise
         arma::mat M = {{4.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
         arma::uvec ind;
-        std::unordered_map<std::string, std::vector<double>> mtl;
-        mtl_matrix_to_map0<double>(M, ind, mtl);
-        mtl["coiF"] = {1.0};
+        std::unordered_map<std::string, std::vector<double>> base, mtl;
+        mtl_matrix_to_map0<double>(M, ind, base);
+        mtl = base;
+        mtl["coiF"] = {1.0}; // coincidence at the test frequency
         mtl["coiQ"] = {3.0};
         mtl["coiA"] = {6.0};
+        auto Cb = make1<double>(base, 4, OT_EXIT, 1, 1, 0, 0, 1, 0, 1.0, 2.0, 0.5, QPI / 2.0, 0.15);
         auto C = make1<double>(mtl, 4, OT_EXIT, 1, 1, 0, 0, 1, 0, 1.0, 2.0, 0.5, QPI / 2.0, 0.15);
+        CHECK_NOTHROW(Cb.run());
         CHECK_NOTHROW(C.run());
+        CHECK(vvf(C) == vvf(Cb));
+        CHECK((double)C.gain(0) == (double)Cb.gain(0));
     }
 }
 

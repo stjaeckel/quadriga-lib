@@ -6,8 +6,9 @@
 
 #include "ray_test_helpers.hpp"
 
-// One body of a bonded mass-law plate, for diag_bonded_TL: the slope, the reference frequency and
-// the normal thickness, exactly the three quantities Material::medium_gain forms its term from.
+// One body of a bonded mass-law plate, for diag_bonded_TL: the mass column, the reference frequency and
+// the normal thickness, exactly the three quantities Material::medium_gain forms its term from. The
+// column is a switch (M10): m > 0 is the limp mass law at 20 dB per decade, whatever its value.
 struct DiagMass
 {
     double m, fRef, thk;
@@ -15,7 +16,7 @@ struct DiagMass
 
 // Mass term of a bonded plate, in dB, written from the column definitions. Bonded bodies move with
 // one velocity, so their transfer impedances are in series and what adds is the impedance ratio
-//     X0 = ((f / fRef) M)^(m / 20)
+//     X0 = (f / fRef) M
 // of each body, not its term in dB. The plate is then one body: A = 20 log10(sum X0), with the
 // single-body angle shape. A body contributes its X0 unclipped, so the hard zero sits on the sum;
 // a body without the column (m = 0) is absent.
@@ -26,7 +27,7 @@ static inline double diag_bonded_TL(const std::vector<DiagMass> &bodies, double 
     {
         double arg = (f_hz * 1e-9 / B.fRef) * B.thk;
         if (B.m > 0.0 && arg > 0.0)
-            X += std::pow(arg, 0.05 * B.m);
+            X += arg;
     }
     if (!(X > 1.0) || !(cosv > 0.0))
         return 0.0;
@@ -218,8 +219,7 @@ TEST_CASE("Stack with a mass-law layer - resolved by segments, not killed", "[ac
     //   a lossy medium are not an energy statement, and the two orders differ by up to 0.03 dB
     //   (md/acoustic.md 7), recorded with that bound;
     //   the reflect port does not read m, and not what lies behind the mass-law layer;
-    //   the mass term enters through the plate rule (md/acoustic.md 10 N1), so two slopes differ by
-    //   what the reference's plate passes with each;
+    //   the mass column is a switch (M10): a layer with m 10 pays exactly what it pays with m 20;
     //   a lossless-permittivity stack reflects and transmits no more than it received;
     //   an air-like coherent sheet in front of a mass-law sheet is that mass-law sheet.
     //
@@ -234,7 +234,7 @@ TEST_CASE("Stack with a mass-law layer - resolved by segments, not killed", "[ac
     const std::vector<LumpMtl> pal = {
         {5.24, 0.63, thk},                                                // 1 A      coherent
         {1.50, 0.40, thk, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 20.0, 0.001},     // 2 M      m 20, argument 6
-        {1.50, 0.40, thk, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 10.0, 0.001},     // 3 M2     m 10
+        {1.50, 0.40, thk, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 10.0, 0.001},     // 3 M2     m 10: the switch, M again
         {1.00, 0.00, thk},                                                // 4 AIRS   an air-like coherent sheet
         {4.00, 0.00, thk},                                                // 5 AL     lossless coherent
         {2.25, 0.00, thk, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 20.0, 0.001},     // 6 ML     lossless, m 20
@@ -326,9 +326,9 @@ TEST_CASE("Stack with a mass-law layer - resolved by segments, not killed", "[ac
         }
 
     // Statements about the mass term alone
-    QD_DIAG("\n# diag: the mass term in a stack. m 20 against m 10 on the same layer, and an air-like\n");
-    QD_DIAG("# sheet in front of the mass-law sheet against that sheet on its own\n");
-    QD_DIAG("theta_n,order,dTL_dB,paid_ref_dB,paid_dB,d_R_m,d_null_T,d_null_R\n");
+    QD_DIAG("\n# diag: the mass term in a stack. m 10 against m 20 on the same layer (a switch: the same), and an\n");
+    QD_DIAG("# air-like sheet in front of the mass-law sheet against that sheet on its own\n");
+    QD_DIAG("theta_n,order,TL_dB,paid_ref_dB,paid_dB,d_R_m,d_null_T,d_null_R\n");
     for (double thd : {0.0, 20.0, 45.0, 70.0})
         for (int ord = 0; ord < 2; ++ord)
         {
@@ -336,7 +336,7 @@ TEST_CASE("Stack with a mass-law layer - resolved by segments, not killed", "[ac
             uint8_t ot = ord ? OT_STACK_SBS : OT_STACK_FBS;
             auto T20 = stk(4, ot, A, M, th), T10 = stk(4, ot, A, M2, th);
             auto R20 = stk(3, ot, A, M, th), R10 = stk(3, ot, A, M2, th);
-            double dTL = diag_mass_TL(20.0, 0.001, f_hz, thk, ct) - diag_mass_TL(10.0, 0.001, f_hz, thk, ct);
+            double TL = diag_mass_TL(20.0, 0.001, f_hz, thk, ct);
             double paid = -10.0 * std::log10((double)T20.gain(0) / (double)T10.gain(0));
             const std::complex<double> ci(ct, 0.0);
             const int f1 = ord ? M : A, s1 = ord ? A : M, f2 = ord ? M2 : A, s2 = ord ? A : M2;
@@ -354,10 +354,11 @@ TEST_CASE("Stack with a mass-law layer - resolved by segments, not killed", "[ac
             double d_nT = std::abs(cpx(Nt.xprmat, 0, 0) - cpx(Pt.xprmat, 0, 0));
             double d_nR = std::abs(cpx(Nr.xprmat, 0, 0) - cpx(Pr.xprmat, 0, 0) * back);
 
-            QD_DIAG("%.1f,%s,%.6f,%.6f,%.6f,%.3e,%.3e,%.3e\n", thd, ord ? "2|1" : "1|2", dTL, paid_ref, paid, d_Rm, d_nT, d_nR);
+            QD_DIAG("%.1f,%s,%.6f,%.6f,%.6f,%.3e,%.3e,%.3e\n", thd, ord ? "2|1" : "1|2", TL, paid_ref, paid, d_Rm, d_nT, d_nR);
             INFO("mass term, order " << (ord ? "2|1" : "1|2") << ", theta_n " << thd);
-            CHECK(std::abs(paid - paid_ref) < 1.0e-9); // the two slopes through the plate rule
-            CHECK(dTL > 1.0);                     // and worth dB, so the row is not passing on a zero term
+            CHECK(paid_ref == 0.0);               // the reference: m is a switch
+            CHECK(T20.gain(0) == T10.gain(0));    // and so is the library's, bitwise
+            CHECK(TL > 1.0);                      // the term is worth dB, so the row is not passing on a zero term
             CHECK(d_Rm < 1.0e-15);                // the reflect port never reads m
             CHECK(std::abs(cpx(R20.xprmat, 0, 0)) > 1.0e-3);
             CHECK(d_nT < 1.0e-12);
@@ -543,6 +544,9 @@ TEST_CASE("Bonded mass - sheet on sheet, sheet on solid and solid on solid as on
     // a tau / (a + tau - a tau) (md/acoustic.md 10 N1), tau = diag_bonded_TL; what is paid above a
     // is the reference.
     //
+    // The mass column is a switch (M10): the rigid board and the concrete keep m 30 and pay the limp
+    // mass law at 20 dB per decade, which every row with them guards.
+    //
     // The ray runs on the x axis and the angle comes from fbs_angle, so a solid of normal
     // thickness d is given the path d / cos.
     const double f_hz = FRQ;
@@ -562,7 +566,7 @@ TEST_CASE("Bonded mass - sheet on sheet, sheet on solid and solid on solid as on
         {e_w, 0.0, 0.0, 0.0, tf_w, 0.0, 0.0, 0.0, 0.0, 20.0, fR},                    // 5  WS     wood solid
         {e_w, 0.0, 0.0, 0.0, tf_w, 0.0, 0.0, 0.0, 0.0, 20.0, fR * Lw / (Lw + tw)},   // 6  WSF    WS with P20's mass folded in
         {e_w, 0.0, 0.0, 0.0, tf_w, 0.0, 0.0, 0.0, 0.0, 20.0, fR},                    // 7  WS2    WS under a second index
-        {e_c, 0.0, 0.012, 0.5, tf_c, 0.0, 0.0, 0.0, 0.0, 30.0, fR},                  // 8  SB     a rigid board, m 30
+        {e_c, 0.0, 0.012, 0.5, tf_c, 0.0, 0.0, 0.0, 0.0, 30.0, fR},                  // 8  SB     a rigid board, m 30 (a switch)
         {e_c, 0.0, 0.0, 2.0, tf_c, 0.0, 0.0, 0.0, 0.0, 30.0, fR},                    // 9  CONC   concrete solid, m 30
         {e_c, 0.0, 0.0, 2.0, tf_c, 0.0, 0.0, 0.0, 0.0, 30.0, fZ},                    // 10 CONCZ  without its mass
         {e_w, 0.0, 0.008, 0.0, tf_w, 0.0, 0.0, 0.0, 0.0, 20.0, fZ},                  // 11 P8Z
@@ -1035,7 +1039,9 @@ TEST_CASE("Bonded mass - a mass-law sheet inside a mass-law wall", "[acoustic]")
     // the rest of the plate rule, dB(a) - dB(a tau / (a + tau - a tau)) (md/acoustic.md 10 N1). A
     // sheet without the column separates the halves, by the settled rule, and is the control: each
     // half is a plate of its own. Every sheet differs from its wall in permittivity; one that does
-    // not is merged into the host leg and is another case.
+    // not is merged into the host leg and is another case. The mass column is a switch (M10): the
+    // board and the concrete keep m 30 and pay the slope-20 law, so a stack of m 20 and m 30 bodies
+    // is one plate of one slope, which their rows guard.
     const double f_hz = FRQ;
     const double e_w = 2.1609e-8, e_c = 2.401e-9, tf_w = 0.2, tf_c = 0.1, fR = 0.001, fZ = 1.0e9;
     const uint8_t OT_SHEET_ISO = 67;
@@ -1562,19 +1568,18 @@ TEST_CASE("Leak direction - a closed face hands the wall behind a traced layer t
         QD_DIAG("%s", q.c_str());
 }
 
-TEST_CASE("Bonded mass - the plate at any depth where the slopes agree", "[acoustic]")
+TEST_CASE("Bonded mass - the plate at any depth", "[acoustic]")
 {
     // One ray per call, many thousand calls: a thread team per call costs twenty times the work
     ub::OneThread one_thread;
     // Plate depth. A leg learns what it is bonded to from the previous-medium word and the buffer
     // word, which name one body behind the ray, or two where that body is a sheet inside the
-    // current medium. Bodies of one slope m are, at every frequency, one thicker body of one of
-    // them, so the thickness code carries that equivalent thickness and the plate is exact at
-    // any depth where the slopes agree. A body of another slope that the words do not name is
-    // left out, so a stack of mixed slopes is exact from the side on which the bodies that have
-    // to be folded agree, and pays more from the other; those rows are recorded, as are a
-    // deferred medium, which displaces the code, and an equivalent thickness above the 100 m the
-    // code reaches. A mass-law sheet with its mass-law host's permittivity cuts the host leg like
+    // current medium. Every mass-law body has the slope of the mass law (M10: m > 0 is a switch;
+    // the bodies named 30 keep m 30 and pay as m 20, which their rows guard), so bonded bodies are,
+    // at every frequency, one thicker body of one of them: the thickness code carries that
+    // equivalent thickness and the plate is exact at any depth, up to the entry face the state
+    // re-forms one level deep. Recorded: a deferred medium, which displaces the code, and an
+    // equivalent thickness above the 100 m the code reaches. A mass-law sheet with its mass-law host's permittivity cuts the host leg like
     // any other sheet. Event by event through ray_triangle_intersect, ray_mesh_interact and
     // ray_state_update, scalar, both tracers. The mass an event paid is its gain against the same event on a palette whose mass
     // arguments are taken to nothing (every fRef times 1e12), which leaves every face, tf and state word in
@@ -1822,7 +1827,7 @@ TEST_CASE("Bonded mass - the plate at any depth where the slopes agree", "[acous
     auto X_of = [](const DiagMass &B, double f_hz)
     {
         double arg = (f_hz * 1e-9 / B.fRef) * B.thk;
-        return (B.m > 0.0 && arg > 0.0) ? std::pow(arg, 0.05 * B.m) : 0.0;
+        return (B.m > 0.0 && arg > 0.0) ? arg : 0.0;
     };
     (void)X_of;
 
@@ -1835,25 +1840,25 @@ TEST_CASE("Bonded mass - the plate at any depth where the slopes agree", "[acous
     // The plate's entry face is re-formed from the state, which is one level deep (md/acoustic.md 7): on
     // the last leg the previous-medium word names the body before it, whose face stands in for the stack's
     // first. Where it absorbs differently (A20 | B20 | C20 as named: 0.2 for 0.1) the level is off by the
-    // ratio, at most 3.01 dB in this palette (bits 2 and 3, bounded); mixed slopes and a deferred medium as before.
+    // ratio, at most 3.01 dB in this palette (bits 2 and 3, bounded); a deferred medium as before.
     const std::vector<Stack> stacks = {
         {"A20 100 | B20 100 | C20 100", {O(A20), G(0.1), C(A20), O(B20), G(0.1), C(B20), O(C20), G(0.1), C(C20)}, 2 | 4},
         {"A20 30 | B20 100 | C20 200", {O(A20), G(0.03), C(A20), O(B20), G(0.1), C(B20), O(C20), G(0.2), C(C20)}, 2 | 4},
         {"A20 100 | B20 13 | C20 100", {O(A20), G(0.1), C(A20), O(B20), G(0.013), C(B20), O(C20), G(0.1), C(C20)}, 2 | 4},
         {"A30 60 | B30 100 | C30 30", {O(A30), G(0.06), C(A30), O(B30), G(0.1), C(B30), O(C30), G(0.03), C(C30)}, 2 | 4},
-        {"A20 100 | B20 100 | C30 50", {O(A20), G(0.1), C(A20), O(B20), G(0.1), C(B20), O(C30), G(0.05), C(C30)}, 4},
-        {"A20 100 | B30 50 | C20 100", {O(A20), G(0.1), C(A20), O(B30), G(0.05), C(B30), O(C20), G(0.1), C(C20)}, 0},
+        {"A20 100 | B20 100 | C30 50", {O(A20), G(0.1), C(A20), O(B20), G(0.1), C(B20), O(C30), G(0.05), C(C30)}, 2 | 4},
+        {"A20 100 | B30 50 | C20 100", {O(A20), G(0.1), C(A20), O(B30), G(0.05), C(B30), O(C20), G(0.1), C(C20)}, 2 | 4},
         {"A20 50 | B20 50 | C20 50 | A20 50", {O(A20), G(0.05), C(A20), O(B20), G(0.05), C(B20), O(C20), G(0.05), C(C20), O(A20), G(0.05), C(A20)}, 3},
         {"plaster 15 | brick20 115 | plaster 15", {O(PL), G(0.015), C(PL), O(BR20), G(0.115), C(BR20), O(PL), G(0.015), C(PL)}, 4 | 8},
-        {"plaster 15 | brick30 115 | plaster 15", {O(PL), G(0.015), C(PL), O(BR30), G(0.115), C(BR30), O(PL), G(0.015), C(PL)}, 0},
+        {"plaster 15 | brick30 115 | plaster 15", {O(PL), G(0.015), C(PL), O(BR30), G(0.115), C(BR30), O(PL), G(0.015), C(PL)}, 4 | 8},
         {"lining L20 > A20 100 | B20 100", {S(L20), O(A20), G(0.1), C(A20), O(B20), G(0.1), C(B20)}, 2 | 4},
         {"lining L20 > B20 60 | S20 | B20 40", {S(L20), O(B20), G(0.06), S(S20), G(0.04), C(B20)}, 2 | 4},
         {"lining L20 > B20 60 | S30 | B20 40", {S(L20), O(B20), G(0.06), S(S30), G(0.04), C(B20)}, 2 | 4},
-        {"lining L30 > B20 60 | S20 | B20 40", {S(L30), O(B20), G(0.06), S(S20), G(0.04), C(B20)}, 2},
+        {"lining L30 > B20 60 | S20 | B20 40", {S(L30), O(B20), G(0.06), S(S20), G(0.04), C(B20)}, 2 | 4},
         {"A20 100 | B20 60 | S20 | B20 40", {O(A20), G(0.1), C(A20), O(B20), G(0.06), S(S20), G(0.04), C(B20)}, 2 | 4},
         {"B20 60 | S20 T20 | B20 40", {O(B20), G(0.06), S(S20), S(T20), G(0.04), C(B20)}, 3},
-        {"B20 60 | S20 T30 | B20 40", {O(B20), G(0.06), S(S20), S(T30), G(0.04), C(B20)}, 1},
-        {"B20 60 | S30 T20 | B20 40", {O(B20), G(0.06), S(S30), S(T20), G(0.04), C(B20)}, 2},
+        {"B20 60 | S20 T30 | B20 40", {O(B20), G(0.06), S(S20), S(T30), G(0.04), C(B20)}, 3},
+        {"B20 60 | S30 T20 | B20 40", {O(B20), G(0.06), S(S30), S(T20), G(0.04), C(B20)}, 3},
         {"deferred: A20 100 | C20 100 [D20 100] C20 100", {O(A20), G(0.1), C(A20), O(C20), G(0.1), N(D20), G(0.1), n(D20), G(0.1), C(C20)}, 2},
         {"deferred: lining L20 > A20 100 [B20 100 A20 100] B20 100", {S(L20), O(A20), G(0.1), O(B20), G(0.1), C(A20), G(0.1), C(B20)}, 2},
         {"merged: B20 60 | HS 8 | B20 40", {O(B20), G(0.06), S(HS), G(0.04), C(B20)}, 3},
@@ -2080,7 +2085,7 @@ TEST_CASE("Unentered branches - a sheet without the mass column of its mass-law 
     // (md/acoustic.md 10 N1), tau the term of one body of the thickness crossed.
     const double f = FRQ, Lw = 0.100;
     const std::vector<LumpMtl> lp = {
-        {2.401e-9, 0.0, 0.0, 0.0, 0.3, 0.0, 0.0, 0.0, 0.0, 30.0, 0.001}, // 1 rigid wall, tf 0.3, m 30
+        {2.401e-9, 0.0, 0.0, 0.0, 0.3, 0.0, 0.0, 0.0, 0.0, 30.0, 0.001}, // 1 rigid wall, tf 0.3, m 30 (a switch: slope 20)
         {2.401e-9, 0.0, 0.0, 0.0, 0.3, 0.0, 0.0, 0.0, 0.0, 30.0, 1.0e9}, // 2 its twin without a mass argument
         {2.401e-9, 0.0, 0.008},                                          // 3 a sheet of the wall's permittivity, no mass column
         {2.1609e-8, 0.0, 0.008},                                         // 4 a sheet of another permittivity, no mass column
@@ -5672,9 +5677,9 @@ TEST_CASE("Resonance - on a mass-law material res* is the plate's resonance and 
 
 TEST_CASE("Coincidence - on a mass-law material coiF and coiQ are the bending stiffness of the plate", "[acoustic]")
 {
-    // N4 (M4a): X0 |1 - (f/coiF)^2 sin^4(theta) (1 + j/coiQ)|, coiA 0: the diffuse-field dip of a pane comes from
-    // the angle. 4 mm glass, coincidence 2989 Hz, loss factor 0.015 (coiQ 66.7). At bb336dc coiF / coiQ acted
-    // only through coiA in the interface gain, which is zero here: the plate had no coincidence.
+    // N4 (M4a): X0 |1 - (f/coiF)^2 sin^4(theta) (1 + j/coiQ)|: the diffuse-field dip of a pane comes from the
+    // angle. 4 mm glass, coincidence 2989 Hz, loss factor 0.015 (coiQ 66.7). At bb336dc coiF / coiQ acted only
+    // through coiA in the interface gain: the plate had no coincidence. coiA is no column any more (D2-b).
     ub::OneThread one_thread;
     const double a = 8.4794e-10, thk = 0.004, tf = 0.05, fRef = 4.5805e-05, cF = 2989.0 * r1::FMAP, cQ = 66.7;
     QD_DIAG("\n# diag: the bending stiffness of a 4 mm pane, sheet and traced solid, scalar\n");
@@ -5683,7 +5688,7 @@ TEST_CASE("Coincidence - on a mass-law material coiF and coiQ are the bending st
     {
         std::vector<LumpMtl> lp = {{a, 0.0, kind ? 0.0 : thk, 0.0, tf, 0.0, 0.0, 0.0, 0.0, 20.0, fRef}};
         ub::Pal P = lump_palette(lp);
-        r1::col(P, "coiF", {cF}), r1::col(P, "coiQ", {cQ}), r1::col(P, "coiA", {0.0});
+        r1::col(P, "coiF", {cF}), r1::col(P, "coiQ", {cQ});
         for (int tr : {4, 5})
             for (double f_hz : {1000.0, 4000.0})
                 for (double thd : {0.0, 30.0, 59.8, 70.0, 80.0})
@@ -5697,6 +5702,99 @@ TEST_CASE("Coincidence - on a mass-law material coiF and coiQ are the bending st
                     CHECK(std::abs(r1::dB(W.T) - r1::dB(Tr)) < 0.01);
                 }
     }
+}
+
+TEST_CASE("Coincidence column - a table that carries coiA loads and the column changes nothing - the mass-law part", "[acoustic]")
+{
+    // D2-b on a mass-law material: a 4 mm pane with its bending stiffness (coiF 2989 Hz, coiQ 66.7, which act in
+    // X0) and a coiA column, read from a table, passes and reflects exactly what it does without the column,
+    // bitwise, at the coincidence frequency: as a traced solid and as a sheet, EM type 1 (both channels) and
+    // scalar types 4 and 5.
+    ub::OneThread one_thread;
+    const char *FN = "coiA_table_mass.csv";
+    const char *HEADER = "name,a,tf,m,fRef,thk,coiF,coiQ,coiA";
+    char rows[512];
+    const double cF = 2989.0 * r1::FMAP;
+    std::snprintf(rows, sizeof(rows), "air,1,0,0,1,0,0,0,0\npane,8.4794e-10,0.05,20,4.5805e-05,0,%.9g,66.7,6\nsheet,8.4794e-10,0.05,20,4.5805e-05,0.004,%.9g,66.7,6\n", cF, cF);
+    const char *ROWS = rows;
+
+    // a table with a coiA column, read through obj_file_read (table only, name-keyed, schema-blind)
+    std::unordered_map<std::string, std::vector<double>> pal;
+    {
+        std::ofstream csv(FN);
+        REQUIRE(csv.is_open());
+        csv << HEADER << "\n" << ROWS;
+        csv.close();
+        arma::uvec csv_ind;
+        std::vector<std::string> csv_names;
+        REQUIRE_NOTHROW(quadriga_lib::obj_file_read<double>("", nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                                                            FN, &csv_ind, &csv_names, &pal));
+        std::remove(FN);
+        REQUIRE(csv_names.size() == 3);
+        REQUIRE(pal.count("coiA") == 1); // the column is read and handed on
+    }
+    std::unordered_map<std::string, std::vector<double>> bare = pal;
+    bare.erase("coiA");
+
+    const double f = cF * 1.0e9;
+    CHECK(quadriga_lib::interface_gain(pal, 2, f) == quadriga_lib::interface_gain(bare, 2, f));
+    for (int kind = 0; kind < 2; ++kind) // 0 traced solid 4 mm, 1 sheet 4 mm
+        for (int tr : {1, 4, 5})
+            for (double thd : {0.0, 30.0, 59.8})
+            {
+                arma::uvec mi;
+                arma::mat mesh = kind ? ub::build({0.0}, {3}, {false}, mi) : ub::build({0.0, 0.004}, {2, 2}, {false, true}, mi), o, d;
+                diag_ray_at(thd, o, d);
+                bf::Acc A, B;
+                bf::walk(pal, mesh, mi, tr, f, thd, 0.0, nullptr, o, d, 1.0, 1.0, 0.0, 0.0, 0, 60, A);
+                bf::walk(bare, mesh, mi, tr, f, thd, 0.0, nullptr, o, d, 1.0, 1.0, 0.0, 0.0, 0, 60, B);
+                INFO((kind ? "sheet" : "traced solid") << ", type " << tr << ", " << thd << " deg");
+                CHECK(A.nT == B.nT);
+                CHECK(A.nR == B.nR);
+                CHECK((A.T[0] == B.T[0] && A.T[1] == B.T[1]));
+                CHECK((A.R[0] == B.R[0] && A.R[1] == B.R[1]));
+                CHECK(std::norm(A.T[0]) > 1.0e-8); // the row is not passing on nothing
+            }
+}
+
+TEST_CASE("Mass law - m switches the limp mass law on", "[acoustic]")
+{
+    // M10: m > 0 switches the mass term on, and the term is the limp mass law at 20 dB per decade whatever
+    // the value of m. A 4 mm pane of float glass (2500 kg/m3) with fRef written from its density, so that
+    // (f / fRef) thk is the impedance ratio X = omega m'' / (2 rho0 c) of the limp panel (md/acoustic.md 2.1):
+    // fRef = (f_GHz / f_Hz) rho0 c / (pi rho). The reference is the thin-plate law of 3.4 without bending,
+    // 10 log10(1 + (X cos)^2), normalized as in 2.1 to 20 log10 X at normal incidence; the pane passes the
+    // plate rule of that term and its face (tf 0.05). The same pane with m 12 and m 30 passes the same,
+    // bitwise. As a sheet and as a traced solid, both acoustic tracers.
+    ub::OneThread one_thread;
+    const double a = 8.4794e-10, rho = 2500.0, rho0c = 1.204 * 343.0, thk = 0.004, tf = 0.05;
+    const double fRef = r1::FMAP * rho0c / (QPI * rho);
+    QD_DIAG("\n# diag: m switches the limp mass law on, 4 mm glass, sheet (S) and traced solid (X), scalar\n");
+    QD_DIAG("kind,m,type,f_Hz,theta,T_dB,T_ref_dB,dT\n");
+    for (int kind = 0; kind < 2; ++kind)
+        for (int tr : {4, 5})
+            for (double f_hz : {125.0, 500.0, 2000.0, 4000.0})
+                for (double thd : {0.0, 30.0, 60.0, 80.0})
+                {
+                    const double c = std::cos(thd * QPI / 180.0), X = 2.0 * QPI * f_hz * rho * thk / (2.0 * rho0c);
+                    const double A = 20.0 * std::log10(X), TL = (c >= 1.0) ? A : A * std::log10(1.0 + X * c * X * c) / std::log10(1.0 + X * X);
+                    const double Tr = r1::plate(tf, std::pow(10.0, -0.1 * TL));
+                    double T20 = 0.0;
+                    for (double m : {20.0, 12.0, 30.0})
+                    {
+                        std::vector<LumpMtl> lp = {{a, 0.0, kind ? 0.0 : thk, 0.0, tf, 0.0, 0.0, 0.0, 0.0, m, fRef}};
+                        ub::Pal P = lump_palette(lp);
+                        r1::Out W = kind ? r1::wall(P, {0.0, thk}, {1, 1}, {false, true}, tr, f_hz * r1::FMAP * 1.0e9, thd)
+                                         : r1::wall(P, {0.0}, {1}, {false}, tr, f_hz * r1::FMAP * 1.0e9, thd);
+                        QD_DIAG("%s,%.0f,%d,%.0f,%.0f,%.4f,%.4f,%+.4f\n", kind ? "X" : "S", m, tr, f_hz, thd, r1::dB(W.T), r1::dB(Tr), r1::dB(W.T) - r1::dB(Tr));
+                        INFO((kind ? "traced" : "sheet") << ", m " << m << ", type " << tr << ", " << f_hz << " Hz, " << thd << " deg");
+                        CHECK(std::abs(r1::dB(W.T) - r1::dB(Tr)) < 0.01);
+                        if (m == 20.0)
+                            T20 = W.T;
+                        else
+                            CHECK(W.T == T20); // m is a switch
+                    }
+                }
 }
 
 TEST_CASE("Two-parameter mapping - air | water, a hard wall's phase, a porous layer on it and every tracer below its critical angle", "[acoustic]")

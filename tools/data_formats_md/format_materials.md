@@ -7,8 +7,8 @@ Materials are stored in a name-keyed table: each triangle references a material 
 
 The table is schema-blind: the only required column is `name` (the join key for `.obj` materials); every other column is an optional numeric parameter. A parameter the table does not define is simply absent from `csv_prop`, and downstream consumers substitute its default (listed below). Empty cells parse as 0. The recognized parameters split into three physical roles:
 - **Interface reflection** (`a`, `b`, `c`, `d`, `e`, `f`, `g`, `h`, `resF`, `resQ`, `resS`) — set the complex permittivity ε and permeability μ, which fix the Fresnel reflection coefficient `R` at every surface crossing. ε and μ govern the reflected power `abs(R)²` and the complementary room-side absorption `1 − abs(R)²`. Applied once per surface hit, independent of path length.
-- **Interface transmission** (`att`, `attB`, `coiF`, `coiQ`, `coiA`) — the through-surface isolation in dB, applied once when entering a material (the front-side air→material or material→material crossing). Independent of path length and not applied on exit. The transmitted power is *not* simply the Fresnel `1 − abs(R)²`; see the partition note below.
-- **In-medium attenuation** (`c`, `d`, `g`, `h` via ε·μ; `alpha`, `alphaB`; `m`) — loss accumulated along the path traversed inside a body. The loss from `Im(√(εμ))` (fed by the σ term in ε and the σμ term in μ) and the explicit `alpha` term sum, and `m` adds a mass-law slope; all scale with the in-medium distance.
+- **Interface transmission** (`att`, `attB`) — the through-surface isolation in dB, applied once when entering a material (the front-side air→material or material→material crossing). Independent of path length and not applied on exit. The transmitted power is *not* simply the Fresnel `1 − abs(R)²`; see the partition note below.
+- **In-medium attenuation** (`c`, `d`, `g`, `h` via ε·μ; `alpha`, `alphaB`; `m`) — loss accumulated along the path traversed inside a body. The loss from `Im(√(εμ))` (fed by the σ term in ε and the σμ term in μ) and the explicit `alpha` term sum and scale with the in-medium distance; `m > 0` switches the mass law on, 20 dB per decade (a term from the normal thickness, not per meter).
 
 **Transmission partition.** Reflection and transmission are computed independently, not as energy-complementary halves of a single Fresnel split. ε and μ (`a`, `b`, `e`, `f`, `resF…`) set reflection and room-side absorption; the lumped (`att`, `coi…`) and in-medium (`alpha`, `m`) terms set the transmission level. The transmitted field is gated by the index contrast across the crossing: on a **light→dense** crossing — entering a higher-index medium, `Re(ε₁μ₁)` < `Re(ε₂μ₂)` — it is additionally scaled by the Fresnel `1 − abs(R)²`; on a **dense→light** crossing — entering a lower-index medium, `Re(ε₁μ₁)` > `Re(ε₂μ₂)` — it is pass-through (`abs(R)²` is not subtracted). This gate applies only to the two straight-through **transmission** modes of `ray_mesh_interact` — type 1 (EM transmission) and type 4 (scalar transmission), which pass the ray through undeviated. Reflection (types 0 and 3) computes the Fresnel `abs(R)²` directly and never uses the gate; EM **refraction** (type 2) bends the ray per Snell with `(ε₁μ₁)/(ε₂μ₂)` and applies the full Fresnel transmission, bypassing the gate entirely — type 2 is the physically correct transmission path, while types 1/4 are the undeviated approximation the gate exists to keep well-behaved. Types 1 and 4 share the one gate; there is no separate scalar rule. The dense→light pass-through prevents spurious amplification and the critical-angle total reflection that an ε < 1 Fresnel transmission would otherwise impose on the undeviated path. On types 1/4 the lumped and in-medium terms set the transmission *level* (ε/μ do not); on type 2 the Fresnel transmission from ε/μ applies directly.
 
@@ -42,13 +42,12 @@ Each parameter is one numeric column of the material table and one key of `csv_p
 | alpha  | In-medium absorption at fRef          | dB/m       | 0       |
 | alphaB | Frequency exponent for alpha          | —          | 0       |
 | fRef   | Reference frequency                   | GHz        | 1.0     |
-| m      | Mass-law transmission slope           | dB/decade  | 0       |
+| m      | Mass-law switch (> 0: the mass law, 20 dB/decade) | —   | 0       |
 | resF   | Permittivity resonance frequency      | GHz        | 0       |
 | resQ   | Permittivity resonance quality factor | —          | 0       |
 | resS   | Permittivity resonance strength       | —          | 0       |
-| coiF   | Coincidence frequency                 | GHz        | 0       |
-| coiQ   | Coincidence quality factor            | —          | 0       |
-| coiA   | Coincidence loss amplitude            | dB         | 0       |
+| coiF   | Coincidence frequency (with `m`, the plate's bending stiffness) | GHz | 0 |
+| coiQ   | Coincidence quality factor (with `m`, 1 / loss factor) | — | 0  |
 
 ## Frequency laws:
 `f` is given in GHz; `f/fRef` is the relative frequency. `resF` and `coiF` are
@@ -61,17 +60,17 @@ not the frequency.<br><br>
 | σ(f)       | `c·(f/fRef)^d`                                                             | [S/m]  | conductivity (enters ε as the −i term)     |
 | μ(f)       | `e·(f/fRef)^f − i·17.98·σμ/f`                                              | —      | relative permeability (complex)            |
 | σμ(f)      | `g·(f/fRef)^h`                                                             | —      | magnetic loss (enters μ as the −i term)    |
-| att(f)     | `att·(f/fRef)^attB + coiA / (1 + (coiQ·(f − coiF)/coiF)²)`                 | [dB]   | lumped loss added once on entering         |
+| att(f)     | `att·(f/fRef)^attB`, clamped to ≥ 0                                       | [dB]   | lumped loss added once on entering         |
 | α(f)       | `alpha·(f/fRef)^alphaB`                                                    | [dB/m] | explicit in-medium loss × path length      |
-| mass(f, L) | `max(0, m·log10((f/fRef)·L))`                                              | [dB]   | mass-law slope, L = in-medium path length  |
+| mass(f, M) | `max(0, 20·log10((f/fRef)·M))` where `m > 0`, at normal incidence           | [dB]   | the limp mass law, M = normal thickness    |
 
 - The refractive index is `n = √(εμ)` and the wave impedance `Z = Z₀·√(μ/ε)`. With `μ = 1` (the default) these reduce to `n = √ε`, `Z = Z₀/√ε`, and every formula here matches the legacy ε-only model exactly. The Fresnel coefficient uses the admittance `√(ε/μ)`; Snell refraction and total reflection use the index ratio `(ε₁μ₁)/(ε₂μ₂)`; and the in-medium loss uses the loss tangent of the **product** `ε·μ`, so the `g`/`h` (μ-loss) term feeds bulk attenuation exactly as `c`/`d` (σ) do.
 - Loss appears as a negative imaginary part of ε and μ (Rec. ITU-R P.2040-1, eq. 9b). Both the σ term and the resonance are written so that `c > 0` and `resS > 0` add loss; `g > 0` likewise adds loss to μ. The total in-medium attenuation over a path of length `L` is `8.686·L/Δ` (from `Im(√(εμ))`, where Δ is the attenuation length derived from the loss tangent of `ε·μ`) plus `α(f)·L` plus `mass(f, L)`, summed; `att` is separate and is not path-dependent.
 
 ## Mechanisms:
 - **Permittivity resonance** (`resF`, `resQ`, `resS`): a Lorentz pole that adds a peak to absorption (acoustic α) and a feature to reflection near `resF`; `resQ` sets sharpness (higher = narrower). Active only when `resF > 0` and `resS ≠ 0`. Models resonant dielectrics / frequency-selective media (EM) and Helmholtz / membrane absorbers (acoustic).
-- **Coincidence term** (`coiF`, `coiQ`, `coiA`): a Lorentzian added to the transmission loss at `coiF`. Negative `coiA` produces a transmission dip (acoustic coincidence / pass-band); positive `coiA` produces a stop-band. Total loss is clamped to ≥ 0. Active only when `coiF > 0` and `coiA ≠ 0`.
-- **Mass-law term** (`m`): a transmission loss that is logarithmic in both frequency and in-medium path length. `m = 20` reproduces the acoustic mass law (+6 dB/octave and +6 dB per thickness doubling). Default 0 (EM through-loss is the linear `alpha` term). The resonance denominator uses `+i·(resF/resQ)·f` so that `resS > 0` adds loss under the library's negative-imaginary loss convention (consistent with σ).
+- **Coincidence** (`coiF`, `coiQ`): on a mass-law material (`m > 0`) the bending stiffness of the plate, `coiF` its coincidence frequency and `1/coiQ` its loss factor, acting in the mass term as `X₀·|1 − (f/coiF)²·sin⁴θ·(1 + j/coiQ)|`, so the coincidence dip of a diffuse field comes from the angle. On a wave medium they do nothing. There is no coincidence loss at the interface: the former `coiA` Lorentzian was removed (2026-10-17); a `coiA` column of an older table is read and ignored.
+- **Mass-law term** (`m`): `m > 0` switches the mass law on, 20 dB per decade, whatever its value: `X₀ = (f/fRef)·M` from the normal thickness `M`, `20·log10 X₀` at normal incidence, with the mass law's angle shape `log10(1 + (X₀ cos θ)²)` normalized to it (+6 dB/octave and +6 dB per thickness doubling). With `fRef = (f_GHz/f_Hz)·ρ₀c/(π·ρ)`, `X₀ = ωm″/(2ρ₀c)` is the impedance ratio of the limp panel. Default 0 (EM through-loss is the linear `alpha` term). The resonance denominator uses `+i·(resF/resQ)·f` so that `resS > 0` adds loss under the library's negative-imaginary loss convention (consistent with σ).
 - **Permeability** (`e`, `f`, `g`, `h`): the magnetic-permeability analog μ, default 1+0j — identical to the legacy ε-only model. μ decouples the wave impedance `Z = Z₀√(μ/ε)` from the refractive index `n = √(εμ)`, so reflection and bulk loss can be matched independently — required for any medium that is not single-parameter, e.g. a porous absorber (acoustically, ε ↔ compressibility, μ ↔ effective density). `e`/`f` set the real part like `a`/`b`; `g`/`h` add loss like `c`/`d`.
 MD!*/
 
@@ -139,7 +138,7 @@ Reusing the column model to simulate acoustic propagation with a radio-wave ray 
 ## The two material families:
 With permeability available, acoustic materials split into two calibration families. ε ↔ compressibility and μ ↔ effective density; the index is `n = √(εμ)` and the surface impedance is `Z = Z₀√(μ/ε)`.
 
-- **Rigid reflectors** (concrete, glass, steel, brick, gypsum, wood panels): a single-parameter medium — `εr ≪ 1` (tiny `a`, ~1e-9 … 1e-3), `μ = 1`. The tiny ε gives near-total reflection (`abs(R) → 1`, low room-side absorption) and the body is effectively opaque. Through-material isolation is carried by `att` (baseline level) and `m` (mass-law slope), with `coiF`/`coiQ`/`coiA` for the coincidence dip of thin stiff panels. `σ = 0`.
+- **Rigid reflectors** (concrete, glass, steel, brick, gypsum, wood panels): a single-parameter medium — `εr ≪ 1` (tiny `a`, ~1e-9 … 1e-3), `μ = 1`. The tiny ε gives near-total reflection (`abs(R) → 1`, low room-side absorption) and the body is effectively opaque. Through-material isolation is carried by the mass law (`m > 0`, its level from `fRef` with the thickness) and `att`, with `coiF`/`coiQ` (the bending stiffness of the plate) for the coincidence dip of thin stiff panels. `σ = 0`.
 - **Porous absorbers** (foam, mineral wool, fiberglass, carpet, curtains): a two-parameter medium — `εr ≈ 1` with light loss (pore air, near free-air compressibility) and `μr > 1` with strong loss (the frame-loaded, viscously damped effective density). Calibrated from the complex index and impedance directly (below); `att` = `alpha` = `m` = 0 — the absorber is carried by ε and μ alone.
 
 ## Parameter roles:
@@ -150,10 +149,10 @@ With permeability available, acoustic materials split into two calibration famil
   | Rigid-wall reflection (single parameter)              | `a` (tiny), `μ = 1`         | `ε ≪ 1` → near-total reflection, low room-side absorption          |
   | Resonant absorber (Helmholtz / membrane / MPP)        | `resF`, `resQ`, `resS`      | Lorentz pole in ε; peaked α and reflection feature at `resF`       |
   | Lumped panel transmission loss (thin partition)       | `att`, `attB`               | fixed dB on entry; thickness-independent                           |
-  | Mass-law transmission (rigid partitions)              | `m`                         | log in freq & thickness; `m = 20` ⇒ +6 dB/oct, +6 dB/doubling      |
-  | Coincidence dip (thin stiff panels)                   | `coiF`, `coiQ`, `coiA`      | Lorentzian on TL at `coiF`; negative `coiA` = dip                  |
+  | Mass-law transmission (rigid partitions)              | `m > 0`, `fRef`, `thk`      | the limp mass law: +6 dB/oct, +6 dB/doubling                       |
+  | Coincidence dip (thin stiff panels)                   | `coiF`, `coiQ` (with `m`)   | bending stiffness in the mass term; the dip from the angle         |
 
-- Room-side absorption `α = 1 − abs(R)²` (which sets reverberation) is set by the medium (ε, μ) via the reflection branch. The lumped `att`/`coi…` and in-medium `m`/`alpha` terms are reserved for rigid-partition transmission and resonators and remain decoupled from the porous medium calibration: tuning them never changes the reverberant field, and the porous ε, μ fit never changes the through-wall mass-law isolation of a separate rigid partition.
+- Room-side absorption `α = 1 − abs(R)²` (which sets reverberation) is set by the medium (ε, μ) via the reflection branch. The lumped `att` and the mass-law `m`/`coi…` and in-medium `alpha` terms are reserved for rigid-partition transmission and resonators and remain decoupled from the porous medium calibration: tuning them never changes the reverberant field, and the porous ε, μ fit never changes the through-wall mass-law isolation of a separate rigid partition.
 
 ## Calibrating a porous absorber:
 A porous layer is intrinsically a two-parameter medium (independent density and compressibility), so a single ε cannot match its reflection and its bulk loss at once — with one parameter the impedance `Z = Z₀/√ε` and the index `n = √ε` are locked together. Permeability breaks the lock: `Z = Z₀√(μ/ε)`, `n = √(εμ)`. Given the material's complex index `n(f) = k/k₀` and normalized surface impedance `z(f) = Zc/Z₀` (from a Delany-Bazley fit of the flow resistivity, or from measurement), the columns follow in closed form:
@@ -204,7 +203,7 @@ The physics: the rigid backing forces a velocity node at the wall, so below the 
 - Geometric low-frequency accuracy is fundamentally a wave-solver regime (below the Schroeder frequency the field is modal/diffraction-dominated). The ray model is the mid/high-frequency engine; the absorber's standing wave and the room's modes are the same kind of physics in the same band where the ray tracer is itself an approximation.
 
 ## Material classes:
-- **Rigid reflectors** (concrete, glass, steel, brick, gypsum, wood panels): tiny `a` from impedance (~1e-9 … 1e-3), `b = 0`, `μ = 1`. The tiny `a` gives near-total reflection (`abs(R) → 1`, low room-side absorption). Through-material isolation is carried by `att` (baseline level) and `m` (mass-law slope); `coiF/coiQ/coiA` add a coincidence dip for thin stiff panels.
+- **Rigid reflectors** (concrete, glass, steel, brick, gypsum, wood panels): tiny `a` from impedance (~1e-9 … 1e-3), `b = 0`, `μ = 1`. The tiny `a` gives near-total reflection (`abs(R) → 1`, low room-side absorption). Through-material isolation is carried by the mass law (`m > 0`) and `att`; `coiF/coiQ` (the bending stiffness of the plate) add a coincidence dip for thin stiff panels.
 - **Porous absorbers** (foam, mineral wool, fiberglass, carpet, curtains): the two-parameter ε, μ via the closed form (`ε = n/z`, `μ = n·z`); `att` = `alpha` = `m` = 0. Model the layer at its installed thickness so the bulk loss accumulates over the real path; mind the mounted standing-wave limit above.
 - **Empirical absorbers** (furniture, audience, people): measured α coefficients fitted as a porous medium (ε, μ); geometry sized to the effective absorption depth.
 - **Resonant absorbers** (Helmholtz, membrane, micro-perforated): `resF/resQ/resS` for the peak, on top of a baseline reflector.
@@ -213,13 +212,13 @@ The physics: the rigid backing forces a velocity node at the wall, so below the 
 - Not captured: phase / interference (use Monte-Carlo phase post-processing), diffraction, and rough-surface scattering — handle these outside the material model.
 - Mounted absorbers: the volumetric model over-predicts low-frequency absorption below the quarter-wave frequency `c/4d` of a layer on a rigid backing (see above). Bounded, shrinks with thickness, valid above `c/4d`; use the surface-impedance boundary for a low-frequency-exact result.
 - LF floor: P.2040 is nominal above 100 MHz ≡ 114 Hz acoustic; the 16 / 31.5 / 63 Hz bands are extrapolation. Below the Schroeder frequency the field is modal and a wave solver is required for rigorous results.
-- The smooth dispersion exponents (`b`, `d`, `f`, `h`, `alphaB`, `attB`) are single power laws over ~3 decades; use the resonance and coincidence terms for non-monotonic features rather than forcing a power-law fit.
+- The smooth dispersion exponents (`b`, `d`, `f`, `h`, `alphaB`, `attB`) are single power laws over ~3 decades; use the resonance terms (and on a mass-law plate the coincidence columns) for non-monotonic features rather than forcing a power-law fit.
 - Geometry: model each material at its installed thickness as a watertight body; see the OBJ geometry guidance for object dimensions.
-- The mass-law term sets only the frequency/thickness *slope* (`m = 20` → +6 dB/octave and +6 dB per thickness doubling); the absolute transmission-loss *level* of a rigid partition comes from `a` (the interface term), not from `m`. Because `mass(f, L)` scales with the in-medium path length `L = thickness / cosθ`, the modeled mass-law loss *increases* at oblique incidence, opposite to the real mass law (which falls as ≈ 20·log10 cosθ). Treat this as a known approximation.
+- The mass-law term is the limp mass law (`m > 0`, +6 dB/octave and +6 dB per thickness doubling); its level is set by `fRef` with the thickness, and it falls toward oblique incidence with the mass law's angle shape (20 dB per decade of cos θ).
 
 ## Acoustic Default Materials
 - Built-in acoustic material library (under construction).
-- Acoustic materials use the same parameters as the EM model with `fRef = 0.875 GHz`. Rigid rows keep `μ = 1` (`e = 1`, `f = g = h = 0`); porous rows use the full ε, μ pair. The table below is a work-in-progress template grouped by the material classes above; `resF`…`coiA` are 0 unless the row is a resonant absorber.<br><br>
+- Acoustic materials use the same parameters as the EM model with `fRef = 0.875 GHz`. Rigid rows keep `μ = 1` (`e = 1`, `f = g = h = 0`); porous rows use the full ε, μ pair. The table below is a work-in-progress template grouped by the material classes above; `resF`…`coiQ` are 0 unless the row is a resonant absorber.<br><br>
   | Name                 | Class   | a       | b     | c      | d    | e    | f     | g     | h    | att | alpha | m  |
   | -------------------- | ------- | ------: | ----: | -----: | ---: | ---: | ----: | ----: | ---: | --: | ----: | -: |
   | concrete (0.1–0.6 m) | rigid   | 2.4e-9  | 0.0   | 0      | 0    | 1.0  | 0     | 0     | 0    | 0   | 0     | 20 |
@@ -227,7 +226,7 @@ The physics: the rigid backing forces a velocity node at the wall, so below the 
   | _resonant_ (TBD)     | resonant| …       | 0     | 0      | 0    | 1.0  | 0     | 0     | 0    | 0   | 0     | 0  |
 
 - `porous_generic` is the calibrated mineral-wool example from the calibration section (flow resistivity ≈ 12000 Pa·s/m²); model it at its installed thickness. For the resonant row, set `resF`/`resQ`/`resS` for the peak on top of a baseline reflector.
-- Note: in the concrete row the `m = 20` term supplies only the mass-law slope; the absolute transmission loss is carried by `a` (the interface term), not by `m`.
+- Note: in the concrete row `m = 20` (any `m > 0`) switches the mass law on; its level comes from `fRef` with the thickness.
 MD!*/
 
 /*!MD
@@ -303,5 +302,5 @@ Acoustic mechanism mapping (the analogy the parameters approximate):
 - <a target="_blank" rel="noopener noreferrer" href="https://en.wikipedia.org/wiki/Soundproofing">Soundproofing</a> (mass law, coincidence, partition behavior)
 - <a target="_blank" rel="noopener noreferrer" href="https://en.wikipedia.org/wiki/Sound_transmission_class">Sound transmission class</a> (single-number TL rating context)
 - <a target="_blank" rel="noopener noreferrer" href="https://en.wikipedia.org/wiki/Absorption_(acoustics)">Absorption (acoustics)</a> (porous absorption: ε, μ, alpha)
-- <a target="_blank" rel="noopener noreferrer" href="https://en.wikipedia.org/wiki/Helmholtz_resonance">Helmholtz resonance</a> (resonant absorbers: resF/resQ/resS, coiF/coiQ/coiA)
+- <a target="_blank" rel="noopener noreferrer" href="https://en.wikipedia.org/wiki/Helmholtz_resonance">Helmholtz resonance</a> (resonant absorbers: resF/resQ/resS; coiF/coiQ the bending stiffness of a mass-law plate)
 MD!*/

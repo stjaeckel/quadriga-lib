@@ -47,19 +47,20 @@ static inline QdMassRef qd_mass_ref(double eps_s, double thd)
 // The mass-law transmission loss in dB. arg is (f/fRef) times the surface-mass surrogate with the
 // angle removed, which for a sheet is the normal thickness.
 //
-// The normal-incidence term A is the material table's own value and the angle carries the mass
-// law's shape normalized to it, so the two endpoints are exact: A at normal incidence and zero at
-// tangency. The asymptotic angle slope is 20 dB per decade of the cosine, independent of m.
+// The mass column is a switch (M10): m > 0 is the limp mass law, X0 = arg and A = 20 log10 X0, whatever
+// the value of m. The angle carries the mass law's shape normalized to A, so the two endpoints are
+// exact: A at normal incidence and zero at tangency. The asymptotic angle slope is 20 dB per decade
+// of the cosine.
 static inline double qd_mass_TL(double m, double arg, double ct)
 {
     if (m <= 0.0 || arg <= 0.0 || ct <= 0.0)
         return 0.0;
-    double A = m * std::log10(arg);
+    double A = 20.0 * std::log10(arg);
     if (A <= 0.0)
         return 0.0;
     if (ct >= 1.0)
         return A;
-    double X0 = std::pow(arg, 0.05 * m);
+    double X0 = arg;
     double x = X0 * ct;
     return A * std::log10(1.0 + x * x) / std::log10(1.0 + X0 * X0);
 }
@@ -74,7 +75,7 @@ struct QdMassSheet
     double fRef = 1.0e-4; // GHz
     double thk = 0.0125;  // m
     double eps = 5.24;
-    double m = 12.0; // dB/decade, deliberately not 20 so the angle slope is distinguishable
+    double m = 12.0; // the mass column is a switch (M10): 12 pays as 20, which the case guards
 
     double arg() const { return (f_hz * 1.0e-9 / fRef) * thk; } // 125.0
 
@@ -138,12 +139,12 @@ TEST_CASE("Thin sheet - mass-law angle dependence", "[acoustic]")
     { return (p > 0.0) ? 10.0 * std::log10(p) : -std::numeric_limits<double>::infinity(); };
 
     const double arg = F.arg();
-    const double A0 = F.m * std::log10(arg);           // normal-incidence term
-    const double X0 = std::pow(arg, 0.05 * F.m);       // = 10^(A0/20)
+    const double A0 = 20.0 * std::log10(arg);          // normal-incidence term, the mass law at any m > 0
+    const double X0 = arg;                             // = 10^(A0/20)
     const double ct_knee = 1.0 / X0;                   // x = 1
     const double th_knee = std::acos(ct_knee) * 180.0 / arma::datum::pi;
 
-    QD_DIAG("\n# diag: mass-law angle dependence, sheet thk 12.5 mm, eps 5.24, m 12 dB/decade\n");
+    QD_DIAG("\n# diag: mass-law angle dependence, sheet thk 12.5 mm, eps 5.24, m 12 (a switch: the mass law, 20 dB/decade)\n");
     QD_DIAG("# (f/fRef) * thk = %.4f; knee at %.6f deg\n", arg, th_knee);
     QD_DIAG("angle,cos,a,T_dB,TL_meas_dB,TL_dB,d_dB,R_meas,R_ref\n");
 
@@ -209,9 +210,8 @@ TEST_CASE("Thin sheet - mass-law angle dependence", "[acoustic]")
     }
 
     // Angle slope, taken between two rows well inside the mass-controlled region. The cosine enters
-    // through the fluid admittance rather than through the panel, so the slope is 20 dB per decade
-    // and does not follow the fitted m. It approaches 20 from below by the saturation gap, which is
-    // 0.05 dB at 60 deg for this material.
+    // through the fluid admittance, so the slope is 20 dB per decade. It approaches 20 from below by
+    // the saturation gap, which is 0.05 dB at 60 deg for this material.
     double c30 = std::cos(30.0 * arma::datum::pi / 180.0);
     double c60 = std::cos(60.0 * arma::datum::pi / 180.0);
     double slope = (tl_at[0] - tl_at[1]) / (std::log10(c30) - std::log10(c60));
@@ -219,17 +219,22 @@ TEST_CASE("Thin sheet - mass-law angle dependence", "[acoustic]")
     CHECK(slope > 19.5);
     CHECK(slope < 20.0);
 
-    // Normal incidence is the material table's own value, m log10((f / fRef) thk), clipped at zero.
-    // This is what keeps the public medium_gain entry point, and every table calibrated through it,
-    // on the column definition.
+    // Normal incidence is the column definition, 20 log10((f / fRef) thk), clipped at zero, at any
+    // m > 0. This is what keeps the public medium_gain entry point, and every table calibrated
+    // through it, on the column definition; and m 12 passes exactly what m 20 passes.
     {
         double T = F.run(mesh, half, 0.0, 4, F.m);
         double tl = tl_of(T, 0.0);
-        CHECK(std::abs(tl - std::max(0.0, F.m * std::log10(arg))) < 1.0e-9);
+        CHECK(std::abs(tl - std::max(0.0, 20.0 * std::log10(arg))) < 1.0e-9);
+        for (double thd : {0.0, 30.0, 60.0, 85.0})
+        {
+            INFO("m 12 against m 20, angle " << thd);
+            CHECK(F.run(mesh, half, thd, 4, F.m) == F.run(mesh, half, thd, 4, 20.0));
+        }
     }
 
-    // There is no cutoff in angle. The knee sits where x = 1, which is fixed by m, the frequency
-    // and the surface mass, and by no geometry. The term there is A * log10(2) / log10(1 + X0^2),
+    // There is no cutoff in angle. The knee sits where x = 1, which is fixed by the frequency and
+    // the surface mass, and by no geometry. The term there is A * log10(2) / log10(1 + X0^2),
     // which is 10 * log10(2) up to the normalization.
     {
         double want = A0 * std::log10(2.0) / std::log10(1.0 + X0 * X0);
@@ -240,19 +245,20 @@ TEST_CASE("Thin sheet - mass-law angle dependence", "[acoustic]")
         CHECK(std::abs(want - 10.0 * std::log10(2.0)) < 0.01);
     }
 
-    // Past the knee the term tapers rather than switching off: still positive at 89.9 deg, and
-    // decaying as the square of the cosine.
+    // Past the knee the term tapers rather than switching off: still positive at 89.9 deg (0.20 dB,
+    // x = X0 cos = 0.22), and decaying as the square of the cosine, log10(1 + x^2) against x^2 within
+    // 2 % at that x.
     {
         double T = F.run(mesh, half, 89.9, 4, F.m);
         double tl = tl_of(T, 89.9);
         CHECK(tl > 0.0);
-        CHECK(tl < 0.05);
+        CHECK(tl < 0.25);
 
         double T2 = F.run(mesh, half, 89.95, 4, F.m);
         double tl2 = tl_of(T2, 89.95);
         CHECK(tl2 > 0.0);
         CHECK(tl2 < tl);
-        CHECK(std::abs(tl / tl2 - 4.0) < 0.05); // cos halves, the term quarters
+        CHECK(std::abs(tl / tl2 - 4.0) < 0.1); // cos halves, the term quarters
     }
 
     // The mass term is a transmission surrogate and must not reach the reflect port. Doubling m
