@@ -5,6 +5,8 @@
 #include <catch2/catch_test_macros.hpp>
 #include "quadriga_channel.hpp"
 #include <iostream>
+#include <cmath>
+#include <complex>
 
 TEST_CASE("Baseband Frequency Response - Single")
 {
@@ -169,4 +171,97 @@ TEST_CASE("Baseband Frequency Response - Multi")
     CHECK(arma::approx_equal(hmat_im[3] * 3.0, hmat_im[1], "absdiff", 2e-6));
     CHECK(arma::approx_equal(hmat_re[3] * 2.0, hmat_re[2], "absdiff", 1.5e-6));
     CHECK(arma::approx_equal(hmat_im[3] * 2.0, hmat_im[2], "absdiff", 1.5e-6));
+}
+
+TEST_CASE("Baseband Frequency Response - Long delays with the phase in double precision (B-020)")
+{
+    // One path, coefficient 1, bandwidth 100 MHz, tau = 0.12 s: H = exp(-j * 2 * pi * B * p * tau)
+    const double B = 1.0e8, tau = 0.12;
+    arma::cube cr(1, 1, 1, arma::fill::ones), ci(1, 1, 1, arma::fill::zeros), dl(1, 1, 1);
+    dl(0) = tau;
+    arma::vec pg = {0.5, 1.0};
+    arma::cx_cube h;
+    quadriga_lib::baseband_freq_response<double>(&cr, &ci, &dl, &pg, B, nullptr, nullptr, &h);
+    for (arma::uword k = 0; k < 2; ++k)
+    {
+        std::complex<double> ref = std::polar(1.0, -2.0 * arma::datum::pi * B * pg(k) * tau);
+        CHECK(std::abs(h(k) - ref) < 1e-4);
+    }
+
+    // Float version: delays and coefficients in single precision
+    arma::fcube crf(1, 1, 1, arma::fill::ones), cif(1, 1, 1, arma::fill::zeros), dlf(1, 1, 1);
+    dlf(0) = 0.125f; // exact in float
+    arma::fvec pgf = {0.5f, 1.0f};
+    arma::cx_fcube hf;
+    quadriga_lib::baseband_freq_response<float>(&crf, &cif, &dlf, &pgf, B, nullptr, nullptr, &hf);
+    for (arma::uword k = 0; k < 2; ++k)
+    {
+        std::complex<double> ref = std::polar(1.0, -2.0 * arma::datum::pi * B * (double)pgf(k) * 0.125);
+        CHECK(std::abs(std::complex<double>(hf(k)) - ref) < 1e-4);
+    }
+}
+
+TEST_CASE("Baseband Frequency Response - Delays up to 10 s against a double-precision reference (B-020)")
+{
+    // 2x2 MIMO with per-antenna delays from 1 us to 10 s, 64 carriers over 100 MHz. The reference evaluates
+    // exp(-j * 2 * pi * x) with x = (-B * p) * tau in double, reduced to x - round(x), as the library does;
+    // the library then evaluates sin / cos in single precision. Each build (AVX2 and generic) stays within
+    // 5e-7 of the reference, so both agree to 1e-6.
+    const double B = 1.0e8;
+    arma::uword n_rx = 2, n_tx = 2, n_path = 4, n_ant = n_rx * n_tx;
+    arma::cube cr(n_rx, n_tx, n_path), ci(n_rx, n_tx, n_path), dl(n_rx, n_tx, n_path);
+    arma::vec amp = {0.4, 0.3, 0.2, 0.1}, tau = {1.0e-6, 1.0e-3, 0.5, 10.0};
+    for (arma::uword p = 0; p < n_path; ++p)
+        for (arma::uword a = 0; a < n_ant; ++a)
+        {
+            double ph = 0.7 * (double)(p + 1) + 0.3 * (double)a;
+            cr(a + p * n_ant) = amp(p) * std::cos(ph);
+            ci(a + p * n_ant) = amp(p) * std::sin(ph);
+            dl(a + p * n_ant) = tau(p) * (1.0 + 1.0e-7 * (double)a) + 3.3e-9 * (double)a;
+        }
+    arma::vec pg = arma::linspace<arma::vec>(0.0, 1.0, 64);
+    pg(17) = 0.123456789, pg(40) = 0.987654321;
+
+    arma::cx_cube h;
+    quadriga_lib::baseband_freq_response<double>(&cr, &ci, &dl, &pg, B, nullptr, nullptr, &h);
+    REQUIRE(h.n_slices == pg.n_elem);
+
+    double err = 0.0;
+    for (arma::uword k = 0; k < pg.n_elem; ++k)
+        for (arma::uword a = 0; a < n_ant; ++a)
+        {
+            std::complex<double> ref(0.0, 0.0);
+            for (arma::uword p = 0; p < n_path; ++p)
+            {
+                double x = (-B * pg(k)) * dl(a + p * n_ant);
+                x -= std::round(x);
+                ref += std::complex<double>(cr(a + p * n_ant), ci(a + p * n_ant)) * std::polar(1.0, 2.0 * arma::datum::pi * x);
+            }
+            err = std::max(err, std::abs(h(a + k * n_ant) - ref));
+        }
+    CHECK(err < 5.0e-7);
+
+    // Planar-wave delays [1, 1, n_path] give the same result as identical per-antenna delays
+    arma::cube dl1(1, 1, n_path), dlx(n_rx, n_tx, n_path);
+    for (arma::uword p = 0; p < n_path; ++p)
+        dl1(p) = tau(p), dlx.slice(p).fill(tau(p));
+    arma::cx_cube h1, hx;
+    quadriga_lib::baseband_freq_response<double>(&cr, &ci, &dl1, &pg, B, nullptr, nullptr, &h1);
+    quadriga_lib::baseband_freq_response<double>(&cr, &ci, &dlx, &pg, B, nullptr, nullptr, &hx);
+    CHECK(arma::approx_equal(h1, hx, "absdiff", 1e-12));
+
+    // Non-finite delays give NaN (as before); a phase beyond 2^50 cycles (1e8 s at 100 MHz) stays finite
+    arma::cube c1(1, 1, 1, arma::fill::ones), c0(1, 1, 1, arma::fill::zeros), d1(1, 1, 1);
+    arma::vec pg2 = {0.25, 0.5, 1.0};
+    for (double d : {arma::datum::nan, arma::datum::inf, 1.0e8})
+    {
+        d1(0) = d;
+        arma::cx_cube hn;
+        quadriga_lib::baseband_freq_response<double>(&c1, &c0, &d1, &pg2, B, nullptr, nullptr, &hn);
+        for (arma::uword k = 0; k < 3; ++k)
+            if (std::isfinite(d))
+                CHECK(std::abs(std::abs(hn(k)) - 1.0) < 1e-6);
+            else
+                CHECK(std::isnan(hn(k).real()));
+    }
 }

@@ -69,7 +69,7 @@ The flags are composable in one call; the per-column order is always
 initialize -> update -> normalize -> apply_gain. Argument order is
 `(xprmat, update, gain, initialize, normalize, apply_gain, ray_index)`.
 ```
-arma::Mat<dtype> M;                                 // ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH (EM)
+arma::Mat<dtype> M;                                 // ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH (EM), labels <out><in>
 
 // (1) Initialization
 xpr_update(M, &U0);                                 // empty M: sized from U0, seeded, M := U0
@@ -98,6 +98,9 @@ xpr_update(M, &U, &g, false, true, true, &idx);     // full chain step: scatter+
 ## Storage layout (column-major, interleaved complex):
 - **EM mode**, 8 values per ray: `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]`, so column 0 of the
   2x2 is `[VV; HV]` (response to a V input) and column 1 is `[VH; HH]` (response to an H input).
+  The labels are `<out><in>`: the first letter is the output (receive) polarisation, the second the input
+  (transmit) polarisation, so rows 0-1 = (V out, V in), rows 2-3 = (H out, V in), rows 4-5 = (V out, H in),
+  rows 6-7 = (H out, H in). This is the row order of `M` in [[get_channels_spherical]] (rows = RX, columns = TX).
 - **Scalar mode**, 2 values per ray: `[Re Im]`.
 - The update is `M_out = M_update * M_state` (new interaction left-multiplies), consistent with
   `E_out = M * E_in` for column vectors and Armadillo/MATLAB column-major storage.

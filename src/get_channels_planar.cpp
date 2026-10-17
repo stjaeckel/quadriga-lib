@@ -24,7 +24,14 @@ Calculate MIMO channel coefficients for planar wave paths
 - Interpolates antenna patterns for both arrays, accounting for element positions, orientation, and polarization.
 - LOS path detection is distance-based (angles ignored).
 - Polarization transfer matrix `M` must be normalized; rows are interleaved real/imag components.
-- If `add_fake_los_path` is true, a zero-power LOS path is appended, making output size `n_path+1`.
+- If `add_fake_los_path` is true, one output path is always added (output size `n_path+1`): slot 0 holds the LOS path,
+  with zero power if no LOS path was found. LOS = the strongest path whose `path_length` is within 0.1 mm of the TX-RX
+  distance; it is moved to slot 0 and its original slot (input index + 1) holds a zero-power path. All other paths
+  keep their order, shifted by one slot.
+- Polarization coupling: `M` is the 2x2 Jones matrix (rows = RX polarisation V/H, columns = TX polarisation V/H),
+  column-major with Re/Im interleaved: rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx),
+  rows 6-7 = (H rx, H tx).
+- `path_length` is used as given for the delay and phase of the phase centres (no geometry check).
 - Setting `center_frequency = 0` disables phase calculation (delays still computed).
 - `use_absolute_delays = false` subtracts the straight-line TX↔RX distance (between the phase centres) from all path
   lengths before converting to delay; per-element delays of pairs that are closer to each other than the phase
@@ -70,10 +77,11 @@ void quadriga_lib::get_channels_planar(
 - **`eoa`** — Arrival elevation angles; `[n_path]`
 - **`path_gain`** — Path gains in linear scale; `[n_path]`
 - **`path_length`** — Path lengths from TX to RX phase center; `[n_path]`
-- **`M`** — Polarization transfer matrix, row order: ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH; `[8, n_path]`
+- **`M`** — Polarization transfer matrix, Jones row order as above; `[8, n_path]`
 - **`center_frequency`** *(optional)* — Center frequency; 0 disables phase calculation
 - **`use_absolute_delays`** *(optional)* — Include LOS delay offset in all paths
-- **`add_fake_los_path`** *(optional)* — Append a zero-power LOS path when no LOS is present
+- **`add_fake_los_path`** *(optional)* — Always add one output path; slot 0 holds the LOS path (zero power if none was
+  found); a LOS path found in the input leaves a zero-power path in its original slot
 
 ## Outputs:
 - **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path(+1)]`

@@ -15,8 +15,14 @@ Calculate MIMO channel coefficients for planar wave paths
 - Computes complex channel coefficients and delays for all TX/RX element pairs across `n_path` propagation paths.
 - Interpolates antenna patterns for both arrays, accounting for element positions, orientation, and polarization.
 - LOS path detection is distance-based (angles ignored).
-- Polarization transfer matrix `M` must be normalized; rows are interleaved real/imag components.
-- If `add_fake_los_path` is true, a zero-power LOS path is appended, making output size `n_path+1`.
+- Polarization transfer matrix `M` must be normalized; it is the 2x2 Jones matrix (rows = RX polarisation V/H,
+  columns = TX polarisation V/H), stored column-major with Re/Im interleaved: rows 1-2 = (V rx, V tx),
+  rows 3-4 = (H rx, V tx), rows 5-6 = (V rx, H tx), rows 7-8 = (H rx, H tx).
+- `path_length` is used as given for the delay and phase of the phase centres (no geometry check).
+- If `add_fake_los_path` is true, one output path is always added (output size `n_path+1`): slot 1 holds the LOS path,
+  with zero power if no LOS path was found. LOS = the strongest path whose `path_length` is within 0.1 mm of the TX-RX
+  distance; it is moved to slot 1 and its original slot (input index + 1) holds a zero-power path. All other paths
+  keep their order, shifted by one slot.
 - Setting `center_freq = 0` disables phase calculation (delays still computed).
 - `use_absolute_delays = false` subtracts the straight-line TX↔RX distance (between the phase centres) from all path
   lengths before converting to delay; per-element delays of pairs that are closer to each other than the phase
@@ -40,14 +46,15 @@ Calculate MIMO channel coefficients for planar wave paths
 - **`eoa`** — Arrival elevation angles; rad; `[n_path, 1]`
 - **`path_gain`** — Path gains in linear scale; `[n_path, 1]`
 - **`path_length`** — Total path lengths from TX to RX phase center; `[n_path, 1]`
-- **`M`** — Polarization transfer matrix, interleaved (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH); `[8, n_path]`
+- **`M`** — Polarization transfer matrix, Jones row order as above; `[8, n_path]`
 - **`tx_pos`** — Transmitter position; `[3, 1]`
 - **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `[3, 1]`
 - **`rx_pos`** — Receiver position; `[3, 1]`
 - **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading); `[3, 1]`
 - **`center_freq`** — Center frequency; set to `0` or skip/leave empty to skip phase computation; default: 0
 - **`use_absolute_delays`** — If `true`, delays include the LOS component; Default: `false`
-- **`add_fake_los_path`** — If `true`, prepends a zero-power LOS path when none is present; Default: `false`
+- **`add_fake_los_path`** — If `true`, always adds one output path; slot 1 holds the LOS path (zero power if none was
+  found); a LOS path found in the input leaves a zero-power path in its original slot; Default: `false`
 
 
 ## Outputs:

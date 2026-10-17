@@ -28,8 +28,10 @@ Compute the baseband frequency response of a MIMO channel
   path coefficients and delays
 - `delay` supports broadcasting: shape `[1, 1, n_path]` applies the same delays to all RX/TX pairs
 - `pilot_grid` values are normalized to bandwidth: `0.0` = center frequency, `1.0` = center + bandwidth
-- Internal arithmetic is single-precision; uses AVX2 for 8-carrier parallel computation; double inputs are
-  narrowed to float internally, results widened back
+- The phase `bandwidth · pilot_grid · delay` (in cycles) is computed in double precision and reduced to one period
+  before sin / cos are evaluated in single precision, so long (absolute) delays keep their accuracy; coefficients and
+  sums are single precision; uses AVX2 for 8-carrier parallel computation; double inputs are narrowed to float
+  internally, results widened back
 - Safe to call in a loop over snapshots and parallelize with OpenMP
 
 ## Declaration:
@@ -125,51 +127,48 @@ void quadriga_lib::baseband_freq_response(const arma::Cube<dtype> *coeff_re,    
         return;
 
     // Declare constants
-    const double scale = -6.283185307179586 * bandwidth;
     const bool planar_wave = delay->n_rows == 1 && delay->n_cols == 1;
 
 // Allocate aligned memory
 #if defined(_MSC_VER) // Windows
-    float *phasor = (float *)_aligned_malloc(n_carrier_s * sizeof(float), 32);
+    double *freq = (double *)_aligned_malloc(n_carrier_s * sizeof(double), 32);
     float *Hr = (float *)_aligned_malloc(n_carrier_s * n_ant * sizeof(float), 32);
     float *Hi = (float *)_aligned_malloc(n_carrier_s * n_ant * sizeof(float), 32);
 #else // Linux
-    float *phasor = (float *)aligned_alloc(32, n_carrier_s * sizeof(float));
+    double *freq = (double *)aligned_alloc(32, n_carrier_s * sizeof(double));
     float *Hr = (float *)aligned_alloc(32, n_carrier_s * n_ant * sizeof(float));
     float *Hi = (float *)aligned_alloc(32, n_carrier_s * n_ant * sizeof(float));
 #endif
 
-    // Convert pilot grid to phasor
+    // Carrier frequencies relative to the centre frequency, negated: the phase of a path in cycles is freq * delay,
+    // computed and reduced to one period in double precision by the DFT kernels
     const dtype *p_carrier = pilot_grid->memptr();
     for (arma::uword i_carrier = 0; i_carrier < n_carrier; ++i_carrier)
-    {
-        double tmp = scale * (double)p_carrier[i_carrier];
-        phasor[i_carrier] = (float)tmp;
-    }
+        freq[i_carrier] = -bandwidth * (double)p_carrier[i_carrier];
     for (arma::uword i_carrier = n_carrier; i_carrier < n_carrier_s; ++i_carrier)
-        phasor[i_carrier] = 0.0f;
+        freq[i_carrier] = 0.0;
 
     // Call DFT function
 #if BUILD_WITH_AVX2
     if (runtime_AVX2_Check()) // CPU support for AVX2
     {
         qd_DFT_AVX2(coeff_re->memptr(), coeff_im->memptr(), delay->memptr(),
-                    n_ant, n_path, planar_wave, phasor, n_carrier_s, Hr, Hi);
+                    n_ant, n_path, planar_wave, freq, n_carrier_s, Hr, Hi);
     }
     else
     {
         qd_DFT_GENERIC(coeff_re->memptr(), coeff_im->memptr(), delay->memptr(),
-                       n_ant, n_path, planar_wave, phasor, n_carrier_s, Hr, Hi);
+                       n_ant, n_path, planar_wave, freq, n_carrier_s, Hr, Hi);
     }
 #else // AVX2 disabled
     qd_DFT_GENERIC(coeff_re->memptr(), coeff_im->memptr(), delay->memptr(),
-                   n_ant, n_path, planar_wave, phasor, n_carrier_s, Hr, Hi);
+                   n_ant, n_path, planar_wave, freq, n_carrier_s, Hr, Hi);
 #endif
 
 #if defined(_MSC_VER) // Windows
-    _aligned_free(phasor);
+    _aligned_free(freq);
 #else // Linux
-    free(phasor);
+    free(freq);
 #endif
 
     // Copy data to output
@@ -217,7 +216,7 @@ Compute the baseband frequency response of multiple MIMO channels
 - Batch wrapper around [[baseband_freq_response]], applying it across snapshots in parallel via OpenMP
 - Each element of the input vectors is a cube of shape `[n_rx, n_tx, n_path]`; `delay` supports broadcasting to `[1, 1, n_path]`
 - Output vectors have length `n_out`: either `n_snap` (all snapshots) or `length(i_snap)` (subset)
-- Internal arithmetic is single-precision
+- Same arithmetic as [[baseband_freq_response]]: phase in double precision, sin / cos and sums in single precision
 
 ## Declaration:
 ```
@@ -397,9 +396,13 @@ void quadriga_lib::baseband_freq_response_multi(
 - **`delay`** — Path delays in seconds, vector of `n_freq_in` cubes; only `delay[0]` is used; shape `[n_rx, n_tx, n_path]` or `[1, 1, n_path]`
 - **`freq_in`** — Input sample frequencies, sorted ascending; `[n_freq_in]`
 - **`freq_out`** — Output carrier frequencies (absolute); `[n_carrier]`
-- **`remove_delay_phase`** *(optional)* — Removes baked-in `exp(-j·2π·freq_in[f]·delay)` before SLERP and
-  re-applies analytically at output frequencies; must be `true` for output from
-  [[get_channels_multifreq]] or [[get_channels_spherical]], `false` for pure envelope coefficients
+- **`remove_delay_phase`** *(optional)* — Removes baked-in `exp(-j·2π·freq_in[f]·delay)` before SLERP and re-applies
+  analytically at output frequencies; must be `true` for output from [[get_channels_multifreq]] or
+  [[get_channels_spherical]], `false` for pure envelope coefficients. These channels must be generated with
+  `use_absolute_delays = true`: their coefficients carry the phase of the absolute path length also when `delay` holds
+  relative delays. With relative delays the phase of the TX-RX distance stays in the coefficients and is interpolated
+  across the `freq_in` grid, which gives wrong phases (magnitudes stay right) unless the `freq_in` spacing is far
+  below `c / (TX-RX distance)`
 
 ## Outputs:
 - **`hmat_re`** *(optional)* — Real part of the frequency-domain channel matrix; `[n_rx, n_tx, n_carrier]`

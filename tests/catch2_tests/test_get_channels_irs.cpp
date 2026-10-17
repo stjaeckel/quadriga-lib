@@ -552,3 +552,40 @@ TEST_CASE("Tools - Combine IRS Coord inactive")
     CHECK(interact_coord(1, 5) == 41.0f);
     CHECK(interact_coord(2, 5) == 42.0f);
 }
+
+TEST_CASE("Get Channels IRS - Delay is the sum of both segment path lengths (B-003)")
+{
+    // TX (0,0,0) -> IRS (50,0,0) -> RX (100,0,0); one NLOS path per segment whose path_length exceeds the
+    // TX-FBS-LBS-IRS (IRS-FBS-LBS-RX) polyline. The IRS has one element and a single unit codebook entry.
+    const double C = 299792458.0, fc = 3.0e9, k = 2.0 * arma::datum::pi * fc / C;
+    auto ant = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    auto irs = ant.copy();
+    irs.coupling_re.ones(1, 1);
+    irs.coupling_im.reset();
+
+    arma::mat f1 = arma::vec({20.0, 15.0, 0.0}), l1 = arma::vec({35.0, 15.0, 0.0});
+    arma::mat f2 = arma::vec({60.0, -10.0, 0.0}), l2 = arma::vec({85.0, -10.0, 0.0});
+    const double poly_1 = 25.0 + 15.0 + std::sqrt(15.0 * 15.0 + 15.0 * 15.0);
+    const double poly_2 = std::sqrt(10.0 * 10.0 + 10.0 * 10.0) + 25.0 + std::sqrt(15.0 * 15.0 + 10.0 * 10.0);
+
+    arma::vec g = {1.0};
+    arma::mat M = arma::vec({1.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0});
+    arma::cube cr, ci, dl;
+
+    for (double extra : {0.0, 7.5})
+    {
+        arma::vec pl1 = {extra > 0.0 ? poly_1 + extra : 0.0}, pl2 = {extra > 0.0 ? poly_2 + 2.0 * extra : 0.0};
+        const double L = poly_1 + poly_2 + 3.0 * extra;
+        quadriga_lib::get_channels_irs<double>(&ant, &ant, &irs,
+                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                               100.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                               50.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                               &f1, &l1, &g, &pl1, &M, &f2, &l2, &g, &pl2, &M,
+                                               &cr, &ci, &dl, 0, -200.0, fc, true);
+        REQUIRE(dl.n_slices == 1);
+        CHECK(std::abs(dl(0) * C - L) < 1e-6);
+        const double a = std::hypot(cr(0), ci(0));
+        CHECK(std::abs(cr(0) / a - std::cos(k * L)) < 1e-6);
+        CHECK(std::abs(ci(0) / a + std::sin(k * L)) < 1e-6);
+    }
+}

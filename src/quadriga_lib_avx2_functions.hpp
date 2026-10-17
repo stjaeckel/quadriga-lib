@@ -66,7 +66,7 @@ void qd_DFT_AVX2(const dtype *CFr,       // Channel coefficients, real part, Siz
                  const size_t n_ant,     // Number of MIMO sub-links
                  const size_t n_path,    // Number multipath components
                  const bool planar_wave, // Indicator that same delays are used for all antennas
-                 const float *phasor,    // Phasor, -pi/2 to pi/2, aligned to 32 byte, Size [ n_carrier ]
+                 const double *freq,     // Carrier frequencies -bandwidth * pilot_grid in [Hz], aligned to 32 byte, Size [ n_carrier ]
                  const size_t n_carrier, // Number of carriers, mutiple of 8
                  float *Hr,              // Channel matrix, real part, Size [ n_carrier, n_ant ]
                  float *Hi);             // Channel matrix, imaginary part, Size [ n_carrier, n_ant ]
@@ -79,7 +79,7 @@ void qd_coeff_combine_avx2(const dtype *__restrict pVrr, const dtype *__restrict
                            const dtype *__restrict pHrr, const dtype *__restrict pHri, // RX H-pol pattern (real, imag), length n_links
                            const dtype *__restrict pVtr, const dtype *__restrict pVti, // TX V-pol pattern (real, imag), length n_links
                            const dtype *__restrict pHtr, const dtype *__restrict pHti, // TX H-pol pattern (real, imag), length n_links
-                           const dtype *__restrict pM,                                 // Polarization transfer matrix, 8 values broadcast over all links: {Re_VV, Im_VV, Re_HV, Im_HV, Re_VH, Im_VH, Re_HH, Im_HH}
+                           const dtype *__restrict pM,                                 // Polarization transfer matrix, 8 values broadcast over all links: {Re_VV, Im_VV, Re_HV, Im_HV, Re_VH, Im_VH, Re_HH, Im_HH}, labels <rx><tx>
                            const dtype *__restrict p_delays,                           // Per-link path lengths in [m], length n_links  (read-only)
                            dtype wave_number,                                          // 2*pi*f/c
                            dtype wavelength,                                           // wavelength  : c/f

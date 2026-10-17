@@ -19,15 +19,27 @@ Compute channel coefficients for spherical waves across multiple frequencies
 - `path_gain` is interpolated linearly; `M` is interpolated via SLERP per complex entry pair to preserve phase
 - Extrapolation clamps to the nearest frequency entry on all four grids
 - `propagation_speed` supports EM (speed of light, default) and acoustic (343 m/s) simulations
-- `M` accepts 8 rows (full polarimetric: ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH) or 2 rows (scalar pressure: ReVV, ImVV only)
+- `M` accepts 8 rows (full polarimetric: the 2x2 Jones matrix (rows = RX polarisation V/H, columns = TX polarisation
+  V/H), stored column-major with Re/Im interleaved: rows 1-2 = (V rx, V tx), rows 3-4 = (H rx, V tx),
+  rows 5-6 = (V rx, H tx), rows 7-8 = (H rx, H tx)) or 2 rows (scalar pressure: Re, Im of the (V rx, V tx) entry only)
+- NLOS paths: the path length between the TX and RX phase centres is `max(path_length, d_poly)`, where `d_poly` is the
+  TX-FBS-LBS-RX polyline length; the length beyond the polyline (interactions between FBS and LBS) is added to the
+  FBS-LBS segment. Delays and phases follow this length; the per-element offsets follow the FBS / LBS geometry.
 - Coupling matrices are interpolated across frequencies (SLERP for complex pairs), identical to antenna pattern handling
-- `n_path_out = n_path + 1` if `add_fake_los_path` else `n_path`
+- `n_path_out = n_path + 1` if `add_fake_los_path` else `n_path`: with `add_fake_los_path`, slot 1 holds the LOS path
+  (zero power if no LOS path was found; LOS = the path whose length is closest to the TX-RX distance, within 0.1 mm);
+  a LOS path found in the input is moved to slot 1 and leaves a zero-power path in its original slot
+  (input index + 1); all other paths keep their order, shifted by one slot
 - If `use_absolute_delays` is false, the LOS delay between the TX and RX phase centres is subtracted from all paths;
   per-element delays can then be negative, down to about -(half the TX array size + half the RX array size) /
   `propagation_speed` (both arrays endfire). [[quantize_delays]] rejects delays at or below `-tap_spacing / 2`. For
   acoustics (`propagation_speed` about 343 m/s) that happens for practically every array: at 48 kHz taps, half sizes
   adding up to more than about 3.6 mm (a 5 cm microphone pair already exceeds it); for radio at 5 ns taps, about
   0.75 m. Use `use_absolute_delays = true` in that case
+- The coefficients always carry the phase of the absolute path length, also when `use_absolute_delays` is false.
+  [[baseband_freq_response]] in multi-frequency mode removes the phase of `delay` before it interpolates across
+  `center_freq`, so it needs channels generated with `use_absolute_delays = true`; with relative delays, the phase of
+  the TX-RX distance stays in the coefficients, is interpolated across the frequency grid and gives wrong phases
 
 ## Usage:
 ```
@@ -42,8 +54,10 @@ Compute channel coefficients for spherical waves across multiple frequencies
 - **`fbs_pos`** — First-bounce scatterer positions; `[3, n_path]`
 - **`lbs_pos`** — Last-bounce scatterer positions; `[3, n_path]`
 - **`path_gain`** — Linear-scale path gains per input frequency; `[n_path, n_freq_in]`
-- **`path_length`** — Absolute TX-to-RX path lengths; `[n_path, 1]`
-- **`M`** — Polarization transfer matrix; `[8, n_path, n_freq_in]` (full pol, interleaved Re/Im for VV, VH, HV, HH) or `[2, n_path, n_freq_in]` (scalar pressure: ReVV, ImVV only)
+- **`path_length`** — Absolute TX-to-RX path lengths (between the phase centres); values shorter than the
+  TX-FBS-LBS-RX polyline (e.g. 0) use the polyline length; `[n_path, 1]`
+- **`M`** — Polarization transfer matrix, row order as above; `[8, n_path, n_freq_in]` (full pol) or
+  `[2, n_path, n_freq_in]` (scalar pressure)
 - **`tx_pos`** — Transmitter position; `[3, 1]`
 - **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `[3, 1]`
 - **`rx_pos`** — Receiver position; `[3, 1]`
@@ -51,7 +65,8 @@ Compute channel coefficients for spherical waves across multiple frequencies
 - **`freq_in`** — Input sample frequencies for `path_gain` and `M`; `[n_freq_in, 1]`
 - **`freq_out`** — Target output frequencies; `[n_freq_out, 1]`
 - **`use_absolute_delays`** — If `true`, delays include the LOS component; default: `false`
-- **`add_fake_los_path`** — If `true`, prepends a zero-power LOS path when none is present; default: `false`
+- **`add_fake_los_path`** — If `true`, always adds one output path; slot 1 holds the LOS path (zero power if none was
+  found); a LOS path found in the input leaves a zero-power path in its original slot; default: `false`
 - **`propagation_speed`** — Wave speed in m/s; use ~343.0 for acoustics; default: `299792458.0`
 
 ## Outputs:

@@ -490,6 +490,8 @@ static inline void qd_power_mat(size_t n, size_t m,                             
 //
 //   Jones product (complex multiply-accumulate across 4 polarization components):
 //     c = Vr * M_VV * Vt  +  Hr * M_HV * Vt  +  Vr * M_VH * Ht  +  Hr * M_HH * Ht
+//   with labels M_<rx><tx> (first letter: RX polarisation, second: TX polarisation), i.e. pM holds the 2x2 Jones
+//   matrix column-major: rows 0-1 = (V rx, V tx), 2-3 = (H rx, V tx), 4-5 = (V rx, H tx), 6-7 = (H rx, H tx).
 //   where Vr, Hr, Vt, Ht and M_xx are complex, giving complex c = re + j*im.
 //
 //   Phase rotation from element-specific path delay:
@@ -501,7 +503,7 @@ inline void qd_coeff_combine(const dtype *pVrr, const dtype *pVri, // RX V-pol p
                              const dtype *pHrr, const dtype *pHri, // RX H-pol pattern (real, imag), length n_links
                              const dtype *pVtr, const dtype *pVti, // TX V-pol pattern (real, imag), length n_links
                              const dtype *pHtr, const dtype *pHti, // TX H-pol pattern (real, imag), length n_links
-                             const dtype *pM,                      // Polarization transfer matrix, 8 values broadcast over all links: {Re_VV, Im_VV, Re_HV, Im_HV, Re_VH, Im_VH, Re_HH, Im_HH}
+                             const dtype *pM,                      // Polarization transfer matrix, 8 values broadcast over all links: {Re_VV, Im_VV, Re_HV, Im_HV, Re_VH, Im_VH, Re_HH, Im_HH}, labels <rx><tx>
                              const dtype *p_delays,                // Per-link path lengths in [m], length n_links  (read-only)
                              dtype wave_number,                    // 2*pi*f/c
                              dtype wavelength,                     // wavelength  : c/f

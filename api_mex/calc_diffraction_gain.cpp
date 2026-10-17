@@ -64,8 +64,9 @@ Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh
   default (bounded by 0 and 1), absolute propagation gain when `apply_fspl = true`
 - **`xprmat`** — Normalized polarization transfer matrix: the amplitude carries no path gain (max column
   power is 1), only the relative polarization coupling and phase; `gain` holds the power. EM mode:
-  interleaved complex, col-major `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]`; `[8, n_pos]`; scalar mode:
-  scalar pressure coefficient `[Re Im]`; `[2, n_pos]`
+  interleaved complex, col-major `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]` with labels `<rx><tx>`:
+  rows 1-2 = (V rx, V tx), rows 3-4 = (H rx, V tx), rows 5-6 = (V rx, H tx), rows 7-8 = (H rx, H tx), the row order
+  of `M` in [[get_channels_spherical]]; `[8, n_pos]`; scalar mode: scalar pressure coefficient `[Re Im]`; `[2, n_pos]`
 - **`coord`** — Diffracted path coordinates excluding endpoints; `[3, n_seg-1, n_pos]`
 
 ## See also:

@@ -16,7 +16,10 @@ Calculate MIMO channel coefficients for planar wave paths
   paths under the planar wave assumption.
 - Interpolates antenna patterns for both arrays, accounting for element positions, orientation, and polarization.
 - LOS path detection is distance-based; the input angles are not used for LOS detection.
-- Polarization coupling is applied via the 8-row transfer matrix `M` (interleaved Re/Im for VV, VH, HV, HH).
+- Polarization coupling is applied via the 8-row transfer matrix `M`: the 2x2 Jones matrix (rows = RX polarisation
+  V/H, columns = TX polarisation V/H), stored column-major with Re/Im interleaved: rows 0-1 = (V rx, V tx),
+  rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx).
+- `path_length` is used as given for the delay and phase of the phase centres (no geometry check).
 - Path data is given for `n_freq` frequencies; single-frequency data uses `n_freq = 1`.
 - The scalar argument `freq` selects the frequency index that is processed; a single frequency is returned per call.
 - If `center_freq` is `None` or the selected entry is `0`, phase calculation is disabled and only delays are computed.
@@ -25,8 +28,10 @@ Calculate MIMO channel coefficients for planar wave paths
   negative, down to about -(half the TX array size + half the RX array size) / speed of light; [[quantize_delays]] rejects
   delays at or below `-tap_spacing / 2` (at 5 ns taps: half sizes adding up to more than about 0.75 m), use
   `use_absolute_delays = true` in that case.
-- If `add_fake_los_path == True`, a zero-power LOS path is prepended when none is present, making the
-  output size `n_path + 1`.
+- If `add_fake_los_path == True`, one output path is always added (output size `n_path + 1`): slot 0 holds the LOS
+  path, with zero power if no LOS path was found. LOS = the strongest path whose `path_length` is within 0.1 mm of the
+  TX-RX distance; it is moved to slot 0 and its original slot (input index + 1) holds a zero-power path. All other
+  paths keep their order, shifted by one slot.
 - `complex=True` returns one combined complex coefficient array `coeff`; `complex=False` (default) returns
   separate real `coeff_re` and `coeff_im` via a zero-copy fast path.
 
@@ -50,8 +55,7 @@ coeff_re, coeff_im, delays, rx_Doppler = quadriga_lib.arrayant.get_channels_plan
 - **`eoa`** — Arrival elevation angles in rad; `(n_path,)`
 - **`path_gain`** — Path gains in linear scale; `(n_path, n_freq)`
 - **`path_length`** — Total path lengths from TX to RX phase center; `(n_path,)`
-- **`M`** — Polarization transfer matrix, interleaved Re/Im; `(8, n_path, n_freq)`
-  (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH)
+- **`M`** — Polarization transfer matrix, Jones row order as above; `(8, n_path, n_freq)`
 - **`tx_pos`** — Transmitter position in Cartesian coordinates; `(3,)`
 - **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `(3,)`
 - **`rx_pos`** — Receiver position in Cartesian coordinates; `(3,)`
@@ -59,7 +63,8 @@ coeff_re, coeff_im, delays, rx_Doppler = quadriga_lib.arrayant.get_channels_plan
 - **`center_freq`** — Center frequencies in Hz; `(n_freq,)`; set an entry to `0` or pass `None` to skip
   phase computation; default: `None`
 - **`use_absolute_delays`** — If `True`, delays include the LOS component; default: `False`
-- **`add_fake_los_path`** — If `True`, prepends a zero-power LOS path when none is present; default: `False`
+- **`add_fake_los_path`** — If `True`, always adds one output path; slot 0 holds the LOS path (zero power if none was
+  found); a LOS path found in the input leaves a zero-power path in its original slot; default: `False`
 - **`complex`** — If `True`, combine coefficients into a single complex array `coeff`; if `False`, return
   separate `coeff_re` and `coeff_im`; default: `False`
 - **`freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `M` and `center_freq` that is

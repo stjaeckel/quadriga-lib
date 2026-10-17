@@ -101,6 +101,7 @@ namespace quadriga_lib
         uint8_t interact_type[2] = {0, 0};                                  // Type of the first 2 interactions
         float len_acc = 0.0f;                                               // Accumulated path length
         float xprmat[8] = {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f}; // EM: Jones matrix for freq 0, col-major; SCALAR: Pressure coeffs for freqs 0-3
+        // Jones labels <out><in> (= <rx><tx> in get_channels_*): ReHV = H out, V in = rows 2-3; ReVH = V out, H in = rows 4-5
         float *data = nullptr;                                              // Variable-length data buffer
 
         // Data buffer EM:
@@ -317,7 +318,8 @@ namespace quadriga_lib
     // - Outputs are returned in the frequency domain at the given sample positions
     // - Uses AVX2 to accelerate the computations (calculate 8 carriers in parallel)
     // - It is possible to call this function in a loop for multiple snapshots and parallelize this loop using OpenMP
-    // - Internal calculations are done in single precision
+    // - The phase bandwidth * pilot * delay is computed in double precision and reduced to one period; sin / cos,
+    //   coefficients and sums are single precision
     template <typename dtype>
     void baseband_freq_response(const arma::Cube<dtype> *coeff_re,                // Channel coefficients, real part, cube of size [n_rx, n_tx, n_path]
                                 const arma::Cube<dtype> *coeff_im,                // Channel coefficients, imaginary part, cube of size [n_rx, n_tx, n_path]
@@ -333,6 +335,8 @@ namespace quadriga_lib
     // - Applies delay-induced phase rotation analytically at each output carrier frequency
     // - When remove_delay_phase is true (default), undoes the delay phase baked in by get_channels_multifreq
     //   before interpolation, then re-applies it at the output frequency; set to false for pure envelope inputs
+    // - With remove_delay_phase, the channels must be generated with use_absolute_delays = true (the coefficients of
+    //   get_channels_* carry the phase of the absolute path length)
     // - Delays are taken from delay[0] only (frequency-independent geometry); supports [n_rx, n_tx, n_path]
     //   or broadcastable [1, 1, n_path]
     template <typename dtype>

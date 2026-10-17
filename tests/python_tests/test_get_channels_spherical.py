@@ -497,9 +497,26 @@ class TestGetChannelsSpherical(unittest.TestCase):
             ant, ant, fbs_pos, lbs_pos, path_gain, path_length, M,
             [0, 0, 0], [0, 0, 0], [100, 0, 0], [0, 0, 0], 0.0, True, False, angles=True)
 
-        self.assertAlmostEqual(delay[0, 0, 0], d_total / C, places=12)
+        # path_length is longer than the TX-FBS-LBS-RX polyline: the delay follows path_length (B-003)
+        self.assertAlmostEqual(delay[0, 0, 0], path_length[0] / C, places=12)
         self.assertAlmostEqual(aod[0, 0, 0], math.atan2(30.0, 20.0), places=5)
         self.assertAlmostEqual(aoa[0, 0, 0], math.atan2(30.0, -20.0), places=5)
+
+    def test_nlos_path_length_longer_than_polyline(self):
+        # B-003: 3-bounce path via (30,40,0), (50,60,0), (70,40,0) between TX (0,0,0) and RX (100,0,0);
+        # FBS = first, LBS = last interaction, path_length = 100 + 40 * sqrt(2) = 156.5685 m (polyline: 140 m)
+        ant = omni()
+        fbs_pos = np.array([[30.0], [40.0], [0.0]], order='F')
+        lbs_pos = np.array([[70.0], [40.0], [0.0]], order='F')
+        fc = 3.0e9
+        for L, L_exp in ((100.0 + 40.0 * math.sqrt(2.0), 100.0 + 40.0 * math.sqrt(2.0)), (0.0, 140.0)):
+            cr, ci, delay = arrayant.get_channels_spherical(
+                ant, ant, fbs_pos, lbs_pos, np.array([1.0]), np.array([L]), make_M(1),
+                [0, 0, 0], [0, 0, 0], [100, 0, 0], [0, 0, 0], fc, True, False)
+            self.assertAlmostEqual(delay[0, 0, 0] * C, L_exp, places=6)
+            k = 2.0 * PI * fc / C
+            self.assertAlmostEqual(cr[0, 0, 0], math.cos(k * L_exp), places=6)
+            self.assertAlmostEqual(ci[0, 0, 0], -math.sin(k * L_exp), places=6)
 
     # -------------------------------------------------------------------------
     # Zero center frequency disables phase

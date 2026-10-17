@@ -129,6 +129,9 @@ is the coordinator's suggestion from the hunt.
 | B-050 | 02 | Empty `tx_orientation` / `rx_orientation` read back as 3x1 zeros | (a) keep and document (b) marker attribute, read back empty (changes MATLAB/Python output) | (a) | (a) keep the current behaviour, documented; B-050 counts as fixed (2026-10-16) |
 | B-119 | - | HDF5 1.14.6 itself misbehaves on crafted files (`H5Fopen` 4 GB zero-fill, `H5Gopen2` 2^64-byte request) | (a) record as an item, won't fix (b) mitigate | (a) | (a) recorded as B-119, won't fix (upstream) (2026-10-16) |
 | B-002 | 03 | Relative delays of acoustic arrays and of radio arrays of about 1.5 m and more go below -tap_spacing/2 and throw (manager's check of WP-03: a 5 cm microphone pair at 48 kHz already throws) | (a) keep: tapped delay line emulators need non-negative delays; document the limit and point to absolute delays (b) clamp all negative delays (c) allow negative taps | (c) | (a) keep the decision; document the limit in quantize_delays and get_channels_*, and the error message points to use_absolute_delays (2026-10-17) |
+| B-120 | 13 | Circular XPR columns of `calc_cross_polarization_ratio` inverted for the LOS matrix of `get_channels_*` (found in WP-04) | (a) record as an item, fix in WP-13 (b) leave | (a) | (a) recorded as B-120, assigned to WP-13 (2026-10-17) |
+| B-121 | 12 | AVX2-vs-generic ray kernel tests never run (`test_bin` without `BUILD_WITH_AVX2`, found in WP-04) | (a) record as an item, fix first in WP-12 (b) leave | (a) | (a) recorded as B-121, assigned to WP-12 (2026-10-17) |
+| WP-08 | 08 | One shared sin/cos core for the baseband DFT kernels and `fastmath_avx2.h` (proposed by the WP-04 worker) | (a) add to WP-08 as a note (b) leave | (a) | (a) added to WP-08 as a note; the WP-08 worker decides after measuring (2026-10-17) |
 
 ## 5. Work packages
 
@@ -192,7 +195,10 @@ acceptance checks beyond section 3.1. Severities in brackets.
 - Notes: B-003 changes results of every NLOS path whose `path_length` exceeds the polyline; check the existing tests
   that pin delays and the MEX/Python tests. B-020 (phase in double) also removes the baseband route into B-026.
   Decisions B-019, B-069.
-- Acceptance: AVX2 and generic baseband results agree to 1e-6 for delays up to 10 s.
+- Acceptance: AVX2 and generic baseband results agree to 1e-6 for delays up to 10 s. Restated after WP-04: the error
+  must not grow with the delay and stay at single-precision level; measured 5-8e-7 (10 paths) and 1.2-2.9e-6 (100
+  paths, sum of 100 float terms, |H| about 4) at every delay from 1 us to 10 s, AVX2 vs generic and vs an exact
+  reference.
 
 ### WP-05 Python bindings
 
@@ -237,6 +243,11 @@ acceptance checks beyond section 3.1. Severities in brackets.
 - Items: B-026 [S2], B-037 [S3], B-074 [S3], B-075 [S3], B-076 [S3].
 - Files: `src/fastmath_avx2.h`, `src/fastmath_vectorized_avx2.cpp`, `src/fastmath_armadillo.cpp`,
   `src/ray_triangle_intersect.cpp`, `src/ray_point_intersect.cpp` (B-074).
+- Notes after WP-04 (decision 2026-10-17): the baseband DFT kernels have their own sin/cos of 2*pi*r for reduced
+  phases (`qd_sincos_2pi_reduced` in `src/quadriga_lib_generic_functions.hpp`, an AVX2 helper in
+  `src/baseband_freq_response_avx2.cpp`). Consider one shared core with `fastmath_avx2.h`, measured with
+  `build_linux/scratch/fix/WP-04/bench/run_bench.sh`; details in `md/fix_logs/WP-04.md` ("Proposed for WP-08"). Both
+  kernels round with the magic-number trick (exact only without `-ffast-math`); add a comment that says so.
 - Notes: decision B-074. The sin/cos change touches every AVX2 user (antenna interpolation, `qd_coeff_combine_avx2`,
   baseband); compare AVX2 against generic before and after over the ranges of the hunt (area D probes in
   `build_linux/scratch/hunt/D/`).
@@ -274,7 +285,9 @@ acceptance checks beyond section 3.1. Severities in brackets.
 ### WP-12 Geometry
 
 - Items: B-027 [S2], B-028 [S2], B-071 [S3], B-072 [S3], B-073 [S3], B-077 [S3], B-078 [S3], B-079 [S3], B-081 [S3],
-  B-082 [S3], B-084 [S3].
+  B-082 [S3], B-084 [S3], B-121 [S3] (added after WP-04).
+- Notes after WP-04: fix B-121 first (define `BUILD_WITH_AVX2` for `test_bin` when the library has AVX2), so that the
+  AVX2-vs-generic kernel tests run before the kernels change; they may expose B-071.
 - Files: `src/ray_triangle_intersect*.cpp`, `src/ray_point_intersect*.cpp`, `src/point_inside_mesh.cpp`,
   `src/obj_overlap_test.cpp`, `src/subdivide_triangles.cpp`, `src/icosphere.cpp`, `src/cube.cpp`, `src/plane.cpp`.
 - Notes: decisions B-077, B-082. B-027 (shift to a local origin before the float kernel) changes AVX2 results slightly
@@ -283,7 +296,10 @@ acceptance checks beyond section 3.1. Severities in brackets.
 
 ### WP-13 Channel tools
 
-- Items: B-024 [S2], B-025 [S2], B-061 [S3], B-062 [S3], B-066 [S3], B-067 [S3], B-070 [S3], B-083 [S3], B-107 [S4].
+- Items: B-024 [S2], B-025 [S2], B-061 [S3], B-062 [S3], B-066 [S3], B-067 [S3], B-070 [S3], B-083 [S3], B-107 [S4],
+  B-120 [S3] (added after WP-04: circular XPR columns, `src/qd_tools_calc_xpr.cpp`; decide the handedness convention
+  with the user in the prompt if the fix needs it). B-062 also applies to the `freq` array that WP-04 added to
+  `baseband_freq_response`.
 - Files: `src/update_xpr.cpp`, `src/path_to_tube.cpp`, `src/combine_irs_coord.cpp`, `src/baseband_freq_response.cpp`
   (B-062), `src/qd_tools_calc_delay_spread.cpp`, `src/qd_tools_acdf.cpp`, `src/calc_diffraction_gain.cpp` (doc),
   `src/interp.cpp`.
@@ -398,8 +414,8 @@ unexpected changes in the diff; proposed `md/bugs.md` updates; anything the next
 | WP-00 | decisions (section 4) | done 2026-10-15 | - |
 | WP-01 | 11 | done 2026-10-16 (11 of 11 fixed) | 3a7c2cc |
 | WP-02 | 8 | done 2026-10-16 (8 of 8 fixed; round 2: reads back to the old speed) | e8f4edc (round 1), 94a8f33 (round 2) |
-| WP-03 | 4 | done 2026-10-17 (4 of 4 fixed; round 2: limit documented, message points to absolute delays) | commit `WP-03: ...` (hash at next update) |
-| WP-04 | 5 | open | - |
+| WP-03 | 4 | done 2026-10-17 (4 of 4 fixed; round 2: limit documented, message points to absolute delays) | 9e5af26 |
+| WP-04 | 5 | done 2026-10-17 (B-003, B-020 fixed; B-019, B-068, B-069 documented; B-120, B-121 found) | commit `WP-04: ...` (hash at next update) |
 | WP-05 | 12 | open | - |
 | WP-06 | 6 | open | - |
 | WP-07 | 4 | open | - |
@@ -407,8 +423,8 @@ unexpected changes in the diff; proposed `md/bugs.md` updates; anything the next
 | WP-09 | 9 | open | - |
 | WP-10 | 7 | open | - |
 | WP-11 | 5 | open | - |
-| WP-12 | 11 | open | - |
-| WP-13 | 9 | open | - |
+| WP-12 | 12 | open | - |
+| WP-13 | 10 | open | - |
 | WP-14 | 4 | open | - |
 | WP-15 | 9 | open | - |
 | WP-16 | 3 | open | - |
@@ -540,3 +556,5 @@ Repro folders are under `build_linux/scratch/hunt/final/`; run `bash build_linux
 | B-117 | S4 | WP-05 | `G-13` | Python output dtypes and shapes differ from the docs (`qdant_read`, `point_inside_mesh`, `generate_speaker`, `get_ieee_indoor`) |
 | B-118 | S4 | WP-05 | `G-15` | Python single-frequency arrayant dict: a 1-element `center_freq` array gives a numpy DeprecationWarning, 2 elements an unclear error |
 | B-119 | S4 | - | `B-119` | Crafted HDF5 files make HDF5 1.14.6 itself zero-fill about 4 GB in `H5Fopen` or request a 2^64-byte allocation in `H5Gopen2` (upstream; won't fix) |
+| B-120 | S3 | WP-13 | `B-120` | `calc_cross_polarization_ratio`: circular XPR columns inverted for the LOS matrix of `get_channels_*`; per transmit vs per receive polarisation |
+| B-121 | S3 | WP-12 | `B-121` | Test defect: `test_bin` without `BUILD_WITH_AVX2`, the AVX2-vs-generic ray kernel tests never run |

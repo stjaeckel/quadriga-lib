@@ -18,10 +18,16 @@ Calculate the cross-polarization ratio (XPR) for linear and circular polarizatio
 - Inputs are lists so each CIR can have a different number of paths
 - XPR is computed in both the linear V/H basis and the circular LHCP/RHCP basis via the Jones matrix
   transform `M_circ = T · M_lin · T^-1`
-- `M` is stored with interleaved real/imaginary parts, 8 rows per path:
-  `[Re(M_vv); Im(M_vv); Re(M_vh); Im(M_vh); Re(M_hv); Im(M_hv); Re(M_hh); Im(M_hh)]`
-- LOS paths are identified by comparing path length against the direct TX-RX distance `dTR`; paths
-  with `path_length < dTR + window_size` are excluded by default
+- `M` is the 2x2 Jones matrix (rows = RX polarisation V/H, columns = TX polarisation V/H), stored column-major with
+  interleaved real/imaginary parts, 8 rows per path: rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx),
+  rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx). Below, `M_<rx><tx>` names an entry by its receive and transmit
+  polarisation: `M_vv` = rows 0-1, `M_hv` = rows 2-3, `M_vh` = rows 4-5, `M_hh` = rows 6-7
+- V-XPR and H-XPR are ratios per receive polarisation: V-XPR is the power received in V from V transmission over
+  the power received in V from H transmission; H-XPR likewise for the H receive polarisation
+- The circular entries are `M_LL = (M_vv + M_hh + j(M_vh - M_hv)) / 2`, `M_RL = (M_vv - M_hh - j(M_vh + M_hv)) / 2`,
+  `M_LR = (M_vv - M_hh + j(M_vh + M_hv)) / 2`, `M_RR = (M_vv + M_hh - j(M_vh - M_hv)) / 2`
+- LOS paths are identified by comparing path length against the direct TX-RX distance `dTR`; paths with
+  `path_length <= dTR + window_size` are excluded by default
 - Normalization of `M` does not affect XPR (cancels in the ratio) but does affect `pg`
 - If cross-pol power is zero and co-pol is positive, XPR is set to infinity; if both are zero, XPR
   is set to 0
@@ -43,7 +49,7 @@ xpr, pg = quadriga_lib.tools.calc_cross_polarization_ratio( powers, M, path_leng
 - **`tx_pos`** — Transmitter position [x; y; z]; `(3, 1)` (fixed) or `(3, n_cir)` (mobile)
 - **`rx_pos`** — Receiver position [x; y; z]; `(3, 1)` (fixed) or `(3, n_cir)` (mobile)
 - **`include_los`** — If True, includes LOS and near-LOS paths in the XPR calculation; default: False
-- **`window_size`** — LOS exclusion window; paths within `dTR + window_size` are excluded when
+- **`window_size`** — LOS exclusion window; paths with `path_length <= dTR + window_size` are excluded when
   `include_los = False`; default: 0.01
 
 ## Outputs:
@@ -51,8 +57,8 @@ xpr, pg = quadriga_lib.tools.calc_cross_polarization_ratio( powers, M, path_leng
    | Col | Description                                                     |
    | :-: | --------------------------------------------------------------- |
    | 0   | Aggregate linear XPR (total V+H co-pol / total V+H cross-pol)   |
-   | 1   | V-XPR: sum(abs(M_vv)^2) / sum(abs(M_hv)^2)                      |
-   | 2   | H-XPR: sum(abs(M_hh)^2) / sum(abs(M_vh)^2)                      |
+   | 1   | V-XPR: sum(abs(M_vv)^2) / sum(abs(M_vh)^2) (receive V)          |
+   | 2   | H-XPR: sum(abs(M_hh)^2) / sum(abs(M_hv)^2) (receive H)          |
    | 3   | Aggregate circular XPR (total L+R co-pol / total L+R cross-pol) |
    | 4   | LHCP XPR: sum(abs(M_LL)^2) / sum(abs(M_RL)^2)                   |
    | 5   | RHCP XPR: sum(abs(M_RR)^2) / sum(abs(M_LR)^2)                   |

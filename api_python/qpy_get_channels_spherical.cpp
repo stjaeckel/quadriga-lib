@@ -20,7 +20,13 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
   using the spherical wave assumption with per-element phase and delay.
 - Interpolates antenna patterns for both arrays, accounting for element positions and array orientation
   (bank/tilt/heading Euler angles).
-- Polarization coupling is applied via the 8-row transfer matrix `M` (interleaved Re/Im for VV, VH, HV, HH components).
+- Polarization coupling is applied via the 8-row transfer matrix `M`: the 2x2 Jones matrix (rows = RX polarisation
+  V/H, columns = TX polarisation V/H), stored column-major with Re/Im interleaved: rows 0-1 = (V rx, V tx),
+  rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx).
+- NLOS paths: the path length between the TX and RX phase centres is `max(path_length, d_poly)`, where `d_poly` is the
+  TX-FBS-LBS-RX polyline length; the length beyond the polyline (interactions between FBS and LBS, e.g. paths of
+  [[qrt_file_read]] with more than two interactions) is added to the FBS-LBS segment. Delays and phases follow this
+  length; the per-element offsets follow the FBS / LBS geometry.
 - Path data is given for `n_freq` frequencies; single-frequency data uses `n_freq = 1`.
 - The scalar argument `freq` selects the frequency index that is processed; a single frequency is returned per call.
 - If `center_freq` is `None` or the selected entry is `0`, phase calculation is disabled and only delays are computed.
@@ -29,7 +35,10 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
   down to about -(half the TX array size + half the RX array size) / speed of light (both arrays endfire).
   [[quantize_delays]] maps delays above `-tap_spacing / 2` to tap 0 and rejects lower ones (at 5 ns taps: half sizes
   adding up to more than about 0.75 m); use `use_absolute_delays = true` in that case.
-- If `add_fake_los_path == True`, a zero-power LOS path is prepended when no LOS path is detected.
+- LOS detection: the path whose length is closest to the TX-RX distance, within 0.1 mm.
+- If `add_fake_los_path == True`, one output path is always added (`n_path + 1` outputs): slot 0 holds the LOS path,
+  with zero power if no LOS path was found. If a LOS path was found, it is moved to slot 0 and its original slot
+  (input index + 1) holds a zero-power path. All other paths keep their order, shifted by one slot.
 - `complex=True` returns one combined complex coefficient array `coeff`; `complex=False` (default) returns
   separate real `coeff_re` and `coeff_im` via a zero-copy fast path
 
@@ -63,16 +72,18 @@ coeff_re, coeff_im, delays = quadriga_lib.arrayant.get_channels_spherical( ..., 
 - **`fbs_pos`** — First-bounce scatterer positions; `(3, n_path)`, or a list of length `n_out` in batch mode
 - **`lbs_pos`** — Last-bounce scatterer positions; `(3, n_path)`, or a list of length `n_out` in batch mode
 - **`path_gain`** — Path gains in linear scale; `(n_path, n_freq)`, or a list of length `n_out` in batch mode
-- **`path_length`** — Total path lengths from TX to RX phase center; `(n_path,)`, or a list of length `n_out` in batch mode
-- **`M`** — Polarization transfer matrix, interleaved Re/Im; `(8, n_path, n_freq)`, or a list of length
-  `n_out` in batch mode; (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH)
+- **`path_length`** — Total path lengths from TX to RX phase center; values shorter than the TX-FBS-LBS-RX polyline
+  (e.g. 0) use the polyline length; `(n_path,)`, or a list of length `n_out` in batch mode
+- **`M`** — Polarization transfer matrix, Jones row order as above; `(8, n_path, n_freq)`, or a list of length `n_out`
+  in batch mode
 - **`tx_pos`** — Transmitter position in Cartesian coordinates; `(3,)`, or `(3, n_out)` in batch mode
 - **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `(3,)`, or `(3, n_out)` in batch mode
 - **`rx_pos`** — Receiver position in Cartesian coordinates; `(3,)`, or `(3, n_out)` in batch mode
 - **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading); `(3,)`, or `(3, n_out)` in batch mode
 - **`center_freq`** — Center frequencies in Hz; `(n_freq,)`; set an entry to `0` or pass `None` to skip phase computation; default: `None`
 - **`use_absolute_delays`** — If `True`, delays include the LOS component; default: `False`
-- **`add_fake_los_path`** — If `True`, prepends a zero-power LOS path when none is present; default: `False`
+- **`add_fake_los_path`** — If `True`, always adds one output path; slot 0 holds the LOS path (zero power if none was
+  found); a LOS path found in the input leaves a zero-power path in its original slot; default: `False`
 - **`angles`** — If `True`, also return departure/arrival angles in antenna-local coordinates; default: `False`
 - **`complex`** — If `True`, combine coefficients into a single complex array `coeff`; if `False`, return
   separate `coeff_re` and `coeff_im`; default: `False`

@@ -1291,9 +1291,9 @@ TEST_CASE("Get Channels Spherical - FBS and LBS at different positions")
         &coeff_re, &coeff_im, &delay, 0.0, true, false,
         &aod, &eod, &aoa, &eoa);
 
-    // Per-element NLOS delay is computed from geometry: TX→FBS + FBS→LBS + LBS→RX
-    // path_length only affects LOS/NLOS branch selection, not the stored delay
-    CHECK(std::abs(delay.at(0, 0, 0) - d_shortest / C) < 1.0e-14);
+    // The NLOS delay follows path_length when it is longer than TX→FBS + FBS→LBS + LBS→RX (B-003): the extra
+    // length belongs to interactions between FBS and LBS
+    CHECK(std::abs(delay.at(0, 0, 0) - path_length(0) / C) < 1.0e-14);
 
     // AOD should point toward FBS: atan2(30, 20)
     double expected_aod = std::atan2(30.0, 20.0);
@@ -1769,4 +1769,152 @@ TEST_CASE("Get Channels Spherical - Fake LOS swaps true LOS to first slice")
     float amp2 = std::sqrt(coeff_re.at(0, 0, 2) * coeff_re.at(0, 0, 2) +
                            coeff_im.at(0, 0, 2) * coeff_im.at(0, 0, 2));
     CHECK(std::abs(amp2) < 1.0e-6f);
+}
+
+TEST_CASE("Get Channels Spherical - NLOS delay and phase follow path_length (B-003)")
+{
+    // TX (0,0,0), RX (100,0,0); 3-bounce path via (30,40,0), (50,60,0), (70,40,0) as coord2path / qrt_file_read
+    // return it: FBS = first, LBS = last interaction, path_length = full length 50 + 2 * 28.284 + 50 = 156.5685 m.
+    // The geometric TX-FBS-LBS-RX polyline is only 140 m.
+    const double C = 299792458.0, fc = 3.0e9, k = 2.0 * arma::datum::pi * fc / C;
+    auto ant = quadriga_lib::generate_arrayant_omni<double>(10.0);
+
+    arma::u32_vec no_int = {3};
+    arma::mat coord = {{30.0, 50.0, 70.0}, {40.0, 60.0, 40.0}, {0.0, 0.0, 0.0}};
+    arma::vec len;
+    arma::mat fbs, lbs;
+    quadriga_lib::coord2path<double>(0, 0, 0, 100, 0, 0, &no_int, &coord, &len, &fbs, &lbs);
+    const double L_true = 100.0 + 40.0 * std::sqrt(2.0);
+    REQUIRE(std::abs(len(0) - L_true) < 1e-9);
+
+    arma::vec gain = {1.0};
+    arma::mat M = arma::vec({1.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0});
+    arma::cube cr, ci, dl;
+
+    // path_length longer than the polyline: delay and phase follow path_length
+    for (double L : {L_true, 300.0})
+    {
+        arma::vec pl = {L};
+        quadriga_lib::get_channels_spherical<double>(&ant, &ant, 0, 0, 0, 0, 0, 0, 100, 0, 0, 0, 0, 0,
+                                                     &fbs, &lbs, &gain, &pl, &M, &cr, &ci, &dl, fc, true, false);
+        CHECK(std::abs(dl(0) * C - L) < 1e-6);
+        CHECK(std::abs(cr(0) - std::cos(k * L)) < 1e-6);
+        CHECK(std::abs(ci(0) + std::sin(k * L)) < 1e-6);
+
+        // Relative delays subtract the TX-RX distance (100 m)
+        quadriga_lib::get_channels_spherical<double>(&ant, &ant, 0, 0, 0, 0, 0, 0, 100, 0, 0, 0, 0, 0,
+                                                     &fbs, &lbs, &gain, &pl, &M, &cr, &ci, &dl, fc, false, false);
+        CHECK(std::abs(dl(0) * C - (L - 100.0)) < 1e-6);
+    }
+
+    // path_length shorter than the polyline (or 0): the polyline length is used
+    for (double L : {0.0, 120.0, 140.0})
+    {
+        arma::vec pl = {L};
+        quadriga_lib::get_channels_spherical<double>(&ant, &ant, 0, 0, 0, 0, 0, 0, 100, 0, 0, 0, 0, 0,
+                                                     &fbs, &lbs, &gain, &pl, &M, &cr, &ci, &dl, fc, true, false);
+        CHECK(std::abs(dl(0) * C - 140.0) < 1e-6);
+        CHECK(std::abs(cr(0) - std::cos(k * 140.0)) < 1e-6);
+        CHECK(std::abs(ci(0) + std::sin(k * 140.0)) < 1e-6);
+    }
+
+    // MIMO: the per-element spherical offsets of the polyline are kept, the phase-centre length is path_length
+    auto tx = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    tx.copy_element(0, 1);
+    tx.element_pos.zeros(3, 2);
+    tx.element_pos(1, 0) = -0.3, tx.element_pos(1, 1) = 0.3, tx.element_pos(2, 1) = 0.1;
+    auto rx = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    rx.copy_element(0, 1);
+    rx.copy_element(0, 2);
+    rx.element_pos.zeros(3, 3);
+    rx.element_pos(0, 0) = 0.2, rx.element_pos(1, 1) = 0.25, rx.element_pos(2, 2) = -0.15;
+    tx.coupling_re.eye(2, 2), tx.coupling_im.reset();
+    rx.coupling_re.eye(3, 3), rx.coupling_im.reset();
+
+    arma::vec pl = {L_true};
+    quadriga_lib::get_channels_spherical<double>(&tx, &rx, 0, 0, 0, 0, 0, 0, 100, 0, 0, 0, 0, 0,
+                                                 &fbs, &lbs, &gain, &pl, &M, &cr, &ci, &dl, fc, true, false);
+    REQUIRE(dl.n_rows == 3);
+    REQUIRE(dl.n_cols == 2);
+    const arma::vec F = fbs.col(0), B = lbs.col(0), T0 = {0.0, 0.0, 0.0}, R0 = {100.0, 0.0, 0.0};
+    for (arma::uword t = 0; t < 2; ++t)
+        for (arma::uword r = 0; r < 3; ++r)
+        {
+            arma::vec Tt = T0 + tx.element_pos.col(t), Rr = R0 + rx.element_pos.col(r);
+            double expected = L_true + (arma::norm(F - Tt) - arma::norm(F - T0)) + (arma::norm(B - Rr) - arma::norm(B - R0));
+            CHECK(std::abs(dl(r, t, 0) * C - expected) < 1e-6);
+            CHECK(std::abs(cr(r, t, 0) - std::cos(k * expected)) < 1e-6);
+            CHECK(std::abs(ci(r, t, 0) + std::sin(k * expected)) < 1e-6);
+        }
+}
+
+TEST_CASE("Get Channels Spherical - add_fake_los_path layout (B-068)")
+{
+    // add_fake_los_path always adds one output path; slot 0 holds the LOS path (zero power if none was found);
+    // if a LOS path was present, its original slot holds a zero-power path.
+    const double C = 299792458.0;
+    auto omni = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    arma::mat F(3, 3); // TX (0,0,0), RX (50,0,0)
+    F.col(0) = arma::vec({20, 20, 0}), F.col(2) = arma::vec({30, -25, 0});
+    arma::vec G = {0.5, 1.0, 0.25};
+    arma::mat M(8, 3, arma::fill::zeros);
+    M.row(0).fill(1.0), M.row(6).fill(-1.0);
+    arma::cube cr, ci, dl;
+
+    // Case 1: LOS path at input index 1 (FBS on the TX-RX line, path_length = 50)
+    F.col(1) = arma::vec({25, 0, 0});
+    arma::vec PL = {0.0, 50.0, 0.0};
+    quadriga_lib::get_channels_spherical<double>(&omni, &omni, 0, 0, 0, 0, 0, 0, 50, 0, 0, 0, 0, 0, &F, &F, &G, &PL, &M,
+                                                 &cr, &ci, &dl, 1e9, true, true);
+    REQUIRE(cr.n_slices == 4);
+    arma::vec p = arma::vectorise(arma::square(cr) + arma::square(ci));
+    CHECK(std::abs(p(0) - 1.0) < 1e-9);  // LOS moved to slot 0
+    CHECK(std::abs(p(1) - 0.5) < 1e-9);  // input path 0
+    CHECK(p(2) == 0.0);                  // original slot of the LOS path: zero power
+    CHECK(std::abs(p(3) - 0.25) < 1e-9); // input path 2
+    CHECK(std::abs(dl(0) * C - 50.0) < 1e-6);
+    CHECK(std::abs(dl(2) * C - 50.0) < 1e-6);
+
+    // Case 2: no LOS path (input path 1 is NLOS)
+    F.col(1) = arma::vec({25, 10, 0});
+    quadriga_lib::get_channels_spherical<double>(&omni, &omni, 0, 0, 0, 0, 0, 0, 50, 0, 0, 0, 0, 0, &F, &F, &G, &PL, &M,
+                                                 &cr, &ci, &dl, 1e9, true, true);
+    REQUIRE(cr.n_slices == 4);
+    p = arma::vectorise(arma::square(cr) + arma::square(ci));
+    CHECK(p(0) == 0.0); // zero-power LOS path
+    CHECK(std::abs(p(1) - 0.5) < 1e-9);
+    CHECK(std::abs(p(2) - 1.0) < 1e-9);
+    CHECK(std::abs(p(3) - 0.25) < 1e-9);
+    CHECK(std::abs(dl(0) * C - 50.0) < 1e-6);
+}
+
+TEST_CASE("Get Channels Spherical - Rows of M follow the Jones convention rx by tx (B-069)")
+{
+    // M is the 2x2 Jones matrix (rows = RX polarisation V/H, columns = TX polarisation V/H), column-major,
+    // Re/Im interleaved: rows 0-1 = (V rx, V tx), 2-3 = (H rx, V tx), 4-5 = (V rx, H tx), 6-7 = (H rx, H tx)
+    auto v = quadriga_lib::generate_arrayant_omni<double>(10.0); // V-pol
+    auto h = v;                                                  // H-pol
+    std::swap(h.e_theta_re, h.e_phi_re);
+    std::swap(h.e_theta_im, h.e_phi_im);
+    arma::mat F = arma::vec({50.0, 20.0, 0.0});
+    arma::vec g = {1.0}, L = {0.0};
+
+    auto amp = [&](const quadriga_lib::arrayant<double> &tx, const quadriga_lib::arrayant<double> &rx, int row)
+    {
+        arma::mat M(8, 1, arma::fill::zeros);
+        M(row) = 1.0;
+        arma::cube cr, ci, dl;
+        quadriga_lib::get_channels_spherical<double>(&tx, &rx, 0, 0, 0, 0, 0, 0, 100, 0, 0, 0, 0, 0, &F, &F, &g, &L, &M,
+                                                     &cr, &ci, &dl, 0.0);
+        return std::hypot(cr(0), ci(0));
+    };
+
+    // Only the row of the matching (rx, tx) pair couples
+    for (int row : {0, 2, 4, 6})
+    {
+        CHECK(std::abs(amp(v, v, row) - (row == 0 ? 1.0 : 0.0)) < 1e-12);
+        CHECK(std::abs(amp(v, h, row) - (row == 2 ? 1.0 : 0.0)) < 1e-12); // TX V, RX H
+        CHECK(std::abs(amp(h, v, row) - (row == 4 ? 1.0 : 0.0)) < 1e-12); // TX H, RX V
+        CHECK(std::abs(amp(h, h, row) - (row == 6 ? 1.0 : 0.0)) < 1e-12);
+    }
 }
