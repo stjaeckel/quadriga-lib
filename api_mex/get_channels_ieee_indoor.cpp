@@ -104,7 +104,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     double speed_station_kmh = (nrhs < 9) ? 0.0 : qd_mex_get_scalar<double>(prhs[8], "speed_station_kmh", 0.0);
     double speed_env_kmh = (nrhs < 10) ? 1.2 : qd_mex_get_scalar<double>(prhs[9], "speed_env_kmh", 1.2);
     arma::vec Dist = (nrhs < 11) ? arma::vec{4.99} : qd_mex_get_Col<double>(prhs[10]);
-    arma::uvec n_floors = (nrhs < 12) ? arma::uvec{0} : qd_mex_get_Col<arma::uword>(prhs[11]);
+    arma::uvec n_floors = (nrhs < 12) ? arma::uvec{0} : qd_mex_get_Col<arma::uword>(prhs[11], false, "n_floors");
     bool uplink = (nrhs < 13) ? false : qd_mex_get_scalar<bool>(prhs[12], "uplink", false);
     arma::mat offset_angles = (nrhs < 14) ? arma::mat{} : qd_mex_get_Mat<double>(prhs[13]);
     arma::uword n_subpath = (nrhs < 15) ? 20 : qd_mex_get_scalar<arma::uword>(prhs[14], "n_subpath", 20);
@@ -115,7 +115,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     double SF_std_dB_LOS = (nrhs < 20) ? NAN : qd_mex_get_scalar<double>(prhs[19], "SF_std_dB_LOS", NAN);
     double SF_std_dB_NLOS = (nrhs < 21) ? NAN : qd_mex_get_scalar<double>(prhs[20], "SF_std_dB_NLOS", NAN);
     double dBP_m = (nrhs < 22) ? NAN : qd_mex_get_scalar<double>(prhs[21], "dBP_m", NAN);
-    arma::uvec n_walls = (nrhs < 23) ? arma::uvec{0} : qd_mex_get_Col<arma::uword>(prhs[22]);
+    arma::uvec n_walls = (nrhs < 23) ? arma::uvec{0} : qd_mex_get_Col<arma::uword>(prhs[22], false, "n_walls");
     double wall_loss = (nrhs < 24) ? 5.0 : qd_mex_get_scalar<double>(prhs[23], "wall_loss", 5.0);
 
     // Declare outputs

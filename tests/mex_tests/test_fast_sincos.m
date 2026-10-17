@@ -70,4 +70,25 @@ s1 = quadriga_lib.fast_sincos(x, []);
 assertTrue(isequal(s1, s0));
 assertTrue(isa(s1, 'single'));
 assert_close(s1, sin(x), 1e-6);
+
+%% Malformed input is rejected by the MEX helpers
+assert_cpp_error( @() quadriga_lib.fast_sincos( sparse([0 0 1.5]) ), 'Sparse inputs are not supported.' );
+assert_cpp_error( @() quadriga_lib.fast_sincos( [0 0 1.5], sparse(true) ), 'Input ''cosineOnly'' is sparse' );
+assert_cpp_error( @() quadriga_lib.fast_sincos( ones(2,2,2,2,2) ), 'Inputs with more than 4 dimensions are not supported.' );
+s = quadriga_lib.fast_sincos( ones(2,2,2,2) );                  % 4 dimensions are supported (all 16 values)
+assertEqual( numel(s), 16 );
+end
+
+% Assert that fn() raises quadriga_lib:CPPerror with a message that contains expected (substring).
+% One output is requested: without outputs, the wrapper returns before it reads the inputs.
+function assert_cpp_error(fn, expected)
+try
+    [~] = fn();
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if ~strcmp(ME.identifier, 'quadriga_lib:CPPerror') || isempty(strfind(ME.message, expected)) %#ok<STREMP>
+        error('moxunit:exceptionNotRaised', ['EXPECTED: quadriga_lib:CPPerror "', expected, '", GOT: ', ...
+            ME.identifier, ' "', ME.message, '"']);
+    end
+end
 end

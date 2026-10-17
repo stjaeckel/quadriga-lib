@@ -294,6 +294,8 @@ acceptance checks beyond section 3.1. Severities in brackets.
 
 - Items: B-027 [S2], B-028 [S2], B-071 [S3], B-072 [S3], B-073 [S3], B-077 [S3], B-078 [S3], B-079 [S3], B-081 [S3],
   B-082 [S3], B-084 [S3], B-121 [S3] (added after WP-04).
+- Notes after WP-06: the MEX side of `icosphere(-1)` / `icosphere(NaN)` is fixed, but the C++ `icosphere` still writes
+  out of bounds for very large `n_div` (B-078; the C++ part of repro `F-6` still segfaults).
 - Notes after WP-04: fix B-121 first (define `BUILD_WITH_AVX2` for `test_bin` when the library has AVX2), so that the
   AVX2-vs-generic kernel tests run before the kernels change; they may expose B-071.
 - Files: `src/ray_triangle_intersect*.cpp`, `src/ray_point_intersect*.cpp`, `src/point_inside_mesh.cpp`,
@@ -330,6 +332,8 @@ acceptance checks beyond section 3.1. Severities in brackets.
   `api_mex/arrayant_qdant_read.cpp`, `api_mex/calc_diffraction_gain.cpp`, `api_mex/generate_diffraction_paths.cpp`,
   `api_python/qpy_calc_diffraction_gain.cpp`, `src/generate_diffraction_paths.cpp`, `api_mex/get_channels_*.cpp`,
   `src/get_channels_*.cpp` (B-113), `api_mex/arrayant_rotate_pattern.cpp`.
+- Notes after WP-06: MEX `subdivide_triangles` and `triangle_mesh_segmentation` subtract 1 from `mtl_ind_in`, which is
+  1-based in C++ with 0 = "no material", so an input 0 wraps around (related to B-089).
 - Notes after WP-05: Python `hdf5_write_channel` and `hdf5_read_layout` still return uint32, while `hdf5_create_file`
   returns int64 since WP-05 (B-116); align them with the integer-output rule of the Python spec.
 - Notes: decisions B-087, B-088, B-091, B-092, B-095, B-113. B-088 changes the C++ defaults of
@@ -351,6 +355,8 @@ acceptance checks beyond section 3.1. Severities in brackets.
 - Left open by earlier packages: `CMakeLists.txt:498` (MATLAB API section) still says MATLAB links quadriga_static "to
   avoid conflicts with MATLAB's own bundled libhdf5.so"; the static link does not separate the HDF5 libraries, the
   different soname of the system HDF5 does (see the comment at `CMakeLists.txt:196`, rewritten in WP-01).
+- From WP-06: `include/quadriga_tools.hpp` calls `obj_ind` of `obj_file_write` "1-based"; the C++ code and its
+  documentation block use 0-based indices.
 - From WP-03: `src/qd_channel_quantize_delays.cpp`: a NaN `power_exponent` passes the `<= 0` check and gives NaN
   coefficients (reject it); the short parameter comments of `quantize_delays` in `include/quadriga_channel.hpp`
   (around line 368) do not mention the valid delay range or the shape rule.
@@ -426,8 +432,8 @@ unexpected changes in the diff; proposed `md/bugs.md` updates; anything the next
 | WP-02 | 8 | done 2026-10-16 (8 of 8 fixed; round 2: reads back to the old speed) | e8f4edc (round 1), 94a8f33 (round 2) |
 | WP-03 | 4 | done 2026-10-17 (4 of 4 fixed; round 2: limit documented, message points to absolute delays) | 9e5af26 |
 | WP-04 | 5 | done 2026-10-17 (B-003, B-020 fixed; B-019, B-068, B-069 documented; B-120, B-121 found) | 4e2cf89 |
-| WP-05 | 12 | done 2026-10-17 (10 fixed, B-099 and B-117 documented) | commit after 07a1712 (hash at next update) |
-| WP-06 | 6 | open | - |
+| WP-05 | 12 | done 2026-10-17 (10 fixed, B-099 and B-117 documented) | bf76f2f |
+| WP-06 | 6 | done 2026-10-17 (6 of 6 fixed; integer conversion of large index inputs 14-17% slower, accepted pending the user's review) | commit after bf76f2f (hash at next update) |
 | WP-07 | 4 | open | - |
 | WP-08 | 5 | open | - |
 | WP-09 | 9 | open | - |

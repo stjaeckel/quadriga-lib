@@ -80,10 +80,12 @@ assert_throws( @() quadriga_lib.sos_val( freq, phase, uint8(pos) ), 'Unsupported
 assert_throws( @() quadriga_lib.sos_val( freq, phase, pos > 0 ), 'Unsupported data type.' );
 vi = quadriga_lib.sos_val( freq, phase, int32(pos), [], [], [], [], [], [], 1 );
 assertEqual( vi, quadriga_lib.sos_val( freq, phase, pos, [], [], [], [], [], [], 1 ) );
-% Scalars: complex and uint8 are rejected, non-integer values are truncated
+% Scalars: complex, uint8 and non-integer values for integer arguments are rejected
 assert_throws( @() quadriga_lib.sos_val( freq, phase, pos, pos_b, phase, [], [], complex(1, 1) ), 'Complex datatypes are not supported.' );
 assert_throws( @() quadriga_lib.sos_val( freq, phase, pos, [], [], [], [], [], [], uint8(1) ), 'unsupported data type' );
-vk = quadriga_lib.sos_val( freq, phase, pos, [], [], [], [], [], [], 1.7 );    % use_kernel = 1
+assert_cpp_error( @() quadriga_lib.sos_val( freq, phase, pos, [], [], [], [], [], [], 1.7 ), ...
+    'Input ''use_kernel'' must be an integer from -2147483648 to 2147483647.' );
+vk = quadriga_lib.sos_val( freq, phase, pos, [], [], [], [], [], [], 1.0 );    % use_kernel = 1
 assertEqual( vk, quadriga_lib.sos_val( freq, phase, pos, [], [], [], [], [], [], 1 ) );
 
 end
@@ -101,6 +103,19 @@ try
 catch ME
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expected)) %#ok<STREMP>
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expected, '", GOT: "', ME.message, '"']);
+    end
+end
+end
+
+% Assert that fn() raises quadriga_lib:CPPerror with a message that contains expected (substring).
+function assert_cpp_error(fn, expected)
+try
+    fn();
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if ~strcmp(ME.identifier, 'quadriga_lib:CPPerror') || isempty(strfind(ME.message, expected)) %#ok<STREMP>
+        error('moxunit:exceptionNotRaised', ['EXPECTED: quadriga_lib:CPPerror "', expected, '", GOT: ', ...
+            ME.identifier, ' "', ME.message, '"']);
     end
 end
 end

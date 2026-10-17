@@ -86,7 +86,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const bool multifreq = struct_input && mxGetNumberOfElements(prhs[0]) > 1;
 
     // Element indices: 1-based MATLAB → 0-based C++ (empty = all elements)
-    arma::uvec i_element = (nrhs < 6) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[5], true);
+    arma::uvec i_element = (nrhs < 6) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[5], true, "i_element");
 
     if (arma::any(i_element == 0))
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Entries in 'i_element' cannot be 0 (1-based index).");

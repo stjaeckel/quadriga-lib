@@ -122,10 +122,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const auto orig = qd_mex_get_Mat<double>(prhs[2]);
     const auto dest = qd_mex_get_Mat<double>(prhs[3]);
     const auto mesh = qd_mex_get_Mat<double>(prhs[4]);
-    const arma::uvec mtl_ind = qd_mex_get_Col<arma::uword>(prhs[5]);
+    const arma::uvec mtl_ind = qd_mex_get_Col<arma::uword>(prhs[5], false, "mtl_ind");
     const auto mtl_prop = qd_mex_struct2map<double>(prhs[6]);
-    const auto fbs_ind = qd_mex_get_Col<unsigned>(prhs[7]);
-    const auto sbs_ind = qd_mex_get_Col<unsigned>(prhs[8]);
+    const auto fbs_ind = qd_mex_get_Col<unsigned>(prhs[7], false, "fbs_ind");
+    const auto sbs_ind = qd_mex_get_Col<unsigned>(prhs[8], false, "sbs_ind");
     const auto trivec = (nrhs < 10) ? arma::mat() : qd_mex_get_Mat<double>(prhs[9]);
     const auto tridir = (nrhs < 11) ? arma::mat() : qd_mex_get_Mat<double>(prhs[10]);
     const auto compact = (nrhs < 12) ? true : qd_mex_get_scalar<bool>(prhs[11], "compact", true);

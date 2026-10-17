@@ -745,10 +745,42 @@ end
 
 if exist(fn2, 'file'); delete(fn2); end
 
+%% ===== Datasets with more dimensions than supported, sparse data =====
+tst = tst + 1; if tst > run_tests; return; end
+if verbose; disp("Test: 4-D, 5-D and sparse datasets are rejected"); end
+fn3 = 'hdf_mex_dims.hdf5';
+if exist(fn3, 'file'); delete(fn3); end
+quadriga_lib.hdf5_create_file(fn3, [2, 2]);
+assert_cpp_error( @() quadriga_lib.hdf5_write_dset(fn3, [1, 1], 'd4', rand(2,3,4,2)), ...
+    'Input ''data'' has more than 3 dimensions.' );
+assert_cpp_error( @() quadriga_lib.hdf5_write_dset(fn3, [1, 1], 'd5', rand(2,3,4,2,2)), ...
+    'Input ''data'' has more than 3 dimensions.' );
+assert_cpp_error( @() quadriga_lib.hdf5_write_dset(fn3, [1, 1], 'sp', sparse([0 0 1.5])), ...
+    'Input ''data'' is sparse; sparse inputs are not supported.' );
+assert_cpp_error( @() quadriga_lib.hdf5_write_dset(fn3, [0, 1], 'x', 1), 'cannot contain zeros' );
+assert_cpp_error( @() quadriga_lib.hdf5_write_dset(fn3, [1.5, 1], 'x', 1), 'must be integers from 0 to 4294967295.' );
+quadriga_lib.hdf5_write_dset(fn3, [1, 1], 'd3', reshape(1:24, 2, 3, 4));     % 3-D is supported
+assertEqual( quadriga_lib.hdf5_read_dset(fn3, [1, 1], 'd3'), reshape(1:24, 2, 3, 4) );
+assertEqual( numel(quadriga_lib.hdf5_read_dset_names(fn3, [1, 1])), 1 );   % nothing else was written
+if exist(fn3, 'file'); delete(fn3); end
+
 %% ===== Final cleanup =====
 
 if exist(fn, 'file')
     delete(fn);
 end
 
+end
+
+% Assert that fn() raises quadriga_lib:CPPerror with a message that contains expected (substring).
+function assert_cpp_error(fn, expected)
+try
+    fn();
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if ~strcmp(ME.identifier, 'quadriga_lib:CPPerror') || isempty(strfind(ME.message, expected)) %#ok<STREMP>
+        error('moxunit:exceptionNotRaised', ['EXPECTED: quadriga_lib:CPPerror "', expected, '", GOT: ', ...
+            ME.identifier, ' "', ME.message, '"']);
+    end
+end
 end

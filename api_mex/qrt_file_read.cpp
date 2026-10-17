@@ -80,7 +80,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Read inputs
     const std::string fn = qd_mex_get_string(prhs[0]);
-    arma::uvec i_cir = (nrhs < 2) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[1], true);
+    arma::uvec i_cir = (nrhs < 2) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[1], true, "i_cir");
     arma::uword i_orig = (nrhs < 3) ? 1 : qd_mex_get_scalar<arma::uword>(prhs[2], "i_orig", 1);
     const bool downlink = (nrhs < 4) ? true : qd_mex_get_scalar<bool>(prhs[3], "downlink", true);
     const int normalize_M = (nrhs < 5) ? 1 : qd_mex_get_scalar<int>(prhs[4], "normalize_M", 1);

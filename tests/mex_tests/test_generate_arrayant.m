@@ -115,7 +115,7 @@ try
     data = quadriga_lib.arrayant_generate('3gpp', [], [], [], [], [], 2, 1, [], [], [], [], [], [], [], trash);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Unsupported data type.';
+    expectedErrorMessage = 'Input ''e_theta_re'' has an unsupported data type.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -200,4 +200,23 @@ catch ME
     end
 end
 
+%% Integer inputs must be integers in the range of the C++ type
+assert_cpp_error( @() quadriga_lib.arrayant_generate('3GPP', [], [], [], [], [], -1), 'Input ''M'' must be an integer from 0 to 4294967295.' );
+assert_cpp_error( @() quadriga_lib.arrayant_generate('3GPP', [], [], [], [], [], 2.7), 'Input ''M'' must be an integer from 0 to 4294967295.' );
+assert_cpp_error( @() quadriga_lib.arrayant_generate('3GPP', [], [], [], [], [], 1, 2^32), 'Input ''N'' must be an integer from 0 to 4294967295.' );
+a = quadriga_lib.arrayant_generate('3GPP', [], [], [], [], [], 2.0);
+assertEqual( size(a.e_theta_re, 3), 2 );
+end
+
+% Assert that fn() raises quadriga_lib:CPPerror with a message that contains expected (substring).
+function assert_cpp_error(fn, expected)
+try
+    fn();
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if ~strcmp(ME.identifier, 'quadriga_lib:CPPerror') || isempty(strfind(ME.message, expected)) %#ok<STREMP>
+        error('moxunit:exceptionNotRaised', ['EXPECTED: quadriga_lib:CPPerror "', expected, '", GOT: ', ...
+            ME.identifier, ' "', ME.message, '"']);
+    end
+end
 end

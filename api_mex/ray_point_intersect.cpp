@@ -64,7 +64,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::mat trivec = qd_mex_get_Mat<double>(prhs[1]);
     const arma::mat tridir = qd_mex_get_Mat<double>(prhs[2]);
     const arma::mat points = qd_mex_get_Mat<double>(prhs[3]);
-    arma::u32_vec sub_cloud_index = (nrhs < 5) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[4], true);
+    arma::u32_vec sub_cloud_index = (nrhs < 5) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[4], true, "sub_cloud_index");
     const int use_kernel = (nrhs < 6) ? 0 : qd_mex_get_scalar<int>(prhs[5], "use_kernel", 0);
     const int gpu_id = (nrhs < 7) ? 0 : qd_mex_get_scalar<int>(prhs[6], "gpu_id", 0);
 

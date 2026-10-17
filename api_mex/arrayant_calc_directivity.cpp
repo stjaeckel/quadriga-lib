@@ -93,9 +93,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Read i_element (1-based index)
     arma::uvec element_ind;
     if (struct_mode)
-        element_ind = (nrhs < 2) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[1], "i_element");
+        element_ind = (nrhs < 2) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[1], true, "i_element");
     else
-        element_ind = (nrhs < 7) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[6], "i_element");
+        element_ind = (nrhs < 7) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[6], true, "i_element");
 
     if (element_ind.empty()) // Set defaults
         element_ind = arma::regspace<arma::uvec>(0, n_elements - 1);
