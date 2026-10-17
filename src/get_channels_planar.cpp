@@ -26,7 +26,11 @@ Calculate MIMO channel coefficients for planar wave paths
 - Polarization transfer matrix `M` must be normalized; rows are interleaved real/imag components.
 - If `add_fake_los_path` is true, a zero-power LOS path is appended, making output size `n_path+1`.
 - Setting `center_frequency = 0` disables phase calculation (delays still computed).
-- `use_absolute_delays = false` subtracts the straight-line TX↔RX distance from all path lengths before converting to delay.
+- `use_absolute_delays = false` subtracts the straight-line TX↔RX distance (between the phase centres) from all path
+  lengths before converting to delay; per-element delays of pairs that are closer to each other than the phase
+  centres are then negative, down to about -(half the TX array size + half the RX array size) / speed of light; [[quantize_delays]] rejects
+  delays at or below `-tap_spacing / 2` (at 5 ns taps: half sizes adding up to more than about 0.75 m), use
+  `use_absolute_delays = true` in that case.
 
 ## Declaration:
 ```

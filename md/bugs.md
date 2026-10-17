@@ -34,12 +34,12 @@ How to read the items:
 ## Summary table
 
 Items: 119 (S1: 5, S2: 31, S3: 64, S4: 19); B-119 was found during the fixes (WP-02).
-Status: open: 99, fixed: 19, partly fixed: 0, won't fix: 1, documented: 0 (after WP-02 round 1).
+Status: open: 95, fixed: 23, partly fixed: 0, won't fix: 1, documented: 0 (after WP-03).
 
 | ID | Title | Area | Kind | Severity | Mark | Status |
 |---|---|---|---|---|---|---|
 | [B-001](#b-001) | `hdf5_write` silently drops the `par_*` data when the slot already holds a `Data` group | B channel, file I/O | 1 defect | S1 | [R] | fixed (WP-02) |
-| [B-002](#b-002) | `quantize_delays` segfaults on a negative delay, including the slightly negative relative delays that `get_channels_spherical` returns | B channel, file I/O | 1 defect | S1 | [R] | open |
+| [B-002](#b-002) | `quantize_delays` segfaults on a negative delay, including the slightly negative relative delays that `get_channels_spherical` returns | B channel, file I/O | 1 defect | S1 | [R] | fixed (WP-03) |
 | [B-003](#b-003) | `get_channels_spherical`, `_multifreq` and `_irs` ignore `path_length` for NLOS paths: delays and phases too short | C channel gen., tools | 1 defect | S1 | [R] | open |
 | [B-004](#b-004) | Python `tools.geo2cart` / `tools.cart2geo` with separate inputs read freed memory: wrong values, segfault | G Python layer | 1 defect | S1 | [R] | open |
 | [B-005](#b-005) | Python HDF5 writers ignore numpy strides for 1-D and (n,1) arrays: wrong data written, heap over-read | G Python layer | 1 defect | S1 | [R] | open |
@@ -91,8 +91,8 @@ Status: open: 99, fixed: 19, partly fixed: 0, won't fix: 1, documented: 0 (after
 | [B-051](#b-051) | HDF5 functions call `H5close()`, switch off error printing process-wide, and leak handles and memory on error paths | B channel, file I/O | 1 defect | S3 | [R] | fixed (WP-02) |
 | [B-052](#b-052) | `hdf5_write` "overwrites" a slot by adding a new group; the file grows with every rewrite | B channel, file I/O | 2 doc | S3 | [R] | fixed (WP-02) |
 | [B-053](#b-053) | `hdf5_read_dset` returns a variable-length string as 8 bytes of a heap pointer, and leaks it | B channel, file I/O | 1 defect | S3 | [R] | fixed (WP-02) |
-| [B-054](#b-054) | `quantize_delays` builds dense vectors over the absolute delay range: a 20 ms offset makes it 4000 times slower | B channel, file I/O | 4 performance | S3 | [M] | open |
-| [B-055](#b-055) | `quantize_delays` gives wrong results when the outputs alias the inputs (undocumented) | B channel, file I/O | 1 defect | S3 | [R] | open |
+| [B-054](#b-054) | `quantize_delays` builds dense vectors over the absolute delay range: a 20 ms offset makes it 4000 times slower | B channel, file I/O | 4 performance | S3 | [M] | fixed (WP-03) |
+| [B-055](#b-055) | `quantize_delays` gives wrong results when the outputs alias the inputs (undocumented) | B channel, file I/O | 1 defect | S3 | [R] | fixed (WP-03) |
 | [B-056](#b-056) | `mitsuba_xml_file_write` is quadratic in the number of vertices per object | B channel, file I/O | 4 performance | S3 | [M] | open |
 | [B-057](#b-057) | OBJ reader: CRLF `.mtl` files lose their materials; face indices unchecked when only `face_ind` is requested; no-output call skips validation | B channel, file I/O | 1 defect | S3 | [R] | open |
 | [B-058](#b-058) | `write_png`: constant, NaN or inverted-range data trigger a NaN-to-integer cast and all pixels get the last colour; an empty matrix writes an invalid PNG | B channel, file I/O | 1 defect | S3 | [R] | open |
@@ -140,7 +140,7 @@ Status: open: 99, fixed: 19, partly fixed: 0, won't fix: 1, documented: 0 (after
 | [B-100](#b-100) | Python: invalid input accepted silently (2-D positions, short `interact_coord`, 4-D arrayant without `center_freq`) | G Python layer | 1 defect | S3 | [R] | open |
 | [B-101](#b-101) | `arrayant::copy_element` ignores `read_only`; an empty destination gives an Armadillo-internal error | A arrayant | 1 defect | S4 | [R] | open |
 | [B-102](#b-102) | Arrayant documentation typos and misleading statements; latent int32 offsets and a vertex sentinel (grouped) | A arrayant | 2 doc | S4 | [C] | open |
-| [B-103](#b-103) | `quantize_delays` docs: `fix_taps` 1 and 2 give `[1, 1, n_taps]` delays only for shared input | B channel, file I/O | 2 doc | S4 | [R] | open |
+| [B-103](#b-103) | `quantize_delays` docs: `fix_taps` 1 and 2 give `[1, 1, n_taps]` delays only for shared input | B channel, file I/O | 2 doc | S4 | [R] | fixed (WP-03) |
 | [B-104](#b-104) | Channel and file-I/O documentation and message nits (grouped) | B channel, file I/O | 2 doc | S4 | [R, C] | open |
 | [B-105](#b-105) | `memcpy` with a null pointer and size 0 (formal UB) in `get_channels_irs` and in the Python list adapter | C channel gen., tools | 1 defect | S4 | [R] | fixed (WP-01) |
 | [B-106](#b-106) | Docs and code of `path_to_tube`, `qd_path` and `calc_diffraction_gain` debug output disagree (grouped) | C channel gen., tools | 2 doc | S4 | [R, C] | open |
@@ -202,6 +202,9 @@ miscompilation by the LAF split-compare passes, not a library defect. The campai
 | after WP-02 round 1: ASan + UBSan gcc-12, `suppress_equal_pcs=0` | `All tests passed (1307922 assertions in 1144 test cases)`; reports: only the excluded `ray_progress` UBSan reports (`test_wave_progress.cpp:301`), no ASan report, no leak | 317 s | 5.1 / 2.5 |
 | after WP-02 round 2: base / generic | `All tests passed (1307922 assertions in 1144 test cases)` / `(1307673 assertions in 1144 test cases)` | 92 s / 40 s | 3.0 / 18.3, 18.3 / 9.9 |
 | after WP-02 round 2: ASan + UBSan gcc-12, `suppress_equal_pcs=0` | `All tests passed (1307922 assertions in 1144 test cases)`; only the excluded `ray_progress` reports, no leak | 322 s | 8.5 / 2.6 |
+| after WP-03: base | `All tests passed (1332501 assertions in 1151 test cases)` (round 2; round 1: 1332491 / 1150) | 148 s (8 threads) | 26.1 / 31.8 |
+| after WP-03 round 1: generic | `All tests passed (1332242 assertions in 1150 test cases)` (not re-run for round 2, which changed one message and documentation) | 40 s | 3.5 / 4.5 |
+| after WP-03 round 1: ASan + UBSan gcc-12, `suppress_equal_pcs=0` | `All tests passed (1332491 assertions in 1150 test cases)`; only the excluded `ray_progress` reports, no leak (not re-run for round 2) | 317 s | 3.8 / 1.6 |
 
 Run commands: `flock /tmp/quadriga-fixes-suite.lock build_linux/test_bin` (output
 `build_linux/scratch/hunt/base_test.txt`); the sanitizer runs with
@@ -245,6 +248,7 @@ GNUmakefile default is `avx2 = OFF`, so a default `make` gives MEX files without
 | after WP-01: Octave 11.1, R2024a, R2026a | 65 of 66 in each, same excluded failure; R2026a exits with 0, no crash dump (B-029 fixed) | - | 2 |
 | after WP-02 round 1: Octave 11.1, R2024a, R2026a | 65 of 66 in each, same excluded failure; R2026a exits with 0, no crash dump | - | 1-2 |
 | after WP-02 round 2: Octave 11.1, R2026a | 65 of 66 in each, same excluded failure; R2026a exits with 0, no crash dump | - | 2-3 |
+| after WP-03 round 1: Octave 11.1, R2026a | 65 of 66 in each, same excluded failure; R2026a exits with 0, no crash dump (round 2: only `test_quantize_delays` in Octave, OK) | - | 2-4 |
 
 The R2026a crash is B-029. A single `quadriga_lib.version` call does not crash R2026a at
 exit (2 of 2 runs).
@@ -255,7 +259,7 @@ exit (2 of 2 runs).
 `762 passed, 1 skipped, 37 subtests passed in 2.55s` (load 9.5 before, 11.7 after). The skip is
 `test_ray_point_intersect.py:403` (CUDA kernel not available). Module version string `0.12.2_AVX2`.
 
-After WP-01: `762 passed, 1 skipped, 37 subtests passed in 1.85s`. After WP-02 round 1: `762 passed, 1 skipped, 37 subtests passed in 1.80s` (the Python suite has no HDF5 tests). After WP-02 round 2: the same.
+After WP-01: `762 passed, 1 skipped, 37 subtests passed in 1.85s`. After WP-02 round 1: `762 passed, 1 skipped, 37 subtests passed in 1.80s` (the Python suite has no HDF5 tests). After WP-02 round 2: the same. After WP-03 round 1: `763 passed, 1 skipped, 37 subtests passed` (round 2: `test_quantize_delays.py`, 23 passed).
 
 ### Fuzzing (AFL++ 4.33c)
 
@@ -661,7 +665,7 @@ case 2 (expected x=99): par fields read back: x=1
 
 ## B-002: `quantize_delays` segfaults on a negative delay, including the slightly negative relative delays that `get_channels_spherical` returns
 
-- Status: open
+- Status: fixed (WP-03); delays at or below `-tap_spacing / 2` still throw by decision (2026-10-17): tapped delay line emulators need non-negative delays, and relative delays of acoustic arrays and of radio arrays of about 1.5 m and more go below that limit (use `use_absolute_delays = true`)
 - Severity: S1, because it crashes on valid input in normal use: `get_channels_spherical` with its default relative delays returns negative delays for some element pairs of a rotated array (here 16 of 64, down to -6.3e-11 s), and passing that output to `quantize_delays` segfaults, also from Python.
 - Kind: crash (memory, UB)
 - Mark: [R]
@@ -825,6 +829,8 @@ calling quantize_delays on this output ...
 /sjc/quadriga-lib-fixes/build_linux/scratch/hunt/final/B-006//run.sh: line 16: 712867 Segmentation fault         (core dumped) "$D/repro_normal"
 exit code 139
 ```
+
+Added after WP-03: the negative delays are not always small. They reach about (half the TX array size + half the RX array size) / propagation speed (both arrays endfire): -0.9 taps for a 2.7 m radio array at 5 ns, -1 to -24 taps for 5-35 cm acoustic arrays at 48 kHz (manager's check, `build_linux/scratch/fix/WP-03/manager/neg_delay_use.cpp`). Such delays throw after WP-03 (decision of 2026-10-17).
 
 **Cause.** The conversion of a negative (or NaN, or too large) tap value to `unsigned` is undefined; it wraps to `UINT_MAX`, `max_idx + 1` becomes 0, the vector of length 0 is indexed. Separately, `get_channels_spherical` documents that "the minimum delay (LOS delay) is subtracted", but with per-element spherical delays the subtracted LOS delay is that of the phase centres, so elements closer than the phase centre get negative delays.
 
@@ -4895,7 +4901,7 @@ SUMMARY: AddressSanitizer: 29 byte(s) leaked in 1 allocation(s).
 
 ## B-054: `quantize_delays` builds dense vectors over the absolute delay range: a 20 ms offset makes it 4000 times slower
 
-- Status: open
+- Status: fixed (WP-03)
 - Severity: S3, because it is a clear performance defect: the same channel shifted by 20 ms takes seconds instead of a millisecond (absolute delays are a documented option of the channel functions).
 - Kind: performance
 - Mark: [M]
@@ -4967,7 +4973,7 @@ load after: 1.50 5.14 8.01 1/2762 713575
 
 ## B-055: `quantize_delays` gives wrong results when the outputs alias the inputs (undocumented)
 
-- Status: open
+- Status: fixed (WP-03)
 - Severity: S3, because an in-place call silently returns a wrong first tap; aliasing is neither supported nor documented as excluded.
 - Kind: wrong result (aliasing)
 - Mark: [R]
@@ -8255,7 +8261,7 @@ copy_element with empty destination: 'Mat::max(): object has no elements'
 
 ## B-103: `quantize_delays` docs: `fix_taps` 1 and 2 give `[1, 1, n_taps]` delays only for shared input
 
-- Status: open
+- Status: fixed (WP-03)
 - Severity: S4, because only the documented output shape is incomplete.
 - Kind: doc
 - Mark: [R]

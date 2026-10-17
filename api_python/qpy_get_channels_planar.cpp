@@ -20,7 +20,11 @@ Calculate MIMO channel coefficients for planar wave paths
 - Path data is given for `n_freq` frequencies; single-frequency data uses `n_freq = 1`.
 - The scalar argument `freq` selects the frequency index that is processed; a single frequency is returned per call.
 - If `center_freq` is `None` or the selected entry is `0`, phase calculation is disabled and only delays are computed.
-- If `use_absolute_delays == False`, the straight-line TX-RX delay (LOS delay) is subtracted from all paths.
+- If `use_absolute_delays == False`, the straight-line TX-RX delay between the phase centres (LOS delay) is subtracted
+  from all paths; per-element delays of pairs that are closer to each other than the phase centres are then
+  negative, down to about -(half the TX array size + half the RX array size) / speed of light; [[quantize_delays]] rejects
+  delays at or below `-tap_spacing / 2` (at 5 ns taps: half sizes adding up to more than about 0.75 m), use
+  `use_absolute_delays = true` in that case.
 - If `add_fake_los_path == True`, a zero-power LOS path is prepended when none is present, making the
   output size `n_path + 1`.
 - `complex=True` returns one combined complex coefficient array `coeff`; `complex=False` (default) returns

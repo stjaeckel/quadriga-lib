@@ -25,6 +25,8 @@ Calculate MIMO channel coefficients for IRS-assisted communication
 - If `active_path` is provided, it overrides `threshold_dB` for path selection
 - Optional `irs_array_2` provides a separate IRS antenna pattern for the RX-facing side (asymmetric IRS)
 - Setting `center_frequency = 0.0` disables phase computation
+- If `use_absolute_delays == false`, the LOS delay between the TX and RX phase centres (direct distance, not via the IRS)
+  is subtracted from all paths; per-element delays can be slightly negative when the IRS is close to the TX-RX line
 
 ## Declaration:
 ```
