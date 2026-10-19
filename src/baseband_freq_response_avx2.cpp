@@ -7,55 +7,10 @@
 #include <vector>
 
 #include "quadriga_lib_avx2_functions.hpp"
+#include "fastmath_avx2.h"
 
 // Vector size for AVX2
 #define VEC_SIZE 8
-
-// sin and cos of 2 * pi * r for r in [-0.5, 0.5] (one period, already reduced in double precision by the caller).
-// Quadrant reduction q = nearest integer of 4 * r (exact in float), t = (4 * r - q) * pi / 2 in [-pi/4, pi/4], then
-// the Cephes single-precision polynomials of _fm256_sincos256_ps and the quadrant swap / signs.
-static inline void qd_sincos_2pi_reduced(__m256 r, __m256 *s, __m256 *c)
-{
-    const __m256 four = _mm256_set1_ps(4.0f);
-    const __m256 pi_2 = _mm256_set1_ps(1.57079632679489662f);
-    const __m256 one = _mm256_set1_ps(1.0f);
-    const __m256 n_half = _mm256_set1_ps(-0.5f);
-    const __m256i i32_1 = _mm256_set1_epi32(1);
-    const __m256i i32_2 = _mm256_set1_epi32(2);
-
-    const __m256 Sp0 = _mm256_set1_ps(-1.9515295891E-4f);
-    const __m256 Sp1 = _mm256_set1_ps(8.3321608736E-3f);
-    const __m256 Sp2 = _mm256_set1_ps(-1.6666654611E-1f);
-    const __m256 Cp0 = _mm256_set1_ps(2.443315711809948E-005f);
-    const __m256 Cp1 = _mm256_set1_ps(-1.388731625493765E-003f);
-    const __m256 Cp2 = _mm256_set1_ps(4.166664568298827E-002f);
-
-    __m256 u = _mm256_mul_ps(r, four);                                        // In [-2, 2], exact
-    __m256 n = _mm256_round_ps(u, _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC); // Quadrant -2 ... 2
-    __m256i q = _mm256_cvtps_epi32(n);
-    __m256 t = _mm256_mul_ps(_mm256_sub_ps(u, n), pi_2); // In [-pi/4, pi/4]
-
-    __m256 z = _mm256_mul_ps(t, t);
-    __m256 z2 = _mm256_mul_ps(z, z);
-
-    // sin(t) ~ t * (1 + Sp2*z + Sp1*z^2 + Sp0*z^3)
-    __m256 t0s = _mm256_fmadd_ps(Sp2, z, one);
-    __m256 t1s = _mm256_fmadd_ps(Sp0, z, Sp1);
-    __m256 ys = _mm256_mul_ps(_mm256_fmadd_ps(z2, t1s, t0s), t);
-
-    // cos(t) ~ 1 - 0.5*z + z^2*(Cp2 + Cp1*z + Cp0*z^2)
-    __m256 te = _mm256_fmadd_ps(Cp0, z2, Cp2);
-    __m256 ev = _mm256_fmadd_ps(z2, te, one);
-    __m256 to = _mm256_fmadd_ps(Cp1, z2, n_half);
-    __m256 yc = _mm256_fmadd_ps(z, to, ev);
-
-    // sin(t + q*pi/2), cos(t + q*pi/2): swap for odd q; sin negated for q & 2, cos negated for (q + 1) & 2
-    __m256 swap = _mm256_castsi256_ps(_mm256_slli_epi32(q, 31));
-    __m256 sign_sin = _mm256_castsi256_ps(_mm256_slli_epi32(_mm256_and_si256(q, i32_2), 30));
-    __m256 sign_cos = _mm256_castsi256_ps(_mm256_slli_epi32(_mm256_and_si256(_mm256_add_epi32(q, i32_1), i32_2), 30));
-    *s = _mm256_xor_ps(_mm256_blendv_ps(ys, yc, swap), sign_sin);
-    *c = _mm256_xor_ps(_mm256_blendv_ps(yc, ys, swap), sign_cos);
-}
 
 // AVX2 accelerated implementation of DFT
 // The phase x = freq * delay (in cycles) is computed in double precision and reduced to x - round(x), which is in
@@ -112,7 +67,7 @@ void qd_DFT_AVX2(const dtype *__restrict CFr,    // Channel coefficients, real p
                 const __m256 r = _mm256_set_m128(_mm256_cvtpd_ps(x_hi), _mm256_cvtpd_ps(x_lo));
 
                 __m256 vsin, vcos;
-                qd_sincos_2pi_reduced(r, &vsin, &vcos);
+                _fm256_sincos_2pi_reduced_ps(r, &vsin, &vcos);
 
                 hr = _mm256_fnmadd_ps(vsin, ci, hr);
                 hr = _mm256_fmadd_ps(vcos, cr, hr);

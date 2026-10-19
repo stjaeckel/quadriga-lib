@@ -18,6 +18,9 @@ Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector
 - Inputs are arbitrary 3D vectors (not required to be unit-length); `len` returns the Euclidean norm
 - `z/len` is clamped to [-1, 1] before `asin` to guard against `len == 0` and rounding artifacts
   pushing `abs(z/len)` slightly above 1
+- Azimuth in [-pi, pi], with the special values of `atan2` (e.g. `atan2(0, -0) = pi`); NaN input gives NaN
+  in `az` and `len`
+- The AVX2 kernel computes the angles in single precision; `len` and `z/len` in double precision
 - Option to provide a single `[3, n, m]` cube or separate x, y, z `[n, m]` inputs
 
 ## Usage:
@@ -30,7 +33,7 @@ Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector
 - **`y`** — Y-coordinates; `[n, m]` or empty; ignored for combined input
 - **`z`** — Z-coordinates; `[n, m]` or empty; ignored for combined input
 - **`use_kernel`** — Kernel selection: 0 = auto (AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2 
-  (throws if AVX2 unavailable); default: 1
+  (throws if AVX2 unavailable); other values throw; default: 1
 
 ## Outputs:
 - **`az`** — Azimuth angles in radians; `[n, m]`

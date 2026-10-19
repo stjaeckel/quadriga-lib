@@ -15,7 +15,9 @@ SECTION!*/
 Compute elementwise approximate sine and/or cosine of a vector
 
 - AVX2-optimized (8 floats/lane); scalar fallback without AVX2
-- For x in [-pi, pi]: max absolute error = 2^(-22.1); for x in [-500, 500]: 2^(-16.0)
+- Max absolute error about 1.3e-7 (2^-22.9) against the exact sine / cosine of the input value for
+  abs(x) <= 1e10 (the argument is reduced in double precision where single precision is not enough)
+- Results stay in [-1, 1] for all finite x; Inf and NaN give NaN
 - Either `s` or `c` may be `nullptr` to skip that computation
 - Works on vectors, matrices, and 3-D arrays
 - Accepts any numeric input class; best performance with single precision

@@ -34,7 +34,7 @@ How to read the items:
 ## Summary table
 
 Items: 123 (S1: 5, S2: 31, S3: 68, S4: 19); B-119 to B-123 were found during the fixes (WP-02, WP-04, WP-07).
-Status: open: 72, fixed: 45, partly fixed: 0, won't fix: 1, documented: 5 (after WP-07).
+Status: open: 67, fixed: 50, partly fixed: 0, won't fix: 1, documented: 5 (after WP-08).
 
 | ID | Title | Area | Kind | Severity | Mark | Status |
 |---|---|---|---|---|---|---|
@@ -63,7 +63,7 @@ Status: open: 72, fixed: 45, partly fixed: 0, won't fix: 1, documented: 5 (after
 | [B-023](#b-023) | IEEE indoor model uplink conjugates the channel (Doppler sign reversed), unlike the reciprocity of `get_channels_spherical` (user decision) | C channel gen., tools | 3 cross-API | S2 | [R] | open |
 | [B-024](#b-024) | `xpr_update`: data race when `ray_index` contains duplicates (wrong, non-deterministic result with threads) | C channel gen., tools | 1 defect | S2 | [R] | open |
 | [B-025](#b-025) | `path_to_tube`: NaN vertices when interior path points are collinear | C channel gen., tools | 1 defect | S2 | [R] | open |
-| [B-026](#b-026) | AVX2 sin/cos returns values far outside [-1, 1], ±inf or NaN for large arguments (fast_sincos, fast_geo2cart, baseband_freq_response) | D geometry, math | 1 defect | S2 | [R] | open |
+| [B-026](#b-026) | AVX2 sin/cos returns values far outside [-1, 1], ±inf or NaN for large arguments (fast_sincos, fast_geo2cart, baseband_freq_response) | D geometry, math | 1 defect | S2 | [R] | fixed (WP-08) |
 | [B-027](#b-027) | `point_inside_mesh` misclassifies points 5 cm from a face at UTM-like coordinates in AVX2 builds (float ray–triangle kernel) | D geometry, math | 1 defect | S2 | [R] | open |
 | [B-028](#b-028) | `obj_overlap_test` misses a clear overlap when vertices of the penetrating object lie on extensions of the other object's face planes | D geometry, math | 1 defect | S2 | [R] | open |
 | [B-029](#b-029) | MATLAB R2026a segfaults at exit after any HDF5 MEX call (the unloaded thread-safe libhdf5 leaves a dangling pthread-key destructor) | F MEX layer | 1 defect | S2 | [R] | fixed (WP-01) |
@@ -74,7 +74,7 @@ Status: open: 72, fixed: 45, partly fixed: 0, won't fix: 1, documented: 5 (after
 | [B-034](#b-034) | MEX helpers convert NaN, negative, fractional and out-of-range numbers to integers without checks: crashes, bad_alloc, silent truncation, wrapped seeds | F MEX layer | 1 defect | S2 | [R] | fixed (WP-06) |
 | [B-035](#b-035) | Python `arrayant.interpolate(local_angles=True)` without `dist=True` returns uninitialised memory | G Python layer | 1 defect | S2 | [R] | fixed (WP-05) |
 | [B-036](#b-036) | Python `channel.baseband_freq_response`: an exception inside the OpenMP region aborts the interpreter | G Python layer | 1 defect | S2 | [R] | fixed (WP-05) |
-| [B-037](#b-037) | AVX2 antenna interpolation returns 0 where all four corner amplitudes are below 1.19e-7 (generic interpolates) | A arrayant | 1 defect | S3 | [R] | open |
+| [B-037](#b-037) | AVX2 antenna interpolation returns 0 where all four corner amplitudes are below 1.19e-7 (generic interpolates) | A arrayant | 1 defect | S3 | [R] | fixed (WP-08) |
 | [B-038](#b-038) | qdant writer stores element positions, coupling and pattern values with only 6 significant digits | A arrayant | 1 defect | S3 | [R] | open |
 | [B-039](#b-039) | `qdant_write_multi` deletes an existing file before it validates its input | A arrayant | 1 defect | S3 | [R] | fixed (WP-01) |
 | [B-040](#b-040) | `qdant_read(fn, 1)` returns another entry without error when the file has no ID 1 | A arrayant | 1 defect | S3 | [R] | open |
@@ -111,9 +111,9 @@ Status: open: 72, fixed: 45, partly fixed: 0, won't fix: 1, documented: 5 (after
 | [B-071](#b-071) | `ray_triangle_intersect`: AVX2 and generic kernels swap `fbs_ind`/`sbs_ind` for hits at equal distance (shared edge or vertex) | D geometry, math | 1 defect | S3 | [R] | open |
 | [B-072](#b-072) | `ray_triangle_intersect`: the AABB slab test rejects rays with dz = 0 in the plane z = Zmin/Zmax (x and y are accepted) | D geometry, math | 1 defect | S3 | [R] | open |
 | [B-073](#b-073) | `ray_point_intersect` requires sub-clouds aligned to 8 only in AVX2 builds; the default `point_cloud_segmentation` output makes it throw | D geometry, math | 3 cross-API | S3 | [R] | open |
-| [B-074](#b-074) | Invalid `use_kernel` values are accepted silently; `use_kernel = 2` does not throw in builds without AVX2 (confirms item 1.7 of the Python fix plan) | D geometry, math | 2 doc | S3 | [R] | open |
-| [B-075](#b-075) | AVX2 `fast_atan2` / `fast_cart2geo`: NaN becomes π/4, (inf, inf) gives NaN, tiny or huge double vectors give elevation 0; two doc claims are wrong | D geometry, math | 1 defect | S3 | [R] | open |
-| [B-076](#b-076) | AVX2 `fast_slerp` fast path: error 3e-6 (about 50 ULP, documented ~5) and each lane's result depends on its neighbours | D geometry, math | 1 defect | S3 | [R] | open |
+| [B-074](#b-074) | Invalid `use_kernel` values are accepted silently; `use_kernel = 2` does not throw in builds without AVX2 (confirms item 1.7 of the Python fix plan) | D geometry, math | 2 doc | S3 | [R] | fixed (WP-08) |
+| [B-075](#b-075) | AVX2 `fast_atan2` / `fast_cart2geo`: NaN becomes π/4, (inf, inf) gives NaN, tiny or huge double vectors give elevation 0; two doc claims are wrong | D geometry, math | 1 defect | S3 | [R] | fixed (WP-08) |
+| [B-076](#b-076) | AVX2 `fast_slerp` fast path: error 3e-6 (about 50 ULP, documented ~5) and each lane's result depends on its neighbours | D geometry, math | 1 defect | S3 | [R] | fixed (WP-08) |
 | [B-077](#b-077) | `obj_overlap_test` crashes on an empty mesh | D geometry, math | 1 defect | S3 | [R] | open |
 | [B-078](#b-078) | `subdivide_triangles` (and `icosphere`, `cube`, `plane`): unchecked overflow of the face count leads to writes through a null pointer | D geometry, math | 1 defect | S3 | [R] | open |
 | [B-079](#b-079) | An output that aliases an input gives wrong results (`ray_triangle_intersect` with `fbs = &orig`, `subdivide_triangles` in place) | D geometry, math | 1 defect | S3 | [R] | open |
@@ -214,6 +214,8 @@ miscompilation by the LAF split-compare passes, not a library defect. The campai
 | after WP-04: ASan + UBSan gcc-12, `suppress_equal_pcs=0` | `All tests passed (1332667 assertions in 1162 test cases)`; only the excluded `ray_progress` reports, no leak | 428 s (8 threads) | 21.4 / 1.5 |
 | after WP-07: base / generic | `All tests passed (1333935 assertions in 1169 test cases)` / `(1333686 assertions in 1169 test cases)` | 38 s / 37 s (12 threads) | 5.3 / 4.1 |
 | after WP-07: ASan + UBSan gcc-12, `suppress_equal_pcs=0` | `All tests passed (1333935 assertions in 1169 test cases)`; only the excluded `ray_progress` reports, no leak | 550 s (12 threads) | 3.5 / 35.7 |
+| after WP-08: base | `All tests passed (1334516 assertions in 1184 test cases)` (manager) | 38 s (12 threads) | 1.7 / 2.6 |
+| after WP-08: generic, ASan + UBSan | generic `1334185 / 1184`; ASan + UBSan `1334516 / 1184`, only the excluded `ray_progress` reports (worker's runs; Octave MEX 65 of 66, pytest 792 passed, 1 skipped) | - | - |
 
 Run commands: `flock /tmp/quadriga-fixes-suite.lock build_linux/test_bin` (output
 `build_linux/scratch/hunt/base_test.txt`); the sanitizer runs with
@@ -2615,7 +2617,7 @@ Output of the phase-2 re-run (`bash run.sh`):
 
 ## B-026: AVX2 sin/cos returns values far outside [-1, 1], ±inf or NaN for large arguments (fast_sincos, fast_geo2cart, baseband_freq_response)
 
-- Status: open
+- Status: fixed (WP-08)
 - Severity: S2, because the AVX2 kernel differs from the generic one far beyond rounding on valid finite input; `baseband_freq_response` reaches it with long delays (e.g. 2 s gives |H| = 1.6e11 instead of 1, 5 s gives NaN).
 - Kind: wrong result (AVX2 differs from generic)
 - Mark: [R]
@@ -3573,7 +3575,7 @@ exit code 134
 
 ## B-037: AVX2 antenna interpolation returns 0 where all four corner amplitudes are below 1.19e-7 (generic interpolates)
 
-- Status: open
+- Status: fixed (WP-08)
 - Severity: S3: the AVX2 kernel differs from the generic one beyond rounding (S2 by the letter of the scale), but only for patterns whose absolute field amplitude is below 1.2e-7 (-138 dB) around the query; in deep nulls of normalised patterns the difference is a tiny value against 0.
 - Kind: wrong result (AVX2 differs from generic)
 - Mark: [R]
@@ -6385,7 +6387,7 @@ use_kernel=0: OK, total hits 2999
 
 ## B-074: Invalid `use_kernel` values are accepted silently; `use_kernel = 2` does not throw in builds without AVX2 (confirms item 1.7 of the Python fix plan)
 
-- Status: open
+- Status: fixed (WP-08)
 - Severity: S3, because invalid input is accepted without an error; `md/SPEC_CPP_API.md` requires a throw for an unavailable kernel and for out-of-range values, and the documentation says "2 = AVX2 (throws if unavailable)".
 - Kind: doc / validation
 - Mark: [R]
@@ -6509,7 +6511,7 @@ geo2cart use_kernel=-1: accepted, result shape (3, 2, 2)
 
 ## B-075: AVX2 `fast_atan2` / `fast_cart2geo`: NaN becomes π/4, (inf, inf) gives NaN, tiny or huge double vectors give elevation 0; two doc claims are wrong
 
-- Status: open
+- Status: fixed (WP-08)
 - Severity: S3, because it needs non-finite or extreme input, but NaN silently turns into a plausible angle in the AVX2 build.
 - Kind: wrong result (AVX2 differs from generic) / doc
 - Mark: [R]
@@ -6586,7 +6588,7 @@ fast_cart2geo(1e+20,1e+20,1e+20): az=0.7853982  el=0.6154797  len=1.732051e+20
 
 ## B-076: AVX2 `fast_slerp` fast path: error 3e-6 (about 50 ULP, documented ~5) and each lane's result depends on its neighbours
 
-- Status: open
+- Status: fixed (WP-08)
 - Severity: S3, because the error is small but ten times the documented bound and non-local: identical inputs give different outputs depending on the other 7 lanes.
 - Kind: wrong result / doc
 - Mark: [R]

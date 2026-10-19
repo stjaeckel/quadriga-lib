@@ -17,8 +17,10 @@ Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector
 - Inputs are arbitrary 3D vectors (not required to be unit length); length returns the Euclidean norm
 - z / length is clamped to [-1, 1] before asin to guard against length == 0 and rounding artifacts
 - Azimuth is in [-pi, pi], elevation in [-pi/2, pi/2]; elevation pi/2 points to the zenith, 0 to the horizon
+- Special values of atan2 as in numpy (e.g. atan2(0, -0) = pi); NaN input gives NaN in az and length
 - Two mutually exclusive input forms: a combined array `cart` of shape (3, n, m), or separate `x`, `y`, `z` of shape (n, m)
-- The AVX2 kernel computes internally in single precision; use `use_kernel = 1` for full double precision
+- The AVX2 kernel computes the angles in single precision (length and z / length in double precision); use
+  `use_kernel = 1` for full double precision
 
 ## Usage:
 ```
@@ -31,7 +33,7 @@ az, el, length = quadriga_lib.tools.cart2geo( cart, y, z, combine=False )
 - **`y`** — Y-coordinates `(n, m)`; provide together with `z` for separate inputs; default: None
 - **`z`** — Z-coordinates `(n, m)`; provide together with `y`; default: None
 - **`combine`** — If True, return a single `(3, n, m)` array; if False, return separate az, el, length arrays; default: True
-- **`use_kernel`** — Kernel: 0 = auto (AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2 (throws if unavailable); default: 1
+- **`use_kernel`** — Kernel: 0 = auto (AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2 (throws if unavailable); other values raise; default: 1
 
 ## Outputs:
 - **`geo_coords`** — Combined geographic coordinates `(3, n, m)`; row 0 = azimuth, row 1 = elevation, row 2 = vector length; returned when `combine` is True
