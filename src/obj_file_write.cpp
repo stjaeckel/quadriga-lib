@@ -839,12 +839,14 @@ void quadriga_lib::obj_file_write(const std::string &fn,
         static const std::vector<std::string> kOrder = {
             "a", "b", "c", "d", "e", "f", "g", "h",
             "att", "attB", "alpha", "alphaB", "fRef", "m",
-            "resF", "resQ", "resS", "coiF", "coiQ", "tf", "tfB", "tfP", "tfF", "tfQ"};
+            "resF", "resQ", "resS", "coiF", "coiQ", "tf", "tfB", "tfP", "tfF", "tfQ", "side"};
 
         auto default_for = [](const std::string &col) -> dtype
         {
             if (col == "a" || col == "e" || col == "fRef")
                 return (dtype)1.0;
+            if (col == "side") // the panel size a mass-law material takes where the column is absent
+                return (dtype)3.29;
             return (dtype)0.0;
         };
 

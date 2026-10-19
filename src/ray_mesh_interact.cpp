@@ -67,6 +67,7 @@ namespace
         const dtype *tfP = nullptr;    // Resonant peak added to tf
         const dtype *tfF = nullptr;    // Frequency of that peak, GHz
         const dtype *tfQ = nullptr;    // Quality factor of that peak
+        const dtype *side = nullptr;   // Panel size of a mass-law material, sqrt(area), m (0: the infinite plate)
 
         MaterialCols() = default; // All pointers stay nullptr
 
@@ -124,6 +125,7 @@ namespace
             tfP = resolve("tfP");
             tfF = resolve("tfF");
             tfQ = resolve("tfQ");
+            side = resolve("side");
 
             // Physical sanity: reject corrupt input rather than silently clamping it. Loss-like terms must
             // be non-negative (a negative would be gain); material constants must be positive. Reported
@@ -156,6 +158,7 @@ namespace
             require(coiF, "coiF", false);   // coincidence frequency >= 0 (0 disables)
             require(coiQ, "coiQ", false);   // coincidence Q >= 0
             require(tfF, "tfF", false);     // tf peak frequency >= 0 (0 disables)
+            require(side, "side", false);   // panel size >= 0 (0: the infinite plate)
         }
 
         // Flag for a "thin-sheet" material
@@ -203,6 +206,7 @@ namespace
         double tfP = 0.0;    // Resonant peak added to tf
         double tfF = 0.0;    // Frequency of that peak, GHz
         double tfQ = 0.0;    // Quality factor of that peak
+        double side = 3.29;  // Panel size of a mass-law material, sqrt(area), m (0: the infinite plate; 3.29: 4.0 x 2.7 m)
 
         Material() = default; // All pointers stay nullptr
 
@@ -243,6 +247,7 @@ namespace
             tfP = cols.tfP ? (double)cols.tfP[i] : tfP;
             tfF = cols.tfF ? (double)cols.tfF[i] : tfF;
             tfQ = cols.tfQ ? (double)cols.tfQ[i] : tfQ;
+            side = cols.side ? (double)cols.side[i] : side;
         }
 
         // Relative permittivity, with its resonance: a complex Lorentz pole, inactive unless
@@ -314,7 +319,10 @@ namespace
             // the term is worth anything.
             //
             // The angle dependence has no cutoff. It tapers to zero and is never negative, and its
-            // knee sits at x = 1, fixed by the frequency and the surface mass, and by no geometry.
+            // knee sits at x = 1, fixed by the frequency and the surface mass. That is the infinite
+            // plate, side = 0. A panel of finite size radiates its forced wave with a bounded efficiency:
+            // with side > 0 the cosine is replaced by 1 / sigma, Davy's forced radiation efficiency of a
+            // square of that side, and the finite plate's gain 1 / (sigma c) is paid; see mass_TL.
             //
             // A body bonded to mass-law bodies the wave has already crossed is not a second panel. With
             // no air gap the bodies move with one velocity, so their transfer impedances are in series
@@ -324,7 +332,8 @@ namespace
             if (m > 0.0 && dist_geo > mass_min_path)
             {
                 double mass_c = (mass_cos >= 0.0) ? mass_cos : abs_cos_theta;
-                loss += mass_TL(mass_bonded + mass_X0((mass_normal >= 0.0) ? mass_normal : dist_geo * abs_cos_theta, fGHz, mass_c), mass_c) - mass_TL(mass_bonded, mass_c);
+                loss += mass_TL(mass_bonded + mass_X0((mass_normal >= 0.0) ? mass_normal : dist_geo * abs_cos_theta, fGHz, mass_c), mass_c, fGHz, side) -
+                        mass_TL(mass_bonded, mass_c, fGHz, side);
             }
             return std::pow(10.0, -0.1 * loss);
         }
@@ -358,17 +367,47 @@ namespace
             return (mass_arg > 0.0) ? mass_arg * res * coi : 0.0;
         }
 
-        // Mass term in dB of one plate with impedance ratio X0 at angle factor mass_c: the
-        // single-body law of medium_gain written in X0, zero below an X0 of one.
-        static double mass_TL(double X0, double mass_c)
+        // Mass term in dB of one plate with impedance ratio X0 at angle factor mass_c (the cosine the
+        // wave has in air): the single-body law of medium_gain written in X0, zero below an X0 of one.
+        //
+        // The cosine is the radiation of the plate's forced wave, rho0 c / cos per unit velocity on an
+        // infinite plate (side = 0): near grazing the air's load outgrows any mass and the plate turns
+        // transparent. A panel of finite size radiates its forced wave as a source of finite length, whose
+        // efficiency sigma stays bounded at grazing and falls below one at low frequency. With side > 0 the
+        // radiation cosine is 1 / sigma, sigma Davy's forced radiation efficiency of a square of that side
+        // (side = sqrt(panel area)), and the plate passes the finite plate's gain 1 / (sigma c) on top:
+        // tau = |1 + j X0 / sigma|^-2 / (sigma c), in the normalized form below, clipped at one. The plate's
+        // own impedance (its resonance and bending stiffness, mass_X0) stays at the cosine in air.
+        static double mass_TL(double X0, double mass_c, double fGHz = 1.0, double side = 0.0)
         {
             if (!(X0 > 1.0) || !(mass_c > 0.0))
                 return 0.0;
             double A = 20.0 * std::log10(X0);
-            if (mass_c >= 1.0)
-                return A;
-            double x = X0 * mass_c;
-            return A * std::log10(1.0 + x * x) / std::log10(1.0 + X0 * X0);
+            if (!(side > 0.0))
+            {
+                if (mass_c >= 1.0)
+                    return A;
+                double x = X0 * mass_c;
+                return A * std::log10(1.0 + x * x) / std::log10(1.0 + X0 * X0);
+            }
+            double c = std::min(mass_c, 1.0), sig = davy_sigma(fGHz, c, side), x = X0 / sig;
+            return std::max(0.0, A * std::log10(1.0 + x * x) / std::log10(1.0 + X0 * X0) + 10.0 * std::log10(sig * c));
+        }
+
+        // Davy's forced radiation efficiency of a finite flat panel, averaged over the azimuth, for a
+        // square of the given side (2a = side, S = side^2) at incidence cosine g: J. L. Davy, JASA 126 (2009)
+        // 694, Eqs. 19, 28, 34, 36, 37 with n = 2, w = 1.3, beta = 0.124. It is 1 / cos up to an angle that
+        // grows with the size in wavelengths, then levels off at about 0.38 sqrt(k side) at grazing; q = 2 pi /
+        // (k^2 S) is a panel small in wavelengths, radiating less than an infinite plate at every angle. The
+        // acoustic mapping keeps wavelengths, so k = 2 pi f / c0 of the mapped frequency. ka is held at 0.1 or
+        // above, below Davy's range and below 5 Hz for a 1.35 m pane.
+        static double davy_sigma(double fGHz, double g, double side)
+        {
+            double k = 20.958450219516818 * fGHz, ka = std::max(0.5 * k * side, 0.1);
+            double p = std::min(1.0, 1.3 * std::sqrt(1.5707963267948966 / ka));
+            double h = 1.0 / (2.0 / 3.0 * std::sqrt(0.6366197723675814 * ka) - 0.124);
+            double q = 6.283185307179586 / (k * k * side * side), x = (g >= p) ? g : h - (h / p - 1.0) * g;
+            return 1.0 / std::sqrt(x * x + q * q);
         }
 
         // Linear gain of the non-conductive absorption only: the alpha column, without the
@@ -524,6 +563,7 @@ namespace
                    tfB == other.tfB &&
                    tfP == other.tfP &&
                    tfF == other.tfF &&
+                   (!(m > 0.0) || side == other.side) && // the panel size is read only where m > 0
                    tfQ == other.tfQ;
         }
 
@@ -1034,7 +1074,7 @@ namespace
                     const Material &L = *layers[n_layers - 1].mtl;
                     std::complex<double> o_te, o_tm;
                     double a_out = mat_far.interact_with(L, it, 0.0, fGHz, &o_te, &o_tm, nullptr, nullptr, nullptr, nullptr, false, &ci) / L.interface_gain(fGHz);
-                    double a_in = (plate_a >= 0.0) ? plate_a : a_out, tau = std::pow(10.0, -0.1 * Material::mass_TL(mass_bonded, mc)) * amp * amp;
+                    double a_in = (plate_a >= 0.0) ? plate_a : a_out, tau = std::pow(10.0, -0.1 * Material::mass_TL(mass_bonded, mc, fGHz, mat_near.side)) * amp * amp;
                     if (a_in > 0.0 && tau > 0.0)
                         amp *= std::sqrt(qd_plate(std::min(a_in, a_out), tau) / (a_in * tau));
                 }
@@ -1503,9 +1543,12 @@ Linear gain of a ray traversing a homogeneous lossy medium
   - An acoustic mass-law term `A = 20·log10((f/fRef)·dist)` dB, added once (not per meter) when `m > 0`,
     `dist` exceeds ~1.5 mm, and the term is positive; `m > 0` switches the mass law on, 20 dB per decade. At oblique
     incidence the term carries the mass law's angle shape, `A·log10(1 + x²)/log10(1 + X₀²)` with
-    `X₀ = 10^(A/20)` and `x = X₀·cos θ`, which is `A` at normal incidence, tapers to zero at tangency,
-    and has an angle slope of 20 dB/decade of `cos θ`. This entry point supplies
-    `cos θ = 1` and therefore returns `A` unchanged.
+    `X₀ = 10^(A/20)` and `x = X₀·cos θ`: the infinite plate, `A` at normal incidence, zero at tangency,
+    20 dB/decade of `cos θ`, which a `side` column of 0 selects. A panel of finite size (`side` = √(panel area) in m,
+    3.29 where the column is absent) radiates with Davy's forced radiation efficiency `σ` in place of `1/cos θ`:
+    `x = X₀/σ` and the term drops by `10·log10(1/(σ·cos θ))`, clipped at zero; near grazing the panel keeps
+    insulating, and at low frequency a small panel insulates more than the infinite plate. This entry point supplies
+    `cos θ = 1`: it returns `A` for `side` 0, and `A` up to the low-frequency term of the panel's size otherwise.
 - The penetration-loss columns (`att`, `attB`) of `mtl_prop` are not used — they describe
   thin-slab transmission loss, not propagation through a finite-thickness medium.
 
@@ -4316,7 +4359,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
             if (mtl.m > 0.0 && !refracted && plate_out >= 0 && m == mtl_current)
             {
                 double a_in = PLATE_IN(mtl), a_out = PLATE_ABS(MAT(plate_out), mtl);
-                double tau = std::pow(10.0, -0.1 * Material::mass_TL(MASS_RUN(), abs_cos_theta)) * g;
+                double tau = std::pow(10.0, -0.1 * Material::mass_TL(MASS_RUN(), abs_cos_theta, fGHz, MAT(mtl_prev).side)) * g;
                 if (a_in > 0.0 && tau > 0.0)
                     g *= qd_plate(std::min(a_in, a_out), tau) / (a_in * tau);
             }

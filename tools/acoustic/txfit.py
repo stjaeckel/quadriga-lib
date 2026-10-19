@@ -10,17 +10,21 @@
 #   tl_refs.json (the 13 constructions of report 3.6). Bounds of report 3.6 on cF, cQ, rF, rQ.
 #   Variant V (dict): amax (upper angle of the average; 90 = random incidence, the library's own average and the fit
 #   convention of md/acoustic.md 9; 78 = field incidence), mfit, noatt, m13 ('col' | 'davy'), m14 (deg), m15, pcf (coiF
-#   pinned at the physical coincidence), attmax (the att bound, 12 dB by default).
+#   pinned at the physical coincidence), attmax (the att bound, 12 dB by default), side (the finite panel as built,
+#   md/acoustic.md 2.1: "lab" each construction at its laboratory side LAB_SIDE, a number one side for all, 0 the
+#   infinite plate; absent = "lab" in the default variant, the fit convention of md/acoustic.md 9 since 2026-10-19).
 # Procedure: differential evolution on 96 x 3, Nelder-Mead on 192 x 6, then every fitted vector of every seed evaluated at
 # 768 x 12 and the best kept (a polish or a selection on a coarser grid picks knobs that alias it).
 #
 # usage: python3 tools/acoustic/txfit.py [--variant JSON] [--seeds N] [--procs P] [--out FILE] [construction ...]
-#   e.g. --variant '{"amax": 90}' fits the library as built at random incidence (md/m10_m15_report.md 1.0: 2.97 dB)
+#   e.g. --variant '{"amax": 90, "side": "lab"}' (the default) fits the library as built at random incidence, each
+#   construction at its laboratory side (md/grazing_report.md 1.5: 2.70 dB); '{"amax": 90, "side": 0}' the infinite plate
+#   (md/m10_m15_report.md 1.0: 2.97 dB)
 import argparse, json, math, os, random, sys
 import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from txlib import FMAP, RHO0C
+from txlib import FMAP, RHO0C, davy_sigma
 
 _R = json.load(open(os.path.join(HERE, 'tl_refs.json')))
 OCT = _R['octaves_hz']
@@ -28,6 +32,20 @@ REF = [(c['name'], c['cls'], c['thk'], [tuple(t) if t else None for t in c['targ
 ABS = {k: tuple(v) for k, v in _R['absorption_law'].items()}
 NAMES = [r[0] for r in REF]
 PHYS_FC = {n: v['fc_hz'] for n, v in _R['physical'].items() if v['fc_hz']}
+# laboratory side sqrt(area) of each reference (m): the AGC / EN 12758 pane 1.23 x 1.48, a board 1.2 x 2.4, the Riverbank
+# opening 4.37 x 2.84 m (BIA TN 5A, RD066) for the walls and linings (md/grazing_report.md 1.5)
+_LAB = {'glass': (1.23, 1.48), 'board': (1.2, 2.4), 'wall': (4.37, 2.84)}
+_KIND = {'glass 4 mm': 'glass', 'glass 6 mm': 'glass', '4-16-4 (AGC)': 'glass', '4-12-4-12-4 (AGC)': 'glass',
+         'gypsum 12.5 (model)': 'board', 'plywood 18 (model)': 'board'}
+LAB_SIDE = {n: math.sqrt(_LAB[_KIND.get(n, 'wall')][0] * _LAB[_KIND.get(n, 'wall')][1]) for n in NAMES}
+
+
+def resolve(V, name):
+    """V with its side resolved for construction name: 'lab' -> LAB_SIDE[name]"""
+    if V.get('side') == 'lab':
+        V = dict(V)
+        V['side'] = LAB_SIDE[name]
+    return V
 
 
 class Grid:
@@ -50,6 +68,21 @@ def grid(na, ns, amax=78.0):
     return _G[k]
 
 
+_RAD = {}
+
+
+def _radiation(side, g):
+    """(radiation cosine, gain) on the grid g: the cosine and 1 for the infinite plate (side 0), 1 / sigma and
+    1 / (sigma c) for a panel of the given side (txlib.davy_sigma at each grid frequency, mapped)"""
+    if not (side > 0.0):
+        return g.C[None, :], 1.0
+    key = (side, id(g))
+    if key not in _RAD:
+        sig = np.array([[davy_sigma(f * FMAP, min(c, 1.0), side) for c in g.C] for f in g.F])
+        _RAD[key] = (1.0 / sig, 1.0 / (sig * g.C[None, :]))
+    return _RAD[key]
+
+
 def TL_oct(p, tfl, V, g):
     """octave TL (dB) of the plate rule over the average of g"""
     X1k, m, att, attB, cF, cQ, rF, rQ, rS, C = p
@@ -61,6 +94,7 @@ def TL_oct(p, tfl, V, g):
     c = g.C[None, :]
     if V.get('m14') is not None:
         c = np.maximum(c, math.cos(math.radians(V['m14'])))
+    cr, gain = _radiation(V.get('side', 0.0), g)   # the radiation cosine and the finite plate's gain
     Xm = X1k * (f / 1000.0) ** (m / 20.0) * np.ones_like(c)
     if rF > 0 and rQ > 0 and rS != 0:
         if rS > 0:
@@ -80,13 +114,13 @@ def TL_oct(p, tfl, V, g):
         w = (f / cF) ** 2 * s2 * s2
         X = Xm * np.abs((1 - w) - 1j * w * eta)
         if V.get('m15'):
-            cross = 2.0 * c * Xm * w * eta
+            cross = 2.0 * cr * Xm * w * eta
     else:
         X = Xm
     Xc = np.maximum(X, 1.0)
     A = 20 * np.log10(Xc)
     with np.errstate(divide='ignore', invalid='ignore'):
-        TL = np.where(X > 1.0, A * np.log10(1 + (Xc * c) ** 2 + cross) / np.log10(1 + Xc * Xc), 0.0)
+        TL = np.where(X > 1.0, np.maximum(0.0, A * np.log10(1 + (Xc * cr) ** 2 + cross) / np.log10(1 + Xc * Xc) - 10 * np.log10(gain)), 0.0)
     tau = 10 ** (-0.1 * TL)
     a = np.clip(tfl[0] * (g.F / 1000.0) ** tfl[1], 0.0, 1.0)[:, None]
     ig = (10 ** (-0.1 * np.maximum(att * (g.F / 1000.0) ** attB, 0.0)))[:, None]
@@ -195,6 +229,7 @@ def de(fun, lo, hi, pop=48, gens=350, rnd=None, inits=()):
 
 def fit_de(name, V, seed=0, x0s=(), pop=48, gens=350, mid=(96, 3), fine=(192, 6)):
     """global: jDE on the mid grid for each resonance sign, then Nelder-Mead polish of the six best of each on the fine grid"""
+    V = resolve(V, name)
     k = NAMES.index(name); _, acl, thk, tg = REF[k]; tfl = ABS[acl]
     amax = V.get('amax', 78.0)
     gm, gf = grid(mid[0], mid[1], amax), grid(fine[0], fine[1], amax)
@@ -236,6 +271,7 @@ def fit_de(name, V, seed=0, x0s=(), pop=48, gens=350, mid=(96, 3), fine=(192, 6)
 
 def evaluate(name, p, V, na=768, ns=12):
     """octave TL, residuals and worst residual at the evaluation grid"""
+    V = resolve(V, name)
     k = NAMES.index(name)
     _, acl, thk, tg = REF[k]
     v = TL_oct(p, ABS[acl], V, grid(na, ns, V.get('amax', 78.0)))
@@ -265,6 +301,7 @@ def project(p, V, name=None):
 
 def select(name, V, vecs):
     """the best of the vectors (projected onto V) at the evaluation grid"""
+    V = resolve(V, name)
     k = NAMES.index(name)
     _, acl, thk, tg = REF[k]
     ge = grid(768, 12, V.get('amax', 78.0))
@@ -272,7 +309,9 @@ def select(name, V, vecs):
 
 
 def columns(name, p, V={}):
-    """library columns (GHz) of a fit"""
+    """library columns (GHz) of a fit; side where V names one (the library reads 3.29 where the column is absent), and the
+    rigid face's permittivity a = 8.4794e-10"""
+    V = resolve(V, name)
     k = NAMES.index(name)
     _, acl, thk, tg = REF[k]
     tfl = ABS[acl]
@@ -282,8 +321,11 @@ def columns(name, p, V={}):
         att = 0.0
     F1K = 1000 * FMAP
     fRef = F1K * thk / X1k ** (20.0 / m)
-    return dict(thk=thk, tf=tfl[0] * (fRef / F1K) ** tfl[1], tfB=tfl[1], m=m, fRef=fRef, resF=rF * FMAP, resQ=rQ, resS=rS,
-                att=att * (fRef / F1K) ** attB, attB=attB, coiF=cF * FMAP, coiQ=cQ)
+    out = dict(a=8.4794e-10, thk=thk, tf=tfl[0] * (fRef / F1K) ** tfl[1], tfB=tfl[1], m=m, fRef=fRef, resF=rF * FMAP, resQ=rQ,
+               resS=rS, att=att * (fRef / F1K) ** attB, attB=attB, coiF=cF * FMAP, coiQ=cQ)
+    if V.get('side') is not None:
+        out['side'] = V['side']
+    return out
 
 
 def _task(a):
@@ -294,7 +336,8 @@ def _task(a):
 if __name__ == '__main__':
     ap = argparse.ArgumentParser(description='transmission fit on the formula copy (md/acoustic.md 9)')
     ap.add_argument('names', nargs='*', help='constructions (default: all 13)')
-    ap.add_argument('--variant', default='{"amax": 90}', help='variant dict as JSON (default: the library at random incidence)')
+    ap.add_argument('--variant', default='{"amax": 90, "side": "lab"}',
+                    help='variant dict as JSON (default: the library at random incidence, each construction at its lab side)')
     ap.add_argument('--seeds', type=int, default=6)
     ap.add_argument('--procs', type=int, default=os.cpu_count() or 1)
     ap.add_argument('--out', default='', help='write the fits as JSON')

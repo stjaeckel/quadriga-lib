@@ -178,12 +178,12 @@ assertEqual( lines{1}, 'name,c,tf,zzz' );
 assertEqual( lines{2}, 'slab,0.05,2,7' );
 delete(fn); delete(mtl_fn); delete(csv_obj_fn);
 
-% csv_write_defaults = true -> full canonical set with defaults (a, e, fRef = 1, else 0)
+% csv_write_defaults = true -> full canonical set with defaults (a, e, fRef = 1, side = 3.29, else 0)
 quadriga_lib.obj_file_write( fn, mesh, obj_ind, mtl_ind, obj_names, mtl_names, ...
     [], [], [], 0.001, [], csv_names, csv_prop, true );
 lines = read_lines(csv_obj_fn);
-assertEqual( lines{1}, 'name,a,b,c,d,e,f,g,h,att,attB,alpha,alphaB,fRef,m,resF,resQ,resS,coiF,coiQ,tf,tfB,tfP,tfF,tfQ,zzz' );
-assertEqual( lines{2}, 'slab,1,0,0.05,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,7' );
+assertEqual( lines{1}, 'name,a,b,c,d,e,f,g,h,att,attB,alpha,alphaB,fRef,m,resF,resQ,resS,coiF,coiQ,tf,tfB,tfP,tfF,tfQ,side,zzz' );
+assertEqual( lines{2}, 'slab,1,0,0.05,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,3.29,7' );
 delete(fn); delete(mtl_fn); delete(csv_obj_fn);
 
 % Validation: csv_prop column length must match numel(csv_names)

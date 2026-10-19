@@ -76,7 +76,7 @@ void calc_diffraction_gain(
 - **`scalar_mode`** — If `true`, uses scalar transmission (TE-only reflection coefficient,
   energy-conservation transmission) instead of EM TE/TM averaging. Default `false` (EM mode). Selects
   interaction type passed to [[ray_mesh_interact]] (4 vs. 1).
-- **`thin_slab_threshold`** — Thin-slab (Fabry-Pérot) resolve threshold; 0 = resolve always (default), 1 = resolve never,  see [[ray_state_update]]
+- **`thin_slab_threshold`** — Thin-slab (Fabry-Pérot) resolve threshold on the round-trip in-slab amplitude `ρ`: a series is summed where `ρ ≥ eps`; 0 = resolve always (default); `eps ≥ 1` re-emits every series whose `ρ` is below one, and a round trip at or above one is always summed; see [[ray_state_update]]
 - **`apply_fspl`** — If `true`, folds the geometric spreading loss into `gain`, so that `gain` becomes an
   absolute propagation gain instead of a value relative to FSPL. Default `false`. The reference distance is
   the direct TX-RX distance, matching the `path_length` definition used by [[qrt_file_read]] for a transmission-only 

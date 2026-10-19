@@ -336,7 +336,7 @@ class test_case(unittest.TestCase):
         _rm(mtl_fn)
         _rm(csv_obj_fn)
 
-        # csv_write_defaults = True -> full canonical set with defaults (a, e, fRef = 1, else 0)
+        # csv_write_defaults = True -> full canonical set with defaults (a, e, fRef = 1, side = 3.29, else 0)
         quadriga_lib.RTtools.obj_file_write(
             fn, mesh, obj_ind, mtl_ind, obj_names, mtl_names,
             csv_names=csv_names, csv_prop=csv_prop, csv_write_defaults=True,
@@ -344,11 +344,11 @@ class test_case(unittest.TestCase):
         lines = read_lines(csv_obj_fn)
         npt.assert_equal(
             lines[0],
-            "name,a,b,c,d,e,f,g,h,att,attB,alpha,alphaB,fRef,m,resF,resQ,resS,coiF,coiQ,tf,tfB,tfP,tfF,tfQ,zzz",
+            "name,a,b,c,d,e,f,g,h,att,attB,alpha,alphaB,fRef,m,resF,resQ,resS,coiF,coiQ,tf,tfB,tfP,tfF,tfQ,side,zzz",
         )
         npt.assert_equal(
             lines[1],
-            "slab,1,0,0.05,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,7",
+            "slab,1,0,0.05,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,3.29,7",
         )
         _rm(fn)
         _rm(mtl_fn)

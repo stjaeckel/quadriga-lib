@@ -6,6 +6,18 @@
 
 #include "ray_test_helpers.hpp"
 
+// A palette with the side column at zero: the infinite plate (md/acoustic.md 2.1), for the cases whose statement is
+// written for it - a bonded run, the mass cosine, a resonance, the bending stiffness, a closed plate, a peaked face -
+// rather than for the radiation of a finite panel ("Finite plate - ...")
+static inline std::unordered_map<std::string, std::vector<double>> side0(std::unordered_map<std::string, std::vector<double>> P)
+{
+    size_t n = 0;
+    for (const auto &kv : P)
+        n = std::max(n, kv.second.size());
+    P["side"] = std::vector<double>(n, 0.0);
+    return P;
+}
+
 // One body of a bonded mass-law plate, for diag_bonded_TL: the mass column, the reference frequency and
 // the normal thickness, exactly the three quantities Material::medium_gain forms its term from. The
 // column is a switch (M10): m > 0 is the limp mass law at 20 dB per decade, whatever its value.
@@ -242,7 +254,7 @@ TEST_CASE("Stack with a mass-law layer - resolved by segments, not killed", "[ac
         {5.24, 0.63, thk, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 10.0, 0.001},     // 8 MB     a second mass-law sheet
         {1.50, 0.40, thk},                                                // 9 B      M without its column
     };
-    auto mtl = lump_palette(pal);
+    auto mtl = side0(lump_palette(pal));
     auto Lay = [&](int idx)
     { return lump_layer(pal[(size_t)idx - 1], f_hz); };
     auto stk = [&](int itype, uint8_t otype, int m1, int m2, double th)
@@ -404,7 +416,7 @@ TEST_CASE("Leak reciprocity - a mass-law panel on a rigid wall as a sheet and as
             {e_w, 0.0, thk, att_w, tf_w, 0.0, 0.0, 0.0, 0.0, 20.0, 0.001}, // 1 WOOD   panel, m 20
             {e_c, 0.0, 0.0, att_c, tf_c},                                  // 2 CONC0  without its mass law
         };
-        auto mtl = lump_palette(pal);
+        auto mtl = side0(lump_palette(pal));
         QD_DIAG("\n# diag: leak reciprocity as a sheet, wood panel (20 mm, tf 0.2, att 1 dB, m 20) on concrete\n");
         QD_DIAG("# (tf 0.1, att 2 dB), scalar. e_minus_x is entry minus exit with the wall's interface gain\n");
         QD_DIAG("# taken out; near_face is the flat first face against the Fresnel exit, the part recorded\n");
@@ -449,7 +461,7 @@ TEST_CASE("Leak reciprocity - a mass-law panel on a rigid wall as a sheet and as
             {e_w, 0.0, 0.0, att_w, tf_w, 0.0, 0.0, 0.0, 0.0, 20.0, 1.0}, // 1 WOOD as a solid
             {e_c, 0.0, 0.0, att_c, tf_c, 0.0, 0.0, 0.0, 0.0, 30.0, 1.0}, // 2 CONC as a solid
         };
-        auto mtl = lump_palette(pal);
+        auto mtl = side0(lump_palette(pal));
         arma::mat mesh = quadriga_lib::cube<double>();
         arma::mat cube2 = quadriga_lib::cube<double>(arma::vec{1.0}, arma::vec{0.0, 0.0, 0.0}, arma::vec{2.0, 0.0, 0.0});
         mesh = arma::join_cols(mesh, cube2);
@@ -498,7 +510,7 @@ TEST_CASE("Leak reciprocity - a mass-law panel on a rigid wall as a sheet and as
             {4.0, 0.0, 0.0},                                             // 1 plain solid
             {4.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 20.0, 1.0},    // 2 the same with a mass law, term zero at this path
         };
-        auto mtl = lump_palette(pal);
+        auto mtl = side0(lump_palette(pal));
         for (double thd : {30.0, 60.0})
         {
             double th = thd * QPI / 180.0, ct = diag_traced_ct(std::complex<double>(4.0, 0.0), th);
@@ -576,7 +588,7 @@ TEST_CASE("Bonded mass - sheet on sheet, sheet on solid and solid on solid as on
         {e_w, 0.0, 0.012, 0.0, tf_w, 0.0, 0.0, 0.0, 0.0, 20.0, fZ},                  // 15 P12Z
     };
     const int P12Z = 15;
-    auto mtl = lump_palette(pal);
+    auto mtl = side0(lump_palette(pal));
     mtl["attB"][(size_t)WS2 - 1] = 1.0; // att is zero, so this separates WS2 from WS and does nothing else
 
     const std::vector<double> angles = {0.0, 30.0, 60.0, 75.0};
@@ -1064,7 +1076,7 @@ TEST_CASE("Bonded mass - a mass-law sheet inside a mass-law wall", "[acoustic]")
         {1.0e-8, 0.0, 0.008, 0.0, tf_w, 0.0, 0.0, 0.0, 0.0, 20.0, fZ}, // 13 D8Z
     };
     const int D8 = 12, D8Z = 13;
-    auto mtl = lump_palette(pal);
+    auto mtl = side0(lump_palette(pal));
     // the wall's face to air (tf where it is closed, the pair rule on its Fresnel reflectance at normal
     // incidence, where it is open), and what the legs of a plate pay above that face
     auto face = [](double eps, double tf, double ct)
@@ -1720,7 +1732,7 @@ TEST_CASE("Bonded mass - the plate at any depth", "[acoustic]")
         std::vector<LumpMtl> v = base;
         for (LumpMtl &M : v)
             M.fRef = twin ? M.fRef * 1.0e12 : M.fRef * fRef_scale; // the twin keeps the ratios between the bodies
-        return lump_palette(v);
+        return side0(lump_palette(v));
     };
     const Pal p_twin = pal_of(1.0, true);
     struct Regime
@@ -2228,7 +2240,7 @@ TEST_CASE("Mass cosine - a mass-law sheet behind a refracting layer forms its te
     };
     std::vector<LumpMtl> lt = lp;
     lt[0].fRef *= 1.0e12, lt[1].fRef *= 1.0e12;
-    const ub::Pal pal = lump_palette(lp), twin = lump_palette(lt);
+    const ub::Pal pal = side0(lump_palette(lp)), twin = side0(lump_palette(lt));
     auto TL = [&](int iM, double c) { return diag_mass_TL(lp[iM - 1].m, lp[iM - 1].fRef, f, lp[iM - 1].thk, c); };
     auto prod = [](const std::vector<ub::Ev> &v) { std::complex<double> z = 1.0; for (const auto &e : v) z *= cpx(e.xpr, 0, 0); return z; };
     auto cosx = [](const arma::mat &d) { return std::abs(d(0, 0)) / std::sqrt(ub::sumsq(d)); };
@@ -2306,7 +2318,7 @@ TEST_CASE("Mass cosine - a mass-law sheet behind a refracting layer forms its te
                     double v[2][4];
                     for (int k = 0; k < 2; ++k)
                     {
-                        ub::Pal P = lump_palette(k ? qt : q);
+                        ub::Pal P = side0(lump_palette(k ? qt : q));
                         arma::uvec m1, m2, m3, m4;
                         arma::mat sCM = ub::build({0.0, gap}, {2, 1}, {false, true}, m1), sMC = ub::build({0.0, gap}, {1, 2}, {false, true}, m2);
                         arma::mat tCs = ub::build({0.0, tC, tC + gap}, {3, 3, 1}, {false, true, false}, m3), tMs = ub::build({0.0, gap, gap + tC}, {1, 3, 3}, {false, false, true}, m4);
@@ -2895,7 +2907,7 @@ TEST_CASE("Total reflection of the outer pair - the sheet stays in the result - 
             {2.401e-9, 0.0, 0.0, att_c, tf_c, 0.0, 0.0, 0.0, 0.0, 30.0, 0.001},  // 2 CONC   as a wall
             {2.401e-9, 0.0, 0.0, att_c, tf_c},                                   // 3 CONC0  without its mass law
         };
-        auto mtl = lump_palette(pal);
+        auto mtl = side0(lump_palette(pal));
         const double e_w = 2.1609e-8, e_c = 2.401e-9;
         const double G_w = std::pow(10.0, -0.1 * att_w), G_c = std::pow(10.0, -0.1 * att_c);
 
@@ -4315,7 +4327,7 @@ TEST_CASE("Closed plate - a mass-law layer the wave is evanescent in passes the 
                     for (int tw = 0; tw < 2; ++tw) // 0: mass argument at nothing, 1: the 26.8 dB sheet
                     {
                         std::vector<LumpMtl> q = {rigid(tfM, 0.022, tw ? 0.001 : 0.001 * BIG), {2.50, ei, tC}, {2.50, ei, 0.0}};
-                        ub::Pal P = lump_palette(q);
+                        ub::Pal P = side0(lump_palette(q));
                         arma::uvec m1, m2, m3, m4;
                         arma::mat sCM = ub::build({0.0, gap}, {2, 1}, {false, true}, m1), sMC = ub::build({0.0, gap}, {1, 2}, {false, true}, m2);
                         arma::mat tCs = ub::build({0.0, tC, tC + gap}, {3, 3, 1}, {false, true, false}, m3), tMs = ub::build({0.0, gap, gap + tC}, {1, 3, 3}, {false, false, true}, m4);
@@ -4368,7 +4380,7 @@ TEST_CASE("Closed plate - a mass-law layer the wave is evanescent in passes the 
                         if (tM == 0.2 && tfC == 0.0)
                             continue; // table A
                         std::vector<LumpMtl> q = {rigid(tM, 0.022, 0.001 * BIG), {2.50, ei, tC, 0.0, tfC}, {2.50, ei, 0.0, 0.0, tfC}};
-                        ub::Pal P = lump_palette(q);
+                        ub::Pal P = side0(lump_palette(q));
                         arma::uvec m1, m2, m3, m4;
                         arma::mat sCM = ub::build({0.0, gap}, {2, 1}, {false, true}, m1), sMC = ub::build({0.0, gap}, {1, 2}, {false, true}, m2);
                         arma::mat tCs = ub::build({0.0, tC, tC + gap}, {3, 3, 1}, {false, true, false}, m3), tMs = ub::build({0.0, gap, gap + tC}, {1, 3, 3}, {false, false, true}, m4);
@@ -4403,7 +4415,7 @@ TEST_CASE("Closed plate - a mass-law layer the wave is evanescent in passes the 
                     for (double thd : {10.0, 30.0, 60.0})
                     {
                         std::vector<LumpMtl> q = {rigid(tM, 0.022, 0.001 * BIG), {he[H][0], he[H][1], 0.0}};
-                        ub::Pal P = lump_palette(q);
+                        ub::Pal P = side0(lump_palette(q));
                         const double d1 = 0.010, d2 = 0.012;
                         arma::uvec mi, mx, me;
                         arma::mat m_in = ub::build({0.0, d1, d1 + d2}, {2, 1, 2}, {false, false, true}, mi);
@@ -4453,7 +4465,7 @@ TEST_CASE("Closed plate - a mass-law layer the wave is evanescent in passes the 
             for (double thd : {10.0, 30.0, 60.0})
             {
                 std::vector<LumpMtl> q = {rigid(tfM, 0.022, 0.001 * BIG), {eB, 0.0, 0.012, 0.0, tB, 0.0, 0.0, 0.0, 0.0, 20.0, 0.001 * BIG}};
-                ub::Pal P = lump_palette(q);
+                ub::Pal P = side0(lump_palette(q));
                 arma::uvec m1, m2;
                 arma::mat s1 = ub::build({0.0, gap}, {1, 2}, {false, true}, m1), s2 = ub::build({0.0, gap}, {2, 1}, {false, true}, m2);
                 auto a = ub::chain(P, s1, m1, {4}, f, thd, {0.0}), b = ub::chain(P, s2, m2, {4}, f, thd, {0.0});
@@ -4482,7 +4494,7 @@ TEST_CASE("Closed plate - a mass-law layer the wave is evanescent in passes the 
                                   {2.25, 0.0, 0.006, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 20.0, 0.001},   // 5 mass-law, permittivity above one
                                   {1.50, 0.40, 0.006, 0.0, 0.3, 0.0, 0.0, 0.0, 0.0, 20.0, 0.001},  // 6 the same lossy, with tf
                                   {2.401e-9, 0.0, 0.0, 0.0, 0.1, 0.0, 0.0, 0.0, 0.0, 20.0, 0.001}}; // 7 rigid wall, traced
-        ub::Pal P = lump_palette(q);
+        ub::Pal P = side0(lump_palette(q));
         struct Row
         {
             const char *name;
@@ -4545,7 +4557,7 @@ TEST_CASE("Closed plate - a mass-law layer the wave is evanescent in passes the 
         for (double thd : {30.0, 40.0, 44.0, 44.9, 45.1, 46.0, 50.0, 60.0})
         {
             std::vector<LumpMtl> q = {{0.50, 0.0, 0.022, 0.0, 0.2, 0.0, 0.0, 0.0, 0.0, 20.0, 0.001 * BIG}, {2.50, ei, 0.0}};
-            ub::Pal P = lump_palette(q);
+            ub::Pal P = side0(lump_palette(q));
             arma::uvec mi;
             arma::mat mesh = ub::build({0.0, 0.010, 0.022}, {2, 1, 2}, {false, false, true}, mi);
             auto a = ub::chain(P, mesh, mi, {4, 4}, f, thd, {1.5});
@@ -5511,6 +5523,45 @@ namespace r1
     }
     // Set a column of every material at once
     static void col(ub::Pal &P, const char *k, const std::vector<double> &v) { P[k] = v; }
+    // Davy's forced radiation efficiency of a finite panel, azimuth mean, written from the paper
+    // [Davy_2009_ForcedRadiationEfficiency, Eqs. 19, 28, 34, 36, 37; n = 2, w = 1.3, beta = 0.124], for a square of
+    // side s (2a = s, S = s^2) at f_hz in air (k = 2 pi f / 343) and the cosine g of the incidence
+    static double davy_sigma(double f_hz, double g, double s)
+    {
+        const double k = 2.0 * QPI * f_hz / 343.0, ka = 0.5 * k * s, S = s * s;
+        const double p = std::min(1.0, 1.3 * std::sqrt(QPI / (2.0 * ka)));             // Eq. 19
+        const double h = 1.0 / (2.0 / 3.0 * std::sqrt(2.0 * ka / QPI) - 0.124);         // Eq. 28
+        const double al = h / p - 1.0, q = 2.0 * QPI / (k * k * S);                      // Eqs. 34, 36
+        const double x = (g >= p) ? g : h - al * g;                                      // Eq. 37
+        return 1.0 / std::sqrt(x * x + q * q);
+    }
+    // The mass term of a panel of side s (md/grazing_report.md 0.7, decision 2026-10-19): the radiation cosine of
+    // mass_TL replaced by 1 / sigma and the finite plate's gain 1 / (sigma c), the transmission clipped at one;
+    // s = 0 is the infinite plate
+    static double mass_TL_side(double X0, double c, double f_hz, double s)
+    {
+        if (!(s > 0.0))
+            return mass_TL(X0, c);
+        if (!(X0 > 1.0) || !(c > 0.0))
+            return 0.0;
+        const double sg = davy_sigma(f_hz, std::min(c, 1.0), s), x = X0 / sg;
+        const double TL = 20.0 * std::log10(X0) * std::log10(1.0 + x * x) / std::log10(1.0 + X0 * X0) + 10.0 * std::log10(sg * std::min(c, 1.0));
+        return std::max(0.0, TL);
+    }
+    // r1::wall with a ray that starts close to the wall and whose path through it is centred on y = 0.37, so that
+    // a ray within a tenth of a degree of grazing still crosses a traced solid on the 400 m faces (a 4 mm traced
+    // pane crossed 100 m from the origin passes 0.2 dB more than at 0.37 m: keep the crossing near the origin)
+    static Out wall_g(const ub::Pal &P, const std::vector<double> &x, const std::vector<int> &mat, const std::vector<bool> &flip, int tr, double f, double thd)
+    {
+        arma::uvec mi;
+        arma::mat mesh = ub::build(x, mat, flip, mi);
+        const double t = std::tan(thd * QPI / 180.0), dl = std::min(1.0, 50.0 / std::max(t, 1.0e-12));
+        const double y0 = 0.37 - 0.5 * (x.back() - x.front()) * t;
+        arma::mat o = {{-dl, y0 - dl * t, 0.0}}, d = {{dl, y0 + dl * t, 0.0}};
+        bf::Acc A;
+        bf::walk(P, mesh, mi, tr, f, thd, 0.0, nullptr, o, d, 1.0, 1.0, 0.0, 0.0, 0, 200, A);
+        return {std::norm(A.T[0]), std::norm(A.R[0]), A.nT};
+    }
 }
 
 TEST_CASE("Plate rule - a rigid mass-law panel passes the incoherent series of its face and its plate and reflects what its face does not absorb", "[acoustic]")
@@ -5518,7 +5569,8 @@ TEST_CASE("Plate rule - a rigid mass-law panel passes the incoherent series of i
     // N1 (R1h): a closed mass-law plate in air reflects 1 - a and passes a tau / (a + tau - a tau), a the
     // absorption of its outer faces (tf of the material, the pad), tau its mass term. As a sheet and as a
     // traced solid, both tracers, in the one- and the two-parameter mapping (N7). At bb336dc the plate
-    // passed a^2 tau, the two leaks.
+    // passed a^2 tau, the two leaks. The tables carry no side column: tau is the term of a panel of the default
+    // side 3.29 m (Davy's forced radiation efficiency, "Finite plate - ...").
     ub::OneThread one_thread;
     // 4 mm glass (tf of window glass, falling), 152 mm concrete (tf of concrete, rising): report 1.11
     struct M
@@ -5547,7 +5599,7 @@ TEST_CASE("Plate rule - a rigid mass-law panel passes the incoherent series of i
                     for (double thd : {0.0, 10.0, 30.0, 60.0, 80.0})
                     {
                         const double c = std::cos(thd * QPI / 180.0);
-                        const double tau = std::pow(10.0, -0.1 * r1::mass_TL((fG / m.fRef) * m.thk, c));
+                        const double tau = std::pow(10.0, -0.1 * r1::mass_TL_side((fG / m.fRef) * m.thk, c, f_hz, 3.29)); // no side column: 3.29 m
                         r1::Out W = kind ? r1::wall(P, {0.0, m.thk}, {1, 1}, {false, true}, tr, f, thd) : r1::wall(P, {0.0}, {1}, {false}, tr, f, thd);
                         const double Tr = r1::plate(a, tau), Rr = 1.0 - a;
                         QD_DIAG("%s,%s,%d,%.0f,%.0f,%.4f,%.3f,%.3f,%+.4f,%.4f,%.4f,%+.5f\n", m.name, kind ? "X" : "S", tr, f_hz, thd, a, r1::dB(W.T), r1::dB(Tr),
@@ -5657,7 +5709,7 @@ TEST_CASE("Resonance - on a mass-law material res* is the plate's resonance and 
         for (int kind = 0; kind < 2; ++kind)
         {
             std::vector<LumpMtl> lp = {{a, 0.0, kind ? 0.0 : thk, 0.0, tf, k.F_hz * r1::FMAP, k.Q, k.S, 0.0, 20.0, fRef}};
-            ub::Pal P = lump_palette(lp);
+            ub::Pal P = side0(lump_palette(lp));
             for (int tr : {4, 5})
                 for (double f_hz : k.f_hz)
                     for (double thd : {0.0, 30.0, 60.0})
@@ -5687,7 +5739,7 @@ TEST_CASE("Coincidence - on a mass-law material coiF and coiQ are the bending st
     for (int kind = 0; kind < 2; ++kind)
     {
         std::vector<LumpMtl> lp = {{a, 0.0, kind ? 0.0 : thk, 0.0, tf, 0.0, 0.0, 0.0, 0.0, 20.0, fRef}};
-        ub::Pal P = lump_palette(lp);
+        ub::Pal P = side0(lump_palette(lp));
         r1::col(P, "coiF", {cF}), r1::col(P, "coiQ", {cQ});
         for (int tr : {4, 5})
             for (double f_hz : {1000.0, 4000.0})
@@ -5765,7 +5817,10 @@ TEST_CASE("Mass law - m switches the limp mass law on", "[acoustic]")
     // fRef = (f_GHz / f_Hz) rho0 c / (pi rho). The reference is the thin-plate law of 3.4 without bending,
     // 10 log10(1 + (X cos)^2), normalized as in 2.1 to 20 log10 X at normal incidence; the pane passes the
     // plate rule of that term and its face (tf 0.05). The same pane with m 12 and m 30 passes the same,
-    // bitwise. As a sheet and as a traced solid, both acoustic tracers.
+    // bitwise. As a sheet and as a traced solid, both acoustic tracers. The table carries no side column, so the
+    // pane radiates as a panel of side 3.29 m: the reference takes Davy's forced radiation efficiency in place of
+    // 1 / cos (decision 2026-10-19, "Finite plate - ..."); its term lies above the infinite plate's by 6.5 / 4.3 / 1.0 dB at
+    // 80 deg and 125 / 500 / 2000 Hz, by 2.6 dB at 60 deg and 125 Hz, and by less than 0.04 dB elsewhere in the table.
     ub::OneThread one_thread;
     const double a = 8.4794e-10, rho = 2500.0, rho0c = 1.204 * 343.0, thk = 0.004, tf = 0.05;
     const double fRef = r1::FMAP * rho0c / (QPI * rho);
@@ -5777,7 +5832,7 @@ TEST_CASE("Mass law - m switches the limp mass law on", "[acoustic]")
                 for (double thd : {0.0, 30.0, 60.0, 80.0})
                 {
                     const double c = std::cos(thd * QPI / 180.0), X = 2.0 * QPI * f_hz * rho * thk / (2.0 * rho0c);
-                    const double A = 20.0 * std::log10(X), TL = (c >= 1.0) ? A : A * std::log10(1.0 + X * c * X * c) / std::log10(1.0 + X * X);
+                    const double TL = r1::mass_TL_side(X, c, f_hz, 3.29); // no side column: a panel of side 3.29 m
                     const double Tr = r1::plate(tf, std::pow(10.0, -0.1 * TL));
                     double T20 = 0.0;
                     for (double m : {20.0, 12.0, 30.0})
@@ -5795,6 +5850,151 @@ TEST_CASE("Mass law - m switches the limp mass law on", "[acoustic]")
                             CHECK(W.T == T20); // m is a switch
                     }
                 }
+}
+
+TEST_CASE("Finite plate - a mass-law panel of side s radiates with Davy's forced radiation efficiency", "[acoustic]")
+{
+    // Decision 2026-10-19 (md/grazing_report.md 0.7): the mass term of a mass-law material takes the radiation
+    // efficiency of the forced wave on a finite panel in place of the infinite plate's 1 / cos, sigma_D of Davy's
+    // closed form for a square of side s = sqrt(area) (2a = s, S = s^2), with the gain of a finite plate 1 / (sigma c),
+    // the transmission clipped at one. The plate's own impedance is untouched. The reference is written here from
+    // Davy's equations (r1::davy_sigma), not from library code. A 4 mm pane with side 1.35 m and a 152 mm concrete
+    // wall with side 3.29 m, limp (fRef from the density, as in "Mass law - m switches the limp mass law on"), the
+    // face of each tf 0.05: the panel passes the plate rule of that face and the term. Sheet and traced solid, both
+    // acoustic tracers, 0 to 89.9 deg (the traced solid to 89.5 deg), fine near grazing.
+    //
+    // What the finite size changes, read off the rows: near grazing the infinite plate turns transparent and the
+    // finite one does not (glass 500 Hz, 89 deg: a term of 1.6 dB against 13.2 dB); at 31.5 Hz the small pane radiates
+    // less than an infinite plate even at normal incidence (sigma 1 / sqrt(1 + q^2)), so its term rises there.
+    ub::OneThread one_thread;
+    const double rho0c = 1.204 * 343.0, tf = 0.05;
+    struct M
+    {
+        const char *name;
+        double a, rho, thk, side;
+    };
+    const std::vector<M> mats = {{"glass 4 mm", 8.4794e-10, 2500.0, 0.004, 1.35}, {"concrete 152 mm", 2.0260e-09, 347.0 / 0.152, 0.152, 3.29}};
+    const std::vector<double> angles = {0.0, 30.0, 45.0, 60.0, 70.0, 75.0, 78.0, 80.0, 82.0, 84.0, 85.0, 86.0, 87.0, 88.0, 89.0, 89.5, 89.9};
+    QD_DIAG("\n# diag: finite plate, Davy's forced radiation efficiency in the mass term; S sheet, X traced solid, scalar\n");
+    QD_DIAG("# TL_side the reference term at the panel's side, TL_inf the infinite plate's\n");
+    QD_DIAG("material,kind,type,f_Hz,theta,sigma,TL_side_dB,TL_inf_dB,T_dB,T_ref_dB,dT\n");
+    for (const auto &m : mats)
+    {
+        const double fRef = r1::FMAP * rho0c / (QPI * m.rho);
+        for (int kind = 0; kind < 2; ++kind)
+        {
+            std::vector<LumpMtl> lp = {{m.a, 0.0, kind ? 0.0 : m.thk, 0.0, tf, 0.0, 0.0, 0.0, 0.0, 20.0, fRef}};
+            ub::Pal P = lump_palette(lp);
+            r1::col(P, "side", {m.side});
+            for (int tr : {4, 5})
+                for (double f_hz : {31.5, 63.0, 125.0, 500.0, 2000.0})
+                    for (double thd : angles)
+                    {
+                        // a traced solid stops at 89.5 deg: crossed at 89.9 deg (87 m of path through the 152 mm wall) the
+                        // traced leg misses even the infinite plate's rule by up to 3.4 dB at bc24b0c (md/grazing_report.md 1)
+                        if (kind && thd > 89.6)
+                            continue;
+                        const double c = std::cos(thd * QPI / 180.0), X = 2.0 * QPI * f_hz * m.rho * m.thk / (2.0 * rho0c);
+                        const double TLs = r1::mass_TL_side(X, c, f_hz, m.side), TLi = r1::mass_TL(X, c);
+                        const double Tr = r1::plate(tf, std::pow(10.0, -0.1 * TLs));
+                        r1::Out W = kind ? r1::wall_g(P, {0.0, m.thk}, {1, 1}, {false, true}, tr, f_hz * r1::FMAP * 1.0e9, thd)
+                                         : r1::wall_g(P, {0.0}, {1}, {false}, tr, f_hz * r1::FMAP * 1.0e9, thd);
+                        QD_DIAG("%s,%s,%d,%.1f,%.1f,%.5f,%.4f,%.4f,%.4f,%.4f,%+.4f\n", m.name, kind ? "X" : "S", tr, f_hz, thd, r1::davy_sigma(f_hz, c, m.side),
+                                TLs, TLi, r1::dB(W.T), r1::dB(Tr), r1::dB(W.T) - r1::dB(Tr));
+                        INFO(m.name << (kind ? " traced" : " sheet") << ", type " << tr << ", " << f_hz << " Hz, " << thd << " deg");
+                        REQUIRE(W.nT > 0);
+                        CHECK(std::abs(r1::dB(W.T) - r1::dB(Tr)) < 0.01);
+                    }
+        }
+        // the size reaches normal incidence at 31.5 Hz: the small pane's term rises by 7.8 dB, the wall's by 3.0 dB
+        // (the reference, printed), far beyond the 0.01 dB tolerance above
+        const double X31 = 2.0 * QPI * 31.5 * m.rho * m.thk / (2.0 * rho0c);
+        QD_DIAG("# %s, 31.5 Hz, normal incidence: TL_side - TL_inf = %+.3f dB\n", m.name, r1::mass_TL_side(X31, 1.0, 31.5, m.side) - r1::mass_TL(X31, 1.0));
+        CHECK(r1::mass_TL_side(X31, 1.0, 31.5, m.side) - r1::mass_TL(X31, 1.0) > 1.0);
+    }
+}
+
+TEST_CASE("Finite plate - side 0 is the infinite plate, a table without the column is side 3.29, a wave medium ignores it, a negative side is refused, a bonded run takes the side of the body that forms its term", "[acoustic]")
+{
+    // The side column of a mass-law material (decision 2026-10-19): side = 0 gives the infinite plate, the mass term
+    // of md/acoustic.md 2.1; a table without the column takes side 3.29 m (sqrt of 10.8 m^2, a 4.0 x 2.7 m wall),
+    // bitwise; the column is read only where m > 0, so a wave medium passes and reflects bitwise the same with it;
+    // side < 0 is refused like every other non-negative column. A bonded run of mass-law bodies is one panel and
+    // should carry one side (rule of use, like one att per run): where the sides differ, each body pays its
+    // increment at its own side, TL(X_run + X0; s) - TL(X_run; s), so the run passes
+    // TL(X1; s1) + TL(X1 + X2; s2) - TL(X1; s2).
+    ub::OneThread one_thread;
+    const double rho0c = 1.204 * 343.0, tf = 0.05, rho = 2500.0, thk = 0.004, fRef = r1::FMAP * rho0c / (QPI * rho);
+    QD_DIAG("\n# diag: side 0 against the infinite plate's rule, 4 mm glass, S sheet, X traced solid, scalar\n");
+    QD_DIAG("kind,type,f_Hz,theta,T_dB,T_ref_dB,dT\n");
+    for (int kind = 0; kind < 2; ++kind)
+    {
+        std::vector<LumpMtl> lp = {{8.4794e-10, 0.0, kind ? 0.0 : thk, 0.0, tf, 0.0, 0.0, 0.0, 0.0, 20.0, fRef}};
+        ub::Pal P0 = lump_palette(lp), Pn = lump_palette(lp), Pd = lump_palette(lp);
+        r1::col(P0, "side", {0.0}), r1::col(Pd, "side", {3.29});
+        for (int tr : {4, 5})
+            for (double f_hz : {31.5, 500.0})
+                for (double thd : {0.0, 60.0, 85.0, 89.5})
+                {
+                    const double f = f_hz * r1::FMAP * 1.0e9, c = std::cos(thd * QPI / 180.0), X = 2.0 * QPI * f_hz * rho * thk / (2.0 * rho0c);
+                    auto W = [&](const ub::Pal &P)
+                    { return kind ? r1::wall_g(P, {0.0, thk}, {1, 1}, {false, true}, tr, f, thd) : r1::wall_g(P, {0.0}, {1}, {false}, tr, f, thd); };
+                    r1::Out W0 = W(P0), Wn = W(Pn), Wd = W(Pd);
+                    const double Tr = r1::plate(tf, std::pow(10.0, -0.1 * r1::mass_TL(X, c)));
+                    QD_DIAG("%s,%d,%.1f,%.1f,%.6f,%.6f,%+.2e\n", kind ? "X" : "S", tr, f_hz, thd, r1::dB(W0.T), r1::dB(Tr), r1::dB(W0.T) - r1::dB(Tr));
+                    INFO((kind ? "traced" : "sheet") << ", type " << tr << ", " << f_hz << " Hz, " << thd << " deg");
+                    CHECK(std::abs(r1::dB(W0.T) - r1::dB(Tr)) < 0.01); // side 0: the infinite plate (the face's open normal incidence: 0.008 dB)
+                    CHECK(Wn.T == Wd.T); // no column: side 3.29, bitwise
+                    CHECK(Wn.R == Wd.R);
+                }
+    }
+    {
+        // a wave medium (m = 0) with a side column passes and reflects what it does without one, bitwise
+        for (int kind = 0; kind < 2; ++kind)
+            for (int tr : {1, 4, 5})
+                for (double thd : {0.0, 60.0, 85.0})
+                {
+                    std::vector<LumpMtl> lp = {{5.24, 0.3, kind ? 0.0 : 0.0125, 0.0, 0.2}};
+                    ub::Pal Pw = lump_palette(lp), Ps = lump_palette(lp);
+                    r1::col(Ps, "side", {1.0});
+                    auto W = [&](const ub::Pal &P)
+                    { return kind ? r1::wall_g(P, {0.0, 0.0125}, {1, 1}, {false, true}, tr, FRQ, thd) : r1::wall_g(P, {0.0}, {1}, {false}, tr, FRQ, thd); };
+                    r1::Out A = W(Pw), B = W(Ps);
+                    INFO("wave medium, " << (kind ? "traced" : "sheet") << ", type " << tr << ", " << thd << " deg");
+                    CHECK(A.T == B.T);
+                    CHECK(A.R == B.R);
+                }
+    }
+    {
+        // side < 0 is refused
+        std::unordered_map<std::string, std::vector<double>> bad = {{"a", {8.4794e-10}}, {"m", {20.0}}, {"fRef", {fRef}}, {"side", {-1.0}}};
+        CHECK_THROWS_AS(quadriga_lib::medium_gain<double>(bad, 1, 0.1, 1.0e9), std::invalid_argument);
+    }
+    {
+        // a bonded run: two 152 mm concrete bodies, one solid on the other, the first of side 1.35 m, the second of
+        // side 3.29 m; reference the rule above, against the two single-side readings of the run
+        const double rc = 347.0 / 0.152, Lc = 0.152, fRc = r1::FMAP * rho0c / (QPI * rc);
+        std::vector<LumpMtl> lp = {{2.0260e-09, 0.0, 0.0, 0.0, tf, 0.0, 0.0, 0.0, 0.0, 20.0, fRc}, {2.0260e-09, 0.0, 0.0, 0.0, tf, 0.0, 0.0, 0.0, 0.0, 20.0, fRc}};
+        ub::Pal P = lump_palette(lp);
+        r1::col(P, "side", {1.35, 3.29});
+        r1::col(P, "attB", {0.0, 1.0}); // att is zero: this only keeps the two rows apart as materials
+        QD_DIAG("\n# diag: a bonded run of two concrete bodies, sides 1.35 | 3.29 m, traced solids, scalar\n");
+        QD_DIAG("type,f_Hz,theta,T_dB,T_rule_dB,T_all_s1_dB,T_all_s2_dB,dT\n");
+        for (int tr : {4, 5})
+            for (double f_hz : {31.5, 125.0, 500.0})
+                for (double thd : {0.0, 60.0, 85.0})
+                {
+                    const double c = std::cos(thd * QPI / 180.0), X1 = 2.0 * QPI * f_hz * rc * Lc / (2.0 * rho0c), X2 = X1;
+                    const double TLr = r1::mass_TL_side(X1, c, f_hz, 1.35) + r1::mass_TL_side(X1 + X2, c, f_hz, 3.29) - r1::mass_TL_side(X1, c, f_hz, 3.29);
+                    const double Tr = r1::plate(tf, std::pow(10.0, -0.1 * TLr));
+                    const double T1 = r1::plate(tf, std::pow(10.0, -0.1 * r1::mass_TL_side(X1 + X2, c, f_hz, 1.35)));
+                    const double T2 = r1::plate(tf, std::pow(10.0, -0.1 * r1::mass_TL_side(X1 + X2, c, f_hz, 3.29)));
+                    r1::Out W = r1::wall_g(P, {0.0, Lc, Lc, 2.0 * Lc}, {1, 1, 2, 2}, {false, true, false, true}, tr, f_hz * r1::FMAP * 1.0e9, thd);
+                    QD_DIAG("%d,%.1f,%.1f,%.4f,%.4f,%.4f,%.4f,%+.4f\n", tr, f_hz, thd, r1::dB(W.T), r1::dB(Tr), r1::dB(T1), r1::dB(T2), r1::dB(W.T) - r1::dB(Tr));
+                    INFO("bonded run, type " << tr << ", " << f_hz << " Hz, " << thd << " deg");
+                    CHECK(std::abs(r1::dB(W.T) - r1::dB(Tr)) < 0.02); // the run's code is quantized (Bonded mass, 0.01 dB)
+                }
+    }
 }
 
 TEST_CASE("Two-parameter mapping - air | water, a hard wall's phase, a porous layer on it and every tracer below its critical angle", "[acoustic]")
@@ -6064,7 +6264,7 @@ TEST_CASE("Absorption peak - tfP, tfF and tfQ add a resonant peak to the room-si
     for (const Map &mp : std::vector<Map>{{"one", 8.1817e-08, 1.0}, {"two", 4.6908e-05, 573.33}})
         for (int kind = 0; kind < 2; ++kind)
         {
-            const ub::Pal P = m6t::board(mp.a, mp.mu, kind ? 0.0 : thk, tfQ);
+            const ub::Pal P = side0(m6t::board(mp.a, mp.mu, kind ? 0.0 : thk, tfQ));
             for (int tr : {4, 5})
                 for (double f_hz : {63.0, 150.0, 250.0, 500.0, 1000.0})
                     for (double thd : {0.0, 45.0})
