@@ -25,11 +25,14 @@ acoustic side is rebuilt: a change made for acoustics sits behind `m > 0` and mo
 First step of every session, from the repository root:
 
 ```
-cmake --build build_linux --parallel
-./build_linux/test_bin "[wave]" > test_wave.txt          # All tests passed (165258 assertions in 180 test cases)
-./build_linux/test_bin "[acoustic]" > test_acoustic.txt  # All tests passed (40050 assertions in 56 test cases)
-./build_linux/test_bin > test.txt                        # All tests passed (1314857 assertions in 1143 test cases)
+cmake --build build_linux --parallel 12
+OMP_NUM_THREADS=12 ./build_linux/test_bin "[wave]" > test_wave.txt          # All tests passed (165258 assertions in 180 test cases)
+OMP_NUM_THREADS=12 ./build_linux/test_bin "[acoustic]" > test_acoustic.txt  # All tests passed (41523 assertions in 58 test cases)
+OMP_NUM_THREADS=12 ./build_linux/test_bin > test.txt                        # All tests passed (1316330 assertions in 1145 test cases)
 ```
+
+At most 12 threads (since 2026-10-19): the machine is shared with other sessions, and oversubscribed OpenMP runs slow
+both. One suite at a time.
 
 The three baselines are untracked (`.gitignore`: `test*.txt`). A change is diffed against them. The
 wave tables that print coefficients with every digit also assert them against

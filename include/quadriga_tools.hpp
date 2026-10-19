@@ -122,7 +122,7 @@ namespace quadriga_lib
                                int use_kernel = 0,                                                  // Kernel: 0=auto, 1=GENERIC, 2=AVX2, 3=CUDA
                                int gpu_id = 0,                                                      // CUDA device ID, ignored otherwise
                                bool scalar_mode = false,                                            // Scalar (acoustic) mode
-                               double thin_slab_threshold = 0.0,                                    // Resolve threshold on the round-trip in-slab amplitude, 0 = always resolve, 1 = never
+                               double thin_slab_threshold = 0.0,                                    // Resolve threshold on the round-trip in-slab amplitude rho: summed where rho >= eps; 0 = always; >= 1 re-emits every series with rho < 1
                                bool apply_fspl = false,                                             // If true, fold the geometric spreading loss into gain
                                bool apply_phase = false);                                           // If true, multiply xprmat by the propagation phase term exp(-j·2π·d/λ)
 

@@ -9,11 +9,13 @@
 // a box of air; the fixture is "ray_progress - a leaf on a box of air at every frequency of a band".
 //
 // stdin, one line per run: tag itype theta maxdepth start sink nm (a b c d e f g h thk tf tfB m fRef resF resQ resS att
-// coiF coiQ alpha tfP tfF tfQ)*nm nf (x mat flip)*nf thr maxint floor_dB nfreq f_1 .. f_nfreq
+// coiF coiQ alpha tfP tfF tfQ side)*nm nf (x mat flip)*nf thr maxint floor_dB nfreq f_1 .. f_nfreq
 //   itype 4 or 5; theta in degrees; maxdepth, start and sink are read and ignored; materials are numbered from 1 in
 //   the order given (columns as in Material, ray_mesh_interact.cpp); thr the thin_slab_threshold, maxint the
 //   interaction cap (at most 255), floor_dB the gain floor; frequencies in acoustic Hz (mapped by 8.7403e5).
 //   tfP tfF tfQ: the peak of md/acoustic.md 2.6 (tfF in GHz like resF and coiF; 0 0 0 for none).
+//   side: the panel size of a mass-law material, sqrt(area) in m (0 the infinite plate; the library's default 3.29
+//   applies only where a table has no side column, and this probe always gives one).
 // stdout: P,tag,theta,tracer,f_base,f,nT,nR,rays,events,Tre,Tim,Rre,Rim (one line per frequency of the band).
 // Build: tools/acoustic/build_band_probe.sh <output binary>, from the repository root.
 #include "quadriga_lib.hpp"
@@ -28,7 +30,7 @@ int main()
     const double PI = 3.14159265358979323846, C0 = 299792458.0, FMAP = 8.7403e5;
     const std::complex<double> J(0.0, 1.0);
     typedef std::unordered_map<std::string, std::vector<float>> Pal;
-    const char *COLS[] = {"a", "b", "c", "d", "e", "f", "g", "h", "thk", "tf", "tfB", "m", "fRef", "resF", "resQ", "resS", "att", "coiF", "coiQ", "alpha", "tfP", "tfF", "tfQ"};
+    const char *COLS[] = {"a", "b", "c", "d", "e", "f", "g", "h", "thk", "tf", "tfB", "m", "fRef", "resF", "resQ", "resS", "att", "coiF", "coiQ", "alpha", "tfP", "tfF", "tfQ", "side"};
     printf("P,tag,theta,tracer,f_base,f,nT,nR,rays,events,Tre,Tim,Rre,Rim\n");
     std::string line;
     while (std::getline(std::cin, line))

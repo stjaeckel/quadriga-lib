@@ -209,6 +209,7 @@ TEST_CASE("ray_progress - the bonded plate at any depth", "[acoustic]")
         p["a"] = eps, p["b"] = std::vector<float>(eps.size(), 0.0f), p["c"] = std::vector<float>(eps.size(), 0.0f);
         p["d"] = std::vector<float>(eps.size(), 0.0f), p["thk"] = thk, p["tf"] = tfv, p["m"] = mv;
         p["fRef"] = std::vector<float>(eps.size(), twin ? 1.0e9f : (float)fR);
+        p["side"] = std::vector<float>(eps.size(), 0.0f); // the infinite plate: the case states the bonded run, not the radiation
         return p;
     };
     const Pal pal = pal_of(false), pal_twin = pal_of(true);
@@ -626,6 +627,7 @@ TEST_CASE("ray_progress - the plate rule and the absorption peak at every freque
         Pal pal;
         pal["a"] = {(float)a}, pal["fRef"] = {(float)fRef}, pal["thk"] = {sheet ? (float)thk : 0.0f}, pal["tf"] = {(float)tf0}, pal["m"] = {20.0f};
         pal["tfP"] = {(float)tfP}, pal["tfF"] = {(float)(tfF_hz * FMAP)}, pal["tfQ"] = {(float)tfQ};
+        pal["side"] = {0.0f}; // the infinite plate: the case states the plate rule and the peak, not the radiation
         const float h = 200.0f, xb = sheet ? 0.0f : (float)thk;
         std::vector<float> x = sheet ? std::vector<float>{0.0f} : std::vector<float>{0.0f, xb};
         arma::fmat mesh(2 * x.size(), 9);

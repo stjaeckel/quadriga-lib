@@ -93,6 +93,7 @@ struct QdMassSheet
         mp["fRef"] = {fRef};
         mp["thk"] = {thk};
         mp["m"] = {m_val};
+        mp["side"] = {0.0}; // the infinite plate: the case states its angle law (the finite plate: "Finite plate - ...")
         return mp;
     }
 
@@ -294,6 +295,7 @@ TEST_CASE("Acoustic - medium_gain in-medium loss", "[acoustic]")
     mtl_mass["a"] = {1.0};
     mtl_mass["m"] = {20.0};
     mtl_mass["fRef"] = {fRef_GHz};
+    mtl_mass["side"] = {0.0}; // the column definition: the infinite plate at normal incidence
 
     double dist = 2.0;
 

@@ -21,7 +21,7 @@ closed-form evaluation made for this document, "measured here" a run of the libr
 sources (section 9) and sets no parameter.
 
 First step: `md/wave.md`, section 0. The acoustic half:
-`./build_linux/test_bin "[acoustic]" > test_acoustic.txt` → `All tests passed (40050 assertions in 56 test cases)`.
+`OMP_NUM_THREADS=12 ./build_linux/test_bin "[acoustic]" > test_acoustic.txt` → `All tests passed (41523 assertions in 58 test cases)`.
 Its cases are in `test_acoustic_mesh_interact.cpp`, `test_acoustic_progress.cpp`,
 `test_acoustic_state_update.cpp` and `test_acoustic_leaf.cpp` (the leaves of 2.8); 16 of them are "<name> - the mass-law part" of a wave case. The appendix
 lists every case with the section that states it. The machine described in section 2 is the one after
@@ -73,16 +73,43 @@ thickness) and an angle factor `c` (the cosine the wave has in air):
     TL = A·log10(1 + (X₀·c)²) / log10(1 + X₀²)
 
 **`m > 0` switches the mass law on, 20 dB per decade**, whatever its value (M10, built 2026-10-17; until then `m`
-was a fitted slope, `X₀ = ((f/fRef)·M)^(m/20)`, fitted 1.64 to 35.13 in round 1). `A` at normal incidence, zero at
-tangency, 20 dB per decade of `cos θ` (the cosine enters through the fluid's admittance, not the panel's
-impedance). The term is zero below `X₀ = 1` (a kink in frequency, bounded by 3 dB within a decade of the knee).
+was a fitted slope, `X₀ = ((f/fRef)·M)^(m/20)`, fitted 1.64 to 35.13 in round 1). For the infinite plate (`side` 0, below)
+the term is `A` at normal incidence, zero at tangency, 20 dB per decade of `cos θ` (the cosine enters through the
+fluid's admittance, not the panel's impedance). The term is zero below `X₀ = 1` (a kink in frequency, bounded by 3 dB within a decade of the knee).
 With `fRef = (f_GHz/f_Hz)·ρ₀c/(π·ρ)`, a material constant (4.58e-5 GHz for glass), `X₀ = ωm′/(2ρ₀c)` is the
 physical impedance ratio of a limp panel and `TL` is the limp mass law `10·log10(1 + (X₀·c)²)` wherever
 `X₀ ≫ 1` [Davy_2009_SingleLeafCremer, Eqs. 3, 13]. A traced solid's leg shorter than 1.5 mm carries no term;
-a sheet carries it at any thickness. The public `medium_gain` supplies `c = 1` and returns `A`. Asserted in:
+a sheet carries it at any thickness. The public `medium_gain` supplies `c = 1`: it returns `A` for `side` 0, and `A` up to the panel's low-frequency term
+otherwise (below). Asserted in:
 *Thin sheet - mass-law angle dependence* (`m` 12, which passes what `m` 20 passes); *Mass law - m switches the limp
 mass law on* (a 4 mm pane with `fRef` from its density against the limp mass law, `m` 12, 20, 30 bitwise equal);
 *Acoustic - medium_gain in-medium loss*.
+
+**The finite panel (`side`, decided and built 2026-10-19; `md/grazing_report.md`).** The cosine in the term is the
+radiation of the plate's forced wave: an infinite plate driven by a wave of trace wavenumber `k·sin θ` radiates
+`ρ₀c/cos θ` per unit velocity on each face. Near grazing that load outgrows any mass and the infinite plate turns
+transparent (`τ → 1`); below coincidence, where `X₀ > 1/cos²78° ≈ 23` (a 4 mm pane from about 300 Hz, a 152 mm
+wall at every octave), more than half of what it transmits comes from the last 12° before grazing. A panel of finite size radiates its forced wave as a source of finite length: its forced radiation
+efficiency `σ` is `1/cos θ` up to an angle that grows with the size in wavelengths (the finite plate leaves the
+infinite one at `cos θ ≈ 1.9/√(kL)`), then stays bounded (about `0.38·√(k·side)` at grazing), and below about
+`kL ≈ 4` it is under one at every angle. The library takes `σ` from Davy's closed form for a square of side `side`
+[Davy_2009_ForcedRadiationEfficiency, Eqs. 19, 28, 34, 36, 37], replaces the cosine by `1/σ` and pays the finite plate's
+gain `1/(σ cos θ)`: `TL = A·log10(1 + (X₀/σ)²)/log10(1 + X₀²) + 10·log10(σ·cos θ)`, clipped at zero. The column
+`side` = √(panel area) in m, 2a = `side`, S = `side²` (√area is within 0.45 dB of Davy's form with the true area and
+perimeter up to an aspect ratio of 3.3 : 1, 1.5 dB at 10 : 1); 3.29 m (a 4.0 × 2.7 m wall) where the column is absent;
+0 is the infinite plate, bitwise; a negative side is refused; read only where `m > 0`. The plate's own impedance (the
+resonance and the bending stiffness below) stays at the cosine in air. Against the windowed finite plate of
+`tools/acoustic/gzlib.py` (azimuth mean), the form is within 0.4 dB diffuse and 0.8 dB per angle on single and double
+leaves at sizes from 1.23 × 1.48 m to 10 × 3 m. What it changes: near grazing the panel keeps insulating (4 mm glass,
+500 Hz, 89°: a term of 13.2 dB against 1.6 dB), and at 31.5 Hz a small panel insulates beyond the infinite plate even at
+normal incidence (+7.8 dB for a 1.35 m pane, +3.0 dB for a 3.29 m concrete wall). Asserted in: *Finite plate - a
+mass-law panel of side s radiates with Davy's forced radiation efficiency*; *Finite plate - side 0 is the infinite
+plate, a table without the column is side 3.29, a wave medium ignores it, a negative side is refused, a bonded run
+takes the side of the body that forms its term*; *Mass law - m switches the limp mass law on* and *Plate rule - a
+rigid mass-law panel passes the incoherent series of its face and its plate and reflects what its face does not
+absorb* state their references at the default side; the cases whose statements are written for the infinite plate
+(the angle law, the bonded run, the mass cosine, the resonance, the bending stiffness, a closed plate, a peaked face)
+carry `side` 0.
 
 **Two impedances in series with the mass** act in `X₀` (`Material::mass_X0`), both at the cosine `c` the
 wave has in air (N3, N4):
@@ -146,6 +173,15 @@ write their references at slope 20, so each table guards that `m` is a switch. A
 sheet, sheet on solid and solid on solid as one plate*; *Bonded mass - a mass-law sheet inside a mass-law wall*;
 *Bonded mass - the plate at any depth*; *ray_progress - the bonded plate at any depth*; *Stack with a mass-law layer
 - resolved by segments, not killed* (an `m` 10 layer pays what `m` 20 pays, bitwise).
+
+**One side per bonded run** (rule of use, like one `att` per run; decided 2026-10-19). A bonded run is one panel and
+should carry one `side`. Each body pays its increment at its own side, `TL(X_run + X₀; s) − TL(X_run; s)`, so where the
+sides differ the run passes `TL(X₁; s₁) + TL(X₁ + X₂; s₂) − TL(X₁; s₂)`; in the mass-controlled range each later
+increment hardly depends on the side, and the run passes what the whole run passes at the side of the **first** body
+the ray meets (within 0.0003 dB, two 152 mm concrete bodies of sides 1.35 \| 3.29 m, 31.5 to 500 Hz, 0° to 85°). The
+result then depends on the direction. Asserted in: *Finite plate - side 0 is the infinite plate, a table without the
+column is side 3.29, a wave medium ignores it, a negative side is refused, a bonded run takes the side of the body that
+forms its term*.
 
 ### 2.3 The plate rule
 
@@ -322,15 +358,42 @@ recorded). One `att` per bonded run (A5).
 | quantity (per band) | column | settable on its own | round-1 evidence |
 | --- | --- | --- | --- |
 | room-side absorption of a rigid face | `tf`, `tfB` (power law), `tfP`, `tfF`, `tfQ` (a resonant peak) | yes | monotone rows within 0.051 in α (report 3.4); the peak on the resonator law: every lining and pane row within 0.017, cork board 0.047 (report 3.8 refitted, `md/m5_a21_report.md` 1.2); as a locally reacting face (M6) the same residuals on the Paris target (`md/m6_report.md` 0.6) |
-| transmission level | `fRef` with `thk` | yes: the plate passes about `τ` where `τ ≪ a` | the 13 constructions within 2.97 dB at 0–90° under M10 with the rows below (`md/m10_m15_report.md` 1.0); light panels at their mass (glass 4 / 6 mm 1.42 / 1.07 of it, gypsum 0.72, plywood 1.25), the units at 0.57 / 0.61, heavy walls and linings at 0.02 to 0.84 |
+| transmission level | `fRef` with `thk` | yes: the plate passes about `τ` where `τ ≪ a` | the 13 constructions within 2.70 dB at 0–90° with the finite panel at their laboratory side (`md/grazing_report.md` 1.5; the table below); light panels at their mass (glass 4 / 6 mm 1.13 / 0.90 of it, gypsum 0.64, plywood 0.88), the units at 0.41 / 0.36, heavy walls and linings at 0.02 to 0.39 (under the infinite plate glass read 1.42 / 1.42: its level bought back the grazing transmission) |
 | the mass law | `m > 0`, a switch (20 dB per decade, M10) | yes | the slope is the mass law's; until 2026-10-17 `m` was fitted, 1.64 to 35.13 (report 3.6) |
-| coincidence dip | `coiF`, `coiQ` (bending stiffness in `X₀`; `coiA` removed) | yes | light panels at their coincidence (glass 3088 / 2040 Hz against 2989 / 1993, gypsum 2836 against 2500, the units 3195 / 3020 against 2989; plywood 1562 against 1146); on heavy walls and linings at the knob bounds, a broad tilt: concrete, brick 203 and plaster 3.7 to 18 kHz with `coiQ` 1.1 to 1.9, the furred lining 30 Hz (1.0) |
-| mass-air-mass dip of a double or triple unit | `res*`, `resS > 0` | yes | 4-16-4 0.71 dB, triple 0.77 dB (report 3.6, 0–78°); at 0–90° under M10 the fits take the first-mode form at 220 / 195 Hz: 1.55 / 2.69 dB (1.0) |
-| a panel's first mode, the stiffness region below it | `res*`, `resS < 0` | yes | the fits choose the sign unstably (report 3.8; 1.0: nine of 13 take `resS < 0`) |
-| extra loss per entry (frame, seals) | `att`, `attB` | yes; one per bonded run (A5) | under M10 at 0–90°: 0 to 1.2 dB on light panels, 4.7 / 6.4 dB on the units, up to the 12 dB bound on heavy walls and linings (concrete, furred lining, dabs at it; plaster 11.6): with a level far below the mass, a level with a weaker angle dependence, the finite plate the infinite one lacks (`md/m10_m15_report.md` 0.2, 1.0) |
+| panel size (finite-plate radiation) | `side` = √(panel area), m; 3.29 where absent, 0 the infinite plate | yes; one per bonded run | the 13 at their laboratory side (1.349 m panes and units, 1.697 m boards, 3.523 m walls and linings) within 2.70 dB; all at 3.29 m within 2.70 dB as well (`md/grazing_report.md` 1.5) |
+| coincidence dip | `coiF`, `coiQ` (bending stiffness in `X₀`; `coiA` removed) | yes | light panels at their coincidence (glass 2967 / 1975 Hz against 2989 / 1993, gypsum 2763 against 2500, the units 3073 / 2967 against 2989; plywood 1563 against 1146); on heavy walls and linings off the physics above coincidence: concrete 6925 Hz (`coiQ` 1.19), brick 203 18.9 kHz (1.0), plaster 3734 Hz (1.61), block 8151 Hz (3.0), the furred lining at the 30 Hz bound (1.0). The finite panel does not change this: the heavy walls are above coincidence from 125 Hz, where grazing carries nothing (`md/grazing_report.md` 0.6) |
+| mass-air-mass dip of a double or triple unit | `res*`, `resS > 0` | yes | 4-16-4 0.71 dB, triple 0.77 dB (report 3.6, 0–78°); at 0–90° with the finite panel the fits take the first-mode form at 211 / 192 Hz: 1.56 / 2.67 dB (`md/grazing_report.md` 1.5) |
+| a panel's first mode, the stiffness region below it | `res*`, `resS < 0` | yes | the fits choose the sign unstably (report 3.8; with the finite panel six of 13 take `resS < 0`) |
+| extra loss per entry (frame, seals) | `att`, `attB` | yes; one per bonded run (A5) | with the finite panel at 0–90°: 0 to 1.9 dB on light panels, 5.4 / 7.2 dB on the units, 2.3 to the 12 dB bound on heavy walls and linings (the furred lining and the board on dabs at it; concrete 7.0, block 8.9, plaster 9.9): a level below the mass with a flat `att` stands for what the infinite or finite plate does not model above coincidence (`md/grazing_report.md` 0.6, 1.5) |
 | porous and empirical absorbers | `a`–`h`, `alpha` (wave media) in the two-parameter mapping | yes (`md/wave.md`; section 1) | Knauf TP 120 A within ±0.025 (20 mm), ±0.032 (30 mm), 31.5 Hz–8 kHz (report 3.4) |
 | bonded layers | the plate rule | yes | 2.3 |
 | reflection phase of a hard wall, of a resonant face | the two-parameter mapping (N7); `tfP`, `tfF`, `tfQ` as a series impedance (M6, 2.6) | yes | within 0.1° to 60° (report 3.5); a peaked face on its series impedance to 1e-12 (*Absorption peak - a peaked face is its series impedance in magnitude and phase from 0 to 85 deg, as a sheet and as a traced solid, on both branches*); a flat pad keeps the bare face's phase |
+
+
+**The 13 fits as library columns** (decided 2026-10-19: the finite panel at each construction's laboratory side; the
+procedure of section 9, 8 seeds and the M10 0–90° fit as a start, selection at 768 × 12; `md/grazing_report.md` 1.5).
+Worst residual 2.70 dB (the furred lining; gypsum, a model reference, 2.54); before, under the infinite plate, 2.97 dB.
+`thk` the construction's, `tfB` the class's absorption law of report 3.6, `att` in dB at 1 kHz, `coiF` and `res` in Hz
+(the library takes GHz: × 8.7403e-4); `fRef` and `tf` are library values. A 0 in the residuals is a band inside its
+target or without one. Through the built library: sheet and formula copy within 0.0000 dB, traced solid within 0.0042
+dB, R + T below one in every row, a band through `ray_progress` on its single frequencies bitwise (`md/grazing_report.md`
+2.4).
+
+| construction | worst | residual per octave 31.5 Hz … 8 kHz (dB) | `side` (m) | `m″` level (of mass) | `att` / `attB` | `coiF` Hz / `coiQ` | `res` Hz / Q / sign | `fRef` (GHz) | `tf` at `fRef` |
+| −-- | −-- | −-- | −-- | −-- | −-- | −-- | −-- | −-- | −-- |
+| glass 4 mm | 0.85 | 0 +0.09 −0.49 +0.51 +0.30 −0.51 +0.25 +0.52 −0.85 | 1.349 | 11.3 (1.13) | 0.05 / +1.35 | 2967 / 284 | 138 / 2.33 / + | 4.0562e-05 | 5.661 |
+| glass 6 mm | 1.78 | 0 0 +1.78 +1.75 −0.64 −1.78 +1.78 +1.77 −1.25 | 1.349 | 13.5 (0.90) | 0.00 / −0.43 | 1975 / 300 | 26 / 49.7 / + | 5.1068e-05 | 3.682 |
+| gypsum 12.5 (model) | 2.54 | +2.54 +0.59 +0.54 0 −1.30 −2.54 +2.54 +2.54 +0.53 | 1.697 | 5.5 (0.64) | 0.81 / −0.78 | 2763 / 300 | 30 / 38.3 / − | 0.0002614 | 7.349 |
+| plywood 18 (model) | 0.31 | 0 +0.14 +0.22 +0.08 −0.31 +0.30 −0.31 +0.22 +0.06 | 1.697 | 9.5 (0.88) | 1.93 / +0.49 | 1563 / 300 | 734 / 50 / + | 0.00021843 | 0.2127 |
+| concrete 152 | 0.57 | +0.47 0 −0.56 +0.56 −0.56 +0.57 −0.56 +0.09 0 | 3.523 | 88.8 (0.26) | 7.01 / −0.09 | 6925 / 1.19 | 78 / 1.44 / − | 0.00019663 | 0.0002549 |
+| brick 95 | 0.01 | 0 0 0 0 0 0 0 +0.01 0 | 3.523 | 66.0 (0.35) | 2.43 / +1.04 | 5621 / 11.9 | 205 / 2.77 / + | 0.00016602 | 0.004283 |
+| brick 203 | 0.58 | −0.52 0 +0.28 +0.58 −0.58 +0.58 −0.57 −0.10 −0.31 | 3.523 | 158.6 (0.39) | 2.27 / −0.34 | 18910 / 1 | 119 / 6.78 / + | 0.00014723 | 0.004146 |
+| block 190 | 0.49 | −0.49 0 +0.49 −0.49 +0.49 −0.49 +0.21 +0.04 0 | 3.523 | 51.2 (0.23) | 8.93 / +0.25 | 8151 / 3.03 | 580 / 2.87 / + | 0.00042658 | 0.004688 |
+| 4-16-4 (AGC) | 1.56 | 0 0 +1.55 −1.08 +1.55 −1.56 −1.42 +1.56 0 | 1.349 | 8.2 (0.41) | 5.35 / +0.54 | 3073 / 300 | 211 / 49.6 / − | 0.00011189 | 1.341 |
+| 4-12-4-12-4 (AGC) | 2.67 | 0 0 +2.66 −1.41 +2.67 −2.67 −2.33 +2.67 0 | 1.349 | 10.8 (0.36) | 7.17 / +0.53 | 2967 / 299 | 192 / 49.4 / − | 0.00012741 | 1.279 |
+| brick 203 + furred board | 2.70 | +2.60 +2.61 +2.16 +1.60 −1.79 −2.70 −2.32 +2.66 0 | 3.523 | 7.7 (0.02) | 12.00 / −0.36 | 30 / 1 | 165 / 48.9 / + | 0.0030373 | 0.6398 |
+| SCR 140 + board on dabs | 1.95 | 0 0 +1.60 −1.73 +1.51 −1.95 +0.80 +0.64 0 | 3.523 | 86.5 (0.31) | 12.00 / +0.95 | 2673 / 290 | 203 / 3.29 / − | 0.00018593 | 1.183 |
+| brick 105 + plaster one face | 0.00 | 0 0 0 0 0 0 0 0 0 | 3.523 | 35.2 (0.17) | 9.90 / +0.09 | 3734 / 1.61 | 113 / 1.03 / − | 0.00034267 | 0.006445 |
 
 ### 2.8 Leaves as wave-medium sheets
 
@@ -352,6 +415,13 @@ shift, with no lumped column. Measured in `build_linux/scratch/m9` (`md/m9_fixtu
   on a half-space, 7 on a finite wall. Through `ray_progress` a band equals its single frequencies (the box and the
   sheets do not bend).
 - A double leaf: two leaves glued on the two faces of one box.
+- A double unit is one lumped sheet with its fitted columns (2.7), or two wave-medium leaves on a box; never two
+  meshed mass-law sheets. Measured 2026-10-19 (`md/grazing_report.md` 1.4), 4|16|4 as two 4 mm mass-law sheets 16 mm
+  apart: with a near-air box between, the unbridged double leaf above its resonance (70.1 / 104.3 dB at 1 / 4 kHz, 0°,
+  against the transfer matrix's 70.2 / 104.7; the measured unit, whose spacer bridges the panes, reads 36.4 / 36.5 in
+  those octaves) and no mass-air-mass dip (29.2 / 39.8 dB at 125 / 250 Hz against 21.9 / 23.7): a mass-law sheet carries
+  its term as a power factor and the box's series cannot resonate on it. With a plain gap, two uncoupled plates
+  (37.6 dB at 1 kHz). Before 2026-10-15 the meshed unit read 105 dB at 1 kHz.
 - A porous fill: a traced porous body glued at the back of the box (air in front, the fill against the wall), its
   columns fitted to the chosen model (A15). Each body is summed; the exchange between the two is followed as paths,
   55 to 170 events per ray for Shearer's build (20 mm air, 75 mm rock wool), up to 3,314 for 10 mm of air on 15 mm
@@ -370,6 +440,9 @@ shift, with no lumped column. Measured in `build_linux/scratch/m9` (`md/m9_fixtu
 - The fill (Shearer's build): on the transfer matrix of its columns within 2.6e-5 in R.
 
 **Limits.**
+- Wave media keep the infinite plate at grazing: `side` is read only where `m > 0`, so a leaf (or a leaf of a meshed
+  double wall) is the infinite fluid layer at every angle, transparent toward grazing like the infinite plate; its
+  finite size is not modeled (7).
 - No bending stiffness: a fluid layer has none. Coincidence stays with the mass column, and the stiffness of a
   small clamped panel's edge is not in it (section 5, A19).
 - A meshed gap in place of the box is exact where its path series converges, but needs 1,126 to more than 8,000
@@ -469,7 +542,7 @@ The thin infinite plate: `τ(θ) = |1 + Z(θ)·cos θ/(2ρ₀c₀)|⁻²`,
 | mass law, angle | `τ(0) = 1/(1 + a²)`, `a = ωm/(2ρ₀c₀)`; diffuse average with weight `2 cos θ sin θ` [Davy_2009_SingleLeafCremer, Eqs. 1, 13; London_1949_SingleWalls] | the limp mass law, `m > 0` a switch at 20 dB per decade (2.1, M10); also a wave-medium sheet (section 1, 2.8) | expressible; *Mass law - m switches the limp mass law on*; *Thin sheet - mass-law angle dependence*; *Leaf - a wave-medium sheet in the two-parameter mapping is a limp leaf* | M9 |
 | coincidence and loss | the `η·r²sin⁴θ` term is resistive and adds to the one inside the modulus [Davy_2009_SingleLeafCremer, Eq. 8] | `X₀·\|1 − (f/coiF)²·sin⁴θ·(1 + j/coiQ)\|`, then `TL` from the modulus as a reactance: the resistive part enters in quadrature. At coincidence the physical `τ` is `1/(1 + X₀ηc)²`, the library's about `1/(1 + (X₀ηc)²)`, 3 dB apart where `X₀ηc ≈ 1` (derived here) | expressible where `X₀ηc` is large; *Coincidence - …*; 13 constructions within 2.97 dB at 0–90° under M10 (`md/m10_m15_report.md` 1.0) | M15 (proposal) |
 | the installed loss factor | `η = η_int + η_edge + 2η_rad` [Davy_2009_SingleLeafCremer, Eq. 9]; for laboratory specimens `η = η_int + m/(485√f)` [Davy_2009_SingleLeafCremer, Eq. 11]; installed values 1.3 to 4 times the isolated ones [Davy_2019_MassAirMassResonance; Quirt_1995_GypsumWallsSummaryIR693]; round 1: the coupling loss is the largest single effect on heavy walls (report 3.1) | `1/coiQ`, constant in frequency | partial; the fits reach the guideline without it (report 3.6; with it no better, `md/m10_m15_report.md` 0.2) | M13 (dropped) |
-| finite size below `f_c` | infinite-plate theory to 90° under-predicts measured R; a limiting angle of 85° fitted NRC data better than 78° [Northwood_1968_PlasterboardWalls, p. 2]; a finite panel's forced radiation efficiency replaces it [Davy_2009_ForcedRadiationEfficiency]; a 1.55 × 0.95 m specimen read about 5 dB above a 2.4 × 4.8 m one [Wareing_2015_SampleSizeVariations]; round 1: a lab pane 7.8 to 11.2 dB above the infinite plate at 31.5 Hz (report 3.1) | no size; under M10 the level and `att` columns absorb it per construction (a level far below the mass with a flat `att`, `md/m10_m15_report.md` 0.2) | partial; a size is a row, not a column (A11) | M14 (open) |
+| finite size below `f_c` | infinite-plate theory to 90° under-predicts measured R; a limiting angle of 85° fitted NRC data better than 78° [Northwood_1968_PlasterboardWalls, p. 2]; a finite panel's forced radiation efficiency replaces it [Davy_2009_ForcedRadiationEfficiency]; a 1.55 × 0.95 m specimen read about 5 dB above a 2.4 × 4.8 m one [Wareing_2015_SampleSizeVariations]; round 1: a lab pane 7.8 to 11.2 dB above the infinite plate at 31.5 Hz (report 3.1) | the finite panel in the mass term (2.1): Davy's forced radiation efficiency of a square of side `side` in place of `1/cos θ`, within 0.4 dB diffuse and 0.8 dB per angle of the windowed finite plate; the 78° / 85° conventions are this at one size and frequency each: the limit that makes the infinite plate match the finite one is `cos θ_l ≈ 1.53/√(kL)`, 78° at 0.9 kHz on a 4.0 × 2.7 m wall and at 2.2 kHz on a lab pane, 85° at 5 kHz on the wall, none at 31.5 Hz (`md/grazing_report.md` 0.3, 0.5); a measured size effect of a small specimen reproduced in sign and about half its size (1.1 to 2.8 dB, 1.9 to 3.5 with the niche, of Wareing's "more than 5 dB"; the rest edges and rooms) | expressible: `side` (2.1, decided 2026-10-19) | (d) built, M14 closed |
 | single-plate accuracy | for nine homogeneous plates the spectral RMS error over 50 Hz to 5 kHz was 6 to 7 dB for mass law and Sharp, about 3 dB for Davy's finite-size model [Kosala_2020_SingleBafflesAccuracy, Table 2] | fitted per construction (P1) | — | — |
 | double leaves | below the mass-air-mass resonance one leaf of the combined mass, above it a steep rise until stud bridging [Davy_2019_MassAirMassResonance]; double glazing gains about 3 dB per doubling of the air space instead of 6 [Quirt_1982_WindowsI, Sec. II.D]; of 17 models against 52 walls none was acceptable for all wall types, the best below 10 dB per band, the choice set by stud type and fill [Hongisto_2006_DoubleWallsOverview, Secs. 5.2-5.3]; the mass-air-mass constant 60 adiabatic, about 51 isothermal, about 80 in Sharp's model [review 9.10] | one sheet per unit with `resS > 0` (the dip, capped at one, B4m by P1) | expressible as a fit per measured construction (4-16-4 0.71 dB, triple 0.77 dB); not predictive. Two wave-medium leaves (`m = 0`, two-parameter mapping) resonate: 4\|16\|4 on an air body within 0.007 dB of the transfer-matrix reference at 50 Hz–1 kHz, 0° to 60°, the dip at 211.3 / 244.0 / 298.8 / 422.6 Hz at 0° / 30° / 45° / 60° on a 1/96-octave sweep (2.8; *Leaf - two leaves on a box of air resonate at the mass-air-mass frequency*; A18's 200 and 315 Hz were grid points) | M9 |
 | a lining on a wall | a leaf over a cavity: the lined wall's R falls around the leaf's resonance and rises above it; gypsum linings on masonry lower R at 50 to 160 Hz by up to 8 dB without fill [Zeitler_2015_ConcreteBlockRR334, Table A1.2] | the lined wall as one material with `res*` and bending (report 3.8: furred board 1.70 dB, board on dabs 2.51 dB) | expressible as a fit | M9 |
@@ -756,6 +829,16 @@ none of these candidates needs a state bit.
   constructions reach 1.78 dB today and 1.17 dB with a limit at 78° (2.97 → 2.80 dB under M10).
 - Open (Stephan, 2026-10-17): not in this round; pending a first-principles study of grazing incidence (the
   infinite plate against the finite plate). No new open item.
+- **Closed (Stephan, 2026-10-19): superseded by the finite panel (2.1).** The study (`md/grazing_report.md` 0) found a
+  fixed limit right in one octave per size only (off by up to 14 dB at 31.5–125 Hz), and every clamp or soft limit
+  4 to 34 dB off the finite plate per angle past 78°; Davy's forced radiation efficiency with a size column follows it
+  within 0.8 dB per angle. Built with the column `side` (decision 2 of 10).
+- Side finding, open (for the double-leaf rows of 3.4, not this round): the cavity spring of `res*` with `resS > 0`
+  is formed at the cosine in air, so the mass-air-mass dip sweeps up as `f₀/cos θ` and through the band at grazing. A
+  cavity partitioned by battens, studs or a pane's spacer is locally reacting and does not sweep (a honeycomb partition
+  removes the angle shift of a panel absorber [Toyoda_2011_HoneycombPanelAbsorbers, Fig. 2]). With the spring at normal
+  incidence and the finite panel the double units and linings fit to 0.04 to 1.12 dB (4-16-4 0.04, board on dabs 0.16,
+  furred lining 1.12 with its `coiF` off the 30 Hz bound; worst of the 13 2.53 dB; `md/grazing_report.md` 0.6).
 
 **M15 — the loss of the bending term as a resistance** (modification, proposal).
 - What: `TL` from `|1 + X₀·c·(j·(1 − w) + w/coiQ)|²` in place of the reactance modulus.
@@ -891,6 +974,15 @@ not the material model's to carry.
   the wall against 0.0774 for tracer 5 and the walker (both tracers), so R + T is 0.065 / 0.044 low at 31.5 / 63 Hz;
   under M5 the same leg carries 2.6e-5 against 3.5e-3, invisible because M5's face passes little at 85°. The lining's
   series is summed (`ρ` 1.006 / 1.029); the cause is not traced (`md/m6_report.md` 2.4, S1).
+- Wave media, the leaves of a meshed double wall included, keep the infinite plate at grazing: the finite panel
+  (`side`) acts only where `m > 0` (2.1, 2.8). Their finite size is not modeled.
+- A traced leg loses precision far from the origin and near grazing (measured 2026-10-19, `md/grazing_report.md` 1.3;
+  to be investigated, not in this round). The same 4 mm traced pane, crossed at normal incidence 100 m from the origin,
+  passes 0.2 dB more than crossed 0.37 m from it (−31.454 against −31.658 dB at 500 Hz); a 152 mm traced wall crossed at
+  89.9° (an 87 m path through it) misses its own plate rule by −0.007 / −0.027 / −0.10 / −1.17 / −3.42 dB at 31.5 / 63 /
+  125 / 500 / 2000 Hz, where at 89.5° it holds to 1e-4 dB. Likely the length and cosine of the leg in large
+  coordinates. *Finite plate - a mass-law panel of side s radiates with Davy's forced radiation efficiency* stops its
+  traced solid at 89.5° and keeps the crossing near the origin.
 - A peak set on a non-rigid mass-law body makes its face the series impedance: `eps 1.50`, `m` 20 with the board's peak
   reflects 0.844 at 150 Hz, 0°, where its Fresnel face with the flat pad read 0.085. No use case.
 
@@ -909,8 +1001,9 @@ not the material model's to carry.
   round 1's `conf/cols.tsv` holds its earlier unbounded fits). Whichever knob is removed, another non-physical one
   takes over its job (0.2): the slope (today, M11), a flat `att` with a level far below the mass (M10, built), a broad
   coincidence at 3.7 to 18 kHz with `coiQ` about 1. Under M10 at 0–90° the light panels fit with their mass and
-  coincidence and the heavy walls and linings sit at the knob bounds (1.0, 2.7). M13 and M15 change none of it; M14
-  stays open (section 4).
+  coincidence and the heavy walls and linings sit at the knob bounds (1.0, 2.7). M13 and M15 change none of it, nor
+  does the finite panel (2.1, closing M14): the heavy walls are above coincidence from 125 Hz, where grazing carries
+  nothing; their knobs stand for the plate physics above coincidence (`md/grazing_report.md` 0.6).
 - The test-case name *Unentered branches - a sheet without the mass column of its mass-law host's permittivity
   is merged* states the rule of 2.2: a matched sheet merges unless both carry the mass column. The previous
   text of 2.2 said a sheet with its host's permittivity is not merged into a mass-law host, which holds for a
@@ -1019,6 +1112,10 @@ measurements later; this test shows that the knobs exist.
   today and 2.97 dB under M10 (`md/m10_m15_report.md` 0.2, 1.0). Fit at 192 angles × 6 frequencies per third or
   coarser, but select and report at 768 × 12: a polish or a selection on a coarser grid picks knobs that alias it
   (report 0.2: 5.71 against 3.33 dB). The formula copy and the fitter are `tools/acoustic/txlib.py` and `txfit.py`.
+  **Since 2026-10-19 each construction is fitted at its laboratory side** (`side` = √(lab area): 1.349 m for the panes
+  and units, 1.697 m for the boards, 3.523 m for the walls and linings of the Riverbank opening), the size its reference
+  was measured at; `txfit.py --variant` takes `side` as `"lab"`, a number (one nominal side for all) or 0 (the infinite
+  plate). At the lab side the 13 reach 2.70 dB, at 3.29 m for all 2.70 dB (`md/grazing_report.md` 1.5).
 - **Invariants per candidate:** both ports at most one, sheet on solid at the relaunch bound, no step in angle, a
   band on its single frequencies, the `[wave]` baseline and twins untouched, line counts.
 
@@ -1187,6 +1284,32 @@ tests. `[wave]` 165258 assertions in 180 cases (output identical apart from the 
 unchanged), `[acoustic]` 40050 in 56, whole suite 1314857 in 1143. The 13 fits of report 1.0 through the built
 library: sheet on traced solid within 0.0018 dB, a band on its single frequencies bitwise, R + T at most 0.99324.
 
+**Taken (Stephan, 2026-10-19), after the grazing study (`md/grazing_report.md` 0, 1):**
+
+- (d) adopted: Davy's forced radiation efficiency `σ` in the mass term in place of `1/cos θ`, with the finite plate's
+  gain `1/(σ cos θ)` and the transmission clipped at one per frequency, on the radiation cosine only; the plate's own
+  impedance (bending at the true `sin θ`, the `res*` cavity spring at the true cosine) unchanged. Mass-law materials
+  only (`m > 0`); wave media, the leaves of a meshed double wall included, keep the infinite plate (2.8, 7).
+- The size is a column, `side` = √(panel area) in m (2a = `side`, S = `side²`), 3.29 m where absent (a 4.0 × 2.7 m wall),
+  0 the infinite plate, < 0 refused, read only where `m > 0`; `same_as` compares it where `m > 0`.
+- One side per bonded run, a rule of use with no code (2.2); a mixed run takes the side of the first body the ray meets.
+- M14 closed, superseded (section 4). The locally reacting cavity of `res*` not in this round: a side finding for the
+  double-leaf rows (section 4, M14 entry).
+- The precision of a traced leg far from the origin or near grazing is a separate investigation (7).
+- Transmission fits at each construction's laboratory side (section 9).
+
+**Built (2026-10-19)**: the finite panel (`md/grazing_report.md` 2): `src/ray_mesh_interact.cpp` 5159 lines against
+5116 (`MaterialCols::side` and its check, `Material::side`, `same_as`, `Material::davy_sigma`, `mass_TL` with the
+frequency and the side, its three call sites; the public `medium_gain` text); `side` after `tfQ` in the OBJ writer
+(default 3.29), the Python and MATLAB readers and `tools/acoustic/band_probe.cpp`; the slab-threshold comments of
+`include/quadriga_tools.hpp` and `calc_diffraction_gain` made to match `ray_state_update`'s `eps`. Two cases new (*Finite
+plate - …*, 2.1, 2.2), two restated at the default side (*Mass law - m switches the limp mass law on*, *Plate rule - a
+rigid mass-law panel passes …*), fifteen given `side` 0 where their statement is the infinite plate's; the OBJ header
+checks in the C++, Python and MATLAB tests. `[wave]` 165258 assertions in 180 cases (output identical, the stored
+twins unchanged), `[acoustic]` 41523 in 58, whole suite 1316330 in 1145. The 13 fits at their lab side through the
+built library: sheet and formula within 0.0000 dB, traced solid within 0.0042 dB, R + T below one in every row, a band
+on its single frequencies bitwise. CPU time unchanged (whole suite 46.0 against 45.9 s single-threaded).
+
 **Round history** (detail in the report and in `build_linux/scratch/i47/NOTES.md`):
 
 - What was entangled before round 1 (the window analysis, i47, against a thin-plate impedance model of 4 mm,
@@ -1264,6 +1387,8 @@ of section 9; `cases.py`, moved rows per case between two runs; `README.md`).
 | *Coincidence - on a mass-law material coiF and coiQ are the bending stiffness of the plate* | 2.1 |
 | *Coincidence column - a table that carries coiA loads and the column changes nothing - the mass-law part* | 2.1, 4 (D2-b) |
 | *Mass law - m switches the limp mass law on* | 2.1, 4 (M10) |
+| *Finite plate - a mass-law panel of side s radiates with Davy's forced radiation efficiency* | 2.1, 4 (M14), 10 |
+| *Finite plate - side 0 is the infinite plate, a table without the column is side 3.29, a wave medium ignores it, a negative side is refused, a bonded run takes the side of the body that forms its term* | 2.1, 2.2 |
 | *Mass cosine - a mass-law sheet behind a refracting layer forms its term at the cosine the wave has in air* | 2.1, 7 |
 | *Refracting tracer - a traced bend is known from the state and the leg is exact - the mass-law part* | 2.1 |
 | *Bonded mass - sheet on sheet, sheet on solid and solid on solid as one plate* | 2.2, 2.3 |
