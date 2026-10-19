@@ -33,8 +33,8 @@ How to read the items:
 
 ## Summary table
 
-Items: 121 (S1: 5, S2: 31, S3: 66, S4: 19); B-119 to B-121 were found during the fixes (WP-02, WP-04).
-Status: open: 74, fixed: 41, partly fixed: 0, won't fix: 1, documented: 5 (after WP-06).
+Items: 123 (S1: 5, S2: 31, S3: 68, S4: 19); B-119 to B-123 were found during the fixes (WP-02, WP-04, WP-07).
+Status: open: 72, fixed: 45, partly fixed: 0, won't fix: 1, documented: 5 (after WP-07).
 
 | ID | Title | Area | Kind | Severity | Mark | Status |
 |---|---|---|---|---|---|---|
@@ -54,7 +54,7 @@ Status: open: 74, fixed: 41, partly fixed: 0, won't fix: 1, documented: 5 (after
 | [B-014](#b-014) | HDF5 storage layout: `nx*ny*nz*nw` wraps in 32 bits; `hdf5_write` then reads and writes past the index buffer | B channel, file I/O | 1 defect | S2 | [R] | fixed (WP-02) |
 | [B-015](#b-015) | `hdf5_write` copies 256 bytes from the channel name: heap memory ends up in the file; names of 256+ characters over-read on reading | B channel, file I/O | 1 defect | S2 | [R] | fixed (WP-02) |
 | [B-016](#b-016) | `qrt_file_read` (C++) fills `aod`, `eod`, `aoa`, `eoa` only when `path_gain` or `path_length` is also requested | B channel, file I/O | 1 defect | S2 | [R] | fixed (WP-01) |
-| [B-017](#b-017) | `qrt_file_append` corrupts the file when a CIR orientation is non-zero in double but rounds to 0 in float | B channel, file I/O | 1 defect | S2 | [R] | open |
+| [B-017](#b-017) | `qrt_file_append` corrupts the file when a CIR orientation is non-zero in double but rounds to 0 in float | B channel, file I/O | 1 defect | S2 | [R] | fixed (WP-07) |
 | [B-018](#b-018) | OBJ round trip loses "no material": faces with `mtl_ind = 0` inherit the previous material | B channel, file I/O | 1 defect | S2 | [R] | open |
 | [B-019](#b-019) | `baseband_freq_response_multi` gives wrong phases for `get_channels_*` output with the default relative delays | C channel gen., tools | 1 defect | S2 | [R] | documented (WP-04) |
 | [B-020](#b-020) | `baseband_freq_response`: phase computed in single precision, error grows with delay × bandwidth (both builds) | C channel gen., tools | 1 defect | S2 | [R] | fixed (WP-04) |
@@ -85,8 +85,8 @@ Status: open: 74, fixed: 41, partly fixed: 0, won't fix: 1, documented: 5 (after
 | [B-045](#b-045) | `combine_pattern` and `arrayant_combine_pattern_multi` hard-code the speed of light (acoustic arrays combined without position phase) | A arrayant | 1 defect | S3 | [R] | open |
 | [B-046](#b-046) | `remove_zeros` and `calc_directivity_dBi` use absolute power thresholds (low-level patterns lose data or report 0 dBi) | A arrayant | 1 defect | S3 | [R] | open |
 | [B-047](#b-047) | `generate_arrayant_multibeam` defaults M = N = 2 in the header, 1 in the docs and both wrappers | A arrayant | 3 cross-API | S3 | [C] | open |
-| [B-048](#b-048) | QRT readers trust header and path counts: a 136-byte file returns 20 million zero paths or allocates GBs | B channel, file I/O | 1 defect | S3 | [R, M] | open |
-| [B-049](#b-049) | `qrt_file_read` truncates `i_cir` / `i_orig` to 32 bits before the range check | B channel, file I/O | 1 defect | S3 | [R] | open |
+| [B-048](#b-048) | QRT readers trust header and path counts: a 136-byte file returns 20 million zero paths or allocates GBs | B channel, file I/O | 1 defect | S3 | [R, M] | fixed (WP-07) |
+| [B-049](#b-049) | `qrt_file_read` truncates `i_cir` / `i_orig` to 32 bits before the range check | B channel, file I/O | 1 defect | S3 | [R] | fixed (WP-07) |
 | [B-050](#b-050) | HDF5 write/read round trip changes data (empty snapshots, missing frequency, 1-element vectors, empty strings, long names) | B channel, file I/O | 1 defect | S3 | [R] | fixed (WP-02) |
 | [B-051](#b-051) | HDF5 functions call `H5close()`, switch off error printing process-wide, and leak handles and memory on error paths | B channel, file I/O | 1 defect | S3 | [R] | fixed (WP-02) |
 | [B-052](#b-052) | `hdf5_write` "overwrites" a slot by adding a new group; the file grows with every rewrite | B channel, file I/O | 2 doc | S3 | [R] | fixed (WP-02) |
@@ -96,7 +96,7 @@ Status: open: 74, fixed: 41, partly fixed: 0, won't fix: 1, documented: 5 (after
 | [B-056](#b-056) | `mitsuba_xml_file_write` is quadratic in the number of vertices per object | B channel, file I/O | 4 performance | S3 | [M] | open |
 | [B-057](#b-057) | OBJ reader: CRLF `.mtl` files lose their materials; face indices unchecked when only `face_ind` is requested; no-output call skips validation | B channel, file I/O | 1 defect | S3 | [R] | open |
 | [B-058](#b-058) | `write_png`: constant, NaN or inverted-range data trigger a NaN-to-integer cast and all pixels get the last colour; an empty matrix writes an invalid PNG | B channel, file I/O | 1 defect | S3 | [R] | open |
-| [B-059](#b-059) | `channel::add_paths` accepts inconsistent counts and leaves an invalid object; `qrt_file_read` accepts any `normalize_M` | B channel, file I/O | 1 defect | S3 | [R] | open |
+| [B-059](#b-059) | `channel::add_paths` accepts inconsistent counts and leaves an invalid object; `qrt_file_read` accepts any `normalize_M` | B channel, file I/O | 1 defect | S3 | [R] | fixed (WP-07) |
 | [B-060](#b-060) | Channel and file-I/O header comments contradict the code (index bases, `calc_effective_path_gain` "average", `normalize_M` column power) | B channel, file I/O | 2 doc | S3 | [R, C] | open |
 | [B-061](#b-061) | `combine_irs_coord`: no shape check on `interact_coord_1/2`, heap over-read | C channel gen., tools | 1 defect | S3 | [R] | open |
 | [B-062](#b-062) | `baseband_freq_response`: `aligned_alloc` with sizes that are not a multiple of 32 (generic build) and unchecked NULL return | C channel gen., tools | 1 defect | S3 | [R] | open |
@@ -159,6 +159,8 @@ Status: open: 74, fixed: 41, partly fixed: 0, won't fix: 1, documented: 5 (after
 | [B-119](#b-119) | Crafted HDF5 files make HDF5 1.14.6 itself zero-fill about 4 GB in `H5Fopen` or request a 2^64-byte allocation in `H5Gopen2` (upstream, not quadriga-lib code) | B channel, file I/O | 1 defect | S4 | [R] | won't fix (upstream HDF5) |
 | [B-120](#b-120) | `calc_cross_polarization_ratio`: the circular XPR columns report 0 (fully cross-polar) for the LOS matrix that `get_channels_*` treats as co-polar, and are defined per transmit polarisation while the linear columns are per receive polarisation | C channel gen., tools | 1 defect | S3 | [R] | open |
 | [B-121](#b-121) | Test defect: `test_bin` is compiled without `BUILD_WITH_AVX2`, so the AVX2-vs-generic cases of the ray-triangle and ray-point kernel tests never run | D geometry, math | 1 defect | S3 | [R] | open |
+| [B-122](#b-122) | `qrt_file_read_raw` is quadratic in the number of paths per origin (`reserve` per CIR): 240 000 paths take 7.5 s | B channel, file I/O | 4 performance | S3 | [M] | open |
+| [B-123](#b-123) | MEX and Python `qrt_file_read` build a 2^32-entry index vector (34 GB) for a valid file with 0 CIRs | F MEX layer | 1 defect | S3 | [R] | open |
 
 ## Baseline
 
@@ -210,6 +212,8 @@ miscompilation by the LAF split-compare passes, not a library defect. The campai
 | after WP-04: base | `All tests passed (1332667 assertions in 1162 test cases)` | 113 s (12 threads) | 13.3 / 36.3 |
 | after WP-04: generic | `All tests passed (1332418 assertions in 1162 test cases)` | 88 s (12 threads) | 36.3 / 25.1 |
 | after WP-04: ASan + UBSan gcc-12, `suppress_equal_pcs=0` | `All tests passed (1332667 assertions in 1162 test cases)`; only the excluded `ray_progress` reports, no leak | 428 s (8 threads) | 21.4 / 1.5 |
+| after WP-07: base / generic | `All tests passed (1333935 assertions in 1169 test cases)` / `(1333686 assertions in 1169 test cases)` | 38 s / 37 s (12 threads) | 5.3 / 4.1 |
+| after WP-07: ASan + UBSan gcc-12, `suppress_equal_pcs=0` | `All tests passed (1333935 assertions in 1169 test cases)`; only the excluded `ray_progress` reports, no leak | 550 s (12 threads) | 3.5 / 35.7 |
 
 Run commands: `flock /tmp/quadriga-fixes-suite.lock build_linux/test_bin` (output
 `build_linux/scratch/hunt/base_test.txt`); the sanitizer runs with
@@ -1909,7 +1913,7 @@ aod with path_length: 2 element(s)
 
 ## B-017: `qrt_file_append` corrupts the file when a CIR orientation is non-zero in double but rounds to 0 in float
 
-- Status: open
+- Status: fixed (WP-07)
 - Severity: S2, because a valid input (an orientation column of tiny values such as 1e-50 rad) leads to a corrupted QRT file: shifted TX positions, lost paths, zero CIR positions, without an error.
 - Kind: wrong result (writer data corruption)
 - Mark: [R]
@@ -4213,7 +4217,7 @@ scale 1e-08: directivity = 0.000 dBi, remove_zeros -> 0 x 0 (input 37 x 73)
 
 ## B-048: QRT readers trust header and path counts: a 136-byte file returns 20 million zero paths or allocates GBs
 
-- Status: open
+- Status: fixed (WP-07)
 - Severity: S3, because unchecked counts in a malformed file lead to accepted-but-wrong results and multi-GB allocations instead of an error; no memory corruption was found.
 - Kind: resource / invalid input accepted
 - Mark: [R] results, [M] memory and time; [C] for the uninitialised values at the end
@@ -4343,7 +4347,7 @@ load after: 1.61 5.68 8.31 1/2786 713088
 
 ## B-049: `qrt_file_read` truncates `i_cir` / `i_orig` to 32 bits before the range check
 
-- Status: open
+- Status: fixed (WP-07)
 - Severity: S3, because an out-of-range index is accepted (returns another CIR without paths) or rejected with Armadillo's internal message, depending on the cache.
 - Kind: invalid input accepted
 - Mark: [R]
@@ -5384,7 +5388,7 @@ empty 0x0                          -> no exception from write_png; decoding the 
 
 ## B-059: `channel::add_paths` accepts inconsistent counts and leaves an invalid object; `qrt_file_read` accepts any `normalize_M`
 
-- Status: open
+- Status: fixed (WP-07)
 - Severity: S3, because invalid input is accepted without an error (and in the first case leaves the object in a state that `is_valid` rejects).
 - Kind: invalid input accepted
 - Mark: [R]
@@ -9690,3 +9694,34 @@ RPI Internal - Dense Grid (AVX2 vs GENERIC): test cases: 1 | 1 passed assertions
 **Proposed fix.** Define `BUILD_WITH_AVX2` for `test_bin` exactly when the library is built with AVX2 (same CMake condition); compile the AVX2 test parts with the kernel's flags if they call the intrinsics directly; keep the run-time `quadriga_lib_has_AVX2()` guard. Expect the newly running cases to expose B-071. File: `CMakeLists.txt`.
 
 **Test for the fix session.** `test_bin --list-tests` contains "RTI Internal - AVX2 comparison", and the three AVX2 cases report assertions; the case counts of the suite go up accordingly.
+
+
+## B-122: `qrt_file_read_raw` is quadratic in the number of paths per origin (`reserve` per CIR): 240 000 paths take 7.5 s
+
+- Status: open
+- Severity: S3, because reading the raw paths of a large ray-tracing result takes seconds to minutes where linear time would take milliseconds; results are correct.
+- Kind: performance
+- Mark: [M] (found and measured by the WP-07 worker, 2026-10-19; details and timings in `md/fix_logs/WP-07.md`, "Found on the way")
+- Where: `src/qd_channel_qrt.cpp`, `qrt_file_read_raw` (around line 1872 after WP-07): `out.reserve(...)` is called once per CIR with a slightly larger size, so the output vectors are reallocated and copied on every CIR.
+
+**What happens.** On a generated 93 MB QRT file, each doubling of the paths per origin makes `qrt_file_read_raw` about 4 times slower: 0.43 s, 1.74 s and 7.50 s for 60 000, 120 000 and 240 000 paths; the same in the code before WP-07.
+
+**Reproduce.** The WP-07 benchmark generator and timing scripts in `build_linux/scratch/fix/WP-07/` (see the log); time `qrt_file_read_raw` of one origin for 750, 1500 and 3000 CIRs.
+
+**Proposed fix.** Reserve once per origin from the known path count (or grow geometrically). File: `src/qd_channel_qrt.cpp`.
+
+**Test for the fix session.** Timing ratio check: doubling the paths at most doubles the time (plus noise); outputs unchanged (checksum).
+
+## B-123: MEX and Python `qrt_file_read` build a 2^32-entry index vector (34 GB) for a valid file with 0 CIRs
+
+- Status: open
+- Severity: S3, because a valid file without CIRs makes the wrapper allocate 34 GB (MemoryError in Python, "out of memory" in Octave) instead of returning empty outputs.
+- Kind: defect (unsigned underflow)
+- Mark: [R] (found by the WP-07 worker under `ulimit`, 2026-10-19; details in `md/fix_logs/WP-07.md`)
+- Where: `api_mex/qrt_file_read.cpp:100`, `api_python/qpy_qrt_file_read.cpp:127`: the default CIR list is `regspace(0, no_cir - 1)` in 32 bit, which underflows for `no_cir = 0`.
+
+**Reproduce.** A QRT file with 0 CIRs written with `qrt_file_init`, then `quadriga_lib.qrt_file_read(fn)` in Octave / Python under `ulimit -v 4000000`.
+
+**Proposed fix.** Return empty outputs (or an empty CIR list) when `no_cir == 0`. Files: the two wrappers.
+
+**Test for the fix session.** MOxUnit and pytest: a file with 0 CIRs returns empty outputs without a large allocation.

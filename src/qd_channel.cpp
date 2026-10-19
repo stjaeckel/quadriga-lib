@@ -385,6 +385,7 @@ Append new propagation paths to an existing channel snapshot
 
 - Adds path-level data to snapshot `i_snap` in a `channel` object; does not modify `tx_pos`, `rx_pos`, or orientation fields
 - All provided fields must have consistent length `n_path_add` and match existing snapshot structure
+- The first provided field sets `n_path_add`, also when it holds 0 paths; a field with a different path count throws
 
 ## Declaration:
 ```
@@ -435,7 +436,9 @@ void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
         throw std::invalid_argument("Snapshot index out of bound.");
 
     // Check MIMO coefficients
+    // The first given field sets the number of added paths (also when it is 0), every other field must match
     bool add_coefficients = false;
+    bool n_path_set = false;
     arma::uword n_path_add = 0ULL;
     if (coeff_re_add != nullptr)
     {
@@ -446,6 +449,7 @@ void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
             throw std::invalid_argument("'coeff_im_add' or 'delay_add' is missing.");
 
         n_path_add = coeff_re_add->n_slices;
+        n_path_set = true;
         if (coeff_im_add->n_slices != n_path_add)
             throw std::invalid_argument("Size of 'coeff_im_add' does not match size of 'coeff_re_add'");
         if (delay_add->n_slices != n_path_add)
@@ -477,7 +481,8 @@ void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
         if (interact_coord_add == nullptr)
             throw std::invalid_argument("'no_interact_add' is given but 'interact_coord_add' is missing.");
 
-        n_path_add = (n_path_add == 0ULL) ? no_interact_add->n_elem : n_path_add;
+        if (!n_path_set)
+            n_path_add = no_interact_add->n_elem, n_path_set = true;
         if (no_interact_add->n_elem != n_path_add)
             throw std::invalid_argument("Size of 'no_interact_add' does not match size of 'coeff_re_add'");
 
@@ -498,7 +503,8 @@ void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
         if (this->path_gain.size() == 0)
             throw std::invalid_argument("Channel object requires existing 'path_gain'.");
 
-        n_path_add = (n_path_add == 0ULL) ? path_gain_add->n_elem : n_path_add;
+        if (!n_path_set)
+            n_path_add = path_gain_add->n_elem, n_path_set = true;
         if (path_gain_add->n_elem != n_path_add)
             throw std::invalid_argument("Size of 'path_gain_add' does not match 'n_path_add'");
     }
@@ -511,7 +517,8 @@ void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
         if (this->path_length.size() == 0)
             throw std::invalid_argument("Channel object requires existing 'path_length'.");
 
-        n_path_add = (n_path_add == 0ULL) ? path_length_add->n_elem : n_path_add;
+        if (!n_path_set)
+            n_path_add = path_length_add->n_elem, n_path_set = true;
         if (path_length_add->n_elem != n_path_add)
             throw std::invalid_argument("Size of 'path_length_add' does not match 'n_path_add'");
     }
@@ -524,7 +531,8 @@ void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
         if (this->path_polarization.size() == 0)
             throw std::invalid_argument("Channel object requires existing 'path_polarization'.");
 
-        n_path_add = (n_path_add == 0ULL) ? path_polarization_add->n_cols : n_path_add;
+        if (!n_path_set)
+            n_path_add = path_polarization_add->n_cols, n_path_set = true;
         if (path_polarization_add->n_cols != n_path_add)
             throw std::invalid_argument("Number of columns in 'path_polarization_add' does not match 'n_path_add'");
         if (path_polarization_add->n_rows != 8ULL)
@@ -539,7 +547,8 @@ void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
         if (this->path_angles.size() == 0)
             throw std::invalid_argument("Channel object requires existing 'path_angles'.");
 
-        n_path_add = (n_path_add == 0ULL) ? path_angles_add->n_rows : n_path_add;
+        if (!n_path_set)
+            n_path_add = path_angles_add->n_rows, n_path_set = true;
         if (path_angles_add->n_rows != n_path_add)
             throw std::invalid_argument("Number of rows in 'path_angles_add' does not match 'n_path_add'");
         if (path_angles_add->n_cols != 4ULL)
@@ -554,7 +563,8 @@ void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
         if (this->path_fbs_pos.size() == 0)
             throw std::invalid_argument("Channel object requires existing 'path_fbs_pos'.");
 
-        n_path_add = (n_path_add == 0ULL) ? path_fbs_pos_add->n_cols : n_path_add;
+        if (!n_path_set)
+            n_path_add = path_fbs_pos_add->n_cols, n_path_set = true;
         if (path_fbs_pos_add->n_cols != n_path_add)
             throw std::invalid_argument("Number of columns in 'path_fbs_pos_add' does not match 'n_path_add'");
         if (path_fbs_pos_add->n_rows != 3ULL)
@@ -569,7 +579,8 @@ void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
         if (this->path_lbs_pos.size() == 0)
             throw std::invalid_argument("Channel object requires existing 'path_lbs_pos'.");
 
-        n_path_add = (n_path_add == 0ULL) ? path_lbs_pos_add->n_cols : n_path_add;
+        if (!n_path_set)
+            n_path_add = path_lbs_pos_add->n_cols, n_path_set = true;
         if (path_lbs_pos_add->n_cols != n_path_add)
             throw std::invalid_argument("Number of columns in 'path_lbs_pos_add' does not match 'n_path_add'");
         if (path_lbs_pos_add->n_rows != 3ULL)

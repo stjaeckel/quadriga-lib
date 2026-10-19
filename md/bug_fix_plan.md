@@ -80,6 +80,13 @@ numbers (WP-xx), no "decision (a)", no "worker log", no file paths under `md/`. 
 why (the defect in plain words), behaviour changes for users, and the test and benchmark results. The commit itself
 may still contain the `md/` files. Earlier commits (WP-01 to WP-03) are not rewritten.
 
+### 3.1b Light review (user's request of 2026-10-19, from WP-07 on)
+
+The manager does not repeat the worker's heavy runs. Per package it reads the diff, runs the full AVX2 Catch2 suite,
+re-runs the item repros, and takes the generic, ASan, MEX, Python, AFL and benchmark results from the worker's log.
+A heavy run is repeated only when the diff or the log gives a concrete reason (an unexplained number, a risky change
+such as memory aliasing or a kernel rewrite, or a result that does not fit).
+
 ### 3.2 Extra checks per package
 
 Named in section 5 under "Acceptance" (fuzz re-runs, MATLAB R2026a exit, timings).
@@ -319,13 +326,14 @@ acceptance checks beyond section 3.1. Severities in brackets.
 
 ### WP-14 OBJ, MTL, PNG and Mitsuba writers/readers
 
-- Items: B-018 [S2], B-056 [S3], B-057 [S3], B-058 [S3].
+- Items: B-018 [S2], B-056 [S3], B-057 [S3], B-058 [S3], B-122 [S3] (added after WP-07, `src/qd_channel_qrt.cpp`).
 - Files: `src/obj_file_write.cpp`, `src/obj_file_read.cpp`, `src/mitsuba_xml_file_write.cpp`, `src/write_png.cpp`.
 - Acceptance: re-run the OBJ, MTL and CSV AFL harnesses for 15 minutes each.
 
 ### WP-15 API consistency of the wrappers
 
-- Items: B-087 [S3], B-088 [S3], B-089 [S3], B-090 [S3], B-091 [S3], B-092 [S3], B-095 [S3], B-113 [S4], B-114 [S4].
+- Items: B-087 [S3], B-088 [S3], B-089 [S3], B-090 [S3], B-091 [S3], B-092 [S3], B-095 [S3], B-113 [S4], B-114 [S4],
+  B-123 [S3] (added after WP-07, `api_mex/qrt_file_read.cpp`, `api_python/qpy_qrt_file_read.cpp`).
 - Files: `api_mex/arrayant_generate.cpp`, `api_python/qpy_arrayant_generate.cpp`, `api_mex/calc_angular_spread.cpp`,
   `api_python/qpy_calc_angular_spread.cpp` (or the C++ defaults), `api_mex/triangle_mesh_segmentation.cpp`,
   `api_mex/subdivide_triangles.cpp`, `api_mex/baseband_freq_response.cpp`, `api_mex/get_channels_irs.cpp`,
@@ -433,16 +441,16 @@ unexpected changes in the diff; proposed `md/bugs.md` updates; anything the next
 | WP-03 | 4 | done 2026-10-17 (4 of 4 fixed; round 2: limit documented, message points to absolute delays) | 9e5af26 |
 | WP-04 | 5 | done 2026-10-17 (B-003, B-020 fixed; B-019, B-068, B-069 documented; B-120, B-121 found) | 4e2cf89 |
 | WP-05 | 12 | done 2026-10-17 (10 fixed, B-099 and B-117 documented) | bf76f2f |
-| WP-06 | 6 | done 2026-10-17 (6 of 6 fixed; integer conversion of large index inputs 14-17% slower, accepted pending the user's review) | commit after bf76f2f (hash at next update) |
-| WP-07 | 4 | open | - |
+| WP-06 | 6 | done 2026-10-17 (6 of 6 fixed; integer conversion of large index inputs 14-17% slower, accepted by the user) | fd4cfe0 |
+| WP-07 | 4 | done 2026-10-19 (4 of 4 fixed; B-122, B-123 found) | commit after fd4cfe0 (hash at next update) |
 | WP-08 | 5 | open | - |
 | WP-09 | 9 | open | - |
 | WP-10 | 7 | open | - |
 | WP-11 | 5 | open | - |
 | WP-12 | 12 | open | - |
 | WP-13 | 10 | open | - |
-| WP-14 | 4 | open | - |
-| WP-15 | 9 | open | - |
+| WP-14 | 5 | open | - |
+| WP-15 | 10 | open | - |
 | WP-16 | 3 | open | - |
 | WP-17 | 6 | open | - |
 
@@ -574,3 +582,5 @@ Repro folders are under `build_linux/scratch/hunt/final/`; run `bash build_linux
 | B-119 | S4 | - | `B-119` | Crafted HDF5 files make HDF5 1.14.6 itself zero-fill about 4 GB in `H5Fopen` or request a 2^64-byte allocation in `H5Gopen2` (upstream; won't fix) |
 | B-120 | S3 | WP-13 | `B-120` | `calc_cross_polarization_ratio`: circular XPR columns inverted for the LOS matrix of `get_channels_*`; per transmit vs per receive polarisation |
 | B-121 | S3 | WP-12 | `B-121` | Test defect: `test_bin` without `BUILD_WITH_AVX2`, the AVX2-vs-generic ray kernel tests never run |
+| B-122 | S3 | WP-14 | - | `qrt_file_read_raw` quadratic in the number of paths per origin |
+| B-123 | S3 | WP-15 | - | MEX / Python `qrt_file_read` allocate 34 GB for a file with 0 CIRs |

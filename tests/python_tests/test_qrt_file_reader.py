@@ -257,6 +257,28 @@ class test_case(unittest.TestCase):
         with self.assertRaisesRegex(IndexError, "CIR index exceeds"):
             channel.qrt_file_read(FN_V4, [999], 0, True, 1)
 
+        # normalize_M other than 0 or 1 (raised by the reader thread)
+        with self.assertRaisesRegex(RuntimeError, "'normalize_M' must be 0 or 1"):
+            channel.qrt_file_read(FN_V5, [0], 0, True, 5)
+
+    def test_truncated_file(self):
+        # A truncated file raises an error instead of returning wrong data
+        import tempfile
+        with open(FN_V5, 'rb') as f:
+            data = f.read()
+        with tempfile.TemporaryDirectory() as d:
+            fn = os.path.join(d, 'trunc.qrt')
+            with open(fn, 'wb') as f:
+                f.write(data[:-10])
+            with self.assertRaisesRegex(RuntimeError, "truncated or corrupt"):
+                channel.qrt_file_read(fn, [1], 0)
+            with open(fn, 'wb') as f:
+                f.write(data[:40])
+            with self.assertRaisesRegex(ValueError, "truncated or corrupt"):
+                channel.qrt_file_parse(fn)
+            with self.assertRaisesRegex(ValueError, "truncated or corrupt"):
+                channel.qrt_file_read(fn, [0], 0)
+
 
     # ------------------------------------------------------------------
     # An exception in the converting loop while the reader thread runs must
