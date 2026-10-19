@@ -606,15 +606,16 @@ static inline void avx2_gather_slerp_polrot(
 
     // ---- 6× SLERP: bilinear spherical interpolation ----
     // Interpolate along azimuth (A↔B, C↔D), then along elevation (E↔F)
+    // zero_if_both_tiny = false: linear interpolation where both amplitudes are tiny, as the generic kernel
     __m256 VEr8, VEi8, VFr8, VFi8, Vr8, Vi8;
-    _fm256_slerp_complex_ps(VfAr8, VfAi8, VfBr8, VfBi8, up8, &VEr8, &VEi8);
-    _fm256_slerp_complex_ps(VfCr8, VfCi8, VfDr8, VfDi8, up8, &VFr8, &VFi8);
-    _fm256_slerp_complex_ps(VEr8, VEi8, VFr8, VFi8, vp8, &Vr8, &Vi8);
+    _fm256_slerp_complex_ps(VfAr8, VfAi8, VfBr8, VfBi8, up8, &VEr8, &VEi8, false);
+    _fm256_slerp_complex_ps(VfCr8, VfCi8, VfDr8, VfDi8, up8, &VFr8, &VFi8, false);
+    _fm256_slerp_complex_ps(VEr8, VEi8, VFr8, VFi8, vp8, &Vr8, &Vi8, false);
 
     __m256 HEr8, HEi8, HFr8, HFi8, Hr8, Hi8;
-    _fm256_slerp_complex_ps(HfAr8, HfAi8, HfBr8, HfBi8, up8, &HEr8, &HEi8);
-    _fm256_slerp_complex_ps(HfCr8, HfCi8, HfDr8, HfDi8, up8, &HFr8, &HFi8);
-    _fm256_slerp_complex_ps(HEr8, HEi8, HFr8, HFi8, vp8, &Hr8, &Hi8);
+    _fm256_slerp_complex_ps(HfAr8, HfAi8, HfBr8, HfBi8, up8, &HEr8, &HEi8, false);
+    _fm256_slerp_complex_ps(HfCr8, HfCi8, HfDr8, HfDi8, up8, &HFr8, &HFi8, false);
+    _fm256_slerp_complex_ps(HEr8, HEi8, HFr8, HFi8, vp8, &Hr8, &Hi8, false);
 
     // ---- Polarization rotation (Jones matrix rotation by gamma) ----
     *v_re8 = _mm256_fmsub_ps(cos_gamma8, Vr8, _mm256_mul_ps(sin_gamma8, Hr8));
@@ -1140,9 +1141,9 @@ void qd_arrayant_interpolate_avx2(const arma::Cube<dtype> &e_theta_re,    // Ver
                     }
                 }
 
-                __m256 sAZi8, cAZi8, sELi8, cELi8;
-                _fm256_sincos256_ps(az_in8, &sAZi8, &cAZi8);
-                _fm256_sincos256_ps(el_in8, &sELi8, &cELi8);
+                __m256 sAZi8, cAZi8, sELi8, cELi8; // <false>: and / or selection, faster in this kernel
+                _fm256_sincos256_ps<false>(az_in8, &sAZi8, &cAZi8);
+                _fm256_sincos256_ps<false>(el_in8, &sELi8, &cELi8);
                 cELi8 = _mm256_add_ps(cELi8, eps_8); // pole guard
 
                 // ==== Stages B+C: Rotation, cart2geo, basis vectors, gamma ====
@@ -1385,9 +1386,9 @@ void qd_arrayant_interpolate_avx2(const arma::Cube<dtype> &e_theta_re,    // Ver
                     el_in8 = _mm256_set1_ps((float)p_el_global[a]);
                 }
 
-                __m256 sAZi8, cAZi8, sELi8, cELi8;
-                _fm256_sincos256_ps(az_in8, &sAZi8, &cAZi8);
-                _fm256_sincos256_ps(el_in8, &sELi8, &cELi8);
+                __m256 sAZi8, cAZi8, sELi8, cELi8; // <false>: and / or selection, faster in this kernel
+                _fm256_sincos256_ps<false>(az_in8, &sAZi8, &cAZi8);
+                _fm256_sincos256_ps<false>(el_in8, &sELi8, &cELi8);
                 cELi8 = _mm256_add_ps(cELi8, eps_8); // pole guard
 
                 // Load rotation matrix from SoA buffer

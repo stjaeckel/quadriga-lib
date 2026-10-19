@@ -1918,3 +1918,39 @@ TEST_CASE("Get Channels Spherical - Rows of M follow the Jones convention rx by 
         CHECK(std::abs(amp(h, h, row) - (row == 6 ? 1.0 : 0.0)) < 1e-12);
     }
 }
+
+TEST_CASE("Get Channels Spherical - AVX2 interpolation of a low-amplitude pattern")
+{
+    // The AVX2 antenna interpolation must not set the result to zero where all corner amplitudes are small
+    // (here 1e-9 times a directional pattern); it must agree with the generic interpolation.
+    auto tx = quadriga_lib::generate_arrayant_custom<double>(90.0, 90.0, 0.0, 5.0);
+    const double s = 1e-9, ph = 0.7;
+    tx.e_theta_im = tx.e_theta_re * (s * std::sin(ph));
+    tx.e_theta_re *= s * std::cos(ph);
+    auto rx = quadriga_lib::generate_arrayant_omni<double>();
+
+    arma::arma_rng::set_seed(5);
+    const arma::uword n_path = 21;
+    arma::mat fbs = arma::randu<arma::mat>(3, n_path) * 100.0 - 50.0;
+    fbs.row(2) = arma::randu<arma::rowvec>(n_path) * 20.0 - 5.0;
+    arma::vec gain(n_path, arma::fill::ones), len(n_path, arma::fill::zeros);
+    arma::mat M(8, n_path, arma::fill::zeros);
+    M.row(0).fill(1.0), M.row(6).fill(-1.0);
+
+    arma::cube cr_g, ci_g, dl_g, cr_v, ci_v, dl_v;
+    quadriga_lib::get_channels_spherical<double>(&tx, &rx, 0.0, 0.0, 10.0, 0.0, 0.0, 0.0, 30.0, 5.0, 1.5, 0.0, 0.0, 0.0,
+                                                 &fbs, &fbs, &gain, &len, &M, &cr_g, &ci_g, &dl_g, 3.5e9, true, false,
+                                                 nullptr, nullptr, nullptr, nullptr, false);
+    quadriga_lib::get_channels_spherical<double>(&tx, &rx, 0.0, 0.0, 10.0, 0.0, 0.0, 0.0, 30.0, 5.0, 1.5, 0.0, 0.0, 0.0,
+                                                 &fbs, &fbs, &gain, &len, &M, &cr_v, &ci_v, &dl_v, 3.5e9, true, false,
+                                                 nullptr, nullptr, nullptr, nullptr, true);
+
+    arma::vec amp_g = arma::sqrt(arma::vectorise(arma::square(cr_g) + arma::square(ci_g)));
+    const double amax = amp_g.max();
+    REQUIRE(amax > 1e-12);
+    REQUIRE(amax < 1e-7);
+    double dmax = 0.0;
+    for (arma::uword i = 0; i < cr_g.n_elem; ++i)
+        dmax = std::max(dmax, std::hypot(cr_g(i) - cr_v(i), ci_g(i) - ci_v(i)));
+    CHECK(dmax / amax < 1e-4);
+}

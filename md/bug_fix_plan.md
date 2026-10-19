@@ -47,6 +47,14 @@ package (a second worker session, "WP-xx, round 2"), not for the next one.
   The repro scripts in `build_linux/scratch/hunt/final/` link against these libraries.
 - Machine rules of `~/.claude/CLAUDE.md` apply (load check, thread counts, `flock /tmp/bench.lock` for timings, no
   GPU). Run every `test_bin` through `flock /tmp/quadriga-fixes-suite.lock`.
+- Resource limits (user's rule of 2026-10-19; another coding session runs in parallel and also waits for an idle
+  machine to measure):
+  - at most 12 threads for everything: `cmake --build ... --parallel 12` (or less), `OMP_NUM_THREADS=12` (or less)
+    for test runs;
+  - never run two builds or two suites at the same time (they saturate OpenMP); run them one after the other;
+  - heavy tools (ASan suite, AFL, MATLAB, benchmarks, long sweeps) only when the package needs them, and then once
+    on the final code, not repeatedly; use the resource-saving settings (fewer threads, short runs);
+  - benchmarks: wait for a 1-min load below 4, keep them short, and repeat only if the load was too high.
 - Install nothing system-wide; Python via `PYTHONPATH=/sjc/quadriga-lib-fixes/lib`, MATLAB/Octave via `addpath`.
 - Do not commit. Do not edit `md/bugs.md`, `md/bug_fix_plan.md`, `md/bug_hunt_brief.md`.
 - Documentation: when behaviour changes, update the C++ comment block, the MEX and the Python block in the same work
@@ -363,6 +371,10 @@ acceptance checks beyond section 3.1. Severities in brackets.
 - Left open by earlier packages: `CMakeLists.txt:498` (MATLAB API section) still says MATLAB links quadriga_static "to
   avoid conflicts with MATLAB's own bundled libhdf5.so"; the static link does not separate the HDF5 libraries, the
   different soname of the system HDF5 does (see the comment at `CMakeLists.txt:196`, rewritten in WP-01).
+- From WP-08: the MEX and Python docs of `ray_triangle_intersect` say auto mode picks CUDA from 10 000 rays (the
+  C++ code uses 500); a SLERP header comment in `src/fastmath_avx2.h` claims a double-precision direction sum the code
+  does not do; `_fm256_polar_ps` is unused (dead code); `fast_cart2geo` returns elevation 0 (not NaN) for NaN input in
+  both kernels, while azimuth and length are NaN.
 - From WP-06: `include/quadriga_tools.hpp` calls `obj_ind` of `obj_file_write` "1-based"; the C++ code and its
   documentation block use 0-based indices.
 - From WP-03: `src/qd_channel_quantize_delays.cpp`: a NaN `power_exponent` passes the `<= 0` check and gives NaN
@@ -442,8 +454,8 @@ unexpected changes in the diff; proposed `md/bugs.md` updates; anything the next
 | WP-04 | 5 | done 2026-10-17 (B-003, B-020 fixed; B-019, B-068, B-069 documented; B-120, B-121 found) | 4e2cf89 |
 | WP-05 | 12 | done 2026-10-17 (10 fixed, B-099 and B-117 documented) | bf76f2f |
 | WP-06 | 6 | done 2026-10-17 (6 of 6 fixed; integer conversion of large index inputs 14-17% slower, accepted by the user) | fd4cfe0 |
-| WP-07 | 4 | done 2026-10-19 (4 of 4 fixed; B-122, B-123 found) | commit after fd4cfe0 (hash at next update) |
-| WP-08 | 5 | open | - |
+| WP-07 | 4 | done 2026-10-19 (4 of 4 fixed; B-122, B-123 found) | 89437ad |
+| WP-08 | 5 | done 2026-10-19 (5 of 5 fixed; AVX2 interpolation and get_channels_spherical at 1.00-1.06 of old) | commit after 89437ad (hash at next update) |
 | WP-09 | 9 | open | - |
 | WP-10 | 7 | open | - |
 | WP-11 | 5 | open | - |

@@ -49,7 +49,7 @@ void quadriga_lib::ray_point_intersect(
 - **`trivec`** — Vectors from ray origin center to triangular wavefront vertices, order `[v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z]`; `[n_ray, 9]`
 - **`tridir`** — Direction vectors of the three vertex-rays in Cartesian coordinates (need not be normalized), order `[d1x, d1y, d1z, d2x, d2y, d2z, d3x, d3y, d3z]`; `[n_ray, 9]`
 - **`sub_cloud_index`** *(optional)* — Segment boundary indices for the point cloud (see [[point_cloud_segmentation]]); `[n_sub]`
-- **`use_kernel`** *(optional)* — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable; auto mode selects CUDA when `n_points >= 500` and CUDA is available, else AVX2, else GENERIC.
+- **`use_kernel`** *(optional)* — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable and for other values; auto mode selects CUDA when `n_points >= 500` and CUDA is available, else AVX2, else GENERIC.
 - **`gpu_id`** *(optional)* — CUDA device ID; ignored when not using CUDA
 
 ## Optional outputs:
@@ -133,7 +133,7 @@ void quadriga_lib::ray_point_intersect(const arma::Mat<dtype> &points,
             throw std::invalid_argument("CUDA kernel requested but not available (compile with BUILD_WITH_CUDA and run on CUDA-capable GPU).");
         kernel = 3;
     }
-    else // Auto-select (use_kernel == 0)
+    else if (use_kernel == 0) // Auto-select
     {
         if (n_point_t >= 500 && quadriga_lib::quadriga_lib_has_CUDA())
             kernel = 3;
@@ -142,6 +142,8 @@ void quadriga_lib::ray_point_intersect(const arma::Mat<dtype> &points,
         else
             kernel = 1;
     }
+    else
+        throw std::invalid_argument("Input 'use_kernel' must be 0, 1, 2 or 3.");
 
     // Determine SIMD vector size based on selected kernel
     size_t vec_size = (kernel == 2) ? 8ULL : 1ULL;

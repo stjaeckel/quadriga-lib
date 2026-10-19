@@ -152,6 +152,13 @@ class test_case(unittest.TestCase):
         except (ValueError, RuntimeError):
             pass
 
+    # Kernel values outside 0, 1, 2 are rejected (they used to run the auto kernel silently)
+    def test_invalid_use_kernel(self):
+        e = np.random.rand(3, 2, 2)
+        for k in (3, 99, -1):
+            with self.assertRaises(ValueError, msg="use_kernel=%d" % k):
+                quadriga_lib.tools.geo2cart(e, use_kernel=k)
+
     # --- Error paths ---
 
     def test_errors(self):

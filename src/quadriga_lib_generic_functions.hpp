@@ -71,8 +71,10 @@ void qd_RPI_GENERIC(const dtype *Px, const dtype *Py, const dtype *Pz,    // Poi
                     unsigned *hit_offset);                                // Output: 0-based start of each point's block, length n_point + 1, allocated by the caller
 
 // sin and cos of 2 * pi * r for r in [-0.5, 0.5] (one period, already reduced in double precision by the caller).
-// Same algorithm as the AVX2 DFT kernel: quadrant q = nearest integer of 4 * r (magic-number rounding, exact for
-// |4 * r| < 2^22), t = (4 * r - q) * pi / 2 in [-pi/4, pi/4], Cephes single-precision polynomials, quadrant swap / signs.
+// Same algorithm as the AVX2 DFT kernel (_fm256_sincos_2pi_reduced_ps and the shared polynomial part
+// _fm256_sincos_poly_ps in fastmath_avx2.h): quadrant q = nearest integer of 4 * r (magic-number rounding, exact for
+// |4 * r| < 2^22, and only without -ffast-math, which may fold (u + magic) - magic to u), t = (4 * r - q) * pi / 2 in
+// [-pi/4, pi/4], Cephes single-precision polynomials, quadrant swap / signs.
 // Branch-free, so that loops calling it can be vectorized.
 inline void qd_sincos_2pi_reduced(float r, float &s, float &c)
 {
@@ -93,7 +95,8 @@ inline void qd_sincos_2pi_reduced(float r, float &s, float &c)
 // The phase x = freq * delay (in cycles) is computed in double precision and reduced to x - round(x), which is in
 // [-0.5, 0.5], before sin / cos are evaluated in single precision; coefficients and sums are single precision.
 // Paths are processed one after the other, the carrier loop is innermost and branch-free (vectorizable): the rounding
-// uses the magic-number method, exact for |x| < 2^51; paths with larger or non-finite phases use a scalar loop.
+// uses the magic-number method, exact for |x| < 2^51 and only without -ffast-math (which may fold it away); paths with
+// larger or non-finite phases use a scalar loop.
 template <typename dtype>
 void qd_DFT_GENERIC(const dtype *__restrict CFr,    // Channel coefficients, real part, Size [n_ant, n_path]
                     const dtype *__restrict CFi,    // Channel coefficients, imaginary part, Size [n_ant, n_path]

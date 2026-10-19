@@ -9,6 +9,18 @@
 
 #include <immintrin.h>
 
+// The fast paths must be inlined into the vector loops; the rarely used large-argument paths are kept out of line so
+// that they do not prevent this.
+#if defined(_MSC_VER)
+#define QD_FM_INLINE static __forceinline
+#define QD_FM_NOINLINE static __declspec(noinline)
+#define QD_FM_UNLIKELY(x) (x)
+#else
+#define QD_FM_INLINE static inline __attribute__((always_inline))
+#define QD_FM_NOINLINE static __attribute__((noinline, cold, unused))
+#define QD_FM_UNLIKELY(x) __builtin_expect(!!(x), 0)
+#endif
+
 // AVX2 signum: returns -1.0f, 0.0f, or +1.0f per lane
 static inline __m256 _fm256_signum_ps(__m256 x)
 {
@@ -45,28 +57,24 @@ static inline __m256 _fm256_rsqrt_nr_ps(__m256 x)
                          _mm256_fnmadd_ps(x, _mm256_mul_ps(r0, r0), _mm256_set1_ps(3.0f)));
 }
 
+// Polynomial part of the AVX2 sine / cosine (Cephes single-precision polynomials), shared by all sin / cos kernels.
+// Input: reduced argument x in [-pi/4, pi/4] (plus rounding) and an index k (negative values are allowed):
+//   quadrant = false: k = j is an even octant index, s = sin(x + j * pi/4), c = cos(x + j * pi/4)
+//   quadrant = true:  k = q is a quadrant index,     s = sin(x + q * pi/2), c = cos(x + q * pi/2)
+// Only bits 1 and 2 of j (bits 0 and 1 of q) are used. Both forms give the same bits for j = 2 * q.
+// blend_select: select the sine / cosine polynomial with blendv (faster in fast_sincos, fast_geo2cart and the
+// baseband kernel) or with and / andnot / or (faster in the antenna interpolation kernel and SLERP; measured); both
+// give the same bits.
 // Note: A SINE / COSINE-only version provides no significant performance advantage
 // Just compute both and drop the unwanted one
-static inline void _fm256_sincos256_ps(__m256 x, __m256 * s, __m256 * c)
+template <bool quadrant = false, bool blend_select = true>
+QD_FM_INLINE void _fm256_sincos_poly_ps(__m256 x, __m256i k, __m256 *s, __m256 *c)
 {
-    // Bit masks
-    const __m256 sign_mask = _mm256_castsi256_ps(_mm256_set1_epi32(0x80000000u));
-    const __m256 inv_sign_mask = _mm256_castsi256_ps(_mm256_set1_epi32(0x7fffffff));
-    const __m256i pi32_0 = _mm256_set1_epi32(0);
-    const __m256i pi32_1 = _mm256_set1_epi32(1);
-    const __m256i pi32_inv1 = _mm256_set1_epi32(~1);
-    const __m256i pi32_2 = _mm256_set1_epi32(2);
-    const __m256i pi32_4 = _mm256_set1_epi32(4);
-
-    // Constants
+    constexpr int sh = quadrant ? 1 : 0;             // k = j >> sh
+    const __m256i bit1 = _mm256_set1_epi32(2 >> sh); // bit 1 of j
+    const __m256i bit2 = _mm256_set1_epi32(4 >> sh); // bit 2 of j
     const __m256 one = _mm256_set1_ps(1.0f);
     const __m256 n_half = _mm256_set1_ps(-0.5f);
-    const __m256 FOPI = _mm256_set1_ps(1.27323954473516f); // 4/pi
-
-    // Cody–Waite split constants
-    const __m256 DP1 = _mm256_set1_ps(-0.78515625f);
-    const __m256 DP2 = _mm256_set1_ps(-2.4187564849853515625e-4f);
-    const __m256 DP3 = _mm256_set1_ps(-3.77489497744594108e-8f);
 
     // Polynomial coeffs (Cephes), single-precision
     const __m256 Sp0 = _mm256_set1_ps(-1.9515295891E-4f);
@@ -77,29 +85,14 @@ static inline void _fm256_sincos256_ps(__m256 x, __m256 * s, __m256 * c)
     const __m256 Cp1 = _mm256_set1_ps(-1.388731625493765E-003f);
     const __m256 Cp2 = _mm256_set1_ps(4.166664568298827E-002f);
 
-    // sign for sine; |x|
-    __m256 sign_bit_sin = _mm256_and_ps(x, sign_mask);
-    x = _mm256_and_ps(x, inv_sign_mask);
-
-    // Scale by 4/pi and get j = (int)y;  j = (j+1) & (~1)
-    __m256 y = _mm256_mul_ps(x, FOPI);
-    __m256i j = _mm256_cvttps_epi32(y);
-    j = _mm256_add_epi32(j, pi32_1);
-    j = _mm256_and_si256(j, pi32_inv1);
-    y = _mm256_cvtepi32_ps(j);
-
-    // swap sign flag for sine and cosine sign bit
-    __m256 swap_sin = _mm256_castsi256_ps(_mm256_slli_epi32(_mm256_and_si256(j, pi32_4), 29));
+    // sign flip of the sine where j & 4; of the cosine where (j + 2) & 4 (bit 2 moved to the sign bit)
+    __m256 swap_sin = _mm256_castsi256_ps(_mm256_slli_epi32(_mm256_and_si256(k, bit2), 29 + sh));
     __m256 sign_bit_cos = _mm256_castsi256_ps(
-        _mm256_slli_epi32(_mm256_andnot_si256(_mm256_sub_epi32(j, pi32_2), pi32_4), 29));
+        _mm256_slli_epi32(_mm256_and_si256(_mm256_add_epi32(k, bit1), bit2), 29 + sh));
 
-    // polynomial selection mask for sine: (j & 2) == 0
-    __m256 poly = _mm256_castsi256_ps(_mm256_cmpeq_epi32(_mm256_and_si256(j, pi32_2), pi32_0));
-
-    // Range reduction: x = ((x - y*DP1) - y*DP2) - y*DP3 (as fused adds)
-    x = _mm256_fmadd_ps(y, DP1, x);
-    x = _mm256_fmadd_ps(y, DP2, x);
-    x = _mm256_fmadd_ps(y, DP3, x);
+    // polynomials swapped where j & 2 (bit 1 of j moved to the sign bit for blendv, or a mask of all ones)
+    __m256 swap = blend_select ? _mm256_castsi256_ps(_mm256_slli_epi32(k, 30 + sh))
+                               : _mm256_castsi256_ps(_mm256_cmpeq_epi32(_mm256_and_si256(k, bit1), bit1));
 
     // Common powers
     __m256 z = _mm256_mul_ps(x, x);
@@ -122,23 +115,35 @@ static inline void _fm256_sincos256_ps(__m256 x, __m256 * s, __m256 * c)
     __m256 yc = _mm256_fmadd_ps(z, to, ev);       // even + odd
 
     // Select between sin/cos polys for sine/cosine results
-    __m256 sin_approx = _mm256_or_ps(_mm256_and_ps(poly, ys), _mm256_andnot_ps(poly, yc));
-    __m256 cos_approx = _mm256_or_ps(_mm256_and_ps(poly, yc), _mm256_andnot_ps(poly, ys));
+    __m256 sin_approx, cos_approx;
+    if (blend_select)
+        sin_approx = _mm256_blendv_ps(ys, yc, swap), cos_approx = _mm256_blendv_ps(yc, ys, swap);
+    else
+        sin_approx = _mm256_or_ps(_mm256_andnot_ps(swap, ys), _mm256_and_ps(swap, yc)),
+        cos_approx = _mm256_or_ps(_mm256_andnot_ps(swap, yc), _mm256_and_ps(swap, ys));
 
     // Apply signs
-    sign_bit_sin = _mm256_xor_ps(sign_bit_sin, swap_sin);
-    *s = _mm256_xor_ps(sin_approx, sign_bit_sin);
+    *s = _mm256_xor_ps(sin_approx, swap_sin);
     *c = _mm256_xor_ps(cos_approx, sign_bit_cos);
 }
 
-// Double-input variant: takes two __m256d (8 doubles as low/high halves),
-// does Cody–Waite range reduction to [-pi/4, pi/4] in double precision,
-// converts to float, then evaluates the same Cephes polynomial + reconstruction.
-// This avoids the cascaded reduction problem where the float kernel would
-// re-reduce an already-reduced input, losing precision near octant boundaries.
-static inline void _fm256_sincos256_pd(__m256d xl, __m256d xh, __m256 * s, __m256 * c)
+// Double-precision range reduction by multiples of 2*pi: returns x - n * 2*pi with n = round(x / (2*pi)), in
+// [-pi, pi] (plus rounding) for |x| < 2^45 * 2*pi (n * CW_C1 is exact). Two-constant split CW_C1 + CW_C2 = 2*pi with
+// CW_C1 exactly representable in 8 bits, as qd_range_reduce_2pi of the generic kernel. Inf and NaN give NaN.
+QD_FM_INLINE __m256d _fm256_range_reduce_2pi_pd(__m256d x)
 {
-    // --- Double-precision constants for range reduction ---
+    const __m256d inv_two_pi = _mm256_set1_pd(0.15915494309189533577); // 1 / (2*pi)
+    const __m256d CW_C1 = _mm256_set1_pd(6.28125);                     // high bits of 2*pi
+    const __m256d CW_C2 = _mm256_set1_pd(1.9353071795864769253e-03);   // 2*pi - CW_C1
+    __m256d n = _mm256_round_pd(_mm256_mul_pd(x, inv_two_pi), _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC);
+    x = _mm256_fnmadd_pd(n, CW_C1, x); // exact (Sterbenz)
+    return _mm256_fnmadd_pd(n, CW_C2, x);
+}
+
+// Octant reduction of 4 doubles: |x| = j * pi/4 + r with an even j and r in [-pi/4, pi/4] (Cody–Waite, two constants).
+// j is an int32; for |x| * 4/pi >= 2^31 - 1, inf and NaN the conversion overflows and j is negative.
+QD_FM_INLINE void _fm256_octant_reduce_pd(__m256d x, __m128 *r, __m128i *j, __m128 *sign)
+{
     const __m256d abs_mask_d = _mm256_castsi256_pd(
         _mm256_set_epi64x(0x7FFFFFFFFFFFFFFFLL, 0x7FFFFFFFFFFFFFFFLL,
                           0x7FFFFFFFFFFFFFFFLL, 0x7FFFFFFFFFFFFFFFLL));
@@ -153,76 +158,210 @@ static inline void _fm256_sincos256_pd(__m256d xl, __m256d xh, __m256 * s, __m25
     const __m128i one_128 = _mm_set1_epi32(1);
     const __m128i inv1_128 = _mm_set1_epi32(~1);
 
-    // --- Process low 4 doubles ---
-    __m256d sign_dl = _mm256_andnot_pd(abs_mask_d, xl);       // sign bits
-    __m256d axl = _mm256_and_pd(xl, abs_mask_d);              // |x|
-    __m256d yl = _mm256_mul_pd(axl, FOPI_D);                  // |x| * 4/pi
-    __m128i jl = _mm256_cvttpd_epi32(yl);                     // truncate → 4 int32
-    jl = _mm_and_si128(_mm_add_epi32(jl, one_128), inv1_128); // (j+1) & ~1
-    __m256d jdl = _mm256_cvtepi32_pd(jl);                     // j → double
-    axl = _mm256_fnmadd_pd(jdl, DP1_D, axl);                  // ax -= j*DP1
-    axl = _mm256_fnmadd_pd(jdl, DP2_D, axl);                  // ax -= j*DP2
+    __m256d sign_d = _mm256_andnot_pd(abs_mask_d, x);         // sign bits
+    __m256d ax = _mm256_and_pd(x, abs_mask_d);                // |x|
+    __m256d y = _mm256_mul_pd(ax, FOPI_D);                    // |x| * 4/pi
+    __m128i jj = _mm256_cvttpd_epi32(y);                      // truncate → 4 int32
+    jj = _mm_and_si128(_mm_add_epi32(jj, one_128), inv1_128); // (j+1) & ~1
+    __m256d jd = _mm256_cvtepi32_pd(jj);                      // j → double
+    ax = _mm256_fnmadd_pd(jd, DP1_D, ax);                     // ax -= j*DP1
+    ax = _mm256_fnmadd_pd(jd, DP2_D, ax);                     // ax -= j*DP2
 
-    // --- Process high 4 doubles ---
-    __m256d sign_dh = _mm256_andnot_pd(abs_mask_d, xh);
-    __m256d axh = _mm256_and_pd(xh, abs_mask_d);
-    __m256d yh = _mm256_mul_pd(axh, FOPI_D);
-    __m128i jh = _mm256_cvttpd_epi32(yh);
-    jh = _mm_and_si128(_mm_add_epi32(jh, one_128), inv1_128);
-    __m256d jdh = _mm256_cvtepi32_pd(jh);
-    axh = _mm256_fnmadd_pd(jdh, DP1_D, axh);
-    axh = _mm256_fnmadd_pd(jdh, DP2_D, axh);
+    *r = _mm256_cvtpd_ps(ax);
+    *j = jj;
+    *sign = _mm256_cvtpd_ps(sign_d);
+}
 
-    // --- Pack into 8-wide float/int vectors ---
-    __m256 x8 = _mm256_set_m128(_mm256_cvtpd_ps(axh), _mm256_cvtpd_ps(axl));
+// Quadrant reduction of 8 values given as two halves of doubles, for large arguments: x = q * pi/2 + r with
+// q = round(x * 2/pi) kept in double (no int32 overflow) and r in [-pi/4, pi/4] (two-constant split of pi/2, PIO2_1
+// exactly representable in 8 bits; error below 1e-8 for |x| < 2^37). Returns r as float and the low 32 bits of q in
+// two's complement (taken from the mantissa of q + 1.5 * 2^52). sin(x) = sin(r + q * pi/2), so no sign handling is
+// needed. NaN gives NaN in r.
+QD_FM_INLINE void _fm256_quadrant_reduce_pd(__m256d xl, __m256d xh, __m256 *r, __m256i *q)
+{
+    const __m256d TOPI_D = _mm256_set1_pd(0.63661977236758134308); // 2/pi
+    const __m256d PIO2_1 = _mm256_set1_pd(1.5703125);
+    const __m256d PIO2_2 = _mm256_set1_pd(4.8382679489661923132e-4); // pi/2 - PIO2_1
+    const __m256d shift = _mm256_set1_pd(6755399441055744.0);        // 1.5 * 2^52
+    // Magic-number rounding: x * 2/pi + 1.5 * 2^52 rounds to an integer (exact only without -ffast-math, which may
+    // fold the subtraction below); the low mantissa word of the sum holds q mod 2^32
+    __m256d tl = _mm256_fmadd_pd(xl, TOPI_D, shift), th = _mm256_fmadd_pd(xh, TOPI_D, shift);
+    __m256d ql = _mm256_sub_pd(tl, shift), qh = _mm256_sub_pd(th, shift);
+    xl = _mm256_fnmadd_pd(ql, PIO2_2, _mm256_fnmadd_pd(ql, PIO2_1, xl));
+    xh = _mm256_fnmadd_pd(qh, PIO2_2, _mm256_fnmadd_pd(qh, PIO2_1, xh));
+    *r = _mm256_set_m128(_mm256_cvtpd_ps(xh), _mm256_cvtpd_ps(xl));
+    __m256 bl = _mm256_castpd_ps(tl), bh = _mm256_castpd_ps(th);
+    __m256 b = _mm256_shuffle_ps(bl, bh, _MM_SHUFFLE(2, 0, 2, 0)); // l0 l1 h0 h1 | l2 l3 h2 h3
+    b = _mm256_castpd_ps(_mm256_permute4x64_pd(_mm256_castps_pd(b), _MM_SHUFFLE(3, 1, 2, 0)));
+    *q = _mm256_castps_si256(b);
+}
+
+// Lanes with |x| > 2^37 (and inf) of two halves of doubles are reduced by multiples of 2*pi, repeatedly above
+// 2^45 * 2*pi, where one step is not exact (each step shrinks |x| by about 2^-50); inf becomes NaN. The other lanes
+// are not changed.
+QD_FM_INLINE void _fm256_reduce_very_large_pd(__m256d *xl, __m256d *xh)
+{
+    const __m256d abs_mask_d = _mm256_castsi256_pd(_mm256_set1_epi64x(0x7FFFFFFFFFFFFFFFLL));
+    const __m256d limit = _mm256_set1_pd(137438953472.0); // 2^37
+    __m256d big_l = _mm256_cmp_pd(_mm256_and_pd(*xl, abs_mask_d), limit, _CMP_GT_OQ);
+    __m256d big_h = _mm256_cmp_pd(_mm256_and_pd(*xh, abs_mask_d), limit, _CMP_GT_OQ);
+    while (_mm256_movemask_pd(_mm256_or_pd(big_l, big_h)))
+    {
+        *xl = _mm256_blendv_pd(*xl, _fm256_range_reduce_2pi_pd(*xl), big_l);
+        *xh = _mm256_blendv_pd(*xh, _fm256_range_reduce_2pi_pd(*xh), big_h);
+        big_l = _mm256_cmp_pd(_mm256_and_pd(*xl, abs_mask_d), limit, _CMP_GT_OQ);
+        big_h = _mm256_cmp_pd(_mm256_and_pd(*xh, abs_mask_d), limit, _CMP_GT_OQ);
+    }
+}
+
+// sin / cos of 8 large arguments given as two halves of doubles: very large lanes are first reduced by multiples of
+// 2*pi (_fm256_reduce_very_large_pd), then all lanes are reduced to a quadrant in double precision. Max. error 1.3e-7
+// for |x| <= 1e10; |s|, |c| <= 1 for all finite x; inf and NaN give NaN.
+QD_FM_NOINLINE void _fm256_sincos256_big_pd(__m256d xl, __m256d xh, __m256 *s, __m256 *c)
+{
+    _fm256_reduce_very_large_pd(&xl, &xh);
+    __m256 r;
+    __m256i q;
+    _fm256_quadrant_reduce_pd(xl, xh, &r, &q);
+    _fm256_sincos_poly_ps<true>(r, q, s, c);
+}
+
+// sin / cos of 8 large float arguments (|x| > 2^22 in some lanes): as _fm256_sincos256_big_pd, inline, with the check
+// for very large lanes done on the float input.
+QD_FM_INLINE void _fm256_sincos256_big_ps(__m256 x, __m256 *s, __m256 *c)
+{
+    const __m256 inv_sign_mask = _mm256_castsi256_ps(_mm256_set1_epi32(0x7fffffff));
+    const __m256 limit = _mm256_set1_ps(137438953472.0f); // 2^37
+    __m256d xl = _mm256_cvtps_pd(_mm256_castps256_ps128(x)), xh = _mm256_cvtps_pd(_mm256_extractf128_ps(x, 1));
+    if (QD_FM_UNLIKELY(_mm256_movemask_ps(_mm256_cmp_ps(_mm256_and_ps(x, inv_sign_mask), limit, _CMP_GT_OQ))))
+        _fm256_reduce_very_large_pd(&xl, &xh);
+    __m256 r;
+    __m256i q;
+    _fm256_quadrant_reduce_pd(xl, xh, &r, &q);
+    _fm256_sincos_poly_ps<true>(r, q, s, c);
+}
+
+// Double-input variant: takes two __m256d (8 doubles as low/high halves),
+// does Cody–Waite range reduction to [-pi/4, pi/4] in double precision,
+// converts to float, then evaluates the same Cephes polynomial + reconstruction.
+// This avoids the cascaded reduction problem where the float kernel would
+// re-reduce an already-reduced input, losing precision near octant boundaries.
+// Lanes whose octant index does not fit into an int32 (|x| > 1.68e9, inf, NaN) are computed by the large-argument
+// variant and blended in; the other lanes are not changed by this, so the result of a lane does not depend on the
+// other lanes. Max. error 1.3e-7 for |x| <= 1e10; |s|, |c| <= 1 for all finite x; inf and NaN give NaN.
+QD_FM_INLINE void _fm256_sincos256_pd(__m256d xl, __m256d xh, __m256 *s, __m256 *c)
+{
+    __m128 rl, rh, sl, sh;
+    __m128i jl, jh;
+    _fm256_octant_reduce_pd(xl, &rl, &jl, &sl);
+    _fm256_octant_reduce_pd(xh, &rh, &jh, &sh);
     __m256i j = _mm256_set_m128i(jh, jl);
-    __m256 sign_bit_sin = _mm256_set_m128(_mm256_cvtpd_ps(sign_dh),
-                                          _mm256_cvtpd_ps(sign_dl));
 
-    // --- From here: identical to _fm256_sincos256_ps after its range reduction ---
-    const __m256i pi32_0 = _mm256_set1_epi32(0);
-    const __m256i pi32_2 = _mm256_set1_epi32(2);
-    const __m256i pi32_4 = _mm256_set1_epi32(4);
-    const __m256 one = _mm256_set1_ps(1.0f);
-    const __m256 n_half = _mm256_set1_ps(-0.5f);
+    __m256 sin_r, cos_r;
+    _fm256_sincos_poly_ps(_mm256_set_m128(rh, rl), j, &sin_r, &cos_r);
+    *s = _mm256_xor_ps(sin_r, _mm256_set_m128(sh, sl));
+    *c = cos_r;
 
-    const __m256 Sp0 = _mm256_set1_ps(-1.9515295891E-4f);
-    const __m256 Sp1 = _mm256_set1_ps(8.3321608736E-3f);
-    const __m256 Sp2 = _mm256_set1_ps(-1.6666654611E-1f);
-    const __m256 Cp0 = _mm256_set1_ps(2.443315711809948E-005f);
-    const __m256 Cp1 = _mm256_set1_ps(-1.388731625493765E-003f);
-    const __m256 Cp2 = _mm256_set1_ps(4.166664568298827E-002f);
+    if (QD_FM_UNLIKELY(_mm256_movemask_ps(_mm256_castsi256_ps(j)))) // Some lane overflowed: large, inf or NaN
+    {
+        __m256 sb, cb;
+        _fm256_sincos256_big_pd(xl, xh, &sb, &cb);
+        *s = _mm256_blendv_ps(*s, sb, _mm256_castsi256_ps(j));
+        *c = _mm256_blendv_ps(*c, cb, _mm256_castsi256_ps(j));
+    }
+}
 
-    // Swap/sign/poly flags from j
-    __m256 swap_sin = _mm256_castsi256_ps(_mm256_slli_epi32(_mm256_and_si256(j, pi32_4), 29));
-    __m256 sign_bit_cos = _mm256_castsi256_ps(
-        _mm256_slli_epi32(_mm256_andnot_si256(_mm256_sub_epi32(j, pi32_2), pi32_4), 29));
-    __m256 poly = _mm256_castsi256_ps(_mm256_cmpeq_epi32(_mm256_and_si256(j, pi32_2), pi32_0));
+// Single-precision input, small arguments only: Cody–Waite range reduction in float, exact enough for |x| <= 2^22
+// (max. error 1.3e-7); larger arguments give wrong results (see _fm256_sincos256_ps). For callers whose arguments
+// are known to be small, and for loops that send vectors with large lanes to _fm256_sincos256_ps
+// (_fm256_any_large_ps). blend_select: see _fm256_sincos_poly_ps.
+template <bool blend_select = true>
+QD_FM_INLINE void _fm256_sincos256_small_ps(__m256 x, __m256 *s, __m256 *c)
+{
+    // Bit masks
+    const __m256 sign_mask = _mm256_castsi256_ps(_mm256_set1_epi32(0x80000000u));
+    const __m256 inv_sign_mask = _mm256_castsi256_ps(_mm256_set1_epi32(0x7fffffff));
+    const __m256i pi32_1 = _mm256_set1_epi32(1);
+    const __m256i pi32_inv1 = _mm256_set1_epi32(~1);
 
-    // Common powers
-    __m256 z = _mm256_mul_ps(x8, x8);
-    __m256 z2 = _mm256_mul_ps(z, z);
+    // Constants
+    const __m256 FOPI = _mm256_set1_ps(1.27323954473516f); // 4/pi
 
-    // Estrin: SIN   sin(x) ~ x * (1 + Sp2*z + Sp1*z^2 + Sp0*z^3)
-    __m256 t0s = _mm256_fmadd_ps(Sp2, z, one);
-    __m256 t1s = _mm256_fmadd_ps(Sp0, z, Sp1);
-    __m256 Qs = _mm256_fmadd_ps(z2, t1s, t0s);
-    __m256 ys = _mm256_mul_ps(Qs, x8);
+    // Cody–Waite split constants
+    const __m256 DP1 = _mm256_set1_ps(-0.78515625f);
+    const __m256 DP2 = _mm256_set1_ps(-2.4187564849853515625e-4f);
+    const __m256 DP3 = _mm256_set1_ps(-3.77489497744594108e-8f);
 
-    // Estrin: COS   cos(x) ~ 1 - 0.5*z + z^2*(Cp2 + Cp1*z + Cp0*z^2)
-    __m256 te = _mm256_fmadd_ps(Cp0, z2, Cp2);
-    __m256 ev = _mm256_fmadd_ps(z2, te, one);
-    __m256 to = _mm256_fmadd_ps(Cp1, z2, n_half);
-    __m256 yc = _mm256_fmadd_ps(z, to, ev);
+    // sign for sine; |x|
+    __m256 sign_bit_sin = _mm256_and_ps(x, sign_mask);
+    x = _mm256_and_ps(x, inv_sign_mask);
 
-    // Select between sin/cos polys
-    __m256 sin_approx = _mm256_or_ps(_mm256_and_ps(poly, ys), _mm256_andnot_ps(poly, yc));
-    __m256 cos_approx = _mm256_or_ps(_mm256_and_ps(poly, yc), _mm256_andnot_ps(poly, ys));
+    // Scale by 4/pi and get j = (int)y;  j = (j+1) & (~1)
+    __m256 y = _mm256_mul_ps(x, FOPI);
+    __m256i j = _mm256_cvttps_epi32(y);
+    j = _mm256_add_epi32(j, pi32_1);
+    j = _mm256_and_si256(j, pi32_inv1);
+    y = _mm256_cvtepi32_ps(j);
 
-    // Apply signs
-    sign_bit_sin = _mm256_xor_ps(sign_bit_sin, swap_sin);
-    *s = _mm256_xor_ps(sin_approx, sign_bit_sin);
-    *c = _mm256_xor_ps(cos_approx, sign_bit_cos);
+    // Range reduction: x = ((x - y*DP1) - y*DP2) - y*DP3 (as fused adds)
+    x = _mm256_fmadd_ps(y, DP1, x);
+    x = _mm256_fmadd_ps(y, DP2, x);
+    x = _mm256_fmadd_ps(y, DP3, x);
+
+    __m256 sin_r, cos_r;
+    _fm256_sincos_poly_ps<false, blend_select>(x, j, &sin_r, &cos_r);
+    *s = _mm256_xor_ps(sin_r, sign_bit_sin);
+    *c = cos_r;
+}
+
+// Mask of the lanes that are too large for _fm256_sincos256_small_ps (|x| > 2^22, inf; not NaN)
+QD_FM_INLINE __m256 _fm256_large_lanes_ps(__m256 x)
+{
+    const __m256 inv_sign_mask = _mm256_castsi256_ps(_mm256_set1_epi32(0x7fffffff));
+    return _mm256_cmp_ps(_mm256_and_ps(x, inv_sign_mask), _mm256_set1_ps(4194304.0f), _CMP_GT_OQ);
+}
+
+// True if any lane of x is too large for _fm256_sincos256_small_ps
+QD_FM_INLINE bool _fm256_any_large_ps(__m256 x)
+{
+    return _mm256_movemask_ps(_fm256_large_lanes_ps(x)) != 0;
+}
+
+// Single-precision input, any argument: lanes with |x| <= 2^22 as _fm256_sincos256_small_ps; lanes with |x| > 2^22
+// (and inf) are computed by the large-argument variant (quadrant reduction in double precision) from the same float
+// value and blended in (if all lanes are large, only by that), so the result of a lane does not depend on the other
+// lanes. Max. error 1.3e-7 for |x| <= 1e10; |s|, |c| <= 1 for all finite x; inf and NaN give NaN.
+// blend_select: see _fm256_sincos_poly_ps.
+template <bool blend_select = true>
+QD_FM_INLINE void _fm256_sincos256_ps(__m256 x, __m256 *s, __m256 *c)
+{
+    const __m256 big = _fm256_large_lanes_ps(x);
+    const int big_lanes = _mm256_movemask_ps(big);
+    if (QD_FM_UNLIKELY(big_lanes == 0xFF)) // All lanes large
+    {
+        _fm256_sincos256_big_ps(x, s, c);
+        return;
+    }
+    _fm256_sincos256_small_ps<blend_select>(x, s, c);
+    if (QD_FM_UNLIKELY(big_lanes)) // Some lanes large: blend in the large-argument results
+    {
+        __m256 sb, cb;
+        _fm256_sincos256_big_ps(x, &sb, &cb);
+        *s = _mm256_blendv_ps(*s, sb, big);
+        *c = _mm256_blendv_ps(*c, cb, big);
+    }
+}
+
+// sin and cos of 2*pi*r for r in [-0.5, 0.5] (one period, already reduced in double precision by the caller; used by
+// the baseband DFT kernel). Quadrant q = nearest integer of 4*r (exact in float), t = (4*r - q) * pi/2 in
+// [-pi/4, pi/4], then the shared polynomial part.
+QD_FM_INLINE void _fm256_sincos_2pi_reduced_ps(__m256 r, __m256 *s, __m256 *c)
+{
+    const __m256 four = _mm256_set1_ps(4.0f);
+    const __m256 pi_2 = _mm256_set1_ps(1.57079632679489662f);
+    __m256 u = _mm256_mul_ps(r, four);                                            // In [-2, 2], exact
+    __m256 n = _mm256_round_ps(u, _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC); // Quadrant -2 ... 2
+    _fm256_sincos_poly_ps<true>(_mm256_mul_ps(_mm256_sub_ps(u, n), pi_2), _mm256_cvtps_epi32(n), s, c);
 }
 
 // AVX2 accelerated arc-sine (single precision, full [-1, 1] domain)
@@ -360,10 +499,11 @@ static inline __m256 _fm256_acos256_ps(__m256 x)
 //
 // Max error: < 2 ULP  (polynomial kernel < 0.3 ULP; reconstruction adds ~1 ULP)
 //
-// Special cases (IEEE-compliant except as noted):
+// Special cases (IEEE-compliant, as std::atan2):
 //   atan2(±y, 0)   → ±pi/2        atan2(0, +x)    → 0
 //   atan2(±0, -x)  → ±pi          atan2(±0, +0)   → ±0
-// Note: atan2(±0, -0) returns ±0 (not ±pi); irrelevant for well-conditioned inputs.
+//   atan2(±0, -0)  → ±pi          atan2(±inf, ±inf) → ±pi/4, ±3pi/4
+//   NaN in x or y  → NaN
 static inline __m256 _fm256_atan2256_ps(__m256 y, __m256 x)
 {
     // Bit masks
@@ -393,6 +533,11 @@ static inline __m256 _fm256_atan2256_ps(__m256 y, __m256 x)
     // Octant reduction: work with min/max of |x|, |y|
     __m256 mn = _mm256_min_ps(ax, ay);
     __m256 mx = _mm256_max_ps(ax, ay);
+
+    // Both infinite (mn = inf): use |x| = |y| = 1, i.e. the diagonal of the quadrant
+    __m256 both_inf = _mm256_cmp_ps(mn, _mm256_castsi256_ps(_mm256_set1_epi32(0x7f800000)), _CMP_EQ_OQ);
+    mn = _mm256_blendv_ps(mn, one, both_inf);
+    mx = _mm256_blendv_ps(mx, one, both_inf);
 
     // Cephes two-region reduction (decided BEFORE dividing):
     //   big = (mn > tan(pi/8) * mx)   i.e. ratio = mn/mx > 0.4142
@@ -431,14 +576,14 @@ static inline __m256 _fm256_atan2256_ps(__m256 y, __m256 x)
     __m256 swap = _mm256_cmp_ps(ay, ax, _CMP_GT_OQ);
     r = _mm256_blendv_ps(r, _mm256_sub_ps(pio2, r), swap);
 
-    // Quadrant fixup: if x < 0  →  r = pi - r
-    __m256 x_neg = _mm256_cmp_ps(x, zero, _CMP_LT_OQ);
-    r = _mm256_blendv_ps(r, _mm256_sub_ps(pi, r), x_neg);
+    // Quadrant fixup: if x is negative (sign bit set, also for x = -0)  →  r = pi - r
+    r = _mm256_blendv_ps(r, _mm256_sub_ps(pi, r), x);
 
     // Apply sign of y (r is non-negative here, so OR with sign bit suffices)
     r = _mm256_or_ps(r, _mm256_and_ps(y, sign_mask));
 
-    return r;
+    // NaN in x or y: min / max above drop a NaN, so set the result to NaN explicitly
+    return _mm256_or_ps(r, _mm256_cmp_ps(x, y, _CMP_UNORD_Q));
 }
 
 // Convert geographic (azimuth, elevation) to Cartesian (x, y, z)
@@ -487,6 +632,36 @@ static inline void _fm256_cart2geo_ps(__m256 x, __m256 y, __m256 z,
     *el  = _fm256_asin256_ps(_fm256_clamp_pm1_ps(zn));
 }
 
+// Half of _fm256_cart2geo_pd (4 doubles): length, x / length and y / length (x and y unscaled if the length is 0, inf
+// or NaN), z / length (0 if the length is not positive)
+QD_FM_INLINE void _fm256_cart2geo_half_pd(__m256d x, __m256d y, __m256d z, __m128 *xs, __m128 *ys, __m128 *zn,
+                                          __m256d *len)
+{
+    const __m256d one = _mm256_set1_pd(1.0);
+    const __m256d inf = _mm256_castsi256_pd(_mm256_set1_epi64x(0x7FF0000000000000LL));
+    *len = _mm256_sqrt_pd(_mm256_fmadd_pd(z, z, _mm256_fmadd_pd(y, y, _mm256_mul_pd(x, x))));
+    const __m256d inv = _mm256_div_pd(one, *len);
+    const __m256d pos = _mm256_cmp_pd(*len, _mm256_setzero_pd(), _CMP_GT_OQ);
+    const __m256d scale = _mm256_blendv_pd(one, inv, _mm256_and_pd(pos, _mm256_cmp_pd(*len, inf, _CMP_LT_OQ)));
+    *xs = _mm256_cvtpd_ps(_mm256_mul_pd(x, scale));
+    *ys = _mm256_cvtpd_ps(_mm256_mul_pd(y, scale));
+    *zn = _mm256_cvtpd_ps(_mm256_and_pd(pos, _mm256_mul_pd(z, inv)));
+}
+
+// Double-precision input (8 values as low / high halves): the length and z / length are computed in double precision,
+// so that vectors whose squared components underflow or overflow in float keep their direction; x and y are scaled
+// by 1 / length before they are narrowed to float for atan2. Returns az and el in float, the length in double.
+// Special values as in the generic kernel: length 0 gives el = 0; NaN gives NaN in az and len and el = 0.
+QD_FM_INLINE void _fm256_cart2geo_pd(__m256d xl, __m256d xh, __m256d yl, __m256d yh, __m256d zl, __m256d zh,
+                                     __m256 *az, __m256 *el, __m256d *len_l, __m256d *len_h)
+{
+    __m128 xs_l, xs_h, ys_l, ys_h, zn_l, zn_h;
+    _fm256_cart2geo_half_pd(xl, yl, zl, &xs_l, &ys_l, &zn_l, len_l);
+    _fm256_cart2geo_half_pd(xh, yh, zh, &xs_h, &ys_h, &zn_h, len_h);
+    *az = _fm256_atan2256_ps(_mm256_set_m128(ys_h, ys_l), _mm256_set_m128(xs_h, xs_l));
+    *el = _fm256_asin256_ps(_fm256_clamp_pm1_ps(_mm256_set_m128(zn_h, zn_l)));
+}
+
 // Convert complex RE/IM to polar form (magnitude and phase angle)
 // abs = sqrt(re² + im²),  arg = atan2(im, re)
 static inline void _fm256_absarg_ps(__m256 re, __m256 im, __m256 * abs, __m256 * arg)
@@ -513,20 +688,26 @@ static inline void _fm256_polar_ps(__m256 abs, __m256 arg, __m256 * re, __m256 *
 //   - Weighted direction sum promoted to double precision to prevent catastrophic
 //     cancellation when the interpolated direction crosses a component zero
 //     (reduces worst-case ULP from millions to ~10–15)
+//   - Nearly parallel directions (cos(Phase) > 0.99998, Phase < 0.0063) use the normalised linear interpolation of
+//     the directions times the interpolated amplitude; its phase differs from SLERP by less than 4e-9 rad
+//   - Optionally (zero_if_both_tiny = false) the linear result instead of zero when both amplitudes are tiny
 //
 // Otherwise identical:
 //   - Spherical interpolation of normalised direction
 //   - Linear interpolation of amplitude
 //   - Smooth transition to linear fallback for near-antipodal directions
-//   - Zero output when both input amplitudes are negligible
+//   - Zero output when both input amplitudes are negligible (zero_if_both_tiny = true, as slerp_complex_mf)
+// The result of a lane depends only on the inputs of that lane.
 //
 // Parameters (all __m256, i.e. 8 lanes of float):
 //   Ar, Ai  – real/imag parts of source A
 //   Br, Bi  – real/imag parts of source B
 //   w       – interpolation weight per lane  (0 → A, 1 → B)
 //   Xr, Xi  – output real/imag parts (written via restrict pointer)
+//   zero_if_both_tiny – true: zero where both amplitudes are below 1.19e-7; false: linear interpolation there (as the
+//                       generic antenna interpolation)
 static inline void _fm256_slerp_complex_ps(__m256 Ar, __m256 Ai, __m256 Br, __m256 Bi, __m256 w,
-                                           __m256 * Xr, __m256 * Xi)
+                                           __m256 * Xr, __m256 * Xi, const bool zero_if_both_tiny = true)
 {
     // ---- Constants ----
     const __m256 one = _mm256_set1_ps(1.0f);
@@ -590,15 +771,29 @@ static inline void _fm256_slerp_complex_ps(__m256 Ar, __m256 Ai, __m256 Br, __m2
     __m256 fXr = _mm256_fmadd_ps(wA, Ar, _mm256_mul_ps(wB, Br));
     __m256 fXi = _mm256_fmadd_ps(wA, Ai, _mm256_mul_ps(wB, Bi));
 
-    // ---- Fast path: nearly-identical directions → SLERP ≈ linear interpolation ----
-    // When cos(Φ) > 0.99995 (Φ < ~0.01 rad), sin(wΦ)/sin(Φ) → w with relative
-    // error < 1e-8. The linear fallback fXr/fXi already gives the correct result.
-    // Tiny-amplitude lanes have cPhase forced to -1, so they never enter here.
-    if (_mm256_movemask_ps(_mm256_cmp_ps(cPhase, _mm256_set1_ps(0.99998f), _CMP_GT_OQ)) == 0xFF)
+    // Linear interpolation of amplitude
+    __m256 ampX = _mm256_fmadd_ps(wA, ampA, _mm256_mul_ps(wB, ampB));
+
+    // ---- Nearly parallel directions: normalised linear interpolation of the directions ----
+    // For cos(Φ) > 0.99998 (Φ < 0.0063 rad) the direction of wA * gA + wB * gB differs from the SLERP direction by
+    // less than Φ³/64 (< 4e-9 rad). Its length is sqrt(1 - 2 wA wB (1 - cos(Φ))), short by up to Φ²/8 (5e-6);
+    // 1 + wA wB (1 - cos(Φ)) corrects that to 4e-11. (Linear interpolation of the complex values themselves would
+    // weight the directions by the amplitudes.) Tiny-amplitude lanes have cPhase forced to -1, so they never enter
+    // here. The fast path (all lanes nearly parallel) and the blend at the end give the same lane results.
+    __m256 near = _mm256_cmp_ps(cPhase, _mm256_set1_ps(0.99998f), _CMP_GT_OQ);
+    const int near_lanes = _mm256_movemask_ps(near);
+    __m256 nXr = _mm256_setzero_ps(), nXi = _mm256_setzero_ps();
+    if (near_lanes)
     {
-        *Xr = _mm256_andnot_ps(both_tiny, fXr);
-        *Xi = _mm256_andnot_ps(both_tiny, fXi);
-        return;
+        __m256 nscale = _mm256_mul_ps(ampX, _mm256_fmadd_ps(_mm256_mul_ps(wA, wB), _mm256_sub_ps(one, cPhase), one));
+        nXr = _mm256_mul_ps(_mm256_fmadd_ps(wA, gAr, _mm256_mul_ps(wB, gBr)), nscale);
+        nXi = _mm256_mul_ps(_mm256_fmadd_ps(wA, gAi, _mm256_mul_ps(wB, gBi)), nscale);
+        if (near_lanes == 0xFF)
+        {
+            *Xr = nXr;
+            *Xi = nXi;
+            return;
+        }
     }
 
     // ---- Spherical path (computed for all lanes, selected by mask later) ----
@@ -629,7 +824,7 @@ static inline void _fm256_slerp_complex_ps(__m256 Ar, __m256 Ai, __m256 Br, __m2
     //   sin(wA*Phase) = sin(Phase)*cos(wB*Phase) - cos(Phase)*sin(wB*Phase)
     // This eliminates one full sincos call (~28 cycles).
     __m256 sinWB, cosWB;
-    _fm256_sincos256_ps(_mm256_mul_ps(wB, Phase), &sinWB, &cosWB);
+    _fm256_sincos256_small_ps<false>(_mm256_mul_ps(wB, Phase), &sinWB, &cosWB); // wB * Phase in [0, pi]
     __m256 sinWA = _mm256_fmsub_ps(sinPhase, cosWB, _mm256_mul_ps(cPhase_clamped, sinWB));
 
     __m256 wp = _mm256_mul_ps(sinWB, sPhase);
@@ -638,9 +833,6 @@ static inline void _fm256_slerp_complex_ps(__m256 Ar, __m256 Ai, __m256 Br, __m2
     // Spherical interpolation of normalised direction
     __m256 gXr = _mm256_fmadd_ps(wn, gAr, _mm256_mul_ps(wp, gBr));
     __m256 gXi = _mm256_fmadd_ps(wn, gAi, _mm256_mul_ps(wp, gBi));
-
-    // Linear interpolation of amplitude
-    __m256 ampX = _mm256_fmadd_ps(wA, ampA, _mm256_mul_ps(wB, ampB));
 
     // Pure spherical result = direction * amplitude
     __m256 sXr = _mm256_mul_ps(gXr, ampX);
@@ -659,7 +851,8 @@ static inline void _fm256_slerp_complex_ps(__m256 Ar, __m256 Ai, __m256 Br, __m2
     //   cPhase >= tS              →  pure spherical    (do_slerp & !linear_int)
     //   tL < cPhase < tS          →  transition blend  (do_slerp &  linear_int)
     //   cPhase <= tL              →  pure linear       (!do_slerp, linear_int is always true here)
-    //   both amplitudes tiny      →  zero              (overrides everything)
+    //   cPhase > 0.99998          →  normalised linear (inside the pure spherical region)
+    //   both amplitudes tiny      →  zero              (overrides everything, if zero_if_both_tiny)
     __m256 transition = _mm256_and_ps(do_slerp, linear_int);
     __m256 pure_slerp = _mm256_andnot_ps(linear_int, do_slerp);
 
@@ -675,9 +868,19 @@ static inline void _fm256_slerp_complex_ps(__m256 Ar, __m256 Ai, __m256 Br, __m2
     resXr = _mm256_blendv_ps(resXr, sXr, pure_slerp);
     resXi = _mm256_blendv_ps(resXi, sXi, pure_slerp);
 
+    // Overwrite nearly parallel lanes
+    if (near_lanes)
+    {
+        resXr = _mm256_blendv_ps(resXr, nXr, near);
+        resXi = _mm256_blendv_ps(resXi, nXi, near);
+    }
+
     // Zero out lanes where both amplitudes are negligible
-    resXr = _mm256_andnot_ps(both_tiny, resXr);
-    resXi = _mm256_andnot_ps(both_tiny, resXi);
+    if (zero_if_both_tiny)
+    {
+        resXr = _mm256_andnot_ps(both_tiny, resXr);
+        resXi = _mm256_andnot_ps(both_tiny, resXi);
+    }
 
     *Xr = resXr;
     *Xi = resXi;

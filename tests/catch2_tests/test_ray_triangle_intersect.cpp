@@ -4,6 +4,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include "quadriga_tools.hpp"
+#include "quadriga_lib.hpp"
 #include <iostream>
 
 TEST_CASE("Ray-Triangle Intersect - Simple Mode")
@@ -102,4 +103,32 @@ TEST_CASE("Ray-Triangle Intersect - Sub-mesh Mode")
 
     CHECK(fbs_1 == fbs_0);
     CHECK(sbs_1 == sbs_0);
+}
+
+TEST_CASE("Ray-Triangle Intersect - Invalid use_kernel")
+{
+    arma::mat orig = {{0.0, 0.0, 1.0}}, dest = {{0.0, 0.0, -1.0}};
+    arma::mat mesh = {{-1.0, -1.0, 0.0, 1.0, -1.0, 0.0, 0.0, 1.0, 0.0}};
+    arma::u32_vec fbs_ind;
+
+    for (int k : {7, -1, 4})
+    {
+        INFO("use_kernel = " << k);
+        CHECK_THROWS_AS(quadriga_lib::ray_triangle_intersect<double>(&orig, &dest, &mesh, nullptr, nullptr, nullptr, &fbs_ind,
+                                                                     nullptr, nullptr, nullptr, k),
+                        std::invalid_argument);
+    }
+
+    // 2 = AVX2 throws when AVX2 is not available
+    if (!quadriga_lib::quadriga_lib_has_AVX2())
+        CHECK_THROWS_AS(quadriga_lib::ray_triangle_intersect<double>(&orig, &dest, &mesh, nullptr, nullptr, nullptr, &fbs_ind,
+                                                                     nullptr, nullptr, nullptr, 2),
+                        std::invalid_argument);
+
+    for (int k : {0, 1})
+    {
+        quadriga_lib::ray_triangle_intersect<double>(&orig, &dest, &mesh, nullptr, nullptr, nullptr, &fbs_ind,
+                                                     nullptr, nullptr, nullptr, k);
+        CHECK(fbs_ind.at(0) == 1);
+    }
 }
