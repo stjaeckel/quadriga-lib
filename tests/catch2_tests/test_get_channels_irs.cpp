@@ -589,3 +589,38 @@ TEST_CASE("Get Channels IRS - Delay is the sum of both segment path lengths (B-0
         CHECK(std::abs(ci(0) / a + std::sin(k * L)) < 1e-6);
     }
 }
+
+TEST_CASE("Channel - Add Paths with 0 paths in the first field")
+{
+    // B-059: the first given field sets the number of added paths, also when it is 0; every other field must match
+    quadriga_lib::channel<double> c;
+    c.tx_pos = arma::mat(3, 1, arma::fill::zeros);
+    c.rx_pos = arma::mat(3, 1, arma::fill::ones);
+    c.coeff_re.push_back(arma::cube(2, 2, 1, arma::fill::ones));
+    c.coeff_im.push_back(arma::cube(2, 2, 1, arma::fill::zeros));
+    c.delay.push_back(arma::cube(1, 1, 1, arma::fill::zeros));
+    c.path_gain.push_back(arma::vec(1, arma::fill::ones));
+    c.path_length.push_back(arma::vec(1, arma::fill::ones));
+
+    arma::cube re0(2, 2, 0), im0(2, 2, 0), dl0(1, 1, 0);
+    arma::vec v0, v5(5, arma::fill::ones);
+
+    // 0 coefficient paths and 5 path gains
+    CHECK_THROWS_AS(c.add_paths(0, &re0, &im0, &dl0, nullptr, nullptr, &v5, &v0), std::invalid_argument);
+    // 0 path gains and 5 path lengths (no coefficients involved)
+    quadriga_lib::channel<double> d = c;
+    d.coeff_re.clear(), d.coeff_im.clear(), d.delay.clear();
+    CHECK_THROWS_AS(d.add_paths(0, nullptr, nullptr, nullptr, nullptr, nullptr, &v0, &v5), std::invalid_argument);
+    // The objects are unchanged and valid
+    CHECK(c.is_valid().empty());
+    CHECK(d.is_valid().empty());
+    CHECK(c.path_gain[0].n_elem == 1);
+    CHECK(d.path_length[0].n_elem == 1);
+
+    // 0 paths in every field is accepted
+    c.add_paths(0, &re0, &im0, &dl0, nullptr, nullptr, &v0, &v0);
+    d.add_paths(0, nullptr, nullptr, nullptr, nullptr, nullptr, &v0, &v0);
+    CHECK(c.is_valid().empty());
+    CHECK(d.is_valid().empty());
+    CHECK(c.n_path()(0) == 1);
+}

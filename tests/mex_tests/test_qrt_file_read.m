@@ -286,4 +286,41 @@ out = cell(1, 18);
 [out{:}] = quadriga_lib.qrt_file_read(fn5, 1);
 assertTrue(isa(out{18}{1}, 'uint8'));
 
+% ---------- qrt_file_read: normalize_M other than 0 or 1 ----------
+try
+    c = quadriga_lib.qrt_file_read(fn5, 1, 1, true, 5);
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    expectedErrorMessage = '''normalize_M'' must be 0 or 1';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "', ME.message, '"']);
+    end
+end
+
+% ---------- truncated file: parse and read throw ----------
+fid = fopen(fn5, 'r'); bytes = fread(fid, inf, 'uint8=>uint8'); fclose(fid);
+fn_trunc = [tempname, '.qrt'];
+fid = fopen(fn_trunc, 'w'); fwrite(fid, bytes(1:numel(bytes)-10), 'uint8'); fclose(fid);
+expectedErrorMessage = 'truncated or corrupt';
+try
+    c = quadriga_lib.qrt_file_read(fn_trunc, 2, 1);
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        delete(fn_trunc);
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "', ME.message, '"']);
+    end
+end
+fid = fopen(fn_trunc, 'w'); fwrite(fid, bytes(1:40), 'uint8'); fclose(fid);
+try
+    c = quadriga_lib.qrt_file_parse(fn_trunc);
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        delete(fn_trunc);
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "', ME.message, '"']);
+    end
+end
+delete(fn_trunc);
+
 end
