@@ -20,7 +20,8 @@ Convert elementwise azimuth/elevation angles to Cartesian coordinates
 - Defaults to the GENERIC kernel (`use_kernel=1`) to preserve full double precision, matching
   MATLAB's default numeric type
 - Set `use_kernel=0` for auto-selection or `use_kernel=2` to force AVX2; the AVX2 kernel
-  computes in single precision internally (inputs narrowed to float, results widened back)
+  computes sine and cosine in single precision (angles reduced in double precision first; max. error
+  about 1.3e-7 for angles up to 1e10), results widened back
 
 ## Usage:
 ```
@@ -36,7 +37,7 @@ cart = quadriga_lib.geo2cart( az, el, len, use_kernel, split );
 - **`el`** — Elevation angles in radians; `[n, m]`
 - **`len`** — Euclidean vector length sqrt(x^2 + y^2 + z^2); `[n, m]`; default: 1
 - **`use_kernel`** — Kernel selection: 0 = auto (AVX2 if available, else GENERIC),
-  1 = GENERIC, 2 = AVX2 (throws if AVX2 unavailable); default: 1
+  1 = GENERIC, 2 = AVX2 (throws if AVX2 unavailable); other values throw; default: 1
 - **`split`** — If true, return x/y/z and optional sin/cos as separate `[n, m]` matrices. If false, 
   return a single combined `[3, n, m]` cube; sin/cos outputs unavailable in this mode; default: false
 

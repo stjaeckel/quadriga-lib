@@ -93,3 +93,18 @@ class test_case(unittest.TestCase):
             pass
         
 
+    def test_documented_kwargs(self):
+        """The kwarg names of the documentation are accepted (B-099)."""
+        import tempfile, shutil
+        d = tempfile.mkdtemp()
+        try:
+            cube = quadriga_lib.RTtools.cube()
+            n = cube.shape[0]
+            fn = os.path.join(d, 's.xml')
+            quadriga_lib.RTtools.mitsuba_xml_file_write(fn, vert_list=cube.reshape(-1, 3),
+                                                        face_ind=np.arange(3 * n, dtype=np.uint64).reshape(n, 3),
+                                                        obj_ind=np.zeros(n, np.uint64), mtl_ind=np.ones(n, np.uint64),
+                                                        obj_names=['o'], mtl_names=['concrete'], map_to_itu=True)
+            self.assertIn('itu', open(fn).read())
+        finally:
+            shutil.rmtree(d, ignore_errors=True)

@@ -961,3 +961,78 @@ TEST_CASE("Rotate Pattern - ULA antenna rotation")
     CHECK(std::abs(dir0 - dir0_after) < 0.3);
     CHECK(ant.is_valid().empty());
 }
+
+// ================================================================================================
+// B-009: coupling, centre frequency and name are kept (output mode and in place with a grid update);
+// a single element rotated into an output gets identity coupling
+// ================================================================================================
+
+static quadriga_lib::arrayant<double> rotate_pattern_two_element_one_port()
+{
+    auto a = quadriga_lib::generate_arrayant_custom<double>(90.0, 90.0, 0.0, 10.0);
+    a.copy_element(0, 1); // 2 elements
+    a.element_pos = {{0.0, 0.0}, {-0.1, 0.1}, {0.0, 0.0}};
+    a.coupling_re = arma::mat(arma::colvec{0.6, 0.8}); // -> 1 port
+    a.coupling_im = arma::mat(arma::colvec{0.1, -0.2});
+    a.center_frequency = 3.5e9;
+    a.name = "myant";
+    return a;
+}
+
+TEST_CASE("Rotate Pattern - Output keeps coupling, centre frequency and name (B-009)")
+{
+    auto a = rotate_pattern_two_element_one_port();
+    for (unsigned usage : {0u, 1u, 2u, 3u, 4u})
+    {
+        quadriga_lib::arrayant<double> out;
+        a.rotate_pattern(0.0, 0.0, 45.0, usage, -1, &out);
+        CHECK(out.n_elements() == 2);
+        CHECK(out.n_ports() == 1);
+        CHECK(arma::approx_equal(out.coupling_re, a.coupling_re, "absdiff", 0.0));
+        CHECK(arma::approx_equal(out.coupling_im, a.coupling_im, "absdiff", 0.0));
+        CHECK(out.center_frequency == 3.5e9);
+        CHECK(out.name == "myant");
+        CHECK(out.is_valid(false).empty());
+    }
+
+    // An output that already holds data of the same size must not keep its old coupling
+    quadriga_lib::arrayant<double> out = a.copy();
+    out.coupling_re = arma::mat(arma::colvec{5.0, 6.0});
+    out.name = "old";
+    a.rotate_pattern(0.0, 0.0, 30.0, 3, -1, &out);
+    CHECK(arma::approx_equal(out.coupling_re, a.coupling_re, "absdiff", 0.0));
+    CHECK(out.name == "myant");
+
+    // A single element rotated into an output: one element, identity coupling, frequency and name kept
+    quadriga_lib::arrayant<double> one;
+    a.rotate_pattern(0.0, 0.0, 45.0, 3, 1, &one);
+    CHECK(one.n_elements() == 1);
+    CHECK(one.n_ports() == 1);
+    CHECK(one.coupling_re(0, 0) == 1.0);
+    CHECK(one.coupling_im(0, 0) == 0.0);
+    CHECK(one.center_frequency == 3.5e9);
+    CHECK(one.name == "myant");
+}
+
+TEST_CASE("Rotate Pattern - In place with a grid update keeps the coupling (B-009)")
+{
+    auto a = rotate_pattern_two_element_one_port();
+    a.azimuth_grid(5) += 0.01; // non-uniform grid -> grid update in rotate_pattern
+    auto c = a.copy();
+    c.rotate_pattern(0.0, 0.0, 45.0, 0);
+    CHECK(c.n_azimuth() != a.n_azimuth());
+    CHECK(c.n_elements() == 2);
+    CHECK(c.n_ports() == 1);
+    CHECK(arma::approx_equal(c.coupling_re, a.coupling_re, "absdiff", 0.0));
+    CHECK(arma::approx_equal(c.coupling_im, a.coupling_im, "absdiff", 0.0));
+    CHECK(c.center_frequency == 3.5e9);
+    CHECK(c.name == "myant");
+    CHECK(c.is_valid(false).empty());
+
+    // Same with an output
+    quadriga_lib::arrayant<double> out;
+    a.rotate_pattern(0.0, 0.0, 45.0, 1, -1, &out);
+    CHECK(out.n_ports() == 1);
+    CHECK(arma::approx_equal(out.coupling_re, a.coupling_re, "absdiff", 0.0));
+    CHECK(out.name == "myant");
+}

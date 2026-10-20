@@ -14,6 +14,7 @@ Calculates the directivity in dBi of array antenna elements
 
 - Directivity = 10 log10(peak radiation intensity / mean over 4π); isotropic radiator = 0 dBi
 - Calculated per element, not per port; ignores element coupling
+- Independent of the scale of the pattern; an element whose pattern is zero everywhere gives 0 dBi
 
 ## Usage:
 ```
@@ -93,9 +94,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Read i_element (1-based index)
     arma::uvec element_ind;
     if (struct_mode)
-        element_ind = (nrhs < 2) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[1], "i_element");
+        element_ind = (nrhs < 2) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[1], true, "i_element");
     else
-        element_ind = (nrhs < 7) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[6], "i_element");
+        element_ind = (nrhs < 7) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[6], true, "i_element");
 
     if (element_ind.empty()) // Set defaults
         element_ind = arma::regspace<arma::uvec>(0, n_elements - 1);

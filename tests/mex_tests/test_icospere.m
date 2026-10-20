@@ -47,4 +47,29 @@ catch ME
     end
 end
 
+%% Integer inputs must be integers in the range of the C++ type
+assert_cpp_error( @() quadriga_lib.icosphere( -1 ), 'Input ''n_div'' must be an integer from 0 to 18446744073709551615.' );
+assert_cpp_error( @() quadriga_lib.icosphere( NaN ), 'Input ''n_div'' must be an integer from 0 to' );
+assert_cpp_error( @() quadriga_lib.icosphere( 2.5 ), 'Input ''n_div'' must be an integer from 0 to' );
+assert_cpp_error( @() quadriga_lib.icosphere( Inf ), 'Input ''n_div'' must be an integer from 0 to' );
+assert_cpp_error( @() quadriga_lib.icosphere( 1e30 ), 'Input ''n_div'' must be an integer from 0 to' );
+assert_cpp_error( @() quadriga_lib.icosphere( int32(-1) ), 'Input ''n_div'' must be an integer from 0 to' );
+assert_cpp_error( @() quadriga_lib.icosphere( sparse(2) ), 'Input ''n_div'' is sparse' );
+center = quadriga_lib.icosphere( 2.0 );                                    % integer-valued double is fine
+assertEqual( size(center), [80,3] );
+center = quadriga_lib.icosphere( uint64(2) );
+assertEqual( size(center), [80,3] );
+end
+
+% Assert that fn() raises quadriga_lib:CPPerror with a message that contains expected (substring).
+function assert_cpp_error(fn, expected)
+try
+    fn();
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if ~strcmp(ME.identifier, 'quadriga_lib:CPPerror') || isempty(strfind(ME.message, expected)) %#ok<STREMP>
+        error('moxunit:exceptionNotRaised', ['EXPECTED: quadriga_lib:CPPerror "', expected, '", GOT: ', ...
+            ME.identifier, ' "', ME.message, '"']);
+    end
+end
 end

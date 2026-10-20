@@ -8,6 +8,8 @@
 
 #include <iostream>
 #include <string>
+#include <cmath>
+#include <limits>
 
 TEST_CASE("Arrayant interpolation - Minimal test")
 {
@@ -349,4 +351,58 @@ TEST_CASE("Arrayant interpolation - Example")
 
     arma::mat V_re, V_im, H_re, H_im;
     ant.interpolate(&azimuth, &elevation, &V_re, &V_im, &H_re, &H_im);
+}
+// B-007: NaN or infinite angles must give NaN output without reading outside the pattern (the bracket search used
+// to wrap an index to SIZE_MAX; the out-of-bounds read is visible only in the ASan suite). Finite angles in the same
+// call are not affected.
+template <typename dtype>
+static void arrayant_interpolate_nonfinite_check()
+{
+    const dtype nan = std::numeric_limits<dtype>::quiet_NaN(), inf = std::numeric_limits<dtype>::infinity();
+    auto ant = quadriga_lib::generate_arrayant_xpol<dtype>(5.0); // 37 x 73 grid, 2 elements
+    ant.element_pos = {{0.1, -0.1}, {0.2, 0.0}, {0.0, 0.3}};
+
+    // Shared angles [1, n_ang]: columns 1..6 are non-finite, columns 0 and 7 are finite
+    arma::Mat<dtype> az = {{0.3, nan, inf, -inf, 0.2, 0.2, 0.2, -2.0}};
+    arma::Mat<dtype> el = {{0.1, 0.0, 0.0, 0.0, nan, inf, -inf, 0.5}};
+    arma::Mat<dtype> Vr, Vi, Hr, Hi, dist, az_loc, el_loc, gam;
+    ant.interpolate(&az, &el, &Vr, &Vi, &Hr, &Hi, {}, nullptr, nullptr, &dist, &az_loc, &el_loc, &gam);
+
+    arma::Mat<dtype> az_f = {{0.3, -2.0}}, el_f = {{0.1, 0.5}};
+    arma::Mat<dtype> Vr_f, Vi_f, Hr_f, Hi_f;
+    ant.interpolate(&az_f, &el_f, &Vr_f, &Vi_f, &Hr_f, &Hi_f);
+
+    for (arma::uword o = 0; o < 2; ++o)
+    {
+        for (arma::uword a = 1; a < 7; ++a)
+        {
+            CHECK(std::isnan(Vr(o, a)));
+            CHECK(std::isnan(Vi(o, a)));
+            CHECK(std::isnan(Hr(o, a)));
+            CHECK(std::isnan(Hi(o, a)));
+            CHECK(std::isnan(dist(o, a)));
+        }
+        CHECK(Vr(o, 0) == Vr_f(o, 0));
+        CHECK(Hr(o, 0) == Hr_f(o, 0));
+        CHECK(Vr(o, 7) == Vr_f(o, 1));
+        CHECK(Hi(o, 7) == Hi_f(o, 1));
+    }
+
+    // Per-element angles [n_out, n_ang]: non-finite angles for some elements only
+    arma::Mat<dtype> az2 = {{nan, 0.3, 0.1, inf}, {0.3, -inf, 0.2, 0.0}};
+    arma::Mat<dtype> el2 = {{0.1, 0.1, nan, 0.0}, {0.1, 0.1, 0.0, -inf}};
+    const int bad[2][4] = {{1, 0, 1, 1}, {0, 1, 0, 1}};
+    ant.interpolate(&az2, &el2, &Vr, &Vi, &Hr, &Hi);
+    for (arma::uword o = 0; o < 2; ++o)
+        for (arma::uword a = 0; a < 4; ++a)
+        {
+            CHECK(std::isnan(Vr(o, a)) == (bad[o][a] == 1));
+            CHECK(std::isnan(Hi(o, a)) == (bad[o][a] == 1));
+        }
+}
+
+TEST_CASE("Arrayant interpolation - NaN and infinite angles give NaN (B-007)")
+{
+    arrayant_interpolate_nonfinite_check<float>();
+    arrayant_interpolate_nonfinite_check<double>();
 }

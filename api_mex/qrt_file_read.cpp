@@ -36,7 +36,8 @@ Read ray-tracing CIR data from a QRT file
     | `normalize_M` | `M`                   | `path_gain`                      |
     | :-----------: | :-------------------: | :------------------------------: |
     | 0             | As stored in QRT file | -PL                              |
-    | 1             | Max column power = 1  | -PL minus material losses        |
+    | 1             | Max column power = 1  | -PL minus material losses        |<br><br>
+    Other values are rejected with an error.
 
 ## Outputs:
 - **`center_freq`** — Center frequency in Hz; `[n_freq]`
@@ -60,7 +61,7 @@ Read ray-tracing CIR data from a QRT file
   Cell of length `n_out`; elements `[n_path]`
 - **`coord`** — Interaction coordinates (flat, concatenated across paths); single;
   Cell of length `n_out`; elements `[3, sum(no_int)]`
-- **`interact_type`** — Interaction type codes (flat, concatenated across paths, matching `coord`); uint32;
+- **`interact_type`** — Interaction type codes (flat, concatenated across paths, matching `coord`); uint8;
   Cell of length `n_out`; elements `[sum(no_int)]`. Empty for v4 legacy files.
 
 ## See also:
@@ -80,7 +81,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Read inputs
     const std::string fn = qd_mex_get_string(prhs[0]);
-    arma::uvec i_cir = (nrhs < 2) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[1]);
+    arma::uvec i_cir = (nrhs < 2) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[1], true, "i_cir");
     arma::uword i_orig = (nrhs < 3) ? 1 : qd_mex_get_scalar<arma::uword>(prhs[2], "i_orig", 1);
     const bool downlink = (nrhs < 4) ? true : qd_mex_get_scalar<bool>(prhs[3], "downlink", true);
     const int normalize_M = (nrhs < 5) ? 1 : qd_mex_get_scalar<int>(prhs[4], "normalize_M", 1);

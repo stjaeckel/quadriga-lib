@@ -290,3 +290,33 @@ TEST_CASE("fast_slerp - Output is resized correctly")
     CHECK(std::abs(Xr(2) - 0.0f) < 1e-6f);
     CHECK(std::abs(Xi(2) - 3.0f) < 1e-6f);
 }
+TEST_CASE("fast_slerp - Nearly parallel inputs: accuracy and lane independence")
+{
+    // A = 1, B = exp(i * 0.005), w = 0.5: exact result exp(i * 0.0025), |X| = 1
+    auto run = [](double phi_lane7, arma::fvec &Xr, arma::fvec &Xi)
+    {
+        arma::fvec Ar(8, arma::fill::ones), Ai(8, arma::fill::zeros), Br(8), Bi(8), w(8, arma::fill::value(0.5f));
+        for (int i = 0; i < 8; ++i)
+        {
+            double p = (i == 7) ? phi_lane7 : 0.005;
+            Br(i) = (float)std::cos(p), Bi(i) = (float)std::sin(p);
+        }
+        quadriga_lib::fast_slerp(Ar, Ai, Br, Bi, w, Xr, Xi);
+    };
+
+    arma::fvec Xr, Xi, Yr, Yi;
+    run(0.005, Xr, Xi); // all 8 lanes nearly parallel
+    run(1.0, Yr, Yi);   // lane 7 far from lanes 0-6
+
+    for (arma::uword i = 0; i < 7; ++i)
+    {
+        double mag = std::hypot((double)Xr(i), (double)Xi(i));
+        CHECK(std::abs(mag - 1.0) < 5e-7);
+        CHECK(std::abs((double)Xr(i) - std::cos(0.0025)) < 5e-7);
+        CHECK(std::abs((double)Xi(i) - std::sin(0.0025)) < 5e-7);
+        CHECK(Xr(i) == Yr(i)); // independent of lane 7
+        CHECK(Xi(i) == Yi(i));
+    }
+    CHECK(std::abs(std::hypot((double)Yr(7), (double)Yi(7)) - 1.0) < 1e-6);
+    CHECK(std::abs(std::atan2((double)Yi(7), (double)Yr(7)) - 0.5) < 1e-6);
+}

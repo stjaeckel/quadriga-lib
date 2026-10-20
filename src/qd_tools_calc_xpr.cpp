@@ -20,9 +20,15 @@ Calculate the cross-polarization ratio (XPR) for linear and circular polarizatio
 - XPR is computed in both the linear V/H basis and the circular LHCP/RHCP basis via Jones matrix transform
   `M_circ = T · M_lin · T^-1`.
 - LOS paths are identified by comparing path length against direct TX-RX distance `dTR`; paths with
-  `path_length < dTR + window_size` are excluded by default (`include_los = false`).
-- Polarization transfer matrix `M` is stored column-major with interleaved real/imaginary parts,
-  8 rows per path: `[Re(M_vv), Im(M_vv), Re(M_vh), Im(M_vh), Re(M_hv), Im(M_hv), Re(M_hh), Im(M_hh)]`.
+  `path_length <= dTR + window_size` are excluded by default (`include_los = false`).
+- Polarization transfer matrix `M` is the 2x2 Jones matrix (rows = RX polarisation V/H, columns = TX polarisation
+  V/H), stored column-major with interleaved real/imaginary parts, 8 rows per path: rows 0-1 = (V rx, V tx),
+  rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx). Below, `M_<rx><tx>` names an entry by its
+  receive and transmit polarisation: `M_vv` = rows 0-1, `M_hv` = rows 2-3, `M_vh` = rows 4-5, `M_hh` = rows 6-7
+- V-XPR and H-XPR are ratios per receive polarisation: V-XPR is the power received in V from V transmission over
+  the power received in V from H transmission; H-XPR likewise for the H receive polarisation
+- The circular entries are `M_LL = (M_vv + M_hh + j(M_vh - M_hv)) / 2`, `M_RL = (M_vv - M_hh - j(M_vh + M_hv)) / 2`,
+  `M_LR = (M_vv - M_hh + j(M_vh + M_hv)) / 2`, `M_RR = (M_vv + M_hh - j(M_vh - M_hv)) / 2`.
 - Normalization of `M` does not affect XPR (cancels in ratio) but does affect `pg`.
 - If cross-pol power is zero and co-pol is positive, XPR is set to infinity; if both are zero, XPR is set to 0.
 - TX/RX positions may be fixed `[3, 1]` or mobile `[3, n_cir]`.
@@ -48,15 +54,16 @@ void quadriga_lib::calc_cross_polarization_ratio(
 - **`tx_pos`** — Transmitter position [x; y; z]; `[3, 1]` or `[3, n_cir]`
 - **`rx_pos`** — Receiver position [x; y; z]; `[3, 1]` or `[3, n_cir]`
 - **`include_los`** *(optional)* — If true, includes LOS and near-LOS paths in the XPR calculation
-- **`window_size`** *(optional)* — LOS exclusion window; paths within `dTR + window_size` are excluded when `include_los = false`
+- **`window_size`** *(optional)* — LOS exclusion window; paths with `path_length <= dTR + window_size` are excluded
+  when `include_los = false`
 
 ## Outputs:
 - **`xpr`** *(optional)* — XPR on linear scale; `[n_cir, 6]`; columns:<br><br>
    | Col | Description                                                     |
    | --- | --------------------------------------------------------------- |
    | 0   | Aggregate linear XPR (total V+H co-pol / total V+H cross-pol)   |
-   | 1   | V-XPR: sum(abs(M_vv)^2) / sum(abs(M_hv)^2)                      |
-   | 2   | H-XPR: sum(abs(M_hh)^2) / sum(abs(M_vh)^2)                      |
+   | 1   | V-XPR: sum(abs(M_vv)^2) / sum(abs(M_vh)^2) (receive V)          |
+   | 2   | H-XPR: sum(abs(M_hh)^2) / sum(abs(M_hv)^2) (receive H)          |
    | 3   | Aggregate circular XPR (total L+R co-pol / total L+R cross-pol) |
    | 4   | LHCP XPR: sum(abs(M_LL)^2) / sum(abs(M_RL)^2)                   |
    | 5   | RHCP XPR: sum(abs(M_RR)^2) / sum(abs(M_LR)^2)                   |
@@ -157,14 +164,16 @@ void quadriga_lib::calc_cross_polarization_ratio(const std::vector<arma::Col<dty
             arma::uword offset = p * 8;
             dtype a = pM[offset];     // Re(M_vv)
             dtype b = pM[offset + 1]; // Im(M_vv)
-            dtype c = pM[offset + 2]; // Re(M_vh)
-            dtype d = pM[offset + 3]; // Im(M_vh)
-            dtype e = pM[offset + 4]; // Re(M_hv)
-            dtype f = pM[offset + 5]; // Im(M_hv)
+            dtype c = pM[offset + 2]; // Re(M_hv), H rx, V tx
+            dtype d = pM[offset + 3]; // Im(M_hv)
+            dtype e = pM[offset + 4]; // Re(M_vh), V rx, H tx
+            dtype f = pM[offset + 5]; // Im(M_vh)
             dtype g = pM[offset + 6]; // Re(M_hh)
             dtype h = pM[offset + 7]; // Im(M_hh)
 
             dtype abs2_vv = a * a + b * b;
+            // Local names keep the old labels: abs2_vh / P_vh = rows 2-3 (H rx, V tx) = M_hv of the docs,
+            // abs2_hv / P_hv = rows 4-5 (V rx, H tx) = M_vh of the docs
             dtype abs2_vh = c * c + d * d;
             dtype abs2_hv = e * e + f * f;
             dtype abs2_hh = g * g + h * h;
@@ -186,22 +195,22 @@ void quadriga_lib::calc_cross_polarization_ratio(const std::vector<arma::Col<dty
             P_hh += w * abs2_hh;
 
             // --- Circular basis ---
-            // M_LL = (M_vv + M_hh + j*(M_hv - M_vh)) / 2
+            // M_LL = (M_vv + M_hh + j*(M_vh - M_hv)) / 2
             dtype LL_re = a + g + d - f;
             dtype LL_im = b + h + e - c;
             P_LL += w * (LL_re * LL_re + LL_im * LL_im) / (dtype)4;
 
-            // M_RL = (M_vv - M_hh - j*(M_hv + M_vh)) / 2
+            // M_RL = (M_vv - M_hh - j*(M_vh + M_hv)) / 2
             dtype RL_re = a - g + d + f;
             dtype RL_im = b - h - c - e;
             P_RL += w * (RL_re * RL_re + RL_im * RL_im) / (dtype)4;
 
-            // M_LR = (M_vv - M_hh + j*(M_hv + M_vh)) / 2
+            // M_LR = (M_vv - M_hh + j*(M_vh + M_hv)) / 2
             dtype LR_re = a - g - d - f;
             dtype LR_im = b - h + c + e;
             P_LR += w * (LR_re * LR_re + LR_im * LR_im) / (dtype)4;
 
-            // M_RR = (M_vv + M_hh - j*(M_hv - M_vh)) / 2
+            // M_RR = (M_vv + M_hh - j*(M_vh - M_hv)) / 2
             dtype RR_re = a + g - d + f;
             dtype RR_im = b + h + c - e;
             P_RR += w * (RR_re * RR_re + RR_im * RR_im) / (dtype)4;

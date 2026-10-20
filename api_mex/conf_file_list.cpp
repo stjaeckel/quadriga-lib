@@ -65,7 +65,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (mxIsChar(prhs[0]))
         dirs.push_back(qd_mex_get_string(prhs[0]));
     else if (mxIsCell(prhs[0]))
-        dirs = qd_mex_get_strings(prhs[0]);
+        dirs = qd_mex_get_strings(prhs[0], "dirs");
     else
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'dirs' must be a string or a cell array of strings.");
     const bool parse_shortnames = (nrhs < 2) ? true : qd_mex_get_scalar<bool>(prhs[1], "parse_shortnames", true);

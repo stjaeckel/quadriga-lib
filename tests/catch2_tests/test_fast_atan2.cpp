@@ -259,3 +259,30 @@ TEST_CASE("fast_atan2 - Large vector (exercises OpenMP and AVX2 bulk path)")
 
     CHECK(max_ulp <= 3);
 }
+
+TEST_CASE("fast_atan2 - NaN and infinite input, signed zeros")
+{
+    // y and x as float and as double; 9 values (one full block of 8 and a tail of 1)
+    const float inf = INFINITY, nan = NAN;
+    std::vector<float> ys = {1.0f, nan, inf, inf, -inf, 0.0f, -0.0f, -0.0f, nan};
+    std::vector<float> xs = {nan, 1.0f, inf, -inf, inf, -0.0f, -0.0f, -1.0f, nan};
+
+    arma::fvec yf(ys), xf(xs), af;
+    arma::vec yd = arma::conv_to<arma::vec>::from(yf), xd = arma::conv_to<arma::vec>::from(xf);
+    arma::fvec ad;
+    quadriga_lib::fast_atan2(yf, xf, af);
+    quadriga_lib::fast_atan2(yd, xd, ad);
+
+    for (const arma::fvec *a : {&af, &ad})
+    {
+        CHECK(std::isnan((*a)(0)));
+        CHECK(std::isnan((*a)(1)));
+        CHECK(std::isnan((*a)(8)));
+        CHECK(ulp_dist((*a)(2), (float)(M_PI / 4.0)) <= 1);
+        CHECK(ulp_dist((*a)(3), (float)(3.0 * M_PI / 4.0)) <= 1);
+        CHECK(ulp_dist((*a)(4), (float)(-M_PI / 4.0)) <= 1);
+        CHECK(ulp_dist((*a)(5), (float)M_PI) <= 1);   // atan2(+0, -0) = +pi
+        CHECK(ulp_dist((*a)(6), (float)-M_PI) <= 1);  // atan2(-0, -0) = -pi
+        CHECK(ulp_dist((*a)(7), (float)-M_PI) <= 1);  // atan2(-0, -1) = -pi
+    }
+}

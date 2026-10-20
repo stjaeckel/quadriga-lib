@@ -29,7 +29,7 @@ namespace quadriga_lib
         arma::Mat<dtype> coupling_im;                // Coupling matrix, imaginary part; [n_elements, n_ports]
         dtype center_frequency = dtype(299792458.0); // Center frequency
         bool read_only = false;                      // Prevent member functions from writing to the properties
-        dtype *check_ptr[9];                         // Data pointers for quick validation
+        dtype *check_ptr[9] = {};                    // Data pointers for quick validation
         arrayant() {};                               // Default constructor
 
         // Functions to determine the size of the array antenna properties
@@ -54,8 +54,9 @@ namespace quadriga_lib
 
         // Combine element patterns, positions, and coupling weights into effective radiation patterns
         // Returns new arrayant with n_ports elements (= number of columns in coupling_re/im), each holding the combined effective pattern for that port
-        arrayant<dtype> combine_pattern(const arma::Col<dtype> *azimuth_grid_new = nullptr,          // Output azimuth grid in rad, in [-pi, pi], sorted; defaults to input grid
-                                        const arma::Col<dtype> *elevation_grid_new = nullptr) const; // Output elevation grid in rad, in [-pi/2, pi/2], sorted; defaults to input grid
+        arrayant<dtype> combine_pattern(const arma::Col<dtype> *azimuth_grid_new = nullptr,         // Output azimuth grid in rad, in [-pi, pi], sorted; defaults to input grid
+                                        const arma::Col<dtype> *elevation_grid_new = nullptr,       // Output elevation grid in rad, in [-pi/2, pi/2], sorted; defaults to input grid
+                                        dtype propagation_speed = dtype(299792458.0)) const;        // Wave propagation speed in m/s (~343 for acoustics); positive, finite
 
         // Creates a copy of the array antenna object
         arrayant<dtype> copy() const;
@@ -125,7 +126,8 @@ namespace quadriga_lib
     std::vector<arrayant<dtype>> arrayant_combine_pattern_multi(const std::vector<arrayant<dtype>> &arrayant_vec,     // Non-empty vector of valid arrayant objects
                                                                 const arma::Col<dtype> *azimuth_grid_new = nullptr,   // Output azimuth grid in rad, in [-pi, pi], sorted; defaults to input grid
                                                                 const arma::Col<dtype> *elevation_grid_new = nullptr, // Output elevation grid in rad, in [-pi/2, pi/2], sorted; defaults to input grid
-                                                                const arma::Col<dtype> *freq_grid_new = nullptr);     // Output frequency grid in Hz; defaults to input grid
+                                                                const arma::Col<dtype> *freq_grid_new = nullptr,      // Output frequency grid in Hz; defaults to input grid
+                                                                dtype propagation_speed = dtype(299792458.0));        // Wave propagation speed in m/s (~343 for acoustics); positive, finite
     // Concatenate two multi-frequency arrayant vectors into a single multi-element model
     // - Both inputs must have equal entry counts, identical angular grids, and matching center_frequency values at each index.
     // - Per frequency entry: pattern cubes are joined along the element (slice) dimension; element_pos matrices are horizontally concatenated (empty positions treated as zeros).
@@ -291,8 +293,8 @@ namespace quadriga_lib
     // - Beamforming weights are phasors only
     // - Polarization indicator: (1) Vertical polarization only, (2) H/V polarized elements, (3) +/-45 degree polarized elements
     template <typename dtype>
-    arrayant<dtype> generate_arrayant_multibeam(arma::uword M = 2,               // Number of vertical elements
-                                                arma::uword N = 2,               // Number of horizontal elements
+    arrayant<dtype> generate_arrayant_multibeam(arma::uword M = 1,               // Number of vertical elements
+                                                arma::uword N = 1,               // Number of horizontal elements
                                                 arma::Col<dtype> az = {0.0},     // Azimuth beam angles in degree
                                                 arma::Col<dtype> el = {0.0},     // Elevation beam angles in degree
                                                 arma::Col<dtype> weight = {1.0}, // Scaling factor for the beams
@@ -343,8 +345,13 @@ namespace quadriga_lib
     // - For the LOS-Path, FBS and LBS must be on the direct line between Tx and Rx (i.e. FBS-Pos = TX-Pos, LBS-Pos = RX-Pos)
     // - LOS-Path delays and amplitudes are calculated including the individual element positions
     // - If path length is shorter than the shortest possible path (TX > FBS > LBS > RX), shortest possible path is used for delay calculation
-    // - Polarization transfer matrix must be given by 8 interleaved complex values, (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH)
+    // - If path length is longer (more interactions than FBS and LBS), it is used for the delay and phase of the phase centres;
+    //   the extra length is added to the FBS-LBS segment, per-element offsets follow the FBS / LBS geometry
+    // - Polarization transfer matrix: 2x2 Jones matrix (rows = RX pol. V/H, columns = TX pol. V/H), column-major, Re/Im
+    //   interleaved: rows 0-1 = (V rx, V tx), 2-3 = (H rx, V tx), 4-5 = (V rx, H tx), 6-7 = (H rx, H tx)
     // - Polarization transfer matrix must be normalized (i.e., not include the free-space equivalent path gain)
+    // - add_fake_los_path always adds one output path: slot 0 holds the LOS path (zero power if none was found); a LOS path
+    //   found in the input leaves a zero-power path in its original slot
     template <typename dtype>
     void get_channels_spherical(const arrayant<dtype> *tx_array,     // Transmit array antenna with 'n_tx' elements (= ports after element coupling)
                                 const arrayant<dtype> *rx_array,     // Receive array antenna with 'n_rx' elements (= ports after element coupling)
@@ -362,7 +369,7 @@ namespace quadriga_lib
                                 arma::Cube<dtype> *delay,            // Output: Propagation delay in seconds, tensor of size [n_rx, n_tx, n_path]
                                 dtype center_frequency = dtype(0.0), // Center frequency in [Hz]; a value of 0 disables phase calculation in coefficients
                                 bool use_absolute_delays = false,    // Option: If true, the LOS delay is included for all paths
-                                bool add_fake_los_path = false,      // Option: Add a zero-power LOS path in case where no LOS path was present
+                                bool add_fake_los_path = false,      // Option: Add one path, slot 0 = LOS path (zero power if none was present)
                                 arma::Cube<dtype> *aod = nullptr,    // Optional output: Azimuth of Departure angles in [rad], Size [n_rx, n_tx, n_path]
                                 arma::Cube<dtype> *eod = nullptr,    // Optional output: Elevation of Departure angles in [rad], Size [n_rx, n_tx, n_path]
                                 arma::Cube<dtype> *aoa = nullptr,    // Optional output: Azimuth of Arrival angles in [rad], Size [n_rx, n_tx, n_path]
@@ -375,7 +382,10 @@ namespace quadriga_lib
     // - TX/RX antenna patterns are interpolated from multi-frequency arrayant vectors at each output frequency
     // - Path gain and polarization transfer matrix are interpolated from freq_in to freq_out grids
     // - Supports both radio (speed of light) and acoustic (speed of sound) propagation
-    // - Jones matrix M can have 2 rows (scalar pressure: ReVV, ImVV only) or 8 rows (full polarimetric)
+    // - Jones matrix M can have 2 rows (scalar pressure: Re, Im of (V rx, V tx) only) or 8 rows (full polarimetric, row
+    //   order as in get_channels_spherical)
+    // - NLOS path lengths and add_fake_los_path as in get_channels_spherical
+    // - For baseband_freq_response_multi with remove_delay_phase = true, generate the channels with use_absolute_delays = true
     // - Output coefficients and delays are returned as vectors of cubes, one per output frequency
     template <typename dtype>
     void get_channels_multifreq(const std::vector<arrayant<dtype>> &tx_array, // Multi-frequency transmit array
@@ -395,7 +405,7 @@ namespace quadriga_lib
                                 std::vector<arma::Cube<dtype>> &coeff_im,     // Output: imag part of coefficients, length [n_freq_out], each [n_rx, n_tx, n_path]
                                 std::vector<arma::Cube<dtype>> &delay,        // Output: delays [s], length [n_freq_out], each [n_rx, n_tx, n_path]
                                 bool use_absolute_delays = false,             // If true, include LOS delay in all paths
-                                bool add_fake_los_path = false,               // Add zero-power LOS path if none present
+                                bool add_fake_los_path = false,               // Add one path, slot 0 = LOS path (zero power if none was present)
                                 dtype propagation_speed = 299792458.0);       // Wave propagation speed [m/s]
 
     // Calculate channels for Intelligent Reflective Surfaces (IRS)
@@ -448,8 +458,11 @@ namespace quadriga_lib
     // - Calculates the channel response and delays in time domain for each MIMO sub-link (including antenna element coupling)
     // - LOS-Path identification: path-length must equal the TX-RX 3D-distance within 0.1 mm
     // - Angles are ignored for LOS path identification
-    // - Polarization transfer matrix must be given by 8 interleaved complex values, (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH)
+    // - Polarization transfer matrix: 2x2 Jones matrix (rows = RX pol. V/H, columns = TX pol. V/H), column-major, Re/Im
+    //   interleaved: rows 0-1 = (V rx, V tx), 2-3 = (H rx, V tx), 4-5 = (V rx, H tx), 6-7 = (H rx, H tx)
     // - Polarization transfer matrix must be normalized (i.e., not include the path gain)
+    // - add_fake_los_path always adds one output path: slot 0 holds the strongest LOS path (zero power if none was found);
+    //   a LOS path found in the input leaves a zero-power path in its original slot
     // - Option to calculate the Doppler weights from orientation (+1 Moves towards path, -1 moves away from path)
     template <typename dtype>
     void get_channels_planar(const arrayant<dtype> *tx_array,         // Transmit array antenna with 'n_tx' elements (= ports after element coupling)
@@ -470,7 +483,7 @@ namespace quadriga_lib
                              arma::Cube<dtype> *delay,                // Output: Propagation delay in seconds, tensor of size [n_rx, n_tx, n_path(+1)]
                              dtype center_frequency = dtype(0.0),     // Center frequency in [Hz]; a value of 0.0 disables phase calculation in coefficients
                              bool use_absolute_delays = false,        // Option: If true, the LOS delay is included for all paths
-                             bool add_fake_los_path = false,          // Option: Add a zero-power LOS path in case where no LOS path was present
+                             bool add_fake_los_path = false,          // Option: Add one path, slot 0 = LOS path (zero power if none was present)
                              arma::Col<dtype> *rx_Doppler = nullptr); // Optional output: Doppler weights for moving RX, vector of length 'n_path(+1)'
 
 }

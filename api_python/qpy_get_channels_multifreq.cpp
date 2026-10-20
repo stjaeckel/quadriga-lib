@@ -20,9 +20,28 @@ Compute channel coefficients for spherical waves across multiple frequencies
 - `path_gain` is interpolated linearly; `M` is interpolated via SLERP per complex entry pair to preserve phase
 - Coupling matrices are interpolated across frequencies (SLERP for complex pairs); pass 3D coupling `(n_elem, n_ports, n_freq)` for per-frequency coupling
 - Extrapolation clamps to the nearest frequency entry on all four grids
-- `M` accepts 8 rows (full polarimetric: ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH) or 2 rows (scalar pressure: ReVV, ImVV only)
+- `M` accepts 8 rows (full polarimetric: the 2x2 Jones matrix (rows = RX polarisation V/H, columns = TX polarisation
+  V/H), stored column-major with Re/Im interleaved: rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx),
+  rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx)) or 2 rows (scalar pressure: Re, Im of the (V rx, V tx) entry only)
+- NLOS paths: the path length between the TX and RX phase centres is `max(path_length, d_poly)`, where `d_poly` is the
+  TX-FBS-LBS-RX polyline length; the length beyond the polyline (interactions between FBS and LBS) is added to the
+  FBS-LBS segment. Delays and phases follow this length; the per-element offsets follow the FBS / LBS geometry
 - `propagation_speed` supports EM (speed of light, default) and acoustic (343 m/s) simulations
-- `n_path_out = n_path + 1` if `add_fake_los_path` else `n_path`
+- `n_path_out = n_path + 1` if `add_fake_los_path` else `n_path`: with `add_fake_los_path`, slot 0 holds the LOS path
+  (zero power if no LOS path was found; LOS = the path whose length is closest to the TX-RX distance, within 0.1 mm);
+  a LOS path found in the input is moved to slot 0 and leaves a zero-power path in its original slot
+  (input index + 1); all other paths keep their order, shifted by one slot
+- If `use_absolute_delays` is false, the LOS delay between the TX and RX phase centres is subtracted from all paths;
+  per-element delays can then be negative, down to about -(half the TX array size + half the RX array size) /
+  `propagation_speed` (both arrays endfire). [[quantize_delays]] rejects delays at or below `-tap_spacing / 2`. For
+  acoustics (`propagation_speed` about 343 m/s) that happens for practically every array: at 48 kHz taps, half sizes
+  adding up to more than about 3.6 mm (a 5 cm microphone pair already exceeds it); for radio at 5 ns taps, about
+  0.75 m. Use `use_absolute_delays = true` in that case
+- The coefficients always carry the phase of the absolute path length, also when `use_absolute_delays` is false.
+  [[baseband_freq_response]] with multi-frequency input and `remove_delay_phase = True` removes the phase of `delay`
+  before it interpolates across `freq_in`, so it needs channels generated with `use_absolute_delays = True`; with
+  relative delays, the phase of the TX-RX distance stays in the coefficients, is interpolated across the frequency
+  grid and gives wrong phases
 - `complex=True` returns one combined complex coefficient array `coeff`; `complex=False` (default) returns
   separate real `coeff_re` and `coeff_im` via a zero-copy fast path
 
@@ -36,14 +55,16 @@ coeff, delay = quadriga_lib.arrayant.get_channels_multifreq( ..., complex=True )
 ```
 
 ## Inputs:
-- **`ant_tx`** — Multi-frequency TX arrayant dict; pattern fields 3D `(n_el, n_az, n_elem)` or 4D `(n_el, n_az, n_elem, n_freq)`; see [[generate]]
+- **`ant_tx`** — Multi-frequency TX arrayant dict; pattern fields 3D `(n_el, n_az, n_elem)` or 4D `(n_el, n_az, n_elem, n_freq)`; see [[generate]];
+  4D input requires `center_freq` with one value per frequency entry `(n_freq,)`
 - **`ant_rx`** — RX arrayant dict; same format as `ant_tx`
 - **`fbs_pos`** — First-bounce scatterer positions; `(3, n_path)`
 - **`lbs_pos`** — Last-bounce scatterer positions; `(3, n_path)`
 - **`path_gain`** — Linear-scale path gains, one column per input frequency; `(n_path, n_freq_in)`
-- **`path_length`** — Absolute TX-to-RX path lengths; `(n_path,)`
-- **`M`** — Polarization transfer matrix, interleaved Re/Im; `(8, n_path, n_freq_in)` full pol (VV, VH, HV, HH)
-  or `(2, n_path, n_freq_in)` scalar pressure (ReVV, ImVV only)
+- **`path_length`** — Absolute TX-to-RX path lengths (between the phase centres); values shorter than the
+  TX-FBS-LBS-RX polyline (e.g. 0) use the polyline length; `(n_path,)`
+- **`M`** — Polarization transfer matrix, row order as above; `(8, n_path, n_freq_in)` full pol or
+  `(2, n_path, n_freq_in)` scalar pressure
 - **`tx_pos`** — Transmitter position; `(3,)`
 - **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `(3,)`
 - **`rx_pos`** — Receiver position; `(3,)`
@@ -51,7 +72,8 @@ coeff, delay = quadriga_lib.arrayant.get_channels_multifreq( ..., complex=True )
 - **`freq_in`** — Input sample frequencies for `path_gain` and `M`; `(n_freq_in,)`
 - **`freq_out`** — Target output frequencies; `(n_freq_out,)`
 - **`use_absolute_delays`** — If `True`, delays include the LOS component; default: `False`
-- **`add_fake_los_path`** — If `True`, prepends a zero-power LOS path when none is present; default: `False`
+- **`add_fake_los_path`** — If `True`, always adds one output path; slot 0 holds the LOS path (zero power if none was
+  found); a LOS path found in the input leaves a zero-power path in its original slot; default: `False`
 - **`propagation_speed`** — Wave speed in m/s; use ~343.0 for acoustics; default: `299792458.0`
 - **`complex`** — If `True`, combine coefficients into a single complex array `coeff`; if `False`, return
   separate `coeff_re` and `coeff_im`; default: `False`

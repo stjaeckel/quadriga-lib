@@ -13,6 +13,7 @@ SECTION!*/
 Interpolate polarimetric array antenna field patterns (single- and multi-frequency)
 
 - Interpolates complex e-theta (V) and e-phi (H) field components at the requested azimuth / elevation angles.
+- NaN or infinite angles give NaN in all outputs for that angle (and element); no error is raised
 - Single-frequency mode: pass a 1-element struct (or arrayant data via separate inputs); returns up to 8 outputs 
   including the optional `dist`, `azimuth_loc`, `elevation_loc`, and `gamma` as matrices of size `[n_out, n_ang]`
 - Multi-frequency mode is selected automatically when `arrayant` is a struct array with more than one 
@@ -42,7 +43,7 @@ Interpolate polarimetric array antenna field patterns (single- and multi-frequen
 - **`azimuth`** — Azimuth angles in rad, in [-π, π]; single or double precision; `[1, n_ang]` for planar-wave mode 
   (same angles for all elements) or `[n_out, n_ang]` for per-element angles (spherical-wave mode)
 - **`elevation`** — Elevation angles in rad, in [-π/2, π/2]; single or double; shape must match `azimuth`
-- **`element`** — Element indices to interpolate; duplicates allowed; defaults to `[1:n_elements]` 
+- **`element`** — Element indices to interpolate; 1-based; duplicates allowed; defaults to `[1:n_elements]` 
   when empty; `[1, n_out]`, `[n_out, 1]`, or `[]`; uint32 or double
 - **`orientation`** — Antenna orientation (bank, tilt, heading) in rad; East is the default broadside; 
   `[3, 1]`, `[3, n_out]`, `[3, 1, n_ang]`, `[3, n_out, n_ang]`, or `[]`
@@ -99,7 +100,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (az.n_elem == 0)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Azimuth angles cannot be empty.");
 
-    const arma::uvec element_ind = (nrhs > 3) ? qd_mex_typecast_Col<arma::uword>(prhs[3]) - 1 : arma::uvec();
+    // Element indices: 1-based (MATLAB) -> 0-based (C++), empty = all elements
+    arma::uvec element_ind = (nrhs > 3) ? qd_mex_typecast_Col<arma::uword>(prhs[3], "element") : arma::uvec();
+    if (arma::any(element_ind == 0))
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Entries in 'element' cannot be 0 (1-based index).");
+    element_ind -= 1;
     const auto ori = (nrhs > 4) ? qd_mex_get_Cube<double>(prhs[4]) : arma::cube();
     const auto elpos = (nrhs > 5) ? qd_mex_get_Mat<double>(prhs[5]) : arma::mat();
 

@@ -48,7 +48,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Read input data
     const arma::mat points = qd_mex_get_Mat<double>(prhs[0]);
-    arma::u32_vec sub_cloud_index = (nrhs < 2) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[1], true);
+    arma::u32_vec sub_cloud_index = (nrhs < 2) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[1], true, "sub_cloud_index");
     const arma::uword vec_size = (nrhs < 3) ? 1 : qd_mex_get_scalar<arma::uword>(prhs[2], "vec_size", 1);
 
     // Convert sub_mesh_index to 0-based

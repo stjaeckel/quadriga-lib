@@ -46,22 +46,45 @@ assert_throws( @() quadriga_lib.sos_init_phases( 7, 3, 42, 1 ), 'Wrong number of
 assert_throws( @() out2( 7, 3, 42 ), 'Wrong number of output arguments.' );
 assert_throws( @() quadriga_lib.sos_init_phases( 0, 3, 42 ), 'n_coeff' );       % thrown by C++
 assert_throws( @() quadriga_lib.sos_init_phases( 7, 0, 42 ), 'n_gen' );         % thrown by C++
-assert_throws( @() quadriga_lib.sos_init_phases( 7, 3, -2 ), 'seed' );          % thrown by C++
+assert_throws( @() quadriga_lib.sos_init_phases( 7, 3, -2 ), 'seed' );
 
 % Counts and the seed are validated by the wrapper before the conversion to an integer type
-assert_throws( @() quadriga_lib.sos_init_phases( -1 ), 'Input ''n_coeff'' must be a finite number >= 1' );
-assert_throws( @() quadriga_lib.sos_init_phases( NaN ), 'Input ''n_coeff'' must be a finite number >= 1' );
-assert_throws( @() quadriga_lib.sos_init_phases( [] ), 'Input ''n_coeff'' must be a finite number >= 1' );
-assert_throws( @() quadriga_lib.sos_init_phases( 7, -1 ), 'Input ''n_gen'' must be a finite number >= 1' );
-assert_throws( @() quadriga_lib.sos_init_phases( 7, Inf ), 'Input ''n_gen'' must be a finite number >= 1' );
-assert_throws( @() quadriga_lib.sos_init_phases( 7, 3, NaN ), 'Input ''seed''' );
-assert_throws( @() quadriga_lib.sos_init_phases( 7, 3, Inf ), 'Input ''seed''' );
-assert_throws( @() quadriga_lib.sos_init_phases( 7, 3, -Inf ), 'Input ''seed''' );
+msg_seed = 'Input ''seed'' must be an integer from -1 to 9223372036854775807.';
+assert_cpp_error( @() quadriga_lib.sos_init_phases( -1 ), 'Input ''n_coeff'' must be an integer >= 1.' );
+assert_cpp_error( @() quadriga_lib.sos_init_phases( NaN ), 'Input ''n_coeff'' must be an integer >= 1.' );
+assert_cpp_error( @() quadriga_lib.sos_init_phases( [] ), 'Input ''n_coeff'' must be an integer >= 1.' );
+assert_cpp_error( @() quadriga_lib.sos_init_phases( 7, -1 ), 'Input ''n_gen'' must be an integer >= 1.' );
+assert_cpp_error( @() quadriga_lib.sos_init_phases( 7, Inf ), 'Input ''n_gen'' must be an integer >= 1.' );
+assert_cpp_error( @() quadriga_lib.sos_init_phases( 7, 3, NaN ), msg_seed );
+assert_cpp_error( @() quadriga_lib.sos_init_phases( 7, 3, Inf ), msg_seed );
+assert_cpp_error( @() quadriga_lib.sos_init_phases( 7, 3, -Inf ), msg_seed );
+assert_cpp_error( @() quadriga_lib.sos_init_phases( 7, 3, -2 ), msg_seed );
+assert_cpp_error( @() quadriga_lib.sos_init_phases( 7, 3, int64(-2) ), msg_seed );
 
-%% Non-integer scalars are truncated
-assertEqual( quadriga_lib.sos_init_phases( 7.9, 3.9, 42.9 ), phase );
-p5 = quadriga_lib.sos_init_phases( 7, 3, -1.5 );                               % truncated to -1: random seed
-assertTrue( max(abs(p5(:) - phase(:))) > 1e-6 );
+%% Non-integer scalars are rejected
+assert_cpp_error( @() quadriga_lib.sos_init_phases( 7.9, 3, 42 ), 'Input ''n_coeff'' must be an integer >= 1.' );
+assert_cpp_error( @() quadriga_lib.sos_init_phases( 7, 3.9, 42 ), 'Input ''n_gen'' must be an integer >= 1.' );
+assert_cpp_error( @() quadriga_lib.sos_init_phases( 7, 3, 42.9 ), msg_seed );
+assert_cpp_error( @() quadriga_lib.sos_init_phases( 7, 3, -1.5 ), msg_seed );
+assertEqual( quadriga_lib.sos_init_phases( 7.0, 3.0, 42.0 ), phase );
+
+%% Seeds: -1 (random) and 0 ... 2^63-1; uint64 seeds keep their value, larger seeds are rejected
+assertEqual( quadriga_lib.sos_init_phases( 7, 3, uint64(42) ), phase );
+assertEqual( quadriga_lib.sos_init_phases( 7, 3, int64(42) ), phase );
+s62 = uint64(2)^62;
+p62 = quadriga_lib.sos_init_phases( 4, 1, s62 );
+assertEqual( quadriga_lib.sos_init_phases( 4, 1, s62 ), p62 );                 % reproducible
+assertEqual( quadriga_lib.sos_init_phases( 4, 1, int64(s62) ), p62 );
+assertEqual( quadriga_lib.sos_init_phases( 4, 1, 2^62 ), p62 );                % exact as double
+assertTrue( max(abs(quadriga_lib.sos_init_phases( 4, 1, s62 + 1 ) - p62)) > 1e-6 );
+s_max = uint64(intmax('int64'));
+assertEqual( quadriga_lib.sos_init_phases( 4, 1, s_max ), quadriga_lib.sos_init_phases( 4, 1, intmax('int64') ) );
+assert_cpp_error( @() quadriga_lib.sos_init_phases( 4, 1, intmax('uint64') ), msg_seed );
+assert_cpp_error( @() quadriga_lib.sos_init_phases( 4, 1, s_max + 1 ), msg_seed );
+assert_cpp_error( @() quadriga_lib.sos_init_phases( 4, 1, 2^63 ), msg_seed );
+p5 = quadriga_lib.sos_init_phases( 7, 3, int64(-1) );                         % -1: random seed
+p6 = quadriga_lib.sos_init_phases( 7, 3, int64(-1) );
+assertTrue( max(abs(p5(:) - p6(:))) > 1e-6 );
 
 end
 
@@ -78,6 +101,19 @@ try
 catch ME
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expected)) %#ok<STREMP>
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expected, '", GOT: "', ME.message, '"']);
+    end
+end
+end
+
+% Assert that fn() raises quadriga_lib:CPPerror with a message that contains expected (substring).
+function assert_cpp_error(fn, expected)
+try
+    fn();
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if ~strcmp(ME.identifier, 'quadriga_lib:CPPerror') || isempty(strfind(ME.message, expected)) %#ok<STREMP>
+        error('moxunit:exceptionNotRaised', ['EXPECTED: quadriga_lib:CPPerror "', expected, '", GOT: ', ...
+            ME.identifier, ' "', ME.message, '"']);
     end
 end
 end

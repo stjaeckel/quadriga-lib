@@ -12,6 +12,7 @@
 #include <stdexcept>
 #include <memory>
 #include <type_traits>
+#include <cstdint>
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 #include <unordered_map>
@@ -848,14 +849,46 @@ static py::array_t<dtype> qd_python_init_output(arma::uword n_rows, arma::uword 
     return output;
 }
 
+// -------------------------------- qd_python_element_strided --------------------------------
+
+// True if the array can be read with element strides: the data pointer is aligned for dtype, and every dimension
+// with more than one entry has a non-negative stride that is a multiple of the item size. Not true for negative
+// strides (x[::-1]), fields of packed structured arrays (byte strides like 12 for a float64 field) and unaligned
+// buffers.
+template <typename dtype>
+static bool qd_python_has_element_strides(const py::array &input)
+{
+    if (reinterpret_cast<std::uintptr_t>(input.data()) % alignof(dtype) != 0)
+        return false;
+    for (py::ssize_t d = 0; d < input.ndim(); ++d)
+        if (input.shape(d) > 1 && (input.strides(d) < 0 || input.strides(d) % (py::ssize_t)sizeof(dtype) != 0))
+            return false;
+    return true;
+}
+
+// Returns the input itself if it can be read with element strides, otherwise an aligned Fortran-contiguous copy made
+// by numpy. Use before qd_python_get_shape on arrays that come from the user.
+template <typename dtype>
+static py::array_t<dtype> qd_python_element_strided(const py::array_t<dtype> &input)
+{
+    if (qd_python_has_element_strides<dtype>(input))
+        return input;
+    constexpr int flags = py::array::f_style | py::array::forcecast | py::detail::npy_api::NPY_ARRAY_ALIGNED_;
+    auto output = py::array_t<dtype, flags>::ensure(input);
+    if (!output)
+        throw std::invalid_argument("Could not convert the input to a contiguous array.");
+    return py::array_t<dtype>(output);
+}
+
 // -------------------------------- qd_python_get_shape --------------------------------
 
 // 0-2: n_row, n_cols, n_slices
 // 3-5: Strides in number of elements (not bytes!)
-//   6: Fortran-contiguous (1) or C-contiguous (0)
+//   6: Fortran-contiguous (1) or not (0), as numpy's F_CONTIGUOUS flag (including the 4th dim if present)
 //   7: Total number of elements
 //   8: Total number of bytes
 // Optional: n_frames (4th dim, 1 if input is 1D-3D), stride_frames (stride of 4th dim in elements)
+// With shape_only = false, the array must have element strides (see qd_python_element_strided).
 template <typename dtype>
 static std::array<size_t, 9> qd_python_get_shape(const py::array_t<dtype> &input, bool shape_only = false,
                                                  size_t *n_frames = nullptr, size_t *stride_frames = nullptr)
@@ -900,6 +933,9 @@ static std::array<size_t, 9> qd_python_get_shape(const py::array_t<dtype> &input
     if (buf.itemsize != (py::ssize_t)n_bytes)
         throw std::invalid_argument("Dtype size mismatch");
 
+    if (!qd_python_has_element_strides<dtype>(input))
+        throw std::invalid_argument("Internal error: array strides are not a non-negative multiple of the item size.");
+
     shape[3] = (size_t)buf.strides[0] / n_bytes;
     shape[4] = (nd >= 2) ? (size_t)buf.strides[1] / n_bytes : shape[0];
     shape[5] = (nd == 3) ? (size_t)buf.strides[2] / n_bytes : shape[0] * shape[1];
@@ -908,9 +944,9 @@ static std::array<size_t, 9> qd_python_get_shape(const py::array_t<dtype> &input
     if (stride_frames != nullptr)
         *stride_frames = sf;
 
-    // Check if input is Fortran-contiguous (including 4th dim if present)
-    shape[6] = (shape[3] == 1) && (shape[4] == shape[0]) && (shape[5] == shape[0] * shape[1]) &&
-               (sf == shape[0] * shape[1] * shape[2]);
+    // Fortran-contiguous (including 4th dim if present); numpy's flag also covers the arbitrary strides of
+    // dimensions with a single entry, e.g. a C-ordered (n, 1) array
+    shape[6] = (input.flags() & py::array::f_style) ? 1 : 0;
 
     shape[7] = shape[0] * shape[1] * shape[2];           // Total number of elements (per frame)
     shape[8] = shape[0] * shape[1] * shape[2] * n_bytes; // Total number of bytes (per frame)
@@ -950,6 +986,7 @@ static std::vector<std::array<size_t, 9>> qd_python_get_list_shape(const py::lis
             typed_array = py::array_t<dtype>(array); // implicit cast creates new array
         else
             typed_array = array.cast<py::array_t<dtype>>();
+        typed_array = qd_python_element_strided(typed_array);
 
         output[i] = qd_python_get_shape(typed_array);
         buffer_pointers[i] = const_cast<dtype *>(typed_array.data());
@@ -976,7 +1013,10 @@ static void qd_python_copy2arma(const dtype *src, const std::array<size_t, 9> &s
     dtype *dst = output.memptr();
 
     if (shape[6] == 1)
-        std::memcpy(dst, src, shape[8]);
+    {
+        if (shape[8]) // No memcpy for empty arrays (null data pointer)
+            std::memcpy(dst, src, shape[8]);
+    }
     else
         for (size_t is = 0; is < ns; ++is)
             for (size_t ic = 0; ic < nc; ++ic)
@@ -991,8 +1031,9 @@ static void qd_python_copy2arma(const dtype *src, const std::array<size_t, 9> &s
 template <typename dtype>
 static void qd_python_copy2arma(const py::array_t<dtype> &input, arma::Cube<dtype> &output)
 {
-    auto shape = qd_python_get_shape(input);
-    const dtype *src = input.data();
+    const auto array = qd_python_element_strided(input);
+    auto shape = qd_python_get_shape(array);
+    const dtype *src = array.data();
     qd_python_copy2arma(src, shape, output);
 }
 
@@ -1031,60 +1072,120 @@ static void qd_python_copy2arma(const std::complex<dtype> *src, const std::array
 template <typename dtype>
 static void qd_python_copy2arma(const py::array_t<std::complex<dtype>> &input, arma::Cube<dtype> &real, arma::Cube<dtype> &imag)
 {
-    auto shape = qd_python_get_shape(input);
-    const std::complex<dtype> *src = input.data();
+    const auto array = qd_python_element_strided(input);
+    auto shape = qd_python_get_shape(array);
+    const std::complex<dtype> *src = array.data();
     qd_python_copy2arma(src, shape, real, imag);
 }
 
 // -------------------------------- qd_python_numpy2arma --------------------------------
+//
+// Convert a numpy array to an Armadillo object.
+// - view = false: the data is copied.
+// - view = true: the Armadillo object aliases the numpy memory (copy_aux_mem = false, strict = true) when the array
+//   is Fortran-contiguous and aligned; otherwise the data is copied. view = true, strict = true throws instead of
+//   copying. Empty arrays give an empty object (nothing to alias).
+// - What may be aliased, by overload:
+//   - `const py::array_t<dtype> &` (an lvalue): the array the call site holds, e.g. a wrapper parameter. If pybind11
+//     had to convert the caller's object (other dtype, list, scalar), this is the converted array, which pybind11
+//     keeps in its argument caster until the wrapped function returns.
+//   - `py::array_t<dtype> &&` (a temporary): never aliased, always copied, since the temporary is released before
+//     the result is used.
+//   - `const py::handle &`: aliased only when the object already is an ndarray of dtype (no conversion, the caller's
+//     own array); everything else is converted into a temporary and copied.
+// - Rules for code that uses view = true: an aliased object is read-only (never written, resized or assigned to),
+//   it must not outlive the wrapper call or be stored in a returned object, and its source array must stay
+//   referenced while the GIL is released (other threads may remove list entries or dict values). Read-only numpy
+//   arrays (flags.writeable = False) are aliased for reading as well.
+
+// True if an Armadillo object may alias the memory of 'input'
+template <typename dtype>
+static bool qd_python_can_alias(const py::array_t<dtype> &input)
+{
+    const int flags = input.flags();
+    return (flags & py::array::f_style) && (flags & py::detail::npy_api::NPY_ARRAY_ALIGNED_);
+}
+
+static void qd_python_no_view_error()
+{
+    throw std::invalid_argument("Could not obtain memory view, possibly due to mismatching strides.");
+}
 
 template <typename dtype>
 static arma::Col<dtype> qd_python_numpy2arma_Col(const py::array_t<dtype> &input,
                                                  bool view = false, bool strict = false,
                                                  std::string var_name = "", arma::uword n_elem = 0)
 {
-    auto shape = qd_python_get_shape(input, !view);
-    if (n_elem != 0 && shape[0] != n_elem)
+    const auto shape = qd_python_get_shape(input, true);
+    const arma::uword n = (arma::uword)(shape[0] * shape[1] * shape[2]);
+    if (n_elem != 0 && n != n_elem)
     {
         if (var_name.empty())
             throw std::invalid_argument("Incorrect number of elements.");
         else
             throw std::invalid_argument("Input '" + var_name + "' has incorrect number of elements.");
     }
-    if (view && shape[6])
-        return arma::Col<dtype>(const_cast<dtype *>(input.data()), shape[0] * shape[1] * shape[2], true, false);
+    if (n == 0)
+        return arma::Col<dtype>();
+    if (view && qd_python_can_alias(input))
+        return arma::Col<dtype>(const_cast<dtype *>(input.data()), n, false, true);
     if (view && strict)
-        throw std::invalid_argument("Could not obtain memory view, possibly due to mismatching strides.");
+        qd_python_no_view_error();
 
-    arma::Col<dtype> output(shape[0] * shape[1] * shape[2], arma::fill::none);
+    arma::Col<dtype> output(n, arma::fill::none);
     arma::Cube<dtype> wrapper(output.memptr(), shape[0], shape[1], shape[2], false, true);
     qd_python_copy2arma(input, wrapper);
     return output;
+}
+
+template <typename dtype>
+static arma::Col<dtype> qd_python_numpy2arma_Col(py::array_t<dtype> &&input,
+                                                 bool view = false, bool strict = false,
+                                                 std::string var_name = "", arma::uword n_elem = 0)
+{
+    const py::array_t<dtype> &array = input;
+    if (view && strict && array.size() != 0)
+        qd_python_no_view_error();
+    return qd_python_numpy2arma_Col(array, false, false, var_name, n_elem);
 }
 
 template <typename dtype>
 static arma::Mat<dtype> qd_python_numpy2arma_Mat(const py::array_t<dtype> &input, bool view = false, bool strict = false)
 {
-    auto shape = qd_python_get_shape(input, !view);
-    if (view && shape[6])
-        return arma::Mat<dtype>(const_cast<dtype *>(input.data()), shape[0], shape[1] * shape[2], true, false);
+    const auto shape = qd_python_get_shape(input, true);
+    const arma::uword n_rows = (arma::uword)shape[0], n_cols = (arma::uword)(shape[1] * shape[2]);
+    if (n_rows * n_cols == 0)
+        return arma::Mat<dtype>(n_rows, n_cols);
+    if (view && qd_python_can_alias(input))
+        return arma::Mat<dtype>(const_cast<dtype *>(input.data()), n_rows, n_cols, false, true);
     if (view && strict)
-        throw std::invalid_argument("Could not obtain memory view, possibly due to mismatching strides.");
+        qd_python_no_view_error();
 
-    arma::Mat<dtype> output(shape[0], shape[1] * shape[2], arma::fill::none);
+    arma::Mat<dtype> output(n_rows, n_cols, arma::fill::none);
     arma::Cube<dtype> wrapper(output.memptr(), shape[0], shape[1], shape[2], false, true);
     qd_python_copy2arma(input, wrapper);
     return output;
 }
 
 template <typename dtype>
+static arma::Mat<dtype> qd_python_numpy2arma_Mat(py::array_t<dtype> &&input, bool view = false, bool strict = false)
+{
+    const py::array_t<dtype> &array = input;
+    if (view && strict && array.size() != 0)
+        qd_python_no_view_error();
+    return qd_python_numpy2arma_Mat(array, false, false);
+}
+
+template <typename dtype>
 static arma::Cube<dtype> qd_python_numpy2arma_Cube(const py::array_t<dtype> &input, bool view = false, bool strict = false)
 {
-    auto shape = qd_python_get_shape(input, !view);
-    if (view && shape[6])
-        return arma::Cube<dtype>(const_cast<dtype *>(input.data()), shape[0], shape[1], shape[2], true, false);
+    const auto shape = qd_python_get_shape(input, true);
+    if (shape[0] * shape[1] * shape[2] == 0)
+        return arma::Cube<dtype>(shape[0], shape[1], shape[2]);
+    if (view && qd_python_can_alias(input))
+        return arma::Cube<dtype>(const_cast<dtype *>(input.data()), shape[0], shape[1], shape[2], false, true);
     if (view && strict)
-        throw std::invalid_argument("Could not obtain memory view, possibly due to mismatching strides.");
+        qd_python_no_view_error();
 
     arma::Cube<dtype> output(shape[0], shape[1], shape[2], arma::fill::none);
     qd_python_copy2arma(input, output);
@@ -1092,27 +1193,28 @@ static arma::Cube<dtype> qd_python_numpy2arma_Cube(const py::array_t<dtype> &inp
 }
 
 template <typename dtype>
+static arma::Cube<dtype> qd_python_numpy2arma_Cube(py::array_t<dtype> &&input, bool view = false, bool strict = false)
+{
+    const py::array_t<dtype> &array = input;
+    if (view && strict && array.size() != 0)
+        qd_python_no_view_error();
+    return qd_python_numpy2arma_Cube(array, false, false);
+}
+
+// py::handle overloads: None gives an empty object; only an ndarray of dtype (the caller's own array) can be aliased
+template <typename dtype>
 static arma::Col<dtype> qd_python_numpy2arma_Col(const py::handle &obj, bool view = false, bool strict = false)
 {
     if (obj.is_none())
         return arma::Col<dtype>();
-
-    py::array_t<dtype> pyarray;
     if (py::isinstance<py::array_t<dtype>>(obj))
-        pyarray = py::reinterpret_borrow<py::array_t<dtype>>(obj);
-    else
     {
-        if (view && strict)
-            throw std::invalid_argument("Expected a numpy.ndarray, but got something else.");
-        pyarray = py::cast<py::array_t<dtype>>(obj);
-        view = false;
+        const auto array = py::reinterpret_borrow<py::array_t<dtype>>(obj);
+        return qd_python_numpy2arma_Col(array, view, strict);
     }
-    if (pyarray.ndim() == 0)
-    {
-        pyarray = py::array_t<dtype>(1, pyarray.data());
-        view = false;
-    }
-    return qd_python_numpy2arma_Col(pyarray, view, strict);
+    if (view && strict)
+        throw std::invalid_argument("Expected a numpy.ndarray, but got something else.");
+    return qd_python_numpy2arma_Col(py::cast<py::array_t<dtype>>(obj));
 }
 
 template <typename dtype>
@@ -1120,23 +1222,14 @@ static arma::Mat<dtype> qd_python_numpy2arma_Mat(const py::handle &obj, bool vie
 {
     if (obj.is_none())
         return arma::Mat<dtype>();
-
-    py::array_t<dtype> pyarray;
     if (py::isinstance<py::array_t<dtype>>(obj))
-        pyarray = py::reinterpret_borrow<py::array_t<dtype>>(obj);
-    else
     {
-        if (view && strict)
-            throw std::invalid_argument("Expected a numpy.ndarray, but got something else.");
-        pyarray = py::cast<py::array_t<dtype>>(obj);
-        view = false;
+        const auto array = py::reinterpret_borrow<py::array_t<dtype>>(obj);
+        return qd_python_numpy2arma_Mat(array, view, strict);
     }
-    if (pyarray.ndim() == 0)
-    {
-        pyarray = py::array_t<dtype>(1, pyarray.data());
-        view = false;
-    }
-    return qd_python_numpy2arma_Mat(pyarray, view, strict);
+    if (view && strict)
+        throw std::invalid_argument("Expected a numpy.ndarray, but got something else.");
+    return qd_python_numpy2arma_Mat(py::cast<py::array_t<dtype>>(obj));
 }
 
 template <typename dtype>
@@ -1144,52 +1237,44 @@ static arma::Cube<dtype> qd_python_numpy2arma_Cube(const py::handle &obj, bool v
 {
     if (obj.is_none())
         return arma::Cube<dtype>();
-
-    py::array_t<dtype> pyarray;
     if (py::isinstance<py::array_t<dtype>>(obj))
-        pyarray = py::reinterpret_borrow<py::array_t<dtype>>(obj);
-    else
     {
-        if (view && strict)
-            throw std::invalid_argument("Expected a numpy.ndarray, but got something else.");
-        pyarray = py::cast<py::array_t<dtype>>(obj);
-        view = false;
+        const auto array = py::reinterpret_borrow<py::array_t<dtype>>(obj);
+        return qd_python_numpy2arma_Cube(array, view, strict);
     }
-    if (pyarray.ndim() == 0)
-    {
-        pyarray = py::array_t<dtype>(1, pyarray.data());
-        view = false;
-    }
-    return qd_python_numpy2arma_Cube(pyarray, view, strict);
+    if (view && strict)
+        throw std::invalid_argument("Expected a numpy.ndarray, but got something else.");
+    return qd_python_numpy2arma_Cube(py::cast<py::array_t<dtype>>(obj));
 }
 
 // Convert a 3D or 4D Numpy array to std::vector<arma::Cube<dtype>>
 // 3D input → vector with 1 entry, 4D input → vector with n_frames entries
+// Aliasing rules as for qd_python_numpy2arma_Cube; a Fortran-contiguous array gives one alias per frame.
 template <typename dtype>
 static std::vector<arma::Cube<dtype>> qd_python_numpy2arma_vecCube(const py::array_t<dtype> &input,
                                                                    bool view = false, bool strict = false)
 {
     size_t n_frames, stride_frames;
-    // Always compute full strides (shape_only=false): the copy path below passes shape
-    // to qd_python_copy2arma(ptr, shape, cube) which reads shape[3..8] (strides, Fortran
-    // flag, byte count). With shape_only=true those fields are uninitialized → UB.
-    auto shape = qd_python_get_shape(input, false, &n_frames, &stride_frames);
+    auto shape = qd_python_get_shape(input, true, &n_frames, &stride_frames);
+    const bool empty = shape[0] * shape[1] * shape[2] == 0;
 
-    std::vector<arma::Cube<dtype>> output(n_frames);
-
-    if (view && shape[6]) // Fully Fortran-contiguous: direct memory views
+    if (view && !empty && qd_python_can_alias(input)) // Fully Fortran-contiguous: direct memory views
     {
+        std::vector<arma::Cube<dtype>> output(n_frames);
         dtype *base = const_cast<dtype *>(input.data());
         for (size_t i = 0; i < n_frames; ++i)
-            output[i] = arma::Cube<dtype>(base + i * stride_frames, shape[0], shape[1], shape[2], true, false);
+            output[i] = arma::Cube<dtype>(base + i * stride_frames, shape[0], shape[1], shape[2], false, true);
         return output;
     }
 
-    if (view && strict)
-        throw std::invalid_argument("Could not obtain memory view, possibly due to mismatching strides.");
+    if (view && strict && !empty && n_frames != 0)
+        qd_python_no_view_error();
 
     // Copy path: offset source pointer per frame, delegate to existing copy2arma
-    const dtype *src = input.data();
+    const auto array = qd_python_element_strided(input);
+    shape = qd_python_get_shape(array, false, &n_frames, &stride_frames);
+    std::vector<arma::Cube<dtype>> output(n_frames);
+    const dtype *src = array.data();
     for (size_t i = 0; i < n_frames; ++i)
     {
         output[i].set_size(shape[0], shape[1], shape[2]);
@@ -1198,22 +1283,29 @@ static std::vector<arma::Cube<dtype>> qd_python_numpy2arma_vecCube(const py::arr
     return output;
 }
 
+template <typename dtype>
+static std::vector<arma::Cube<dtype>> qd_python_numpy2arma_vecCube(py::array_t<dtype> &&input,
+                                                                   bool view = false, bool strict = false)
+{
+    const py::array_t<dtype> &array = input;
+    if (view && strict && array.size() != 0)
+        qd_python_no_view_error();
+    return qd_python_numpy2arma_vecCube(array, false, false);
+}
+
 // py::handle overload for qd_python_numpy2arma_vecCube
 template <typename dtype>
 static std::vector<arma::Cube<dtype>> qd_python_numpy2arma_vecCube(const py::handle &obj,
                                                                    bool view = false, bool strict = false)
 {
-    py::array_t<dtype> pyarray;
     if (py::isinstance<py::array_t<dtype>>(obj))
-        pyarray = py::reinterpret_borrow<py::array_t<dtype>>(obj);
-    else
     {
-        if (view && strict)
-            throw std::invalid_argument("Expected a numpy.ndarray, but got something else.");
-        pyarray = py::cast<py::array_t<dtype>>(obj);
-        view = false;
+        const auto array = py::reinterpret_borrow<py::array_t<dtype>>(obj);
+        return qd_python_numpy2arma_vecCube(array, view, strict);
     }
-    return qd_python_numpy2arma_vecCube(pyarray, view, strict);
+    if (view && strict)
+        throw std::invalid_argument("Expected a numpy.ndarray, but got something else.");
+    return qd_python_numpy2arma_vecCube(py::cast<py::array_t<dtype>>(obj));
 }
 
 template <typename dtype>
@@ -1222,14 +1314,15 @@ static void qd_python_numpy2arma_vecCube_Cplx(const py::array_t<std::complex<dty
                                               std::vector<arma::Cube<dtype>> &imag)
 {
     size_t n_frames, stride_frames;
-    auto shape = qd_python_get_shape(input, false, &n_frames, &stride_frames);
+    const auto array = qd_python_element_strided(input);
+    auto shape = qd_python_get_shape(array, false, &n_frames, &stride_frames);
 
     real.clear();
     real.resize(n_frames);
     imag.clear();
     imag.resize(n_frames);
 
-    const std::complex<dtype> *src = input.data();
+    const std::complex<dtype> *src = array.data();
     for (size_t i = 0; i < n_frames; ++i)
         qd_python_copy2arma(src + i * stride_frames, shape, real[i], imag[i]);
 }
@@ -1411,9 +1504,48 @@ static std::vector<arma::Mat<dtype>> qd_python_Complex2Interleaved(const std::ve
 
 // -------------------------------- std::any --------------------------------
 
+// Convert a numpy array (or 0-d array) of a supported element type to a std::any; any strides and byte order.
+// The caller's own Fortran-contiguous array is aliased (rules of qd_python_numpy2arma: the std::any is read-only and
+// must not outlive the wrapper call); converted arrays (other byte order) and other layouts are copied.
+template <typename dtype>
+static std::any qd_python_anycast_array(const py::array &obj, const std::string &var_name)
+{
+    const auto arr = py::array_t<dtype>::ensure(obj); // Native byte order; a copy only if the byte order differs
+    if (!arr)
+        throw std::invalid_argument("Input '" + var_name + "' could not be converted.");
+    const bool view = arr.ptr() == obj.ptr(); // No conversion: 'arr' is the caller's array
+
+    switch (arr.ndim())
+    {
+    case 0:
+        return *arr.data();
+    case 1: // Stored as a column vector
+    {
+        const arma::uword n = (arma::uword)arr.shape(0);
+        if (view && n != 0 && qd_python_can_alias(arr))
+            return arma::Row<dtype>(const_cast<dtype *>(arr.data()), n, false, true);
+        arma::Row<dtype> output(n, arma::fill::none);
+        arma::Cube<dtype> wrapper(output.memptr(), n, 1, 1, false, true);
+        qd_python_copy2arma(arr, wrapper);
+        return output;
+    }
+    case 2: // Also (n, 1) and (1, 1), so that the shape is kept
+        return qd_python_numpy2arma_Mat<dtype>(arr, view);
+    case 3:
+        return qd_python_numpy2arma_Cube<dtype>(arr, view);
+    default:
+        throw std::invalid_argument("Input '" + var_name + "' has more than 3 dimensions.");
+    }
+}
+
+// Convert a Python object to a std::any (unstructured data of the HDF5 writers)
+// - str -> std::string, float -> double, int and bool -> long long (a bool is stored as the integer 0 or 1)
+// - numpy scalars and 0-d arrays -> scalar of their element type
+// - numpy arrays: 1D -> arma::Row, 2D -> arma::Mat, 3D -> arma::Cube; Fortran-contiguous arrays are aliased, all
+//   others copied (any strides, byte order)
+// - Element types: float32, float64, int32, uint32, int64, uint64; any other type throws
 static std::any qd_python_anycast(py::handle obj, std::string var_name = "")
 {
-
     if (py::isinstance<py::str>(obj))
         return py::cast<std::string>(obj);
 
@@ -1423,88 +1555,30 @@ static std::any qd_python_anycast(py::handle obj, std::string var_name = "")
     if (py::isinstance<py::int_>(obj))
         return py::cast<long long>(obj);
 
+    py::object array_obj; // Stays null for unsupported types (a default py::array would be an empty array)
     if (py::isinstance<py::array>(obj))
+        array_obj = py::reinterpret_borrow<py::object>(obj);
+    else if (py::isinstance(obj, py::module_::import("numpy").attr("generic"))) // numpy scalar -> 0-d array
+        array_obj = py::array::ensure(obj);
+
+    if (array_obj)
     {
-        py::array arr = py::cast<py::array>(obj);
-        py::buffer_info buf = arr.request();
+        const auto arr = py::reinterpret_borrow<py::array>(array_obj);
+        const char kind = arr.dtype().kind();
+        const py::ssize_t size = arr.dtype().itemsize();
 
-        if (arr.dtype().is(py::dtype::of<double>()))
-        {
-            auto arr_t = py::array_t<double>(py::reinterpret_borrow<py::array_t<double>>(arr));
-            if (buf.ndim == 1)
-                return arma::Row<double>(reinterpret_cast<double *>(buf.ptr), buf.shape[0], false, true);
-            else if (buf.ndim == 2 && buf.shape[1] == 1)
-                return arma::Col<double>(reinterpret_cast<double *>(buf.ptr), buf.shape[0], false, true);
-            else if (buf.ndim == 2)
-                return qd_python_numpy2arma_Mat<double>(arr_t);
-            else if (buf.ndim == 3)
-                return qd_python_numpy2arma_Cube<double>(arr_t);
-        }
-
-        if (arr.dtype().is(py::dtype::of<float>()))
-        {
-            auto arr_t = py::array_t<float>(py::reinterpret_borrow<py::array_t<float>>(arr));
-            if (buf.ndim == 1)
-                return arma::Row<float>(reinterpret_cast<float *>(buf.ptr), buf.shape[0], false, true);
-            else if (buf.ndim == 2 && buf.shape[1] == 1)
-                return arma::Col<float>(reinterpret_cast<float *>(buf.ptr), buf.shape[0], false, true);
-            else if (buf.ndim == 2)
-                return qd_python_numpy2arma_Mat<float>(arr_t);
-            else if (buf.ndim == 3)
-                return qd_python_numpy2arma_Cube<float>(arr_t);
-        }
-
-        if (arr.dtype().is(py::dtype::of<unsigned>()))
-        {
-            auto arr_t = py::array_t<unsigned>(py::reinterpret_borrow<py::array_t<unsigned>>(arr));
-            if (buf.ndim == 1)
-                return arma::Row<unsigned>(reinterpret_cast<unsigned *>(buf.ptr), buf.shape[0], false, true);
-            else if (buf.ndim == 2 && buf.shape[1] == 1)
-                return arma::Col<unsigned>(reinterpret_cast<unsigned *>(buf.ptr), buf.shape[0], false, true);
-            else if (buf.ndim == 2)
-                return qd_python_numpy2arma_Mat<unsigned>(arr_t);
-            else if (buf.ndim == 3)
-                return qd_python_numpy2arma_Cube<unsigned>(arr_t);
-        }
-
-        if (arr.dtype().is(py::dtype::of<int>()))
-        {
-            auto arr_t = py::array_t<int>(py::reinterpret_borrow<py::array_t<int>>(arr));
-            if (buf.ndim == 1)
-                return arma::Row<int>(reinterpret_cast<int *>(buf.ptr), buf.shape[0], false, true);
-            else if (buf.ndim == 2 && buf.shape[1] == 1)
-                return arma::Col<int>(reinterpret_cast<int *>(buf.ptr), buf.shape[0], false, true);
-            else if (buf.ndim == 2)
-                return qd_python_numpy2arma_Mat<int>(arr_t);
-            else if (buf.ndim == 3)
-                return qd_python_numpy2arma_Cube<int>(arr_t);
-        }
-
-        if (arr.dtype().is(py::dtype::of<unsigned long long>()))
-        {
-            auto arr_t = py::array_t<unsigned long long>(py::reinterpret_borrow<py::array_t<unsigned long long>>(arr));
-            if (buf.ndim == 1)
-                return arma::Row<unsigned long long>(reinterpret_cast<unsigned long long *>(buf.ptr), buf.shape[0], false, true);
-            else if (buf.ndim == 2 && buf.shape[1] == 1)
-                return arma::Col<unsigned long long>(reinterpret_cast<unsigned long long *>(buf.ptr), buf.shape[0], false, true);
-            else if (buf.ndim == 2)
-                return qd_python_numpy2arma_Mat<unsigned long long>(arr_t);
-            else if (buf.ndim == 3)
-                return qd_python_numpy2arma_Cube<unsigned long long>(arr_t);
-        }
-
-        if (arr.dtype().is(py::dtype::of<long long>()) || arr.dtype().is(py::dtype::of<int64_t>()))
-        {
-            auto arr_t = py::array_t<long long>(py::reinterpret_borrow<py::array_t<long long>>(arr));
-            if (buf.ndim == 1)
-                return arma::Row<long long>(reinterpret_cast<long long *>(buf.ptr), buf.shape[0], false, true);
-            else if (buf.ndim == 2 && buf.shape[1] == 1)
-                return arma::Col<long long>(reinterpret_cast<long long *>(buf.ptr), buf.shape[0], false, true);
-            else if (buf.ndim == 2)
-                return qd_python_numpy2arma_Mat<long long>(arr_t);
-            else if (buf.ndim == 3)
-                return qd_python_numpy2arma_Cube<long long>(arr_t);
-        }
+        if (kind == 'f' && size == 8)
+            return qd_python_anycast_array<double>(arr, var_name);
+        if (kind == 'f' && size == 4)
+            return qd_python_anycast_array<float>(arr, var_name);
+        if (kind == 'u' && size == 4)
+            return qd_python_anycast_array<unsigned>(arr, var_name);
+        if (kind == 'i' && size == 4)
+            return qd_python_anycast_array<int>(arr, var_name);
+        if (kind == 'u' && size == 8)
+            return qd_python_anycast_array<unsigned long long>(arr, var_name);
+        if (kind == 'i' && size == 8)
+            return qd_python_anycast_array<long long>(arr, var_name);
     }
 
     std::string error_message = "Input '" + var_name + "' has an unsupported type.";

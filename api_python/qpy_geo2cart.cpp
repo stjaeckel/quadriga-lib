@@ -19,7 +19,8 @@ Convert elementwise azimuth/elevation angles to Cartesian coordinates
 - For combined input, row 0 = azimuth, row 1 = elevation, row 2 = length
 - `len` is optional in separate mode; omit it for unit length
 - Inverse of `cart2geo`; round-trips in both the combined and separate forms
-- The AVX2 kernel computes internally in single precision; use `use_kernel = 1` for full double precision
+- The AVX2 kernel computes sine and cosine in single precision (angles reduced in double precision first; max. error
+  about 1.3e-7 for angles up to 1e10); use `use_kernel = 1` for full double precision
 
 ## Usage:
 ```
@@ -34,7 +35,7 @@ x, y, z = quadriga_lib.tools.geo2cart( az, el, len, combine=False )
 - **`len`** — Vector length `(n, m)`; omit for unit length; ignored for combined input; default: None
 - **`combine`** — If True, return a single `(3, n, m)` array; if False, return separate x, y, z  arrays; default: True
 - **`use_kernel`** — Kernel: 0 = auto (AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2 (throws
-  if unavailable); default: 1
+  if unavailable); other values raise; default: 1
 
 ## Outputs:
 - **`cart`** — Combined Cartesian coordinates `(3, n, m)`; row 0 = x, row 1 = y, row 2 = z; returned when `combine` is True
@@ -49,8 +50,10 @@ py::object geo2cart(const py::array_t<double> &az,
                     bool combine,
                     int use_kernel)
 {
-    // Read inputs into flat angle/length vectors
+    // Read inputs into flat angle/length vectors; in separate mode these alias az_a, el_a, len_a, which must
+    // therefore live in function scope
     arma::vec az_v, el_v, len_v;
+    arma::mat az_a, el_a, len_a;
     arma::uword n = 0, m = 0, n_val = 0;
     bool have_len = false;
 
@@ -72,9 +75,9 @@ py::object geo2cart(const py::array_t<double> &az,
     }
     else // Separate inputs: az, el, and optional len
     {
-        auto az_a = qd_python_numpy2arma_Mat<double>(az, true);
-        auto el_a = qd_python_numpy2arma_Mat<double>(el, true);
-        auto len_a = qd_python_numpy2arma_Mat<double>(len, true); // None -> empty
+        az_a = qd_python_numpy2arma_Mat<double>(az, true);
+        el_a = qd_python_numpy2arma_Mat<double>(el, true);
+        len_a = qd_python_numpy2arma_Mat<double>(len, true); // None -> empty
 
         if (az_a.n_elem == 0 || el_a.n_rows != az_a.n_rows || el_a.n_cols != az_a.n_cols)
             throw std::invalid_argument("Separate inputs 'az' and 'el' must be non-empty and have the same shape.");

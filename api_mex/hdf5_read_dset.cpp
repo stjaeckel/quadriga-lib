@@ -48,7 +48,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Read inputs
     const std::string fn = qd_mex_get_string(prhs[0]);
-    const arma::Col<unsigned> location = qd_mex_get_Col<unsigned>(prhs[1]);
+    const arma::Col<unsigned> location = qd_mex_get_Col<unsigned>(prhs[1], false, "location");
     const std::string name = qd_mex_get_string(prhs[2]);
     const std::string prefix = (nrhs < 4) ? std::string("par_") : qd_mex_get_string(prhs[3], "par_");
 

@@ -596,3 +596,26 @@ TEST_CASE("Ray-Point Intersect - Input Validation")
                                                           nullptr, nullptr, nullptr, nullptr, nullptr, 3),
                         std::invalid_argument);
 }
+TEST_CASE("Ray-Point Intersect - Invalid use_kernel")
+{
+    arma::fmat points(8, 3, arma::fill::ones);
+    arma::fmat orig, trivec, tridir;
+    quadriga_lib::icosphere<float>(1, 1.0f, &orig, nullptr, &trivec, &tridir, true);
+
+    for (int k : {7, -1, 4})
+    {
+        INFO("use_kernel = " << k);
+        CHECK_THROWS_AS(quadriga_lib::ray_point_intersect(points, orig, trivec, tridir,
+                                                          nullptr, nullptr, nullptr, nullptr, nullptr, k),
+                        std::invalid_argument);
+    }
+
+    // 2 = AVX2 throws when AVX2 is not available
+    if (!quadriga_lib::quadriga_lib_has_AVX2())
+        CHECK_THROWS_AS(quadriga_lib::ray_point_intersect(points, orig, trivec, tridir,
+                                                          nullptr, nullptr, nullptr, nullptr, nullptr, 2),
+                        std::invalid_argument);
+
+    CHECK_NOTHROW(quadriga_lib::ray_point_intersect(points, orig, trivec, tridir,
+                                                    nullptr, nullptr, nullptr, nullptr, nullptr, 1));
+}

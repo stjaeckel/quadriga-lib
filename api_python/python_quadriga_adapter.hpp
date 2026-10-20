@@ -149,8 +149,13 @@ static quadriga_lib::arrayant<double> qd_python_dict2arrayant(const py::dict &ar
     else
         ant.coupling_im.zeros(ant.coupling_re.n_rows, ant.coupling_re.n_cols);
 
-    if (arrayant.contains("center_freq"))
-        ant.center_frequency = arrayant["center_freq"].cast<double>();
+    if (arrayant.contains("center_freq")) // Scalar or array with exactly one element
+    {
+        const auto center_freq = qd_python_numpy2arma_Col<double>(arrayant["center_freq"]);
+        if (center_freq.n_elem != 1)
+            throw std::invalid_argument("Input 'center_freq' must have exactly one element for a single-frequency arrayant.");
+        ant.center_frequency = center_freq.at(0);
+    }
 
     if (arrayant.contains("name"))
         ant.name = arrayant["name"].cast<std::string>();
@@ -166,9 +171,12 @@ static quadriga_lib::arrayant<double> qd_python_dict2arrayant(const py::dict &ar
 }
 
 // Multi-frequency: dict → std::vector<arrayant>
+// - 'require_center_freq': 4D input without 'center_freq' raises; pass false only where the frequency is not used
+//   (all entries then get the default 299792458)
 static std::vector<quadriga_lib::arrayant<double>> qd_python_dict2arrayant_multi(const py::dict &arrayant,
                                                                                  bool view = false, bool strict = false,
-                                                                                 bool validate = false)
+                                                                                 bool validate = false,
+                                                                                 bool require_center_freq = true)
 {
     // Determine number of frequencies from e_theta_re shape
     py::array e_theta_re_arr = py::cast<py::array>(arrayant["e_theta_re"]);
@@ -211,25 +219,18 @@ static std::vector<quadriga_lib::arrayant<double>> qd_python_dict2arrayant_multi
     if (arrayant.contains("name"))
         name = arrayant["name"].cast<std::string>();
 
-    // Parse center_freq: scalar or 1D array
+    // Parse center_freq: one value per frequency entry (scalar or array); required for more than one entry
     arma::Col<double> center_freqs(n_freq);
     if (arrayant.contains("center_freq"))
     {
-        py::handle cf_obj = arrayant["center_freq"];
-        if (py::isinstance<py::array>(cf_obj))
-        {
-            center_freqs = qd_python_numpy2arma_Col<double>(cf_obj);
-            if (center_freqs.n_elem != n_freq)
-                throw std::invalid_argument("'center_freq' length must match number of frequency entries.");
-        }
-        else // scalar
-        {
-            double cf_val = cf_obj.cast<double>();
-            center_freqs.fill(cf_val);
-        }
+        center_freqs = qd_python_numpy2arma_Col<double>(arrayant["center_freq"]);
+        if (center_freqs.n_elem != n_freq)
+            throw std::invalid_argument("'center_freq' length must match number of frequency entries.");
     }
-    else
+    else if (n_freq == 1 || !require_center_freq)
         center_freqs.fill(299792458.0); // Default
+    else
+        throw std::invalid_argument("Input 'center_freq' is required for a multi-frequency arrayant (4D pattern fields).");
 
     // Parse coupling: 2D (shared) or 3D (per-freq)
     std::vector<arma::Mat<double>> coupling_re_vec(n_freq);

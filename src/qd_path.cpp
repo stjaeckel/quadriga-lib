@@ -28,6 +28,7 @@ SECTION!*/
         uint8_t interact_type[2] = {0, 0};                                  // Type of the first 2 interactions
         float len_acc = 0.0f;                                               // Accumulated path length
         float xprmat[8] = {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f}; // EM: Jones matrix for freq 0, col-major; SCALAR: Pressure coeffs for freqs 0-3
+        // Jones labels <out><in> (= <rx><tx> in get_channels_*): ReHV = H out, V in = rows 2-3; ReVH = V out, H in = rows 4-5
         float *data = nullptr;                                              // Variable-length data buffer
 
         // Data buffer EM:
@@ -525,7 +526,7 @@ float quadriga_lib::path::xpr_update(const float *coeff_update, float gain_updat
         return gain_from_coeff(oRe, oIm, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, true, d, fGHz);
     }
 
-    // EM mode, 8 values: [ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH], column-major
+    // EM mode, 8 values: [ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH], column-major, labels <out><in> (HV = H out, V in)
     float oReVV = oX[0], oImVV = oX[1];
     float oReHV = oX[2], oImHV = oX[3];
     float oReVH = oX[4], oImVH = oX[5];

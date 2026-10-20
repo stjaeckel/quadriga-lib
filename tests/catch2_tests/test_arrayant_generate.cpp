@@ -241,3 +241,85 @@ TEST_CASE("Generate Arrayant - Multi-Beam")
     CHECK(arma::approx_equal(x, y, "absdiff", 1e-14));
 }
 
+
+// B-011: a beam towards a pole, where the element pattern is exactly 0, used to leave the beam weights unset:
+// pol = 1 returned one port per element, pol = 2 and 3 crashed (null pointer in memcpy).
+TEST_CASE("Generate Arrayant - Multi-Beam towards the poles (B-011)")
+{
+    for (double el : {90.0, -90.0})
+        for (unsigned pol : {1u, 2u, 3u})
+        {
+            quadriga_lib::arrayant<double> a;
+            REQUIRE_NOTHROW(a = quadriga_lib::generate_arrayant_multibeam<double>(2, 2, arma::vec{0.0}, arma::vec{el},
+                                                                                 arma::vec{1.0}, 3e9, pol));
+            const arma::uword n_el = pol == 1 ? 4 : 8;
+            CHECK(a.n_elements() == n_el);
+            CHECK(a.n_ports() == (pol == 1 ? 1 : 2));
+            CHECK(a.is_valid(false).empty());
+            CHECK(arma::is_finite(a.coupling_re));
+            CHECK(arma::is_finite(a.coupling_im));
+            CHECK(arma::accu(arma::abs(a.coupling_re)) + arma::accu(arma::abs(a.coupling_im)) > 0.0);
+        }
+
+    // Separate beams, one of them towards the zenith
+    auto b = quadriga_lib::generate_arrayant_multibeam<double>(2, 2, arma::vec{0.0, 30.0}, arma::vec{90.0, 0.0}, {}, 3e9, 2,
+                                                               0.5, 120.0, 120.0, 0.0, 10.0, true);
+    CHECK(b.n_elements() == 8);
+    CHECK(b.n_ports() == 4);
+    CHECK(b.is_valid(false).empty());
+}
+
+// B-044: the ULA and 3GPP generators use only the radiation pattern of a custom pattern; its element positions and
+// coupling are ignored (as documented).
+TEST_CASE("Generate Arrayant - ULA and 3GPP ignore positions and coupling of a custom pattern (B-044)")
+{
+    auto p = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    p.copy_element(0, 1);
+    p.element_pos = {{0.3, 0.3}, {0.0, 0.0}, {0.7, -0.7}};
+    p.coupling_re = arma::mat(2, 1, arma::fill::ones); // 2 elements -> 1 port
+    p.coupling_im = arma::mat(2, 1, arma::fill::zeros);
+    p.center_frequency = 1e9;
+
+    const double lambda = 299792458.0 / 3e9;
+    auto u = quadriga_lib::generate_arrayant_ula<double>(2, 3e9, 0.5, &p);
+    CHECK(u.n_elements() == 4);
+    CHECK(u.n_ports() == 4);
+    CHECK(arma::approx_equal(u.coupling_re, arma::mat(4, 4, arma::fill::eye), "absdiff", 0.0));
+    CHECK(arma::all(arma::vectorise(u.coupling_im) == 0.0));
+    CHECK(arma::all(u.element_pos.row(0) == 0.0));
+    CHECK(arma::all(u.element_pos.row(2) == 0.0));
+    arma::rowvec y = {-0.25 * lambda, -0.25 * lambda, 0.25 * lambda, 0.25 * lambda};
+    CHECK(arma::approx_equal(u.element_pos.row(1), y, "absdiff", 1e-12));
+    CHECK(u.center_frequency == 3e9);
+
+    auto g = quadriga_lib::generate_arrayant_3GPP<double>(1, 1, 3e9, 1, 0.0, 0.5, 1, 1, 0.5, 0.5, &p);
+    CHECK(g.n_elements() == 2);
+    CHECK(g.n_ports() == 2);
+    CHECK(arma::approx_equal(g.coupling_re, arma::mat(2, 2, arma::fill::eye), "absdiff", 0.0));
+    CHECK(arma::all(arma::vectorise(g.element_pos) == 0.0));
+
+    // Vertical stacking: z positions come from the array geometry only
+    auto g2 = quadriga_lib::generate_arrayant_3GPP<double>(2, 1, 3e9, 1, 0.0, 0.5, 1, 1, 0.5, 0.5, &p);
+    CHECK(g2.n_elements() == 4);
+    CHECK(g2.n_ports() == 4);
+    CHECK(arma::all(g2.element_pos.row(0) == 0.0));
+    arma::rowvec z = {-0.25 * lambda, -0.25 * lambda, 0.25 * lambda, 0.25 * lambda};
+    CHECK(arma::approx_equal(g2.element_pos.row(2), z, "absdiff", 1e-12));
+}
+
+// B-047: the header defaults were M = N = 2, the documentation and the MATLAB / Python wrappers say 1
+TEST_CASE("Generate Arrayant - Multi-Beam defaults are 1 x 1 (B-047)")
+{
+    auto a = quadriga_lib::generate_arrayant_multibeam<double>();
+    CHECK(a.n_elements() == 1);
+    CHECK(a.n_ports() == 1);
+
+    auto b = quadriga_lib::generate_arrayant_multibeam<float>();
+    CHECK(b.n_elements() == 1);
+    CHECK(b.n_ports() == 1);
+
+    // Same as passing M = N = 1 explicitly
+    auto c = quadriga_lib::generate_arrayant_multibeam<double>(1, 1);
+    CHECK(arma::approx_equal(a.e_theta_re, c.e_theta_re, "absdiff", 0.0));
+    CHECK(arma::approx_equal(a.coupling_re, c.coupling_re, "absdiff", 0.0));
+}

@@ -103,6 +103,7 @@ Append elements of another arrayant to the current one
 
 - Both arrays must share identical sampling grids; throws otherwise
 - Coupling is block-diagonal (see [[arrayant_concat_multi]] diagram); center_frequency is taken from this
+- An empty `coupling_re` counts as identity (one port per element), an empty `coupling_im` as zeros
 
 ## Declaration:
 ```
@@ -164,12 +165,6 @@ quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::append(const quadri
     std::memcpy(output.e_phi_im.slice_memptr(0), this->e_phi_im.slice_memptr(0), n_azimuth * n_elevation * n_elements_1 * sizeof(dtype));
     if (!this->element_pos.empty())
         std::memcpy(output.element_pos.colptr(0), this->element_pos.colptr(0), 3 * n_elements_1 * sizeof(dtype));
-    if (!this->coupling_re.empty())
-        for (arma::uword n = 0; n < n_ports_1; ++n)
-        {
-            std::memcpy(output.coupling_re.colptr(n), this->coupling_re.colptr(n), n_elements_1 * sizeof(dtype));
-            std::memcpy(output.coupling_im.colptr(n), this->coupling_im.colptr(n), n_elements_1 * sizeof(dtype));
-        }
 
     // Inherit scalar/string metadata from *this
     output.center_frequency = this->center_frequency;
@@ -182,12 +177,11 @@ quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::append(const quadri
     std::memcpy(output.e_phi_im.slice_memptr(n_elements_1), new_arrayant->e_phi_im.slice_memptr(0), n_azimuth * n_elevation * n_elements_2 * sizeof(dtype));
     if (!new_arrayant->element_pos.empty())
         std::memcpy(output.element_pos.colptr(n_elements_1), new_arrayant->element_pos.colptr(0), 3 * n_elements_2 * sizeof(dtype));
-    if (!new_arrayant->coupling_re.empty())
-        for (arma::uword n = 0; n < n_ports_2; ++n)
-        {
-            std::memcpy(output.coupling_re.colptr(n + n_ports_1) + n_elements_1, new_arrayant->coupling_re.colptr(n), n_elements_2 * sizeof(dtype));
-            std::memcpy(output.coupling_im.colptr(n + n_ports_1) + n_elements_1, new_arrayant->coupling_im.colptr(n), n_elements_2 * sizeof(dtype));
-        }
+
+    // Block-diagonal coupling (empty coupling_re: identity block, empty coupling_im: zeros)
+    qd_arrayant_coupling_block_diag(this->coupling_re, this->coupling_im, n_elements_1,
+                                    new_arrayant->coupling_re, new_arrayant->coupling_im, n_elements_2,
+                                    output.coupling_re, output.coupling_im);
 
     return output;
 }
@@ -199,6 +193,12 @@ Calculate the beamwidth and pointing angles of array antenna elements in degrees
 - Computes azimuth and elevation beamwidth at a given dB threshold (default 3 dB = FWHM)
 - Also returns the azimuth and elevation pointing angles of the main beam
 - Sub-grid resolution is achieved by bilinear interpolation of the field pattern (≈100x finer grid in each direction than the antenna sampling grid)
+- The width is that of the main lobe: starting at the maximum, the search goes outwards until the power drops below the
+  threshold; side lobes above the threshold are not included
+- Azimuth: cut at the elevation of the maximum, circular across ±180° when the grid covers the full circle; 360° when
+  the whole cut is above the threshold (e.g. omni patterns or a beam pointing to a pole, where the cut is a point)
+- Elevation: cut along the great circle through the maximum, so a lobe can extend across the poles (requires samples
+  at ±90°); the result is at most 180°
 - Ignores element coupling
 
 ## Declaration:
@@ -273,108 +273,127 @@ void quadriga_lib::arrayant<dtype>::calc_beamwidth_deg(arma::uword i_element, dt
     arma::uvec i_el_vec(1);
     i_el_vec(0) = i_element;
 
-    // Azimuth pass
-    if (need_az)
+    // Width of the main lobe in samples of a cut: the samples above the threshold that are connected to the
+    // maximum, searched outwards from the maximum (wrapping around for a circular cut). Returns n for a circular
+    // cut that is above the threshold everywhere.
+    auto lobe_width = [](const arma::Col<double> &P, arma::uword iM, double thres, bool circular) -> arma::uword
     {
-        const dtype az_first = azimuth_grid(0);
-        const dtype az_last = azimuth_grid(nAz - 1);
-        const dtype az_step = (az_last - az_first) / dtype(100 * nAz);
-        const arma::uword nAzi = 100 * nAz + 1;
+        const arma::uword n = P.n_elem;
+        arma::uword n_left = 0, n_right = 0;
+        if (circular)
+        {
+            while (n_left + n_right + 1 < n && P(iM >= n_left + 1 ? iM - n_left - 1 : iM + n - n_left - 1) > thres)
+                ++n_left;
+            while (n_left + n_right + 1 < n && P((iM + n_right + 1) % n) > thres)
+                ++n_right;
+            if (n_left + n_right + 1 == n && P(iM) > thres)
+                return n;
+        }
+        else
+        {
+            while (iM >= n_left + 1 && P(iM - n_left - 1) > thres)
+                ++n_left;
+            while (iM + n_right + 1 < n && P(iM + n_right + 1) > thres)
+                ++n_right;
+        }
+        return n_left + n_right;
+    };
 
-        arma::Mat<dtype> az_q(1, nAzi), el_q(1, nAzi);
-        for (arma::uword i = 0; i < nAzi - 1; ++i)
-            az_q(0, i) = az_first + dtype(i) * az_step;
-        az_q(0, nAzi - 1) = az_last;
-        el_q.fill(elevation_grid(iEl_max));
-
+    // Power of the interpolated cut and the index of its maximum
+    auto cut_power = [&](const arma::Mat<dtype> &az_q, const arma::Mat<dtype> &el_q, arma::Col<double> &P) -> arma::uword
+    {
         arma::Mat<dtype> V_re, V_im, H_re, H_im;
         this->interpolate(&az_q, &el_q, &V_re, &V_im, &H_re, &H_im, i_el_vec);
-
-        double Pi_max = 0.0;
+        P.set_size(az_q.n_elem);
+        double P_max = 0.0;
         arma::uword iM = 0;
-        arma::Col<double> Pi(nAzi);
-        for (arma::uword i = 0; i < nAzi; ++i)
+        for (arma::uword i = 0; i < az_q.n_elem; ++i)
         {
             double a = double(V_re(0, i)), b = double(V_im(0, i));
             double c = double(H_re(0, i)), d = double(H_im(0, i));
             double v = a * a + b * b + c * c + d * d;
-            Pi(i) = v;
-            if (v > Pi_max)
-            {
-                Pi_max = v;
-                iM = i;
-            }
+            P(i) = v;
+            if (v > P_max)
+                P_max = v, iM = i;
         }
-        const double thres_abs = Pi_max * thres_lin;
-        arma::uword iS = 0, iL = nAzi - 1;
+        return iM;
+    };
+
+    const double pi = arma::datum::pi, tau = 2.0 * pi, pi_half = 0.5 * pi, tol = 1.0e-4;
+
+    // Azimuth pass: cut at the elevation of the maximum. When the grid covers the full circle (the gap between the
+    // last and the first grid point is not larger than the largest grid step), the cut is circular.
+    if (need_az)
+    {
+        const double az_first = double(azimuth_grid(0));
+        const double az_last = double(azimuth_grid(nAz - 1));
+        double step_max = 0.0;
+        for (arma::uword i = 1; i < nAz; ++i)
+            step_max = std::max(step_max, double(azimuth_grid(i) - azimuth_grid(i - 1)));
+        const bool circular = nAz == 1 || az_first + tau - az_last <= step_max + tol;
+
+        const arma::uword nAzi = circular ? 100 * nAz : 100 * nAz + 1;
+        const double az_step = circular ? tau / double(nAzi) : (az_last - az_first) / double(100 * nAz);
+
+        arma::Mat<dtype> az_q(1, nAzi), el_q(1, nAzi);
         for (arma::uword i = 0; i < nAzi; ++i)
-            if (Pi(i) > thres_abs)
-            {
-                iS = i;
-                break;
-            }
-        for (arma::uword i = nAzi; i-- > 0;)
-            if (Pi(i) > thres_abs)
-            {
-                iL = i;
-                break;
-            }
+        {
+            double az = az_first + double(i) * az_step;
+            az_q(0, i) = dtype(az > pi ? az - tau : az);
+        }
+        if (!circular)
+            az_q(0, nAzi - 1) = dtype(az_last);
+        el_q.fill(elevation_grid(iEl_max));
+
+        arma::Col<double> Pi;
+        const arma::uword iM = cut_power(az_q, el_q, Pi);
+        const arma::uword width = lobe_width(Pi, iM, Pi(iM) * thres_lin, circular);
 
         if (beamwidth_az != nullptr)
-            *beamwidth_az = dtype(double(az_q(0, iL) - az_q(0, iS)) * rad2deg);
+            *beamwidth_az = dtype(width == nAzi ? 360.0 : double(width) * az_step * rad2deg);
         if (az_point_ang != nullptr)
             *az_point_ang = dtype(double(az_q(0, iM)) * rad2deg);
     }
 
-    // Elevation pass
+    // Elevation pass: cut along the great circle through the maximum (azimuth of the maximum and the opposite
+    // azimuth), so that a main lobe can extend across the poles. Without samples at a pole the cut ends there.
+    // The result is at most 180 degree.
     if (need_el)
     {
-        const dtype el_first = elevation_grid(0);
-        const dtype el_last = elevation_grid(nEl - 1);
-        const dtype el_step = (el_last - el_first) / dtype(100 * nEl);
-        const arma::uword nEli = 100 * nEl + 1;
+        const double el_first = double(elevation_grid(0));
+        const double el_last = double(elevation_grid(nEl - 1));
+        const bool full_el = el_first <= -pi_half + tol && el_last >= pi_half - tol;
+
+        const double az_front = double(azimuth_grid(iAz_max));
+        const double az_back = az_front > 0.0 ? az_front - pi : az_front + pi;
+
+        arma::uword nEli;
+        double el_step;
+        if (full_el) // Full great circle, parameter t in [el_first, el_first + 2 pi)
+            nEli = 200 * nEl, el_step = tau / double(nEli);
+        else
+            nEli = 100 * nEl + 1, el_step = (el_last - el_first) / double(100 * nEl);
 
         arma::Mat<dtype> az_q(1, nEli), el_q(1, nEli);
-        for (arma::uword i = 0; i < nEli - 1; ++i)
-            el_q(0, i) = el_first + dtype(i) * el_step;
-        el_q(0, nEli - 1) = el_last;
-        az_q.fill(azimuth_grid(iAz_max));
-
-        arma::Mat<dtype> V_re, V_im, H_re, H_im;
-        this->interpolate(&az_q, &el_q, &V_re, &V_im, &H_re, &H_im, i_el_vec);
-
-        double Pi_max = 0.0;
-        arma::uword iM = 0;
-        arma::Col<double> Pi(nEli);
         for (arma::uword i = 0; i < nEli; ++i)
         {
-            double a = double(V_re(0, i)), b = double(V_im(0, i));
-            double c = double(H_re(0, i)), d = double(H_im(0, i));
-            double v = a * a + b * b + c * c + d * d;
-            Pi(i) = v;
-            if (v > Pi_max)
-            {
-                Pi_max = v;
-                iM = i;
-            }
+            double t = el_first + double(i) * el_step;
+            if (!full_el || t <= pi_half) // Front half
+                az_q(0, i) = dtype(az_front), el_q(0, i) = dtype(t);
+            else if (t <= 3.0 * pi_half) // Back half, across the north pole
+                az_q(0, i) = dtype(az_back), el_q(0, i) = dtype(pi - t);
+            else // Across the south pole, back to the front half
+                az_q(0, i) = dtype(az_front), el_q(0, i) = dtype(t - tau);
         }
-        const double thres_abs = Pi_max * thres_lin;
-        arma::uword iS = 0, iL = nEli - 1;
-        for (arma::uword i = 0; i < nEli; ++i)
-            if (Pi(i) > thres_abs)
-            {
-                iS = i;
-                break;
-            }
-        for (arma::uword i = nEli; i-- > 0;)
-            if (Pi(i) > thres_abs)
-            {
-                iL = i;
-                break;
-            }
+        if (!full_el)
+            el_q(0, nEli - 1) = dtype(el_last);
+
+        arma::Col<double> Pi;
+        const arma::uword iM = cut_power(az_q, el_q, Pi);
+        const arma::uword width = lobe_width(Pi, iM, Pi(iM) * thres_lin, full_el);
 
         if (beamwidth_el != nullptr)
-            *beamwidth_el = dtype(double(el_q(0, iL) - el_q(0, iS)) * rad2deg);
+            *beamwidth_el = dtype(std::min(double(width) * el_step * rad2deg, 180.0));
         if (el_point_ang != nullptr)
             *el_point_ang = dtype(double(el_q(0, iM)) * rad2deg);
     }
@@ -385,6 +404,7 @@ void quadriga_lib::arrayant<dtype>::calc_beamwidth_deg(arma::uword i_element, dt
 Calculate the directivity in dBi of a single array element
 
 - Directivity = 10 log10(peak radiation intensity / mean over 4π); isotropic radiator = 0 dBi
+- Independent of the scale of the pattern; an element whose pattern is zero everywhere returns 0 dBi
 - Ignores element coupling
 
 ## Declaration:
@@ -466,7 +486,8 @@ dtype quadriga_lib::arrayant<dtype>::calc_directivity_dBi(arma::uword i_element)
         p_sum += pow * ptr[i];
     }
 
-    double directivity = p_max < 1.0e-14 ? 0.0 : 10.0 * std::log10(p_max / p_sum);
+    // An all-zero element has no directivity; 0 dBi is returned
+    double directivity = (p_max > 0.0 && p_sum > 0.0) ? 10.0 * std::log10(p_max / p_sum) : 0.0;
     return dtype(directivity);
 }
 
@@ -475,18 +496,23 @@ dtype quadriga_lib::arrayant<dtype>::calc_directivity_dBi(arma::uword i_element)
 Combine element patterns, positions, and coupling weights into effective radiation patterns
 
 - Integrates `e_theta_re/im`, `e_phi_re/im`, `element_pos`, and `coupling_re/im` to produce one output element per port (column) of the coupling matrix
+- The element positions add the phase `-2 pi f d / propagation_speed` with `f = center_frequency` and `d` the distance
+  of the element from the wavefront plane through the origin; the default speed of light applies to radio waves, use
+  about 343 m/s for acoustic arrays (e.g. from [[generate_speaker]])
 - Useful for beamforming and MIMO channel computation speedup
 
 ## Declaration:
 ```
 quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::combine_pattern(
     const arma::Col<dtype> *azimuth_grid_new = nullptr,
-    const arma::Col<dtype> *elevation_grid_new = nullptr) const;
+    const arma::Col<dtype> *elevation_grid_new = nullptr,
+    dtype propagation_speed = 299792458.0) const;
 ```
 
 ## Inputs:
 - **`azimuth_grid_new`** *(optional)* — Alternative azimuth grid in rad, in [-pi, pi], sorted; defaults to input grid
 - **`elevation_grid_new`** *(optional)* — Alternative elevation grid in rad, in [-pi/2, pi/2], sorted; defaults to input grid
+- **`propagation_speed`** *(optional)* — Wave propagation speed in m/s; positive and finite; use about 343 for acoustics
 
 ## Returns:
 - New `arrayant` with `n_ports` elements (= number of columns in `coupling_re/im`), each holding the combined effective pattern for that port
@@ -498,12 +524,16 @@ MD!*/
 
 template <typename dtype>
 quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::combine_pattern(const arma::Col<dtype> *azimuth_grid_new,
-                                                                             const arma::Col<dtype> *elevation_grid_new) const
+                                                                             const arma::Col<dtype> *elevation_grid_new,
+                                                                             dtype propagation_speed) const
 {
     // Check if calling arrayant object is valid
     std::string error_message = this->is_valid(false); // Deep check
     if (error_message.length() != 0)
         throw std::invalid_argument(error_message.c_str());
+
+    if (!(propagation_speed > dtype(0.0)) || !std::isfinite(propagation_speed))
+        throw std::invalid_argument("Input 'propagation_speed' must be positive and finite.");
 
     // Get output angular grid
     bool new_azgrid = azimuth_grid_new != nullptr && azimuth_grid_new->n_elem != 0;
@@ -550,7 +580,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::combine_pattern(con
                             V_re, V_im, H_re, H_im, &dist);
 
     // Apply phase shift caused by element positions
-    double lambda = 299792458.0 / (double)this->center_frequency;
+    double lambda = (double)propagation_speed / (double)this->center_frequency;
     dtype wave_no = dtype(2.0 * arma::datum::pi / lambda);
     arma::Mat<std::complex<dtype>> phase(arma::cos(wave_no * dist), arma::sin(-wave_no * dist));
     arma::Mat<std::complex<dtype>> Vi(V_re, V_im), Hi(H_re, H_im);
@@ -648,6 +678,7 @@ Copy a single antenna element to one or more destination slots
 
 - Array is resized if any destination index exceeds the current number of elements
 - Coupling matrix for added elements is set to identity; if not existing, it gets initialized to identity
+- Throws `std::invalid_argument` for a read-only object or an empty `destination`
 
 ## Declaration:
 ```
@@ -667,6 +698,12 @@ MD!*/
 template <typename dtype>
 void quadriga_lib::arrayant<dtype>::copy_element(arma::uword source, arma::uvec destination)
 {
+    if (read_only)
+        throw std::invalid_argument("Cannot copy elements of a read-only array antenna object.");
+
+    if (destination.n_elem == 0)
+        throw std::invalid_argument("Input 'destination' is empty.");
+
     // Check if arrayant object is valid
     std::string error_message = validate(); // Deep check
     if (error_message.length() != 0)
@@ -1119,6 +1156,7 @@ Interpolate polarimetric antenna field patterns for given azimuth/elevation angl
 - Outputs complex e-theta (V) and e-phi (H) field components at requested angles
 - `n_out` equals `n_elements` when `i_element` is omitted; equals `len(i_element)` otherwise
 - Azimuth input supports planar wave mode (`[1, n_ang]`) or per-element spherical wave mode (`[n_out, n_ang]`)
+- NaN or infinite angles give NaN in all outputs for that angle (and element); no exception is thrown
 - Output matrices are resized automatically if dimensions do not match; this invalidates existing data pointers
 
 ## Declaration:
@@ -1285,6 +1323,18 @@ Write arrayant data to a QDANT (XML) file
 
 - Multiple antennas can be stored in the same file using distinct `id` values
 - If `id = 0` and the file exists, the antenna is appended with `id = max_existing_id + 1`; if file does not exist, `id = 1` gets assigned
+- Without `layout` (empty), the layout in the file is replaced by a `[1, n]` row of all IDs in the file in file
+  order; a custom layout written before is lost. Pass the layout again with every write that should keep it.
+- The file has single-precision-equivalent accuracy relative to the element peak, also for double-precision data:
+  pattern magnitudes (in dB) and phases (in degree) get the fewest decimals (0 to 6) that keep the error of each
+  complex sample at or below 6e-8 times the peak amplitude of its element (over e_theta and e_phi). Samples near
+  the peak are accurate to about 6e-8 of their own amplitude; the relative error grows by 10 per 20 dB below the
+  peak (about 6e-4 at -80 dB, 6e-2 at -120 dB), while the absolute error stays below 6e-8 of the peak. An element at
+  a low level is quantized relative to its own peak. Element positions and coupling (magnitude, phase) are written
+  as the shortest text that reads back as the same float (at most 9 significant digits); sampling grids are rounded
+  to 0.001 degree
+- All non-zero pattern samples are written, at any level; exact zeros are written as `-inf` dB. An element that is
+  zero in both field components is written as an all `-inf` `EthetaMag` node.
 
 ## Declaration:
 ```
@@ -1333,8 +1383,10 @@ unsigned quadriga_lib::arrayant<dtype>::qdant_write(std::string fn, unsigned id,
 Remove zero-valued entries from antenna pattern data, reducing its size
 
 - Modifies in-place when `output = nullptr`; otherwise writes to `*output`
-- A column or row is removed if the total power summed over all field components and array elements does not exceed 1e-12;
-  immediate neighbors of retained entries are also kept unless the local grid spacing is strongly asymmetric (factor > 1.5)
+- A column or row is removed if the total power summed over all field components and array elements does not exceed
+  1e-12 times the peak power of a single sample (summed over field components and elements); the result does not
+  depend on the scale of the pattern; an all-zero pattern is left unchanged
+- Immediate neighbors of retained entries are also kept unless the local grid spacing is strongly asymmetric (factor > 1.5)
 
 ## Declaration:
 ```
@@ -1364,29 +1416,38 @@ void quadriga_lib::arrayant<dtype>::remove_zeros(quadriga_lib::arrayant<dtype> *
     unsigned long long n_az = e_theta_re.n_cols;
     unsigned long long n_slices = e_theta_re.n_slices;
 
-    // Calculate the power pattern
-    arma::Mat<dtype> pow(n_el, n_az);
-    dtype *pp = pow.memptr();
-    dtype limit = dtype(1.0e-12), pi_half = dtype(arma::datum::pi / 2.0);
+    // Calculate the power pattern (in double precision, so that low-level float patterns do not underflow)
+    arma::mat pow(n_el, n_az, arma::fill::zeros);
+    double *pw = pow.memptr();
+    dtype pi_half = dtype(arma::datum::pi / 2.0);
 
     for (auto is = 0ULL; is < n_slices; ++is)
     {
         dtype *pa = e_theta_re.slice_memptr(is), *pb = e_theta_im.slice_memptr(is),
               *pc = e_phi_re.slice_memptr(is), *pd = e_phi_im.slice_memptr(is);
         for (auto j = 0ULL; j < n_el * n_az; ++j)
-            pp[j] += pa[j] * pa[j] + pb[j] * pb[j] + pc[j] * pc[j] + pd[j] * pd[j];
+        {
+            double a = double(pa[j]), b = double(pb[j]), c = double(pc[j]), d = double(pd[j]);
+            pw[j] += a * a + b * b + c * c + d * d;
+        }
     }
 
-    arma::Row<dtype> az_sum = arma::sum(pow, 0);
-    arma::Col<dtype> el_sum = arma::sum(pow, 1);
+    // Threshold relative to the peak power
+    const double p_peak = pow.max();
+    const double limit = 1.0e-12 * p_peak;
+
+    arma::rowvec az_sum = arma::sum(pow, 0);
+    arma::vec el_sum = arma::sum(pow, 1);
     pow.reset();
 
-    // Determine which parts of the pattern should be kept
-    arma::uvec keep_az(n_az), keep_el(n_el);
+    // Determine which parts of the pattern should be kept; an all-zero pattern is kept unchanged
+    arma::uvec keep_az(n_az, arma::fill::zeros), keep_el(n_el, arma::fill::zeros);
+    if (!(p_peak > 0.0))
+        keep_az.ones(), keep_el.ones();
     unsigned long long *keep_az_ptr = keep_az.memptr();
     unsigned long long *keep_el_ptr = keep_el.memptr();
 
-    pp = az_sum.memptr();
+    const double *ps = az_sum.memptr();
     dtype *grid_ptr = azimuth_grid.memptr();
     for (auto ia = 0ULL; ia < n_az; ++ia)
     {
@@ -1396,14 +1457,14 @@ void quadriga_lib::arrayant<dtype>::remove_zeros(quadriga_lib::arrayant<dtype> *
         unsigned long long ip = ia == 0ULL ? n_az - 1ULL : ia - 1ULL;
         unsigned long long in = ia == n_az - 1ULL ? 0ULL : ia + 1ULL;
 
-        if (pp[ia] > limit)
+        if (ps[ia] > limit)
             keep_az_ptr[ip] = n > 0.001 * p && p > 1.5 * n ? keep_az_ptr[ip] : 1,
             keep_az_ptr[ia] = 1,
             keep_az_ptr[in] = p > 0.001 * n && n > 1.5 * p ? keep_az_ptr[in] : 1;
     }
     az_sum.reset();
 
-    pp = el_sum.memptr(), grid_ptr = elevation_grid.memptr();
+    ps = el_sum.memptr(), grid_ptr = elevation_grid.memptr();
 
     for (auto ie = 0ULL; ie < n_el; ++ie)
     {
@@ -1413,7 +1474,7 @@ void quadriga_lib::arrayant<dtype>::remove_zeros(quadriga_lib::arrayant<dtype> *
         unsigned long long ip = ie == 0ULL ? 0ULL : ie - 1ULL;
         unsigned long long in = ie == n_el - 1ULL ? n_el - 1ULL : ie + 1ULL;
 
-        if (pp[ie] > limit)
+        if (ps[ie] > limit)
             keep_el_ptr[ip] = n > 0.001 * p && p > 1.5 * n ? keep_el_ptr[ip] : 1ULL,
             keep_el_ptr[ie] = 1,
             keep_el_ptr[in] = p > 0.001 * n && n > 1.5 * p ? keep_el_ptr[in] : 1ULL;
@@ -1496,7 +1557,7 @@ void quadriga_lib::arrayant<dtype>::remove_zeros(quadriga_lib::arrayant<dtype> *
 
     // Copy the new azimuth grid
     dtype *azimuth_grid_new = new dtype[n_az_new];
-    pp = azimuth_grid_new;
+    dtype *pp = azimuth_grid_new;
     for (auto ia = 0ULL; ia < n_az; ++ia)
         if (keep_az_ptr[ia] == 1)
             *pp++ = azimuth_grid[ia];
@@ -1599,6 +1660,8 @@ Rotate antenna radiation patterns around the principal axes using Euler rotation
 
 - Rotates pattern and/or polarization around x (bank), y (tilt), z (heading) axes in degrees
 - Modifies in-place when `output = nullptr`; otherwise writes to `*output`
+- Coupling, `center_frequency` and `name` are kept (also in `*output`); when a single `element` is written to
+  `*output`, the output holds only that element and its coupling is identity
 
 ## Declaration:
 ```
@@ -1871,9 +1934,25 @@ void quadriga_lib::arrayant<dtype>::rotate_pattern(dtype x_deg, dtype y_deg, dty
                                 V_re, V_im, H_re, H_im);
     azimuth_loc.reset(), elevation_loc.reset();
 
-    // Adjust size of output, if needed
+    // Adjust size of output, if needed; coupling, center frequency and name are kept. A single element written to
+    // the output gets identity coupling.
     if (output != nullptr)
-        output->set_size(n_el, n_az, n_out, n_out);
+    {
+        if (use_all_elements)
+        {
+            output->set_size(n_el, n_az, n_out, coupling_re.n_cols);
+            output->coupling_re = coupling_re;
+            output->coupling_im = coupling_im;
+        }
+        else
+        {
+            output->set_size(n_el, n_az, n_out, n_out);
+            output->coupling_re.eye(n_out, n_out);
+            output->coupling_im.zeros(n_out, n_out);
+        }
+        output->center_frequency = center_frequency;
+        output->name = name;
+    }
 
     if (usage == 2) // Only adjust the polarization
     {
@@ -1928,8 +2007,8 @@ void quadriga_lib::arrayant<dtype>::rotate_pattern(dtype x_deg, dtype y_deg, dty
         if (n_out > 1) // Transpose the interpolated data
             V_re = V_re.t(), V_im = V_im.t(), H_re = H_re.t(), H_im = H_im.t();
 
-        if (output == nullptr && update_grid) // Set new array size
-            set_size(n_el, n_az, n_out, n_out);
+        if (output == nullptr && update_grid) // Set new array size, keep the coupling (n_out = n_elements here)
+            set_size(n_el, n_az, n_out, coupling_re.n_cols);
 
         dtype *ptrI, *ptrO;
 

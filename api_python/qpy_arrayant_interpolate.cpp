@@ -13,6 +13,7 @@ SECTION!*/
 Interpolate polarimetric array antenna field patterns (single- and multi-frequency)
 
 - Interpolates the complex e-theta (V) and e-phi (H) field components at the requested azimuth / elevation angles
+- NaN or infinite angles give NaN in all outputs for that angle (and element); no error is raised
 - Single-frequency input (3D pattern fields) returns 2D outputs `(n_out, n_ang)`; the optional `dist` and
   `local_angles` outputs are available only on this path
 - Multi-frequency input (4D pattern fields) interpolates spatially and across frequency; for each
@@ -44,7 +45,8 @@ vr, vi, hr, hi = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation
 
 ## Inputs:
 - **`arrayant`** — Dict with the array antenna data; keys as in [[generate]]; pattern fields may
-  be 3D `(n_elevation, n_azimuth, n_elements)` or 4D `(n_elevation, n_azimuth, n_elements, n_freq)`
+  be 3D `(n_elevation, n_azimuth, n_elements)` or 4D `(n_elevation, n_azimuth, n_elements, n_freq)`;
+  4D input requires `center_freq` with one value per frequency entry `(n_freq,)`
 - **`azimuth`** — Azimuth angles in rad, in [-pi, pi]; `(1, n_ang)` for shared angles (planar
   wave) or `(n_out, n_ang)` for per-element angles (spherical wave)
 - **`elevation`** — Elevation angles in rad, in [-pi/2, pi/2]; same shape as `azimuth`
@@ -65,7 +67,8 @@ vr, vi, hr, hi = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation
 - **`local_angles`** — If `True`, also return the antenna-local angles; single-frequency input
   only and not allowed together with `frequency`; default: `False`
 - **`fast_access`** — If `True`, require the pattern arrays to be double and column-major
-  (Fortran-contiguous) so they can be read without a copy; raises if not; default: `False`
+  (Fortran-contiguous) so they can be read without a copy; raises if not. With `False`, such arrays are
+  read without a copy as well and all others are copied; default: `False`
 
 ## Outputs:
 Returned as a tuple; its length depends on `complex`, `dist`, and `local_angles`.
@@ -188,7 +191,7 @@ py::tuple arrayant_interpolate(const py::dict &arrayant,
         gamma_py = qd_python_init_output(n_out, n_ang, &gamma);
     }
 
-    if (dist && local_angles)
+    if (local_angles) // Without 'dist', dist_proj is a scratch output
         ant.interpolate(&az, &el, &V_re, &V_im, &H_re, &H_im, element_ind, &ori, &elpos, &dist_proj, &azimuth_loc, &elevation_loc, &gamma);
     else if (dist)
         ant.interpolate(&az, &el, &V_re, &V_im, &H_re, &H_im, element_ind, &ori, &elpos, &dist_proj);

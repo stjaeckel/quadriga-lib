@@ -331,4 +331,25 @@ catch ME
     end
 end
 
+%% Element indices: 1-based, converted to 0-based; 0 and non-integers are rejected
+ant1 = quadriga_lib.arrayant_generate('omni');
+assert_cpp_error( @() quadriga_lib.arrayant_interpolate( ant1, 0, 0, 0 ), 'Entries in ''element'' cannot be 0 (1-based index).' );
+assert_cpp_error( @() quadriga_lib.arrayant_interpolate( ant1, 0, 0, [1 0] ), 'Entries in ''element'' cannot be 0 (1-based index).' );
+assert_cpp_error( @() quadriga_lib.arrayant_interpolate( ant1, 0, 0, 1.7 ), 'Entries in ''element'' must be integers from 0 to' );
+assert_cpp_error( @() quadriga_lib.arrayant_interpolate( ant1, 0, 0, -1 ), 'Entries in ''element'' must be integers from 0 to' );
+assert_cpp_error( @() quadriga_lib.arrayant_interpolate( ant1, 0, 0, sparse(1) ), 'Input ''element'' is sparse' );
+end
+
+% Assert that fn() raises quadriga_lib:CPPerror with a message that contains expected (substring).
+% One output is requested: without outputs, the wrapper returns before it reads the inputs.
+function assert_cpp_error(fn, expected)
+try
+    [~] = fn();
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if ~strcmp(ME.identifier, 'quadriga_lib:CPPerror') || isempty(strfind(ME.message, expected)) %#ok<STREMP>
+        error('moxunit:exceptionNotRaised', ['EXPECTED: quadriga_lib:CPPerror "', expected, '", GOT: ', ...
+            ME.identifier, ' "', ME.message, '"']);
+    end
+end
 end

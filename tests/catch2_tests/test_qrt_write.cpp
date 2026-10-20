@@ -10,6 +10,8 @@
 
 #include <cstdio>
 #include <cmath>
+#include <fstream>
+#include <iterator>
 
 using quadriga_lib::path;
 
@@ -418,5 +420,98 @@ TEST_CASE("QRT Write - read_raw with shared stream and cache")
     REQUIRE(t.size() == 1);
     CHECK(t[0] == 9);
 
+    std::remove(fn.c_str());
+}
+TEST_CASE("QRT Write - append after an orientation that rounds to 0 in float")
+{
+    // B-017: a CIR orientation column of 1e-50 rad is non-zero in double but 0 in float. Init and append
+    // must agree on the stored orientation columns, otherwise the TX table and path data are misplaced.
+    for (bool scalar : {false, true})
+    {
+        std::string fn = scalar ? "tests/data/test_write_tiny_ori_v6.qrt" : "tests/data/test_write_tiny_ori_v5.qrt";
+        arma::vec freq = scalar ? arma::vec{1000.0, 2000.0} : arma::vec{3.5, 28.0};
+        arma::mat cir_pos = {{1, 2, 3}, {4, 5, 6}, {7, 8, 9}};
+        arma::mat cir_ori(3, 3, arma::fill::zeros);
+        cir_ori.col(0).fill(1e-50); // bank: non-zero in double, 0.0f in float
+        cir_ori(1, 2) = 0.25;       // heading of CIR 1 is stored
+        quadriga_lib::qrt_file_init<double>(fn, freq, cir_pos, cir_ori, {"RX"}, {0}, 3, scalar);
+
+        auto mk = [&](unsigned iC, unsigned nSEG, std::vector<uint8_t> t)
+        { return scalar ? make_scalar_path(iC, nSEG, 2, t) : make_em_path(iC, nSEG, 2, t); };
+        std::vector<std::vector<path>> tx(3);
+        tx[0] = {mk(0, 0, {}), mk(2, 3, {1, 2, 3}), mk(0, 1, {4})};
+        tx[2] = {mk(1, 2, {5, 6})}; // tx[1] has no paths
+        for (unsigned t = 0; t < 3; ++t)
+            CHECK(quadriga_lib::qrt_file_append<double>(fn, tx[t], arma::vec{100.0 + t, 200.0, 30.0},
+                                                        arma::vec{0.0, 0.0, 0.5 * t}, "TX" + std::to_string(t)) == tx[t].size());
+
+        auto cache = quadriga_lib::qrt_read_cache_init(fn);
+        REQUIRE(cache.no_orig == 3);
+        for (unsigned t = 0; t < 3; ++t)
+        {
+            CHECK(cache.orig_pos_all(t, 0) == float(100.0 + t));
+            CHECK(cache.orig_pos_all(t, 1) == 200.0f);
+            CHECK(cache.orig_pos_all(t, 2) == 30.0f);
+            CHECK(cache.orig_orientation(t, 2) == float(0.5 * t));
+        }
+        CHECK(cache.cir_orientation(0, 0) == 0.0f);
+        CHECK(cache.cir_orientation(1, 2) == 0.25f);
+
+        // read_raw returns the paths of each TX grouped by CIR, in written order within a CIR
+        for (unsigned t = 0; t < 3; ++t)
+        {
+            std::vector<path> raw = quadriga_lib::qrt_file_read_raw(fn, t);
+            std::vector<const path *> exp;
+            for (unsigned c = 0; c < 3; ++c)
+                for (auto &p : tx[t])
+                    if (p.iC == c)
+                        exp.push_back(&p);
+            REQUIRE(raw.size() == exp.size());
+            for (size_t i = 0; i < raw.size(); ++i)
+            {
+                CHECK(raw[i].iC == exp[i]->iC);
+                REQUIRE(raw[i].n_seg() == exp[i]->n_seg());
+                CHECK(raw[i].interaction_type_codes() == exp[i]->interaction_type_codes());
+                for (size_t s = 0; s < raw[i].n_seg(); ++s)
+                    for (int k = 0; k < 3; ++k)
+                        CHECK(raw[i].coord(s)[k] == exp[i]->coord(s)[k]);
+                for (size_t f = 0; f < 2; ++f)
+                    for (size_t k = 0; k < (scalar ? 2u : 8u); ++k)
+                        CHECK(raw[i].xpr_coeff(f)[k] == exp[i]->xpr_coeff(f)[k]);
+            }
+        }
+
+        // qrt_file_read returns the CIR positions and the path count of each CIR
+        for (unsigned c = 0; c < 3; ++c)
+        {
+            arma::vec rx_pos, rx_ori;
+            arma::u32_vec no_int;
+            quadriga_lib::qrt_file_read<double>(fn, c, 0, true, nullptr, nullptr, nullptr, &rx_pos, &rx_ori, nullptr, nullptr,
+                                                nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 1, &no_int);
+            CHECK(arma::approx_equal(rx_pos, cir_pos.row(c).t(), "absdiff", 0.0));
+            CHECK(rx_ori(2) == (c == 1 ? 0.25 : 0.0));
+            CHECK(no_int.n_elem == (c == 0 ? 2u : c == 2 ? 1u : 0u));
+        }
+        std::remove(fn.c_str());
+    }
+}
+
+TEST_CASE("QRT Write - append to a v4 file is rejected")
+{
+    // v4 legacy files cannot be appended to; the file must stay unchanged
+    std::string src = "tests/data/test.qrt", fn = "tests/data/test_write_v4_copy.qrt";
+    std::vector<char> before;
+    {
+        std::ifstream i(src, std::ios::binary);
+        before.assign(std::istreambuf_iterator<char>(i), std::istreambuf_iterator<char>());
+        std::ofstream o(fn, std::ios::binary);
+        o.write(before.data(), (std::streamsize)before.size());
+    }
+    std::vector<path> paths = {make_em_path(0, 1, 1, {1})};
+    CHECK_THROWS_AS(quadriga_lib::qrt_file_append<double>(fn, paths, arma::vec{0.0, 0.0, 0.0}), std::invalid_argument);
+    std::ifstream i(fn, std::ios::binary);
+    std::vector<char> after((std::istreambuf_iterator<char>(i)), std::istreambuf_iterator<char>());
+    CHECK(after == before);
+    i.close();
     std::remove(fn.c_str());
 }

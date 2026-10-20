@@ -15,6 +15,7 @@ Rotate antenna radiation patterns around the principal axes using Euler rotation
 - Rotates pattern and/or polarization around x (bank), y (tilt), z (heading) axes
 - Rotations applied in order x, y, z, composed as Rz·Ry·Rx (intrinsic Tait-Bryan)
 - Adjusts the sampling grid for non-uniformly sampled antennas when `usage` is 0 or 1
+- Coupling, `center_freq` and `name` are kept, also when the sampling grid is adjusted
 - For scalar acoustic fields (pressure stored in `e_theta_re` only), use `usage = 1` to avoid
   spurious polarization effects
 
@@ -86,7 +87,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const bool multifreq = struct_input && mxGetNumberOfElements(prhs[0]) > 1;
 
     // Element indices: 1-based MATLAB → 0-based C++ (empty = all elements)
-    arma::uvec i_element = (nrhs < 6) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[5], true);
+    arma::uvec i_element = (nrhs < 6) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[5], true, "i_element");
 
     if (arma::any(i_element == 0))
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Entries in 'i_element' cannot be 0 (1-based index).");

@@ -97,7 +97,7 @@ assertTrue(directivity_out > directivity_ant + 1.2);
 
 % Errors
 try
-    out = quadriga_lib.arrayant_combine_pattern( ant, [],[],[],[]);
+    out = quadriga_lib.arrayant_combine_pattern( ant, [],[],[],[],[]);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Wrong number of input arguments.';
@@ -427,6 +427,63 @@ try
 catch ME
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised')
         error('moxunit:exceptionNotRaised', 'Expected the C++ multi-freq validator to throw.');
+    end
+end
+
+% ==== Propagation speed ====
+
+% Two omni elements 0.2 m apart on the y-axis at 1 kHz, summed into one port
+omni = quadriga_lib.arrayant_generate('omni', 10);
+ant_ac = omni;
+ant_ac.e_theta_re = cat(3, omni.e_theta_re, omni.e_theta_re);
+ant_ac.e_theta_im = cat(3, omni.e_theta_im, omni.e_theta_im);
+ant_ac.e_phi_re = cat(3, omni.e_phi_re, omni.e_phi_re);
+ant_ac.e_phi_im = cat(3, omni.e_phi_im, omni.e_phi_im);
+ant_ac.element_pos = [0, 0; -0.1, 0.1; 0, 0];
+ant_ac.coupling_re = [1; 1];
+ant_ac.coupling_im = [0; 0];
+ant_ac.center_freq = 1000;
+
+ie = 10; ia0 = 19; ia90 = 28;  % el = 0; az = 0 and 90 deg on the 10 deg grid (1-based)
+expected = 2 * abs(cos(pi * 1000 * 0.2 / 344));
+
+% Default (omitted or []): speed of light
+out = quadriga_lib.arrayant_combine_pattern( ant_ac );
+assertElementsAlmostEqual( abs(complex(out.e_theta_re(ie,ia90), out.e_theta_im(ie,ia90))), 2, 'absolute', 1e-6 );
+out2 = quadriga_lib.arrayant_combine_pattern( ant_ac, [], [], [], [] );
+assertEqual( out2.e_theta_re, out.e_theta_re );
+assertEqual( out2.e_theta_im, out.e_theta_im );
+
+% Struct mode, 5th input
+out = quadriga_lib.arrayant_combine_pattern( ant_ac, [], [], [], 344 );
+assertElementsAlmostEqual( abs(complex(out.e_theta_re(ie,ia0), out.e_theta_im(ie,ia0))), 2, 'absolute', 1e-6 );
+assertElementsAlmostEqual( abs(complex(out.e_theta_re(ie,ia90), out.e_theta_im(ie,ia90))), expected, 'absolute', 1e-6 );
+assertElementsAlmostEqual( expected, 0.506, 'absolute', 1e-3 );
+
+% Separate inputs, 16th input
+out = quadriga_lib.arrayant_combine_pattern( [], [], [], [], ant_ac.e_theta_re, ant_ac.e_theta_im, ...
+    ant_ac.e_phi_re, ant_ac.e_phi_im, ant_ac.azimuth_grid, ant_ac.elevation_grid, ant_ac.element_pos, ...
+    ant_ac.coupling_re, ant_ac.coupling_im, ant_ac.center_freq, 'ac', 344 );
+assertElementsAlmostEqual( abs(complex(out.e_theta_re(ie,ia90), out.e_theta_im(ie,ia90))), expected, 'absolute', 1e-6 );
+
+% Multi-frequency branch (vector frequency)
+out = quadriga_lib.arrayant_combine_pattern( ant_ac, [500, 1000], [], [], 344 );
+assertEqual( numel(out), 2 );
+assertElementsAlmostEqual( abs(complex(out(1).e_theta_re(ie,ia90), out(1).e_theta_im(ie,ia90))), ...
+    2 * abs(cos(pi * 500 * 0.2 / 344)), 'absolute', 1e-6 );
+assertElementsAlmostEqual( abs(complex(out(2).e_theta_re(ie,ia90), out(2).e_theta_im(ie,ia90))), ...
+    expected, 'absolute', 1e-6 );
+
+% Invalid speeds
+for v = [0, -344, NaN, Inf]
+    try
+        out = quadriga_lib.arrayant_combine_pattern( ant_ac, [], [], [], v );
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    catch ME
+        expectedErrorMessage = 'propagation_speed';
+        if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+            error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+        end
     end
 end
 

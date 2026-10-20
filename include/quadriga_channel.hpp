@@ -101,6 +101,7 @@ namespace quadriga_lib
         uint8_t interact_type[2] = {0, 0};                                  // Type of the first 2 interactions
         float len_acc = 0.0f;                                               // Accumulated path length
         float xprmat[8] = {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f}; // EM: Jones matrix for freq 0, col-major; SCALAR: Pressure coeffs for freqs 0-3
+        // Jones labels <out><in> (= <rx><tx> in get_channels_*): ReHV = H out, V in = rows 2-3; ReVH = V out, H in = rows 4-5
         float *data = nullptr;                                              // Variable-length data buffer
 
         // Data buffer EM:
@@ -213,6 +214,7 @@ namespace quadriga_lib
     // - Dimensions of the storage layout must be defined when the file is initially created
     // - It is possible to reshape the layout using 'hdf5_reshape_layout', but the total number of
     //   entries must not change
+    // - The total number of entries nx * ny * nz * nw must not exceed 4294967295 (2^32 - 1)
     void hdf5_create(std::string fn,      // Filename of the HDF5 file
                      unsigned nx = 65536, // Number of x-entries in the storage layout (first dimension, e.g. for BSs)
                      unsigned ny = 1,     // Number of y-entries in the storage layout (second dimension, e.g. for UEs)
@@ -225,6 +227,8 @@ namespace quadriga_lib
     // - The index is updated to include to the newly written data
     // - If file does not exist, a new file will be created with (nx = 65535, ny = 1, nz = 1, nw = 1)
     // - Returns 0 if new dataset was created, 1 if dataset was overwritten or modified
+    // - Overwriting replaces the slot completely: the old structured data and all unstructured datasets of the slot
+    //   (also those written with hdf5_write_dset) are removed; the file does not shrink, use h5repack for that
     // - The switch "assume_valid" can be used to skip the data integrity check (for better performance)
     // - Throws and error if the requested index in the file has not been reserved during hdf5_create
     template <typename dtype>                              // Float or double
@@ -245,7 +249,7 @@ namespace quadriga_lib
 
     // Reshapes the storage layout inside an existing HDF5 file
     // - Total number of elements in the HDF5 file is fixed when calling hdf5_create
-    // - Reshaping is possible only when the total number does not change
+    // - Reshaping is possible only when the total number does not change (at most 4294967295 entries)
     void hdf5_reshape_layout(std::string fn,   // Filename of the HDF5 file
                              unsigned nx,      // Number of x-entries in the storage layout (first dimension, e.g. for BSs)
                              unsigned ny = 1,  // Number of y-entries in the storage layout (second dimension, e.g. for UEs)
@@ -256,6 +260,7 @@ namespace quadriga_lib
     // - Returns empty channel object if channel ID does not exist
     // - All structured data is stored in single precision, but is converted to double in case if dtype = double
     // - Conversion to float or double is not done for unstructured data
+    // - Throws std::invalid_argument if the file is malformed (e.g. dataset sizes do not match the attributes)
     template <typename dtype>                          // Read as float or double
     channel<dtype> hdf5_read_channel(std::string fn,   // Filename of the HDF5 file
                                      unsigned ix = 0,  // x-Index in the HDF file
@@ -268,6 +273,7 @@ namespace quadriga_lib
     // - They are identified by a prefix (usually "par_") followed by a dataset name (par_name)
     // - Returns a std::any object, that can be further analyzed using the function quadriga_lib::any_type_id
     // - Returns empty std::any if there is no dataset at this location or under this name
+    // - Scalar datasets are returned as scalars, 1D datasets as arma::Col (also with one element)
     std::any hdf5_read_dset(std::string fn,               // Filename of the HDF5 file
                             std::string par_name,         // Dataset name without the prefix (typically "par_")
                             unsigned ix = 0,              // x-Index in the HDF file
@@ -295,6 +301,8 @@ namespace quadriga_lib
     // - Parameter name may only contain letters and numbers and the underscore "_"
     // - An additional prefix "par_" will be added to the name before writing to the HDF file
     // - Unsupported data types will cause an error
+    // - The dataset is added to the slot, everything else in the slot is kept; an existing dataset of the same
+    //   name causes an error (no overwrite)
     void hdf5_write_dset(std::string fn,               // Filename of the HDF5 file
                          std::string par_name,         // Dataset name without the prefix (typically "par_")
                          const std::any *par_data,     // Data to be written
@@ -310,7 +318,8 @@ namespace quadriga_lib
     // - Outputs are returned in the frequency domain at the given sample positions
     // - Uses AVX2 to accelerate the computations (calculate 8 carriers in parallel)
     // - It is possible to call this function in a loop for multiple snapshots and parallelize this loop using OpenMP
-    // - Internal calculations are done in single precision
+    // - The phase bandwidth * pilot * delay is computed in double precision and reduced to one period; sin / cos,
+    //   coefficients and sums are single precision
     template <typename dtype>
     void baseband_freq_response(const arma::Cube<dtype> *coeff_re,                // Channel coefficients, real part, cube of size [n_rx, n_tx, n_path]
                                 const arma::Cube<dtype> *coeff_im,                // Channel coefficients, imaginary part, cube of size [n_rx, n_tx, n_path]
@@ -326,6 +335,8 @@ namespace quadriga_lib
     // - Applies delay-induced phase rotation analytically at each output carrier frequency
     // - When remove_delay_phase is true (default), undoes the delay phase baked in by get_channels_multifreq
     //   before interpolation, then re-applies it at the output frequency; set to false for pure envelope inputs
+    // - With remove_delay_phase, the channels must be generated with use_absolute_delays = true (the coefficients of
+    //   get_channels_* carry the phase of the absolute path length)
     // - Delays are taken from delay[0] only (frequency-independent geometry); supports [n_rx, n_tx, n_path]
     //   or broadcastable [1, 1, n_path]
     template <typename dtype>

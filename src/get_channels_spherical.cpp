@@ -27,10 +27,23 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
 
 - Computes complex channel coefficients and propagation delays for all TX/RX element pairs and paths, using spherical wave assumption with per-element phase and delay.
 - Interpolates antenna patterns for both arrays, accounting for element positions and array orientation (bank/tilt/heading Euler angles).
-- Polarization coupling is applied via the 8-row transfer matrix `M` (interleaved Re/Im for VV, VH, HV, HH components).
+- Polarization coupling is applied via the 8-row transfer matrix `M`: the 2x2 Jones matrix (rows = RX polarisation
+  V/H, columns = TX polarisation V/H), stored column-major with Re/Im interleaved: rows 0-1 = (V rx, V tx),
+  rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx).
+- NLOS paths: the path length between the TX and RX phase centres is `max(path_length, d_poly)`, where `d_poly` is the
+  TX-FBS-LBS-RX polyline length; the length beyond the polyline (interactions between FBS and LBS, e.g. paths of
+  [[coord2path]] or [[qrt_file_read]] with more than two interactions) is added to the FBS-LBS segment. Delays and
+  phases follow this length; the per-element offsets follow the FBS / LBS geometry (spherical waves).
 - If `center_frequency == 0`, phase calculation is disabled and only delays are computed.
-- If `use_absolute_delays == false`, the minimum delay (LOS delay) is subtracted from all paths.
-- If `add_fake_los_path == true`, a zero-power LOS path is prepended when no LOS path is detected.
+- If `use_absolute_delays == false`, the LOS delay between the TX and RX phase centres is subtracted from all paths.
+  Delays are per element pair, so pairs that are closer to each other than the phase centres get negative delays,
+  down to about -(half the TX array size + half the RX array size) / speed of light (both arrays endfire).
+  [[quantize_delays]] maps delays above `-tap_spacing / 2` to tap 0 and rejects lower ones (at 5 ns taps: half sizes
+  adding up to more than about 0.75 m); use `use_absolute_delays = true` in that case.
+- LOS detection: the path whose length is closest to the TX-RX distance, within 0.1 mm.
+- If `add_fake_los_path == true`, one output path is always added (`n_path + 1` outputs): slot 0 holds the LOS path,
+  with zero power if no LOS path was found. If a LOS path was found, it is moved to slot 0 and its original slot
+  (input index + 1) holds a zero-power path. All other paths keep their order, shifted by one slot.
 
 ## Declaration:
 ```
@@ -69,21 +82,24 @@ void quadriga_lib::get_channels_spherical(
 - **`fbs_pos`** — First-bounce scatterer positions; `[3, n_path]`
 - **`lbs_pos`** — Last-bounce scatterer positions; `[3, n_path]`
 - **`path_gain`** — Path gains in linear scale; `[n_path]`
-- **`path_length`** — Total path lengths from TX to RX phase center; `[n_path]`
-- **`M`** — Polarization transfer matrix, interleaved (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH); `[8, n_path]`
+- **`path_length`** — Total path lengths from TX to RX phase center; values shorter than the TX-FBS-LBS-RX polyline
+  (e.g. 0) use the polyline length; `[n_path]`
+- **`M`** — Polarization transfer matrix, 2x2 Jones matrix column-major, Re/Im interleaved: rows 0-1 = (V rx, V tx),
+  rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx); `[8, n_path]`
 - **`center_frequency`** *(optional)* — Center frequency; set to `0` to skip phase computation
 - **`use_absolute_delays`** *(optional)* — If `true`, delays include the LOS component
-- **`add_fake_los_path`** *(optional)* — If `true`, prepends a zero-power LOS path when none is present
+- **`add_fake_los_path`** *(optional)* — If `true`, always adds one output path; slot 0 holds the LOS path (zero power
+  if none was found); a LOS path found in the input leaves a zero-power path in its original slot
 - **`use_avx2`** *(optional)* — If `true`, use AVX2 for antenna interpolation; faster, but less accurate; ignored when not supported
 
 ## Outputs:
-- **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path]`
-- **`coeff_im`** — Imaginary part of channel coefficients; `[n_rx, n_tx, n_path]`
-- **`delay`** — Propagation delays in seconds; `[n_rx, n_tx, n_path]`
-- **`aod`** *(optional)* — Azimuth of departure; `[n_rx, n_tx, n_path]`
-- **`eod`** *(optional)* — Elevation of departure; `[n_rx, n_tx, n_path]`
-- **`aoa`** *(optional)* — Azimuth of arrival; `[n_rx, n_tx, n_path]`
-- **`eoa`** *(optional)* — Elevation of arrival; `[n_rx, n_tx, n_path]`
+- **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path(+1)]`
+- **`coeff_im`** — Imaginary part of channel coefficients; `[n_rx, n_tx, n_path(+1)]`
+- **`delay`** — Propagation delays in seconds; `[n_rx, n_tx, n_path(+1)]`
+- **`aod`** *(optional)* — Azimuth of departure; `[n_rx, n_tx, n_path(+1)]`
+- **`eod`** *(optional)* — Elevation of departure; `[n_rx, n_tx, n_path(+1)]`
+- **`aoa`** *(optional)* — Azimuth of arrival; `[n_rx, n_tx, n_path(+1)]`
+- **`eoa`** *(optional)* — Elevation of arrival; `[n_rx, n_tx, n_path(+1)]`
 
 ## See also:
 - [[get_channels_planar]] (planar wave variant)
@@ -280,6 +296,10 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
             x = Rx - p_lbs[ix], y = Ry - p_lbs[iy], z = Rz - p_lbs[iz];
             d_shortest += std::sqrt(x * x + y * y + z * z);
             d_length = (p_length[i] < d_shortest) ? d_shortest : p_length[i];
+
+            // Paths with more interactions than FBS and LBS are longer than the TX-FBS-LBS-RX polyline: the extra
+            // length goes into the FBS-LBS segment, so that the phase-centre length equals d_length (= path_length)
+            d_fbs_lbs += d_length - d_shortest;
         }
 
         // Calculate path delays, departure angles and arrival angles

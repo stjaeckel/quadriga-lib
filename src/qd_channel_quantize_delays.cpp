@@ -7,8 +7,57 @@
 #include <cmath>
 #include <cstring>
 #include <algorithm>
+#include <climits>
+#include <utility>
 #include <vector>
 #include <stdexcept>
+
+// --- Internal helper: accumulate_pdp ---
+// Sums the power per tap index, in the order of the entries, and returns the taps with non-zero power in ascending
+// order together with their power. The work does not depend on the absolute delays: a dense vector is used only over
+// the index range [d_min, d_max] and only when that range is small compared to the number of entries; otherwise the
+// entries are sorted by tap index (sparse). Both give the same sums in the same order.
+static void accumulate_pdp(const unsigned *d, const double *p, arma::uword n, unsigned d_min, unsigned d_max,
+                           std::vector<unsigned> &taps, std::vector<double> &power)
+{
+    taps.clear();
+    power.clear();
+    if (n == 0)
+        return;
+
+    arma::uword range = (arma::uword)(d_max - d_min) + 1;
+    if (range <= 4 * n + 64)
+    {
+        std::vector<double> pdp(range, 0.0);
+        for (arma::uword i = 0; i < n; ++i)
+            pdp[d[i] - d_min] += p[i];
+        for (arma::uword k = 0; k < range; ++k)
+            if (pdp[k] > 0.0)
+            {
+                taps.push_back(d_min + (unsigned)k);
+                power.push_back(pdp[k]);
+            }
+    }
+    else
+    {
+        std::vector<std::pair<unsigned, arma::uword>> order(n); // (tap index, entry), sorted: entry order per tap
+        for (arma::uword i = 0; i < n; ++i)
+            order[i] = {d[i], i};
+        std::sort(order.begin(), order.end());
+        for (arma::uword i = 0; i < n;)
+        {
+            unsigned k = order[i].first;
+            double sum = 0.0;
+            for (; i < n && order[i].first == k; ++i)
+                sum += p[order[i].second];
+            if (sum > 0.0)
+            {
+                taps.push_back(k);
+                power.push_back(sum);
+            }
+        }
+    }
+}
 
 // --- Internal helper: find_optimal_delays ---
 // Accumulates PDP, selects the strongest taps up to max_taps.
@@ -20,36 +69,29 @@ static std::vector<unsigned> find_optimal_delays(
     const unsigned *di, const double *pi, arma::uword n_int,
     arma::uword max_taps)
 {
-    // Find maximum tap index across both arrays
-    unsigned max_idx = 0;
-    for (arma::uword i = 0; i < n_non; ++i)
-        if (dn[i] > max_idx)
-            max_idx = dn[i];
-    for (arma::uword i = 0; i < n_int; ++i)
-        if (di[i] > max_idx)
-            max_idx = di[i];
-
-    if (max_idx == 0 && n_non == 0 && n_int == 0)
+    if (n_non == 0 && n_int == 0)
         return {};
 
-    // Accumulate PDP for non-interpolated taps
-    std::vector<double> pdp_non(max_idx + 1, 0.0);
+    // Index ranges of both arrays
+    unsigned min_non = UINT_MAX, max_non = 0, min_int = UINT_MAX, max_int = 0;
     for (arma::uword i = 0; i < n_non; ++i)
-        pdp_non[dn[i]] += pn[i];
+    {
+        min_non = (dn[i] < min_non) ? dn[i] : min_non;
+        max_non = (dn[i] > max_non) ? dn[i] : max_non;
+    }
+    for (arma::uword i = 0; i < n_int; ++i)
+    {
+        min_int = (di[i] < min_int) ? di[i] : min_int;
+        max_int = (di[i] > max_int) ? di[i] : max_int;
+    }
+    unsigned max_idx = (max_int > max_non) ? max_int : max_non;
 
-    // Collect non-zero non-interpolated taps
+    // Accumulate PDP for non-interpolated taps, collect non-zero taps
     std::vector<unsigned> dB;
     std::vector<double> dB_power;
-    for (unsigned k = 0; k <= max_idx; ++k)
-    {
-        if (pdp_non[k] > 0.0)
-        {
-            dB.push_back(k);
-            dB_power.push_back(pdp_non[k]);
-        }
-    }
+    accumulate_pdp(dn, pn, n_non, min_non, max_non, dB, dB_power);
 
-    arma::uword eff_max = (max_taps == 0) ? (arma::uword)(max_idx + 1) : max_taps;
+    arma::uword eff_max = (max_taps == 0) ? (arma::uword)max_idx + 1 : max_taps;
 
     // If non-interp taps fill or exceed budget, or no interp data — pick strongest non-interp
     if (dB.size() >= eff_max || n_int == 0)
@@ -71,38 +113,25 @@ static std::vector<unsigned> find_optimal_delays(
         return dB;
     }
 
-    // Accumulate PDP for interpolated taps
-    std::vector<double> pdp_int(max_idx + 1, 0.0);
-    for (arma::uword i = 0; i < n_int; ++i)
-        pdp_int[di[i]] += pi[i];
-
-    // Collect all non-zero interpolated taps
+    // Accumulate PDP for interpolated taps, collect all non-zero interpolated taps
     std::vector<unsigned> D;
-    for (unsigned k = 0; k <= max_idx; ++k)
-    {
-        if (pdp_int[k] > 0.0)
-            D.push_back(k);
-    }
+    std::vector<double> D_power;
+    accumulate_pdp(di, pi, n_int, min_int, max_int, D, D_power);
 
     if (D.size() <= eff_max)
         return D;
 
-    // Too many — keep all non-interp, fill remainder with strongest interp-only
+    // Too many — keep all non-interp, fill remainder with strongest interp-only (D and dB are both sorted)
     std::vector<unsigned> interp_only;
     std::vector<double> interp_only_pwr;
-    for (arma::uword i = 0; i < D.size(); ++i)
+    for (arma::uword i = 0, j = 0; i < D.size(); ++i)
     {
-        bool is_non = false;
-        for (arma::uword j = 0; j < dB.size(); ++j)
-            if (D[i] == dB[j])
-            {
-                is_non = true;
-                break;
-            }
-        if (!is_non)
+        while (j < dB.size() && dB[j] < D[i])
+            ++j;
+        if (j == dB.size() || dB[j] != D[i])
         {
             interp_only.push_back(D[i]);
-            interp_only_pwr.push_back(pdp_int[D[i]]);
+            interp_only_pwr.push_back(D_power[i]);
         }
     }
 
@@ -138,8 +167,23 @@ Map path delays to a fixed tap grid using two-tap power-weighted interpolation
 - Use `power_exponent=1.0` for narrowband (linear interpolation) or `0.5` for wideband (incoherent power preservation)
 - If all fractional offsets are below 0.01 or above 0.99, weight computation is skipped but tap-selection logic still applies
 - Input `delay` may be per-antenna `[n_rx, n_tx, n_path_s]` or shared `[1, 1, n_path_s]`; shared delays are expanded 
-  internally when `fix_taps` is 0 or 3, and output delays remain shared `[1, 1, n_taps]` when `fix_taps` is 1 or 2
+  internally when `fix_taps` is 0 or 3, and output delays remain shared `[1, 1, n_taps]` when `fix_taps` is 1 or 2;
+  per-antenna input always gives `[n_rx, n_tx, n_taps]` output delays (identical for all pairs when `fix_taps` is 1 or 2)
 - `n_rx` and `n_tx` must be identical across all snapshots; `n_path_s` may differ per snapshot
+- Delays must be non-negative, as for a tapped delay line, with a tolerance of `tap_spacing / 2`: delays in
+  `(-tap_spacing / 2, 0)` are treated as 0, so all of their power goes to tap 0 (there is no tap below 0 to
+  interpolate with; the error is below `tap_spacing / 2`, as for nearest-tap rounding). Delays at or below
+  `-tap_spacing / 2` throw `std::invalid_argument`, as do NaN, Inf and delays of 2^31 taps or more
+  (`delay / tap_spacing < 2^31`, e.g. 10.7 s at 5 ns or 12.4 h at 48 kHz)
+- Relative delays (`use_absolute_delays = false` in [[get_channels_spherical]], [[get_channels_multifreq]] and
+  [[get_channels_planar]]) are negative for element pairs that are closer to each other than the phase centres, by up
+  to about (half the TX array size + half the RX array size) / propagation speed (both arrays endfire). They stay
+  above `-tap_spacing / 2` only while these half sizes add up to less than `tap_spacing / 2` times the propagation
+  speed: about 0.75 m for radio at 5 ns taps, but only about 3.6 mm for sound at 48 kHz taps, i.e. practically every
+  acoustic array. In those cases use absolute delays (`use_absolute_delays = true`)
+- Run time and memory depend on the number of paths and taps, not on the absolute delay values
+- Outputs may alias inputs, also across arguments (e.g. `delay_quant == coeff_re`); all inputs are read before the
+  outputs are written. The three outputs must be different objects.
 
 ## Declaration:
 ```
@@ -159,22 +203,24 @@ void quadriga_lib::quantize_delays(
 ## Inputs:
 - **`coeff_re`** — Channel coefficients, real part; vector of length `n_snap`, each cube `[n_rx, n_tx, n_path_s]`
 - **`coeff_im`** — Channel coefficients, imaginary part; same layout as `coeff_re`
-- **`delay`** — Path delays in seconds; vector of length `n_snap`, each cube `[n_rx, n_tx, n_path_s]` or `[1, 1, n_path_s]`
-- **`tap_spacing`** *(optional)* — Delay bin spacing in seconds; 5 ns corresponds to 200 MHz sampling rate
+- **`delay`** — Path delays in seconds; vector of length `n_snap`, each cube `[n_rx, n_tx, n_path_s]` or `[1, 1, n_path_s]`;
+  non-negative with a tolerance of `tap_spacing / 2`, finite, below `2^31 * tap_spacing`
+- **`tap_spacing`** *(optional)* — Delay bin spacing in seconds, positive and finite; 5 ns corresponds to 200 MHz sampling rate
 - **`max_no_taps`** *(optional)* — Maximum number of output taps; 0 means unlimited
 - **`power_exponent`** *(optional)* — Interpolation exponent alpha; 1.0 = narrowband, 0.5 = wideband power-preserving
 - **`fix_taps`** *(optional)* — Delay grid sharing mode:<br><br>
   | Value | Meaning                                                                                                                               |
   | ----- | ------------------------------------------------------------------------------------------------------------------------------------- |
   | 0     | Per tx-rx pair and snapshot; output delays `[n_rx, n_tx, n_taps]`                                                                     |
-  | 1     | Single shared grid across all snapshots and tx-rx pairs; output delays `[1, 1, n_taps]`, identical for every snapshot                 |
-  | 2     | Per snapshot; output delays `[1, 1, n_taps]`, but each snapshot has its own independent tap grid — taps do not align across snapshots |
+  | 1     | Single shared grid across all snapshots and tx-rx pairs; output delays `[1, 1, n_taps]` for shared delay input (`[n_rx, n_tx, n_taps]` for per-antenna input), identical for every snapshot |
+  | 2     | Per snapshot; output delays `[1, 1, n_taps]` for shared delay input (`[n_rx, n_tx, n_taps]` for per-antenna input), but each snapshot has its own independent tap grid — taps do not align across snapshots |
   | 3     | Per tx-rx pair across all snapshots; output delays `[n_rx, n_tx, n_taps]`                                                             |
 
 ## Outputs:
 - **`coeff_re_quant`** — Output coefficients, real part; vector of length `n_snap`, each cube `[n_rx, n_tx, n_taps]`
 - **`coeff_im_quant`** — Output coefficients, imaginary part; same layout as `coeff_re_quant`
-- **`delay_quant`** — Output delays in seconds; each cube `[n_rx, n_tx, n_taps]` or `[1, 1, n_taps]` depending on `fix_taps`
+- **`delay_quant`** — Output delays in seconds; each cube `[n_rx, n_tx, n_taps]`, or `[1, 1, n_taps]` for shared delay input with
+  `fix_taps` 1 or 2
 
 ## Example:
 ```
@@ -212,6 +258,8 @@ void quadriga_lib::quantize_delays(const std::vector<arma::Cube<dtype>> *coeff_r
         throw std::invalid_argument("Output 'coeff_im_quant' must not be NULL.");
     if (delay_quant == nullptr)
         throw std::invalid_argument("Output 'delay_quant' must not be NULL.");
+    if (coeff_re_quant == coeff_im_quant || coeff_re_quant == delay_quant || coeff_im_quant == delay_quant)
+        throw std::invalid_argument("Outputs 'coeff_re_quant', 'coeff_im_quant' and 'delay_quant' must be different objects.");
 
     arma::uword n_snap = (arma::uword)coeff_re->size();
     if (n_snap == 0)
@@ -220,8 +268,8 @@ void quadriga_lib::quantize_delays(const std::vector<arma::Cube<dtype>> *coeff_r
         throw std::invalid_argument("Inputs 'coeff_re' and 'coeff_im' must have the same length.");
     if ((arma::uword)delay->size() != n_snap)
         throw std::invalid_argument("Inputs 'coeff_re' and 'delay' must have the same length.");
-    if (tap_spacing <= (dtype)0)
-        throw std::invalid_argument("Input 'tap_spacing' must be positive.");
+    if (!(tap_spacing > (dtype)0) || !std::isfinite(tap_spacing) || !std::isfinite((dtype)1.0 / tap_spacing))
+        throw std::invalid_argument("Input 'tap_spacing' must be positive and finite.");
     if (power_exponent <= (dtype)0)
         throw std::invalid_argument("Input 'power_exponent' must be positive.");
     if (fix_taps < 0 || fix_taps > 3)
@@ -281,6 +329,12 @@ void quadriga_lib::quantize_delays(const std::vector<arma::Cube<dtype>> *coeff_r
     dtype inv_tap = (dtype)1.0 / tap_spacing;
     arma::uword n_total = offset[n_snap];
 
+    // Valid delays: above -tap_spacing / 2 and below 2^31 taps; this keeps every tap index (and index + 1) within
+    // the range of 'unsigned'. Small negative delays (relative delays of elements closer than the phase centre) are
+    // mapped to tap 0.
+    const dtype delay_min = (dtype)-0.5 * tap_spacing;
+    const dtype tap_limit = (dtype)2147483648.0; // 2^31
+
     // --- Step 1: Compute tap indices, fractional offsets, detect already-quantized ---
     std::vector<unsigned> Dn(n_total);    // Rounded (nearest) tap index
     std::vector<unsigned> Di_lo(n_total); // Floor tap index
@@ -303,7 +357,17 @@ void quadriga_lib::quantize_delays(const std::vector<arma::Cube<dtype>> *coeff_r
                 {
                     arma::uword ci = base + r + t * n_rx + p * n_ant;
                     arma::uword dli = shared_delays ? p : (r + t * n_rx + p * n_ant);
-                    dtype val = dl_ptr[dli] * inv_tap;
+                    dtype dl_val = dl_ptr[dli];
+                    dtype val = dl_val * inv_tap;
+                    if (!(dl_val > delay_min && val < tap_limit)) // also catches NaN and Inf
+                    {
+                        if (!std::isfinite(dl_val))
+                            throw std::invalid_argument("Input 'delay' contains NaN or Inf values.");
+                        if (dl_val <= delay_min)
+                            throw std::invalid_argument("Input 'delay' contains a value at or below -tap_spacing / 2; relative delays of large or acoustic arrays can be that negative, use absolute delays (use_absolute_delays = true).");
+                        throw std::invalid_argument("Input 'delay' contains a value of 2^31 taps or more (delay / tap_spacing must be below 2^31).");
+                    }
+                    val = (val < (dtype)0) ? (dtype)0 : val; // -tap_spacing / 2 < delay < 0: tap 0
                     dtype fl = std::floor(val);
                     dtype fr = val - fl;
                     unsigned fl_u = (unsigned)fl;
@@ -491,24 +555,25 @@ void quadriga_lib::quantize_delays(const std::vector<arma::Cube<dtype>> *coeff_r
     // Output delays are shared [1,1,n_taps] only when input was shared AND fix_taps is 1 or 2
     bool output_shared = shared_delays && (fix_taps == 1 || fix_taps == 2);
 
-    coeff_re_quant->resize(n_snap);
-    coeff_im_quant->resize(n_snap);
-    delay_quant->resize(n_snap);
+    // The outputs are built in local vectors and moved to the output arguments at the end, after the last read of
+    // the inputs, so any output may alias any input
+    std::vector<arma::Cube<dtype>> out_re(n_snap), out_im(n_snap), out_dl(n_snap);
+    std::vector<int> tap2pos; // Lookup tap index - grid[0] -> position in grid, reused for all grids
 
     for (arma::uword s = 0; s < n_snap; ++s)
     {
         arma::uword n_p = n_path_vec[s];
 
-        coeff_re_quant->at(s).zeros(n_rx, n_tx, n_taps);
-        coeff_im_quant->at(s).zeros(n_rx, n_tx, n_taps);
+        out_re[s].zeros(n_rx, n_tx, n_taps);
+        out_im[s].zeros(n_rx, n_tx, n_taps);
         if (output_shared)
-            delay_quant->at(s).zeros(1, 1, n_taps);
+            out_dl[s].zeros(1, 1, n_taps);
         else
-            delay_quant->at(s).zeros(n_rx, n_tx, n_taps);
+            out_dl[s].zeros(n_rx, n_tx, n_taps);
 
-        dtype *ore = coeff_re_quant->at(s).memptr();
-        dtype *oim = coeff_im_quant->at(s).memptr();
-        dtype *odl = delay_quant->at(s).memptr();
+        dtype *ore = out_re[s].memptr();
+        dtype *oim = out_im[s].memptr();
+        dtype *odl = out_dl[s].memptr();
         const dtype *ire = coeff_re->at(s).memptr();
         const dtype *iim = coeff_im->at(s).memptr();
         arma::uword gbase = offset[s];
@@ -535,15 +600,31 @@ void quadriga_lib::quantize_delays(const std::vector<arma::Cube<dtype>> *coeff_r
                     odl[r + t * n_rx + k * n_ant] = (dtype)grid[k] * tap_spacing;
             }
 
-            // Build lookup: tap_index -> position in grid
-            unsigned max_grid_val = 0;
-            for (arma::uword k = 0; k < n_grid; ++k)
-                if (grid[k] > max_grid_val)
-                    max_grid_val = grid[k];
+            if (n_grid == 0)
+                continue;
 
-            std::vector<int> tap2pos(max_grid_val + 2, -1); // +2 for ceil safety
-            for (arma::uword k = 0; k < n_grid; ++k)
-                tap2pos[grid[k]] = (int)k;
+            // Position of a tap index in the (sorted) grid, -1 if not in the grid: dense table over the grid's index
+            // range when that range is small, binary search otherwise
+            const unsigned g_min = grid.front();
+            const arma::uword g_range = (arma::uword)(grid.back() - g_min) + 1;
+            const bool use_table = g_range <= 4 * n_grid + 1024;
+            if (use_table)
+            {
+                tap2pos.assign(g_range, -1);
+                for (arma::uword k = 0; k < n_grid; ++k)
+                    tap2pos[grid[k] - g_min] = (int)k;
+            }
+            auto pos_of = [&](unsigned tap) -> int
+            {
+                if (use_table)
+                {
+                    if (tap < g_min || (arma::uword)(tap - g_min) >= g_range)
+                        return -1;
+                    return tap2pos[tap - g_min];
+                }
+                auto it = std::lower_bound(grid.begin(), grid.end(), tap);
+                return (it != grid.end() && *it == tap) ? (int)(it - grid.begin()) : -1;
+            };
 
             // Map each path to the grid
             for (arma::uword p = 0; p < n_p; ++p)
@@ -554,26 +635,24 @@ void quadriga_lib::quantize_delays(const std::vector<arma::Cube<dtype>> *coeff_r
                 if (already_quantized)
                 {
                     // No interpolation — accumulate at rounded tap
-                    unsigned dn_val = Dn[gi];
-                    if (dn_val <= max_grid_val && tap2pos[dn_val] >= 0)
+                    int pos = pos_of(Dn[gi]);
+                    if (pos >= 0)
                     {
-                        arma::uword oi = r + t * n_rx + (arma::uword)tap2pos[dn_val] * n_ant;
+                        arma::uword oi = r + t * n_rx + (arma::uword)pos * n_ant;
                         ore[oi] += ire[ci];
                         oim[oi] += iim[ci];
                     }
                 }
                 else
                 {
-                    unsigned lo = Di_lo[gi];
-                    unsigned hi = Di_hi[gi];
-                    bool lo_in = (lo <= max_grid_val && tap2pos[lo] >= 0);
-                    bool hi_in = (hi < (unsigned)tap2pos.size() && tap2pos[hi] >= 0);
+                    int pos_lo = pos_of(Di_lo[gi]);
+                    int pos_hi = pos_of(Di_hi[gi]);
 
-                    if (lo_in && hi_in)
+                    if (pos_lo >= 0 && pos_hi >= 0)
                     {
                         // Both floor and ceil are in the grid — use interpolated coefficients
-                        arma::uword oi_lo = r + t * n_rx + (arma::uword)tap2pos[lo] * n_ant;
-                        arma::uword oi_hi = r + t * n_rx + (arma::uword)tap2pos[hi] * n_ant;
+                        arma::uword oi_lo = r + t * n_rx + (arma::uword)pos_lo * n_ant;
+                        arma::uword oi_hi = r + t * n_rx + (arma::uword)pos_hi * n_ant;
                         ore[oi_lo] += Ci_re_lo[gi];
                         oim[oi_lo] += Ci_im_lo[gi];
                         ore[oi_hi] += Ci_re_hi[gi];
@@ -582,10 +661,10 @@ void quadriga_lib::quantize_delays(const std::vector<arma::Cube<dtype>> *coeff_r
                     else
                     {
                         // Fallback — one or both interpolation taps missing; use rounded tap
-                        unsigned dn_val = Dn[gi];
-                        if (dn_val <= max_grid_val && tap2pos[dn_val] >= 0)
+                        int pos = pos_of(Dn[gi]);
+                        if (pos >= 0)
                         {
-                            arma::uword oi = r + t * n_rx + (arma::uword)tap2pos[dn_val] * n_ant;
+                            arma::uword oi = r + t * n_rx + (arma::uword)pos * n_ant;
                             ore[oi] += ire[ci];
                             oim[oi] += iim[ci];
                         }
@@ -599,8 +678,8 @@ void quadriga_lib::quantize_delays(const std::vector<arma::Cube<dtype>> *coeff_r
     arma::uword max_used = 0;
     for (arma::uword s = 0; s < n_snap; ++s)
     {
-        const dtype *ore = coeff_re_quant->at(s).memptr();
-        const dtype *oim = coeff_im_quant->at(s).memptr();
+        const dtype *ore = out_re[s].memptr();
+        const dtype *oim = out_im[s].memptr();
         for (arma::uword k = n_taps; k > max_used; --k) // upper bound tightens as max_used grows
         {
             for (arma::uword a = 0; a < n_ant; ++a)
@@ -623,25 +702,30 @@ void quadriga_lib::quantize_delays(const std::vector<arma::Cube<dtype>> *coeff_r
         {
             arma::Cube<dtype> tmp_re(n_rx, n_tx, max_used);
             arma::Cube<dtype> tmp_im(n_rx, n_tx, max_used);
-            std::memcpy(tmp_re.memptr(), coeff_re_quant->at(s).memptr(), n_ant * max_used * sizeof(dtype));
-            std::memcpy(tmp_im.memptr(), coeff_im_quant->at(s).memptr(), n_ant * max_used * sizeof(dtype));
-            coeff_re_quant->at(s) = std::move(tmp_re);
-            coeff_im_quant->at(s) = std::move(tmp_im);
+            std::memcpy(tmp_re.memptr(), out_re[s].memptr(), n_ant * max_used * sizeof(dtype));
+            std::memcpy(tmp_im.memptr(), out_im[s].memptr(), n_ant * max_used * sizeof(dtype));
+            out_re[s] = std::move(tmp_re);
+            out_im[s] = std::move(tmp_im);
 
             if (output_shared)
             {
                 arma::Cube<dtype> tmp_dl(1, 1, max_used);
-                std::memcpy(tmp_dl.memptr(), delay_quant->at(s).memptr(), max_used * sizeof(dtype));
-                delay_quant->at(s) = std::move(tmp_dl);
+                std::memcpy(tmp_dl.memptr(), out_dl[s].memptr(), max_used * sizeof(dtype));
+                out_dl[s] = std::move(tmp_dl);
             }
             else
             {
                 arma::Cube<dtype> tmp_dl(n_rx, n_tx, max_used);
-                std::memcpy(tmp_dl.memptr(), delay_quant->at(s).memptr(), n_ant * max_used * sizeof(dtype));
-                delay_quant->at(s) = std::move(tmp_dl);
+                std::memcpy(tmp_dl.memptr(), out_dl[s].memptr(), n_ant * max_used * sizeof(dtype));
+                out_dl[s] = std::move(tmp_dl);
             }
         }
     }
+
+    // All inputs have been read: assign the outputs
+    *coeff_re_quant = std::move(out_re);
+    *coeff_im_quant = std::move(out_im);
+    *delay_quant = std::move(out_dl);
 }
 
 // --- Explicit template instantiation ---

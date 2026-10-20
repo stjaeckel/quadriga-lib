@@ -19,7 +19,10 @@ SECTION!*/
 Compute elementwise approximate sine and/or cosine of a vector
 
 - AVX2-optimized (8 floats/lane); scalar fallback without AVX2
-- For x in [-pi, pi]: max absolute error = 2^(-22.1); for x in [-500, 500]: 2^(-16.0)
+- Max absolute error about 1.3e-7 (2^-22.9) against the exact sine / cosine of the input value for |x| <= 1e10
+  (both kernels; the argument is reduced in double precision where single precision is not enough)
+- Results stay in [-1, 1] for all finite x; inf and NaN give NaN
+- The AVX2 kernel is fastest for |x| <= 2^22 (4.2e6); larger arguments take about 1.5 times as long
 - Either `s` or `c` may be `nullptr` to skip that computation
 
 ## Declaration:
@@ -211,8 +214,9 @@ template void quadriga_lib::fast_acos(const arma::Col<double> &x, arma::fvec &c)
 Compute elementwise approximate two-argument arc-tangent of two vectors
 
 - AVX2-optimized (8 floats/lane); scalar fallback without AVX2
-- Returns angles in (-pi, pi]; max error ~3 ULP (~3.6e-7)
-- atan2(0, 0) returns 0; atan2(±0, -0) returns ±0 (not ±pi)
+- Returns angles in [-pi, pi]; max error ~3 ULP (~3.6e-7)
+- Special values as std::atan2 (both kernels): atan2(±0, +0) = ±0, atan2(±0, -0) = ±pi, atan2(±0, x < 0) = ±pi,
+  atan2(±inf, ±inf) = ±pi/4 or ±3pi/4; NaN in x or y gives NaN
 
 ## Declaration:
 ```
@@ -270,8 +274,10 @@ Compute elementwise approximate SLERP interpolation between two complex-valued v
 - Interpolates phase via SLERP on normalized directions; amplitudes are linearly interpolated
 - Weight `w=0` returns A, `w=1` returns B; per-element weights in [0, 1]
 - Near-antipodal inputs (phase difference close to pi) fall back to linear interpolation smoothly
-- If both input amplitudes are negligible, output is zero
-- Max error vs. double-precision reference: ~5 ULP
+- If both input amplitudes are negligible (below 1.19e-7), output is zero
+- Max relative error vs. double-precision reference about 5e-7 for phase differences up to 2 rad, 1.2e-5 up to
+  3 rad; larger towards the near-antipodal transition to linear interpolation
+- The result of an element does not depend on the other elements
 - AVX2-optimized (8 complex pairs/lane); scalar fallback without AVX2
 
 ## Declaration:
@@ -357,8 +363,9 @@ Convert elementwise azimuth/elevation angles to Cartesian coordinates
 - Optional pointer outputs `sAZ`, `cAZ`, `sEL`, `cEL` return intermediate sin/cos values; pass `nullptr` to skip
 - AVX2-optimized (8 floats/lane); scalar fallback without AVX2
 - Precision: GENERIC kernel uses full `dtype` precision (double or float).
-- AVX2 kernel always computes in single precision internally — for `dtype=double`, inputs are narrowed to 
-  float and results widened back. Use `use_kernel=1` to force GENERIC if full double precision is required.
+- AVX2 kernel computes sine and cosine in single precision (max. error about 1.3e-7 for angles up to 1e10;
+  `dtype=double` angles are reduced in double precision first), results widened back. Use `use_kernel=1` to force
+  GENERIC if full double precision is required.
 
 ## Declaration:
 ```
@@ -380,7 +387,7 @@ void fast_geo2cart(
 - **`az`** — Azimuth angles; `[n_elem]`
 - **`el`** — Elevation angles; `[n_elem]`
 - **`len`** *(optional)* — Euclidean vector length sqrt(x² + y² + z²); `[n_elem]`
-- **`use_kernel`** — Kernel selection: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2 (throws if AVX2 unavailable)
+- **`use_kernel`** — Kernel selection: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2 (throws if AVX2 unavailable); other values throw
 
 ## Outputs:
 - **`x`** — X-coordinates; `[n_elem]`
@@ -402,10 +409,6 @@ void quadriga_lib::fast_geo2cart(const arma::Col<dtype> &az, const arma::Col<dty
                                  arma::Col<dtype> *sEL, arma::Col<dtype> *cEL,
                                  const arma::Col<dtype> *len, int use_kernel)
 {
-#if !BUILD_WITH_AVX2
-    (void)use_kernel;
-#endif
-
     const arma::uword n_val = az.n_elem;
 
     if (el.n_elem != n_val)
@@ -413,21 +416,18 @@ void quadriga_lib::fast_geo2cart(const arma::Col<dtype> &az, const arma::Col<dty
     if (len && len->n_elem != n_val)
         throw std::invalid_argument("Input vectors 'az', 'el' and 'len' must have the same length.");
 
-    // Kernel selection
+    // Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2
 #if BUILD_WITH_AVX2
     const bool avx2_ok = runtime_AVX2_Check();
-
-    int kernel = 1; // Default to GENERIC
-    if (use_kernel == 1)
-        kernel = 1;
-    else if (use_kernel == 2)
-    {
-        if (!avx2_ok)
-            throw std::invalid_argument("AVX2 kernel requested but not available (compile with BUILD_WITH_AVX2 and run on AVX2-capable CPU).");
-        kernel = 2;
-    }
-    else // Auto-select (use_kernel == 0)
-        kernel = avx2_ok ? 2 : 1;
+#else
+    const bool avx2_ok = false;
+#endif
+    if (use_kernel < 0 || use_kernel > 2)
+        throw std::invalid_argument("Input 'use_kernel' must be 0, 1 or 2.");
+    if (use_kernel == 2 && !avx2_ok)
+        throw std::invalid_argument("AVX2 kernel requested but not available (compile with BUILD_WITH_AVX2 and run on AVX2-capable CPU).");
+#if BUILD_WITH_AVX2
+    const int kernel = (use_kernel == 1 || !avx2_ok) ? 1 : 2;
 #endif
 
     // Resize required outputs
@@ -492,7 +492,10 @@ Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector
 - Inputs are arbitrary 3D vectors (not required to be unit-length); `len` returns the Euclidean norm
 - z/len is clamped to [-1, 1] before asin to guard against len == 0 and FMA rounding artefacts pushing abs(z/len) slightly above 1
 - All inputs must have the same length
-- AVX2 kernel computes internally in single precision (double outputs are cast back from float); GENERIC kernel preserves full `dtype` precision
+- AVX2 kernel computes the angles in single precision (double outputs are cast back from float); for `dtype=double`,
+  `len` and z / len are computed in double precision, so very small or very large vectors keep their direction;
+  GENERIC kernel preserves full `dtype` precision
+- Azimuth in [-pi, pi] (atan2 special values as in [[fast_atan2]]); NaN input gives NaN in `az` and `len`
 
 ## Declaration:
 ```
@@ -506,7 +509,7 @@ void quadriga_lib::fast_cart2geo(const arma::vec &x, const arma::vec &y, const a
 - **`x`** — X-coordinates; `[n_elem]`
 - **`y`** — Y-coordinates; `[n_elem]`
 - **`z`** — Z-coordinates; `[n_elem]`
-- **`use_kernel`** — Kernel selection: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2 (throws if AVX2 unavailable); default `0`
+- **`use_kernel`** — Kernel selection: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2 (throws if AVX2 unavailable); other values throw; default `0`
 
 ## Outputs:
 - **`az`** — Azimuth angles; `[n_elem]`
@@ -521,29 +524,22 @@ template <typename dtype>
 void quadriga_lib::fast_cart2geo(const arma::Col<dtype> &x, const arma::Col<dtype> &y, const arma::Col<dtype> &z,
                                  arma::Col<dtype> &az, arma::Col<dtype> &el, arma::Col<dtype> *len, int use_kernel)
 {
-#if !BUILD_WITH_AVX2
-    (void)use_kernel;
-#endif
-
     const arma::uword n_val = x.n_elem;
     if (y.n_elem != n_val || z.n_elem != n_val)
         throw std::invalid_argument("Input vectors 'x', 'y', and 'z' must have the same length.");
 
-    // Kernel selection
+    // Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2
 #if BUILD_WITH_AVX2
     const bool avx2_ok = runtime_AVX2_Check();
-
-    int kernel = 1; // Default to GENERIC
-    if (use_kernel == 1)
-        kernel = 1;
-    else if (use_kernel == 2)
-    {
-        if (!avx2_ok)
-            throw std::invalid_argument("AVX2 kernel requested but not available (compile with BUILD_WITH_AVX2 and run on AVX2-capable CPU).");
-        kernel = 2;
-    }
-    else // Auto-select (use_kernel == 0)
-        kernel = avx2_ok ? 2 : 1;
+#else
+    const bool avx2_ok = false;
+#endif
+    if (use_kernel < 0 || use_kernel > 2)
+        throw std::invalid_argument("Input 'use_kernel' must be 0, 1 or 2.");
+    if (use_kernel == 2 && !avx2_ok)
+        throw std::invalid_argument("AVX2 kernel requested but not available (compile with BUILD_WITH_AVX2 and run on AVX2-capable CPU).");
+#if BUILD_WITH_AVX2
+    const int kernel = (use_kernel == 1 || !avx2_ok) ? 1 : 2;
 #endif
 
     // Resize outputs

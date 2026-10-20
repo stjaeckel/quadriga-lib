@@ -89,14 +89,14 @@ namespace quadriga_lib
     // - If cross-polarized power is zero, XPR is set to 0 (undefined)
     template <typename dtype>
     void calc_cross_polarization_ratio(const std::vector<arma::Col<dtype>> &powers,      // Path powers in [W], Vector (n_cir) of vectors of length [n_path]
-                                       const std::vector<arma::Mat<dtype>> &M,           // Polarization transfer matrix, Vector (n_cir) of matrices of size [8, n_path]
+                                       const std::vector<arma::Mat<dtype>> &M,           // Polarization transfer matrix (Jones rows as in get_channels_spherical), Vector (n_cir) of matrices of size [8, n_path]
                                        const std::vector<arma::Col<dtype>> &path_length, // Absolute path length from TX to RX phase center in [m], Vector (n_cir) of vectors of length [n_path]
                                        const arma::Mat<dtype> &tx_pos,                   // Transmitter position in Cartesian coordinates, Size [3, 1] (fixed TX) or [3, n_cir] (mobile TX)
                                        const arma::Mat<dtype> &rx_pos,                   // Receiver position in Cartesian coordinates, Size [3, 1] (fixed RX) or [3, n_cir] (mobile RX)
-                                       arma::Mat<dtype> *xpr = nullptr,                  // Cross-polarization ratio, linear scale, Size [n_cir, 6], Cols: 0=agg. linear, 1=V-XPR, 2=H-XPR, 3=agg. circular, 4=LHCP, 5=RHCP
+                                       arma::Mat<dtype> *xpr = nullptr,                  // Cross-polarization ratio, linear scale, Size [n_cir, 6], Cols: 0=agg. linear, 1=V-XPR (receive V), 2=H-XPR (receive H), 3=agg. circular, 4=LHCP, 5=RHCP
                                        arma::Col<dtype> *pg = nullptr,                   // Total path gain (sum of path-powers × polarimetric powers in M), Length [n_cir]
                                        bool include_los = false,                         // Include the LOS path(s) in the XPR calculation
-                                       dtype window_size = 0.01);                        // LOS window size in meters, paths within dTR + window_size are excluded
+                                       dtype window_size = 0.01);                        // LOS window size in meters, paths with path_length <= dTR + window_size are excluded
 
     // ---- Site-specific simulation tools ----
 

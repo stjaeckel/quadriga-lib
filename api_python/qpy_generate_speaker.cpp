@@ -12,7 +12,8 @@ SECTION!*/
 # generate_speaker
 Generate a parametric frequency-dependent loudspeaker directivity model
 
-- Returns a multi-frequency arrayant dict; pattern fields are 4D arrays where the 4th dim is frequency
+- Returns a multi-frequency arrayant dict; pattern fields are 4D arrays where the 4th dim is frequency; for a
+  single frequency the dict is a single-frequency arrayant dict (3D pattern fields, scalar `center_freq`)
 - Directivity is stored as real-valued data in `e_theta_re`; dipole rear hemisphere is encoded with negative sign for 180° phase inversion
 - Multi-driver systems (e.g. two-way) are built by calling this per driver and combining via arrayant.[[concat]];
   crossover behavior emerges from overlapping bandpass responses
@@ -77,7 +78,8 @@ speaker = quadriga_lib.arrayant.generate_speaker( frequencies=np.array([100.0, 5
 - **`angular_resolution`** — Azimuth and elevation grid resolution in degrees; default: 5
 
 ## Outputs:
-- **`speaker`** — Multi-frequency arrayant dict with fields:
+- **`speaker`** — Multi-frequency arrayant dict with the fields below; for `n_freq = 1` the pattern fields
+  are 3D `(n_elevation, n_azimuth, n_elements)` and `center_freq` is a float:
   - `e_theta_re` — e-theta field component, real part; `(n_elevation, n_azimuth, n_elements, n_freq)`
   - `e_theta_im` — e-theta field component, imaginary part; `(n_elevation, n_azimuth, n_elements, n_freq)`
   - `e_phi_re` — e-phi field component, real part; `(n_elevation, n_azimuth, n_elements, n_freq)`

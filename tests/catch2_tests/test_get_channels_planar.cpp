@@ -259,3 +259,42 @@ TEST_CASE("Get Channels Planar - Coupling")
     CHECK(std::abs(coeff_im.at(0, 0, 0) - 0.0) < 1.0e-14f);
     CHECK(std::abs(delay.at(0, 0, 0) - dx) < 1.0e-14f);
 }
+
+TEST_CASE("Get Channels Planar - add_fake_los_path layout (B-068)")
+{
+    // Always one extra output path; slot 0 holds the LOS path (zero power if none was found);
+    // if a LOS path was present, its original slot holds a zero-power path.
+    const double C = 299792458.0;
+    auto omni = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    arma::vec aod = {0.5, 0.0, -0.4}, eod = {0.0, 0.0, 0.1}, aoa = {2.5, arma::datum::pi, -2.7}, eoa = {0.0, 0.0, 0.1};
+    arma::vec G = {0.5, 1.0, 0.25};
+    arma::mat M(8, 3, arma::fill::zeros);
+    M.row(0).fill(1.0), M.row(6).fill(-1.0);
+    arma::cube cr, ci, dl;
+
+    // Case 1: LOS path at input index 1 (path_length = TX-RX distance 50 m)
+    arma::vec PL = {60.0, 50.0, 70.0};
+    quadriga_lib::get_channels_planar<double>(&omni, &omni, 0, 0, 0, 0, 0, 0, 50, 0, 0, 0, 0, 0,
+                                              &aod, &eod, &aoa, &eoa, &G, &PL, &M, &cr, &ci, &dl, 1e9, true, true);
+    REQUIRE(cr.n_slices == 4);
+    arma::vec p = arma::vectorise(arma::square(cr) + arma::square(ci));
+    CHECK(std::abs(p(0) - 1.0) < 1e-9);
+    CHECK(std::abs(p(1) - 0.5) < 1e-9);
+    CHECK(p(2) == 0.0);
+    CHECK(std::abs(p(3) - 0.25) < 1e-9);
+    CHECK(std::abs(dl(0) * C - 50.0) < 1e-6);
+    CHECK(std::abs(dl(2) * C - 50.0) < 1e-6);
+
+    // Case 2: no LOS path
+    PL(1) = 55.0;
+    quadriga_lib::get_channels_planar<double>(&omni, &omni, 0, 0, 0, 0, 0, 0, 50, 0, 0, 0, 0, 0,
+                                              &aod, &eod, &aoa, &eoa, &G, &PL, &M, &cr, &ci, &dl, 1e9, true, true);
+    REQUIRE(cr.n_slices == 4);
+    p = arma::vectorise(arma::square(cr) + arma::square(ci));
+    CHECK(p(0) == 0.0);
+    CHECK(std::abs(p(1) - 0.5) < 1e-9);
+    CHECK(std::abs(p(2) - 1.0) < 1e-9);
+    CHECK(std::abs(p(3) - 0.25) < 1e-9);
+    CHECK(std::abs(dl(0) * C - 50.0) < 1e-6);
+    CHECK(std::abs(dl(2) * C - 55.0) < 1e-6);
+}

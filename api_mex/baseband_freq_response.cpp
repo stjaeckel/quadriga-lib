@@ -18,9 +18,13 @@ Compute the baseband frequency response of a MIMO channel
   presence of `i_snap` — see the table below
 - Single-frequency mode: computes the frequency-domain channel matrix at the carrier positions via
   DFT over time-domain path coefficients and delays
-- Multi-frequency mode: interpolates complex channel coefficients from the input frequency grid
-  `center_freq` to the output grid using SLERP, then applies delay-induced phase rotation per output
-  carrier; only the first frequency slab of `delay` is used
+- Multi-frequency mode: interpolates complex channel coefficients from the input frequency grid `center_freq` to the
+  output grid using SLERP, then applies delay-induced phase rotation per output carrier; only the first frequency slab
+  of `delay` is used. The delay-induced phase is removed from the input coefficients before the interpolation, so
+  channels from [[get_channels_multifreq]] / [[get_channels_spherical]] must be generated with
+  `use_absolute_delays = true`: their coefficients carry the phase of the absolute path length also when `delay` is
+  relative, and with relative delays the phase of the TX-RX distance is interpolated across `center_freq`, which gives
+  wrong phases (magnitudes stay right)
 - Multi-snapshot mode: applies the single-frequency backend in parallel across snapshots via OpenMP;
   `i_snap` (1-based MATLAB indices) optionally selects a subset
 - Carrier positions are specified one of two ways: as a normalized `pilot_grid` paired with `bandwidth`
@@ -31,8 +35,10 @@ Compute the baseband frequency response of a MIMO channel
 - Multi-snapshot inputs require `center_freq` to be omitted or scalar (no combined multi-freq + multi-snap)
 - Single-frequency inputs ignore `center_freq` when `pilot_grid` + `bandwidth` are given
 - `delay` supports broadcasting: shape `[1, 1, n_path, ...]` applies the same delays to all RX/TX pairs
-- Internal arithmetic is single-precision; uses AVX2 where supported; double inputs are narrowed to
-  float internally, results widened back
+- Single-frequency and multi-snapshot modes: the phase `bandwidth · pilot_grid · delay` (in cycles) is computed in
+  double precision and reduced to one period before sin / cos are evaluated in single precision; coefficients and sums
+  are single precision; uses AVX2 where supported; double inputs are narrowed to float internally, results widened
+  back. Multi-frequency mode computes in double precision
 
 ## Usage:
 ```
@@ -96,7 +102,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nrhs >= 8 && !mxIsEmpty(prhs[7]))
     {
         has_isnap = true;
-        arma::uvec idx = qd_mex_get_Col<arma::uword>(prhs[7]);
+        arma::uvec idx = qd_mex_get_Col<arma::uword>(prhs[7], false, "i_snap");
         if (!(idx.n_elem == 1 && idx[0] == 0))
         {
             if (idx.min() < 1)
