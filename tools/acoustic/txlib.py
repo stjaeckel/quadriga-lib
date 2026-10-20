@@ -2,7 +2,7 @@
 # Part of quadriga-lib — see LICENSE for terms.
 #
 # Formula copy of what the library gives a closed mass-law sheet in air (md/acoustic.md 2.1, 2.3), written from
-# src/ray_mesh_interact.cpp (Material::mass_X0, mass_TL, davy_sigma, interface_gain, tf, qd_plate) as built on
+# src/ray_mesh_interact.cpp (Material::mass_X0, mass_TL, davy_sigma, Material::interface_gain, Material::tf, qd_plate) as built on
 # 2026-10-19 (M10: m > 0 switches the mass law on at 20 dB per decade; D2-b: no coiA; the finite panel: the column side).
 # Column level, GHz as the library reads them; one face in air, one body, the plate rule R1h:
 #   T = a tau / (a + tau - a tau) * g_int,  R = 1 - a,  a = tf(f) (power law, clamped to [-1, 1], negative -> 0)
@@ -81,7 +81,7 @@ def X0_parts(M, fG, c, V={}, normal=None):
 
 
 def davy_sigma(fG, g, side):
-    """the library's Material::davy_sigma: Davy's forced radiation efficiency of a square of the given side (2a = side,
+    """the library's davy_sigma: Davy's forced radiation efficiency of a square of the given side (2a = side,
     S = side^2) at incidence cosine g [Davy_2009_ForcedRadiationEfficiency, Eqs. 19, 28, 34, 36, 37], k of the mapped
     frequency (the mapping keeps wavelengths), ka held at 0.1 or above"""
     k = 2 * math.pi * fG / 0.299792458

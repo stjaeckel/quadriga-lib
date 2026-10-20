@@ -2,7 +2,7 @@
 
 This file is the manager's memory. A manager session reads it first, works from it, and updates it after every step
 (state, roadmap, pending decisions). When a manager's context fills up, a new manager reads this file and continues;
-nothing depends on one chat. Last updated: 2026-10-16, after commit 2c5be17 (de60194; precision round complete, waiting for Stephan's commit).
+nothing depends on one chat. Last updated: 2026-10-16, after commit 2c5be17 (6307a64; cleanup task 1 complete, waiting for Stephan's commit).
 
 ## 1. Roles
 
@@ -83,14 +83,14 @@ Run on every worker phase; say which items were checked.
 
 ## 4. Current state (2026-10-16)
 
-- Last commit **de60194** (finite-panel radiation, the `side` column). Before it: bc24b0c (M10, `coiA` removed),
-  2c5be17 (M6), 4035ac4 (this file), 238444d (M5, A21), 04b92bd (acoustic.md rewrite, M9), 4720a92 (round 1 built).
-- `src/ray_mesh_interact.cpp` 5159 lines.
-- Counts: `[wave]` 165258 / 180, `[acoustic]` 41523 / 58, whole suite 1316330 / 1145; baselines
-  regenerated with 12 threads; `check_docs.py` passes.
+- Last commit **6307a64** (traced-leg precision). Before it: de60194 (finite panel, `side`), bc24b0c (M10, `coiA`
+  removed), 2c5be17 (M6), 4035ac4 (this file), 238444d (M5, A21), 4720a92 (round 1 built).
+- `src/ray_mesh_interact.cpp` 5211 lines.
+- Counts: `[wave]` 165594 / 181, `[acoustic]` 42391 / 60, whole suite 1317534 / 1148 (baselines current, 12 threads);
+  `check_docs.py` passes.
 - Documents: `md/acoustic.md` (the reference), `md/wave.md`, `md/acoustic_round1_report.md`,
   `md/m9_fixtures_report.md`, `md/m5_a21_report.md`, `md/m6_report.md`; briefs `md/m9_fixtures_brief.md`,
-  `md/m5_a21_brief.md`, `md/m6_brief.md`, `md/m10_m15_brief.md`, report `md/m10_m15_report.md`; `md/grazing_brief.md`, report `md/grazing_report.md`; `md/precision_brief.md` (approved, uncommitted).
+  `md/m5_a21_brief.md`, `md/m6_brief.md`, `md/m10_m15_brief.md`, report `md/m10_m15_report.md`; `md/grazing_brief.md`, report `md/grazing_report.md`; `md/precision_brief.md`, report `md/precision_report.md`; `md/cleanup_src_brief.md`, report `md/cleanup_src_report.md` (uncommitted).
 - Tools: `tools/acoustic` (`sabine_to_random.py`, `band_probe.cpp` with the peak columns, `paris_cf.py` the closed-form
   Paris value of a locally reacting face, `check_docs.py`, and with M10: `txlib.py` / `txfit.py` / `tl_refs.json` the transmission formula copy
   and fit, `cases.py` moved rows per case; README).
@@ -140,40 +140,58 @@ efficiency of a finite panel in the mass term, the column `side` = √(panel are
 plate), M14 closed; 13 constructions within 2.70 dB at 0–90°; `tools/acoustic/gzlib.py`. Left: regenerate
 `html_docu/` (Stephan).
 
-1. **Traced-leg precision** (investigation, from the grazing round; unknown cause). Brief `md/precision_brief.md`
-   approved 2026-10-19; phase 0 done (`md/precision_report.md` 0), reviewed 2026-10-19 (the manager checked
-   `qd_relaunch_offset` = 8·2⁻²³·max(|F|, 1), the 1e-6 VBS gate, and recomputed the 28 GHz phase of 4 mm glass at
-   100 m, 4.85°, and the 24 % thickness loss at 1 km). Cause: every in-medium leg starts at the relaunch point, short by
-   the nudge (≈ 1 µm per metre of coordinate); the 89.9° finding was a fixture artefact (`r1::wall_g`). Also N2 lost
-   rays near grazing (AVX2, float, `ray_progress`, EM included), N3 walls thinner than the nudge skipped, N4 a false
-   −26 dB in float mass-law walls; open: large turned faces in float lost or running away at the origin. EM crosses
-   0.1 dB on a coherent slab sum from about 10 m at mm-wave. Candidates W1 (ledger starts with the nudge; wave change),
-   W2 (nudge keeps its normal component), W3″ (float gate in mass-law media). **Decided (Stephan, 2026-10-19):**
-   W3″ adopted; `r1::wall_g` repaired; the turned-faces finding dropped (no new item, veto). D1 / D2 explained again
-   (W1 keeps the nudge and only adds it to the in-wall distance; W2 is a fringe case: transmission within 3° of grazing,
-   0.27 % of a diffuse field, where EM transmits almost nothing); manager's revised recommendation: W1 yes, W2 no,
-   the rule of use "local coordinates near the origin" documented. Decided: W1 yes, W2 dropped (as recommended).
-   Phase 1 done and reviewed 2026-10-20 (`md/precision_report.md` 1; the manager rebuilt with 12 threads and reran the
-   new tests on today's library: `[acoustic]` 60 cases, 2 failing with 372 assertions; `[wave]` 181 cases, 11 failing
-   with 575, as reported). Under the what-if only the 5 twin tables fail (260 rows). The phase-0 what-if had a defect
-   (followed bounces of type 1 took the written direction): the corrected W1 rule uses the incoming segment's normal
-   cosine for every type but 2 and 5. One measured exception kept (*Measurement - the mirror behind a second solid*,
-   1.34e-3 dB at one row, limit 2e-3 from 1e-2). Phase 2 done and reviewed 2026-10-20: `src/ray_mesh_interact.cpp` 5211 lines (+52), `ray_progress.cpp`
-   documentation; `tests/data/wave_twins.tsv` rewritten, exactly 260 rows in the 5 tables (checked by the manager);
-   the manager rebuilt with 12 threads and reran `[wave]` 165594 / 181 and `[acoustic]` 42391 / 60, all passing; whole
-   suite 1317534 / 1148 per the report; no measurable CPU cost. Phase 3 done and reviewed 2026-10-20 (`md/wave.md` 8 rule of use and
-   limits, `md/acoustic.md` 7 / 10; baselines regenerated; `check_docs.py` passes); commit message given, waiting for
-   Stephan's commit Lead: `ray_triangle_intersect` computes in single precision in
-   its AVX2 and CUDA kernels (its own documentation), and `ray_progress` stores the accumulated distances as `float`; a 4 mm pane crossed at y = −100 m
-   passes 0.2 dB more at normal incidence than near the origin; 152 mm concrete crossed at 89.9° (87 m inside) misses
-   its own mass-law rule by up to −3.4 dB at 2 kHz. Where precision is lost (mesh storage, intersection, the thickness
-   reconstructed from leg length and cosine) and whether EM path lengths are affected. Read-only first.
-2. **The `res*` cavity spring of a lumped double material** (D4 of the grazing round, open): locally reacting for
-   partitioned cavities (linings on battens or dabs, stud walls; fits 1.1–2.7 → 0.04–1.12 dB), double glazing by a short
-   study. Small; transmission only.
-3. **The parameter session**: the material table from the review's data with the A13 / A14 / A19 rules
+Done: **traced-leg precision** (committed 6307a64, 2026-10-20; `md/precision_report.md`): the in-medium distance counts
+the relaunch offset (exact in double far from the origin), the float bend check in mass-law media, the rule of use
+"local coordinates near the origin". Dropped (Stephan, 2026-10-20, veto): the `res*` cavity-spring item (1–2.6 dB,
+inside tolerance).
+
+Next: three cleanup tasks (Stephan, 2026-10-20), in this order; each with a plan stop (inventory: what changes,
+what is removed and why) and a stop before the commit. The parallel `fixes` checkout (`/sjc/quadriga-lib-fixes`) does
+not touch the ray files or the ray tests (checked 2026-10-20). Resources: 12 threads, one suite at a time.
+
+1. **Source cleanup of `src/ray_mesh_interact.cpp`** (brief `md/cleanup_src_brief.md`, approved 2026-10-20; phase 0
+   (inventory and plan) done, `md/cleanup_src_report.md`; Stephan decided 0.6 with the worker (option C: pure and
+   shared helpers at file scope, per-ray event logic as flat lambdas with explicit captures; every step bit-identical;
+   `tools/acoustic/rowdiff.py`; dead-code items 1–6; API statements corrected); manager's review 2026-10-20: plan
+   sound, name suggestions for the state-word bits (one name per bit and word) and a few lambdas, taken; phase 1 done
+   and reviewed 2026-10-20: 4726 lines (from 5211), 769 comment-only (from 1227), an 84-line header overview; the
+   manager rebuilt and reran `[wave]` and `[acoustic]` with 12 threads, `rowdiff` against the baselines: every number
+   identical; `tools/extract_md.py -a cpp` extracts. Decided (Stephan, 2026-10-20): A (one normalize form) dropped,
+   B `half_pi` the exact double nearest π/2 (moves 1326 printed rounding-noise values below 1e-9, every assertion
+   passes), C `k0()` in `davy_sigma`. Phase 2 with a new worker (the first one's context was 85 % full); phase 2 done and reviewed 2026-10-20 (B and C
+   applied, exactly the measured values moved, baselines regenerated, CPU 0.983–1.000, 4725 lines, 768 comment-only;
+   the manager reran `[acoustic]` against the new baselines: identical); commit message given, waiting for Stephan's
+   commit). Remove stale comments; comments down to the necessary minimum
+   without losing readability; an agent that reads only this file must understand what it does (a header overview);
+   readable structure, correct scoping (anonymous namespace, `const`, the narrowest scope), sensible names. **One
+   file**, with the large functions (`ray_state_update` about 2000 lines of lambdas, `ray_mesh_interact` about 1000)
+   split into named helper functions grouped in sections (material model, interface physics, slab / stack solver,
+   `ray_mesh_interact`, `ray_state_update`). **The public API blocks (`/*!MD … */`) are shortened to the essentials**:
+   they compile into the public docs, so they describe what a user or an AI sees from the whole-library perspective;
+   internal workings only where needed for context. **Tests must not move**: every assertion passes and the stored
+   twins hold their 1e-12 tolerance; printed rows may drift in their last digits only (Stephan chose this over
+   bit-identity) — the worker reports every printed value that changes. No change to `ray_progress.cpp` or the
+   tests in this task.
+2. **Test cleanup of the ray tests** (`[wave]` and `[acoustic]` files and `ray_test_helpers.hpp`, about 33,800 lines;
+   other test areas and the Python / MATLAB suites out of scope). Remove **redundant** tests only: print-only cases
+   without assertions, duplicates, tests of retired behavior, cases whose every assertion another case already makes;
+   every mechanism and every EM statement keeps at least one guard; each removal listed with its reason at the plan
+   stop. Remove stale comments; comments to the necessary minimum. **As fast as sensible** (no number; the two big
+   cases, *ray_progress - the reflect port of a sheet lies where its transmit port puts the layer* 9.8 s and
+   *Measurement - the mirror behind the ray after a back reflection* 9.6 s of the whole suite's 38 s, first).
+   **Diagnostic output off by default, switchable** (one environment variable, no rebuild), so the printed-row
+   comparison stays available for future analysis.
+3. **Material model document**: `html_docu/quadriga_lib_material_model.md` rewritten to match what is implemented,
+   **two sections in one page**: a user part (the physics, every column, the rules of use, the limits) and a short
+   developer part (how the code is structured, after task 1); **published** with the other html_docu pages. It
+   **absorbs what users need from `md/acoustic.md` and `md/wave.md`** (rules of use, limits). The transitory `md/`
+   files stay until the parameter project (Stephan's choice); the column reference `format_materials.md` is not in
+   this task.
+
+4. **The parameter session** — to become a project of its own (Stephan, 2026-10-20); kept here only so its
+   context is not lost; not to be started from this file: the material table from the review's data with the A13 / A14 / A19 rules
    (`tools/acoustic/sabine_to_random.py`), the acceptance classes of `md/acoustic.md` 9.
-4. **A9**: the material-model page, after the machine is settled.
+(A9, the material-model page, is task 3 above.)
 
 Decisions in section 6 can be taken whenever Stephan wants; none blocks item 1.
 
