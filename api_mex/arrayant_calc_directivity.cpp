@@ -14,6 +14,7 @@ Calculates the directivity in dBi of array antenna elements
 
 - Directivity = 10 log10(peak radiation intensity / mean over 4π); isotropic radiator = 0 dBi
 - Calculated per element, not per port; ignores element coupling
+- Independent of the scale of the pattern; an element whose pattern is zero everywhere gives 0 dBi
 
 ## Usage:
 ```

@@ -6,6 +6,8 @@
 
 #include "quadriga_lib.hpp"
 
+#include <algorithm>
+#include <cmath>
 #include <iostream>
 #include <string>
 
@@ -1953,4 +1955,50 @@ TEST_CASE("Get Channels Spherical - AVX2 interpolation of a low-amplitude patter
     for (arma::uword i = 0; i < cr_g.n_elem; ++i)
         dmax = std::max(dmax, std::hypot(cr_g(i) - cr_v(i), ci_g(i) - ci_v(i)));
     CHECK(dmax / amax < 1e-4);
+}
+
+// B-006: with use_avx2 = true, get_channels_spherical passes per-element angles of size [n_links, n_ang] to the AVX2
+// kernel. For n_links not a multiple of 8, the last block must not load angles past the end of the matrices (heap
+// over-read, visible only in the ASan suite). The result must agree with the generic interpolation.
+template <typename dtype>
+static void get_channels_spherical_avx2_tail_check()
+{
+    auto rx = quadriga_lib::generate_arrayant_omni<dtype>(10.0);
+    auto tx = quadriga_lib::generate_arrayant_xpol<dtype>(10.0); // 2 elements, 1 RX element: n_links = 2
+    arma::arma_rng::set_seed(17);
+    const arma::uword n_path = 100;
+    arma::Mat<dtype> fbs = arma::randu<arma::Mat<dtype>>(3, n_path);
+    fbs.row(0) += dtype(5.0);
+    arma::Col<dtype> gain(n_path, arma::fill::ones), len(n_path);
+    for (arma::uword p = 0; p < n_path; ++p)
+    {
+        const dtype x = fbs(0, p), y = fbs(1, p), z = fbs(2, p); // no arma::norm: the test binary links without BLAS
+        len(p) = std::sqrt(x * x + y * y + z * z) + std::sqrt((x - dtype(10)) * (x - dtype(10)) + y * y + z * z) + dtype(0.1);
+    }
+    arma::Mat<dtype> M(8, n_path, arma::fill::zeros);
+    M.row(0).ones(), M.row(6).fill(-1.0);
+
+    arma::Cube<dtype> cr_g, ci_g, dl_g, cr_v, ci_v, dl_v;
+    quadriga_lib::get_channels_spherical<dtype>(&tx, &rx, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0,
+                                                &fbs, &fbs, &gain, &len, &M, &cr_g, &ci_g, &dl_g, dtype(3e9),
+                                                false, false, nullptr, nullptr, nullptr, nullptr, false);
+    quadriga_lib::get_channels_spherical<dtype>(&tx, &rx, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0,
+                                                &fbs, &fbs, &gain, &len, &M, &cr_v, &ci_v, &dl_v, dtype(3e9),
+                                                false, false, nullptr, nullptr, nullptr, nullptr, true);
+    REQUIRE(cr_v.n_elem == cr_g.n_elem);
+    REQUIRE(cr_v.n_elem == 2 * n_path);
+    double amax = 0.0, dmax = 0.0;
+    for (arma::uword i = 0; i < cr_g.n_elem; ++i)
+    {
+        amax = std::max(amax, std::hypot(double(cr_g(i)), double(ci_g(i))));
+        dmax = std::max(dmax, std::hypot(double(cr_g(i) - cr_v(i)), double(ci_g(i) - ci_v(i))));
+    }
+    REQUIRE(amax > 0.0);
+    CHECK(dmax / amax < 1e-4);
+}
+
+TEST_CASE("Get Channels Spherical - AVX2 with per-element angles, n_links not a multiple of 8 (B-006)")
+{
+    get_channels_spherical_avx2_tail_check<float>();
+    get_channels_spherical_avx2_tail_check<double>();
 }

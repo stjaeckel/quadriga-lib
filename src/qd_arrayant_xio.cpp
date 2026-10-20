@@ -757,10 +757,6 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::arrayant_concat_multi(
     // --- Reference dimensions ---
     arma::uword n_elem1 = arrayant_vec1[0].n_elements();
     arma::uword n_elem2 = arrayant_vec2[0].n_elements();
-    arma::uword n_ports1 = arrayant_vec1[0].coupling_re.n_cols;
-    arma::uword n_ports2 = arrayant_vec2[0].coupling_re.n_cols;
-    bool has_coupling_im1 = !arrayant_vec1[0].coupling_im.empty();
-    bool has_coupling_im2 = !arrayant_vec2[0].coupling_im.empty();
 
     // --- Build output ---
     std::vector<quadriga_lib::arrayant<dtype>> output(n_freq);
@@ -798,21 +794,9 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::arrayant_concat_multi(
         // Block-diagonal coupling matrix assembly
         // [ C1  0  ]
         // [ 0   C2 ]
-        arma::uword n_elem_out = n_elem1 + n_elem2;
-        arma::uword n_ports_out = n_ports1 + n_ports2;
-
-        out.coupling_re.zeros(n_elem_out, n_ports_out);
-        out.coupling_re.submat(0, 0, n_elem1 - 1, n_ports1 - 1) = a1.coupling_re;
-        out.coupling_re.submat(n_elem1, n_ports1, n_elem_out - 1, n_ports_out - 1) = a2.coupling_re;
-
-        if (has_coupling_im1 || has_coupling_im2)
-        {
-            out.coupling_im.zeros(n_elem_out, n_ports_out);
-            if (has_coupling_im1)
-                out.coupling_im.submat(0, 0, n_elem1 - 1, n_ports1 - 1) = a1.coupling_im;
-            if (has_coupling_im2)
-                out.coupling_im.submat(n_elem1, n_ports1, n_elem_out - 1, n_ports_out - 1) = a2.coupling_im;
-        }
+        qd_arrayant_coupling_block_diag(a1.coupling_re, a1.coupling_im, n_elem1,
+                                        a2.coupling_re, a2.coupling_im, n_elem2,
+                                        out.coupling_re, out.coupling_im);
 
         // Validate and initialize check_ptr
         err = out.validate();

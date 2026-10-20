@@ -439,6 +439,12 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_ula(arma::uword N,
         std::string error_message = ant.validate(); // Deep check
         if (error_message.length() != 0)
             throw std::invalid_argument(error_message.c_str());
+
+        // Only the radiation pattern is used: element positions and coupling of the custom pattern are ignored
+        const arma::uword n_el_pattern = ant.n_elements();
+        ant.element_pos.zeros(3, n_el_pattern);
+        ant.coupling_re.eye(n_el_pattern, n_el_pattern);
+        ant.coupling_im.zeros(n_el_pattern, n_el_pattern);
     }
 
     ant.center_frequency = center_freq;
@@ -553,6 +559,12 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(arma::uword M
         std::string error_message = ant.validate(); // Deep check
         if (error_message.length() != 0)
             throw std::invalid_argument(error_message.c_str());
+
+        // Only the radiation pattern is used: element positions and coupling of the custom pattern are ignored
+        const arma::uword n_el_pattern = ant.n_elements();
+        ant.element_pos.zeros(3, n_el_pattern);
+        ant.coupling_re.eye(n_el_pattern, n_el_pattern);
+        ant.coupling_im.zeros(n_el_pattern, n_el_pattern);
     }
 
     ant.center_frequency = center_freq;
@@ -960,8 +972,9 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_multibeam(arma::uw
             // tmp.print("test angles");
             // std::cout << "IT = " << lp << ", B = " << i_beam << ", Gain = " << 10.0*std::log10( gain[i_beam]) << " > " << 10.0*std::log10(gain_new) << std::endl;
 
-            // Update search direction for next iteration
-            if (gain_new > gain[i_beam]) // Update gain and angles, keep search direction
+            // Update search direction for next iteration. The first iteration tests the start angles and is always
+            // stored, also when the gain is 0 (e.g. a beam towards a pole, where the element pattern is 0).
+            if (gain_new > gain[i_beam] || lp == 0) // Update gain and angles, keep search direction
             {
                 gain[i_beam] = gain_new;
                 angles(0, i_beam) = test_angles(0, i_beam);

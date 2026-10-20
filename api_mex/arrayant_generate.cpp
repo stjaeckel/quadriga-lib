@@ -103,7 +103,8 @@ ant = quadriga_lib.arrayant_generate('multibeam_sep', res, freq, az_3dB, el_3dB,
 
 ## Inputs (type ula, 3GPP):
 - **`pattern`** — Custom per-element pattern struct used for 3GPP or ULA; same format as
-  outputs; overrides default 3GPP/ULA element pattern; other struct fields if present are ignored
+  outputs; overrides default 3GPP/ULA element pattern; only the radiation pattern is used: element
+  positions, coupling and center frequency of the pattern are ignored, as are other struct fields
 
 ## Inputs (type multibeam, multibeam_sep):
 - **`dir`** — Beam steering angles, `[3, n_beams]`; rows are `[azimuth_deg; elevation_deg; weight]`; 

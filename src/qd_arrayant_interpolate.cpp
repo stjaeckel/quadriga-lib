@@ -249,7 +249,9 @@ void qd_arrayant_interpolate(const arma::Cube<dtype> &e_theta_re, const arma::Cu
                 i_vp = 0, i_vn = 0, vp = one, vn = zero;
                 if (n_azimuth != 1)
                 {
-                    if (*p_azimuth_grid > az) // az is between -pi and first grid point
+                    // az is between -pi and first grid point; also taken for NaN (from NaN or infinite input angles),
+                    // so that the indices stay in bounds and the NaN weights give a NaN output
+                    if (!(*p_azimuth_grid <= az))
                     {
                         i_up = n_azimuth - 1;
                         un = (*p_azimuth_grid - az + R0) * *az_diff;
