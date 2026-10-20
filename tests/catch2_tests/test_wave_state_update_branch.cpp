@@ -150,7 +150,7 @@ TEST_CASE("Unentered branches - the displacement budget caps what a sheet takes 
 
                     // What the event sees, as normal thicknesses: the leg in front, and the gap ahead
                     // to the second face of the hit. Each half of the sheet takes no more than its side
-                    const double hf = 0.5 * L - o(0, 0), hb = std::abs(Et.sbs(0, 0) - Et.fbs(0, 0));
+                    const double hf = 0.5 * L - E0.fbs(0, 0), hb = std::abs(Et.sbs(0, 0) - Et.fbs(0, 0));
                     const double un = std::min(0.5 * thk[q], hf), ubk = std::min(0.5 * thk[q], hb), budget = un + ubk;
                     DiagLayer lay;
                     lay.e = eS, lay.d = thk[q];
@@ -166,7 +166,7 @@ TEST_CASE("Unentered branches - the displacement budget caps what a sheet takes 
 
                     // The series on the leg behind the sheet: the sheet a layer backed by the host, centred,
                     // the half on this side capped by the leg
-                    const double dleg = L - Et.origN(0, 0);
+                    const double dleg = L - Et.fbs(0, 0);
                     DiagSheet Mr = diag_cm_stack(eH, 1.0, {lay}, eH, 1.0, ct, f, true, true, 2.0 * std::min(0.5 * thk[q], dleg));
                     const std::complex<double> rb = Mr.R_te;
                     const double mir = std::abs(rb);
@@ -232,7 +232,7 @@ TEST_CASE("Unentered branches - the displacement budget caps what a sheet takes 
                 ub::onward(Et, o2, d2);
                 ub::Ev X0 = ub::traced<double>(pal_q, mesh, mi, tr, f, o2, d2, &Et, dec);
                 REQUIRE((E0.nh && Et.nh >= 2 && Er.nh >= 2 && X0.nh));
-                const double tt = K.ta + K.tb, budget = 2.0 * std::min(0.5 * tt, K.xs - o(0, 0));
+                const double tt = K.ta + K.tb, budget = 2.0 * std::min(0.5 * tt, K.xs - E0.fbs(0, 0));
                 std::vector<DiagLayer> lay = {lump_layer(lq[iA - 1], f), lump_layer(lq[iB - 1], f)};
                 DiagSheet W = diag_cm_stack(eH, 1.0, lay, eH, 1.0, ct, f, false, true, budget);
                 DiagSheet U = diag_cm_stack(eH, 1.0, lay, eH, 1.0, ct, f, false, true);
@@ -335,7 +335,7 @@ TEST_CASE("Unentered branches - the core's loss cap is a floor on the transmit p
         std::complex<double> rl = diag_cm_stack(eH, 1.0, {lay}, 1.0, 1.0, ct, f, true, true).R_te;
         std::complex<double> rh = (nH * ct - nM * cM) / (nH * ct + nM * cM);
         const std::complex<double> rb = (nH * ct - std::cos(th)) / (nH * ct + std::cos(th));
-        const std::complex<double> ph2 = std::exp(-2.0 * J * k0 * nH * ct * (0.100 - c0[0].origN(0, 0)));
+        const std::complex<double> ph2 = std::exp(-2.0 * J * k0 * nH * ct * (0.100 - c0[0].fbs(0, 0)));
         const double dl = std::abs(S - 1.0 / (1.0 - rl * rb * ph2)), dh = std::abs(S - 1.0 / (1.0 - rh * rb * ph2));
         QD_DIAG("%.2f,%d,%.6f,%.3e,%.3e\n", 8.685889638 * Np, (int)(Np > cap_Np), std::abs(S), dl, dh);
         INFO("loss cap mirror, loss " << loss_dB[q]);
@@ -615,7 +615,7 @@ TEST_CASE("Unentered branches - a verdict handed in on a leg known not parallel 
             arma::mat o, d;
             diag_ray_at(thd, o, d);
             ub::Ev G = ub::traced<double>(pal, mesh, mi, 4, FRQ, o, d, nullptr); // the geometry does not depend on the frequency
-            const double dl = Ls - G.origN(0, 0), b = std::sqrt(1.0e4 - s2), c = std::cos(th);
+            const double dl = Ls - G.fbs(0, 0), b = std::sqrt(1.0e4 - s2), c = std::cos(th);
             const double N = std::round(2.0 * b * dl * FRQ / C0), fN = N * C0 / (2.0 * b * dl), f = fN * (1.0 + psi / (2.0 * QPI * N));
             const double rs = (b - c) / (b + c), k = 2.0 * QPI * f / C0;
             const std::complex<double> den = 1.0 - rs * rs * std::exp(-2.0 * J * k * b * dl);
@@ -958,7 +958,7 @@ TEST_CASE("One solver - a sheet and a stack are one sum and no mirror is clamped
             auto a0 = ub::chain(P, mesh, mi, {4, 4}, f, thd, {1.5, 0.0}), a1 = ub::chain(P, mesh, mi, {4, 4}, f, thd, {1.5, 1.5});
             REQUIRE((a0.size() == 2 && a1.size() == 2));
             const cd S = cpx(a0[1].xpr, 0, 0) / cpx(a1[1].xpr, 0, 0);
-            const double L = d1 - a0[0].origN(0, 0);
+            const double L = d1 - a0[0].fbs(0, 0);
             const cd ph = std::exp(-J * k0 * bH * L), r_b = (bH - std::cos(th)) / (bH + std::cos(th));
             const cd r_2 = diag_cm_stack(eH, U, {{e1, U, t1}, {e2, U, t2}}, eH, U, cH, f, false, true).R_te;
             const cd r_1 = diag_cm_stack(eH, U, {{e1, U, t1}}, eH, U, cH, f, false, true).R_te;
@@ -966,7 +966,7 @@ TEST_CASE("One solver - a sheet and a stack are one sum and no mirror is clamped
             // the leg behind the stack
             auto b0 = ub::chain(P, mesh, mi, {4, 4, 4}, f, thd, {1.5, 1.5, 0.0}), b1 = ub::chain(P, mesh, mi, {4, 4, 4}, f, thd, {1.5, 1.5, 1.5});
             REQUIRE((b0.size() == 3 && b1.size() == 3));
-            const cd Sb = cpx(b0[2].xpr, 0, 0) / cpx(b1[2].xpr, 0, 0), phb = std::exp(-J * k0 * bH * (d1 + G + d2 - b0[1].origN(0, 0)));
+            const cd Sb = cpx(b0[2].xpr, 0, 0) / cpx(b1[2].xpr, 0, 0), phb = std::exp(-J * k0 * bH * (d1 + G + d2 - b0[1].sbs(0, 0))); // from the SBS the pair relaunches at
             const cd q_2 = diag_cm_stack(eH, U, {{e2, U, t2}, {e1, U, t1}}, eH, U, cH, f, false, true).R_te;
             const cd q_1 = diag_cm_stack(eH, U, {{e2, U, t2}}, eH, U, cH, f, false, true).R_te;
             const cd Sb2 = 1.0 / (1.0 - r_b * q_2 * phb * phb), Sb1 = 1.0 / (1.0 - r_b * q_1 * phb * phb);
@@ -981,7 +981,7 @@ TEST_CASE("One solver - a sheet and a stack are one sum and no mirror is clamped
             QD_DIAG("%g-%gj,%.0f,%.6f,%.3e,%.3e,%04x,%.3e,%.3e,%d,%+.4f,%+.4f\n", h.first, h.second, thd, std::abs(S), std::abs(S - S2), std::abs(S - S1),
                     ub::w(a0[1].buf(0)), std::abs(Sb - Sb2), std::abs(Sb - Sb1), A.nT, dT, dR);
             INFO("G, host " << h.first << "-" << h.second << "j, theta " << thd);
-            CHECK(std::abs(S - S2) < 1.0e-6);  // the relaunch offset of the leg is in L
+            CHECK(std::abs(S - S2) < 1.0e-6);  // L is the leg from the hit point
             CHECK(std::abs(S - S1) > 1.0e-4);  // and the two mirrors are told apart
             CHECK(a0[1].buf(0) == (short)(0x4000 | 2)); // the previous-medium word names the last layer, the buffer word the first
             CHECK(std::abs(Sb - Sb2) < 1.0e-6);         // so the leg behind sums against both

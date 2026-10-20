@@ -3061,7 +3061,10 @@ void quadriga_lib::ray_state_update(
 - **`verdict_outN`** *(optional)* — Per event, 1 where this call summed a bounce series and 0 where it left the
   bounces to the tracer, compact set; `[n_rayN]`. NULL skips the write.
 - **`acc_dist_geometricN`** — Accumulated geometric distance leaving this call, compact set; `[n_rayN]`. NULL skips the write.
+  Where the ray goes on inside a medium it includes the relaunch offset of [[ray_mesh_interact]] (`origN` lies that
+  far past the point the ray left at), so the next leg, measured from `origN`, adds up to the leg from the hit point.
 - **`acc_dist_refractedN`** — Accumulated refracted (VBS) distance leaving this call, compact set; `[n_rayN]`. NULL skips the write.
+  It includes the relaunch offset the same way, projected onto the direction the wave has (exact for parallel faces).
 - **`resolved_typeN`** *(optional)* — Resolved interaction-type code, bit-encoded (`qd::bits<uint8_t>`),
   compact set; `[n_rayN]`. 0 = ray killed. NULL skips the write.<br><br>
    | Bit  | Flag        | Meaning                                                                        |
@@ -3643,7 +3646,20 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 dist_orig_vbs = dist_OV;
                 abs_cos_theta_t = (ct > 1.0) ? 1.0 : ct;
                 theta_t = std::acos(abs_cos_theta_t) - 1.570796326794897;
-                use_vbs = std::abs(abs_cos_theta_t - abs_cos_theta) > 1e-6;
+
+                // In a mass-law medium the wave is held undeviated, so a difference between the two
+                // cosines is rounding unless a refracting tracer bent the wave into the medium. In
+                // single precision the segment's ends are rounded to float: far from the origin, on a
+                // short segment, that alone tilts its direction by more than 1e-6 and would count a
+                // held leg as a bent one, skipping its plate rule. There the test allows the rounding
+                // of the segment's ends.
+                double tol_vbs = 1e-6;
+                if (sizeof(dtype) == 4 && MAT(mtl_current).m > 0.0)
+                {
+                    const double sc = std::max({std::abs(O[0]), std::abs(O[1]), std::abs(O[2]), std::abs(F[0]), std::abs(F[1]), std::abs(F[2]), 1.0});
+                    tol_vbs += 8.0 * 1.1920929e-7 * sc / std::max(dist_orig_fbs, 1.0e-9);
+                }
+                use_vbs = std::abs(abs_cos_theta_t - abs_cos_theta) > tol_vbs;
             }
         }
 
@@ -3667,11 +3683,15 @@ void quadriga_lib::ray_state_update(int interaction_type,
         // one the segment was built on, the ray tube and the rule for a mass-law medium included.
         const int bent_enter = ((interaction_type == 2 || interaction_type == 5) && !total_reflection) ? (int)0x4000 : 0;
 
-        // Accumulated in-medium distance
+        // Accumulated in-medium distance. A leg is measured from the point the ray left at, the hit
+        // point or the far face of a co-located pair: ray_mesh_interact relaunches a few float ulp past
+        // it, and the ledger written below carries that part (see LEG_FROM_HIT_POINT).
         double dist_refract = p_acc_refract_in ? (double)p_acc_refract_in[i_ray] : 0.0;
         double dist_geo = p_acc_geo_in ? (double)p_acc_geo_in[i_ray] : 0.0;
+        bool ledger_at_relaunch = false; // the ledger ends where this event relaunches the ray
         auto DIST_ADD = [&](double val_refract = 0.0, double val_geo = 0.0)
         {
+            ledger_at_relaunch = val_refract == 0.0 && val_geo == 0.0 && nH != 0;
             dist_refract += (val_refract == 0.0) ? dist_orig_vbs : val_refract;
             if (val_geo == 0.0)
                 dist_geo += (val_refract == 0.0) ? dist_orig_fbs : val_refract;
@@ -3680,6 +3700,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
         };
         auto DIST_SET = [&](double val_refract = 0.0, double val_geo = 0.0)
         {
+            ledger_at_relaunch = val_refract == 0.0 && val_geo == 0.0;
             dist_refract = val_refract;
             dist_geo = (val_geo == 0.0) ? val_refract : val_geo;
         };
@@ -5095,6 +5116,37 @@ void quadriga_lib::ray_state_update(int interaction_type,
             }
             else // Unmatched
                 KILL_RAY();
+        }
+
+        // LEG_FROM_HIT_POINT. The leg that follows inside a medium is measured by the next event from
+        // the relaunch point, qd_relaunch_offset past the point this event left at, so the ledger
+        // starts with that offset: the next leg then adds up to the leg from the hit point, at any
+        // distance from the origin. The refracted ledger is measured along the wave's direction to the
+        // next face: it misses the offset times |g.N| / |dir_next.N|, g the direction the segment goes
+        // on in - the incoming one, or its mirror, which has the same normal cosine - and 1 where the
+        // tracer bends the segment itself (types 2 and 5). Exact for parallel faces. A ledger
+        // preloaded to the destination (a segment that ends inside a body) is left as it is.
+        if (ledger_at_relaunch && nH != 0 && (int)typeR != 0 && (next_current & 0x3FFF) != 0)
+        {
+            const bool at_sbs = nH >= 2 && DIST(F, S) < colocation_dist;
+            double Nf[3] = {(double)p_normal_vecN[ii + (at_sbs ? 3 : 0) * n_rayN], (double)p_normal_vecN[ii + (at_sbs ? 4 : 1) * n_rayN],
+                            (double)p_normal_vecN[ii + (at_sbs ? 5 : 2) * n_rayN]};
+            NORMALIZE(Nf);
+            double dn[3] = {dir_next[0], dir_next[1], dir_next[2]};
+            if (p_path_dirN)
+                dn[0] = (double)p_path_dirN[i_rayN], dn[1] = (double)p_path_dirN[i_rayN + n_rayN], dn[2] = (double)p_path_dirN[i_rayN + 2 * n_rayN];
+            NORMALIZE(dn);
+            const double off = qd_relaunch_offset(F[0], F[1], F[2]);
+            dist_geo += off;
+            if (interaction_type == 2 || interaction_type == 5)
+                dist_refract += off;
+            else
+            {
+                double g[3] = {F[0] - O[0], F[1] - O[1], F[2] - O[2]};
+                NORMALIZE(g);
+                const double cg = std::abs(g[0] * Nf[0] + g[1] * Nf[1] + g[2] * Nf[2]), cd = std::abs(dn[0] * Nf[0] + dn[1] * Nf[1] + dn[2] * Nf[2]);
+                dist_refract += (cd > 1.0e-9) ? off * cg / cd : off;
+            }
         }
 
         // Write the new state words (compact set)

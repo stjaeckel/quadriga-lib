@@ -21,7 +21,7 @@ closed-form evaluation made for this document, "measured here" a run of the libr
 sources (section 9) and sets no parameter.
 
 First step: `md/wave.md`, section 0. The acoustic half:
-`OMP_NUM_THREADS=12 ./build_linux/test_bin "[acoustic]" > test_acoustic.txt` → `All tests passed (41523 assertions in 58 test cases)`.
+`OMP_NUM_THREADS=12 ./build_linux/test_bin "[acoustic]" > test_acoustic.txt` → `All tests passed (42391 assertions in 60 test cases)`.
 Its cases are in `test_acoustic_mesh_interact.cpp`, `test_acoustic_progress.cpp`,
 `test_acoustic_state_update.cpp` and `test_acoustic_leaf.cpp` (the leaves of 2.8); 16 of them are "<name> - the mass-law part" of a wave case. The appendix
 lists every case with the section that states it. The machine described in section 2 is the one after
@@ -976,13 +976,25 @@ not the material model's to carry.
   series is summed (`ρ` 1.006 / 1.029); the cause is not traced (`md/m6_report.md` 2.4, S1).
 - Wave media, the leaves of a meshed double wall included, keep the infinite plate at grazing: the finite panel
   (`side`) acts only where `m > 0` (2.1, 2.8). Their finite size is not modeled.
-- A traced leg loses precision far from the origin and near grazing (measured 2026-10-19, `md/grazing_report.md` 1.3;
-  to be investigated, not in this round). The same 4 mm traced pane, crossed at normal incidence 100 m from the origin,
-  passes 0.2 dB more than crossed 0.37 m from it (−31.454 against −31.658 dB at 500 Hz); a 152 mm traced wall crossed at
-  89.9° (an 87 m path through it) misses its own plate rule by −0.007 / −0.027 / −0.10 / −1.17 / −3.42 dB at 31.5 / 63 /
-  125 / 500 / 2000 Hz, where at 89.5° it holds to 1e-4 dB. Likely the length and cosine of the leg in large
-  coordinates. *Finite plate - a mass-law panel of side s radiates with Davy's forced radiation efficiency* stops its
-  traced solid at 89.5° and keeps the crossing near the origin.
+- **Closed (2026-10-20): a traced leg far from the origin** (`md/precision_report.md`). `ray_mesh_interact` relaunches
+  a ray 8·2⁻²³ of the hit point's largest coordinate past it, about 1 µm per metre, and the leg inside a solid was
+  measured from there: short by that much. A 4 mm traced pane at normal incidence passed 0.2 dB more 100 m from the
+  origin (−31.454 against −31.658 dB at 500 Hz) and 2.4 dB more at 1 km. The ledger now counts the offset, so the leg is
+  measured from the hit point: the same pane passes what it passes at the origin to 5.4e-11 dB up to 1 km (*Far from the
+  origin - a traced mass-law wall passes what it passes at the origin, its leg measured from the hit point*). The 89.9°
+  row of the same finding (a 152 mm wall missing its plate rule by up to 3.42 dB) was the fixture's: `r1::wall_g`'s first
+  segment ended inside the wall and the walker added the preloaded leg again. The segment now reaches past the wall and
+  *Finite plate - a mass-law panel of side s radiates with Davy's forced radiation efficiency* traces its solid to 89.9°.
+- **Closed (2026-10-20): the false −26 dB of a float mass-law wall.** In single precision, on a short segment 10 m or
+  more from the origin, rounding of the segment's ends made the 1e-6 test of `use_vbs` count a held leg as a bent one;
+  the plate rule was skipped and the wall passed its two leaks, 26 dB too little (in 16 of 72 rows at 100 m; through
+  `ray_progress` only on segments of a few metres). In a mass-law medium in float the test allows that rounding (*Far
+  from the origin - in single precision a mass-law leg is not taken for a bent one*).
+- **Rule of use:** build scenes in local coordinates near the origin: mm-wave through `ray_progress` within about 100 m;
+  never raw georeferenced coordinates, where the nudge exceeds a wall's thickness. **Limits** (`md/wave.md` 8): a body
+  thinner than the nudge is skipped; rays within about 3° of grazing can be lost in float or with the AVX2 kernel; the
+  float position rounding leaves an EM phase of about 3.8° at 28 GHz at 1 km. Recorded, no item: a 4 mm pane on large
+  turned faces in float is lost or runs away even at the origin.
 - A peak set on a non-rigid mass-law body makes its face the series impedance: `eps 1.50`, `m` 20 with the board's peak
   reflects 0.844 at 150 Hz, 0°, where its Fresnel face with the flat pad read 0.085. No use case.
 
@@ -1295,7 +1307,8 @@ library: sheet on traced solid within 0.0018 dB, a band on its single frequencie
 - One side per bonded run, a rule of use with no code (2.2); a mixed run takes the side of the first body the ray meets.
 - M14 closed, superseded (section 4). The locally reacting cavity of `res*` not in this round: a side finding for the
   double-leaf rows (section 4, M14 entry).
-- The precision of a traced leg far from the origin or near grazing is a separate investigation (7).
+- The precision of a traced leg far from the origin or near grazing is a separate investigation (7; closed 2026-10-20,
+  below).
 - Transmission fits at each construction's laboratory side (section 9).
 
 **Built (2026-10-19)**: the finite panel (`md/grazing_report.md` 2): `src/ray_mesh_interact.cpp` 5159 lines against
@@ -1309,6 +1322,29 @@ checks in the C++, Python and MATLAB tests. `[wave]` 165258 assertions in 180 ca
 twins unchanged), `[acoustic]` 41523 in 58, whole suite 1316330 in 1145. The 13 fits at their lab side through the
 built library: sheet and formula within 0.0000 dB, traced solid within 0.0042 dB, R + T below one in every row, a band
 on its single frequencies bitwise. CPU time unchanged (whole suite 46.0 against 45.9 s single-threaded).
+
+**Taken (Stephan, 2026-10-19), after the precision study (`md/precision_report.md` 0, 1):**
+
+- W1 adopted, a decided wave change: each in-medium leg starts with the relaunch offset it skipped, so it is measured
+  from the hit point; the refracted ledger's share is the offset times `|g·N| / |dir_next·N|` (`g` the incoming segment,
+  1 for types 2 and 5); preloaded legs untouched; the offset itself unchanged. The `[wave]` twins move (260 of 736
+  rows, 5 tables, at most 8.8e-3 relative); the fixtures that wrote "the thickness crossed" from `origN` are restated to
+  the hit point.
+- W3″ adopted: in a mass-law medium and the float template the `use_vbs` tolerance is
+  `1e-6 + 8·2⁻²³·max(|O|, |F|, 1) / |O − F|`.
+- W2 (a nudge with a normal component) dropped: rays within about 3° of grazing in float or AVX2 stay a limit.
+- `r1::wall_g` repaired; *Finite plate - …* traced to 89.9°.
+- One rule of use and one line of limits (7, `md/wave.md` 8); no new open items; the large turned faces in float
+  recorded only.
+
+**Built (2026-10-20)**: W1 and W3″ in `ray_state_update` (`md/precision_report.md` 2): `src/ray_mesh_interact.cpp` 5211
+lines against 5159; the `acc_dist` documentation of `ray_state_update` and `ray_progress` says the ledgers carry the
+offset. Three cases new (*Far from the origin - …*, two `[acoustic]`, one `[wave]`); the fixtures that wrote a thickness
+from `origN` restated to the hit point (10 `[wave]` cases of them failed on the library before); `tests/data/wave_twins.tsv`
+rewritten (260 rows). `[wave]` 165594 assertions in 181 cases, `[acoustic]`
+42391 in 60, whole suite 1317534 in 1148; the built library's run equals the what-if's line for line; printed rows
+move in 76 cases (38 `[wave]`, 38 `[acoustic]`), every one accounted for. CPU time unchanged (+0.2 / −1.6 / −2.1 % on
+three test files, single-threaded, alternated).
 
 **Round history** (detail in the report and in `build_linux/scratch/i47/NOTES.md`):
 
@@ -1439,3 +1475,5 @@ of section 9; `cases.py`, moved rows per case between two runs; `README.md`).
 | *ray_progress - a leaf on a box of air at every frequency of a band* | 2.8 |
 | *Leaf - a porous fill at the back of the box is the transfer matrix of leaf, air, fill and wall* | 2.8, 3.1 |
 | *Sheet between two bodies - nothing is created and the wave left in air inside the far body is killed* | 2.8, 6 (A21) |
+| *Far from the origin - a traced mass-law wall passes what it passes at the origin, its leg measured from the hit point* | 7, 10 |
+| *Far from the origin - in single precision a mass-law leg is not taken for a bent one* | 7, 10 |

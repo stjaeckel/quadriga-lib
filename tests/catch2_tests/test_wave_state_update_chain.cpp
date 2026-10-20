@@ -429,7 +429,7 @@ TEST_CASE("Exits and verdicts - every exit at the cosine the wave has there", "[
                 cd eh = diag_eps(h, f_hz), zh = std::sqrt(eh);
                 Ref r = ref_of(eh, true, st * st, false, 0.0);
                 cd a0 = std::cos(th), b0 = zh * r.c_near, t01 = 2.0 * a0 / (a0 + b0), t10 = 2.0 * b0 / (a0 + b0);
-                double Lx = (L - c.ev[0].origN(0, 0)) + c.ev[1].origN(0, 0);
+                double Lx = (L - c.ev[0].fbs(0, 0)) + c.ev[1].fbs(0, 0);
                 cd a = c.abs_vv(k0) / (t01 * r.R * t10 * std::exp(-J * k0 * zh * r.c_near * Lx));
                 QD_DIAG("%d,%d,%.1f,%s,%+.6f,%+.4f\n", tr, h, thd, rts(c).c_str(), dB(std::norm(a)), deg(a * std::exp(J * k0 * st * c.dy)));
                 CHECK(std::abs(dB(std::norm(a))) < 1.0e-3);
@@ -757,7 +757,7 @@ TEST_CASE("Sheet reflection - a declined series is followed and not dropped", "[
 
     struct Ev
     {
-        arma::mat origN, destN, path_dirN, xpr, fbs;
+        arma::mat origN, destN, path_dirN, xpr, fbs, sbs;
         arma::Col<short> prev, cur, buf;
         arma::vec accg, accr;
         uint8_t ot = 0, rt = 0;
@@ -783,7 +783,7 @@ TEST_CASE("Sheet reflection - a declined series is followed and not dropped", "[
                                        in ? &in->path_dirN : nullptr, in ? &in->accg : nullptr, in ? &in->accr : nullptr,
                                        &E.prev, &E.cur, &E.buf, &gain, &E.xpr, &E.path_dirN, &E.accg, &E.accr, &rt,
                                        (arma::u32_vec *)nullptr, eps, relaunch ? &E.origN : nullptr, relaunch ? &E.destN : nullptr);
-        E.ot = ot[0], E.rt = rt[0], E.nh = nh(0);
+        E.ot = ot[0], E.rt = rt[0], E.nh = nh(0); E.sbs = sbsN;
         return E;
     };
     using ub::face;
@@ -793,7 +793,7 @@ TEST_CASE("Sheet reflection - a declined series is followed and not dropped", "[
         std::complex<double> vv = 1.0;
         double Lin = 0.0, dy = 0.0; // in-wall polyline length, lateral walk first to last hit
         std::vector<Ev> ev;
-        std::vector<double> fx, ox; // per event: x of the hit point, x of the relaunch point
+        std::vector<double> fx, bx; // per event: x of the hit point, x where the leg that follows starts (qd_leg_start)
         bool ok = true;
         std::string rts, words;
         std::complex<double> at_point(double k, double st) const // the field at the polyline's exit point
@@ -843,7 +843,7 @@ TEST_CASE("Sheet reflection - a declined series is followed and not dropped", "[
             d /= std::sqrt(d(0, 0) * d(0, 0) + d(0, 1) * d(0, 1) + d(0, 2) * d(0, 2));
             // long enough to cross every face that is left
             orig = E.origN, dest = E.origN + (1.2 / std::abs(d(0, 0))) * d;
-            C.fx.push_back(fx), C.ox.push_back(E.origN(0, 0));
+            C.fx.push_back(fx), C.bx.push_back(qd_leg_start(E, 0));
             P = E, have = true;
             C.ev.push_back(E);
         }
@@ -967,7 +967,7 @@ TEST_CASE("Sheet reflection - a declined series is followed and not dropped", "[
                 INFO("paths, host " << h << ", tracer " << tr << ", theta " << thd);
                 REQUIRE((t[0].ok && r0.ok && c0.ok));
                 FR[0] = r0.at_point(k1, st);
-                double Lx = t[0].fx[1] - t[0].ox[0];
+                double Lx = t[0].fx[1] - t[0].bx[0];
                 std::complex<double> eH = diag_eps(h, FRQ), eS = diag_eps(SHEET, FRQ);
                 RT W = cm(e_air, {{eH, Lx}, {eS, thk}}, e_air, s2, k1);
                 // the clamp of section 5: the coating seen from the host, above one in magnitude
@@ -1037,7 +1037,7 @@ TEST_CASE("Measurement - the mirror behind the ray after a back reflection", "[w
 
     struct Ev
     {
-        arma::mat origN, destN, path_dirN, xpr, fbs;
+        arma::mat origN, destN, path_dirN, xpr, fbs, sbs;
         arma::Col<short> prev, cur, buf;
         arma::vec accg, accr;
         uint8_t ot = 0, rt = 0;
@@ -1065,7 +1065,7 @@ TEST_CASE("Measurement - the mirror behind the ray after a back reflection", "[w
                                        &E.prev, &E.cur, &E.buf, &gain, &E.xpr, &E.path_dirN, &E.accg, &E.accr, &rt,
                                        (arma::u32_vec *)nullptr, eps, relaunch ? &E.origN : nullptr, relaunch ? &E.destN : nullptr,
                                        (arma::mat *)nullptr, (arma::mat *)nullptr, vin, vout);
-        E.ot = ot[0], E.rt = rt[0], E.nh = nh(0);
+        E.ot = ot[0], E.rt = rt[0], E.nh = nh(0); E.sbs = sbsN;
         return E;
     };
     using ub::face;
@@ -1073,7 +1073,7 @@ TEST_CASE("Measurement - the mirror behind the ray after a back reflection", "[w
     struct Chain
     {
         std::vector<Ev> ev;
-        std::vector<double> fx, ox;
+        std::vector<double> fx, bx; // per event: x of the hit point, x where the leg that follows starts
         bool ok = true;
         std::string words;
     };
@@ -1100,7 +1100,7 @@ TEST_CASE("Measurement - the mirror behind the ray after a back reflection", "[w
             arma::mat d = E.destN - E.origN;
             d /= std::sqrt(d(0, 0) * d(0, 0) + d(0, 1) * d(0, 1) + d(0, 2) * d(0, 2));
             orig = E.origN, dest = E.origN + (1.2 / std::abs(d(0, 0))) * d; // long enough to cross every face that is left
-            C.fx.push_back(E.fbs(0, 0)), C.ox.push_back(E.origN(0, 0));
+            C.fx.push_back(E.fbs(0, 0)), C.bx.push_back(qd_leg_start(E, 0));
             P = E, have = true;
             C.ev.push_back(E);
         }
@@ -1258,7 +1258,7 @@ TEST_CASE("Measurement - the mirror behind the ray after a back reflection", "[w
                         return rint(eM, eO, s2);
                     return unit(cm(eM, {{eS, thk}}, kind == 2 ? e_air : eM, s2, k1).r);
                 };
-                std::complex<double> pp = phi(eM, s2, k1, std::abs(c.fx[n - 1] - c.ox[n - 2]));
+                std::complex<double> pp = phi(eM, s2, k1, std::abs(c.fx[n - 1] - c.bx[n - 2]));
                 std::complex<double> ra = mirror(lc.ahead), rb = mirror(lc.behind), rw = mirror(lc.word);
                 std::complex<double> S_true = 1.0 / (1.0 - ra * rb * pp * pp), S_word = 1.0 / (1.0 - ra * rw * pp * pp);
                 double rho_t = std::abs(ra * rb) * std::norm(pp), rho_w = std::abs(ra * rw) * std::norm(pp);
@@ -1315,7 +1315,7 @@ TEST_CASE("Measurement - the mirror behind the ray after a back reflection", "[w
                 INFO("near coating, host " << h << ", tracer " << tr << ", theta " << thd);
                 REQUIRE((c0.ok && c1.ok && ct.ok));
                 std::complex<double> R0 = field(c0, st), R1 = field(c1, st), T = field(ct, st);
-                RT W = cm(e_air, {{diag_eps(SHEET, FRQ), thk}, {diag_eps(h, FRQ), std::abs(ct.fx[1] - ct.ox[0])}}, e_air, s2, k1);
+                RT W = cm(e_air, {{diag_eps(SHEET, FRQ), thk}, {diag_eps(h, FRQ), std::abs(ct.fx[1] - ct.bx[0])}}, e_air, s2, k1);
                 std::complex<double> Ra = R0 + R1, Rw = W.r * std::exp(2.0 * J * k1 * std::cos(th) * thk);
                 QD_DIAG("%d,%d,%.0f,%+.2f,%+.6f,%+.4f,%+.6f,%s\n", h, tr, thd, dB(std::norm(R1 / R0)), dB(std::norm(Ra / Rw)),
                         std::arg(Ra / Rw) * 180.0 / QPI, dB(std::norm(T / W.t)), c1.words.c_str());
@@ -1778,7 +1778,7 @@ TEST_CASE("Sheet reflect port - where the layer lies and what the echo pays", "[
                         Ev e0 = traced(mtl, mesh, mi, tr, FRQ, orig, dest, nullptr, 1.5, true);
                         onward(e0, orig, dest);
                         Ev e1 = traced(mtl, mesh, mi, tr, FRQ, orig, dest, &e0, 1.5, true);
-                        const double d_host = std::abs(e1.fbs(0, 0) - e0.origN(0, 0)); // the thickness the leg crossed
+                        const double d_host = std::abs(e1.fbs(0, 0) - e0.fbs(0, 0)); // the thickness the leg crossed
                         Out O = walk(mtl, mesh, mi, tr, FRQ, eps, thd, 30, -300.0, 0.0, 0.10);
                         std::vector<Lay> ls = {{eS, one, thk}, {diag_eps(h, FRQ), one, d_host}};
                         if (lined)
@@ -2382,14 +2382,14 @@ TEST_CASE("Refracting tracer - a traced bend is known from the state and the leg
             REQUIRE((c4.ok && c5.ok && c2.ok));
             REQUIRE((c4.ev.size() == 2 && c5.ev.size() == 2 && c2.ev.size() == 2));
             std::complex<double> t, t4, r_in;
-            slab(diag_eps(m, f_hz), th, f_hz, true, L - c5.ev[0].origN(0, 0), t, r_in);
-            slab(diag_eps(m, f_hz), th, f_hz, true, L - c4.ev[0].origN(0, 0), t4, r_in);
+            slab(diag_eps(m, f_hz), th, f_hz, true, L - c5.ev[0].fbs(0, 0), t, r_in);
+            slab(diag_eps(m, f_hz), th, f_hz, true, L - c4.ev[0].fbs(0, 0), t4, r_in);
             std::complex<double> q = c5.abs_vv(k0) * std::exp(std::complex<double>(0.0, k0 * std::sin(th) * c5.dy)) / t;
             // each over the slab it crossed, each at the point its own polyline leaves at
             std::complex<double> r54 = (c5.abs_vv(k0) * std::exp(std::complex<double>(0.0, k0 * std::sin(th) * c5.dy)) / t) /
                                        (c4.abs_vv(k0) * std::exp(std::complex<double>(0.0, k0 * std::sin(th) * c4.dy)) / t4);
             double p_te = 0.0, p_tm = 0.0;
-            diag_slab_p_pol(diag_eps(m, f_hz), L - c2.ev[0].origN(0, 0), th, f_hz, p_te, p_tm);
+            diag_slab_p_pol(diag_eps(m, f_hz), L - c2.ev[0].fbs(0, 0), th, f_hz, p_te, p_tm);
             QD_DIAG("%d,%.1f,%04x,%04x,%u,%+.6f,%+.4f,%+.6f,%+.4f,%+.6f,%+.6f,%.4f,%.4f\n", m, thd, (unsigned)(unsigned short)c4.ev[0].cur(0),
                     (unsigned)(unsigned short)c5.ev[0].cur(0), (unsigned)c5.ev[1].rt, dB(std::norm(q)), deg(q), dB(std::norm(r54)), deg(r54),
                     dB(std::norm(c2.vv) / p_te), dB(std::norm(c2.hh) / p_tm), std::atan2(c5.out_y, c5.out_x) * 180.0 / QPI, c5.traj);
@@ -2501,7 +2501,7 @@ TEST_CASE("Refracting tracer - a traced bend is known from the state and the leg
                 Chain c5 = run(mtl, mesh, mi, {5, 3, 5}, thd, eps, f_hz, 0.0);
                 REQUIRE((c5.ok && c5.ev.size() == 3));
                 std::complex<double> t, r_in;
-                slab(diag_eps(m, f_hz), th, f_hz, eps == 0.0, L - c5.ev[0].origN(0, 0), t, r_in);
+                slab(diag_eps(m, f_hz), th, f_hz, eps == 0.0, L - c5.ev[0].fbs(0, 0), t, r_in);
                 std::complex<double> q = c5.abs_vv(k0) * std::exp(std::complex<double>(0.0, k0 * std::sin(th) * c5.dy)) / r_in;
                 std::string r5;
                 for (const auto &E : c5.ev)
@@ -2534,7 +2534,7 @@ TEST_CASE("Refracting tracer - a traced bend is known from the state and the leg
             Chain c5 = run(mtl, mesh, mi, {5}, thd, 0.0, f1, f_hz);
             REQUIRE((c5.ok && c5.ev.size() == 2));
             std::complex<double> t, r_in;
-            slab(diag_eps(5, f1), th, f1, true, L - c5.ev[0].origN(0, 0), t, r_in);
+            slab(diag_eps(5, f1), th, f1, true, L - c5.ev[0].fbs(0, 0), t, r_in);
             std::complex<double> q = c5.abs_vv(k1) * std::exp(std::complex<double>(0.0, k1 * std::sin(th) * c5.dy)) / t;
             QD_DIAG("%.1f,%.1f,%+.6f,%+.4f,%.4f\n", f1 * 1e-9, thd, dB(std::norm(q)), deg(q), std::atan2(c5.out_y, c5.out_x) * 180.0 / QPI);
             INFO("second frequency " << f1 << ", theta_ext " << thd);
@@ -2605,8 +2605,8 @@ TEST_CASE("Refracting tracer - a traced bend is known from the state and the leg
                     if (bare)
                     {
                         std::complex<double> t, t4, r_in;
-                        slab(diag_eps(S.mat[0], f_hz), th, f_hz, true, L - c5.ev[0].origN(0, 0), t, r_in);
-                        slab(diag_eps(S.mat[0], f_hz), th, f_hz, true, L - c4.ev[0].origN(0, 0), t4, r_in);
+                        slab(diag_eps(S.mat[0], f_hz), th, f_hz, true, L - c5.ev[0].fbs(0, 0), t, r_in);
+                        slab(diag_eps(S.mat[0], f_hz), th, f_hz, true, L - c4.ev[0].fbs(0, 0), t4, r_in);
                         q = c5.abs_vv(k0) * std::exp(std::complex<double>(0.0, k0 * std::sin(th) * c5.dy)) / t;
                         r54 *= t4 / t; // each over the slab it crossed
                     }
@@ -2689,7 +2689,7 @@ TEST_CASE("Phase reference - a traversal carries the phase at the point the poly
 
     struct Ev
     {
-        arma::mat origN, destN, path_dirN, xpr, fbs;
+        arma::mat origN, destN, path_dirN, xpr, fbs, sbs;
         arma::Col<short> prev, cur, buf;
         arma::vec accg, accr;
         uint8_t ot = 0, rt = 0;
@@ -2718,7 +2718,7 @@ TEST_CASE("Phase reference - a traversal carries the phase at the point the poly
                                        in ? &in->path_dirN : nullptr, in ? &in_state->accg : nullptr, in ? &in->accr : nullptr,
                                        &E.prev, &E.cur, &E.buf, &gain, &E.xpr, &E.path_dirN, &E.accg, &E.accr, &rt,
                                        (arma::u32_vec *)nullptr, eps, relaunch ? &E.origN : nullptr, relaunch ? &E.destN : nullptr);
-        E.ot = ot[0], E.rt = rt[0], E.nh = nh(0);
+        E.ot = ot[0], E.rt = rt[0], E.nh = nh(0); E.sbs = sbsN;
         return E;
     };
     using ub::face;
@@ -2729,7 +2729,7 @@ TEST_CASE("Phase reference - a traversal carries the phase at the point the poly
         double Lin = 0.0, dy = 0.0; // in-wall polyline length, lateral walk first to last hit
         std::vector<Ev> ev, evb;    // the events at f, and at the base frequency (geometry, words)
         // per event, for the leg it closes: polyline length and lateral walk between the two hit
-        // points, the length the ledger was given (relaunch point to hit point), its normal part,
+        // points, the length the ledger was given (from where the leg started, qd_leg_start, to the hit point), its normal part,
         // and the lateral offset of the relaunch point from the hit point it left
         std::vector<double> len, lat, led, ledx, ledy, offy;
         bool ok = true;
@@ -2743,7 +2743,7 @@ TEST_CASE("Phase reference - a traversal carries the phase at the point the poly
         diag_ray_at(thd, orig, dest);
         Ev P, Pb;
         bool have = false, inside = false;
-        double xp = 0.0, yp = 0.0, y0 = 0.0;
+        double xp = 0.0, yp = 0.0, y0 = 0.0, xb = 0.0, yb = 0.0;
         for (int k = 0; k < 8; ++k)
         {
             int itype = seq.size() == 1 ? seq[0] : (k < (int)seq.size() ? seq[k] : -1);
@@ -2764,13 +2764,14 @@ TEST_CASE("Phase reference - a traversal carries the phase at the point the poly
             if (k == 0)
                 y0 = fy;
             double seg = std::sqrt((fx - xp) * (fx - xp) + (fy - yp) * (fy - yp));
-            double ox = fx - orig(0, 0), oy = fy - orig(0, 1);
+            double ox = fx - xb, oy = fy - yb;
             C.len.push_back(inside ? seg : 0.0), C.lat.push_back(inside ? std::abs(fy - yp) : 0.0);
             C.led.push_back(inside ? std::sqrt(ox * ox + oy * oy) : 0.0), C.ledx.push_back(inside ? std::abs(ox) : 0.0), C.ledy.push_back(inside ? std::abs(oy) : 0.0);
             C.offy.push_back(std::abs(B.origN(0, 1) - fy));
             if (inside)
                 C.Lin += seg;
             xp = fx, yp = fy, C.dy = fy - y0;
+            xb = qd_leg_start(B, 0), yb = qd_leg_start(B, 1); // where the next leg's ledger starts
             inside = mat_of(B.cur(0)) != 0;
             arma::mat d = B.destN - B.origN;
             d /= std::sqrt(d(0, 0) * d(0, 0) + d(0, 1) * d(0, 1) + d(0, 2) * d(0, 2));
@@ -2817,7 +2818,7 @@ TEST_CASE("Phase reference - a traversal carries the phase at the point the poly
                     arma::mat mesh = build({0.0, L}, {m, m}, {false, true}, mi);
                     Chain c = run(mtl, mesh, mi, {tr}, thd, 0.0, f1, f1 == FRQ ? 0.0 : FRQ);
                     REQUIRE((c.ok && c.ev.size() == 2));
-                    double Lx = L - c.evb[0].origN(0, 0);
+                    double Lx = L - c.evb[0].fbs(0, 0);
                     Sl s = slabp(diag_eps(m, f1), 1.0, th);
                     std::complex<double> phi = phi_of(s, f1, Lx), t = s.t01 * s.t10 * phi / (1.0 - s.r10 * s.r10 * phi * phi);
                     double s_ray = Lx * tan_of(c.ev[0]) + c.offy[0];
@@ -2858,7 +2859,7 @@ TEST_CASE("Phase reference - a traversal carries the phase at the point the poly
                             CHECK(false); // no ray dies on this path: the wave crosses the front face
                             continue;
                         }
-                        double Lx1 = L - c.evb[0].origN(0, 0), Lx2 = c.evb[1].origN(0, 0), tt = tan_of(c.ev[0]);
+                        double Lx1 = L - c.evb[0].fbs(0, 0), Lx2 = c.evb[1].fbs(0, 0), tt = tan_of(c.ev[0]);
                         Sl s = slabp(diag_eps(m, f1), 1.0, th);
                         std::complex<double> p1 = phi_of(s, f1, Lx1), p2 = phi_of(s, f1, Lx2);
                         std::complex<double> S = (eps == 0.0) ? 1.0 / (1.0 - s.r10 * s.r10 * p1 * p1) : std::complex<double>(1.0, 0.0);
@@ -2900,7 +2901,7 @@ TEST_CASE("Phase reference - a traversal carries the phase at the point the poly
                 arma::mat mesh = build({0.0, 0.05, L}, {h, SHEET, h}, {false, false, true}, mi);
                 Chain c = run(mtl, mesh, mi, {tr}, thd, 1.5, FRQ, 0.0);
                 REQUIRE((c.ok && c.ev.size() == 3));
-                double Dw = (0.05 - c.evb[0].origN(0, 0)) + (L - c.evb[1].origN(0, 0)), tth = tan_of(c.ev[0]);
+                double Dw = (0.05 - c.evb[0].fbs(0, 0)) + (L - c.evb[1].fbs(0, 0)), tth = tan_of(c.ev[0]);
                 Sl sh = slabp(diag_eps(h, FRQ), 1.0, th), ss = slabp(diag_eps(SHEET, FRQ), 1.0, th);
                 std::complex<double> bh = sh.nc, bs = ss.nc, r_sh = (bs - bh) / (bs + bh);
                 std::complex<double> ps = phi_of(ss, FRQ, thk), Ts = (2.0 * bh / (bh + bs)) * (2.0 * bs / (bh + bs)) * ps / (1.0 - r_sh * r_sh * ps * ps);
@@ -2960,7 +2961,7 @@ TEST_CASE("Phase reference - a traversal carries the phase at the point the poly
                         std::complex<double> es, mus;
                         wool(f1, es, mus);
                         Sl s = slabp(es, mus, th);
-                        double Lx1 = W - c.evb[0].origN(0, 0), Lx2 = back ? c.evb[1].origN(0, 0) : 0.0, tt = tan_of(c.ev[0]);
+                        double Lx1 = W - c.evb[0].fbs(0, 0), Lx2 = back ? c.evb[1].fbs(0, 0) : 0.0, tt = tan_of(c.ev[0]);
                         std::complex<double> p1 = phi_of(s, f1, Lx1), ref;
                         double r12_dB = 0.0, r12_deg = 0.0;
                         if (back)
@@ -2989,10 +2990,10 @@ TEST_CASE("Phase reference - a traversal carries the phase at the point the poly
     // E. Two solids across a bare face: where the phase between the two tracers comes from
     // ------------------------------------------------------------------------------------------
     // The absolute transfer puts the free-space reference back over the polyline between hit points.
-    // A coefficient carries that reference over the ledger only, which starts at the relaunch point
-    // and ends at the hit point. What lies between a hit point and the next relaunch point - the
-    // relaunch offset, and across a co-located pair the gap between its two faces - is in the
-    // polyline and in no ledger, and is charged as free space along the polyline. At the polyline's
+    // A coefficient carries that reference over the ledger only, which starts where the leg started -
+    // the hit point, or the far face of a co-located pair - and ends at the next hit point. What lies
+    // across a co-located pair, the gap between its two faces, is in the polyline and in no ledger,
+    // and is charged as free space along the polyline. At the polyline's
     // point what is left of such a piece of length u and lateral walk v is u - sin(theta) v, summed
     // to U. And a leg is as thick as its ledger is long along the normal, d. Both differ between the
     // two tracers, and the phase that follows from the geometry alone is
@@ -3253,7 +3254,7 @@ TEST_CASE("Measurement - the mirror behind a second solid and behind a sheet ins
 
     struct Ev
     {
-        arma::mat origN, destN, path_dirN, xpr, fbs;
+        arma::mat origN, destN, path_dirN, xpr, fbs, sbs;
         arma::Col<short> prev, cur, buf;
         arma::vec accg, accr;
         uint8_t ot = 0, rt = 0;
@@ -3279,7 +3280,7 @@ TEST_CASE("Measurement - the mirror behind a second solid and behind a sheet ins
                                        in ? &in->path_dirN : nullptr, in ? &in->accg : nullptr, in ? &in->accr : nullptr,
                                        &E.prev, &E.cur, &E.buf, &gain, &E.xpr, &E.path_dirN, &E.accg, &E.accr, &rt,
                                        (arma::u32_vec *)nullptr, eps, relaunch ? &E.origN : nullptr, relaunch ? &E.destN : nullptr);
-        E.ot = ot[0], E.rt = rt[0], E.nh = nh(0);
+        E.ot = ot[0], E.rt = rt[0], E.nh = nh(0); E.sbs = sbsN;
         return E;
     };
     using ub::face;
@@ -3289,7 +3290,7 @@ TEST_CASE("Measurement - the mirror behind a second solid and behind a sheet ins
         std::complex<double> vv = 1.0;
         double Lin = 0.0, dy = 0.0; // in-wall polyline length, lateral walk first to last hit
         std::vector<Ev> ev;
-        std::vector<double> fx, ox; // per event: x of the hit point, x of the relaunch point
+        std::vector<double> fx, bx; // per event: x of the hit point, x where the leg that follows starts (qd_leg_start)
         bool ok = true;
         std::string rts, words;
         std::complex<double> at_point(double k, double st) const // the field at the polyline's exit point
@@ -3339,7 +3340,7 @@ TEST_CASE("Measurement - the mirror behind a second solid and behind a sheet ins
             d /= std::sqrt(d(0, 0) * d(0, 0) + d(0, 1) * d(0, 1) + d(0, 2) * d(0, 2));
             // long enough to cross every face that is left
             orig = E.origN, dest = E.origN + (1.2 / std::abs(d(0, 0))) * d;
-            C.fx.push_back(fx), C.ox.push_back(E.origN(0, 0));
+            C.fx.push_back(fx), C.bx.push_back(qd_leg_start(E, 0));
             P = E, have = true;
             C.ev.push_back(E);
         }
@@ -3409,7 +3410,7 @@ TEST_CASE("Measurement - the mirror behind a second solid and behind a sheet ins
                     Chain c0 = run(mtl, mesh, mi, {tr, tr, tr}, {0.0, 0.0, 0.0}, thd, FRQ);
                     INFO("series, tracer " << tr << ", A " << A << ", B " << B << ", theta " << thd);
                     REQUIRE((cD.ok && cB.ok && cA.ok && c0.ok));
-                    double LA = cD.fx[1] - cD.ox[0], LB = cD.fx[2] - cD.ox[1]; // the thickness each leg crossed
+                    double LA = cD.fx[1] - cD.bx[0], LB = cD.fx[2] - cD.bx[1]; // the thickness each leg crossed
                     std::complex<double> eA = diag_eps(A, FRQ), eB = diag_eps(B, FRQ);
                     std::complex<double> S_B = cpx(cB.ev[2].xpr, 0, 0) / cpx(cD.ev[2].xpr, 0, 0);
                     std::complex<double> S_A = cpx(cA.ev[1].xpr, 0, 0) / cpx(cD.ev[1].xpr, 0, 0);
@@ -3468,7 +3469,7 @@ TEST_CASE("Measurement - the mirror behind a second solid and behind a sheet ins
                     }
                     INFO("paths, tracer " << tr << ", A " << A << ", B " << B << ", theta " << thd);
                     REQUIRE(c[0].ok);
-                    double LA = c[0].fx[1] - c[0].ox[0], LB = c[0].fx[2] - c[0].ox[1];
+                    double LA = c[0].fx[1] - c[0].bx[0], LB = c[0].fx[2] - c[0].bx[1];
                     std::complex<double> W = cm(e_air, {{diag_eps(A, FRQ), LA}, {diag_eps(B, FRQ), LB}}, e_air, s2, k1).t;
                     std::complex<double> s0 = F[0] / W, s1 = (F[0] + F[1]) / W, s2c = (F[0] + F[1] + F[2]) / W;
                     std::complex<double> q = F[1] / F[0], sinf = s0 / (1.0 - q);
@@ -3479,10 +3480,11 @@ TEST_CASE("Measurement - the mirror behind a second solid and behind a sheet ins
                     // The paths the tracer follows are a geometric sequence and their sum is the wall
                     REQUIRE((c[1].ok && c[2].ok));
                     CHECK(std::abs(F[2] / F[1] - q) < 1.0e-4);
-                    // Every path is short by its own relaunch offsets, which the reference cannot
-                    // hold: up to 1e-5 m per leg with the refracting tracer at 85 deg, and a lossless
-                    // second layer there turns that into 5e-3 dB on the limit
-                    CHECK(std::abs(dB(std::norm(sinf))) < ((tr == 5 && B == 6 && thd == 85.0) ? 1.0e-2 : 1.0e-3));
+                    // Every leg is measured from the point it started at, so the paths hold the
+                    // thicknesses of the reference. With the refracting tracer at 85 deg a lossless second
+                    // layer still leaves 1.3e-3 dB on the limit (2.4e-3 dB while the legs were short by
+                    // the relaunch offset; not traced further)
+                    CHECK(std::abs(dB(std::norm(sinf))) < ((tr == 5 && B == 6 && thd == 85.0) ? 2.0e-3 : 1.0e-3));
                     CHECK(std::abs(deg(sinf)) < 0.05);
                 }
     {
@@ -3515,7 +3517,7 @@ TEST_CASE("Measurement - the mirror behind a second solid and behind a sheet ins
                 Chain c1 = run(mtl, mesh, mi, {tr, tr, tr}, {1.5, 0.0, 1.5}, thd, FRQ);
                 INFO("sheet wall, tracer " << tr << ", host " << h << ", theta " << thd);
                 REQUIRE((cD.ok && c2.ok && c1.ok));
-                double La = cD.fx[1] - cD.ox[0], Lb = cD.fx[2] - cD.ox[1];
+                double La = cD.fx[1] - cD.bx[0], Lb = cD.fx[2] - cD.bx[1];
                 std::complex<double> eH = diag_eps(h, FRQ), eS = diag_eps(SHEET, FRQ);
                 std::complex<double> S_2 = cpx(c2.ev[2].xpr, 0, 0) / cpx(cD.ev[2].xpr, 0, 0);
                 std::complex<double> S_1 = cpx(c1.ev[1].xpr, 0, 0) / cpx(cD.ev[1].xpr, 0, 0);
@@ -3577,7 +3579,7 @@ TEST_CASE("Measurement - the mirror behind a second solid and behind a sheet ins
             Chain c0 = run(mtl, mesh, mi, {4, 4, 4, 4}, {0.0, 0.0, 0.0, 0.0}, thd, FRQ);
             INFO("three solids, " << A << " " << B << " " << Cm << ", theta " << thd);
             REQUIRE((cD.ok && c0.ok));
-            double LA = c0.fx[1] - c0.ox[0], LB = c0.fx[2] - c0.ox[1], LC = c0.fx[3] - c0.ox[2];
+            double LA = c0.fx[1] - c0.bx[0], LB = c0.fx[2] - c0.bx[1], LC = c0.fx[3] - c0.bx[2];
             std::complex<double> eA = diag_eps(A, FRQ), eB = diag_eps(B, FRQ), eC = diag_eps(Cm, FRQ);
             std::complex<double> S_C = cpx(c0.ev[3].xpr, 0, 0) / cpx(cD.ev[3].xpr, 0, 0), pC = phi(eC, s2, k1, LC), r_out = rint(eC, e_air, s2);
             auto S_of = [&](std::complex<double> R)
@@ -4219,4 +4221,43 @@ TEST_CASE("Lossy verdict - a lossy second medium has no critical angle", "[wave]
             CHECK(std::abs(std::norm(cpx(et.xpr, 0, 0)) - std::norm(D.T_te)) < 1.0e-9);
             CHECK(std::abs(std::norm(cpx(et.xpr, 0, 3)) - std::norm(D.T_tm)) < 1.0e-9);
         }
+}
+
+TEST_CASE("Far from the origin - a thin dielectric slab transmits what it does at the origin, summed and followed", "[wave]")
+{
+    // Decision 2026-10-19 (md/precision_report.md 0): ray_mesh_interact relaunches a ray 8 float ulp of the hit point's
+    // largest coordinate past it, about 1 um per metre, and the leg inside a solid is measured from the hit point all the
+    // same: the ledger carries the part the relaunch skips. Before, every leg was short by it; through 4 mm of glass at
+    // 28 GHz that is k0 (n - 1) times the offset, 4.8 deg at 100 m and 48 deg at 1 km, and the slab's series moved by up
+    // to 0.7 dB at 100 m. The slab here is moved away from the origin with its ray, in its plane and along its normal, to
+    // 10 m, 100 m and 1 km: what it transmits is the slab of its true thickness, TE and TM, both EM tracers, the series
+    // summed in one event (eps 0) and every bounce followed (eps 1.5). itu_glass of data/materials_rf.csv at 28 GHz.
+    ub::OneThread one_thread;
+    const double f = 28.0e9, thk = 0.004, sig = 0.0036 * std::pow(28.0, 1.3394); // ITU-R P.2040: eps' 6.31, sigma = c f^d
+    const std::complex<double> eS(6.31, -17.98 * sig / 28.0);
+    ub::Pal P = lump_palette({{6.31, 17.98 * sig, 0.0}});
+    auto dB = [](double g) { return 10.0 * std::log10(g); };
+    QD_DIAG("\n# diag: 4 mm glass at 28 GHz moved away from the origin with its ray; T against the slab of its true thickness, dB\n");
+    QD_DIAG("type,eps,theta,shift,along,dTE,dTM\n");
+    double worst = 0.0;
+    for (int tr : {1, 2})
+        for (double eps : {0.0, 1.5})
+            for (double thd : {0.0, 30.0, 60.0, 80.0})
+                for (double R : {0.0, 10.0, 100.0, 1000.0})
+                    for (int along : {0, 1})
+                    {
+                        if (R == 0.0 && along)
+                            continue;
+                        double p_te = 0.0, p_tm = 0.0;
+                        diag_slab_p_pol(eS, thk, thd * QPI / 180.0, f, p_te, p_tm);
+                        bf::Acc A = bf::walk_far(P, {0.0, thk}, {1, 1}, {false, true}, tr, f, thd, eps, along ? R : 0.0, along ? 0.0 : R);
+                        const double dTE = dB(std::norm(A.T[0]) / p_te), dTM = dB(std::norm(A.T[1]) / p_tm);
+                        worst = std::max({worst, std::abs(dTE), std::abs(dTM)});
+                        QD_DIAG("%d,%.1f,%.0f,%.0f,%s,%+.6f,%+.6f\n", tr, eps, thd, R, along ? "normal" : "plane", dTE, dTM);
+                        INFO("type " << tr << ", eps " << eps << ", " << thd << " deg, " << R << " m " << (along ? "along the normal" : "in the plane"));
+                        REQUIRE(A.nT > 0);
+                        CHECK(std::abs(dTE) < 1.0e-4);
+                        CHECK(std::abs(dTM) < 1.0e-4);
+                    }
+    QD_DIAG("# largest |dT| %.2e dB\n", worst);
 }

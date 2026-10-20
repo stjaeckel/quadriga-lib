@@ -2127,7 +2127,7 @@ TEST_CASE("Unentered branches - a sheet without the mass column of its mass-law 
                     lvl[s][tw] = ub::dB(v);
                     if (tw == 0)
                     {
-                        dleg = Lw - c[0].origN(0, 0), Ein = c[0];
+                        dleg = Lw - c[0].fbs(0, 0), Ein = c[0];
                         if (s)
                             Esh[s] = c[1];
                     }
@@ -3755,7 +3755,7 @@ TEST_CASE("Measurement - the mirror behind a second solid and behind a sheet ins
 
     struct Ev
     {
-        arma::mat origN, destN, path_dirN, xpr, fbs;
+        arma::mat origN, destN, path_dirN, xpr, fbs, sbs;
         arma::Col<short> prev, cur, buf;
         arma::vec accg, accr;
         uint8_t ot = 0, rt = 0;
@@ -3781,7 +3781,7 @@ TEST_CASE("Measurement - the mirror behind a second solid and behind a sheet ins
                                        in ? &in->path_dirN : nullptr, in ? &in->accg : nullptr, in ? &in->accr : nullptr,
                                        &E.prev, &E.cur, &E.buf, &gain, &E.xpr, &E.path_dirN, &E.accg, &E.accr, &rt,
                                        (arma::u32_vec *)nullptr, eps, relaunch ? &E.origN : nullptr, relaunch ? &E.destN : nullptr);
-        E.ot = ot[0], E.rt = rt[0], E.nh = nh(0);
+        E.ot = ot[0], E.rt = rt[0], E.nh = nh(0); E.sbs = sbsN;
         return E;
     };
     using ub::face;
@@ -3791,7 +3791,7 @@ TEST_CASE("Measurement - the mirror behind a second solid and behind a sheet ins
         std::complex<double> vv = 1.0;
         double Lin = 0.0, dy = 0.0; // in-wall polyline length, lateral walk first to last hit
         std::vector<Ev> ev;
-        std::vector<double> fx, ox; // per event: x of the hit point, x of the relaunch point
+        std::vector<double> fx, bx; // per event: x of the hit point, x where the leg that follows starts (qd_leg_start)
         bool ok = true;
         std::string rts, words;
         std::complex<double> at_point(double k, double st) const // the field at the polyline's exit point
@@ -3841,7 +3841,7 @@ TEST_CASE("Measurement - the mirror behind a second solid and behind a sheet ins
             d /= std::sqrt(d(0, 0) * d(0, 0) + d(0, 1) * d(0, 1) + d(0, 2) * d(0, 2));
             // long enough to cross every face that is left
             orig = E.origN, dest = E.origN + (1.2 / std::abs(d(0, 0))) * d;
-            C.fx.push_back(fx), C.ox.push_back(E.origN(0, 0));
+            C.fx.push_back(fx), C.bx.push_back(qd_leg_start(E, 0));
             P = E, have = true;
             C.ev.push_back(E);
         }
@@ -3913,7 +3913,7 @@ TEST_CASE("Measurement - the mirror behind a second solid and behind a sheet ins
                 REQUIRE(c.ok);
                 unsigned word = (unsigned)(unsigned short)c.ev[1].buf(0);
                 int k = (int)(word & 0x7FFFu);
-                double LA = c.fx[1] - c.ox[0];
+                double LA = c.fx[1] - c.bx[0];
                 double kf = 1.0 + std::round((std::log10(LA) + 4.0) * (32766.0 / 6.0));
                 double d_q = std::pow(10.0, -4.0 + 6.0 * (double)(k - 1) / 32766.0);
                 double ph[2], dS[2];
@@ -5549,13 +5549,14 @@ namespace r1
         return std::max(0.0, TL);
     }
     // r1::wall with a ray that starts close to the wall and whose path through it is centred on y = 0.37, so that
-    // a ray within a tenth of a degree of grazing still crosses a traced solid on the 400 m faces (a 4 mm traced
-    // pane crossed 100 m from the origin passes 0.2 dB more than at 0.37 m: keep the crossing near the origin)
+    // a ray within a tenth of a degree of grazing still crosses a traced solid on the 400 m faces. The first segment
+    // reaches past the last face: one that ends inside a body preloads the rest of the leg, which the walker's
+    // relaunch would add a second time (87 m through 152 mm at 89.9 deg read as 137 m, md/precision_report.md 0.2)
     static Out wall_g(const ub::Pal &P, const std::vector<double> &x, const std::vector<int> &mat, const std::vector<bool> &flip, int tr, double f, double thd)
     {
         arma::uvec mi;
         arma::mat mesh = ub::build(x, mat, flip, mi);
-        const double t = std::tan(thd * QPI / 180.0), dl = std::min(1.0, 50.0 / std::max(t, 1.0e-12));
+        const double t = std::tan(thd * QPI / 180.0), dl = std::max(std::min(1.0, 50.0 / std::max(t, 1.0e-12)), x.back() - x.front() + 0.05);
         const double y0 = 0.37 - 0.5 * (x.back() - x.front()) * t;
         arma::mat o = {{-dl, y0 - dl * t, 0.0}}, d = {{dl, y0 + dl * t, 0.0}};
         bf::Acc A;
@@ -5861,7 +5862,7 @@ TEST_CASE("Finite plate - a mass-law panel of side s radiates with Davy's forced
     // Davy's equations (r1::davy_sigma), not from library code. A 4 mm pane with side 1.35 m and a 152 mm concrete
     // wall with side 3.29 m, limp (fRef from the density, as in "Mass law - m switches the limp mass law on"), the
     // face of each tf 0.05: the panel passes the plate rule of that face and the term. Sheet and traced solid, both
-    // acoustic tracers, 0 to 89.9 deg (the traced solid to 89.5 deg), fine near grazing.
+    // acoustic tracers, 0 to 89.9 deg, fine near grazing.
     //
     // What the finite size changes, read off the rows: near grazing the infinite plate turns transparent and the
     // finite one does not (glass 500 Hz, 89 deg: a term of 1.6 dB against 13.2 dB); at 31.5 Hz the small pane radiates
@@ -5890,10 +5891,6 @@ TEST_CASE("Finite plate - a mass-law panel of side s radiates with Davy's forced
                 for (double f_hz : {31.5, 63.0, 125.0, 500.0, 2000.0})
                     for (double thd : angles)
                     {
-                        // a traced solid stops at 89.5 deg: crossed at 89.9 deg (87 m of path through the 152 mm wall) the
-                        // traced leg misses even the infinite plate's rule by up to 3.4 dB at bc24b0c (md/grazing_report.md 1)
-                        if (kind && thd > 89.6)
-                            continue;
                         const double c = std::cos(thd * QPI / 180.0), X = 2.0 * QPI * f_hz * m.rho * m.thk / (2.0 * rho0c);
                         const double TLs = r1::mass_TL_side(X, c, f_hz, m.side), TLi = r1::mass_TL(X, c);
                         const double Tr = r1::plate(tf, std::pow(10.0, -0.1 * TLs));
@@ -6543,4 +6540,110 @@ TEST_CASE("Absorption peak - a peaked face is its series impedance in magnitude 
     }
     QD_DIAG("# maxima: A %.1e (R+T %.6f), B %.1e, C %.1e, D %.1e (R+T %.6f), E %.1e / %.1e (R+T %.6f), F glued %.1e traced %.1e, G %.1e step %.1e\n", mA,
             mRT, mB, mC, mD, mDRT, mE, mET, mERT, mFH, mFX, mG, mGs);
+}
+
+TEST_CASE("Far from the origin - a traced mass-law wall passes what it passes at the origin, its leg measured from the hit point", "[acoustic]")
+{
+    // Decision 2026-10-19 (md/precision_report.md 0): ray_mesh_interact relaunches a ray 8 float ulp of the hit point's
+    // largest coordinate past it, about 1 um per metre, and the leg inside a solid is measured from the hit point all the
+    // same: the ledger carries the part the relaunch skips. Before, the leg was short by it, and a 4 mm pane crossed 100 m
+    // from the origin was traced as 3.905 mm. The wall here is moved away from the origin with its ray, in its plane and
+    // along its normal, to 10 m, 100 m and 1 km: it passes what it passes at the origin, to 1e-5 dB, and that is the plate
+    // rule of its true thickness (to 5e-3 dB: the face at exact normal incidence costs 4 mm glass 1.8e-3 dB at 125 Hz).
+    // 4 mm glass and 152 mm concrete, limp, side 0 (the infinite plate), the face of each tf 0.05; both acoustic tracers.
+    ub::OneThread one_thread;
+    const double rho0c = 1.204 * 343.0, tf = 0.05;
+    struct M
+    {
+        const char *name;
+        double a, rho, thk;
+    };
+    const std::vector<M> mats = {{"glass 4 mm", 8.4794e-10, 2500.0, 0.004}, {"concrete 152 mm", 2.0260e-09, 347.0 / 0.152, 0.152}};
+    QD_DIAG("\n# diag: a traced mass-law wall moved away from the origin with its ray; T against the plate rule of its true thickness\n");
+    QD_DIAG("material,type,f_Hz,theta,shift,along,T_dB,T_ref_dB,dT,dT_origin\n");
+    double worst = 0.0, worst0 = 0.0;
+    for (const auto &m : mats)
+    {
+        const double fRef = r1::FMAP * rho0c / (QPI * m.rho);
+        std::vector<LumpMtl> lp = {{m.a, 0.0, 0.0, 0.0, tf, 0.0, 0.0, 0.0, 0.0, 20.0, fRef}};
+        ub::Pal P = side0(lump_palette(lp));
+        for (int tr : {4, 5})
+            for (double f_hz : {125.0, 500.0, 2000.0})
+                for (double thd : {0.0, 45.0, 80.0})
+                {
+                    double T0 = 0.0; // the wall at the origin
+                    for (double R : {0.0, 10.0, 100.0, 1000.0})
+                        for (int along : {0, 1})
+                        {
+                            if (R == 0.0 && along)
+                                continue;
+                            const double c = std::cos(thd * QPI / 180.0), X = 2.0 * QPI * f_hz * m.rho * m.thk / (2.0 * rho0c);
+                            const double Tr = r1::plate(tf, std::pow(10.0, -0.1 * r1::mass_TL(X, c)));
+                            bf::Acc A = bf::walk_far(P, {0.0, m.thk}, {1, 1}, {false, true}, tr, f_hz * r1::FMAP * 1.0e9, thd, 0.0, along ? R : 0.0,
+                                                     along ? 0.0 : R);
+                            const double T = r1::dB(std::norm(A.T[0])), dT = T - r1::dB(Tr);
+                            if (R == 0.0)
+                                T0 = T;
+                            worst = std::max(worst, std::abs(dT)), worst0 = std::max(worst0, std::abs(T - T0));
+                            QD_DIAG("%s,%d,%.0f,%.0f,%.0f,%s,%.5f,%.5f,%+.6f,%+.2e\n", m.name, tr, f_hz, thd, R, along ? "normal" : "plane", T, r1::dB(Tr), dT,
+                                    T - T0);
+                            INFO(m.name << ", type " << tr << ", " << f_hz << " Hz, " << thd << " deg, " << R << " m " << (along ? "along the normal" : "in the plane"));
+                            REQUIRE(A.nT == 1);
+                            CHECK(std::abs(T - T0) < 1.0e-5);
+                            CHECK(std::abs(dT) < 5.0e-3);
+                        }
+                }
+    }
+    QD_DIAG("# largest |dT| against the rule %.2e dB, against the origin %.2e dB\n", worst, worst0);
+}
+
+TEST_CASE("Far from the origin - in single precision a mass-law leg is not taken for a bent one", "[acoustic]")
+{
+    // Decision 2026-10-19 (md/precision_report.md 0): ray_state_update tells a leg the tracer bent from one it held by
+    // the direction the previous event wrote against the segment's own; the two cosines are compared to 1e-6. In single
+    // precision 100 m from the origin, on the short segments a walker relaunches on, rounding alone moves them apart by
+    // more: a mass-law leg was taken for a bent one, its plate rule was skipped and the wall passed its two leaks, 26 dB
+    // too little. In a mass-law medium the test allows the rounding of the segment's ends (float only). The direct path
+    // through 4 mm glass and 152 mm concrete, entry and exit event, in single precision against double, 0 to 85 deg.
+    ub::OneThread one_thread;
+    const double rho0c = 1.204 * 343.0, tf = 0.05, R = 100.0, f_hz = 500.0, f = f_hz * r1::FMAP * 1.0e9;
+    struct M
+    {
+        const char *name;
+        double a, rho, thk;
+    };
+    const std::vector<M> mats = {{"glass 4 mm", 8.4794e-10, 2500.0, 0.004}, {"concrete 152 mm", 2.0260e-09, 347.0 / 0.152, 0.152}};
+    QD_DIAG("\n# diag: the direct path through a mass-law wall 100 m from the origin, float against double, dB\n");
+    QD_DIAG("material,type,theta,T_double_dB,T_float_dB,d_dB\n");
+    for (const auto &m : mats)
+    {
+        const double fRef = r1::FMAP * rho0c / (QPI * m.rho);
+        std::vector<LumpMtl> lp = {{m.a, 0.0, 0.0, 0.0, tf, 0.0, 0.0, 0.0, 0.0, 20.0, fRef}};
+        ub::Pal P = side0(lump_palette(lp));
+        arma::uvec mi;
+        arma::mat mesh = ub::build({0.0, m.thk}, {1, 1}, {false, true}, mi);
+        for (arma::uword r = 0; r < mesh.n_rows; ++r)
+            for (int v = 0; v < 3; ++v)
+                mesh(r, 3 * v + 1) += R;
+        for (int tr : {4, 5})
+            for (int i = 0; i <= 17; ++i)
+            {
+                const double thd = 5.0 * i, t = std::tan(thd * QPI / 180.0), dl = std::max(std::min(1.0, 50.0 / std::max(t, 1.0e-12)), m.thk + 0.05);
+                const double y0 = R + 0.37 - 0.5 * m.thk * t;
+                ub::Opt op;
+                op.relaunch = true;
+                auto path = [&](bool single)
+                {
+                    arma::mat o = {{-dl, y0 - dl * t, 0.0}}, d = {{dl, y0 + dl * t, 0.0}}, o2, d2;
+                    ub::Ev E0 = single ? ub::traced<float>(P, mesh, mi, tr, f, o, d, nullptr, op) : ub::traced<double>(P, mesh, mi, tr, f, o, d, nullptr, op);
+                    ub::onward(E0, o2, d2);
+                    ub::Ev E1 = single ? ub::traced<float>(P, mesh, mi, tr, f, o2, d2, &E0, op) : ub::traced<double>(P, mesh, mi, tr, f, o2, d2, &E0, op);
+                    return r1::dB(std::norm(cpx(E0.xpr, 0, 0) * cpx(E1.xpr, 0, 0)));
+                };
+                const double Td = path(false), Tf = path(true);
+                QD_DIAG("%s,%d,%.0f,%.4f,%.4f,%+.4f\n", m.name, tr, thd, Td, Tf, Tf - Td);
+                INFO(m.name << ", type " << tr << ", " << thd << " deg");
+                CHECK(std::abs(Tf - Td) < 0.05);
+            }
+    }
 }

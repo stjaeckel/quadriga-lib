@@ -1092,6 +1092,26 @@ static inline void diag_ray_at(double theta_n_deg, arma::mat &orig, arma::mat &d
     dest = arma::mat{{1.0, 0.37 + 2.0 * t, 0.0}};
 }
 
+// The relaunch offset of ray_mesh_interact (qd_relaunch_offset): 8 float ulp of the hit point's largest coordinate, at
+// least of 1 m. A ray leaves an event that far past the point it left at; the ledger of the leg that follows carries
+// that part from the event on, so the leg is measured from the point itself (decision 2026-10-19, md/precision_report.md 0).
+static inline double qd_relaunch_nudge(double largest_coordinate)
+{
+    return 8.0 * 1.1920929e-7 * std::max(std::abs(largest_coordinate), 1.0);
+}
+
+// Where the leg that follows an event starts, coordinate c: the far face of a co-located pair (closer than 1 mm), else
+// the hit point. ray_mesh_interact relaunches the ray a few float ulp past that point and the ledger of the leg is
+// measured from the point itself, so a slab's thickness is the next hit point minus this, never minus origN. E: any
+// event type with fbs, sbs and nh.
+template <typename E>
+static inline double qd_leg_start(const E &e, int c)
+{
+    const double dx = e.sbs(0, 0) - e.fbs(0, 0), dy = e.sbs(0, 1) - e.fbs(0, 1), dz = e.sbs(0, 2) - e.fbs(0, 2);
+    const bool pair = e.nh >= 2 && dx * dx + dy * dy + dz * dz < 1.0e-6;
+    return pair ? e.sbs(0, c) : e.fbs(0, c);
+}
+
 // Exact analytic slab, TE/TM averaged power, air | slab | air. Independent of every library
 // internal; the same closed form the ray_mesh_interact suite uses as its oracle. Delegates to the
 // per-polarization form below so there is one copy of the closed form, not two.
@@ -2225,6 +2245,29 @@ namespace bf
             ub::onward(E, o2, d2);
             walk(pal, mesh, mi, tr, f, thd, eps, &E, o2, d2, b0, b1, L2, yy0, depth + 1, maxdepth, A);
         }
+    }
+}
+
+// Every path of one ray through a wall moved away from the origin: the faces of ub::build (planes x = const, 400 m) and
+// the ray shifted by (dx, dy) together. The ray starts close to the wall, its path through it centred on y = 0.37 of the
+// wall, and its first segment reaches past the last face (the geometry of r1::wall_g). The coordinates the library sees
+// grow with the shift, the geometry does not: a wall at (dx, dy) passes what it passes at the origin.
+namespace bf
+{
+    static Acc walk_far(const ub::Pal &pal, const std::vector<double> &x, const std::vector<int> &mat, const std::vector<bool> &flip, int tr, double f,
+                        double thd, double eps, double dx, double dy)
+    {
+        arma::uvec mi;
+        arma::mat mesh = ub::build(x, mat, flip, mi);
+        for (arma::uword r = 0; r < mesh.n_rows; ++r)
+            for (int v = 0; v < 3; ++v)
+                mesh(r, 3 * v) += dx, mesh(r, 3 * v + 1) += dy;
+        const double t = std::tan(thd * QPI / 180.0), dl = std::max(std::min(1.0, 50.0 / std::max(t, 1.0e-12)), x.back() - x.front() + 0.05);
+        const double y0 = 0.37 - 0.5 * (x.back() - x.front()) * t;
+        arma::mat o = {{dx - dl, dy + y0 - dl * t, 0.0}}, d = {{dx + dl, dy + y0 + dl * t, 0.0}};
+        Acc A;
+        walk(pal, mesh, mi, tr, f, thd, eps, nullptr, o, d, 1.0, 1.0, 0.0, 0.0, 0, 200, A);
+        return A;
     }
 }
 
