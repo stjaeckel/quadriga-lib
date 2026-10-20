@@ -17,6 +17,14 @@ Writes array antenna data to QDANT files
 - If writing to an existing file without specifying an `id`, the data is appended at the end and
   the returned `id_in_file` identifies its location in the file
 - An optional `layout` can be provided to organize the data inside the file
+- Without `layout`, the layout in the file is replaced by a row of all IDs in the file in file order;
+  a custom layout written before is lost (pass it again with every write that should keep it)
+- The file has single-precision-equivalent accuracy relative to the element peak: pattern
+  magnitudes (dB) and phases (degree) are rounded so that every sample is within 6e-8 of the peak
+  amplitude of its element; samples far below the peak are less accurate relative to their own
+  amplitude (about 6e-4 at -80 dB, 6e-2 at -120 dB below the peak); positions and coupling are
+  written as float values (at most 9 significant digits); sampling grids are rounded to 0.001
+  degree; all non-zero pattern samples are written at any level, exact zeros as `-inf` dB
 - Passing a struct array (multiple elements) writes a frequency-dependent model with sequential
   1-based IDs; in this mode appending to an exisiting file is not allowed and will cause an error
 
@@ -37,7 +45,8 @@ id_in_file = quadriga_lib.arrayant_qdant_write( fn, [], id, layout, e_theta_re, 
   model and requires `id` and `layout` to be omitted
 - **`id`** — Target ID of the antenna inside the file; default: max-ID in existing file + 1 (or 1 if the file does not exist);
   ignored for multi-frequency model
-- **`layout`** — Matrix organizing multiple antenna IDs within the file; must only reference IDs present in the file; uint32
+- **`layout`** — Matrix organizing multiple antenna IDs within the file; must only reference IDs present in the file; uint32;
+  default: a row of all IDs in the file (replaces a layout written before)
 
 ## Inputs (separate arrayant data, required when `arrayant` is `[]`):
 - **`e_theta_re`** — e-theta field component, real part; `[n_elevation, n_azimuth, n_elements]`

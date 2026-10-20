@@ -496,18 +496,23 @@ dtype quadriga_lib::arrayant<dtype>::calc_directivity_dBi(arma::uword i_element)
 Combine element patterns, positions, and coupling weights into effective radiation patterns
 
 - Integrates `e_theta_re/im`, `e_phi_re/im`, `element_pos`, and `coupling_re/im` to produce one output element per port (column) of the coupling matrix
+- The element positions add the phase `-2 pi f d / propagation_speed` with `f = center_frequency` and `d` the distance
+  of the element from the wavefront plane through the origin; the default speed of light applies to radio waves, use
+  about 343 m/s for acoustic arrays (e.g. from [[generate_speaker]])
 - Useful for beamforming and MIMO channel computation speedup
 
 ## Declaration:
 ```
 quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::combine_pattern(
     const arma::Col<dtype> *azimuth_grid_new = nullptr,
-    const arma::Col<dtype> *elevation_grid_new = nullptr) const;
+    const arma::Col<dtype> *elevation_grid_new = nullptr,
+    dtype propagation_speed = 299792458.0) const;
 ```
 
 ## Inputs:
 - **`azimuth_grid_new`** *(optional)* — Alternative azimuth grid in rad, in [-pi, pi], sorted; defaults to input grid
 - **`elevation_grid_new`** *(optional)* — Alternative elevation grid in rad, in [-pi/2, pi/2], sorted; defaults to input grid
+- **`propagation_speed`** *(optional)* — Wave propagation speed in m/s; positive and finite; use about 343 for acoustics
 
 ## Returns:
 - New `arrayant` with `n_ports` elements (= number of columns in `coupling_re/im`), each holding the combined effective pattern for that port
@@ -519,12 +524,16 @@ MD!*/
 
 template <typename dtype>
 quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::combine_pattern(const arma::Col<dtype> *azimuth_grid_new,
-                                                                             const arma::Col<dtype> *elevation_grid_new) const
+                                                                             const arma::Col<dtype> *elevation_grid_new,
+                                                                             dtype propagation_speed) const
 {
     // Check if calling arrayant object is valid
     std::string error_message = this->is_valid(false); // Deep check
     if (error_message.length() != 0)
         throw std::invalid_argument(error_message.c_str());
+
+    if (!(propagation_speed > dtype(0.0)) || !std::isfinite(propagation_speed))
+        throw std::invalid_argument("Input 'propagation_speed' must be positive and finite.");
 
     // Get output angular grid
     bool new_azgrid = azimuth_grid_new != nullptr && azimuth_grid_new->n_elem != 0;
@@ -571,7 +580,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::combine_pattern(con
                             V_re, V_im, H_re, H_im, &dist);
 
     // Apply phase shift caused by element positions
-    double lambda = 299792458.0 / (double)this->center_frequency;
+    double lambda = (double)propagation_speed / (double)this->center_frequency;
     dtype wave_no = dtype(2.0 * arma::datum::pi / lambda);
     arma::Mat<std::complex<dtype>> phase(arma::cos(wave_no * dist), arma::sin(-wave_no * dist));
     arma::Mat<std::complex<dtype>> Vi(V_re, V_im), Hi(H_re, H_im);
@@ -1314,6 +1323,18 @@ Write arrayant data to a QDANT (XML) file
 
 - Multiple antennas can be stored in the same file using distinct `id` values
 - If `id = 0` and the file exists, the antenna is appended with `id = max_existing_id + 1`; if file does not exist, `id = 1` gets assigned
+- Without `layout` (empty), the layout in the file is replaced by a `[1, n]` row of all IDs in the file in file
+  order; a custom layout written before is lost. Pass the layout again with every write that should keep it.
+- The file has single-precision-equivalent accuracy relative to the element peak, also for double-precision data:
+  pattern magnitudes (in dB) and phases (in degree) get the fewest decimals (0 to 6) that keep the error of each
+  complex sample at or below 6e-8 times the peak amplitude of its element (over e_theta and e_phi). Samples near
+  the peak are accurate to about 6e-8 of their own amplitude; the relative error grows by 10 per 20 dB below the
+  peak (about 6e-4 at -80 dB, 6e-2 at -120 dB), while the absolute error stays below 6e-8 of the peak. An element at
+  a low level is quantized relative to its own peak. Element positions and coupling (magnitude, phase) are written
+  as the shortest text that reads back as the same float (at most 9 significant digits); sampling grids are rounded
+  to 0.001 degree
+- All non-zero pattern samples are written, at any level; exact zeros are written as `-inf` dB. An element that is
+  zero in both field components is written as an all `-inf` `EthetaMag` node.
 
 ## Declaration:
 ```

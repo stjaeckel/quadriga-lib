@@ -292,3 +292,50 @@ TEST_CASE("Arrayant rotation - Partial sphere, inplace")
     CHECK(std::abs(ant.e_theta_re.at(1, end, 1) - 2.0f) < 1e-4f);
     CHECK(arma::approx_equal(ant.element_pos, T, "absdiff", 1e-5));
 }
+
+// B-045: the position phase used the speed of light; acoustic arrays were combined without it
+TEST_CASE("Arrayant combine pattern - Propagation speed (B-045)")
+{
+    // Two omni elements 0.2 m apart on the y-axis at 1 kHz, summed into one port
+    auto ant = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    ant.copy_element(0, 1);
+    ant.element_pos = {{0.0, 0.0}, {-0.1, 0.1}, {0.0, 0.0}};
+    ant.coupling_re = arma::mat(2, 1, arma::fill::ones);
+    ant.coupling_im = arma::mat(2, 1, arma::fill::zeros);
+    ant.center_frequency = 1000.0;
+
+    const arma::uword ie = 9, ia0 = 18, ia90 = 27; // el = 0; az = 0 and 90 deg on the 10 deg grid
+    auto amp = [](const quadriga_lib::arrayant<double> &a, arma::uword i, arma::uword j)
+    { return std::hypot(a.e_theta_re(i, j, 0), a.e_theta_im(i, j, 0)); };
+
+    // Default: speed of light, the 0.2 m spacing is negligible at 1 kHz
+    auto em = ant.combine_pattern();
+    CHECK(std::abs(amp(em, ie, ia0) - 2.0) < 1e-6);
+    CHECK(std::abs(amp(em, ie, ia90) - 2.0) < 1e-6);
+
+    // Speed of sound
+    const double c = 344.0, expected = 2.0 * std::abs(std::cos(arma::datum::pi * 1000.0 * 0.2 / c));
+    auto ac = ant.combine_pattern(nullptr, nullptr, c);
+    CHECK(std::abs(amp(ac, ie, ia0) - 2.0) < 1e-6);
+    CHECK(std::abs(amp(ac, ie, ia90) - expected) < 1e-6);
+    CHECK(std::abs(expected - 0.506) < 1e-3);
+
+    // Explicit speed of light equals the default
+    auto em2 = ant.combine_pattern(nullptr, nullptr, 299792458.0);
+    CHECK(arma::approx_equal(em.e_theta_re, em2.e_theta_re, "absdiff", 0.0));
+    CHECK(arma::approx_equal(em.e_theta_im, em2.e_theta_im, "absdiff", 0.0));
+
+    // Float
+    auto antf = quadriga_lib::generate_arrayant_omni<float>(10.0f);
+    antf.copy_element(0, 1);
+    antf.element_pos = {{0.0f, 0.0f}, {-0.1f, 0.1f}, {0.0f, 0.0f}};
+    antf.coupling_re = arma::fmat(2, 1, arma::fill::ones);
+    antf.coupling_im = arma::fmat(2, 1, arma::fill::zeros);
+    antf.center_frequency = 1000.0f;
+    auto acf = antf.combine_pattern(nullptr, nullptr, 344.0f);
+    CHECK(std::abs(std::hypot(acf.e_theta_re(ie, ia90, 0), acf.e_theta_im(ie, ia90, 0)) - expected) < 1e-4);
+
+    // Invalid speeds
+    for (double v : {0.0, -344.0, arma::datum::nan, arma::datum::inf})
+        CHECK_THROWS_AS(ant.combine_pattern(nullptr, nullptr, v), std::invalid_argument);
+}

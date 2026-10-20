@@ -85,6 +85,12 @@ template void quadriga_lib::qdant_write_multi(const std::string &, const std::ve
 Read an arrayant object from a QDANT file
 
 - Parses a QuaDRiGa Array Antenna Exchange Format (QDANT) XML file and returns the arrayant for the given ID.
+- Throws `std::invalid_argument` if the file has no entry with the given ID. The first entry of a file is ID 1 only
+  if it has no `id` attribute (files written by other tools); otherwise ID 1 must exist.
+- Malformed files throw `std::invalid_argument`. The number of elements (`NoElements`) must be backed by data in the
+  file (element positions, coupling, or pattern nodes of the last element). Elements without pattern nodes read as
+  zeros; their zero patterns, and the identity coupling of a file without `CouplingAbs`, are limited to 2^24 values
+  each (e.g. 256 elements without pattern data on a 1-degree grid, 4096 elements without coupling).
 
 ## Declaration:
 ```
@@ -824,6 +830,8 @@ Combine element patterns, positions, and coupling weights into effective radiati
 - Field interpolation across frequency is delegated to [[arrayant_interpolate_multi]] (SLERP with linear-interpolation fallback)
 - Coupling matrices are SLERP-interpolated between bracketing input entries; out-of-range output frequencies are clamped to the nearest input entry
 - Each output arrayant has identity coupling and zero element positions (patterns are pre-combined)
+- The element positions add the phase `-2 pi f d / propagation_speed` at each output frequency `f`; the default speed
+  of light applies to radio waves, use about 343 m/s for acoustic arrays (e.g. from [[generate_speaker]])
 
 ## Declaration:
 ```
@@ -831,7 +839,8 @@ std::vector<arrayant<dtype>> arrayant_combine_pattern_multi(
     const std::vector<arrayant<dtype>> &arrayant_vec,
     const arma::Col<dtype> *azimuth_grid_new = nullptr,
     const arma::Col<dtype> *elevation_grid_new = nullptr,
-    const arma::Col<dtype> *freq_grid_new = nullptr);
+    const arma::Col<dtype> *freq_grid_new = nullptr,
+    dtype propagation_speed = 299792458.0);
 ```
 
 ## Inputs:
@@ -839,6 +848,7 @@ std::vector<arrayant<dtype>> arrayant_combine_pattern_multi(
 - **`azimuth_grid_new`** *(optional)* — Alternative azimuth grid in rad, in [-pi, pi], sorted; defaults to `arrayant_vec[0].azimuth_grid`
 - **`elevation_grid_new`** *(optional)* — Alternative elevation grid in rad, in [-pi/2, pi/2], sorted; defaults to `arrayant_vec[0].elevation_grid`
 - **`freq_grid_new`** *(optional)* — Alternative frequency grid in Hz; defaults to per-entry `center_frequency`
+- **`propagation_speed`** *(optional)* — Wave propagation speed in m/s; positive and finite; use about 343 for acoustics
 
 ## Returns:
 - Vector of arrayant objects (length = `n_freq_out`), each with `n_ports` elements equal to the number of columns in the coupling matrix
@@ -854,10 +864,14 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::arrayant_combine_patter
     const std::vector<arrayant<dtype>> &arrayant_vec,
     const arma::Col<dtype> *azimuth_grid_new,
     const arma::Col<dtype> *elevation_grid_new,
-    const arma::Col<dtype> *freq_grid_new)
+    const arma::Col<dtype> *freq_grid_new,
+    dtype propagation_speed)
 {
     if (arrayant_vec.empty())
         throw std::invalid_argument("arrayant_combine_pattern_multi: Input vector is empty.");
+
+    if (!(propagation_speed > dtype(0.0)) || !std::isfinite(propagation_speed))
+        throw std::invalid_argument("arrayant_combine_pattern_multi: Input 'propagation_speed' must be positive and finite.");
 
     // Validate input vector (deep check)
     std::string err = quadriga_lib::arrayant_is_valid_multi(arrayant_vec, false);
@@ -961,7 +975,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::arrayant_combine_patter
 
     // Build output entries
     std::vector<quadriga_lib::arrayant<dtype>> output(n_freq_out);
-    constexpr double C0 = 299792458.0;
+    const double C0 = (double)propagation_speed;
 
     for (arma::uword f = 0; f < n_freq_out; ++f)
     {
@@ -1083,8 +1097,8 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::arrayant_combine_patter
 
 template std::vector<quadriga_lib::arrayant<float>> quadriga_lib::arrayant_combine_pattern_multi(
     const std::vector<quadriga_lib::arrayant<float>> &,
-    const arma::Col<float> *, const arma::Col<float> *, const arma::Col<float> *);
+    const arma::Col<float> *, const arma::Col<float> *, const arma::Col<float> *, float);
 
 template std::vector<quadriga_lib::arrayant<double>> quadriga_lib::arrayant_combine_pattern_multi(
     const std::vector<quadriga_lib::arrayant<double>> &,
-    const arma::Col<double> *, const arma::Col<double> *, const arma::Col<double> *);
+    const arma::Col<double> *, const arma::Col<double> *, const arma::Col<double> *, double);

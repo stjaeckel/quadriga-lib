@@ -18,10 +18,14 @@ Reads array antenna data from QDANT files
 - `id = 0` reads every entry: a frequency-dependent dict with 4D pattern fields when the file
   holds multiple entries, or a plain single-entry dict (3D fields) when it holds exactly one
 - Reading all entries is the inverse of `qdant_write` with a 4D-pattern dict
+- An `id` that is not in the file raises an error; the first entry counts as ID 1 only if it has no
+  `id` attribute
+- Malformed files raise an error, also when they declare more elements (`NoElements`) than the file
+  has data for; elements without pattern data read as zeros (at most 2^24 zero values per entry)
 
 ## Usage:
 ```
-# Read a single entry (default: the first entry)
+# Read a single entry (default: ID 1)
 data = quadriga_lib.arrayant.qdant_read( fn )
 data = quadriga_lib.arrayant.qdant_read( fn, id )
 

@@ -17,20 +17,24 @@ Combine element patterns, positions, and coupling weights into effective radiati
 - The result behaves as a virtual array with one element per port, zeroed element positions, and an
   identity coupling matrix
 - Speeds up MIMO channel computation; useful for beamforming in 5G systems and network planning
+- The element positions add a phase that depends on frequency and `propagation_speed`; the default speed of light
+  applies to radio waves, use about 343 m/s for acoustic arrays (e.g. from [[generate_speaker]])
 
 ## Usage:
 ```
 % Input as struct (struct mode)
 arrayant_out = quadriga_lib.arrayant_combine_pattern( arrayant_in );
-arrayant_out = quadriga_lib.arrayant_combine_pattern( arrayant_in, center_freq_new, azimuth_grid_new, elevation_grid_new );
+arrayant_out = quadriga_lib.arrayant_combine_pattern( arrayant_in, center_freq_new, azimuth_grid_new, ...
+    elevation_grid_new, propagation_speed );
 
 % Separate outputs, struct input (single-freq only)
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, coupling_re, ...
     coupling_im, center_freq, name] = quadriga_lib.arrayant_combine_pattern( arrayant_in );
 
-% Separate inputs (split-mode, single-freq only)
+% Separate inputs (split-mode, single-freq only); propagation_speed is the 16th input
 arrayant_out = quadriga_lib.arrayant_combine_pattern( [], center_freq_new, azimuth_grid_new, elevation_grid_new, ...
-    e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, coupling_re, coupling_im, center_freq, name );
+    e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, coupling_re, ...
+    coupling_im, center_freq, name, propagation_speed );
 ```
 
 ## Inputs:
@@ -41,6 +45,8 @@ arrayant_out = quadriga_lib.arrayant_combine_pattern( [], center_freq_new, azimu
    entry's `center_freq` unchanged.
 - **`azimuth_grid_new`** — Alternative azimuth grid in rad; in [-pi, pi]; sorted; defaults to input grid
 - **`elevation_grid_new`** — Alternative elevation grid in rad; in [-pi/2, pi/2]; sorted; defaults to input grid
+- **`propagation_speed`** — Wave propagation speed in m/s; positive and finite; use about 343 for acoustics;
+  5th input in struct mode, 16th input with separate inputs; default: 299792458
 - **`e_theta_re`** ... **`elevation_grid`** — Required inputs for slit-mode
 - **`element_pos`** ... **`name`** — Optional inputs for slit-mode
 
@@ -61,7 +67,7 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    if (nrhs < 1 || (nrhs > 4 && nrhs < 10) || nrhs > 15)
+    if (nrhs < 1 || (nrhs > 5 && nrhs < 10) || nrhs > 16)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
 
     if (nlhs > 11)
@@ -78,6 +84,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     if (!arrayant_is_struct && !separate_inputs)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "First input must be an arrayant struct/struct array, or [] with separate inputs (>=10 args).");
+
+    // Propagation speed: 5th input in struct mode, 16th input with separate inputs
+    double propagation_speed = 299792458.0;
+    if (arrayant_is_struct && nrhs == 5)
+        propagation_speed = qd_mex_get_scalar<double>(prhs[4], "propagation_speed", 299792458.0);
+    else if (separate_inputs && nrhs == 16)
+        propagation_speed = qd_mex_get_scalar<double>(prhs[15], "propagation_speed", 299792458.0);
 
     if (separate_inputs && freq.n_elem > 1)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Multi-frequency mode (vector freq) requires struct input.");
@@ -98,7 +111,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         const auto ant_multi = qd_mex_struct2arrayant_multi(prhs[0]);
 
         std::vector<quadriga_lib::arrayant<double>> out;
-        CALL_QD(out = quadriga_lib::arrayant_combine_pattern_multi(ant_multi, &az, &el, &freq));
+        CALL_QD(out = quadriga_lib::arrayant_combine_pattern_multi(ant_multi, &az, &el, &freq, propagation_speed));
 
         if (out.size() == 1)
             plhs[0] = qd_mex_arrayant2struct(out[0]);
@@ -137,7 +150,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Call member function
     auto arrayant_out = quadriga_lib::arrayant<double>();
-    CALL_QD(arrayant_out = ant.combine_pattern(&az, &el));
+    CALL_QD(arrayant_out = ant.combine_pattern(&az, &el, propagation_speed));
 
     // Return to MATLAB
     if (nlhs == 1)

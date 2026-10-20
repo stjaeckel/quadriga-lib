@@ -155,6 +155,7 @@ is the coordinator's suggestion from the hunt.
 | B-120 | 13 | Circular XPR columns of `calc_cross_polarization_ratio` inverted for the LOS matrix of `get_channels_*` (found in WP-04) | (a) record as an item, fix in WP-13 (b) leave | (a) | (a) recorded as B-120, assigned to WP-13 (2026-10-17) |
 | B-121 | 12 | AVX2-vs-generic ray kernel tests never run (`test_bin` without `BUILD_WITH_AVX2`, found in WP-04) | (a) record as an item, fix first in WP-12 (b) leave | (a) | (a) recorded as B-121, assigned to WP-12 (2026-10-17) |
 | WP-08 | 08 | One shared sin/cos core for the baseband DFT kernels and `fastmath_avx2.h` (proposed by the WP-04 worker) | (a) add to WP-08 as a note (b) leave | (a) | (a) added to WP-08 as a note; the WP-08 worker decides after measuring (2026-10-17) |
+| B-038 | 10 | Precision of qdant files (round 1 wrote 15 significant digits for double: files twice as large) | (a) double precision (b) single-equivalent, files as small as possible | - | (b) single-equivalent: dB magnitudes and phases with 6 decimals (5.8e-8 per sample at every level), positions and coupling as the shortest float text; replaces the 1e-12 round-trip acceptance (2026-10-20); changed 2026-10-20 (round 3): decimals relative to the element peak, absolute error at most single resolution of the element peak for every sample, at most 6 decimals |
 
 ## 5. Work packages
 
@@ -293,7 +294,9 @@ acceptance checks beyond section 3.1. Severities in brackets.
 - Notes: decisions B-012, B-041, B-045, B-047. B-012 and B-038 change the file content (more digits, no floor); old
   files stay readable.
 - Acceptance: re-run the qdant AFL harness for 15 minutes; qdant round trip of the area-A probe
-  `build_linux/scratch/hunt/A/p5_qdant_roundtrip.cpp` exact to 1e-12 relative.
+  `build_linux/scratch/hunt/A/p5_qdant_roundtrip.cpp` exact to 1e-12 relative. Replaced by decision B-038 (b) of
+  2026-10-20: within single resolution; measured 5.7e-8 of the peak and 5.8e-8 per sample (double reads); float reads
+  2.5e-7 per sample from the float arithmetic of the reader, unchanged since before WP-10.
 
 ### WP-11 IEEE indoor model
 
@@ -371,6 +374,8 @@ acceptance checks beyond section 3.1. Severities in brackets.
 - Left open by earlier packages: `CMakeLists.txt:498` (MATLAB API section) still says MATLAB links quadriga_static "to
   avoid conflicts with MATLAB's own bundled libhdf5.so"; the static link does not separate the HDF5 libraries, the
   different soname of the system HDF5 does (see the comment at `CMakeLists.txt:196`, rewritten in WP-01).
+- From WP-10 (small defect, fix here): the qdant writer ignores a namespace prefix of an existing file, so an entry
+  appended to such a file cannot be read back (`src/qd_arrayant_qdant.cpp`, around line 442 after WP-10).
 - From WP-09 (small defects, fix here): `arrayant::remove_zeros` does not copy `name` to the output, and computes the
   azimuth spacing of the first grid point wrongly (`src/qd_arrayant.cpp`, around line 1433 after WP-09).
 - From WP-08: the MEX and Python docs of `ray_triangle_intersect` say auto mode picks CUDA from 10 000 rays (the
@@ -458,8 +463,8 @@ unexpected changes in the diff; proposed `md/bugs.md` updates; anything the next
 | WP-06 | 6 | done 2026-10-17 (6 of 6 fixed; integer conversion of large index inputs 14-17% slower, accepted by the user) | fd4cfe0 |
 | WP-07 | 4 | done 2026-10-19 (4 of 4 fixed; B-122, B-123 found) | 89437ad |
 | WP-08 | 5 | done 2026-10-19 (5 of 5 fixed; AVX2 interpolation and get_channels_spherical at 1.00-1.06 of old) | 6ad4f2b |
-| WP-09 | 9 | done 2026-10-20 (9 of 9 fixed; interpolation 0.99-1.02 of old) | commit after 6ad4f2b (hash at next update) |
-| WP-10 | 7 | open | - |
+| WP-09 | 9 | done 2026-10-20 (9 of 9 fixed; interpolation 0.99-1.02 of old) | 098b8c7 |
+| WP-10 | 7 | done 2026-10-20 (6 fixed, B-041 documented; 3 rounds: qdant precision single-equivalent relative to the element peak) | commit after 098b8c7 (hash at next update) |
 | WP-11 | 5 | open | - |
 | WP-12 | 12 | open | - |
 | WP-13 | 10 | open | - |

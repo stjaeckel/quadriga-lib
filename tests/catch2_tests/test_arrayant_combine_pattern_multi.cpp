@@ -1021,3 +1021,47 @@ TEST_CASE("Combine multi - Default freq grid recovers per-entry combine_pattern 
         CHECK(arma::approx_equal(out[f].e_theta_im, ref.e_theta_im, "absdiff", 1e-9));
     }
 }
+
+// B-045: the position phase used the speed of light; acoustic arrays were combined without it
+TEST_CASE("Combine multi - Propagation speed (B-045)")
+{
+    // Two omni "speakers" 0.2 m apart at 1 kHz (lambda = 0.344 m in air), summed into one port
+    auto s = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0, "monopole",
+                                                    0, 0, 0, 0.15, 0.25, arma::vec{1000.0}, 10.0);
+    auto two = quadriga_lib::arrayant_concat_multi(s, s);
+    quadriga_lib::arrayant_set_element_pos_multi(two, arma::mat({{0.0, 0.0}, {-0.1, 0.1}, {0.0, 0.0}}));
+    two[0].coupling_re = arma::mat(2, 1, arma::fill::ones);
+    two[0].coupling_im = arma::mat(2, 1, arma::fill::zeros);
+
+    const arma::uword ie = 9, ia0 = 18, ia90 = 27; // el = 0; az = 0 and 90 deg on the 10 deg grid
+    auto amp = [](const quadriga_lib::arrayant<double> &a, arma::uword i, arma::uword j)
+    { return std::hypot(a.e_theta_re(i, j, 0), a.e_theta_im(i, j, 0)); };
+
+    // Default: speed of light
+    auto em = quadriga_lib::arrayant_combine_pattern_multi(two);
+    REQUIRE(em.size() == 1);
+    const double p0 = amp(em[0], ie, ia0);
+    CHECK(std::abs(amp(em[0], ie, ia90) / p0 - 1.0) < 1e-6);
+
+    // Speed of sound: |1 + exp(j k d)| = 2 |cos(pi f d / c)| relative to broadside
+    const double c = 344.0, ratio = std::abs(std::cos(arma::datum::pi * 1000.0 * 0.2 / c));
+    auto ac = quadriga_lib::arrayant_combine_pattern_multi<double>(two, nullptr, nullptr, nullptr, c);
+    REQUIRE(ac.size() == 1);
+    CHECK(std::abs(amp(ac[0], ie, ia0) / p0 - 1.0) < 1e-6);
+    CHECK(std::abs(amp(ac[0], ie, ia90) / p0 - ratio) < 1e-6);
+
+    // Same as the single-frequency combine_pattern with the same speed
+    auto single = two[0].combine_pattern(nullptr, nullptr, c);
+    CHECK(arma::approx_equal(ac[0].e_theta_re, single.e_theta_re, "absdiff", 1e-9));
+    CHECK(arma::approx_equal(ac[0].e_theta_im, single.e_theta_im, "absdiff", 1e-9));
+
+    // With an output frequency grid: the phase follows freq / propagation_speed
+    arma::vec f_out = {500.0};
+    auto ac500 = quadriga_lib::arrayant_combine_pattern_multi<double>(two, nullptr, nullptr, &f_out, c);
+    REQUIRE(ac500.size() == 1);
+    CHECK(std::abs(amp(ac500[0], ie, ia90) / amp(ac500[0], ie, ia0) - std::abs(std::cos(arma::datum::pi * 500.0 * 0.2 / c))) < 1e-6);
+
+    // Invalid speeds
+    for (double v : {0.0, -344.0, arma::datum::nan, arma::datum::inf})
+        CHECK_THROWS_AS(quadriga_lib::arrayant_combine_pattern_multi<double>(two, nullptr, nullptr, nullptr, v), std::invalid_argument);
+}

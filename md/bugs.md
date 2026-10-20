@@ -34,7 +34,7 @@ How to read the items:
 ## Summary table
 
 Items: 123 (S1: 5, S2: 31, S3: 68, S4: 19); B-119 to B-123 were found during the fixes (WP-02, WP-04, WP-07).
-Status: open: 58, fixed: 59, partly fixed: 0, won't fix: 1, documented: 5 (after WP-09).
+Status: open: 51, fixed: 65, partly fixed: 0, won't fix: 1, documented: 6 (after WP-10).
 
 | ID | Title | Area | Kind | Severity | Mark | Status |
 |---|---|---|---|---|---|---|
@@ -49,7 +49,7 @@ Status: open: 58, fixed: 59, partly fixed: 0, won't fix: 1, documented: 5 (after
 | [B-009](#b-009) | `arrayant::rotate_pattern` loses coupling, centre frequency and name | A arrayant | 1 defect | S2 | [R] | fixed (WP-09) |
 | [B-010](#b-010) | `arrayant::calc_beamwidth_deg` is wrong when the main lobe wraps ±180° or points towards a pole | A arrayant | 1 defect | S2 | [R] | fixed (WP-09) |
 | [B-011](#b-011) | `generate_arrayant_multibeam` with a beam towards el = ±90° returns wrong ports (pol 1) or segfaults (pol 2, 3) | A arrayant | 1 defect | S2 | [R] | fixed (WP-09) |
-| [B-012](#b-012) | qdant writer drops every pattern sample below -100 dB absolute power; a whole low-level element reads back as zeros | A arrayant | 1 defect | S2 | [R] | open |
+| [B-012](#b-012) | qdant writer drops every pattern sample below -100 dB absolute power; a whole low-level element reads back as zeros | A arrayant | 1 defect | S2 | [R] | fixed (WP-10) |
 | [B-013](#b-013) | `hdf5_read_channel`: a malformed HDF5 file overflows heap and stack buffers (sizes taken from attributes, not from the datasets) | B channel, file I/O | 1 defect | S2 | [R] | fixed (WP-02) |
 | [B-014](#b-014) | HDF5 storage layout: `nx*ny*nz*nw` wraps in 32 bits; `hdf5_write` then reads and writes past the index buffer | B channel, file I/O | 1 defect | S2 | [R] | fixed (WP-02) |
 | [B-015](#b-015) | `hdf5_write` copies 256 bytes from the channel name: heap memory ends up in the file; names of 256+ characters over-read on reading | B channel, file I/O | 1 defect | S2 | [R] | fixed (WP-02) |
@@ -75,16 +75,16 @@ Status: open: 58, fixed: 59, partly fixed: 0, won't fix: 1, documented: 5 (after
 | [B-035](#b-035) | Python `arrayant.interpolate(local_angles=True)` without `dist=True` returns uninitialised memory | G Python layer | 1 defect | S2 | [R] | fixed (WP-05) |
 | [B-036](#b-036) | Python `channel.baseband_freq_response`: an exception inside the OpenMP region aborts the interpreter | G Python layer | 1 defect | S2 | [R] | fixed (WP-05) |
 | [B-037](#b-037) | AVX2 antenna interpolation returns 0 where all four corner amplitudes are below 1.19e-7 (generic interpolates) | A arrayant | 1 defect | S3 | [R] | fixed (WP-08) |
-| [B-038](#b-038) | qdant writer stores element positions, coupling and pattern values with only 6 significant digits | A arrayant | 1 defect | S3 | [R] | open |
+| [B-038](#b-038) | qdant writer stores element positions, coupling and pattern values with only 6 significant digits | A arrayant | 1 defect | S3 | [R] | fixed (WP-10) |
 | [B-039](#b-039) | `qdant_write_multi` deletes an existing file before it validates its input | A arrayant | 1 defect | S3 | [R] | fixed (WP-01) |
-| [B-040](#b-040) | `qdant_read(fn, 1)` returns another entry without error when the file has no ID 1 | A arrayant | 1 defect | S3 | [R] | open |
-| [B-041](#b-041) | `arrayant::qdant_write` without a layout replaces an existing custom layout in the file (user decision) | A arrayant | 2 doc | S3 | [R] | open |
-| [B-042](#b-042) | A 138-byte qdant file makes the reader allocate 4.7 GB and fail with `std::bad_alloc` | A arrayant | 1 defect | S3 | [R] | open |
+| [B-040](#b-040) | `qdant_read(fn, 1)` returns another entry without error when the file has no ID 1 | A arrayant | 1 defect | S3 | [R] | fixed (WP-10) |
+| [B-041](#b-041) | `arrayant::qdant_write` without a layout replaces an existing custom layout in the file (user decision) | A arrayant | 2 doc | S3 | [R] | documented (WP-10) |
+| [B-042](#b-042) | A 138-byte qdant file makes the reader allocate 4.7 GB and fail with `std::bad_alloc` | A arrayant | 1 defect | S3 | [R] | fixed (WP-10) |
 | [B-043](#b-043) | `arrayant` default constructor leaves `check_ptr` uninitialised; the quick `is_valid()` can pass an invalid object | A arrayant | 1 defect | S3 | [R] | fixed (WP-01) |
 | [B-044](#b-044) | ULA and 3GPP generators keep the custom pattern's element positions and coupling, contrary to the docs | A arrayant | 2 doc | S3 | [R] | fixed (WP-09) |
-| [B-045](#b-045) | `combine_pattern` and `arrayant_combine_pattern_multi` hard-code the speed of light (acoustic arrays combined without position phase) | A arrayant | 1 defect | S3 | [R] | open |
+| [B-045](#b-045) | `combine_pattern` and `arrayant_combine_pattern_multi` hard-code the speed of light (acoustic arrays combined without position phase) | A arrayant | 1 defect | S3 | [R] | fixed (WP-10) |
 | [B-046](#b-046) | `remove_zeros` and `calc_directivity_dBi` use absolute power thresholds (low-level patterns lose data or report 0 dBi) | A arrayant | 1 defect | S3 | [R] | fixed (WP-09) |
-| [B-047](#b-047) | `generate_arrayant_multibeam` defaults M = N = 2 in the header, 1 in the docs and both wrappers | A arrayant | 3 cross-API | S3 | [C] | open |
+| [B-047](#b-047) | `generate_arrayant_multibeam` defaults M = N = 2 in the header, 1 in the docs and both wrappers | A arrayant | 3 cross-API | S3 | [C] | fixed (WP-10) |
 | [B-048](#b-048) | QRT readers trust header and path counts: a 136-byte file returns 20 million zero paths or allocates GBs | B channel, file I/O | 1 defect | S3 | [R, M] | fixed (WP-07) |
 | [B-049](#b-049) | `qrt_file_read` truncates `i_cir` / `i_orig` to 32 bits before the range check | B channel, file I/O | 1 defect | S3 | [R] | fixed (WP-07) |
 | [B-050](#b-050) | HDF5 write/read round trip changes data (empty snapshots, missing frequency, 1-element vectors, empty strings, long names) | B channel, file I/O | 1 defect | S3 | [R] | fixed (WP-02) |
@@ -218,6 +218,8 @@ miscompilation by the LAF split-compare passes, not a library defect. The campai
 | after WP-08: generic, ASan + UBSan | generic `1334185 / 1184`; ASan + UBSan `1334516 / 1184`, only the excluded `ray_progress` reports (worker's runs; Octave MEX 65 of 66, pytest 792 passed, 1 skipped) | - | - |
 | after WP-09: base | `All tests passed (1334881 assertions in 1195 test cases)` (manager) | 37 s (12 threads) | 1.3 / 2.7 |
 | after WP-09: generic, ASan + UBSan | generic `1334550 / 1195`; ASan + UBSan all passed, only the excluded `ray_progress` reports (worker's runs; Octave MEX 65 of 66, pytest 792 passed, 1 skipped) | - | - |
+| after WP-10: base | `All tests passed (1334981 assertions in 1203 test cases)` (manager, rounds 2 and 3; round 1: 1334988) | 38 s (12 threads) | 0.6 / 2.4 |
+| after WP-10: generic, ASan + UBSan | generic `1334650 / 1203` (round 2); ASan + UBSan of round 1 (the reader did not change in round 2); ASan + UBSan all passed, only the excluded `ray_progress` reports (worker's runs; Octave MEX 65 of 66, pytest 793 passed, 1 skipped; qdant AFL 15 min: no crash, 1637 inputs replayed, slowest 0.035 s) | - | - |
 
 Run commands: `flock /tmp/quadriga-fixes-suite.lock build_linux/test_bin` (output
 `build_linux/scratch/hunt/base_test.txt`); the sanitizer runs with
@@ -1496,7 +1498,7 @@ exit code 1
 
 ## B-012: qdant writer drops every pattern sample below -100 dB absolute power; a whole low-level element reads back as zeros
 
-- Status: open
+- Status: fixed (WP-10)
 - Severity: S2: data loss in a writer (S1 by the letter of the scale), but only for samples below an absolute field amplitude of 1e-5, so whole elements are lost only when a pattern is scaled to a very low absolute level; the floor is undocumented.
 - Kind: wrong result (writer data loss)
 - Mark: [R]
@@ -3646,7 +3648,7 @@ scale 1e-08: generic V_re/s = 2.354853 2.019394 1.292355   avx2 V_re/s = 0.00000
 
 ## B-038: qdant writer stores element positions, coupling and pattern values with only 6 significant digits
 
-- Status: open
+- Status: fixed (WP-10) with single-equivalent precision relative to the element peak (user decisions of 2026-10-20: files need only single-precision accuracy and must stay as small as possible): dB magnitudes and phases with up to 6 decimals, one fewer per 20 dB below the element peak, so every sample stays within 6e-8 of the element peak; positions and coupling as the shortest text that reads back as the same float
 - Severity: S3, because the precision loss is silent but small: 0.2 mm on a 123 m element position, about 1e-6 relative on coupling and magnitudes, far coarser phases than the 1e-5° the code intends.
 - Kind: wrong result (precision)
 - Mark: [R]
@@ -3770,7 +3772,7 @@ after: file exists = 0
 
 ## B-040: `qdant_read(fn, 1)` returns another entry without error when the file has no ID 1
 
-- Status: open
+- Status: fixed (WP-10)
 - Severity: S3, because the request is accepted and a different antenna is returned.
 - Kind: wrong result
 - Mark: [R]
@@ -3832,7 +3834,7 @@ read id=1 from a file with ids {2,3}: returned 'two' (no error)
 
 ## B-041: `arrayant::qdant_write` without a layout replaces an existing custom layout in the file (user decision)
 
-- Status: open
+- Status: documented (WP-10): qdant_write without a layout resets the layout (decision (b))
 - Severity: S3, because appending an antenna silently discards a layout the user wrote before; this may be intended, but the documentation does not say so.
 - Kind: doc / wrong result
 - Mark: [R]
@@ -3894,7 +3896,7 @@ layout after appending id 4 without layout:
 
 ## B-042: A 138-byte qdant file makes the reader allocate 4.7 GB and fail with `std::bad_alloc`
 
-- Status: open
+- Status: fixed (WP-10)
 - Severity: S3, because unchecked file input leads to an unbounded allocation and an unclear exception type instead of a clean error.
 - Kind: resource (unbounded allocation)
 - Mark: [R]
@@ -4088,7 +4090,7 @@ ULA coupling_re:
 
 ## B-045: `combine_pattern` and `arrayant_combine_pattern_multi` hard-code the speed of light (acoustic arrays combined without position phase)
 
-- Status: open
+- Status: fixed (WP-10)
 - Severity: S3, because the acoustic multi-driver workflow (`generate_speaker`, `set_element_pos_multi`, `concat_multi`, `combine_pattern_multi`) silently ignores the driver spacing; there is no `propagation_speed` argument, unlike `get_channels_multifreq`.
 - Kind: wrong result / doc
 - Mark: [R]
@@ -4207,7 +4209,7 @@ scale 1e-08: directivity = 0.000 dBi, remove_zeros -> 0 x 0 (input 37 x 73)
 
 ## B-047: `generate_arrayant_multibeam` defaults M = N = 2 in the header, 1 in the docs and both wrappers
 
-- Status: open
+- Status: fixed (WP-10)
 - Severity: S3, because a C++ call that relies on the defaults gets a 2×2 array while the documentation and the MATLAB/Python wrappers say 1×1.
 - Kind: doc / cross-API
 - Mark: [C]
