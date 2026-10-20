@@ -279,7 +279,9 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
   all slices hold the same geometric direction
 - **`acc_dist`** — Accumulated in-layer distance; `[n_ray, 1 + n_freq]`; col 0 = geometric distance,
   col `1+f` = refracted distance at frequency `f`. The geometric column is shared because the traced polyline
-  is the base-frequency geometry by construction; only the refracted length varies with frequency
+  is the base-frequency geometry by construction; only the refracted length varies with frequency. Inside a
+  medium both include the relaunch offset of the last event (a few float ulp of the coordinate, about 1 µm
+  per metre), so the leg the next event measures from `orig` adds up to the leg from the hit point
 - **`paths`** — Per-ray [[path]] objects; `n_ray` entries. Frequency count and layout must match
   `center_frequency` and `scalar_mode`. Terminated paths are freed; surviving paths carry the appended
   interaction segment and the updated polarization product

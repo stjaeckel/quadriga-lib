@@ -2,7 +2,7 @@
 
 This file is the manager's memory. A manager session reads it first, works from it, and updates it after every step
 (state, roadmap, pending decisions). When a manager's context fills up, a new manager reads this file and continues;
-nothing depends on one chat. Last updated: 2026-10-16, after commit 2c5be17 (bc24b0c; grazing round complete, waiting for Stephan's commit).
+nothing depends on one chat. Last updated: 2026-10-16, after commit 2c5be17 (de60194; precision round complete, waiting for Stephan's commit).
 
 ## 1. Roles
 
@@ -12,6 +12,9 @@ nothing depends on one chat. Last updated: 2026-10-16, after commit 2c5be17 (bc2
   decisions and the commit messages, and keeps this file and the roadmap current. It does not edit `src/` or tests and
   does not run experiments beyond a quick read-only check of a worker's claim. Its own edits: this file, briefs
   (`md/*_brief.md`), small document corrections Stephan asks for, `tools/acoustic`.
+- **Stephan's veto (2026-10-19): no new items.** The goal is a good, usable system, not a perfect one. Side findings
+  are recorded in the report (at most a one-line limitation in the documents) and dropped; no new open item, study or
+  roadmap entry from them, and no work on fringe edge cases. Size every effect for typical scenes before proposing work.
 - **Workers** (one fresh session per item) follow a brief in phases, write `md/<item>_report.md`, stop after each
   phase, and never commit.
 
@@ -80,14 +83,14 @@ Run on every worker phase; say which items were checked.
 
 ## 4. Current state (2026-10-16)
 
-- Last commit **bc24b0c** (M10: `m` a switch at 20 dB per decade; `coiA` removed). Before it: 2c5be17 (M6), 4035ac4
-  (this file, `check_docs.py`), 238444d (M5, A21), 04b92bd (acoustic.md rewrite, M9), 4720a92 (round 1 built).
-- `src/ray_mesh_interact.cpp` 5159 lines with the finite panel (uncommitted; 5116 at bc24b0c).
-- Counts with the finite panel: `[wave]` 165258 / 180, `[acoustic]` 41523 / 58, whole suite 1316330 / 1145; baselines
+- Last commit **de60194** (finite-panel radiation, the `side` column). Before it: bc24b0c (M10, `coiA` removed),
+  2c5be17 (M6), 4035ac4 (this file), 238444d (M5, A21), 04b92bd (acoustic.md rewrite, M9), 4720a92 (round 1 built).
+- `src/ray_mesh_interact.cpp` 5159 lines.
+- Counts: `[wave]` 165258 / 180, `[acoustic]` 41523 / 58, whole suite 1316330 / 1145; baselines
   regenerated with 12 threads; `check_docs.py` passes.
 - Documents: `md/acoustic.md` (the reference), `md/wave.md`, `md/acoustic_round1_report.md`,
   `md/m9_fixtures_report.md`, `md/m5_a21_report.md`, `md/m6_report.md`; briefs `md/m9_fixtures_brief.md`,
-  `md/m5_a21_brief.md`, `md/m6_brief.md`, `md/m10_m15_brief.md`, report `md/m10_m15_report.md`; `md/grazing_brief.md` (approved, uncommitted).
+  `md/m5_a21_brief.md`, `md/m6_brief.md`, `md/m10_m15_brief.md`, report `md/m10_m15_report.md`; `md/grazing_brief.md`, report `md/grazing_report.md`; `md/precision_brief.md` (approved, uncommitted).
 - Tools: `tools/acoustic` (`sabine_to_random.py`, `band_probe.cpp` with the peak columns, `paris_cf.py` the closed-form
   Paris value of a locally reacting face, `check_docs.py`, and with M10: `txlib.py` / `txfit.py` / `tl_refs.json` the transmission formula copy
   and fit, `cases.py` moved rows per case; README).
@@ -132,66 +135,45 @@ line 113 expects the field `|T|²`, the library returns `1 − R`); the two "1 =
 (`calc_diffraction_gain`'s description, `include/quadriga_tools.hpp` `thin_slab_threshold`) were not in that round's
 scope and are still open, comment only.
 
-1. **Grazing-incidence study (M14 from first principles)**, next. Brief `md/grazing_brief.md` approved 2026-10-17;
-   phase 0 done (`md/grazing_report.md` 0), reviewed 2026-10-19 (the manager recomputed the transparency angle, the
-   grazing share of a limp plate, Davy's σ(90°) and the equivalent angle `cos θ_l ≈ 1.53/√(kL)` for the nominal wall:
-   all as reported). Finding: an infinite plate turns transparent past `cos θ = 1/X₀` because the air's radiation
-   impedance `ρ₀c/cos θ` grows without bound; a finite plate's forced wave radiates as a beam that the wall plane cuts
-   near grazing, σ saturates at `≈ 0.38·√(kL)`, and the transmitted power per incident intensity levels off. Recommended
-   (d): Davy's σ in the mass term with a nominal 4.0 × 2.7 m size, no column (+12 lines; 2.97 → 2.69 dB on the 13; light
-   panels at 0.93 / 0.95 of their mass; heavy walls' knobs unchanged: their job is above coincidence). Side findings: the
-   `resS > 0` cavity spring at the true cosine (a locally reacting cavity fits the units and linings to 0.04–1.12 dB);
-   heavy walls above `f_c`. **Decided (Stephan, 2026-10-19):** D1 (d) Davy's σ in
-   the mass term; D2 a size column (manager's check, `scratch/size1.py`: of one-number sizes in Davy's form √area is
-   best, ≤ 0.44 dB per angle and diffuse for aspect ratios to 3.3 : 1, 1.5 dB at 10 : 1; 4S/U with S = L² ≤ 0.5 dB and
-   4.2 dB at 10 : 1; the diagonal 0.8–2.0 dB; a fixed nominal up to 7 dB on small panes): column `side`, √(panel area)
-   in m, default 3.29 m (a 4.0 × 2.7 m wall), 0 = the infinite plate, `m > 0` only; D3 M14 closed as superseded; D4
-   open (the `res*` cavity spring; manager's explainer given 2026-10-19, recommends a later small item, not this round: it acts only on the lumped double material; a meshed double
-   leaf on an air box has its cavity from the wave physics and is not affected; note the meshed leaf is a wave medium
-   and keeps the infinite plate's grazing transparency under (d)). Phase 1 prompt given (2026-10-19, revised: one `side`
-   per bonded run; a measurement of 4|16|4 as two mass-law sheets on a meshed air gap for a rule of use (before round 1
-   it read −105 dB at 1 kHz against 35 dB measured: no mass-air-mass resonance, the two losses add); the two "1 = never"
-   slab-threshold comments, dropped by mistake from the M10 round, carried into this round's phase 2). Phase 1 done and reviewed 2026-10-19
-   (`md/grazing_report.md` 1; the manager rebuilt and reran: `[acoustic]` 58 cases, 4 failing with 691 assertions, plus
-   the OBJ header = 693 as reported; `[wave]` identical). Fixtures: two new *Finite plate* cases, *Mass law* and *Plate
-   rule* restated at the default side, 15 cases restated with `side` 0 (their statements are the infinite plate's).
-   Refit of the 13 under (d): 2.70 dB worst at lab side and at 3.29 m. 4|16|4 as two meshed mass-law sheets on a box:
-   the unbridged double leaf above resonance (70 dB at 1 kHz against 36 measured), no mass-air-mass dip: rule of use.
-   Side finding (unknown cause): a traced leg far from the origin or near grazing loses precision (a 4 mm pane crossed
-   at y = −100 m passes 0.2 dB more at normal incidence; today's library at 89.9° through 152 mm misses its own rule by
-   up to −3.4 dB at 2 kHz). Open for Stephan: `same_as` compares `side` (where `m > 0`), the bonded-run rule of use,
-   the precision finding as a separate investigation (EM check included). Decided 2026-10-19 as recommended (same_as compares `side`
-   where `m > 0`; one `side` per bonded run as a rule of use; the precision finding a separate investigation). Phase 2
-   done and reviewed 2026-10-19: `src/ray_mesh_interact.cpp` 5159 lines (+56 / −14), `side` in the OBJ writer, both
-   readers and the band probe, the two slab-threshold comments fixed; the manager rebuilt with 12 threads and reran
-   `[wave]` (identical, twins unmodified) and `[acoustic]` (41523 / 58); whole suite 1316330 / 1145 per the report;
-   the 13 on the built library within 0.0042 dB sheet against solid, band bitwise, R + T ≤ 1; no measurable run-time
-   cost (CPU time, alternated). Phase 3 done and reviewed 2026-10-19 (documents, `md/wave.md` 0 with the
-   12-thread commands, `format_materials.md`, `tools/acoustic/gzlib.py` with its checks, txlib / txfit as built;
-   baselines regenerated; `check_docs.py` passes); commit message given, waiting for Stephan's commit (phase 0 is the study and the explanation; phases 1–3 only if a model is chosen). Why: the infinite plate passes nearly everything at grazing (the air's normal impedance `ρ₀c/cos θ` grows
-   without bound, so the plate's mass stops mattering; equivalently its forced wave radiates with efficiency
-   `1/cos θ`); on round-1 columns 78°–90° carry 4.3 % of a diffuse field but up to 15.3 dB of an octave's transmission;
-   a finite wall radiates its forced wave with a bounded efficiency. Stephan asked for this earlier and never got a
-   clear answer; he wants the physics understood before choosing a model. Needed: (1) the derivation in plain words;
-   (2) per-angle `τ(θ)` of the infinite plate against the finite plate of round 1's `a1/p3/fp.py` (FIN: forced wave
-   windowed, Rayleigh integral; MOD: modal sum; σ cached for 1.20 × 2.40, 1.23 × 1.48, 4.37 × 2.84 m) for light and
-   heavy panels and several sizes, where and how they part; (3) Davy_2009_ForcedRadiationEfficiency (in the review's
-   references), Northwood 78° / 85°, Wareing's size effect; (4) candidates: none, a fixed limit angle, a
-   size-dependent limit angle, Davy's σ with a size (a column or a nominal size; the library cannot know a panel's size
-   from a triangle hit); (5) each judged per angle against FIN / MOD, on the 13 constructions at 0–90° (D4-B), and by
-   code. Read-only until Stephan decides; the fitter `tools/acoustic/txlib.py` / `txfit.py` (with `tl_refs.json`).
-   Must precede the parameter session (the fitted knobs depend on it). Also to check there: whether a finite-size form
-   frees the heavy walls' knobs, which under M10 at 0–90° sit at their bounds (`md/m10_m15_report.md` 1.0).
-2. **Traced-leg precision** (investigation, from the grazing round; unknown cause): a 4 mm pane crossed at y = −100 m
+Done: **grazing incidence** (committed de60194, 2026-10-19; `md/grazing_report.md`): Davy's forced radiation
+efficiency of a finite panel in the mass term, the column `side` = √(panel area) (default 3.29 m, 0 the infinite
+plate), M14 closed; 13 constructions within 2.70 dB at 0–90°; `tools/acoustic/gzlib.py`. Left: regenerate
+`html_docu/` (Stephan).
+
+1. **Traced-leg precision** (investigation, from the grazing round; unknown cause). Brief `md/precision_brief.md`
+   approved 2026-10-19; phase 0 done (`md/precision_report.md` 0), reviewed 2026-10-19 (the manager checked
+   `qd_relaunch_offset` = 8·2⁻²³·max(|F|, 1), the 1e-6 VBS gate, and recomputed the 28 GHz phase of 4 mm glass at
+   100 m, 4.85°, and the 24 % thickness loss at 1 km). Cause: every in-medium leg starts at the relaunch point, short by
+   the nudge (≈ 1 µm per metre of coordinate); the 89.9° finding was a fixture artefact (`r1::wall_g`). Also N2 lost
+   rays near grazing (AVX2, float, `ray_progress`, EM included), N3 walls thinner than the nudge skipped, N4 a false
+   −26 dB in float mass-law walls; open: large turned faces in float lost or running away at the origin. EM crosses
+   0.1 dB on a coherent slab sum from about 10 m at mm-wave. Candidates W1 (ledger starts with the nudge; wave change),
+   W2 (nudge keeps its normal component), W3″ (float gate in mass-law media). **Decided (Stephan, 2026-10-19):**
+   W3″ adopted; `r1::wall_g` repaired; the turned-faces finding dropped (no new item, veto). D1 / D2 explained again
+   (W1 keeps the nudge and only adds it to the in-wall distance; W2 is a fringe case: transmission within 3° of grazing,
+   0.27 % of a diffuse field, where EM transmits almost nothing); manager's revised recommendation: W1 yes, W2 no,
+   the rule of use "local coordinates near the origin" documented. Decided: W1 yes, W2 dropped (as recommended).
+   Phase 1 done and reviewed 2026-10-20 (`md/precision_report.md` 1; the manager rebuilt with 12 threads and reran the
+   new tests on today's library: `[acoustic]` 60 cases, 2 failing with 372 assertions; `[wave]` 181 cases, 11 failing
+   with 575, as reported). Under the what-if only the 5 twin tables fail (260 rows). The phase-0 what-if had a defect
+   (followed bounces of type 1 took the written direction): the corrected W1 rule uses the incoming segment's normal
+   cosine for every type but 2 and 5. One measured exception kept (*Measurement - the mirror behind a second solid*,
+   1.34e-3 dB at one row, limit 2e-3 from 1e-2). Phase 2 done and reviewed 2026-10-20: `src/ray_mesh_interact.cpp` 5211 lines (+52), `ray_progress.cpp`
+   documentation; `tests/data/wave_twins.tsv` rewritten, exactly 260 rows in the 5 tables (checked by the manager);
+   the manager rebuilt with 12 threads and reran `[wave]` 165594 / 181 and `[acoustic]` 42391 / 60, all passing; whole
+   suite 1317534 / 1148 per the report; no measurable CPU cost. Phase 3 done and reviewed 2026-10-20 (`md/wave.md` 8 rule of use and
+   limits, `md/acoustic.md` 7 / 10; baselines regenerated; `check_docs.py` passes); commit message given, waiting for
+   Stephan's commit Lead: `ray_triangle_intersect` computes in single precision in
+   its AVX2 and CUDA kernels (its own documentation), and `ray_progress` stores the accumulated distances as `float`; a 4 mm pane crossed at y = −100 m
    passes 0.2 dB more at normal incidence than near the origin; 152 mm concrete crossed at 89.9° (87 m inside) misses
    its own mass-law rule by up to −3.4 dB at 2 kHz. Where precision is lost (mesh storage, intersection, the thickness
    reconstructed from leg length and cosine) and whether EM path lengths are affected. Read-only first.
-3. **The `res*` cavity spring of a lumped double material** (D4 of the grazing round, open): locally reacting for
+2. **The `res*` cavity spring of a lumped double material** (D4 of the grazing round, open): locally reacting for
    partitioned cavities (linings on battens or dabs, stud walls; fits 1.1–2.7 → 0.04–1.12 dB), double glazing by a short
    study. Small; transmission only.
-4. **The parameter session**: the material table from the review's data with the A13 / A14 / A19 rules
+3. **The parameter session**: the material table from the review's data with the A13 / A14 / A19 rules
    (`tools/acoustic/sabine_to_random.py`), the acceptance classes of `md/acoustic.md` 9.
-5. **A9**: the material-model page, after the machine is settled.
+4. **A9**: the material-model page, after the machine is settled.
 
 Decisions in section 6 can be taken whenever Stephan wants; none blocks item 1.
 

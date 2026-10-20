@@ -26,9 +26,9 @@ First step of every session, from the repository root:
 
 ```
 cmake --build build_linux --parallel 12
-OMP_NUM_THREADS=12 ./build_linux/test_bin "[wave]" > test_wave.txt          # All tests passed (165258 assertions in 180 test cases)
-OMP_NUM_THREADS=12 ./build_linux/test_bin "[acoustic]" > test_acoustic.txt  # All tests passed (41523 assertions in 58 test cases)
-OMP_NUM_THREADS=12 ./build_linux/test_bin > test.txt                        # All tests passed (1316330 assertions in 1145 test cases)
+OMP_NUM_THREADS=12 ./build_linux/test_bin "[wave]" > test_wave.txt          # All tests passed (165594 assertions in 181 test cases)
+OMP_NUM_THREADS=12 ./build_linux/test_bin "[acoustic]" > test_acoustic.txt  # All tests passed (42391 assertions in 60 test cases)
+OMP_NUM_THREADS=12 ./build_linux/test_bin > test.txt                        # All tests passed (1317534 assertions in 1148 test cases)
 ```
 
 At most 12 threads (since 2026-10-19): the machine is shared with other sessions, and oversubscribed OpenMP runs slow
@@ -403,9 +403,22 @@ None has a fix in sight or one worth its cost. Sizes are measured.
   reached only from a host entered from a denser medium, never by a wall in air.
 - A caller with types 2 or 5 that does not hand in the geometry keeps the layer's segment behind a
   closed face. `ray_progress` hands it in on the base-frequency transmit call.
-- A traced leg is short by the relaunch offset (1e-6 m undeviated, up to 1.06e-5 m refracting at 85°):
-  up to 4e-3 dB through the series of a dense slab near grazing. A lossless leg behind a co-located
-  pair carries that pair's anchoring (1.6e-6 at 85° through `ray_progress`).
+- The relaunch offset. `ray_mesh_interact` relaunches a ray 8·2⁻²³ of the hit point's largest coordinate
+  past it (`qd_relaunch_offset`, at least of 1 m: about 1 µm per metre). The in-medium ledger counts it
+  (2026-10-20): the leg the next event measures from `origN` adds up to the leg from the hit point, so a
+  traced leg is exact in double at any distance from the origin (the refracted ledger exact for parallel
+  faces) and within float rounding in float. Before, every leg was short by it: 4 mm of glass at 28 GHz
+  4.8° at 100 m and 48° at 1 km. Asserted in *Far from the origin - a thin dielectric slab transmits what
+  it does at the origin, summed and followed* (to 1 km within 1.2e-5 dB) and *ray_state_update -
+  accumulated distance ledger*. A lossless leg behind a co-located pair carries that pair's anchoring
+  (1.6e-6 at 85° through `ray_progress`).
+- **Rule of use:** build scenes in local coordinates near the origin: mm-wave through `ray_progress` within
+  about 100 m; never raw georeferenced coordinates, where the nudge exceeds a wall's thickness.
+- **Limits:** a body thinner than the nudge is skipped (a 4 mm pane is lost at 10 km); rays within about 3°
+  of grazing can be lost in float or with the AVX2 kernel (the relaunch point rounds back onto the face once
+  the face's own coordinate is 1 m or more); the float position rounding leaves an EM phase of about 3.8° at
+  28 GHz at 1 km (4 mm glass). Recorded, no item: a 4 mm pane on large turned faces (50 to 200 m) in float
+  is lost or runs away even at the origin (`md/precision_report.md` 0.4).
 - The bent flag, the series verdict and the geometry are the base frequency's; near a critical angle
   of a lossless dispersive medium another frequency can have the other verdict. Where the cosines
   decide (the 1e-6 test of `use_vbs`) rounding can, near normal incidence and in single precision.
@@ -513,7 +526,11 @@ without them.
 - `bf::walk` sends one ray through, runs both passes at every event, relaunches on the written
   segment, and sums every path back in air at its polyline's point (`eps` 0 sums every series, 1.5
   follows every bounce; `inc` is the sum of path powers). `cf::walk` adds a sink medium (a wall behind
-  as a half-space) and a seeded start medium.
+  as a half-space) and a seeded start medium. `bf::walk_far` is `bf::walk` through a wall moved away from the
+  origin with its ray (its first segment reaching past the last face).
+- `qd_leg_start` is where the leg after an event starts: the hit point, or the far face of a co-located
+  pair. A slab's thickness is measured from it, never from `origN`. `qd_relaunch_nudge` is the relaunch
+  offset written in the test.
 - Several cases carry their own chain runner (`traced`, `trace`, `run`, `chain`, `walk`) and the
   `ray_progress` cases a `trace` that calls `ray_progress` until no ray is left; they were left as
   they are.

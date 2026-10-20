@@ -978,15 +978,18 @@ TEST_CASE("ray_state_update - accumulated distance ledger", "[wave]")
         CHECK(std::abs((double)C.acc_ref_out(0) - dfd) < 1e-9); // refracted (post-exit leg is unrefracted)
         CHECK(std::abs((double)C.acc_geo_out(0) - dfd) < 1e-9); // geometric
     }
-    SECTION("a non-terminal entry restarts the in-medium distance at zero")
+    SECTION("a non-terminal entry restarts the in-medium distance at the relaunch offset it skips")
     {
+        // the ray leaves the hit point at x = 1.5 a relaunch offset past it; the ledger carries that part, so the
+        // next event's leg from the relaunch point adds up to the leg from the hit point
         auto C = make1<double>(mtl, 4, OT_ENTRY, 2, 4, 4, 0, 0, 0, 1.5, 2.0, 0.5, QPI / 2.0, 1.5);
         C.has_acc_geo_out = true, C.has_acc_ref_out = true;
         C.acc_geo_out.zeros(1);
         C.acc_ref_out.zeros(1);
         C.run();
-        CHECK(std::abs((double)C.acc_ref_out(0)) < 1e-9);
-        CHECK(std::abs((double)C.acc_geo_out(0)) < 1e-9);
+        const double nudge = qd_relaunch_nudge(1.5);
+        CHECK(std::abs((double)C.acc_ref_out(0) - nudge) < 1e-12);
+        CHECK(std::abs((double)C.acc_geo_out(0) - nudge) < 1e-12);
     }
     SECTION("the accumulated input distance threads into the exit medium loss")
     {

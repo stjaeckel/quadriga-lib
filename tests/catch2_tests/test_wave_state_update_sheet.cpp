@@ -327,10 +327,11 @@ TEST_CASE("Diagnostic - Host layer carried through a matched sheet", "[wave]")
             if (sheet_mtl == MATCHED)
             {
                 // The layer continues: nothing about the medium state may change, and the distance
-                // accumulated up to the sheet has to survive rather than being reset.
+                // accumulated up to the sheet has to survive rather than being reset. The ray goes on a
+                // relaunch offset past the sheet, which the ledger carries from here on.
                 CHECK(mat_of(C.prev_out(0)) == 0);
                 CHECK(mat_of(C.cur_out(0)) == HOST);
-                CHECK(std::abs((double)C.acc_geo_out(0) - L) < 1e-9);
+                CHECK(std::abs((double)C.acc_geo_out(0) - (L + qd_relaunch_nudge(L))) < 1e-12);
 
                 // And the crossing itself is a no-op. The sheet occupies thk of the medium it sits
                 // in, so a sheet made of that same medium replaces it with itself: both interfaces
