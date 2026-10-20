@@ -109,6 +109,17 @@ Describes a single array antenna
 - Pattern blocks: Number of lines = length of `ElevationGrid`. Numbers per line = length of `AzimuthGrid`.
   Magnitudes in dB; phases in degrees.
 - Omissions: If a component is everywhere zero, omit its *Mag (and its *Phase). If all phases are zero, *Phase may be omitted.
+- Zeros and levels: a magnitude of `-inf` dB is an exact zero; there is no lower limit for other values.
+  quadriga-lib writes every non-zero sample, and an element that is zero in both components as an
+  all-`-inf` `EthetaMag` node.
+- Precision written by quadriga-lib (single-precision equivalent relative to the element peak): magnitudes (dB)
+  and phases (degree) get the fewest decimals (0 to 6) that keep the error of each complex sample at or below
+  6e-8 times the peak amplitude of its element (over both components); magnitudes get 6 decimals within 20 dB of
+  the peak and one fewer per 20 dB below it. Samples far below the peak are therefore less accurate relative to
+  their own value (about 6e-4 at -80 dB, 6e-2 at -120 dB). Positions and coupling as the shortest text that reads
+  back as the same float (at most 9 significant digits), grids rounded to 0.001 degree. A phase tag is omitted if
+  all phases round to 0.
+- `NoElements` must be backed by data: `ElementPosition`, `CouplingAbs`, or pattern tags with `el="N"`.
 
 ## Quick Reference:
 | Element           | Required | Type / Units      | Notes                                                                |

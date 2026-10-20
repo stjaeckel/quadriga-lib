@@ -54,8 +54,9 @@ namespace quadriga_lib
 
         // Combine element patterns, positions, and coupling weights into effective radiation patterns
         // Returns new arrayant with n_ports elements (= number of columns in coupling_re/im), each holding the combined effective pattern for that port
-        arrayant<dtype> combine_pattern(const arma::Col<dtype> *azimuth_grid_new = nullptr,          // Output azimuth grid in rad, in [-pi, pi], sorted; defaults to input grid
-                                        const arma::Col<dtype> *elevation_grid_new = nullptr) const; // Output elevation grid in rad, in [-pi/2, pi/2], sorted; defaults to input grid
+        arrayant<dtype> combine_pattern(const arma::Col<dtype> *azimuth_grid_new = nullptr,         // Output azimuth grid in rad, in [-pi, pi], sorted; defaults to input grid
+                                        const arma::Col<dtype> *elevation_grid_new = nullptr,       // Output elevation grid in rad, in [-pi/2, pi/2], sorted; defaults to input grid
+                                        dtype propagation_speed = dtype(299792458.0)) const;        // Wave propagation speed in m/s (~343 for acoustics); positive, finite
 
         // Creates a copy of the array antenna object
         arrayant<dtype> copy() const;
@@ -125,7 +126,8 @@ namespace quadriga_lib
     std::vector<arrayant<dtype>> arrayant_combine_pattern_multi(const std::vector<arrayant<dtype>> &arrayant_vec,     // Non-empty vector of valid arrayant objects
                                                                 const arma::Col<dtype> *azimuth_grid_new = nullptr,   // Output azimuth grid in rad, in [-pi, pi], sorted; defaults to input grid
                                                                 const arma::Col<dtype> *elevation_grid_new = nullptr, // Output elevation grid in rad, in [-pi/2, pi/2], sorted; defaults to input grid
-                                                                const arma::Col<dtype> *freq_grid_new = nullptr);     // Output frequency grid in Hz; defaults to input grid
+                                                                const arma::Col<dtype> *freq_grid_new = nullptr,      // Output frequency grid in Hz; defaults to input grid
+                                                                dtype propagation_speed = dtype(299792458.0));        // Wave propagation speed in m/s (~343 for acoustics); positive, finite
     // Concatenate two multi-frequency arrayant vectors into a single multi-element model
     // - Both inputs must have equal entry counts, identical angular grids, and matching center_frequency values at each index.
     // - Per frequency entry: pattern cubes are joined along the element (slice) dimension; element_pos matrices are horizontally concatenated (empty positions treated as zeros).
@@ -291,8 +293,8 @@ namespace quadriga_lib
     // - Beamforming weights are phasors only
     // - Polarization indicator: (1) Vertical polarization only, (2) H/V polarized elements, (3) +/-45 degree polarized elements
     template <typename dtype>
-    arrayant<dtype> generate_arrayant_multibeam(arma::uword M = 2,               // Number of vertical elements
-                                                arma::uword N = 2,               // Number of horizontal elements
+    arrayant<dtype> generate_arrayant_multibeam(arma::uword M = 1,               // Number of vertical elements
+                                                arma::uword N = 1,               // Number of horizontal elements
                                                 arma::Col<dtype> az = {0.0},     // Azimuth beam angles in degree
                                                 arma::Col<dtype> el = {0.0},     // Elevation beam angles in degree
                                                 arma::Col<dtype> weight = {1.0}, // Scaling factor for the beams

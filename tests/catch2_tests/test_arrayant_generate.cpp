@@ -306,3 +306,20 @@ TEST_CASE("Generate Arrayant - ULA and 3GPP ignore positions and coupling of a c
     arma::rowvec z = {-0.25 * lambda, -0.25 * lambda, 0.25 * lambda, 0.25 * lambda};
     CHECK(arma::approx_equal(g2.element_pos.row(2), z, "absdiff", 1e-12));
 }
+
+// B-047: the header defaults were M = N = 2, the documentation and the MATLAB / Python wrappers say 1
+TEST_CASE("Generate Arrayant - Multi-Beam defaults are 1 x 1 (B-047)")
+{
+    auto a = quadriga_lib::generate_arrayant_multibeam<double>();
+    CHECK(a.n_elements() == 1);
+    CHECK(a.n_ports() == 1);
+
+    auto b = quadriga_lib::generate_arrayant_multibeam<float>();
+    CHECK(b.n_elements() == 1);
+    CHECK(b.n_ports() == 1);
+
+    // Same as passing M = N = 1 explicitly
+    auto c = quadriga_lib::generate_arrayant_multibeam<double>(1, 1);
+    CHECK(arma::approx_equal(a.e_theta_re, c.e_theta_re, "absdiff", 0.0));
+    CHECK(arma::approx_equal(a.coupling_re, c.coupling_re, "absdiff", 0.0));
+}
