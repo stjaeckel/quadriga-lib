@@ -371,6 +371,8 @@ acceptance checks beyond section 3.1. Severities in brackets.
 - Left open by earlier packages: `CMakeLists.txt:498` (MATLAB API section) still says MATLAB links quadriga_static "to
   avoid conflicts with MATLAB's own bundled libhdf5.so"; the static link does not separate the HDF5 libraries, the
   different soname of the system HDF5 does (see the comment at `CMakeLists.txt:196`, rewritten in WP-01).
+- From WP-09 (small defects, fix here): `arrayant::remove_zeros` does not copy `name` to the output, and computes the
+  azimuth spacing of the first grid point wrongly (`src/qd_arrayant.cpp`, around line 1433 after WP-09).
 - From WP-08: the MEX and Python docs of `ray_triangle_intersect` say auto mode picks CUDA from 10 000 rays (the
   C++ code uses 500); a SLERP header comment in `src/fastmath_avx2.h` claims a double-precision direction sum the code
   does not do; `_fm256_polar_ps` is unused (dead code); `fast_cart2geo` returns elevation 0 (not NaN) for NaN input in
@@ -455,8 +457,8 @@ unexpected changes in the diff; proposed `md/bugs.md` updates; anything the next
 | WP-05 | 12 | done 2026-10-17 (10 fixed, B-099 and B-117 documented) | bf76f2f |
 | WP-06 | 6 | done 2026-10-17 (6 of 6 fixed; integer conversion of large index inputs 14-17% slower, accepted by the user) | fd4cfe0 |
 | WP-07 | 4 | done 2026-10-19 (4 of 4 fixed; B-122, B-123 found) | 89437ad |
-| WP-08 | 5 | done 2026-10-19 (5 of 5 fixed; AVX2 interpolation and get_channels_spherical at 1.00-1.06 of old) | commit after 89437ad (hash at next update) |
-| WP-09 | 9 | open | - |
+| WP-08 | 5 | done 2026-10-19 (5 of 5 fixed; AVX2 interpolation and get_channels_spherical at 1.00-1.06 of old) | 6ad4f2b |
+| WP-09 | 9 | done 2026-10-20 (9 of 9 fixed; interpolation 0.99-1.02 of old) | commit after 6ad4f2b (hash at next update) |
 | WP-10 | 7 | open | - |
 | WP-11 | 5 | open | - |
 | WP-12 | 12 | open | - |

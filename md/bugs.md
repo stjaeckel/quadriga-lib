@@ -34,7 +34,7 @@ How to read the items:
 ## Summary table
 
 Items: 123 (S1: 5, S2: 31, S3: 68, S4: 19); B-119 to B-123 were found during the fixes (WP-02, WP-04, WP-07).
-Status: open: 67, fixed: 50, partly fixed: 0, won't fix: 1, documented: 5 (after WP-08).
+Status: open: 58, fixed: 59, partly fixed: 0, won't fix: 1, documented: 5 (after WP-09).
 
 | ID | Title | Area | Kind | Severity | Mark | Status |
 |---|---|---|---|---|---|---|
@@ -43,12 +43,12 @@ Status: open: 67, fixed: 50, partly fixed: 0, won't fix: 1, documented: 5 (after
 | [B-003](#b-003) | `get_channels_spherical`, `_multifreq` and `_irs` ignore `path_length` for NLOS paths: delays and phases too short | C channel gen., tools | 1 defect | S1 | [R] | fixed (WP-04) |
 | [B-004](#b-004) | Python `tools.geo2cart` / `tools.cart2geo` with separate inputs read freed memory: wrong values, segfault | G Python layer | 1 defect | S1 | [R] | fixed (WP-05) |
 | [B-005](#b-005) | Python HDF5 writers ignore numpy strides for 1-D and (n,1) arrays: wrong data written, heap over-read | G Python layer | 1 defect | S1 | [R] | fixed (WP-05) |
-| [B-006](#b-006) | AVX2 antenna interpolation reads up to 56 bytes past the angle matrices (per-element angles, n_out not a multiple of 8) | A arrayant | 1 defect | S2 | [R] | open |
-| [B-007](#b-007) | Generic antenna interpolation reads before the pattern buffer for NaN or infinite angles | A arrayant | 1 defect | S2 | [R] | open |
-| [B-008](#b-008) | `arrayant::append` builds a wrong coupling matrix, and segfaults when `coupling_im` is empty | A arrayant | 1 defect | S2 | [R] | open |
-| [B-009](#b-009) | `arrayant::rotate_pattern` loses coupling, centre frequency and name | A arrayant | 1 defect | S2 | [R] | open |
-| [B-010](#b-010) | `arrayant::calc_beamwidth_deg` is wrong when the main lobe wraps ±180° or points towards a pole | A arrayant | 1 defect | S2 | [R] | open |
-| [B-011](#b-011) | `generate_arrayant_multibeam` with a beam towards el = ±90° returns wrong ports (pol 1) or segfaults (pol 2, 3) | A arrayant | 1 defect | S2 | [R] | open |
+| [B-006](#b-006) | AVX2 antenna interpolation reads up to 56 bytes past the angle matrices (per-element angles, n_out not a multiple of 8) | A arrayant | 1 defect | S2 | [R] | fixed (WP-09) |
+| [B-007](#b-007) | Generic antenna interpolation reads before the pattern buffer for NaN or infinite angles | A arrayant | 1 defect | S2 | [R] | fixed (WP-09) |
+| [B-008](#b-008) | `arrayant::append` builds a wrong coupling matrix, and segfaults when `coupling_im` is empty | A arrayant | 1 defect | S2 | [R] | fixed (WP-09) |
+| [B-009](#b-009) | `arrayant::rotate_pattern` loses coupling, centre frequency and name | A arrayant | 1 defect | S2 | [R] | fixed (WP-09) |
+| [B-010](#b-010) | `arrayant::calc_beamwidth_deg` is wrong when the main lobe wraps ±180° or points towards a pole | A arrayant | 1 defect | S2 | [R] | fixed (WP-09) |
+| [B-011](#b-011) | `generate_arrayant_multibeam` with a beam towards el = ±90° returns wrong ports (pol 1) or segfaults (pol 2, 3) | A arrayant | 1 defect | S2 | [R] | fixed (WP-09) |
 | [B-012](#b-012) | qdant writer drops every pattern sample below -100 dB absolute power; a whole low-level element reads back as zeros | A arrayant | 1 defect | S2 | [R] | open |
 | [B-013](#b-013) | `hdf5_read_channel`: a malformed HDF5 file overflows heap and stack buffers (sizes taken from attributes, not from the datasets) | B channel, file I/O | 1 defect | S2 | [R] | fixed (WP-02) |
 | [B-014](#b-014) | HDF5 storage layout: `nx*ny*nz*nw` wraps in 32 bits; `hdf5_write` then reads and writes past the index buffer | B channel, file I/O | 1 defect | S2 | [R] | fixed (WP-02) |
@@ -81,9 +81,9 @@ Status: open: 67, fixed: 50, partly fixed: 0, won't fix: 1, documented: 5 (after
 | [B-041](#b-041) | `arrayant::qdant_write` without a layout replaces an existing custom layout in the file (user decision) | A arrayant | 2 doc | S3 | [R] | open |
 | [B-042](#b-042) | A 138-byte qdant file makes the reader allocate 4.7 GB and fail with `std::bad_alloc` | A arrayant | 1 defect | S3 | [R] | open |
 | [B-043](#b-043) | `arrayant` default constructor leaves `check_ptr` uninitialised; the quick `is_valid()` can pass an invalid object | A arrayant | 1 defect | S3 | [R] | fixed (WP-01) |
-| [B-044](#b-044) | ULA and 3GPP generators keep the custom pattern's element positions and coupling, contrary to the docs | A arrayant | 2 doc | S3 | [R] | open |
+| [B-044](#b-044) | ULA and 3GPP generators keep the custom pattern's element positions and coupling, contrary to the docs | A arrayant | 2 doc | S3 | [R] | fixed (WP-09) |
 | [B-045](#b-045) | `combine_pattern` and `arrayant_combine_pattern_multi` hard-code the speed of light (acoustic arrays combined without position phase) | A arrayant | 1 defect | S3 | [R] | open |
-| [B-046](#b-046) | `remove_zeros` and `calc_directivity_dBi` use absolute power thresholds (low-level patterns lose data or report 0 dBi) | A arrayant | 1 defect | S3 | [R] | open |
+| [B-046](#b-046) | `remove_zeros` and `calc_directivity_dBi` use absolute power thresholds (low-level patterns lose data or report 0 dBi) | A arrayant | 1 defect | S3 | [R] | fixed (WP-09) |
 | [B-047](#b-047) | `generate_arrayant_multibeam` defaults M = N = 2 in the header, 1 in the docs and both wrappers | A arrayant | 3 cross-API | S3 | [C] | open |
 | [B-048](#b-048) | QRT readers trust header and path counts: a 136-byte file returns 20 million zero paths or allocates GBs | B channel, file I/O | 1 defect | S3 | [R, M] | fixed (WP-07) |
 | [B-049](#b-049) | `qrt_file_read` truncates `i_cir` / `i_orig` to 32 bits before the range check | B channel, file I/O | 1 defect | S3 | [R] | fixed (WP-07) |
@@ -138,7 +138,7 @@ Status: open: 67, fixed: 50, partly fixed: 0, won't fix: 1, documented: 5 (after
 | [B-098](#b-098) | Python adapter `view = true` always copies (confirms item 1.1 of `md/python_fix_plan_v00.md`) | G Python layer | 2 doc | S3 | [R] | fixed (WP-05) |
 | [B-099](#b-099) | Python: documented kwargs `sub_cloud_index` and `map_to_itu_materials` raise `TypeError` | G Python layer | 2 doc | S3 | [R] | documented (WP-05) |
 | [B-100](#b-100) | Python: invalid input accepted silently (2-D positions, short `interact_coord`, 4-D arrayant without `center_freq`) | G Python layer | 1 defect | S3 | [R] | fixed (WP-05) |
-| [B-101](#b-101) | `arrayant::copy_element` ignores `read_only`; an empty destination gives an Armadillo-internal error | A arrayant | 1 defect | S4 | [R] | open |
+| [B-101](#b-101) | `arrayant::copy_element` ignores `read_only`; an empty destination gives an Armadillo-internal error | A arrayant | 1 defect | S4 | [R] | fixed (WP-09) |
 | [B-102](#b-102) | Arrayant documentation typos and misleading statements; latent int32 offsets and a vertex sentinel (grouped) | A arrayant | 2 doc | S4 | [C] | open |
 | [B-103](#b-103) | `quantize_delays` docs: `fix_taps` 1 and 2 give `[1, 1, n_taps]` delays only for shared input | B channel, file I/O | 2 doc | S4 | [R] | fixed (WP-03) |
 | [B-104](#b-104) | Channel and file-I/O documentation and message nits (grouped) | B channel, file I/O | 2 doc | S4 | [R, C] | open |
@@ -216,6 +216,8 @@ miscompilation by the LAF split-compare passes, not a library defect. The campai
 | after WP-07: ASan + UBSan gcc-12, `suppress_equal_pcs=0` | `All tests passed (1333935 assertions in 1169 test cases)`; only the excluded `ray_progress` reports, no leak | 550 s (12 threads) | 3.5 / 35.7 |
 | after WP-08: base | `All tests passed (1334516 assertions in 1184 test cases)` (manager) | 38 s (12 threads) | 1.7 / 2.6 |
 | after WP-08: generic, ASan + UBSan | generic `1334185 / 1184`; ASan + UBSan `1334516 / 1184`, only the excluded `ray_progress` reports (worker's runs; Octave MEX 65 of 66, pytest 792 passed, 1 skipped) | - | - |
+| after WP-09: base | `All tests passed (1334881 assertions in 1195 test cases)` (manager) | 37 s (12 threads) | 1.3 / 2.7 |
+| after WP-09: generic, ASan + UBSan | generic `1334550 / 1195`; ASan + UBSan all passed, only the excluded `ray_progress` reports (worker's runs; Octave MEX 65 of 66, pytest 792 passed, 1 skipped) | - | - |
 
 Run commands: `flock /tmp/quadriga-fixes-suite.lock build_linux/test_bin` (output
 `build_linux/scratch/hunt/base_test.txt`); the sanitizer runs with
@@ -1074,7 +1076,7 @@ SUMMARY: AddressSanitizer: heap-buffer-overflow (/usr/lib/x86_64-linux-gnu/libhd
 
 ## B-006: AVX2 antenna interpolation reads up to 56 bytes past the angle matrices (per-element angles, n_out not a multiple of 8)
 
-- Status: open
+- Status: fixed (WP-09)
 - Severity: S2, because every `get_channels_spherical(..., use_avx2 = true)` call (and the MEX `use_avx2` flag) with a number of element pairs that is not a multiple of 8 reads past a heap buffer; the values are discarded, so results are right, but the read can fault at a page boundary. `use_avx2` is off by default.
 - Kind: memory (heap over-read)
 - Mark: [R]
@@ -1153,7 +1155,7 @@ exit code 1
 
 ## B-007: Generic antenna interpolation reads before the pattern buffer for NaN or infinite angles
 
-- Status: open
+- Status: fixed (WP-09)
 - Severity: S2, because a NaN or infinite angle (unchecked input) makes the public `arrayant::interpolate` and everything built on it read out of bounds; the output is NaN, so no wrong value is visible, but it is undefined behaviour.
 - Kind: UB / memory (heap under-read)
 - Mark: [R]
@@ -1220,7 +1222,7 @@ exit code 1
 
 ## B-008: `arrayant::append` builds a wrong coupling matrix, and segfaults when `coupling_im` is empty
 
-- Status: open
+- Status: fixed (WP-09)
 - Severity: S2, because appending any array whose number of ports differs from its number of elements (multibeam without weights applied, a 2-element/1-port array) silently produces a wrong coupling matrix and so wrong channels; a state that `is_valid` accepts (empty `coupling_im`) crashes.
 - Kind: wrong result / crash
 - Mark: [R]
@@ -1302,7 +1304,7 @@ exit code 1
 
 ## B-009: `arrayant::rotate_pattern` loses coupling, centre frequency and name
 
-- Status: open
+- Status: fixed (WP-09)
 - Severity: S2, because a rotated copy of an array with port coupling or a non-default frequency is silently wrong (ports become elements, frequency resets to the default).
 - Kind: wrong result
 - Mark: [R]
@@ -1365,7 +1367,7 @@ in place + grid update: n_ports=2
 
 ## B-010: `arrayant::calc_beamwidth_deg` is wrong when the main lobe wraps ±180° or points towards a pole
 
-- Status: open
+- Status: fixed (WP-09)
 - Severity: S2, because any element pointing backwards or towards the zenith gets a meaningless beamwidth on valid input.
 - Kind: wrong result
 - Mark: [R]
@@ -1426,7 +1428,7 @@ pointing to zenith: bw_az=360.00 bw_el=44.62 point=(-108.0, 90.0)
 
 ## B-011: `generate_arrayant_multibeam` with a beam towards el = ±90° returns wrong ports (pol 1) or segfaults (pol 2, 3)
 
-- Status: open
+- Status: fixed (WP-09)
 - Severity: S2, because a valid beam direction gives a silently wrong array for pol = 1 and a crash for pol = 2 and 3.
 - Kind: crash / wrong result
 - Mark: [R]
@@ -4019,7 +4021,7 @@ call 2: is_valid() = ''   is_valid(false) = 'Values of 'azimuth_grid' must be so
 
 ## B-044: ULA and 3GPP generators keep the custom pattern's element positions and coupling, contrary to the docs
 
-- Status: open
+- Status: fixed (WP-09); the generators reset positions and coupling of a custom pattern, as documented (behaviour change)
 - Severity: S3, because the documentation says these are ignored; the code keeps them, and in the ULA case the coupling becomes inconsistent (neither identity nor replicated).
 - Kind: doc / wrong result
 - Mark: [R]
@@ -4144,7 +4146,7 @@ Output of the phase-2 re-run (`bash run.sh`):
 
 ## B-046: `remove_zeros` and `calc_directivity_dBi` use absolute power thresholds (low-level patterns lose data or report 0 dBi)
 
-- Status: open
+- Status: fixed (WP-09)
 - Severity: S3, because valid but low-level patterns lose non-zero samples or become empty (`rotate_pattern` with a grid update calls `remove_zeros`), and directivity changes with the pattern scale.
 - Kind: wrong result
 - Mark: [R]
@@ -8187,7 +8189,7 @@ Output of the phase-2 re-run (`bash run.sh`):
 
 ## B-101: `arrayant::copy_element` ignores `read_only`; an empty destination gives an Armadillo-internal error
 
-- Status: open
+- Status: fixed (WP-09)
 - Severity: S4, because the effects are an unenforced flag and an unclear error message.
 - Kind: doc / error message
 - Mark: [R]

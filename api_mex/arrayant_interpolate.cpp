@@ -13,6 +13,7 @@ SECTION!*/
 Interpolate polarimetric array antenna field patterns (single- and multi-frequency)
 
 - Interpolates complex e-theta (V) and e-phi (H) field components at the requested azimuth / elevation angles.
+- NaN or infinite angles give NaN in all outputs for that angle (and element); no error is raised
 - Single-frequency mode: pass a 1-element struct (or arrayant data via separate inputs); returns up to 8 outputs 
   including the optional `dist`, `azimuth_loc`, `elevation_loc`, and `gamma` as matrices of size `[n_out, n_ang]`
 - Multi-frequency mode is selected automatically when `arrayant` is a struct array with more than one 

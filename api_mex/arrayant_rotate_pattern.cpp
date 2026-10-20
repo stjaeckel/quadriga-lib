@@ -15,6 +15,7 @@ Rotate antenna radiation patterns around the principal axes using Euler rotation
 - Rotates pattern and/or polarization around x (bank), y (tilt), z (heading) axes
 - Rotations applied in order x, y, z, composed as Rz·Ry·Rx (intrinsic Tait-Bryan)
 - Adjusts the sampling grid for non-uniformly sampled antennas when `usage` is 0 or 1
+- Coupling, `center_freq` and `name` are kept, also when the sampling grid is adjusted
 - For scalar acoustic fields (pressure stored in `e_theta_re` only), use `usage = 1` to avoid
   spurious polarization effects
 

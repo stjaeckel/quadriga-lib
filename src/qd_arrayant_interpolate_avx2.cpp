@@ -1362,12 +1362,32 @@ void qd_arrayant_interpolate_avx2(const arma::Cube<dtype> &e_theta_re,    // Ver
                 {
                     // Load per-element angles for this angle index
                     // azimuth layout: [n_out, n_ang], column a at offset a*n_out
+                    // In the last, partial block only n_valid values may be read (end of the matrix)
                     const dtype *az_col = p_az_global + (size_t)a * n_out;
                     const dtype *el_col = p_el_global + (size_t)a * n_out;
                     if constexpr (sizeof(dtype) == sizeof(float))
                     {
-                        az_in8 = _mm256_loadu_ps((const float *)az_col + o_base);
-                        el_in8 = _mm256_loadu_ps((const float *)el_col + o_base);
+                        if (is_tail_iter)
+                        {
+                            az_in8 = _mm256_maskload_ps((const float *)az_col + o_base, tail_mask);
+                            el_in8 = _mm256_maskload_ps((const float *)el_col + o_base, tail_mask);
+                        }
+                        else
+                        {
+                            az_in8 = _mm256_loadu_ps((const float *)az_col + o_base);
+                            el_in8 = _mm256_loadu_ps((const float *)el_col + o_base);
+                        }
+                    }
+                    else if (is_tail_iter)
+                    {
+                        alignas(32) float az_tmp[8] = {0}, el_tmp[8] = {0};
+                        for (size_t j = 0; j < n_valid; ++j)
+                        {
+                            az_tmp[j] = (float)az_col[o_base + j];
+                            el_tmp[j] = (float)el_col[o_base + j];
+                        }
+                        az_in8 = _mm256_load_ps(az_tmp);
+                        el_in8 = _mm256_load_ps(el_tmp);
                     }
                     else
                     {

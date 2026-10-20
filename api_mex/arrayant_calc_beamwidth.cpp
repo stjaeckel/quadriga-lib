@@ -16,6 +16,12 @@ Calculate the beamwidth and pointing angles of array antenna elements in degrees
 - Also returns the azimuth and elevation pointing angles of the main beam
 - Sub-grid resolution is achieved by bilinear interpolation of the field pattern (≈100x finer grid in
   each direction than the antenna sampling grid)
+- The width is that of the main lobe, searched outwards from the maximum; side lobes above the threshold
+  are not included
+- Azimuth: cut at the elevation of the maximum, circular across ±180° when the grid covers the full
+  circle; 360° when the whole cut is above the threshold (e.g. a beam pointing to a pole)
+- Elevation: cut along the great circle through the maximum, so a lobe can extend across the poles;
+  at most 180°
 - Calculated per element, not per port; ignores element coupling
 
 ## Usage:

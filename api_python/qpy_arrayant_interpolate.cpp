@@ -13,6 +13,7 @@ SECTION!*/
 Interpolate polarimetric array antenna field patterns (single- and multi-frequency)
 
 - Interpolates the complex e-theta (V) and e-phi (H) field components at the requested azimuth / elevation angles
+- NaN or infinite angles give NaN in all outputs for that angle (and element); no error is raised
 - Single-frequency input (3D pattern fields) returns 2D outputs `(n_out, n_ang)`; the optional `dist` and
   `local_angles` outputs are available only on this path
 - Multi-frequency input (4D pattern fields) interpolates spatially and across frequency; for each

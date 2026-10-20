@@ -15,6 +15,7 @@ Rotate antenna radiation patterns around the principal axes using Euler rotation
 - Rotates the pattern and/or polarization of array antenna elements around the x (bank), y (tilt), and z (heading) axes
 - Rotations are applied in the order x, y, z, composed as Rz·Ry·Rx (intrinsic Tait-Bryan)
 - Single-frequency input (3D pattern fields): `usage` 0 and 1 adjust the sampling grid for non-uniformly sampled antennas
+- Coupling, `center_freq` and `name` are kept, also when the sampling grid is adjusted
 - Frequency-dependent input (4D pattern fields): the rotation is applied to every entry and the grid is never adjusted,
   since all entries must share one grid
 - For scalar acoustic fields (pressure stored in `e_theta_re` only) use `usage = 1` to avoid spurious polarization effects
