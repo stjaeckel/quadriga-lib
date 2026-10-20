@@ -34,7 +34,7 @@ How to read the items:
 ## Summary table
 
 Items: 123 (S1: 5, S2: 31, S3: 68, S4: 19); B-119 to B-123 were found during the fixes (WP-02, WP-04, WP-07).
-Status: open: 51, fixed: 65, partly fixed: 0, won't fix: 1, documented: 6 (after WP-10).
+Status: open: 46, fixed: 69, partly fixed: 1, won't fix: 1, documented: 6 (after WP-11).
 
 | ID | Title | Area | Kind | Severity | Mark | Status |
 |---|---|---|---|---|---|---|
@@ -58,9 +58,9 @@ Status: open: 51, fixed: 65, partly fixed: 0, won't fix: 1, documented: 6 (after
 | [B-018](#b-018) | OBJ round trip loses "no material": faces with `mtl_ind = 0` inherit the previous material | B channel, file I/O | 1 defect | S2 | [R] | open |
 | [B-019](#b-019) | `baseband_freq_response_multi` gives wrong phases for `get_channels_*` output with the default relative delays | C channel gen., tools | 1 defect | S2 | [R] | documented (WP-04) |
 | [B-020](#b-020) | `baseband_freq_response`: phase computed in single precision, error grows with delay × bandwidth (both builds) | C channel gen., tools | 1 defect | S2 | [R] | fixed (WP-04) |
-| [B-021](#b-021) | IEEE indoor model: `n_floors > 0` shifts all tap delays (3-D path length minus 2-D distance) | C channel gen., tools | 1 defect | S2 | [R] | open |
-| [B-022](#b-022) | IEEE indoor model prunes taps with an absolute power threshold after path loss (taps vanish with distance, floors, walls) | C channel gen., tools | 1 defect | S2 | [R] | open |
-| [B-023](#b-023) | IEEE indoor model uplink conjugates the channel (Doppler sign reversed), unlike the reciprocity of `get_channels_spherical` (user decision) | C channel gen., tools | 3 cross-API | S2 | [R] | open |
+| [B-021](#b-021) | IEEE indoor model: `n_floors > 0` shifts all tap delays (3-D path length minus 2-D distance) | C channel gen., tools | 1 defect | S2 | [R] | fixed (WP-11) |
+| [B-022](#b-022) | IEEE indoor model prunes taps with an absolute power threshold after path loss (taps vanish with distance, floors, walls) | C channel gen., tools | 1 defect | S2 | [R] | fixed (WP-11) |
+| [B-023](#b-023) | IEEE indoor model uplink conjugates the channel (Doppler sign reversed), unlike the reciprocity of `get_channels_spherical` (user decision) | C channel gen., tools | 3 cross-API | S2 | [R] | fixed (WP-11) |
 | [B-024](#b-024) | `xpr_update`: data race when `ray_index` contains duplicates (wrong, non-deterministic result with threads) | C channel gen., tools | 1 defect | S2 | [R] | open |
 | [B-025](#b-025) | `path_to_tube`: NaN vertices when interior path points are collinear | C channel gen., tools | 1 defect | S2 | [R] | open |
 | [B-026](#b-026) | AVX2 sin/cos returns values far outside [-1, 1], ±inf or NaN for large arguments (fast_sincos, fast_geo2cart, baseband_freq_response) | D geometry, math | 1 defect | S2 | [R] | fixed (WP-08) |
@@ -101,8 +101,8 @@ Status: open: 51, fixed: 65, partly fixed: 0, won't fix: 1, documented: 6 (after
 | [B-061](#b-061) | `combine_irs_coord`: no shape check on `interact_coord_1/2`, heap over-read | C channel gen., tools | 1 defect | S3 | [R] | open |
 | [B-062](#b-062) | `baseband_freq_response`: `aligned_alloc` with sizes that are not a multiple of 32 (generic build) and unchecked NULL return | C channel gen., tools | 1 defect | S3 | [R] | open |
 | [B-063](#b-063) | Test defect: `test_qd_ieee_chan.cpp:318` reads past the delay cube (hidden in the full ASan suite run) | C channel gen., tools | 1 defect | S3 | [R] | fixed (WP-01) |
-| [B-064](#b-064) | IEEE indoor model: `XPR_NLOS_linear = 0` gives NaN coefficients | C channel gen., tools | 1 defect | S3 | [R] | open |
-| [B-065](#b-065) | Unchecked float-to-integer casts (UB) for non-finite `observation_time` and tiny `quantize` | C channel gen., tools | 1 defect | S3 | [R] | open |
+| [B-064](#b-064) | IEEE indoor model: `XPR_NLOS_linear = 0` gives NaN coefficients | C channel gen., tools | 1 defect | S3 | [R] | fixed (WP-11) |
+| [B-065](#b-065) | Unchecked float-to-integer casts (UB) for non-finite `observation_time` and tiny `quantize` | C channel gen., tools | 1 defect | S3 | [R] | partly fixed (WP-11) |
 | [B-066](#b-066) | `calc_delay_spread` with `granularity`: memory n_cir × global delay span / granularity (800 MB for 100 paths) | C channel gen., tools | 4 performance | S3 | [M] | open |
 | [B-067](#b-067) | `acdf`: all-NaN data sets bias the averaged CDF; unsorted user bins are accepted | C channel gen., tools | 1 defect | S3 | [R] | open |
 | [B-068](#b-068) | Docs of `add_fake_los_path` do not match the code: always one extra path; a present LOS is moved to slot 0 and a zero path is left behind | C channel gen., tools | 2 doc | S3 | [R] | documented (WP-04) |
@@ -220,6 +220,8 @@ miscompilation by the LAF split-compare passes, not a library defect. The campai
 | after WP-09: generic, ASan + UBSan | generic `1334550 / 1195`; ASan + UBSan all passed, only the excluded `ray_progress` reports (worker's runs; Octave MEX 65 of 66, pytest 792 passed, 1 skipped) | - | - |
 | after WP-10: base | `All tests passed (1334981 assertions in 1203 test cases)` (manager, rounds 2 and 3; round 1: 1334988) | 38 s (12 threads) | 0.6 / 2.4 |
 | after WP-10: generic, ASan + UBSan | generic `1334650 / 1203` (round 2); ASan + UBSan of round 1 (the reader did not change in round 2); ASan + UBSan all passed, only the excluded `ray_progress` reports (worker's runs; Octave MEX 65 of 66, pytest 793 passed, 1 skipped; qdant AFL 15 min: no crash, 1637 inputs replayed, slowest 0.035 s) | - | - |
+| after WP-11: base | `All tests passed (1335771 assertions in 1222 test cases)` (manager); publication tests 14 cases in 1.2 s | 39 s (12 threads) | 1.2 / 2.7 |
+| after WP-11: generic, ASan + UBSan | generic `1335440 / 1222`; ASan + UBSan all passed, only the excluded `ray_progress` reports (worker's runs; Octave MEX 65 of 66, pytest 793 passed, 1 skipped) | - | - |
 
 Run commands: `flock /tmp/quadriga-fixes-suite.lock build_linux/test_bin` (output
 `build_linux/scratch/hunt/base_test.txt`); the sanitizer runs with
@@ -2314,7 +2316,7 @@ tau = 0.12   s: |H| = 1            |H - H_exact| = 0.313
 
 ## B-021: IEEE indoor model: `n_floors > 0` shifts all tap delays (3-D path length minus 2-D distance)
 
-- Status: open
+- Status: fixed (WP-11)
 - Severity: S2, because any multi-floor scenario gets all taps delayed by a few to tens of ns, so the first tap is not at 0.
 - Kind: wrong result
 - Mark: [R]
@@ -2369,7 +2371,7 @@ model B, 5 m, n_floors = 4: delay of tap 0 = 26.685 ns, tap 1 = 36.685 ns (expec
 
 ## B-022: IEEE indoor model prunes taps with an absolute power threshold after path loss (taps vanish with distance, floors, walls)
 
-- Status: open
+- Status: fixed (WP-11)
 - Severity: S2, because the number of taps (and so the delay spread) shrinks with distance and wall/floor loss, and in strong-loss cases all taps vanish and the call fails with a misleading error.
 - Kind: wrong result
 - Mark: [R]
@@ -2442,7 +2444,7 @@ model F, SF = 0, d =   100 m, 4 floors: exception: Inputs 'aod', 'eod', 'aoa', '
 
 ## B-023: IEEE indoor model uplink conjugates the channel (Doppler sign reversed), unlike the reciprocity of `get_channels_spherical` (user decision)
 
-- Status: open
+- Status: fixed (WP-11): the uplink is the plain transpose; the downlink Doppler sign was also wrong (opposite to get_channels_spherical) and was flipped to exp(+j2 pi f t), decided with the user during WP-11 (2026-10-20). Sections 3.8 and 3.9 of the published paper 11-25-2318 now differ from the code; no published result used uplink channels
 - Severity: S2, because with a moving station the uplink channel has the opposite Doppler sign of a reciprocal channel; it is consistent with its own test, so the user must decide which convention is intended.
 - Kind: wrong result / cross-function inconsistency
 - Mark: [R]
@@ -5776,7 +5778,7 @@ All tests passed (313 assertions in 2 test cases)
 
 ## B-064: IEEE indoor model: `XPR_NLOS_linear = 0` gives NaN coefficients
 
-- Status: open
+- Status: fixed (WP-11)
 - Severity: S3, because an edge input (pure cross-polarisation) is accepted and gives NaN instead of an error or a valid channel.
 - Kind: wrong result
 - Mark: [R]
@@ -5828,7 +5830,7 @@ XPR_NLOS_linear = 0: NaN in coeff_re = 12 of 13, sum(path_gain) = -nan
 
 ## B-065: Unchecked float-to-integer casts (UB) for non-finite `observation_time` and tiny `quantize`
 
-- Status: open
+- Status: partly fixed (WP-11): observation_time and update_rate are validated; the quantize / granularity part (qd_tools_calc_angular_spread.cpp, qd_tools_calc_delay_spread.cpp) moves to WP-13
 - Severity: S3, because invalid input reaches undefined behaviour (the results are returned without an error or fail with an unrelated message).
 - Kind: UB
 - Mark: [R] (what-if builds with `-fsanitize=float-cast-overflow`, sources unchanged), [C] for `calc_delay_spread`

@@ -265,9 +265,12 @@ static void qd_ieee_indoor_param(arma::mat &rx_pos,                      // Outp
     if (CarrierFreq_Hz < 1.0e9)
         SF_std_dB_LOS -= 1.0, SF_std_dB_NLOS -= 1.0;
 
+    // XPR = 0 (no co-polar power) and XPR = Inf (no cross-polar power) have no Jones matrix; NAN selects the default
+    if (!std::isnan(XPR_NLOS_linear_overwrite) && !(XPR_NLOS_linear_overwrite > 0.0 && std::isfinite(XPR_NLOS_linear_overwrite)))
+        throw std::invalid_argument("XPR_NLOS_linear must be NAN (model default) or a finite value larger than 0.");
+
     // Apply parameter overwrites
     KF_linear_overwrite = (KF_linear_overwrite < 0.0) ? NAN : KF_linear_overwrite;
-    XPR_NLOS_linear_overwrite = (XPR_NLOS_linear_overwrite < 0.0) ? NAN : XPR_NLOS_linear_overwrite;
     dBP_m_overwrite = (dBP_m_overwrite < 0.0) ? NAN : dBP_m_overwrite;
 
     KF_linear = std::isnan(KF_linear_overwrite) ? KF_linear : KF_linear_overwrite;
@@ -735,11 +738,12 @@ static void qd_ieee_indoor_param(arma::mat &rx_pos,                      // Outp
         aod[i_user].transform(rad);
         aoa[i_user].transform(rad);
 
-        // Normalize cluster powers and apply PL and SF
-        pdp_linear /= arma::accu(pdp_linear);                                       // Normalize to unit-sum-power
-        pdp_linear *= dB_2_linear(-Pathloss_dB[i_user] + Shadow_Fading_dB[i_user]); // Include Pathloss and SF in the PDP
+        // Normalize cluster powers to unit-sum-power; PL and SF are applied after the selection of the paths
+        pdp_linear /= arma::accu(pdp_linear);
+        const double large_scale_gain = dB_2_linear(-Pathloss_dB[i_user] + Shadow_Fading_dB[i_user]);
 
-        // Remove zero-power paths from the output and scale path powers to include PDP
+        // Remove zero-power paths from the output and scale path powers to include PDP, PL and SF
+        // The threshold applies to the normalized PDP, so the number of paths does not depend on PL, SF, floors or walls
         arma::uword j_path = 0; // Current non-zer path index, starts at 0
         for (arma::uword i_path = 0; i_path < n_path_out; ++i_path)
         {
@@ -749,6 +753,8 @@ static void qd_ieee_indoor_param(arma::mat &rx_pos,                      // Outp
             // Keep only non-zero paths
             if (p_path > 1.0e-14)
             {
+                p_path *= large_scale_gain;
+
                 // Scale sub-path powers to contain the path power
                 double *vi = pow[i_user].colptr(i_path);
                 double *vo = pow[i_user].colptr(j_path);
