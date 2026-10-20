@@ -17,9 +17,14 @@ Write a single unstructured dataset to an HDF5 file
 - `name` must contain only alphanumeric characters and underscores
 - The file must already exist (use [[hdf5_create_file]] first)
 - A dataset of the same name at the same slot is not overwritten; an error is thrown instead
-- Supported types: string, scalar, vector (row or column), 2D matrix, and 3D array; numeric element
-  types: single, double, int32, uint32, int64, uint64
-- Row vectors are stored as column vectors
+- The dataset is added to the slot; everything else stored there is kept. A later [[hdf5_write_channel]] to the
+  same slot replaces the slot completely, including the datasets written with this function
+- Supported types: str; Python float (stored as double), int and bool (stored as int64; a bool is stored as the
+  integer 0 or 1 and reads back as an int); numpy scalars and 0-d arrays; numpy arrays with 1, 2 or 3 dimensions
+  in any memory layout and byte order; numeric element types: float32, float64, int32, uint32, int64, uint64.
+  Other types (e.g. int16, numpy bool, complex) raise an error
+- 1D arrays are stored as vectors and read back with shape `(n,)`, also with a single element (not as a scalar);
+  2D and 3D arrays keep their shape, also `(n, 1)` and `(1, 1)`
 
 ## Usage:
 ```

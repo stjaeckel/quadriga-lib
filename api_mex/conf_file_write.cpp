@@ -111,7 +111,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     {
         if (!mxIsCell(prhs[3]) && !mxIsChar(prhs[3]))
             mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'short_names' must be a cell array of strings.");
-        short_names = qd_mex_get_strings(prhs[3]);
+        short_names = qd_mex_get_strings(prhs[3], "short_names");
     }
 
     const std::string ref = (nrhs < 5) ? std::string() : qd_mex_get_string(prhs[4]);
@@ -120,7 +120,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     {
         if (!mxIsCell(prhs[5]))
             mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'ref_sec' must be a cell array of strings.");
-        ref_sec = qd_mex_get_strings(prhs[5]);
+        ref_sec = qd_mex_get_strings(prhs[5], "ref_sec");
     }
 
     const arma::mat valid_range = (nrhs < 7) ? arma::mat() : qd_mex_typecast_Mat<double>(prhs[6], "valid_range");

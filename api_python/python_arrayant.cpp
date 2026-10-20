@@ -39,7 +39,8 @@ void quadriga_lib_arrayant(py::module_ &m)
           py::arg("arrayant"),
           py::arg("freq") = py::none(),
           py::arg("azimuth_grid") = py::none(),
-          py::arg("elevation_grid") = py::none());
+          py::arg("elevation_grid") = py::none(),
+          py::arg("propagation_speed") = 299792458.0);
 
     m.def("concat", &arrayant_concat,
           py::arg("arrayant1"),

@@ -129,6 +129,13 @@ class test_case(unittest.TestCase):
         except (ValueError, RuntimeError):
             pass
 
+    # Kernel values outside 0, 1, 2 are rejected (they used to run the auto kernel silently)
+    def test_invalid_use_kernel(self):
+        e = np.random.rand(3, 2, 2)
+        for k in (3, 99, -1):
+            with self.assertRaises(ValueError, msg="use_kernel=%d" % k):
+                quadriga_lib.tools.cart2geo(e, use_kernel=k)
+
     # --- Error paths ---
 
     def test_errors(self):
@@ -153,6 +160,21 @@ class test_case(unittest.TestCase):
         # Only one of y / z provided
         with self.assertRaises(ValueError):
             quadriga_lib.tools.cart2geo(np.random.rand(4, 1), None, np.random.rand(4, 1))
+
+    # Separate inputs must give the same values as the combined input, also for large n (B-004:
+    # the separate-input branch read freed memory, wrong values for n > 16, segfault for large n)
+    def test_separate_inputs_equal_combined(self):
+        rng = np.random.default_rng(1)
+        for n in (5, 100, 1000, 100000):
+            x = rng.uniform(-3, 3, n)
+            y = rng.uniform(-3, 3, n)
+            z = rng.uniform(-3, 3, n)
+            ref = quadriga_lib.tools.cart2geo(np.stack([x, y, z]).reshape(3, n, 1))
+            geo = quadriga_lib.tools.cart2geo(x, y, z)
+            np.testing.assert_array_equal(geo, ref, err_msg="combine=True, n=%d" % n)
+            az, el, ln = quadriga_lib.tools.cart2geo(x, y, z, combine=False)
+            np.testing.assert_array_equal(np.stack([az.ravel(), el.ravel(), ln.ravel()]), ref.reshape(3, n),
+                                          err_msg="combine=False, n=%d" % n)
 
 
 if __name__ == '__main__':

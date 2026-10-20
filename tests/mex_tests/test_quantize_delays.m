@@ -28,6 +28,19 @@ catch ME
     end
 end
 
+% NaN delay (B-002)
+dl_nan = dl;
+dl_nan(1,2,2,1) = NaN;
+try
+    quadriga_lib.quantize_delays(cre, cim, dl_nan, 5e-9);
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    expectedErrorMessage = 'NaN or Inf';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "', ME.message, '"']);
+    end
+end
+
 % --- Single path at exact tap boundary ---
 cre = zeros(1, 1, 1, 1);
 cim = zeros(1, 1, 1, 1);

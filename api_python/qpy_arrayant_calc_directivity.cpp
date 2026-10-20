@@ -14,6 +14,7 @@ Calculates the directivity in dBi of array antenna elements
 
 - Directivity = 10·log10(peak radiation intensity / mean over 4π); isotropic radiator = 0 dBi
 - Calculated per element, not per port; ignores element coupling
+- Independent of the scale of the pattern; an element whose pattern is zero everywhere gives 0 dBi
 - Accepts both single-frequency (3D pattern fields) and multi-frequency (4D pattern fields)
   arrayant dicts; output dimensionality follows the input
 
@@ -42,7 +43,7 @@ py::array_t<double> arrayant_calc_directivity(const py::dict &arrayant,
                                               py::handle element)
 {
     // Parse arrayant (handles 3D single-freq and 4D multi-freq pattern arrays uniformly)
-    const auto ant_multi = qd_python_dict2arrayant_multi(arrayant, true, false, true);
+    const auto ant_multi = qd_python_dict2arrayant_multi(arrayant, true, false, true, false);
     const size_t n_freq = ant_multi.size();
     const arma::uword n_elements = ant_multi[0].e_theta_re.n_slices;
 

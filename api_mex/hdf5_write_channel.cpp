@@ -15,7 +15,9 @@ Write one or more channel objects to an HDF5 file
 - Writes a struct array of channels into 4D slots (one slot per array element)
 - Optional unstructured data can be passed as a matching struct array
 - Creates the file with a sensible default layout if it does not yet exist; appends to existing files otherwise
-- A warning is issued if any selected slot already contains data (it is overwritten)
+- A warning is issued if any selected slot already contains data. That slot is replaced completely: its old
+  structured data and all its unstructured datasets (also those written with [[hdf5_write_dset]]) are removed.
+  The file does not shrink; use `h5repack` to reclaim the space of the removed data
 - Structured data is stored in single precision regardless of MATLAB input precision
 - Unstructured datasets retain their MATLAB type and shape (see [[hdf5_write_dset]])
 - Each scalar location input is broadcast to all `numel(chan)` channels; each vector input must have exactly `numel(chan)` elements
@@ -31,6 +33,7 @@ storage_dims = quadriga_lib.hdf5_write_channel( fn, chan, par, ix, iy, iz, iw );
 - **`chan`** — Structured channel data; non-empty struct array; field layout matches [[hdf5_read_channel]]
 - **`par`** — Unstructured data; struct array of the same size as `chan`. Field names become HDF5 dataset
   names per slot (each prefixed with `par_`). Empty fields are skipped. Pass `[]` or omit to disable.
+  Field values follow the type rules of [[hdf5_write_dset]] (at most 3 dimensions).
 - **`ix`** — 1-based slot index along dimension X; scalar or vector of length `numel(chan)`; default `1:numel(chan)`
 - **`iy`** — 1-based slot index along dimension Y; scalar or vector of length `numel(chan)`; default `1`
 - **`iz`** — 1-based slot index along dimension Z; scalar or vector of length `numel(chan)`; default `1`
@@ -74,27 +77,27 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     }
 
     // Parse location indices (scalar broadcast or vector of length n_chan)
-    auto get_index = [&](int arg_idx, unsigned default_val) -> arma::Col<unsigned>
+    auto get_index = [&](int arg_idx, unsigned default_val, const char *name) -> arma::Col<unsigned>
     {
         if (arg_idx >= nrhs || mxGetNumberOfElements(prhs[arg_idx]) == 0)
             return arma::Col<unsigned>(1).fill(default_val);
-        return qd_mex_get_Col<unsigned>(prhs[arg_idx]);
+        return qd_mex_get_Col<unsigned>(prhs[arg_idx], false, name);
     };
 
     arma::Col<unsigned> ix_vec, iy_vec, iz_vec, iw_vec;
 
     // ix: default = 1:n_chan
     if (nrhs > 3 && mxGetNumberOfElements(prhs[3]) != 0)
-        ix_vec = qd_mex_get_Col<unsigned>(prhs[3]);
+        ix_vec = qd_mex_get_Col<unsigned>(prhs[3], false, "ix");
     else
     {
         ix_vec.set_size(n_chan);
         for (arma::uword i = 0; i < n_chan; ++i)
             ix_vec.at(i) = (unsigned)(i + 1);
     }
-    iy_vec = get_index(4, 1);
-    iz_vec = get_index(5, 1);
-    iw_vec = get_index(6, 1);
+    iy_vec = get_index(4, 1, "iy");
+    iz_vec = get_index(5, 1, "iz");
+    iw_vec = get_index(6, 1, "iw");
 
     auto check_idx = [&](const arma::Col<unsigned> &v, const char *name)
     {

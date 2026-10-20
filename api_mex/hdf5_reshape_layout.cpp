@@ -46,7 +46,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Read inputs
     const std::string fn = qd_mex_get_string(prhs[0]);
-    const arma::u32_vec storage_dims = (nrhs < 2) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[1]);
+    const arma::u32_vec storage_dims = (nrhs < 2) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[1], false, "storage_dims");
 
     unsigned nx = storage_dims.is_empty() ? 65536 : storage_dims.at(0);
     unsigned ny = storage_dims.n_elem > 1 ? storage_dims.at(1) : 1;

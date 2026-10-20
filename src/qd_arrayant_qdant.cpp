@@ -4,12 +4,70 @@
 
 #include <iostream>
 #include <algorithm>
+#include <charconv>
+#include <cmath>
+#include <cstring>
+#include <limits>
+#include <vector>
 #include "qd_arrayant_functions.hpp"
 
 #define PUGIXML_HEADER_ONLY
 #include "pugixml.hpp"
 
 // Note: Uncomment "#define PUGIXML_HEADER_ONLY" in "pugiconfig.hpp"
+
+// Largest number of values the reader creates without data in the file: zero patterns of elements that have no
+// pattern node, and the identity coupling of files without 'CouplingAbs' (2^24 values, 128 MB in double precision)
+#define QDANT_MAX_VALUES_WITHOUT_DATA 16777216ULL
+
+// Strict parse of a non-negative decimal integer: digits only, surrounding white space allowed, at most max_value
+static bool qd_qdant_parse_uint(const char *str, unsigned long long max_value, unsigned long long *value)
+{
+    while (*str == ' ' || *str == '\t' || *str == '\n' || *str == '\r')
+        ++str;
+    if (*str < '0' || *str > '9')
+        return false;
+    unsigned long long val = 0ULL;
+    for (; *str >= '0' && *str <= '9'; ++str)
+    {
+        val = 10ULL * val + (unsigned long long)(*str - '0');
+        if (val > max_value)
+            return false;
+    }
+    while (*str == ' ' || *str == '\t' || *str == '\n' || *str == '\r')
+        ++str;
+    if (*str != 0)
+        return false;
+    *value = val;
+    return true;
+}
+
+// Parse a list of numbers; Armadillo reports malformed lists (e.g. rows of different lengths) as std::logic_error
+template <typename dtype>
+static bool qd_qdant_parse_list(const pugi::xml_node &node, arma::Col<dtype> *values)
+{
+    try
+    {
+        *values = arma::Col<dtype>(std::string(node.text().as_string()));
+    }
+    catch (const std::bad_alloc &)
+    {
+        throw;
+    }
+    catch (const std::exception &)
+    {
+        values->reset();
+        return false;
+    }
+    return true;
+}
+
+// An arrayant node without "id" attribute (or with an empty one) is entry 1 if it is the first one in the file
+static bool qd_qdant_has_id(const pugi::xml_node &node)
+{
+    pugi::xml_attribute attr = node.attribute("id");
+    return !attr.empty() && attr.value()[0] != 0;
+}
 
 // Read from QDANT file
 template <typename dtype> // float or double
@@ -57,35 +115,53 @@ std::string qd_arrayant_qdant_read(const std::string fn, const int id,
     node = node_qdant.child(node_name.c_str());
     if (node.empty()) // Parse all arrayant nodes and extract id to build layout
     {
-        arma::Mat<unsigned> tmp;
+        std::vector<unsigned> ids;
         std::string node_name = pfx + "arrayant";
         for (pugi::xml_node node_arrayant : node_qdant.children(node_name.c_str()))
         {
-            std::string val = node_arrayant.first_attribute().value();
-            val = val.empty() && tmp.empty() ? "1" : val;
-            val = val.empty() ? "0" : val;
-            tmp.reshape(1, tmp.n_elem + 1);
-            tmp(0, tmp.n_elem - 1) = std::stoi(val);
+            unsigned long long val = ids.empty() ? 1ULL : 0ULL;
+            if (qd_qdant_has_id(node_arrayant) && !qd_qdant_parse_uint(node_arrayant.attribute("id").value(), 4294967295ULL, &val))
+                return "Invalid arrayant ID '" + std::string(node_arrayant.attribute("id").value()) + "' in the file.";
+            ids.push_back((unsigned)val);
         }
-        *layout = tmp;
+        if (ids.empty())
+            layout->reset();
+        else
+            *layout = arma::Mat<unsigned>(ids.data(), 1, ids.size());
     }
     else // Read the layout from the file
     {
         std::string s = node.text().as_string();
         std::replace(s.begin(), s.end(), ' ', ';'); // replace all ' ' to ';'
-        arma::Mat<unsigned> tmp = arma::Mat<unsigned>(s);
+        arma::Mat<unsigned> tmp;
+        try
+        {
+            tmp = arma::Mat<unsigned>(s);
+        }
+        catch (const std::bad_alloc &)
+        {
+            throw;
+        }
+        catch (const std::exception &)
+        {
+            return "Malformed 'layout' in the file.";
+        }
         *layout = tmp.t();
     }
 
-    // Find the correct arrayant object
+    // Find the correct arrayant object; the first arrayant node is ID 1 only if it has no ID
     node_name = pfx + "arrayant";
     attr_name = "id";
     attr_value = std::to_string(id);
     node_arrayant = node_qdant.find_child_by_attribute(node_name.c_str(), attr_name.c_str(), attr_value.c_str());
     if (node_arrayant.empty() && id == 1)
-        node_arrayant = node_qdant.child(node_name.c_str());
+    {
+        pugi::xml_node node_first = node_qdant.child(node_name.c_str());
+        if (!node_first.empty() && !qd_qdant_has_id(node_first))
+            node_arrayant = node_first;
+    }
     if (node_arrayant.empty())
-        return "Could not find an arrayant object with given ID in the file.";
+        return "Could not find an arrayant object with ID " + attr_value + " in the file.";
 
     // Read name
     node_name = pfx + "name";
@@ -100,20 +176,62 @@ std::string qd_arrayant_qdant_read(const std::string fn, const int id,
     // Read the number of elements
     node_name = pfx + "NoElements";
     node = node_arrayant.child(node_name.c_str());
-    unsigned long long n_elements = node.empty() ? 1ULL : node.text().as_ullong();
+    unsigned long long n_elements = 1ULL;
+    if (!node.empty() && (!qd_qdant_parse_uint(node.text().as_string(), 4294967295ULL, &n_elements) || n_elements == 0ULL))
+        return "'NoElements' must be a positive integer.";
+
+    // Find the pattern nodes of each element: 0 = EthetaMag, 1 = EthetaPhase, 2 = EphiMag, 3 = EphiPhase
+    // The first node with matching "el" attribute is used; a single element may also omit the attribute
+    const std::string pattern_node_names[4] = {pfx + "EthetaMag", pfx + "EthetaPhase", pfx + "EphiMag", pfx + "EphiPhase"};
+    std::vector<std::pair<unsigned long long, pugi::xml_node>> pattern_nodes[4]; // (element, node) as found in the file
+    unsigned long long max_el = 0ULL;
+    for (pugi::xml_node node_pat : node_arrayant.children())
+        for (int c = 0; c < 4; ++c)
+            if (pattern_node_names[c] == node_pat.name())
+            {
+                const char *el_str = node_pat.attribute("el").value();
+                unsigned long long el = 0ULL;
+                if (qd_qdant_parse_uint(el_str, n_elements, &el) && el != 0ULL && std::to_string(el) == el_str)
+                {
+                    pattern_nodes[c].push_back({el, node_pat});
+                    max_el = el > max_el ? el : max_el;
+                }
+            }
 
     // Read element position
     node_name = pfx + "ElementPosition";
     node = node_arrayant.child(node_name.c_str());
-    if (node.empty())
-        *element_pos = arma::Mat<dtype>(3, n_elements, arma::fill::zeros);
-    else
+    const bool has_element_pos = !node.empty();
+    arma::Col<dtype> element_pos_file;
+    if (has_element_pos)
     {
-        arma::Col<dtype> tmp = arma::Col<dtype>(node.text().as_string());
-        if (tmp.n_elem != 3ULL * n_elements)
+        if (!qd_qdant_parse_list(node, &element_pos_file))
+            return "Malformed number list in 'ElementPosition'.";
+        if (element_pos_file.n_elem != 3ULL * n_elements)
             return "Number of entries in 'ElementPosition' does not match the number of antenna elements.";
-        *element_pos = arma::reshape(tmp, 3ULL, n_elements);
     }
+
+    // Read the absolute values of the coupling matrix
+    node_name = pfx + "CouplingAbs";
+    node = node_arrayant.child(node_name.c_str());
+    const bool has_coupling = !node.empty();
+    arma::Col<dtype> coupling_abs_file;
+    unsigned long long n_ports = n_elements;
+    if (has_coupling)
+    {
+        if (!qd_qdant_parse_list(node, &coupling_abs_file))
+            return "Malformed number list in 'CouplingAbs'.";
+        if (coupling_abs_file.n_elem == 0ULL || coupling_abs_file.n_elem % n_elements != 0ULL)
+            return "'CouplingAbs' must be a matrix with number of rows equal to number of elements";
+        n_ports = coupling_abs_file.n_elem / n_elements;
+    }
+
+    // The number of elements must be backed by data in the file before it is used for any allocation
+    if (n_elements > 1ULL && !has_element_pos && !has_coupling && max_el < n_elements)
+        return "'NoElements' (" + std::to_string(n_elements) + ") is larger than the number of elements found in the file.";
+
+    if (!has_coupling && n_elements > QDANT_MAX_VALUES_WITHOUT_DATA / n_elements)
+        return "Array antenna objects with more than 4096 elements must define 'CouplingAbs'.";
 
     // Read the elevation grid
     const dtype deg2rad = dtype(0.017453292519943);
@@ -121,7 +239,10 @@ std::string qd_arrayant_qdant_read(const std::string fn, const int id,
     node = node_arrayant.child(node_name.c_str());
     if (node.empty())
         return "Array antenna object must have an 'ElevationGrid'.";
-    *elevation_grid = arma::Col<dtype>(node.text().as_string()) * deg2rad;
+    arma::Col<dtype> grid_file;
+    if (!qd_qdant_parse_list(node, &grid_file))
+        return "Malformed number list in 'ElevationGrid'.";
+    *elevation_grid = grid_file * deg2rad;
     unsigned long long n_elevation = elevation_grid->n_elem;
 
     // Read the azimuth grid
@@ -129,23 +250,56 @@ std::string qd_arrayant_qdant_read(const std::string fn, const int id,
     node = node_arrayant.child(node_name.c_str());
     if (node.empty())
         return "Array antenna object must have an 'AzimuthGrid'.";
-    *azimuth_grid = arma::Col<dtype>(node.text().as_string()) * deg2rad;
+    if (!qd_qdant_parse_list(node, &grid_file))
+        return "Malformed number list in 'AzimuthGrid'.";
+    *azimuth_grid = grid_file * deg2rad;
     unsigned long long n_azimuth = azimuth_grid->n_elem;
 
-    // Read the coupling matrix
-    node_name = pfx + "CouplingAbs";
-    node = node_arrayant.child(node_name.c_str());
-    unsigned long long n_ports = n_elements;
-    if (node.empty())
-        *coupling_re = arma::Mat<dtype>(n_elements, n_elements, arma::fill::eye);
-    else
+    // Pattern nodes of each element (first one wins), the node without "el" attribute for a single element
+    std::vector<pugi::xml_node> pattern_node(4ULL * n_elements); // Index 4 * element + component
+    for (int c = 0; c < 4; ++c)
     {
-        arma::Col<dtype> tmp = arma::Col<dtype>(node.text().as_string());
-        if (tmp.n_elem % n_elements != 0)
-            return "'CouplingAbs' must be a matrix with number of rows equal to number of elements";
-        n_ports = tmp.n_elem / n_elements;
-        *coupling_re = arma::reshape(tmp, n_elements, n_ports);
+        for (auto &p : pattern_nodes[c])
+            if (pattern_node[4ULL * (p.first - 1ULL) + c].empty())
+                pattern_node[4ULL * (p.first - 1ULL) + c] = p.second;
+        if (n_elements == 1ULL && pattern_node[c].empty())
+            pattern_node[c] = node_arrayant.child(pattern_node_names[c].c_str());
     }
+
+    // Before allocating: each magnitude node must be long enough for the grid, and the zero patterns of elements
+    // without magnitude nodes must stay within the limit
+    const unsigned long long n_ang = n_elevation * n_azimuth;
+    unsigned long long n_without_data = 0ULL;
+    for (unsigned long long el = 0ULL; el < n_elements; ++el)
+    {
+        bool has_data = false;
+        for (int c = 0; c < 4; c += 2) // EthetaMag, EphiMag; k = 1 below is the phase node of the same component
+            if (!pattern_node[4ULL * el + c].empty())
+            {
+                has_data = true;
+                for (int k = 0; k < 2; ++k)
+                {
+                    const pugi::xml_node &n = pattern_node[4ULL * el + c + k];
+                    if (!n.empty() && std::strlen(n.text().as_string()) + 1ULL < 2ULL * n_ang)
+                        return "Number of entries in antenna field pattern does not match the number of azimuth * elevation angles.";
+                }
+            }
+        n_without_data += has_data ? 0ULL : 1ULL;
+    }
+    if (n_ang != 0ULL && n_without_data > QDANT_MAX_VALUES_WITHOUT_DATA / n_ang)
+        return "Too many array elements without pattern data (" + std::to_string(n_without_data) + ") for the size of the sampling grid.";
+
+    // Element positions
+    if (has_element_pos)
+        *element_pos = arma::reshape(element_pos_file, 3ULL, n_elements);
+    else
+        *element_pos = arma::Mat<dtype>(3, n_elements, arma::fill::zeros);
+
+    // Coupling matrix
+    if (has_coupling)
+        *coupling_re = arma::reshape(coupling_abs_file, n_elements, n_ports);
+    else
+        *coupling_re = arma::Mat<dtype>(n_elements, n_elements, arma::fill::eye);
 
     node_name = pfx + "CouplingPhase";
     node = node_arrayant.child(node_name.c_str());
@@ -153,7 +307,10 @@ std::string qd_arrayant_qdant_read(const std::string fn, const int id,
         *coupling_im = arma::Mat<dtype>(n_elements, n_ports, arma::fill::zeros);
     else
     {
-        arma::Col<dtype> tmp = arma::Col<dtype>(node.text().as_string()) * deg2rad;
+        arma::Col<dtype> tmp;
+        if (!qd_qdant_parse_list(node, &tmp))
+            return "Malformed number list in 'CouplingPhase'.";
+        tmp *= deg2rad;
         if (tmp.n_elem != n_elements * n_ports)
             return "Number of entries in 'CouplingPhase' must match number of entries in 'CouplingAbs'.";
         arma::Mat<dtype> tmp2 = arma::reshape(tmp, n_elements, n_ports);
@@ -167,75 +324,43 @@ std::string qd_arrayant_qdant_read(const std::string fn, const int id,
     *e_phi_re = arma::Cube<dtype>(n_elevation, n_azimuth, n_elements, arma::fill::zeros);
     *e_phi_im = arma::Cube<dtype>(n_elevation, n_azimuth, n_elements, arma::fill::zeros);
 
+    // Magnitudes are powers in dB; powers below the smallest normal number of dtype lose precision or become 0 in
+    // sqrt(10^(0.1 * x)), these amplitudes are computed directly as 10^(0.05 * x) in double precision
+    const double x_min = 10.0 * std::log10((double)std::numeric_limits<dtype>::min());
+
     for (auto el = 0ULL; el < n_elements; ++el)
-    {
-        // Read magnitude of Vertical Component
-        node_name = pfx + "EthetaMag";
-        attr_name = "el";
-        attr_value = std::to_string(el + 1ULL);
-        node = node_arrayant.find_child_by_attribute(node_name.c_str(), attr_name.c_str(), attr_value.c_str());
-        if (node.empty() && n_elements == 1)
-            node = node_arrayant.child(node_name.c_str());
-
-        if (!node.empty())
+        for (int c = 0; c < 4; c += 2) // Etheta, then Ephi
         {
+            node = pattern_node[4ULL * el + c];
+            if (node.empty())
+                continue;
+
+            arma::Cube<dtype> *e_re = (c == 0) ? e_theta_re : e_phi_re;
+            arma::Cube<dtype> *e_im = (c == 0) ? e_theta_im : e_phi_im;
+
             // Convert magnitude to amplitude
-            arma::Col<dtype> tmp = arma::Col<dtype>(node.text().as_string());
+            arma::Col<dtype> tmp;
+            if (!qd_qdant_parse_list(node, &tmp))
+                return "Malformed number list in antenna field pattern.";
             if (tmp.n_elem != n_elevation * n_azimuth)
                 return "Number of entries in antenna field pattern does not match the number of azimuth * elevation angles.";
 
-            arma::Mat<dtype> R = arma::reshape(tmp, n_azimuth, n_elevation);
-            R = sqrt(exp10(R.t() * dtype(0.1)));
-
-            // Read phase
-            node_name = pfx + "EthetaPhase";
-            node = node_arrayant.find_child_by_attribute(node_name.c_str(), attr_name.c_str(), attr_value.c_str());
-            if (node.empty() && n_elements == 1)
-                node = node_arrayant.child(node_name.c_str());
-
-            if (!node.empty())
+            arma::Mat<dtype> X = arma::reshape(tmp, n_azimuth, n_elevation).t();
+            arma::Mat<dtype> R = sqrt(exp10(X * dtype(0.1)));
             {
-                tmp = arma::Col<dtype>(node.text().as_string());
-                if (tmp.n_elem != n_elevation * n_azimuth)
-                    return "Number of entries in antenna field pattern does not match the number of azimuth * elevation angles.";
-                arma::Mat<dtype> I = arma::reshape(tmp, n_azimuth, n_elevation);
-                I = I.t() * deg2rad;
-
-                arma::Mat<dtype> tmp = R % arma::cos(I);
-                std::memcpy(e_theta_re->slice_memptr(el), tmp.memptr(), tmp.n_elem * sizeof(dtype));
-
-                tmp = R % arma::sin(I);
-                std::memcpy(e_theta_im->slice_memptr(el), tmp.memptr(), tmp.n_elem * sizeof(dtype));
+                dtype *p_R = R.memptr();
+                const dtype *p_X = X.memptr();
+                for (arma::uword i = 0; i < R.n_elem; ++i)
+                    if ((double)p_X[i] < x_min && std::isfinite(p_X[i]))
+                        p_R[i] = dtype(std::pow(10.0, 0.05 * (double)p_X[i]));
             }
-            else
-                std::memcpy(e_theta_re->slice_memptr(el), R.memptr(), R.n_elem * sizeof(dtype));
-        }
-
-        // Read magnitude if Horizontal Component
-        node_name = pfx + "EphiMag";
-        node = node_arrayant.find_child_by_attribute(node_name.c_str(), attr_name.c_str(), attr_value.c_str());
-        if (node.empty() && n_elements == 1ULL)
-            node = node_arrayant.child(node_name.c_str());
-
-        if (!node.empty())
-        {
-            // Convert magnitude to amplitude
-            arma::Col<dtype> tmp = arma::Col<dtype>(node.text().as_string());
-            if (tmp.n_elem != n_elevation * n_azimuth)
-                return "Number of entries in antenna field pattern does not match the number of azimuth * elevation angles.";
-
-            arma::Mat<dtype> R = arma::reshape(tmp, n_azimuth, n_elevation);
-            R = sqrt(exp10(R.t() * dtype(0.1)));
 
             // Read phase
-            node_name = pfx + "EphiPhase";
-            node = node_arrayant.find_child_by_attribute(node_name.c_str(), attr_name.c_str(), attr_value.c_str());
-            if (node.empty() && n_elements == 1)
-                node = node_arrayant.child(node_name.c_str());
-
+            node = pattern_node[4ULL * el + c + 1];
             if (!node.empty())
             {
-                tmp = arma::Col<dtype>(node.text().as_string());
+                if (!qd_qdant_parse_list(node, &tmp))
+                    return "Malformed number list in antenna field pattern.";
                 if (tmp.n_elem != n_elevation * n_azimuth)
                     return "Number of entries in antenna field pattern does not match the number of azimuth * elevation angles.";
 
@@ -243,15 +368,14 @@ std::string qd_arrayant_qdant_read(const std::string fn, const int id,
                 I = I.t() * deg2rad;
 
                 arma::Mat<dtype> tmp = R % arma::cos(I);
-                std::memcpy(e_phi_re->slice_memptr(el), tmp.memptr(), tmp.n_elem * sizeof(dtype));
+                std::memcpy(e_re->slice_memptr(el), tmp.memptr(), tmp.n_elem * sizeof(dtype));
 
                 tmp = R % arma::sin(I);
-                std::memcpy(e_phi_im->slice_memptr(el), tmp.memptr(), tmp.n_elem * sizeof(dtype));
+                std::memcpy(e_im->slice_memptr(el), tmp.memptr(), tmp.n_elem * sizeof(dtype));
             }
             else
-                std::memcpy(e_phi_re->slice_memptr(el), R.memptr(), R.n_elem * sizeof(dtype));
+                std::memcpy(e_re->slice_memptr(el), R.memptr(), R.n_elem * sizeof(dtype));
         }
-    }
 
     return "";
 }
@@ -276,6 +400,86 @@ template std::string qd_arrayant_qdant_read(const std::string fn, const int id,
                                             arma::Mat<double> *coupling_re, arma::Mat<double> *coupling_im,
                                             double *center_frequency,
                                             arma::Mat<unsigned> *layout);
+
+// Append a value rounded to the given number of decimals, without trailing zeros ("-0" is written as "0"), -inf and
+// nan as such; returns true if the written value is not "0"
+static bool qd_qdant_append_fixed(std::string &text, double value, int decimals)
+{
+    if (!std::isfinite(value))
+    {
+        text += std::isnan(value) ? "nan" : (value < 0.0 ? "-inf" : "inf");
+        return true;
+    }
+    char buf[400];
+    auto res = std::to_chars(buf, buf + sizeof(buf), value, std::chars_format::fixed, decimals);
+    if (res.ec != std::errc())
+    {
+        text += std::to_string(value);
+        return true;
+    }
+    char *end = res.ptr;
+    if (std::find(buf, end, '.') != end)
+    {
+        while (end[-1] == '0')
+            --end;
+        if (end[-1] == '.')
+            --end;
+    }
+    if ((end - buf == 1 && buf[0] == '0') || (end - buf == 2 && buf[0] == '-' && buf[1] == '0'))
+    {
+        text += '0';
+        return false;
+    }
+    text.append(buf, end);
+    return true;
+}
+
+// Decimals of the pattern values, relative to the element peak: the absolute error of every complex sample after
+// rounding its magnitude (dB) and phase (degree) stays at or below 6e-8 times the peak amplitude of the element (half
+// the float resolution). A sample at level x dB (element peak P dB) gets the fewest magnitude decimals k with
+// x - P <= mag[k], then the fewest phase decimals kp with x - P <= phase[k][kp]; at most 6 decimals (reached near the
+// peak). Error terms for an amplitude a: magnitude step s dB gives at most a (10^(s/40) - 1); phase step t degree
+// gives at most a (1 + magnitude error) (t / 2) (pi / 180); the two are orthogonal. The magnitude may use 97% of the
+// budget, the phase the rest.
+struct qd_qdant_decimal_thresholds
+{
+    double mag[7];
+    double phase[7][7];
+    qd_qdant_decimal_thresholds()
+    {
+        const double budget = 6.0e-8;
+        for (int k = 0; k < 7; ++k)
+        {
+            double err_mag = std::pow(10.0, std::pow(10.0, -k) / 40.0) - 1.0;
+            mag[k] = 20.0 * std::log10(0.97 * budget / err_mag);
+            for (int kp = 0; kp < 7; ++kp)
+            {
+                double err_phase = (1.0 + err_mag) * 0.5 * std::pow(10.0, -kp) * 0.017453292519943295;
+                phase[k][kp] = 20.0 * std::log10(budget / std::sqrt(err_mag * err_mag + err_phase * err_phase));
+            }
+        }
+    }
+};
+
+// Matrix as text: columns separated by spaces, values within a column by commas; each value as the shortest text
+// that reads back as the same float (at most 9 significant digits)
+template <typename dtype>
+static std::string qd_qdant_float_columns(const arma::Mat<dtype> &values)
+{
+    std::string text;
+    char buf[64];
+    for (arma::uword c = 0ULL; c < values.n_cols; ++c)
+        for (arma::uword r = 0ULL; r < values.n_rows; ++r)
+        {
+            if (r != 0ULL)
+                text += ',';
+            else if (c != 0ULL)
+                text += ' ';
+            auto res = std::to_chars(buf, buf + sizeof(buf), (float)values.at(r, c));
+            text.append(buf, res.ptr);
+        }
+    return text;
+}
 
 // Write to QDANT file
 template <typename dtype> // float or double
@@ -345,14 +549,16 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
 
         // Read all existing IDs in the file
         std::string node_name = pfx + "arrayant";
+        std::vector<unsigned> ids_file;
         for (pugi::xml_node node_arrayant : node_qdant.children(node_name.c_str()))
         {
-            std::string val = node_arrayant.attribute("id").value();
-            val = val.empty() && ids.empty() ? "1" : val;
-            val = val.empty() ? "0" : val;
-            ids.reshape(1, ids.n_elem + 1);
-            ids(0, ids.n_elem - 1) = std::stoi(val);
+            unsigned long long val = ids_file.empty() ? 1ULL : 0ULL;
+            if (qd_qdant_has_id(node_arrayant) && !qd_qdant_parse_uint(node_arrayant.attribute("id").value(), 4294967295ULL, &val))
+                return "Existing file contains an invalid arrayant ID '" + std::string(node_arrayant.attribute("id").value()) + "'.";
+            ids_file.push_back((unsigned)val);
         }
+        if (!ids_file.empty())
+            ids = arma::Mat<unsigned>(ids_file.data(), 1, ids_file.size());
 
         // Search for existing arrayant in file if ID is given
         if (ID > 0)
@@ -395,21 +601,19 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
     std::ostringstream strm;
     std::string str;
 
+    // Number formats (single-precision equivalent, see qdant_write): element positions and coupling as the shortest
+    // text that reads back as the same float; grids rounded to 0.001 degree; pattern magnitudes (dB) and phases
+    // (degree) with decimals relative to the element peak (qd_qdant_decimal_thresholds)
+    const std::streamsize digits_grid = 6;
+
     // Element pos
     if (!element_pos->empty())
-    {
-        element_pos->t().raw_print(strm);
-        str = strm.str();
-        std::replace(str.begin(), str.end(), ' ', ',');
-        std::replace(str.begin(), str.end(), '\n', ' ');
-        str.erase(str.size() - 1);
-        node_arrayant.append_child("ElementPosition").text().set(str.c_str());
-        strm.str("");
-    }
+        node_arrayant.append_child("ElementPosition").text().set(qd_qdant_float_columns(*element_pos).c_str());
 
     const dtype rad2deg = dtype(57.295779513082323);
 
     // Elevation grid
+    strm.precision(digits_grid);
     arma::Row<dtype> row_vec_tmp = elevation_grid->t() * rad2deg;
     for (dtype &val : row_vec_tmp)
         val = dtype(0.001 * std::round((double)val * 1000.0));
@@ -441,107 +645,136 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
 
         mat_tmp.transform([](dtype x)
                           { return std::sqrt(x); });
-        mat_tmp.t().raw_print(strm);
-        str = strm.str();
-        std::replace(str.begin(), str.end(), ' ', ',');
-        std::replace(str.begin(), str.end(), '\n', ' ');
-        str.erase(str.size() - 1);
-        node_arrayant.append_child("CouplingAbs").text().set(str.c_str());
-        strm.str("");
+        node_arrayant.append_child("CouplingAbs").text().set(qd_qdant_float_columns(mat_tmp).c_str());
 
         // Coupling phase
         if (!coupling_im->empty())
         {
             mat_tmp = arma::atan2(*coupling_im, *coupling_re) * rad2deg;
-            mat_tmp.t().raw_print(strm);
-            str = strm.str();
-            std::replace(str.begin(), str.end(), ' ', ',');
-            std::replace(str.begin(), str.end(), '\n', ' ');
-            str.erase(str.size() - 1);
-            node_arrayant.append_child("CouplingPhase").text().set(str.c_str());
-            strm.str("");
+            node_arrayant.append_child("CouplingPhase").text().set(qd_qdant_float_columns(mat_tmp).c_str());
         }
     }
 
-    // Lambda to calculate the power and check if the pattern has any entry > -200 dB
-    auto calc_power = [](const dtype *Re, const dtype *Im, double *pow, arma::uword n_elem, double th = -200.0, double abs_precision = 1.0e-10) -> bool
+    // Power in dB of each sample; all finite values are written (no floor), exact zeros as -Inf
+    // Returns the largest value (the peak in dB), -Inf if all samples are zero
+    auto calc_power = [](const dtype *Re, const dtype *Im, double *pow, arma::uword n_elem) -> double
     {
-        double multiply = std::round(1.0 / abs_precision);
-        bool has_power = false;
+        double peak = -INFINITY;
         for (arma::uword i = 0ULL; i < n_elem; ++i)
         {
             double re = (double)Re[i], im = (double)Im[i];
             double p = re * re + im * im;
-            p = 10.0 * std::log10(p);
-            p = abs_precision * std::round(p * multiply);
-            p = (p < th) ? -INFINITY : p;
+            if (p >= std::numeric_limits<double>::min())
+                p = 10.0 * std::log10(p);
+            else if (re == 0.0 && im == 0.0)
+                p = -INFINITY;
+            else // Power below the smallest normal double, or NaN
+                p = 20.0 * std::log10(std::hypot(re, im));
             pow[i] = p;
-            if (p > th)
-                has_power = true;
+            if (p > peak)
+                peak = p;
         }
-        return has_power;
+        return peak;
     };
 
-    auto calc_phase = [](const dtype *Re, const dtype *Im, double *phase, arma::uword n_elem, double th = 0.001, double abs_precision = 1.0e-10) -> bool
+    // Phase in degree in (-180, 180]
+    auto calc_phase = [](const dtype *Re, const dtype *Im, double *phase, arma::uword n_elem)
     {
-        double multiply = std::round(1.0 / abs_precision);
-        bool has_phase = false;
         for (arma::uword i = 0ULL; i < n_elem; ++i)
         {
             double re = (double)Re[i], im = (double)Im[i];
             double p = std::atan2(im, re) * 57.295779513082323;
-            p = (std::abs(p) < th) ? 0.0 : p;
-            p = abs_precision * std::round(p * multiply);
-            p = (p < -180.0 + abs_precision) ? 180.0 : p;
-            phase[i] = p;
-            if (std::abs(p) > th)
-                has_phase = true;
+            phase[i] = (p <= -180.0) ? 180.0 : p;
         }
-        return has_phase;
     };
 
-    // Write filed components
-    auto write_e_field = [&](const arma::Cube<dtype> *eRe, const arma::Cube<dtype> *eIm, const std::string eName)
+    // Text of a pattern node, one line per elevation angle: the magnitudes (dB) in 'mag', or the phases in 'phase'
+    // with the decimals following from the magnitude of the same sample; returns true if any value is not "0"
+    static const qd_qdant_decimal_thresholds thr;
+    auto pattern_text = [](const arma::mat &mag, const arma::mat *phase, double peak_dB, std::string &text) -> bool
+    {
+        bool non_zero = false;
+        text.clear();
+        text.reserve(10ULL * mag.n_elem + mag.n_rows + 1ULL);
+        text += '\n';
+        for (arma::uword r = 0ULL; r < mag.n_rows; ++r)
+        {
+            for (arma::uword c = 0ULL; c < mag.n_cols; ++c)
+            {
+                if (c != 0ULL)
+                    text += ' ';
+                const double x = mag.at(r, c), level = x - peak_dB;
+                int k = 0;
+                while (k < 6 && !(level <= thr.mag[k]))
+                    ++k;
+                if (phase == nullptr)
+                    non_zero |= qd_qdant_append_fixed(text, x, k);
+                else
+                {
+                    int kp = 0;
+                    while (kp < 6 && !(level <= thr.phase[k][kp]))
+                        ++kp;
+                    non_zero |= qd_qdant_append_fixed(text, phase->at(r, c), kp);
+                }
+            }
+            text += '\n';
+        }
+        return non_zero;
+    };
+
+    // Peak of each element over both components; an element that is zero in both components gets an all -Inf
+    // 'EthetaMag' node, so that every element is backed by data in the file
+    std::vector<double> theta_peak(NoElements), phi_peak(NoElements);
+    {
+        arma::uword n_links = e_theta_re->n_rows * e_theta_re->n_cols;
+        arma::mat mat_tmp(e_theta_re->n_rows, e_theta_re->n_cols, arma::fill::none);
+        for (auto i = 0ULL; i < NoElements; ++i)
+        {
+            theta_peak[i] = calc_power(e_theta_re->slice_memptr(i), e_theta_im->slice_memptr(i), mat_tmp.memptr(), n_links);
+            phi_peak[i] = calc_power(e_phi_re->slice_memptr(i), e_phi_im->slice_memptr(i), mat_tmp.memptr(), n_links);
+        }
+    }
+
+    auto write_e_field = [&](const arma::Cube<dtype> *eRe, const arma::Cube<dtype> *eIm, const std::string eName, bool is_theta)
     {
         pugi::xml_node node_pat;
         for (auto i = 0ULL; i < NoElements; ++i)
         {
+            const double element_peak = std::max(theta_peak[i], phi_peak[i]);
+            bool has_power = (is_theta ? theta_peak[i] : phi_peak[i]) > -INFINITY;
+            bool write_mag = has_power || (is_theta && !(phi_peak[i] > -INFINITY));
 
             arma::uword n_links = eRe->n_rows * eRe->n_cols;
-            arma::mat mat_tmp(eRe->n_rows, eRe->n_cols, arma::fill::none);
-            bool valid = calc_power(eRe->slice_memptr(i), eIm->slice_memptr(i), mat_tmp.memptr(), n_links, -100.0, 1.0e-4);
+            arma::mat mag(eRe->n_rows, eRe->n_cols, arma::fill::none);
+            calc_power(eRe->slice_memptr(i), eIm->slice_memptr(i), mag.memptr(), n_links);
 
-            if (valid) // Write magnitude
+            if (write_mag) // Write magnitude
             {
+                pattern_text(mag, nullptr, element_peak, str);
                 std::string node_name_x = eName + "Mag";
-                mat_tmp.raw_print(strm, "\n");
-                str = strm.str();
-                str.erase(0, 1);
                 node_pat = node_arrayant.append_child(node_name_x.c_str());
                 node_pat.append_attribute("el").set_value(i + 1);
                 node_pat.text().set(str.c_str());
-                strm.str("");
             }
 
-            if (valid) // Calculate phase
-                valid = calc_phase(eRe->slice_memptr(i), eIm->slice_memptr(i), mat_tmp.memptr(), n_links, 1.0e-5, 1.0e-5);
-
-            if (valid) // Write phase
+            if (has_power) // Write phase, unless all phases are written as 0
             {
-                std::string node_name_x = eName + "Phase";
-                mat_tmp.raw_print(strm, "\n");
-                str = strm.str();
-                str.erase(0, 1);
-                node_pat = node_arrayant.append_child(node_name_x.c_str());
-                node_pat.append_attribute("el").set_value(i + 1);
-                node_pat.text().set(str.c_str());
-                strm.str("");
+                arma::mat phase(eRe->n_rows, eRe->n_cols, arma::fill::none);
+                calc_phase(eRe->slice_memptr(i), eIm->slice_memptr(i), phase.memptr(), n_links);
+                if (pattern_text(mag, &phase, element_peak, str))
+                {
+                    std::string node_name_x = eName + "Phase";
+                    node_pat = node_arrayant.append_child(node_name_x.c_str());
+                    node_pat.append_attribute("el").set_value(i + 1);
+                    node_pat.text().set(str.c_str());
+                }
             }
         }
         return;
     };
-    write_e_field(e_theta_re, e_theta_im, "Etheta");
-    write_e_field(e_phi_re, e_phi_im, "Ephi");
+    write_e_field(e_theta_re, e_theta_im, "Etheta", true);
+    write_e_field(e_phi_re, e_phi_im, "Ephi", false);
+    str.clear();
 
     // Process layout data
     std::string node_name = pfx + "layout";

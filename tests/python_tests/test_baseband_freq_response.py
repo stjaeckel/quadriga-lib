@@ -13,7 +13,17 @@ package_path = os.path.join(current_dir, '../../lib')
 if package_path not in sys.path:
     sys.path.append(package_path)
 
+import subprocess
+import quadriga_lib
 from quadriga_lib import channel
+
+
+def module_dir():
+    """Directory to put on PYTHONPATH so that a subprocess imports the same quadriga_lib module."""
+    path = os.path.abspath(quadriga_lib.__file__)
+    if os.path.basename(path).startswith('__init__.'):
+        path = os.path.dirname(path)
+    return os.path.dirname(path)
 
 # ==========================================================================================
 # Helpers
@@ -476,6 +486,37 @@ class test_case(unittest.TestCase):
                                                freq_in=np.array([1e9, 2e9]),
                                                freq_out=np.linspace(1e9, 2e9, 64))
         self.assertEqual(hmat.shape, (2, 3, 64, 1))
+
+
+    # ==================================================================================
+    # An exception inside the parallel region must reach Python (B-036); run in a
+    # subprocess, since before the fix the interpreter aborted (std::terminate)
+    # ==================================================================================
+
+    def test_exception_in_parallel_region_raises(self):
+        code = (
+            "import numpy as np, quadriga_lib as q\n"
+            "rng = np.random.default_rng(0)\n"
+            "coeff = [rng.normal(size=(2, 2, 3, 2)) + 1j * rng.normal(size=(2, 2, 3, 2)) for _ in range(5)]\n"
+            "delay = [rng.random((2, 2, 3)) * 1e-7 for _ in range(5)]\n"
+            "for kw in ({'coeff': coeff}, {'coeff_re': [c.real.copy() for c in coeff], 'coeff_im': [c.imag.copy() for c in coeff]}):\n"
+            "    try:\n"
+            "        q.channel.baseband_freq_response(delay=delay, freq_in=np.array([2e9, 1e9]), freq_out=np.array([1.5e9]), **kw)\n"
+            "        print('no exception')\n"
+            "    except ValueError as e:\n"
+            "        print('ValueError:', e)\n"
+            "print('alive')\n")
+        env = dict(os.environ)
+        env['PYTHONPATH'] = module_dir()
+        for n_threads in ('1', '4'):
+            env['OMP_NUM_THREADS'] = n_threads
+            r = subprocess.run([sys.executable, '-c', code], capture_output=True, text=True, env=env, timeout=300)
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+            lines = r.stdout.splitlines()
+            self.assertEqual(len(lines), 3, r.stdout)
+            for line in lines[:2]:
+                self.assertIn("ValueError: Input 'freq_in' must be sorted in strictly ascending order.", line)
+            self.assertEqual(lines[2], 'alive')
 
 
 if __name__ == '__main__':

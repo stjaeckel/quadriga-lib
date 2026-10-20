@@ -47,7 +47,7 @@ void arrayant_export_obj_file(const std::string &fn,
     const arma::uvec element_a = qd_python_numpy2arma_Col<arma::uword>(element, true);
 
     // Parse the (possibly frequency-dependent) input antenna
-    const auto ant = qd_python_dict2arrayant_multi(arrayant, true, false, true);
+    const auto ant = qd_python_dict2arrayant_multi(arrayant, true, false, true, false);
 
     if (freq_ind >= ant.size())
         throw std::invalid_argument("'freq_ind' is out of bound.");

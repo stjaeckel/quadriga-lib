@@ -34,8 +34,8 @@ Calculate intersections of ray beams with points in 3D space
 - **`points`** — 3D point cloud coordinates; `[n_points, 3]`
 - **`sub_cloud_index`** — Segment boundary indices for the point cloud; use [[point_cloud_segmentation]] to gnerate;
   uint32; `[n_sub]`; default: `[]` (not using sub-clouds)
-- **`use_kernel`** — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable;
-  auto mode selects CUDA when `n_points >= 500` and CUDA is available, else AVX2, else GENERIC; default: 0
+- **`use_kernel`** — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable
+  and for other values; auto mode selects CUDA when `n_points >= 500` and CUDA is available, else AVX2, else GENERIC; default: 0
 - **`gpu_id`** — CUDA device ID; ignored when not using CUDA; default: 0
 
 ## Outputs:
@@ -64,7 +64,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::mat trivec = qd_mex_get_Mat<double>(prhs[1]);
     const arma::mat tridir = qd_mex_get_Mat<double>(prhs[2]);
     const arma::mat points = qd_mex_get_Mat<double>(prhs[3]);
-    arma::u32_vec sub_cloud_index = (nrhs < 5) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[4], true);
+    arma::u32_vec sub_cloud_index = (nrhs < 5) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[4], true, "sub_cloud_index");
     const int use_kernel = (nrhs < 6) ? 0 : qd_mex_get_scalar<int>(prhs[5], "use_kernel", 0);
     const int gpu_id = (nrhs < 7) ? 0 : qd_mex_get_scalar<int>(prhs[6], "gpu_id", 0);
 

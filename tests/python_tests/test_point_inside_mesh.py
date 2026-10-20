@@ -88,3 +88,11 @@ class test_case(unittest.TestCase):
         self.assertEqual(int(res[0]), 2)
         self.assertEqual(int(res[1]), 2)
         
+
+    def test_output_dtype(self):
+        """The result is int64 of shape (n_points,) (B-117)."""
+        res = RTtools.point_inside_mesh(np.zeros((2, 3)), RTtools.cube())
+        self.assertEqual(res.dtype, np.int64)
+        self.assertEqual(res.shape, (2,))
+        res = RTtools.point_inside_mesh(np.zeros((1, 3)), RTtools.cube(), np.ones(12, dtype=np.uint64))
+        self.assertEqual(res.dtype, np.int64)

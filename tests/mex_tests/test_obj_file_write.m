@@ -350,6 +350,23 @@ catch ME
     end
 end
 
+% Unset or non-string cell elements in name lists (an unset element crashed MATLAB R2026a)
+assert_cpp_error( @() quadriga_lib.obj_file_write( fn, mesh, ones(12,1), [], cell(1,1) ), ...
+    'Cell element 1 of ''obj_names'' is not a string.' );
+assert_cpp_error( @() quadriga_lib.obj_file_write( fn, mesh, [ones(6,1); 2*ones(6,1)], [], {'a', 1} ), ...
+    'Cell element 2 of ''obj_names'' is not a string.' );
+assert_cpp_error( @() quadriga_lib.obj_file_write( fn, mesh, [], ones(12,1), [], cell(1,1) ), ...
+    'Cell element 1 of ''mtl_names'' is not a string.' );
+
+% Index 0 in the 1-based inputs that the wrapper converts to 0-based
+assert_cpp_error( @() quadriga_lib.obj_file_write( fn, mesh, zeros(12,1), [], {'a'} ), ...
+    'Entries in ''obj_ind'' cannot be 0 (1-based index).' );
+face_ind0 = face_ind; face_ind0(3,2) = 0;
+assert_cpp_error( @() quadriga_lib.obj_file_write( fn, [], [], [], [], [], vert_list, face_ind0 ), ...
+    'Entries in ''face_ind'' cannot be 0 (1-based index).' );
+assert_cpp_error( @() quadriga_lib.obj_file_write( fn, [], [], [], [], [], vert_list, face_ind - 0.5 ), ...
+    'Entries in ''face_ind'' must be integers from 0 to' );
+
 % None of the error cases should have produced a file
 assertTrue( exist(fn,'file') ~= 2 );
 assertTrue( exist('cube.txt','file') ~= 2 );
@@ -386,4 +403,17 @@ while true
     lines{end+1,1} = l; %#ok<AGROW>
 end
 fclose(f);
+end
+
+% Assert that fn() raises quadriga_lib:CPPerror with a message that contains expected (substring).
+function assert_cpp_error(fn, expected)
+try
+    fn();
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if ~strcmp(ME.identifier, 'quadriga_lib:CPPerror') || isempty(strfind(ME.message, expected)) %#ok<STREMP>
+        error('moxunit:exceptionNotRaised', ['EXPECTED: quadriga_lib:CPPerror "', expected, '", GOT: ', ...
+            ME.identifier, ' "', ME.message, '"']);
+    end
+end
 end

@@ -4,6 +4,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include "quadriga_channel.hpp"
+#include "quadriga_lib.hpp" // get_channels_multifreq (B-019 test)
 
 #include <cmath>
 #include <complex>
@@ -1040,4 +1041,40 @@ TEST_CASE("baseband_freq_response_multi - Acoustic scenario large delay")
     double expected_im = std::sin(expected_phase);
     CHECK(std::abs(Hr(0, 0, 2) - expected_re) < 1e-6);
     CHECK(std::abs(Hi(0, 0, 2) - expected_im) < 1e-6);
+}
+
+TEST_CASE("baseband_freq_response_multi - get_channels_multifreq output with absolute delays (B-019)")
+{
+    // remove_delay_phase = true needs channels generated with use_absolute_delays = true: the coefficients of
+    // get_channels_* carry the phase of the absolute path length. From the C-2 repro: LOS + one single-bounce path,
+    // TX (0,0,2), RX (30,0,1.5), freq_in 2-3 GHz in 100 MHz steps, freq_out in 1 MHz steps; the truth is
+    // get_channels_multifreq evaluated directly at freq_out.
+    auto omni = quadriga_lib::generate_arrayant_omni<double>(5.0);
+    std::vector<quadriga_lib::arrayant<double>> va = {omni};
+    arma::mat fbs(3, 2);
+    fbs.col(0) = arma::vec({15.0, 0.0, 1.75}), fbs.col(1) = arma::vec({10.0, 12.0, 2.0});
+    arma::vec len = {0.0, 0.0};
+    arma::vec fin = arma::regspace<arma::vec>(2.0e9, 0.1e9, 3.0e9), fout = arma::regspace<arma::vec>(2.0e9, 1.0e6, 3.0e9);
+    auto mk = [](arma::uword nf, arma::mat &pg, arma::cube &M)
+    {
+        pg.set_size(2, nf), pg.row(0).fill(1.0), pg.row(1).fill(0.5);
+        M.zeros(8, 2, nf), M.tube(0, 0).fill(1.0), M.tube(6, 0).fill(-1.0);
+    };
+    arma::mat pg, pgo;
+    arma::cube M, Mo;
+    mk(fin.n_elem, pg, M), mk(fout.n_elem, pgo, Mo);
+
+    std::vector<arma::cube> cr, ci, dl, tr, ti, td;
+    quadriga_lib::get_channels_multifreq<double>(va, va, 0, 0, 2, 0, 0, 0, 30, 0, 1.5, 0, 0, 0, fbs, fbs, pg, len, M, fin, fin, cr, ci, dl, true);
+    quadriga_lib::get_channels_multifreq<double>(va, va, 0, 0, 2, 0, 0, 0, 30, 0, 1.5, 0, 0, 0, fbs, fbs, pgo, len, Mo, fout, fout, tr, ti, td, true);
+    arma::cx_cube h;
+    quadriga_lib::baseband_freq_response_multi<double>(cr, ci, dl, fin, fout, nullptr, nullptr, &h, true);
+    REQUIRE(h.n_slices == fout.n_elem);
+    double err = 0.0;
+    for (arma::uword k = 0; k < fout.n_elem; ++k)
+    {
+        std::complex<double> ht = std::complex<double>(tr[k](0), ti[k](0)) + std::complex<double>(tr[k](1), ti[k](1));
+        err = std::max(err, std::abs(h(0, 0, k) - ht));
+    }
+    CHECK(err < 1e-5);
 }

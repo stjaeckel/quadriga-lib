@@ -118,9 +118,28 @@ Compute channel coefficients for spherical waves across multiple frequencies
 - `path_gain` interpolated linearly; `M` interpolated via SLERP per complex entry pair to preserve phase
 - Extrapolation clamps to nearest frequency entry on all four grids
 - `propagation_speed` supports EM (speed of light, default) and acoustic (~343 m/s) simulations
-- `M` accepts 8 rows (full polarimetric: ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH) or 2 rows (scalar pressure: ReVV, ImVV only)
+- `M` accepts 8 rows (full polarimetric: the 2x2 Jones matrix, rows = RX polarisation V/H, columns = TX polarisation
+  V/H, column-major with Re/Im interleaved: rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx),
+  rows 6-7 = (H rx, H tx)) or 2 rows (scalar pressure: Re, Im of the (V rx, V tx) entry only)
+- NLOS paths: the path length between the TX and RX phase centres is `max(path_length, d_poly)`, where `d_poly` is the
+  TX-FBS-LBS-RX polyline length; the length beyond the polyline (interactions between FBS and LBS) is added to the
+  FBS-LBS segment. Delays and phases follow this length; the per-element offsets follow the FBS / LBS geometry
+- LOS detection: the path whose length is closest to the TX-RX distance, within 0.1 mm
 - Coupling matrices interpolated across frequencies per complex entry (SLERP for complex pairs), identical to antenna pattern handling
-- `n_path_out = n_path + 1` if `add_fake_los_path` else `n_path`
+- `n_path_out = n_path + 1` if `add_fake_los_path` else `n_path`: with `add_fake_los_path`, slot 0 holds the LOS path
+  (zero power if no LOS path was found); a LOS path found in the input is moved to slot 0 and leaves a zero-power path
+  in its original slot (input index + 1); all other paths keep their order, shifted by one slot
+- If `use_absolute_delays` is false, the LOS delay between the TX and RX phase centres is subtracted from all paths;
+  per-element delays can then be negative, down to about -(half the TX array size + half the RX array size) /
+  `propagation_speed` (both arrays endfire). [[quantize_delays]] rejects delays at or below `-tap_spacing / 2`. For
+  acoustics (`propagation_speed` about 343 m/s) that happens for practically every array: at 48 kHz taps, half sizes
+  adding up to more than about 3.6 mm (a 5 cm microphone pair already exceeds it); for radio at 5 ns taps, about
+  0.75 m. Use `use_absolute_delays = true` in that case
+- The coefficients always carry the phase of the absolute path length, also when `use_absolute_delays` is false.
+  [[baseband_freq_response_multi]] with `remove_delay_phase = true` removes the phase of `delay` before it
+  interpolates across `freq_in`, so it needs channels generated with `use_absolute_delays = true`; with relative
+  delays, the phase of the TX-RX distance stays in the coefficients, is interpolated across the `freq_in` grid and
+  gives wrong phases
 
 ## Declaration:
 ```
@@ -156,12 +175,15 @@ void quadriga_lib::get_channels_multifreq(
 - **`fbs_pos`** — First-bounce scatterer positions; `[3, n_path]`
 - **`lbs_pos`** — Last-bounce scatterer positions; `[3, n_path]`
 - **`path_gain`** — Linear-scale path gains; `[n_path, n_freq_in]`
-- **`path_length`** — Absolute TX-to-RX path lengths; `[n_path]`
-- **`M`** — Polarization transfer matrix; `[8, n_path, n_freq_in]` (full pol) or `[2, n_path, n_freq_in]` (scalar)
+- **`path_length`** — Absolute TX-to-RX path lengths (between the phase centres); values shorter than the
+  TX-FBS-LBS-RX polyline (e.g. 0) use the polyline length; `[n_path]`
+- **`M`** — Polarization transfer matrix, row order as above; `[8, n_path, n_freq_in]` (full pol) or
+  `[2, n_path, n_freq_in]` (scalar)
 - **`freq_in`** — Input sample frequencies for `path_gain` and `M`; `[n_freq_in]`
 - **`freq_out`** — Target output frequencies; `[n_freq_out]`
 - **`use_absolute_delays`** *(optional)* — Include LOS delay in all paths if true
-- **`add_fake_los_path`** *(optional)* — Add zero-power LOS path if none detected
+- **`add_fake_los_path`** *(optional)* — Always add one output path; slot 0 holds the LOS path (zero power if none was
+  found); a LOS path found in the input leaves a zero-power path in its original slot
 - **`propagation_speed`** *(optional)* — Wave speed [m/s]; use ~343.0 for acoustics
 
 ## Outputs:
@@ -362,6 +384,10 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
             z = Rz - p_lbs[iz];
             d_shortest += std::sqrt(x * x + y * y + z * z);
             d_length = (p_length[i] < d_shortest) ? d_shortest : p_length[i];
+
+            // Paths with more interactions than FBS and LBS are longer than the TX-FBS-LBS-RX polyline: the extra
+            // length goes into the FBS-LBS segment, so that the phase-centre length equals d_length (= path_length)
+            d_fbs_lbs += d_length - d_shortest;
         }
 
         if (std::abs(d_length - dist_rx_tx) < shortest_path) // LOS path
@@ -802,13 +828,13 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
 
                     if (scalar_M)
                     {
-                        // Scalar pressure: only VV component, M = [ReVV, ImVV]
+                        // Scalar pressure: only the (V rx, V tx) component, M = [Re, Im]
                         re += pVrr[R] * pM[0] * pVtr[R] - pVri[R] * pM[1] * pVtr[R] - pVrr[R] * pM[1] * pVti[R] - pVri[R] * pM[0] * pVti[R];
                         im += pVrr[R] * pM[1] * pVtr[R] + pVri[R] * pM[0] * pVtr[R] + pVrr[R] * pM[0] * pVti[R] - pVri[R] * pM[1] * pVti[R];
                     }
                     else
                     {
-                        // Full 2x2 Jones: [ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH]
+                        // Full 2x2 Jones, column-major: (V rx, V tx), (H rx, V tx), (V rx, H tx), (H rx, H tx), Re/Im each
                         re += pVrr[R] * pM[0] * pVtr[R] - pVri[R] * pM[1] * pVtr[R] - pVrr[R] * pM[1] * pVti[R] - pVri[R] * pM[0] * pVti[R];
                         re += pHrr[R] * pM[2] * pVtr[R] - pHri[R] * pM[3] * pVtr[R] - pHrr[R] * pM[3] * pVti[R] - pHri[R] * pM[2] * pVti[R];
                         re += pVrr[R] * pM[4] * pHtr[R] - pVri[R] * pM[5] * pHtr[R] - pVrr[R] * pM[5] * pHti[R] - pVri[R] * pM[4] * pHti[R];

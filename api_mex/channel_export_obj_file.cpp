@@ -41,7 +41,7 @@ quadriga_lib.channel_export_obj_file( fn, max_no_paths, gain_max, gain_min, colo
 - **`center_freq`** — Center frequency in Hz; `[n_snap]` or scalar
 - **`coeff_re`** — Channel coefficients, real part; `[n_rx, n_tx, n_path, n_snap]`
 - **`coeff_im`** — Channel coefficients, imaginary part; `[n_rx, n_tx, n_path, n_snap]`
-- **`i_snap`** — Snapshot indices to include; range [1 ... n_snap]; empty exports all
+- **`i_snap`** — Snapshot indices to include; 1-based; range [1 ... n_snap]; empty exports all
 
 ## Outputs:
 - This function writes the OBJ file directly to disk and does not return any data
@@ -70,21 +70,22 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     c.rx_pos = qd_mex_get_Mat<double>(prhs[8]);
     c.tx_pos = qd_mex_get_Mat<double>(prhs[9]);
-    c.no_interact = qd_mex_matlab2vector_Col<unsigned>(prhs[10], 1);
-    c.interact_coord = qd_mex_matlab2vector_Mat<double>(prhs[11], 2);
-    c.center_frequency = qd_mex_get_Col<double>(prhs[12]);
-    c.coeff_re = qd_mex_matlab2vector_Cube<double>(prhs[13], 3);
-    c.coeff_im = qd_mex_matlab2vector_Cube<double>(prhs[14], 3);
+    c.no_interact = qd_mex_matlab2vector_Col<unsigned>(prhs[10], 1, "no_interact");
+    c.interact_coord = qd_mex_matlab2vector_Mat<double>(prhs[11], 2, "interact_coord");
+    c.center_frequency = qd_mex_get_Col<double>(prhs[12], false, "center_freq");
+    c.coeff_re = qd_mex_matlab2vector_Cube<double>(prhs[13], 3, "coeff_re");
+    c.coeff_im = qd_mex_matlab2vector_Cube<double>(prhs[14], 3, "coeff_im");
 
-    arma::uvec i_snap;
-    if (nrhs > 15)
-    {
-        i_snap = qd_mex_get_Col<arma::uword>(prhs[15]);
-        if (!i_snap.is_empty())
-            i_snap = i_snap - 1; // Convert from 1-based to 0-based
-    }
+    // Snapshot indices: 1-based (MATLAB) -> 0-based (C++), copy so we don't mutate caller memory
+    arma::uvec i_snap = (nrhs < 16) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[15], true, "i_snap");
+    if (arma::any(i_snap == 0))
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Entries in 'i_snap' cannot be 0 (1-based index).");
+    i_snap -= 1;
 
-    if (c.coeff_re.size() > c.interact_coord.size())
+    // The loop below reads one entry of no_interact and interact_coord per snapshot of the coefficients
+    if (c.no_interact.size() != c.coeff_re.size())
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Number of snapshots in no_interact must match coefficients.");
+    if (c.interact_coord.size() != c.coeff_re.size())
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Number of snapshots in interact_coord must match coefficients.");
 
     for (size_t i_snap_a = 0; i_snap_a < c.coeff_re.size(); ++i_snap_a)

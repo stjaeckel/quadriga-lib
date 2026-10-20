@@ -18,6 +18,9 @@ Reads array antenna data from QDANT files
 - With `id`, a single entry is read; useful for picking one frequency from a multi-frequency file
 - Separate-fields output (11 or 12 outputs) is only available when the result is a single entry 
   (i.e. `id` was provided, or the file contains exactly one entry)
+- An `id` that is not in the file is an error; the first entry counts as ID 1 only if it has no `id` attribute
+- Malformed files are an error, also when they declare more elements (`NoElements`) than the file has data for;
+  elements without pattern data read as zeros (at most 2^24 zero values per entry)
 
 ## Usage:
 ```

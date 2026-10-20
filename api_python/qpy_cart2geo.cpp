@@ -17,8 +17,10 @@ Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector
 - Inputs are arbitrary 3D vectors (not required to be unit length); length returns the Euclidean norm
 - z / length is clamped to [-1, 1] before asin to guard against length == 0 and rounding artifacts
 - Azimuth is in [-pi, pi], elevation in [-pi/2, pi/2]; elevation pi/2 points to the zenith, 0 to the horizon
+- Special values of atan2 as in numpy (e.g. atan2(0, -0) = pi); NaN input gives NaN in az and length
 - Two mutually exclusive input forms: a combined array `cart` of shape (3, n, m), or separate `x`, `y`, `z` of shape (n, m)
-- The AVX2 kernel computes internally in single precision; use `use_kernel = 1` for full double precision
+- The AVX2 kernel computes the angles in single precision (length and z / length in double precision); use
+  `use_kernel = 1` for full double precision
 
 ## Usage:
 ```
@@ -31,7 +33,7 @@ az, el, length = quadriga_lib.tools.cart2geo( cart, y, z, combine=False )
 - **`y`** — Y-coordinates `(n, m)`; provide together with `z` for separate inputs; default: None
 - **`z`** — Z-coordinates `(n, m)`; provide together with `y`; default: None
 - **`combine`** — If True, return a single `(3, n, m)` array; if False, return separate az, el, length arrays; default: True
-- **`use_kernel`** — Kernel: 0 = auto (AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2 (throws if unavailable); default: 1
+- **`use_kernel`** — Kernel: 0 = auto (AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2 (throws if unavailable); other values raise; default: 1
 
 ## Outputs:
 - **`geo_coords`** — Combined geographic coordinates `(3, n, m)`; row 0 = azimuth, row 1 = elevation, row 2 = vector length; returned when `combine` is True
@@ -46,8 +48,10 @@ py::object cart2geo(const py::array_t<double> &cart,
                     bool combine,
                     int use_kernel)
 {
-    // Read inputs into flat coordinate vectors
+    // Read inputs into flat coordinate vectors; in separate mode these alias x_a, y_a, z_a, which must
+    // therefore live in function scope
     arma::vec cx, cy, cz;
+    arma::mat x_a, y_a, z_a;
     arma::uword n = 0, m = 0, n_val = 0;
 
     if (y.is_none() && z.is_none()) // Combined input: cart is (3, n, m)
@@ -66,15 +70,15 @@ py::object cart2geo(const py::array_t<double> &cart,
     }
     else // Separate inputs: cart is x, plus y and z
     {
-        auto cart_a = qd_python_numpy2arma_Mat<double>(cart, true);
-        auto y_a = qd_python_numpy2arma_Mat<double>(y, true);
-        auto z_a = qd_python_numpy2arma_Mat<double>(z, true);
+        x_a = qd_python_numpy2arma_Mat<double>(cart, true);
+        y_a = qd_python_numpy2arma_Mat<double>(y, true);
+        z_a = qd_python_numpy2arma_Mat<double>(z, true);
 
-        if (cart_a.n_elem == 0 || y_a.n_elem != cart_a.n_elem || z_a.n_elem != cart_a.n_elem)
+        if (x_a.n_elem == 0 || y_a.n_elem != x_a.n_elem || z_a.n_elem != x_a.n_elem)
             throw std::invalid_argument("Separate inputs 'x', 'y', 'z' must be non-empty and equal in size.");
 
-        n = cart_a.n_rows, m = cart_a.n_cols, n_val = cart_a.n_elem;
-        cx = arma::vec(cart_a.memptr(), n_val, false, true);
+        n = x_a.n_rows, m = x_a.n_cols, n_val = x_a.n_elem;
+        cx = arma::vec(x_a.memptr(), n_val, false, true);
         cy = arma::vec(y_a.memptr(), n_val, false, true);
         cz = arma::vec(z_a.memptr(), n_val, false, true);
     }

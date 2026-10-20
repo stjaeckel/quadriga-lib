@@ -47,9 +47,9 @@ assert_throws( @() quadriga_lib.sos_acf_estimate( freq(:, 1:2), phase, bins, 150
 assert_throws( @() quadriga_lib.sos_acf_estimate( freq, phase, bins, 1 ), 'n_pos' );                % thrown by C++
 
 % n_pos and the seed are validated by the wrapper before the conversion to an integer type
-assert_throws( @() quadriga_lib.sos_acf_estimate( freq, phase, bins, -1 ), 'Input ''n_pos'' must be a finite number >= 1' );
-assert_throws( @() quadriga_lib.sos_acf_estimate( freq, phase, bins, NaN ), 'Input ''n_pos'' must be a finite number >= 1' );
-assert_throws( @() quadriga_lib.sos_acf_estimate( freq, phase, bins, 0 ), 'Input ''n_pos'' must be a finite number >= 1' );
+assert_cpp_error( @() quadriga_lib.sos_acf_estimate( freq, phase, bins, -1 ), 'Input ''n_pos'' must be an integer >= 1.' );
+assert_cpp_error( @() quadriga_lib.sos_acf_estimate( freq, phase, bins, NaN ), 'Input ''n_pos'' must be an integer >= 1.' );
+assert_cpp_error( @() quadriga_lib.sos_acf_estimate( freq, phase, bins, 0 ), 'Input ''n_pos'' must be an integer >= 1.' );
 assert_throws( @() quadriga_lib.sos_acf_estimate( freq, phase, bins, 150, [], [], NaN ), 'Input ''seed''' );
 assert_throws( @() quadriga_lib.sos_acf_estimate( freq, phase, [bins(1:end-1), Inf], 150 ), 'bins' );  % thrown by C++
 assert_throws( @() dual_without_acf( freq, phase, bins ), 'acf' );                                  % thrown by C++
@@ -74,6 +74,19 @@ try
 catch ME
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expected)) %#ok<STREMP>
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expected, '", GOT: "', ME.message, '"']);
+    end
+end
+end
+
+% Assert that fn() raises quadriga_lib:CPPerror with a message that contains expected (substring).
+function assert_cpp_error(fn, expected)
+try
+    fn();
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if ~strcmp(ME.identifier, 'quadriga_lib:CPPerror') || isempty(strfind(ME.message, expected)) %#ok<STREMP>
+        error('moxunit:exceptionNotRaised', ['EXPECTED: quadriga_lib:CPPerror "', expected, '", GOT: ', ...
+            ME.identifier, ' "', ME.message, '"']);
     end
 end
 end

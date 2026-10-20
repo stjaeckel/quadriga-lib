@@ -103,7 +103,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                 v.at(i) = i + 1;
             return v;
         }
-        arma::Col<unsigned> v = qd_mex_get_Col<unsigned>(prhs[arg_idx]);
+        arma::Col<unsigned> v = qd_mex_get_Col<unsigned>(prhs[arg_idx], false, name);
         for (auto val : v)
             if (val == 0 || val > n_dim)
                 mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Index '%s' out of bounds.", name);
@@ -116,7 +116,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::Col<unsigned> iw_vec = parse_idx(4, nw, "iw");
 
     // Parse snap
-    arma::uvec snap = (nrhs < 6) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[5]);
+    arma::uvec snap = (nrhs < 6) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[5], true, "snap");
 
     const arma::uword n_sel = ix_vec.n_elem * iy_vec.n_elem * iz_vec.n_elem * iw_vec.n_elem;
     if (!snap.is_empty() && n_sel > 1)

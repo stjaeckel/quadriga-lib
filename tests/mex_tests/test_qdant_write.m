@@ -249,3 +249,11 @@ catch ME
 end
 
 delete('testm.qdant');
+
+%% Separate inputs with center_freq = [] write the default 299792458
+ant = quadriga_lib.arrayant_generate('omni');
+quadriga_lib.arrayant_qdant_write('testm.qdant', [], [], [], ant.e_theta_re, ant.e_theta_im, ant.e_phi_re, ant.e_phi_im, ...
+    ant.azimuth_grid, ant.elevation_grid, [], [], [], [], 'x');
+a2 = quadriga_lib.arrayant_qdant_read('testm.qdant', 1);
+assertEqual(a2.center_freq, 299792458);
+delete('testm.qdant');

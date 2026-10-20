@@ -135,4 +135,17 @@ assertElementsAlmostEqual( le1, le2, 'absolute', 1e-5 );
 [az3,el3,le3] = quadriga_lib.cart2geo(e, [], [], []);
 assertElementsAlmostEqual( az1, az3, 'absolute', 1e-5 );
 
+% Kernel values outside 0, 1, 2 are rejected (they used to run the auto kernel silently)
+for k = [3, 99]
+    try
+        [~] = quadriga_lib.cart2geo(e, [], [], k);
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    catch ME
+        expectedErrorMessage = 'Input ''use_kernel'' must be 0, 1 or 2.';
+        if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+            error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+        end
+    end
+end
+
 end

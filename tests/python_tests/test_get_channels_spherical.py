@@ -497,9 +497,26 @@ class TestGetChannelsSpherical(unittest.TestCase):
             ant, ant, fbs_pos, lbs_pos, path_gain, path_length, M,
             [0, 0, 0], [0, 0, 0], [100, 0, 0], [0, 0, 0], 0.0, True, False, angles=True)
 
-        self.assertAlmostEqual(delay[0, 0, 0], d_total / C, places=12)
+        # path_length is longer than the TX-FBS-LBS-RX polyline: the delay follows path_length (B-003)
+        self.assertAlmostEqual(delay[0, 0, 0], path_length[0] / C, places=12)
         self.assertAlmostEqual(aod[0, 0, 0], math.atan2(30.0, 20.0), places=5)
         self.assertAlmostEqual(aoa[0, 0, 0], math.atan2(30.0, -20.0), places=5)
+
+    def test_nlos_path_length_longer_than_polyline(self):
+        # B-003: 3-bounce path via (30,40,0), (50,60,0), (70,40,0) between TX (0,0,0) and RX (100,0,0);
+        # FBS = first, LBS = last interaction, path_length = 100 + 40 * sqrt(2) = 156.5685 m (polyline: 140 m)
+        ant = omni()
+        fbs_pos = np.array([[30.0], [40.0], [0.0]], order='F')
+        lbs_pos = np.array([[70.0], [40.0], [0.0]], order='F')
+        fc = 3.0e9
+        for L, L_exp in ((100.0 + 40.0 * math.sqrt(2.0), 100.0 + 40.0 * math.sqrt(2.0)), (0.0, 140.0)):
+            cr, ci, delay = arrayant.get_channels_spherical(
+                ant, ant, fbs_pos, lbs_pos, np.array([1.0]), np.array([L]), make_M(1),
+                [0, 0, 0], [0, 0, 0], [100, 0, 0], [0, 0, 0], fc, True, False)
+            self.assertAlmostEqual(delay[0, 0, 0] * C, L_exp, places=6)
+            k = 2.0 * PI * fc / C
+            self.assertAlmostEqual(cr[0, 0, 0], math.cos(k * L_exp), places=6)
+            self.assertAlmostEqual(ci[0, 0, 0], -math.sin(k * L_exp), places=6)
 
     # -------------------------------------------------------------------------
     # Zero center frequency disables phase
@@ -912,6 +929,87 @@ class TestGetChannelsSpherical(unittest.TestCase):
             ant, ant, fbs_pos, fbs_pos, path_gain, path_length, M,
             [0, 0, 1], [0, 0, 0], [20, 0, 1], [0, 0, 0], 2997924580.0, True)
         self.assertEqual(len(result), 3)
+
+
+    # -------------------------------------------------------------------------
+    # Input memory layouts (B-098): F-contiguous float64 inputs are aliased, all
+    # other inputs are copied; the results must be identical in every case
+    # -------------------------------------------------------------------------
+
+    def test_input_memory_layouts_give_equal_results(self):
+        rng = np.random.default_rng(7)
+        ant = arrayant.generate('3gpp', M=2, N=1, pol=2, res=10.0)
+        n_out, n_freq = 4, 2
+        cf = np.array([2.0e9, 3.5e9])
+        def u(lo, hi, shape):  # float32-exact values, so that the float32 variant converts losslessly
+            return np.asfortranarray(rng.uniform(lo, hi, shape).astype(np.float32).astype(np.float64))
+
+        snaps = []
+        for s in range(n_out):
+            n_path = 3 + s
+            fbs = u(-50, 50, (3, n_path))
+            lbs = u(-50, 50, (3, n_path))
+            gain = u(0.1, 1.0, (n_path, n_freq))
+            plen = np.zeros(n_path)
+            M = u(-1, 1, (8, n_path, n_freq))
+            snaps.append((fbs, lbs, gain, plen, M))
+        tx_pos = u(-1, 1, (3, n_out)); tx_pos[2] = u(9, 11, n_out)
+        tx_ori = u(-0.5, 0.5, (3, n_out))
+        rx_pos = u(-1, 1, (3, n_out)); rx_pos[0] = u(99, 101, n_out)
+        rx_ori = u(-0.5, 0.5, (3, n_out))
+        snaps_copy = [tuple(x.copy() for x in snap) for snap in snaps]
+
+        def single(s, conv, freq):
+            fbs, lbs, gain, plen, M = (conv(x) for x in snaps[s])
+            return arrayant.get_channels_spherical(ant, ant, fbs, lbs, gain, plen, M,
+                                                   conv(tx_pos[:, s].copy()), conv(tx_ori[:, s].copy()),
+                                                   conv(rx_pos[:, s].copy()), conv(rx_ori[:, s].copy()),
+                                                   conv(cf), angles=True, freq=freq)
+
+        def batch(conv, freq):
+            lists = [[conv(snaps[s][k]) for s in range(n_out)] for k in range(5)]
+            return arrayant.get_channels_spherical(ant, ant, *lists, conv(tx_pos), conv(tx_ori), conv(rx_pos),
+                                                   conv(rx_ori), conv(cf), angles=True, freq=freq)
+
+        def sliced(x):  # same values, every second element along the last axis of a larger array
+            big = np.zeros(x.shape[:-1] + (2 * x.shape[-1],), order='F')
+            big[..., ::2] = x
+            return big[..., ::2]
+
+        convs = {'F-order': lambda x: x, 'C-order': np.ascontiguousarray,
+                 'float32': lambda x: x.astype(np.float32), 'sliced': sliced}
+        ant_c = {k: (np.ascontiguousarray(v) if isinstance(v, np.ndarray) else v) for k, v in ant.items()}
+
+        for freq in (0, 1):
+            ref = [single(s, convs['F-order'], freq) for s in range(n_out)]
+            for name, conv in convs.items():
+                b = batch(conv, freq)
+                for s in range(n_out):
+                    r = single(s, conv, freq)
+                    for k in range(7):
+                        npt.assert_array_equal(r[k], ref[s][k], err_msg="single, %s, freq %d" % (name, freq))
+                        npt.assert_array_equal(b[k][s], ref[s][k], err_msg="batch, %s, freq %d" % (name, freq))
+            b = arrayant.get_channels_spherical(ant_c, ant_c, *[[snaps[s][k] for s in range(n_out)] for k in range(5)],
+                                                tx_pos, tx_ori, rx_pos, rx_ori, cf, angles=True, freq=freq)
+            for s in range(n_out):
+                for k in range(7):
+                    npt.assert_array_equal(b[k][s], ref[s][k], err_msg="batch, C-order antenna, freq %d" % freq)
+
+        # The caller's (aliased) arrays are not modified
+        for snap, snap_copy in zip(snaps, snaps_copy):
+            for x, y in zip(snap, snap_copy):
+                npt.assert_array_equal(x, y)
+
+
+    def test_error_position_with_6_elements(self):
+        """A (3, 2) position has 6 elements and is rejected, not truncated (B-100)."""
+        ant = omni()
+        fbs_pos = np.zeros((3, 2), order='F'); fbs_pos[0, :] = [10, 5]
+        for i in range(4):
+            pos = [[0, 0, 1], [0, 0, 0], [20, 0, 1], [0, 0, 0]]
+            pos[i] = np.array([[0.0, 1.0], [0.0, 0.0], [1.0, 1.0]])
+            with self.assertRaises(ValueError):
+                arrayant.get_channels_spherical(ant, ant, fbs_pos, fbs_pos, np.ones(2), np.zeros(2), make_M(2), *pos)
 
 
 if __name__ == '__main__':

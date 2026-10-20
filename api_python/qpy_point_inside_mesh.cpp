@@ -37,7 +37,7 @@ result = quadriga_lib.RTtools.point_inside_mesh( points, mesh, obj_ind, distance
 
 ## Output Arguments:
 - `**result**`— Indicator: `0` = outside, `1` = inside any object (no `obj_ind`), or 1-based object
-  index (with `obj_ind`); uint32; size `(n_points,)`
+  index (with `obj_ind`); int64; size `(n_points,)`
 
 See also:
 - [[obj_file_read]] (for reading `mesh` and `obj_ind` from an .obj file)

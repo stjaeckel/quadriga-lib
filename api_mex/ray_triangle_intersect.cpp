@@ -32,8 +32,8 @@ Compute ray-triangle intersections in 3D using the Möller–Trumbore algorithm
   use [[triangle_mesh_segmentation]] to generate; `[n_sub]`; default: `[]` (not using sub-meshes)
 - **`aabb`** — Pre-computed axis-aligned bounding boxes per sub-mesh; each row: `{x_min x_max y_min y_max z_min z_max}`; 
   if empty or omitted, AABBs are computed from `mesh`; `[n_sub, 6]`
-- **`use_kernel`** — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable; 
-  auto mode selects CUDA when `n_ray >= 10000` and CUDA is available, else AVX2, else GENERIC; default: 0
+- **`use_kernel`** — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable 
+  and for other values; auto mode selects CUDA when `n_ray >= 10000` and CUDA is available, else AVX2, else GENERIC; default: 0
 - **`gpu_id`** — CUDA device ID; ignored when not using CUDA; default: 0
 
 ## Outputs:
@@ -65,7 +65,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::mat mesh = qd_mex_get_Mat<double>(prhs[2]);
 
     // Optional inputs
-    arma::u32_vec sub_mesh_index = (nrhs < 4) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[3], true);
+    arma::u32_vec sub_mesh_index = (nrhs < 4) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[3], true, "sub_mesh_index");
     arma::mat aabb = (nrhs < 5) ? arma::mat() : qd_mex_get_Mat<double>(prhs[4]);
     int use_kernel = (nrhs < 6) ? 0 : qd_mex_get_scalar<int>(prhs[5], "use_kernel", 0);
     int gpu_id = (nrhs < 7) ? 0 : qd_mex_get_scalar<int>(prhs[6], "gpu_id", 0);

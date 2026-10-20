@@ -19,6 +19,14 @@ Writes array antenna data to QDANT files
 - Frequency-dependent input (4D pattern fields) writes every frequency entry with sequential
   1-based IDs; `id` and `layout` do not apply, and the file must not already exist
 - Returns the ID assigned to the written entry (`0` for a frequency-dependent write)
+- Without `layout`, the layout in the file is replaced by a row of all IDs in the file in file order;
+  a custom layout written before is lost (pass it again with every write that should keep it)
+- The file has single-precision-equivalent accuracy relative to the element peak: pattern
+  magnitudes (dB) and phases (degree) are rounded so that every sample is within 6e-8 of the peak
+  amplitude of its element; samples far below the peak are less accurate relative to their own
+  amplitude (about 6e-4 at -80 dB, 6e-2 at -120 dB below the peak); positions and coupling are
+  written as float values (at most 9 significant digits); sampling grids are rounded to 0.001
+  degree; all non-zero pattern samples are written at any level, exact zeros as `-inf` dB
 
 ## Usage:
 ```
@@ -33,11 +41,13 @@ arrayant.quadriga_lib.qdant_write( fn, arrayant )
 ## Inputs:
 - **`fn`** — Output QDANT filename; str; must not be empty
 - **`arrayant`** — Dict with the array antenna data; keys as in [[generate]]; pattern fields may
-  be 3D `(n_elevation, n_azimuth, n_elements)` or 4D `(n_elevation, n_azimuth, n_elements, n_freq)`
+  be 3D `(n_elevation, n_azimuth, n_elements)` or 4D `(n_elevation, n_azimuth, n_elements, n_freq)`; 4D input
+  requires `center_freq` with one value per frequency entry `(n_freq,)`
 - **`id`** — Target 1-based ID of the entry inside the file; `0` appends after the highest
   existing ID (or 1 if the file does not exist); ignored for 4D input; default: 0
 - **`layout`** — uint32 matrix organizing multiple antenna IDs within the file; must reference
-  only IDs present in the file; ignored for 4D input; default: `None`
+  only IDs present in the file; ignored for 4D input; default: `None` (a row of all IDs in the file,
+  which replaces a layout written before)
 
 ## Outputs:
 - **`id_in_file`** — ID assigned to the entry in the file after writing; `0` for a frequency-dependent (4D) write

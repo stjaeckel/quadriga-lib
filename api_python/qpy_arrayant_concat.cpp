@@ -43,8 +43,8 @@ py::dict arrayant_concat(const py::dict &arrayant1,
                          const py::dict &arrayant2)
 {
     // Parse both inputs via the unified multi-freq reader
-    auto ant1 = qd_python_dict2arrayant_multi(arrayant1, false, false, true);
-    auto ant2 = qd_python_dict2arrayant_multi(arrayant2, true, false, true);
+    auto ant1 = qd_python_dict2arrayant_multi(arrayant1, false, false, true, false);
+    auto ant2 = qd_python_dict2arrayant_multi(arrayant2, true, false, true, false);
 
     if (ant1.empty() || ant2.empty())
         throw std::invalid_argument("'arrayant1' and 'arrayant2' cannot be empty.");

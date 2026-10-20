@@ -103,4 +103,19 @@ catch ME
     end
 end
 
+% B-003: NLOS delay and phase follow path_length when it is longer than the TX-FBS-LBS-RX polyline
+% 3-bounce path via (30,40,0), (50,60,0), (70,40,0), TX (0,0,0), RX (100,0,0): 100 + 40*sqrt(2) m, polyline 140 m
+ant = quadriga_lib.arrayant_generate('omni');
+C = 299792458.0;
+fc = 3.0e9;
+L_true = 100.0 + 40.0 * sqrt(2.0);
+for L = [L_true, 0.0]
+    [cr, ci, dl] = quadriga_lib.get_channels_spherical( ant, ant, [30;40;0], [70;40;0], 1, L, [1;0;0;0;0;0;-1;0], ...
+        [0;0;0], [0;0;0], [100;0;0], [0;0;0], fc, 1);
+    L_exp = max(L, 140.0);
+    assertElementsAlmostEqual( dl * C, L_exp, 'absolute', 1e-6 );
+    assertElementsAlmostEqual( cr, cos(2*pi*fc/C * L_exp), 'absolute', 1e-6 );
+    assertElementsAlmostEqual( ci, -sin(2*pi*fc/C * L_exp), 'absolute', 1e-6 );
+end
+
 end

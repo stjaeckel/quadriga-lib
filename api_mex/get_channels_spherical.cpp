@@ -16,10 +16,23 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
   using spherical wave assumption with per-element phase and delay.
 - Interpolates antenna patterns for both arrays, accounting for element positions and array orientation
   (bank/tilt/heading Euler angles).
-- Polarization coupling is applied via the 8-row transfer matrix `M` (interleaved Re/Im for VV, VH, HV, HH components).
+- Polarization coupling is applied via the 8-row transfer matrix `M`: the 2x2 Jones matrix (rows = RX polarisation
+  V/H, columns = TX polarisation V/H), stored column-major with Re/Im interleaved: rows 1-2 = (V rx, V tx),
+  rows 3-4 = (H rx, V tx), rows 5-6 = (V rx, H tx), rows 7-8 = (H rx, H tx).
+- NLOS paths: the path length between the TX and RX phase centres is `max(path_length, d_poly)`, where `d_poly` is the
+  TX-FBS-LBS-RX polyline length; the length beyond the polyline (interactions between FBS and LBS, e.g. paths of
+  [[coord2path]] or [[qrt_file_read]] with more than two interactions) is added to the FBS-LBS segment. Delays and
+  phases follow this length; the per-element offsets follow the FBS / LBS geometry.
 - If `center_freq == 0`, phase calculation is disabled and only delays are computed.
-- If `use_absolute_delays == false`, the minimum delay (LOS delay) is subtracted from all paths.
-- If `add_fake_los_path == true`, a zero-power LOS path is prepended when no LOS path is detected.
+- If `use_absolute_delays == false`, the LOS delay between the TX and RX phase centres is subtracted from all paths.
+  Delays are per element pair, so pairs that are closer to each other than the phase centres get negative delays,
+  down to about -(half the TX array size + half the RX array size) / speed of light (both arrays endfire).
+  [[quantize_delays]] maps delays above `-tap_spacing / 2` to tap 0 and rejects lower ones (at 5 ns taps: half sizes
+  adding up to more than about 0.75 m); use `use_absolute_delays = true` in that case.
+- LOS detection: the path whose length is closest to the TX-RX distance, within 0.1 mm.
+- If `add_fake_los_path == true`, one output path is always added (`n_path + 1` outputs): slot 1 holds the LOS path,
+  with zero power if no LOS path was found. If a LOS path was found, it is moved to slot 1 and its original slot
+  (input index + 1) holds a zero-power path. All other paths keep their order, shifted by one slot.
 
 ## Usage:
 ```
@@ -34,15 +47,17 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
 - **`fbs_pos`** — First-bounce scatterer positions; `[3, n_path]`
 - **`lbs_pos`** — Last-bounce scatterer positions; `[3, n_path]`
 - **`path_gain`** — Path gains in linear scale; `[n_path, 1]`
-- **`path_length`** — Total path lengths from TX to RX phase center; `[n_path, 1]`
-- **`M`** — Polarization transfer matrix, interleaved (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH); `[8, n_path]`
+- **`path_length`** — Total path lengths from TX to RX phase center; values shorter than the TX-FBS-LBS-RX polyline
+  (e.g. 0) use the polyline length; `[n_path, 1]`
+- **`M`** — Polarization transfer matrix, Jones row order as above; `[8, n_path]`
 - **`tx_pos`** — Transmitter position; `[3, 1]`
 - **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `[3, 1]`
 - **`rx_pos`** — Receiver position; `[3, 1]`
 - **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading); `[3, 1]`
 - **`center_freq`** — Center frequency; set to `0` or skip/leave empty to skip phase computation; default: 0
 - **`use_absolute_delays`** — If `true`, delays include the LOS component; Default: `false`
-- **`add_fake_los_path`** — If `true`, prepends a zero-power LOS path when none is present; Default: `false`
+- **`add_fake_los_path`** — If `true`, always adds one output path; slot 1 holds the LOS path (zero power if none was
+  found); a LOS path found in the input leaves a zero-power path in its original slot; Default: `false`
 - **`use_avx2`** — If `true`, use AVX2 for antenna interpolation; reduces accuracy to single-precision interpolation, 
   equivalent precision loss to the AVX2 kernel in arrayant_interpolate; default: `false`
 

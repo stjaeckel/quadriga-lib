@@ -41,4 +41,40 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
                                     const arma::Mat<unsigned> *layout,
                                     unsigned *id_in_file);
 
+// Block-diagonal coupling [C1 0; 0 C2] of two arrays with n_el1 and n_el2 elements (arrayant::append and
+// arrayant_concat_multi). An empty coupling_re is an identity block (one port per element); an empty coupling_im is
+// zero. Outputs are set to [n_el1 + n_el2, n_ports1 + n_ports2]; they must not alias the inputs.
+template <typename dtype>
+inline void qd_arrayant_coupling_block_diag(const arma::Mat<dtype> &coupling_re1, const arma::Mat<dtype> &coupling_im1,
+                                            arma::uword n_el1,
+                                            const arma::Mat<dtype> &coupling_re2, const arma::Mat<dtype> &coupling_im2,
+                                            arma::uword n_el2,
+                                            arma::Mat<dtype> &coupling_re, arma::Mat<dtype> &coupling_im)
+{
+    const arma::uword n_ports1 = coupling_re1.is_empty() ? n_el1 : coupling_re1.n_cols;
+    const arma::uword n_ports2 = coupling_re2.is_empty() ? n_el2 : coupling_re2.n_cols;
+    coupling_re.zeros(n_el1 + n_el2, n_ports1 + n_ports2);
+    coupling_im.zeros(n_el1 + n_el2, n_ports1 + n_ports2);
+
+    if (n_el1 != 0 && n_ports1 != 0)
+    {
+        if (coupling_re1.is_empty())
+            coupling_re.submat(0, 0, n_el1 - 1, n_ports1 - 1).eye();
+        else
+            coupling_re.submat(0, 0, n_el1 - 1, n_ports1 - 1) = coupling_re1;
+        if (!coupling_im1.is_empty())
+            coupling_im.submat(0, 0, n_el1 - 1, n_ports1 - 1) = coupling_im1;
+    }
+    if (n_el2 != 0 && n_ports2 != 0)
+    {
+        const arma::uword r1 = n_el1 + n_el2 - 1, c1 = n_ports1 + n_ports2 - 1;
+        if (coupling_re2.is_empty())
+            coupling_re.submat(n_el1, n_ports1, r1, c1).eye();
+        else
+            coupling_re.submat(n_el1, n_ports1, r1, c1) = coupling_re2;
+        if (!coupling_im2.is_empty())
+            coupling_im.submat(n_el1, n_ports1, r1, c1) = coupling_im2;
+    }
+}
+
 #endif

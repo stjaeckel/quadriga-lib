@@ -20,12 +20,25 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
   using the spherical wave assumption with per-element phase and delay.
 - Interpolates antenna patterns for both arrays, accounting for element positions and array orientation
   (bank/tilt/heading Euler angles).
-- Polarization coupling is applied via the 8-row transfer matrix `M` (interleaved Re/Im for VV, VH, HV, HH components).
+- Polarization coupling is applied via the 8-row transfer matrix `M`: the 2x2 Jones matrix (rows = RX polarisation
+  V/H, columns = TX polarisation V/H), stored column-major with Re/Im interleaved: rows 0-1 = (V rx, V tx),
+  rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx).
+- NLOS paths: the path length between the TX and RX phase centres is `max(path_length, d_poly)`, where `d_poly` is the
+  TX-FBS-LBS-RX polyline length; the length beyond the polyline (interactions between FBS and LBS, e.g. paths of
+  [[qrt_file_read]] with more than two interactions) is added to the FBS-LBS segment. Delays and phases follow this
+  length; the per-element offsets follow the FBS / LBS geometry.
 - Path data is given for `n_freq` frequencies; single-frequency data uses `n_freq = 1`.
 - The scalar argument `freq` selects the frequency index that is processed; a single frequency is returned per call.
 - If `center_freq` is `None` or the selected entry is `0`, phase calculation is disabled and only delays are computed.
-- If `use_absolute_delays == False`, the minimum delay (LOS delay) is subtracted from all paths.
-- If `add_fake_los_path == True`, a zero-power LOS path is prepended when no LOS path is detected.
+- If `use_absolute_delays == False`, the LOS delay between the TX and RX phase centres is subtracted from all paths.
+  Delays are per element pair, so pairs that are closer to each other than the phase centres get negative delays,
+  down to about -(half the TX array size + half the RX array size) / speed of light (both arrays endfire).
+  [[quantize_delays]] maps delays above `-tap_spacing / 2` to tap 0 and rejects lower ones (at 5 ns taps: half sizes
+  adding up to more than about 0.75 m); use `use_absolute_delays = true` in that case.
+- LOS detection: the path whose length is closest to the TX-RX distance, within 0.1 mm.
+- If `add_fake_los_path == True`, one output path is always added (`n_path + 1` outputs): slot 0 holds the LOS path,
+  with zero power if no LOS path was found. If a LOS path was found, it is moved to slot 0 and its original slot
+  (input index + 1) holds a zero-power path. All other paths keep their order, shifted by one slot.
 - `complex=True` returns one combined complex coefficient array `coeff`; `complex=False` (default) returns
   separate real `coeff_re` and `coeff_im` via a zero-copy fast path
 
@@ -33,12 +46,14 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
 - If `fbs_pos` is a `list` of arrays, the function switches to batch mode and processes `n_out` snapshots
   in one call, distributing the snapshots over all available cores (OpenMP).
 - The path inputs `fbs_pos`, `lbs_pos`, `path_gain`, `path_length` and `M` are then lists of length `n_out`,
-  matching the output format of [[qrt_file_read]]; list entries are aliased, not copied.
+  matching the output format of [[qrt_file_read]]; list entries that are Fortran-contiguous float64 arrays (as
+  returned by [[qrt_file_read]]) are read in place, other entries are copied.
 - The position and orientation inputs are `(3, n_out)` arrays with one column per snapshot; a `(3,)` array
   or a single-column `(3, 1)` array is applied to all snapshots.
 - All outputs are returned as lists of length `n_out`, one entry per snapshot.
 - Snapshots without any path produce an empty output entry with `n_path = 0`.
-- Batch mode releases the GIL while processing, so it can be combined with Python threads.
+- Batch mode releases the GIL while processing, so it can be combined with Python threads. The function keeps
+  references to all input arrays until it returns, but other threads must not write into them meanwhile.
 
 ## Usage:
 ```
@@ -59,16 +74,18 @@ coeff_re, coeff_im, delays = quadriga_lib.arrayant.get_channels_spherical( ..., 
 - **`fbs_pos`** — First-bounce scatterer positions; `(3, n_path)`, or a list of length `n_out` in batch mode
 - **`lbs_pos`** — Last-bounce scatterer positions; `(3, n_path)`, or a list of length `n_out` in batch mode
 - **`path_gain`** — Path gains in linear scale; `(n_path, n_freq)`, or a list of length `n_out` in batch mode
-- **`path_length`** — Total path lengths from TX to RX phase center; `(n_path,)`, or a list of length `n_out` in batch mode
-- **`M`** — Polarization transfer matrix, interleaved Re/Im; `(8, n_path, n_freq)`, or a list of length
-  `n_out` in batch mode; (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH)
+- **`path_length`** — Total path lengths from TX to RX phase center; values shorter than the TX-FBS-LBS-RX polyline
+  (e.g. 0) use the polyline length; `(n_path,)`, or a list of length `n_out` in batch mode
+- **`M`** — Polarization transfer matrix, Jones row order as above; `(8, n_path, n_freq)`, or a list of length `n_out`
+  in batch mode
 - **`tx_pos`** — Transmitter position in Cartesian coordinates; `(3,)`, or `(3, n_out)` in batch mode
 - **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `(3,)`, or `(3, n_out)` in batch mode
 - **`rx_pos`** — Receiver position in Cartesian coordinates; `(3,)`, or `(3, n_out)` in batch mode
 - **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading); `(3,)`, or `(3, n_out)` in batch mode
 - **`center_freq`** — Center frequencies in Hz; `(n_freq,)`; set an entry to `0` or pass `None` to skip phase computation; default: `None`
 - **`use_absolute_delays`** — If `True`, delays include the LOS component; default: `False`
-- **`add_fake_los_path`** — If `True`, prepends a zero-power LOS path when none is present; default: `False`
+- **`add_fake_los_path`** — If `True`, always adds one output path; slot 0 holds the LOS path (zero power if none was
+  found); a LOS path found in the input leaves a zero-power path in its original slot; default: `False`
 - **`angles`** — If `True`, also return departure/arrival angles in antenna-local coordinates; default: `False`
 - **`complex`** — If `True`, combine coefficients into a single complex array `coeff`; if `False`, return
   separate `coeff_re` and `coeff_im`; default: `False`
@@ -103,35 +120,53 @@ static bool qd_is_array_list(const py::handle &h)
     return lst.size() == 0 || py::isinstance<py::array>(lst[0]);
 }
 
-// Alias the entries of a list of numpy arrays, the array data itself is not copied
-static std::vector<arma::Mat<double>> qd_alias_list_Mat(const py::handle &h)
+// Alias the entries of a list of numpy arrays, the array data itself is not copied (entries that are not
+// Fortran-contiguous float64 arrays are copied). Every entry is added to 'keep_alive': the aliased memory must stay
+// valid while the GIL is released, even if another thread removes the entry from the list.
+static std::vector<arma::Mat<double>> qd_alias_list_Mat(const py::handle &h, std::vector<py::object> &keep_alive)
 {
     py::list lst = py::reinterpret_borrow<py::list>(h);
     std::vector<arma::Mat<double>> out;
     out.reserve(lst.size());
     for (auto item : lst)
-        out.push_back(qd_python_numpy2arma_Mat<double>(item, true));
+    {
+        keep_alive.push_back(py::reinterpret_borrow<py::object>(item));
+        out.push_back(qd_python_numpy2arma_Mat<double>(keep_alive.back(), true));
+    }
     return out;
 }
 
-static std::vector<arma::Col<double>> qd_alias_list_Col(const py::handle &h)
+static std::vector<arma::Col<double>> qd_alias_list_Col(const py::handle &h, std::vector<py::object> &keep_alive)
 {
     py::list lst = py::reinterpret_borrow<py::list>(h);
     std::vector<arma::Col<double>> out;
     out.reserve(lst.size());
     for (auto item : lst)
-        out.push_back(qd_python_numpy2arma_Col<double>(item, true));
+    {
+        keep_alive.push_back(py::reinterpret_borrow<py::object>(item));
+        out.push_back(qd_python_numpy2arma_Col<double>(keep_alive.back(), true));
+    }
     return out;
 }
 
-static std::vector<arma::Cube<double>> qd_alias_list_Cube(const py::handle &h)
+static std::vector<arma::Cube<double>> qd_alias_list_Cube(const py::handle &h, std::vector<py::object> &keep_alive)
 {
     py::list lst = py::reinterpret_borrow<py::list>(h);
     std::vector<arma::Cube<double>> out;
     out.reserve(lst.size());
     for (auto item : lst)
-        out.push_back(qd_python_numpy2arma_Cube<double>(item, true));
+    {
+        keep_alive.push_back(py::reinterpret_borrow<py::object>(item));
+        out.push_back(qd_python_numpy2arma_Cube<double>(keep_alive.back(), true));
+    }
     return out;
+}
+
+// Add all values of an arrayant dict to 'keep_alive' (the antenna patterns are aliased, see above)
+static void qd_keep_dict_values(const py::dict &dict, std::vector<py::object> &keep_alive)
+{
+    for (auto item : dict)
+        keep_alive.push_back(py::reinterpret_borrow<py::object>(item.second));
 }
 
 // Select the column of a (3, n_out) matrix belonging to a snapshot, a single column applies to all snapshots
@@ -158,6 +193,11 @@ py::tuple get_channels_spherical(const py::dict &ant_tx,
                                  const bool complex,
                                  const arma::uword freq)
 {
+    // References to every aliased Python array, held until the function returns (the GIL is released below)
+    std::vector<py::object> keep_alive;
+    qd_keep_dict_values(ant_tx, keep_alive);
+    qd_keep_dict_values(ant_rx, keep_alive);
+
     // Parse the antenna arrays and center frequencies, common to both code paths
     const auto ant_tx_a = qd_python_dict2arrayant(ant_tx, true);
     const auto ant_rx_a = qd_python_dict2arrayant(ant_rx, true);
@@ -174,11 +214,11 @@ py::tuple get_channels_spherical(const py::dict &ant_tx,
             throw std::invalid_argument("Inputs 'fbs_pos', 'lbs_pos', 'path_gain', 'path_length' and 'M' must all be lists.");
 
         // Alias the list entries, no path data is copied
-        const auto fbs_pos_a = qd_alias_list_Mat(fbs_pos);
-        const auto lbs_pos_a = qd_alias_list_Mat(lbs_pos);
-        const auto path_gain_a = qd_alias_list_Mat(path_gain);
-        const auto path_length_a = qd_alias_list_Col(path_length);
-        const auto M_a = qd_alias_list_Cube(M);
+        const auto fbs_pos_a = qd_alias_list_Mat(fbs_pos, keep_alive);
+        const auto lbs_pos_a = qd_alias_list_Mat(lbs_pos, keep_alive);
+        const auto path_gain_a = qd_alias_list_Mat(path_gain, keep_alive);
+        const auto path_length_a = qd_alias_list_Col(path_length, keep_alive);
+        const auto M_a = qd_alias_list_Cube(M, keep_alive);
 
         const arma::uword n_out = (arma::uword)fbs_pos_a.size();
 

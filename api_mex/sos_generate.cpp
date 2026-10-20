@@ -9,32 +9,17 @@
 #include <cmath>
 #include <string>
 
-// Count argument: read as double, so that a negative or non-finite value is rejected with the name of the
-// argument instead of wrapping around in the conversion to an unsigned type. Non-integer values are truncated.
+// Count argument: read as double, so that a negative, non-finite or non-integer value is rejected with the name of
+// the argument instead of wrapping around in the conversion to an unsigned type.
 static arma::uword qd_mex_sos_count(const mxArray *input, const char *name, double default_value)
 {
     const double v = qd_mex_get_scalar<double>(input, name, default_value);
-    if (!(v >= 1.0) || !(v < 9.0e18))
+    if (!(v >= 1.0) || !(v < 9.0e18) || v != std::floor(v))
     {
-        const std::string msg = std::string("Input '") + name + "' must be a finite number >= 1.";
+        const std::string msg = std::string("Input '") + name + "' must be an integer >= 1.";
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", msg.c_str());
     }
     return (arma::uword)v;
-}
-
-// Seed: a floating-point value is checked before the conversion to an integer type, so that NaN and Inf are
-// rejected; non-integer values are truncated. Integer classes are read as they are (seeds above 2^53 are
-// exact only as int64 or uint64). Values below -1 are left to the library to reject.
-static arma::sword qd_mex_sos_seed(const mxArray *input)
-{
-    if (mxIsDouble(input) || mxIsSingle(input))
-    {
-        const double v = qd_mex_get_scalar<double>(input, "seed", -1.0);
-        if (!(v > -9.0e18) || !(v < 9.0e18))
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'seed' must be a finite number >= -1.");
-        return (arma::sword)v;
-    }
-    return qd_mex_get_scalar<arma::sword>(input, "seed", -1);
 }
 
 /*!SECTION
@@ -94,7 +79,7 @@ Find the frequencies of a sum-of-sinusoids generator for a given ACF
 - **`freq_max`** — Upper limit of the frequency magnitude; must be >= 0 and, if not 0,
   larger than `freq_min`; 0 = `15 / max(dist)`; limited by the size of the search
   grid, see above; default: 0
-- **`seed`** — Seed; must be >= -1; -1 seeds from the system random device; default: -1
+- **`seed`** — Seed; integer from -1 to 2^63-1; -1 seeds from the system random device; default: -1
 
 ## Outputs:
 - **`freq`** — Frequencies; `[n_coeff, n_dim]`
@@ -126,7 +111,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const bool random_init = (nrhs < 7) ? true : qd_mex_get_scalar<bool>(prhs[6], "random_init", true);
     const double freq_min = (nrhs < 8) ? 0.0 : qd_mex_get_scalar<double>(prhs[7], "freq_min", 0.0);
     const double freq_max = (nrhs < 9) ? 0.0 : qd_mex_get_scalar<double>(prhs[8], "freq_max", 0.0);
-    const arma::sword seed = (nrhs < 10) ? -1 : qd_mex_sos_seed(prhs[9]);
+    const arma::sword seed = (nrhs < 10) ? -1 : qd_mex_get_seed(prhs[9]);
 
     // Wrap optional pointers; the number of passes is known only after the call
     arma::mat freq, test_dir;

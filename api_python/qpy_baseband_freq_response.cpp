@@ -4,6 +4,7 @@
 
 #include "python_arma_adapter.hpp"
 #include "quadriga_lib.hpp"
+#include <exception>
 
 /*!SECTION
 Channel functions
@@ -30,7 +31,9 @@ Compute the baseband frequency response of a MIMO channel
 - `delay` may be broadcast: a `(1, 1, n_path)` item applies the same delays to every RX/TX pair;
   for multi-freq a 3D delay item is reused for all input frequencies
 - `snap` selects a 0-based subset of snapshots; omitted processes all snapshots
-- Internal arithmetic is single-precision; double inputs are narrowed to float, results widened back
+- single-freq: the phase `bandwidth · pilot_grid · delay` (in cycles) is computed in double precision and reduced to
+  one period before sin / cos are evaluated in single precision; coefficients and sums are single precision, double
+  inputs are narrowed to float, results widened back; multi-freq computes in double precision
 
 ## Usage:
 ```
@@ -65,9 +68,11 @@ hmat = quadriga_lib.channel.baseband_freq_response( coeff_re=cre, coeff_im=cim, 
   single-freq input used together with `freq_out` as the phase reference; default: `None`
 - **`freq_out`** — Absolute output carrier frequencies in Hz; 1D array of length `n_carrier`;
   required for multi-freq input; may replace `bandwidth` + `pilot_grid` for single-freq; default: `None`
-- **`remove_delay_phase`** — If `True`, undo the delay-induced phase baked in by the channel
-  generator before SLERP, then re-apply it analytically per output carrier; multi-freq only;
-  default: `True`
+- **`remove_delay_phase`** — If `True`, undo the delay-induced phase baked in by the channel generator before SLERP,
+  then re-apply it analytically per output carrier; multi-freq only; needs channels generated with
+  `use_absolute_delays = True`: the coefficients of `get_channels_*` carry the phase of the absolute path length also
+  when `delay` is relative, and with relative delays the phase of the TX-RX distance is interpolated across `freq_in`,
+  which gives wrong phases (magnitudes stay right); default: `True`
 
 ## Outputs:
 - **`hmat`** — Complex frequency-domain channel matrix; shape `(n_rx, n_tx, n_carrier, n_out)`,
@@ -77,6 +82,15 @@ hmat = quadriga_lib.channel.baseband_freq_response( coeff_re=cre, coeff_im=cim, 
 - [[get_channels_spherical]] (single-frequency channel generator)
 - [[get_channels_multifreq]] (multi-frequency channel generator)
 MD!*/
+
+// Called in a catch block inside an OpenMP region: keep the first exception, which is rethrown after the region
+// (an exception that leaves the region calls std::terminate)
+static void qd_store_first_exception(std::exception_ptr &first_exception)
+{
+#pragma omp critical(qd_baseband_freq_response_exception)
+    if (!first_exception)
+        first_exception = std::current_exception();
+}
 
 py::array_t<std::complex<double>> baseband_freq_response(const py::object &coeff,
                                                          const py::object &delay,
@@ -363,6 +377,7 @@ py::array_t<std::complex<double>> baseband_freq_response(const py::object &coeff
                     coeff_arrays_4d_cx[i] = py::array_t<std::complex<double>>(arr);
                 else
                     coeff_arrays_4d_cx[i] = arr.cast<py::array_t<std::complex<double>>>();
+                coeff_arrays_4d_cx[i] = qd_python_element_strided(coeff_arrays_4d_cx[i]);
 
                 coeff_shapes_4d_cx[i] = qd_python_get_shape(coeff_arrays_4d_cx[i], false,
                                                             &coeff_nframes_4d_cx[i], &coeff_fstride_4d_cx[i]);
@@ -393,6 +408,7 @@ py::array_t<std::complex<double>> baseband_freq_response(const py::object &coeff
                     cre_arrays_4d[i] = py::array_t<double>(arr_re);
                 else
                     cre_arrays_4d[i] = arr_re.cast<py::array_t<double>>();
+                cre_arrays_4d[i] = qd_python_element_strided(cre_arrays_4d[i]);
 
                 cre_shapes_4d[i] = qd_python_get_shape(cre_arrays_4d[i], false,
                                                        &cre_nframes_4d[i], &cre_fstride_4d[i]);
@@ -404,6 +420,7 @@ py::array_t<std::complex<double>> baseband_freq_response(const py::object &coeff
                     cim_arrays_4d[i] = py::array_t<double>(arr_im);
                 else
                     cim_arrays_4d[i] = arr_im.cast<py::array_t<double>>();
+                cim_arrays_4d[i] = qd_python_element_strided(cim_arrays_4d[i]);
 
                 cim_shapes_4d[i] = qd_python_get_shape(cim_arrays_4d[i], false,
                                                        &cim_nframes_4d[i], &cim_fstride_4d[i]);
@@ -439,6 +456,7 @@ py::array_t<std::complex<double>> baseband_freq_response(const py::object &coeff
                 delay_arrays_4d[i] = py::array_t<double>(arr_dl);
             else
                 delay_arrays_4d[i] = arr_dl.cast<py::array_t<double>>();
+            delay_arrays_4d[i] = qd_python_element_strided(delay_arrays_4d[i]);
 
             int dl_ndim = (int)delay_arrays_4d[i].ndim();
             if (dl_ndim == 3)
@@ -487,6 +505,7 @@ py::array_t<std::complex<double>> baseband_freq_response(const py::object &coeff
 
     //  OMP parallel loop over snapshots
     int n_snap_omp = (int)n_snap_out;
+    std::exception_ptr first_exception = nullptr;
 
     if (!is_multifreq) // ---- Single-freq (3D) path ----
     {
@@ -497,6 +516,7 @@ py::array_t<std::complex<double>> baseband_freq_response(const py::object &coeff
 
 #pragma omp for schedule(static)
             for (int ii = 0; ii < n_snap_omp; ++ii)
+            try
             {
                 arma::uword j = snap_arma[(arma::uword)ii]; // Source snapshot index
 
@@ -532,6 +552,10 @@ py::array_t<std::complex<double>> baseband_freq_response(const py::object &coeff
                                                              (arma::Cube<double> *)nullptr,
                                                              &hmat_vec[ii]);
             }
+            catch (...)
+            {
+                qd_store_first_exception(first_exception);
+            }
         }
     }
     else // ---- Multi-freq (4D) path ----
@@ -546,6 +570,7 @@ py::array_t<std::complex<double>> baseband_freq_response(const py::object &coeff
 
 #pragma omp for schedule(static)
             for (int ii = 0; ii < n_snap_omp; ++ii)
+            try
             {
                 arma::uword j = snap_arma[(arma::uword)ii]; // Source snapshot index
 
@@ -615,8 +640,16 @@ py::array_t<std::complex<double>> baseband_freq_response(const py::object &coeff
                     &hmat_vec[ii],
                     remove_delay_phase);
             }
+            catch (...)
+            {
+                qd_store_first_exception(first_exception);
+            }
         }
     }
+
+    // Exceptions cannot leave an OpenMP region; the first one is rethrown here
+    if (first_exception)
+        std::rethrow_exception(first_exception);
 
     return output;
 }

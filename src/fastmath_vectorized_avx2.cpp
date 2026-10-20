@@ -8,10 +8,94 @@
 #include <immintrin.h>
 #include <limits.h>
 #include <cstring> // std::memcpy
+#include <algorithm>
 
 #ifndef QD_OMP_THRESHOLD
 #define QD_OMP_THRESHOLD 4096 // iterations of the inner loop before parallelizing
 #endif
+
+#define QD_SPLIT_BLOCK 256LL // 8-float vectors per OpenMP iteration in the loops with large-argument handling
+
+// True if any of the 8-float vectors [i, i1) of x has a lane too large for _fm256_sincos256_small_ps
+static inline bool qd_any_large_ps(const float *__restrict x, long long i, const long long i1)
+{
+    const __m256 inv_sign_mask = _mm256_castsi256_ps(_mm256_set1_epi32(0x7fffffff));
+    const __m256 limit = _mm256_set1_ps(4194304.0f); // 2^22, as _fm256_large_lanes_ps
+    for (; i + 4 <= i1; i += 4)
+    {
+        const float *p = x + (i << 3);
+        __m256 m = _mm256_max_ps(_mm256_max_ps(_mm256_and_ps(_mm256_loadu_ps(p), inv_sign_mask),
+                                               _mm256_and_ps(_mm256_loadu_ps(p + 8), inv_sign_mask)),
+                                 _mm256_max_ps(_mm256_and_ps(_mm256_loadu_ps(p + 16), inv_sign_mask),
+                                               _mm256_and_ps(_mm256_loadu_ps(p + 24), inv_sign_mask)));
+        if (_mm256_movemask_ps(_mm256_cmp_ps(m, limit, _CMP_GT_OQ)))
+            return true;
+    }
+    for (; i < i1; ++i)
+        if (_fm256_any_large_ps(_mm256_loadu_ps(x + (i << 3))))
+            return true;
+    return false;
+}
+
+// sin and / or cos of the 8-float vectors [i, i1) (float input). Blocks without large arguments (the common case) run
+// through _fm256_sincos256_small_ps only. Otherwise, vectors without large arguments and vectors with large arguments
+// run in separate inner loops, so that the code for large arguments does not slow down the loop for small ones
+// (register allocation of the polynomial constants).
+template <bool do_sin, bool do_cos>
+static inline void qd_sincos_ps_range(const float *__restrict x, float *__restrict s, float *__restrict c,
+                                      long long i, const long long i1)
+{
+    if (!qd_any_large_ps(x, i, i1))
+    {
+        for (; i < i1; ++i)
+        {
+            __m256 sv, cv;
+            _fm256_sincos256_small_ps(_mm256_loadu_ps(x + (i << 3)), &sv, &cv);
+            if (do_sin)
+                _mm256_storeu_ps(s + (i << 3), sv);
+            if (do_cos)
+                _mm256_storeu_ps(c + (i << 3), cv);
+        }
+        return;
+    }
+    while (i < i1)
+    {
+        for (; i < i1; ++i) // Small arguments
+        {
+            const __m256 xv = _mm256_loadu_ps(x + (i << 3));
+            if (_fm256_any_large_ps(xv))
+                break;
+            __m256 sv, cv;
+            _fm256_sincos256_small_ps(xv, &sv, &cv);
+            if (do_sin)
+                _mm256_storeu_ps(s + (i << 3), sv);
+            if (do_cos)
+                _mm256_storeu_ps(c + (i << 3), cv);
+        }
+        for (; i < i1; ++i) // Large arguments
+        {
+            const __m256 xv = _mm256_loadu_ps(x + (i << 3));
+            if (!_fm256_any_large_ps(xv))
+                break;
+            __m256 sv, cv;
+            _fm256_sincos256_ps(xv, &sv, &cv);
+            if (do_sin)
+                _mm256_storeu_ps(s + (i << 3), sv);
+            if (do_cos)
+                _mm256_storeu_ps(c + (i << 3), cv);
+        }
+    }
+}
+
+// sin and / or cos of n_vec full 8-float vectors (float input)
+template <bool do_sin, bool do_cos>
+static inline void qd_sincos_ps_vectors(const float *x, float *s, float *c, long long n_vec)
+{
+    const long long n_blk = (n_vec + QD_SPLIT_BLOCK - 1) / QD_SPLIT_BLOCK;
+#pragma omp parallel for schedule(static) if (n_vec >= QD_OMP_THRESHOLD)
+    for (long long b = 0; b < n_blk; ++b)
+        qd_sincos_ps_range<do_sin, do_cos>(x, s, c, b * QD_SPLIT_BLOCK, std::min((b + 1) * QD_SPLIT_BLOCK, n_vec));
+}
 
 template <> // float
 void qd_SINCOS_AVX2(const float *x,
@@ -20,17 +104,7 @@ void qd_SINCOS_AVX2(const float *x,
                     size_t n_val)
 {
     const long long n_vec = (long long)n_val >> 3; // number of full 8-float vectors
-
-#pragma omp parallel for schedule(static) if (n_vec >= QD_OMP_THRESHOLD)
-    for (long long i = 0; i < n_vec; ++i)
-    {
-        const size_t off = (static_cast<size_t>(i) << 3);
-        __m256 xv = _mm256_loadu_ps(x + off);
-        __m256 sv, cv;
-        _fm256_sincos256_ps(xv, &sv, &cv);
-        _mm256_storeu_ps(s + off, sv);
-        _mm256_storeu_ps(c + off, cv);
-    }
+    qd_sincos_ps_vectors<true, true>(x, s, c, n_vec);
 
     const size_t n_tail = n_val & 7;
     if (n_tail)
@@ -89,16 +163,7 @@ void qd_SIN_AVX2(const float *x,
                  size_t n_val)
 {
     const long long n_vec = (long long)n_val >> 3;
-
-#pragma omp parallel for schedule(static) if (n_vec >= QD_OMP_THRESHOLD)
-    for (long long i = 0; i < n_vec; ++i)
-    {
-        const size_t off = (static_cast<size_t>(i) << 3);
-        __m256 xv = _mm256_loadu_ps(x + off);
-        __m256 sv, cv;
-        _fm256_sincos256_ps(xv, &sv, &cv);
-        _mm256_storeu_ps(s + off, sv);
-    }
+    qd_sincos_ps_vectors<true, false>(x, s, nullptr, n_vec);
 
     const size_t n_tail = n_val & 7;
     if (n_tail)
@@ -151,16 +216,7 @@ void qd_COS_AVX2(const float *x,
                  size_t n_val)
 {
     const long long n_vec = (long long)n_val >> 3;
-
-#pragma omp parallel for schedule(static) if (n_vec >= QD_OMP_THRESHOLD)
-    for (long long i = 0; i < n_vec; ++i)
-    {
-        const size_t off = (static_cast<size_t>(i) << 3);
-        __m256 xv = _mm256_loadu_ps(x + off);
-        __m256 sv, cv;
-        _fm256_sincos256_ps(xv, &sv, &cv);
-        _mm256_storeu_ps(c + off, cv);
-    }
+    qd_sincos_ps_vectors<false, true>(x, nullptr, c, n_vec);
 
     const size_t n_tail = n_val & 7;
     if (n_tail)
@@ -504,6 +560,70 @@ void qd_SLERP_AVX2(const double *Ar, const double *Ai,
     }
 }
 
+// One 8-float vector of geo2cart at offset off (angles vaz, vel); small = true: all angles are small (see
+// _fm256_any_large_ps)
+template <bool small>
+static inline void qd_geo2cart_ps_vector(const float *__restrict len, float *__restrict x, float *__restrict y, float *__restrict z,
+                                         float *__restrict sAZ, float *__restrict cAZ, float *__restrict sEL, float *__restrict cEL,
+                                         const __m256 vaz, const __m256 vel, const size_t off)
+{
+    __m256 vx, vy, vz, vsa, vca, vse, vce;
+    if (small)
+    {
+        _fm256_sincos256_small_ps(vaz, &vsa, &vca);
+        _fm256_sincos256_small_ps(vel, &vse, &vce);
+        vx = _mm256_mul_ps(vce, vca), vy = _mm256_mul_ps(vce, vsa), vz = vse;
+    }
+    else
+        _fm256_geo2cart_ps(vaz, vel, &vx, &vy, &vz, &vsa, &vca, &vse, &vce);
+    if (len)
+    {
+        const __m256 vlen = _mm256_loadu_ps(len + off);
+        vx = _mm256_mul_ps(vx, vlen);
+        vy = _mm256_mul_ps(vy, vlen);
+        vz = _mm256_mul_ps(vz, vlen);
+    }
+    _mm256_storeu_ps(x + off, vx);
+    _mm256_storeu_ps(y + off, vy);
+    _mm256_storeu_ps(z + off, vz);
+    if (sAZ)
+        _mm256_storeu_ps(sAZ + off, vsa);
+    if (cAZ)
+        _mm256_storeu_ps(cAZ + off, vca);
+    if (sEL)
+        _mm256_storeu_ps(sEL + off, vse);
+    if (cEL)
+        _mm256_storeu_ps(cEL + off, vce);
+}
+
+// geo2cart of the 8-float vectors [i, i1); small and large angles in separate inner loops (as in qd_sincos_ps_range;
+// a pre-scan of the block was measured to be slower here)
+static inline void qd_geo2cart_ps_range(const float *__restrict az, const float *__restrict el, const float *__restrict len,
+                                        float *__restrict x, float *__restrict y, float *__restrict z,
+                                        float *__restrict sAZ, float *__restrict cAZ, float *__restrict sEL, float *__restrict cEL,
+                                        long long i, const long long i1)
+{
+    while (i < i1)
+    {
+        for (; i < i1; ++i) // Small angles
+        {
+            const size_t off = (static_cast<size_t>(i) << 3);
+            const __m256 vaz = _mm256_loadu_ps(az + off), vel = _mm256_loadu_ps(el + off);
+            if (_mm256_movemask_ps(_mm256_or_ps(_fm256_large_lanes_ps(vaz), _fm256_large_lanes_ps(vel))))
+                break;
+            qd_geo2cart_ps_vector<true>(len, x, y, z, sAZ, cAZ, sEL, cEL, vaz, vel, off);
+        }
+        for (; i < i1; ++i) // Large angles
+        {
+            const size_t off = (static_cast<size_t>(i) << 3);
+            const __m256 vaz = _mm256_loadu_ps(az + off), vel = _mm256_loadu_ps(el + off);
+            if (!_mm256_movemask_ps(_mm256_or_ps(_fm256_large_lanes_ps(vaz), _fm256_large_lanes_ps(vel))))
+                break;
+            qd_geo2cart_ps_vector<false>(len, x, y, z, sAZ, cAZ, sEL, cEL, vaz, vel, off);
+        }
+    }
+}
+
 template <> // float
 void qd_GEO2CART_AVX2(const float *az, const float *el, const float *len,
                       float *x, float *y, float *z,
@@ -513,33 +633,11 @@ void qd_GEO2CART_AVX2(const float *az, const float *el, const float *len,
     const long long n_vec = (long long)n_val >> 3;
     const bool has_len = (len != nullptr);
 
+    const long long n_blk = (n_vec + QD_SPLIT_BLOCK - 1) / QD_SPLIT_BLOCK;
 #pragma omp parallel for schedule(static) if (n_vec >= QD_OMP_THRESHOLD)
-    for (long long i = 0; i < n_vec; ++i)
-    {
-        const size_t off = (static_cast<size_t>(i) << 3);
-        const __m256 vaz = _mm256_loadu_ps(az + off);
-        const __m256 vel = _mm256_loadu_ps(el + off);
-        __m256 vx, vy, vz, vsa, vca, vse, vce;
-        _fm256_geo2cart_ps(vaz, vel, &vx, &vy, &vz, &vsa, &vca, &vse, &vce);
-        if (has_len)
-        {
-            const __m256 vlen = _mm256_loadu_ps(len + off);
-            vx = _mm256_mul_ps(vx, vlen);
-            vy = _mm256_mul_ps(vy, vlen);
-            vz = _mm256_mul_ps(vz, vlen);
-        }
-        _mm256_storeu_ps(x + off, vx);
-        _mm256_storeu_ps(y + off, vy);
-        _mm256_storeu_ps(z + off, vz);
-        if (sAZ)
-            _mm256_storeu_ps(sAZ + off, vsa);
-        if (cAZ)
-            _mm256_storeu_ps(cAZ + off, vca);
-        if (sEL)
-            _mm256_storeu_ps(sEL + off, vse);
-        if (cEL)
-            _mm256_storeu_ps(cEL + off, vce);
-    }
+    for (long long b = 0; b < n_blk; ++b)
+        qd_geo2cart_ps_range(az, el, len, x, y, z, sAZ, cAZ, sEL, cEL, b * QD_SPLIT_BLOCK,
+                             std::min((b + 1) * QD_SPLIT_BLOCK, n_vec));
 
     const size_t n_tail = n_val & 7;
     if (n_tail)
@@ -750,15 +848,11 @@ void qd_CART2GEO_AVX2(const double *x, const double *y, const double *z,
     for (long long i = 0; i < n_vec; ++i)
     {
         const size_t off = (static_cast<size_t>(i) << 3);
-        __m256 vx = _mm256_set_m128(_mm256_cvtpd_ps(_mm256_loadu_pd(x + off + 4)),
-                                    _mm256_cvtpd_ps(_mm256_loadu_pd(x + off)));
-        __m256 vy = _mm256_set_m128(_mm256_cvtpd_ps(_mm256_loadu_pd(y + off + 4)),
-                                    _mm256_cvtpd_ps(_mm256_loadu_pd(y + off)));
-        __m256 vz = _mm256_set_m128(_mm256_cvtpd_ps(_mm256_loadu_pd(z + off + 4)),
-                                    _mm256_cvtpd_ps(_mm256_loadu_pd(z + off)));
-
-        __m256 vaz, vel, vlen;
-        _fm256_cart2geo_ps(vx, vy, vz, &vaz, &vel, &vlen);
+        __m256 vaz, vel;
+        __m256d len_l, len_h;
+        _fm256_cart2geo_pd(_mm256_loadu_pd(x + off), _mm256_loadu_pd(x + off + 4), _mm256_loadu_pd(y + off),
+                           _mm256_loadu_pd(y + off + 4), _mm256_loadu_pd(z + off), _mm256_loadu_pd(z + off + 4),
+                           &vaz, &vel, &len_l, &len_h);
 
         _mm256_storeu_pd(az + off, _mm256_cvtps_pd(_mm256_castps256_ps128(vaz)));
         _mm256_storeu_pd(az + off + 4, _mm256_cvtps_pd(_mm256_extractf128_ps(vaz, 1)));
@@ -766,8 +860,8 @@ void qd_CART2GEO_AVX2(const double *x, const double *y, const double *z,
         _mm256_storeu_pd(el + off + 4, _mm256_cvtps_pd(_mm256_extractf128_ps(vel, 1)));
         if (len)
         {
-            _mm256_storeu_pd(len + off, _mm256_cvtps_pd(_mm256_castps256_ps128(vlen)));
-            _mm256_storeu_pd(len + off + 4, _mm256_cvtps_pd(_mm256_extractf128_ps(vlen, 1)));
+            _mm256_storeu_pd(len + off, len_l);
+            _mm256_storeu_pd(len + off + 4, len_h);
         }
     }
 
@@ -779,15 +873,10 @@ void qd_CART2GEO_AVX2(const double *x, const double *y, const double *z,
         std::memcpy(px, x + off, n_tail * sizeof(double));
         std::memcpy(py, y + off, n_tail * sizeof(double));
         std::memcpy(pz, z + off, n_tail * sizeof(double));
-        __m256 vx = _mm256_set_m128(_mm256_cvtpd_ps(_mm256_load_pd(px + 4)),
-                                    _mm256_cvtpd_ps(_mm256_load_pd(px)));
-        __m256 vy = _mm256_set_m128(_mm256_cvtpd_ps(_mm256_load_pd(py + 4)),
-                                    _mm256_cvtpd_ps(_mm256_load_pd(py)));
-        __m256 vz = _mm256_set_m128(_mm256_cvtpd_ps(_mm256_load_pd(pz + 4)),
-                                    _mm256_cvtpd_ps(_mm256_load_pd(pz)));
-
-        __m256 vaz, vel, vlen;
-        _fm256_cart2geo_ps(vx, vy, vz, &vaz, &vel, &vlen);
+        __m256 vaz, vel;
+        __m256d len_l, len_h;
+        _fm256_cart2geo_pd(_mm256_load_pd(px), _mm256_load_pd(px + 4), _mm256_load_pd(py), _mm256_load_pd(py + 4),
+                           _mm256_load_pd(pz), _mm256_load_pd(pz + 4), &vaz, &vel, &len_l, &len_h);
 
         alignas(32) double daz[8], del[8], dlen[8];
         _mm256_store_pd(daz, _mm256_cvtps_pd(_mm256_castps256_ps128(vaz)));
@@ -800,8 +889,8 @@ void qd_CART2GEO_AVX2(const double *x, const double *y, const double *z,
 
         if (len)
         {
-            _mm256_store_pd(dlen, _mm256_cvtps_pd(_mm256_castps256_ps128(vlen)));
-            _mm256_store_pd(dlen + 4, _mm256_cvtps_pd(_mm256_extractf128_ps(vlen, 1)));
+            _mm256_store_pd(dlen, len_l);
+            _mm256_store_pd(dlen + 4, len_h);
             std::memcpy(len + off, dlen, n_tail * sizeof(double));
         }
     }

@@ -80,4 +80,26 @@ function test_point_inside_mesh
     assertEqual(2, numel(res), 'Number of results must be 2');
     assertEqual(uint64(2), res(1), 'First point → obj_ind = 2');
     assertEqual(uint64(2), res(2), 'Second point within 2.0 → obj_ind = 2');
+
+    % ───────────────────────────────────────────────────────────────
+    % obj_ind is 1-based in MATLAB and 0-based in C++: 0 and non-integers are rejected
+    % ───────────────────────────────────────────────────────────────
+    assert_cpp_error( @() quadriga_lib.point_inside_mesh(points, mesh, zeros(12,1)), 'Entries in ''obj_ind'' cannot be 0 (1-based index).' );
+    assert_cpp_error( @() quadriga_lib.point_inside_mesh(points, mesh, [ones(11,1); 0]), 'Entries in ''obj_ind'' cannot be 0 (1-based index).' );
+    assert_cpp_error( @() quadriga_lib.point_inside_mesh(points, mesh, ones(12,1)*1.5), 'Entries in ''obj_ind'' must be integers from 0 to' );
+    res = quadriga_lib.point_inside_mesh(points, mesh, uint32(obj_ind));
+    assertEqual(uint64([2; 0]), res);
+end
+
+% Assert that fn() raises quadriga_lib:CPPerror with a message that contains expected (substring).
+function assert_cpp_error(fn, expected)
+try
+    fn();
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if ~strcmp(ME.identifier, 'quadriga_lib:CPPerror') || isempty(strfind(ME.message, expected)) %#ok<STREMP>
+        error('moxunit:exceptionNotRaised', ['EXPECTED: quadriga_lib:CPPerror "', expected, '", GOT: ', ...
+            ME.identifier, ' "', ME.message, '"']);
+    end
+end
 end

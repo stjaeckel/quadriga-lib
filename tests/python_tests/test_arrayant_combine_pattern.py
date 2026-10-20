@@ -357,5 +357,56 @@ class test_case(unittest.TestCase):
             arrayant.combine_pattern(mf)
 
 
+    def test_propagation_speed(self):
+        # Two omni elements 0.2 m apart on the y-axis at 1 kHz, summed into one port
+        omni = arrayant.generate("omni", res=10)
+        ant = {}
+        for key in ("e_theta_re", "e_theta_im", "e_phi_re", "e_phi_im"):
+            ant[key] = np.concatenate([omni[key], omni[key]], axis=2)
+        ant["azimuth_grid"] = omni["azimuth_grid"]
+        ant["elevation_grid"] = omni["elevation_grid"]
+        ant["element_pos"] = np.array([[0.0, 0.0], [-0.1, 0.1], [0.0, 0.0]])
+        ant["coupling_re"] = np.ones((2, 1))
+        ant["coupling_im"] = np.zeros((2, 1))
+        ant["center_freq"] = 1000.0
+
+        ie, ia0, ia90 = 9, 18, 27  # el = 0; az = 0 and 90 deg on the 10 deg grid
+
+        def amp(out, i, j):
+            return np.hypot(out["e_theta_re"][i, j, 0], out["e_theta_im"][i, j, 0])
+
+        # Default: speed of light, the spacing has no effect at 1 kHz
+        out = arrayant.combine_pattern(ant)
+        self.assertAlmostEqual(amp(out, ie, ia0), 2.0, places=6)
+        self.assertAlmostEqual(amp(out, ie, ia90), 2.0, places=6)
+        out2 = arrayant.combine_pattern(ant, propagation_speed=299792458.0)
+        npt.assert_array_equal(out["e_theta_re"], out2["e_theta_re"])
+        npt.assert_array_equal(out["e_theta_im"], out2["e_theta_im"])
+
+        # Speed of sound
+        expected = 2.0 * abs(np.cos(np.pi * 1000.0 * 0.2 / 344.0))
+        out = arrayant.combine_pattern(ant, propagation_speed=344.0)
+        self.assertAlmostEqual(amp(out, ie, ia0), 2.0, places=6)
+        self.assertAlmostEqual(amp(out, ie, ia90), expected, places=6)
+        self.assertAlmostEqual(expected, 0.506, places=3)
+
+        # Positional argument, and the multi-frequency branch (vector freq)
+        out = arrayant.combine_pattern(ant, None, None, None, 344.0)
+        self.assertAlmostEqual(amp(out, ie, ia90), expected, places=6)
+        out = arrayant.combine_pattern(ant, freq=np.array([500.0, 1000.0]), propagation_speed=344.0)
+        self.assertEqual(out["e_theta_re"].shape[3], 2)
+        a500 = np.hypot(out["e_theta_re"][ie, ia90, 0, 0], out["e_theta_im"][ie, ia90, 0, 0])
+        a1k = np.hypot(out["e_theta_re"][ie, ia90, 0, 1], out["e_theta_im"][ie, ia90, 0, 1])
+        self.assertAlmostEqual(a500, 2.0 * abs(np.cos(np.pi * 500.0 * 0.2 / 344.0)), places=6)
+        self.assertAlmostEqual(a1k, expected, places=6)
+
+        # Invalid speeds
+        for v in (0.0, -344.0, np.nan, np.inf):
+            with self.assertRaises(ANY_ERR):
+                arrayant.combine_pattern(ant, propagation_speed=v)
+            with self.assertRaises(ANY_ERR):
+                arrayant.combine_pattern(ant, freq=np.array([500.0, 1000.0]), propagation_speed=v)
+
+
 if __name__ == '__main__':
     unittest.main()

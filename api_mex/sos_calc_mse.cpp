@@ -9,14 +9,14 @@
 #include <cmath>
 #include <string>
 
-// Count argument: read as double, so that a negative or non-finite value is rejected with the name of the
-// argument instead of wrapping around in the conversion to an unsigned type. Non-integer values are truncated.
+// Count argument: read as double, so that a negative, non-finite or non-integer value is rejected with the name of
+// the argument instead of wrapping around in the conversion to an unsigned type.
 static arma::uword qd_mex_sos_count(const mxArray *input, const char *name, double default_value)
 {
     const double v = qd_mex_get_scalar<double>(input, name, default_value);
-    if (!(v >= 1.0) || !(v < 9.0e18))
+    if (!(v >= 1.0) || !(v < 9.0e18) || v != std::floor(v))
     {
-        const std::string msg = std::string("Input '") + name + "' must be a finite number >= 1.";
+        const std::string msg = std::string("Input '") + name + "' must be an integer >= 1.";
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", msg.c_str());
     }
     return (arma::uword)v;

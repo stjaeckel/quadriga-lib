@@ -176,3 +176,161 @@ TEST_CASE("Arrayant reading from QDANT file - More complex test")
 
     std::remove("test.qdant");
 }
+// B-040: a request for ID 1 returned the first entry of the file, also when that entry has another ID
+TEST_CASE("Arrayant reading from QDANT file - Missing ID throws (B-040)")
+{
+    const std::string fn = "test_qdant_missing_id.qdant";
+    std::remove(fn.c_str());
+
+    auto a = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    a.name = "two";
+    a.qdant_write(fn, 2);
+    a.name = "three";
+    a.qdant_write(fn, 3);
+
+    CHECK_THROWS_AS(quadriga_lib::qdant_read<double>(fn, 1), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::qdant_read<float>(fn, 4), std::invalid_argument);
+    CHECK(quadriga_lib::qdant_read<double>(fn, 2).name == "two");
+    CHECK(quadriga_lib::qdant_read<double>(fn, 3).name == "three");
+
+    // qdant_read_multi takes the IDs from the layout and is not affected
+    arma::u32_mat layout;
+    auto v = quadriga_lib::qdant_read_multi<double>(fn, &layout);
+    REQUIRE(v.size() == 2);
+    CHECK(v[0].name == "two");
+    CHECK(v[1].name == "three");
+
+    // A first entry without an "id" attribute is entry 1; an entry with another ID is not
+    std::ofstream f(fn);
+    f << "<qdant><arrayant><name>no-id</name><ElevationGrid>0</ElevationGrid><AzimuthGrid>0</AzimuthGrid></arrayant>"
+      << "<arrayant id=\"2\"><name>id-2</name><ElevationGrid>0</ElevationGrid><AzimuthGrid>0</AzimuthGrid></arrayant></qdant>\n";
+    f.close();
+    CHECK(quadriga_lib::qdant_read<double>(fn, 1).name == "no-id");
+    CHECK(quadriga_lib::qdant_read<double>(fn, 2).name == "id-2");
+
+    f.open(fn);
+    f << "<qdant><arrayant id=\"2\"><name>id-2</name><ElevationGrid>0</ElevationGrid><AzimuthGrid>0</AzimuthGrid></arrayant>"
+      << "<arrayant><name>no-id</name><ElevationGrid>0</ElevationGrid><AzimuthGrid>0</AzimuthGrid></arrayant></qdant>\n";
+    f.close();
+    CHECK_THROWS_AS(quadriga_lib::qdant_read<double>(fn, 1), std::invalid_argument);
+
+    std::remove(fn.c_str());
+}
+
+// Writes the given text to a file and returns the exception type of qdant_read (or "none")
+static std::string qdant_read_exception(const std::string &fn, const std::string &text, unsigned id = 1)
+{
+    std::ofstream f(fn);
+    f << text;
+    f.close();
+    try
+    {
+        quadriga_lib::qdant_read<double>(fn, id);
+        quadriga_lib::qdant_read_multi<float>(fn);
+    }
+    catch (const std::invalid_argument &)
+    {
+        return "invalid_argument";
+    }
+    catch (const std::bad_alloc &)
+    {
+        return "bad_alloc";
+    }
+    catch (const std::exception &e)
+    {
+        return std::string("other: ") + e.what();
+    }
+    return "none";
+}
+
+// B-042: the reader allocated memory from counts in the file without checking them against the data
+TEST_CASE("Arrayant reading from QDANT file - Malformed counts throw invalid_argument (B-042)")
+{
+    const std::string fn = "test_qdant_malformed.qdant";
+    const std::string grid = "<ElevationGrid>0</ElevationGrid><AzimuthGrid>0</AzimuthGrid>";
+    auto ant = [&](const std::string &body)
+    { return "<qdant><arrayant id=\"1\">" + body + "</arrayant></qdant>\n"; };
+
+    // The 138-byte file of the report: 2e8 elements, no data
+    CHECK(qdant_read_exception(fn, ant("<NoElements>200000000</NoElements>" + grid)) == "invalid_argument");
+
+    // Element count not backed by positions, coupling or pattern data
+    CHECK(qdant_read_exception(fn, ant("<NoElements>2</NoElements>" + grid)) == "invalid_argument");
+
+    // Invalid element counts
+    for (std::string n : {"0", "-1", "abc", "1e3", "2.5", "99999999999999999999999"})
+        CHECK(qdant_read_exception(fn, ant("<NoElements>" + n + "</NoElements>" + grid)) == "invalid_argument");
+
+    // Element positions that do not match the element count
+    CHECK(qdant_read_exception(fn, ant("<NoElements>3</NoElements><ElementPosition>0,0,0 1,1,1</ElementPosition>" + grid)) == "invalid_argument");
+
+    // Coupling without entries, or with a number of entries that is not a multiple of the element count
+    CHECK(qdant_read_exception(fn, ant("<NoElements>2</NoElements><CouplingAbs> </CouplingAbs>" + grid)) == "invalid_argument");
+    CHECK(qdant_read_exception(fn, ant("<NoElements>2</NoElements><CouplingAbs>1,0,0</CouplingAbs>" + grid)) == "invalid_argument");
+
+    // Element count backed only by a pattern node whose text is too short for the grid
+    CHECK(qdant_read_exception(fn, ant("<NoElements>3</NoElements><ElevationGrid>-90 0 90</ElevationGrid>"
+                                       "<AzimuthGrid>-90 0 90</AzimuthGrid><EthetaMag el=\"3\">0</EthetaMag>")) == "invalid_argument");
+
+    // Many elements without pattern data on a fine grid (positions present, 300 x 181 x 361 zero samples)
+    {
+        std::string pos;
+        for (int i = 0; i < 300; ++i)
+            pos += i == 0 ? "0,0,0" : " 0,0,0";
+        std::string el_grid, az_grid;
+        for (int i = -90; i <= 90; ++i)
+            el_grid += std::to_string(i) + " ";
+        for (int i = -180; i <= 180; ++i)
+            az_grid += std::to_string(i) + " ";
+        std::string cpl;
+        for (int i = 0; i < 300; ++i)
+            cpl += i == 0 ? "1" : " 1";
+        CHECK(qdant_read_exception(fn, ant("<NoElements>300</NoElements><ElementPosition>" + pos + "</ElementPosition>" +
+                                           "<CouplingAbs>" + cpl + "</CouplingAbs>"
+                                           "<ElevationGrid>" + el_grid + "</ElevationGrid><AzimuthGrid>" + az_grid + "</AzimuthGrid>")) == "invalid_argument");
+
+        // 5000 elements without coupling: the identity coupling alone would have 25 million entries
+        pos.clear();
+        for (int i = 0; i < 5000; ++i)
+            pos += i == 0 ? "0,0,0" : " 0,0,0";
+        CHECK(qdant_read_exception(fn, ant("<NoElements>5000</NoElements><ElementPosition>" + pos + "</ElementPosition>" + grid)) == "invalid_argument");
+    }
+
+    // Malformed number lists (Armadillo reports them as std::logic_error)
+    CHECK(qdant_read_exception(fn, ant("<ElevationGrid>0 1;2</ElevationGrid><AzimuthGrid>0</AzimuthGrid>")) == "invalid_argument");
+    CHECK(qdant_read_exception(fn, ant(grid + "<EthetaMag>1 2;3</EthetaMag>")) == "invalid_argument");
+    CHECK(qdant_read_exception(fn, ant("<ElementPosition>0,0;0</ElementPosition>" + grid)) == "invalid_argument");
+
+    // Malformed layout and IDs
+    CHECK(qdant_read_exception(fn, "<qdant><layout>1,2 3</layout><arrayant id=\"1\">" + grid + "</arrayant></qdant>\n") == "invalid_argument");
+    CHECK(qdant_read_exception(fn, "<qdant><arrayant id=\"abc\">" + grid + "</arrayant></qdant>\n", 2) == "invalid_argument");
+    CHECK(qdant_read_exception(fn, "<qdant><arrayant id=\"99999999999\">" + grid + "</arrayant></qdant>\n", 2) == "invalid_argument");
+
+    // Valid files: an element count backed by positions only (elements without pattern data read as zeros)
+    {
+        std::ofstream f(fn);
+        f << ant("<NoElements>2</NoElements><ElementPosition>0,0,0 1,2,3</ElementPosition>"
+                 "<ElevationGrid>-90 0 90</ElevationGrid><AzimuthGrid>-90 0 90</AzimuthGrid>"
+                 "<EthetaMag el=\"1\">0 0 0 0 0 0 0 0 0</EthetaMag>");
+        f.close();
+        auto a = quadriga_lib::qdant_read<double>(fn);
+        CHECK(a.n_elements() == 2);
+        CHECK(arma::all(arma::vectorise(a.e_theta_re.slice(0)) == 1.0));
+        CHECK(arma::all(arma::vectorise(a.e_theta_re.slice(1)) == 0.0));
+        CHECK(a.element_pos(2, 1) == 3.0);
+    }
+
+    // ... or by pattern nodes only
+    {
+        std::ofstream f(fn);
+        f << ant("<NoElements>2</NoElements><ElevationGrid>0</ElevationGrid><AzimuthGrid>-90 90</AzimuthGrid>"
+                 "<EthetaMag el=\"1\">0 0</EthetaMag><EphiMag el=\"2\">0 -inf</EphiMag>");
+        f.close();
+        auto a = quadriga_lib::qdant_read<double>(fn);
+        CHECK(a.n_elements() == 2);
+        CHECK(a.e_phi_re(0, 0, 1) == 1.0);
+        CHECK(a.e_phi_re(0, 1, 1) == 0.0);
+    }
+
+    std::remove(fn.c_str());
+}

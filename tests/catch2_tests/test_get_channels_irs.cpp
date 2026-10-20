@@ -552,3 +552,75 @@ TEST_CASE("Tools - Combine IRS Coord inactive")
     CHECK(interact_coord(1, 5) == 41.0f);
     CHECK(interact_coord(2, 5) == 42.0f);
 }
+
+TEST_CASE("Get Channels IRS - Delay is the sum of both segment path lengths (B-003)")
+{
+    // TX (0,0,0) -> IRS (50,0,0) -> RX (100,0,0); one NLOS path per segment whose path_length exceeds the
+    // TX-FBS-LBS-IRS (IRS-FBS-LBS-RX) polyline. The IRS has one element and a single unit codebook entry.
+    const double C = 299792458.0, fc = 3.0e9, k = 2.0 * arma::datum::pi * fc / C;
+    auto ant = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    auto irs = ant.copy();
+    irs.coupling_re.ones(1, 1);
+    irs.coupling_im.reset();
+
+    arma::mat f1 = arma::vec({20.0, 15.0, 0.0}), l1 = arma::vec({35.0, 15.0, 0.0});
+    arma::mat f2 = arma::vec({60.0, -10.0, 0.0}), l2 = arma::vec({85.0, -10.0, 0.0});
+    const double poly_1 = 25.0 + 15.0 + std::sqrt(15.0 * 15.0 + 15.0 * 15.0);
+    const double poly_2 = std::sqrt(10.0 * 10.0 + 10.0 * 10.0) + 25.0 + std::sqrt(15.0 * 15.0 + 10.0 * 10.0);
+
+    arma::vec g = {1.0};
+    arma::mat M = arma::vec({1.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0});
+    arma::cube cr, ci, dl;
+
+    for (double extra : {0.0, 7.5})
+    {
+        arma::vec pl1 = {extra > 0.0 ? poly_1 + extra : 0.0}, pl2 = {extra > 0.0 ? poly_2 + 2.0 * extra : 0.0};
+        const double L = poly_1 + poly_2 + 3.0 * extra;
+        quadriga_lib::get_channels_irs<double>(&ant, &ant, &irs,
+                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                               100.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                               50.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                               &f1, &l1, &g, &pl1, &M, &f2, &l2, &g, &pl2, &M,
+                                               &cr, &ci, &dl, 0, -200.0, fc, true);
+        REQUIRE(dl.n_slices == 1);
+        CHECK(std::abs(dl(0) * C - L) < 1e-6);
+        const double a = std::hypot(cr(0), ci(0));
+        CHECK(std::abs(cr(0) / a - std::cos(k * L)) < 1e-6);
+        CHECK(std::abs(ci(0) / a + std::sin(k * L)) < 1e-6);
+    }
+}
+
+TEST_CASE("Channel - Add Paths with 0 paths in the first field")
+{
+    // B-059: the first given field sets the number of added paths, also when it is 0; every other field must match
+    quadriga_lib::channel<double> c;
+    c.tx_pos = arma::mat(3, 1, arma::fill::zeros);
+    c.rx_pos = arma::mat(3, 1, arma::fill::ones);
+    c.coeff_re.push_back(arma::cube(2, 2, 1, arma::fill::ones));
+    c.coeff_im.push_back(arma::cube(2, 2, 1, arma::fill::zeros));
+    c.delay.push_back(arma::cube(1, 1, 1, arma::fill::zeros));
+    c.path_gain.push_back(arma::vec(1, arma::fill::ones));
+    c.path_length.push_back(arma::vec(1, arma::fill::ones));
+
+    arma::cube re0(2, 2, 0), im0(2, 2, 0), dl0(1, 1, 0);
+    arma::vec v0, v5(5, arma::fill::ones);
+
+    // 0 coefficient paths and 5 path gains
+    CHECK_THROWS_AS(c.add_paths(0, &re0, &im0, &dl0, nullptr, nullptr, &v5, &v0), std::invalid_argument);
+    // 0 path gains and 5 path lengths (no coefficients involved)
+    quadriga_lib::channel<double> d = c;
+    d.coeff_re.clear(), d.coeff_im.clear(), d.delay.clear();
+    CHECK_THROWS_AS(d.add_paths(0, nullptr, nullptr, nullptr, nullptr, nullptr, &v0, &v5), std::invalid_argument);
+    // The objects are unchanged and valid
+    CHECK(c.is_valid().empty());
+    CHECK(d.is_valid().empty());
+    CHECK(c.path_gain[0].n_elem == 1);
+    CHECK(d.path_length[0].n_elem == 1);
+
+    // 0 paths in every field is accepted
+    c.add_paths(0, &re0, &im0, &dl0, nullptr, nullptr, &v0, &v0);
+    d.add_paths(0, nullptr, nullptr, nullptr, nullptr, nullptr, &v0, &v0);
+    CHECK(c.is_valid().empty());
+    CHECK(d.is_valid().empty());
+    CHECK(c.n_path()(0) == 1);
+}

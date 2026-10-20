@@ -18,7 +18,11 @@
 // - TGac badwidth extension
 // - Delay, Powers and RMSDS for TGn and TGac
 // - Doppler from moving vehicle in Model F
-// - Uplink-downlink reciprocity for MIMO channels
+// - Uplink-downlink reciprocity for MIMO channels (plain transpose, moving station)
+// - Doppler sign of a moving station against get_channels_spherical (downlink and uplink)
+// - Floors add attenuation but no delay
+// - Number of paths independent of distance, floors and walls
+// - Invalid XPR, non-finite observation time and update rate
 // - Wall penetration loss (default 5 dB, custom 7 dB, per-user vector)
 // - TGax floor penetration loss formula (n=2,3,4 vs n=1 reference)
 
@@ -55,7 +59,10 @@ static arma::mat calc_Doppler_profile(quadriga_lib::channel<double> chan, double
         H.col(i) = arma::vectorise(hmat);
     }
 
-    arma::cx_mat G = arma::ifft2(H);
+    // Delay: IFFT over frequency (rows). Doppler: FFT over time (columns), so that a coefficient
+    // that rotates as exp(+j 2 pi f t) (approaching scatterer) appears at +f. Scaled like ifft2.
+    arma::cx_mat G = arma::ifft(H);
+    G = arma::cx_mat(arma::fft(arma::cx_mat(G.st())).st()) / double(w);
 
     // fftshift along Doppler (columns)
     {
@@ -298,7 +305,7 @@ TEST_CASE("IEEE Chan - B + 3user + Floors and Distances")
     CHECK(arma::all(arma::abs(arma::vectorise(A) - 1.0) < 1e-12));
 
     // Check delays
-    auto d = arma::mat(chan[0].delay[0].memptr(), 4 * 4, 13, false, true);
+    auto d = arma::mat(chan[0].delay[0].memptr(), 4 * 4, 13);
     d *= 1e9;
 
     CHECK(arma::all(arma::abs(d.col(0) - 0.0) < 1.5));
@@ -315,7 +322,7 @@ TEST_CASE("IEEE Chan - B + 3user + Floors and Distances")
     CHECK(arma::all(arma::abs(d.col(11) - 70.0) < 1.5));
     CHECK(arma::all(arma::abs(d.col(12) - 80.0) < 1.5));
 
-    d = arma::mat(chan[1].delay[0].memptr(), 4 * 4, 13, false, true);
+    d = arma::mat(chan[1].delay[0].memptr(), 4 * 4, 12);
     d *= 1e9;
 
     CHECK(arma::all(arma::abs(d.col(0) - 0.0) < 1.5));
@@ -780,125 +787,75 @@ TEST_CASE("IEEE Chan - Doppler from moving vehicle")
 
 TEST_CASE("IEEE Chan - Reciprocity")
 {
-    double fGHz = 2.4;
-    double tap_spacing_ns = 5;
-    double observation_time_s = 0.0;
-    double update_rate_s = 0.004;    // 100 Hz sampling -> 0.05 Hz resolution
-    double speed_station_kmh = 0.0;  // TGn: stations static
-    double speed_env_kmh = 0.0;      // TGn environmental speed
-    double speed_vehicle_kmh = 40.0; // TGn environmental speed
+    // The uplink is the plain transpose of the downlink for every snapshot and path: the reciprocal channel in
+    // the baseband convention of the library (as get_channels_spherical with TX and RX swapped). A moving
+    // station gives the same Doppler shift in both directions; a conjugate transpose would reverse it.
+    double fc = 2.4e9;
+    auto ant_AP = quadriga_lib::generate_arrayant_ula<double>(4, fc, 0.5);
+    auto ant_STA = quadriga_lib::generate_arrayant_ula<double>(2, fc, 0.7);
 
-    auto ant_AP = quadriga_lib::generate_arrayant_ula<double>(4, fGHz * 1e9, 0.5);
-    auto ant_STA = quadriga_lib::generate_arrayant_ula<double>(2, fGHz * 1e9, 0.7);
-
-    // Symmetric pilot grid
     arma::vec pilot_grid = arma::regspace<arma::vec>(-0.5, 0.01, 0.5);
 
-    // Downlink channel
-    auto chan_down = quadriga_lib::get_channels_ieee_indoor(
-        ant_AP, ant_STA, "F",
-        fGHz * 1e9,
-        tap_spacing_ns / 1e9,
-        2,
-        observation_time_s,
-        update_rate_s,
-        speed_station_kmh,
-        speed_env_kmh,
-        {}, {}, false, {}, 100, speed_vehicle_kmh, 1234);
-
-    auto chan_up = quadriga_lib::get_channels_ieee_indoor(
-        ant_AP, ant_STA, "F",
-        fGHz * 1e9,
-        tap_spacing_ns / 1e9,
-        2,
-        observation_time_s,
-        update_rate_s,
-        speed_station_kmh,
-        speed_env_kmh,
-        {}, {}, true, {}, 100, speed_vehicle_kmh, 1234);
-
-    REQUIRE(chan_down[0].n_rx() == 2);
-    REQUIRE(chan_down[0].n_tx() == 4);
-
-    REQUIRE(chan_up[0].n_rx() == 4);
-    REQUIRE(chan_up[0].n_tx() == 2);
-
-    arma::uvec n_path = chan_down[0].n_path();
-    REQUIRE(arma::all(n_path == n_path[0]));
-
-    // Compare in time domain
-    double max_err = 0.0;
-    for (arma::uword k = 0; k < n_path[0]; ++k)
+    for (std::string type : {"B", "F"})
     {
-        arma::mat Hdl = chan_down[0].coeff_re[0].slice(k); // 2x4
-        arma::mat Hul = chan_up[0].coeff_re[0].slice(k);   // 4x2
-        arma::mat diff = Hul.t() - Hdl;
+        auto chan_down = quadriga_lib::get_channels_ieee_indoor(ant_AP, ant_STA, type, fc, 5e-9, 2, 0.02, 0.004, 5.0, 1.2,
+                                                                {}, {}, false, {}, 100, 40.0, 1234);
+        auto chan_up = quadriga_lib::get_channels_ieee_indoor(ant_AP, ant_STA, type, fc, 5e-9, 2, 0.02, 0.004, 5.0, 1.2,
+                                                              {}, {}, true, {}, 100, 40.0, 1234);
+        REQUIRE(chan_down.size() == 2);
+        REQUIRE(chan_up.size() == 2);
 
-        double slice_max = arma::abs(diff).max();
-        if (slice_max > max_err)
-            max_err = slice_max;
+        for (size_t u = 0; u < 2; ++u)
+        {
+            const auto &dl = chan_down[u];
+            const auto &ul = chan_up[u];
 
-        Hdl = chan_down[0].coeff_im[0].slice(k); // 2x4
-        Hul = chan_up[0].coeff_im[0].slice(k);   // 4x2
-        diff = Hul.t() + Hdl;                    // conjugate
+            REQUIRE(dl.n_rx() == 2);
+            REQUIRE(dl.n_tx() == 4);
+            REQUIRE(ul.n_rx() == 4);
+            REQUIRE(ul.n_tx() == 2);
+            REQUIRE(dl.n_snap() == 6);
+            REQUIRE(ul.n_snap() == 6);
 
-        slice_max = arma::abs(diff).max();
-        if (slice_max > max_err)
-            max_err = slice_max;
+            // Positions and orientations are swapped; the moving station is the transmitter in the uplink
+            CHECK(arma::approx_equal(ul.tx_pos, dl.rx_pos, "absdiff", 0.0));
+            CHECK(arma::approx_equal(ul.rx_pos, dl.tx_pos, "absdiff", 0.0));
+            CHECK(arma::approx_equal(ul.tx_orientation, dl.rx_orientation, "absdiff", 0.0));
+            CHECK(arma::approx_equal(ul.rx_orientation, dl.tx_orientation, "absdiff", 0.0));
+            CHECK(ul.tx_pos.n_cols == 6);
 
-        Hdl = chan_down[0].delay[0].slice(k); // 2x4
-        Hul = chan_up[0].delay[0].slice(k);   // 4x2
-        diff = Hul.t() - Hdl;
+            double max_err = 0.0, max_err_conj = 0.0;
+            for (arma::uword s = 0; s < 6; ++s)
+            {
+                REQUIRE(ul.n_path()[s] == dl.n_path()[s]);
+                CHECK(arma::approx_equal(ul.path_gain[s], dl.path_gain[s], "absdiff", 0.0));
 
-        slice_max = arma::abs(diff).max();
-        if (slice_max > max_err)
-            max_err = slice_max;
+                for (arma::uword k = 0; k < dl.n_path()[s]; ++k)
+                {
+                    arma::mat Hdl_re = dl.coeff_re[s].slice(k), Hul_re = ul.coeff_re[s].slice(k);
+                    arma::mat Hdl_im = dl.coeff_im[s].slice(k), Hul_im = ul.coeff_im[s].slice(k);
+                    arma::mat Ddl = dl.delay[s].slice(k), Dul = ul.delay[s].slice(k);
+
+                    max_err = std::max(max_err, arma::abs(Hul_re.t() - Hdl_re).max());
+                    max_err = std::max(max_err, arma::abs(Hul_im.t() - Hdl_im).max());
+                    max_err = std::max(max_err, arma::abs(Dul.t() - Ddl).max());
+                    max_err_conj = std::max(max_err_conj, arma::abs(Hul_im.t() + Hdl_im).max());
+                }
+
+                // Frequency domain: H_up(f) = H_down(f)^T at every frequency
+                arma::cx_cube hmat_down, hmat_up;
+                quadriga_lib::baseband_freq_response<double>(&dl.coeff_re[s], &dl.coeff_im[s], &dl.delay[s],
+                                                             &pilot_grid, 100e6, nullptr, nullptr, &hmat_down);
+                quadriga_lib::baseband_freq_response<double>(&ul.coeff_re[s], &ul.coeff_im[s], &ul.delay[s],
+                                                             &pilot_grid, 100e6, nullptr, nullptr, &hmat_up);
+                REQUIRE(hmat_up.n_slices == hmat_down.n_slices);
+                for (arma::uword f = 0; f < hmat_down.n_slices; ++f)
+                    max_err = std::max(max_err, arma::abs(hmat_up.slice(f) - hmat_down.slice(f).st()).max());
+            }
+            CHECK(max_err < 1e-12);
+            CHECK(max_err_conj > 1e-6); // the coefficients are complex, so a conjugate would differ
+        }
     }
-    REQUIRE(max_err < 1e-10);
-
-    // Convert to frequency domain
-    arma::cx_cube hmat_down;
-    quadriga_lib::baseband_freq_response<double>(
-        &chan_down[0].coeff_re[0], &chan_down[0].coeff_im[0], &chan_down[0].delay[0],
-        &pilot_grid, 100e6, nullptr, nullptr, &hmat_down);
-
-    arma::cx_cube hmat_up;
-    quadriga_lib::baseband_freq_response<double>(
-        &chan_up[0].coeff_re[0], &chan_up[0].coeff_im[0], &chan_up[0].delay[0],
-        &pilot_grid, 100e6, nullptr, nullptr, &hmat_up);
-
-    // hmat_down: [n_rx_DL, n_tx_DL, n_f]  = [2,4, ...]
-    // hmat_up:   [n_rx_UL, n_tx_UL, n_f]  = [4,2, ...]
-    // Expect: H_up(f) ≈ H_down(f)^H  (conjugate transpose) for all f
-
-    REQUIRE(hmat_down.n_rows == 2);
-    REQUIRE(hmat_down.n_cols == 4);
-    REQUIRE(hmat_up.n_rows == 4);
-    REQUIRE(hmat_up.n_cols == 2);
-    REQUIRE(hmat_down.n_slices == hmat_up.n_slices);
-
-    // NOTE:
-    // reciprocity in time domain implies reciprocity in frequency domain with a flipped frequency axis
-
-    max_err = 0.0;
-    arma::uword Nf = hmat_down.n_slices;
-
-    for (arma::uword k = 0; k < Nf; ++k)
-    {
-        arma::uword k_mirror = Nf - 1 - k; // f_k ↔ -f_k (assuming symmetric grid)
-
-        arma::cx_mat Hdl_neg = hmat_down.slice(k_mirror); // H_down(-f)
-        arma::cx_mat Hul = hmat_up.slice(k);              // H_up(f)
-
-        // Reciprocity: H_up(f) = H_down(-f)^H
-        arma::cx_mat diff = Hul - Hdl_neg.t();
-
-        double slice_max = arma::abs(diff).max();
-        if (slice_max > max_err)
-            max_err = slice_max;
-    }
-
-    REQUIRE(max_err < 1e-10);
 }
 
 TEST_CASE("IEEE Chan - B + Wall loss")
@@ -1000,4 +957,174 @@ TEST_CASE("IEEE Chan - B + TGax floor loss formula")
         double expected = -(FL(static_cast<double>(nf)) - FL(1.0));
         CHECK(std::abs(10.0 * std::log10(Pn / P1) - expected) < 1e-10);
     }
+}
+TEST_CASE("IEEE Chan - Doppler sign of a moving station matches get_channels_spherical")
+{
+    // A station moving along the track given in rx_pos (downlink) or tx_pos (uplink) must see the same phase
+    // evolution as the deterministic channel of get_channels_spherical along that track: approaching the AP
+    // shortens the path, the coefficient (proportional to exp(-j k d)) rotates as exp(+j 2 pi f_D t), f_D > 0.
+    // The uplink (reciprocal channel) has the same Doppler shift as the downlink.
+
+    double fc = 2.4e9, v_kmh = 5.0, dt = 1.0e-3;
+    auto ap = quadriga_lib::generate_arrayant_ula<double>(2, fc, 0.5);
+    auto sta = quadriga_lib::generate_arrayant_ula<double>(2, fc, 0.5);
+
+    // One user; AoD LOS = 30 deg, AoA LOS = 50 deg: the station heads 50 deg off the direction to the AP
+    arma::mat offsets(4, 1);
+    offsets.col(0) = arma::vec({30.0, 0.0, 50.0, 0.0});
+    arma::mat M_los = arma::vec({1.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0});
+
+    double fD = v_kmh / 3.6 / (299792458.0 / fc) * std::cos(50.0 * arma::datum::pi / 180.0);
+    double step_expected = 2.0 * arma::datum::pi * fD * dt; // > 0, approaching
+
+    for (bool uplink : {false, true})
+    {
+        // Model A with a large K-factor: path 0 is the LOS path
+        auto chan = quadriga_lib::get_channels_ieee_indoor(ap, sta, "A", fc, 10e-9, 1, 0.01, dt, v_kmh, 0.0, {50.0}, {0},
+                                                           uplink, offsets, 20, 0.0, 11, 1.0e6);
+        const auto &c = chan[0];
+        REQUIRE(c.n_snap() == 11);
+
+        arma::mat track = uplink ? c.tx_pos : c.rx_pos;
+        arma::vec o_sta = uplink ? c.tx_orientation.col(0) : c.rx_orientation.col(0);
+        REQUIRE(track.n_cols == 11);
+
+        std::vector<arma::cx_mat> H_ieee, H_sph;
+        for (arma::uword s = 0; s < 11; ++s)
+        {
+            arma::vec p = track.col(s);
+            arma::mat sc = 0.5 * p;
+            arma::vec pg = {1.0}, pl = {std::sqrt(p(0) * p(0) + p(1) * p(1) + p(2) * p(2))};
+            arma::cube cr, ci, dly;
+            if (uplink)
+                quadriga_lib::get_channels_spherical<double>(&sta, &ap, p(0), p(1), p(2), o_sta(0), o_sta(1), o_sta(2),
+                                                             0.0, 0.0, 0.0, 0.0, 0.0, 0.0, &sc, &sc, &pg, &pl, &M_los,
+                                                             &cr, &ci, &dly, fc);
+            else
+                quadriga_lib::get_channels_spherical<double>(&ap, &sta, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                                             p(0), p(1), p(2), o_sta(0), o_sta(1), o_sta(2),
+                                                             &sc, &sc, &pg, &pl, &M_los, &cr, &ci, &dly, fc);
+            H_sph.push_back(arma::cx_mat(cr.slice(0), ci.slice(0)));
+            H_ieee.push_back(arma::cx_mat(c.coeff_re[s].slice(0), c.coeff_im[s].slice(0)));
+        }
+
+        // Phase evolution relative to the first snapshot, per MIMO sub-link
+        double max_err = 0.0;
+        for (arma::uword s = 1; s < 11; ++s)
+        {
+            arma::cx_mat R_ieee = H_ieee[s] / H_ieee[0];
+            arma::cx_mat R_sph = H_sph[s] / H_sph[0];
+            max_err = std::max(max_err, arma::abs(R_ieee - R_sph).max());
+        }
+        CHECK(max_err < 1.0e-3);
+
+        double step = std::arg(H_ieee[1](0, 0) / H_ieee[0](0, 0));
+        CHECK(std::abs(step - step_expected) < 1.0e-6);
+    }
+}
+
+TEST_CASE("IEEE Chan - Floors add attenuation, not delay")
+{
+    // n_floors adds floor penetration loss (and the TGah shadow fading below 1 GHz) but no delay: the station
+    // is placed 3 m per floor above the AP, and the same 3-D distance is used for the path lengths and the
+    // relative delays, so the first tap stays at 0 for any number of floors.
+    auto omni = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    arma::vec T = {0.0, 10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0};
+
+    for (double fc : {5.25e9, 0.9e9})
+    {
+        auto ref = quadriga_lib::get_channels_ieee_indoor(omni, omni, "B", fc, 10e-9, 1, 0.0, 1e-3, 0.0, 1.2, {5.0}, {0},
+                                                          false, {}, 20, 50.0, 7, NAN, NAN, 0.0, 0.0);
+        REQUIRE(ref[0].n_path()[0] == 12);
+
+        for (arma::uword nf = 1; nf <= 4; ++nf)
+        {
+            auto ch = quadriga_lib::get_channels_ieee_indoor(omni, omni, "B", fc, 10e-9, 1, 0.0, 1e-3, 0.0, 1.2, {5.0}, {nf},
+                                                             false, {}, 20, 50.0, 7, NAN, NAN, 0.0, 0.0);
+            REQUIRE(ch[0].n_path()[0] == 12);
+
+            CHECK(std::abs(ch[0].delay[0](0, 0, 0)) < 1.0e-15);
+            arma::vec d = arma::vectorise(ch[0].delay[0]);
+            CHECK(arma::approx_equal(d, arma::vectorise(ref[0].delay[0]), "absdiff", 1.0e-18));
+
+            arma::vec du = arma::unique(d) * 1.0e9;
+            REQUIRE(du.n_elem == T.n_elem);
+            CHECK(arma::approx_equal(du, T, "absdiff", 1.0e-6));
+
+            CHECK(ch[0].rx_pos(2, 0) == 3.0 * double(nf));
+
+            // Floors attenuate
+            CHECK(arma::accu(ch[0].path_gain[0]) < arma::accu(ref[0].path_gain[0]));
+        }
+    }
+}
+
+TEST_CASE("IEEE Chan - Number of paths does not depend on distance, floors and walls")
+{
+    // Zero-power taps are removed from the normalised power-delay profile, before path loss and shadow fading,
+    // so the number of paths (and the delay spread) does not depend on the link budget.
+    auto omni = quadriga_lib::generate_arrayant_omni<double>(10.0);
+
+    for (double fc : {5.25e9, 0.9e9})
+        for (double d : {10.0, 30.0, 40.0, 60.0, 100.0, 300.0})
+            for (arma::uword nf : {0, 2, 4})
+                for (arma::uword nw : {0, 6})
+                {
+                    std::vector<quadriga_lib::channel<double>> ch;
+                    REQUIRE_NOTHROW(ch = quadriga_lib::get_channels_ieee_indoor(omni, omni, "F", fc, 10e-9, 1, 0.0, 1e-3, 0.0, 1.2,
+                                                                                {d}, {nf}, false, {}, 20, 0.0, 7,
+                                                                                NAN, NAN, 0.0, 0.0, NAN, {nw}, 5.0));
+                    arma::uword n_expected = (d < 30.0 && nf == 0) ? 42 : 41; // LOS only below dBP on the same floor
+                    CHECK(ch[0].n_path()[0] == n_expected);
+                    CHECK(ch[0].coeff_re[0].is_finite());
+                    CHECK(ch[0].coeff_im[0].is_finite());
+                    CHECK(arma::all(ch[0].path_gain[0] > 0.0));
+                }
+}
+
+TEST_CASE("IEEE Chan - Invalid XPR_NLOS_linear")
+{
+    // XPR = 0 (no co-polar power) and XPR = Inf (no cross-polar power) give NaN coefficients; they and negative
+    // values are rejected. NaN selects the model default (2, i.e. 3 dB).
+    auto omni = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    auto run = [&](double xpr)
+    {
+        return quadriga_lib::get_channels_ieee_indoor(omni, omni, "B", 5.25e9, 10e-9, 1, 0.0, 1e-3, 0.0, 1.2, {3.0}, {0},
+                                                      false, {}, 20, 50.0, 7, NAN, xpr);
+    };
+
+    for (double xpr : {0.0, -1.0, -arma::datum::inf, arma::datum::inf})
+        CHECK_THROWS_AS(run(xpr), std::invalid_argument);
+
+    for (double xpr : {1.0e-6, 2.0, 1.0e6})
+    {
+        auto ch = run(xpr);
+        CHECK(ch[0].coeff_re[0].is_finite());
+        CHECK(ch[0].coeff_im[0].is_finite());
+        CHECK(std::isfinite(arma::accu(ch[0].path_gain[0])));
+    }
+
+    auto ch_nan = run(NAN), ch_2 = run(2.0);
+    CHECK(arma::approx_equal(ch_nan[0].coeff_re[0], ch_2[0].coeff_re[0], "absdiff", 0.0));
+    CHECK(arma::approx_equal(ch_nan[0].coeff_im[0], ch_2[0].coeff_im[0], "absdiff", 0.0));
+}
+
+TEST_CASE("IEEE Chan - Non-finite observation time and update rate")
+{
+    auto omni = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    auto run = [&](double observation_time, double update_rate)
+    {
+        return quadriga_lib::get_channels_ieee_indoor(omni, omni, "A", 5.25e9, 10e-9, 1, observation_time, update_rate);
+    };
+
+    CHECK_THROWS_AS(run(INFINITY, 1e-3), std::invalid_argument);
+    CHECK_THROWS_AS(run(NAN, 1e-3), std::invalid_argument);
+    CHECK_THROWS_AS(run(0.1, INFINITY), std::invalid_argument);
+    CHECK_THROWS_AS(run(0.1, NAN), std::invalid_argument);
+    CHECK_THROWS_AS(run(1.0e30, 1e-3), std::invalid_argument); // snapshot count not representable
+    CHECK_THROWS_AS(run(-1.0, 1e-3), std::invalid_argument);
+    CHECK_THROWS_AS(run(0.1, 0.0), std::invalid_argument);
+
+    CHECK(run(0.0, 1e-3)[0].n_snap() == 1);
+    CHECK(run(0.01, 1e-3)[0].n_snap() == 11);
 }

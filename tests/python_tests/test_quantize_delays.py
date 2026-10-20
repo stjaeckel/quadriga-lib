@@ -504,5 +504,26 @@ class test_quantize_delays(unittest.TestCase):
         with self.assertRaises(Exception):
             quadriga_lib.channel.quantize_delays(coeff_re=cre, coeff_im=cim)
 
+    def test_small_negative_delay_clamped(self):
+        """B-002: a delay that is negative by rounding noise returns; its power goes to tap 0."""
+        cre = [np.ones((1, 1, 3))]
+        cim = [np.zeros((1, 1, 3))]
+        dl = [np.array([-1e-20, 12.5e-9, 33.4e-9]).reshape(1, 1, 3)]
+        dl0 = [np.array([0.0, 12.5e-9, 33.4e-9]).reshape(1, 1, 3)]
+
+        cre_q, cim_q, dl_q = quadriga_lib.channel.quantize_delays(cre, cim, dl)
+        cre_r, cim_r, dl_r = quadriga_lib.channel.quantize_delays(cre, cim, dl0)
+        npt.assert_array_equal(cre_q[0], cre_r[0])
+        npt.assert_array_equal(cim_q[0], cim_r[0])
+        npt.assert_array_equal(dl_q[0], dl_r[0])
+        self.assertEqual(dl_q[0][0, 0, 0], 0.0)
+        self.assertEqual(cre_q[0][0, 0, 0], 1.0)
+
+        # At or below -tap_spacing / 2, NaN and Inf: error
+        for bad in [-2.5e-9, -5e-9, np.nan, np.inf]:
+            dl_bad = [np.array([bad, 12.5e-9, 33.4e-9]).reshape(1, 1, 3)]
+            with self.assertRaises(ValueError):
+                quadriga_lib.channel.quantize_delays(cre, cim, dl_bad)
+
 if __name__ == '__main__':
     unittest.main()

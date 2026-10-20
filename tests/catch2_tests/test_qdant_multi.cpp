@@ -401,3 +401,24 @@ TEST_CASE("QDANT Multi - Large number of entries")
 
     std::filesystem::remove(fn);
 }
+
+TEST_CASE("QDANT Multi - Invalid entry keeps existing file")
+{
+    // B-039: validation must happen before an existing file is removed
+    std::string fn = "test_qdant_multi_invalid_keep.qdant";
+    auto a = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    a.qdant_write(fn);
+    REQUIRE(std::filesystem::exists(fn));
+    auto size_before = std::filesystem::file_size(fn);
+
+    std::vector<quadriga_lib::arrayant<double>> vec(2, a);
+    vec[1].e_theta_im.reset(); // invalid entry
+    REQUIRE_THROWS_AS(quadriga_lib::qdant_write_multi(fn, vec), std::invalid_argument);
+
+    REQUIRE(std::filesystem::exists(fn));
+    CHECK(std::filesystem::file_size(fn) == size_before);
+    auto b = quadriga_lib::qdant_read<double>(fn, 1);
+    CHECK(arma::approx_equal(b.e_theta_re, a.e_theta_re, "absdiff", 1e-6));
+
+    std::filesystem::remove(fn);
+}

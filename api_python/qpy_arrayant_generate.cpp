@@ -79,7 +79,8 @@ ant = quadriga_lib.arrayant.generate('multibeam', M=6, N=6, freq=3.7e9, pol=1, \
 
 ## Inputs (ula, 3gpp):
 - **`pattern`** — Custom per-element pattern dict (same field layout as the output);
-  overrides default 3GPP/ULA element pattern; default: empty dict (use built-in pattern)
+  overrides default 3GPP/ULA element pattern; only the radiation pattern is used: element positions,
+  coupling and center frequency of the pattern are ignored; default: empty dict (use built-in pattern)
 
 ## Inputs (multibeam only):
 - **`beam_az`** — Azimuth beam angles in degrees; `(n_beams,)`; default: `[0.0]`
@@ -101,7 +102,7 @@ ant = quadriga_lib.arrayant.generate('multibeam', M=6, N=6, freq=3.7e9, pol=1, \
    | `element_pos`    | Element (x,y,z) positions in meters             | `[3, n_elements]`                      |
    | `coupling_re`    | Coupling matrix, real part                      | `[n_elements, n_ports]`                |
    | `coupling_im`    | Coupling matrix, imaginary part                 | `[n_elements, n_ports]`                |
-   | `center_freq`    | Center frequency in Hz                          | scalar                                 |
+   | `center_freq`    | Center frequency in Hz; inputs accept `(1,)`    | scalar                                 |
    | `name`           | Name of the array antenna object                | string                                 |
 MD!*/
 

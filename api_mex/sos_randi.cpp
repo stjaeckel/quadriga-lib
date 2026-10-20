@@ -9,32 +9,17 @@
 #include <cmath>
 #include <string>
 
-// Count argument: read as double, so that a negative or non-finite value is rejected with the name of the
-// argument instead of wrapping around in the conversion to an unsigned type. Non-integer values are truncated.
+// Count argument: read as double, so that a negative, non-finite or non-integer value is rejected with the name of
+// the argument instead of wrapping around in the conversion to an unsigned type.
 static arma::uword qd_mex_sos_count(const mxArray *input, const char *name, double default_value)
 {
     const double v = qd_mex_get_scalar<double>(input, name, default_value);
-    if (!(v >= 1.0) || !(v < 9.0e18))
+    if (!(v >= 1.0) || !(v < 9.0e18) || v != std::floor(v))
     {
-        const std::string msg = std::string("Input '") + name + "' must be a finite number >= 1.";
+        const std::string msg = std::string("Input '") + name + "' must be an integer >= 1.";
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", msg.c_str());
     }
     return (arma::uword)v;
-}
-
-// Seed: a floating-point value is checked before the conversion to an integer type, so that NaN and Inf are
-// rejected; non-integer values are truncated. Integer classes are read as they are (seeds above 2^53 are
-// exact only as int64 or uint64). Values below -1 are left to the library to reject.
-static arma::sword qd_mex_sos_seed(const mxArray *input)
-{
-    if (mxIsDouble(input) || mxIsSingle(input))
-    {
-        const double v = qd_mex_get_scalar<double>(input, "seed", -1.0);
-        if (!(v > -9.0e18) || !(v < 9.0e18))
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'seed' must be a finite number >= -1.");
-        return (arma::sword)v;
-    }
-    return qd_mex_get_scalar<arma::sword>(input, "seed", -1);
 }
 
 /*!SECTION
@@ -89,8 +74,8 @@ val = quadriga_lib.sos_randi( dist_decorr, pos, imax, pos_b, dist_decorr_b, pres
 - **`dist_decorr_b`** *(optional)* — Decorrelation distances of the second device; requires
   `pos_b`; must be >= 0; omitted or empty = same as `dist_decorr`; `[n_gen]`
 - **`preset`** — Name of the preset, see [[sos_preset]]; string; default: 'Comb256'
-- **`seed`** — Seed of the phases; must be >= -1; -1 seeds from the system random device;
-  default: -1
+- **`seed`** — Seed of the phases; integer from -1 to 2^63-1; -1 seeds from the system random
+  device; default: -1
 
 ## Output:
 - **`val`** — Integer values from 1 to `imax`, each with approximately the same probability;
@@ -117,7 +102,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::mat pos_b = (nrhs < 4) ? arma::mat() : qd_mex_get_Mat<double>(prhs[3]);
     const arma::vec dist_decorr_b = (nrhs < 5) ? arma::vec() : qd_mex_get_Col<double>(prhs[4]);
     const std::string preset = (nrhs < 6) ? std::string("Comb256") : qd_mex_get_string(prhs[5], "Comb256");
-    const arma::sword seed = (nrhs < 7) ? -1 : qd_mex_sos_seed(prhs[6]);
+    const arma::sword seed = (nrhs < 7) ? -1 : qd_mex_get_seed(prhs[6]);
 
     // Output allocation
     arma::mat val;

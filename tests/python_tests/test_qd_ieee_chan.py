@@ -436,9 +436,9 @@ class test_case(unittest.TestCase):
     # 8) Doppler shift on the LOS path (moving station)
     # ------------------------------------------------------------------
     def test_ieee_chan_a_doppler_los(self):
-        """With a static environment and a station moving along the LOS axis
-        the LOS path coefficient evolves as exp(j 2π f_D t), so an FFT of
-        coeff[s][0,0,0] over the snapshots peaks at f_D = v * fc / c."""
+        """With a static environment and a station moving towards the AP along
+        the LOS axis the LOS path coefficient evolves as exp(+j 2π f_D t), so an
+        FFT of coeff[s][0,0,0] over the snapshots peaks at +f_D = v * fc / c."""
         fGHz = 2.4
         update_rate_s = 0.0025
         observation_time_s = 10.0
@@ -471,21 +471,25 @@ class test_case(unittest.TestCase):
         v = speed_station_kmh / 3.6
         fD_expected = v * (fGHz * 1e9) / 3.0e8
 
-        self.assertLess(abs(abs(f_peak) - fD_expected), 5.0)
+        self.assertLess(abs(f_peak - fD_expected), 5.0)  # positive: approaching
 
     # ------------------------------------------------------------------
     # 9) Uplink-downlink reciprocity (time domain)
     # ------------------------------------------------------------------
     def test_ieee_chan_reciprocity(self):
-        """For zero observation time and a fixed seed, the uplink channel must
-        equal the conjugate transpose of the downlink channel per path, with
-        identical delays."""
+        """For a fixed seed, the uplink channel must equal the transpose (no
+        conjugation) of the downlink channel per path and snapshot, with
+        transposed delays: the reciprocal channel, with the same Doppler shift
+        for a moving station."""
         ant = arrayant.generate("xpol", 30.0)  # 2 elements at each end
 
         common = dict(CarrierFreq_Hz=2.4e9,
                       tap_spacing_s=5e-9,
                       n_users=2,
                       Doppler_effect=40.0,
+                      observation_time=0.02,
+                      update_rate=0.004,
+                      speed_station_kmh=5.0,
                       seed=1234)
 
         chan_dl = _ieee_call(ant, ant, "F", uplink=False, **common)
@@ -495,24 +499,29 @@ class test_case(unittest.TestCase):
         self.assertEqual(len(chan_ul), 2)
 
         # User 0 only — same property holds per user
-        coeff_dl = _coeff_at(chan_dl[0], 0)  # (n_rx_DL, n_tx_DL, n_path)
-        coeff_ul = _coeff_at(chan_ul[0], 0)  # (n_rx_UL, n_tx_UL, n_path)
-        delay_dl = _delay_at(chan_dl[0], 0)
-        delay_ul = _delay_at(chan_ul[0], 0)
-
-        self.assertEqual(coeff_dl.shape[2], coeff_ul.shape[2])
-        self.assertEqual(coeff_dl.shape[0], coeff_ul.shape[1])  # n_rx_DL = n_tx_UL
-        self.assertEqual(coeff_dl.shape[1], coeff_ul.shape[0])  # n_tx_DL = n_rx_UL
+        n_snap = _n_snap(chan_dl[0])
+        self.assertEqual(n_snap, 6)
+        self.assertEqual(_n_snap(chan_ul[0]), 6)
 
         max_err = 0.0
-        for k in range(coeff_dl.shape[2]):
-            H_dl = coeff_dl[:, :, k]
-            H_ul = coeff_ul[:, :, k]
-            max_err = max(max_err, float(np.max(np.abs(H_ul - H_dl.conj().T))))
+        for s in range(n_snap):
+            coeff_dl = _coeff_at(chan_dl[0], s)  # (n_rx_DL, n_tx_DL, n_path)
+            coeff_ul = _coeff_at(chan_ul[0], s)  # (n_rx_UL, n_tx_UL, n_path)
+            delay_dl = _delay_at(chan_dl[0], s)
+            delay_ul = _delay_at(chan_ul[0], s)
 
-            d_dl = delay_dl[:, :, k]
-            d_ul = delay_ul[:, :, k]
-            max_err = max(max_err, float(np.max(np.abs(d_ul - d_dl.T))))
+            self.assertEqual(coeff_dl.shape[2], coeff_ul.shape[2])
+            self.assertEqual(coeff_dl.shape[0], coeff_ul.shape[1])  # n_rx_DL = n_tx_UL
+            self.assertEqual(coeff_dl.shape[1], coeff_ul.shape[0])  # n_tx_DL = n_rx_UL
+
+            for k in range(coeff_dl.shape[2]):
+                H_dl = coeff_dl[:, :, k]
+                H_ul = coeff_ul[:, :, k]
+                max_err = max(max_err, float(np.max(np.abs(H_ul - H_dl.T))))
+
+                d_dl = delay_dl[:, :, k]
+                d_ul = delay_ul[:, :, k]
+                max_err = max(max_err, float(np.max(np.abs(d_ul - d_dl.T))))
 
         self.assertLess(max_err, 1e-10)
 
@@ -623,6 +632,17 @@ class test_case(unittest.TestCase):
                 ch_s["path_gain"],
                 np.stack([_path_gain_at(ch_l, s) for s in range(n_snap)], axis=-1))
             
+
+    def test_output_keys_and_center_frequency_shape(self):
+        """center_frequency is an array of shape (1,); initial_position is returned (B-117)."""
+        ant = arrayant.generate('omni')
+        c = channel.get_ieee_indoor(ant, ant, 'B', seed=1)[0]
+        self.assertIsInstance(c['center_frequency'], np.ndarray)
+        self.assertEqual(c['center_frequency'].shape, (1,))
+        self.assertIn('initial_position', c)
+        self.assertEqual(set(c.keys()), {'name', 'tx_position', 'rx_position', 'tx_orientation', 'rx_orientation',
+                                         'coeff', 'delay', 'path_gain', 'center_frequency', 'initial_position'})
+
 
 if __name__ == '__main__':
     unittest.main()

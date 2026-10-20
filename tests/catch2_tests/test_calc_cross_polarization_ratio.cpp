@@ -518,3 +518,24 @@ TEST_CASE("calc_cross_polarization_ratio - Circular XPR with known cross-pol")
     double cross_circ = 0.3125 + 0.3125; // 0.625
     CHECK(std::abs(xpr(0, 3) - co_circ / cross_circ) < 1e-10);
 }
+
+TEST_CASE("calc_cross_polarization_ratio - V-XPR and H-XPR are per receive polarisation (B-069)")
+{
+    // M rows: 0-1 = (V rx, V tx), 2-3 = (H rx, V tx), 4-5 = (V rx, H tx), 6-7 = (H rx, H tx).
+    // V-XPR = sum |M(V rx, V tx)|^2 / sum |M(V rx, H tx)|^2, H-XPR = sum |M(H rx, H tx)|^2 / sum |M(H rx, V tx)|^2
+    arma::mat tx = arma::vec({0.0, 0.0, 0.0}), rx = arma::vec({100.0, 0.0, 0.0}), xpr;
+    std::vector<arma::vec> pw = {{1.0}}, pl = {{200.0}};
+
+    // Leakage from V transmit into H receive only (rows 2-3): V receive sees no cross-pol
+    std::vector<arma::mat> Mv = {arma::mat(arma::vec({1.0, 0.0, 0.5, 0.0, 0.0, 0.0, 1.0, 0.0}))};
+    quadriga_lib::calc_cross_polarization_ratio<double>(pw, Mv, pl, tx, rx, &xpr);
+    CHECK(std::isinf(xpr(0, 1)));                 // V-XPR
+    CHECK(std::abs(xpr(0, 2) - 4.0) < 1e-12);     // H-XPR = 1 / 0.25
+    CHECK(std::abs(xpr(0, 0) - 8.0) < 1e-12);     // aggregate (1 + 1) / 0.25
+
+    // Leakage from H transmit into V receive only (rows 4-5): H receive sees no cross-pol
+    Mv = {arma::mat(arma::vec({1.0, 0.0, 0.0, 0.0, 0.0, 0.5, 1.0, 0.0}))};
+    quadriga_lib::calc_cross_polarization_ratio<double>(pw, Mv, pl, tx, rx, &xpr);
+    CHECK(std::abs(xpr(0, 1) - 4.0) < 1e-12);
+    CHECK(std::isinf(xpr(0, 2)));
+}

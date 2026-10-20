@@ -310,20 +310,23 @@ f_peak = freqs(idx_peak);
 v = speed_station_kmh / 3.6;
 fD_expected = v * (fGHz * 1e9) / 3e8;
 
-assertElementsAlmostEqual(abs(f_peak), fD_expected, 'absolute', 5.0);
+% The station approaches the AP: the LOS coefficient rotates as exp(+j 2 pi f_D t)
+assertElementsAlmostEqual(f_peak, fD_expected, 'absolute', 5.0);
 
 
 % ---------------------------------------------------------------------
 % 9) Uplink-downlink reciprocity (time domain)
 %
-% For zero observation time and a fixed seed, the uplink channel must
-% equal the conjugate transpose of the downlink channel per path, with
-% identical (transposed) delays.
+% For a fixed seed, the uplink channel must equal the transpose (no
+% conjugation) of the downlink channel per path and snapshot, with
+% transposed delays: the reciprocal channel, with the same Doppler shift
+% for a moving station.
 % ---------------------------------------------------------------------
 ant = quadriga_lib.arrayant_generate('xpol');   % 2 elements at each end
 
 common = {'CarrierFreq_Hz', 2.4e9, 'tap_spacing_s', 5e-9, ...
-          'n_users', 2, 'Doppler_effect', 40.0, 'seed', 1234};
+          'n_users', 2, 'Doppler_effect', 40.0, 'seed', 1234, ...
+          'observation_time', 0.02, 'update_rate', 0.004, 'speed_station_kmh', 5.0};
 
 chan_dl = call_ieee(ant, ant, 'F', 'uplink', false, common{:});
 chan_ul = call_ieee(ant, ant, 'F', 'uplink', true,  common{:});
@@ -337,23 +340,28 @@ assertEqual(sz_dl(3), sz_ul(3));   % same n_path
 assertEqual(sz_dl(1), sz_ul(2));   % n_rx_DL = n_tx_UL
 assertEqual(sz_dl(2), sz_ul(1));   % n_tx_DL = n_rx_UL
 
+assertEqual(size(chan_dl(1).coeff_re, 4), 6);
+assertEqual(size(chan_ul(1).coeff_re, 4), 6);
+
 n_path = sz_dl(3);
 max_err = 0;
-for k = 1:n_path
-    Hdl_re = chan_dl(1).coeff_re(:, :, k, 1);
-    Hdl_im = chan_dl(1).coeff_im(:, :, k, 1);
-    Hul_re = chan_ul(1).coeff_re(:, :, k, 1);
-    Hul_im = chan_ul(1).coeff_im(:, :, k, 1);
+for s = 1:6
+    for k = 1:n_path
+        Hdl_re = chan_dl(1).coeff_re(:, :, k, s);
+        Hdl_im = chan_dl(1).coeff_im(:, :, k, s);
+        Hul_re = chan_ul(1).coeff_re(:, :, k, s);
+        Hul_im = chan_ul(1).coeff_im(:, :, k, s);
 
-    % Reciprocity: H_ul = conj(H_dl).' (real transposes, imag negated transposed)
-    e_re = max(max(abs(Hul_re - Hdl_re.')));
-    e_im = max(max(abs(Hul_im + Hdl_im.')));
+        % Reciprocity: H_ul = H_dl.' (plain transpose of real and imaginary parts)
+        e_re = max(max(abs(Hul_re - Hdl_re.')));
+        e_im = max(max(abs(Hul_im - Hdl_im.')));
 
-    Ddl = chan_dl(1).delay(:, :, k, 1);
-    Dul = chan_ul(1).delay(:, :, k, 1);
-    e_d  = max(max(abs(Dul - Ddl.')));
+        Ddl = chan_dl(1).delay(:, :, k, s);
+        Dul = chan_ul(1).delay(:, :, k, s);
+        e_d  = max(max(abs(Dul - Ddl.')));
 
-    max_err = max([max_err, e_re, e_im, e_d]);
+        max_err = max([max_err, e_re, e_im, e_d]);
+    end
 end
 assertElementsAlmostEqual(max_err, 0, 'absolute', 1e-10);
 

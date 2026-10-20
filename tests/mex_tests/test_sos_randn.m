@@ -64,7 +64,17 @@ assert_throws( @() quadriga_lib.sos_randn( [5, -1], pos ), 'dist_decorr' );     
 assert_throws( @() quadriga_lib.sos_randn( dd, pos, [], dd ), 'dist_decorr_b' );                % thrown by C++
 assert_throws( @() quadriga_lib.sos_randn( dd, pos, [], [], 'Comb300' ), 'name' );              % thrown by C++
 assert_throws( @() quadriga_lib.sos_randn( dd, pos, [], [], [], NaN ), 'Input ''seed''' );            % wrapper
-assert_throws( @() quadriga_lib.sos_randn( dd, pos, [], [], [], -2 ), 'seed' );                        % thrown by C++
+assert_throws( @() quadriga_lib.sos_randn( dd, pos, [], [], [], -2 ), 'seed' );                        % wrapper
+
+%% Seeds: uint64 seeds keep their value; seeds above 2^63-1 and non-integer seeds are rejected
+msg_seed = 'Input ''seed'' must be an integer from -1 to 9223372036854775807.';
+assert_cpp_error( @() quadriga_lib.sos_randn( dd, pos, [], [], [], intmax('uint64') ), msg_seed );
+assert_cpp_error( @() quadriga_lib.sos_randn( dd, pos, [], [], [], uint64(2)^63 ), msg_seed );
+assert_cpp_error( @() quadriga_lib.sos_randn( dd, pos, [], [], [], 2.5 ), msg_seed );
+a = quadriga_lib.sos_randn( dd, pos, [], [], [], uint64(2)^62 );
+b = quadriga_lib.sos_randn( dd, pos, [], [], [], uint64(2)^62 );
+assertEqual( a, b );
+assertEqual( quadriga_lib.sos_randn( dd, pos, [], [], [], uint64(7) ), val );
 
 end
 
@@ -81,6 +91,19 @@ try
 catch ME
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expected)) %#ok<STREMP>
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expected, '", GOT: "', ME.message, '"']);
+    end
+end
+end
+
+% Assert that fn() raises quadriga_lib:CPPerror with a message that contains expected (substring).
+function assert_cpp_error(fn, expected)
+try
+    fn();
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if ~strcmp(ME.identifier, 'quadriga_lib:CPPerror') || isempty(strfind(ME.message, expected)) %#ok<STREMP>
+        error('moxunit:exceptionNotRaised', ['EXPECTED: quadriga_lib:CPPerror "', expected, '", GOT: ', ...
+            ME.identifier, ' "', ME.message, '"']);
     end
 end
 end
