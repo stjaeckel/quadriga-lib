@@ -556,16 +556,17 @@ TEST_CASE("Sheet between two bodies - nothing is created and the wave left in ai
 {
     // A21 (md/acoustic.md 6). A porous sheet co-located with the exit face of a box of near-air material and the entry
     // face of a wall: box 0 to 10 mm | sheet 15 mm | wall from 10 mm, faces in the plane x = 10 mm in the order box exit,
-    // sheet, wall entry. The intersector reports two of the three tied faces, by mesh order; here the box's exit and the
-    // sheet, a glued exit with air assumed beyond it (md/wave.md 6), so the wave is left in air inside the wall. Before
-    // the change the summed series created energy (R 42 at 125 Hz, 60 deg, on an m = 0 wall) and the wall's exit face,
-    // met from inside, was taken as an exit into air; in EM the same (R + T 42.19 TE, 14.46 TM). Asserted, scalar types 4
-    // and 5 on both walls, EM type 1 per channel (TE, TM) on the m = 0 wall, the faces as dielectrics: R + T <= 1, summed
-    // and followed, and the ray killed at the wall's exit face (both passes); the premise, the glued-exit hit code at the
-    // triple face.
-    // Recorded, not asserted: R against air 10 mm | porous 15 mm | the concrete half-space; the event at the triple face
-    // stays the box | sheet | air port, which only loses energy. The porous layer as a traced body glued on the wall is
-    // the form that works (the fill case above). Wave media only (m = 0 wall), and the same on a mass-law wall.
+    // sheet, wall entry. The intersector reports two of the three tied faces, and its kernel's arithmetic decides which
+    // two. Box exit + sheet is a glued exit with air assumed beyond it (md/wave.md 6), so the wave is left in air inside
+    // the wall. Before the change the summed series created energy (R 42 at 125 Hz, 60 deg, on an m = 0 wall) and the
+    // wall's exit face, met from inside, was taken as an exit into air; in EM the same (R + T 42.19 TE, 14.46 TM).
+    // Asserted, scalar types 4 and 5 on both walls, EM type 1 per channel (TE, TM) on the m = 0 wall, the faces as
+    // dielectrics: R + T <= 1, summed and followed, on the pair the kernel picks; at the triple face, every pair handed
+    // in, the hit code, the medium after it, and the kill at the wall's exit face (both passes) where the wave was left
+    // in air.
+    // Recorded, not asserted: R against air 10 mm | porous 15 mm | the concrete half-space; box | sheet | air only loses
+    // energy, the sheet ignored reflects nearly all of it. The porous layer as a traced body glued on the wall is the
+    // form that works (the fill case above). Wave media only (m = 0 wall), and the same on a mass-law wall.
     ub::OneThread one_thread;
     const double x1 = 0.010;
     lw::Mtl F; // the rock wool of the fill case (Miki 32.8 kPa s/m2), as a 15 mm sheet
@@ -603,8 +604,13 @@ TEST_CASE("Sheet between two bodies - nothing is created and the wave left in ai
                         INFO((mass ? "mass-law wall" : "m = 0 wall") << ", type " << r.name << (mode ? ", followed, " : ", summed, ") << fa << " Hz, " << thd << " deg");
                         CHECK(rt <= 1.0 + 1.0e-6);
                     }
-        // The kill: event 1 enters the box, event 2 is the triple face (transmit), event 3 the wall's exit face met by
-        // the wave the state puts in air
+        // The triple face: event 1 enters the box, event 2 is the triple face (transmit), event 3 the wall's exit face.
+        // Which two of the three tied faces the intersector reports is decided by its kernel's arithmetic (GENERIC: box
+        // exit + sheet, AVX2: box exit + wall entry), so every ordered pair is handed in at event 2. Box exit + sheet is
+        // the glued exit (69), the wave left in air and killed at the wall's exit face (both passes); box exit + wall
+        // entry is body | body (5, or 7 with the wall entry first), sheet + wall entry the glued entry (71), both in the
+        // wall and not killed, with the total-reflection bit beyond the wall's critical angle (60 deg). The pair the
+        // kernel picks is one of them, with that pair's outcome.
         for (int tr : {4, 5, 1})
         {
             if (tr == 1 && mass)
@@ -612,24 +618,72 @@ TEST_CASE("Sheet between two bodies - nothing is created and the wave left in ai
             for (double thd : {0.0, 60.0})
             {
                 const double f = 125.0 * lw::GHZ * 1.0e9;
-                arma::mat o, d, o2, d2, o3, d3;
+                arma::mat o, d, o2, d2;
                 diag_ray_at(thd, o, d);
                 ub::Opt op;
                 op.eps = 0.0, op.relaunch = true;
                 const ub::Ev E1 = ub::traced<double>(P, mesh, mi, tr, f, o, d, nullptr, op);
                 ub::onward(E1, o2, d2);
-                const ub::Ev E2 = ub::traced<double>(P, mesh, mi, tr, f, o2, d2, &E1, op);
-                ub::onward(E2, o3, d3);
-                INFO((mass ? "mass-law wall" : "m = 0 wall") << ", type " << tr << ", " << thd << " deg");
-                CHECK((int)E2.ot == 69); // the glued exit, box | sheet | air
-                CHECK((E2.cur(0) & 0x3FFF) == 0);
-                for (int it : {tr, tr < 3 ? 0 : 3})
+                unsigned t[3]; // the triangle event 2 crosses on the box exit, the sheet and the wall entry (faces 1-3)
+                for (arma::uword k = 1; k <= 3; ++k)
                 {
-                    const ub::Ev E3 = ub::traced<double>(P, mesh, mi, it, f, o3, d3, &E2, op);
-                    INFO("pass type " << it << ", hit code " << (int)E3.ot << ", resolved " << (int)E3.rt);
-                    CHECK(E3.nh > 0);
-                    CHECK((int)E3.rt == 0);
+                    const arma::mat fm = mesh.rows(2 * k, 2 * k + 1);
+                    arma::u32_vec h;
+                    quadriga_lib::ray_triangle_intersect<double>(&o2, &d2, &fm, nullptr, nullptr, nullptr, &h);
+                    t[k - 1] = (unsigned)(2 * k) + h(0);
                 }
+                struct Out
+                {
+                    ub::Ev E2;
+                    uint8_t rt[2] = {0, 0};
+                    unsigned nh[2] = {0, 0};
+                };
+                const auto event = [&](unsigned fi, unsigned si) // fi = 0: the kernel's pair
+                {
+                    Out R;
+                    ub::Opt q = op;
+                    q.fi_in = fi, q.si_in = si;
+                    R.E2 = ub::traced<double>(P, mesh, mi, tr, f, o2, d2, &E1, q);
+                    arma::mat o3, d3;
+                    ub::onward(R.E2, o3, d3);
+                    int n = 0;
+                    for (int it : {tr, tr < 3 ? 0 : 3})
+                    {
+                        const ub::Ev E3 = ub::traced<double>(P, mesh, mi, it, f, o3, d3, &R.E2, op);
+                        R.rt[n] = E3.rt, R.nh[n++] = E3.nh;
+                    }
+                    return R;
+                };
+                INFO((mass ? "mass-law wall" : "m = 0 wall") << ", type " << tr << ", " << thd << " deg");
+                const int code[3][3] = {{0, 69, 5}, {69, 0, 71}, {7, 71, 0}}, tir = thd > 0.0 ? 32 : 0;
+                Out D[3][3];
+                for (int a = 0; a < 3; ++a)
+                    for (int b = 0; b < 3; ++b)
+                    {
+                        if (a == b)
+                            continue;
+                        D[a][b] = event(t[a], t[b]);
+                        const Out &R = D[a][b];
+                        const bool wall = a == 2 || b == 2;
+                        INFO("faces " << a + 1 << ", " << b + 1 << ": hit code " << (int)R.E2.ot << ", resolved " << (int)R.rt[0] << ", " << (int)R.rt[1]);
+                        CHECK((int)R.E2.ot == code[a][b] + (wall ? tir : 0));
+                        CHECK((R.E2.cur(0) & 0x3FFF) == (wall ? 1 : 0));
+                        for (int n : {0, 1})
+                        {
+                            CHECK(R.nh[n] > 0);
+                            CHECK((R.rt[n] != 0) == wall);
+                        }
+                    }
+                const Out K = event(0, 0);
+                int ka = -1, kb = -1;
+                for (int a = 0; a < 3; ++a)
+                    ka = K.E2.fi == t[a] ? a : ka, kb = K.E2.si == t[a] ? a : kb;
+                INFO("the kernel's pair: triangles " << K.E2.fi << ", " << K.E2.si);
+                REQUIRE((ka >= 0 && kb >= 0 && ka != kb));
+                CHECK(K.E2.ot == D[ka][kb].E2.ot);
+                CHECK(K.E2.cur(0) == D[ka][kb].E2.cur(0));
+                CHECK(K.rt[0] == D[ka][kb].rt[0]);
+                CHECK(K.rt[1] == D[ka][kb].rt[1]);
             }
         }
     }
