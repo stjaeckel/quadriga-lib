@@ -129,7 +129,7 @@ is the coordinator's suggestion from the hunt.
 | B-007 | 09 | NaN / Inf angles in `arrayant::interpolate` | (a) NaN output, no exception (b) throw `invalid_argument` | (a) | (a) NaN output, no exception (2026-10-15) |
 | B-012 | 10 | qdant writer magnitude floor (-100 dB absolute) | (a) write all finite dB values, -Inf only for exact zeros (b) floor relative to the element peak | (a) | (a) write all finite dB values, -Inf only for exact zeros (2026-10-15) |
 | B-019 | 04 | `baseband_freq_response_multi` with relative delays | (a) document that absolute delays are required (b) add an argument for the LOS delay (c) change the phase convention of `get_channels_*` | (a) | (a) document that use_absolute_delays = true is required (2026-10-15) |
-| B-023 | 11 | IEEE indoor uplink: conjugate (current) or reciprocal transpose | (a) transpose only (reciprocity, like `get_channels_spherical`) (b) keep conjugation, document it | (a) | (a) transpose only (reciprocity); fix code, comment at line 710 and the test "IEEE Chan - Reciprocity"; list as a behaviour change (2026-10-15) |
+| B-023 | 11 | IEEE indoor uplink: conjugate (current) or reciprocal transpose | (a) transpose only (reciprocity, like `get_channels_spherical`) (b) keep conjugation, document it | (a) | (a) transpose only (reciprocity); fix code, comment at line 710 and the test "IEEE Chan - Reciprocity"; list as a behaviour change (2026-10-15); reconfirmed 2026-10-20 although the published paper (html_docu/publications/11-25-2318-modern-cpp-framework.md, section 3.9) states the conjugate transpose: transpose is the reciprocal channel in the library's baseband convention, the conjugate reverses the Doppler sign; WP-11 reports the impact on the paper's results |
 | B-041 | 10 | `qdant_write` without a layout replaces a custom layout | (a) keep the existing layout node (b) keep current behaviour and document it | (b) | (b) keep current behaviour, document it (2026-10-15) |
 | B-045 | 10 | `combine_pattern` for acoustic arrays | (a) add an optional `propagation_speed` argument (default 299792458) in C++, MEX, Python (b) document the limitation | (a) | (a) optional propagation_speed argument, default 299792458, in C++, MEX, Python (2026-10-15) |
 | B-047 | 10 | `generate_arrayant_multibeam` default M, N | (a) header to 1, 1 (as docs and wrappers) (b) docs and wrappers to 2, 2 | (a) | (a) header defaults to 1, 1 (2026-10-15) |
@@ -304,6 +304,9 @@ acceptance checks beyond section 3.1. Severities in brackets.
   part of B-065 goes with WP-13 if simpler, note it in the log).
 - Files: `src/get_channels_ieee_indoor.cpp`, `src/ieee_channel_model_functions.hpp`,
   `tests/catch2_tests/test_qd_ieee_chan.cpp` (B-023 changes the pinned behaviour).
+- Notes after WP-10 (user's request of 2026-10-20): check the published paper
+  `html_docu/publications/11-25-2318-modern-cpp-framework.md` (claims valid? results reproduced after the fixes?) and
+  anchor its results as fast tests; the paper is published and is not edited.
 - Notes: decision B-023. WP-01 (B-063) changed `tests/catch2_tests/test_qd_ieee_chan.cpp` lines 301 and 318: `d` is
   now a copy (`arma::mat(ptr, 16, 13)` / `(ptr, 16, 12)`), no longer a strict alias of `chan[0].delay[0]`; start from
   these lines.
@@ -325,7 +328,8 @@ acceptance checks beyond section 3.1. Severities in brackets.
 ### WP-13 Channel tools
 
 - Items: B-024 [S2], B-025 [S2], B-061 [S3], B-062 [S3], B-066 [S3], B-067 [S3], B-070 [S3], B-083 [S3], B-107 [S4],
-  B-120 [S3] (added after WP-04: circular XPR columns, `src/qd_tools_calc_xpr.cpp`; decide the handedness convention
+  B-065 [S3] remainder (added after WP-11: the `quantize` / `granularity` casts in `qd_tools_calc_angular_spread.cpp`,
+  `qd_tools_calc_delay_spread.cpp`; repro `C-14`, second half), B-120 [S3] (added after WP-04: circular XPR columns, `src/qd_tools_calc_xpr.cpp`; decide the handedness convention
   with the user in the prompt if the fix needs it). B-062 also applies to the `freq` array that WP-04 added to
   `baseband_freq_response`.
 - Files: `src/update_xpr.cpp`, `src/path_to_tube.cpp`, `src/combine_irs_coord.cpp`, `src/baseband_freq_response.cpp`
@@ -374,6 +378,8 @@ acceptance checks beyond section 3.1. Severities in brackets.
 - Left open by earlier packages: `CMakeLists.txt:498` (MATLAB API section) still says MATLAB links quadriga_static "to
   avoid conflicts with MATLAB's own bundled libhdf5.so"; the static link does not separate the HDF5 libraries, the
   different soname of the system HDF5 does (see the comment at `CMakeLists.txt:196`, rewritten in WP-01).
+- From WP-11 (validation gaps, fix here): `get_channels_ieee_indoor` accepts a 7 ns tap spacing and treats it as 10 ns;
+  carrier frequency, distance and speeds are not checked for NaN.
 - From WP-10 (small defect, fix here): the qdant writer ignores a namespace prefix of an existing file, so an entry
   appended to such a file cannot be read back (`src/qd_arrayant_qdant.cpp`, around line 442 after WP-10).
 - From WP-09 (small defects, fix here): `arrayant::remove_zeros` does not copy `name` to the output, and computes the
@@ -464,8 +470,8 @@ unexpected changes in the diff; proposed `md/bugs.md` updates; anything the next
 | WP-07 | 4 | done 2026-10-19 (4 of 4 fixed; B-122, B-123 found) | 89437ad |
 | WP-08 | 5 | done 2026-10-19 (5 of 5 fixed; AVX2 interpolation and get_channels_spherical at 1.00-1.06 of old) | 6ad4f2b |
 | WP-09 | 9 | done 2026-10-20 (9 of 9 fixed; interpolation 0.99-1.02 of old) | 098b8c7 |
-| WP-10 | 7 | done 2026-10-20 (6 fixed, B-041 documented; 3 rounds: qdant precision single-equivalent relative to the element peak) | commit after 098b8c7 (hash at next update) |
-| WP-11 | 5 | open | - |
+| WP-10 | 7 | done 2026-10-20 (6 fixed, B-041 documented; 3 rounds: qdant precision single-equivalent relative to the element peak) | d0f4a31 |
+| WP-11 | 5 | done 2026-10-20 (4 fixed, B-065 partly; downlink Doppler sign flipped; publication checked, 14 tests) | commit after d0f4a31 (hash at next update) |
 | WP-12 | 12 | open | - |
 | WP-13 | 10 | open | - |
 | WP-14 | 5 | open | - |
