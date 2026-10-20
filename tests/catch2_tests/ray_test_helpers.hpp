@@ -2037,7 +2037,7 @@ namespace ub
         arma::Col<short> prev, cur, buf;
         arma::vec accg, accr;
         uint8_t ot = 0, rt = 0, vout = 0;
-        unsigned nh = 0;
+        unsigned nh = 0, fi = 0, si = 0; // fi, si: the faces the event was resolved with (1-based)
     };
     struct Opt
     {
@@ -2045,6 +2045,7 @@ namespace ub
         bool relaunch = false;                       // hand origN and destN to ray_state_update
         const std::vector<uint8_t> *vin = nullptr;   // verdict_inN
         const arma::mat *trivec = nullptr, *tridir = nullptr;
+        unsigned fi_in = 0, si_in = 0;               // a tie handed in: replace the intersector's first and second face (1-based)
     };
     struct OneThread
     {
@@ -2071,6 +2072,8 @@ namespace ub
         arma::u32_vec nh, fi, si;
         std::vector<uint8_t> ot, rt, vo;
         quadriga_lib::ray_triangle_intersect<T>(&o, &d, &ms, &fbs, &sbs, &nh, &fi, &si);
+        if (opt.fi_in)
+            fi(0) = opt.fi_in, si(0) = opt.si_in;
         const bool tube = opt.trivec && opt.tridir;
         if (tube)
             tv = arma::conv_to<M>::from(*opt.trivec), td = arma::conv_to<M>::from(*opt.tridir);
@@ -2078,7 +2081,7 @@ namespace ub
                                            &oN, &dN, &fN, &sN, &gain, &xp, tube ? &tvN : nullptr, tube ? &tdN : nullptr, &fang, nullptr,
                                            nullptr, &nv, &ot, &pd, false, nullptr);
         Ev E;
-        E.xpr0 = arma::conv_to<arma::mat>::from(xp), E.dir0 = arma::conv_to<arma::mat>::from(pd), E.ot = ot[0], E.nh = nh(0);
+        E.xpr0 = arma::conv_to<arma::mat>::from(xp), E.dir0 = arma::conv_to<arma::mat>::from(pd), E.ot = ot[0], E.nh = nh(0), E.fi = fi(0), E.si = si(0);
         arma::Col<short> mf(1), m2(1);
         mf(0) = fi(0) ? (short)mtl_ind(fi(0) - 1) : (short)0, m2(0) = si(0) ? (short)mtl_ind(si(0) - 1) : (short)0;
         M pin;

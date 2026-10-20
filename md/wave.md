@@ -27,8 +27,8 @@ First step of every session, from the repository root:
 ```
 cmake --build build_linux --parallel 12
 OMP_NUM_THREADS=12 ./build_linux/test_bin "[wave]" > test_wave.txt          # All tests passed (165594 assertions in 181 test cases)
-OMP_NUM_THREADS=12 ./build_linux/test_bin "[acoustic]" > test_acoustic.txt  # All tests passed (42391 assertions in 60 test cases)
-OMP_NUM_THREADS=12 ./build_linux/test_bin > test.txt                        # All tests passed (1317534 assertions in 1148 test cases)
+OMP_NUM_THREADS=12 ./build_linux/test_bin "[acoustic]" > test_acoustic.txt  # All tests passed (42741 assertions in 60 test cases)
+OMP_NUM_THREADS=12 ./build_linux/test_bin > test.txt                        # All tests passed (1345968 assertions in 1238 test cases)
 ```
 
 At most 12 threads (since 2026-10-19): the machine is shared with other sessions, and oversubscribed OpenMP runs slow
