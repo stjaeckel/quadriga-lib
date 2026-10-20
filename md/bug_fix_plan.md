@@ -471,13 +471,61 @@ unexpected changes in the diff; proposed `md/bugs.md` updates; anything the next
 | WP-08 | 5 | done 2026-10-19 (5 of 5 fixed; AVX2 interpolation and get_channels_spherical at 1.00-1.06 of old) | 6ad4f2b |
 | WP-09 | 9 | done 2026-10-20 (9 of 9 fixed; interpolation 0.99-1.02 of old) | 098b8c7 |
 | WP-10 | 7 | done 2026-10-20 (6 fixed, B-041 documented; 3 rounds: qdant precision single-equivalent relative to the element peak) | d0f4a31 |
-| WP-11 | 5 | done 2026-10-20 (4 fixed, B-065 partly; downlink Doppler sign flipped; publication checked, 14 tests) | commit after d0f4a31 (hash at next update) |
+| WP-11 | 5 | done 2026-10-20 (4 fixed, B-065 partly; downlink Doppler sign flipped; publication checked, 14 tests) | 9d3148d |
 | WP-12 | 12 | open | - |
 | WP-13 | 10 | open | - |
 | WP-14 | 5 | open | - |
 | WP-15 | 10 | open | - |
 | WP-16 | 3 | open | - |
 | WP-17 | 6 | open | - |
+
+## 8a. Manager handoff (2026-10-20)
+
+State at the handoff:
+- WP-01 to WP-11 are done and committed. On 2026-10-20 `fixes` was merged into `main` (merge commit a5bdfb7, made in
+  a temporary worktree, tested, then `main` fast-forwarded with `git merge --ff-only`), and `fixes` was fast-forwarded
+  to `main` at 71b894b, which includes the acoustic session's work. Both branches are at 71b894b. WP-12 starts there.
+- New baseline after the merge (manager, build_linux rebuilt and installed): Catch2 AVX2 `1346299 assertions in 1238
+  test cases`, all passed. build_generic and build_asan are stale (the WP-12 worker rebuilds them); the MEX and Python
+  suites of the combined code have not been run yet.
+- Another coding session (acoustic work, on `main`, in `/sjc/quadriga-lib`) runs in parallel. Do not touch its
+  worktree except for an agreed merge.
+
+How each package was run (keep doing this):
+1. Prompt. Template 6.1, plus:
+   - the section-4 decisions for the items;
+   - "manager defaults" for every open choice an item leaves, listed again for the user below the prompt so they can
+     override them before starting the worker;
+   - the resource limits of section 2;
+   - notes from reading the code (verify claims before writing them);
+   - the repro folders of section 8;
+   - for packages that change computation code, a Performance section (old-vs-new benchmark of the changed files,
+     built before the first change, limits, a stop rule: report the fastest correct variant instead of starting a
+     second round).
+   Recent prompts (WP-08 to WP-11) are the model; they are in this conversation's history only, so re-derive them from
+   this section.
+2. Review (light, section 3.1b): read the diff (scope, risky parts), run the full Catch2 AVX2 suite at 12 threads and
+   the item repros; take generic, ASan, MEX, Python, AFL and benchmark results from the worker log unless there is a
+   concrete reason to repeat one. Use `git status`, not a stash, to check scope.
+3. Status files, before the user commits, so they go into the same commit:
+   - in `md/bugs.md`: the status lines of the items (fixed / partly fixed / documented / won't fix, with a short note
+     where the outcome is not obvious), the Status column, the counts line, and a Baseline row "after WP-xx";
+   - in this plan: the status table, notes for later packages ("Notes after WP-xx", "From WP-xx" in WP-17), and new
+     decisions in section 4;
+   - new defects become items B-1xx (with repro folder under `build_linux/scratch/hunt/final/`), after the user agrees,
+     and are assigned to a package.
+4. Commit message for the user: plain words, no references to `md/` (section 3.1a). The user commits and names the
+   hash; record it in the status table at the next update.
+5. When the user asks for a second round: write a short follow-up prompt for the same (existing) worker session.
+
+Useful files: `build_linux/scratch/fix/build_asan_mod.sh` (ASan Python module); benchmark models in
+`build_linux/scratch/fix/WP-0{3,4,8,9}/bench/`; worker logs in `md/fix_logs/`. `test_bin` must run from the repository
+root (relative data paths). The library and tests deliberately link no BLAS/LAPACK: never use `arma::norm`, `dot`,
+`svd` and similar.
+
+Next: WP-12 (geometry). Start with B-121 (enable the AVX2-vs-generic ray kernel tests in test_bin), which may expose
+B-071. The acoustic session's commits changed `ray_mesh_interact.cpp` and the traced-media code; WP-12 must not
+change the excluded ray-interaction machinery.
 
 ## 8. Item index
 

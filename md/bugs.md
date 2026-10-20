@@ -222,6 +222,7 @@ miscompilation by the LAF split-compare passes, not a library defect. The campai
 | after WP-10: generic, ASan + UBSan | generic `1334650 / 1203` (round 2); ASan + UBSan of round 1 (the reader did not change in round 2); ASan + UBSan all passed, only the excluded `ray_progress` reports (worker's runs; Octave MEX 65 of 66, pytest 793 passed, 1 skipped; qdant AFL 15 min: no crash, 1637 inputs replayed, slowest 0.035 s) | - | - |
 | after WP-11: base | `All tests passed (1335771 assertions in 1222 test cases)` (manager); publication tests 14 cases in 1.2 s | 39 s (12 threads) | 1.2 / 2.7 |
 | after WP-11: generic, ASan + UBSan | generic `1335440 / 1222`; ASan + UBSan all passed, only the excluded `ray_progress` reports (worker's runs; Octave MEX 65 of 66, pytest 793 passed, 1 skipped) | - | - |
+| after the merge with main (2026-10-20, 71b894b) | `All tests passed (1346299 assertions in 1238 test cases)` (manager; includes the acoustic session's tests) | 39 s (12 threads) | 10.2 / 7.2 |
 
 Run commands: `flock /tmp/quadriga-fixes-suite.lock build_linux/test_bin` (output
 `build_linux/scratch/hunt/base_test.txt`); the sanitizer runs with
