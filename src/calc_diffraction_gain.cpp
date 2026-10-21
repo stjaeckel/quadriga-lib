@@ -67,7 +67,12 @@ void calc_diffraction_gain(
 - **`mesh`** — Triangle vertices, each row `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_mesh, 9]`
 - **`mtl_ind`** — 1-based material index per face, 0 = no material (the `csv_ind` output of [[obj_file_read]]); `[n_mesh]`
 - **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [[obj_file_read]]); each value has length `n_mtl`
-- **`center_frequency`** — Center frequency
+- **`center_frequency`** — Center frequency in [Hz]. In EM mode the electromagnetic frequency. In scalar (acoustic)
+  mode the EM-equivalent frequency `f_eq = f_acoustic · c_light / c_sound` (c_light = 299 792 458 m/s,
+  c_sound = 342.76271 m/s), so that `c_light / f_eq` is the acoustic wavelength; this is the frequency unit of
+  [[ray_mesh_interact]], [[ray_progress]] and [[generate_diffraction_paths]] in scalar mode. Passing the acoustic
+  frequency itself gives a wavelength 874 636 times too long. The MATLAB and Python wrappers take the acoustic
+  frequency and convert it.
 - **`lod`** — Level of detail (0–6), controls `n_path` and `n_seg`; see [[generate_diffraction_paths]]
 - **`verbose`** — Verbosity level
 - **`sub_mesh_index`** — 0-based sub-mesh index for acceleration; see [[triangle_mesh_segmentation]]; `[n_mesh]`
@@ -81,10 +86,12 @@ void calc_diffraction_gain(
   absolute propagation gain instead of a value relative to FSPL. Default `false`. The reference distance is
   the direct TX-RX distance, matching the `path_length` definition used by [[qrt_file_read]] for a transmission-only 
   path. In EM mode the loss is `32.45 + 20·log10(f_GHz) + 20·log10(d_m)` [dB]; in scalar mode it is 
-  `20·log10(d_m) + α(f)·d_m` [dB], with `α` from ISO 9613-1 at T = 20 °C, RH = 50 %, p = 1 atm.
+  `20·log10(d_m) + α(f)·d_m` [dB], with `α` from ISO 9613-1 at T = 20 °C, RH = 50 %, p = 1 atm, evaluated at the
+  acoustic frequency `f = center_frequency · c_sound / c_light`.
 - **`apply_phase`** — If `true`, multiplies `xprmat` by the propagation phase term `exp(-j·2π·d/λ)`, using the
-  same direct TX-RX distance `d`. Default `false`. The wavelength follows from `center_frequency` and the
-  medium wave speed (speed of light in EM mode, speed of sound in scalar mode). Since the term has unit
+  same direct TX-RX distance `d`. Default `false`. The wavelength is `λ = c_light / center_frequency` in both
+  modes; in scalar mode this is the acoustic wavelength because `center_frequency` is the EM-equivalent
+  frequency (see above). Since the term has unit
   magnitude, `xprmat` stays normalized. This is the phase contribution that
   [[get_channels_spherical]] would otherwise add from `path_length`; enabling it here gives the complete
   omni-radiator coefficient without running the channel generator.
