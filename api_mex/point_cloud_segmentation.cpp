@@ -29,7 +29,8 @@ Reorganize a point cloud into spatial sub-clouds for efficient processing
 ## Inputs:
 - **`points`** — Original 3D point cloud; `[n_points, 3]`
 - **`target_size`** — Maximum points per sub-cloud before padding; default: 1024
-- **`vec_size`** — SIMD/CUDA alignment; sub-cloud size is padded to a multiple of this value; no padding when `1`; default: 1
+- **`vec_size`** — SIMD/CUDA alignment; sub-cloud size is padded to a multiple of this value; no padding when `1`;
+  [[ray_point_intersect]] accepts any value, padding (e.g. 8 for AVX2) only improves its speed; default: 1
 
 ## Outputs:
 - **`pointsR`** — Reorganized point cloud with points grouped by sub-cloud; `[n_pointsR, 3]`
