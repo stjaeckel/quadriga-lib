@@ -262,6 +262,9 @@ void quadriga_lib::path_to_tube(const arma::Mat<dtype> *path_coord, arma::Mat<dt
         // Vector "g" is orthogonal to "-d" and "f"
         double gx = NAN, gy = NAN, gz = NAN;
 
+        // Segment and next segment are collinear (straight continuation or exact reversal): no bend plane
+        bool collinear = false;
+
         // Vector "h" lies in between "-d" and "f"
         double hx = NAN, hy = NAN, hz = NAN;
 
@@ -320,11 +323,22 @@ void quadriga_lib::path_to_tube(const arma::Mat<dtype> *path_coord, arma::Mat<dt
             fx *= scl, fy *= scl, fz *= scl;
 
             // Calculate a normal-vector "g" that is orthogonal to "-d" and "f"
-            crossp(-dx, -dy, -dz, fx, fy, fz, &gx, &gy, &gz, true);
+            // - For (nearly) collinear "d" and "f" the cross product vanishes and has no direction; "u" is then used,
+            //   which is orthogonal to "d" (any normal works: the ring is carried over without rotation)
+            crossp(-dx, -dy, -dz, fx, fy, fz, &gx, &gy, &gz);
+            double len_g = std::sqrt(gx * gx + gy * gy + gz * gz);
+            collinear = !(len_g > 1.0e-10);
+            if (collinear)
+                gx = ux, gy = uy, gz = uz;
+            else
+            {
+                double scl = 1.0 / len_g;
+                gx *= scl, gy *= scl, gz *= scl;
+            }
 
             // Calculate the angle between vectors "-d" and "f"
             ang_df = dotp(-dx, -dy, -dz, fx, fy, fz, true);
-            ang_df = std::acos(ang_df);
+            ang_df = std::acos(ang_df > 1.0 ? 1.0 : (ang_df < -1.0 ? -1.0 : ang_df));
 
             // Calculate vector "h" that lies in between "-d" and "f"
             rotate_vector_around_axis(-dx, -dy, -dz, gx, gy, gz, 0.5 * ang_df, &hx, &hy, &hz, true);
@@ -345,8 +359,8 @@ void quadriga_lib::path_to_tube(const arma::Mat<dtype> *path_coord, arma::Mat<dt
             ey = ey * radius_d;
             ez = ez * radius_d;
 
-            // Update FBS by shifting to v1
-            if (i_seg == n_segments - 1ULL || i_subseg[i_seg] != i_subseg[i_seg + 1ULL])
+            // Update FBS by shifting to v1 (also for a straight continuation, where the ring is carried over)
+            if (i_seg == n_segments - 1ULL || i_subseg[i_seg] != i_subseg[i_seg + 1ULL] || collinear)
             {
                 p_fbs[i_edge] = ex + x1;
                 p_fbs[i_edge + n_edges] = ey + y1;
@@ -371,8 +385,8 @@ void quadriga_lib::path_to_tube(const arma::Mat<dtype> *path_coord, arma::Mat<dt
             }
         }
 
-        // Projection mode
-        if (i_seg < n_segments - 1ULL && i_subseg[i_seg] == i_subseg[i_seg + 1ULL])
+        // Projection mode (not for a straight continuation: the bisecting plane is orthogonal to "d" there)
+        if (i_seg < n_segments - 1ULL && i_subseg[i_seg] == i_subseg[i_seg + 1ULL] && !collinear)
         {
             // Generate destination points for the projection
             // - Minimum angle "ang_df" = 10 deg --> tand(80°) = 5.7
@@ -406,9 +420,13 @@ void quadriga_lib::path_to_tube(const arma::Mat<dtype> *path_coord, arma::Mat<dt
         }
 
         // Update "u" for the next segment by rotating it around "-g"
-        ang_df = dotp(dx, dy, dz, fx, fy, fz, true);
-        ang_df = std::acos(ang_df);
-        rotate_vector_around_axis(ux, uy, uz, -gx, -gy, -gz, ang_df, &ux, &uy, &uz, true);
+        // - Collinear segments keep "u", which is orthogonal to the next segment as well
+        if (!collinear)
+        {
+            ang_df = dotp(dx, dy, dz, fx, fy, fz, true);
+            ang_df = std::acos(ang_df > 1.0 ? 1.0 : (ang_df < -1.0 ? -1.0 : ang_df));
+            rotate_vector_around_axis(ux, uy, uz, -gx, -gy, -gz, ang_df, &ux, &uy, &uz, true);
+        }
 
         // Build face matrix
         for (arma::uword i_edge = 0ULL; i_edge < n_edges; ++i_edge)
