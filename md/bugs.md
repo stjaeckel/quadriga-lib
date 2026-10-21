@@ -34,7 +34,7 @@ How to read the items:
 ## Summary table
 
 Items: 123 (S1: 5, S2: 31, S3: 68, S4: 19); B-119 to B-123 were found during the fixes (WP-02, WP-04, WP-07).
-Status: open: 17, fixed: 96, partly fixed: 2, won't fix: 1, documented: 7 (after WP-14).
+Status: open: 7, fixed: 106, partly fixed: 2, won't fix: 1, documented: 7 (after WP-15).
 
 | ID | Title | Area | Kind | Severity | Mark | Status |
 |---|---|---|---|---|---|---|
@@ -124,15 +124,15 @@ Status: open: 17, fixed: 96, partly fixed: 2, won't fix: 1, documented: 7 (after
 | [B-084](#b-084) | `obj_overlap_test`: reason strings are non-deterministic (unseeded shuffle, thread count), and a flag array is read outside its critical section | D geometry, math | 1 defect | S3 | [R, C] | fixed (WP-12) |
 | [B-085](#b-085) | MEX `fast_sincos(x, [])` returns cos instead of sin; the single-precision output is undocumented | F MEX layer | 1 defect | S3 | [R] | fixed (WP-01) |
 | [B-086](#b-086) | MEX `arrayant_qdant_write` (separate inputs) writes `center_freq = NaN` for `[]` instead of the documented 299792458 | F MEX layer | 1 defect | S3 | [R] | fixed (WP-01) |
-| [B-087](#b-087) | `arrayant_generate('multibeam')` uses a 90° element beamwidth by default in MATLAB and Python; docs (and the C++ default) say 120° | F MEX layer | 3 cross-API | S3 | [R] | open |
-| [B-088](#b-088) | `calc_angular_spread` defaults differ: MATLAB and Python disable wrapping and the bank angle, C++ enables both | F MEX layer | 3 cross-API | S3 | [R] | open |
-| [B-089](#b-089) | `triangle_mesh_segmentation` pads `mtl_ind_out` with material 1 in MATLAB, with 0 ("no material") in C++ and Python | F MEX layer | 3 cross-API | S3 | [R] | open |
-| [B-090](#b-090) | MEX `baseband_freq_response` with `carrier_freq`: descending carriers are rejected, duplicate carriers give silent NaN (Python handles both) | F MEX layer | 3 cross-API | S3 | [R] | open |
-| [B-091](#b-091) | MEX `get_channels_irs` `i_irs` is 0-based, against the 1-based rule of the MATLAB spec; the doc does not say which | F MEX layer | 2 doc | S3 | [R] | open |
-| [B-092](#b-092) | `arrayant_qdant_read(fn)` returns every entry as a struct array in MATLAB, Python's default reads ID 1 | F MEX layer | 3 cross-API | S3 | [R] | open |
+| [B-087](#b-087) | `arrayant_generate('multibeam')` uses a 90° element beamwidth by default in MATLAB and Python; docs (and the C++ default) say 120° | F MEX layer | 3 cross-API | S3 | [R] | fixed (WP-15) |
+| [B-088](#b-088) | `calc_angular_spread` defaults differ: MATLAB and Python disable wrapping and the bank angle, C++ enables both | F MEX layer | 3 cross-API | S3 | [R] | fixed (WP-15) |
+| [B-089](#b-089) | `triangle_mesh_segmentation` pads `mtl_ind_out` with material 1 in MATLAB, with 0 ("no material") in C++ and Python | F MEX layer | 3 cross-API | S3 | [R] | fixed (WP-15) |
+| [B-090](#b-090) | MEX `baseband_freq_response` with `carrier_freq`: descending carriers are rejected, duplicate carriers give silent NaN (Python handles both) | F MEX layer | 3 cross-API | S3 | [R] | fixed (WP-15) |
+| [B-091](#b-091) | MEX `get_channels_irs` `i_irs` is 0-based, against the 1-based rule of the MATLAB spec; the doc does not say which | F MEX layer | 2 doc | S3 | [R] | fixed (WP-15) |
+| [B-092](#b-092) | `arrayant_qdant_read(fn)` returns every entry as a struct array in MATLAB, Python's default reads ID 1 | F MEX layer | 3 cross-API | S3 | [R] | fixed (WP-15) |
 | [B-093](#b-093) | MEX: arrays with more than 4 dimensions are silently truncated; a 4-D dataset written with `hdf5_write_dset` comes back 3-D | F MEX layer | 1 defect | S3 | [R] | fixed (WP-06) |
 | [B-094](#b-094) | MEX: index value 0 is not rejected in several wrappers (silent wrong result or a misleading error) | F MEX layer | 1 defect | S3 | [R] | fixed (WP-06) |
-| [B-095](#b-095) | Diffraction level of detail 7: accepted by C++, empty `coord` in MATLAB, internal error in Python, rejected by MATLAB `generate_diffraction_paths`, documented as 0-6 | F MEX layer | 3 cross-API | S3 | [R] | open |
+| [B-095](#b-095) | Diffraction level of detail 7: accepted by C++, empty `coord` in MATLAB, internal error in Python, rejected by MATLAB `generate_diffraction_paths`, documented as 0-6 | F MEX layer | 3 cross-API | S3 | [R] | fixed (WP-15) |
 | [B-096](#b-096) | Python `qrt_file_read`: an exception in the main loop while the reader thread runs calls `std::terminate` | G Python layer | 1 defect | S3 | [R] | fixed (WP-05) |
 | [B-097](#b-097) | Python HDF5 writers reject numpy scalars, 0-d arrays and non-native dtypes that the docs list as supported | G Python layer | 3 cross-API | S3 | [R] | fixed (WP-05) |
 | [B-098](#b-098) | Python adapter `view = true` always copies (confirms item 1.1 of `md/python_fix_plan_v00.md`) | G Python layer | 2 doc | S3 | [R] | fixed (WP-05) |
@@ -150,8 +150,8 @@ Status: open: 17, fixed: 96, partly fixed: 2, won't fix: 1, documented: 7 (after
 | [B-110](#b-110) | `sos_randn` / `sos_rand` / `sos_randi` report an unknown preset as "Input 'name' ...", an argument they do not have | E SOS | 2 doc | S4 | [R] | open |
 | [B-111](#b-111) | `md/SPEC_PYTHON_API.md` gives two contradicting rules for the headings of the `sos` entries | E SOS | 2 doc | S4 | [C] | open |
 | [B-112](#b-112) | MEX `qrt_file_read` returns `interact_type` as uint8; the doc says uint32 | F MEX layer | 2 doc | S4 | [R] | fixed (WP-01) |
-| [B-113](#b-113) | MEX `get_channels_*` with 0 paths and `add_fake_los_path` return a zero path with delay 0, where C++ throws | F MEX layer | 3 cross-API | S4 | [R] | open |
-| [B-114](#b-114) | MEX `arrayant_rotate_pattern`: struct arrays reject usage 3 and 4 (Python maps them); a call without output argument errors | F MEX layer | 3 cross-API | S4 | [R] | open |
+| [B-113](#b-113) | MEX `get_channels_*` with 0 paths and `add_fake_los_path` return a zero path with delay 0, where C++ throws | F MEX layer | 3 cross-API | S4 | [R] | fixed (WP-15) |
+| [B-114](#b-114) | MEX `arrayant_rotate_pattern`: struct arrays reject usage 3 and 4 (Python maps them); a call without output argument errors | F MEX layer | 3 cross-API | S4 | [R] | fixed (WP-15) |
 | [B-115](#b-115) | MEX documentation, error IDs and latent helper defects (grouped) | F MEX layer | 2 doc | S4 | [R, C] | open |
 | [B-116](#b-116) | Python `hdf5_create_file` returns uint32 although the wrapper builds int64 (confirms item 1.3 of the Python fix plan) | G Python layer | 2 doc | S4 | [R] | fixed (WP-05) |
 | [B-117](#b-117) | Python output dtypes and shapes differ from the docs (`qdant_read`, `point_inside_mesh`, `generate_speaker`, `get_ieee_indoor`) | G Python layer | 2 doc | S4 | [R] | documented (WP-05) |
@@ -160,7 +160,7 @@ Status: open: 17, fixed: 96, partly fixed: 2, won't fix: 1, documented: 7 (after
 | [B-120](#b-120) | `calc_cross_polarization_ratio`: the circular XPR columns report 0 (fully cross-polar) for the LOS matrix that `get_channels_*` treats as co-polar, and are defined per transmit polarisation while the linear columns are per receive polarisation | C channel gen., tools | 1 defect | S3 | [R] | fixed (WP-13) |
 | [B-121](#b-121) | Test defect: `test_bin` is compiled without `BUILD_WITH_AVX2`, so the AVX2-vs-generic cases of the ray-triangle and ray-point kernel tests never run | D geometry, math | 1 defect | S3 | [R] | fixed (WP-12) |
 | [B-122](#b-122) | `qrt_file_read_raw` is quadratic in the number of paths per origin (`reserve` per CIR): 240 000 paths take 7.5 s | B channel, file I/O | 4 performance | S3 | [M] | fixed (WP-14) |
-| [B-123](#b-123) | MEX and Python `qrt_file_read` build a 2^32-entry index vector (34 GB) for a valid file with 0 CIRs | F MEX layer | 1 defect | S3 | [R] | open |
+| [B-123](#b-123) | MEX and Python `qrt_file_read` build a 2^32-entry index vector (34 GB) for a valid file with 0 CIRs | F MEX layer | 1 defect | S3 | [R] | fixed (WP-15) |
 
 ## Baseline
 
@@ -230,6 +230,8 @@ miscompilation by the LAF split-compare passes, not a library defect. The campai
 | after the merge with main (2026-10-21, f0d093d) | `All tests passed (1346180 assertions in 1265 test cases)`, generic `1344398 / 1264`; `[wave]` 163474 / 178, `[acoustic]` 42741 / 59 in both builds (manager, temporary worktree; includes the acoustic session's test cleanup; Octave MEX 66 of 67, pytest 799 passed, 1 skipped) | - (12 threads) | 2.2 / 6.2 |
 | after WP-14: base | `All tests passed (1346416 assertions in 1273 test cases)` (manager, round 2; round 1: 1346411 / 1272) | 40 s (12 threads) | 3.3 / 2.6 |
 | after WP-14: generic, ASan + UBSan, gate | generic `1344629 / 1271`; ASan + UBSan all passed, only the excluded `ray_progress` reports; `[wave]` 163474 / 178 and `[acoustic]` 42741 / 59 in both builds (worker's runs; Octave MEX 66 of 67, pytest 801 passed, 1 skipped; OBJ / MTL / CSV AFL 15 min each: no crash, no hang, 2613 inputs replayed, slowest 0.034 s) | - | - |
+| after WP-15: base | `All tests passed (1346724 assertions in 1283 test cases)` (manager, round 2; round 1: 1346567 / 1278) | 40 s (12 threads) | 1.7 / 3.4 |
+| after WP-15: generic, ASan + UBSan, gate | generic `1344942 / 1282`; ASan + UBSan all passed, only the excluded `ray_progress` reports; `[wave]` 163474 / 178 and `[acoustic]` 42741 / 59 in both builds (worker's runs, round 2; Octave MEX and MATLAB R2026a 66 of 67, pytest 817 passed) | - | - |
 
 Run commands: `flock /tmp/quadriga-fixes-suite.lock build_linux/test_bin` (output
 `build_linux/scratch/hunt/base_test.txt`); the sanitizer runs with
@@ -7309,7 +7311,7 @@ center_freq read back = NaN (documented default 299792458)
 
 ## B-087: `arrayant_generate('multibeam')` uses a 90° element beamwidth by default in MATLAB and Python; docs (and the C++ default) say 120°
 
-- Status: open
+- Status: fixed (WP-15): the MATLAB and Python wrappers pass 120 deg for multibeam; round 2: the C++ generator maps a beamwidth <= 0 to 120 deg (was 90), breaking for C++ callers that pass 0
 - Severity: S3, because the documented default is not what is computed (max difference 0.48 in the pattern), in both wrappers.
 - Kind: doc / cross-API
 - Mark: [R]
@@ -7372,7 +7374,7 @@ Python default vs 90 : max diff 0
 
 ## B-088: `calc_angular_spread` defaults differ: MATLAB and Python disable wrapping and the bank angle, C++ enables both
 
-- Status: open
+- Status: fixed (WP-15): C++ calc_angular_spreads_sphere defaults to wrapping off and bank angle off, as the wrappers; breaking for C++ callers
 - Severity: S3, because the same default call gives different spreads in C++ (1.678) and MATLAB/Python (1.627).
 - Kind: cross-API
 - Mark: [R]
@@ -7451,7 +7453,7 @@ Python default                 as=1.627282 es=0.190512
 
 ## B-089: `triangle_mesh_segmentation` pads `mtl_ind_out` with material 1 in MATLAB, with 0 ("no material") in C++ and Python
 
-- Status: open
+- Status: fixed (WP-15): the MEX wrappers pass mtl_ind through; MATLAB padding entries are 0 (breaking for MATLAB)
 - Severity: S3, because padding faces get a real material in MATLAB only, and an input 0 ("no material") underflows on the way.
 - Kind: cross-API
 - Mark: [R] (also seen by area G)
@@ -7508,7 +7510,7 @@ Python mtl_ind_out = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 0, 0, 0, 0]
 
 ## B-090: MEX `baseband_freq_response` with `carrier_freq`: descending carriers are rejected, duplicate carriers give silent NaN (Python handles both)
 
-- Status: open
+- Status: fixed (WP-15): MEX follows Python (span from min / max, zero span with several carriers throws, reference = input carrier or min, input order kept)
 - Severity: S3, because valid carrier lists are rejected or give silent NaN in MATLAB, while Python handles them.
 - Kind: cross-API / wrong result
 - Mark: [R]
@@ -7578,7 +7580,7 @@ two equal carriers: error: 'freq_out' values must span a positive range.
 
 ## B-091: MEX `get_channels_irs` `i_irs` is 0-based, against the 1-based rule of the MATLAB spec; the doc does not say which
 
-- Status: open
+- Status: fixed (WP-15): MEX i_irs is 1-based (default 1, 0 rejected); breaking for MATLAB
 - Severity: S3, because a MATLAB user who passes 1 for the first codebook port silently gets the second.
 - Kind: doc / spec
 - Mark: [R]
@@ -7638,7 +7640,7 @@ i_irs=2: error: get_channels_irs: IRS codebook index out of bound.
 
 ## B-092: `arrayant_qdant_read(fn)` returns every entry as a struct array in MATLAB, Python's default reads ID 1
 
-- Status: open
+- Status: fixed (WP-15): MATLAB keeps reading all entries and throws when they do not form a frequency set (arrayant_is_valid_multi); Python qdant_read(fn, id=0) checks the same
 - Severity: S3, because the same default call differs between the APIs, and MATLAB returns a struct array of unrelated antennas, which its own convention treats as a frequency-dependent model.
 - Kind: cross-API
 - Mark: [R]
@@ -7798,7 +7800,7 @@ arrayant_interpolate element=0 -> arrayant_interpolate: Element indices 'i_eleme
 
 ## B-095: Diffraction level of detail 7: accepted by C++, empty `coord` in MATLAB, internal error in Python, rejected by MATLAB `generate_diffraction_paths`, documented as 0-6
 
-- Status: open
+- Status: fixed (WP-15): lod documented as 1-7 (generate_diffraction_paths) and 0-7 (calc_diffraction_gain); the wrappers size coord from C++; empty orig / dest throw
 - Severity: S3, because the same value gives four different behaviours across functions and APIs, including an Armadillo-internal error in Python, and the documented range does not match any of them.
 - Kind: cross-API / doc
 - Mark: [R]
@@ -8910,7 +8912,7 @@ class(interact_type{1}) = uint8 (doc: uint32)
 
 ## B-113: MEX `get_channels_*` with 0 paths and `add_fake_los_path` return a zero path with delay 0, where C++ throws
 
-- Status: open
+- Status: fixed (WP-15): C++ returns the zero-power LOS path with its LOS delays for 0 paths with add_fake_los_path, the wrappers call C++; round 2: 0 paths without it gives empty outputs [n_rx, n_tx, 0] in all APIs, and Python spherical batch mode adds the fake LOS path too
 - Severity: S4, because it is an error-behaviour difference on an edge case (and the returned delay ignores `use_absolute_delays`).
 - Kind: cross-API
 - Mark: [R]
@@ -8981,7 +8983,7 @@ C++ spherical -> Missing data for any of: fbs_pos, lbs_pos, path_gain, path_leng
 
 ## B-114: MEX `arrayant_rotate_pattern`: struct arrays reject usage 3 and 4 (Python maps them); a call without output argument errors
 
-- Status: open
+- Status: fixed (WP-15)
 - Severity: S4, because it is an API inconsistency on a less used path.
 - Kind: cross-API
 - Mark: [R]
@@ -9736,7 +9738,7 @@ RPI Internal - Dense Grid (AVX2 vs GENERIC): test cases: 1 | 1 passed assertions
 
 ## B-123: MEX and Python `qrt_file_read` build a 2^32-entry index vector (34 GB) for a valid file with 0 CIRs
 
-- Status: open
+- Status: fixed (WP-15): empty outputs for 0 CIRs, no large allocation
 - Severity: S3, because a valid file without CIRs makes the wrapper allocate 34 GB (MemoryError in Python, "out of memory" in Octave) instead of returning empty outputs.
 - Kind: defect (unsigned underflow)
 - Mark: [R] (found by the WP-07 worker under `ulimit`, 2026-10-19; details in `md/fix_logs/WP-07.md`)
