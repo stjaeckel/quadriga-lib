@@ -2,6 +2,10 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Diagnostic output: off by default. QD_DIAG_RAY=1 prints the tables of this file, QD_DIAG=1 those of all areas
+// (see qd_test_diag.hpp); the assertions run either way. Example:
+//   QD_DIAG_RAY=1 ./build_linux/test_bin "[acoustic]"
+
 // Leaves as wave-medium sheets. Under the two-parameter mapping (eps = n z, mu = n / z, so mu = rho / rho0) a thin
 // layer of a wave medium has the series impedance j w m'' / Z0: a sheet with m = 0 is a limp leaf. Glued on a meshed
 // box of near-air material on a mass-law wall, its cavity series is summed in one event. The leaf cases evaluate wave

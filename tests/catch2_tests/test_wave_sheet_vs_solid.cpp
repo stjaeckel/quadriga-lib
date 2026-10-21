@@ -2,13 +2,16 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Diagnostic output: off by default. QD_DIAG_RAY=1 prints the tables of this file, QD_DIAG=1 those of all areas
+// (see qd_test_diag.hpp); the assertions run either way. Example:
+//   QD_DIAG_RAY=1 ./build_linux/test_bin "[sheet]"
+
 // A sheet through calc_diffraction_gain, wave media: two coincident faces of one material are one sheet, and a thk
 // column present with the value zero is the column absent.
-//
-// Set the environment variable QD_TEST_DIAG=1 to print the tables.
 
 #include <catch2/catch_test_macros.hpp>
 #include "quadriga_lib.hpp"
+#include "qd_test_diag.hpp"
 
 #include <algorithm>
 #include <complex>
@@ -32,11 +35,7 @@ namespace
 
     bool verbose()
     {
-        static const bool on = []
-        {
-            const char *v = std::getenv("QD_TEST_DIAG");
-            return v != nullptr && v[0] != '\0' && v[0] != '0';
-        }();
+        static const bool on = qd_test_diag_env("QD_DIAG_RAY");
         return on;
     }
 

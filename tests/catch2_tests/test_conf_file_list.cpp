@@ -2,6 +2,10 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Diagnostic output: off by default. QD_DIAG_CONF=1 prints the tables of this file, QD_DIAG=1 those of all areas
+// (see qd_test_diag.hpp); the assertions run either way. Example:
+//   QD_DIAG_CONF=1 ./build_linux/test_bin "conf_file_list*"
+
 // Verification suite for quadriga_lib::conf_file_list.
 //
 // Pins down: which files of a directory are listed and in which order, the short names and their
@@ -26,15 +30,8 @@
 #include <string>
 #include <vector>
 
-// Diagnostic output. Comment out to silence the tables. The assertions run either way.
-#define QD_TEST_VERBOSE
-
-#ifdef QD_TEST_VERBOSE
-#include <cstdio>
-#define QD_DIAG(...) std::printf(__VA_ARGS__)
-#else
-#define QD_DIAG(...) ((void)0)
-#endif
+#include "qd_test_diag.hpp"
+QD_TEST_DIAG_SWITCH("QD_DIAG_CONF")
 
 namespace
 {

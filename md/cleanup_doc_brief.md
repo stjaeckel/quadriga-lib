@@ -26,7 +26,7 @@ the cleanup series.
     limits; the acoustic mapping; worked examples.
   - A **developer part** of about 100 lines: a map of `src/ray_mesh_interact.cpp` (the per-event call sequence, the
     seven sections, the state words and the ledger, where the hit-code tables are) plus **how a change is checked**
-    (the test tags, `QD_TEST_DIAG`, the baselines, the stored twins, `rowdiff`, and the rules: EM and wave rows first,
+    (the test tags, `QD_DIAG_RAY` / `QD_DIAG`, the baselines, the stored twins, `rowdiff`, and the rules: EM and wave rows first,
     energy). That part must survive the deletion of `md/wave.md` (its sections 10 and 11 move here). The source's
     84-line header overview and its section comments are the basis; do not copy them, explain them.
 - **Format: Markdown with LaTeX math** (GitHub syntax: `$…$` inline, `$$…$$` display), as the old page. Same file
@@ -58,7 +58,7 @@ the cleanup series.
 
 - Last commit dc47ff6. `git status` should show only `md/acoustic_manager.md`, the review-path line in three
   `tools/acoustic` files, and this brief. If anything under `src/` or `tests/` is modified, stop and ask Stephan.
-- Counts (`md/wave.md` 0, with `QD_TEST_DIAG=1`, 12 threads): `[wave]` 163474 assertions in 178 cases,
+- Counts (`md/wave.md` 0, with `QD_DIAG_RAY=1` / `QD_DIAG=1`, 12 threads): `[wave]` 163474 assertions in 178 cases,
   `[acoustic]` 42741 in 59, whole suite 1343848 in 1234 (generic build). `python3 tools/acoustic/check_docs.py`
   passes.
 - `src/ray_mesh_interact.cpp`, 4725 lines:
@@ -128,7 +128,7 @@ the cleanup series.
 
 ## Phase 0 — inventory and plan (no edit outside the report; stop)
 
-1. **Baseline**: build, the three suites with the 12-thread commands and `QD_TEST_DIAG=1`, the counts above;
+1. **Baseline**: build, the three suites with the 12-thread commands of `md/wave.md` 0 (`QD_DIAG_RAY=1`, whole suite `QD_DIAG=1`), the counts above;
    `check_docs.py`.
 2. **The old page against the code**: per section, what is still right, what is stale (with the code's statement),
    what is gone.

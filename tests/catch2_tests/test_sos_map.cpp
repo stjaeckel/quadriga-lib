@@ -2,6 +2,10 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Diagnostic output: off by default. QD_DIAG_SOS=1 prints the tables of this file, QD_DIAG=1 those of all areas
+// (see qd_test_diag.hpp); the assertions run either way. Example:
+//   QD_DIAG_SOS=1 ./build_linux/test_bin "sos_map*"
+
 // Verification suite for quadriga_lib::sos_map.
 //
 // Pins down: the meshgrid ordering of the output, the handling of omitted grid vectors, one cube per
@@ -20,8 +24,8 @@
 #include <stdexcept>
 #include <vector>
 
-// Diagnostic tables print with QD_TEST_DIAG=1 in the environment; the assertions run either way.
 #include "qd_test_diag.hpp"
+QD_TEST_DIAG_SWITCH("QD_DIAG_SOS")
 
 namespace
 {
