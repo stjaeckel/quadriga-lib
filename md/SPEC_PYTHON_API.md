@@ -101,7 +101,7 @@ There are two review points at which you stop, report, and wait for my answer be
 | Channel generation functions | not clear (`arrayant` or `channel`): ask |
 
 - If the submodule is not clear from the C++ documentation, ask.
-- Submodule `sos`: the wrapper of `quadriga_lib::sos_<name>` is the C++ function `sos_<name>` in `qpy_sos_<name>.cpp`, exposed as `quadriga_lib.sos.<name>` (prefix dropped, as for `arrayant`). The heading of its documentation block keeps the prefix (`# sos_<name>`, linked as `[[sos_<name>]]`), because `generate` would collide with the array antenna function of that name; the Usage line shows the call without the prefix.
+- Submodule `sos`: the wrapper of `quadriga_lib::sos_<name>` is the C++ function `sos_<name>` in `qpy_sos_<name>.cpp`, exposed as `quadriga_lib.sos.<name>` (prefix dropped, as for `arrayant`). The heading of its documentation block and the cross-references follow the rule for prefixed names under "Documentation block" below (`# sos.<name>`, linked as `[[sos.<name>]]`); the Usage line shows the call without the prefix.
 
 ## Index and dtype conventions
 - C++ and Python both use 0-based indices, so no conversion is performed in either direction. Indices documented as "1-based" in the C++ documentation remain 1-based in Python (the user provides 1-based and gets 1-based back).

@@ -157,6 +157,7 @@ is the coordinator's suggestion from the hunt.
 | WP-08 | 08 | One shared sin/cos core for the baseband DFT kernels and `fastmath_avx2.h` (proposed by the WP-04 worker) | (a) add to WP-08 as a note (b) leave | (a) | (a) added to WP-08 as a note; the WP-08 worker decides after measuring (2026-10-17) |
 | B-038 | 10 | Precision of qdant files (round 1 wrote 15 significant digits for double: files twice as large) | (a) double precision (b) single-equivalent, files as small as possible | - | (b) single-equivalent: dB magnitudes and phases with 6 decimals (5.8e-8 per sample at every level), positions and coupling as the shortest float text; replaces the 1e-12 round-trip acceptance (2026-10-20); changed 2026-10-20 (round 3): decimals relative to the element peak, absolute error at most single resolution of the element peak for every sample, at most 6 decimals |
 | B-018 | 14 | The `usemtl (null)` marker reserves the name `(null)`; a user material of that name read back as "no material" | (1) document only (2) the writer rejects a used material named `(null)` (3) the reader tells marker and material apart by the `.mtl` (4) the writer renames it | (2) | (2) rejected by obj_file_write, `std::invalid_argument` before anything is written; unused entries allowed (2026-10-21, WP-14 round 2) |
+| B-109 | 16 | `sos_remove_bias` with `offset` and `mean_before` as the same object (the offsets were silently replaced by the means; a rule the WP-16 worker added beyond the default) | (a) reject (b) allow | (a) | (a) keep the rejection (2026-10-21) |
 | B-113 | 15 | 0 paths without `add_fake_los_path`: C++ / Python planar and spherical throw, MATLAB and Python multifreq return empty outputs (found in WP-15) | (a) empty outputs `[n_rx, n_tx, 0]` in all APIs (b) an error in all APIs (c) leave | (a) | (a) empty outputs in all APIs; also Python spherical batch mode adds the fake LOS path for 0 paths, and the C++ multibeam generator maps a beamwidth <= 0 to 120 deg (2026-10-21, WP-15 round 2) |
 | B-028 | 12 | Manager default D2 (judge each hit only against the face that produced it) reports touching boxes with an offset or a larger touching face as overlapping: the diagonal of the touching face crosses the other box's edge, which the edge-inclusive triangle test reports as a hit on a side face (found by the WP-12 worker) | (a) worker's graze rule: a hit on face G is a touch when the edge lies in the plane of another face of the same object and G lies on one side of that plane (clears a subset of what the old code cleared) (b) D2 literally, accept false overlaps | (a) | (a) graze rule accepted (2026-10-21) |
 
@@ -393,6 +394,11 @@ acceptance checks beyond section 3.1. Severities in brackets.
 - Left open by earlier packages: `CMakeLists.txt:498` (MATLAB API section) still says MATLAB links quadriga_static "to
   avoid conflicts with MATLAB's own bundled libhdf5.so"; the static link does not separate the HDF5 libraries, the
   different soname of the system HDF5 does (see the comment at `CMakeLists.txt:196`, rewritten in WP-01).
+- From WP-16 (misuse with hand-built matrices on foreign memory only; one check or one documentation sentence each):
+  `sos_map` passes a matrix on the map's memory to `sos_val`, so a map that overlaps `freq` or `phase` is rejected with a
+  message naming `val`, an argument `sos_map` does not have; `sos_acf_approx` writes its output cube while it still
+  reads its inputs, without an overlap check; `sos_preset` writes its three outputs one after the other, so an output
+  on another output's memory overwrites it.
 - From WP-15 (fix here, close to B-115 (c)): MEX `arrayant_qdant_read` without an output argument on a multi-entry file
   reports "Separate-fields output only available in single-frequency mode." (`api_mex/arrayant_qdant_read.cpp:84-85`,
   `nlhs == 0` is neither 1 nor 2); treat `nlhs == 0` as one output.
@@ -498,7 +504,7 @@ unexpected changes in the diff; proposed `md/bugs.md` updates; anything the next
 | WP-13 | 11 | done 2026-10-21 (10 fixed incl. the B-065 remainder, B-070 documented; circular XPR redefined; all workloads at or below 1.05 of old, delay spread 0.39, long-grid interp 0.001) | 5fbc6a4 (xpr_update), d7378ca (path_to_tube), 7f866e9 (combine_irs_coord), cce2d5b (baseband buffers), 5da6971 (channel statistics), f593b48 (circular XPR), d9d577f (interp), 0671302 (calc_diffraction_gain doc), plus the notes commit |
 | WP-14 | 5 | done 2026-10-21 (5 of 5 fixed, B-104 point 5 also; Mitsuba 80 000 faces 0.02 s instead of 3.2 s, QRT raw reader linear, OBJ read 0.85 of old; AFL clean; round 2: a used material named `(null)` is rejected) | 58deaf6 (OBJ files), a85bf88 (write_png), 38a70b3 (Mitsuba), cdaa991 (QRT raw reader), plus the notes commit |
 | WP-15 | 10 | done 2026-10-21 (10 of 10 fixed and the three notes; round 2: 0 paths give empty outputs in all APIs, C++ multibeam 0 -> 120 deg, Python qrt_file_read docs, MEX subdivide_triangles size check) | 52fbfd6 (get_channels), 78cf7ed (antennas), f952982 (angular spread), bd071f0 (diffraction lod), 5c18599 (baseband carriers), da0f1ff (mesh wrappers), a118be1 (QRT / HDF5 wrappers), plus the notes commit |
-| WP-16 | 3 | open | - |
+| WP-16 | 3 | done 2026-10-21 (3 of 3 fixed; SOS results of valid calls bit-identical) | 518a5f9, plus the notes commit |
 | WP-17 | 6 | open | - |
 
 ## 8a. Manager handoff (2026-10-20)
@@ -582,8 +588,9 @@ beamwidth 120 deg (MATLAB, Python; C++ for 0), calc_angular_spreads_sphere C++ d
 triangle_mesh_segmentation, MATLAB i_irs 1-based, MATLAB arrayant_qdant_read error for files that are no frequency set,
 Python int64 storage_dims, 0 paths give empty outputs in C++ and Python planar / spherical.
 
-Next: WP-16 (sum of sinusoids, small items: B-109, B-110, B-111), then WP-17 (documentation sweep and final
-verification).
+WP-16 (2026-10-21): done, review passed; one commit 518a5f9 plus the notes commit.
+
+Next: WP-17 (documentation sweep and final verification).
 
 ## 8. Item index
 
