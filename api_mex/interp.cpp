@@ -15,8 +15,10 @@ SECTION!*/
 Perform linear interpolation (1D or 2D) on single or multiple data sets
 
 - Interpolates given input data at specified output points.
+- Outside the range of the data sampling points, the nearest end value is returned (constant extrapolation);
+  output sampling points that are NaN give NaN.
+- The data sampling points need not be sorted; repeated values are allowed.
 - Supports single and multiple data sets.
-- Returns interpolated results either directly or through reference argument.
 - Data types: `single` or `double`
 
 ## Usage:
