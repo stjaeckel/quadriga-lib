@@ -31,7 +31,8 @@ arma::uword quadriga_lib::point_cloud_segmentation(
 ## Inputs:
 - **`points`** — Original 3D point cloud; `[n_points, 3]`
 - **`target_size`** *(optional)* — Maximum points per sub-cloud before padding
-- **`vec_size`** *(optional)* — SIMD/CUDA alignment; sub-cloud size is padded to a multiple of this value; no padding when `1`
+- **`vec_size`** *(optional)* — SIMD/CUDA alignment; sub-cloud size is padded to a multiple of this value; no padding when `1`;
+  [[ray_point_intersect]] accepts any value, padding (e.g. 8 for AVX2) only improves its speed
 
 ## Outputs:
 - **`pointsR`** — Reorganized point cloud with points grouped by sub-cloud; `[n_pointsR, 3]`
