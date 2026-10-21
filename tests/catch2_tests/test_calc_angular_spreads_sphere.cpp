@@ -17,7 +17,7 @@ TEST_CASE("calc_angular_spreads_sphere - Single path returns zero spread")
     arma::vec as, es;
     arma::mat orient;
 
-    quadriga_lib::calc_angular_spreads_sphere(az, el, powers, &as, &es, &orient);
+    quadriga_lib::calc_angular_spreads_sphere<double>(az, el, powers, &as, &es, &orient, nullptr, nullptr, false, true);
 
     REQUIRE(as.n_elem == 1);
     REQUIRE(es.n_elem == 1);
@@ -37,7 +37,7 @@ TEST_CASE("calc_angular_spreads_sphere - Two symmetric azimuth paths")
     arma::vec as, es;
     arma::mat orient;
 
-    quadriga_lib::calc_angular_spreads_sphere(az, el, powers, &as, &es, &orient);
+    quadriga_lib::calc_angular_spreads_sphere<double>(az, el, powers, &as, &es, &orient, nullptr, nullptr, false, true);
 
     CHECK(std::abs(as(0) - 0.1) < 1e-6);
     CHECK(es(0) < 1e-6);
@@ -55,7 +55,7 @@ TEST_CASE("calc_angular_spreads_sphere - Two symmetric elevation paths")
     arma::mat orient;
     std::vector<arma::vec> phi, theta;
 
-    quadriga_lib::calc_angular_spreads_sphere(az, el, powers, &as, &es, &orient, &phi, &theta);
+    quadriga_lib::calc_angular_spreads_sphere<double>(az, el, powers, &as, &es, &orient, &phi, &theta, false, true);
 
     REQUIRE(phi.size() == 1);
     REQUIRE(phi[0].n_elem == 2);
@@ -75,7 +75,7 @@ TEST_CASE("calc_angular_spreads_sphere - Pole paths (near zenith)")
     powers[0] = {1.0, 1.0, 1.0, 1.0};
 
     arma::vec as, es;
-    quadriga_lib::calc_angular_spreads_sphere(az, el, powers, &as, &es);
+    quadriga_lib::calc_angular_spreads_sphere<double>(az, el, powers, &as, &es, nullptr, nullptr, nullptr, false, true);
 
     CHECK(as(0) < 0.5);
     CHECK(es(0) < 0.5);
@@ -98,7 +98,7 @@ TEST_CASE("calc_angular_spreads_sphere - Variable path counts per CIR")
     std::vector<arma::vec> phi, theta;
 
     quadriga_lib::calc_angular_spreads_sphere(az, el, powers, &as, &es,
-                                              (arma::mat *)nullptr, &phi, &theta);
+                                              (arma::mat *)nullptr, &phi, &theta, false, true);
 
     REQUIRE(as.n_elem == 3);
     REQUIRE(phi.size() == 3);
@@ -143,7 +143,7 @@ TEST_CASE("calc_angular_spreads_sphere - Disable wrapping")
     arma::mat orient_raw;
     std::vector<arma::vec> phi_raw, theta_raw;
 
-    quadriga_lib::calc_angular_spreads_sphere(az, el, powers, &as_wrap, &es_wrap);
+    quadriga_lib::calc_angular_spreads_sphere<double>(az, el, powers, &as_wrap, &es_wrap, nullptr, nullptr, nullptr, false, true);
     quadriga_lib::calc_angular_spreads_sphere(az, el, powers, &as_raw, &es_raw, &orient_raw,
                                               &phi_raw, &theta_raw, true);
 
@@ -189,7 +189,7 @@ TEST_CASE("calc_angular_spreads_sphere - Wrap-around at +/- pi")
     powers[0] = {1.0, 1.0};
 
     arma::vec as, es;
-    quadriga_lib::calc_angular_spreads_sphere(az, el, powers, &as, &es);
+    quadriga_lib::calc_angular_spreads_sphere<double>(az, el, powers, &as, &es, nullptr, nullptr, nullptr, false, true);
 
     double gap = 2.0 * (3.14159265358979 - 3.0);
     CHECK(as(0) < gap);
@@ -204,7 +204,7 @@ TEST_CASE("calc_angular_spreads_sphere - Float precision")
     powers[0] = {1.0f, 1.0f, 2.0f};
 
     arma::fvec as, es;
-    quadriga_lib::calc_angular_spreads_sphere(az, el, powers, &as, &es);
+    quadriga_lib::calc_angular_spreads_sphere<float>(az, el, powers, &as, &es, nullptr, nullptr, nullptr, false, true);
 
     REQUIRE(as.n_elem == 1);
     CHECK(as(0) > 0.0f);
@@ -222,7 +222,7 @@ TEST_CASE("calc_angular_spreads_sphere - Output shapes and valid ranges")
     arma::mat orient;
     std::vector<arma::vec> phi, theta;
 
-    quadriga_lib::calc_angular_spreads_sphere(az, el, powers, &as, &es, &orient, &phi, &theta);
+    quadriga_lib::calc_angular_spreads_sphere<double>(az, el, powers, &as, &es, &orient, &phi, &theta, false, true);
 
     REQUIRE(as.n_elem == 1);
     REQUIRE(es.n_elem == 1);
@@ -321,4 +321,18 @@ TEST_CASE("calc_angular_spreads_sphere - quantize must be 0 or a finite value >=
                     std::invalid_argument);
     CHECK_NOTHROW(quadriga_lib::calc_angular_spreads_sphere<float>(azf, elf, pwf, &asf, nullptr, nullptr, nullptr, nullptr,
                                                                    false, true, 1.0e-3f));
+}
+
+TEST_CASE("calc_angular_spreads_sphere - Defaults: wrapping off, bank angle off (as in MATLAB and Python)")
+{
+    std::vector<arma::vec> az = {{0.1, 2.9, -3.0}}, el = {{0.1, -0.2, 0.3}}, pw = {{1.0, 0.8, 0.5}};
+    arma::vec as, es, as0, es0;
+    arma::mat orient;
+    quadriga_lib::calc_angular_spreads_sphere<double>(az, el, pw, &as, &es, &orient);
+    quadriga_lib::calc_angular_spreads_sphere<double>(az, el, pw, &as0, &es0, nullptr, nullptr, nullptr, true, false);
+    CHECK(as(0) == as0(0));
+    CHECK(es(0) == es0(0));
+    CHECK(std::abs(as(0) - 1.627282) < 1.0e-6); // MATLAB / Python default result on this input
+    CHECK(std::abs(es(0) - 0.190512) < 1.0e-6);
+    CHECK(arma::all(arma::vectorise(orient) == 0.0)); // no rotation without wrapping
 }

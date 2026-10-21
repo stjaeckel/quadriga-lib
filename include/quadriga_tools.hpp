@@ -47,9 +47,10 @@ namespace quadriga_lib
                                        dtype granularity = 0.0,                     // Window size in seconds to group paths in delay domain
                                        arma::Col<dtype> *mean_delay = nullptr);     // Optional output: mean delay in [s].
 
-    // Calculate azimuth and elevation angular spreads with spherical wrapping
-    // The power-weighted mean direction is rotated to the equator to decouple spreads,
+    // Calculate azimuth and elevation angular spreads, optionally with spherical wrapping
+    // With wrapping, the power-weighted mean direction is rotated to the equator to decouple spreads,
     // and an optional bank angle aligns the angular distribution to its principal axes.
+    // Defaults: wrapping off, bank angle off (as in the MATLAB and Python wrappers).
     template <typename dtype>
     void calc_angular_spreads_sphere(const std::vector<arma::Col<dtype>> &az,        // Azimuth angles in [rad], Vector (n_cir) of vectors of length [n_path]
                                      const std::vector<arma::Col<dtype>> &el,        // Elevation angles in [rad], Vector (n_cir) of vectors of length [n_path]
@@ -59,8 +60,8 @@ namespace quadriga_lib
                                      arma::Mat<dtype> *orientation = nullptr,        // Mean-angle orientation [bank;tilt;heading] in [rad], Size [3, n_cir]
                                      std::vector<arma::Col<dtype>> *phi = nullptr,   // Rotated azimuth angles in [rad], Vector (n_cir) of vectors of length [n_path]
                                      std::vector<arma::Col<dtype>> *theta = nullptr, // Rotated elevation angles in [rad], Vector (n_cir) of vectors of length [n_path]
-                                     bool disable_wrapping = false,                  // Disable the rotation and use raw az/el angles for spread calculation
-                                     bool calc_bank_angle = true,                    // Compute optimal bank angle analytically (only for disable_wrapping = false)
+                                     bool disable_wrapping = true,                   // Disable the rotation and use raw az/el angles for spread calculation
+                                     bool calc_bank_angle = false,                   // Compute optimal bank angle analytically (only for disable_wrapping = false)
                                      dtype quantize = 0.0);                          // Angular quantization step in [deg], 0 = disabled
 
     // Calculate the Rician K-Factor
