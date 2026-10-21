@@ -41,7 +41,8 @@ Calculate azimuth and elevation angular spreads with spherical wrapping
 - **`powers`** — Path powers in [W]; `[n_path, n_cir]`
 - **`wrapping`** — If true, enables spherical rotation; default: false
 - **`calc_bank_angle`** — If true, computes optimal bank angle analytically; only used when `wrapping = true`; default: false
-- **`quantize`** — Angular quantization step in [deg]; paths within this distance are grouped; default: 0 (no quantization)
+- **`quantize`** — Angular quantization step in [deg]; paths within this distance are grouped; default: 0 (no quantization);
+  otherwise it must be finite and >= 1e-3 deg, else an error is raised
 
 ## Outputs:
 - **`as`** — RMS azimuth angular spread; `[n_cir]`

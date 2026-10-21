@@ -109,6 +109,22 @@ class test_acdf(unittest.TestCase):
         with self.assertRaises(Exception):
             quadriga_lib.tools.acdf(np.empty((0, 0), dtype=np.float64))
 
+    def test_bins_must_be_ascending_and_empty_sets(self):
+        data = np.arange(100, dtype=np.float64).reshape(100, 1)
+        with self.assertRaises(ValueError):
+            quadriga_lib.tools.acdf(data, np.array([50.0, 0.0, 99.0, 25.0]))
+        with self.assertRaises(ValueError):
+            quadriga_lib.tools.acdf(data, np.array([0.0, 25.0, 25.0, 99.0]))
+
+        # A data set without finite values gets a NaN CDF and is left out of the averages
+        data2 = np.hstack([data, np.full((100, 1), np.nan)])
+        cdf2, bins2, avg2, mu2, sig2 = quadriga_lib.tools.acdf(data2)
+        cdf1, bins1, avg1, mu1, sig1 = quadriga_lib.tools.acdf(data, bins2)
+        self.assertTrue(np.all(np.isnan(cdf2[:, 1])))
+        npt.assert_array_equal(mu2, mu1)
+        npt.assert_array_equal(avg2, avg1)
+        npt.assert_allclose(mu1[4], 49.005, atol=1e-12, rtol=0)
+
     def test_error_n_bins_too_small(self):
         data = np.arange(10, dtype=np.float64).reshape(10, 1)
         with self.assertRaises(Exception):

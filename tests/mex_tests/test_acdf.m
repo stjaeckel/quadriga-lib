@@ -95,4 +95,20 @@ catch
     % Expected
 end
 
+% --- User bins must be finite and strictly ascending ---
+failed = false;
+try
+    [~] = quadriga_lib.acdf( (0:99).', [50; 0; 99; 25] );
+catch ME
+    failed = ~isempty(strfind(ME.message, 'strictly ascending'));
+end
+assertTrue( failed );
+
+% --- A data set without finite values gets a NaN CDF and is left out of the averages ---
+[ Sh2, bins2, Sc2, mu2 ] = quadriga_lib.acdf( [ (0:99).', NaN(100,1) ] );
+[ Sh1, ~, Sc1, mu1 ] = quadriga_lib.acdf( (0:99).', bins2 );
+assertTrue( all( isnan( Sh2(:,2) ) ) );
+assertEqual( mu2, mu1 );
+assertEqual( Sc2, Sc1 );
+
 end

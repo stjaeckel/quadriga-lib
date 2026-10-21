@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <stdexcept>
 #include <limits>
+#include <vector>
 
 /*!SECTION
 Channel statistics
@@ -22,8 +23,11 @@ Calculate the empirical averaged cumulative distribution function (CDF)
   then mapped back to the bin grid
 - Quantile statistics (mean and std) are reported at the 0.1, 0.2, ..., 0.9 probability levels
 - `Inf` and `NaN` values are excluded from computation
-- If `bins` points to an empty vector, equally spaced bins spanning the data range are generated and stored back; 
-  if non-empty, those bin centers are used; if `nullptr`, bins are auto-generated internally
+- A data set without any finite value gets a NaN column in `cdf_per_set` and is left out of `cdf_avg`, `mu` and `sig`;
+  if no set has finite values (possible only with user-supplied bins), `cdf_avg`, `mu` and `sig` are NaN
+- If `bins` points to an empty vector, equally spaced bins spanning the data range are generated and stored back
+  (data without any finite value then throws); if non-empty, those bin centers are used and must be finite and
+  strictly ascending, else `std::invalid_argument` is thrown; if `nullptr`, bins are auto-generated internally
 
 ## Declaration:
 ```
@@ -39,14 +43,14 @@ void quadriga_lib::acdf(const arma::Mat<dtype> &data,
 ## Inputs:
 - **`data`** — Input data matrix; each column is one independent data set; `[n_samples, n_sets]`
 - **`bins`** *(optional)* — Bin centers; auto-generated and stored back if pointing to empty vector, 
-  used as-is if non-empty, ignored if `nullptr`; `[n_bins]`
+  used as-is if non-empty (finite, strictly ascending), ignored if `nullptr`; `[n_bins]`
 - **`n_bins`** *(optional)* — Number of bins when auto-generating; must be >= 2; ignored when non-empty bins are provided
 
 ## Outputs:
-- **`cdf_per_set`** *(optional)* — Individual CDFs, one per column of data; `[n_bins, n_sets]`
-- **`cdf_avg`** *(optional)* — Averaged CDF via quantile-space averaging across data sets; `[n_bins]`
-- **`mu`** *(optional)* — Mean of the 0.1–0.9 quantiles across data sets, `[9]`
-- **`sig`** *(optional)* — Standard deviation of the 0.1–0.9 quantiles across data sets, `[9]`
+- **`cdf_per_set`** *(optional)* — Individual CDFs, one per column of data (NaN for a set without finite values); `[n_bins, n_sets]`
+- **`cdf_avg`** *(optional)* — Averaged CDF via quantile-space averaging across the data sets with finite values; `[n_bins]`
+- **`mu`** *(optional)* — Mean of the 0.1–0.9 quantiles across the data sets with finite values, `[9]`
+- **`sig`** *(optional)* — Standard deviation of the 0.1–0.9 quantiles across the data sets with finite values, `[9]`
 MD!*/
 
 template <typename dtype>
@@ -77,6 +81,10 @@ void quadriga_lib::acdf(const arma::Mat<dtype> &data,
     if (bins_provided)
     {
         bins_local = *bins;
+        const dtype *pb = bins_local.memptr();
+        for (arma::uword i = 0; i < bins_local.n_elem; ++i)
+            if (!std::isfinite(pb[i]) || (i != 0 && !(pb[i] > pb[i - 1])))
+                throw std::invalid_argument("Input 'bins' must be finite and strictly ascending.");
     }
     else
     {
@@ -123,7 +131,10 @@ void quadriga_lib::acdf(const arma::Mat<dtype> &data,
     // --- Compute individual CDFs (cdf_per_set) ---
 
     // We need the individual CDFs for cdf_avg/mu/sig computation regardless of whether cdf_per_set is requested
+    // A set without finite values gets a NaN column and is left out of cdf_avg, mu and sig
     arma::Mat<dtype> cdf_per_set_local(no_bins, n_sets, arma::fill::zeros);
+    std::vector<arma::uword> valid_sets;
+    valid_sets.reserve(n_sets);
 
     for (arma::uword s = 0; s < n_sets; ++s)
     {
@@ -184,7 +195,11 @@ void quadriga_lib::acdf(const arma::Mat<dtype> &data,
                 cumsum += p_cdf[b];
                 p_cdf[b] = cumsum * inv_n;
             }
+            valid_sets.push_back(s);
         }
+        else
+            for (arma::uword b = 0; b < no_bins; ++b)
+                p_cdf[b] = std::numeric_limits<dtype>::quiet_NaN();
     }
 
     if (cdf_per_set != nullptr)
@@ -192,19 +207,31 @@ void quadriga_lib::acdf(const arma::Mat<dtype> &data,
 
     // --- Compute averaged CDF, mu, sig ---
 
+    const arma::uword n_valid_sets = (arma::uword)valid_sets.size();
+
     if (cdf_avg != nullptr || mu != nullptr || sig != nullptr)
     {
-        if (n_sets == 1)
+        if (n_valid_sets == 0)
+        {
+            // No set has data (only possible with user bins)
+            if (cdf_avg != nullptr)
+                cdf_avg->set_size(no_bins), cdf_avg->fill(std::numeric_limits<dtype>::quiet_NaN());
+            if (mu != nullptr)
+                mu->set_size(9), mu->fill(std::numeric_limits<dtype>::quiet_NaN());
+            if (sig != nullptr)
+                sig->set_size(9), sig->fill(std::numeric_limits<dtype>::quiet_NaN());
+        }
+        else if (n_valid_sets == 1)
         {
             // No averaging needed
             if (cdf_avg != nullptr)
-                *cdf_avg = cdf_per_set_local.col(0);
+                *cdf_avg = cdf_per_set_local.col(valid_sets[0]);
 
             if (mu != nullptr || sig != nullptr)
             {
                 arma::Col<dtype> mu_local(9);
                 arma::Col<dtype> sig_local(9, arma::fill::zeros);
-                const dtype *p_cdf = cdf_per_set_local.memptr();
+                const dtype *p_cdf = cdf_per_set_local.colptr(valid_sets[0]);
                 for (arma::uword q = 0; q < 9; ++q)
                 {
                     dtype level = (dtype)(q + 1) * (dtype)0.1;
@@ -241,16 +268,22 @@ void quadriga_lib::acdf(const arma::Mat<dtype> &data,
             bool get_mu_sig = (mu != nullptr || sig != nullptr);
             arma::Mat<dtype> temp;
             if (get_mu_sig)
-                temp.set_size(n_sets, n_vals);
+                temp.set_size(n_valid_sets, n_vals);
+
+            // CDFs of the sets with finite values
+            arma::Mat<dtype> cdf_valid;
+            if (n_valid_sets != n_sets)
+                cdf_valid = cdf_per_set_local.cols(arma::conv_to<arma::uvec>::from(valid_sets));
+            const arma::Mat<dtype> &cdf_use = (n_valid_sets != n_sets) ? cdf_valid : cdf_per_set_local;
 
             for (arma::uword v = 0; v < n_vals; ++v)
             {
                 dtype level = vals(v);
                 dtype sum_x = (dtype)0.0;
 
-                for (arma::uword s = 0; s < n_sets; ++s)
+                for (arma::uword s = 0; s < n_valid_sets; ++s)
                 {
-                    const dtype *p_cdf = cdf_per_set_local.colptr(s);
+                    const dtype *p_cdf = cdf_use.colptr(s);
                     // Find first bin where CDF > level
                     arma::uword idx = no_bins - 1;
                     for (arma::uword b = 0; b < no_bins; ++b)
@@ -266,7 +299,7 @@ void quadriga_lib::acdf(const arma::Mat<dtype> &data,
                     if (get_mu_sig)
                         temp(s, v) = x_val;
                 }
-                Sc_q(v) = sum_x / (dtype)n_sets;
+                Sc_q(v) = sum_x / (dtype)n_valid_sets;
             }
 
             // Compute mu and sig at quantile levels 0.1, 0.2, ..., 0.9
@@ -289,7 +322,7 @@ void quadriga_lib::acdf(const arma::Mat<dtype> &data,
 
                     for (arma::uword v = i_start; v <= i_end; ++v)
                     {
-                        for (arma::uword s = 0; s < n_sets; ++s)
+                        for (arma::uword s = 0; s < n_valid_sets; ++s)
                         {
                             dtype val = temp(s, v);
                             sum_val += val;

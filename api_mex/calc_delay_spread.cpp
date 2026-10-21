@@ -28,7 +28,9 @@ Calculates RMS delay spread from per-CIR delays and linear-scale powers
 - **`delays`** — Delays in [s] per CIR; `[n_path, n_cir]`
 - **`powers`** — Path powers on linear scale in [W]; `[n_path, n_cir]`
 - **`threshold`** — Power threshold in [dB] relative to strongest path; paths below threshold are excluded; default: 100
-- **`granularity`** — Bin width in [s] for grouping paths in the delay domain; default: 0 (no grouping)
+- **`granularity`** — Bin width in [s] for grouping paths in the delay domain; default: 0 (no grouping); must be finite
+  and non-negative; when > 0, all delays must be finite and the delay span / granularity must be below 2^53, else an
+  error is raised
 
 ## Outputs:
 - **`ds`** — RMS delay spread in [s] per CIR; `[n_cir]`
