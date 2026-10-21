@@ -111,4 +111,15 @@ catch
     % Expected
 end
 
+% --- quantize must be 0 or a finite value >= 1e-3 deg ---
+failed = false;
+try
+    [as_q] = quadriga_lib.calc_angular_spread([0.1; 0.2], [0; 0.05], [1; 1], 1, 1, 1e-8);
+catch ME
+    failed = ~isempty(strfind(ME.message, 'quantize'));
+end
+assertTrue( failed );
+as_q = quadriga_lib.calc_angular_spread([0.1; 0.2], [0; 0.05], [1; 1], 1, 1, 1e-3);
+assertTrue( isfinite(as_q) );
+
 end

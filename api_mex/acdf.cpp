@@ -19,6 +19,8 @@ Calculate the empirical averaged cumulative distribution function (CDF)
   column CDF are averaged, then mapped back to the bin grid
 - Quantile statistics (mean and std) are reported at the 0.1, 0.2, ..., 0.9 probability levels
 - `Inf` and `NaN` values are excluded from computation
+- A data set without any finite value gets a NaN column in `cdf_per_set` and is left out of `cdf_avg`, `mu`
+  and `sig`; if no set has finite values (possible only with `bins_in`), `cdf_avg`, `mu` and `sig` are NaN
 - If `bins` is empty, equally spaced bins spanning the data range are generated
 
 ## Usage:
@@ -28,18 +30,19 @@ Calculate the empirical averaged cumulative distribution function (CDF)
 
 ## Inputs:
 - **`data`** — Input data matrix; each column is one independent data set; `[n_samples, n_sets]`
-- **`bins_in`** — Bin centers; used as-is if non-empty; if empty, equally spaced bins spanning the 
-  data range are generated; `[n_bins_in]` or empty; default: `[]`
+- **`bins_in`** — Bin centers; used as-is if non-empty (must be finite and strictly ascending, else an
+  error is raised); if empty, equally spaced bins spanning the data range are generated; `[n_bins_in]` or
+  empty; default: `[]`
 - **`n_bins`** — Number of bins when auto-generating; must be >= 2; ignored when non-empty `bins_in` 
   are provided; default: 201
 
 ## Outputs:
-- **`cdf_per_set`** — Individual CDFs; one per column of data; `[n_bins_out, n_sets]`
+- **`cdf_per_set`** — Individual CDFs; one per column of data (NaN for a set without finite values); `[n_bins_out, n_sets]`
 - **`bins_out`** — Auto-generated bins; copy of `bins_in` when non-empty `bins_in` are provided;
   `[n_bins_out = n_bins]` or `[n_bins_out = n_bins_in]`
-- **`cdf_avg`** — Averaged CDF via quantile-space averaging across data sets; `[n_bins]`
-- **`mu`** — Mean of the 0.1–0.9 quantiles across data sets; `[9]`
-- **`sig`** — Standard deviation of the 0.1–0.9 quantiles across data sets; `[9]`
+- **`cdf_avg`** — Averaged CDF via quantile-space averaging across the data sets with finite values; `[n_bins]`
+- **`mu`** — Mean of the 0.1–0.9 quantiles across the data sets with finite values; `[9]`
+- **`sig`** — Standard deviation of the 0.1–0.9 quantiles across the data sets with finite values; `[9]`
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

@@ -38,6 +38,7 @@ static dtype calc_angular_spread_1d(const dtype *ang, const dtype *pw, arma::uwo
     arma::Col<dtype> edges_vec, powQ_vec;
     if (quantize_rad > (dtype)0)
     {
+        // quantize_rad >= 1e-3 deg (checked by the caller), so |lo|, |hi| <= 180 000 fit an int
         const dtype pi_val = (dtype)3.14159265358979323846;
         int lo = (int)std::floor(-pi_val / quantize_rad);
         int hi = (int)std::ceil(pi_val / quantize_rad);
@@ -104,7 +105,8 @@ Calculate azimuth and elevation angular spreads with spherical wrapping
 - Mean direction is computed in Cartesian coordinates and all paths are rotated so the centroid lies on the equator before computing spreads, avoiding pole singularity artifacts.
 - When `calc_bank_angle = true`, an optimal bank angle maximizing azimuth spread is derived analytically from eigenvectors of the 2x2 power-weighted covariance matrix of centered angles.
 - When `disable_wrapping = true`, spreads are computed directly from raw angles; `orientation` will be zero and `phi`/`theta` equal the input `az`/`el`.
-- When `quantize > 0`, paths within that angular distance are grouped and their powers summed before computing spreads.
+- When `quantize > 0`, paths within that angular distance are grouped and their powers summed before computing spreads;
+  `quantize` must be 0 or a finite value >= 1e-3 deg (negative, NaN, Inf and smaller positive values throw).
 
 ## Declaration:
 ```
@@ -128,7 +130,8 @@ void quadriga_lib::calc_angular_spreads_sphere(
 - **`powers`** — Path powers in [W]; same structure as `az`
 - **`disable_wrapping`** *(optional)* — If true, skips spherical rotation and computes spreads from raw angles
 - **`calc_bank_angle`** *(optional)* — If true, computes optimal bank angle analytically; only used when `disable_wrapping = false`
-- **`quantize`** *(optional)* — Angular quantization step in [deg]; paths within this distance are grouped; 0 disables grouping
+- **`quantize`** *(optional)* — Angular quantization step in [deg]; paths within this distance are grouped; 0 disables grouping;
+  otherwise it must be finite and >= 1e-3 deg, else `std::invalid_argument` is thrown
 
 ## Outputs:
 - **`azimuth_spread`** *(optional)* — RMS azimuth spread; `[n_cir]`
@@ -173,6 +176,10 @@ void quadriga_lib::calc_angular_spreads_sphere(const std::vector<arma::Col<dtype
         if (powers[n].n_elem != L)
             throw std::invalid_argument("Element " + std::to_string(n) + " of 'powers' must have the same length as 'az'.");
     }
+
+    // quantize: 0 (off) or a finite step >= 1e-3 deg, so that the bin count stays below 360 000 + 2
+    if (!(quantize == (dtype)0 || (std::isfinite(quantize) && quantize >= (dtype)1e-3)))
+        throw std::invalid_argument("Input 'quantize' must be 0 (off) or a finite value >= 1e-3 deg.");
 
     dtype quantize_rad = quantize * (dtype)(3.14159265358979323846 / 180.0);
     dtype pi_val = (dtype)3.14159265358979323846;
