@@ -3,8 +3,10 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include <catch2/catch_test_macros.hpp>
+#include "quadriga_lib.hpp"
 #include "quadriga_tools.hpp"
 #include <cmath>
+#include <complex>
 #include <vector>
 
 TEST_CASE("calc_cross_polarization_ratio - Basic NLOS XPR")
@@ -123,14 +125,13 @@ TEST_CASE("calc_cross_polarization_ratio - Include LOS")
 
 TEST_CASE("calc_cross_polarization_ratio - Circular polarization identity check")
 {
-    // For a purely diagonal M with M_vv = 1, M_hh = -1 (LOS-like),
-    // the circular basis should show:
-    // M_LL = (1 + (-1)) / 2 = 0 (all real)
-    // M_RR = (1 + (-1)) / 2 = 0
-    // M_LR = (1 - (-1)) / 2 = 1
-    // M_RL = (1 - (-1)) / 2 = 1
-    // => circular XPR = 0 (co-pol is zero, cross-pol is nonzero)
-    // This reflects the physical fact that a single reflection reverses handedness.
+    // M = diag(1, -1) is the LOS matrix of get_channels_* and the ray tracer (the receive frame's e_phi points the
+    // other way). The circular entries couple the same circular vector at both ends, c(r, t) = r^T M t, with
+    // L = (1, +j)/sqrt(2) and R = (1, -j)/sqrt(2) in (V, H):
+    // M_LL = (M_vv - M_hh + j(M_vh + M_hv)) / 2 = (1 - (-1)) / 2 = 1, M_RR = 1
+    // M_LR = (M_vv + M_hh + j(M_hv - M_vh)) / 2 = 0, M_RL = 0
+    // => circular XPR = Inf (co-pol only), as get_channels_spherical gives |c| = 1 for the same circular
+    //    pattern at both ends and 0 for opposite patterns: the LOS keeps the handedness
 
     arma::mat tx(3, 1);
     tx.col(0) = arma::vec({0.0, 0.0, 0.0});
@@ -161,21 +162,20 @@ TEST_CASE("calc_cross_polarization_ratio - Circular polarization identity check"
     CHECK(std::isinf(xpr(0, 1)));
     CHECK(std::isinf(xpr(0, 2)));
 
-    // Circular: M_LL = (1+(-1))/2 = 0, M_RR = (1+(-1))/2 = 0
-    //           M_LR = (1-(-1))/2 = 1, M_RL = (1-(-1))/2 = 1
-    // Co-pol_circ = 0, Cross-pol_circ = 2 => circ XPR = 0
-    CHECK(xpr(0, 3) == 0.0);
-    CHECK(xpr(0, 4) == 0.0);
-    CHECK(xpr(0, 5) == 0.0);
+    // Circular: co-pol_circ = 2, cross-pol_circ = 0 => Inf in all three circular columns
+    CHECK(std::isinf(xpr(0, 3)));
+    CHECK(std::isinf(xpr(0, 4)));
+    CHECK(std::isinf(xpr(0, 5)));
 }
 
 TEST_CASE("calc_cross_polarization_ratio - Circular XPR for identity matrix")
 {
     // M = identity: M_vv=1, M_hv=0, M_vh=0, M_hh=1
-    // This is a double-bounce / polarization-preserving channel
-    // Circular: M_LL = (1+1)/2 = 1, M_RR = (1+1)/2 = 1
-    //           M_LR = (1-1)/2 = 0, M_RL = (1-1)/2 = 0
-    // => Circular XPR = infinite (co-pol = 2, cross-pol = 0) => returns Inf
+    // Relative to the LOS matrix diag(1, -1) the H component is mirrored, as by a single reflection: the
+    // handedness is reversed
+    // Circular: M_LL = (1-1)/2 = 0, M_RR = (1-1)/2 = 0
+    //           M_LR = (1+1)/2 = 1, M_RL = (1+1)/2 = 1
+    // => Circular XPR = 0 (co-pol = 0, cross-pol = 2)
 
     arma::mat tx(3, 1);
     tx.col(0) = arma::vec({0.0, 0.0, 0.0});
@@ -201,8 +201,10 @@ TEST_CASE("calc_cross_polarization_ratio - Circular XPR for identity matrix")
     // Linear XPR: P_vv=1, P_hh=1, P_hv=0, P_vh=0 => perfect isolation (Inf)
     CHECK(std::isinf(xpr(0, 0)));
 
-    // Circular XPR: co=2, cross=0 => perfect isolation (Inf)
-    CHECK(std::isinf(xpr(0, 3)));
+    // Circular XPR: co=0, cross=2 => 0
+    CHECK(xpr(0, 3) == 0.0);
+    CHECK(xpr(0, 4) == 0.0);
+    CHECK(xpr(0, 5) == 0.0);
 }
 
 TEST_CASE("calc_cross_polarization_ratio - Complex M elements")
@@ -508,15 +510,16 @@ TEST_CASE("calc_cross_polarization_ratio - Circular XPR with known cross-pol")
     CHECK(std::abs(xpr(0, 1) - 1.0) < 1e-10);
     CHECK(std::abs(xpr(0, 2) - 1.0) < 1e-10);
 
-    // Circular: with all M elements equal and real:
-    // a=g=0.5, c=e=0.5, b=d=f=h=0
-    // M_LL: re=(0.5+0.5-0+0.5)=1.5, im=(0+0+0.5-0.5)=0 => |M_LL|²=1.5²/4=0.5625
-    // M_RL: re=(0.5-0.5+0+0.5)=0.5, im=(0-0-0.5-0.5)=-1 => |M_RL|²=(0.25+1)/4=0.3125
-    // M_LR: re=(0.5-0.5-0-0.5)=-0.5, im=(0-0+0.5+0.5)=1 => |M_LR|²=(0.25+1)/4=0.3125
-    // M_RR: re=(0.5+0.5+0-0.5)=0.5, im=(0+0-0.5+0.5)=0 => |M_RR|²=0.25/4=0.0625
-    double co_circ = 0.5625 + 0.0625;    // 0.625
-    double cross_circ = 0.3125 + 0.3125; // 0.625
+    // Circular: with all M elements equal and real (M_vv = M_hv = M_vh = M_hh = 0.5):
+    // M_LL = (M_vv - M_hh + j(M_vh + M_hv)) / 2 = 0.5j  => |M_LL|^2 = 0.25
+    // M_RR = (M_vv - M_hh - j(M_vh + M_hv)) / 2 = -0.5j => |M_RR|^2 = 0.25
+    // M_LR = (M_vv + M_hh + j(M_hv - M_vh)) / 2 = 0.5   => |M_LR|^2 = 0.25
+    // M_RL = (M_vv + M_hh + j(M_vh - M_hv)) / 2 = 0.5   => |M_RL|^2 = 0.25
+    double co_circ = 0.25 + 0.25;    // 0.5
+    double cross_circ = 0.25 + 0.25; // 0.5
     CHECK(std::abs(xpr(0, 3) - co_circ / cross_circ) < 1e-10);
+    CHECK(std::abs(xpr(0, 4) - 1.0) < 1e-10);
+    CHECK(std::abs(xpr(0, 5) - 1.0) < 1e-10);
 }
 
 TEST_CASE("calc_cross_polarization_ratio - V-XPR and H-XPR are per receive polarisation (B-069)")
@@ -538,4 +541,69 @@ TEST_CASE("calc_cross_polarization_ratio - V-XPR and H-XPR are per receive polar
     quadriga_lib::calc_cross_polarization_ratio<double>(pw, Mv, pl, tx, rx, &xpr);
     CHECK(std::abs(xpr(0, 1) - 4.0) < 1e-12);
     CHECK(std::isinf(xpr(0, 2)));
+}
+
+TEST_CASE("calc_cross_polarization_ratio - Circular columns are per receive polarisation and match get_channels_spherical")
+{
+    // Circular coupling matrix C (rows = RX L/R, columns = TX L/R) -> linear M = P^-T C P^-1 with P = [L R],
+    // L = (1, +j)/sqrt(2), R = (1, -j)/sqrt(2) in (V, H), P^-1 = [1 -j; 1 j] / sqrt(2)
+    typedef std::complex<double> cx;
+    const cx j(0.0, 1.0);
+    const cx C[2][2] = {{1.0, 0.5 * j}, {0.25, 2.0}}; // C_LL, C_LR (rx L, tx R); C_RL (rx R, tx L), C_RR
+    const cx Pinv[2][2] = {{1.0 / std::sqrt(2.0), -j / std::sqrt(2.0)}, {1.0 / std::sqrt(2.0), j / std::sqrt(2.0)}};
+    cx Ml[2][2];
+    for (int r = 0; r < 2; ++r)
+        for (int t = 0; t < 2; ++t)
+        {
+            Ml[r][t] = 0.0;
+            for (int a = 0; a < 2; ++a)
+                for (int b = 0; b < 2; ++b)
+                    Ml[r][t] += Pinv[a][r] * C[a][b] * Pinv[b][t]; // (P^-T)(r, a) = P^-1(a, r)
+        }
+    arma::mat M = arma::vec({Ml[0][0].real(), Ml[0][0].imag(), Ml[1][0].real(), Ml[1][0].imag(),
+                             Ml[0][1].real(), Ml[0][1].imag(), Ml[1][1].real(), Ml[1][1].imag()});
+
+    arma::mat tx = arma::vec({0.0, 0.0, 0.0}), rx = arma::vec({100.0, 0.0, 0.0}), xpr;
+    std::vector<arma::vec> pw = {{1.0}}, pl = {{100.0}};
+    std::vector<arma::mat> Mv = {M};
+    quadriga_lib::calc_cross_polarization_ratio<double>(pw, Mv, pl, tx, rx, &xpr, nullptr, true);
+    CHECK(std::abs(xpr(0, 3) - (1.0 + 4.0) / (0.25 + 0.0625)) < 1e-12); // (LL + RR) / (LR + RL)
+    CHECK(std::abs(xpr(0, 4) - 1.0 / 0.25) < 1e-12);                    // LHCP: |C_LL|^2 / |C_LR|^2
+    CHECK(std::abs(xpr(0, 5) - 4.0 / 0.0625) < 1e-12);                  // RHCP: |C_RR|^2 / |C_RL|^2
+
+    // The same powers from get_channels_spherical with circular patterns, (V, H) = (1, +j)/sqrt(2) (LHCP) and
+    // (1, -j)/sqrt(2) (RHCP), at the receive and transmit ends
+    auto L = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    L.e_theta_re *= std::sqrt(0.5);
+    L.e_phi_im = L.e_theta_re;
+    L.e_phi_re.zeros();
+    auto R = L;
+    R.e_phi_im *= -1.0;
+    arma::mat F = arma::vec({50.0, 0.0, 0.0});
+    arma::vec g = {1.0}, len = {100.0};
+    auto p2 = [&](const quadriga_lib::arrayant<double> &tx_ant, const quadriga_lib::arrayant<double> &rx_ant)
+    {
+        arma::cube cr, ci, dl;
+        quadriga_lib::get_channels_spherical<double>(&tx_ant, &rx_ant, 0, 0, 0, 0, 0, 0, 100, 0, 0, 0, 0, 0, &F, &F, &g,
+                                                     &len, &M, &cr, &ci, &dl, 0.0);
+        return cr(0) * cr(0) + ci(0) * ci(0);
+    };
+    double LL = p2(L, L), LR = p2(R, L), RL = p2(L, R), RR = p2(R, R); // <rx><tx>
+    CHECK(std::abs(LL - 1.0) < 1e-5);
+    CHECK(std::abs(LR - 0.25) < 1e-5);
+    CHECK(std::abs(RL - 0.0625) < 1e-5);
+    CHECK(std::abs(RR - 4.0) < 1e-5);
+    CHECK(std::abs(xpr(0, 4) - LL / LR) < 1e-3);
+    CHECK(std::abs(xpr(0, 5) - RR / RL) < 1e-2);
+
+    // LOS matrix of get_channels_* (co-polar) and a mirrored H component as by one reflection (cross-polar)
+    Mv = {arma::mat(arma::vec({1.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0})), arma::mat(arma::vec({1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0}))};
+    std::vector<arma::vec> pw2 = {{1.0}, {1.0}}, pl2 = {{100.0}, {100.0}};
+    quadriga_lib::calc_cross_polarization_ratio<double>(pw2, Mv, pl2, tx, rx, &xpr, nullptr, true);
+    CHECK(std::isinf(xpr(0, 3)));
+    CHECK(std::isinf(xpr(0, 4)));
+    CHECK(std::isinf(xpr(0, 5)));
+    CHECK(xpr(1, 3) == 0.0);
+    CHECK(xpr(1, 4) == 0.0);
+    CHECK(xpr(1, 5) == 0.0);
 }

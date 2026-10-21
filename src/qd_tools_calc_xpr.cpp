@@ -17,8 +17,7 @@ Calculate the cross-polarization ratio (XPR) for linear and circular polarizatio
 
 - Computes aggregate XPR from polarization transfer matrices using the total-power-ratio method:
   co-pol and cross-pol powers are summed across all qualifying paths per CIR, and XPR is their ratio.
-- XPR is computed in both the linear V/H basis and the circular LHCP/RHCP basis via Jones matrix transform
-  `M_circ = T · M_lin · T^-1`.
+- XPR is computed in both the linear V/H basis and the circular LHCP/RHCP basis.
 - LOS paths are identified by comparing path length against direct TX-RX distance `dTR`; paths with
   `path_length <= dTR + window_size` are excluded by default (`include_los = false`).
 - Polarization transfer matrix `M` is the 2x2 Jones matrix (rows = RX polarisation V/H, columns = TX polarisation
@@ -27,8 +26,16 @@ Calculate the cross-polarization ratio (XPR) for linear and circular polarizatio
   receive and transmit polarisation: `M_vv` = rows 0-1, `M_hv` = rows 2-3, `M_vh` = rows 4-5, `M_hh` = rows 6-7
 - V-XPR and H-XPR are ratios per receive polarisation: V-XPR is the power received in V from V transmission over
   the power received in V from H transmission; H-XPR likewise for the H receive polarisation
-- The circular entries are `M_LL = (M_vv + M_hh + j(M_vh - M_hv)) / 2`, `M_RL = (M_vv - M_hh - j(M_vh + M_hv)) / 2`,
-  `M_LR = (M_vv - M_hh + j(M_vh + M_hv)) / 2`, `M_RR = (M_vv + M_hh - j(M_vh - M_hv)) / 2`.
+- The circular entries couple circular patterns through `M` as [[get_channels_spherical]] couples antenna patterns,
+  `c(r, t) = r^T M t` (plain transpose), with the same circular vectors at both ends, each in that antenna's own
+  (e_theta, e_phi) frame: L = (V, H) = (1, +j) / sqrt(2) (LHCP), R = (1, -j) / sqrt(2) (RHCP). The names follow the
+  IEEE definition (rotation seen along the propagation direction) for the time convention exp(+j 2 pi f t), which the
+  library's coefficients exp(-j 2 pi f tau) imply, and e_theta x e_phi = the outward direction of the pattern.
+  `M_<rx><tx>`: `M_LL = (M_vv - M_hh + j(M_vh + M_hv)) / 2`, `M_RR = (M_vv - M_hh - j(M_vh + M_hv)) / 2`,
+  `M_LR = (M_vv + M_hh + j(M_hv - M_vh)) / 2` (receive L, transmit R), `M_RL = (M_vv + M_hh + j(M_vh - M_hv)) / 2`.
+  Co-polar means the same circular vector at both ends: the LOS matrix `diag(1, -1)` of [[get_channels_spherical]] is
+  co-polar (handedness kept), `diag(1, 1)` (one mirrored component, as by a single reflection) is cross-polar.
+- LHCP-XPR and RHCP-XPR are ratios per receive polarisation, like V-XPR and H-XPR.
 - Normalization of `M` does not affect XPR (cancels in ratio) but does affect `pg`.
 - If cross-pol power is zero and co-pol is positive, XPR is set to infinity; if both are zero, XPR is set to 0.
 - TX/RX positions may be fixed `[3, 1]` or mobile `[3, n_cir]`.
@@ -65,8 +72,8 @@ void quadriga_lib::calc_cross_polarization_ratio(
    | 1   | V-XPR: sum(abs(M_vv)^2) / sum(abs(M_vh)^2) (receive V)          |
    | 2   | H-XPR: sum(abs(M_hh)^2) / sum(abs(M_hv)^2) (receive H)          |
    | 3   | Aggregate circular XPR (total L+R co-pol / total L+R cross-pol) |
-   | 4   | LHCP XPR: sum(abs(M_LL)^2) / sum(abs(M_RL)^2)                   |
-   | 5   | RHCP XPR: sum(abs(M_RR)^2) / sum(abs(M_LR)^2)                   |
+   | 4   | LHCP XPR: sum(abs(M_LL)^2) / sum(abs(M_LR)^2) (receive L)       |
+   | 5   | RHCP XPR: sum(abs(M_RR)^2) / sum(abs(M_RL)^2) (receive R)       |
 - **`pg`** *(optional)* — Total path gain summed over all paths (including LOS) as
   `0.5 * sum(powers * (abs(M_vv)^2 + abs(M_hv)^2 + abs(M_vh)^2 + abs(M_hh)^2))`; `[n_cir]`
 MD!*/
@@ -195,25 +202,26 @@ void quadriga_lib::calc_cross_polarization_ratio(const std::vector<arma::Col<dty
             P_hh += w * abs2_hh;
 
             // --- Circular basis ---
-            // M_LL = (M_vv + M_hh + j*(M_vh - M_hv)) / 2
-            dtype LL_re = a + g + d - f;
-            dtype LL_im = b + h + e - c;
+            // c(r, t) = r^T M t with L = (1, +j)/sqrt(2), R = (1, -j)/sqrt(2) in (V, H) at both ends; M_<rx><tx>
+            // M_LL = (M_vv - M_hh + j*(M_vh + M_hv)) / 2
+            dtype LL_re = a - g - d - f;
+            dtype LL_im = b - h + c + e;
             P_LL += w * (LL_re * LL_re + LL_im * LL_im) / (dtype)4;
 
-            // M_RL = (M_vv - M_hh - j*(M_vh + M_hv)) / 2
-            dtype RL_re = a - g + d + f;
-            dtype RL_im = b - h - c - e;
-            P_RL += w * (RL_re * RL_re + RL_im * RL_im) / (dtype)4;
+            // M_RR = (M_vv - M_hh - j*(M_vh + M_hv)) / 2
+            dtype RR_re = a - g + d + f;
+            dtype RR_im = b - h - c - e;
+            P_RR += w * (RR_re * RR_re + RR_im * RR_im) / (dtype)4;
 
-            // M_LR = (M_vv - M_hh + j*(M_vh + M_hv)) / 2
-            dtype LR_re = a - g - d - f;
-            dtype LR_im = b - h + c + e;
+            // M_LR = (M_vv + M_hh + j*(M_hv - M_vh)) / 2, receive L, transmit R
+            dtype LR_re = a + g - d + f;
+            dtype LR_im = b + h + c - e;
             P_LR += w * (LR_re * LR_re + LR_im * LR_im) / (dtype)4;
 
-            // M_RR = (M_vv + M_hh - j*(M_vh - M_hv)) / 2
-            dtype RR_re = a + g - d + f;
-            dtype RR_im = b + h + c - e;
-            P_RR += w * (RR_re * RR_re + RR_im * RR_im) / (dtype)4;
+            // M_RL = (M_vv + M_hh + j*(M_vh - M_hv)) / 2, receive R, transmit L
+            dtype RL_re = a + g + d - f;
+            dtype RL_im = b + h + e - c;
+            P_RL += w * (RL_re * RL_re + RL_im * RL_im) / (dtype)4;
         }
 
         // --- Write outputs ---
@@ -243,19 +251,19 @@ void quadriga_lib::calc_cross_polarization_ratio(const std::vector<arma::Col<dty
                                                      : (dtype)0;
 
             // Col 3: Aggregate circular XPR
-            dtype cross_circ = P_RL + P_LR;
+            dtype cross_circ = P_LR + P_RL;
             dtype co_circ = P_LL + P_RR;
             pX[i + 3 * stride] = (cross_circ > (dtype)0) ? co_circ / cross_circ
                                  : (co_circ > (dtype)0)  ? std::numeric_limits<dtype>::infinity()
                                                          : (dtype)0;
 
-            // Col 4: LHCP XPR (transmit L, co=LL, cross=RL)
-            pX[i + 4 * stride] = (P_RL > (dtype)0)   ? P_LL / P_RL
+            // Col 4: LHCP XPR (receive L, co = LL, cross = LR)
+            pX[i + 4 * stride] = (P_LR > (dtype)0)   ? P_LL / P_LR
                                  : (P_LL > (dtype)0) ? std::numeric_limits<dtype>::infinity()
                                                      : (dtype)0;
 
-            // Col 5: RHCP XPR (transmit R, co=RR, cross=LR)
-            pX[i + 5 * stride] = (P_LR > (dtype)0)   ? P_RR / P_LR
+            // Col 5: RHCP XPR (receive R, co = RR, cross = RL)
+            pX[i + 5 * stride] = (P_RL > (dtype)0)   ? P_RR / P_RL
                                  : (P_RR > (dtype)0) ? std::numeric_limits<dtype>::infinity()
                                                      : (dtype)0;
         }
