@@ -323,3 +323,20 @@ TEST_CASE("Generate Arrayant - Multi-Beam defaults are 1 x 1 (B-047)")
     CHECK(arma::approx_equal(a.e_theta_re, c.e_theta_re, "absdiff", 0.0));
     CHECK(arma::approx_equal(a.coupling_re, c.coupling_re, "absdiff", 0.0));
 }
+
+TEST_CASE("Arrayant generation - Multibeam beamwidth <= 0 selects the default 120 deg")
+{
+    arma::vec az = {20.0, 0.0}, el = {-7.0, 30.0};
+    auto ref = quadriga_lib::generate_arrayant_multibeam<double>(2, 2, az, el, {}, 3.75e9, 1, 0.5, 120.0, 120.0, 0.0, 10.0);
+    auto b90 = quadriga_lib::generate_arrayant_multibeam<double>(2, 2, az, el, {}, 3.75e9, 1, 0.5, 90.0, 90.0, 0.0, 10.0);
+    for (double bw : {0.0, -5.0})
+    {
+        auto a = quadriga_lib::generate_arrayant_multibeam<double>(2, 2, az, el, {}, 3.75e9, 1, 0.5, bw, bw, 0.0, 10.0);
+        CHECK(arma::approx_equal(a.e_theta_re, ref.e_theta_re, "absdiff", 0.0));
+        CHECK(arma::approx_equal(a.e_theta_im, ref.e_theta_im, "absdiff", 0.0));
+    }
+    auto a = quadriga_lib::generate_arrayant_multibeam<double>(2, 2, az, el, {}, 3.75e9, 1, 0.5, 0.0, 90.0, 0.0, 10.0);
+    auto b = quadriga_lib::generate_arrayant_multibeam<double>(2, 2, az, el, {}, 3.75e9, 1, 0.5, 120.0, 90.0, 0.0, 10.0);
+    CHECK(arma::approx_equal(a.e_theta_re, b.e_theta_re, "absdiff", 0.0)); // each angle separately
+    CHECK(arma::abs(ref.e_theta_re - b90.e_theta_re).max() > 0.01);
+}

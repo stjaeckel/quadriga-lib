@@ -14,7 +14,10 @@ Reads array antenna data from QDANT files
 
 - The QuaDRiGa array antenna exchange format (QDANT) is an XML format for storing antenna pattern data
 - Without `id`, all entries are read: returns a struct array when the file has multiple entries (frequency-dependent model) 
-  or a single struct when it has exactly one entry
+  or a single struct when it has exactly one entry; multiple entries must form a frequency set (same number of elements,
+  same azimuth and elevation grids, element positions and coupling size), otherwise
+  an error asks to pass `id`
+- Differs from Python, where `qdant_read(fn)` reads ID 1 only
 - With `id`, a single entry is read; useful for picking one frequency from a multi-frequency file
 - Separate-fields output (11 or 12 outputs) is only available when the result is a single entry 
   (i.e. `id` was provided, or the file contains exactly one entry)
@@ -80,6 +83,15 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         {
             if (nlhs != 1 && nlhs != 2)
                 mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Separate-fields output only available in single-frequency mode.");
+
+            // The entries must form a frequency set (same element count, grids, positions and coupling size)
+            std::string err = quadriga_lib::arrayant_is_valid_multi(arrayant, true);
+            if (!err.empty())
+            {
+                err = "Entries in file '" + fn + "' do not form a frequency set (" + err +
+                      "); pass 'id' to read single entries.";
+                mexErrMsgIdAndTxt("quadriga_lib:CPPerror", err.c_str());
+            }
 
             plhs[0] = qd_mex_arrayant2struct_multi(arrayant);
             if (nlhs == 2)
