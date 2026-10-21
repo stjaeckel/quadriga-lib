@@ -2,9 +2,19 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-// Diagnostic output of the test cases: QD_DIAG prints only when the environment variable QD_TEST_DIAG is set and
-// not "0", e.g. QD_TEST_DIAG=1 ./build_linux/test_bin "sos_val*". The assertions run either way, and the arguments
-// of QD_DIAG are evaluated only when the output is on.
+// Diagnostic output of the test cases, switched per area by environment variables. A variable is on when it is set
+// and not "0"; the output is off by default, and the assertions run either way.
+//
+//   QD_DIAG_SOS    sum-of-sinusoids tests (test_sos_*.cpp)
+//   QD_DIAG_CONF   conf-file and scenario-parameter tests (test_conf_*.cpp, test_scenpar_validate.cpp)
+//   QD_DIAG_RAY    ray-tracing tests, tags [wave] and [acoustic] (test_wave_*.cpp, test_acoustic_*.cpp)
+//   QD_DIAG        all areas
+//
+// Example: QD_DIAG_SOS=1 ./build_linux/test_bin "sos_val*"
+//
+// A test file selects its area once with QD_TEST_DIAG_SWITCH("QD_DIAG_SOS"). Then qd_diag() tells whether the area
+// is on, and QD_DIAG(...) prints like printf only then; its arguments are evaluated only when the output is on.
+// A new area adds its variable to the list above.
 
 #ifndef QD_TEST_DIAG_HPP
 #define QD_TEST_DIAG_HPP
@@ -12,16 +22,22 @@
 #include <cstdio>
 #include <cstdlib>
 
-static inline bool qd_test_diag()
+// True when the environment variable 'name' or QD_DIAG is set and not "0"
+static inline bool qd_test_diag_env(const char *name)
 {
-    static const bool on = []
-    {
-        const char *v = std::getenv("QD_TEST_DIAG");
-        return v != nullptr && v[0] != '\0' && v[0] != '0';
-    }();
-    return on;
+    auto on = [](const char *v)
+    { return v != nullptr && v[0] != '\0' && v[0] != '0'; };
+    return on(std::getenv("QD_DIAG")) || on(std::getenv(name));
 }
 
-#define QD_DIAG(...) (qd_test_diag() ? (void)std::printf(__VA_ARGS__) : (void)0)
+// Defines qd_diag() for the area of one test file; the environment is read once
+#define QD_TEST_DIAG_SWITCH(name)                      \
+    static inline bool qd_diag()                       \
+    {                                                  \
+        static const bool on = qd_test_diag_env(name); \
+        return on;                                     \
+    }
+
+#define QD_DIAG(...) (qd_diag() ? (void)std::printf(__VA_ARGS__) : (void)0)
 
 #endif

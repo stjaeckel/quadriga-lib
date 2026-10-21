@@ -2,6 +2,10 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Diagnostic output: off by default. QD_DIAG_RAY=1 prints the tables of this file, QD_DIAG=1 those of all areas
+// (see qd_test_diag.hpp); the assertions run either way. Example:
+//   QD_DIAG_RAY=1 ./build_linux/test_bin "[wave]"
+
 // ray_progress, wave.
 
 #include "ray_test_helpers.hpp"
@@ -2201,7 +2205,7 @@ TEST_CASE("Measurement - ray_progress and the mirror behind a back reflection", 
     // The mirror behind the ray after a back reflection, through the tracer: one ray, ray_progress called until no ray
     // is left, every path that ends in air summed at its polyline's point. Scalar, float, 1 GHz unless a band is named,
     // both tracers. Asserted: the default threshold and every series summed are one wall (A), and both frequencies of a
-    // band are on their own matrix (C). B and D are tables, printed with QD_TEST_DIAG.
+    // band are on their own matrix (C). B and D are tables, printed with QD_DIAG_RAY.
     //   H    host 100                          HS   host 100 | coating 6 mm
     //   SH   coating 6 mm | host 100           AB   A 50 | B 100, two solids across a bare face
     //   HSH  host 50 | sheet 6 mm | host 50

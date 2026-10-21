@@ -26,13 +26,14 @@ First step of every session, from the repository root:
 
 ```
 cmake --build build_linux --parallel 12
-QD_TEST_DIAG=1 OMP_NUM_THREADS=12 ./build_linux/test_bin "[wave]" > test_wave.txt          # All tests passed (163474 assertions in 178 test cases)
-QD_TEST_DIAG=1 OMP_NUM_THREADS=12 ./build_linux/test_bin "[acoustic]" > test_acoustic.txt  # All tests passed (42741 assertions in 59 test cases)
-QD_TEST_DIAG=1 OMP_NUM_THREADS=12 ./build_linux/test_bin > test.txt                        # All tests passed (1343848 assertions in 1234 test cases)
+QD_DIAG_RAY=1 OMP_NUM_THREADS=12 ./build_linux/test_bin "[wave]" > test_wave.txt           # All tests passed (163474 assertions in 178 test cases)
+QD_DIAG_RAY=1 OMP_NUM_THREADS=12 ./build_linux/test_bin "[acoustic]" > test_acoustic.txt   # All tests passed (42741 assertions in 59 test cases)
+QD_DIAG=1 OMP_NUM_THREADS=12 ./build_linux/test_bin > test.txt                             # All tests passed (1343848 assertions in 1234 test cases)
 ```
 
-`QD_TEST_DIAG=1` prints the diagnostic tables that the baselines and `tools/acoustic/rowdiff.py` compare; without
-it the ray cases print nothing and run the same assertions (section 11).
+`QD_DIAG_RAY=1` prints the diagnostic tables of the ray tests that the baselines and `tools/acoustic/rowdiff.py`
+compare; `QD_DIAG=1` prints those of all test areas (the whole-suite baseline `test.txt` includes the SOS and conf
+tables). Without them the cases print nothing and run the same assertions (section 11).
 
 At most 12 threads (since 2026-10-19): the machine is shared with other sessions, and oversubscribed OpenMP runs slow
 both. One suite at a time.
@@ -496,8 +497,8 @@ two-parameter mapping, so a change on the wave side is checked against `test_aco
 
 ## 11. Test instruments
 
-All in `tests/catch2_tests/ray_test_helpers.hpp` unless noted. The environment variable `QD_TEST_DIAG`
-(set and not `0`) prints the tables of every test file; the assertions are the same with it off. Every
+All in `tests/catch2_tests/ray_test_helpers.hpp` unless noted. The environment variable `QD_DIAG_RAY`
+(set and not `0`; `QD_DIAG` for all test areas, see `qd_test_diag.hpp`) prints the tables of every ray test file; the assertions are the same with it off. Every
 printed table carries at least one numeric bound, except four sanity sections of the two *Measurement*
 cases in `test_wave_progress.cpp` and `test_wave_state_update_chain.cpp`, which only print and are
 skipped with it off.

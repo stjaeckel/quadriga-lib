@@ -2,6 +2,10 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Diagnostic output: off by default. QD_DIAG_RAY=1 prints the tables of this file, QD_DIAG=1 those of all areas
+// (see qd_test_diag.hpp); the assertions run either way. Example:
+//   QD_DIAG_RAY=1 ./build_linux/test_bin "[wave]"
+
 // ray_state_update, wave: branch cases, walkers, the one solver, the budget and the resonant medium.
 
 #include "ray_test_helpers.hpp"

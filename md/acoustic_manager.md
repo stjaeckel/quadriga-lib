@@ -106,8 +106,9 @@ Run on every worker phase; say which items were checked.
 - `src/ray_mesh_interact.cpp` 4725 lines, restructured: an 84-line header overview, seven sections in one anonymous
   namespace, the five public API blocks shortened (`md/cleanup_src_report.md` 1.6 has the rename table old → new).
 - Counts: `[wave]` 163474 / 178, `[acoustic]` 42741 / 59, whole suite 1343848 / 1234 (generic build); AVX2 build
-  1344179 / 1234. Baselines are generated **with `QD_TEST_DIAG=1`** (the diagnostic tables print only with that
-  environment variable; a plain run of the ray tests prints nothing): commands in `md/wave.md` 0, 12 threads.
+  1344179 / 1234. Baselines are generated **with `QD_DIAG_RAY=1`** for `[wave]` / `[acoustic]` and `QD_DIAG=1` for the
+  whole suite (the diagnostic tables print only with these environment variables; a plain run prints nothing; the
+  variables were renamed from `QD_TEST_DIAG` on 2026-10-21, see `tests/catch2_tests/qd_test_diag.hpp`): commands in `md/wave.md` 0, 12 threads.
   `python3 tools/acoustic/check_docs.py` passes. Checked by the manager 2026-10-21: `[wave]` and `[acoustic]` rerun
   at dc47ff6, `rowdiff` identical; `test.txt` had been written without `QD_TEST_DIAG=1` (34 KB, right counts, no ray
   tables) and was regenerated with it (1.9 MB).
@@ -115,7 +116,7 @@ Run on every worker phase; say which items were checked.
   (`cmake -S . -B build_linux/scratch/avx2 -DCMAKE_CXX_COMPILER=g++-12 -DENABLE_AVX2=ON -DENABLE_TESTS=ON`; scratch,
   may be gone after `make clean`).
 - Manager's verification routine for a worker's claim: rebuild with `--parallel 12`, rerun `[wave]` and `[acoustic]`
-  one after the other with `QD_TEST_DIAG=1 OMP_NUM_THREADS=12`, compare against the baselines with
+  one after the other with `QD_DIAG_RAY=1 OMP_NUM_THREADS=12`, compare against the baselines with
   `python3 -I tools/acoustic/rowdiff.py test_wave.txt <new run>` (number by number), and check the diff scope
   (`git diff --stat`, `git diff --quiet -- src include api_python api_mex`).
 - Documents (internal, transitory; they stay until the parameter project): `md/acoustic.md` (the acoustic reference),

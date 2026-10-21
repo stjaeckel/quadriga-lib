@@ -2,6 +2,10 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Diagnostic output: off by default. QD_DIAG_SOS=1 prints the tables of this file, QD_DIAG=1 those of all areas
+// (see qd_test_diag.hpp); the assertions run either way. Example:
+//   QD_DIAG_SOS=1 ./build_linux/test_bin "sos_acf_approx*"
+
 // Verification suite for quadriga_lib::sos_acf_approx.
 //
 // Pins down: the closed form of the ACF of the sinusoids, the assignment of rows and columns to the axes
@@ -19,8 +23,8 @@
 #include <cmath>
 #include <stdexcept>
 
-// Diagnostic tables print with QD_TEST_DIAG=1 in the environment; the assertions run either way.
 #include "qd_test_diag.hpp"
+QD_TEST_DIAG_SWITCH("QD_DIAG_SOS")
 
 namespace
 {

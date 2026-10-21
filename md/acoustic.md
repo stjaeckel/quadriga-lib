@@ -21,7 +21,7 @@ closed-form evaluation made for this document, "measured here" a run of the libr
 sources (section 9) and sets no parameter.
 
 First step: `md/wave.md`, section 0. The acoustic half:
-`QD_TEST_DIAG=1 OMP_NUM_THREADS=12 ./build_linux/test_bin "[acoustic]" > test_acoustic.txt` → `All tests passed (42741 assertions in 59 test cases)`.
+`QD_DIAG_RAY=1 OMP_NUM_THREADS=12 ./build_linux/test_bin "[acoustic]" > test_acoustic.txt` → `All tests passed (42741 assertions in 59 test cases)`.
 Its cases are in `test_acoustic_mesh_interact.cpp`, `test_acoustic_progress.cpp`,
 `test_acoustic_state_update.cpp` and `test_acoustic_leaf.cpp` (the leaves of 2.8); 16 of them are "<name> - the mass-law part" of a wave case. The appendix
 lists every case with the section that states it. The machine described in section 2 is the one after

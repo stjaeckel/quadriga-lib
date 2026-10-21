@@ -28,21 +28,12 @@
 #include <unordered_map>
 #include <vector>
 
-// Diagnostic tables print when the environment variable QD_TEST_DIAG is set and not "0"; the assertions run
-// either way. QD_DIAG is an expression, and its arguments are evaluated only when the tables print.
+// Diagnostic tables print with QD_DIAG_RAY=1 (or QD_DIAG=1, all areas) in the environment; the assertions run either
+// way. qd_diag() and QD_DIAG(...) come from qd_test_diag.hpp.
 #include <cstdio>
 #include <cstdlib>
-
-static inline bool qd_diag()
-{
-    static const bool on = []
-    {
-        const char *v = std::getenv("QD_TEST_DIAG");
-        return v != nullptr && v[0] != '\0' && v[0] != '0';
-    }();
-    return on;
-}
-#define QD_DIAG(...) (qd_diag() ? (void)std::printf(__VA_ARGS__) : (void)0)
+#include "qd_test_diag.hpp"
+QD_TEST_DIAG_SWITCH("QD_DIAG_RAY")
 
 // ==== ray_state_update: conventions and helpers ====
 
