@@ -396,16 +396,17 @@ Read a Wavefront `.obj` file and extract geometry, visual materials, and EM/acou
 - Parses a triangulated `.obj`; quads and n-gons are rejected. Two independent material systems are returned:
   - Visual side, from the companion `.mtl`: `mtl_ind`, `mtl_names` (raw `usemtl` names), and `bsdf`.
   - EM/acoustic side, from a material table (`fn_csv`, or a built-in ITU-R P.2040 default): `csv_ind`,`csv_names`, `csv_prop`.
-- A face's `usemtl` name is matched to the table by exact name, then by name with a trailing Blender
-  `.NNN` suffix removed. Unmatched names throw when `csv_strict = true`; otherwise they map to index 0
-  (no material). The two index spaces are decoupled, so several visual
-  materials (e.g. `wall.001`, `wall.002`) may resolve to a single EM material.
+- A face's `usemtl` name is matched to the table by exact name, then by the base name (everything
+  before the first dot, so Blender sub-materials like `concrete.gray` map to `concrete`). Unmatched names
+  throw when `csv_strict = true`; otherwise they map to index 0 (no material). The two index spaces are
+  decoupled, so several visual materials (e.g. `wall.001`, `wall.002`) may resolve to a single EM material.
 - Geometry indices (`face_ind`, `obj_ind`) are 0-based. Material indices (`mtl_ind`, `csv_ind`) are
   1-based, with 0 reserved for the outside / no-material state (faces with no assigned material;
   for `csv_ind` in non-strict mode, also materials absent from the table).
 - With an empty `fn_obj`, geometry and `.mtl` outputs are empty and only the table (`csv_names`, `csv_prop`) 
   is populated — useful for inspecting a CSV or the default library. If `fn_csv` is also empty, the built-in default table is returned.
-- For a detailed description of the material model see <a href="http://quadriga-lib.org/formats.html">Data Formats</a>
+- The material model and its columns: <a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md">The quadriga-lib Material Model and Ray-Surface Physics</a>; the CSV format
+  of the material table: <a href="http://quadriga-lib.org/formats.html">Data Formats</a>
   
 ## Declaration:
 ```
