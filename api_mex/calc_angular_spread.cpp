@@ -12,7 +12,7 @@ SECTION!*/
 
 /*!MD
 # CALC_ANGULAR_SPREAD
-Calculate azimuth and elevation angular spreads with spherical wrapping
+Calculate azimuth and elevation angular spreads, optionally with spherical wrapping
 
 - Computes RMS azimuth and elevation angular spreads from power-weighted angles; each column
   of `az`/`el`/`powers` is one CIR; zero-power paths can be used to pad CIRs with fewer paths

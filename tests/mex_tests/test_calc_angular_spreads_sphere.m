@@ -122,4 +122,11 @@ assertTrue( failed );
 as_q = quadriga_lib.calc_angular_spread([0.1; 0.2], [0; 0.05], [1; 1], 1, 1, 1e-3);
 assertTrue( isfinite(as_q) );
 
+% --- Defaults: wrapping off, bank angle off (the C++ defaults; same values in C++ and Python) ---
+az = [0.1; 2.9; -3.0]; el = [0.1; -0.2; 0.3]; pw = [1; 0.8; 0.5];
+[as, es] = quadriga_lib.calc_angular_spread(az, el, pw);
+[as0, es0] = quadriga_lib.calc_angular_spread(az, el, pw, false, false);
+assertEqual( [as, es], [as0, es0] );
+assertElementsAlmostEqual( [as, es], [1.627282, 0.190512], 'absolute', 1e-6 );
+
 end
