@@ -310,5 +310,31 @@ class test_case(unittest.TestCase):
         self.assertEqual(r.stdout.splitlines(), ['MemoryError', 'alive'], r.stdout + r.stderr)
 
 
+class test_zero_cir(unittest.TestCase):
+
+    # A valid file with 0 CIRs gives empty outputs (no large allocation)
+    def test(self):
+        fn = os.path.join(current_dir, '../data/test_zero_cir.qrt')
+        out = channel.qrt_file_read(fn)
+        self.assertEqual(len(out), 18)
+        npt.assert_array_equal(out[0], [3e9])
+        for k in range(1, 5):
+            self.assertEqual(out[k].shape, (3, 0))
+        for k in range(5, 18):
+            self.assertEqual(len(out[k]), 0)
+        with self.assertRaises(IndexError):
+            channel.qrt_file_read(fn, [0])
+
+    # The documented keyword names are the registered ones
+    def test_documented_keywords(self):
+        a = channel.qrt_file_read(fn=FN_V4, i_cir=[1, 0], i_orig=0, downlink=False, normalize_M=0)
+        b = channel.qrt_file_read(FN_V4, [1, 0], 0, False, 0)
+        self.assertEqual(len(a), 18)
+        for x, y in zip(a[:5], b[:5]):
+            npt.assert_array_equal(x, y)
+        for x, y in zip(a[5], b[5]):
+            npt.assert_array_equal(x, y)
+
+
 if __name__ == '__main__':
     unittest.main()
