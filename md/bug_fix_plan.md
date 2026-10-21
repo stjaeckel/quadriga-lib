@@ -156,6 +156,7 @@ is the coordinator's suggestion from the hunt.
 | B-121 | 12 | AVX2-vs-generic ray kernel tests never run (`test_bin` without `BUILD_WITH_AVX2`, found in WP-04) | (a) record as an item, fix first in WP-12 (b) leave | (a) | (a) recorded as B-121, assigned to WP-12 (2026-10-17) |
 | WP-08 | 08 | One shared sin/cos core for the baseband DFT kernels and `fastmath_avx2.h` (proposed by the WP-04 worker) | (a) add to WP-08 as a note (b) leave | (a) | (a) added to WP-08 as a note; the WP-08 worker decides after measuring (2026-10-17) |
 | B-038 | 10 | Precision of qdant files (round 1 wrote 15 significant digits for double: files twice as large) | (a) double precision (b) single-equivalent, files as small as possible | - | (b) single-equivalent: dB magnitudes and phases with 6 decimals (5.8e-8 per sample at every level), positions and coupling as the shortest float text; replaces the 1e-12 round-trip acceptance (2026-10-20); changed 2026-10-20 (round 3): decimals relative to the element peak, absolute error at most single resolution of the element peak for every sample, at most 6 decimals |
+| B-018 | 14 | The `usemtl (null)` marker reserves the name `(null)`; a user material of that name read back as "no material" | (1) document only (2) the writer rejects a used material named `(null)` (3) the reader tells marker and material apart by the `.mtl` (4) the writer renames it | (2) | (2) rejected by obj_file_write, `std::invalid_argument` before anything is written; unused entries allowed (2026-10-21, WP-14 round 2) |
 | B-028 | 12 | Manager default D2 (judge each hit only against the face that produced it) reports touching boxes with an offset or a larger touching face as overlapping: the diagonal of the touching face crosses the other box's edge, which the edge-inclusive triangle test reports as a hit on a side face (found by the WP-12 worker) | (a) worker's graze rule: a hit on face G is a touch when the edge lies in the plane of another face of the same object and G lies on one side of that plane (clears a subset of what the old code cleared) (b) D2 literally, accept false overlaps | (a) | (a) graze rule accepted (2026-10-21) |
 
 ## 5. Work packages
@@ -386,7 +387,7 @@ acceptance checks beyond section 3.1. Severities in brackets.
 
 ### WP-17 Documentation sweep and final verification
 
-- Items: B-060 [S3], B-102 [S4], B-104 [S4], B-106 [S4], B-108 [S4] (point 3 fixed in WP-12), B-115 [S4], and any documentation parts that
+- Items: B-060 [S3], B-102 [S4], B-104 [S4] (point 5 fixed in WP-14), B-106 [S4], B-108 [S4] (point 3 fixed in WP-12), B-115 [S4], and any documentation parts that
   earlier packages left open (the manager lists them in the prompt).
 - Left open by earlier packages: `CMakeLists.txt:498` (MATLAB API section) still says MATLAB links quadriga_static "to
   avoid conflicts with MATLAB's own bundled libhdf5.so"; the static link does not separate the HDF5 libraries, the
@@ -491,7 +492,7 @@ unexpected changes in the diff; proposed `md/bugs.md` updates; anything the next
 | WP-11 | 5 | done 2026-10-20 (4 fixed, B-065 partly; downlink Doppler sign flipped; publication checked, 14 tests) | 9d3148d |
 | WP-12 | 12 | done 2026-10-21 (12 of 12 fixed; B-108 point 3 also; double AVX2 ray-triangle kernel 0.82 of old, all others 0.95-1.00) | 7bba69d (kernel tests), db31293 (ray-triangle), 4516f8e (ray-point), ee658ed (obj_overlap_test), ab407ec (mesh generators), 437dada (notes) |
 | WP-13 | 11 | done 2026-10-21 (10 fixed incl. the B-065 remainder, B-070 documented; circular XPR redefined; all workloads at or below 1.05 of old, delay spread 0.39, long-grid interp 0.001) | 5fbc6a4 (xpr_update), d7378ca (path_to_tube), 7f866e9 (combine_irs_coord), cce2d5b (baseband buffers), 5da6971 (channel statistics), f593b48 (circular XPR), d9d577f (interp), 0671302 (calc_diffraction_gain doc), plus the notes commit |
-| WP-14 | 5 | open | - |
+| WP-14 | 5 | done 2026-10-21 (5 of 5 fixed, B-104 point 5 also; Mitsuba 80 000 faces 0.02 s instead of 3.2 s, QRT raw reader linear, OBJ read 0.85 of old; AFL clean; round 2: a used material named `(null)` is rejected) | 58deaf6 (OBJ files), a85bf88 (write_png), 38a70b3 (Mitsuba), cdaa991 (QRT raw reader), plus the notes commit |
 | WP-15 | 10 | open | - |
 | WP-16 | 3 | open | - |
 | WP-17 | 6 | open | - |
@@ -555,9 +556,24 @@ binary alone; the WP-13 harness has a layout check (`build_linux/scratch/fix/WP-
 objects linked in several orders); ask for it when a ratio near the limit is decisive. (2) Allocation-failure repros
 run only in plain builds under `ulimit -v`, never under ASan (an unbounded ASan probe took the desktop app down).
 
-Next: WP-14 (OBJ, MTL, PNG and Mitsuba writers/readers; B-018, B-056, B-057, B-058, B-122). The acoustic session
-changed `src/obj_file_write.cpp` and the OBJ/MTL material columns (mass law `m`, panel `side`, `coiA` removed);
-check its commits on `main` before writing the prompt. Keep the gate if a change reaches the ray code.
+Merge 2026-10-21: `fixes` (WP-12, WP-13) merged into `main` in a temporary worktree (merge commit f0d093d), tested
+there (Catch2 AVX2 1346180 / 1265, generic 1344398 / 1264, `[wave]` 163474 / 178 and `[acoustic]` 42741 / 59 in both
+builds, Octave MEX 66 of 67 with the known excluded failure, pytest 799 passed), then `main` and `fixes`
+fast-forwarded to f0d093d. It includes the acoustic session's ray-test cleanup (dc47ff6, 9510ad8). The build
+directories of this worktree are stale since the merge; the next worker rebuilds build_linux, build_generic and
+build_asan first.
+
+Test diagnostics (2026-10-21, on `main`, commits a7f1954 and e34dd2a; `fixes` fast-forwarded to e34dd2a): the
+tables of the test suite are off by default and switched per area by environment variables, `QD_DIAG_SOS`,
+`QD_DIAG_CONF`, `QD_DIAG_RAY` (`[wave]` and `[acoustic]`), `QD_DIAG` for all (`tests/catch2_tests/qd_test_diag.hpp`).
+Suite runs print only the summary; worker prompts need no switch for the gate (counts only). `main` is the acoustic
+session's branch again: the fixes work touches it only for an agreed merge.
+
+WP-14 (2026-10-21): done, review passed; four themed commits 58deaf6 to cdaa991 plus the notes commit. AFL note: with the new OBJ reader the MTL / CSV harnesses must be built at
+`-O1` (toolchain crash in AFL's coverage counter at `-O2`; Fuzzing section of `md/bugs.md`). Round 2 (2026-10-21): the
+writer rejects a used material named `(null)` (section 4).
+
+Next: WP-15 (API consistency of the wrappers).
 
 ## 8. Item index
 
