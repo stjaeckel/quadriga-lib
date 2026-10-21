@@ -16,15 +16,8 @@
 #include <cmath>
 #include <stdexcept>
 
-// Diagnostic output. Comment out to silence the tables. The assertions run either way.
-#define QD_TEST_VERBOSE
-
-#ifdef QD_TEST_VERBOSE
-#include <cstdio>
-#define QD_DIAG(...) std::printf(__VA_ARGS__)
-#else
-#define QD_DIAG(...) ((void)0)
-#endif
+// Diagnostic tables print with QD_TEST_DIAG=1 in the environment; the assertions run either way.
+#include "qd_test_diag.hpp"
 
 TEST_CASE("sos_acf_2d - grid values match the hand-computed radial interpolation")
 {
