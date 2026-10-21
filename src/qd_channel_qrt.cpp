@@ -1868,8 +1868,10 @@ std::vector<quadriga_lib::path> quadriga_lib::qrt_file_read_raw(const std::strin
             throw std::invalid_argument("qrt_file_read_raw: unexpected end of file in path block.");
 
         // Reassemble one path object per stored path.
+        // Grow the output geometrically: a reserve of exactly the next size per CIR would move all paths read so far
         size_t coord_cursor = 0, type_cursor = 0;
-        out.reserve(out.size() + nP);
+        if (out.size() + nP > out.capacity())
+            out.reserve(std::max(out.size() + nP, 2 * out.capacity()));
         for (unsigned iP = 0; iP < nP; ++iP)
         {
             unsigned ns = nmi[iP];
