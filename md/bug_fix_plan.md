@@ -156,6 +156,7 @@ is the coordinator's suggestion from the hunt.
 | B-121 | 12 | AVX2-vs-generic ray kernel tests never run (`test_bin` without `BUILD_WITH_AVX2`, found in WP-04) | (a) record as an item, fix first in WP-12 (b) leave | (a) | (a) recorded as B-121, assigned to WP-12 (2026-10-17) |
 | WP-08 | 08 | One shared sin/cos core for the baseband DFT kernels and `fastmath_avx2.h` (proposed by the WP-04 worker) | (a) add to WP-08 as a note (b) leave | (a) | (a) added to WP-08 as a note; the WP-08 worker decides after measuring (2026-10-17) |
 | B-038 | 10 | Precision of qdant files (round 1 wrote 15 significant digits for double: files twice as large) | (a) double precision (b) single-equivalent, files as small as possible | - | (b) single-equivalent: dB magnitudes and phases with 6 decimals (5.8e-8 per sample at every level), positions and coupling as the shortest float text; replaces the 1e-12 round-trip acceptance (2026-10-20); changed 2026-10-20 (round 3): decimals relative to the element peak, absolute error at most single resolution of the element peak for every sample, at most 6 decimals |
+| B-028 | 12 | Manager default D2 (judge each hit only against the face that produced it) reports touching boxes with an offset or a larger touching face as overlapping: the diagonal of the touching face crosses the other box's edge, which the edge-inclusive triangle test reports as a hit on a side face (found by the WP-12 worker) | (a) worker's graze rule: a hit on face G is a touch when the edge lies in the plane of another face of the same object and G lies on one side of that plane (clears a subset of what the old code cleared) (b) D2 literally, accept false overlaps | (a) | (a) graze rule accepted (2026-10-21) |
 
 ## 5. Work packages
 
@@ -324,6 +325,12 @@ acceptance checks beyond section 3.1. Severities in brackets.
 - Notes: decisions B-077, B-082. B-027 (shift to a local origin before the float kernel) changes AVX2 results slightly
   for every caller; run the area-D comparison probes (`build_linux/scratch/hunt/D/rti_random.cpp`, `rpi_random.cpp`).
   The CUDA ray kernels have the same slab-test logic (B-072); CUDA is out of scope, note it for later.
+- Notes after WP-12 (for later, CUDA out of scope): `src/ray_triangle_intersect_cuda.cu:226-230` has the B-072 fold
+  (NaN of the second or third slab adopted, also for a -0 direction) and rounds double coordinates to float (`RTI_d2f`),
+  so its double precision still degrades with the distance from the origin (documented); its tie order is already the
+  generic one. The ray-point AABB test has no B-072 pattern, but a degenerate beam (vertex direction parallel to the
+  wavefront plane) could give 0*inf there. Benchmark of the ray kernels and `obj_overlap_test`:
+  `build_linux/scratch/fix/WP-12/bench/run_bench.sh` (pins to an idle core; core 2 is often busy).
 
 ### WP-13 Channel tools
 
@@ -357,6 +364,9 @@ acceptance checks beyond section 3.1. Severities in brackets.
   `src/get_channels_*.cpp` (B-113), `api_mex/arrayant_rotate_pattern.cpp`.
 - Notes after WP-06: MEX `subdivide_triangles` and `triangle_mesh_segmentation` subtract 1 from `mtl_ind_in`, which is
   1-based in C++ with 0 = "no material", so an input 0 wraps around (related to B-089).
+- Notes after WP-12: the MEX and Python `icosphere` wrappers pre-allocate `20 * n_div * n_div` outputs without an
+  overflow check; harmless since WP-12 (C++ throws "Input 'n_div' is too large." before writing), align with the
+  integer-input checks.
 - Notes after WP-05: Python `hdf5_write_channel` and `hdf5_read_layout` still return uint32, while `hdf5_create_file`
   returns int64 since WP-05 (B-116); align them with the integer-output rule of the Python spec.
 - Notes: decisions B-087, B-088, B-091, B-092, B-095, B-113. B-088 changes the C++ defaults of
@@ -373,7 +383,7 @@ acceptance checks beyond section 3.1. Severities in brackets.
 
 ### WP-17 Documentation sweep and final verification
 
-- Items: B-060 [S3], B-102 [S4], B-104 [S4], B-106 [S4], B-108 [S4], B-115 [S4], and any documentation parts that
+- Items: B-060 [S3], B-102 [S4], B-104 [S4], B-106 [S4], B-108 [S4] (point 3 fixed in WP-12), B-115 [S4], and any documentation parts that
   earlier packages left open (the manager lists them in the prompt).
 - Left open by earlier packages: `CMakeLists.txt:498` (MATLAB API section) still says MATLAB links quadriga_static "to
   avoid conflicts with MATLAB's own bundled libhdf5.so"; the static link does not separate the HDF5 libraries, the
@@ -384,8 +394,7 @@ acceptance checks beyond section 3.1. Severities in brackets.
   appended to such a file cannot be read back (`src/qd_arrayant_qdant.cpp`, around line 442 after WP-10).
 - From WP-09 (small defects, fix here): `arrayant::remove_zeros` does not copy `name` to the output, and computes the
   azimuth spacing of the first grid point wrongly (`src/qd_arrayant.cpp`, around line 1433 after WP-09).
-- From WP-08: the MEX and Python docs of `ray_triangle_intersect` say auto mode picks CUDA from 10 000 rays (the
-  C++ code uses 500); a SLERP header comment in `src/fastmath_avx2.h` claims a double-precision direction sum the code
+- From WP-08: a SLERP header comment in `src/fastmath_avx2.h` claims a double-precision direction sum the code
   does not do; `_fm256_polar_ps` is unused (dead code); `fast_cart2geo` returns elevation 0 (not NaN) for NaN input in
   both kernels, while azimuth and length are NaN.
 - From WP-06: `include/quadriga_tools.hpp` calls `obj_ind` of `obj_file_write` "1-based"; the C++ code and its
@@ -472,7 +481,7 @@ unexpected changes in the diff; proposed `md/bugs.md` updates; anything the next
 | WP-09 | 9 | done 2026-10-20 (9 of 9 fixed; interpolation 0.99-1.02 of old) | 098b8c7 |
 | WP-10 | 7 | done 2026-10-20 (6 fixed, B-041 documented; 3 rounds: qdant precision single-equivalent relative to the element peak) | d0f4a31 |
 | WP-11 | 5 | done 2026-10-20 (4 fixed, B-065 partly; downlink Doppler sign flipped; publication checked, 14 tests) | 9d3148d |
-| WP-12 | 12 | open | - |
+| WP-12 | 12 | done 2026-10-21 (12 of 12 fixed; B-108 point 3 also; double AVX2 ray-triangle kernel 0.82 of old, all others 0.95-1.00) | see 8a |
 | WP-13 | 10 | open | - |
 | WP-14 | 5 | open | - |
 | WP-15 | 10 | open | - |
@@ -519,13 +528,20 @@ How each package was run (keep doing this):
 5. When the user asks for a second round: write a short follow-up prompt for the same (existing) worker session.
 
 Useful files: `build_linux/scratch/fix/build_asan_mod.sh` (ASan Python module); benchmark models in
-`build_linux/scratch/fix/WP-0{3,4,8,9}/bench/`; worker logs in `md/fix_logs/`. `test_bin` must run from the repository
+`build_linux/scratch/fix/WP-0{3,4,8,9}/bench/` and `WP-12/bench/`; worker logs in `md/fix_logs/`. `test_bin` must run from the repository
 root (relative data paths). The library and tests deliberately link no BLAS/LAPACK: never use `arma::norm`, `dot`,
 `svd` and similar.
 
-Next: WP-12 (geometry). Start with B-121 (enable the AVX2-vs-generic ray kernel tests in test_bin), which may expose
-B-071. The acoustic session's commits changed `ray_mesh_interact.cpp` and the traced-media code; WP-12 must not
-change the excluded ray-interaction machinery.
+WP-12 (2026-10-21): done; the user committed it as several commits, one per function group (kernel test build,
+ray-triangle kernels, ray-point kernel, `obj_overlap_test`, mesh generators), plus a commit with these notes. Hashes:
+see the status table of section 7 once filled in. The WP-12 prompt carried a coordination rule that later packages
+keep: the acoustic session owns `src/ray_mesh_interact.cpp`, `src/ray_progress.cpp`, the `[wave]` / `[acoustic]` test
+files, `tests/catch2_tests/ray_test_helpers.hpp` and `tests/data/wave_twins.tsv` (its test cleanup is about to start on
+`main`); a package that changes code those tests reach runs `[wave]` and `[acoustic]` in both builds as a gate and
+stops on a failure instead of editing the tests.
+
+Next: WP-13 (channel tools). `path_to_tube` and `calc_diffraction_gain` call `ray_triangle_intersect`; keep the gate
+above if WP-13 changes their results.
 
 ## 8. Item index
 
