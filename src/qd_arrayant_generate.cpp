@@ -775,8 +775,8 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_multibeam(
    | 2     | H/V polarization      | 2NM      |
    | 3     | ±45° polarization     | 2NM      |
 - **`spacing`** *(optional)* — Inter-element spacing in wavelengths
-- **`az_3dB`** *(optional)* — Per-element azimuth 3dB beamwidth in degrees
-- **`el_3dB`** *(optional)* — Per-element elevation 3dB beamwidth in degrees
+- **`az_3dB`** *(optional)* — Per-element azimuth 3dB beamwidth in degrees; values <= 0 select the default 120
+- **`el_3dB`** *(optional)* — Per-element elevation 3dB beamwidth in degrees; values <= 0 select the default 120
 - **`rear_gain_lin`** *(optional)* — Per-element front-to-back gain ratio (linear)
 - **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees
 - **`separate_beams`** *(optional)* — If `true`, generate one independent beam per angle pair
@@ -814,8 +814,8 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_multibeam(arma::uw
     center_freq = (center_freq <= zero) ? (dtype)299792458.0 : center_freq;
     pol = (pol == 0 || pol > 3) ? 1 : pol;
     spacing = (spacing < zero) ? (dtype)0.5 : spacing;
-    az_3dB = (az_3dB <= zero) ? (dtype)90.0 : az_3dB;
-    el_3dB = (el_3dB <= zero) ? (dtype)90.0 : el_3dB;
+    az_3dB = (az_3dB <= zero) ? (dtype)120.0 : az_3dB; // Default per-element beamwidth
+    el_3dB = (el_3dB <= zero) ? (dtype)120.0 : el_3dB;
     rear_gain_lin = (rear_gain_lin < zero) ? zero : rear_gain_lin;
 
     // Normalized distance = 5000 wavelengths

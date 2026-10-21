@@ -4,6 +4,7 @@
 
 import sys
 import os
+import tempfile
 import unittest
 import numpy as np
 import numpy.testing as npt
@@ -127,6 +128,28 @@ class test_case(unittest.TestCase):
             npt.assert_array_equal(r['layout'], [[1]])
         finally:
             shutil.rmtree(d, ignore_errors=True)
+
+
+class test_default_id(unittest.TestCase):
+
+    # Python reads ID 1 by default (MATLAB reads all entries, which must form a frequency set)
+    def test(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            fn = os.path.join(tmp, 'two.qdant')
+            arrayant.qdant_write(fn, arrayant.generate('omni'), 1)
+            arrayant.qdant_write(fn, arrayant.generate('xpol'), 2)
+            r = arrayant.qdant_read(fn)
+            self.assertEqual(r['e_theta_re'].shape[2], 1)
+            r2 = arrayant.qdant_read(fn, 2)
+            self.assertEqual(r2['e_theta_re'].shape[2], 2)
+            # id = 0 reads all entries; they must form a frequency set (same element count and grids)
+            with self.assertRaisesRegex(ValueError, "do not form a frequency set.*pass 'id'"):
+                arrayant.qdant_read(fn, 0)
+            fn = os.path.join(tmp, 'grids.qdant')
+            arrayant.qdant_write(fn, arrayant.generate('omni'), 1)
+            arrayant.qdant_write(fn, arrayant.generate('omni', res=5.0), 2)
+            with self.assertRaisesRegex(ValueError, "do not form a frequency set"):
+                arrayant.qdant_read(fn, 0)
 
 
 if __name__ == '__main__':

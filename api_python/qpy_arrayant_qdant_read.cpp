@@ -16,7 +16,10 @@ Reads array antenna data from QDANT files
 - A QDANT file may hold one or several entries (e.g. a frequency-dependent antenna model)
 - `id` reads a single entry by its 1-based ID; the result is a dict with 3D pattern fields
 - `id = 0` reads every entry: a frequency-dependent dict with 4D pattern fields when the file
-  holds multiple entries, or a plain single-entry dict (3D fields) when it holds exactly one
+  holds multiple entries, or a plain single-entry dict (3D fields) when it holds exactly one; multiple
+  entries must form a frequency set (same number of elements, same azimuth and elevation grids, element
+  positions and coupling size), otherwise an error asks to pass `id`
+- Differs from MATLAB, where `arrayant_qdant_read(fn)` without `id` reads every entry (here: `id = 0`)
 - Reading all entries is the inverse of `qdant_write` with a 4D-pattern dict
 - An `id` that is not in the file raises an error; the first entry counts as ID 1 only if it has no
   `id` attribute
@@ -64,6 +67,13 @@ py::dict arrayant_qdant_read(const std::string &fn,
         auto ant_vec = quadriga_lib::qdant_read_multi<double>(fn, &layout);
         if (ant_vec.empty())
             throw std::runtime_error("File does not contain any antenna data.");
+        if (ant_vec.size() > 1) // The entries must form a frequency set
+        {
+            std::string err = quadriga_lib::arrayant_is_valid_multi(ant_vec, true);
+            if (!err.empty())
+                throw std::invalid_argument("Entries in file '" + fn + "' do not form a frequency set (" + err +
+                                            "); pass 'id' to read single entries.");
+        }
         output = qd_python_arrayant2dict_multi(ant_vec);
     }
     else // Read a single entry by its 1-based ID
