@@ -493,7 +493,9 @@ two-parameter mapping, so a change on the wave side is checked against `test_aco
 - Fixtures that call the library one ray at a time use `ub::OneThread`.
 - A moved table is read in its unit, column by column; changing a test translation unit alone shifts
   a few residual rows by about 3e-16.
-- `html_docu/quadriga_lib_material_model.md` is out of date and out of scope until it is taken up.
+- `html_docu/quadriga_lib_material_model.md` is the public page of the material model (rewritten from the code
+  2026-10-21): a change that moves a formula, a default, a rule of use or a limit updates it; `python3
+  tools/acoustic/check_docs.py` checks its columns, labels, math and anchors.
 
 ## 11. Test instruments
 

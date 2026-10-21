@@ -2451,7 +2451,7 @@ Linear gain of a ray traversing a homogeneous lossy medium
     `ε_r = a·(f/fRef)^b − j·17.98·σ/f[GHz]`, `σ = c·(f/fRef)^d`, `μ_r` from `e`, `f`, `g`, `h` in the same form,
     and for a material without the mass column the permittivity resonance (`resF`, `resQ`, `resS`);
   - the distance absorption `alpha·(f/fRef)^alphaB` dB/m (excess loss not captured by `σ`, e.g. foliage);
-  - for a mass-law material (`m > 0`, the acoustic switch) the mass term, added once and not per metre where
+  - for a mass-law material (`m > 0`, the acoustic switch) the mass term, added once and not per meter where
     `dist` exceeds 1.5 mm: `20·log10((f/fRef)·dist)` dB with `dist` as the normal thickness, the resonance and
     coincidence columns acting on it, zero where it would be negative. With a panel size `side > 0` (√area in m,
     3.29 where the column is absent) Davy's radiation efficiency of a finite panel enters: a panel small in
@@ -2479,6 +2479,7 @@ dtype quadriga_lib::medium_gain(
 - Linear in-medium gain in `[0, 1]`; multiply by the incident field/power gain to get the value after the medium
 
 ## See also:
+- <a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md">The quadriga-lib Material Model and Ray-Surface Physics</a> (the formulas and the columns)
 - [[ray_mesh_interact]] (for complex ray-material interactions)
 - [[obj_file_read]] (defines mtl_prop format)
 MD!*/
@@ -2526,6 +2527,7 @@ dtype quadriga_lib::interface_gain(
 - Linear interface gain in `[0, 1]`; multiply by the incident field/power gain to get the value after the interface
 
 ## See also:
+- <a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md">The quadriga-lib Material Model and Ray-Surface Physics</a> (the formulas and the columns)
 - [[medium_gain]] (for the distance-dependent in-medium loss)
 - [[ray_mesh_interact]] (for complex ray-material interactions)
 - [[obj_file_read]] (defines mtl_prop format)
@@ -2573,6 +2575,7 @@ dtype quadriga_lib::refractive_index(
 - Real refractive index of the medium relative to air
 
 ## See also:
+- <a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md">The quadriga-lib Material Model and Ray-Surface Physics</a> (the formulas and the columns)
 - [[medium_gain]] (for the distance-dependent in-medium loss)
 - [[ray_mesh_interact]] (for complex ray-material interactions)
 - [[obj_file_read]] (defines mtl_prop format)
@@ -2617,8 +2620,10 @@ Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh 
 - Past the critical angle into a lossless medium (a lossy one has none) the face reflects fully where no `tf` is
   set; with `tf` it passes the leak of its pad. With a ray tube and types 2 or 5, a tube with any vertex past the
   critical angle passes undeviated as a whole.
-- In-medium attenuation is not applied here ([[ray_state_update]] does), and no spreading loss is applied.
-- For a detailed description of the material model see <a href="http://quadriga-lib.org/formats.html">Data Formats</a>
+- The loss inside a traced solid is not applied here ([[ray_state_update]] applies it where the leg closes); a sheet's
+  composite includes the loss and the mass term of its layer. No spreading loss is applied.
+- The material model, its columns, the rules of use and the limits: the companion page under See also; the CSV format
+  of the material table: <a href="http://quadriga-lib.org/formats.html">Data Formats</a>
 
 ## Declaration:
 ```
@@ -2726,11 +2731,12 @@ void quadriga_lib::ray_mesh_interact(
 - **`path_dirN`** — Refraction-correct path direction: mirror for types 0/3, Snell direction for types 1/2/4/5; `[n_rayN, 3]`.
   For undeviated transmission (types 1/4) this is the *refracted* direction, which differs from the geometric continuation
   (along the incoming ray) used for `origN`/`destN`; it lets downstream code recover the true transmission angle.
-  Out of a mass-law medium (`m > 0`) there is no bend with any type: the wave is held undeviated at every face.
+  No ray bends into a mass-law medium (`m > 0`). The wave in it is held: into air or another mass-law body it keeps its
+  direction, into a medium without the mass column it is refracted as a wave from air.
 - **`ray_indN`** — 0-based input ray index for each output ray (inverse of the internal compaction map; order-preserving); `[n_rayN]`
 
 ## See also:
-- <a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md">The quadriga-lib Material Model and Ray-State Machine</a> (companion document)
+- <a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md">The quadriga-lib Material Model and Ray-Surface Physics</a> (companion document)
 - [[obj_file_read]] (for loading `mesh` and `mtl_prop` from OBJ file)
 - [[ray_state_update]] (inside/outside state machine)
 - [[icosphere]] (for generating beams)
@@ -3291,7 +3297,7 @@ void quadriga_lib::ray_state_update(
    | Word                 | Bits 0-13                          | Bit 14                                        | Bit 15                    |
    | -------------------- | ---------------------------------- | --------------------------------------------- | ------------------------- |
    | `mtl_ind_current`    | medium the ray is in, 0 = air      | bent: the leg follows a bend traced with type 2 or 5; zero in air | the leg's series was summed |
-   | `mtl_ind_prev`       | medium the leg was entered from, or the sheet crossed or reflected off | the sheet in this word lies inside the current medium | the leg's faces are not parallel |
+   | `mtl_ind_prev`       | medium the leg was entered from, or the sheet crossed or reflected off | a sheet in this word lies inside the current medium; with a solid, the face into the current medium was evaluated at a real-invariant cosine | the leg's faces are not parallel |
    | `mtl_ind_buffer`     | deferred medium                    | followed, with a zero index: the leg began at a reflection that left the series to the tracer. With an index: the layer of an ordered stack behind the ray that the previous-medium word does not name | clear |
    | `mtl_ind_buffer`     | thickness code, bits 0-14          | (part of the code)                            | set: mass-crossed         |
    Under bit 15 the buffer word is the normal thickness, as a logarithmic code, of a mass-law leg closed on the way
@@ -3406,7 +3412,7 @@ void quadriga_lib::ray_state_update(
    A stack of two different sheets is crossed as one event with the codes of a sheet; a singular stack kills the ray.
 
 ## See also:
-- <a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md">The quadriga-lib Material Model and Ray-State Machine</a> (companion document)
+- <a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md">The quadriga-lib Material Model and Ray-Surface Physics</a> (companion document)
 - [[ray_mesh_interact]] (computes the per-interaction Fresnel/Jones result this function corrects)
 - [[calc_diffraction_gain]] (uses this function for its media)
 - [[ray_progress]] (the tracer that calls it)
