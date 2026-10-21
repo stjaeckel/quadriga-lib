@@ -18,6 +18,8 @@ Mechanical checks of the acoustic documents (md/acoustic.md, md/wave.md), run fr
    MaterialCols reads (resolve("...") in src/ray_mesh_interact.cpp) is a row of the page's column table; no internal
    labels (item ids, "round 1", md/ files, briefs, rigs, scratch paths) outside math and code; `$` balanced per
    paragraph and `$$` per file; no \newcommand; every in-page anchor resolves to a heading.
+7. The material part of the Data Formats page, tools/data_formats_md/format_materials.md: tables and spelling as
+   above; every column that MaterialCols reads is a row of its column table (header "| Key |"); no internal labels.
 
 Exit code 0 when every check passes, 1 otherwise. It reports; it changes nothing.
 """
@@ -26,6 +28,7 @@ import csv, glob, os, re, sys
 ROOT = os.getcwd()
 DOCS = ['md/acoustic.md', 'md/wave.md']
 PAGE = 'html_docu/quadriga_lib_material_model.md'
+FORMATS = 'tools/data_formats_md/format_materials.md'
 SOURCE = 'src/ray_mesh_interact.cpp'
 REVIEW = os.environ.get('QD_REVIEW_DIR', '/sjc/accoustic_research')
 BRITISH = ['neighbour', 'centre', 'behaviour', 'modelled', 'modelling', 'colour', 'millimetre', 'metre ', 'favour',
@@ -81,29 +84,38 @@ def slug(h):
     h = re.sub(r'[^\w\- ]', '', h)
     return h.replace(' ', '-')
 
-def check_page(text):
-    """(missing columns, label hits, bad math paragraphs, $$ ok, no newcommand, unresolved anchors)"""
+def missing_columns(text, header):
+    """(columns MaterialCols reads that are no row of the table whose header line starts with `header`, count)"""
     cols = re.findall(r'resolve\("([A-Za-z]+)"\)', read(SOURCE))
     rows, in_tab = set(), False
     for line in text.split('\n'):
-        if line.startswith('| column |'):
+        if re.match(header, line):
             in_tab = True
         elif in_tab and line.startswith('|'):
-            m = re.match(r'\|\s*`([A-Za-z]+)`\s*\|', line)
+            m = re.match(r'\|\s*`?([A-Za-z]+)`?\s*\|', line)
             if m:
                 rows.add(m.group(1))
         else:
             in_tab = False
-    missing = [c for c in cols if c not in rows]
+    return [c for c in cols if c not in rows], len(cols)
+
+def find_labels(text):
+    """internal labels outside math and code"""
     plain = strip_math_code(text)
     labels = []
     for pat in (r'\b[AMNPDW]\d+[a-z\u2032]?\b', r'\bD2-b\b', r'\bround 1\b', r'\bmd/', r'_report\.md', r'_brief\.md',
                 r'\bbriefs?\b', r'\brigs?\b', r'build_linux/scratch'):
         labels += re.findall(pat, plain)
+    return labels
+
+def check_page(text):
+    """(missing columns, label hits, bad math paragraphs, $$ ok, no newcommand, unresolved anchors)"""
+    missing, ncol = missing_columns(text, r'\| column \|')
+    labels = find_labels(text)
     bad_math, dd_ok, nc_ok = check_math(text)
     heads = {slug(m) for m in re.findall(r'^#+\s+(.*)$', text, flags=re.M)}
     anchors = [a for a in re.findall(r'\]\(#([^)]+)\)', text) if a not in heads]
-    return missing, labels, bad_math, dd_ok, nc_ok, anchors, len(cols)
+    return missing, labels, bad_math, dd_ok, nc_ok, anchors, ncol
 
 def main():
     ok = True
@@ -173,6 +185,20 @@ def main():
         ok &= not bad and not hits and not missing and not labels and not bad_math and dd_ok and nc_ok and not anchors
     else:
         print('page       skipped (%s not found)' % PAGE)
+    # 7. the material part of the Data Formats page
+    if os.path.exists(os.path.join(ROOT, FORMATS)):
+        fmt = read(FORMATS)
+        bad = check_tables(FORMATS, fmt)
+        print('tables     %-16s %s' % ('formats', 'ok' if not bad else 'rows off at lines %s' % bad))
+        hits = sorted({w.strip() for w in BRITISH if re.search(r'\b' + re.escape(w.strip()), fmt, re.I)})
+        print('spelling   %-16s %s' % ('formats', 'ok' if not hits else 'British spellings: %s' % hits))
+        missing, ncol = missing_columns(fmt, r'\|\s*Key\s*\|')
+        print('columns    %-16s %s' % ('formats', '%d of %d in the column table' % (ncol - len(missing), ncol) + ('' if not missing else ', MISSING: %s' % missing)))
+        labels = find_labels(fmt)
+        print('labels     %-16s %s' % ('formats', 'none' if not labels else 'FOUND: %s' % sorted(set(labels))))
+        ok &= not bad and not hits and not missing and not labels
+    else:
+        print('formats    skipped (%s not found)' % FORMATS)
     print('RESULT     %s' % ('all checks pass' if ok else 'checks failed'))
     return 0 if ok else 1
 

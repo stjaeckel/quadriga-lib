@@ -2,8 +2,8 @@
 
 This file is the manager's memory. A manager session reads it first, works from it, and updates it after every step
 (state, roadmap, pending decisions). When a manager's context fills up, a new manager reads this file and continues;
-nothing depends on one chat. Last updated: 2026-10-21, after commit f33c8cb (cleanup tasks 1 and 2 done; task 3 phases 1–2 done and reviewed,
-waiting for Stephan's commit; `main` is the acoustic work's branch again).
+nothing depends on one chat. Last updated: 2026-10-21, after commit 32c55b2 (cleanup tasks 1–3 done, task 3 committed 23ad1b6; the Data Formats
+material part done and reviewed, waiting for Stephan's commit; `main` is the acoustic work's branch again).
 
 ## 1. Roles
 
@@ -101,7 +101,9 @@ Run on every worker phase; say which items were checked.
 
 ## 4. Current state (2026-10-21)
 
-- Last commit **e34dd2a**. On 2026-10-21 three commits from the fixes manager (branch `fixes`,
+- Last commit **32c55b2** (`.gitignore`: `__pycache__/` everywhere; the stray `tools/acoustic/__pycache__` file was
+  removed from the index in 23ad1b6). Before it **23ad1b6**, task 3: the material-model page rewritten from the code,
+  seven API-block edits, `check_docs.py` checks the page. Before them, e34dd2a. On 2026-10-21 three commits from the fixes manager (branch `fixes`,
   `/sjc/quadriga-lib-fixes`) landed on `main`; from then on `main` is ours again, and the fixes work touches it only
   for an agreed merge:
   - **f0d093d**, merge of `fixes`: `ray_triangle_intersect` (all kernels) reports hits at equal distance in index
@@ -124,7 +126,7 @@ Run on every worker phase; say which items were checked.
   every face pair), a5bdfb7 (merge of the `fixes` branch from another session), 29e1f05 (source cleanup of
   `src/ray_mesh_interact.cpp`), 6307a64 (traced-leg precision), de60194 (finite panel, `side` column), bc24b0c (`m` a
   switch, `coiA` removed), 2c5be17 (peaked face as series impedance), 238444d, 04b92bd, 4720a92 (round 1).
-- `src/ray_mesh_interact.cpp` 4725 lines, restructured: an 84-line header overview, seven sections in one anonymous
+- `src/ray_mesh_interact.cpp` 4731 lines (4725 before the task-3 API-block edits), restructured: an 84-line header overview, seven sections in one anonymous
   namespace, the five public API blocks shortened (`md/cleanup_src_report.md` 1.6 has the rename table old → new).
 - Counts: `[wave]` 163474 / 178, `[acoustic]` 42741 / 59, whole suite 1344398 / 1264 (generic build; the merge
   added 30 cases outside the ray tests); AVX2 build 1346180 / 1265. Baselines are generated **with `QD_DIAG_RAY=1`** for `[wave]` / `[acoustic]` and `QD_DIAG=1` for the
@@ -183,9 +185,10 @@ kernel reports hits at equal distance in index order, so generic and AVX2 agree;
 
 Done in this cleanup series: task 1, the source cleanup (29e1f05; `md/cleanup_src_report.md`); task 2, the ray-test
 cleanup (dc47ff6; `md/cleanup_tests_report.md`: four redundant cases removed by per-case coverage, diagnostics behind
-`QD_TEST_DIAG`, the ray cases 24.9 → 5.9 CPU-s, the whole suite 38 → 19 s).
+`QD_TEST_DIAG`, the ray cases 24.9 → 5.9 CPU-s, the whole suite 38 → 19 s); task 3, the material-model page
+(23ad1b6; `md/cleanup_doc_report.md`; details in item 1 below, kept for the record).
 
-1. **Task 3: the material-model document** — **brief written 2026-10-21** (`md/cleanup_doc_brief.md`, report to come
+1. **Task 3: the material-model document** — **done, committed 23ad1b6 (2026-10-21)**. Brief written 2026-10-21 (`md/cleanup_doc_brief.md`, report to come
    in `md/cleanup_doc_report.md`), **approved by Stephan 2026-10-21**; a fresh worker runs phase 0 with the kick-off prompt
    `Read md/cleanup_doc_brief.md in full and follow it. Start with the baseline check and phase 0; stop after phase 0
    with the report in md/cleanup_doc_report.md. At most 12 threads, one suite at a time, no new items.`
@@ -247,7 +250,32 @@ cleanup (dc47ff6; `md/cleanup_tests_report.md`: four redundant cases removed by 
 2. **`tools/data_formats_md/format_materials.md`** (Stephan, 2026-10-21: a separate session after task 3 updates
    the published column reference): 18 contradictions with the code are listed in `md/cleanup_doc_report.md` 0.7
    (missing columns `thk`, `tf*`; the transmission gate that no longer exists; `m` as a slope; no scalar refraction;
-   the one-parameter rigid family; the acoustic `concrete` default row without `tf`). Brief to write after task 3.
+   the one-parameter rigid family; the acoustic `concrete` default row without `tf`). **Brief written 2026-10-21**
+   (`md/formats_doc_brief.md`, report to come in `md/formats_doc_report.md`), waiting for Stephan's review. Decided
+   by Stephan before the brief (2026-10-21): a **lean format reference** (the table format, all 26 columns with unit,
+   default and a one-line meaning, the built-in EM table, the BSDF part; all model prose replaced by a link to the
+   page); the **acoustic default section removed** (a pointer to the page's starting rows; `data/materials_ac.csv`
+   and `tools/acoustic_parameter_mapping/` untouched until the parameter project); **three neighboring fixes**,
+   comment-only (the C++ `obj_file_read` block's name matching: the code takes the part before the first dot, line
+   89; the "detailed description … Data Formats" pointer in the three `obj_file_read` blocks also names the page;
+   the page's section 9 range "valid 1–40 GHz" against the per-material ranges up to 100 GHz, checked against
+   P.2040-3 Table 3); **one stop**, before the commit. Kick-off prompt: `Read md/formats_doc_brief.md in full and
+   follow it. Start with the baseline check; stop before the commit with the report in md/formats_doc_report.md. At
+   most 12 threads, one suite at a time, no new items.`
+   Done and reviewed 2026-10-21 (`md/formats_doc_report.md`): `format_materials.md` 307 → 179 lines (the table, its
+   CSV form and reader rules, 26 columns, the built-in EM table with range and source per row, BSDF, references);
+   the three fixes inside the MD blocks (checked hunk by hunk by the manager); P.2040-3 Table 3 read from
+   `references/itu_rec_p2040_3.pdf` (printed p. 24, PDF page 26) by the manager too: the page's "1–40 GHz" was
+   wrong, the per-row ranges right, floorboard 50–100 GHz; seven built-in rows (`textiles` … `water_ice`) are
+   library estimates (commit 75f43b9), `itu_vegetation` 0.03–30 GHz (P.833-9 Fig. 2). Manager's checks: whole suite
+   1344398 / 1264, output identical apart from the seed; `check_docs.py` passes (formats 26 of 26); `formats.html`
+   built into scratch, no raw Markdown. Side findings outside the acoustic work (report 2.6), proposed for the fixes
+   manager: `include/quadriga_tools.hpp` 111 calls `calc_diffraction_gain`'s `mtl_ind` 0-based (1-based in code);
+   `obj_file_write` block defaults (`side` 3.29 written) and `thk` among the extra columns; `std::stod` accepts
+   `1.5x`, `nan`, `inf`; the `.mtl` reader fails on CRLF files and indented keywords. Five other API blocks keep the
+   old "see Data Formats" sentence (`api_mex/ray_mesh_interact.cpp`, `api_mex/calc_diffraction_gain.cpp`,
+   `api_python/qpy_calc_diffraction_gain.cpp`, `api_python/qpy_obj_file_write.cpp`,
+   `api_python/qpy_mitsuba_xml_file_write.cpp`); page section 9 says `irr_glass` follows TR 38.901 (only its `att`).
 3. **The parameter session** — to become a project of its own (Stephan, 2026-10-20); kept here only so its context is
    not lost; not to be started from this file: the material table from the review's data with the A13 / A14 / A19
    rules (`tools/acoustic/sabine_to_random.py`, `txfit.py`), the acceptance classes of `md/acoustic.md` 9, defaults for

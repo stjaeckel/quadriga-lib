@@ -267,7 +267,7 @@ $$
 
 ## 9. Electromagnetic use
 
-`obj_file_read` without a material file assigns the built-in table of Rec. ITU-R P.2040-3, Table 3 [1] (valid 1–40 GHz, ground 1–10 GHz) by the base name of each `.obj` material (the part before the first dot; unknown names map to air unless `csv_strict` is set). It defines `a`, `b`, `c`, `d`, `att` only (`fRef` 1 GHz, $\mu = 1$):
+`obj_file_read` without a material file assigns the built-in table by the base name of each `.obj` material (the part before the first dot; unknown names map to air unless `csv_strict` is set). Its `air`, `vacuum` and `itu_` rows other than `itu_vegetation` are Rec. ITU-R P.2040-3, Table 3 [1], whose frequency ranges are indicative and reach 100 GHz for most materials (brick and plywood 40 GHz, marble 60 GHz, floorboard 50–100 GHz); the ground types are limited to 1–10 GHz. [Data Formats](formats.html) lists the range and the source of every row. The table defines `a`, `b`, `c`, `d`, `att` only (`fRef` 1 GHz, $\mu = 1$):
 
 | name | a | b | c | d | att | | name | a | b | c | d | att |
 | --- | ---: | ---: | ---: | ---: | ---: | --- | --- | ---: | ---: | ---: | ---: | ---: |

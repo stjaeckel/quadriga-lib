@@ -3,238 +3,129 @@ Material Properties
 SECTION!*/
 
 /*!SECTION_DESC
-Materials are stored in a name-keyed table: each triangle references a material by row index (`csv_ind` or `mtl_ind`), the row names are returned in `csv_names` / `mtl_names`, and the per-material parameters are returned in `csv_prop` — a map from parameter name to a vector with one entry per material row (so a value is read as `csv_prop["a"][csv_ind[face]]`). The model is formulated for electromagnetic propagation — complex relative permittivity ε, relative permeability μ, and conductivity σ following Rec. ITU-R P.2040 — and reuses the same parameters for an acoustic interpretation (mass law, coincidence, resonant absorption).<br><br>
+The material table describes the media of a scene for propagation, one row per material, keyed by the material's name. <a href="cpp_api.html#obj_file_read">obj_file_read</a> reads it from a CSV file (or uses its built-in table), assigns every triangle the row of its `.obj` material (`csv_ind`), and returns the row names in `csv_names` and the columns in `csv_prop`, a map from column name to a vector with one value per row. `csv_ind` is 1-based, so the value of face `i` is `csv_prop["a"][csv_ind[i] - 1]`; index 0 is no material. The ray functions take `csv_prop` as their material table (`mtl_prop`) and `csv_ind` as the material index of each face.<br><br>
 
-The table is schema-blind: the only required column is `name` (the join key for `.obj` materials); every other column is an optional numeric parameter. A parameter the table does not define is simply absent from `csv_prop`, and downstream consumers substitute its default (listed below). Empty cells parse as 0. The recognized parameters split into three physical roles:
-- **Interface reflection** (`a`, `b`, `c`, `d`, `e`, `f`, `g`, `h`, `resF`, `resQ`, `resS`) — set the complex permittivity ε and permeability μ, which fix the Fresnel reflection coefficient `R` at every surface crossing. ε and μ govern the reflected power `abs(R)²` and the complementary room-side absorption `1 − abs(R)²`. Applied once per surface hit, independent of path length.
-- **Interface transmission** (`att`, `attB`) — the through-surface isolation in dB, applied once when entering a material (the front-side air→material or material→material crossing). Independent of path length and not applied on exit. The transmitted power is *not* simply the Fresnel `1 − abs(R)²`; see the partition note below.
-- **In-medium attenuation** (`c`, `d`, `g`, `h` via ε·μ; `alpha`, `alphaB`; `m`) — loss accumulated along the path traversed inside a body. The loss from `Im(√(εμ))` (fed by the σ term in ε and the σμ term in μ) and the explicit `alpha` term sum and scale with the in-medium distance; `m > 0` switches the mass law on, 20 dB per decade (a term from the normal thickness, not per meter).
+This section describes the table and its file format. The model behind the columns (the formulas, the interface physics, sheets and traced solids, the electromagnetic and the acoustic use, the rules of use and the limits) is described on the page <a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md">The quadriga-lib Material Model and Ray-Surface Physics</a>.<br><br>
 
-**Transmission partition.** Reflection and transmission are computed independently, not as energy-complementary halves of a single Fresnel split. ε and μ (`a`, `b`, `e`, `f`, `resF…`) set reflection and room-side absorption; the lumped (`att`, `coi…`) and in-medium (`alpha`, `m`) terms set the transmission level. The transmitted field is gated by the index contrast across the crossing: on a **light→dense** crossing — entering a higher-index medium, `Re(ε₁μ₁)` < `Re(ε₂μ₂)` — it is additionally scaled by the Fresnel `1 − abs(R)²`; on a **dense→light** crossing — entering a lower-index medium, `Re(ε₁μ₁)` > `Re(ε₂μ₂)` — it is pass-through (`abs(R)²` is not subtracted). This gate applies only to the two straight-through **transmission** modes of `ray_mesh_interact` — type 1 (EM transmission) and type 4 (scalar transmission), which pass the ray through undeviated. Reflection (types 0 and 3) computes the Fresnel `abs(R)²` directly and never uses the gate; EM **refraction** (type 2) bends the ray per Snell with `(ε₁μ₁)/(ε₂μ₂)` and applies the full Fresnel transmission, bypassing the gate entirely — type 2 is the physically correct transmission path, while types 1/4 are the undeviated approximation the gate exists to keep well-behaved. Types 1 and 4 share the one gate; there is no separate scalar rule. The dense→light pass-through prevents spurious amplification and the critical-angle total reflection that an ε < 1 Fresnel transmission would otherwise impose on the undeviated path. On types 1/4 the lumped and in-medium terms set the transmission *level* (ε/μ do not); on type 2 the Fresnel transmission from ε/μ applies directly.
-
-Both domains use the same parameter set but populate it very differently: EM materials have εr > 1 with σ-based loss and μ = 1, whereas acoustic materials use a two-parameter ε, μ — rigid reflectors with εr ≪ 1 and μ = 1, porous absorbers with εr ≈ 1 and a lossy μr > 1 — with the att / alpha / mass-law terms reserved for partitions, coincidence, and resonators. See the Electromagnetic and Acoustic interpretation sections below.
-See related functions that produce or consume material properties:
-- C++ OBJ reader (<a href="cpp_api.html#obj_file_read">obj_file_read</a>)
+Related functions:
+- C++ OBJ reader (<a href="cpp_api.html#obj_file_read">obj_file_read</a>) and writer (<a href="cpp_api.html#obj_file_write">obj_file_write</a>)
 - C++ ray / mesh interaction (<a href="cpp_api.html#ray_mesh_interact">ray_mesh_interact</a>)
+- C++ ray tracer (<a href="cpp_api.html#ray_progress">ray_progress</a>)
 - C++ diffraction gain (<a href="cpp_api.html#calc_diffraction_gain">calc_diffraction_gain</a>)
 - C++ Mitsuba scene export (<a href="cpp_api.html#mitsuba_xml_file_write">mitsuba_xml_file_write</a>)
 SECTION_DESC!*/
 
 /*!MD
-# 1. Material Model
-Complex permittivity, permeability, conductivity, and loss parameters with their frequency dependence
+# 1. Material Table
+The CSV form of the table, how it is read, and its 26 columns
 
-## Parameters:
-Each parameter is one numeric column of the material table and one key of `csv_prop`. `Key` is the CSV column name (and the `csv_prop` key); a parameter absent from the table is substituted with the listed default by downstream consumers. Only the `name` column is mandatory, and column order does not matter.<br><br>
+## CSV form:
+A material file is a comma-separated text file. The first line is the header with the column names; every further line is one material. Only the `name` column is required, at any position; every other column is numeric, and the column order does not matter. Example: a concrete wall traced as a solid and a 6 mm glass pane as a thin sheet:<br><br>
 
-| Key    | Property                              | Units      | Default |
-| :----: | ------------------------------------- | :--------: | :-----: |
-| a      | εr at fRef                            | —          | 1.0     |
-| b      | Frequency exponent for εr             | —          | 0       |
-| c      | σ at fRef                             | S/m        | 0       |
-| d      | Frequency exponent for σ              | —          | 0       |
-| e      | μr at fRef                            | —          | 1.0     |
-| f      | Frequency exponent for μr             | —          | 0       |
-| g      | σμ (magnetic loss) at fRef            | —          | 0       |
-| h      | Frequency exponent for σμ             | —          | 0       |
-| att    | Penetration loss at fRef              | dB         | 0       |
-| attB   | Frequency exponent for att            | —          | 0       |
-| alpha  | In-medium absorption at fRef          | dB/m       | 0       |
-| alphaB | Frequency exponent for alpha          | —          | 0       |
-| fRef   | Reference frequency                   | GHz        | 1.0     |
-| m      | Mass-law switch (> 0: the mass law, 20 dB/decade) | —   | 0       |
-| resF   | Permittivity resonance frequency      | GHz        | 0       |
-| resQ   | Permittivity resonance quality factor | —          | 0       |
-| resS   | Permittivity resonance strength       | —          | 0       |
-| coiF   | Coincidence frequency (with `m`, the plate's bending stiffness) | GHz | 0 |
-| coiQ   | Coincidence quality factor (with `m`, 1 / loss factor) | — | 0  |
-| side   | Panel size for the finite-plate radiation of a mass-law material: the side of a square with the panel's area, √(area), in m. Only read where m > 0; 0 gives the infinite plate. Typical: window pane 1.2–1.5, door 1.4, interior wall 3–3.5, large wall 5–7. | m | 3.29 |
+```
+name,a,b,c,d,thk
+itu_concrete,5.24,0,0.0462,0.7822,0
+itu_glass,6.31,0,0.0036,1.3394,0.006
+```
 
-## Frequency laws:
-`f` is given in GHz; `f/fRef` is the relative frequency. `resF` and `coiF` are
-absolute GHz. In the μ(f) and σμ(f) rows the exponent `f` is the parameter column,
-not the frequency.<br><br>
+## Reader rules:
+- Cells are separated by commas and trimmed of surrounding white space; there is no quoting, so a name or a value cannot contain a comma. A UTF-8 byte-order mark is skipped, and blank lines are ignored.
+- Column names are case-sensitive. An empty column name in the header is an error.
+- Every material needs a non-empty name, and names must be unique.
+- An empty numeric cell, and a missing cell at the end of a line, reads as 0, not as the column's default. Where the default is not 0, fill every cell or leave the column out: a 0 in `fRef`, `a` or `e` is rejected, and a 0 in `side` selects the infinite plate. A cell that does not start with a number is an error.
+- The file needs at least one material. A material file replaces the built-in table; the two are not merged.
+- Columns the model does not know are returned in `csv_prop` and ignored by the ray functions.
+- `obj_file_read` does not check the values. The functions that take the table check it when they read it: all columns have one length; `fRef`, `a` and `e` are positive; `c`, `g`, `thk`, `att`, `alpha`, `m`, `resF`, `resQ`, `coiF`, `coiQ`, `tfF` and `side` are not negative. A violation throws and names the column and the 1-based material. `ray_progress` takes at most 16383 materials.
+- <a href="cpp_api.html#obj_file_write">obj_file_write</a> writes `csv_names` and `csv_prop` in the same form, as a `.csv` file named after the `.obj` file.
 
-| Parameter  | Formula                                                                    | Unit   | Meaning                                |
-| ---------- | -------------------------------------------------------------------------- | ------ | -------------------------------------- |
-| ε(f)       | `a·(f/fRef)^b − i·17.98·σ/f + resS·resF² / (resF² − f² + i·(resF/resQ)·f)` | —      | relative permittivity (complex)            |
-| σ(f)       | `c·(f/fRef)^d`                                                             | [S/m]  | conductivity (enters ε as the −i term)     |
-| μ(f)       | `e·(f/fRef)^f − i·17.98·σμ/f`                                              | —      | relative permeability (complex)            |
-| σμ(f)      | `g·(f/fRef)^h`                                                             | —      | magnetic loss (enters μ as the −i term)    |
-| att(f)     | `att·(f/fRef)^attB`, clamped to ≥ 0                                       | [dB]   | lumped loss added once on entering         |
-| α(f)       | `alpha·(f/fRef)^alphaB`                                                    | [dB/m] | explicit in-medium loss × path length      |
-| mass(f, M) | `max(0, 20·log10((f/fRef)·M))` where `m > 0`, at normal incidence           | [dB]   | the limp mass law, M = normal thickness    |
+## Material lookup:
+- Each face takes the material of its `usemtl` name: the row of the same name, else the row of its base name, the part before the first dot (`concrete.gray` and `concrete.001` both map to `concrete`). Several visual materials can so share one row of the table.
+- A name that matches no row is an error when `csv_strict` is set; otherwise the face gets index 0, no material, which the ray functions treat as air.
+- Row `k` of the table (counted from 1) is index `k` in `csv_ind`.
+- Without a material file the built-in table is used (Section 2). With an empty `.obj` file name, only the table is read and returned.
 
-- The refractive index is `n = √(εμ)` and the wave impedance `Z = Z₀·√(μ/ε)`. With `μ = 1` (the default) these reduce to `n = √ε`, `Z = Z₀/√ε`, and every formula here matches the legacy ε-only model exactly. The Fresnel coefficient uses the admittance `√(ε/μ)`; Snell refraction and total reflection use the index ratio `(ε₁μ₁)/(ε₂μ₂)`; and the in-medium loss uses the loss tangent of the **product** `ε·μ`, so the `g`/`h` (μ-loss) term feeds bulk attenuation exactly as `c`/`d` (σ) do.
-- Loss appears as a negative imaginary part of ε and μ (Rec. ITU-R P.2040-1, eq. 9b). Both the σ term and the resonance are written so that `c > 0` and `resS > 0` add loss; `g > 0` likewise adds loss to μ. The total in-medium attenuation over a path of length `L` is `8.686·L/Δ` (from `Im(√(εμ))`, where Δ is the attenuation length derived from the loss tangent of `ε·μ`) plus `α(f)·L` plus `mass(f, L)`, summed; `att` is separate and is not path-dependent.
+## Columns:
+Every column is optional apart from `name`; an absent column takes its default for every material. Frequencies are in GHz (the API takes frequencies in Hz); a value "at `fRef`" is scaled by its exponent as `(f/fRef)^exponent`. Wave media are the materials without the mass column (`m` = 0); `m > 0` switches a material to a mass-law material, a lumped plate with the mass law. The last column says which of the two a column acts on.<br><br>
 
-## Mechanisms:
-- **Permittivity resonance** (`resF`, `resQ`, `resS`): a Lorentz pole that adds a peak to absorption (acoustic α) and a feature to reflection near `resF`; `resQ` sets sharpness (higher = narrower). Active only when `resF > 0` and `resS ≠ 0`. Models resonant dielectrics / frequency-selective media (EM) and Helmholtz / membrane absorbers (acoustic).
-- **Panel size** (`side`, with `m > 0`): a panel of finite size radiates its forced wave with Davy's bounded forced radiation efficiency `σ` (J. L. Davy, JASA 126 (2009) 694) of a square of side `side` = √(panel area) in m, in place of the infinite plate's `1/cos θ`: the mass term becomes `A·log10(1 + (X₀/σ)²)/log10(1 + X₀²) + 10·log10(σ·cos θ)`, clipped at zero. Near grazing the panel keeps insulating; at low frequency a small panel insulates beyond the infinite plate even at normal incidence. Default 3.29 m (√10.8 m², a 4.0 × 2.7 m wall) where the column is absent; `0` gives the infinite plate; negative values are refused. A bonded run of mass-law bodies should carry one `side`. Wave media (`m = 0`) ignore it.
-- **Coincidence** (`coiF`, `coiQ`): on a mass-law material (`m > 0`) the bending stiffness of the plate, `coiF` its coincidence frequency and `1/coiQ` its loss factor, acting in the mass term as `X₀·|1 − (f/coiF)²·sin⁴θ·(1 + j/coiQ)|`, so the coincidence dip of a diffuse field comes from the angle. On a wave medium they do nothing. There is no coincidence loss at the interface: the former `coiA` Lorentzian was removed (2026-10-17); a `coiA` column of an older table is read and ignored.
-- **Mass-law term** (`m`): `m > 0` switches the mass law on, 20 dB per decade, whatever its value: `X₀ = (f/fRef)·M` from the normal thickness `M`, `20·log10 X₀` at normal incidence, with the mass law's angle shape `log10(1 + (X₀ cos θ)²)` normalized to it (+6 dB/octave and +6 dB per thickness doubling). That is the infinite plate (`side = 0`), which turns transparent toward grazing. With `fRef = (f_GHz/f_Hz)·ρ₀c/(π·ρ)`, `X₀ = ωm″/(2ρ₀c)` is the impedance ratio of the limp panel. Default 0 (EM through-loss is the linear `alpha` term). The resonance denominator uses `+i·(resF/resQ)·f` so that `resS > 0` adds loss under the library's negative-imaginary loss convention (consistent with σ).
-- **Permeability** (`e`, `f`, `g`, `h`): the magnetic-permeability analog μ, default 1+0j — identical to the legacy ε-only model. μ decouples the wave impedance `Z = Z₀√(μ/ε)` from the refractive index `n = √(εμ)`, so reflection and bulk loss can be matched independently — required for any medium that is not single-parameter, e.g. a porous absorber (acoustically, ε ↔ compressibility, μ ↔ effective density). `e`/`f` set the real part like `a`/`b`; `g`/`h` add loss like `c`/`d`.
+| Key    | Unit | Default | Meaning                                                                                   | Acts on   |
+| :----: | :--: | :-----: | ----------------------------------------------------------------------------------------- | --------- |
+| fRef   | GHz  | 1       | reference frequency of every power law; of a mass-law material it also sets the surface mass | both   |
+| a      | —    | 1       | relative permittivity ε′ at `fRef`                                                        | both      |
+| b      | —    | 0       | frequency exponent of `a`                                                                 | both      |
+| c      | S/m  | 0       | conductivity σ at `fRef`                                                                  | both      |
+| d      | —    | 0       | frequency exponent of `c`                                                                 | both      |
+| e      | —    | 1       | relative permeability μ′ at `fRef`                                                        | both      |
+| f      | —    | 0       | frequency exponent of `e`                                                                 | both      |
+| g      | S/m  | 0       | magnetic loss at `fRef` (the loss of μ, as `c` is that of ε)                              | both      |
+| h      | —    | 0       | frequency exponent of `g`                                                                 | both      |
+| thk    | m    | 0       | thickness: > 0 makes every face of the material a thin sheet of this thickness; 0 a traced solid | both |
+| att    | dB   | 0       | penetration loss paid once per entry, at `fRef`                                           | both      |
+| attB   | —    | 0       | frequency exponent of `att`                                                               | both      |
+| alpha  | dB/m | 0       | absorption along the path inside the material, at `fRef`                                  | both      |
+| alphaB | —    | 0       | frequency exponent of `alpha`                                                             | both      |
+| m      | —    | 0       | the mass column: any value > 0 makes the material a mass-law material                     | switch    |
+| resF   | GHz  | 0       | resonance frequency: a pole of ε (wave media); the plate's resonance (mass-law)           | both, differently |
+| resQ   | —    | 0       | quality factor of that resonance                                                          | both      |
+| resS   | —    | 0       | strength of the pole (wave media); its sign selects the form of the resonance (mass-law)  | both, differently |
+| coiF   | GHz  | 0       | coincidence frequency, the plate's bending stiffness                                      | mass-law  |
+| coiQ   | —    | 0       | 1 / loss factor of the bending                                                            | mass-law  |
+| tf     | —    | 0       | transmission factor of the faces at `fRef`: > 0 leaks reflected power into transmission, a negative value forces reflection | both |
+| tfB    | —    | 0       | frequency exponent of `tf`                                                                | both      |
+| tfP    | —    | 0       | height of a resonant peak added to `tf`                                                   | both (a series impedance on mass-law faces) |
+| tfF    | GHz  | 0       | frequency of that peak                                                                    | both      |
+| tfQ    | —    | 0       | quality factor of that peak; a negative value selects the under-damped branch             | both      |
+| side   | m    | 3.29    | panel size of a mass-law material, √(area); 0 the infinite plate                          | mass-law  |
 MD!*/
 
 /*!MD
-# 2. Electromagnetic Interpretation
-Mapping the column model onto a physical EM material (the model's native domain)
+# 2. Built-in EM Materials
+The table obj_file_read uses when no material file is given
 
-- `a`…`d` define the complex relative permittivity: real part `εr(f) = a·(f/fRef)^b`, imaginary part `ε'' = 17.98·σ/f` with `σ(f) = c·(f/fRef)^d` and `f` in GHz.
-- `e`…`h` define the complex relative permeability the same way: `μr(f) = e·(f/fRef)^f`, imaginary part `μ'' = 17.98·σμ/f` with `σμ(f) = g·(f/fRef)^h`. μ defaults to 1+0j, so EM materials that omit `e`…`h` are unchanged (the magneto-dielectric TM branch is out of scope; μ is intended for TE / scalar use and for any μ = 1 material).
-- Interface reflection uses the Fresnel coefficient from the wave impedance `Z = Z₀√(μ/ε)`; at normal incidence `R = (1 − √(ε/μ))/(1 + √(ε/μ))`, reducing to `(1 − √ε)/(1 + √ε)` when μ = 1, and the RT tool applies the angle-dependent form.
-- The three EM interaction modes of <a href="cpp_api.html#ray_mesh_interact">ray_mesh_interact</a> are 0 (reflection — the Fresnel `abs(R)²`), 1 (transmission — the undeviated straight-through ray, governed by the dense→light/light→dense partition gate), and 2 (refraction — bends the ray per Snell using `(ε₁μ₁)/(ε₂μ₂)` and applies the full Fresnel transmission directly). Type 2 is the physically correct transmission path and does **not** use the partition gate; use it when correct dielectric refraction matters, and type 1 when an undeviated transmitted ray is sufficient.
-- Built-in EM materials have `εr > 1`, `μ = 1`, use only parameters `a`…`att`, and set `fRef = 1 GHz`; the extended parameters (`e`…`h`, `m`, `res*`, `coi…`) are normally default for EM.
-- See Electromagnetic Default Materials for the built-in library and Background and References for the standards (ITU-R P.2040, P.833, 3GPP TR 38.901).
+## Table:
+Built-in material table used by <a href="cpp_api.html#obj_file_read">obj_file_read</a> when no material file is given. It defines only the columns `a`, `b`, `c`, `d` and `att`; every other column is absent and takes its default (`fRef` 1 GHz, μ = 1, no `thk`, so every material is a traced solid). A scene using only built-in materials therefore has the keys `a`, `b`, `c`, `d`, `att` in `csv_prop`. The range is the frequency range of the source in GHz.<br><br>
 
-## Electromagnetic Default Materials
-Built-in material library used when no `materials_csv` is provided. Values follow Rec. ITU-R P.2040-3, Table 3, valid for 1–40 GHz (ground materials limited to 1–10 GHz). The built-in table defines only the parameters `a`, `b`, `c`, `d`, `att`; every other parameter is absent (consumers default it, so `μ = 1`) and `fRef = 1 GHz`. A scene using only built-in materials therefore exposes the keys `a`, `b`, `c`, `d`, `att` in `csv_prop`, each a vector with one entry per table row. `max fGHz` is the upper frequency for which each fit is considered valid.<br><br>
+| Name                  | a     | b      | c       | d      | att  | Range (GHz) | Source         |
+| --------------------- | ----: | -----: | ------: | -----: | ---: | ----------: | -------------- |
+| air                   | 1.0   | 0.0    | 0.0     | 0.0    | 0.0  | 0.001–100   | P.2040-3       |
+| vacuum                | 1.0   | 0.0    | 0.0     | 0.0    | 0.0  | 0.001–100   | P.2040-3       |
+| textiles              | 1.5   | 0.0    | 5e-5    | 0.62   | 0.0  | 1–100       | estimate       |
+| plastic               | 2.44  | 0.0    | 2.33e-5 | 1.0    | 0.0  | 1–100       | estimate       |
+| ceramic               | 6.5   | 0.0    | 0.0023  | 1.32   | 0.0  | 1–100       | estimate       |
+| sea_water             | 80.0  | -0.25  | 4.0     | 0.58   | 0.0  | 1–100       | estimate       |
+| sea_ice               | 3.2   | -0.022 | 1.1     | 1.5    | 0.0  | 1–100       | estimate       |
+| water                 | 80.0  | -0.18  | 0.6     | 1.52   | 0.0  | 1–20        | estimate       |
+| water_ice             | 3.17  | -0.005 | 5.6e-5  | 1.7    | 0.0  | 1–20        | estimate       |
+| itu_concrete          | 5.24  | 0.0    | 0.0462  | 0.7822 | 0.0  | 1–100       | P.2040-3       |
+| itu_brick             | 3.91  | 0.0    | 0.0238  | 0.16   | 0.0  | 1–40        | P.2040-3       |
+| itu_plasterboard      | 2.73  | 0.0    | 0.0085  | 0.9395 | 0.0  | 1–100       | P.2040-3       |
+| itu_wood              | 1.99  | 0.0    | 0.0047  | 1.0718 | 0.0  | 0.001–100   | P.2040-3       |
+| itu_glass             | 6.31  | 0.0    | 0.0036  | 1.3394 | 0.0  | 0.1–100     | P.2040-3       |
+| itu_ceiling_board     | 1.48  | 0.0    | 0.0011  | 1.075  | 0.0  | 1–100       | P.2040-3       |
+| itu_chipboard         | 2.58  | 0.0    | 0.0217  | 0.78   | 0.0  | 1–100       | P.2040-3       |
+| itu_plywood           | 2.71  | 0.0    | 0.33    | 0.0    | 0.0  | 1–40        | P.2040-3       |
+| itu_marble            | 7.074 | 0.0    | 0.0055  | 0.9262 | 0.0  | 1–60        | P.2040-3       |
+| itu_floorboard        | 3.66  | 0.0    | 0.0044  | 1.3515 | 0.0  | 50–100      | P.2040-3       |
+| itu_metal             | 1.0   | 0.0    | 1.0e7   | 0.0    | 0.0  | 1–100       | P.2040-3       |
+| itu_very_dry_ground   | 3.0   | 0.0    | 0.00015 | 2.52   | 0.0  | 1–10        | P.2040-3       |
+| itu_medium_dry_ground | 15.0  | -0.1   | 0.035   | 1.63   | 0.0  | 1–10        | P.2040-3       |
+| itu_wet_ground        | 30.0  | -0.4   | 0.15    | 1.3    | 0.0  | 1–10        | P.2040-3       |
+| itu_vegetation        | 1.0   | 0.0    | 1.0e-4  | 1.1    | 0.0  | 0.03–30     | P.833-9        |
+| irr_glass             | 6.27  | 0.0    | 0.0043  | 1.1925 | 23.0 | 0.5–100     | TR 38.901      |
 
-| Name                  | a     | b      | c       | d      | att  | max fGHz |
-| --------------------- | ----: | -----: | ------: | -----: | ---: | -------: |
-| air                   | 1.0   | 0.0    | 0.0     | 0.0    | 0.0  | 100      |
-| vacuum                | 1.0   | 0.0    | 0.0     | 0.0    | 0.0  | 100      |
-| textiles              | 1.5   | 0.0    | 5e-5    | 0.62   | 0.0  | 100      |
-| plastic               | 2.44  | 0.0    | 2.33e-5 | 1.0    | 0.0  | 100      |
-| ceramic               | 6.5   | 0.0    | 0.0023  | 1.32   | 0.0  | 100      |
-| sea_water             | 80.0  | -0.25  | 4.0     | 0.58   | 0.0  | 100      |
-| sea_ice               | 3.2   | -0.022 | 1.1     | 1.5    | 0.0  | 100      |
-| water                 | 80.0  | -0.18  | 0.6     | 1.52   | 0.0  | 20       |
-| water_ice             | 3.17  | -0.005 | 5.6e-5  | 1.7    | 0.0  | 20       |
-| itu_concrete          | 5.24  | 0.0    | 0.0462  | 0.7822 | 0.0  | 100      |
-| itu_brick             | 3.91  | 0.0    | 0.0238  | 0.16   | 0.0  | 40       |
-| itu_plasterboard      | 2.73  | 0.0    | 0.0085  | 0.9395 | 0.0  | 100      |
-| itu_wood              | 1.99  | 0.0    | 0.0047  | 1.0718 | 0.0  | 100      |
-| itu_glass             | 6.31  | 0.0    | 0.0036  | 1.3394 | 0.0  | 100      |
-| itu_ceiling_board     | 1.48  | 0.0    | 0.0011  | 1.075  | 0.0  | 100      |
-| itu_chipboard         | 2.58  | 0.0    | 0.0217  | 0.78   | 0.0  | 100      |
-| itu_plywood           | 2.71  | 0.0    | 0.33    | 0.0    | 0.0  | 40       |
-| itu_marble            | 7.074 | 0.0    | 0.0055  | 0.9262 | 0.0  | 60       |
-| itu_floorboard        | 3.66  | 0.0    | 0.0044  | 1.3515 | 0.0  | 100      |
-| itu_metal             | 1.0   | 0.0    | 1.0e7   | 0.0    | 0.0  | 100      |
-| itu_very_dry_ground   | 3.0   | 0.0    | 0.00015 | 2.52   | 0.0  | 10       |
-| itu_medium_dry_ground | 15.0  | -0.1   | 0.035   | 1.63   | 0.0  | 10       |
-| itu_wet_ground        | 30.0  | -0.4   | 0.15    | 1.3    | 0.0  | 10       |
-| itu_vegetation        | 1.0   | 0.0    | 1.0e-4  | 1.1    | 0.0  | 100      |
-| irr_glass             | 6.27  | 0.0    | 0.0043  | 1.1925 | 23.0 | 100      |
-
-Notes:
-- `air` is row 0 of the table — the transparent fallback used for unmatched materials  when `csv_strict = false`. `vacuum` is a separate, identical row (lossless free space).
-- `itu_vegetation` follows Rec. ITU-R P.833-9, Figure 2.
-- `irr_glass` (infrared-reflective glass) follows 3GPP TR 38.901 V17.0.0, Table 7.4.3-1 and is the
-  only built-in material with a non-zero `att`.
+## Notes:
+- The P.2040-3 rows are Rec. ITU-R P.2040-3, Table 3. Its frequency ranges are not hard limits but indicate the measurements behind each fit, except for the three ground types, which must not be used outside 1–10 GHz.
+- `air` and `vacuum` are rows 1 and 2, identical (lossless free space). A face with no material (index 0) is also treated as air.
+- `itu_vegetation` follows the specific attenuation of woodland in Rec. ITU-R P.833-9, Figure 2 (30 MHz to about 30 GHz).
+- `irr_glass` (infrared-reflective glass) takes its `att` from 3GPP TR 38.901 V17.0.0, Table 7.4.3-1 (the constant 23 dB of its loss `23 + 0.3 f` dB) and is the only built-in material with a non-zero `att`.
+- `textiles`, `plastic`, `ceramic`, `sea_water`, `sea_ice`, `water` and `water_ice` are estimates of the library, not values of a recommendation; the range is the band they were made for.
+- There is no built-in acoustic table. Preliminary starting rows for rigid constructions are listed in <a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md#114-starting-rows-for-rigid-constructions">Section 11.4 of the material-model page</a>.
 MD!*/
 
 /*!MD
-# 3. Acoustic Interpretation
-Reusing the column model to simulate acoustic propagation with a radio-wave ray tracer
-- Acoustic waves at kHz frequencies share wavelengths with radio waves at GHz frequencies, so the EM material model can be reused for acoustic planning. The mapping is an analogy: it holds for interface reflection, bulk absorption, and the resonance / mass-law mechanisms below, and does not model phase or diffraction.
-- Acoustic interactions use the scalar interaction types of <a href="cpp_api.html#ray_mesh_interact">ray_mesh_interact</a> (3 = reflection, 4 = transmission): a single TE-mode pressure coefficient with no refractive bending of the ray. There is no scalar refraction mode — EM refraction (type 2) has no scalar analog — so scalar transmission is always the undeviated straight-through path. Reflection (type 3) uses the Fresnel `abs(R)²` from the impedance `√(μ/ε)`, so the ε, μ pair sets reflection and room-side absorption. Transmission (type 4) shares the dense→light / light→dense gate with EM transmission (type 1): entering a lower-index medium (`Re(ε₁μ₁)` > `Re(ε₂μ₂)`) is pass-through, entering a higher-index medium subtracts the Fresnel `1 − abs(R)²`. The lumped `att` / `coi…` and in-medium `alpha` / `m` carry any added isolation in both cases.
-
-## Wave mapping:
-- `f_radio = f_acoustic × 874,636` (c_light / c_sound, c_sound ≈ 342.77 m/s).
-- `fRef = 0.875 GHz ≡ 1 kHz` acoustic; fixed for every acoustic material.
-- `resF` and `coiF` are absolute radio GHz: `f_acoustic[Hz] × 8.746e-4` (e.g. 100 Hz → 0.0875 GHz; 2 kHz → 1.75 GHz).
-- Octave-band grid 16 … 16000 Hz; simulation results are air-normalized (ISO 9613-1 air absorption already removed).
-
-## The two material families:
-With permeability available, acoustic materials split into two calibration families. ε ↔ compressibility and μ ↔ effective density; the index is `n = √(εμ)` and the surface impedance is `Z = Z₀√(μ/ε)`.
-
-- **Rigid reflectors** (concrete, glass, steel, brick, gypsum, wood panels): a single-parameter medium — `εr ≪ 1` (tiny `a`, ~1e-9 … 1e-3), `μ = 1`. The tiny ε gives near-total reflection (`abs(R) → 1`, low room-side absorption) and the body is effectively opaque. Through-material isolation is carried by the mass law (`m > 0`, its level from `fRef` with the thickness) and `att`, with `coiF`/`coiQ` (the bending stiffness of the plate) for the coincidence dip of thin stiff panels. `σ = 0`.
-- **Porous absorbers** (foam, mineral wool, fiberglass, carpet, curtains): a two-parameter medium — `εr ≈ 1` with light loss (pore air, near free-air compressibility) and `μr > 1` with strong loss (the frame-loaded, viscously damped effective density). Calibrated from the complex index and impedance directly (below); `att` = `alpha` = `m` = 0 — the absorber is carried by ε and μ alone.
-
-## Parameter roles:
-- `σ` (`c`, `d`) is 0 for rigid reflectors but **non-zero for porous** absorbers (it carries part of the bulk loss), so the old "σ held at 0 for all acoustic materials" rule no longer applies. Each remaining effect still has an independent knob:<br><br>
-  | Acoustic effect                                       | Parameters                  | Notes                                                              |
-  | ----------------------------------------------------- | --------------------------- | ------------------------------------------------------------------ |
-  | Medium: surface reflection + bulk absorption          | `a`,`b`,`c`,`d`,`e`,`f`,`g`,`h` | two-parameter ε, μ; reflection from `√(μ/ε)`, bulk loss from `Im√(εμ)` |
-  | Rigid-wall reflection (single parameter)              | `a` (tiny), `μ = 1`         | `ε ≪ 1` → near-total reflection, low room-side absorption          |
-  | Resonant absorber (Helmholtz / membrane / MPP)        | `resF`, `resQ`, `resS`      | Lorentz pole in ε; peaked α and reflection feature at `resF`       |
-  | Lumped panel transmission loss (thin partition)       | `att`, `attB`               | fixed dB on entry; thickness-independent                           |
-  | Mass-law transmission (rigid partitions)              | `m > 0`, `fRef`, `thk`      | the limp mass law: +6 dB/oct, +6 dB/doubling                       |
-  | Coincidence dip (thin stiff panels)                   | `coiF`, `coiQ` (with `m`)   | bending stiffness in the mass term; the dip from the angle         |
-
-- Room-side absorption `α = 1 − abs(R)²` (which sets reverberation) is set by the medium (ε, μ) via the reflection branch. The lumped `att` and the mass-law `m`/`coi…` and in-medium `alpha` terms are reserved for rigid-partition transmission and resonators and remain decoupled from the porous medium calibration: tuning them never changes the reverberant field, and the porous ε, μ fit never changes the through-wall mass-law isolation of a separate rigid partition.
-
-## Calibrating a porous absorber:
-A porous layer is intrinsically a two-parameter medium (independent density and compressibility), so a single ε cannot match its reflection and its bulk loss at once — with one parameter the impedance `Z = Z₀/√ε` and the index `n = √ε` are locked together. Permeability breaks the lock: `Z = Z₀√(μ/ε)`, `n = √(εμ)`. Given the material's complex index `n(f) = k/k₀` and normalized surface impedance `z(f) = Zc/Z₀` (from a Delany-Bazley fit of the flow resistivity, or from measurement), the columns follow in closed form:
-
-  `ε = n / z`  (compressibility)   `μ = n · z`  (density)<br><br>
-
-Fit `ε'`, `ε''`, `μ'`, `μ''` over the working band as power laws and read off the columns: `ε' → (a, b)`, `ε'' → (c, d)`, `μ' → (e, f)`, `μ'' → (g, h)`. Worked example for mineral wool, flow resistivity ≈ 12000 Pa·s/m²:<br><br>
-
-  | a    | b     | c      | d    | e    | f     | g     | h    |
-  | ---: | ----: | -----: | ---: | ---: | ----: | ----: | ---: |
-  | 1.16 | −0.04 | 0.0038 | 1.46 | 1.66 | −0.19 | 0.091 | 0.13 |
-
-  with `fRef = 0.875`, `att = alpha = m = 0`. This matches both the surface reflection and the bulk attenuation against Delany-Bazley across ~250 Hz … 4 kHz simultaneously (the band the power-law fit covers well) — the thing a single ε cannot do. Note where the loss went: ε is nearly real (compressibility ≈ air), and μ carries the viscous loss (density), which is where dissipation physically lives. A single-ε fit was forced to cram that loss into `ε''`, which over-stated the surface reflection.
-
-- Band edges: the power-law `μ''` runs hot above ~12 kHz (over-states the top-octave bulk loss); below ~100 Hz the Delany-Bazley source is itself extrapolation. Use the resonance term for non-monotonic features rather than forcing the power law past its range.
-
-## Rigid-surface absorption (small residual):
-For a nominally rigid surface with a small measured absorption α (painted concrete, glass), invert the single-parameter normal-incidence reflection with `μ = 1`:
-
-  `a = ((1 − √(1−α)) / (1 + √(1−α)))²`  (small α: `a ≈ α²/16`)<br><br>
-  | α at fRef | a       |
-  | --------: | ------: |
-  | 0.01      | 6.3e-6  |
-  | 0.1       | 6.8e-4  |
-  | 0.3       | 7.7e-3  |
-  | 0.5       | 2.9e-2  |
-  | 0.7       | 7.7e-2  |
-  | 0.9       | 2.7e-1  |
-  | 1.0       | 1.0     |
-
-- This is the `ε ≪ 1` recipe and applies **only to rigid reflectors** (`μ = 1`), for tuning the small surface absorption of an otherwise reflective wall. Porous absorbers use the two-parameter ε, μ calibration above, not this table. Because `ε ≪ 1`, a rigid material is "optically rarer" than air; on the reflection path this still gives near-total reflection with no change of ray direction, and on the transmission path the dense→light gate makes the air→wall crossing pass-through, so isolation comes from `att` (and `m` for the slope), not from `a`.
-
-## Layered and mounted materials (no air gap):
-Stacked materials with no air between them (a porous absorber glued to a wall, carpet on a wooden floor, wood on concrete) are modeled as two watertight bodies whose shared faces are coincident (within the 1 mm interaction tolerance) with opposing normals. <a href="cpp_api.html#ray_mesh_interact">ray_mesh_interact</a> detects this as a material-to-material interface. The *reflection* branch computes the Fresnel coefficient from the two real materials' ε, μ directly (no air); the *transmission* branch uses the dense→light / light→dense gate (pass-through entering a lower-index medium, `1 − abs(R)²` entering a higher-index medium), partitioned from the lumped/in-medium terms as everywhere else. The wave cascade (entry → internal interface(s) → exit) is traced as separate ray segments by the ray tracer, which must split each interaction into its reflected and transmitted children.
-
-- **Rigid on rigid** (wood on concrete): the mutual interface is gated by the index contrast; isolation is the sum of each entered layer's `att` plus the in-medium (`alpha`, `m`) losses of the two layers. Set `att` on at most one layer (see below) and let `m`/`alpha` carry the rest.
-- The lumped `att` is applied once per material entry, including at an internal material-to-material interface (using the entered material's `att`). If both stacked layers carry an `att`, the loss is counted at each entry — set `att` on at most one layer of a glued stack to avoid double counting.
-- Geometry requirement: the glued faces must be coincident within 1 mm with opposing normals, or the pair is treated as two air interfaces separated by a thin air layer, which changes the result.
-
-## Mounted porous absorbers and the standing-wave limit:
-A porous layer on a rigid backing (foam on concrete, the canonical broadband absorber) is the one configuration where the geometry-driven volumetric model has a known low-frequency error, and it is worth understanding before trusting the numbers there.
-
-The physics: the rigid backing forces a velocity node at the wall, so below the quarter-wave frequency `f = c_sound / (4·thickness)` the porous material sits in a low-velocity region and dissipates little — real absorption rolls off hard toward zero. This is a standing-wave (phase) effect. A phaseless ray tracer cannot resolve it: tracing the ray into the layer, reflecting off the backing, and summing the return path over-states the low-frequency absorption, because the velocity-node suppression is invisible to it. The error is always an over-prediction of absorption, confined **below ~c/4d**, and it shrinks as the layer thickens (a thicker layer pushes `c/4d` down). Above `c/4d` the backing stops mattering, the layer is effectively anechoic, and the volumetric result is correct.
-
-- `f = c/4d` ≈ **858 Hz** for 0.1 m, **1.7 kHz** for 0.05 m, **8.6 kHz** for 0.01 m. Trust the mounted absorption above this; treat below it as optimistic, and the sub-100 Hz bands as extrapolation regardless.
-- **Energy safety:** a coherent sum of the internal bounce paths is not bounded by passivity — a truncated bounce series can return `abs(R)² > 1` (the layer would emit more than it received). The +3 dB "two paths at most in phase" intuition does not bound this, because at low frequency the true reflection already sits at the unity ceiling (`α → 0`), leaving no headroom for any overshoot, and the dropped higher-order bounces are exactly the terms that would resum it back to passive. Clamp the per-interaction reflected power to ≤ the incident power. For a thin layer at low frequency the clamp lands on total reflection, which is the physically correct answer there, so it costs nothing for thick absorbers and fixes the thin-layer case.
-- **Low-frequency-exact mounted absorption:** replace the volumetric trace-through of the layer with a surface-impedance boundary on the front face. With `z = √(μ/ε)`, `n = √(εμ)`, `k = (2π·f / c_sound)·n`, and `cosθt = √(1 − (sinθ / n)²)` (Snell), the input impedance of the layer on a rigid backing is `Zs = −j·(z / cosθt)·cot(k·d·cosθt)` and the reflection is `R = (Zs·cosθ − 1) / (Zs·cosθ + 1)`. This is the analytic infinite-bounce resummation, passive by construction (`abs(R) ≤ 1`) and exact at the quarter-wave knee, but it requires tagging the face with its layer thickness and backing rather than reading the thickness from the mesh.
-- Geometric low-frequency accuracy is fundamentally a wave-solver regime (below the Schroeder frequency the field is modal/diffraction-dominated). The ray model is the mid/high-frequency engine; the absorber's standing wave and the room's modes are the same kind of physics in the same band where the ray tracer is itself an approximation.
-
-## Material classes:
-- **Rigid reflectors** (concrete, glass, steel, brick, gypsum, wood panels): tiny `a` from impedance (~1e-9 … 1e-3), `b = 0`, `μ = 1`. The tiny `a` gives near-total reflection (`abs(R) → 1`, low room-side absorption). Through-material isolation is carried by the mass law (`m > 0`) and `att`; `coiF/coiQ` (the bending stiffness of the plate) add a coincidence dip for thin stiff panels.
-- **Porous absorbers** (foam, mineral wool, fiberglass, carpet, curtains): the two-parameter ε, μ via the closed form (`ε = n/z`, `μ = n·z`); `att` = `alpha` = `m` = 0. Model the layer at its installed thickness so the bulk loss accumulates over the real path; mind the mounted standing-wave limit above.
-- **Empirical absorbers** (furniture, audience, people): measured α coefficients fitted as a porous medium (ε, μ); geometry sized to the effective absorption depth.
-- **Resonant absorbers** (Helmholtz, membrane, micro-perforated): `resF/resQ/resS` for the peak, on top of a baseline reflector.
-
-## Validity and limitations:
-- Not captured: phase / interference (use Monte-Carlo phase post-processing), diffraction, and rough-surface scattering — handle these outside the material model.
-- Mounted absorbers: the volumetric model over-predicts low-frequency absorption below the quarter-wave frequency `c/4d` of a layer on a rigid backing (see above). Bounded, shrinks with thickness, valid above `c/4d`; use the surface-impedance boundary for a low-frequency-exact result.
-- LF floor: P.2040 is nominal above 100 MHz ≡ 114 Hz acoustic; the 16 / 31.5 / 63 Hz bands are extrapolation. Below the Schroeder frequency the field is modal and a wave solver is required for rigorous results.
-- The smooth dispersion exponents (`b`, `d`, `f`, `h`, `alphaB`, `attB`) are single power laws over ~3 decades; use the resonance terms (and on a mass-law plate the coincidence columns) for non-monotonic features rather than forcing a power-law fit.
-- Geometry: model each material at its installed thickness as a watertight body; see the OBJ geometry guidance for object dimensions.
-- The mass-law term is the limp mass law (`m > 0`, +6 dB/octave and +6 dB per thickness doubling); its level is set by `fRef` with the thickness, and it falls toward oblique incidence with the mass law's angle shape (20 dB per decade of cos θ).
-
-## Acoustic Default Materials
-- Built-in acoustic material library (under construction).
-- Acoustic materials use the same parameters as the EM model with `fRef = 0.875 GHz`. Rigid rows keep `μ = 1` (`e = 1`, `f = g = h = 0`); porous rows use the full ε, μ pair. The table below is a work-in-progress template grouped by the material classes above; `resF`…`coiQ` are 0 unless the row is a resonant absorber.<br><br>
-  | Name                 | Class   | a       | b     | c      | d    | e    | f     | g     | h    | att | alpha | m  |
-  | -------------------- | ------- | ------: | ----: | -----: | ---: | ---: | ----: | ----: | ---: | --: | ----: | -: |
-  | concrete (0.1–0.6 m) | rigid   | 2.4e-9  | 0.0   | 0      | 0    | 1.0  | 0     | 0     | 0    | 0   | 0     | 20 |
-  | porous_generic       | porous  | 1.16    | −0.04 | 0.0038 | 1.46 | 1.66 | −0.19 | 0.091 | 0.13 | 0   | 0     | 0  |
-  | _resonant_ (TBD)     | resonant| …       | 0     | 0      | 0    | 1.0  | 0     | 0     | 0    | 0   | 0     | 0  |
-
-- `porous_generic` is the calibrated mineral-wool example from the calibration section (flow resistivity ≈ 12000 Pa·s/m²); model it at its installed thickness. For the resonant row, set `resF`/`resQ`/`resS` for the peak on top of a baseline reflector.
-- Note: in the concrete row `m = 20` (any `m > 0`) switches the mass law on; its level comes from `fRef` with the thickness.
-MD!*/
-
-/*!MD
-# 4. Principled BSDF
+# 3. Principled BSDF
 Visual material parameters read from the companion .mtl file
 
+## Parameters:
 When an OBJ file references an `.mtl` library, the per-material Principled BSDF parameters can be returned as an `[n_mtl, 17]` matrix (`bsdf`). These describe visual appearance only and do not affect propagation. Each row corresponds to one entry of `mtl_names`; if no matching `.mtl` file is found, the matrix is empty. All color, alpha, and 0–1 parameters are clamped to [0, 1].<br><br>
 
 | Index | Field                | Property                       | Range  | Default |
@@ -262,13 +153,13 @@ When an OBJ file references an `.mtl` library, the per-material Principled BSDF 
 | ------------ | ---------------------- | ------------------------------------------------ |
 | `Kd`         | R, G, B                | Base color                                       |
 | `Ke`         | Re, Ge, Be             | Emission color                                   |
-| `Ka`         | metallic               | —                                                |
-| `Pm`         | metallic               | Overrides `Ka` when present                      |
+| `Ka`         | metallic               | First component only                             |
+| `Pm`         | metallic               | The later of `Ka` and `Pm` wins                  |
 | `Ks`         | specular               | First component only                             |
 | `d`          | alpha                  | —                                                |
 | `Ni`         | ior                    | —                                                |
 | `Ns`         | roughness              | Converted: `roughness = 1 − sqrt(Ns · 0.001)`    |
-| `Pr`         | roughness              | Overrides `Ns` when present                      |
+| `Pr`         | roughness              | The later of `Ns` and `Pr` wins                  |
 | `Ps`         | sheen                  | —                                                |
 | `Pc`         | clearcoat              | —                                                |
 | `Pcr`        | clearcoat_roughness    | —                                                |
@@ -278,31 +169,11 @@ When an OBJ file references an `.mtl` library, the per-material Principled BSDF 
 MD!*/
 
 /*!MD
-# 5. Background and References
-Sources for the material model and its parameters
+# 4. References
+Sources of the built-in table and the description of the model
 
-Primary recommendations:
-- <a target="_blank" rel="noopener noreferrer" href="https://www.itu.int/rec/R-REC-P.2040">Rec. ITU-R P.2040</a>
-  — defines the (a, b, c, d) permittivity / conductivity model and the Fresnel coefficients; source of the
-  built-in material table (Table 3).
-- <a target="_blank" rel="noopener noreferrer" href="https://www.itu.int/rec/R-REC-P.833">Rec. ITU-R P.833</a>
-  — vegetation attenuation (source of `itu_vegetation`).
-- 3GPP TR 38.901 V17.0.0, Table 7.4.3-1 — material penetration losses (source of `irr_glass` and the `att` parameter).
-
-Base EM model (reflection and σ-loss):
-- <a target="_blank" rel="noopener noreferrer" href="https://en.wikipedia.org/wiki/Fresnel_equations">Fresnel equations</a> (interface reflection / transmission from ε, μ)
-- <a target="_blank" rel="noopener noreferrer" href="https://en.wikipedia.org/wiki/Relative_permittivity">Relative permittivity (a, b)</a>
-- <a target="_blank" rel="noopener noreferrer" href="https://en.wikipedia.org/wiki/Permeability_(electromagnetism)">Relative permeability (e, f, g, h)</a> (decouples wave impedance from refractive index)
-- <a target="_blank" rel="noopener noreferrer" href="https://en.wikipedia.org/wiki/Electrical_resistivity_and_conductivity">Electrical resistivity and conductivity (c, d)</a>
-- <a target="_blank" rel="noopener noreferrer" href="https://en.wikipedia.org/wiki/Dielectric_loss">Dielectric loss / loss tangent</a> (in-medium σ loss)
-- <a target="_blank" rel="noopener noreferrer" href="https://en.wikipedia.org/wiki/Attenuation">Attenuation</a> (alpha, linear in path length)
-
-Acoustic mechanism mapping (the analogy the parameters approximate):
-- <a target="_blank" rel="noopener noreferrer" href="https://en.wikipedia.org/wiki/Acoustic_impedance">Acoustic impedance</a> (basis for deriving ε, μ from the index and impedance)
-- <a target="_blank" rel="noopener noreferrer" href="https://en.wikipedia.org/wiki/Sound_absorption">Delany-Bazley / porous absorption</a> (source of the n, z model behind `ε = n/z`, `μ = n·z`)
-- <a target="_blank" rel="noopener noreferrer" href="https://en.wikipedia.org/wiki/Acoustic_transmission">Acoustic transmission</a> (mass-law transmission loss (m) and the coincidence effect)
-- <a target="_blank" rel="noopener noreferrer" href="https://en.wikipedia.org/wiki/Soundproofing">Soundproofing</a> (mass law, coincidence, partition behavior)
-- <a target="_blank" rel="noopener noreferrer" href="https://en.wikipedia.org/wiki/Sound_transmission_class">Sound transmission class</a> (single-number TL rating context)
-- <a target="_blank" rel="noopener noreferrer" href="https://en.wikipedia.org/wiki/Absorption_(acoustics)">Absorption (acoustics)</a> (porous absorption: ε, μ, alpha)
-- <a target="_blank" rel="noopener noreferrer" href="https://en.wikipedia.org/wiki/Helmholtz_resonance">Helmholtz resonance</a> (resonant absorbers: resF/resQ/resS; coiF/coiQ the bending stiffness of a mass-law plate)
+- <a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md">The quadriga-lib Material Model and Ray-Surface Physics</a> — the model behind the columns, with its own references.
+- <a target="_blank" rel="noopener noreferrer" href="https://www.itu.int/rec/R-REC-P.2040">Rec. ITU-R P.2040-3</a>, Effects of building materials and structures on radiowave propagation above about 100 MHz, 2023 — Table 3, the source of the P.2040-3 rows.
+- <a target="_blank" rel="noopener noreferrer" href="https://www.itu.int/rec/R-REC-P.833">Rec. ITU-R P.833-9</a>, Attenuation in vegetation, 2016 — Figure 2, the source of `itu_vegetation`.
+- 3GPP TR 38.901 V17.0.0, Study on channel model for frequencies from 0.5 to 100 GHz, 2022 — Table 7.4.3-1, material penetration losses, the source of the `att` of `irr_glass`.
 MD!*/
