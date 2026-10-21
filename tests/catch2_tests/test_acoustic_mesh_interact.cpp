@@ -6,51 +6,17 @@
 
 #include "ray_test_helpers.hpp"
 
-// Closed-form oracle for the incoherent mass-law composite, air | sheet | air, real lossless
-// permittivity, att = alpha = tf = 0, no resonance. Shares no code with the library.
-//
-// A sheet whose material carries m > 0 takes the incoherent route in qd_slab_resolve produce
-// mode: no internal series, no in-slab phase, the near interface evaluated at the incidence
-// cosine and the far one at the in-slab cosine, and one lumped mass-law power factor. With tf = 0
-// the amplitude rescale is the identity, and with air on both sides the near-to-far flux
-// conversion and the lumped interface gain are both unity, so the transmit port is the product of
-// the two raw Fresnel transmission amplitudes times the square root of the mass gain.
-struct QdMassRef
+// The in-slab cosine of a lossless sheet of permittivity eps_s, met from air at thd degrees.
+static inline double qd_slab_cos(double eps_s, double thd)
 {
-    double base = 0.0; // composite transmitted power with the mass term removed
-    double refl = 0.0; // reflect port: the bare near interface, Stokes-reversed
-    double cts = 0.0;  // in-slab cosine
-};
-
-static inline QdMassRef qd_mass_ref(double eps_s, double thd)
-{
-    const double th = thd * arma::datum::pi / 180.0;
-    const double c1 = std::cos(th), s1 = std::sin(th);
-    const double zs = std::sqrt(eps_s);
-    const double cts = std::sqrt(1.0 - (1.0 / eps_s) * s1 * s1);
-
-    const double tn_te = 2.0 * c1 / (c1 + zs * cts);
-    const double tn_tm = 2.0 * c1 / (zs * c1 + cts);
-    const double tf_te = 2.0 * zs * cts / (zs * cts + c1);
-    const double tf_tm = 2.0 * zs * cts / (cts + zs * c1);
-
-    const double r_te = (c1 - zs * cts) / (c1 + zs * cts);
-    const double r_tm = (zs * c1 - cts) / (zs * c1 + cts);
-
-    QdMassRef R;
-    R.cts = cts;
-    R.base = 0.5 * (tn_te * tf_te * tn_te * tf_te + tn_tm * tf_tm * tn_tm * tf_tm);
-    R.refl = 0.5 * (r_te * r_te + r_tm * r_tm);
-    return R;
+    const double s1 = std::sin(thd * arma::datum::pi / 180.0);
+    return std::sqrt(1.0 - (1.0 / eps_s) * s1 * s1);
 }
 
-// The mass-law transmission loss in dB. arg is (f/fRef) times the surface-mass surrogate with the
-// angle removed, which for a sheet is the normal thickness.
-//
-// The mass column is a switch (M10): m > 0 is the limp mass law, X0 = arg and A = 20 log10 X0, whatever
-// the value of m. The angle carries the mass law's shape normalized to A, so the two endpoints are
-// exact: A at normal incidence and zero at tangency. The asymptotic angle slope is 20 dB per decade
-// of the cosine.
+// The mass-law transmission loss in dB, from the column definition; arg is (f / fRef) times the normal thickness. m > 0
+// switches the limp mass law on whatever its value: X0 = arg and A = 20 log10 X0 at normal incidence. The angle carries
+// the limp panel's shape normalized to A, A log10(1 + (X0 cos)^2) / log10(1 + X0^2): A at normal incidence, zero at
+// tangency, 20 dB per decade of the cosine in between.
 static inline double qd_mass_TL(double m, double arg, double ct)
 {
     if (m <= 0.0 || arg <= 0.0 || ct <= 0.0)
@@ -75,7 +41,7 @@ struct QdMassSheet
     double fRef = 1.0e-4; // GHz
     double thk = 0.0125;  // m
     double eps = 5.24;
-    double m = 12.0; // the mass column is a switch (M10): 12 pays as 20, which the case guards
+    double m = 12.0; // m > 0 is a switch: 12 pays what 20 pays, which the case asserts
 
     double arg() const { return (f_hz * 1.0e-9 / fRef) * thk; } // 125.0
 
@@ -126,12 +92,10 @@ struct QdMassSheet
 
 TEST_CASE("Thin sheet - mass-law angle dependence", "[acoustic]")
 {
-    // The mass term is the only angle-dependent quantity in the sheet composite that is not a
-    // Fresnel amplitude. A mass-law sheet is one plate: its first face passes what it absorbs, the
-    // flux transmittance a = 1 - r^2 of air | sheet, and the plate passes the incoherent series of
-    // the face and its term, a tau / (a + tau - a tau) (the plate rule, md/acoustic.md 10 N1). Scalar,
-    // the acoustic types. The case inverts the rule, tau = T a / (a - T + a T), which leaves the mass
-    // term alone, and compares it with the closed form.
+    // The mass term is the only angle-dependent quantity of the sheet composite that is not a Fresnel amplitude. A
+    // mass-law sheet is one plate: its face passes what it absorbs, a = 1 - r^2 of air | sheet, and the plate passes
+    // the incoherent series of face and term, a tau / (a + tau - a tau). Scalar types. The case inverts that rule, tau
+    // = T a / (a - T + a T), and compares the term with the closed form.
     const QdMassSheet F;
     const double half = 200.0;
     arma::mat mesh = qd_quad_x(half, 0.0);
@@ -140,9 +104,9 @@ TEST_CASE("Thin sheet - mass-law angle dependence", "[acoustic]")
     { return (p > 0.0) ? 10.0 * std::log10(p) : -std::numeric_limits<double>::infinity(); };
 
     const double arg = F.arg();
-    const double A0 = 20.0 * std::log10(arg);          // normal-incidence term, the mass law at any m > 0
-    const double X0 = arg;                             // = 10^(A0/20)
-    const double ct_knee = 1.0 / X0;                   // x = 1
+    const double A0 = 20.0 * std::log10(arg); // normal-incidence term, the mass law at any m > 0
+    const double X0 = arg;                    // = 10^(A0/20)
+    const double ct_knee = 1.0 / X0;          // x = 1
     const double th_knee = std::acos(ct_knee) * 180.0 / arma::datum::pi;
 
     QD_DIAG("\n# diag: mass-law angle dependence, sheet thk 12.5 mm, eps 5.24, m 12 (a switch: the mass law, 20 dB/decade)\n");
@@ -153,8 +117,7 @@ TEST_CASE("Thin sheet - mass-law angle dependence", "[acoustic]")
     // transmit port through the plate rule
     auto face_R = [&](double thd)
     {
-        QdMassRef Rf = qd_mass_ref(F.eps, thd);
-        double ct = std::cos(thd * arma::datum::pi / 180.0), zc = std::sqrt(F.eps) * Rf.cts, r = (ct - zc) / (ct + zc);
+        double ct = std::cos(thd * arma::datum::pi / 180.0), zc = std::sqrt(F.eps) * qd_slab_cos(F.eps, thd), r = (ct - zc) / (ct + zc);
         return r * r;
     };
     auto tl_of = [&](double T, double thd)
@@ -273,9 +236,8 @@ TEST_CASE("Thin sheet - mass-law angle dependence", "[acoustic]")
     }
 }
 
-// Test 3 - medium_gain in-medium loss (mass law, excess absorption)
-// medium_gain is the standalone in-medium term. It applies mass-law transmission and distance-linear
-// absorption, and must not include the interface penetration loss att.
+// medium_gain is the in-medium term alone: the mass law and the distance-linear absorption alpha, never the interface
+// loss att.
 TEST_CASE("Acoustic - medium_gain in-medium loss", "[acoustic]")
 {
     double fRef_rf = ac2rf(1000.0);

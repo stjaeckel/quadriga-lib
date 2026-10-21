@@ -8,19 +8,17 @@
 
 TEST_CASE("Recovery gate - the hit code a traced run carries", "[wave]")
 {
-    // Every chain fixture above hands ray_state_update a synthetic hit code, 1 for a bare exit and
-    // 69 for a glued one. A traced run does not: with the undeviated tracer a ray inside a solid
-    // travels at its external angle, ray_mesh_interact judges the exit face at that angle, and from
-    // sqrt|eps| sin(theta_ext) >= 1 its code carries the total-reflection bit, 33 and 101. That bit
-    // is a statement about the face ahead at an angle the wave does not have. The recovery inverts
-    // the bend at the face behind, and declines on it.
+    // A hand-built event carries a synthetic hit code, 1 for a bare exit and 69 for a glued one. A traced run does not:
+    // with the undeviated tracer a ray inside a solid travels at its external angle, ray_mesh_interact judges the exit
+    // face at that angle, and from sqrt|eps| sin(theta_ext) >= 1 its code carries the total-reflection bit, 33 and 101.
+    // That bit is a statement about the face ahead at an angle the wave does not have. The recovery inverts the bend at
+    // the face behind, and declines on it.
     //
-    // Four instruments. The code ray_mesh_interact writes for the exit, asserted. The twin: the
-    // same event with that code and with the bit cleared, bitwise, which needs no reference. The
-    // absolute level with the real code, against the analytic slab and the composite at the exact
-    // cosine. And the two-event run through the intersector with nothing synthetic in it, for the
-    // undeviated and for the refracting tracer; the lossy rows of the refracting tracer are
-    // recorded and not asserted.
+    // Four instruments. The code ray_mesh_interact writes for the exit, asserted. The twin: the same event with that
+    // code and with the bit cleared, bitwise, which needs no reference. The absolute level with the real code, against
+    // the analytic slab and the composite at the exact cosine. And the two-event run through the intersector with
+    // nothing synthetic in it, for the undeviated and for the refracting tracer; the lossy rows of the refracting
+    // tracer are printed and not asserted.
     const double f_hz = FRQ, k0 = 2.0 * QPI * f_hz / C0, L = 0.10, thk = 0.006;
     auto mtl = diag_palette<double>();
     const int SHEET = 3, LOSSY = 5, DENSE = 2;
@@ -73,9 +71,7 @@ TEST_CASE("Recovery gate - the hit code a traced run carries", "[wave]")
         return (double)A.gain(0) == (double)B.gain(0);
     };
 
-    // ------------------------------------------------------------------------------------------
-    // Bare exit
-    // ------------------------------------------------------------------------------------------
+    // ---- Bare exit ----
     QD_DIAG("\n# diag: recovery gate, bare exit. air | slab 100 mm | air, scalar, the exit event along the\n");
     QD_DIAG("# direction a tracer holds, series resolved. code is what ray_mesh_interact writes for that exit\n");
     QD_DIAG("# met at the external angle. d_real and d_syn are the chain against the analytic slab with\n");
@@ -112,9 +108,7 @@ TEST_CASE("Recovery gate - the hit code a traced run carries", "[wave]")
             CHECK(same(Er, Es));
         }
 
-    // ------------------------------------------------------------------------------------------
-    // Glued exit
-    // ------------------------------------------------------------------------------------------
+    // ---- Glued exit ----
     QD_DIAG("\n# diag: recovery gate, glued exit. host 100 mm | coating 6 mm eps 5.24 - 0.63j | air, scalar,\n");
     QD_DIAG("# host series declined. d_T and d_R: the event with the code ray_mesh_interact writes against\n");
     QD_DIAG("# the composite at the exact cosine times the host leg; s_T the same with code 69\n");
@@ -152,9 +146,7 @@ TEST_CASE("Recovery gate - the hit code a traced run carries", "[wave]")
             CHECK(same(Er, Es));
         }
 
-    // ------------------------------------------------------------------------------------------
-    // A face that is closed at the recovered cosine
-    // ------------------------------------------------------------------------------------------
+    // ---- A face that is closed at the recovered cosine ----
     // The lossy host entered from a lossless dense solid with a transverse invariant above one:
     // the face to air is closed, the bit is right, and the reflection is evaluated at the
     // recovered cosine or, where the recovery declines, at the projection. The far medium's root
@@ -194,9 +186,7 @@ TEST_CASE("Recovery gate - the hit code a traced run carries", "[wave]")
         }
     }
 
-    // ------------------------------------------------------------------------------------------
-    // Nothing synthetic: two events through the intersector
-    // ------------------------------------------------------------------------------------------
+    // ---- Nothing synthetic: two events through the intersector ----
     QD_DIAG("\n# diag: recovery gate, the traced run. air | slab 100 mm | air through ray_triangle_intersect,\n");
     QD_DIAG("# ray_mesh_interact and ray_state_update, two events, scalar, series resolved, against the\n");
     QD_DIAG("# analytic slab. itype 4 is the undeviated tracer, 5 the refracting one. out_deg is the\n");
@@ -257,9 +247,9 @@ TEST_CASE("Recovery gate - the hit code a traced run carries", "[wave]")
                             dB(ch), dB(p_te), dB(ch) - dB(p_te));
                     INFO("traced run, itype " << itype << ", material " << m << ", theta_ext " << thd);
                     REQUIRE((B.ot & 0x1F) == 1);
-                    // The relaunch offset moves the leg by a few float ulp, so the bound is not
-                    // the 1e-6 dB of a hand-built event. The refracting tracer's lossy rows are
-                    // recorded: the recovery does not run where traced and geometric cosines agree
+                    // The relaunch offset moves the leg by a few float ulp, so the bound is not the 1e-6 dB of a
+                    // hand-built event. The refracting tracer's lossy rows are printed: the recovery does not run where
+                    // traced and geometric cosines agree
                     if (itype == 4 || m == 6)
                         CHECK(std::abs(dB(ch) - dB(p_te)) < 1.0e-3);
                 }
@@ -268,6 +258,7 @@ TEST_CASE("Recovery gate - the hit code a traced run carries", "[wave]")
 
 TEST_CASE("Exits and verdicts - every exit at the cosine the wave has there", "[wave]")
 {
+    ub::OneThread one_thread;
     // Every exit and every verdict is formed at the cosine the wave has at that face:
     //   A. a resolved ray of the undeviated tracer by two more routes: reflected off a coating on
     //      the far side (always resolved, whatever eps is), and returning across a bare face into
@@ -316,8 +307,8 @@ TEST_CASE("Exits and verdicts - every exit at the cosine the wave has there", "[
         E.ot = ot[0], E.rt = rt[0], E.nh = nh(0);
         return E;
     };
-    using ub::face;
     using ub::build;
+    using ub::face;
     struct Chain
     {
         cd vv = 1.0;
@@ -403,9 +394,7 @@ TEST_CASE("Exits and verdicts - every exit at the cosine the wave has there", "[
         return r;
     };
 
-    // ------------------------------------------------------------------------------------------
-    // A1. A resolved ray that was reflected off a coating on the far side
-    // ------------------------------------------------------------------------------------------
+    // ---- A1. A resolved ray that was reflected off a coating on the far side ----
     QD_DIAG("\n# diag: exits and verdicts, a ray reflected off a far-side coating. air | host 100 mm | coating 6 mm eps 5.24 - 0.63j |\n");
     QD_DIAG("# air through the intersector: enter, reflect off the coating (type 3), leave by the front face. Host\n");
     QD_DIAG("# series declined (eps 1.5); the reflection off a sheet flags the ray resolved all the same. Scalar,\n");
@@ -436,9 +425,7 @@ TEST_CASE("Exits and verdicts - every exit at the cosine the wave has there", "[
                 CHECK(std::abs(deg(a * std::exp(J * k0 * st * c.dy))) < 0.05);
             }
 
-    // ------------------------------------------------------------------------------------------
-    // A2. A resolved ray returning across a bare face into the first solid
-    // ------------------------------------------------------------------------------------------
+    // ---- A2. A resolved ray returning across a bare face into the first solid ----
     QD_DIAG("\n# diag: exits and verdicts, a resolved ray across a bare face into a solid. air | A 50 mm | B 100 mm | air through the\n");
     QD_DIAG("# intersector, every series resolved (eps 0): enter A, cross into B, reflect at B | air, cross back into\n");
     QD_DIAG("# A, leave by the front face. No reference: the undeviated tracer over the refracting one, each at its\n");
@@ -465,9 +452,7 @@ TEST_CASE("Exits and verdicts - every exit at the cosine the wave has there", "[
             CHECK(std::abs(deg(r45)) < 0.05);
         }
 
-    // ------------------------------------------------------------------------------------------
-    // B. A wedge: the bare exit against the glued one
-    // ------------------------------------------------------------------------------------------
+    // ---- B. A wedge: the bare exit against the glued one ----
     // Entry face at x = 0, exit face through (L, 0.37) with its outward normal turned by 10 deg
     // towards +y, so the entry event sets the non-parallel flag itself and the recovery declines
     // on the leg. Angles are against the exit normal. in: the direction the wave has; seg_in: the
@@ -534,9 +519,7 @@ TEST_CASE("Exits and verdicts - every exit at the cosine the wave has there", "[
                     }
     }
 
-    // ------------------------------------------------------------------------------------------
-    // C and D. The lossy host entered from a lossless dense solid, invariant p around and above one
-    // ------------------------------------------------------------------------------------------
+    // ---- C and D. The lossy host entered from a lossless dense solid, invariant p around and above one ----
     // The code ray_mesh_interact writes for the exit met along the segment, which with the
     // undeviated tracer runs at the angle the wave had in the dense solid
     auto exit_code = [&](int itype, int host, bool glued, double th) -> uint8_t
@@ -733,17 +716,17 @@ TEST_CASE("Exits and verdicts - every exit at the cosine the wave has there", "[
 
 TEST_CASE("Sheet reflection - a declined series is followed and not dropped", "[wave]")
 {
-    // A host leg that closes at a sheet either has its bounce series summed or leaves the bounces
-    // to the tracer. A reflection off the sheet flagged the ray resolved either way, so with the
-    // series declined the next reflection of that ray was killed: neither summed nor followed.
-    // The flag belongs to a ray whose series was summed and to no other.
+    ub::OneThread one_thread;
+    // A host leg that closes at a sheet either has its bounce series summed or leaves the bounces to the tracer. Only a
+    // ray whose series was summed carries the resolved flag: with the series declined, the next reflection of that ray
+    // is followed, not killed.
     //
-    // Through ray_triangle_intersect, ray_mesh_interact and ray_state_update, scalar, both
-    // tracers. Walls: HS, air | host 100 | coating 6 mm | air; HSH, air | host 50 | sheet | host 50
-    // | air. eps 1.5 declines every series, eps 0 sums every one.
+    // Through ray_triangle_intersect, ray_mesh_interact and ray_state_update, scalar, both tracers. Walls: HS, air |
+    // host 100 | coating 6 mm | air; HSH, air | host 50 | sheet | host 50 | air. eps 1.5 declines every series, eps 0
+    // sums every one.
     // A. The current-medium word after the reflection off the sheet.
-    // B. HS, declined: the transmitted paths, one more round trip each, and the reflected ones,
-    //    as geometric sequences whose limits are the wall. Control: eps 0 on one path.
+    // B. HS, declined: the transmitted paths, one more round trip each, and the reflected ones, as geometric sequences
+    // whose limits are the wall. Control: eps 0 on one path.
     const double gap = 1.0e-5, thk = 0.006;
     auto mtl = diag_palette<double>();
     const int SHEET = 3;
@@ -783,11 +766,12 @@ TEST_CASE("Sheet reflection - a declined series is followed and not dropped", "[
                                        in ? &in->path_dirN : nullptr, in ? &in->accg : nullptr, in ? &in->accr : nullptr,
                                        &E.prev, &E.cur, &E.buf, &gain, &E.xpr, &E.path_dirN, &E.accg, &E.accr, &rt,
                                        (arma::u32_vec *)nullptr, eps, relaunch ? &E.origN : nullptr, relaunch ? &E.destN : nullptr);
-        E.ot = ot[0], E.rt = rt[0], E.nh = nh(0); E.sbs = sbsN;
+        E.ot = ot[0], E.rt = rt[0], E.nh = nh(0);
+        E.sbs = sbsN;
         return E;
     };
-    using ub::face;
     using ub::build;
+    using ub::face;
     struct Chain
     {
         std::complex<double> vv = 1.0;
@@ -797,7 +781,9 @@ TEST_CASE("Sheet reflection - a declined series is followed and not dropped", "[
         bool ok = true;
         std::string rts, words;
         std::complex<double> at_point(double k, double st) const // the field at the polyline's exit point
-        { return vv * std::exp(std::complex<double>(0.0, -k * Lin)) * std::exp(std::complex<double>(0.0, k * st * dy)); }
+        {
+            return vv * std::exp(std::complex<double>(0.0, -k * Lin)) * std::exp(std::complex<double>(0.0, k * st * dy));
+        }
     };
     // seq: one type per event, or one type repeated until the ray is out. epsv likewise
     auto run = [&](const Pal &pal, const arma::mat &mesh, const arma::uvec &mtl_ind, const std::vector<int> &seq,
@@ -881,17 +867,12 @@ TEST_CASE("Sheet reflection - a declined series is followed and not dropped", "[
     };
     auto rint = [&](std::complex<double> ea, std::complex<double> eb, double s2) // seen from a, towards b
     { return (bof(ea, s2) - bof(eb, s2)) / (bof(ea, s2) + bof(eb, s2)); };
-    auto tint = [&](std::complex<double> ea, std::complex<double> eb, double s2)
-    { return 2.0 * bof(ea, s2) / (bof(ea, s2) + bof(eb, s2)); };
     auto phi = [&](std::complex<double> e, double s2, double k, double d)
     { return std::exp(-J * k * bof(e, s2) * d); };
 
-
     const double L = 0.10, k1 = 2.0 * QPI * FRQ / C0;
 
-    // ------------------------------------------------------------------------------------------
-    // A. The state word
-    // ------------------------------------------------------------------------------------------
+    // ---- A. The state word ----
     QD_DIAG("\n# diag: sheet reflection, the word. Enter, then reflect off the sheet (type 3). wall HS: a coating on the far\n");
     QD_DIAG("# face; HSH: a sheet inside the host. S: the reflect event at this eps over the one at eps 1.5. res: the\n");
     QD_DIAG("# resolved flag of the current-medium word after it. words as prev.cur.buf\n");
@@ -918,9 +899,7 @@ TEST_CASE("Sheet reflection - a declined series is followed and not dropped", "[
                             CHECK(summed);
                     }
 
-    // ------------------------------------------------------------------------------------------
-    // B. The paths of a wall coated on its far side
-    // ------------------------------------------------------------------------------------------
+    // ---- B. The paths of a wall coated on its far side ----
     auto seqT = [](int tr, int n)
     {
         std::vector<int> s = {tr};
@@ -970,7 +949,7 @@ TEST_CASE("Sheet reflection - a declined series is followed and not dropped", "[
                 double Lx = t[0].fx[1] - t[0].bx[0];
                 std::complex<double> eH = diag_eps(h, FRQ), eS = diag_eps(SHEET, FRQ);
                 RT W = cm(e_air, {{eH, Lx}, {eS, thk}}, e_air, s2, k1);
-                // the clamp of section 5: the coating seen from the host, above one in magnitude
+                // the clamp of a mirror above one: the coating seen from the host, above one in magnitude
                 std::complex<double> Rs = cm(eH, {{eS, thk}}, e_air, s2, k1).r, r_fr = rint(eH, e_air, s2), pp = phi(eH, s2, k1, Lx);
                 std::complex<double> Rc = (std::abs(Rs) > 1.0) ? Rs / std::abs(Rs) : Rs;
                 double clamp_dB = 2.0 * dB(std::abs((1.0 - r_fr * Rs * pp * pp) / (1.0 - r_fr * Rc * pp * pp)));
@@ -987,7 +966,7 @@ TEST_CASE("Sheet reflection - a declined series is followed and not dropped", "[
                     QD_DIAG("%d,%d,%.0f,dead,dead,%+.4f,dead,dead,dead,%+.4f,dead,dead,%+.6f,%+.6f,%s,%s\n", h, tr, thd, dB(std::norm(FT[0] / W.t)),
                             dB(std::norm((FR[0] + FR[1]) / W.r)), c0_dB, clamp_dB, t[1].rts.c_str(), r[1].rts.c_str());
                 CHECK(std::abs(c0_dB) < 1.0e-3); // the control: summed, one path is the wall; clamp_dB is what the clamp was worth
-                CHECK(all);                                  // no bounce of a declined series dies
+                CHECK(all);                      // no bounce of a declined series dies
                 if (all)
                 {
                     const double bound = (tr == 5 && thd == 85.0) ? 1.0e-2 : 1.0e-3; // the relaunch offsets, as for two solids
@@ -1007,26 +986,27 @@ TEST_CASE("Measurement - the mirror behind the ray after a back reflection", "[w
 {
     // One ray per call, many thousand calls: a thread team per call costs twenty times the work
     ub::OneThread one_thread;
-    // Plan item 1, measured. A series is formed from the face ahead of the ray and the one behind
-    // it, and the one behind is read from the previous-medium word. A back reflection at a bare
-    // face does not write that word. Through ray_triangle_intersect, ray_mesh_interact and
-    // ray_state_update, scalar, double, 1 GHz, both tracers. Nothing is asserted beyond sanity.
+    // A series is formed from the face ahead of the ray and the one behind it, and the one behind is read from the
+    // previous-medium word. A back reflection at a bare face does not write that word. Through ray_triangle_intersect,
+    // ray_mesh_interact and ray_state_update, scalar, double, 1 GHz, both tracers.
     //
     // Walls, all standing in air:
     //   H    host 100                          HS   host 100 | coating 6 mm
     //   SH   coating 6 mm | host 100           AB   A 50 | B 100, two solids across a bare face
     //   HSH  host 50 | sheet 6 mm | host 50
     //
-    // A. One leg at a time. The event that closes a leg which began at a back reflection at a
-    //    bare face, at eps 0 over the same at eps 1.5: the series it forms, against the form with
-    //    the mirror that is behind the ray and against the form with what the word holds. And the
-    //    threshold at which that event stops summing, found by bisection: the rho the library
-    //    formed, next to the one of the first leg in the same body.
-    // B. Every path. One ray, every reflected and transmitted ray followed until it is in air,
-    //    dead or 20 events old, summed at the polyline's point. Four runs per row: the library at
-    //    eps 0.15; the same with eps 1.5 handed to every event on a leg that began at a declined
-    //    reflection (the verdict inherited); the same with the mirror written into the word by
-    //    the fixture after a declined reflection at a bare face (the word made true); and eps 0.
+    // A. One leg at a time. The event that closes a leg which began at a back reflection at a bare face, at eps 0 over
+    // the same at eps 1.5. Asserted: such a leg forms no series at any threshold (the verdict is inherited), the
+    // reflection leaves the followed mark and the previous-medium word as it was. Printed: the series against the form
+    // with the mirror that is behind the ray and with what the word holds, and the threshold at which the event would
+    // stop summing, by bisection.
+    // B. Every path, a printed table: one ray, every reflected and transmitted ray followed until it is in air, dead or
+    // 20 events old, summed at the polyline's point. Four runs per row: the library at eps 0.15; the same with eps 1.5
+    // handed to every event on a leg that began at a declined reflection (the verdict inherited); the same with the
+    // mirror written into the word by the fixture after a declined reflection at a bare face (the word made true); and
+    // eps 0.
+    // C. The reflection of a wall coated on its near side, a printed table.
+    // D. A verdict handed in, asserted.
     const double gap = 1.0e-5, thk = 0.006;
     auto mtl = diag_palette<double>();
     const int SHEET = 3;
@@ -1065,11 +1045,12 @@ TEST_CASE("Measurement - the mirror behind the ray after a back reflection", "[w
                                        &E.prev, &E.cur, &E.buf, &gain, &E.xpr, &E.path_dirN, &E.accg, &E.accr, &rt,
                                        (arma::u32_vec *)nullptr, eps, relaunch ? &E.origN : nullptr, relaunch ? &E.destN : nullptr,
                                        (arma::mat *)nullptr, (arma::mat *)nullptr, vin, vout);
-        E.ot = ot[0], E.rt = rt[0], E.nh = nh(0); E.sbs = sbsN;
+        E.ot = ot[0], E.rt = rt[0], E.nh = nh(0);
+        E.sbs = sbsN;
         return E;
     };
-    using ub::face;
     using ub::build;
+    using ub::face;
     struct Chain
     {
         std::vector<Ev> ev;
@@ -1138,7 +1119,7 @@ TEST_CASE("Measurement - the mirror behind the ray after a back reflection", "[w
     { return (bof(ea, s2) - bof(eb, s2)) / (bof(ea, s2) + bof(eb, s2)); };
     auto phi = [&](std::complex<double> e, double s2, double k, double d)
     { return std::exp(-J * k * bof(e, s2) * d); };
-    auto unit = [](std::complex<double> r) // the clamp of section 5 on a mirror above one
+    auto unit = [](std::complex<double> r) // a mirror above one, clamped to the unit circle
     { return (std::abs(r) > 1.0) ? r / std::abs(r) : r; };
     const double k1 = 2.0 * QPI * FRQ / C0;
     std::vector<double> angles;
@@ -1164,9 +1145,7 @@ TEST_CASE("Measurement - the mirror behind the ray after a back reflection", "[w
         return build({0.0, 0.05, 0.10}, {a, SHEET, a}, {false, false, true}, mi); // HSH
     };
 
-    // ------------------------------------------------------------------------------------------
-    // A. One leg at a time
-    // ------------------------------------------------------------------------------------------
+    // ---- A. One leg at a time ----
     QD_DIAG("\n# diag: mirror behind, one leg. The event that closes a leg which began at a back reflection at a bare face, at\n");
     QD_DIAG("# eps 0 over the same at eps 1.5: the series S it forms. leg: the body and the path, t a transmission, r a\n");
     QD_DIAG("# reflection. d_true: |S - S| with the mirror that is behind the ray; d_word: with what the previous-medium word\n");
@@ -1178,8 +1157,8 @@ TEST_CASE("Measurement - the mirror behind the ray after a back reflection", "[w
     {
         const char *wall, *leg;
         int a, b;
-        std::string seq, seq1; // t/r per event; the last event of each is the one measured
-        int body;              // which solid the leg is in: 0 = a, 1 = b
+        std::string seq, seq1;   // t/r per event; the last event of each is the one measured
+        int body;                // which solid the leg is in: 0 = a, 1 = b
         int ahead, behind, word; // 0 air, 1 the other solid, 2 the sheet backed by air, 3 the sheet backed by the host
     };
     std::vector<LegCase> legs;
@@ -1282,11 +1261,9 @@ TEST_CASE("Measurement - the mirror behind the ray after a back reflection", "[w
                     }
             }
 
-    // ------------------------------------------------------------------------------------------
-    // C. The reflection of a wall coated on its near side, every series summed
-    // ------------------------------------------------------------------------------------------
-    // At eps 0 the wall reflects on two paths: off the coating, and enter, off the bare far face
-    // with the host's series, leave through the coating. Both at the polyline's point.
+    // ---- C. The reflection of a wall coated on its near side, every series summed (a printed table) ----
+    // At eps 0 the wall reflects on two paths: off the coating, and enter, off the bare far face with the host's
+    // series, leave through the coating. Both at the polyline's point.
     auto field = [&](const Chain &c, double st) -> std::complex<double>
     {
         std::complex<double> v = 1.0;
@@ -1304,27 +1281,27 @@ TEST_CASE("Measurement - the mirror behind the ray after a back reflection", "[w
     QD_DIAG("# matrix of coating | host with the coating in front of the mesh plane, where the reflect port of a glued entry\n");
     QD_DIAG("# puts it. T_dB: enter, leave by the far face, against the matrix. R1/R0: dB\n");
     QD_DIAG("host,tracer,theta,R1/R0_dB,R_dB,R_deg,T_dB,words_R1\n");
-    for (int h : {5, 6})
-        for (int tr : {4, 5})
-            for (double thd : angles)
-            {
-                double th = thd * QPI / 180.0, st = std::sin(th), s2 = st * st;
-                arma::uvec mi;
-                arma::mat mesh = mesh_of("SH", h, 0, mi);
-                Chain c0 = run(mesh, mi, {3}, {0.0}, thd), c1 = run(mesh, mi, {tr, 3, tr}, {0.0}, thd), ct = run(mesh, mi, {tr, tr}, {0.0}, thd);
-                INFO("near coating, host " << h << ", tracer " << tr << ", theta " << thd);
-                REQUIRE((c0.ok && c1.ok && ct.ok));
-                std::complex<double> R0 = field(c0, st), R1 = field(c1, st), T = field(ct, st);
-                RT W = cm(e_air, {{diag_eps(SHEET, FRQ), thk}, {diag_eps(h, FRQ), std::abs(ct.fx[1] - ct.bx[0])}}, e_air, s2, k1);
-                std::complex<double> Ra = R0 + R1, Rw = W.r * std::exp(2.0 * J * k1 * std::cos(th) * thk);
-                QD_DIAG("%d,%d,%.0f,%+.2f,%+.6f,%+.4f,%+.6f,%s\n", h, tr, thd, dB(std::norm(R1 / R0)), dB(std::norm(Ra / Rw)),
-                        std::arg(Ra / Rw) * 180.0 / QPI, dB(std::norm(T / W.t)), c1.words.c_str());
-                CHECK(std::isfinite(std::abs(Ra)));
-            }
+    if (qd_diag())
+    {
+        for (int h : {5, 6})
+            for (int tr : {4, 5})
+                for (double thd : angles)
+                {
+                    double th = thd * QPI / 180.0, st = std::sin(th), s2 = st * st;
+                    arma::uvec mi;
+                    arma::mat mesh = mesh_of("SH", h, 0, mi);
+                    Chain c0 = run(mesh, mi, {3}, {0.0}, thd), c1 = run(mesh, mi, {tr, 3, tr}, {0.0}, thd), ct = run(mesh, mi, {tr, tr}, {0.0}, thd);
+                    if (!(c0.ok && c1.ok && ct.ok))
+                        continue;
+                    std::complex<double> R0 = field(c0, st), R1 = field(c1, st), T = field(ct, st);
+                    RT W = cm(e_air, {{diag_eps(SHEET, FRQ), thk}, {diag_eps(h, FRQ), std::abs(ct.fx[1] - ct.bx[0])}}, e_air, s2, k1);
+                    std::complex<double> Ra = R0 + R1, Rw = W.r * std::exp(2.0 * J * k1 * std::cos(th) * thk);
+                    QD_DIAG("%d,%d,%.0f,%+.2f,%+.6f,%+.4f,%+.6f,%s\n", h, tr, thd, dB(std::norm(R1 / R0)), dB(std::norm(Ra / Rw)),
+                            std::arg(Ra / Rw) * 180.0 / QPI, dB(std::norm(T / W.t)), c1.words.c_str());
+                }
+    }
 
-    // ------------------------------------------------------------------------------------------
-    // B. Every path
-    // ------------------------------------------------------------------------------------------
+    // ---- B. Every path (a printed table) ----
     struct Out
     {
         std::complex<double> T = 0.0, R = 0.0;
@@ -1414,48 +1391,46 @@ TEST_CASE("Measurement - the mirror behind the ray after a back reflection", "[w
     QD_DIAG("# and summed a series, lib; worth: the largest of them, dB; sum_true: the same count with the word made true.\n");
     QD_DIAG("# cut: the rays stopped at 20 events, lib\n");
     QD_DIAG("wall,a,b,tracer,theta,nT,nR,cut,sum,worth,sum_true,T_lib,T_inh,T_true,T_res,R_lib,R_inh,R_true,R_res,T_inh-true,R_inh-true\n");
-    std::vector<Wall> walls = {{"H", 5, 0}, {"H", 6, 0}, {"HS", 5, 0}, {"HS", 6, 0}, {"SH", 5, 0}, {"SH", 6, 0},
-                               {"AB", 2, 5}, {"AB", 2, 6}, {"HSH", 5, 0}, {"HSH", 6, 0}};
-    for (const Wall &w : walls)
-        for (int tr : {4, 5})
-            for (double thd : angles)
-            {
-                const std::string nm = w.name;
-                double s2 = std::sin(thd * QPI / 180.0) * std::sin(thd * QPI / 180.0);
-                arma::uvec mi;
-                arma::mat mesh = mesh_of(nm, w.a, w.b, mi);
-                const double x_back = (nm == "AB") ? 0.15 : 0.10;
-                const bool two = nm == "AB";
-                Out L = walk(mesh, mi, tr, 0.15, 0, thd, 20, -400.0, x_back, w.a, w.b, two);
-                Out I = walk(mesh, mi, tr, 0.15, 1, thd, 20, -400.0, x_back, w.a, w.b, two);
-                Out U = walk(mesh, mi, tr, 0.15, 2, thd, 20, -400.0, x_back, w.a, w.b, two);
-                Out Z = walk(mesh, mi, tr, 0.0, 0, thd, 20, -400.0, x_back, w.a, w.b, two);
-                std::complex<double> eA = diag_eps(w.a, FRQ), eB = diag_eps(w.b, FRQ), eS = diag_eps(SHEET, FRQ);
-                RT W;
-                if (nm == "H")
-                    W = cm(e_air, {{eA, 0.10}}, e_air, s2, k1);
-                else if (nm == "HS")
-                    W = cm(e_air, {{eA, 0.10}, {eS, thk}}, e_air, s2, k1);
-                else if (nm == "SH")
-                    W = cm(e_air, {{eS, thk}, {eA, 0.10}}, e_air, s2, k1);
-                else if (nm == "AB")
-                    W = cm(e_air, {{eA, 0.05}, {eB, 0.10}}, e_air, s2, k1);
-                else
+    std::vector<Wall> walls = {{"H", 5, 0}, {"H", 6, 0}, {"HS", 5, 0}, {"HS", 6, 0}, {"SH", 5, 0}, {"SH", 6, 0}, {"AB", 2, 5}, {"AB", 2, 6}, {"HSH", 5, 0}, {"HSH", 6, 0}};
+    if (qd_diag())
+    {
+        for (const Wall &w : walls)
+            for (int tr : {4, 5})
+                for (double thd : angles)
                 {
-                    Out Z60 = walk(mesh, mi, tr, 0.0, 0, thd, 60, -400.0, x_back, w.a, w.b, two);
-                    W.t = Z60.T, W.r = Z60.R;
+                    const std::string nm = w.name;
+                    double s2 = std::sin(thd * QPI / 180.0) * std::sin(thd * QPI / 180.0);
+                    arma::uvec mi;
+                    arma::mat mesh = mesh_of(nm, w.a, w.b, mi);
+                    const double x_back = (nm == "AB") ? 0.15 : 0.10;
+                    const bool two = nm == "AB";
+                    Out L = walk(mesh, mi, tr, 0.15, 0, thd, 20, -400.0, x_back, w.a, w.b, two);
+                    Out I = walk(mesh, mi, tr, 0.15, 1, thd, 20, -400.0, x_back, w.a, w.b, two);
+                    Out U = walk(mesh, mi, tr, 0.15, 2, thd, 20, -400.0, x_back, w.a, w.b, two);
+                    Out Z = walk(mesh, mi, tr, 0.0, 0, thd, 20, -400.0, x_back, w.a, w.b, two);
+                    std::complex<double> eA = diag_eps(w.a, FRQ), eB = diag_eps(w.b, FRQ), eS = diag_eps(SHEET, FRQ);
+                    RT W;
+                    if (nm == "H")
+                        W = cm(e_air, {{eA, 0.10}}, e_air, s2, k1);
+                    else if (nm == "HS")
+                        W = cm(e_air, {{eA, 0.10}, {eS, thk}}, e_air, s2, k1);
+                    else if (nm == "SH")
+                        W = cm(e_air, {{eS, thk}, {eA, 0.10}}, e_air, s2, k1);
+                    else if (nm == "AB")
+                        W = cm(e_air, {{eA, 0.05}, {eB, 0.10}}, e_air, s2, k1);
+                    else
+                    {
+                        Out Z60 = walk(mesh, mi, tr, 0.0, 0, thd, 60, -400.0, x_back, w.a, w.b, two);
+                        W.t = Z60.T, W.r = Z60.R;
+                    }
+                    QD_DIAG("%s,%d,%d,%d,%.0f,%d,%d,%d,%d,%.3f,%d,%+.4f,%+.4f,%+.4f,%+.4f,%+.4f,%+.4f,%+.4f,%+.4f,%+.1e,%+.1e\n", w.name, w.a, w.b, tr, thd,
+                            L.nT, L.nR, L.n_cut, L.n_sum, L.worst, U.n_sum, dB(std::norm(L.T / W.t)), dB(std::norm(I.T / W.t)), dB(std::norm(U.T / W.t)),
+                            dB(std::norm(Z.T / W.t)), dB(std::norm(L.R / W.r)), dB(std::norm(I.R / W.r)), dB(std::norm(U.R / W.r)), dB(std::norm(Z.R / W.r)),
+                            dB(std::norm(I.T / U.T)), dB(std::norm(I.R / U.R)));
                 }
-                INFO("paths, wall " << nm << ", a " << w.a << ", b " << w.b << ", tracer " << tr << ", theta " << thd);
-                CHECK(L.nT >= 1);
-                QD_DIAG("%s,%d,%d,%d,%.0f,%d,%d,%d,%d,%.3f,%d,%+.4f,%+.4f,%+.4f,%+.4f,%+.4f,%+.4f,%+.4f,%+.4f,%+.1e,%+.1e\n", w.name, w.a, w.b, tr, thd,
-                        L.nT, L.nR, L.n_cut, L.n_sum, L.worst, U.n_sum, dB(std::norm(L.T / W.t)), dB(std::norm(I.T / W.t)), dB(std::norm(U.T / W.t)),
-                        dB(std::norm(Z.T / W.t)), dB(std::norm(L.R / W.r)), dB(std::norm(I.R / W.r)), dB(std::norm(U.R / W.r)), dB(std::norm(Z.R / W.r)),
-                        dB(std::norm(I.T / U.T)), dB(std::norm(I.R / U.R)));
-            }
+    }
 
-    // ------------------------------------------------------------------------------------------
-    // D. A verdict that is handed in
-    // ------------------------------------------------------------------------------------------
+    // ---- D. A verdict that is handed in ----
     // The event that closes the first leg in a body, both passes: with the verdict "sum" handed
     // in it is the event at eps 0 whatever eps says, with "do not sum" the event at eps 1.5, and
     // the verdict handed out says which of the two a call was.
@@ -1555,8 +1530,8 @@ TEST_CASE("Sheet reflect port - where the layer lies and what the echo pays", "[
         E.rt = rt[0];
         return E;
     };
-    using ub::face;
     using ub::build;
+    using ub::face;
     auto onward = [](const Ev &E, arma::mat &orig, arma::mat &dest) // long enough to cross every face that is left
     {
         arma::mat d = E.destN - E.origN;
@@ -1669,9 +1644,9 @@ TEST_CASE("Sheet reflect port - where the layer lies and what the echo pays", "[
     const double thk = 0.006, k1 = 2.0 * QPI * FRQ / C0;
     const std::complex<double> eS = diag_eps(SHEET, FRQ);
 
-    // A reflected sum against its wall. Where the wall reflects 10 dB less than the path off its
-    // first face, the two nearly cancel and the same distance reads larger in dB; such a row,
-    // and a row that carries the clamp of section 5, is held against the first-face term.
+    // A reflected sum against its wall. Where the wall reflects 10 dB less than the path off its first face, the two
+    // nearly cancel and the same distance reads larger in dB; such a row, and a row whose mirror is clamped above one,
+    // is held against the first-face term.
     auto on_wall = [&](std::complex<double> R, std::complex<double> ref, std::complex<double> R0, bool clamp) -> bool
     {
         if (clamp || std::abs(ref) < 0.316 * std::abs(R0))
@@ -1679,9 +1654,7 @@ TEST_CASE("Sheet reflect port - where the layer lies and what the echo pays", "[
         return std::abs(dB(R / ref)) < 5.0e-3 && std::abs(deg(R / ref)) < 0.05;
     };
 
-    // ------------------------------------------------------------------------------------------
-    // A. A wall coated on its near side through ray_mesh_interact alone
-    // ------------------------------------------------------------------------------------------
+    // ---- A. A wall coated on its near side through ray_mesh_interact alone ----
     // What a caller without state gets. First the glued entry itself, both ports, against the
     // redo of ray_state_update. Then, on the lossless host with the refracting tracer, whose
     // segments are the wave, the paths of the wall from ray_mesh_interact's coefficients alone,
@@ -1754,9 +1727,7 @@ TEST_CASE("Sheet reflect port - where the layer lies and what the echo pays", "[
                 CHECK(std::abs(dB(T / W.t)) < 5.0e-3);
             }
 
-    // ------------------------------------------------------------------------------------------
-    // B. A wall coated on its near side and a wall lined on both faces, every path
-    // ------------------------------------------------------------------------------------------
+    // ---- B. A wall coated on its near side and a wall lined on both faces, every path ----
     QD_DIAG("\n# diag: reflect port, a wall coated on its near side (SH) and lined on both faces (SHS), every path. coating 6 mm,\n");
     QD_DIAG("# host 100. eps 0 and 0.15, 30 events. R_dB, R_deg: the reflected sum against the matrix of the wall with the near\n");
     QD_DIAG("# coating in front of the mesh plane; R_ff: its distance from that wall over the path off the first coating.\n");
@@ -1795,9 +1766,7 @@ TEST_CASE("Sheet reflect port - where the layer lies and what the echo pays", "[
                             CHECK(std::abs(dB(O.T / W.t)) < 5.0e-3);
                     }
 
-    // ------------------------------------------------------------------------------------------
-    // C. An absorber on a rigid wall, as a sheet and as a traced solid
-    // ------------------------------------------------------------------------------------------
+    // ---- C. An absorber on a rigid wall, as a sheet and as a traced solid ----
     // Mineral wool 50 mm, the two-column-pair fit of the phase-reference case, on a rigid wall
     // eps 2.401e-9 whose face stands at x = 0 in both meshes. As a sheet the wool is a face at
     // x = 0, co-located with the wall; as a traced solid it stands in front of the wall, from
@@ -1849,14 +1818,11 @@ TEST_CASE("Sheet reflect port - where the layer lies and what the echo pays", "[
                 }
     }
 
-    // ------------------------------------------------------------------------------------------
-    // D. A sheet in front of a wall across an air gap
-    // ------------------------------------------------------------------------------------------
-    // air | sheet 6 mm | air 30 mm | host 100 | air, the sheet's face at x = 0 and the wall's at
-    // x = 30 mm. The layer of the sheet occupies 6 mm of that air, [-u, 6 mm - u]. Three walls,
-    // each referenced to x = 0: u = 0 (behind the face, in the gap), 3 mm (centred) and 6 mm (in
-    // front). The mesh plane is the mid-plane, so the paths sum to the centred wall on both
-    // ports, and the other two are recorded to show they are told apart.
+    // ---- D. A sheet in front of a wall across an air gap ----
+    // air | sheet 6 mm | air 30 mm | host 100 | air, the sheet's face at x = 0 and the wall's at x = 30 mm. The layer
+    // of the sheet occupies 6 mm of that air, [-u, 6 mm - u]. Three walls, each referenced to x = 0: u = 0 (behind the
+    // face, in the gap), 3 mm (centred) and 6 mm (in front). The mesh plane is the mid-plane, so the paths sum to the
+    // centred wall on both ports, and the other two are printed to show they are told apart.
     QD_DIAG("\n# diag: reflect port, a sheet in front of a wall across an air gap. air | sheet 6 mm | air 30 mm | host 100 | air,\n");
     QD_DIAG("# eps 0, every path, floor -120 dB. The summed paths against the wall whose layer lies at [-u, thk - u]: uh centred,\n");
     QD_DIAG("# asserted; u0 behind the face and ut in front, recorded. dB and deg. cut: rays stopped at the floor\n");
@@ -1889,13 +1855,10 @@ TEST_CASE("Sheet reflect port - where the layer lies and what the echo pays", "[
                 CHECK(std::abs(L.R / rr[2] - 1.0) > 1.0e-2);
             }
 
-    // ------------------------------------------------------------------------------------------
-    // E. A sheet inside a wall
-    // ------------------------------------------------------------------------------------------
-    // air | host 50 | sheet 6 mm | host 50 | air. The sheet displaces 3 mm of host on either side
-    // of its face, so the wall is host 47 | sheet | host 47, on both ports, whether every series
-    // is summed, every bounce followed, or the threshold falls between. w44: the same sums
-    // against host 50 | sheet | host 44, recorded.
+    // ---- E. A sheet inside a wall ----
+    // air | host 50 | sheet 6 mm | host 50 | air. The sheet displaces 3 mm of host on either side of its face, so the
+    // wall is host 47 | sheet | host 47, on both ports, whether every series is summed, every bounce followed, or the
+    // threshold falls between. w44: the same sums against host 50 | sheet | host 44, printed.
     QD_DIAG("\n# diag: reflect port, a sheet inside a wall. air | host 50 | sheet 6 mm | host 50 | air, every path, floor -100 dB;\n");
     QD_DIAG("# eps 1.5 with 20 events, eps 0 and 0.15 with 60. The summed paths against host 47 | sheet | host 47, dB and deg;\n");
     QD_DIAG("# w44: against host 50 | sheet | host 44, dB\n");
@@ -1941,9 +1904,7 @@ TEST_CASE("Sheet reflect port - where the layer lies and what the echo pays", "[
                 CHECK(std::abs(deg(A.T / B.T)) < 0.01);
             }
 
-    // ------------------------------------------------------------------------------------------
-    // F. A sheet and a traced solid of one material and thickness, with att
-    // ------------------------------------------------------------------------------------------
+    // ---- F. A sheet and a traced solid of one material and thickness, with att ----
     // 20 mm of eps 5.24 - 0.63j and of eps 5.24, in air, with att 0, 3 and 10 dB. The sheet is
     // one face and one event, its layer centred on the face; the solid is two faces 20 mm apart
     // with its series summed, its front face on the mesh plane. So the sheet's reflection is the
@@ -1987,7 +1948,7 @@ TEST_CASE("Sheet reflect port - where the layer lies and what the echo pays", "[
                             std::abs(own - Rs), dB(cpx(et.xpr, 0, 0) / O.T), dB(Fo.R / O.R), dB(Rs / none));
                     CHECK(std::abs(Rs / (once * half) - 1.0) < 1.0e-9);
                     CHECK(std::abs(own - Rs) < 1.0e-12);
-                    CHECK(std::abs(dB(O.R / once)) < 1.0e-3); // the traced solid pays the gain once
+                    CHECK(std::abs(dB(O.R / once)) < 1.0e-3);        // the traced solid pays the gain once
                     CHECK(std::abs(dB(Rs / (O.R * half))) < 1.0e-3); // and the two representations are one wall
                     CHECK(std::abs(deg(Rs / (O.R * half))) < 0.05);
                     CHECK(std::abs(dB(cpx(et.xpr, 0, 0) / O.T)) < 5.0e-3); // a traced leg is short by the relaunch offset
@@ -1997,28 +1958,26 @@ TEST_CASE("Sheet reflect port - where the layer lies and what the echo pays", "[
 
 TEST_CASE("Direction - a ray leaves a parallel slab parallel to how it arrived", "[wave]")
 {
-    // Across parallel faces the transverse wavenumber of a wave that started in air is real and
-    // conserved, so behind any stack of layers the direction in air has tangential part sqrt(p)
-    // and normal part sqrt(1 - p) with p = sin^2(theta_ext): the direction the ray came in at.
+    // Across parallel faces the transverse wavenumber of a wave that started in air is real and conserved, so behind
+    // any stack of layers the direction in air has tangential part sqrt(p) and normal part sqrt(1 - p) with p =
+    // sin^2(theta_ext): the direction the ray came in at.
     //
-    // Measured at every writer of a direction into air, with the undeviated tracer, which is the
-    // mode in which ray_state_update writes one: a glued exit, a glued exit behind a sheet and
-    // behind an ordered stack inside the host, a bare exit and a bare exit of a resolved ray, the
-    // last two through the intersector because a bare exit keeps what ray_mesh_interact wrote
-    // unless ray_state_update replaces it. Lossless host as the control.
+    // Measured at every writer of a direction into air, with the undeviated tracer, which is the mode in which
+    // ray_state_update writes one: a glued exit, a glued exit behind a sheet and behind an ordered stack inside the
+    // host, a bare exit and a bare exit of a resolved ray, the last two through the intersector because a bare exit
+    // keeps what ray_mesh_interact wrote unless ray_state_update replaces it. Lossless host as the control.
     //
-    // d_t and d_n are the tangential and the normal component of the written unit vector minus
-    // those of the incoming one. map_t and map_n are what the real-angle map makes of the traced
-    // direction before normalization, minus sqrt(p) and sqrt(1 - p): the tangential shortfall
-    // 1 / N of the projection, and the far cosine formed at a real angle in a lossy host.
+    // d_t and d_n are the tangential and the normal component of the written unit vector minus those of the incoming
+    // one. map_t and map_n are what the real-angle map makes of the traced direction before normalization, minus
+    // sqrt(p) and sqrt(1 - p): the tangential shortfall 1 / N of the projection, and the far cosine formed at a real
+    // angle in a lossy host.
     //
-    // Two kinds of row keep the direction they had and are pinned to it: a host whose recovery
-    // declines (no direction supplied, or faces known not parallel), which takes the real-angle
-    // map; and a closed outer pair, whose leak is undeviated. The refracting tracer's bare-exit
-    // rows are recorded.
+    // Two kinds of row keep the direction they had and are pinned to it: a host whose recovery declines (no direction
+    // supplied, or faces known not parallel), which takes the real-angle map; and a closed outer pair, whose leak is
+    // undeviated. The refracting tracer's bare-exit rows are printed.
     //
-    // The rows that evaluate a material with the mass column (m > 0) are in the case of the same name
-    // with the suffix " - the mass-law part".
+    // The rows that evaluate a material with the mass column (m > 0) are in the case of the same name with the suffix "
+    // - the mass-law part".
     const double f_hz = FRQ, L = 0.10;
     auto mtl = diag_palette<double>();
     const int SHEET = 3, SHEET2 = 8, DENSE = 2;
@@ -2045,9 +2004,7 @@ TEST_CASE("Direction - a ray leaves a parallel slab parallel to how it arrived",
         b = std::real(std::sqrt(1.0 - e * s * s));
     };
 
-    // ------------------------------------------------------------------------------------------
-    // Glued exit: entered through a bare face, behind a sheet inside the host, behind a stack
-    // ------------------------------------------------------------------------------------------
+    // ---- Glued exit: entered through a bare face, behind a sheet inside the host, behind a stack ----
     QD_DIAG("\n# diag: direction, glued exit. air | host 100 mm | coating 6 mm | air, undeviated tracer, the\n");
     QD_DIAG("# exit along the direction a tracer holds. route: bare-entered, behind a sheet inside the\n");
     QD_DIAG("# host, behind an ordered stack inside the host. d_pass is the direction the sheet or stack\n");
@@ -2084,9 +2041,7 @@ TEST_CASE("Direction - a ray leaves a parallel slab parallel to how it arrived",
                 CHECK(std::abs(ox - std::cos(th)) < 1.0e-9);
             }
 
-    // ------------------------------------------------------------------------------------------
-    // Rows that keep the direction they have
-    // ------------------------------------------------------------------------------------------
+    // ---- Rows that keep the direction they have ----
     QD_DIAG("\n# diag: direction, glued exits that keep it. nodir: no direction supplied, the reported angle\n");
     QD_DIAG("# is the in-medium one. wedge: faces known not parallel. Both take the real-angle map, d_map\n");
     QD_DIAG("# against it. closed: the outer pair is closed, the leak is undeviated, d_map against dir_prev\n");
@@ -2136,9 +2091,7 @@ TEST_CASE("Direction - a ray leaves a parallel slab parallel to how it arrived",
         CHECK(d_map < 1.0e-12);
     }
 
-    // ------------------------------------------------------------------------------------------
-    // Bare exit, through the intersector
-    // ------------------------------------------------------------------------------------------
+    // ---- Bare exit, through the intersector ----
     struct Ev
     {
         arma::mat origN, destN, path_dirN, xpr;
@@ -2220,31 +2173,29 @@ TEST_CASE("Direction - a ray leaves a parallel slab parallel to how it arrived",
                         }
                     }
     }
-
 }
 
 TEST_CASE("Refracting tracer - a traced bend is known from the state and the leg is exact", "[wave]")
 {
-    // With types 2 and 5 ray_mesh_interact bends the segment itself, so inside a solid the traced
-    // and the geometric cosine coincide and nothing can be read off their difference. That the
-    // leg follows a bend is a fact of the polyline, and the event that entered the medium knows
-    // it: bit 14 of the current-medium word, set where a type 2 or 5 event refracted into the
-    // medium, clear where it entered under total reflection, carried while the ray stays in the
-    // medium and zero in air. Every consumer of the recovered cosine then runs on that leg as it
-    // does for the undeviated tracer, and the traversal takes no walk-off, since the lateral shift
-    // is in the polyline.
+    ub::OneThread one_thread;
+    // With types 2 and 5 ray_mesh_interact bends the segment itself, so inside a solid the traced and the geometric
+    // cosine coincide and nothing can be read off their difference. That the leg follows a bend is a fact of the
+    // polyline, and the event that entered the medium knows it: bit 14 of the current-medium word, set where a type 2
+    // or 5 event refracted into the medium, clear where it entered under total reflection, carried while the ray stays
+    // in the medium and zero in air. Every consumer of the recovered cosine then runs on that leg as it does for the
+    // undeviated tracer, and the traversal takes no walk-off, since the lateral shift is in the polyline.
     //
-    // Everything runs through ray_triangle_intersect, ray_mesh_interact and ray_state_update.
-    // The quantity compared is the absolute transfer between the first and the last hit point,
-    // the chain coefficient with the free-space reference over the in-wall polyline put back:
+    // Everything runs through ray_triangle_intersect, ray_mesh_interact and ray_state_update. The quantity compared is
+    // the absolute transfer between the first and the last hit point, the chain coefficient with the free-space
+    // reference over the in-wall polyline put back:
     //   - against the analytic slab at the polyline's exit point, power and phase;
-    //   - tracer 5 against tracer 4. Each traversal carries the phase at the point its own
-    //     polyline leaves at, so each absolute transfer is taken there, times
-    //     exp(+j k0 sin(theta) dy) with dy that polyline's lateral walk, and the two are one number.
-    // Recorded and not asserted: the trajectory (destN - origN) out of a lossy wall.
+    //   - tracer 5 against tracer 4. Each traversal carries the phase at the point its own polyline leaves at, so each
+    //     absolute transfer is taken there, times exp(+j k0 sin(theta) dy) with dy that polyline's lateral walk, and
+    //     the two are one number.
+    // Printed and not asserted: the trajectory (destN - origN) out of a lossy wall.
     //
-    // The rows that evaluate a material with the mass column (m > 0) are in the case of the same name
-    // with the suffix " - the mass-law part".
+    // The rows that evaluate a material with the mass column (m > 0) are in the case of the same name with the suffix "
+    // - the mass-law part".
     const double f_hz = FRQ, k0 = 2.0 * QPI * f_hz / C0, L = 0.10, gap = 1.0e-5;
     auto mtl = diag_palette<double>();
     const int SHEET = 3;
@@ -2294,8 +2245,8 @@ TEST_CASE("Refracting tracer - a traced bend is known from the state and the leg
         E.ot = ot[0], E.rt = rt[0], E.nh = nh(0);
         return E;
     };
-    using ub::face;
     using ub::build;
+    using ub::face;
     struct Chain
     {
         std::complex<double> vv = 1.0, hh = 1.0; // chain coefficient, VV (TE, scalar) and HH (TM)
@@ -2363,9 +2314,7 @@ TEST_CASE("Refracting tracer - a traced bend is known from the state and the leg
         t = t01 * t10 * phi * S, r_in = t01 * r10 * t10 * phi * phi * S;
     };
 
-    // ------------------------------------------------------------------------------------------
-    // Bare slab: the state, the chain against the analytic slab, the two tracers, the direction
-    // ------------------------------------------------------------------------------------------
+    // ---- Bare slab: the state, the chain against the analytic slab, the two tracers, the direction ----
     QD_DIAG("\n# diag: refracting tracer, bare slab. air | 100 mm | air through the intersector, series resolved.\n");
     QD_DIAG("# d_dB, ph: tracer 5 against the analytic slab at the polyline's exit point. r54: tracer 5 over 4,\n");
     QD_DIAG("# absolute transfer. tm_dB: tracer 2, HH against the TM slab. cur: current word after the entry,\n");
@@ -2413,9 +2362,7 @@ TEST_CASE("Refracting tracer - a traced bend is known from the state and the leg
             CHECK(std::abs(c5.out_x - std::cos(th)) < 1.0e-9);
         }
 
-    // ------------------------------------------------------------------------------------------
-    // Sheets on and in the host, and two solids: tracer 5 against tracer 4
-    // ------------------------------------------------------------------------------------------
+    // ---- Sheets on and in the host, and two solids: tracer 5 against tracer 4 ----
     struct Stack
     {
         const char *name;
@@ -2423,7 +2370,7 @@ TEST_CASE("Refracting tracer - a traced bend is known from the state and the leg
         std::vector<int> mat;
         std::vector<bool> flip;
         double eps;
-        bool phase; // the phase is asserted
+        bool phase;   // the phase is asserted
         int sheet_ev; // event after which the ray is behind a sheet inside the host, or -1
     };
     std::vector<Stack> stacks;
@@ -2435,8 +2382,7 @@ TEST_CASE("Refracting tracer - a traced bend is known from the state and the leg
         stacks.push_back({"sheet_inside", {0.0, 0.05, L}, {h, SHEET, h}, {false, false, true}, 0.0, true, 1});
     }
     for (auto P : std::vector<std::pair<int, int>>{{1, 5}, {5, 1}, {2, 5}, {2, 6}, {1, 6}})
-        stacks.push_back({"two_solids  ", {0.0, 0.05, 0.05 + gap, 0.15 + gap}, {P.first, P.first, P.second, P.second},
-                          {false, true, false, true}, 1.5, true, -1});
+        stacks.push_back({"two_solids  ", {0.0, 0.05, 0.05 + gap, 0.15 + gap}, {P.first, P.first, P.second, P.second}, {false, true, false, true}, 1.5, true, -1});
     QD_DIAG("\n# diag: refracting tracer, layered walls. Tracer 5 over tracer 4, absolute transfer, scalar. Sheets:\n");
     QD_DIAG("# series resolved. two_solids: series declined. Each tracer at the point its polyline leaves at.\n");
     QD_DIAG("# words: the last in-wall state words of tracer 5, hex\n");
@@ -2484,9 +2430,7 @@ TEST_CASE("Refracting tracer - a traced bend is known from the state and the leg
             CHECK(std::abs(c5.out_x - std::cos(th)) < 1.0e-9);
         }
 
-    // ------------------------------------------------------------------------------------------
-    // Back reflection: the reflect pass does not name the tracer, the word does
-    // ------------------------------------------------------------------------------------------
+    // ---- Back reflection: the reflect pass does not name the tracer, the word does ----
     QD_DIAG("\n# diag: refracting tracer, back reflection. Enter (5), reflect at the far face (3), leave by the\n");
     QD_DIAG("# front face (5), against t01 r10 t10 phi^2 [S] at the polyline's exit point. eps 0: the reflection\n");
     QD_DIAG("# collapses the series and the ray leaves resolved. cur: the word after the reflection, hex\n");
@@ -2518,9 +2462,7 @@ TEST_CASE("Refracting tracer - a traced bend is known from the state and the leg
                 CHECK(std::abs(c5.out_x - std::cos(th)) < 1.0e-9);
             }
 
-    // ------------------------------------------------------------------------------------------
-    // A second frequency of a run, recorded
-    // ------------------------------------------------------------------------------------------
+    // ---- A second frequency of a run (printed) ----
     QD_DIAG("\n# diag: refracting tracer, a second frequency. Geometry and state words at 1 GHz, coefficient and\n");
     QD_DIAG("# direction at f1, as ray_progress runs a band. eps 1.50 - 0.40j at 1 GHz, 100 mm, against the slab at\n");
     QD_DIAG("# f1 at the polyline's exit point, power and phase\n");
@@ -2543,14 +2485,11 @@ TEST_CASE("Refracting tracer - a traced bend is known from the state and the leg
             CHECK(std::abs(c5.out_y - std::sin(th)) < 1.0e-9);
             CHECK(std::abs(c5.out_x - std::cos(th)) < 1.0e-9);
         }
-    // ------------------------------------------------------------------------------------------
-    // The trajectory: the segment out of a lossy medium is the direction written
-    // ------------------------------------------------------------------------------------------
-    // ray_state_update is handed origN and destN and puts them on one line through the point the
-    // ray leaves at, along the direction it writes, wherever that direction is the one of a wave
-    // out of a lossy medium whose cosine was recovered. Everything else of the event is what it
-    // was, so the chain is the one of the tables above, and the leg in a second solid now runs
-    // where the transition says the wave runs.
+    // ---- The trajectory: the segment out of a lossy medium is the direction written ----
+    // ray_state_update is handed origN and destN and puts them on one line through the point the ray leaves at, along
+    // the direction it writes, wherever that direction is the one of a wave out of a lossy medium whose cosine was
+    // recovered. Everything else of the event is what it was, so the chain is the one of the tables above, and the leg
+    // in a second solid runs where the transition says the wave runs.
     relaunch = true;
     auto lossy = [&](int m)
     { return std::imag(diag_eps(m, f_hz)) != 0.0; };
@@ -2659,6 +2598,7 @@ TEST_CASE("Refracting tracer - a traced bend is known from the state and the leg
 
 TEST_CASE("Phase reference - a traversal carries the phase at the point the polyline leaves at", "[wave]")
 {
+    ub::OneThread one_thread;
     // The tracer commits a polyline, and the path length, the delay and the free-space phase of a
     // path are taken from it. A coefficient is therefore owed the field at the point where the
     // polyline leaves a body. For a plane wave that field is the stack's transfer on the thickness
@@ -2718,11 +2658,12 @@ TEST_CASE("Phase reference - a traversal carries the phase at the point the poly
                                        in ? &in->path_dirN : nullptr, in ? &in_state->accg : nullptr, in ? &in->accr : nullptr,
                                        &E.prev, &E.cur, &E.buf, &gain, &E.xpr, &E.path_dirN, &E.accg, &E.accr, &rt,
                                        (arma::u32_vec *)nullptr, eps, relaunch ? &E.origN : nullptr, relaunch ? &E.destN : nullptr);
-        E.ot = ot[0], E.rt = rt[0], E.nh = nh(0); E.sbs = sbsN;
+        E.ot = ot[0], E.rt = rt[0], E.nh = nh(0);
+        E.sbs = sbsN;
         return E;
     };
-    using ub::face;
     using ub::build;
+    using ub::face;
     struct Chain
     {
         std::complex<double> vv = 1.0;
@@ -2800,9 +2741,7 @@ TEST_CASE("Phase reference - a traversal carries the phase at the point the poly
     auto phi_of = [&](const Sl &s, double f, double Lx)
     { return std::exp(-J * (2.0 * QPI * f / C0) * s.nc * Lx); };
 
-    // ------------------------------------------------------------------------------------------
-    // A. A transmitted chain, both tracers, the base frequency and two more of a band
-    // ------------------------------------------------------------------------------------------
+    // ---- A. A transmitted chain, both tracers, the base frequency and two more of a band ----
     QD_DIAG("\n# diag: phase reference, transmitted. air | 100 mm | air through the intersector, series resolved, scalar,\n");
     QD_DIAG("# against the analytic slab. Base frequency 1 GHz; 0.5 and 2 GHz are run as frequencies of a band.\n");
     QD_DIAG("# ph_ray: at the point where the refracted ray of that frequency leaves. ph_poly: at the polyline's exit\n");
@@ -2831,9 +2770,7 @@ TEST_CASE("Phase reference - a traversal carries the phase at the point the poly
                     CHECK(std::abs(deg(q_poly)) < 0.05);
                 }
 
-    // ------------------------------------------------------------------------------------------
-    // B. A back reflection, the two legs apart
-    // ------------------------------------------------------------------------------------------
+    // ---- B. A back reflection, the two legs apart ----
     QD_DIAG("\n# diag: phase reference, back reflection. Enter, reflect at the far face (type 3), leave by the front\n");
     QD_DIAG("# face, against t01 r10 t10 phi^2 [S]. eps 1.5: series declined; eps 0: the reflection collapses it\n");
     QD_DIAG("# and the ray leaves resolved. Per leg: the event that closes it against r10 phi [S] (leg 1, closed\n");
@@ -2883,9 +2820,7 @@ TEST_CASE("Phase reference - a traversal carries the phase at the point the poly
                         CHECK(std::abs(deg(a2 * std::exp(J * k1 * st * c.lat[2]))) < 0.05);
                     }
 
-    // ------------------------------------------------------------------------------------------
-    // C. A sheet inside a host: which point the composite and its displaced-host term sit on
-    // ------------------------------------------------------------------------------------------
+    // ---- C. A sheet inside a host: which point the composite and its displaced-host term sit on ----
     QD_DIAG("\n# diag: phase reference, a sheet inside a host. air | host 50 | sheet 6 mm eps 5.24 - 0.63j | host 50 | air,\n");
     QD_DIAG("# host series declined, scalar, 1 GHz, against the single pass through host (100 - 6 mm) and the sheet's\n");
     QD_DIAG("# Airy pair. Four points: poly, the polyline's; host, where a ray refracted in the host alone leaves,\n");
@@ -2916,9 +2851,7 @@ TEST_CASE("Phase reference - a traversal carries the phase at the point the poly
                 CHECK(std::abs(deg(a * std::exp(J * k1 * st * c.dy))) < 0.05); // the composite and the host legs on one point
             }
 
-    // ------------------------------------------------------------------------------------------
-    // D. An acoustic absorber as a traced solid, over a band
-    // ------------------------------------------------------------------------------------------
+    // ---- D. An acoustic absorber as a traced solid, over a band ----
     // Mineral wool at about 12 kPa s/m^2, the two-column-pair fit of the material model, 50 mm; and a
     // rigid backing, eps 2.401e-9. Frequencies are acoustic, scaled by c0 / 343 m/s. The index is
     // about 1.5 - 0.75j at 1 kHz, so the wave is refracted into the layer at every angle.
@@ -2986,9 +2919,7 @@ TEST_CASE("Phase reference - a traversal carries the phase at the point the poly
                     }
     }
 
-    // ------------------------------------------------------------------------------------------
-    // E. Two solids across a bare face: where the phase between the two tracers comes from
-    // ------------------------------------------------------------------------------------------
+    // ---- E. Two solids across a bare face: where the phase between the two tracers comes from ----
     // The absolute transfer puts the free-space reference back over the polyline between hit points.
     // A coefficient carries that reference over the ledger only, which starts where the leg started -
     // the hit point, or the far face of a co-located pair - and ends at the next hit point. What lies
@@ -3023,17 +2954,15 @@ TEST_CASE("Phase reference - a traversal carries the phase at the point the poly
                 QD_DIAG("%d|%d,%.0f,%.1f,%+.6f,%+.4f,%.3f,%.3f,%+.4f,%+.4f,%+.4f\n", P.first, P.second, g * 1e6, thd, dB(std::norm(r54)), deg(r54),
                         U4 * 1e6, U5 * 1e6, pU * 180.0 / QPI, pd * 180.0 / QPI, deg(r54) - (pU + pd) * 180.0 / QPI);
                 INFO("two solids " << P.first << "|" << P.second << ", gap " << g << ", theta_ext " << thd);
-                CHECK(std::abs(dB(std::norm(r54))) < 2.0e-2); // 2e-3 at the 10 um of the refracting-tracer case
+                CHECK(std::abs(dB(std::norm(r54))) < 2.0e-2);                // 2e-3 at the 10 um of the refracting-tracer case
                 CHECK(std::abs(deg(r54) - (pU + pd) * 180.0 / QPI) < 0.005); // nothing but the geometry
                 CHECK(std::abs(deg(r54)) < 0.05);
             }
 
-    // ------------------------------------------------------------------------------------------
-    // G. Outside the item, recorded: the phase a rigid body reflects with, seen from air
-    // ------------------------------------------------------------------------------------------
-    // The backed rows above take the wall at the Fresnel phase of the permittivity it is mapped to.
-    // Seen from air that phase is measured here, for the one-parameter mapping (eps = (Z_air / Z)^2,
-    // mu = 1) and for a body with the same impedance and an index of 0.1 (eps = z n, mu = n / z).
+    // ---- G. Printed: the phase a rigid body reflects with, seen from air ----
+    // The backed rows above take the wall at the Fresnel phase of the permittivity it is mapped to. Seen from air that
+    // phase is measured here, for the one-parameter mapping (eps = (Z_air / Z)^2, mu = 1) and for a body with the same
+    // impedance and an index of 0.1 (eps = z n, mu = n / z).
     {
         const double zr = std::sqrt(2.401e-9), nr = 0.1;
         std::unordered_map<std::string, std::vector<double>> pal;
@@ -3098,8 +3027,8 @@ TEST_CASE("Leak direction - the direction a closed face writes for a wave launch
         E.ot = ot[0], E.rt = rt[0], E.nh = nh(0);
         return E;
     };
-    using ub::face;
     using ub::build;
+    using ub::face;
     auto unit = [](arma::mat d) -> arma::mat
     {
         d /= std::sqrt(d(0, 0) * d(0, 0) + d(0, 1) * d(0, 1) + d(0, 2) * d(0, 2));
@@ -3115,56 +3044,8 @@ TEST_CASE("Leak direction - the direction a closed face writes for a wave launch
         double tot = 0.0, dy = 0.0;
         bool ok = true;
     };
-    auto chain = [&](const Pal &pal, const arma::mat &mesh, const arma::uvec &mi, int itype, arma::mat orig, arma::mat dest,
-                     const Ev *seed, int hold) -> Row
-    {
-        Row R;
-        const std::vector<double> &mcol = pal.at("m");
-        Ev P;
-        bool have = seed != nullptr;
-        if (seed)
-            P = *seed;
-        double y0 = 0.0;
-        for (int k = 0; k < 8; ++k)
-        {
-            arma::mat sd = unit(dest - orig), wd = have ? unit(P.path_dirN) : sd;
-            Ev E = traced(pal, mesh, mi, itype, orig, dest, have ? &P : nullptr, 1.5);
-            if (E.nh == 0)
-                break;
-            int mb = have ? mat_of(P.cur(0)) : 0, ma = mat_of(E.cur(0));
-            double g = dB(std::norm(cpx(E.xpr, 0, 0)));
-            R.seg.push_back(ang(sd)), R.dir.push_back(ang(wd)), R.g.push_back(g), R.code.push_back(E.ot), R.rt.push_back(E.rt);
-            if (E.rt == 0)
-            {
-                R.ok = false;
-                break;
-            }
-            R.tot += g;
-            if (k == 0)
-                y0 = E.fbs(0, 1);
-            R.dy = E.fbs(0, 1) - y0;
-            arma::mat d = unit(E.destN - E.origN);
-            bool held = mb != 0 && mcol[(size_t)mb - 1] > 0.0 && (hold == 1 || (hold == 2 && ma == 0));
-            if (held)
-            {
-                E.path_dirN = wd;
-                if (itype == 5)
-                    d = wd;
-                if (ma != 0)
-                    E.cur(0) = (short)(E.cur(0) & ~(short)0x4000);
-            }
-            R.out.push_back(ang(E.path_dirN)), R.cur.push_back((unsigned)(unsigned short)E.cur(0));
-            // Long enough to cross every face that is left: a segment that ends inside a body
-            // preloads the ledger for a ray that ends there, and the next event would add to it
-            orig = E.origN, dest = E.origN + (1.2 / std::abs(d(0, 0))) * d;
-            P = E, have = true;
-        }
-        return R;
-    };
 
-    // ------------------------------------------------------------------------------------------
-    // B. The direction a closed face writes
-    // ------------------------------------------------------------------------------------------
+    // ---- B. The direction a closed face writes ----
     {
         // diag_palette with a tenth material, RARE: eps 1, lossless, a solid. The host eps
         // 1.50 - 0.40j is entered from the lossless eps 5.24 solid the ray is launched in, with a
@@ -3223,24 +3104,25 @@ TEST_CASE("Leak direction - the direction a closed face writes for a wave launch
 
 TEST_CASE("Measurement - the mirror behind a second solid and behind a sheet inside a wall", "[wave]")
 {
-    // Plan item 1, measured and nothing asserted about the code beyond sanity. Two traced solids
-    // that share a face are two series, and the second one's takes the first as a half-space
-    // where the wall has it as a layer backed by air; a sheet inside a wall is the same limit.
-    // Everything runs through ray_triangle_intersect, ray_mesh_interact and ray_state_update,
-    // scalar, both tracers. The references are written here as a TE characteristic matrix in
-    // the admittance b = sqrt(eps - sin^2), sharing no code with the library.
+    ub::OneThread one_thread;
+    // Two traced solids that share a face are two series, and the second one's takes the first as a half-space where
+    // the wall has it as a layer backed by air; a sheet inside a wall is the same limit. Everything runs through
+    // ray_triangle_intersect, ray_mesh_interact and ray_state_update, scalar, both tracers. The references are written
+    // here as a TE characteristic matrix in the admittance b = sqrt(eps - sin^2), sharing no code with the library.
+    // Asserted: each series is its own body's between half-spaces, and the paths a tracer follows sum to the wall; the
+    // rest is printed.
     //
-    // A. The series of each solid as a ratio, the resolving run over the declined one, against
-    //    the factorized form with the mirror behind as a half-space and as a layer backed by air.
-    // B. The transmitted field as a sum over the paths a tracer follows, every series resolved:
-    //    the straight path, then the paths that reflect at the far face, return into the first
-    //    solid, reflect at the front face and come forward again, each at its polyline's point.
+    // A. The series of each solid as a ratio, the resolving run over the declined one, against the factorized form with
+    // the mirror behind as a half-space and as a layer backed by air.
+    // B. The transmitted field as a sum over the paths a tracer follows, every series resolved: the straight path, then
+    // the paths that reflect at the far face, return into the first solid, reflect at the front face and come forward
+    // again, each at its polyline's point.
     // C. The same two for a wall with a sheet inside it.
     // D. Three solids: what each candidate mirror would leave on the third solid's series.
     // E. The thickness code: the code the library writes, and what its step costs the mirror.
     //
-    // The rows that evaluate a material with the mass column (m > 0) are in the case of the same name
-    // with the suffix " - the mass-law part".
+    // The rows that evaluate a material with the mass column (m > 0) are in the case of the same name with the suffix "
+    // - the mass-law part".
     const double gap = 1.0e-5, thk = 0.006;
     auto mtl = diag_palette<double>();
     const int SHEET = 3;
@@ -3280,11 +3162,12 @@ TEST_CASE("Measurement - the mirror behind a second solid and behind a sheet ins
                                        in ? &in->path_dirN : nullptr, in ? &in->accg : nullptr, in ? &in->accr : nullptr,
                                        &E.prev, &E.cur, &E.buf, &gain, &E.xpr, &E.path_dirN, &E.accg, &E.accr, &rt,
                                        (arma::u32_vec *)nullptr, eps, relaunch ? &E.origN : nullptr, relaunch ? &E.destN : nullptr);
-        E.ot = ot[0], E.rt = rt[0], E.nh = nh(0); E.sbs = sbsN;
+        E.ot = ot[0], E.rt = rt[0], E.nh = nh(0);
+        E.sbs = sbsN;
         return E;
     };
-    using ub::face;
     using ub::build;
+    using ub::face;
     struct Chain
     {
         std::complex<double> vv = 1.0;
@@ -3294,7 +3177,9 @@ TEST_CASE("Measurement - the mirror behind a second solid and behind a sheet ins
         bool ok = true;
         std::string rts, words;
         std::complex<double> at_point(double k, double st) const // the field at the polyline's exit point
-        { return vv * std::exp(std::complex<double>(0.0, -k * Lin)) * std::exp(std::complex<double>(0.0, k * st * dy)); }
+        {
+            return vv * std::exp(std::complex<double>(0.0, -k * Lin)) * std::exp(std::complex<double>(0.0, k * st * dy));
+        }
     };
     // seq: one type per event, or one type repeated until the ray is out. epsv likewise
     auto run = [&](const Pal &pal, const arma::mat &mesh, const arma::uvec &mtl_ind, const std::vector<int> &seq,
@@ -3386,9 +3271,7 @@ TEST_CASE("Measurement - the mirror behind a second solid and behind a sheet ins
     const double L1 = 0.05, L2 = 0.10;
     const double k1 = 2.0 * QPI * FRQ / C0;
 
-    // ------------------------------------------------------------------------------------------
-    // A. The series of each solid
-    // ------------------------------------------------------------------------------------------
+    // ---- A. The series of each solid ----
     QD_DIAG("\n# diag: mirror, the series of each solid. air | A 50 mm | B 100 mm | air through the intersector, scalar, 1 GHz.\n");
     QD_DIAG("# S_B: B's exit, resolving over declined. d_half: |S_B - S| with A behind as a half-space; d_layer: with A as a\n");
     QD_DIAG("# layer of its thickness backed by air; sep: the two references apart; worth_dB: 20 log |S_layer / S_half|.\n");
@@ -3430,13 +3313,11 @@ TEST_CASE("Measurement - the mirror behind a second solid and behind a sheet ins
                     // decomposition, and the paths below carry what the half-spaces do not return
                     CHECK(std::abs(S_B - S_half) < 1.0e-9);
                     CHECK(std::abs(S_A - S_A_ref) < 1.0e-9);
-                    CHECK(std::abs(S_half - S_layer) > 1.0e-3);    // the two mirrors can be told apart
+                    CHECK(std::abs(S_half - S_layer) > 1.0e-3);   // the two mirrors can be told apart
                     CHECK(std::abs(dB(std::norm(F0c))) < 1.0e-3); // the first path is off the wall by the mirror and nothing else
                 }
 
-    // ------------------------------------------------------------------------------------------
-    // B. The paths a tracer follows, summed
-    // ------------------------------------------------------------------------------------------
+    // ---- B. The paths a tracer follows, summed ----
     auto seq_of = [](int tr, int n) // the path that couples the two series n times
     {
         std::vector<int> s = {tr, tr};
@@ -3480,10 +3361,9 @@ TEST_CASE("Measurement - the mirror behind a second solid and behind a sheet ins
                     // The paths the tracer follows are a geometric sequence and their sum is the wall
                     REQUIRE((c[1].ok && c[2].ok));
                     CHECK(std::abs(F[2] / F[1] - q) < 1.0e-4);
-                    // Every leg is measured from the point it started at, so the paths hold the
-                    // thicknesses of the reference. With the refracting tracer at 85 deg a lossless second
-                    // layer still leaves 1.3e-3 dB on the limit (2.4e-3 dB while the legs were short by
-                    // the relaunch offset; not traced further)
+                    // Every leg is measured from the point it started at, so the paths hold the thicknesses of the
+                    // reference. With the refracting tracer at 85 deg a lossless second layer still leaves 1.3e-3 dB on
+                    // the limit
                     CHECK(std::abs(dB(std::norm(sinf))) < ((tr == 5 && B == 6 && thd == 85.0) ? 2.0e-3 : 1.0e-3));
                     CHECK(std::abs(deg(sinf)) < 0.05);
                 }
@@ -3494,9 +3374,7 @@ TEST_CASE("Measurement - the mirror behind a second solid and behind a sheet ins
         QD_DIAG("# the state words after each event of path 1, A 2, B 5, 40 deg, tracer 4, as prev.cur.buf: %s\n", c.words.c_str());
     }
 
-    // ------------------------------------------------------------------------------------------
-    // C. A wall with a sheet inside it
-    // ------------------------------------------------------------------------------------------
+    // ---- C. A wall with a sheet inside it ----
     QD_DIAG("\n# diag: mirror, a sheet inside a wall. air | host 50 | sheet 6 mm eps 5.24 - 0.63j | host 50 | air, scalar, 1 GHz.\n");
     QD_DIAG("# S_2: the second half's series at the exit; d_host: against the sheet behind backed by a half-space of the host;\n");
     QD_DIAG("# d_wall: against the sheet and the first half backed by air; worth_dB: 20 log of the two. d_1: the first half's\n");
@@ -3559,9 +3437,7 @@ TEST_CASE("Measurement - the mirror behind a second solid and behind a sheet ins
         QD_DIAG("# the state words after each event of path 1, host 5, 40 deg, tracer 4, as prev.cur.buf: %s\n", c.words.c_str());
     }
 
-    // ------------------------------------------------------------------------------------------
-    // D. Three solids
-    // ------------------------------------------------------------------------------------------
+    // ---- D. Three solids ----
     QD_DIAG("\n# diag: mirror, three solids. air | A 50 | B 100 | C 50 | air, every series resolved, tracer 4. S_C: C's series\n");
     QD_DIAG("# at the exit. d_half: against B behind as a half-space. In dB on the path, 20 log |S_x / S_exact| with S_exact\n");
     QD_DIAG("# the mirror {B, A} backed by air: half, B a half-space; B_air, B a layer backed by air; B_A, B a layer backed\n");
@@ -3592,21 +3468,19 @@ TEST_CASE("Measurement - the mirror behind a second solid and behind a sheet ins
                     dB(std::norm(c0.at_point(k1, st) / W)));
             CHECK(std::isfinite(std::abs(S_C)));
         }
-
 }
 
 TEST_CASE("Lossy verdict - a lossy second medium has no critical angle", "[wave]")
 {
     // One ray per call, many thousand calls: a thread team per call costs twenty times the work
     ub::OneThread one_thread;
-    // sqrt|e1 mu1 / e2 mu2| sin(theta) >= 1 is the critical angle of two lossless media. A lossy
-    // second medium has none: it always admits a transmitted wave, with a complex cosine, and the
-    // flux form closes no port on it. So the magnitude test holds where the second medium is
-    // lossless and nowhere else, and every reader of the verdict - the coefficient, the hit code,
-    // the direction, the bent flag, the ray tube, the crossings of a mass-law sheet - is
-    // continuous through the angle at which the test would trip. A rigid body of the acoustic
-    // mapping is lossless and stays closed. Through ray_triangle_intersect, ray_mesh_interact
-    // and ray_state_update; the rows of J with a loss column are recorded.
+    // sqrt|e1 mu1 / e2 mu2| sin(theta) >= 1 is the critical angle of two lossless media. A lossy second medium has
+    // none: it always admits a transmitted wave, with a complex cosine, and the flux form closes no port on it. So the
+    // magnitude test holds where the second medium is lossless and nowhere else, and every reader of the verdict - the
+    // coefficient, the hit code, the direction, the bent flag, the ray tube, the crossings of a mass-law sheet - is
+    // continuous through the angle at which the test would trip. A rigid body of the acoustic mapping is lossless and
+    // stays closed. Through ray_triangle_intersect, ray_mesh_interact and ray_state_update; the rows of J with a loss
+    // column are printed.
     //
     // A. A porous sheet in air, both ports, against the analytic slab
     // B. A porous sheet on a rigid wall and on a leaking one, both ports
@@ -3617,8 +3491,8 @@ TEST_CASE("Lossy verdict - a lossy second medium has no critical angle", "[wave]
     // G. EM: air into the porous medium, per channel
     // H. EM: a lossless dense solid in front of a lossy rarer one, bare and as a coating
     //
-    // The rows that evaluate a material with the mass column (m > 0) are in the case of the same name
-    // with the suffix " - the mass-law part".
+    // The rows that evaluate a material with the mass column (m > 0) are in the case of the same name with the suffix "
+    // - the mass-law part".
     const double gap = 1.0e-5;
     const std::complex<double> J(0.0, 1.0), one(1.0, 0.0);
     typedef std::unordered_map<std::string, std::vector<double>> Pal;
@@ -3661,8 +3535,8 @@ TEST_CASE("Lossy verdict - a lossy second medium has no critical angle", "[wave]
         E.rt = rt[0];
         return E;
     };
-    using ub::face;
     using ub::build;
+    using ub::face;
     auto onward = [](const Ev &E, arma::mat &orig, arma::mat &dest)
     {
         arma::mat d = E.destN - E.origN;
@@ -3782,29 +3656,29 @@ TEST_CASE("Lossy verdict - a lossy second medium has no critical angle", "[wave]
 
     const double f_hz = FRQ, k1 = 2.0 * QPI * f_hz / C0, dS = 0.050;
     const std::vector<LumpMtl> lp = {
-        {0.31, 0.20, 0.010},                    // 1 porous sheet 10 mm, rarer than air
-        {0.31, 0.20, 0.0},                      // 2 the same medium as a solid
-        {2.401e-9, 0.0, 0.0},                   // 3 rigid wall
-        {2.401e-9, 0.0, 0.0, 0.0, 0.3},         // 4 rigid wall leaking, tf 0.3
-        {0.31, 0.20, dS},                       // 5 porous sheet 50 mm
-        {2.50, 0.80, 0.010},                    // 6 dense lossy sheet 10 mm
-        {0.31, 0.20, 0.010, 0.0, 0.2},          // 7 porous sheet 10 mm with tf 0.2
-        {0.31, 0.20, 0.0, 0.0, 0.2},            // 8 porous solid with tf 0.2
-        {5.24, 0.00, 0.0},                      // 9 EM: lossless dense solid
-        {1.50, 0.40, 0.0},                      // 10 EM: lossy solid, rarer than 9
-        {1.50, 0.40, 0.006, 0.0, 0.5},          // 11 EM: the same as a 6 mm sheet with tf 0.5
-        {1.50, 0.40, 0.006},                    // 12 EM: the same as a 6 mm sheet
-        {0.50, 0.60, 0.0},                      // 13 a rarer solid with more loss, the test trips at 62.1 deg
-        {0.31, 0.60, 0.0},                      // 14 the same at 55.3 deg
-        {2.401e-9, 1.0e-10, 0.0, 0.0, 0.3},     // 15 the leaking rigid wall with a loss tangent of 0.04
+        {0.31, 0.20, 0.010},                                                 // 1 porous sheet 10 mm, rarer than air
+        {0.31, 0.20, 0.0},                                                   // 2 the same medium as a solid
+        {2.401e-9, 0.0, 0.0},                                                // 3 rigid wall
+        {2.401e-9, 0.0, 0.0, 0.0, 0.3},                                      // 4 rigid wall leaking, tf 0.3
+        {0.31, 0.20, dS},                                                    // 5 porous sheet 50 mm
+        {2.50, 0.80, 0.010},                                                 // 6 dense lossy sheet 10 mm
+        {0.31, 0.20, 0.010, 0.0, 0.2},                                       // 7 porous sheet 10 mm with tf 0.2
+        {0.31, 0.20, 0.0, 0.0, 0.2},                                         // 8 porous solid with tf 0.2
+        {5.24, 0.00, 0.0},                                                   // 9 EM: lossless dense solid
+        {1.50, 0.40, 0.0},                                                   // 10 EM: lossy solid, rarer than 9
+        {1.50, 0.40, 0.006, 0.0, 0.5},                                       // 11 EM: the same as a 6 mm sheet with tf 0.5
+        {1.50, 0.40, 0.006},                                                 // 12 EM: the same as a 6 mm sheet
+        {0.50, 0.60, 0.0},                                                   // 13 a rarer solid with more loss, the test trips at 62.1 deg
+        {0.31, 0.60, 0.0},                                                   // 14 the same at 55.3 deg
+        {2.401e-9, 1.0e-10, 0.0, 0.0, 0.3},                                  // 15 the leaking rigid wall with a loss tangent of 0.04
         {2.401e-9, 0.0, 0.0, 0.0, 0.3, 0.0, 0.0, 0.0, 0.0, 30.0, 0.001},     // 16 the leaking rigid wall with its mass law
         {2.401e-9, 1.0e-10, 0.0, 0.0, 0.3, 0.0, 0.0, 0.0, 0.0, 30.0, 0.001}, // 17 with both
     };
     Pal mtl = lump_palette(lp);
     const std::complex<double> eP = lump_eps(lp[1], f_hz), eW = lump_eps(lp[2], f_hz), eD = lump_eps(lp[5], f_hz);
     const std::complex<double> eH = lump_eps(lp[8], f_hz), eL = lump_eps(lp[9], f_hz);
-    const double tc = std::asin(std::sqrt(std::abs(eP))) * 180.0 / QPI;      // where the test trips, air | porous
-    const double tcH = std::asin(std::sqrt(std::abs(eL / eH))) * 180.0 / QPI; // dense | lossy rarer
+    const double tc = std::asin(std::sqrt(std::abs(eP))) * 180.0 / QPI;        // where the test trips, air | porous
+    const double tcH = std::asin(std::sqrt(std::abs(eL / eH))) * 180.0 / QPI;  // dense | lossy rarer
     const double tcA = std::asin(std::sqrt(std::abs(1.0 / eH))) * 180.0 / QPI; // dense | air, a critical angle
     QD_DIAG("\n# diag: lossy verdict. The magnitude test trips at %.4f deg for air | eps %.2f%+.2fj, at %.4f deg for\n", tc, std::real(eP), std::imag(eP), tcH);
     QD_DIAG("# eps 5.24 | eps %.2f%+.2fj; eps 5.24 | air has its critical angle at %.4f deg\n", std::real(eL), std::imag(eL), tcA);
@@ -3816,9 +3690,7 @@ TEST_CASE("Lossy verdict - a lossy second medium has no critical angle", "[wave]
         return std::atan2(sn * std::sin(th), std::abs(std::real(c2))) * 180.0 / QPI;
     };
 
-    // ------------------------------------------------------------------------------------------
-    // A. A porous sheet in air
-    // ------------------------------------------------------------------------------------------
+    // ---- A. A porous sheet in air ----
     QD_DIAG("\n# diag: lossy verdict A, porous sheet 10 mm in air, scalar, first event. T, R: the port against the analytic slab,\n");
     QD_DIAG("# dB and deg; own: ray_mesh_interact's composite against the redo, complex difference; dir: direction written, deg\n");
     QD_DIAG("tracer,theta,ot,rt,T_lib_dB,T_dB,T_deg,R_lib_dB,R_dB,R_deg,own_T,own_R,dir\n");
@@ -3840,9 +3712,7 @@ TEST_CASE("Lossy verdict - a lossy second medium has no critical angle", "[wave]
             CHECK(std::abs(R / (W.r * und) - 1.0) < 1.0e-9);
         }
 
-    // ------------------------------------------------------------------------------------------
-    // B. A porous sheet on a rigid wall
-    // ------------------------------------------------------------------------------------------
+    // ---- B. A porous sheet on a rigid wall ----
     QD_DIAG("\n# diag: lossy verdict B, porous sheet 10 mm on a rigid wall, scalar, the glued entry. T_ref: the chain of an\n");
     QD_DIAG("# ordinary crossing, its series summed (diag_leak_series), which has no test on the near face; dT: complex distance\n");
     QD_DIAG("# from it over its magnitude. R_ref: the composite on the rigid backing. T_own: ray_mesh_interact's composite.\n");
@@ -3878,12 +3748,10 @@ TEST_CASE("Lossy verdict - a lossy second medium has no critical angle", "[wave]
                 CHECK(std::abs(ang(et.path_dirN) - thd) < 1.0e-9);
                 CHECK(std::abs(R - Dr.R_te) < 1.0e-9);
                 CHECK(std::abs(T - D.T_te) < 1.0e-9 * std::abs(D.T_te) + 1.0e-12); // an ordinary crossing at every angle
-                CHECK(std::abs(cpx(et.xpr0, 0, 0) - T) < 1.0e-12);                // ray_mesh_interact's own composite agrees
+                CHECK(std::abs(cpx(et.xpr0, 0, 0) - T) < 1.0e-12);                 // ray_mesh_interact's own composite agrees
             }
 
-    // ------------------------------------------------------------------------------------------
-    // C. A sheet in front of a lossy half-space rarer than air: the outer pair
-    // ------------------------------------------------------------------------------------------
+    // ---- C. A sheet in front of a lossy half-space rarer than air: the outer pair ----
     QD_DIAG("\n# diag: lossy verdict C, dense lossy sheet 10 mm glued on the porous medium as a half-space, scalar. The outer pair\n");
     QD_DIAG("# air | porous trips, the near face never does. T, R against the analytic layer on the half-space, the transmit\n");
     QD_DIAG("# port in normal flux; dB and deg\n");
@@ -3910,9 +3778,7 @@ TEST_CASE("Lossy verdict - a lossy second medium has no critical angle", "[wave]
             CHECK((unsigned)(unsigned short)et.cur(0) == ((tr == 5) ? 0x4002u : 0x0002u)); // the refracting tracer bent
         }
 
-    // ------------------------------------------------------------------------------------------
-    // D. The porous medium as a traced solid in air
-    // ------------------------------------------------------------------------------------------
+    // ---- D. The porous medium as a traced solid in air ----
     QD_DIAG("\n# diag: lossy verdict D1, porous solid 50 mm in air, scalar, per event. entry: air | porous, against the half-space\n");
     QD_DIAG("# 1 - |r|^2 and |r|^2; exit: the event behind it. dir: direction written; seg: the segment relaunched on; d0: what\n");
     QD_DIAG("# ray_mesh_interact wrote; deg. cur: the current word after the entry, hex\n");
@@ -3973,9 +3839,7 @@ TEST_CASE("Lossy verdict - a lossy second medium has no critical angle", "[wave]
                 CHECK(std::abs(deg(O.R / W.r)) < 0.05);
             }
 
-    // ------------------------------------------------------------------------------------------
-    // E. The traced solid on a leaking wall against the sheet of its thickness
-    // ------------------------------------------------------------------------------------------
+    // ---- E. The traced solid on a leaking wall against the sheet of its thickness ----
     QD_DIAG("\n# diag: lossy verdict E, porous 50 mm on a rigid wall with tf 0.3, scalar: as a traced solid, three events (entry,\n");
     QD_DIAG("# porous | wall, wall | air), and as a sheet, two (glued entry, wall | air). Power of each event and of the path,\n");
     QD_DIAG("# dB; ref: the sheet's chain of an ordinary crossing, series summed. dirW: direction in the wall, deg\n");
@@ -4012,9 +3876,7 @@ TEST_CASE("Lossy verdict - a lossy second medium has no critical angle", "[wave]
                     CHECK(std::abs(g(so, 0) + g(so, 1) - g(sh, 0)) < 5.0e-3);
             }
 
-    // ------------------------------------------------------------------------------------------
-    // F. ray_mesh_interact alone: the ray tube
-    // ------------------------------------------------------------------------------------------
+    // ---- F. ray_mesh_interact alone: the ray tube ----
     QD_DIAG("\n# diag: lossy verdict F, ray_mesh_interact alone with a ray tube, type 5, air | porous solid. The spine at theta,\n");
     QD_DIAG("# two vertex rays at theta -+ 0.6 deg in the plane and one tilted out of it. gain0: without the tube\n");
     QD_DIAG("theta,ot_tube,gain_tube_dB,ot_spine,gain_spine_dB,dir_tube,dir_spine,v1,v2,v3\n");
@@ -4052,9 +3914,7 @@ TEST_CASE("Lossy verdict - a lossy second medium has no critical angle", "[wave]
         CHECK(std::abs(ang(pd) - ang(pd2)) < 1.0e-9);
     }
 
-    // ------------------------------------------------------------------------------------------
-    // I. The recovery in a lossy solid rarer than air
-    // ------------------------------------------------------------------------------------------
+    // ---- I. The recovery in a lossy solid rarer than air ----
     // A wave from air leaves a parallel slab at the angle it arrived at. Where the exit direction
     // is off, the cosine recovered in the solid is. Past the angle the real-index start of the
     // solve is far from the root, and the solve has to run until it has converged.
@@ -4088,9 +3948,7 @@ TEST_CASE("Lossy verdict - a lossy second medium has no critical angle", "[wave]
             }
         }
 
-    // ------------------------------------------------------------------------------------------
-    // J. A rigid wall that is given a loss
-    // ------------------------------------------------------------------------------------------
+    // ---- J. A rigid wall that is given a loss ----
     // Rigid bodies of the acoustic mapping are lossless and closed from 0.003 deg. What a loss
     // column on such a body does to its tf leak, under whatever the verdict is.
     QD_DIAG("\n# diag: lossy verdict J, a rigid wall 200 mm with tf 0.3 in air, scalar, tracer 4 and 5: lossless and with a loss\n");
@@ -4119,9 +3977,7 @@ TEST_CASE("Lossy verdict - a lossy second medium has no critical angle", "[wave]
                 }
             }
 
-    // ------------------------------------------------------------------------------------------
-    // G. EM: air into the porous medium, per channel
-    // ------------------------------------------------------------------------------------------
+    // ---- G. EM: air into the porous medium, per channel ----
     auto fres = [&](std::complex<double> e1, std::complex<double> e2, double c1, std::complex<double> &rte, std::complex<double> &rtm)
     {
         std::complex<double> z1 = std::sqrt(e1), z2 = std::sqrt(e2), a = 1.0 - (e1 / e2) * (1.0 - c1 * c1);
@@ -4154,9 +4010,7 @@ TEST_CASE("Lossy verdict - a lossy second medium has no critical angle", "[wave]
             CHECK((unsigned)(unsigned short)et.cur(0) == ((tr == 2) ? 0x4002u : 0x0002u));
         }
 
-    // ------------------------------------------------------------------------------------------
-    // H. EM: a lossless dense solid in front of a lossy rarer one
-    // ------------------------------------------------------------------------------------------
+    // ---- H. EM: a lossless dense solid in front of a lossy rarer one ----
     // The ray is launched inside the dense solid: across parallel faces from air the invariant
     // stays below one and the test never trips on this pair. No series is summed (eps 1e3), so
     // an event is its interface and the lossless leg it closes.
@@ -4225,18 +4079,19 @@ TEST_CASE("Lossy verdict - a lossy second medium has no critical angle", "[wave]
 
 TEST_CASE("Far from the origin - a thin dielectric slab transmits what it does at the origin, summed and followed", "[wave]")
 {
-    // Decision 2026-10-19 (md/precision_report.md 0): ray_mesh_interact relaunches a ray 8 float ulp of the hit point's
-    // largest coordinate past it, about 1 um per metre, and the leg inside a solid is measured from the hit point all the
-    // same: the ledger carries the part the relaunch skips. Before, every leg was short by it; through 4 mm of glass at
-    // 28 GHz that is k0 (n - 1) times the offset, 4.8 deg at 100 m and 48 deg at 1 km, and the slab's series moved by up
-    // to 0.7 dB at 100 m. The slab here is moved away from the origin with its ray, in its plane and along its normal, to
-    // 10 m, 100 m and 1 km: what it transmits is the slab of its true thickness, TE and TM, both EM tracers, the series
-    // summed in one event (eps 0) and every bounce followed (eps 1.5). itu_glass of data/materials_rf.csv at 28 GHz.
+    // ray_mesh_interact relaunches a ray 8 float ulp of the hit point's largest coordinate past it, about 1 um per
+    // metre, and the leg inside a solid is measured from the hit point all the same: the ledger carries the part the
+    // relaunch skips. A leg short by that offset would cost k0 (n - 1) times it in phase, through 4 mm of glass at 28
+    // GHz 4.8 deg at 100 m and 48 deg at 1 km, and move the slab's series by up to 0.7 dB at 100 m. The slab here is
+    // moved away from the origin with its ray, in its plane and along its normal, to 10 m, 100 m and 1 km: what it
+    // transmits is the slab of its true thickness, TE and TM, both EM tracers, the series summed in one event (eps 0)
+    // and every bounce followed (eps 1.5). itu_glass of data/materials_rf.csv at 28 GHz.
     ub::OneThread one_thread;
     const double f = 28.0e9, thk = 0.004, sig = 0.0036 * std::pow(28.0, 1.3394); // ITU-R P.2040: eps' 6.31, sigma = c f^d
     const std::complex<double> eS(6.31, -17.98 * sig / 28.0);
     ub::Pal P = lump_palette({{6.31, 17.98 * sig, 0.0}});
-    auto dB = [](double g) { return 10.0 * std::log10(g); };
+    auto dB = [](double g)
+    { return 10.0 * std::log10(g); };
     QD_DIAG("\n# diag: 4 mm glass at 28 GHz moved away from the origin with its ray; T against the slab of its true thickness, dB\n");
     QD_DIAG("type,eps,theta,shift,along,dTE,dTM\n");
     double worst = 0.0;
