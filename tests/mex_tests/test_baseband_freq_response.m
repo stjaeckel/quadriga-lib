@@ -232,7 +232,7 @@ try
     quadriga_lib.baseband_freq_response( real(coeff), imag(coeff), delay, [], [] );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Provide pilot_grid+bandwidth or center_freq+carrier_freq';
+    expectedErrorMessage = 'Provide pilot_grid+bandwidth or carrier_freq';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -360,15 +360,37 @@ catch ME
     end
 end
 
-% ---- Error: single-element carrier_freq without center_freq -----------
-try
-    quadriga_lib.baseband_freq_response( coeff_re_ms, coeff_im_ms, delay_ms, [], [], [], 1e9, 0 );
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    expectedErrorMessage = 'requires center_freq';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+% ---- Carriers as frequencies: same rules as Python ---------------------
+% span = max - min; reference = center_freq(1) when given, else min(carrier_freq); output in input order;
+% more than one carrier with a zero span is an error. Expected values from the closed form
+% H(f) = sum_p c_p * exp(-j 2 pi (f - f_ref) tau_p), the same expectation as in the Python test.
+cre = reshape([1 0.5], 1, 1, 2); cim = zeros(1, 1, 2); dl = reshape([10e-9 35e-9], 1, 1, 2);
+f0 = 3e9; fa = f0 + [0; 10e6; 20e6];
+Hx = @(f, fr) sum(squeeze(cre + 1j*cim) .* exp(-2j*pi*(f(:).' - fr) .* squeeze(dl)), 1).';
+for snap = [false true]   % single-frequency and multi-snapshot branch
+    if snap, xa = {0}; else, xa = {}; end
+    [hr, hi] = quadriga_lib.baseband_freq_response(cre, cim, dl, [], [], f0, fa, xa{:});
+    assertElementsAlmostEqual( squeeze(hr + 1j*hi), Hx(fa, f0), 'absolute', 1e-5 );
+    [hr, hi] = quadriga_lib.baseband_freq_response(cre, cim, dl, [], [], f0, flipud(fa), xa{:});
+    assertElementsAlmostEqual( squeeze(hr + 1j*hi), Hx(flipud(fa), f0), 'absolute', 1e-5 );
+    fu = f0 + [10e6; 0; 20e6];   % unsorted
+    [hr, hi] = quadriga_lib.baseband_freq_response(cre, cim, dl, [], [], f0, fu, xa{:});
+    assertElementsAlmostEqual( squeeze(hr + 1j*hi), Hx(fu, f0), 'absolute', 1e-5 );
+    [hr, hi] = quadriga_lib.baseband_freq_response(cre, cim, dl, [], [], [], flipud(fa), xa{:});   % reference: min
+    assertElementsAlmostEqual( squeeze(hr + 1j*hi), Hx(flipud(fa), f0), 'absolute', 1e-5 );
+    [hr, hi] = quadriga_lib.baseband_freq_response(cre, cim, dl, [], [], f0, f0 + 10e6, xa{:});   % one carrier
+    assertElementsAlmostEqual( squeeze(hr + 1j*hi), Hx(f0 + 10e6, f0), 'absolute', 1e-5 );
+    [hr, hi] = quadriga_lib.baseband_freq_response(cre, cim, dl, [], [], f0, f0 - 10e6, xa{:});   % below the reference
+    assertElementsAlmostEqual( squeeze(hr + 1j*hi), Hx(f0 - 10e6, f0), 'absolute', 1e-5 );
+    [hr, hi] = quadriga_lib.baseband_freq_response(cre, cim, dl, [], [], [], f0 + 10e6, xa{:});   % one carrier, no reference
+    assertElementsAlmostEqual( squeeze(hr + 1j*hi), 1.5, 'absolute', 1e-6 );
+    failed = false;
+    try
+        [~] = quadriga_lib.baseband_freq_response(cre, cim, dl, [], [], f0, [f0; f0], xa{:});
+    catch ME
+        failed = ~isempty(strfind(ME.message, 'carrier_freq')) && ~isempty(strfind(ME.message, 'positive range'));
     end
+    assertTrue( failed );
 end
 
 end
