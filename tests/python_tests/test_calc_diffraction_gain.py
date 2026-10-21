@@ -503,5 +503,23 @@ class test_case(unittest.TestCase):
                 self.orig, self.dest, self.cube, mtl_ind_big, self.mtl_prop, 1e9, 0)
 
 
+class test_lod_range(unittest.TestCase):
+
+    # lod 0-7: coord is (3, n_seg-1, n_pos) as returned by C++, lod 7 included; empty input names the input
+    def test(self):
+        R = quadriga_lib.RTtools
+        cube = R.cube(); o = np.array([[-3.0, 0, 0.5], [-3.0, 0, 0.2]]); d = np.array([[3.0, 0, 0.5], [3.0, 0, 0.3]])
+        mtl = np.ones(12, dtype=np.uint64); prop = {'a': [1.0], 'b': [0.0], 'c': [0.0], 'd': [0.0]}
+        for lod, n in [(0, 0), (1, 2), (2, 2), (3, 3), (4, 4), (5, 1), (6, 1), (7, 9)]:
+            g, x, c = R.calc_diffraction_gain(o, d, cube, mtl, prop, 3.5e9, lod)
+            self.assertEqual(c.shape, (3, n, 2))
+            self.assertEqual(g.shape, (2,))
+        for lod in (-1, 8):
+            with self.assertRaisesRegex(ValueError, "Input 'lod' must be 0-7."):
+                R.calc_diffraction_gain(o, d, cube, mtl, prop, 3.5e9, lod)
+        with self.assertRaisesRegex(ValueError, "Inputs 'orig' and 'dest' cannot be empty."):
+            R.calc_diffraction_gain(np.zeros((0, 3)), np.zeros((0, 3)), cube, mtl, prop, 3.5e9)
+
+
 if __name__ == '__main__':
     unittest.main()

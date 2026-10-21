@@ -1167,3 +1167,58 @@ TEST_CASE("Calc Diffraction Gain - Float instantiation with FSPL and phase")
     CHECK(std::abs((double)X(1, 0) - ph.imag()) < 1e-5);
     CHECK(std::abs(std::hypot((double)X(0, 0), (double)X(1, 0)) - 1.0) < 1e-6);
 }
+// Level of detail 0-7 (lod 7: 1 path, 10 segments); coord holds the n_seg-1 waypoints of the generated paths;
+// out-of-range lod and empty input give errors that name the input
+TEST_CASE("Calc Diffraction Gain - lod range, coord shape and empty input")
+{
+    arma::mat cube = quadriga_lib::cube<double>({}, {}, {0.0, 0.0, 0.001});
+    arma::uvec mtl_ind;
+    std::unordered_map<std::string, std::vector<double>> mtl_map;
+    arma::mat mtl_prop = repmat(arma::mat({{1.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}}), 12, 1);
+    mtl_matrix_to_map(mtl_prop, mtl_ind, mtl_map);
+
+    arma::mat orig = {{-10.0, 0.0, 0.5}, {-10.0, 0.0, 0.2}};
+    arma::mat dest = {{-5.0, 0.0, 0.5}, {-5.0, 0.0, 0.3}};
+    arma::vec gain;
+    arma::mat xprmat;
+    arma::cube coord;
+
+    const int lods[8] = {0, 1, 2, 3, 4, 5, 6, 7};
+    const arma::uword n_wp[8] = {0, 2, 2, 3, 4, 1, 1, 9};
+    for (int k = 0; k < 8; ++k)
+    {
+        INFO("lod " << lods[k]);
+        quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map, 1.0e9, lods[k], &gain, &xprmat, &coord);
+        CHECK(coord.n_rows == 3);
+        CHECK(coord.n_cols == n_wp[k]);
+        CHECK(coord.n_slices == 2);
+        CHECK(arma::approx_equal(gain, arma::vec({1.0, 1.0}), "absdiff", 1e-13)); // path outside the cube
+
+        if (lods[k] != 0) // coord matches the waypoints of generate_diffraction_paths
+        {
+            arma::cube rx, ry, rz, w;
+            quadriga_lib::generate_diffraction_paths<double>(orig, dest, 1.0e9, lods[k], rx, ry, rz, w);
+            CHECK(w.n_slices == n_wp[k] + 1);
+            CHECK(rx.n_slices == n_wp[k]);
+        }
+    }
+
+    auto message = [&](const arma::mat &o, const arma::mat &d, int lod) -> std::string
+    {
+        try
+        {
+            quadriga_lib::calc_diffraction_gain<double>(o, d, cube, mtl_ind, mtl_map, 1.0e9, lod, &gain, &xprmat, &coord);
+        }
+        catch (const std::invalid_argument &e)
+        {
+            return e.what();
+        }
+        return "no error";
+    };
+    CHECK(message(orig, dest, -1) == "Input 'lod' must be 0-7.");
+    CHECK(message(orig, dest, 8) == "Input 'lod' must be 0-7.");
+    CHECK(message(arma::mat(0, 3), arma::mat(0, 3), 2) == "Inputs 'orig' and 'dest' cannot be empty.");
+    CHECK(message(arma::mat(0, 3), arma::mat(0, 3), 0) == "Inputs 'orig' and 'dest' cannot be empty.");
+    CHECK_THROWS_AS(quadriga_lib::calc_diffraction_gain<double>(arma::mat(0, 3), arma::mat(0, 3), cube, mtl_ind, mtl_map, 1.0e9, 0, &gain),
+                    std::invalid_argument);
+}

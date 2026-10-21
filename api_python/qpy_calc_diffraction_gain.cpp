@@ -42,7 +42,9 @@ gain, xprmat, coord = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, me
 - **`mtl_ind`** — 1-based material index per face (0 = no material; the `csv_ind` output of [[obj_file_read]]); `(n_mesh,)`
 - **`mtl_prop`** — Material properties as a `dict`; each key is one column (the `csv_prop` output of [[obj_file_read]]) mapping to a 1D array of length `n_mtl`
 - **`center_frequency`** — Center frequency
-- **`lod`** — Level of detail (0–6), controls `n_path` and `n_seg`; see [[generate_diffraction_paths]]; default: 2
+- **`lod`** — Level of detail (0–7), controls `n_path` and `n_seg`: 0 = direct ray only (1 path, 1 segment);
+  1 / 2 = 7 / 19 paths with 3 segments; 3 = 37 paths, 4 segments; 4 = 61 paths, 5 segments; 5 / 6 = 1 / 2 paths
+  with 2 segments (debug); 7 = direct line in 10 segments; default: 2
 - **`verbose`** — Verbosity level; default: 0
 - **`sub_mesh_index`** — 0-based sub-mesh index for acceleration; see [[triangle_mesh_segmentation]]; `(n_mesh,)` or `None`; default: `None`
 - **`use_kernel`** — Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; error if unavailable; default: 0
@@ -72,7 +74,8 @@ gain, xprmat, coord = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, me
   rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx), the row
   order of `M` in [[get_channels_spherical]], `(8, n_pos)`; scalar
   mode: scalar pressure coefficient `[Re Im]`, `(2, n_pos)`
-- **`coord`** — Diffracted path coordinates excluding endpoints; `(3, n_seg-1, n_pos)`
+- **`coord`** — Diffracted path coordinates excluding endpoints; `(3, n_seg-1, n_pos)` with `n_seg` from `lod`
+  (e.g. `(3, 2, n_pos)` for lod 2, `(3, 9, n_pos)` for lod 7, `(3, 0, n_pos)` for lod 0)
 
 ## See also:
 - [[generate_diffraction_paths]] (controls path/segment count via `lod`)
@@ -106,23 +109,14 @@ py::tuple calc_diffraction_gain(const py::array_t<double> &orig,
     const auto sub_mesh_index_a = qd_python_numpy2arma_Col<unsigned>(sub_mesh_index, true);
 
     arma::uword n_pos = orig_a.n_rows;
-    arma::uword n_seg = 0;
-    if (lod == 1 || lod == 2)
-        n_seg = 2;
-    else if (lod == 3)
-        n_seg = 3;
-    else if (lod == 4)
-        n_seg = 4;
-    else if (lod == 5 || lod == 6)
-        n_seg = 1;
 
-    // Pre-allocate outputs in Python memory and map Armadillo wrappers to them
+    // Pre-allocate outputs in Python memory and map Armadillo wrappers to them;
+    // the size of coord depends on lod and is set by C++ (copied after the call)
     arma::vec gain;
     arma::mat xprmat;
     arma::cube coord;
     auto gain_p = qd_python_init_output(n_pos, &gain);
     auto xprmat_p = qd_python_init_output((scalar_mode ? 2 : 8), n_pos, &xprmat);
-    auto coord_p = qd_python_init_output(3, n_seg, n_pos, &coord);
 
     // Resolve optional pointer
     const arma::u32_vec *p_sub_mesh_index = sub_mesh_index_a.empty() ? nullptr : &sub_mesh_index_a;
@@ -136,7 +130,7 @@ py::tuple calc_diffraction_gain(const py::array_t<double> &orig,
                                                 p_sub_mesh_index, use_kernel, gpu_id, scalar_mode,
                                                 thin_slab_threshold, apply_fspl, apply_phase);
 
-    return py::make_tuple(gain_p, xprmat_p, coord_p);
+    return py::make_tuple(gain_p, xprmat_p, qd_python_copy2numpy(&coord));
 }
 
 // pybind11 declaration:

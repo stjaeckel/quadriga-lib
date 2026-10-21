@@ -114,7 +114,7 @@ namespace quadriga_lib
                                const arma::uvec &mtl_ind,                                           // 0-based material index, Size: [n_mesh]
                                const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop, // Material properties; Length: [n_mtl]
                                dtype center_frequency,                                              // Center frequency in [Hz]
-                               int lod = 2,                                                         // Level of detail, 0-6
+                               int lod = 2,                                                         // Level of detail, 0-7 (0 = direct ray only)
                                arma::Col<dtype> *gain = nullptr,                                    // Diffraction gain, linear scale; Size: [ n_pos ]
                                arma::Mat<dtype> *xprmat = nullptr,                                  // Polarization transfer matrix; Size [n_pos, 8] for EM or [n_pos, 8] for scalar
                                arma::Cube<dtype> *coord = nullptr,                                  // Diffracted path coords (excl. endpoints); Size: [ 3, n_seg-1, n_pos ]
