@@ -27,8 +27,8 @@ storage_dims, has_data = quadriga_lib.channel.hdf5_read_layout( fn )
 - **`fn`** — Filename of the HDF5 file; str
 
 ## Outputs:
-- **`storage_dims`** — Size of the storage space `[nx, ny, nz, nw]`; `(4,)`
-- **`has_data`** — Slot occupancy mask; 1 where a slot holds data, 0 otherwise; `(nx, ny, nz, nw)`
+- **`storage_dims`** — Size of the storage space `[nx, ny, nz, nw]`; `(4,)`; int64
+- **`has_data`** — Slot occupancy mask; 1 where a slot holds data, 0 otherwise; uint32; `(nx, ny, nz, nw)`
 
 ## See also:
 - [[hdf5_create_file]] (for creating a file with a custom storage layout)
@@ -47,8 +47,8 @@ py::tuple hdf5_read_layout(const std::string &fn)
     if (channelID.n_elem != (arma::uword)nx * ny * nz * nw)
         throw std::runtime_error("Corrupted storage index.");
 
-    // storage_dims: 4-element vector [nx, ny, nz, nw]
-    auto storage_dims = qd_python_copy2numpy(&storage_space);
+    // storage_dims: 4-element vector [nx, ny, nz, nw] (copied integer output: int64)
+    auto storage_dims = qd_python_copy2numpy<unsigned, py::ssize_t>(&storage_space);
 
     // has_data: 4D occupancy mask (1 where a slot holds data, 0 otherwise)
     std::vector<arma::Cube<unsigned>> has_data_cubes;

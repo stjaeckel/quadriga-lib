@@ -27,7 +27,8 @@ Read ray-tracing CIR data from a QRT file
 
 ## Inputs:
 - **`fn`** — Path to the QRT file; string
-- **`i_cir`** — Snapshot indices; 1-based; uint64; `[n_out]` or empty; default: `[]` (read all)
+- **`i_cir`** — Snapshot indices; 1-based; uint64; `[n_out]` or empty; default: `[]` (read all; for a file
+  without CIRs, all outputs are empty with `n_out = 0`)
 - **`i_orig`** — Origin index; 1-based; uint64; scalar; default: 1
 - **`downlink`** — If `true`, origin=TX, destination=RX; if `false`, roles are swapped; logical scalar; default: `true`
 - **`normalize_M`** — Controls `M` and `path_gain` scaling where PL is the propagation-only path loss
@@ -96,8 +97,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     quadriga_lib::qrt_read_cache cache;
     CALL_QD(cache = quadriga_lib::qrt_read_cache_init(fn, &stream));
 
-    if (i_cir.empty()) // Default: read all CIRs
-        i_cir = arma::regspace<arma::uvec>(0, arma::uword(cache.no_cir - 1));
+    if (i_cir.empty()) // Default: read all CIRs (none for a file without CIRs: empty outputs)
+    {
+        if (cache.no_cir != 0)
+            i_cir = arma::regspace<arma::uvec>(0, arma::uword(cache.no_cir) - 1);
+    }
     else // Convert 1-based (MATLAB) to 0-based (C++); guard against unsigned underflow
     {
         if (arma::any(i_cir == 0))

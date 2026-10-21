@@ -179,5 +179,21 @@ class test_case(unittest.TestCase):
         npt.assert_array_equal(channel.hdf5_read_dset(fn, name='x'), x0)
 
 
+class test_storage_dims_dtype(unittest.TestCase):
+
+    # storage_dims is a copied integer output: int64 in all HDF5 functions
+    def test(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            fn = os.path.join(tmp, 'd.hdf5')
+            dims = channel.hdf5_create_file(fn, 2, 3)
+            self.assertEqual(dims.dtype, np.int64)
+            dims = channel.hdf5_write_channel(fn, minimal_channel())
+            self.assertEqual(dims.dtype, np.int64)
+            npt.assert_array_equal(dims, [2, 3, 1, 1])
+            dims, has_data = channel.hdf5_read_layout(fn)
+            self.assertEqual(dims.dtype, np.int64)
+            npt.assert_array_equal(dims, [2, 3, 1, 1])
+
+
 if __name__ == '__main__':
     unittest.main()
