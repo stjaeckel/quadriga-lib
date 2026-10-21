@@ -2,7 +2,7 @@
 
 Instruments of the acoustic add-on that outlive the scratch rigs (`build_linux/scratch` is removed by `make clean`).
 The reference for what they are used for is `md/acoustic.md`; source keys in square brackets refer to the literature
-review in `/home/stephan/accoustic_research` (`references/index.csv`).
+review in `/sjc/accoustic_research` (`references/index.csv`).
 
 | file | what it does | used for |
 | --- | --- | --- |

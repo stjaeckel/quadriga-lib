@@ -11,7 +11,7 @@ A13). Extended reaction (the layer refracts) by default; local reaction on reque
 Use only where the model fits the product and the sample is a flush patch: where sigma is measured, compare the fitted
 sigma with it (md/acoustic.md 6, A13 and A14: PU foam 10.3 against 10.6 kPa s/m2, glass wool 19.0 against 13.1;
 polyester and a framed stone wool did not convert). Source keys refer to the literature review in
-/home/stephan/accoustic_research (references/index.csv).
+/sjc/accoustic_research (references/index.csv).
 
   sabine_to_random.py convert --thk 0.05 --sample 3 4 --alpha 0.153 0.587 0.993 1.073 1.017 0.987
   sabine_to_random.py check            # reproduces the validation of md/acoustic.md 6 (A13, A14)

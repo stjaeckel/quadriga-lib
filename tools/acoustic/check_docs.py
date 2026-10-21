@@ -7,8 +7,7 @@ Mechanical checks of the acoustic documents (md/acoustic.md, md/wave.md), run fr
 1. Tables: every row of a markdown table has the column count of its header row (an unescaped `|` inside a cell, e.g.
    in `|R|` or `4|16|4`, splits the cell; write `\\|`).
 2. Source keys: every [Key_YYYY_Name] cited in md/acoustic.md resolves in the literature review's references/index.csv
-   (path from $QD_REVIEW_DIR, default /home/stephan/accoustic_research). Keys the review cites without an index entry
-   are listed in KNOWN_MISSING and reported apart.
+   (path from $QD_REVIEW_DIR, default /sjc/accoustic_research).
 3. Test cases: every TEST_CASE of tests/catch2_tests/test_acoustic_*.cpp is named in md/acoustic.md (whitespace
    normalized, `\\|` and `\\*` unescaped).
 4. Counts: the "All tests passed (N assertions in M test cases)" lines quoted in md/acoustic.md and md/wave.md
@@ -22,9 +21,7 @@ import csv, glob, os, re, sys
 
 ROOT = os.getcwd()
 DOCS = ['md/acoustic.md', 'md/wave.md']
-REVIEW = os.environ.get('QD_REVIEW_DIR', '/home/stephan/accoustic_research')
-KNOWN_MISSING = {'PTB_2012_AbsorptionTable', 'PTB_2002_RR3Data', 'Scheibler_2018_Pyroomacoustics',
-                 'Nell_TIP_TieftonAbsorber', 'CATT_SurfaceProperties_web'}   # cited by the review, not in its index
+REVIEW = os.environ.get('QD_REVIEW_DIR', '/sjc/accoustic_research')
 BRITISH = ['neighbour', 'centre', 'behaviour', 'modelled', 'modelling', 'colour', 'millimetre', 'metre ', 'favour',
            'labelled', 'travelled', 'grey ']
 
@@ -70,10 +67,8 @@ def main():
         with open(idx, encoding='utf-8') as f:
             index = {r['key'] for r in csv.DictReader(f)}
         keys = cited_keys(texts['md/acoustic.md'])
-        unknown = sorted(keys - index - KNOWN_MISSING)
-        known = sorted((keys - index) & KNOWN_MISSING)
-        print('keys       %d cited, %s%s' % (len(keys), 'all resolve' if not unknown else 'UNRESOLVED: %s' % unknown,
-                                            ('; known gaps of the review index: %s' % known) if known else ''))
+        unknown = sorted(keys - index)
+        print('keys       %d cited, %s' % (len(keys), 'all resolve' if not unknown else 'UNRESOLVED: %s' % unknown))
         ok &= not unknown
     else:
         print('keys       skipped (%s not found; set QD_REVIEW_DIR)' % idx)

@@ -2,7 +2,8 @@
 
 This file is the manager's memory. A manager session reads it first, works from it, and updates it after every step
 (state, roadmap, pending decisions). When a manager's context fills up, a new manager reads this file and continues;
-nothing depends on one chat. Last updated: 2026-10-20, after commit 71b894b (cleanup task 1 and the AVX2 test fix committed; task 2 complete, waiting for Stephan's commit).
+nothing depends on one chat. Last updated: 2026-10-21, after commit dc47ff6 (cleanup tasks 1 and 2 done; task 3 brief written, waiting for
+Stephan's review).
 
 ## 1. Roles
 
@@ -29,19 +30,34 @@ nothing depends on one chat. Last updated: 2026-10-20, after commit 71b894b (cle
 3. **Review.** Stephan says a phase is done (or pastes the worker's summary). The manager reads the report from disk
    and the diff (`git diff --stat`, `git diff src/`), runs the checklist (section 3), and answers with: what checks out,
    what does not, the decisions in the format of section 2.1, and a paste-ready message for the worker.
-4. **Commit.** After the last phase the manager writes the commit message (style below) and the `git add` line;
-   Stephan commits and regenerates the three baselines (`md/wave.md` 0). The worker session can then be archived.
+4. **Commit.** After the last phase the manager writes the commit message (style below; saved in the scratchpad for
+   `git commit -F`) and the `git add` line; Stephan commits. The worker regenerates the baselines before the commit. The worker session can then be archived.
 5. **Update this file**: state, roadmap, pending decisions.
 
 **2.1 Decisions are presented as:** what Stephan is deciding; the options; trade-offs and implications; what is correct
 (physics first, then the library's rules); a recommendation. One table or list per decision, a paste-ready message at
 the end.
 
-**2.2 Commit messages:** title "Acoustic: <what changed>", body in plain physical and code terms with the measured
+**2.2 Commit messages:** title "<area>: <what changed>" (e.g. "Acoustic: …", "Ray tests: …"), body in plain physical and code terms with the measured
 numbers, the line count of `src/ray_mesh_interact.cpp`, the three counts, and the trailer
 `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>` (Stephan keeps it). **No internal labels or documents**
 (Stephan, 2026-10-17): no item ids (M10, D2-b, A12, N4 …), no `md/` files, briefs, reports or their sections, no
 "round 1"; they are transitory and will be deleted. Test case names, source and tool paths are fine.
+
+**2.3 Working with Stephan (lessons, 2026-10-14 to 21):**
+- Explain decisions in plain physical terms first (what the quantity is, what happens, how big it is in typical
+  scenes: indoor rooms, site models in local coordinates); he asked twice for a plainer explanation before deciding.
+  Size every effect for typical scenes; say plainly when something is a fringe case (his veto, section 1).
+- Before setting up a new task, ask him the open choices (scope, strictness, order, stops) with the question tool, a
+  recommendation first, then write the brief.
+- Verify a worker's factual claims that a decision rests on (a "dead" helper was in fact called; a claimed cause was a
+  test-fixture artefact): read the code, rerun the suites, recompute key numbers.
+- Cleanup and document tasks use a plan stop (inventory, what changes, what is removed and why) and a stop before the
+  commit, not the fixtures-first phases.
+- When a worker's context nears full, a fresh worker continues the next phase from the brief and the report on disk.
+- In the desktop app, a decision question in the next-step box ends the turn and hides any text after it: write the
+  explanation and the paste-ready message in the reply first, then ask.
+- Every brief and prompt carries the resource rule (section 3) and "no new items".
 
 ## 3. The review checklist
 
@@ -81,139 +97,103 @@ Run on every worker phase; say which items were checked.
 - **One writer** for `md/acoustic.md` and `md/wave.md` at a time (the active worker in its document phase, or the
   manager), never two sessions at once.
 
-## 4. Current state (2026-10-16)
+## 4. Current state (2026-10-21)
 
-- Last commit **71b894b** (AVX2 test fix). Before it: a5bdfb7 (merge of `fixes`), 29e1f05 (source cleanup, task 1),
-  6307a64 (traced-leg precision), de60194 (finite panel, `side`), bc24b0c (M10, `coiA` removed), 2c5be17 (M6).
-- `src/ray_mesh_interact.cpp` 4725 lines (after the source cleanup).
-- Counts (after the test cleanup, uncommitted): `[wave]` 163474 / 178, `[acoustic]` 42741 / 59, whole suite 1343848 /
-  1234 (generic; AVX2 1344179 / 1234); baselines with `QD_TEST_DIAG=1` (12 threads); `check_docs.py` passes.
-- Documents: `md/acoustic.md` (the reference), `md/wave.md`, `md/acoustic_round1_report.md`,
-  `md/m9_fixtures_report.md`, `md/m5_a21_report.md`, `md/m6_report.md`; briefs `md/m9_fixtures_brief.md`,
-  `md/m5_a21_brief.md`, `md/m6_brief.md`, `md/m10_m15_brief.md`, report `md/m10_m15_report.md`; `md/grazing_brief.md`, report `md/grazing_report.md`; `md/precision_brief.md`, report `md/precision_report.md`; `md/cleanup_src_brief.md`, report `md/cleanup_src_report.md`; `md/cleanup_tests_brief.md`, report `md/cleanup_tests_report.md` (uncommitted).
-- Tools: `tools/acoustic` (`sabine_to_random.py`, `band_probe.cpp` with the peak columns, `paris_cf.py` the closed-form
-  Paris value of a locally reacting face, `check_docs.py`, and with M10: `txlib.py` / `txfit.py` / `tl_refs.json` the transmission formula copy
-  and fit, `cases.py` moved rows per case; README).
-- Literature review: `/home/stephan/accoustic_research/review.md`, data `data/material_properties.csv`, keys in
-  `references/index.csv` (four keys the review cites are missing from its index; `check_docs.py` knows them).
+- Last commit **dc47ff6** (ray-test cleanup). Before it: 71b894b (AVX2 test fix: the three-face tie asserted for
+  every face pair), a5bdfb7 (merge of the `fixes` branch from another session), 29e1f05 (source cleanup of
+  `src/ray_mesh_interact.cpp`), 6307a64 (traced-leg precision), de60194 (finite panel, `side` column), bc24b0c (`m` a
+  switch, `coiA` removed), 2c5be17 (peaked face as series impedance), 238444d, 04b92bd, 4720a92 (round 1).
+- `src/ray_mesh_interact.cpp` 4725 lines, restructured: an 84-line header overview, seven sections in one anonymous
+  namespace, the five public API blocks shortened (`md/cleanup_src_report.md` 1.6 has the rename table old → new).
+- Counts: `[wave]` 163474 / 178, `[acoustic]` 42741 / 59, whole suite 1343848 / 1234 (generic build); AVX2 build
+  1344179 / 1234. Baselines are generated **with `QD_TEST_DIAG=1`** (the diagnostic tables print only with that
+  environment variable; a plain run of the ray tests prints nothing): commands in `md/wave.md` 0, 12 threads.
+  `python3 tools/acoustic/check_docs.py` passes. Checked by the manager 2026-10-21: `[wave]` and `[acoustic]` rerun
+  at dc47ff6, `rowdiff` identical; `test.txt` had been written without `QD_TEST_DIAG=1` (34 KB, right counts, no ray
+  tables) and was regenerated with it (1.9 MB).
+- Builds: `build_linux` (generic, the suite's build); an AVX2 build for checks at `build_linux/scratch/avx2`
+  (`cmake -S . -B build_linux/scratch/avx2 -DCMAKE_CXX_COMPILER=g++-12 -DENABLE_AVX2=ON -DENABLE_TESTS=ON`; scratch,
+  may be gone after `make clean`).
+- Manager's verification routine for a worker's claim: rebuild with `--parallel 12`, rerun `[wave]` and `[acoustic]`
+  one after the other with `QD_TEST_DIAG=1 OMP_NUM_THREADS=12`, compare against the baselines with
+  `python3 -I tools/acoustic/rowdiff.py test_wave.txt <new run>` (number by number), and check the diff scope
+  (`git diff --stat`, `git diff --quiet -- src include api_python api_mex`).
+- Documents (internal, transitory; they stay until the parameter project): `md/acoustic.md` (the acoustic reference),
+  `md/wave.md` (the wave reference), briefs and reports per item (`md/*_brief.md`, `md/*_report.md`; the latest:
+  `cleanup_src_*`, `cleanup_tests_*`, `precision_*`, `grazing_*`, `m10_m15_*`, `m6_*`).
+- Tools: `tools/acoustic` (`rowdiff.py` two runs number by number, `cases.py` moved rows per case, `check_docs.py`,
+  `txlib.py` / `txfit.py` / `tl_refs.json` the transmission formula copy and fit, `gzlib.py` finite-plate reference
+  models, `paris_cf.py`, `sabine_to_random.py`, `band_probe.cpp`; README).
+- Literature review: `/sjc/accoustic_research/review.md` (moved there 2026-10-21, the same disk location as
+  `~/sjc/accoustic_research`; a local git repository, read-only for the manager and workers), data
+  `data/material_properties.csv`, keys in `references/index.csv` (every key `md/acoustic.md` cites resolves there;
+  `check_docs.py` has no list of known gaps any more).
+- Left for Stephan, no item: regenerate `html_docu/` after the API-block changes; the MATLAB `ray_mesh_interact`
+  wrapper and its test will be rewritten later (its test at line 113 expects the field `|T|²`).
 
 ## 5. Decided (pointers; the text is in `md/acoustic.md` 10)
 
-P1–P9 (P6 reflect side first; P9 scattering out of scope, a separate project only on very strong evidence); N1–N7
-(round 1: the plate rule R1h, M2, `res*` and `coi*` in `X₀`, the two-parameter mapping); A10, A11; M5 (built), M10 (built: `m` a switch), D2-b (`coiA` removed), M11 / M13 dropped, M15 proposal, M14 open (study),
-0–90° fit rule, M6 (built:
-locally reacting peaks, D1–D5 in `md/acoustic.md` 10; over-damped default, `tfQ < 0` under-damped), M7 dropped, M9 (the route for
-unpartitioned built constructions: a wave-medium leaf glued on a box of near-air material on a mass-law wall); A13
-(tiered rule for `tf` references), A14 (class 4 on Dupont's 50 mm glass wool), A15 (Miki / Komatsu), A16 (two-tier
-tolerances), A17 (classes 8 panel absorber, 9 curtain, 10 MPP; carpet a row of class 4; no corner-trap class), A19
-revised (measured `f₀`, else 60 empty / 50 filled; no framed factor); A21 (the kill after a glued exit, every type);
+P1–P9 (P6 reflect side first; P9 scattering out of scope); N1–N7 (round 1: the plate rule, nothing reflected back into
+a mass-law body, `res*` and `coi*` in `X₀`, the two-parameter mapping); A10, A11; M5 (resonator law of the `tf` peak);
+M6 (a peaked face is a locally reacting series impedance; over-damped default, `tfQ < 0` under-damped); M9 (an
+unpartitioned built construction is a wave-medium leaf on a box of near-air material); M10 (`m` > 0 switches the mass
+law on at 20 dB per decade); `coiA` removed; M11, M13 dropped; M7 dropped; M14 closed (superseded by the finite panel:
+Davy's forced radiation efficiency, column `side` = √(panel area), default 3.29 m, 0 the infinite plate); transmission
+references fitted on the 0–90° average; traced legs count the relaunch offset (rule of use: scenes in local
+coordinates near the origin); A13 (tiered rule for `tf` references), A14, A15, A16, A17, A19 revised, A21; M8
+(Stephan, 2026-10-21: the material-model page teaches the two-parameter mapping only, the one-parameter form in one
+sentence; recorded in `md/acoustic.md` 10 by the task-3 worker).
 
-## 6. Pending decisions (proposed in `md/acoustic.md`, not yet decided)
+## 6. Pending decisions (for the parameter project, none blocks anything)
 
-- **A13 refinement**: a conversion whose fitted σ is off a measured σ by more than about 1.5 times is marked, not used.
-- **A14**: the two Scrosati rows out until a polyester model and a framed-sample model exist.
-- **A17′**: class 8 as the family of resonant absorbers (panel and membrane; perforated and slotted panels; MPP).
-- **M8**: retire the one-parameter mapping for materials (documentation only).
-- **M15**: the bending loss as a resistance; decide with the parameter session (where `coiQ` comes from).
-- **M14**: a limiting angle; after the grazing-incidence study (roadmap item 1).
-- **M16**: a relaxation term on `μ` for fabrics (curtains).
+A13 refinement (a conversion whose fitted σ is off a measured σ by more than about 1.5 times is marked); A14 (two
+Scrosati rows out); A17′ (class 8 as the family of resonant absorbers); M15 (the bending loss as a resistance; decide where `coiQ` comes from); M16 (a relaxation term on
+`μ` for curtains).
 
-## 7. Open items without a decision (`md/acoustic.md` 6)
+## 7. Open items without a decision (`md/acoustic.md` 6; no work planned, Stephan's veto)
 
-A8 (low priority), A9 (`html_docu/quadriga_lib_material_model.md`, last), A12 (closed for locally reacting faces by M6; a flat `tf`
-keeps the hard wall's phase), A20 (closed for the peak; open for a wall's power-law `tf` behind a porous fill: the pad on
-the fill's immittance against a wall impedance fixed as seen from air), A21 remainder
-(the three-face tie is decided by mesh order; a full fix needs the intersector or `ray_progress` to report the third
-face; how often the kill fires in a real EM scene with glued sheets is unmeasured).
+A8 (low priority), A20 (a wall's power-law `tf` behind a porous fill), A21 remainder (the three-face tie is decided
+by the intersector's arithmetic; both outcomes are asserted since 71b894b).
 
 ## 8. Roadmap (next first)
 
-Done: **M10–M15** (committed bc24b0c, 2026-10-17; `md/m10_m15_report.md`): M10 built, `coiA` removed (D2-b, with the
-unused helper header), M11 / M13 dropped, M15 a proposal, M14 open (item 1), fit rule 0–90°. Left from it: regenerate
-`html_docu/` (Stephan); the MATLAB `ray_mesh_interact` wrapper and test to be rewritten (Stephan, later; its test at
-line 113 expects the field `|T|²`, the library returns `1 − R`); the two "1 = never" comments on the slab threshold
-(`calc_diffraction_gain`'s description, `include/quadriga_tools.hpp` `thin_slab_threshold`) were not in that round's
-scope and are still open, comment only.
+Done in this cleanup series: task 1, the source cleanup (29e1f05; `md/cleanup_src_report.md`); task 2, the ray-test
+cleanup (dc47ff6; `md/cleanup_tests_report.md`: four redundant cases removed by per-case coverage, diagnostics behind
+`QD_TEST_DIAG`, the ray cases 24.9 → 5.9 CPU-s, the whole suite 38 → 19 s).
 
-Done: **grazing incidence** (committed de60194, 2026-10-19; `md/grazing_report.md`): Davy's forced radiation
-efficiency of a finite panel in the mass term, the column `side` = √(panel area) (default 3.29 m, 0 the infinite
-plate), M14 closed; 13 constructions within 2.70 dB at 0–90°; `tools/acoustic/gzlib.py`. Left: regenerate
-`html_docu/` (Stephan).
-
-Done: **traced-leg precision** (committed 6307a64, 2026-10-20; `md/precision_report.md`): the in-medium distance counts
-the relaunch offset (exact in double far from the origin), the float bend check in mass-law media, the rule of use
-"local coordinates near the origin". Dropped (Stephan, 2026-10-20, veto): the `res*` cavity-spring item (1–2.6 dB,
-inside tolerance).
-
-Next: three cleanup tasks (Stephan, 2026-10-20), in this order; each with a plan stop (inventory: what changes,
-what is removed and why) and a stop before the commit. The parallel `fixes` checkout (`/sjc/quadriga-lib-fixes`) does
-not touch the ray files or the ray tests (checked 2026-10-20). Resources: 12 threads, one suite at a time.
-
-1. **Source cleanup of `src/ray_mesh_interact.cpp`** (brief `md/cleanup_src_brief.md`, approved 2026-10-20; phase 0
-   (inventory and plan) done, `md/cleanup_src_report.md`; Stephan decided 0.6 with the worker (option C: pure and
-   shared helpers at file scope, per-ray event logic as flat lambdas with explicit captures; every step bit-identical;
-   `tools/acoustic/rowdiff.py`; dead-code items 1–6; API statements corrected); manager's review 2026-10-20: plan
-   sound, name suggestions for the state-word bits (one name per bit and word) and a few lambdas, taken; phase 1 done
-   and reviewed 2026-10-20: 4726 lines (from 5211), 769 comment-only (from 1227), an 84-line header overview; the
-   manager rebuilt and reran `[wave]` and `[acoustic]` with 12 threads, `rowdiff` against the baselines: every number
-   identical; `tools/extract_md.py -a cpp` extracts. Decided (Stephan, 2026-10-20): A (one normalize form) dropped,
-   B `half_pi` the exact double nearest π/2 (moves 1326 printed rounding-noise values below 1e-9, every assertion
-   passes), C `k0()` in `davy_sigma`. Phase 2 with a new worker (the first one's context was 85 % full); phase 2 done and reviewed 2026-10-20 (B and C
-   applied, exactly the measured values moved, baselines regenerated, CPU 0.983–1.000, 4725 lines, 768 comment-only;
-   the manager reran `[acoustic]` against the new baselines: identical); commit message given, waiting for Stephan's
-   commit). Remove stale comments; comments down to the necessary minimum
-   without losing readability; an agent that reads only this file must understand what it does (a header overview);
-   readable structure, correct scoping (anonymous namespace, `const`, the narrowest scope), sensible names. **One
-   file**, with the large functions (`ray_state_update` about 2000 lines of lambdas, `ray_mesh_interact` about 1000)
-   split into named helper functions grouped in sections (material model, interface physics, slab / stack solver,
-   `ray_mesh_interact`, `ray_state_update`). **The public API blocks (`/*!MD … */`) are shortened to the essentials**:
-   they compile into the public docs, so they describe what a user or an AI sees from the whole-library perspective;
-   internal workings only where needed for context. **Tests must not move**: every assertion passes and the stored
-   twins hold their 1e-12 tolerance; printed rows may drift in their last digits only (Stephan chose this over
-   bit-identity) — the worker reports every printed value that changes. No change to `ray_progress.cpp` or the
-   tests in this task.
-   *Found 2026-10-20 after the `fixes` merge (a5bdfb7):* with `ENABLE_AVX2=ON` the case *Sheet between two bodies -
-   nothing is created and the wave left in air inside the far body is killed* fails 40 of 108 assertions (manager's
-   scratch build `build_linux/scratch/avx2`); generic passes. Not the merge, not other work: the case (238444d) asserts
-   which two faces the intersector reports in a three-face tie (box exit + sheet, hit code 69), and the AVX2 kernel
-   breaks the tie differently (box exit + wall entry, the sheet ignored: R ≈ 1.0), both documented A21 outcomes; every
-   energy check (R + T ≤ 1) passes on both kernels. Fix (test only): pin the GENERIC kernel for the premise and kill
-   checks (an option in `ub::Opt` / the walkers' `ray_triangle_intersect` call), the energy rows on the default
-   kernel. Stephan (2026-10-20): fixed now as a small separate change (worker prompt given); task 2 runs the ray
-   suites in an AVX2 build as well. Fix done and checked 2026-10-20: the worker handed every ordered pair of the three
-   tied faces in at the triple face (`ub::Opt::fi_in` / `si_in`) and asserts each pair's outcome, plus the kernel's own
-   pair against it, instead of pinning a kernel; the case passes on generic and AVX2 (458 assertions); whole suite
-   AVX2 1346299 / 1238, generic 1345968 / 1238 after the merge; `[wave]` rows identical; baselines regenerated by the
-   manager and the quoted counts in `md/wave.md` 0 and `md/acoustic.md` updated.
-2. **Test cleanup of the ray tests** (brief `md/cleanup_tests_brief.md`, approved 2026-10-20; phase 0 done,
-   `md/cleanup_tests_report.md`, reviewed 2026-10-20: per-case coverage of `ray_mesh_interact.cpp` and `ray_progress.cpp`
-   as the redundancy test; removals R1–R4 (coverage 6349 / 6349 kept), speed S1–S5 (ray cases 24.8 → about 6 s),
-   switch `QD_TEST_DIAG`; the manager found D8 wrong: `diag_res` is used (through `lump_res`, four call sites), so it
-   stays; recommended D1–D7 as proposed, S5 on all ten cases, D4 keep 16 angles, D5 the shared walker yes; decided as
-   recommended; phases 1–2 done and reviewed 2026-10-21: 237 ray cases, coverage unchanged, CPU 24.9 → 5.9 s, whole
-   suite 38 → 19 s; the manager reran `[wave]` and `[acoustic]` with the switch (rowdiff: every number identical), the
-   ray cases without it (nothing printed), the AVX2 whole suite (1344179 / 1234); commit message given; `[wave]` and `[acoustic]` files and `ray_test_helpers.hpp`, about 33,800 lines;
-   other test areas and the Python / MATLAB suites out of scope). Remove **redundant** tests only: print-only cases
-   without assertions, duplicates, tests of retired behavior, cases whose every assertion another case already makes;
-   every mechanism and every EM statement keeps at least one guard; each removal listed with its reason at the plan
-   stop. Remove stale comments; comments to the necessary minimum. **As fast as sensible** (no number; the two big
-   cases, *ray_progress - the reflect port of a sheet lies where its transmit port puts the layer* 9.8 s and
-   *Measurement - the mirror behind the ray after a back reflection* 9.6 s of the whole suite's 38 s, first).
-   **Diagnostic output off by default, switchable** (one environment variable, no rebuild), so the printed-row
-   comparison stays available for future analysis.
-3. **Material model document**: `html_docu/quadriga_lib_material_model.md` rewritten to match what is implemented,
-   **two sections in one page**: a user part (the physics, every column, the rules of use, the limits) and a short
-   developer part (how the code is structured, after task 1); **published** with the other html_docu pages. It
-   **absorbs what users need from `md/acoustic.md` and `md/wave.md`** (rules of use, limits). The transitory `md/`
-   files stay until the parameter project (Stephan's choice); the column reference `format_materials.md` is not in
-   this task.
-
-4. **The parameter session** — to become a project of its own (Stephan, 2026-10-20); kept here only so its
-   context is not lost; not to be started from this file: the material table from the review's data with the A13 / A14 / A19 rules
-   (`tools/acoustic/sabine_to_random.py`), the acceptance classes of `md/acoustic.md` 9.
-(A9, the material-model page, is task 3 above.)
-
-Decisions in section 6 can be taken whenever Stephan wants; none blocks item 1.
+1. **Task 3: the material-model document** — **brief written 2026-10-21** (`md/cleanup_doc_brief.md`, report to come
+   in `md/cleanup_doc_report.md`), waiting for Stephan's review; then a fresh worker with the kick-off prompt
+   `Read md/cleanup_doc_brief.md in full and follow it. Start with the baseline check and phase 0; stop after phase 0
+   with the report in md/cleanup_doc_report.md. At most 12 threads, one suite at a time, no new items.`
+   Stephan's answers before the brief (2026-10-21): **Markdown with LaTeX** (GitHub math, same file and name, not
+   generated); **API blocks** may be corrected comment-only inside `/*!MD` after his OK at the plan stop; **developer
+   part** about 100 lines, a source map plus how a change is checked (takes over `md/wave.md` 10–11); **worked
+   examples**: EM from the ITU table, acoustic a single-leaf wall, a glass pane or window and a porous absorber on a
+   rigid wall, from the review's data by the decided rules, measured with the library; **mapping** two-parameter
+   only (M8 decided). Phases: 0 inventory and plan (absorption table of `md/wave.md` / `md/acoustic.md`, outline,
+   example plan, API-block correction list, `format_materials.md` contradictions report-only, `check_docs.py`
+   extended to the page) → stop; 1 examples measured, page written, corrections applied; 2 `md/` updates (A9 closed,
+   M8 in 10, `md/wave.md` line 495) and final checks → stop before the commit. Decided by Stephan (2026-10-20):
+   - the file `html_docu/quadriga_lib_material_model.md` (738 lines, hand-written, last edited 2026-10-13 (807a1d6), before the
+     acoustic work, so stale throughout) is rewritten to match what is implemented;
+   - **one page, two sections**: a user part (the physics, every material column with its unit and meaning, the rules
+     of use, the limits) and a short developer part (how `src/ray_mesh_interact.cpp` is structured, after task 1: its
+     header overview and sections are the basis);
+   - **published** with the other `html_docu` pages (find how the pages are generated: `tools/extract_html.py`,
+     `tools/extract_md.py`, `tools/html_parts`; Stephan regenerates `html_docu`);
+   - it **absorbs what users need from `md/acoustic.md` and `md/wave.md`** (the rules of use and the limits, for EM and
+     for acoustics), so those transitory files are no longer needed for that; the `md/` files themselves stay until the
+     parameter project;
+   - the column reference `tools/data_formats_md/format_materials.md` is **not** in this task;
+   - workflow as for tasks 1–2: a plan stop (outline, what comes from where, what is dropped) and a stop before the
+     commit; no source or test change; written from the code (the source is the normative reference), with the
+     formulas as implemented; EM first (the library's primary use), acoustics as the mapping and the mass-column
+     switch; the API blocks in the source are the public reference for the five functions, the page must agree with
+     them.
+2. **The parameter session** — to become a project of its own (Stephan, 2026-10-20); kept here only so its context is
+   not lost; not to be started from this file: the material table from the review's data with the A13 / A14 / A19
+   rules (`tools/acoustic/sabine_to_random.py`, `txfit.py`), the acceptance classes of `md/acoustic.md` 9, defaults for
+   `side`, and the open decisions of section 6.
 
 ## 9. Traps (collected)
 
@@ -230,3 +210,7 @@ Decisions in section 6 can be taken whenever Stephan wants; none blocks item 1.
 - A followed series of a lossy body between strong reflectors diverges (round trip above one): only summed rows count.
 - `python3 -I` puts no script directory on `sys.path`.
 - Pasted worker summaries are shortened; read the report and the diff.
+- A baseline with the right counts can still be a plain run: check that `test.txt` carries the ray tables (about
+  1.9 MB with `QD_TEST_DIAG=1`, 34 KB without).
+- `data/materials_ac.csv` and `tools/acoustic_parameter_mapping/` are from before the acoustic work: never a
+  reference.
