@@ -624,3 +624,49 @@ TEST_CASE("Channel - Add Paths with 0 paths in the first field")
     CHECK(d.is_valid().empty());
     CHECK(c.n_path()(0) == 1);
 }
+
+TEST_CASE("Tools - Combine IRS Coord - shapes of interact_coord_1 / _2 are checked")
+{
+    // Throws std::invalid_argument whose message names the input
+    auto throws_naming = [](const arma::u32_vec &n1, const arma::mat &c1, const arma::u32_vec &n2, const arma::mat &c2,
+                            const std::string &name)
+    {
+        arma::u32_vec no;
+        arma::mat out;
+        bool thrown = false;
+        try
+        {
+            quadriga_lib::combine_irs_coord<double>(0.0, 0.0, 0.0, &n1, &c1, &n2, &c2, &no, &out);
+        }
+        catch (const std::invalid_argument &e)
+        {
+            thrown = std::string(e.what()).find(name) != std::string::npos;
+            INFO(e.what());
+            CHECK(thrown);
+        }
+        catch (...)
+        {
+        }
+        return thrown;
+    };
+
+    arma::u32_vec n10 = {10}, n1 = {1}, n0 = {0}, n23 = {2, 3};
+    arma::mat c3x10(3, 10, arma::fill::ones), c3x1(3, 1, arma::fill::ones), c3x5(3, 5, arma::fill::ones);
+
+    CHECK(throws_naming(n10, arma::mat(2, 10, arma::fill::ones), n1, c3x1, "interact_coord_1")); // heap over-read before
+    CHECK(throws_naming(n10, arma::mat(3, 9, arma::fill::ones), n1, c3x1, "interact_coord_1"));
+    CHECK(throws_naming(n10, arma::mat(4, 10, arma::fill::ones), n1, c3x1, "interact_coord_1"));
+    CHECK(throws_naming(n10, c3x10, n1, arma::mat(2, 1, arma::fill::ones), "interact_coord_2"));
+    CHECK(throws_naming(n10, c3x10, n23, arma::mat(3, 4, arma::fill::ones), "interact_coord_2"));
+    CHECK(throws_naming(n0, c3x1, n1, c3x1, "interact_coord_1"));
+
+    // Valid shapes, including no interactions with an empty coordinate matrix
+    arma::u32_vec no;
+    arma::mat out;
+    quadriga_lib::combine_irs_coord<double>(0.0, 0.0, 0.0, &n10, &c3x10, &n23, &c3x5, &no, &out);
+    CHECK(out.n_cols == 2 * (10 + 1) + 2 + 3);
+    arma::mat empty;
+    quadriga_lib::combine_irs_coord<double>(0.0, 0.0, 0.0, &n0, &empty, &n1, &c3x1, &no, &out);
+    CHECK(no.n_elem == 1);
+    CHECK(out.n_cols == 2);
+}

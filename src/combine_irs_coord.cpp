@@ -36,9 +36,11 @@ void quadriga_lib::combine_irs_coord(
 ## Inputs:
 - **`Ix, Iy, Iz`** — IRS position in Cartesian coordinates
 - **`no_interact_1`** — Number of interaction points per path for segment 1 (TX → IRS); `[n_path_1]`
-- **`interact_coord_1`** — Interaction coordinates for segment 1; `[3, sum(no_interact_1)]`
+- **`interact_coord_1`** — Interaction coordinates for segment 1; `[3, sum(no_interact_1)]`; any other size throws
+  `std::invalid_argument` (an empty matrix is accepted when `sum(no_interact_1)` is 0)
 - **`no_interact_2`** — Number of interaction points per path for segment 2 (IRS → RX); `[n_path_2]`
-- **`interact_coord_2`** — Interaction coordinates for segment 2; `[3, sum(no_interact_2)]`
+- **`interact_coord_2`** — Interaction coordinates for segment 2; `[3, sum(no_interact_2)]`; same check as for
+  `interact_coord_1`
 - **`reverse_segment_1`** *(optional)* — If `true`, reverses interaction coordinate order within segment 1
 - **`reverse_segment_2`** *(optional)* — If `true`, reverses interaction coordinate order within segment 2
 - **`active_path`** *(optional)* — Boolean mask selecting path combinations to include; pass the return value of [[get_channels_irs]] directly; `[n_path_1 × n_path_2]`
@@ -76,6 +78,18 @@ void quadriga_lib::combine_irs_coord(dtype Ix, dtype Iy, dtype Iz,
     arma::uword n_path_1 = no_interact_1->n_elem;
     arma::uword n_path_2 = no_interact_2->n_elem;
     arma::uword n_path = n_path_1 * n_path_2;
+
+    // The coordinates must hold exactly the interactions counted in 'no_interact_1' / '_2'
+    // - With no interactions an empty matrix is accepted
+    arma::uword sum_1 = 0ULL, sum_2 = 0ULL;
+    for (arma::uword i = 0ULL; i < n_path_1; ++i)
+        sum_1 += (arma::uword)no_interact_1->at(i);
+    for (arma::uword i = 0ULL; i < n_path_2; ++i)
+        sum_2 += (arma::uword)no_interact_2->at(i);
+    if (interact_coord_1->n_cols != sum_1 || (sum_1 != 0ULL && interact_coord_1->n_rows != 3ULL))
+        throw std::invalid_argument("Input 'interact_coord_1' must have 3 rows and sum(no_interact_1) = " + std::to_string(sum_1) + " columns.");
+    if (interact_coord_2->n_cols != sum_2 || (sum_2 != 0ULL && interact_coord_2->n_rows != 3ULL))
+        throw std::invalid_argument("Input 'interact_coord_2' must have 3 rows and sum(no_interact_2) = " + std::to_string(sum_2) + " columns.");
     arma::uword n_path_irs = n_path;
 
     bool get_subset = active_path != nullptr;
