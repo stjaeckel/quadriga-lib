@@ -14,6 +14,10 @@ Mechanical checks of the acoustic documents (md/acoustic.md, md/wave.md), run fr
    against the last line of the baseline files test_wave.txt, test_acoustic.txt, test.txt (if present; regenerate
    them first, md/wave.md section 0).
 5. Spelling: British spellings that the documents avoid (American English); italic test-case names are skipped.
+6. The material-model page html_docu/quadriga_lib_material_model.md: tables and spelling as above; every column that
+   MaterialCols reads (resolve("...") in src/ray_mesh_interact.cpp) is a row of the page's column table; no internal
+   labels (item ids, "round 1", md/ files, briefs, rigs, scratch paths) outside math and code; `$` balanced per
+   paragraph and `$$` per file; no \newcommand; every in-page anchor resolves to a heading.
 
 Exit code 0 when every check passes, 1 otherwise. It reports; it changes nothing.
 """
@@ -21,6 +25,8 @@ import csv, glob, os, re, sys
 
 ROOT = os.getcwd()
 DOCS = ['md/acoustic.md', 'md/wave.md']
+PAGE = 'html_docu/quadriga_lib_material_model.md'
+SOURCE = 'src/ray_mesh_interact.cpp'
 REVIEW = os.environ.get('QD_REVIEW_DIR', '/sjc/accoustic_research')
 BRITISH = ['neighbour', 'centre', 'behaviour', 'modelled', 'modelling', 'colour', 'millimetre', 'metre ', 'favour',
            'labelled', 'travelled', 'grey ']
@@ -50,6 +56,54 @@ def cited_keys(text):
             if re.match(r'^[A-Z][A-Za-z]+_[A-Za-z0-9]+_', k):
                 keys.add(k)
     return keys
+
+def strip_math_code(text):
+    """the text without $$ blocks, $`...`$ and $...$ math, code fences and code spans"""
+    t = re.sub(r'```.*?```', '', text, flags=re.S)
+    t = re.sub(r'\$\$.*?\$\$', '', t, flags=re.S)
+    t = re.sub(r'\$`.*?`\$', '', t)
+    t = re.sub(r'`[^`\n]*`', '', t)
+    return re.sub(r'(?<!\\)\$[^$\n]*\$', '', t)
+
+def check_math(text):
+    """paragraphs (blank-line separated, code fences skipped) whose unescaped $ outside $$ is odd; $$ count of the file"""
+    t = re.sub(r'```.*?```', '', text, flags=re.S)
+    bad = []
+    for i, para in enumerate(re.split(r'\n\s*\n', t)):
+        q = re.sub(r'\$`.*?`\$', '', para.replace('$$', ''))
+        q = re.sub(r'`[^`\n]*`', '', q)
+        if len(re.findall(r'(?<!\\)\$', q)) % 2:
+            bad.append(para.strip().split('\n')[0][:60])
+    return bad, t.count('$$') % 2 == 0, '\\newcommand' not in text
+
+def slug(h):
+    h = re.sub(r'`', '', h.strip().lower())
+    h = re.sub(r'[^\w\- ]', '', h)
+    return h.replace(' ', '-')
+
+def check_page(text):
+    """(missing columns, label hits, bad math paragraphs, $$ ok, no newcommand, unresolved anchors)"""
+    cols = re.findall(r'resolve\("([A-Za-z]+)"\)', read(SOURCE))
+    rows, in_tab = set(), False
+    for line in text.split('\n'):
+        if line.startswith('| column |'):
+            in_tab = True
+        elif in_tab and line.startswith('|'):
+            m = re.match(r'\|\s*`([A-Za-z]+)`\s*\|', line)
+            if m:
+                rows.add(m.group(1))
+        else:
+            in_tab = False
+    missing = [c for c in cols if c not in rows]
+    plain = strip_math_code(text)
+    labels = []
+    for pat in (r'\b[AMNPDW]\d+[a-z\u2032]?\b', r'\bD2-b\b', r'\bround 1\b', r'\bmd/', r'_report\.md', r'_brief\.md',
+                r'\bbriefs?\b', r'\brigs?\b', r'build_linux/scratch'):
+        labels += re.findall(pat, plain)
+    bad_math, dd_ok, nc_ok = check_math(text)
+    heads = {slug(m) for m in re.findall(r'^#+\s+(.*)$', text, flags=re.M)}
+    anchors = [a for a in re.findall(r'\]\(#([^)]+)\)', text) if a not in heads]
+    return missing, labels, bad_math, dd_ok, nc_ok, anchors, len(cols)
 
 def main():
     ok = True
@@ -103,6 +157,22 @@ def main():
         hits = sorted({w.strip() for w in BRITISH if re.search(r'\b' + re.escape(w.strip()), plain, re.I)})
         print('spelling   %-16s %s' % (fn, 'ok' if not hits else 'British spellings: %s' % hits))
         ok &= not hits
+    # 6. the material-model page
+    if os.path.exists(os.path.join(ROOT, PAGE)):
+        page = read(PAGE)
+        bad = check_tables(PAGE, page)
+        print('tables     %-16s %s' % ('page', 'ok' if not bad else 'rows off at lines %s' % bad))
+        plain = re.sub(r'\*[^*]+\*', '', page)
+        hits = sorted({w.strip() for w in BRITISH if re.search(r'\b' + re.escape(w.strip()), plain, re.I)})
+        print('spelling   %-16s %s' % ('page', 'ok' if not hits else 'British spellings: %s' % hits))
+        missing, labels, bad_math, dd_ok, nc_ok, anchors, ncol = check_page(page)
+        print('columns    %-16s %s' % ('page', '%d of %d in the column table' % (ncol - len(missing), ncol) + ('' if not missing else ', MISSING: %s' % missing)))
+        print('labels     %-16s %s' % ('page', 'none' if not labels else 'FOUND: %s' % sorted(set(labels))))
+        print('math       %-16s %s' % ('page', 'ok' if not bad_math and dd_ok and nc_ok else 'UNBALANCED: %s%s%s' % (bad_math, '' if dd_ok else ' $$ odd', '' if nc_ok else ' newcommand')))
+        print('anchors    %-16s %s' % ('page', 'all resolve' if not anchors else 'UNRESOLVED: %s' % anchors))
+        ok &= not bad and not hits and not missing and not labels and not bad_math and dd_ok and nc_ok and not anchors
+    else:
+        print('page       skipped (%s not found)' % PAGE)
     print('RESULT     %s' % ('all checks pass' if ok else 'checks failed'))
     return 0 if ok else 1
 

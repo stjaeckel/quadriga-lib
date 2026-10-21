@@ -2,8 +2,8 @@
 
 This file is the manager's memory. A manager session reads it first, works from it, and updates it after every step
 (state, roadmap, pending decisions). When a manager's context fills up, a new manager reads this file and continues;
-nothing depends on one chat. Last updated: 2026-10-21, after commit e34dd2a (cleanup tasks 1 and 2 done; task 3 brief written, waiting for
-Stephan's review; `main` is the acoustic work's branch again).
+nothing depends on one chat. Last updated: 2026-10-21, after commit f33c8cb (cleanup tasks 1 and 2 done; task 3 phases 1–2 done and reviewed,
+waiting for Stephan's commit; `main` is the acoustic work's branch again).
 
 ## 1. Roles
 
@@ -58,6 +58,8 @@ numbers, the line count of `src/ray_mesh_interact.cpp`, the three counts, and th
 - In the desktop app, a decision question in the next-step box ends the turn and hides any text after it: write the
   explanation and the paste-ready message in the reply first, then ask.
 - Every brief and prompt carries the resource rule (section 3) and "no new items".
+- Public Markdown pages: plain `$…$` math (Stephan's viewer shows the dollar-backtick form raw) and one line per
+  paragraph or list item (2026-10-21).
 
 ## 3. The review checklist
 
@@ -184,9 +186,39 @@ cleanup (dc47ff6; `md/cleanup_tests_report.md`: four redundant cases removed by 
 `QD_TEST_DIAG`, the ray cases 24.9 → 5.9 CPU-s, the whole suite 38 → 19 s).
 
 1. **Task 3: the material-model document** — **brief written 2026-10-21** (`md/cleanup_doc_brief.md`, report to come
-   in `md/cleanup_doc_report.md`), waiting for Stephan's review; then a fresh worker with the kick-off prompt
+   in `md/cleanup_doc_report.md`), **approved by Stephan 2026-10-21**; a fresh worker runs phase 0 with the kick-off prompt
    `Read md/cleanup_doc_brief.md in full and follow it. Start with the baseline check and phase 0; stop after phase 0
    with the report in md/cleanup_doc_report.md. At most 12 threads, one suite at a time, no new items.`
+   Phase 0 done 2026-10-21 (`md/cleanup_doc_report.md` 0): baseline reproduced at f33c8cb; outline user part about
+   760 lines in 14 sections plus developer part about 100; 16 rules of use; examples EM `itu_concrete` 200 mm,
+   `itu_glass` / `irr_glass` 6 mm at 3.5 and 28 GHz (P.2040 slab closed form, 3GPP TR 38.901 losses), acoustic
+   concrete 152 mm and glass 4 mm (the decided fit rows, second references Mahn 2023 CON150 and Quirt 1981), glass
+   wool 50 mm (Komatsu at the measured σ, Dupont 2023); seven API-block edits; 18 `format_materials.md`
+   contradictions. Manager's review: the code claims behind the API edits checked and right (the pole needs
+   `resQ > 0` and `m = 0`, `eta()`; a held wave leaving a plate into a wave medium is refracted as from air,
+   `interact_with` 827–844; `prev_embedded` written for a solid, 4492; a sheet composite carries `qd_mass_amp` and
+   `stack_layer_phase`); the brief's `map_to_itu_materials` belongs to `mitsuba_xml_file_write` (the manager's
+   error); the U+2212 delimiter row in `md/acoustic.md` 2.7 (line 383) confirmed. Review notes: user part long
+   (760 against the old page's 738 in all; Q7 proposed: about 600); D2 without the machine and team rules (12 threads,
+   shared machine, `pkill`); no "U1" / "D1" labels on the page (the label check would flag them).
+   Decided by Stephan (2026-10-21): Q1 keep the fit rows with `coiQ` (if M15 changes `coiQ`'s meaning, the two
+   mass-law examples are re-measured); Q2 keep the Data Formats pointer (worker's text, the CSV format), no edit of
+   `format_materials.md` in this task (a separate session follows, roadmap item 2); Q3 the 13 fitted constructions
+   go on the page as preliminary starting rows with a note that they will change (also the starting point of the
+   parameter project), worst deviations re-evaluated with `txlib.py`, no refit; Q4 title "The quadriga-lib Material
+   Model and Ray-Surface Physics"; Q5 both EM references (3GPP differences stated, not asserted); Q6 every limit
+   size from today's library: the `QD_DIAG_RAY` diagnostic output first, else a scratch probe, else dropped; Q7 user
+   part about 600 lines as a guideline.
+   Phases 1–2 done and reviewed 2026-10-21 (report 1, 2): the page 538 lines (one line per paragraph, Stephan's
+   request; Part I 490, Part II 48), plain `$…$` math (the dollar-backtick form showed raw in Stephan's viewer);
+   seven API-block edits, all inside `/*!MD` (checked line by line), `src/ray_mesh_interact.cpp` 4731 lines;
+   `check_docs.py` checks the page (columns 26 of 26: the brief's "27" was wrong, labels, math, anchors). Manager's
+   checks: rebuild, `[wave]` / `[acoustic]` rowdiff identical (141128 / 112451), `check_docs.py` passes, the page
+   read in full, the mass-term factors and the `tf` peak checked against `mass_X0` / `Material::tf`. Two nits fixed by the
+   manager on Stephan's request: `k0 = 2π·10⁹ f / c0` (f in GHz, as the section states); reference [16] with its
+   year (2022, the copyright year in library catalogs; released 2021). Side findings recorded: `band_probe.cpp` has no `attB` column (every fit row carries one; for the parameter
+   project); `tools/acoustic/__pycache__/txlib.cpython-314.pyc` was committed by accident in bc24b0c.
+   **If `coiQ`'s meaning changes (M15), the page's 11.1, 11.2 and 11.4 are re-measured.**
    Stephan's answers before the brief (2026-10-21): **Markdown with LaTeX** (GitHub math, same file and name, not
    generated); **API blocks** may be corrected comment-only inside `/*!MD` after his OK at the plan stop; **developer
    part** about 100 lines, a source map plus how a change is checked (takes over `md/wave.md` 10–11); **worked
@@ -212,7 +244,11 @@ cleanup (dc47ff6; `md/cleanup_tests_report.md`: four redundant cases removed by 
      formulas as implemented; EM first (the library's primary use), acoustics as the mapping and the mass-column
      switch; the API blocks in the source are the public reference for the five functions, the page must agree with
      them.
-2. **The parameter session** — to become a project of its own (Stephan, 2026-10-20); kept here only so its context is
+2. **`tools/data_formats_md/format_materials.md`** (Stephan, 2026-10-21: a separate session after task 3 updates
+   the published column reference): 18 contradictions with the code are listed in `md/cleanup_doc_report.md` 0.7
+   (missing columns `thk`, `tf*`; the transmission gate that no longer exists; `m` as a slope; no scalar refraction;
+   the one-parameter rigid family; the acoustic `concrete` default row without `tf`). Brief to write after task 3.
+3. **The parameter session** — to become a project of its own (Stephan, 2026-10-20); kept here only so its context is
    not lost; not to be started from this file: the material table from the review's data with the A13 / A14 / A19
    rules (`tools/acoustic/sabine_to_random.py`, `txfit.py`), the acceptance classes of `md/acoustic.md` 9, defaults for
    `side`, and the open decisions of section 6.
