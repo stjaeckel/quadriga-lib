@@ -21,6 +21,7 @@ Calculate MIMO channel coefficients for IRS-assisted communication
 - Each segment is computed like [[get_channels_spherical]]: NLOS path lengths are `max(path_length, d_poly)` with the
   polyline length `d_poly` of the segment; the delay of a combined path is the sum of both segment delays
 - Output paths `n_path_irs` are all combinations of segment 1 and segment 2 paths exceeding `threshold_dB`
+- A segment without paths (all its path inputs empty) gives empty outputs `[n_rx, n_tx, 0]`
 - If `active_path_in` is provided, it overrides `threshold_dB` for path selection
 - Optional `ant_irs_2` provides a separate IRS antenna pattern for the RX-facing side (asymmetric IRS)
 - If `center_freq == 0`, phase calculation is disabled and only delays are computed
@@ -59,7 +60,7 @@ Calculate MIMO channel coefficients for IRS-assisted communication
 - **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading); `[3, 1]`
 - **`irs_pos`** — IRS position; `[3, 1]`
 - **`irs_orientation`** — IRS orientation as Euler angles (bank, tilt, heading); `[3, 1]`
-- **`i_irs`** — IRS codebook port index; default: `0`
+- **`i_irs`** — IRS codebook port index, 1-based (one port per column of the IRS coupling matrix); default: `1`
 - **`threshold_dB`** — Gain threshold in dB; path combinations below this are discarded; dB; default: `-140`
 - **`center_freq`** — Center frequency; set to `0` or skip/leave empty to skip phase computation; default: `0`
 - **`use_absolute_delays`** — If `true`, delays include the LOS component; default: `false`
@@ -82,6 +83,15 @@ Calculate MIMO channel coefficients for IRS-assisted communication
 - [[arrayant_generate]] (antenna array generator)
 - [[combine_irs_coord]] (coordinate setup for IRS geometry)
 MD!*/
+
+// Cube output; an empty result keeps its [n_rx, n_tx, 0] shape (the generic copy returns 0x0)
+static mxArray *copy_cube(const arma::cube &c)
+{
+    if (c.n_elem != 0)
+        return qd_mex_copy2matlab(&c);
+    mwSize dims[3] = {(mwSize)c.n_rows, (mwSize)c.n_cols, (mwSize)c.n_slices};
+    return mxCreateNumericArray(3, dims, mxDOUBLE_CLASS, mxREAL);
+}
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
@@ -119,7 +129,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const auto irs_orientation = qd_mex_typecast_Col<double>(prhs[18], "irs_orientation", 3);
 
     // Configuration parameters
-    arma::uword i_irs = (nrhs < 20) ? 0 : qd_mex_get_scalar<arma::uword>(prhs[19], "i_irs", 0);
+    arma::uword i_irs = (nrhs < 20) ? 1 : qd_mex_get_scalar<arma::uword>(prhs[19], "i_irs", 1);
     double threshold_dB = (nrhs < 21) ? -140.0 : qd_mex_get_scalar<double>(prhs[20], "threshold_dB", -140.0);
     double center_freq = (nrhs < 22) ? 0.0 : qd_mex_get_scalar<double>(prhs[21], "center_freq", 0.0);
     bool use_absolute_delays = (nrhs < 23) ? false : qd_mex_get_scalar<bool>(prhs[22], "use_absolute_delays", false);
@@ -130,6 +140,16 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     bool use_alternative_irs = (nrhs > 24) && !mxIsEmpty(prhs[24]);
     if (use_alternative_irs)
         ant_irs_2 = qd_mex_struct2arrayant(prhs[24]);
+
+    // Codebook port index: 1-based (MATLAB) -> 0-based (C++)
+    const arma::uword n_codebook = ant_irs.coupling_re.n_cols; // 0 = missing coupling, reported by C++
+    if (i_irs == 0 || (n_codebook != 0 && i_irs > n_codebook))
+    {
+        std::string msg = "Input 'i_irs' must be from 1 to " + std::to_string(n_codebook == 0 ? 1 : n_codebook) +
+                          " (1-based codebook port index, one per column of the IRS coupling matrix).";
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", msg.c_str());
+    }
+    i_irs -= 1;
 
     // Extract scalar values
     double Tx = tx_pos.at(0), Ty = tx_pos.at(1), Tz = tx_pos.at(2);
@@ -162,19 +182,19 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Write to MATLAB
     if (nlhs > 0)
-        plhs[0] = qd_mex_copy2matlab(&coeff_re);
+        plhs[0] = copy_cube(coeff_re);
     if (nlhs > 1)
-        plhs[1] = qd_mex_copy2matlab(&coeff_im);
+        plhs[1] = copy_cube(coeff_im);
     if (nlhs > 2)
-        plhs[2] = qd_mex_copy2matlab(&delay);
+        plhs[2] = copy_cube(delay);
     if (nlhs > 3)
         plhs[3] = qd_mex_copy2matlab(&active_path_out);
     if (nlhs > 4)
-        plhs[4] = qd_mex_copy2matlab(&aod);
+        plhs[4] = copy_cube(aod);
     if (nlhs > 5)
-        plhs[5] = qd_mex_copy2matlab(&eod);
+        plhs[5] = copy_cube(eod);
     if (nlhs > 6)
-        plhs[6] = qd_mex_copy2matlab(&aoa);
+        plhs[6] = copy_cube(aoa);
     if (nlhs > 7)
-        plhs[7] = qd_mex_copy2matlab(&eoa);
+        plhs[7] = copy_cube(eoa);
 }

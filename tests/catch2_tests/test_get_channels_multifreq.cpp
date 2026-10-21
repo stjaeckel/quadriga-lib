@@ -1309,3 +1309,100 @@ TEST_CASE("Multifreq - add_fake_los_path layout (B-068)")
     CHECK(std::abs(p(3) - 0.25) < 1e-9);
     CHECK(std::abs(dl[0](0) * C - 50.0) < 1e-6);
 }
+
+TEST_CASE("Multifreq - 0 paths with add_fake_los_path")
+{
+    // The output holds exactly the zero-power LOS path for every output frequency; its delays per antenna pair equal
+    // those of a real LOS path with the same geometry; without add_fake_los_path, the outputs are empty
+    const double C = 299792458.0;
+    auto tx = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    tx.copy_element(0, 1);
+    tx.element_pos = {{0.3, -0.2}, {0.1, 0.4}, {0.0, 0.2}};
+    tx.center_frequency = 3e9;
+    auto rx = tx;
+    rx.coupling_re = arma::vec({1.0, 0.5}); // 2 elements, 1 port
+    rx.coupling_im = arma::vec({0.0, 0.2});
+    std::vector<quadriga_lib::arrayant<double>> txv = {tx}, rxv = {rx};
+
+    const double Tx = 1, Ty = 2, Tz = 3, Rx = 11, Ry = -3, Rz = 5;
+    const double dx = Rx - Tx, dy = Ry - Ty, dz = Rz - Tz, dist = std::sqrt(dx * dx + dy * dy + dz * dz);
+    arma::mat f0(3, 0), g0(0, 1), fL = {0.5 * (Tx + Rx), 0.5 * (Ty + Ry), 0.5 * (Tz + Rz)}, gL = {1.0};
+    fL = fL.t();
+    arma::cube M0(8, 0, 1), ML(8, 1, 1, arma::fill::zeros);
+    ML(0, 0, 0) = 1.0, ML(6, 0, 0) = -1.0;
+    arma::vec e, len = {dist}, fin = {3e9}, fout = {3e9, 4e9};
+
+    for (bool abs_delays : {true, false})
+    {
+        std::vector<arma::cube> cr, ci, dl, crL, ciL, dlL;
+        quadriga_lib::get_channels_multifreq<double>(txv, rxv, Tx, Ty, Tz, 0, 0, 0.3, Rx, Ry, Rz, 0, 0, -0.2,
+                                                     f0, f0, g0, e, M0, fin, fout, cr, ci, dl, abs_delays, true);
+        quadriga_lib::get_channels_multifreq<double>(txv, rxv, Tx, Ty, Tz, 0, 0, 0.3, Rx, Ry, Rz, 0, 0, -0.2,
+                                                     fL, fL, gL, len, ML, fin, fout, crL, ciL, dlL, abs_delays, true);
+        REQUIRE(cr.size() == 2);
+        for (size_t f = 0; f < 2; ++f)
+        {
+            REQUIRE(cr[f].n_rows == 1);
+            REQUIRE(cr[f].n_cols == 2);
+            REQUIRE(cr[f].n_slices == 1);
+            REQUIRE(dl[f].n_slices == 1);
+            CHECK(arma::all(arma::vectorise(cr[f]) == 0.0));
+            CHECK(arma::all(arma::vectorise(ci[f]) == 0.0));
+            CHECK(arma::approx_equal(dl[f].slice(0), dlL[f].slice(0), "absdiff", 1e-18));
+            if (abs_delays)
+                CHECK(std::abs(arma::mean(arma::vectorise(dl[f])) * C - dist) < 0.5);
+            else
+                CHECK(std::abs(arma::mean(arma::vectorise(dl[f])) * C) < 0.5);
+        }
+    }
+
+    auto omni = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    std::vector<quadriga_lib::arrayant<double>> ov = {omni};
+    std::vector<arma::cube> cr, ci, dl;
+    quadriga_lib::get_channels_multifreq<double>(ov, ov, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0,
+                                                 f0, f0, g0, e, M0, fin, fin, cr, ci, dl, true, true);
+    REQUIRE(dl.size() == 1);
+    REQUIRE(dl[0].n_elem == 1);
+    CHECK(std::abs(dl[0](0) - 10.0 / C) < 1e-20);
+    CHECK(cr[0](0) == 0.0);
+    quadriga_lib::get_channels_multifreq<double>(ov, ov, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0,
+                                                 f0, f0, g0, e, M0, fin, fin, cr, ci, dl, true, false);
+    CHECK(dl[0].n_slices == 0); // without add_fake_los_path: empty outputs
+}
+
+TEST_CASE("Multifreq - 0 paths without add_fake_los_path")
+{
+    // Empty outputs of size [n_rx_ports, n_tx_ports, 0] for every output frequency
+    auto tx = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    tx.copy_element(0, 1);
+    tx.center_frequency = 3e9;
+    auto rx = tx;
+    rx.coupling_re = arma::vec({1.0, 0.5}); // 2 elements, 1 port
+    rx.coupling_im = arma::vec({0.0, 0.2});
+    std::vector<quadriga_lib::arrayant<double>> txv = {tx}, rxv = {rx};
+    arma::mat f0(3, 0), g0(0, 1), fx, gx;
+    arma::cube M0(8, 0, 1), Mx;
+    arma::vec e, fin = {3e9}, fout = {3e9, 4e9};
+    for (int k = 0; k < 2; ++k)
+    {
+        std::vector<arma::cube> cr(3, arma::cube(2, 2, 2, arma::fill::ones)), ci, dl;
+        quadriga_lib::get_channels_multifreq<double>(txv, rxv, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0,
+                                                     k == 0 ? f0 : fx, k == 0 ? f0 : fx, k == 0 ? g0 : gx, e,
+                                                     k == 0 ? M0 : Mx, fin, fout, cr, ci, dl, true, false);
+        REQUIRE(cr.size() == 2);
+        REQUIRE(ci.size() == 2);
+        REQUIRE(dl.size() == 2);
+        for (size_t f = 0; f < 2; ++f)
+            for (const arma::cube *c : {&cr[f], &ci[f], &dl[f]})
+            {
+                CHECK(c->n_rows == 1);
+                CHECK(c->n_cols == 2);
+                CHECK(c->n_slices == 0);
+            }
+    }
+    // The frequency inputs are still checked
+    std::vector<arma::cube> cr, ci, dl;
+    CHECK_THROWS_AS(quadriga_lib::get_channels_multifreq<double>(txv, rxv, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0,
+                                                                 f0, f0, g0, e, M0, fin, arma::vec(), cr, ci, dl, true, false),
+                    std::invalid_argument);
+}

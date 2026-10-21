@@ -191,4 +191,34 @@ catch ME
     end
 end
 
+% 0 paths with add_fake_los_path: one zero-power LOS path with the LOS delay (as in C++ and Python)
+C = 299792458.0;
+a1 = quadriga_lib.arrayant_generate('omni'); a1.center_freq = fc;
+[cr, ci, dl] = quadriga_lib.get_channels_multifreq(a1, a1, zeros(3,0), zeros(3,0), zeros(0,1), zeros(0,1), zeros(8,0), ...
+    [0;0;0], [0,0,0], [10;0;0], [0,0,0], fc, [fc, 2*fc], true, true);
+assertEqual( size(dl), [1, 1, 1, 2] );
+assertEqual( [cr(:); ci(:)], zeros(4, 1) );
+assertElementsAlmostEqual( dl(:), [10; 10] / C, 'absolute', 1e-18 );
+[~, ~, dl] = quadriga_lib.get_channels_multifreq(a1, a1, zeros(3,0), zeros(3,0), zeros(0,1), zeros(0,1), zeros(8,0), ...
+    [0;0;0], [0,0,0], [10;0;0], [0,0,0], fc, fc, false, true);
+assertEqual( dl, 0 );
+% Per antenna pair: the delays of a real LOS path (moved to slot 0) with the same geometry
+tx = [1;2;3]; rx = [11;-3;5];
+for abs_dl = [true, false]
+    [cr0, ci0, dl0] = quadriga_lib.get_channels_multifreq(ant, ant, zeros(3,0), zeros(3,0), zeros(0,1), zeros(0,1), zeros(8,0), ...
+        tx, [0;0;0.3], rx, [0;0;-0.2], fc, fc, abs_dl, true);
+    [~, ~, dlL] = quadriga_lib.get_channels_multifreq(ant, ant, (tx+rx)/2, (tx+rx)/2, 1, norm(rx-tx), [1;0;0;0;0;0;-1;0], ...
+        tx, [0;0;0.3], rx, [0;0;-0.2], fc, fc, abs_dl, true);
+    assertEqual( size(dl0), [2, 2] );
+    assertEqual( [cr0, ci0], zeros(2, 4) );
+    assertElementsAlmostEqual( dl0, dlL(:,:,1), 'absolute', 1e-17 );
+end
+
+% 0 paths without add_fake_los_path: empty outputs [n_rx_ports, n_tx_ports, 0, n_freq_out] (as in C++ and Python)
+[cr0, ci0, dl0] = quadriga_lib.get_channels_multifreq(ant, ant, zeros(3,0), zeros(3,0), zeros(0,1), zeros(0,1), zeros(8,0), ...
+    tx, [0;0;0.3], rx, [0;0;-0.2], fc, [fc, 2*fc], true, false);
+for x = {cr0, ci0, dl0}
+    assertEqual( [size(x{1}, 1), size(x{1}, 2), size(x{1}, 3), size(x{1}, 4)], [2, 2, 0, 2] );
+end
+
 end
