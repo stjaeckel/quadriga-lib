@@ -2,8 +2,8 @@
 
 This file is the manager's memory. A manager session reads it first, works from it, and updates it after every step
 (state, roadmap, pending decisions). When a manager's context fills up, a new manager reads this file and continues;
-nothing depends on one chat. Last updated: 2026-10-21, after commit dc47ff6 (cleanup tasks 1 and 2 done; task 3 brief written, waiting for
-Stephan's review).
+nothing depends on one chat. Last updated: 2026-10-21, after commit e34dd2a (cleanup tasks 1 and 2 done; task 3 brief written, waiting for
+Stephan's review; `main` is the acoustic work's branch again).
 
 ## 1. Roles
 
@@ -99,19 +99,39 @@ Run on every worker phase; say which items were checked.
 
 ## 4. Current state (2026-10-21)
 
-- Last commit **dc47ff6** (ray-test cleanup). Before it: 71b894b (AVX2 test fix: the three-face tie asserted for
+- Last commit **e34dd2a**. On 2026-10-21 three commits from the fixes manager (branch `fixes`,
+  `/sjc/quadriga-lib-fixes`) landed on `main`; from then on `main` is ours again, and the fixes work touches it only
+  for an agreed merge:
+  - **f0d093d**, merge of `fixes`: `ray_triangle_intersect` (all kernels) reports hits at equal distance in index
+    order (the AVX2 kernel used to swap them), the AVX2 kernel forms its vectors in double before rounding, a ray in
+    a bounding-box plane is no longer rejected, `fbs` / `sbs` may alias `orig` / `dest`; also `xpr_update`,
+    `path_to_tube`, and documentation of `calc_diffraction_gain` (scalar mode takes the EM-equivalent frequency in
+    the whole C++ core). None of the ray files or ray tests changed. Checked by the manager: generic `[wave]` and
+    `[acoustic]` identical to the baselines; AVX2 `[wave]` identical before and after the merge; AVX2 `[acoustic]`
+    moved 146 values, all in the three-face tie of *Sheet between two bodies - nothing is created and the wave left
+    in air inside the far body is killed* (before: box exit + wall entry, R 0.9998; now the index-order pair, as
+    generic), so the AVX2 `[acoustic]` rows now equal the generic baseline number for number. AVX2 `[wave]` still
+    differs from generic in 18 `nh` values (hits reported on the segment, 3 instead of 2 at 50°) of *Unentered
+    branches - a corner with a sheet is the sheet alone once the state is kept*, every coefficient identical; this
+    was already so before the merge.
+  - **a7f1954**, **e34dd2a**: `QD_TEST_DIAG` replaced by per-area switches in `tests/catch2_tests/qd_test_diag.hpp`
+    (`QD_DIAG_RAY` the ray tests, `QD_DIAG_SOS`, `QD_DIAG_CONF`, `QD_DIAG` all areas; set and not `0` = on);
+    `ray_test_helpers.hpp` uses `QD_TEST_DIAG_SWITCH("QD_DIAG_RAY")`; the commands in `md/wave.md`, `md/acoustic.md`,
+    this file and the task-3 brief were updated by the fixes manager.
+- Before them: dc47ff6 (ray-test cleanup), 71b894b (AVX2 test fix: the three-face tie asserted for
   every face pair), a5bdfb7 (merge of the `fixes` branch from another session), 29e1f05 (source cleanup of
   `src/ray_mesh_interact.cpp`), 6307a64 (traced-leg precision), de60194 (finite panel, `side` column), bc24b0c (`m` a
   switch, `coiA` removed), 2c5be17 (peaked face as series impedance), 238444d, 04b92bd, 4720a92 (round 1).
 - `src/ray_mesh_interact.cpp` 4725 lines, restructured: an 84-line header overview, seven sections in one anonymous
   namespace, the five public API blocks shortened (`md/cleanup_src_report.md` 1.6 has the rename table old → new).
-- Counts: `[wave]` 163474 / 178, `[acoustic]` 42741 / 59, whole suite 1343848 / 1234 (generic build); AVX2 build
-  1344179 / 1234. Baselines are generated **with `QD_DIAG_RAY=1`** for `[wave]` / `[acoustic]` and `QD_DIAG=1` for the
+- Counts: `[wave]` 163474 / 178, `[acoustic]` 42741 / 59, whole suite 1344398 / 1264 (generic build; the merge
+  added 30 cases outside the ray tests); AVX2 build 1346180 / 1265. Baselines are generated **with `QD_DIAG_RAY=1`** for `[wave]` / `[acoustic]` and `QD_DIAG=1` for the
   whole suite (the diagnostic tables print only with these environment variables; a plain run prints nothing; the
   variables were renamed from `QD_TEST_DIAG` on 2026-10-21, see `tests/catch2_tests/qd_test_diag.hpp`): commands in `md/wave.md` 0, 12 threads.
   `python3 tools/acoustic/check_docs.py` passes. Checked by the manager 2026-10-21: `[wave]` and `[acoustic]` rerun
-  at dc47ff6, `rowdiff` identical; `test.txt` had been written without `QD_TEST_DIAG=1` (34 KB, right counts, no ray
-  tables) and was regenerated with it (1.9 MB).
+  at dc47ff6 and again at e34dd2a, `rowdiff` identical. `test.txt` regenerated at e34dd2a with `QD_DIAG=1`: the
+  printed lines are unchanged by the merge (23821), only its summary moved to 1344398 / 1264 (the quoted count in
+  `md/wave.md` 0 updated with it; before, `check_docs.py` passed only because both were stale).
 - Builds: `build_linux` (generic, the suite's build); an AVX2 build for checks at `build_linux/scratch/avx2`
   (`cmake -S . -B build_linux/scratch/avx2 -DCMAKE_CXX_COMPILER=g++-12 -DENABLE_AVX2=ON -DENABLE_TESTS=ON`; scratch,
   may be gone after `make clean`).
@@ -153,8 +173,9 @@ Scrosati rows out); A17′ (class 8 as the family of resonant absorbers); M15 (t
 
 ## 7. Open items without a decision (`md/acoustic.md` 6; no work planned, Stephan's veto)
 
-A8 (low priority), A20 (a wall's power-law `tf` behind a porous fill), A21 remainder (the three-face tie is decided
-by the intersector's arithmetic; both outcomes are asserted since 71b894b).
+A8 (low priority), A20 (a wall's power-law `tf` behind a porous fill), A21 remainder (the three-face tie: since f0d093d every
+kernel reports hits at equal distance in index order, so generic and AVX2 agree; both outcomes stay asserted since
+71b894b).
 
 ## 8. Roadmap (next first)
 

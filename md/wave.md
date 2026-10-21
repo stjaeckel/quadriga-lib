@@ -28,7 +28,7 @@ First step of every session, from the repository root:
 cmake --build build_linux --parallel 12
 QD_DIAG_RAY=1 OMP_NUM_THREADS=12 ./build_linux/test_bin "[wave]" > test_wave.txt           # All tests passed (163474 assertions in 178 test cases)
 QD_DIAG_RAY=1 OMP_NUM_THREADS=12 ./build_linux/test_bin "[acoustic]" > test_acoustic.txt   # All tests passed (42741 assertions in 59 test cases)
-QD_DIAG=1 OMP_NUM_THREADS=12 ./build_linux/test_bin > test.txt                             # All tests passed (1343848 assertions in 1234 test cases)
+QD_DIAG=1 OMP_NUM_THREADS=12 ./build_linux/test_bin > test.txt                             # All tests passed (1344398 assertions in 1264 test cases)
 ```
 
 `QD_DIAG_RAY=1` prints the diagnostic tables of the ray tests that the baselines and `tools/acoustic/rowdiff.py`
