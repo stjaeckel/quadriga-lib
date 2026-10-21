@@ -3,6 +3,8 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
+#include <cmath>
+#include <limits>
 
 /*!SECTION
 Site-specific simulation tools
@@ -30,7 +32,7 @@ arma::uword quadriga_lib::icosphere(
 
 ## Inputs:
 - **`n_div`** — Number of subdivisions; generates 20 × n_div² faces
-- **`radius`** — Radius of icosphere in meters
+- **`radius`** — Radius of icosphere in meters; finite and positive
 - **`direction_xyz`** (optional) — Output directions in Cartesian (true) or spherical azimuth/elevation (false)
 
 ## Outputs:
@@ -51,8 +53,13 @@ arma::uword quadriga_lib::icosphere(arma::uword n_div, dtype radius, arma::Mat<d
     if (n_div == 0)
         throw std::invalid_argument("Input 'n_div' cannot be 0.");
 
-    if (radius < dtype(0.0))
-        throw std::invalid_argument("Input 'radius' cannot be negative.");
+    if (!std::isfinite(radius) || radius <= dtype(0.0))
+        throw std::invalid_argument("Input 'radius' must be a finite positive number.");
+
+    // The largest output, 20 * n_div^2 faces with 9 values each, must fit into 64 bits
+    const arma::uword uword_max = std::numeric_limits<arma::uword>::max();
+    if (n_div > uword_max / n_div || n_div * n_div > uword_max / 180)
+        throw std::invalid_argument("Input 'n_div' is too large.");
 
     arma::uword n_faces = n_div * n_div * 20;
 

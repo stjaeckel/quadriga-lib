@@ -319,3 +319,18 @@ TEST_CASE("Plane - Invalid inputs")
     // location must have 0 or 3 elements
     CHECK_THROWS_AS(quadriga_lib::plane<double>({1.0}, {}, {5.0}), std::invalid_argument);
 }
+TEST_CASE("Plane - Negative scale keeps the +z normal")
+{
+    // A negative product of the x and y scales swaps the winding, so the normals stay +z before the rotation;
+    // the third scale element stays ignored
+    const double pi = arma::datum::pi;
+    for (const arma::vec &s : {arma::vec{-1.0, 1.0}, arma::vec{2.0, -0.5}, arma::vec{-1.0}, arma::vec{-1.0, -3.0},
+                               arma::vec{-1.0, 1.0, 5.0}, arma::vec{1.0, 1.0, -1.0}})
+        for (arma::uword n_div : {1, 4})
+        {
+            INFO("scale = " << s.t() << "n_div = " << n_div);
+            CHECK(normals_match(quadriga_lib::plane<double>(s, {}, {}, n_div), 0.0, 0.0, 1.0));
+            // Rx(pi/2) turns the normal to -y
+            CHECK(normals_match(quadriga_lib::plane<double>(s, {pi / 2.0, 0.0, 0.0}, {1.0, 2.0, 3.0}, n_div), 0.0, -1.0, 0.0, 1e-9));
+        }
+}

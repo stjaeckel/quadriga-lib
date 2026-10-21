@@ -26,6 +26,13 @@ class test_case(unittest.TestCase):
         self.assertEqual(length.shape, (20,))
         self.assertEqual(vert.shape, (20,9))
         self.assertEqual(direction.shape, (20,6))
+
+    def test_invalid_radius(self):
+        # The radius must be finite and positive
+        for r in (0.0, -1.0, float('nan'), float('inf')):
+            with self.subTest(radius=r):
+                with self.assertRaises(ValueError):
+                    RTtools.icosphere(1, r)
        
 if __name__ == '__main__':
     unittest.main()

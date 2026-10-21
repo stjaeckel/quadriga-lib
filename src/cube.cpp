@@ -15,7 +15,9 @@ Construct a triangulated cube mesh
 - Generates a Blender-style cube: a 2 x 2 x 2 box centered at the origin (vertices at +/-1) before scaling
 - Each of the 6 faces is split into 2 triangles, yielding 12 triangles at n_div = 1
 - Optional uniform subdivision produces 12 * n_div^2 triangles
-- Triangle winding is consistent (outward-facing normals), compatible with [[obj_file_write]]
+- Triangle winding is consistent (outward-facing normals), compatible with [[obj_file_write]]; a negative scale mirrors
+  the cube, and when the product of the scales is negative the winding is swapped so that the normals stay outward
+  (as Blender's "Apply Scale")
 - Scale, Euler rotation, and translation are applied in that order (scale -> rotate -> translate)
 
 ## Declaration:
@@ -120,6 +122,11 @@ arma::Mat<dtype> quadriga_lib::cube(const arma::vec &scale,
             pz[n] = dtype(R20 * x + R21 * y + R22 * z + lz);
         }
     }
+
+    // A negative product of the scales mirrors the mesh, which reverses the winding; swapping the second and third vertex
+    // restores it (as Blender's "Apply Scale")
+    if (sx * sy * sz < 0.0)
+        mesh.swap_cols(3, 6), mesh.swap_cols(4, 7), mesh.swap_cols(5, 8);
 
     return mesh;
 }

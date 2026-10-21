@@ -498,3 +498,65 @@ TEST_CASE("Quadriga tools - Point cloud split of identical points")
     for (int axis = 1; axis <= 3; ++axis)
         CHECK(quadriga_lib::point_cloud_split(&points, &pointsA, &pointsB, axis) == -axis);
 }
+
+TEST_CASE("Quadriga tools - Subdivision count too large")
+{
+    // n_div^2 wraps to 0 in 64 bits for n_div = 2^32; the output count must be checked before any allocation
+    arma::mat t = {{0, 0, 0, 1, 0, 0, 0, 1, 0}}, out;
+    CHECK_THROWS_AS(quadriga_lib::subdivide_triangles(1ULL << 32, &t, &out), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::subdivide_triangles(arma::uword(-1), &t, &out), std::invalid_argument);
+    CHECK(out.n_elem == 0);
+
+    // 2^60 * 9 values fit into 64 bits but not into memory: an allocation error, no crash
+    CHECK_THROWS(quadriga_lib::subdivide_triangles(1ULL << 30, &t, &out));
+
+    arma::mat center;
+    CHECK_THROWS_AS(quadriga_lib::icosphere<double>(1ULL << 32, 1.0, &center), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::icosphere<double>(arma::uword(-1), 1.0, &center), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::icosphere<double>(1ULL << 29, 1.0, &center), std::invalid_argument); // 20 * 2^58 * 9
+    CHECK(center.n_elem == 0);
+
+    CHECK_THROWS_AS(quadriga_lib::cube<double>({1.0}, {}, {}, 1ULL << 32), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::plane<double>({1.0}, {}, {}, 1ULL << 32), std::invalid_argument);
+}
+
+TEST_CASE("Quadriga tools - Subdivide triangles in place")
+{
+    arma::mat t = {{0, 0, 0, 1, 0, 0, 0, 1, 0}, {1, 2, 3, 4, 5, 7, -1, 0, 2}}, ref;
+    arma::uvec mtl = {3, 5}, mtl_ref;
+    quadriga_lib::subdivide_triangles(3, &t, &ref, &mtl, &mtl_ref);
+    REQUIRE(ref.n_rows == 18);
+
+    arma::mat t2 = t;
+    arma::uvec mtl2 = mtl;
+    arma::uword n = quadriga_lib::subdivide_triangles(3, &t2, &t2, &mtl2, &mtl2);
+    CHECK(n == 18);
+    CHECK(arma::approx_equal(t2, ref, "absdiff", 0.0));
+    CHECK(arma::all(mtl2 == mtl_ref));
+
+    // n_div = 1 keeps the size: the output is written into the input's memory
+    t2 = t, mtl2 = mtl;
+    const double *p = t2.memptr();
+    quadriga_lib::subdivide_triangles(1, &t2, &t2, &mtl2, &mtl2);
+    CHECK(t2.memptr() == p);
+    CHECK(arma::approx_equal(t2, t, "absdiff", 0.0));
+
+    // An invalid material list leaves the output untouched
+    arma::mat out(1, 1, arma::fill::value(9.0));
+    arma::uvec bad = {1, 2, 3};
+    CHECK_THROWS_AS(quadriga_lib::subdivide_triangles(2, &t, &out, &bad, &mtl2), std::invalid_argument);
+    CHECK(out.n_elem == 1);
+}
+
+TEST_CASE("Quadriga tools - Icosphere radius must be finite and positive")
+{
+    arma::mat center;
+    for (double r : {0.0, -1.0, (double)NAN, (double)INFINITY})
+    {
+        INFO("radius = " << r);
+        CHECK_THROWS_AS(quadriga_lib::icosphere<double>(1, r, &center), std::invalid_argument);
+    }
+    arma::fmat center_f;
+    CHECK_THROWS_AS(quadriga_lib::icosphere<float>(1, 0.0f, &center_f), std::invalid_argument);
+    CHECK(quadriga_lib::icosphere<double>(1, 1e-3, &center) == 20);
+}
