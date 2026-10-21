@@ -18,7 +18,8 @@ Construct a triangulated cube mesh
 - Optional uniform subdivision produces 12 · n_div^2 triangles
 - Triangle winding is consistent (outward-facing normals), compatible with obj_file_write
 - Scale, rotation, and translation are applied in that order (scale -> rotate -> translate)
-- An odd number of negative scale components flips the winding (inward-facing normals)
+- A negative scale mirrors the cube; when the product of the scales is negative, the winding is swapped so that
+  the normals stay outward (as Blender's "Apply Scale")
 
 ## Usage:
 ```
