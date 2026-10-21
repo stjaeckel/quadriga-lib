@@ -66,7 +66,7 @@ void qd_DFT_AVX2(const dtype *CFr,       // Channel coefficients, real part, Siz
                  const size_t n_ant,     // Number of MIMO sub-links
                  const size_t n_path,    // Number multipath components
                  const bool planar_wave, // Indicator that same delays are used for all antennas
-                 const double *freq,     // Carrier frequencies -bandwidth * pilot_grid in [Hz], aligned to 32 byte, Size [ n_carrier ]
+                 const double *freq,     // Carrier frequencies -bandwidth * pilot_grid in [Hz], Size [ n_carrier ] (no alignment needed)
                  const size_t n_carrier, // Number of carriers, mutiple of 8
                  float *Hr,              // Channel matrix, real part, Size [ n_carrier, n_ant ]
                  float *Hi);             // Channel matrix, imaginary part, Size [ n_carrier, n_ant ]

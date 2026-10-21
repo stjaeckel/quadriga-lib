@@ -265,3 +265,53 @@ TEST_CASE("Baseband Frequency Response - Delays up to 10 s against a double-prec
                 CHECK(std::isnan(hn(k).real()));
     }
 }
+
+TEST_CASE("Baseband Frequency Response - Carrier counts that are not a multiple of 8, unaligned buffers")
+{
+    // 7, 13 and 1021 carriers (padding path of the AVX2 kernel; the internal buffers are ordinary, unaligned
+    // allocations), float and double, the three output forms, and a call without outputs
+    const double B = 2.0e7;
+    arma::uword n_rx = 3, n_tx = 2, n_path = 5, n_ant = n_rx * n_tx;
+    arma::cube cr(n_rx, n_tx, n_path), ci(n_rx, n_tx, n_path), dl(n_rx, n_tx, n_path);
+    for (arma::uword i = 0; i < cr.n_elem; ++i)
+        cr(i) = std::cos(0.37 * (double)i), ci(i) = std::sin(0.91 * (double)i), dl(i) = 1.0e-7 * (double)(i % 17) + 3.0e-9;
+
+    for (arma::uword n_carrier : {7ULL, 13ULL, 1021ULL})
+    {
+        arma::vec pg = arma::linspace<arma::vec>(0.0, 1.0, n_carrier);
+        arma::cube hr, hi;
+        arma::cx_cube h;
+        quadriga_lib::baseband_freq_response<double>(&cr, &ci, &dl, &pg, B, &hr, &hi, &h);
+        REQUIRE(h.n_slices == n_carrier);
+        REQUIRE(hr.n_slices == n_carrier);
+        CHECK(arma::approx_equal(hr, arma::cube(arma::real(h)), "absdiff", 0.0));
+        CHECK(arma::approx_equal(hi, arma::cube(arma::imag(h)), "absdiff", 0.0));
+
+        double err = 0.0;
+        for (arma::uword k = 0; k < n_carrier; ++k)
+            for (arma::uword a = 0; a < n_ant; ++a)
+            {
+                std::complex<double> ref(0.0, 0.0);
+                for (arma::uword p = 0; p < n_path; ++p)
+                {
+                    double x = (-B * pg(k)) * dl(a + p * n_ant);
+                    x -= std::round(x);
+                    ref += std::complex<double>(cr(a + p * n_ant), ci(a + p * n_ant)) * std::polar(1.0, 2.0 * arma::datum::pi * x);
+                }
+                err = std::max(err, std::abs(h(a + k * n_ant) - ref));
+            }
+        INFO("n_carrier = " << n_carrier);
+        CHECK(err < 2.0e-6);
+
+        // Float inputs with the same carrier count
+        arma::fcube crf = arma::conv_to<arma::fcube>::from(cr), cif = arma::conv_to<arma::fcube>::from(ci);
+        arma::fcube dlf = arma::conv_to<arma::fcube>::from(dl), hrf;
+        arma::fvec pgf = arma::conv_to<arma::fvec>::from(pg);
+        quadriga_lib::baseband_freq_response<float>(&crf, &cif, &dlf, &pgf, B, &hrf, nullptr);
+        REQUIRE(hrf.n_slices == n_carrier);
+        CHECK(hrf.is_finite());
+
+        // No output requested: returns without computing
+        quadriga_lib::baseband_freq_response<double>(&cr, &ci, &dl, &pg, B, nullptr, nullptr, nullptr);
+    }
+}
