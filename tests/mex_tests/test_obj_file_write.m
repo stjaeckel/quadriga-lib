@@ -371,6 +371,18 @@ assert_cpp_error( @() quadriga_lib.obj_file_write( fn, [], [], [], [], [], vert_
 assertTrue( exist(fn,'file') ~= 2 );
 assertTrue( exist('cube.txt','file') ~= 2 );
 
+%% Faces without material (mtl_ind = 0) after a face with material read back as 0
+tri3 = [ 0 0 0 1 0 0 0 1 0; 5 0 0 6 0 0 5 1 0; 9 0 0 10 0 0 9 1 0 ];
+quadriga_lib.obj_file_write( fn, tri3, [1;1;1], [1;0;2], {'box'}, {'itu_wood', 'itu_glass'} );
+assertEqual( sum( strcmp( read_lines(fn), 'usemtl (null)' ) ), 1 );
+[ ~, ~, ~, ~, ~, mtl_ind_rd, mtl_names_rd, bsdf_rd, csv_ind_rd ] = quadriga_lib.obj_file_read( fn );
+assertEqual( mtl_ind_rd, uint64([1;0;2]) );
+assertEqual( mtl_names_rd, {'itu_wood'; 'itu_glass'} );
+assertEqual( size(bsdf_rd, 1), 2 );
+assertEqual( csv_ind_rd(2), uint64(0) );
+assertTrue( csv_ind_rd(1) ~= 0 && csv_ind_rd(3) ~= 0 );
+delete(fn); delete(mtl_fn);
+
 if exist(fn,'file');         delete(fn);         end
 if exist(mtl_fn,'file');     delete(mtl_fn);     end
 if exist(csv_fn,'file');     delete(csv_fn);     end

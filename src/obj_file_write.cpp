@@ -318,6 +318,10 @@ Write a triangulated Wavefront .obj (and .mtl) file
   follows the welded vertex list, so unwelded input geometry yields one part per face
 - Without `mtl_ind`: no `usemtl` tags and no `.mtl` file are written. With `mtl_ind`, each face carries a
   1-based material index (0 = no material, leaving that face unassigned); pass `mtl_ind = nullptr` to omit materials entirely
+- A face with `mtl_ind = 0` that follows a face with a material in the same object (or part) is preceded by
+  `usemtl (null)`, which [[obj_file_read]] reads back as 0; the `.mtl` gets no `(null)` entry. Face order and objects
+  are unchanged. A material named `(null)` that is used by a face is therefore rejected (`std::invalid_argument`);
+  unused entries of `mtl_names` may carry the name
 - The `.mtl` (named after the `.obj`) lists each used material; values default to a gray material when `bsdf` is omitted
 - Duplicate entries in `mtl_names` are merged into one `.mtl` entry if their `bsdf` rows are identical (or if `bsdf`
   is omitted); duplicates with differing `bsdf` rows are disambiguated as `name.001`, `name.002`, ...
@@ -462,6 +466,11 @@ void quadriga_lib::obj_file_write(const std::string &fn,
             throw std::invalid_argument("'mtl_names' is missing or too short for the given 'mtl_ind'.");
         if (bsdf != nullptr && (bsdf->n_cols != 17 || bsdf->n_rows < n_mtl))
             throw std::invalid_argument("Input 'bsdf' must have 17 columns and one row per material.");
+
+        // "(null)" marks faces without material in the written file (see below); a used material cannot carry it
+        for (arma::uword i = 0; i < n_mtl; ++i)
+            if ((*mtl_names)[i] == "(null)" && arma::any(*mtl_ind == i + 1))
+                throw std::invalid_argument("Material name '(null)' is reserved for faces without material; rename it.");
     }
     else if (bsdf != nullptr)
         throw std::invalid_argument("'bsdf' requires 'mtl_ind' and 'mtl_names'.");
@@ -750,6 +759,7 @@ void quadriga_lib::obj_file_write(const std::string &fn,
 
         // Faces; emit usemtl on material change (reset per object, like the reader)
         // Compared by written name, so merged duplicates do not emit a redundant tag
+        // A face without material after one with material gets "usemtl (null)", which the reader maps back to 0
         std::string last_mtl_name;
         bool have_last_mtl = false;
         for (arma::uword ii = bf; ii < bg; ++ii)
@@ -757,6 +767,7 @@ void quadriga_lib::obj_file_write(const std::string &fn,
             const arma::uword i = face_order[ii];
 
             if (write_materials)
+            {
                 if (const arma::uword m = mtlid(i); m != NO_MTL)
                 {
                     const std::string &mname = mtl_out_name.at(m);
@@ -767,6 +778,12 @@ void quadriga_lib::obj_file_write(const std::string &fn,
                         have_last_mtl = true;
                     }
                 }
+                else if (have_last_mtl)
+                {
+                    obj << "usemtl (null)\n";
+                    have_last_mtl = false;
+                }
+            }
 
             const arma::uword a = offset + remap[FI.at(i, 0)] + 1;
             const arma::uword b = offset + remap[FI.at(i, 1)] + 1;

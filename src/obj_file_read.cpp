@@ -15,6 +15,7 @@
 #include <filesystem>
 #include <cstdio>
 #include <cmath>
+#include <climits>
 
 // Built-in EM/acoustic material table (Rec. ITU-R P.2040-3; irr_glass: 3GPP TR 38.901 V17.0.0, Table 7.4.3-1).
 // Stored as a CSV literal so it is parsed through the exact same path as a user-supplied CSV file.
@@ -66,6 +67,44 @@ static inline std::string trim_ws(const std::string &s)
         return std::string();
     size_t e = s.find_last_not_of(" \t\r\n");
     return s.substr(b, e - b + 1);
+}
+
+// Remove a trailing '\r' (files with Windows line endings read on Linux / macOS)
+static inline void strip_cr(std::string &line)
+{
+    if (!line.empty() && line.back() == '\r')
+        line.pop_back();
+}
+
+// Parse the vertex references of a face line "f r1 r2 r3 ...". A reference is "v", "v/vt", "v//vn" or "v/vt/vn";
+// v is a 1-based index, negative values count back from the last vertex defined before the line (OBJ relative
+// indices); the texture / normal parts are skipped. Reads at most 4 references and stops at the first token that
+// does not start with an integer. A reference is stored as magnitude (saturated, so any overlong value stays out of
+// range) and sign. Returns the number of references read.
+static inline int parse_face_refs(const char *s, unsigned long long *mag, bool *neg)
+{
+    int n = 0;
+    ++s; // 'f'
+    while (n < 4)
+    {
+        while (*s == ' ' || *s == '\t')
+            ++s;
+        neg[n] = (*s == '-');
+        if (*s == '-' || *s == '+')
+            ++s;
+        if (*s < '0' || *s > '9')
+            break;
+        unsigned long long v = 0;
+        for (; *s >= '0' && *s <= '9'; ++s)
+            v = (v < 100000000000000000ULL) ? 10ULL * v + (unsigned long long)(*s - '0') : ULLONG_MAX;
+        mag[n++] = v;
+        if (*s == '/') // texture / normal references
+            while (*s == '/' || *s == '-' || *s == '+' || (*s >= '0' && *s <= '9'))
+                ++s;
+        if (*s != ' ' && *s != '\t')
+            break; // end of line or a trailing token that is not a reference
+    }
+    return n;
 }
 
 // Split a CSV line into trimmed cells.
@@ -249,9 +288,9 @@ static void read_mtl_bsdf(const std::filesystem::path &obj_file, const std::stri
 
         std::string line;
 
-        // Find "newmtl <name>"
+        // Find "newmtl <name>" (the name compared without surrounding whitespace, like the "usemtl" names)
         while (std::getline(fileR, line))
-            if (line.rfind("newmtl ", 0) == 0 && line.substr(7) == names[i_mtl])
+            if (line.rfind("newmtl ", 0) == 0 && trim_ws(line.substr(7)) == names[i_mtl])
             {
                 any_found = true;
                 break;
@@ -260,6 +299,7 @@ static void read_mtl_bsdf(const std::filesystem::path &obj_file, const std::stri
         // Scan until the next "newmtl " or EOF
         while (std::getline(fileR, line))
         {
+            strip_cr(line);
             if (line.rfind("newmtl ", 0) == 0)
                 break;
 
@@ -393,13 +433,20 @@ SECTION!*/
 # obj_file_read
 Read a Wavefront `.obj` file and extract geometry, visual materials, and EM/acoustic materials
 
-- Parses a triangulated `.obj`; quads and n-gons are rejected. Two independent material systems are returned:
+- Parses a triangulated `.obj`; quads and n-gons are rejected. Face references may be `v`, `v/vt`, `v//vn` or
+  `v/vt/vn`; a negative (relative) index counts back from the last vertex defined before the face line (`-1` = that
+  vertex). Index 0, or an index beyond the vertices defined before the face, throws `std::invalid_argument`. The file is
+  parsed and validated for any combination of requested outputs, also when no output is requested.
+- Lines may end in LF or CRLF (`.obj`, `.mtl` and material CSV).
+- Two independent material systems are returned:
   - Visual side, from the companion `.mtl`: `mtl_ind`, `mtl_names` (raw `usemtl` names), and `bsdf`.
   - EM/acoustic side, from a material table (`fn_csv`, or a built-in ITU-R P.2040 default): `csv_ind`,`csv_names`, `csv_prop`.
 - A face's `usemtl` name is matched to the table by exact name, then by name with a trailing Blender
   `.NNN` suffix removed. Unmatched names throw when `csv_strict = true`; otherwise they map to index 0
   (no material). The two index spaces are decoupled, so several visual
   materials (e.g. `wall.001`, `wall.002`) may resolve to a single EM material.
+- `usemtl (null)` (written by [[obj_file_write]]) marks the following faces as having no material: index 0 in `mtl_ind`
+  and `csv_ind` (also with `csv_strict`); `(null)` is not listed in `mtl_names` or `bsdf`.
 - Geometry indices (`face_ind`, `obj_ind`) are 0-based. Material indices (`mtl_ind`, `csv_ind`) are
   1-based, with 0 reserved for the outside / no-material state (faces with no assigned material;
   for `csv_ind` in non-strict mode, also materials absent from the table).
@@ -538,14 +585,17 @@ arma::uword quadriga_lib::obj_file_read(const std::string &fn_obj, arma::Mat<dty
     {
         std::string line;
         while (std::getline(fileR, line))
+        {
+            strip_cr(line);
             if (line.length() > 2 && line[0] == 'v' && line[1] == ' ')
                 ++n_vert;
             else if (line.length() > 2 && line[0] == 'f' && line[1] == ' ')
                 ++n_faces;
+        }
     }
 
-    // Empty / degenerate mesh -> empty geometry; table outputs still valid
-    if (n_vert == 0 || n_faces == 0)
+    // No faces -> empty geometry; table outputs still valid (faces without vertices fail in the parse below)
+    if (n_faces == 0)
     {
         empty_geometry_outputs();
         if (want_csv_table)
@@ -556,10 +606,7 @@ arma::uword quadriga_lib::obj_file_read(const std::string &fn_obj, arma::Mat<dty
         return 0;
     }
 
-    // Count-only fast path: nothing requested
-    const bool any_output = mesh || vert_list || face_ind || obj_ind || obj_names || mtl_ind || mtl_names || bsdf || want_csv_table;
-    if (!any_output)
-        return n_faces;
+    // Without outputs the parse below still runs: it validates the faces (index range, triangles)
 
     // Load the material table now if any csv output is requested (needed for csv_ind resolution)
     if (want_csv_table)
@@ -666,12 +713,13 @@ arma::uword quadriga_lib::obj_file_read(const std::string &fn_obj, arma::Mat<dty
     bool have_obj = false;
     arma::uword cur_mtl = 0;
     arma::uword cur_csv = 0;
-    bool simple_face_format = true;
     std::string mtllib_fn;
     std::string line;
 
     while (std::getline(fileR, line))
     {
+        strip_cr(line);
+
         // mtllib reference (used later to locate the .mtl file)
         if (line.rfind("mtllib ", 0) == 0)
         {
@@ -696,25 +744,30 @@ arma::uword quadriga_lib::obj_file_read(const std::string &fn_obj, arma::Mat<dty
             continue;
         }
 
-        // Face "f " (1-based indices in the file)
+        // Face "f " (1-based or negative relative indices in the file)
         if (line.length() > 2 && line[0] == 'f' && line[1] == ' ')
         {
             if (i_face >= n_faces)
                 throw std::invalid_argument("Error reading face data in '" + fn_obj + "'.");
 
-            unsigned long long a = 0, b = 0, c = 0, d = 0;
-            if (simple_face_format)
-            {
-                std::sscanf(line.c_str(), "f %llu %llu %llu %llu", &a, &b, &c, &d);
-                simple_face_format = (b != 0);
-            }
-            if (!simple_face_format)
-                std::sscanf(line.c_str(), "f %llu%*[/0-9] %llu%*[/0-9] %llu%*[/0-9] %llu", &a, &b, &c, &d);
-
-            if (a == 0 || b == 0 || c == 0)
+            unsigned long long mag[4];
+            bool neg[4];
+            const int n_ref = parse_face_refs(line.c_str(), mag, neg);
+            if (n_ref < 3)
                 throw std::invalid_argument("Error reading face data in '" + fn_obj + "'.");
-            if (d != 0)
+            if (n_ref > 3)
                 throw std::invalid_argument("Mesh in '" + fn_obj + "' is not triangulated (quads/n-gons unsupported).");
+
+            // 0-based vertex index; index 0 and indices beyond the vertices defined so far are invalid
+            arma::uword abc[3];
+            for (int k = 0; k < 3; ++k)
+            {
+                if (mag[k] == 0 || mag[k] > (unsigned long long)i_vert)
+                    throw std::invalid_argument("Error reading face data in '" + fn_obj + "': face " + std::to_string(i_face + 1) +
+                                                " references a vertex that is 0 or beyond the " + std::to_string(i_vert) +
+                                                " vertices defined before it.");
+                abc[k] = neg[k] ? i_vert - (arma::uword)mag[k] : (arma::uword)mag[k] - 1;
+            }
 
             // Assign material (lazily create a "default" entry for faces before any usemtl)
             if (p_mtl != nullptr)
@@ -734,9 +787,9 @@ arma::uword quadriga_lib::obj_file_read(const std::string &fn_obj, arma::Mat<dty
 
             if (need_face)
             {
-                p_face[i_face] = (arma::uword)a - 1;
-                p_face[i_face + n_faces] = (arma::uword)b - 1;
-                p_face[i_face + 2 * n_faces] = (arma::uword)c - 1;
+                p_face[i_face] = abc[0];
+                p_face[i_face + n_faces] = abc[1];
+                p_face[i_face + 2 * n_faces] = abc[2];
             }
             ++i_face;
             continue;
@@ -755,9 +808,16 @@ arma::uword quadriga_lib::obj_file_read(const std::string &fn_obj, arma::Mat<dty
         }
 
         // Material "usemtl " (defines the material for the following faces)
+        // "usemtl (null)" (written by obj_file_write) marks the following faces as having no material
         if (line.rfind("usemtl ", 0) == 0)
         {
             std::string raw = trim_ws(line.substr(7));
+            if (raw == "(null)")
+            {
+                cur_mtl = 0;
+                cur_csv = 0;
+                continue;
+            }
             if (collect_mtl)
                 cur_mtl = intern_mtl(raw) + 1; // 1-based; 0 = no material
             if (csv_ind != nullptr)
@@ -779,10 +839,7 @@ arma::uword quadriga_lib::obj_file_read(const std::string &fn_obj, arma::Mat<dty
         dtype *p_mesh = mesh->memptr();
         for (arma::uword n = 0; n < n_faces; ++n)
         {
-            arma::uword a = p_face[n], b = p_face[n + n_faces], c = p_face[n + 2 * n_faces];
-            if (a >= n_vert || b >= n_vert || c >= n_vert)
-                throw std::invalid_argument("Error assembling triangle mesh from '" + fn_obj + "'.");
-
+            arma::uword a = p_face[n], b = p_face[n + n_faces], c = p_face[n + 2 * n_faces]; // checked in the parse
             p_mesh[n] = p_vert[a];
             p_mesh[n + n_faces] = p_vert[a + n_vert];
             p_mesh[n + 2 * n_faces] = p_vert[a + 2 * n_vert];
