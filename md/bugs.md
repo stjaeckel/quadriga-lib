@@ -34,7 +34,7 @@ How to read the items:
 ## Summary table
 
 Items: 123 (S1: 5, S2: 31, S3: 68, S4: 19); B-119 to B-123 were found during the fixes (WP-02, WP-04, WP-07).
-Status: open: 23, fixed: 91, partly fixed: 1, won't fix: 1, documented: 7 (after WP-13).
+Status: open: 17, fixed: 96, partly fixed: 2, won't fix: 1, documented: 7 (after WP-14).
 
 | ID | Title | Area | Kind | Severity | Mark | Status |
 |---|---|---|---|---|---|---|
@@ -55,7 +55,7 @@ Status: open: 23, fixed: 91, partly fixed: 1, won't fix: 1, documented: 7 (after
 | [B-015](#b-015) | `hdf5_write` copies 256 bytes from the channel name: heap memory ends up in the file; names of 256+ characters over-read on reading | B channel, file I/O | 1 defect | S2 | [R] | fixed (WP-02) |
 | [B-016](#b-016) | `qrt_file_read` (C++) fills `aod`, `eod`, `aoa`, `eoa` only when `path_gain` or `path_length` is also requested | B channel, file I/O | 1 defect | S2 | [R] | fixed (WP-01) |
 | [B-017](#b-017) | `qrt_file_append` corrupts the file when a CIR orientation is non-zero in double but rounds to 0 in float | B channel, file I/O | 1 defect | S2 | [R] | fixed (WP-07) |
-| [B-018](#b-018) | OBJ round trip loses "no material": faces with `mtl_ind = 0` inherit the previous material | B channel, file I/O | 1 defect | S2 | [R] | open |
+| [B-018](#b-018) | OBJ round trip loses "no material": faces with `mtl_ind = 0` inherit the previous material | B channel, file I/O | 1 defect | S2 | [R] | fixed (WP-14) |
 | [B-019](#b-019) | `baseband_freq_response_multi` gives wrong phases for `get_channels_*` output with the default relative delays | C channel gen., tools | 1 defect | S2 | [R] | documented (WP-04) |
 | [B-020](#b-020) | `baseband_freq_response`: phase computed in single precision, error grows with delay × bandwidth (both builds) | C channel gen., tools | 1 defect | S2 | [R] | fixed (WP-04) |
 | [B-021](#b-021) | IEEE indoor model: `n_floors > 0` shifts all tap delays (3-D path length minus 2-D distance) | C channel gen., tools | 1 defect | S2 | [R] | fixed (WP-11) |
@@ -93,9 +93,9 @@ Status: open: 23, fixed: 91, partly fixed: 1, won't fix: 1, documented: 7 (after
 | [B-053](#b-053) | `hdf5_read_dset` returns a variable-length string as 8 bytes of a heap pointer, and leaks it | B channel, file I/O | 1 defect | S3 | [R] | fixed (WP-02) |
 | [B-054](#b-054) | `quantize_delays` builds dense vectors over the absolute delay range: a 20 ms offset makes it 4000 times slower | B channel, file I/O | 4 performance | S3 | [M] | fixed (WP-03) |
 | [B-055](#b-055) | `quantize_delays` gives wrong results when the outputs alias the inputs (undocumented) | B channel, file I/O | 1 defect | S3 | [R] | fixed (WP-03) |
-| [B-056](#b-056) | `mitsuba_xml_file_write` is quadratic in the number of vertices per object | B channel, file I/O | 4 performance | S3 | [M] | open |
-| [B-057](#b-057) | OBJ reader: CRLF `.mtl` files lose their materials; face indices unchecked when only `face_ind` is requested; no-output call skips validation | B channel, file I/O | 1 defect | S3 | [R] | open |
-| [B-058](#b-058) | `write_png`: constant, NaN or inverted-range data trigger a NaN-to-integer cast and all pixels get the last colour; an empty matrix writes an invalid PNG | B channel, file I/O | 1 defect | S3 | [R] | open |
+| [B-056](#b-056) | `mitsuba_xml_file_write` is quadratic in the number of vertices per object | B channel, file I/O | 4 performance | S3 | [M] | fixed (WP-14) |
+| [B-057](#b-057) | OBJ reader: CRLF `.mtl` files lose their materials; face indices unchecked when only `face_ind` is requested; no-output call skips validation | B channel, file I/O | 1 defect | S3 | [R] | fixed (WP-14) |
+| [B-058](#b-058) | `write_png`: constant, NaN or inverted-range data trigger a NaN-to-integer cast and all pixels get the last colour; an empty matrix writes an invalid PNG | B channel, file I/O | 1 defect | S3 | [R] | fixed (WP-14) |
 | [B-059](#b-059) | `channel::add_paths` accepts inconsistent counts and leaves an invalid object; `qrt_file_read` accepts any `normalize_M` | B channel, file I/O | 1 defect | S3 | [R] | fixed (WP-07) |
 | [B-060](#b-060) | Channel and file-I/O header comments contradict the code (index bases, `calc_effective_path_gain` "average", `normalize_M` column power) | B channel, file I/O | 2 doc | S3 | [R, C] | open |
 | [B-061](#b-061) | `combine_irs_coord`: no shape check on `interact_coord_1/2`, heap over-read | C channel gen., tools | 1 defect | S3 | [R] | fixed (WP-13) |
@@ -141,7 +141,7 @@ Status: open: 23, fixed: 91, partly fixed: 1, won't fix: 1, documented: 7 (after
 | [B-101](#b-101) | `arrayant::copy_element` ignores `read_only`; an empty destination gives an Armadillo-internal error | A arrayant | 1 defect | S4 | [R] | fixed (WP-09) |
 | [B-102](#b-102) | Arrayant documentation typos and misleading statements; latent int32 offsets and a vertex sentinel (grouped) | A arrayant | 2 doc | S4 | [C] | open |
 | [B-103](#b-103) | `quantize_delays` docs: `fix_taps` 1 and 2 give `[1, 1, n_taps]` delays only for shared input | B channel, file I/O | 2 doc | S4 | [R] | fixed (WP-03) |
-| [B-104](#b-104) | Channel and file-I/O documentation and message nits (grouped) | B channel, file I/O | 2 doc | S4 | [R, C] | open |
+| [B-104](#b-104) | Channel and file-I/O documentation and message nits (grouped) | B channel, file I/O | 2 doc | S4 | [R, C] | partly fixed (WP-14) |
 | [B-105](#b-105) | `memcpy` with a null pointer and size 0 (formal UB) in `get_channels_irs` and in the Python list adapter | C channel gen., tools | 1 defect | S4 | [R] | fixed (WP-01) |
 | [B-106](#b-106) | Docs and code of `path_to_tube`, `qd_path` and `calc_diffraction_gain` debug output disagree (grouped) | C channel gen., tools | 2 doc | S4 | [R, C] | open |
 | [B-107](#b-107) | `interp`: a NaN query returns the first data value; clamped extrapolation is undocumented | D geometry, math | 2 doc | S4 | [R] | fixed (WP-13) |
@@ -159,7 +159,7 @@ Status: open: 23, fixed: 91, partly fixed: 1, won't fix: 1, documented: 7 (after
 | [B-119](#b-119) | Crafted HDF5 files make HDF5 1.14.6 itself zero-fill about 4 GB in `H5Fopen` or request a 2^64-byte allocation in `H5Gopen2` (upstream, not quadriga-lib code) | B channel, file I/O | 1 defect | S4 | [R] | won't fix (upstream HDF5) |
 | [B-120](#b-120) | `calc_cross_polarization_ratio`: the circular XPR columns report 0 (fully cross-polar) for the LOS matrix that `get_channels_*` treats as co-polar, and are defined per transmit polarisation while the linear columns are per receive polarisation | C channel gen., tools | 1 defect | S3 | [R] | fixed (WP-13) |
 | [B-121](#b-121) | Test defect: `test_bin` is compiled without `BUILD_WITH_AVX2`, so the AVX2-vs-generic cases of the ray-triangle and ray-point kernel tests never run | D geometry, math | 1 defect | S3 | [R] | fixed (WP-12) |
-| [B-122](#b-122) | `qrt_file_read_raw` is quadratic in the number of paths per origin (`reserve` per CIR): 240 000 paths take 7.5 s | B channel, file I/O | 4 performance | S3 | [M] | open |
+| [B-122](#b-122) | `qrt_file_read_raw` is quadratic in the number of paths per origin (`reserve` per CIR): 240 000 paths take 7.5 s | B channel, file I/O | 4 performance | S3 | [M] | fixed (WP-14) |
 | [B-123](#b-123) | MEX and Python `qrt_file_read` build a 2^32-entry index vector (34 GB) for a valid file with 0 CIRs | F MEX layer | 1 defect | S3 | [R] | open |
 
 ## Baseline
@@ -227,6 +227,9 @@ miscompilation by the LAF split-compare passes, not a library defect. The campai
 | after WP-12: ASan + UBSan, gate | ASan + UBSan all passed, only the excluded `ray_progress` reports; `[wave]` 165594 / 181 and `[acoustic]` 42741 / 60 in both builds (worker's runs; Octave MEX 66 of 67, pytest 797 passed, 1 skipped) | - | - |
 | after WP-13: base | `All tests passed (1348300 assertions in 1269 test cases)` (manager; generic `1346518 / 1268`, also manager) | 40 s (12 threads) | 1.3 / 2.8 |
 | after WP-13: ASan + UBSan, gate | ASan + UBSan all passed, only the excluded `ray_progress` reports; `[wave]` 165594 / 181 and `[acoustic]` 42741 / 60 in both builds (worker's runs; Octave MEX 66 of 67, pytest 799 passed, 1 skipped) | - | - |
+| after the merge with main (2026-10-21, f0d093d) | `All tests passed (1346180 assertions in 1265 test cases)`, generic `1344398 / 1264`; `[wave]` 163474 / 178, `[acoustic]` 42741 / 59 in both builds (manager, temporary worktree; includes the acoustic session's test cleanup; Octave MEX 66 of 67, pytest 799 passed, 1 skipped) | - (12 threads) | 2.2 / 6.2 |
+| after WP-14: base | `All tests passed (1346416 assertions in 1273 test cases)` (manager, round 2; round 1: 1346411 / 1272) | 40 s (12 threads) | 3.3 / 2.6 |
+| after WP-14: generic, ASan + UBSan, gate | generic `1344629 / 1271`; ASan + UBSan all passed, only the excluded `ray_progress` reports; `[wave]` 163474 / 178 and `[acoustic]` 42741 / 59 in both builds (worker's runs; Octave MEX 66 of 67, pytest 801 passed, 1 skipped; OBJ / MTL / CSV AFL 15 min each: no crash, no hang, 2613 inputs replayed, slowest 0.034 s) | - | - |
 
 Run commands: `flock /tmp/quadriga-fixes-suite.lock build_linux/test_bin` (output
 `build_linux/scratch/hunt/base_test.txt`); the sanitizer runs with
@@ -311,6 +314,12 @@ they compare runs, not files. The QRT throughput is low because inputs make the 
 clear very large arrays (see the item). The HDF5 crashes all reduce to heap-buffer-overflow writes by
 `H5Dread` into buffers that `hdf5_read_channel` sized from attributes (`qd_channel_hdf5.cpp:1838/1839`
 and `1880/1881`); the HDF5 library itself is not instrumented and was not the target. HDF5: B-013; QRT: B-048.
+
+Note after WP-14: with the WP-14 OBJ reader, the `fz_mtl` and `fz_csv` harnesses built at `-O2` crash on every valid
+seed in AFL's own coverage-counter increment (a garbage guard index, inside `arma::Mat::init_warm` called from
+`obj_file_read`, the site of the LAF note above); gcc ASan + UBSan, plain clang -O3 ASan and clang with
+`trace-pc-guard` are clean. Build the harness TUs with `-O1` (the library keeps `-O3`); evidence in
+`build_linux/scratch/fix/WP-14/afl/dbg/`.
 
 ## Coverage
 
@@ -2060,7 +2069,7 @@ build_linux/scratch/hunt/final/B-007/p11_v6.qrt: version 6, no_orig 3, no_cir 3,
 
 ## B-018: OBJ round trip loses "no material": faces with `mtl_ind = 0` inherit the previous material
 
-- Status: open
+- Status: fixed (WP-14): a no-material face after a material face in the same object is written after `usemtl (null)`, which the reader maps back to 0; face order and objects unchanged; a used material named `(null)` is rejected by the writer (round 2)
 - Severity: S2, because writing and reading a mesh changes its materials without an error whenever a face without material follows one with material.
 - Kind: wrong result (writer data loss)
 - Mark: [R]
@@ -5100,7 +5109,7 @@ aliased outputs:  coeff_re taps = 0 0.5 0.5 0.32 0.68
 
 ## B-056: `mitsuba_xml_file_write` is quadratic in the number of vertices per object
 
-- Status: open
+- Status: fixed (WP-14): one-pass vertex map and per-object face buckets, output byte-identical; 80 000 faces 0.02 s instead of 5.9 s
 - Severity: S3, because it is a clear performance defect: 80 000 faces take 5.9 s (and 4× the faces take about 15× the time).
 - Kind: performance
 - Mark: [M]
@@ -5189,7 +5198,7 @@ load after: 1.57 5.03 7.95 1/2779 713700
 
 ## B-057: OBJ reader: CRLF `.mtl` files lose their materials; face indices unchecked when only `face_ind` is requested; no-output call skips validation
 
-- Status: open
+- Status: fixed (WP-14): CR stripped from every OBJ / MTL line; own face parser with relative (negative) indices; every index checked for every output combination (also against the vertices defined before the face); the no-output call validates the whole file
 - Severity: S3, because invalid or Windows-style input is accepted with wrong results (materials missing, out-of-range or wrapped indices) instead of being read correctly or rejected.
 - Kind: wrong result / invalid input accepted
 - Mark: [R]
@@ -5311,7 +5320,7 @@ Output of the phase-2 re-run (`bash run.sh`):
 
 ## B-058: `write_png`: constant, NaN or inverted-range data trigger a NaN-to-integer cast and all pixels get the last colour; an empty matrix writes an invalid PNG
 
-- Status: open
+- Status: fixed (WP-14): degenerate ranges and NaN give the first colour, +-Inf clipped, inverted user range and empty matrix throw
 - Severity: S3, because edge input gives a wrong image (all maximum colour, also for log input that the docs map to the minimum colour), undefined behaviour, or an undecodable file, without an error.
 - Kind: wrong result / UB
 - Mark: [R] (UBSan as a what-if: the unchanged `src/write_png.cpp` compiled into the probe with `-fsanitize=undefined,float-cast-overflow`)
@@ -8388,7 +8397,7 @@ per-antenna input, fix_taps=2: delay_quant size 2x2x6
 
 ## B-104: Channel and file-I/O documentation and message nits (grouped)
 
-- Status: open
+- Status: partly fixed (WP-14): point 5 (closing quote of the write_png message) fixed; the other points remain (WP-17)
 - Severity: S4, because these are cosmetic or minor documentation mismatches.
 - Kind: doc
 - Mark: [R] for items 2 and 6 (shown in the outputs of B-057 line (f) and B-056), [C] for the rest
@@ -9711,7 +9720,7 @@ RPI Internal - Dense Grid (AVX2 vs GENERIC): test cases: 1 | 1 passed assertions
 
 ## B-122: `qrt_file_read_raw` is quadratic in the number of paths per origin (`reserve` per CIR): 240 000 paths take 7.5 s
 
-- Status: open
+- Status: fixed (WP-14): geometric growth of the output; linear scaling
 - Severity: S3, because reading the raw paths of a large ray-tracing result takes seconds to minutes where linear time would take milliseconds; results are correct.
 - Kind: performance
 - Mark: [M] (found and measured by the WP-07 worker, 2026-10-19; details and timings in `md/fix_logs/WP-07.md`, "Found on the way")
