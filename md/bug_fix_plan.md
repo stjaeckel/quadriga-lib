@@ -481,7 +481,7 @@ unexpected changes in the diff; proposed `md/bugs.md` updates; anything the next
 | WP-09 | 9 | done 2026-10-20 (9 of 9 fixed; interpolation 0.99-1.02 of old) | 098b8c7 |
 | WP-10 | 7 | done 2026-10-20 (6 fixed, B-041 documented; 3 rounds: qdant precision single-equivalent relative to the element peak) | d0f4a31 |
 | WP-11 | 5 | done 2026-10-20 (4 fixed, B-065 partly; downlink Doppler sign flipped; publication checked, 14 tests) | 9d3148d |
-| WP-12 | 12 | done 2026-10-21 (12 of 12 fixed; B-108 point 3 also; double AVX2 ray-triangle kernel 0.82 of old, all others 0.95-1.00) | see 8a |
+| WP-12 | 12 | done 2026-10-21 (12 of 12 fixed; B-108 point 3 also; double AVX2 ray-triangle kernel 0.82 of old, all others 0.95-1.00) | 7bba69d (kernel tests), db31293 (ray-triangle), 4516f8e (ray-point), ee658ed (obj_overlap_test), ab407ec (mesh generators), 437dada (notes) |
 | WP-13 | 10 | open | - |
 | WP-14 | 5 | open | - |
 | WP-15 | 10 | open | - |
@@ -533,8 +533,8 @@ root (relative data paths). The library and tests deliberately link no BLAS/LAPA
 `svd` and similar.
 
 WP-12 (2026-10-21): done; the user committed it as several commits, one per function group (kernel test build,
-ray-triangle kernels, ray-point kernel, `obj_overlap_test`, mesh generators), plus a commit with these notes. Hashes:
-see the status table of section 7 once filled in. The WP-12 prompt carried a coordination rule that later packages
+ray-triangle kernels, ray-point kernel, `obj_overlap_test`, mesh generators), plus a commit with these notes: 7bba69d, db31293,
+4516f8e, ee658ed, ab407ec, 437dada (status table of section 7). The WP-12 prompt carried a coordination rule that later packages
 keep: the acoustic session owns `src/ray_mesh_interact.cpp`, `src/ray_progress.cpp`, the `[wave]` / `[acoustic]` test
 files, `tests/catch2_tests/ray_test_helpers.hpp` and `tests/data/wave_twins.tsv` (its test cleanup is about to start on
 `main`); a package that changes code those tests reach runs `[wave]` and `[acoustic]` in both builds as a gate and
