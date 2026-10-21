@@ -23,6 +23,10 @@ Write a Wavefront .obj file
 - With `split_loose_parts`, each object is split into connected components ("separate by loose parts");
   faces sharing a vertex belong to the same part, and parts of a split object are named `name.001`, `name.002`, ...
 - Without `mtl_ind`, no `usemtl` tags and no `.mtl` file are written
+- A face with `mtl_ind = 0` that follows a face with a material in the same object (or part) is preceded by
+  `usemtl (null)`, which [[obj_file_read]] reads back as 0; the `.mtl` gets no `(null)` entry. Face order and objects
+  are unchanged; a material named `(null)` that is used by a face is rejected with an error (unused entries of
+  `mtl_names` may carry the name)
 - The `.mtl` file is named after the `.obj` and lists each used material; values default to a gray
   material when `bsdf` is omitted
 - Duplicate entries in `mtl_names` are merged into one `.mtl` entry if their `bsdf` rows are identical (or if
