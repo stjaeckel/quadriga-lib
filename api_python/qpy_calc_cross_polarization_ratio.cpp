@@ -16,16 +16,22 @@ Calculate the cross-polarization ratio (XPR) for linear and circular polarizatio
 - Computes aggregate XPR from polarization transfer matrices using the total-power-ratio method:
   co-pol and cross-pol powers are summed across all qualifying paths per CIR, and XPR is their ratio
 - Inputs are lists so each CIR can have a different number of paths
-- XPR is computed in both the linear V/H basis and the circular LHCP/RHCP basis via the Jones matrix
-  transform `M_circ = T · M_lin · T^-1`
+- XPR is computed in both the linear V/H basis and the circular LHCP/RHCP basis
 - `M` is the 2x2 Jones matrix (rows = RX polarisation V/H, columns = TX polarisation V/H), stored column-major with
   interleaved real/imaginary parts, 8 rows per path: rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx),
   rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx). Below, `M_<rx><tx>` names an entry by its receive and transmit
   polarisation: `M_vv` = rows 0-1, `M_hv` = rows 2-3, `M_vh` = rows 4-5, `M_hh` = rows 6-7
 - V-XPR and H-XPR are ratios per receive polarisation: V-XPR is the power received in V from V transmission over
   the power received in V from H transmission; H-XPR likewise for the H receive polarisation
-- The circular entries are `M_LL = (M_vv + M_hh + j(M_vh - M_hv)) / 2`, `M_RL = (M_vv - M_hh - j(M_vh + M_hv)) / 2`,
-  `M_LR = (M_vv - M_hh + j(M_vh + M_hv)) / 2`, `M_RR = (M_vv + M_hh - j(M_vh - M_hv)) / 2`
+- The circular entries couple circular patterns through `M` as get_channels_spherical couples antenna patterns,
+  `c(r, t) = r^T M t` (plain transpose), with the same circular vectors at both ends, each in that antenna's own
+  (e_theta, e_phi) frame: L = (V, H) = (1, +j) / sqrt(2) (LHCP), R = (1, -j) / sqrt(2) (RHCP); names after the IEEE
+  definition for the time convention exp(+j 2 pi f t) of the library's coefficients exp(-j 2 pi f tau).
+  `M_<rx><tx>`: `M_LL = (M_vv - M_hh + j(M_vh + M_hv)) / 2`, `M_RR = (M_vv - M_hh - j(M_vh + M_hv)) / 2`,
+  `M_LR = (M_vv + M_hh + j(M_hv - M_vh)) / 2` (receive L, transmit R), `M_RL = (M_vv + M_hh + j(M_vh - M_hv)) / 2`.
+  Co-polar means the same circular vector at both ends: the LOS matrix `diag(1, -1)` is co-polar (handedness
+  kept), `diag(1, 1)` (one mirrored component, as by a single reflection) is cross-polar
+- LHCP-XPR and RHCP-XPR are ratios per receive polarisation, like V-XPR and H-XPR
 - LOS paths are identified by comparing path length against the direct TX-RX distance `dTR`; paths with
   `path_length <= dTR + window_size` are excluded by default
 - Normalization of `M` does not affect XPR (cancels in the ratio) but does affect `pg`
@@ -60,8 +66,8 @@ xpr, pg = quadriga_lib.tools.calc_cross_polarization_ratio( powers, M, path_leng
    | 1   | V-XPR: sum(abs(M_vv)^2) / sum(abs(M_vh)^2) (receive V)          |
    | 2   | H-XPR: sum(abs(M_hh)^2) / sum(abs(M_hv)^2) (receive H)          |
    | 3   | Aggregate circular XPR (total L+R co-pol / total L+R cross-pol) |
-   | 4   | LHCP XPR: sum(abs(M_LL)^2) / sum(abs(M_RL)^2)                   |
-   | 5   | RHCP XPR: sum(abs(M_RR)^2) / sum(abs(M_LR)^2)                   |
+   | 4   | LHCP XPR: sum(abs(M_LL)^2) / sum(abs(M_LR)^2) (receive L)       |
+   | 5   | RHCP XPR: sum(abs(M_RR)^2) / sum(abs(M_RL)^2) (receive R)       |
 - **`pg`** — Total path gain summed over all paths (including LOS) as
   `0.5 · sum(powers · (abs(M_vv)^2 + abs(M_hv)^2 + abs(M_vh)^2 + abs(M_hh)^2))`; `(n_cir,)`
 MD!*/

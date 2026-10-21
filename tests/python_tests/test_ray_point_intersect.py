@@ -364,6 +364,20 @@ class test_case(unittest.TestCase):
         )
         npt.assert_array_equal(hit_ref, hit_R[reverse_index])
 
+    def test_unaligned_sub_cloud_ind(self):
+        """Sub-clouds that are not aligned to the SIMD vector size are accepted by every kernel."""
+        orig, trivec, tridir, points = self._icosphere_setup(no_div=20)
+        hit_ref, idx_ref, off_ref = quadriga_lib.RTtools.ray_point_intersect(orig, trivec, tridir, points)
+        sci = np.array([0, 3, 11], dtype=np.uint32)
+        for kernel in (0, 1):
+            with self.subTest(use_kernel=kernel):
+                hit, idx, off = quadriga_lib.RTtools.ray_point_intersect(
+                    orig, trivec, tridir, points, sub_cloud_ind=sci, use_kernel=kernel
+                )
+                npt.assert_array_equal(hit, hit_ref)
+                npt.assert_array_equal(idx, idx_ref)
+                npt.assert_array_equal(off, off_ref)
+
     def test_kernel_auto_vs_generic(self):
         """auto and GENERIC kernel must produce identical results."""
         orig, trivec, tridir, points = self._icosphere_setup(no_div=20)

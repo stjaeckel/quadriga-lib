@@ -288,3 +288,34 @@ TEST_CASE("Cube - Invalid inputs")
     // location must have 0 or 3 elements
     CHECK_THROWS_AS(quadriga_lib::cube<double>({1.0}, {}, {5.0}), std::invalid_argument);
 }
+// Fraction of faces whose normal (v2 - v1) x (v3 - v1) points away from the mesh centroid
+static double outward_fraction(const arma::mat &m)
+{
+    arma::vec3 c = bbox_center(m);
+    arma::uword n = 0;
+    for (arma::uword i = 0; i < m.n_rows; ++i)
+    {
+        arma::vec3 a = m.row(i).cols(0, 2).t(), b = m.row(i).cols(3, 5).t(), d = m.row(i).cols(6, 8).t();
+        arma::vec3 nv = arma::cross(b - a, d - a), f = (a + b + d) / 3.0 - c;
+        if (nv(0) * f(0) + nv(1) * f(1) + nv(2) * f(2) > 0.0)
+            ++n;
+    }
+    return (double)n / (double)m.n_rows;
+}
+
+TEST_CASE("Cube - Negative scale keeps outward normals")
+{
+    // As Blender's "Apply Scale": a negative product of the scales swaps the winding
+    for (const arma::vec &s : {arma::vec{-1.0}, arma::vec{1.0, 1.0, -2.0}, arma::vec{-1.0, 2.0, 3.0},
+                               arma::vec{-1.0, -1.0, 1.0}, arma::vec{-1.0, -2.0, -0.5}})
+        for (arma::uword n_div : {1, 3})
+        {
+            INFO("scale = " << s.t() << "n_div = " << n_div);
+            arma::mat m = quadriga_lib::cube<double>(s, {0.3, -0.2, 1.1}, {5.0, -2.0, 1.0}, n_div);
+            CHECK(outward_fraction(m) == 1.0);
+
+            // Same surface as the positive scale (the vertex sets of each face are mirrored)
+            arma::mat p = quadriga_lib::cube<double>(arma::abs(s), {0.3, -0.2, 1.1}, {5.0, -2.0, 1.0}, n_div);
+            CHECK(std::abs(mesh_area(m) - mesh_area(p)) < 1e-9);
+        }
+}

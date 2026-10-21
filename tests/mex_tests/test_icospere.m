@@ -59,6 +59,12 @@ center = quadriga_lib.icosphere( 2.0 );                                    % int
 assertEqual( size(center), [80,3] );
 center = quadriga_lib.icosphere( uint64(2) );
 assertEqual( size(center), [80,3] );
+
+% The radius must be finite and positive; n_div must not overflow the output size
+assert_cpp_error( @() quadriga_lib.icosphere( 1, 0 ), 'Input ''radius'' must be a finite positive number.' );
+assert_cpp_error( @() quadriga_lib.icosphere( 1, NaN ), 'Input ''radius'' must be a finite positive number.' );
+assert_cpp_error( @() quadriga_lib.icosphere( 1, Inf ), 'Input ''radius'' must be a finite positive number.' );
+assert_cpp_error( @() quadriga_lib.icosphere( 2^32 ), 'Input ''n_div'' is too large.' );
 end
 
 % Assert that fn() raises quadriga_lib:CPPerror with a message that contains expected (substring).

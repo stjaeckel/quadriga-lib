@@ -31,7 +31,9 @@ ds, mean_delay = quadriga_lib.tools.calc_delay_spread( delays, powers, threshold
   array of length `n_path`
 - **`threshold`** — Power threshold in [dB] relative to the strongest path; paths below threshold
   are excluded; default: 100.0
-- **`granularity`** — Bin width in [s] for grouping paths in the delay domain; default: 0.0 (no grouping)
+- **`granularity`** — Bin width in [s] for grouping paths in the delay domain; default: 0.0 (no grouping); must be
+  finite and non-negative; when > 0, all delays must be finite and the delay span / granularity must be below 2^53,
+  else a `ValueError` is raised
 
 ## Outputs:
 - **`ds`** — RMS delay spread per CIR; `(n_cir,)`

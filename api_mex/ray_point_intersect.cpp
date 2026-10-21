@@ -32,7 +32,8 @@ Calculate intersections of ray beams with points in 3D space
 - **`tridir`** — Direction vectors of the three vertex-rays in Cartesian coordinates; not normalized;
   order `{d1x, d1y, d1z, d2x, d2y, d2z, d3x, d3y, d3z}`; `[n_ray, 9]`
 - **`points`** — 3D point cloud coordinates; `[n_points, 3]`
-- **`sub_cloud_index`** — Segment boundary indices for the point cloud; use [[point_cloud_segmentation]] to gnerate;
+- **`sub_cloud_index`** — Segment boundary indices for the point cloud; use [[point_cloud_segmentation]] to generate;
+  sub-clouds need not be aligned to the SIMD vector size (padding with `vec_size` is optional and only improves speed);
   uint32; `[n_sub]`; default: `[]` (not using sub-clouds)
 - **`use_kernel`** — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable
   and for other values; auto mode selects CUDA when `n_points >= 500` and CUDA is available, else AVX2, else GENERIC; default: 0

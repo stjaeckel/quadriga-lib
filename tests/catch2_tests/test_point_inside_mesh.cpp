@@ -48,3 +48,27 @@ TEST_CASE("Test Point inside Mesh")
     CHECK(res.at(0) == 2);
     CHECK(res.at(1) == 2);
 }
+
+TEST_CASE("Test Point inside Mesh - Cube far from the origin")
+{
+    // A 10 m cube at UTM-like coordinates and 12 points 5 cm inside (1) or outside (0) each face; the default kernel
+    // (AVX2 in AVX2 builds) must classify them as at the origin
+    for (double off : {0.0, 5e6, 1e7})
+    {
+        INFO("offset (" << off << ", " << off << ")");
+        arma::mat mesh = quadriga_lib::cube<double>({5.0}, {}, {off, off, 5.0});
+        arma::mat pts(12, 3);
+        arma::uvec expect(12);
+        arma::uword n = 0;
+        for (int ax = 0; ax < 3; ++ax)
+            for (int s = -1; s <= 1; s += 2)
+                for (double dd : {-0.05, 0.05})
+                {
+                    pts(n, 0) = off, pts(n, 1) = off, pts(n, 2) = 5.0;
+                    pts(n, ax) += s * (5.0 + dd);
+                    expect(n++) = dd < 0.0 ? 1 : 0;
+                }
+        arma::uvec res = quadriga_lib::point_inside_mesh<double>(&pts, &mesh);
+        CHECK(arma::all(res == expect));
+    }
+}

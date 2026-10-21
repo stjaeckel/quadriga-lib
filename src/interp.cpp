@@ -4,6 +4,10 @@
 
 #include "quadriga_math.hpp"
 
+#include <algorithm>
+#include <cmath>
+#include <limits>
+
 /*!SECTION
 Math functions
 SECTION!*/
@@ -13,6 +17,9 @@ SECTION!*/
 Perform linear interpolation (1D or 2D) on single or multiple data sets
 
 - Interpolates given input data at specified output points.
+- Outside the range of the input sample points, the nearest end value is returned (constant extrapolation);
+  output sample points that are NaN give NaN.
+- The input sample points need not be sorted (they are sorted internally); repeated values are allowed.
 - Supports single and multiple data sets.
 - Returns interpolated results either directly or through reference argument.
 - Data types (`dtype`): `float` or `double`
@@ -117,13 +124,26 @@ void quadriga_lib::interp_2D(const arma::Cube<dtype> &input,
         for (arma::uword i = 1ULL; i < n; ++i)
             p_diff[i] = dtype(1.0) / (p_grid[i] - p_grid[i - 1]);
 
+        // Index search: ip = index of the first grid value > val (n if there is none), by a linear scan for
+        // short grids and a binary search otherwise; both give the same index, also with repeated grid values
         const dtype *p_samples_out = samples_out.memptr();
         for (arma::uword i = 0ULL; i < m; ++i)
         {
             arma::uword ip = 0ULL, in = 0ULL;                               // Indices for reading the input data
             dtype val = p_samples_out[i], wp = dtype(1.0), wn = dtype(0.0); // Relative weights for interpolation
-            while (ip < n && p_grid[ip] <= val)
-                ++ip;
+            if (n <= 16ULL)
+                while (ip < n && p_grid[ip] <= val)
+                    ++ip;
+            else
+                ip = (arma::uword)(std::upper_bound(p_grid, p_grid + n, val) - p_grid);
+
+            // A NaN query ends at ip == 0 (scan) or ip == n (binary search): NaN weights make the output NaN
+            if ((ip == 0ULL || ip == n) && std::isnan(val))
+            {
+                i_prev[i] = p_ind[0], i_next[i] = p_ind[0];
+                d_prev[i] = std::numeric_limits<dtype>::quiet_NaN(), d_next[i] = std::numeric_limits<dtype>::quiet_NaN();
+                continue;
+            }
             if (ip == n)
                 in = --ip;
             else if (ip != 0ULL)
@@ -214,7 +234,7 @@ arma::Mat<dtype> quadriga_lib::interp_2D(const arma::Mat<dtype> &input,
 template <typename dtype>
 arma::Mat<dtype> quadriga_lib::interp_1D(const arma::Mat<dtype> &input, const arma::Col<dtype> &xi, const arma::Col<dtype> &xo)
 {
-    arma::Col<dtype> y(1);
+    arma::Col<dtype> y(1, arma::fill::zeros);
     arma::Mat<dtype> output(xo.n_elem, input.n_cols, arma::fill::none);
     arma::Cube<dtype> output_cube(output.memptr(), 1ULL, xo.n_elem, input.n_cols, false, true);
     const arma::Cube<dtype> input_cube(const_cast<dtype *>(input.memptr()), 1ULL, input.n_rows, input.n_cols, false, true);
@@ -225,7 +245,7 @@ arma::Mat<dtype> quadriga_lib::interp_1D(const arma::Mat<dtype> &input, const ar
 template <typename dtype>
 arma::Col<dtype> quadriga_lib::interp_1D(const arma::Col<dtype> &input, const arma::Col<dtype> &xi, const arma::Col<dtype> &xo)
 {
-    arma::Col<dtype> y(1);
+    arma::Col<dtype> y(1, arma::fill::zeros);
     arma::Col<dtype> output(xo.n_elem, arma::fill::none);
     arma::Cube<dtype> output_cube(output.memptr(), 1ULL, xo.n_elem, 1ULL, false, true);
     const arma::Cube<dtype> input_cube(const_cast<dtype *>(input.memptr()), 1ULL, input.n_rows, 1ULL, false, true);

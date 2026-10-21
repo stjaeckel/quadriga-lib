@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_lib_generic_functions.hpp"
+#include <limits>
 
 // Generic C++ implementation of RayTriangleIntersect
 template <typename dtype>
@@ -54,9 +55,10 @@ void qd_RTI_GENERIC(const dtype *Tx, const dtype *Ty, const dtype *Tz, // First 
         unsigned hit_counter = 0U;       // Hit counter
 
         // Step 1 - Check intersection with the AABBs of the sub-meshes (slab-method)
-        dtype dx_i = dtype(1.0) / dx;
-        dtype dy_i = dtype(1.0) / dy;
-        dtype dz_i = dtype(1.0) / dz;
+        // Adding 0 turns a direction of -0 into +0, so that a ray in a slab plane gets the slab limits -inf and +inf
+        dtype dx_i = dtype(1.0) / (dx + dtype(0.0));
+        dtype dy_i = dtype(1.0) / (dy + dtype(0.0));
+        dtype dz_i = dtype(1.0) / (dz + dtype(0.0));
 
         std::vector<int> sub_mesh_hit(n_sub);
         int *p_sub_mesh_hit = sub_mesh_hit.data();
@@ -85,17 +87,19 @@ void qd_RTI_GENERIC(const dtype *Tx, const dtype *Ty, const dtype *Tz, // First 
             t2_high = M ? t2_low : t2_high;
             t2_low = T;
 
-            M = t0_low >= t1_low;
-            t0_low = M ? t0_low : t1_low;
-            M = t0_low >= t2_low;
-            t0_low = M ? t0_low : t2_low;
+            // A ray that lies in a plane of a slab gives NaN (0 * inf) for that plane, and the slab does not limit
+            // the segment then. NaN values are skipped, the running values start at -inf and +inf.
+            dtype t_low = -std::numeric_limits<dtype>::infinity();
+            t_low = (t0_low > t_low) ? t0_low : t_low;
+            t_low = (t1_low > t_low) ? t1_low : t_low;
+            t_low = (t2_low > t_low) ? t2_low : t_low;
 
-            M = t0_high <= t1_high;
-            t0_high = M ? t0_high : t1_high;
-            M = t0_high <= t2_high;
-            t0_high = M ? t0_high : t2_high;
+            dtype t_high = std::numeric_limits<dtype>::infinity();
+            t_high = (t0_high < t_high) ? t0_high : t_high;
+            t_high = (t1_high < t_high) ? t1_high : t_high;
+            t_high = (t2_high < t_high) ? t2_high : t_high;
 
-            bool C1 = t0_high > dtype(0.0) && t0_high >= t0_low && t0_low <= dtype(1.0);
+            bool C1 = t_high > dtype(0.0) && t_high >= t_low && t_low <= dtype(1.0);
             p_sub_mesh_hit[i_sub] = int(C1);
         }
 

@@ -4,6 +4,14 @@
 
 #include "quadriga_tools.hpp"
 
+#include <algorithm>
+#include <cstdint>
+#include <vector>
+
+#if defined(_OPENMP)
+#include <omp.h>
+#endif
+
 /*!SECTION
 Site-specific simulation tools
 SECTION!*/
@@ -62,7 +70,10 @@ void xpr_update(
 - **`apply_gain`** — Flips `gain` from output to input (see above). Applying a gain requires a `gain` vector.
 - **`ray_index`** — Optional map from update index (`0..n_rayU-1`) to global column of `xprmat`.
   Length `n_rayU`. Default is the identity map, which requires `n_ray == n_rayU`. Values must be
-  `< n_ray`.
+  `< n_ray`. Duplicate values are allowed: the updates of a column are then applied one after the other
+  in update-index order (each with the full initialize -> update -> normalize -> apply_gain sequence),
+  so the result is the same as a single-threaded run for any thread count. With duplicates the call
+  runs single-threaded; unique indices keep the parallel loop.
 
 ## Usage:
 The flags are composable in one call; the per-column order is always
@@ -270,6 +281,39 @@ namespace
     }
 }
 
+#if defined(_OPENMP)
+// True if 'idx' (n values, each < n_ray) holds a value more than once. Strictly ascending input (the
+// common case) is recognized in one pass. Otherwise a bitset of the columns is used when it is no
+// larger than the index list itself, else a sorted copy; both need O(n) memory, never O(n_ray).
+static bool has_duplicate_index(const arma::uword *idx, arma::uword n, arma::uword n_ray)
+{
+    arma::uword i = 1;
+    while (i < n && idx[i] > idx[i - 1])
+        ++i;
+    if (i >= n)
+        return false;
+
+    const arma::uword n_words = n_ray / 64 + 1;
+    if (n_words <= n)
+    {
+        std::vector<uint64_t> seen(n_words, 0);
+        for (arma::uword k = 0; k < n; ++k)
+        {
+            const uint64_t bit = (uint64_t)1 << (idx[k] & 63);
+            uint64_t &w = seen[idx[k] >> 6];
+            if (w & bit)
+                return true;
+            w |= bit;
+        }
+        return false;
+    }
+
+    std::vector<arma::uword> s(idx, idx + n);
+    std::sort(s.begin(), s.end());
+    return std::adjacent_find(s.begin(), s.end()) != s.end();
+}
+#endif
+
 template <typename dtype>
 void quadriga_lib::xpr_update(arma::Mat<dtype> &xprmat,
                               const arma::Mat<dtype> *update,
@@ -409,10 +453,18 @@ void quadriga_lib::xpr_update(arma::Mat<dtype> &xprmat,
     };
 
     // Single OMP region, guarded so small update sets (including the 1-ray-in-a-loop case) run
-    // serially with no team setup. Updates are independent, so the loop is embarrassingly parallel.
+    // serially with no team setup. Updates of distinct columns are independent, so the loop is
+    // embarrassingly parallel. Duplicate entries in 'ray_index' would make two threads read-modify-write
+    // the same column; they run serially instead, in update order (the single-thread result). One thread
+    // runs the updates in order anyway, so the check is skipped then.
     // Signed counter for OpenMP 2.0 (MSVC), which forbids an unsigned loop variable.
     const long long N = (long long)n_rayU;
-    if (n_rayU >= (arma::uword)QD_XPR_OMP_MIN)
+    bool run_parallel = n_rayU >= (arma::uword)QD_XPR_OMP_MIN;
+#if defined(_OPENMP)
+    if (run_parallel && p_idx && omp_get_max_threads() > 1)
+        run_parallel = !has_duplicate_index(p_idx, n_rayU, n_ray);
+#endif
+    if (run_parallel)
     {
 #pragma omp parallel for schedule(static)
         for (long long i = 0; i < N; ++i)

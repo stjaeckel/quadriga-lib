@@ -114,4 +114,11 @@ catch ME
     end
 end
 
+% --- Circular XPR: the LOS matrix diag(1,-1) keeps the handedness (co-polar), diag(1,1) reverses it ---
+Mc = [[1.0; 0.0; 0.0; 0.0; 0.0; 0.0; -1.0; 0.0], [1.0; 0.0; 0.0; 0.0; 0.0; 0.0; 1.0; 0.0]];
+xpr_c1 = quadriga_lib.calc_cross_polarization_ratio(1.0, Mc(:,1), 20.0, [0;0;0], [5;0;0]);
+xpr_c2 = quadriga_lib.calc_cross_polarization_ratio(1.0, Mc(:,2), 20.0, [0;0;0], [5;0;0]);
+assertTrue(all(isinf(xpr_c1(1,4:6))));
+assertEqual(xpr_c2(1,4:6), [0, 0, 0]);
+
 end

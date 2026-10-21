@@ -119,7 +119,7 @@ class test_case(unittest.TestCase):
         npt.assert_allclose(xpr[1, 1], 0.144 / 0.036, atol=1e-10, rtol=0)
 
     def test_circular_xpr_diagonal_m(self):
-        """Diagonal M with M_hh=-1: perfect linear isolation, zero circular co-pol"""
+        """Diagonal M with M_hh=-1 (LOS matrix of get_channels_*): perfect linear and circular isolation"""
         tx = np.array([[0.0], [0.0], [0.0]])
         rx = np.array([[5.0], [0.0], [0.0]])
 
@@ -130,10 +130,16 @@ class test_case(unittest.TestCase):
         xpr, _ = quadriga_lib.tools.calc_cross_polarization_ratio(pw, M, pl, tx, rx)
 
         # Linear XPR: perfect isolation (co-pol > 0, cross-pol = 0) => Inf
-        # Circular XPR: co-pol = 0, cross-pol > 0 => 0
+        # Circular XPR: the LOS keeps the handedness, co-pol > 0, cross-pol = 0 => Inf
         npt.assert_equal(xpr[0, 0], np.inf)
         npt.assert_equal(xpr[0, 1], np.inf)
         npt.assert_equal(xpr[0, 2], np.inf)
+        npt.assert_equal(xpr[0, 3:], np.inf)
+
+        # M = identity mirrors the H component relative to the LOS (as one reflection): circular co-pol = 0
+        M = [np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0]).reshape(8, 1)]
+        xpr, _ = quadriga_lib.tools.calc_cross_polarization_ratio(pw, M, pl, tx, rx)
+        npt.assert_equal(xpr[0, 0], np.inf)
         npt.assert_allclose(xpr[0, 3:], 0.0, atol=1e-14, rtol=0)
 
     def test_window_size_effect(self):

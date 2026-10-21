@@ -39,8 +39,8 @@ void qd_RTI_AVX2(const dtype *Tx, const dtype *Ty, const dtype *Tz, // First ver
                  unsigned *hit_cnt = nullptr);                      // Number of hits between orig and dest, length n_ray, uninitialized, optional
 
 // AVX2 accelerated implementation of RayPointIntersect
-void qd_RPI_AVX2(const float *Px, const float *Py, const float *Pz,    // Point coordinates, aligned to 32 byte, length n_point
-                 const size_t n_point,                                 // Number of points, the arrays must be allocated up to the next multiple of 8
+void qd_RPI_AVX2(const float *Px, const float *Py, const float *Pz,    // Point coordinates, length n_point (allocated n_point + 7)
+                 const size_t n_point,                                 // Number of points, the arrays must be allocated up to n_point + 7
                  const unsigned *SCI,                                  // List of sub-cloud indices, length n_sub
                  const float *Xmin, const float *Xmax,                 // Minimum and maximum x-values of the AABB, aligned to 32 byte, length n_sub_s
                  const float *Ymin, const float *Ymax,                 // Minimum and maximum y-values of the AABB, aligned to 32 byte, length n_sub_s
@@ -66,7 +66,7 @@ void qd_DFT_AVX2(const dtype *CFr,       // Channel coefficients, real part, Siz
                  const size_t n_ant,     // Number of MIMO sub-links
                  const size_t n_path,    // Number multipath components
                  const bool planar_wave, // Indicator that same delays are used for all antennas
-                 const double *freq,     // Carrier frequencies -bandwidth * pilot_grid in [Hz], aligned to 32 byte, Size [ n_carrier ]
+                 const double *freq,     // Carrier frequencies -bandwidth * pilot_grid in [Hz], Size [ n_carrier ] (no alignment needed)
                  const size_t n_carrier, // Number of carriers, mutiple of 8
                  float *Hr,              // Channel matrix, real part, Size [ n_carrier, n_ant ]
                  float *Hi);             // Channel matrix, imaginary part, Size [ n_carrier, n_ant ]

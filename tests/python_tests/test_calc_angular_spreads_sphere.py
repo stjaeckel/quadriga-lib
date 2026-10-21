@@ -160,6 +160,16 @@ class test_case(unittest.TestCase):
         self.assertTrue(np.all(theta_arr >= -np.pi / 2 - 0.01))
         self.assertTrue(np.all(theta_arr <= np.pi / 2 + 0.01))
 
+    def test_quantize_bound(self):
+        az = [np.array([0.1, 0.2])]
+        el = [np.array([0.0, 0.05])]
+        powers = [np.array([1.0, 1.0])]
+        for q in [1e-8, -1.0, np.nan, np.inf]:
+            with self.assertRaises(ValueError):
+                quadriga_lib.tools.calc_angular_spread(az, el, powers, 1, 1, quantize=q)
+        a_s, _, _, _, _ = quadriga_lib.tools.calc_angular_spread(az, el, powers, 1, 1, quantize=1e-3)
+        self.assertTrue(np.isfinite(a_s[0]))
+
 
 if __name__ == '__main__':
     unittest.main()

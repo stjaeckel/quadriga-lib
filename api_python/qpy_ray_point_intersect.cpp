@@ -36,7 +36,8 @@ hit_count, hit_index, hit_offset = quadriga_lib.RTtools.ray_point_intersect( ori
   order `{d1x, d1y, d1z, d2x, d2y, d2z, d3x, d3y, d3z}`; `(n_ray, 9)`
 - **`points`** — 3D point cloud coordinates; `(n_points, 3)`
 - **`sub_cloud_ind`** *(optional)* — 0-based segment boundary indices for the point cloud
-  (see `quadriga_lib.point_cloud_segmentation`); uint32; `(n_sub,)`
+  (see `quadriga_lib.point_cloud_segmentation`); sub-clouds need not be aligned to the SIMD vector size (padding with
+  `vec_size` is optional and only improves speed); uint32; `(n_sub,)`
 - **`use_kernel`** *(optional)* — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2,
   3 = CUDA; throws if unavailable and for other values; auto mode selects CUDA when `n_points >= 500` and CUDA is
   available, else AVX2, else GENERIC; default: 0

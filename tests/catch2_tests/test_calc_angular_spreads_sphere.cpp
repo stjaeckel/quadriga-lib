@@ -292,3 +292,33 @@ TEST_CASE("calc_angular_spreads_sphere - Selective outputs (nullptr)")
                                                       false, true, 0.0);
     CHECK(as(0) > 0.0);
 }
+
+TEST_CASE("calc_angular_spreads_sphere - quantize must be 0 or a finite value >= 1e-3 deg")
+{
+    std::vector<arma::vec> az = {{0.1, 0.2}}, el = {{0.0, 0.05}}, pw = {{1.0, 1.0}};
+    arma::vec as;
+    auto run = [&](double q, bool wrap)
+    {
+        quadriga_lib::calc_angular_spreads_sphere<double>(az, el, pw, &as, nullptr, nullptr, nullptr, nullptr, !wrap, true, q);
+    };
+    for (bool wrap : {true, false})
+    {
+        INFO("wrapping " << wrap);
+        for (double q : {1.0e-8, 9.99e-4, -1.0, -1.0e-8, (double)NAN, (double)INFINITY, -(double)INFINITY})
+        {
+            INFO("quantize " << q);
+            CHECK_THROWS_AS(run(q, wrap), std::invalid_argument);
+        }
+        CHECK_NOTHROW(run(0.0, wrap));
+        CHECK_NOTHROW(run(1.0e-3, wrap));
+        CHECK(std::isfinite(as(0)));
+        CHECK_NOTHROW(run(400.0, wrap));
+    }
+    std::vector<arma::fvec> azf = {{0.1f, 0.2f}}, elf = {{0.0f, 0.05f}}, pwf = {{1.0f, 1.0f}};
+    arma::fvec asf;
+    CHECK_THROWS_AS(quadriga_lib::calc_angular_spreads_sphere<float>(azf, elf, pwf, &asf, nullptr, nullptr, nullptr, nullptr,
+                                                                     false, true, 1.0e-8f),
+                    std::invalid_argument);
+    CHECK_NOTHROW(quadriga_lib::calc_angular_spreads_sphere<float>(azf, elf, pwf, &asf, nullptr, nullptr, nullptr, nullptr,
+                                                                   false, true, 1.0e-3f));
+}
