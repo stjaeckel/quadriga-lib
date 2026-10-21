@@ -414,6 +414,87 @@ TEST_CASE("sos_remove_bias - input validation")
     }
 }
 
+TEST_CASE("sos_remove_bias - an argument that is written cannot share memory with another argument")
+{
+    // 'phase' and 'phase_b' are updated in place, 'offset' and 'mean_before' are written. A second matrix
+    // object on the same memory, or on part of it, is rejected like the same object: the call throws before
+    // anything is written. Memory that only touches another argument is accepted.
+    arma::mat freq = rnd(10, 3, -0.05, 0.05, 22), phase = rnd(10, 2, -pi, pi, 23), phase_b = rnd(10, 2, -pi, pi, 24);
+    arma::mat pos = positions(8, 60.0, 25), pos_b = positions(8, 60.0, 26);
+    arma::mat *no_mat = nullptr;
+    arma::vec *no_vec = nullptr;
+
+    SECTION("phase_b on the memory of phase")
+    {
+        arma::mat p = phase;
+        arma::mat pb(p.memptr(), p.n_rows, p.n_cols, false, true);
+        std::string msg;
+        try
+        {
+            quadriga_lib::sos_remove_bias(freq, p, pos, &pos_b, &pb);
+        }
+        catch (const std::invalid_argument &e)
+        {
+            msg = e.what();
+        }
+        CHECK(msg.find("'phase_b'") != std::string::npos);
+        CHECK(msg.find("'phase'") != std::string::npos);
+        CHECK(arma::approx_equal(p, phase, "absdiff", 0.0));
+    }
+    SECTION("phase_b on part of the memory of phase")
+    {
+        // One block of three columns: phase on columns 0 and 1, phase_b on columns 1 and 2
+        arma::mat block = arma::join_rows(phase, phase_b.col(1)), keep = block;
+        arma::mat p(block.colptr(0), 10, 2, false, true), pb(block.colptr(1), 10, 2, false, true);
+        CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(freq, p, pos, &pos_b, &pb), std::invalid_argument);
+        CHECK(arma::approx_equal(block, keep, "absdiff", 0.0));
+    }
+    SECTION("phase on part of the memory of an input")
+    {
+        // One block: pos on elements 0 to 23, phase on 20 to 39
+        arma::vec block(40);
+        std::copy(pos.begin(), pos.end(), block.begin());
+        std::copy(phase.begin() + 4, phase.end(), block.begin() + 24);
+        arma::vec keep = block;
+        arma::mat ps(block.memptr(), 8, 3, false, true), p(block.memptr() + 20, 10, 2, false, true);
+        CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(freq, p, ps), std::invalid_argument);
+        // freq [3, 3] on elements 22 to 30, phase [3, 2] on 20 to 25
+        arma::mat f(block.memptr() + 22, 3, 3, false, true), p3(block.memptr() + 20, 3, 2, false, true);
+        CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(f, p3, pos), std::invalid_argument);
+        CHECK(arma::approx_equal(block, keep, "absdiff", 0.0));
+    }
+    SECTION("offset and mean_before on the memory of another argument")
+    {
+        arma::mat p = phase, ps = pos, pb = phase_b;
+        arma::mat off_p(p.memptr() + 5, 2, 1, false, true), mean_ps(ps.memptr() + 3, 2, 1, false, true);
+        arma::mat off_pb(pb.memptr() + 16, 2, 2, false, true), off(2, 1), mean(2, 1);
+        CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(freq, p, pos, no_mat, no_mat, no_vec, no_vec, &off_p), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(freq, p, ps, no_mat, no_mat, no_vec, no_vec, &off, &mean_ps), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(freq, p, pos, &pos_b, &pb, no_vec, no_vec, &off_pb), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(freq, p, pos, no_mat, no_mat, no_vec, no_vec, &off, &off), std::invalid_argument);
+        CHECK(arma::approx_equal(p, phase, "absdiff", 0.0));
+        CHECK(arma::approx_equal(ps, pos, "absdiff", 0.0));
+        CHECK(arma::approx_equal(pb, phase_b, "absdiff", 0.0));
+    }
+    SECTION("memory next to another argument is accepted")
+    {
+        arma::mat p_ref = phase, pb_ref = phase_b, off_ref, mean_ref;
+        quadriga_lib::sos_remove_bias(freq, p_ref, pos, &pos_b, &pb_ref, no_vec, no_vec, &off_ref, &mean_ref);
+
+        // One block: phase on elements 0 to 19, phase_b on 20 to 39, offset on 40 to 43, mean_before on 44 to 47
+        arma::vec block(48);
+        std::copy(phase.begin(), phase.end(), block.begin());
+        std::copy(phase_b.begin(), phase_b.end(), block.begin() + 20);
+        arma::mat p(block.memptr(), 10, 2, false, true), pb(block.memptr() + 20, 10, 2, false, true);
+        arma::mat off(block.memptr() + 40, 2, 2, false, true), mean(block.memptr() + 44, 2, 2, false, true);
+        REQUIRE_NOTHROW(quadriga_lib::sos_remove_bias(freq, p, pos, &pos_b, &pb, no_vec, no_vec, &off, &mean));
+        CHECK(arma::approx_equal(p, p_ref, "absdiff", 0.0));
+        CHECK(arma::approx_equal(pb, pb_ref, "absdiff", 0.0));
+        CHECK(arma::approx_equal(off, off_ref, "absdiff", 0.0));
+        CHECK(arma::approx_equal(mean, mean_ref, "absdiff", 0.0));
+    }
+}
+
 TEST_CASE("sos_remove_bias - a generator whose mean is zero for every offset is left unchanged")
 {
     // One sinusoid with a wavelength of 4 m, positions at 0 and 2 m: the two values are s and -s for every

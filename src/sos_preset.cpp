@@ -1478,6 +1478,32 @@ static const double qd_sos_table_Comb1024[1024] = {
     -0.044326909469942832, -0.068800048953462742, 0.0050000000000000001, -0.055148327284507061,
     0.016644191904285465, -0.019294246998407576, 0.066865185835696658, -0.02924014045918346};
 
+// Type (0 = Exp, 1 = Gauss, 2 = Comb) and number of sinusoids of a preset name; false for an unknown name
+// Declared in quadriga_lib_helper_functions.hpp, also used by sos_randn, sos_rand and sos_randi
+bool qd_sos_preset_lookup(const std::string &name, int &type, arma::uword &n_coeff)
+{
+    type = -1;
+    std::string number;
+    if (name.rfind("Exp", 0) == 0)
+        type = 0, number = name.substr(3);
+    else if (name.rfind("Gauss", 0) == 0)
+        type = 1, number = name.substr(5);
+    else if (name.rfind("Comb", 0) == 0)
+        type = 2, number = name.substr(4);
+
+    n_coeff = 0;
+    if (number == "128")
+        n_coeff = 128;
+    else if (number == "256")
+        n_coeff = 256;
+    else if (number == "512")
+        n_coeff = 512;
+    else if (number == "1024")
+        n_coeff = 1024;
+
+    return type >= 0 && n_coeff != 0;
+}
+
 /*!SECTION
 Sum-of-sinusoids random number generator
 SECTION!*/
@@ -1540,25 +1566,8 @@ void quadriga_lib::sos_preset(const std::string &name,
 {
     // ACF type: 0 = Exp, 1 = Gauss, 2 = Comb
     int type = -1;
-    std::string number;
-    if (name.rfind("Exp", 0) == 0)
-        type = 0, number = name.substr(3);
-    else if (name.rfind("Gauss", 0) == 0)
-        type = 1, number = name.substr(5);
-    else if (name.rfind("Comb", 0) == 0)
-        type = 2, number = name.substr(4);
-
     arma::uword n_coeff = 0;
-    if (number == "128")
-        n_coeff = 128;
-    else if (number == "256")
-        n_coeff = 256;
-    else if (number == "512")
-        n_coeff = 512;
-    else if (number == "1024")
-        n_coeff = 1024;
-
-    if (type < 0 || n_coeff == 0)
+    if (!qd_sos_preset_lookup(name, type, n_coeff))
         throw std::invalid_argument("Input 'name' is not a known preset.");
     if (!(dist_decorr > (dtype)0.0) || !std::isfinite((double)dist_decorr))
         throw std::invalid_argument("Input 'dist_decorr' must be > 0.");

@@ -404,11 +404,11 @@ void quadriga_lib::sos_val(const arma::Mat<dtype> &freq,
     }
 
     // The output is resized and written while the inputs are still read, so it cannot be one of them:
-    // neither the same object nor a matrix on the same memory
+    // neither the same object nor a matrix on all or part of the memory of one
     const arma::Mat<dtype> *inputs[7] = {&freq, &phase, &pos, pos_b, phase_b, acf, dist};
     for (const arma::Mat<dtype> *in : inputs)
-        if (in != nullptr && (in == &val || (val.memptr() != nullptr && in->memptr() == val.memptr())))
-            throw std::invalid_argument("Output 'val' cannot be the same object as an input.");
+        if (in != nullptr && (in == &val || qd_sos_share_memory(*in, val)))
+            throw std::invalid_argument("Output 'val' cannot be an input or share memory with one.");
 
     // kernel: 1 = GENERIC, 2 = AVX2
     int kernel = 1;
