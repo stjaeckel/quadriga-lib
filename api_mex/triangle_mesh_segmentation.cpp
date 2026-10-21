@@ -34,13 +34,14 @@ Reorganize a 3D triangular mesh into spatially clustered sub-meshes for faster p
 - **`vec_size`** — SIMD/GPU alignment size (e.g. 8 for AVX2, 32 for CUDA); each sub-mesh row count is rounded
   up to a multiple of this value; default: 1
 - **`mtl_ind_in`** — 1-based material index per face (the `csv_ind` output of [[obj_file_read]]);
-  `[n_mesh]` or empty; padding entries get index 1; default: `[]`
+  0 = no material; `[n_mesh]` or empty; passed through unchanged; default: `[]`
 
 ## Outputs:
 - **`triangles_out`** — Reordered and padded triangle vertices; `[n_meshR, 9]`
 - **`sub_mesh_index`** — 1-based start indices of sub-meshes in `triangles_out`; uint32; `[n_sub]`
 - **`mesh_index`** — 1-based mapping from original to reorganized mesh (0 = padding); uint32; `[n_meshR]`
-- **`mtl_ind_out`** — Reordered and padded material indices; `[n_meshR]`; only populated if `mtl_ind_in` is given
+- **`mtl_ind_out`** — Reordered and padded material indices, 1-based; padding entries get 0 (no material); uint64;
+  `[n_meshR]`; only populated if `mtl_ind_in` is given
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
@@ -56,10 +57,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::uword target_size = (nrhs < 2) ? 1024 : qd_mex_get_scalar<arma::uword>(prhs[1], "target_size", 1024);
     const arma::uword vec_size = (nrhs < 3) ? 1 : qd_mex_get_scalar<arma::uword>(prhs[2], "vec_size", 1);
 
-    // Material index: MATLAB 1-based -> C++ 0-based (copy so we don't mutate caller memory)
-    arma::uvec mtl_ind = (nrhs < 4) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[3], true, "mtl_ind_in");
-    if (!mtl_ind.is_empty())
-        mtl_ind -= 1;
+    // Material index: 1-based in C++ as well (0 = no material), no shift intended
+    const arma::uvec mtl_ind = (nrhs < 4) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[3], false, "mtl_ind_in");
 
     // Output containers (sizes are determined inside the C++ call)
     arma::mat meshR;
@@ -76,10 +75,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     CALL_QD(quadriga_lib::triangle_mesh_segmentation<double>(&mesh, &meshR, &sub_mesh_index,
                                                              target_size, vec_size, p_mtl_ind, p_mtl_indR, p_mesh_index));
 
-    // Convert indices from 0-based (C++) to 1-based (MATLAB)
+    // Convert indices from 0-based (C++) to 1-based (MATLAB); mtl_indR is 1-based in C++ (no shift intended)
     sub_mesh_index += 1;
-    if (!mtl_indR.is_empty())
-        mtl_indR += 1;
 
     // Copy outputs to MATLAB (sizes only known after the C++ call)
     if (nlhs > 0)

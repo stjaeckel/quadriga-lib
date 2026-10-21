@@ -29,7 +29,16 @@ assertElementsAlmostEqual( mesh_seg(1:108,:), mesh_sub, 'absolute', 1e-14 );
 assertElementsAlmostEqual( mesh_seg(109:end,:), zeros(4,9), 'absolute', 1e-14 );
 
 assertEqual( mtl_ind_seg(1:108), mtl_ind_sub );
-assertEqual( mtl_ind_seg(109:end), ones(4,1, 'like', mtl_ind_seg) );   % padding -> air (index 1)
+assertEqual( mtl_ind_seg(109:end), zeros(4,1, 'like', mtl_ind_seg) );  % padding -> 0 (no material), as in C++ and Python
+
+% Material indices are 1-based in C++ as well (0 = no material): they pass through unchanged
+mtl_in = mtl_ind_sub; mtl_in(2) = 0;
+[~, ~, mesh_index, mtl_ind_seg] = quadriga_lib.triangle_mesh_segmentation(mesh_sub, 1024, 8, mtl_in);
+assertEqual( mtl_ind_seg(1:108), mtl_in );
+assertEqual( mtl_ind_seg(2), uint64(0) );
+assertEqual( mtl_ind_seg(109:end), zeros(4,1, 'like', mtl_ind_seg) );
+[~, ~, ~, mtlR] = quadriga_lib.triangle_mesh_segmentation(quadriga_lib.cube(), 1024, 8, (1:12)');
+assertEqual( double(mtlR(:)'), [1:12, 0, 0, 0, 0] );
 
 assertEqual( mesh_index(1:108), uint32(1:108)' );
 

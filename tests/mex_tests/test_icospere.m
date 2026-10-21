@@ -65,6 +65,14 @@ assert_cpp_error( @() quadriga_lib.icosphere( 1, 0 ), 'Input ''radius'' must be 
 assert_cpp_error( @() quadriga_lib.icosphere( 1, NaN ), 'Input ''radius'' must be a finite positive number.' );
 assert_cpp_error( @() quadriga_lib.icosphere( 1, Inf ), 'Input ''radius'' must be a finite positive number.' );
 assert_cpp_error( @() quadriga_lib.icosphere( 2^32 ), 'Input ''n_div'' is too large.' );
+% Checked before the outputs are allocated: 20 * n_div^2 wraps to a huge but representable count for 2^31 + 1
+assert_cpp_error( @() icosphere4( 2^31 + 1 ), 'Input ''n_div'' is too large.' );
+assert_cpp_error( @() icosphere4( 2^30 ), 'Input ''n_div'' is too large.' );
+end
+
+% Request all 4 outputs, so that the wrapper allocates them (an anonymous function requests none)
+function icosphere4(n_div)
+[~, ~, ~, ~] = quadriga_lib.icosphere( n_div );
 end
 
 % Assert that fn() raises quadriga_lib:CPPerror with a message that contains expected (substring).
