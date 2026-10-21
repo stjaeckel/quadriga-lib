@@ -34,5 +34,14 @@ class test_case(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     RTtools.icosphere(1, r)
        
+class test_n_div_too_large(unittest.TestCase):
+
+    # Checked before the outputs are allocated: 20 * n_div^2 wraps to a huge but representable count for 2^31 + 1
+    def test(self):
+        for n_div in (2**31 + 1, 2**30, 2**32):
+            with self.assertRaisesRegex(ValueError, "Input 'n_div' is too large."):
+                RTtools.icosphere(n_div)
+
+
 if __name__ == '__main__':
     unittest.main()

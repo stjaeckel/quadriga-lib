@@ -50,7 +50,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const double radius = (nrhs < 2) ? 1.0 : qd_mex_get_scalar<double>(prhs[1], "radius", 1.0);
     const bool direction_xyz = (nrhs < 3) ? false : qd_mex_get_scalar<bool>(prhs[2], "direction_xyz", false);
 
-    // Output sizes are known up front
+    // Output sizes are known up front; the largest output (20 * n_div^2 faces, 9 values each) must fit into 64 bits,
+    // checked before the outputs are allocated (same check and message as in C++)
+    const arma::uword uword_max = std::numeric_limits<arma::uword>::max();
+    if (n_div != 0 && (n_div > uword_max / n_div || n_div * n_div > uword_max / 180))
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'n_div' is too large.");
     const arma::uword n_faces = 20 * n_div * n_div;
     const arma::uword n_dir_cols = direction_xyz ? 9 : 6;
 
