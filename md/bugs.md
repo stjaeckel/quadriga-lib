@@ -34,7 +34,7 @@ How to read the items:
 ## Summary table
 
 Items: 123 (S1: 5, S2: 31, S3: 68, S4: 19); B-119 to B-123 were found during the fixes (WP-02, WP-04, WP-07).
-Status: open: 33, fixed: 81, partly fixed: 2, won't fix: 1, documented: 6 (after WP-12).
+Status: open: 23, fixed: 91, partly fixed: 1, won't fix: 1, documented: 7 (after WP-13).
 
 | ID | Title | Area | Kind | Severity | Mark | Status |
 |---|---|---|---|---|---|---|
@@ -61,8 +61,8 @@ Status: open: 33, fixed: 81, partly fixed: 2, won't fix: 1, documented: 6 (after
 | [B-021](#b-021) | IEEE indoor model: `n_floors > 0` shifts all tap delays (3-D path length minus 2-D distance) | C channel gen., tools | 1 defect | S2 | [R] | fixed (WP-11) |
 | [B-022](#b-022) | IEEE indoor model prunes taps with an absolute power threshold after path loss (taps vanish with distance, floors, walls) | C channel gen., tools | 1 defect | S2 | [R] | fixed (WP-11) |
 | [B-023](#b-023) | IEEE indoor model uplink conjugates the channel (Doppler sign reversed), unlike the reciprocity of `get_channels_spherical` (user decision) | C channel gen., tools | 3 cross-API | S2 | [R] | fixed (WP-11) |
-| [B-024](#b-024) | `xpr_update`: data race when `ray_index` contains duplicates (wrong, non-deterministic result with threads) | C channel gen., tools | 1 defect | S2 | [R] | open |
-| [B-025](#b-025) | `path_to_tube`: NaN vertices when interior path points are collinear | C channel gen., tools | 1 defect | S2 | [R] | open |
+| [B-024](#b-024) | `xpr_update`: data race when `ray_index` contains duplicates (wrong, non-deterministic result with threads) | C channel gen., tools | 1 defect | S2 | [R] | fixed (WP-13) |
+| [B-025](#b-025) | `path_to_tube`: NaN vertices when interior path points are collinear | C channel gen., tools | 1 defect | S2 | [R] | fixed (WP-13) |
 | [B-026](#b-026) | AVX2 sin/cos returns values far outside [-1, 1], ±inf or NaN for large arguments (fast_sincos, fast_geo2cart, baseband_freq_response) | D geometry, math | 1 defect | S2 | [R] | fixed (WP-08) |
 | [B-027](#b-027) | `point_inside_mesh` misclassifies points 5 cm from a face at UTM-like coordinates in AVX2 builds (float ray–triangle kernel) | D geometry, math | 1 defect | S2 | [R] | fixed (WP-12) |
 | [B-028](#b-028) | `obj_overlap_test` misses a clear overlap when vertices of the penetrating object lie on extensions of the other object's face planes | D geometry, math | 1 defect | S2 | [R] | fixed (WP-12) |
@@ -98,16 +98,16 @@ Status: open: 33, fixed: 81, partly fixed: 2, won't fix: 1, documented: 6 (after
 | [B-058](#b-058) | `write_png`: constant, NaN or inverted-range data trigger a NaN-to-integer cast and all pixels get the last colour; an empty matrix writes an invalid PNG | B channel, file I/O | 1 defect | S3 | [R] | open |
 | [B-059](#b-059) | `channel::add_paths` accepts inconsistent counts and leaves an invalid object; `qrt_file_read` accepts any `normalize_M` | B channel, file I/O | 1 defect | S3 | [R] | fixed (WP-07) |
 | [B-060](#b-060) | Channel and file-I/O header comments contradict the code (index bases, `calc_effective_path_gain` "average", `normalize_M` column power) | B channel, file I/O | 2 doc | S3 | [R, C] | open |
-| [B-061](#b-061) | `combine_irs_coord`: no shape check on `interact_coord_1/2`, heap over-read | C channel gen., tools | 1 defect | S3 | [R] | open |
-| [B-062](#b-062) | `baseband_freq_response`: `aligned_alloc` with sizes that are not a multiple of 32 (generic build) and unchecked NULL return | C channel gen., tools | 1 defect | S3 | [R] | open |
+| [B-061](#b-061) | `combine_irs_coord`: no shape check on `interact_coord_1/2`, heap over-read | C channel gen., tools | 1 defect | S3 | [R] | fixed (WP-13) |
+| [B-062](#b-062) | `baseband_freq_response`: `aligned_alloc` with sizes that are not a multiple of 32 (generic build) and unchecked NULL return | C channel gen., tools | 1 defect | S3 | [R] | fixed (WP-13) |
 | [B-063](#b-063) | Test defect: `test_qd_ieee_chan.cpp:318` reads past the delay cube (hidden in the full ASan suite run) | C channel gen., tools | 1 defect | S3 | [R] | fixed (WP-01) |
 | [B-064](#b-064) | IEEE indoor model: `XPR_NLOS_linear = 0` gives NaN coefficients | C channel gen., tools | 1 defect | S3 | [R] | fixed (WP-11) |
-| [B-065](#b-065) | Unchecked float-to-integer casts (UB) for non-finite `observation_time` and tiny `quantize` | C channel gen., tools | 1 defect | S3 | [R] | partly fixed (WP-11) |
-| [B-066](#b-066) | `calc_delay_spread` with `granularity`: memory n_cir × global delay span / granularity (800 MB for 100 paths) | C channel gen., tools | 4 performance | S3 | [M] | open |
-| [B-067](#b-067) | `acdf`: all-NaN data sets bias the averaged CDF; unsorted user bins are accepted | C channel gen., tools | 1 defect | S3 | [R] | open |
+| [B-065](#b-065) | Unchecked float-to-integer casts (UB) for non-finite `observation_time` and tiny `quantize` | C channel gen., tools | 1 defect | S3 | [R] | fixed (WP-13) |
+| [B-066](#b-066) | `calc_delay_spread` with `granularity`: memory n_cir × global delay span / granularity (800 MB for 100 paths) | C channel gen., tools | 4 performance | S3 | [M] | fixed (WP-13) |
+| [B-067](#b-067) | `acdf`: all-NaN data sets bias the averaged CDF; unsorted user bins are accepted | C channel gen., tools | 1 defect | S3 | [R] | fixed (WP-13) |
 | [B-068](#b-068) | Docs of `add_fake_los_path` do not match the code: always one extra path; a present LOS is moved to slot 0 and a zero path is left behind | C channel gen., tools | 2 doc | S3 | [R] | documented (WP-04) |
 | [B-069](#b-069) | Naming of the cross-polarisation rows of `M` is inconsistent; `calc_cross_polarization_ratio` V/H columns are ambiguous (user decision) | C channel gen., tools | 2 doc | S3 | [R] | documented (WP-04) |
-| [B-070](#b-070) | `calc_diffraction_gain` (C++) scalar mode expects an electromagnetic-equivalent frequency, the docs say the speed of sound is used | C channel gen., tools | 2 doc | S3 | [R] | open |
+| [B-070](#b-070) | `calc_diffraction_gain` (C++) scalar mode expects an electromagnetic-equivalent frequency, the docs say the speed of sound is used | C channel gen., tools | 2 doc | S3 | [R] | documented (WP-13) |
 | [B-071](#b-071) | `ray_triangle_intersect`: AVX2 and generic kernels swap `fbs_ind`/`sbs_ind` for hits at equal distance (shared edge or vertex) | D geometry, math | 1 defect | S3 | [R] | fixed (WP-12) |
 | [B-072](#b-072) | `ray_triangle_intersect`: the AABB slab test rejects rays with dz = 0 in the plane z = Zmin/Zmax (x and y are accepted) | D geometry, math | 1 defect | S3 | [R] | fixed (WP-12) |
 | [B-073](#b-073) | `ray_point_intersect` requires sub-clouds aligned to 8 only in AVX2 builds; the default `point_cloud_segmentation` output makes it throw | D geometry, math | 3 cross-API | S3 | [R] | fixed (WP-12) |
@@ -120,7 +120,7 @@ Status: open: 33, fixed: 81, partly fixed: 2, won't fix: 1, documented: 6 (after
 | [B-080](#b-080) | `point_cloud_split` leaks its work buffer on every failed split | D geometry, math | 1 defect | S3 | [R] | fixed (WP-01) |
 | [B-081](#b-081) | `obj_overlap_test` docs call `obj_ind` 1-based and "the output of `obj_file_read`", which is 0-based; IDs are returned as given | D geometry, math | 2 doc | S3 | [R] | fixed (WP-12) |
 | [B-082](#b-082) | `icosphere(radius = 0)` returns NaN; `cube` / `plane` with a negative scale return inward / -z normals, contrary to the docs | D geometry, math | 1 defect | S3 | [R] | fixed (WP-12) |
-| [B-083](#b-083) | `interp` 1-D/2-D index search is O(n·m): 4 s for 160 000 samples | D geometry, math | 4 performance | S3 | [M] | open |
+| [B-083](#b-083) | `interp` 1-D/2-D index search is O(n·m): 4 s for 160 000 samples | D geometry, math | 4 performance | S3 | [M] | fixed (WP-13) |
 | [B-084](#b-084) | `obj_overlap_test`: reason strings are non-deterministic (unseeded shuffle, thread count), and a flag array is read outside its critical section | D geometry, math | 1 defect | S3 | [R, C] | fixed (WP-12) |
 | [B-085](#b-085) | MEX `fast_sincos(x, [])` returns cos instead of sin; the single-precision output is undocumented | F MEX layer | 1 defect | S3 | [R] | fixed (WP-01) |
 | [B-086](#b-086) | MEX `arrayant_qdant_write` (separate inputs) writes `center_freq = NaN` for `[]` instead of the documented 299792458 | F MEX layer | 1 defect | S3 | [R] | fixed (WP-01) |
@@ -144,7 +144,7 @@ Status: open: 33, fixed: 81, partly fixed: 2, won't fix: 1, documented: 6 (after
 | [B-104](#b-104) | Channel and file-I/O documentation and message nits (grouped) | B channel, file I/O | 2 doc | S4 | [R, C] | open |
 | [B-105](#b-105) | `memcpy` with a null pointer and size 0 (formal UB) in `get_channels_irs` and in the Python list adapter | C channel gen., tools | 1 defect | S4 | [R] | fixed (WP-01) |
 | [B-106](#b-106) | Docs and code of `path_to_tube`, `qd_path` and `calc_diffraction_gain` debug output disagree (grouped) | C channel gen., tools | 2 doc | S4 | [R, C] | open |
-| [B-107](#b-107) | `interp`: a NaN query returns the first data value; clamped extrapolation is undocumented | D geometry, math | 2 doc | S4 | [R] | open |
+| [B-107](#b-107) | `interp`: a NaN query returns the first data value; clamped extrapolation is undocumented | D geometry, math | 2 doc | S4 | [R] | fixed (WP-13) |
 | [B-108](#b-108) | Geometry documentation and validation nits (index-map directions, 9-column check, precision claim, header typos; dead code; CPU check) | D geometry, math | 2 doc | S4 | [R, C] | partly fixed (WP-12) |
 | [B-109](#b-109) | `sos_val` / `sos_remove_bias`: an output that partially overlaps an input is accepted and gives wrong values (docs promise an error) | E SOS | 2 doc | S4 | [R] | open |
 | [B-110](#b-110) | `sos_randn` / `sos_rand` / `sos_randi` report an unknown preset as "Input 'name' ...", an argument they do not have | E SOS | 2 doc | S4 | [R] | open |
@@ -157,7 +157,7 @@ Status: open: 33, fixed: 81, partly fixed: 2, won't fix: 1, documented: 6 (after
 | [B-117](#b-117) | Python output dtypes and shapes differ from the docs (`qdant_read`, `point_inside_mesh`, `generate_speaker`, `get_ieee_indoor`) | G Python layer | 2 doc | S4 | [R] | documented (WP-05) |
 | [B-118](#b-118) | Python single-frequency arrayant dict: a 1-element `center_freq` array gives a numpy DeprecationWarning, 2 elements an unclear error | G Python layer | 3 cross-API | S4 | [R] | fixed (WP-05) |
 | [B-119](#b-119) | Crafted HDF5 files make HDF5 1.14.6 itself zero-fill about 4 GB in `H5Fopen` or request a 2^64-byte allocation in `H5Gopen2` (upstream, not quadriga-lib code) | B channel, file I/O | 1 defect | S4 | [R] | won't fix (upstream HDF5) |
-| [B-120](#b-120) | `calc_cross_polarization_ratio`: the circular XPR columns report 0 (fully cross-polar) for the LOS matrix that `get_channels_*` treats as co-polar, and are defined per transmit polarisation while the linear columns are per receive polarisation | C channel gen., tools | 1 defect | S3 | [R] | open |
+| [B-120](#b-120) | `calc_cross_polarization_ratio`: the circular XPR columns report 0 (fully cross-polar) for the LOS matrix that `get_channels_*` treats as co-polar, and are defined per transmit polarisation while the linear columns are per receive polarisation | C channel gen., tools | 1 defect | S3 | [R] | fixed (WP-13) |
 | [B-121](#b-121) | Test defect: `test_bin` is compiled without `BUILD_WITH_AVX2`, so the AVX2-vs-generic cases of the ray-triangle and ray-point kernel tests never run | D geometry, math | 1 defect | S3 | [R] | fixed (WP-12) |
 | [B-122](#b-122) | `qrt_file_read_raw` is quadratic in the number of paths per origin (`reserve` per CIR): 240 000 paths take 7.5 s | B channel, file I/O | 4 performance | S3 | [M] | open |
 | [B-123](#b-123) | MEX and Python `qrt_file_read` build a 2^32-entry index vector (34 GB) for a valid file with 0 CIRs | F MEX layer | 1 defect | S3 | [R] | open |
@@ -225,6 +225,8 @@ miscompilation by the LAF split-compare passes, not a library defect. The campai
 | after the merge with main (2026-10-20, 71b894b) | `All tests passed (1346299 assertions in 1238 test cases)` (manager; includes the acoustic session's tests) | 39 s (12 threads) | 10.2 / 7.2 |
 | after WP-12: base | `All tests passed (1347918 assertions in 1255 test cases)` (manager; generic `1346136 / 1254`, also manager) | 40 s (12 threads) | 3.9 / 4.5 |
 | after WP-12: ASan + UBSan, gate | ASan + UBSan all passed, only the excluded `ray_progress` reports; `[wave]` 165594 / 181 and `[acoustic]` 42741 / 60 in both builds (worker's runs; Octave MEX 66 of 67, pytest 797 passed, 1 skipped) | - | - |
+| after WP-13: base | `All tests passed (1348300 assertions in 1269 test cases)` (manager; generic `1346518 / 1268`, also manager) | 40 s (12 threads) | 1.3 / 2.8 |
+| after WP-13: ASan + UBSan, gate | ASan + UBSan all passed, only the excluded `ray_progress` reports; `[wave]` 165594 / 181 and `[acoustic]` 42741 / 60 in both builds (worker's runs; Octave MEX 66 of 67, pytest 799 passed, 1 skipped) | - | - |
 
 Run commands: `flock /tmp/quadriga-fixes-suite.lock build_linux/test_bin` (output
 `build_linux/scratch/hunt/base_test.txt`); the sanitizer runs with
@@ -2512,7 +2514,7 @@ phase step per snapshot of path 1: downlink -0.1480 rad, uplink +0.1480 rad
 
 ## B-024: `xpr_update`: data race when `ray_index` contains duplicates (wrong, non-deterministic result with threads)
 
-- Status: open
+- Status: fixed (WP-13): duplicate `ray_index` entries are applied in update order (single-thread result); unique indices keep the parallel loop
 - Severity: S2, because duplicate indices are allowed by the documentation (only `ray_index < n_ray` is required) and give a wrong, run-to-run different result as soon as the update count reaches the OpenMP threshold.
 - Kind: race
 - Mark: [R]
@@ -2572,7 +2574,7 @@ Output of the phase-2 re-run (`bash run.sh`):
 
 ## B-025: `path_to_tube`: NaN vertices when interior path points are collinear
 
-- Status: open
+- Status: fixed (WP-13): also for an exact reversal
 - Severity: S2, because straight multi-point paths (e.g. transmission through a wall) are common, and the NaN mesh breaks the OBJ export of channels.
 - Kind: wrong result
 - Mark: [R]
@@ -5588,7 +5590,7 @@ Output of the phase-2 re-run (`bash run.sh`):
 
 ## B-061: `combine_irs_coord`: no shape check on `interact_coord_1/2`, heap over-read
 
-- Status: open
+- Status: fixed (WP-13)
 - Severity: S3, because invalid input (coordinates with fewer rows or columns than `no_interact` implies) is accepted and read out of bounds instead of rejected.
 - Kind: memory
 - Mark: [R]
@@ -5647,7 +5649,7 @@ SUMMARY: AddressSanitizer: heap-buffer-overflow /usr/include/x86_64-linux-gnu/bi
 
 ## B-062: `baseband_freq_response`: `aligned_alloc` with sizes that are not a multiple of 32 (generic build) and unchecked NULL return
 
-- Status: open
+- Status: fixed (WP-13): the AVX2 DFT kernel uses unaligned loads and stores, the buffers are ordinary Armadillo vectors (no `aligned_alloc`); a call without outputs returns after validation
 - Severity: S3, because (a) is undefined behaviour under C11 before DR 460 and fails on some C libraries, and (b) turns an allocation failure into a segfault; both need unusual conditions on glibc.
 - Kind: UB / crash
 - Mark: [R]
@@ -5833,7 +5835,7 @@ XPR_NLOS_linear = 0: NaN in coeff_re = 12 of 13, sum(path_gain) = -nan
 
 ## B-065: Unchecked float-to-integer casts (UB) for non-finite `observation_time` and tiny `quantize`
 
-- Status: partly fixed (WP-11): observation_time and update_rate are validated; the quantize / granularity part (qd_tools_calc_angular_spread.cpp, qd_tools_calc_delay_spread.cpp) moves to WP-13
+- Status: fixed (WP-11, WP-13): observation_time and update_rate validated in WP-11; quantize (0 or >= 1e-3 deg) and granularity (finite, finite delays, bounded bin index) in WP-13
 - Severity: S3, because invalid input reaches undefined behaviour (the results are returned without an error or fail with an unrelated message).
 - Kind: UB
 - Mark: [R] (what-if builds with `-fsanitize=float-cast-overflow`, sources unchanged), [C] for `calc_delay_spread`
@@ -5911,7 +5913,7 @@ azimuth spread with quantize = 1e-8 deg: 0.374807 (no error)
 
 ## B-066: `calc_delay_spread` with `granularity`: memory n_cir × global delay span / granularity (800 MB for 100 paths)
 
-- Status: open
+- Status: fixed (WP-13): sparse binning per CIR, results bit-identical; C-15 needs 4 MB instead of 808 MB
 - Severity: S3, because a clear performance (memory) defect: 50 CIRs with 2 paths each and a 1 ms delay span at 1 ns granularity need 0.8 GB.
 - Kind: performance (memory)
 - Mark: [M] (maximum RSS; not a timing)
@@ -5962,7 +5964,7 @@ max RSS = 807456 kB, wall = 0.73 s
 
 ## B-067: `acdf`: all-NaN data sets bias the averaged CDF; unsorted user bins are accepted
 
-- Status: open
+- Status: fixed (WP-13): a set without finite values gets a NaN column and is left out of the averages
 - Severity: S3, because an empty (all-NaN) data set distorts the average silently, and invalid bins give a wrong CDF without an error.
 - Kind: wrong result / invalid input accepted
 - Mark: [R]
@@ -6140,7 +6142,7 @@ calc_cross_polarization_ratio, M rows 0,2,6 = 1,0.5,1: V-XPR = inf, H-XPR = 4
 
 ## B-070: `calc_diffraction_gain` (C++) scalar mode expects an electromagnetic-equivalent frequency, the docs say the speed of sound is used
 
-- Status: open
+- Status: documented (WP-13): decision changed to (a) on 2026-10-21; the C++ block states that scalar mode takes the EM-equivalent frequency, as the whole C++ core does; wrappers unchanged
 - Severity: S3, because a C++ user passing the acoustic frequency gets a wavelength 870 000 times too long and wrong diffraction phases; the MEX and Python wrappers convert internally, so only C++ callers are affected.
 - Kind: doc / cross-API
 - Mark: [R]
@@ -7067,7 +7069,7 @@ plane scale {-1,1}: normal z of face 0 = -4
 
 ## B-083: `interp` 1-D/2-D index search is O(n·m): 4 s for 160 000 samples
 
-- Status: open
+- Status: fixed (WP-13): binary search for grids of more than 16 values, results bit-identical
 - Severity: S3, because it is a clear performance defect for long series, which a binary search or a merge walk makes negligible.
 - Kind: performance
 - Mark: [M] (the re-run below ran under `flock /tmp/bench.lock` at a 1-minute load of 1.59; the 160 000 point is from phase 1 at a load of 10.5 and is provisional)
@@ -8579,7 +8581,7 @@ sizeof(path) = 56 (doc: 64-byte header); interaction codes = 2
 
 ## B-107: `interp`: a NaN query returns the first data value; clamped extrapolation is undocumented
 
-- Status: open
+- Status: fixed (WP-13)
 - Severity: S4, because a NaN query becomes a valid-looking number and the documentation does not mention clamping.
 - Kind: doc / wrong result on NaN
 - Mark: [R]
@@ -9566,7 +9568,7 @@ file driver that rejects reads beyond the file size; run untrusted files in a se
 
 ## B-120: `calc_cross_polarization_ratio`: the circular XPR columns report 0 (fully cross-polar) for the LOS matrix that `get_channels_*` treats as co-polar, and are defined per transmit polarisation while the linear columns are per receive polarisation
 
-- Status: open
+- Status: fixed (WP-13): circular entries are the coupling r^T M t of the same circular pattern at both ends, LHCP = (V, H) = (1, +j)/sqrt 2 (derived from the library's frames); columns 4 and 5 are per receive polarisation
 - Severity: S3, because the circular XPR of every LOS-dominated channel from the ray tracer or `get_channels_*` is reported inverted (co and cross swapped), so circular-polarisation studies read the wrong ratio; the linear columns are not affected.
 - Kind: wrong result
 - Mark: [R] (found by the WP-04 worker while documenting B-069; repro re-run by the manager, 2026-10-17)
@@ -9626,7 +9628,7 @@ get_channels_spherical, LOS M = diag(1,-1): opposite circular patterns: |c| = 0.
 calc_cross_polarization_ratio, same M, include_los: circular XPR = 0, LHCP = 0, RHCP = 0
 ```
 
-**Cause.** Probably the circular transform assumes an `M` without the receive-side mirror, so for `M` from `get_channels_*` or the ray tracer the co- and cross-polar terms are swapped; to be confirmed in the fix session.
+**Cause.** Probably the circular transform assumes an `M` without the receive-side mirror, so for `M` from `get_channels_*` or the ray tracer the co- and cross-polar terms are swapped; to be confirmed in the fix session. Confirmed in WP-13: the old entries were r^H M t (conjugated circular basis at the receiver) instead of the r^T M t coupling that the channel generators use, so co- and cross-polar were swapped; the old columns are the reciprocals of the new ones (3), with 4 and 5 exchanged.
 
 **Proposed fix.** Define the handedness convention and the per-receive (or per-transmit) meaning of the circular columns consistently with the linear ones and with `get_channels_*`, fix the transform, and correct the pinned test. Behaviour change of columns 3-5. File: `src/qd_tools_calc_xpr.cpp` (and the MEX / Python blocks).
 
