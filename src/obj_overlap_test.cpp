@@ -4,6 +4,7 @@
 
 #include "quadriga_lib.hpp"
 #include "quadriga_lib_helper_functions.hpp"
+#include <limits>
 
 namespace arma
 {
@@ -275,7 +276,7 @@ SECTION!*/
 # obj_overlap_test
 Detect overlapping 3D objects in a triangular mesh
 
-- Returns 1-based indices of all objects that intersect at least one other object
+- Returns the IDs (as given in `obj_ind`) of all objects that intersect at least one other object
 - Touching faces or edges are not considered overlapping
 - Checks for intersecting triangle faces and vertices/edges penetrating another object's bounding volume
 - Overlaps smaller than `tolerance` are ignored to account for numerical imprecision
@@ -292,12 +293,13 @@ arma::uvec quadriga_lib::obj_overlap_test(
 
 ## Inputs:
 - **`mesh`** — Triangular mesh; each row `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_mesh, 9]`
-- **`obj_ind`** — 1-based object index mapping triangles to objects; output of [[obj_file_read]]; `[n_mesh]`
-- **`reason`** *(optional)* — Human-readable overlap descriptions per overlapping object; `[n_overlap]`
+- **`obj_ind`** — Object ID of each triangle; any values, e.g. the 0-based `obj_ind` output of [[obj_file_read]]; `[n_mesh]`
+- **`reason`** *(optional)* — Human-readable overlap description per overlapping object: the finding of its first
+  overlapping pair, pairs taken in the order of the sorted object IDs; independent of the number of threads; `[n_overlap]`
 - **`tolerance`** *(optional)* — Geometric tolerance; intersections smaller than this are ignored
 
 ## Returns:
-- `arma::uvec`: Unique 1-based object indices of all overlapping objects; `[n_overlap]`
+- `arma::uvec`: IDs of all overlapping objects as given in `obj_ind`, unique and ascending; empty for an empty mesh; `[n_overlap]`
 
 ## See also:
 - [[obj_file_read]] (reads mesh data from files and generates `obj_ind` input)
@@ -314,6 +316,14 @@ arma::uvec quadriga_lib::obj_overlap_test(const arma::Mat<dtype> *mesh, const ar
         throw std::invalid_argument("Input 'mesh' cannot be NULL.");
     if (obj_ind == nullptr)
         throw std::invalid_argument("Input 'obj_ind' cannot be NULL.");
+
+    // An empty mesh has no overlapping objects
+    if (mesh->n_elem == 0 && obj_ind->n_elem == 0)
+    {
+        if (reason != nullptr)
+            reason->clear();
+        return arma::uvec();
+    }
 
     if (mesh->n_cols != 9)
         throw std::invalid_argument("Input 'mesh' must have 9 columns containing x,y,z coordinates of 3 vertices.");
@@ -515,21 +525,45 @@ arma::uvec quadriga_lib::obj_overlap_test(const arma::Mat<dtype> *mesh, const ar
     if (want_to_know)
         why.resize(n_obj);
 
-    // List of intersecing objects
-    int *intersecting_objects = new int[n_obj]();
+    // Pairs are ordered by (i_obj_1, i_obj_2), i.e. by the key i_obj_1 * n_obj + i_obj_2. An overlapping object
+    // keeps the key of its first overlapping pair in this order, and the finding of that pair as its reason, so
+    // the result does not depend on the processing order or the number of threads. A recorded key can only become
+    // smaller. 'no_pair' marks an object without an overlapping pair.
+    const arma::uword no_pair = std::numeric_limits<arma::uword>::max();
+    std::vector<arma::uword> first_pair(n_obj, no_pair);
+    arma::uword *p_first_pair = first_pair.data();
 
-    // Performance is better for randomized processing if large objects are clumped together
-    arma::uvec rand_obj_indices = arma::regspace<arma::uvec>(0, n_obj - 1);
-    rand_obj_indices = arma::shuffle(rand_obj_indices);
+    // Record an overlapping pair, keep the earlier one per object
+    auto record = [&](arma::uword i_obj_1, arma::uword i_obj_2, const std::string &why_1, const std::string &why_2)
+    {
+        const arma::uword key = i_obj_1 * n_obj + i_obj_2;
+#pragma omp critical
+        {
+            if (key < p_first_pair[i_obj_1])
+            {
+#pragma omp atomic write
+                p_first_pair[i_obj_1] = key;
+                if (want_to_know)
+                    why[i_obj_1] = why_1;
+            }
+            if (key < p_first_pair[i_obj_2])
+            {
+#pragma omp atomic write
+                p_first_pair[i_obj_2] = key;
+                if (want_to_know)
+                    why[i_obj_2] = why_2;
+            }
+        }
+    };
 
     bool omp_failed = false;
     std::string omp_error;
 
-    // Pairwise tests
-#pragma omp parallel for
+    // Pairwise tests, dynamic scheduling balances objects of different size
+#pragma omp parallel for schedule(dynamic)
     for (int i_obj_1_int = 0; i_obj_1_int < (int)n_obj; ++i_obj_1_int)
     {
-        arma::uword i_obj_1 = rand_obj_indices(i_obj_1_int);
+        arma::uword i_obj_1 = (arma::uword)i_obj_1_int;
 
         arma::uword n_faces_1 = p_faces_per_object[i_obj_1];
         dtype *p_obj_1 = obj_faces[i_obj_1].memptr();
@@ -542,8 +576,15 @@ arma::uvec quadriga_lib::obj_overlap_test(const arma::Mat<dtype> *mesh, const ar
             if (i_obj_1 == i_obj_2)
                 continue;
 
-            // Skip if both objects are already marked as intersecting
-            if (intersecting_objects[i_obj_1] && intersecting_objects[i_obj_2])
+            // Skip the pair if it cannot change the result: both objects already have an overlapping pair, and,
+            // when the reasons are requested, both pairs come before this one
+            arma::uword first_1, first_2;
+#pragma omp atomic read
+            first_1 = p_first_pair[i_obj_1];
+#pragma omp atomic read
+            first_2 = p_first_pair[i_obj_2];
+            const arma::uword key = want_to_know ? i_obj_1 * n_obj + i_obj_2 : no_pair;
+            if (first_1 < key && first_2 < key)
                 continue;
 
             arma::uword n_faces_2 = p_faces_per_object[i_obj_2];
@@ -574,17 +615,11 @@ arma::uvec quadriga_lib::obj_overlap_test(const arma::Mat<dtype> *mesh, const ar
 
             if (test_condition)
             {
-#pragma omp critical
-                {
-                    intersecting_objects[i_obj_1] = 1;
-                    intersecting_objects[i_obj_2] = 1;
-
-                    if (want_to_know)
-                    {
-                        why[i_obj_1] = "Identical with OBJ-ID " + std::to_string(p_obj_ids[i_obj_2]);
-                        why[i_obj_2] = "Identical with OBJ-ID " + std::to_string(p_obj_ids[i_obj_1]);
-                    }
-                }
+                if (want_to_know)
+                    record(i_obj_1, i_obj_2, "Identical with OBJ-ID " + std::to_string(p_obj_ids[i_obj_2]),
+                           "Identical with OBJ-ID " + std::to_string(p_obj_ids[i_obj_1]));
+                else
+                    record(i_obj_1, i_obj_2, std::string(), std::string());
                 continue;
             }
 
@@ -601,30 +636,73 @@ arma::uvec quadriga_lib::obj_overlap_test(const arma::Mat<dtype> *mesh, const ar
             arma::Mat<dtype> *edge_faces = &obj_faces[i_obj_2];
 
             // Test if edges intersect with faces (3D test)
-            arma::u32_vec hit;                                    // Face hit indicator, 1-based, 0 = no hit
+            arma::u32_vec hit, hit_2;                             // First and second face hit, 1-based, 0 = no hit
             arma::Mat<dtype> edge_orig_t = edges->rows(0, 2).t(); // [3, n_edges].t() → [n_edges, 3]
             arma::Mat<dtype> edge_dest_t = edges->rows(3, 5).t(); // [3, n_edges].t() → [n_edges, 3]
             arma::Mat<dtype> faces_t = faces->rows(0, 8).t();     // [9, n_faces].t() → [n_faces, 9]
 
             OMP_SAFE_CALL(omp_failed, omp_error,
                           quadriga_lib::ray_triangle_intersect<dtype>(&edge_orig_t, &edge_dest_t, &faces_t,
-                                                                      nullptr, nullptr, nullptr, &hit));
+                                                                      nullptr, nullptr, nullptr, &hit, &hit_2));
 
-            // False positives:
-            // - Edge lies in the face plane (and hits at a random place due to numeric instabilities)
-            // - Edge starts in the face plane (and causes random hit)
-            // - Edge ends in the face plane (and causes random hit)
-
-            // Use the hit indicator to test for different intersect reasons
-            // 0 - no intersection, 1 - 2D intersections, >1 3D intersections
-            unsigned *p_hit = hit.memptr();
-            for (arma::uword i_edge = 0; i_edge < n_edges; ++i_edge)
-                if (p_hit[i_edge])
-                    ++p_hit[i_edge];
+            if (hit.n_elem != n_edges || hit_2.n_elem != n_edges) // Failed, the error is thrown after the loop
+                continue;
 
             dtype *p_faces = faces->memptr();
             dtype *p_edges = edges->memptr();
             dtype *p_edge_faces = edge_faces->memptr();
+
+            // Signed distance of point P from the plane of face i_face
+            auto plane_dist = [&](arma::uword i_face, const dtype *P) -> dtype
+            {
+                const dtype *f = &p_faces[18 * i_face];
+                return f[9] * (P[0] - f[0]) + f[10] * (P[1] - f[1]) + f[11] * (P[2] - f[2]);
+            };
+
+            // False positives of the 3D test:
+            // - Edge starts or ends in the plane of the hit face (touching, the hit position is random)
+            // - Edge lies in the plane of the hit face (the 2D test below decides)
+            // - Edge lies in the plane of another face of OBJ-1 and the hit face does not reach through that plane:
+            //   the hit can only be on the boundary of the hit face, e.g. an edge of a touching face that crosses a
+            //   corner or an edge of OBJ-1
+            auto false_3D_hit = [&](arma::uword i_face, arma::uword i_edge) -> bool
+            {
+                const dtype *e = &p_edges[6 * i_edge];
+                dtype dist_o = std::fabs(plane_dist(i_face, e)), dist_d = std::fabs(plane_dist(i_face, e + 3));
+                if ((dist_o < tolerance && dist_d > tolerance) || (dist_o > tolerance && dist_d < tolerance) ||
+                    (dist_o < tolerance && dist_d < tolerance))
+                    return true;
+
+                const dtype *g = &p_faces[18 * i_face];
+                for (arma::uword i_plane = 0; i_plane < n_faces; ++i_plane)
+                {
+                    if (std::fabs(plane_dist(i_plane, e)) >= tolerance || std::fabs(plane_dist(i_plane, e + 3)) >= tolerance)
+                        continue; // Edge is not in this plane
+
+                    dtype d0 = plane_dist(i_plane, g), d1 = plane_dist(i_plane, g + 3), d2 = plane_dist(i_plane, g + 6);
+                    bool above = d0 > tolerance || d1 > tolerance || d2 > tolerance;
+                    bool below = d0 < -tolerance || d1 < -tolerance || d2 < -tolerance;
+                    if (!(above && below)) // Hit face does not reach through the plane
+                        return true;
+                }
+                return false;
+            };
+
+            // Hit indicator: 0 - no intersection, 1 - 2D intersection, >1 - 3D intersection with face p_hit - 2
+            // A rejected first hit falls back to the second hit, which is judged in the same way
+            unsigned *p_hit = hit.memptr();
+            const unsigned *p_hit_2 = hit_2.memptr();
+            for (arma::uword i_edge = 0; i_edge < n_edges; ++i_edge)
+            {
+                unsigned i_hit = p_hit[i_edge];
+                if (i_hit != 0U && false_3D_hit(i_hit - 1U, i_edge))
+                {
+                    i_hit = p_hit_2[i_edge];
+                    if (i_hit != 0U && false_3D_hit(i_hit - 1U, i_edge))
+                        i_hit = 0U;
+                }
+                p_hit[i_edge] = (i_hit != 0U) ? i_hit + 1U : 0U;
+            }
 
             // Iterate through all faces of OBJ-1
             for (arma::uword i_face = 0; i_face < n_faces; ++i_face)
@@ -692,14 +770,8 @@ arma::uvec quadriga_lib::obj_overlap_test(const arma::Mat<dtype> *mesh, const ar
                     dtype dist_o = std::fabs(Nx * (ox - x0) + Ny * (oy - y0) + Nz * (oz - z0));
                     dtype dist_d = std::fabs(Nx * (dx - x0) + Ny * (dy - y0) + Nz * (dz - z0));
 
-                    // Is one point on the plane and the other outside?
-                    if ((dist_o < tolerance && dist_d > tolerance) || (dist_o > tolerance && dist_d < tolerance))
-                    {
-                        p_hit[i_edge] = 0U; // Clear potential 3D hit
-                        continue;
-                    }
-
                     // Are both edge points in the face plane?
+                    // The 2D test only adds hits; it does not clear a 3D hit on another face.
                     if (dist_o < tolerance && dist_d < tolerance)
                     {
                         // Check if the normal vectors of the face and the edge point in the same direction
@@ -710,10 +782,7 @@ arma::uvec quadriga_lib::obj_overlap_test(const arma::Mat<dtype> *mesh, const ar
 
                         dtype dtp = dotp(Mx, My, Mz, Nx, Ny, Nz);
                         if (std::fabs(dtp - (dtype)1.0) > (dtype)1e-5) // Different directions?
-                        {
-                            p_hit[i_edge] = 0U; // Clear potential 3D hit
                             continue;
-                        }
 
                         // 3D to 2D projection
                         auto O = project2D(ox, oy, oz);
@@ -721,10 +790,8 @@ arma::uvec quadriga_lib::obj_overlap_test(const arma::Mat<dtype> *mesh, const ar
 
                         int edge_hit = line_triangle_intersect_2D(P1.x, P2.x, P2.y, O.x, O.y, D.x, D.y, tolerance);
 
-                        if (edge_hit != 0)      // Did we have a 2D hit?
-                            p_hit[i_edge] = 1U; // A 2D hit overwrites a 3D miss!
-                        else                    // Both edge points are on the plane, but no 2D hit was found
-                            p_hit[i_edge] = 0U; // Clear any detected 3D hit!
+                        if (edge_hit != 0 && p_hit[i_edge] == 0U) // A 2D hit where there was no hit
+                            p_hit[i_edge] = 1U;
 
                         // Debugging output
                         // std::cout << "F:" << i_face << " {(" << x0 << "," << y0 << "," << z0 << ")"
@@ -824,17 +891,7 @@ arma::uvec quadriga_lib::obj_overlap_test(const arma::Mat<dtype> *mesh, const ar
 
             if (test_condition)
             {
-#pragma omp critical
-                {
-                    intersecting_objects[i_obj_1] = 2;
-                    intersecting_objects[i_obj_2] = 2;
-
-                    if (want_to_know)
-                    {
-                        why[i_obj_1] = findings;
-                        why[i_obj_2] = findings;
-                    }
-                }
+                record(i_obj_1, i_obj_2, findings, findings);
                 continue;
             }
         }
@@ -846,7 +903,7 @@ arma::uvec quadriga_lib::obj_overlap_test(const arma::Mat<dtype> *mesh, const ar
     // Get the number of intersecting objects
     arma::uword n_intersecting = 0;
     for (arma::uword i_obj = 0; i_obj < n_obj; ++i_obj)
-        if (intersecting_objects[i_obj])
+        if (p_first_pair[i_obj] != no_pair)
             ++n_intersecting;
 
     if (want_to_know)
@@ -856,7 +913,7 @@ arma::uvec quadriga_lib::obj_overlap_test(const arma::Mat<dtype> *mesh, const ar
     arma::uvec obj_ids_intersecting(n_intersecting);
     n_intersecting = 0;
     for (arma::uword i_obj = 0; i_obj < n_obj; ++i_obj)
-        if (intersecting_objects[i_obj])
+        if (p_first_pair[i_obj] != no_pair)
         {
             obj_ids_intersecting(n_intersecting) = p_obj_ids[i_obj];
             if (want_to_know)
@@ -864,7 +921,6 @@ arma::uvec quadriga_lib::obj_overlap_test(const arma::Mat<dtype> *mesh, const ar
             ++n_intersecting;
         }
 
-    delete[] intersecting_objects;
     return obj_ids_intersecting;
 }
 
