@@ -44,7 +44,7 @@ all_mask = true(1, numel(path_gain_1)*numel(path_gain_2));
 some_mask = [true true true false]; % length 4
 
 % ---------- 1) Basic call; all paths kept; f0=0 ----------
-i_irs = 0; thr_keep_all = -300; f0_zero = 0; use_abs=false; active_path_in=[];
+i_irs = 1; thr_keep_all = -300; f0_zero = 0; use_abs=false; active_path_in=[];
 [cr0,ci0,D0,act0,aod0,eod0,aoa0,eoa0] = quadriga_lib.get_channels_irs( ...
     ant_tx, ant_rx, ant_irs, ...
     fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1, ...
@@ -118,8 +118,8 @@ assertEqual(sum(act_sel), sum(some_mask));
 assertTrue(all(~act_sel | some_mask(:))); % used paths must be a subset of requested
 
 % ---------- 5) i_irs index changes coefficients when IRS has multiple ports ----------
-i_irs0 = 0;
-i_irs1 = 1;
+i_irs0 = 1;   % 1-based codebook port
+i_irs1 = 2;
 [cr_i0,~,~,~,~,~,~,~] = quadriga_lib.get_channels_irs( ...
     ant_tx, ant_rx, ant_irs, ...
     fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1, ...
@@ -171,7 +171,7 @@ C = 299792458.0;
     fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1, ...
     fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2, ...
     tx_pos, tx_ori, rx_pos, rx_ori, irs_pos, irs_ori, ...
-    0, thr_keep_all, f0_zero, true, [], [] );
+    1, thr_keep_all, f0_zero, true, [], [] );
 expected_min_delay = (min(path_length_1) + min(path_length_2)) / C;
 assertTrue(abs(min(D_abs_chk(:)) - expected_min_delay) < 5e-9);
 
@@ -184,7 +184,7 @@ ant_irs2 = rmfield(ant_irs, 'element_pos');
     fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1, ...
     fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2, ...
     tx_pos, tx_ori, rx_pos, rx_ori, irs_pos, irs_ori, ...
-    0, thr_keep_all, f0_zero, false, [], [] );
+    1, thr_keep_all, f0_zero, false, [], [] );
 
 ant_tx2 = rmfield(ant_tx2, 'coupling_re');
 ant_tx2 = rmfield(ant_tx2, 'coupling_im');
@@ -193,7 +193,7 @@ ant_tx2 = rmfield(ant_tx2, 'coupling_im');
     fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1, ...
     fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2, ...
     tx_pos, tx_ori, rx_pos, rx_ori, irs_pos, irs_ori, ...
-    0, thr_keep_all, f0_zero, false, [], [] );
+    1, thr_keep_all, f0_zero, false, [], [] );
 
 % ---------- 7d) Subset of outputs (only first three) ----------
 [cr_s, ci_s, D_s] = quadriga_lib.get_channels_irs( ...
@@ -201,7 +201,7 @@ ant_tx2 = rmfield(ant_tx2, 'coupling_im');
     fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1, ...
     fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2, ...
     tx_pos, tx_ori, rx_pos, rx_ori, irs_pos, irs_ori, ...
-    0, thr_keep_all, f0_zero, false, [], [] );
+    1, thr_keep_all, f0_zero, false, [], [] );
 assertEqual(size(cr_s,3), 4);
 assertEqual(size(ci_s,3), 4);
 assertEqual(size(D_s,3),  4);
@@ -214,7 +214,7 @@ try
         fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1_bad, ...
         fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2, ...
         tx_pos, tx_ori, rx_pos, rx_ori, irs_pos, irs_ori, ...
-        0, thr_keep_all, f0_zero, false, [], [] );
+        1, thr_keep_all, f0_zero, false, [], [] );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Inputs ''fbs_pos'', ''lbs_pos'', ''path_gain'', ''path_length'', and ''M'' must have the same number of columns (n_paths).';
@@ -231,7 +231,7 @@ try
         fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1, ...
         fbs_pos_2_bad, lbs_pos_2, path_gain_2, path_length_2, M_2, ...
         tx_pos, tx_ori, rx_pos, rx_ori, irs_pos, irs_ori, ...
-        0, thr_keep_all, f0_zero, false, [], [] );
+        1, thr_keep_all, f0_zero, false, [], [] );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Inputs ''fbs_pos'', ''lbs_pos'', ''path_gain'', ''path_length'', and ''M'' must have the same number of columns (n_paths).';
@@ -247,7 +247,7 @@ try
         fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1, ...
         fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2, ...
         [0;0;1;1], tx_ori, rx_pos, rx_ori, irs_pos, irs_ori, ...
-        0, thr_keep_all, f0_zero, false, [], [] );
+        1, thr_keep_all, f0_zero, false, [], [] );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Input ''tx_pos'' has incorrect number of elements.';
@@ -263,7 +263,7 @@ try
         fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1, ...
         fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2, ...
         tx_pos, tx_ori, rx_pos, rx_ori, [10;0], irs_ori, ...
-        0, thr_keep_all, f0_zero, false, [], [] );
+        1, thr_keep_all, f0_zero, false, [], [] );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Input ''irs_pos'' has incorrect number of elements.';
@@ -279,7 +279,7 @@ try
         fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1, ...
         fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2, ...
         tx_pos, tx_ori, rx_pos, rx_ori, irs_pos, [0;0], ...
-        0, thr_keep_all, f0_zero, false, [], [] );
+        1, thr_keep_all, f0_zero, false, [], [] );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Input ''irs_orientation'' has incorrect number of elements.';
@@ -296,7 +296,7 @@ try
         fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1, ...
         fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2, ...
         tx_pos, tx_ori, rx_pos, rx_ori, irs_pos, irs_ori, ...
-        0, thr_keep_all, f0_zero, false, bad_mask, [] );
+        1, thr_keep_all, f0_zero, false, bad_mask, [] );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Optional input ''active_path'' does not have the correct number of elements.';
@@ -314,7 +314,7 @@ try
         fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1, ...
         fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2, ...
         tx_pos, tx_ori, rx_pos, rx_ori, irs_pos, irs_ori, ...
-        0, thr_keep_all, f0_zero, false, [], [] );
+        1, thr_keep_all, f0_zero, false, [], [] );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Transmit antenna: Imaginary part of coupling matrix (phase component) defined without real part (absolute component)';
@@ -332,7 +332,7 @@ try
         fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1, ...
         fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2, ...
         tx_pos, tx_ori, rx_pos, rx_ori, irs_pos, irs_ori, ...
-        0, thr_keep_all, f0_zero, false, [], [] );
+        1, thr_keep_all, f0_zero, false, [], [] );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'IRS array: Imaginary part of coupling matrix (phase component) defined without real part (absolute component)';
@@ -342,6 +342,44 @@ catch ME
 end
 
 
+% ---------- 11) i_irs is a 1-based codebook port index, default 1 ----------
+args = {ant_tx, ant_rx, ant_irs_diff, ...
+    fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1, ...
+    fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2, ...
+    tx_pos, tx_ori, rx_pos, rx_ori, irs_pos, irs_ori};
+cr_def = quadriga_lib.get_channels_irs( args{:} );
+cr_p1 = quadriga_lib.get_channels_irs( args{:}, 1 );
+cr_p2 = quadriga_lib.get_channels_irs( args{:}, 2 );
+cr_e = quadriga_lib.get_channels_irs( args{:}, [] );
+assertEqual( cr_def, cr_p1 );
+assertEqual( cr_e, cr_p1 );
+assertTrue( any(abs(cr_p1(:) - cr_p2(:)) > 1e-12) );
+% Port 1 uses the first coupling column only: an IRS whose first column equals port 2 of ant_irs_diff gives cr_p2
+ant_sw = ant_irs_diff;
+ant_sw.coupling_re = ant_irs_diff.coupling_re(:, [2 1]);
+ant_sw.coupling_im = ant_irs_diff.coupling_im(:, [2 1]);
+args_sw = args; args_sw{3} = ant_sw;
+assertEqual( quadriga_lib.get_channels_irs( args_sw{:}, 1 ), cr_p2 );
+for bad = [0, 3]
+    failed = false;
+    try
+        [~] = quadriga_lib.get_channels_irs( args{:}, bad );
+    catch ME
+        failed = ~isempty(strfind(ME.message, 'i_irs')) && ~isempty(strfind(ME.message, '1 to 2'));
+    end
+    assertTrue( failed );
+end
+
+% ---------- 12) A segment without paths gives empty outputs [n_ports_rx, n_ports_tx, 0] ----------
+o0 = cell(1, 8);
+[o0{:}] = quadriga_lib.get_channels_irs( ant_tx, ant_rx, ant_irs, ...
+    fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1, ...
+    zeros(3,0), zeros(3,0), zeros(1,0), zeros(1,0), zeros(8,0), ...
+    tx_pos, tx_ori, rx_pos, rx_ori, irs_pos, irs_ori, 1 );
+for k = [1:3, 5:8]
+    assertEqual( [size(o0{k}, 1), size(o0{k}, 2), size(o0{k}, 3)], [n_ports_rx, n_ports_tx, 0] );
+end
+assertTrue( isempty(o0{4}) );
 
 % ---------- helpers ----------
     function ant = make_ant(nel,naz,nelem,nports,scale)

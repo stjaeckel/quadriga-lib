@@ -102,4 +102,33 @@ catch ME
     end
 end
 
+% 0 paths with add_fake_los_path: one zero-power LOS path with the LOS delay (as in C++ and Python)
+C = 299792458.0;
+ant1 = quadriga_lib.arrayant_generate('omni');
+e = zeros(0, 1);
+[cr, ci, dl, dop] = quadriga_lib.get_channels_planar(ant1, ant1, e, e, e, e, e, e, zeros(8,0), [0;0;0], [0;0;0], [10;0;0], [0;0;0], 1e9, true, true);
+assertEqual( [cr, ci, dop], [0, 0, 0] );
+assertElementsAlmostEqual( dl, 10 / C, 'absolute', 1e-18 );
+[~, ~, dl] = quadriga_lib.get_channels_planar(ant1, ant1, e, e, e, e, e, e, zeros(8,0), [0;0;0], [0;0;0], [10;0;0], [0;0;0], 1e9, false, true);
+assertEqual( dl, 0 );
+% Per antenna pair: the delays of a real LOS path (moved to slot 0) with the same geometry
+ant2 = ant1; ant2.e_theta_re(:,:,2) = 1; ant2.e_theta_im(:,:,2) = 0; ant2.e_phi_re(:,:,2) = 0; ant2.e_phi_im(:,:,2) = 0;
+ant2.element_pos = [0.3, -0.2; 0.1, 0.4; 0, 0.2]; ant2.coupling_re = [1, 0.3; 0, 1]; ant2.coupling_im = [0, 0.2; 0, 0];
+tx = [1;2;3]; rx = [11;-3;5]; d = rx - tx;
+az = atan2(d(2), d(1)); el = atan2(d(3), hypot(d(1), d(2)));
+for abs_dl = [true, false]
+    [cr0, ci0, dl0] = quadriga_lib.get_channels_planar(ant2, ant2, e, e, e, e, e, e, zeros(8,0), tx, [0;0;0.3], rx, [0;0;-0.2], 1e9, abs_dl, true);
+    [~, ~, dlL] = quadriga_lib.get_channels_planar(ant2, ant2, az, el, atan2(-d(2), -d(1)), -el, 1, norm(d), [1;0;0;0;0;0;-1;0], tx, [0;0;0.3], rx, [0;0;-0.2], 1e9, abs_dl, true);
+    assertEqual( size(dl0), [2, 2] );
+    assertEqual( [cr0, ci0], zeros(2, 4) );
+    assertElementsAlmostEqual( dl0, dlL(:,:,1), 'absolute', 1e-17 );
+end
+
+% 0 paths without add_fake_los_path: empty outputs [n_rx_ports, n_tx_ports, 0] (as in C++ and Python)
+[cr, ci, dl, dop] = quadriga_lib.get_channels_planar(ant2, ant2, e, e, e, e, e, e, zeros(8,0), tx, [0;0;0.3], rx, [0;0;-0.2], 1e9, true, false);
+assertEqual( [size(cr, 1), size(cr, 2), size(cr, 3)], [2, 2, 0] );
+assertEqual( size(ci), size(cr) );
+assertEqual( size(dl), size(cr) );
+assertTrue( isempty(dop) );
+
 end

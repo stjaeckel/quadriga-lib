@@ -39,6 +39,9 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
 - If `add_fake_los_path == True`, one output path is always added (`n_path + 1` outputs): slot 0 holds the LOS path,
   with zero power if no LOS path was found. If a LOS path was found, it is moved to slot 0 and its original slot
   (input index + 1) holds a zero-power path. All other paths keep their order, shifted by one slot.
+- With 0 paths (all path inputs empty), the outputs are empty, `(n_rx, n_tx, 0)`; with `add_fake_los_path = True` they
+  hold only this zero-power LOS path, with the LOS delays and angles per antenna pair (also per snapshot in batch
+  mode).
 - `complex=True` returns one combined complex coefficient array `coeff`; `complex=False` (default) returns
   separate real `coeff_re` and `coeff_im` via a zero-copy fast path
 
@@ -51,7 +54,8 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
 - The position and orientation inputs are `(3, n_out)` arrays with one column per snapshot; a `(3,)` array
   or a single-column `(3, 1)` array is applied to all snapshots.
 - All outputs are returned as lists of length `n_out`, one entry per snapshot.
-- Snapshots without any path produce an empty output entry with `n_path = 0`.
+- Snapshots without any path produce an empty output entry with `n_path = 0`, or only the zero-power LOS path
+  when `add_fake_los_path` is set (as for a single snapshot).
 - Batch mode releases the GIL while processing, so it can be combined with Python threads. The function keeps
   references to all input arrays until it returns, but other threads must not write into them meanwhile.
 
@@ -274,7 +278,7 @@ py::tuple get_channels_spherical(const py::dict &ant_tx,
         for (arma::uword i = 0ULL; i < n_out; ++i)
         {
             arma::uword n_path_in = fbs_pos_a[i].n_cols;
-            n_path[i] = (add_fake_los_path && n_path_in != 0ULL) ? n_path_in + 1ULL : n_path_in;
+            n_path[i] = add_fake_los_path ? n_path_in + 1ULL : n_path_in;
         }
 
         // Allocate all outputs before the parallel region, numpy memory is mapped to the Armadillo cubes

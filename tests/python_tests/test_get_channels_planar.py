@@ -529,5 +529,35 @@ class TestGetChannelsPlanar(unittest.TestCase):
                 arrayant.get_channels_planar(o, o, *self._planar_args())
 
 
+class test_zero_paths_fake_los(unittest.TestCase):
+
+    # 0 paths with add_fake_los_path: one zero-power LOS path with the LOS delay (as in C++ and MATLAB)
+    def test(self):
+        ant = arrayant.generate('omni')
+        e = np.zeros(0)
+        cr, ci, dl, dop = arrayant.get_channels_planar(ant, ant, e, e, e, e, e, e, np.zeros((8, 0)),
+                                                       [0, 0, 0], [0, 0, 0], [10, 0, 0], [0, 0, 0], 1e9, True, True)
+        self.assertEqual(dl.shape, (1, 1, 1))
+        npt.assert_array_equal(np.concatenate([cr.ravel(), ci.ravel(), np.ravel(dop)]), [0, 0, 0])
+        npt.assert_allclose(dl.ravel(), [10 / 299792458.0], rtol=1e-15)
+        cr, ci, dl, dop = arrayant.get_channels_planar(ant, ant, e, e, e, e, e, e, np.zeros((8, 0)),
+                                                       [0, 0, 0], [0, 0, 0], [10, 0, 0], [0, 0, 0], 1e9, False, True)
+        npt.assert_array_equal(dl.ravel(), [0])
+
+    # 0 paths without add_fake_los_path: empty outputs (n_rx_ports, n_tx_ports, 0), as in C++ and MATLAB
+    def test_without_fake_los(self):
+        ant = arrayant.generate('xpol')
+        e = np.zeros(0)
+        cr, ci, dl, dop = arrayant.get_channels_planar(ant, ant, e, e, e, e, e, e, np.zeros((8, 0)),
+                                                       [0, 0, 0], [0, 0, 0], [10, 0, 0], [0, 0, 0], 1e9, True, False)
+        for x in (cr, ci, dl):
+            self.assertEqual(x.shape, (2, 2, 0))
+        self.assertEqual(np.shape(dop), (0,))
+        c, dl, dop = arrayant.get_channels_planar(ant, ant, e, e, e, e, e, e, np.zeros((8, 0)),
+                                                  [0, 0, 0], [0, 0, 0], [10, 0, 0], [0, 0, 0], 1e9, True, False,
+                                                  complex=True)
+        self.assertEqual(c.shape, (2, 2, 0))
+
+
 if __name__ == '__main__':
     unittest.main()

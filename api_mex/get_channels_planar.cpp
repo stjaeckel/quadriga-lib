@@ -23,6 +23,8 @@ Calculate MIMO channel coefficients for planar wave paths
   with zero power if no LOS path was found. LOS = the strongest path whose `path_length` is within 0.1 mm of the TX-RX
   distance; it is moved to slot 1 and its original slot (input index + 1) holds a zero-power path. All other paths
   keep their order, shifted by one slot.
+- With 0 paths (all path inputs empty), the outputs are empty, `[n_rx, n_tx, 0]`; with `add_fake_los_path = true` they
+  hold only this zero-power LOS path, with the LOS delays per antenna pair.
 - Setting `center_freq = 0` disables phase calculation (delays still computed).
 - `use_absolute_delays = false` subtracts the straight-line TX↔RX distance (between the phase centres) from all path
   lengths before converting to delay; per-element delays of pairs that are closer to each other than the phase
@@ -123,12 +125,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 3)
         plhs[3] = qd_mex_init_output(&rx_Doppler, n_path, true);
 
-    // Call member function
-    if ((add_fake_los_path && n_path > 1) || (!add_fake_los_path && n_path > 0))
-        CALL_QD(quadriga_lib::get_channels_planar<double>(&ant_tx, &ant_rx,
-                                                          Tx, Ty, Tz, Tb, Tt, Th, Rx, Ry, Rz, Rb, Rt, Rh,
-                                                          &aod, &eod, &aoa, &eoa, &path_gain, &path_length, &M,
-                                                          &coeff_re, &coeff_im, &delay,
-                                                          center_freq, use_absolute_delays, add_fake_los_path,
-                                                          &rx_Doppler));
+    // Call the C++ function
+    // 0 paths: C++ returns the zero-power LOS path with add_fake_los_path, else empty outputs
+    CALL_QD(quadriga_lib::get_channels_planar<double>(&ant_tx, &ant_rx,
+                                                      Tx, Ty, Tz, Tb, Tt, Th, Rx, Ry, Rz, Rb, Rt, Rh,
+                                                      &aod, &eod, &aoa, &eoa, &path_gain, &path_length, &M,
+                                                      &coeff_re, &coeff_im, &delay,
+                                                      center_freq, use_absolute_delays, add_fake_los_path,
+                                                      &rx_Doppler));
 }

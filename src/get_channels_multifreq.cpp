@@ -129,6 +129,8 @@ Compute channel coefficients for spherical waves across multiple frequencies
 - `n_path_out = n_path + 1` if `add_fake_los_path` else `n_path`: with `add_fake_los_path`, slot 0 holds the LOS path
   (zero power if no LOS path was found); a LOS path found in the input is moved to slot 0 and leaves a zero-power path
   in its original slot (input index + 1); all other paths keep their order, shifted by one slot
+- With 0 paths (all path inputs empty), the outputs are empty, `[n_rx, n_tx, 0]` per output frequency; with
+  `add_fake_los_path = true` they hold only this zero-power LOS path, with the LOS delays per antenna pair
 - If `use_absolute_delays` is false, the LOS delay between the TX and RX phase centres is subtracted from all paths;
   per-element delays can then be negative, down to about -(half the TX array size + half the RX array size) /
   `propagation_speed` (both arrays endfire). [[quantize_delays]] rejects delays at or below `-tap_spacing / 2`. For
@@ -232,14 +234,59 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
             throw std::invalid_argument("get_channels_multifreq: RX array validation failed: " + err);
     }
 
-    if (fbs_pos.n_elem == 0 || lbs_pos.n_elem == 0 || path_gain.n_elem == 0 ||
-        path_length.n_elem == 0 || M.n_elem == 0)
+    // 0 paths with add_fake_los_path: the output holds only the zero-power LOS path. Its slot (delays from the TX-RX
+    // geometry) does not depend on the path data, so a dummy NLOS path (1 m longer than the LOS path, never detected
+    // as LOS) fills the input; its own slot is dropped.
+    if (add_fake_los_path && fbs_pos.n_elem == 0 && lbs_pos.n_elem == 0 && path_gain.n_elem == 0 &&
+        path_length.n_elem == 0 && M.n_elem == 0)
+    {
+        const dtype x = Rx - Tx, y = Ry - Ty, z = Rz - Tz;
+        const arma::Mat<dtype> pos_d = {(Tx + Rx) * (dtype)0.5, (Ty + Ry) * (dtype)0.5, (Tz + Rz) * (dtype)0.5};
+        const arma::Mat<dtype> fbs_d = pos_d.t();
+        const arma::Col<dtype> length_d = {std::sqrt(x * x + y * y + z * z) + one};
+        const arma::uword n_f = freq_in.n_elem;
+        const arma::Mat<dtype> gain_d(1, n_f, arma::fill::ones);
+        arma::Cube<dtype> M_d((M.n_rows == 2) ? 2 : 8, 1, n_f, arma::fill::zeros);
+        for (arma::uword f = 0; f < n_f; ++f)
+        {
+            M_d(0, 0, f) = one;
+            if (M_d.n_rows == 8)
+                M_d(6, 0, f) = -one;
+        }
+
+        std::vector<arma::Cube<dtype>> cr, ci, dl;
+        quadriga_lib::get_channels_multifreq<dtype>(tx_array, rx_array, Tx, Ty, Tz, Tb, Tt, Th, Rx, Ry, Rz, Rb, Rt, Rh,
+                                                    fbs_d, fbs_d, gain_d, length_d, M_d, freq_in, freq_out,
+                                                    cr, ci, dl, use_absolute_delays, true, propagation_speed);
+
+        // Copy slot 0 to the outputs
+        auto copy_slot = [](const std::vector<arma::Cube<dtype>> &src, std::vector<arma::Cube<dtype>> &dst)
+        {
+            if (dst.size() != src.size())
+                dst.resize(src.size());
+            for (size_t f = 0; f < src.size(); ++f)
+            {
+                if (dst[f].n_rows != src[f].n_rows || dst[f].n_cols != src[f].n_cols || dst[f].n_slices != 1ULL)
+                    dst[f].set_size(src[f].n_rows, src[f].n_cols, 1ULL);
+                std::memcpy(dst[f].memptr(), src[f].memptr(), src[f].n_rows * src[f].n_cols * sizeof(dtype));
+            }
+        };
+        copy_slot(cr, coeff_re), copy_slot(ci, coeff_im), copy_slot(dl, delay);
+        return;
+    }
+
+    // 0 paths without add_fake_los_path: the path inputs are not checked, the outputs are empty [n_rx, n_tx, 0]
+    const bool no_paths = fbs_pos.n_elem == 0 && lbs_pos.n_elem == 0 && path_gain.n_elem == 0 &&
+                          path_length.n_elem == 0 && M.n_elem == 0;
+
+    if (!no_paths && (fbs_pos.n_elem == 0 || lbs_pos.n_elem == 0 || path_gain.n_elem == 0 ||
+                      path_length.n_elem == 0 || M.n_elem == 0))
         throw std::invalid_argument("get_channels_multifreq: Missing path data.");
 
-    if (fbs_pos.n_rows != 3 || lbs_pos.n_rows != 3)
+    if (!no_paths && (fbs_pos.n_rows != 3 || lbs_pos.n_rows != 3))
         throw std::invalid_argument("get_channels_multifreq: 'fbs_pos' and 'lbs_pos' must have 3 rows.");
 
-    if (M.n_rows != 8 && M.n_rows != 2)
+    if (!no_paths && M.n_rows != 8 && M.n_rows != 2)
         throw std::invalid_argument("get_channels_multifreq: 'M' must have 8 rows (full polarimetric) or 2 rows (scalar pressure).");
 
     const bool scalar_M = (M.n_rows == 2);
@@ -254,13 +301,13 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
     if (n_freq_out == 0)
         throw std::invalid_argument("get_channels_multifreq: 'freq_out' is empty.");
 
-    if (lbs_pos.n_cols != n_path)
+    if (!no_paths && lbs_pos.n_cols != n_path)
         throw std::invalid_argument("get_channels_multifreq: 'lbs_pos' must have n_path columns.");
-    if (path_gain.n_rows != n_path || path_gain.n_cols != n_freq_in)
+    if (!no_paths && (path_gain.n_rows != n_path || path_gain.n_cols != n_freq_in))
         throw std::invalid_argument("get_channels_multifreq: 'path_gain' must have size [n_path, n_freq_in].");
-    if (path_length.n_elem != n_path)
+    if (!no_paths && path_length.n_elem != n_path)
         throw std::invalid_argument("get_channels_multifreq: 'path_length' must have n_path elements.");
-    if (M.n_cols != n_path || M.n_slices != n_freq_in)
+    if (!no_paths && (M.n_cols != n_path || M.n_slices != n_freq_in))
         throw std::invalid_argument("get_channels_multifreq: 'M' must have size [8|2, n_path, n_freq_in].");
     if (propagation_speed <= zero)
         throw std::invalid_argument("get_channels_multifreq: 'propagation_speed' must be positive.");
@@ -289,6 +336,9 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
         if (delay[f].n_rows != n_rx_ports || delay[f].n_cols != n_tx_ports || delay[f].n_slices != n_out)
             delay[f].set_size(n_rx_ports, n_tx_ports, n_out);
     }
+
+    if (n_out == 0) // 0 paths without add_fake_los_path: empty outputs
+        return;
 
     // Build center-frequency vectors for TX, RX, and freq_in grids
     arma::Col<dtype> tx_center_freqs((arma::uword)tx_array.size());

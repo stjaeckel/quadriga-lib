@@ -33,6 +33,8 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
 - If `add_fake_los_path == true`, one output path is always added (`n_path + 1` outputs): slot 1 holds the LOS path,
   with zero power if no LOS path was found. If a LOS path was found, it is moved to slot 1 and its original slot
   (input index + 1) holds a zero-power path. All other paths keep their order, shifted by one slot.
+- With 0 paths (all path inputs empty), the outputs are empty, `[n_rx, n_tx, 0]`; with `add_fake_los_path = true` they
+  hold only this zero-power LOS path, with the LOS delays and angles per antenna pair.
 
 ## Usage:
 ```
@@ -135,12 +137,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 6)
         plhs[6] = qd_mex_init_output(&eoa, n_ports_rx, n_ports_tx, n_path), p_eoa = &eoa;
 
-    // Call member function
-    if ((add_fake_los_path && n_path > 1) || (!add_fake_los_path && n_path > 0))
-        CALL_QD(quadriga_lib::get_channels_spherical<double>(&ant_tx, &ant_rx,
-                                                             Tx, Ty, Tz, Tb, Tt, Th, Rx, Ry, Rz, Rb, Rt, Rh,
-                                                             &fbs_pos, &lbs_pos, &path_gain, &path_length, &M,
-                                                             &coeff_re, &coeff_im, &delay,
-                                                             center_freq, use_absolute_delays, add_fake_los_path,
-                                                             p_aod, p_eod, p_aoa, p_eoa, use_avx2));
+    // Call the C++ function
+    // 0 paths: C++ returns the zero-power LOS path with add_fake_los_path, else empty outputs
+    CALL_QD(quadriga_lib::get_channels_spherical<double>(&ant_tx, &ant_rx,
+                                                         Tx, Ty, Tz, Tb, Tt, Th, Rx, Ry, Rz, Rb, Rt, Rh,
+                                                         &fbs_pos, &lbs_pos, &path_gain, &path_length, &M,
+                                                         &coeff_re, &coeff_im, &delay,
+                                                         center_freq, use_absolute_delays, add_fake_los_path,
+                                                         p_aod, p_eod, p_aoa, p_eoa, use_avx2));
 }

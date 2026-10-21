@@ -1012,5 +1012,60 @@ class TestGetChannelsSpherical(unittest.TestCase):
                 arrayant.get_channels_spherical(ant, ant, fbs_pos, fbs_pos, np.ones(2), np.zeros(2), make_M(2), *pos)
 
 
+class test_zero_paths_fake_los(unittest.TestCase):
+
+    # 0 paths with add_fake_los_path: one zero-power LOS path with the LOS delay (as in C++ and MATLAB)
+    def test(self):
+        ant = arrayant.generate('omni')
+        e = np.zeros(0)
+        cr, ci, dl = arrayant.get_channels_spherical(ant, ant, np.zeros((3, 0)), np.zeros((3, 0)), e, e,
+                                                     np.zeros((8, 0)), [0, 0, 0], [0, 0, 0], [10, 0, 0], [0, 0, 0],
+                                                     1e9, True, True)
+        self.assertEqual(dl.shape, (1, 1, 1))
+        npt.assert_array_equal(np.concatenate([cr.ravel(), ci.ravel()]), [0, 0])
+        npt.assert_allclose(dl.ravel(), [10 / 299792458.0], rtol=1e-15)
+        cr, ci, dl = arrayant.get_channels_spherical(ant, ant, np.zeros((3, 0)), np.zeros((3, 0)), e, e,
+                                                     np.zeros((8, 0)), [0, 0, 0], [0, 0, 0], [10, 0, 0], [0, 0, 0],
+                                                     1e9, False, True)
+        npt.assert_array_equal(dl.ravel(), [0])
+
+    # 0 paths without add_fake_los_path: empty outputs (n_rx_ports, n_tx_ports, 0), as in C++ and MATLAB
+    def test_without_fake_los(self):
+        ant = arrayant.generate('xpol')
+        e = np.zeros(0)
+        out = arrayant.get_channels_spherical(ant, ant, np.zeros((3, 0)), np.zeros((3, 0)), e, e, np.zeros((8, 0)),
+                                              [0, 0, 0], [0, 0, 0], [10, 0, 0], [0, 0, 0], 1e9, True, False,
+                                              angles=True)
+        self.assertEqual(len(out), 7)
+        for x in out:
+            self.assertEqual(x.shape, (2, 2, 0))
+
+    # Batch mode: a snapshot without paths gets the zero-power LOS path with add_fake_los_path, as in single mode
+    def test_batch_zero_path_snapshot(self):
+        ant = arrayant.generate('omni')
+        C = 299792458.0
+        fbs = [np.array([[5.0], [5.0], [0.0]]), np.zeros((3, 0))]
+        gain = [np.array([0.5]), np.zeros(0)]
+        length = [np.array([0.0]), np.zeros(0)]
+        M = [np.array([[1.0], [0], [0], [0], [0], [0], [-1.0], [0]]), np.zeros((8, 0))]
+        tx = np.zeros((3, 2)); rx = np.array([[10.0, 20.0], [0, 0], [0, 0]])
+        o = np.zeros((3, 2))
+        cr, ci, dl = arrayant.get_channels_spherical(ant, ant, fbs, fbs, gain, length, M, tx, o, rx, o,
+                                                     1e9, True, True)
+        self.assertEqual(dl[0].shape, (1, 1, 2))
+        self.assertEqual(dl[1].shape, (1, 1, 1))
+        npt.assert_allclose(dl[1].ravel(), [20.0 / C], rtol=1e-15)
+        npt.assert_array_equal(np.concatenate([cr[1].ravel(), ci[1].ravel()]), [0, 0])
+        # Same as the single-snapshot call
+        s_cr, s_ci, s_dl = arrayant.get_channels_spherical(ant, ant, fbs[1], fbs[1], gain[1], length[1], M[1],
+                                                           tx[:, 1], o[:, 1], rx[:, 1], o[:, 1], 1e9, True, True)
+        npt.assert_array_equal(dl[1], s_dl)
+        # Without add_fake_los_path the snapshot stays empty
+        cr, ci, dl = arrayant.get_channels_spherical(ant, ant, fbs, fbs, gain, length, M, tx, o, rx, o,
+                                                     1e9, True, False)
+        self.assertEqual(dl[0].shape, (1, 1, 1))
+        self.assertEqual(dl[1].shape, (1, 1, 0))
+
+
 if __name__ == '__main__':
     unittest.main()

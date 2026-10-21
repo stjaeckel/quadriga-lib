@@ -32,6 +32,8 @@ Calculate MIMO channel coefficients for planar wave paths
   path, with zero power if no LOS path was found. LOS = the strongest path whose `path_length` is within 0.1 mm of the
   TX-RX distance; it is moved to slot 0 and its original slot (input index + 1) holds a zero-power path. All other
   paths keep their order, shifted by one slot.
+- With 0 paths (all path inputs empty), the outputs are empty, `(n_rx, n_tx, 0)`; with `add_fake_los_path = True` they
+  hold only this zero-power LOS path, with the LOS delays per antenna pair.
 - `complex=True` returns one combined complex coefficient array `coeff`; `complex=False` (default) returns
   separate real `coeff_re` and `coeff_im` via a zero-copy fast path.
 

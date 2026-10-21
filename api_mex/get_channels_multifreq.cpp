@@ -30,6 +30,8 @@ Compute channel coefficients for spherical waves across multiple frequencies
   (zero power if no LOS path was found; LOS = the path whose length is closest to the TX-RX distance, within 0.1 mm);
   a LOS path found in the input is moved to slot 1 and leaves a zero-power path in its original slot
   (input index + 1); all other paths keep their order, shifted by one slot
+- With 0 paths (all path inputs empty), the outputs are empty, `[n_rx, n_tx, 0, n_freq_out]`; with
+  `add_fake_los_path = true` they hold only this zero-power LOS path, with the LOS delays per antenna pair
 - If `use_absolute_delays` is false, the LOS delay between the TX and RX phase centres is subtracted from all paths;
   per-element delays can then be negative, down to about -(half the TX array size + half the RX array size) /
   `propagation_speed` (both arrays endfire). [[quantize_delays]] rejects delays at or below `-tap_spacing / 2`. For
@@ -134,14 +136,14 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 2)
         plhs[2] = qd_mex_init_output(&delay, n_ports_rx, n_ports_tx, n_path, n_freq_out);
 
-    // Call C++ function
-    if ((add_fake_los_path && n_path > 1) || (!add_fake_los_path && n_path > 0))
-        CALL_QD(quadriga_lib::get_channels_multifreq<double>(ant_tx, ant_rx,
-                                                             Tx, Ty, Tz, Tb, Tt, Th,
-                                                             Rx, Ry, Rz, Rb, Rt, Rh,
-                                                             fbs_pos, lbs_pos, path_gain, path_length, M,
-                                                             freq_in, freq_out,
-                                                             coeff_re, coeff_im, delay,
-                                                             use_absolute_delays, add_fake_los_path,
-                                                             propagation_speed));
+    // Call the C++ function
+    // 0 paths: C++ returns the zero-power LOS path with add_fake_los_path, else empty outputs
+    CALL_QD(quadriga_lib::get_channels_multifreq<double>(ant_tx, ant_rx,
+                                                         Tx, Ty, Tz, Tb, Tt, Th,
+                                                         Rx, Ry, Rz, Rb, Rt, Rh,
+                                                         fbs_pos, lbs_pos, path_gain, path_length, M,
+                                                         freq_in, freq_out,
+                                                         coeff_re, coeff_im, delay,
+                                                         use_absolute_delays, add_fake_los_path,
+                                                         propagation_speed));
 }
