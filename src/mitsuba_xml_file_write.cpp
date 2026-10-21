@@ -7,9 +7,31 @@
 #include <unordered_set>
 #include <unordered_map>
 #include <string_view>
+#include <vector>
+#include <algorithm>
 
 #define PUGIXML_HEADER_ONLY
 #include "pugixml.hpp"
+
+// ----------------------------------------------------------------------------
+// Helper: groups the face indices by object in one pass (counting sort, ascending face order within each object,
+// the order of arma::find(obj_ind == i)). The faces of object i are face_list[start[i] ... start[i + 1] - 1].
+// All entries of obj_ind must be below n_obj.
+// ----------------------------------------------------------------------------
+static void faces_by_object(const arma::uvec &obj_ind, arma::uword n_obj,
+                            std::vector<arma::uword> &start, std::vector<arma::uword> &face_list)
+{
+    start.assign(n_obj + 1, 0);
+    for (const arma::uword o : obj_ind)
+        ++start[o + 1];
+    for (arma::uword i = 0; i < n_obj; ++i)
+        start[i + 1] += start[i];
+
+    std::vector<arma::uword> cursor(start.begin(), start.end() - 1);
+    face_list.resize(obj_ind.n_elem);
+    for (arma::uword f = 0; f < obj_ind.n_elem; ++f)
+        face_list[cursor[obj_ind[f]]++] = f;
+}
 
 // ----------------------------------------------------------------------------
 // Helper: returns the ITU material that best matches `name`.
@@ -240,14 +262,17 @@ void quadriga_lib::mitsuba_xml_file_write(const std::string &fn,
     auto obj_ind_local = obj_ind;
     obj_names_local.reserve(2 * n_obj);
 
+    std::vector<arma::uword> obj_start, obj_faces; // faces per object, see faces_by_object
+    faces_by_object(obj_ind, n_obj, obj_start, obj_faces);
+
     arma::uword next_obj_id = n_obj;
     for (arma::uword i_obj = 0; i_obj < n_obj; ++i_obj)
     {
         // Get the the original object name
         const std::string base_name = obj_names_valid[i_obj];
 
-        // Find all faces whose obj_ind == i_obj
-        arma::uvec face_idx = arma::find(obj_ind == i_obj);
+        // All faces whose obj_ind == i_obj
+        arma::uvec face_idx(obj_faces.data() + obj_start[i_obj], obj_start[i_obj + 1] - obj_start[i_obj]);
 
         //  Gather the material IDs for these faces
         arma::uvec mtls_here = mtl_ind_local.elem(face_idx);
@@ -306,6 +331,13 @@ void quadriga_lib::mitsuba_xml_file_write(const std::string &fn,
     else if (!std::filesystem::create_directory(mesh_folder, ec) || ec)
         throw std::runtime_error("Failed to create directory '" + mesh_folder.string() + "': " + ec.message());
 
+    // Faces per object after the split
+    faces_by_object(obj_ind_local, n_obj, obj_start, obj_faces);
+
+    // Global to PLY-local vertex index; set for the vertices of each object before its faces read it
+    std::vector<unsigned> ply_index(n_vert);
+    std::vector<arma::uword> unique_vert_idx;
+
     // Write PLY meshes
     for (arma::uword i_obj = 0; i_obj < n_obj; ++i_obj)
     {
@@ -319,15 +351,19 @@ void quadriga_lib::mitsuba_xml_file_write(const std::string &fn,
         std::string bin_data = "ply\nformat binary_little_endian 1.0\ncomment Created by Quadriga-Lib " + quadriga_lib::quadriga_lib_version() + "\n";
         fileW.write(bin_data.c_str(), bin_data.size());
 
-        // Find all faces whose obj_ind == i_obj
-        arma::uvec face_idx = arma::find(obj_ind_local == i_obj);
-        arma::uword n_faces = face_idx.n_elem;
+        // All faces whose obj_ind == i_obj, ascending
+        const arma::uword *face_idx = obj_faces.data() + obj_start[i_obj];
+        arma::uword n_faces = obj_start[i_obj + 1] - obj_start[i_obj];
 
-        // Gather the vertex IDs for these faces
-        arma::umat vert_idx = face_ind.rows(face_idx);
-        arma::uvec unique_vert_idx = arma::unique(vert_idx);
+        // The vertex IDs of these faces, sorted and unique
+        unique_vert_idx.resize(3 * n_faces);
+        for (arma::uword i_face = 0; i_face < n_faces; ++i_face)
+            for (arma::uword i = 0; i < 3; ++i)
+                unique_vert_idx[3 * i_face + i] = face_ind.at(face_idx[i_face], i);
+        std::sort(unique_vert_idx.begin(), unique_vert_idx.end());
+        unique_vert_idx.erase(std::unique(unique_vert_idx.begin(), unique_vert_idx.end()), unique_vert_idx.end());
 
-        bin_data = "element vertex " + std::to_string(unique_vert_idx.n_elem) + "\n";
+        bin_data = "element vertex " + std::to_string(unique_vert_idx.size()) + "\n";
         fileW.write(bin_data.c_str(), bin_data.size());
 
         bin_data = "property float x\nproperty float y\nproperty float z\n";
@@ -341,7 +377,6 @@ void quadriga_lib::mitsuba_xml_file_write(const std::string &fn,
 
         // Write vertices
         unsigned ply_face_idx = 0;
-        arma::u32_mat ply_vert_idx(n_faces, 3);
         for (const auto &i_vert : unique_vert_idx)
         {
             if (i_vert >= n_vert)
@@ -355,9 +390,8 @@ void quadriga_lib::mitsuba_xml_file_write(const std::string &fn,
             fileW.write((char *)&y, sizeof(float));
             fileW.write((char *)&z, sizeof(float));
 
-            // Obtain indices relative to the local PLY file
-            arma::uvec idx = arma::find(vert_idx == i_vert);
-            ply_vert_idx.elem(idx).fill(ply_face_idx);
+            // Index relative to the local PLY file
+            ply_index[i_vert] = ply_face_idx;
             ++ply_face_idx;
         }
 
@@ -368,7 +402,7 @@ void quadriga_lib::mitsuba_xml_file_write(const std::string &fn,
             fileW.write((char *)&const_3, sizeof(unsigned char));
             for (arma::uword i = 0; i < 3; ++i)
             {
-                unsigned e = ply_vert_idx.at(i_face, i);
+                unsigned e = ply_index[face_ind.at(face_idx[i_face], i)];
                 fileW.write((char *)&e, sizeof(unsigned));
             }
         }
@@ -555,8 +589,7 @@ void quadriga_lib::mitsuba_xml_file_write(const std::string &fn,
         node_boolean.append_attribute("name").set_value("face_normals");
         node_boolean.append_attribute("value").set_value("true");
 
-        arma::uvec face_idx = arma::find(obj_ind_local == i_obj, 1);
-        arma::uword mtl_idx = mtl_ind_local.at(face_idx.at(0));
+        arma::uword mtl_idx = mtl_ind_local.at(obj_faces[obj_start[i_obj]]); // material of the first face
 
         if (mtl_idx >= n_mtl)
             throw std::runtime_error("Material index out of bound. This should not happen! Ever!");
