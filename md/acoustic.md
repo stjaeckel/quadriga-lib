@@ -13,7 +13,7 @@ without it is wave physics, settled and guarded, in `md/wave.md`. Every acoustic
 are the check. The material model lives in `src/ray_mesh_interact.cpp`, and so does the acoustic work.
 The reflect side comes first (P6); scattering is out of scope (P9).
 
-**Sources.** Physics statements cite the literature review `/home/stephan/accoustic_research/review.md`
+**Sources.** Physics statements cite the literature review `/sjc/accoustic_research/review.md`
 by source key in square brackets; the keys resolve in `references/index.csv` there, and "review 4.2" is a
 section of that file. "Report 3.4" is a section of `md/acoustic_round1_report.md`. "Derived here" is a
 closed-form evaluation made for this document, "measured here" a run of the library; both are in
