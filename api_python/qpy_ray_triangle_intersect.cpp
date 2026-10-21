@@ -15,7 +15,12 @@ Compute ray-triangle intersections in 3D using the Möller–Trumbore algorithm
 
 - Counts the total number of intersections between `orig` and `dest`
 - Computes the coordinates and object IDs of the first two intersections per ray (FBS/SBS)
-- Internal computations always use single precision for AVX2 and CUDA kernels; only GENERIC has `double` support
+- The AVX2 and CUDA kernels compute in single precision, GENERIC in the precision of the input; with `double` input,
+  the AVX2 kernel forms the vectors between ray origin, vertices and bounding boxes in `double` before rounding them, so
+  its precision depends on the size of the scene, not on its distance from the coordinate origin (e.g. UTM coordinates);
+  the CUDA kernel rounds the coordinates themselves, so its errors grow with the distance from the origin
+- Triangle edges and vertices count as hits; hits at the same distance (e.g. on a shared edge) are reported in the
+  order of the mesh index, the lower index first (all kernels)
 
 ## Usage:
 ```
@@ -34,7 +39,7 @@ fbs, sbs, no_interact, fbs_ind, sbs_ind = RTtools.ray_triangle_intersect( orig, 
 - **`aabb`** (optional) — Pre-computed axis-aligned bounding boxes per sub-mesh; each row:
   `{x_min x_max y_min y_max z_min z_max}`; if empty or omitted, AABBs are computed from `mesh`; `(n_sub, 6)`
 - **`use_kernel`** *(optional)* — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA;
-  throws if unavailable and for other values; auto mode selects CUDA when `n_ray >= 10000` and CUDA is available, else AVX2,
+  throws if unavailable and for other values; auto mode selects CUDA when `n_ray >= 500` and CUDA is available, else AVX2,
   else GENERIC.
 - **`gpu_id`** *(optional)* — CUDA device ID; ignored when not using CUDA
 

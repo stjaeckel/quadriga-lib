@@ -424,7 +424,8 @@ namespace quadriga_lib
     // Calculates the intersection of rays and triangles in three dimensions
     // - Implements the Möller–Trumbore ray-triangle intersection algorithm
     // - Supports three compute kernels: GENERIC (scalar), AVX2 (SIMD), and CUDA (GPU)
-    // - All internal computations are done using single precision
+    // - AVX2 and CUDA compute in single precision, GENERIC in the precision of dtype; for double input, the AVX2
+    //   precision depends on the scene size, not on the distance from the coordinate origin (CUDA rounds the coordinates)
     template <typename dtype>
     void ray_triangle_intersect(const arma::Mat<dtype> *orig,                  // Ray origin points in GCS, Size [ n_ray, 3 ]
                                 const arma::Mat<dtype> *dest,                  // Ray destination points in GCS, Size [ n_ray, 3 ]
