@@ -16,6 +16,11 @@ if package_path not in sys.path:
 
 import quadriga_lib
 
+try:
+    from PIL import Image
+except ImportError:  # the decoding checks need Pillow
+    Image = None
+
 class test_case(unittest.TestCase):
 
     def test(self):
@@ -46,3 +51,33 @@ class test_case(unittest.TestCase):
 
         # Clean up
         os.remove(out_file)
+
+    @unittest.skipUnless(Image is not None, "Pillow is not installed")
+    def test_degenerate_range_nan_and_errors(self):
+        out_file = "test_png_range.png"
+        first, last = (0, 0, 131), (128, 0, 0)  # first and last colour of "jet"
+
+        def pixels(data, *args):
+            quadriga_lib.tools.write_png(out_file, data, "jet", *args)
+            with Image.open(out_file) as im:
+                px = np.asarray(im.convert("RGB"))
+            os.remove(out_file)
+            return px
+
+        # Constant data, a single value and all-NaN data give the first colour everywhere
+        for data in (np.full((4, 3), 2.5), np.array([[7.0]]), np.full((4, 3), np.nan)):
+            px = pixels(data)
+            self.assertEqual(px.shape, data.shape + (3,))
+            npt.assert_array_equal(px.reshape(-1, 3), np.tile(first, (data.size, 1)))
+
+        # NaN pixels get the first colour, +-Inf are clipped and do not change the auto range
+        px = pixels(np.array([[0.0, 1.0, np.inf, -np.inf, np.nan]]))
+        npt.assert_array_equal(px[0], [first, last, last, first, first])
+
+        # Inverted user range and empty data raise
+        with self.assertRaises(ValueError):
+            quadriga_lib.tools.write_png(out_file, np.ones((2, 2)), "jet", 2.0, 1.0)
+        with self.assertRaises(ValueError):
+            quadriga_lib.tools.write_png(out_file, np.zeros((0, 3)))
+        self.assertFalse(os.path.exists(out_file))
+
