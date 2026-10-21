@@ -45,6 +45,17 @@ assertEqual( hit_count, hit_count_R(reverse_index) );
 hit_count_g = quadriga_lib.ray_point_intersect( orig, trivec, tridir, points, [], 1 );
 assertEqual( hit_count, hit_count_g );
 
+% Sub-clouds that are not aligned to the SIMD vector size are accepted by every kernel
+sub_idx = uint32([1, 4, 12]);
+[hit_count_u, ray_ind_u] = quadriga_lib.ray_point_intersect( orig, trivec, tridir, points, sub_idx );
+assertEqual( hit_count, hit_count_u );
+assertEqual( ray_ind, ray_ind_u );
+hit_count_u = quadriga_lib.ray_point_intersect( orig, trivec, tridir, points, sub_idx, 1 );
+assertEqual( hit_count, hit_count_u );
+[pointsR, sub_cloud_index, ~, reverse_index] = quadriga_lib.point_cloud_segmentation( points, 3 );
+hit_count_R = quadriga_lib.ray_point_intersect( orig, trivec, tridir, pointsR, sub_cloud_index );
+assertEqual( hit_count, hit_count_R(reverse_index) );
+
 try % 3 imputs
     quadriga_lib.ray_point_intersect( orig, trivec, tridir );
     error('moxunit:exceptionNotRaised', 'Expected an error!');

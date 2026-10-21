@@ -685,6 +685,13 @@ if (ENABLE_TESTS)
     )
 
     target_link_libraries(test_bin PRIVATE ${QUADRIGA_LINK_TARGET} ${CATCH2_LIB})
+
+    # The kernel tests compare AVX2 with GENERIC under #ifdef BUILD_WITH_AVX2, so the macro is defined only when
+    # the library has the AVX2 kernels (the library itself gets BUILD_WITH_AVX2=0 or 1)
+    if(BUILD_WITH_AVX2)
+        target_compile_definitions(test_bin PRIVATE BUILD_WITH_AVX2=1)
+    endif()
+
     if(QUADRIGA_LINK_TARGET STREQUAL "quadriga_static")
         target_link_libraries(test_bin PRIVATE ${HDF5_LINK_LIBS})
     endif()

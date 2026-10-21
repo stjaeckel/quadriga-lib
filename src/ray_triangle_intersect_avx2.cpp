@@ -10,59 +10,48 @@
 
 // ---- Double-to-float load helpers ------------------------------------------
 
-// Load 8 doubles from memory and convert to a single __m256 of floats
-static inline __m256 _load8_cvt_pd_ps(const double *p)
+// Load 8 doubles into two registers
+static inline void _load8_pd(const double *p, __m256d &lo, __m256d &hi)
 {
-    __m256d lo = _mm256_loadu_pd(p);
-    __m256d hi = _mm256_loadu_pd(p + 4);
-    return _mm256_set_m128(_mm256_cvtpd_ps(hi), _mm256_cvtpd_ps(lo));
+    lo = _mm256_loadu_pd(p);
+    hi = _mm256_loadu_pd(p + 4);
 }
 
-// Masked load of up to 8 doubles, converted to a single __m256 of floats
-// mask must be an int32 lane mask (sign bit set = active lane)
-static inline __m256 _maskload8_cvt_pd_ps(const double *p, __m256i mask)
+// Masked load of up to 8 doubles into two registers
+// m_lo and m_hi are int64 lane masks (sign bit set = active lane) for the first and the second 4 values
+static inline void _maskload8_pd(const double *p, __m256i m_lo, __m256i m_hi, __m256d &lo, __m256d &hi)
 {
-    __m128i mlo = _mm256_castsi256_si128(mask);
-    __m128i mhi = _mm256_extracti128_si256(mask, 1);
-    __m256i mask64_lo = _mm256_cvtepi32_epi64(mlo);
-    __m256i mask64_hi = _mm256_cvtepi32_epi64(mhi);
-    __m256d lo = _mm256_maskload_pd(p, mask64_lo);
-    __m256d hi = _mm256_maskload_pd(p + 4, mask64_hi);
-    return _mm256_set_m128(_mm256_cvtpd_ps(hi), _mm256_cvtpd_ps(lo));
+    lo = _mm256_maskload_pd(p, m_lo);
+    hi = _mm256_maskload_pd(p + 4, m_hi);
+}
+
+// Difference a - b of 8 doubles (given as two registers each), computed in double and converted to float
+static inline __m256 _sub8_cvt_pd_ps(__m256d a_lo, __m256d a_hi, __m256d b_lo, __m256d b_hi)
+{
+    return _mm256_set_m128(_mm256_cvtpd_ps(_mm256_sub_pd(a_hi, b_hi)), _mm256_cvtpd_ps(_mm256_sub_pd(a_lo, b_lo)));
 }
 
 // ---- Shared AABB slab test (float SIMD) ------------------------------------
 
 // Returns a float bitmask: -1 (all bits set) for hit, 0 for miss per lane
-static inline __m256 rti_aabb_slab_test(__m256 xmin_v, __m256 xmax_v,
-                                        __m256 ymin_v, __m256 ymax_v,
-                                        __m256 zmin_v, __m256 zmax_v,
-                                        __m256 ox, __m256 oy, __m256 oz,
+// lx, hx, ly, hy, lz, hz are the AABB limits minus the ray origin, i.e. x_min - ox, x_max - ox, y_min - oy, ...
+static inline __m256 rti_aabb_slab_test(__m256 lx, __m256 hx,
+                                        __m256 ly, __m256 hy,
+                                        __m256 lz, __m256 hz,
                                         __m256 dx_i, __m256 dy_i, __m256 dz_i,
                                         __m256 r0, __m256 r1, __m256i aabb_mask)
 {
     // Calculate the intersections of the ray with the two planes orthogonal to each coordinate axis
-    __m256 T = _mm256_sub_ps(xmin_v, ox);
-    __m256 t0_low = _mm256_mul_ps(T, dx_i);
-
-    T = _mm256_sub_ps(xmax_v, ox);
-    __m256 t0_high = _mm256_mul_ps(T, dx_i);
-
-    T = _mm256_sub_ps(ymin_v, oy);
-    __m256 t1_low = _mm256_mul_ps(T, dy_i);
-
-    T = _mm256_sub_ps(ymax_v, oy);
-    __m256 t1_high = _mm256_mul_ps(T, dy_i);
-
-    T = _mm256_sub_ps(zmin_v, oz);
-    __m256 t2_low = _mm256_mul_ps(T, dz_i);
-
-    T = _mm256_sub_ps(zmax_v, oz);
-    __m256 t2_high = _mm256_mul_ps(T, dz_i);
+    __m256 t0_low = _mm256_mul_ps(lx, dx_i);
+    __m256 t0_high = _mm256_mul_ps(hx, dx_i);
+    __m256 t1_low = _mm256_mul_ps(ly, dy_i);
+    __m256 t1_high = _mm256_mul_ps(hy, dy_i);
+    __m256 t2_low = _mm256_mul_ps(lz, dz_i);
+    __m256 t2_high = _mm256_mul_ps(hz, dz_i);
 
     // Calculate the close and far extrema of the segment within each slab
     __m256 M = _mm256_cmp_ps(t0_low, t0_high, _CMP_GE_OQ);
-    T = _mm256_blendv_ps(t0_low, t0_high, M);
+    __m256 T = _mm256_blendv_ps(t0_low, t0_high, M);
     t0_high = _mm256_blendv_ps(t0_high, t0_low, M);
     t0_low = T;
 
@@ -77,15 +66,16 @@ static inline __m256 rti_aabb_slab_test(__m256 xmin_v, __m256 xmax_v,
     t2_low = T;
 
     // Calculate the intersection of all segments
-    M = _mm256_cmp_ps(t0_low, t1_low, _CMP_GE_OQ);
-    t0_low = _mm256_blendv_ps(t1_low, t0_low, M);
-    M = _mm256_cmp_ps(t0_low, t2_low, _CMP_GE_OQ);
-    t0_low = _mm256_blendv_ps(t2_low, t0_low, M);
+    // A ray that lies in a plane of a slab gives NaN (0 * inf) for that plane, and the slab does not limit the
+    // segment then. NaN values are skipped: max_ps and min_ps return the second operand when the first one is NaN,
+    // and the running values start at -inf and +inf.
+    t0_low = _mm256_max_ps(t0_low, _mm256_set1_ps(-INFINITY));
+    t0_low = _mm256_max_ps(t1_low, t0_low);
+    t0_low = _mm256_max_ps(t2_low, t0_low);
 
-    M = _mm256_cmp_ps(t0_high, t1_high, _CMP_LE_OQ);
-    t0_high = _mm256_blendv_ps(t1_high, t0_high, M);
-    M = _mm256_cmp_ps(t0_high, t2_high, _CMP_LE_OQ);
-    t0_high = _mm256_blendv_ps(t2_high, t0_high, M);
+    t0_high = _mm256_min_ps(t0_high, _mm256_set1_ps(INFINITY));
+    t0_high = _mm256_min_ps(t1_high, t0_high);
+    t0_high = _mm256_min_ps(t2_high, t0_high);
 
     // If t0_high < 0, the ray is intersecting AABB, but the whole AABB is behind us
     // If t0_low >= t0_high, ray doesn't intersect AABB
@@ -100,6 +90,16 @@ static inline __m256 rti_aabb_slab_test(__m256 xmin_v, __m256 xmax_v,
 }
 
 // ---- Shared Möller-Trumbore + FBS/SBS update (float SIMD) ------------------
+
+// Lane mask of the reduction steps: keep the own lane when (W, I) < (Wp, Ip) lexicographically, i.e. W < Wp, or
+// W == Wp and I < Ip. On exact ties the lower mesh index wins, as in the generic kernel.
+static inline __m256 rti_lex_less(__m256 W, __m256 Wp, __m256i I, __m256i Ip)
+{
+    __m256 C = _mm256_cmp_ps(W, Wp, _CMP_LT_OQ);                  // W < Wp
+    __m256 E = _mm256_cmp_ps(W, Wp, _CMP_EQ_OQ);                  // W == Wp
+    E = _mm256_and_ps(E, _mm256_castsi256_ps(_mm256_cmpgt_epi32(Ip, I))); // W == Wp & I < Ip
+    return _mm256_or_ps(C, E);
+}
 
 // tx, ty, tz must already be (origin - vertex), i.e. ox-Tx, oy-Ty, oz-Tz
 static inline void rti_moller_trumbore_update(__m256 tx, __m256 ty, __m256 tz,
@@ -192,21 +192,21 @@ static inline void rti_moller_trumbore_update(__m256 tx, __m256 ty, __m256 tz,
     // Perform parallel reduction to find the FBS location and index
     // FBS Step 1: Pairwise comparisons
     __m256 Wp = _mm256_permute_ps(W, 0b10110001);                      // Permuted values
-    C1 = _mm256_cmp_ps(W, Wp, _CMP_LT_OQ);                             // Compare values
+    C1 = rti_lex_less(W, Wp, i0, i0p);                                 // Compare values and indices
     __m256 Wm = _mm256_blendv_ps(Wp, W, C1);                           // Minimum values
     __m256i Im = _mm256_blendv_epi8(i0p, i0, _mm256_castps_si256(C1)); // Minimum indices
 
     // FBS Step 2: Logarithmic reduction
     Wp = _mm256_permute2f128_ps(Wm, Wm, 0x21);                // Swap 128 bit lanes
     Ip = _mm256_permute2f128_si256(Im, Im, 0x21);             // Swap 128 bit lanes
-    C1 = _mm256_cmp_ps(Wm, Wp, _CMP_LT_OQ);                   // Compare values
+    C1 = rti_lex_less(Wm, Wp, Im, Ip);                        // Compare values and indices
     Wm = _mm256_blendv_ps(Wp, Wm, C1);                        // Minimum values
     Im = _mm256_blendv_epi8(Ip, Im, _mm256_castps_si256(C1)); // Minimum indices
 
     // FBS Step 3: Final reduction
     Wp = _mm256_permute_ps(Wm, 0b00001111);                   // Permuted values
     Ip = _mm256_permutevar8x32_epi32(Im, iX);                 // Permuted indices
-    C1 = _mm256_cmp_ps(Wm, Wp, _CMP_LT_OQ);                   // Compare values
+    C1 = rti_lex_less(Wm, Wp, Im, Ip);                        // Compare values and indices
     Wm = _mm256_blendv_ps(Wp, Wm, C1);                        // Minimum values
     Im = _mm256_blendv_epi8(Ip, Im, _mm256_castps_si256(C1)); // Minimum indices
     int i_avx = _mm256_extract_epi32(Im, 0);                  // Extract index in the AVX vector
@@ -243,21 +243,21 @@ static inline void rti_moller_trumbore_update(__m256 tx, __m256 ty, __m256 tz,
     // Perform parallel reduction to find the SBS location and index
     // SBS Step 1: Pairwise comparisons
     Wp = _mm256_permute_ps(W, 0b10110001);                     // Permuted values
-    C1 = _mm256_cmp_ps(W, Wp, _CMP_LT_OQ);                     // Compare values
+    C1 = rti_lex_less(W, Wp, i0, i0p);                         // Compare values and indices
     Wm = _mm256_blendv_ps(Wp, W, C1);                          // Minimum values
     Im = _mm256_blendv_epi8(i0p, i0, _mm256_castps_si256(C1)); // Minimum indices
 
     // SBS Step 2: Logarithmic reduction
     Wp = _mm256_permute2f128_ps(Wm, Wm, 0x21);                // Swap 128 bit lanes
     Ip = _mm256_permute2f128_si256(Im, Im, 0x21);             // Swap 128 bit lanes
-    C1 = _mm256_cmp_ps(Wm, Wp, _CMP_LT_OQ);                   // Compare values
+    C1 = rti_lex_less(Wm, Wp, Im, Ip);                        // Compare values and indices
     Wm = _mm256_blendv_ps(Wp, Wm, C1);                        // Minimum values
     Im = _mm256_blendv_epi8(Ip, Im, _mm256_castps_si256(C1)); // Minimum indices
 
     // SBS Step 3: Final reduction
     Wp = _mm256_permute_ps(Wm, 0b00001111);                   // Permuted values
     Ip = _mm256_permutevar8x32_epi32(Im, iX);                 // Permuted indices
-    C1 = _mm256_cmp_ps(Wm, Wp, _CMP_LT_OQ);                   // Compare values
+    C1 = rti_lex_less(Wm, Wp, Im, Ip);                        // Compare values and indices
     Wm = _mm256_blendv_ps(Wp, Wm, C1);                        // Minimum values
     Im = _mm256_blendv_epi8(Ip, Im, _mm256_castps_si256(C1)); // Minimum indices
 
@@ -334,9 +334,10 @@ void qd_RTI_AVX2<float>(const float *Tx, const float *Ty, const float *Tz, // Fi
             unsigned hit_counter = 0;
 
             // Step 1 - AABB intersection test (slab method)
-            __m256 dx_i = _mm256_div_ps(r1, dx);
-            __m256 dy_i = _mm256_div_ps(r1, dy);
-            __m256 dz_i = _mm256_div_ps(r1, dz);
+            // Adding 0 turns a direction of -0 into +0, so that a ray in a slab plane gets the slab limits -inf and +inf
+            __m256 dx_i = _mm256_div_ps(r1, _mm256_add_ps(dx, r0));
+            __m256 dy_i = _mm256_div_ps(r1, _mm256_add_ps(dy, r0));
+            __m256 dz_i = _mm256_div_ps(r1, _mm256_add_ps(dz, r0));
 
             for (size_t i_sub = 0; i_sub < n_sub; i_sub += VEC_SIZE)
             {
@@ -363,8 +364,10 @@ void qd_RTI_AVX2<float>(const float *Tx, const float *Ty, const float *Tz, // Fi
                     zmax_v = _mm256_maskload_ps(&Zmax[i_sub], aabb_mask);
                 }
 
-                __m256 M = rti_aabb_slab_test(xmin_v, xmax_v, ymin_v, ymax_v, zmin_v, zmax_v,
-                                              ox, oy, oz, dx_i, dy_i, dz_i, r0, r1, aabb_mask);
+                __m256 M = rti_aabb_slab_test(_mm256_sub_ps(xmin_v, ox), _mm256_sub_ps(xmax_v, ox),
+                                              _mm256_sub_ps(ymin_v, oy), _mm256_sub_ps(ymax_v, oy),
+                                              _mm256_sub_ps(zmin_v, oz), _mm256_sub_ps(zmax_v, oz),
+                                              dx_i, dy_i, dz_i, r0, r1, aabb_mask);
 
                 if (remaining >= VEC_SIZE)
                     _mm256_storeu_ps((float *)&p_sub_mesh_hit[i_sub], M);
@@ -478,6 +481,23 @@ void qd_RTI_AVX2<double>(const double *Tx, const double *Ty, const double *Tz, /
     const __m256i i0p = _mm256_setr_epi32(1, 0, 3, 2, 5, 4, 7, 6);
     const __m256i iX = _mm256_set_epi32(0, 1, 2, 3, 0, 1, 2, 3);
 
+    // Edges U - T and V - T, formed in double and narrowed to float. With enough rays they are computed once here
+    // and loaded by the triangle loop; otherwise the triangle loop forms them in the same way (same values).
+    const bool cache_edges = n_ray * 16 >= n_mesh;
+    std::vector<float> edge_cache(cache_edges ? 6 * n_mesh : 0);
+    float *E1x = nullptr, *E1y = nullptr, *E1z = nullptr, *E2x = nullptr, *E2y = nullptr, *E2z = nullptr;
+    if (cache_edges)
+    {
+        E1x = edge_cache.data(), E1y = E1x + n_mesh, E1z = E1y + n_mesh;
+        E2x = E1z + n_mesh, E2y = E2x + n_mesh, E2z = E2y + n_mesh;
+#pragma omp parallel for if (n_mesh_int >= 65536)
+        for (int i = 0; i < n_mesh_int; ++i)
+        {
+            E1x[i] = float(Ux[i] - Tx[i]), E1y[i] = float(Uy[i] - Ty[i]), E1z[i] = float(Uz[i] - Tz[i]);
+            E2x[i] = float(Vx[i] - Tx[i]), E2y[i] = float(Vy[i] - Ty[i]), E2z[i] = float(Vz[i] - Tz[i]);
+        }
+    }
+
 #pragma omp parallel if (n_ray_int >= 64)
     {
         // Per-thread storage for sub-mesh hit indicators, reused across ray iterations
@@ -487,10 +507,12 @@ void qd_RTI_AVX2<double>(const double *Tx, const double *Ty, const double *Tz, /
 #pragma omp for schedule(static)
         for (int i_ray = 0; i_ray < n_ray_int; ++i_ray)
         {
-            // Load origin and direction, convert double scalars to float broadcasts
-            __m256 ox = _mm256_set1_ps((float)Ox[i_ray]);
-            __m256 oy = _mm256_set1_ps((float)Oy[i_ray]);
-            __m256 oz = _mm256_set1_ps((float)Oz[i_ray]);
+            // Origin in double: the vectors from the origin to the AABB limits and from the first vertex to the origin,
+            // and the edges, are formed in double and then narrowed to float. Their precision depends on the size of
+            // the scene, not on its distance from the coordinate origin.
+            __m256d ox = _mm256_set1_pd(Ox[i_ray]);
+            __m256d oy = _mm256_set1_pd(Oy[i_ray]);
+            __m256d oz = _mm256_set1_pd(Oz[i_ray]);
 
             __m256 dx = _mm256_set1_ps(float(Dx[i_ray] - Ox[i_ray]));
             __m256 dy = _mm256_set1_ps(float(Dy[i_ray] - Oy[i_ray]));
@@ -503,37 +525,42 @@ void qd_RTI_AVX2<double>(const double *Tx, const double *Ty, const double *Tz, /
             unsigned hit_counter = 0;
 
             // Step 1 - AABB intersection test (slab method)
-            __m256 dx_i = _mm256_div_ps(r1, dx);
-            __m256 dy_i = _mm256_div_ps(r1, dy);
-            __m256 dz_i = _mm256_div_ps(r1, dz);
+            // Adding 0 turns a direction of -0 into +0, so that a ray in a slab plane gets the slab limits -inf and +inf
+            __m256 dx_i = _mm256_div_ps(r1, _mm256_add_ps(dx, r0));
+            __m256 dy_i = _mm256_div_ps(r1, _mm256_add_ps(dy, r0));
+            __m256 dz_i = _mm256_div_ps(r1, _mm256_add_ps(dz, r0));
 
             for (size_t i_sub = 0; i_sub < n_sub; i_sub += VEC_SIZE)
             {
                 int remaining = (int)(n_sub - i_sub);
                 __m256i aabb_mask = _mm256_cmpgt_epi32(_mm256_set1_epi32(remaining), i0);
 
-                __m256 xmin_v, xmax_v, ymin_v, ymax_v, zmin_v, zmax_v;
+                __m256d xmin_lo, xmin_hi, xmax_lo, xmax_hi, ymin_lo, ymin_hi, ymax_lo, ymax_hi, zmin_lo, zmin_hi, zmax_lo, zmax_hi;
                 if (remaining >= VEC_SIZE)
                 {
-                    xmin_v = _load8_cvt_pd_ps(&Xmin[i_sub]);
-                    xmax_v = _load8_cvt_pd_ps(&Xmax[i_sub]);
-                    ymin_v = _load8_cvt_pd_ps(&Ymin[i_sub]);
-                    ymax_v = _load8_cvt_pd_ps(&Ymax[i_sub]);
-                    zmin_v = _load8_cvt_pd_ps(&Zmin[i_sub]);
-                    zmax_v = _load8_cvt_pd_ps(&Zmax[i_sub]);
+                    _load8_pd(&Xmin[i_sub], xmin_lo, xmin_hi);
+                    _load8_pd(&Xmax[i_sub], xmax_lo, xmax_hi);
+                    _load8_pd(&Ymin[i_sub], ymin_lo, ymin_hi);
+                    _load8_pd(&Ymax[i_sub], ymax_lo, ymax_hi);
+                    _load8_pd(&Zmin[i_sub], zmin_lo, zmin_hi);
+                    _load8_pd(&Zmax[i_sub], zmax_lo, zmax_hi);
                 }
                 else
                 {
-                    xmin_v = _maskload8_cvt_pd_ps(&Xmin[i_sub], aabb_mask);
-                    xmax_v = _maskload8_cvt_pd_ps(&Xmax[i_sub], aabb_mask);
-                    ymin_v = _maskload8_cvt_pd_ps(&Ymin[i_sub], aabb_mask);
-                    ymax_v = _maskload8_cvt_pd_ps(&Ymax[i_sub], aabb_mask);
-                    zmin_v = _maskload8_cvt_pd_ps(&Zmin[i_sub], aabb_mask);
-                    zmax_v = _maskload8_cvt_pd_ps(&Zmax[i_sub], aabb_mask);
+                    __m256i m_lo = _mm256_cvtepi32_epi64(_mm256_castsi256_si128(aabb_mask));
+                    __m256i m_hi = _mm256_cvtepi32_epi64(_mm256_extracti128_si256(aabb_mask, 1));
+                    _maskload8_pd(&Xmin[i_sub], m_lo, m_hi, xmin_lo, xmin_hi);
+                    _maskload8_pd(&Xmax[i_sub], m_lo, m_hi, xmax_lo, xmax_hi);
+                    _maskload8_pd(&Ymin[i_sub], m_lo, m_hi, ymin_lo, ymin_hi);
+                    _maskload8_pd(&Ymax[i_sub], m_lo, m_hi, ymax_lo, ymax_hi);
+                    _maskload8_pd(&Zmin[i_sub], m_lo, m_hi, zmin_lo, zmin_hi);
+                    _maskload8_pd(&Zmax[i_sub], m_lo, m_hi, zmax_lo, zmax_hi);
                 }
 
-                __m256 M = rti_aabb_slab_test(xmin_v, xmax_v, ymin_v, ymax_v, zmin_v, zmax_v,
-                                              ox, oy, oz, dx_i, dy_i, dz_i, r0, r1, aabb_mask);
+                __m256 M = rti_aabb_slab_test(_sub8_cvt_pd_ps(xmin_lo, xmin_hi, ox, ox), _sub8_cvt_pd_ps(xmax_lo, xmax_hi, ox, ox),
+                                              _sub8_cvt_pd_ps(ymin_lo, ymin_hi, oy, oy), _sub8_cvt_pd_ps(ymax_lo, ymax_hi, oy, oy),
+                                              _sub8_cvt_pd_ps(zmin_lo, zmin_hi, oz, oz), _sub8_cvt_pd_ps(zmax_lo, zmax_hi, oz, oz),
+                                              dx_i, dy_i, dz_i, r0, r1, aabb_mask);
 
                 if (remaining >= VEC_SIZE)
                     _mm256_storeu_ps((float *)&p_sub_mesh_hit[i_sub], M);
@@ -554,44 +581,38 @@ void qd_RTI_AVX2<double>(const double *Tx, const double *Ty, const double *Tz, /
                 {
                     int remaining = i_mesh_end - i_mesh;
                     __m256i tail_mask = _mm256_cmpgt_epi32(_mm256_set1_epi32(remaining), i0);
+
+                    // Vector from the first vertex T to the origin (O - T) and edges (U - T, V - T), one axis at a time
+                    __m256d t_lo, t_hi, u_lo, u_hi, v_lo, v_hi;
                     __m256 tx, ty, tz, e1x, e1y, e1z, e2x, e2y, e2z;
-                    if (remaining >= VEC_SIZE)
+                    if (remaining >= VEC_SIZE && cache_edges)
                     {
-                        tx = _load8_cvt_pd_ps(&Tx[i_mesh]);
-                        ty = _load8_cvt_pd_ps(&Ty[i_mesh]);
-                        tz = _load8_cvt_pd_ps(&Tz[i_mesh]);
-                        e1x = _load8_cvt_pd_ps(&Ux[i_mesh]);
-                        e1y = _load8_cvt_pd_ps(&Uy[i_mesh]);
-                        e1z = _load8_cvt_pd_ps(&Uz[i_mesh]);
-                        e2x = _load8_cvt_pd_ps(&Vx[i_mesh]);
-                        e2y = _load8_cvt_pd_ps(&Vy[i_mesh]);
-                        e2z = _load8_cvt_pd_ps(&Vz[i_mesh]);
+                        _load8_pd(&Tx[i_mesh], t_lo, t_hi), tx = _sub8_cvt_pd_ps(ox, ox, t_lo, t_hi);
+                        _load8_pd(&Ty[i_mesh], t_lo, t_hi), ty = _sub8_cvt_pd_ps(oy, oy, t_lo, t_hi);
+                        _load8_pd(&Tz[i_mesh], t_lo, t_hi), tz = _sub8_cvt_pd_ps(oz, oz, t_lo, t_hi);
+                        e1x = _mm256_loadu_ps(&E1x[i_mesh]), e1y = _mm256_loadu_ps(&E1y[i_mesh]), e1z = _mm256_loadu_ps(&E1z[i_mesh]);
+                        e2x = _mm256_loadu_ps(&E2x[i_mesh]), e2y = _mm256_loadu_ps(&E2y[i_mesh]), e2z = _mm256_loadu_ps(&E2z[i_mesh]);
+                    }
+                    else if (remaining >= VEC_SIZE)
+                    {
+                        _load8_pd(&Tx[i_mesh], t_lo, t_hi), _load8_pd(&Ux[i_mesh], u_lo, u_hi), _load8_pd(&Vx[i_mesh], v_lo, v_hi);
+                        tx = _sub8_cvt_pd_ps(ox, ox, t_lo, t_hi), e1x = _sub8_cvt_pd_ps(u_lo, u_hi, t_lo, t_hi), e2x = _sub8_cvt_pd_ps(v_lo, v_hi, t_lo, t_hi);
+                        _load8_pd(&Ty[i_mesh], t_lo, t_hi), _load8_pd(&Uy[i_mesh], u_lo, u_hi), _load8_pd(&Vy[i_mesh], v_lo, v_hi);
+                        ty = _sub8_cvt_pd_ps(oy, oy, t_lo, t_hi), e1y = _sub8_cvt_pd_ps(u_lo, u_hi, t_lo, t_hi), e2y = _sub8_cvt_pd_ps(v_lo, v_hi, t_lo, t_hi);
+                        _load8_pd(&Tz[i_mesh], t_lo, t_hi), _load8_pd(&Uz[i_mesh], u_lo, u_hi), _load8_pd(&Vz[i_mesh], v_lo, v_hi);
+                        tz = _sub8_cvt_pd_ps(oz, oz, t_lo, t_hi), e1z = _sub8_cvt_pd_ps(u_lo, u_hi, t_lo, t_hi), e2z = _sub8_cvt_pd_ps(v_lo, v_hi, t_lo, t_hi);
                     }
                     else
                     {
-                        tx = _maskload8_cvt_pd_ps(&Tx[i_mesh], tail_mask);
-                        ty = _maskload8_cvt_pd_ps(&Ty[i_mesh], tail_mask);
-                        tz = _maskload8_cvt_pd_ps(&Tz[i_mesh], tail_mask);
-                        e1x = _maskload8_cvt_pd_ps(&Ux[i_mesh], tail_mask);
-                        e1y = _maskload8_cvt_pd_ps(&Uy[i_mesh], tail_mask);
-                        e1z = _maskload8_cvt_pd_ps(&Uz[i_mesh], tail_mask);
-                        e2x = _maskload8_cvt_pd_ps(&Vx[i_mesh], tail_mask);
-                        e2y = _maskload8_cvt_pd_ps(&Vy[i_mesh], tail_mask);
-                        e2z = _maskload8_cvt_pd_ps(&Vz[i_mesh], tail_mask);
+                        __m256i m_lo = _mm256_cvtepi32_epi64(_mm256_castsi256_si128(tail_mask));
+                        __m256i m_hi = _mm256_cvtepi32_epi64(_mm256_extracti128_si256(tail_mask, 1));
+                        _maskload8_pd(&Tx[i_mesh], m_lo, m_hi, t_lo, t_hi), _maskload8_pd(&Ux[i_mesh], m_lo, m_hi, u_lo, u_hi), _maskload8_pd(&Vx[i_mesh], m_lo, m_hi, v_lo, v_hi);
+                        tx = _sub8_cvt_pd_ps(ox, ox, t_lo, t_hi), e1x = _sub8_cvt_pd_ps(u_lo, u_hi, t_lo, t_hi), e2x = _sub8_cvt_pd_ps(v_lo, v_hi, t_lo, t_hi);
+                        _maskload8_pd(&Ty[i_mesh], m_lo, m_hi, t_lo, t_hi), _maskload8_pd(&Uy[i_mesh], m_lo, m_hi, u_lo, u_hi), _maskload8_pd(&Vy[i_mesh], m_lo, m_hi, v_lo, v_hi);
+                        ty = _sub8_cvt_pd_ps(oy, oy, t_lo, t_hi), e1y = _sub8_cvt_pd_ps(u_lo, u_hi, t_lo, t_hi), e2y = _sub8_cvt_pd_ps(v_lo, v_hi, t_lo, t_hi);
+                        _maskload8_pd(&Tz[i_mesh], m_lo, m_hi, t_lo, t_hi), _maskload8_pd(&Uz[i_mesh], m_lo, m_hi, u_lo, u_hi), _maskload8_pd(&Vz[i_mesh], m_lo, m_hi, v_lo, v_hi);
+                        tz = _sub8_cvt_pd_ps(oz, oz, t_lo, t_hi), e1z = _sub8_cvt_pd_ps(u_lo, u_hi, t_lo, t_hi), e2z = _sub8_cvt_pd_ps(v_lo, v_hi, t_lo, t_hi);
                     }
-
-                    // Compute edges inline
-                    e1x = _mm256_sub_ps(e1x, tx);
-                    e1y = _mm256_sub_ps(e1y, ty);
-                    e1z = _mm256_sub_ps(e1z, tz);
-                    e2x = _mm256_sub_ps(e2x, tx);
-                    e2y = _mm256_sub_ps(e2y, ty);
-                    e2z = _mm256_sub_ps(e2z, tz);
-
-                    // Calculate vector from first vertex coordinate V1 to origin O
-                    tx = _mm256_sub_ps(ox, tx);
-                    ty = _mm256_sub_ps(oy, ty);
-                    tz = _mm256_sub_ps(oz, tz);
 
                     rti_moller_trumbore_update(tx, ty, tz, e1x, e1y, e1z, e2x, e2y, e2z,
                                                dx, dy, dz, r0, r1, tail_mask, i0, i0p, iX,

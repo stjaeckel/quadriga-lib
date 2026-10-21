@@ -580,14 +580,16 @@ TEST_CASE("Ray-Point Intersect - Input Validation")
                                                       nullptr, nullptr, nullptr, nullptr, &too_large, 1),
                     std::invalid_argument);
 
-    // Sub-clouds must be aligned to the SIMD vector size for the AVX2 kernel
+    // Sub-clouds need not be aligned to the SIMD vector size, the AVX2 kernel accepts them
     if (quadriga_lib::quadriga_lib_has_AVX2())
     {
         arma::u32_vec misaligned(2);
         misaligned.at(0) = 0, misaligned.at(1) = 3;
-        CHECK_THROWS_AS(quadriga_lib::ray_point_intersect(points, orig, trivec, tridir,
-                                                          nullptr, nullptr, nullptr, nullptr, &misaligned, 2),
-                        std::invalid_argument);
+        arma::u32_vec cnt_avx2, cnt_gen;
+        CHECK_NOTHROW(quadriga_lib::ray_point_intersect(points, orig, trivec, tridir,
+                                                        nullptr, nullptr, &cnt_avx2, nullptr, &misaligned, 2));
+        quadriga_lib::ray_point_intersect(points, orig, trivec, tridir, nullptr, nullptr, &cnt_gen, nullptr, &misaligned, 1);
+        CHECK(arma::all(cnt_avx2 == cnt_gen));
     }
 
     // Requesting a kernel that is not available must be rejected
@@ -618,4 +620,47 @@ TEST_CASE("Ray-Point Intersect - Invalid use_kernel")
 
     CHECK_NOTHROW(quadriga_lib::ray_point_intersect(points, orig, trivec, tridir,
                                                     nullptr, nullptr, nullptr, nullptr, nullptr, 1));
+}
+
+TEST_CASE("Ray-Point Intersect - Unaligned sub-clouds")
+{
+    // The default point_cloud_segmentation output (vec_size = 1) has sub-clouds that do not start at multiples of 8;
+    // also hand-made sub-clouds of 3 and 5 points and a last one that ends 5 points after a multiple of 8. Every
+    // kernel accepts them and returns the same hits as without sub-clouds.
+    arma::arma_rng::set_seed(5);
+    arma::mat center, vert, tridir;
+    quadriga_lib::icosphere<double>(2, 1.0, &center, nullptr, &vert, &tridir, true);
+    arma::mat trivec = vert;
+    for (arma::uword c = 0; c < 9; ++c)
+        trivec.col(c) += center.col(c % 3);
+    arma::mat orig(center.n_rows, 3, arma::fill::zeros);
+
+    arma::mat points = arma::randu<arma::mat>(3000, 3) * 20.0 - 10.0;
+    arma::mat pR;
+    arma::u32_vec sci_seg;
+    quadriga_lib::point_cloud_segmentation(&points, &pR, &sci_seg);
+    REQUIRE(pR.n_rows == 3000);
+    REQUIRE(arma::any(sci_seg - 8 * (sci_seg / 8) != 0)); // unaligned
+
+    arma::u32_vec sci_hand = {0, 3, 8, 13, 2995};
+
+    std::vector<unsigned> idx_ref;
+    arma::u32_vec off_ref;
+    quadriga_lib::ray_point_intersect<double>(pR, orig, trivec, tridir, &idx_ref, &off_ref, nullptr, nullptr, nullptr, 1);
+    REQUIRE(idx_ref.size() > 2900);
+
+    std::vector<int> kernels = {1};
+    if (quadriga_lib::quadriga_lib_has_AVX2())
+        kernels.push_back(2);
+
+    for (int kernel : kernels)
+        for (const arma::u32_vec *sci : {&sci_seg, &sci_hand})
+        {
+            INFO("use_kernel = " << kernel << ", " << (sci == &sci_seg ? "point_cloud_segmentation" : "hand-made") << " sub-clouds");
+            std::vector<unsigned> idx;
+            arma::u32_vec off;
+            REQUIRE_NOTHROW(quadriga_lib::ray_point_intersect<double>(pR, orig, trivec, tridir, &idx, &off, nullptr, nullptr, sci, kernel));
+            CHECK(idx == idx_ref);
+            CHECK(arma::all(off == off_ref));
+        }
 }

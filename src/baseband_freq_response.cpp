@@ -5,10 +5,6 @@
 #include "quadriga_lib.hpp"
 #include "quadriga_lib_generic_functions.hpp"
 
-#if defined(_MSC_VER) // Windows
-#include <malloc.h>   // Include for _aligned_malloc and _aligned_free
-#endif
-
 #if BUILD_WITH_AVX2
 #include "quadriga_lib_avx2_functions.hpp"
 #define VEC_SIZE 8ULL
@@ -123,22 +119,18 @@ void quadriga_lib::baseband_freq_response(const arma::Cube<dtype> *coeff_re,    
         if (n_path == 0)
             hmat->zeros();
     }
-    if (n_path == 0)
+    if (n_path == 0 || (hmat_re == nullptr && hmat_im == nullptr && hmat == nullptr))
         return;
 
     // Declare constants
     const bool planar_wave = delay->n_rows == 1 && delay->n_cols == 1;
 
-// Allocate aligned memory
-#if defined(_MSC_VER) // Windows
-    double *freq = (double *)_aligned_malloc(n_carrier_s * sizeof(double), 32);
-    float *Hr = (float *)_aligned_malloc(n_carrier_s * n_ant * sizeof(float), 32);
-    float *Hi = (float *)_aligned_malloc(n_carrier_s * n_ant * sizeof(float), 32);
-#else // Linux
-    double *freq = (double *)aligned_alloc(32, n_carrier_s * sizeof(double));
-    float *Hr = (float *)aligned_alloc(32, n_carrier_s * n_ant * sizeof(float));
-    float *Hi = (float *)aligned_alloc(32, n_carrier_s * n_ant * sizeof(float));
-#endif
+    // Internal scratch buffers (no alignment needed: the AVX2 kernel uses unaligned loads and stores); Armadillo
+    // throws std::bad_alloc when an allocation fails, and the buffers are released on any exit
+    arma::Col<double> freq_buf(n_carrier_s, arma::fill::none);
+    arma::Col<float> Hr_buf(n_carrier_s * n_ant, arma::fill::none), Hi_buf(n_carrier_s * n_ant, arma::fill::none);
+    double *freq = freq_buf.memptr();
+    float *Hr = Hr_buf.memptr(), *Hi = Hi_buf.memptr();
 
     // Carrier frequencies relative to the centre frequency, negated: the phase of a path in cycles is freq * delay,
     // computed and reduced to one period in double precision by the DFT kernels
@@ -165,12 +157,6 @@ void quadriga_lib::baseband_freq_response(const arma::Cube<dtype> *coeff_re,    
                    n_ant, n_path, planar_wave, freq, n_carrier_s, Hr, Hi);
 #endif
 
-#if defined(_MSC_VER) // Windows
-    _aligned_free(freq);
-#else // Linux
-    free(freq);
-#endif
-
     // Copy data to output
     bool use_re = hmat_re != nullptr, use_im = hmat_im != nullptr, use_cplx = hmat != nullptr;
     dtype *p_hmat_re = use_re ? hmat_re->memptr() : nullptr;
@@ -191,14 +177,6 @@ void quadriga_lib::baseband_freq_response(const arma::Cube<dtype> *coeff_re,    
                 p_hmat[o] = {(dtype)Hr[i], (dtype)Hi[i]};
         }
 
-// Free aligned memory
-#if defined(_MSC_VER) // Windows
-    _aligned_free(Hr);
-    _aligned_free(Hi);
-#else // Linux
-    free(Hr);
-    free(Hi);
-#endif
 }
 
 template void quadriga_lib::baseband_freq_response(const arma::Cube<float> *coeff_re, const arma::Cube<float> *coeff_im, const arma::Cube<float> *delay,

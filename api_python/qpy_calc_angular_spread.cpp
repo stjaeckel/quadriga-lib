@@ -39,7 +39,8 @@ azimuth_spread, elevation_spread, orientation, phi, theta = \
 - **`powers`** — Path powers; list of length `n_cir`, each element a 1D array of length `n_path`
 - **`wrapping`** — If True, enables spherical rotation; default: False
 - **`calc_bank_angle`** — If True, computes the optimal bank angle analytically; only used when `wrapping = True`; default: False
-- **`quantize`** — Angular quantization step in [deg]; paths within this distance are grouped; default: 0.0 (no quantization)
+- **`quantize`** — Angular quantization step in [deg]; paths within this distance are grouped; default: 0.0 (no quantization);
+  otherwise it must be finite and >= 1e-3 deg, else a `ValueError` is raised
 
 ## Outputs:
 - **`azimuth_spread`** — RMS azimuth angular spread; `(n_cir,)`

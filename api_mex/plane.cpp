@@ -22,7 +22,8 @@ Construct a triangulated plane mesh
 - Triangle winding is consistent (normals point in +z direction), compatible with obj_file_write
 - The plane has no thickness in z-direction; scaling therefore only affects x and y
 - Scale, rotation, and translation are applied in that order (scale -> rotate -> translate)
-- An odd number of negative scale components flips the winding (normals point in -z direction)
+- When the product of the x and y scales is negative (mirrored plane), the winding is swapped so that the normals
+  still point in +z direction before the rotation; the z scale is ignored
 
 ## Usage:
 ```

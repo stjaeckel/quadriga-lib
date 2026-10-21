@@ -136,7 +136,7 @@ is the coordinator's suggestion from the hunt.
 | B-052 | 02 | `hdf5_write` rewriting a slot grows the file | (a) delete the old group link, document that space is not reclaimed (b) document only | (a) | (a) delete the old group link, document that space is reclaimed only by h5repack (2026-10-15) |
 | B-060 | 17 | `calc_effective_path_gain`: comment says "average", code sums | (a) fix the comment (b) divide by `n_rx * n_tx` | (a) | (a) fix the comment to 'sum' (2026-10-15) |
 | B-069 | 04 | Naming of the cross-polarisation rows of `M` | (a) one convention written out in words ("rows 2-3: response of the H port to a V input") in all docs, XPR columns checked against it (b) other | (a) | Global convention: M is the 2x2 Jones matrix (rows = RX polarisation V/H, columns = TX polarisation V/H) stored column-major as in MATLAB, i.e. rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx), Re/Im interleaved. This matches the measured code behaviour; fix every doc and label that says otherwise, and check the XPR columns of calc_cross_polarization_ratio against it (2026-10-15) |
-| B-070 | 13 | `calc_diffraction_gain` C++ frequency in scalar mode | (a) document the EM-equivalent frequency (b) convert inside C++ and drop the wrapper conversion | (a) | (b) C++ takes the acoustic frequency and converts internally; drop the conversion in the MEX and Python wrappers; API change for C++ callers (2026-10-15) |
+| B-070 | 13 | `calc_diffraction_gain` C++ frequency in scalar mode | (a) document the EM-equivalent frequency (b) convert inside C++ and drop the wrapper conversion | (a) | (b) C++ takes the acoustic frequency and converts internally; drop the conversion in the MEX and Python wrappers; API change for C++ callers (2026-10-15); changed 2026-10-21 to (a): the C++ core works in EM-equivalent frequency throughout (`src/qd_atmospheric_absorption.hpp`; ray_progress, ray_state_update, ray_mesh_interact, generate_diffraction_paths) and the acoustic session's wave tests call calc_diffraction_gain with EM-equivalent values; document the EM-equivalent frequency in the C++ block, wrappers unchanged |
 | B-074 | 08 | Invalid `use_kernel` values | (a) throw for values outside the documented set, and for 2 without AVX2 (as `sos_val`) (b) document "falls back to auto/generic" | (a) | (a) throw for values outside the documented set, and for 2 without AVX2 (2026-10-15) |
 | B-077 | 12 | `obj_overlap_test` with an empty mesh | (a) return an empty result (b) throw | (a) | (a) return an empty result (2026-10-15) |
 | B-082 | 12 | `cube` / `plane` with a negative scale | (a) swap the winding so normals stay outward / +z (b) reject negative scales | (a) | Mirror Blender: when a negative scale is applied to the mesh, Blender swaps the winding so normals stay outward / +z (checked with Blender 5.2.2, Object > Apply > Scale: cube scale (-1,1,1) and (1,1,-2) give 6 of 6 outward faces, plane scale (-1,1,1) gives normal z = +4). So: (a) swap the winding when the scale product is negative (2026-10-15) |
@@ -156,6 +156,7 @@ is the coordinator's suggestion from the hunt.
 | B-121 | 12 | AVX2-vs-generic ray kernel tests never run (`test_bin` without `BUILD_WITH_AVX2`, found in WP-04) | (a) record as an item, fix first in WP-12 (b) leave | (a) | (a) recorded as B-121, assigned to WP-12 (2026-10-17) |
 | WP-08 | 08 | One shared sin/cos core for the baseband DFT kernels and `fastmath_avx2.h` (proposed by the WP-04 worker) | (a) add to WP-08 as a note (b) leave | (a) | (a) added to WP-08 as a note; the WP-08 worker decides after measuring (2026-10-17) |
 | B-038 | 10 | Precision of qdant files (round 1 wrote 15 significant digits for double: files twice as large) | (a) double precision (b) single-equivalent, files as small as possible | - | (b) single-equivalent: dB magnitudes and phases with 6 decimals (5.8e-8 per sample at every level), positions and coupling as the shortest float text; replaces the 1e-12 round-trip acceptance (2026-10-20); changed 2026-10-20 (round 3): decimals relative to the element peak, absolute error at most single resolution of the element peak for every sample, at most 6 decimals |
+| B-028 | 12 | Manager default D2 (judge each hit only against the face that produced it) reports touching boxes with an offset or a larger touching face as overlapping: the diagonal of the touching face crosses the other box's edge, which the edge-inclusive triangle test reports as a hit on a side face (found by the WP-12 worker) | (a) worker's graze rule: a hit on face G is a touch when the edge lies in the plane of another face of the same object and G lies on one side of that plane (clears a subset of what the old code cleared) (b) D2 literally, accept false overlaps | (a) | (a) graze rule accepted (2026-10-21) |
 
 ## 5. Work packages
 
@@ -324,6 +325,12 @@ acceptance checks beyond section 3.1. Severities in brackets.
 - Notes: decisions B-077, B-082. B-027 (shift to a local origin before the float kernel) changes AVX2 results slightly
   for every caller; run the area-D comparison probes (`build_linux/scratch/hunt/D/rti_random.cpp`, `rpi_random.cpp`).
   The CUDA ray kernels have the same slab-test logic (B-072); CUDA is out of scope, note it for later.
+- Notes after WP-12 (for later, CUDA out of scope): `src/ray_triangle_intersect_cuda.cu:226-230` has the B-072 fold
+  (NaN of the second or third slab adopted, also for a -0 direction) and rounds double coordinates to float (`RTI_d2f`),
+  so its double precision still degrades with the distance from the origin (documented); its tie order is already the
+  generic one. The ray-point AABB test has no B-072 pattern, but a degenerate beam (vertex direction parallel to the
+  wavefront plane) could give 0*inf there. Benchmark of the ray kernels and `obj_overlap_test`:
+  `build_linux/scratch/fix/WP-12/bench/run_bench.sh` (pins to an idle core; core 2 is often busy).
 
 ### WP-13 Channel tools
 
@@ -335,8 +342,11 @@ acceptance checks beyond section 3.1. Severities in brackets.
 - Files: `src/update_xpr.cpp`, `src/path_to_tube.cpp`, `src/combine_irs_coord.cpp`, `src/baseband_freq_response.cpp`
   (B-062), `src/qd_tools_calc_delay_spread.cpp`, `src/qd_tools_acdf.cpp`, `src/calc_diffraction_gain.cpp` (doc),
   `src/interp.cpp`.
-- Notes: decision B-070 (convert the acoustic frequency inside C++; remove the conversion from
-  `api_mex/calc_diffraction_gain.cpp` and `api_python/qpy_calc_diffraction_gain.cpp`; API change for C++ callers).
+- Notes: decision B-070, changed on 2026-10-21 to (a): document in the C++ block that scalar mode takes the
+  EM-equivalent frequency; no code change, the wrappers keep converting.
+- Notes before WP-13 (user's choice of 2026-10-21): B-062 is fixed by switching the four aligned accesses of the
+  AVX2 DFT kernel to loadu / storeu and using ordinary buffers, unless that is slower than 1.05 of old; the
+  buffers are internal scratch, the copy into the outputs is a layout transpose and stays.
   B-083 timing under `flock /tmp/bench.lock` at low load.
 
 ### WP-14 OBJ, MTL, PNG and Mitsuba writers/readers
@@ -357,6 +367,9 @@ acceptance checks beyond section 3.1. Severities in brackets.
   `src/get_channels_*.cpp` (B-113), `api_mex/arrayant_rotate_pattern.cpp`.
 - Notes after WP-06: MEX `subdivide_triangles` and `triangle_mesh_segmentation` subtract 1 from `mtl_ind_in`, which is
   1-based in C++ with 0 = "no material", so an input 0 wraps around (related to B-089).
+- Notes after WP-12: the MEX and Python `icosphere` wrappers pre-allocate `20 * n_div * n_div` outputs without an
+  overflow check; harmless since WP-12 (C++ throws "Input 'n_div' is too large." before writing), align with the
+  integer-input checks.
 - Notes after WP-05: Python `hdf5_write_channel` and `hdf5_read_layout` still return uint32, while `hdf5_create_file`
   returns int64 since WP-05 (B-116); align them with the integer-output rule of the Python spec.
 - Notes: decisions B-087, B-088, B-091, B-092, B-095, B-113. B-088 changes the C++ defaults of
@@ -373,19 +386,23 @@ acceptance checks beyond section 3.1. Severities in brackets.
 
 ### WP-17 Documentation sweep and final verification
 
-- Items: B-060 [S3], B-102 [S4], B-104 [S4], B-106 [S4], B-108 [S4], B-115 [S4], and any documentation parts that
+- Items: B-060 [S3], B-102 [S4], B-104 [S4], B-106 [S4], B-108 [S4] (point 3 fixed in WP-12), B-115 [S4], and any documentation parts that
   earlier packages left open (the manager lists them in the prompt).
 - Left open by earlier packages: `CMakeLists.txt:498` (MATLAB API section) still says MATLAB links quadriga_static "to
   avoid conflicts with MATLAB's own bundled libhdf5.so"; the static link does not separate the HDF5 libraries, the
   different soname of the system HDF5 does (see the comment at `CMakeLists.txt:196`, rewritten in WP-01).
+- From WP-13 (fix here): `interp_1D` / `interp_2D` do not validate the grids `xi` / `yi`; a NaN in a grid that
+  `is_sorted()` accepts gives NaN results at some queries (before and after WP-13), an unsorted grid with NaN throws
+  inside `arma::sort_index`; a finiteness check settles it. Several error checks in `tests/mex_tests/test_acdf.m`
+  (`try ...; error('Expected ...'); catch; end`) pass whether or not an error is raised, because the `catch` also
+  catches the `error` call; use a flag as the new WP-13 checks do.
 - From WP-11 (validation gaps, fix here): `get_channels_ieee_indoor` accepts a 7 ns tap spacing and treats it as 10 ns;
   carrier frequency, distance and speeds are not checked for NaN.
 - From WP-10 (small defect, fix here): the qdant writer ignores a namespace prefix of an existing file, so an entry
   appended to such a file cannot be read back (`src/qd_arrayant_qdant.cpp`, around line 442 after WP-10).
 - From WP-09 (small defects, fix here): `arrayant::remove_zeros` does not copy `name` to the output, and computes the
   azimuth spacing of the first grid point wrongly (`src/qd_arrayant.cpp`, around line 1433 after WP-09).
-- From WP-08: the MEX and Python docs of `ray_triangle_intersect` say auto mode picks CUDA from 10 000 rays (the
-  C++ code uses 500); a SLERP header comment in `src/fastmath_avx2.h` claims a double-precision direction sum the code
+- From WP-08: a SLERP header comment in `src/fastmath_avx2.h` claims a double-precision direction sum the code
   does not do; `_fm256_polar_ps` is unused (dead code); `fast_cart2geo` returns elevation 0 (not NaN) for NaN input in
   both kernels, while azimuth and length are NaN.
 - From WP-06: `include/quadriga_tools.hpp` calls `obj_ind` of `obj_file_write` "1-based"; the C++ code and its
@@ -471,13 +488,76 @@ unexpected changes in the diff; proposed `md/bugs.md` updates; anything the next
 | WP-08 | 5 | done 2026-10-19 (5 of 5 fixed; AVX2 interpolation and get_channels_spherical at 1.00-1.06 of old) | 6ad4f2b |
 | WP-09 | 9 | done 2026-10-20 (9 of 9 fixed; interpolation 0.99-1.02 of old) | 098b8c7 |
 | WP-10 | 7 | done 2026-10-20 (6 fixed, B-041 documented; 3 rounds: qdant precision single-equivalent relative to the element peak) | d0f4a31 |
-| WP-11 | 5 | done 2026-10-20 (4 fixed, B-065 partly; downlink Doppler sign flipped; publication checked, 14 tests) | commit after d0f4a31 (hash at next update) |
-| WP-12 | 12 | open | - |
-| WP-13 | 10 | open | - |
+| WP-11 | 5 | done 2026-10-20 (4 fixed, B-065 partly; downlink Doppler sign flipped; publication checked, 14 tests) | 9d3148d |
+| WP-12 | 12 | done 2026-10-21 (12 of 12 fixed; B-108 point 3 also; double AVX2 ray-triangle kernel 0.82 of old, all others 0.95-1.00) | 7bba69d (kernel tests), db31293 (ray-triangle), 4516f8e (ray-point), ee658ed (obj_overlap_test), ab407ec (mesh generators), 437dada (notes) |
+| WP-13 | 11 | done 2026-10-21 (10 fixed incl. the B-065 remainder, B-070 documented; circular XPR redefined; all workloads at or below 1.05 of old, delay spread 0.39, long-grid interp 0.001) | 5fbc6a4 (xpr_update), d7378ca (path_to_tube), 7f866e9 (combine_irs_coord), cce2d5b (baseband buffers), 5da6971 (channel statistics), f593b48 (circular XPR), d9d577f (interp), 0671302 (calc_diffraction_gain doc), plus the notes commit |
 | WP-14 | 5 | open | - |
 | WP-15 | 10 | open | - |
 | WP-16 | 3 | open | - |
 | WP-17 | 6 | open | - |
+
+## 8a. Manager handoff (2026-10-20)
+
+State at the handoff:
+- WP-01 to WP-11 are done and committed. On 2026-10-20 `fixes` was merged into `main` (merge commit a5bdfb7, made in
+  a temporary worktree, tested, then `main` fast-forwarded with `git merge --ff-only`), and `fixes` was fast-forwarded
+  to `main` at 71b894b, which includes the acoustic session's work. Both branches are at 71b894b. WP-12 starts there.
+- New baseline after the merge (manager, build_linux rebuilt and installed): Catch2 AVX2 `1346299 assertions in 1238
+  test cases`, all passed. build_generic and build_asan are stale (the WP-12 worker rebuilds them); the MEX and Python
+  suites of the combined code have not been run yet.
+- Another coding session (acoustic work, on `main`, in `/sjc/quadriga-lib`) runs in parallel. Do not touch its
+  worktree except for an agreed merge.
+
+How each package was run (keep doing this):
+1. Prompt. Template 6.1, plus:
+   - the section-4 decisions for the items;
+   - "manager defaults" for every open choice an item leaves, listed again for the user below the prompt so they can
+     override them before starting the worker;
+   - the resource limits of section 2;
+   - notes from reading the code (verify claims before writing them);
+   - the repro folders of section 8;
+   - for packages that change computation code, a Performance section (old-vs-new benchmark of the changed files,
+     built before the first change, limits, a stop rule: report the fastest correct variant instead of starting a
+     second round).
+   Recent prompts (WP-08 to WP-11) are the model; they are in this conversation's history only, so re-derive them from
+   this section.
+2. Review (light, section 3.1b): read the diff (scope, risky parts), run the full Catch2 AVX2 suite at 12 threads and
+   the item repros; take generic, ASan, MEX, Python, AFL and benchmark results from the worker log unless there is a
+   concrete reason to repeat one. Use `git status`, not a stash, to check scope.
+3. Status files, before the user commits, so they go into the same commit:
+   - in `md/bugs.md`: the status lines of the items (fixed / partly fixed / documented / won't fix, with a short note
+     where the outcome is not obvious), the Status column, the counts line, and a Baseline row "after WP-xx";
+   - in this plan: the status table, notes for later packages ("Notes after WP-xx", "From WP-xx" in WP-17), and new
+     decisions in section 4;
+   - new defects become items B-1xx (with repro folder under `build_linux/scratch/hunt/final/`), after the user agrees,
+     and are assigned to a package.
+4. Commit message for the user: plain words, no references to `md/` (section 3.1a). The user commits and names the
+   hash; record it in the status table at the next update.
+5. When the user asks for a second round: write a short follow-up prompt for the same (existing) worker session.
+
+Useful files: `build_linux/scratch/fix/build_asan_mod.sh` (ASan Python module); benchmark models in
+`build_linux/scratch/fix/WP-0{3,4,8,9}/bench/` and `WP-12/bench/`; worker logs in `md/fix_logs/`. `test_bin` must run from the repository
+root (relative data paths). The library and tests deliberately link no BLAS/LAPACK: never use `arma::norm`, `dot`,
+`svd` and similar.
+
+WP-12 (2026-10-21): done; the user committed it as several commits, one per function group (kernel test build,
+ray-triangle kernels, ray-point kernel, `obj_overlap_test`, mesh generators), plus a commit with these notes: 7bba69d, db31293,
+4516f8e, ee658ed, ab407ec, 437dada (status table of section 7). The WP-12 prompt carried a coordination rule that later packages
+keep: the acoustic session owns `src/ray_mesh_interact.cpp`, `src/ray_progress.cpp`, the `[wave]` / `[acoustic]` test
+files, `tests/catch2_tests/ray_test_helpers.hpp` and `tests/data/wave_twins.tsv` (its test cleanup is about to start on
+`main`); a package that changes code those tests reach runs `[wave]` and `[acoustic]` in both builds as a gate and
+stops on a failure instead of editing the tests.
+
+WP-13 (2026-10-21): done; committed as eight themed commits, 5fbc6a4 to 0671302 (status table of section 7), plus
+the notes commit. Lessons for
+later prompts: (1) benchmark loops that are memory- or branch-light can move by up to 25 % with the code layout of the
+binary alone; the WP-13 harness has a layout check (`build_linux/scratch/fix/WP-13/bench/layout_check.sh`, old and new
+objects linked in several orders); ask for it when a ratio near the limit is decisive. (2) Allocation-failure repros
+run only in plain builds under `ulimit -v`, never under ASan (an unbounded ASan probe took the desktop app down).
+
+Next: WP-14 (OBJ, MTL, PNG and Mitsuba writers/readers; B-018, B-056, B-057, B-058, B-122). The acoustic session
+changed `src/obj_file_write.cpp` and the OBJ/MTL material columns (mass law `m`, panel `side`, `coiA` removed);
+check its commits on `main` before writing the prompt. Keep the gate if a change reaches the ray code.
 
 ## 8. Item index
 

@@ -25,7 +25,7 @@ Construct a geodesic polyhedron from recursive icosahedron subdivision
 
 ## Inputs:
 - **`n_div`** — Number of subdivisions; generates 20 · n_div² faces; default: 1
-- **`radius`** — Radius of icosphere in meters; default: 1
+- **`radius`** — Radius of icosphere in meters; finite and positive; default: 1
 - **`direction_xyz`** — Output directions in Cartesian (true) or spherical azimuth/elevation (false); default: false
 
 ## Outputs:

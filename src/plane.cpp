@@ -15,7 +15,9 @@ Construct a triangulated plane mesh
 - Generates a Blender-style plane: a 2 x 2 quad in the xy-plane centered at the origin (vertices at +/-1, z = 0) before scaling
 - The quad is split into 2 triangles, yielding 2 triangles at n_div = 1
 - Optional uniform subdivision produces 2 * n_div^2 triangles
-- Triangle winding is consistent (normals point in +z direction), compatible with [[obj_file_write]]
+- Triangle winding is consistent (normals point in +z direction), compatible with [[obj_file_write]]; when the product
+  of the x and y scales is negative (mirrored plane), the winding is swapped so that the normals still point in +z
+  direction before the rotation
 - The plane has no thickness in z-direction; scaling therefore only affects x and y
 - Scale, Euler rotation, and translation are applied in that order (scale -> rotate -> translate)
 
@@ -113,6 +115,11 @@ arma::Mat<dtype> quadriga_lib::plane(const arma::vec &scale,
             pz[n] = dtype(R20 * x + R21 * y + R22 * z + lz);
         }
     }
+
+    // A negative product of the x and y scales mirrors the mesh, which reverses the winding; swapping the second and third vertex
+    // restores it (as Blender's "Apply Scale")
+    if (sx * sy < 0.0)
+        mesh.swap_cols(3, 6), mesh.swap_cols(4, 7), mesh.swap_cols(5, 8);
 
     return mesh;
 }

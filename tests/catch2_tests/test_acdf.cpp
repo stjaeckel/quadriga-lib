@@ -301,3 +301,78 @@ TEST_CASE("ACDF - strictly increasing")
         check_monotonic(bins);
     }
 }
+
+TEST_CASE("ACDF - Data sets without finite values are excluded from the averages")
+{
+    arma::mat data(100, 2);
+    for (int i = 0; i < 100; ++i)
+        data(i, 0) = i, data(i, 1) = NAN; // the second set has no finite value
+    arma::vec bins, ca, mu, sig;
+    arma::mat cps;
+    quadriga_lib::acdf<double>(data, &bins, &cps, &ca, &mu, &sig);
+
+    arma::mat d1 = data.col(0);
+    arma::vec b1 = bins, ca1, mu1, sig1;
+    arma::mat cps1;
+    quadriga_lib::acdf<double>(d1, &b1, &cps1, &ca1, &mu1, &sig1);
+
+    CHECK(std::abs(mu1(4) - 49.005) < 1e-12);
+    CHECK(arma::approx_equal(mu, mu1, "absdiff", 0.0)); // median 49.005 (74.2275 with the bias)
+    CHECK(arma::approx_equal(sig, sig1, "absdiff", 0.0));
+    CHECK(arma::approx_equal(ca, ca1, "absdiff", 0.0));
+    CHECK(arma::approx_equal(cps.col(0), cps1.col(0), "absdiff", 0.0));
+    CHECK(cps.col(1).has_nan());
+    CHECK(arma::all(arma::vec(cps.col(1)) != arma::vec(cps.col(1)))); // all NaN
+
+    // Three valid sets and two empty ones (Inf counts as not finite) average like the three valid sets alone
+    arma::mat d5 = arma::randn(200, 5), d3(200, 3);
+    d5.col(1).fill(NAN), d5.col(3).fill(INFINITY);
+    d3.col(0) = d5.col(0), d3.col(1) = d5.col(2), d3.col(2) = d5.col(4);
+    arma::vec b5 = arma::linspace(-3.0, 3.0, 101), b3 = b5, ca5, mu5, sig5, ca3, mu3, sig3;
+    arma::mat c5, c3;
+    quadriga_lib::acdf<double>(d5, &b5, &c5, &ca5, &mu5, &sig5);
+    quadriga_lib::acdf<double>(d3, &b3, &c3, &ca3, &mu3, &sig3);
+    CHECK(arma::approx_equal(ca5, ca3, "absdiff", 0.0));
+    CHECK(arma::approx_equal(mu5, mu3, "absdiff", 0.0));
+    CHECK(arma::approx_equal(sig5, sig3, "absdiff", 0.0));
+    CHECK(arma::approx_equal(c5.col(2), c3.col(1), "absdiff", 0.0));
+    CHECK(c5.col(3).has_nan());
+
+    // No set has data (only possible with user bins): the averaged outputs are NaN
+    for (arma::uword n_sets : {1ULL, 3ULL})
+    {
+        arma::mat dn(10, n_sets);
+        dn.fill(NAN);
+        arma::vec bn = {0.0, 1.0, 2.0}, can, mun, sign;
+        arma::mat cn;
+        quadriga_lib::acdf<double>(dn, &bn, &cn, &can, &mun, &sign);
+        INFO("n_sets " << n_sets);
+        REQUIRE(cn.n_rows == 3);
+        REQUIRE(cn.n_cols == n_sets);
+        REQUIRE(can.n_elem == 3);
+        REQUIRE(mun.n_elem == 9);
+        REQUIRE(sign.n_elem == 9);
+        CHECK(arma::all(arma::vectorise(cn) != arma::vectorise(cn)));
+        CHECK(arma::all(can != can));
+        CHECK(arma::all(mun != mun));
+        CHECK(arma::all(sign != sign));
+    }
+}
+
+TEST_CASE("ACDF - User bins must be finite and strictly ascending")
+{
+    arma::mat data(100, 1);
+    for (int i = 0; i < 100; ++i)
+        data(i, 0) = i;
+    arma::mat cdf;
+    for (arma::vec ub : {arma::vec({50.0, 0.0, 99.0, 25.0}), arma::vec({0.0, 25.0, 25.0, 99.0}), arma::vec({0.0, NAN, 99.0}),
+                         arma::vec({0.0, 50.0, INFINITY}), arma::vec({-INFINITY, 50.0})})
+    {
+        INFO("bins " << ub.t());
+        CHECK_THROWS_AS(quadriga_lib::acdf<double>(data, &ub, &cdf), std::invalid_argument);
+    }
+    arma::vec ok = {0.0, 25.0, 50.0, 99.0}, one = {10.0};
+    CHECK_NOTHROW(quadriga_lib::acdf<double>(data, &ok, &cdf));
+    CHECK_NOTHROW(quadriga_lib::acdf<double>(data, &one, &cdf));
+    CHECK(cdf(0) == 1.0);
+}

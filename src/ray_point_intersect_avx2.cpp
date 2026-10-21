@@ -37,8 +37,8 @@ static inline int qd_first_set_bit(int mask)
 }
 
 // AVX2 accelerated implementation of RayPointIntersect
-void qd_RPI_AVX2(const float *Px, const float *Py, const float *Pz,    // Point coordinates, length n_point (padded to multiple of 8)
-                 const size_t n_point,                                 // Number of points, the arrays must be allocated up to the next multiple of 8
+void qd_RPI_AVX2(const float *Px, const float *Py, const float *Pz,    // Point coordinates, length n_point (allocated n_point + 7)
+                 const size_t n_point,                                 // Number of points, the arrays must be allocated up to n_point + 7
                  const unsigned *SCI,                                  // List of sub-cloud indices, length n_sub
                  const float *Xmin, const float *Xmax,                 // Minimum and maximum x-values of the AABB, length n_sub_s
                  const float *Ymin, const float *Ymax,                 // Minimum and maximum y-values of the AABB, length n_sub_s
@@ -68,9 +68,8 @@ void qd_RPI_AVX2(const float *Px, const float *Py, const float *Pz,    // Point 
     const long long n_point_l = (long long)n_point; // Number of points as signed 64 bit
     const long long n_ray_l = (long long)n_ray;     // Number of rays as signed 64 bit
 
-    // The point arrays are read in blocks of 8, the last block may reach past
-    // the real points. Those lanes are discarded when the hits are emitted.
-    const long long n_point_pad = (long long)(VEC_SIZE * ((n_point + VEC_SIZE - 1) / VEC_SIZE));
+    // The points of a sub-cloud are read in blocks of 8 from its first point, so the last block may reach into the
+    // next sub-cloud or past the real points. Those lanes are discarded when the hits are emitted.
     const __m256 r0 = _mm256_set1_ps(0.0f);         // Zero (float8)
     const __m256 r1 = _mm256_set1_ps(1.0f);         // One (float8)
     const __m256 r_slack = _mm256_set1_ps(1.0e-5f); // Small value for numeric stability
@@ -284,7 +283,7 @@ void qd_RPI_AVX2(const float *Px, const float *Py, const float *Pz,    // Point 
                 continue;
 
             long long i_point_start = (long long)SCI[i_sub];
-            long long i_point_end = (i_sub == n_sub - 1) ? n_point_pad : (long long)SCI[i_sub + 1];
+            long long i_point_end = (i_sub == n_sub - 1) ? n_point_l : (long long)SCI[i_sub + 1];
 
             for (long long i_point = i_point_start; i_point < i_point_end; i_point += VEC_SIZE) // Points loop
             {
@@ -398,7 +397,7 @@ void qd_RPI_AVX2(const float *Px, const float *Py, const float *Pz,    // Point 
                     const long long i = (long long)qd_first_set_bit(mask);
                     mask &= mask - 1;
 
-                    if (i_point + i >= n_point_l) // Lane belongs to the padding
+                    if (i_point + i >= i_point_end) // Lane belongs to the next sub-cloud or the padding
                         continue;
 
                     if (p_write == p_stop) // Current chunk is full

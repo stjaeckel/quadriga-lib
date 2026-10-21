@@ -252,10 +252,10 @@ namespace quadriga_lib
                         bool split_loose_parts = false);                                               // If `true`, split each object into connected components
 
     // Tests if 3D objects overlap (have a shared volume or boolean intersection)
-    // - Returns: Subset of list of object indices (obj_ind) that are overlapping, length [ n_overlap ]
+    // - Returns: IDs of the overlapping objects as given in obj_ind, unique and ascending, length [ n_overlap ]
     template <typename dtype>                                               // Supported types: float or double
     arma::uvec obj_overlap_test(const arma::Mat<dtype> *mesh,               // Faces of the triangular mesh, Size: [ n_mesh, 9 ]
-                                const arma::uvec *obj_ind,                  // Object index, 1-based, Size: [ n_mesh ]
+                                const arma::uvec *obj_ind,                  // Object ID per triangle (any values, e.g. 0-based from obj_file_read), Size: [ n_mesh ]
                                 std::vector<std::string> *reason = nullptr, // Optional output: Overlap reason, Length [ n_overlap ]
                                 dtype tolerance = 0.0005);                  // Optional input: Detection tolerance in meters
 
@@ -424,7 +424,8 @@ namespace quadriga_lib
     // Calculates the intersection of rays and triangles in three dimensions
     // - Implements the Möller–Trumbore ray-triangle intersection algorithm
     // - Supports three compute kernels: GENERIC (scalar), AVX2 (SIMD), and CUDA (GPU)
-    // - All internal computations are done using single precision
+    // - AVX2 and CUDA compute in single precision, GENERIC in the precision of dtype; for double input, the AVX2
+    //   precision depends on the scene size, not on the distance from the coordinate origin (CUDA rounds the coordinates)
     template <typename dtype>
     void ray_triangle_intersect(const arma::Mat<dtype> *orig,                  // Ray origin points in GCS, Size [ n_ray, 3 ]
                                 const arma::Mat<dtype> *dest,                  // Ray destination points in GCS, Size [ n_ray, 3 ]
