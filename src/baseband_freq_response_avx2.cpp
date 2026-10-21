@@ -22,10 +22,10 @@ void qd_DFT_AVX2(const dtype *__restrict CFr,    // Channel coefficients, real p
                  const size_t n_ant,             // Number of MIMO sub-links
                  const size_t n_path,            // Number multipath components
                  const bool planar_wave,         // Indicator that same delays are used for all antennas
-                 const double *__restrict freq,  // Carrier frequencies -bandwidth * pilot_grid in [Hz], aligned to 32 byte, Size [ n_carrier ]
+                 const double *__restrict freq,  // Carrier frequencies -bandwidth * pilot_grid in [Hz], Size [ n_carrier ]
                  const size_t n_carrier,         // Number of carriers, mutiple of 8
-                 float *__restrict Hr,           // Channel matrix, real part, aligned to 32 byte, Size [ n_carrier, n_ant ]
-                 float *__restrict Hi)           // Channel matrix, imaginary part, aligned to 32 byte, Size [ n_carrier, n_ant ]
+                 float *__restrict Hr,           // Channel matrix, real part, Size [ n_carrier, n_ant ]
+                 float *__restrict Hi)           // Channel matrix, imaginary part, Size [ n_carrier, n_ant ]
 {
     // Preallocate per-path, per-antenna scalars to avoid per-block casts
     std::vector<float> crf(n_path), cif(n_path);
@@ -50,8 +50,8 @@ void qd_DFT_AVX2(const dtype *__restrict CFr,    // Channel coefficients, real p
             __m256 hr = _mm256_setzero_ps();
             __m256 hi = _mm256_setzero_ps();
 
-            const __m256d f_lo = _mm256_load_pd(&freq[i_carrier]);
-            const __m256d f_hi = _mm256_load_pd(&freq[i_carrier + 4]);
+            const __m256d f_lo = _mm256_loadu_pd(&freq[i_carrier]);
+            const __m256d f_hi = _mm256_loadu_pd(&freq[i_carrier + 4]);
 
             for (size_t i_path = 0; i_path < n_path; ++i_path)
             {
@@ -76,8 +76,8 @@ void qd_DFT_AVX2(const dtype *__restrict CFr,    // Channel coefficients, real p
                 hi = _mm256_fmadd_ps(vcos, ci, hi);
             }
 
-            _mm256_store_ps(&Hr[o], hr);
-            _mm256_store_ps(&Hi[o], hi);
+            _mm256_storeu_ps(&Hr[o], hr);
+            _mm256_storeu_ps(&Hi[o], hi);
         }
     }
 }
