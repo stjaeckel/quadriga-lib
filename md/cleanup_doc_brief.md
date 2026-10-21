@@ -56,10 +56,11 @@ the cleanup series.
 
 ## Facts at the start
 
-- Last commit dc47ff6. `git status` should show only `md/acoustic_manager.md`, the review-path line in three
-  `tools/acoustic` files, and this brief. If anything under `src/` or `tests/` is modified, stop and ask Stephan.
+- Last commit e34dd2a (after dc47ff6: the `fixes` merge f0d093d, which changed `ray_triangle_intersect` but none of
+  the ray files, and the per-area diagnostic switches). `git status` should be clean apart from
+  `md/acoustic_manager.md`; if anything under `src/` or `tests/` is modified, stop and ask Stephan.
 - Counts (`md/wave.md` 0, with `QD_DIAG_RAY=1` / `QD_DIAG=1`, 12 threads): `[wave]` 163474 assertions in 178 cases,
-  `[acoustic]` 42741 in 59, whole suite 1343848 in 1234 (generic build). `python3 tools/acoustic/check_docs.py`
+  `[acoustic]` 42741 in 59, whole suite 1344398 in 1264 (generic build). `python3 tools/acoustic/check_docs.py`
   passes.
 - `src/ray_mesh_interact.cpp`, 4725 lines:
   - the header overview (lines 5–88);
