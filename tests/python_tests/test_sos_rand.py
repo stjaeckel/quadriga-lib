@@ -128,7 +128,7 @@ class test_case(unittest.TestCase):
         # Thrown by C++: std::invalid_argument -> ValueError
         with self.assertRaises(ValueError) as ctx:
             quadriga_lib.sos.rand(self.dd, self.pos, preset="NoSuchPreset")
-        self.assertIn("preset", str(ctx.exception))
+        self.assertEqual(str(ctx.exception), "Input 'preset' is not a known preset.")
 
         with self.assertRaises(ValueError) as ctx:
             quadriga_lib.sos.rand(self.dd, np.zeros((4, 4)))

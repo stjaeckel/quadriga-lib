@@ -537,6 +537,7 @@ inline void qd_coeff_combine(const dtype *pVrr, const dtype *pVri, // RX V-pol p
 
 // ---- Helpers of the sum-of-sinusoids functions (sos_*.cpp) ----
 #include <algorithm>
+#include <cstdint>
 #include <limits>
 
 // Random stream of the sum-of-sinusoids functions
@@ -613,6 +614,21 @@ static inline void qd_sos_check_acf_same_map(const arma::Col<dtype> &acf, const 
         if (!(acf.at(i) > (dtype)-1.0))
             throw std::invalid_argument("Input 'acf' must be > -1 for two devices on the same map.");
 }
+
+// True if two matrices share memory, i.e. the ranges [memptr, memptr + n_elem) of their elements overlap;
+// false if one of them is empty. Compared as integers, since the two pointers may belong to different blocks.
+template <typename dtype>
+static inline bool qd_sos_share_memory(const arma::Mat<dtype> &a, const arma::Mat<dtype> &b)
+{
+    if (a.n_elem == 0 || b.n_elem == 0)
+        return false;
+    const std::uintptr_t a0 = (std::uintptr_t)a.memptr(), b0 = (std::uintptr_t)b.memptr();
+    return a0 < b0 + b.n_elem * sizeof(dtype) && b0 < a0 + a.n_elem * sizeof(dtype);
+}
+
+// Type and number of sinusoids of a preset of sos_preset (defined in sos_preset.cpp)
+// type: 0 = Exp, 1 = Gauss, 2 = Comb; returns false for a name that is not a preset
+bool qd_sos_preset_lookup(const std::string &name, int &type, arma::uword &n_coeff);
 
 // Check that the sample points of an ACF table are equally spaced
 // Tolerance: 1e-4 of the step, but not less than 4 spacings of dtype at the last sample point, which is
