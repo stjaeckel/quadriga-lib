@@ -2,12 +2,10 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-// A sheet through calc_diffraction_gain, wave: two coincident faces of one material are one sheet,
-// and a thk column present with the value zero is the column absent. The two cases kept from the
-// former test_sheet_vs_solid.cpp; the sheet against its traced solid is asserted in the walker
-// cases of test_wave_state_update_branch.cpp.
+// A sheet through calc_diffraction_gain, wave media: two coincident faces of one material are one sheet, and a thk
+// column present with the value zero is the column absent.
 //
-// Set the environment variable QD_TEST_VERBOSE=1 to print the tables.
+// Set the environment variable QD_TEST_DIAG=1 to print the tables.
 
 #include <catch2/catch_test_macros.hpp>
 #include "quadriga_lib.hpp"
@@ -34,12 +32,12 @@ namespace
 
     bool verbose()
     {
-#ifdef QD_TEST_VERBOSE
-        return true;
-#else
-        const char *v = std::getenv("QD_TEST_VERBOSE");
-        return v != nullptr && v[0] != '0';
-#endif
+        static const bool on = []
+        {
+            const char *v = std::getenv("QD_TEST_DIAG");
+            return v != nullptr && v[0] != '\0' && v[0] != '0';
+        }();
+        return on;
     }
 
     // Canonical column defaults, matching obj_file_write's csv_write_defaults
@@ -88,14 +86,11 @@ namespace
         }
     };
 
-    // Material definitions used across the suite. Sheet and solid entries are identical apart from
-    // thk, which is what selects the model - so a sheet glued to a solid of the same properties is a
-    // homogeneous slab of the summed thickness and has an exact analytic reference.
+    // A material by its ITU-R P.2040 columns. A sheet and a solid of one material differ only in thk, so a sheet glued
+    // to a solid of the same material is one slab of the summed thickness, with an exact reference.
     struct MatDef
     {
-        double a, b, c, d;   // eps_r and sigma, ITU-R P.2040 form
-        double att = 0.0;    // lumped interface loss, dB
-        double m = 0.0;      // acoustic mass-law slope, dB/decade
+        double a, b, c, d; // eps_r and sigma, ITU-R P.2040 form
     };
 
     std::map<std::string, double> to_cols(const MatDef &M, double thk)
@@ -103,16 +98,12 @@ namespace
         std::map<std::string, double> v = {{"a", M.a}, {"b", M.b}, {"c", M.c}, {"d", M.d}, {"fRef", 1.0}};
         if (thk > 0.0)
             v["thk"] = thk;
-        if (M.att != 0.0)
-            v["att"] = M.att;
-        if (M.m != 0.0)
-            v["m"] = M.m;
         return v;
     }
 
     // ---- analytic reference -------------------------------------------------------------------
 
-    // Relative permittivity, matching Material::eta
+    // Relative permittivity from the a, b, c, d columns at fRef = 1 GHz
     cdouble eps_of(const MatDef &M, double fGHz)
     {
         double fr = fGHz / 1.0;
@@ -179,17 +170,10 @@ namespace
         return m;
     }
 
-    // Lateral offset of every obstacle, in the plane of the face.
-    //
-    // At exactly normal incidence the ray crosses at (0, 0, 0), which is the shared edge of the two
-    // triangles that make up a quad or a box face. The intersector then returns two co-planar
-    // triangles of the SAME surface as the FBS/SBS pair, and the surface that was supposed to be the
-    // second face is either missed or handled as a separate interaction. In the first run that
-    // corrupted three rows: a matched-normal duplicate charged twice, a glued entry that lost its
-    // sheet entirely, and an ordered stack that was not killed. Moving the obstacle sideways changes
-    // no physics - the plane x = 0 and its normal are untouched, so every incidence angle and every
-    // crossing point is identical - it only moves the triangulation relative to where the rays land.
-    // 0.37 m is chosen to sit clear of every crossing point in the sweep (0, 0.88, 1.82, ... 57.15 m).
+    // Lateral offset of every obstacle in the plane of the face. At normal incidence the ray would cross at the shared
+    // edge of the two triangles of a quad, and the intersector would return two coplanar triangles of one surface as
+    // the face pair. The offset moves the triangulation, not the plane: every angle and crossing point stays the same.
+    // 0.37 m sits clear of every crossing point of the sweep (0, 0.88, 1.82, ... 57.15 m).
     constexpr double Y_OFF = 0.37;
 
     // Quad in the plane x = x0, normal along +x
@@ -219,18 +203,9 @@ namespace
         arma::mat xprmat; // [8, n_pos] in EM mode, [2, n_pos] in scalar mode
     };
 
-    // Forward pass-through trace, lod 0 throughout.
-    //
-    // lod 0 is the clean feed-forward path: one ray, no diffraction ellipsoid, no sub-path
-    // aggregation. That is the whole subject of this suite - the slab and sheet interaction physics -
-    // and nothing here is meant to exercise the diffraction machinery. Higher lods were used in the
-    // first run and cost more than they gave: the seven elliptic sub-paths of lod 1 produce a 0.7 dB
-    // artifact at exactly normal incidence that has nothing to do with the material model, and lod 5
-    // agrees with lod 0 while still carrying the ellipsoid construction. Every table below is lod 0.
-    //
-    // GENERIC kernel so the numbers do not depend on the host's SIMD support. thin_slab_threshold 0
-    // forces the slab to resolve on every crossing, which is the case under test. apply_fspl stays off
-    // so the gain is bounded by 0 and 1 and the comparison is scale-free.
+    // Forward trace, one ray per position, lod 0: no diffraction ellipsoid, which is not the subject here. The generic
+    // kernel, so the numbers do not depend on the host's SIMD support; thin_slab_threshold 0, so every slab series is
+    // summed; no free-space loss, so the gain lies between 0 and 1.
     Trace forward_trace(const arma::mat &mesh, const arma::uvec &mtl_ind, const MtlProp &prop,
                         const arma::mat &orig, const arma::mat &dest,
                         double fc, bool scalar_mode, int lod = 0)
@@ -282,9 +257,7 @@ namespace
         return deg;
     }
 
-    // 0.5 * sum(xprmat^2) for one column. Equal to gain when the matrix carries the interaction
-    // amplitude; equal to 1 when the caller has power-normalized it. Which of the two it is decides
-    // whether the phase columns below can be read at all, and is currently an open question.
+    // 0.5 * sum(xprmat^2) of one column, printed beside the gain.
     double xpr_norm(const arma::mat &X, arma::uword i)
     {
         double s = 0.0;
@@ -307,11 +280,8 @@ namespace
         double worst_vs_analytic_ref = 0.0;
     };
 
-    // Prints one comparison block. ref is the baseline (usually the traced solid), test the thing
-    // under study (usually the sheet). analytic may be empty. thk_phase drives the predicted phase
-    // offset column: the sheet carries the absolute in-slab phase while the solid's SCALE_BY_MEDIUM
-    // subtracts the free-space reference over the same thickness, so the two are predicted to differ
-    // by k0*thk*cos(theta). Pass 0.0 where no prediction applies.
+    // Prints one comparison block: test against ref, both against the analytic value where one is given. thk_phase
+    // predicts a phase offset k0 thk cos(theta) between the two; 0 where none applies.
     Summary report(const char *tag, const Geometry &geo,
                    const Trace &ref, const Trace &test,
                    const std::vector<double> &analytic,
@@ -385,9 +355,8 @@ namespace
 
 TEST_CASE("Collapsed duplicate equals a single sheet", "[sheet][case5][wave]")
 {
-    // Two coincident sheets of identical material are an exporter double-sided artifact, not a
-    // laminate. The classifier collapses them, so the result must equal a single quad. Reference is
-    // the single quad rather than the analytic value, because this asserts the collapse itself.
+    // Two coincident sheets of one material are a double-sided export, not a laminate: they collapse to one sheet, so
+    // the result equals a single quad. The reference is the single quad, because the collapse itself is asserted.
     const double thickness = 0.1;
     MaterialTable mt;
     arma::uword iSheet = mt.add("concrete_sheet", to_cols(CONCRETE, thickness));
@@ -408,15 +377,12 @@ TEST_CASE("Collapsed duplicate equals a single sheet", "[sheet][case5][wave]")
     Summary S = report("case 5: two coincident quads, reversed normals, same material", geo,
                        one, two, ana, FC, 0.0, "single", "duplicate");
 
-    // The collapse should be exact: the duplicate must not be charged twice, and must not interfere
-    // with its own copy.
+    // Exact: the duplicate is neither charged twice nor coupled to its copy.
     INFO("a collapsed duplicate must be bit-comparable to a single sheet");
     CHECK(S.worst_rel < 1.0e-9);
 
-    // Same again with matched rather than reversed normals, which the classifier also has to catch.
-    // Exactly duplicated rows rather than a small offset: a separation below the relaunch nudge
-    // (about 1e-6 m at these coordinates) would test the relaunch rather than the collapse, and in
-    // the first run a 1e-5 m offset did exactly that.
+    // The same with matched normals. The rows are duplicated exactly: a separation below the relaunch offset (about
+    // 1e-6 m here) would test the relaunch instead of the collapse.
     arma::mat dup_same = arma::join_vert(single, single);
     Trace two_same = forward_trace(dup_same, fill_ind(dup_same.n_rows, iSheet), mt.prop,
                                    geo.orig, geo.dest, FC, false);
@@ -427,10 +393,8 @@ TEST_CASE("Collapsed duplicate equals a single sheet", "[sheet][case5][wave]")
 
 TEST_CASE("thk = 0 is identical to no sheet at all", "[sheet][regression][wave]")
 {
-    // The whole sheet path is gated behind bit 6 of the hit code, which cannot be set without a
-    // nonzero thk. A material that carries the column with a zero value must therefore reproduce the
-    // pre-refactor result exactly. Asserted rather than argued, because it is the guarantee the
-    // hundreds of existing solid tests rest on.
+    // The sheet path needs a nonzero thk, so a material that carries the column with the value zero is the solid
+    // without the column, to the bit.
     const double thickness = 0.1;
 
     MaterialTable a, b;

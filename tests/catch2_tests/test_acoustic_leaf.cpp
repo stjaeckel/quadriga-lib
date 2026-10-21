@@ -2,11 +2,11 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-// Leaves as wave-medium sheets (M9, md/acoustic.md 2.8). Under the two-parameter mapping (eps = n z, mu = n / z, so
-// mu = rho / rho0) a thin layer of a wave medium has the series impedance j w m'' / Z0: a sheet with m = 0 is a limp
-// leaf. Glued on a meshed box of near-air material on a mass-law wall, its cavity series is summed in one event.
-// The leaf cases evaluate wave media only, the box cases a mass-law wall; all of them guard the acoustic route.
-// Every reference is the transfer matrix of fluid layers (or the limp mass law) written here, not library code.
+// Leaves as wave-medium sheets. Under the two-parameter mapping (eps = n z, mu = n / z, so mu = rho / rho0) a thin
+// layer of a wave medium has the series impedance j w m'' / Z0: a sheet with m = 0 is a limp leaf. Glued on a meshed
+// box of near-air material on a mass-law wall, its cavity series is summed in one event. The leaf cases evaluate wave
+// media only, the box cases a mass-law wall. Every reference is the transfer matrix of fluid layers (or the limp mass
+// law) written here, not library code.
 
 #include "ray_test_helpers.hpp"
 
@@ -100,12 +100,12 @@ namespace lw
     // ---- the traced run ----
     // cf::walk without the recursion (a followed series of a lossless box needs thousands of events, and one stack
     // frame per event overflows the default stack): every path of one ray through ray_triangle_intersect,
-    // ray_mesh_interact and ray_state_update, both passes at every event, collected where the ray is in air outside
-    // the structure's x range or has entered the sink medium, into T where it runs towards +x. A ray the state puts in
-    // air inside that range is followed on: a sheet between two bodies (A21) leaves the wave in air inside the second
-    // body, and collecting it there would hide what the library does next. Scalar types (reflect pass type 3), or EM
-    // types 1 / 2 (reflect pass type 0) on one channel of xprmat, ch 0 (TE) or 3 (TM). ev: traced events with a hit; a
-    // path weaker than floor in power is dropped and counted in drop.
+    // ray_mesh_interact and ray_state_update, both passes at every event, collected where the ray is in air outside the
+    // structure's x range or has entered the sink medium, into T where it runs towards +x. A ray the state puts in air
+    // inside that range is followed on: a sheet between two bodies leaves the wave in air inside the second body, and
+    // collecting it there would hide what the library does next. Scalar types (reflect pass type 3), or EM types 1 / 2
+    // (reflect pass type 0) on one channel of xprmat, ch 0 (TE) or 3 (TM). ev: traced events with a hit; a path weaker
+    // than floor in power is dropped and counted in drop.
     struct Acc
     {
         cd T = 0.0, R = 0.0;
@@ -232,14 +232,14 @@ TEST_CASE("Leaf - a wave-medium sheet in the two-parameter mapping is a limp lea
 
 TEST_CASE("Leaf - a leaf on a box of air is the transfer matrix of leaf and cavity at every angle", "[acoustic]")
 {
-    // A18 as a fixture. The board (12.5 mm gypsum, 8.6 kg/m2, its mounting resistance a loss ratio 0.2 on mu) glued on a
-    // meshed box of near-air material (25 mm) glued on a mass-law wall: two-parameter concrete with m 20, tf 0 (closed:
-    // it reflects its half-space's Fresnel coefficient) or tf 0.02 (a pad on it), as a half-space or as a traced wall of
-    // 200 mm. 50 Hz to 1 kHz, 0 to 60 deg, tracers 4 and 5, the box's series summed (one event). Followed (every bounce,
-    // down to a path power of 1e-12) on six rows of tf 0.02 on the half-space. Reference: leaf | air 25 mm | the half-space
-    // behind the pad, phase on the mesh plane (the glued leaf lies in front of it: r times exp(2 j k0 h cos)). Asserted:
-    // summed and followed on the reference, the walker here equal to cf::walk on the summed rows, and the angle shift of
-    // the resonance, 1 / cos theta.
+    // The board (12.5 mm gypsum, 8.6 kg/m2, its mounting resistance a loss ratio 0.2 on mu) glued on a meshed box of
+    // near-air material (25 mm) glued on a mass-law wall: two-parameter concrete with m 20, tf 0 (closed: it reflects
+    // its half-space's Fresnel coefficient) or tf 0.02 (a pad on it), as a half-space or as a traced wall of 200 mm. 50
+    // Hz to 1 kHz, 0 to 60 deg, tracers 4 and 5, the box's series summed (one event). Followed (every bounce, down to a
+    // path power of 1e-12) on six rows of tf 0.02 on the half-space. Reference: leaf | air 25 mm | the half-space
+    // behind the pad, phase on the mesh plane (the glued leaf lies in front of it: r times exp(2 j k0 h cos)).
+    // Asserted: summed and followed on the reference, the walker here equal to cf::walk on the summed rows, and the
+    // angle shift of the resonance, 1 / cos theta.
     ub::OneThread one_thread;
     const double depth = 0.025, h = lw::BOARD.thk;
     const std::vector<double> FA = {50, 63, 80, 100, 112, 125, 140, 160, 200, 250, 315, 400, 500, 1000};
@@ -327,11 +327,11 @@ TEST_CASE("Leaf - a leaf on a box of air is the transfer matrix of leaf and cavi
 
 TEST_CASE("Leaf - two leaves on a box of air resonate at the mass-air-mass frequency", "[acoustic]")
 {
-    // 4|16|4: two 4 mm glass leaves (m = 0) glued on both faces of a meshed box of near-air material, air on both sides,
-    // the box summed in one event, tracers 4 and 5. Reference: glass | air 16 mm | glass in air, phases on the mesh planes
-    // (r times exp(2 j k0 h cos), t times exp(j k0 cos (24 - 16 mm))). The leaves resonate on the cavity: the
-    // transmission loss dips near the mass-air-mass frequency (211 Hz lumped) and the dip moves up as 1 / cos theta.
-    // Mass-law sheets in the one-parameter mapping carry no mass reactance and do not (md/acoustic.md 10, item 5).
+    // 4|16|4: two 4 mm glass leaves (m = 0) glued on both faces of a meshed box of near-air material, air on both
+    // sides, the box summed in one event, tracers 4 and 5. Reference: glass | air 16 mm | glass in air, phases on the
+    // mesh planes (r times exp(2 j k0 h cos), t times exp(j k0 cos (24 - 16 mm))). The leaves resonate on the cavity:
+    // the transmission loss dips near the mass-air-mass frequency (211 Hz lumped) and the dip moves up as 1 / cos
+    // theta. Mass-law sheets in the one-parameter mapping carry no mass reactance and do not resonate.
     ub::OneThread one_thread;
     const double gap = 0.016, h = lw::GLASS.thk;
     const ub::Pal P = lw::pal({lw::GLASS, lw::air_body()});
@@ -387,11 +387,12 @@ TEST_CASE("Leaf - two leaves on a box of air resonate at the mass-air-mass frequ
 TEST_CASE("ray_progress - a leaf on a box of air at every frequency of a band", "[acoustic]")
 {
     // The board on its box on a mass-law wall (tf 0.02, 200 mm) and 4|16|4 on its box, through ray_progress (scalar,
-    // float, one ray until none is left, thin_slab_threshold 0.15, which sums the box), a band of frequencies across the
-    // resonance on the base frequency's geometry (the first of the band) against each frequency alone and against the
-    // fluid layers, tracers 4 and 5. Paths are summed at their polyline's point where they end in air in front of the
-    // first face (R) or behind the last (T). A meshed gap is out of reach here (255 interactions; 3.7e-3 in R on the
-    // board, 9.1 dB on 4|16|4: md/m9_fixtures_report.md, item 3).
+    // float, one ray until none is left, thin_slab_threshold 0.15, which sums the box), a band of frequencies across
+    // the resonance on the base frequency's geometry (the first of the band) against each frequency alone and against
+    // the fluid layers, tracers 4 and 5. Paths are summed at their polyline's point where they end in air in front of
+    // the first face (R) or behind the last (T). A meshed air gap between the faces would be out of reach of the 255
+    // interactions ray_progress allows (3.7e-3 in R on the board, 9.1 dB on 4|16|4); the box of near-air material is
+    // summed in one event.
     ub::OneThread one_thread;
     typedef std::unordered_map<std::string, std::vector<float>> PalF;
     const std::complex<double> J(0.0, 1.0);
@@ -401,66 +402,34 @@ TEST_CASE("ray_progress - a leaf on a box of air at every frequency of a band", 
         PalF pal;
         for (const auto &kv : Pd)
             pal[kv.first] = std::vector<float>(kv.second.begin(), kv.second.end());
-        const float hh = 200.0f;
-        const size_t nfc = x.size(), nf = fa.size();
-        arma::fmat mesh(2 * nfc, 9);
-        arma::uvec mi(2 * nfc);
-        for (size_t k = 0; k < nfc; ++k)
-        {
-            if (!flip[k])
-                mesh.row(2 * k) = arma::frowvec{x[k], -hh, -hh, x[k], -hh, hh, x[k], hh, -hh}, mesh.row(2 * k + 1) = arma::frowvec{x[k], hh, -hh, x[k], -hh, hh, x[k], hh, hh};
-            else
-                mesh.row(2 * k) = arma::frowvec{x[k], -hh, -hh, x[k], hh, -hh, x[k], -hh, hh}, mesh.row(2 * k + 1) = arma::frowvec{x[k], hh, -hh, x[k], hh, hh, x[k], -hh, hh};
-            mi(2 * k) = (arma::uword)mat[k], mi(2 * k + 1) = (arma::uword)mat[k];
-        }
+        const size_t nf = fa.size();
+        arma::fmat mesh;
+        arma::uvec mi;
+        rp::planes(x, mat, std::vector<bool>(flip.begin(), flip.end()), mesh, mi);
         const float x_front = *std::min_element(x.begin(), x.end()), x_back = *std::max_element(x.begin(), x.end());
         const double th = thd * QPI / 180.0, st = std::sin(th);
-        const float Ox = -1.0f, Oy = 0.37f - (float)std::tan(th), Oz = 0.0f, r0 = 0.1f, len = 300.0f;
-        arma::frowvec kv = {(float)std::cos(th), (float)std::sin(th), 0.0f};
         arma::fvec fq(nf);
         for (size_t q = 0; q < nf; ++q)
             fq(q) = (float)(fa[q] * lw::GHZ * 1.0e9);
-        arma::fmat orig(1, 3), dest(1, 3), acc(1, 1 + nf, arma::fill::zeros);
-        orig.row(0) = arma::frowvec{Ox, Oy, Oz} + r0 * kv, dest.row(0) = arma::frowvec{Ox, Oy, Oz} + (r0 + len) * kv;
-        arma::fcube pd(1, 3, nf);
-        for (size_t q = 0; q < nf; ++q)
-            pd.slice(q) = kv;
-        arma::Col<short> prev(1, arma::fill::zeros), cur(1, arma::fill::zeros), buf(1, arma::fill::zeros);
-        std::vector<quadriga_lib::path> paths(1);
-        paths[0].init(0, nf, true);
-        paths[0].set_length(r0);
         T.assign(nf, 0.0), R.assign(nf, 0.0);
-        for (int g = 0; g < 60; ++g)
-        {
-            quadriga_lib::ray_progress(mesh, mi, pal, fq, Ox, Oy, Oz, orig, dest, prev, cur, buf, pd, acc, paths, nullptr, nullptr, nullptr, nullptr,
-                                       (uint8_t)60, 255, 255, 0, -250.0f, 3.0f, 0.15f, tr == 5, true, nullptr, nullptr, nullptr, nullptr);
-            if (orig.n_rows == 0)
-                break;
-            for (arma::uword i = 0; i < orig.n_rows; ++i)
+        rp::Opt o;
+        o.calls = 60, o.max_int = 60, o.max_refl = 255, o.max_trans = 255, o.min_gain = -250.0f, o.refr = tr == 5;
+        rp::walk(mesh, mi, pal, fq, thd, o, [&](const rp::Ray &r)
+                 {
+            const float *first = r.first(), *last = r.last();
+            const bool fwd = r.fwd();
+            const bool isT = fwd && last[0] > x_back - 1.0e-3f, isR = !fwd && last[0] < x_front + 1.0e-3f;
+            if (!isT && !isR)
+                return false;
+            const double Lin = r.poly();
+            for (size_t q = 0; q < nf; ++q)
             {
-                const bool fwd = dest(i, 0) > orig(i, 0);
-                const size_t ns = paths[i].n_seg();
-                if ((cur(i) & (short)0x3FFF) != 0 || ns != (size_t)(g + 1))
-                    continue;
-                const float *first = paths[i].coord(0), *last = paths[i].coord(ns - 1);
-                const bool isT = fwd && last[0] > x_back - 1.0e-3f, isR = !fwd && last[0] < x_front + 1.0e-3f;
-                if (!isT && !isR)
-                    continue;
-                double Lin = 0.0;
-                for (size_t s = 1; s < ns; ++s)
-                {
-                    const float *p = paths[i].coord(s - 1), *q = paths[i].coord(s);
-                    Lin += std::sqrt(((double)q[0] - p[0]) * ((double)q[0] - p[0]) + ((double)q[1] - p[1]) * ((double)q[1] - p[1]) + ((double)q[2] - p[2]) * ((double)q[2] - p[2]));
-                }
-                for (size_t q = 0; q < nf; ++q)
-                {
-                    const double k = 2.0 * QPI * fq(q) / C0;
-                    const float *xc = paths[i].xpr_coeff(q);
-                    const lw::cd F = lw::cd((double)xc[0], (double)xc[1]) * std::exp(-J * k * Lin) * std::exp(J * k * st * ((double)last[1] - (double)first[1]));
-                    (isT ? T[q] : R[q]) += F;
-                }
+                const double k = 2.0 * QPI * fq(q) / C0;
+                const float *xc = r.xc(q);
+                const lw::cd F = lw::cd((double)xc[0], (double)xc[1]) * std::exp(-J * k * Lin) * std::exp(J * k * st * ((double)last[1] - (double)first[1]));
+                (isT ? T[q] : R[q]) += F;
             }
-        }
+            return false; });
     };
 
     QD_DIAG("\n# diag: ray_progress, a band against each frequency alone and against the fluid layers\n");
@@ -520,14 +489,14 @@ TEST_CASE("ray_progress - a leaf on a box of air at every frequency of a band", 
 
 TEST_CASE("Leaf - a porous fill at the back of the box is the transfer matrix of leaf, air, fill and wall", "[acoustic]")
 {
-    // Shearer's filled membrane absorber [Shearer_2016_AbsorptionBelow100Hz, Sec. 3.6]: 6 mm MDF (4.65 kg/m2, a leaf with
-    // m = 0, loss ratio 0.2 on mu) glued on a box of near-air material (20 mm) glued on a porous body (75 mm rock wool:
-    // Miki at 32.8 kPa s/m2 in the two-parameter mapping, power-law columns fitted on its zc and kc over 40 Hz - 1 kHz,
-    // md/m9_fixtures_report.md item 4) glued on the mass-law wall with tf 0. Each body's series summed, the exchange
-    // between the two bodies followed as paths (up to a few hundred events). Reference: MDF | air | the same columns |
-    // the concrete half-space. Not asserted: the followed mode (the series of a lossy layer between strong reflectors
-    // diverges, round trip 1.145), a fill directly behind the leaf with air behind it (no finite path sum), tf behind a
-    // fill (a pad matched to the fill: md/acoustic.md 6), and the comparison with Shearer's measured peak (80 Hz third).
+    // Shearer's filled membrane absorber [Shearer_2016_AbsorptionBelow100Hz, Sec. 3.6]: 6 mm MDF (4.65 kg/m2, a leaf
+    // with m = 0, loss ratio 0.2 on mu) glued on a box of near-air material (20 mm) glued on a porous body (75 mm rock
+    // wool: Miki at 32.8 kPa s/m2 in the two-parameter mapping, power-law columns fitted on its zc and kc over 40 Hz -
+    // 1 kHz) glued on the mass-law wall with tf 0. Each body's series summed, the exchange between the two bodies
+    // followed as paths (up to a few hundred events). Reference: MDF | air | the same columns | the concrete half-
+    // space. Not asserted: the followed mode (the series of a lossy layer between strong reflectors diverges, round
+    // trip 1.145), a fill directly behind the leaf with air behind it (no finite path sum), tf behind a fill (a pad
+    // matched to air, not to the fill), and the comparison with Shearer's measured peak (80 Hz third).
     ub::OneThread one_thread;
     const lw::Mtl MDF = lw::leaf(4.5e-5, 775.0 / 1.2, 0.006, 0.2);
     lw::Mtl W = lw::wall(0.0), A = lw::air_body(), F;
@@ -554,19 +523,16 @@ TEST_CASE("Leaf - a porous fill at the back of the box is the transfer matrix of
 
 TEST_CASE("Sheet between two bodies - nothing is created and the wave left in air inside the far body is killed", "[acoustic]")
 {
-    // A21 (md/acoustic.md 6). A porous sheet co-located with the exit face of a box of near-air material and the entry
-    // face of a wall: box 0 to 10 mm | sheet 15 mm | wall from 10 mm, faces in the plane x = 10 mm in the order box exit,
-    // sheet, wall entry. The intersector reports two of the three tied faces, and its kernel's arithmetic decides which
-    // two. Box exit + sheet is a glued exit with air assumed beyond it (md/wave.md 6), so the wave is left in air inside
-    // the wall. Before the change the summed series created energy (R 42 at 125 Hz, 60 deg, on an m = 0 wall) and the
-    // wall's exit face, met from inside, was taken as an exit into air; in EM the same (R + T 42.19 TE, 14.46 TM).
-    // Asserted, scalar types 4 and 5 on both walls, EM type 1 per channel (TE, TM) on the m = 0 wall, the faces as
+    // A porous sheet co-located with the exit face of a box of near-air material and the entry face of a wall: box 0 to
+    // 10 mm | sheet 15 mm | wall from 10 mm, faces in the plane x = 10 mm in the order box exit, sheet, wall entry. The
+    // intersector reports two of the three tied faces, and its kernel's arithmetic decides which two. Box exit + sheet
+    // is a glued exit with air assumed beyond it, so the wave is left in air inside the wall; the wall's exit face, met
+    // from there, kills it instead of taking it as an exit into air.
+    // Asserted, scalar types 4 and 5 on both walls and EM type 1 per channel (TE, TM) on the m = 0 wall, the faces as
     // dielectrics: R + T <= 1, summed and followed, on the pair the kernel picks; at the triple face, every pair handed
     // in, the hit code, the medium after it, and the kill at the wall's exit face (both passes) where the wave was left
-    // in air.
-    // Recorded, not asserted: R against air 10 mm | porous 15 mm | the concrete half-space; box | sheet | air only loses
-    // energy, the sheet ignored reflects nearly all of it. The porous layer as a traced body glued on the wall is the
-    // form that works (the fill case above). Wave media only (m = 0 wall), and the same on a mass-law wall.
+    // in air. Printed, not asserted: R against air 10 mm | porous 15 mm | the concrete half-space; the porous layer as
+    // a traced body glued on the wall (the fill case above) is the form that matches it.
     ub::OneThread one_thread;
     const double x1 = 0.010;
     lw::Mtl F; // the rock wool of the fill case (Miki 32.8 kPa s/m2), as a 15 mm sheet

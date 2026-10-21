@@ -9,12 +9,11 @@
 TEST_CASE("Unentered branches - a corner with a sheet is the sheet alone once the state is kept", "[wave]")
 {
     ub::OneThread one_thread;
-    // A sheet that meets another face at an angle, within the co-location distance along the ray.
-    // ray_mesh_interact drops the second face and clears the co-location and corner bits; the redo
-    // re-derives an isolated sheet from the material indices. So with the state kept the event is
-    // the sheet without its neighbour, bit for bit, whatever the neighbour is. What
-    // ray_mesh_interact wrote itself is recorded: it is the bare face of a half-space of the
-    // sheet's material, not the composite. A sheet as the second face is dropped altogether.
+    // A sheet that meets another face at an angle, within the co-location distance along the ray. ray_mesh_interact
+    // drops the second face and clears the co-location and corner bits; the redo re-derives an isolated sheet from the
+    // material indices. So with the state kept the event is the sheet without its neighbour, bit for bit, whatever the
+    // neighbour is. What ray_mesh_interact wrote itself is printed: the bare face of a half-space of the sheet's
+    // material, not the composite. A sheet as the second face is dropped altogether.
     const std::vector<LumpMtl> lp = {
         {5.24, 0.63, 0.006}, // 1 sheet 6 mm
         {1.50, 0.40, 0.0},   // 2 solid
@@ -66,7 +65,7 @@ TEST_CASE("Unentered branches - a corner with a sheet is the sheet alone once th
                         ub::w(E.prev(0)), ub::w(E.cur(0)), ub::w(E.buf(0)), E.origN(0, 0));
                 INFO("corner " << cfg[q].name << " theta " << thd << " type " << it);
                 REQUIRE(E.nh >= 1);
-                CHECK(bits);               // the redo is the first face alone
+                CHECK(bits);                                      // the redo is the first face alone
                 CHECK(std::abs(a - cpx(W.xpr0, 0, 0)) < 1.0e-12); // and so is what ray_mesh_interact wrote
                 CHECK(E.rt == W.rt);
                 CHECK(E.prev(0) == W.prev(0));
@@ -75,7 +74,7 @@ TEST_CASE("Unentered branches - a corner with a sheet is the sheet alone once th
                 if (has_twin)
                 {
                     CHECK(E.nh >= 2);
-                    CHECK((E.ot & 0x1C) == 0);                 // co-location, same-direction and corner bits are cleared
+                    CHECK((E.ot & 0x1C) == 0);                  // co-location, same-direction and corner bits are cleared
                     CHECK(((E.ot & 0x40) != 0) == sheet_first); // the sheet bit says whether the face that is kept is the sheet
                     if (it != 3)
                         CHECK(E.origN(0, 0) > 1.0e-4); // relaunched behind the face that was dropped
@@ -202,9 +201,7 @@ TEST_CASE("Unentered branches - the displacement budget caps what a sheet takes 
     {
         double Lh, xs, ta, tb;
     };
-    const std::vector<Sk> sk = {{0.010, 0.005, 0.0005, 0.0005}, {0.010, 0.005, 0.002, 0.001}, {0.010, 0.005, 0.003, 0.002}, {0.010, 0.005, 0.006, 0.003},
-                                {0.100, 0.010, 0.0005, 0.0005}, {0.100, 0.010, 0.004, 0.003}, {0.100, 0.010, 0.006, 0.006}, {0.100, 0.050, 0.0005, 0.0005}, {0.100, 0.050, 0.006, 0.006},
-                                {0.100, 0.090, 0.0005, 0.0005}, {0.100, 0.090, 0.006, 0.006}, {0.010, 0.002, 0.0005, 0.0005}, {0.010, 0.002, 0.006, 0.006}};
+    const std::vector<Sk> sk = {{0.010, 0.005, 0.0005, 0.0005}, {0.010, 0.005, 0.002, 0.001}, {0.010, 0.005, 0.003, 0.002}, {0.010, 0.005, 0.006, 0.003}, {0.100, 0.010, 0.0005, 0.0005}, {0.100, 0.010, 0.004, 0.003}, {0.100, 0.010, 0.006, 0.006}, {0.100, 0.050, 0.0005, 0.0005}, {0.100, 0.050, 0.006, 0.006}, {0.100, 0.090, 0.0005, 0.0005}, {0.100, 0.090, 0.006, 0.006}, {0.010, 0.002, 0.0005, 0.0005}, {0.010, 0.002, 0.006, 0.006}};
     std::vector<LumpMtl> lq = {{1.50, 0.40, 0.0}};
     for (const Sk &K : sk)
         lq.push_back({5.24, 0.63, K.ta}), lq.push_back({2.50, 0.80, K.tb});
@@ -269,9 +266,9 @@ TEST_CASE("Unentered branches - the core's loss cap is a floor on the transmit p
     const std::complex<double> J(0.0, 1.0);
     const std::vector<double> loss_dB = {100.0, 300.0, 390.0, 399.0, 401.0, 450.0, 600.0, 2000.0};
     std::vector<LumpMtl> lp = {
-        {2.50, 0.00, 0.002},                // 1 a coherent partner layer
-        {2.50, 0.00, 0.002, 0.0, 0.2},      // 2 the same with tf, which takes the scattering form
-        {1.50, 0.40, 0.0},                  // 3 a host
+        {2.50, 0.00, 0.002},           // 1 a coherent partner layer
+        {2.50, 0.00, 0.002, 0.0, 0.2}, // 2 the same with tf, which takes the scattering form
+        {1.50, 0.40, 0.0},             // 3 a host
     };
     for (double a : loss_dB)
     {
@@ -414,16 +411,15 @@ TEST_CASE("Unentered branches - sheet and stack and slab series at float against
 TEST_CASE("Unentered branches - the followed mark and the resolved flag across abutting and nested and overlapping bodies", "[wave]")
 {
     ub::OneThread one_thread;
-    // A leg that began at a reflection carries what that reflection decided: the followed mark in
-    // the buffer word where the series was left to the tracer, the resolved flag where it was
-    // summed. Three ways such a leg meets a face that is not the end of its body.
-    //   A. A wall meshed as two abutting blocks of one material. The shared face is a transparent
-    //      transition, the mark is carried, and the wall is the wall meshed as one block.
-    //   B. An object nested in the wall. Its medium is stored over the mark, and the event that
-    //      closes the leg judges its series for itself: the recorded limitation.
-    //   C. A body that overlaps the wall. A resolved ray that leaves the wall into it has the
-    //      coefficient of the two faces of the hit rewritten to wall | body like any other ray,
-    //      and forms no series.
+    // A leg that began at a reflection carries what that reflection decided: the followed mark in the buffer word where
+    // the series was left to the tracer, the resolved flag where it was summed. Three ways such a leg meets a face that
+    // is not the end of its body.
+    //   A. A wall meshed as two abutting blocks of one material. The shared face is a transparent transition, the mark
+    //   is carried, and the wall is the wall meshed as one block.
+    //   B. An object nested in the wall. Its medium is stored over the mark, and the event that closes the leg judges
+    //   its series for itself (an accepted limitation: the state holds one word for both).
+    //   C. A body that overlaps the wall. A resolved ray that leaves the wall into it has the coefficient of the two
+    //   faces of the hit rewritten to wall | body like any other ray, and forms no series.
     const double f = FRQ, gap = 1.0e-5;
     const std::vector<LumpMtl> lp = {
         {1.50, 0.40, 0.0},               // 1 lossy host
@@ -467,12 +463,12 @@ TEST_CASE("Unentered branches - the followed mark and the resolved flag across a
                 const bool bits = ub::same_bits(ca[4].xpr, cb[4].xpr);
                 QD_DIAG("%d|%d,%d,%.0f,%d,%.3e,%.4f,%d,%s,%s\n", B.first, B.second, tr, thd, (int)ca[3].rt, ub::dB(q), ub::deg(q), (int)bits, words(ca[2]).c_str(), words(ca[3]).c_str());
                 INFO("mark A blocks " << B.first << "|" << B.second << " tracer " << tr << " theta " << thd);
-                CHECK(ub::w(ca[2].buf(0)) == 0x4000u);               // the reflection left the series to the tracer
-                CHECK(ub::w(ca[3].buf(0)) == 0x4000u);               // and the shared face carries the mark
-                CHECK((ca[3].rt & ~0x10) == 73);                     // a same-medium pass
+                CHECK(ub::w(ca[2].buf(0)) == 0x4000u);                    // the reflection left the series to the tracer
+                CHECK(ub::w(ca[3].buf(0)) == 0x4000u);                    // and the shared face carries the mark
+                CHECK((ca[3].rt & ~0x10) == 73);                          // a same-medium pass
                 CHECK(((ca[3].rt & 0x10) != 0) == (B.first != B.second)); // with the fix-flag where the two blocks have two indices
                 CHECK(ca[3].prev(0) == ca[2].prev(0));
-                CHECK(bits);                                         // so the leg forms no series
+                CHECK(bits); // so the leg forms no series
                 CHECK(std::abs(ub::dB(q)) < 2.0e-3);
                 CHECK(std::abs(ub::deg(q)) < 0.05);
             }
@@ -501,18 +497,17 @@ TEST_CASE("Unentered branches - the followed mark and the resolved flag across a
                 CHECK(ca[4].buf(0) == 5);              // and its medium replaces the mark
                 CHECK(ca[5].buf(0) == 0);              // which does not come back when the object is left
                 CHECK(twin);                           // without the object the leg forms no series
-                CHECK(std::abs(S - 1.0) > 1.0e-3);     // with it the leg judges for itself: the recorded limitation
+                CHECK(std::abs(S - 1.0) > 1.0e-3);     // with it the leg judges for itself: the accepted limitation
             }
 
     QD_DIAG("\n# diag: resolved flag C, a body from -50 mm to 30 mm overlapping a wall from 0 to 100 mm, every series summed: enter the\n");
     QD_DIAG("# body, cross into the wall, reflect at its far face, come back and leave the wall into the body. The crossing back\n");
     QD_DIAG("# against the same crossing where the body ends at the wall's face: d_dB, d_deg. bits: that event at eps 0 against 1.5\n");
     QD_DIAG("wall|body,tracer,theta,rt,rt_abut,d_dB,d_deg,bits,w_before,w_after\n");
-    // level: the row is asserted in dB; point: also in phase. With the refracting tracer
-    // ray_mesh_interact bends the segment at the face of a deferred body as if it were entered
-    // from air, so the two polylines differ inside the overlap and each coefficient is the field
-    // at its own. The rigid rows carry no mass column, where an exit is written along the normal
-    // (the recorded limitation), and are recorded.
+    // level: the row is asserted in dB; point: also in phase. With the refracting tracer ray_mesh_interact bends the
+    // segment at the face of a deferred body as if it were entered from air, so the two polylines differ inside the
+    // overlap and each coefficient is the field at its own. The rigid rows carry no mass column, where an exit is
+    // written along the normal (an accepted limitation), and are printed only.
     struct Ov
     {
         int a, b, tr;
@@ -534,13 +529,13 @@ TEST_CASE("Unentered branches - the followed mark and the resolved flag across a
         QD_DIAG("%d|%d,%d,%.0f,%d,%d,%.3e,%.4f,%d,%s,%s\n", V.a, V.b, V.tr, V.thd, (int)co[5].rt, (int)cb[3].rt, ub::dB(q), ub::deg(q), (int)bits,
                 words(co[4]).c_str(), words(co[5]).c_str());
         INFO("resolved C wall " << V.a << " body " << V.b << " tracer " << V.tr << " theta " << V.thd);
-        CHECK((ub::w(co[3].cur(0)) & 0x8000u) != 0);  // the reflection summed the wall's series
-        CHECK((ub::w(co[4].cur(0)) & 0x8000u) != 0);  // the body's face met from inside the wall keeps the flag
-        CHECK(co[4].buf(0) == V.b);                   // and defers the body
-        CHECK(mat_of(co[5].cur(0)) == V.b);           // the wall's own face then leads into it
+        CHECK((ub::w(co[3].cur(0)) & 0x8000u) != 0); // the reflection summed the wall's series
+        CHECK((ub::w(co[4].cur(0)) & 0x8000u) != 0); // the body's face met from inside the wall keeps the flag
+        CHECK(co[4].buf(0) == V.b);                  // and defers the body
+        CHECK(mat_of(co[5].cur(0)) == V.b);          // the wall's own face then leads into it
         CHECK((ub::w(co[5].cur(0)) & 0x8000u) == 0);
         CHECK(co[5].buf(0) == 0);
-        CHECK(bits);                                  // a resolved ray forms no series
+        CHECK(bits); // a resolved ray forms no series
         if (V.level)
             CHECK(std::abs(ub::dB(q)) < 2.0e-3);
         if (V.point)
@@ -560,8 +555,8 @@ TEST_CASE("Unentered branches - a verdict handed in on a leg known not parallel 
     const double gap = 1.0e-5;
     const std::complex<double> J(0.0, 1.0);
     const std::vector<LumpMtl> lp = {
-        {1.50, 0.40, 0.0},   // 1 lossy solid
-        {1.0e4, 0.0, 0.0},   // 2 lossless and very dense: its faces reflect 0.993 from inside at 80 deg
+        {1.50, 0.40, 0.0}, // 1 lossy solid
+        {1.0e4, 0.0, 0.0}, // 2 lossless and very dense: its faces reflect 0.993 from inside at 80 deg
     };
     ub::Pal pal = lump_palette(lp);
     (void)gap;
@@ -648,21 +643,16 @@ TEST_CASE("Unentered branches - a verdict handed in on a leg known not parallel 
 TEST_CASE("Scalar closed face - a lossy box on a rigid wall reflects no more than it received and is its sheet", "[wave]")
 {
     ub::OneThread one_thread;
-    // A closed face has nothing propagating behind it: a rigid wall of the acoustic mapping from
-    // 0.003 deg on. Seen from a lossless medium its Fresnel reflection has unit magnitude. Seen
-    // from a lossy one it has not: part of what arrives is absorbed in the medium at the wall,
-    // and for the porous absorbers of the acoustic table, which are rarer than air, the magnitude
-    // is far below one. The EM types reflect at that magnitude. The scalar types took the Fresnel
-    // phase and a magnitude of one, which hands that power back: a porous box on a rigid floor,
-    // the geometry the modelling guidelines prescribe, reflected more than it received, with no
-    // tf anywhere, and parted from the same layer meshed as a sheet.
+    // A closed face has nothing propagating behind it: a rigid wall of the acoustic mapping from 0.003 deg on. Seen
+    // from a lossless medium its Fresnel reflection has unit magnitude; seen from a lossy one it has not: part of what
+    // arrives is absorbed in the medium at the wall, and for porous absorbers, which are rarer than air, the magnitude
+    // is far below one. A closed face reflects at the Fresnel magnitude in the scalar types as in the EM types, capped
+    // at one as the far face of a sheet caps it; a magnitude of one would hand the absorbed power back, and a porous
+    // box on a rigid floor would reflect more than it received.
     //
-    // The rule asserted here: a closed face reflects at the Fresnel magnitude in the scalar types
-    // as in the EM types, capped at one as the far face of a sheet caps it.
-    //
-    // Everything runs through ray_triangle_intersect, ray_mesh_interact and ray_state_update.
-    // The materials are rows of data/materials_ac.csv at 1 kHz, without tf and without the mass
-    // column; types 1 and 0 on them are the control and not EM materials.
+    // Everything runs through ray_triangle_intersect, ray_mesh_interact and ray_state_update. The materials are porous
+    // rows of data/materials_ac.csv at 1 kHz, without tf and without the mass column; types 1 and 0 on them are the
+    // control and not EM materials.
     //
     // A. The reflect port of the box, every path, against the sheet of its thickness
     // B. One reflection off the wall inside the box, scalar against the TE channel
@@ -676,11 +666,12 @@ TEST_CASE("Scalar closed face - a lossy box on a rigid wall reflects no more tha
         double a, c, thk;
     };
     // name, a, c of the table (eps'' = 17.98 c at 1 GHz, which stands for 1 kHz), thickness of the guidelines
-    const std::vector<Row> rows = {{"carpet_thin", 0.312032, 0.0191446, 0.008}, {"carpet_thick", 0.195963, 0.0229164, 0.020}, {"curtain_light_cotton", 0.548166, 0.0123962, 0.008},
-                                   {"foam_light_melamine", 0.312032, 0.0191446, 0.050}, {"mineral_wool", 0.141626, 0.0247974, 0.050}};
+    const std::vector<Row> rows = {{"carpet_thin", 0.312032, 0.0191446, 0.008}, {"carpet_thick", 0.195963, 0.0229164, 0.020}, {"curtain_light_cotton", 0.548166, 0.0123962, 0.008}, {"foam_light_melamine", 0.312032, 0.0191446, 0.050}, {"mineral_wool", 0.141626, 0.0247974, 0.050}};
     const double eW = 2.401e-9; // concrete
-    auto kz_of = [](cd e, double p) { cd v = std::sqrt(e - p); return (std::imag(v) > 0.0 || (std::imag(v) == 0.0 && std::real(v) < 0.0)) ? -v : v; };
-    auto sum = [&](const ub::Pal &P, const arma::mat &mesh, const arma::uvec &mi, int tr, double thd, double eps) {
+    auto kz_of = [](cd e, double p)
+    { cd v = std::sqrt(e - p); return (std::imag(v) > 0.0 || (std::imag(v) == 0.0 && std::real(v) < 0.0)) ? -v : v; };
+    auto sum = [&](const ub::Pal &P, const arma::mat &mesh, const arma::uvec &mi, int tr, double thd, double eps)
+    {
         bf::Acc A;
         arma::mat o, d;
         diag_ray_at(thd, o, d);
@@ -688,9 +679,7 @@ TEST_CASE("Scalar closed face - a lossy box on a rigid wall reflects no more tha
         return A;
     };
 
-    // ------------------------------------------------------------------------------------------
-    // A. The reflect port of the box against the sheet
-    // ------------------------------------------------------------------------------------------
+    // ---- A. The reflect port of the box against the sheet ----
     QD_DIAG("\n# diag: scalar closed face A, a porous box on concrete, no tf anywhere, through the intersector. R_sheet: the layer as a sheet\n");
     QD_DIAG("# on the wall, dB. R_sum, R_fol: the box as a traced solid, every path, series summed and every bounce followed, dB. d_sum,\n");
     QD_DIAG("# d_fol: the box over the sheet, dB; deg: its phase, both referenced to the wall face. k: 0 scalar or VV, 3 HH. nR: paths\n");
@@ -723,9 +712,7 @@ TEST_CASE("Scalar closed face - a lossy box on a rigid wall reflects no more tha
                 }
             }
 
-    // ------------------------------------------------------------------------------------------
-    // B. One reflection off the wall, scalar against TE
-    // ------------------------------------------------------------------------------------------
+    // ---- B. One reflection off the wall, scalar against TE ----
     QD_DIAG("\n# diag: scalar closed face B, one path: enter the box, reflect off the wall, both events with the series declined. sc, vv: the\n");
     QD_DIAG("# path in the scalar type and in the VV channel, which is TE in this frame, dB. rF: the Fresnel reflection box | wall written\n");
     QD_DIAG("# from the two media, dB. d: scalar over VV, dB\n");
@@ -747,9 +734,7 @@ TEST_CASE("Scalar closed face - a lossy box on a rigid wall reflects no more tha
             CHECK(std::abs(ub::dB(vs / ve)) < 1.0e-9);
         }
 
-    // ------------------------------------------------------------------------------------------
-    // C. Twins with every digit
-    // ------------------------------------------------------------------------------------------
+    // ---- C. Twins with every digit ----
     QD_DIAG("\n# diag: scalar closed face C, twins, the complex coefficient with every digit: the path of B for a lossless box, the same in the\n");
     QD_DIAG("# VV and HH channels for a lossy one, the bare wall from air, and a lossy box entered and left through its front face\n");
     QD_DIAG("twin,theta,re,im\n");
@@ -760,7 +745,8 @@ TEST_CASE("Scalar closed face - a lossy box on a rigid wall reflects no more tha
         arma::mat mesh1 = ub::build({0.0, 0.02, 0.02 + gap, 0.22 + gap}, {1, 1, 2, 2}, {false, true, false, true}, m1);
         arma::mat mesh3 = ub::build({0.0, 0.02, 0.02 + gap, 0.22 + gap}, {3, 3, 2, 2}, {false, true, false, true}, m3);
         arma::mat meshw = ub::build({0.0, 0.2}, {2, 2}, {false, true}, mw);
-        auto prod = [](const std::vector<ub::Ev> &v, int k) { cd x = 1.0; for (const ub::Ev &e : v) x *= cpx(e.xpr, 0, k); return x; };
+        auto prod = [](const std::vector<ub::Ev> &v, int k)
+        { cd x = 1.0; for (const ub::Ev &e : v) x *= cpx(e.xpr, 0, k); return x; };
         const cd a = prod(ub::chain(P, mesh1, m1, {4, 3}, f, thd, {1.5}), 0), b = prod(ub::chain(P, mesh1, m1, {5, 3}, f, thd, {1.5}), 0);
         const cd c0 = prod(ub::chain(P, mesh3, m3, {1, 0}, f, thd, {1.5}), 0), c3 = prod(ub::chain(P, mesh3, m3, {1, 0}, f, thd, {1.5}), 3);
         const cd w = prod(ub::chain(P, meshw, mw, {3}, f, thd, {1.5}), 0), e = prod(ub::chain(P, mesh3, m3, {3}, f, thd, {1.5}), 0);
@@ -785,16 +771,17 @@ TEST_CASE("Scalar closed face - a lossy box on a rigid wall reflects no more tha
 TEST_CASE("One solver - a sheet and a stack are one sum and no mirror is clamped", "[wave]")
 {
     ub::OneThread one_thread;
-    // One solver resolves every sheet and every stack, and the series of a traced solid takes its
-    // mirrors as the faces are. A reflection above one seen from a lossy medium is the Fresnel
-    // value: capped before a series is summed it made a wall lined on both faces pass 44 times
-    // what it received. Through ray_triangle_intersect, ray_mesh_interact and ray_state_update.
+    // One solver resolves every sheet and every stack, and the series of a traced solid takes its mirrors as the faces
+    // are: a reflection above one, seen from a lossy medium, is the Fresnel value and is not capped before the series
+    // is summed (a cap there makes a wall lined on both faces pass 44 times what it received). Through
+    // ray_triangle_intersect, ray_mesh_interact and ray_state_update.
     //   1 host eps 5.24, 2 host eps 5.24 with tf -0.5, 3 .. sheets and solids as listed per table.
     //   No material here carries the mass column, and only table H carries tf.
     typedef std::complex<double> cd;
     const cd J(0.0, 1.0), U(1.0, 0.0);
     const double f = FRQ, G = 1.0e-5, k0 = 2.0 * QPI * f / C0;
-    auto dBp = [](double p) { return (p > 0.0) ? 10.0 * std::log10(p) : -999.0; };
+    auto dBp = [](double p)
+    { return (p > 0.0) ? 10.0 * std::log10(p) : -999.0; };
 
     // A: a traced solid with a coating, every series summed, every path, against the matrix of the wall
     QD_DIAG("\n# diag: one solver A, a solid 6 mm with a 6 mm coating on its near face, its far face or both, every series summed, every\n");
@@ -981,12 +968,12 @@ TEST_CASE("One solver - a sheet and a stack are one sum and no mirror is clamped
             QD_DIAG("%g-%gj,%.0f,%.6f,%.3e,%.3e,%04x,%.3e,%.3e,%d,%+.4f,%+.4f\n", h.first, h.second, thd, std::abs(S), std::abs(S - S2), std::abs(S - S1),
                     ub::w(a0[1].buf(0)), std::abs(Sb - Sb2), std::abs(Sb - Sb1), A.nT, dT, dR);
             INFO("G, host " << h.first << "-" << h.second << "j, theta " << thd);
-            CHECK(std::abs(S - S2) < 1.0e-6);  // L is the leg from the hit point
-            CHECK(std::abs(S - S1) > 1.0e-4);  // and the two mirrors are told apart
+            CHECK(std::abs(S - S2) < 1.0e-6);           // L is the leg from the hit point
+            CHECK(std::abs(S - S1) > 1.0e-4);           // and the two mirrors are told apart
             CHECK(a0[1].buf(0) == (short)(0x4000 | 2)); // the previous-medium word names the last layer, the buffer word the first
             CHECK(std::abs(Sb - Sb2) < 1.0e-6);         // so the leg behind sums against both
             CHECK(std::abs(Sb - Sb1) > 1.0e-4);
-            CHECK(A.nT <= 8); // and its bounces are no rays
+            CHECK(A.nT <= 8);             // and its bounces are no rays
             CHECK(std::abs(dT) < 5.0e-3); // four layers on the characteristic matrix, as a sum of paths
             CHECK(std::abs(dR) < 1.0e-2);
         }
@@ -1028,7 +1015,8 @@ TEST_CASE("Budget - a sheet or a stack inside a host is one wall on every port w
     {
         double Lf, Lb, tot;
     };
-    auto walls = [&](const char *tag, const std::vector<LumpMtl> &lp, const std::vector<Geo> &geo, bool lossless, double bound) {
+    auto walls = [&](const char *tag, const std::vector<LumpMtl> &lp, const std::vector<Geo> &geo, bool lossless, double bound)
+    {
         const int nlay = (int)lp.size() - 1;
         const std::complex<double> eH = lump_eps(lp[0], f);
         for (const Geo &g : geo)
@@ -1076,8 +1064,7 @@ TEST_CASE("Budget - a sheet or a stack inside a host is one wall on every port w
     QD_DIAG("# eps 1.50 | eps 1.60 in eps 1.50-0.40j, a stack thicker than its whole host met from the long side, which nothing in the event\n");
     QD_DIAG("# can know. sum: both ports, every path. dT, dR: against the wall where the layers fit, dB. drop: power the walk cut\n");
     QD_DIAG("family,layers,host_mm,tot_mm,tracer,theta,fits,nT,sum,dT,dR,drop\n");
-    const std::vector<Geo> g1 = {{0.05, 0.05, 0.012}, {0.005, 0.005, 0.005}, {0.01, 0.09, 0.012}, {0.09, 0.01, 0.012}, {0.005, 0.005, 0.009},
-                                 {0.01, 0.09, 0.030}, {0.09, 0.01, 0.030}, {0.005, 0.005, 0.015}, {0.01, 0.09, 0.120}};
+    const std::vector<Geo> g1 = {{0.05, 0.05, 0.012}, {0.005, 0.005, 0.005}, {0.01, 0.09, 0.012}, {0.09, 0.01, 0.012}, {0.005, 0.005, 0.009}, {0.01, 0.09, 0.030}, {0.09, 0.01, 0.030}, {0.005, 0.005, 0.015}, {0.01, 0.09, 0.120}};
     walls("lossless", {{1.50, 0.0, 0.0}, {5.24, 0.0, 0.001}, {2.50, 0.0, 0.001}}, g1, true, 1.0 + 1.0e-4);
     walls("lossless", {{1.50, 0.0, 0.0}, {5.24, 0.0, 0.001}}, g1, true, 1.0 + 1.0e-4);
     walls("offcentre", {{1.50, 0.40, 0.0}, {1.50, 0.0, 0.001}}, {{0.09, 0.01, 0.090}, {0.09, 0.01, 0.110}, {0.01, 0.09, 0.140}}, false, 1.0);
@@ -1123,7 +1110,8 @@ TEST_CASE("Resonant medium - a permittivity resonance is part of the medium a wa
         bf::walk(P, mesh, mi, tr, f, thd, eps, nullptr, o, dd, 1.0, 1.0, 0.0, 0.0, 0, depth, A);
         return A;
     };
-    auto sum = [](const bf::Acc &A, int ch) { return std::norm(A.T[ch]) + std::norm(A.R[ch]); };
+    auto sum = [](const bf::Acc &A, int ch)
+    { return std::norm(A.T[ch]) + std::norm(A.R[ch]); };
     const int types[4] = {4, 5, 1, 2};
 
     // A. The sheet whose pole takes eps 4 to 1 is a sheet of air: no reflection, and a transmission of one with no phase, at
@@ -1390,10 +1378,10 @@ TEST_CASE("Unentered branches - ray_mesh_interact's own glued composite against 
         CHECK(std::abs(ang(E.path_dirN) - ang(E4.path_dirN)) < 1.0e-9);
         if (thd > 44.0 && thd < 45.0) // the spine is open and one edge is not
         {
-            CHECK(((E.ot & 0x20) != 0 && (N5.ot & 0x20) == 0));   // the edge closes the whole tube
-            CHECK(arma::abs(E.xpr - E.xpr0).max() < 1.0e-12);      // and a caller without state gets the spine's coefficient, as the redo does
-            CHECK(std::norm(cpx(E.xpr, 0, 0)) > 0.1);              // where the redo has the composite of the open pair
-            CHECK(E.cur(0) == E4.cur(0));                          // on a leg that is not flagged bent
+            CHECK(((E.ot & 0x20) != 0 && (N5.ot & 0x20) == 0));     // the edge closes the whole tube
+            CHECK(arma::abs(E.xpr - E.xpr0).max() < 1.0e-12);       // and a caller without state gets the spine's coefficient, as the redo does
+            CHECK(std::norm(cpx(E.xpr, 0, 0)) > 0.1);               // where the redo has the composite of the open pair
+            CHECK(E.cur(0) == E4.cur(0));                           // on a leg that is not flagged bent
             CHECK(std::abs(ang(E.destN - E.origN) - thd) < 1.0e-6); // because the segment was not bent
         }
         else
@@ -1431,10 +1419,14 @@ TEST_CASE("Stack geometry - an ordered stack leaves the ray on the line it arriv
     const char *mn[] = {"air", "C1", "C2", "R", "N", "H", "Hl", "L", "Q"};
     const std::vector<std::pair<bool, bool>> flips = {{false, true}, {false, false}, {true, true}, {true, false}};
     const char *fn[] = {"front|back", "front|front", "back|back", "back|front"};
-    auto unit = [](arma::mat d) { d /= std::sqrt(ub::sumsq(d)); return d; };
-    auto dmax = [](const arma::mat &a, const arma::mat &b) { double v = 0.0; for (arma::uword i = 0; i < 3; ++i) v = std::max(v, std::abs(a(0, i) - b(0, i))); return v; };
-    auto ang = [](const arma::mat &d) { return std::atan2(std::sqrt(d(0, 1) * d(0, 1) + d(0, 2) * d(0, 2)), std::abs(d(0, 0))) * 180.0 / QPI; };
-    auto sig = [](const arma::mat &x) { double v = 0.0; for (arma::uword i = 0; i < x.n_elem; ++i) v += 0.731 * (double)(i + 1) * x(i); return v; };
+    auto unit = [](arma::mat d)
+    { d /= std::sqrt(ub::sumsq(d)); return d; };
+    auto dmax = [](const arma::mat &a, const arma::mat &b)
+    { double v = 0.0; for (arma::uword i = 0; i < 3; ++i) v = std::max(v, std::abs(a(0, i) - b(0, i))); return v; };
+    auto ang = [](const arma::mat &d)
+    { return std::atan2(std::sqrt(d(0, 1) * d(0, 1) + d(0, 2) * d(0, 2)), std::abs(d(0, 0))) * 180.0 / QPI; };
+    auto sig = [](const arma::mat &x)
+    { double v = 0.0; for (arma::uword i = 0; i < x.n_elem; ++i) v += 0.731 * (double)(i + 1) * x(i); return v; };
     auto fan = [](const arma::mat &u, arma::mat &tv, arma::mat &td) // three vertex rays about the spine
     {
         const double e[3][3] = {{0.0, 0.004, 0.0}, {0.0, -0.002, 0.0035}, {0.0, -0.002, -0.0035}};
@@ -1449,9 +1441,7 @@ TEST_CASE("Stack geometry - an ordered stack leaves the ray on the line it arriv
     };
     const double TOL = 1.0e-9;
 
-    // ------------------------------------------------------------------------------------------
-    // A. In air, one event: every pair, every orientation of the two normals, every type
-    // ------------------------------------------------------------------------------------------
+    // ---- A. In air, one event: every pair, every orientation of the two normals, every type ----
     QD_DIAG("\n# diag: stack geometry A, two co-located sheets in air, one event with a tube. seg, own: the segment and ray_mesh_interact's own\n");
     QD_DIAG("# path_dirN, deg from the normal. Largest component of a unit-vector difference: e_seg the segment against the direction\n");
     QD_DIAG("# written, e_in against the incoming direction, e_own the own path_dirN against the incoming direction, e_tube the vertex\n");
@@ -1487,9 +1477,7 @@ TEST_CASE("Stack geometry - an ordered stack leaves the ray on the line it arriv
                     CHECK(e_tube < TOL); // each vertex ray in the direction it arrived in
                 }
 
-    // ------------------------------------------------------------------------------------------
-    // B. Inside a host, and where the next wall is met
-    // ------------------------------------------------------------------------------------------
+    // ---- B. Inside a host, and where the next wall is met ----
     // Host 22 mm with the stack in its middle, entered across a bare face or through a glued
     // sheet L, and a 50 mm eps 2.50 wall 0.5 m behind. The twin has the first layer alone in
     // place of the stack: a single sheet, which leaves the ray where it was. A leg behind a
@@ -1552,17 +1540,15 @@ TEST_CASE("Stack geometry - an ordered stack leaves the ray on the line it arriv
                             CHECK(e_stk_in < TOL);                 // on the line it was reached on
                             CHECK(e_stk < (glued ? 2.0e-4 : TOL)); // which is the direction written
                             CHECK(e_exit < (glued ? 2.0e-4 : TOL));
-                            CHECK(c[2].rt == t[2].rt); // the exit behind the stack is the exit behind a single sheet
-                            if (!glued)                // behind a glued entry that entry's anchoring can set the bit, for the twin as well
-                                CHECK((c[2].rt & 2) == 0); // behind the stack the wave's direction is the segment again
+                            CHECK(c[2].rt == t[2].rt);                     // the exit behind the stack is the exit behind a single sheet
+                            if (!glued)                                    // behind a glued entry that entry's anchoring can set the bit, for the twin as well
+                                CHECK((c[2].rt & 2) == 0);                 // behind the stack the wave's direction is the segment again
                             CHECK(std::abs(dyw) < (glued ? 1.0e-6 : TOL)); // the next wall is met where the single sheet meets it
                             CHECK(e_wall < (glued ? 2.0e-4 : TOL));
                             CHECK(std::abs(dL) < 1.0e-3); // and with the level of the undeviated tracer
                         }
 
-    // ------------------------------------------------------------------------------------------
-    // C. Twins that must not move, with every digit
-    // ------------------------------------------------------------------------------------------
+    // ---- C. Twins that must not move, with every digit ----
     QD_DIAG("\n# diag: stack geometry C1, what must not move: origN, destN and a weighted sum of tridirN with every digit. A single sheet, a\n");
     QD_DIAG("# collapsed duplicate, a glued entry, a bare entry with every type, and the stack with types 1, 4, 0 and 3\n");
     QD_DIAG("what,type,theta,ot,rt,origN_x,origN_y,origN_z,destN_x,destN_y,destN_z,tube\n");
@@ -1592,8 +1578,7 @@ TEST_CASE("Stack geometry - an ordered stack leaves the ray on the line it arriv
                 const ub::Ev E = ub::traced<double>(pal, mesh, mi, it, f, o, d, nullptr, op);
                 QD_DIAG("%s,%d,%.0f,%u,%u,%.17g,%.17g,%.17g,%.17g,%.17g,%.17g,%.17g\n", nm, it, thd, (unsigned)E.ot, (unsigned)E.rt, E.origN(0, 0), E.origN(0, 1), E.origN(0, 2),
                         E.destN(0, 0), E.destN(0, 1), E.destN(0, 2), sig(E.tridirN));
-                twin("stack geometry C1", twin_key("%s,%d,%.0f", nm, it, thd), {(double)E.ot, (double)E.rt, E.origN(0, 0), E.origN(0, 1), E.origN(0, 2),
-                                                                   E.destN(0, 0), E.destN(0, 1), E.destN(0, 2), sig(E.tridirN)});
+                twin("stack geometry C1", twin_key("%s,%d,%.0f", nm, it, thd), {(double)E.ot, (double)E.rt, E.origN(0, 0), E.origN(0, 1), E.origN(0, 2), E.destN(0, 0), E.destN(0, 1), E.destN(0, 2), sig(E.tridirN)});
                 CHECK(E.rt != 0);
             }
 
@@ -1638,18 +1623,15 @@ TEST_CASE("Stack geometry - an ordered stack leaves the ray on the line it arriv
 TEST_CASE("Rare sheet - a coherent sheet with tf that is rarer than the invariant passes no more than it received", "[wave]")
 {
     ub::OneThread one_thread;
-    // A sheet without the mass column whose permittivity is below the transverse invariant carries
-    // an evanescent wave, or for a lossy sheet a strongly damped one, and the Fresnel reflectance
-    // of its faces is close to one for a reason that is not a missing forward port: the wave
-    // tunnels. A rule that rescales the raw amplitude by (1 - R') / (1 - R0) is a gain there: 20 dB
-    // per decade of whatever loss keeps 1 - R0 off zero, the host's or the sheet's own, and a step
-    // where it is zero. tf acts on such a face as on every face of a coherent sheet, as the ideal
-    // transformer of the sheet-tf case, formed on the modulus of the admittance ratio: the
-    // tunnelled wave stays and the face creates nothing. Everything runs through
-    // ray_triangle_intersect, ray_mesh_interact and ray_state_update. S is 6 mm of eps 0.31 - j es,
-    // past its critical angle from 33.83 deg in every medium entered from air. These are EM
-    // materials: tf, no mass column. The rows with the mass column are in "Rare sheet - ... - the
-    // mass-law part".
+    // A sheet without the mass column whose permittivity is below the transverse invariant carries an evanescent wave,
+    // or for a lossy sheet a strongly damped one, and the Fresnel reflectance of its faces is close to one for a reason
+    // that is not a missing forward port: the wave tunnels. A rule that rescales the raw amplitude by (1 - R') / (1 -
+    // R0) would be a gain there: 20 dB per decade of whatever loss keeps 1 - R0 off zero, the host's or the sheet's
+    // own, and a step where it is zero. tf acts on such a face as on every face of a coherent sheet, as the ideal
+    // transformer of the sheet-tf case, formed on the modulus of the admittance ratio: the tunnelled wave stays and the
+    // face creates nothing. Everything runs through ray_triangle_intersect, ray_mesh_interact and ray_state_update. S
+    // is 6 mm of eps 0.31 - j es, past its critical angle from 33.83 deg in every medium entered from air. These are EM
+    // materials: tf, no mass column.
     //
     // A. The sheet inside a host: every loss of the host, both signs of tf, tf on the host, scalar and EM
     // B. The sheet with a loss of its own, inside a host and in air
@@ -1659,9 +1641,12 @@ TEST_CASE("Rare sheet - a coherent sheet with tf that is rarer than the invarian
     // F. Twins that must not move, with every digit
     const double f = FRQ, gap = 1.0e-5, d1 = 0.010, d2 = 0.012, ZERO = 1.0e-9;
     const double losses[5] = {0.8, 0.1, 1.0e-3, 1.0e-6, 0.0};
-    auto lin = [](double x) { return std::pow(10.0, 0.1 * x); };
-    auto lvl = [](const std::vector<ub::Ev> &v, size_t n, int k) { return (v.size() == n) ? ub::dB(cpx(v[n - 1].xpr, 0, k)) : -999.0; };
-    auto refl = [](int tr) { return (tr == 4 || tr == 5) ? 3 : 0; };
+    auto lin = [](double x)
+    { return std::pow(10.0, 0.1 * x); };
+    auto lvl = [](const std::vector<ub::Ev> &v, size_t n, int k)
+    { return (v.size() == n) ? ub::dB(cpx(v[n - 1].xpr, 0, k)) : -999.0; };
+    auto refl = [](int tr)
+    { return (tr == 4 || tr == 5) ? 3 : 0; };
     // The sheet event inside a host, 10 mm in front and 12 mm behind: both ports, with the host leg in front
     auto inside = [&](const ub::Pal &P, int tr, double thd, int k, double &T, double &R)
     {
@@ -1670,9 +1655,7 @@ TEST_CASE("Rare sheet - a coherent sheet with tf that is rarer than the invarian
         T = lvl(ub::chain(P, mesh, mi, {tr, tr}, f, thd, {1.5}), 2, k), R = lvl(ub::chain(P, mesh, mi, {tr, refl(tr)}, f, thd, {1.5}), 2, k);
     };
 
-    // ------------------------------------------------------------------------------------------
-    // A. Inside a host
-    // ------------------------------------------------------------------------------------------
+    // ---- A. Inside a host ----
     QD_DIAG("\n# diag: rare sheet A, S 6 mm eps 0.31 inside 10 mm + 12 mm of eps 2.50 - j ei, the sheet event with its host leg, dB.\n");
     QD_DIAG("# tf: on the sheet, or on the host where the sheet has none. k: 0 scalar / VV (TE), 3 HH (TM). sum: T + R, linear\n");
     QD_DIAG("type,k,tf_on,tf,theta,ei,T,R,sum\n");
@@ -1694,8 +1677,8 @@ TEST_CASE("Rare sheet - a coherent sheet with tf that is rarer than the invarian
                         INFO("A, type " << tr << ", k " << k << ", cfg " << cfg << ", theta " << thd << ", ei " << losses[q]);
                         CHECK(Tl[q] < ZERO); // no more than it received, on either port
                         CHECK(Rl[q] < ZERO);
-                        if (losses[q] == 0.0) // and on their sum where the host is lossless; in a lossy host the incident and the
-                            CHECK(lin(Tl[q]) + lin(Rl[q]) < 1.0 + 1.0e-6); // reflected wave interfere and the sum is recorded
+                        if (losses[q] == 0.0)                              // and on their sum where the host is lossless; in a lossy host the incident and the
+                            CHECK(lin(Tl[q]) + lin(Rl[q]) < 1.0 + 1.0e-6); // reflected wave interfere and the sum is printed only
                     }
                     INFO("A, continuity at zero loss, type " << tr << ", k " << k << ", cfg " << cfg << ", theta " << thd);
                     CHECK(std::abs(Tl[3] - Tl[4]) < 1.0e-3); // ei 1e-6 against ei 0
@@ -1750,9 +1733,7 @@ TEST_CASE("Rare sheet - a coherent sheet with tf that is rarer than the invarian
         }
     }
 
-    // ------------------------------------------------------------------------------------------
-    // B. A loss of its own
-    // ------------------------------------------------------------------------------------------
+    // ---- B. A loss of its own ----
     QD_DIAG("\n# diag: rare sheet B, S 6 mm eps 0.31 - j es with tf, inside eps 2.50 - 0.80j, inside eps 2.50, and alone in air, scalar, dB.\n");
     QD_DIAG("# sum is recorded: for a lossy sheet with tf the two ports are not bounded by one together, which is an issue of its own\n");
     QD_DIAG("where,tf,theta,es,T,R,sum\n");
@@ -1783,9 +1764,7 @@ TEST_CASE("Rare sheet - a coherent sheet with tf that is rarer than the invarian
                 CHECK(std::abs(Rl[3] - Rl[4]) < 1.0e-3);
             }
 
-    // ------------------------------------------------------------------------------------------
-    // C. The sheet as a lining
-    // ------------------------------------------------------------------------------------------
+    // ---- C. The sheet as a lining ----
     QD_DIAG("\n# diag: rare sheet C, S 6 mm eps 0.31 with tf as a lining of 10 mm eps 2.50 - j ei: entry, on the near face (one event), and\n");
     QD_DIAG("# exit, on the far face (the second event, with the host leg), series declined, scalar, dB. own: ray_mesh_interact's entry\n");
     QD_DIAG("type,tf,theta,ei,entry,exit,entry_R,exit_R,own_entry,exit-entry\n");
@@ -1810,7 +1789,7 @@ TEST_CASE("Rare sheet - a coherent sheet with tf that is rarer than the invarian
                     CHECK(Ex[q] < ZERO);
                     CHECK(EnR < ZERO);
                     CHECK(ExR < ZERO);
-                    CHECK(En[q] > -30.0); // the lining tunnels, with either sign of tf
+                    CHECK(En[q] > -30.0);                  // the lining tunnels, with either sign of tf
                     CHECK(std::abs(own - En[q]) < 1.0e-9); // the two public functions agree on a glued entry
                     if (losses[q] == 0.0)
                         CHECK(std::abs(Ex[q] - En[q]) < 1.0e-6); // a lossless lined wall is one wall from its two sides
@@ -1820,9 +1799,7 @@ TEST_CASE("Rare sheet - a coherent sheet with tf that is rarer than the invarian
                 CHECK(std::abs(Ex[3] - Ex[4]) < 1.0e-3);
             }
 
-    // ------------------------------------------------------------------------------------------
-    // D. The core
-    // ------------------------------------------------------------------------------------------
+    // ---- D. The core ----
     QD_DIAG("\n# diag: rare sheet D, the ordered stack of S 6 mm eps 0.31 with tf and C 10 mm eps 2.50 - j ei without, both orders, in air (one\n");
     QD_DIAG("# event) and inside 10 mm + 12 mm of eps 2.50 - j ei (the stack event with its host leg), scalar, dB\n");
     QD_DIAG("where,tf,theta,ei,S|C,C|S,d\n");
@@ -1861,9 +1838,7 @@ TEST_CASE("Rare sheet - a coherent sheet with tf that is rarer than the invarian
                 CHECK(std::abs(L[3][1] - L[4][1]) < 1.0e-3);
             }
 
-    // ------------------------------------------------------------------------------------------
-    // E. Under a closed outer pair
-    // ------------------------------------------------------------------------------------------
+    // ---- E. Under a closed outer pair ----
     // Both ports are the composite on the pad of the closed wall face. The transmit port is
     // printed with every digit; the echo of the reflect port crosses the near face twice.
     QD_DIAG("\n# diag: rare sheet E, S 10 mm eps 0.31 - j es with tf 0.5 on a rigid wall eps 2.401e-9 with tf tW, the glued entry, scalar.\n");
@@ -1892,26 +1867,24 @@ TEST_CASE("Rare sheet - a coherent sheet with tf that is rarer than the invarian
             CHECK(std::abs(Rl[3] - Rl[4]) < 1.0e-3);
         }
 
-    // ------------------------------------------------------------------------------------------
-    // F. Twins that must not move
-    // ------------------------------------------------------------------------------------------
+    // ---- F. Twins that must not move ----
     QD_DIAG("\n# diag: rare sheet F, twins, the complex coefficient of the sheet event with every digit, scalar and EM (VV, HH).\n");
     QD_DIAG("# A sheet denser than the invariant, a rare sheet without tf anywhere, a rare sheet below its critical angle and a sheet under a\n");
     QD_DIAG("# closed outer pair; families that sheet tf H or flat branch H print are not repeated here\n");
     QD_DIAG("row,type,port,theta,re,im,re_hh,im_hh\n");
     {
         const double BIG = 1.0e12;
-        ub::Pal P = lump_palette({{5.24, 0.63, 0.006, 0.0, 0.5},                                             // 1 dense lossy sheet with tf
-                                  {5.24, 0.0, 0.006, 0.0, -0.5},                                             // 2 dense lossless sheet, tf below zero
-                                  {0.31, 0.0, 0.006},                                                        // 3 rare sheet without tf
-                                  {0.31, 0.0, 0.006, 0.0, 0.5},                                              // 4 rare sheet with tf
-                                  {0.50, 0.0, 0.022, 0.0, 0.2, 0.0, 0.0, 0.0, 0.0, 20.0, 0.001 * BIG},       // 5 rare mass-law sheet
-                                  {2.1609e-8, 0.0, 0.022, 0.0, 0.2, 0.0, 0.0, 0.0, 0.0, 20.0, 0.001 * BIG},  // 6 rigid mass-law sheet
-                                  {2.50, 0.80, 0.0},                                                         // 7 lossy host
-                                  {2.50, 0.0, 0.0},                                                          // 8 lossless host
-                                  {1.50, 0.40, 0.0, 0.0, 0.5},                                               // 9 host with tf
-                                  {2.401e-9, 0.0, 0.0, 0.0, 0.3},                                            // 10 rigid wall
-                                  {0.31, 0.20, 0.006, 0.0, 0.5}});                                           // 11 porous sheet with tf
+        ub::Pal P = lump_palette({{5.24, 0.63, 0.006, 0.0, 0.5},                                            // 1 dense lossy sheet with tf
+                                  {5.24, 0.0, 0.006, 0.0, -0.5},                                            // 2 dense lossless sheet, tf below zero
+                                  {0.31, 0.0, 0.006},                                                       // 3 rare sheet without tf
+                                  {0.31, 0.0, 0.006, 0.0, 0.5},                                             // 4 rare sheet with tf
+                                  {0.50, 0.0, 0.022, 0.0, 0.2, 0.0, 0.0, 0.0, 0.0, 20.0, 0.001 * BIG},      // 5 rare mass-law sheet
+                                  {2.1609e-8, 0.0, 0.022, 0.0, 0.2, 0.0, 0.0, 0.0, 0.0, 20.0, 0.001 * BIG}, // 6 rigid mass-law sheet
+                                  {2.50, 0.80, 0.0},                                                        // 7 lossy host
+                                  {2.50, 0.0, 0.0},                                                         // 8 lossless host
+                                  {1.50, 0.40, 0.0, 0.0, 0.5},                                              // 9 host with tf
+                                  {2.401e-9, 0.0, 0.0, 0.0, 0.3},                                           // 10 rigid wall
+                                  {0.31, 0.20, 0.006, 0.0, 0.5}});                                          // 11 porous sheet with tf
         struct Row
         {
             const char *name;
@@ -1983,15 +1956,23 @@ TEST_CASE("Flat branch - a coherent sheet rarer than the invariant without tf tu
     const double f = FRQ, gap = 1.0e-5, d1 = 0.010, d2 = 0.012, k0 = 2.0 * QPI * f / C0, TOL = 1.0e-9;
     const double eS = 0.31, tS = 0.006, losses[5] = {0.8, 0.1, 1.0e-3, 1.0e-6, 0.0};
     const std::complex<double> U(1.0, 0.0), cS(eS, 0.0), cRef(3.0, 0.0);
-    auto val = [](const std::vector<ub::Ev> &v, size_t n, int k) { return (v.size() == n) ? cpx(v[n - 1].xpr, 0, k) : std::complex<double>(0.0, 0.0); };
-    auto dBc = [](std::complex<double> z) { return (std::abs(z) > 0.0) ? 20.0 * std::log10(std::abs(z)) : -999.0; };
-    auto refl = [](int tr) { return (tr == 4 || tr == 5) ? 3 : 0; };
-    auto rel = [](std::complex<double> a, std::complex<double> b) { return std::abs(a - b) / std::abs(b); };
+    auto val = [](const std::vector<ub::Ev> &v, size_t n, int k)
+    { return (v.size() == n) ? cpx(v[n - 1].xpr, 0, k) : std::complex<double>(0.0, 0.0); };
+    auto dBc = [](std::complex<double> z)
+    { return (std::abs(z) > 0.0) ? 20.0 * std::log10(std::abs(z)) : -999.0; };
+    auto refl = [](int tr)
+    { return (tr == 4 || tr == 5) ? 3 : 0; };
+    auto rel = [](std::complex<double> a, std::complex<double> b)
+    { return std::abs(a - b) / std::abs(b); };
     // Sheet material 1 and a reference sheet 3, 1 mm of eps 3.0 that is never rare; host 2
-    auto pal_of = [&](double ei, double tf) { return lump_palette({{eS, 0.0, tS, 0.0, tf}, {2.50, ei, 0.0}, {3.0, 0.0, 0.001}}); };
-    auto host_of = [&](double ei) { return std::complex<double>(2.50, -ei); };
-    auto ct_of = [&](double ei, double thd) { double s = std::sin(thd * QPI / 180.0); return std::sqrt(1.0 - s * s / host_of(ei)); };
-    auto legdB = [&](double ei, double thd) { return 20.0 * std::log10(std::abs(std::exp(std::complex<double>(0.0, -1.0) * k0 * std::sqrt(host_of(ei)) * ct_of(ei, thd) * d1))); };
+    auto pal_of = [&](double ei, double tf)
+    { return lump_palette({{eS, 0.0, tS, 0.0, tf}, {2.50, ei, 0.0}, {3.0, 0.0, 0.001}}); };
+    auto host_of = [&](double ei)
+    { return std::complex<double>(2.50, -ei); };
+    auto ct_of = [&](double ei, double thd)
+    { double s = std::sin(thd * QPI / 180.0); return std::sqrt(1.0 - s * s / host_of(ei)); };
+    auto legdB = [&](double ei, double thd)
+    { return 20.0 * std::log10(std::abs(std::exp(std::complex<double>(0.0, -1.0) * k0 * std::sqrt(host_of(ei)) * ct_of(ei, thd) * d1))); };
     // The sheet event inside the host, 10 mm in front and 12 mm behind, both ports
     auto inside = [&](const ub::Pal &P, int sheet, int tr, double thd, int k, std::complex<double> &T, std::complex<double> &R, double da = 0.010, double db = 0.012)
     {
@@ -2023,11 +2004,10 @@ TEST_CASE("Flat branch - a coherent sheet rarer than the invariant without tf tu
         arma::mat mesh = ub::build({0.0, d1, d1 + gap}, {2, 2, sheet}, {false, true, false}, mi);
         T = val(ub::chain(P, mesh, mi, {tr, tr}, f, thd, {1.5}), 2, k), R = val(ub::chain(P, mesh, mi, {tr, refl(tr)}, f, thd, {1.5}), 2, k);
     };
-    auto pick = [](const DiagSheet &W, int k, bool port_r) { return port_r ? (k ? W.R_tm : W.R_te) : (k ? W.T_tm : W.T_te); };
+    auto pick = [](const DiagSheet &W, int k, bool port_r)
+    { return port_r ? (k ? W.R_tm : W.R_te) : (k ? W.T_tm : W.T_te); };
 
-    // ------------------------------------------------------------------------------------------
-    // A. Inside a host
-    // ------------------------------------------------------------------------------------------
+    // ---- A. Inside a host ----
     QD_DIAG("\n# diag: flat branch A, S 6 mm eps 0.31 without tf inside 10 mm + 12 mm of eps 2.50 - j ei, the sheet event with its host leg.\n");
     QD_DIAG("# T, R: dB; T_cm, R_cm: the characteristic matrix times the host leg. dT, dR: relative distance in the complex plane of the event over\n");
     QD_DIAG("# the same event with a 1 mm sheet of eps 3.0 from the same ratio of two matrices. k: 0 scalar / VV (TE), 3 HH (TM)\n");
@@ -2067,9 +2047,7 @@ TEST_CASE("Flat branch - a coherent sheet rarer than the invariant without tf tu
             }
         }
 
-    // ------------------------------------------------------------------------------------------
-    // B. Alone in air
-    // ------------------------------------------------------------------------------------------
+    // ---- B. Alone in air ----
     QD_DIAG("\n# diag: flat branch B, S alone in air, across its critical angle of 33.83 deg, one event. dT, dR: distance from the matrix in the\n");
     QD_DIAG("# complex plane. d_own: ray_mesh_interact's own transmit coefficient against the redo's. sum: |T|^2 + |R|^2\n");
     QD_DIAG("type,k,theta,T,T_cm,R,R_cm,dT,dR,d_own,sum\n");
@@ -2094,9 +2072,7 @@ TEST_CASE("Flat branch - a coherent sheet rarer than the invariant without tf tu
             }
         }
 
-    // ------------------------------------------------------------------------------------------
-    // C. As a lining
-    // ------------------------------------------------------------------------------------------
+    // ---- C. As a lining ----
     QD_DIAG("\n# diag: flat branch C, S without tf as a lining of 10 mm eps 2.50 - j ei. Entry, air | S | host, one event: distance from the matrix\n");
     QD_DIAG("# in the complex plane, and ray_mesh_interact's own. Exit, host | S | air, the second event with its host leg, series declined: relative\n");
     QD_DIAG("# distance of the event over the same event with a 1 mm lining of eps 3.0 from the ratio of two matrices. Levels in dB\n");
@@ -2141,9 +2117,7 @@ TEST_CASE("Flat branch - a coherent sheet rarer than the invariant without tf tu
             }
         }
 
-    // ------------------------------------------------------------------------------------------
-    // D. tf to zero
-    // ------------------------------------------------------------------------------------------
+    // ---- D. tf to zero ----
     QD_DIAG("\n# diag: flat branch D, tf to zero: the events of A, B and C with tf 1e-9 and -1e-9 on the sheet against the sheet without tf, dB.\n");
     QD_DIAG("# T0, R0: without tf. dT+, dR+, dT-, dR-: the level with tf 1e-9 and -1e-9 less the level without\n");
     QD_DIAG("where,type,k,theta,ei,T0,R0,dT+,dR+,dT-,dR-\n");
@@ -2186,9 +2160,7 @@ TEST_CASE("Flat branch - a coherent sheet rarer than the invariant without tf tu
                     }
             }
 
-    // ------------------------------------------------------------------------------------------
-    // E. One sheet against the stack of its two halves
-    // ------------------------------------------------------------------------------------------
+    // ---- E. One sheet against the stack of its two halves ----
     // The ordered stack takes the core's matrix. Its two faces are 10 um apart in the mesh, so in a
     // lossy host the leg in front differs by that much, which is 5e-4 dB; lossless, the levels
     // are compared at 1e-9.
@@ -2228,9 +2200,7 @@ TEST_CASE("Flat branch - a coherent sheet rarer than the invariant without tf tu
                     }
             }
 
-    // ------------------------------------------------------------------------------------------
-    // F. Under a closed outer pair without tf
-    // ------------------------------------------------------------------------------------------
+    // ---- F. Under a closed outer pair without tf ----
     // The far side carries no wave, and without tf the transmit port is exactly zero. The
     // reflect port is the composite: the layer on its closed backing.
     QD_DIAG("\n# diag: flat branch F, S without tf glued on a rigid wall eps 2.401e-9 without tf, the glued entry. |T|: exactly zero.\n");
@@ -2256,9 +2226,7 @@ TEST_CASE("Flat branch - a coherent sheet rarer than the invariant without tf tu
             }
         }
 
-    // ------------------------------------------------------------------------------------------
-    // G. A rigid sheet of the acoustic mapping
-    // ------------------------------------------------------------------------------------------
+    // ---- G. A rigid sheet of the acoustic mapping ----
     // An acoustic material, scalar types. Its permittivity is an impedance mapping, and the mass
     // column is what says so: with it the sheet is a closed mass-law layer and without tf passes
     // nothing. Without the column it is a wave medium like any other and tunnels, on the matrix.
@@ -2295,13 +2263,11 @@ TEST_CASE("Flat branch - a coherent sheet rarer than the invariant without tf tu
                 }
                 QD_DIAG("%s,%d,%.0f,%.4f,%.4f,%.2e,%.2e\n", where == 0 ? "air" : (where == 1 ? "inside" : "lining"), tr, thd, dBc(T), dBc(R), dT, dR);
                 INFO("G, where " << where << ", type " << tr << ", theta " << thd);
-                CHECK(dT < TOL);               // without it: a wave medium, on the matrix
+                CHECK(dT < TOL); // without it: a wave medium, on the matrix
                 CHECK(dR < TOL);
             }
 
-    // ------------------------------------------------------------------------------------------
-    // H. Twins
-    // ------------------------------------------------------------------------------------------
+    // ---- H. Twins ----
     QD_DIAG("\n# diag: flat branch H, twins, the complex coefficient of the sheet event with every digit, scalar and EM (VV, HH). Sheets that are\n");
     QD_DIAG("# denser than the invariant, lossy, below their critical angle, with tf, or under a closed outer pair, beside the rows of this\n");
     QD_DIAG("# case: a diff of the output shows which rows a change reaches; families that sheet tf H prints are not repeated here\n");
@@ -2370,47 +2336,54 @@ TEST_CASE("Flat branch - a coherent sheet rarer than the invariant without tf tu
 TEST_CASE("Sheet tf - the face of a coherent sheet with tf creates nothing and has no gate on the invariant", "[wave]")
 {
     ub::OneThread one_thread;
-    // tf moves power between the two ports of a boundary. Between two lossless media that carry a
-    // wave that is one statement about amplitudes as well: the impedance step of the face is
-    // moved towards its neighbour (tf > 0) or away from it (tf < 0). Where the two sides are not
-    // in phase - a lossy sheet, a sheet the wave is evanescent in, a lossy host - the power
-    // statement does not fix the amplitudes, and a rule that scales the reflection to
-    // (1 - tf) R0 and rescales the transmission to match creates energy: by the quotient
-    // (1 - R') / (1 - R0), whose 1 - R0 is not the flux a face passes next to a lossy medium; by
-    // the forcing factor, which raises a mirror at the phase of a complex reflection; and on a
-    // lining, where a tunnelling face is given a lower mirror and keeps its coupling.
+    // tf moves power between the two ports of a boundary. Between two lossless media that carry a wave that is one
+    // statement about amplitudes as well: the impedance step of the face is moved towards its neighbour (tf > 0) or
+    // away from it (tf < 0). Where the two sides are not in phase - a lossy sheet, a sheet the wave is evanescent in, a
+    // lossy host - the power statement does not fix the amplitudes, and a rule that scales the reflection to (1 - tf)
+    // R0 and rescales the transmission to match would create energy: by the quotient (1 - R') / (1 - R0), whose 1 - R0
+    // is not the flux a face passes next to a lossy medium; by the forcing factor, which raises a mirror at the phase
+    // of a complex reflection; and on a lining, where a tunnelling face would be given a lower mirror and keep its
+    // coupling.
     //
-    // The rule asserted here: at the face of a coherent sheet tf is an ideal transformer of real
-    // ratio. The tangential field is scaled by k and its partner by 1 / k, so the normal flux is
-    // continuous whatever the two media are, and the face creates nothing. The ratio comes from
-    // the pair rule applied to the modulus of the admittance ratio of the two sides; where that
-    // ratio is real it is the pair rule on the reflectance, digit for digit. One expression for a
-    // propagating and a tunnelling wave, so nothing is decided on the transverse invariant.
-    // Mass-law sheets and a far face under a closed outer pair keep the pair rule.
+    // The rule asserted here: at the face of a coherent sheet tf is an ideal transformer of real ratio. The tangential
+    // field is scaled by k and its partner by 1 / k, so the normal flux is continuous whatever the two media are, and
+    // the face creates nothing. The ratio comes from the pair rule applied to the modulus of the admittance ratio of
+    // the two sides; where that ratio is real it is the pair rule on the reflectance, digit for digit. One expression
+    // for a propagating and a tunnelling wave, so nothing is decided on the transverse invariant. Mass-law sheets and a
+    // far face under a closed outer pair keep the pair rule.
     //
-    // Everything runs through ray_triangle_intersect, ray_mesh_interact and ray_state_update.
-    // EM materials throughout: tf, no mass column; type 4 is the scalar type on the same
-    // materials. The rigid wall of D, G and H is an acoustic material.
+    // Everything runs through ray_triangle_intersect, ray_mesh_interact and ray_state_update. EM materials throughout:
+    // tf, no mass column; type 4 is the scalar type on the same materials. The rigid wall of D, G and H is an acoustic
+    // material.
     //
-    // A. Both ports of one sheet event, in air, inside a host and as a lining: at most one
-    //    together, the lossless sheet one, and the two powers on the reference of the rule
+    // A. Both ports of one sheet event, in air, inside a host and as a lining: at most one together, the lossless sheet
+    // one, and the two powers on the reference of the rule
     // B. A lossless sheet below its critical angle: where the pair rule has it
     // C. A sheet without tf: on the characteristic matrix
     // D. No step where a sheet becomes rarer than the invariant, neighbours 0.02 deg apart
     // E. The end points tf = -1 and tf = +1
-    // G. On a rigid wall with tf: both ports, recorded
+    // G. On a rigid wall with tf: both ports, printed
     // S. An ordered stack through the core
     // H. Twins with every digit
     //
-    // The rows that evaluate a material with the mass column (m > 0) are in the case of the same name
-    // with the suffix " - the mass-law part".
+    // The rows that evaluate a material with the mass column (m > 0) are in the case of the same name with the suffix "
+    // - the mass-law part".
     typedef std::complex<double> cd;
     const double f = FRQ, gap = 1.0e-5, k0 = 2.0 * QPI * f / C0, ONE = 1.0 + 1.0e-6, TOL = 1.0e-9;
     const cd U(1.0, 0.0);
-    auto val = [](const std::vector<ub::Ev> &v, size_t n, int k) { return (v.size() == n) ? cpx(v[n - 1].xpr, 0, k) : cd(0.0, 0.0); };
-    auto refl = [](int tr) { return (tr == 4 || tr == 5) ? 3 : 0; };
-    auto dBp = [](double p) { return (p > 0.0) ? 10.0 * std::log10(p) : -999.0; };
-    enum { AIR, INSIDE, ENTRY, EXIT };
+    auto val = [](const std::vector<ub::Ev> &v, size_t n, int k)
+    { return (v.size() == n) ? cpx(v[n - 1].xpr, 0, k) : cd(0.0, 0.0); };
+    auto refl = [](int tr)
+    { return (tr == 4 || tr == 5) ? 3 : 0; };
+    auto dBp = [](double p)
+    { return (p > 0.0) ? 10.0 * std::log10(p) : -999.0; };
+    enum
+    {
+        AIR,
+        INSIDE,
+        ENTRY,
+        EXIT
+    };
     // Both ports of the sheet event. Material 1 is the sheet, 2 the host; inside a host and at an
     // exit the event carries its host leg
     auto ports = [&](const ub::Pal &P, int cfg, int tr, double thd, int k, double leg, cd &T, cd &R)
@@ -2432,7 +2405,8 @@ TEST_CASE("Sheet tf - the face of a coherent sheet with tf creates nothing and h
     // The reference of the rule, in powers, written in tilted admittances and sharing nothing with
     // the library: eta = kz for TE and the scalar type, eps / kz for TM, with kz = sqrt(eps - p)
     // on the decaying root and p the transverse invariant, sin^2 of the angle in air.
-    auto kz_of = [](cd e, double p) { cd v = std::sqrt(e - p); return (std::imag(v) > 0.0 || (std::imag(v) == 0.0 && std::real(v) < 0.0)) ? -v : v; };
+    auto kz_of = [](cd e, double p)
+    { cd v = std::sqrt(e - p); return (std::imag(v) > 0.0 || (std::imag(v) == 0.0 && std::real(v) < 0.0)) ? -v : v; };
     struct Fc
     {
         cd r, t, tb;
@@ -2450,7 +2424,8 @@ TEST_CASE("Sheet tf - the face of a coherent sheet with tf creates nothing and h
     auto sheet_ref = [&](cd en, cd es, cd ef, double tf_n, double tf_s, double tf_f, double d, double thd, bool tm, double &Tp, double &Rp) -> bool
     {
         const double sn = std::sin(thd * QPI / 180.0), p = sn * sn;
-        auto adm = [&](cd e) { return tm ? e / kz_of(e, p) : kz_of(e, p); };
+        auto adm = [&](cd e)
+        { return tm ? e / kz_of(e, p) : kz_of(e, p); };
         const cd a = adm(en), s = adm(es), b = adm(ef), phi = std::exp(cd(0.0, -1.0) * k0 * kz_of(es, p) * d);
         const Fc n = face_ref(a, s, tf_n, tf_s), q = face_ref(s, b, tf_s, tf_f);
         const cd den = 1.0 + n.r * q.r * phi * phi;
@@ -2465,9 +2440,7 @@ TEST_CASE("Sheet tf - the face of a coherent sheet with tf creates nothing and h
     };
     const std::vector<Sh> sheets = {{0.31, 0.20}, {0.90, 0.20}, {1.50, 0.40}, {5.24, 0.63}, {5.24, 5.0}, {0.31, 0.0}, {0.90, 0.0}, {5.24, 0.0}};
 
-    // ------------------------------------------------------------------------------------------
-    // A. Both ports of one sheet event
-    // ------------------------------------------------------------------------------------------
+    // ---- A. Both ports of one sheet event ----
     QD_DIAG("\n# diag: sheet tf A, both ports of one sheet event, the worst over 0, 20, 37, 45, 60, 73 and 85 deg and 1, 6 and 25 mm. tf on the\n");
     QD_DIAG("# sheet, or 0.5 on the host. sum: T + R in power, the largest, at theta / mm; above: rows above one / rows. dT, dR: the largest\n");
     QD_DIAG("# distance of a power from the reference of the rule. Inside a host and at an exit the event carries its host leg. Inside the\n");
@@ -2482,8 +2455,7 @@ TEST_CASE("Sheet tf - the face of a coherent sheet with tf creates nothing and h
             double ha, hei, leg;
             bool ref;
         };
-        const std::vector<Cf> cfgs = {{"air", AIR, 1.0, 0.0, 0.010, true}, {"inside 2.50", INSIDE, 2.50, 0.0, 0.060, true}, {"entry on 2.50", ENTRY, 2.50, 0.0, 0.010, true},
-                                      {"exit from 2.50", EXIT, 2.50, 0.0, 0.010, true}, {"entry on 2.50-0.80j", ENTRY, 2.50, 0.80, 0.010, true}, {"inside 2.50-0.80j", INSIDE, 2.50, 0.80, 0.010, false}};
+        const std::vector<Cf> cfgs = {{"air", AIR, 1.0, 0.0, 0.010, true}, {"inside 2.50", INSIDE, 2.50, 0.0, 0.060, true}, {"entry on 2.50", ENTRY, 2.50, 0.0, 0.010, true}, {"exit from 2.50", EXIT, 2.50, 0.0, 0.010, true}, {"entry on 2.50-0.80j", ENTRY, 2.50, 0.80, 0.010, true}, {"inside 2.50-0.80j", INSIDE, 2.50, 0.80, 0.010, false}};
         const double tfs[4][2] = {{0.5, 0.0}, {0.9, 0.0}, {-0.5, 0.0}, {0.0, 0.5}}; // sheet, host
         const char *chn[3] = {"sc", "TE", "TM"};
         for (const Cf &C : cfgs)
@@ -2526,7 +2498,7 @@ TEST_CASE("Sheet tf - the face of a coherent sheet with tf creates nothing and h
                                     if (C.ref)
                                         CHECK(sum < ONE); // the sheet creates nothing
                                     else
-                                        CHECK((pT < ONE && pR < ONE)); // in a lossy host the sum is recorded, see the header
+                                        CHECK((pT < ONE && pR < ONE)); // in a lossy host the sum is printed only, see the header
                                     if (S.ei == 0.0 && C.hei == 0.0)
                                         CHECK(std::abs(sum - 1.0) < 1.0e-6); // and a lossless sheet between lossless media loses nothing, tunnelling or not
                                     if (C.ref)
@@ -2548,9 +2520,7 @@ TEST_CASE("Sheet tf - the face of a coherent sheet with tf creates nothing and h
                 }
     }
 
-    // ------------------------------------------------------------------------------------------
-    // B. A lossless sheet below its critical angle, and C. a sheet without tf
-    // ------------------------------------------------------------------------------------------
+    // ---- B. A lossless sheet below its critical angle, and C. a sheet without tf ----
     QD_DIAG("\n# diag: sheet tf B, a lossless 6 mm sheet in air below its critical angle against the pair rule on the reflectance\n");
     QD_DIAG("# (diag_sheet_composite), and C, a sheet without tf in air and on eps 2.50 - 0.80j against the characteristic matrix; the largest\n");
     QD_DIAG("# distance in the complex plane over the angles, both ports, scalar, TE and TM\n");
@@ -2615,9 +2585,7 @@ TEST_CASE("Sheet tf - the face of a coherent sheet with tf creates nothing and h
         }
     }
 
-    // ------------------------------------------------------------------------------------------
-    // D. No step where a sheet becomes rarer than the invariant
-    // ------------------------------------------------------------------------------------------
+    // ---- D. No step where a sheet becomes rarer than the invariant ----
     // The transmit port in dB. The reflect port sits at -18 dB to -52 dB on these rows, with a
     // slope of its own of up to 0.016 dB per 0.02 deg and a kink at the critical angle of a
     // lossless sheet, so it is asserted in amplitude against the same pair of angles with no tf
@@ -2627,7 +2595,6 @@ TEST_CASE("Sheet tf - the face of a coherent sheet with tf creates nothing and h
     QD_DIAG("# angle; dT: dB between the two; dR: the same in amplitude; dR_0: dR with no tf anywhere\n");
     QD_DIAG("row,ch,theta_a,theta_b,T,R,dT,dR,dR_0\n");
     {
-        const LumpMtl rigid = {2.401e-9, 0.0, 0.0, 0.0, 0.3, 0.0, 0.0, 0.0, 0.0, 20.0, 1.0e9};
         struct St
         {
             const char *name;
@@ -2665,19 +2632,19 @@ TEST_CASE("Sheet tf - the face of a coherent sheet with tf creates nothing and h
                     const double dT = dBp(std::norm(Tb)) - dBp(std::norm(Ta)), dR = std::abs(Rb) - std::abs(Ra), dR0 = std::abs(Rb0) - std::abs(Ra0);
                     QD_DIAG("%s,%s,%.3f,%.3f,%.4f,%.4f,%+.5f,%+.2e,%+.2e\n", W.name, tr == 4 ? "sc" : (k ? "TM" : "TE"), W.ta, W.tb, dBp(std::norm(Ta)), dBp(std::norm(Ra)), dT, dR, dR0);
                     INFO("D, " << W.name << ", type " << tr << ", k " << k);
-                    CHECK(std::abs(dT) < 0.01);         // no step on the transmit port
-                    if (W.S.ei > 0.0)                       // the critical angle of a lossless sheet is a kink of its own, with tf and without: recorded
+                    CHECK(std::abs(dT) < 0.01);             // no step on the transmit port
+                    if (W.S.ei > 0.0)                       // the critical angle of a lossless sheet is a kink of its own, with tf and without: printed
                         CHECK(std::abs(dR - dR0) < 1.0e-3); // nor on the reflect port
                     if (!W.leak)
                         CHECK(std::norm(Ta) + std::norm(Ra) < ONE);
                 }
     }
 
-    // Where the admittance ratio of a face has modulus one and tf forces, the direction the face is
-    // moved in flips: away from its neighbour is up on one side and down on the other. Between
-    // media in phase that is a matched boundary, where a forced reflection changes sign and
-    // nothing else; where they are not in phase the two ports step. Recorded; each side creates
-    // nothing. eps 0.90 - 0.20j in air: modulus one at 60 deg in TE and the scalar type.
+    // Where the admittance ratio of a face has modulus one and tf forces, the direction the face is moved in flips:
+    // away from its neighbour is up on one side and down on the other. Between media in phase that is a matched
+    // boundary, where a forced reflection changes sign and nothing else; where they are not in phase the two ports
+    // step. Printed; each side creates nothing. eps 0.90 - 0.20j in air: modulus one at 60 deg in TE and the scalar
+    // type.
     QD_DIAG("\n# diag: sheet tf D2, recorded: tf < 0 on a 6 mm sheet of eps 0.90 - 0.20j in air about 60 deg, where the admittance ratio of its\n");
     QD_DIAG("# faces has modulus one in TE. T, R: dB at the first angle; dT, dR: dB between the two; sum: T + R at the first angle\n");
     QD_DIAG("tf,ch,theta_a,theta_b,T,R,dT,dR,sum\n");
@@ -2697,12 +2664,9 @@ TEST_CASE("Sheet tf - the face of a coherent sheet with tf creates nothing and h
                 CHECK(std::norm(Tb) + std::norm(Rb) < ONE);
             }
 
-    // ------------------------------------------------------------------------------------------
-    // E. The end points
-    // ------------------------------------------------------------------------------------------
-    // tf = -1 closes the transmit port of every sheet. tf = +1 closes the reflect port where the
-    // two sides of a face are in phase; where they are not, a real ratio cannot match the face
-    // and what is left is recorded.
+    // ---- E. The end points ----
+    // tf = -1 closes the transmit port of every sheet. tf = +1 closes the reflect port where the two sides of a face
+    // are in phase; where they are not, a real ratio cannot match the face and what is left is printed.
     QD_DIAG("\n# diag: sheet tf E, the end points, 6 mm sheet in air and inside eps 2.50, power, the largest over 0, 45 and 75 deg, scalar, TE and TM\n");
     QD_DIAG("sheet,where,T_at_tf-1,R_at_tf+1\n");
     for (const Sh &S : sheets)
@@ -2739,9 +2703,7 @@ TEST_CASE("Sheet tf - the face of a coherent sheet with tf creates nothing and h
             QD_DIAG("%.2f-%.2fj,%s,%.3e,%.3e\n", S.a, S.ei, cfg == AIR ? "air" : "inside 2.50", wT, wR);
         }
 
-    // ------------------------------------------------------------------------------------------
-    // S. An ordered stack through the core
-    // ------------------------------------------------------------------------------------------
+    // ---- S. An ordered stack through the core ----
     QD_DIAG("\n# diag: sheet tf S, the ordered stack A | B in air, 6 mm each, tf on A, both orders, the worst T + R over 0, 30, 45, 60, 75 and 85 deg\n");
     QD_DIAG("A,B,tf,order,ch,sum,theta,above\n");
     {
@@ -2779,9 +2741,7 @@ TEST_CASE("Sheet tf - the face of a coherent sheet with tf creates nothing and h
                 }
     }
 
-    // ------------------------------------------------------------------------------------------
-    // H. Twins
-    // ------------------------------------------------------------------------------------------
+    // ---- H. Twins ----
     QD_DIAG("\n# diag: sheet tf H, twins, the complex coefficient of the sheet event with every digit, scalar and EM (VV, HH): sheets with tf\n");
     QD_DIAG("# whose faces are in phase, sheets with tf whose faces are not, sheets without tf, sheets under a closed outer pair and\n");
     QD_DIAG("# ordered stacks. A diff of the output shows which rows a change to a face reaches\n");
@@ -2873,20 +2833,24 @@ TEST_CASE("Bare tf - a bare face with tf is a transformer where it is open and a
     // with the suffix " - the mass-law part".
     typedef std::complex<double> cd;
     const double f = FRQ, gap = 1.0e-5;
-    auto dB = [](double p) { return (p > 0.0) ? 10.0 * std::log10(p) : -999.0; };
-    auto mk = [](double a, double ei, double thk, double tf, double m = 0.0, double fRef = 1.0e9) {
+    auto dB = [](double p)
+    { return (p > 0.0) ? 10.0 * std::log10(p) : -999.0; };
+    auto mk = [](double a, double ei, double thk, double tf, double m = 0.0, double fRef = 1.0e9)
+    {
         LumpMtl L;
         L.a = a, L.ei = ei, L.thk = thk, L.tf = tf, L.m = m, L.fRef = fRef;
         return L;
     };
-    auto ports = [&](const ub::Pal &P, const arma::mat &mesh, const arma::uvec &mi, int tr, double thd, bool follow, int maxdepth = 400) {
+    auto ports = [&](const ub::Pal &P, const arma::mat &mesh, const arma::uvec &mi, int tr, double thd, bool follow, int maxdepth = 400)
+    {
         bf::Acc A;
         arma::mat o, d;
         diag_ray_at(thd, o, d);
         bf::walk(P, mesh, mi, tr, f, thd, follow ? 1.5 : 0.0, nullptr, o, d, 1.0, 1.0, 0.0, 0.0, 0, maxdepth, A);
         return A;
     };
-    auto event = [&](const ub::Pal &P, const arma::mat &mesh, const arma::uvec &mi, int it, double thd, int k) -> cd {
+    auto event = [&](const ub::Pal &P, const arma::mat &mesh, const arma::uvec &mi, int it, double thd, int k) -> cd
+    {
         arma::mat o, d;
         diag_ray_at(thd, o, d);
         ub::Ev E = ub::traced<double>(P, mesh, mi, it, f, o, d, nullptr);
@@ -2897,11 +2861,10 @@ TEST_CASE("Bare tf - a bare face with tf is a transformer where it is open and a
         const char *name;
         double a, ei;
     };
-    const std::vector<Mt> mats = {{"5.24-0.63j", 5.24, 0.63}, {"2.50-0.80j", 2.50, 0.80}, {"1.50-0.40j", 1.50, 0.40}, {"0.90-0.20j", 0.90, 0.20},
-                                  {"0.31-0.20j", 0.31, 0.20}, {"5.24", 5.24, 0.0},        {"2.50", 2.50, 0.0}};
+    const std::vector<Mt> mats = {{"5.24-0.63j", 5.24, 0.63}, {"2.50-0.80j", 2.50, 0.80}, {"1.50-0.40j", 1.50, 0.40}, {"0.90-0.20j", 0.90, 0.20}, {"0.31-0.20j", 0.31, 0.20}, {"5.24", 5.24, 0.0}, {"2.50", 2.50, 0.0}};
 
     QD_DIAG("\n# diag: bare tf A, one traced solid with tf in air, both ports as sums over every path, series summed (sum) and every bounce\n");
-    QD_DIAG("# followed (fol). Worst T + R over 0 to 85 deg and 1, 6, 50 mm, with its row; above: rows above 1.0005 of 18. Scalar: one channel\n");
+    QD_DIAG("# followed (fol). Worst T + R over 0 to 85 deg and 1, 6, 50 mm, with its row; above: rows above 1.0005 of 18 (followed: 9). Scalar: one channel\n");
     QD_DIAG("solid,tf,type,mode,worst,at_mm,at_deg,above,worst_hh,at_mm,at_deg,above_hh,least\n");
     for (const Mt &M : mats)
         for (double tf : {0.5, 0.9, -0.5})
@@ -2911,7 +2874,7 @@ TEST_CASE("Bare tf - a bare face with tf is a transformer where it is open and a
                     double w[2] = {0.0, 0.0}, wl[2] = {0.0, 0.0}, wt[2] = {0.0, 0.0}, least = 1.0e300;
                     int above[2] = {0, 0};
                     for (double L : {0.001, 0.006, 0.050})
-                        for (double thd : {0.0, 20.0, 45.0, 60.0, 75.0, 85.0})
+                        for (double thd : follow ? std::vector<double>{0.0, 45.0, 85.0} : std::vector<double>{0.0, 20.0, 45.0, 60.0, 75.0, 85.0})
                         {
                             ub::Pal P = lump_palette({mk(M.a, M.ei, 0.0, tf)});
                             arma::uvec mi;
@@ -2977,7 +2940,7 @@ TEST_CASE("Bare tf - a bare face with tf is a transformer where it is open and a
                     INFO("solid against sheet, " << M.name << ", tf " << tf << ", type " << tr << ", theta " << thd);
                     for (int q = 0; q < ((tr > 2) ? 2 : 4); ++q)
                         if (q % 2 == 0 || std::norm(q < 2 ? B.R[0] : B.R[1]) > 1.0e-4) // a reflect port near a null has no level to compare
-                            CHECK(std::abs(d[q]) < 2.0e-3);                                // one wall, at the relaunch bound
+                            CHECK(std::abs(d[q]) < 2.0e-3);                            // one wall, at the relaunch bound
                 }
 
     QD_DIAG("\n# diag: bare tf D, a sheet of air (eps 1, 6 mm) on a wall with tf against the bare wall, the entry event, both ports: the\n");
@@ -3096,8 +3059,7 @@ TEST_CASE("Bare tf - a bare face with tf is a transformer where it is open and a
                 bf::Acc A = ports(P, mesh, mi, tr, thd, false);
                 QD_DIAG("no tf %s,%d,%.0f,%.17g,%.17g,%.17g,%.17g,%.17g,%.17g,%.17g,%.17g\n", M.name, tr, thd, A.T[0].real(), A.T[0].imag(), A.R[0].real(), A.R[0].imag(),
                         A.T[1].real(), A.T[1].imag(), A.R[1].real(), A.R[1].imag());
-                twin("bare tf T", twin_key("no tf %s,%d,%.0f", M.name, tr, thd), {A.T[0].real(), A.T[0].imag(), A.R[0].real(), A.R[0].imag(),
-                                                                         A.T[1].real(), A.T[1].imag(), A.R[1].real(), A.R[1].imag()});
+                twin("bare tf T", twin_key("no tf %s,%d,%.0f", M.name, tr, thd), {A.T[0].real(), A.T[0].imag(), A.R[0].real(), A.R[0].imag(), A.T[1].real(), A.T[1].imag(), A.R[1].real(), A.R[1].imag()});
                 CHECK(std::norm(A.T[0]) + std::norm(A.R[0]) < 1.0005);
                 CHECK(std::norm(A.T[1]) + std::norm(A.R[1]) < 1.0005);
             }
@@ -3106,39 +3068,36 @@ TEST_CASE("Bare tf - a bare face with tf is a transformer where it is open and a
 TEST_CASE("Closed face - a coating met from inside a dense solid", "[wave]")
 {
     ub::OneThread one_thread;
-    // A closed face has a wave on one side only: behind it nothing propagates, a rigid wall of the
-    // acoustic mapping from 0.003 deg on, air behind a coated solid met from inside past the
-    // critical angle. tf says that a share leaks through. Next to a lossless medium that carries
-    // a wave that is one statement, a share of the forward wave's flux. Next to a lossy medium,
-    // or a sheet the wave is evanescent in, the flux towards the face is carried by the forward
-    // and the reflected wave together, and a share of the forward wave alone is not what the
-    // reflection leaves: the two ports of a sheet on a rigid wall added to more than they
-    // received, a lossless sheet rarer than the invariant was entered as a leak and charged no
-    // decay, and the same sheet with a loss of 1e-6 sat 55 dB below it.
+    // A closed face has a wave on one side only: behind it nothing propagates, a rigid wall of the acoustic mapping
+    // from 0.003 deg on, air behind a coated solid met from inside past the critical angle. tf says that a share leaks
+    // through. Next to a lossless medium that carries a wave that is one statement, a share of the forward wave's flux.
+    // Next to a lossy medium, or a sheet the wave is evanescent in, the flux towards the face is carried by the forward
+    // and the reflected wave together, and a share of the forward wave alone is not what the reflection leaves: taken
+    // as the leak, it makes the two ports of a sheet on a rigid wall add to more than they received.
     //
-    // The rule asserted here: the leak of a closed face is a matched resistive pad in front of
-    // it, formed on the modulus of the admittance of the side the wave is on, as the transformer
-    // of an open face forms its ratio on a modulus. The face passes what it absorbs. In front of
-    // a lossless medium that carries a wave it is sqrt(R') on the Fresnel reflection and 1 - R'
-    // of the flux, R' the pair rule on a reflectance of one; at a critical angle it is the limit
-    // of the transformer. One rule at the far face of a coherent sheet, at the bare face of a
-    // traced solid, at the mirror of a summed series and at the faces of a closed mass-law layer.
+    // The rule asserted here: the leak of a closed face is a matched resistive pad in front of it, formed on the
+    // modulus of the admittance of the side the wave is on, as the transformer of an open face forms its ratio on a
+    // modulus. The face passes what it absorbs. In front of a lossless medium that carries a wave it is sqrt(R') on the
+    // Fresnel reflection and 1 - R' of the flux, R' the pair rule on a reflectance of one; at a critical angle it is
+    // the limit of the transformer. One rule at the far face of a coherent sheet, at the bare face of a traced solid,
+    // at the mirror of a summed series and at the faces of a closed mass-law layer.
     //
-    // Everything runs through ray_triangle_intersect, ray_mesh_interact and ray_state_update.
-    // The coated solid is an EM material with tf and no mass column. The rows on a rigid wall,
-    // which carries the mass column, are in "Closed face - tf at a closed face is a pad and the two
-    // ports of a sheet on it add up".
+    // Everything runs through ray_triangle_intersect, ray_mesh_interact and ray_state_update. The coated solid is an EM
+    // material with tf and no mass column. The rows on a rigid wall, which carries the mass column, are in "Closed face
+    // - tf at a closed face is a pad and the two ports of a sheet on it add up".
     //
-    // A. Both ports of a coating met from inside: at most one together, and on the reference of
-    //    the rule
+    // A. Both ports of a coating met from inside: at most one together, and on the reference of the rule
     // D2. No step in the rule at the critical angle of the outer pair
     // H. Twins with every digit
     typedef std::complex<double> cd;
     const double f = FRQ, gap = 1.0e-5, k0 = 2.0 * QPI * f / C0, ONE = 1.0 + 1.0e-6, eW = 2.401e-9;
     const cd J(0.0, 1.0);
-    auto refl = [](int tr) { return (tr > 2) ? 3 : 0; };
-    auto dBp = [](double p) { return (p > 0.0) ? 10.0 * std::log10(p) : -999.0; };
-    auto launched = [](int cur, double thd) {
+    auto refl = [](int tr)
+    { return (tr > 2) ? 3 : 0; };
+    auto dBp = [](double p)
+    { return (p > 0.0) ? 10.0 * std::log10(p) : -999.0; };
+    auto launched = [](int cur, double thd)
+    {
         ub::Ev S;
         const double th = thd * QPI / 180.0;
         S.prev = arma::Col<short>{0}, S.cur = arma::Col<short>{(short)cur}, S.buf = arma::Col<short>{0};
@@ -3146,9 +3105,14 @@ TEST_CASE("Closed face - a coating met from inside a dense solid", "[wave]")
         S.accg = arma::vec{0.1}, S.accr = arma::vec{0.1};
         return S;
     };
-    enum { WALL, COAT };
+    enum
+    {
+        WALL,
+        COAT
+    };
     // Both ports of the sheet event. Material 1 is the sheet, 2 the wall behind it (WALL) or the host the ray is launched in (COAT)
-    auto ports = [&](const ub::Pal &P, int cfg, int tr, double thd, int k, cd &T, cd &R) {
+    auto ports = [&](const ub::Pal &P, int cfg, int tr, double thd, int k, cd &T, cd &R)
+    {
         arma::uvec mi;
         arma::mat mesh = (cfg == WALL) ? ub::build({0.0, gap, gap + 0.1}, {1, 2, 2}, {false, false, true}, mi) : ub::build({0.0, gap}, {2, 1}, {true, false}, mi);
         ub::Ev S = launched(2, thd);
@@ -3160,9 +3124,12 @@ TEST_CASE("Closed face - a coating met from inside a dense solid", "[wave]")
     // library: kz for TE and the scalar type, eps / kz for TM, kz = sqrt(eps - p) on the decaying
     // root, p the transverse invariant. Near face: a transformer of ratio sqrt(nu). Far face,
     // closed: the pad, a load |s| (nu |s| + b) / (|s| + nu b) in front of the reactance b
-    auto kz_of = [](cd e, double p) { cd v = std::sqrt(e - p); return (std::imag(v) > 0.0 || (std::imag(v) == 0.0 && std::real(v) < 0.0)) ? -v : v; };
-    auto pad_ref = [&](cd en, cd es, cd ef, double tf_n, double tf_s, double tf_f, double d, double p, bool tm, double &Tp, double &Rp) -> bool {
-        auto adm = [&](cd e) { return tm ? e / kz_of(e, p) : kz_of(e, p); };
+    auto kz_of = [](cd e, double p)
+    { cd v = std::sqrt(e - p); return (std::imag(v) > 0.0 || (std::imag(v) == 0.0 && std::real(v) < 0.0)) ? -v : v; };
+    auto pad_ref = [&](cd en, cd es, cd ef, double tf_n, double tf_s, double tf_f, double d, double p, bool tm, double &Tp, double &Rp) -> bool
+    {
+        auto adm = [&](cd e)
+        { return tm ? e / kz_of(e, p) : kz_of(e, p); };
         const cd a = adm(en), s = adm(es), b = adm(ef), phi = std::exp(-J * k0 * kz_of(es, p) * d);
         cd r1 = (a - s) / (a + s), t1 = 1.0 + r1, tb1 = 1.0 - r1;
         const double x0 = std::abs(s / a);
@@ -3203,9 +3170,7 @@ TEST_CASE("Closed face - a coating met from inside a dense solid", "[wave]")
     const std::vector<Sh> coats = {{0.31, 0.20}, {0.90, 0.20}, {1.50, 0.40}, {2.50, 0.80}, {5.24, 0.63}, {9.0, 1.2}, {0.31, 0.0}, {1.50, 0.0}, {2.50, 0.0}, {9.0, 0.0}};
     const char *chn[3] = {"sc", "TE", "TM"};
 
-    // ------------------------------------------------------------------------------------------
-    // A. Both ports of one sheet event under a closed outer pair
-    // ------------------------------------------------------------------------------------------
+    // ---- A. Both ports of one sheet event under a closed outer pair ----
     QD_DIAG("\n# diag: closed face A, both ports of a sheet event under a closed outer pair, the worst over 1, 6 and 25 mm and seven angles:\n");
     QD_DIAG("# 27 to 85 deg for a coating on eps 5.24 met from inside (critical angle 25.9 deg). tf: of the sheet. sum: T + R in\n");
     QD_DIAG("# power, the largest, at theta / mm; above: rows above one / rows. dT, dR: the largest distance of a power from the reference of the\n");
@@ -3299,9 +3264,7 @@ TEST_CASE("Closed face - a coating met from inside a dense solid", "[wave]")
             }
     }
 
-    // ------------------------------------------------------------------------------------------
-    // H. Twins with every digit
-    // ------------------------------------------------------------------------------------------
+    // ---- H. Twins with every digit ----
     QD_DIAG("\n# diag: closed face H, twins, the complex coefficient of the sheet event with every digit, 6 mm, 45 deg: a lossless sheet denser\n");
     QD_DIAG("# than the invariant with tf as a coating on eps 5.24 and a lossy sheet without tf as a coating. port: T or R. k: 0 scalar\n");
     QD_DIAG("# or VV, 3 HH\n");
@@ -3313,7 +3276,7 @@ TEST_CASE("Closed face - a coating met from inside a dense solid", "[wave]")
             int cfg;
             LumpMtl s, w;
         };
-        const LumpMtl wall = {eW, 0.0, 0.0, 0.0, 0.3, 0.0, 0.0, 0.0, 0.0, 20.0, 1.0e9}, wall0 = {eW, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 20.0, 1.0e9}, host = {5.24, 0.0};
+        const LumpMtl host = {5.24, 0.0};
         const std::vector<Tw> tw = {{"dense 9.0 tf 0.5 coating on 5.24", COAT, {9.0, 0.0, 0.006, 0.0, 0.5}, host},
                                     {"lossy 1.50-0.40j no tf coating on 5.24", COAT, {1.50, 0.40, 0.006}, host}};
         for (const Tw &W : tw)

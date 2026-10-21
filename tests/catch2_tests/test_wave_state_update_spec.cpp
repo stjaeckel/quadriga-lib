@@ -410,17 +410,15 @@ TEST_CASE("ray_state_update - survival gate thresholds on eps", "[wave]")
 
 TEST_CASE("ray_state_update - lossy medium feeds |phi| from medium_gain", "[wave]")
 {
-    // For a slab with power-law absorption |phi|^2 must equal the implementation's own
-    // medium_gain(L), not an eta-only loss. The test measures medium_gain through a cavity-exit
-    // magnitude and then checks S against the closed form. (The mass column cannot be used here:
-    // m > 0 marks a lumped-transmission material and is excluded from slab resolution.)
+    // With absorption (alpha) in the slab, |phi|^2 is the library's own medium_gain(L), not a loss from eps alone. The
+    // case measures medium_gain through the magnitude of a cavity exit and checks S against the closed form with it.
     arma::mat M = {{4.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
     arma::uvec ind;
     std::unordered_map<std::string, std::vector<double>> mtl;
     mtl_matrix_to_map0<double>(M, ind, mtl);
     mtl["alpha"] = {5.0}; // power-law absorption, dB/m (alphaB defaults to 0)
 
-    const double F10 = 10.0e9; // mass law engages above its clamp (fGHz * dist > 1)
+    const double F10 = 10.0e9;
     const double L = 40.0 * half_wave(2.0, F10);
 
     // Measure medium_gain over d by the exit magnitude: |factor|^2 = medium_gain(d) (eps high, no S)
@@ -432,10 +430,8 @@ TEST_CASE("ray_state_update - lossy medium feeds |phi| from medium_gain", "[wave
         return std::norm(vvf(C));
     };
     double g_L = med_of(L);
-    double g_2L = med_of(2.0 * L);
 
-    CHECK(g_L < 0.999); // engagement tripwire: the mass column took effect
-    // WARN("mass-law g_L = " << g_L << ", g_2L = " << g_2L << " (log-in-distance, not multiplicative)");
+    CHECK(g_L < 0.999); // the absorption takes effect
 
     // Cavity exit with eps = 0: extract S from the exit factor and compare with the measured |phi|
     auto C = make1<double>(mtl, 4, OT_EXIT, 1, 1, 0, 0, 1, 0, L, 2.0, 0.5, QPI / 2.0, 0.0,
@@ -478,14 +474,15 @@ TEST_CASE("ray_state_update - transmission factor folds into the resolved gain",
     CHECK(std::abs(x.imag()) < 1e-6);
     CHECK(x.real() > 0.0);
     CHECK(x.real() < 1.0);
-    // Engagement tripwire: with tf = 0.6 the effective reflectance must differ from 1/9.
+    // With tf 0.6 the effective reflectance differs from the bare 1/9.
     CHECK(std::abs(x.real() - 1.0 / 9.0) > 1e-3);
 }
 
 TEST_CASE("ray_state_update - resolve clamp near the Airy pole", "[wave]")
 {
-    // A lossless slab near grazing drives r^2 toward 1. At resonance with the Airy denominator
-    // below 1e-2 the resolve is refused; detuned or at moderate angles it resolves finite.
+    // A lossless slab near grazing drives r^2 towards 1. At resonance, with the Airy denominator below 1e-2, the
+    // denominator is floored: the slab is still resolved and the factor stays bounded. Detuned, or at a moderate angle,
+    // it resolves as usual.
     static const auto mtl = base_palette<double>();
     const int mat = 4;
     const double n = 2.0;
@@ -1014,7 +1011,7 @@ TEST_CASE("ray_state_update - accumulated distance ledger", "[wave]")
         const double sentinel = 7.5; // a NULL side must leave the caller's vector exactly as it was
 
         auto C = make1<double>(mtl, 4, OT_EXIT, 1, 6, 0, 0, 6, 0, dof, 2.0, 0.5, QPI / 2.0, 1.5); // ABSORB
-        C.has_acc_ref_in = true; // geometric input omitted, reads as 0
+        C.has_acc_ref_in = true;                                                                  // geometric input omitted, reads as 0
         C.acc_ref_in.zeros(1);
         C.acc_ref_in(0) = preload;
         C.has_acc_ref_out = true; // geometric output omitted, write skipped
@@ -1022,7 +1019,7 @@ TEST_CASE("ray_state_update - accumulated distance ledger", "[wave]")
         C.acc_geo_out.ones(1);
         C.acc_geo_out(0) = sentinel;
         CHECK_NOTHROW(C.run());
-        CHECK(std::abs(std::norm(vvf(C)) - medg(6, L)) < 1e-9); // the refracted column still drives the loss
+        CHECK(std::abs(std::norm(vvf(C)) - medg(6, L)) < 1e-9);      // the refracted column still drives the loss
         CHECK(std::abs((double)C.acc_geo_out(0) - sentinel) < 1e-9); // untouched by the call
 
         auto D = make1<double>(mtl, 4, OT_EXIT, 1, 6, 0, 0, 6, 0, dof, 2.0, 0.5, QPI / 2.0, 1.5);
@@ -1034,7 +1031,7 @@ TEST_CASE("ray_state_update - accumulated distance ledger", "[wave]")
         D.acc_ref_out.ones(1);
         D.acc_ref_out(0) = sentinel;
         CHECK_NOTHROW(D.run());
-        CHECK(std::abs(std::norm(vvf(D)) - medg(6, dof)) < 1e-9); // refracted preload absent -> loss over d(orig,fbs) only
+        CHECK(std::abs(std::norm(vvf(D)) - medg(6, dof)) < 1e-9);    // refracted preload absent -> loss over d(orig,fbs) only
         CHECK(std::abs((double)D.acc_ref_out(0) - sentinel) < 1e-9); // untouched by the call
     }
 }
@@ -1058,7 +1055,7 @@ TEST_CASE("ray_state_update - permeability affects the refractive index", "[wave
 
 TEST_CASE("ray_state_update - a resonance shifts the slab factor, coincidence columns leave a wave medium alone", "[wave]")
 {
-    // Engagement tripwires for the new material features.
+    // A permittivity resonance changes the resolved slab factor; coincidence columns leave a wave medium alone.
     SECTION("a permittivity resonance shifts the resolved slab factor")
     {
         arma::mat M = {{4.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
@@ -1079,8 +1076,8 @@ TEST_CASE("ray_state_update - a resonance shifts the slab factor, coincidence co
     }
     SECTION("coincidence columns leave a wave medium alone")
     {
-        // coiF / coiQ act only on a mass-law plate (in X0); a coiA column is no column (D2-b), read and ignored:
-        // the exit at coincidence is the exit without the three columns, bitwise
+        // coiF and coiQ act only on a mass-law plate, and coiA is no column (it is read and ignored): the exit at
+        // coincidence is the exit without the three columns, bitwise
         arma::mat M = {{4.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
         arma::uvec ind;
         std::unordered_map<std::string, std::vector<double>> base, mtl;
@@ -1198,7 +1195,7 @@ TEST_CASE("ray_state_update - input validation", "[wave]")
             C.itype = it;
             CHECK_THROWS_AS(C.run(), std::invalid_argument);
         }
-        for (int it : {0, 1, 2, 3, 4, 5}) // 5 (scalar refraction) is now valid
+        for (int it : {0, 1, 2, 3, 4, 5}) // every interaction type
         {
             auto C = make_valid();
             C.itype = it;

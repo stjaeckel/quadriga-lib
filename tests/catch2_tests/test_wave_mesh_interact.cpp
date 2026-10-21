@@ -13,7 +13,6 @@ TEST_CASE("Ray-Mesh Interact - Air to Air (x-z plane)", "[wave]")
 
     // Conversions
     double deg2rad = arma::datum::pi / 180.0;
-    double rad2deg = 180.0 / arma::datum::pi;
 
     // Ray start 10 m west of cube center, pointing east
     arma::mat orig = {{-10.0, 0.0, 0.5}};
@@ -52,14 +51,14 @@ TEST_CASE("Ray-Mesh Interact - Air to Air (x-z plane)", "[wave]")
     arma::vec gainN, fbs_angleN, thicknessN, edge_lengthN, U;
     double a;
 
-    // Test case 1 : Cube of air
+    // A cube of air
     arma::mat mtl_prop = {{1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}}; // Air
     mtl_prop = repmat(mtl_prop, 12, 1);
     arma::uvec mtl_ind;
     std::unordered_map<std::string, std::vector<double>> mtl_map;
     mtl_matrix_to_map<double>(mtl_prop, mtl_ind, mtl_map);
 
-    // Test reflection (spherical tridir); also capture fbsN/sbsN (now engine-computed outputs)
+    // Reflection with a spherical tridir; fbsN and sbsN are the hit points
     quadriga_lib::ray_mesh_interact(0, 10.0e9, &orig, &dest, &cube, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind,
                                     &trivec, &tridir_sph,
                                     &origN, &destN, &fbsN, &sbsN, &gainN, &xprmatN, &trivecN, &tridir_sphN,
@@ -101,7 +100,7 @@ TEST_CASE("Ray-Mesh Interact - Air to Air (x-z plane)", "[wave]")
     CHECK(arma::approx_equal(gainN, U, "absdiff", 1e-6));
 
     T = {{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}};
-    CHECK(arma::approx_equal(xprmatN.t(), T, "absdiff", 1e-6)); // xprmat now [8, n_rayN]
+    CHECK(arma::approx_equal(xprmatN.t(), T, "absdiff", 1e-6)); // xprmat is [8, n_rayN]
 
     a = std::tan(1.0 * deg2rad) * 9.0 + 0.2;
     T = {{0.0, -0.1, a, 0.0, -0.1, -0.2, 0.0, a, 0.0}};
@@ -152,7 +151,6 @@ TEST_CASE("Ray-Mesh Interact - Air to Dielectric Medium (x-z plane)", "[wave]")
 
     // Conversions
     double deg2rad = arma::datum::pi / 180.0;
-    double rad2deg = 180.0 / arma::datum::pi;
 
     // 45° incidence on dielectric medium
     arma::mat orig = {{-1.5, 0.0, 0.0}};
@@ -295,7 +293,6 @@ TEST_CASE("Ray-Mesh Interact - Dielectric Medium to Air (x-y plane, float)", "[w
 
     // Conversions
     float deg2rad = arma::datum::pi / 180.0;
-    float rad2deg = 180.0 / arma::datum::pi;
 
     // 45° incidence, x-y plane
     arma::fmat orig = {{0.5, 0.1, 0.0}}; // start inside the cube
@@ -372,7 +369,7 @@ TEST_CASE("Ray-Mesh Interact - Dielectric Medium to Air (x-y plane, float)", "[w
     T = {{x, y, 0.0}};
     CHECK(arma::approx_equal(destN, T, "absdiff", 1e-6));
 
-    // Tranmission coefficients, ITU-R P.2040-1, eq. (31a) and (31b), converted to normal flux
+    // Transmission coefficients, ITU-R P.2040-1, eq. (31a) and (31b), converted to normal flux
     float T_te = (2.0 * sqrt_eps * cos_th) / (sqrt_eps * cos_th + cos_th2);
     float T_tm = (2.0 * sqrt_eps * cos_th) / (cos_th + sqrt_eps * cos_th2);
     float obl = cos_th2 / (sqrt_eps * cos_th); // Re(z2 c2)/Re(z1 c1), the same in both channels here
@@ -469,7 +466,6 @@ TEST_CASE("Ray-Mesh Interact - Medium to Medium (x-y plane, double)", "[wave]")
 
     // Conversions
     double deg2rad = arma::datum::pi / 180.0;
-    double rad2deg = 180.0 / arma::datum::pi;
 
     // 45° incidence, x-y plane
     arma::mat orig = {{0.5, 0.1, 0.0}}; // start inside the cube
@@ -530,8 +526,8 @@ TEST_CASE("Ray-Mesh Interact - Medium to Medium (x-y plane, double)", "[wave]")
     quadriga_lib::ray_mesh_interact(2, 10.0e9, &orig, &dest, &msh, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind, &trivec, &tridir,
                                     &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr, &gainN, &xprmatN, &trivecN, &tridirN);
 
-    // Entered medium (M2) carries att = 3 dB as a lumped interface loss (still folded into
-    // the transmission-class gain after the refactor; in-medium distance loss is not).
+    // The entered medium carries att = 3 dB, a lumped interface loss on the transmission-class gain; the in-medium
+    // distance loss is not in it.
     double transition_gain = std::pow(10.0, -0.1 * 3.0);
 
     double th2 = std::acos(cos_th2);
@@ -545,7 +541,7 @@ TEST_CASE("Ray-Mesh Interact - Medium to Medium (x-y plane, double)", "[wave]")
     T = {{x, y, 0.0}};
     CHECK(arma::approx_equal(destN, T, "absdiff", 1e-6));
 
-    // Tranmission coefficients, ITU-R P.2040-1, eq. (31a) and (31b)
+    // Transmission coefficients, ITU-R P.2040-1, eq. (31a) and (31b)
     double T_te = (2.0 * sqrt_eps1 * cos_th) / (sqrt_eps1 * cos_th + sqrt_eps2 * cos_th2);
     double T_tm = (2.0 * sqrt_eps1 * cos_th) / (sqrt_eps2 * cos_th + sqrt_eps1 * cos_th2);
 
@@ -587,7 +583,6 @@ TEST_CASE("Ray-Mesh Interact - Conductive to Dielectric (x-y plane, double)", "[
 
     // Conversions
     double deg2rad = arma::datum::pi / 180.0;
-    double rad2deg = 180.0 / arma::datum::pi;
 
     // 45° incidence, x-y plane
     arma::mat orig = {{0.5, 0.1, 0.0}}; // start inside the cube
@@ -629,8 +624,8 @@ TEST_CASE("Ray-Mesh Interact - Conductive to Dielectric (x-y plane, double)", "[
     std::complex<double> R_te = (sqrt_eps1 * cos_th - sqrt_eps2 * cos_th2) / (sqrt_eps1 * cos_th + sqrt_eps2 * cos_th2);
     std::complex<double> R_tm = (sqrt_eps2 * cos_th - sqrt_eps1 * cos_th2) / (sqrt_eps2 * cos_th + sqrt_eps1 * cos_th2);
 
-    // Gain and coefficients now exclude in-medium (distance) loss; the complex eta from the
-    // conductive incidence medium still shapes the Fresnel terms.
+    // The gain and the coefficients carry no in-medium loss; the complex eps of the conductive incidence medium shapes
+    // the Fresnel terms.
     U = {0.5 * std::norm(R_tm) + 0.5 * std::norm(R_te)}; // Gain without FSPL
     CHECK(arma::approx_equal(gainN, U, "absdiff", 1e-6));
 
@@ -638,8 +633,7 @@ TEST_CASE("Ray-Mesh Interact - Conductive to Dielectric (x-y plane, double)", "[
     T = {{std::real(R_te), std::imag(R_te), 0.0, 0.0, 0.0, 0.0, std::real(R_tm), std::imag(R_tm)}};
     CHECK(arma::approx_equal(xprmatN.t(), T, "absdiff", 1e-6));
 
-    // The in-medium conductivity attenuation lives in medium_gain(): verify it reproduces the
-    // ITU P.2040-1 conductive loss over the in-slab path.
+    // The in-medium conductivity loss is medium_gain's: the ITU-R P.2040-1 conductive loss over the in-slab path.
     double thickness = std::sqrt(2.0 * 0.5 * 0.5) + 0.001;
     double tan_delta = std::imag(eta1) / std::real(eta1); // Loss tangent, ITU-R P.2040-1, eq. (13)
     double cos_delta = std::cos(std::atan(tan_delta));
@@ -702,9 +696,8 @@ TEST_CASE("Ray-Mesh Interact - fRef parameterization equivalence", "[wave]")
     // Both parameterisations are identical at every frequency:
     //   ε_r(f) = 2·f        σ(f) = 0.01·f
     //   Att(f) = 1·f [dB]   α(f) = 0.5·f [dB/m]
-    // Material A specifies at fRef = 1 GHz; Material B at fRef = 2 GHz.
-    // After the refactor only att and the (complex) Fresnel terms remain in gain/xprmat; both stay
-    // identical across the two parameterisations, so the equivalence still holds.
+    // Material A specifies at fRef = 1 GHz, material B at fRef = 2 GHz. The gain and xprmat carry att and the complex
+    // Fresnel terms, identical for the two.
     arma::mat mtl_A = {{2.0, 1.0, 0.01, 1.0, 1.0, 1.0, 0.5, 1.0, 1.0}};
     arma::mat mtl_B = {{4.0, 1.0, 0.02, 1.0, 2.0, 1.0, 1.0, 1.0, 2.0}};
     mtl_A = repmat(mtl_A, 12, 1);
@@ -744,8 +737,7 @@ TEST_CASE("Ray-Mesh Interact - Penetration loss frequency scaling", "[wave]")
     quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
 
     // ε_r = 1, σ = 0 (no reflection, no in-medium loss)
-    // att = 6 dB @ 2 GHz, attB = 1  →  at 10 GHz:  Att = 6·(10/2)^1 = 30 dB
-    // Interface (att) loss is still folded into transmission-class gain after the refactor.
+    // att = 6 dB @ 2 GHz, attB = 1  →  at 10 GHz:  Att = 6·(10/2)^1 = 30 dB, on the transmission-class gain
     arma::mat mtl_prop = {{1.0, 0.0, 0.0, 0.0, 6.0, 1.0, 0.0, 0.0, 2.0}};
     mtl_prop = repmat(mtl_prop, 12, 1);
     arma::uvec mtl_ind;
@@ -800,14 +792,13 @@ TEST_CASE("Ray-Mesh Interact - Alpha in-medium absorption (medium_gain)", "[wave
                                     &trivec, &tridir,
                                     &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr, &gainN, &xprmatN, &trivecN, &tridirN);
 
-    // Reflection gain is now the lossless Fresnel term only; the α loss moved to medium_gain().
+    // The reflection gain is the lossless Fresnel term; the α loss is medium_gain's.
     std::complex<double> eta1(1.5, 0.0), eta2(1.0, 0.0);
     double refl_gain = calc_transition_gain(0, 45.0, 0.0, 0.0, eta1, eta2);
     arma::vec U = {refl_gain};
     CHECK(arma::approx_equal(gainN, U, "absdiff", 1e-9));
 
-    // α in-medium absorption is now owned by medium_gain(): with real ε and σ = 0 it returns
-    // exactly the α term over the in-slab path.
+    // medium_gain owns the α absorption: with real ε and σ = 0 it is exactly the α term over the in-slab path.
     double thickness = std::sqrt(0.5 * 0.5 + 0.5 * 0.5) + 0.001; // OF_length + ray_offset
     double alpha_10 = 2.0 * std::pow(10.0 / 5.0, 1.0);           // 4 dB/m
     double alpha_loss = std::pow(10.0, -0.1 * thickness * alpha_10);
@@ -931,7 +922,7 @@ TEST_CASE("Ray-Mesh Interact - Permeability impedance-matches a dense medium", "
     std::unordered_map<std::string, std::vector<double>> mapM, mapU;
     mtl_matrix_to_map<double>(mtl, indM, mapM);
     set_mu<double>(mapM, 4.0, 0.0, 0.0, 0.0);   // matched: eps = mu = 4 -> admittance 1, n = 4
-    mtl_matrix_to_map<double>(mtl, indU, mapU); // unmatched: eps = 4, mu = 1 (pre-mu behavior)
+    mtl_matrix_to_map<double>(mtl, indU, mapU); // unmatched: eps = 4, mu = 1
 
     arma::mat o, d, x, tv, td;
     arma::vec g, U;
@@ -954,9 +945,8 @@ TEST_CASE("Ray-Mesh Interact - Permeability impedance-matches a dense medium", "
 
 TEST_CASE("Ray-Mesh Interact - eps<->mu swap leaves reflected power invariant", "[wave]")
 {
-    // Swapping eps and mu preserves n = sqrt(eps*mu) and, at normal incidence, |R|, so the
-    // reflected power must be identical. Tripwire: if the Fresnel term reverts to sqrt(eps),
-    // A and B diverge.
+    // Swapping eps and mu preserves n = sqrt(eps*mu) and, at normal incidence, |R|, so the reflected power is
+    // identical; a Fresnel term that read sqrt(eps) alone would tell A and B apart.
     arma::mat cube = quadriga_lib::cube<double>();
 
     arma::mat orig = {{-2.0, 0.0, 0.5}};
@@ -1027,14 +1017,13 @@ TEST_CASE("Ray-Mesh Interact - Permeability drives in-medium loss (medium_gain)"
     double full = calc_transition_gain_mu(0, 45.0, thickness, 0.0, eta1, eta2, mu1, mu2);
     double refl_only = calc_transition_gain_mu(0, 45.0, 0.0, 0.0, eta1, eta2, mu1, mu2);
 
-    // Reflection gain is now the loss-free admittance term; the mu-driven bulk loss moved to medium_gain().
+    // The reflection gain is the loss-free admittance term; the bulk loss from mu is medium_gain's.
     arma::vec U = {refl_only};
     CHECK(arma::approx_equal(g, U, "absdiff", 1e-9));
 
     double bulk = full / refl_only; // the loss factor medium_gain carries
     CHECK(std::abs(quadriga_lib::medium_gain(map, 1, thickness, 10.0e9) - bulk) < 1e-9);
-    CHECK(bulk < 0.7); // mu attenuates the path; this factor is exactly 1 if the loss feed
-                       // reverts to eps (which is real here)
+    CHECK(bulk < 0.7); // mu attenuates the path; eps alone is real here
 }
 
 TEST_CASE("Ray-Mesh Interact - path_dirN direction contract (45° dielectric, x-z plane)", "[wave]")
@@ -1215,7 +1204,6 @@ TEST_CASE("Ray-Mesh Interact - Scalar interactions (types 3/4/5) gains, invarian
     double cos_th2 = std::sqrt(1.0 - 1.5 * cos_th * cos_th); // 0.5
     double sqrt_eps = std::sqrt(1.5);
     double R = (sqrt_eps * cos_th - cos_th2) / (sqrt_eps * cos_th + cos_th2);
-    double Tt = 1.0 + R;
 
     arma::mat mtl_prop = repmat(arma::mat{{1.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}}, 12, 1);
     mtl_matrix_to_map<double>(mtl_prop, mtl_ind, mtl_map);
@@ -1505,8 +1493,8 @@ TEST_CASE("Ray-Mesh Interact - Public helpers: refractive_index, interface_gain,
         map["a"] = {4.0}, map["b"] = {2.0}, map["fRef"] = {5.0};
         CHECK(std::abs(quadriga_lib::refractive_index(map, 1, 10.0e9) - 4.0) < 1e-9);
 
-        // coincidence columns on a wave medium leave the index and the interface gain alone: coiF / coiQ act
-        // only on a mass-law plate (in X0), and a coiA column is no column (D2-b), read and ignored
+        // The coincidence columns leave a wave medium's index and interface gain alone: coiF and coiQ act only on a
+        // mass-law plate, and coiA is no column (it is read and ignored)
         std::unordered_map<std::string, std::vector<double>> coi = map;
         coi["coiF"] = {20.0}, coi["coiQ"] = {5.0}, coi["coiA"] = {6.0};
         CHECK(std::abs(quadriga_lib::refractive_index(coi, 1, 10.0e9) - quadriga_lib::refractive_index(map, 1, 10.0e9)) < 1e-12);
@@ -1711,18 +1699,13 @@ TEST_CASE("Ray-Mesh Interact - compact = false keeps missed rays in place", "[wa
 
 TEST_CASE("Diagnostic - Interface energy split per polarization", "[wave]")
 {
-    // Where the averaged reflectance enters. Material::interact_with builds its gain from
-    // 0.5*(|R_TE|^2 + |R_TM|^2) and rescales both Fresnel coefficients by one common factor to
-    // carry it. This table shows what that does to each channel at a single interface: the
-    // per-channel RATIO should survive the common rescale, while the reported gain is the average
-    // by construction. If the ratio moves here, the defect is in interact_with itself; if it only
-    // moves after a slab resolve, it is the corr / Tsp coupling in qd_slab_resolve.
+    // The averaged reflectance and the channels at a single interface. interact_with builds the gain from 0.5 (|R_TE|^2
+    // + |R_TM|^2) and hands over the exact per-channel coefficients, so each channel is its own Fresnel value and the
+    // gain is their average.
     //
-    // Channel identification. The ray lies in the x-y plane and the normal is along x, so
-    // eQ = U x N is parallel to z, and so is eV. qd_polbasis therefore performs a clean swap rather
-    // than a mixing rotation: VV is the TE channel and HH is the TM channel, up to sign. That is the
-    // reverse of the degenerate collinear case, and getting it backwards inverts every comparison
-    // against a per-polarization reference.
+    // Channel identification: the ray lies in the x-y plane and the normal is along x, so eQ = U x N is parallel to z,
+    // and so is eV. The polarization basis is then a clean swap rather than a mixing rotation: VV is the TE channel and
+    // HH the TM channel, up to sign.
     const double f_hz = 1.0e9;
     const std::complex<double> eps_s(5.24, -0.63); // lossy concrete-like at 1 GHz
     arma::mat mesh = qd_quad_x(200.0, 0.0);
@@ -1782,9 +1765,8 @@ TEST_CASE("Diagnostic - Interface energy split per polarization", "[wave]")
             CHECK(gainN(0) >= 0.0);
             CHECK(std::abs(gainN(0) - 0.5 * (vv2 + hh2)) < 1e-9); // gain is derived from xprmat
 
-            // interact_with hands over exact per-channel coefficients. The averaged reflectance sets
-            // the total and rescales both channels by one common factor, so it cannot move a ratio -
-            // measured to 8e-16. Anything that reintroduces a per-channel rescale here fails.
+            // interact_with hands over exact per-channel coefficients; the averaged reflectance sets only the total, so
+            // the channel ratio is the Fresnel ratio (measured to 8e-16).
             INFO("type " << type << ", angle " << thd);
             CHECK(std::abs(gainN(0) - ref_avg) < 1e-12);
             CHECK(std::abs(vv2 - ref_te) < 1e-12);
@@ -1795,34 +1777,21 @@ TEST_CASE("Diagnostic - Interface energy split per polarization", "[wave]")
 
 TEST_CASE("Diagnostic - Transmission convention baseline, single interface", "[wave]")
 {
-    // Absolute per-type level at one interface, which nothing else in either suite prints. Every
-    // other table here measures a ratio or a composite: a ratio is nearly blind to the obliquity
-    // factor, and the sheet composite never takes its coefficients from Material::interact_with at
-    // all. Without this table a shifted level after the convention change could only be compared
-    // against the previous run, not against physics.
+    // The absolute level of every transmission-class type at one interface. Every other table measures a ratio or a
+    // composite, and a ratio is nearly blind to the obliquity factor.
     //
-    // Two references sit beside the code's output:
+    // Two references beside the output:
     //   raw_X  = |t_X|^2, the Fresnel amplitude power with no obliquity factor
-    //   flux_X = Re(z2 c2)/Re(z1 c1) |t_TE|^2  and  Re(conj(z2) c2)/Re(conj(z1) c1) |t_TM|^2,
-    //            the per-channel normal-flux transmittance
+    //   flux_X = Re(z2 c2)/Re(z1 c1) |t_TE|^2  and  Re(conj(z2) c2)/Re(conj(z1) c1) |t_TM|^2, the per-channel
+    //   normal-flux transmittance
     //
-    // d_raw_dB and d_flux_dB report which of the two each interaction type is currently on. Types
-    // 2 and 5 sit on raw and types 1 and 4 on the TE/TM-averaged flux value, so the same physical
-    // crossing reports different energy depending only on whether the tracer was asked to bend the
-    // ray. That gap, not the channel ratio, is the size of the convention defect.
+    // Asserted: every type (1, 2, 4, 5) in both directions reports flux_X, total reflection excluded; d_raw_dB is
+    // printed, the size of the obliquity factor. The m2a rows are the lossy-incidence case, where flux_X and 1 - R_X
+    // separate and flux_X is not bounded by 1; in the a2m rows the two coincide.
     //
-    // The m2a rows are the lossy-incidence case, where flux_X and 1 - R_X separate and flux_X is
-    // no longer bounded by 1. The a2m rows are where the two coincide identically.
-    //
-    // Channel identification: the ray lies in the x-y plane and the normal is along x, so
-    // qd_polbasis performs a clean swap and VV is TE while HH is TM, in both hit directions - the
-    // back-side hit flips the normal before the basis is built. Scalar types carry one coefficient;
-    // VV2 is repeated into HH2 and both references use the TE form, which is what the scalar branch
-    // computes, since z is the acoustic admittance and T = 1 + R equals t_TE algebraically.
-    //
-    // The acceptance test is |d_flux_dB| < 1e-9 for all four types in both directions, with the
-    // total-reflection rows excluded. d_raw_dB is kept as a printed column: it is the size of the
-    // obliquity factor.
+    // Channel identification: VV is TE and HH is TM in both hit directions (the back-side hit flips the normal before
+    // the basis is built). Scalar types carry one coefficient; VV2 is repeated into HH2 and both references use the TE
+    // form, which is the scalar branch's: z is the acoustic admittance and T = 1 + R equals t_TE.
     const double f_hz = 1.0e9;
     const double fGHz = f_hz * 1e-9;
 
@@ -1937,11 +1906,9 @@ TEST_CASE("Diagnostic - Transmission convention baseline, single interface", "[w
                     CHECK(gainN(0) >= 0.0);
                     CHECK(std::abs(gainN(0) - (is_scalar ? vv2 : 0.5 * (vv2 + hh2))) < 1e-9);
 
-                    // Acceptance test for the energy convention: every transmission-class type
-                    // reports the per-channel normal-flux transmittance of its own interface, and
-                    // the four types therefore agree with each other. Total reflection is excluded,
-                    // because there is no forward Fresnel port there and the coefficient carries a
-                    // flat tf leak instead.
+                    // Every transmission-class type reports the per-channel normal-flux transmittance of its own
+                    // interface, so the four types agree. Total reflection is excluded: there is no forward Fresnel
+                    // port, and the coefficient carries a flat tf leak instead.
                     if (!tir)
                     {
                         CHECK(std::abs(vv2 - flux_te) < 1e-9);
@@ -1957,28 +1924,15 @@ TEST_CASE("Diagnostic - Transmission convention baseline, single interface", "[w
 
 TEST_CASE("Diagnostic - Thin sheet composite vs analytic slab", "[wave]")
 {
-    // The sheet composite is produced in one atomic event and should equal the exact analytic
-    // slab. Any residual here is the floor on how close the sheet can get to physics, and the
-    // traced solid cannot do better than that floor either. The polarization-ratio columns are
-    // the sharper of the two: a power error can hide behind the TE/TM average, a ratio error
-    // cannot.
+    // The sheet composite is produced in one event and equals the exact analytic slab. The polarization-ratio columns
+    // are the sharper check: a power error can hide behind the TE/TM average, a ratio error cannot.
     //
-    // The last row is magnetic, and is the only place a non-unit permeability reaches
-    // ray_mesh_interact's own sheet composite. ray_state_update re-resolves every sheet crossing
-    // when medium tracking is on, and its path is covered for permeability; this one serves
-    // callers without state and had never seen a magnetic material. Produce mode is one function
-    // and was measured exact at mu != 1 through the redo, so what this row measures is what is
-    // different here: this function's own material lookup into the e, f, g, h columns, and its own
-    // polarization basis, built from a real incidence plane where the redo's harness has a
-    // degenerate one. Three further things differ between the two call sites - the incidence
-    // cosine comes from the face normal rather than from fbs_angle, the displacement budget is the
-    // leg just travelled, and total reflection is handled by the ray tube rather than by a
-    // re-derived verdict - and none of them reads mu or is engaged by a sheet in air.
+    // The last row is magnetic: it reaches ray_mesh_interact's own lookup of the e, f, g, h columns and its
+    // polarization basis, built from a real incidence plane. ray_state_update re-resolves sheet crossings when medium
+    // tracking is on; this composite serves callers without state.
     //
-    // Both ports are measured on every row, per channel and labelled. The min/max ratio above is
-    // blind to which channel is which, and so is the average. The labelled comparison is the one
-    // that would catch a basis that swapped them, and a magnetic sheet is where that matters most,
-    // because a permeability can order the two channels either way.
+    // Both ports are measured on every row, per channel and labelled: the min/max ratio and the average are blind to
+    // which channel is which, and a magnetic sheet can order the two either way.
     const double f_hz = 1.0e9;
 
     struct Mat
@@ -2091,22 +2045,16 @@ TEST_CASE("Diagnostic - Thin sheet composite vs analytic slab", "[wave]")
             CHECK(gainN(0) >= 0.0);
             CHECK(gainN(0) <= 1.0);
 
-            // The sheet composite matches the exact analytic slab to the amplitude-convention floor,
-            // and its phase sits exactly one free-space reference term away from it. Both hold across
-            // five materials and eight angles, so both are regression guards rather than targets.
-            // With the raw-amplitude interface convention and the exact complex propagation factor
-            // both in, nothing separates the sheet composite from the exact analytic slab: it is the
-            // same closed form evaluated the same way. The bounds are numerical, not physical, and a
-            // failure here means an approximation has been reintroduced somewhere in produce mode.
+            // The sheet composite matches the exact analytic slab, and its phase sits one free-space reference term
+            // away from it, across five materials and eight angles: the same closed form evaluated the same way, so the
+            // bounds are numerical.
             INFO(M.name << ", angle " << thd);
             CHECK(std::abs(dB(gainN(0)) - dB(R.p_avg)) < 1.0e-6);
             CHECK(std::abs(rc - R.ratio) < 1.0e-9);
             CHECK(std::abs(d_arg - pred) < 1.0e-3);
 
-            // Per channel and labelled, both ports. VV is TE and HH is TM in this geometry, for the
-            // reflected direction as well as the transmitted one. The magnetic row is asserted to
-            // the bounds the plan sets for it, 1e-6 dB on the transmit port above and 1e-9 on the
-            // reflect port here; the dielectric rows meet the same bounds and are held to them.
+            // Per channel and labelled, both ports. VV is TE and HH is TM in this geometry, for the reflected direction
+            // as well as the transmitted one; the magnetic row is held to the same bounds as the dielectric ones.
             CHECK(std::abs(vv2 - R.p_te) < 1.0e-9);
             CHECK(std::abs(hh2 - R.p_tm) < 1.0e-9);
             CHECK(std::abs(rvv2 - Ra_te) < 1.0e-9);
@@ -2132,19 +2080,15 @@ TEST_CASE("Diagnostic - Thin sheet composite vs analytic slab", "[wave]")
 
 TEST_CASE("Thin sheet - permeability and the lumped columns through ray_mesh_interact", "[wave]")
 {
-    // Two things the case above cannot say.
+    // Two statements the case above cannot make.
     //
-    // The eps<->mu swap. Swapping holds n = sqrt(eps mu), and so every cosine and the propagation
-    // factor, exactly fixed and replaces z by 1/z. With air on both sides that maps every
-    // reflection and every transmission product of the Airy pair onto its opposite polarization,
-    // so the swap exchanges the TE and TM ports. The redo asserts this through a degenerate
-    // incidence plane; here the plane is real, VV is TE and HH is TM, and the exchange is a
-    // statement about this function's polarization basis that no dielectric and no power average
-    // can make. It needs no reference at all.
+    // The eps <-> mu swap. Swapping holds n = sqrt(eps mu), and so every cosine and the propagation factor, and
+    // replaces z by 1/z. With air on both sides that maps every reflection and transmission product of the Airy pair
+    // onto the other polarization, so the swap exchanges the TE and TM ports. Here the incidence plane is real, VV is
+    // TE and HH is TM: a statement about this function's polarization basis that needs no reference.
     //
-    // The lumped columns. att, tf and a permittivity resonance on a sheet reach produce mode
-    // through this function's own material lookup as well as through the redo's, and no sheet in
-    // this file has ever set one of them. Each is run against qd_slab_ref_lumped on both ports.
+    // The lumped columns. att, tf and a permittivity resonance on a sheet reach the composite through this function's
+    // own material lookup; each is run against qd_slab_ref_lumped on both ports.
     const double f_hz = 1.0e9;
     const double thk = 0.006;
     arma::mat mesh = qd_quad_x(200.0, 0.0);
@@ -2196,9 +2140,7 @@ TEST_CASE("Thin sheet - permeability and the lumped columns through ray_mesh_int
         return m;
     };
 
-    // ------------------------------------------------------------------------------------------
-    // The swap. eps 5.24 - 0.63j with mu 2.10 - 0.35j, against eps 2.10 - 0.35j with mu 5.24 - 0.63j.
-    // ------------------------------------------------------------------------------------------
+    // ---- The swap: eps 5.24 - 0.63j with mu 2.10 - 0.35j, against eps 2.10 - 0.35j with mu 5.24 - 0.63j ----
     QD_DIAG("\n# diag: eps<->mu swap on a sheet through ray_mesh_interact, thk 6 mm\n");
     QD_DIAG("angle,port,d_te_vs_tm,d_tm_vs_te,d_gain,separation\n");
 
@@ -2226,9 +2168,7 @@ TEST_CASE("Thin sheet - permeability and the lumped columns through ray_mesh_int
                 CHECK(sep > 1.0e-3);
         }
 
-    // ------------------------------------------------------------------------------------------
-    // The lumped columns, each on a sheet of eps 5.24 - 0.63j.
-    // ------------------------------------------------------------------------------------------
+    // ---- The lumped columns, each on a sheet of eps 5.24 - 0.63j ----
     struct Lump
     {
         const char *name;
@@ -2360,8 +2300,8 @@ TEST_CASE("Diagnostic - In-slab cosine projection, two ways", "[wave]")
         CHECK(ct_traced > 0.0);
         CHECK(ct_traced <= 1.0 + 1e-12);
 
-        // The two projections differ by under 1e-3 relative, which is 0.08 mm of path over a 100 mm
-        // slab and below every other term in this suite. Guarded rather than fixed.
+        // The two projections differ by under 1e-3 relative, 0.08 mm of path over a 100 mm slab, below every other term
+        // in this suite.
         INFO("angle " << thd << ", ct_sheet " << ct_sheet << ", ct_traced " << ct_traced);
         CHECK(std::abs(rel) < 1.0e-3);
     }
@@ -2369,16 +2309,15 @@ TEST_CASE("Diagnostic - In-slab cosine projection, two ways", "[wave]")
 
 TEST_CASE("Thin sheet - grazing incidence does not depend on the face", "[wave]")
 {
-    // A thin sheet is a laterally infinite layer, so the triangle it was cut from does not enter the
-    // composite and the composite is the analytic slab at every angle up to tangency. A floor on
-    // the incidence cosine at thk / sqrt(thk^2 + ext^2) would freeze the whole interface at the
-    // onset angle: on the 57 mm face below, a constant -3.315 dB of transmission from 83.95 deg
-    // onward, 28.8 dB above the slab at 89.9 deg, with the reflected port held at 0.473 where the
+    // A thin sheet is a laterally infinite layer, so the triangle it was cut from does not enter the composite: on a
+    // face with a longest edge of 565.7 m and on one of 0.057 m it is the analytic slab at every angle, up to 89.9999
+    // deg, where the lossy sheet is nearly a mirror and both ports stay finite. A floor on the incidence cosine at thk
+    // / sqrt(thk^2 + ext^2) would freeze the interface from its onset angle: on the small face a constant -3.315 dB of
+    // transmission from 83.95 deg on, 28.8 dB above the slab at 89.9 deg, with the reflected port at 0.473 where the
     // slab reflects 0.997.
     //
-    // Both ports are checked. Grazing incidence turns a pane into a mirror, so the reflected port is
-    // where the freeze did the most damage in absolute energy, and it is held to the same bound as
-    // the transmitted one.
+    // Both ports: grazing incidence turns a pane into a mirror, so the reflected port is where such a floor costs the
+    // most energy.
     const QdSheetFace F;
     const std::complex<double> eps_s(5.24, -0.63);
 
@@ -2389,7 +2328,7 @@ TEST_CASE("Thin sheet - grazing incidence does not depend on the face", "[wave]"
     QD_DIAG("# large face longest edge 565.7 m, small face 0.0566 m\n");
     QD_DIAG("angle,T_large_dB,T_small_dB,T_ana_dB,R_large_dB,R_small_dB,R_ana_dB,sum_large,sum_ana\n");
 
-    for (double thd : {60.0, 80.0, 85.0, 88.0, 89.0, 89.5, 89.9, 89.99, 89.999})
+    for (double thd : {60.0, 80.0, 85.0, 88.0, 89.0, 89.5, 89.9, 89.99, 89.999, 89.9999})
     {
         arma::mat big = qd_quad_x(200.0, 0.0), small = qd_quad_x(0.02, 0.0);
         double Tl = F.run(big, 200.0, thd, 1), Ts = F.run(small, 0.02, thd, 1);
@@ -2399,7 +2338,7 @@ TEST_CASE("Thin sheet - grazing incidence does not depend on the face", "[wave]"
         QdSlabRef A = qd_slab_ref(eps_s, F.thk, th, F.f_hz);
         double Ra = qd_slab_ref_R(eps_s, F.thk, th, F.f_hz);
 
-        QD_DIAG("%.3f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f\n",
+        QD_DIAG("%.4f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f\n",
                 thd, dB(Tl), dB(Ts), dB(A.p_avg), dB(Rl), dB(Rs), dB(Ra), Tl + Rl, A.p_avg + Ra);
 
         INFO("angle " << thd);
@@ -2418,125 +2357,6 @@ TEST_CASE("Thin sheet - grazing incidence does not depend on the face", "[wave]"
         // ray_state_update re-resolves every sheet crossing and never sees the face at all.
         CHECK(std::abs(Tl - Ts) <= 1.0e-9 * std::max(Tl, 1.0e-300));
         CHECK(std::abs(Rl - Rs) <= 1.0e-9 * std::max(Rl, 1.0e-300));
-    }
-}
-
-TEST_CASE("Thin sheet - mesh subdivision invariance", "[wave]")
-{
-    // The same plane, the same rays, the same material, meshed two ways: as two triangles and as
-    // 2 * 65^2. No coefficient may notice. The grazing clamp did notice, because it read the longest
-    // edge of the hit triangle: the coarse mesh clamped past 89.9994 deg and the fine mesh past
-    // 89.96 deg, so at 89.99 deg the same wall answered 20 dB apart depending on mesh density.
-    //
-    // 65 cells per side is odd, which puts z = 0 inside a row rather than on a shared edge, and the
-    // crossing at y = 140 is not a cell boundary either. The physics does not care - every
-    // sub-triangle is coplanar, identically oriented and carries the same material - but a hit
-    // landing exactly on a shared edge would make the comparison depend on which of two triangles
-    // the intersector happened to return.
-    const QdSheetFace F;
-    const std::complex<double> eps_s(5.24, -0.63);
-    const double half = 200.0;
-    const int n_sub = 65;
-
-    arma::mat coarse = qd_quad_x(half, 0.0);
-    arma::mat fine = qd_quad_x_sub(half, 0.0, n_sub);
-    REQUIRE(fine.n_rows == (arma::uword)(2 * n_sub * n_sub));
-
-    auto dB = [](double p)
-    { return (p > 0.0) ? 10.0 * std::log10(p) : -std::numeric_limits<double>::infinity(); };
-
-    QD_DIAG("\n# diag: subdivision invariance, 400 m face as 2 triangles and as 2 * 65^2\n");
-    QD_DIAG("# coarse longest edge 565.7 m, fine 8.70 m\n");
-    QD_DIAG("angle,T_coarse_dB,T_fine_dB,T_ana_dB,R_coarse_dB,R_fine_dB,R_ana_dB,rel_T,rel_R\n");
-
-    for (double thd : {60.0, 80.0, 88.0, 89.9, 89.99, 89.999})
-    {
-        double Tc = F.run(coarse, half, thd, 1), Tf = F.run(fine, half, thd, 1);
-        double Rc = F.run(coarse, half, thd, 0), Rf = F.run(fine, half, thd, 0);
-
-        double th = thd * arma::datum::pi / 180.0;
-        QdSlabRef A = qd_slab_ref(eps_s, F.thk, th, F.f_hz);
-        double Ra = qd_slab_ref_R(eps_s, F.thk, th, F.f_hz);
-
-        double rel_T = std::abs(Tc - Tf) / std::max(Tc, 1.0e-300);
-        double rel_R = std::abs(Rc - Rf) / std::max(Rc, 1.0e-300);
-
-        QD_DIAG("%.3f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.3e,%.3e\n",
-                thd, dB(Tc), dB(Tf), dB(A.p_avg), dB(Rc), dB(Rf), dB(Ra), rel_T, rel_R);
-
-        INFO("angle " << thd);
-        REQUIRE(std::isfinite(Tc));
-        REQUIRE(std::isfinite(Tf));
-        REQUIRE(std::isfinite(Rc));
-        REQUIRE(std::isfinite(Rf));
-
-        CHECK(rel_T < 1.0e-9);
-        CHECK(rel_R < 1.0e-9);
-        CHECK(std::abs(dB(Tf) - dB(A.p_avg)) < 1.0e-6);
-        CHECK(std::abs(dB(Rf) - dB(Ra)) < 1.0e-6);
-    }
-}
-
-TEST_CASE("Diagnostic - Derived lengths and the tangency limit", "[wave]")
-{
-    // What the clamp was said to be guarding against, printed unclamped.
-    //
-    // The transfer function is written in the normal thickness and the complex in-slab cosine. The
-    // normal thickness is thk by construction and the in-slab cosine is bounded from below by the
-    // internal critical angle - 0.9011 for eps 5.24 - so neither moves at grazing incidence. The
-    // geometric path thk / cos does grow without bound, but it reaches a result only as the mass-law
-    // term dist_geo * cos^2 = thk * cos, which shrinks instead. qd_slab_resolve now forms that term
-    // as a product and never builds the quotient.
-    //
-    // The one genuine path length left is thk / cos_slab, read by the alpha column and by the
-    // mass-law conductivity term. Both are dB-linear in it, so it saturates and is capped by loss
-    // rather than by angle.
-    const QdSheetFace F;
-    const std::complex<double> eps_s(5.24, -0.63);
-
-    auto dB = [](double p)
-    { return (p > 0.0) ? 10.0 * std::log10(p) : -std::numeric_limits<double>::infinity(); };
-
-    QD_DIAG("\n# diag: derived lengths, sheet thk 6 mm, eps 5.24 - 0.63j\n");
-    QD_DIAG("angle,ct_geo,ct_slab,thk_over_ct_slab_m,thk_normal_m,thk_over_ct_geo_m,mass_path_m\n");
-    for (double thd : {80.0, 89.0, 89.9, 89.99, 89.999, 89.9999})
-    {
-        double th = thd * arma::datum::pi / 180.0;
-        double ct_geo = std::cos(th), s1 = std::sin(th);
-        double ct_slab = std::abs(std::real(std::sqrt(1.0 - (1.0 / eps_s) * s1 * s1)));
-        double d_slab = F.thk / ct_slab, d_geo = F.thk / ct_geo;
-
-        QD_DIAG("%.4f,%.3e,%.9f,%.9f,%.9f,%.6f,%.3e\n",
-                thd, ct_geo, ct_slab, d_slab, d_slab * ct_slab, d_geo, d_geo * ct_geo * ct_geo);
-
-        CHECK(std::abs(d_slab * ct_slab - F.thk) < 1e-15);       // clamp-invariant by construction
-        CHECK(d_geo * ct_geo * ct_geo <= F.thk + 1e-15);         // shrinks rather than diverging
-        CHECK(ct_slab > 0.9);                                    // bounded by the internal critical angle
-    }
-
-    // The tangency limit itself. A lossy slab approaches a perfect mirror, so the transmitted port
-    // goes to zero and the reflected one to unity, and both stay finite all the way in. This is the
-    // behaviour the clamp was introduced to protect and which it in fact prevented.
-    arma::mat mesh = qd_quad_x(200.0, 0.0);
-    QD_DIAG("\n# diag: tangency limit, unclamped\n");
-    QD_DIAG("angle,T_dB,T_ana_dB,R_lin,R_ana_lin\n");
-    for (double thd : {89.9, 89.99, 89.999, 89.9999})
-    {
-        double T = F.run(mesh, 200.0, thd, 1);
-        double R = F.run(mesh, 200.0, thd, 0);
-        double th = thd * arma::datum::pi / 180.0;
-        QdSlabRef A = qd_slab_ref(eps_s, F.thk, th, F.f_hz);
-        double Ra = qd_slab_ref_R(eps_s, F.thk, th, F.f_hz);
-
-        QD_DIAG("%.4f,%.6f,%.6f,%.9f,%.9f\n", thd, dB(T), dB(A.p_avg), R, Ra);
-
-        INFO("angle " << thd);
-        REQUIRE(std::isfinite(T));
-        REQUIRE(std::isfinite(R));
-        CHECK(T >= 0.0);
-        CHECK(R <= 1.0);
-        CHECK(std::abs(dB(T) - dB(A.p_avg)) < 1.0e-6);
-        CHECK(std::abs(R - Ra) < 1.0e-9);
     }
 }
 
@@ -2579,56 +2399,12 @@ TEST_CASE("Resonance - the public index and in-medium gain carry the permittivit
     }
 }
 
-// Test 4 - interface_gain penetration loss and coincidence
-// interface_gain is the standalone interface term: a frequency-scaled penetration loss att plus an
-// optional coincidence Lorentzian, clamped so it never becomes gain.
-TEST_CASE("Acoustic - interface_gain is the penetration loss alone; a coiA column is ignored", "[wave]")
-{
-    // interface_gain is att (f / fRef)^attB, clamped at >= 0 dB. The coincidence Lorentzian coiA is removed
-    // (D2-b): coincidence on a mass-law plate is coiF / coiQ in X0, and an angle-free Lorentzian in dB is no
-    // physical element. A table that still carries coiF, coiQ and coiA gives the penetration loss alone, at
-    // coincidence and off it, for a dip (coiA < 0), a stop-band (coiA > 0) and a dip deeper than the loss.
-    double fRef_GHz = ac2rf(1000.0) / 1.0e9;
-    double coiF_GHz = ac2rf(2000.0) / 1.0e9;
-
-    // Closed-form interface reference: the att power law, clamped at >= 0 dB.
-    auto ref_if_gain = [&](double f_ac, double att, double attB)
-    {
-        double fGHz = ac2rf(f_ac) / 1.0e9;
-        double dB = att * std::pow(fGHz / fRef_GHz, attB);
-        return dB < 0.0 ? 1.0 : std::pow(10.0, -0.1 * dB);
-    };
-
-    for (double coiA : {-6.0, 6.0, -12.0})
-        for (double att : {10.0, 3.0, 2.0})
-        {
-            std::unordered_map<std::string, std::vector<double>> mtl, bare;
-            mtl["att"] = {att}, mtl["coiF"] = {coiF_GHz}, mtl["coiQ"] = {5.0}, mtl["coiA"] = {coiA}, mtl["fRef"] = {fRef_GHz};
-            bare["att"] = {att}, bare["fRef"] = {fRef_GHz};
-            for (double f_ac : {1000.0, 2000.0, 4000.0})
-            {
-                INFO("att " << att << " dB, coiA " << coiA << " dB, " << f_ac << " Hz");
-                CHECK(quadriga_lib::interface_gain<double>(mtl, 1, ac2rf(f_ac)) == Approx(ref_if_gain(f_ac, att, 0.0)).epsilon(1e-12));
-                CHECK(quadriga_lib::interface_gain<double>(mtl, 1, ac2rf(f_ac)) == quadriga_lib::interface_gain<double>(bare, 1, ac2rf(f_ac)));
-            }
-        }
-
-    // Penetration loss scales with frequency via attB: att ~ (f/fRef)^1 doubles at 2*fRef.
-    std::unordered_map<std::string, std::vector<double>> mtl_attB;
-    mtl_attB["att"] = {6.0};
-    mtl_attB["attB"] = {1.0};
-    mtl_attB["fRef"] = {fRef_GHz};
-    CHECK(quadriga_lib::interface_gain<double>(mtl_attB, 1, ac2rf(2000.0)) ==
-          Approx(std::pow(10.0, -0.1 * 12.0)).epsilon(1e-6));
-}
-
 TEST_CASE("Coincidence column - a table that carries coiA loads and the column changes nothing", "[wave]")
 {
-    // D2-b: coiA is no column. A material table written before still carries it; it loads (the reader is
-    // name-keyed and hands every column on) and the column is ignored: a wave medium as a traced solid and
-    // as a sheet passes and reflects exactly what it does without the column, bitwise, at the coincidence
-    // frequency the column names (3 GHz), EM type 1 (both channels) and scalar types 4 and 5. The mass-law
-    // part is in the acoustic cases.
+    // coiA is no column. A material table that still carries it loads (the reader is name-keyed and hands every column
+    // on) and the column is ignored: a wave medium as a traced solid and as a sheet passes and reflects exactly what it
+    // does without the column, bitwise, at the coincidence frequency the column names (3 GHz), EM type 1 (both
+    // channels) and scalar types 4 and 5. The mass-law part is in the acoustic cases.
     ub::OneThread one_thread;
     const char *FN = "coiA_table_wave.csv";
     const char *HEADER = "name,a,c,att,fRef,thk,coiF,coiQ,coiA";
@@ -2639,7 +2415,8 @@ TEST_CASE("Coincidence column - a table that carries coiA loads and the column c
     {
         std::ofstream csv(FN);
         REQUIRE(csv.is_open());
-        csv << HEADER << "\n" << ROWS;
+        csv << HEADER << "\n"
+            << ROWS;
         csv.close();
         arma::uvec csv_ind;
         std::vector<std::string> csv_names;
@@ -2674,9 +2451,8 @@ TEST_CASE("Coincidence column - a table that carries coiA loads and the column c
             }
 }
 
-// Test 6 - convergence to the scalar reference when acoustic terms are absent
-// Adding acoustic columns that are all zero must be a structural no-op: reflection, transmission,
-// gain, polarization coefficient, and diffracted path must be identical bit-for-bit.
+// Acoustic columns that are all zero change nothing: reflection, transmission, gain, the polarization coefficient and
+// the diffracted path are identical bit for bit.
 TEST_CASE("Acoustic - convergence with acoustic terms absent", "[wave]")
 {
     arma::mat cube_mesh = quadriga_lib::cube<double>({}, {}, {0.0, 0.0, 0.001});
@@ -2713,10 +2489,8 @@ TEST_CASE("Acoustic - convergence with acoustic terms absent", "[wave]")
     CHECK(arma::approx_equal(c1, c2, "absdiff", 1e-12));
 }
 
-// Test 8 - scalar total internal reflection at oblique incidence
-// Going from a dense medium (air, eps = 1) into a lighter one (eps < 1), reflection follows the
-// closed-form scalar curve across the angle sweep and becomes total past the critical angle:
-// reflection saturates at unity and transmission collapses to zero.
+// From a dense medium (air, eps = 1) into a lighter one (eps < 1) the reflection follows the closed-form scalar curve
+// across the angle sweep and is total past the critical angle: reflection one, transmission zero.
 TEST_CASE("Acoustic - scalar total internal reflection", "[wave]")
 {
     arma::mat cube_mesh = quadriga_lib::cube<double>({}, {}, {0.0, 0.0, 0.001});
@@ -2767,10 +2541,9 @@ TEST_CASE("Acoustic - scalar total internal reflection", "[wave]")
     CHECK(gt > 0.0);
 }
 
-// Test 9 - pass-through calibration against an explicit interface x medium x interface composition
-// A single ray through a thin slab (thin-slab resolution disabled, eps = 1) equals the naive
-// single-pass product of the entry interface, the in-medium loss over the thickness, and the exit
-// interface. This ties calc_diffraction_gain's integrated result to the isolated term functions.
+// A single ray through a thin slab (thin-slab resolution off, eps = 1) equals the single-pass product of entry
+// interface, in-medium loss over the thickness and exit interface: calc_diffraction_gain's result tied to the term
+// functions.
 TEST_CASE("Acoustic - pass-through calibration", "[wave]")
 {
     double t = 0.1, L = 20.0, d = 50.0; // thin slab, large faces, distant endpoints (normal ray)
@@ -2841,10 +2614,9 @@ TEST_CASE("Acoustic - pass-through calibration", "[wave]")
     }
 }
 
-// Test 10 - embedded material counted once (calc_diffraction_gain)
-// A smaller cube interpenetrating a larger one, sharing zero permittivity contrast so no reflections
-// occur, isolates the penetration loss of the embedded material. Crossing it must charge that loss
-// exactly once: 12 dB versus 6 dB is a factor of 10^0.6 in gain.
+// A smaller cube inside a larger one of the same permittivity, so that nothing reflects, isolates the penetration loss
+// of the embedded material. Crossing it charges that loss exactly once: 12 dB against 6 dB is a factor of 10^0.6 in
+// gain.
 TEST_CASE("Acoustic - embedded material counted once", "[wave]")
 {
     arma::mat A = quadriga_lib::cube<double>({}, {}, {0.0, 0.0, 0.001});

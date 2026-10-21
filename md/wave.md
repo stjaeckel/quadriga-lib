@@ -26,10 +26,13 @@ First step of every session, from the repository root:
 
 ```
 cmake --build build_linux --parallel 12
-OMP_NUM_THREADS=12 ./build_linux/test_bin "[wave]" > test_wave.txt          # All tests passed (165594 assertions in 181 test cases)
-OMP_NUM_THREADS=12 ./build_linux/test_bin "[acoustic]" > test_acoustic.txt  # All tests passed (42741 assertions in 60 test cases)
-OMP_NUM_THREADS=12 ./build_linux/test_bin > test.txt                        # All tests passed (1345968 assertions in 1238 test cases)
+QD_TEST_DIAG=1 OMP_NUM_THREADS=12 ./build_linux/test_bin "[wave]" > test_wave.txt          # All tests passed (163474 assertions in 178 test cases)
+QD_TEST_DIAG=1 OMP_NUM_THREADS=12 ./build_linux/test_bin "[acoustic]" > test_acoustic.txt  # All tests passed (42741 assertions in 59 test cases)
+QD_TEST_DIAG=1 OMP_NUM_THREADS=12 ./build_linux/test_bin > test.txt                        # All tests passed (1343848 assertions in 1234 test cases)
 ```
+
+`QD_TEST_DIAG=1` prints the diagnostic tables that the baselines and `tools/acoustic/rowdiff.py` compare; without
+it the ray cases print nothing and run the same assertions (section 11).
 
 At most 12 threads (since 2026-10-19): the machine is shared with other sessions, and oversubscribed OpenMP runs slow
 both. One suite at a time.
@@ -148,9 +151,9 @@ materials carry `m`).
   gain once, on what entered the sheet and came back (the solver's second recursion `Ge`), never the
   far medium's. A sheet in air and its traced solid are one wall on both ports. A negative total loss
   returns a gain of one. Asserted in: *Lumped columns - interface gain on the sheet, glued and
-  embedded paths*; *Sheet reflect port - where the layer lies and what the echo pays*; *Acoustic -
-  interface_gain is the penetration loss alone; a coiA column is ignored*; *Ray-Mesh Interact -
-  Penetration loss frequency scaling*.
+  embedded paths*; *Sheet reflect port - where the layer lies and what the echo pays*; *Ray-Mesh Interact -
+  Public helpers: refractive_index, interface_gain, medium_gain*; *Ray-Mesh Interact - Penetration loss
+  frequency scaling*.
 - **Coincidence columns on a wave medium**: none act. The coincidence Lorentzian `coiA` of the
   interface gain was removed on 2026-10-17 (`md/acoustic.md` 4, D2-b: an angle-free Lorentzian in dB
   is no physical element), the only wave change of that round; `coiF` / `coiQ` are the bending
@@ -493,9 +496,11 @@ two-parameter mapping, so a change on the wave side is checked against `test_aco
 
 ## 11. Test instruments
 
-All in `tests/catch2_tests/ray_test_helpers.hpp` unless noted. `QD_TEST_VERBOSE` in a test file
-switches its tables on; every table carries at least one numeric bound, so no case is a no-op
-without them.
+All in `tests/catch2_tests/ray_test_helpers.hpp` unless noted. The environment variable `QD_TEST_DIAG`
+(set and not `0`) prints the tables of every test file; the assertions are the same with it off. Every
+printed table carries at least one numeric bound, except four sanity sections of the two *Measurement*
+cases in `test_wave_progress.cpp` and `test_wave_state_update_chain.cpp`, which only print and are
+skipped with it off.
 
 **Independent references** (closed forms with complex angles throughout, no library code):
 - `qd_slab_ref`, `qd_slab_ref_R`, `qd_iface_ref` (with the per-channel flux fields),
@@ -510,7 +515,7 @@ without them.
   `fRef`, gain) and `diag_sc_stack` (the far-end recursion with `tf` per medium), each reproducing the
   other and the single-layer builders.
 - `diag_tf_face` (the transformer, written as a Fresnel face of the scaled ratio), `diag_closed_face`
-  (the pad), `diag_tf_pair`, `diag_tf_port`, `diag_leak_series` (a coherent sheet on a closed far side).
+  (the pad), `diag_tf_pair`, `diag_leak_series` (a coherent sheet on a closed far side).
 - `diag_res` (the Lorentz pole from the column definition), `LumpMtl` / `lump_palette` (a palette with
   `att`, `tf`, resonance, `alpha`, `m`, `fRef`), `diag_ray_at(theta)` (a ray from x = −1 crossing
   x = 0 at y = 0.37 + tan θ).
@@ -531,9 +536,12 @@ without them.
 - `qd_leg_start` is where the leg after an event starts: the hit point, or the far face of a co-located
   pair. A slab's thickness is measured from it, never from `origN`. `qd_relaunch_nudge` is the relaunch
   offset written in the test.
-- Several cases carry their own chain runner (`traced`, `trace`, `run`, `chain`, `walk`) and the
-  `ray_progress` cases a `trace` that calls `ray_progress` until no ray is left; they were left as
-  they are.
+- `rp::walk` sends one ray from `diag_ray_at`'s origin through `ray_progress` until no ray is left
+  or a call limit is reached, and hands every ray in air that the last call extended to the case;
+  `rp::Opt` sets the `ray_progress` arguments, `rp::planes` makes the faces in planes x = const. The
+  `ray_progress` cases with tubes, a forced subdivision, a ray count or one expected path carry their
+  own loop.
+- Several cases carry their own chain runner (`traced`, `trace`, `run`, `chain`, `walk`).
 - `twin()` asserts every-digit rows against `tests/data/wave_twins.tsv`.
 
 **Instruments worth reusing:** the series as a ratio (`eps` 0 over 1.5); the host leg as a ratio of

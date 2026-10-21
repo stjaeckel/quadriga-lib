@@ -21,7 +21,7 @@ closed-form evaluation made for this document, "measured here" a run of the libr
 sources (section 9) and sets no parameter.
 
 First step: `md/wave.md`, section 0. The acoustic half:
-`OMP_NUM_THREADS=12 ./build_linux/test_bin "[acoustic]" > test_acoustic.txt` → `All tests passed (42741 assertions in 60 test cases)`.
+`QD_TEST_DIAG=1 OMP_NUM_THREADS=12 ./build_linux/test_bin "[acoustic]" > test_acoustic.txt` → `All tests passed (42741 assertions in 59 test cases)`.
 Its cases are in `test_acoustic_mesh_interact.cpp`, `test_acoustic_progress.cpp`,
 `test_acoustic_state_update.cpp` and `test_acoustic_leaf.cpp` (the leaves of 2.8); 16 of them are "<name> - the mass-law part" of a wave case. The appendix
 lists every case with the section that states it. The machine described in section 2 is the one after
@@ -1442,7 +1442,6 @@ of section 9; `cases.py`, moved rows per case between two runs; `README.md`).
 | *Unentered branches - a stack of a coherent and a mass-law layer against the laminate meshed as a solid with a lining* | 2.3 |
 | *Sheet tf - the face of a coherent sheet with tf creates nothing and has no gate on the invariant - the mass-law part* | 2.3 |
 | *Bare tf - a bare face with tf is a transformer where it is open and a flat leak where it is closed - the mass-law part* | 2.3 |
-| *Rare sheet - a coherent sheet with tf that is rarer than the invariant passes no more than it received - the mass-law part* | 2.3 |
 | *Flat branch - a coherent sheet rarer than the invariant without tf tunnels on the characteristic matrix - the mass-law part* | 2.3 |
 | *Lumped columns - a bounding sheet: tf is a layer, a mass-law sheet a half-space* | 2.3 |
 | *Stack with a mass-law layer - resolved by segments, not killed* | 2.2, 2.3 |

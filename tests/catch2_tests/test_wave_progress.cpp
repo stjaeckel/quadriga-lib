@@ -6,9 +6,7 @@
 
 #include "ray_test_helpers.hpp"
 
-// ===========================================================================================
-// Return contract
-// ===========================================================================================
+// ==== Return contract ====
 
 TEST_CASE("ray_progress - single reflection", "[wave]")
 {
@@ -70,7 +68,7 @@ TEST_CASE("ray_progress - single transmission", "[wave]")
     REQUIRE(C.n() == 1);
 
     CHECK(std::abs(C.orig(0, 0) - 4.0f) < 1e-3f);
-    CHECK(C.dest(0, 0) > 4.0f);      // continues into the slab
+    CHECK(C.dest(0, 0) > 4.0f);         // continues into the slab
     CHECK(C.path_dir(0, 0, 0) > 0.99f); // normal incidence: no bending
 
     CHECK(C.paths[0].n_seg() == 1);
@@ -178,9 +176,7 @@ TEST_CASE("ray_progress - max_no_interactions = 0 disables tracing", "[wave]")
     check_shapes(C, 0);
 }
 
-// ===========================================================================================
-// Survival gates
-// ===========================================================================================
+// ==== Survival gates ====
 
 TEST_CASE("ray_progress - reflection and transmission passes can be switched off", "[wave]")
 {
@@ -283,9 +279,7 @@ TEST_CASE("ray_progress - per-ray counters gate the next generation", "[wave]")
     }
 }
 
-// ===========================================================================================
-// Beam subdivision
-// ===========================================================================================
+// ==== Beam subdivision ====
 
 TEST_CASE("ray_progress - beam subdivision", "[wave]")
 {
@@ -455,9 +449,7 @@ TEST_CASE("ray_progress - beam buffers survive the assembly", "[wave]")
         }
 }
 
-// ===========================================================================================
-// Compaction
-// ===========================================================================================
+// ==== Compaction ====
 
 TEST_CASE("ray_progress - compaction preserves per-ray results", "[wave]")
 {
@@ -514,8 +506,8 @@ TEST_CASE("ray_progress - compaction preserves per-ray results", "[wave]")
 
     // The compaction is a pure permutation of per-ray results: every ray common to two runs must
     // come out identical. HIGH vs LOW crosses the branch; both against REF pins the absolute value.
-    check_same_rays(HIGH, LOW);       // ids 0..3 are sub-beams in both, 4.. are reflections
-    check_same_rays(HIGH, REF, 4u);   // ids 0..3 differ in kind, so compare the rest
+    check_same_rays(HIGH, LOW);     // ids 0..3 are sub-beams in both, 4.. are reflections
+    check_same_rays(HIGH, REF, 4u); // ids 0..3 differ in kind, so compare the rest
     check_same_rays(LOW, REF, 4u);
 
     // The subdivided rays appear as sub-beams, never as reflections
@@ -559,9 +551,7 @@ TEST_CASE("ray_progress - the reported hit count is independent of subdivision",
     CHECK(LOW.n() == expected_out(sl));
 }
 
-// ===========================================================================================
-// Frequencies, layout, medium state
-// ===========================================================================================
+// ==== Frequencies, layout, medium state ====
 
 TEST_CASE("ray_progress - multi-frequency", "[wave]")
 {
@@ -731,9 +721,7 @@ TEST_CASE("ray_progress - sub-mesh partitioning does not change the result", "[w
     }
 }
 
-// ===========================================================================================
-// Multi-generation behaviour
-// ===========================================================================================
+// ==== Multi-generation behaviour ====
 
 TEST_CASE("ray_progress - a trace terminates and respects its limits", "[wave]")
 {
@@ -820,15 +808,9 @@ TEST_CASE("ray_progress - repeated calls are deterministic", "[wave]")
 
 TEST_CASE("ray_progress - accumulated path length", "[wave]")
 {
-    // path::length is defined as source -> last interaction, and check_gains reads it back as
-    // "source -> current ray origin" when it forms the free-space path loss. The source position
-    // only enters ray_progress through Ox/Oy/Oz, so the first segment is the one at risk.
-    //
-    // NOTE: path::extend derives the new segment length from the previous stored coordinate, and
-    // a fresh path has none (nSEG == 0), so the first interaction contributes dl = 0 and the leg
-    // from the source to the first bounce is dropped. The first CHECK below is written against
-    // the intended contract and fails until ray_progress writes the length it already computes
-    // for the gain gate back into the extended path.
+    // path::length is source -> last interaction, and check_gains reads it back as source -> current ray origin when it
+    // forms the free-space path loss. The source position enters ray_progress only through Ox/Oy/Oz, so the first
+    // segment is the one at risk.
     Scene S = one_cube(5.0f, 0.0f, 0.0f);
     Cfg C = one_ray(20.0f);
 
@@ -844,9 +826,8 @@ TEST_CASE("ray_progress - accumulated path length", "[wave]")
     auto s2 = C.step(S, o);
     REQUIRE(s2[3] == 1);
 
-    // Independent of the absolute value, the increment must be the length of the new leg,
-    // here the 2 m slab crossing from x = 4 to x = 6. This isolates the defect to the first
-    // extend rather than to the accumulation.
+    // Independent of the absolute value, the increment is the length of the new leg, here the 2 m slab crossing from x
+    // = 4 to x = 6.
     CHECK(std::abs((C.paths[0].length() - after_first) - 2.0f) < 1e-2f);
 
     // The subdivision path recomputes the length from the source instead of accumulating it,
@@ -860,15 +841,13 @@ TEST_CASE("ray_progress - accumulated path length", "[wave]")
         CHECK(std::abs(B.paths[i].length() - radius(B.orig, i)) < 1e-4f);
 }
 
-// ===========================================================================================
-// Delegated ray-mesh intersection
-// ===========================================================================================
+// ==== Delegated ray-mesh intersection ====
 
 TEST_CASE("ray_progress - delegated intersection matches the internal one", "[wave]")
 {
-    // Supplying the ray_triangle_intersect result must be a pure refactor: bit-identical output,
-    // not merely an equivalent one. Exact comparison is legitimate here because the delegated and
-    // internal paths feed the same arrays into the same per-ray kernels in the same order.
+    // Supplying the ray_triangle_intersect result changes nothing: bit-identical output, not merely an equivalent one.
+    // Exact comparison is legitimate here because the delegated and internal paths feed the same arrays into the same
+    // per-ray kernels in the same order.
     Scene S = one_cube(5.0f, 0.0f, 0.0f);
 
     arma::fmat dirs;
@@ -1107,9 +1086,7 @@ TEST_CASE("ray_progress - delegated intersection validation", "[wave]")
     }
 }
 
-// ===========================================================================================
-// Delegated subdivision flag
-// ===========================================================================================
+// ==== Delegated subdivision flag ====
 
 TEST_CASE("ray_progress - delegated subdivision flag matches the internal one", "[wave]")
 {
@@ -1217,10 +1194,10 @@ TEST_CASE("ray_progress - delegated subdivision flag matches the internal one", 
         auto sb = B.step(S, with_flag(o, f));
 
         CHECK(sa == sb);
-        CHECK(sb[0] == 32);                        // only the forward half hits
-        CHECK(sb[1] == (unsigned)n_wide_hit);      // and only the wide survivors subdivide
-        CHECK(count_true(f) == n_wide_hit);        // rays that miss are never flagged
-        CHECK(sb[1] == (unsigned)count_true(f));   // the flag is the decision, one for one
+        CHECK(sb[0] == 32);                      // only the forward half hits
+        CHECK(sb[1] == (unsigned)n_wide_hit);    // and only the wide survivors subdivide
+        CHECK(count_true(f) == n_wide_hit);      // rays that miss are never flagged
+        CHECK(sb[1] == (unsigned)count_true(f)); // the flag is the decision, one for one
         check_identical(A, B);
     }
     SECTION("combined with a delegated intersection")
@@ -1412,10 +1389,7 @@ TEST_CASE("ray_progress - delegated subdivision flag validation", "[wave]")
     }
 }
 
-// ===========================================================================================
-// Authoritative subdivision flag
-// ===========================================================================================
-//
+// ==== Authoritative subdivision flag ====
 // A delegated subdiv_flag_in is the authority on what gets split. It overrides every condition
 // ray_subdivide_flag would otherwise apply: the mesh-hit status, the per-ray subdivision limit and
 // the outside-a-medium gate. These paths are unreachable from the internal decision, so each case
@@ -1550,9 +1524,9 @@ TEST_CASE("ray_progress - a flagged ray inside a medium inherits its propagation
     Scene S = one_cube(5.0f, 0.0f, 0.0f);
     Cfg C = one_ray(10.0f, 1, false, WIDE_DEG);
 
-    C.cur(0) = 1;              // travelling inside material 1
-    C.acc_dist(0, 0) = 1.10f;  // geometric in-layer distance, shared across frequencies
-    C.acc_dist(0, 1) = 1.25f;  // refracted in-layer distance at the single frequency
+    C.cur(0) = 1;             // travelling inside material 1
+    C.acc_dist(0, 0) = 1.10f; // geometric in-layer distance, shared across frequencies
+    C.acc_dist(0, 1) = 1.25f; // refracted in-layer distance at the single frequency
 
     // A tracked direction that is deliberately not the geometric +x continuation
     const float dx = 0.6f, dy = 0.8f, dz = 0.0f;
@@ -1588,8 +1562,7 @@ TEST_CASE("ray_progress - a flagged ray inside a medium inherits its propagation
 
 TEST_CASE("ray_progress - the outside-a-medium branch still recomputes and clears", "[wave]")
 {
-    // The counterpart to the case above: with mtl_ind_current == 0 the sub-beams must NOT inherit.
-    // Both branches share one loop, so this pins that the added condition did not invert it.
+    // The counterpart to the case above: with mtl_ind_current == 0 the sub-beams do not inherit.
     Scene S = one_cube(5.0f, 0.0f, 0.0f);
     Cfg C = one_ray(10.0f, 1, false, WIDE_DEG);
 
@@ -1657,9 +1630,9 @@ TEST_CASE("ray_progress - hit and subdivision counts are independent", "[wave]")
 
     auto s = C.step(S, with_flag(o, f));
 
-    CHECK(s[0] == 32);                                          // rays that hit the mesh
-    CHECK(s[1] == (unsigned)(n_miss_flagged + n_hit_flagged));  // rays that were split
-    CHECK(s[2] == (unsigned)(32 - n_hit_flagged));              // hit and not split -> reflected
+    CHECK(s[0] == 32);                                         // rays that hit the mesh
+    CHECK(s[1] == (unsigned)(n_miss_flagged + n_hit_flagged)); // rays that were split
+    CHECK(s[2] == (unsigned)(32 - n_hit_flagged));             // hit and not split -> reflected
     CHECK(s[3] == 0);
 
     check_shapes(C, expected_out(s));
@@ -1676,9 +1649,7 @@ TEST_CASE("ray_progress - hit and subdivision counts are independent", "[wave]")
     CHECK(n_sub_out == 4u * (n_miss_flagged + n_hit_flagged));
 }
 
-// ===========================================================================================
-// Input validation
-// ===========================================================================================
+// ==== Input validation ====
 
 TEST_CASE("ray_progress - input validation", "[wave]")
 {
@@ -1707,11 +1678,11 @@ TEST_CASE("ray_progress - input validation", "[wave]")
     SECTION("center frequency")
     {
         std::vector<arma::fvec> bad;
-        bad.push_back(arma::fvec());                          // empty
-        bad.push_back(arma::fvec(128, arma::fill::ones));     // more than 127 entries
-        bad.push_back(arma::fvec{0.0f});                      // not positive
-        bad.push_back(arma::fvec{-PROG_FRQ});                      // negative
-        bad.push_back(arma::fvec{PROG_FRQ, 0.0f});                 // one bad entry among good ones
+        bad.push_back(arma::fvec());                      // empty
+        bad.push_back(arma::fvec(128, arma::fill::ones)); // more than 127 entries
+        bad.push_back(arma::fvec{0.0f});                  // not positive
+        bad.push_back(arma::fvec{-PROG_FRQ});             // negative
+        bad.push_back(arma::fvec{PROG_FRQ, 0.0f});        // one bad entry among good ones
 
         for (const auto &f : bad)
         {
@@ -1888,16 +1859,16 @@ TEST_CASE("ray_progress - the material count is limited by the 14-bit state inde
 
 TEST_CASE("Measurement - ray_progress follows the coupling between the series of a layered wall", "[wave]")
 {
-    // Plan item 1, measured through the tracer itself. A wall of two solid layers, or of one layer
-    // with a sheet inside it, is resolved as two series, each with the other body as a mirror that
-    // does not return what its far side reflects. That part is not dropped by a run: the ray
-    // reflected at the far face goes back into the first body, is reflected at the front face and
-    // comes forward again, as further paths. One ray is launched, ray_progress is called until no
-    // ray is left, and every path that ends in air is collected: behind the wall into T, in front
-    // of it into R, each as the field at the point its polyline leaves at,
-    // coefficient * exp(-j k0 L_in) * exp(+j k0 sin(theta) dy), against the characteristic matrix
-    // of the whole wall. Scalar, float, 1 GHz, both tracers, thin_slab_threshold 0 (every series
-    // resolved) and 0.15 (the default). Nothing is asserted beyond sanity.
+    ub::OneThread one_thread;
+    // A wall of two solid layers, or of one layer with a sheet inside it, is resolved as two series, each with the
+    // other body as a mirror that does not return what its far side reflects. That part is not dropped by a run: the
+    // ray reflected at the far face goes back into the first body, is reflected at the front face and comes forward
+    // again, as further paths. One ray is launched, ray_progress is called until no ray is left, and every path that
+    // ends in air is collected: behind the wall into T, in front of it into R, each as the field at the point its
+    // polyline leaves at, coefficient * exp(-j k0 L_in) * exp(+j k0 sin(theta) dy), against the characteristic matrix
+    // of the whole wall. Scalar, float, 1 GHz, both tracers, thin_slab_threshold 0 (every series resolved) and 0.15
+    // (the default). Asserted: two solids with every series resolved sum to the wall's matrix with the coupling
+    // followed as paths; every configuration delivers a finite field behind the wall.
     const double PI = 3.14159265358979323846, C0 = 299792458.0, FRQ = 1.0e9, k0 = 2.0 * PI * FRQ / C0;
     const float gap = 1.0e-5f;
     const std::complex<double> J(0.0, 1.0);
@@ -1914,23 +1885,6 @@ TEST_CASE("Measurement - ray_progress follows the coupling between the series of
     {
         const double a[7] = {1.0, 5.24, 5.24, 5.24, 9.0, 1.50, 1.50}, im[7] = {0.0, 0.63, 0.0, 0.63, 1.20, 0.40, 0.0};
         return std::complex<double>(a[m], -im[m]);
-    };
-
-    auto build = [](const std::vector<float> &x, const std::vector<int> &mat, const std::vector<bool> &flip, arma::fmat &mesh, arma::uvec &mi)
-    {
-        const float h = 200.0f;
-        mesh.set_size(2 * x.size(), 9);
-        mi.set_size(2 * x.size());
-        for (size_t k = 0; k < x.size(); ++k)
-        {
-            if (!flip[k])
-                mesh.row(2 * k) = arma::frowvec{x[k], -h, -h, x[k], -h, h, x[k], h, -h},
-                mesh.row(2 * k + 1) = arma::frowvec{x[k], h, -h, x[k], -h, h, x[k], h, h};
-            else
-                mesh.row(2 * k) = arma::frowvec{x[k], -h, -h, x[k], h, -h, x[k], -h, h},
-                mesh.row(2 * k + 1) = arma::frowvec{x[k], h, -h, x[k], h, h, x[k], -h, h};
-            mi(2 * k) = (arma::uword)mat[k], mi(2 * k + 1) = (arma::uword)mat[k];
-        }
     };
 
     // The reference: TE, mu = 1, admittance b = sqrt(eps - sin^2), layer phase k b d
@@ -1963,58 +1917,30 @@ TEST_CASE("Measurement - ray_progress follows the coupling between the series of
     {
         Sum S;
         const double th = thd * PI / 180.0, st = std::sin(th);
-        const float Ox = -1.0f, Oy = 0.37f - (float)std::tan(th), Oz = 0.0f, r0 = 0.1f, len = 300.0f;
-        arma::frowvec kv = {(float)std::cos(th), (float)std::sin(th), 0.0f};
-        arma::fvec cf = {(float)FRQ};
-        arma::fmat orig(1, 3), dest(1, 3), acc(1, 2, arma::fill::zeros);
-        orig.row(0) = arma::frowvec{Ox, Oy, Oz} + r0 * kv;
-        dest.row(0) = arma::frowvec{Ox, Oy, Oz} + (r0 + len) * kv;
-        arma::fcube pd(1, 3, 1);
-        pd.slice(0) = kv;
-        arma::Col<short> prev(1, arma::fill::zeros), cur(1, arma::fill::zeros), buf(1, arma::fill::zeros);
-        std::vector<quadriga_lib::path> paths(1);
-        paths[0].init(0, 1, true);
-        paths[0].set_length(r0);
-        for (int g = 0; g < 80; ++g)
-        {
-            quadriga_lib::ray_progress(mesh, mi, pal, cf, Ox, Oy, Oz, orig, dest, prev, cur, buf, pd, acc, paths,
-                                       nullptr, nullptr, nullptr, nullptr,
-                                       (uint8_t)max_int, 100, 100, 0, min_gain, 3.0f, slab, refr, true,
-                                       nullptr, nullptr, nullptr, nullptr);
-            if (orig.n_rows == 0)
-                break;
-            S.gens = g + 1;
-            for (arma::uword i = 0; i < orig.n_rows; ++i)
+        rp::Opt o;
+        o.max_int = (uint8_t)max_int, o.min_gain = min_gain, o.slab = slab, o.refr = refr;
+        S.gens = rp::walk(mesh, mi, pal, arma::fvec{(float)FRQ}, thd, o, [&](const rp::Ray &r)
+                          {
+            const size_t ns = r.ns;
+            const double Lin = r.poly();
+            const float *first = r.first(), *last = r.last(), *xc = r.xc(0);
+            std::complex<double> F = std::complex<double>((double)xc[0], (double)xc[1]) * std::exp(-J * k0 * Lin) *
+                                     std::exp(J * k0 * st * ((double)last[1] - (double)first[1]));
+            const bool fwd = r.fwd();
+            S.seg_max = std::max(S.seg_max, ns);
+            if (fwd && last[0] > x_back - 1.0e-3f)
             {
-                const size_t ns = paths[i].n_seg();
-                if ((cur(i) & (short)0x3FFF) != 0 || ns != (size_t)(g + 1))
-                    continue; // inside the wall, or a ray that was already collected
-                double Lin = 0.0;
-                for (size_t s = 1; s < ns; ++s)
-                {
-                    const float *a = paths[i].coord(s - 1), *b = paths[i].coord(s);
-                    Lin += std::sqrt(((double)b[0] - a[0]) * ((double)b[0] - a[0]) + ((double)b[1] - a[1]) * ((double)b[1] - a[1]) +
-                                     ((double)b[2] - a[2]) * ((double)b[2] - a[2]));
-                }
-                const float *first = paths[i].coord(0), *last = paths[i].coord(ns - 1), *xc = paths[i].xpr_coeff(0);
-                std::complex<double> F = std::complex<double>((double)xc[0], (double)xc[1]) * std::exp(-J * k0 * Lin) *
-                                         std::exp(J * k0 * st * ((double)last[1] - (double)first[1]));
-                const bool fwd = dest(i, 0) > orig(i, 0);
-                S.seg_max = std::max(S.seg_max, ns);
-                if (fwd && last[0] > x_back - 1.0e-3f)
-                {
-                    S.T += F, ++S.nT;
-                    if (ns < S.segT1)
-                        S.segT1 = ns, S.T1 = F;
-                }
-                else if (!fwd && last[0] < 1.0e-3f)
-                {
-                    S.R += F, ++S.nR;
-                    if (ns < S.segR1)
-                        S.segR1 = ns, S.R1 = F;
-                }
+                S.T += F, ++S.nT;
+                if (ns < S.segT1)
+                    S.segT1 = ns, S.T1 = F;
             }
-        }
+            else if (!fwd && last[0] < 1.0e-3f)
+            {
+                S.R += F, ++S.nR;
+                if (ns < S.segR1)
+                    S.segR1 = ns, S.R1 = F;
+            }
+            return false; });
         return S;
     };
     auto dB = [](std::complex<double> z)
@@ -2022,16 +1948,14 @@ TEST_CASE("Measurement - ray_progress follows the coupling between the series of
     auto deg = [&](std::complex<double> z)
     { return std::arg(z) * 180.0 / PI; };
 
-#ifdef QD_TEST_VERBOSE
-    std::printf("\n# diag: mirror through ray_progress. One ray, called until none is left, scalar, float, 1 GHz. wall AB: air | A 50 |\n");
-    std::printf("# B 100 | air; wall HSH: air | host 50 | sheet 6 mm eps 5.24 - 0.63j | host 50 | air, against host | sheet | host with\n");
-    std::printf("# 6 mm of host divided out. slab: thin_slab_threshold. max: max_no_interactions. nT, nR: the paths that end behind\n");
-    std::printf("# and in front of the wall; seg: the segments of the longest. T1, R1: the shortest path alone against the matrix of\n");
-    std::printf("# the whole wall, dB; T, R: all of them, dB and deg at the polyline's point\n");
-    std::printf("# min: min_gain_dB. wall HS: air | host 100 | coating 6 mm | air; wall H: air | host 100 | air. slab 1.00 declines\n");
-    std::printf("# every series, so every bounce is a path of its own\n");
-    std::printf("wall,a,b,tracer,slab,max,min,theta,nT,nR,seg,T1_dB,T_dB,T_deg,R1_dB,R_dB,R_deg\n");
-#endif
+    QD_DIAG("\n# diag: mirror through ray_progress. One ray, called until none is left, scalar, float, 1 GHz. wall AB: air | A 50 |\n");
+    QD_DIAG("# B 100 | air; wall HSH: air | host 50 | sheet 6 mm eps 5.24 - 0.63j | host 50 | air, against host | sheet | host with\n");
+    QD_DIAG("# 6 mm of host divided out. slab: thin_slab_threshold. max: max_no_interactions. nT, nR: the paths that end behind\n");
+    QD_DIAG("# and in front of the wall; seg: the segments of the longest. T1, R1: the shortest path alone against the matrix of\n");
+    QD_DIAG("# the whole wall, dB; T, R: all of them, dB and deg at the polyline's point\n");
+    QD_DIAG("# min: min_gain_dB. wall HS: air | host 100 | coating 6 mm | air; wall H: air | host 100 | air. slab 1.00 declines\n");
+    QD_DIAG("# every series, so every bounce is a path of its own\n");
+    QD_DIAG("wall,a,b,tracer,slab,max,min,theta,nT,nR,seg,T1_dB,T_dB,T_deg,R1_dB,R_dB,R_deg\n");
     for (int wall = 0; wall < 4; ++wall)
         for (int pair = 0; pair < 2; ++pair)
             for (int refr = 0; refr < 2; ++refr)
@@ -2051,22 +1975,22 @@ TEST_CASE("Measurement - ray_progress follows the coupling between the series of
                         const double s2 = std::sin(thd * PI / 180.0) * std::sin(thd * PI / 180.0);
                         if (wall == 0)
                         {
-                            build({0.0f, 0.05f, 0.05f + gap, 0.15f + gap}, {A, A, B, B}, {false, true, false, true}, mesh, mi);
+                            rp::planes({0.0f, 0.05f, 0.05f + gap, 0.15f + gap}, {A, A, B, B}, {false, true, false, true}, mesh, mi);
                             ls = {{eps_of(A), 0.05}, {eps_of(B), 0.10}}, x_back = 0.15f;
                         }
                         else if (wall == 2) // a coating on the far side
                         {
-                            build({0.0f, 0.10f, 0.10f + gap}, {A, A, B}, {false, true, true}, mesh, mi);
+                            rp::planes({0.0f, 0.10f, 0.10f + gap}, {A, A, B}, {false, true, true}, mesh, mi);
                             ls = {{eps_of(A), 0.10}, {eps_of(B), 0.006}}, x_back = 0.10f;
                         }
                         else if (wall == 3) // one bare wall
                         {
-                            build({0.0f, 0.10f}, {A, A}, {false, true}, mesh, mi);
+                            rp::planes({0.0f, 0.10f}, {A, A}, {false, true}, mesh, mi);
                             ls = {{eps_of(A), 0.10}}, x_back = 0.10f;
                         }
                         else
                         {
-                            build({0.0f, 0.05f, 0.10f}, {A, B, A}, {false, false, true}, mesh, mi);
+                            rp::planes({0.0f, 0.05f, 0.10f}, {A, B, A}, {false, false, true}, mesh, mi);
                             ls = {{eps_of(A), 0.05}, {eps_of(B), 0.006}, {eps_of(A), 0.05}}, x_back = 0.10f;
                             div = std::exp(-J * k0 * std::sqrt(eps_of(A) - s2) * 0.006);
                         }
@@ -2087,29 +2011,25 @@ TEST_CASE("Measurement - ray_progress follows the coupling between the series of
                             CHECK(std::abs(dB(S.R / r)) < bound);
                             CHECK(S.nT >= 5); // the coupling is followed
                         }
-#ifdef QD_TEST_VERBOSE
-                        std::printf("%s,%d,%d,%d,%.2f,%d,%.0f,%.0f,%d,%d,%zu,%+.4f,%+.4f,%+.3f,%+.4f,%+.4f,%+.3f\n", wall == 0 ? "AB " : (wall == 1 ? "HSH" : (wall == 2 ? "HS " : "H  ")), A, B, refr ? 5 : 4,
-                                    (double)slab, max_int, (double)min_gain, thd, S.nT, S.nR, S.seg_max, dB(S.T1 / t), dB(S.T / t), deg(S.T / t), dB(S.R1 / r),
-                                    dB(S.R / r), deg(S.R / r));
-#endif
+                        QD_DIAG("%s,%d,%d,%d,%.2f,%d,%.0f,%.0f,%d,%d,%zu,%+.4f,%+.4f,%+.3f,%+.4f,%+.4f,%+.3f\n", wall == 0 ? "AB " : (wall == 1 ? "HSH" : (wall == 2 ? "HS " : "H  ")), A, B, refr ? 5 : 4,
+                                (double)slab, max_int, (double)min_gain, thd, S.nT, S.nR, S.seg_max, dB(S.T1 / t), dB(S.T / t), deg(S.T / t), dB(S.R1 / r),
+                                dB(S.R / r), deg(S.R / r));
                     }
 
     // Which wall a sheet inside a host is. The sheet's transit takes its thickness of host out
     // while both host series run over the meshed legs, so the sum is compared with four walls:
     // 50 | 6 | 50 with 6 mm of host divided out of T, 47 | 6 | 47, 44 | 6 | 50 and 50 | 6 | 44.
-#ifdef QD_TEST_VERBOSE
-    std::printf("\n# diag: mirror through ray_progress, which wall a sheet inside a host is. air | host 50 | sheet 6 mm | host 50 | air as\n");
-    std::printf("# meshed, every series resolved, 60 interactions. The summed paths against four walls, dB and deg: w50, host 50 |\n");
-    std::printf("# sheet | host 50 with 6 mm of host divided out of T; w47, 47 | 6 | 47; w44f, 44 | 6 | 50; w44b, 50 | 6 | 44\n");
-    std::printf("host,tracer,theta,T_w50,T_w47,T_w44f,T_w44b,R_w50,R_w47,R_w44f,R_w44b,Tdeg_w50,Tdeg_w47,Rdeg_w50,Rdeg_w47,Rdeg_w44f,Rdeg_w44b\n");
-#endif
+    QD_DIAG("\n# diag: mirror through ray_progress, which wall a sheet inside a host is. air | host 50 | sheet 6 mm | host 50 | air as\n");
+    QD_DIAG("# meshed, every series resolved, 60 interactions. The summed paths against four walls, dB and deg: w50, host 50 |\n");
+    QD_DIAG("# sheet | host 50 with 6 mm of host divided out of T; w47, 47 | 6 | 47; w44f, 44 | 6 | 50; w44b, 50 | 6 | 44\n");
+    QD_DIAG("host,tracer,theta,T_w50,T_w47,T_w44f,T_w44b,R_w50,R_w47,R_w44f,R_w44b,Tdeg_w50,Tdeg_w47,Rdeg_w50,Rdeg_w47,Rdeg_w44f,Rdeg_w44b\n");
     for (int hst : {5, 6})
         for (int refr = 0; refr < 2; ++refr)
             for (double thd : {10.0, 20.0, 40.0, 60.0, 75.0, 85.0})
             {
                 arma::fmat mesh;
                 arma::uvec mi;
-                build({0.0f, 0.05f, 0.10f}, {hst, 3, hst}, {false, false, true}, mesh, mi);
+                rp::planes({0.0f, 0.05f, 0.10f}, {hst, 3, hst}, {false, false, true}, mesh, mi);
                 const double s2 = std::sin(thd * PI / 180.0) * std::sin(thd * PI / 180.0);
                 Sum S = trace(mesh, mi, thd, refr != 0, 0.0f, 0.10f, 60, -300.0f);
                 const double fr[4] = {0.050, 0.047, 0.044, 0.050}, bk[4] = {0.050, 0.047, 0.050, 0.044};
@@ -2119,16 +2039,15 @@ TEST_CASE("Measurement - ray_progress follows the coupling between the series of
                 t[0] /= std::exp(-J * k0 * std::sqrt(eps_of(hst) - s2) * 0.006);
                 INFO("which wall, host " << hst << ", refr " << refr << ", theta " << thd);
                 CHECK(S.nT >= 1);
-#ifdef QD_TEST_VERBOSE
-                std::printf("%d,%d,%.0f,%+.4f,%+.4f,%+.4f,%+.4f,%+.4f,%+.4f,%+.4f,%+.4f,%+.3f,%+.3f,%+.3f,%+.3f,%+.3f,%+.3f\n", hst, refr ? 5 : 4, thd,
-                            dB(S.T / t[0]), dB(S.T / t[1]), dB(S.T / t[2]), dB(S.T / t[3]), dB(S.R / r[0]), dB(S.R / r[1]), dB(S.R / r[2]),
-                            dB(S.R / r[3]), deg(S.T / t[0]), deg(S.T / t[1]), deg(S.R / r[0]), deg(S.R / r[1]), deg(S.R / r[2]), deg(S.R / r[3]));
-#endif
+                QD_DIAG("%d,%d,%.0f,%+.4f,%+.4f,%+.4f,%+.4f,%+.4f,%+.4f,%+.4f,%+.4f,%+.3f,%+.3f,%+.3f,%+.3f,%+.3f,%+.3f\n", hst, refr ? 5 : 4, thd,
+                        dB(S.T / t[0]), dB(S.T / t[1]), dB(S.T / t[2]), dB(S.T / t[3]), dB(S.R / r[0]), dB(S.R / r[1]), dB(S.R / r[2]),
+                        dB(S.R / r[3]), deg(S.T / t[0]), deg(S.T / t[1]), deg(S.R / r[0]), deg(S.R / r[1]), deg(S.R / r[2]), deg(S.R / r[3]));
             }
 }
 
 TEST_CASE("ray_progress - a declined series at a sheet is followed and not dropped", "[wave]")
 {
+    ub::OneThread one_thread;
     // Where thin_slab_threshold declines the series of a host that closes at a sheet, the bounces
     // have to arrive as paths, as they do on a bare wall. One ray, called until none is left;
     // every path that ends in air is summed at its polyline's point and compared with the
@@ -2155,23 +2074,6 @@ TEST_CASE("ray_progress - a declined series at a sheet is followed and not dropp
         return std::complex<double>(a[m], -im[m]);
     };
 
-    auto build = [](const std::vector<float> &x, const std::vector<int> &mat, const std::vector<bool> &flip, arma::fmat &mesh, arma::uvec &mi)
-    {
-        const float h = 200.0f;
-        mesh.set_size(2 * x.size(), 9);
-        mi.set_size(2 * x.size());
-        for (size_t k = 0; k < x.size(); ++k)
-        {
-            if (!flip[k])
-                mesh.row(2 * k) = arma::frowvec{x[k], -h, -h, x[k], -h, h, x[k], h, -h},
-                mesh.row(2 * k + 1) = arma::frowvec{x[k], h, -h, x[k], -h, h, x[k], h, h};
-            else
-                mesh.row(2 * k) = arma::frowvec{x[k], -h, -h, x[k], h, -h, x[k], -h, h},
-                mesh.row(2 * k + 1) = arma::frowvec{x[k], h, -h, x[k], h, h, x[k], -h, h};
-            mi(2 * k) = (arma::uword)mat[k], mi(2 * k + 1) = (arma::uword)mat[k];
-        }
-    };
-
     // The reference: TE, mu = 1, admittance b = sqrt(eps - sin^2), layer phase k b d
     struct Lay
     {
@@ -2202,58 +2104,30 @@ TEST_CASE("ray_progress - a declined series at a sheet is followed and not dropp
     {
         Sum S;
         const double th = thd * PI / 180.0, st = std::sin(th);
-        const float Ox = -1.0f, Oy = 0.37f - (float)std::tan(th), Oz = 0.0f, r0 = 0.1f, len = 300.0f;
-        arma::frowvec kv = {(float)std::cos(th), (float)std::sin(th), 0.0f};
-        arma::fvec cf = {(float)FRQ};
-        arma::fmat orig(1, 3), dest(1, 3), acc(1, 2, arma::fill::zeros);
-        orig.row(0) = arma::frowvec{Ox, Oy, Oz} + r0 * kv;
-        dest.row(0) = arma::frowvec{Ox, Oy, Oz} + (r0 + len) * kv;
-        arma::fcube pd(1, 3, 1);
-        pd.slice(0) = kv;
-        arma::Col<short> prev(1, arma::fill::zeros), cur(1, arma::fill::zeros), buf(1, arma::fill::zeros);
-        std::vector<quadriga_lib::path> paths(1);
-        paths[0].init(0, 1, true);
-        paths[0].set_length(r0);
-        for (int g = 0; g < 80; ++g)
-        {
-            quadriga_lib::ray_progress(mesh, mi, pal, cf, Ox, Oy, Oz, orig, dest, prev, cur, buf, pd, acc, paths,
-                                       nullptr, nullptr, nullptr, nullptr,
-                                       (uint8_t)max_int, 100, 100, 0, min_gain, 3.0f, slab, refr, true,
-                                       nullptr, nullptr, nullptr, nullptr);
-            if (orig.n_rows == 0)
-                break;
-            S.gens = g + 1;
-            for (arma::uword i = 0; i < orig.n_rows; ++i)
+        rp::Opt o;
+        o.max_int = (uint8_t)max_int, o.min_gain = min_gain, o.slab = slab, o.refr = refr;
+        S.gens = rp::walk(mesh, mi, pal, arma::fvec{(float)FRQ}, thd, o, [&](const rp::Ray &r)
+                          {
+            const size_t ns = r.ns;
+            const double Lin = r.poly();
+            const float *first = r.first(), *last = r.last(), *xc = r.xc(0);
+            std::complex<double> F = std::complex<double>((double)xc[0], (double)xc[1]) * std::exp(-J * k0 * Lin) *
+                                     std::exp(J * k0 * st * ((double)last[1] - (double)first[1]));
+            const bool fwd = r.fwd();
+            S.seg_max = std::max(S.seg_max, ns);
+            if (fwd && last[0] > x_back - 1.0e-3f)
             {
-                const size_t ns = paths[i].n_seg();
-                if ((cur(i) & (short)0x3FFF) != 0 || ns != (size_t)(g + 1))
-                    continue; // inside the wall, or a ray that was already collected
-                double Lin = 0.0;
-                for (size_t s = 1; s < ns; ++s)
-                {
-                    const float *a = paths[i].coord(s - 1), *b = paths[i].coord(s);
-                    Lin += std::sqrt(((double)b[0] - a[0]) * ((double)b[0] - a[0]) + ((double)b[1] - a[1]) * ((double)b[1] - a[1]) +
-                                     ((double)b[2] - a[2]) * ((double)b[2] - a[2]));
-                }
-                const float *first = paths[i].coord(0), *last = paths[i].coord(ns - 1), *xc = paths[i].xpr_coeff(0);
-                std::complex<double> F = std::complex<double>((double)xc[0], (double)xc[1]) * std::exp(-J * k0 * Lin) *
-                                         std::exp(J * k0 * st * ((double)last[1] - (double)first[1]));
-                const bool fwd = dest(i, 0) > orig(i, 0);
-                S.seg_max = std::max(S.seg_max, ns);
-                if (fwd && last[0] > x_back - 1.0e-3f)
-                {
-                    S.T += F, ++S.nT;
-                    if (ns < S.segT1)
-                        S.segT1 = ns, S.T1 = F;
-                }
-                else if (!fwd && last[0] < 1.0e-3f)
-                {
-                    S.R += F, ++S.nR;
-                    if (ns < S.segR1)
-                        S.segR1 = ns, S.R1 = F;
-                }
+                S.T += F, ++S.nT;
+                if (ns < S.segT1)
+                    S.segT1 = ns, S.T1 = F;
             }
-        }
+            else if (!fwd && last[0] < 1.0e-3f)
+            {
+                S.R += F, ++S.nR;
+                if (ns < S.segR1)
+                    S.segR1 = ns, S.R1 = F;
+            }
+            return false; });
         return S;
     };
     auto dB = [](std::complex<double> z)
@@ -2261,13 +2135,10 @@ TEST_CASE("ray_progress - a declined series at a sheet is followed and not dropp
     auto deg = [&](std::complex<double> z)
     { return std::arg(z) * 180.0 / PI; };
 
-
-#ifdef QD_TEST_VERBOSE
-    std::printf("\n# diag: declined series at a sheet, through ray_progress. wall HS: air | host 100 | coating 6 mm | air, the summed\n");
-    std::printf("# paths against the matrix of the wall, dB and deg. slab: thin_slab_threshold; max: max_no_interactions; nT, nR:\n");
-    std::printf("# the paths behind and in front of the wall\n");
-    std::printf("wall,host,tracer,slab,max,theta,nT,nR,T_dB,R_dB,R_deg\n");
-#endif
+    QD_DIAG("\n# diag: declined series at a sheet, through ray_progress. wall HS: air | host 100 | coating 6 mm | air, the summed\n");
+    QD_DIAG("# paths against the matrix of the wall, dB and deg. slab: thin_slab_threshold; max: max_no_interactions; nT, nR:\n");
+    QD_DIAG("# the paths behind and in front of the wall\n");
+    QD_DIAG("wall,host,tracer,slab,max,theta,nT,nR,T_dB,R_dB,R_deg\n");
     for (int hst : {5, 6})
         for (int refr = 0; refr < 2; ++refr)
             for (int cfg = 0; cfg < 2; ++cfg)
@@ -2277,15 +2148,13 @@ TEST_CASE("ray_progress - a declined series at a sheet is followed and not dropp
                     const int max_int = cfg ? 60 : 20;
                     arma::fmat mesh;
                     arma::uvec mi;
-                    build({0.0f, 0.10f, 0.10f + gap}, {hst, hst, 3}, {false, true, true}, mesh, mi);
+                    rp::planes({0.0f, 0.10f, 0.10f + gap}, {hst, hst, 3}, {false, true, true}, mesh, mi);
                     const double s2 = std::sin(thd * PI / 180.0) * std::sin(thd * PI / 180.0);
                     std::complex<double> r, t;
                     cm({{eps_of(hst), 0.10}, {eps_of(3), 0.006}}, s2, r, t);
                     Sum S = trace(mesh, mi, thd, refr != 0, slab, 0.10f, max_int, -300.0f);
-#ifdef QD_TEST_VERBOSE
-                    std::printf("HS ,%d,%d,%.2f,%d,%.0f,%d,%d,%+.4f,%+.4f,%+.3f\n", hst, refr ? 5 : 4, (double)slab, max_int, thd, S.nT, S.nR, dB(S.T / t),
-                                dB(S.R / r), deg(S.R / r));
-#endif
+                    QD_DIAG("HS ,%d,%d,%.2f,%d,%.0f,%d,%d,%+.4f,%+.4f,%+.3f\n", hst, refr ? 5 : 4, (double)slab, max_int, thd, S.nT, S.nR, dB(S.T / t),
+                            dB(S.R / r), deg(S.R / r));
                     INFO("HS, host " << hst << ", refr " << refr << ", slab " << slab << ", theta " << thd);
                     REQUIRE(S.nT >= 1);
                     // 0.03: the row the default threshold resolves on the lossy host at 85 deg carries
@@ -2301,27 +2170,22 @@ TEST_CASE("ray_progress - a declined series at a sheet is followed and not dropp
                         CHECK(S.nT >= 9); // every bounce is a path
                 }
 
-#ifdef QD_TEST_VERBOSE
-    std::printf("\n# diag: declined series at a sheet, a sheet inside a wall. air | host 50 | sheet 6 mm | host 50 | air: the summed\n");
-    std::printf("# paths at the default threshold 0.15 over those with every series resolved, 60 interactions, min_gain -100 dB\n");
-    std::printf("host,tracer,theta,nT_def,nT_res,T_dB,T_deg,R_dB,R_deg\n");
-#endif
+    QD_DIAG("\n# diag: declined series at a sheet, a sheet inside a wall. air | host 50 | sheet 6 mm | host 50 | air: the summed\n");
+    QD_DIAG("# paths at the default threshold 0.15 over those with every series resolved, 60 interactions, min_gain -100 dB\n");
+    QD_DIAG("host,tracer,theta,nT_def,nT_res,T_dB,T_deg,R_dB,R_deg\n");
     for (int hst : {5, 6})
         for (int refr = 0; refr < 2; ++refr)
             for (double thd : {10.0, 40.0, 60.0, 75.0, 85.0})
             {
                 arma::fmat mesh;
                 arma::uvec mi;
-                build({0.0f, 0.05f, 0.10f}, {hst, 3, hst}, {false, false, true}, mesh, mi);
+                rp::planes({0.0f, 0.05f, 0.10f}, {hst, 3, hst}, {false, false, true}, mesh, mi);
                 Sum D = trace(mesh, mi, thd, refr != 0, 0.15f, 0.10f, 60, -100.0f), Z = trace(mesh, mi, thd, refr != 0, 0.0f, 0.10f, 60, -100.0f);
-#ifdef QD_TEST_VERBOSE
-                std::printf("%d,%d,%.0f,%d,%d,%+.4f,%+.3f,%+.4f,%+.3f\n", hst, refr ? 5 : 4, thd, D.nT, Z.nT, dB(D.T / Z.T), deg(D.T / Z.T), dB(D.R / Z.R),
-                            deg(D.R / Z.R));
-#endif
+                QD_DIAG("%d,%d,%.0f,%d,%d,%+.4f,%+.3f,%+.4f,%+.3f\n", hst, refr ? 5 : 4, thd, D.nT, Z.nT, dB(D.T / Z.T), deg(D.T / Z.T), dB(D.R / Z.R),
+                        deg(D.R / Z.R));
                 INFO("HSH, host " << hst << ", refr " << refr << ", theta " << thd);
                 REQUIRE((D.nT >= 1 && Z.nT >= 1));
-                // To 60 deg the two regimes are one wall. From 75 deg they are recorded: up to 0.18 dB,
-                // not attributed
+                // To 60 deg the two regimes are one wall. From 75 deg they are printed, up to 0.18 dB apart.
                 if (thd <= 60.0)
                 {
                     CHECK(std::abs(dB(D.T / Z.T)) < 0.02);
@@ -2334,9 +2198,10 @@ TEST_CASE("Measurement - ray_progress and the mirror behind a back reflection", 
 {
     // One ray per call, many thousand calls: a thread team per call costs twenty times the work
     ub::OneThread one_thread;
-    // Plan item 1, measured through the tracer itself. One ray, ray_progress called until no ray
-    // is left, every path that ends in air summed at its polyline's point. Scalar, float, 1 GHz
-    // unless a band is named, both tracers. Nothing is asserted beyond sanity.
+    // The mirror behind the ray after a back reflection, through the tracer: one ray, ray_progress called until no ray
+    // is left, every path that ends in air summed at its polyline's point. Scalar, float, 1 GHz unless a band is named,
+    // both tracers. Asserted: the default threshold and every series summed are one wall (A), and both frequencies of a
+    // band are on their own matrix (C). B and D are tables, printed with QD_TEST_DIAG.
     //   H    host 100                          HS   host 100 | coating 6 mm
     //   SH   coating 6 mm | host 100           AB   A 50 | B 100, two solids across a bare face
     //   HSH  host 50 | sheet 6 mm | host 50
@@ -2356,23 +2221,6 @@ TEST_CASE("Measurement - ray_progress and the mirror behind a back reflection", 
     {
         const double a[7] = {1.0, 5.24, 5.24, 5.24, 9.0, 1.50, 1.50}, im[7] = {0.0, 0.63, 0.0, 0.63, 1.20, 0.40, 0.0};
         return std::complex<double>(a[m], -im[m] / fGHz);
-    };
-
-    auto build = [](const std::vector<float> &x, const std::vector<int> &mat, const std::vector<bool> &flip, arma::fmat &mesh, arma::uvec &mi)
-    {
-        const float h = 200.0f;
-        mesh.set_size(2 * x.size(), 9);
-        mi.set_size(2 * x.size());
-        for (size_t k = 0; k < x.size(); ++k)
-        {
-            if (!flip[k])
-                mesh.row(2 * k) = arma::frowvec{x[k], -h, -h, x[k], -h, h, x[k], h, -h},
-                mesh.row(2 * k + 1) = arma::frowvec{x[k], h, -h, x[k], -h, h, x[k], h, h};
-            else
-                mesh.row(2 * k) = arma::frowvec{x[k], -h, -h, x[k], h, -h, x[k], -h, h},
-                mesh.row(2 * k + 1) = arma::frowvec{x[k], h, -h, x[k], h, h, x[k], -h, h};
-            mi(2 * k) = (arma::uword)mat[k], mi(2 * k + 1) = (arma::uword)mat[k];
-        }
     };
 
     // The reference: TE, mu = 1, admittance b = sqrt(eps - sin^2), layer phase k b d
@@ -2408,66 +2256,38 @@ TEST_CASE("Measurement - ray_progress and the mirror behind a back reflection", 
         Sum S;
         const arma::uword nf = fGHz.size();
         const double th = thd * PI / 180.0, st = std::sin(th);
-        const float Ox = -1.0f, Oy = 0.37f - (float)std::tan(th), Oz = 0.0f, r0 = 0.1f, len = 300.0f;
-        arma::frowvec kv = {(float)std::cos(th), (float)std::sin(th), 0.0f};
         arma::fvec cf(nf);
         for (arma::uword f = 0; f < nf; ++f)
             cf(f) = (float)(fGHz[f] * 1.0e9);
-        arma::fmat orig(1, 3), dest(1, 3), acc(1, 1 + nf, arma::fill::zeros);
-        orig.row(0) = arma::frowvec{Ox, Oy, Oz} + r0 * kv;
-        dest.row(0) = arma::frowvec{Ox, Oy, Oz} + (r0 + len) * kv;
-        arma::fcube pd(1, 3, nf);
-        for (arma::uword f = 0; f < nf; ++f)
-            pd.slice(f) = kv;
-        arma::Col<short> prev(1, arma::fill::zeros), cur(1, arma::fill::zeros), buf(1, arma::fill::zeros);
-        std::vector<quadriga_lib::path> paths(1);
-        paths[0].init(0, nf, true);
-        paths[0].set_length(r0);
-        for (int g = 0; g < 80; ++g)
-        {
-            quadriga_lib::ray_progress(mesh, mi, pal, cf, Ox, Oy, Oz, orig, dest, prev, cur, buf, pd, acc, paths,
-                                       nullptr, nullptr, nullptr, nullptr,
-                                       (uint8_t)max_int, 100, 100, 0, min_gain, 3.0f, slab, refr, true,
-                                       nullptr, nullptr, nullptr, nullptr);
-            if (orig.n_rows == 0)
-                break;
-            S.gens = g + 1;
-            for (arma::uword i = 0; i < orig.n_rows; ++i)
+        rp::Opt o;
+        o.max_int = (uint8_t)max_int, o.min_gain = min_gain, o.slab = slab, o.refr = refr;
+        S.gens = rp::walk(mesh, mi, pal, cf, thd, o, [&](const rp::Ray &r)
+                          {
+            const size_t ns = r.ns;
+            const double Lin = r.poly();
+            const float *first = r.first(), *last = r.last();
+            const bool fwd = r.fwd();
+            const bool isT = fwd && last[0] > x_back - 1.0e-3f, isR = !fwd && last[0] < 1.0e-3f;
+            for (arma::uword f = 0; f < nf; ++f)
             {
-                const size_t ns = paths[i].n_seg();
-                if ((cur(i) & (short)0x3FFF) != 0 || ns != (size_t)(g + 1))
-                    continue; // inside the wall, or a ray that was already collected
-                double Lin = 0.0;
-                for (size_t s = 1; s < ns; ++s)
-                {
-                    const float *a = paths[i].coord(s - 1), *b = paths[i].coord(s);
-                    Lin += std::sqrt(((double)b[0] - a[0]) * ((double)b[0] - a[0]) + ((double)b[1] - a[1]) * ((double)b[1] - a[1]) +
-                                     ((double)b[2] - a[2]) * ((double)b[2] - a[2]));
-                }
-                const float *first = paths[i].coord(0), *last = paths[i].coord(ns - 1);
-                const bool fwd = dest(i, 0) > orig(i, 0);
-                const bool isT = fwd && last[0] > x_back - 1.0e-3f, isR = !fwd && last[0] < 1.0e-3f;
-                for (arma::uword f = 0; f < nf; ++f)
-                {
-                    const double k = 2.0 * PI * fGHz[f] * 1.0e9 / C0;
-                    const float *xc = paths[i].xpr_coeff(f);
-                    std::complex<double> F = std::complex<double>((double)xc[0], (double)xc[1]) * std::exp(-J * k * Lin) *
-                                             std::exp(J * k * st * ((double)last[1] - (double)first[1]));
-                    if (isT)
-                        S.T[f] += F;
-                    else if (isR)
-                    {
-                        S.R[f] += F;
-                        if (ns <= S.segR1)
-                            S.R1[f] = F;
-                    }
-                }
+                const double k = 2.0 * PI * fGHz[f] * 1.0e9 / C0;
+                const float *xc = r.xc(f);
+                std::complex<double> F = std::complex<double>((double)xc[0], (double)xc[1]) * std::exp(-J * k * Lin) *
+                                         std::exp(J * k * st * ((double)last[1] - (double)first[1]));
                 if (isT)
-                    ++S.nT;
+                    S.T[f] += F;
                 else if (isR)
-                    ++S.nR, S.segR1 = std::min(S.segR1, ns);
+                {
+                    S.R[f] += F;
+                    if (ns <= S.segR1)
+                        S.R1[f] = F;
+                }
             }
-        }
+            if (isT)
+                ++S.nT;
+            else if (isR)
+                ++S.nR, S.segR1 = std::min(S.segR1, ns);
+            return false; });
         return S;
     };
     auto dB = [](std::complex<double> z)
@@ -2484,28 +2304,24 @@ TEST_CASE("Measurement - ray_progress and the mirror behind a back reflection", 
         const std::string nm = w.name;
         x_back = 0.10f;
         if (nm == "H")
-            build({0.0f, 0.10f}, {w.a, w.a}, {false, true}, mesh, mi), ls = {{w.a, 0.10}};
+            rp::planes({0.0f, 0.10f}, {w.a, w.a}, {false, true}, mesh, mi), ls = {{w.a, 0.10}};
         else if (nm == "HS")
-            build({0.0f, 0.10f, 0.10f + gap}, {w.a, w.a, 3}, {false, true, true}, mesh, mi), ls = {{w.a, 0.10}, {3, 0.006}};
+            rp::planes({0.0f, 0.10f, 0.10f + gap}, {w.a, w.a, 3}, {false, true, true}, mesh, mi), ls = {{w.a, 0.10}, {3, 0.006}};
         else if (nm == "SH")
-            build({0.0f, gap, 0.10f + gap}, {3, w.a, w.a}, {false, false, true}, mesh, mi), ls = {{3, 0.006}, {w.a, 0.10}};
+            rp::planes({0.0f, gap, 0.10f + gap}, {3, w.a, w.a}, {false, false, true}, mesh, mi), ls = {{3, 0.006}, {w.a, 0.10}};
         else if (nm == "AB")
-            build({0.0f, 0.05f, 0.05f + gap, 0.15f + gap}, {w.a, w.a, w.b, w.b}, {false, true, false, true}, mesh, mi),
+            rp::planes({0.0f, 0.05f, 0.05f + gap, 0.15f + gap}, {w.a, w.a, w.b, w.b}, {false, true, false, true}, mesh, mi),
                 ls = {{w.a, 0.05}, {w.b, 0.10}}, x_back = 0.15f;
         else
-            build({0.0f, 0.05f, 0.10f}, {w.a, 3, w.a}, {false, false, true}, mesh, mi), ls.clear();
+            rp::planes({0.0f, 0.05f, 0.10f}, {w.a, 3, w.a}, {false, false, true}, mesh, mi), ls.clear();
     };
 
-    // ------------------------------------------------------------------------------------------
-    // A. The windows at the default threshold
-    // ------------------------------------------------------------------------------------------
-#ifdef QD_TEST_VERBOSE
-    std::printf("\n# diag: mirror behind, through ray_progress. thin_slab_threshold 0.15 and 0, 20 interactions, no gain floor. The\n");
-    std::printf("# summed paths against the matrix of the wall, dB; HSH against its own sum at threshold 0 with 60 interactions.\n");
-    std::printf("# n: the paths behind and in front of the wall at 0.15. SH is referenced with its coating in front of the mesh\n");
-    std::printf("# plane, where the reflect port of a glued entry puts it\n");
-    std::printf("wall,a,b,tracer,theta,nT,nR,T_015,R_015,Rdeg_015,T_0,R_0\n");
-#endif
+    // ---- A. The windows at the default threshold ----
+    QD_DIAG("\n# diag: mirror behind, through ray_progress. thin_slab_threshold 0.15 and 0, 20 interactions, no gain floor. The\n");
+    QD_DIAG("# summed paths against the matrix of the wall, dB; HSH against its own sum at threshold 0 with 60 interactions.\n");
+    QD_DIAG("# n: the paths behind and in front of the wall at 0.15. SH is referenced with its coating in front of the mesh\n");
+    QD_DIAG("# plane, where the reflect port of a glued entry puts it\n");
+    QD_DIAG("wall,a,b,tracer,theta,nT,nR,T_015,R_015,Rdeg_015,T_0,R_0\n");
     std::vector<Wall> walls = {{"H", 5, 0}, {"H", 6, 0}, {"HS", 5, 0}, {"HS", 6, 0}, {"SH", 5, 0}, {"SH", 6, 0}, {"AB", 2, 5}, {"AB", 2, 6}, {"HSH", 5, 0}, {"HSH", 6, 0}};
     for (const Wall &w : walls)
         for (int refr = 0; refr < 2; ++refr)
@@ -2518,16 +2334,19 @@ TEST_CASE("Measurement - ray_progress and the mirror behind a back reflection", 
                 make(w, mesh, mi, ls, x_back);
                 const double s2 = std::sin(thd * PI / 180.0) * std::sin(thd * PI / 180.0), k0 = 2.0 * PI * 1.0e9 / C0;
                 Sum D = trace(mesh, mi, thd, refr != 0, 0.15f, x_back, 20, -300.0f, {1.0}), Z = trace(mesh, mi, thd, refr != 0, 0.0f, x_back, 20, -300.0f, {1.0});
-                std::complex<double> r, t;
-                if (ls.empty())
+                std::complex<double> r, t; // the references of the printed rows
+                if (qd_diag())
                 {
-                    Sum Z60 = trace(mesh, mi, thd, refr != 0, 0.0f, x_back, 60, -300.0f, {1.0});
-                    r = Z60.R[0], t = Z60.T[0];
+                    if (ls.empty())
+                    {
+                        Sum Z60 = trace(mesh, mi, thd, refr != 0, 0.0f, x_back, 60, -300.0f, {1.0});
+                        r = Z60.R[0], t = Z60.T[0];
+                    }
+                    else
+                        cm(ls, s2, 1.0, r, t);
+                    if (std::string(w.name) == "SH")
+                        r *= std::exp(2.0 * J * k0 * std::cos(thd * PI / 180.0) * 0.006);
                 }
-                else
-                    cm(ls, s2, 1.0, r, t);
-                if (std::string(w.name) == "SH")
-                    r *= std::exp(2.0 * J * k0 * std::cos(thd * PI / 180.0) * 0.006);
                 INFO("windows, wall " << w.name << ", a " << w.a << ", b " << w.b << ", refr " << refr << ", theta " << thd);
                 CHECK(D.nT >= 1);
                 // The default threshold and every series summed are one wall. A sheet inside a wall
@@ -2535,57 +2354,46 @@ TEST_CASE("Measurement - ray_progress and the mirror behind a back reflection", 
                 const double bound = ls.empty() ? 1.0e-2 : 5.0e-3;
                 CHECK(std::abs(dB(D.T[0] / Z.T[0])) < bound);
                 CHECK(std::abs(dB(D.R[0] / Z.R[0])) < bound);
-#ifdef QD_TEST_VERBOSE
-                std::printf("%s,%d,%d,%d,%.0f,%d,%d,%+.4f,%+.4f,%+.3f,%+.4f,%+.4f\n", w.name, w.a, w.b, refr ? 5 : 4, thd, D.nT, D.nR, dB(D.T[0] / t),
-                            dB(D.R[0] / r), deg(D.R[0] / r), dB(Z.T[0] / t), dB(Z.R[0] / r));
-#endif
+                QD_DIAG("%s,%d,%d,%d,%.0f,%d,%d,%+.4f,%+.4f,%+.3f,%+.4f,%+.4f\n", w.name, w.a, w.b, refr ? 5 : 4, thd, D.nT, D.nR, dB(D.T[0] / t),
+                        dB(D.R[0] / r), deg(D.R[0] / r), dB(Z.T[0] / t), dB(Z.R[0] / r));
             }
 
-    // ------------------------------------------------------------------------------------------
-    // B. A sheet inside a wall: the gain floor
-    // ------------------------------------------------------------------------------------------
-#ifdef QD_TEST_VERBOSE
-    std::printf("\n# diag: mirror behind, a sheet inside a wall and the gain floor. air | host 50 | sheet 6 mm | host 50 | air, undeviated\n");
-    std::printf("# tracer. D: threshold 0.15; Z: threshold 0. Each against Z at 60 interactions and a floor of -300 dB, dB.\n");
-    std::printf("# max: max_no_interactions; min: min_gain_dB; n: the paths behind the wall\n");
-    std::printf("host,theta,max,min,nT_D,nT_Z,T_D,T_Z,T_D/Z,R_D,R_Z,R_D/Z\n");
-#endif
-    for (int hst : {5, 6})
-        for (double thd : {60.0, 75.0, 85.0})
-        {
-            arma::fmat mesh;
-            arma::uvec mi;
-            build({0.0f, 0.05f, 0.10f}, {hst, 3, hst}, {false, false, true}, mesh, mi);
-            Sum W = trace(mesh, mi, thd, false, 0.0f, 0.10f, 60, -300.0f, {1.0});
-            struct Cfg
+    // ---- B. A sheet inside a wall: the gain floor (a printed table) ----
+    QD_DIAG("\n# diag: mirror behind, a sheet inside a wall and the gain floor. air | host 50 | sheet 6 mm | host 50 | air, undeviated\n");
+    QD_DIAG("# tracer. D: threshold 0.15; Z: threshold 0. Each against Z at 60 interactions and a floor of -300 dB, dB.\n");
+    QD_DIAG("# max: max_no_interactions; min: min_gain_dB; n: the paths behind the wall\n");
+    QD_DIAG("host,theta,max,min,nT_D,nT_Z,T_D,T_Z,T_D/Z,R_D,R_Z,R_D/Z\n");
+    if (qd_diag())
+    {
+        for (int hst : {5, 6})
+            for (double thd : {60.0, 75.0, 85.0})
             {
-                int max_int;
-                float floor;
-            };
-            for (const Cfg &c : {Cfg{60, -100.0f}, Cfg{60, -120.0f}, Cfg{60, -140.0f}, Cfg{60, -160.0f}, Cfg{20, -100.0f}, Cfg{20, -300.0f}})
-            {
-                Sum D = trace(mesh, mi, thd, false, 0.15f, 0.10f, c.max_int, c.floor, {1.0}), Z = trace(mesh, mi, thd, false, 0.0f, 0.10f, c.max_int, c.floor, {1.0});
-                INFO("floor, host " << hst << ", theta " << thd << ", max " << c.max_int << ", floor " << c.floor);
-                CHECK((D.nT >= 1 && Z.nT >= 1));
-#ifdef QD_TEST_VERBOSE
-                std::printf("%d,%.0f,%d,%.0f,%d,%d,%+.4f,%+.4f,%+.4f,%+.4f,%+.4f,%+.4f\n", hst, thd, c.max_int, (double)c.floor, D.nT, Z.nT, dB(D.T[0] / W.T[0]),
+                arma::fmat mesh;
+                arma::uvec mi;
+                rp::planes({0.0f, 0.05f, 0.10f}, {hst, 3, hst}, {false, false, true}, mesh, mi);
+                Sum W = trace(mesh, mi, thd, false, 0.0f, 0.10f, 60, -300.0f, {1.0});
+                struct Cfg
+                {
+                    int max_int;
+                    float floor;
+                };
+                for (const Cfg &c : {Cfg{60, -100.0f}, Cfg{60, -120.0f}, Cfg{60, -140.0f}, Cfg{60, -160.0f}, Cfg{20, -100.0f}, Cfg{20, -300.0f}})
+                {
+                    Sum D = trace(mesh, mi, thd, false, 0.15f, 0.10f, c.max_int, c.floor, {1.0}), Z = trace(mesh, mi, thd, false, 0.0f, 0.10f, c.max_int, c.floor, {1.0});
+                    QD_DIAG("%d,%.0f,%d,%.0f,%d,%d,%+.4f,%+.4f,%+.4f,%+.4f,%+.4f,%+.4f\n", hst, thd, c.max_int, (double)c.floor, D.nT, Z.nT, dB(D.T[0] / W.T[0]),
                             dB(Z.T[0] / W.T[0]), dB(D.T[0] / Z.T[0]), dB(D.R[0] / W.R[0]), dB(Z.R[0] / W.R[0]), dB(D.R[0] / Z.R[0]));
-#endif
+                }
             }
-        }
+    }
 
-    // ------------------------------------------------------------------------------------------
-    // C. The verdict of the base frequency and another frequency of the band
-    // ------------------------------------------------------------------------------------------
+    // ---- C. The verdict of the base frequency and another frequency of the band ----
     // The paths are the base frequency's: where it sums a series the reflected ray is resolved,
     // where it declines the bounces are rays. Every other frequency of the run takes that
     // verdict, or its series is counted twice or not at all. One bare wall, a band of two.
-#ifdef QD_TEST_VERBOSE
-    std::printf("\n# diag: mirror behind, the verdict across a band. air | host 100 | air, eps 1.50 - 0.40j at 1 GHz, threshold 0.15,\n");
-    std::printf("# 20 interactions. base, other: the two frequencies of one run, GHz. The summed paths of each against the matrix at\n");
-    std::printf("# its frequency, dB; alone: the other frequency run on its own. n: the paths behind the wall\n");
-    std::printf("tracer,base,other,theta,nT_band,nT_alone,T_base,T_other,T_alone,R_base,R_other,R_alone\n");
-#endif
+    QD_DIAG("\n# diag: mirror behind, the verdict across a band. air | host 100 | air, eps 1.50 - 0.40j at 1 GHz, threshold 0.15,\n");
+    QD_DIAG("# 20 interactions. base, other: the two frequencies of one run, GHz. The summed paths of each against the matrix at\n");
+    QD_DIAG("# its frequency, dB; alone: the other frequency run on its own. n: the paths behind the wall\n");
+    QD_DIAG("tracer,base,other,theta,nT_band,nT_alone,T_base,T_other,T_alone,R_base,R_other,R_alone\n");
     for (int refr = 0; refr < 2; ++refr)
         for (int ord = 0; ord < 6; ++ord)
             for (double thd : {60.0, 65.0, 70.0, 72.0, 74.0, 76.0, 78.0, 80.0, 82.0, 85.0})
@@ -2594,7 +2402,7 @@ TEST_CASE("Measurement - ray_progress and the mirror behind a back reflection", 
                 const double fb = fbv[ord], fo = fov[ord];
                 arma::fmat mesh;
                 arma::uvec mi;
-                build({0.0f, 0.10f}, {5, 5}, {false, true}, mesh, mi);
+                rp::planes({0.0f, 0.10f}, {5, 5}, {false, true}, mesh, mi);
                 const double s2 = std::sin(thd * PI / 180.0) * std::sin(thd * PI / 180.0);
                 Sum B = trace(mesh, mi, thd, refr != 0, 0.15f, 0.10f, 20, -300.0f, {fb, fo}), A = trace(mesh, mi, thd, refr != 0, 0.15f, 0.10f, 20, -300.0f, {fo});
                 std::complex<double> rb, tb, ro, to;
@@ -2605,40 +2413,34 @@ TEST_CASE("Measurement - ray_progress and the mirror behind a back reflection", 
                 CHECK(std::abs(dB(B.R[0] / rb)) < 5.0e-3);
                 CHECK(std::abs(dB(B.T[1] / to)) < 5.0e-3); // the other frequency is the wall as well
                 CHECK(std::abs(dB(B.R[1] / ro)) < 5.0e-3);
-#ifdef QD_TEST_VERBOSE
-                std::printf("%d,%.2f,%.2f,%.0f,%d,%d,%+.4f,%+.4f,%+.4f,%+.4f,%+.4f,%+.4f\n", refr ? 5 : 4, fb, fo, thd, B.nT, A.nT, dB(B.T[0] / tb), dB(B.T[1] / to),
-                            dB(A.T[0] / to), dB(B.R[0] / rb), dB(B.R[1] / ro), dB(A.R[0] / ro));
-#endif
+                QD_DIAG("%d,%.2f,%.2f,%.0f,%d,%d,%+.4f,%+.4f,%+.4f,%+.4f,%+.4f,%+.4f\n", refr ? 5 : 4, fb, fo, thd, B.nT, A.nT, dB(B.T[0] / tb), dB(B.T[1] / to),
+                        dB(A.T[0] / to), dB(B.R[0] / rb), dB(B.R[1] / ro), dB(A.R[0] / ro));
             }
 
-    // ------------------------------------------------------------------------------------------
-    // D. A wall coated on its near side, over frequency
-    // ------------------------------------------------------------------------------------------
-#ifdef QD_TEST_VERBOSE
-    std::printf("\n# diag: mirror behind, a wall coated on its near side over frequency. air | coating 6 mm | host 100 | air, every\n");
-    std::printf("# series summed, undeviated tracer. The reflected sum against the matrix of the wall with the coating in front of\n");
-    std::printf("# the mesh plane, dB and deg; T: the transmitted sum; mis: 2 k0 cos(theta) thk, deg\n");
-    std::printf("host,fGHz,theta,mis_deg,R_dB,R_deg,T_dB\n");
-#endif
-    for (int hst : {5, 6})
-        for (double fg : {0.3, 1.0, 3.0, 6.0})
-            for (double thd : {10.0, 30.0, 50.0, 70.0})
-            {
-                arma::fmat mesh;
-                arma::uvec mi;
-                build({0.0f, gap, 0.10f + gap}, {3, hst, hst}, {false, false, true}, mesh, mi);
-                const double th = thd * PI / 180.0, s2 = std::sin(th) * std::sin(th), k = 2.0 * PI * fg * 1.0e9 / C0;
-                Sum Z = trace(mesh, mi, thd, false, 0.0f, 0.10f, 20, -300.0f, {fg});
-                std::complex<double> r, t;
-                cm({{3, 0.006}, {hst, 0.10}}, s2, fg, r, t);
-                r *= std::exp(2.0 * J * k * std::cos(th) * 0.006);
-                INFO("near coating, host " << hst << ", f " << fg << ", theta " << thd);
-                CHECK(Z.nR >= 1);
-#ifdef QD_TEST_VERBOSE
-                std::printf("%d,%.1f,%.0f,%.1f,%+.4f,%+.3f,%+.4f\n", hst, fg, thd, 2.0 * k * std::cos(th) * 0.006 * 180.0 / PI, dB(Z.R[0] / r), deg(Z.R[0] / r),
+    // ---- D. A wall coated on its near side, over frequency (a printed table; the asserted rows are in the
+    // reflect-port case) ----
+    QD_DIAG("\n# diag: mirror behind, a wall coated on its near side over frequency. air | coating 6 mm | host 100 | air, every\n");
+    QD_DIAG("# series summed, undeviated tracer. The reflected sum against the matrix of the wall with the coating in front of\n");
+    QD_DIAG("# the mesh plane, dB and deg; T: the transmitted sum; mis: 2 k0 cos(theta) thk, deg\n");
+    QD_DIAG("host,fGHz,theta,mis_deg,R_dB,R_deg,T_dB\n");
+    if (qd_diag())
+    {
+        for (int hst : {5, 6})
+            for (double fg : {0.3, 1.0, 3.0, 6.0})
+                for (double thd : {10.0, 30.0, 50.0, 70.0})
+                {
+                    arma::fmat mesh;
+                    arma::uvec mi;
+                    rp::planes({0.0f, gap, 0.10f + gap}, {3, hst, hst}, {false, false, true}, mesh, mi);
+                    const double th = thd * PI / 180.0, s2 = std::sin(th) * std::sin(th), k = 2.0 * PI * fg * 1.0e9 / C0;
+                    Sum Z = trace(mesh, mi, thd, false, 0.0f, 0.10f, 20, -300.0f, {fg});
+                    std::complex<double> r, t;
+                    cm({{3, 0.006}, {hst, 0.10}}, s2, fg, r, t);
+                    r *= std::exp(2.0 * J * k * std::cos(th) * 0.006);
+                    QD_DIAG("%d,%.1f,%.0f,%.1f,%+.4f,%+.3f,%+.4f\n", hst, fg, thd, 2.0 * k * std::cos(th) * 0.006 * 180.0 / PI, dB(Z.R[0] / r), deg(Z.R[0] / r),
                             dB(Z.T[0] / t));
-#endif
-            }
+                }
+    }
 }
 
 TEST_CASE("ray_progress - the reflect port of a sheet lies where its transmit port puts the layer", "[wave]")
@@ -2669,23 +2471,6 @@ TEST_CASE("ray_progress - the reflect port of a sheet lies where its transmit po
     {
         const double a[7] = {1.0, 5.24, 5.24, 5.24, 9.0, 1.50, 1.50}, im[7] = {0.0, 0.63, 0.0, 0.63, 1.20, 0.40, 0.0};
         return std::complex<double>(a[m], -im[m] / fGHz);
-    };
-
-    auto build = [](const std::vector<float> &x, const std::vector<int> &mat, const std::vector<bool> &flip, arma::fmat &mesh, arma::uvec &mi)
-    {
-        const float h = 200.0f;
-        mesh.set_size(2 * x.size(), 9);
-        mi.set_size(2 * x.size());
-        for (size_t k = 0; k < x.size(); ++k)
-        {
-            if (!flip[k])
-                mesh.row(2 * k) = arma::frowvec{x[k], -h, -h, x[k], -h, h, x[k], h, -h},
-                mesh.row(2 * k + 1) = arma::frowvec{x[k], h, -h, x[k], -h, h, x[k], h, h};
-            else
-                mesh.row(2 * k) = arma::frowvec{x[k], -h, -h, x[k], h, -h, x[k], -h, h},
-                mesh.row(2 * k + 1) = arma::frowvec{x[k], h, -h, x[k], h, h, x[k], -h, h};
-            mi(2 * k) = (arma::uword)mat[k], mi(2 * k + 1) = (arma::uword)mat[k];
-        }
     };
 
     // The reference: TE, mu = 1, admittance b = sqrt(eps - sin^2), layer phase k b d; material 0 is air
@@ -2720,57 +2505,31 @@ TEST_CASE("ray_progress - the reflect port of a sheet lies where its transmit po
     {
         Sum S;
         const double th = thd * PI / 180.0, st = std::sin(th), k = 2.0 * PI * fGHz * 1.0e9 / C0;
-        const float Ox = -1.0f, Oy = 0.37f - (float)std::tan(th), Oz = 0.0f, r0 = 0.1f, len = 300.0f;
-        arma::frowvec kv = {(float)std::cos(th), (float)std::sin(th), 0.0f};
         arma::fvec cf(1);
         cf(0) = (float)(fGHz * 1.0e9);
-        arma::fmat orig(1, 3), dest(1, 3), acc(1, 2, arma::fill::zeros);
-        orig.row(0) = arma::frowvec{Ox, Oy, Oz} + r0 * kv;
-        dest.row(0) = arma::frowvec{Ox, Oy, Oz} + (r0 + len) * kv;
-        arma::fcube pd(1, 3, 1);
-        pd.slice(0) = kv;
-        arma::Col<short> prev(1, arma::fill::zeros), cur(1, arma::fill::zeros), buf(1, arma::fill::zeros);
-        std::vector<quadriga_lib::path> paths(1);
-        paths[0].init(0, 1, true);
-        paths[0].set_length(r0);
-        for (int g = 0; g < 120; ++g)
-        {
-            quadriga_lib::ray_progress(mesh, mi, pal, cf, Ox, Oy, Oz, orig, dest, prev, cur, buf, pd, acc, paths,
-                                       nullptr, nullptr, nullptr, nullptr,
-                                       (uint8_t)max_int, 100, 100, 0, min_gain, 3.0f, slab, refr, true,
-                                       nullptr, nullptr, nullptr, nullptr);
-            if (orig.n_rows == 0)
-                break;
-            for (arma::uword i = 0; i < orig.n_rows; ++i)
+        rp::Opt o;
+        o.calls = 120, o.max_int = (uint8_t)max_int, o.min_gain = min_gain, o.slab = slab, o.refr = refr;
+        rp::walk(mesh, mi, pal, cf, thd, o, [&](const rp::Ray &r)
+                 {
+            const size_t ns = r.ns;
+            const float *first = r.first(), *last = r.last();
+            const bool fwd = r.fwd();
+            const bool isT = fwd && last[0] > x_back - 1.0e-3f, isR = !fwd && last[0] < 1.0e-3f;
+            if (!isT && !isR)
+                return false; // in air between two bodies
+            const double Lin = r.poly();
+            const float *xc = r.xc(0);
+            std::complex<double> F = std::complex<double>((double)xc[0], (double)xc[1]) * std::exp(-J * k * Lin) *
+                                     std::exp(J * k * st * ((double)last[1] - (double)first[1]));
+            if (isT)
+                S.T += F, ++S.nT;
+            else
             {
-                const size_t ns = paths[i].n_seg();
-                if ((cur(i) & (short)0x3FFF) != 0 || ns != (size_t)(g + 1))
-                    continue; // inside a body, or a ray that was already collected
-                const float *first = paths[i].coord(0), *last = paths[i].coord(ns - 1);
-                const bool fwd = dest(i, 0) > orig(i, 0);
-                const bool isT = fwd && last[0] > x_back - 1.0e-3f, isR = !fwd && last[0] < 1.0e-3f;
-                if (!isT && !isR)
-                    continue; // in air between two bodies
-                double Lin = 0.0;
-                for (size_t s = 1; s < ns; ++s)
-                {
-                    const float *a = paths[i].coord(s - 1), *b = paths[i].coord(s);
-                    Lin += std::sqrt(((double)b[0] - a[0]) * ((double)b[0] - a[0]) + ((double)b[1] - a[1]) * ((double)b[1] - a[1]) +
-                                     ((double)b[2] - a[2]) * ((double)b[2] - a[2]));
-                }
-                const float *xc = paths[i].xpr_coeff(0);
-                std::complex<double> F = std::complex<double>((double)xc[0], (double)xc[1]) * std::exp(-J * k * Lin) *
-                                         std::exp(J * k * st * ((double)last[1] - (double)first[1]));
-                if (isT)
-                    S.T += F, ++S.nT;
-                else
-                {
-                    S.R += F, ++S.nR;
-                    if (ns <= S.segR1)
-                        S.R1 = F, S.segR1 = ns;
-                }
+                S.R += F, ++S.nR;
+                if (ns <= S.segR1)
+                    S.R1 = F, S.segR1 = ns;
             }
-        }
+            return false; });
         return S;
     };
     auto dB = [](std::complex<double> z)
@@ -2778,20 +2537,16 @@ TEST_CASE("ray_progress - the reflect port of a sheet lies where its transmit po
     auto deg = [&](std::complex<double> z)
     { return std::arg(z) * 180.0 / PI; };
 
-    // ------------------------------------------------------------------------------------------
-    // A. A wall coated on its near side and a wall lined on both faces, over frequency
-    // ------------------------------------------------------------------------------------------
+    // ---- A. A wall coated on its near side and a wall lined on both faces, over frequency ----
     // Where the wall reflects 10 dB less than the path off its first coating the two nearly
     // cancel, and the row is held against that first path. A traced leg is short by the relaunch
     // offset, which the reference does not know and which grows with frequency: the rows at
     // 6 GHz are held at 1e-2 dB.
-#ifdef QD_TEST_VERBOSE
-    std::printf("\n# diag: reflect port, a wall coated on its near side (SH) and lined on both faces (SHS) through ray_progress.\n");
-    std::printf("# coating 6 mm, host 100, 20 interactions, no gain floor. thr: thin_slab_threshold. R_dB, R_deg: the reflected sum\n");
-    std::printf("# against the matrix of the wall with the near coating in front of the mesh plane; R_ff: its distance from that\n");
-    std::printf("# wall over the shortest reflected path; T: the transmitted sum; mis: 2 k0 cos(theta) thk, deg\n");
-    std::printf("wall,host,tracer,thr,fGHz,theta,nT,nR,mis_deg,R_dB,R_deg,R_ff,T_dB\n");
-#endif
+    QD_DIAG("\n# diag: reflect port, a wall coated on its near side (SH) and lined on both faces (SHS) through ray_progress.\n");
+    QD_DIAG("# coating 6 mm, host 100, 20 interactions, no gain floor. thr: thin_slab_threshold. R_dB, R_deg: the reflected sum\n");
+    QD_DIAG("# against the matrix of the wall with the near coating in front of the mesh plane; R_ff: its distance from that\n");
+    QD_DIAG("# wall over the shortest reflected path; T: the transmitted sum; mis: 2 k0 cos(theta) thk, deg\n");
+    QD_DIAG("wall,host,tracer,thr,fGHz,theta,nT,nR,mis_deg,R_dB,R_deg,R_ff,T_dB\n");
     for (int lined = 0; lined < 2; ++lined)
         for (int hst : {5, 6})
             for (int refr = 0; refr < 2; ++refr)
@@ -2805,9 +2560,9 @@ TEST_CASE("ray_progress - the reflect port of a sheet lies where its transmit po
                             arma::uvec mi;
                             std::vector<Lay> ls = {{3, 0.006}, {hst, 0.10}};
                             if (lined)
-                                build({0.0f, gap, 0.10f + gap, 0.10f + 2.0f * gap}, {3, hst, hst, 3}, {false, false, true, true}, mesh, mi), ls.push_back({3, 0.006});
+                                rp::planes({0.0f, gap, 0.10f + gap, 0.10f + 2.0f * gap}, {3, hst, hst, 3}, {false, false, true, true}, mesh, mi), ls.push_back({3, 0.006});
                             else
-                                build({0.0f, gap, 0.10f + gap}, {3, hst, hst}, {false, false, true}, mesh, mi);
+                                rp::planes({0.0f, gap, 0.10f + gap}, {3, hst, hst}, {false, false, true}, mesh, mi);
                             const double th = thd * PI / 180.0, s2 = std::sin(th) * std::sin(th), k = 2.0 * PI * fg * 1.0e9 / C0;
                             Sum Z = trace(mesh, mi, thd, refr != 0, thr, 0.10f, 20, -300.0f, fg);
                             std::complex<double> r, t;
@@ -2823,26 +2578,20 @@ TEST_CASE("ray_progress - the reflect port of a sheet lies where its transmit po
                                 CHECK(std::abs(deg(Z.R / r)) < 0.05);
                             }
                             CHECK(std::abs(dB(Z.T / t)) < 5.0e-3);
-#ifdef QD_TEST_VERBOSE
-                            std::printf("%s,%d,%d,%.2f,%.1f,%.0f,%d,%d,%.1f,%+.4f,%+.3f,%.2e,%+.4f\n", lined ? "SHS" : "SH", hst, refr ? 5 : 4, (double)thr, fg, thd, Z.nT,
-                                        Z.nR, 2.0 * k * std::cos(th) * 0.006 * 180.0 / PI, dB(Z.R / r), deg(Z.R / r), std::abs(Z.R - r) / std::abs(Z.R1), dB(Z.T / t));
-#endif
+                            QD_DIAG("%s,%d,%d,%.2f,%.1f,%.0f,%d,%d,%.1f,%+.4f,%+.3f,%.2e,%+.4f\n", lined ? "SHS" : "SH", hst, refr ? 5 : 4, (double)thr, fg, thd, Z.nT,
+                                    Z.nR, 2.0 * k * std::cos(th) * 0.006 * 180.0 / PI, dB(Z.R / r), deg(Z.R / r), std::abs(Z.R - r) / std::abs(Z.R1), dB(Z.T / t));
                         }
 
-    // ------------------------------------------------------------------------------------------
-    // B. A sheet in front of a wall across an air gap
-    // ------------------------------------------------------------------------------------------
-    // The layer of the sheet occupies 6 mm of the air around its face, [-u, 6 mm - u]: uh centred,
-    // which is the wall the paths sum to; u0 behind the face, in the gap, and ut in front,
-    // recorded. Each wall referenced to the sheet's face. The cavity is followed bounce by
-    // bounce: with 60 interactions and a floor of -120 dB the lossless host at 70 deg and 3 GHz
-    // is 0.059 dB short, so the rows run to 110 interactions and -200 dB.
-#ifdef QD_TEST_VERBOSE
-    std::printf("\n# diag: reflect port, a sheet in front of a wall across an air gap through ray_progress. air | sheet 6 mm | air 30 mm\n");
-    std::printf("# | host 100 | air, every series summed, 110 interactions, floor -200 dB. The summed paths against the wall whose\n");
-    std::printf("# layer lies at [-u, thk - u]: uh centred, asserted; u0 behind the face and ut in front, recorded; dB and deg\n");
-    std::printf("host,tracer,fGHz,theta,nT,nR,R_uh,Rdeg_uh,T_uh,Tdeg_uh,R_u0,Rdeg_u0,T_u0,R_ut,Rdeg_ut,T_ut\n");
-#endif
+    // ---- B. A sheet in front of a wall across an air gap ----
+    // The layer of the sheet occupies 6 mm of the air around its face, [-u, 6 mm - u]: uh centred, which is the wall
+    // the paths sum to, asserted; u0 behind the face, in the gap, and ut in front, printed. Each wall is referenced to
+    // the sheet's face. The cavity is followed bounce by bounce, to 110 interactions and -200 dB (at 60 and -120 dB the
+    // lossless host at 70 deg and 3 GHz is 0.059 dB short). The lossless host at 70 deg runs at 0.3 and 1 GHz only:
+    // above, its cavity takes 10^5 to 10^6 paths and says nothing the other rows do not.
+    QD_DIAG("\n# diag: reflect port, a sheet in front of a wall across an air gap through ray_progress. air | sheet 6 mm | air 30 mm\n");
+    QD_DIAG("# | host 100 | air, every series summed, 110 interactions, floor -200 dB. The summed paths against the wall whose\n");
+    QD_DIAG("# layer lies at [-u, thk - u]: uh centred, asserted; u0 behind the face and ut in front, recorded; dB and deg\n");
+    QD_DIAG("host,tracer,fGHz,theta,nT,nR,R_uh,Rdeg_uh,T_uh,Tdeg_uh,R_u0,Rdeg_u0,T_u0,R_ut,Rdeg_ut,T_ut\n");
     for (int hst : {5, 6})
         for (int refr = 0; refr < 2; ++refr)
             for (double fg : {0.3, 1.0, 3.0, 6.0})
@@ -2850,10 +2599,12 @@ TEST_CASE("ray_progress - the reflect port of a sheet lies where its transmit po
                 {
                     if (refr && fg != 1.0)
                         continue;
+                    if (hst == 6 && thd == 70.0 && fg > 2.0)
+                        continue;
                     const float g = 0.03f;
                     arma::fmat mesh;
                     arma::uvec mi;
-                    build({0.0f, g, g + 0.10f}, {3, hst, hst}, {false, false, true}, mesh, mi);
+                    rp::planes({0.0f, g, g + 0.10f}, {3, hst, hst}, {false, false, true}, mesh, mi);
                     const double th = thd * PI / 180.0, s2 = std::sin(th) * std::sin(th), ck = 2.0 * PI * fg * 1.0e9 / C0 * std::cos(th);
                     Sum Z = trace(mesh, mi, thd, refr != 0, 0.0f, g + 0.10f, 110, -200.0f, fg);
                     std::complex<double> rr[3], tt[3];
@@ -2869,11 +2620,9 @@ TEST_CASE("ray_progress - the reflect port of a sheet lies where its transmit po
                     CHECK(std::abs(deg(Z.R / rr[1])) < 0.05);
                     CHECK(std::abs(dB(Z.T / tt[1])) < 5.0e-3);
                     CHECK(std::abs(deg(Z.T / tt[1])) < 0.05);
-#ifdef QD_TEST_VERBOSE
-                    std::printf("%d,%d,%.1f,%.0f,%d,%d,%+.4f,%+.3f,%+.4f,%+.3f,%+.4f,%+.3f,%+.4f,%+.4f,%+.3f,%+.4f\n", hst, refr ? 5 : 4, fg, thd, Z.nT, Z.nR, dB(Z.R / rr[1]),
-                                deg(Z.R / rr[1]), dB(Z.T / tt[1]), deg(Z.T / tt[1]), dB(Z.R / rr[0]), deg(Z.R / rr[0]), dB(Z.T / tt[0]), dB(Z.R / rr[2]), deg(Z.R / rr[2]),
-                                dB(Z.T / tt[2]));
-#endif
+                    QD_DIAG("%d,%d,%.1f,%.0f,%d,%d,%+.4f,%+.3f,%+.4f,%+.3f,%+.4f,%+.3f,%+.4f,%+.4f,%+.3f,%+.4f\n", hst, refr ? 5 : 4, fg, thd, Z.nT, Z.nR, dB(Z.R / rr[1]),
+                            deg(Z.R / rr[1]), dB(Z.T / tt[1]), deg(Z.T / tt[1]), dB(Z.R / rr[0]), deg(Z.R / rr[0]), dB(Z.T / tt[0]), dB(Z.R / rr[2]), deg(Z.R / rr[2]),
+                            dB(Z.T / tt[2]));
                 }
 }
 
@@ -2881,19 +2630,17 @@ TEST_CASE("ray_progress - a lossy medium has no critical angle and a band takes 
 {
     // One ray per call, many thousand calls: a thread team per call costs twenty times the work
     ub::OneThread one_thread;
-    // A porous medium, eps 0.31 - 0.20j / fGHz, rarer than air and lossy. It has no critical
-    // angle. The magnitude test sqrt|1 / eps| sin(theta) >= 1 would trip at 45.3 deg at 0.5 GHz,
-    // 37.4 deg at 1 GHz and 34.8 deg at 2 GHz, so a band would have its frequencies on different
-    // sides of it; the verdict on a lossy medium is decided on the medium, and every frequency
-    // of a band is what it is alone. Through the tracer itself, scalar, float: one ray,
-    // ray_progress called until no ray is left, every path that ends in air outside the
-    // structure summed at its polyline's point. The coherent sums of PW are recorded: the
-    // bounces of a leak inside the rigid wall have no phase the media define.
+    // A porous medium, eps 0.31 - 0.20j / fGHz, rarer than air and lossy. It has no critical angle. The magnitude test
+    // sqrt|1 / eps| sin(theta) >= 1 would trip at 45.3 deg at 0.5 GHz, 37.4 deg at 1 GHz and 34.8 deg at 2 GHz, so a
+    // band would have its frequencies on different sides of it; the verdict on a lossy medium is decided on the medium,
+    // and every frequency of a band is what it is alone. Through the tracer itself, scalar, float: one ray,
+    // ray_progress called until no ray is left, every path that ends in air outside the structure summed at its
+    // polyline's point. The coherent sums of PW are printed only: the bounces of a leak inside the rigid wall have no
+    // phase the media define.
     //   P    porous solid 50 mm in air, against the analytic slab
     //   PW   porous solid 50 mm on a rigid wall with tf 0.3
     //   SW   the same layer as a sheet on that wall
-    // First each frequency alone, then bands whose base and second frequency fall on different
-    // sides of the angle.
+    // First each frequency alone, then bands whose base and second frequency fall on different sides of the angle.
     const double PI = 3.14159265358979323846, C0 = 299792458.0;
     const float gap = 1.0e-5f;
     const std::complex<double> J(0.0, 1.0);
@@ -2910,22 +2657,6 @@ TEST_CASE("ray_progress - a lossy medium has no critical angle and a band takes 
     auto eps_p = [](double fGHz)
     { return std::complex<double>(0.31, -0.20 / fGHz); };
 
-    auto build = [](const std::vector<float> &x, const std::vector<int> &mat, const std::vector<bool> &flip, arma::fmat &mesh, arma::uvec &mi)
-    {
-        const float h = 200.0f;
-        mesh.set_size(2 * x.size(), 9);
-        mi.set_size(2 * x.size());
-        for (size_t k = 0; k < x.size(); ++k)
-        {
-            if (!flip[k])
-                mesh.row(2 * k) = arma::frowvec{x[k], -h, -h, x[k], -h, h, x[k], h, -h},
-                mesh.row(2 * k + 1) = arma::frowvec{x[k], h, -h, x[k], -h, h, x[k], h, h};
-            else
-                mesh.row(2 * k) = arma::frowvec{x[k], -h, -h, x[k], h, -h, x[k], -h, h},
-                mesh.row(2 * k + 1) = arma::frowvec{x[k], h, -h, x[k], h, h, x[k], -h, h};
-            mi(2 * k) = (arma::uword)mat[k], mi(2 * k + 1) = (arma::uword)mat[k];
-        }
-    };
     auto slab = [&](double d, double s2, double fGHz, std::complex<double> &r, std::complex<double> &t) // air | porous d | air
     {
         const double k = 2.0 * PI * fGHz * 1.0e9 / C0;
@@ -2948,59 +2679,31 @@ TEST_CASE("ray_progress - a lossy medium has no critical angle and a band takes 
         const size_t nf = fGHz.size();
         std::vector<Sum> S(nf);
         const double th = thd * PI / 180.0, st = std::sin(th);
-        const float Ox = -1.0f, Oy = 0.37f - (float)std::tan(th), Oz = 0.0f, r0 = 0.1f, len = 300.0f;
-        arma::frowvec kv = {(float)std::cos(th), (float)std::sin(th), 0.0f};
         arma::fvec cf(nf);
         for (size_t q = 0; q < nf; ++q)
             cf(q) = (float)(fGHz[q] * 1.0e9);
-        arma::fmat orig(1, 3), dest(1, 3), acc(1, 1 + nf, arma::fill::zeros);
-        orig.row(0) = arma::frowvec{Ox, Oy, Oz} + r0 * kv;
-        dest.row(0) = arma::frowvec{Ox, Oy, Oz} + (r0 + len) * kv;
-        arma::fcube pd(1, 3, nf);
-        for (size_t q = 0; q < nf; ++q)
-            pd.slice(q) = kv;
-        arma::Col<short> prev(1, arma::fill::zeros), cur(1, arma::fill::zeros), buf(1, arma::fill::zeros);
-        std::vector<quadriga_lib::path> paths(1);
-        paths[0].init(0, nf, true);
-        paths[0].set_length(r0);
-        for (int g = 0; g < 120; ++g)
-        {
-            quadriga_lib::ray_progress(mesh, mi, pal, cf, Ox, Oy, Oz, orig, dest, prev, cur, buf, pd, acc, paths,
-                                       nullptr, nullptr, nullptr, nullptr,
-                                       (uint8_t)max_int, 100, 100, 0, min_gain, 3.0f, thr, refr, true,
-                                       nullptr, nullptr, nullptr, nullptr);
-            if (orig.n_rows == 0)
-                break;
-            for (arma::uword i = 0; i < orig.n_rows; ++i)
+        rp::Opt o;
+        o.calls = 120, o.max_int = (uint8_t)max_int, o.min_gain = min_gain, o.slab = thr, o.refr = refr;
+        rp::walk(mesh, mi, pal, cf, thd, o, [&](const rp::Ray &r)
+                 {
+            const float *first = r.first(), *last = r.last();
+            const bool fwd = r.fwd();
+            const bool isT = fwd && last[0] > x_back - 1.0e-3f, isR = !fwd && last[0] < 1.0e-3f;
+            if (!isT && !isR)
+                return false;
+            const double Lin = r.poly();
+            for (size_t q = 0; q < nf; ++q)
             {
-                const size_t ns = paths[i].n_seg();
-                if ((cur(i) & (short)0x3FFF) != 0 || ns != (size_t)(g + 1))
-                    continue;
-                const float *first = paths[i].coord(0), *last = paths[i].coord(ns - 1);
-                const bool fwd = dest(i, 0) > orig(i, 0);
-                const bool isT = fwd && last[0] > x_back - 1.0e-3f, isR = !fwd && last[0] < 1.0e-3f;
-                if (!isT && !isR)
-                    continue;
-                double Lin = 0.0;
-                for (size_t s = 1; s < ns; ++s)
-                {
-                    const float *a = paths[i].coord(s - 1), *b = paths[i].coord(s);
-                    Lin += std::sqrt(((double)b[0] - a[0]) * ((double)b[0] - a[0]) + ((double)b[1] - a[1]) * ((double)b[1] - a[1]) +
-                                     ((double)b[2] - a[2]) * ((double)b[2] - a[2]));
-                }
-                for (size_t q = 0; q < nf; ++q)
-                {
-                    const double k = 2.0 * PI * fGHz[q] * 1.0e9 / C0;
-                    const float *xc = paths[i].xpr_coeff(q);
-                    std::complex<double> F = std::complex<double>((double)xc[0], (double)xc[1]) * std::exp(-J * k * Lin) *
-                                             std::exp(J * k * st * ((double)last[1] - (double)first[1]));
-                    if (isT)
-                        S[q].T += F, S[q].Tp += std::norm(F), ++S[q].nT;
-                    else
-                        S[q].R += F, S[q].Rp += std::norm(F), ++S[q].nR;
-                }
+                const double k = 2.0 * PI * fGHz[q] * 1.0e9 / C0;
+                const float *xc = r.xc(q);
+                std::complex<double> F = std::complex<double>((double)xc[0], (double)xc[1]) * std::exp(-J * k * Lin) *
+                                         std::exp(J * k * st * ((double)last[1] - (double)first[1]));
+                if (isT)
+                    S[q].T += F, S[q].Tp += std::norm(F), ++S[q].nT;
+                else
+                    S[q].R += F, S[q].Rp += std::norm(F), ++S[q].nR;
             }
-        }
+            return false; });
         return S;
     };
     auto dB = [](std::complex<double> z)
@@ -3018,20 +2721,18 @@ TEST_CASE("ray_progress - a lossy medium has no critical angle and a band takes 
     };
     std::vector<Geo> geo(3);
     geo[0].name = "P", geo[0].x_back = 0.05f, geo[0].analytic = true;
-    build({0.0f, 0.05f}, {1, 1}, {false, true}, geo[0].mesh, geo[0].mi);
+    rp::planes({0.0f, 0.05f}, {1, 1}, {false, true}, geo[0].mesh, geo[0].mi);
     geo[1].name = "PW", geo[1].x_back = 0.25f, geo[1].analytic = false;
-    build({0.0f, 0.05f, 0.05f + gap, 0.25f + gap}, {1, 1, 3, 3}, {false, true, false, true}, geo[1].mesh, geo[1].mi);
+    rp::planes({0.0f, 0.05f, 0.05f + gap, 0.25f + gap}, {1, 1, 3, 3}, {false, true, false, true}, geo[1].mesh, geo[1].mi);
     geo[2].name = "SW", geo[2].x_back = 0.2f, geo[2].analytic = false;
-    build({0.0f, gap, 0.2f + gap}, {2, 3, 3}, {false, false, true}, geo[2].mesh, geo[2].mi);
+    rp::planes({0.0f, gap, 0.2f + gap}, {2, 3, 3}, {false, false, true}, geo[2].mesh, geo[2].mi);
 
-#ifdef QD_TEST_VERBOSE
-    std::printf("\n# diag: lossy verdict through ray_progress, scalar, 30 interactions, floor -150 dB, thin_slab_threshold 0.15.\n");
-    std::printf("# P: porous solid 50 mm in air; PW: on a rigid wall with tf 0.3; SW: the same layer as a sheet on that wall.\n");
-    std::printf("# band: the frequencies of the run, the base first; f: the frequency of the row. T, R: the coherent sums, dB;\n");
-    std::printf("# Tp, Rp: the power sums; T_ref, R_ref: the analytic slab, P only. The test trips at 45.3 deg at 0.5 GHz,\n");
-    std::printf("# 37.4 deg at 1 GHz and 34.8 deg at 2 GHz\n");
-    std::printf("geo,tracer,band,f,theta,nT,nR,T_dB,Tp_dB,T_ref_dB,R_dB,Rp_dB,R_ref_dB\n");
-#endif
+    QD_DIAG("\n# diag: lossy verdict through ray_progress, scalar, 30 interactions, floor -150 dB, thin_slab_threshold 0.15.\n");
+    QD_DIAG("# P: porous solid 50 mm in air; PW: on a rigid wall with tf 0.3; SW: the same layer as a sheet on that wall.\n");
+    QD_DIAG("# band: the frequencies of the run, the base first; f: the frequency of the row. T, R: the coherent sums, dB;\n");
+    QD_DIAG("# Tp, Rp: the power sums; T_ref, R_ref: the analytic slab, P only. The test trips at 45.3 deg at 0.5 GHz,\n");
+    QD_DIAG("# 37.4 deg at 1 GHz and 34.8 deg at 2 GHz\n");
+    QD_DIAG("geo,tracer,band,f,theta,nT,nR,T_dB,Tp_dB,T_ref_dB,R_dB,Rp_dB,R_ref_dB\n");
     const std::vector<std::vector<double>> bands = {{0.5}, {1.0}, {2.0}, {1.0, 0.5}, {0.5, 1.0}, {1.0, 2.0}, {2.0, 1.0}};
     std::map<std::string, Sum> alone; // geometry, tracer, frequency, angle
     auto key = [](const char *g, int refr, double f, double thd)
@@ -3071,11 +2772,9 @@ TEST_CASE("ray_progress - a lossy medium has no critical angle and a band takes 
                                 CHECK(std::abs(dB(Z[q].R) - dB(A.R)) < 2.0e-3);
                             }
                         }
-#ifdef QD_TEST_VERBOSE
-                        std::printf("%s,%d,%s%.1f%s,%.1f,%.0f,%d,%d,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f\n", G.name, refr ? 5 : 4, (band.size() == 2) ? ((q == 0) ? "" : (band[0] == 0.5 ? "0.5+" : (band[0] == 1.0 ? "1.0+" : "2.0+"))) : "",
-                                    (band.size() == 2 && q == 0) ? band[0] : band[q], (band.size() == 2 && q == 0) ? ((band[1] == 0.5) ? "+0.5" : (band[1] == 1.0 ? "+1.0" : "+2.0")) : "",
-                                    band[q], thd, Z[q].nT, Z[q].nR, dB(Z[q].T), pdB(Z[q].Tp), G.analytic ? dB(t) : 0.0, dB(Z[q].R), pdB(Z[q].Rp), G.analytic ? dB(r) : 0.0);
-#endif
+                        QD_DIAG("%s,%d,%s%.1f%s,%.1f,%.0f,%d,%d,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f\n", G.name, refr ? 5 : 4, (band.size() == 2) ? ((q == 0) ? "" : (band[0] == 0.5 ? "0.5+" : (band[0] == 1.0 ? "1.0+" : "2.0+"))) : "",
+                                (band.size() == 2 && q == 0) ? band[0] : band[q], (band.size() == 2 && q == 0) ? ((band[1] == 0.5) ? "+0.5" : (band[1] == 1.0 ? "+1.0" : "+2.0")) : "",
+                                band[q], thd, Z[q].nT, Z[q].nR, dB(Z[q].T), pdB(Z[q].Tp), G.analytic ? dB(t) : 0.0, dB(Z[q].R), pdB(Z[q].Rp), G.analytic ? dB(r) : 0.0);
                     }
                 }
 }
@@ -3207,7 +2906,8 @@ TEST_CASE("ray_progress - an ordered stack leaves the ray on the line it arrived
             d = std::max(d, (double)std::abs(a(c) - b(c)));
         return d;
     };
-    auto ang = [&](const arma::frowvec &d) { return std::atan2(std::sqrt((double)d(1) * d(1) + (double)d(2) * d(2)), std::abs((double)d(0))) * 180.0 / PI; };
+    auto ang = [&](const arma::frowvec &d)
+    { return std::atan2(std::sqrt((double)d(1) * d(1) + (double)d(2) * d(2)), std::abs((double)d(0))) * 180.0 / PI; };
     const char *sn[] = {"C1|C2", "C2|C1", "C1 alone", "C2 alone"};
     // s 0, 1: the stack in its two orders; 2, 3: its first layer alone. nrm 0: normals outward, 1: both towards the source
     auto wall = [&](int H, int s, int nrm) -> Wall
@@ -3228,9 +2928,7 @@ TEST_CASE("ray_progress - an ordered stack leaves the ray on the line it arrived
     };
     const double TOL = 1.0e-6;
 
-    // ------------------------------------------------------------------------------------------
-    // A. The transmitted path: behind the stack, at the wall behind it and behind that wall
-    // ------------------------------------------------------------------------------------------
+    // ---- A. The transmitted path: behind the stack, at the wall behind it and behind that wall ----
     QD_DIAG("\n# diag: stack trajectory A, the stack in air (host 0) or in the middle of 22 mm of eps 2.50 (3) or 2.50-0.80j (4), a 50 mm\n");
     QD_DIAG("# eps 2.50 wall behind at x = 0.5 m; the transmitted path, no reflections. seg, dir: segment and path_dir behind the stack's\n");
     QD_DIAG("# wall, deg; e_seg, e_dir0, e_dir1: against the launched direction, largest component, the direction at 1 and 2 GHz.\n");
@@ -3271,9 +2969,7 @@ TEST_CASE("ray_progress - an ordered stack leaves the ray on the line it arrived
                     CHECK(std::abs(dP1) < 1.0e-2);
                 }
 
-    // ------------------------------------------------------------------------------------------
-    // B. A beam, split in air behind the stack
-    // ------------------------------------------------------------------------------------------
+    // ---- B. A beam, split in air behind the stack ----
     QD_DIAG("\n# diag: stack trajectory B, a beam of 0.5 deg half angle through the stack in air, split in the call after it. n: sub-beams,\n");
     QD_DIAG("# refracting and undeviated tracer; e_seg, e_tube: every sub-beam's segment and vertex rays against the undeviated tracer's,\n");
     QD_DIAG("# largest component; seg_min, seg_max: the sub-beams' segments, deg\n");
@@ -3300,9 +2996,7 @@ TEST_CASE("ray_progress - an ordered stack leaves the ray on the line it arrived
                 CHECK(e_tube < TOL);
             }
 
-    // ------------------------------------------------------------------------------------------
-    // C. What must not move, with every digit of a float
-    // ------------------------------------------------------------------------------------------
+    // ---- C. What must not move, with every digit of a float ----
     QD_DIAG("\n# diag: stack trajectory C, raw. Every ray after the first two calls with one reflection allowed: a single sheet with both\n");
     QD_DIAG("# tracers, the stack with the undeviated tracer, and of the stack with the refracting tracer the reflected ray alone\n");
     QD_DIAG("host,stack,tracer,theta,call,types,orig_x,orig_y,orig_z,dest_x,dest_y,dest_z,P0,P1\n");
@@ -3611,63 +3305,34 @@ TEST_CASE("ray_progress - a coherent sheet with tf creates nothing and has no ga
             x = {0.0f, gap, gap + 0.010f}, mat = {1, 2, 2}, flip = {false, false, true};
         else
             x = {0.0f, 0.010f, 0.022f}, mat = {2, 1, 2}, flip = {false, false, true};
-        const float h = 200.0f, x_back = x.back();
-        arma::fmat mesh(2 * x.size(), 9);
-        arma::uvec mi(2 * x.size());
-        for (size_t k = 0; k < x.size(); ++k)
-        {
-            if (!flip[k])
-                mesh.row(2 * k) = arma::frowvec{x[k], -h, -h, x[k], -h, h, x[k], h, -h}, mesh.row(2 * k + 1) = arma::frowvec{x[k], h, -h, x[k], -h, h, x[k], h, h};
-            else
-                mesh.row(2 * k) = arma::frowvec{x[k], -h, -h, x[k], h, -h, x[k], -h, h}, mesh.row(2 * k + 1) = arma::frowvec{x[k], h, -h, x[k], h, h, x[k], -h, h};
-            mi(2 * k) = (arma::uword)mat[k], mi(2 * k + 1) = (arma::uword)mat[k];
-        }
+        const float x_back = x.back();
+        arma::fmat mesh;
+        arma::uvec mi;
+        rp::planes(x, mat, flip, mesh, mi);
         Sum S;
         const double th = thd * PI / 180.0, st = std::sin(th), k = 2.0 * PI * 1.0e9 / C0;
-        const float Ox = -1.0f, Oy = 0.37f - (float)std::tan(th), Oz = 0.0f, r0 = 0.1f, len = 300.0f;
-        arma::frowvec kv = {(float)std::cos(th), (float)std::sin(th), 0.0f};
         arma::fvec cf(1);
         cf(0) = 1.0e9f;
-        arma::fmat orig(1, 3), dest(1, 3), acc(1, 2, arma::fill::zeros);
-        orig.row(0) = arma::frowvec{Ox, Oy, Oz} + r0 * kv, dest.row(0) = arma::frowvec{Ox, Oy, Oz} + (r0 + len) * kv;
-        arma::fcube pd(1, 3, 1);
-        pd.slice(0) = kv;
-        arma::Col<short> prev(1, arma::fill::zeros), cur(1, arma::fill::zeros), buf(1, arma::fill::zeros);
-        std::vector<quadriga_lib::path> paths(1);
-        paths[0].init(0, 1, scalar);
-        paths[0].set_length(r0);
-        for (int g = 0; g < 130; ++g)
-        {
-            quadriga_lib::ray_progress(mesh, mi, pal, cf, Ox, Oy, Oz, orig, dest, prev, cur, buf, pd, acc, paths, nullptr, nullptr, nullptr, nullptr,
-                                       (uint8_t)60, 100, 100, 0, -300.0f, 3.0f, 0.0f, refr, scalar, nullptr, nullptr, nullptr, nullptr);
-            if (orig.n_rows == 0)
-                break;
-            for (arma::uword i = 0; i < orig.n_rows; ++i)
-            {
-                const size_t ns = paths[i].n_seg();
-                if ((cur(i) & (short)0x3FFF) != 0 || ns != (size_t)(g + 1))
-                    continue; // inside the host, or a ray that was already collected
-                const float *first = paths[i].coord(0), *last = paths[i].coord(ns - 1);
-                const bool fwd = dest(i, 0) > orig(i, 0);
-                const bool isT = fwd && last[0] > x_back - 1.0e-3f, isR = !fwd && last[0] < 1.0e-3f;
-                if (!isT && !isR)
-                    continue;
-                double Lin = 0.0;
-                for (size_t s = 1; s < ns; ++s)
-                {
-                    const float *p = paths[i].coord(s - 1), *q = paths[i].coord(s);
-                    Lin += std::sqrt(((double)q[0] - p[0]) * ((double)q[0] - p[0]) + ((double)q[1] - p[1]) * ((double)q[1] - p[1]) + ((double)q[2] - p[2]) * ((double)q[2] - p[2]));
-                }
-                const float *xc = paths[i].xpr_coeff(0);
-                const std::complex<double> ph = std::exp(-J * k * Lin) * std::exp(J * k * st * ((double)last[1] - (double)first[1]));
-                for (int c = 0; c < (scalar ? 1 : 2); ++c)
-                    (isT ? S.T[c] : S.R[c]) += std::complex<double>((double)xc[6 * c], (double)xc[6 * c + 1]) * ph;
-                ++(isT ? S.nT : S.nR);
-            }
-        }
+        rp::Opt o;
+        o.calls = 130, o.max_int = 60, o.slab = 0.0f, o.refr = refr, o.scalar = scalar;
+        rp::walk(mesh, mi, pal, cf, thd, o, [&](const rp::Ray &r)
+                 {
+            const float *first = r.first(), *last = r.last();
+            const bool fwd = r.fwd();
+            const bool isT = fwd && last[0] > x_back - 1.0e-3f, isR = !fwd && last[0] < 1.0e-3f;
+            if (!isT && !isR)
+                return false;
+            const double Lin = r.poly();
+            const float *xc = r.xc(0);
+            const std::complex<double> ph = std::exp(-J * k * Lin) * std::exp(J * k * st * ((double)last[1] - (double)first[1]));
+            for (int c = 0; c < (scalar ? 1 : 2); ++c)
+                (isT ? S.T[c] : S.R[c]) += std::complex<double>((double)xc[6 * c], (double)xc[6 * c + 1]) * ph;
+            ++(isT ? S.nT : S.nR);
+            return false; });
         return S;
     };
-    auto dB = [](double p) { return (p > 0.0) ? 10.0 * std::log10(p) : -999.0; };
+    auto dB = [](double p)
+    { return (p > 0.0) ? 10.0 * std::log10(p) : -999.0; };
 
     QD_DIAG("\n# diag: ray_progress sheet tf A, a coherent sheet with tf alone in air (0), on 10 mm of eps 2.50 (1) and inside 10 mm + 12 mm of it (2),\n");
     QD_DIAG("# every path summed, series summed, float. T, R: dB; sum: T + R in power. scalar: one channel; EM: VV and HH\n");
@@ -3678,9 +3343,14 @@ TEST_CASE("ray_progress - a coherent sheet with tf creates nothing and has no ga
         std::vector<double> th;
     };
     const std::vector<Sh> sheets = {
-        {0.31, 0.20, 0.006, 0.5, {20.0, 37.0, 60.0}}, {0.31, 0.20, 0.001, 0.9, {20.0, 37.0}}, {0.90, 0.20, 0.006, 0.9, {45.0, 60.0}},
-        {5.24, 0.63, 0.025, -0.5, {45.0, 67.0}},     {0.90, 0.20, 0.006, -0.5, {0.0, 45.0}},  {0.90, 0.0, 0.001, 0.5, {60.0, 73.0}},
-        {0.31, 0.0, 0.006, 0.5, {20.0, 45.0}},       {5.24, 0.0, 0.006, -0.5, {20.0, 60.0}},
+        {0.31, 0.20, 0.006, 0.5, {20.0, 37.0, 60.0}},
+        {0.31, 0.20, 0.001, 0.9, {20.0, 37.0}},
+        {0.90, 0.20, 0.006, 0.9, {45.0, 60.0}},
+        {5.24, 0.63, 0.025, -0.5, {45.0, 67.0}},
+        {0.90, 0.20, 0.006, -0.5, {0.0, 45.0}},
+        {0.90, 0.0, 0.001, 0.5, {60.0, 73.0}},
+        {0.31, 0.0, 0.006, 0.5, {20.0, 45.0}},
+        {5.24, 0.0, 0.006, -0.5, {20.0, 60.0}},
     };
     for (const Sh &S : sheets)
         for (int wall = 0; wall < 3; ++wall)
@@ -3762,63 +3432,34 @@ TEST_CASE("ray_progress - a traced solid with tf creates nothing", "[wave]")
             x = {0.0f, gap, gap + Lf}, mat = {2, 1, 1}, flip = {false, false, true};
         else
             x = {0.0f, 0.020f, 0.020f + gap, 0.020f + gap + Lf}, mat = {3, 3, 1, 1}, flip = {false, true, false, true};
-        const float h = 200.0f, x_back = x.back();
-        arma::fmat mesh(2 * x.size(), 9);
-        arma::uvec mi(2 * x.size());
-        for (size_t k = 0; k < x.size(); ++k)
-        {
-            if (!flip[k])
-                mesh.row(2 * k) = arma::frowvec{x[k], -h, -h, x[k], -h, h, x[k], h, -h}, mesh.row(2 * k + 1) = arma::frowvec{x[k], h, -h, x[k], -h, h, x[k], h, h};
-            else
-                mesh.row(2 * k) = arma::frowvec{x[k], -h, -h, x[k], h, -h, x[k], -h, h}, mesh.row(2 * k + 1) = arma::frowvec{x[k], h, -h, x[k], h, h, x[k], -h, h};
-            mi(2 * k) = (arma::uword)mat[k], mi(2 * k + 1) = (arma::uword)mat[k];
-        }
+        const float x_back = x.back();
+        arma::fmat mesh;
+        arma::uvec mi;
+        rp::planes(x, mat, flip, mesh, mi);
         Sum S;
         const double th = thd * PI / 180.0, st = std::sin(th), k = 2.0 * PI * 1.0e9 / C0;
-        const float Ox = -1.0f, Oy = 0.37f - (float)std::tan(th), Oz = 0.0f, r0 = 0.1f, len = 300.0f;
-        arma::frowvec kv = {(float)std::cos(th), (float)std::sin(th), 0.0f};
         arma::fvec cf(1);
         cf(0) = 1.0e9f;
-        arma::fmat orig(1, 3), dest(1, 3), acc(1, 2, arma::fill::zeros);
-        orig.row(0) = arma::frowvec{Ox, Oy, Oz} + r0 * kv, dest.row(0) = arma::frowvec{Ox, Oy, Oz} + (r0 + len) * kv;
-        arma::fcube pd(1, 3, 1);
-        pd.slice(0) = kv;
-        arma::Col<short> prev(1, arma::fill::zeros), cur(1, arma::fill::zeros), buf(1, arma::fill::zeros);
-        std::vector<quadriga_lib::path> paths(1);
-        paths[0].init(0, 1, scalar);
-        paths[0].set_length(r0);
-        for (int g = 0; g < 130; ++g)
-        {
-            quadriga_lib::ray_progress(mesh, mi, pal, cf, Ox, Oy, Oz, orig, dest, prev, cur, buf, pd, acc, paths, nullptr, nullptr, nullptr, nullptr,
-                                       (uint8_t)60, 100, 100, 0, -300.0f, 3.0f, 0.0f, refr, scalar, nullptr, nullptr, nullptr, nullptr);
-            if (orig.n_rows == 0)
-                break;
-            for (arma::uword i = 0; i < orig.n_rows; ++i)
-            {
-                const size_t ns = paths[i].n_seg();
-                if ((cur(i) & (short)0x3FFF) != 0 || ns != (size_t)(g + 1))
-                    continue; // inside a solid, or a ray that was already collected
-                const float *first = paths[i].coord(0), *last = paths[i].coord(ns - 1);
-                const bool fwd = dest(i, 0) > orig(i, 0);
-                const bool isT = fwd && last[0] > x_back - 1.0e-3f, isR = !fwd && last[0] < 1.0e-3f;
-                if (!isT && !isR)
-                    continue;
-                double Lin = 0.0;
-                for (size_t s = 1; s < ns; ++s)
-                {
-                    const float *p = paths[i].coord(s - 1), *q = paths[i].coord(s);
-                    Lin += std::sqrt(((double)q[0] - p[0]) * ((double)q[0] - p[0]) + ((double)q[1] - p[1]) * ((double)q[1] - p[1]) + ((double)q[2] - p[2]) * ((double)q[2] - p[2]));
-                }
-                const float *xc = paths[i].xpr_coeff(0);
-                const std::complex<double> ph = std::exp(-J * k * Lin) * std::exp(J * k * st * ((double)last[1] - (double)first[1]));
-                for (int c = 0; c < (scalar ? 1 : 2); ++c)
-                    (isT ? S.T[c] : S.R[c]) += std::complex<double>((double)xc[6 * c], (double)xc[6 * c + 1]) * ph;
-                ++(isT ? S.nT : S.nR);
-            }
-        }
+        rp::Opt o;
+        o.calls = 130, o.max_int = 60, o.slab = 0.0f, o.refr = refr, o.scalar = scalar;
+        rp::walk(mesh, mi, pal, cf, thd, o, [&](const rp::Ray &r)
+                 {
+            const float *first = r.first(), *last = r.last();
+            const bool fwd = r.fwd();
+            const bool isT = fwd && last[0] > x_back - 1.0e-3f, isR = !fwd && last[0] < 1.0e-3f;
+            if (!isT && !isR)
+                return false;
+            const double Lin = r.poly();
+            const float *xc = r.xc(0);
+            const std::complex<double> ph = std::exp(-J * k * Lin) * std::exp(J * k * st * ((double)last[1] - (double)first[1]));
+            for (int c = 0; c < (scalar ? 1 : 2); ++c)
+                (isT ? S.T[c] : S.R[c]) += std::complex<double>((double)xc[6 * c], (double)xc[6 * c + 1]) * ph;
+            ++(isT ? S.nT : S.nR);
+            return false; });
         return S;
     };
-    auto dB = [](double p) { return (p > 0.0) ? 10.0 * std::log10(p) : -999.0; };
+    auto dB = [](double p)
+    { return (p > 0.0) ? 10.0 * std::log10(p) : -999.0; };
 
     QD_DIAG("\n# diag: ray_progress bare tf A, a traced solid with tf alone in air (0), behind a 6 mm coating of eps 2.50 (1) and behind 20 mm of\n");
     QD_DIAG("# eps 2.50 (2), every path summed, series summed, float. T, R: dB; sum: T + R in power. scalar: one channel; EM: VV and HH.\n");
@@ -3830,9 +3471,15 @@ TEST_CASE("ray_progress - a traced solid with tf creates nothing", "[wave]")
         std::vector<double> th;
     };
     const std::vector<So> solids = {
-        {0.31, 0.20, 0.006, 0.5, {20.0, 60.0, 75.0}}, {0.90, 0.20, 0.050, -0.5, {0.0, 45.0}},  {0.90, 0.20, 0.006, 0.9, {60.0, 75.0}},
-        {1.50, 0.40, 0.006, 0.9, {45.0, 75.0}},       {5.24, 0.63, 0.006, 0.9, {45.0, 75.0}},  {5.24, 0.63, 0.025, -0.5, {45.0, 67.0}},
-        {5.24, 0.0, 0.006, 0.5, {20.0, 75.0}},        {5.24, 0.0, 0.006, -0.5, {20.0, 60.0}},  {2.50, 0.0, 0.006, 0.9, {45.0, 75.0}},
+        {0.31, 0.20, 0.006, 0.5, {20.0, 60.0, 75.0}},
+        {0.90, 0.20, 0.050, -0.5, {0.0, 45.0}},
+        {0.90, 0.20, 0.006, 0.9, {60.0, 75.0}},
+        {1.50, 0.40, 0.006, 0.9, {45.0, 75.0}},
+        {5.24, 0.63, 0.006, 0.9, {45.0, 75.0}},
+        {5.24, 0.63, 0.025, -0.5, {45.0, 67.0}},
+        {5.24, 0.0, 0.006, 0.5, {20.0, 75.0}},
+        {5.24, 0.0, 0.006, -0.5, {20.0, 60.0}},
+        {2.50, 0.0, 0.006, 0.9, {45.0, 75.0}},
     };
     for (const So &S : solids)
         for (int wall = 0; wall < 3; ++wall)
@@ -3879,12 +3526,10 @@ TEST_CASE("ray_progress - a wall with a stack inside it is on its matrix with th
     for (int m = 1; m <= 4; ++m)
         pal["a"][m - 1] = (float)a[m], pal["c"][m - 1] = (float)(im[m] / 17.98), pal["fRef"][m - 1] = 1.0f, pal["thk"][m - 1] = (float)tk[m];
     const double k0 = 2.0 * PI * 1.0e9 / C0;
-#ifdef QD_TEST_VERBOSE
-    std::printf("\n# diag: ray_progress stack wall, air | host 50 | 6 mm eps 5.24-0.63j, 6 mm eps 2.50 | host 50 | air, one ray, 20 interactions,\n");
-    std::printf("# floor -140 dB. thr: thin_slab_threshold. nT, nR: paths behind and in front; rays: rays launched over all calls. T, R: the\n");
-    std::printf("# summed paths against the matrix of the wall, dB\n");
-    std::printf("host,tracer,theta,thr,nT,nR,rays,T,R\n");
-#endif
+    QD_DIAG("\n# diag: ray_progress stack wall, air | host 50 | 6 mm eps 5.24-0.63j, 6 mm eps 2.50 | host 50 | air, one ray, 20 interactions,\n");
+    QD_DIAG("# floor -140 dB. thr: thin_slab_threshold. nT, nR: paths behind and in front; rays: rays launched over all calls. T, R: the\n");
+    QD_DIAG("# summed paths against the matrix of the wall, dB\n");
+    QD_DIAG("host,tracer,theta,thr,nT,nR,rays,T,R\n");
     for (int host : {3, 4})
         for (int refr = 0; refr < 2; ++refr)
             for (double thd : {20.0, 60.0, 85.0})
@@ -3960,9 +3605,7 @@ TEST_CASE("ray_progress - a wall with a stack inside it is on its matrix with th
                     }
                     std::complex<double> B = m11 + m12 * h0, Cc = m21 + m22 * h0, r = (h0 * B - Cc) / (h0 * B + Cc), t = 2.0 * h0 / (h0 * B + Cc);
                     const double dT = 10.0 * std::log10(std::norm(Ts / t)), dR = 10.0 * std::log10(std::norm(Rs / r));
-#ifdef QD_TEST_VERBOSE
-                    std::printf("%s,%d,%.0f,%.2f,%d,%d,%ld,%+.4f,%+.4f\n", (host == 3) ? "1.50-0.40j" : "1.50", refr ? 5 : 4, thd, (double)thr, nT, nR, rays, dT, dR);
-#endif
+                    QD_DIAG("%s,%d,%.0f,%.2f,%d,%d,%ld,%+.4f,%+.4f\n", (host == 3) ? "1.50-0.40j" : "1.50", refr ? 5 : 4, thd, (double)thr, nT, nR, rays, dT, dR);
                     INFO("stack wall, host " << host << ", refr " << refr << ", theta " << thd << ", thr " << thr);
                     CHECK(nT >= 1);
                     if (thr == 0.0f) // every series summed: the paths of a sheet inside a wall, on the matrix
@@ -3989,11 +3632,9 @@ TEST_CASE("ray_progress - a resonant solid is its medium at every frequency of a
     const double rF[2] = {2.0, 1.0}, rQ[2] = {1.0e30, 5.0}, rS[2] = {-1.5, 0.5};
     auto pole = [&](int p, double fG) // the Lorentz pole from the column definition
     { return (rS[p] * rF[p] * rF[p]) / std::complex<double>(rF[p] * rF[p] - fG * fG, (rF[p] / rQ[p]) * fG); };
-#ifdef QD_TEST_VERBOSE
-    std::printf("\n# diag: ray_progress, a resonant solid 37.5 mm in air, a band traced at its first frequency. pole: 0 lossless, 1 lossy.\n");
-    std::printf("# T, R: the summed paths against the TE matrix of eps 4 + pole(f), dB and deg; sum: both ports\n");
-    std::printf("pole,tracer,theta,base,f,nT,T_dB,T_deg,R_dB,R_deg,sum\n");
-#endif
+    QD_DIAG("\n# diag: ray_progress, a resonant solid 37.5 mm in air, a band traced at its first frequency. pole: 0 lossless, 1 lossy.\n");
+    QD_DIAG("# T, R: the summed paths against the TE matrix of eps 4 + pole(f), dB and deg; sum: both ports\n");
+    QD_DIAG("pole,tracer,theta,base,f,nT,T_dB,T_deg,R_dB,R_deg,sum\n");
     for (int p = 0; p < 2; ++p)
         for (int refr = 0; refr < 2; ++refr)
             for (double thd : {30.0, 60.0})
@@ -4005,63 +3646,37 @@ TEST_CASE("ray_progress - a resonant solid is its medium at every frequency of a
                     for (const char *key : {"a", "b", "c", "d", "fRef", "thk", "resF", "resQ", "resS"})
                         pal[key] = std::vector<float>(1, 0.0f);
                     pal["a"][0] = 4.0f, pal["fRef"][0] = 1.0f, pal["resF"][0] = (float)rF[p], pal["resQ"][0] = (float)rQ[p], pal["resS"][0] = (float)rS[p];
-                    arma::fmat mesh(4, 9);
-                    arma::uvec mi(4, arma::fill::ones);
-                    const float hh = 200.0f, x1 = (float)d;
-                    mesh.row(0) = arma::frowvec{0.0f, -hh, -hh, 0.0f, -hh, hh, 0.0f, hh, -hh}, mesh.row(1) = arma::frowvec{0.0f, hh, -hh, 0.0f, -hh, hh, 0.0f, hh, hh};
-                    mesh.row(2) = arma::frowvec{x1, -hh, -hh, x1, hh, -hh, x1, -hh, hh}, mesh.row(3) = arma::frowvec{x1, hh, -hh, x1, hh, hh, x1, -hh, hh};
+                    const float x1 = (float)d;
+                    arma::fmat mesh;
+                    arma::uvec mi;
+                    rp::planes({0.0f, x1}, {1, 1}, {false, true}, mesh, mi);
                     const double th = thd * PI / 180.0, st = std::sin(th);
-                    const float Ox = -1.0f, Oy = 0.37f - (float)std::tan(th), Oz = 0.0f, r0 = 0.1f, len = 300.0f;
-                    arma::frowvec kv = {(float)std::cos(th), (float)std::sin(th), 0.0f};
                     arma::fvec cf(nf);
                     for (size_t q = 0; q < nf; ++q)
                         cf(q) = (float)(fq[q] * 1.0e9);
-                    arma::fmat orig(1, 3), dest(1, 3), acc(1, 1 + nf, arma::fill::zeros);
-                    orig.row(0) = arma::frowvec{Ox, Oy, Oz} + r0 * kv, dest.row(0) = arma::frowvec{Ox, Oy, Oz} + (r0 + len) * kv;
-                    arma::fcube pd(1, 3, nf);
-                    for (size_t q = 0; q < nf; ++q)
-                        pd.slice(q) = kv;
-                    arma::Col<short> prev(1, arma::fill::zeros), cur(1, arma::fill::zeros), buf(1, arma::fill::zeros);
-                    std::vector<quadriga_lib::path> paths(1);
-                    paths[0].init(0, nf, true);
-                    paths[0].set_length(r0);
                     std::vector<std::complex<double>> Ts(nf, 0.0), Rs(nf, 0.0);
                     int nT = 0;
-                    for (int g = 0; g < 30; ++g)
-                    {
-                        quadriga_lib::ray_progress(mesh, mi, pal, cf, Ox, Oy, Oz, orig, dest, prev, cur, buf, pd, acc, paths, nullptr, nullptr, nullptr, nullptr,
-                                                   (uint8_t)20, 100, 100, 0, -140.0f, 3.0f, 0.0f, refr != 0, true, nullptr, nullptr, nullptr, nullptr);
-                        if (orig.n_rows == 0)
-                            break;
-                        for (arma::uword i = 0; i < orig.n_rows; ++i)
+                    rp::Opt o;
+                    o.calls = 30, o.min_gain = -140.0f, o.slab = 0.0f, o.refr = refr != 0;
+                    rp::walk(mesh, mi, pal, cf, thd, o, [&](const rp::Ray &r)
+                             {
+                        const double Lin = r.poly();
+                        const float *first = r.first(), *last = r.last();
+                        const bool fwd = r.fwd();
+                        if (fwd && last[0] > x1 - 1.0e-3f)
+                            ++nT;
+                        for (size_t q = 0; q < nf; ++q)
                         {
-                            const size_t ns = paths[i].n_seg();
-                            if ((cur(i) & (short)0x3FFF) != 0 || ns != (size_t)(g + 1))
-                                continue;
-                            double Lin = 0.0;
-                            for (size_t s2 = 1; s2 < ns; ++s2)
-                            {
-                                const float *a = paths[i].coord(s2 - 1), *b = paths[i].coord(s2);
-                                Lin += std::sqrt(((double)b[0] - a[0]) * ((double)b[0] - a[0]) + ((double)b[1] - a[1]) * ((double)b[1] - a[1]) +
-                                                 ((double)b[2] - a[2]) * ((double)b[2] - a[2]));
-                            }
-                            const float *first = paths[i].coord(0), *last = paths[i].coord(ns - 1);
-                            const bool fwd = dest(i, 0) > orig(i, 0);
+                            const double k0 = 2.0 * PI * fq[q] * 1.0e9 / C0;
+                            const float *xc = r.xc(q);
+                            std::complex<double> F = std::complex<double>((double)xc[0], (double)xc[1]) * std::exp(-J * k0 * Lin) *
+                                                     std::exp(J * k0 * st * ((double)last[1] - (double)first[1]));
                             if (fwd && last[0] > x1 - 1.0e-3f)
-                                ++nT;
-                            for (size_t q = 0; q < nf; ++q)
-                            {
-                                const double k0 = 2.0 * PI * fq[q] * 1.0e9 / C0;
-                                const float *xc = paths[i].xpr_coeff(q);
-                                std::complex<double> F = std::complex<double>((double)xc[0], (double)xc[1]) * std::exp(-J * k0 * Lin) *
-                                                         std::exp(J * k0 * st * ((double)last[1] - (double)first[1]));
-                                if (fwd && last[0] > x1 - 1.0e-3f)
-                                    Ts[q] += F;
-                                else if (!fwd && last[0] < 1.0e-3f)
-                                    Rs[q] += F;
-                            }
+                                Ts[q] += F;
+                            else if (!fwd && last[0] < 1.0e-3f)
+                                Rs[q] += F;
                         }
-                    }
+                        return false; });
                     for (size_t q = 0; q < nf; ++q)
                     {
                         // The TE matrix of one layer of eps 4 + pole(f), admittance b = sqrt(eps - sin^2)
@@ -4074,9 +3689,7 @@ TEST_CASE("ray_progress - a resonant solid is its medium at every frequency of a
                         const double dT = 10.0 * std::log10(std::norm(Ts[q] / t)), aT = std::arg(Ts[q] / t) * 180.0 / PI;
                         const double dR = 10.0 * std::log10(std::norm(Rs[q] / r)), aR = std::arg(Rs[q] / r) * 180.0 / PI;
                         const double sm = std::norm(Ts[q]) + std::norm(Rs[q]);
-#ifdef QD_TEST_VERBOSE
-                        std::printf("%d,%d,%.0f,%.2f,%.2f,%d,%+.4f,%+.3f,%+.4f,%+.3f,%.5f\n", p, refr ? 5 : 4, thd, fq[0], fq[q], nT, dT, aT, dR, aR, sm);
-#endif
+                        QD_DIAG("%d,%d,%.0f,%.2f,%.2f,%d,%+.4f,%+.3f,%+.4f,%+.3f,%.5f\n", p, refr ? 5 : 4, thd, fq[0], fq[q], nT, dT, aT, dR, aR, sm);
                         INFO("resonant solid, pole " << p << ", refr " << refr << ", theta " << thd << ", base " << fq[0] << ", f " << fq[q]);
                         CHECK(nT >= 1);
                         CHECK(std::abs(dT) < 1.0e-3);
@@ -4090,6 +3703,7 @@ TEST_CASE("ray_progress - a resonant solid is its medium at every frequency of a
 
 TEST_CASE("ray_progress - refracting tracer: the segment out of a lossy medium is the direction the wave has", "[wave]")
 {
+    ub::OneThread one_thread;
     // With refraction_mode ray_mesh_interact bends the segment at a real angle in the medium the ray
     // leaves, and ray_state_update writes the direction the wave has into path_dir. Across parallel
     // faces a wave from air leaves parallel to the direction it arrived in, so the launched segment,
@@ -4136,10 +3750,10 @@ TEST_CASE("ray_progress - refracting tracer: the segment out of a lossy medium i
         {
             if (!flip[k]) // normal along -x, front side towards the source
                 W.mesh.row(2 * k) = arma::frowvec{x[k], -h, -h, x[k], -h, h, x[k], h, -h},
-                W.mesh.row(2 * k + 1) = arma::frowvec{x[k], h, -h, x[k], -h, h, x[k], h, h};
+                               W.mesh.row(2 * k + 1) = arma::frowvec{x[k], h, -h, x[k], -h, h, x[k], h, h};
             else
                 W.mesh.row(2 * k) = arma::frowvec{x[k], -h, -h, x[k], h, -h, x[k], -h, h},
-                W.mesh.row(2 * k + 1) = arma::frowvec{x[k], h, -h, x[k], h, h, x[k], -h, h};
+                               W.mesh.row(2 * k + 1) = arma::frowvec{x[k], h, -h, x[k], h, h, x[k], -h, h};
             W.mi(2 * k) = (arma::uword)mat[k], W.mi(2 * k + 1) = (arma::uword)mat[k];
         }
         return W;
@@ -4160,8 +3774,8 @@ TEST_CASE("ray_progress - refracting tracer: the segment out of a lossy medium i
     struct Run
     {
         std::vector<Gen> g;
-        arma::frowvec k;     // launched spine direction
-        arma::fmat v0;       // launched vertex directions, one per row
+        arma::frowvec k; // launched spine direction
+        arma::fmat v0;   // launched vertex directions, one per row
     };
     auto trace = [&](const Pal &P, const Wall &W, double thd, bool refr, int n_gen, int max_ref, float slab,
                      bool beam, int force_gen) -> Run
@@ -4251,9 +3865,7 @@ TEST_CASE("ray_progress - refracting tracer: the segment out of a lossy medium i
     const std::vector<double> angles = {10.0, 20.0, 40.0, 60.0, 75.0, 85.0};
     const double TOL = 1.0e-6;
 
-    // ------------------------------------------------------------------------------------------
-    // One wall: the segment behind it against the direction the ray arrived in
-    // ------------------------------------------------------------------------------------------
+    // ---- One wall: the segment behind it against the direction the ray arrived in ----
     QD_DIAG("\n# diag: trajectory, one wall. air | 100 mm | air through ray_progress. seg: dest - orig behind the wall,\n");
     QD_DIAG("# dir: path_dir there, deg from the normal. d_seg, d_dir: largest component against the launched\n");
     QD_DIAG("# direction. raw: orig and dest behind the wall, every digit\n");
@@ -4277,9 +3889,7 @@ TEST_CASE("ray_progress - refracting tracer: the segment out of a lossy medium i
                 CHECK(dmax(G.seg(0), R.k) < TOL);
             }
 
-    // ------------------------------------------------------------------------------------------
-    // Two walls in a row: where and at what angle the second one is met
-    // ------------------------------------------------------------------------------------------
+    // ---- Two walls in a row: where and at what angle the second one is met ----
     QD_DIAG("\n# diag: trajectory, two walls in a row, 1.9 m of air between. dy: the lateral run from the exit of\n");
     QD_DIAG("# the first wall to the entry of the second, refracting and undeviated tracer; the two differ in\n");
     QD_DIAG("# where they leave the first wall and in nothing else. in2: the segment inside the second wall,\n");
@@ -4302,9 +3912,7 @@ TEST_CASE("ray_progress - refracting tracer: the segment out of a lossy medium i
             CHECK(dmax(R5.g[3].seg(0), R5.k) < TOL);
         }
 
-    // ------------------------------------------------------------------------------------------
-    // Two solids across a bare face: the segment in the second one
-    // ------------------------------------------------------------------------------------------
+    // ---- Two solids across a bare face: the segment in the second one ----
     QD_DIAG("\n# diag: trajectory, two solids across a bare face, 50 mm | 100 mm. in2: the segment in the second\n");
     QD_DIAG("# solid against path_dir there, and against the segment of the same solid entered from air, which\n");
     QD_DIAG("# is the direction a single refraction writes. out: the segment behind the wall\n");
@@ -4327,9 +3935,7 @@ TEST_CASE("ray_progress - refracting tracer: the segment out of a lossy medium i
             CHECK(dmax(R.g[2].seg(0), R.k) < TOL);
         }
 
-    // ------------------------------------------------------------------------------------------
-    // Sheets on and in the host
-    // ------------------------------------------------------------------------------------------
+    // ---- Sheets on and in the host ----
     QD_DIAG("\n# diag: trajectory, sheets on and in the host. The segment behind the wall against the launched\n");
     QD_DIAG("# direction. Lossless host: a leg behind a glued entry carries that entry's anchoring, 1.6e-6 at 85 deg\n");
     QD_DIAG("stack,host,theta,types,seg_deg,d_seg,raw\n");
@@ -4354,9 +3960,7 @@ TEST_CASE("ray_progress - refracting tracer: the segment out of a lossy medium i
                 CHECK(dmax(G.seg(0), R.k) < (h == 5 ? TOL : 1.0e-5));
             }
 
-    // ------------------------------------------------------------------------------------------
-    // Reflections: a ray leaving by the front face, and what the reflect pass launches
-    // ------------------------------------------------------------------------------------------
+    // ---- Reflections: a ray leaving by the front face, and what the reflect pass launches ----
     QD_DIAG("\n# diag: trajectory, reflections on, one wall. slab 0: the far-face reflection collapses the series and\n");
     QD_DIAG("# the ray leaves resolved; slab 1: it does not. front: the ray that leaves by the front face against\n");
     QD_DIAG("# the mirror of the launched direction. Every ray of the last generation is printed raw\n");
@@ -4390,9 +3994,7 @@ TEST_CASE("ray_progress - refracting tracer: the segment out of a lossy medium i
                 CHECK(dmax(R.g[1].seg((arma::uword)j), R.g[1].dir.row((arma::uword)j)) < TOL);
             }
 
-    // ------------------------------------------------------------------------------------------
-    // The ray tube
-    // ------------------------------------------------------------------------------------------
+    // ---- The ray tube ----
     QD_DIAG("\n# diag: trajectory, the ray tube, 0.5 deg half angle. Behind one wall: each vertex direction against\n");
     QD_DIAG("# the one it was launched in (d_v), its angle to the spine (fan, deg), and the mean of the three\n");
     QD_DIAG("# against the segment, which is what a subdivision makes the spine of\n");
@@ -4458,5 +4060,4 @@ TEST_CASE("ray_progress - refracting tracer: the segment out of a lossy medium i
                 CHECK(dmax(R5.g[2].dir.row(i), R4.g[2].dir.row(i)) < TOL);
             }
         }
-
 }

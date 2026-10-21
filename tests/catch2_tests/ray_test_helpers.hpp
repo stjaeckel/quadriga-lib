@@ -3,10 +3,8 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-// Shared helpers of the ray tests: test_wave_*.cpp and test_acoustic_*.cpp. The wave files hold every
-// case in which no material with the mass column (m > 0) is evaluated; the acoustic files hold the
-// cases in which one is. The three sections below are the file-scope code of the former
-// test_ray_state_update.cpp, test_ray_mesh_interact.cpp and test_ray_progress.cpp.
+// Shared helpers of the ray tests, test_wave_*.cpp and test_acoustic_*.cpp. The wave files hold every case in which no
+// material with the mass column (m > 0) is evaluated; the acoustic files hold the cases in which one is.
 
 #include <catch2/catch_test_macros.hpp>
 #ifdef _OPENMP
@@ -30,51 +28,48 @@
 #include <unordered_map>
 #include <vector>
 
-// Diagnostic tables. Comment out to silence them; the assertions of the diagnostic cases run either
-// way.
-#define QD_TEST_VERBOSE
-
-#ifdef QD_TEST_VERBOSE
+// Diagnostic tables print when the environment variable QD_TEST_DIAG is set and not "0"; the assertions run
+// either way. QD_DIAG is an expression, and its arguments are evaluated only when the tables print.
 #include <cstdio>
-#define QD_DIAG(...) std::printf(__VA_ARGS__)
-#else
-#define QD_DIAG(...) ((void)0)
-#endif
+#include <cstdlib>
 
-// ================================================================================================
-// ray_state_update: verification suite conventions and helpers
-// ================================================================================================
+static inline bool qd_diag()
+{
+    static const bool on = []
+    {
+        const char *v = std::getenv("QD_TEST_DIAG");
+        return v != nullptr && v[0] != '\0' && v[0] != '0';
+    }();
+    return on;
+}
+#define QD_DIAG(...) (qd_diag() ? (void)std::printf(__VA_ARGS__) : (void)0)
 
-// Verification suite for the public ray_state_update API (post-VBS refactor).
+// ==== ray_state_update: conventions and helpers ====
+
+// Every expected value comes from independent reference math (ITU-R P.2040 Fresnel and medium loss, the closed-form
+// Airy sum), not from library internals. Where the field depends on parts these references do not model (the
+// polarization basis, the Snell and mirror directions, the coefficients of interact_with), the checks assert physical
+// invariants instead: |R|^2 + |T|^2 <= 1, the gain against the power of xprmat, agreement between the two passes.
 //
-// All expected values come from independent reference math (ITU-R P.2040 Fresnel and medium
-// loss, the closed-form Airy sum), never from library internals. Where the corrected field
-// depends on internals that are not part of this translation unit (the polarization-basis
-// build qd_polbasis, the Snell/mirror direction updates, and Material::interact_with), the
-// affected checks assert physical invariants instead: energy balance |R|^2 + |T|^2 <= 1,
-// gain-vs-xprmat power consistency, and cross-pass agreement. The function is then its own
-// oracle only for the parts it alone can produce, and the physics is pinned by the invariant.
-//
-// Model of the refactored function (what this suite assumes and checks):
-//  - The interface Fresnel/Jones coefficient is written by ray_mesh_interact. ray_state_update
-//    CORRECTS the incoming field: in the geometric (no path_dir) path it is a pure multiply by
-//    the in-medium factor (magnitude sqrt(medium_gain), excess phase) and the thin-slab factor
-//    S; it OVERWRITES the field only on the VBS path or the EM per-polarization slab resolve.
-//  - Consequences used below: an o-i entry defers the medium loss (field kept); a no-crossing
-//    pass-through and a same-material transition reset the field to an isotropic unit interface
-//    (gain 1); a cavity exit / M2M transition / internal reflection multiplies by close * S.
-//  - State: three signed-short words (mat = w & 0x3FFF, resolved/non-parallel flag = w & 0x8000,
-//    bit 14 of the previous-medium word: the sheet in it lies inside the current medium).
-//  - resolved_typeN: the bit-encoded outcome code (qd::bits<uint8_t>), see the code table below.
+// What ray_state_update does to the field, as the cases use it:
+//  - ray_mesh_interact writes the interface coefficient; ray_state_update multiplies it by the in-medium factor
+//    (magnitude sqrt(medium_gain), excess phase) and the slab factor S. It overwrites the field only where a direction
+//    is handed in (the exact-cosine path) and in the per-polarization slab resolve of the EM types.
+//  - An o-i entry defers its medium loss (the field is kept); a pass-through without a crossing and a transition into
+//    the same material reset the field to a unit interface (gain 1); a cavity exit, a material-to-material transition
+//    and an internal reflection multiply by close * S.
+//  - State: three signed-short words, material = w & 0x3FFF. Bits 15 and 14 are, in the current word, the leg summed
+//    and the leg bent; in the previous-medium word, the faces not parallel and the sheet lying inside the current
+//    medium; in the buffer word, the mass code and the followed mark.
+//  - resolved_typeN: the bit-encoded outcome code (qd::bits<uint8_t>), see the table below.
 //
 // Conventions:
-//  - fbs_angleN uses the grazing convention (pi/2 at perpendicular incidence). The reference
-//    Fresnel below is parameterized by the angle from the surface normal theta_n, so tests feed
-//    fbs_angleN = pi/2 - theta_n.
+//  - fbs_angleN is the grazing angle (pi/2 at normal incidence). The references take the angle from the normal,
+//    theta_n, so the cases feed fbs_angleN = pi/2 - theta_n.
 //  - c0 = 299792458 m/s. The scalar (acoustic) Fresnel coefficient is the TE / admittance form.
-//  - Transmission amplitudes are energy-normalized, |t|^2 = 1 - |r|^2 (Stokes-consistent).
-//  - Extended material keys: "m" (mass-law slope), "tf"/"tfB" (transmission factor),
-//    "e"/"f"/"g"/"h" (permeability). These are the current obj_file_read column names.
+//  - Transmission amplitudes are energy-normalized, |t|^2 = 1 - |r|^2.
+//  - Column names are obj_file_read's: m (the mass column), tf / tfB (transmission factor), e / f / g / h
+//    (permeability).
 
 // Reference gain from ITU-R P.2040 (independent oracle, mu = 1 path).
 #ifndef calc_transition_gain_HELPER
@@ -196,8 +191,8 @@ static inline void set_mu(std::unordered_map<std::string, std::vector<dtype>> &m
 // a deduplicated (mtl_ind, mtl_prop-map) pair, matching what obj_file_read would emit.
 template <typename dtype>
 static inline void mtl_matrix_to_map0(const arma::Mat<dtype> &M,
-                                     arma::uvec &mtl_ind,
-                                     std::unordered_map<std::string, std::vector<dtype>> &mtl_prop)
+                                      arma::uvec &mtl_ind,
+                                      std::unordered_map<std::string, std::vector<dtype>> &mtl_prop)
 {
     static const char *names[9] = {"a", "b", "c", "d", "att", "attB", "alpha", "alphaB", "fRef"};
     const arma::uword n_face = M.n_rows;
@@ -269,8 +264,8 @@ static constexpr uint8_t RT_RINT_SLAB = 141;   // refl, inside, resolve, ok
 // Read one bit of a resolved_type / out_type code
 static inline bool rt_bit(uint8_t code, unsigned b) { return qd::bits<uint8_t>(code).test(b); }
 
-// State-word encoding (bit 15 = resolved / non-parallel flag, bits 0..14 = material index).
-// Uses qd::bits so the intent is explicit; never arithmetic negation.
+// State-word encoding: bit 15 the flag, bits 0..13 the material index; set through qd::bits, never by arithmetic
+// negation.
 static inline short enc(int m, bool flag)
 {
     qd::bits<short> w = (short)m;
@@ -348,14 +343,14 @@ static inline double half_wave(double n_real, double f_hz)
 
 // Material palette, 1-based indices, 0 = air:
 //   1 FOG1   eta = 1, alpha = 2 dB/m  (no Fresnel mismatch, pure in-medium loss)
-//   2 FOG2   identical to FOG1 but a distinct index (SAME(...) false, TRN exactly 1)
+//   2 FOG2   FOG1 under another index: another medium with the same eps and mu
 //   3 FOG3   eta = 1, alpha = 5 dB/m
 //   4 DENSE  eta = 4, lossless (n = 2, inside-face r = 1/3)
 //   5 NINE   eta = 9, lossless (n = 3, inside-face r = 1/2, lossless rho = 0.25)
 //   6 ABSORB eta = 4, alpha = 30 dB/m
 //   7 WEAK   eta = 1.21, lossless
-// b = c = d = att = attB = alphaB = 0, fRef = 1. eta is real and frequency-flat; the only
-// medium loss is alpha * dist dB, exactly medg(idx, dist).
+// b = c = d = att = attB = alphaB = 0, fRef = 1. eta is real and frequency-flat; the only medium loss is alpha * dist
+// dB, exactly medg(idx, dist).
 template <typename dtype>
 static inline std::unordered_map<std::string, std::vector<dtype>> base_palette()
 {
@@ -683,8 +678,8 @@ static Rsu<double> merge_rows(const std::vector<Rsu<double>> &v)
     return B;
 }
 
-// Type parity: the same scenario set in a second precision. Tolerances: 1e-9 for double, a
-// looser bound for float (the VBS / phase math accumulates more rounding than the legacy path).
+// Type parity: the same scenario set in a second precision. Tolerances: 1e-9 for double, a looser bound for float (the
+// exact-cosine and phase arithmetic rounds more in float).
 template <typename dtype>
 static void run_parity(double tol)
 {
@@ -770,8 +765,7 @@ static Rsu<double> make_valid()
     return C;
 }
 
-// Palette for the diagnostics, 1-based, 0 = air. Conductive so that the in-slab refraction
-// cosine is genuinely complex, which is the condition every open item below depends on.
+// Palette for the diagnostics, 1-based, 0 = air. Conductive, so that the in-slab refraction cosine is complex:
 //   1 LOSSY   eps = 5.24 - 0.63j at 1 GHz, no alpha
 //   2 CLEAN   eps = 5.24, lossless (control: every complex-angle effect vanishes)
 //   3 SHEET   electrically identical to LOSSY, plus thk = 6 mm (a distinct material index)
@@ -782,25 +776,18 @@ static Rsu<double> make_valid()
 //   8 LO_CLEAN_TWIN electrically identical to LO_CLEAN, plus thk = 6 mm
 //   9 LO_NEAR  eps = 1.5015 - 0.40j at 1 GHz, plus thk = 6 mm
 //
-// LO_NEAR is a sheet NEAR-matched to LO rather than matched to it. The 1e-3 relative offset in the
-// real part is large enough that TRANSPARENT_TO fails, so SHEET_EVENT does not merge the host layer
-// and the sheet is written into the previous-medium word, and small enough that the host | sheet
-// reflection is 2.5e-4 in amplitude, so the wave passes through it almost unimpeded. It is the case
-// section 3.1 names as the one merge_host cannot catch: correction-mode Fresnel reads r = 0 at that
-// boundary and drops the host layer's internal series, when physically the sheet is a nearly
-// transparent 6 mm layer through which the wave still sees the real boundary behind it.
+// LO_NEAR is near-matched to LO: the 1e-3 offset in the real part makes it a medium of its own, so the sheet is not
+// merged into the host and is written into the previous-medium word, while its reflection against LO is 2.5e-4 in
+// amplitude - a nearly transparent 6 mm layer through which the wave still sees the boundary behind it.
 //
-// The twins (3 with 1, 7 with 5, 8 with 6) are distinct material indices presenting no boundary to a
-// wave. Placed as the previous medium they make the far Fresnel coefficient vanish, so the Airy
-// denominator is 1 and the series factor is exactly 1 with everything else about the run untouched -
-// which is how a diagnostic measures its own reference instead of reconstructing it.
+// The twins (3 with 1, 7 with 5, 8 with 6) are distinct material indices presenting no boundary to a wave. Placed as
+// the previous medium they make the far Fresnel coefficient vanish, so the Airy denominator is 1 and the series factor
+// is exactly 1 with everything else about the run untouched: a case measures its own reference instead of
+// reconstructing it.
 //
-// The LO group exists because an i-o exit from eps 5.24 into air total-reflects above
-// asin(1/2.289) = 25.9 deg, which turns every row past 25 deg of an in-slab sweep into a
-// forced-TIR result carrying no information about the slab. eps 1.50 puts the critical angle at
-// asin(1/1.2247) = 54.7 deg, so a sweep to 50 deg stays entirely below it while keeping a loss
-// tangent of 0.27 - enough that the in-slab refraction cosine is genuinely complex, which is the
-// condition every open item depends on.
+// The LO group exists because an i-o exit from eps 5.24 into air total-reflects above asin(1/2.289) = 25.9 deg. eps
+// 1.50 puts the critical angle at asin(1/1.2247) = 54.7 deg, so a sweep to 50 deg stays below it, with a loss tangent
+// of 0.27 that keeps the in-slab cosine complex.
 template <typename dtype>
 static inline std::unordered_map<std::string, std::vector<dtype>> diag_palette()
 {
@@ -834,12 +821,10 @@ static inline std::complex<double> diag_eps(int idx, double f_hz)
     return std::complex<double>(a[idx], -17.98 * c[idx] / (f_hz * 1e-9));
 }
 
-// In-medium correction the function applies over an accumulated path L at fbs angle theta_n, with
-// no path_dir supplied. Two things this has to get right, both of which the first run got wrong:
-// the harness feeds theta_n straight in as fbs_angle, so abs_cos_theta_t is cos(theta_n) and NOT a
-// refracted cosine; and medium_gain is evaluated over dist_refract = L, the accumulated geometric
-// length, with no 1/cos factor. The excess phase then follows the walk-off form
-// k0 * (n - 1) * L * cos^2(theta_n), which the diagnostics confirmed to 0.000 deg.
+// In-medium correction ray_state_update applies over an accumulated path L at fbs angle theta_n, with no path_dir
+// handed in. The harness feeds theta_n straight in as fbs_angle, so the cosine is cos(theta_n) and not a refracted one,
+// and medium_gain is evaluated over the accumulated geometric length L with no 1/cos factor. The excess phase follows
+// the walk-off form k0 (n - 1) L cos^2(theta_n).
 static inline std::complex<double> diag_close(std::complex<double> eps, double L,
                                               double theta_n_rad, double f_hz)
 {
@@ -900,9 +885,9 @@ static inline double diag_medium_gain(std::complex<double> eps, double dist, dou
     return std::pow(10.0, -0.1 * (dist * 8.686 / Del));
 }
 
-// Slab-side Fresnel reflection at a slab|adjacent boundary, TE / scalar form, parameterized by
-// the cosine used on the slab side. Passing the real projection reproduces what fresnel_r does;
-// passing the exact complex in-slab cosine gives the value the entry boundary actually applied.
+// Slab-side Fresnel reflection at a slab | adjacent boundary, TE / scalar form, at a given slab-side cosine: the real
+// projection gives what slab_face_reflection computes from a traced direction, the exact complex in-slab cosine what
+// the entry boundary applied.
 static inline std::complex<double> diag_r_slabside(std::complex<double> eps_s, std::complex<double> eps_a,
                                                    std::complex<double> cos_slab)
 {
@@ -912,10 +897,8 @@ static inline std::complex<double> diag_r_slabside(std::complex<double> eps_s, s
     return (z1 * cos_slab - z2 * c2) / (z1 * cos_slab + z2 * c2);
 }
 
-// Exact analytic slab, TE/TM averaged power, air | slab | air. Independent of every library
-// internal; the same closed form the ray_mesh_interact suite uses as its oracle.
-// Exact analytic slab, per polarization. Same closed form as diag_slab_p_avg, which is the
-// average of the two outputs; split out because a scalar chain measures one channel.
+// Exact analytic slab, air | slab | air, per polarization; independent of the library. diag_slab_p_avg is the average
+// of the two outputs.
 static inline void diag_slab_p_pol(std::complex<double> eps_s, double thk,
                                    double theta_n_rad, double f_hz,
                                    double &p_te, double &p_tm,
@@ -923,7 +906,7 @@ static inline void diag_slab_p_pol(std::complex<double> eps_s, double thk,
 {
     const double k0 = 2.0 * QPI * f_hz / C0;
     const std::complex<double> z1(1.0, 0.0), z2 = std::sqrt(eps_s / mu_s),
-                               n = std::sqrt(eps_s * mu_s);
+                                             n = std::sqrt(eps_s * mu_s);
     const double c1 = std::cos(theta_n_rad), s1 = std::sin(theta_n_rad);
     const std::complex<double> c2 = std::sqrt(1.0 - (1.0 / (eps_s * mu_s)) * s1 * s1);
     const std::complex<double> phi = std::exp(std::complex<double>(0.0, -1.0) * k0 * n * thk * c2);
@@ -944,13 +927,13 @@ static inline void diag_slab_p_pol(std::complex<double> eps_s, double thk,
     p_te = p[0], p_tm = p[1];
 }
 
-// The transmission port Material::interact_with writes for a crossing e1 -> e2, at an incidence
-// cosine that may be complex: the raw Fresnel amplitude times the square root of its own
-// per-channel normal-flux obliquity factor, Re(z2 c2)/Re(z1 c1) for TE and the conjugated form for
-// TM. The diagnostic palette carries no tf and no att, so neither of those two scales appears.
+// The transmission port interact_with writes for a crossing e1 -> e2, at an incidence cosine that may be complex: the
+// raw Fresnel amplitude times the square root of its own per-channel normal-flux obliquity factor, Re(z2 c2)/Re(z1 c1)
+// for TE and the conjugated form for TM. The diagnostic palette carries no tf and no att, so neither of those two
+// scales appears.
 //
-// Passing a real cosine reproduces an ordinary face hit; passing the exact complex in-slab cosine
-// reproduces the far face of a traced solid.
+// A real cosine reproduces an ordinary face hit; the exact complex in-slab cosine reproduces the far face of a traced
+// solid.
 static inline void diag_port(std::complex<double> e1, std::complex<double> e2,
                              std::complex<double> ct1, bool scalar,
                              std::complex<double> &T_te, std::complex<double> &T_tm)
@@ -1054,12 +1037,11 @@ static inline std::complex<double> diag_medium_geo(std::complex<double> es, doub
            std::exp(std::complex<double>(0.0, -k0 * (n_re * dist - dist_geo)));
 }
 
-// In-medium traversal on the walk-off branch, in its general form. SCALE_BY_MEDIUM takes this
-// branch whenever walk_off is true, which on a sheet crossing means the reflection pass:
+// In-medium traversal on the walk-off branch, in its general form; the reflection pass of a sheet crossing takes it:
 //   sqrt(medium_gain(dist_refract)) * exp(-j k0 (n_re dist_refract ct_t^2 - dist_geo ct^2))
-// diag_medium_geo is the ct_t = ct = 1 special case of it and cannot be used where the traced and
-// geometric cosines differ. The palette carries no alpha and no mass term, so medium_gain is the
-// ITU-R P.2040 path form over dist_refract alone.
+// diag_medium_geo is the ct_t = ct = 1 special case of it and cannot be used where the traced and geometric cosines
+// differ. The palette carries no alpha and no mass term, so medium_gain is the ITU-R P.2040 path form over dist_refract
+// alone.
 static inline std::complex<double> diag_medium_walk(std::complex<double> es, double dist_refract,
                                                     double ct_traced, double dist_geo,
                                                     double ct_geo, double f_hz)
@@ -1094,7 +1076,7 @@ static inline void diag_ray_at(double theta_n_deg, arma::mat &orig, arma::mat &d
 
 // The relaunch offset of ray_mesh_interact (qd_relaunch_offset): 8 float ulp of the hit point's largest coordinate, at
 // least of 1 m. A ray leaves an event that far past the point it left at; the ledger of the leg that follows carries
-// that part from the event on, so the leg is measured from the point itself (decision 2026-10-19, md/precision_report.md 0).
+// that part from the event on, so the leg is measured from the point itself.
 static inline double qd_relaunch_nudge(double largest_coordinate)
 {
     return 8.0 * 1.1920929e-7 * std::max(std::abs(largest_coordinate), 1.0);
@@ -1157,7 +1139,7 @@ static inline double diag_slab_p_avg(std::complex<double> eps_s, double thk,
 // z = sqrt(eps/mu), every Snell ratio becomes a ratio of the products eps*mu, and the propagation
 // index becomes n = sqrt(eps*mu). The Fresnel groupings, the Airy assembly, the Stokes sign and the
 // flux conversion are already written in z and c and need no structural change. The three arguments
-// default to 1, so every dielectric call site reads exactly as before.
+// default to 1.
 //
 // Three lumped columns are carried through the trailing DiagLump, which see: the interface gains,
 // the sheet's transmission factor and a permittivity resonance on any of the three media. At its
@@ -1186,36 +1168,28 @@ static inline std::complex<double> diag_res(double resF, double resQ, double res
     return (resS * resF * resF) / std::complex<double>(resF * resF - f * f, (resF / resQ) * f);
 }
 
-// The lumped material columns a sheet composite can carry, as the reference takes them. Every
-// field defaults to the value at which it is inert, and at those defaults both builders below
-// execute the expressions they executed before this struct existed.
+// The lumped material columns a sheet composite can carry, as the reference takes them. Every field defaults to the
+// value at which it is inert.
 //
-//   g_slab, g_far   Interface power gains, 10^(-att/10) with the coincidence term folded in. They
-//                   multiply the transmit port only, as sqrt(g_slab * g_far). g_far is NOT gated
-//                   inside the builder: the row states what the far medium is owed - its own gain
-//                   where the wave newly enters it, 1 where the wave was already in it or leaves
-//                   into air - so the gate the library applies is measured against a statement of
-//                   the physics rather than against a copy of the test it is written as.
+//   g_slab, g_far   Interface power gains, 10^(-att/10). They multiply the transmit port only, as sqrt(g_slab * g_far).
+//                   g_far is not gated inside the builder: the row states what the far medium is owed - its own gain
+//                   where the wave newly enters it, 1 where the wave was already in it or leaves into air.
 //
-//   tf              The SHEET's transmission factor. tf is not a boundary admittance: it moves
-//                   energy between the reflected and the transmitted port of a boundary after the
-//                   Fresnel problem has been solved, so it has no place in the field-continuity
-//                   form and none in a characteristic matrix. It does have one in the Airy form,
-//                   which is written in per-boundary r and t, and that is the form this builder
-//                   is in. Per boundary and per channel, with R0 = |r|^2 the raw reflectance:
+//   tf              The sheet's transmission factor. tf is not a boundary admittance: it moves energy between the
+//                   reflected and the transmitted port of a boundary after the Fresnel problem has been solved, so it
+//                   has no place in a characteristic matrix. It does have one in the Airy form, which is written in
+//                   per-boundary r and t. Per boundary and per channel, with R0 = |r|^2 the raw reflectance:
 //                       R' = R0 (1 - tf)             for tf >= 0, a leak out of the reflection
 //                       R' = R0 + (1 - R0) (-tf)     for tf <  0, a forced reflection
 //                       r' = r sqrt(R' / R0)         t' = t sqrt((1 - R') / (1 - R0))
-//                   Each face is owed by the PAIR of media that form it, symmetrically: tf_near
-//                   and tf_far are the neighbours' columns, and diag_tf_port combines them with
-//                   the sheet's. With both at zero this is the sheet's own tf on both faces.
-//                   Preconditions: 0 < R0 < 1 on every boundary and channel wherever tf < 0, so
-//                   no exact Brewster angle, no matched boundary and no internal total reflection.
+//                   Each face is owed by the pair of media that form it: tf_near and tf_far are the neighbours'
+//                   columns, combined with the sheet's by the pair rule (diag_tf_pair). With both at zero this is the
+//                   sheet's own tf on both faces. Preconditions: 0 < R0 < 1 on every boundary and channel wherever tf is
+//                   negative, so no exact Brewster angle, no matched boundary and no internal total reflection.
 //
-//   res_*           Permittivity resonances, as increments. A resonance is part of the
-//                   permittivity: the admittance sqrt((eps + res)/mu), every cosine and the
-//                   propagation index sqrt((eps + res) mu) all read it, one medium at its faces
-//                   and inside it.
+//   res_*           Permittivity resonances, as increments. A resonance is part of the permittivity: the admittance
+//                   sqrt((eps + res)/mu), every cosine and the propagation index sqrt((eps + res) mu) all read it, one
+//                   medium at its faces and inside it.
 struct DiagLump
 {
     double g_slab = 1.0, g_far = 1.0;
@@ -1224,18 +1198,10 @@ struct DiagLump
     double tf_near = 0.0, tf_far = 0.0; // the neighbours' tf: each face is owed by the PAIR of media forming it
 };
 
-// tf redistribution at one boundary, one channel: rescales the reflection in place and returns the
-// factor the two transmission amplitudes of that boundary take.
-//
-// The rule is the symmetric two-medium one: a boundary is formed by two media and both act on it.
-// With tf+ = max(tf, 0) and tf- = max(-tf, 0) on either side,
+// tf at one boundary, one channel, by the pair rule: a boundary is formed by two media and both act on it. With tf+ =
+// max(tf, 0) and tf- = max(-tf, 0) on either side,
 //     R_leak = R0 (1 - tfA+) (1 - tfB+)        R' = R_leak + (1 - R_leak) max(tfA-, tfB-)
-// which is the single-medium rule whenever the other side carries no tf - bit for bit, since the
-// extra factor is 1.0 and the extra term is a product with 0.0.
-//
-// A boundary with no forward Fresnel port, 1 - R0 below 1e-9, has nothing to rescale and returns
-// 0 for the transmission factor; a caller that wants the flat leak of such a face reads it from
-// diag_tf_pair directly.
+// which is the single-medium rule whenever the other side carries no tf. Returns R'.
 static inline double diag_tf_pair(double R0, double tf_a, double tf_b)
 {
     double ap = (tf_a > 0.0) ? tf_a : 0.0, am = (tf_a < 0.0) ? -tf_a : 0.0;
@@ -1243,20 +1209,13 @@ static inline double diag_tf_pair(double R0, double tf_a, double tf_b)
     double Rl = R0 * (1.0 - ap) * (1.0 - bp);
     return Rl + (1.0 - Rl) * ((am > bm) ? am : bm);
 }
-static inline double diag_tf_port(std::complex<double> &r, double tf, double tf_other = 0.0)
-{
-    double R0 = std::norm(r);
-    double Rt = diag_tf_pair(R0, tf, tf_other);
-    r = (R0 > 0.0) ? r * std::sqrt(Rt / R0) : std::complex<double>(0.0, 0.0);
-    return (1.0 - R0 > 1.0e-9) ? std::sqrt((1.0 - Rt) / (1.0 - R0)) : 0.0;
-}
 
 // tf at the face of a coherent sheet: an ideal transformer of real ratio k = sqrt(nu) in front of
 // the far side of the boundary. With beta = (1 - r) / (1 + r) the admittance ratio of the two
 // sides, the face is the Fresnel face of the ratio nu beta, r' = (1 - nu beta) / (1 + nu beta), and
 // both crossings take k (1 + r') / (1 + r). nu comes from the pair rule applied to the real
 // reflection of the modulus of beta; for a real beta that is the pair rule on r itself, so the
-// factor is diag_tf_port's. The flux across the face is continuous for any two media. Rescales the
+// transmission factor is sqrt((1 - R') / (1 - R0)). The flux across the face is continuous for any two media. Rescales the
 // reflection in place and returns the factor of the two transmission amplitudes. A face with r of
 // exactly +1 or -1 is left as it is.
 static inline std::complex<double> diag_tf_face(std::complex<double> &r, double tf, double tf_other = 0.0)
@@ -1349,8 +1308,7 @@ static inline DiagSheet diag_sheet_composite(std::complex<double> e_near, std::c
         std::exp(std::complex<double>(0.0, -1.0) * k0 * std::sqrt(i_disp * mu_disp) * thk * c_disp);
     const std::complex<double> phi_t = phi / phi_disp;
 
-    // The sheet's tf, on both of its faces. Skipped outright at tf = 0, so that case executes
-    // nothing it did not execute before.
+    // The sheet's tf, on both of its faces; skipped at tf = 0.
     //
     // Each face whose pair carries tf is a transformer, propagating or tunnelling. A far face with
     // no wave behind it - a lossless far medium past the critical angle of the outer pair - is the
@@ -1510,21 +1468,19 @@ static inline DiagSheet diag_sheet_composite_cx(std::complex<double> e_near, std
     return D;
 }
 
-// One layer of a stratified stack: a complex permittivity and permeability pair and a normal
-// thickness. Permeability is carried from the start even though nothing supplies it yet, because
-// issue 3 generalizes the two builders above the same way and the core is meant to inherit a
-// reference that already has it.
+// One layer of a stratified stack: a complex permittivity and permeability pair, a normal thickness, and the lumped
+// columns the scattering form reads.
 struct DiagLayer
 {
     std::complex<double> e{1.0, 0.0};
     std::complex<double> mu{1.0, 0.0};
-    double d = 0.0;                  // normal thickness, m
+    double d = 0.0;                     // normal thickness, m
     std::complex<double> res{0.0, 0.0}; // permittivity resonance, part of the permittivity, see DiagLump
-    double alpha = 0.0;              // in-medium absorption, dB per meter of path
-    double tf = 0.0;                 // transmission factor; read by diag_sc_stack only
-    double m = 0.0;                  // mass-law slope, dB/decade; read by diag_sc_stack only
-    double fRef = 1.0;               // reference frequency of the mass-law argument, GHz
-    double g = 1.0;                  // interface power gain, on the reflect port's echo; diag_sc_stack only
+    double alpha = 0.0;                 // in-medium absorption, dB per meter of path
+    double tf = 0.0;                    // transmission factor; read by diag_sc_stack only
+    double m = 0.0;                     // mass-law slope, dB/decade; read by diag_sc_stack only
+    double fRef = 1.0;                  // reference frequency of the mass-law argument, GHz
+    double g = 1.0;                     // interface power gain, on the reflect port's echo; diag_sc_stack only
 };
 
 // Hand-built 2x2 characteristic-matrix reference for an ordered stack of layers between two
@@ -1685,8 +1641,8 @@ static inline DiagSheet diag_cm_stack(std::complex<double> e_near, std::complex<
     return D;
 }
 
-// The mass-law term of Material::medium_gain, in dB, written from the column definition (md/acoustic.md
-// 2.1, M10: m > 0 switches the limp mass law on, 20 dB per decade, whatever its value):
+// The mass-law term of the column definition, in dB (m > 0 switches the limp mass law on, 20 dB per decade, whatever
+// its value):
 //     X0 = (f / fRef) M        A = 20 log10 X0
 //     TL = A log10(1 + (X0 c)^2) / log10(1 + X0^2)
 // with M the normal thickness and c the real incidence cosine. Zero below an argument of one.
@@ -1708,7 +1664,7 @@ static inline double diag_mass_TL(double m, double fRef_GHz, double f_hz, double
 // A characteristic matrix states field continuity and has no per-boundary reflection to rescale.
 // This form does. Each boundary a|b is a two-port in the library's own amplitude convention,
 //     r, t_ab, t_ba, and r_ba = -r,
-// rescaled by diag_tf_port under the pair rule with the tf of the two media that form it, and each
+// rescaled under the pair rule (diag_tf_pair) with the tf of the two media that form it, and each
 // layer is a one-way factor phi = exp(-j k0 n d c) times its alpha term. The stack is the product
 // of the wave-transfer matrices B_1 P_1 B_2 ... B_{N+1}, evaluated here by recursion from the far
 // end so that a closed boundary (t = 0 at tf = -1) and an opaque layer need no inverse:
@@ -1721,8 +1677,8 @@ static inline double diag_mass_TL(double m, double fRef_GHz, double f_hz, double
 // amplitude factor - the conductivity loss and its alpha over d / mass_cos, the path the held wave
 // takes, and the mass term at the real incidence cosine mass_cos - and starts the next segment as
 // its incidence half-space. Nothing returns across it, so the reflect port is that of the first
-// segment alone. Mass-law layers with no coherent layer between them are one plate (the plate rule,
-// md/acoustic.md 10 N1): its faces are the transformer, the faces inside it pass what reaches them and
+// segment alone. Mass-law layers with no coherent layer between them are one plate (the plate rule):
+// its faces are the transformer, the faces inside it pass what reaches them and
 // reflect nothing, its first face passes a (its flux transmittance), and its last face puts the whole
 // right so that the plate passes a tau / (a + tau - a tau), a the smaller of what its two outer faces
 // pass, tau the product of its layers' factors. With no coherent layer at all this is the mass-law
@@ -1833,7 +1789,7 @@ static inline DiagSheet diag_sc_stack(std::complex<double> e_near, std::complex<
         };
 
         // Mass-law layers with no coherent layer between them are bonded and are one plate: its
-        // impedance ratio is the sum of theirs, X0 = (f / fRef) d each (M10: one slope), and the plate
+        // impedance ratio is the sum of theirs, X0 = (f / fRef) d each (one slope), and the plate
         // pays the single-body term of that sum once. A lone layer keeps diag_mass_TL.
         auto plate_TL = [&](double X)
         {
@@ -1861,7 +1817,7 @@ static inline DiagSheet diag_sc_stack(std::complex<double> e_near, std::complex<
             {
                 const DiagLayer &L = layers[q - 1];
                 double dist = L.d / mass_cos; // the held path
-                if (q - p > 1) // a coherent layer in between: a new plate
+                if (q - p > 1)                // a coherent layer in between: a new plate
                     run = 0, X_plate = 0.0, paid_dB = 0.0;
                 double mass_dB;
                 if (run == 0)
@@ -2021,13 +1977,8 @@ static inline DiagLeak diag_leak_series(std::complex<double> e_near, std::comple
     return D;
 }
 
-// ================================================================================================
-// Branches that had a guard and no row: the displacement budget, float, a corner with a sheet,
-// the core's loss cap, ray_mesh_interact's own composite, a mixed stack, the followed mark and the
-// resolved flag across abutting, nested and overlapping bodies, a verdict handed in, and a sheet
-// without the mass column in a mass-law host. Every chain runs through ray_triangle_intersect,
-// ray_mesh_interact and ray_state_update, one ray per call.
-// ================================================================================================
+// ==== One ray through ray_triangle_intersect, ray_mesh_interact and ray_state_update: one event, a chain, every path
+// ====
 namespace ub
 {
     typedef std::unordered_map<std::string, std::vector<double>> Pal;
@@ -2042,10 +1993,10 @@ namespace ub
     struct Opt
     {
         double eps = 1.5;
-        bool relaunch = false;                       // hand origN and destN to ray_state_update
-        const std::vector<uint8_t> *vin = nullptr;   // verdict_inN
+        bool relaunch = false;                     // hand origN and destN to ray_state_update
+        const std::vector<uint8_t> *vin = nullptr; // verdict_inN
         const arma::mat *trivec = nullptr, *tridir = nullptr;
-        unsigned fi_in = 0, si_in = 0;               // a tie handed in: replace the intersector's first and second face (1-based)
+        unsigned fi_in = 0, si_in = 0; // a tie handed in: replace the intersector's first and second face (1-based)
     };
     struct OneThread
     {
@@ -2316,9 +2267,7 @@ namespace cf
     }
 }
 
-// ================================================================================================
-// ray_mesh_interact: reference oracles and mesh helpers
-// ================================================================================================
+// ==== ray_mesh_interact: reference oracles and mesh helpers ====
 
 // Exact analytic slab, complex angles throughout, per polarization:
 //   T = t12 t23 phi / (1 - r12 r23 phi^2),  phi = exp(-j k0 n d cos(theta_slab))
@@ -2522,15 +2471,13 @@ static inline QdIfaceRef qd_iface_ref(std::complex<double> e1, std::complex<doub
     return F;
 }
 
-// Two coplanar triangles spanning +-half in y and z at x = x0, normal along -x. Built by hand
-// rather than through plane() so the face extent - which drives the thin-sheet grazing clamp - is
-// set explicitly and independently of the builder's conventions.
+// Two coplanar triangles spanning +-half in y and z at x = x0, normal along -x. Built by hand rather than through
+// plane() so the face extent is set explicitly.
 //
-// The winding matters and is easy to get wrong. ray_mesh_interact forms
-// thetaF = acos(OD . N) - pi/2, so a normal pointing ALONG the ray gives thetaF < 0, which is a
-// back-side hit: the face material becomes M1 and the interaction is medium -> air, not air ->
-// medium. With the rays below travelling towards +x the normal has to point at -x. The shared
-// triangulation edge runs along y + z = 0, so a ray in the z = 0 plane must not cross at y = 0.
+// The winding decides the side: ray_mesh_interact forms theta_fbs = acos(OD . N) - pi/2, so a normal pointing along the
+// ray gives theta_fbs < 0, a back-side hit, and the crossing is medium -> air. With the rays below travelling towards
+// +x the normal has to point at -x. The shared triangulation edge runs along y + z = 0, so a ray in the z = 0 plane
+// must not cross at y = 0.
 static inline arma::mat qd_quad_x(double half, double x0)
 {
     arma::mat m(2, 9);
@@ -2539,30 +2486,10 @@ static inline arma::mat qd_quad_x(double half, double x0)
     return m;
 }
 
-// The same square as qd_quad_x, meshed as 2 * n^2 triangles instead of 2. Same plane, same normal
-// orientation, same material - only the triangulation differs. Every cell is split on the same
-// diagonal as the parent quad, so the winding and therefore the normal direction are unchanged.
-static inline arma::mat qd_quad_x_sub(double half, double x0, int n)
-{
-    arma::mat m((arma::uword)(2 * n * n), 9);
-    double step = 2.0 * half / (double)n;
-    arma::uword row = 0;
-    for (int iy = 0; iy < n; ++iy)
-        for (int iz = 0; iz < n; ++iz)
-        {
-            double y0 = -half + step * (double)iy, y1 = y0 + step;
-            double z0 = -half + step * (double)iz, z1 = z0 + step;
-            m.row(row++) = arma::rowvec{x0, y0, z0, x0, y0, z1, x0, y1, z0};
-            m.row(row++) = arma::rowvec{x0, y1, z0, x0, y0, z1, x0, y1, z1};
-        }
-    return m;
-}
-
-// The same square as qd_quad_x with the winding reversed, so the normal points along +x. A ray
-// travelling towards +x then produces thetaF < 0, which is a back-side hit: the face material
-// becomes M1 and the crossing is medium -> air. That is the same trick ray_mesh_interact uses to
-// recover the incidence medium without any state. The triangulation edge is unchanged, so the
-// rays from qd_ray_at clear it exactly as they do for the front-side quad.
+// The same square as qd_quad_x with the winding reversed, so the normal points along +x: a ray travelling towards +x
+// makes a back-side hit, and the crossing is medium -> air, which is how ray_mesh_interact recovers the incidence
+// medium without any state. The triangulation edge is unchanged, so the rays from qd_ray_at clear it as they do for the
+// front-side quad.
 static inline arma::mat qd_quad_x_rev(double half, double x0)
 {
     arma::mat m(2, 9);
@@ -2682,9 +2609,7 @@ struct QdSheetFace
     }
 };
 
-// ================================================================================================
-// ray_progress: scenes and launch configurations
-// ================================================================================================
+// ==== ray_progress: scenes and launch configurations ====
 
 // Verification suite for the public ray_progress API.
 //
@@ -2729,7 +2654,7 @@ struct QdSheetFace
 
 namespace
 {
-    constexpr float PROG_FRQ = 10.0e9f;      // Reference frequency
+    constexpr float PROG_FRQ = 10.0e9f; // Reference frequency
     constexpr float R0 = 0.1f;          // Launch sphere radius
     constexpr float WIDE_DEG = 1.0f;    // Beam half-angle that subdivides at SUB_TOL
     constexpr float NARROW_DEG = 0.01f; // Beam half-angle that never subdivides
@@ -2739,9 +2664,7 @@ namespace
     // linked for single precision here, so do it directly.
     float nrm3(const arma::frowvec &v) { return std::sqrt(v(0) * v(0) + v(1) * v(1) + v(2) * v(2)); }
 
-    // ---------------------------------------------------------------------------------------
-    // Materials
-    // ---------------------------------------------------------------------------------------
+    // ---- Materials ----
 
     // Lossless dielectric, eps_r = 5, frequency independent
     arma::frowvec mtl_dielectric() { return {5.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f}; }
@@ -2749,9 +2672,7 @@ namespace
     // ITU-style concrete: eps_r = 5.24, sigma = 0.0462 * f^0.7822 -> frequency dependent
     arma::frowvec mtl_concrete() { return {5.24f, 0.0f, 0.0462f, 0.7822f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f}; }
 
-    // ---------------------------------------------------------------------------------------
-    // Scene
-    // ---------------------------------------------------------------------------------------
+    // ---- Scene ----
 
     struct Scene
     {
@@ -2783,9 +2704,7 @@ namespace
         return S;
     }
 
-    // ---------------------------------------------------------------------------------------
-    // Launch configuration
-    // ---------------------------------------------------------------------------------------
+    // ---- Launch configuration ----
 
     // The optional block of ray_progress, so a scenario reads as one call
     struct Opt
@@ -2947,9 +2866,7 @@ namespace
         }
     }
 
-    // ---------------------------------------------------------------------------------------
-    // Delegated ray-mesh intersection
-    // ---------------------------------------------------------------------------------------
+    // ---- Delegated ray-mesh intersection ----
 
     // Intersection results, computed exactly the way a caller delegating the work would
     struct Hits
@@ -3001,9 +2918,7 @@ namespace
         return n;
     }
 
-    // ---------------------------------------------------------------------------------------
-    // Assertions
-    // ---------------------------------------------------------------------------------------
+    // ---- Assertions ----
 
     // Every returned block matches n_out, keeps its column count, and is finite
     void check_shapes(const Cfg &C, arma::uword n_out)
@@ -3151,9 +3066,107 @@ namespace
     }
 }
 
-// ================================================================================================
-// Acoustic frequency mapping and single-material helpers (former test_acoustic_interactions.cpp)
-// ================================================================================================
+// ==== One ray through ray_progress until none is left ====
+namespace rp
+{
+    typedef std::unordered_map<std::string, std::vector<float>> Pal;
+
+    // Faces in the planes x = const, 400 m square, their normal towards -x, or towards +x where flip is set
+    static inline void planes(const std::vector<float> &x, const std::vector<int> &mat, const std::vector<bool> &flip, arma::fmat &mesh, arma::uvec &mi)
+    {
+        const float h = 200.0f;
+        mesh.set_size(2 * x.size(), 9);
+        mi.set_size(2 * x.size());
+        for (size_t k = 0; k < x.size(); ++k)
+        {
+            if (!flip[k])
+                mesh.row(2 * k) = arma::frowvec{x[k], -h, -h, x[k], -h, h, x[k], h, -h},
+                mesh.row(2 * k + 1) = arma::frowvec{x[k], h, -h, x[k], -h, h, x[k], h, h};
+            else
+                mesh.row(2 * k) = arma::frowvec{x[k], -h, -h, x[k], h, -h, x[k], -h, h},
+                mesh.row(2 * k + 1) = arma::frowvec{x[k], h, -h, x[k], h, h, x[k], -h, h};
+            mi(2 * k) = (arma::uword)mat[k], mi(2 * k + 1) = (arma::uword)mat[k];
+        }
+    }
+
+    // The ray_progress arguments a walk sets; it uses no ray tube, no subdivision and no delegated intersection
+    struct Opt
+    {
+        int calls = 80; // at most
+        uint8_t max_int = 20, max_refl = 100, max_trans = 100;
+        float min_gain = -300.0f, slab = 0.15f;
+        bool refr = false, scalar = true;
+    };
+
+    // A ray the last call left in air: row i after call g (from 0), with ns segments
+    struct Ray
+    {
+        const std::vector<quadriga_lib::path> &paths;
+        const arma::fmat &orig, &dest;
+        const arma::fcube &pd;
+        arma::uword i;
+        int g;
+        size_t ns;
+        bool fwd() const { return dest(i, 0) > orig(i, 0); }
+        const float *first() const { return paths[i].coord(0); }
+        const float *last() const { return paths[i].coord(ns - 1); }
+        const float *xc(size_t q) const { return paths[i].xpr_coeff(q); }
+        double poly() const // the length of the polyline from its first to its last point
+        {
+            double L = 0.0;
+            for (size_t s = 1; s < ns; ++s)
+            {
+                const float *a = paths[i].coord(s - 1), *b = paths[i].coord(s);
+                L += std::sqrt(((double)b[0] - a[0]) * ((double)b[0] - a[0]) + ((double)b[1] - a[1]) * ((double)b[1] - a[1]) +
+                               ((double)b[2] - a[2]) * ((double)b[2] - a[2]));
+            }
+            return L;
+        }
+    };
+
+    // One ray from (-1, 0.37 - tan(theta), 0), in the x-y plane at theta to the x axis, launched 0.1 m out and 300 m long at
+    // the frequencies cf (Hz), through ray_progress until no ray is left or o.calls calls are made. take(ray) is called once
+    // for every ray that is in air and was extended by the last call, and returns true to end the walk. Returns the number of
+    // calls that left rays.
+    template <class Take>
+    static int walk(const arma::fmat &mesh, const arma::uvec &mi, const Pal &pal, const arma::fvec &cf, double thd, const Opt &o, Take take)
+    {
+        const size_t nf = cf.n_elem;
+        const double th = thd * QPI / 180.0;
+        const float Ox = -1.0f, Oy = 0.37f - (float)std::tan(th), Oz = 0.0f, r0 = 0.1f, len = 300.0f;
+        const arma::frowvec kv = {(float)std::cos(th), (float)std::sin(th), 0.0f};
+        arma::fmat orig(1, 3), dest(1, 3), acc(1, 1 + nf, arma::fill::zeros);
+        orig.row(0) = arma::frowvec{Ox, Oy, Oz} + r0 * kv;
+        dest.row(0) = arma::frowvec{Ox, Oy, Oz} + (r0 + len) * kv;
+        arma::fcube pd(1, 3, nf);
+        for (size_t q = 0; q < nf; ++q)
+            pd.slice(q) = kv;
+        arma::Col<short> prev(1, arma::fill::zeros), cur(1, arma::fill::zeros), buf(1, arma::fill::zeros);
+        std::vector<quadriga_lib::path> paths(1);
+        paths[0].init(0, nf, o.scalar);
+        paths[0].set_length(r0);
+        int n = 0;
+        for (int g = 0; g < o.calls; ++g)
+        {
+            quadriga_lib::ray_progress(mesh, mi, pal, cf, Ox, Oy, Oz, orig, dest, prev, cur, buf, pd, acc, paths, nullptr, nullptr, nullptr,
+                                       nullptr, o.max_int, o.max_refl, o.max_trans, 0, o.min_gain, 3.0f, o.slab, o.refr, o.scalar);
+            if (orig.n_rows == 0)
+                break;
+            n = g + 1;
+            for (arma::uword i = 0; i < orig.n_rows; ++i)
+            {
+                const size_t ns = paths[i].n_seg();
+                if ((cur(i) & (short)0x3FFF) != 0 || ns != (size_t)(g + 1))
+                    continue; // inside a body, or collected after an earlier call
+                if (take(Ray{paths, orig, dest, pd, i, g, ns}))
+                    return n;
+            }
+        }
+        return n;
+    }
+}
+
+// ==== Acoustic frequency mapping and single-material helpers ====
 
 #include <utility>
 #include <catch2/catch_approx.hpp>
@@ -3196,10 +3209,9 @@ static inline double ref_scalar_reflection_gain(std::complex<double> eta1, std::
     return std::norm(R_te);
 }
 
-// Single-interface gain from ray_mesh_interact. Computes the ray-triangle indices, runs the
-// interaction, and returns the per-ray gain. interaction_type: 3 = scalar reflection,
-// 4 = scalar transmission. Under the new API ray_mesh_interact recomputes the intersection points
-// internally, so only the indices are forwarded.
+// Single-interface gain from ray_mesh_interact: computes the ray-triangle indices, runs the interaction and returns the
+// per-ray gain. interaction_type: 3 = scalar reflection, 4 = scalar transmission. ray_mesh_interact computes the
+// intersection points itself from the indices.
 static double rmi_gain(int interaction_type, double freq,
                        const arma::mat &orig, const arma::mat &dest,
                        const arma::mat &mesh, const arma::uvec &mtl_ind,
@@ -3219,15 +3231,13 @@ static double rmi_gain(int interaction_type, double freq,
     return gainN.n_elem ? gainN(0) : 0.0;
 }
 
-// ================================================================================================
-// Twins with every digit, asserted against stored values
-// ================================================================================================
-// The wave tables that print a coefficient with every digit also assert it against the value stored
-// in tests/data/wave_twins.tsv, one row per table row: table, key, values, tab-separated. A value
-// passes within a relative 1e-12, so a change that moves a twin fails an assertion instead of only
-// showing in a diff of the output. With the environment variable QD_TWIN_WRITE set to a file name the
-// values are appended to that file instead and nothing is asserted; that is how the stored file is
-// regenerated after a change that is meant to move them. The suite runs from the repository root.
+// ==== Twins with every digit, asserted against stored values ====
+// The wave tables that print a coefficient with every digit also assert it against the value stored in
+// tests/data/wave_twins.tsv, one row per table row: table, key, values, tab-separated. A value passes within a relative
+// 1e-12, so a change that moves a twin fails an assertion instead of only showing in a diff of the output. With the
+// environment variable QD_TWIN_WRITE set to a file name the values are appended to that file instead and nothing is
+// asserted; that is how the stored file is regenerated after a change that is meant to move them. The suite runs from
+// the repository root.
 #include <cstdarg>
 #include <fstream>
 #include <sstream>

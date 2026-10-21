@@ -8,28 +8,19 @@
 
 TEST_CASE("Diagnostic - Slab factor per polarization", "[wave]")
 {
-    // The traced solid's TE/TM ratio, and the acceptance test for removing the Tsp * corr pair from
-    // qd_slab_resolve's correction mode.
+    // The traced solid's TE/TM ratio through a slab exit: the port's per-channel transmission times the series factor,
+    // |T_X|^2 |S_X|^2, and nothing else. The ratio is exactly 1 at normal incidence, so the sweep makes the statement.
+    // Printed beside it: the per-channel energy target (1 - R_X) |S_X|^2, whose gap to the asserted ratio is the TE/TM
+    // obliquity asymmetry of a lossy interface in the sqrt(1 - R) amplitude convention; and ratio_pre, the port with a
+    // second single-pass transmittance, which the assertion excludes.
     //
-    // Three references are printed. ratio_pre is what the code produced BEFORE that change:
-    // |T_X|^2 * |S_X|^2 * Tsp_X, the port's own per-channel transmission times a second copy of it.
-    // ratio_post is what it must produce after, with the series factor alone: |T_X|^2 * |S_X|^2.
-    // ratio_ref is the per-channel energy target (1 - R_X) * |S_X|^2; the gap between ratio_post and
-    // ratio_ref is the TE/TM obliquity asymmetry of a lossy interface, which belongs to the sqrt(1-R)
-    // amplitude convention and is settled separately.
+    // The probe field is symmetric, because the function rebuilds the coefficient from the two channel coefficients on
+    // this path rather than scaling what it was handed. The slab is eps 1.50, whose critical angle is 54.7 deg, so the
+    // sweep stays below total reflection.
     //
-    // The assertion is on ratio_post. It is exactly 1 at normal incidence for either version, so a
-    // sweep is required to see the change at all.
-    //
-    // Two corrections over the first run. The probe field is symmetric, because the function
-    // REBUILDS the interaction coefficient from cTE/cTM on this path rather than scaling what it
-    // was handed - feeding an asymmetric probe measured the rebuild, not the physics. And the slab
-    // is eps 1.50, whose critical angle is 54.7 deg, so the sweep stays below total reflection
-    // instead of collapsing past 25.9 deg as eps 5.24 did.
-    //
-    // Channel identification: make1 puts orig, fbs and dest on the x axis with the normal along x,
-    // so the incidence plane is degenerate, qd_polbasis takes its identity branch, and VV is TM
-    // while HH is TE. That is the opposite of the oblique fixture in the ray_mesh_interact suite.
+    // Channel identification: make1 puts orig, fbs and dest on the x axis with the normal along x, so the incidence
+    // plane is degenerate, the polarization basis takes its identity branch, and VV is TM while HH is TE. That is the
+    // opposite of the oblique fixture of the ray_mesh_interact cases.
     const double f_hz = FRQ;
     const double L = 0.10;
     auto mtl = diag_palette<double>();
@@ -72,11 +63,11 @@ TEST_CASE("Diagnostic - Slab factor per polarization", "[wave]")
         auto ratio_of = [](double a, double b)
         { double lo = std::min(a, b), hi = std::max(a, b); return (hi > 0.0) ? lo / hi : 0.0; };
 
-        // Post-fix: port times series, nothing else. Common factors drop out of a ratio.
+        // Asserted: the port times the series, nothing else. Common factors drop out of a ratio.
         double ratio_post = ratio_of(std::norm(t_te) * std::norm(S_te),
                                      std::norm(t_tm) * std::norm(S_tm));
-        // Pre-fix: the same with the extra per-channel single-pass transmittance. Both boundaries of
-        // this fixture are slab|air at the same angle, so Tsp_X = (1 - R_X)^2.
+        // Printed: the same with the port's per-channel single-pass transmittance a second time; both boundaries of
+        // this fixture are slab | air at the same angle, so that is (1 - R_X)^2.
         double ratio_pre = ratio_of(std::norm(t_te) * std::norm(S_te) * (1.0 - R_te) * (1.0 - R_te),
                                     std::norm(t_tm) * std::norm(S_tm) * (1.0 - R_tm) * (1.0 - R_tm));
         // Energy target, for the amplitude-convention residual.
@@ -91,8 +82,7 @@ TEST_CASE("Diagnostic - Slab factor per polarization", "[wave]")
         CHECK(C.gain(0) >= 0.0);
         CHECK(std::abs(C.gain(0) - 0.5 * (vv2 + hh2)) < 1e-9);
 
-        // The correction-mode series factor is S alone. Anything else here is the Tsp * corr pair
-        // coming back.
+        // The slab factor is S alone.
         INFO("theta_n " << thd << ", ratio_out " << ratio_out << ", ratio_post " << ratio_post);
         CHECK(std::abs(ratio_out - ratio_post) < 1e-9);
     }
@@ -100,28 +90,21 @@ TEST_CASE("Diagnostic - Slab factor per polarization", "[wave]")
 
 TEST_CASE("Diagnostic - Entry boundary evaluated at two angles", "[wave]")
 {
-    // One slab crossing, evaluated two ways. ray_mesh_interact applied the entry boundary at the true
-    // incidence angle with the complex refraction cosine kept; qd_slab_resolve then re-derived that
-    // same boundary from the real projection the tracer was left holding, so the Airy denominator
-    // summed a series against a coefficient the path never carried.
+    // One slab crossing at the exact complex in-slab cosine. ray_mesh_interact applies the entry boundary at the true
+    // incidence angle with the complex refraction cosine kept; ray_state_update recovers that cosine from the traced
+    // direction, so the Airy denominator sums its series against the coefficient the path carries, not against one
+    // re-derived from the real projection the tracer holds.
     //
-    // The fixture hands the function what a tracer would actually have produced: fbs_angle carries the
-    // geometric external angle, path_dir_prev carries the direction qd_refract wrote, and the in-slab
-    // cosine the function sees is that direction's real projection. Supplying path_dir_prev is what
-    // arms the recovery - without it nothing was ever projected and the gate correctly declines.
+    // The fixture hands the function what a tracer would produce: fbs_angle carries the geometric external angle,
+    // path_dir_prev the direction qd_refract wrote, so the in-slab cosine the function sees is that direction's real
+    // projection. Supplying path_dir_prev arms the recovery; without it nothing was projected and the gate declines.
     //
-    // ISOLATION. A run with air behind the slab divided by one with an electrically identical twin
-    // behind it, whose far Fresnel coefficient vanishes so the series factor is exactly 1, does not
-    // isolate the series: the twin makes the entry and slab permittivities equal, which is one of
-    // the recovery's own decline conditions, so the twin run evaluates its exit port at the real
-    // projection while the air run evaluates it at the recovered cosine. The ratio then carries
-    // T_exit(cs) / T_exit(ct_traced) on top of the series - up to 4.1 dB at 85 deg - and
-    // measures the two things at once.
-    //
-    // So the series is isolated against a closed form instead. With the port on the recovered cosine
-    // the whole leg is analytic and the reconstruction is exact. The
-    // lossless control pins it: for a real permittivity the normalization inside qd_refract is inert,
-    // both cosines coincide, and the two references must agree exactly.
+    // The series is isolated against a closed form. A run with air behind the slab over one with an electrically
+    // identical twin behind it (far Fresnel coefficient zero, series factor one) would not isolate it: the twin makes
+    // the entry and slab permittivities equal, one of the recovery's decline conditions, so the two runs would evaluate
+    // the exit port at different cosines, up to 4.1 dB apart at 85 deg. With the port on the recovered cosine the whole
+    // leg is analytic. The lossless control pins the reference: for a real permittivity the normalization inside
+    // qd_refract is inert and both cosines coincide.
     const double f_hz = FRQ;
     const double L = 0.10;
     auto mtl = diag_palette<double>();
@@ -155,14 +138,10 @@ TEST_CASE("Diagnostic - Entry boundary evaluated at two angles", "[wave]")
             std::complex<double> probe = cpx(C.x_in, 0, 0);
             unsigned rtype_seen = (unsigned)C.resolved_type[0];
 
-            // Whether the recovery fires at all is decided by use_vbs, not by the angle: at exactly
-            // normal incidence the traced direction and the geometric one coincide, nothing was ever
-            // projected, and the function correctly declines. It then keeps BOTH the hybrid
-            // medium_gain propagation factor and, because the VBS correction is a no-op there, the
-            // interface coefficient ray_mesh_interact already wrote - so the probe field survives
-            // into the output instead of being rebuilt. The reference has to follow it on both
-            // counts, or the row reports the gap between the ITU-R P.2040 Delta form and
-            // exp(-k0 Im(n) L) as if it were a defect in the recovery.
+            // Whether the recovery runs is decided by use_vbs, not by the angle: at normal incidence the traced and the
+            // geometric direction coincide, nothing was projected, and the function declines. It then keeps both the
+            // medium_gain propagation factor and the interface coefficient ray_mesh_interact wrote, so the probe field
+            // survives into the output instead of being rebuilt; the reference follows it on both counts.
             bool recovery_fires = std::abs(ct_tr - std::cos(th_ext)) > 1e-6;
 
             double dr = L / ct_tr;
@@ -215,9 +194,9 @@ TEST_CASE("Diagnostic - Entry boundary evaluated at two angles", "[wave]")
             INFO("material " << m << ", theta_ext " << thd);
             CHECK(std::abs(S_applied - S_ex) < 1e-9);
 
-            // The lossless control pins the reference itself: there the normalization inside
-            // qd_refract is inert, so both cosines coincide and the two references must agree
-            // exactly. A gap here means diag_traced_ct no longer matches the map qd_refract applies.
+            // The lossless control pins the reference itself: there the normalization inside qd_refract is inert, so
+            // both cosines coincide and the two references agree exactly. A gap here means diag_traced_ct no longer
+            // matches the map qd_refract applies.
             if (m == 6)
                 CHECK(std::abs(S_tr - S_ex) < 1e-12);
         }
@@ -226,19 +205,14 @@ TEST_CASE("Diagnostic - Entry boundary evaluated at two angles", "[wave]")
 
 TEST_CASE("Diagnostic - Series collapse when the previous medium matches the slab", "[wave]")
 {
-    // What happens when the host layer's Airy denominator is evaluated with a matched sheet as one
-    // of its bounding media: r = 0 there and the denominator collapses to exactly 1, removing the
-    // internal series.
+    // The host layer's Airy denominator with a matched sheet as one of its bounding media: r = 0 there, the denominator
+    // is exactly 1 and the internal series is gone. ray_state_update does not write a matched sheet into the
+    // previous-medium word (it does not cut the layer there), so the state is set by hand; a sheet whose impedance is
+    // merely close to the host's is resolved as a layer in the layered-stack cases.
     //
-    // This characterises SLAB_AIRY_FACTOR. The prev = matched-sheet state is unreachable by
-    // construction - SHEET_EVENT does not write a matched sheet into the previous-medium word,
-    // because it does not interrupt the layer there. The rows are kept because the same collapse
-    // still occurs for a sheet whose impedance merely happens to be close to the host's, which the
-    // merge does not catch and only the transfer-matrix core fixes.
-    //
-    // Material 7 is electrically identical to material 5 and differs only by carrying thk. The
-    // first row of each pair is the ordinary case (previous medium = air, series present); the
-    // second replaces it with the matched sheet. |S| and arg(S) should both stay put.
+    // Material 7 is electrically identical to material 5 and differs only by carrying thk. The first row of each pair
+    // is the ordinary case (previous medium = air, series present); the second replaces it with the matched sheet. |S|
+    // and arg(S) stay put.
     const double f_hz = FRQ;
     auto mtl = diag_palette<double>();
     const int SLAB = 5, SHEET = 7;
@@ -281,19 +255,15 @@ TEST_CASE("Diagnostic - Series collapse when the previous medium matches the sla
 
 TEST_CASE("Diagnostic - Host layer carried through a matched sheet", "[wave]")
 {
-    // A sheet crossing where the sheet is electrically identical to the host it sits in. The sheet is
-    // not a boundary, so the layer must not be cut there: the accumulated distance has to keep
-    // running, the medium words have to stay put, and the series must be left to resolve once at the
-    // far side over the whole path.
+    // A sheet crossing where the sheet is electrically identical to the host it sits in. The sheet is not a boundary,
+    // so the layer is not cut there: the accumulated distance keeps running, the medium words stay put, and the series
+    // resolves once at the far side over the whole path.
     //
-    // Materials 5 and 7 of the palette differ only in thk, which is exactly the column that does not
-    // affect a boundary - so Material::same_as separates them while the wave cannot.
+    // Materials 5 and 7 differ only in thk, the column that does not affect a boundary: two media with the same eps and
+    // mu.
     //
-    // The control uses material 3, whose permittivity differs from the host, and must still split the
-    // layer in the old way. It has to be an actual sheet: material 4 was tried first and every row
-    // came back with resolved_type 0, because its thk column is zero, so is_sheet is false, the case
-    // re-derivation returns "not a sheet", and out_type 67 then falls through to the legacy unmatched
-    // branch and kills the ray. Correct defensive behaviour, wrong fixture.
+    // The control is material 3, whose permittivity differs from the host's: it splits the layer. It has to be a sheet
+    // (thk > 0), or hit code 67 does not re-derive as a sheet and the event kills the ray.
     const double L = 0.10;
     auto mtl = diag_palette<double>();
     const uint8_t OT_SHEET_FRONT = 67; // isolated sheet, front-side hit
@@ -350,34 +320,20 @@ TEST_CASE("Diagnostic - Host layer carried through a matched sheet", "[wave]")
 
 TEST_CASE("Diagnostic - Excess-phase walk-off convention", "[wave]")
 {
-    // SCALE_BY_MEDIUM applies k0 * (n * dist_refract * cos2 - dist_geo * cos2_geo), where the cos^2
-    // factors are present only when the tracer did NOT trace the bend (walk_off) and drop to 1 when
-    // it did. A thin sheet is never displaced and carries the cos^2 form unconditionally, so the two
-    // paths describe different geometries and their phases differ.
+    // The in-medium factor on the walk-off branch is k0 (n dist_refract cos2 - dist_geo cos2_geo), where the cos^2
+    // factors are present only when the tracer did not trace the bend and are 1 when it did. A thin sheet is never
+    // displaced and carries the cos^2 form, so the two describe different geometries and their phases differ.
     //
-    // Both terms sit on the thickness axis. Grouping each into a normal thickness, d_t =
-    // dist_refract * ct_t and d_i = dist_geo * ct_i, the applied argument is
-    // -k0 * (n * d_t * ct_t - d_i * ct_i), which is the tilted-slab excess phase
-    // k0 * d * (n * cos_t - cos_i) referenced to the emergent wavefront rather than to the ray path.
-    // An undeviated tracer holds no cos_t, so the branch substitutes cos_i and the expression
-    // collapses to k0 * d * cos_i * (n - 1) = k0 * L * cos_i^2 * (n - 1). That is what the cos^2
-    // standing in for the untraced lateral shift amounts to.
+    // Both terms sit on the thickness axis. With d_t = dist_refract ct_t and d_i = dist_geo ct_i the applied argument
+    // is -k0 (n d_t ct_t - d_i ct_i), the tilted-slab excess phase k0 d (n cos_t - cos_i) referenced to the emergent
+    // wavefront rather than to the ray path. An undeviated tracer holds no cos_t, so cos_i stands in and the expression
+    // is k0 d cos_i (n - 1) = k0 L cos_i^2 (n - 1): the cos^2 stands for the untraced lateral shift.
     //
-    // The case isolates that factor. With no path_dir supplied use_vbs is false, so REPLACE_BY_VBS
-    // takes its fast return and writes no coefficient; the buffer branch above that return needs
-    // mtl_buffer != 0 and the fixture passes 0. eps = 1.5 exceeds any reachable rho, which is
-    // bounded by 1, so SLAB_AIRY_FACTOR declines on every row. out / in is the medium factor alone.
-    // The lossless material keeps the in-slab angle real, which isolates the convention from every
-    // complex-angle effect and puts medium_gain at exactly 1.
-    //
-    // What this fixture cannot separate. use_vbs false forces walk_off true whatever refl_pass and
-    // resolved hold, dist_refract equals dist_geo, and ct_t equals ct_i, so the two cosines and the
-    // two length ledgers are one quantity each here; any degree-2 split on the n-term agrees. The
-    // recovery also declines on its no-direction gate, so the exact branch is unreachable. The
-    // reference below is therefore called in its general form with those equalities passed in as
-    // arguments rather than written into the expression, so the row states what it rests on. A
-    // fixture that separates them needs path_dir_prev at an angle to orig -> FBS on a leg that still
-    // takes this branch, which is issue 7's and not this one's.
+    // The case isolates that factor. With no path_dir the exact-cosine path is not taken and no coefficient is written;
+    // eps = 1.5 exceeds any reachable rho, so no series is summed: out / in is the medium factor alone. The lossless
+    // material keeps the in-slab angle real and medium_gain at 1. Without path_dir, dist_refract equals dist_geo and
+    // ct_t equals ct_i, so the reference is called in its general form with those equalities passed in as arguments:
+    // the row states what it rests on.
     const double f_hz = FRQ;
     const double L = 0.10;
     auto mtl = diag_palette<double>();
@@ -420,26 +376,18 @@ TEST_CASE("Diagnostic - Excess-phase walk-off convention", "[wave]")
         CHECK(std::isfinite(C.gain(0)));
         CHECK(C.gain(0) >= 0.0);
 
-        // Promoted. The applied factor against the general walk-off traversal form, with the
-        // fixture's own degeneracies (ct_t = ct_i = ct, dist_refract = dist_geo = L) supplied as
-        // arguments. Written this way the row survives issue 7 in either direction: narrowing
-        // walk_off leaves this leg on the branch, routing recovered-cosine legs to the exact form
-        // leaves it alone because no cosine is recovered here, and a change to which cosine the
-        // walk-off form reads lands in diag_medium_walk rather than in this expression.
-        //
-        // The magnitude is asserted with the phase so the object pinned is the factor and not its
-        // argument. The palette carries no alpha and the material is lossless, so medium_gain is 1
-        // and this also catches an interface coefficient or an undeclined series reaching this path.
+        // The applied factor against the general walk-off traversal form, with the fixture's equalities (ct_t = ct_i =
+        // ct, dist_refract = dist_geo = L) passed as arguments. The magnitude is asserted with the phase: the palette
+        // carries no alpha and the material is lossless, so medium_gain is 1, and an interface coefficient or a summed
+        // series reaching this path would show.
         std::complex<double> ref = diag_medium_walk(diag_eps(SLAB, f_hz), L, ct, L, ct, f_hz);
 
         INFO("angle " << thd);
         CHECK(std::abs(wrap(a - std::arg(ref) * 180.0 / QPI)) < 1.0e-2);
         CHECK(std::abs(std::abs(applied) - std::abs(ref)) < 1.0e-12);
 
-        // The raw-path convention, the other column the table prints, is excluded by a margin that
-        // grows with the angle. The equality above says nothing about whether the row can tell the
-        // two conventions apart; this records that it can. The two coincide at normal incidence by
-        // construction, so the margin is claimed only past it.
+        // The raw-path convention, the other column the table prints, is excluded by a margin that grows with the
+        // angle: the row tells the two apart. They coincide at normal incidence, so the margin is claimed only past it.
         if (thd > 0.0)
             CHECK(std::abs(wrap(a - rw)) > 1.0);
     }
@@ -447,19 +395,13 @@ TEST_CASE("Diagnostic - Excess-phase walk-off convention", "[wave]")
 
 TEST_CASE("Thin sheet - the redo sits on the analytic slab at grazing incidence", "[wave]")
 {
-    // ray_state_update re-resolves every sheet crossing when medium tracking is on, so in any run
-    // with state this function's composite is the one that reaches the output and whatever
-    // ray_mesh_interact computed is discarded. It also has no mesh: the fixture supplies none, and
-    // the function has no way to learn anything about the face.
+    // ray_state_update re-resolves every sheet crossing when medium tracking is on, so in a run with state its
+    // composite is the one that reaches the output. It has no mesh: nothing about the face reaches it. The composite is
+    // the analytic slab all the way to tangency.
     //
-    // That is why the grazing clamp here was a fixed extent-to-thickness ratio rather than a
-    // geometry, and why it froze the interface past 89.943 deg for every sheet at every thickness.
-    // With it gone the composite is the analytic slab all the way to tangency.
-    //
-    // The sheet is isolated in air, so mtl_current is 0: no host leg is closed and no medium factor
-    // is applied, and the gain the function writes is the composite by itself. It is written, not
-    // scaled - SHEET_RESOLVE rebuilds xprmat from cTE/cTM with unit amplitude - so the incoming
-    // probe field sets the polarization basis and not the level.
+    // The sheet is isolated in air, so mtl_current is 0: no host leg is closed and no medium factor applied, and the
+    // gain written is the composite itself. It is written, not scaled (the coefficient is rebuilt with unit amplitude),
+    // so the incoming probe field sets the polarization basis and not the level.
     const double f_hz = FRQ;
     const double thk = 0.006;
     auto mtl = diag_palette<double>();
@@ -498,41 +440,35 @@ TEST_CASE("Thin sheet - the redo sits on the analytic slab at grazing incidence"
 
 TEST_CASE("Glued sheet - the near-to-far flux conversion", "[wave]")
 {
-    // qd_slab_resolve produce mode applies the near-to-far obliquity factor once, on the transmit
-    // port, so that a glued sheet reports the same energy as the equivalent traced entry. The branch
-    // is gated on near != far, so only sheet_case 2 (glued entry, air | sheet | solid) and
-    // sheet_case 3 (glued exit, solid | sheet | air) reach it. It shipped unmeasured: every existing
-    // sheet case is air | sheet | air or has near == far on every row.
+    // The composite applies the near-to-far obliquity factor once, on the transmit port, so that a glued sheet reports
+    // the same energy as the equivalent traced entry. The factor is gated on near != far, so only a glued entry (air |
+    // sheet | solid) and a glued exit (solid | sheet | air) take it.
     //
-    // Six stacks. Two exercise the trivial branch and four the non-trivial one. The embedded row is
-    // there so the gate is pinned as near == far rather than as "far is air": it is a sheet inside a
-    // medium, where the factor must still be exactly 1.
+    // Six stacks: two on the trivial branch and four on the other. The embedded row pins the gate as near == far rather
+    // than as "far is air": a sheet inside a medium, where the factor is exactly 1.
     //
-    // ISOLATION. The composite is what is measured, so nothing else may multiply it.
-    //   - Entry rows run with mtl_current = 0, so SHEET_EVENT applies no host factors at all and the
-    //     written field is the composite outright. Those rows are asserted complex.
-    //   - Rows inside a medium close out a host leg. eps = 1.5 puts the survival gate above any
-    //     reachable rho, so the correction-mode series declines and SLAB_AIRY_FACTOR applies
-    //     nothing; SCALE_BY_MEDIUM then contributes sqrt(medium_gain) with a phase. Those rows are
-    //     asserted per-channel in power, where the phase drops out. That is the right target anyway:
-    //     fx is a real positive scale and cannot move a phase, and the composite phase is already
-    //     pinned by the air | sheet | air cases.
+    // Isolation. The composite is what is measured, so nothing else may multiply it.
+    //   - Entry rows run with mtl_current = 0, so no host factor is applied and the written field is the composite;
+    //     they are asserted complex.
+    //   - Rows inside a medium close out a host leg. eps = 1.5 puts the survival gate above any reachable rho, so no
+    //     series is summed, and the leg contributes sqrt(medium_gain) with a phase. These rows are asserted per channel
+    //     in power, where the phase drops out: fx is a real positive scale, and the composite phase is pinned by the
+    //     air | sheet | air cases.
     //
-    // Channel identification: make1 puts orig, fbs and dest on the x axis with the normal along x,
-    // so the incidence plane is degenerate, qd_polbasis takes its identity branch, and VV is TM
-    // while HH is TE, for the reflected direction as well as the transmitted one.
+    // Channel identification: make1 puts orig, fbs and dest on the x axis with the normal along x, so the incidence
+    // plane is degenerate, the polarization basis takes its identity branch, and VV is TM while HH is TE, for the
+    // reflected direction as well as the transmitted one.
     //
-    // The exit sweeps stop at 50 deg. The internal critical angle of eps 1.50 against air is
-    // 54.7 deg, and past it the slab-side TM reflection magnitude exceeds 1 for a lossy sheet, which
-    // apply_tf clamps; that is a separate question from this one and is kept out of the measurement.
+    // The exit sweeps stop at 50 deg: the internal critical angle of eps 1.50 against air is 54.7 deg, and past it the
+    // slab-side TM reflection of a lossy sheet exceeds one, a question of its own.
     const double f_hz = FRQ;
     const double thk = 0.006; // the sheet material's own thickness column
     const double L = 0.10;    // host path up to the sheet, only read on the rows inside a medium
     auto mtl = diag_palette<double>();
 
     const uint8_t OT_SHEET_ISO = 67;   // ok | sheet, no co-located face
-    const uint8_t OT_GLUED_ENTRY = 71; // ok | front | co-located | sheet -> sheet_case 2
-    const uint8_t OT_GLUED_EXIT = 69;  // ok | co-located | sheet      -> sheet_case 3
+    const uint8_t OT_GLUED_ENTRY = 71; // ok | front | co-located | sheet -> a glued entry
+    const uint8_t OT_GLUED_EXIT = 69;  // ok | co-located | sheet      -> a glued exit
     const int SHEET = 3, LOSSY = 1, LO = 5, LO_CLEAN = 6;
 
     struct Row
@@ -540,10 +476,10 @@ TEST_CASE("Glued sheet - the near-to-far flux conversion", "[wave]")
         const char *name;
         uint8_t otype;
         unsigned nH;
-        int m2;       // the co-located non-sheet face, 0 when there is none
-        int cur;      // medium the ray is travelling in
-        int e_near;   // palette index of the near medium (0 = air)
-        int e_far;    // palette index of the far medium
+        int m2;     // the co-located non-sheet face, 0 when there is none
+        int cur;    // medium the ray is travelling in
+        int e_near; // palette index of the near medium (0 = air)
+        int e_far;  // palette index of the far medium
         bool disp_far;
         double lim;   // highest angle swept
         bool trivial; // near == far, so the factor must be exactly 1
@@ -580,9 +516,8 @@ TEST_CASE("Glued sheet - the near-to-far flux conversion", "[wave]")
                                                diag_eps(R.e_far, f_hz), thk, ct, f_hz,
                                                R.disp_far, false);
 
-            // The host leg the crossing closes out. Lossless hosts contribute exactly 1 in
-            // magnitude; the lossy one contributes the ITU-R P.2040 path form over L, which is what
-            // SCALE_BY_MEDIUM applies with no path_dir supplied.
+            // The host leg the crossing closes out. Lossless hosts contribute exactly 1 in magnitude; the lossy one
+            // contributes the ITU-R P.2040 path form over L, with which the leg is closed when no path_dir is supplied.
             double host_g = (R.cur == 0) ? 1.0 : diag_medium_gain(diag_eps(R.cur, f_hz), L, f_hz);
 
             double vv2 = C.xprmat(0, 0) * C.xprmat(0, 0) + C.xprmat(1, 0) * C.xprmat(1, 0); // TM
@@ -598,8 +533,8 @@ TEST_CASE("Glued sheet - the near-to-far flux conversion", "[wave]")
 
             INFO(R.name << ", theta_n " << thd);
             REQUIRE(std::isfinite(C.gain(0)));
-            REQUIRE(C.resolved_type[0] != 0); // the ray must survive: case 4 kills, and so does a
-                                              // hit code that fails the sheet re-derivation
+            REQUIRE(C.resolved_type[0] != 0); // the ray survives: a hit code that fails the sheet
+                                              // re-derivation would kill it
 
             // The composite, per channel, against the hand-built stack.
             CHECK(std::abs(hh2 - P_te) < 1.0e-9);
@@ -669,46 +604,37 @@ TEST_CASE("Glued sheet - the near-to-far flux conversion", "[wave]")
 
 TEST_CASE("Sheet in a medium - the composite at the exact in-medium cosine", "[wave]")
 {
-    // Issue 2. SHEET_RESOLVE hands qd_slab_resolve produce mode ct_geo = abs_cos_theta_t as the
-    // incidence cosine, and produce mode builds every term of the composite from it on the
-    // assumption that it is a real incidence angle in mat_near. When mat_near is a traced solid it
-    // is not: the propagation cosine there is complex and abs_cos_theta_t is the real projection
-    // qd_refract left behind. This case measures the gap.
+    // A sheet met inside a traced solid: the incidence cosine there is complex, and the tracer holds only its real
+    // projection. The composite is built at the exact in-medium cosine, and the case asserts it on both ports against a
+    // reference at that cosine.
     //
-    // What separates it from the glued-sheet case above. That one supplies no path_dir, so
-    // abs_cos_theta_t equals the fbs angle and the cosine handed to produce mode is a genuine real
-    // incidence cosine; the reference is then built at the same value and the case is a check on the
-    // conversion's form rather than on its argument. Here path_dir_prev carries the refracted
-    // direction a tracer would have written, so the two separate and the reference is built at the
-    // exact complex cosine instead.
+    // What separates it from the glued-sheet case: there no path_dir is supplied, so the cosine handed to the composite
+    // is a real incidence cosine. Here path_dir_prev carries the refracted direction a tracer would have written, so
+    // the projection and the exact cosine separate.
     //
-    // Geometry, the same one the exit-boundary case uses. A ray crosses air | LO at the external
-    // angle, the tracer writes the refracted direction, and the sheet is met after 100 mm of normal
-    // thickness. fbs_angle stays the external angle because the geometric ray was never bent.
+    // Geometry, as in the exit-boundary case: a ray crosses air | LO at the external angle, the tracer writes the
+    // refracted direction, and the sheet is met after 100 mm of normal thickness. fbs_angle stays the external angle
+    // because the geometric ray was never bent.
     //
     // Two stacks:
-    //   embedded    LO | sheet | LO,  sheet_case 1, near == far so the flux conversion is 1
-    //   glued exit  LO | sheet | air, sheet_case 3, near != far so the conversion is live
-    // and both ports of each, so the reflect port is covered as well as the transmit port.
+    //   embedded    LO | sheet | LO,  an isolated sheet, near == far so the flux conversion is 1
+    //   glued exit  LO | sheet | air, near != far so the conversion is live
+    // and both ports of each.
     //
-    // Isolation. eps = 1.5 puts the correction-mode survival gate above any reachable rho, so
-    // SLAB_AIRY_FACTOR declines and the only thing multiplying the composite is the host leg
-    // SCALE_BY_MEDIUM closes out. That leg is reproduced from the closed forms already used by the
-    // exit-boundary case: the exact inhomogeneous form on the transmission pass, where the recovery
-    // is armed, and the walk-off form on the reflection pass, where it is not.
+    // Isolation. eps = 1.5 puts the survival gate above any reachable rho, so no series is summed and the only thing
+    // multiplying the composite is the host leg: the exact form on the transmission pass, where the recovery is armed,
+    // and the walk-off form on the reflection pass, where it is not.
     //
-    // Modes. The scalar run pins the complex coefficient outright. The EM run pins the gain, which
-    // is the Frobenius norm of the Jones matrix and therefore invariant under the polarization
-    // basis, so it measures both channels without depending on which matrix element each lands in.
-    // The refracted direction has a transverse component, so the basis is not the degenerate one the
-    // glued-sheet case relies on.
+    // Modes. The scalar run pins the complex coefficient outright. The EM run pins the gain, the Frobenius norm of the
+    // Jones matrix, which is invariant under the polarization basis; the refracted direction has a transverse
+    // component, so the basis is not the degenerate one of the glued-sheet case.
     const double f_hz = FRQ;
     const double thk = 0.006; // the sheet material's own thickness column
     const double L = 0.10;    // normal thickness of the host layer up to the sheet
     auto mtl = diag_palette<double>();
 
-    const uint8_t OT_SHEET_ISO = 67;  // ok | sheet, no co-located face   -> sheet_case 1
-    const uint8_t OT_GLUED_EXIT = 69; // ok | co-located | sheet          -> sheet_case 3
+    const uint8_t OT_SHEET_ISO = 67;  // ok | sheet, no co-located face   -> an isolated sheet
+    const uint8_t OT_GLUED_EXIT = 69; // ok | co-located | sheet          -> a glued exit
     const int SHEET = 3, LO = 5;
 
     const std::complex<double> e_h = diag_eps(LO, f_hz);    // host, eps 1.50 - 0.40j
@@ -720,10 +646,10 @@ TEST_CASE("Sheet in a medium - the composite at the exact in-medium cosine", "[w
         const char *name;
         uint8_t otype;
         unsigned nH;
-        int m2;                    // the co-located non-sheet face, 0 when there is none
+        int m2; // the co-located non-sheet face, 0 when there is none
         std::complex<double> e_far;
-        bool disp_far;             // the sheet sits on the side that is not the solid
-        bool trivial;              // near == far, so the flux conversion is identically 1
+        bool disp_far; // the sheet sits on the side that is not the solid
+        bool trivial;  // near == far, so the flux conversion is identically 1
     };
     const std::vector<Row> rows = {
         {"embedded   LO | sheet | LO", OT_SHEET_ISO, 1u, 0, e_h, false, true},
@@ -744,11 +670,10 @@ TEST_CASE("Sheet in a medium - the composite at the exact in-medium cosine", "[w
             double th = thd * QPI / 180.0;
             double ct = diag_traced_ct(e_h, th);              // the real projection the tracer holds
             std::complex<double> cx = diag_ct_exact(e_h, th); // the exact complex in-medium cosine
-            double dr = L / ct;                              // refracted path up to the sheet
+            double dr = L / ct;                               // refracted path up to the sheet
 
-            // The gate use_vbs applies. At normal incidence the projection and the exact value
-            // coincide, the recovery declines and the traversal keeps its walk-off form, so that row
-            // is a control: it must read zero before the fix as well as after.
+            // The gate use_vbs applies. At normal incidence the projection and the exact value coincide, the recovery
+            // declines and the traversal keeps its walk-off form: that row is a control.
             bool armed = std::abs(ct - std::cos(th)) > 1.0e-6;
 
             std::complex<double> Mt = armed ? diag_medium_vbs(e_h, dr, ct, L, cx, f_hz, std::cos(th))
@@ -800,17 +725,10 @@ TEST_CASE("Sheet in a medium - the composite at the exact in-medium cosine", "[w
             double d_Rs = std::abs(cpx(Cr.xprmat, 0, 0) - refRs);
             double d_Rg = std::abs((double)Cx.gain(0) - refRg);
 
-            // The host leg on its own, isolated from the composite entirely.
-            //
-            // Dividing the written field by a hand-built composite would only work while the code
-            // and that composite are built at the same cosine, so it cannot survive a change to
-            // which cosine the composite uses. Two runs that differ only in host path length can:
-            // the composite is identical on both and cancels in the ratio, whatever it is. Both
-            // traversal forms are pure exponentials in the path length, so the ratio over L and 2L
-            // is the factor over L itself.
-            //
-            // diag_medium_vbs is also asserted by the exit-boundary case; diag_medium_walk is not
-            // asserted anywhere else, which is why the reflect pass gets its own row.
+            // The host leg on its own, isolated from the composite: two runs that differ only in host path length, so
+            // the composite (a function of the cosine and the materials) cancels in the ratio, and both traversal forms
+            // are exponentials in the path length, so the ratio over L and 2L is the factor over L. diag_medium_walk is
+            // asserted nowhere else, so the reflect pass gets its own row.
             double d_hT = std::abs(cpx(Ct2.xprmat, 0, 0) / cpx(Ct.xprmat, 0, 0) - Mt);
             double d_hR = std::abs(cpx(Cr2.xprmat, 0, 0) / cpx(Cr.xprmat, 0, 0) - Mr);
 
@@ -830,28 +748,22 @@ TEST_CASE("Sheet in a medium - the composite at the exact in-medium cosine", "[w
 
             INFO(R.name << ", theta_ext " << thd);
 
-            // The ray must survive: sheet_case 4 kills, and so does a hit code that fails the sheet
-            // re-derivation.
+            // The ray survives: a hit code that fails the sheet re-derivation would kill it.
             REQUIRE(Ct.resolved_type[0] != 0);
             REQUIRE(Cr.resolved_type[0] != 0);
             REQUIRE(std::isfinite(Ct.gain(0)));
             REQUIRE(std::isfinite(Cr.gain(0)));
 
-            // The complex builder reproduces the measured one at a real cosine, term for term. This
-            // is what carries the 1.67e-15 bound of the glued-sheet case over to this reference.
+            // The complex builder reproduces the real-cosine one at a real cosine, term for term.
             DiagSheet Pd = diag_sheet_composite(e_h, e_s, R.e_far, thk, ct, f_hz, R.disp_far, false);
             CHECK(std::abs(Pd.T_te - Pe.T_te) < 1.0e-15);
             CHECK(std::abs(Pd.T_tm - Pe.T_tm) < 1.0e-15);
             CHECK(std::abs(Pd.R_te - Pe.R_te) < 1.0e-15);
             CHECK(std::abs(Pd.R_tm - Pe.R_tm) < 1.0e-15);
 
-            // Two conditions the measurement depends on, asserted so that a failure of either shows
-            // up as itself rather than as an unexplained residual.
-            //
-            // The apply_tf clamp of section 5 must not engage. It caps the slab-side TM reflection at
-            // unity past the internal critical angle of the near | far pair, and this sweep stays
-            // below that angle at every row because the in-medium traced angle reaches only 51.7 deg
-            // at 85 deg of external incidence.
+            // Two conditions the measurement depends on, asserted so that a failure of either shows as itself. The
+            // slab-side TM reflection stays below one: the sweep stays below the internal critical angle of the near |
+            // far pair, the traced angle reaching only 51.7 deg at 85 deg of external incidence.
             std::complex<double> zs = std::sqrt(e_s), zf = std::sqrt(R.e_far);
             std::complex<double> r_slab_p = (zf * Pe.c_slab - zs * Pe.c_far) / (zf * Pe.c_slab + zs * Pe.c_far);
             std::complex<double> r_slab_x = (zf * Xe.c_slab - zs * Xe.c_far) / (zf * Xe.c_slab + zs * Xe.c_far);
@@ -864,8 +776,7 @@ TEST_CASE("Sheet in a medium - the composite at the exact in-medium cosine", "[w
             if (!R.disp_far)
                 CHECK(0.8 * (dr + 0.5) * ct > thk);
 
-            // The two cosines differ, so the case can fail. This stays true after the fix and is not
-            // an assertion about the defect.
+            // The two cosines differ, so the case can fail.
             if (thd > 0.0)
                 CHECK(std::abs(cx - cp) > 1.0e-6);
 
@@ -877,16 +788,12 @@ TEST_CASE("Sheet in a medium - the composite at the exact in-medium cosine", "[w
                 CHECK(Xe.fx_tm == 1.0);
             }
 
-            // The host leg the crossing closes out, on its own. Asserted first, so that a red
-            // fixture is attributable: these two are independent of the composite by construction
-            // and a failure here is a statement about the traversal reference, not about the
-            // incidence cosine.
+            // The host leg the crossing closes out, on its own and first: independent of the composite by construction,
+            // so a failure here is a statement about the traversal reference, not about the incidence cosine.
             CHECK(d_hT < 1.0e-12);
             CHECK(d_hR < 1.0e-12);
 
-            // The two references are far enough apart that the composite assertions below cannot
-            // pass at both cosines. This is a statement about the references, not about the code,
-            // so it holds whichever one the code is built at and guards against a revert.
+            // The two references are far enough apart that the composite assertions below cannot pass at both cosines.
             if (thd >= 20.0)
             {
                 CHECK(std::abs(Pe.T_te - Xe.T_te) > 1.0e-6);
@@ -903,22 +810,17 @@ TEST_CASE("Sheet in a medium - the composite at the exact in-medium cosine", "[w
 
 TEST_CASE("Exit boundary - the port at the recovered angle", "[wave]")
 {
-    // The far face of a traced solid, measured against a hand-built reference at the exact
-    // recovered cosine rather than at the real projection the tracer was left holding.
+    // The far face of a traced solid against a reference at the exact recovered cosine, not at the real projection the
+    // tracer holds. The whole exit leg is asserted: ray_state_update writes T_exit S M, the port, the series factor and
+    // the in-medium traversal, all three reproduced from closed forms that share no code with the library. The port
+    // alone is printed as out / (S M).
     //
-    // The whole exit leg is asserted, not just the port: ray_state_update writes
-    // T_exit * S * M, with S the series factor and M the in-medium traversal, and all three are
-    // reproduced here from closed forms that share no code with the library. The port alone is
-    // printed as out / (S M) so the table shows the quantity the fix moves.
+    // Nothing divides one run by another: the exact-cosine path rebuilds the field from the interface coefficient, so
+    // the written value is absolute and the probe cancels out.
     //
-    // Nothing here divides one run by another. REPLACE_BY_VBS REBUILDS the field from the
-    // interface coefficient rather than scaling what it was handed, so the written value is
-    // absolute and the probe cancels out of the measurement by construction.
-    //
-    // Two modes. The scalar run pins the complex coefficient outright. The EM run pins the gain,
-    // which is the Frobenius norm of the Jones matrix and is therefore invariant under the
-    // polarization basis - so it measures the TE and TM ports without depending on which matrix
-    // element each one lands in for this geometry.
+    // Two modes. The scalar run pins the complex coefficient outright. The EM run pins the gain, the Frobenius norm of
+    // the Jones matrix, which is invariant under the polarization basis, so it measures the TE and TM ports without
+    // depending on which element each lands in.
     const double f_hz = FRQ;
     const double L = 0.10; // normal thickness of the traversed layer
     auto mtl = diag_palette<double>();
@@ -1005,8 +907,8 @@ TEST_CASE("Exit boundary - the port at the recovered angle", "[wave]")
             // pins the TM port as well.
             CHECK(std::abs(Ce.gain(0) - g_ref) < 1e-9);
 
-            // Sanity: the port actually moved, so the case can fail. The recovery is a provable
-            // no-op for a real permittivity, which is why the lossless control is exempt.
+            // The port moves, so the case can fail. The recovery changes nothing for a real permittivity, which is why
+            // the lossless control is exempt.
             if (m != 6 && thd >= 40.0)
                 CHECK(std::abs(Tt_te - Ts_te) > 1e-6);
         }
@@ -1015,22 +917,17 @@ TEST_CASE("Exit boundary - the port at the recovered angle", "[wave]")
 
 TEST_CASE("Traced solid - air | slab | air chain against the analytic slab", "[wave]")
 {
-    // The end-to-end statement, and the case that would have caught the exit-angle defect.
-    //
-    // The chain is assembled from the ports the two public functions actually write, with nothing
-    // reconstructed in between: ray_mesh_interact supplies the entry coefficient and the refracted
-    // direction, and ray_state_update supplies the exit leg - exit port, internal series and
-    // in-medium traversal - from that direction. Their product is compared against the analytic
+    // The end-to-end statement: the chain is assembled from the ports the two public functions write, nothing
+    // reconstructed in between. ray_mesh_interact supplies the entry coefficient and the refracted direction,
+    // ray_state_update the exit leg (exit port, series, traversal) from that direction; their product is the analytic
     // slab, which shares no code with either.
     //
-    // The tracer is undeviated (type 4), which is the configuration the whole VBS machinery exists
-    // for: the geometric ray continues straight, so the far face is met at the external angle,
-    // while path_dirN carries the Snell direction and the two disagree. A refracting tracer
-    // (type 5) bends the geometry itself, the two angles coincide, and there is nothing to correct.
+    // The tracer is undeviated (type 4): the geometric ray continues straight, so the far face is met at the external
+    // angle while path_dirN carries the Snell direction. A refracting tracer (type 5) bends the geometry itself and the
+    // two angles coincide.
     //
-    // Why the entry-boundary case cannot see what this one sees: it divides the exit factor out by
-    // construction, so an exit evaluated at the wrong cosine cancels against itself. Here it does
-    // not cancel against anything.
+    // The entry-boundary case divides the exit factor out, so an exit at the wrong cosine would cancel there; here it
+    // cancels against nothing.
     const double f_hz = FRQ;
     const double L = 0.10; // normal thickness of the slab
     auto mtl = diag_palette<double>();
@@ -1113,9 +1010,8 @@ TEST_CASE("Traced solid - air | slab | air chain against the analytic slab", "[w
             // Entry port, traversal, exit port and series, telescoping onto the analytic slab.
             CHECK(std::abs(chain_dB - ana_dB) < 1e-6);
 
-            // The oracle is the average of the two channels; the scalar chain measures TE, so the
-            // average is printed only where the two coincide. Kept as a guard that the per-channel
-            // split of the reference has not been swapped.
+            // The oracle is the average of the two channels; the scalar chain measures TE, so the average is printed
+            // only where the two coincide. The per-channel split of the reference against its average.
             CHECK(std::abs(diag_slab_p_avg(es, L, th, f_hz) - 0.5 * (p_te + p_tm)) < 1e-15);
         }
     }
@@ -1123,32 +1019,23 @@ TEST_CASE("Traced solid - air | slab | air chain against the analytic slab", "[w
 
 TEST_CASE("Permeability - the traced solid and a magnetic layer in a stack", "[wave]")
 {
-    // The sheet, glued and single-layer stack paths are covered elsewhere and the library was found
-    // correct on them without a source change. Two statements were left open by that work and are
-    // made here: a traced solid with mu != 1, and a magnetic layer inside an ordered stack.
+    // A traced solid with mu != 1, and a magnetic layer inside an ordered stack. The analytic slab takes the three
+    // substitutions of the sheet builders, z = sqrt(eps/mu), the Snell ratio as a ratio of eps mu products and n =
+    // sqrt(eps mu); diag_traced_ct and diag_ct_exact take the third, since the map qd_refract applies is built from the
+    // product.
     //
-    // The analytic-slab oracle could not express either. diag_slab_p_pol formed both the admittance
-    // and the index as sqrt(eps), so a magnetic slab had no reference at all; it now takes the same
-    // three substitutions the sheet builders took, z = sqrt(eps/mu), the Snell ratio as a ratio of
-    // eps*mu products, and n = sqrt(eps*mu). diag_traced_ct and diag_ct_exact take the third of
-    // those, since the map qd_refract applies is built from the product.
+    // What a magnetic traced solid adds over a magnetic sheet:
     //
-    // What is distinct about a magnetic traced solid, over and above a magnetic sheet:
+    //   The telescoping property does not read mu. The entry port carries sqrt(Re(z_s c_s)/Re(z_a c_a)) and the exit
+    //   port its reciprocal, and the pair cancels whatever z_s is. What a magnetic run checks is that both crossings
+    //   read the same z_s and the same c_s, which the recovered cosine provides.
     //
-    //   The telescoping property does not read mu. The entry port carries
-    //   sqrt(Re(z_s c_s)/Re(z_a c_a)) and the exit port its reciprocal, and the pair cancels as a
-    //   ratio of one and the same real number whatever z_s is. So mu cannot break it; what a
-    //   magnetic run checks is that both crossings still read the SAME z_s and the same c_s, which
-    //   is the property the recovered cosine exists to provide.
-    //
-    //   The swap leaves the geometry bit-identical. qd_refract's snell, its refraction root, the
-    //   total-reflection test, EXACT_IN_SLAB_COSINE's eps_r, medium_gain's loss rate and
-    //   SCALE_BY_MEDIUM's index are all eps*mu products, so an eps<->mu swap moves nothing about
-    //   the traced path, the recovered cosine or the traversal - only the two interface channels,
-    //   which it exchanges. That is a stronger statement than the sheet version of it, because it
-    //   also asserts that none of the geometry reads the admittance.
+    //   The swap leaves the geometry bit-identical. The Snell ratio, the refraction root, the total-reflection test,
+    //   the recovered cosine, medium_gain's loss rate and the traversal's index are all eps mu products, so an eps <->
+    //   mu swap moves nothing about the traced path, the recovered cosine or the traversal - only the two interface
+    //   channels, which it exchanges.
     const double f_hz = FRQ;
-    const double L = 0.10;   // normal thickness of the traced solid
+    const double L = 0.10;    // normal thickness of the traced solid
     const double thk = 0.006; // sheet thickness in the stack block
     arma::mat mesh = diag_quad_x(200.0, 0.0);
     const std::complex<double> U(1.0, 0.0), e_air(1.0, 0.0);
@@ -1159,11 +1046,11 @@ TEST_CASE("Permeability - the traced solid and a magnetic layer in a stack", "[w
     };
     const int MSOL = 1, MSWP = 2, MMAT = 3, MLAY = 4, DLAY = 5;
     const std::vector<MuRow> pal = {
-        {1.50, 0.40 / 17.98, 1.20, 0.0, 0.0},                  // 1 MSOL, magnetic lossy solid
-        {1.20, 0.0, 1.50, 0.40 / 17.98, 0.0},                  // 2 MSWP, its eps<->mu swap
-        {2.00, 0.0, 2.00, 0.0, 0.0},                           // 3 MMAT, matched: z = 1, n = 2
-        {5.24, 0.63 / 17.98, 2.10, 0.35 / 17.98, 0.006},       // 4 MLAY, magnetic sheet layer
-        {1.50, 0.40 / 17.98, 1.00, 0.0, 0.006},                // 5 DLAY, dielectric sheet layer
+        {1.50, 0.40 / 17.98, 1.20, 0.0, 0.0},            // 1 MSOL, magnetic lossy solid
+        {1.20, 0.0, 1.50, 0.40 / 17.98, 0.0},            // 2 MSWP, its eps<->mu swap
+        {2.00, 0.0, 2.00, 0.0, 0.0},                     // 3 MMAT, matched: z = 1, n = 2
+        {5.24, 0.63 / 17.98, 2.10, 0.35 / 17.98, 0.006}, // 4 MLAY, magnetic sheet layer
+        {1.50, 0.40 / 17.98, 1.00, 0.0, 0.006},          // 5 DLAY, dielectric sheet layer
     };
     const std::complex<double> e_sol(1.50, -0.40), mu_sol(1.20, 0.0);
     const std::complex<double> e_swp(1.20, 0.0), mu_swp(1.50, -0.40);
@@ -1182,16 +1069,11 @@ TEST_CASE("Permeability - the traced solid and a magnetic layer in a stack", "[w
         mtl["thk"][i] = pal[i].thk, mtl["fRef"][i] = 1.0;
     }
 
-    // ------------------------------------------------------------------------------------------
-    // A traced air | slab | air chain through a magnetic solid, assembled from the ports the two
-    // public functions write, exactly as the dielectric chain case assembles it: the entry
-    // coefficient and the refracted direction from ray_mesh_interact, the exit leg from
-    // ray_state_update, nothing reconstructed in between.
-    //
-    // The sweep stops at 75 deg. The internal critical angle of eps*mu = 1.80 - 0.48j is 47.6 deg
-    // and the traced internal angle reaches 45.5 deg at 75 deg of external incidence, so the whole
-    // sweep stays below it with about two degrees to spare and no row turns into a forced mirror.
-    // ------------------------------------------------------------------------------------------
+    // ---- A traced air | slab | air chain through a magnetic solid ----
+    // Assembled from the ports the two public functions write, as the dielectric chain case does: the entry coefficient
+    // and the refracted direction from ray_mesh_interact, the exit leg from ray_state_update, nothing reconstructed in
+    // between. The sweep stops at 75 deg: the internal critical angle of eps mu = 1.80 - 0.48j is 47.6 deg and the
+    // traced internal angle reaches 45.5 deg at 75 deg of external incidence.
     QD_DIAG("\n# diag: permeability, traced air | slab | air chain, normal thickness 100 mm\n");
     QD_DIAG("# MSOL is eps 1.50 - 0.40j with mu 1.20; MSWP is the eps<->mu swap of it, so the two\n");
     QD_DIAG("# share every cosine and every phase and differ only in the admittance.\n");
@@ -1209,11 +1091,9 @@ TEST_CASE("Permeability - the traced solid and a magnetic layer in a stack", "[w
         {"MMAT", MMAT, e_mat, mu_mat},
     };
 
-    // The sweep starts at 10 deg, as the dielectric chain case does. At exactly normal incidence
-    // the traced and geometric cosines coincide, ray_state_update drops use_vbs on its own 1e-6
-    // re-test, and the traversal falls back to the hybrid path form, which sits 2.5e-5 dB from the
-    // exact one and would not clear the bound below. That gap is its own open item and is nothing
-    // to do with permeability, so it is kept out of the measurement rather than absorbed into it.
+    // The sweep starts at 10 deg, as the dielectric chain case does. At normal incidence the traced and geometric
+    // cosines coincide, the exact-cosine path is not taken, and the traversal falls back to the path form, 2.5e-5 dB
+    // from the exact one, which would not clear the bound below; that gap has nothing to do with permeability.
     for (const auto &S : solids)
         for (double thd : {10.0, 20.0, 40.0, 60.0, 75.0})
         {
@@ -1330,13 +1210,9 @@ TEST_CASE("Permeability - the traced solid and a magnetic layer in a stack", "[w
             CHECK(std::abs(sep) > 1.0e-2);
     }
 
-    // ------------------------------------------------------------------------------------------
-    // A magnetic layer inside an ordered two-sheet stack, air | 6 mm | 6 mm | air. diag_cm_stack
-    // already carries (eps, mu) per layer, so this is a fixture row rather than a reference change.
-    // What it adds over a magnetic single sheet is the layer product: the matrix multiplies two
-    // layers whose admittances and indices are now independent of each other, and the order
-    // statement has to survive that.
-    // ------------------------------------------------------------------------------------------
+    // ---- A magnetic layer inside an ordered two-sheet stack, air | 6 mm | 6 mm | air ----
+    // diag_cm_stack carries (eps, mu) per layer. What this adds over a magnetic single sheet is the layer product: two
+    // layers whose admittances and indices are independent of each other, and the order statement has to survive that.
     QD_DIAG("\n# diag: permeability, ordered stack with one magnetic layer\n");
     QD_DIAG("# air | MLAY (eps 5.24 - 0.63j, mu 2.10 - 0.35j) | DLAY (eps 1.50 - 0.40j) | air\n");
     QD_DIAG("order,theta_n,ref_|T|,ref_|R|,out_|T|,out_|R|,dT,dR,rtype_T,rtype_R\n");
@@ -1419,18 +1295,15 @@ TEST_CASE("Permeability - the traced solid and a magnetic layer in a stack", "[w
 
 TEST_CASE("Layered stack - the characteristic-matrix reference against the single-layer oracles", "[wave]")
 {
-    // diag_cm_stack has to reproduce diag_sheet_composite and diag_sheet_composite_cx exactly at
-    // one layer, since those are what the shipped composite is already asserted against. Nothing
-    // here touches the library: it is a check that two independently written closed forms agree,
-    // so that a failure in the two cases below is attributable to the solver rather than to the
-    // reference.
+    // diag_cm_stack reproduces diag_sheet_composite and diag_sheet_composite_cx exactly at one layer, the references
+    // the composite is asserted against. Nothing here touches the library: two independently written closed forms
+    // agree, so a failure in the cases below is attributable to the solver rather than to the reference.
     //
-    // Four further properties of the matrix product are asserted, each of which would catch a
-    // different transcription error:
+    // Four further properties of the matrix product, each of which would catch a different transcription error:
     //   a layer of zero thickness is inert, which pins the identity element,
     //   splitting one layer into two halves is inert, which pins the product and the phase,
     //   the transmit port is invariant under layer order, which is reciprocity (det M = 1),
-    //   the reflect port is not, which is the whole reason sheet_case 4 carries an order at all.
+    //   the reflect port is not, which is why an ordered stack carries its order.
     const double f_hz = FRQ;
     const double thk = 0.006;
     const std::complex<double> U(1.0, 0.0);
@@ -1473,8 +1346,8 @@ TEST_CASE("Layered stack - the characteristic-matrix reference against the singl
                 double d_re = std::max(std::max(std::abs(A.T_te - B.T_te), std::abs(A.T_tm - B.T_tm)),
                                        std::max(std::abs(A.R_te - B.R_te), std::abs(A.R_tm - B.R_tm)));
 
-                // The same statement at a complex incidence cosine, which is the argument the core
-                // will actually be handed wherever the near medium is a traced solid.
+                // The same statement at a complex incidence cosine, the argument the core is handed where the near
+                // medium is a traced solid.
                 std::complex<double> cx = diag_ct_exact(e_lo, th);
                 DiagSheet Ac = diag_sheet_composite_cx(e_lo, e_s, S.e_far, thk, cx, f_hz,
                                                        S.disp_far, scalar);
@@ -1527,36 +1400,27 @@ TEST_CASE("Layered stack - the characteristic-matrix reference against the singl
         CHECK(std::abs(AB.T_te - BA.T_te) < 1.0e-14);
         CHECK(std::abs(AB.T_tm - BA.T_tm) < 1.0e-14);
 
-        // The reflect port does. This is the only thing the ordering machinery of sheet_case 4
-        // exists to serve, and it is asserted so that a reference that lost the order shows up here
-        // rather than as a silent pass in the third case below.
+        // The reflect port does: an ordered stack carries its order for this alone, and a reference that lost the order
+        // would show here.
         CHECK(std::abs(AB.R_te - BA.R_te) > 1.0e-3);
     }
 }
 
 TEST_CASE("Permeability - the sheet, stack and glued paths", "[wave]")
 {
-    // The e, f, g, h columns are live in every expression the sheet and stack paths form, and no
-    // sheet, stack, glued pair or traced chain has ever run with a non-unit mu. This case supplies
-    // the coverage. No source change accompanies it.
+    // The e, f, g, h columns in every expression the sheet and stack paths form: sheets, stacks, glued pairs and traced
+    // chains with mu != 1.
     //
-    // Where mu enters. Every site is one of two forms and never a third. Through the PRODUCT
-    // eps*mu: the index n = sqrt(eps*mu) in every propagation factor, every Snell ratio and every
-    // refraction root, the total-reflection test, medium_gain's loss rate, qd_refract's snell,
-    // EXACT_IN_SLAB_COSINE's eps_r, the displaced-host cosine and index, and SCALE_BY_MEDIUM, which
-    // never sees mu on its own at all. Through the QUOTIENT eps/mu: the admittance z in every
-    // Fresnel amplitude, the core's tilted admittances z*c and z/c, and flux_amp's Re(z c) and
-    // Re(conj(z) c).
+    // Where mu enters. Every site is one of two forms. Through the product eps mu: the index n = sqrt(eps mu) in every
+    // propagation factor, every Snell ratio and refraction root, the total-reflection test, medium_gain's loss rate,
+    // the recovered cosine, the displaced host's cosine and index, and the traversal, which never sees mu on its own.
+    // Through the quotient eps/mu: the admittance z in every Fresnel amplitude, the core's tilted admittances z c and z
+    // / c, and the flux factors Re(z c) and Re(conj(z) c).
     //
-    // So there is exactly one magnetic degree of freedom to test: n and z stop being the same
-    // number. A single permittivity fixes both, which is why no dielectric palette can reach any of
-    // this, and it is why an eps<->mu swap is the sharpest available probe - it holds n, and
-    // therefore every cosine and every phase, fixed while inverting z.
-    //
-    // What the six existing permeability cases cover is the product-and-quotient split at a single
-    // interface and in medium_gain. None of them involves a layer, so none of them can see a
-    // propagation phase built at the wrong index or an internal series built at the wrong
-    // admittance.
+    // So there is one magnetic degree of freedom: n and z stop being the same number. A single permittivity fixes both,
+    // which is why no dielectric palette reaches this, and why an eps <-> mu swap is the sharpest probe: it holds n,
+    // and with it every cosine and phase, while inverting z. The single-interface permeability cases involve no layer,
+    // so they cannot see a propagation phase built at the wrong index or a series built at the wrong admittance.
     const double f_hz = FRQ;
     const double thk = 0.006;
     const double L = 0.10;
@@ -1592,22 +1456,19 @@ TEST_CASE("Permeability - the sheet, stack and glued paths", "[wave]")
     }
 
     const uint8_t OT_SHEET_ISO = 67;   // ok | sheet, no co-located face
-    const uint8_t OT_GLUED_ENTRY = 71; // ok | front | co-located | sheet -> sheet_case 2
+    const uint8_t OT_GLUED_ENTRY = 71; // ok | front | co-located | sheet -> a glued entry
 
-    // Channel identification, as in the flux-conversion case: make1 puts orig, fbs and dest on the
-    // x axis with the normal along x, so the incidence plane is degenerate, qd_polbasis takes its
-    // identity branch, and VV is TM while HH is TE.
+    // Channel identification, as in the flux-conversion case: make1 puts orig, fbs and dest on the x axis with the
+    // normal along x, so the incidence plane is degenerate, the polarization basis takes its identity branch, and VV is
+    // TM while HH is TE.
     auto TM = [](const arma::mat &X)
     { return cpx(X, 0, 0); };
     auto TE = [](const arma::mat &X)
     { return cpx(X, 0, 3); };
 
-    // ------------------------------------------------------------------------------------------
-    // The generalized builders against diag_cm_stack, at mu != 1. Nothing here touches the
-    // library. diag_cm_stack was written with (eps, mu) pairs from the start and shares no code
-    // with the two single-layer builders, so this is what establishes that the three substitutions
-    // above are the right three before any of them is used as an oracle below.
-    // ------------------------------------------------------------------------------------------
+    // ---- The generalized builders against diag_cm_stack, at mu != 1 ----
+    // Nothing here touches the library. diag_cm_stack takes (eps, mu) pairs and shares no code with the two
+    // single-layer builders, so this establishes the three substitutions before they serve as oracles below.
     QD_DIAG("\n# diag: permeability, generalized single-layer builders against diag_cm_stack\n");
     QD_DIAG("stack,mode,theta_n,d_real_builder,d_complex_builder\n");
 
@@ -1659,8 +1520,8 @@ TEST_CASE("Permeability - the sheet, stack and glued paths", "[wave]")
                 CHECK(d_re < 1.0e-14);
                 CHECK(d_cx < 1.0e-14);
 
-                // And the complex-cosine builder still reproduces the real-cosine one at a real
-                // cosine with mu live, which is the invariant the sheet-in-a-medium case rests on.
+                // And the complex-cosine builder reproduces the real-cosine one at a real cosine with mu live, the
+                // invariant the sheet-in-a-medium case rests on.
                 DiagSheet Ar = diag_sheet_composite_cx(S.e_near, e_ms, S.e_far, thk,
                                                        std::complex<double>(ct, 0.0), f_hz,
                                                        S.disp_far, scalar, S.mu_near, mu_ms, S.mu_far);
@@ -1671,11 +1532,10 @@ TEST_CASE("Permeability - the sheet, stack and glued paths", "[wave]")
     QD_DIAG("# worst against the real-cosine builder %.3e, against the complex one %.3e\n",
             worst_re, worst_cx);
 
-    // ------------------------------------------------------------------------------------------
-    // An isolated magnetic sheet in air, and a glued entry into a magnetic solid, both against the
-    // generalized reference. The isolated rows run with mtl_current = 0, so SHEET_EVENT applies no
-    // host factor and the written field is the composite outright; those are asserted complex.
-    // ------------------------------------------------------------------------------------------
+    // ---- An isolated magnetic sheet in air, and a glued entry into a magnetic solid, against the generalized
+    // reference ----
+    // The isolated rows run with mtl_current = 0, so no host factor is applied and the written field is the composite
+    // outright; those are asserted complex.
     QD_DIAG("\n# diag: permeability through the library, sheet eps 5.24 - 0.63j, mu 2.10 - 0.35j\n");
     QD_DIAG("stack,theta_n,T_te_meas,T_te_ref,T_tm_meas,T_tm_ref,d_te,d_tm,rtype\n");
 
@@ -1721,16 +1581,12 @@ TEST_CASE("Permeability - the sheet, stack and glued paths", "[wave]")
             CHECK(std::abs((double)C.gain(0) - 0.5 * (std::norm(D.T_te) + std::norm(D.T_tm))) < 1.0e-9);
         }
 
-    // ------------------------------------------------------------------------------------------
-    // The eps<->mu swap, on the sheet only, in air. Swapping holds n = sqrt(eps*mu) and therefore
-    // every cosine and the propagation factor exactly fixed, and replaces z by 1/z. With both hosts
-    // at unit admittance every reflection and every transmission product in the Airy pair maps onto
-    // its opposite polarization, so the swap exchanges the TE and TM ports exactly, on both ports.
-    //
-    // The power-averaged gain is invariant under that exchange, so this statement is invisible to
-    // gain and to scalar mode and can only be made per channel. That is the point: a solver that
-    // reverted the admittance to sqrt(eps) would still report the same total.
-    // ------------------------------------------------------------------------------------------
+    // ---- The eps <-> mu swap, on the sheet only, in air ----
+    // Swapping holds n = sqrt(eps mu), and so every cosine and the propagation factor, and replaces z by 1/z. With both
+    // hosts at unit admittance every reflection and transmission product of the Airy pair maps onto the other
+    // polarization, so the swap exchanges the TE and TM ports exactly, on both ports. The power-averaged gain is
+    // invariant under that exchange, so the statement can only be made per channel: an admittance read as sqrt(eps)
+    // would still report the same total.
     QD_DIAG("\n# diag: permeability, eps<->mu swap on an isolated sheet in air\n");
     QD_DIAG("theta_n,d_te_vs_tm,d_tm_vs_te,d_gain,separation\n");
 
@@ -1767,17 +1623,12 @@ TEST_CASE("Permeability - the sheet, stack and glued paths", "[wave]")
             CHECK(sep > 1.0e-3);
     }
 
-    // ------------------------------------------------------------------------------------------
-    // An impedance-matched dense sheet, eps = mu = 4, so z = 1 and n = 4. At normal incidence both
-    // interfaces vanish and the sheet is invisible except for its phase: the composite is exactly
-    // the propagation it carries over the host it displaces, exp(-j k0 thk (n - 1)), with unit
-    // magnitude and no reflection at all. No dielectric can do that, because a single permittivity
-    // that moves n also moves z.
-    //
-    // At oblique incidence it does reflect, and the reflection is polarization-independent, since
-    // with z equal on both sides the TE and TM Fresnel expressions collapse onto the same function
-    // of the two cosines. That is the second thing only a magnetic material produces.
-    // ------------------------------------------------------------------------------------------
+    // ---- An impedance-matched dense sheet, eps = mu = 4, so z = 1 and n = 4 ----
+    // At normal incidence both interfaces vanish and the sheet is invisible except for its phase: the composite is
+    // exactly the propagation it carries over the host it displaces, exp(-j k0 thk (n - 1)), with unit magnitude and no
+    // reflection. No dielectric can do that, because a single permittivity that moves n also moves z.
+    // At oblique incidence it reflects, and the reflection is polarization-independent: with z equal on both sides the
+    // TE and TM Fresnel expressions collapse onto one function of the two cosines.
     QD_DIAG("\n# diag: permeability, impedance-matched dense sheet, eps = mu = 4, thk 6 mm\n");
     QD_DIAG("theta_n,|T|,arg_T_deg,pred_deg,|R_te|,|R_tm|,d_pol\n");
 
@@ -1830,33 +1681,24 @@ TEST_CASE("Permeability - the sheet, stack and glued paths", "[wave]")
 
 TEST_CASE("Layered stack - a host layer bounded by a sheet", "[wave]")
 {
-    // Symptom one and symptom two of issue 1, on the same geometry.
+    // An i-o exit out of a host layer whose previous-medium word holds a sheet. The host's series runs between the face
+    // ahead and the sheet behind, and the sheet is a layer with air behind it, not a half-space of its material: the
+    // reflection behind the ray is the characteristic matrix of the sheet on its backing.
     //
-    // An i-o exit out of a host layer whose previous-medium word holds a sheet. APPLY_TRANSITION
-    // calls SLAB_AIRY_FACTOR(mtl_current, mtl_next, mtl_prev), so correction mode is handed the
-    // sheet as mat_far and treats it as a half-space: no thickness, no internal structure, and
-    // nothing behind it. The host layer's Airy denominator then reflects off an object that does
-    // not exist.
+    // Two sheets are swept. SHEET (eps 5.24 - 0.63j) is a real boundary and measures the coupling across the layer.
+    // LO_NEAR (eps 1.5015 - 0.40j) is near-matched to the host: as a half-space it would reflect 2.5e-4 and the host's
+    // series would collapse, while the wave passes through the sheet almost unimpeded and still sees the boundary
+    // behind it.
     //
-    // Two sheets are swept. SHEET (eps 5.24 - 0.63j) is a real boundary and measures the
-    // cross-layer coupling: the denominator gets a reflection coefficient of roughly the right size
-    // but the wrong value. LO_NEAR (eps 1.5015 - 0.40j) is near-matched to the host and measures
-    // the series collapse: the half-space reflection is 2.5e-4, the denominator collapses onto 1,
-    // and the host loses its internal series entirely, when physically the wave passes through the
-    // sheet almost unimpeded and still sees the boundary behind it.
-    //
-    // The reference is the two-layer stack the crossing actually is. The quantity the harness can
-    // isolate is the series factor, so the reference is written as
+    // The reference is the two-layer stack the crossing is. The harness isolates the series factor, so the reference is
+    // written as
     //     S = 1 / (1 - r_ahead * r_behind * phi^2)
-    // with r_behind taken from the characteristic matrix rather than from a half-space Fresnel
-    // value. That factorization is exact: substituting the matrix value for r_behind reproduces the
-    // full two-layer stack, which is what makes a series-factor assertion a statement about the
-    // stack and not about the shape of the correction.
+    // with r_behind taken from the characteristic matrix. That factorization is exact: substituting the matrix value
+    // for r_behind reproduces the full two-layer stack.
     //
-    // Everything else in the row is held at the values the shipped diagnostic uses. No path_dir is
-    // supplied, so abs_cos_theta_t is the fbs cosine, the propagation factor is the hybrid form
-    // diag_phi reproduces, and both boundaries are taken from the slab side at that same real
-    // cosine. The reference is built at the same cosine for the same reason.
+    // No path_dir is supplied, so abs_cos_theta_t is the fbs cosine, the propagation factor is the path form diag_phi
+    // reproduces, and both boundaries are taken from the slab side at that real cosine; the reference is built at the
+    // same cosine.
     const double f_hz = FRQ;
     const double thk = 0.006;
     auto mtl = diag_palette<double>();
@@ -1932,18 +1774,15 @@ TEST_CASE("Layered stack - a host layer bounded by a sheet", "[wave]")
                 REQUIRE(rt_bit(C.resolved_type[0], 2));
                 REQUIRE(std::isfinite(C.gain(0)));
 
-                // The two far-side reflections are far enough apart that the assertion below
-                // discriminates. A statement about the references, true whichever one the solver is
-                // built against, so it guards against a revert as well as against a bad reference.
+                // The two far-side reflections are far enough apart that the assertion below discriminates; a statement
+                // about the references.
                 CHECK(std::abs(r_hs - B.R_te) > 1.0e-3);
 
-                // A near-matched sheet is nearly not a boundary, so the layer it stands for is
-                // nearly six more millimeters of host. At normal incidence the two descriptions of
-                // that stack are the same object and the reference converges onto the extended-path
-                // form linearly in the mismatch. Only at normal incidence: at an angle the two
-                // carry different propagation conventions, the layer using k0 n thk cos and the
-                // extended path the walk-off cos^2 of issue 9, and the gap between those two is not
-                // a statement about this item.
+                // A near-matched sheet is nearly not a boundary, so the layer it stands for is nearly six more
+                // millimetres of host. At normal incidence the two descriptions of that stack are one object and the
+                // reference converges onto the extended-path form linearly in the mismatch. Only at normal incidence:
+                // at an angle the layer uses k0 n thk cos and the extended path the walk-off cos^2, and their gap is
+                // not this statement.
                 if (R.near_matched && thd == 0.0)
                 {
                     std::complex<double> phi2 = diag_phi(e_h, L + thk, theta_n, f_hz);
@@ -1958,28 +1797,22 @@ TEST_CASE("Layered stack - a host layer bounded by a sheet", "[wave]")
             }
 }
 
-TEST_CASE("Layered stack - sheet_case 4 resolves rather than killing the ray", "[wave]")
+TEST_CASE("Layered stack - an ordered stack of two sheets resolves rather than killing the ray", "[wave]")
 {
-    // Symptom three. Two co-located sheets of different materials are an ordered stack. Detection
-    // and the type bits are correct in both functions, but no sheet physics runs for it:
-    // SHEET_EVENT calls KILL_RAY and the ray disappears.
+    // Two co-located sheets of different materials are an ordered stack: one event, resolved on the characteristic
+    // matrix of the two layers.
     //
-    // The stack here is air | A | B | air with both sheets 6 mm, so mtl_current bounds both sides,
-    // near == far, the flux conversion is identically 1, and the displaced host is 12 mm of air.
-    // That makes the target composite a pure two-layer characteristic matrix with nothing else
-    // multiplying it: with mtl_current at 0, SHEET_EVENT closes out no host leg and returns without
-    // touching the state words, so the written field IS the composite.
+    // The stack here is air | A | B | air with both sheets 6 mm, so mtl_current bounds both sides, near == far, the
+    // flux conversion is identically 1, and the displaced host is 12 mm of air: the composite is a pure two-layer
+    // matrix with nothing else multiplying it. With mtl_current at 0 no host leg is closed and the state words are
+    // untouched, so the written field is the composite.
     //
-    // Both orders are run. Bit 1 of the hit code carries the traversal order that ray_mesh_interact
-    // derived from the face normals, the layer hit on its front side being traversed first, with
-    // bit 3 recording that the order fell back to the geometric FBS -> SBS sequence. Note that
-    // ray_state_update's case re-derivation currently keeps only sheet_mtl = M1 and leaves
-    // sheet_solid at 0, so the second material index and the order are both discarded before
-    // SHEET_EVENT sees them; the core needs them carried.
+    // Both orders are run. Bit 1 of the hit code carries the traversal order ray_mesh_interact derived from the face
+    // normals, the layer hit on its front side being traversed first, with bit 3 recording that the order fell back to
+    // the geometric FBS -> SBS sequence.
     //
-    // Transmission is order-independent by reciprocity and only the reflect port separates the two,
-    // which is asserted here on the reference as well as on the solver so that the order can be
-    // seen to matter at all.
+    // Transmission is order-independent by reciprocity and only the reflect port separates the two, which is asserted
+    // on the reference as well as on the solver, so that the order can be seen to matter at all.
     const double f_hz = FRQ;
     const double thk = 0.006;
     auto mtl = diag_palette<double>();
@@ -2004,7 +1837,7 @@ TEST_CASE("Layered stack - sheet_case 4 resolves rather than killing the ray", "
         {"B|A", OT_STACK_SBS, A, B, e_B, e_A},
     };
 
-    QD_DIAG("\n# diag: sheet_case 4, air | 6 mm | 6 mm | air, sheets eps 5.24 - 0.63j and\n");
+    QD_DIAG("\n# diag: a stack of two sheets, air | 6 mm | 6 mm | air, sheets eps 5.24 - 0.63j and\n");
     QD_DIAG("# eps 1.50 - 0.40j, 1 GHz. ref_* is the two-layer characteristic matrix, out_* is what\n");
     QD_DIAG("# the stack resolve wrote.\n");
     QD_DIAG("order,theta_n,ref_|T|,ref_|R|,out_|T|,out_gain_T,out_gain_R,dT,dR,rtype_T,rtype_R\n");
@@ -2015,8 +1848,8 @@ TEST_CASE("Layered stack - sheet_case 4 resolves rather than killing the ray", "
             double th = thd * QPI / 180.0;
             std::complex<double> ci(std::cos(th), 0.0);
 
-            // near == far == air, so the conversion is 1 and the displaced host is air over the
-            // whole 12 mm, which is what SHEET_RESOLVE leaves uncapped for an air host.
+            // near == far == air, so the conversion is 1 and the displaced host is air over the whole 12 mm, which the
+            // displacement budget leaves uncapped for an air host.
             DiagSheet Xs = diag_cm_stack(e_air, U, {{O.first, U, thk}, {O.second, U, thk}},
                                          e_air, U, ci, f_hz, false, /*scalar*/ true);
             DiagSheet Xe = diag_cm_stack(e_air, U, {{O.first, U, thk}, {O.second, U, thk}},
@@ -2083,33 +1916,22 @@ TEST_CASE("Layered stack - sheet_case 4 resolves rather than killing the ray", "
 
 TEST_CASE("Lumped columns - interface gain on the sheet, glued and embedded paths", "[wave]")
 {
-    // ig = sqrt(slab.interface_gain * (far_is_new ? far.interface_gain : 1)) in produce mode, with
-    // far_is_new = !far_is_air && !far.same_as(near). No sheet test has ever set att, so the branch
-    // has only ever evaluated sqrt(1 * 1).
-    //
-    // What it has to say, in the quantities it holds. An interface gain is a penetration loss owed
-    // once per medium ENTERED, which is what Material::interact_with charges for a single
-    // transmission-class crossing: the entered medium's, never the one being left. A sheet crossing
-    // enters the sheet, so it owes the sheet's. It enters the far medium as well only if the wave
-    // was not already in it:
+    // The interface gains on a sheet: sqrt(G_sheet * (far is new ? G_far : 1)) on the transmit port. An interface gain
+    // is a penetration loss owed once per medium entered, which is what interact_with charges for a single
+    // transmission-class crossing: the entered medium's, never the one being left. A sheet crossing enters the sheet,
+    // so it owes the sheet's; it enters the far medium as well only if the wave was not already in it:
     //
     //   isolated   air  | sheet | air     G_sheet             air owes nothing
     //   entry      air  | sheet | wall    G_sheet * G_wall    the wall is entered here and nowhere else
     //   embedded   host | sheet | host    G_sheet             the host was entered earlier and paid then
     //   exit       host | sheet | air     G_sheet             leaving, and air owes nothing
     //
-    // The embedded row is the one far_is_new was written for. Testing for air instead of for
-    // near == far would charge the host a second time at every sheet inside it, and the row is
-    // built so that this costs the full 5 dB of the host's column.
+    // The embedded row is the one the gate exists for: testing for air instead of for near == far would charge the host
+    // a second time at every sheet inside it, which the row makes cost the full 5 dB of the host's column. The
+    // reference does not copy the gate: DiagLump::g_far is set by the row to what the far medium is owed.
     //
-    // The reference does not copy the gate. DiagLump::g_far is set by the row to what the far
-    // medium is owed, so what is measured is the gate against the table above.
-    //
-    // The reflect port owes nothing: nothing was penetrated by the part that turns around at the
-    // near face, and produce mode extends that to the whole port, including the series that did
-    // enter the sheet and came back out. That second half is a convention rather than a
-    // consequence - a traced solid charges the same echo its entry gain - and it is asserted here
-    // as what the composite does, exactly, not as what a solid would do.
+    // The reflect port owes nothing for the part that turns around at the near face; what entered the sheet and came
+    // back out pays the sheet's gain once, as the echo of a traced solid does.
     const double f_hz = FRQ;
     const double thk = 0.006;
     const double L = 0.10;
@@ -2217,10 +2039,9 @@ TEST_CASE("Lumped columns - interface gain on the sheet, glued and embedded path
 
             if (R.near == HOST && R.far == HOST)
             {
-                // The embedded sheet pays the host's gain not at all. Stated twice. Against the
-                // reference: charging it would cost the full 5 dB. And against the host's twin
-                // without the column, where it is exact by construction: with near == far the
-                // host's att column is never read, so the two runs are the same arithmetic.
+                // The embedded sheet does not pay the host's gain. Stated twice: against the reference, where charging
+                // it would cost the full 5 dB, and against the host's twin without the column, exact by construction:
+                // with near == far the host's att column is never read.
                 auto Ch = run(SH, 0, HOST0, 1);
                 CHECK(std::abs(p_te - P(D.T_te) * G_wall) > 0.5 * p_te);
                 CHECK(p_te == P(TE(Ch.xprmat)));
@@ -2228,8 +2049,8 @@ TEST_CASE("Lumped columns - interface gain on the sheet, glued and embedded path
             }
             if (R.far == WALL)
             {
-                // The glued entry pays the wall's, which no other event on the path will: without
-                // it the wall's penetration loss disappears for every wall that carries a coating.
+                // The glued entry pays the wall's, which no other event on the path will: without it the wall's
+                // penetration loss would disappear for every wall that carries a coating.
                 CHECK(std::abs(p_te - P(D.T_te) / G_wall) > 0.5 * p_te);
             }
 
@@ -2250,37 +2071,30 @@ TEST_CASE("Lumped columns - interface gain on the sheet, glued and embedded path
 
 TEST_CASE("Lumped columns - the transmission factor on a sheet, both ports", "[wave]")
 {
-    // The AMP lambda in produce mode, and the apply_tf call in the two boundary lambdas that feeds
-    // it. Per boundary and per channel, with R0 the raw Fresnel reflectance and R' = apply_tf(R0):
+    // tf at the faces of a sheet. Each face is the ideal transformer of the sheet-tf case; between real admittances
+    // that is, per boundary and per channel, with R0 the raw Fresnel reflectance and R' the pair rule on it:
     //
     //     r' = sqrt(R') exp(j arg r)        t' = t sqrt((1 - R') / (1 - R0))
     //
-    // so the reflectance is replaced, the transmission keeps its Fresnel phase, and its power is
-    // moved by exactly what the reflection gave up or took. tf > 0 leaks, R' = R0 (1 - tf), which
-    // scales |r| by sqrt(1 - tf) whatever the angle but scales t by an amount that grows with R0
-    // and is unbounded towards grazing; tf < 0 forces, R' = R0 + (1 - R0)|tf|, which scales t by
-    // sqrt(1 - |tf|) whatever the angle. Both faces take the SHEET's tf.
+    // so the reflectance is replaced, the transmission keeps its Fresnel phase, and its power moves by exactly what the
+    // reflection gave up or took. tf > 0 leaks, R' = R0 (1 - tf), which scales |r| by sqrt(1 - tf) at every angle but
+    // scales t by an amount that grows with R0; tf < 0 forces, R' = R0 + (1 - R0)|tf|, which scales t by sqrt(1 - |tf|)
+    // at every angle. Both faces take the sheet's tf.
     //
-    // tf is not a boundary admittance, so the characteristic matrix cannot hold it. The Airy pair
-    // can, because it is written in exactly the per-boundary r and t that tf rescales, and
-    // diag_sheet_composite is in that form. So the reference expresses the rule in closed form and
-    // the assertion is the ordinary one. What it cannot be is independent of the rule: it is the
-    // same convention written a second time. Two statements below are independent of it.
+    // tf is not a boundary admittance, so the characteristic matrix cannot hold it. The Airy pair can, because it is
+    // written in the per-boundary r and t that tf rescales, and diag_sheet_composite is in that form; the reference is
+    // the same convention written a second time. Two statements below are independent of it.
     //
-    //   Unitarity. In flux-normalized amplitudes a lossless boundary below its critical angle is
-    //   [[r, tau], [tau, -r]] with r and tau real and r^2 + tau^2 = 1. The rescale keeps both
-    //   phases and keeps the sum, so the boundary is still unitary, and a lossless sheet between
-    //   two unitary boundaries conserves energy per channel at any tf. Nothing in the reference is
-    //   needed to say that.
+    //   Unitarity. In flux-normalized amplitudes a lossless boundary below its critical angle is [[r, tau], [tau, -r]]
+    //   with r and tau real and r^2 + tau^2 = 1. The rescale keeps both phases and the sum, so the boundary stays
+    //   unitary, and a lossless sheet between two unitary boundaries conserves energy per channel at any tf.
     //
-    //   The end points. tf = +1 removes the reflection outright, so the reflect port is exactly
-    //   zero and a lossless sheet is a pure phase; tf = -1 makes both faces mirrors, so the
-    //   transmit port is exactly zero.
+    //   The end points. tf = +1 removes the reflection, so the reflect port is exactly zero and a lossless sheet is a
+    //   pure phase; tf = -1 makes both faces mirrors, so the transmit port is exactly zero.
     //
-    // A tf-bearing PAIR, sheet and solid both, is the pair rule: each face is owed by the two
-    // media that form it. The last block asserts a wall's tf under a coating against the reference
-    // carrying the wall's column; the full
-    // sweep is in the neighbour-tf case below.
+    // A tf-bearing pair, sheet and solid both, is the pair rule: each face is owed by the two media that form it. The
+    // last block asserts a wall's tf under a coating against the reference carrying the wall's column; the full sweep
+    // is in the neighbour-tf case below.
     const double f_hz = FRQ;
     const double thk = 0.006;
     const double L = 0.10;
@@ -2441,14 +2255,12 @@ TEST_CASE("Lumped columns - the transmission factor on a sheet, both ports", "[w
     QD_DIAG("# worst: transmit %.3e, reflect and scalar %.3e, energy of a lossless sheet %.3e\n",
             worst_T, worst_R, worst_E);
 
-    // The far medium's tf. A glued entry into a wall that carries one, with a sheet that does not,
-    // against the same entry with the wall's column removed. The wall's boundary is now
-    // sheet | wall rather than air | wall, so the column is not worth what it is worth on the bare
-    // wall, and a forced far face adds a series against the sheet's front face. Asserted against
-    // the reference. bare_dB is what the same column is worth on the uncoated wall, from the
-    // rule Material::interact_with applies to a single crossing: the TE/TM-averaged reflectance R
-    // becomes R (1 - tf) for a leak and R + (1 - R)|tf| for a forced reflection, and the
-    // transmitted power moves by (1 - R') / (1 - R).
+    // The far medium's tf. A glued entry into a wall that carries one, with a sheet that does not, against the same
+    // entry with the wall's column removed. The wall's boundary is sheet | wall rather than air | wall, so the column
+    // is not worth what it is worth on the bare wall, and a forced far face adds a series against the sheet's front
+    // face. Asserted against the reference. bare_dB is what the same column is worth on the uncoated wall, from the
+    // rule interact_with applies to a single crossing: the TE/TM-averaged reflectance R becomes R (1 - tf) for a leak
+    // and R + (1 - R)|tf| for a forced reflection, and the transmitted power moves by (1 - R') / (1 - R).
     QD_DIAG("\n# diag: the far medium's tf on a glued entry, air | sheet (tf 0) | wall (tf)\n");
     QD_DIAG("# composite_dB is what the wall's column moves the coated entry by, bare_dB what it\n");
     QD_DIAG("# moves the uncoated wall by\n");
@@ -2499,26 +2311,23 @@ TEST_CASE("Lumped columns - the transmission factor on a sheet, both ports", "[w
 
 TEST_CASE("Lumped columns - a permittivity resonance is part of the medium on the sheet paths", "[wave]")
 {
-    // A resonance added at every INTERFACE quantity - the admittances and the cosines - and left
-    // out of every propagation INDEX is not a wave any medium
-    // supports at oblique incidence, and with a lossy pole it is not passive: the face takes
-    // power out of the wave and the inside gives none back. A Lorentz pole is a dispersive
-    // dielectric, one medium of eps + res at its faces and inside it, which is what the library
-    // and the references here now carry.
+    // A resonance added at every interface quantity - the admittances and the cosines - and left out of every
+    // propagation index is not a wave any medium supports at oblique incidence, and with a lossy pole it is not
+    // passive. A Lorentz pole is a dispersive dielectric, one medium of eps + res at its faces and inside it, which is
+    // what the library and the references carry.
     //
     // Three kinds of statement.
     //
-    //   Against the reference with the pole in the permittivity, 1e-9, complex wherever nothing
-    //   else multiplies the composite: a resonant sheet in air, a resonant sheet glued to a plain
-    //   solid, a plain sheet glued to a resonant solid, and a resonant sheet inside a resonant host.
-    //   The host of the last row is lossy at 1 GHz through its pole, so the leg the event closes
-    //   is a decay, compared in power with the decay written from the medium.
+    //   Against the reference with the pole in the permittivity, 1e-9, complex wherever nothing else multiplies the
+    //   composite: a resonant sheet in air, a resonant sheet glued to a plain solid, a plain sheet glued to a resonant
+    //   solid, and a resonant sheet inside a resonant host. The host of the last row is lossy at 1 GHz through its
+    //   pole, so the leg the event closes is a decay, compared in power with the decay written from the medium.
     //
     //   Against the resonance dropped, as a margin.
     //
-    //   Without a reference at all. A lossless sheet of eps 4 whose pole takes it to exactly 1 is a
-    //   sheet of air: no reflection and a transmission of one with no phase, at every angle and in
-    //   both channels. The split gave it exp(-j k0 thk cos(theta) (2 - 1)), which is recorded.
+    //   Without a reference at all. A lossless sheet of eps 4 whose pole takes it to exactly 1 is a sheet of air: no
+    //   reflection and a transmission of one with no phase, at every angle and in both channels. A pole at the faces
+    //   only would leave it exp(-j k0 thk cos(theta) (2 - 1)), which is printed beside it.
     const double f_hz = FRQ;
     const double thk = 0.006;
     const double L = 0.10;
@@ -2526,11 +2335,11 @@ TEST_CASE("Lumped columns - a permittivity resonance is part of the medium on th
 
     const int SHR = 1, WALL = 2, WALLR = 3, HOSTR = 4, SH = 5, MATCH = 6;
     const std::vector<LumpMtl> pal = {
-        {5.24, 0.63, thk, 0.0, 0.0, 1.2, 5.0, 0.8},     // 1 SHR    resonant sheet
-        {1.50, 0.40, 0.0},                              // 2 WALL   plain lossy solid
-        {1.50, 0.40, 0.0, 0.0, 0.0, 0.8, 4.0, 0.5},     // 3 WALLR  resonant lossy solid
-        {1.50, 0.00, 0.0, 0.0, 0.0, 0.8, 4.0, 0.5},     // 4 HOSTR  resonant solid, lossless index
-        {5.24, 0.63, thk},                              // 5 SH     plain sheet
+        {5.24, 0.63, thk, 0.0, 0.0, 1.2, 5.0, 0.8},       // 1 SHR    resonant sheet
+        {1.50, 0.40, 0.0},                                // 2 WALL   plain lossy solid
+        {1.50, 0.40, 0.0, 0.0, 0.0, 0.8, 4.0, 0.5},       // 3 WALLR  resonant lossy solid
+        {1.50, 0.00, 0.0, 0.0, 0.0, 0.8, 4.0, 0.5},       // 4 HOSTR  resonant solid, lossless index
+        {5.24, 0.63, thk},                                // 5 SH     plain sheet
         {4.00, 0.00, thk, 0.0, 0.0, 2.0, 1.0e300, -2.25}, // 6 MATCH  eps 4, interface eps exactly 1
     };
     auto mtl = lump_palette(pal);
@@ -2678,23 +2487,18 @@ TEST_CASE("Lumped columns - a permittivity resonance is part of the medium on th
 
 TEST_CASE("Neighbour tf - each face of a sheet is owed by the pair of media that form it", "[wave]")
 {
-    // Item 3. Produce mode gave both faces of a sheet to the sheet and read the neighbours' tf
-    // nowhere, while Material::interact_with combines the two media of a bare boundary through
-    // apply_tf_pair. The rule asserted here is the second one applied to each face of the sheet
-    // with its own neighbour, per channel:
+    // Each face of a sheet is owed by the pair of media that form it, as a bare boundary is (interact_with combines its
+    // two media through apply_tf_pair), per channel:
     //
     //     near face   pair(tf_near, tf_sheet)        far face   pair(tf_sheet, tf_far)
     //
-    // It reduces to the sheet's own tf, bit for bit, wherever the neighbour carries none, which is
-    // every tf row that existed before; those are the control rows here.
+    // It reduces to the sheet's own tf, bit for bit, wherever the neighbour carries none; those rows are the control.
     //
-    // The limit. A sheet whose permittivity is its host's is not a boundary on the host side, so
-    // an air-like sheet on a tf-bearing wall has to be the bare tf-bearing wall. That is asserted
-    // against the bare boundary written from Material::interact_with's rule, the transformer of
-    // a face with a wave behind it: complex in scalar mode and complex per channel in EM, for a
+    // The limit. A sheet whose permittivity is its host's is not a boundary on the host side, so an air-like sheet on a
+    // tf-bearing wall is the bare tf-bearing wall: asserted against the bare boundary written from interact_with's
+    // rule, the transformer of a face with a wave behind it, complex in scalar mode and per channel in EM, for a
     // lossless and for a lossy wall.
     const double f_hz = FRQ, thk = 0.006, L = 0.10;
-    const double k0 = 2.0 * QPI * f_hz / C0;
     const uint8_t OT_GLUED_ENTRY = 71, OT_GLUED_EXIT = 69;
     const int SH = 1, WALL = 2, HOST = 3;
 
@@ -2707,8 +2511,7 @@ TEST_CASE("Neighbour tf - each face of a sheet is owed by the pair of media that
     {
         double tf_s, tf_n;
     };
-    const std::vector<Combo> combos = {{0.0, 0.0}, {0.25, 0.0}, {-0.5, 0.0}, {0.0, 0.5}, {0.0, -0.5},
-                                       {0.25, 0.5}, {-0.25, 0.5}, {0.25, -0.5}, {-0.5, -0.25}};
+    const std::vector<Combo> combos = {{0.0, 0.0}, {0.25, 0.0}, {-0.5, 0.0}, {0.0, 0.5}, {0.0, -0.5}, {0.25, 0.5}, {-0.25, 0.5}, {0.25, -0.5}, {-0.5, -0.25}};
 
     QD_DIAG("\n# diag: neighbour tf by the pair rule, 6 mm sheet eps 5.24 - 0.63j. entry is\n");
     QD_DIAG("# air | SH | WALL (eps 1.50 - 0.40j, tf_n), exit is HOST (eps 1.50, tf_n) | SH | air.\n");
@@ -2805,75 +2608,75 @@ TEST_CASE("Neighbour tf - each face of a sheet is owed by the pair of media that
     QD_DIAG("\n# diag: air | sheet eps 1 (6 mm) | wall eps 1.50 - j ei (tf) against the bare wall, the transformer per channel\n");
     QD_DIAG("wall_ei,wall_tf,theta_n,d_scalar_T,d_scalar_R,d_gain_T,d_gain_R,d_chan,moved_dB\n");
     for (double wei : {0.0, 0.40})
-      for (double wtf : {0.5, -0.5})
-        for (double thd : {0.0, 20.0, 45.0, 70.0})
-        {
-            const std::vector<LumpMtl> pal = {
-                {1.00, 0.00, thk},            // 1 a sheet of the host's own permittivity
-                {1.50, wei, 0.0, 0.0, wtf},   // 2 the wall
-                {1.50, wei, 0.0, 0.0, 0.0},   // 3 the wall without its column
-            };
-            auto mtl = lump_palette(pal);
-            double theta_n = thd * QPI / 180.0, ct = std::cos(theta_n);
-            auto run = [&](int itype, int wall)
+        for (double wtf : {0.5, -0.5})
+            for (double thd : {0.0, 20.0, 45.0, 70.0})
             {
-                auto C = make1<double>(mtl, itype, OT_GLUED_ENTRY, 2u, 1, wall, 0, 0, 0,
-                                       L, 0.5, 0.5, QPI / 2.0 - theta_n, 1.5);
-                C.run();
-                return C;
-            };
+                const std::vector<LumpMtl> pal = {
+                    {1.00, 0.00, thk},          // 1 a sheet of the host's own permittivity
+                    {1.50, wei, 0.0, 0.0, wtf}, // 2 the wall
+                    {1.50, wei, 0.0, 0.0, 0.0}, // 3 the wall without its column
+                };
+                auto mtl = lump_palette(pal);
+                double theta_n = thd * QPI / 180.0, ct = std::cos(theta_n);
+                auto run = [&](int itype, int wall)
+                {
+                    auto C = make1<double>(mtl, itype, OT_GLUED_ENTRY, 2u, 1, wall, 0, 0, 0,
+                                           L, 0.5, 0.5, QPI / 2.0 - theta_n, 1.5);
+                    C.run();
+                    return C;
+                };
 
-            // The bare boundary air | wall, from the rule Material::interact_with applies: the
-            // transformer of an open face, per channel
-            std::complex<double> ew = lump_eps(pal[1], f_hz), zw = std::sqrt(ew);
-            std::complex<double> cw = std::sqrt(1.0 - (1.0 / ew) * (1.0 - ct * ct));
-            std::complex<double> r_te = (ct - zw * cw) / (ct + zw * cw), r_tm = (zw * ct - cw) / (zw * ct + cw);
-            std::complex<double> t_te = 2.0 * ct / (ct + zw * cw), t_tm = 2.0 * ct / (zw * ct + cw);
-            double s_te = std::sqrt(std::real(zw * cw) / ct), s_tm = std::sqrt(std::real(std::conj(zw) * cw) / ct);
-            std::complex<double> q_te = r_te, q_tm = r_tm;
-            std::complex<double> c_te = diag_tf_face(q_te, 0.0, wtf), c_tm = diag_tf_face(q_tm, 0.0, wtf);
+                // The bare boundary air | wall, from the rule interact_with applies: the transformer of an open face, per
+                // channel
+                std::complex<double> ew = lump_eps(pal[1], f_hz), zw = std::sqrt(ew);
+                std::complex<double> cw = std::sqrt(1.0 - (1.0 / ew) * (1.0 - ct * ct));
+                std::complex<double> r_te = (ct - zw * cw) / (ct + zw * cw), r_tm = (zw * ct - cw) / (zw * ct + cw);
+                std::complex<double> t_te = 2.0 * ct / (ct + zw * cw), t_tm = 2.0 * ct / (zw * ct + cw);
+                double s_te = std::sqrt(std::real(zw * cw) / ct), s_tm = std::sqrt(std::real(std::conj(zw) * cw) / ct);
+                std::complex<double> q_te = r_te, q_tm = r_tm;
+                std::complex<double> c_te = diag_tf_face(q_te, 0.0, wtf), c_tm = diag_tf_face(q_tm, 0.0, wtf);
 
-            // The layer lies in the air in front of the wall, so the wall is on the mesh plane and
-            // the reflect port is the bare wall's, phase included
-            std::complex<double> back(1.0, 0.0);
-            std::complex<double> Ts_ref = (1.0 + r_te) * s_te * c_te;
-            std::complex<double> Rs_ref = q_te * back;
+                // The layer lies in the air in front of the wall, so the wall is on the mesh plane and
+                // the reflect port is the bare wall's, phase included
+                std::complex<double> back(1.0, 0.0);
+                std::complex<double> Ts_ref = (1.0 + r_te) * s_te * c_te;
+                std::complex<double> Rs_ref = q_te * back;
 
-            auto St = run(4, 2), Sr = run(3, 2), Ct = run(1, 2), Cr = run(0, 2), C0 = run(1, 3);
-            double d_sT = std::abs(cpx(St.xprmat, 0, 0) - Ts_ref), d_sR = std::abs(cpx(Sr.xprmat, 0, 0) - Rs_ref);
-            double d_gT = std::abs((double)Ct.gain(0) - 0.5 * (std::norm(t_te * s_te * c_te) + std::norm(t_tm * s_tm * c_tm)));
-            double d_gR = std::abs((double)Cr.gain(0) - 0.5 * (std::norm(q_te) + std::norm(q_tm)));
-            double d_ch = std::max(std::abs(TE(Ct.xprmat) - t_te * s_te * c_te), std::abs(TM(Ct.xprmat) - t_tm * s_tm * c_tm));
-            if (thd > 0.0) // the EM reflect port at exactly normal incidence has its own basis
-                d_ch = std::max(d_ch, std::max(std::abs(TE(Cr.xprmat) - q_te * back), std::abs(TM(Cr.xprmat) - q_tm * back)));
-            QD_DIAG("%.2f,%+.1f,%.1f,%.2e,%.2e,%.2e,%.2e,%.2e,%+.6f\n", wei, wtf, thd, d_sT, d_sR, d_gT, d_gR, d_ch,
-                    10.0 * std::log10((double)Ct.gain(0) / (double)C0.gain(0)));
-            INFO("limit, wall ei " << wei << ", wall tf " << wtf << ", theta_n " << thd);
-            const double lim = 1.0e-9;
-            CHECK(d_sT < lim);
-            CHECK(d_sR < lim);
-            CHECK(d_gT < lim);
-            CHECK(d_gR < lim);
-            CHECK(d_ch < lim);
-        }
+                auto St = run(4, 2), Sr = run(3, 2), Ct = run(1, 2), Cr = run(0, 2), C0 = run(1, 3);
+                double d_sT = std::abs(cpx(St.xprmat, 0, 0) - Ts_ref), d_sR = std::abs(cpx(Sr.xprmat, 0, 0) - Rs_ref);
+                double d_gT = std::abs((double)Ct.gain(0) - 0.5 * (std::norm(t_te * s_te * c_te) + std::norm(t_tm * s_tm * c_tm)));
+                double d_gR = std::abs((double)Cr.gain(0) - 0.5 * (std::norm(q_te) + std::norm(q_tm)));
+                double d_ch = std::max(std::abs(TE(Ct.xprmat) - t_te * s_te * c_te), std::abs(TM(Ct.xprmat) - t_tm * s_tm * c_tm));
+                if (thd > 0.0) // the EM reflect port at exactly normal incidence has its own basis
+                    d_ch = std::max(d_ch, std::max(std::abs(TE(Cr.xprmat) - q_te * back), std::abs(TM(Cr.xprmat) - q_tm * back)));
+                QD_DIAG("%.2f,%+.1f,%.1f,%.2e,%.2e,%.2e,%.2e,%.2e,%+.6f\n", wei, wtf, thd, d_sT, d_sR, d_gT, d_gR, d_ch,
+                        10.0 * std::log10((double)Ct.gain(0) / (double)C0.gain(0)));
+                INFO("limit, wall ei " << wei << ", wall tf " << wtf << ", theta_n " << thd);
+                const double lim = 1.0e-9;
+                CHECK(d_sT < lim);
+                CHECK(d_sR < lim);
+                CHECK(d_gT < lim);
+                CHECK(d_gR < lim);
+                CHECK(d_ch < lim);
+            }
 }
 
 TEST_CASE("Stack with tf - the scattering form against its reference, produce mode and itself", "[wave]")
 {
-    // Item 2, the tf half. A characteristic matrix has no per-boundary r and t to rescale, so the
-    // core declined on tf: an ordered stack was killed and a bounding sheet fell back to a
-    // half-space. The scattering form carries it, and what is asserted is
+    ub::OneThread one_thread;
+    // A characteristic matrix has no per-boundary r and t to rescale, so a stack with tf is resolved in the scattering
+    // form. Asserted:
     //
-    //   the reference against the two it has to reduce to - diag_cm_stack at tf = 0, and
-    //   diag_sheet_composite with tf at one layer;
+    //   the reference against the two it has to reduce to - diag_cm_stack at tf = 0, and diag_sheet_composite with tf
+    //   at one layer;
     //   the library's ordered stack against that reference, both orders, both ports, scalar and EM;
-    //   three statements that need no reference - a lossless stack conserves energy per channel
-    //   at any tf, the transmit port is invariant under layer order, and tf = +1 / -1 on every
-    //   layer closes the reflect / transmit port exactly;
-    //   the core against produce mode - two 6 mm sheets of one permittivity and one tf > 0 are a
-    //   single 12 mm sheet, because a matched boundary has no reflection to leak;
-    //   a bounding sheet with tf resolved as a layer, with a negligible tf leaving the series
-    //   where the tf-free layer puts it.
+    //   three statements that need no reference - a lossless stack conserves energy per channel at any tf, the transmit
+    //   port is invariant under layer order, and tf = +1 / -1 on every layer closes the reflect / transmit port
+    //   exactly;
+    //   the core against produce mode - two 6 mm sheets of one permittivity and one tf > 0 are a single 12 mm sheet,
+    //   because a matched boundary has no reflection to leak;
+    //   a bounding sheet with tf resolved as a layer, with a negligible tf leaving the series where the tf-free layer
+    //   puts it.
     const double f_hz = FRQ, thk = 0.006;
     const std::complex<double> U(1.0, 0.0), e_air(1.0, 0.0);
     const uint8_t OT_STACK_FBS = 71, OT_STACK_SBS = 69;
@@ -2883,9 +2686,7 @@ TEST_CASE("Stack with tf - the scattering form against its reference, produce mo
     auto TE = [](const arma::mat &X)
     { return cpx(X, 0, 3); };
 
-    // ------------------------------------------------------------------------------------------
-    // The reference against the forms it reduces to. No library call.
-    // ------------------------------------------------------------------------------------------
+    // ---- The reference against the forms it reduces to. No library call. ----
     {
         const std::complex<double> eA(5.24, -0.63), eB(1.50, -0.40);
         double w_cm = 0.0, w_one = 0.0;
@@ -2922,9 +2723,7 @@ TEST_CASE("Stack with tf - the scattering form against its reference, produce mo
         CHECK(w_one < 1.0e-14);
     }
 
-    // ------------------------------------------------------------------------------------------
-    // The library's ordered stack against the reference
-    // ------------------------------------------------------------------------------------------
+    // ---- The library's ordered stack against the reference ----
     QD_DIAG("\n# diag: ordered stack with tf, air | 6 mm | 6 mm | air. A eps 5.24 - 0.63j,\n");
     QD_DIAG("# B eps 1.50 - 0.40j; AL and BL are their lossless twins\n");
     QD_DIAG("stack,tf,order,theta_n,ref_|T_te|,ref_|R_te|,d_scalar,d_EM_T,d_EM_R,rtype_T,rtype_R\n");
@@ -3016,10 +2815,9 @@ TEST_CASE("Stack with tf - the scattering form against its reference, produce mo
     QD_DIAG("# worst: tf = 0 rows %.3e, tf rows %.3e, energy of a lossless stack %.3e, order %.3e\n",
             worst_ctl, worst_tf, worst_E, worst_ord);
 
-    // ------------------------------------------------------------------------------------------
-    // The core against produce mode. Two sheets of one permittivity and one tf > 0 share a
-    // matched boundary, R0 = 0, which has nothing to leak; the stack is the 12 mm sheet.
-    // ------------------------------------------------------------------------------------------
+    // ---- The core against produce mode ----
+    // Two sheets of one permittivity and one tf > 0 share a matched boundary, R0 = 0, which has nothing to leak; the
+    // stack is the 12 mm sheet.
     QD_DIAG("\n# diag: tf, the core against produce mode. 6 mm | 6 mm of eps 5.24 - 0.63j, one tf,\n");
     QD_DIAG("# against one 12 mm sheet with that tf\ntf,theta_n,|T_te|,|R_te|,d_T,d_R,d_scalar\n");
     for (double tf : {0.25, 0.5, 1.0})
@@ -3061,18 +2859,16 @@ TEST_CASE("Stack with tf - the scattering form against its reference, produce mo
         }
     }
 
-    // ------------------------------------------------------------------------------------------
-    // A bounding sheet with tf, resolved as a layer. The host's own tf belongs to the host | sheet
-    // face under the same rule, not to the layer's composite reflectance.
-    // ------------------------------------------------------------------------------------------
+    // ---- A bounding sheet with tf, resolved as a layer ----
+    // The host's own tf belongs to the host | sheet face under the same rule, not to the layer's composite reflectance.
     {
         const std::vector<LumpMtl> pal = {
-            {1.50, 0.40, 0.0},               // 1 HOST
-            {1.50, 0.40, 0.0, 0.0, 0.3},     // 2 HOST with tf 0.3
-            {5.24, 0.63, thk},               // 3 SHEET
-            {5.24, 0.63, thk, 0.0, 1.0e-9},  // 4 SHEET tf 1e-9
-            {5.24, 0.63, thk, 0.0, 0.25},    // 5 SHEET tf 0.25
-            {5.24, 0.63, thk, 0.0, -0.25},   // 6 SHEET tf -0.25
+            {1.50, 0.40, 0.0},              // 1 HOST
+            {1.50, 0.40, 0.0, 0.0, 0.3},    // 2 HOST with tf 0.3
+            {5.24, 0.63, thk},              // 3 SHEET
+            {5.24, 0.63, thk, 0.0, 1.0e-9}, // 4 SHEET tf 1e-9
+            {5.24, 0.63, thk, 0.0, 0.25},   // 5 SHEET tf 0.25
+            {5.24, 0.63, thk, 0.0, -0.25},  // 6 SHEET tf -0.25
         };
         auto mtl = lump_palette(pal);
         struct Row
@@ -3081,9 +2877,12 @@ TEST_CASE("Stack with tf - the scattering form against its reference, produce mo
             int host, prev;
         };
         const std::vector<Row> rows = {
-            {"plain host | SHEET        ", 1, 3}, {"plain host | SHEET tf 1e-9", 1, 4},
-            {"plain host | SHEET tf 0.25", 1, 5}, {"plain host | SHEET tf -.25", 1, 6},
-            {"host tf .3 | SHEET        ", 2, 3}, {"host tf .3 | SHEET tf 0.25", 2, 5},
+            {"plain host | SHEET        ", 1, 3},
+            {"plain host | SHEET tf 1e-9", 1, 4},
+            {"plain host | SHEET tf 0.25", 1, 5},
+            {"plain host | SHEET tf -.25", 1, 6},
+            {"host tf .3 | SHEET        ", 2, 3},
+            {"host tf .3 | SHEET tf 0.25", 2, 5},
         };
         QD_DIAG("\n# diag: host layer bounded by a sheet carrying tf, host eps 1.50 - 0.40j. S_ref has the\n");
         QD_DIAG("# sheet as a layer backed by air with tf by the pair rule; d_plain is against the same\n");
@@ -3142,7 +2941,7 @@ TEST_CASE("Reciprocity - glued entry against glued exit", "[wave]")
     // incident and reflected waves in a lossy medium interfere, so splitting its flux into two
     // independent parts is not exact, and the flux form is the one that composes across a chain.
     // That is the settled energy convention, so the residual is asserted against its closed form
-    // and recorded against a bound, never asserted to zero. The normal-incidence row is called out:
+    // and held to a bound, never asserted to zero. The normal-incidence row is called out:
     // no cosine enters there and the residual is sec^2(arg z) alone, 0.073946 dB for eps 1.50 - 0.40j.
     //
     // The host leg the exit closes is isolated by running it over L and 2 L and taking the ratio,
@@ -3225,7 +3024,7 @@ TEST_CASE("Reciprocity - glued entry against glued exit", "[wave]")
             }
             else
             {
-                // The flux-splitting residual, recorded against a bound. TE grows towards grazing
+                // The flux-splitting residual, held to a bound. TE grows towards grazing
                 // and TM falls, so the bound is on the larger channel and on the mean.
                 CHECK(dB(Px_s / Pe_s) > 0.0);
                 CHECK(dB(Px_s / Pe_s) < 0.50);
@@ -3241,18 +3040,14 @@ TEST_CASE("Reciprocity - glued entry against glued exit", "[wave]")
 
 TEST_CASE("Lined on both faces - a glued exit behind a sheet exits into air", "[wave]")
 {
-    // Item 1. A glued exit, solid | sheet | whatever encloses the host, took its far medium from
-    // the previous-medium word. After a sheet crossing that word holds a sheet, so a solid entered
-    // through a sheet and left through a sheet resolved its second sheet against a half-space of
-    // the first sheet's material and left the event with that sheet as the current medium.
+    // A glued exit, solid | sheet | air, behind a solid that was entered through a sheet: after the sheet crossing the
+    // previous-medium word holds that sheet, and a sheet in that word is not a medium. Beyond the sheet ahead is air,
+    // which ray_mesh_interact's own composite assumes for every glued exit, and the exit leaves the ray in air with the
+    // sheet it crossed as the previous medium.
     //
-    // A sheet in that word is not a medium. Beyond the sheet ahead is air, which is what
-    // ray_mesh_interact's own composite assumes for every glued exit, and the exit leaves the ray
-    // in air with the sheet it crossed as the previous medium.
-    //
-    // No path_dir is supplied, so every boundary is at the fbs cosine and the host leg closes in
-    // the hybrid form diag_close reproduces. The composite is measured with the host's series
-    // declined (eps 1.5) and the series as the ratio of the run that resolves (eps 0) over it.
+    // No path_dir is supplied, so every boundary is at the fbs cosine and the host leg closes in the path form
+    // diag_close reproduces. The composite is measured with the host's series declined (eps 1.5), and the series as the
+    // ratio of the run that resolves (eps 0) over it.
     const double f_hz = FRQ, thk = 0.006, L = 0.10;
     auto mtl = diag_palette<double>();
     const std::complex<double> U(1.0, 0.0), e_air(1.0, 0.0);
@@ -3287,9 +3082,7 @@ TEST_CASE("Lined on both faces - a glued exit behind a sheet exits into air", "[
         return C;
     };
 
-    // ------------------------------------------------------------------------------------------
-    // The composite and the state words, both ports, scalar
-    // ------------------------------------------------------------------------------------------
+    // ---- The composite and the state words, both ports, scalar ----
     QD_DIAG("\n# diag: lined on both faces, air | S1 | host | S2 | air as two events, host eps 1.50 - 0.40j\n");
     QD_DIAG("# over 100 mm, S eps 5.24 - 0.63j and N eps 1.5015 - 0.40j, 6 mm, scalar, host series declined.\n");
     QD_DIAG("# The second event against the reference with air beyond (d_ref) and against the same exit\n");
@@ -3336,9 +3129,7 @@ TEST_CASE("Lined on both faces - a glued exit behind a sheet exits into air", "[
             }
         }
 
-    // ------------------------------------------------------------------------------------------
-    // The same in EM, per entry of the matrix, against the bare-entered exit
-    // ------------------------------------------------------------------------------------------
+    // ---- The same in EM, per entry of the matrix, against the bare-entered exit ----
     QD_DIAG("\n# diag: lined on both faces, EM. Gain of the second event against the same exit with a clean\n");
     QD_DIAG("# previous-medium word; d_x is the largest difference over the eight matrix entries\n");
     QD_DIAG("stack,theta_n,port,gain_dB,bare_dB,d_gain_dB,d_x,cur\n");
@@ -3362,9 +3153,7 @@ TEST_CASE("Lined on both faces - a glued exit behind a sheet exits into air", "[
                 CHECK(mat_of(A.cur_out(0)) == (port ? HOST : 0));
             }
 
-    // ------------------------------------------------------------------------------------------
-    // The host's series between two sheets
-    // ------------------------------------------------------------------------------------------
+    // ---- The host's series between two sheets ----
     // Its mirrors are the sheet ahead and the sheet behind, each a layer of its own thickness
     // with air beyond. The bare-entered row has a half-space of air behind and is the control.
     QD_DIAG("\n# diag: lined on both faces, the host's series. S_applied is the resolving run over the\n");
@@ -3401,9 +3190,7 @@ TEST_CASE("Lined on both faces - a glued exit behind a sheet exits into air", "[
                     CHECK(std::abs(S - S_ref) < 1.0e-9);
                 }
 
-    // ------------------------------------------------------------------------------------------
-    // The continuation direction
-    // ------------------------------------------------------------------------------------------
+    // ---- The continuation direction ----
     // The outer pair decides it, and the outer pair is host | air. The ray is tilted in the xy
     // plane so the direction the segment has and the angle the hit reports agree.
     QD_DIAG("\n# diag: lined on both faces, the direction the transmitted ray leaves in, degrees from the\n");
@@ -3438,13 +3225,11 @@ TEST_CASE("Lined on both faces - a glued exit behind a sheet exits into air", "[
             CHECK(deg(C[1]) > thd + 1.0); // host to air bends away from the normal
         }
 
-    // ------------------------------------------------------------------------------------------
-    // A resolved ray at a sheet
-    // ------------------------------------------------------------------------------------------
-    // A reflection that collapsed the host's bounce series flags the ray as resolved, and the
-    // close-out of that leg must not apply the series a second time. A bare exit does not; a
-    // sheet event did. Measured as the resolving run over the declined one, with the flag set and
-    // without it, for a glued exit, an embedded sheet and an ordered stack.
+    // ---- A resolved ray at a sheet ----
+    // A reflection that collapsed the host's bounce series flags the ray as resolved, and the close-out of that leg
+    // does not apply the series a second time, at a bare exit and at a sheet event alike. Measured as the resolving run
+    // over the declined one, with the flag set and without it, for a glued exit, an embedded sheet and an ordered
+    // stack.
     QD_DIAG("\n# diag: a resolved ray at a sheet. S is what the host's series applies at the event; it has\n");
     QD_DIAG("# to be one for a resolved ray, whatever it is for an unresolved one\n");
     QD_DIAG("event,host,prev,theta_n,|S_unresolved|,|S_resolved|,|S_resolved - 1|,cur,rtype\n");
@@ -3495,27 +3280,22 @@ TEST_CASE("Lined on both faces - a glued exit behind a sheet exits into air", "[
 
 TEST_CASE("Layered wall - a glued exit behind a bare-entered second layer exits into air", "[wave]")
 {
-    // A glued exit, solid | sheet | air, took what lies beyond its sheet from the previous-medium
-    // word wherever that word names a medium. For a wall of two solid layers with a coating on
-    // its far side, air | A | B | coating | air, the leg in B was entered from A, so the event
-    // resolved B | coating | A and left the ray "in A" while it is in air.
+    // A glued exit, solid | sheet | air, on a wall of two solid layers with a coating on its far side, air | A | B |
+    // coating | air: the leg in B was entered from A, so the previous-medium word names A. Beyond the sheet of a glued
+    // exit is air; the medium the host was entered from is behind the ray and is the mirror behind it in the host's
+    // series, nothing else.
     //
-    // Beyond the sheet of a glued exit is air. The medium the host was entered from is behind
-    // the ray and is the mirror behind it in the host's series, nothing else.
+    // Four instruments. Per event, with no path_dir: the exit with A in the previous-medium word, with and without bit
+    // 14, against the composite with air beyond and against the same exit with a clean word, bitwise, both ports,
+    // scalar and EM, the state words and the direction. The host's series as the ratio of the resolving run over the
+    // declined one, with the coating backed by air and by A as two references. The chain, entry from ray_mesh_interact,
+    // the transition A -> B and the glued exit fed the words the transition wrote, with path_dir: against the single
+    // pass through A and B times the composite, and, with B's series resolved, against the characteristic matrix of {B,
+    // coating} between the half-spaces A and air. And the next wall after the exit, which has to be entered from air.
     //
-    // Four instruments. Per event, with no path_dir: the exit with A in the previous-medium word,
-    // with and without bit 14, against the composite with air beyond and against the same exit
-    // with a clean word, bitwise, both ports, scalar and EM, the state words and the direction.
-    // The host's series as the ratio of the resolving run over the declined one, with the coating
-    // backed by air and by A as two references. The chain, entry from ray_mesh_interact, the
-    // transition A -> B and the glued exit fed the words the transition wrote, with path_dir:
-    // against the single pass through A and B times the composite, and, with B's series
-    // resolved, against the characteristic matrix of {B, coating} between the half-spaces A and
-    // air. And the next wall after the exit, which has to be entered from air.
-    //
-    // The matrix of the whole wall, air | A | B | coating | air, is recorded and not asserted:
-    // two traced solids are resolved as two series, and the mirror behind B is A as a half-space
-    // where the whole wall has A as a layer backed by air.
+    // The matrix of the whole wall, air | A | B | coating | air, is printed and not asserted: two traced solids are
+    // resolved as two series, and the mirror behind B is A as a half-space where the whole wall has A as a layer backed
+    // by air.
     const double f_hz = FRQ, k0 = 2.0 * QPI * f_hz / C0, thk = 0.006, L = 0.10;
     auto mtl = diag_palette<double>();
     arma::mat mesh = diag_quad_x(200.0, 0.0);
@@ -3534,9 +3314,7 @@ TEST_CASE("Layered wall - a glued exit behind a bare-entered second layer exits 
         return C;
     };
 
-    // ------------------------------------------------------------------------------------------
-    // The composite and the state words, both ports, scalar
-    // ------------------------------------------------------------------------------------------
+    // ---- The composite and the state words, both ports, scalar ----
     QD_DIAG("\n# diag: layered wall, the glued exit of B | coating | air with A in the previous-medium word.\n");
     QD_DIAG("# B eps 1.50 - 0.40j over 100 mm, coating eps 5.24 - 0.63j 6 mm, scalar, no path_dir, host series\n");
     QD_DIAG("# declined. A is 2 (eps 5.24), 1 (eps 5.24 - 0.63j) or 4 (eps 9.0 - 1.20j); flag is bit 14 of\n");
@@ -3581,9 +3359,7 @@ TEST_CASE("Layered wall - a glued exit behind a bare-entered second layer exits 
                 }
             }
 
-    // ------------------------------------------------------------------------------------------
-    // The same in EM, per entry of the matrix
-    // ------------------------------------------------------------------------------------------
+    // ---- The same in EM, per entry of the matrix ----
     QD_DIAG("\n# diag: layered wall, EM. Gain of the glued exit with A in the previous-medium word against\n");
     QD_DIAG("# the same exit with a clean word; d_x is the largest difference over the eight matrix entries\n");
     QD_DIAG("A,theta_n,port,gain_dB,bare_dB,d_gain_dB,d_x,cur\n");
@@ -3605,9 +3381,7 @@ TEST_CASE("Layered wall - a glued exit behind a bare-entered second layer exits 
                 CHECK(mat_of(A.cur_out(0)) == (port ? HOST : 0));
             }
 
-    // ------------------------------------------------------------------------------------------
-    // The host's series: the coating ahead backed by air, A behind as a half-space
-    // ------------------------------------------------------------------------------------------
+    // ---- The host's series: the coating ahead backed by air, A behind as a half-space ----
     QD_DIAG("\n# diag: layered wall, the host's series at the glued exit. S_applied is the resolving run over\n");
     QD_DIAG("# the declined one. S_air has the coating as a layer backed by air and A behind as a half-space;\n");
     QD_DIAG("# S_A backs the coating with A\n");
@@ -3637,9 +3411,7 @@ TEST_CASE("Layered wall - a glued exit behind a bare-entered second layer exits 
                 CHECK(std::abs(S - S_air) < 1.0e-9);
             }
 
-    // ------------------------------------------------------------------------------------------
-    // The continuation direction, no recovery involved
-    // ------------------------------------------------------------------------------------------
+    // ---- The continuation direction, no recovery involved ----
     QD_DIAG("\n# diag: layered wall, the direction the transmitted ray leaves in, degrees from the normal,\n");
     QD_DIAG("# against the same exit with a clean previous-medium word\n");
     QD_DIAG("A,theta_n,out_deg,bare_deg,d_dir\n");
@@ -3672,9 +3444,7 @@ TEST_CASE("Layered wall - a glued exit behind a bare-entered second layer exits 
             CHECK(deg(C[1]) > thd + 1.0); // host to air bends away from the normal
         }
 
-    // ------------------------------------------------------------------------------------------
-    // The chain, air | A | B | coating | air, with path_dir
-    // ------------------------------------------------------------------------------------------
+    // ---- The chain, air | A | B | coating | air, with path_dir ----
     struct Ent
     {
         std::complex<double> te;
@@ -3822,14 +3592,12 @@ TEST_CASE("Layered wall - a glued exit behind a bare-entered second layer exits 
                         dB(chain[0]) - dB(ref), std::abs(r_s), clamp_dB, dB(std::norm(W.T_te)),
                         dB(chain[1]) - dB(std::norm(W.T_te)), (unsigned)X.resolved_type[0]);
                 INFO("chain resolved, A " << first << ", B " << host << ", theta_ext " << thd);
-                CHECK(std::abs(dB(chain[0]) - dB(ref)) < 1.0e-6); // on the matrix: no mirror is clamped; clamp_dB is what the clamp was worth
+                CHECK(std::abs(dB(chain[0]) - dB(ref)) < 1.0e-6); // on the matrix: no mirror is clamped; clamp_dB is what a clamp would cost
                 if (!(host == HOST && thd == 85.0))
                     CHECK(clamp_dB == 0.0); // the clamp is engaged on the lossy host at 85 deg only
             }
 
-    // ------------------------------------------------------------------------------------------
-    // The next wall after the exit
-    // ------------------------------------------------------------------------------------------
+    // ---- The next wall after the exit ----
     // The ray is in air. The next wall reflects off its front face, is entered through it and is
     // left through its back face exactly as by a ray with clean state words.
     QD_DIAG("\n# diag: layered wall, the next wall (eps 9.0 - 1.20j, 100 mm) after the glued exit, fed the words\n");
@@ -3879,22 +3647,20 @@ TEST_CASE("Layered wall - a glued exit behind a bare-entered second layer exits 
 
 TEST_CASE("Recovery behind a sheet - the leg after a sheet crossing at the exact in-medium cosine", "[wave]")
 {
-    // A traced ray holds a real direction inside a lossy host while the propagation cosine there
-    // is complex, and the recovery returns the complex value by inverting the refraction map of
-    // the pair previous medium -> current medium. After a sheet crossing the previous-medium word
-    // holds the sheet, and the recovery declines: the exit interface, the host's series, the
-    // traversal and a sheet composite on that leg are then built at the real projection, while
-    // the entry was evaluated at the exact cosine.
+    // A traced ray holds a real direction inside a lossy host while the propagation cosine there is complex; the
+    // recovery returns the complex value by inverting the refraction map of the pair previous medium -> current medium.
+    // After a sheet crossing the previous-medium word holds the sheet, and the leg behind it is still at the exact
+    // cosine: the exit interface, the host's series, the traversal and a sheet composite on that leg are built at the
+    // cosine the entry was evaluated at.
     //
-    // Two instruments. End to end, the chain air | S | host | air and air | S | host | S | air,
-    // entered through a glued sheet and assembled from what ray_state_update writes, against the
-    // characteristic matrix of the whole stack, in power: the displaced air and the free-space
-    // reference are pure phases. And per event, the same leg with a sheet in the previous-medium
-    // word against the same leg with a clean word, host series declined, which isolates what the
-    // decline costs on one event and needs no reference.
+    // Two instruments. End to end, the chains air | S | host | air and air | S | host | S | air, entered through a
+    // glued sheet and assembled from what ray_state_update writes, against the characteristic matrix of the whole
+    // stack, in power: the displaced air and the free-space reference are pure phases. And per event, the same leg with
+    // a sheet in the previous-medium word against the same leg with a clean word, host series declined, which needs no
+    // reference.
     //
-    // A lossless host has a real cosine and nothing to recover, so its rows sit on the reference
-    // whatever the recovery does and are the control on the chain and on the reference.
+    // A lossless host has a real cosine and nothing to recover, so its rows sit on the reference whatever the recovery
+    // does and are the control on the chain and on the reference.
     const double f_hz = FRQ, thk = 0.006, L = 0.10;
     auto mtl = diag_palette<double>();
     const std::complex<double> U(1.0, 0.0), e_air(1.0, 0.0);
@@ -3960,10 +3726,9 @@ TEST_CASE("Recovery behind a sheet - the leg after a sheet crossing at the exact
                 double chain_dB = dB(std::norm(chain)), ref_dB = dB(std::norm(Ref.T_te));
                 double ct_map = diag_traced_ct(e_h, th);
 
-                // The host's series clamps a mirror's reflectance into [0, 1]. Seen from a lossy
-                // host close to its critical angle a sheet backed by air reflects more than that,
-                // and the clamp is then the whole of what separates the chain from the matrix.
-                // What it costs is formed from the factorized series, exact against clamped.
+                // A clamp of a mirror's reflectance into [0, 1] would matter only where a sheet backed by air, seen
+                // from a lossy host close to its critical angle, reflects more than one: clamp_dB is what such a clamp
+                // would cost, formed from the factorized series.
                 std::complex<double> cs = diag_ct_exact(e_h, th);
                 std::complex<double> r_s = diag_cm_stack(e_h, U, {{e_s, U, thk}}, e_air, U, cs, f_hz, false, true, 0.0).R_te;
                 std::complex<double> r_c = (std::abs(r_s) > 1.0) ? r_s / std::abs(r_s) : r_s;
@@ -3978,9 +3743,9 @@ TEST_CASE("Recovery behind a sheet - the leg after a sheet crossing at the exact
                         (unsigned)E2.resolved_type[0]);
                 INFO((lined ? "lined" : "coated") << ", host " << host << ", theta_ext " << thd);
                 CHECK(std::abs(std::abs(dx) - ct_map) < 1.0e-9); // the entry wrote the map the recovery inverts
-                CHECK(std::abs(chain_dB - ref_dB) < 1.0e-6); // on the matrix: no mirror is clamped; clamp_dB is what the clamp was worth
+                CHECK(std::abs(chain_dB - ref_dB) < 1.0e-6);     // on the matrix: no mirror is clamped; clamp_dB is what a clamp would cost
                 if (!(host == LOSSY && thd == 85.0))
-                    CHECK(clamp_dB == 0.0); // the clamp is engaged on the one row and nowhere else
+                    CHECK(clamp_dB == 0.0); // such a clamp would act on the one row and nowhere else
             }
 
     QD_DIAG("\n# diag: recovery behind a sheet, per event. One leg of the lossy host (eps 1.50 - 0.40j,\n");
@@ -4055,20 +3820,18 @@ TEST_CASE("Recovery behind a sheet - the leg after a sheet crossing at the exact
 
 TEST_CASE("Measurement - a host entered from a lossy solid across a bare face", "[wave]")
 {
-    // A measurement, taken before any decision. The recovery inverts the refraction map of the
-    // pair previous medium -> current medium, and every fixture that pins it enters from air or
-    // from a lossless solid. Here the host is entered from a LOSSY solid across a bare shared
-    // face, air | first | host | air, so the previous-medium word names a lossy medium.
+    // The recovery inverts the refraction map of the pair previous medium -> current medium, and the other cases enter
+    // from air or from a lossless solid. Here the host is entered from a lossy solid across a bare shared face, air |
+    // first | host | air, so the previous-medium word names a lossy medium.
     //
-    // A ray that starts in air keeps a real transverse wavenumber across parallel faces however
-    // lossy the layers are, so the exact cosine in the host is sqrt(1 - sin^2(theta_ext) / eps_h)
-    // and the first solid drops out of it. The reference is the single pass through the stack at
-    // those cosines, in power, with every series declined (eps 1.5) so that nothing but the three
-    // ports and the two traversals is in the chain.
+    // A ray that starts in air keeps a real transverse wavenumber across parallel faces however lossy the layers are,
+    // so the exact cosine in the host is sqrt(1 - sin^2(theta_ext) / eps_h) and the first solid drops out of it. The
+    // reference is the single pass through the stack at those cosines, in power, with every series declined (eps 1.5)
+    // so that nothing but the three ports and the two traversals is in the chain.
     //
-    // The last event is run twice along the same direction: with the state words the transition
-    // wrote, which name the first solid, and with a clean previous-medium word, where the
-    // recovery solves for a real invariant with no medium named.
+    // The last event is run twice along the same direction: with the state words the transition wrote, which name the
+    // first solid, and with a clean previous-medium word, where the recovery solves for a real invariant with no medium
+    // named.
     const double f_hz = FRQ, L1 = 0.05, L2 = 0.10, k0 = 2.0 * QPI * f_hz / C0;
     auto mtl = diag_palette<double>();
     arma::mat mesh = diag_quad_x(200.0, 0.0);
@@ -4084,88 +3847,88 @@ TEST_CASE("Measurement - a host entered from a lossy solid across a bare face", 
     // projection of the first leg is furthest from a unit vector.
     const int pairs[9][2] = {{2, 5}, {1, 5}, {4, 5}, {2, 6}, {1, 6}, {4, 6}, {5, 1}, {5, 4}, {5, 6}};
     for (const auto &pr : pairs)
-            for (double thd : {10.0, 20.0, 40.0, 60.0, 75.0, 85.0})
+        for (double thd : {10.0, 20.0, 40.0, 60.0, 75.0, 85.0})
+        {
+            const int first = pr[0], host = pr[1];
+            double th = thd * QPI / 180.0, s2 = std::sin(th) * std::sin(th);
+            std::complex<double> e1 = diag_eps(first, f_hz), e2 = diag_eps(host, f_hz);
+
+            // Entry air -> first, from ray_mesh_interact, as the traced-chain case does
+            arma::mat orig, dest, fbs, sbs;
+            diag_ray_at(thd, orig, dest);
+            arma::uvec mtl_ind(mesh.n_rows, arma::fill::value((arma::uword)first));
+            arma::u32_vec fbs_ind, sbs_ind;
+            quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+            arma::mat origN, destN, xprmatN, path_dirN, normal_vecN;
+            arma::vec gainN;
+            quadriga_lib::ray_mesh_interact(4, f_hz, &orig, &dest, &mesh, &mtl_ind, &mtl,
+                                            &fbs_ind, &sbs_ind, (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                            &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                            &gainN, &xprmatN, (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                            (arma::vec *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr,
+                                            &normal_vecN, (std::vector<uint8_t> *)nullptr,
+                                            &path_dirN, true, (arma::u32_vec *)nullptr);
+            REQUIRE(path_dirN.n_rows == 1);
+            std::complex<double> a0(xprmatN(0, 0), xprmatN(1, 0));
+            double nx = normal_vecN(0, 0), ny = normal_vecN(0, 1), nz = normal_vecN(0, 2);
+            double c1t = std::abs(path_dirN(0, 0) * nx + path_dirN(0, 1) * ny + path_dirN(0, 2) * nz);
+            double s1t = std::sqrt(std::max(0.0, 1.0 - c1t * c1t));
+
+            // Transition first -> host, in the frame make1 uses (normal along x)
+            auto T = make1<double>(mtl, 4, OT_M2M_M1, 2u, first, host, 0, first, 0, L1, 0.5, 0.5, QPI / 2.0 - th, 1.5);
+            T.has_path_dir = true;
+            T.path_dir_prev.zeros(1, 3);
+            T.path_dir_prev(0, 0) = c1t, T.path_dir_prev(0, 1) = s1t;
+            T.has_path_dirN = true;
+            T.path_dirN.zeros(1, 3);
+            T.path_dirN(0, 0) = std::cos(th), T.path_dirN(0, 1) = std::sin(th);
+            T.normals(0, 3) = -1.0; // the host's front face: its normal opposes the ray
+            T.run();
+            double dx = (double)T.path_dirN(0, 0), dy = (double)T.path_dirN(0, 1);
+
+            // Exit host -> air along the direction the transition wrote
+            std::complex<double> a2[2];
+            Rsu<double> X;
+            for (int k = 0; k < 2; ++k)
             {
-                const int first = pr[0], host = pr[1];
-                double th = thd * QPI / 180.0, s2 = std::sin(th) * std::sin(th);
-                std::complex<double> e1 = diag_eps(first, f_hz), e2 = diag_eps(host, f_hz);
-
-                // Entry air -> first, from ray_mesh_interact, as the traced-chain case does
-                arma::mat orig, dest, fbs, sbs;
-                diag_ray_at(thd, orig, dest);
-                arma::uvec mtl_ind(mesh.n_rows, arma::fill::value((arma::uword)first));
-                arma::u32_vec fbs_ind, sbs_ind;
-                quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
-                arma::mat origN, destN, xprmatN, path_dirN, normal_vecN;
-                arma::vec gainN;
-                quadriga_lib::ray_mesh_interact(4, f_hz, &orig, &dest, &mesh, &mtl_ind, &mtl,
-                                                &fbs_ind, &sbs_ind, (arma::mat *)nullptr, (arma::mat *)nullptr,
-                                                &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr,
-                                                &gainN, &xprmatN, (arma::mat *)nullptr, (arma::mat *)nullptr,
-                                                (arma::vec *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr,
-                                                &normal_vecN, (std::vector<uint8_t> *)nullptr,
-                                                &path_dirN, true, (arma::u32_vec *)nullptr);
-                REQUIRE(path_dirN.n_rows == 1);
-                std::complex<double> a0(xprmatN(0, 0), xprmatN(1, 0));
-                double nx = normal_vecN(0, 0), ny = normal_vecN(0, 1), nz = normal_vecN(0, 2);
-                double c1t = std::abs(path_dirN(0, 0) * nx + path_dirN(0, 1) * ny + path_dirN(0, 2) * nz);
-                double s1t = std::sqrt(std::max(0.0, 1.0 - c1t * c1t));
-
-                // Transition first -> host, in the frame make1 uses (normal along x)
-                auto T = make1<double>(mtl, 4, OT_M2M_M1, 2u, first, host, 0, first, 0, L1, 0.5, 0.5, QPI / 2.0 - th, 1.5);
-                T.has_path_dir = true;
-                T.path_dir_prev.zeros(1, 3);
-                T.path_dir_prev(0, 0) = c1t, T.path_dir_prev(0, 1) = s1t;
-                T.has_path_dirN = true;
-                T.path_dirN.zeros(1, 3);
-                T.path_dirN(0, 0) = std::cos(th), T.path_dirN(0, 1) = std::sin(th);
-                T.normals(0, 3) = -1.0; // the host's front face: its normal opposes the ray
-                T.run();
-                double dx = (double)T.path_dirN(0, 0), dy = (double)T.path_dirN(0, 1);
-
-                // Exit host -> air along the direction the transition wrote
-                std::complex<double> a2[2];
-                Rsu<double> X;
-                for (int k = 0; k < 2; ++k)
-                {
-                    X = make1<double>(mtl, 4, OT_EXIT, 1u, host, 0, k ? 0 : (int)T.prev_out(0), (int)T.cur_out(0),
-                                      k ? 0 : (int)T.buf_out(0), L2, 0.5, 0.5, QPI / 2.0 - th, 1.5);
-                    X.has_path_dir = true;
-                    X.path_dir_prev.zeros(1, 3);
-                    X.path_dir_prev(0, 0) = dx, X.path_dir_prev(0, 1) = dy;
-                    X.run();
-                    a2[k] = cpx(X.xprmat, 0, 0);
-                }
-                std::complex<double> a1 = cpx(T.xprmat, 0, 0);
-
-                // Single pass at the exact cosines, written from the media alone
-                std::complex<double> c0(std::cos(th), 0.0), c1 = std::sqrt(1.0 - s2 / e1), c2 = std::sqrt(1.0 - s2 / e2);
-                std::complex<double> z0(1.0, 0.0), z1 = std::sqrt(e1), z2 = std::sqrt(e2);
-                std::complex<double> t01 = 2.0 * z0 * c0 / (z0 * c0 + z1 * c1), t12 = 2.0 * z1 * c1 / (z1 * c1 + z2 * c2),
-                                     t20 = 2.0 * z2 * c2 / (z2 * c2 + z0 * c0);
-                double ref = std::norm(t01 * t12 * t20) *
-                             std::exp(2.0 * k0 * (std::imag(z1 * c1) * L1 + std::imag(z2 * c2) * L2));
-                double named = std::norm(a0 * a1 * a2[0]), clean = std::norm(a0 * a1 * a2[1]);
-                double ct_one = diag_traced_ct(e2, th);
-
-                QD_DIAG("%d,%d,%.1f,%.9f,%.9f,%.6f,%.6f,%+.6f,%.6f,%+.6f,%d,%u\n", first, host, thd, std::abs(dx), ct_one,
-                        dB(ref), dB(named), dB(named) - dB(ref), dB(clean), dB(clean) - dB(ref),
-                        mat_of(T.prev_out(0)), (unsigned)X.resolved_type[0]);
-                INFO("first " << first << ", host " << host << ", theta_ext " << thd);
-                REQUIRE(mat_of(T.prev_out(0)) == first);
-                REQUIRE(std::isfinite(named));
-                // Every row, the lossless first solid being the control on the chain and on the
-                // reference: the ray is not killed, the word names nothing the recovery reads, the
-                // host direction is the one a single refraction from air writes, and the chain is
-                // on the single pass.
-                CHECK(named > 0.0);
-                CHECK(std::abs(dB(named) - dB(clean)) < 1.0e-9);
-                CHECK(std::abs(std::abs(dx) - ct_one) < 1.0e-9);
-                CHECK(std::abs(dB(named) - dB(ref)) < 1.0e-6);
-                // Bit 14 of the word the transition wrote: set out of a lossy solid whose face
-                // was evaluated at the recovered cosine, clear out of a lossless one
-                CHECK((((int)T.prev_out(0) & 0x4000) != 0) == (std::imag(e1) != 0.0));
+                X = make1<double>(mtl, 4, OT_EXIT, 1u, host, 0, k ? 0 : (int)T.prev_out(0), (int)T.cur_out(0),
+                                  k ? 0 : (int)T.buf_out(0), L2, 0.5, 0.5, QPI / 2.0 - th, 1.5);
+                X.has_path_dir = true;
+                X.path_dir_prev.zeros(1, 3);
+                X.path_dir_prev(0, 0) = dx, X.path_dir_prev(0, 1) = dy;
+                X.run();
+                a2[k] = cpx(X.xprmat, 0, 0);
             }
+            std::complex<double> a1 = cpx(T.xprmat, 0, 0);
+
+            // Single pass at the exact cosines, written from the media alone
+            std::complex<double> c0(std::cos(th), 0.0), c1 = std::sqrt(1.0 - s2 / e1), c2 = std::sqrt(1.0 - s2 / e2);
+            std::complex<double> z0(1.0, 0.0), z1 = std::sqrt(e1), z2 = std::sqrt(e2);
+            std::complex<double> t01 = 2.0 * z0 * c0 / (z0 * c0 + z1 * c1), t12 = 2.0 * z1 * c1 / (z1 * c1 + z2 * c2),
+                                 t20 = 2.0 * z2 * c2 / (z2 * c2 + z0 * c0);
+            double ref = std::norm(t01 * t12 * t20) *
+                         std::exp(2.0 * k0 * (std::imag(z1 * c1) * L1 + std::imag(z2 * c2) * L2));
+            double named = std::norm(a0 * a1 * a2[0]), clean = std::norm(a0 * a1 * a2[1]);
+            double ct_one = diag_traced_ct(e2, th);
+
+            QD_DIAG("%d,%d,%.1f,%.9f,%.9f,%.6f,%.6f,%+.6f,%.6f,%+.6f,%d,%u\n", first, host, thd, std::abs(dx), ct_one,
+                    dB(ref), dB(named), dB(named) - dB(ref), dB(clean), dB(clean) - dB(ref),
+                    mat_of(T.prev_out(0)), (unsigned)X.resolved_type[0]);
+            INFO("first " << first << ", host " << host << ", theta_ext " << thd);
+            REQUIRE(mat_of(T.prev_out(0)) == first);
+            REQUIRE(std::isfinite(named));
+            // Every row, the lossless first solid being the control on the chain and on the
+            // reference: the ray is not killed, the word names nothing the recovery reads, the
+            // host direction is the one a single refraction from air writes, and the chain is
+            // on the single pass.
+            CHECK(named > 0.0);
+            CHECK(std::abs(dB(named) - dB(clean)) < 1.0e-9);
+            CHECK(std::abs(std::abs(dx) - ct_one) < 1.0e-9);
+            CHECK(std::abs(dB(named) - dB(ref)) < 1.0e-6);
+            // Bit 14 of the word the transition wrote: set out of a lossy solid whose face
+            // was evaluated at the recovered cosine, clear out of a lossless one
+            CHECK((((int)T.prev_out(0) & 0x4000) != 0) == (std::imag(e1) != 0.0));
+        }
 }
 
 TEST_CASE("Recovery behind a lossy solid - EM, a second transition and a sheet inside the host", "[wave]")
@@ -4293,7 +4056,7 @@ TEST_CASE("Recovery behind a lossy solid - EM, a second transition and a sheet i
             double th = thd * QPI / 180.0, s2 = std::sin(th) * std::sin(th);
             std::complex<double> eA = diag_eps(A, f_hz), eB = diag_eps(B, f_hz), eC = diag_eps(C, f_hz);
             std::complex<double> c0(std::cos(th), 0.0), cA = std::sqrt(1.0 - s2 / eA), cB = std::sqrt(1.0 - s2 / eB),
-                                 cC = std::sqrt(1.0 - s2 / eC);
+                                                        cC = std::sqrt(1.0 - s2 / eC);
             Ent E = entry(4, A, thd);
             auto T1 = event(4, OT_M2M_M1, 2u, A, B, 0, A, 0, LA, th, E.c, E.s);
             auto T2 = event(4, OT_M2M_M1, 2u, B, C, (int)T1.prev_out(0), (int)T1.cur_out(0), (int)T1.buf_out(0), LB, th,
@@ -4458,9 +4221,9 @@ TEST_CASE("Recovery behind a lossy solid - a face that was evaluated at a real a
                 CHECK(std::abs(ct_h - ct_map) < 1.0e-9); // the direction is the real-angle map
                 REQUIRE(std::isfinite(pw[0]));
                 REQUIRE(std::isfinite(pw[1]));
-                // The word carries no flag, so the recovery keeps the solid named and the event
-                // sits on the cosine the face was evaluated at. The clean column is recorded: it
-                // is what a solve for a real invariant makes of this wave.
+                // The word carries no flag, so the recovery keeps the solid named and the event sits on the cosine the
+                // face was evaluated at. The clean column is printed: it is what a solve for a real invariant makes of
+                // this wave.
                 CHECK((prev_named & 0x4000) == 0);
                 CHECK(pw[0] > 0.0);
                 CHECK(std::abs(dB(pw[0]) - dB(ref)) < 1.0e-6);
@@ -4579,41 +4342,39 @@ TEST_CASE("ray_state_update - the material index is 14 bits", "[wave]")
 
 TEST_CASE("Lumped columns - an ordered stack: what the core carries, by matrix and by scattering", "[wave]")
 {
-    // The characteristic-matrix core generalizes produce mode's two expressible columns to a
-    // stack, and declines on the three it has no expression for.
+    // The characteristic-matrix core carries the two columns it can express in a stack, and the scattering form the
+    // three it cannot.
     //
-    // Carried. The interface gains become a product, one per layer entered plus the far medium's
-    // where it is newly entered, on the transmit port only. A resonance is part of each layer's
-    // permittivity, at its faces and in its phase.
+    // Carried. The interface gains become a product, one per layer entered plus the far medium's where it is newly
+    // entered, on the transmit port only. A resonance is part of each layer's permittivity, at its faces and in its
+    // phase.
     //
-    // alpha is carried as well, folded into the layer phase as nepers over the path thk / |Re c|.
-    // It has two statements here. Against the reference, which carries it the same way. And
-    // against produce mode, with no reference at all: a sheet of eps 5.24 - 0.63j with 100 dB/m
-    // stacked on its twin without the column is 12 mm of one permittivity with no boundary in the
-    // middle, so every wave crosses both halves and the stack is the single 12 mm sheet at
-    // 50 dB/m, on both ports. One is resolved by the core and the other by produce mode.
+    // alpha is carried as well, folded into the layer phase as nepers over the path thk / |Re c|. It has two statements
+    // here. Against the reference, which carries it the same way. And against produce mode, with no reference at all: a
+    // sheet of eps 5.24 - 0.63j with 100 dB/m stacked on its twin without the column is 12 mm of one permittivity with
+    // no boundary in the middle, so every wave crosses both halves and the stack is the single 12 mm sheet at 50 dB/m,
+    // on both ports. One is resolved by the core and the other by produce mode.
     //
-    // tf and m have no matrix expression. They are resolved in the scattering form - tf per
-    // boundary by the pair rule, a mass-law layer as the end of a coherent segment - and the last
-    // block asserts the row with tf against that reference. The row with m is in "Lumped columns -
-    // an ordered stack: ... - the mass-law part".
+    // tf and m have no matrix expression. They are resolved in the scattering form - tf per boundary by the pair rule,
+    // a mass-law layer as the end of a coherent segment - and the last block asserts the row with tf against that
+    // reference. The row with m is in "Lumped columns - an ordered stack: ... - the mass-law part".
     const double f_hz = FRQ;
     const double thk = 0.006;
     const std::complex<double> U(1.0, 0.0), e_air(1.0, 0.0);
 
-    const int A = 1, B = 2, A_ATT = 3, B_ATT = 4, A_RES = 5, B_ALPHA = 6, B_TF = 7, B_M = 8;
+    const int A = 1, B = 2, A_ATT = 3, B_ATT = 4, A_RES = 5, B_ALPHA = 6, B_TF = 7;
     const int A_ALPHA = 9, A_THICK = 10;
     const std::vector<LumpMtl> pal = {
-        {5.24, 0.63, thk},                              // 1 A
-        {1.50, 0.40, thk},                              // 2 B
-        {5.24, 0.63, thk, 3.0},                         // 3 A_ATT    3 dB
-        {1.50, 0.40, thk, 2.0},                         // 4 B_ATT    2 dB
-        {5.24, 0.63, thk, 0.0, 0.0, 1.2, 5.0, 0.8},     // 5 A_RES    resonant
-        {1.50, 0.40, thk, 0.0, 0.0, 0.0, 0.0, 0.0, 50.0}, // 6 B_ALPHA  50 dB/m
-        {1.50, 0.40, thk, 0.0, 0.25},                   // 7 B_TF     tf 0.25
-        {1.50, 0.40, thk, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 10.0}, // 8 B_M  mass law
-        {5.24, 0.63, thk, 0.0, 0.0, 0.0, 0.0, 0.0, 100.0},       // 9 A_ALPHA  100 dB/m
-        {5.24, 0.63, 2.0 * thk, 0.0, 0.0, 0.0, 0.0, 0.0, 50.0},  // 10 A_THICK 12 mm at 50 dB/m
+        {5.24, 0.63, thk},                                      // 1 A
+        {1.50, 0.40, thk},                                      // 2 B
+        {5.24, 0.63, thk, 3.0},                                 // 3 A_ATT    3 dB
+        {1.50, 0.40, thk, 2.0},                                 // 4 B_ATT    2 dB
+        {5.24, 0.63, thk, 0.0, 0.0, 1.2, 5.0, 0.8},             // 5 A_RES    resonant
+        {1.50, 0.40, thk, 0.0, 0.0, 0.0, 0.0, 0.0, 50.0},       // 6 B_ALPHA  50 dB/m
+        {1.50, 0.40, thk, 0.0, 0.25},                           // 7 B_TF     tf 0.25
+        {1.50, 0.40, thk, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 10.0},  // 8 B_M  mass law
+        {5.24, 0.63, thk, 0.0, 0.0, 0.0, 0.0, 0.0, 100.0},      // 9 A_ALPHA  100 dB/m
+        {5.24, 0.63, 2.0 * thk, 0.0, 0.0, 0.0, 0.0, 0.0, 50.0}, // 10 A_THICK 12 mm at 50 dB/m
     };
     auto mtl = lump_palette(pal);
     auto E = [&](int idx)
@@ -4634,14 +4395,12 @@ TEST_CASE("Lumped columns - an ordered stack: what the core carries, by matrix a
         return C;
     };
 
-    // ------------------------------------------------------------------------------------------
-    // Carried: att on both layers, a resonance in one, and alpha in one.
-    // ------------------------------------------------------------------------------------------
+    // ---- Carried: att on both layers, a resonance in one, and alpha in one. ----
     struct Carry
     {
         const char *name;
-        int m1, m2;  // the two faces, FBS and SBS
-        double g;    // product of the layer gains
+        int m1, m2; // the two faces, FBS and SBS
+        double g;   // product of the layer gains
     };
     const double G_A = std::pow(10.0, -0.1 * 3.0), G_B = std::pow(10.0, -0.1 * 2.0);
     const std::vector<Carry> carried = {
@@ -4770,9 +4529,7 @@ TEST_CASE("Lumped columns - an ordered stack: what the core carries, by matrix a
             CHECK((double)Sa.gain(0) < 0.99 * (double)S0.gain(0));
         }
 
-    // ------------------------------------------------------------------------------------------
-    // The two columns the matrix cannot hold, on the second layer, both orders, both passes.
-    // ------------------------------------------------------------------------------------------
+    // ---- The two columns the matrix cannot hold, on the second layer, both orders, both passes. ----
     struct Decl
     {
         const char *name;
@@ -4828,40 +4585,34 @@ TEST_CASE("Lumped columns - an ordered stack: what the core carries, by matrix a
 
 TEST_CASE("Total reflection of the outer pair - the sheet stays in the result", "[wave]")
 {
-    // Where the near | far pair is past its critical angle SHEET_RESOLVE discarded the sheet and
-    // wrote the bare near | far boundary: a mirror on the reflect pass, the pair's tf leak on the
-    // transmit pass. Total reflection of the outer pair says one thing only, that no Fresnel wave
-    // propagates in the far medium. It says nothing about the sheet.
+    // Where the near | far pair is past its critical angle the sheet stays in the result. Total reflection of the outer
+    // pair says one thing only, that no Fresnel wave propagates in the far medium; it says nothing about the sheet.
     //
-    // In EM this is a coated solid at a steep in-medium angle. Under the acoustic mapping,
-    // eps = (Z_air / Z)^2, it is every sheet on a rigid wall at every angle: air | concrete has a
-    // critical angle of 0.003 deg.
+    // In EM this is a coated solid at a steep in-medium angle. Under the acoustic mapping, eps = (Z_air / Z)^2, it is
+    // every sheet on a rigid wall at every angle: air | concrete has a critical angle of 0.003 deg.
     //
-    // Reflect port. The wave enters the sheet, turns around at the far face and comes back, which
-    // is the ordinary composite with a totally reflecting far face - an absorber on a rigid
-    // backing. Asserted against diag_sheet_composite, whose reflect port never needed a forward
-    // port in the far medium.
+    // Reflect port. The wave enters the sheet, turns around at the far face and comes back, which is the ordinary
+    // composite with a totally reflecting far face - an absorber on a rigid backing. Asserted against
+    // diag_sheet_composite, whose reflect port never needed a forward port in the far medium.
     //
-    // Transmit port. The Fresnel part is zero; what crosses is the tf leak, and a leak that
-    // crosses the sheet pays what the sheet charges. A coherent sheet is the composite with the
-    // pad of a closed face on its far side, which passes what it absorbs: one rule for both
-    // ports, with the series. A mass-law sheet has no wave inside and is the two crossings a
-    // traced solid of its material would make, with the mass term between them:
+    // Transmit port. The Fresnel part is zero; what crosses is the tf leak, and a leak that crosses the sheet pays what
+    // the sheet charges. A coherent sheet is the composite with the pad of a closed face on its far side, which passes
+    // what it absorbs: one rule for both ports, with the series. A mass-law sheet has no wave inside and is the two
+    // crossings a traced solid of its material would make, with the mass term between them:
     //
-    //     near | sheet      Material::interact_with's transmission, the sheet's interface gain
-    //     sheet | far       Material::interact_with's transmission, the far medium's interface gain
+    //     near | sheet      interact_with's transmission, the sheet's interface gain
+    //     sheet | far       interact_with's transmission, the far medium's interface gain
     //
-    // The displaced host is taken out at the incidence cosine because the far side carries no
-    // wave. Asserted in power and complex, on lossless permittivities.
+    // The displaced host is taken out at the incidence cosine because the far side carries no wave. Asserted in power
+    // and complex, on lossless permittivities.
     //
-    // Each event is evaluated at the cosine the wave has there: the incidence cosine after a first
-    // crossing that was itself a leak, the Snell cosine after an ordinary one. A leak inside a
-    // mass-law sheet is not judged from inside it at the far face and is charged what the other
-    // direction charges, and a wave that entered by an ordinary crossing carries the sheet's
-    // internal series. Both have their own case; the rows here follow the same rules.
+    // Each event is evaluated at the cosine the wave has there: the incidence cosine after a first crossing that was
+    // itself a leak, the Snell cosine after an ordinary one. A leak inside a mass-law sheet is not judged from inside
+    // it at the far face and is charged what the other direction charges, and a wave that entered by an ordinary
+    // crossing carries the sheet's internal series. Both have their own case; the rows here follow the same rules.
     //
-    // The rows that evaluate a material with the mass column (m > 0) are in the case of the same name
-    // with the suffix " - the mass-law part".
+    // The rows that evaluate a material with the mass column (m > 0) are in the case of the same name with the suffix "
+    // - the mass-law part".
     const double f_hz = FRQ;
     const double L = 0.10;
     const uint8_t OT_GLUED_ENTRY = 71, OT_GLUED_EXIT = 69;
@@ -4870,15 +4621,13 @@ TEST_CASE("Total reflection of the outer pair - the sheet stays in the result", 
     auto TE = [](const arma::mat &X)
     { return cpx(X, 0, 3); };
 
-    // ------------------------------------------------------------------------------------------
-    // Reflect port, acoustic: a lossy sheet on a rigid wall, air | sheet | rigid
-    // ------------------------------------------------------------------------------------------
+    // ---- Reflect port, acoustic: a lossy sheet on a rigid wall, air | sheet | rigid ----
     {
         const std::vector<LumpMtl> pal = {
-            {0.31, 0.20, 0.010},                 // 1 a porous layer, rarer than air
-            {2.50, 0.80, 0.010},                 // 2 a dense lossy layer
-            {2.401e-9, 0.0, 0.0},                // 3 rigid wall
-            {2.401e-9, 0.0, 0.0, 0.0, 0.3},      // 4 rigid wall leaking, tf 0.3
+            {0.31, 0.20, 0.010},            // 1 a porous layer, rarer than air
+            {2.50, 0.80, 0.010},            // 2 a dense lossy layer
+            {2.401e-9, 0.0, 0.0},           // 3 rigid wall
+            {2.401e-9, 0.0, 0.0, 0.0, 0.3}, // 4 rigid wall leaking, tf 0.3
         };
         auto mtl = lump_palette(pal);
         struct Row
@@ -4886,8 +4635,7 @@ TEST_CASE("Total reflection of the outer pair - the sheet stays in the result", 
             const char *name;
             int sh, wall;
         };
-        const std::vector<Row> rows = {{"porous | rigid      ", 1, 3}, {"dense  | rigid      ", 2, 3},
-                                       {"porous | rigid tf .3", 1, 4}, {"dense  | rigid tf .3", 2, 4}};
+        const std::vector<Row> rows = {{"porous | rigid      ", 1, 3}, {"dense  | rigid      ", 2, 3}, {"porous | rigid tf .3", 1, 4}, {"dense  | rigid tf .3", 2, 4}};
         QD_DIAG("\n# diag: reflect port of a 10 mm lossy sheet on a rigid wall, scalar, air | sheet | rigid.\n");
         QD_DIAG("# alpha_ref is the absorbed fraction 1 - |R|^2 of the reference; 0 deg is below the\n");
         QD_DIAG("# critical angle and is the control row\nstack,theta_n,|R|^2,ref_|R|^2,alpha_ref,d_R,R0_far\n");
@@ -4903,7 +4651,7 @@ TEST_CASE("Total reflection of the outer pair - the sheet stays in the result", 
                 Lp.tf_far = Wm.tf;
                 DiagSheet D = diag_sheet_composite(1.0, lump_eps(Sm, f_hz), lump_eps(Wm, f_hz), Sm.thk, ct, f_hz,
                                                    false, true, 1.0, 1.0, 1.0, Lp);
-                // raw slab-side reflectance of the far face: the known clamp in apply_tf engages above 1
+                // raw slab-side reflectance of the far face, above one past the critical angle
                 std::complex<double> zs = std::sqrt(lump_eps(Sm, f_hz)), zf = std::sqrt(lump_eps(Wm, f_hz));
                 double R0f = std::norm((zs * D.c_slab - zf * D.c_far) / (zs * D.c_slab + zf * D.c_far));
                 double d_R = std::abs(cpx(C.xprmat, 0, 0) - D.R_te);
@@ -4911,16 +4659,13 @@ TEST_CASE("Total reflection of the outer pair - the sheet stays in the result", 
                 QD_DIAG("%s,%.1f,%.9f,%.9f,%.6f,%.3e,%.6f\n", R.name, thd, (double)C.gain(0), std::norm(D.R_te),
                         1.0 - std::norm(D.R_te), d_R, R0f);
                 INFO(R.name << ", theta_n " << thd);
-                CHECK(R0f <= 1.0);                   // the row is outside the clamp
-                CHECK(std::norm(D.R_te) < 0.99);     // and the sheet absorbs, so a bare mirror cannot pass
+                CHECK(R0f <= 1.0);               // the row is outside the clamp
+                CHECK(std::norm(D.R_te) < 0.99); // and the sheet absorbs, so a bare mirror cannot pass
                 CHECK(d_R < 1.0e-9);
             }
     }
 
-    // ------------------------------------------------------------------------------------------
-    // Reflect port, EM and scalar: a coated solid past its critical angle, HOST | SH | air.
-    // The TM channel of a lossy sheet is inside the clamp recorded in section 5 and is printed.
-    // ------------------------------------------------------------------------------------------
+    // ---- Reflect port, EM and scalar: a coated solid past its critical angle, HOST | SH | air ----
     {
         const double thk = 0.006;
         const std::vector<LumpMtl> pal = {
@@ -4951,15 +4696,13 @@ TEST_CASE("Total reflection of the outer pair - the sheet stays in the result", 
             INFO("coated solid, theta_n " << thd);
             CHECK(d_te < 1.0e-9);
             CHECK(d_sc < 1.0e-9);
-            // TM past the critical angle: the slab-side reflectance of the closed far face is
-            // above one, and nothing caps it. It was 4.0e-2 off while a clamp stood on that face.
+            // TM past the critical angle: the slab-side reflectance of the closed far face is above one, and nothing
+            // caps it.
             CHECK(std::abs(std::abs(TM(Cr.xprmat)) - std::abs(D.R_tm)) < 1.0e-9);
         }
     }
 
-    // ------------------------------------------------------------------------------------------
-    // Transmit leak through a coherent sheet, EM and scalar: HOST | SH (tf) | air past critical
-    // ------------------------------------------------------------------------------------------
+    // ---- Transmit leak through a coherent sheet, EM and scalar: HOST | SH (tf) | air past critical ----
     {
         const double thk = 0.006, tf_s = 0.5;
         const std::vector<LumpMtl> pal = {
@@ -5026,9 +4769,7 @@ TEST_CASE("Leak chain - each face at the cosine the wave has and the series on a
     auto dB = [](double g)
     { return (g > 0.0) ? 10.0 * std::log10(g) : -999.0; };
 
-    // ------------------------------------------------------------------------------------------
-    // No tf anywhere: a closed outer pair transmits nothing, whatever the sheet is
-    // ------------------------------------------------------------------------------------------
+    // ---- No tf anywhere: a closed outer pair transmits nothing, whatever the sheet is ----
     {
         auto mtl = diag_palette<double>(); // 2 = eps 5.24 solid, 8 = eps 1.50 sheet, both lossless
         QD_DIAG("\n# diag: closed outer pair with no tf, eps 5.24 | 6 mm eps 1.50 | air. The pair closes at\n");
@@ -5062,9 +4803,7 @@ TEST_CASE("Leak chain - each face at the cosine the wave has and the series on a
         }
     }
 
-    // ------------------------------------------------------------------------------------------
-    // A coherent lossless sheet rarer than the invariant on a closed wall: it tunnels to the pad
-    // ------------------------------------------------------------------------------------------
+    // ---- A coherent lossless sheet rarer than the invariant on a closed wall: it tunnels to the pad ----
     {
         const double thk = 0.010, e_s = 0.31, e_c = 2.401e-9, tf_s = 0.3, tf_c = 0.1;
         const std::vector<LumpMtl> pal = {{e_s, 0.0, thk, 0.0, tf_s}, {e_c, 0.0, 0.0, 0.0, tf_c}};
@@ -5085,8 +4824,8 @@ TEST_CASE("Leak chain - each face at the cosine the wave has and the series on a
             std::complex<double> ref_cx = std::polar(std::sqrt(ref), arg_n + arg_f - k0 * (zs - 1.0) * thk * ct);
             double evan = dB(std::exp(-2.0 * k0 * thk * std::sqrt(s2 - e_s)));
             (void)ref_cx;
-            // The sheet is a wave medium and tunnels to the pad of the closed wall face; the two flat
-            // leaks, which it was held at while it was entered as a leak, are recorded beside it
+            // The sheet is a wave medium and tunnels to the pad of the closed wall face; the two flat leaks of a sheet
+            // entered as a leak are printed beside it
             DiagLeak Dp = diag_leak_series(1.0, e_s, e_c, 0.0, tf_s, tf_c, thk, ct, f_hz, true);
             double d_cx = std::abs(cpx(C.xprmat, 0, 0) - Dp.T_te);
             QD_DIAG("%.1f,%.9f,%.9f,%+.4f,%+.4f,%.3e\n", thd, (double)C.gain(0), ref, dB((double)C.gain(0) / ref), evan, d_cx);
@@ -5096,9 +4835,7 @@ TEST_CASE("Leak chain - each face at the cosine the wave has and the series on a
         }
     }
 
-    // ------------------------------------------------------------------------------------------
-    // The series on a closed far face, EM and scalar: eps 1.50 | 6 mm eps 5.24 (tf 0.5) | air
-    // ------------------------------------------------------------------------------------------
+    // ---- The series on a closed far face, EM and scalar: eps 1.50 | 6 mm eps 5.24 (tf 0.5) | air ----
     {
         const double thk = 0.006, tf_s = 0.5;
         const std::vector<LumpMtl> pal = {{5.24, 0.00, thk, 0.0, tf_s}, {1.50, 0.00, 0.0}};
@@ -5135,14 +4872,12 @@ TEST_CASE("Leak chain - each face at the cosine the wave has and the series on a
         }
     }
 
-    // ------------------------------------------------------------------------------------------
-    // The series on a closed far face, acoustic: an absorber without tf on a leaking rigid wall
-    // ------------------------------------------------------------------------------------------
+    // ---- The series on a closed far face, acoustic: an absorber without tf on a leaking rigid wall ----
     {
         const double tf_c = 0.3;
         const std::vector<LumpMtl> pal = {
-            {2.50, 0.80, 0.010},            // 1 a dense lossy layer
-            {0.31, 0.20, 0.010},            // 2 a porous layer, rarer than air
+            {2.50, 0.80, 0.010},             // 1 a dense lossy layer
+            {0.31, 0.20, 0.010},             // 2 a porous layer, rarer than air
             {2.401e-9, 0.0, 0.0, 0.0, tf_c}, // 3 rigid wall leaking, tf 0.3
         };
         auto mtl = lump_palette(pal);
@@ -5174,13 +4909,11 @@ TEST_CASE("Leak chain - each face at the cosine the wave has and the series on a
             }
     }
 
-    // ------------------------------------------------------------------------------------------
-    // The step at the critical angle of the outer pair, recorded
-    // ------------------------------------------------------------------------------------------
+    // ---- The step at the critical angle of the outer pair (printed) ----
     {
-        // Just below, the composite; just above, the chain. With the series on both sides and the
-        // far face at one cosine on both sides, the scalar step closes. In EM the near crossing
-        // is per channel in the chain as in the composite, and the table records what is left.
+        // Just below, the composite; just above, the chain. With the series on both sides and the far face at one
+        // cosine on both sides, the scalar step closes. In EM the near crossing is per channel in the chain as in the
+        // composite, and the table prints what is left.
         const double thk = 0.006, tf_s = 0.5;
         const std::vector<LumpMtl> pal = {{5.24, 0.00, thk, 0.0, tf_s}, {1.50, 0.00, 0.0}};
         auto mtl = lump_palette(pal);
@@ -5201,6 +4934,5 @@ TEST_CASE("Leak chain - each face at the cosine the wave has and the series on a
         CHECK(std::abs(st_s) < 0.01);
         CHECK(std::abs(st_te) < 0.5);
         CHECK(std::abs(st_tm) < 0.5);
-
     }
 }
