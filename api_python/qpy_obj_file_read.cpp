@@ -29,8 +29,8 @@ Read a Wavefront `.obj` file and extract geometry, visual materials, and EM/acou
   1-based, with 0 reserved for the outside / no-material state
 - With an empty `fn`, geometry and `.mtl` outputs are empty and only the table (`csv_names`,
   `csv_prop`) is populated; if `fn_csv` is also empty, the built-in default table is returned
-- For a detailed description of the material model see
-  <a href="http://quadriga-lib.org/formats.html">Data Formats</a> section
+- The material model and its columns: <a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md">The quadriga-lib Material Model and Ray-Surface Physics</a>; the CSV format
+  of the material table: <a href="http://quadriga-lib.org/formats.html">Data Formats</a>
 
 ## Usage:
 ```

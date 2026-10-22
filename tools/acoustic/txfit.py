@@ -1,25 +1,25 @@
 # SPDX-License-Identifier: Apache-2.0
 # Part of quadriga-lib — see LICENSE for terms.
 #
-# The transmission fit of md/acoustic.md 9 on the formula copy txlib.py, vectorized: the knobs of a mass-law material
-# fitted per construction to a transmission reference, minimax over octaves (md/m10_m15_report.md 0.2, 1.0).
+# The transmission fit of the expressibility test (md/acoustic_engine_notes.md 5, 8.4) on the formula copy txlib.py, vectorized: the knobs of a mass-law material
+# fitted per construction to a transmission reference, minimax over octaves.
 #   Knobs p = [X1k, m, att, attB, cF, cQ, rF, rQ, rS, C]: X1k the level (X0 at 1 kHz, i.e. fRef with thk), m the mass
 #   column (a switch: fitted only with V['mfit']), att (dB at 1 kHz) / attB, cF / cQ the bending stiffness, rF / rQ / rS
-#   the resonance (+ the mass-air-mass dip, - the first mode), C the column of candidate M13.
-#   Rule R1h; tf fixed at the class's absorption law; references, absorption laws and physical constants from
-#   tl_refs.json (the 13 constructions of report 3.6). Bounds of report 3.6 on cF, cQ, rF, rQ.
+#   the resonance (+ the mass-air-mass dip, - the first mode), C the column of the installed loss factor in frequency (a dropped candidate).
+#   The plate rule; tf fixed at the class's absorption law; references, absorption laws and physical constants from
+#   tl_refs.json (the 13 reference constructions of the first acoustic round, bb336dc). Bounds of that round on cF, cQ, rF, rQ.
 #   Variant V (dict): amax (upper angle of the average; 90 = random incidence, the library's own average and the fit
-#   convention of md/acoustic.md 9; 78 = field incidence), mfit, noatt, m13 ('col' | 'davy'), m14 (deg), m15, pcf (coiF
+#   convention of the fits; 78 = field incidence), mfit, noatt, m13 (the installed loss factor in frequency, 'col' | 'davy'), m14 (a limiting angle in deg), m15 (the bending loss as a resistance), pcf (coiF
 #   pinned at the physical coincidence), attmax (the att bound, 12 dB by default), side (the finite panel as built,
-#   md/acoustic.md 2.1: "lab" each construction at its laboratory side LAB_SIDE, a number one side for all, 0 the
-#   infinite plate; absent = "lab" in the default variant, the fit convention of md/acoustic.md 9 since 2026-10-19).
+#   page 5.4: "lab" each construction at its laboratory side LAB_SIDE, a number one side for all, 0 the
+#   infinite plate; absent = "lab" in the default variant, the fit convention since 2026-10-19).
 # Procedure: differential evolution on 96 x 3, Nelder-Mead on 192 x 6, then every fitted vector of every seed evaluated at
 # 768 x 12 and the best kept (a polish or a selection on a coarser grid picks knobs that alias it).
 #
 # usage: python3 tools/acoustic/txfit.py [--variant JSON] [--seeds N] [--procs P] [--out FILE] [construction ...]
 #   e.g. --variant '{"amax": 90, "side": "lab"}' (the default) fits the library as built at random incidence, each
-#   construction at its laboratory side (md/grazing_report.md 1.5: 2.70 dB); '{"amax": 90, "side": 0}' the infinite plate
-#   (md/m10_m15_report.md 1.0: 2.97 dB)
+#   construction at its laboratory side (2.70 dB, de60194); '{"amax": 90, "side": 0}' the infinite plate
+#   (2.97 dB, bc24b0c)
 import argparse, json, math, os, random, sys
 import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -33,7 +33,7 @@ ABS = {k: tuple(v) for k, v in _R['absorption_law'].items()}
 NAMES = [r[0] for r in REF]
 PHYS_FC = {n: v['fc_hz'] for n, v in _R['physical'].items() if v['fc_hz']}
 # laboratory side sqrt(area) of each reference (m): the AGC / EN 12758 pane 1.23 x 1.48, a board 1.2 x 2.4, the Riverbank
-# opening 4.37 x 2.84 m (BIA TN 5A, RD066) for the walls and linings (md/grazing_report.md 1.5)
+# opening 4.37 x 2.84 m (BIA TN 5A, RD066) for the walls and linings
 _LAB = {'glass': (1.23, 1.48), 'board': (1.2, 2.4), 'wall': (4.37, 2.84)}
 _KIND = {'glass 4 mm': 'glass', 'glass 6 mm': 'glass', '4-16-4 (AGC)': 'glass', '4-12-4-12-4 (AGC)': 'glass',
          'gypsum 12.5 (model)': 'board', 'plywood 18 (model)': 'board'}
@@ -334,7 +334,7 @@ def _task(a):
 
 
 if __name__ == '__main__':
-    ap = argparse.ArgumentParser(description='transmission fit on the formula copy (md/acoustic.md 9)')
+    ap = argparse.ArgumentParser(description='transmission fit on the formula copy')
     ap.add_argument('names', nargs='*', help='constructions (default: all 13)')
     ap.add_argument('--variant', default='{"amax": 90, "side": "lab"}',
                     help='variant dict as JSON (default: the library at random incidence, each construction at its lab side)')

@@ -5,16 +5,16 @@ Sabine (reverberation-chamber, ISO 354) absorption to random-incidence absorptio
 A one-parameter porous layer (Miki, flow resistivity sigma, known thickness, rigid backing) is fitted so that a finite
 sample of the test size reproduces the chamber values; Thomasson's field impedance of the rectangular patch carries
 the finite size [Thomasson_1980_AbsorptionCoefficient, Eqs. 17, 23, 26]. The output is the Paris integral (0-90 deg)
-of the same layer as an infinite surface: the random-incidence coefficient a tf reference takes (md/acoustic.md 3.1,
-A13). Extended reaction (the layer refracts) by default; local reaction on request.
+of the same layer as an infinite surface: the random-incidence coefficient a tf reference takes (md/acoustic_engine_notes.md
+5). Extended reaction (the layer refracts) by default; local reaction on request.
 
 Use only where the model fits the product and the sample is a flush patch: where sigma is measured, compare the fitted
-sigma with it (md/acoustic.md 6, A13 and A14: PU foam 10.3 against 10.6 kPa s/m2, glass wool 19.0 against 13.1;
+sigma with it (md/acoustic_engine_notes.md 9.3: PU foam 10.3 against 10.6 kPa s/m2, glass wool 19.0 against 13.1;
 polyester and a framed stone wool did not convert). Source keys refer to the literature review in
 /sjc/accoustic_research (references/index.csv).
 
   sabine_to_random.py convert --thk 0.05 --sample 3 4 --alpha 0.153 0.587 0.993 1.073 1.017 0.987
-  sabine_to_random.py check            # reproduces the validation of md/acoustic.md 6 (A13, A14)
+  sabine_to_random.py check            # reproduces the validation of 2026-10-15 (md/acoustic_engine_notes.md 5)
 
 Octaves 125 Hz to 4 kHz, each the mean of its three third-octave centres (as the references in the review).
 The field-impedance table of a sample size takes minutes on one thread; it is cached in $QD_ACOUSTIC_CACHE
@@ -116,7 +116,7 @@ CORR_ISO = [0.042, 0.187, 0.22, 0.14, 0.07, 0.04]                 # beta*E at E 
 def edge_corrected(alpha_s, E=14.0 / 12.0):
     return [min(1.0, x - c * E / (14.0 / 12.0)) for x, c in zip(alpha_s, CORR_ISO)]
 
-# ---- the validation of md/acoustic.md 6 (A13, A14), 2026-10-15 ----
+# ---- the validation of 2026-10-15 (md/acoustic_engine_notes.md 5) ----
 CASES = [  # name, thickness, sample, chamber 125..4k, independent random incidence (None: none), measured sigma
     ('Dupont glass wool 50 mm', 0.05, (3, 4), [0.153, 0.587, 0.993, 1.073, 1.017, 0.987], [0.130, 0.407, 0.720, 0.887, 0.937, 0.940], 13112),
     ('Dupont PU foam 50 mm', 0.05, (3, 4), [0.107, 0.437, 0.817, 0.980, 0.963, 0.973], [0.177, 0.317, 0.620, 0.883, 0.880, 0.913], 10605),
@@ -157,7 +157,7 @@ if __name__ == '__main__':
     c.add_argument('--alpha', type=float, nargs=6, required=True, help='chamber values at 125 250 500 1k 2k 4k Hz')
     c.add_argument('--local', action='store_true', help='local reaction instead of extended reaction')
     c.add_argument('--sigma', type=float, help='a measured flow resistivity, Pa s/m2, to compare with the fitted one')
-    sp.add_parser('check', help='reproduce the validation of md/acoustic.md 6 (A13, A14)')
+    sp.add_parser('check', help='reproduce the validation of 2026-10-15')
     args = ap.parse_args()
     if args.cmd == 'check':
         check()

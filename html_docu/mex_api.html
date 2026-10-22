@@ -206,6 +206,9 @@ Calculate the beamwidth and pointing angles of array antenna elements in degrees
 <li>Computes azimuth and elevation beamwidth at a given dB threshold (default 3 dB = FWHM)</li>
 <li>Also returns the azimuth and elevation pointing angles of the main beam</li>
 <li>Sub-grid resolution is achieved by bilinear interpolation of the field pattern (≈100x finer grid in each direction than the antenna sampling grid)</li>
+<li>The width is that of the main lobe, searched outwards from the maximum; side lobes above the threshold are not included</li>
+<li>Azimuth: cut at the elevation of the maximum, circular across ±180° when the grid covers the full circle; 360° when the whole cut is above the threshold (e.g. a beam pointing to a pole)</li>
+<li>Elevation: cut along the great circle through the maximum, so a lobe can extend across the poles; at most 180°</li>
 <li>Calculated per element, not per port; ignores element coupling</li>
 </ul>
 
@@ -265,6 +268,7 @@ Calculates the directivity in dBi of array antenna elements
 <ul>
 <li>Directivity = 10 log10(peak radiation intensity / mean over 4π); isotropic radiator = 0 dBi</li>
 <li>Calculated per element, not per port; ignores element coupling</li>
+<li>Independent of the scale of the pattern; an element whose pattern is zero everywhere gives 0 dBi</li>
 </ul>
 
 <b>Usage:</b><br>
@@ -311,21 +315,24 @@ Combine element patterns, positions, and coupling weights into effective radiati
 <li>Integrates the element field patterns, element positions, and coupling weights into one effective pattern per port (column of the coupling matrix)</li>
 <li>The result behaves as a virtual array with one element per port, zeroed element positions, and an identity coupling matrix</li>
 <li>Speeds up MIMO channel computation; useful for beamforming in 5G systems and network planning</li>
+<li>The element positions add a phase that depends on frequency and <code>propagation_speed</code>; the default speed of light applies to radio waves, use about 343 m/s for acoustic arrays (e.g. from <a href="#generate_speaker">generate_speaker</a>)</li>
 </ul>
 
 <b>Usage:</b><br>
 <pre>
 % Input as struct (struct mode)
 arrayant_out = quadriga_lib.arrayant_combine_pattern( arrayant_in );
-arrayant_out = quadriga_lib.arrayant_combine_pattern( arrayant_in, center_freq_new, azimuth_grid_new, elevation_grid_new );
+arrayant_out = quadriga_lib.arrayant_combine_pattern( arrayant_in, center_freq_new, azimuth_grid_new, ...
+    elevation_grid_new, propagation_speed );
 
 % Separate outputs, struct input (single-freq only)
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, coupling_re, ...
     coupling_im, center_freq, name] = quadriga_lib.arrayant_combine_pattern( arrayant_in );
 
-% Separate inputs (split-mode, single-freq only)
+% Separate inputs (split-mode, single-freq only); propagation_speed is the 16th input
 arrayant_out = quadriga_lib.arrayant_combine_pattern( [], center_freq_new, azimuth_grid_new, elevation_grid_new, ...
-    e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, coupling_re, coupling_im, center_freq, name );
+    e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, coupling_re, ...
+    coupling_im, center_freq, name, propagation_speed );
 </pre>
 
 <b>Inputs:</b><br>
@@ -334,6 +341,7 @@ arrayant_out = quadriga_lib.arrayant_combine_pattern( [], center_freq_new, azimu
 <li><b><code>center_freq_new</code></b> — Alternative frequency (grid) in Hz; if provided, the combined pattern is recomputed (interpolated) at each requested frequency. If omitted or empty, the function uses each input entry's <code>center_freq</code> unchanged.</li>
 <li><b><code>azimuth_grid_new</code></b> — Alternative azimuth grid in rad; in [-pi, pi]; sorted; defaults to input grid</li>
 <li><b><code>elevation_grid_new</code></b> — Alternative elevation grid in rad; in [-pi/2, pi/2]; sorted; defaults to input grid</li>
+<li><b><code>propagation_speed</code></b> — Wave propagation speed in m/s; positive and finite; use about 343 for acoustics; 5th input in struct mode, 16th input with separate inputs; default: 299792458</li>
 <li><b><code>e_theta_re</code></b> ... <b><code>elevation_grid</code></b> — Required inputs for slit-mode</li>
 <li><b><code>element_pos</code></b> ... <b><code>name</code></b> — Optional inputs for slit-mode</li>
 </ul>
@@ -773,7 +781,7 @@ ant = quadriga_lib.arrayant_generate('multibeam_sep', res, freq, az_3dB, el_3dB,
 
 <b>Inputs (type ula, 3GPP):</b><br>
 <ul>
-<li><b><code>pattern</code></b> — Custom per-element pattern struct used for 3GPP or ULA; same format as outputs; overrides default 3GPP/ULA element pattern; other struct fields if present are ignored</li>
+<li><b><code>pattern</code></b> — Custom per-element pattern struct used for 3GPP or ULA; same format as outputs; overrides default 3GPP/ULA element pattern; only the radiation pattern is used: element positions, coupling and center frequency of the pattern are ignored, as are other struct fields</li>
 </ul>
 
 <b>Inputs (type multibeam, multibeam_sep):</b><br>
@@ -858,6 +866,7 @@ unit coupling, zero positions, 299792458 Hz).
 Interpolate polarimetric array antenna field patterns (single- and multi-frequency)
 <ul>
 <li>Interpolates complex e-theta (V) and e-phi (H) field components at the requested azimuth / elevation angles.</li>
+<li>NaN or infinite angles give NaN in all outputs for that angle (and element); no error is raised</li>
 <li>Single-frequency mode: pass a 1-element struct (or arrayant data via separate inputs); returns up to 8 outputs including the optional <code>dist</code>, <code>azimuth_loc</code>, <code>elevation_loc</code>, and <code>gamma</code> as matrices of size <code>[n_out, n_ang]</code></li>
 <li>Multi-frequency mode is selected automatically when <code>arrayant</code> is a struct array with more than one element or when <code>freq</code> is non-empty; for each target frequency, the two bracketing <code>center_freq</code> entries are located and blended via SLERP.</li>
 <li>Separate arrayant inputs are accepted in single-frequency mode only</li>
@@ -884,7 +893,7 @@ Interpolate polarimetric array antenna field patterns (single- and multi-frequen
 <li><b><code>arrayant</code></b> — Struct (single-frequency) or struct array (multi-frequency) containing the arrayant data; field layout as in <a href="#arrayant_generate">arrayant_generate</a>. Pass <code>[]</code> to provide the data via separate inputs (single-frequency only)</li>
 <li><b><code>azimuth</code></b> — Azimuth angles in rad, in [-π, π]; single or double precision; <code>[1, n_ang]</code> for planar-wave mode (same angles for all elements) or <code>[n_out, n_ang]</code> for per-element angles (spherical-wave mode)</li>
 <li><b><code>elevation</code></b> — Elevation angles in rad, in [-π/2, π/2]; single or double; shape must match <code>azimuth</code></li>
-<li><b><code>element</code></b> — Element indices to interpolate; duplicates allowed; defaults to <code>[1:n_elements]</code> when empty; <code>[1, n_out]</code>, <code>[n_out, 1]</code>, or <code>[]</code>; uint32 or double</li>
+<li><b><code>element</code></b> — Element indices to interpolate; 1-based; duplicates allowed; defaults to <code>[1:n_elements]</code> when empty; <code>[1, n_out]</code>, <code>[n_out, 1]</code>, or <code>[]</code>; uint32 or double</li>
 <li><b><code>orientation</code></b> — Antenna orientation (bank, tilt, heading) in rad; East is the default broadside; <code>[3, 1]</code>, <code>[3, n_out]</code>, <code>[3, 1, n_ang]</code>, <code>[3, n_out, n_ang]</code>, or <code>[]</code></li>
 <li><b><code>element_pos</code></b> — Override element positions in m; <code>[3, n_out]</code> or <code>[]</code>; falls back to <code>arrayant.element_pos</code> (or zeros) when empty</li>
 <li><b><code>freq</code></b> — Target frequencies in Hz; <code>[n_freq]</code>. When passing a struct array, <code>freq</code> may be omitted or <code>[]</code>, in which case the <code>center_freq</code> values of the struct array entries are used  as target frequencies (no interpolation between bands, one output slice per entry).</li>
@@ -928,6 +937,8 @@ Reads array antenna data from QDANT files
 <li>Without <code>id</code>, all entries are read: returns a struct array when the file has multiple entries (frequency-dependent model) or a single struct when it has exactly one entry</li>
 <li>With <code>id</code>, a single entry is read; useful for picking one frequency from a multi-frequency file</li>
 <li>Separate-fields output (11 or 12 outputs) is only available when the result is a single entry (i.e. <code>id</code> was provided, or the file contains exactly one entry)</li>
+<li>An <code>id</code> that is not in the file is an error; the first entry counts as ID 1 only if it has no <code>id</code> attribute</li>
+<li>Malformed files are an error, also when they declare more elements (<code>NoElements</code>) than the file has data for; elements without pattern data read as zeros (at most 2^24 zero values per entry)</li>
 </ul>
 
 <b>Usage:</b><br>
@@ -972,6 +983,8 @@ Writes array antenna data to QDANT files
 <li>Multiple array antennas can be stored in the same file using distinct <code>id</code> values</li>
 <li>If writing to an existing file without specifying an <code>id</code>, the data is appended at the end and the returned <code>id_in_file</code> identifies its location in the file</li>
 <li>An optional <code>layout</code> can be provided to organize the data inside the file</li>
+<li>Without <code>layout</code>, the layout in the file is replaced by a row of all IDs in the file in file order; a custom layout written before is lost (pass it again with every write that should keep it)</li>
+<li>The file has single-precision-equivalent accuracy relative to the element peak: pattern magnitudes (dB) and phases (degree) are rounded so that every sample is within 6e-8 of the peak amplitude of its element; samples far below the peak are less accurate relative to their own amplitude (about 6e-4 at -80 dB, 6e-2 at -120 dB below the peak); positions and coupling are written as float values (at most 9 significant digits); sampling grids are rounded to 0.001 degree; all non-zero pattern samples are written at any level, exact zeros as <code>-inf</code> dB</li>
 <li>Passing a struct array (multiple elements) writes a frequency-dependent model with sequential 1-based IDs; in this mode appending to an exisiting file is not allowed and will cause an error</li>
 </ul>
 
@@ -990,7 +1003,7 @@ id_in_file = quadriga_lib.arrayant_qdant_write( fn, [], id, layout, e_theta_re, 
 <li><b><code>fn</code></b> — Output QDANT filename; string; must not be empty</li>
 <li><b><code>arrayant</code></b> — Struct containing the arrayant data; field layout as documented in <a href="#arrayant_generate">arrayant_generate</a>; pass <code>[]</code> to provide the data via separate inputs instead; a struct array writes a frequency-dependent model and requires <code>id</code> and <code>layout</code> to be omitted</li>
 <li><b><code>id</code></b> — Target ID of the antenna inside the file; default: max-ID in existing file + 1 (or 1 if the file does not exist); ignored for multi-frequency model</li>
-<li><b><code>layout</code></b> — Matrix organizing multiple antenna IDs within the file; must only reference IDs present in the file; uint32</li>
+<li><b><code>layout</code></b> — Matrix organizing multiple antenna IDs within the file; must only reference IDs present in the file; uint32; default: a row of all IDs in the file (replaces a layout written before)</li>
 </ul>
 
 <b>Inputs (separate arrayant data, required when `arrayant` is `[]`):</b><br>
@@ -1028,6 +1041,7 @@ Rotate antenna radiation patterns around the principal axes using Euler rotation
 <li>Rotates pattern and/or polarization around x (bank), y (tilt), z (heading) axes</li>
 <li>Rotations applied in order x, y, z, composed as Rz·Ry·Rx (intrinsic Tait-Bryan)</li>
 <li>Adjusts the sampling grid for non-uniformly sampled antennas when <code>usage</code> is 0 or 1</li>
+<li>Coupling, <code>center_freq</code> and <code>name</code> are kept, also when the sampling grid is adjusted</li>
 <li>For scalar acoustic fields (pressure stored in <code>e_theta_re</code> only), use <code>usage = 1</code> to avoid spurious polarization effects</li>
 </ul>
 
@@ -1175,14 +1189,14 @@ Compute the baseband frequency response of a MIMO channel
 <ul>
 <li>Three dispatch modes depending on the dimensionality of coeff_re / coeff_im / delay  and the presence of <code>i_snap</code> — see the table below</li>
 <li>Single-frequency mode: computes the frequency-domain channel matrix at the carrier positions via DFT over time-domain path coefficients and delays</li>
-<li>Multi-frequency mode: interpolates complex channel coefficients from the input frequency grid <code>center_freq</code> to the output grid using SLERP, then applies delay-induced phase rotation per output carrier; only the first frequency slab of <code>delay</code> is used</li>
+<li>Multi-frequency mode: interpolates complex channel coefficients from the input frequency grid <code>center_freq</code> to the output grid using SLERP, then applies delay-induced phase rotation per output carrier; only the first frequency slab of <code>delay</code> is used. The delay-induced phase is removed from the input coefficients before the interpolation, so channels from <a href="#get_channels_multifreq">get_channels_multifreq</a> / <a href="#get_channels_spherical">get_channels_spherical</a> must be generated with <code>use_absolute_delays = true</code>: their coefficients carry the phase of the absolute path length also when <code>delay</code> is relative, and with relative delays the phase of the TX-RX distance is interpolated across <code>center_freq</code>, which gives wrong phases (magnitudes stay right)</li>
 <li>Multi-snapshot mode: applies the single-frequency backend in parallel across snapshots via OpenMP; <code>i_snap</code> (1-based MATLAB indices) optionally selects a subset</li>
 <li>Carrier positions are specified one of two ways: as a normalized <code>pilot_grid</code> paired with <code>bandwidth</code> (where <code>0.0</code> corresponds to <code>center_freq(1)</code> and <code>1.0</code> to <code>center_freq(1) + bandwidth</code>), or as absolute frequencies via <code>carrier_freq</code>; supplying both pairs is an error</li>
 <li>Multi-frequency inputs always require <code>center_freq</code>; if <code>carrier_freq</code> is omitted it is derived as <code>center_freq(1) + pilot_grid · bandwidth</code></li>
 <li>Multi-snapshot inputs require <code>center_freq</code> to be omitted or scalar (no combined multi-freq + multi-snap)</li>
 <li>Single-frequency inputs ignore <code>center_freq</code> when <code>pilot_grid</code> + <code>bandwidth</code> are given</li>
 <li><code>delay</code> supports broadcasting: shape <code>[1, 1, n_path, ...]</code> applies the same delays to all RX/TX pairs</li>
-<li>Internal arithmetic is single-precision; uses AVX2 where supported; double inputs are narrowed to float internally, results widened back</li>
+<li>Single-frequency and multi-snapshot modes: the phase <code>bandwidth · pilot_grid · delay</code> (in cycles) is computed in double precision and reduced to one period before sin / cos are evaluated in single precision; coefficients and sums are single precision; uses AVX2 where supported; double inputs are narrowed to float internally, results widened back. Multi-frequency mode computes in double precision</li>
 </ul>
 
 <b>Usage:</b><br>
@@ -1277,7 +1291,7 @@ quadriga_lib.channel_export_obj_file( fn, max_no_paths, gain_max, gain_min, colo
 <li><b><code>center_freq</code></b> — Center frequency in Hz; <code>[n_snap]</code> or scalar</li>
 <li><b><code>coeff_re</code></b> — Channel coefficients, real part; <code>[n_rx, n_tx, n_path, n_snap]</code></li>
 <li><b><code>coeff_im</code></b> — Channel coefficients, imaginary part; <code>[n_rx, n_tx, n_path, n_snap]</code></li>
-<li><b><code>i_snap</code></b> — Snapshot indices to include; range [1 ... n_snap]; empty exports all</li>
+<li><b><code>i_snap</code></b> — Snapshot indices to include; 1-based; range [1 ... n_snap]; empty exports all</li>
 </ul>
 
 <b>Outputs:</b><br>
@@ -1619,7 +1633,7 @@ Write one or more channel objects to an HDF5 file
 <li>Writes a struct array of channels into 4D slots (one slot per array element)</li>
 <li>Optional unstructured data can be passed as a matching struct array</li>
 <li>Creates the file with a sensible default layout if it does not yet exist; appends to existing files otherwise</li>
-<li>A warning is issued if any selected slot already contains data (it is overwritten)</li>
+<li>A warning is issued if any selected slot already contains data. That slot is replaced completely: its old structured data and all its unstructured datasets (also those written with <a href="#hdf5_write_dset">hdf5_write_dset</a>) are removed. The file does not shrink; use <code>h5repack</code> to reclaim the space of the removed data</li>
 <li>Structured data is stored in single precision regardless of MATLAB input precision</li>
 <li>Unstructured datasets retain their MATLAB type and shape (see <a href="#hdf5_write_dset">hdf5_write_dset</a>)</li>
 <li>Each scalar location input is broadcast to all <code>numel(chan)</code> channels; each vector input must have exactly <code>numel(chan)</code> elements</li>
@@ -1635,7 +1649,7 @@ storage_dims = quadriga_lib.hdf5_write_channel( fn, chan, par, ix, iy, iz, iw );
 <ul>
 <li><b><code>fn</code></b> — Filename of the HDF5 file; string</li>
 <li><b><code>chan</code></b> — Structured channel data; non-empty struct array; field layout matches <a href="#hdf5_read_channel">hdf5_read_channel</a></li>
-<li><b><code>par</code></b> — Unstructured data; struct array of the same size as <code>chan</code>. Field names become HDF5 dataset names per slot (each prefixed with <code>par_</code>). Empty fields are skipped. Pass <code>[]</code> or omit to disable.</li>
+<li><b><code>par</code></b> — Unstructured data; struct array of the same size as <code>chan</code>. Field names become HDF5 dataset names per slot (each prefixed with <code>par_</code>). Empty fields are skipped. Pass <code>[]</code> or omit to disable. Field values follow the type rules of <a href="#hdf5_write_dset">hdf5_write_dset</a> (at most 3 dimensions).</li>
 <li><b><code>ix</code></b> — 1-based slot index along dimension X; scalar or vector of length <code>numel(chan)</code>; default <code>1:numel(chan)</code></li>
 <li><b><code>iy</code></b> — 1-based slot index along dimension Y; scalar or vector of length <code>numel(chan)</code>; default <code>1</code></li>
 <li><b><code>iz</code></b> — 1-based slot index along dimension Z; scalar or vector of length <code>numel(chan)</code>; default <code>1</code></li>
@@ -1663,7 +1677,9 @@ Write a single unstructured dataset to an HDF5 file
 <li><code>name</code> must contain only alphanumeric characters and underscores</li>
 <li>The file must already exist (use <a href="#hdf5_create_file">hdf5_create_file</a> first)</li>
 <li>A dataset of the same name at the same slot is not overwritten; an error is thrown instead</li>
+<li>The dataset is added to the slot; everything else stored there is kept. A later <a href="#hdf5_write_channel">hdf5_write_channel</a> to the same slot replaces the slot completely, including the datasets written with this function</li>
 <li>Supported types: string, scalar, vector (row or column), 2D matrix, and 3D array; numeric element types: single, double, int32, uint32, int64, uint64</li>
+<li>Arrays with more than 3 dimensions, sparse and complex arrays are rejected</li>
 <li>Row vectors are stored as column vectors</li>
 </ul>
 
@@ -1771,8 +1787,10 @@ Read ray-tracing CIR data from a QRT file
   <td class="c">1</td>
   <td class="c">Max column power = 1</td>
   <td class="c">-PL minus material losses</td>
+  <td><br><br></td>
 </tr>
 </table>
+Other values are rejected with an error.
 </li>
 </ul>
 </li>
@@ -1797,7 +1815,7 @@ Read ray-tracing CIR data from a QRT file
 <li><b><code>path_coord</code></b> — Interaction coordinates per path; Cell of length <code>n_out</code>; elements Cell of length <code>n_path</code>, each <code>[3, n_interact + 2]</code></li>
 <li><b><code>no_int</code></b> — Number of mesh interactions per path; 0 indicates LOS; uint32; Cell of length <code>n_out</code>; elements <code>[n_path]</code></li>
 <li><b><code>coord</code></b> — Interaction coordinates (flat, concatenated across paths); single; Cell of length <code>n_out</code>; elements <code>[3, sum(no_int)]</code></li>
-<li><b><code>interact_type</code></b> — Interaction type codes (flat, concatenated across paths, matching <code>coord</code>); uint32; Cell of length <code>n_out</code>; elements <code>[sum(no_int)]</code>. Empty for v4 legacy files.</li>
+<li><b><code>interact_type</code></b> — Interaction type codes (flat, concatenated across paths, matching <code>coord</code>); uint8; Cell of length <code>n_out</code>; elements <code>[sum(no_int)]</code>. Empty for v4 legacy files.</li>
 </ul>
 
 <b>See also:</b><br>
@@ -1819,6 +1837,9 @@ Map path delays to a fixed tap grid using two-tap power-weighted interpolation
 <li>If all fractional per-tap offsets are below 0.01 or above 0.99, weight computation is skipped (nearest neighor selection) but tap-selection logic still applies</li>
 <li>Input <code>delay</code> may be per-antenna <code>[n_rx, n_tx, n_path, n_snap]</code> or shared <code>[1, 1, n_path, n_snap]</code>; shared delays are expanded internally when <code>fix_taps</code> is 0 or 3</li>
 <li>Output arrays are zero-padded along the tap dimension so that all snapshots share the same <code>n_taps</code></li>
+<li>Delays must be non-negative, as for a tapped delay line, with a tolerance of <code>tap_spacing / 2</code>: delays in <code>(-tap_spacing / 2, 0)</code> are treated as 0, so all of their power goes to tap 0. Delays at or below <code>-tap_spacing / 2</code> raise an error, as do NaN, Inf and delays of 2^31 taps or more (<code>delay / tap_spacing &amp;lt; 2^31</code>, e.g. 10.7 s at 5 ns or 12.4 h at 48 kHz)</li>
+<li>Relative delays (<code>use_absolute_delays = false</code> in <a href="#get_channels_spherical">get_channels_spherical</a>, <a href="#get_channels_multifreq">get_channels_multifreq</a> and <a href="#get_channels_planar">get_channels_planar</a>) are negative for element pairs that are closer to each other than the phase centres, by up to about (half the TX array size + half the RX array size) / propagation speed (both arrays endfire). They stay above <code>-tap_spacing / 2</code> only while these half sizes add up to less than <code>tap_spacing / 2</code> times the propagation speed: about 0.75 m for radio at 5 ns taps, but only about 3.6 mm for sound at 48 kHz taps, i.e. practically every acoustic array. In those cases use absolute delays (<code>use_absolute_delays = true</code>)</li>
+<li>Run time and memory depend on the number of paths and taps, not on the absolute delay values</li>
 </ul>
 
 <b>Usage:</b><br>
@@ -1831,8 +1852,8 @@ Map path delays to a fixed tap grid using two-tap power-weighted interpolation
 <ul>
 <li><b><code>coeff_re</code></b> — Channel coefficients, real part; <code>[n_rx, n_tx, n_path, n_snap]</code></li>
 <li><b><code>coeff_im</code></b> — Channel coefficients, imaginary part; <code>[n_rx, n_tx, n_path, n_snap]</code></li>
-<li><b><code>delay</code></b> — Path delays in seconds; <code>[n_rx, n_tx, n_path, n_snap]</code> or <code>[1, 1, n_path, n_snap]</code></li>
-<li><b><code>tap_spacing</code></b> — Delay bin spacing in seconds; 5 ns corresponds to 200 MHz sampling rate; default: 5e-9</li>
+<li><b><code>delay</code></b> — Path delays in seconds; <code>[n_rx, n_tx, n_path, n_snap]</code> or <code>[1, 1, n_path, n_snap]</code>; non-negative with a tolerance of <code>tap_spacing / 2</code>, finite, below <code>2^31 * tap_spacing</code></li>
+<li><b><code>tap_spacing</code></b> — Delay bin spacing in seconds, positive and finite; 5 ns corresponds to 200 MHz sampling rate; default: 5e-9</li>
 <li><b><code>max_no_taps</code></b> — Maximum number of output taps; 0 = unlimited; default: 48</li>
 <li><b><code>power_exponent</code></b> — Interpolation exponent α; default: 1.0</li>
 <li><b><code>fix_taps</code></b> — Delay grid sharing mode; default: 0<br><br>
@@ -1847,11 +1868,11 @@ Map path delays to a fixed tap grid using two-tap power-weighted interpolation
 </tr>
 <tr>
   <td class="c">1</td>
-  <td>Single shared grid across all snapshots and tx-rx pairs; output delays <code>[1, 1, n_taps, n_snap]</code></td>
+  <td>Single shared grid across all snapshots and tx-rx pairs; output delays <code>[1, 1, n_taps, n_snap]</code> for shared delay input, <code>[n_rx, n_tx, n_taps, n_snap]</code> for per-antenna input</td>
 </tr>
 <tr>
   <td class="c">2</td>
-  <td>Per snapshot; output delays <code>[1, 1, n_taps, n_snap]</code>, each snapshot independent</td>
+  <td>Per snapshot; output delays <code>[1, 1, n_taps, n_snap]</code> for shared delay input, <code>[n_rx, n_tx, n_taps, n_snap]</code> for per-antenna input; each snapshot independent</td>
 </tr>
 <tr>
   <td class="c">3</td>
@@ -1865,7 +1886,7 @@ Map path delays to a fixed tap grid using two-tap power-weighted interpolation
 <ul>
 <li><b><code>coeff_re_q</code></b> — Output coefficients, real part; <code>[n_rx, n_tx, n_taps, n_snap]</code></li>
 <li><b><code>coeff_im_q</code></b> — Output coefficients, imaginary part; <code>[n_rx, n_tx, n_taps, n_snap]</code></li>
-<li><b><code>delay_q</code></b> — Output delays in seconds; <code>[n_rx, n_tx, n_taps, n_snap]</code> or <code>[1, 1, n_taps, n_snap]</code> depending on <code>fix_taps</code></li>
+<li><b><code>delay_q</code></b> — Output delays in seconds; <code>[n_rx, n_tx, n_taps, n_snap]</code>, or <code>[1, 1, n_taps, n_snap]</code> for shared delay input with <code>fix_taps</code> 1 or 2</li>
 </ul>
 
 <hr class="greyline"><br><br>
@@ -2023,8 +2044,11 @@ Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models
 <li>Supported channel types: <code>A, B, C, D, E, F</code> (TGn definitions)</li>
 <li>MU-MIMO supported (<code>n_users &gt; 1</code>) with per-user distances/floors and optional angle offsets per TGac</li>
 <li>Time-evolving channels via <code>observation_time</code>, <code>update_rate</code>, and mobility parameters; <code>observation_time = 0.0</code> yields a static channel</li>
-<li>Floor penetration loss according to TGah for CarrierFreq &lt; 1 GHz and TGax for above 1 GHz</li>
-<li>NAN or negative value for any override parameter restores the model default</li>
+<li>Floor penetration loss according to TGah for CarrierFreq &lt; 1 GHz and TGax for above 1 GHz; floors add attenuation (and the TGah shadow fading below 1 GHz) but no delay; the station is placed 3 m per floor above the AP</li>
+<li>Taps with zero power in the model tables are removed; the number of paths does not depend on distance, floors or walls</li>
+<li>Time evolution: each sub-path is rotated by <code>exp(+j 2 pi f_D t)</code>, i.e. a station moving towards the AP or a scatterer sees a positive Doppler shift <code>f_D</code>, as the channel of <a href="#get_channels_spherical">get_channels_spherical</a> along the returned station positions</li>
+<li>Uplink: the coefficient and delay matrices are the transposes of the downlink ones (reciprocal channel, no conjugation), so both directions have the same Doppler shift; positions and orientations are swapped (the moving station is the transmitter)</li>
+<li>NAN or negative value for any override parameter restores the model default, except <code>XPR_NLOS_linear</code> (see below)</li>
 </ul>
 
 <b>Usage:</b><br>
@@ -2043,19 +2067,19 @@ chan = quadriga_lib.get_channels_ieee_indoor( ap_array, sta_array, channel_type,
 <li><b><code>center_freq</code></b> — Carrier frequency; default: 5.25e9</li>
 <li><b><code>tap_spacing_s</code></b> — Tap spacing in seconds; must equal <code>10 ns / 2^k</code>; default: 10e-9</li>
 <li><b><code>n_users</code></b> — Number of users (TGac/TGah/TGax only); output vector length equals <code>n_users</code>; default: 1</li>
-<li><b><code>observation_time</code></b> — Channel observation time in seconds; default: 0</li>
-<li><b><code>update_rate</code></b> — Channel update interval in seconds; relevant only when <code>observation_time &gt; 0</code>; default: 1e-3</li>
+<li><b><code>observation_time</code></b> — Channel observation time in seconds; must be finite; default: 0</li>
+<li><b><code>update_rate</code></b> — Channel update interval in seconds (finite, > 0); relevant only when <code>observation_time &gt; 0</code>; default: 1e-3</li>
 <li><b><code>speed_station_kmh</code></b> — Station speed in km/h; movement direction is <code>AoA_offset</code>; relevant only when <code>observation_time &gt; 0</code>; default: 0</li>
 <li><b><code>speed_env_kmh</code></b> — Environment speed in km/h; use <code>0.089</code> for TGac; relevant only when <code>observation_time &gt; 0</code>; default: 1.2 (TGn)</li>
 <li><b><code>dist_m</code></b> — TX-to-RX distance(s); <code>[n_users]</code> or <code>[1]</code>; default: 4.99</li>
-<li><b><code>n_floors</code></b> — Number of floors per user for TGah or TGax models; <code>[n_users]</code> or <code>[1]</code>; default: 0</li>
-<li><b><code>uplink</code></b> — Set <code>true</code> to generate uplink (reverse) direction; default: false</li>
+<li><b><code>n_floors</code></b> — Number of floors per user for TGah or TGax models (0 to 4, attenuation only, no delay); <code>[n_users]</code> or <code>[1]</code>; default: 0</li>
+<li><b><code>uplink</code></b> — Set <code>true</code> to generate uplink (reverse) direction; coefficients are the transpose of the downlink; default: false</li>
 <li><b><code>offset_angles</code></b> — Azimuth offset angles in degrees; rows: AoD LOS, AoD NLOS, AoA LOS, AoA NLOS; empty uses TGac auto-defaults for <code>n_users &gt; 1</code>; <code>[4, n_users]</code>; default: [] (auto-generate)</li>
 <li><b><code>n_subpath</code></b> — Sub-paths per cluster for Laplacian angular spread mapping; default: 20</li>
 <li><b><code>doppler_effect</code></b> — Special Doppler: models D/E use mains frequency (Hz), model F uses vehicle speed (km/h); 0 disables; default: 50</li>
 <li><b><code>seed</code></b> — RNG seed for repeatability; <code>-1</code> uses the system random device; default: -1</li>
 <li><b><code>KF_linear</code></b> — Overrides model KF (linear scale); default:  A/B/C → 1 (LOS) / 0 (NLOS), D → 2/0, E/F → 4/0; applied to first tap only; breakpoint ignored when <code>KF_linear &gt;= 0</code></li>
-<li><b><code>XPR_NLOS_linear</code></b> — Overrides NLOS cross-polarization ratio (linear scale); default: XPR NLOS: 2 (3 dB)</li>
+<li><b><code>XPR_NLOS_linear</code></b> — Overrides NLOS cross-polarization ratio (linear scale); NAN or <code>[]</code> restores the default; must otherwise be finite and > 0 (0, negative and Inf throw); default: XPR NLOS: 2 (3 dB)</li>
 <li><b><code>SF_std_dB_LOS</code></b> — Overrides LOS shadow fading std in dB (applied when d &lt; dBP); default: 3 dB</li>
 <li><b><code>SF_std_dB_NLOS</code></b> — Overrides NLOS shadow fading std in dB (applied when d >= dBP); default: A/B → 4 dB, C/D → 5 dB, E/F → 6 dB</li>
 <li><b><code>dBP_m</code></b> — Overrides breakpoint distance; default: A/B/C → 5 m, D → 10 m, E → 20 m, F → 30 m</li>
@@ -2144,12 +2168,13 @@ Calculate MIMO channel coefficients for IRS-assisted communication
 <ul>
 <li>Computes channel coefficients and delays from two path segments: TX → IRS and IRS → RX</li>
 <li>IRS is modeled as a passive array; phase shifts are defined via its coupling matrix; codebook entry selected by <code>i_irs</code></li>
-<li>Polarization coupling is applied via the 8-row transfer matrices <code>M_1</code>, <code>M_2</code> (interleaved Re/Im for VV, VH, HV, HH components)</li>
+<li>Polarization coupling is applied via the 8-row transfer matrices <code>M_1</code>, <code>M_2</code>: 2x2 Jones matrices (rows = receive polarisation V/H, columns = transmit polarisation V/H; the IRS receives in segment 1 and transmits in segment 2), column-major with Re/Im interleaved: rows 1-2 = (V rx, V tx), rows 3-4 = (H rx, V tx), rows 5-6 = (V rx, H tx), rows 7-8 = (H rx, H tx)</li>
+<li>Each segment is computed like <a href="#get_channels_spherical">get_channels_spherical</a>: NLOS path lengths are <code>max(path_length, d_poly)</code> with the polyline length <code>d_poly</code> of the segment; the delay of a combined path is the sum of both segment delays</li>
 <li>Output paths <code>n_path_irs</code> are all combinations of segment 1 and segment 2 paths exceeding <code>threshold_dB</code></li>
 <li>If <code>active_path_in</code> is provided, it overrides <code>threshold_dB</code> for path selection</li>
 <li>Optional <code>ant_irs_2</code> provides a separate IRS antenna pattern for the RX-facing side (asymmetric IRS)</li>
 <li>If <code>center_freq == 0</code>, phase calculation is disabled and only delays are computed</li>
-<li>If <code>use_absolute_delays == false</code>, the minimum delay (LOS delay) is subtracted from all paths</li>
+<li>If <code>use_absolute_delays == false</code>, the LOS delay between the TX and RX phase centres (direct distance, not via the IRS) is subtracted from all paths; per-element delays can be slightly negative when the IRS is close to the TX-RX line</li>
 </ul>
 
 <b>Usage:</b><br>
@@ -2170,13 +2195,13 @@ Calculate MIMO channel coefficients for IRS-assisted communication
 <li><b><code>fbs_pos_1</code></b> — First-bounce scatterer positions for TX → IRS paths; <code>[3, n_path_1]</code></li>
 <li><b><code>lbs_pos_1</code></b> — Last-bounce scatterer positions for TX → IRS paths; <code>[3, n_path_1]</code></li>
 <li><b><code>path_gain_1</code></b> — Path gains in linear scale for TX → IRS paths; <code>[n_path_1, 1]</code></li>
-<li><b><code>path_length_1</code></b> — Total path lengths from TX to IRS phase center for TX → IRS paths; <code>[n_path_1, 1]</code></li>
-<li><b><code>M_1</code></b> — Polarization transfer matrix for TX → IRS paths, interleaved (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH); <code>[8, n_path_1]</code></li>
+<li><b><code>path_length_1</code></b> — Total path lengths from TX to IRS phase center for TX → IRS paths; values shorter than the polyline (e.g. 0) use the polyline length; <code>[n_path_1, 1]</code></li>
+<li><b><code>M_1</code></b> — Polarization transfer matrix for TX → IRS paths, row order as above; <code>[8, n_path_1]</code></li>
 <li><b><code>fbs_pos_2</code></b> — First-bounce scatterer positions for IRS → RX paths; <code>[3, n_path_2]</code></li>
 <li><b><code>lbs_pos_2</code></b> — Last-bounce scatterer positions for IRS → RX paths; <code>[3, n_path_2]</code></li>
 <li><b><code>path_gain_2</code></b> — Path gains in linear scale for IRS → RX paths; <code>[n_path_2, 1]</code></li>
-<li><b><code>path_length_2</code></b> — Total path lengths from IRS to RX phase center for IRS → RX paths; <code>[n_path_2, 1]</code></li>
-<li><b><code>M_2</code></b> — Polarization transfer matrix for IRS → RX paths, interleaved complex; <code>[8, n_path_2]</code></li>
+<li><b><code>path_length_2</code></b> — Total path lengths from IRS to RX phase center for IRS → RX paths; values shorter than the polyline (e.g. 0) use the polyline length; <code>[n_path_2, 1]</code></li>
+<li><b><code>M_2</code></b> — Polarization transfer matrix for IRS → RX paths, row order as above; <code>[8, n_path_2]</code></li>
 <li><b><code>tx_pos</code></b> — Transmitter position; <code>[3, 1]</code></li>
 <li><b><code>tx_orientation</code></b> — Transmitter orientation as Euler angles (bank, tilt, heading); <code>[3, 1]</code></li>
 <li><b><code>rx_pos</code></b> — Receiver position; <code>[3, 1]</code></li>
@@ -2223,9 +2248,12 @@ Compute channel coefficients for spherical waves across multiple frequencies
 <li><code>path_gain</code> is interpolated linearly; <code>M</code> is interpolated via SLERP per complex entry pair to preserve phase</li>
 <li>Extrapolation clamps to the nearest frequency entry on all four grids</li>
 <li><code>propagation_speed</code> supports EM (speed of light, default) and acoustic (343 m/s) simulations</li>
-<li><code>M</code> accepts 8 rows (full polarimetric: ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH) or 2 rows (scalar pressure: ReVV, ImVV only)</li>
+<li><code>M</code> accepts 8 rows (full polarimetric: the 2x2 Jones matrix (rows = RX polarisation V/H, columns = TX polarisation V/H), stored column-major with Re/Im interleaved: rows 1-2 = (V rx, V tx), rows 3-4 = (H rx, V tx), rows 5-6 = (V rx, H tx), rows 7-8 = (H rx, H tx)) or 2 rows (scalar pressure: Re, Im of the (V rx, V tx) entry only)</li>
+<li>NLOS paths: the path length between the TX and RX phase centres is <code>max(path_length, d_poly)</code>, where <code>d_poly</code> is the TX-FBS-LBS-RX polyline length; the length beyond the polyline (interactions between FBS and LBS) is added to the FBS-LBS segment. Delays and phases follow this length; the per-element offsets follow the FBS / LBS geometry.</li>
 <li>Coupling matrices are interpolated across frequencies (SLERP for complex pairs), identical to antenna pattern handling</li>
-<li><code>n_path_out = n_path + 1</code> if <code>add_fake_los_path</code> else <code>n_path</code></li>
+<li><code>n_path_out = n_path + 1</code> if <code>add_fake_los_path</code> else <code>n_path</code>: with <code>add_fake_los_path</code>, slot 1 holds the LOS path (zero power if no LOS path was found; LOS = the path whose length is closest to the TX-RX distance, within 0.1 mm); a LOS path found in the input is moved to slot 1 and leaves a zero-power path in its original slot (input index + 1); all other paths keep their order, shifted by one slot</li>
+<li>If <code>use_absolute_delays</code> is false, the LOS delay between the TX and RX phase centres is subtracted from all paths; per-element delays can then be negative, down to about -(half the TX array size + half the RX array size) / <code>propagation_speed</code> (both arrays endfire). <a href="#quantize_delays">quantize_delays</a> rejects delays at or below <code>-tap_spacing / 2</code>. For acoustics (<code>propagation_speed</code> about 343 m/s) that happens for practically every array: at 48 kHz taps, half sizes adding up to more than about 3.6 mm (a 5 cm microphone pair already exceeds it); for radio at 5 ns taps, about 0.75 m. Use <code>use_absolute_delays = true</code> in that case</li>
+<li>The coefficients always carry the phase of the absolute path length, also when <code>use_absolute_delays</code> is false. <a href="#baseband_freq_response">baseband_freq_response</a> in multi-frequency mode removes the phase of <code>delay</code> before it interpolates across <code>center_freq</code>, so it needs channels generated with <code>use_absolute_delays = true</code>; with relative delays, the phase of the TX-RX distance stays in the coefficients, is interpolated across the frequency grid and gives wrong phases</li>
 </ul>
 
 <b>Usage:</b><br>
@@ -2242,8 +2270,8 @@ Compute channel coefficients for spherical waves across multiple frequencies
 <li><b><code>fbs_pos</code></b> — First-bounce scatterer positions; <code>[3, n_path]</code></li>
 <li><b><code>lbs_pos</code></b> — Last-bounce scatterer positions; <code>[3, n_path]</code></li>
 <li><b><code>path_gain</code></b> — Linear-scale path gains per input frequency; <code>[n_path, n_freq_in]</code></li>
-<li><b><code>path_length</code></b> — Absolute TX-to-RX path lengths; <code>[n_path, 1]</code></li>
-<li><b><code>M</code></b> — Polarization transfer matrix; <code>[8, n_path, n_freq_in]</code> (full pol, interleaved Re/Im for VV, VH, HV, HH) or <code>[2, n_path, n_freq_in]</code> (scalar pressure: ReVV, ImVV only)</li>
+<li><b><code>path_length</code></b> — Absolute TX-to-RX path lengths (between the phase centres); values shorter than the TX-FBS-LBS-RX polyline (e.g. 0) use the polyline length; <code>[n_path, 1]</code></li>
+<li><b><code>M</code></b> — Polarization transfer matrix, row order as above; <code>[8, n_path, n_freq_in]</code> (full pol) or <code>[2, n_path, n_freq_in]</code> (scalar pressure)</li>
 <li><b><code>tx_pos</code></b> — Transmitter position; <code>[3, 1]</code></li>
 <li><b><code>tx_orientation</code></b> — Transmitter orientation as Euler angles (bank, tilt, heading); <code>[3, 1]</code></li>
 <li><b><code>rx_pos</code></b> — Receiver position; <code>[3, 1]</code></li>
@@ -2251,7 +2279,7 @@ Compute channel coefficients for spherical waves across multiple frequencies
 <li><b><code>freq_in</code></b> — Input sample frequencies for <code>path_gain</code> and <code>M</code>; <code>[n_freq_in, 1]</code></li>
 <li><b><code>freq_out</code></b> — Target output frequencies; <code>[n_freq_out, 1]</code></li>
 <li><b><code>use_absolute_delays</code></b> — If <code>true</code>, delays include the LOS component; default: <code>false</code></li>
-<li><b><code>add_fake_los_path</code></b> — If <code>true</code>, prepends a zero-power LOS path when none is present; default: <code>false</code></li>
+<li><b><code>add_fake_los_path</code></b> — If <code>true</code>, always adds one output path; slot 1 holds the LOS path (zero power if none was found); a LOS path found in the input leaves a zero-power path in its original slot; default: <code>false</code></li>
 <li><b><code>propagation_speed</code></b> — Wave speed in m/s; use ~343.0 for acoustics; default: <code>299792458.0</code></li>
 </ul>
 
@@ -2276,10 +2304,11 @@ Calculate MIMO channel coefficients for planar wave paths
 <li>Computes complex channel coefficients and delays for all TX/RX element pairs across <code>n_path</code> propagation paths.</li>
 <li>Interpolates antenna patterns for both arrays, accounting for element positions, orientation, and polarization.</li>
 <li>LOS path detection is distance-based (angles ignored).</li>
-<li>Polarization transfer matrix <code>M</code> must be normalized; rows are interleaved real/imag components.</li>
-<li>If <code>add_fake_los_path</code> is true, a zero-power LOS path is appended, making output size <code>n_path+1</code>.</li>
+<li>Polarization transfer matrix <code>M</code> must be normalized; it is the 2x2 Jones matrix (rows = RX polarisation V/H, columns = TX polarisation V/H), stored column-major with Re/Im interleaved: rows 1-2 = (V rx, V tx), rows 3-4 = (H rx, V tx), rows 5-6 = (V rx, H tx), rows 7-8 = (H rx, H tx).</li>
+<li><code>path_length</code> is used as given for the delay and phase of the phase centres (no geometry check).</li>
+<li>If <code>add_fake_los_path</code> is true, one output path is always added (output size <code>n_path+1</code>): slot 1 holds the LOS path, with zero power if no LOS path was found. LOS = the strongest path whose <code>path_length</code> is within 0.1 mm of the TX-RX distance; it is moved to slot 1 and its original slot (input index + 1) holds a zero-power path. All other paths keep their order, shifted by one slot.</li>
 <li>Setting <code>center_freq = 0</code> disables phase calculation (delays still computed).</li>
-<li><code>use_absolute_delays = false</code> subtracts the straight-line TX↔RX distance from all path lengths before converting to delay.</li>
+<li><code>use_absolute_delays = false</code> subtracts the straight-line TX↔RX distance (between the phase centres) from all path lengths before converting to delay; per-element delays of pairs that are closer to each other than the phase centres are then negative, down to about -(half the TX array size + half the RX array size) / speed of light; <a href="#quantize_delays">quantize_delays</a> rejects delays at or below <code>-tap_spacing / 2</code> (at 5 ns taps: half sizes adding up to more than about 0.75 m), use <code>use_absolute_delays = true</code> in that case.</li>
 </ul>
 
 <b>Usage:</b><br>
@@ -2299,14 +2328,14 @@ Calculate MIMO channel coefficients for planar wave paths
 <li><b><code>eoa</code></b> — Arrival elevation angles; rad; <code>[n_path, 1]</code></li>
 <li><b><code>path_gain</code></b> — Path gains in linear scale; <code>[n_path, 1]</code></li>
 <li><b><code>path_length</code></b> — Total path lengths from TX to RX phase center; <code>[n_path, 1]</code></li>
-<li><b><code>M</code></b> — Polarization transfer matrix, interleaved (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH); <code>[8, n_path]</code></li>
+<li><b><code>M</code></b> — Polarization transfer matrix, Jones row order as above; <code>[8, n_path]</code></li>
 <li><b><code>tx_pos</code></b> — Transmitter position; <code>[3, 1]</code></li>
 <li><b><code>tx_orientation</code></b> — Transmitter orientation as Euler angles (bank, tilt, heading); <code>[3, 1]</code></li>
 <li><b><code>rx_pos</code></b> — Receiver position; <code>[3, 1]</code></li>
 <li><b><code>rx_orientation</code></b> — Receiver orientation as Euler angles (bank, tilt, heading); <code>[3, 1]</code></li>
 <li><b><code>center_freq</code></b> — Center frequency; set to <code>0</code> or skip/leave empty to skip phase computation; default: 0</li>
 <li><b><code>use_absolute_delays</code></b> — If <code>true</code>, delays include the LOS component; Default: <code>false</code></li>
-<li><b><code>add_fake_los_path</code></b> — If <code>true</code>, prepends a zero-power LOS path when none is present; Default: <code>false</code></li>
+<li><b><code>add_fake_los_path</code></b> — If <code>true</code>, always adds one output path; slot 1 holds the LOS path (zero power if none was found); a LOS path found in the input leaves a zero-power path in its original slot; Default: <code>false</code></li>
 </ul>
 
 <b>Outputs:</b><br>
@@ -2333,10 +2362,12 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
 <ul>
 <li>Computes complex channel coefficients and propagation delays for all TX/RX element pairs and paths, using spherical wave assumption with per-element phase and delay.</li>
 <li>Interpolates antenna patterns for both arrays, accounting for element positions and array orientation (bank/tilt/heading Euler angles).</li>
-<li>Polarization coupling is applied via the 8-row transfer matrix <code>M</code> (interleaved Re/Im for VV, VH, HV, HH components).</li>
+<li>Polarization coupling is applied via the 8-row transfer matrix <code>M</code>: the 2x2 Jones matrix (rows = RX polarisation V/H, columns = TX polarisation V/H), stored column-major with Re/Im interleaved: rows 1-2 = (V rx, V tx), rows 3-4 = (H rx, V tx), rows 5-6 = (V rx, H tx), rows 7-8 = (H rx, H tx).</li>
+<li>NLOS paths: the path length between the TX and RX phase centres is <code>max(path_length, d_poly)</code>, where <code>d_poly</code> is the TX-FBS-LBS-RX polyline length; the length beyond the polyline (interactions between FBS and LBS, e.g. paths of <a href="#coord2path">coord2path</a> or <a href="#qrt_file_read">qrt_file_read</a> with more than two interactions) is added to the FBS-LBS segment. Delays and phases follow this length; the per-element offsets follow the FBS / LBS geometry.</li>
 <li>If <code>center_freq == 0</code>, phase calculation is disabled and only delays are computed.</li>
-<li>If <code>use_absolute_delays == false</code>, the minimum delay (LOS delay) is subtracted from all paths.</li>
-<li>If <code>add_fake_los_path == true</code>, a zero-power LOS path is prepended when no LOS path is detected.</li>
+<li>If <code>use_absolute_delays == false</code>, the LOS delay between the TX and RX phase centres is subtracted from all paths. Delays are per element pair, so pairs that are closer to each other than the phase centres get negative delays, down to about -(half the TX array size + half the RX array size) / speed of light (both arrays endfire). <a href="#quantize_delays">quantize_delays</a> maps delays above <code>-tap_spacing / 2</code> to tap 0 and rejects lower ones (at 5 ns taps: half sizes adding up to more than about 0.75 m); use <code>use_absolute_delays = true</code> in that case.</li>
+<li>LOS detection: the path whose length is closest to the TX-RX distance, within 0.1 mm.</li>
+<li>If <code>add_fake_los_path == true</code>, one output path is always added (<code>n_path + 1</code> outputs): slot 1 holds the LOS path, with zero power if no LOS path was found. If a LOS path was found, it is moved to slot 1 and its original slot (input index + 1) holds a zero-power path. All other paths keep their order, shifted by one slot.</li>
 </ul>
 
 <b>Usage:</b><br>
@@ -2353,15 +2384,15 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
 <li><b><code>fbs_pos</code></b> — First-bounce scatterer positions; <code>[3, n_path]</code></li>
 <li><b><code>lbs_pos</code></b> — Last-bounce scatterer positions; <code>[3, n_path]</code></li>
 <li><b><code>path_gain</code></b> — Path gains in linear scale; <code>[n_path, 1]</code></li>
-<li><b><code>path_length</code></b> — Total path lengths from TX to RX phase center; <code>[n_path, 1]</code></li>
-<li><b><code>M</code></b> — Polarization transfer matrix, interleaved (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH); <code>[8, n_path]</code></li>
+<li><b><code>path_length</code></b> — Total path lengths from TX to RX phase center; values shorter than the TX-FBS-LBS-RX polyline (e.g. 0) use the polyline length; <code>[n_path, 1]</code></li>
+<li><b><code>M</code></b> — Polarization transfer matrix, Jones row order as above; <code>[8, n_path]</code></li>
 <li><b><code>tx_pos</code></b> — Transmitter position; <code>[3, 1]</code></li>
 <li><b><code>tx_orientation</code></b> — Transmitter orientation as Euler angles (bank, tilt, heading); <code>[3, 1]</code></li>
 <li><b><code>rx_pos</code></b> — Receiver position; <code>[3, 1]</code></li>
 <li><b><code>rx_orientation</code></b> — Receiver orientation as Euler angles (bank, tilt, heading); <code>[3, 1]</code></li>
 <li><b><code>center_freq</code></b> — Center frequency; set to <code>0</code> or skip/leave empty to skip phase computation; default: 0</li>
 <li><b><code>use_absolute_delays</code></b> — If <code>true</code>, delays include the LOS component; Default: <code>false</code></li>
-<li><b><code>add_fake_los_path</code></b> — If <code>true</code>, prepends a zero-power LOS path when none is present; Default: <code>false</code></li>
+<li><b><code>add_fake_los_path</code></b> — If <code>true</code>, always adds one output path; slot 1 holds the LOS path (zero power if none was found); a LOS path found in the input leaves a zero-power path in its original slot; Default: <code>false</code></li>
 <li><b><code>use_avx2</code></b> — If <code>true</code>, use AVX2 for antenna interpolation; reduces accuracy to single-precision interpolation, equivalent precision loss to the AVX2 kernel in arrayant_interpolate; default: <code>false</code></li>
 </ul>
 
@@ -2449,6 +2480,7 @@ Calculate the empirical averaged cumulative distribution function (CDF)
 <li>Averaged CDF is obtained by quantile-space averaging: for a fine probability grid, x-values from each column CDF are averaged, then mapped back to the bin grid</li>
 <li>Quantile statistics (mean and std) are reported at the 0.1, 0.2, ..., 0.9 probability levels</li>
 <li><code>Inf</code> and <code>NaN</code> values are excluded from computation</li>
+<li>A data set without any finite value gets a NaN column in <code>cdf_per_set</code> and is left out of <code>cdf_avg</code>, <code>mu</code> and <code>sig</code>; if no set has finite values (possible only with <code>bins_in</code>), <code>cdf_avg</code>, <code>mu</code> and <code>sig</code> are NaN</li>
 <li>If <code>bins</code> is empty, equally spaced bins spanning the data range are generated</li>
 </ul>
 
@@ -2460,17 +2492,17 @@ Calculate the empirical averaged cumulative distribution function (CDF)
 <b>Inputs:</b><br>
 <ul>
 <li><b><code>data</code></b> — Input data matrix; each column is one independent data set; <code>[n_samples, n_sets]</code></li>
-<li><b><code>bins_in</code></b> — Bin centers; used as-is if non-empty; if empty, equally spaced bins spanning the data range are generated; <code>[n_bins_in]</code> or empty; default: <code>[]</code></li>
+<li><b><code>bins_in</code></b> — Bin centers; used as-is if non-empty (must be finite and strictly ascending, else an error is raised); if empty, equally spaced bins spanning the data range are generated; <code>[n_bins_in]</code> or empty; default: <code>[]</code></li>
 <li><b><code>n_bins</code></b> — Number of bins when auto-generating; must be >= 2; ignored when non-empty <code>bins_in</code> are provided; default: 201</li>
 </ul>
 
 <b>Outputs:</b><br>
 <ul>
-<li><b><code>cdf_per_set</code></b> — Individual CDFs; one per column of data; <code>[n_bins_out, n_sets]</code></li>
+<li><b><code>cdf_per_set</code></b> — Individual CDFs; one per column of data (NaN for a set without finite values); <code>[n_bins_out, n_sets]</code></li>
 <li><b><code>bins_out</code></b> — Auto-generated bins; copy of <code>bins_in</code> when non-empty <code>bins_in</code> are provided; <code>[n_bins_out = n_bins]</code> or <code>[n_bins_out = n_bins_in]</code></li>
-<li><b><code>cdf_avg</code></b> — Averaged CDF via quantile-space averaging across data sets; <code>[n_bins]</code></li>
-<li><b><code>mu</code></b> — Mean of the 0.1–0.9 quantiles across data sets; <code>[9]</code></li>
-<li><b><code>sig</code></b> — Standard deviation of the 0.1–0.9 quantiles across data sets; <code>[9]</code></li>
+<li><b><code>cdf_avg</code></b> — Averaged CDF via quantile-space averaging across the data sets with finite values; <code>[n_bins]</code></li>
+<li><b><code>mu</code></b> — Mean of the 0.1–0.9 quantiles across the data sets with finite values; <code>[9]</code></li>
+<li><b><code>sig</code></b> — Standard deviation of the 0.1–0.9 quantiles across the data sets with finite values; <code>[9]</code></li>
 </ul>
 
 <hr class="greyline"><br>
@@ -2499,7 +2531,7 @@ Calculate azimuth and elevation angular spreads with spherical wrapping
 <li><b><code>powers</code></b> — Path powers in [W]; <code>[n_path, n_cir]</code></li>
 <li><b><code>wrapping</code></b> — If true, enables spherical rotation; default: false</li>
 <li><b><code>calc_bank_angle</code></b> — If true, computes optimal bank angle analytically; only used when <code>wrapping = true</code>; default: false</li>
-<li><b><code>quantize</code></b> — Angular quantization step in [deg]; paths within this distance are grouped; default: 0 (no quantization)</li>
+<li><b><code>quantize</code></b> — Angular quantization step in [deg]; paths within this distance are grouped; default: 0 (no quantization); otherwise it must be finite and >= 1e-3 deg, else an error is raised</li>
 </ul>
 
 <b>Outputs:</b><br>
@@ -2517,9 +2549,12 @@ Calculate azimuth and elevation angular spreads with spherical wrapping
 Calculate the cross-polarization ratio (XPR) for linear and circular polarization bases
 <ul>
 <li>Computes aggregate XPR from polarization transfer matrices using the total-power-ratio method: co-pol and cross-pol powers are summed across all qualifying paths per CIR, and XPR is their ratio</li>
-<li>XPR is computed in both the linear V/H basis and the circular LHCP/RHCP basis via the Jones matrix transform <code>M_circ = T <i> M_lin </i> T^-1</code></li>
-<li>LOS paths are identified by comparing path length against the direct TX-RX distance <code>dTR</code>; paths with <code>path_length &amp;lt; dTR + window_size</code> are excluded by default</li>
-<li>Polarization transfer matrix <code>M</code> is stored column-major with interleaved real/imaginary parts, 8 rows per path: <code>[Re(M_vv); Im(M_vv); Re(M_vh); Im(M_vh); Re(M_hv); Im(M_hv); Re(M_hh); Im(M_hh)]</code></li>
+<li>XPR is computed in both the linear V/H basis and the circular LHCP/RHCP basis</li>
+<li>LOS paths are identified by comparing path length against the direct TX-RX distance <code>dTR</code>; paths with <code>path_length &lt;= dTR + window_size</code> are excluded by default</li>
+<li>Polarization transfer matrix <code>M</code> is the 2x2 Jones matrix (rows = RX polarisation V/H, columns = TX polarisation V/H), stored column-major with interleaved real/imaginary parts, 8 rows per path: rows 1-2 = (V rx, V tx), rows 3-4 = (H rx, V tx), rows 5-6 = (V rx, H tx), rows 7-8 = (H rx, H tx). Below, <code>M_&lt;rx&gt;&lt;tx&gt;</code> names an entry by its receive and transmit polarisation: <code>M_vv</code> = rows 1-2, <code>M_hv</code> = rows 3-4, <code>M_vh</code> = rows 5-6, <code>M_hh</code> = rows 7-8</li>
+<li>V-XPR and H-XPR are ratios per receive polarisation: V-XPR is the power received in V from V transmission over the power received in V from H transmission; H-XPR likewise for the H receive polarisation</li>
+<li>The circular entries couple circular patterns through <code>M</code> as get_channels_spherical couples antenna patterns, <code>c(r, t) = r^T M t</code> (plain transpose), with the same circular vectors at both ends, each in that antenna's own (e_theta, e_phi) frame: L = (V, H) = (1, +j) / sqrt(2) (LHCP), R = (1, -j) / sqrt(2) (RHCP); names after the IEEE definition for the time convention exp(+j 2 pi f t) of the library's coefficients exp(-j 2 pi f tau). <code>M_&lt;rx&gt;&lt;tx&gt;</code>: <code>M_LL = (M_vv - M_hh + j(M_vh + M_hv)) / 2</code>, <code>M_RR = (M_vv - M_hh - j(M_vh + M_hv)) / 2</code>, <code>M_LR = (M_vv + M_hh + j(M_hv - M_vh)) / 2</code> (receive L, transmit R), <code>M_RL = (M_vv + M_hh + j(M_vh - M_hv)) / 2</code>. Co-polar means the same circular vector at both ends: the LOS matrix <code>diag(1, -1)</code> is co-polar (handedness kept), <code>diag(1, 1)</code> (one mirrored component, as by a single reflection) is cross-polar</li>
+<li>LHCP-XPR and RHCP-XPR are ratios per receive polarisation, like V-XPR and H-XPR</li>
 <li>Normalization of <code>M</code> does not affect XPR (cancels in the ratio) but does affect <code>pg</code></li>
 <li>If cross-pol power is zero and co-pol is positive, XPR is set to infinity; if both are zero, XPR is set to 0</li>
 <li>TX/RX positions may be fixed <code>[3, 1]</code> or mobile <code>[3, n_cir]</code></li>
@@ -2538,7 +2573,7 @@ Calculate the cross-polarization ratio (XPR) for linear and circular polarizatio
 <li><b><code>tx_pos</code></b> — Transmitter position [x; y; z]; <code>[3, 1]</code> (fixed) or <code>[3, n_cir]</code> (mobile)</li>
 <li><b><code>rx_pos</code></b> — Receiver position [x; y; z]; <code>[3, 1]</code> (fixed) or <code>[3, n_cir]</code> (mobile)</li>
 <li><b><code>include_los</code></b> — If true, includes LOS and near-LOS paths in the XPR calculation; default: false</li>
-<li><b><code>window_size</code></b> — LOS exclusion window; paths within <code>dTR + window_size</code> are excluded when <code>include_los = false</code>; default: 0.01</li>
+<li><b><code>window_size</code></b> — LOS exclusion window; paths with <code>path_length &lt;= dTR + window_size</code> are excluded when <code>include_los = false</code>; default: 0.01</li>
 </ul>
 
 <b>Outputs:</b><br>
@@ -2555,11 +2590,11 @@ Calculate the cross-polarization ratio (XPR) for linear and circular polarizatio
 </tr>
 <tr>
   <td class="c">2</td>
-  <td>V-XPR: sum(abs(M_vv)^2) / sum(abs(M_hv)^2)</td>
+  <td>V-XPR: sum(abs(M_vv)^2) / sum(abs(M_vh)^2) (receive V)</td>
 </tr>
 <tr>
   <td class="c">3</td>
-  <td>H-XPR: sum(abs(M_hh)^2) / sum(abs(M_vh)^2)</td>
+  <td>H-XPR: sum(abs(M_hh)^2) / sum(abs(M_hv)^2) (receive H)</td>
 </tr>
 <tr>
   <td class="c">4</td>
@@ -2567,11 +2602,11 @@ Calculate the cross-polarization ratio (XPR) for linear and circular polarizatio
 </tr>
 <tr>
   <td class="c">5</td>
-  <td>LHCP XPR: sum(abs(M_LL)^2) / sum(abs(M_RL)^2)</td>
+  <td>LHCP XPR: sum(abs(M_LL)^2) / sum(abs(M_LR)^2) (receive L)</td>
 </tr>
 <tr>
   <td class="c">6</td>
-  <td>RHCP XPR: sum(abs(M_RR)^2) / sum(abs(M_LR)^2)</td>
+  <td>RHCP XPR: sum(abs(M_RR)^2) / sum(abs(M_RL)^2) (receive R)</td>
 </tr>
 </table>
 </li>
@@ -2597,7 +2632,7 @@ Calculates RMS delay spread from per-CIR delays and linear-scale powers
 <li><b><code>delays</code></b> — Delays in [s] per CIR; <code>[n_path, n_cir]</code></li>
 <li><b><code>powers</code></b> — Path powers on linear scale in [W]; <code>[n_path, n_cir]</code></li>
 <li><b><code>threshold</code></b> — Power threshold in [dB] relative to strongest path; paths below threshold are excluded; default: 100</li>
-<li><b><code>granularity</code></b> — Bin width in [s] for grouping paths in the delay domain; default: 0 (no grouping)</li>
+<li><b><code>granularity</code></b> — Bin width in [s] for grouping paths in the delay domain; default: 0 (no grouping); must be finite and non-negative; when > 0, all delays must be finite and the delay span / granularity must be below 2^53, else an error is raised</li>
 </ul>
 
 <b>Outputs:</b><br>
@@ -2679,6 +2714,8 @@ Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector
 <li>Computes: <code>len = sqrt(x² + y² + z²)</code>, <code>az = atan2(y, x)</code>, <code>el = asin(clamp(z / len, -1, 1))</code></li>
 <li>Inputs are arbitrary 3D vectors (not required to be unit-length); <code>len</code> returns the Euclidean norm</li>
 <li><code>z/len</code> is clamped to [-1, 1] before <code>asin</code> to guard against <code>len == 0</code> and rounding artifacts pushing <code>abs(z/len)</code> slightly above 1</li>
+<li>Azimuth in [-pi, pi], with the special values of <code>atan2</code> (e.g. <code>atan2(0, -0) = pi</code>); NaN input gives NaN in <code>az</code> and <code>len</code></li>
+<li>The AVX2 kernel computes the angles in single precision; <code>len</code> and <code>z/len</code> in double precision</li>
 <li>Option to provide a single <code>[3, n, m]</code> cube or separate x, y, z <code>[n, m]</code> inputs</li>
 </ul>
 
@@ -2692,7 +2729,7 @@ Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector
 <li><b><code>x</code></b> — X-coordinates or combined input; <code>[n, m]</code> or <code>[3, n, m]</code>;</li>
 <li><b><code>y</code></b> — Y-coordinates; <code>[n, m]</code> or empty; ignored for combined input</li>
 <li><b><code>z</code></b> — Z-coordinates; <code>[n, m]</code> or empty; ignored for combined input</li>
-<li><b><code>use_kernel</code></b> — Kernel selection: 0 = auto (AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2 (throws if AVX2 unavailable); default: 1</li>
+<li><b><code>use_kernel</code></b> — Kernel selection: 0 = auto (AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2 (throws if AVX2 unavailable); other values throw; default: 1</li>
 </ul>
 
 <b>Outputs:</b><br>
@@ -2708,11 +2745,12 @@ Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector
 Compute elementwise approximate sine and/or cosine of a vector
 <ul>
 <li>AVX2-optimized (8 floats/lane); scalar fallback without AVX2</li>
-<li>For x in [-pi, pi]: max absolute error = 2^(-22.1); for x in [-500, 500]: 2^(-16.0)</li>
+<li>Max absolute error about 1.3e-7 (2^-22.9) against the exact sine / cosine of the input value for abs(x) <= 1e10 (the argument is reduced in double precision where single precision is not enough)</li>
+<li>Results stay in [-1, 1] for all finite x; Inf and NaN give NaN</li>
 <li>Either <code>s</code> or <code>c</code> may be <code>nullptr</code> to skip that computation</li>
 <li>Works on vectors, matrices, and 3-D arrays</li>
 <li>Accepts any numeric input class; best performance with single precision</li>
-<li>Outputs are always single precision</li>
+<li>Outputs are always single precision, also for double input</li>
 <li>Request one or two outputs to control which results are returned</li>
 <li>With one output, set the optional <code>cos_only</code> flag to <code>true</code> to return cosine instead of sine</li>
 </ul>
@@ -2727,13 +2765,13 @@ c = quadriga_lib.fast_sincos(x, true);
 <b>Inputs:</b><br>
 <ul>
 <li><b><code>x</code></b> (input) — Input angles; radians; <code>[n_elem]</code></li>
-<li><b><code>cos_only</code></b> — Forsingle output: <code>true</code> returns <code>cos(x)</code>; false returns <code>sin(x)</code>; default: false</li>
+<li><b><code>cos_only</code></b> — For a single output: <code>true</code> returns <code>cos(x)</code>; <code>false</code> or <code>[]</code> returns <code>sin(x)</code>; default: false</li>
 </ul>
 
 <b>Outputs:</b><br>
 <ul>
-<li><b><code>s</code></b> — sin(x); <code>[n_elem]</code></li>
-<li><b><code>c</code></b> — cos(x); <code>[n_elem]</code></li>
+<li><b><code>s</code></b> — sin(x); single; <code>[n_elem]</code></li>
+<li><b><code>c</code></b> — cos(x); single; <code>[n_elem]</code></li>
 </ul>
 
 <hr class="greyline"><br>
@@ -2744,7 +2782,7 @@ Convert elementwise azimuth/elevation angles to Cartesian coordinates
 <li>Conversion: <code>x = cos(el) cos(az) len</code>, <code>y = cos(el) sin(az) len</code>, <code>z = sin(el) len</code></li>
 <li>Optional outputs <code>sAZ</code>, <code>cAZ</code>, <code>sEL</code>, <code>cEL</code> return intermediate sin/cos values; omit from the output list to skip their computation</li>
 <li>Defaults to the GENERIC kernel (<code>use_kernel=1</code>) to preserve full double precision, matching MATLAB's default numeric type</li>
-<li>Set <code>use_kernel=0</code> for auto-selection or <code>use_kernel=2</code> to force AVX2; the AVX2 kernel computes in single precision internally (inputs narrowed to float, results widened back)</li>
+<li>Set <code>use_kernel=0</code> for auto-selection or <code>use_kernel=2</code> to force AVX2; the AVX2 kernel computes sine and cosine in single precision (angles reduced in double precision first; max. error about 1.3e-7 for angles up to 1e10), results widened back</li>
 </ul>
 
 <b>Usage:</b><br>
@@ -2761,7 +2799,7 @@ cart = quadriga_lib.geo2cart( az, el, len, use_kernel, split );
 <li><b><code>az</code></b> — Azimuth angles in radians; <code>[n, m]</code></li>
 <li><b><code>el</code></b> — Elevation angles in radians; <code>[n, m]</code></li>
 <li><b><code>len</code></b> — Euclidean vector length sqrt(x^2 + y^2 + z^2); <code>[n, m]</code>; default: 1</li>
-<li><b><code>use_kernel</code></b> — Kernel selection: 0 = auto (AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2 (throws if AVX2 unavailable); default: 1</li>
+<li><b><code>use_kernel</code></b> — Kernel selection: 0 = auto (AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2 (throws if AVX2 unavailable); other values throw; default: 1</li>
 <li><b><code>split</code></b> — If true, return x/y/z and optional sin/cos as separate <code>[n, m]</code> matrices. If false, return a single combined <code>[3, n, m]</code> cube; sin/cos outputs unavailable in this mode; default: false</li>
 </ul>
 
@@ -2782,8 +2820,9 @@ cart = quadriga_lib.geo2cart( az, el, len, use_kernel, split );
 Perform linear interpolation (1D or 2D) on single or multiple data sets
 <ul>
 <li>Interpolates given input data at specified output points.</li>
+<li>Outside the range of the data sampling points, the nearest end value is returned (constant extrapolation); output sampling points that are NaN give NaN.</li>
+<li>The data sampling points need not be sorted; repeated values are allowed.</li>
 <li>Supports single and multiple data sets.</li>
-<li>Returns interpolated results either directly or through reference argument.</li>
 <li>Data types: <code>single</code> or <code>double</code></li>
 </ul>
 
@@ -2897,7 +2936,7 @@ Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh
 <b>Outputs:</b><br>
 <ul>
 <li><b><code>gain</code></b> — Diffraction gain per TX-RX pair, linear power scale; <code>[n_pos, 1]</code>. Relative to FSPL by default (bounded by 0 and 1), absolute propagation gain when <code>apply_fspl = true</code></li>
-<li><b><code>xprmat</code></b> — Normalized polarization transfer matrix: the amplitude carries no path gain (max column power is 1), only the relative polarization coupling and phase; <code>gain</code> holds the power. EM mode: interleaved complex, col-major <code>[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]</code>; <code>[8, n_pos]</code>; scalar mode: scalar pressure coefficient <code>[Re Im]</code>; <code>[2, n_pos]</code></li>
+<li><b><code>xprmat</code></b> — Normalized polarization transfer matrix: the amplitude carries no path gain (max column power is 1), only the relative polarization coupling and phase; <code>gain</code> holds the power. EM mode: interleaved complex, col-major <code>[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]</code> with labels <code>&lt;rx&gt;&lt;tx&gt;</code>: rows 1-2 = (V rx, V tx), rows 3-4 = (H rx, V tx), rows 5-6 = (V rx, H tx), rows 7-8 = (H rx, H tx), the row order of <code>M</code> in <a href="#get_channels_spherical">get_channels_spherical</a>; <code>[8, n_pos]</code>; scalar mode: scalar pressure coefficient <code>[Re Im]</code>; <code>[2, n_pos]</code></li>
 <li><b><code>coord</code></b> — Diffracted path coordinates excluding endpoints; <code>[3, n_seg-1, n_pos]</code></li>
 </ul>
 
@@ -2922,7 +2961,7 @@ Construct a triangulated cube mesh
 <li>Optional uniform subdivision produces 12 · n_div^2 triangles</li>
 <li>Triangle winding is consistent (outward-facing normals), compatible with obj_file_write</li>
 <li>Scale, rotation, and translation are applied in that order (scale -> rotate -> translate)</li>
-<li>An odd number of negative scale components flips the winding (inward-facing normals)</li>
+<li>A negative scale mirrors the cube; when the product of the scales is negative, the winding is swapped so that the normals stay outward (as Blender's "Apply Scale")</li>
 </ul>
 
 <b>Usage:</b><br>
@@ -3046,7 +3085,7 @@ Construct a geodesic polyhedron from recursive icosahedron subdivision
 <b>Inputs:</b><br>
 <ul>
 <li><b><code>n_div</code></b> — Number of subdivisions; generates 20 · n_div² faces; default: 1</li>
-<li><b><code>radius</code></b> — Radius of icosphere in meters; default: 1</li>
+<li><b><code>radius</code></b> — Radius of icosphere in meters; finite and positive; default: 1</li>
 <li><b><code>direction_xyz</code></b> — Output directions in Cartesian (true) or spherical azimuth/elevation (false); default: false</li>
 </ul>
 
@@ -3075,7 +3114,7 @@ Read a Wavefront `.obj` file and extract geometry, visual materials, and EM/acou
 <li>A face's <code>usemtl</code> name is matched to the table by exact name, then by the base name (everything before the first dot, so Blender sub-materials like <code>concrete.gray</code> map to <code>concrete</code>)</li>
 <li>Unmatched names throw when <code>csv_strict</code> is true; otherwise they map to index 0 (no material)</li>
 <li>With an empty <code>fn</code>, geometry and <code>.mtl</code> outputs are empty and only the table (<code>csv_names</code>, <code>csv_prop</code>) is populated; if <code>fn_csv</code> is also empty, the built-in default table is returned</li>
-<li>For a detailed description of the material model see <a href="http://quadriga-lib.org/formats.html">Data Formats</a></li>
+<li>The material model and its columns: <a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md">The quadriga-lib Material Model and Ray-Surface Physics</a>; the CSV format of the material table: <a href="http://quadriga-lib.org/formats.html">Data Formats</a></li>
 </ul>
 
 <b>Usage:</b><br>
@@ -3180,7 +3219,7 @@ Construct a triangulated plane mesh
 <li>Triangle winding is consistent (normals point in +z direction), compatible with obj_file_write</li>
 <li>The plane has no thickness in z-direction; scaling therefore only affects x and y</li>
 <li>Scale, rotation, and translation are applied in that order (scale -> rotate -> translate)</li>
-<li>An odd number of negative scale components flips the winding (normals point in -z direction)</li>
+<li>When the product of the x and y scales is negative (mirrored plane), the winding is swapped so that the normals still point in +z direction before the rotation; the z scale is ignored</li>
 </ul>
 
 <b>Usage:</b><br>
@@ -3261,7 +3300,7 @@ Reorganize a point cloud into spatial sub-clouds for efficient processing
 <ul>
 <li><b><code>points</code></b> — Original 3D point cloud; <code>[n_points, 3]</code></li>
 <li><b><code>target_size</code></b> — Maximum points per sub-cloud before padding; default: 1024</li>
-<li><b><code>vec_size</code></b> — SIMD/CUDA alignment; sub-cloud size is padded to a multiple of this value; no padding when <code>1</code>; default: 1</li>
+<li><b><code>vec_size</code></b> — SIMD/CUDA alignment; sub-cloud size is padded to a multiple of this value; no padding when <code>1</code>; <a href="#ray_point_intersect">ray_point_intersect</a> accepts any value, padding (e.g. 8 for AVX2) only improves its speed; default: 1</li>
 </ul>
 
 <b>Outputs:</b><br>
@@ -3293,7 +3332,7 @@ result = quadriga_lib.point_inside_mesh( points, mesh, obj_ind, distance );
 <ul>
 <li><b><code>points</code></b> — 3D coordinates of test points; <code>[n_points, 3]</code></li>
 <li><b><code>mesh</code></b> — Triangle faces in row-major vertex format <code>{x1,y1,z1,x2,y2,z2,x3,y3,z3}</code>; <code>[n_mesh, 9]</code></li>
-<li><b><code>obj_ind</code></b> — Object index per mesh element; enables per-object output; <code>[n_mesh]</code></li>
+<li><b><code>obj_ind</code></b> — Object index per mesh element; 1-based; enables per-object output; <code>[n_mesh]</code></li>
 <li><b><code>distance</code></b> — Surface proximity threshold; points within this distance of the mesh surface are classified as inside; increases ray count to 4 + N_icosphere(⌈distance⌉ + 1); range: 0–20 m; Default: 0</li>
 </ul>
 
@@ -3480,8 +3519,8 @@ Calculate intersections of ray beams with points in 3D space
 <li><b><code>trivec</code></b> — Vectors from ray origin center to triangular wavefront vertices, order <code>{v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z}</code>; <code>[n_ray, 9]</code></li>
 <li><b><code>tridir</code></b> — Direction vectors of the three vertex-rays in Cartesian coordinates; not normalized; order <code>{d1x, d1y, d1z, d2x, d2y, d2z, d3x, d3y, d3z}</code>; <code>[n_ray, 9]</code></li>
 <li><b><code>points</code></b> — 3D point cloud coordinates; <code>[n_points, 3]</code></li>
-<li><b><code>sub_cloud_index</code></b> — Segment boundary indices for the point cloud; use <a href="#point_cloud_segmentation">point_cloud_segmentation</a> to gnerate; uint32; <code>[n_sub]</code>; default: <code>[]</code> (not using sub-clouds)</li>
-<li><b><code>use_kernel</code></b> — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable; auto mode selects CUDA when <code>n_points &gt;= 500</code> and CUDA is available, else AVX2, else GENERIC; default: 0</li>
+<li><b><code>sub_cloud_index</code></b> — Segment boundary indices for the point cloud; use <a href="#point_cloud_segmentation">point_cloud_segmentation</a> to generate; sub-clouds need not be aligned to the SIMD vector size (padding with <code>vec_size</code> is optional and only improves speed); uint32; <code>[n_sub]</code>; default: <code>[]</code> (not using sub-clouds)</li>
+<li><b><code>use_kernel</code></b> — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable and for other values; auto mode selects CUDA when <code>n_points &gt;= 500</code> and CUDA is available, else AVX2, else GENERIC; default: 0</li>
 <li><b><code>gpu_id</code></b> — CUDA device ID; ignored when not using CUDA; default: 0</li>
 </ul>
 
@@ -3507,7 +3546,8 @@ Compute ray-triangle intersections in 3D using the Möller–Trumbore algorithm
 <ul>
 <li>Counts the total number of intersections between <code>orig</code> and <code>dest</code></li>
 <li>Computes the coordinates and object IDs of the first two intersections per ray (FBS/SBS)</li>
-<li>Internal computations always use single precision for AVX2 and CUDA kernels; only GENERIC has <code>double</code> support</li>
+<li>The AVX2 and CUDA kernels compute in single precision, GENERIC in the precision of the input; with <code>double</code> input, the AVX2 kernel forms the vectors between ray origin, vertices and bounding boxes in <code>double</code> before rounding them, so its precision depends on the size of the scene, not on its distance from the coordinate origin (e.g. UTM coordinates); the CUDA kernel rounds the coordinates themselves, so its errors grow with the distance from the origin</li>
+<li>Triangle edges and vertices count as hits; hits at the same distance (e.g. on a shared edge) are reported in the order of the mesh index, the lower index first (all kernels)</li>
 </ul>
 
 <b>Usage:</b><br>
@@ -3523,7 +3563,7 @@ Compute ray-triangle intersections in 3D using the Möller–Trumbore algorithm
 <li><b><code>mesh</code></b> — Triangular mesh; each row: <code>{x1 y1 z1 x2 y2 z2 x3 y3 z3}</code>; <code>[n_mesh, 9]</code></li>
 <li><b><code>sub_mesh_index</code></b> — Start indices of sub-meshes in <code>mesh</code>; enables AABB-accelerated traversal; use <a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a> to generate; <code>[n_sub]</code>; default: <code>[]</code> (not using sub-meshes)</li>
 <li><b><code>aabb</code></b> — Pre-computed axis-aligned bounding boxes per sub-mesh; each row: <code>{x_min x_max y_min y_max z_min z_max}</code>; if empty or omitted, AABBs are computed from <code>mesh</code>; <code>[n_sub, 6]</code></li>
-<li><b><code>use_kernel</code></b> — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable; auto mode selects CUDA when <code>n_ray &gt;= 10000</code> and CUDA is available, else AVX2, else GENERIC; default: 0</li>
+<li><b><code>use_kernel</code></b> — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable and for other values; auto mode selects CUDA when <code>n_ray &gt;= 500</code> and CUDA is available, else AVX2, else GENERIC; default: 0</li>
 <li><b><code>gpu_id</code></b> — CUDA device ID; ignored when not using CUDA; default: 0</li>
 </ul>
 
@@ -3858,7 +3898,7 @@ Monte-Carlo estimate of the ACF of one generator
 <li><b><code>n_pos</code></b> — Number of random positions per device; must be > 1</li>
 <li><b><code>acf</code></b> <i>(optional)</i> — Target ACF; required for <code>acf_est_dual</code>, must then be > -1; <code>[n_acf]</code></li>
 <li><b><code>dist</code></b> <i>(optional)</i> — Sample points of the ACF; must start at 0, increase strictly and be finite; <code>[n_acf]</code></li>
-<li><b><code>seed</code></b> — Seed for the positions; must be >= -1; -1 seeds from the system random device; default: -1</li>
+<li><b><code>seed</code></b> — Seed for the positions; integer from -1 to 2^63-1; -1 seeds from the system random device; default: -1</li>
 </ul>
 
 <b>Outputs:</b><br>
@@ -3986,7 +4026,7 @@ Find the frequencies of a sum-of-sinusoids generator for a given ACF
 <li><b><code>random_init</code></b> — Start from random frequencies (true) or build up sinusoid by sinusoid (false); default: true</li>
 <li><b><code>freq_min</code></b> — Lower limit of the frequency magnitude; must be >= 0; 0 = none; default: 0</li>
 <li><b><code>freq_max</code></b> — Upper limit of the frequency magnitude; must be >= 0 and, if not 0, larger than <code>freq_min</code>; 0 = <code>15 / max(dist)</code>; limited by the size of the search grid, see above; default: 0</li>
-<li><b><code>seed</code></b> — Seed; must be >= -1; -1 seeds from the system random device; default: -1</li>
+<li><b><code>seed</code></b> — Seed; integer from -1 to 2^63-1; -1 seeds from the system random device; default: -1</li>
 </ul>
 
 <b>Outputs:</b><br>
@@ -4023,7 +4063,7 @@ phase = quadriga_lib.sos_init_phases( n_coeff, n_gen, seed );
 <ul>
 <li><b><code>n_coeff</code></b> — Number of sinusoids; must be > 0</li>
 <li><b><code>n_gen</code></b> — Number of generators; must be > 0; default: 1</li>
-<li><b><code>seed</code></b> — Seed of the random stream; must be >= -1; -1 seeds from the system random device and gives different phases on each call; default: -1</li>
+<li><b><code>seed</code></b> — Seed of the random stream; integer from -1 to 2^63-1; -1 seeds from the system random device and gives different phases on each call; default: -1</li>
 </ul>
 
 <b>Output:</b><br>
@@ -4143,7 +4183,7 @@ val = quadriga_lib.sos_rand( dist_decorr, pos, pos_b, dist_decorr_b, preset, see
 <li><b><code>pos_b</code></b> <i>(optional)</i> — Positions of the second device; omitted or empty = one device; <code>[n_pos, 1]</code>, <code>[n_pos, 2]</code> or <code>[n_pos, 3]</code> as for <code>pos</code>; the number of columns may differ from <code>pos</code></li>
 <li><b><code>dist_decorr_b</code></b> <i>(optional)</i> — Decorrelation distances of the second device; requires <code>pos_b</code>; must be >= 0; omitted or empty = same as <code>dist_decorr</code>; <code>[n_gen]</code></li>
 <li><b><code>preset</code></b> — Name of the preset, see <a href="#sos_preset">sos_preset</a>; string; default: 'Comb256'</li>
-<li><b><code>seed</code></b> — Seed of the phases; must be >= -1; -1 seeds from the system random device; default: -1</li>
+<li><b><code>seed</code></b> — Seed of the phases; integer from -1 to 2^63-1; -1 seeds from the system random device; default: -1</li>
 </ul>
 
 <b>Output:</b><br>
@@ -4188,7 +4228,7 @@ val = quadriga_lib.sos_randi( dist_decorr, pos, imax, pos_b, dist_decorr_b, pres
 <li><b><code>pos_b</code></b> <i>(optional)</i> — Positions of the second device; omitted or empty = one device; <code>[n_pos, 1]</code>, <code>[n_pos, 2]</code> or <code>[n_pos, 3]</code> as for <code>pos</code>; the number of columns may differ from <code>pos</code></li>
 <li><b><code>dist_decorr_b</code></b> <i>(optional)</i> — Decorrelation distances of the second device; requires <code>pos_b</code>; must be >= 0; omitted or empty = same as <code>dist_decorr</code>; <code>[n_gen]</code></li>
 <li><b><code>preset</code></b> — Name of the preset, see <a href="#sos_preset">sos_preset</a>; string; default: 'Comb256'</li>
-<li><b><code>seed</code></b> — Seed of the phases; must be >= -1; -1 seeds from the system random device; default: -1</li>
+<li><b><code>seed</code></b> — Seed of the phases; integer from -1 to 2^63-1; -1 seeds from the system random device; default: -1</li>
 </ul>
 
 <b>Output:</b><br>
@@ -4231,7 +4271,7 @@ val = quadriga_lib.sos_randn( dist_decorr, pos, pos_b, dist_decorr_b, preset, se
 <li><b><code>pos_b</code></b> <i>(optional)</i> — Positions of the second device; omitted or empty = one device; <code>[n_pos, 1]</code>, <code>[n_pos, 2]</code> or <code>[n_pos, 3]</code> as for <code>pos</code>; the number of columns may differ from <code>pos</code></li>
 <li><b><code>dist_decorr_b</code></b> <i>(optional)</i> — Decorrelation distances of the second device; requires <code>pos_b</code>; must be >= 0; omitted or empty = same as <code>dist_decorr</code>; <code>[n_gen]</code></li>
 <li><b><code>preset</code></b> — Name of the preset, see <a href="#sos_preset">sos_preset</a>; string; default: 'Comb256'</li>
-<li><b><code>seed</code></b> — Seed of the phases; must be >= -1; -1 seeds from the system random device; default: -1</li>
+<li><b><code>seed</code></b> — Seed of the phases; integer from -1 to 2^63-1; -1 seeds from the system random device; default: -1</li>
 </ul>
 
 <b>Output:</b><br>
