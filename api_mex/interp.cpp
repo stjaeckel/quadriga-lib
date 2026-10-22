@@ -17,7 +17,7 @@ Perform linear interpolation (1D or 2D) on single or multiple data sets
 - Interpolates given input data at specified output points.
 - Outside the range of the data sampling points, the nearest end value is returned (constant extrapolation);
   output sampling points that are NaN give NaN.
-- The data sampling points need not be sorted; repeated values are allowed.
+- The data sampling points need not be sorted; repeated values are allowed; they must be finite.
 - Supports single and multiple data sets.
 - Data types: `single` or `double`
 
@@ -33,9 +33,9 @@ dataI = quadriga_lib.interp( x, [], data, xI );         % 1D case
 - **`x`** — Data x-axis sampling points; Length: `[nx]`
 - **`y`** — Data y-axis sampling points; Length: `[ny]`
 - **`data`** — Input data array/matrix; `[ny, nx, ne]` or `[1, nx, ne]` for 1D case; 3rd dimension
-  enables interpolation for mutiple datasets simultaneously.
+  enables interpolation for multiple datasets simultaneously.
 - **`xI`** — Output x-axis sampling points; Length: `[nxI]`
-- **`yI`** — Output y-axis sampling points; Length: `[nyI]`
+- **`yI`** — Output y-axis sampling points; Length: `[nyI]`; required when `y` is not empty
 
 ## Output:
 - **`dataI`**  —  Interpolated data `[nyI, nxI, ne]` or `[1, nxI, ne]` for 1D case
@@ -50,6 +50,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     bool twoD = mxGetNumberOfElements(prhs[1]) != 0;
+    if (twoD && nrhs < 5)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'yI' is required when 'y' is given (2D case).");
 
     if (mxIsSingle(prhs[0]) && nlhs > 0)
     {
