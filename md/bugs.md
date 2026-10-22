@@ -34,7 +34,7 @@ How to read the items:
 ## Summary table
 
 Items: 123 (S1: 5, S2: 31, S3: 68, S4: 19); B-119 to B-123 were found during the fixes (WP-02, WP-04, WP-07).
-Status: open: 4, fixed: 109, partly fixed: 2, won't fix: 1, documented: 7 (after WP-16).
+Status: open: 0, fixed: 115, partly fixed: 0, won't fix: 1, documented: 7 (after WP-17a; final verification in WP-17b).
 
 | ID | Title | Area | Kind | Severity | Mark | Status |
 |---|---|---|---|---|---|---|
@@ -97,7 +97,7 @@ Status: open: 4, fixed: 109, partly fixed: 2, won't fix: 1, documented: 7 (after
 | [B-057](#b-057) | OBJ reader: CRLF `.mtl` files lose their materials; face indices unchecked when only `face_ind` is requested; no-output call skips validation | B channel, file I/O | 1 defect | S3 | [R] | fixed (WP-14) |
 | [B-058](#b-058) | `write_png`: constant, NaN or inverted-range data trigger a NaN-to-integer cast and all pixels get the last colour; an empty matrix writes an invalid PNG | B channel, file I/O | 1 defect | S3 | [R] | fixed (WP-14) |
 | [B-059](#b-059) | `channel::add_paths` accepts inconsistent counts and leaves an invalid object; `qrt_file_read` accepts any `normalize_M` | B channel, file I/O | 1 defect | S3 | [R] | fixed (WP-07) |
-| [B-060](#b-060) | Channel and file-I/O header comments contradict the code (index bases, `calc_effective_path_gain` "average", `normalize_M` column power) | B channel, file I/O | 2 doc | S3 | [R, C] | open |
+| [B-060](#b-060) | Channel and file-I/O header comments contradict the code (index bases, `calc_effective_path_gain` "average", `normalize_M` column power) | B channel, file I/O | 2 doc | S3 | [R, C] | fixed (WP-17) |
 | [B-061](#b-061) | `combine_irs_coord`: no shape check on `interact_coord_1/2`, heap over-read | C channel gen., tools | 1 defect | S3 | [R] | fixed (WP-13) |
 | [B-062](#b-062) | `baseband_freq_response`: `aligned_alloc` with sizes that are not a multiple of 32 (generic build) and unchecked NULL return | C channel gen., tools | 1 defect | S3 | [R] | fixed (WP-13) |
 | [B-063](#b-063) | Test defect: `test_qd_ieee_chan.cpp:318` reads past the delay cube (hidden in the full ASan suite run) | C channel gen., tools | 1 defect | S3 | [R] | fixed (WP-01) |
@@ -139,20 +139,20 @@ Status: open: 4, fixed: 109, partly fixed: 2, won't fix: 1, documented: 7 (after
 | [B-099](#b-099) | Python: documented kwargs `sub_cloud_index` and `map_to_itu_materials` raise `TypeError` | G Python layer | 2 doc | S3 | [R] | documented (WP-05) |
 | [B-100](#b-100) | Python: invalid input accepted silently (2-D positions, short `interact_coord`, 4-D arrayant without `center_freq`) | G Python layer | 1 defect | S3 | [R] | fixed (WP-05) |
 | [B-101](#b-101) | `arrayant::copy_element` ignores `read_only`; an empty destination gives an Armadillo-internal error | A arrayant | 1 defect | S4 | [R] | fixed (WP-09) |
-| [B-102](#b-102) | Arrayant documentation typos and misleading statements; latent int32 offsets and a vertex sentinel (grouped) | A arrayant | 2 doc | S4 | [C] | open |
+| [B-102](#b-102) | Arrayant documentation typos and misleading statements; latent int32 offsets and a vertex sentinel (grouped) | A arrayant | 2 doc | S4 | [C] | fixed (WP-17) |
 | [B-103](#b-103) | `quantize_delays` docs: `fix_taps` 1 and 2 give `[1, 1, n_taps]` delays only for shared input | B channel, file I/O | 2 doc | S4 | [R] | fixed (WP-03) |
-| [B-104](#b-104) | Channel and file-I/O documentation and message nits (grouped) | B channel, file I/O | 2 doc | S4 | [R, C] | partly fixed (WP-14) |
+| [B-104](#b-104) | Channel and file-I/O documentation and message nits (grouped) | B channel, file I/O | 2 doc | S4 | [R, C] | fixed (WP-17) |
 | [B-105](#b-105) | `memcpy` with a null pointer and size 0 (formal UB) in `get_channels_irs` and in the Python list adapter | C channel gen., tools | 1 defect | S4 | [R] | fixed (WP-01) |
-| [B-106](#b-106) | Docs and code of `path_to_tube`, `qd_path` and `calc_diffraction_gain` debug output disagree (grouped) | C channel gen., tools | 2 doc | S4 | [R, C] | open |
+| [B-106](#b-106) | Docs and code of `path_to_tube`, `qd_path` and `calc_diffraction_gain` debug output disagree (grouped) | C channel gen., tools | 2 doc | S4 | [R, C] | fixed (WP-17) |
 | [B-107](#b-107) | `interp`: a NaN query returns the first data value; clamped extrapolation is undocumented | D geometry, math | 2 doc | S4 | [R] | fixed (WP-13) |
-| [B-108](#b-108) | Geometry documentation and validation nits (index-map directions, 9-column check, precision claim, header typos; dead code; CPU check) | D geometry, math | 2 doc | S4 | [R, C] | partly fixed (WP-12) |
+| [B-108](#b-108) | Geometry documentation and validation nits (index-map directions, 9-column check, precision claim, header typos; dead code; CPU check) | D geometry, math | 2 doc | S4 | [R, C] | fixed (WP-17) |
 | [B-109](#b-109) | `sos_val` / `sos_remove_bias`: an output that partially overlaps an input is accepted and gives wrong values (docs promise an error) | E SOS | 2 doc | S4 | [R] | fixed (WP-16) |
 | [B-110](#b-110) | `sos_randn` / `sos_rand` / `sos_randi` report an unknown preset as "Input 'name' ...", an argument they do not have | E SOS | 2 doc | S4 | [R] | fixed (WP-16) |
 | [B-111](#b-111) | `md/SPEC_PYTHON_API.md` gives two contradicting rules for the headings of the `sos` entries | E SOS | 2 doc | S4 | [C] | fixed (WP-16) |
 | [B-112](#b-112) | MEX `qrt_file_read` returns `interact_type` as uint8; the doc says uint32 | F MEX layer | 2 doc | S4 | [R] | fixed (WP-01) |
 | [B-113](#b-113) | MEX `get_channels_*` with 0 paths and `add_fake_los_path` return a zero path with delay 0, where C++ throws | F MEX layer | 3 cross-API | S4 | [R] | fixed (WP-15) |
 | [B-114](#b-114) | MEX `arrayant_rotate_pattern`: struct arrays reject usage 3 and 4 (Python maps them); a call without output argument errors | F MEX layer | 3 cross-API | S4 | [R] | fixed (WP-15) |
-| [B-115](#b-115) | MEX documentation, error IDs and latent helper defects (grouped) | F MEX layer | 2 doc | S4 | [R, C] | open |
+| [B-115](#b-115) | MEX documentation, error IDs and latent helper defects (grouped) | F MEX layer | 2 doc | S4 | [R, C] | fixed (WP-17) |
 | [B-116](#b-116) | Python `hdf5_create_file` returns uint32 although the wrapper builds int64 (confirms item 1.3 of the Python fix plan) | G Python layer | 2 doc | S4 | [R] | fixed (WP-05) |
 | [B-117](#b-117) | Python output dtypes and shapes differ from the docs (`qdant_read`, `point_inside_mesh`, `generate_speaker`, `get_ieee_indoor`) | G Python layer | 2 doc | S4 | [R] | documented (WP-05) |
 | [B-118](#b-118) | Python single-frequency arrayant dict: a 1-element `center_freq` array gives a numpy DeprecationWarning, 2 elements an unclear error | G Python layer | 3 cross-API | S4 | [R] | fixed (WP-05) |
@@ -234,6 +234,8 @@ miscompilation by the LAF split-compare passes, not a library defect. The campai
 | after WP-15: generic, ASan + UBSan, gate | generic `1344942 / 1282`; ASan + UBSan all passed, only the excluded `ray_progress` reports; `[wave]` 163474 / 178 and `[acoustic]` 42741 / 59 in both builds (worker's runs, round 2; Octave MEX and MATLAB R2026a 66 of 67, pytest 817 passed) | - | - |
 | after WP-16: base | `All tests passed (1346786 assertions in 1285 test cases)` (manager) | 40 s (12 threads) | 0.7 / 2.0 |
 | after WP-16: generic, ASan + UBSan | generic `1345004 / 1284`; ASan + UBSan all passed, only the excluded `ray_progress` reports (worker's runs; Octave MEX 66 of 67, pytest 817 passed, 1 skipped; SOS hashes of valid calls identical old vs new at 1 and 12 threads, 90 AVX2 / 77 generic) | - | - |
+| after WP-17a: base | `All tests passed (1348756 assertions in 1300 test cases)` (manager) | 40 s (12 threads) | 0.9 / 1.4 |
+| after WP-17a: generic, ASan + UBSan, gate | generic `1346833 / 1299`; ASan + UBSan all passed, only the excluded `ray_progress` reports; `[wave]` 163474 / 178 and `[acoustic]` 42741 / 59 in both builds (worker's runs; Octave MEX 67 of 68, pytest 817 passed) | - | - |
 
 Run commands: `flock /tmp/quadriga-fixes-suite.lock build_linux/test_bin` (output
 `build_linux/scratch/hunt/base_test.txt`); the sanitizer runs with
@@ -5507,7 +5509,7 @@ Output of the phase-2 re-run (`bash run.sh`):
 
 ## B-060: Channel and file-I/O header comments contradict the code (index bases, `calc_effective_path_gain` "average", `normalize_M` column power)
 
-- Status: open
+- Status: fixed (WP-17): the header comments follow the MD blocks; calc_effective_path_gain "sum" (decision (a)); normalize_M = 1 normalises the maximum column power
 - Severity: S3, because these comments would lead a user to a wrong call or a wrong interpretation (index bases off by one, a sum read as an average).
 - Kind: doc
 - Mark: [R] for the two measured items, [C] for the index-base items
@@ -8277,7 +8279,7 @@ copy_element with empty destination: 'Mat::max(): object has no elements'
 
 ## B-102: Arrayant documentation typos and misleading statements; latent int32 offsets and a vertex sentinel (grouped)
 
-- Status: open
+- Status: fixed (WP-17): points 1-5 corrected; 6: the AVX2 interpolation falls back to the generic kernel above INT32_MAX pattern samples; 7: OBJ export writes each vertex once
 - Severity: S4, because these are typos, misleading comments or code paths that are not reachable in practice.
 - Kind: doc / dead code
 - Mark: [C]
@@ -8401,7 +8403,7 @@ per-antenna input, fix_taps=2: delay_quant size 2x2x6
 
 ## B-104: Channel and file-I/O documentation and message nits (grouped)
 
-- Status: partly fixed (WP-14): point 5 (closing quote of the write_png message) fixed; the other points remain (WP-17)
+- Status: fixed (WP-14, WP-17): point 5 in WP-14; the others in WP-17 (6: PLY paths relative to the XML; 8: qrt_file_init validates before opening the file, also a first cir_offset other than 0; 9: std::type_index)
 - Severity: S4, because these are cosmetic or minor documentation mismatches.
 - Kind: doc
 - Mark: [R] for items 2 and 6 (shown in the outputs of B-057 line (f) and B-056), [C] for the rest
@@ -8501,7 +8503,7 @@ calc_delay_spread([empty]) -> ValueError Delay and power vectors must not be emp
 
 ## B-106: Docs and code of `path_to_tube`, `qd_path` and `calc_diffraction_gain` debug output disagree (grouped)
 
-- Status: open
+- Status: fixed (WP-17): 1: path_to_tube splits above 160 deg (the code compares against cos 20 deg; the earlier comment said cosd(10)); 2: qd_path layout; 3: the debug print indexed the R set with the G index (heap and stack over-read under ASan), now fixed
 - Severity: S4, because these are stale or misleading comments and a debug-only code path.
 - Kind: doc
 - Mark: [R] for items 1 and 2, [C] for item 3
@@ -8588,6 +8590,8 @@ after extend with types 130 and 5: nREF = 0, nTRA = 0
 sizeof(path) = 56 (doc: 64-byte header); interaction codes = 2
 ```
 
+Corrected in WP-17: the split angle is a deviation above 160 deg, not 170 deg (the code compares against cos 20 deg); the 10 deg came from the old comment.
+
 **Proposed fix.** Correct the comments (items 1, 2); index with the R index in the debug print (item 3).
 
 **Test for the fix session.** None needed for 1-2; for 3 a run with `verbose = 2` and one position does not throw.
@@ -8647,7 +8651,7 @@ xo = nan  -> 0
 
 ## B-108: Geometry documentation and validation nits (index-map directions, 9-column check, precision claim, header typos; dead code; CPU check)
 
-- Status: partly fixed (WP-12): point 3 (precision claim in the header) fixed; points 1, 2, 4, 5 and 6 remain (WP-17)
+- Status: fixed (WP-12, WP-17): point 3 in WP-12; the others in WP-17 (2: meshes with >= 9 columns everywhere, dest must match orig; 5: dead code removed; 6: the CPU check tests AVX2, FMA, OSXSAVE and the YMM state)
 - Severity: S4, because these are misleading wording, a confusing error message, dead code or a robustness gap on unusual CPUs.
 - Kind: doc / dead code / robustness
 - Mark: [R] for items 1 and 2, [C] for the rest
@@ -9049,7 +9053,7 @@ Python multi usage=3: OK, e_theta_re shape (19, 37, 2, 2)
 
 ## B-115: MEX documentation, error IDs and latent helper defects (grouped)
 
-- Status: open
+- Status: fixed (WP-17): all points; the string-literal copy flags had been fixed in WP-06 (fd4cfe0), only the i_freq message was left
 - Severity: S4, because these are documentation errors, a non-standard error ID, typos and latent defects without a current caller.
 - Kind: doc / dead code
 - Mark: [R] for items a-e (in the repro), [C] for the rest
