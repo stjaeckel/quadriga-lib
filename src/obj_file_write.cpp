@@ -327,7 +327,8 @@ Write a triangulated Wavefront .obj (and .mtl) file
   is omitted); duplicates with differing `bsdf` rows are disambiguated as `name.001`, `name.002`, ...
 - If `csv_names` is given, the EM/acoustic material table is written to a companion `.csv` (named after the `.obj`):
   columns follow a fixed canonical order, then any extra `csv_prop` columns (alphabetical); `csv_write_defaults`
-  additionally emits canonical columns absent from `csv_prop`, filled with their defaults (`a`, `e`, `fRef` = 1, else 0)
+  additionally emits canonical columns absent from `csv_prop`, filled with their defaults (`a`, `e`, `fRef` = 1,
+  `side` = 3.29, else 0)
 
 ## Declaration:
 ```
@@ -854,7 +855,7 @@ void quadriga_lib::obj_file_write(const std::string &fn,
     if (want_csv)
     {
         static const std::vector<std::string> kOrder = {
-            "a", "b", "c", "d", "e", "f", "g", "h",
+            "a", "b", "c", "d", "e", "f", "g", "h", "thk",
             "att", "attB", "alpha", "alphaB", "fRef", "m",
             "resF", "resQ", "resS", "coiF", "coiQ", "tf", "tfB", "tfP", "tfF", "tfQ", "side"};
 
