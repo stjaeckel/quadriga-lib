@@ -495,7 +495,7 @@ Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector
 - AVX2 kernel computes the angles in single precision (double outputs are cast back from float); for `dtype=double`,
   `len` and z / len are computed in double precision, so very small or very large vectors keep their direction;
   GENERIC kernel preserves full `dtype` precision
-- Azimuth in [-pi, pi] (atan2 special values as in [[fast_atan2]]); NaN input gives NaN in `az` and `len`
+- Azimuth in [-pi, pi] (atan2 special values as in [[fast_atan2]]); NaN input gives NaN in `az`, `el` and `len`
 
 ## Declaration:
 ```
