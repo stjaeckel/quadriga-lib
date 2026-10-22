@@ -4,6 +4,7 @@
 
 #include "quadriga_sos.hpp"
 #include "quadriga_lib.hpp"
+#include "quadriga_lib_helper_functions.hpp"
 
 #include <cstdint>
 #include <cstring>
@@ -29,6 +30,7 @@ Spatially correlated random values on a regular grid
 - Cubes of the correct size keep their memory. If they lie one after the other in memory (one block of
   `n_gen` cubes, as the MATLAB and Python interfaces allocate it), the values are computed in place;
   otherwise they are computed in a matrix `[ny·nx·nz, n_gen]` and copied
+- A cube that shares memory with `freq` or `phase` is an error, before anything is written
 
 ## Declaration:
 ```
@@ -110,6 +112,12 @@ void quadriga_lib::sos_map(const arma::Mat<dtype> &freq,
                 if (n_dim_pos > 2)
                     pos.at(i, 2) = z->at(iz);
             }
+
+    // The cubes of the map are outputs: none of them can share memory with 'freq' or 'phase', which are read
+    // while the map is written (checked before anything is resized or written)
+    for (arma::uword g = 0; g < n_gen && g < (arma::uword)map.size(); ++g)
+        if (qd_sos_share_memory(map[g], freq) || qd_sos_share_memory(map[g], phase))
+            throw std::invalid_argument("Output 'map' cannot share memory with 'freq' or 'phase'.");
 
     if (map.size() != n_gen)
         map.resize(n_gen);
