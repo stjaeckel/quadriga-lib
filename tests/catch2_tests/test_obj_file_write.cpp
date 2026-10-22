@@ -562,9 +562,40 @@ TEST_CASE("Test OBJ File Write - CSV columns, defaults and validation")
         std::getline(f, row);
         f.close();
 
-        CHECK(header == "name,a,b,c,d,e,f,g,h,att,attB,alpha,alphaB,fRef,m,resF,resQ,resS,coiF,coiQ,tf,tfB,tfP,tfF,tfQ,side,zzz");
+        CHECK(header == "name,a,b,c,d,e,f,g,h,thk,att,attB,alpha,alphaB,fRef,m,resF,resQ,resS,coiF,coiQ,tf,tfB,tfP,tfF,tfQ,side,zzz");
         // a=1, e=1, fRef=1, side=3.29 by default; c=0.05 and tf=2 from csv_prop; rest 0; zzz=7 last
-        CHECK(row == "slab,1,0,0.05,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,3.29,7");
+        CHECK(row == "slab,1,0,0.05,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,3.29,7");
+
+        std::remove("cube.obj");
+        std::remove("cube.mtl");
+        std::remove("cube.csv");
+    }
+
+    SECTION("thk is written in the canonical position (after h, before att), default 0")
+    {
+        std::unordered_map<std::string, std::vector<double>> prop_thk;
+        prop_thk["att"] = {3.0};
+        prop_thk["thk"] = {0.2};
+        prop_thk["h"] = {0.5};
+        quadriga_lib::obj_file_write<double>("cube.obj", &mesh, &obj_ind, &mtl_ind, &obj_names, &mtl_names,
+                                             &vlo, &fio, nullptr, nullptr, nullptr, 0.001,
+                                             nullptr, &csv_names, &prop_thk, /*csv_write_defaults=*/false);
+        std::ifstream f("cube.csv");
+        std::string header, row;
+        std::getline(f, header);
+        std::getline(f, row);
+        f.close();
+        CHECK(header == "name,h,thk,att");
+        CHECK(row == "slab,0.5,0.2,3");
+
+        // Round trip: the reader returns thk as a column
+        arma::uvec ci;
+        std::vector<std::string> cn;
+        std::unordered_map<std::string, std::vector<double>> cp;
+        quadriga_lib::obj_file_read<double>("cube.obj", nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                                            "cube.csv", &ci, &cn, &cp);
+        REQUIRE(cp.count("thk") == 1);
+        CHECK(cp["thk"][0] == 0.2);
 
         std::remove("cube.obj");
         std::remove("cube.mtl");

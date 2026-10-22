@@ -529,6 +529,57 @@ TEST_CASE("Test OBJ File Read - CRLF line endings in the OBJ / MTL / CSV files")
     std::remove("crlf.csv");
 }
 
+TEST_CASE("Test OBJ File Read - Indented .mtl statements")
+{
+    write_text_file("indent.obj", "mtllib indent.mtl\no a\nv 0 0 0\nv 1 0 0\nv 0 1 0\nusemtl red\nf 1 2 3\n"
+                                  "usemtl blue\nf 1 3 2\n");
+    write_text_file("indent.mtl", "# indented statements\nnewmtl red\n    Kd 1 0 0\n\td 0.5\n  newmtl blue\n  Kd 0 0 1\n");
+
+    arma::mat bsdf;
+    std::vector<std::string> mn;
+    quadriga_lib::obj_file_read<double>("indent.obj", nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &mn, &bsdf);
+    CHECK(mn == std::vector<std::string>{"red", "blue"});
+    REQUIRE(bsdf.n_rows == 2);
+    CHECK(arma::approx_equal(bsdf.row(0).cols(0, 3), arma::rowvec({1.0, 0.0, 0.0, 0.5}), "absdiff", 1e-12));
+    CHECK(arma::approx_equal(bsdf.row(1).cols(0, 3), arma::rowvec({0.0, 0.0, 1.0, 1.0}), "absdiff", 1e-12));
+
+    std::remove("indent.obj");
+    std::remove("indent.mtl");
+}
+
+TEST_CASE("Test OBJ File Read - CSV cells must be one finite number")
+{
+    std::vector<std::string> cn;
+    std::unordered_map<std::string, std::vector<double>> prop;
+    for (const std::string cell : {"1.5x", "nan", "inf", "-inf", "NaN", "1.5 2", "0x"})
+    {
+        write_text_file("cells.csv", "name,a\nred," + cell + "\n");
+        std::string msg;
+        try
+        {
+            quadriga_lib::obj_file_read<double>("", nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                                                "cells.csv", nullptr, &cn, &prop);
+        }
+        catch (const std::invalid_argument &e)
+        {
+            msg = e.what();
+        }
+        INFO("cell '" << cell << "'");
+        CHECK(msg.find("column 'a' is not numeric") != std::string::npos);
+    }
+    for (const std::pair<std::string, double> ok : {std::pair<std::string, double>{" 2.5 ", 2.5}, {"1e3", 1000.0},
+                                                    {"-0.5", -0.5}, {"", 0.0}})
+    {
+        write_text_file("cells.csv", "name,a\nred," + ok.first + "\n");
+        quadriga_lib::obj_file_read<double>("", nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                                            "cells.csv", nullptr, &cn, &prop);
+        INFO("cell '" << ok.first << "'");
+        REQUIRE(prop.count("a") == 1);
+        CHECK(prop["a"] == std::vector<double>{ok.second});
+    }
+    std::remove("cells.csv");
+}
+
 TEST_CASE("Test OBJ File Read - Relative (negative) face indices")
 {
     // -1 is the last vertex defined before the face line; mixed with absolute indices and v/vt/vn references

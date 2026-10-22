@@ -11,6 +11,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <algorithm>
+#include <cmath>
 #include <stdexcept>
 #include <filesystem>
 #include <cstdio>
@@ -76,6 +77,13 @@ static inline void strip_cr(std::string &line)
         line.pop_back();
 }
 
+// Remove leading spaces and tabs (indented .mtl statements)
+static inline void strip_leading_ws(std::string &line)
+{
+    size_t b = line.find_first_not_of(" \t");
+    line.erase(0, b == std::string::npos ? line.size() : b);
+}
+
 // Parse the vertex references of a face line "f r1 r2 r3 ...". A reference is "v", "v/vt", "v//vn" or "v/vt/vn";
 // v is a 1-based index, negative values count back from the last vertex defined before the line (OBJ relative
 // indices); the texture / normal parts are skipped. Reads at most 4 references and stops at the first token that
@@ -131,7 +139,8 @@ static inline std::string base_material_name(const std::string &s)
 
 // Parse a material table from any input stream. The reader is schema-blind: it requires only a
 // "name" column (the join key for .obj materials); every other column is treated as numeric.
-// Empty numeric cells parse as 0.0. Non-numeric cells in a numeric column are an error.
+// Empty numeric cells parse as 0.0. A non-empty cell must be one finite number in full ("1.5x", "nan" and "inf" are
+// errors).
 static MtlTable parse_mtl_table(std::istream &in, const std::string &src)
 {
     MtlTable T;
@@ -201,16 +210,19 @@ static MtlTable parse_mtl_table(std::istream &in, const std::string &src)
             double d = 0.0; // empty cell -> 0.0
             if (!v.empty())
             {
+                size_t n_read = 0;
                 try
                 {
-                    d = std::stod(v);
+                    d = std::stod(v, &n_read);
                 }
                 catch (const std::exception &)
                 {
+                    n_read = 0;
+                }
+                if (n_read != v.size() || !std::isfinite(d)) // the whole cell must be one finite number
                     throw std::invalid_argument("Error reading materials: '" + src + "' line " +
                                                 std::to_string(line_num) + " column '" + T.columns[c] +
                                                 "' is not numeric ('" + v + "').");
-                }
             }
             T.values[c].push_back(d);
         }
@@ -290,16 +302,20 @@ static void read_mtl_bsdf(const std::filesystem::path &obj_file, const std::stri
 
         // Find "newmtl <name>" (the name compared without surrounding whitespace, like the "usemtl" names)
         while (std::getline(fileR, line))
+        {
+            strip_leading_ws(line);
             if (line.rfind("newmtl ", 0) == 0 && trim_ws(line.substr(7)) == names[i_mtl])
             {
                 any_found = true;
                 break;
             }
+        }
 
-        // Scan until the next "newmtl " or EOF
+        // Scan until the next "newmtl " or EOF (statements may be indented)
         while (std::getline(fileR, line))
         {
             strip_cr(line);
+            strip_leading_ws(line);
             if (line.rfind("newmtl ", 0) == 0)
                 break;
 
