@@ -1,7 +1,7 @@
 ---
 title: "C++ API Documentation for Quadriga-Lib v0.12.2"
 author: "Stephan Jaeckel"
-date: "21.10.2026"
+date: "22.10.2026"
 lang: en-US
 ---
 
@@ -77,8 +77,8 @@ lang: en-US
 | [hdf5_write](#hdf5_write) | Channel functions | 1754 |
 | [hdf5_write_dset](#hdf5_write_dset) | Channel functions | 1798 |
 | [path](#path) | Channel functions | 1840 |
-| [qrt_file_append](#qrt_file_append) | Channel functions | 1961 |
-| [qrt_file_init](#qrt_file_init) | Channel functions | 1997 |
+| [qrt_file_append](#qrt_file_append) | Channel functions | 1960 |
+| [qrt_file_init](#qrt_file_init) | Channel functions | 1996 |
 | [qrt_file_parse](#qrt_file_parse) | Channel functions | 2036 |
 | [qrt_file_read](#qrt_file_read) | Channel functions | 2085 |
 | [qrt_file_read_raw](#qrt_file_read_raw) | Channel functions | 2184 |
@@ -89,73 +89,73 @@ lang: en-US
 | [conf_file_write](#conf_file_write) | Channel generation functions | 2468 |
 | [get_channels_ieee_indoor](#get_channels_ieee_indoor) | Channel generation functions | 2554 |
 | [get_channels_irs](#get_channels_irs) | Channel generation functions | 2641 |
-| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 2744 |
-| [get_channels_planar](#get_channels_planar) | Channel generation functions | 2834 |
-| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 2914 |
-| [scenpar_validate](#scenpar_validate) | Channel generation functions | 3002 |
-| [acdf](#acdf) | Channel statistics | 3067 |
-| [calc_angular_spreads_sphere](#calc_angular_spreads_sphere) | Channel statistics | 3105 |
-| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 3149 |
-| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 3215 |
-| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 3251 |
-| [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | 3286 |
-| [fast_acos](#fast_acos) | Math functions | 3319 |
-| [fast_asin](#fast_asin) | Math functions | 3338 |
-| [fast_atan2](#fast_atan2) | Math functions | 3357 |
-| [fast_cart2geo](#fast_cart2geo) | Math functions | 3379 |
-| [fast_geo2cart](#fast_geo2cart) | Math functions | 3415 |
-| [fast_sincos](#fast_sincos) | Math functions | 3461 |
-| [fast_slerp](#fast_slerp) | Math functions | 3485 |
-| [interp_2D](#interp_2d) | Math functions | 3522 |
-| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 3589 |
-| [colormap](#colormap) | Site-specific simulation tools | 3676 |
-| [combine_irs_coord](#combine_irs_coord) | Site-specific simulation tools | 3695 |
-| [coord2path](#coord2path) | Site-specific simulation tools | 3740 |
-| [cube](#cube) | Site-specific simulation tools | 3778 |
-| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 3813 |
-| [icosphere](#icosphere) | Site-specific simulation tools | 3857 |
-| [interface_gain](#interface_gain) | Site-specific simulation tools | 3891 |
-| [medium_gain](#medium_gain) | Site-specific simulation tools | 3924 |
-| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 3965 |
-| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 4007 |
-| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 4075 |
-| [obj_overlap_test](#obj_overlap_test) | Site-specific simulation tools | 4142 |
-| [path_to_tube](#path_to_tube) | Site-specific simulation tools | 4174 |
-| [plane](#plane) | Site-specific simulation tools | 4202 |
-| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 4240 |
-| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 4269 |
-| [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 4309 |
-| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 4345 |
-| [ray_commit](#ray_commit) | Site-specific simulation tools | 4381 |
-| [ray_init](#ray_init) | Site-specific simulation tools | 4486 |
-| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 4579 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 4724 |
-| [ray_progress](#ray_progress) | Site-specific simulation tools | 4773 |
-| [ray_state_update](#ray_state_update) | Site-specific simulation tools | 4918 |
-| [ray_subdivide_flag](#ray_subdivide_flag) | Site-specific simulation tools | 5121 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 5182 |
-| [refractive_index](#refractive_index) | Site-specific simulation tools | 5236 |
-| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 5268 |
-| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 5326 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 5358 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 5386 |
-| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 5427 |
-| [write_png](#write_png) | Site-specific simulation tools | 5462 |
-| [xpr_update](#xpr_update) | Site-specific simulation tools | 5488 |
-| [sos_acf_2d](#sos_acf_2d) | Sum-of-sinusoids random number generator | 5735 |
-| [sos_acf_approx](#sos_acf_approx) | Sum-of-sinusoids random number generator | 5770 |
-| [sos_acf_estimate](#sos_acf_estimate) | Sum-of-sinusoids random number generator | 5810 |
-| [sos_acfi](#sos_acfi) | Sum-of-sinusoids random number generator | 5870 |
-| [sos_calc_mse](#sos_calc_mse) | Sum-of-sinusoids random number generator | 5900 |
-| [sos_generate](#sos_generate) | Sum-of-sinusoids random number generator | 5961 |
-| [sos_init_phases](#sos_init_phases) | Sum-of-sinusoids random number generator | 6041 |
-| [sos_map](#sos_map) | Sum-of-sinusoids random number generator | 6080 |
-| [sos_preset](#sos_preset) | Sum-of-sinusoids random number generator | 6127 |
-| [sos_rand](#sos_rand) | Sum-of-sinusoids random number generator | 6175 |
-| [sos_randi](#sos_randi) | Sum-of-sinusoids random number generator | 6236 |
-| [sos_randn](#sos_randn) | Sum-of-sinusoids random number generator | 6300 |
-| [sos_remove_bias](#sos_remove_bias) | Sum-of-sinusoids random number generator | 6360 |
-| [sos_val](#sos_val) | Sum-of-sinusoids random number generator | 6443 |
+| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 2745 |
+| [get_channels_planar](#get_channels_planar) | Channel generation functions | 2837 |
+| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 2919 |
+| [scenpar_validate](#scenpar_validate) | Channel generation functions | 3009 |
+| [acdf](#acdf) | Channel statistics | 3074 |
+| [calc_angular_spreads_sphere](#calc_angular_spreads_sphere) | Channel statistics | 3112 |
+| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 3158 |
+| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 3224 |
+| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 3260 |
+| [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | 3295 |
+| [fast_acos](#fast_acos) | Math functions | 3328 |
+| [fast_asin](#fast_asin) | Math functions | 3347 |
+| [fast_atan2](#fast_atan2) | Math functions | 3366 |
+| [fast_cart2geo](#fast_cart2geo) | Math functions | 3388 |
+| [fast_geo2cart](#fast_geo2cart) | Math functions | 3424 |
+| [fast_sincos](#fast_sincos) | Math functions | 3470 |
+| [fast_slerp](#fast_slerp) | Math functions | 3494 |
+| [interp_2D](#interp_2d) | Math functions | 3531 |
+| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 3599 |
+| [colormap](#colormap) | Site-specific simulation tools | 3688 |
+| [combine_irs_coord](#combine_irs_coord) | Site-specific simulation tools | 3707 |
+| [coord2path](#coord2path) | Site-specific simulation tools | 3752 |
+| [cube](#cube) | Site-specific simulation tools | 3790 |
+| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 3825 |
+| [icosphere](#icosphere) | Site-specific simulation tools | 3870 |
+| [interface_gain](#interface_gain) | Site-specific simulation tools | 3904 |
+| [medium_gain](#medium_gain) | Site-specific simulation tools | 3937 |
+| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 3978 |
+| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 4021 |
+| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 4096 |
+| [obj_overlap_test](#obj_overlap_test) | Site-specific simulation tools | 4168 |
+| [path_to_tube](#path_to_tube) | Site-specific simulation tools | 4200 |
+| [plane](#plane) | Site-specific simulation tools | 4229 |
+| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 4267 |
+| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 4296 |
+| [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 4336 |
+| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 4372 |
+| [ray_commit](#ray_commit) | Site-specific simulation tools | 4408 |
+| [ray_init](#ray_init) | Site-specific simulation tools | 4513 |
+| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 4606 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 4751 |
+| [ray_progress](#ray_progress) | Site-specific simulation tools | 4800 |
+| [ray_state_update](#ray_state_update) | Site-specific simulation tools | 4945 |
+| [ray_subdivide_flag](#ray_subdivide_flag) | Site-specific simulation tools | 5148 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 5209 |
+| [refractive_index](#refractive_index) | Site-specific simulation tools | 5263 |
+| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 5295 |
+| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 5353 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 5385 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 5413 |
+| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 5454 |
+| [write_png](#write_png) | Site-specific simulation tools | 5489 |
+| [xpr_update](#xpr_update) | Site-specific simulation tools | 5520 |
+| [sos_acf_2d](#sos_acf_2d) | Sum-of-sinusoids random number generator | 5767 |
+| [sos_acf_approx](#sos_acf_approx) | Sum-of-sinusoids random number generator | 5802 |
+| [sos_acf_estimate](#sos_acf_estimate) | Sum-of-sinusoids random number generator | 5843 |
+| [sos_acfi](#sos_acfi) | Sum-of-sinusoids random number generator | 5903 |
+| [sos_calc_mse](#sos_calc_mse) | Sum-of-sinusoids random number generator | 5933 |
+| [sos_generate](#sos_generate) | Sum-of-sinusoids random number generator | 5994 |
+| [sos_init_phases](#sos_init_phases) | Sum-of-sinusoids random number generator | 6074 |
+| [sos_map](#sos_map) | Sum-of-sinusoids random number generator | 6113 |
+| [sos_preset](#sos_preset) | Sum-of-sinusoids random number generator | 6161 |
+| [sos_rand](#sos_rand) | Sum-of-sinusoids random number generator | 6211 |
+| [sos_randi](#sos_randi) | Sum-of-sinusoids random number generator | 6272 |
+| [sos_randn](#sos_randn) | Sum-of-sinusoids random number generator | 6336 |
+| [sos_remove_bias](#sos_remove_bias) | Sum-of-sinusoids random number generator | 6396 |
+| [sos_val](#sos_val) | Sum-of-sinusoids random number generator | 6482 |
 
 ---
 
@@ -256,7 +256,7 @@ void calc_beamwidth_deg(arma::uword i_element,
     dtype threshold_dB = 3.0,
     dtype *beamwidth_az = nullptr,
     dtype *beamwidth_el = nullptr,
-    dtype *z_point_ang = nullptr,
+    dtype *az_point_ang = nullptr,
     dtype *el_point_ang = nullptr) const;
 ```
 
@@ -968,7 +968,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_multibeam(
 - **`N`** *(optional)* — Number of horizontal (column) elements
 - **`az`** *(optional)* — Azimuth beam angles in degrees; `[n_beams]`
 - **`el`** *(optional)* — Elevation beam angles in degrees; `[n_beams]`
-- **`weight`** *(optional)* — Per-beam scaling factors (normalized to sum = 1); `[n_beams]`
+- **`weight`** *(optional)* — Per-beam scaling factors (not normalized); `[n_beams]`
 - **`center_freq`** *(optional)* — Center frequency
 - **`pol`** *(optional)* — Polarization mode:
    | `pol` | Description           | Elements |
@@ -977,8 +977,8 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_multibeam(
    | 2     | H/V polarization      | 2NM      |
    | 3     | ±45° polarization     | 2NM      |
 - **`spacing`** *(optional)* — Inter-element spacing in wavelengths
-- **`az_3dB`** *(optional)* — Per-element azimuth 3dB beamwidth in degrees
-- **`el_3dB`** *(optional)* — Per-element elevation 3dB beamwidth in degrees
+- **`az_3dB`** *(optional)* — Per-element azimuth 3dB beamwidth in degrees; values <= 0 select the default 120
+- **`el_3dB`** *(optional)* — Per-element elevation 3dB beamwidth in degrees; values <= 0 select the default 120
 - **`rear_gain_lin`** *(optional)* — Per-element front-to-back gain ratio (linear)
 - **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees
 - **`separate_beams`** *(optional)* — If `true`, generate one independent beam per angle pair
@@ -1841,7 +1841,7 @@ void quadriga_lib::hdf5_write_dset(
 Class for storing and managing a single propagation path with a compact fixed-size header
 
 - Represents one ray from origin to destination through a sequence of `nSEG` interaction points
-- A 64-byte header holds metadata, the first 6 interaction type codes, and the frequency-0
+- A 56-byte header holds metadata, the first 2 interaction type codes, and the frequency-0
   transfer coefficients; a variable-length heap buffer holds coordinates, the remaining
   frequency coefficients, and the overflow interaction codes
 - Two layout modes selected at initialization: EM carries a full 2x2 Jones matrix per frequency;
@@ -1852,7 +1852,6 @@ Class for storing and managing a single propagation path with a compact fixed-si
 | Attribute            | Size   | Description                                                       |
 | -------------------- | ------ | ----------------------------------------------------------------- |
 | `unsigned iC`        | scalar | Channel ID: the channel to which the path belongs                 |
-| `unsigned iR`        | scalar | Ray index: relative index in the launch configuration             |
 | `uint8_t nREF`       | scalar | Number of reflections (interaction type codes 128-255)            |
 | `uint8_t nTRA`       | scalar | Number of transmissions / refractions (type codes 1-127)          |
 | `uint8_t nSUB`       | scalar | Number of subdivisions                                            |
@@ -1864,14 +1863,14 @@ Class for storing and managing a single propagation path with a compact fixed-si
 | ------------- | ----------------- | ------------------------------------------------------- |
 | Coordinates   | `3 * nSEG`        | Interaction points `[x, y, z]` per segment              |
 | Jones         | `8 * (nFRQ - 1)`  | Transfer matrices for frequencies 1..nFRQ-1, col-major  |
-| Interactions  | `(nSEG - 3) / 4`  | Overflow type codes past the first 6, packed 4 per float, present for `nSEG >= 7` |
+| Interactions  | `(nSEG + 1) / 4`  | Overflow type codes past the first 2, packed 4 per float, present for `nSEG > 2` |
 
 ### Data buffer layout (SCALAR mode):
 | Block         | Size (floats)     | Description                                             |
 | ------------- | ----------------- | ------------------------------------------------------- |
 | Coordinates   | `3 * nSEG`        | Interaction points `[x, y, z]` per segment              |
 | Coeff         | `2 * (nFRQ - 4)`  | Pressure coefficients for frequencies 4..nFRQ-1         |
-| Interactions  | `(nSEG - 3) / 4`  | Overflow type codes past the first 6, packed 4 per float, present for `nSEG >= 7` |
+| Interactions  | `(nSEG + 1) / 4`  | Overflow type codes past the first 2, packed 4 per float, present for `nSEG > 2` |
 
 ### Simple member functions:
 | Method            | Description                                                                     |
@@ -2019,12 +2018,13 @@ void quadriga_lib::qrt_file_init(
 ```
 
 ### Inputs:
-- **`fn`** — Path to the QRT file to create (truncated if it exists)
+- **`fn`** — Path to the QRT file to create (truncated if it exists; all inputs are checked before the file is
+  opened, so an invalid input throws and leaves an existing file unchanged)
 - **`freq`** — Frequencies in GHz (EM) or Hz (scalar); `[n_freq]`, 1 to 127 entries
 - **`cir_pos`** — CIR positions in Cartesian coordinates; `[no_cir, 3]`
 - **`cir_orientation`** — CIR orientations as Euler angles (bank, tilt, head); `[no_cir, 3]` or empty for none
-- **`dest_names`** — Receiver (MT) names; `[no_dest]`
-- **`cir_offset`** — CIR offset for each receiver, 0-based; `[no_dest]`, must equal `dest_names` in length
+- **`dest_names`** — Receiver (MT) names, at most 255 characters each; `[no_dest]`
+- **`cir_offset`** — CIR offset for each receiver, 0-based, the first entry 0; `[no_dest]`, must equal `dest_names` in length
 - **`no_orig`** — Number of origin (TX) slots to reserve; at least 1
 - **`scalar_mode`** — `true` writes a v6 scalar-layout file, `false` a v5 EM file
 
@@ -2187,7 +2187,7 @@ Read raw ray-tracing path data from a QRT file into path objects
 - Reassembles the stored path data for a single origin (TX) into a vector of [path](#path) objects — the inverse of [qrt_file_append](#qrt_file_append).
 - Unlike [qrt_file_read](#qrt_file_read), which returns processed CIR data (channel matrices, angles, path loss), this returns the raw per-path storage:
   coordinates, polarization coefficients, and interaction type codes.
-- Each returned path has `iC` set to its CIR index and `iR` to a running index within the origin. Counters not stored in the file
+- Each returned path has `iC` set to its CIR index. Counters not stored in the file
   (`nREF`, `nTRA`, `nSUB`, `nSCT`) and `length` are left at their defaults.
 - Only v05/v06 files can be read as raw paths; v4 legacy files are rejected.
 - An origin slot that was reserved by [qrt_file_init](#qrt_file_init) but never written by [qrt_file_append](#qrt_file_append) returns an empty vector.
@@ -2604,14 +2604,14 @@ std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_ieee_indoo
 - **`ap_array`** — Access point array antenna; `n_tx` = number of ports after element coupling, see [arrayant](#arrayant)
 - **`sta_array`** — Mobile station array antenna; `n_rx` = number of ports after element coupling, see [arrayant](#arrayant)
 - **`ChannelType`** — Model type string; one of `"A"`, `"B"`, `"C"`, `"D"`, `"E"`, `"F"`
-- **`CarrierFreq_Hz`** *(optional)* — Carrier frequency
+- **`CarrierFreq_Hz`** *(optional)* — Carrier frequency (finite)
 - **`tap_spacing_s`** *(optional)* — Tap spacing in seconds; must equal `10 ns / 2^k`
 - **`n_users`** *(optional)* — Number of users (TGac/TGah/TGax only); output vector length equals `n_users`
 - **`observation_time`** *(optional)* — Channel observation time in seconds; must be finite
 - **`update_rate`** *(optional)* — Channel update interval in seconds (finite, > 0); relevant only when `observation_time > 0`
-- **`speed_station_kmh`** *(optional)* — Station speed in km/h; movement direction is `AoA_offset`; relevant only when `observation_time > 0`
-- **`speed_env_kmh`** *(optional)* — Environment speed in km/h; use `0.089` for TGac; relevant only when `observation_time > 0`
-- **`Dist_m`** *(optional)* — TX-to-RX distance(s); `[n_users]` or `[1]`
+- **`speed_station_kmh`** *(optional)* — Station speed in km/h (finite); movement direction is `AoA_offset`; relevant only when `observation_time > 0`
+- **`speed_env_kmh`** *(optional)* — Environment speed in km/h (finite); use `0.089` for TGac; relevant only when `observation_time > 0`
+- **`Dist_m`** *(optional)* — TX-to-RX distance(s) (finite); `[n_users]` or `[1]`
 - **`n_floors`** *(optional)* — Number of floors per user for TGah or TGax models (0 to 4, attenuation only, no delay); `[n_users]` or `[1]`
 - **`uplink`** *(optional)* — Set `true` to generate uplink (reverse) direction; coefficients are the transpose of the downlink
 - **`offset_angles`** *(optional)* — Azimuth offset angles in degrees; rows: AoD LOS, AoD NLOS, AoA LOS, AoA NLOS; empty uses TGac auto-defaults for `n_users > 1`; `[4, n_users]`
@@ -2650,6 +2650,7 @@ Calculate MIMO channel coefficients for IRS-assisted communication
 - Each segment is computed by [get_channels_spherical](#get_channels_spherical): NLOS path lengths are `max(path_length, d_poly)` with the
   polyline length `d_poly` of the segment; the delay of a combined path is the sum of both segment delays
 - Output paths `n_path_irs` are all combinations of segment 1 and segment 2 paths that exceed `threshold_dB`
+- A segment without paths (all its path inputs empty) gives empty outputs `[n_rx, n_tx, 0]`
 - If `active_path` is provided, it overrides `threshold_dB` for path selection
 - Optional `irs_array_2` provides a separate IRS antenna pattern for the RX-facing side (asymmetric IRS)
 - Setting `center_frequency = 0.0` disables phase computation
@@ -2762,6 +2763,8 @@ Compute channel coefficients for spherical waves across multiple frequencies
 - `n_path_out = n_path + 1` if `add_fake_los_path` else `n_path`: with `add_fake_los_path`, slot 0 holds the LOS path
   (zero power if no LOS path was found); a LOS path found in the input is moved to slot 0 and leaves a zero-power path
   in its original slot (input index + 1); all other paths keep their order, shifted by one slot
+- With 0 paths (all path inputs empty), the outputs are empty, `[n_rx, n_tx, 0]` per output frequency; with
+  `add_fake_los_path = true` they hold only this zero-power LOS path, with the LOS delays per antenna pair
 - If `use_absolute_delays` is false, the LOS delay between the TX and RX phase centres is subtracted from all paths;
   per-element delays can then be negative, down to about -(half the TX array size + half the RX array size) /
   `propagation_speed` (both arrays endfire). [quantize_delays](#quantize_delays) rejects delays at or below `-tap_spacing / 2`. For
@@ -2842,6 +2845,8 @@ Calculate MIMO channel coefficients for planar wave paths
   with zero power if no LOS path was found. LOS = the strongest path whose `path_length` is within 0.1 mm of the TX-RX
   distance; it is moved to slot 0 and its original slot (input index + 1) holds a zero-power path. All other paths
   keep their order, shifted by one slot.
+- With 0 paths (all path inputs empty), the outputs are empty, `[n_rx, n_tx, 0]`; with `add_fake_los_path = true` they
+  hold only this zero-power LOS path, with the LOS delays per antenna pair.
 - Polarization coupling: `M` is the 2x2 Jones matrix (rows = RX polarisation V/H, columns = TX polarisation V/H),
   column-major with Re/Im interleaved: rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx),
   rows 6-7 = (H rx, H tx).
@@ -2933,6 +2938,8 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
 - If `add_fake_los_path == true`, one output path is always added (`n_path + 1` outputs): slot 0 holds the LOS path,
   with zero power if no LOS path was found. If a LOS path was found, it is moved to slot 0 and its original slot
   (input index + 1) holds a zero-power path. All other paths keep their order, shifted by one slot.
+- With 0 paths (all path inputs empty), the outputs are empty, `[n_rx, n_tx, 0]`; with `add_fake_los_path = true` they
+  hold only this zero-power LOS path, with the LOS delays and angles per antenna pair.
 
 ### Declaration:
 ```
@@ -3103,13 +3110,13 @@ void quadriga_lib::acdf(const arma::Mat<dtype> &data,
 
 ---
 ## calc_angular_spreads_sphere
-Calculate azimuth and elevation angular spreads with spherical wrapping
+Calculate azimuth and elevation angular spreads, optionally with spherical wrapping
 
 - Computes RMS azimuth and elevation angular spreads from power-weighted angles; each CIR may have a different number of paths.
 - RMS spread formula: `sqrt(sum(pw .* d^2))` where `d` are wrapped deviations from the circular mean (3GPP TR 38.901 second-moment definition).
-- Mean direction is computed in Cartesian coordinates and all paths are rotated so the centroid lies on the equator before computing spreads, avoiding pole singularity artifacts.
-- When `calc_bank_angle = true`, an optimal bank angle maximizing azimuth spread is derived analytically from eigenvectors of the 2x2 power-weighted covariance matrix of centered angles.
-- When `disable_wrapping = true`, spreads are computed directly from raw angles; `orientation` will be zero and `phi`/`theta` equal the input `az`/`el`.
+- With wrapping (`disable_wrapping = false`), the mean direction is computed in Cartesian coordinates and all paths are rotated so the centroid lies on the equator before computing spreads, avoiding pole singularity artifacts.
+- When `calc_bank_angle = true` (with wrapping), an optimal bank angle maximizing azimuth spread is derived analytically from eigenvectors of the 2x2 power-weighted covariance matrix of centered angles.
+- When `disable_wrapping = true` (the default), spreads are computed directly from raw angles; `orientation` will be zero and `phi`/`theta` equal the input `az`/`el`.
 - When `quantize > 0`, paths within that angular distance are grouped and their powers summed before computing spreads;
   `quantize` must be 0 or a finite value >= 1e-3 deg (negative, NaN, Inf and smaller positive values throw).
 
@@ -3124,8 +3131,8 @@ void quadriga_lib::calc_angular_spreads_sphere(
     arma::Mat<dtype> *orientation = nullptr,
     std::vector<arma::Col<dtype>> *phi = nullptr,
     std::vector<arma::Col<dtype>> *theta = nullptr,
-    bool disable_wrapping = false,
-    bool calc_bank_angle = true,
+    bool disable_wrapping = true,
+    bool calc_bank_angle = false,
     dtype quantize = (dtype)0);
 ```
 
@@ -3133,8 +3140,10 @@ void quadriga_lib::calc_angular_spreads_sphere(
 - **`az`** — Azimuth angles; range -pi to pi; `[n_cir]` vector, each element of length `n_path`
 - **`el`** — Elevation angles; range -pi/2 to pi/2; same structure as `az`
 - **`powers`** — Path powers in [W]; same structure as `az`
-- **`disable_wrapping`** *(optional)* — If true, skips spherical rotation and computes spreads from raw angles
-- **`calc_bank_angle`** *(optional)* — If true, computes optimal bank angle analytically; only used when `disable_wrapping = false`
+- **`disable_wrapping`** *(optional)* — If true, skips spherical rotation and computes spreads from raw angles; default:
+  `true` (wrapping off, as in the MATLAB and Python wrappers)
+- **`calc_bank_angle`** *(optional)* — If true, computes optimal bank angle analytically; only used when
+  `disable_wrapping = false`; default: `false`
 - **`quantize`** *(optional)* — Angular quantization step in [deg]; paths within this distance are grouped; 0 disables grouping;
   otherwise it must be finite and >= 1e-3 deg, else `std::invalid_argument` is thrown
 
@@ -3386,7 +3395,7 @@ Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector
 - AVX2 kernel computes the angles in single precision (double outputs are cast back from float); for `dtype=double`,
   `len` and z / len are computed in double precision, so very small or very large vectors keep their direction;
   GENERIC kernel preserves full `dtype` precision
-- Azimuth in [-pi, pi] (atan2 special values as in [fast_atan2](#fast_atan2)); NaN input gives NaN in `az` and `len`
+- Azimuth in [-pi, pi] (atan2 special values as in [fast_atan2](#fast_atan2)); NaN input gives NaN in `az`, `el` and `len`
 
 ### Declaration:
 ```
@@ -3525,7 +3534,8 @@ Perform linear interpolation (1D or 2D) on single or multiple data sets
 - Interpolates given input data at specified output points.
 - Outside the range of the input sample points, the nearest end value is returned (constant extrapolation);
   output sample points that are NaN give NaN.
-- The input sample points need not be sorted (they are sorted internally); repeated values are allowed.
+- The input sample points need not be sorted (they are sorted internally); repeated values are allowed;
+  they must be finite.
 - Supports single and multiple data sets.
 - Returns interpolated results either directly or through reference argument.
 - Data types (`dtype`): `float` or `double`
@@ -3628,7 +3638,8 @@ void calc_diffraction_gain(
   [ray_mesh_interact](#ray_mesh_interact), [ray_progress](#ray_progress) and [generate_diffraction_paths](#generate_diffraction_paths) in scalar mode. Passing the acoustic
   frequency itself gives a wavelength 874 636 times too long. The MATLAB and Python wrappers take the acoustic
   frequency and convert it.
-- **`lod`** — Level of detail (0–6), controls `n_path` and `n_seg`; see [generate_diffraction_paths](#generate_diffraction_paths)
+- **`lod`** — Level of detail (0–7), controls `n_path` and `n_seg`; 0 = direct ray only (`n_path = 1`, `n_seg = 1`);
+  1–7 as in the table of [generate_diffraction_paths](#generate_diffraction_paths)
 - **`verbose`** — Verbosity level
 - **`sub_mesh_index`** — 0-based sub-mesh index for acceleration; see [triangle_mesh_segmentation](#triangle_mesh_segmentation); `[n_mesh]`
 - **`use_kernel`** — Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; error if unavailable
@@ -3662,7 +3673,8 @@ void calc_diffraction_gain(
   For scalar mode: scalar pressure coefficient `[Re Im]`; `[2, n_pos]`.
   With `apply_phase = true`, the propagation phase `exp(-j·2π·d/λ)` is applied on top; the normalization
   is unaffected because that term has unit magnitude.
-- **`coord`** — Diffracted path coordinates excluding endpoints; `[3, n_seg-1, n_pos]`
+- **`coord`** — Diffracted path coordinates excluding endpoints; `[3, n_seg-1, n_pos]` with `n_seg` from `lod`
+  (e.g. `[3, 2, n_pos]` for lod 2, `[3, 9, n_pos]` for lod 7, `[3, 0, n_pos]` for lod 0)
 
 ### See also:
 - [generate_diffraction_paths](#generate_diffraction_paths) (controls path/segment count via `lod`)
@@ -3843,6 +3855,7 @@ void generate_diffraction_paths(
    | 4     | 61       | 5       | -     |
    | 5     | 1        | 2       | debug |
    | 6     | 2        | 2       | debug |
+   | 7     | 1        | 10      | direct line in 10 segments |
 
 ### Outputs:
 - **`ray_x`** — x-coordinates of path waypoints (excluding endpoints); `[n_pos, n_path, n_seg-1]`
@@ -3882,7 +3895,7 @@ arma::uword quadriga_lib::icosphere(
 - **`center`** — Face center coordinates in Cartesian space; each vector points radially outward from origin with magnitude equal to the inradius of the face; `[n_faces, 3]`
 - **`length`** (optional) — Distance from origin to face plane; equals the magnitude of each `center` vector; `[n_faces]`
 - **`vert`** (optional) — Vertex offsets from face center [x1,y1,z1,x2,y2,z2,x3,y3,z3]; `[n_faces, 9]`
-- **`direction`** (optional) — Edge directions; spherical [az1,el1,az2,el2,az3,el3] or Cartesian [x1,y1,z1,x2,y2,z2,x3,y3,z3] per `direction_xyz` flag; `[n_faces, 6]` or `[n_faces, 9]`
+- **`direction`** (optional) — Directions of the vertex rays; spherical [az1,el1,az2,el2,az3,el3] or Cartesian [x1,y1,z1,x2,y2,z2,x3,y3,z3] per `direction_xyz` flag; `[n_faces, 6]` or `[n_faces, 9]`
 
 ### Returns:
 - Number of generated triangular faces (20 × n_div²)
@@ -3970,7 +3983,8 @@ Write a triangular mesh to a Mitsuba 3 XML scene file
 - Supports grouping faces into named objects with per-face material assignments
 - Optionally maps material names to ITU-defined presets used by Sionna RT
 - Creates a subdirectory `<stem>_meshes/` next to the XML file and writes one binary PLY file per object into it;
-  both the XML and the mesh folder must be distributable together
+  both the XML and the mesh folder must be distributable together; the XML refers to each PLY file by its path
+  relative to the XML file (`<stem>_meshes/<object>.ply`)
 - Objects whose faces reference more than one material are automatically split into sub-objects (one per material)
   and renamed `<obj_name>_<mtl_name>`; the effective object count in the output may therefore exceed the length of `obj_names`
 
@@ -4007,13 +4021,20 @@ void quadriga_lib::mitsuba_xml_file_write(
 ## obj_file_read
 Read a Wavefront `.obj` file and extract geometry, visual materials, and EM/acoustic materials
 
-- Parses a triangulated `.obj`; quads and n-gons are rejected. Two independent material systems are returned:
+- Parses a triangulated `.obj`; quads and n-gons are rejected. Face references may be `v`, `v/vt`, `v//vn` or
+  `v/vt/vn`; a negative (relative) index counts back from the last vertex defined before the face line (`-1` = that
+  vertex). Index 0, or an index beyond the vertices defined before the face, throws `std::invalid_argument`. The file is
+  parsed and validated for any combination of requested outputs, also when no output is requested.
+- Lines may end in LF or CRLF (`.obj`, `.mtl` and material CSV).
+- Two independent material systems are returned:
   - Visual side, from the companion `.mtl`: `mtl_ind`, `mtl_names` (raw `usemtl` names), and `bsdf`.
   - EM/acoustic side, from a material table (`fn_csv`, or a built-in ITU-R P.2040 default): `csv_ind`,`csv_names`, `csv_prop`.
 - A face's `usemtl` name is matched to the table by exact name, then by the base name (everything
   before the first dot, so Blender sub-materials like `concrete.gray` map to `concrete`). Unmatched names
   throw when `csv_strict = true`; otherwise they map to index 0 (no material). The two index spaces are
   decoupled, so several visual materials (e.g. `wall.001`, `wall.002`) may resolve to a single EM material.
+- `usemtl (null)` (written by [obj_file_write](#obj_file_write)) marks the following faces as having no material: index 0 in `mtl_ind`
+  and `csv_ind` (also with `csv_strict`); `(null)` is not listed in `mtl_names` or `bsdf`.
 - Geometry indices (`face_ind`, `obj_ind`) are 0-based. Material indices (`mtl_ind`, `csv_ind`) are
   1-based, with 0 reserved for the outside / no-material state (faces with no assigned material;
   for `csv_ind` in non-strict mode, also materials absent from the table).
@@ -4084,12 +4105,17 @@ Write a triangulated Wavefront .obj (and .mtl) file
   follows the welded vertex list, so unwelded input geometry yields one part per face
 - Without `mtl_ind`: no `usemtl` tags and no `.mtl` file are written. With `mtl_ind`, each face carries a
   1-based material index (0 = no material, leaving that face unassigned); pass `mtl_ind = nullptr` to omit materials entirely
+- A face with `mtl_ind = 0` that follows a face with a material in the same object (or part) is preceded by
+  `usemtl (null)`, which [obj_file_read](#obj_file_read) reads back as 0; the `.mtl` gets no `(null)` entry. Face order and objects
+  are unchanged. A material named `(null)` that is used by a face is therefore rejected (`std::invalid_argument`);
+  unused entries of `mtl_names` may carry the name
 - The `.mtl` (named after the `.obj`) lists each used material; values default to a gray material when `bsdf` is omitted
 - Duplicate entries in `mtl_names` are merged into one `.mtl` entry if their `bsdf` rows are identical (or if `bsdf`
   is omitted); duplicates with differing `bsdf` rows are disambiguated as `name.001`, `name.002`, ...
 - If `csv_names` is given, the EM/acoustic material table is written to a companion `.csv` (named after the `.obj`):
   columns follow a fixed canonical order, then any extra `csv_prop` columns (alphabetical); `csv_write_defaults`
-  additionally emits canonical columns absent from `csv_prop`, filled with their defaults (`a`, `e`, `fRef` = 1, else 0)
+  additionally emits canonical columns absent from `csv_prop`, filled with their defaults (`a`, `e`, `fRef` = 1,
+  `side` = 3.29, else 0)
 
 ### Declaration:
 ```
@@ -4175,7 +4201,8 @@ arma::uvec quadriga_lib::obj_overlap_test(
 Convert a 3D path into a tube surface mesh for visualization
 
 - Converts an ordered sequence of 3D points into a tubular quad mesh with circular cross-sections
-- At bends steeper than 10°, the tube is split and an extra vertex ring is inserted to avoid intersection
+- Where the path turns by more than 160° (the two segments enclose an angle below 20°), the tube is split and an
+  extra vertex ring is inserted to avoid intersection
 - Cross-section orientation uses continuous frame alignment between segments to minimize twisting
 - Output `faces` indices are directly usable in `.obj` or `.ply` export
 
@@ -4195,7 +4222,7 @@ void quadriga_lib::path_to_tube(
 - **`n_edges`** *(optional)* — Number of vertices per circular cross-section; must be ≥ 3
 
 ### Outputs:
-- **`vert`** — Tube vertex positions; `[3, (n_coord + n_split) × n_edges]` where `n_split` is the number of bends > 10°
+- **`vert`** — Tube vertex positions; `[3, (n_coord + n_split) × n_edges]` where `n_split` is the number of turns > 160°
 - **`faces`** — Quad face indices into `vert`, 4 indices per quad; `[4, (n_coord - 1) × n_edges]`
 
 ---
@@ -4294,8 +4321,8 @@ arma::uword quadriga_lib::point_cloud_segmentation(
 ### Outputs:
 - **`pointsR`** — Reorganized point cloud with points grouped by sub-cloud; `[n_pointsR, 3]`
 - **`sub_cloud_index`** — 0-based starting index of each sub-cloud within `pointsR`; `[n_sub]`
-- **`forward_index`** *(optional)* — 1-based index map from `points` to `pointsR`; padding entries are `0`; `[n_pointsR]`
-- **`reverse_index`** *(optional)* — 0-based index map from `pointsR` back to `points`; `[n_points]`
+- **`forward_index`** *(optional)* — 1-based row in `points` of each row of `pointsR`; padding entries are `0`; `[n_pointsR]`
+- **`reverse_index`** *(optional)* — 0-based row in `pointsR` of each row of `points`; `[n_points]`
 
 ### Returns:
 - Number of generated sub-clouds `n_sub`
@@ -5211,7 +5238,7 @@ void quadriga_lib::ray_triangle_intersect(
 ### Inputs:
 - **`orig`** — Ray origins in GCS; `[n_ray, 3]`
 - **`dest`** — Ray destinations in GCS; `[n_ray, 3]`
-- **`mesh`** — Triangular mesh; each row: `{x1 y1 z1 x2 y2 z2 x3 y3 z3}`; `[n_mesh, 9]`
+- **`mesh`** — Triangular mesh; each row: `{x1 y1 z1 x2 y2 z2 x3 y3 z3}`; further columns are ignored; `[n_mesh, 9]`
 - **`sub_mesh_index`** (optional) — Start indices of sub-meshes in `mesh`; enables AABB-accelerated traversal; `[n_sub]`
 - **`aabb`** (optional) — Pre-computed axis-aligned bounding boxes per sub-mesh; each row: `{x_min x_max y_min y_max z_min z_max}`; if `nullptr`, AABBs are computed from `mesh`; `[n_sub, 6]`
 - **`use_kernel`** *(optional)* — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable and for other values; auto mode selects CUDA when `n_ray >= 500` and CUDA is available, else AVX2, else GENERIC.
@@ -5372,7 +5399,7 @@ arma::Mat<dtype> quadriga_lib::triangle_mesh_aabb(
 ```
 
 ### Inputs:
-- **`mesh`** — Triangle mesh vertices in global Cartesian coordinates; `[n_triangles, 9]`
+- **`mesh`** — Triangle mesh vertices in global Cartesian coordinates; further columns are ignored; `[n_triangles, 9]`
 - **`sub_mesh_index`** *(optional)* — 0-based start indices of sub-meshes; if omitted, the AABB of the entire mesh is returned; `[n_sub]`
 - **`vec_size`** *(optional)* — Alignment size for SIMD/CUDA padding (e.g., `8` for AVX2, `32` for CUDA)
 
@@ -5414,7 +5441,7 @@ arma::uword triangle_mesh_segmentation(
 - **`meshR`** — Reordered and padded triangle vertices; `[n_meshR, 9]`
 - **`sub_mesh_index`** — 0-based start indices of sub-meshes in `meshR`; `[n_sub]`
 - **`mtl_ind_out`** *(optional)* — Reordered and padded material indices (padding = 0); `[n_meshR]`
-- **`mesh_index`** *(optional)* — 1-based mapping from original to reorganized mesh (0 = padding); `[n_meshR]`
+- **`mesh_index`** *(optional)* — 1-based row in `mesh` of each row of `meshR` (0 = padding); `[n_meshR]`
 
 ### Returns:
 - Number of created sub-meshes `n_sub`
@@ -5463,6 +5490,11 @@ int triangle_mesh_split(
 Write a data matrix to a color-coded PNG file
 
 - Values are clipped to `[min_val, max_val]` before colormap mapping; auto-detected from data if `NAN`
+- The auto-detected range ignores `NaN` and `+-Inf`; `+Inf` and `-Inf` values get the last and first colour
+- `NaN` values get the first colour of the map
+- A degenerate range (`max <= min` after auto-detection, e.g. constant or single-value data, all-`NaN` data, or log
+  input without a positive value; also an infinite `min_val` or `max_val`) maps every value to the first colour
+- Throws `std::invalid_argument` for an empty `data` matrix and for `min_val > max_val` (both given)
 - Uses [LodePNG](https://github.com/lvandeve/lodepng) for PNG encoding
 
 ### Declaration:
@@ -5783,6 +5815,7 @@ ACF produced by a set of sinusoids
   half is its mirror image, so the symmetry is exact
 - Equally spaced has the meaning given in [sos_acf_2d](#sos_acf_2d)
 - `dist_2d` may be the same object as `dist`
+- `acf_approx` cannot share memory with `freq` or `dist`; such a call throws before anything is written
 
 ### Declaration:
 ```
@@ -6091,6 +6124,7 @@ Spatially correlated random values on a regular grid
 - Cubes of the correct size keep their memory. If they lie one after the other in memory (one block of
   `n_gen` cubes, as the MATLAB and Python interfaces allocate it), the values are computed in place;
   otherwise they are computed in a matrix `[ny·nx·nz, n_gen]` and copied
+- A cube that shares memory with `freq` or `phase` is an error, before anything is written
 
 ### Declaration:
 ```
@@ -6138,6 +6172,8 @@ Frequencies and ACF of a predefined sum-of-sinusoids generator
 - The tables are stored for `d = 10 m`. For another decorrelation distance the distances are multiplied by
   `d/10` and the frequencies by `10/d`
 - All tables are 3-dimensional and can be used with positions of 1, 2 or 3 columns
+- The outputs cannot be the same object or share memory with each other; such a call throws before anything
+  is written
 - How the tables were made: [sos_generate](#sos_generate) with the 200-sample ACF for 10 m, `n_dim = 3`,
   `uniform_smp = true`, `n_dir = 300`, `random_init = true`, `freq_min = 0.005`, `freq_max = 15 / 49.75`,
   and the seeds 39, 3, 2, 5 (Exp), 13, 32, 6, 21 (Gauss), 13, 25, 37, 47 (Comb) for 128, 256, 512 and 1024
@@ -6376,8 +6412,11 @@ Remove the sample mean of sum-of-sinusoids generators over a set of positions
   mean of the combined, normalised value; `acf` and `dist` are required
 - Two devices on different maps (`pos_b` and `phase_b` given): each device is treated on its own, `phase`
   with `pos` and `phase_b` with `pos_b` and the frequencies `freq · freq_scale_b`; two offsets per generator.
-  The mean of the combined value is then zero as well. `phase_b` must not be the same object as `phase`:
-  one matrix cannot hold two corrections
+  The mean of the combined value is then zero as well. `phase_b` cannot share memory with `phase`: one
+  matrix cannot hold two corrections
+- The arguments that are written, `phase`, `phase_b`, `offset` and `mean_before`, cannot share memory with
+  another argument, not even in part, and `offset` and `mean_before` cannot be the same object. Such a call
+  throws and leaves all arguments unchanged
 - Effect on the statistics: the result is the field conditioned on a zero mean over the positions. The
   variance at a position drops from 1 to `1 - c^2 / v`, where `v` is the variance of the sample mean and
   `c` the mean ACF between that position and all positions; on average over the positions the loss is at
@@ -6421,7 +6460,7 @@ void quadriga_lib::sos_remove_bias(
   `[n_pos_b, 1]`, `[n_pos_b, 2]` or `[n_pos_b, 3]` as for `pos`; `n_pos_b = n_pos` for the same map, any
   number for different maps
 - **`phase_b`** *(optional)* — Phases of the second device in [rad]; requires `pos_b`; omitted or empty =
-  same map; updated in-place; not the same object as `phase`; `[n_coeff, n_gen]`
+  same map; updated in-place; no memory shared with `phase`; `[n_coeff, n_gen]`
 - **`acf`** *(optional)* — Target ACF; required for two devices on the same map, must then be > -1;
   `[n_acf]`
 - **`dist`** *(optional)* — Sample points of the ACF in [m]; must start at 0, increase strictly and be
