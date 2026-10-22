@@ -55,6 +55,11 @@ package (a second worker session, "WP-xx, round 2"), not for the next one.
   - heavy tools (ASan suite, AFL, MATLAB, benchmarks, long sweeps) only when the package needs them, and then once
     on the final code, not repeatedly; use the resource-saving settings (fewer threads, short runs);
   - benchmarks: wait for a 1-min load below 4, keep them short, and repeat only if the load was too high.
+- MATLAB R2024a is a required target (rule of 2026-10-22, after WP-17b): its bundled libstdc++ ends at
+  GLIBCXX_3.4.28. Never use the floating-point overloads of `std::to_chars` (GLIBCXX_3.4.29); the snprintf workaround
+  is in `src/obj_file_write.cpp`. Every package that changes code linked into MEX files checks
+  `objdump -T +quadriga_lib/*.mexa64 | grep -o 'GLIBCXX_3\.4\.[0-9]*' | sort -u` (nothing above 3.4.28) and runs
+  the MEX suite in R2024a as well as Octave.
 - Install nothing system-wide; Python via `PYTHONPATH=/sjc/quadriga-lib-fixes/lib`, MATLAB/Octave via `addpath`.
 - Do not commit. Do not edit `md/bugs.md`, `md/bug_fix_plan.md`, `md/bug_hunt_brief.md`.
 - Documentation: when behaviour changes, update the C++ comment block, the MEX and the Python block in the same work
@@ -157,6 +162,7 @@ is the coordinator's suggestion from the hunt.
 | WP-08 | 08 | One shared sin/cos core for the baseband DFT kernels and `fastmath_avx2.h` (proposed by the WP-04 worker) | (a) add to WP-08 as a note (b) leave | (a) | (a) added to WP-08 as a note; the WP-08 worker decides after measuring (2026-10-17) |
 | B-038 | 10 | Precision of qdant files (round 1 wrote 15 significant digits for double: files twice as large) | (a) double precision (b) single-equivalent, files as small as possible | - | (b) single-equivalent: dB magnitudes and phases with 6 decimals (5.8e-8 per sample at every level), positions and coupling as the shortest float text; replaces the 1e-12 round-trip acceptance (2026-10-20); changed 2026-10-20 (round 3): decimals relative to the element peak, absolute error at most single resolution of the element peak for every sample, at most 6 decimals |
 | B-018 | 14 | The `usemtl (null)` marker reserves the name `(null)`; a user material of that name read back as "no material" | (1) document only (2) the writer rejects a used material named `(null)` (3) the reader tells marker and material apart by the `.mtl` (4) the writer renames it | (2) | (2) rejected by obj_file_write, `std::invalid_argument` before anything is written; unused entries allowed (2026-10-21, WP-14 round 2) |
+| Acoustic findings | 17b | Five findings of the acoustic manager (2026-10-22): material-index header comments, indented .mtl keywords, CSV cells that parse only in part or are non-finite, obj_file_write CSV defaults and the thk column, material-model links | (3) non-finite CSV values rejected, the whole cell must parse; (4) thk in the canonical column order with default 0 | - | agreed (2026-10-22); implemented in WP-17b round 2 together with the R2024a fix (no std::to_chars) |
 | B-109 | 16 | `sos_remove_bias` with `offset` and `mean_before` as the same object (the offsets were silently replaced by the means; a rule the WP-16 worker added beyond the default) | (a) reject (b) allow | (a) | (a) keep the rejection (2026-10-21) |
 | B-113 | 15 | 0 paths without `add_fake_los_path`: C++ / Python planar and spherical throw, MATLAB and Python multifreq return empty outputs (found in WP-15) | (a) empty outputs `[n_rx, n_tx, 0]` in all APIs (b) an error in all APIs (c) leave | (a) | (a) empty outputs in all APIs; also Python spherical batch mode adds the fake LOS path for 0 paths, and the C++ multibeam generator maps a beamwidth <= 0 to 120 deg (2026-10-21, WP-15 round 2) |
 | B-028 | 12 | Manager default D2 (judge each hit only against the face that produced it) reports touching boxes with an offset or a larger touching face as overlapping: the diagonal of the touching face crosses the other box's edge, which the edge-inclusive triangle test reports as a hit on a side face (found by the WP-12 worker) | (a) worker's graze rule: a hit on face G is a touch when the edge lies in the plane of another face of the same object and G lies on one side of that plane (clears a subset of what the old code cleared) (b) D2 literally, accept false overlaps | (a) | (a) graze rule accepted (2026-10-21) |
@@ -505,7 +511,7 @@ unexpected changes in the diff; proposed `md/bugs.md` updates; anything the next
 | WP-14 | 5 | done 2026-10-21 (5 of 5 fixed, B-104 point 5 also; Mitsuba 80 000 faces 0.02 s instead of 3.2 s, QRT raw reader linear, OBJ read 0.85 of old; AFL clean; round 2: a used material named `(null)` is rejected) | 58deaf6 (OBJ files), a85bf88 (write_png), 38a70b3 (Mitsuba), cdaa991 (QRT raw reader), plus the notes commit |
 | WP-15 | 10 | done 2026-10-21 (10 of 10 fixed and the three notes; round 2: 0 paths give empty outputs in all APIs, C++ multibeam 0 -> 120 deg, Python qrt_file_read docs, MEX subdivide_triangles size check) | 52fbfd6 (get_channels), 78cf7ed (antennas), f952982 (angular spread), bd071f0 (diffraction lod), 5c18599 (baseband carriers), da0f1ff (mesh wrappers), a118be1 (QRT / HDF5 wrappers), plus the notes commit |
 | WP-16 | 3 | done 2026-10-21 (3 of 3 fixed; SOS results of valid calls bit-identical) | 518a5f9, plus the notes commit |
-| WP-17 | 6 | WP-17a done 2026-10-22 (6 of 6 items and all notes of earlier packages; cart2geo / interp at 0.99-1.025 of old); WP-17b (final verification) open | fba3c1d (antennas), 39ab1e2 (fast math, CPU check), cd46ca9 (geometry), 79ac502 (channels, files, diffraction), 33fc745 (interp), b90bb12 (SOS), a2d0a49 (MEX layer), plus the notes commit |
+| WP-17 | 6 | WP-17a done 2026-10-22 (6 of 6 items and all notes of earlier packages; cart2geo / interp at 0.99-1.025 of old); WP-17b done 2026-10-22 (final verification; round 2: R2024a fixed without std::to_chars, five acoustic findings) | fba3c1d (antennas), 39ab1e2 (fast math, CPU check), cd46ca9 (geometry), 79ac502 (channels, files, diffraction), 33fc745 (interp), b90bb12 (SOS), a2d0a49 (MEX layer), plus the notes commit |
 
 ## 8a. Manager handoff (2026-10-20)
 
@@ -596,8 +602,12 @@ regenerated once on `main` after the final merge (as after the first merge, c79b
 Left for WP-17b: `tests/mex_tests/test_calc_angular_spreads_sphere.m:107` has the `try/error/catch` check that passes
 whether or not an error is raised (fix it like the WP-17a checks of `test_acdf.m`).
 
-Next: WP-17b (final verification of the committed `fixes` branch), then the final merge into `main` (temporary
-worktree, tests, fast-forward) and the regeneration of `html_docu/` on `main`.
+WP-17b (2026-10-22): done after round 2, review passed (main merged into fixes first, 4302d4e).
+
+Next: commit WP-17b, the final merge of fixes into `main` (temporary worktree, tests, fast-forward), and the
+regeneration of `html_docu/` on `main`. Tell the acoustic manager: `tools/data_formats_md/format_materials.md:35`
+("A cell that does not start with a number is an error.") is incomplete since round 2: a cell must be one complete,
+finite number; the column table puts `fRef` first, the writer after `alphaB` (order is not significant).
 
 ## 8. Item index
 

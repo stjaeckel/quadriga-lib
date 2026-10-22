@@ -34,7 +34,7 @@ How to read the items:
 ## Summary table
 
 Items: 123 (S1: 5, S2: 31, S3: 68, S4: 19); B-119 to B-123 were found during the fixes (WP-02, WP-04, WP-07).
-Status: open: 0, fixed: 115, partly fixed: 0, won't fix: 1, documented: 7 (after WP-17a; final verification in WP-17b).
+Status: open: 0, fixed: 115, partly fixed: 0, won't fix: 1, documented: 7 (final, after WP-17b).
 
 | ID | Title | Area | Kind | Severity | Mark | Status |
 |---|---|---|---|---|---|---|
@@ -236,6 +236,7 @@ miscompilation by the LAF split-compare passes, not a library defect. The campai
 | after WP-16: generic, ASan + UBSan | generic `1345004 / 1284`; ASan + UBSan all passed, only the excluded `ray_progress` reports (worker's runs; Octave MEX 66 of 67, pytest 817 passed, 1 skipped; SOS hashes of valid calls identical old vs new at 1 and 12 threads, 90 AVX2 / 77 generic) | - | - |
 | after WP-17a: base | `All tests passed (1348756 assertions in 1300 test cases)` (manager) | 40 s (12 threads) | 0.9 / 1.4 |
 | after WP-17a: generic, ASan + UBSan, gate | generic `1346833 / 1299`; ASan + UBSan all passed, only the excluded `ray_progress` reports; `[wave]` 163474 / 178 and `[acoustic]` 42741 / 59 in both builds (worker's runs; Octave MEX 67 of 68, pytest 817 passed) | - | - |
+| final verification (WP-17b, rounds 1 and 2, 2026-10-22, fresh builds) | AVX2 `1348780 / 1303`, generic `1346857 / 1302`, all passed (manager confirmed AVX2); ASan + UBSan gcc-12 and gcc-15: only the excluded `ray_progress` reports, no leak; `[wave]` 163474 / 178, `[acoustic]` 42741 / 59 in both builds; MEX 67 of 68 in Octave 11.1, MATLAB R2024a and R2026a (R2026a exit 0, no crash dump; MEX files need at most GLIBCXX_3.4.26); pytest 817 passed, ASan Python module clean; AFL all 7 readers 15 min, no crash; all 122 repro folders as expected. Known exception: one HDF5 fuzz input takes 17 s, all of it inside HDF5's H5Fopen (B-119, upstream, won't fix) | - | - |
 
 Run commands: `flock /tmp/quadriga-fixes-suite.lock build_linux/test_bin` (output
 `build_linux/scratch/hunt/base_test.txt`); the sanitizer runs with
@@ -321,7 +322,8 @@ clear very large arrays (see the item). The HDF5 crashes all reduce to heap-buff
 `H5Dread` into buffers that `hdf5_read_channel` sized from attributes (`qd_channel_hdf5.cpp:1838/1839`
 and `1880/1881`); the HDF5 library itself is not instrumented and was not the target. HDF5: B-013; QRT: B-048.
 
-Note after WP-14: with the WP-14 OBJ reader, the `fz_mtl` and `fz_csv` harnesses built at `-O2` crash on every valid
+Note after WP-17b round 2: the obj, mtl and csv harness TUs now crash the same way at `-O1`; build them at `-O0`
+(gcc ASan builds and `-O0` are clean). Note after WP-14: with the WP-14 OBJ reader, the `fz_mtl` and `fz_csv` harnesses built at `-O2` crash on every valid
 seed in AFL's own coverage-counter increment (a garbage guard index, inside `arma::Mat::init_warm` called from
 `obj_file_read`, the site of the LAF note above); gcc ASan + UBSan, plain clang -O3 ASan and clang with
 `trace-pc-guard` are clean. Build the harness TUs with `-O1` (the library keeps `-O3`); evidence in
