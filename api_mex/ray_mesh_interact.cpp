@@ -26,7 +26,8 @@ Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh 
 - Types 3–5 (scalar) use a single TE-only coefficient, suitable for acoustic simulation with
   impedance-mapped material parameters (ε derived from Z); total internal reflection is handled as
   in the EM path
-- For a detailed description of the material model see <a href="http://quadriga-lib.org/formats.html">Data Formats</a>
+- The material model and its columns: <a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md">The quadriga-lib Material Model and Ray-Surface Physics</a>; the CSV format
+  of the material table: <a href="http://quadriga-lib.org/formats.html">Data Formats</a>
 
 ## Usage:
 ```

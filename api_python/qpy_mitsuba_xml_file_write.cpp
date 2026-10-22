@@ -22,7 +22,8 @@ Write a triangular mesh to a Mitsuba 3 XML scene file
   relative to the XML file (`<stem>_meshes/<object>.ply`)
 - Objects whose faces reference more than one material are automatically split into sub-objects (one per material)
   and renamed `<obj_name>_<mtl_name>`; the effective object count in the output may therefore exceed the length of `obj_names`
-- For a detailed description of the material model see <a href="http://quadriga-lib.org/formats.html">Data Formats</a>
+- The material model and its columns: <a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md">The quadriga-lib Material Model and Ray-Surface Physics</a>; the CSV format
+  of the material table: <a href="http://quadriga-lib.org/formats.html">Data Formats</a>
 
 ## Usage:
 ```

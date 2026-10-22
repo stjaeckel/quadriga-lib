@@ -111,7 +111,7 @@ namespace quadriga_lib
     void calc_diffraction_gain(const arma::Mat<dtype> &orig,                                        // TX positions; Size: [ n_pos, 3 ]
                                const arma::Mat<dtype> &dest,                                        // RX positions; Size: [ n_pos, 3 ]
                                const arma::Mat<dtype> &mesh,                                        // Triangle vertices; Size: [ no_mesh, 9 ]
-                               const arma::uvec &mtl_ind,                                           // 0-based material index, Size: [n_mesh]
+                               const arma::uvec &mtl_ind,                                           // 1-based material index, 0 = no material; Size: [n_mesh]
                                const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop, // Material properties; Length: [n_mtl]
                                dtype center_frequency,                                              // Center frequency in [Hz]
                                int lod = 2,                                                         // Level of detail, 0-7 (0 = direct ray only)
