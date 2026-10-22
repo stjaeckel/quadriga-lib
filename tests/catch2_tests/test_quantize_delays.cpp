@@ -682,7 +682,7 @@ static bool qd_same(const std::vector<arma::Cube<dtype>> &a, const std::vector<a
     return true;
 }
 
-TEST_CASE("quantize_delays - Relative delays of get_channels_spherical (B-002)")
+TEST_CASE("quantize_delays - Relative delays of get_channels_spherical")
 {
     // get_channels_spherical with relative delays (default) returns slightly negative delays for elements that are
     // closer than the phase centre; all of their power must go to tap 0
@@ -717,7 +717,7 @@ TEST_CASE("quantize_delays - Relative delays of get_channels_spherical (B-002)")
     }
 }
 
-TEST_CASE("quantize_delays - Small negative delays are clamped to tap 0 (B-002)")
+TEST_CASE("quantize_delays - Small negative delays are clamped to tap 0")
 {
     const double ts = 5.0e-9;
     const double half = 0.5 * ts;
@@ -779,7 +779,7 @@ TEST_CASE("quantize_delays - Small negative delays are clamped to tap 0 (B-002)"
                     std::invalid_argument);
 }
 
-TEST_CASE("quantize_delays - Non-finite and too large delays throw (B-002)")
+TEST_CASE("quantize_delays - Non-finite and too large delays throw")
 {
     const double ts = 5.0e-9;
     std::vector<arma::Cube<double>> cre(1), cim(1), dl0(1), dl(1), cre_q, cim_q, dl_q;
@@ -836,7 +836,7 @@ TEST_CASE("quantize_delays - Non-finite and too large delays throw (B-002)")
     CHECK(std::abs(dl_q[0](0, 0, 1) - 30.0) < 1e-9);
 }
 
-TEST_CASE("quantize_delays - Delay offset gives the same taps (B-054)")
+TEST_CASE("quantize_delays - Delay offset gives the same taps")
 {
     // Tap spacing, delays and offset are binary fractions, so adding the offset is exact and the taps shift by an
     // integer number. The results must be identical apart from the offset in the output delays.
@@ -888,10 +888,10 @@ TEST_CASE("quantize_delays - Delay offset gives the same taps (B-054)")
     CHECK(sec < 1.0);
 }
 
-TEST_CASE("quantize_delays - Outputs may alias the inputs (B-055)")
+TEST_CASE("quantize_delays - Outputs may alias the inputs")
 {
     // Delay modes: 0 = random, 1 = on the tap grid (no interpolation), 2 = random with max_no_taps = 3 (fallback to
-    // the nearest tap), 3 = the case of md/bugs.md (path at delay 0, interpolation for the others)
+    // the nearest tap), 3 = a path at delay 0 and interpolation for the others
     arma::arma_rng::set_seed(5);
     for (int mode = 0; mode < 4; ++mode)
     for (int shared = 0; shared < 2; ++shared)
@@ -947,7 +947,7 @@ TEST_CASE("quantize_delays - Outputs may alias the inputs (B-055)")
     CHECK_THROWS_AS(quadriga_lib::quantize_delays(&cre, &cim, &dl, &o2, &o1, &o1), std::invalid_argument);
 }
 
-TEST_CASE("quantize_delays - Output delay shapes (B-103)")
+TEST_CASE("quantize_delays - Output delay shapes")
 {
     // [1, 1, n_taps] output delays only for shared [1, 1, n_path] input with fix_taps 1 or 2
     std::vector<arma::Cube<double>> cre(1), cim(1), dl_ant(1), dl_shr(1), cre_q, cim_q, dl_q;
@@ -975,7 +975,7 @@ TEST_CASE("quantize_delays - Output delay shapes (B-103)")
     }
 }
 
-TEST_CASE("quantize_delays - Relative delays of an acoustic array (B-002)")
+TEST_CASE("quantize_delays - Relative delays of an acoustic array")
 {
     // get_channels_multifreq, speed of sound, 48 kHz taps: a 5 cm microphone pair turned by 0.3 rad already has
     // relative delays below -tap_spacing / 2 (about -1 tap). Relative delays throw with a message that points to

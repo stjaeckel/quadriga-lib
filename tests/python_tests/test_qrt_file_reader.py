@@ -282,7 +282,7 @@ class test_case(unittest.TestCase):
 
     # ------------------------------------------------------------------
     # An exception in the converting loop while the reader thread runs must
-    # reach Python (B-096); before the fix std::terminate aborted the process.
+    # reach Python; before the fix std::terminate aborted the process.
     # The address space of the subprocess is capped so that an allocation fails.
     # ------------------------------------------------------------------
     @unittest.skipIf('asan' in os.environ.get('LD_PRELOAD', ''),

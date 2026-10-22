@@ -1293,7 +1293,7 @@ TEST_CASE("Get Channels Spherical - FBS and LBS at different positions")
         &coeff_re, &coeff_im, &delay, 0.0, true, false,
         &aod, &eod, &aoa, &eoa);
 
-    // The NLOS delay follows path_length when it is longer than TX→FBS + FBS→LBS + LBS→RX (B-003): the extra
+    // The NLOS delay follows path_length when it is longer than TX→FBS + FBS→LBS + LBS→RX: the extra
     // length belongs to interactions between FBS and LBS
     CHECK(std::abs(delay.at(0, 0, 0) - path_length(0) / C) < 1.0e-14);
 
@@ -1773,7 +1773,7 @@ TEST_CASE("Get Channels Spherical - Fake LOS swaps true LOS to first slice")
     CHECK(std::abs(amp2) < 1.0e-6f);
 }
 
-TEST_CASE("Get Channels Spherical - NLOS delay and phase follow path_length (B-003)")
+TEST_CASE("Get Channels Spherical - NLOS delay and phase follow path_length")
 {
     // TX (0,0,0), RX (100,0,0); 3-bounce path via (30,40,0), (50,60,0), (70,40,0) as coord2path / qrt_file_read
     // return it: FBS = first, LBS = last interaction, path_length = full length 50 + 2 * 28.284 + 50 = 156.5685 m.
@@ -1850,7 +1850,7 @@ TEST_CASE("Get Channels Spherical - NLOS delay and phase follow path_length (B-0
         }
 }
 
-TEST_CASE("Get Channels Spherical - add_fake_los_path layout (B-068)")
+TEST_CASE("Get Channels Spherical - add_fake_los_path layout")
 {
     // add_fake_los_path always adds one output path; slot 0 holds the LOS path (zero power if none was found);
     // if a LOS path was present, its original slot holds a zero-power path.
@@ -1890,7 +1890,7 @@ TEST_CASE("Get Channels Spherical - add_fake_los_path layout (B-068)")
     CHECK(std::abs(dl(0) * C - 50.0) < 1e-6);
 }
 
-TEST_CASE("Get Channels Spherical - Rows of M follow the Jones convention rx by tx (B-069)")
+TEST_CASE("Get Channels Spherical - Rows of M follow the Jones convention rx by tx")
 {
     // M is the 2x2 Jones matrix (rows = RX polarisation V/H, columns = TX polarisation V/H), column-major,
     // Re/Im interleaved: rows 0-1 = (V rx, V tx), 2-3 = (H rx, V tx), 4-5 = (V rx, H tx), 6-7 = (H rx, H tx)
@@ -1957,7 +1957,7 @@ TEST_CASE("Get Channels Spherical - AVX2 interpolation of a low-amplitude patter
     CHECK(dmax / amax < 1e-4);
 }
 
-// B-006: with use_avx2 = true, get_channels_spherical passes per-element angles of size [n_links, n_ang] to the AVX2
+// With use_avx2 = true, get_channels_spherical passes per-element angles of size [n_links, n_ang] to the AVX2
 // kernel. For n_links not a multiple of 8, the last block must not load angles past the end of the matrices (heap
 // over-read, visible only in the ASan suite). The result must agree with the generic interpolation.
 template <typename dtype>
@@ -1997,7 +1997,7 @@ static void get_channels_spherical_avx2_tail_check()
     CHECK(dmax / amax < 1e-4);
 }
 
-TEST_CASE("Get Channels Spherical - AVX2 with per-element angles, n_links not a multiple of 8 (B-006)")
+TEST_CASE("Get Channels Spherical - AVX2 with per-element angles, n_links not a multiple of 8")
 {
     get_channels_spherical_avx2_tail_check<float>();
     get_channels_spherical_avx2_tail_check<double>();

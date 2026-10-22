@@ -293,8 +293,8 @@ TEST_CASE("Arrayant rotation - Partial sphere, inplace")
     CHECK(arma::approx_equal(ant.element_pos, T, "absdiff", 1e-5));
 }
 
-// B-045: the position phase used the speed of light; acoustic arrays were combined without it
-TEST_CASE("Arrayant combine pattern - Propagation speed (B-045)")
+// The position phase used the speed of light; acoustic arrays were combined without it
+TEST_CASE("Arrayant combine pattern - Propagation speed")
 {
     // Two omni elements 0.2 m apart on the y-axis at 1 kHz, summed into one port
     auto ant = quadriga_lib::generate_arrayant_omni<double>(10.0);

@@ -465,7 +465,7 @@ TEST_CASE("QRT Write - read_raw with shared stream and cache")
 }
 TEST_CASE("QRT Write - append after an orientation that rounds to 0 in float")
 {
-    // B-017: a CIR orientation column of 1e-50 rad is non-zero in double but 0 in float. Init and append
+    // A CIR orientation column of 1e-50 rad is non-zero in double but 0 in float. Init and append
     // must agree on the stored orientation columns, otherwise the TX table and path data are misplaced.
     for (bool scalar : {false, true})
     {

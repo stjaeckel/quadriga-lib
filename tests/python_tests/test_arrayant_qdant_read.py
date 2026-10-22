@@ -117,7 +117,7 @@ class test_case(unittest.TestCase):
         os.remove('test.qdant')
 
     def test_layout_dtype(self):
-        """layout is returned as int64 (B-117)."""
+        """layout is returned as int64."""
         import tempfile, shutil
         d = tempfile.mkdtemp()
         try:

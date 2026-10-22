@@ -504,7 +504,7 @@ class TestSpeakerGenerate(unittest.TestCase):
 
 
     def test_single_frequency_shapes(self):
-        """A single frequency gives 3D pattern fields and a float center_freq (B-117)."""
+        """A single frequency gives 3D pattern fields and a float center_freq."""
         s = arrayant.generate_speaker(frequencies=np.array([1000.0]), angular_resolution=10)
         self.assertEqual(s['e_theta_re'].ndim, 3)
         self.assertEqual(s['e_theta_re'].shape, (19, 37, 1))

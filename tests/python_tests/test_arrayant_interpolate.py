@@ -711,7 +711,7 @@ class TestEdgeCases(unittest.TestCase):
         npt.assert_almost_equal(vr[:, :, 0], vr[:, :, 1], decimal=14)
 
     def test_local_angles_without_dist(self):
-        """local_angles=True alone returns the same local angles as dist=True, local_angles=True (B-035)."""
+        """local_angles=True alone returns the same local angles as dist=True, local_angles=True."""
         ant = arrayant.generate('3gpp', M=1, N=2, pol=1, res=10.0)
         az = np.array([[0.1, 0.5, -1.0]])
         el = np.array([[0.0, 0.2, -0.3]])
@@ -732,7 +732,7 @@ class TestEdgeCases(unittest.TestCase):
 
     def test_input_memory_layouts_give_equal_results(self):
         """F-order, C-order, float32 and sliced angle inputs give the same result, with and without
-        fast_access (inputs are aliased only when they are F-contiguous float64, B-098)."""
+        fast_access (inputs are aliased only when they are F-contiguous float64)."""
         ant = arrayant.generate('3gpp', M=2, N=2, pol=2, res=5.0)
         n_out = ant['e_theta_re'].shape[2]
         rng = np.random.default_rng(3)
@@ -767,7 +767,7 @@ class TestEdgeCases(unittest.TestCase):
 
 
     def test_multi_freq_without_center_freq_raises(self):
-        """A 4D arrayant dict needs center_freq with one value per entry (B-100)."""
+        """A 4D arrayant dict needs center_freq with one value per entry."""
         s = arrayant.generate_speaker(frequencies=np.array([500.0, 1000.0, 2000.0]), angular_resolution=10)
         az, el = np.array([[0.1]]), np.array([[0.2]])
         ref = arrayant.interpolate(s, az, el)[0].ravel()

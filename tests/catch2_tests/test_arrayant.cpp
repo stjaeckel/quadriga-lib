@@ -32,7 +32,7 @@ TEST_CASE("Arrayant append")
     CHECK(std::abs(g1 - 25.627f) < 0.001f);
 }
 
-// B-043: the default constructor must initialise check_ptr. The arrayant is created twice in the same stack slot;
+// The default constructor must initialise check_ptr. The arrayant is created twice in the same stack slot;
 // small matrices live inside the Armadillo objects, so stale check_ptr values of the first object would match the
 // data pointers of the second one and let the quick is_valid() pass an invalid, never validated object.
 static __attribute__((noinline)) std::string arrayant_check_ptr_helper(bool first)
@@ -60,9 +60,9 @@ TEST_CASE("Arrayant - Default constructor initialises check_ptr")
     CHECK(!arrayant_check_ptr_helper(false).empty());
 }
 
-// B-008: append must build the block-diagonal coupling [C1 0; 0 C2] (as arrayant_concat_multi), also when the number
+// Append must build the block-diagonal coupling [C1 0; 0 C2] (as arrayant_concat_multi), also when the number
 // of ports differs from the number of elements, and treat an empty coupling_im as zeros (it used to crash).
-TEST_CASE("Arrayant append - Block-diagonal coupling with fewer ports than elements (B-008)")
+TEST_CASE("Arrayant append - Block-diagonal coupling with fewer ports than elements")
 {
     auto a = quadriga_lib::generate_arrayant_omni<double>(10.0);
     a.copy_element(0, 1);
@@ -98,7 +98,7 @@ TEST_CASE("Arrayant append - Block-diagonal coupling with fewer ports than eleme
     CHECK(d.is_valid(false).empty());
 }
 
-TEST_CASE("Arrayant append - Empty coupling_im is treated as zeros (B-008)")
+TEST_CASE("Arrayant append - Empty coupling_im is treated as zeros")
 {
     auto b = quadriga_lib::generate_arrayant_omni<double>(10.0);
     b.coupling_re = arma::mat(1, 1, arma::fill::value(2.0));
@@ -130,9 +130,9 @@ TEST_CASE("Arrayant append - Empty coupling_im is treated as zeros (B-008)")
     CHECK(arma::all(arma::vectorise(fm[0].coupling_im) == 0.0));
 }
 
-// B-046: remove_zeros and calc_directivity_dBi must not depend on the absolute scale of the pattern; an all-zero
+// Remove_zeros and calc_directivity_dBi must not depend on the absolute scale of the pattern; an all-zero
 // pattern is left unchanged.
-TEST_CASE("Arrayant remove_zeros and calc_directivity_dBi - Low-level patterns (B-046)")
+TEST_CASE("Arrayant remove_zeros and calc_directivity_dBi - Low-level patterns")
 {
     auto a = quadriga_lib::generate_arrayant_custom<double>(90.0, 90.0, 0.0, 5.0); // 37 x 73
     const double d_ref = a.calc_directivity_dBi(0);
@@ -217,8 +217,8 @@ TEST_CASE("Arrayant remove_zeros - name and the azimuth spacing at the wrap-arou
     CHECK(a.n_azimuth() == 2);
 }
 
-// B-101: copy_element must respect read_only and reject an empty destination with a clear message.
-TEST_CASE("Arrayant copy_element - Read-only object and empty destination (B-101)")
+// Copy_element must respect read_only and reject an empty destination with a clear message.
+TEST_CASE("Arrayant copy_element - Read-only object and empty destination")
 {
     auto a = quadriga_lib::generate_arrayant_omni<double>(10.0);
     a.read_only = true;

@@ -173,7 +173,7 @@ TEST_CASE("Baseband Frequency Response - Multi")
     CHECK(arma::approx_equal(hmat_im[3] * 2.0, hmat_im[2], "absdiff", 1.5e-6));
 }
 
-TEST_CASE("Baseband Frequency Response - Long delays with the phase in double precision (B-020)")
+TEST_CASE("Baseband Frequency Response - Long delays with the phase in double precision")
 {
     // One path, coefficient 1, bandwidth 100 MHz, tau = 0.12 s: H = exp(-j * 2 * pi * B * p * tau)
     const double B = 1.0e8, tau = 0.12;
@@ -201,7 +201,7 @@ TEST_CASE("Baseband Frequency Response - Long delays with the phase in double pr
     }
 }
 
-TEST_CASE("Baseband Frequency Response - Delays up to 10 s against a double-precision reference (B-020)")
+TEST_CASE("Baseband Frequency Response - Delays up to 10 s against a double-precision reference")
 {
     // 2x2 MIMO with per-antenna delays from 1 us to 10 s, 64 carriers over 100 MHz. The reference evaluates
     // exp(-j * 2 * pi * x) with x = (-B * p) * tau in double, reduced to x - round(x), as the library does;

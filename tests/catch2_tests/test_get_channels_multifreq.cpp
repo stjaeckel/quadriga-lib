@@ -1220,12 +1220,12 @@ TEST_CASE("Multifreq - Unsorted freq_in is not clamped to first entry")
 }
 
 // ================================================================================================
-// WP-04: path_length of NLOS paths (B-003), add_fake_los_path layout (B-068)
+// path_length of NLOS paths, add_fake_los_path layout
 // ================================================================================================
 
-TEST_CASE("Multifreq - NLOS delay and phase follow path_length (B-003)")
+TEST_CASE("Multifreq - NLOS delay and phase follow path_length")
 {
-    // Geometry of B-003: TX (0,0,0), RX (100,0,0), 3-bounce path via (30,40,0), (50,60,0), (70,40,0);
+    // Geometry: TX (0,0,0), RX (100,0,0), 3-bounce path via (30,40,0), (50,60,0), (70,40,0);
     // full length 156.5685 m, geometric TX-FBS-LBS-RX polyline 140 m
     const double C = 299792458.0;
     auto va = wrap_single(quadriga_lib::generate_arrayant_omni<double>(10.0));
@@ -1271,7 +1271,7 @@ TEST_CASE("Multifreq - NLOS delay and phase follow path_length (B-003)")
     CHECK(std::abs(dl[0](0) * 343.0 - L_true) < 1e-6);
 }
 
-TEST_CASE("Multifreq - add_fake_los_path layout (B-068)")
+TEST_CASE("Multifreq - add_fake_los_path layout")
 {
     // Always one extra output path; slot 0 holds the LOS path (zero power if none was found);
     // if a LOS path was present, its original slot holds a zero-power path.

@@ -493,7 +493,7 @@ class TestGetChannelsPlanar(unittest.TestCase):
 
 
     # -------------------------------------------------------------------------
-    # Input checks (B-100 (a), B-118)
+    # Input checks
     # -------------------------------------------------------------------------
 
     def _planar_args(self):

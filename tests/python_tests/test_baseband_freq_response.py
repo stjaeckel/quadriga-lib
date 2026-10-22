@@ -489,7 +489,7 @@ class test_case(unittest.TestCase):
 
 
     # ==================================================================================
-    # An exception inside the parallel region must reach Python (B-036); run in a
+    # An exception inside the parallel region must reach Python; run in a
     # subprocess, since before the fix the interpreter aborted (std::terminate)
     # ==================================================================================
 

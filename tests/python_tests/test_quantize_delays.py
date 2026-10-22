@@ -505,7 +505,7 @@ class test_quantize_delays(unittest.TestCase):
             quadriga_lib.channel.quantize_delays(coeff_re=cre, coeff_im=cim)
 
     def test_small_negative_delay_clamped(self):
-        """B-002: a delay that is negative by rounding noise returns; its power goes to tap 0."""
+        """A delay that is negative by rounding noise returns; its power goes to tap 0."""
         cre = [np.ones((1, 1, 3))]
         cim = [np.zeros((1, 1, 3))]
         dl = [np.array([-1e-20, 12.5e-9, 33.4e-9]).reshape(1, 1, 3)]

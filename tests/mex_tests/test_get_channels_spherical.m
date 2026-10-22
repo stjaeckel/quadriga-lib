@@ -103,7 +103,7 @@ catch ME
     end
 end
 
-% B-003: NLOS delay and phase follow path_length when it is longer than the TX-FBS-LBS-RX polyline
+% NLOS delay and phase follow path_length when it is longer than the TX-FBS-LBS-RX polyline
 % 3-bounce path via (30,40,0), (50,60,0), (70,40,0), TX (0,0,0), RX (100,0,0): 100 + 40*sqrt(2) m, polyline 140 m
 ant = quadriga_lib.arrayant_generate('omni');
 C = 299792458.0;

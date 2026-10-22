@@ -522,7 +522,7 @@ TEST_CASE("calc_cross_polarization_ratio - Circular XPR with known cross-pol")
     CHECK(std::abs(xpr(0, 5) - 1.0) < 1e-10);
 }
 
-TEST_CASE("calc_cross_polarization_ratio - V-XPR and H-XPR are per receive polarisation (B-069)")
+TEST_CASE("calc_cross_polarization_ratio - V-XPR and H-XPR are per receive polarisation")
 {
     // M rows: 0-1 = (V rx, V tx), 2-3 = (H rx, V tx), 4-5 = (V rx, H tx), 6-7 = (H rx, H tx).
     // V-XPR = sum |M(V rx, V tx)|^2 / sum |M(V rx, H tx)|^2, H-XPR = sum |M(H rx, H tx)|^2 / sum |M(H rx, V tx)|^2

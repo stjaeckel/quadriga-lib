@@ -485,7 +485,7 @@ TEST_CASE("Quadriga tools - coord2path example")
 
 TEST_CASE("Quadriga tools - Point cloud split of identical points")
 {
-    // B-080: a failed split returns a negative value, leaves the outputs unchanged, and does not leak
+    // A failed split returns a negative value, leaves the outputs unchanged, and does not leak
     arma::mat points(1000, 3, arma::fill::ones);
     arma::mat pointsA = {{1.0, 2.0, 3.0}}, pointsB = {{4.0, 5.0, 6.0}};
     arma::mat A0 = pointsA, B0 = pointsB;

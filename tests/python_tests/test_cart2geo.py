@@ -161,7 +161,7 @@ class test_case(unittest.TestCase):
         with self.assertRaises(ValueError):
             quadriga_lib.tools.cart2geo(np.random.rand(4, 1), None, np.random.rand(4, 1))
 
-    # Separate inputs must give the same values as the combined input, also for large n (B-004:
+    # Separate inputs must give the same values as the combined input, also for large n (formerly
     # the separate-input branch read freed memory, wrong values for n > 16, segfault for large n)
     def test_separate_inputs_equal_combined(self):
         rng = np.random.default_rng(1)

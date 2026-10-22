@@ -86,7 +86,7 @@ TEST_CASE("Test Mitsuba XML File Write - 1-based material indices")
         std::invalid_argument);
 }
 
-// Byte-exact output of the writer before the index map rewrite (B-056), for a scene with a split object, a vertex
+// Byte-exact output of the writer before the index map rewrite, for a scene with a split object, a vertex
 // shared by two objects and faces whose vertex order differs from the ascending global order
 TEST_CASE("Test Mitsuba XML File Write - XML and PLY output are byte-identical to the reference")
 {
