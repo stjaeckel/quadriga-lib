@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
 # Part of quadriga-lib — see LICENSE for terms.
-"""Random-incidence absorption of a locally reacting face (md/acoustic.md 2.6, 9; M6).
+"""Random-incidence absorption of a locally reacting face (html_docu/quadriga_lib_material_model.md 6.4).
 
 A face of normalized impedance z = r + j x reflects (z c - 1)/(z c + 1) at the cosine c in air. Its Paris integral
 (random incidence, 0 to 90 deg, weight sin 2 theta) has the closed form

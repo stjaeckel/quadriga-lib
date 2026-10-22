@@ -1,5 +1,5 @@
 {
- "source": "md/acoustic_round1_report.md 1.2-1.7 (measured octaves 125 Hz-4 kHz), 3.1 (model spread at 31.5 / 63 Hz and 8 kHz; gypsum and plywood in every octave), 3.6 (tf at the class's absorption law: tf at 1 kHz, tfB)",
+ "source": "the first acoustic round, 2026-10-14/15 (bb336dc, 4720a92): measured octaves 125 Hz-4 kHz; the model spread at 31.5 / 63 Hz and 8 kHz (gypsum and plywood in every octave); tf at the class's absorption law (tf at 1 kHz, tfB)",
  "octaves_hz": [31.5, 63, 125, 250, 500, 1000, 2000, 4000, 8000],
  "constructions": [
   {"name": "glass 4 mm", "cls": "glass4", "thk": 0.004, "targets": [[5.1, 18.6], [9.3, 16.0], [17.0, 17.0], [20.0, 20.0], [26.0, 26.0], [32.0, 32.0], [33.0, 33.0], [26.0, 26.0], [37.0, 37.2]]},

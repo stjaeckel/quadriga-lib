@@ -1,36 +1,27 @@
 #!/usr/bin/env python3
 """
-Mechanical checks of the acoustic documents (md/acoustic.md, md/wave.md), run from the repository root:
+Mechanical checks of the material-model page and of the material part of the Data Formats page, run from the
+repository root:
 
   python3 tools/acoustic/check_docs.py
 
-1. Tables: every row of a markdown table has the column count of its header row (an unescaped `|` inside a cell, e.g.
-   in `|R|` or `4|16|4`, splits the cell; write `\\|`).
-2. Source keys: every [Key_YYYY_Name] cited in md/acoustic.md resolves in the literature review's references/index.csv
-   (path from $QD_REVIEW_DIR, default /sjc/accoustic_research).
-3. Test cases: every TEST_CASE of tests/catch2_tests/test_acoustic_*.cpp is named in md/acoustic.md (whitespace
-   normalized, `\\|` and `\\*` unescaped).
-4. Counts: the "All tests passed (N assertions in M test cases)" lines quoted in md/acoustic.md and md/wave.md
-   against the last line of the baseline files test_wave.txt, test_acoustic.txt, test.txt (if present; regenerate
-   them first, md/wave.md section 0).
-5. Spelling: British spellings that the documents avoid (American English); italic test-case names are skipped.
-6. The material-model page html_docu/quadriga_lib_material_model.md: tables and spelling as above; every column that
-   MaterialCols reads (resolve("...") in src/ray_mesh_interact.cpp) is a row of the page's column table; no internal
-   labels (item ids, "round 1", md/ files, briefs, rigs, scratch paths) outside math and code; `$` balanced per
-   paragraph and `$$` per file; no \newcommand; every in-page anchor resolves to a heading.
-7. The material part of the Data Formats page, tools/data_formats_md/format_materials.md: tables and spelling as
+1. The material-model page html_docu/quadriga_lib_material_model.md: every row of a markdown table has the column
+   count of its header row (an unescaped `|` inside a cell, e.g. in `|R|` or `4|16|4`, splits the cell; write `\\|`);
+   no British spellings (American English; italic test-case names are skipped); every column that MaterialCols reads
+   (resolve("...") in src/ray_mesh_interact.cpp) is a row of the page's column table; no internal labels (item ids,
+   "round 1", md/ files, briefs, rigs, scratch paths) outside math and code; `$` balanced per paragraph and `$$` per
+   file; no \newcommand; every in-page anchor resolves to a heading.
+2. The material part of the Data Formats page, tools/data_formats_md/format_materials.md: tables and spelling as
    above; every column that MaterialCols reads is a row of its column table (header "| Key |"); no internal labels.
 
 Exit code 0 when every check passes, 1 otherwise. It reports; it changes nothing.
 """
-import csv, glob, os, re, sys
+import os, re, sys
 
 ROOT = os.getcwd()
-DOCS = ['md/acoustic.md', 'md/wave.md']
 PAGE = 'html_docu/quadriga_lib_material_model.md'
 FORMATS = 'tools/data_formats_md/format_materials.md'
 SOURCE = 'src/ray_mesh_interact.cpp'
-REVIEW = os.environ.get('QD_REVIEW_DIR', '/sjc/accoustic_research')
 BRITISH = ['neighbour', 'centre', 'behaviour', 'modelled', 'modelling', 'colour', 'millimetre', 'metre ', 'favour',
            'labelled', 'travelled', 'grey ']
 
@@ -50,15 +41,6 @@ def check_tables(fn, text):
         else:
             hdr = None
     return bad
-
-def cited_keys(text):
-    keys = set()
-    for b in re.findall(r'\[([^\]]+)\]', text):
-        for k in re.split(r';\s*', b):
-            k = k.split(',')[0].strip()
-            if re.match(r'^[A-Z][A-Za-z]+_[A-Za-z0-9]+_', k):
-                keys.add(k)
-    return keys
 
 def strip_math_code(text):
     """the text without $$ blocks, $`...`$ and $...$ math, code fences and code spans"""
@@ -119,57 +101,9 @@ def check_page(text):
 
 def main():
     ok = True
-    texts = {fn: read(fn) for fn in DOCS if os.path.exists(os.path.join(ROOT, fn))}
-    if 'md/acoustic.md' not in texts:
-        print('run from the repository root (md/acoustic.md not found)'); return 1
-    # 1. tables
-    for fn, t in texts.items():
-        bad = check_tables(fn, t)
-        print('tables     %-16s %s' % (fn, 'ok' if not bad else 'rows off at lines %s' % bad))
-        ok &= not bad
-    # 2. source keys
-    idx = os.path.join(REVIEW, 'references', 'index.csv')
-    if os.path.exists(idx):
-        with open(idx, encoding='utf-8') as f:
-            index = {r['key'] for r in csv.DictReader(f)}
-        keys = cited_keys(texts['md/acoustic.md'])
-        unknown = sorted(keys - index)
-        print('keys       %d cited, %s' % (len(keys), 'all resolve' if not unknown else 'UNRESOLVED: %s' % unknown))
-        ok &= not unknown
-    else:
-        print('keys       skipped (%s not found; set QD_REVIEW_DIR)' % idx)
-    # 3. test cases
-    src = ''.join(read(p) for p in sorted(glob.glob(os.path.join(ROOT, 'tests/catch2_tests/test_acoustic_*.cpp'))))
-    names = re.findall(r'TEST_CASE\("([^"]*)"', src)
-    flat = re.sub(r'\s+', ' ', texts['md/acoustic.md']).replace('\\|', '|').replace('\\*', '*')
-    missing = [n for n in names if n not in flat]
-    print('cases      %d [acoustic] cases, %s' % (len(names), 'all named in md/acoustic.md' if not missing else 'MISSING: %s' % missing))
-    ok &= not missing
-    # 4. counts
-    base = {}
-    for b in ('test_wave.txt', 'test_acoustic.txt', 'test.txt'):
-        p = os.path.join(ROOT, b)
-        if os.path.exists(p):
-            with open(p, encoding='utf-8', errors='replace') as f:
-                m = re.findall(r'All tests passed \((\d+) assertions in (\d+) test cases\)', f.read())
-            if m:
-                base[b] = m[-1]
-    for fn, t in texts.items():
-        quoted = re.findall(r'(test_wave\.txt|test_acoustic\.txt|test\.txt)[^\n]*?All tests passed \((\d+) assertions in (\d+) test cases\)', t)
-        for b, a, c in quoted:
-            if b in base:
-                same = base[b] == (a, c)
-                print('counts     %-16s %-18s quoted %s / %s, baseline %s / %s %s' % (fn, b, a, c, base[b][0], base[b][1], 'ok' if same else 'DIFFER'))
-                ok &= same
-    if not base:
-        print('counts     skipped (no baseline files in the repository root)')
-    # 5. spelling
-    for fn, t in texts.items():
-        plain = re.sub(r'\*[^*]+\*', '', t)            # italic test-case names are quoted as written
-        hits = sorted({w.strip() for w in BRITISH if re.search(r'\b' + re.escape(w.strip()), plain, re.I)})
-        print('spelling   %-16s %s' % (fn, 'ok' if not hits else 'British spellings: %s' % hits))
-        ok &= not hits
-    # 6. the material-model page
+    if not any(os.path.exists(os.path.join(ROOT, p)) for p in (PAGE, FORMATS)):
+        print('run from the repository root (%s and %s not found)' % (PAGE, FORMATS)); return 1
+    # 1. the material-model page
     if os.path.exists(os.path.join(ROOT, PAGE)):
         page = read(PAGE)
         bad = check_tables(PAGE, page)
@@ -185,7 +119,7 @@ def main():
         ok &= not bad and not hits and not missing and not labels and not bad_math and dd_ok and nc_ok and not anchors
     else:
         print('page       skipped (%s not found)' % PAGE)
-    # 7. the material part of the Data Formats page
+    # 2. the material part of the Data Formats page
     if os.path.exists(os.path.join(ROOT, FORMATS)):
         fmt = read(FORMATS)
         bad = check_tables(FORMATS, fmt)

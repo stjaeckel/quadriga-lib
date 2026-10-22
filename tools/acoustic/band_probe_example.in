@@ -1,4 +1,4 @@
-# the board of md/acoustic.md 2.8 (12.5 mm gypsum leaf, m = 0, loss ratio 0.2 on mu) glued on a 25 mm box of near-air
+# the board of the leaf-on-a-box cases (12.5 mm gypsum leaf, m = 0, loss ratio 0.2 on mu) glued on a 25 mm box of near-air
 # material glued on a mass-law wall (two-parameter concrete, m 20, tf 0.02, 200 mm); 0 deg, tracer 4, band 80-160 Hz.
 # Expected (fluid-layer reference, pad on the half-space): |R|^2 0.925135 / 0.649358 / 0.444760 / 0.778824, the probe
 # within 4.1e-5 and 0.003 deg (2026-10-15). The wall carries side 3.29 m (2026-10-19): R unchanged, T through the
