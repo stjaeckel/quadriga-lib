@@ -104,12 +104,13 @@ assertTrue(all(theta >= -pi/2 - 0.01));
 assertTrue(all(theta <= pi/2 + 0.01));
 
 % --- Error: too few arguments ---
+failed = false;
 try
-    quadriga_lib.calc_angular_spread(az, el);
-    error('Expected an error');
-catch
-    % Expected
+    [~] = quadriga_lib.calc_angular_spread(az, el);
+catch ME
+    failed = ~isempty(strfind(ME.message, 'Wrong number of input arguments.'));
 end
+assertTrue( failed );
 
 % --- quantize must be 0 or a finite value >= 1e-3 deg ---
 failed = false;
