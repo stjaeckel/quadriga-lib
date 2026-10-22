@@ -84,4 +84,13 @@ catch ME
     end
 end
 
-
+% 2D data (y given) without yI is an error naming yI (it was interpolated at y = 0)
+failed = false;
+try
+    [~] = quadriga_lib.interp( [0 1], [0 1], [0 1; 2 3], 0.5 );
+catch ME
+    failed = ~isempty(strfind(ME.message, '''yI'''));
+end
+assertTrue( failed );
+O = quadriga_lib.interp( [0 1], [0 1], [0 1; 2 3], 0.5, 0.5 );
+assertElementsAlmostEqual( O, 1.5, 'absolute', 1e-13 );

@@ -45,7 +45,7 @@ storage_dims = quadriga_lib.channel.hdf5_write_channel( fn, chan, par, ix, iy, i
 - **`iw`** — 0-based slot indices along dimension W; scalar or vector of length `len(chan)`; default: 0
 
 ## Outputs:
-- **`storage_dims`** — Storage layout dimensions of the file `[nx, ny, nz, nw]`; `(4,)`; uint32
+- **`storage_dims`** — Storage layout dimensions of the file `[nx, ny, nz, nw]`; `(4,)`; int64
 
 ## See also:
 - [[hdf5_create_file]] (for creating a file with a custom storage layout)
@@ -53,7 +53,7 @@ storage_dims = quadriga_lib.channel.hdf5_write_channel( fn, chan, par, ix, iy, i
 - [[hdf5_read_channel]] (for reading channel data)
 MD!*/
 
-py::array_t<unsigned> hdf5_write_channel(const std::string &fn,
+py::array_t<py::ssize_t> hdf5_write_channel(const std::string &fn,
                                          py::handle chan,
                                          py::handle par,
                                          py::handle ix,
@@ -167,8 +167,8 @@ py::array_t<unsigned> hdf5_write_channel(const std::string &fn,
         py::module_::import("warnings")
             .attr("warn")("Modifying or overwriting existing dataset in file.");
 
-    // Return the storage layout
-    return qd_python_copy2numpy(&storage_space);
+    // Return the storage layout (copied integer output: int64)
+    return qd_python_copy2numpy<unsigned, py::ssize_t>(&storage_space);
 }
 
 // pybind11 declaration:

@@ -178,12 +178,12 @@ assertEqual( lines{1}, 'name,c,tf,zzz' );
 assertEqual( lines{2}, 'slab,0.05,2,7' );
 delete(fn); delete(mtl_fn); delete(csv_obj_fn);
 
-% csv_write_defaults = true -> full canonical set with defaults (a, e, fRef = 1, side = 3.29, else 0)
+% csv_write_defaults = true -> full canonical set with defaults (a, e, fRef = 1, side = 3.29, else 0; thk after h)
 quadriga_lib.obj_file_write( fn, mesh, obj_ind, mtl_ind, obj_names, mtl_names, ...
     [], [], [], 0.001, [], csv_names, csv_prop, true );
 lines = read_lines(csv_obj_fn);
-assertEqual( lines{1}, 'name,a,b,c,d,e,f,g,h,att,attB,alpha,alphaB,fRef,m,resF,resQ,resS,coiF,coiQ,tf,tfB,tfP,tfF,tfQ,side,zzz' );
-assertEqual( lines{2}, 'slab,1,0,0.05,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,3.29,7' );
+assertEqual( lines{1}, 'name,a,b,c,d,e,f,g,h,thk,att,attB,alpha,alphaB,fRef,m,resF,resQ,resS,coiF,coiQ,tf,tfB,tfP,tfF,tfQ,side,zzz' );
+assertEqual( lines{2}, 'slab,1,0,0.05,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,3.29,7' );
 delete(fn); delete(mtl_fn); delete(csv_obj_fn);
 
 % Validation: csv_prop column length must match numel(csv_names)
@@ -370,6 +370,18 @@ assert_cpp_error( @() quadriga_lib.obj_file_write( fn, [], [], [], [], [], vert_
 % None of the error cases should have produced a file
 assertTrue( exist(fn,'file') ~= 2 );
 assertTrue( exist('cube.txt','file') ~= 2 );
+
+%% Faces without material (mtl_ind = 0) after a face with material read back as 0
+tri3 = [ 0 0 0 1 0 0 0 1 0; 5 0 0 6 0 0 5 1 0; 9 0 0 10 0 0 9 1 0 ];
+quadriga_lib.obj_file_write( fn, tri3, [1;1;1], [1;0;2], {'box'}, {'itu_wood', 'itu_glass'} );
+assertEqual( sum( strcmp( read_lines(fn), 'usemtl (null)' ) ), 1 );
+[ ~, ~, ~, ~, ~, mtl_ind_rd, mtl_names_rd, bsdf_rd, csv_ind_rd ] = quadriga_lib.obj_file_read( fn );
+assertEqual( mtl_ind_rd, uint64([1;0;2]) );
+assertEqual( mtl_names_rd, {'itu_wood'; 'itu_glass'} );
+assertEqual( size(bsdf_rd, 1), 2 );
+assertEqual( csv_ind_rd(2), uint64(0) );
+assertTrue( csv_ind_rd(1) ~= 0 && csv_ind_rd(3) ~= 0 );
+delete(fn); delete(mtl_fn);
 
 if exist(fn,'file');         delete(fn);         end
 if exist(mtl_fn,'file');     delete(mtl_fn);     end

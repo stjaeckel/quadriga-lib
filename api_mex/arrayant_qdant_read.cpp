@@ -14,9 +14,12 @@ Reads array antenna data from QDANT files
 
 - The QuaDRiGa array antenna exchange format (QDANT) is an XML format for storing antenna pattern data
 - Without `id`, all entries are read: returns a struct array when the file has multiple entries (frequency-dependent model) 
-  or a single struct when it has exactly one entry
+  or a single struct when it has exactly one entry; multiple entries must form a frequency set (same number of elements,
+  same azimuth and elevation grids, element positions and coupling size), otherwise
+  an error asks to pass `id`
+- Differs from Python, where `qdant_read(fn)` reads ID 1 only
 - With `id`, a single entry is read; useful for picking one frequency from a multi-frequency file
-- Separate-fields output (11 or 12 outputs) is only available when the result is a single entry 
+- Separate-fields output (3 to 12 outputs) is only available when the result is a single entry 
   (i.e. `id` was provided, or the file contains exactly one entry)
 - An `id` that is not in the file is an error; the first entry counts as ID 1 only if it has no `id` attribute
 - Malformed files are an error, also when they declare more elements (`NoElements`) than the file has data for;
@@ -61,6 +64,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 12)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
+    // No output argument behaves as one (the struct goes to "ans")
+    const int n_out = (nlhs == 0) ? 1 : nlhs;
+
     // Read inputs
     std::string fn = qd_mex_get_string(prhs[0]);
     bool read_all = (nrhs < 2) || mxIsEmpty(prhs[1]);
@@ -78,11 +84,20 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "File does not contain any data.");
         else if (arrayant.size() > 1) // Multi-freq mode
         {
-            if (nlhs != 1 && nlhs != 2)
+            if (n_out > 2)
                 mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Separate-fields output only available in single-frequency mode.");
 
+            // The entries must form a frequency set (same element count, grids, positions and coupling size)
+            std::string err = quadriga_lib::arrayant_is_valid_multi(arrayant, true);
+            if (!err.empty())
+            {
+                err = "Entries in file '" + fn + "' do not form a frequency set (" + err +
+                      "); pass 'id' to read single entries.";
+                mexErrMsgIdAndTxt("quadriga_lib:CPPerror", err.c_str());
+            }
+
             plhs[0] = qd_mex_arrayant2struct_multi(arrayant);
-            if (nlhs == 2)
+            if (n_out == 2)
                 plhs[1] = qd_mex_copy2matlab(&layout);
             return;
         }
@@ -93,18 +108,19 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         CALL_QD(arrayant[0] = quadriga_lib::qdant_read<double>(fn, id, &layout));
     }
 
-    if (nlhs == 1 || nlhs == 2) // Output as struct
+    if (n_out <= 2) // Output as struct
     {
         plhs[0] = qd_mex_arrayant2struct(arrayant[0]);
-        if (nlhs == 2)
+        if (n_out == 2)
             plhs[1] = qd_mex_copy2matlab(&layout);
     }
-    else if (nlhs > 3) // Separate outputs
+    else // Separate outputs (3 to 12)
     {
         plhs[0] = qd_mex_copy2matlab(&arrayant[0].e_theta_re);
         plhs[1] = qd_mex_copy2matlab(&arrayant[0].e_theta_im);
         plhs[2] = qd_mex_copy2matlab(&arrayant[0].e_phi_re);
-        plhs[3] = qd_mex_copy2matlab(&arrayant[0].e_phi_im);
+        if (nlhs > 3)
+            plhs[3] = qd_mex_copy2matlab(&arrayant[0].e_phi_im);
         if (nlhs > 4)
             plhs[4] = qd_mex_copy2matlab(&arrayant[0].azimuth_grid, true);
         if (nlhs > 5)

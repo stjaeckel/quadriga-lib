@@ -474,3 +474,182 @@ TEST_CASE("Test OBJ File Read - Custom material CSV")
         std::remove("custom_materials.csv");
     }
 }
+// Write a text file byte by byte (binary mode keeps "\r\n" as given)
+static inline void write_text_file(const std::string &fn, const std::string &content)
+{
+    std::ofstream f(fn, std::ios::binary);
+    f << content;
+}
+
+// Read an OBJ file with one combination of requested outputs (0 = none, 1-10 = one output each, 11 = all)
+static inline arma::uword read_obj_combo(const std::string &fn, int k)
+{
+    arma::mat mesh, vert, bsdf;
+    arma::umat face;
+    arma::uvec obj, mtl, csv;
+    std::vector<std::string> on, mn, cn;
+    bool all = (k == 11);
+    return quadriga_lib::obj_file_read<double>(fn, (all || k == 1) ? &mesh : nullptr, (all || k == 2) ? &vert : nullptr,
+                                               (all || k == 3) ? &face : nullptr, (all || k == 4) ? &obj : nullptr,
+                                               (all || k == 5) ? &on : nullptr, (all || k == 6) ? &mtl : nullptr,
+                                               (all || k == 7) ? &mn : nullptr, (all || k == 8) ? &bsdf : nullptr, "",
+                                               (all || k == 9) ? &csv : nullptr, (all || k == 10) ? &cn : nullptr);
+}
+
+TEST_CASE("Test OBJ File Read - CRLF line endings in the OBJ / MTL / CSV files")
+{
+    write_text_file("crlf.obj", "mtllib crlf.mtl\r\no a\r\nv 0 0 0\r\nv 1 0 0\r\nv 0 1 0\r\nusemtl red\r\nf 1 2 3\r\n"
+                                "o b\r\nv 0 0 1\r\nv 1 0 1\r\nv 0 1 1\r\nusemtl blue\r\nf 4 5 6\r\n");
+    write_text_file("crlf.mtl", "# comment\r\nnewmtl red\r\nKd 1 0 0\r\nd 0.5\r\n\r\nnewmtl blue \r\nKd 0 0 1\r\n");
+    write_text_file("crlf.csv", "name,a,b\r\nred,2.0,0.5\r\nblue,3.0,0\r\n");
+
+    arma::mat mesh, bsdf;
+    arma::umat face;
+    arma::uvec obj, mtl, csv;
+    std::vector<std::string> on, mn, cn;
+    std::unordered_map<std::string, std::vector<double>> prop;
+    arma::uword n = quadriga_lib::obj_file_read<double>("crlf.obj", &mesh, nullptr, &face, &obj, &on, &mtl, &mn, &bsdf,
+                                                        "crlf.csv", &csv, &cn, &prop, true);
+    CHECK(n == 2);
+    CHECK(on == std::vector<std::string>{"a", "b"});
+    CHECK(mn == std::vector<std::string>{"red", "blue"});
+    CHECK(arma::all(mtl == arma::uvec({1, 2})));
+    CHECK(arma::all(arma::vectorise(face) == arma::uvec({0, 3, 1, 4, 2, 5})));
+    REQUIRE(bsdf.n_rows == 2);
+    REQUIRE(bsdf.n_cols == 17);
+    CHECK(arma::approx_equal(bsdf.row(0).cols(0, 3), arma::rowvec({1.0, 0.0, 0.0, 0.5}), "absdiff", 1e-12));
+    CHECK(arma::approx_equal(bsdf.row(1).cols(0, 3), arma::rowvec({0.0, 0.0, 1.0, 1.0}), "absdiff", 1e-12));
+    CHECK(cn == std::vector<std::string>{"red", "blue"});
+    CHECK(arma::all(csv == arma::uvec({1, 2})));
+    REQUIRE(prop.count("a") == 1);
+    CHECK(prop["a"] == std::vector<double>{2.0, 3.0});
+
+    std::remove("crlf.obj");
+    std::remove("crlf.mtl");
+    std::remove("crlf.csv");
+}
+
+TEST_CASE("Test OBJ File Read - Indented .mtl statements")
+{
+    write_text_file("indent.obj", "mtllib indent.mtl\no a\nv 0 0 0\nv 1 0 0\nv 0 1 0\nusemtl red\nf 1 2 3\n"
+                                  "usemtl blue\nf 1 3 2\n");
+    write_text_file("indent.mtl", "# indented statements\nnewmtl red\n    Kd 1 0 0\n\td 0.5\n  newmtl blue\n  Kd 0 0 1\n");
+
+    arma::mat bsdf;
+    std::vector<std::string> mn;
+    quadriga_lib::obj_file_read<double>("indent.obj", nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &mn, &bsdf);
+    CHECK(mn == std::vector<std::string>{"red", "blue"});
+    REQUIRE(bsdf.n_rows == 2);
+    CHECK(arma::approx_equal(bsdf.row(0).cols(0, 3), arma::rowvec({1.0, 0.0, 0.0, 0.5}), "absdiff", 1e-12));
+    CHECK(arma::approx_equal(bsdf.row(1).cols(0, 3), arma::rowvec({0.0, 0.0, 1.0, 1.0}), "absdiff", 1e-12));
+
+    std::remove("indent.obj");
+    std::remove("indent.mtl");
+}
+
+TEST_CASE("Test OBJ File Read - CSV cells must be one finite number")
+{
+    std::vector<std::string> cn;
+    std::unordered_map<std::string, std::vector<double>> prop;
+    for (const std::string cell : {"1.5x", "nan", "inf", "-inf", "NaN", "1.5 2", "0x"})
+    {
+        write_text_file("cells.csv", "name,a\nred," + cell + "\n");
+        std::string msg;
+        try
+        {
+            quadriga_lib::obj_file_read<double>("", nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                                                "cells.csv", nullptr, &cn, &prop);
+        }
+        catch (const std::invalid_argument &e)
+        {
+            msg = e.what();
+        }
+        INFO("cell '" << cell << "'");
+        CHECK(msg.find("column 'a' is not numeric") != std::string::npos);
+    }
+    for (const std::pair<std::string, double> ok : {std::pair<std::string, double>{" 2.5 ", 2.5}, {"1e3", 1000.0},
+                                                    {"-0.5", -0.5}, {"", 0.0}})
+    {
+        write_text_file("cells.csv", "name,a\nred," + ok.first + "\n");
+        quadriga_lib::obj_file_read<double>("", nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                                            "cells.csv", nullptr, &cn, &prop);
+        INFO("cell '" << ok.first << "'");
+        REQUIRE(prop.count("a") == 1);
+        CHECK(prop["a"] == std::vector<double>{ok.second});
+    }
+    std::remove("cells.csv");
+}
+
+TEST_CASE("Test OBJ File Read - Relative (negative) face indices")
+{
+    // -1 is the last vertex defined before the face line; mixed with absolute indices and v/vt/vn references
+    write_text_file("rel.obj", "v 0 0 0\nv 1 0 0\nv 0 1 0\nf -3 -2 -1\nv 0 0 1\nv 1 0 1\nv 0 1 1\nf -3 -2 -1\n"
+                               "f -1 -2 -6\nf 4/1/1 -5/2/2 6//3\nf -6/-1 -5/-2 -4/-3\n");
+    arma::umat F_expected = {{0, 1, 2}, {3, 4, 5}, {5, 4, 0}, {3, 1, 5}, {0, 1, 2}};
+
+    for (int k = 0; k <= 11; ++k)
+        CHECK(read_obj_combo("rel.obj", k) == 5);
+
+    arma::mat mesh, vert;
+    arma::umat face;
+    quadriga_lib::obj_file_read<double>("rel.obj", &mesh, &vert, &face);
+    CHECK(arma::all(arma::vectorise(face) == arma::vectorise(F_expected)));
+    REQUIRE(mesh.n_rows == 5);
+    for (arma::uword f = 0; f < 5; ++f)
+        for (arma::uword c = 0; c < 3; ++c)
+            CHECK(arma::approx_equal(mesh.row(f).cols(3 * c, 3 * c + 2), vert.row(F_expected(f, c)), "absdiff", 0.0));
+
+    // Only face_ind requested (the case that returned 2^64 - 3 ... before)
+    arma::umat face2;
+    quadriga_lib::obj_file_read<double>("rel.obj", nullptr, nullptr, &face2);
+    CHECK(arma::all(arma::vectorise(face2) == arma::vectorise(F_expected)));
+
+    std::remove("rel.obj");
+}
+
+TEST_CASE("Test OBJ File Read - Invalid face indices and quads throw for every output combination")
+{
+    const std::string V3 = "o x\nv 0 0 0\nv 1 0 0\nv 0 1 0\n";
+    const std::vector<std::string> bad = {
+        V3 + "f 1 2 99\n",                          // beyond the vertex count
+        V3 + "f 1 2 0\n",                           // index 0
+        V3 + "f -4 -2 -1\n",                        // relative index before the first vertex
+        V3 + "f 1 2 4\nv 1 1 1\n",                  // vertex 4 is defined only after the face
+        V3 + "f 1/1/1 2/2/2 9/9/9\n",               // beyond the vertex count, slash format
+        V3 + "f 1 2 3\nf 1 2 18446744073709551615\n", // 2^64 - 1
+        V3 + "f 1 2 99999999999999999999999\n",     // beyond the 64-bit range
+        V3 + "v 1 1 0\nf 1 2 3 4\n",                // quad
+        V3 + "f 1 2\n"};                            // fewer than 3 indices
+
+    for (size_t i = 0; i < bad.size(); ++i)
+    {
+        write_text_file("bad.obj", bad[i]);
+        for (int k = 0; k <= 11; ++k)
+        {
+            INFO("file " << i << ", output combination " << k);
+            CHECK_THROWS_AS(read_obj_combo("bad.obj", k), std::invalid_argument);
+        }
+    }
+    std::remove("bad.obj");
+}
+
+TEST_CASE("Test OBJ File Read - 'usemtl (null)' marks faces without material")
+{
+    write_text_file("nullmtl.obj", "o x\nv 0 0 0\nv 1 0 0\nv 0 1 0\nusemtl (null)\nf 1 2 3\nusemtl itu_wood\nf 1 2 3\n"
+                                   "usemtl (null)\nf 1 2 3\nf 1 2 3\nusemtl itu_glass\nf 1 2 3\n");
+    arma::uvec mtl, csv;
+    std::vector<std::string> mn, cn;
+    arma::mat bsdf;
+    quadriga_lib::obj_file_read<double>("nullmtl.obj", nullptr, nullptr, nullptr, nullptr, nullptr, &mtl, &mn, &bsdf, "",
+                                        &csv, &cn, nullptr, /*csv_strict=*/true);
+    CHECK(arma::all(mtl == arma::uvec({0, 1, 0, 0, 2})));
+    CHECK(mn == std::vector<std::string>{"itu_wood", "itu_glass"});
+    CHECK(bsdf.n_rows == 0); // no .mtl file
+    REQUIRE(csv.n_elem == 5);
+    CHECK(csv(0) == 0);
+    CHECK(cn[csv(1) - 1] == "itu_wood");
+    CHECK(csv(2) == 0);
+    CHECK(csv(3) == 0);
+    CHECK(cn[csv(4) - 1] == "itu_glass");
+    std::remove("nullmtl.obj");
+}

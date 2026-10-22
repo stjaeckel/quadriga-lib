@@ -28,6 +28,8 @@ Calculate MIMO channel coefficients for planar wave paths
   with zero power if no LOS path was found. LOS = the strongest path whose `path_length` is within 0.1 mm of the TX-RX
   distance; it is moved to slot 0 and its original slot (input index + 1) holds a zero-power path. All other paths
   keep their order, shifted by one slot.
+- With 0 paths (all path inputs empty), the outputs are empty, `[n_rx, n_tx, 0]`; with `add_fake_los_path = true` they
+  hold only this zero-power LOS path, with the LOS delays per antenna pair.
 - Polarization coupling: `M` is the 2x2 Jones matrix (rows = RX polarisation V/H, columns = TX polarisation V/H),
   column-major with Re/Im interleaved: rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx),
   rows 6-7 = (H rx, H tx).
@@ -126,6 +128,46 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
         throw std::invalid_argument(error_message.c_str());
     }
 
+    // 0 paths with add_fake_los_path: the output holds only the zero-power LOS path. Its slot does not depend on the
+    // path data, except that its delays use the antenna response in the direction of path 0: a dummy NLOS path in the
+    // LOS direction (1 m longer, never detected as LOS) gives the delays of a LOS path; its own slot is dropped.
+    if (add_fake_los_path && aod->n_elem == 0 && eod->n_elem == 0 && aoa->n_elem == 0 && eoa->n_elem == 0 &&
+        path_gain->n_elem == 0 && path_length->n_elem == 0 && M->n_cols == 0)
+    {
+        const dtype x = Rx - Tx, y = Ry - Ty, z = Rz - Tz;
+        const dtype d_xy = std::sqrt(x * x + y * y);
+        const arma::Col<dtype> aod_d = {std::atan2(y, x)}, eod_d = {std::atan2(z, d_xy)};
+        const arma::Col<dtype> aoa_d = {std::atan2(-y, -x)}, eoa_d = {-eod_d.at(0)};
+        const arma::Col<dtype> gain_d = {one}, length_d = {std::sqrt(x * x + y * y + z * z) + one};
+        arma::Mat<dtype> M_d(8, 1, arma::fill::zeros);
+        M_d.at(0) = one, M_d.at(6) = -one;
+
+        arma::Cube<dtype> cr, ci, dl;
+        arma::Col<dtype> doppler;
+        quadriga_lib::get_channels_planar<dtype>(tx_array, rx_array, Tx, Ty, Tz, Tb, Tt, Th, Rx, Ry, Rz, Rb, Rt, Rh,
+                                                 &aod_d, &eod_d, &aoa_d, &eoa_d, &gain_d, &length_d, &M_d,
+                                                 &cr, &ci, &dl, center_frequency, use_absolute_delays, true,
+                                                 rx_Doppler == nullptr ? nullptr : &doppler);
+
+        const arma::uword n_ports = cr.n_rows * cr.n_cols;
+        if (coeff_re->n_rows != cr.n_rows || coeff_re->n_cols != cr.n_cols || coeff_re->n_slices != 1ULL)
+            coeff_re->set_size(cr.n_rows, cr.n_cols, 1ULL);
+        if (coeff_im->n_rows != cr.n_rows || coeff_im->n_cols != cr.n_cols || coeff_im->n_slices != 1ULL)
+            coeff_im->set_size(cr.n_rows, cr.n_cols, 1ULL);
+        if (delay->n_rows != cr.n_rows || delay->n_cols != cr.n_cols || delay->n_slices != 1ULL)
+            delay->set_size(cr.n_rows, cr.n_cols, 1ULL);
+        std::memcpy(coeff_re->memptr(), cr.memptr(), n_ports * sizeof(dtype));
+        std::memcpy(coeff_im->memptr(), ci.memptr(), n_ports * sizeof(dtype));
+        std::memcpy(delay->memptr(), dl.memptr(), n_ports * sizeof(dtype));
+        if (rx_Doppler != nullptr)
+        {
+            if (rx_Doppler->n_elem != 1ULL)
+                rx_Doppler->set_size(1ULL);
+            rx_Doppler->at(0) = doppler.at(0);
+        }
+        return;
+    }
+
     // Check if the antennas are valid
     error_message = tx_array->is_valid();
     if (error_message.length() != 0)
@@ -150,12 +192,12 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
     arma::uword n_ports = n_tx_ports * n_rx_ports;                  // Total number of ports
 
     // Check if the number of paths is consistent in all inputs
-    if (n_path == 0ULL || eod->n_elem != n_path || aoa->n_elem != n_path || eoa->n_elem != n_path || path_gain->n_elem != n_path || path_length->n_elem != n_path || M->n_cols != n_path)
+    if (eod->n_elem != n_path || aoa->n_elem != n_path || eoa->n_elem != n_path || path_gain->n_elem != n_path || path_length->n_elem != n_path || M->n_cols != n_path)
     {
         error_message = "Inputs 'aod', 'eod', 'aoa', 'eoa', 'path_gain', 'path_length', and 'M' must have the same number of columns (n_paths).";
         throw std::invalid_argument(error_message.c_str());
     }
-    if (M->n_rows != 8ULL)
+    if (M->n_rows != 8ULL && n_path != 0ULL)
     {
         error_message = "Polarization transfer matrix 'M' must have 8 rows.";
         throw std::invalid_argument(error_message.c_str());
@@ -168,6 +210,14 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
         coeff_im->set_size(n_rx_ports, n_tx_ports, n_out);
     if (delay->n_rows != n_rx_ports || delay->n_cols != n_tx_ports || delay->n_slices != n_out)
         delay->set_size(n_rx_ports, n_tx_ports, n_out);
+
+    // 0 paths without add_fake_los_path: empty outputs of size [n_rx_ports, n_tx_ports, 0]
+    if (n_out == 0ULL)
+    {
+        if (rx_Doppler != nullptr && rx_Doppler->n_elem != 0ULL)
+            rx_Doppler->set_size(0ULL);
+        return;
+    }
 
     // Map output memory to internal representation
     arma::Cube<dtype> CR, CI, DL;

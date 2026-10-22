@@ -73,7 +73,8 @@ void calc_diffraction_gain(
   [[ray_mesh_interact]], [[ray_progress]] and [[generate_diffraction_paths]] in scalar mode. Passing the acoustic
   frequency itself gives a wavelength 874 636 times too long. The MATLAB and Python wrappers take the acoustic
   frequency and convert it.
-- **`lod`** — Level of detail (0–6), controls `n_path` and `n_seg`; see [[generate_diffraction_paths]]
+- **`lod`** — Level of detail (0–7), controls `n_path` and `n_seg`; 0 = direct ray only (`n_path = 1`, `n_seg = 1`);
+  1–7 as in the table of [[generate_diffraction_paths]]
 - **`verbose`** — Verbosity level
 - **`sub_mesh_index`** — 0-based sub-mesh index for acceleration; see [[triangle_mesh_segmentation]]; `[n_mesh]`
 - **`use_kernel`** — Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; error if unavailable
@@ -107,7 +108,8 @@ void calc_diffraction_gain(
   For scalar mode: scalar pressure coefficient `[Re Im]`; `[2, n_pos]`.
   With `apply_phase = true`, the propagation phase `exp(-j·2π·d/λ)` is applied on top; the normalization
   is unaffected because that term has unit magnitude.
-- **`coord`** — Diffracted path coordinates excluding endpoints; `[3, n_seg-1, n_pos]`
+- **`coord`** — Diffracted path coordinates excluding endpoints; `[3, n_seg-1, n_pos]` with `n_seg` from `lod`
+  (e.g. `[3, 2, n_pos]` for lod 2, `[3, 9, n_pos]` for lod 7, `[3, 0, n_pos]` for lod 0)
 
 ## See also:
 - [[generate_diffraction_paths]] (controls path/segment count via `lod`)
@@ -138,6 +140,11 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
                                          bool apply_fspl,
                                          bool apply_phase)
 {
+    if (orig.n_elem == 0 || dest.n_elem == 0)
+        throw std::invalid_argument("Inputs 'orig' and 'dest' cannot be empty.");
+    if (lod < 0 || lod > 7)
+        throw std::invalid_argument("Input 'lod' must be 0-7.");
+
     // Check for correct number of columns
     if (orig.n_cols != 3)
         throw std::invalid_argument("Input 'orig' must have 3 columns containing x,y,z coordinates.");
@@ -490,10 +497,10 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
                               << ", buf " << g_buf[iG] << ">" << buf_out[iR]
                               << ", P " << p_weight[iD] << " > " << seg_weight
                               << ", acc (" << g_acc_ref[iG] << ", " << g_acc_geo[iG] << ") > (" << acc_ref_out[iR] << ", " << acc_geo_out[iR] << ")"
-                              << ", O(" << s_orig.at(iG, 0) << "," << s_orig.at(iG, 1) << "," << s_orig.at(iG, 2) << ")"
-                              << ", D(" << s_dest.at(iG, 0) << "," << s_dest.at(iG, 1) << "," << s_dest.at(iG, 2) << ")"
-                              << ", F" << fbs_ind[iR] << "-(" << fbsN.at(iG, 0) << "," << fbsN.at(iG, 1) << "," << fbsN.at(iG, 2) << ")"
-                              << ", S" << sbs_ind[iR] << "-(" << sbsN.at(iG, 0) << "," << sbsN.at(iG, 1) << "," << sbsN.at(iG, 2) << ")"
+                              << ", O(" << s_orig.at(iR, 0) << "," << s_orig.at(iR, 1) << "," << s_orig.at(iR, 2) << ")"
+                              << ", D(" << s_dest.at(iR, 0) << "," << s_dest.at(iR, 1) << "," << s_dest.at(iR, 2) << ")"
+                              << ", F" << fbs_ind[iR] << "-(" << fbsN.at(iR, 0) << "," << fbsN.at(iR, 1) << "," << fbsN.at(iR, 2) << ")"
+                              << ", S" << sbs_ind[iR] << "-(" << sbsN.at(iR, 0) << "," << sbsN.at(iR, 1) << "," << sbsN.at(iR, 2) << ")"
                               << ", theta = " << fbs_angle[iR] * 57.29577951308232
                               << std::endl;
                     xprmatN.t().print("XPR = ");

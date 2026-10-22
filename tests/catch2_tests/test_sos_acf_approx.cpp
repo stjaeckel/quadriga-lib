@@ -237,3 +237,51 @@ TEST_CASE("sos_acf_approx - the planes are point-symmetric to the last bit")
         CHECK(std::abs(ro(3, 30, 0) - ro(3, 6, 0)) > 1e-3); // Point symmetry is not a mirror along one axis
     }
 }
+
+TEST_CASE("sos_acf_approx - an output that shares memory with an input throws")
+{
+    // 'acf_approx' on foreign memory (hand-built) that overlaps 'freq' or 'dist' was written while the inputs
+    // were still read; the call now throws before anything is written. 'dist_2d' may still be 'dist'.
+    const arma::vec dist = {0.0, 2.0, 4.0, 6.0}; // grid of 13 points
+    const arma::mat freq = arma::mat({0.05, 0.11, -0.07, 0.2}).t();
+    arma::cube ref;
+    quadriga_lib::sos_acf_approx<double>(freq, dist, ref);
+    REQUIRE(ref.n_elem == 13);
+
+    // Output starts inside 'dist'
+    arma::vec block(30, arma::fill::zeros);
+    std::copy(dist.begin(), dist.end(), block.begin());
+    arma::vec d(block.memptr(), 4, false, true);
+    arma::cube out(block.memptr() + 2, 13, 1, 1, false, true);
+    CHECK_THROWS_AS(quadriga_lib::sos_acf_approx<double>(freq, d, out), std::invalid_argument);
+    CHECK(arma::approx_equal(d, dist, "absdiff", 0.0));
+
+    // Output ends inside 'freq'
+    arma::vec block2(30, arma::fill::zeros);
+    std::copy(freq.begin(), freq.end(), block2.begin() + 14);
+    arma::mat f(block2.memptr() + 14, 4, 1, false, true);
+    arma::cube out2(block2.memptr() + 2, 13, 1, 1, false, true);
+    std::string msg;
+    try
+    {
+        quadriga_lib::sos_acf_approx<double>(f, dist, out2);
+    }
+    catch (const std::invalid_argument &e)
+    {
+        msg = e.what();
+    }
+    CHECK(msg == "Output 'acf_approx' cannot share memory with an input.");
+    CHECK(arma::approx_equal(f, freq, "absdiff", 0.0));
+
+    // Next to the inputs: accepted, same values
+    arma::cube out3(block2.memptr() + 1, 13, 1, 1, false, true);
+    quadriga_lib::sos_acf_approx<double>(f, dist, out3);
+    CHECK(arma::approx_equal(out3, ref, "absdiff", 0.0));
+
+    // 'dist_2d' the same object as 'dist' stays valid
+    arma::vec d2 = dist;
+    arma::cube out4;
+    quadriga_lib::sos_acf_approx<double>(freq, d2, out4, &d2);
+    CHECK(arma::approx_equal(out4, ref, "absdiff", 0.0));
+    CHECK(d2.n_elem == 13);
+}

@@ -35,8 +35,8 @@ Reorganize a point cloud into spatial sub-clouds for efficient processing
 ## Outputs:
 - **`pointsR`** — Reorganized point cloud with points grouped by sub-cloud; `[n_pointsR, 3]`
 - **`sub_cloud_index`** — 1-based starting index of each sub-cloud within `pointsR`; `[n_sub]`
-- **`forward_index`** — 1-based index map from `points` to `pointsR`; padding entries are `0`; `[n_pointsR]`
-- **`reverse_index`** — 1-based index map from `pointsR` back to `points`; `[n_points]`
+- **`forward_index`** — 1-based row in `points` of each row of `pointsR`; padding entries are `0`; `[n_pointsR]`
+- **`reverse_index`** — 1-based row in `pointsR` of each row of `points`; `[n_points]`
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

@@ -71,10 +71,10 @@ assertElementsAlmostEqual( gain_only, gain_full, 'absolute', 1e-10 );
 
 %% coord dimensions per lod
 
-% coord is [3, n_seg, n_pos]; xprmat (checked above) is [8, n_pos].
-% n_seg = 2 (lod 1,2), 3 (lod 3), 4 (lod 4), 1 (lod 5,6).
-lods   = [1 2 3 4 5 6];
-n_segs = [2 2 3 4 1 1];
+% coord is [3, n_seg-1, n_pos] with n_seg of generate_diffraction_paths; xprmat (checked above) is [8, n_pos].
+% n_seg-1 = 0 (lod 0, direct ray only), 2 (lod 1,2), 3 (lod 3), 4 (lod 4), 1 (lod 5,6), 9 (lod 7).
+lods   = [0 1 2 3 4 5 6 7];
+n_segs = [0 2 2 3 4 1 1 9];
 for k = 1:numel(lods)
     [~, ~, ck] = quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_ind, mtl_st, 1e9, lods(k) );
     assertTrue( isequal( size(ck), [3, n_segs(k), 2] ), ...
@@ -304,6 +304,20 @@ assert_throws( @() quadriga_lib.calc_diffraction_gain( orig, dest, cube(:,1:8), 
     'mesh' );                                                                      % (guess) mesh not 9 columns
 assert_throws( @() quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_ind, mtl_st, 0, 0 ), ...
     'frequency' );                                                                 % (guess) center_freq <= 0
+assert_throws( @() quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_ind, mtl_st, 1e9, 8 ), ...
+    'Input ''lod'' must be 0-7.' );
+assert_throws( @() quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_ind, mtl_st, 1e9, -1 ), ...
+    'Input ''lod'' must be 0-7.' );
+assert_throws( @() quadriga_lib.calc_diffraction_gain( zeros(0,3), zeros(0,3), cube, mtl_ind, mtl_st, 1e9 ), ...
+    'Inputs ''orig'' and ''dest'' cannot be empty.' );
+% center_freq is mandatory: an empty value is an error (it became 1 GHz)
+failed = false;
+try
+    [~] = quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_ind, mtl_st, [], 0 );
+catch ME
+    failed = ~isempty(strfind(ME.message, 'Input ''center_freq'' cannot be empty.'));
+end
+assertTrue( failed );
 mtl_ind_big = mtl_ind; mtl_ind_big(1) = 40000;
 assert_throws( @() quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_ind_big, mtl_st, 1e9, 0 ), ...
     '16383' );                                                                     % (guess) material index > 16383

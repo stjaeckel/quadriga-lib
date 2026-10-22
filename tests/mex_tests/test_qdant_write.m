@@ -105,8 +105,8 @@ end
 
 quadriga_lib.arrayant_qdant_write('testm.qdant', ant, 6, layout);
 
-% Check if the layout can be restored
-[~, layoutI] = quadriga_lib.arrayant_qdant_read('testm.qdant');
+% Check if the layout can be restored (the entries are no frequency set, so read one entry by its id)
+[~, layoutI] = quadriga_lib.arrayant_qdant_read('testm.qdant', 1);
 assertEqual(layout,layoutI);
 
 % Test error: multiple outputs

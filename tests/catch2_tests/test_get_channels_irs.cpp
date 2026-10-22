@@ -670,3 +670,32 @@ TEST_CASE("Tools - Combine IRS Coord - shapes of interact_coord_1 / _2 are check
     CHECK(no.n_elem == 1);
     CHECK(out.n_cols == 2);
 }
+
+TEST_CASE("Get Channels IRS - A segment without paths gives empty outputs")
+{
+    // get_channels_spherical returns empty segment outputs, so the IRS channel is [n_rx_ports, n_tx_ports, 0]
+    auto ant = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    ant.copy_element(0, 1);
+    auto irs = ant;
+    irs.coupling_re = arma::mat({{1.0, 0.0}, {0.0, 1.0}});
+    irs.coupling_im = arma::mat(2, 2, arma::fill::zeros);
+    arma::mat fb = {5.0, 0.0, 1.0}, f0(3, 0), M = {1.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0}, M0(8, 0);
+    fb = fb.t(), M = M.t();
+    arma::vec g = {1.0}, l = {12.0}, e;
+    arma::cube cr, ci, dl, ad, ed, aa, ea;
+    for (int seg = 1; seg <= 2; ++seg)
+    {
+        const bool s1 = seg == 1;
+        auto keep = quadriga_lib::get_channels_irs<double>(&ant, &ant, &irs, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 5, 5, 0, 0, 0, 0,
+                                                           s1 ? &f0 : &fb, s1 ? &f0 : &fb, s1 ? &e : &g, s1 ? &e : &l, s1 ? &M0 : &M,
+                                                           s1 ? &fb : &f0, s1 ? &fb : &f0, s1 ? &g : &e, s1 ? &l : &e, s1 ? &M : &M0,
+                                                           &cr, &ci, &dl, 0, -140.0, 1e9, false, &ad, &ed, &aa, &ea);
+        CHECK(keep.empty());
+        for (const arma::cube *c : {&cr, &ci, &dl, &ad, &ed, &aa, &ea})
+        {
+            CHECK(c->n_rows == 2);
+            CHECK(c->n_cols == 2);
+            CHECK(c->n_slices == 0);
+        }
+    }
+}

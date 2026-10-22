@@ -28,13 +28,14 @@ Read ray-tracing CIR data from a QRT file
 ## Usage:
 ```
 center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, M, aod, eod, aoa, eoa, \
-    path_coord, no_int, coord, interact_type = quadriga_lib.channel.qrt_file_read( fn, cir, orig, downlink, normalize_M )
+    path_coord, no_int, coord, interact_type = quadriga_lib.channel.qrt_file_read( fn, i_cir, i_orig, downlink, normalize_M )
 ```
 
 ## Inputs:
 - **`fn`** — Path to the QRT file
-- **`cir`** — Snapshot indices to read; `(n_out,)` or `None`; if `None` or empty, all snapshots are read; default: `None`
-- **`orig`** — Origin index (origin = TX for downlink); scalar; default: 0
+- **`i_cir`** — Snapshot indices to read, 0-based; `(n_out,)` or `None`; if `None` or empty, all snapshots are read (for a file
+  without CIRs, all outputs are empty with `n_out = 0`); default: `None`
+- **`i_orig`** — Origin index, 0-based (origin = TX for downlink); scalar; default: 0
 - **`downlink`** — If `True`, origin=TX and destination=RX; if `False`, the roles are swapped; default: `True`
 - **`normalize_M`** — Controls `M` and `path_gain` scaling; 0 = values as stored in the QRT file with
   `path_gain` = -PL; 1 = `M` columns scaled to max power 1 and `path_gain` = -PL minus material losses; default: 1
@@ -123,8 +124,11 @@ py::tuple qrt_file_read(const std::string &fn,
 
     // Resolve snapshot indices (None or empty = read all snapshots)
     arma::uvec i_cir_a = qd_python_numpy2arma_Col<arma::uword>(cir, true);
-    if (i_cir_a.empty())
-        i_cir_a = arma::regspace<arma::uvec>(0, arma::uword(cache.no_cir - 1));
+    if (i_cir_a.empty()) // None for a file without CIRs: empty outputs
+    {
+        if (cache.no_cir != 0)
+            i_cir_a = arma::regspace<arma::uvec>(0, arma::uword(cache.no_cir) - 1);
+    }
     else if (arma::any(i_cir_a >= arma::uword(cache.no_cir)))
         throw std::out_of_range("CIR index exceeds number of CIRs in file.");
     arma::uword no_out = i_cir_a.n_elem;

@@ -336,7 +336,7 @@ class test_case(unittest.TestCase):
         _rm(mtl_fn)
         _rm(csv_obj_fn)
 
-        # csv_write_defaults = True -> full canonical set with defaults (a, e, fRef = 1, side = 3.29, else 0)
+        # csv_write_defaults = True -> full canonical set with defaults (a, e, fRef = 1, side = 3.29, else 0; thk after h)
         quadriga_lib.RTtools.obj_file_write(
             fn, mesh, obj_ind, mtl_ind, obj_names, mtl_names,
             csv_names=csv_names, csv_prop=csv_prop, csv_write_defaults=True,
@@ -344,11 +344,11 @@ class test_case(unittest.TestCase):
         lines = read_lines(csv_obj_fn)
         npt.assert_equal(
             lines[0],
-            "name,a,b,c,d,e,f,g,h,att,attB,alpha,alphaB,fRef,m,resF,resQ,resS,coiF,coiQ,tf,tfB,tfP,tfF,tfQ,side,zzz",
+            "name,a,b,c,d,e,f,g,h,thk,att,attB,alpha,alphaB,fRef,m,resF,resQ,resS,coiF,coiQ,tf,tfB,tfP,tfF,tfQ,side,zzz",
         )
         npt.assert_equal(
             lines[1],
-            "slab,1,0,0.05,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,3.29,7",
+            "slab,1,0,0.05,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,3.29,7",
         )
         _rm(fn)
         _rm(mtl_fn)
@@ -531,3 +531,25 @@ class test_case(unittest.TestCase):
         # None of the error cases should have produced a file
         npt.assert_(not os.path.isfile(fn))
         npt.assert_(not os.path.isfile("cube.txt"))
+
+    def test_no_material_roundtrip(self):
+        # A face without material (mtl_ind = 0) after a face with material is marked "usemtl (null)" and reads back as 0
+        fn = "null_mtl.obj"
+        mtl_fn = "null_mtl.mtl"
+        mesh = np.array([[0, 0, 0, 1, 0, 0, 0, 1, 0], [5, 0, 0, 6, 0, 0, 5, 1, 0], [9, 0, 0, 10, 0, 0, 9, 1, 0]], dtype=float)
+        obj_ind = np.zeros(3, dtype=np.uint64)
+        mtl_ind = np.array([1, 0, 2], dtype=np.uint64)
+
+        quadriga_lib.RTtools.obj_file_write(fn, mesh, obj_ind, mtl_ind, ["box"], ["itu_wood", "itu_glass"])
+        npt.assert_equal(read_lines(fn).count("usemtl (null)"), 1)
+        npt.assert_(all("(null)" not in line for line in read_lines(mtl_fn)))
+
+        (_, _, _, _, _, mtl_ind_rd, mtl_names_rd, bsdf_rd, csv_ind_rd, _, _) = quadriga_lib.RTtools.obj_file_read(fn)
+        npt.assert_array_equal(mtl_ind_rd, [1, 0, 2])
+        npt.assert_equal(list(mtl_names_rd), ["itu_wood", "itu_glass"])
+        npt.assert_equal(bsdf_rd.shape[0], 2)
+        npt.assert_equal(csv_ind_rd[1], 0)
+        npt.assert_(csv_ind_rd[0] != 0 and csv_ind_rd[2] != 0)
+
+        _rm(fn)
+        _rm(mtl_fn)

@@ -34,7 +34,7 @@ fbs, sbs, no_interact, fbs_ind, sbs_ind = RTtools.ray_triangle_intersect( orig, 
 ## Inputs:
 - **`orig`** — Ray origins in GCS; `(n_ray, 3)`
 - **`dest`** — Ray destinations in GCS; `(n_ray, 3)`
-- **`mesh`** — Triangular mesh; each row: `{x1 y1 z1 x2 y2 z2 x3 y3 z3}`; `(n_mesh, 9)`
+- **`mesh`** — Triangular mesh; each row: `{x1 y1 z1 x2 y2 z2 x3 y3 z3}`; further columns are ignored; `(n_mesh, 9)`
 - **`sub_mesh_index`** (optional) — Start indices of sub-meshes in `mesh`; enables AABB-accelerated traversal; 0-based; uint32; `(n_sub)`
 - **`aabb`** (optional) — Pre-computed axis-aligned bounding boxes per sub-mesh; each row:
   `{x_min x_max y_min y_max z_min z_max}`; if empty or omitted, AABBs are computed from `mesh`; `(n_sub, 6)`

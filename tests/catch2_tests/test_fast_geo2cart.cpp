@@ -88,6 +88,56 @@ TEMPLATE_TEST_CASE("fast_cart2geo - Tiny, huge and non-finite vectors", "[fast_c
     }
 }
 
+TEMPLATE_TEST_CASE("fast_cart2geo - NaN input gives NaN elevation", "[fast_cart2geo]", float, double)
+{
+    // A NaN in x, y or z gives NaN in el and len (el was 0), and a NaN in x or y also in az, in both kernels, in the
+    // vector body and in the remainder; the other values are unchanged
+    using dtype = TestType;
+    const arma::uword n = 21; // two blocks of 8 and a remainder of 5
+    arma::Col<dtype> x(n), y(n), z(n);
+    for (arma::uword i = 0; i < n; ++i)
+        x[i] = (dtype)(0.3 + 0.1 * (double)i), y[i] = (dtype)(1.0 - 0.07 * (double)i), z[i] = (dtype)(0.05 * (double)i - 0.4);
+    const arma::Col<dtype> x0 = x, y0 = y, z0 = z;
+    const arma::uword nan_at[6] = {0, 3, 9, 15, 17, 20};
+    for (int j = 0; j < 6; ++j)
+        (j % 3 == 0 ? x : (j % 3 == 1 ? y : z))[nan_at[j]] = (dtype)NAN;
+
+    for (int k : geo_kernels())
+    {
+        INFO("use_kernel = " << k);
+        arma::Col<dtype> az, el, len, az0, el0, len0;
+        quadriga_lib::fast_cart2geo<dtype>(x, y, z, az, el, &len, k);
+        quadriga_lib::fast_cart2geo<dtype>(x0, y0, z0, az0, el0, &len0, k);
+        for (arma::uword i = 0; i < n; ++i)
+        {
+            INFO("i = " << i);
+            bool is_nan = false, xy_nan = false;
+            for (int j = 0; j < 6; ++j)
+                is_nan = is_nan || nan_at[j] == i, xy_nan = xy_nan || (nan_at[j] == i && j % 3 != 2);
+            if (is_nan)
+            {
+                if (xy_nan)
+                    CHECK(std::isnan(az[i]));
+                else
+                    CHECK(std::abs((double)az[i] - (double)az0[i]) < 1e-6); // NaN in z only (AVX2: x, y not scaled)
+                CHECK(std::isnan(el[i]));
+                CHECK(std::isnan(len[i]));
+            }
+            else
+            {
+                CHECK(az[i] == az0[i]);
+                CHECK(el[i] == el0[i]);
+                CHECK(len[i] == len0[i]);
+            }
+        }
+        // Without 'len'
+        arma::Col<dtype> az2, el2;
+        quadriga_lib::fast_cart2geo<dtype>(x, y, z, az2, el2, nullptr, k);
+        CHECK(std::isnan(el2[9]));
+        CHECK(el2[1] == el0[1]);
+    }
+}
+
 TEMPLATE_TEST_CASE("fast_geo2cart / fast_cart2geo - Invalid use_kernel", "[fast_geo2cart]", float, double)
 {
     using dtype = TestType;

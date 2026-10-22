@@ -118,4 +118,35 @@ for L = [L_true, 0.0]
     assertElementsAlmostEqual( ci, -sin(2*pi*fc/C * L_exp), 'absolute', 1e-6 );
 end
 
+% 0 paths with add_fake_los_path: one zero-power LOS path with the LOS delay (as in C++ and Python)
+ant1 = quadriga_lib.arrayant_generate('omni');
+e = zeros(0, 1);
+[cr, ci, dl, ad, ed, aa, ea] = quadriga_lib.get_channels_spherical(ant1, ant1, zeros(3,0), zeros(3,0), e, e, zeros(8,0), [0;0;0], [0;0;0], [10;0;0], [0;0;0], 1e9, true, true);
+assertEqual( [cr, ci], [0, 0] );
+assertElementsAlmostEqual( dl, 10 / C, 'absolute', 1e-18 );
+assertElementsAlmostEqual( [ad, ed, abs(aa), ea], [0, 0, pi, 0], 'absolute', 1e-14 );   % aa = +/- pi
+[~, ~, dl] = quadriga_lib.get_channels_spherical(ant1, ant1, zeros(3,0), zeros(3,0), e, e, zeros(8,0), [0;0;0], [0;0;0], [10;0;0], [0;0;0], 1e9, false, true);
+assertEqual( dl, 0 );
+% Per antenna pair: the delays and angles of a real LOS path (moved to slot 0) with the same geometry
+ant2 = ant1; ant2.e_theta_re(:,:,2) = 1; ant2.e_theta_im(:,:,2) = 0; ant2.e_phi_re(:,:,2) = 0; ant2.e_phi_im(:,:,2) = 0;
+ant2.element_pos = [0.3, -0.2; 0.1, 0.4; 0, 0.2]; ant2.coupling_re = [1, 0.3; 0, 1]; ant2.coupling_im = [0, 0.2; 0, 0];
+tx = [1;2;3]; rx = [11;-3;5];
+for abs_dl = [true, false]
+    o0 = cell(1, 7); oL = cell(1, 7);
+    [o0{:}] = quadriga_lib.get_channels_spherical(ant2, ant2, zeros(3,0), zeros(3,0), e, e, zeros(8,0), tx, [0;0;0.3], rx, [0;0;-0.2], 1e9, abs_dl, true);
+    [oL{:}] = quadriga_lib.get_channels_spherical(ant2, ant2, (tx+rx)/2, (tx+rx)/2, 1, norm(rx-tx), [1;0;0;0;0;0;-1;0], tx, [0;0;0.3], rx, [0;0;-0.2], 1e9, abs_dl, true);
+    assertEqual( size(o0{3}), [2, 2] );
+    assertEqual( [o0{1}, o0{2}], zeros(2, 4) );
+    for k = 3:7
+        assertElementsAlmostEqual( o0{k}, oL{k}(:,:,1), 'absolute', 1e-14 );
+    end
+end
+
+% 0 paths without add_fake_los_path: empty outputs [n_rx_ports, n_tx_ports, 0] (as in C++ and Python)
+o0 = cell(1, 7);
+[o0{:}] = quadriga_lib.get_channels_spherical(ant2, ant2, zeros(3,0), zeros(3,0), e, e, zeros(8,0), tx, [0;0;0.3], rx, [0;0;-0.2], 1e9, true, false);
+for k = 1:7
+    assertEqual( [size(o0{k}, 1), size(o0{k}, 2), size(o0{k}, 3)], [2, 2, 0] );
+end
+
 end

@@ -519,5 +519,30 @@ class test_case(unittest.TestCase):
             self.assertEqual(lines[2], 'alive')
 
 
+class test_carrier_frequencies(unittest.TestCase):
+
+    # Carriers as frequencies: span = max - min, reference = freq_in when given, else min(freq_out), output in
+    # input order, more than one carrier with a zero span is an error. Same closed form as in the MATLAB test.
+    def test(self):
+        cre = np.array([1.0, 0.5]); tau = np.array([10e-9, 35e-9])
+        c = [cre.reshape(1, 1, 2).astype(complex)]; d = [tau.reshape(1, 1, 2)]
+        f0 = 3e9; fa = f0 + np.array([0, 10e6, 20e6])
+        def H(f, fr):
+            return (cre[:, None] * np.exp(-2j * np.pi * (np.atleast_1d(f)[None, :] - fr) * tau[:, None])).sum(0)
+        def run(fo, fi=None):
+            kw = {} if fi is None else {'freq_in': np.array([fi])}
+            return channel.baseband_freq_response(coeff=c, delay=d, freq_out=np.atleast_1d(fo), **kw).ravel()
+        npt.assert_allclose(run(fa, f0), H(fa, f0), atol=1e-5)
+        npt.assert_allclose(run(fa[::-1], f0), H(fa[::-1], f0), atol=1e-5)
+        fu = f0 + np.array([10e6, 0, 20e6])
+        npt.assert_allclose(run(fu, f0), H(fu, f0), atol=1e-5)
+        npt.assert_allclose(run(fa[::-1]), H(fa[::-1], f0), atol=1e-5)
+        npt.assert_allclose(run(f0 + 10e6, f0), H(f0 + 10e6, f0), atol=1e-5)
+        npt.assert_allclose(run(f0 - 10e6, f0), H(f0 - 10e6, f0), atol=1e-5)
+        npt.assert_allclose(run(f0 + 10e6), [1.5], atol=1e-6)
+        with self.assertRaisesRegex(ValueError, 'positive range'):
+            run(np.array([f0, f0]), f0)
+
+
 if __name__ == '__main__':
     unittest.main()

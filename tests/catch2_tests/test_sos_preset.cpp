@@ -354,3 +354,52 @@ TEST_CASE("sos_preset - the stored tables have the recorded checksums")
         CHECK(d2 < 1e-15);
     }
 }
+
+TEST_CASE("sos_preset - outputs that share memory with each other throw")
+{
+    // The three outputs are written one after the other; an output on the memory of another one (or the same
+    // object) overwrote it. Such calls now throw before anything is written.
+    arma::mat freq;
+    arma::vec acf, dist;
+    quadriga_lib::sos_preset<double>("Exp128", freq, &acf, &dist);
+
+    auto message = [](arma::mat &f, arma::vec *a, arma::vec *d) -> std::string
+    {
+        try
+        {
+            quadriga_lib::sos_preset<double>("Exp128", f, a, d);
+        }
+        catch (const std::invalid_argument &e)
+        {
+            return e.what();
+        }
+        return "no error";
+    };
+
+    arma::mat f1;
+    arma::vec same(200, arma::fill::value(7.0));
+    CHECK(message(f1, &same, &same) == "Output 'dist' cannot share memory with 'acf'.");
+    CHECK(arma::all(same == 7.0));
+    CHECK(f1.n_elem == 0); // nothing written
+
+    // 'acf' on part of the memory of 'freq'
+    arma::mat f2(128, 3, arma::fill::value(5.0));
+    arma::vec a2(f2.memptr() + 100, 200, false, true), d2;
+    CHECK(message(f2, &a2, &d2) == "Output 'acf' cannot share memory with 'freq'.");
+    CHECK(arma::all(arma::vectorise(f2) == 5.0));
+
+    // 'dist' overlaps the end of 'acf'
+    arma::vec block(300, arma::fill::value(3.0));
+    arma::vec a3(block.memptr(), 200, false, true), d3(block.memptr() + 150, 150, false, true);
+    arma::mat f3;
+    CHECK(message(f3, &a3, &d3) == "Output 'dist' cannot share memory with 'acf'.");
+    CHECK(arma::all(block == 3.0));
+
+    // Separate outputs next to each other in one block are accepted
+    arma::vec block4(400);
+    arma::vec a4(block4.memptr(), 200, false, true), d4(block4.memptr() + 200, 200, false, true);
+    arma::mat f4;
+    quadriga_lib::sos_preset<double>("Exp128", f4, &a4, &d4);
+    CHECK(arma::approx_equal(a4, acf, "absdiff", 0.0));
+    CHECK(arma::approx_equal(d4, dist, "absdiff", 0.0));
+}

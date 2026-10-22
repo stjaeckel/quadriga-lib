@@ -306,3 +306,78 @@ TEST_CASE("sos_map - cubes that share one block of memory are filled in place")
         CHECK(arma::approx_equal(fmap[g], fsep[g], "absdiff", 0.0f));
     }
 }
+
+TEST_CASE("sos_map - a map cube that shares memory with 'freq' or 'phase' throws")
+{
+    // Cubes on foreign memory (hand-built) that overlap an input: the call throws before anything is written,
+    // with a message that names 'map', for the one-block path and for separate cubes
+    std::mt19937_64 rng(77);
+    std::uniform_real_distribution<double> u(-0.3, 0.3);
+    arma::mat freq(10, 2), phase(10, 2);
+    freq.imbue([&]() { return u(rng); });
+    phase.imbue([&]() { return 10.0 * u(rng); });
+    const arma::vec x = {0.0, 1.0, 2.0, 4.0, 5.0}, y = {0.0, 0.5, 2.0, 3.0}; // 4 x 5 grid = 20 values
+    const arma::mat freq0 = freq, phase0 = phase;
+
+    auto message = [&](std::vector<arma::cube> &map) -> std::string
+    {
+        try
+        {
+            quadriga_lib::sos_map<double>(freq, phase, x, map, &y);
+        }
+        catch (const std::invalid_argument &e)
+        {
+            return e.what();
+        }
+        return "no error";
+    };
+    const std::string expected = "Output 'map' cannot share memory with 'freq' or 'phase'.";
+
+    // One block: two cubes one after the other on the memory of 'freq' (20 values) and the following block
+    arma::vec block(60, arma::fill::zeros);
+    std::copy(freq.begin(), freq.end(), block.begin() + 30);
+    arma::mat f_block(block.memptr() + 30, 10, 2, false, true);
+    std::vector<arma::cube> map1;
+    map1.reserve(2);
+    map1.emplace_back(block.memptr() + 20, 4, 5, 1, false, true);
+    map1.emplace_back(block.memptr() + 40, 4, 5, 1, false, true);
+    try
+    {
+        quadriga_lib::sos_map<double>(f_block, phase, x, map1, &y);
+        FAIL("no error");
+    }
+    catch (const std::invalid_argument &e)
+    {
+        CHECK(std::string(e.what()) == expected);
+    }
+    CHECK(arma::approx_equal(f_block, freq0, "absdiff", 0.0));
+
+    // Separate cubes: the second cube on the memory of 'phase'
+    std::vector<arma::cube> map2;
+    map2.reserve(2);
+    map2.emplace_back(4, 5, 1, arma::fill::zeros);
+    map2.emplace_back(phase.memptr(), 4, 5, 1, false, true);
+    CHECK(message(map2) == expected);
+    CHECK(arma::approx_equal(phase, phase0, "absdiff", 0.0));
+
+    // A cube on the memory of 'freq'
+    std::vector<arma::cube> map3;
+    map3.reserve(2);
+    map3.emplace_back(freq.memptr(), 4, 5, 1, false, true);
+    map3.emplace_back(4, 5, 1, arma::fill::zeros);
+    CHECK(message(map3) == expected);
+    CHECK(arma::approx_equal(freq, freq0, "absdiff", 0.0));
+
+    // Memory next to the inputs is accepted and gives the values of a normal call
+    std::vector<arma::cube> ref, map4;
+    quadriga_lib::sos_map<double>(freq, phase, x, ref, &y);
+    arma::vec block4(60, arma::fill::zeros);
+    std::copy(freq.begin(), freq.end(), block4.begin());
+    arma::mat f4(block4.memptr(), 10, 2, false, true);
+    map4.reserve(2);
+    map4.emplace_back(block4.memptr() + 20, 4, 5, 1, false, true);
+    map4.emplace_back(block4.memptr() + 40, 4, 5, 1, false, true);
+    quadriga_lib::sos_map<double>(f4, phase, x, map4, &y);
+    CHECK(arma::approx_equal(map4[0], ref[0], "absdiff", 0.0));
+    CHECK(arma::approx_equal(map4[1], ref[1], "absdiff", 0.0));
+}

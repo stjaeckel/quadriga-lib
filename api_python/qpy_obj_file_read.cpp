@@ -13,12 +13,17 @@ SECTION!*/
 # obj_file_read
 Read a Wavefront `.obj` file and extract geometry, visual materials, and EM/acoustic materials
 
-- Parses a triangulated `.obj`; quads and n-gons are rejected
-- Parses a triangulated `.obj`; quads and n-gons are rejected. Two independent material systems are returned:
+- Parses a triangulated `.obj`; quads and n-gons are rejected. Face references may be `v`, `v/vt`, `v//vn` or
+  `v/vt/vn`; a negative (relative) index counts back from the last vertex defined before the face line (`-1` = that
+  vertex). Index 0, or an index beyond the vertices defined before the face, raises a `ValueError`, for any requested outputs
+- Lines may end in LF or CRLF (`.obj`, `.mtl` and material CSV)
+- Two independent material systems are returned:
   - Visual side, from the companion `.mtl`: `mtl_ind`, `mtl_names` (raw `usemtl` names), and `bsdf`.
   - EM/acoustic side, from a material table (`fn_csv`, or a built-in ITU-R P.2040 default): `csv_ind`,`csv_names`, `csv_prop`.
 - A face's `usemtl` name is matched to the table by exact name, then by the base name (everything
   before the first dot, so Blender sub-materials like `concrete.gray` map to `concrete`)
+- `usemtl (null)` (written by [[obj_file_write]]) marks the following faces as having no material: index 0 in
+  `mtl_ind` and `csv_ind` (also with `csv_strict`); `(null)` is not listed in `mtl_names` or `bsdf`
 - Unmatched names raise an error when `csv_strict = True`; otherwise they map to index 0 (no material)
 - Geometry indices (`face_ind`, `obj_ind`) are 0-based; material indices (`mtl_ind`, `csv_ind`) are
   1-based, with 0 reserved for the outside / no-material state

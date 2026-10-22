@@ -17,7 +17,7 @@ Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector
 - Inputs are arbitrary 3D vectors (not required to be unit length); length returns the Euclidean norm
 - z / length is clamped to [-1, 1] before asin to guard against length == 0 and rounding artifacts
 - Azimuth is in [-pi, pi], elevation in [-pi/2, pi/2]; elevation pi/2 points to the zenith, 0 to the horizon
-- Special values of atan2 as in numpy (e.g. atan2(0, -0) = pi); NaN input gives NaN in az and length
+- Special values of atan2 as in numpy (e.g. atan2(0, -0) = pi); NaN input gives NaN in az, el and length
 - Two mutually exclusive input forms: a combined array `cart` of shape (3, n, m), or separate `x`, `y`, `z` of shape (n, m)
 - The AVX2 kernel computes the angles in single precision (length and z / length in double precision); use
   `use_kernel = 1` for full double precision

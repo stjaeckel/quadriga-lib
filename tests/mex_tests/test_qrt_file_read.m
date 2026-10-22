@@ -323,4 +323,27 @@ catch ME
 end
 delete(fn_trunc);
 
+% ---------- qrt_file_read: a valid file with 0 CIRs gives empty outputs ----------
+% (written by qrt_file_init with cir_pos of size [0, 3] and one appended origin without paths)
+fn0 = 'data/test_zero_cir.qrt';
+out = cell(1, 18);
+[out{:}] = quadriga_lib.qrt_file_read(fn0);
+assertEqual(out{1}, 3e9);
+for k = 2:5
+    assertEqual(size(out{k}), [3, 0]);
+end
+for k = 6:18
+    assertTrue(iscell(out{k}));
+    assertEqual(size(out{k}), [0, 1]);
+end
+[cf0, tx0] = quadriga_lib.qrt_file_read(fn0, []);
+assertEqual(size(tx0), [3, 0]);
+failed = false;
+try
+    [~] = quadriga_lib.qrt_file_read(fn0, 1);
+catch ME
+    failed = ~isempty(strfind(ME.message, 'CIR index exceeds number of CIRs in file.'));
+end
+assertTrue(failed);
+
 end

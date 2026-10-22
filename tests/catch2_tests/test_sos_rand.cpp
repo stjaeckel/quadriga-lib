@@ -355,6 +355,31 @@ TEST_CASE("sos_randn, sos_rand, sos_randi - input validation")
     SECTION("preset")
     {
         CHECK_THROWS_AS(quadriga_lib::sos_randn(dd, pos, val, no_mat, no_vec, "Comb300"), std::invalid_argument);
+
+        // The error names the argument of these functions, 'preset', not the argument 'name' of sos_preset
+        auto message = [&](int fun, const std::string &preset)
+        {
+            try
+            {
+                if (fun == 0)
+                    quadriga_lib::sos_randn(dd, pos, val, no_mat, no_vec, preset, 1);
+                else if (fun == 1)
+                    quadriga_lib::sos_rand(dd, pos, val, &pos_b, no_vec, preset, 1);
+                else
+                    quadriga_lib::sos_randi(dd, pos, 3, val, &pos_b, &db, preset, 1);
+            }
+            catch (const std::invalid_argument &e)
+            {
+                return std::string(e.what());
+            }
+            return std::string("no exception");
+        };
+        for (int fun = 0; fun < 3; ++fun)
+            for (const std::string preset : {"Comb100", "comb256", "Comb256 ", "", "Gauss"})
+            {
+                INFO("function " << fun << ", preset '" << preset << "'");
+                CHECK(message(fun, preset) == "Input 'preset' is not a known preset.");
+            }
     }
     SECTION("seed")
     {

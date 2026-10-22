@@ -19,7 +19,8 @@ Perform linear interpolation (1D or 2D) on single or multiple data sets
 - Interpolates given input data at specified output points.
 - Outside the range of the input sample points, the nearest end value is returned (constant extrapolation);
   output sample points that are NaN give NaN.
-- The input sample points need not be sorted (they are sorted internally); repeated values are allowed.
+- The input sample points need not be sorted (they are sorted internally); repeated values are allowed;
+  they must be finite.
 - Supports single and multiple data sets.
 - Returns interpolated results either directly or through reference argument.
 - Data types (`dtype`): `float` or `double`
@@ -91,6 +92,10 @@ void quadriga_lib::interp_2D(const arma::Cube<dtype> &input,
 
     if (input.n_elem == 0 || xi.n_elem != nx || yi.n_elem != ny || ne == 0)
         throw std::invalid_argument("Data dimensions must match the given number of sample points.");
+    if (!xi.is_finite())
+        throw std::invalid_argument("Input 'xi' must be finite.");
+    if (!yi.is_finite())
+        throw std::invalid_argument("Input 'yi' must be finite.");
 
     if (output.n_rows != my || output.n_cols != mx || output.n_slices != ne)
         output.set_size(my, mx, ne);

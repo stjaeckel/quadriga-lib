@@ -15,6 +15,11 @@ SECTION!*/
 Write a data matrix to a color-coded PNG file
 
 - Values are clipped to `[min_val, max_val]` before colormap mapping; auto-detected from data if `NaN`
+- The auto-detected range ignores `NaN` and `Inf`; `Inf` and `-Inf` values get the last and first colour
+- `NaN` values get the first colour of the map
+- A degenerate range (`max <= min` after auto-detection, e.g. constant or single-value data, all-`NaN` data, or log
+  input without a positive value; also an infinite `min_val` or `max_val`) maps every value to the first colour
+- Raises an error for empty `data` and for `min_val > max_val` (both given)
 - Uses [LodePNG](https://github.com/lvandeve/lodepng) for PNG encoding
 
 ## Usage:

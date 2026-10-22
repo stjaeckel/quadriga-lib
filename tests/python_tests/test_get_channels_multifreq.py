@@ -1007,5 +1007,32 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         npt.assert_allclose(dl_3d, dl_4d, atol=1e-14, rtol=0)
 
 
+class test_zero_paths_fake_los(unittest.TestCase):
+
+    # 0 paths with add_fake_los_path: one zero-power LOS path with the LOS delay (as in C++ and MATLAB)
+    def test(self):
+        ant = quadriga_lib.arrayant.generate('omni')
+        fc = 3e9
+        ant['center_freq'] = fc
+        cr, ci, dl = quadriga_lib.arrayant.get_channels_multifreq(
+            ant, ant, np.zeros((3, 0)), np.zeros((3, 0)), np.zeros((0, 1)), np.zeros(0), np.zeros((8, 0, 1)),
+            [0, 0, 0], [0, 0, 0], [10, 0, 0], [0, 0, 0], [fc], [fc, 2 * fc], True, True)
+        self.assertEqual(np.shape(dl), (1, 1, 1, 2))
+        npt.assert_array_equal(np.concatenate([np.ravel(cr), np.ravel(ci)]), np.zeros(4))
+        npt.assert_allclose(np.ravel(dl), [10 / 299792458.0] * 2, rtol=1e-15)
+
+    # 0 paths without add_fake_los_path: empty outputs (n_rx_ports, n_tx_ports, 0, n_freq_out), as in C++ and MATLAB
+    def test_without_fake_los(self):
+        ant = quadriga_lib.arrayant.generate('xpol')
+        fc = 3e9
+        ant['center_freq'] = fc
+        for cplx in (False, True):
+            out = quadriga_lib.arrayant.get_channels_multifreq(
+                ant, ant, np.zeros((3, 0)), np.zeros((3, 0)), np.zeros((0, 1)), np.zeros(0), np.zeros((8, 0, 1)),
+                [0, 0, 0], [0, 0, 0], [10, 0, 0], [0, 0, 0], [fc], [fc, 2 * fc], True, False, complex=cplx)
+            for x in out:
+                self.assertEqual(np.shape(x), (2, 2, 0, 2))
+
+
 if __name__ == '__main__':
     unittest.main()

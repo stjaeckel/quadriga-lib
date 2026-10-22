@@ -34,7 +34,7 @@ How to read the items:
 ## Summary table
 
 Items: 123 (S1: 5, S2: 31, S3: 68, S4: 19); B-119 to B-123 were found during the fixes (WP-02, WP-04, WP-07).
-Status: open: 23, fixed: 91, partly fixed: 1, won't fix: 1, documented: 7 (after WP-13).
+Status: open: 0, fixed: 115, partly fixed: 0, won't fix: 1, documented: 7 (final, after WP-17b).
 
 | ID | Title | Area | Kind | Severity | Mark | Status |
 |---|---|---|---|---|---|---|
@@ -55,7 +55,7 @@ Status: open: 23, fixed: 91, partly fixed: 1, won't fix: 1, documented: 7 (after
 | [B-015](#b-015) | `hdf5_write` copies 256 bytes from the channel name: heap memory ends up in the file; names of 256+ characters over-read on reading | B channel, file I/O | 1 defect | S2 | [R] | fixed (WP-02) |
 | [B-016](#b-016) | `qrt_file_read` (C++) fills `aod`, `eod`, `aoa`, `eoa` only when `path_gain` or `path_length` is also requested | B channel, file I/O | 1 defect | S2 | [R] | fixed (WP-01) |
 | [B-017](#b-017) | `qrt_file_append` corrupts the file when a CIR orientation is non-zero in double but rounds to 0 in float | B channel, file I/O | 1 defect | S2 | [R] | fixed (WP-07) |
-| [B-018](#b-018) | OBJ round trip loses "no material": faces with `mtl_ind = 0` inherit the previous material | B channel, file I/O | 1 defect | S2 | [R] | open |
+| [B-018](#b-018) | OBJ round trip loses "no material": faces with `mtl_ind = 0` inherit the previous material | B channel, file I/O | 1 defect | S2 | [R] | fixed (WP-14) |
 | [B-019](#b-019) | `baseband_freq_response_multi` gives wrong phases for `get_channels_*` output with the default relative delays | C channel gen., tools | 1 defect | S2 | [R] | documented (WP-04) |
 | [B-020](#b-020) | `baseband_freq_response`: phase computed in single precision, error grows with delay × bandwidth (both builds) | C channel gen., tools | 1 defect | S2 | [R] | fixed (WP-04) |
 | [B-021](#b-021) | IEEE indoor model: `n_floors > 0` shifts all tap delays (3-D path length minus 2-D distance) | C channel gen., tools | 1 defect | S2 | [R] | fixed (WP-11) |
@@ -93,11 +93,11 @@ Status: open: 23, fixed: 91, partly fixed: 1, won't fix: 1, documented: 7 (after
 | [B-053](#b-053) | `hdf5_read_dset` returns a variable-length string as 8 bytes of a heap pointer, and leaks it | B channel, file I/O | 1 defect | S3 | [R] | fixed (WP-02) |
 | [B-054](#b-054) | `quantize_delays` builds dense vectors over the absolute delay range: a 20 ms offset makes it 4000 times slower | B channel, file I/O | 4 performance | S3 | [M] | fixed (WP-03) |
 | [B-055](#b-055) | `quantize_delays` gives wrong results when the outputs alias the inputs (undocumented) | B channel, file I/O | 1 defect | S3 | [R] | fixed (WP-03) |
-| [B-056](#b-056) | `mitsuba_xml_file_write` is quadratic in the number of vertices per object | B channel, file I/O | 4 performance | S3 | [M] | open |
-| [B-057](#b-057) | OBJ reader: CRLF `.mtl` files lose their materials; face indices unchecked when only `face_ind` is requested; no-output call skips validation | B channel, file I/O | 1 defect | S3 | [R] | open |
-| [B-058](#b-058) | `write_png`: constant, NaN or inverted-range data trigger a NaN-to-integer cast and all pixels get the last colour; an empty matrix writes an invalid PNG | B channel, file I/O | 1 defect | S3 | [R] | open |
+| [B-056](#b-056) | `mitsuba_xml_file_write` is quadratic in the number of vertices per object | B channel, file I/O | 4 performance | S3 | [M] | fixed (WP-14) |
+| [B-057](#b-057) | OBJ reader: CRLF `.mtl` files lose their materials; face indices unchecked when only `face_ind` is requested; no-output call skips validation | B channel, file I/O | 1 defect | S3 | [R] | fixed (WP-14) |
+| [B-058](#b-058) | `write_png`: constant, NaN or inverted-range data trigger a NaN-to-integer cast and all pixels get the last colour; an empty matrix writes an invalid PNG | B channel, file I/O | 1 defect | S3 | [R] | fixed (WP-14) |
 | [B-059](#b-059) | `channel::add_paths` accepts inconsistent counts and leaves an invalid object; `qrt_file_read` accepts any `normalize_M` | B channel, file I/O | 1 defect | S3 | [R] | fixed (WP-07) |
-| [B-060](#b-060) | Channel and file-I/O header comments contradict the code (index bases, `calc_effective_path_gain` "average", `normalize_M` column power) | B channel, file I/O | 2 doc | S3 | [R, C] | open |
+| [B-060](#b-060) | Channel and file-I/O header comments contradict the code (index bases, `calc_effective_path_gain` "average", `normalize_M` column power) | B channel, file I/O | 2 doc | S3 | [R, C] | fixed (WP-17) |
 | [B-061](#b-061) | `combine_irs_coord`: no shape check on `interact_coord_1/2`, heap over-read | C channel gen., tools | 1 defect | S3 | [R] | fixed (WP-13) |
 | [B-062](#b-062) | `baseband_freq_response`: `aligned_alloc` with sizes that are not a multiple of 32 (generic build) and unchecked NULL return | C channel gen., tools | 1 defect | S3 | [R] | fixed (WP-13) |
 | [B-063](#b-063) | Test defect: `test_qd_ieee_chan.cpp:318` reads past the delay cube (hidden in the full ASan suite run) | C channel gen., tools | 1 defect | S3 | [R] | fixed (WP-01) |
@@ -124,43 +124,43 @@ Status: open: 23, fixed: 91, partly fixed: 1, won't fix: 1, documented: 7 (after
 | [B-084](#b-084) | `obj_overlap_test`: reason strings are non-deterministic (unseeded shuffle, thread count), and a flag array is read outside its critical section | D geometry, math | 1 defect | S3 | [R, C] | fixed (WP-12) |
 | [B-085](#b-085) | MEX `fast_sincos(x, [])` returns cos instead of sin; the single-precision output is undocumented | F MEX layer | 1 defect | S3 | [R] | fixed (WP-01) |
 | [B-086](#b-086) | MEX `arrayant_qdant_write` (separate inputs) writes `center_freq = NaN` for `[]` instead of the documented 299792458 | F MEX layer | 1 defect | S3 | [R] | fixed (WP-01) |
-| [B-087](#b-087) | `arrayant_generate('multibeam')` uses a 90° element beamwidth by default in MATLAB and Python; docs (and the C++ default) say 120° | F MEX layer | 3 cross-API | S3 | [R] | open |
-| [B-088](#b-088) | `calc_angular_spread` defaults differ: MATLAB and Python disable wrapping and the bank angle, C++ enables both | F MEX layer | 3 cross-API | S3 | [R] | open |
-| [B-089](#b-089) | `triangle_mesh_segmentation` pads `mtl_ind_out` with material 1 in MATLAB, with 0 ("no material") in C++ and Python | F MEX layer | 3 cross-API | S3 | [R] | open |
-| [B-090](#b-090) | MEX `baseband_freq_response` with `carrier_freq`: descending carriers are rejected, duplicate carriers give silent NaN (Python handles both) | F MEX layer | 3 cross-API | S3 | [R] | open |
-| [B-091](#b-091) | MEX `get_channels_irs` `i_irs` is 0-based, against the 1-based rule of the MATLAB spec; the doc does not say which | F MEX layer | 2 doc | S3 | [R] | open |
-| [B-092](#b-092) | `arrayant_qdant_read(fn)` returns every entry as a struct array in MATLAB, Python's default reads ID 1 | F MEX layer | 3 cross-API | S3 | [R] | open |
+| [B-087](#b-087) | `arrayant_generate('multibeam')` uses a 90° element beamwidth by default in MATLAB and Python; docs (and the C++ default) say 120° | F MEX layer | 3 cross-API | S3 | [R] | fixed (WP-15) |
+| [B-088](#b-088) | `calc_angular_spread` defaults differ: MATLAB and Python disable wrapping and the bank angle, C++ enables both | F MEX layer | 3 cross-API | S3 | [R] | fixed (WP-15) |
+| [B-089](#b-089) | `triangle_mesh_segmentation` pads `mtl_ind_out` with material 1 in MATLAB, with 0 ("no material") in C++ and Python | F MEX layer | 3 cross-API | S3 | [R] | fixed (WP-15) |
+| [B-090](#b-090) | MEX `baseband_freq_response` with `carrier_freq`: descending carriers are rejected, duplicate carriers give silent NaN (Python handles both) | F MEX layer | 3 cross-API | S3 | [R] | fixed (WP-15) |
+| [B-091](#b-091) | MEX `get_channels_irs` `i_irs` is 0-based, against the 1-based rule of the MATLAB spec; the doc does not say which | F MEX layer | 2 doc | S3 | [R] | fixed (WP-15) |
+| [B-092](#b-092) | `arrayant_qdant_read(fn)` returns every entry as a struct array in MATLAB, Python's default reads ID 1 | F MEX layer | 3 cross-API | S3 | [R] | fixed (WP-15) |
 | [B-093](#b-093) | MEX: arrays with more than 4 dimensions are silently truncated; a 4-D dataset written with `hdf5_write_dset` comes back 3-D | F MEX layer | 1 defect | S3 | [R] | fixed (WP-06) |
 | [B-094](#b-094) | MEX: index value 0 is not rejected in several wrappers (silent wrong result or a misleading error) | F MEX layer | 1 defect | S3 | [R] | fixed (WP-06) |
-| [B-095](#b-095) | Diffraction level of detail 7: accepted by C++, empty `coord` in MATLAB, internal error in Python, rejected by MATLAB `generate_diffraction_paths`, documented as 0-6 | F MEX layer | 3 cross-API | S3 | [R] | open |
+| [B-095](#b-095) | Diffraction level of detail 7: accepted by C++, empty `coord` in MATLAB, internal error in Python, rejected by MATLAB `generate_diffraction_paths`, documented as 0-6 | F MEX layer | 3 cross-API | S3 | [R] | fixed (WP-15) |
 | [B-096](#b-096) | Python `qrt_file_read`: an exception in the main loop while the reader thread runs calls `std::terminate` | G Python layer | 1 defect | S3 | [R] | fixed (WP-05) |
 | [B-097](#b-097) | Python HDF5 writers reject numpy scalars, 0-d arrays and non-native dtypes that the docs list as supported | G Python layer | 3 cross-API | S3 | [R] | fixed (WP-05) |
 | [B-098](#b-098) | Python adapter `view = true` always copies (confirms item 1.1 of `md/python_fix_plan_v00.md`) | G Python layer | 2 doc | S3 | [R] | fixed (WP-05) |
 | [B-099](#b-099) | Python: documented kwargs `sub_cloud_index` and `map_to_itu_materials` raise `TypeError` | G Python layer | 2 doc | S3 | [R] | documented (WP-05) |
 | [B-100](#b-100) | Python: invalid input accepted silently (2-D positions, short `interact_coord`, 4-D arrayant without `center_freq`) | G Python layer | 1 defect | S3 | [R] | fixed (WP-05) |
 | [B-101](#b-101) | `arrayant::copy_element` ignores `read_only`; an empty destination gives an Armadillo-internal error | A arrayant | 1 defect | S4 | [R] | fixed (WP-09) |
-| [B-102](#b-102) | Arrayant documentation typos and misleading statements; latent int32 offsets and a vertex sentinel (grouped) | A arrayant | 2 doc | S4 | [C] | open |
+| [B-102](#b-102) | Arrayant documentation typos and misleading statements; latent int32 offsets and a vertex sentinel (grouped) | A arrayant | 2 doc | S4 | [C] | fixed (WP-17) |
 | [B-103](#b-103) | `quantize_delays` docs: `fix_taps` 1 and 2 give `[1, 1, n_taps]` delays only for shared input | B channel, file I/O | 2 doc | S4 | [R] | fixed (WP-03) |
-| [B-104](#b-104) | Channel and file-I/O documentation and message nits (grouped) | B channel, file I/O | 2 doc | S4 | [R, C] | open |
+| [B-104](#b-104) | Channel and file-I/O documentation and message nits (grouped) | B channel, file I/O | 2 doc | S4 | [R, C] | fixed (WP-17) |
 | [B-105](#b-105) | `memcpy` with a null pointer and size 0 (formal UB) in `get_channels_irs` and in the Python list adapter | C channel gen., tools | 1 defect | S4 | [R] | fixed (WP-01) |
-| [B-106](#b-106) | Docs and code of `path_to_tube`, `qd_path` and `calc_diffraction_gain` debug output disagree (grouped) | C channel gen., tools | 2 doc | S4 | [R, C] | open |
+| [B-106](#b-106) | Docs and code of `path_to_tube`, `qd_path` and `calc_diffraction_gain` debug output disagree (grouped) | C channel gen., tools | 2 doc | S4 | [R, C] | fixed (WP-17) |
 | [B-107](#b-107) | `interp`: a NaN query returns the first data value; clamped extrapolation is undocumented | D geometry, math | 2 doc | S4 | [R] | fixed (WP-13) |
-| [B-108](#b-108) | Geometry documentation and validation nits (index-map directions, 9-column check, precision claim, header typos; dead code; CPU check) | D geometry, math | 2 doc | S4 | [R, C] | partly fixed (WP-12) |
-| [B-109](#b-109) | `sos_val` / `sos_remove_bias`: an output that partially overlaps an input is accepted and gives wrong values (docs promise an error) | E SOS | 2 doc | S4 | [R] | open |
-| [B-110](#b-110) | `sos_randn` / `sos_rand` / `sos_randi` report an unknown preset as "Input 'name' ...", an argument they do not have | E SOS | 2 doc | S4 | [R] | open |
-| [B-111](#b-111) | `md/SPEC_PYTHON_API.md` gives two contradicting rules for the headings of the `sos` entries | E SOS | 2 doc | S4 | [C] | open |
+| [B-108](#b-108) | Geometry documentation and validation nits (index-map directions, 9-column check, precision claim, header typos; dead code; CPU check) | D geometry, math | 2 doc | S4 | [R, C] | fixed (WP-17) |
+| [B-109](#b-109) | `sos_val` / `sos_remove_bias`: an output that partially overlaps an input is accepted and gives wrong values (docs promise an error) | E SOS | 2 doc | S4 | [R] | fixed (WP-16) |
+| [B-110](#b-110) | `sos_randn` / `sos_rand` / `sos_randi` report an unknown preset as "Input 'name' ...", an argument they do not have | E SOS | 2 doc | S4 | [R] | fixed (WP-16) |
+| [B-111](#b-111) | `md/SPEC_PYTHON_API.md` gives two contradicting rules for the headings of the `sos` entries | E SOS | 2 doc | S4 | [C] | fixed (WP-16) |
 | [B-112](#b-112) | MEX `qrt_file_read` returns `interact_type` as uint8; the doc says uint32 | F MEX layer | 2 doc | S4 | [R] | fixed (WP-01) |
-| [B-113](#b-113) | MEX `get_channels_*` with 0 paths and `add_fake_los_path` return a zero path with delay 0, where C++ throws | F MEX layer | 3 cross-API | S4 | [R] | open |
-| [B-114](#b-114) | MEX `arrayant_rotate_pattern`: struct arrays reject usage 3 and 4 (Python maps them); a call without output argument errors | F MEX layer | 3 cross-API | S4 | [R] | open |
-| [B-115](#b-115) | MEX documentation, error IDs and latent helper defects (grouped) | F MEX layer | 2 doc | S4 | [R, C] | open |
+| [B-113](#b-113) | MEX `get_channels_*` with 0 paths and `add_fake_los_path` return a zero path with delay 0, where C++ throws | F MEX layer | 3 cross-API | S4 | [R] | fixed (WP-15) |
+| [B-114](#b-114) | MEX `arrayant_rotate_pattern`: struct arrays reject usage 3 and 4 (Python maps them); a call without output argument errors | F MEX layer | 3 cross-API | S4 | [R] | fixed (WP-15) |
+| [B-115](#b-115) | MEX documentation, error IDs and latent helper defects (grouped) | F MEX layer | 2 doc | S4 | [R, C] | fixed (WP-17) |
 | [B-116](#b-116) | Python `hdf5_create_file` returns uint32 although the wrapper builds int64 (confirms item 1.3 of the Python fix plan) | G Python layer | 2 doc | S4 | [R] | fixed (WP-05) |
 | [B-117](#b-117) | Python output dtypes and shapes differ from the docs (`qdant_read`, `point_inside_mesh`, `generate_speaker`, `get_ieee_indoor`) | G Python layer | 2 doc | S4 | [R] | documented (WP-05) |
 | [B-118](#b-118) | Python single-frequency arrayant dict: a 1-element `center_freq` array gives a numpy DeprecationWarning, 2 elements an unclear error | G Python layer | 3 cross-API | S4 | [R] | fixed (WP-05) |
 | [B-119](#b-119) | Crafted HDF5 files make HDF5 1.14.6 itself zero-fill about 4 GB in `H5Fopen` or request a 2^64-byte allocation in `H5Gopen2` (upstream, not quadriga-lib code) | B channel, file I/O | 1 defect | S4 | [R] | won't fix (upstream HDF5) |
 | [B-120](#b-120) | `calc_cross_polarization_ratio`: the circular XPR columns report 0 (fully cross-polar) for the LOS matrix that `get_channels_*` treats as co-polar, and are defined per transmit polarisation while the linear columns are per receive polarisation | C channel gen., tools | 1 defect | S3 | [R] | fixed (WP-13) |
 | [B-121](#b-121) | Test defect: `test_bin` is compiled without `BUILD_WITH_AVX2`, so the AVX2-vs-generic cases of the ray-triangle and ray-point kernel tests never run | D geometry, math | 1 defect | S3 | [R] | fixed (WP-12) |
-| [B-122](#b-122) | `qrt_file_read_raw` is quadratic in the number of paths per origin (`reserve` per CIR): 240 000 paths take 7.5 s | B channel, file I/O | 4 performance | S3 | [M] | open |
-| [B-123](#b-123) | MEX and Python `qrt_file_read` build a 2^32-entry index vector (34 GB) for a valid file with 0 CIRs | F MEX layer | 1 defect | S3 | [R] | open |
+| [B-122](#b-122) | `qrt_file_read_raw` is quadratic in the number of paths per origin (`reserve` per CIR): 240 000 paths take 7.5 s | B channel, file I/O | 4 performance | S3 | [M] | fixed (WP-14) |
+| [B-123](#b-123) | MEX and Python `qrt_file_read` build a 2^32-entry index vector (34 GB) for a valid file with 0 CIRs | F MEX layer | 1 defect | S3 | [R] | fixed (WP-15) |
 
 ## Baseline
 
@@ -227,6 +227,16 @@ miscompilation by the LAF split-compare passes, not a library defect. The campai
 | after WP-12: ASan + UBSan, gate | ASan + UBSan all passed, only the excluded `ray_progress` reports; `[wave]` 165594 / 181 and `[acoustic]` 42741 / 60 in both builds (worker's runs; Octave MEX 66 of 67, pytest 797 passed, 1 skipped) | - | - |
 | after WP-13: base | `All tests passed (1348300 assertions in 1269 test cases)` (manager; generic `1346518 / 1268`, also manager) | 40 s (12 threads) | 1.3 / 2.8 |
 | after WP-13: ASan + UBSan, gate | ASan + UBSan all passed, only the excluded `ray_progress` reports; `[wave]` 165594 / 181 and `[acoustic]` 42741 / 60 in both builds (worker's runs; Octave MEX 66 of 67, pytest 799 passed, 1 skipped) | - | - |
+| after the merge with main (2026-10-21, f0d093d) | `All tests passed (1346180 assertions in 1265 test cases)`, generic `1344398 / 1264`; `[wave]` 163474 / 178, `[acoustic]` 42741 / 59 in both builds (manager, temporary worktree; includes the acoustic session's test cleanup; Octave MEX 66 of 67, pytest 799 passed, 1 skipped) | - (12 threads) | 2.2 / 6.2 |
+| after WP-14: base | `All tests passed (1346416 assertions in 1273 test cases)` (manager, round 2; round 1: 1346411 / 1272) | 40 s (12 threads) | 3.3 / 2.6 |
+| after WP-14: generic, ASan + UBSan, gate | generic `1344629 / 1271`; ASan + UBSan all passed, only the excluded `ray_progress` reports; `[wave]` 163474 / 178 and `[acoustic]` 42741 / 59 in both builds (worker's runs; Octave MEX 66 of 67, pytest 801 passed, 1 skipped; OBJ / MTL / CSV AFL 15 min each: no crash, no hang, 2613 inputs replayed, slowest 0.034 s) | - | - |
+| after WP-15: base | `All tests passed (1346724 assertions in 1283 test cases)` (manager, round 2; round 1: 1346567 / 1278) | 40 s (12 threads) | 1.7 / 3.4 |
+| after WP-15: generic, ASan + UBSan, gate | generic `1344942 / 1282`; ASan + UBSan all passed, only the excluded `ray_progress` reports; `[wave]` 163474 / 178 and `[acoustic]` 42741 / 59 in both builds (worker's runs, round 2; Octave MEX and MATLAB R2026a 66 of 67, pytest 817 passed) | - | - |
+| after WP-16: base | `All tests passed (1346786 assertions in 1285 test cases)` (manager) | 40 s (12 threads) | 0.7 / 2.0 |
+| after WP-16: generic, ASan + UBSan | generic `1345004 / 1284`; ASan + UBSan all passed, only the excluded `ray_progress` reports (worker's runs; Octave MEX 66 of 67, pytest 817 passed, 1 skipped; SOS hashes of valid calls identical old vs new at 1 and 12 threads, 90 AVX2 / 77 generic) | - | - |
+| after WP-17a: base | `All tests passed (1348756 assertions in 1300 test cases)` (manager) | 40 s (12 threads) | 0.9 / 1.4 |
+| after WP-17a: generic, ASan + UBSan, gate | generic `1346833 / 1299`; ASan + UBSan all passed, only the excluded `ray_progress` reports; `[wave]` 163474 / 178 and `[acoustic]` 42741 / 59 in both builds (worker's runs; Octave MEX 67 of 68, pytest 817 passed) | - | - |
+| final verification (WP-17b, rounds 1 and 2, 2026-10-22, fresh builds) | AVX2 `1348780 / 1303`, generic `1346857 / 1302`, all passed (manager confirmed AVX2); ASan + UBSan gcc-12 and gcc-15: only the excluded `ray_progress` reports, no leak; `[wave]` 163474 / 178, `[acoustic]` 42741 / 59 in both builds; MEX 67 of 68 in Octave 11.1, MATLAB R2024a and R2026a (R2026a exit 0, no crash dump; MEX files need at most GLIBCXX_3.4.26); pytest 817 passed, ASan Python module clean; AFL all 7 readers 15 min, no crash; all 122 repro folders as expected. Known exception: one HDF5 fuzz input takes 17 s, all of it inside HDF5's H5Fopen (B-119, upstream, won't fix) | - | - |
 
 Run commands: `flock /tmp/quadriga-fixes-suite.lock build_linux/test_bin` (output
 `build_linux/scratch/hunt/base_test.txt`); the sanitizer runs with
@@ -311,6 +321,13 @@ they compare runs, not files. The QRT throughput is low because inputs make the 
 clear very large arrays (see the item). The HDF5 crashes all reduce to heap-buffer-overflow writes by
 `H5Dread` into buffers that `hdf5_read_channel` sized from attributes (`qd_channel_hdf5.cpp:1838/1839`
 and `1880/1881`); the HDF5 library itself is not instrumented and was not the target. HDF5: B-013; QRT: B-048.
+
+Note after WP-17b round 2: the obj, mtl and csv harness TUs now crash the same way at `-O1`; build them at `-O0`
+(gcc ASan builds and `-O0` are clean). Note after WP-14: with the WP-14 OBJ reader, the `fz_mtl` and `fz_csv` harnesses built at `-O2` crash on every valid
+seed in AFL's own coverage-counter increment (a garbage guard index, inside `arma::Mat::init_warm` called from
+`obj_file_read`, the site of the LAF note above); gcc ASan + UBSan, plain clang -O3 ASan and clang with
+`trace-pc-guard` are clean. Build the harness TUs with `-O1` (the library keeps `-O3`); evidence in
+`build_linux/scratch/fix/WP-14/afl/dbg/`.
 
 ## Coverage
 
@@ -2060,7 +2077,7 @@ build_linux/scratch/hunt/final/B-007/p11_v6.qrt: version 6, no_orig 3, no_cir 3,
 
 ## B-018: OBJ round trip loses "no material": faces with `mtl_ind = 0` inherit the previous material
 
-- Status: open
+- Status: fixed (WP-14): a no-material face after a material face in the same object is written after `usemtl (null)`, which the reader maps back to 0; face order and objects unchanged; a used material named `(null)` is rejected by the writer (round 2)
 - Severity: S2, because writing and reading a mesh changes its materials without an error whenever a face without material follows one with material.
 - Kind: wrong result (writer data loss)
 - Mark: [R]
@@ -5100,7 +5117,7 @@ aliased outputs:  coeff_re taps = 0 0.5 0.5 0.32 0.68
 
 ## B-056: `mitsuba_xml_file_write` is quadratic in the number of vertices per object
 
-- Status: open
+- Status: fixed (WP-14): one-pass vertex map and per-object face buckets, output byte-identical; 80 000 faces 0.02 s instead of 5.9 s
 - Severity: S3, because it is a clear performance defect: 80 000 faces take 5.9 s (and 4× the faces take about 15× the time).
 - Kind: performance
 - Mark: [M]
@@ -5189,7 +5206,7 @@ load after: 1.57 5.03 7.95 1/2779 713700
 
 ## B-057: OBJ reader: CRLF `.mtl` files lose their materials; face indices unchecked when only `face_ind` is requested; no-output call skips validation
 
-- Status: open
+- Status: fixed (WP-14): CR stripped from every OBJ / MTL line; own face parser with relative (negative) indices; every index checked for every output combination (also against the vertices defined before the face); the no-output call validates the whole file
 - Severity: S3, because invalid or Windows-style input is accepted with wrong results (materials missing, out-of-range or wrapped indices) instead of being read correctly or rejected.
 - Kind: wrong result / invalid input accepted
 - Mark: [R]
@@ -5311,7 +5328,7 @@ Output of the phase-2 re-run (`bash run.sh`):
 
 ## B-058: `write_png`: constant, NaN or inverted-range data trigger a NaN-to-integer cast and all pixels get the last colour; an empty matrix writes an invalid PNG
 
-- Status: open
+- Status: fixed (WP-14): degenerate ranges and NaN give the first colour, +-Inf clipped, inverted user range and empty matrix throw
 - Severity: S3, because edge input gives a wrong image (all maximum colour, also for log input that the docs map to the minimum colour), undefined behaviour, or an undecodable file, without an error.
 - Kind: wrong result / UB
 - Mark: [R] (UBSan as a what-if: the unchanged `src/write_png.cpp` compiled into the probe with `-fsanitize=undefined,float-cast-overflow`)
@@ -5494,7 +5511,7 @@ Output of the phase-2 re-run (`bash run.sh`):
 
 ## B-060: Channel and file-I/O header comments contradict the code (index bases, `calc_effective_path_gain` "average", `normalize_M` column power)
 
-- Status: open
+- Status: fixed (WP-17): the header comments follow the MD blocks; calc_effective_path_gain "sum" (decision (a)); normalize_M = 1 normalises the maximum column power
 - Severity: S3, because these comments would lead a user to a wrong call or a wrong interpretation (index bases off by one, a sum read as an average).
 - Kind: doc
 - Mark: [R] for the two measured items, [C] for the index-base items
@@ -7300,7 +7317,7 @@ center_freq read back = NaN (documented default 299792458)
 
 ## B-087: `arrayant_generate('multibeam')` uses a 90° element beamwidth by default in MATLAB and Python; docs (and the C++ default) say 120°
 
-- Status: open
+- Status: fixed (WP-15): the MATLAB and Python wrappers pass 120 deg for multibeam; round 2: the C++ generator maps a beamwidth <= 0 to 120 deg (was 90), breaking for C++ callers that pass 0
 - Severity: S3, because the documented default is not what is computed (max difference 0.48 in the pattern), in both wrappers.
 - Kind: doc / cross-API
 - Mark: [R]
@@ -7363,7 +7380,7 @@ Python default vs 90 : max diff 0
 
 ## B-088: `calc_angular_spread` defaults differ: MATLAB and Python disable wrapping and the bank angle, C++ enables both
 
-- Status: open
+- Status: fixed (WP-15): C++ calc_angular_spreads_sphere defaults to wrapping off and bank angle off, as the wrappers; breaking for C++ callers
 - Severity: S3, because the same default call gives different spreads in C++ (1.678) and MATLAB/Python (1.627).
 - Kind: cross-API
 - Mark: [R]
@@ -7442,7 +7459,7 @@ Python default                 as=1.627282 es=0.190512
 
 ## B-089: `triangle_mesh_segmentation` pads `mtl_ind_out` with material 1 in MATLAB, with 0 ("no material") in C++ and Python
 
-- Status: open
+- Status: fixed (WP-15): the MEX wrappers pass mtl_ind through; MATLAB padding entries are 0 (breaking for MATLAB)
 - Severity: S3, because padding faces get a real material in MATLAB only, and an input 0 ("no material") underflows on the way.
 - Kind: cross-API
 - Mark: [R] (also seen by area G)
@@ -7499,7 +7516,7 @@ Python mtl_ind_out = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 0, 0, 0, 0]
 
 ## B-090: MEX `baseband_freq_response` with `carrier_freq`: descending carriers are rejected, duplicate carriers give silent NaN (Python handles both)
 
-- Status: open
+- Status: fixed (WP-15): MEX follows Python (span from min / max, zero span with several carriers throws, reference = input carrier or min, input order kept)
 - Severity: S3, because valid carrier lists are rejected or give silent NaN in MATLAB, while Python handles them.
 - Kind: cross-API / wrong result
 - Mark: [R]
@@ -7569,7 +7586,7 @@ two equal carriers: error: 'freq_out' values must span a positive range.
 
 ## B-091: MEX `get_channels_irs` `i_irs` is 0-based, against the 1-based rule of the MATLAB spec; the doc does not say which
 
-- Status: open
+- Status: fixed (WP-15): MEX i_irs is 1-based (default 1, 0 rejected); breaking for MATLAB
 - Severity: S3, because a MATLAB user who passes 1 for the first codebook port silently gets the second.
 - Kind: doc / spec
 - Mark: [R]
@@ -7629,7 +7646,7 @@ i_irs=2: error: get_channels_irs: IRS codebook index out of bound.
 
 ## B-092: `arrayant_qdant_read(fn)` returns every entry as a struct array in MATLAB, Python's default reads ID 1
 
-- Status: open
+- Status: fixed (WP-15): MATLAB keeps reading all entries and throws when they do not form a frequency set (arrayant_is_valid_multi); Python qdant_read(fn, id=0) checks the same
 - Severity: S3, because the same default call differs between the APIs, and MATLAB returns a struct array of unrelated antennas, which its own convention treats as a frequency-dependent model.
 - Kind: cross-API
 - Mark: [R]
@@ -7789,7 +7806,7 @@ arrayant_interpolate element=0 -> arrayant_interpolate: Element indices 'i_eleme
 
 ## B-095: Diffraction level of detail 7: accepted by C++, empty `coord` in MATLAB, internal error in Python, rejected by MATLAB `generate_diffraction_paths`, documented as 0-6
 
-- Status: open
+- Status: fixed (WP-15): lod documented as 1-7 (generate_diffraction_paths) and 0-7 (calc_diffraction_gain); the wrappers size coord from C++; empty orig / dest throw
 - Severity: S3, because the same value gives four different behaviours across functions and APIs, including an Armadillo-internal error in Python, and the documented range does not match any of them.
 - Kind: cross-API / doc
 - Mark: [R]
@@ -8264,7 +8281,7 @@ copy_element with empty destination: 'Mat::max(): object has no elements'
 
 ## B-102: Arrayant documentation typos and misleading statements; latent int32 offsets and a vertex sentinel (grouped)
 
-- Status: open
+- Status: fixed (WP-17): points 1-5 corrected; 6: the AVX2 interpolation falls back to the generic kernel above INT32_MAX pattern samples; 7: OBJ export writes each vertex once
 - Severity: S4, because these are typos, misleading comments or code paths that are not reachable in practice.
 - Kind: doc / dead code
 - Mark: [C]
@@ -8388,7 +8405,7 @@ per-antenna input, fix_taps=2: delay_quant size 2x2x6
 
 ## B-104: Channel and file-I/O documentation and message nits (grouped)
 
-- Status: open
+- Status: fixed (WP-14, WP-17): point 5 in WP-14; the others in WP-17 (6: PLY paths relative to the XML; 8: qrt_file_init validates before opening the file, also a first cir_offset other than 0; 9: std::type_index)
 - Severity: S4, because these are cosmetic or minor documentation mismatches.
 - Kind: doc
 - Mark: [R] for items 2 and 6 (shown in the outputs of B-057 line (f) and B-056), [C] for the rest
@@ -8488,7 +8505,7 @@ calc_delay_spread([empty]) -> ValueError Delay and power vectors must not be emp
 
 ## B-106: Docs and code of `path_to_tube`, `qd_path` and `calc_diffraction_gain` debug output disagree (grouped)
 
-- Status: open
+- Status: fixed (WP-17): 1: path_to_tube splits above 160 deg (the code compares against cos 20 deg; the earlier comment said cosd(10)); 2: qd_path layout; 3: the debug print indexed the R set with the G index (heap and stack over-read under ASan), now fixed
 - Severity: S4, because these are stale or misleading comments and a debug-only code path.
 - Kind: doc
 - Mark: [R] for items 1 and 2, [C] for item 3
@@ -8575,6 +8592,8 @@ after extend with types 130 and 5: nREF = 0, nTRA = 0
 sizeof(path) = 56 (doc: 64-byte header); interaction codes = 2
 ```
 
+Corrected in WP-17: the split angle is a deviation above 160 deg, not 170 deg (the code compares against cos 20 deg); the 10 deg came from the old comment.
+
 **Proposed fix.** Correct the comments (items 1, 2); index with the R index in the debug print (item 3).
 
 **Test for the fix session.** None needed for 1-2; for 3 a run with `verbose = 2` and one position does not throw.
@@ -8634,7 +8653,7 @@ xo = nan  -> 0
 
 ## B-108: Geometry documentation and validation nits (index-map directions, 9-column check, precision claim, header typos; dead code; CPU check)
 
-- Status: partly fixed (WP-12): point 3 (precision claim in the header) fixed; points 1, 2, 4, 5 and 6 remain (WP-17)
+- Status: fixed (WP-12, WP-17): point 3 in WP-12; the others in WP-17 (2: meshes with >= 9 columns everywhere, dest must match orig; 5: dead code removed; 6: the CPU check tests AVX2, FMA, OSXSAVE and the YMM state)
 - Severity: S4, because these are misleading wording, a confusing error message, dead code or a robustness gap on unusual CPUs.
 - Kind: doc / dead code / robustness
 - Mark: [R] for items 1 and 2, [C] for the rest
@@ -8708,7 +8727,7 @@ reverse_index (len 4): 3 0 2 1   -> points row j = pointsR row reverse_index(j)
 
 ## B-109: `sos_val` / `sos_remove_bias`: an output that partially overlaps an input is accepted and gives wrong values (docs promise an error)
 
-- Status: open
+- Status: fixed (WP-16): sos_val rejects a val that shares any part of an input's memory; sos_remove_bias rejects any written argument that shares memory with another argument, and offset == mean_before; checked before anything is written
 - Severity: S4, because it needs a hand-built Armadillo matrix on foreign memory that starts inside an input, which no wrapper can produce; the documentation promises an exception, the call silently returns values off by up to 0.92.
 - Kind: doc / invalid input accepted
 - Mark: [R]
@@ -8786,7 +8805,7 @@ Output of the phase-2 re-run (`bash run.sh`):
 
 ## B-110: `sos_randn` / `sos_rand` / `sos_randi` report an unknown preset as "Input 'name' ...", an argument they do not have
 
-- Status: open
+- Status: fixed (WP-16): the random functions check the preset name with the shared lookup of sos_preset and report "Input 'preset' ..."
 - Severity: S4, because only the error message names the wrong argument; the call is rejected correctly in all three APIs.
 - Kind: doc (error message)
 - Mark: [R]
@@ -8843,7 +8862,7 @@ python sos.randn: ValueError Input 'name' is not a known preset.
 
 ## B-111: `md/SPEC_PYTHON_API.md` gives two contradicting rules for the headings of the `sos` entries
 
-- Status: open
+- Status: fixed (WP-16)
 - Severity: S4, because only the spec is inconsistent; the code follows the later rule.
 - Kind: doc
 - Mark: [C] (checked with `sed -n 104p md/SPEC_PYTHON_API.md; sed -n 348p md/SPEC_PYTHON_API.md` and `grep -c "^# sos\." api_python/qpy_sos_*.cpp`, one per file)
@@ -8901,7 +8920,7 @@ class(interact_type{1}) = uint8 (doc: uint32)
 
 ## B-113: MEX `get_channels_*` with 0 paths and `add_fake_los_path` return a zero path with delay 0, where C++ throws
 
-- Status: open
+- Status: fixed (WP-15): C++ returns the zero-power LOS path with its LOS delays for 0 paths with add_fake_los_path, the wrappers call C++; round 2: 0 paths without it gives empty outputs [n_rx, n_tx, 0] in all APIs, and Python spherical batch mode adds the fake LOS path too
 - Severity: S4, because it is an error-behaviour difference on an edge case (and the returned delay ignores `use_absolute_delays`).
 - Kind: cross-API
 - Mark: [R]
@@ -8972,7 +8991,7 @@ C++ spherical -> Missing data for any of: fbs_pos, lbs_pos, path_gain, path_leng
 
 ## B-114: MEX `arrayant_rotate_pattern`: struct arrays reject usage 3 and 4 (Python maps them); a call without output argument errors
 
-- Status: open
+- Status: fixed (WP-15)
 - Severity: S4, because it is an API inconsistency on a less used path.
 - Kind: cross-API
 - Mark: [R]
@@ -9036,7 +9055,7 @@ Python multi usage=3: OK, e_theta_re shape (19, 37, 2, 2)
 
 ## B-115: MEX documentation, error IDs and latent helper defects (grouped)
 
-- Status: open
+- Status: fixed (WP-17): all points; the string-literal copy flags had been fixed in WP-06 (fd4cfe0), only the i_freq message was left
 - Severity: S4, because these are documentation errors, a non-standard error ID, typos and latent defects without a current caller.
 - Kind: doc / dead code
 - Mark: [R] for items a-e (in the repro), [C] for the rest
@@ -9711,7 +9730,7 @@ RPI Internal - Dense Grid (AVX2 vs GENERIC): test cases: 1 | 1 passed assertions
 
 ## B-122: `qrt_file_read_raw` is quadratic in the number of paths per origin (`reserve` per CIR): 240 000 paths take 7.5 s
 
-- Status: open
+- Status: fixed (WP-14): geometric growth of the output; linear scaling
 - Severity: S3, because reading the raw paths of a large ray-tracing result takes seconds to minutes where linear time would take milliseconds; results are correct.
 - Kind: performance
 - Mark: [M] (found and measured by the WP-07 worker, 2026-10-19; details and timings in `md/fix_logs/WP-07.md`, "Found on the way")
@@ -9727,7 +9746,7 @@ RPI Internal - Dense Grid (AVX2 vs GENERIC): test cases: 1 | 1 passed assertions
 
 ## B-123: MEX and Python `qrt_file_read` build a 2^32-entry index vector (34 GB) for a valid file with 0 CIRs
 
-- Status: open
+- Status: fixed (WP-15): empty outputs for 0 CIRs, no large allocation
 - Severity: S3, because a valid file without CIRs makes the wrapper allocate 34 GB (MemoryError in Python, "out of memory" in Octave) instead of returning empty outputs.
 - Kind: defect (unsigned underflow)
 - Mark: [R] (found by the WP-07 worker under `ulimit`, 2026-10-19; details in `md/fix_logs/WP-07.md`)

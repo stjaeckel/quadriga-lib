@@ -39,6 +39,7 @@ Generate elliptic propagation paths and weights for diffraction gain estimation
    | 4     | 61       | 5       | -     |
    | 5     | 1        | 2       | debug |
    | 6     | 2        | 2       | debug |
+   | 7     | 1        | 10      | direct line in 10 segments |
 
 ## Outputs:
 - **`rays`** — Coordinates of path waypoints (x, y, z stacked along the 4th dimension, endpoints
@@ -61,64 +62,31 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::mat orig = qd_mex_get_Mat<double>(prhs[0]);
     const arma::mat dest = qd_mex_get_Mat<double>(prhs[1]);
     const double center_frequency = qd_mex_get_scalar<double>(prhs[2], "center_frequency", 0.0);
+    if (mxGetNumberOfElements(prhs[3]) == 0)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'lod' cannot be empty.");
     const int lod = qd_mex_get_scalar<int>(prhs[3], "lod", 1);
 
-    // Determine output dimensions from lod
-    arma::uword n_path = 0, n_seg = 0;
-    switch (lod)
-    {
-    case 1:
-        n_path = 7;
-        n_seg = 3;
-        break;
-    case 2:
-        n_path = 19;
-        n_seg = 3;
-        break;
-    case 3:
-        n_path = 37;
-        n_seg = 4;
-        break;
-    case 4:
-        n_path = 61;
-        n_seg = 5;
-        break;
-    case 5:
-        n_path = 1;
-        n_seg = 2;
-        break;
-    case 6:
-        n_path = 2;
-        n_seg = 2;
-        break;
-    default:
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'lod' must be in range 1..6.");
-    }
-
-    const arma::uword n_pos = orig.n_rows;
-    const arma::uword n_wp = n_seg - 1; // waypoint count (endpoints excluded)
-
-    // Allocate the rays output as a 4D MATLAB array [n_pos, n_path, n_seg-1, 3]
-    // and wrap each (x, y, z) slab as a strict Armadillo cube so the C++ function
-    // writes directly into MATLAB-owned memory without an extra copy.
-    arma::cube ray_x, ray_y, ray_z;
-    if (nlhs > 0)
-    {
-        mwSize dims[4] = {(mwSize)n_pos, (mwSize)n_path, (mwSize)n_wp, 3};
-        plhs[0] = mxCreateNumericArray(4, dims, mxDOUBLE_CLASS, mxREAL);
-        double *data = (double *)mxGetData(plhs[0]);
-        const arma::uword offset = n_pos * n_path * n_wp;
-        ray_x = arma::cube(data, n_pos, n_path, n_wp, false, true);
-        ray_y = arma::cube(&data[offset], n_pos, n_path, n_wp, false, true);
-        ray_z = arma::cube(&data[2 * offset], n_pos, n_path, n_wp, false, true);
-    }
-
-    // Allocate weights output [n_pos, n_path, n_seg]
-    arma::cube weight;
-    if (nlhs > 1)
-        plhs[1] = qd_mex_init_output(&weight, n_pos, n_path, n_seg);
-
-    // Call library function
+    // Output sizes depend on lod and are set by C++
+    arma::cube ray_x, ray_y, ray_z, weight;
     CALL_QD(quadriga_lib::generate_diffraction_paths<double>(orig, dest, center_frequency, lod,
                                                              ray_x, ray_y, ray_z, weight));
+
+    // Rays output as a 4D MATLAB array [n_pos, n_path, n_seg-1, 3], x, y, z stacked along the 4th dimension
+    if (nlhs > 0)
+    {
+        mwSize dims[4] = {(mwSize)ray_x.n_rows, (mwSize)ray_x.n_cols, (mwSize)ray_x.n_slices, 3};
+        plhs[0] = mxCreateNumericArray(4, dims, mxDOUBLE_CLASS, mxREAL);
+        double *data = (double *)mxGetData(plhs[0]);
+        const arma::uword offset = ray_x.n_elem;
+        if (offset != 0)
+        {
+            std::memcpy(data, ray_x.memptr(), offset * sizeof(double));
+            std::memcpy(&data[offset], ray_y.memptr(), offset * sizeof(double));
+            std::memcpy(&data[2 * offset], ray_z.memptr(), offset * sizeof(double));
+        }
+    }
+
+    // Weights output [n_pos, n_path, n_seg]
+    if (nlhs > 1)
+        plhs[1] = qd_mex_copy2matlab(&weight);
 }

@@ -57,8 +57,10 @@ TEST_CASE("quantize_delays - Input validation")
     CHECK_THROWS_AS(quadriga_lib::quantize_delays<double>(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, -1.0e-9),
                     std::invalid_argument);
 
-    // Invalid power_exponent
+    // Invalid power_exponent (NaN passed the "<= 0" check and gave NaN coefficients)
     CHECK_THROWS_AS(quadriga_lib::quantize_delays<double>(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, 5.0e-9, 48, 0.0),
+                    std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::quantize_delays<double>(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, 5.0e-9, 48, NAN),
                     std::invalid_argument);
 
     // Invalid fix_taps

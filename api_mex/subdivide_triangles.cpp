@@ -27,11 +27,11 @@ Subdivide triangles into smaller triangles
 - **`triangles_in`** — Mesh vertices as `[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]`; `[n_triangles_in, 9]`
 - **`n_div`** — Number of subdivisions per edge
 - **`mtl_ind_in`** — 1-based material index per triangle (the `csv_ind` output of [[obj_file_read]]);
- `[n_triangles_in]`; default: `[]`
+  0 = no material; `[n_triangles_in]`; passed through unchanged; default: `[]`
 
 ## Outputs:
 - **`triangles_out`** — Subdivided mesh vertices, same column layout as `triangles_in`; `[n_triangles_out, 9]`
-- **`mtl_ind_out`** — Material indices for the subdivided triangles; `[n_triangles_out]`; only
+- **`mtl_ind_out`** — Material indices for the subdivided triangles, 1-based; uint64; `[n_triangles_out]`; only
   populated if `mtl_ind_in` is given
 MD!*/
 
@@ -47,13 +47,15 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::mat triangles_in = qd_mex_get_Mat<double>(prhs[0]);
     const arma::uword n_div = (nrhs < 2) ? 1 : qd_mex_get_scalar<arma::uword>(prhs[1], "n_div", 1);
 
-    // Material index: MATLAB 1-based -> C++ 0-based (copy so we don't mutate caller memory)
-    arma::uvec mtl_ind = (nrhs < 3) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[2], true, "mtl_ind_in");
-    if (!mtl_ind.is_empty())
-        mtl_ind -= 1;
+    // Material index: 1-based in C++ as well (0 = no material), no shift intended
+    const arma::uvec mtl_ind = (nrhs < 3) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[2], false, "mtl_ind_in");
 
-    // Compute output sizes
+    // Compute output sizes; the output (n_triangles_in * n_div^2 rows, 9 values each) must fit into 64 bits,
+    // checked before the outputs are allocated (same check and message as in C++)
     arma::uword n_triangles_in = triangles_in.n_rows;
+    const arma::uword uword_max = std::numeric_limits<arma::uword>::max();
+    if (n_div != 0 && (n_div > uword_max / n_div || n_triangles_in > uword_max / 9 / (n_div * n_div)))
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'n_div' is too large.");
     arma::uword n_triangles_out = n_triangles_in * n_div * n_div;
 
     // Output allocation
@@ -78,8 +80,4 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Call library function
     CALL_QD(quadriga_lib::subdivide_triangles<double>(n_div, &triangles_in, &triangles_out, p_mtl_ind, p_mtl_ind_out));
-
-    // Convert material index from 0-based (C++) to 1-based (MATLAB)
-    if (!mtl_ind_out.is_empty())
-        mtl_ind_out += 1;
 }

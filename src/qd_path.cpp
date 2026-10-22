@@ -38,7 +38,7 @@ SECTION!*/
         // │ Jones: [ReVV,ImVV,ReHV,ImHV,ReVH,ImVH,ReHH,ImHH]    │
         // │        × nFREQ-1 = 32×(nFREQ-1) bytes               │
         // ├─────────────────────────────────────────────────────┤
-        // | Interactions: 4 * ((nSEG-3) / 4) bytes, nSEG ≥ 7    │
+        // | Interactions: 4 * ((nSEG+1) / 4) bytes, nSEG > 2    │
         // └─────────────────────────────────────────────────────┘
 
         // Data buffer SCALAR:
@@ -47,7 +47,7 @@ SECTION!*/
         // ├─────────────────────────────────────────────────────┤
         // │ Coeff: [Re,Im] × (nFREQ-4) = 8×(nFREQ-4) bytes      │
         // ├─────────────────────────────────────────────────────┤
-        // | Interactions: 4 * ((nSEG-3) / 4) bytes, nSEG ≥ 7    │
+        // | Interactions: 4 * ((nSEG+1) / 4) bytes, nSEG > 2    │
         // └─────────────────────────────────────────────────────┘
 
     public:
@@ -102,7 +102,7 @@ SECTION!*/
         // Duplicate path, writing to "target"; return length
         float duplicate(path &target) const;
 
-        // Duplicate path and append segment; increase nTRA for types 1-127, nREF for types 128-255; return length
+        // Duplicate path and append segment; nREF and nTRA are not changed; return length
         // - Must be called before xpr_update/gain to use the correct path length in gain calculation
         float extend(path &target, float x, float y, float z, uint8_t type = 0) const;
 
@@ -119,7 +119,7 @@ SECTION!*/
 Class for storing and managing a single propagation path with a compact fixed-size header
 
 - Represents one ray from origin to destination through a sequence of `nSEG` interaction points
-- A 64-byte header holds metadata, the first 6 interaction type codes, and the frequency-0
+- A 56-byte header holds metadata, the first 2 interaction type codes, and the frequency-0
   transfer coefficients; a variable-length heap buffer holds coordinates, the remaining
   frequency coefficients, and the overflow interaction codes
 - Two layout modes selected at initialization: EM carries a full 2x2 Jones matrix per frequency;
@@ -130,7 +130,6 @@ Class for storing and managing a single propagation path with a compact fixed-si
 | Attribute            | Size   | Description                                                       |
 | -------------------- | ------ | ----------------------------------------------------------------- |
 | `unsigned iC`        | scalar | Channel ID: the channel to which the path belongs                 |
-| `unsigned iR`        | scalar | Ray index: relative index in the launch configuration             |
 | `uint8_t nREF`       | scalar | Number of reflections (interaction type codes 128-255)            |
 | `uint8_t nTRA`       | scalar | Number of transmissions / refractions (type codes 1-127)          |
 | `uint8_t nSUB`       | scalar | Number of subdivisions                                            |
@@ -142,14 +141,14 @@ Class for storing and managing a single propagation path with a compact fixed-si
 | ------------- | ----------------- | ------------------------------------------------------- |
 | Coordinates   | `3 * nSEG`        | Interaction points `[x, y, z]` per segment              |
 | Jones         | `8 * (nFRQ - 1)`  | Transfer matrices for frequencies 1..nFRQ-1, col-major  |
-| Interactions  | `(nSEG - 3) / 4`  | Overflow type codes past the first 6, packed 4 per float, present for `nSEG >= 7` |
+| Interactions  | `(nSEG + 1) / 4`  | Overflow type codes past the first 2, packed 4 per float, present for `nSEG > 2` |
 
 ## Data buffer layout (SCALAR mode):<br>
 | Block         | Size (floats)     | Description                                             |
 | ------------- | ----------------- | ------------------------------------------------------- |
 | Coordinates   | `3 * nSEG`        | Interaction points `[x, y, z]` per segment              |
 | Coeff         | `2 * (nFRQ - 4)`  | Pressure coefficients for frequencies 4..nFRQ-1         |
-| Interactions  | `(nSEG - 3) / 4`  | Overflow type codes past the first 6, packed 4 per float, present for `nSEG >= 7` |
+| Interactions  | `(nSEG + 1) / 4`  | Overflow type codes past the first 2, packed 4 per float, present for `nSEG > 2` |
 
 ## Simple member functions:<br>
 | Method            | Description                                                                     |

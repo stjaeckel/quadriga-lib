@@ -169,5 +169,20 @@ class test_case(unittest.TestCase):
         npt.assert_allclose(ant5["coupling_re"][36:72, 0], zeros, atol=1e-14, rtol=0)
 
 
+class test_default_beamwidth(unittest.TestCase):
+
+    # The default element beamwidth of the multibeam array is the documented 120 deg (0 selects it)
+    def test(self):
+        a0 = arrayant.generate('multibeam')
+        a120 = arrayant.generate('multibeam', az_3dB=120.0, el_3dB=120.0)
+        a90 = arrayant.generate('multibeam', az_3dB=90.0, el_3dB=90.0)
+        npt.assert_array_equal(a0['e_theta_re'], a120['e_theta_re'])
+        npt.assert_array_equal(a0['e_phi_re'], a120['e_phi_re'])
+        self.assertGreater(np.abs(a0['e_theta_re'] - a90['e_theta_re']).max(), 0.1)
+        a = arrayant.generate('multibeam', az_3dB=90.0)  # only the elevation takes the default
+        b = arrayant.generate('multibeam', az_3dB=90.0, el_3dB=120.0)
+        npt.assert_array_equal(a['e_theta_re'], b['e_theta_re'])
+
+
 if __name__ == "__main__":
     unittest.main()

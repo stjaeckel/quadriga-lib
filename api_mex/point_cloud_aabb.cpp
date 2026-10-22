@@ -26,7 +26,7 @@ aabb = quadriga_lib.point_cloud_aabb( points, sub_cloud_index, vec_size );
 
 ## Inputs:
 - **`points`** — 3D point coordinates; `[n_points, 3]`
-- **`sub_cloud_index`** — Rrow indices marking the start of each sub-cloud; use [[point_cloud_segmentation]] 
+- **`sub_cloud_index`** — Row indices marking the start of each sub-cloud; use [[point_cloud_segmentation]] 
   to generate; uint32; `[n_sub]`; default: `[]` (not using sub-clouds)
 - **`vec_size`** — SIMD alignment padding factor (e.g. 4, 8, 16); default: 1
 

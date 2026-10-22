@@ -14,7 +14,7 @@ Export antenna pattern geometry to a Wavefront OBJ file for 3D visualization
 
 - Pattern is mapped onto an icosphere; higher `icosphere_n_div` gives a finer mesh
 - Supports multi-frequency arrayant models: pass a struct array and select the entry to export
-  via the `freq` argument
+  via the `i_freq` argument
 
 ## Usage:
 ```
@@ -32,7 +32,7 @@ quadriga_lib.arrayant_export_obj_file( fn, arrayant, directivity_range, colormap
 - **`icosphere_n_div`** — Icosphere subdivision count; higher = finer mesh; see [[icosphere]]; default: 4
 - **`i_element`** — Element indices to export; 1-based; uint64; empty = export all elements
 - **`i_freq`** — Frequency index to export from a multi-frequency arrayant struct array; 1-based; 
-  uint64; default: 1; must satisfy `1 <= freq <= n_freq`
+  uint64; default: 1; must satisfy `1 <= i_freq <= n_freq`
 
 ## See also:
 - [[icosphere]] (icosphere primitive used internally)
@@ -67,9 +67,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // freq: 1-based frequency index for multi-frequency models
     size_t n_freq = (size_t)mxGetNumberOfElements(prhs[1]);
-    size_t freq = (nrhs < 8) ? 1 : qd_mex_get_scalar<size_t>(prhs[7], "freq", 1);
+    size_t freq = (nrhs < 8) ? 1 : qd_mex_get_scalar<size_t>(prhs[7], "i_freq", 1);
     if (freq < 1 || freq > n_freq)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'freq' is out of bound.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'i_freq' is out of bound.");
 
     // Load arrayant (single entry for the requested frequency)
     auto ant = quadriga_lib::arrayant<double>();

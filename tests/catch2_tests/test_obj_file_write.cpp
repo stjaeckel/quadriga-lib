@@ -562,9 +562,40 @@ TEST_CASE("Test OBJ File Write - CSV columns, defaults and validation")
         std::getline(f, row);
         f.close();
 
-        CHECK(header == "name,a,b,c,d,e,f,g,h,att,attB,alpha,alphaB,fRef,m,resF,resQ,resS,coiF,coiQ,tf,tfB,tfP,tfF,tfQ,side,zzz");
+        CHECK(header == "name,a,b,c,d,e,f,g,h,thk,att,attB,alpha,alphaB,fRef,m,resF,resQ,resS,coiF,coiQ,tf,tfB,tfP,tfF,tfQ,side,zzz");
         // a=1, e=1, fRef=1, side=3.29 by default; c=0.05 and tf=2 from csv_prop; rest 0; zzz=7 last
-        CHECK(row == "slab,1,0,0.05,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,3.29,7");
+        CHECK(row == "slab,1,0,0.05,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,3.29,7");
+
+        std::remove("cube.obj");
+        std::remove("cube.mtl");
+        std::remove("cube.csv");
+    }
+
+    SECTION("thk is written in the canonical position (after h, before att), default 0")
+    {
+        std::unordered_map<std::string, std::vector<double>> prop_thk;
+        prop_thk["att"] = {3.0};
+        prop_thk["thk"] = {0.2};
+        prop_thk["h"] = {0.5};
+        quadriga_lib::obj_file_write<double>("cube.obj", &mesh, &obj_ind, &mtl_ind, &obj_names, &mtl_names,
+                                             &vlo, &fio, nullptr, nullptr, nullptr, 0.001,
+                                             nullptr, &csv_names, &prop_thk, /*csv_write_defaults=*/false);
+        std::ifstream f("cube.csv");
+        std::string header, row;
+        std::getline(f, header);
+        std::getline(f, row);
+        f.close();
+        CHECK(header == "name,h,thk,att");
+        CHECK(row == "slab,0.5,0.2,3");
+
+        // Round trip: the reader returns thk as a column
+        arma::uvec ci;
+        std::vector<std::string> cn;
+        std::unordered_map<std::string, std::vector<double>> cp;
+        quadriga_lib::obj_file_read<double>("cube.obj", nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                                            "cube.csv", &ci, &cn, &cp);
+        REQUIRE(cp.count("thk") == 1);
+        CHECK(cp["thk"][0] == 0.2);
 
         std::remove("cube.obj");
         std::remove("cube.mtl");
@@ -1006,4 +1037,124 @@ TEST_CASE("Test OBJ File Write - Vertex welding")
         quadriga_lib::obj_file_write<double>("", &mesh, &obj_ind, nullptr, &obj_names, nullptr, &vlo, &fio);
         CHECK(vlo.n_rows == 6);
     }
+}
+TEST_CASE("Test OBJ File Write - Faces without material keep mtl_ind 0 in the round trip")
+{
+    // Three disjoint triangles; helper that counts the "usemtl (null)" lines of the written file
+    arma::mat mesh = {{0, 0, 0, 1, 0, 0, 0, 1, 0}, {5, 0, 0, 6, 0, 0, 5, 1, 0}, {9, 0, 0, 10, 0, 0, 9, 1, 0}};
+    std::vector<std::string> mtl_names = {"itu_wood", "itu_glass"};
+    auto count_null = [](const std::string &fn)
+    {
+        size_t n = 0;
+        for (const auto &s : collect_after(fn, "usemtl "))
+            n += (s == "(null)");
+        return n;
+    };
+
+    SECTION("mtl_ind {1, 0, 2} in one object")
+    {
+        arma::uvec obj_ind = {0, 0, 0}, mtl_ind = {1, 0, 2};
+        std::vector<std::string> obj_names = {"box"};
+        quadriga_lib::obj_file_write<double>("null_mtl.obj", &mesh, &obj_ind, &mtl_ind, &obj_names, &mtl_names);
+        CHECK(count_null("null_mtl.obj") == 1);
+        CHECK(collect_after("null_mtl.mtl", "newmtl ") == mtl_names); // no "(null)" entry in the .mtl
+
+        arma::uvec mi, ci;
+        arma::mat bsdf;
+        std::vector<std::string> mn;
+        quadriga_lib::obj_file_read<double>("null_mtl.obj", nullptr, nullptr, nullptr, nullptr, nullptr, &mi, &mn, &bsdf,
+                                            "", &ci, nullptr, nullptr, /*csv_strict=*/true);
+        CHECK(arma::all(mi == arma::uvec({1, 0, 2})));
+        CHECK(mn == mtl_names);
+        CHECK(bsdf.n_rows == 2);
+        REQUIRE(ci.n_elem == 3);
+        CHECK(ci(0) != 0);
+        CHECK(ci(1) == 0);
+        CHECK(ci(2) != 0);
+
+        // Only the face index output requested: the marker is parsed the same way
+        arma::uvec ci2;
+        quadriga_lib::obj_file_read<double>("null_mtl.obj", nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                                            nullptr, "", &ci2);
+        CHECK(arma::all(ci2 == ci));
+    }
+
+    SECTION("No switch from a material to no material: no marker, unchanged file")
+    {
+        // Faces without material before the first material, and an object start, need no marker
+        arma::uvec obj_ind = {0, 1, 1}, mtl_ind = {1, 0, 2};
+        std::vector<std::string> obj_names = {"a", "b"};
+        quadriga_lib::obj_file_write<double>("null_mtl.obj", &mesh, &obj_ind, &mtl_ind, &obj_names, &mtl_names);
+        CHECK(count_null("null_mtl.obj") == 0);
+
+        arma::uvec mi;
+        quadriga_lib::obj_file_read<double>("null_mtl.obj", nullptr, nullptr, nullptr, nullptr, nullptr, &mi);
+        CHECK(arma::all(mi == arma::uvec({1, 0, 2})));
+    }
+
+    SECTION("Several switches, consecutive faces without material share one marker")
+    {
+        arma::mat mesh6 = arma::join_cols(mesh, mesh + 20.0);
+        arma::uvec obj_ind(6, arma::fill::zeros), mtl_ind = {1, 0, 0, 2, 0, 2}; // read back in order of first use
+        std::vector<std::string> obj_names = {"box"};
+        quadriga_lib::obj_file_write<double>("null_mtl.obj", &mesh6, &obj_ind, &mtl_ind, &obj_names, &mtl_names);
+        CHECK(count_null("null_mtl.obj") == 2);
+
+        arma::uvec mi;
+        quadriga_lib::obj_file_read<double>("null_mtl.obj", nullptr, nullptr, nullptr, nullptr, nullptr, &mi);
+        CHECK(arma::all(mi == mtl_ind));
+    }
+
+    SECTION("split_loose_parts reorders faces by part; the marker follows the written order")
+    {
+        // Faces 0 and 2 share a vertex (part 1), face 1 is disjoint (part 2): written order 0, 2, 1
+        arma::mat m3 = mesh;
+        m3.row(2) = arma::rowvec{1, 0, 0, 2, 0, 0, 1, 1, 0};
+        arma::uvec obj_ind = {0, 0, 0}, mtl_ind = {1, 2, 0};
+        std::vector<std::string> obj_names = {"box"};
+        quadriga_lib::obj_file_write<double>("null_mtl.obj", &m3, &obj_ind, &mtl_ind, &obj_names, &mtl_names,
+                                             nullptr, nullptr, nullptr, nullptr, nullptr, 0.001,
+                                             nullptr, nullptr, nullptr, false, /*split_loose_parts=*/true);
+        CHECK(collect_after("null_mtl.obj", "o ") == std::vector<std::string>{"box.001", "box.002"});
+        CHECK(count_null("null_mtl.obj") == 1);
+
+        arma::mat mesh_rd;
+        arma::uvec mi;
+        quadriga_lib::obj_file_read<double>("null_mtl.obj", &mesh_rd, nullptr, nullptr, nullptr, nullptr, &mi);
+        REQUIRE(mesh_rd.n_rows == 3);
+        CHECK(arma::approx_equal(mesh_rd.row(0), m3.row(0), "absdiff", 1e-12));
+        CHECK(arma::approx_equal(mesh_rd.row(1), m3.row(2), "absdiff", 1e-12));
+        CHECK(arma::approx_equal(mesh_rd.row(2), m3.row(1), "absdiff", 1e-12));
+        CHECK(arma::all(mi == arma::uvec({1, 0, 2})));
+    }
+
+    std::remove("null_mtl.obj");
+    std::remove("null_mtl.mtl");
+}
+
+TEST_CASE("Test OBJ File Write - A used material named '(null)' is rejected")
+{
+    arma::mat mesh = {{0, 0, 0, 1, 0, 0, 0, 1, 0}, {5, 0, 0, 6, 0, 0, 5, 1, 0}, {9, 0, 0, 10, 0, 0, 9, 1, 0}};
+    arma::uvec obj_ind = {0, 0, 0};
+    std::vector<std::string> obj_names = {"box"}, mtl_names = {"itu_wood", "(null)"};
+    std::remove("null_name.obj");
+    std::remove("null_name.mtl");
+
+    // Material 2 "(null)" is used: throws before any file is written
+    arma::uvec mtl_used = {1, 2, 0};
+    CHECK_THROWS_AS(quadriga_lib::obj_file_write<double>("null_name.obj", &mesh, &obj_ind, &mtl_used, &obj_names, &mtl_names),
+                    std::invalid_argument);
+    CHECK_FALSE(std::filesystem::exists("null_name.obj"));
+    CHECK_FALSE(std::filesystem::exists("null_name.mtl"));
+
+    // The same list with "(null)" unused writes fine and reads back
+    arma::uvec mtl_unused = {1, 0, 1};
+    quadriga_lib::obj_file_write<double>("null_name.obj", &mesh, &obj_ind, &mtl_unused, &obj_names, &mtl_names);
+    CHECK(collect_after("null_name.mtl", "newmtl ") == std::vector<std::string>{"itu_wood"});
+    arma::uvec mi;
+    quadriga_lib::obj_file_read<double>("null_name.obj", nullptr, nullptr, nullptr, nullptr, nullptr, &mi);
+    CHECK(arma::all(mi == mtl_unused));
+
+    std::remove("null_name.obj");
+    std::remove("null_name.mtl");
 }

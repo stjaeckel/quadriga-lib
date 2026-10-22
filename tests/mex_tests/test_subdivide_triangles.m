@@ -21,6 +21,12 @@ assertEqual( size(mtlo), [48, 1] );
 assertEqual( mtlo(1:4), repmat(mtli(1), 4, 1) );   % parent 1 -> 4 sub-triangles
 assertEqual( mtlo(5:8), repmat(mtli(2), 4, 1) );   % parent 2 -> 4 sub-triangles
 
+% 1-based in C++ as well (0 = no material): indices pass through unchanged, also 0
+mtl0 = mtli; mtl0(2) = 0;
+[~, mtlo0] = quadriga_lib.subdivide_triangles(tri, 2, mtl0);
+assertEqual( mtlo0(5:8), zeros(4, 1, 'uint64') );
+assertEqual( mtlo0([1:4, 9:48]), mtlo([1:4, 9:48]) );
+
 % 0 outputs
 quadriga_lib.subdivide_triangles(tri, 2, mtli);
 
@@ -73,6 +79,17 @@ catch ME
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
+end
+
+% The output size is checked before the outputs are allocated: 12 * n_div^2 wraps for 2^31 + 1
+for n_div = [2^31 + 1, 2^30, 2^32]
+    failed = false;
+    try
+        [~, ~] = quadriga_lib.subdivide_triangles(tri, n_div, mtli);
+    catch ME
+        failed = strcmp(ME.identifier, 'quadriga_lib:CPPerror') && ~isempty(strfind(ME.message, 'Input ''n_div'' is too large.'));
+    end
+    assertTrue( failed );
 end
 
 end

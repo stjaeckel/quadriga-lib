@@ -51,10 +51,14 @@ static void qd_sos_rand_impl(const arma::Col<dtype> &dist_decorr, const arma::Ma
     }
     if (seed < -1)
         throw std::invalid_argument("Input 'seed' must be >= -1.");
+    int preset_type = -1;
+    arma::uword preset_n_coeff = 0;
+    if (!qd_sos_preset_lookup(preset, preset_type, preset_n_coeff))
+        throw std::invalid_argument("Input 'preset' is not a known preset.");
 
     const arma::uword n_gen = dist_decorr.n_elem, n_pos = pos.n_rows;
 
-    // Preset for 10 m (throws for an unknown name) and the phases of the first device
+    // Preset for 10 m and the phases of the first device
     arma::mat freq10, phase, phase_b;
     arma::vec acf, dist10;
     quadriga_lib::sos_preset<double>(preset, freq10, &acf, &dist10, 10.0);

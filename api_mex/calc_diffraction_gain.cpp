@@ -20,7 +20,8 @@ Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh
   generalized to arbitrary 3D shapes
 - Optional sub-mesh indexing (see [[triangle_mesh_segmentation]]) accelerates computation by skipping
   triangles whose bounding box does not intersect the TX-RX path
-- For a detailed description of the material model see <a href="http://quadriga-lib.org/formats.html">Data Formats</a>
+- The material model and its columns: <a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md">The quadriga-lib Material Model and Ray-Surface Physics</a>; the CSV format
+  of the material table: <a href="http://quadriga-lib.org/formats.html">Data Formats</a>
 
 ## Usage:
 ```
@@ -38,7 +39,8 @@ Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh
   [[obj_file_read]]); each field holds a vector of length `n_mtl`
 - **`center_freq`** — Center frequency in Hz. In scalar mode this is the true acoustic frequency;
   it is converted internally to the EM-equivalent frequency used by the core
-- **`lod`** — Level of detail (0–6), controls `n_path` and `n_seg`; see [[generate_diffraction_paths]]; default: 2
+- **`lod`** — Level of detail (0–7), controls `n_path` and `n_seg`; 0 = direct ray only (`n_path = 1`, `n_seg = 1`);
+  1–7 as in the table of [[generate_diffraction_paths]]; default: 2
 - **`verbose`** — Verbosity level; default: 0 (no output)
 - **`sub_mesh_index`** — 1-based sub-mesh index for acceleration; see [[triangle_mesh_segmentation]];  `[n_mesh, 1]`;
   default: `[]` (not using sub-meshes)
@@ -67,7 +69,8 @@ Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh
   interleaved complex, col-major `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]` with labels `<rx><tx>`:
   rows 1-2 = (V rx, V tx), rows 3-4 = (H rx, V tx), rows 5-6 = (V rx, H tx), rows 7-8 = (H rx, H tx), the row order
   of `M` in [[get_channels_spherical]]; `[8, n_pos]`; scalar mode: scalar pressure coefficient `[Re Im]`; `[2, n_pos]`
-- **`coord`** — Diffracted path coordinates excluding endpoints; `[3, n_seg-1, n_pos]`
+- **`coord`** — Diffracted path coordinates excluding endpoints; `[3, n_seg-1, n_pos]` with `n_seg` from `lod`
+  (e.g. `[3, 2, n_pos]` for lod 2, `[3, 9, n_pos]` for lod 7, `[3, 0, n_pos]` for lod 0)
 
 ## See also:
 - [[generate_diffraction_paths]] (controls path/segment count via `lod`)
@@ -94,7 +97,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Material properties: MATLAB struct -> std::unordered_map<std::string, std::vector<double>>
     auto mtl_prop = qd_mex_struct2map<double>(prhs[4]);
 
-    double center_freq = qd_mex_get_scalar<double>(prhs[5], "center_frequency", 1.0e9);
+    if (mxGetNumberOfElements(prhs[5]) == 0)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'center_freq' cannot be empty.");
+    double center_freq = qd_mex_get_scalar<double>(prhs[5], "center_freq");
     int lod = (nrhs < 7) ? 2 : qd_mex_get_scalar<int>(prhs[6], "lod", 2);
     int verbose = (nrhs < 8) ? 0 : qd_mex_get_scalar<int>(prhs[7], "verbose", 0);
     arma::u32_vec sub_mesh_index = (nrhs < 9) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[8], true, "sub_mesh_index");
@@ -116,15 +121,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const double center_freq_core = scalar_mode ? center_freq * (3.0e8 / 343.0) : center_freq;
 
     arma::uword n_pos = orig.n_rows;
-    arma::uword n_seg = 0;
-    if (lod == 1 || lod == 2)
-        n_seg = 2;
-    else if (lod == 3)
-        n_seg = 3;
-    else if (lod == 4)
-        n_seg = 4;
-    else if (lod == 5 || lod == 6)
-        n_seg = 1;
 
     // Initialize output containers
     arma::vec gain;
@@ -137,16 +133,21 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 1)
         plhs[1] = qd_mex_init_output(&xprmat, (scalar_mode ? 2 : 8), n_pos);
 
-    if (nlhs > 2)
-        plhs[2] = qd_mex_init_output(&coord, 3, n_seg, n_pos);
-
     arma::vec *p_gain = gain.empty() ? nullptr : &gain;
     arma::mat *p_xprmat = xprmat.empty() ? nullptr : &xprmat;
-    arma::cube *p_coord = coord.empty() ? nullptr : &coord;
+    arma::cube *p_coord = (nlhs > 2) ? &coord : nullptr; // Size depends on lod, set by C++
     arma::u32_vec *p_sub_mesh_index = sub_mesh_index.empty() ? nullptr : &sub_mesh_index;
 
     CALL_QD(quadriga_lib::calc_diffraction_gain(orig, dest, mesh, mtl_ind, mtl_prop,
                                                 center_freq_core, lod, p_gain, p_xprmat, p_coord, verbose,
                                                 p_sub_mesh_index, use_kernel, gpu_id, scalar_mode,
                                                 thin_slab_threshold, apply_fspl, apply_phase));
+
+    if (nlhs > 2) // Keep the [3, 0, n_pos] shape for lod 0
+    {
+        mwSize dims[3] = {(mwSize)coord.n_rows, (mwSize)coord.n_cols, (mwSize)coord.n_slices};
+        plhs[2] = mxCreateNumericArray(3, dims, mxDOUBLE_CLASS, mxREAL);
+        if (coord.n_elem != 0)
+            std::memcpy(mxGetData(plhs[2]), coord.memptr(), coord.n_elem * sizeof(double));
+    }
 }
