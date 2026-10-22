@@ -505,7 +505,7 @@ unexpected changes in the diff; proposed `md/bugs.md` updates; anything the next
 | WP-14 | 5 | done 2026-10-21 (5 of 5 fixed, B-104 point 5 also; Mitsuba 80 000 faces 0.02 s instead of 3.2 s, QRT raw reader linear, OBJ read 0.85 of old; AFL clean; round 2: a used material named `(null)` is rejected) | 58deaf6 (OBJ files), a85bf88 (write_png), 38a70b3 (Mitsuba), cdaa991 (QRT raw reader), plus the notes commit |
 | WP-15 | 10 | done 2026-10-21 (10 of 10 fixed and the three notes; round 2: 0 paths give empty outputs in all APIs, C++ multibeam 0 -> 120 deg, Python qrt_file_read docs, MEX subdivide_triangles size check) | 52fbfd6 (get_channels), 78cf7ed (antennas), f952982 (angular spread), bd071f0 (diffraction lod), 5c18599 (baseband carriers), da0f1ff (mesh wrappers), a118be1 (QRT / HDF5 wrappers), plus the notes commit |
 | WP-16 | 3 | done 2026-10-21 (3 of 3 fixed; SOS results of valid calls bit-identical) | 518a5f9, plus the notes commit |
-| WP-17 | 6 | open | - |
+| WP-17 | 6 | WP-17a done 2026-10-22 (6 of 6 items and all notes of earlier packages; cart2geo / interp at 0.99-1.025 of old); WP-17b (final verification) open | fba3c1d (antennas), 39ab1e2 (fast math, CPU check), cd46ca9 (geometry), 79ac502 (channels, files, diffraction), 33fc745 (interp), b90bb12 (SOS), a2d0a49 (MEX layer), plus the notes commit |
 
 ## 8a. Manager handoff (2026-10-20)
 
@@ -590,7 +590,14 @@ Python int64 storage_dims, 0 paths give empty outputs in C++ and Python planar /
 
 WP-16 (2026-10-21): done, review passed; one commit 518a5f9 plus the notes commit.
 
-Next: WP-17 (documentation sweep and final verification).
+WP-17a (2026-10-22): done, review passed; seven themed commits fba3c1d to a2d0a49 plus the notes commit. All 123 items are closed in `md/bugs.md` (115 fixed, 7 documented, 1 won't
+fix). `make documentation` was not run on `fixes`: `html_docu/` collects the acoustic session's blocks too, so it is
+regenerated once on `main` after the final merge (as after the first merge, c79b95d).
+Left for WP-17b: `tests/mex_tests/test_calc_angular_spreads_sphere.m:107` has the `try/error/catch` check that passes
+whether or not an error is raised (fix it like the WP-17a checks of `test_acdf.m`).
+
+Next: WP-17b (final verification of the committed `fixes` branch), then the final merge into `main` (temporary
+worktree, tests, fast-forward) and the regeneration of `html_docu/` on `main`.
 
 ## 8. Item index
 
