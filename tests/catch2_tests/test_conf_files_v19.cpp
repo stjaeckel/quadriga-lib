@@ -19,8 +19,7 @@
 //
 // Conventions: QuaDRiGa uses elevation angles (+90 deg is up), the TR zenith angles. The EoD offset is
 // the ZOD offset of the TR with the opposite sign; spreads are the same in both conventions.
-// The key formulas are those of section 7.2 of md/conf_file_parser.md, written out in this file. No
-// library code evaluates them yet.
+// The key formulas are written out in this file. No library code evaluates them yet.
 
 #include <catch2/catch_test_macros.hpp>
 

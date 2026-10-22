@@ -84,8 +84,10 @@ code, do not analyse it. Give it one line in the appendix "Seen in excluded code
 
 ## Earlier reviews: do not repeat them
 
-Read these first. They record findings and their status:
+Read these first. They record findings and their status. They are no longer in the tree; read them from
+the git history, e.g. `git show b7c1009:md/bugs.md`:
 
+- `md/bugs.md` (the bug hunt of 2026-10-15, 123 items; all closed by the fix series merged in 730641b)
 - `md/REVIEW_QD_SOS.md`, `md/REVIEW_QD_SOS_V2.md` (sum of sinusoids, reviewed twice)
 - `md/REVIEW_CONF_FILE.md`, `md/PLAN_CONF_FILE_FIXES.md`, `md/LOG_CONF_FILE_FIXES.md` (conf files)
 - `md/python_fix_plan_v00.md` (Python API, 2026-10-05, from reading the code only)

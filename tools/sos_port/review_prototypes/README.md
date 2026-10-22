@@ -1,7 +1,9 @@
 # Prototypes and benchmarks from the review of the sum-of-sinusoids functions
 
-Reference material for `md/PLAN_QD_SOS_FIXES.md`, written during the review of 2026-10-12
-(`md/REVIEW_QD_SOS.md`, section 3). Nothing here is built by CMake or used by the library.
+Reference material for the fix plan of the sum-of-sinusoids functions, written during the review of
+2026-10-12. The review and the plan are in the git history (`git show b7c1009:md/REVIEW_QD_SOS.md`,
+section 3; `git show daafa6a^:md/PLAN_QD_SOS_FIXES.md`). Nothing here is built by CMake or used by the
+library.
 
 | File | Content | Review |
 |---|---|---|
