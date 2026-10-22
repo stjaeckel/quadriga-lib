@@ -32,7 +32,7 @@ Compute ray-triangle intersections in 3D using the Möller–Trumbore algorithm
 ## Inputs:
 - **`orig`** — Ray origins in GCS; `[n_ray, 3]`
 - **`dest`** — Ray destinations in GCS; `[n_ray, 3]`
-- **`mesh`** — Triangular mesh; each row: `{x1 y1 z1 x2 y2 z2 x3 y3 z3}`; `[n_mesh, 9]`
+- **`mesh`** — Triangular mesh; each row: `{x1 y1 z1 x2 y2 z2 x3 y3 z3}`; further columns are ignored; `[n_mesh, 9]`
 - **`sub_mesh_index`** — Start indices of sub-meshes in `mesh`; enables AABB-accelerated traversal; 
   use [[triangle_mesh_segmentation]] to generate; `[n_sub]`; default: `[]` (not using sub-meshes)
 - **`aabb`** — Pre-computed axis-aligned bounding boxes per sub-mesh; each row: `{x_min x_max y_min y_max z_min z_max}`; 

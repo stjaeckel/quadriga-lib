@@ -198,3 +198,35 @@ TEST_CASE("Test Mitsuba XML File Write - XML and PLY output are byte-identical t
     std::filesystem::remove_all("mref_meshes", ec);
     std::filesystem::remove("mref.xml", ec);
 }
+
+TEST_CASE("Test Mitsuba XML File Write - PLY paths are relative to the XML file")
+{
+    // Mitsuba resolves a relative PLY path against the directory of the XML file; an XML in another directory, given
+    // by a relative or an absolute path, must refer to "<stem>_meshes/<object>.ply" and not to the path of the writer
+    arma::mat vert_list = {{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}};
+    arma::umat face_ind = {{0, 1, 2}};
+    arma::uvec obj_ind = {0}, mtl_ind = {1};
+    std::vector<std::string> obj_names = {"tri"}, mtl_names = {"concrete"};
+
+    const std::filesystem::path dir = "mitsuba_rel_path_test";
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+    std::filesystem::create_directory(dir);
+
+    auto slurp = [](const std::filesystem::path &fn)
+    {
+        std::ifstream f(fn, std::ios::binary);
+        return std::string((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+    };
+
+    for (const std::filesystem::path &xml : {dir / "scene.xml", std::filesystem::absolute(dir / "scene_abs.xml")})
+    {
+        quadriga_lib::mitsuba_xml_file_write<double>(xml.string(), vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names);
+        const std::string stem = xml.stem().string();
+        const std::string txt = slurp(xml);
+        CHECK(txt.find("<string name=\"filename\" value=\"" + stem + "_meshes/tri.ply\" />") != std::string::npos);
+        CHECK(txt.find(dir.string()) == std::string::npos); // no directory of the writer in the XML
+        CHECK(std::filesystem::exists(xml.parent_path() / (stem + "_meshes") / "tri.ply"));
+    }
+    std::filesystem::remove_all(dir, ec);
+}

@@ -40,7 +40,8 @@ SECTION!*/
 Convert a 3D path into a tube surface mesh for visualization
 
 - Converts an ordered sequence of 3D points into a tubular quad mesh with circular cross-sections
-- At bends steeper than 10°, the tube is split and an extra vertex ring is inserted to avoid intersection
+- Where the path turns by more than 160° (the two segments enclose an angle below 20°), the tube is split and an
+  extra vertex ring is inserted to avoid intersection
 - Cross-section orientation uses continuous frame alignment between segments to minimize twisting
 - Output `faces` indices are directly usable in `.obj` or `.ply` export
 
@@ -60,7 +61,7 @@ void quadriga_lib::path_to_tube(
 - **`n_edges`** *(optional)* — Number of vertices per circular cross-section; must be ≥ 3
 
 ## Outputs:
-- **`vert`** — Tube vertex positions; `[3, (n_coord + n_split) × n_edges]` where `n_split` is the number of bends > 10°
+- **`vert`** — Tube vertex positions; `[3, (n_coord + n_split) × n_edges]` where `n_split` is the number of turns > 160°
 - **`faces`** — Quad face indices into `vert`, 4 indices per quad; `[4, (n_coord - 1) × n_edges]`
 MD!*/
 
@@ -193,7 +194,7 @@ void quadriga_lib::path_to_tube(const arma::Mat<dtype> *path_coord, arma::Mat<dt
 
     // At steep angles between path segments, the path is split and an additional ring of vertices is added
     // Wee need to determine the number of splits
-    double angle_limit = 0.939692620785908; // cosd(10)
+    double angle_limit = 0.939692620785908; // cosd(20)
     arma::uword n_split = 0ULL;
     arma::uvec subseg_indices(n_segments, arma::fill::zeros);
     arma::uword *i_subseg = subseg_indices.memptr();

@@ -168,7 +168,7 @@ namespace quadriga_lib
 
     // Make a (default) plane
     template <typename dtype>
-    arma::Mat<dtype> plane(const arma::vec &scale = {1.0},              // Scale; Vector of length [1] scales all axes; length [3] scales {x,y,z} independently
+    arma::Mat<dtype> plane(const arma::vec &scale = {1.0},              // Scale; Vector of length [1] scales x and y; length [2] or [3] scales {x,y} independently, z is ignored
                            const arma::vec &rotation = {0.0, 0.0, 0.0}, // Euler rotations in [rad], Vector of length [3]; Empty = default
                            const arma::vec &location = {0.0, 0.0, 0.0}, // Location, Vector of length [3]; Empty = default
                            const arma::uword n_div = 1);                // Number of divisions
@@ -194,7 +194,7 @@ namespace quadriga_lib
                           dtype radius,                          // Radius of the icosphere in meters
                           arma::Mat<dtype> *center,              // Pointing vector from the origin to the center of the triangle, matrix of size [no_faces, 3]
                           arma::Col<dtype> *length = nullptr,    // Length of the pointing vector "center" (slightly smaller than 1), vector of length [no_faces]
-                          arma::Mat<dtype> *vert = nullptr,      // Vectors pointing from "center" to the vertices of the triangle, matrix of size [no_ray, 9], [x1 y1 z1 x2 y2 z3 x3 y3 z3]
+                          arma::Mat<dtype> *vert = nullptr,      // Vectors pointing from "center" to the vertices of the triangle, matrix of size [no_ray, 9], [x1 y1 z1 x2 y2 z2 x3 y3 z3]
                           arma::Mat<dtype> *direction = nullptr, // Directions of the vertex-rays; matrix of size [no_ray, 6] or [no_ray, 9]
                           bool direction_xyz = false);           // Direction format indicator: true = Cartesian, false = Spherical
 
@@ -208,10 +208,10 @@ namespace quadriga_lib
     void mitsuba_xml_file_write(const std::string &fn,                     // Output file name
                                 const arma::Mat<dtype> &vert_list,         // Vertex list, size [n_vert, 3]
                                 const arma::umat &face_ind,                // Face indices (0-based), size [n_mesh, 3]
-                                const arma::uvec &obj_ind,                 // Object indices (1-based), size [n_mesh]
+                                const arma::uvec &obj_ind,                 // Object indices (0-based), size [n_mesh]
                                 const arma::uvec &mtl_ind,                 // Material indices (1-based), size [n_mesh]
-                                const std::vector<std::string> &obj_names, // Object names, length = max(obj_ind)-1
-                                const std::vector<std::string> &mtl_names, // Material names, length = max(mtl_ind)-1
+                                const std::vector<std::string> &obj_names, // Object names, length = max(obj_ind)+1
+                                const std::vector<std::string> &mtl_names, // Material names, length = max(mtl_ind)
                                 const arma::Mat<dtype> &bsdf = {},         // BSDF data, size [mtl_names.size(), 17]
                                 bool map_to_itu_materials = false);        // Optional mapping to ITU default materials used by Sionna
 
@@ -222,24 +222,24 @@ namespace quadriga_lib
                               arma::Mat<dtype> *vert_list = nullptr,                                   // Vertex list, Size: [n_vert, 3]
                               arma::umat *face_ind = nullptr,                                          // 0-based vertex indices per face, Size: [n_mesh, 3]
                               arma::uvec *obj_ind = nullptr,                                           // 0-based object index, Size: [n_mesh]
-                              std::vector<std::string> *obj_names = nullptr,                           // Object names, Size: [max(obj_ind)-1]
-                              arma::uvec *mtl_ind = nullptr,                                           // 0-based material index from .mtl file, Size: [n_mesh]
-                              std::vector<std::string> *mtl_names = nullptr,                           // Material names from .mtl file, Size: [no_mtl = max(mtl_ind)-1]
+                              std::vector<std::string> *obj_names = nullptr,                           // Object names, Size: [max(obj_ind)+1]
+                              arma::uvec *mtl_ind = nullptr,                                           // 1-based material index from .mtl file (0 = no material), Size: [n_mesh]
+                              std::vector<std::string> *mtl_names = nullptr,                           // Material names from .mtl file, Size: [no_mtl]
                               arma::Mat<dtype> *bsdf = nullptr,                                        // BSDF data from .mtl file, Size: [no_mtl, 17]
                               const std::string &fn_csv = "",                                          // Optional EM/acoustic material CSV file
-                              arma::uvec *csv_ind = nullptr,                                           // 0-based material index from .csv file, Size: [n_mesh]
-                              std::vector<std::string> *csv_names = nullptr,                           // Material names from .csv file, Size: [n_csv = max(csv_ind)-1]
+                              arma::uvec *csv_ind = nullptr,                                           // 1-based material index from .csv file (0 = no material), Size: [n_mesh]
+                              std::vector<std::string> *csv_names = nullptr,                           // Material names from .csv file (the full table), Size: [n_csv]
                               std::unordered_map<std::string, std::vector<dtype>> *csv_prop = nullptr, // Material properties; Keys=csv col names; Length: [n_csv]
-                              bool csv_strict = false);                                                // If true, throw if material in obj is not also in csv; false defaults to first scv materia
+                              bool csv_strict = false);                                                // If true, throw if material in obj is not also in csv; false maps it to index 0 (no material)
 
     // Write Wavefront .obj file
     template <typename dtype>                                                                          // Supported types: float or double
     void obj_file_write(const std::string &fn = "",                                                    // File name
                         const arma::Mat<dtype> *mesh = nullptr,                                        // Faces of the triangular mesh, Size: [ n_mesh, 9 ]
-                        const arma::uvec *obj_ind = nullptr,                                           // Object index, 1-based, Size: [ n_mesh ]
-                        const arma::uvec *mtl_ind = nullptr,                                           // Material index, 1-based, Size: [ n_mesh ]
-                        const std::vector<std::string> *obj_names = nullptr,                           // Object names, Size: [ max(obj_ind) ]
-                        const std::vector<std::string> *mtl_names = nullptr,                           // Material names, Size: [ max(mtl_ind) ]
+                        const arma::uvec *obj_ind = nullptr,                                           // Object index, 0-based, Size: [ n_mesh ]
+                        const arma::uvec *mtl_ind = nullptr,                                           // Material index, 1-based (0 = no material), Size: [ n_mesh ]
+                        const std::vector<std::string> *obj_names = nullptr,                           // Object names, Length: > max(obj_ind)
+                        const std::vector<std::string> *mtl_names = nullptr,                           // Material names, Length: >= max(mtl_ind)
                         arma::Mat<dtype> *vert_list_out = nullptr,                                     // Out: List of vertices generated from mesh, Size: [ n_vert, 3 ]
                         arma::umat *face_ind_out = nullptr,                                            // Out: faces indices generated from mesh, 0-based, Size: [ n_mesh, 3 ]
                         const arma::Mat<dtype> *vert_list = nullptr,                                   // List of vertices found in the OBJ file, Size: [ n_vert, 3 ]
@@ -287,8 +287,8 @@ namespace quadriga_lib
     // - Creates the "sub_cloud_index" indicating the start index of each sub-cloud
     // - A "vec_size" can be used to align the sub-clouds to a given vector size for SIMD processing (AVX or CUDA)
     // - For vec_size > 1, unused elements in a sub-cloud are padded with points at the center of the sub-cloud AABB
-    // - "forward_index" contains the map of elements in "points" to "pointsR" in 1-based notation, padded with 0s for vec_size > 1
-    // - "reverse_index" contains the map of elements in "pointsR" to "points" in 0-based notation
+    // - "forward_index" contains for each row of "pointsR" its row in "points" in 1-based notation, padded with 0s for vec_size > 1
+    // - "reverse_index" contains for each row of "points" its row in "pointsR" in 0-based notation
     // - Returns number of sub-clouds "n_sub"
     template <typename dtype>
     arma::uword point_cloud_segmentation(const arma::Mat<dtype> *points,          // Points in 3D Space (input), Size: [ n_points, 3 ]
@@ -296,8 +296,8 @@ namespace quadriga_lib
                                          arma::u32_vec *sub_cloud_index,          // Sub-cloud index, 0-based, Length: [ n_sub ]
                                          arma::uword target_size = 1024,          // Target value for the sub-cloud size
                                          arma::uword vec_size = 1,                // Vector size for SIMD processing (e.g. 8 for AVX2)
-                                         arma::u32_vec *forward_index = nullptr,  // Index mapping elements of "points" to "pointsR", 1-based, Length: [ n_pointsR ]
-                                         arma::u32_vec *reverse_index = nullptr); // Index mapping elements of "pointsR" to "points", 0-based, Length: [ n_points ]
+                                         arma::u32_vec *forward_index = nullptr,  // Row in "points" of each row of "pointsR", 1-based, Length: [ n_pointsR ]
+                                         arma::u32_vec *reverse_index = nullptr); // Row in "pointsR" of each row of "points", 0-based, Length: [ n_points ]
 
     // Split a point cloud into two sub-clouds along a given axis
     // - Returns the axis along which the split was attempted (1 = x, 2 = y, 3 = z)
@@ -307,8 +307,8 @@ namespace quadriga_lib
     // - The optional output split_ind indicates into which sub-cloud (A or B) each point was put
     template <typename dtype>
     int point_cloud_split(const arma::Mat<dtype> *points,       // Points in 3D Space, Size: [ n_points, 3 ]
-                          arma::Mat<dtype> *pointsA,            // First half, Size: [ n_pointsA, 9 ]
-                          arma::Mat<dtype> *pointsB,            // Second half, Size: [ n_pointsB, 9 ]
+                          arma::Mat<dtype> *pointsA,            // First half, Size: [ n_pointsA, 3 ]
+                          arma::Mat<dtype> *pointsB,            // Second half, Size: [ n_pointsB, 3 ]
                           int axis = 0,                         // Axis selector: 0 = Longest, 1 = x, 2 = y, 3 = z
                           arma::Col<int> *split_ind = nullptr); // Split indicator (optional): 1 = pointsA, 2 = pointsB, 0 = Error, Length: [ n_points ]
 
@@ -482,7 +482,7 @@ namespace quadriga_lib
                                            arma::uword vec_size = 1,             // Vector size for SIMD processing (e.g. 8 for AVX2, 32 for CUDA)
                                            const arma::uvec *mtl_ind = nullptr,  // Material indices (input); [ n_mesh ]
                                            arma::uvec *mtl_ind_out = nullptr,    // Material indices (output); [ n_meshR ]
-                                           arma::u32_vec *mesh_index = nullptr); // Index mapping elements of "mesh" to "meshR", 1-based, Length: [ n_meshR ]
+                                           arma::u32_vec *mesh_index = nullptr); // Row in "mesh" of each row of "meshR", 1-based, Length: [ n_meshR ]
 
     // Split a 3D mesh into two sub-meshes along a given axis
     // - Returns the axis along which the split was attempted (1 = x, 2 = y, 3 = z)
@@ -551,7 +551,8 @@ namespace quadriga_lib
     // Write a QuaDRiGa scenario configuration file
     // - All inputs are validated and the complete text is composed before the file is opened; an existing file is replaced;
     //   a failed call leaves it unchanged
-    // - Numbers are written with the fewest digits (15 to 17) that 'conf_file_read' reads back bit-exact
+    // - Numbers are written with up to 15 significant digits, or with 16 or 17 where 15 do not read back to the same
+    //   double in 'conf_file_read'; Inf and -Inf are written as such
     // - The scenario name in the header comment is the file name without the extension ".conf"
     void conf_file_write(const std::string &fn,                                                       // Path of the .conf file to write
                          const std::unordered_map<std::string, double> &scenpar,                      // Numeric scenario parameters, any subset of the n_key keys; missing keys have their default

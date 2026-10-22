@@ -39,7 +39,7 @@ Reorganize a 3D triangular mesh into spatially clustered sub-meshes for faster p
 ## Outputs:
 - **`triangles_out`** — Reordered and padded triangle vertices; `[n_meshR, 9]`
 - **`sub_mesh_index`** — 1-based start indices of sub-meshes in `triangles_out`; uint32; `[n_sub]`
-- **`mesh_index`** — 1-based mapping from original to reorganized mesh (0 = padding); uint32; `[n_meshR]`
+- **`mesh_index`** — 1-based row in `triangles_in` of each row of `triangles_out` (0 = padding); uint32; `[n_meshR]`
 - **`mtl_ind_out`** — Reordered and padded material indices, 1-based; padding entries get 0 (no material); uint64;
   `[n_meshR]`; only populated if `mtl_ind_in` is given
 MD!*/

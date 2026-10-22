@@ -18,7 +18,8 @@ Write a triangular mesh to a Mitsuba 3 XML scene file
 - Supports grouping faces into named objects with per-face material assignments
 - Optionally maps material names to ITU-defined presets used by Sionna RT
 - Creates a subdirectory `<stem>_meshes/` next to the XML file and writes one binary PLY file per object into it;
-  both the XML and the mesh folder must be distributable together
+  both the XML and the mesh folder must be distributable together; the XML refers to each PLY file by its path
+  relative to the XML file (`<stem>_meshes/<object>.ply`)
 - Objects whose faces reference more than one material are automatically split into sub-objects (one per material)
   and renamed `<obj_name>_<mtl_name>`; the effective object count in the output may therefore exceed the length of `obj_names`
 - For a detailed description of the material model see <a href="http://quadriga-lib.org/formats.html">Data Formats</a>
