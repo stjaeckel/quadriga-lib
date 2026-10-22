@@ -497,13 +497,13 @@ class TestGetChannelsSpherical(unittest.TestCase):
             ant, ant, fbs_pos, lbs_pos, path_gain, path_length, M,
             [0, 0, 0], [0, 0, 0], [100, 0, 0], [0, 0, 0], 0.0, True, False, angles=True)
 
-        # path_length is longer than the TX-FBS-LBS-RX polyline: the delay follows path_length (B-003)
+        # path_length is longer than the TX-FBS-LBS-RX polyline: the delay follows path_length
         self.assertAlmostEqual(delay[0, 0, 0], path_length[0] / C, places=12)
         self.assertAlmostEqual(aod[0, 0, 0], math.atan2(30.0, 20.0), places=5)
         self.assertAlmostEqual(aoa[0, 0, 0], math.atan2(30.0, -20.0), places=5)
 
     def test_nlos_path_length_longer_than_polyline(self):
-        # B-003: 3-bounce path via (30,40,0), (50,60,0), (70,40,0) between TX (0,0,0) and RX (100,0,0);
+        # 3-bounce path via (30,40,0), (50,60,0), (70,40,0) between TX (0,0,0) and RX (100,0,0);
         # FBS = first, LBS = last interaction, path_length = 100 + 40 * sqrt(2) = 156.5685 m (polyline: 140 m)
         ant = omni()
         fbs_pos = np.array([[30.0], [40.0], [0.0]], order='F')
@@ -932,7 +932,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
 
 
     # -------------------------------------------------------------------------
-    # Input memory layouts (B-098): F-contiguous float64 inputs are aliased, all
+    # Input memory layouts: F-contiguous float64 inputs are aliased, all
     # other inputs are copied; the results must be identical in every case
     # -------------------------------------------------------------------------
 
@@ -1002,7 +1002,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
 
 
     def test_error_position_with_6_elements(self):
-        """A (3, 2) position has 6 elements and is rejected, not truncated (B-100)."""
+        """A (3, 2) position has 6 elements and is rejected, not truncated."""
         ant = omni()
         fbs_pos = np.zeros((3, 2), order='F'); fbs_pos[0, :] = [10, 5]
         for i in range(4):

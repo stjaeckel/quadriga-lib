@@ -260,7 +260,7 @@ TEST_CASE("Get Channels Planar - Coupling")
     CHECK(std::abs(delay.at(0, 0, 0) - dx) < 1.0e-14f);
 }
 
-TEST_CASE("Get Channels Planar - add_fake_los_path layout (B-068)")
+TEST_CASE("Get Channels Planar - add_fake_los_path layout")
 {
     // Always one extra output path; slot 0 holds the LOS path (zero power if none was found);
     // if a LOS path was present, its original slot holds a zero-power path.

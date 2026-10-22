@@ -28,7 +28,7 @@ catch ME
     end
 end
 
-% NaN delay (B-002)
+% NaN delay
 dl_nan = dl;
 dl_nan(1,2,2,1) = NaN;
 try

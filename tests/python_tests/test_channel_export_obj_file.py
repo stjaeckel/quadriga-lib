@@ -285,7 +285,7 @@ class test_channel_export_obj_file(unittest.TestCase):
 
 
     def test_interact_coord_too_few_columns(self):
-        """interact_coord needs at least sum(no_interact) columns of 3 rows (B-100)."""
+        """interact_coord needs at least sum(no_interact) columns of 3 rows."""
         common = dict(rx_pos=np.array([[1.0], [0], [0]]), tx_pos=np.zeros((3, 1)), center_freq=np.array([1e9]),
                       coeff=[np.ones((1, 1, 3), complex) * 1e-4], gain_min=-300)
         ni = [np.array([1, 0, 2], dtype=np.uint32)]

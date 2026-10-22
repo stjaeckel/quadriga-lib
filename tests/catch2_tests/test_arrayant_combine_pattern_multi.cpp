@@ -1022,8 +1022,8 @@ TEST_CASE("Combine multi - Default freq grid recovers per-entry combine_pattern 
     }
 }
 
-// B-045: the position phase used the speed of light; acoustic arrays were combined without it
-TEST_CASE("Combine multi - Propagation speed (B-045)")
+// The position phase used the speed of light; acoustic arrays were combined without it
+TEST_CASE("Combine multi - Propagation speed")
 {
     // Two omni "speakers" 0.2 m apart at 1 kHz (lambda = 0.344 m in air), summed into one port
     auto s = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0, "monopole",

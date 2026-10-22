@@ -404,7 +404,7 @@ TEST_CASE("QDANT Multi - Large number of entries")
 
 TEST_CASE("QDANT Multi - Invalid entry keeps existing file")
 {
-    // B-039: validation must happen before an existing file is removed
+    // Validation must happen before an existing file is removed
     std::string fn = "test_qdant_multi_invalid_keep.qdant";
     auto a = quadriga_lib::generate_arrayant_omni<double>(10.0);
     a.qdant_write(fn);

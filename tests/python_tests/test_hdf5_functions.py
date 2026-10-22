@@ -61,7 +61,7 @@ class test_case(unittest.TestCase):
         return os.path.join(self.dir, name)
 
     # ------------------------------------------------------------------
-    # hdf5_create_file returns the storage layout as int64 (B-116)
+    # hdf5_create_file returns the storage layout as int64
     # ------------------------------------------------------------------
     def test_create_file_returns_int64(self):
         s = channel.hdf5_create_file(self.fn('a.hdf5'), 2, 3, 1, 4)
@@ -69,7 +69,7 @@ class test_case(unittest.TestCase):
         npt.assert_array_equal(s, [2, 3, 1, 4])
 
     # ------------------------------------------------------------------
-    # Strided arrays are written with their values (B-005)
+    # Strided arrays are written with their values
     # ------------------------------------------------------------------
     def test_write_dset_strided_arrays(self):
         fn = self.fn('b.hdf5')
@@ -93,7 +93,7 @@ class test_case(unittest.TestCase):
             npt.assert_array_equal(r, v, err_msg=name)
 
     # ------------------------------------------------------------------
-    # Scalars, numpy scalars, 0-d arrays and equal-but-distinct dtypes (B-097)
+    # Scalars, numpy scalars, 0-d arrays and equal-but-distinct dtypes
     # ------------------------------------------------------------------
     def test_write_dset_types(self):
         fn = self.fn('d.hdf5')

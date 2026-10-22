@@ -634,7 +634,7 @@ class test_case(unittest.TestCase):
             
 
     def test_output_keys_and_center_frequency_shape(self):
-        """center_frequency is an array of shape (1,); initial_position is returned (B-117)."""
+        """center_frequency is an array of shape (1,); initial_position is returned."""
         ant = arrayant.generate('omni')
         c = channel.get_ieee_indoor(ant, ant, 'B', seed=1)[0]
         self.assertIsInstance(c['center_frequency'], np.ndarray)

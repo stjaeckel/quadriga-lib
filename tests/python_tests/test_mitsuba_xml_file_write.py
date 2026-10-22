@@ -94,7 +94,7 @@ class test_case(unittest.TestCase):
         
 
     def test_documented_kwargs(self):
-        """The kwarg names of the documentation are accepted (B-099)."""
+        """The kwarg names of the documentation are accepted."""
         import tempfile, shutil
         d = tempfile.mkdtemp()
         try:

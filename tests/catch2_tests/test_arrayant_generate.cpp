@@ -242,9 +242,9 @@ TEST_CASE("Generate Arrayant - Multi-Beam")
 }
 
 
-// B-011: a beam towards a pole, where the element pattern is exactly 0, used to leave the beam weights unset:
+// A beam towards a pole, where the element pattern is exactly 0, used to leave the beam weights unset:
 // pol = 1 returned one port per element, pol = 2 and 3 crashed (null pointer in memcpy).
-TEST_CASE("Generate Arrayant - Multi-Beam towards the poles (B-011)")
+TEST_CASE("Generate Arrayant - Multi-Beam towards the poles")
 {
     for (double el : {90.0, -90.0})
         for (unsigned pol : {1u, 2u, 3u})
@@ -269,9 +269,9 @@ TEST_CASE("Generate Arrayant - Multi-Beam towards the poles (B-011)")
     CHECK(b.is_valid(false).empty());
 }
 
-// B-044: the ULA and 3GPP generators use only the radiation pattern of a custom pattern; its element positions and
+// The ULA and 3GPP generators use only the radiation pattern of a custom pattern; its element positions and
 // coupling are ignored (as documented).
-TEST_CASE("Generate Arrayant - ULA and 3GPP ignore positions and coupling of a custom pattern (B-044)")
+TEST_CASE("Generate Arrayant - ULA and 3GPP ignore positions and coupling of a custom pattern")
 {
     auto p = quadriga_lib::generate_arrayant_omni<double>(10.0);
     p.copy_element(0, 1);
@@ -307,8 +307,8 @@ TEST_CASE("Generate Arrayant - ULA and 3GPP ignore positions and coupling of a c
     CHECK(arma::approx_equal(g2.element_pos.row(2), z, "absdiff", 1e-12));
 }
 
-// B-047: the header defaults were M = N = 2, the documentation and the MATLAB / Python wrappers say 1
-TEST_CASE("Generate Arrayant - Multi-Beam defaults are 1 x 1 (B-047)")
+// The header defaults were M = N = 2, the documentation and the MATLAB / Python wrappers say 1
+TEST_CASE("Generate Arrayant - Multi-Beam defaults are 1 x 1")
 {
     auto a = quadriga_lib::generate_arrayant_multibeam<double>();
     CHECK(a.n_elements() == 1);

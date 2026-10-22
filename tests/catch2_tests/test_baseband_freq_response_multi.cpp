@@ -4,7 +4,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include "quadriga_channel.hpp"
-#include "quadriga_lib.hpp" // get_channels_multifreq (B-019 test)
+#include "quadriga_lib.hpp" // get_channels_multifreq
 
 #include <cmath>
 #include <complex>
@@ -1043,7 +1043,7 @@ TEST_CASE("baseband_freq_response_multi - Acoustic scenario large delay")
     CHECK(std::abs(Hi(0, 0, 2) - expected_im) < 1e-6);
 }
 
-TEST_CASE("baseband_freq_response_multi - get_channels_multifreq output with absolute delays (B-019)")
+TEST_CASE("baseband_freq_response_multi - get_channels_multifreq output with absolute delays")
 {
     // remove_delay_phase = true needs channels generated with use_absolute_delays = true: the coefficients of
     // get_channels_* carry the phase of the absolute path length. From the C-2 repro: LOS + one single-bounce path,

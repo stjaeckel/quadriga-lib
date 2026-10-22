@@ -176,8 +176,8 @@ TEST_CASE("Arrayant reading from QDANT file - More complex test")
 
     std::remove("test.qdant");
 }
-// B-040: a request for ID 1 returned the first entry of the file, also when that entry has another ID
-TEST_CASE("Arrayant reading from QDANT file - Missing ID throws (B-040)")
+// A request for ID 1 returned the first entry of the file, also when that entry has another ID
+TEST_CASE("Arrayant reading from QDANT file - Missing ID throws")
 {
     const std::string fn = "test_qdant_missing_id.qdant";
     std::remove(fn.c_str());
@@ -243,8 +243,8 @@ static std::string qdant_read_exception(const std::string &fn, const std::string
     return "none";
 }
 
-// B-042: the reader allocated memory from counts in the file without checking them against the data
-TEST_CASE("Arrayant reading from QDANT file - Malformed counts throw invalid_argument (B-042)")
+// The reader allocated memory from counts in the file without checking them against the data
+TEST_CASE("Arrayant reading from QDANT file - Malformed counts throw invalid_argument")
 {
     const std::string fn = "test_qdant_malformed.qdant";
     const std::string grid = "<ElevationGrid>0</ElevationGrid><AzimuthGrid>0</AzimuthGrid>";

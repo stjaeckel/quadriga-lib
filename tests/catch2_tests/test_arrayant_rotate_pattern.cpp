@@ -963,7 +963,7 @@ TEST_CASE("Rotate Pattern - ULA antenna rotation")
 }
 
 // ================================================================================================
-// B-009: coupling, centre frequency and name are kept (output mode and in place with a grid update);
+// Coupling, centre frequency and name are kept (output mode and in place with a grid update);
 // a single element rotated into an output gets identity coupling
 // ================================================================================================
 
@@ -979,7 +979,7 @@ static quadriga_lib::arrayant<double> rotate_pattern_two_element_one_port()
     return a;
 }
 
-TEST_CASE("Rotate Pattern - Output keeps coupling, centre frequency and name (B-009)")
+TEST_CASE("Rotate Pattern - Output keeps coupling, centre frequency and name")
 {
     auto a = rotate_pattern_two_element_one_port();
     for (unsigned usage : {0u, 1u, 2u, 3u, 4u})
@@ -1014,7 +1014,7 @@ TEST_CASE("Rotate Pattern - Output keeps coupling, centre frequency and name (B-
     CHECK(one.name == "myant");
 }
 
-TEST_CASE("Rotate Pattern - In place with a grid update keeps the coupling (B-009)")
+TEST_CASE("Rotate Pattern - In place with a grid update keeps the coupling")
 {
     auto a = rotate_pattern_two_element_one_port();
     a.azimuth_grid(5) += 0.01; // non-uniform grid -> grid update in rotate_pattern

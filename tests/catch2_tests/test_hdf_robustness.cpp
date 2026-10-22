@@ -79,7 +79,7 @@ TEST_CASE("HDF - Slot rewrite replaces the slot completely")
 {
     const std::string fn = "test_hdf_rewrite.hdf5";
 
-    // B-001 case 1: a dataset written with hdf5_write_dset, then a channel with par "b" into the same slot
+    // Case 1: a dataset written with hdf5_write_dset, then a channel with par "b" into the same slot
     std::remove(fn.c_str());
     std::any a = 1.0;
     quadriga_lib::hdf5_write_dset(fn, "a", &a);
@@ -100,7 +100,7 @@ TEST_CASE("HDF - Slot rewrite replaces the slot completely")
         CHECK(names[0] == "b");
     }
 
-    // B-001 case 2: a parameter-only channel written twice to the same slot
+    // Case 2: a parameter-only channel written twice to the same slot
     std::remove(fn.c_str());
     quadriga_lib::channel<double> p;
     p.par_names = {"x"};
@@ -114,7 +114,7 @@ TEST_CASE("HDF - Slot rewrite replaces the slot completely")
         CHECK(std::any_cast<double>(r.par_data[0]) == 99.0);
     }
 
-    // B-052: five rewrites of one slot leave exactly one channel group of that slot; other slots are kept
+    // Five rewrites of one slot leave exactly one channel group of that slot; other slots are kept
     std::remove(fn.c_str());
     quadriga_lib::hdf5_create(fn, 4);
     auto other = hdf_test_channel(2);

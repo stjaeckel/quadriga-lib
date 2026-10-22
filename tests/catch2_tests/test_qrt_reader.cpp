@@ -378,7 +378,7 @@ TEST_CASE("QRT Reader v5")
 
 TEST_CASE("QRT Reader - angles without path length")
 {
-    // B-016: aod, eod, aoa, eoa must be returned when requested alone (without path_gain or path_length)
+    // Aod, eod, aoa, eoa must be returned when requested alone (without path_gain or path_length)
     std::string fn = "tests/data/test_v5.qrt";
 
     arma::vec aod1 = {12345.0}, eod1 = {12345.0}, aoa1 = {12345.0}, eoa1 = {12345.0}; // stale input values
@@ -403,7 +403,7 @@ TEST_CASE("QRT Reader - angles without path length")
 
 TEST_CASE("QRT Reader - angles with 0 paths")
 {
-    // B-016: an origin without paths returns empty angle vectors (no memcpy from an empty matrix)
+    // An origin without paths returns empty angle vectors (no memcpy from an empty matrix)
     std::string fn = "tests/data/test_read_zero_paths.qrt";
 
     arma::fvec freq = {3.75f};
@@ -450,7 +450,7 @@ TEST_CASE("QRT Reader - angles with 0 paths")
 
 TEST_CASE("QRT Reader - index of 2^32 or more")
 {
-    // B-049: i_cir and i_orig are compared as 64-bit values, with and without the cache
+    // I_cir and i_orig are compared as 64-bit values, with and without the cache
     for (std::string fn : {"tests/data/test.qrt", "tests/data/test_v5.qrt"})
     {
         std::ifstream f(fn, std::ios::binary);
@@ -486,7 +486,7 @@ TEST_CASE("QRT Reader - index of 2^32 or more")
 
 TEST_CASE("QRT Reader - normalize_M must be 0 or 1")
 {
-    // B-059: other values of normalize_M throw, with and without the cache
+    // Other values of normalize_M throw, with and without the cache
     std::string fn = "tests/data/test_v5.qrt";
     std::ifstream f(fn, std::ios::binary);
     auto cache = quadriga_lib::qrt_read_cache_init(fn, &f);

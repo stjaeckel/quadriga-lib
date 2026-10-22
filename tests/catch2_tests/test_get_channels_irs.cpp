@@ -553,7 +553,7 @@ TEST_CASE("Tools - Combine IRS Coord inactive")
     CHECK(interact_coord(2, 5) == 42.0f);
 }
 
-TEST_CASE("Get Channels IRS - Delay is the sum of both segment path lengths (B-003)")
+TEST_CASE("Get Channels IRS - Delay is the sum of both segment path lengths")
 {
     // TX (0,0,0) -> IRS (50,0,0) -> RX (100,0,0); one NLOS path per segment whose path_length exceeds the
     // TX-FBS-LBS-IRS (IRS-FBS-LBS-RX) polyline. The IRS has one element and a single unit codebook entry.
@@ -592,7 +592,7 @@ TEST_CASE("Get Channels IRS - Delay is the sum of both segment path lengths (B-0
 
 TEST_CASE("Channel - Add Paths with 0 paths in the first field")
 {
-    // B-059: the first given field sets the number of added paths, also when it is 0; every other field must match
+    // The first given field sets the number of added paths, also when it is 0; every other field must match
     quadriga_lib::channel<double> c;
     c.tx_pos = arma::mat(3, 1, arma::fill::zeros);
     c.rx_pos = arma::mat(3, 1, arma::fill::ones);

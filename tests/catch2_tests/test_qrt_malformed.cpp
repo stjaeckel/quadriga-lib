@@ -70,7 +70,7 @@ namespace
 
 TEST_CASE("QRT Reader - counts and offsets that do not fit the file")
 {
-    // B-048: patched counts must not make the readers allocate memory or loop over them
+    // Patched counts must not make the readers allocate memory or loop over them
     const std::string fn = "tests/data/test_qrt_malformed.qrt";
     const std::vector<char> good = qrt_small_file(fn);
     REQUIRE(good.size() == 136);
@@ -143,7 +143,7 @@ TEST_CASE("QRT Reader - counts and offsets that do not fit the file")
 
 TEST_CASE("QRT Reader - truncated files")
 {
-    // B-048: every truncation of the small file makes the readers throw std::invalid_argument
+    // Every truncation of the small file makes the readers throw std::invalid_argument
     const std::string fn = "tests/data/test_qrt_truncated.qrt";
     const std::vector<char> good = qrt_small_file(fn);
     REQUIRE(good.size() == 136);

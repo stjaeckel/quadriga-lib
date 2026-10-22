@@ -219,9 +219,9 @@ static double qdant_err_element(const quadriga_lib::arrayant<T> &ref, const quad
     return err;
 }
 
-// B-012: the writer stored magnitudes with a floor at -100 dB absolute power; samples below it read back as 0
+// The writer stored magnitudes with a floor at -100 dB absolute power; samples below it read back as 0
 // The file is accurate to 6e-8 of the element peak; an element at a low level is quantized relative to its own peak
-TEST_CASE("Arrayant writing to QDANT file - Low-level pattern data is kept (B-012)")
+TEST_CASE("Arrayant writing to QDANT file - Low-level pattern data is kept")
 {
     const std::string fn = "test_qdant_low_level.qdant";
 
@@ -279,10 +279,10 @@ TEST_CASE("Arrayant writing to QDANT file - Low-level pattern data is kept (B-01
     std::remove(fn.c_str());
 }
 
-// B-038: element positions, coupling and pattern values were written with 6 significant digits
+// Element positions, coupling and pattern values were written with 6 significant digits
 // The file has single-precision-equivalent accuracy: positions and coupling (magnitude, phase) as floats, pattern
 // samples within 6e-8 of the element peak
-TEST_CASE("Arrayant writing to QDANT file - Single-precision accuracy of positions, coupling and pattern (B-038)")
+TEST_CASE("Arrayant writing to QDANT file - Single-precision accuracy of positions, coupling and pattern")
 {
     const std::string fn = "test_qdant_precision.qdant";
     arma::arma_rng::set_seed(38);
@@ -388,8 +388,8 @@ TEST_CASE("Arrayant writing to QDANT file - Number text and locale")
     std::remove(fn.c_str());
 }
 
-// B-041 (documented behaviour): a write without a layout replaces the layout in the file by all IDs in file order
-TEST_CASE("Arrayant writing to QDANT file - A write without layout resets the layout (B-041)")
+// Documented behaviour: a write without a layout replaces the layout in the file by all IDs in file order
+TEST_CASE("Arrayant writing to QDANT file - A write without layout resets the layout")
 {
     const std::string fn = "test_qdant_layout_reset.qdant";
     std::remove(fn.c_str());

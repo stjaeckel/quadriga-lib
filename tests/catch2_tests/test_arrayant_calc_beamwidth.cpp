@@ -124,9 +124,9 @@ TEST_CASE("Arrayant calc_beamwidth_deg - Invalid element index")
     REQUIRE_THROWS_AS(ant.calc_beamwidth_deg(5, 3.0f, &bw), std::invalid_argument);
 }
 
-// B-010: the beamwidth is measured on the main lobe, searched outwards from the maximum: circularly in azimuth and
+// The beamwidth is measured on the main lobe, searched outwards from the maximum: circularly in azimuth and
 // across the poles in elevation.
-TEST_CASE("Arrayant calc_beamwidth_deg - Main lobe across +-180 deg azimuth and at the poles (B-010)")
+TEST_CASE("Arrayant calc_beamwidth_deg - Main lobe across +-180 deg azimuth and at the poles")
 {
     auto a = quadriga_lib::generate_arrayant_custom<double>(90.0, 90.0, 0.0, 1.0); // 90 deg FWHM in az and el
     double bw_az0 = 0.0, bw_el0 = 0.0, paz = 0.0, pel = 0.0;

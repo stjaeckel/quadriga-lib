@@ -352,7 +352,7 @@ TEST_CASE("Arrayant interpolation - Example")
     arma::mat V_re, V_im, H_re, H_im;
     ant.interpolate(&azimuth, &elevation, &V_re, &V_im, &H_re, &H_im);
 }
-// B-007: NaN or infinite angles must give NaN output without reading outside the pattern (the bracket search used
+// NaN or infinite angles must give NaN output without reading outside the pattern (the bracket search used
 // to wrap an index to SIZE_MAX; the out-of-bounds read is visible only in the ASan suite). Finite angles in the same
 // call are not affected.
 template <typename dtype>
@@ -401,7 +401,7 @@ static void arrayant_interpolate_nonfinite_check()
         }
 }
 
-TEST_CASE("Arrayant interpolation - NaN and infinite angles give NaN (B-007)")
+TEST_CASE("Arrayant interpolation - NaN and infinite angles give NaN")
 {
     arrayant_interpolate_nonfinite_check<float>();
     arrayant_interpolate_nonfinite_check<double>();
