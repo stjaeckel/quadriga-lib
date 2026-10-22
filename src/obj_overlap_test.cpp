@@ -6,11 +6,6 @@
 #include "quadriga_lib_helper_functions.hpp"
 #include <limits>
 
-namespace arma
-{
-    thread_local std::mt19937_64 mt19937_64_instance;
-}
-
 // Line-Triangle intersect in 2D coordinates
 // - Triangle is defined by vertices P0(0,0), P1(x1,0) and P2(x2,y2)
 // - The line segment is given by O(ox,oy) -> D(dx,dy)

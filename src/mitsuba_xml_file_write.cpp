@@ -35,7 +35,7 @@ static void faces_by_object(const arma::uvec &obj_ind, arma::uword n_obj,
 
 // ----------------------------------------------------------------------------
 // Helper: returns the ITU material that best matches `name`.
-// Fallback is "vacuum".
+// Fallback is "air".
 // ----------------------------------------------------------------------------
 static std::string_view map_to_itu(std::string_view name)
 {
@@ -91,7 +91,8 @@ Write a triangular mesh to a Mitsuba 3 XML scene file
 - Supports grouping faces into named objects with per-face material assignments
 - Optionally maps material names to ITU-defined presets used by Sionna RT
 - Creates a subdirectory `<stem>_meshes/` next to the XML file and writes one binary PLY file per object into it;
-  both the XML and the mesh folder must be distributable together
+  both the XML and the mesh folder must be distributable together; the XML refers to each PLY file by its path
+  relative to the XML file (`<stem>_meshes/<object>.ply`)
 - Objects whose faces reference more than one material are automatically split into sub-objects (one per material)
   and renamed `<obj_name>_<mtl_name>`; the effective object count in the output may therefore exceed the length of `obj_names`
 
@@ -573,8 +574,8 @@ void quadriga_lib::mitsuba_xml_file_write(const std::string &fn,
     // Write objects
     for (unsigned i_obj = 0; i_obj < n_obj; ++i_obj)
     {
-        std::filesystem::path ply_file_name = obj_names_local[i_obj] + ".ply";
-        std::filesystem::path ply_file = mesh_folder / ply_file_name;
+        // Path relative to the directory of the XML file (Mitsuba resolves it there), with '/' as separator
+        const std::string ply_file = (mesh_folder_name / (obj_names_local[i_obj] + ".ply")).generic_string();
 
         auto node_shape = node_scene.append_child("shape");
         node_shape.append_attribute("type").set_value("ply");

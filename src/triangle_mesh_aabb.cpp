@@ -26,7 +26,7 @@ arma::Mat<dtype> quadriga_lib::triangle_mesh_aabb(
 ```
 
 ## Inputs:
-- **`mesh`** — Triangle mesh vertices in global Cartesian coordinates; `[n_triangles, 9]`
+- **`mesh`** — Triangle mesh vertices in global Cartesian coordinates; further columns are ignored; `[n_triangles, 9]`
 - **`sub_mesh_index`** *(optional)* — 0-based start indices of sub-meshes; if omitted, the AABB of the entire mesh is returned; `[n_sub]`
 - **`vec_size`** *(optional)* — Alignment size for SIMD/CUDA padding (e.g., `8` for AVX2, `32` for CUDA)
 
@@ -45,15 +45,15 @@ arma::Mat<dtype> quadriga_lib::triangle_mesh_aabb(const arma::Mat<dtype> *mesh,
     // Input validation
     if (mesh == nullptr)
         throw std::invalid_argument("Input 'mesh' cannot be NULL.");
-    if (mesh->n_cols != 9)
-        throw std::invalid_argument("Input 'mesh' must have 9 columns containing x,y,z coordinates of 3 vertices.");
+    if (mesh->n_cols < 9)
+        throw std::invalid_argument("Input 'mesh' must have at least 9 columns containing x,y,z coordinates of 3 vertices.");
     if (mesh->n_rows == 0)
         throw std::invalid_argument("Input 'mesh' must have at least one face.");
     if (vec_size == 0)
         throw std::invalid_argument("Input 'vec_size' cannot be 0.");
 
     arma::uword n_face = mesh->n_rows;
-    arma::uword n_mesh = mesh->n_elem;
+    arma::uword n_mesh = 9 * n_face; // First 9 columns (column-major), further columns are ignored
     const dtype *p_mesh = mesh->memptr();
 
     const unsigned first_sub_mesh_ind = 0;
