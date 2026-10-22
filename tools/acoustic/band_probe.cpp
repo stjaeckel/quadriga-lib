@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // Part of quadriga-lib — see LICENSE for terms.
 //
-// Band probe for the acoustic add-on (md/acoustic.md 2.8, 11): one ray through ray_progress until no ray is left, a band
+// Band probe for the acoustic add-on (html_docu/quadriga_lib_material_model.md 10.4): one ray through ray_progress until no ray is left, a band
 // of frequencies on the base frequency's geometry (the first one), every path that ends in air outside the structure
 // summed at its polyline's point: T beyond the last face, R in front of the first. Scalar mode; tracer 5 =
 // refraction_mode. Faces are planes x = const (normal towards -x, or +x when flipped), as ub::build makes them.
-// Written for the M9 work (md/m9_fixtures_report.md, item 3): a band equals its single frequencies bitwise on a leaf on
+// Written for the leaves on a box (04b92bd): a band equals its single frequencies bitwise on a leaf on
 // a box of air; the fixture is "ray_progress - a leaf on a box of air at every frequency of a band".
 //
 // stdin, one line per run: tag itype theta maxdepth start sink nm (a b c d e f g h thk tf tfB m fRef resF resQ resS att
@@ -13,7 +13,7 @@
 //   itype 4 or 5; theta in degrees; maxdepth, start and sink are read and ignored; materials are numbered from 1 in
 //   the order given (columns as in Material, ray_mesh_interact.cpp); thr the thin_slab_threshold, maxint the
 //   interaction cap (at most 255), floor_dB the gain floor; frequencies in acoustic Hz (mapped by 8.7403e5).
-//   tfP tfF tfQ: the peak of md/acoustic.md 2.6 (tfF in GHz like resF and coiF; 0 0 0 for none).
+//   tfP tfF tfQ: the peak of page 5.3 (tfF in GHz like resF and coiF; 0 0 0 for none).
 //   side: the panel size of a mass-law material, sqrt(area) in m (0 the infinite plate; the library's default 3.29
 //   applies only where a table has no side column, and this probe always gives one).
 // stdout: P,tag,theta,tracer,f_base,f,nT,nR,rays,events,Tre,Tim,Rre,Rim (one line per frequency of the band).

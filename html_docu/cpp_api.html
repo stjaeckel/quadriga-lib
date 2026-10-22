@@ -207,7 +207,7 @@
   <tr><td><a href="#cube">cube</a></td><td>Construct a triangulated cube mesh</td></tr>
   <tr><td><a href="#generate_diffraction_paths">generate_diffraction_paths</a></td><td>Generate elliptic propagation paths and weights for diffraction gain estimation</td></tr>
   <tr><td><a href="#icosphere">icosphere</a></td><td>Construct a geodesic polyhedron from recursive icosahedron subdivision</td></tr>
-  <tr><td><a href="#interface_gain">interface_gain</a></td><td>Linear gain of a wave crossing a thin interface (lumped penetration loss)</td></tr>
+  <tr><td><a href="#interface_gain">interface_gain</a></td><td>Linear gain of the lumped penetration loss of entering a material</td></tr>
   <tr><td><a href="#medium_gain">medium_gain</a></td><td>Linear gain of a ray traversing a homogeneous lossy medium</td></tr>
   <tr><td><a href="#mitsuba_xml_file_write">mitsuba_xml_file_write</a></td><td>Write a triangular mesh to a Mitsuba 3 XML scene file</td></tr>
   <tr><td><a href="#obj_file_read">obj_file_read</a></td><td>Read a Wavefront `.obj` file and extract geometry, visual materials, and EM/acoustic materials</td></tr>
@@ -224,7 +224,7 @@
   <tr><td><a href="#ray_mesh_interact">ray_mesh_interact</a></td><td>Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh surfaces</td></tr>
   <tr><td><a href="#ray_point_intersect">ray_point_intersect</a></td><td>Calculate intersections of ray beams with points in 3D space</td></tr>
   <tr><td><a href="#ray_progress">ray_progress</a></td><td>Advance a ray set by one interaction, spawning reflected, transmitted, and subdivided rays</td></tr>
-  <tr><td><a href="#ray_state_update">ray_state_update</a></td><td>Batched inside/outside ray-state machine with analytic thin-slab (Fabry-Perot) resolution</td></tr>
+  <tr><td><a href="#ray_state_update">ray_state_update</a></td><td>Per-ray medium state machine with closed-form thin-slab (Fabry-Pérot) resolution</td></tr>
   <tr><td><a href="#ray_subdivide_flag">ray_subdivide_flag</a></td><td>Compute the per-ray subdivision decision from the beam-tube footprint at the first bounce</td></tr>
   <tr><td><a href="#ray_triangle_intersect">ray_triangle_intersect</a></td><td>Compute ray-triangle intersections in 3D using the Möller–Trumbore algorithm</td></tr>
   <tr><td><a href="#refractive_index">refractive_index</a></td><td>Real refractive index of a homogeneous medium</td></tr>
@@ -432,6 +432,7 @@ Append elements of another arrayant to the current one
 <ul>
 <li>Both arrays must share identical sampling grids; throws otherwise</li>
 <li>Coupling is block-diagonal (see <a href="#arrayant_concat_multi">arrayant_concat_multi</a> diagram); center_frequency is taken from this</li>
+<li>An empty <code>coupling_re</code> counts as identity (one port per element), an empty <code>coupling_im</code> as zeros</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -463,6 +464,9 @@ Calculate the beamwidth and pointing angles of array antenna elements in degrees
 <li>Computes azimuth and elevation beamwidth at a given dB threshold (default 3 dB = FWHM)</li>
 <li>Also returns the azimuth and elevation pointing angles of the main beam</li>
 <li>Sub-grid resolution is achieved by bilinear interpolation of the field pattern (≈100x finer grid in each direction than the antenna sampling grid)</li>
+<li>The width is that of the main lobe: starting at the maximum, the search goes outwards until the power drops below the threshold; side lobes above the threshold are not included</li>
+<li>Azimuth: cut at the elevation of the maximum, circular across ±180° when the grid covers the full circle; 360° when the whole cut is above the threshold (e.g. omni patterns or a beam pointing to a pole, where the cut is a point)</li>
+<li>Elevation: cut along the great circle through the maximum, so a lobe can extend across the poles (requires samples at ±90°); the result is at most 180°</li>
 <li>Ignores element coupling</li>
 </ul>
 
@@ -501,6 +505,7 @@ void calc_beamwidth_deg(arma::uword i_element,
 Calculate the directivity in dBi of a single array element
 <ul>
 <li>Directivity = 10 log10(peak radiation intensity / mean over 4π); isotropic radiator = 0 dBi</li>
+<li>Independent of the scale of the pattern; an element whose pattern is zero everywhere returns 0 dBi</li>
 <li>Ignores element coupling</li>
 </ul>
 
@@ -530,6 +535,7 @@ dtype quadriga_lib::arrayant&lt;dtype&gt;::calc_directivity_dBi(arma::uword i_el
 Combine element patterns, positions, and coupling weights into effective radiation patterns
 <ul>
 <li>Integrates <code>e_theta_re/im</code>, <code>e_phi_re/im</code>, <code>element_pos</code>, and <code>coupling_re/im</code> to produce one output element per port (column) of the coupling matrix</li>
+<li>The element positions add the phase <code>-2 pi f d / propagation_speed</code> with <code>f = center_frequency</code> and <code>d</code> the distance of the element from the wavefront plane through the origin; the default speed of light applies to radio waves, use about 343 m/s for acoustic arrays (e.g. from <a href="#generate_speaker">generate_speaker</a>)</li>
 <li>Useful for beamforming and MIMO channel computation speedup</li>
 </ul>
 
@@ -537,13 +543,15 @@ Combine element patterns, positions, and coupling weights into effective radiati
 <pre>
 quadriga_lib::arrayant&lt;dtype&gt; quadriga_lib::arrayant&lt;dtype&gt;::combine_pattern(
     const arma::Col&lt;dtype&gt; *azimuth_grid_new = nullptr,
-    const arma::Col&lt;dtype&gt; *elevation_grid_new = nullptr) const;
+    const arma::Col&lt;dtype&gt; *elevation_grid_new = nullptr,
+    dtype propagation_speed = 299792458.0) const;
 </pre>
 
 <b>Inputs:</b><br>
 <ul>
 <li><b><code>azimuth_grid_new</code></b> <i>(optional)</i> — Alternative azimuth grid in rad, in [-pi, pi], sorted; defaults to input grid</li>
 <li><b><code>elevation_grid_new</code></b> <i>(optional)</i> — Alternative elevation grid in rad, in [-pi/2, pi/2], sorted; defaults to input grid</li>
+<li><b><code>propagation_speed</code></b> <i>(optional)</i> — Wave propagation speed in m/s; positive and finite; use about 343 for acoustics</li>
 </ul>
 
 <b>Returns:</b><br>
@@ -564,6 +572,7 @@ Copy a single antenna element to one or more destination slots
 <ul>
 <li>Array is resized if any destination index exceeds the current number of elements</li>
 <li>Coupling matrix for added elements is set to identity; if not existing, it gets initialized to identity</li>
+<li>Throws <code>std::invalid_argument</code> for a read-only object or an empty <code>destination</code></li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -627,6 +636,7 @@ Interpolate polarimetric antenna field patterns for given azimuth/elevation angl
 <li>Outputs complex e-theta (V) and e-phi (H) field components at requested angles</li>
 <li><code>n_out</code> equals <code>n_elements</code> when <code>i_element</code> is omitted; equals <code>len(i_element)</code> otherwise</li>
 <li>Azimuth input supports planar wave mode (<code>[1, n_ang]</code>) or per-element spherical wave mode (<code>[n_out, n_ang]</code>)</li>
+<li>NaN or infinite angles give NaN in all outputs for that angle (and element); no exception is thrown</li>
 <li>Output matrices are resized automatically if dimensions do not match; this invalidates existing data pointers</li>
 </ul>
 
@@ -711,6 +721,9 @@ Write arrayant data to a QDANT (XML) file
 <ul>
 <li>Multiple antennas can be stored in the same file using distinct <code>id</code> values</li>
 <li>If <code>id = 0</code> and the file exists, the antenna is appended with <code>id = max_existing_id + 1</code>; if file does not exist, <code>id = 1</code> gets assigned</li>
+<li>Without <code>layout</code> (empty), the layout in the file is replaced by a <code>[1, n]</code> row of all IDs in the file in file order; a custom layout written before is lost. Pass the layout again with every write that should keep it.</li>
+<li>The file has single-precision-equivalent accuracy relative to the element peak, also for double-precision data: pattern magnitudes (in dB) and phases (in degree) get the fewest decimals (0 to 6) that keep the error of each complex sample at or below 6e-8 times the peak amplitude of its element (over e_theta and e_phi). Samples near the peak are accurate to about 6e-8 of their own amplitude; the relative error grows by 10 per 20 dB below the peak (about 6e-4 at -80 dB, 6e-2 at -120 dB), while the absolute error stays below 6e-8 of the peak. An element at a low level is quantized relative to its own peak. Element positions and coupling (magnitude, phase) are written as the shortest text that reads back as the same float (at most 9 significant digits); sampling grids are rounded to 0.001 degree</li>
+<li>All non-zero pattern samples are written, at any level; exact zeros are written as <code>-inf</code> dB. An element that is zero in both field components is written as an all <code>-inf</code> <code>EthetaMag</code> node.</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -745,7 +758,8 @@ unsigned quadriga_lib::arrayant&lt;dtype&gt;::qdant_write(
 Remove zero-valued entries from antenna pattern data, reducing its size
 <ul>
 <li>Modifies in-place when <code>output = nullptr</code>; otherwise writes to <code>*output</code></li>
-<li>A column or row is removed if the total power summed over all field components and array elements does not exceed 1e-12; immediate neighbors of retained entries are also kept unless the local grid spacing is strongly asymmetric (factor > 1.5)</li>
+<li>A column or row is removed if the total power summed over all field components and array elements does not exceed 1e-12 times the peak power of a single sample (summed over field components and elements); the result does not depend on the scale of the pattern; an all-zero pattern is left unchanged</li>
+<li>Immediate neighbors of retained entries are also kept unless the local grid spacing is strongly asymmetric (factor > 1.5)</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -765,6 +779,7 @@ Rotate antenna radiation patterns around the principal axes using Euler rotation
 <ul>
 <li>Rotates pattern and/or polarization around x (bank), y (tilt), z (heading) axes in degrees</li>
 <li>Modifies in-place when <code>output = nullptr</code>; otherwise writes to <code>*output</code></li>
+<li>Coupling, <code>center_frequency</code> and <code>name</code> are kept (also in <code>*output</code>); when a single <code>element</code> is written to <code>*output</code>, the output holds only that element and its coupling is identity</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -872,6 +887,7 @@ Combine element patterns, positions, and coupling weights into effective radiati
 <li>Field interpolation across frequency is delegated to <a href="#arrayant_interpolate_multi">arrayant_interpolate_multi</a> (SLERP with linear-interpolation fallback)</li>
 <li>Coupling matrices are SLERP-interpolated between bracketing input entries; out-of-range output frequencies are clamped to the nearest input entry</li>
 <li>Each output arrayant has identity coupling and zero element positions (patterns are pre-combined)</li>
+<li>The element positions add the phase <code>-2 pi f d / propagation_speed</code> at each output frequency <code>f</code>; the default speed of light applies to radio waves, use about 343 m/s for acoustic arrays (e.g. from <a href="#generate_speaker">generate_speaker</a>)</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -880,7 +896,8 @@ std::vector&lt;arrayant&lt;dtype&gt;&gt; arrayant_combine_pattern_multi(
     const std::vector&lt;arrayant&lt;dtype&gt;&gt; &amp;arrayant_vec,
     const arma::Col&lt;dtype&gt; *azimuth_grid_new = nullptr,
     const arma::Col&lt;dtype&gt; *elevation_grid_new = nullptr,
-    const arma::Col&lt;dtype&gt; *freq_grid_new = nullptr);
+    const arma::Col&lt;dtype&gt; *freq_grid_new = nullptr,
+    dtype propagation_speed = 299792458.0);
 </pre>
 
 <b>Inputs:</b><br>
@@ -889,6 +906,7 @@ std::vector&lt;arrayant&lt;dtype&gt;&gt; arrayant_combine_pattern_multi(
 <li><b><code>azimuth_grid_new</code></b> <i>(optional)</i> — Alternative azimuth grid in rad, in [-pi, pi], sorted; defaults to <code>arrayant_vec[0].azimuth_grid</code></li>
 <li><b><code>elevation_grid_new</code></b> <i>(optional)</i> — Alternative elevation grid in rad, in [-pi/2, pi/2], sorted; defaults to <code>arrayant_vec[0].elevation_grid</code></li>
 <li><b><code>freq_grid_new</code></b> <i>(optional)</i> — Alternative frequency grid in Hz; defaults to per-entry <code>center_frequency</code></li>
+<li><b><code>propagation_speed</code></b> <i>(optional)</i> — Wave propagation speed in m/s; positive and finite; use about 343 for acoustics</li>
 </ul>
 
 <b>Returns:</b><br>
@@ -1587,6 +1605,8 @@ auto sub = quadriga_lib::generate_speaker&lt;double&gt;("omni", 0.13, 30.0, 200.
 Read an arrayant object from a QDANT file
 <ul>
 <li>Parses a QuaDRiGa Array Antenna Exchange Format (QDANT) XML file and returns the arrayant for the given ID.</li>
+<li>Throws <code>std::invalid_argument</code> if the file has no entry with the given ID. The first entry of a file is ID 1 only if it has no <code>id</code> attribute (files written by other tools); otherwise ID 1 must exist.</li>
+<li>Malformed files throw <code>std::invalid_argument</code>. The number of elements (<code>NoElements</code>) must be backed by data in the file (element positions, coupling, or pattern nodes of the last element). Elements without pattern nodes read as zeros; their zero patterns, and the identity coupling of a file without <code>CouplingAbs</code>, are limited to 2^24 values each (e.g. 256 elements without pattern data on a 1-degree grid, 4096 elements without coupling).</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -1657,7 +1677,7 @@ Write a vector of arrayant objects to a single QDANT file
 <ul>
 <li>Writes each entry in <code>arrayant_vec</code> to a QDANT file with sequential 1-based IDs using <a href="#.qdant_write">.qdant_write</a>.</li>
 <li>Auto-generates a <code>[n_entries, 1]</code> layout matrix with entries <code>1, 2, ..., n_entries</code>.</li>
-<li>Deletes any existing file before writing; all entries are validated first.</li>
+<li>All entries are validated first; an existing file is deleted only after the validation passed, then rewritten. Invalid input throws and leaves an existing file unchanged.</li>
 <li>Primary use case: frequency-dependent models where each arrayant holds a pattern at one frequency via <code>center_frequency</code>.</li>
 </ul>
 
@@ -1849,6 +1869,7 @@ Append new propagation paths to an existing channel snapshot
 <ul>
 <li>Adds path-level data to snapshot <code>i_snap</code> in a <code>channel</code> object; does not modify <code>tx_pos</code>, <code>rx_pos</code>, or orientation fields</li>
 <li>All provided fields must have consistent length <code>n_path_add</code> and match existing snapshot structure</li>
+<li>The first provided field sets <code>n_path_add</code>, also when it holds 0 paths; a field with a different path count throws</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -2102,7 +2123,7 @@ Compute the baseband frequency response of a MIMO channel
 <li>Computes the frequency-domain channel matrix <code>H</code> at given sub-carrier positions via DFT over time-domain path coefficients and delays</li>
 <li><code>delay</code> supports broadcasting: shape <code>[1, 1, n_path]</code> applies the same delays to all RX/TX pairs</li>
 <li><code>pilot_grid</code> values are normalized to bandwidth: <code>0.0</code> = center frequency, <code>1.0</code> = center + bandwidth</li>
-<li>Internal arithmetic is single-precision; uses AVX2 for 8-carrier parallel computation; double inputs are narrowed to float internally, results widened back</li>
+<li>The phase <code>bandwidth · pilot_grid · delay</code> (in cycles) is computed in double precision and reduced to one period before sin / cos are evaluated in single precision, so long (absolute) delays keep their accuracy; coefficients and sums are single precision; uses AVX2 for 8-carrier parallel computation; double inputs are narrowed to float internally, results widened back</li>
 <li>Safe to call in a loop over snapshots and parallelize with OpenMP</li>
 </ul>
 
@@ -2177,7 +2198,7 @@ void quadriga_lib::baseband_freq_response_multi(
 <li><b><code>delay</code></b> — Path delays in seconds, vector of <code>n_freq_in</code> cubes; only <code>delay[0]</code> is used; shape <code>[n_rx, n_tx, n_path]</code> or <code>[1, 1, n_path]</code></li>
 <li><b><code>freq_in</code></b> — Input sample frequencies, sorted ascending; <code>[n_freq_in]</code></li>
 <li><b><code>freq_out</code></b> — Output carrier frequencies (absolute); <code>[n_carrier]</code></li>
-<li><b><code>remove_delay_phase</code></b> <i>(optional)</i> — Removes baked-in <code>exp(-j·2π·freq_in[f]·delay)</code> before SLERP and re-applies analytically at output frequencies; must be <code>true</code> for output from <a href="#get_channels_multifreq">get_channels_multifreq</a> or <a href="#get_channels_spherical">get_channels_spherical</a>, <code>false</code> for pure envelope coefficients</li>
+<li><b><code>remove_delay_phase</code></b> <i>(optional)</i> — Removes baked-in <code>exp(-j·2π·freq_in[f]·delay)</code> before SLERP and re-applies analytically at output frequencies; must be <code>true</code> for output from <a href="#get_channels_multifreq">get_channels_multifreq</a> or <a href="#get_channels_spherical">get_channels_spherical</a>, <code>false</code> for pure envelope coefficients. These channels must be generated with <code>use_absolute_delays = true</code>: their coefficients carry the phase of the absolute path length also when <code>delay</code> holds relative delays. With relative delays the phase of the TX-RX distance stays in the coefficients and is interpolated across the <code>freq_in</code> grid, which gives wrong phases (magnitudes stay right) unless the <code>freq_in</code> spacing is far below <code>c / (TX-RX distance)</code></li>
 </ul>
 
 <b>Outputs:</b><br>
@@ -2202,7 +2223,7 @@ Compute the baseband frequency response of multiple MIMO channels
 <li>Batch wrapper around <a href="#baseband_freq_response">baseband_freq_response</a>, applying it across snapshots in parallel via OpenMP</li>
 <li>Each element of the input vectors is a cube of shape <code>[n_rx, n_tx, n_path]</code>; <code>delay</code> supports broadcasting to <code>[1, 1, n_path]</code></li>
 <li>Output vectors have length <code>n_out</code>: either <code>n_snap</code> (all snapshots) or <code>length(i_snap)</code> (subset)</li>
-<li>Internal arithmetic is single-precision</li>
+<li>Same arithmetic as <a href="#baseband_freq_response">baseband_freq_response</a>: phase in double precision, sin / cos and sums in single precision</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -2264,6 +2285,7 @@ Create a new HDF5 channel file with a defined storage layout
 <li>Defines a 4D layout (x, y, z, w) where each index combination maps to one channel storage slot.</li>
 <li>Typical dimension mapping: x = BS, y = UE, z = frequency, w = scenario/repetition.</li>
 <li>Layout can be reshaped later with <a href="#hdf5_reshape_layout">hdf5_reshape_layout</a> if the total slot count stays constant.</li>
+<li>The total slot count <code>nx × ny × nz × nw</code> must not exceed 4294967295 (2^32 - 1); larger layouts throw before the file is created.</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -2298,7 +2320,9 @@ Read a channel object from an HDF5 file at a specified 4D index
 <ul>
 <li>Returns an empty channel object (<code>no_snapshots == 0</code>) if the slot contains no valid data.</li>
 <li>Structured data is stored in single precision in the file and converted to <code>dtype</code> on read.</li>
-<li>Unstructured fields (<code>std::any</code>) retain their original stored type without conversion.</li>
+<li>Unstructured fields (<code>std::any</code>) retain their original stored type without conversion; see <a href="#hdf5_read_dset">hdf5_read_dset</a> for the returned types.</li>
+<li>Round trip with <a href="#hdf5_write">hdf5_write</a>: every per-snapshot field comes back with one entry per snapshot, also for snapshots without paths (empty entries keep their shape); a channel written without <code>center_frequency</code> comes back with an empty <code>center_frequency</code>; empty <code>tx_orientation</code> / <code>rx_orientation</code> come back as <code>[3, 1]</code> zeros.</li>
+<li>Throws <code>std::invalid_argument</code> if the file is malformed, e.g. if a dataset does not have the size given by the attributes of the channel, or a required dataset or attribute is missing.</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -2339,6 +2363,9 @@ Read an unstructured dataset from an HDF5 file at a specified 4D index
 <li>Reads a user-defined dataset stored under <code>prefix + par_name</code> (e.g., <code>"par_carrier_frequency"</code>).</li>
 <li>Returns an empty <code>std::any</code> if the dataset does not exist at the specified slot or name.</li>
 <li>Use <a href="#any_type_id">any_type_id</a> to determine the contained type and obtain a raw pointer.</li>
+<li>Returned types: a scalar dataset gives a scalar; a 1D dataset an <code>arma::Col</code>, also when it has a single element; a 2D dataset an <code>arma::Mat</code>; a 3D dataset an <code>arma::Cube</code>. An <code>arma::Row</code> written with <a href="#hdf5_write_dset">hdf5_write_dset</a> therefore comes back as an <code>arma::Col</code>.</li>
+<li>Element types: float, double, 32- and 64-bit signed and unsigned integers. Datasets of other types or with more than 3 dimensions are returned as empty <code>std::any</code>.</li>
+<li>Strings: fixed-length strings are returned without trailing NUL characters (an empty string written by <a href="#hdf5_write_dset">hdf5_write_dset</a> comes back empty); variable-length strings (the default of h5py and MATLAB) are supported.</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -2457,7 +2484,7 @@ arma::u32_vec quadriga_lib::hdf5_read_layout(
 Reshape the 4D storage layout of an existing HDF5 channel file
 <ul>
 <li>Updates <code>{nx, ny, nz, nw}</code> of an existing file; total slot count <code>nx × ny × nz × nw</code> must remain unchanged.</li>
-<li>Throws if the new layout violates the total-count constraint.</li>
+<li>Throws if the new layout violates the total-count constraint or has more than 4294967295 (2^32 - 1) slots.</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -2492,11 +2519,12 @@ Write a channel object to an HDF5 file at a specified 4D index
 <ul>
 <li>Writes a <code>quadriga_lib::channel&lt;dtype&gt;</code> object to slot <code>(ix, iy, iz, iw)</code> in the HDF5 file.</li>
 <li>Creates the file with default layout <code>(65536 × 1 × 1 × 1)</code> if it does not exist; appends to existing files.</li>
-<li>Overwrites slot content if the index already contains data.</li>
+<li>If the slot already holds data, the slot is replaced completely: the old structured data and all unstructured datasets of the slot (<code>par_*</code>, including those added with <a href="#hdf5_write_dset">hdf5_write_dset</a>) are removed, and only the new channel is stored there. HDF5 does not reuse the space of the removed data: the file does not shrink; use <code>h5repack</code> to reclaim the space.</li>
 <li>Throws if the index was not reserved during <a href="#hdf5_create">hdf5_create</a>.</li>
 <li>Structured data is always stored in single precision; input may be float or double.</li>
 <li>Unstructured data: supported types are string, double, float, (u)int32, (u)int64; up to 3D; storage order preserved.</li>
 <li>Set <code>assume_valid = true</code> to skip integrity validation (faster but unsafe for potentially corrupted data).</li>
+<li>The channel name is stored with at most 255 characters.</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -2524,7 +2552,7 @@ int quadriga_lib::hdf5_write(
 
 <b>Returns:</b><br>
 <ul>
-<li><code>0</code> if a new dataset was created, <code>1</code> if an existing dataset was overwritten or extended</li>
+<li><code>0</code> if the slot was empty, <code>1</code> if existing data in the slot was replaced</li>
 </ul>
 
 <b>See also:</b><br>
@@ -2539,10 +2567,11 @@ int quadriga_lib::hdf5_write(
 Write a single unstructured dataset to an HDF5 file at a specified 4D index
 <ul>
 <li>Dataset is stored under <code>prefix + par_name</code>; name must contain only alphanumeric characters and underscores.</li>
+<li>Adds the dataset to the slot and keeps everything else stored there (channel data and other datasets); an empty slot is reserved for it. A later <a href="#hdf5_write">hdf5_write</a> to the same slot replaces the slot completely, including the datasets written with this function.</li>
 <li>Supported scalar types: <code>std::string</code>, <code>unsigned</code>, <code>int</code>, <code>long long</code>, <code>unsigned long long</code>, <code>float</code>, <code>double</code></li>
 <li>Supported Armadillo types: <code>arma::Col</code>, <code>arma::Row</code>, <code>arma::Mat</code>, <code>arma::Cube</code> with element types <code>float</code>, <code>double</code>, <code>int</code>, <code>unsigned</code>, <code>sword</code>, <code>uword</code>, <code>unsigned long long</code></li>
 <li><code>arma::Row</code> is converted to <code>arma::Col</code> before writing.</li>
-<li>Throws for unsupported types.</li>
+<li>Throws for unsupported types and invalid names, before the file is changed.</li>
 <li>Throws if a dataset with the same name already exists at the specified slot; no overwrite/update is supported.</li>
 </ul>
 
@@ -2868,7 +2897,7 @@ Create a new QRT file and write its metadata header
 <ul>
 <li>Writes a v5 (EM) or v6 (scalar) header: frequencies, CIR positions/orientations, RX (MT) metadata, and a reserved BS (TX) region.</li>
 <li>Writes no path data. The BS position/orientation rows and the BS index table are reserved as zeros; each <a href="#qrt_file_append">qrt_file_append</a> call fills the next free slot.</li>
-<li>CIR orientation is stored compressed: only the angle columns that carry a nonzero value are written, encoded in a per-file format byte.</li>
+<li>CIR orientation is stored compressed: only the angle columns that carry a nonzero value after conversion to <code>float</code> are written, encoded in a per-file format byte. <a href="#qrt_file_append">qrt_file_append</a> reads this byte from the file.</li>
 <li><code>no_orig</code> fixes the number of TX slots; the file can hold at most that many appended TX blocks.</li>
 <li>Positional data is converted to <code>float</code> on write regardless of <code>dtype</code>.</li>
 </ul>
@@ -2914,6 +2943,7 @@ Read metadata from a QRT file
 <li>All output arguments are optional; pass <code>nullptr</code> to skip any.</li>
 <li>If <code>file</code> is <code>nullptr</code>, the file is opened internally and closed on return; if provided, the stream is left open.</li>
 <li>When <code>no_dest == 0</code> in the file, one implicit RX named <code>"RX"</code> is assumed; <code>dest_names</code> and <code>cir_offset</code> reflect this.</li>
+<li>Throws <code>std::invalid_argument</code> if the file is truncated, or if a count or offset in it does not fit the file size.</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -2970,6 +3000,7 @@ Read ray-tracing CIR data from a QRT file
 <li>For tight-loop performance, pass a pre-opened <code>std::ifstream</code> and a <a href="#qrt_read_cache_init">qrt_read_cache_init</a>-populated cache; reduces per-call I/O to 2 seeks and 4 reads.</li>
 <li><code>fn</code> is ignored when both <code>file</code> and <code>cache</code> are provided.</li>
 <li>Reading a TX slot that was reserved by <a href="#qrt_file_init">qrt_file_init</a> but not yet written by <a href="#qrt_file_append">qrt_file_append</a> returns empty path outputs with zeroed positions, rather than throwing; an out-of-range index still throws.</li>
+<li>Throws <code>std::invalid_argument</code> if the file is truncated, or if a count or offset in it does not fit the file size.</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -3027,8 +3058,10 @@ void quadriga_lib::qrt_file_read(
   <td>1</td>
   <td>Max column power = 1</td>
   <td>-PL minus material losses</td>
+  <td><br><br></td>
 </tr>
 </table>
+Other values throw <code>std::invalid_argument</code>.
 </li>
 </ul>
 </li>
@@ -3089,6 +3122,7 @@ Read raw ray-tracing path data from a QRT file into path objects
 <li>Each returned path has <code>iC</code> set to its CIR index and <code>iR</code> to a running index within the origin. Counters not stored in the file (<code>nREF</code>, <code>nTRA</code>, <code>nSUB</code>, <code>nSCT</code>) and <code>length</code> are left at their defaults.</li>
 <li>Only v05/v06 files can be read as raw paths; v4 legacy files are rejected.</li>
 <li>An origin slot that was reserved by <a href="#qrt_file_init">qrt_file_init</a> but never written by <a href="#qrt_file_append">qrt_file_append</a> returns an empty vector.</li>
+<li>Throws <code>std::invalid_argument</code> if the file is truncated, or if a count or offset in it does not fit the file size.</li>
 <li>For tight loops over many origins, pass a pre-opened <code>std::ifstream</code> and a <a href="#qrt_read_cache_init">qrt_read_cache_init</a>-populated cache to avoid re-parsing the header on each call.</li>
 </ul>
 
@@ -3131,6 +3165,7 @@ Initialize a QRT read cache for fast repeated access
 <li>Populate once, then pass the cache and a shared <code>std::ifstream</code> to <a href="#qrt_file_read">qrt_file_read</a> for tight-loop performance.</li>
 <li>If <code>file</code> is <code>nullptr</code>, the file is opened internally and closed on return; if provided, the stream is left open.</li>
 <li>For a TX slot reserved by <a href="#qrt_file_init">qrt_file_init</a> but not yet written, <code>orig_index</code> and <code>path_data_offset</code> are <code>0</code>; <a href="#qrt_file_read">qrt_file_read</a> treats that as an empty (unwritten) origin.</li>
+<li>Throws <code>std::invalid_argument</code> if the file is truncated, or if a count or offset in it does not fit the file size.</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -3227,8 +3262,12 @@ Map path delays to a fixed tap grid using two-tap power-weighted interpolation
 <li>Each path delay is approximated by two adjacent taps with coefficients scaled by (1-delta)^alpha and delta^alpha, where delta is the fractional offset within the bin and alpha is <code>power_exponent</code>; this avoids discontinuities when delays cross tap boundaries</li>
 <li>Use <code>power_exponent=1.0</code> for narrowband (linear interpolation) or <code>0.5</code> for wideband (incoherent power preservation)</li>
 <li>If all fractional offsets are below 0.01 or above 0.99, weight computation is skipped but tap-selection logic still applies</li>
-<li>Input <code>delay</code> may be per-antenna <code>[n_rx, n_tx, n_path_s]</code> or shared <code>[1, 1, n_path_s]</code>; shared delays are expanded internally when <code>fix_taps</code> is 0 or 3, and output delays remain shared <code>[1, 1, n_taps]</code> when <code>fix_taps</code> is 1 or 2</li>
+<li>Input <code>delay</code> may be per-antenna <code>[n_rx, n_tx, n_path_s]</code> or shared <code>[1, 1, n_path_s]</code>; shared delays are expanded internally when <code>fix_taps</code> is 0 or 3, and output delays remain shared <code>[1, 1, n_taps]</code> when <code>fix_taps</code> is 1 or 2; per-antenna input always gives <code>[n_rx, n_tx, n_taps]</code> output delays (identical for all pairs when <code>fix_taps</code> is 1 or 2)</li>
 <li><code>n_rx</code> and <code>n_tx</code> must be identical across all snapshots; <code>n_path_s</code> may differ per snapshot</li>
+<li>Delays must be non-negative, as for a tapped delay line, with a tolerance of <code>tap_spacing / 2</code>: delays in <code>(-tap_spacing / 2, 0)</code> are treated as 0, so all of their power goes to tap 0 (there is no tap below 0 to interpolate with; the error is below <code>tap_spacing / 2</code>, as for nearest-tap rounding). Delays at or below <code>-tap_spacing / 2</code> throw <code>std::invalid_argument</code>, as do NaN, Inf and delays of 2^31 taps or more (<code>delay / tap_spacing &amp;lt; 2^31</code>, e.g. 10.7 s at 5 ns or 12.4 h at 48 kHz)</li>
+<li>Relative delays (<code>use_absolute_delays = false</code> in <a href="#get_channels_spherical">get_channels_spherical</a>, <a href="#get_channels_multifreq">get_channels_multifreq</a> and <a href="#get_channels_planar">get_channels_planar</a>) are negative for element pairs that are closer to each other than the phase centres, by up to about (half the TX array size + half the RX array size) / propagation speed (both arrays endfire). They stay above <code>-tap_spacing / 2</code> only while these half sizes add up to less than <code>tap_spacing / 2</code> times the propagation speed: about 0.75 m for radio at 5 ns taps, but only about 3.6 mm for sound at 48 kHz taps, i.e. practically every acoustic array. In those cases use absolute delays (<code>use_absolute_delays = true</code>)</li>
+<li>Run time and memory depend on the number of paths and taps, not on the absolute delay values</li>
+<li>Outputs may alias inputs, also across arguments (e.g. <code>delay_quant == coeff_re</code>); all inputs are read before the outputs are written. The three outputs must be different objects.</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -3250,8 +3289,8 @@ void quadriga_lib::quantize_delays(
 <ul>
 <li><b><code>coeff_re</code></b> — Channel coefficients, real part; vector of length <code>n_snap</code>, each cube <code>[n_rx, n_tx, n_path_s]</code></li>
 <li><b><code>coeff_im</code></b> — Channel coefficients, imaginary part; same layout as <code>coeff_re</code></li>
-<li><b><code>delay</code></b> — Path delays in seconds; vector of length <code>n_snap</code>, each cube <code>[n_rx, n_tx, n_path_s]</code> or <code>[1, 1, n_path_s]</code></li>
-<li><b><code>tap_spacing</code></b> <i>(optional)</i> — Delay bin spacing in seconds; 5 ns corresponds to 200 MHz sampling rate</li>
+<li><b><code>delay</code></b> — Path delays in seconds; vector of length <code>n_snap</code>, each cube <code>[n_rx, n_tx, n_path_s]</code> or <code>[1, 1, n_path_s]</code>; non-negative with a tolerance of <code>tap_spacing / 2</code>, finite, below <code>2^31 * tap_spacing</code></li>
+<li><b><code>tap_spacing</code></b> <i>(optional)</i> — Delay bin spacing in seconds, positive and finite; 5 ns corresponds to 200 MHz sampling rate</li>
 <li><b><code>max_no_taps</code></b> <i>(optional)</i> — Maximum number of output taps; 0 means unlimited</li>
 <li><b><code>power_exponent</code></b> <i>(optional)</i> — Interpolation exponent alpha; 1.0 = narrowband, 0.5 = wideband power-preserving</li>
 <li><b><code>fix_taps</code></b> <i>(optional)</i> — Delay grid sharing mode:<br><br>
@@ -3266,11 +3305,11 @@ void quadriga_lib::quantize_delays(
 </tr>
 <tr>
   <td>1</td>
-  <td>Single shared grid across all snapshots and tx-rx pairs; output delays <code>[1, 1, n_taps]</code>, identical for every snapshot</td>
+  <td>Single shared grid across all snapshots and tx-rx pairs; output delays <code>[1, 1, n_taps]</code> for shared delay input (<code>[n_rx, n_tx, n_taps]</code> for per-antenna input), identical for every snapshot</td>
 </tr>
 <tr>
   <td>2</td>
-  <td>Per snapshot; output delays <code>[1, 1, n_taps]</code>, but each snapshot has its own independent tap grid — taps do not align across snapshots</td>
+  <td>Per snapshot; output delays <code>[1, 1, n_taps]</code> for shared delay input (<code>[n_rx, n_tx, n_taps]</code> for per-antenna input), but each snapshot has its own independent tap grid — taps do not align across snapshots</td>
 </tr>
 <tr>
   <td>3</td>
@@ -3284,7 +3323,7 @@ void quadriga_lib::quantize_delays(
 <ul>
 <li><b><code>coeff_re_quant</code></b> — Output coefficients, real part; vector of length <code>n_snap</code>, each cube <code>[n_rx, n_tx, n_taps]</code></li>
 <li><b><code>coeff_im_quant</code></b> — Output coefficients, imaginary part; same layout as <code>coeff_re_quant</code></li>
-<li><b><code>delay_quant</code></b> — Output delays in seconds; each cube <code>[n_rx, n_tx, n_taps]</code> or <code>[1, 1, n_taps]</code> depending on <code>fix_taps</code></li>
+<li><b><code>delay_quant</code></b> — Output delays in seconds; each cube <code>[n_rx, n_tx, n_taps]</code>, or <code>[1, 1, n_taps]</code> for shared delay input with <code>fix_taps</code> 1 or 2</li>
 </ul>
 
 <b>Example:</b><br>
@@ -3502,8 +3541,11 @@ Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models
 <li>Default KF (linear): A/B/C → 1 (LOS) / 0 (NLOS), D → 2/0, E/F → 4/0; applied to first tap only; breakpoint ignored when <code>KF_linear &gt;= 0</code></li>
 <li>Default XPR NLOS: 2 (3 dB); default SF LOS: 3 dB; default SF NLOS: A/B → 4 dB, C/D → 5 dB, E/F → 6 dB</li>
 <li>Default breakpoint distance: A/B/C → 5 m, D → 10 m, E → 20 m, F → 30 m</li>
-<li>Floor floor penetration loss according to TGah for CarrierFreq &lt; 1 GHz and TGax for above 1 GHz</li>
-<li>NAN or negative value for any override parameter restores the model default</li>
+<li>Floor penetration loss according to TGah for CarrierFreq &lt; 1 GHz and TGax for above 1 GHz; floors add attenuation (and the TGah shadow fading below 1 GHz) but no delay; the station is placed 3 m per floor above the AP</li>
+<li>Taps with zero power in the model tables are removed; the number of paths does not depend on distance, floors or walls</li>
+<li>Time evolution: each sub-path is rotated by <code>exp(+j 2 pi f_D t)</code>, i.e. a station moving towards the AP or a scatterer sees a positive Doppler shift <code>f_D</code>, as the channel of <a href="#get_channels_spherical">get_channels_spherical</a> along the returned station positions</li>
+<li>Uplink: the coefficient and delay matrices are the transposes of the downlink ones (reciprocal channel, no conjugation), so both directions have the same Doppler shift; positions and orientations are swapped (the moving station is the transmitter)</li>
+<li>NAN or negative value for any override parameter restores the model default, except <code>XPR_NLOS_linear</code> (see below)</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -3543,19 +3585,19 @@ std::vector&lt;quadriga_lib::channel&lt;double&gt;&gt; quadriga_lib::get_channel
 <li><b><code>CarrierFreq_Hz</code></b> <i>(optional)</i> — Carrier frequency</li>
 <li><b><code>tap_spacing_s</code></b> <i>(optional)</i> — Tap spacing in seconds; must equal <code>10 ns / 2^k</code></li>
 <li><b><code>n_users</code></b> <i>(optional)</i> — Number of users (TGac/TGah/TGax only); output vector length equals <code>n_users</code></li>
-<li><b><code>observation_time</code></b> <i>(optional)</i> — Channel observation time in seconds</li>
-<li><b><code>update_rate</code></b> <i>(optional)</i> — Channel update interval in seconds; relevant only when <code>observation_time &gt; 0</code></li>
+<li><b><code>observation_time</code></b> <i>(optional)</i> — Channel observation time in seconds; must be finite</li>
+<li><b><code>update_rate</code></b> <i>(optional)</i> — Channel update interval in seconds (finite, > 0); relevant only when <code>observation_time &gt; 0</code></li>
 <li><b><code>speed_station_kmh</code></b> <i>(optional)</i> — Station speed in km/h; movement direction is <code>AoA_offset</code>; relevant only when <code>observation_time &gt; 0</code></li>
 <li><b><code>speed_env_kmh</code></b> <i>(optional)</i> — Environment speed in km/h; use <code>0.089</code> for TGac; relevant only when <code>observation_time &gt; 0</code></li>
 <li><b><code>Dist_m</code></b> <i>(optional)</i> — TX-to-RX distance(s); <code>[n_users]</code> or <code>[1]</code></li>
-<li><b><code>n_floors</code></b> <i>(optional)</i> — Number of floors per user for TGah or TGax models; <code>[n_users]</code> or <code>[1]</code></li>
-<li><b><code>uplink</code></b> <i>(optional)</i> — Set <code>true</code> to generate uplink (reverse) direction</li>
+<li><b><code>n_floors</code></b> <i>(optional)</i> — Number of floors per user for TGah or TGax models (0 to 4, attenuation only, no delay); <code>[n_users]</code> or <code>[1]</code></li>
+<li><b><code>uplink</code></b> <i>(optional)</i> — Set <code>true</code> to generate uplink (reverse) direction; coefficients are the transpose of the downlink</li>
 <li><b><code>offset_angles</code></b> <i>(optional)</i> — Azimuth offset angles in degrees; rows: AoD LOS, AoD NLOS, AoA LOS, AoA NLOS; empty uses TGac auto-defaults for <code>n_users &gt; 1</code>; <code>[4, n_users]</code></li>
 <li><b><code>n_subpath</code></b> <i>(optional)</i> — Sub-paths per cluster for Laplacian angular spread mapping</li>
 <li><b><code>Doppler_effect</code></b> <i>(optional)</i> — Special Doppler: models D/E use mains frequency (Hz), model F uses vehicle speed (km/h); <code>0.0</code> disables</li>
 <li><b><code>seed</code></b> <i>(optional)</i> — RNG seed for repeatability; <code>-1</code> uses the system random device</li>
 <li><b><code>KF_linear</code></b> <i>(optional)</i> — Overrides model KF (linear scale); NAN or negative restores model default</li>
-<li><b><code>XPR_NLOS_linear</code></b> <i>(optional)</i> — Overrides NLOS cross-polarization ratio (linear scale); NAN or negative restores model default</li>
+<li><b><code>XPR_NLOS_linear</code></b> <i>(optional)</i> — Overrides NLOS cross-polarization ratio (linear scale); NAN restores model default; must otherwise be finite and > 0 (0, negative and Inf throw)</li>
 <li><b><code>SF_std_dB_LOS</code></b> <i>(optional)</i> — Overrides LOS shadow fading std in dB (applied when d &lt; dBP); NAN restores model default</li>
 <li><b><code>SF_std_dB_NLOS</code></b> <i>(optional)</i> — Overrides NLOS shadow fading std in dB (applied when d >= dBP); NAN restores model default</li>
 <li><b><code>dBP_m</code></b> <i>(optional)</i> — Overrides breakpoint distance; NAN or negative restores model default</li>
@@ -3585,11 +3627,13 @@ Calculate MIMO channel coefficients for IRS-assisted communication
 <ul>
 <li>Computes channel coefficients and delays from two path segments: TX → IRS and IRS → RX</li>
 <li>IRS is modeled as a passive array; phase shifts are defined via its coupling matrix; codebook entry selected by <code>i_irs</code></li>
-<li>Polarization coupling is applied via the 8-row transfer matrices <code>M_1</code>, <code>M_2</code> (interleaved Re/Im for VV, VH, HV, HH components)</li>
+<li>Polarization coupling is applied via the 8-row transfer matrices <code>M_1</code>, <code>M_2</code>: 2x2 Jones matrices (rows = receive polarisation V/H, columns = transmit polarisation V/H; the IRS receives in segment 1 and transmits in segment 2), column-major with Re/Im interleaved: rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx)</li>
+<li>Each segment is computed by <a href="#get_channels_spherical">get_channels_spherical</a>: NLOS path lengths are <code>max(path_length, d_poly)</code> with the polyline length <code>d_poly</code> of the segment; the delay of a combined path is the sum of both segment delays</li>
 <li>Output paths <code>n_path_irs</code> are all combinations of segment 1 and segment 2 paths that exceed <code>threshold_dB</code></li>
 <li>If <code>active_path</code> is provided, it overrides <code>threshold_dB</code> for path selection</li>
 <li>Optional <code>irs_array_2</code> provides a separate IRS antenna pattern for the RX-facing side (asymmetric IRS)</li>
 <li>Setting <code>center_frequency = 0.0</code> disables phase computation</li>
+<li>If <code>use_absolute_delays == false</code>, the LOS delay between the TX and RX phase centres (direct distance, not via the IRS) is subtracted from all paths; per-element delays can be slightly negative when the IRS is close to the TX-RX line</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -3643,13 +3687,13 @@ std::vector&lt;bool&gt; quadriga_lib::get_channels_irs(
 <li><b><code>fbs_pos_1</code></b> — First-bounce scatterer positions for TX → IRS paths; <code>[3, n_path_1]</code></li>
 <li><b><code>lbs_pos_1</code></b> — Last-bounce scatterer positions for TX → IRS paths; <code>[3, n_path_1]</code></li>
 <li><b><code>path_gain_1</code></b> — Path gains in linear scale for TX → IRS paths; <code>[n_path_1]</code></li>
-<li><b><code>path_length_1</code></b> — Total path lengths from TX to IRS phase center; <code>[n_path_1]</code></li>
-<li><b><code>M_1</code></b> — Polarization transfer matrix for TX → IRS paths, interleaved (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH); <code>[8, n_path_1]</code></li>
+<li><b><code>path_length_1</code></b> — Total path lengths from TX to IRS phase center; values shorter than the polyline (e.g. 0) use the polyline length; <code>[n_path_1]</code></li>
+<li><b><code>M_1</code></b> — Polarization transfer matrix for TX → IRS paths, row order as above; <code>[8, n_path_1]</code></li>
 <li><b><code>fbs_pos_2</code></b> — First-bounce scatterer positions for IRS → RX paths; <code>[3, n_path_2]</code></li>
 <li><b><code>lbs_pos_2</code></b> — Last-bounce scatterer positions for IRS → RX paths; <code>[3, n_path_2]</code></li>
 <li><b><code>path_gain_2</code></b> — Path gains in linear scale for IRS → RX paths; <code>[n_path_2]</code></li>
-<li><b><code>path_length_2</code></b> — Total path lengths from IRS to RX phase center; <code>[n_path_2]</code></li>
-<li><b><code>M_2</code></b> — Polarization transfer matrix for IRS → RX paths, interleaved (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH); <code>[8, n_path_2]</code></li>
+<li><b><code>path_length_2</code></b> — Total path lengths from IRS to RX phase center; values shorter than the polyline (e.g. 0) use the polyline length; <code>[n_path_2]</code></li>
+<li><b><code>M_2</code></b> — Polarization transfer matrix for IRS → RX paths, row order as above; <code>[8, n_path_2]</code></li>
 <li><b><code>i_irs</code></b> <i>(optional)</i> — IRS codebook port index</li>
 <li><b><code>threshold_dB</code></b> <i>(optional)</i> — Gain threshold in dB; path combinations below this are discarded</li>
 <li><b><code>center_frequency</code></b> <i>(optional)</i> — Center frequency; set to <code>0</code> to skip phase computation</li>
@@ -3694,9 +3738,13 @@ Compute channel coefficients for spherical waves across multiple frequencies
 <li><code>path_gain</code> interpolated linearly; <code>M</code> interpolated via SLERP per complex entry pair to preserve phase</li>
 <li>Extrapolation clamps to nearest frequency entry on all four grids</li>
 <li><code>propagation_speed</code> supports EM (speed of light, default) and acoustic (~343 m/s) simulations</li>
-<li><code>M</code> accepts 8 rows (full polarimetric: ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH) or 2 rows (scalar pressure: ReVV, ImVV only)</li>
+<li><code>M</code> accepts 8 rows (full polarimetric: the 2x2 Jones matrix, rows = RX polarisation V/H, columns = TX polarisation V/H, column-major with Re/Im interleaved: rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx)) or 2 rows (scalar pressure: Re, Im of the (V rx, V tx) entry only)</li>
+<li>NLOS paths: the path length between the TX and RX phase centres is <code>max(path_length, d_poly)</code>, where <code>d_poly</code> is the TX-FBS-LBS-RX polyline length; the length beyond the polyline (interactions between FBS and LBS) is added to the FBS-LBS segment. Delays and phases follow this length; the per-element offsets follow the FBS / LBS geometry</li>
+<li>LOS detection: the path whose length is closest to the TX-RX distance, within 0.1 mm</li>
 <li>Coupling matrices interpolated across frequencies per complex entry (SLERP for complex pairs), identical to antenna pattern handling</li>
-<li><code>n_path_out = n_path + 1</code> if <code>add_fake_los_path</code> else <code>n_path</code></li>
+<li><code>n_path_out = n_path + 1</code> if <code>add_fake_los_path</code> else <code>n_path</code>: with <code>add_fake_los_path</code>, slot 0 holds the LOS path (zero power if no LOS path was found); a LOS path found in the input is moved to slot 0 and leaves a zero-power path in its original slot (input index + 1); all other paths keep their order, shifted by one slot</li>
+<li>If <code>use_absolute_delays</code> is false, the LOS delay between the TX and RX phase centres is subtracted from all paths; per-element delays can then be negative, down to about -(half the TX array size + half the RX array size) / <code>propagation_speed</code> (both arrays endfire). <a href="#quantize_delays">quantize_delays</a> rejects delays at or below <code>-tap_spacing / 2</code>. For acoustics (<code>propagation_speed</code> about 343 m/s) that happens for practically every array: at 48 kHz taps, half sizes adding up to more than about 3.6 mm (a 5 cm microphone pair already exceeds it); for radio at 5 ns taps, about 0.75 m. Use <code>use_absolute_delays = true</code> in that case</li>
+<li>The coefficients always carry the phase of the absolute path length, also when <code>use_absolute_delays</code> is false. <a href="#baseband_freq_response_multi">baseband_freq_response_multi</a> with <code>remove_delay_phase = true</code> removes the phase of <code>delay</code> before it interpolates across <code>freq_in</code>, so it needs channels generated with <code>use_absolute_delays = true</code>; with relative delays, the phase of the TX-RX distance stays in the coefficients, is interpolated across the <code>freq_in</code> grid and gives wrong phases</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -3734,12 +3782,12 @@ void quadriga_lib::get_channels_multifreq(
 <li><b><code>fbs_pos</code></b> — First-bounce scatterer positions; <code>[3, n_path]</code></li>
 <li><b><code>lbs_pos</code></b> — Last-bounce scatterer positions; <code>[3, n_path]</code></li>
 <li><b><code>path_gain</code></b> — Linear-scale path gains; <code>[n_path, n_freq_in]</code></li>
-<li><b><code>path_length</code></b> — Absolute TX-to-RX path lengths; <code>[n_path]</code></li>
-<li><b><code>M</code></b> — Polarization transfer matrix; <code>[8, n_path, n_freq_in]</code> (full pol) or <code>[2, n_path, n_freq_in]</code> (scalar)</li>
+<li><b><code>path_length</code></b> — Absolute TX-to-RX path lengths (between the phase centres); values shorter than the TX-FBS-LBS-RX polyline (e.g. 0) use the polyline length; <code>[n_path]</code></li>
+<li><b><code>M</code></b> — Polarization transfer matrix, row order as above; <code>[8, n_path, n_freq_in]</code> (full pol) or <code>[2, n_path, n_freq_in]</code> (scalar)</li>
 <li><b><code>freq_in</code></b> — Input sample frequencies for <code>path_gain</code> and <code>M</code>; <code>[n_freq_in]</code></li>
 <li><b><code>freq_out</code></b> — Target output frequencies; <code>[n_freq_out]</code></li>
 <li><b><code>use_absolute_delays</code></b> <i>(optional)</i> — Include LOS delay in all paths if true</li>
-<li><b><code>add_fake_los_path</code></b> <i>(optional)</i> — Add zero-power LOS path if none detected</li>
+<li><b><code>add_fake_los_path</code></b> <i>(optional)</i> — Always add one output path; slot 0 holds the LOS path (zero power if none was found); a LOS path found in the input leaves a zero-power path in its original slot</li>
 <li><b><code>propagation_speed</code></b> <i>(optional)</i> — Wave speed [m/s]; use ~343.0 for acoustics</li>
 </ul>
 
@@ -3767,9 +3815,11 @@ Calculate MIMO channel coefficients for planar wave paths
 <li>Interpolates antenna patterns for both arrays, accounting for element positions, orientation, and polarization.</li>
 <li>LOS path detection is distance-based (angles ignored).</li>
 <li>Polarization transfer matrix <code>M</code> must be normalized; rows are interleaved real/imag components.</li>
-<li>If <code>add_fake_los_path</code> is true, a zero-power LOS path is appended, making output size <code>n_path+1</code>.</li>
+<li>If <code>add_fake_los_path</code> is true, one output path is always added (output size <code>n_path+1</code>): slot 0 holds the LOS path, with zero power if no LOS path was found. LOS = the strongest path whose <code>path_length</code> is within 0.1 mm of the TX-RX distance; it is moved to slot 0 and its original slot (input index + 1) holds a zero-power path. All other paths keep their order, shifted by one slot.</li>
+<li>Polarization coupling: <code>M</code> is the 2x2 Jones matrix (rows = RX polarisation V/H, columns = TX polarisation V/H), column-major with Re/Im interleaved: rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx).</li>
+<li><code>path_length</code> is used as given for the delay and phase of the phase centres (no geometry check).</li>
 <li>Setting <code>center_frequency = 0</code> disables phase calculation (delays still computed).</li>
-<li><code>use_absolute_delays = false</code> subtracts the straight-line TX↔RX distance from all path lengths before converting to delay.</li>
+<li><code>use_absolute_delays = false</code> subtracts the straight-line TX↔RX distance (between the phase centres) from all path lengths before converting to delay; per-element delays of pairs that are closer to each other than the phase centres are then negative, down to about -(half the TX array size + half the RX array size) / speed of light; <a href="#quantize_delays">quantize_delays</a> rejects delays at or below <code>-tap_spacing / 2</code> (at 5 ns taps: half sizes adding up to more than about 0.75 m), use <code>use_absolute_delays = true</code> in that case.</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -3811,10 +3861,10 @@ void quadriga_lib::get_channels_planar(
 <li><b><code>eoa</code></b> — Arrival elevation angles; <code>[n_path]</code></li>
 <li><b><code>path_gain</code></b> — Path gains in linear scale; <code>[n_path]</code></li>
 <li><b><code>path_length</code></b> — Path lengths from TX to RX phase center; <code>[n_path]</code></li>
-<li><b><code>M</code></b> — Polarization transfer matrix, row order: ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH; <code>[8, n_path]</code></li>
+<li><b><code>M</code></b> — Polarization transfer matrix, Jones row order as above; <code>[8, n_path]</code></li>
 <li><b><code>center_frequency</code></b> <i>(optional)</i> — Center frequency; 0 disables phase calculation</li>
 <li><b><code>use_absolute_delays</code></b> <i>(optional)</i> — Include LOS delay offset in all paths</li>
-<li><b><code>add_fake_los_path</code></b> <i>(optional)</i> — Append a zero-power LOS path when no LOS is present</li>
+<li><b><code>add_fake_los_path</code></b> <i>(optional)</i> — Always add one output path; slot 0 holds the LOS path (zero power if none was found); a LOS path found in the input leaves a zero-power path in its original slot</li>
 </ul>
 
 <b>Outputs:</b><br>
@@ -3841,10 +3891,12 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
 <ul>
 <li>Computes complex channel coefficients and propagation delays for all TX/RX element pairs and paths, using spherical wave assumption with per-element phase and delay.</li>
 <li>Interpolates antenna patterns for both arrays, accounting for element positions and array orientation (bank/tilt/heading Euler angles).</li>
-<li>Polarization coupling is applied via the 8-row transfer matrix <code>M</code> (interleaved Re/Im for VV, VH, HV, HH components).</li>
+<li>Polarization coupling is applied via the 8-row transfer matrix <code>M</code>: the 2x2 Jones matrix (rows = RX polarisation V/H, columns = TX polarisation V/H), stored column-major with Re/Im interleaved: rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx).</li>
+<li>NLOS paths: the path length between the TX and RX phase centres is <code>max(path_length, d_poly)</code>, where <code>d_poly</code> is the TX-FBS-LBS-RX polyline length; the length beyond the polyline (interactions between FBS and LBS, e.g. paths of <a href="#coord2path">coord2path</a> or <a href="#qrt_file_read">qrt_file_read</a> with more than two interactions) is added to the FBS-LBS segment. Delays and phases follow this length; the per-element offsets follow the FBS / LBS geometry (spherical waves).</li>
 <li>If <code>center_frequency == 0</code>, phase calculation is disabled and only delays are computed.</li>
-<li>If <code>use_absolute_delays == false</code>, the minimum delay (LOS delay) is subtracted from all paths.</li>
-<li>If <code>add_fake_los_path == true</code>, a zero-power LOS path is prepended when no LOS path is detected.</li>
+<li>If <code>use_absolute_delays == false</code>, the LOS delay between the TX and RX phase centres is subtracted from all paths. Delays are per element pair, so pairs that are closer to each other than the phase centres get negative delays, down to about -(half the TX array size + half the RX array size) / speed of light (both arrays endfire). <a href="#quantize_delays">quantize_delays</a> maps delays above <code>-tap_spacing / 2</code> to tap 0 and rejects lower ones (at 5 ns taps: half sizes adding up to more than about 0.75 m); use <code>use_absolute_delays = true</code> in that case.</li>
+<li>LOS detection: the path whose length is closest to the TX-RX distance, within 0.1 mm.</li>
+<li>If <code>add_fake_los_path == true</code>, one output path is always added (<code>n_path + 1</code> outputs): slot 0 holds the LOS path, with zero power if no LOS path was found. If a LOS path was found, it is moved to slot 0 and its original slot (input index + 1) holds a zero-power path. All other paths keep their order, shifted by one slot.</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -3885,23 +3937,23 @@ void quadriga_lib::get_channels_spherical(
 <li><b><code>fbs_pos</code></b> — First-bounce scatterer positions; <code>[3, n_path]</code></li>
 <li><b><code>lbs_pos</code></b> — Last-bounce scatterer positions; <code>[3, n_path]</code></li>
 <li><b><code>path_gain</code></b> — Path gains in linear scale; <code>[n_path]</code></li>
-<li><b><code>path_length</code></b> — Total path lengths from TX to RX phase center; <code>[n_path]</code></li>
-<li><b><code>M</code></b> — Polarization transfer matrix, interleaved (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH); <code>[8, n_path]</code></li>
+<li><b><code>path_length</code></b> — Total path lengths from TX to RX phase center; values shorter than the TX-FBS-LBS-RX polyline (e.g. 0) use the polyline length; <code>[n_path]</code></li>
+<li><b><code>M</code></b> — Polarization transfer matrix, 2x2 Jones matrix column-major, Re/Im interleaved: rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx); <code>[8, n_path]</code></li>
 <li><b><code>center_frequency</code></b> <i>(optional)</i> — Center frequency; set to <code>0</code> to skip phase computation</li>
 <li><b><code>use_absolute_delays</code></b> <i>(optional)</i> — If <code>true</code>, delays include the LOS component</li>
-<li><b><code>add_fake_los_path</code></b> <i>(optional)</i> — If <code>true</code>, prepends a zero-power LOS path when none is present</li>
+<li><b><code>add_fake_los_path</code></b> <i>(optional)</i> — If <code>true</code>, always adds one output path; slot 0 holds the LOS path (zero power if none was found); a LOS path found in the input leaves a zero-power path in its original slot</li>
 <li><b><code>use_avx2</code></b> <i>(optional)</i> — If <code>true</code>, use AVX2 for antenna interpolation; faster, but less accurate; ignored when not supported</li>
 </ul>
 
 <b>Outputs:</b><br>
 <ul>
-<li><b><code>coeff_re</code></b> — Real part of channel coefficients; <code>[n_rx, n_tx, n_path]</code></li>
-<li><b><code>coeff_im</code></b> — Imaginary part of channel coefficients; <code>[n_rx, n_tx, n_path]</code></li>
-<li><b><code>delay</code></b> — Propagation delays in seconds; <code>[n_rx, n_tx, n_path]</code></li>
-<li><b><code>aod</code></b> <i>(optional)</i> — Azimuth of departure; <code>[n_rx, n_tx, n_path]</code></li>
-<li><b><code>eod</code></b> <i>(optional)</i> — Elevation of departure; <code>[n_rx, n_tx, n_path]</code></li>
-<li><b><code>aoa</code></b> <i>(optional)</i> — Azimuth of arrival; <code>[n_rx, n_tx, n_path]</code></li>
-<li><b><code>eoa</code></b> <i>(optional)</i> — Elevation of arrival; <code>[n_rx, n_tx, n_path]</code></li>
+<li><b><code>coeff_re</code></b> — Real part of channel coefficients; <code>[n_rx, n_tx, n_path(+1)]</code></li>
+<li><b><code>coeff_im</code></b> — Imaginary part of channel coefficients; <code>[n_rx, n_tx, n_path(+1)]</code></li>
+<li><b><code>delay</code></b> — Propagation delays in seconds; <code>[n_rx, n_tx, n_path(+1)]</code></li>
+<li><b><code>aod</code></b> <i>(optional)</i> — Azimuth of departure; <code>[n_rx, n_tx, n_path(+1)]</code></li>
+<li><b><code>eod</code></b> <i>(optional)</i> — Elevation of departure; <code>[n_rx, n_tx, n_path(+1)]</code></li>
+<li><b><code>aoa</code></b> <i>(optional)</i> — Azimuth of arrival; <code>[n_rx, n_tx, n_path(+1)]</code></li>
+<li><b><code>eoa</code></b> <i>(optional)</i> — Elevation of arrival; <code>[n_rx, n_tx, n_path(+1)]</code></li>
 </ul>
 
 <b>See also:</b><br>
@@ -3988,7 +4040,8 @@ Calculate the empirical averaged cumulative distribution function (CDF)
 <li>Averaged CDF is obtained by quantile-space averaging: for a fine probability grid, x-values from each column CDF are averaged, then mapped back to the bin grid</li>
 <li>Quantile statistics (mean and std) are reported at the 0.1, 0.2, ..., 0.9 probability levels</li>
 <li><code>Inf</code> and <code>NaN</code> values are excluded from computation</li>
-<li>If <code>bins</code> points to an empty vector, equally spaced bins spanning the data range are generated and stored back; if non-empty, those bin centers are used; if <code>nullptr</code>, bins are auto-generated internally</li>
+<li>A data set without any finite value gets a NaN column in <code>cdf_per_set</code> and is left out of <code>cdf_avg</code>, <code>mu</code> and <code>sig</code>; if no set has finite values (possible only with user-supplied bins), <code>cdf_avg</code>, <code>mu</code> and <code>sig</code> are NaN</li>
+<li>If <code>bins</code> points to an empty vector, equally spaced bins spanning the data range are generated and stored back (data without any finite value then throws); if non-empty, those bin centers are used and must be finite and strictly ascending, else <code>std::invalid_argument</code> is thrown; if <code>nullptr</code>, bins are auto-generated internally</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -4005,16 +4058,16 @@ void quadriga_lib::acdf(const arma::Mat&lt;dtype&gt; &amp;data,
 <b>Inputs:</b><br>
 <ul>
 <li><b><code>data</code></b> — Input data matrix; each column is one independent data set; <code>[n_samples, n_sets]</code></li>
-<li><b><code>bins</code></b> <i>(optional)</i> — Bin centers; auto-generated and stored back if pointing to empty vector, used as-is if non-empty, ignored if <code>nullptr</code>; <code>[n_bins]</code></li>
+<li><b><code>bins</code></b> <i>(optional)</i> — Bin centers; auto-generated and stored back if pointing to empty vector, used as-is if non-empty (finite, strictly ascending), ignored if <code>nullptr</code>; <code>[n_bins]</code></li>
 <li><b><code>n_bins</code></b> <i>(optional)</i> — Number of bins when auto-generating; must be >= 2; ignored when non-empty bins are provided</li>
 </ul>
 
 <b>Outputs:</b><br>
 <ul>
-<li><b><code>cdf_per_set</code></b> <i>(optional)</i> — Individual CDFs, one per column of data; <code>[n_bins, n_sets]</code></li>
-<li><b><code>cdf_avg</code></b> <i>(optional)</i> — Averaged CDF via quantile-space averaging across data sets; <code>[n_bins]</code></li>
-<li><b><code>mu</code></b> <i>(optional)</i> — Mean of the 0.1–0.9 quantiles across data sets, <code>[9]</code></li>
-<li><b><code>sig</code></b> <i>(optional)</i> — Standard deviation of the 0.1–0.9 quantiles across data sets, <code>[9]</code></li>
+<li><b><code>cdf_per_set</code></b> <i>(optional)</i> — Individual CDFs, one per column of data (NaN for a set without finite values); <code>[n_bins, n_sets]</code></li>
+<li><b><code>cdf_avg</code></b> <i>(optional)</i> — Averaged CDF via quantile-space averaging across the data sets with finite values; <code>[n_bins]</code></li>
+<li><b><code>mu</code></b> <i>(optional)</i> — Mean of the 0.1–0.9 quantiles across the data sets with finite values, <code>[9]</code></li>
+<li><b><code>sig</code></b> <i>(optional)</i> — Standard deviation of the 0.1–0.9 quantiles across the data sets with finite values, <code>[9]</code></li>
 </ul>
 
 <hr class="greyline"><br>
@@ -4027,7 +4080,7 @@ Calculate azimuth and elevation angular spreads with spherical wrapping
 <li>Mean direction is computed in Cartesian coordinates and all paths are rotated so the centroid lies on the equator before computing spreads, avoiding pole singularity artifacts.</li>
 <li>When <code>calc_bank_angle = true</code>, an optimal bank angle maximizing azimuth spread is derived analytically from eigenvectors of the 2x2 power-weighted covariance matrix of centered angles.</li>
 <li>When <code>disable_wrapping = true</code>, spreads are computed directly from raw angles; <code>orientation</code> will be zero and <code>phi</code>/<code>theta</code> equal the input <code>az</code>/<code>el</code>.</li>
-<li>When <code>quantize &gt; 0</code>, paths within that angular distance are grouped and their powers summed before computing spreads.</li>
+<li>When <code>quantize &gt; 0</code>, paths within that angular distance are grouped and their powers summed before computing spreads; <code>quantize</code> must be 0 or a finite value >= 1e-3 deg (negative, NaN, Inf and smaller positive values throw).</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -4053,7 +4106,7 @@ void quadriga_lib::calc_angular_spreads_sphere(
 <li><b><code>powers</code></b> — Path powers in [W]; same structure as <code>az</code></li>
 <li><b><code>disable_wrapping</code></b> <i>(optional)</i> — If true, skips spherical rotation and computes spreads from raw angles</li>
 <li><b><code>calc_bank_angle</code></b> <i>(optional)</i> — If true, computes optimal bank angle analytically; only used when <code>disable_wrapping = false</code></li>
-<li><b><code>quantize</code></b> <i>(optional)</i> — Angular quantization step in [deg]; paths within this distance are grouped; 0 disables grouping</li>
+<li><b><code>quantize</code></b> <i>(optional)</i> — Angular quantization step in [deg]; paths within this distance are grouped; 0 disables grouping; otherwise it must be finite and >= 1e-3 deg, else <code>std::invalid_argument</code> is thrown</li>
 </ul>
 
 <b>Outputs:</b><br>
@@ -4071,9 +4124,12 @@ void quadriga_lib::calc_angular_spreads_sphere(
 Calculate the cross-polarization ratio (XPR) for linear and circular polarization bases
 <ul>
 <li>Computes aggregate XPR from polarization transfer matrices using the total-power-ratio method: co-pol and cross-pol powers are summed across all qualifying paths per CIR, and XPR is their ratio.</li>
-<li>XPR is computed in both the linear V/H basis and the circular LHCP/RHCP basis via Jones matrix transform <code>M_circ = T · M_lin · T^-1</code>.</li>
-<li>LOS paths are identified by comparing path length against direct TX-RX distance <code>dTR</code>; paths with <code>path_length &amp;lt; dTR + window_size</code> are excluded by default (<code>include_los = false</code>).</li>
-<li>Polarization transfer matrix <code>M</code> is stored column-major with interleaved real/imaginary parts, 8 rows per path: <code>[Re(M_vv), Im(M_vv), Re(M_vh), Im(M_vh), Re(M_hv), Im(M_hv), Re(M_hh), Im(M_hh)]</code>.</li>
+<li>XPR is computed in both the linear V/H basis and the circular LHCP/RHCP basis.</li>
+<li>LOS paths are identified by comparing path length against direct TX-RX distance <code>dTR</code>; paths with <code>path_length &lt;= dTR + window_size</code> are excluded by default (<code>include_los = false</code>).</li>
+<li>Polarization transfer matrix <code>M</code> is the 2x2 Jones matrix (rows = RX polarisation V/H, columns = TX polarisation V/H), stored column-major with interleaved real/imaginary parts, 8 rows per path: rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx). Below, <code>M_&lt;rx&gt;&lt;tx&gt;</code> names an entry by its receive and transmit polarisation: <code>M_vv</code> = rows 0-1, <code>M_hv</code> = rows 2-3, <code>M_vh</code> = rows 4-5, <code>M_hh</code> = rows 6-7</li>
+<li>V-XPR and H-XPR are ratios per receive polarisation: V-XPR is the power received in V from V transmission over the power received in V from H transmission; H-XPR likewise for the H receive polarisation</li>
+<li>The circular entries couple circular patterns through <code>M</code> as <a href="#get_channels_spherical">get_channels_spherical</a> couples antenna patterns, <code>c(r, t) = r^T M t</code> (plain transpose), with the same circular vectors at both ends, each in that antenna's own (e_theta, e_phi) frame: L = (V, H) = (1, +j) / sqrt(2) (LHCP), R = (1, -j) / sqrt(2) (RHCP). The names follow the IEEE definition (rotation seen along the propagation direction) for the time convention exp(+j 2 pi f t), which the library's coefficients exp(-j 2 pi f tau) imply, and e_theta x e_phi = the outward direction of the pattern. <code>M_&lt;rx&gt;&lt;tx&gt;</code>: <code>M_LL = (M_vv - M_hh + j(M_vh + M_hv)) / 2</code>, <code>M_RR = (M_vv - M_hh - j(M_vh + M_hv)) / 2</code>, <code>M_LR = (M_vv + M_hh + j(M_hv - M_vh)) / 2</code> (receive L, transmit R), <code>M_RL = (M_vv + M_hh + j(M_vh - M_hv)) / 2</code>. Co-polar means the same circular vector at both ends: the LOS matrix <code>diag(1, -1)</code> of <a href="#get_channels_spherical">get_channels_spherical</a> is co-polar (handedness kept), <code>diag(1, 1)</code> (one mirrored component, as by a single reflection) is cross-polar.</li>
+<li>LHCP-XPR and RHCP-XPR are ratios per receive polarisation, like V-XPR and H-XPR.</li>
 <li>Normalization of <code>M</code> does not affect XPR (cancels in ratio) but does affect <code>pg</code>.</li>
 <li>If cross-pol power is zero and co-pol is positive, XPR is set to infinity; if both are zero, XPR is set to 0.</li>
 <li>TX/RX positions may be fixed <code>[3, 1]</code> or mobile <code>[3, n_cir]</code>.</li>
@@ -4101,7 +4157,7 @@ void quadriga_lib::calc_cross_polarization_ratio(
 <li><b><code>tx_pos</code></b> — Transmitter position [x; y; z]; <code>[3, 1]</code> or <code>[3, n_cir]</code></li>
 <li><b><code>rx_pos</code></b> — Receiver position [x; y; z]; <code>[3, 1]</code> or <code>[3, n_cir]</code></li>
 <li><b><code>include_los</code></b> <i>(optional)</i> — If true, includes LOS and near-LOS paths in the XPR calculation</li>
-<li><b><code>window_size</code></b> <i>(optional)</i> — LOS exclusion window; paths within <code>dTR + window_size</code> are excluded when <code>include_los = false</code></li>
+<li><b><code>window_size</code></b> <i>(optional)</i> — LOS exclusion window; paths with <code>path_length &lt;= dTR + window_size</code> are excluded when <code>include_los = false</code></li>
 </ul>
 
 <b>Outputs:</b><br>
@@ -4118,11 +4174,11 @@ void quadriga_lib::calc_cross_polarization_ratio(
 </tr>
 <tr>
   <td>1</td>
-  <td>V-XPR: sum(abs(M_vv)^2) / sum(abs(M_hv)^2)</td>
+  <td>V-XPR: sum(abs(M_vv)^2) / sum(abs(M_vh)^2) (receive V)</td>
 </tr>
 <tr>
   <td>2</td>
-  <td>H-XPR: sum(abs(M_hh)^2) / sum(abs(M_vh)^2)</td>
+  <td>H-XPR: sum(abs(M_hh)^2) / sum(abs(M_hv)^2) (receive H)</td>
 </tr>
 <tr>
   <td>3</td>
@@ -4130,11 +4186,11 @@ void quadriga_lib::calc_cross_polarization_ratio(
 </tr>
 <tr>
   <td>4</td>
-  <td>LHCP XPR: sum(abs(M_LL)^2) / sum(abs(M_RL)^2)</td>
+  <td>LHCP XPR: sum(abs(M_LL)^2) / sum(abs(M_LR)^2) (receive L)</td>
 </tr>
 <tr>
   <td>5</td>
-  <td>RHCP XPR: sum(abs(M_RR)^2) / sum(abs(M_LR)^2)</td>
+  <td>RHCP XPR: sum(abs(M_RR)^2) / sum(abs(M_RL)^2) (receive R)</td>
 </tr>
 </table>
 </li>
@@ -4147,7 +4203,7 @@ void quadriga_lib::calc_cross_polarization_ratio(
 Calculates RMS delay spread from per-CIR delays and linear-scale powers
 <ul>
 <li>Paths with power below <code>p_max / 10^(0.1 * threshold)</code> are excluded; default threshold of 100 dB effectively includes all paths.</li>
-<li>When <code>granularity &gt; 0</code>, paths falling into the same delay bin of width <code>granularity</code> have their powers summed before computing the spread; function recurses on the binned profile.</li>
+<li>When <code>granularity &gt; 0</code>, paths falling into the same delay bin of width <code>granularity</code> have their powers summed before computing the spread; function recurses on the binned profile. The bins are placed on a grid common to all CIRs; only occupied bins are stored, so memory does not grow with the delay span. All delays must then be finite, and the global delay span divided by <code>granularity</code> must be below 2^53.</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -4165,7 +4221,7 @@ arma::Col&lt;dtype&gt; quadriga_lib::calc_delay_spread(
 <li><b><code>delays</code></b> — Delays in [s] per CIR; <code>[n_cir]</code> vector, each element a column vector of length <code>n_path</code></li>
 <li><b><code>powers</code></b> — Path powers in linear scale [W]; same structure as <code>delays</code></li>
 <li><b><code>threshold</code></b> <i>(optional)</i> — Power threshold in [dB] relative to strongest path; paths below threshold are excluded</li>
-<li><b><code>granularity</code></b> <i>(optional)</i> — Bin width in [s] for grouping paths in the delay domain; 0 disables grouping</li>
+<li><b><code>granularity</code></b> <i>(optional)</i> — Bin width in [s] for grouping paths in the delay domain; 0 disables grouping; must be finite and non-negative; when > 0, non-finite delays or a span / granularity of 2^53 or more throw <code>std::invalid_argument</code></li>
 </ul>
 
 <b>Outputs:</b><br>
@@ -4319,8 +4375,8 @@ void quadriga_lib::fast_asin(const arma::vec &amp;x,  arma::fvec &amp;s);
 Compute elementwise approximate two-argument arc-tangent of two vectors
 <ul>
 <li>AVX2-optimized (8 floats/lane); scalar fallback without AVX2</li>
-<li>Returns angles in (-pi, pi]; max error ~3 ULP (~3.6e-7)</li>
-<li>atan2(0, 0) returns 0; atan2(±0, -0) returns ±0 (not ±pi)</li>
+<li>Returns angles in [-pi, pi]; max error ~3 ULP (~3.6e-7)</li>
+<li>Special values as std::atan2 (both kernels): atan2(±0, +0) = ±0, atan2(±0, -0) = ±pi, atan2(±0, x &lt; 0) = ±pi, atan2(±inf, ±inf) = ±pi/4 or ±3pi/4; NaN in x or y gives NaN</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -4349,7 +4405,8 @@ Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector
 <li>Inputs are arbitrary 3D vectors (not required to be unit-length); <code>len</code> returns the Euclidean norm</li>
 <li>z/len is clamped to [-1, 1] before asin to guard against len == 0 and FMA rounding artefacts pushing abs(z/len) slightly above 1</li>
 <li>All inputs must have the same length</li>
-<li>AVX2 kernel computes internally in single precision (double outputs are cast back from float); GENERIC kernel preserves full <code>dtype</code> precision</li>
+<li>AVX2 kernel computes the angles in single precision (double outputs are cast back from float); for <code>dtype=double</code>, <code>len</code> and z / len are computed in double precision, so very small or very large vectors keep their direction; GENERIC kernel preserves full <code>dtype</code> precision</li>
+<li>Azimuth in [-pi, pi] (atan2 special values as in <a href="#fast_atan2">fast_atan2</a>); NaN input gives NaN in <code>az</code> and <code>len</code></li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -4366,7 +4423,7 @@ void quadriga_lib::fast_cart2geo(const arma::vec &amp;x, const arma::vec &amp;y,
 <li><b><code>x</code></b> — X-coordinates; <code>[n_elem]</code></li>
 <li><b><code>y</code></b> — Y-coordinates; <code>[n_elem]</code></li>
 <li><b><code>z</code></b> — Z-coordinates; <code>[n_elem]</code></li>
-<li><b><code>use_kernel</code></b> — Kernel selection: <code>0</code> = auto (AVX2 if available, else GENERIC), <code>1</code> = GENERIC, <code>2</code> = AVX2 (throws if AVX2 unavailable); default <code>0</code></li>
+<li><b><code>use_kernel</code></b> — Kernel selection: <code>0</code> = auto (AVX2 if available, else GENERIC), <code>1</code> = GENERIC, <code>2</code> = AVX2 (throws if AVX2 unavailable); other values throw; default <code>0</code></li>
 </ul>
 
 <b>Outputs:</b><br>
@@ -4390,7 +4447,7 @@ Convert elementwise azimuth/elevation angles to Cartesian coordinates
 <li>Optional pointer outputs <code>sAZ</code>, <code>cAZ</code>, <code>sEL</code>, <code>cEL</code> return intermediate sin/cos values; pass <code>nullptr</code> to skip</li>
 <li>AVX2-optimized (8 floats/lane); scalar fallback without AVX2</li>
 <li>Precision: GENERIC kernel uses full <code>dtype</code> precision (double or float).</li>
-<li>AVX2 kernel always computes in single precision internally — for <code>dtype=double</code>, inputs are narrowed to float and results widened back. Use <code>use_kernel=1</code> to force GENERIC if full double precision is required.</li>
+<li>AVX2 kernel computes sine and cosine in single precision (max. error about 1.3e-7 for angles up to 1e10; <code>dtype=double</code> angles are reduced in double precision first), results widened back. Use <code>use_kernel=1</code> to force GENERIC if full double precision is required.</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -4414,7 +4471,7 @@ void fast_geo2cart(
 <li><b><code>az</code></b> — Azimuth angles; <code>[n_elem]</code></li>
 <li><b><code>el</code></b> — Elevation angles; <code>[n_elem]</code></li>
 <li><b><code>len</code></b> <i>(optional)</i> — Euclidean vector length sqrt(x² + y² + z²); <code>[n_elem]</code></li>
-<li><b><code>use_kernel</code></b> — Kernel selection: <code>0</code> = auto (AVX2 if available, else GENERIC), <code>1</code> = GENERIC, <code>2</code> = AVX2 (throws if AVX2 unavailable)</li>
+<li><b><code>use_kernel</code></b> — Kernel selection: <code>0</code> = auto (AVX2 if available, else GENERIC), <code>1</code> = GENERIC, <code>2</code> = AVX2 (throws if AVX2 unavailable); other values throw</li>
 </ul>
 
 <b>Outputs:</b><br>
@@ -4439,7 +4496,21 @@ void fast_geo2cart(
 Compute elementwise approximate sine and/or cosine of a vector
 <ul>
 <li>AVX2-optimized (8 floats/lane); scalar fallback without AVX2</li>
-<li>For x in [-pi, pi]: max absolute error = 2^(-22.1); for x in [-500, 500]: 2^(-16.0)</li>
+<table class="md">
+<tr>
+  <td><li>Max absolute error about 1.3e-7 (2^-22.9) against the exact sine / cosine of the input value for</td>
+  <td>x</td>
+  <td><= 1e10 (both kernels; the argument is reduced in double precision where single precision is not enough)</li></td>
+</tr>
+</table>
+<li>Results stay in [-1, 1] for all finite x; inf and NaN give NaN</li>
+<table class="md">
+<tr>
+  <td><li>The AVX2 kernel is fastest for</td>
+  <td>x</td>
+  <td><= 2^22 (4.2e6); larger arguments take about 1.5 times as long</li></td>
+</tr>
+</table>
 <li>Either <code>s</code> or <code>c</code> may be <code>nullptr</code> to skip that computation</li>
 </ul>
 
@@ -4468,8 +4539,9 @@ Compute elementwise approximate SLERP interpolation between two complex-valued v
 <li>Interpolates phase via SLERP on normalized directions; amplitudes are linearly interpolated</li>
 <li>Weight <code>w=0</code> returns A, <code>w=1</code> returns B; per-element weights in [0, 1]</li>
 <li>Near-antipodal inputs (phase difference close to pi) fall back to linear interpolation smoothly</li>
-<li>If both input amplitudes are negligible, output is zero</li>
-<li>Max error vs. double-precision reference: ~5 ULP</li>
+<li>If both input amplitudes are negligible (below 1.19e-7), output is zero</li>
+<li>Max relative error vs. double-precision reference about 5e-7 for phase differences up to 2 rad, 1.2e-5 up to 3 rad; larger towards the near-antipodal transition to linear interpolation</li>
+<li>The result of an element does not depend on the other elements</li>
 <li>AVX2-optimized (8 complex pairs/lane); scalar fallback without AVX2</li>
 </ul>
 
@@ -4507,6 +4579,8 @@ void quadriga_lib::fast_slerp(const arma::vec &amp;Ar, const arma::vec &amp;Ai,
 Perform linear interpolation (1D or 2D) on single or multiple data sets
 <ul>
 <li>Interpolates given input data at specified output points.</li>
+<li>Outside the range of the input sample points, the nearest end value is returned (constant extrapolation); output sample points that are NaN give NaN.</li>
+<li>The input sample points need not be sorted (they are sorted internally); repeated values are allowed.</li>
 <li>Supports single and multiple data sets.</li>
 <li>Returns interpolated results either directly or through reference argument.</li>
 <li>Data types (<code>dtype</code>): <code>float</code> or <code>double</code></li>
@@ -4614,22 +4688,22 @@ void calc_diffraction_gain(
 <li><b><code>mesh</code></b> — Triangle vertices, each row <code>{x1,y1,z1,x2,y2,z2,x3,y3,z3}</code>; <code>[n_mesh, 9]</code></li>
 <li><b><code>mtl_ind</code></b> — 1-based material index per face, 0 = no material (the <code>csv_ind</code> output of <a href="#obj_file_read">obj_file_read</a>); <code>[n_mesh]</code></li>
 <li><b><code>mtl_prop</code></b> — Material properties keyed by column name (the <code>csv_prop</code> output of <a href="#obj_file_read">obj_file_read</a>); each value has length <code>n_mtl</code></li>
-<li><b><code>center_frequency</code></b> — Center frequency</li>
+<li><b><code>center_frequency</code></b> — Center frequency in [Hz]. In EM mode the electromagnetic frequency. In scalar (acoustic) mode the EM-equivalent frequency <code>f_eq = f_acoustic · c_light / c_sound</code> (c_light = 299 792 458 m/s, c_sound = 342.76271 m/s), so that <code>c_light / f_eq</code> is the acoustic wavelength; this is the frequency unit of <a href="#ray_mesh_interact">ray_mesh_interact</a>, <a href="#ray_progress">ray_progress</a> and <a href="#generate_diffraction_paths">generate_diffraction_paths</a> in scalar mode. Passing the acoustic frequency itself gives a wavelength 874 636 times too long. The MATLAB and Python wrappers take the acoustic frequency and convert it.</li>
 <li><b><code>lod</code></b> — Level of detail (0–6), controls <code>n_path</code> and <code>n_seg</code>; see <a href="#generate_diffraction_paths">generate_diffraction_paths</a></li>
 <li><b><code>verbose</code></b> — Verbosity level</li>
 <li><b><code>sub_mesh_index</code></b> — 0-based sub-mesh index for acceleration; see <a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a>; <code>[n_mesh]</code></li>
 <li><b><code>use_kernel</code></b> — Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; error if unavailable</li>
 <li><b><code>gpu_id</code></b> — CUDA device ID; ignored for non-CUDA kernels</li>
 <li><b><code>scalar_mode</code></b> — If <code>true</code>, uses scalar transmission (TE-only reflection coefficient, energy-conservation transmission) instead of EM TE/TM averaging. Default <code>false</code> (EM mode). Selects interaction type passed to <a href="#ray_mesh_interact">ray_mesh_interact</a> (4 vs. 1).</li>
-<li><b><code>thin_slab_threshold</code></b> — Thin-slab (Fabry-Pérot) resolve threshold; 0 = resolve always (default), 1 = resolve never,  see <a href="#ray_state_update">ray_state_update</a></li>
-<li><b><code>apply_fspl</code></b> — If <code>true</code>, folds the geometric spreading loss into <code>gain</code>, so that <code>gain</code> becomes an absolute propagation gain instead of a value relative to FSPL. Default <code>false</code>. The reference distance is the direct TX-RX distance, matching the <code>path_length</code> definition used by <a href="#qrt_file_read">qrt_file_read</a> for a transmission-only path. In EM mode the loss is <code>32.45 + 20·log10(f_GHz) + 20·log10(d_m)</code> [dB]; in scalar mode it is <code>20·log10(d_m) + α(f)·d_m</code> [dB], with <code>α</code> from ISO 9613-1 at T = 20 °C, RH = 50 %, p = 1 atm.</li>
-<li><b><code>apply_phase</code></b> — If <code>true</code>, multiplies <code>xprmat</code> by the propagation phase term <code>exp(-j·2π·d/λ)</code>, using the same direct TX-RX distance <code>d</code>. Default <code>false</code>. The wavelength follows from <code>center_frequency</code> and the medium wave speed (speed of light in EM mode, speed of sound in scalar mode). Since the term has unit magnitude, <code>xprmat</code> stays normalized. This is the phase contribution that <a href="#get_channels_spherical">get_channels_spherical</a> would otherwise add from <code>path_length</code>; enabling it here gives the complete omni-radiator coefficient without running the channel generator.</li>
+<li><b><code>thin_slab_threshold</code></b> — Thin-slab (Fabry-Pérot) resolve threshold on the round-trip in-slab amplitude <code>ρ</code>: a series is summed where <code>ρ ≥ eps</code>; 0 = resolve always (default); <code>eps ≥ 1</code> re-emits every series whose <code>ρ</code> is below one, and a round trip at or above one is always summed; see <a href="#ray_state_update">ray_state_update</a></li>
+<li><b><code>apply_fspl</code></b> — If <code>true</code>, folds the geometric spreading loss into <code>gain</code>, so that <code>gain</code> becomes an absolute propagation gain instead of a value relative to FSPL. Default <code>false</code>. The reference distance is the direct TX-RX distance, matching the <code>path_length</code> definition used by <a href="#qrt_file_read">qrt_file_read</a> for a transmission-only path. In EM mode the loss is <code>32.45 + 20·log10(f_GHz) + 20·log10(d_m)</code> [dB]; in scalar mode it is <code>20·log10(d_m) + α(f)·d_m</code> [dB], with <code>α</code> from ISO 9613-1 at T = 20 °C, RH = 50 %, p = 1 atm, evaluated at the acoustic frequency <code>f = center_frequency · c_sound / c_light</code>.</li>
+<li><b><code>apply_phase</code></b> — If <code>true</code>, multiplies <code>xprmat</code> by the propagation phase term <code>exp(-j·2π·d/λ)</code>, using the same direct TX-RX distance <code>d</code>. Default <code>false</code>. The wavelength is <code>λ = c_light / center_frequency</code> in both modes; in scalar mode this is the acoustic wavelength because <code>center_frequency</code> is the EM-equivalent frequency (see above). Since the term has unit magnitude, <code>xprmat</code> stays normalized. This is the phase contribution that <a href="#get_channels_spherical">get_channels_spherical</a> would otherwise add from <code>path_length</code>; enabling it here gives the complete omni-radiator coefficient without running the channel generator.</li>
 </ul>
 
 <b>Outputs:</b><br>
 <ul>
 <li><b><code>gain</code></b> — Diffraction gain per TX-RX pair, linear power scale; <code>[n_pos]</code>. Relative to FSPL by default, i.e. bounded by 0 and 1; absolute propagation gain when <code>apply_fspl = true</code>.</li>
-<li><b><code>xprmat</code></b> — Normalized polarization transfer matrix: the amplitude carries no path gain (max column power is 1), only the relative polarization coupling and phase. The <code>gain</code> output holds the power. For EM mode: interleaved complex, col-major <code>[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]</code>; <code>[8, n_pos]</code>; For scalar mode: scalar pressure coefficient <code>[Re Im]</code>; <code>[2, n_pos]</code>. With <code>apply_phase = true</code>, the propagation phase <code>exp(-j·2π·d/λ)</code> is applied on top; the normalization is unaffected because that term has unit magnitude.</li>
+<li><b><code>xprmat</code></b> — Normalized polarization transfer matrix: the amplitude carries no path gain (max column power is 1), only the relative polarization coupling and phase. The <code>gain</code> output holds the power. For EM mode: interleaved complex, col-major <code>[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]</code> with labels <code>&lt;rx&gt;&lt;tx&gt;</code>: rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx), the row order of <code>M</code> in <a href="#get_channels_spherical">get_channels_spherical</a>; <code>[8, n_pos]</code>; For scalar mode: scalar pressure coefficient <code>[Re Im]</code>; <code>[2, n_pos]</code>. With <code>apply_phase = true</code>, the propagation phase <code>exp(-j·2π·d/λ)</code> is applied on top; the normalization is unaffected because that term has unit magnitude.</li>
 <li><b><code>coord</code></b> — Diffracted path coordinates excluding endpoints; <code>[3, n_seg-1, n_pos]</code></li>
 </ul>
 
@@ -4699,9 +4773,9 @@ void quadriga_lib::combine_irs_coord(
 <ul>
 <li><b><code>Ix, Iy, Iz</code></b> — IRS position in Cartesian coordinates</li>
 <li><b><code>no_interact_1</code></b> — Number of interaction points per path for segment 1 (TX → IRS); <code>[n_path_1]</code></li>
-<li><b><code>interact_coord_1</code></b> — Interaction coordinates for segment 1; <code>[3, sum(no_interact_1)]</code></li>
+<li><b><code>interact_coord_1</code></b> — Interaction coordinates for segment 1; <code>[3, sum(no_interact_1)]</code>; any other size throws <code>std::invalid_argument</code> (an empty matrix is accepted when <code>sum(no_interact_1)</code> is 0)</li>
 <li><b><code>no_interact_2</code></b> — Number of interaction points per path for segment 2 (IRS → RX); <code>[n_path_2]</code></li>
-<li><b><code>interact_coord_2</code></b> — Interaction coordinates for segment 2; <code>[3, sum(no_interact_2)]</code></li>
+<li><b><code>interact_coord_2</code></b> — Interaction coordinates for segment 2; <code>[3, sum(no_interact_2)]</code>; same check as for <code>interact_coord_1</code></li>
 <li><b><code>reverse_segment_1</code></b> <i>(optional)</i> — If <code>true</code>, reverses interaction coordinate order within segment 1</li>
 <li><b><code>reverse_segment_2</code></b> <i>(optional)</i> — If <code>true</code>, reverses interaction coordinate order within segment 2</li>
 <li><b><code>active_path</code></b> <i>(optional)</i> — Boolean mask selecting path combinations to include; pass the return value of <a href="#get_channels_irs">get_channels_irs</a> directly; <code>[n_path_1 × n_path_2]</code></li>
@@ -4771,7 +4845,7 @@ Construct a triangulated cube mesh
 <li>Generates a Blender-style cube: a 2 x 2 x 2 box centered at the origin (vertices at +/-1) before scaling</li>
 <li>Each of the 6 faces is split into 2 triangles, yielding 12 triangles at n_div = 1</li>
 <li>Optional uniform subdivision produces 12 * n_div^2 triangles</li>
-<li>Triangle winding is consistent (outward-facing normals), compatible with <a href="#obj_file_write">obj_file_write</a></li>
+<li>Triangle winding is consistent (outward-facing normals), compatible with <a href="#obj_file_write">obj_file_write</a>; a negative scale mirrors the cube, and when the product of the scales is negative the winding is swapped so that the normals stay outward (as Blender's "Apply Scale")</li>
 <li>Scale, Euler rotation, and translation are applied in that order (scale -> rotate -> translate)</li>
 </ul>
 
@@ -4918,7 +4992,7 @@ arma::uword quadriga_lib::icosphere(
 <b>Inputs:</b><br>
 <ul>
 <li><b><code>n_div</code></b> — Number of subdivisions; generates 20 × n_div² faces</li>
-<li><b><code>radius</code></b> — Radius of icosphere in meters</li>
+<li><b><code>radius</code></b> — Radius of icosphere in meters; finite and positive</li>
 <li><b><code>direction_xyz</code></b> (optional) — Output directions in Cartesian (true) or spherical azimuth/elevation (false)</li>
 </ul>
 
@@ -4938,15 +5012,10 @@ arma::uword quadriga_lib::icosphere(
 <hr class="greyline"><br>
 <span id="interface_gain" class="qd-func"><b>interface_gain</b></span><br>
 <hr class="thin">
-Linear gain of a wave crossing a thin interface (lumped penetration loss)
+Linear gain of the lumped penetration loss of entering a material
 <ul>
-<li>Computes <code>g = 10^(-A/10)</code>, where <code>A</code> [dB] is the lumped transmission loss applied once when a ray enters a material (the air-to-material or material-to-material front-side crossing). It is independent of path length and is applied on top of the Fresnel interface term <code>1 - abs(R)²</code>:
-<ul>
-<li>Power-law penetration loss <code>att·(f/fRef)^attB</code> (e.g. 3GPP TR 38.901 building-entry loss).</li>
-<li>An optional Lorentzian coincidence feature <code>coiA / (1 + (coiQ·(f - coiF)/coiF)²)</code>, active only when <code>coiF &gt; 0</code> and <code>coiA != 0</code>; negative <code>coiA</code> is a transmission dip (acoustic coincidence), positive <code>coiA</code> a stop-band. The total is clamped to <code>&gt;= 0</code>.</li>
-</ul>
-</li>
-<li>The reflection / conductivity columns (<code>a</code>, <code>b</code>, <code>c</code>, <code>d</code>) and the in-medium columns (<code>alpha</code>, <code>alphaB</code>, <code>m</code>) of <code>mtl_prop</code> are not used here — the Fresnel reflection is handled by the caller and the distance-dependent loss by <a href="#medium_gain">medium_gain</a>.</li>
+<li>Computes <code>g = 10^(-A/10)</code> with <code>A = att·(f/fRef)^attB</code> [dB], the loss applied once where a ray enters material <code>iM</code>, on top of the Fresnel term of the face (e.g. a building-entry loss of 3GPP TR 38.901). <code>att</code> must be <code>≥ 0</code> (the material table is checked when it is read), so <code>g</code> is in <code>[0, 1]</code>.</li>
+<li>Only <code>att</code>, <code>attB</code> and <code>fRef</code> are read; the face reflection is computed by <a href="#ray_mesh_interact">ray_mesh_interact</a> and <a href="#ray_state_update">ray_state_update</a>, the distance-dependent loss by <a href="#medium_gain">medium_gain</a>. Columns the material model does not know are ignored.</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -4971,6 +5040,7 @@ dtype quadriga_lib::interface_gain(
 
 <b>See also:</b><br>
 <ul>
+<li><a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md">The quadriga-lib Material Model and Ray-Surface Physics</a> (the formulas and the columns)</li>
 <li><a href="#medium_gain">medium_gain</a> (for the distance-dependent in-medium loss)</li>
 <li><a href="#ray_mesh_interact">ray_mesh_interact</a> (for complex ray-material interactions)</li>
 <li><a href="#obj_file_read">obj_file_read</a> (defines mtl_prop format)</li>
@@ -4981,14 +5051,21 @@ dtype quadriga_lib::interface_gain(
 <hr class="thin">
 Linear gain of a ray traversing a homogeneous lossy medium
 <ul>
-<li>Computes <code>g = 10^(-A/10)</code>, where <code>A</code> [dB] is the total attenuation accumulated over a path of length <code>dist</code> inside the medium. The loss combines three contributions:
+<li>Computes <code>g = 10^(-A/10)</code> for a path of length <code>dist</code> inside material <code>iM</code>, where <code>A</code> [dB] sums:
 <ul>
-<li>Conductivity-based loss from the complex permittivity model of ITU-R P.2040-1: <code>ε_r = a·(f/fRef)^b</code>, <code>σ = c·(f/fRef)^d</code>. These give an attenuation length <code>Δ</code> and a per-meter power loss <code>8.686 / Δ</code> dB/m.</li>
-<li>Distance absorption of the form <code>α·(f/fRef)^αB</code> dB/m, intended to model excess loss not captured by <code>σ</code> (e.g. foliage, scattering media).</li>
-<li>An acoustic mass-law term <code>A = m·log10((f/fRef)·dist)</code> dB, added once (not per meter) when <code>m &gt; 0</code>, <code>dist</code> exceeds ~1.5 mm, and the term is positive; <code>m</code> is the mass-law slope in dB/decade. At oblique incidence the term carries the mass law's angle shape, <code>A·log10(1 + x²)/log10(1 + X₀²)</code> with <code>X₀ = 10^(A/20)</code> and <code>x = X₀·cos θ</code>, which is <code>A</code> at normal incidence, tapers to zero at tangency, and has an angle slope of 20 dB/decade of <code>cos θ</code> independent of <code>m</code>. This entry point supplies <code>cos θ = 1</code> and therefore returns <code>A</code> unchanged.</li>
+<table class="md">
+<tr>
+  <td><li>the conductivity loss of the ITU-R P.2040 model, <code>8.686·k₀·</td>
+  <td>Im √(ε_r·μ_r)</td>
+  <td></code> dB/m, with <code>ε_r = a·(f/fRef)^b − j·17.98·σ/f[GHz]</code>, <code>σ = c·(f/fRef)^d</code>, <code>μ_r</code> from <code>e</code>, <code>f</code>, <code>g</code>, <code>h</code> in the same form, and for a material without the mass column the permittivity resonance (<code>resF</code>, <code>resQ</code>, <code>resS</code>);</li></td>
+</tr>
+</table>
+<li>the distance absorption <code>alpha·(f/fRef)^alphaB</code> dB/m (excess loss not captured by <code>σ</code>, e.g. foliage);</li>
+<li>for a mass-law material (<code>m &gt; 0</code>, the acoustic switch) the mass term, added once and not per meter where <code>dist</code> exceeds 1.5 mm: <code>20·log10((f/fRef)·dist)</code> dB with <code>dist</code> as the normal thickness, the resonance and coincidence columns acting on it, zero where it would be negative. With a panel size <code>side &gt; 0</code> (√area in m, 3.29 where the column is absent) Davy's radiation efficiency of a finite panel enters: a panel small in wavelengths insulates more than the infinite plate (<code>side = 0</code>).</li>
 </ul>
 </li>
-<li>The penetration-loss columns (<code>att</code>, <code>attB</code>) of <code>mtl_prop</code> are not used — they describe thin-slab transmission loss, not propagation through a finite-thickness medium.</li>
+<li>One path length at normal incidence: the angle dependence of the mass term, the bonded plate of several bodies and the refracted path inside a traced solid are applied by <a href="#ray_state_update">ray_state_update</a>, not here.</li>
+<li>The penetration-loss columns <code>att</code>, <code>attB</code> are not used here (<a href="#interface_gain">interface_gain</a>).</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -5004,7 +5081,7 @@ dtype quadriga_lib::medium_gain(
 <ul>
 <li><b><code>mtl_prop</code></b> — Material properties keyed by column name (the <code>csv_prop</code> output of <a href="#obj_file_read">obj_file_read</a>); each value has length <code>n_mtl</code></li>
 <li><b><code>iM</code></b> —  1-based material index (0 = no material / air)</li>
-<li><b><code>dist</code></b> — Path length of the ray inside the medium</li>
+<li><b><code>dist</code></b> — Path length of the ray inside the medium in [m]</li>
 <li><b><code>center_frequency</code></b> — Center frequency in [Hz]</li>
 </ul>
 
@@ -5015,6 +5092,7 @@ dtype quadriga_lib::medium_gain(
 
 <b>See also:</b><br>
 <ul>
+<li><a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md">The quadriga-lib Material Model and Ray-Surface Physics</a> (the formulas and the columns)</li>
 <li><a href="#ray_mesh_interact">ray_mesh_interact</a> (for complex ray-material interactions)</li>
 <li><a href="#obj_file_read">obj_file_read</a> (defines mtl_prop format)</li>
 </ul>
@@ -5074,10 +5152,10 @@ Read a Wavefront `.obj` file and extract geometry, visual materials, and EM/acou
 <li>EM/acoustic side, from a material table (<code>fn_csv</code>, or a built-in ITU-R P.2040 default): <code>csv_ind</code>,<code>csv_names</code>, <code>csv_prop</code>.</li>
 </ul>
 </li>
-<li>A face's <code>usemtl</code> name is matched to the table by exact name, then by name with a trailing Blender <code>.NNN</code> suffix removed. Unmatched names throw when <code>csv_strict = true</code>; otherwise they map to index 0 (no material). The two index spaces are decoupled, so several visual materials (e.g. <code>wall.001</code>, <code>wall.002</code>) may resolve to a single EM material.</li>
+<li>A face's <code>usemtl</code> name is matched to the table by exact name, then by the base name (everything before the first dot, so Blender sub-materials like <code>concrete.gray</code> map to <code>concrete</code>). Unmatched names throw when <code>csv_strict = true</code>; otherwise they map to index 0 (no material). The two index spaces are decoupled, so several visual materials (e.g. <code>wall.001</code>, <code>wall.002</code>) may resolve to a single EM material.</li>
 <li>Geometry indices (<code>face_ind</code>, <code>obj_ind</code>) are 0-based. Material indices (<code>mtl_ind</code>, <code>csv_ind</code>) are 1-based, with 0 reserved for the outside / no-material state (faces with no assigned material; for <code>csv_ind</code> in non-strict mode, also materials absent from the table).</li>
 <li>With an empty <code>fn_obj</code>, geometry and <code>.mtl</code> outputs are empty and only the table (<code>csv_names</code>, <code>csv_prop</code>) is populated — useful for inspecting a CSV or the default library. If <code>fn_csv</code> is also empty, the built-in default table is returned.</li>
-<li>For a detailed description of the material model see <a href="http://quadriga-lib.org/formats.html">Data Formats</a></li>
+<li>The material model and its columns: <a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md">The quadriga-lib Material Model and Ray-Surface Physics</a>; the CSV format of the material table: <a href="http://quadriga-lib.org/formats.html">Data Formats</a></li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -5209,7 +5287,7 @@ void obj_file_write(
 <hr class="thin">
 Detect overlapping 3D objects in a triangular mesh
 <ul>
-<li>Returns 1-based indices of all objects that intersect at least one other object</li>
+<li>Returns the IDs (as given in <code>obj_ind</code>) of all objects that intersect at least one other object</li>
 <li>Touching faces or edges are not considered overlapping</li>
 <li>Checks for intersecting triangle faces and vertices/edges penetrating another object's bounding volume</li>
 <li>Overlaps smaller than <code>tolerance</code> are ignored to account for numerical imprecision</li>
@@ -5228,14 +5306,14 @@ arma::uvec quadriga_lib::obj_overlap_test(
 <b>Inputs:</b><br>
 <ul>
 <li><b><code>mesh</code></b> — Triangular mesh; each row <code>{x1,y1,z1,x2,y2,z2,x3,y3,z3}</code>; <code>[n_mesh, 9]</code></li>
-<li><b><code>obj_ind</code></b> — 1-based object index mapping triangles to objects; output of <a href="#obj_file_read">obj_file_read</a>; <code>[n_mesh]</code></li>
-<li><b><code>reason</code></b> <i>(optional)</i> — Human-readable overlap descriptions per overlapping object; <code>[n_overlap]</code></li>
+<li><b><code>obj_ind</code></b> — Object ID of each triangle; any values, e.g. the 0-based <code>obj_ind</code> output of <a href="#obj_file_read">obj_file_read</a>; <code>[n_mesh]</code></li>
+<li><b><code>reason</code></b> <i>(optional)</i> — Human-readable overlap description per overlapping object: the finding of its first overlapping pair, pairs taken in the order of the sorted object IDs; independent of the number of threads; <code>[n_overlap]</code></li>
 <li><b><code>tolerance</code></b> <i>(optional)</i> — Geometric tolerance; intersections smaller than this are ignored</li>
 </ul>
 
 <b>Returns:</b><br>
 <ul>
-<li><code>arma::uvec</code>: Unique 1-based object indices of all overlapping objects; <code>[n_overlap]</code></li>
+<li><code>arma::uvec</code>: IDs of all overlapping objects as given in <code>obj_ind</code>, unique and ascending; empty for an empty mesh; <code>[n_overlap]</code></li>
 </ul>
 
 <b>See also:</b><br>
@@ -5285,7 +5363,7 @@ Construct a triangulated plane mesh
 <li>Generates a Blender-style plane: a 2 x 2 quad in the xy-plane centered at the origin (vertices at +/-1, z = 0) before scaling</li>
 <li>The quad is split into 2 triangles, yielding 2 triangles at n_div = 1</li>
 <li>Optional uniform subdivision produces 2 * n_div^2 triangles</li>
-<li>Triangle winding is consistent (normals point in +z direction), compatible with <a href="#obj_file_write">obj_file_write</a></li>
+<li>Triangle winding is consistent (normals point in +z direction), compatible with <a href="#obj_file_write">obj_file_write</a>; when the product of the x and y scales is negative (mirrored plane), the winding is swapped so that the normals still point in +z direction before the rotation</li>
 <li>The plane has no thickness in z-direction; scaling therefore only affects x and y</li>
 <li>Scale, Euler rotation, and translation are applied in that order (scale -> rotate -> translate)</li>
 </ul>
@@ -5383,7 +5461,7 @@ arma::uword quadriga_lib::point_cloud_segmentation(
 <ul>
 <li><b><code>points</code></b> — Original 3D point cloud; <code>[n_points, 3]</code></li>
 <li><b><code>target_size</code></b> <i>(optional)</i> — Maximum points per sub-cloud before padding</li>
-<li><b><code>vec_size</code></b> <i>(optional)</i> — SIMD/CUDA alignment; sub-cloud size is padded to a multiple of this value; no padding when <code>1</code></li>
+<li><b><code>vec_size</code></b> <i>(optional)</i> — SIMD/CUDA alignment; sub-cloud size is padded to a multiple of this value; no padding when <code>1</code>; <a href="#ray_point_intersect">ray_point_intersect</a> accepts any value, padding (e.g. 8 for AVX2) only improves its speed</li>
 </ul>
 
 <b>Outputs:</b><br>
@@ -5655,21 +5733,13 @@ arma::uword ray_init(
 <hr class="thin">
 Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh surfaces
 <ul>
-<li>Computes interaction of plane waves with planar interfaces between homogeneous isotropic media.</li>
-<li>Supports beam-based modeling via triangular ray tubes (<code>trivec</code>, <code>tridir</code>).</li>
-<li>Face side determined by vertex order; CCW winding = front, CW = back (right-hand rule); front-side hit with FBS≠SBS → air-to-media; back-side hit with FBS≠SBS → media-to-air; FBS=SBS with opposing normals → media-to-media.</li>
-<li>With <code>compact = true</code> (default), rays with <code>fbs_ind = 0</code> (no interaction) are omitted from output, so <code>n_rayN ≤ n_ray</code>; with <code>compact = false</code> they are kept as transparent pass-throughs (<code>n_rayN = n_ray</code>).</li>
-<li>Output direction encoding (spherical/Cartesian) matches input <code>tridir</code> format.</li>
-<li>Overlapping mesh geometry must be avoided (materials are transparent to radio waves).</li>
-<li>Thin sheets: a material with <code>thk &gt; 0</code> marks its faces as a <b>sheet</b> — a single face carrying an authored thickness instead of a traced interior. Each crossing is one atomic entry + traversal + exit, with the internal multi-bounce series resolved in closed form. <code>thk = 0</code>, or no <code>thk</code> column, keeps the classic behavior where thickness comes from the geometry and the <a href="#ray_state_update">ray_state_update</a> state machine. Modeling notes:
-<ul>
-<li>Two coincident sheets of the <i>same</i> material are collapsed to a single crossing. Exporters emit back-to-back face pairs to make geometry double-sided, and treating such a pair as a two-layer laminate would double both the thickness and the loss. Author a genuine laminate as two <i>different</i> materials, or as one material with the summed <code>thk</code>.</li>
-<li>Stack depth is capped at two faces, because the FBS/SBS intersector returns two. A third layer is hit as a separate FBS after the relaunch and concatenates incoherently, and <code>solid + sheet + solid</code> is already three faces. Scenes have to be designed around this.</li>
-<li>A closed solid built from a sheet material is legal, not an error: it becomes a hollow box, with sheet loss on entry, the embedding medium inside, and sheet loss on exit.</li>
-</ul>
-</li>
-<li>Types 3–5 (scalar) use a single TE-only coefficient (acoustic simulation with impedance-mapped materials, <code>ε</code> derived from <code>Z</code>); total internal reflection is handled as in the EM path (<code>snell·sinθ ≥ 1</code> into a lossless medium ⇒ unit reflection, refraction collapses to undeviated transmission; a lossy medium has no critical angle).</li>
-<li>For a detailed description of the material model see <a href="http://quadriga-lib.org/formats.html">Data Formats</a></li>
+<li>One face event per ray: from the first and second hit (FBS, SBS) of <a href="#ray_triangle_intersect">ray_triangle_intersect</a>, the interface coefficients between homogeneous isotropic media (TE/TM Fresnel; one scalar pressure coefficient for types 3–5, the acoustic simulation with impedance-mapped materials), the outgoing direction and the relaunch segment, and optionally the ray tube (<code>trivec</code>, <code>tridir</code>; the output format matches the input).</li>
+<li>Face sides follow the vertex order: counter-clockwise is the front (right-hand rule). A front-side hit with FBS ≠ SBS is air-to-medium, a back-side hit medium-to-air; co-located FBS and SBS with opposing normals are a medium-to-medium boundary. Overlapping geometry must be avoided.</li>
+<li>The function sees faces only and assumes air on every side the mesh does not name; <a href="#ray_state_update">ray_state_update</a> knows the medium a ray is in and corrects the result.</li>
+<li>Thin sheets: a material with <code>thk &gt; 0</code> makes its faces sheets, a face standing for a layer of that thickness. A crossing is one event with the internal multiple-reflection series summed in closed form. Two co-located sheets of different materials are a stack, traversed in the order their normals give (the layer hit on its front side first); two coincident sheets of one material are one sheet (a double-sided export). At most two co-located faces form a stack; a third layer is a separate event. A closed body of a sheet material is a hollow box. <code>thk = 0</code>, or no <code>thk</code> column, gives the traced solid.</li>
+<li>Past the critical angle into a lossless medium (a lossy one has none) the face reflects fully where no <code>tf</code> is set; with <code>tf</code> it passes the leak of its pad. With a ray tube and types 2 or 5, a tube with any vertex past the critical angle passes undeviated as a whole.</li>
+<li>The loss inside a traced solid is not applied here (<a href="#ray_state_update">ray_state_update</a> applies it where the leg closes); a sheet's composite includes the loss and the mass term of its layer. No spreading loss is applied.</li>
+<li>The material model, its columns, the rules of use and the limits: the companion page under See also; the CSV format of the material table: <a href="http://quadriga-lib.org/formats.html">Data Formats</a></li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -5720,18 +5790,13 @@ void quadriga_lib::ray_mesh_interact(
 
 <b>Outputs:</b><br>
 <ul>
-<li><b><code>origN</code></b> — New origins after interaction, nudged off the face along the travel direction by ~8 float ULP at the interaction-point coordinate magnitude; <code>[n_rayN, 3]</code></li>
-<li><b><code>destN</code></b> — New destinations accounting for direction change; <code>[n_rayN, 3]</code></li>
-<li><b><code>fbsN</code></b>, <b><code>sbsN</code></b> — First/second interaction points in GCS; <code>[n_ray, 3]</code></li>
-<li><b><code>gainN</code></b> — Linear power gain of the interaction. Derived from <code>xprmatN</code>, not an independent factor; <code>[n_rayN]</code></li>
-<li><b><code>xprmatN</code></b> — Polarization transfer matrix; not normalized: the entries are amplitude coefficients that already carry the interaction gain. For types 0–2: interleaved complex, col-major <code>[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]</code>, i.e. the Jones matrix <code>M = [VV VH; HV HH]</code> acting as <code>e_out = M · e_in</code>; the incoming V/H basis is built from the incident direction, the outgoing basis from <code>path_dirN</code> (<code>eH = ẑ × k̂</code> normalized, <code>eV = eH × k̂</code>); <code>[8, n_rayN]</code>. For types 3–5 (scalar): <code>[Re Im]</code> where <code>Re + jIm</code> is the scalar pressure coefficient; <code>[2, n_rayN]</code>.
-<ul>
-<li><i>Included:</i> TE/TM interface coefficients (with the lumped <code>interface_gain</code> folded in for the transmission classes 1/2/4/5) and the incidence-plane orientation.</li>
-<li><i>Excluded:</i> in-medium attenuation and excess phase — added by <a href="#ray_state_update">ray_state_update</a> — and FSPL / spreading loss, which is never applied here or downstream.</li>
-</ul>
-</li>
+<li><b><code>origN</code></b> — New origins, nudged off the face along the travel direction by 8 float ULP of the hit point's coordinate magnitude (past the SBS of a co-located pair, except for reflection); <code>[n_rayN, 3]</code></li>
+<li><b><code>destN</code></b> — New destinations along the outgoing direction; <code>[n_rayN, 3]</code></li>
+<li><b><code>fbsN</code></b>, <b><code>sbsN</code></b> — First/second interaction points in GCS; <code>[n_rayN, 3]</code></li>
+<li><b><code>gainN</code></b> — Linear power gain of the interaction, derived from <code>xprmatN</code>; <code>[n_rayN]</code></li>
+<li><b><code>xprmatN</code></b> — Polarization transfer matrix of amplitude coefficients that carry the interaction gain. Types 0–2: interleaved complex, col-major <code>[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]</code>, the Jones matrix <code>M = [VV VH; HV HH]</code> acting as <code>e_out = M · e_in</code>, the incoming V/H basis from the incident direction and the outgoing one from <code>path_dirN</code> (<code>eH = ẑ × k̂</code> normalized, <code>eV = eH × k̂</code>); <code>[8, n_rayN]</code>. Types 3–5: <code>[Re Im]</code> of the scalar pressure coefficient; <code>[2, n_rayN]</code>. A transmitted coefficient includes the entered material's <code>interface_gain</code>.</li>
 <li><b><code>trivecN</code></b>, <b><code>tridirN</code></b> — Updated beam geometry/direction (format matches input); empty if inputs not provided</li>
-<li><b><code>fbs_angleN</code></b> — Incidence angle at FBS in rad; <code>[n_rayN]</code></li>
+<li><b><code>fbs_angleN</code></b> — Incidence angle at FBS in rad, the angle to the face (≥ 0 for a front-side hit); <code>[n_rayN]</code></li>
 <li><b><code>thicknessN</code></b> — Geometric FBS-to-SBS distance; <code>[n_rayN]</code>. Unrelated to the material <code>thk</code> column: this is what the mesh measured, <code>thk</code> is what the material table authored.</li>
 <li><b><code>edge_lengthN</code></b> — Max edge length of ray tube triangle at new origin (∞ if partial hit); <code>[n_rayN]</code></li>
 <li><b><code>normal_vecN</code></b> — FBS and SBS normal vectors <code>[Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]</code>; <code>[n_rayN, 6]</code></li>
@@ -5881,24 +5946,16 @@ Reachable composite values (add 32 for the total-reflection variant):<br><br>
   <td>Two-sheet stack with an ill-posed order (geometric FBS→SBS fallback was used)</td>
 </tr>
 </table>
-Codes 69 and 71 are shared by three cases, deliberately: <a href="#ray_state_update">ray_state_update</a> builds its own material
-set and holds both <code>mtl_ind_fbs</code> and <code>mtl_ind_sbs</code>, so it can re-derive sheet-ness per face and material
-identity on the pair. The full case is <code>(composite code, is_sheet(FBS), is_sheet(SBS), same material)</code>.
-Bit 6 alone is a hint meaning <i>at least one face is a sheet</i>; the re-derivation is authoritative and
-<a href="#ray_state_update">ray_state_update</a> performs it. Total reflection can only co-occur with bit 6 for the glued cases,
-where the media either side of the sheet differ. Bit 7 is unused.<br><br>
-The near / far media written into a sheet composite here are <b>provisional</b>. They come from face
-geometry alone, so air is assumed on any side the mesh does not name, which is only correct while the
-ray is in air. <a href="#ray_state_update">ray_state_update</a> holds the tracked medium and re-resolves the composite against the
-real bounding pair whenever medium tracking is enabled; without it, the air-bounded result stands.
+Codes 69 and 71 each stand for three cases, which <a href="#ray_state_update">ray_state_update</a> tells apart from the materials of the two
+faces. Total reflection occurs with bit 6 only for a glued pair. Bit 7 is unused.
 </li>
-<li><b><code>path_dirN</code></b> — Refraction-correct path direction: mirror for types 0/3, Snell direction for types 1/2/4/5; <code>[n_rayN, 3]</code>. For undeviated transmission (types 1/4) this is the <i>refracted</i> direction, which differs from the geometric continuation (along the incoming ray) used for <code>origN</code>/<code>destN</code>; it lets downstream code recover the true transmission angle. Out of a mass-law medium (<code>m &gt; 0</code>) there is no bend with any type: the wave is held undeviated at every face.</li>
+<li><b><code>path_dirN</code></b> — Refraction-correct path direction: mirror for types 0/3, Snell direction for types 1/2/4/5; <code>[n_rayN, 3]</code>. For undeviated transmission (types 1/4) this is the <i>refracted</i> direction, which differs from the geometric continuation (along the incoming ray) used for <code>origN</code>/<code>destN</code>; it lets downstream code recover the true transmission angle. No ray bends into a mass-law medium (<code>m &gt; 0</code>). The wave in it is held: into air or another mass-law body it keeps its direction, into a medium without the mass column it is refracted as a wave from air.</li>
 <li><b><code>ray_indN</code></b> — 0-based input ray index for each output ray (inverse of the internal compaction map; order-preserving); <code>[n_rayN]</code></li>
 </ul>
 
 <b>See also:</b><br>
 <ul>
-<li><a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md">The quadriga-lib Material Model and Ray-State Machine</a> (companion document)</li>
+<li><a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md">The quadriga-lib Material Model and Ray-Surface Physics</a> (companion document)</li>
 <li><a href="#obj_file_read">obj_file_read</a> (for loading <code>mesh</code> and <code>mtl_prop</code> from OBJ file)</li>
 <li><a href="#ray_state_update">ray_state_update</a> (inside/outside state machine)</li>
 <li><a href="#icosphere">icosphere</a> (for generating beams)</li>
@@ -5940,8 +5997,8 @@ void quadriga_lib::ray_point_intersect(
 <li><b><code>orig</code></b> — Ray origin positions in global Cartesian coordinates; <code>[n_ray, 3]</code></li>
 <li><b><code>trivec</code></b> — Vectors from ray origin center to triangular wavefront vertices, order <code>[v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z]</code>; <code>[n_ray, 9]</code></li>
 <li><b><code>tridir</code></b> — Direction vectors of the three vertex-rays in Cartesian coordinates (need not be normalized), order <code>[d1x, d1y, d1z, d2x, d2y, d2z, d3x, d3y, d3z]</code>; <code>[n_ray, 9]</code></li>
-<li><b><code>sub_cloud_index</code></b> <i>(optional)</i> — Segment boundary indices for the point cloud (see <a href="#point_cloud_segmentation">point_cloud_segmentation</a>); <code>[n_sub]</code></li>
-<li><b><code>use_kernel</code></b> <i>(optional)</i> — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable; auto mode selects CUDA when <code>n_points &gt;= 500</code> and CUDA is available, else AVX2, else GENERIC.</li>
+<li><b><code>sub_cloud_index</code></b> <i>(optional)</i> — Segment boundary indices for the point cloud (see <a href="#point_cloud_segmentation">point_cloud_segmentation</a>); sub-clouds need not be aligned to the SIMD vector size (padding with <code>vec_size</code> is optional and only improves speed); <code>[n_sub]</code></li>
+<li><b><code>use_kernel</code></b> <i>(optional)</i> — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable and for other values; auto mode selects CUDA when <code>n_points &gt;= 500</code> and CUDA is available, else AVX2, else GENERIC.</li>
 <li><b><code>gpu_id</code></b> <i>(optional)</i> — CUDA device ID; ignored when not using CUDA</li>
 </ul>
 
@@ -6045,7 +6102,7 @@ std::array&lt;unsigned, 4&gt; quadriga_lib::ray_progress(
 <li><b><code>dest</code></b> — Ray destinations in GCS; <code>[n_ray, 3]</code></li>
 <li><b><code>mtl_ind_prev</code></b>, <b><code>mtl_ind_current</code></b>, <b><code>mtl_ind_buffer</code></b> — Medium-state words (bit-masked: <code>mat = w &amp; 0x3FFF</code>, flags in bits 14 and 15, see <a href="#ray_state_update">ray_state_update</a>); <code>[n_ray]</code></li>
 <li><b><code>path_dir_prev</code></b> — Physical ray direction entering the current segment (unit vectors), one slice per frequency; <code>[n_ray, 3, n_freq]</code>. The Snell bend that defines this direction depends on the material at the evaluation frequency, so a dispersive medium gives a different direction in every slice. Outside a medium all slices hold the same geometric direction</li>
-<li><b><code>acc_dist</code></b> — Accumulated in-layer distance; <code>[n_ray, 1 + n_freq]</code>; col 0 = geometric distance, col <code>1+f</code> = refracted distance at frequency <code>f</code>. The geometric column is shared because the traced polyline is the base-frequency geometry by construction; only the refracted length varies with frequency</li>
+<li><b><code>acc_dist</code></b> — Accumulated in-layer distance; <code>[n_ray, 1 + n_freq]</code>; col 0 = geometric distance, col <code>1+f</code> = refracted distance at frequency <code>f</code>. The geometric column is shared because the traced polyline is the base-frequency geometry by construction; only the refracted length varies with frequency. Inside a medium both include the relaunch offset of the last event (a few float ulp of the coordinate, about 1 µm per metre), so the leg the next event measures from <code>orig</code> adds up to the leg from the hit point</li>
 <li><b><code>paths</code></b> — Per-ray <a href="#path">path</a> objects; <code>n_ray</code> entries. Frequency count and layout must match <code>center_frequency</code> and <code>scalar_mode</code>. Terminated paths are freed; surviving paths carry the appended interaction segment and the updated polarization product</li>
 <li><b><code>trivec</code></b> <i>(optional)</i> — Beam wavefront triangle vertices relative to origin; <code>[n_ray, 9]</code>. Must be supplied together with <code>tridir</code>; empty / NULL disables beam tracing</li>
 <li><b><code>tridir</code></b> <i>(optional)</i> — Vertex-ray directions, Cartesian; <code>[n_ray, 9]</code></li>
@@ -6078,12 +6135,26 @@ std::array&lt;unsigned, 4&gt; quadriga_lib::ray_progress(
 <hr class="greyline"><br>
 <span id="ray_state_update" class="qd-func"><b>ray_state_update</b></span><br>
 <hr class="thin">
-Batched inside/outside ray-state machine with analytic thin-slab (Fabry-Perot) resolution
+Per-ray medium state machine with closed-form thin-slab (Fabry-Pérot) resolution
 <ul>
-<li>Corrects the per-interaction <code>gainN</code> / <code>xprmatN</code> produced by <a href="#ray_mesh_interact">ray_mesh_interact</a> using a tracked per-ray medium state, and carries that state forward. Three signed-<code>short</code> words per ray hold the current medium, the previous medium, and a one-slot next-transition buffer. The material index is 14 bits (<code>mat = w &amp; 0x3FFF</code>, at most 16383 materials) and bits 14 and 15 are flags. With bit 15 set the buffer word is not a medium: it marks a leg that was entered by crossing a bonded mass-law body and its low 15 bits carry a thickness code.</li>
-<li>Implements the inside/outside state machine and overlays a closed-form thin-slab factor <code>S</code> (the Airy sum) so a single coefficient captures the full internal multiple-reflection series of a parallel slab thin enough to matter, instead of relying on the tracer to follow every internal bounce.</li>
-<li>Called twice per interaction by the ray tracer: once for the reflection pass (<code>interaction_type</code> 0 or 3) and once for the transmission/refraction pass (<code>interaction_type</code> 1, 2, 4, 5). With <code>S</code> suppressed (the survival gate re-emits) the transmission/refraction path reproduces <a href="#calc_diffraction_gain">calc_diffraction_gain</a></li>
-<li>Thin sheets: a <code>thk &gt; 0</code> crossing arrives from <a href="#ray_mesh_interact">ray_mesh_interact</a> already resolved as one atomic three-medium event, but with its bounding media guessed from face geometry alone — air on any side the mesh did not name. This function supplies the media the tracked state actually reports and re-resolves the composite against them, which matters for every sheet that does not sit in air: a sheet embedded in a medium is bounded by that medium on both sides, and the wrong pair moves both Fresnel boundaries, the internal series and the lumped interface gain at once. The sheet material never becomes the current medium; it is recorded in the previous-medium word so the host layer on the far side reflects off it — except where the sheet and the host are the same medium electrically, in which case the sheet is not a boundary at all, the host layer is carried through it uninterrupted, and its series resolves once over the whole path rather than collapsing at a face that does not reflect. The total-reflection verdict and the continuation direction are re-derived here too, at the corrected angle, for the same reason <a href="#ray_state_update">ray_state_update</a> re-derives them for a traced solid: an undeviated tracer inside a medium travels at its external angle, so the hit code's geometric-angle verdict turns a glued exit into a mirror past the internal critical angle, and leaving <code>path_dirN</code> unchanged would hand the next interaction a geometric direction where a refracted one is required.</li>
+<li>Corrects the per-event <code>gainN</code> / <code>xprmatN</code> of <a href="#ray_mesh_interact">ray_mesh_interact</a> with the medium each ray is known to be in, and carries that state from event to event in three state words per ray (table below) and the in-medium path lengths (<code>acc_dist_*</code>):
+<ul>
+<li>the face is re-evaluated at the incidence of the direction the wave has (<code>path_dir_prev</code>) instead of the traced segment (the virtual hit point, VBS), with total reflection and the continuation direction;</li>
+<li>the in-medium attenuation and excess phase of the leg the ray leaves are applied;</li>
+<table class="md">
+<tr>
+  <td><li>the internal bounce series of a traced parallel layer is summed in closed form, <code>S = 1/(1 − r_near·r_far·φ²)</code> per polarization, where its round-trip amplitude <code>ρ =</td>
+  <td>r_near·r_far</td>
+  <td>·</td>
+  <td>φ</td>
+  <td>²</code> is at least <code>eps</code>; otherwise the bounces are left to the tracer as further events. A body's verdict is taken once, at the first event that closes a leg in it;</li></td>
+</tr>
+</table>
+<li>a thin-sheet crossing is re-resolved against the media the state reports (a sheet inside a medium has that medium on both sides; <a href="#ray_mesh_interact">ray_mesh_interact</a> assumed air).</li>
+</ul>
+</li>
+<li>Called twice per event by the tracer (<a href="#ray_progress">ray_progress</a>, <a href="#calc_diffraction_gain">calc_diffraction_gain</a>): for the reflect pass (<code>interaction_type</code> 0 or 3) and for the transmit pass (1, 2, 4, 5), each with the outputs of <a href="#ray_mesh_interact">ray_mesh_interact</a> for that type.</li>
+<li>Without state words every ray starts in air and each event is corrected on its own.</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -6134,12 +6205,12 @@ void quadriga_lib::ray_state_update(
 <li><b><code>orig</code></b>, <b><code>dest</code></b> — Ray origin, destination, full ray set; <code>[n_ray, 3]</code>, read at <code>g = ray_indN[i]</code></li>
 <li><b><code>fbsN</code></b>, <b><code>sbsN</code></b>  — First and second interaction points, compact set; <code>[n_rayN, 3]</code></li>
 <li><b><code>no_interact</code></b> — Mesh-hit count per ray, full ray set; <code>[n_ray]</code></li>
-<li><b><code>fbs_angleN</code></b> — Incidence angle at FBS (ITU convention), compact set; <code>[n_rayN]</code></li>
-<li><b><code>normal_vecN</code></b> — FBS and SBS normals <code>[Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]</code>, compact set; <code>[n_rayN, 6]</code>. The VBS plane normal for the Snell corrections; currently also gates the parallelism (wedge) test. NULL disables the wedge test.</li>
-<li><b><code>out_typeN</code></b> — Interaction type code from <a href="#ray_mesh_interact">ray_mesh_interact</a>, compact set; <code>[n_rayN]</code>. Bit 5 is stripped and re-evaluated at the VBS angle; bit 6 (thin sheet) is dispatched on and is <i>not</i> stripped, so the sheet codes 65 / 67 / 69 / 71 / 79 take their own path ahead of the solid state machine.</li>
-<li><b><code>mtl_prop</code></b> — Material properties keyed by column name (the <code>csv_prop</code> output of <a href="#obj_file_read">obj_file_read</a>). The <code>thk</code> column is read here as well as in <a href="#ray_mesh_interact">ray_mesh_interact</a>; it selects the thin-sheet path.</li>
-<li><b><code>mtl_ind_fbsN</code></b>, <b><code>mtl_ind_sbsN</code></b> — Material indices M1 / M2 of the FBS / SBS faces, compact set; <code>[n_rayN]</code> (0 = air). <code>mtl_ind_sbsN</code> is load-bearing beyond media-to-media: it carries the second face of a glued or duplicate sheet pair, and the thin-sheet case is re-derived from <code>(code, is_sheet(FBS), is_sheet(SBS), same material)</code> because codes 69 and 71 are shared by three topologies.</li>
-<li><b><code>mtl_ind_prev_in</code></b>, <b><code>mtl_ind_current_in</code></b>, <b><code>mtl_ind_buffer_in</code></b> — State words, full ray set; <code>[n_ray]</code>, read at <code>g</code>, never written. NULL reads as state <code>0</code> (outside, no flags). A buffer word with bit 15 set is a surface-mass code written by an earlier call and is exempt from the material range check; pass the words through unchanged between calls. A leg that carries the followed mark forms no series: the verdict of a body is taken once, at the first event that closes a leg in it.<br><br>
+<li><b><code>fbs_angleN</code></b> — Incidence angle at FBS (the angle to the face, as <a href="#ray_mesh_interact">ray_mesh_interact</a> writes it), compact set; <code>[n_rayN]</code></li>
+<li><b><code>normal_vecN</code></b> — FBS and SBS normals <code>[Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]</code>, compact set; <code>[n_rayN, 6]</code>; required. The plane of the VBS, and the test whether the two faces of an entry are parallel.</li>
+<li><b><code>out_typeN</code></b> — Interaction type code from <a href="#ray_mesh_interact">ray_mesh_interact</a>, compact set; <code>[n_rayN]</code>. Its total-reflection bit is re-evaluated at the VBS angle; a thin-sheet code takes the sheet path.</li>
+<li><b><code>mtl_prop</code></b> — Material properties keyed by column name (the <code>csv_prop</code> output of <a href="#obj_file_read">obj_file_read</a>); at most 16383 materials.</li>
+<li><b><code>mtl_ind_fbsN</code></b>, <b><code>mtl_ind_sbsN</code></b> — Material indices of the FBS / SBS faces, compact set; <code>[n_rayN]</code> (0 = air). The sheet case of a hit is re-derived from the code and the two faces' materials.</li>
+<li><b><code>mtl_ind_prev_in</code></b>, <b><code>mtl_ind_current_in</code></b>, <b><code>mtl_ind_buffer_in</code></b> — State words, full ray set; <code>[n_ray]</code>, read at <code>g</code>, never written. NULL reads as state <code>0</code> (in air, no flags). Pass the words an earlier call wrote through unchanged.<br><br>
 <table class="md">
 <tr>
   <th>Word</th>
@@ -6151,13 +6222,13 @@ void quadriga_lib::ray_state_update(
   <td><code>mtl_ind_current</code></td>
   <td>medium the ray is in, 0 = air</td>
   <td>bent: the leg follows a bend traced with type 2 or 5; zero in air</td>
-  <td>resolved</td>
+  <td>the leg's series was summed</td>
 </tr>
 <tr>
   <td><code>mtl_ind_prev</code></td>
   <td>medium the leg was entered from, or the sheet crossed or reflected off</td>
-  <td>the sheet in this word lies inside the current medium</td>
-  <td>known non-parallel</td>
+  <td>a sheet in this word lies inside the current medium; with a solid, the face into the current medium was evaluated at a real-invariant cosine</td>
+  <td>the leg's faces are not parallel</td>
 </tr>
 <tr>
   <td><code>mtl_ind_buffer</code></td>
@@ -6172,30 +6243,29 @@ void quadriga_lib::ray_state_update(
   <td>set: mass-crossed</td>
 </tr>
 </table>
-Under bit 15 the code is the normal thickness of a mass-law leg closed on the way into the current
-one: of the solid in <code>mtl_ind_prev</code>, or, where that word holds a sheet lying inside the current
-medium, of the part of the current medium in front of that sheet. Zero means no such leg.
+Under bit 15 the buffer word is the normal thickness, as a logarithmic code, of a mass-law leg closed on the way
+into the current one (bonded mass-law bodies are one plate); it is exempt from the material range check.
 </li>
 <li><b><code>path_dir_prev</code></b> — Physical ray direction entering this segment, full ray set; <code>[n_ray, 3]</code></li>
-<li><b><code>acc_dist_geometric</code></b> — Accumulated geometric in-layer distance carried into this call, full ray set; <code>[n_ray]</code>. NULL reads as 0. Frequency-independent: built from the traced <code>orig</code>-<code>fbs</code> / <code>fbs</code>-<code>dest</code> lengths only, so a multi-frequency caller keeps a single shared instance.</li>
-<li><b><code>acc_dist_refracted</code></b> — Accumulated refracted (VBS) in-layer distance carried into this call, full ray set; <code>[n_ray]</code>. NULL reads as 0. Frequency-dependent, since the Snell bend that defines it follows the material at <code>center_frequency</code>, so a multi-frequency caller keeps one instance per frequency. The two inputs are independent; either may be NULL.</li>
+<li><b><code>acc_dist_geometric</code></b> — Accumulated geometric in-layer distance carried into this call, full ray set; <code>[n_ray]</code>. NULL reads as 0. Frequency-independent, so a multi-frequency caller keeps one instance.</li>
+<li><b><code>acc_dist_refracted</code></b> — Accumulated refracted (VBS) in-layer distance carried into this call, full ray set; <code>[n_ray]</code>. NULL reads as 0. Frequency-dependent (the bend follows the material at <code>center_frequency</code>), so a multi-frequency caller keeps one instance per frequency.</li>
 <li><b><code>ray_indN</code></b> — Compact-to-full ray index map; <code>[n_rayN]</code> to <code>[n_ray]</code>; NULL = identity (<code>n_ray == n_rayN</code>)</li>
-<li><b><code>eps</code></b> <i>(optional)</i> — Thin-slab (Fabry-Pérot) resolve threshold on the round-trip in-slab amplitude <code>ρ</code> (<code>ρ ∈ [0, 1]</code>): the closed-form Airy factor is applied when <code>ρ ≥ eps</code> and the series is re-emitted to the tracer when <code>ρ &amp;lt; eps</code> (weak / fast-decaying slabs). <code>eps = 0</code> always resolves (for callers that cannot re-emit, e.g. <a href="#calc_diffraction_gain">calc_diffraction_gain</a>); <code>eps ≥ 1</code> always re-emits (resolution disabled). A near-pole <code>S</code> or a known non-parallel slab re-emits regardless of <code>eps</code>. Does <b>not</b> gate a thin sheet's own series: a sheet has no interior for the tracer to re-emit into, so that series always resolves. <code>eps</code> still gates the host layer a sheet is embedded in. Default <code>0.15</code>.</li>
-<li><b><code>verdict_inN</code></b> <i>(optional)</i> — The verdict of each event on its bounce series, as an earlier call on the same events wrote it to <code>verdict_outN</code>, compact set; <code>[n_rayN]</code>. Where given, a series is summed exactly where the entry is nonzero and <code>eps</code> is not read. The traced paths of a multi-frequency run are the base frequency's - a reflected ray is resolved or followed as that frequency decided - so the caller hands the base frequency's verdict to the call of every other frequency. A summed series near a pole is clamped in magnitude instead of being re-emitted. NULL: this call decides, by <code>eps</code>.</li>
+<li><b><code>eps</code></b> <i>(optional)</i> — Threshold on the round-trip amplitude <code>ρ</code> (<code>ρ ≥ 0</code>, not bounded by one: next to a lossy or evanescent layer a face can reflect more than one in amplitude): a series is summed where <code>ρ ≥ eps</code> and left to the tracer where <code>ρ &amp;lt; eps</code>. <code>eps = 0</code> always sums (for callers that cannot re-emit); <code>eps ≥ 1</code> leaves every series with <code>ρ &amp;lt; eps</code> to the tracer. A layer whose faces are known not to be parallel is left to the tracer for any <code>eps &gt; 0</code>. A thin sheet's own series is always summed (there is no interior to trace); <code>eps</code> gates the host layer a sheet lies in. Default <code>0.15</code>.</li>
+<li><b><code>verdict_inN</code></b> <i>(optional)</i> — The verdict of each event as an earlier call on the same events wrote it to <code>verdict_outN</code>, compact set; <code>[n_rayN]</code>. Where given, a series is summed exactly where the entry is nonzero and <code>eps</code> is not read: a multi-frequency caller hands the base frequency's verdicts to the other frequencies, whose traced paths are the base frequency's. NULL: this call decides by <code>eps</code>.</li>
 <li><b><code>tridir</code></b> <i>(optional)</i> — Vertex-ray directions of the beam entering this segment, Cartesian, as handed to <a href="#ray_mesh_interact">ray_mesh_interact</a>; <code>[n_ray, 9]</code>. Given together with <code>tridirN</code>; requires <code>origN</code> and <code>destN</code></li>
 </ul>
 
 <b>Outputs:</b><br>
 <ul>
-<li><b><code>mtl_ind_prev_outN</code></b>, <b><code>mtl_ind_current_outN</code></b>, <b><code>mtl_ind_buffer_outN</code></b> — Updated state words, compact set; <code>[n_rayN]</code>. <code>mtl_ind_prev_outN</code> may hold a <b>sheet</b> material index after a thin-sheet crossing. That is a boundary material, not a medium the ray travelled through: the previous-medium word is only ever read as the far material of a slab resolve, for the parallelism flag, and as the bonded mass-law body a leg was entered through, and a sheet is the correct far material for the layer on either side of it. <code>mtl_ind_buffer_outN</code> with bit 15 set carries the surface-mass code of that body (a logarithmic thickness code for a traced solid; for a sheet zero, or the thickness of the host in front of a sheet that lies inside it) instead of a deferred medium. Bit 14 of <code>mtl_ind_prev_outN</code> is set where the sheet in that word lies inside the current medium, so that the layer behind it is backed by that medium and not by air. NULL skips the write. Passing all six state args NULL disables tracking — each interaction is corrected on its own (entry loss, TR kill, single-hit air-gap <code>S</code>); cross-interaction slab <code>S</code> and reflection-bounce <code>S</code> need the tracked medium.</li>
-<li><b><code>gainN</code></b> <i>(in/out)</i> — Per-interaction linear power gain, updated in place; <code>[n_rayN]</code>. Kept consistent with <code>xprmatN</code> at every write. A killed ray (<code>resolved_typeN == 0</code>) yields <code>gainN = 0</code> together with an all-zero <code>xprmatN</code>.</li>
-<li><b><code>xprmatN</code></b> <i>(in/out)</i> — Polarization transfer matrix, updated in place; <code>[8, n_rayN]</code> for EM mode, <code>[2, n_rayN]</code> for scalar mode. Same layout and basis convention as in <a href="#ray_mesh_interact">ray_mesh_interact</a>, but with the medium closed out: on return it additionally contains the in-medium attenuation and excess phase of the traversed segment and, when the resolve bit of <code>resolved_typeN</code> is set, the closed-form thin-slab (Airy) factor <code>S</code> covering the full internal multiple-reflection series. <code>S</code> is applied per polarization and is a pure series factor — the interface coefficients it multiplies are the ones <a href="#ray_mesh_interact">ray_mesh_interact</a> already wrote, and no magnitude conversion is applied on top of them. FSPL / spreading loss remains excluded, so the matrix is the complete per-interaction Jones factor and can be left-multiplied directly into a per-path product. When the series is re-emitted instead (<code>ρ &amp;lt; eps</code>, resolve bit clear), the matrix carries only the first-pass coefficient and the remaining bounces arrive as separate interactions. On a thin-sheet crossing the matrix is <i>replaced</i> by the composite re-resolved for the bounding media the state words report, and no medium gain is charged for the sheet material itself — its traversal loss and phase are already inside the composite. The host medium the ray was travelling in is still closed out.</li>
+<li><b><code>mtl_ind_prev_outN</code></b>, <b><code>mtl_ind_current_outN</code></b>, <b><code>mtl_ind_buffer_outN</code></b> — Updated state words (layout above), compact set; <code>[n_rayN]</code>. The previous-medium word may hold a sheet: the boundary behind the ray, never a medium it travels in. NULL skips the write.</li>
+<li><b><code>gainN</code></b> <i>(in/out)</i> — Per-interaction linear power gain, updated in place; <code>[n_rayN]</code>. Kept consistent with <code>xprmatN</code>. A killed ray (<code>resolved_typeN == 0</code>) has <code>gainN = 0</code> and an all-zero <code>xprmatN</code>.</li>
+<li><b><code>xprmatN</code></b> <i>(in/out)</i> — Polarization transfer matrix, updated in place; <code>[8, n_rayN]</code> for EM mode, <code>[2, n_rayN]</code> for scalar mode, layout and basis as in <a href="#ray_mesh_interact">ray_mesh_interact</a>. On return it also carries the in-medium attenuation and excess phase of the leg the ray leaves and, where the series was summed, the factor <code>S</code>. Spreading loss stays excluded, so the matrix is the complete per-event Jones factor. Where the series is left to the tracer the matrix carries the first pass only, and the bounces arrive as further events. At a thin-sheet crossing the matrix is replaced by the composite for the media the state reports.</li>
 <li><b><code>path_dirN</code></b> <i>(in/out)</i> — Continuation direction, corrected in place by the VBS construction, compact set; <code>[n_rayN, 3]</code></li>
-<li><b><code>origN</code></b>, <b><code>destN</code></b> <i>(optional, in/out)</i> — The relaunch segment <a href="#ray_mesh_interact">ray_mesh_interact</a> built, compact set; <code>[n_rayN, 3]</code>, given together. With a refracting type (2, 5) that segment was bent at a real angle in the medium the ray leaves. Where this function writes the direction of a wave out of a lossy medium whose in-medium cosine it recovered - a bare exit, a glued exit, a transition into another solid - both points are put on one line along <code>path_dirN</code>, through the SBS of a co-located pair and the FBS otherwise. Every other ray, and every other type, is left untouched; NULL leaves the geometry to the caller as before. A caller that runs several frequencies passes them on the call that defines the geometry only.</li>
+<li><b><code>origN</code></b>, <b><code>destN</code></b> <i>(optional, in/out)</i> — The relaunch segment <a href="#ray_mesh_interact">ray_mesh_interact</a> built, compact set; <code>[n_rayN, 3]</code>, given together. With a refracting type (2, 5) that segment was bent at a real angle in the medium the ray leaves. Where this function writes the direction of a wave out of a lossy medium whose in-medium cosine it recovered (a bare exit, a glued exit, a transition into another solid), both points are put on one line along <code>path_dirN</code>, through the SBS of a co-located pair and the FBS otherwise. Every other ray, and every other type, is left untouched. A multi-frequency caller passes them on the call that defines the geometry only.</li>
 <li><b><code>tridirN</code></b> <i>(optional, in/out)</i> — Vertex-ray directions leaving, Cartesian, compact set; <code>[n_rayN, 9]</code>. Corrected together with <code>origN</code> and <code>destN</code>: each vertex ray gets the construction of the spine from its own direction in <code>tridir</code>. If one of the three cannot be formed, the ray keeps the geometry it had.</li>
 <li><b><code>verdict_outN</code></b> <i>(optional)</i> — Per event, 1 where this call summed a bounce series and 0 where it left the bounces to the tracer, compact set; <code>[n_rayN]</code>. NULL skips the write.</li>
-<li><b><code>acc_dist_geometricN</code></b> — Accumulated geometric distance leaving this call, compact set; <code>[n_rayN]</code>. NULL skips the write.</li>
-<li><b><code>acc_dist_refractedN</code></b> — Accumulated refracted (VBS) distance leaving this call, compact set; <code>[n_rayN]</code>. NULL skips the write.</li>
+<li><b><code>acc_dist_geometricN</code></b> — Accumulated geometric distance leaving this call, compact set; <code>[n_rayN]</code>. NULL skips the write. Where the ray goes on inside a medium it includes the relaunch offset of <a href="#ray_mesh_interact">ray_mesh_interact</a> (<code>origN</code> lies that far past the point the ray left at), so the next leg, measured from <code>origN</code>, adds up to the leg from the hit point.</li>
+<li><b><code>acc_dist_refractedN</code></b> — Accumulated refracted (VBS) distance leaving this call, compact set; <code>[n_rayN]</code>. NULL skips the write. It includes the relaunch offset the same way, projected onto the direction the wave has (exact for parallel faces).</li>
 <li><b><code>resolved_typeN</code></b> <i>(optional)</i> — Resolved interaction-type code, bit-encoded (<code>qd::bits&lt;uint8_t&gt;</code>), compact set; <code>[n_rayN]</code>. 0 = ray killed. NULL skips the write.<br><br>
 <table class="md">
 <tr>
@@ -6206,7 +6276,7 @@ medium, of the part of the current medium in front of that sheet. Zero means no 
 <tr>
   <td class="c">0</td>
   <td class="c">ok</td>
-  <td>OK flag (0 = a deferred degenerate-resolve buffer is pending)</td>
+  <td>OK flag (0 = a deferred medium is pending in the buffer word)</td>
 </tr>
 <tr>
   <td class="c">1</td>
@@ -6226,7 +6296,7 @@ medium, of the part of the current medium in front of that sheet. Zero means no 
 <tr>
   <td class="c">4</td>
   <td class="c">fix</td>
-  <td>Fix flag (resolved-false-outside, or entry/exit material mismatch)</td>
+  <td>Fix flag (the exit face names another medium than the state, or a sheet event met a deferred medium)</td>
 </tr>
 <tr>
   <td class="c">5</td>
@@ -6244,8 +6314,7 @@ medium, of the part of the current medium in front of that sheet. Zero means no 
   <td>Reflection flag (0 = transmission/refraction, 1 = reflection/scattering)</td>
 </tr>
 </table>
-Bit 6 is qualified by bit 2, because a transparent interface resolves no series and scattering is not
-implemented, so the two bits together are unreachable for any non-sheet interaction:<br><br>
+Bit 6 is qualified by bit 2 (a transparent interface sums no series, and scattering is not implemented):<br><br>
 <table class="md">
 <tr>
   <th class="c">Bit 6</th>
@@ -6255,7 +6324,7 @@ implemented, so the two bits together are unreachable for any non-sheet interact
 <tr>
   <td class="c">1</td>
   <td class="c">0</td>
-  <td>Transparent interface (transmission) / scatter (reflection) — as before</td>
+  <td>Transparent interface (transmission) / scatter (reflection)</td>
 </tr>
 <tr>
   <td class="c">1</td>
@@ -6263,8 +6332,8 @@ implemented, so the two bits together are unreachable for any non-sheet interact
   <td><b>Thin-sheet crossing</b></td>
 </tr>
 </table>
-Inside the thin-sheet region bit 1 does not mean VBS: the crossing is always re-resolved at the VBS
-angle, so a VBS flag would be constant there. It carries the glued verdict instead:<br><br>
+In the thin-sheet region bit 1 carries the glued verdict instead of the VBS flag (a sheet is always
+re-resolved at the VBS angle):<br><br>
 <table class="md">
 <tr>
   <th class="c">Bit 1 (sheet region)</th>
@@ -6279,9 +6348,8 @@ angle, so a VBS flag would be constant there. It carries the glued verdict inste
   <td>Glued — the two bounding media differ</td>
 </tr>
 </table>
-The sheet region reports the resolved <i>state</i>, not the sheet topology; the state words and <code>out_typeN</code>
-separate an embedded sheet from a glued entry. Note that 69 and 71 also occur as <code>out_typeN</code> values with
-entirely different meanings — the two fields have always had separate tables.
+The sheet region reports the resolved state, not the sheet topology. The codes 69 and 71 below are unrelated
+to the <code>out_typeN</code> codes of the same value.
 Reachable composite values for transmission / refraction:<br><br>
 <table class="md">
 <tr>
@@ -6516,17 +6584,16 @@ Reachable composite values for reflection:<br><br>
   <td>reserved: scattering not implemented</td>
 </tr>
 </table>
-A thin-sheet stack of two different materials (<code>out_typeN</code> 79, or 69/71 with two sheet faces of
-different materials) is <b>not implemented</b> and returns 0: the case is detected but has no physics in
-<a href="#ray_mesh_interact">ray_mesh_interact</a> either.
+A stack of two different sheets is crossed as one event with the codes of a sheet; a singular stack kills the ray.
 </li>
 </ul>
 
 <b>See also:</b><br>
 <ul>
-<li><a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md">The quadriga-lib Material Model and Ray-State Machine</a> (companion document)</li>
+<li><a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md">The quadriga-lib Material Model and Ray-Surface Physics</a> (companion document)</li>
 <li><a href="#ray_mesh_interact">ray_mesh_interact</a> (computes the per-interaction Fresnel/Jones result this function corrects)</li>
-<li><a href="#calc_diffraction_gain">calc_diffraction_gain</a> (the reference state machine this function ports)</li>
+<li><a href="#calc_diffraction_gain">calc_diffraction_gain</a> (uses this function for its media)</li>
+<li><a href="#ray_progress">ray_progress</a> (the tracer that calls it)</li>
 </ul>
 
 <hr class="greyline"><br>
@@ -6591,7 +6658,8 @@ Compute ray-triangle intersections in 3D using the Möller–Trumbore algorithm
 <ul>
 <li>Counts the total number of intersections between <code>orig</code> and <code>dest</code></li>
 <li>Computes the coordinates and object IDs of the first two intersections per ray (FBS/SBS)</li>
-<li>Internal computations always use single precision for AVX2 and CUDA kernels; only GENERIC has <code>double</code> support</li>
+<li>The AVX2 and CUDA kernels compute in single precision, GENERIC in the precision of the input; with <code>double</code> input, the AVX2 kernel forms the vectors between ray origin, vertices and bounding boxes in <code>double</code> before rounding them, so its precision depends on the size of the scene, not on its distance from the coordinate origin (e.g. UTM coordinates); the CUDA kernel rounds the coordinates themselves, so its errors grow with the distance from the origin</li>
+<li>Triangle edges and vertices count as hits; hits at the same distance (e.g. on a shared edge) are reported in the order of the mesh index, the lower index first (all kernels)</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -6618,7 +6686,7 @@ void quadriga_lib::ray_triangle_intersect(
 <li><b><code>mesh</code></b> — Triangular mesh; each row: <code>{x1 y1 z1 x2 y2 z2 x3 y3 z3}</code>; <code>[n_mesh, 9]</code></li>
 <li><b><code>sub_mesh_index</code></b> (optional) — Start indices of sub-meshes in <code>mesh</code>; enables AABB-accelerated traversal; <code>[n_sub]</code></li>
 <li><b><code>aabb</code></b> (optional) — Pre-computed axis-aligned bounding boxes per sub-mesh; each row: <code>{x_min x_max y_min y_max z_min z_max}</code>; if <code>nullptr</code>, AABBs are computed from <code>mesh</code>; <code>[n_sub, 6]</code></li>
-<li><b><code>use_kernel</code></b> <i>(optional)</i> — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable; auto mode selects CUDA when <code>n_ray &gt;= 500</code> and CUDA is available, else AVX2, else GENERIC.</li>
+<li><b><code>use_kernel</code></b> <i>(optional)</i> — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable and for other values; auto mode selects CUDA when <code>n_ray &gt;= 500</code> and CUDA is available, else AVX2, else GENERIC.</li>
 <li><b><code>gpu_id</code></b> <i>(optional)</i> — CUDA device ID; ignored when not using CUDA</li>
 </ul>
 
@@ -6629,6 +6697,7 @@ void quadriga_lib::ray_triangle_intersect(
 <li><b><code>no_interact</code></b> (optional) — Total number of intersections per ray between <code>orig</code> and <code>dest</code>; <code>[n_ray]</code></li>
 <li><b><code>fbs_ind</code></b> (optional) — 1-based index of first intersected mesh element; 0 = none; <code>[n_ray]</code></li>
 <li><b><code>sbs_ind</code></b> (optional) — 1-based index of second intersected mesh element; 0 = none; <code>[n_ray]</code></li>
+<li><code>fbs</code> and <code>sbs</code> may be the same objects as <code>orig</code> or <code>dest</code> (e.g. to advance rays in place)</li>
 </ul>
 
 <b>See also:</b><br>
@@ -6645,8 +6714,8 @@ void quadriga_lib::ray_triangle_intersect(
 <hr class="thin">
 Real refractive index of a homogeneous medium
 <ul>
-<li>Returns <code>n = Re(sqrt(ε_r · μ_r))</code>, the real part of the complex refractive index, using the ITU-R P.2040-1 permittivity model <code>ε_r = a·(f/fRef)^b</code> together with the relative permeability <code>μ_r</code>.</li>
-<li>A permittivity resonance (<code>resF</code>, <code>resQ</code>, <code>resS</code>) is part of <code>ε_r</code>. The coincidence feature (<code>coiF</code>, <code>coiQ</code>, <code>coiA</code>) is excluded: it is a penetration loss at an interface, not bulk propagation.</li>
+<li>Returns <code>n = Re √(ε_r·μ_r)</code> of material <code>iM</code>, with the ITU-R P.2040 model <code>ε_r = a·(f/fRef)^b − j·17.98·σ/f[GHz]</code>, <code>σ = c·(f/fRef)^d</code>, and <code>μ_r</code> from <code>e</code>, <code>f</code>, <code>g</code>, <code>h</code> in the same form. For a material without the mass column the permittivity resonance (<code>resF</code>, <code>resQ</code>, <code>resS</code>) is part of <code>ε_r</code>.</li>
+<li>For a mass-law material (<code>m &gt; 0</code>) <code>ε_r</code> and <code>μ_r</code> are an impedance mapping and <code>n</code> is not a propagation index.</li>
 <li>Air (<code>iM = 0</code>) returns <code>1</code>.</li>
 </ul>
 
@@ -6672,6 +6741,7 @@ dtype quadriga_lib::refractive_index(
 
 <b>See also:</b><br>
 <ul>
+<li><a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md">The quadriga-lib Material Model and Ray-Surface Physics</a> (the formulas and the columns)</li>
 <li><a href="#medium_gain">medium_gain</a> (for the distance-dependent in-medium loss)</li>
 <li><a href="#ray_mesh_interact">ray_mesh_interact</a> (for complex ray-material interactions)</li>
 <li><a href="#obj_file_read">obj_file_read</a> (defines mtl_prop format)</li>
@@ -6744,6 +6814,8 @@ Subdivide triangles into smaller triangles
 <li>Uniformly subdivides each input triangle into <code>n_div x n_div</code> smaller triangles</li>
 <li>Output count: <code>n_triangles_out = n_triangles_in x n_div x n_div</code></li>
 <li>Material indices are duplicated from the parent triangle to all sub-triangles</li>
+<li><code>triangles_out</code> may be the same object as <code>triangles_in</code>, and <code>mtl_ind_out</code> the same as <code>mtl_ind</code> (in place)</li>
+<li>Throws <code>std::invalid_argument</code> when <code>n_div</code> is so large that the number of output values exceeds 64 bits</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -6971,7 +7043,7 @@ void xpr_update(
 <li><b><code>initialize</code></b> — If <code>true</code>, each touched column is set to unity (identity for EM, <code>[1,0]</code> for scalar) before the update. With an <code>update</code> this is a copy-through (the column becomes the update, prior contents discarded); without an <code>update</code> it is a pure reset. Use this to (re)initialize a pre-sized or reused buffer without reallocating.</li>
 <li><b><code>normalize</code></b> — If <code>true</code>, each touched column is scaled to unit gain after the update. Untouched columns of <code>xprmat</code> are left alone.</li>
 <li><b><code>apply_gain</code></b> — Flips <code>gain</code> from output to input (see above). Applying a gain requires a <code>gain</code> vector.</li>
-<li><b><code>ray_index</code></b> — Optional map from update index (<code>0..n_rayU-1</code>) to global column of <code>xprmat</code>. Length <code>n_rayU</code>. Default is the identity map, which requires <code>n_ray == n_rayU</code>. Values must be <code>&lt; n_ray</code>.</li>
+<li><b><code>ray_index</code></b> — Optional map from update index (<code>0..n_rayU-1</code>) to global column of <code>xprmat</code>. Length <code>n_rayU</code>. Default is the identity map, which requires <code>n_ray == n_rayU</code>. Values must be <code>&lt; n_ray</code>. Duplicate values are allowed: the updates of a column are then applied one after the other in update-index order (each with the full initialize -> update -> normalize -> apply_gain sequence), so the result is the same as a single-threaded run for any thread count. With duplicates the call runs single-threaded; unique indices keep the parallel loop.</li>
 </ul>
 
 <b>Usage:</b><br>
@@ -6979,7 +7051,7 @@ The flags are composable in one call; the per-column order is always
 initialize -> update -> normalize -> apply_gain. Argument order is 
 <code>(xprmat, update, gain, initialize, normalize, apply_gain, ray_index)</code>. 
 <pre>
-arma::Mat&lt;dtype&gt; M;                                 // ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH (EM)
+arma::Mat&lt;dtype&gt; M;                                 // ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH (EM), labels &lt;out&gt;&lt;in&gt;
 
 // (1) Initialization
 xpr_update(M, &amp;U0);                                 // empty M: sized from U0, seeded, M := U0
@@ -7007,7 +7079,7 @@ xpr_update(M, &amp;U, &amp;g, false, true, true, &amp;idx);     // full chain st
 
 <b>Storage layout (column-major, interleaved complex):</b><br>
 <ul>
-<li><b>EM mode</b>, 8 values per ray: <code>[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]</code>, so column 0 of the 2x2 is <code>[VV; HV]</code> (response to a V input) and column 1 is <code>[VH; HH]</code> (response to an H input).</li>
+<li><b>EM mode</b>, 8 values per ray: <code>[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]</code>, so column 0 of the 2x2 is <code>[VV; HV]</code> (response to a V input) and column 1 is <code>[VH; HH]</code> (response to an H input). The labels are <code>&lt;out&gt;&lt;in&gt;</code>: the first letter is the output (receive) polarisation, the second the input (transmit) polarisation, so rows 0-1 = (V out, V in), rows 2-3 = (H out, V in), rows 4-5 = (V out, H in), rows 6-7 = (H out, H in). This is the row order of <code>M</code> in <a href="#get_channels_spherical">get_channels_spherical</a> (rows = RX, columns = TX).</li>
 <li><b>Scalar mode</b>, 2 values per ray: <code>[Re Im]</code>.</li>
 <li>The update is <code>M_out = M_update * M_state</code> (new interaction left-multiplies), consistent with <code>E_out = M * E_in</code> for column vectors and Armadillo/MATLAB column-major storage.</li>
 </ul>

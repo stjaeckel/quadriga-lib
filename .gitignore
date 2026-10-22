@@ -18,7 +18,7 @@ wheelhouse/
 tests/test*
 tests/afl/afl_out/*
 tests/afl/bin/*
-tests/python_tests/__pycache__/
+__pycache__/
 tools/extract_html_mex_api.py
 deploy.py
 include/quadriga_lib_config.hpp

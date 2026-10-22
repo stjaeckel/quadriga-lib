@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Part of quadriga-lib — see LICENSE for terms.
 #
-# Reference models of sound transmission through plates in air (md/grazing_report.md; md/acoustic.md 2.1), independent
+# Reference models of sound transmission through plates in air (html_docu/quadriga_lib_material_model.md 5.4; md/acoustic_engine_notes.md 5), independent
 # of the library. Plane-wave acoustics, a plate in a rigid baffle between two half-spaces of air:
 #   - Plate: the transfer impedance Z_p(f, k) of a thin (Kirchhoff) or thick (Mindlin: shear and rotary inertia) plate at a
 #     trace wavenumber k; eta(f) the loss factor (eta_edge: internal plus a coupling loss m''/(Ce sqrt f) to the frame)
@@ -160,7 +160,7 @@ def davy_sigma(k, S, U, th, n=2.0):
 
 def davy_mean(k, S, U):
     """Eq. 43 (n = 2): <sigma> = int_0^90 sigma sin th dth; the infinite plate's limiting angle that gives the same diffuse
-    mass law is cos th_l = exp(1/2 - <sigma>) (md/grazing_report.md 0.5)"""
+    mass law is cos th_l = exp(1/2 - <sigma>)"""
     p, h, al, q = davy_pars(k, S, U)
     r = lambda x: x + math.sqrt(x * x + q * q)
     s = math.log(r(1.0) / r(p))
@@ -182,7 +182,7 @@ if __name__ == '__main__':
           % np.max(np.abs(tau_inf([glass], 500.0, th) / closed - 1)))
     f = np.exp(np.linspace(math.log(100), math.log(400), 20000))
     t = np.array([tau_inf([glass, Air(0.016), glass], x, np.array([0.0]))[0] for x in f])
-    print('4|16|4 at normal incidence: transmission peak at %.1f Hz (md/acoustic.md 2.8: 211.3)' % f[np.argmax(t)])
+    print('4|16|4 at normal incidence: transmission peak at %.1f Hz (expected 211.3)' % f[np.argmax(t)])
     for a, b in ((1.23, 1.48), (4.0, 2.7)):
         S, U = a * b, 2 * (a + b)
         for fx in (500.0, 2000.0):
