@@ -105,7 +105,7 @@ namespace quadriga_lib
                             dtype y_deg = 0.0,                  // Rotation around y-axis (tilt) in degrees
                             dtype z_deg = 0.0,                  // Rotation around z-axis (heading) in degrees
                             unsigned usage = 0,                 // Rotation mode, see docs
-                            unsigned element = -1,              // Element index, 0-bases, default (-1) =  update all elements
+                            unsigned element = -1,              // Element index, 0-based, default (-1) =  update all elements
                             arrayant<dtype> *output = nullptr); // Target arrayant; nullptr modifies in-place
 
         // Resize an arrayant object to new dimensions
@@ -228,7 +228,7 @@ namespace quadriga_lib
 
     // Generate isotropic radiator with vertical polarization
     // - Optional input res is the resolutions of the antenna pattern sampling grid in degree
-    // - Usage example: auto ant = quadriga_lib::generate_omni<float>();
+    // - Usage example: auto ant = quadriga_lib::generate_arrayant_omni<float>();
     template <typename dtype>
     arrayant<dtype> generate_arrayant_omni(dtype res = 1.0);
 
@@ -311,11 +311,11 @@ namespace quadriga_lib
     // Generate a parametric loudspeaker model
     // - Returns a vector of arrayant objects, one per frequency sample
     // - Each arrayant contains the complex-valued directivity balloon at that frequency
-    // - Multi-driver speakers are modelled as multi-element arrayants (one element per driver)
-    // - Driver positions are mapped to element_pos, orientations are applied via rotate_pattern
+    // - Each arrayant has a single element; multi-driver speakers are built by calling this function per driver
+    //   and combining the results via append and element_pos
     // - Supported driver types: "piston" (cone/dome), "horn" (constant directivity), "omni" (subwoofer)
     // - Supported radiation types: "monopole" (4pi), "hemisphere" (2pi, sealed box), "dipole" (figure-8), "cardioid"
-    // - If horn parameters (hor_coverage, ver_coverage, horn_control_freq) are 0, they are auto-derived from radius
+    // - Horn parameters that are 0: hor_coverage and ver_coverage default to 90 and 60 deg, horn_control_freq is derived from radius
     // - Frequency samples are in Hz; if empty, third-octave bands from lower_cutoff to upper_cutoff are used
     // - Angular resolution is in degrees; used to generate azimuth_grid and elevation_grid
     template <typename dtype>

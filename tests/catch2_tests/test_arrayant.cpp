@@ -179,6 +179,44 @@ TEST_CASE("Arrayant remove_zeros and calc_directivity_dBi - Low-level patterns (
     CHECK(z.is_valid(false).empty());
 }
 
+// remove_zeros copies the name to the output, and the azimuth spacing of the first and the last grid point wraps
+// around the circle (previous point of the first = last point - 360 deg)
+TEST_CASE("Arrayant remove_zeros - name and the azimuth spacing at the wrap-around")
+{
+    // Sector grid -30 ... 30 deg in 10 deg steps: the wrap-around gap from 30 to -30 deg is 300 deg. Power only at
+    // -30 deg: its next neighbour (-20 deg) is kept, its previous neighbour across the 300 deg gap (30 deg) is not.
+    const double d2r = arma::datum::pi / 180.0;
+    quadriga_lib::arrayant<double> a;
+    a.name = "sector";
+    a.azimuth_grid = arma::regspace<arma::vec>(-30.0, 10.0, 30.0) * d2r;
+    a.elevation_grid = arma::vec({-90.0, 0.0, 90.0}) * d2r;
+    a.e_theta_re.zeros(3, 7, 1);
+    a.e_theta_re.slice(0).col(0).fill(1.0);
+    a.e_theta_im.zeros(3, 7, 1), a.e_phi_re.zeros(3, 7, 1), a.e_phi_im.zeros(3, 7, 1);
+    a.element_pos.zeros(3, 1), a.coupling_re.ones(1, 1), a.coupling_im.zeros(1, 1);
+    a.center_frequency = 1.0e9;
+    REQUIRE(a.is_valid().empty());
+
+    quadriga_lib::arrayant<double> o;
+    o.name = "other";
+    a.remove_zeros(&o);
+    CHECK(o.name == "sector");
+    CHECK(arma::approx_equal(o.azimuth_grid, arma::vec({-30.0, -20.0}) * d2r, "absdiff", 1e-14));
+    CHECK(o.n_elevation() == 3);
+    CHECK(o.is_valid().empty());
+
+    // Power only at 30 deg: the previous neighbour (20 deg) is kept, the next one across the gap (-30 deg) is not
+    a.e_theta_re.zeros();
+    a.e_theta_re.slice(0).col(6).fill(1.0);
+    a.remove_zeros(&o);
+    CHECK(arma::approx_equal(o.azimuth_grid, arma::vec({20.0, 30.0}) * d2r, "absdiff", 1e-14));
+
+    // In place: the name is kept
+    a.remove_zeros();
+    CHECK(a.name == "sector");
+    CHECK(a.n_azimuth() == 2);
+}
+
 // B-101: copy_element must respect read_only and reject an empty destination with a clear message.
 TEST_CASE("Arrayant copy_element - Read-only object and empty destination (B-101)")
 {

@@ -85,7 +85,7 @@ ant = quadriga_lib.arrayant.generate('multibeam', M=6, N=6, freq=3.7e9, pol=1, \
 ## Inputs (multibeam only):
 - **`beam_az`** — Azimuth beam angles in degrees; `(n_beams,)`; default: `[0.0]`
 - **`beam_el`** — Elevation beam angles in degrees; `(n_beams,)`; default: `[0.0]`
-- **`beam_weight`** — Per-beam scaling factor; normalized so the sum equals 1; same length as `beam_az`; default: `[1.0, 1.0, ...]` (all-ones)
+- **`beam_weight`** — Per-beam scaling factor; not normalized; same length as `beam_az`; default: `[1.0, 1.0, ...]` (all-ones)
 - **`separate_beams`** — Produce one independent beam per angle pair (weights ignored); default: False
 - **`apply_weights`** — Apply the beamforming weights to the output coupling matrix; default: False
 

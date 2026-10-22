@@ -569,7 +569,7 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
 
             if (node_arrayant.empty()) // Append new arrayant to file
             {
-                node_arrayant = node_qdant.append_child("arrayant");
+                node_arrayant = node_qdant.append_child((pfx + "arrayant").c_str());
                 node_arrayant.append_attribute("id").set_value(ID);
                 ids.reshape(1, ids.n_elem + 1);
                 ids(0, ids.n_elem - 1) = ID;
@@ -580,7 +580,7 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
         else // ID not given
         {
             ID = ids.n_elem == 0 ? 1 : ids.max() + 1;
-            node_arrayant = node_qdant.append_child("arrayant");
+            node_arrayant = node_qdant.append_child((pfx + "arrayant").c_str());
             node_arrayant.append_attribute("id").set_value(ID);
             ids.reshape(1, ids.n_elem + 1);
             ids(0, ids.n_elem - 1) = ID;
@@ -591,12 +591,12 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
         return "Something went wrong.";
 
     // Write data
-    node_arrayant.append_child("name").text().set(name->c_str());
-    node_arrayant.append_child("CenterFrequency").text().set(*center_frequency);
+    node_arrayant.append_child((pfx + "name").c_str()).text().set(name->c_str());
+    node_arrayant.append_child((pfx + "CenterFrequency").c_str()).text().set(*center_frequency);
 
     arma::uword NoElements = e_theta_re->n_slices;
     if (NoElements > 1)
-        node_arrayant.append_child("NoElements").text().set(NoElements);
+        node_arrayant.append_child((pfx + "NoElements").c_str()).text().set(NoElements);
 
     std::ostringstream strm;
     std::string str;
@@ -608,7 +608,7 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
 
     // Element pos
     if (!element_pos->empty())
-        node_arrayant.append_child("ElementPosition").text().set(qd_qdant_float_columns(*element_pos).c_str());
+        node_arrayant.append_child((pfx + "ElementPosition").c_str()).text().set(qd_qdant_float_columns(*element_pos).c_str());
 
     const dtype rad2deg = dtype(57.295779513082323);
 
@@ -620,7 +620,7 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
     row_vec_tmp.raw_print(strm);
     str = strm.str();
     str.erase(str.size() - 1);
-    node_arrayant.append_child("ElevationGrid").text().set(str.c_str());
+    node_arrayant.append_child((pfx + "ElevationGrid").c_str()).text().set(str.c_str());
     strm.str("");
 
     // Azimuth grid
@@ -630,7 +630,7 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
     row_vec_tmp.raw_print(strm);
     str = strm.str();
     str.erase(str.size() - 1);
-    node_arrayant.append_child("AzimuthGrid").text().set(str.c_str());
+    node_arrayant.append_child((pfx + "AzimuthGrid").c_str()).text().set(str.c_str());
     strm.str("");
 
     // Coupling matrix
@@ -645,13 +645,13 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
 
         mat_tmp.transform([](dtype x)
                           { return std::sqrt(x); });
-        node_arrayant.append_child("CouplingAbs").text().set(qd_qdant_float_columns(mat_tmp).c_str());
+        node_arrayant.append_child((pfx + "CouplingAbs").c_str()).text().set(qd_qdant_float_columns(mat_tmp).c_str());
 
         // Coupling phase
         if (!coupling_im->empty())
         {
             mat_tmp = arma::atan2(*coupling_im, *coupling_re) * rad2deg;
-            node_arrayant.append_child("CouplingPhase").text().set(qd_qdant_float_columns(mat_tmp).c_str());
+            node_arrayant.append_child((pfx + "CouplingPhase").c_str()).text().set(qd_qdant_float_columns(mat_tmp).c_str());
         }
     }
 
@@ -751,7 +751,7 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
             if (write_mag) // Write magnitude
             {
                 pattern_text(mag, nullptr, element_peak, str);
-                std::string node_name_x = eName + "Mag";
+                std::string node_name_x = pfx + eName + "Mag";
                 node_pat = node_arrayant.append_child(node_name_x.c_str());
                 node_pat.append_attribute("el").set_value(i + 1);
                 node_pat.text().set(str.c_str());
@@ -763,7 +763,7 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
                 calc_phase(eRe->slice_memptr(i), eIm->slice_memptr(i), phase.memptr(), n_links);
                 if (pattern_text(mag, &phase, element_peak, str))
                 {
-                    std::string node_name_x = eName + "Phase";
+                    std::string node_name_x = pfx + eName + "Phase";
                     node_pat = node_arrayant.append_child(node_name_x.c_str());
                     node_pat.append_attribute("el").set_value(i + 1);
                     node_pat.text().set(str.c_str());

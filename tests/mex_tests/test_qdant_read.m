@@ -327,4 +327,44 @@ end
 assertTrue( failed );
 delete(fn);
 
+
+% Every number of outputs from 0 to 12 works; 0 behaves as 1, 3 to 12 are separate fields
+fn = [tempname, '.qdant'];
+a1 = quadriga_lib.arrayant_generate('xpol');
+quadriga_lib.arrayant_qdant_write(fn, a1, 1);
+ref = quadriga_lib.arrayant_qdant_read(fn, 1);
+fields = {'e_theta_re', 'e_theta_im', 'e_phi_re', 'e_phi_im', 'azimuth_grid', 'elevation_grid', ...
+    'element_pos', 'coupling_re', 'coupling_im', 'center_freq', 'name'};
+quadriga_lib.arrayant_qdant_read(fn, 1);
+assertEqual( ans, ref );
+for n = 1 : 12
+    out = cell(1, n);
+    [out{:}] = quadriga_lib.arrayant_qdant_read(fn, 1);
+    if n <= 2
+        assertEqual( out{1}, ref );
+    else
+        for k = 1 : min(n, 11)
+            assertEqual( out{k}, ref.(fields{k}) );
+        end
+    end
+    if n == 2 || n == 12
+        assertEqual( out{end}, uint32(1) );
+    end
+end
+
+% Multi-entry file without 'id': 0 outputs behave as 1, separate fields are an error
+a2 = a1; a2.center_freq = 2e9;
+quadriga_lib.arrayant_qdant_write(fn, a2, 2);
+r = quadriga_lib.arrayant_qdant_read(fn);
+quadriga_lib.arrayant_qdant_read(fn);
+assertEqual( ans, r );
+assertEqual( size(ans), [1 2] );
+failed = false;
+try
+    [~, ~, ~] = quadriga_lib.arrayant_qdant_read(fn);
+catch ME
+    failed = ~isempty(strfind(ME.message, 'Separate-fields output only available in single-frequency mode.'));
+end
+assertTrue( failed );
+delete(fn);
 end
