@@ -618,12 +618,22 @@ static inline void qd_sos_check_acf_same_map(const arma::Col<dtype> &acf, const 
 // True if two matrices share memory, i.e. the ranges [memptr, memptr + n_elem) of their elements overlap;
 // false if one of them is empty. Compared as integers, since the two pointers may belong to different blocks.
 template <typename dtype>
+static inline bool qd_sos_share_memory(const dtype *a, arma::uword n_a, const dtype *b, arma::uword n_b)
+{
+    if (n_a == 0 || n_b == 0)
+        return false;
+    const std::uintptr_t a0 = (std::uintptr_t)a, b0 = (std::uintptr_t)b;
+    return a0 < b0 + n_b * sizeof(dtype) && b0 < a0 + n_a * sizeof(dtype);
+}
+template <typename dtype>
 static inline bool qd_sos_share_memory(const arma::Mat<dtype> &a, const arma::Mat<dtype> &b)
 {
-    if (a.n_elem == 0 || b.n_elem == 0)
-        return false;
-    const std::uintptr_t a0 = (std::uintptr_t)a.memptr(), b0 = (std::uintptr_t)b.memptr();
-    return a0 < b0 + b.n_elem * sizeof(dtype) && b0 < a0 + a.n_elem * sizeof(dtype);
+    return qd_sos_share_memory(a.memptr(), a.n_elem, b.memptr(), b.n_elem);
+}
+template <typename dtype>
+static inline bool qd_sos_share_memory(const arma::Cube<dtype> &a, const arma::Mat<dtype> &b)
+{
+    return qd_sos_share_memory(a.memptr(), a.n_elem, b.memptr(), b.n_elem);
 }
 
 // Type and number of sinusoids of a preset of sos_preset (defined in sos_preset.cpp)
