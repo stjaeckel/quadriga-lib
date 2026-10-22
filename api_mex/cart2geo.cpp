@@ -19,7 +19,7 @@ Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector
 - `z/len` is clamped to [-1, 1] before `asin` to guard against `len == 0` and rounding artifacts
   pushing `abs(z/len)` slightly above 1
 - Azimuth in [-pi, pi], with the special values of `atan2` (e.g. `atan2(0, -0) = pi`); NaN input gives NaN
-  in `az` and `len`
+  in `az`, `el` and `len`
 - The AVX2 kernel computes the angles in single precision; `len` and `z/len` in double precision
 - Option to provide a single `[3, n, m]` cube or separate x, y, z `[n, m]` inputs
 

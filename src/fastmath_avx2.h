@@ -630,6 +630,7 @@ static inline void _fm256_cart2geo_ps(__m256 x, __m256 y, __m256 z,
     __m256 mask = _mm256_cmp_ps(r, _mm256_setzero_ps(), _CMP_GT_OQ);
     __m256 zn   = _mm256_and_ps(mask, _mm256_div_ps(z, r));
     *el  = _fm256_asin256_ps(_fm256_clamp_pm1_ps(zn));
+    *el  = _mm256_or_ps(*el, _mm256_cmp_ps(r, r, _CMP_UNORD_Q)); // NaN length gives NaN
 }
 
 // Half of _fm256_cart2geo_pd (4 doubles): length, x / length and y / length (x and y unscaled if the length is 0, inf
@@ -651,7 +652,7 @@ QD_FM_INLINE void _fm256_cart2geo_half_pd(__m256d x, __m256d y, __m256d z, __m12
 // Double-precision input (8 values as low / high halves): the length and z / length are computed in double precision,
 // so that vectors whose squared components underflow or overflow in float keep their direction; x and y are scaled
 // by 1 / length before they are narrowed to float for atan2. Returns az and el in float, the length in double.
-// Special values as in the generic kernel: length 0 gives el = 0; NaN gives NaN in az and len and el = 0.
+// Special values as in the generic kernel: length 0 gives el = 0; NaN gives NaN in az, el and len.
 QD_FM_INLINE void _fm256_cart2geo_pd(__m256d xl, __m256d xh, __m256d yl, __m256d yh, __m256d zl, __m256d zh,
                                      __m256 *az, __m256 *el, __m256d *len_l, __m256d *len_h)
 {
@@ -660,6 +661,10 @@ QD_FM_INLINE void _fm256_cart2geo_pd(__m256d xl, __m256d xh, __m256d yl, __m256d
     _fm256_cart2geo_half_pd(xh, yh, zh, &xs_h, &ys_h, &zn_h, len_h);
     *az = _fm256_atan2256_ps(_mm256_set_m128(ys_h, ys_l), _mm256_set_m128(xs_h, xs_l));
     *el = _fm256_asin256_ps(_fm256_clamp_pm1_ps(_mm256_set_m128(zn_h, zn_l)));
+    // NaN length gives NaN: the all-ones mask of a NaN length converts to a NaN float
+    const __m128 nan_l = _mm256_cvtpd_ps(_mm256_cmp_pd(*len_l, *len_l, _CMP_UNORD_Q));
+    const __m128 nan_h = _mm256_cvtpd_ps(_mm256_cmp_pd(*len_h, *len_h, _CMP_UNORD_Q));
+    *el = _mm256_or_ps(*el, _mm256_set_m128(nan_h, nan_l));
 }
 
 // Convert complex RE/IM to polar form (magnitude and phase angle)
@@ -670,24 +675,12 @@ static inline void _fm256_absarg_ps(__m256 re, __m256 im, __m256 * abs, __m256 *
     *arg = _fm256_atan2256_ps(im, re);
 }
 
-// Convert polar form (magnitude and phase angle) to complex RE/IM
-// Equivalent to std::polar(abs, arg): re = abs * cos(arg),  im = abs * sin(arg)
-static inline void _fm256_polar_ps(__m256 abs, __m256 arg, __m256 * re, __m256 * im)
-{
-    __m256 s, c;
-    _fm256_sincos256_ps(arg, &s, &c);
-    *re = _mm256_mul_ps(abs, c);
-    *im = _mm256_mul_ps(abs, s);
-}
-
 // AVX2 accelerated spherical interpolation (SLERP) for complex value pairs
 // Processes 8 complex pairs simultaneously with per-lane interpolation weight.
 // Behaviour matches the scalar slerp_complex_mf<float> template except:
 //   - sin(Phase) computed via sqrt(1 - cos²Phase) instead of sincos polynomial
 //     (eliminates one full sincos call, improves accuracy by ~2 ULP)
-//   - Weighted direction sum promoted to double precision to prevent catastrophic
-//     cancellation when the interpolated direction crosses a component zero
-//     (reduces worst-case ULP from millions to ~10–15)
+//   - Weighted direction sum computed in single precision, with one FMA per component
 //   - Nearly parallel directions (cos(Phase) > 0.99998, Phase < 0.0063) use the normalised linear interpolation of
 //     the directions times the interpolated amplitude; its phase differs from SLERP by less than 4e-9 rad
 //   - Optionally (zero_if_both_tiny = false) the linear result instead of zero when both amplitudes are tiny
