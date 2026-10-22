@@ -4,7 +4,9 @@
 
 #include <iostream>
 #include <algorithm>
-#include <charconv>
+#include <clocale>
+#include <cstdio>
+#include <cstdlib>
 #include <cmath>
 #include <cstring>
 #include <limits>
@@ -401,6 +403,24 @@ template std::string qd_arrayant_qdant_read(const std::string fn, const int id,
                                             double *center_frequency,
                                             arma::Mat<unsigned> *layout);
 
+// The number formatters below use snprintf / strtof instead of the std::to_chars float overloads, which need
+// GLIBCXX_3.4.29 (GCC 11) and cannot be loaded by MATLAB versions that ship an older libstdc++ (R2024a). They write
+// the same text as std::to_chars: '.' as decimal point in any locale, shortest form chosen as std::to_chars does.
+
+// Replace the decimal point of the current C locale by '.' (snprintf follows LC_NUMERIC, the file format does not)
+static void qd_qdant_c_decimal_point(char *buf)
+{
+    const char *dp = std::localeconv()->decimal_point;
+    if (dp == nullptr || dp[0] == '\0' || (dp[0] == '.' && dp[1] == '\0'))
+        return;
+    char *pos = std::strstr(buf, dp);
+    if (pos == nullptr)
+        return;
+    const size_t n_dp = std::strlen(dp);
+    *pos = '.';
+    std::memmove(pos + 1, pos + n_dp, std::strlen(pos + n_dp) + 1);
+}
+
 // Append a value rounded to the given number of decimals, without trailing zeros ("-0" is written as "0"), -inf and
 // nan as such; returns true if the written value is not "0"
 static bool qd_qdant_append_fixed(std::string &text, double value, int decimals)
@@ -410,14 +430,57 @@ static bool qd_qdant_append_fixed(std::string &text, double value, int decimals)
         text += std::isnan(value) ? "nan" : (value < 0.0 ? "-inf" : "inf");
         return true;
     }
+    // Fast path (same text as "%.*f"): round value * 10^decimals to the nearest integer, ties to even, from the exact
+    // product p + e (fma gives the rounding error e of p); p - n is exact for |p| < 2^52, and e decides only where
+    // p - n is exactly +-0.5
+    static const double scale[] = {1.0, 10.0, 100.0, 1000.0, 10000.0, 100000.0, 1000000.0};
+    if (decimals >= 0 && decimals <= 6)
+    {
+        const double p = value * scale[decimals];
+        if (std::fabs(p) < 4.0e15)
+        {
+            const double e = std::fma(value, scale[decimals], -p);
+            double n = std::nearbyint(p);
+            if (p - n == 0.5 && e > 0.0)
+                n += 1.0;
+            else if (p - n == -0.5 && e < 0.0)
+                n -= 1.0;
+            if (n == 0.0)
+            {
+                text += '0';
+                return false;
+            }
+            unsigned long long m = (unsigned long long)std::fabs(n);
+            char digits[24];
+            int nd = 0;
+            for (; m != 0ULL || nd <= decimals; m /= 10ULL) // at least one digit before the point
+                digits[nd++] = char('0' + (int)(m % 10ULL));
+            int first = 0; // trailing zeros of the decimals are dropped
+            while (first < decimals && digits[first] == '0')
+                ++first;
+            if (n < 0.0)
+                text += '-';
+            for (int i = nd - 1; i >= decimals; --i)
+                text += digits[i];
+            if (first < decimals)
+            {
+                text += '.';
+                for (int i = decimals - 1; i >= first; --i)
+                    text += digits[i];
+            }
+            return true;
+        }
+    }
+
     char buf[400];
-    auto res = std::to_chars(buf, buf + sizeof(buf), value, std::chars_format::fixed, decimals);
-    if (res.ec != std::errc())
+    int len = std::snprintf(buf, sizeof(buf), "%.*f", decimals, value);
+    if (len < 0 || len >= (int)sizeof(buf))
     {
         text += std::to_string(value);
         return true;
     }
-    char *end = res.ptr;
+    qd_qdant_c_decimal_point(buf);
+    char *end = buf + std::strlen(buf);
     if (std::find(buf, end, '.') != end)
     {
         while (end[-1] == '0')
@@ -432,6 +495,104 @@ static bool qd_qdant_append_fixed(std::string &text, double value, int decimals)
     }
     text.append(buf, end);
     return true;
+}
+
+// Append the shortest text that reads back as the same float (the text std::to_chars writes): the fewest significant
+// digits that read back as 'value' (the correctly rounded digits; a neighbour only where they do not read back), then
+// fixed or scientific notation, whichever is shorter, fixed on a tie; an integer in fixed notation is written exactly
+// (33554448, not 33554450). "-0", "inf", "-inf", "nan" and "-nan" as such.
+static void qd_qdant_append_float(std::string &text, float value)
+{
+    if (std::isnan(value))
+    {
+        text += std::signbit(value) ? "-nan" : "nan";
+        return;
+    }
+    if (std::signbit(value))
+        text += '-';
+    if (std::isinf(value))
+    {
+        text += "inf";
+        return;
+    }
+    if (value == 0.0f)
+    {
+        text += '0';
+        return;
+    }
+    const float v = std::fabs(value);
+    const char *dp = std::localeconv()->decimal_point; // strtof reads the decimal point of the C locale
+    if (dp == nullptr || dp[0] == '\0')
+        dp = ".";
+
+    // Significant digits (no trailing zeros) and decimal exponent: v ~ d.ddd * 10^exp10
+    char digits[24] = "";
+    int n_digits = 0, exp10 = 0;
+    for (int prec = 1; prec <= 9 && n_digits == 0; ++prec)
+    {
+        // The correctly rounded prec-digit value, and its neighbours (needed where the float spacing changes)
+        char buf[64];
+        std::snprintf(buf, sizeof(buf), "%.*e", prec - 1, (double)v);
+        unsigned long long d = 0ULL;
+        const char *p = buf;
+        for (; *p != 'e' && *p != '\0'; ++p)
+            if (*p >= '0' && *p <= '9')
+                d = 10ULL * d + (unsigned long long)(*p - '0');
+        const int e0 = (*p == 'e') ? std::atoi(p + 1) : 0;
+        unsigned long long p10 = 1ULL;
+        for (int i = 1; i < prec; ++i)
+            p10 *= 10ULL;
+        for (int k = 0; k < 3 && n_digits == 0; ++k)
+        {
+            unsigned long long c = (k == 0) ? d : (k == 1 ? d - 1ULL : d + 1ULL);
+            int e = e0;
+            if (c < p10) // fewer digits than prec: found at a lower precision if it reads back
+                continue;
+            if (c >= 10ULL * p10) // 10^prec: one digit more in the exponent
+                c /= 10ULL, ++e;
+            char ds[24];
+            std::snprintf(ds, sizeof(ds), "%llu", c);
+            std::string s(1, ds[0]);
+            if (ds[1] != '\0')
+                s += std::string(dp) + (ds + 1);
+            s += "e" + std::to_string(e);
+            if (std::strtof(s.c_str(), nullptr) != v)
+                continue;
+            exp10 = e;
+            std::strcpy(digits, ds);
+            n_digits = (int)std::strlen(digits);
+            while (n_digits > 1 && digits[n_digits - 1] == '0')
+                digits[--n_digits] = '\0';
+        }
+    }
+    if (n_digits == 0) // not reached for finite floats: 9 digits always read back
+    {
+        char buf[64];
+        std::snprintf(buf, sizeof(buf), "%.9g", (double)v);
+        qd_qdant_c_decimal_point(buf);
+        text += buf;
+        return;
+    }
+
+    // Scientific: d[.ddd]e+XX (at least two exponent digits); fixed: digits with the point moved by exp10
+    std::string sci(1, digits[0]);
+    if (n_digits > 1)
+        sci += std::string(".") + (digits + 1);
+    char ebuf[16];
+    std::snprintf(ebuf, sizeof(ebuf), "e%c%02d", exp10 < 0 ? '-' : '+', exp10 < 0 ? -exp10 : exp10);
+    sci += ebuf;
+    std::string fix;
+    if (exp10 < 0)
+        fix = "0." + std::string((size_t)(-exp10 - 1), '0') + digits;
+    else if (n_digits <= exp10 + 1) // integer: its exact value
+    {
+        char buf[64];
+        std::snprintf(buf, sizeof(buf), "%.0f", (double)v);
+        fix = buf;
+    }
+    else
+        fix = std::string(digits, (size_t)exp10 + 1) + "." + (digits + exp10 + 1);
+    text += (fix.size() <= sci.size()) ? fix : sci;
 }
 
 // Decimals of the pattern values, relative to the element peak: the absolute error of every complex sample after
@@ -467,7 +628,6 @@ template <typename dtype>
 static std::string qd_qdant_float_columns(const arma::Mat<dtype> &values)
 {
     std::string text;
-    char buf[64];
     for (arma::uword c = 0ULL; c < values.n_cols; ++c)
         for (arma::uword r = 0ULL; r < values.n_rows; ++r)
         {
@@ -475,8 +635,7 @@ static std::string qd_qdant_float_columns(const arma::Mat<dtype> &values)
                 text += ',';
             else if (c != 0ULL)
                 text += ' ';
-            auto res = std::to_chars(buf, buf + sizeof(buf), (float)values.at(r, c));
-            text.append(buf, res.ptr);
+            qd_qdant_append_float(text, (float)values.at(r, c));
         }
     return text;
 }

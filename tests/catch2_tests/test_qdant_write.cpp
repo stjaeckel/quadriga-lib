@@ -11,6 +11,7 @@
 #include <fstream>
 #include <iterator>
 #include <string>
+#include <clocale>
 
 TEST_CASE("Arrayant writing to QDANT file - Minimal test")
 {
@@ -339,6 +340,51 @@ TEST_CASE("Arrayant writing to QDANT file - Single-precision accuracy of positio
         CHECK(qdant_err_element(a, b) < 1e-6);
     }
 
+    std::remove(fn.c_str());
+}
+
+// Number text of the writer: the shortest float text in the form std::to_chars writes (fixed or scientific, whichever
+// is shorter), '.' as decimal point also when the C locale uses a comma
+TEST_CASE("Arrayant writing to QDANT file - Number text and locale")
+{
+    const std::string fn = "test_qdant_numtext.qdant", fn_loc = "test_qdant_numtext_locale.qdant";
+    auto read_text = [](const std::string &f)
+    {
+        std::ifstream in(f, std::ios::binary);
+        return std::string((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    };
+
+    auto a = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    a.copy_element(0, {1, 2});
+    a.element_pos = {{1200.0, 0.0001, 2.5e-7}, {-0.0, 1e-5, 1e15}, {123456.0, 0.1, 16777216.0}};
+    std::remove(fn.c_str());
+    a.qdant_write(fn);
+    const std::string txt = read_text(fn);
+    CHECK(txt.find("<ElementPosition>1200,-0,123456 1e-04,1e-05,0.1 2.5e-07,1e+15,16777216</ElementPosition>") != std::string::npos);
+
+    // A locale with a decimal comma (if one is installed) must not change a single byte
+    const std::string old_locale = std::setlocale(LC_NUMERIC, nullptr);
+    const char *comma_locale = nullptr;
+    for (const char *l : {"de_DE.UTF-8", "de_DE.utf8", "de_DE", "fr_FR.UTF-8", "fr_FR.utf8", "ru_RU.UTF-8"})
+        if (std::setlocale(LC_NUMERIC, l) != nullptr && std::string(std::localeconv()->decimal_point) == ",")
+        {
+            comma_locale = l;
+            break;
+        }
+    if (comma_locale != nullptr)
+    {
+        std::remove(fn_loc.c_str());
+        a.qdant_write(fn_loc);
+        std::setlocale(LC_NUMERIC, old_locale.c_str());
+        INFO("locale " << comma_locale);
+        CHECK(read_text(fn_loc) == txt);
+        std::remove(fn_loc.c_str());
+    }
+    else
+    {
+        std::setlocale(LC_NUMERIC, old_locale.c_str());
+        WARN("No locale with a decimal comma installed; the locale part of this test was skipped.");
+    }
     std::remove(fn.c_str());
 }
 
