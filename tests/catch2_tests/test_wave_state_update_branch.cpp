@@ -655,7 +655,7 @@ TEST_CASE("Scalar closed face - a lossy box on a rigid wall reflects no more tha
     // box on a rigid floor would reflect more than it received.
     //
     // Everything runs through ray_triangle_intersect, ray_mesh_interact and ray_state_update. The materials are porous
-    // rows of data/materials_ac.csv at 1 kHz, without tf and without the mass column; types 1 and 0 on them are the
+    // absorbers of the one-parameter acoustic mapping at 1 kHz, without tf and without the mass column; types 1 and 0 on them are the
     // control and not EM materials.
     //
     // A. The reflect port of the box, every path, against the sheet of its thickness

@@ -1,28 +1,28 @@
 # SPDX-License-Identifier: Apache-2.0
 # Part of quadriga-lib — see LICENSE for terms.
 #
-# Formula copy of what the library gives a closed mass-law sheet in air (md/acoustic.md 2.1, 2.3), written from
+# Formula copy of what the library gives a closed mass-law sheet in air (html_docu/quadriga_lib_material_model.md 5.4, 6.5), written from
 # src/ray_mesh_interact.cpp (Material::mass_X0, mass_TL, davy_sigma, Material::interface_gain, Material::tf, qd_plate) as built on
-# 2026-10-19 (M10: m > 0 switches the mass law on at 20 dB per decade; D2-b: no coiA; the finite panel: the column side).
-# Column level, GHz as the library reads them; one face in air, one body, the plate rule R1h:
+# 2026-10-19 (m > 0 switches the mass law on at 20 dB per decade, bc24b0c; no coiA; the finite panel: the column side).
+# Column level, GHz as the library reads them; one face in air, one body, the plate rule:
 #   T = a tau / (a + tau - a tau) * g_int,  R = 1 - a,  a = tf(f) (power law, clamped to [-1, 1], negative -> 0)
 #   tau = 10^(-TL/10),  TL = mass_TL(X0(f, c), c, f, side),  g_int = 10^(-att (f/fRef)^attB / 10), no gain below 0 dB
 #   side (m, default 3.29 as the library where the column is absent; 0 the infinite plate): the radiation cosine is
 #   1 / sigma, Davy's forced radiation efficiency of a square of that side, with the gain 1 / (sigma c), clipped at one
-# Checked against the library through the walker (md/m10_m15_report.md 0.1, 2.4): T within 0.0022 dB, R within
+# Checked against the library through the walker (2026-10-16/17): T within 0.0022 dB, R within
 # 0.0005 dB, sheet and traced solid, scalar types 4 / 5 and EM type 1 alike; as built on 2026-10-19 (the 13 fits of
-# md/acoustic.md 2.7 at their lab side, type 4): sheet T within 0.0000 dB, traced solid within 0.0042 dB, R within 0.0000 dB
-# (md/grazing_report.md 3).
+# the starting rows of page 11.4 at their lab side, type 4): sheet T within 0.0000 dB, traced solid within 0.0042 dB, R within 0.0000 dB
+# (de60194).
 #
 # Switches V (dict, every key optional) for what the library does not do:
 #   mfit  the mass column as a fitted slope, X0 = ((f/fRef) M)^(m/20) (the library before 2026-10-17)
-#   noatt att = 0 (candidate M11, dropped)
+#   noatt att = 0 (a dropped candidate: no att)
 #   m13   'col': eta(f) = 1/coiQ + C (f/coiF)^-1/2 (column 'C'); 'davy': + m''/(485 sqrt f_Hz),
-#         m'' = rho0 c thk / (pi fRef_Hz) (candidate M13, dropped)
-#   m14   limiting angle in degrees: every cosine bounded below by cos(m14) (candidate M14, closed 2026-10-19:
-#         superseded by the finite panel; kept to reproduce md/m10_m15_report.md)
+#         m'' = rho0 c thk / (pi fRef_Hz) (a dropped candidate: the installed loss factor in frequency)
+#   m14   limiting angle in degrees: every cosine bounded below by cos(m14) (a candidate closed 2026-10-19,
+#         superseded by the finite panel; kept to reproduce the knob study of 2026-10-16)
 #   m15   the bending loss as a resistance: TL from |1 + X c (j(1 - w) + w eta)|^2, normalized as the library
-#         (candidate M15, a proposal)
+#         (a pending proposal)
 import math
 
 FMAP = 299792458.0 / 343.0 * 1e-9          # GHz per acoustic Hz (the tests' r1::FMAP)
@@ -94,7 +94,7 @@ def davy_sigma(fG, g, side):
 
 
 def mass_TL(X, c, cross=0.0, fG=1.0, side=0.0):
-    """the library's mass_TL; cross = 2 c Xm w eta, the resistive cross term of M15 (zero in the library); side > 0 the
+    """the library's mass_TL; cross = 2 c Xm w eta, the resistive cross term of the bending loss as a resistance (zero in the library); side > 0 the
     finite panel (fG its frequency in GHz)"""
     if not (X > 1.0) or not (c > 0.0):
         return 0.0
