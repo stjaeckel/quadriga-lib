@@ -9,6 +9,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <iterator>
 #include <string>
 
 TEST_CASE("Arrayant writing to QDANT file - Minimal test")
@@ -371,5 +372,48 @@ TEST_CASE("Arrayant writing to QDANT file - A write without layout resets the la
     REQUIRE(arma::size(L1) == arma::size(L_reset));
     CHECK(arma::all(arma::vectorise(L1 == L_reset)));
 
+    std::remove(fn.c_str());
+}
+
+TEST_CASE("Arrayant writing to QDANT file - append to a file with a namespace prefix")
+{
+    // A file whose root declares a prefix (xmlns:xx) has prefixed node names; an appended or overwritten entry must
+    // use the same prefix, or it cannot be read back
+    const std::string fn = "test_qdant_prefix.qdant";
+    std::remove(fn.c_str());
+    {
+        std::ofstream f(fn);
+        f << "<?xml version=\"1.0\" encoding=\"UTF-8\"?><qdant xmlns:xx=\"http://www.quadriga-channel-model.de\">\n"
+          << "<xx:arrayant id=\"1\">\n<xx:name>first</xx:name>\n"
+          << "<xx:ElevationGrid>-90 0 90</xx:ElevationGrid>\n<xx:AzimuthGrid>-180 0 90</xx:AzimuthGrid>\n"
+          << "<xx:EthetaMag>0 0 0 0 0 0 0 0 0</xx:EthetaMag>\n</xx:arrayant></qdant>\n";
+    }
+
+    auto ant = quadriga_lib::generate_arrayant_xpol<double>(10.0);
+    ant.name = "second";
+    unsigned id = ant.qdant_write(fn); // appended with ID 2
+    CHECK(id == 2);
+
+    auto first = quadriga_lib::qdant_read<double>(fn, 1);
+    CHECK(first.name == "first");
+    auto second = quadriga_lib::qdant_read<double>(fn, 2);
+    CHECK(second.name == "second");
+    CHECK(second.e_theta_re.n_slices == 2);
+    CHECK(arma::approx_equal(second.e_theta_re, ant.e_theta_re, "absdiff", 1e-6));
+    CHECK(arma::approx_equal(second.e_phi_re, ant.e_phi_re, "absdiff", 1e-6));
+    CHECK(arma::approx_equal(second.azimuth_grid, ant.azimuth_grid, "absdiff", 1e-6));
+
+    // Overwrite entry 1 in place
+    ant.name = "replaced";
+    CHECK(ant.qdant_write(fn, 1) == 1);
+    CHECK(quadriga_lib::qdant_read<double>(fn, 1).name == "replaced");
+    CHECK(quadriga_lib::qdant_read<double>(fn, 2).name == "second");
+
+    // Every node in the file carries the prefix
+    std::ifstream f(fn);
+    std::string txt((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+    CHECK(txt.find("<name>") == std::string::npos);
+    CHECK(txt.find("<arrayant") == std::string::npos);
+    CHECK(txt.find("<EthetaMag") == std::string::npos);
     std::remove(fn.c_str());
 }

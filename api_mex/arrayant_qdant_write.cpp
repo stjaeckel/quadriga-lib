@@ -132,9 +132,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     else
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
 
-    // Check if files exisits in multi-freq mode and trow error if yes
+    // Check if files exists in multi-freq mode and throw error if yes
     if (is_multi && std::filesystem::exists(fn))
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "File exisits. Appending a multi-frequency arrays to an aeisting file is not allowed.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "File exists. Appending a multi-frequency array to an existing file is not allowed.");
 
     // Write to file
     if (is_multi)

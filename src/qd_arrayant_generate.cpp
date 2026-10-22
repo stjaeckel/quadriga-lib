@@ -766,7 +766,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_multibeam(
 - **`N`** *(optional)* — Number of horizontal (column) elements
 - **`az`** *(optional)* — Azimuth beam angles in degrees; `[n_beams]`
 - **`el`** *(optional)* — Elevation beam angles in degrees; `[n_beams]`
-- **`weight`** *(optional)* — Per-beam scaling factors (normalized to sum = 1); `[n_beams]`
+- **`weight`** *(optional)* — Per-beam scaling factors (not normalized); `[n_beams]`
 - **`center_freq`** *(optional)* — Center frequency
 - **`pol`** *(optional)* — Polarization mode:<br><br>
    | `pol` | Description           | Elements |
