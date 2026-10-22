@@ -96,7 +96,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Material properties: MATLAB struct -> std::unordered_map<std::string, std::vector<double>>
     auto mtl_prop = qd_mex_struct2map<double>(prhs[4]);
 
-    double center_freq = qd_mex_get_scalar<double>(prhs[5], "center_frequency", 1.0e9);
+    if (mxGetNumberOfElements(prhs[5]) == 0)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'center_freq' cannot be empty.");
+    double center_freq = qd_mex_get_scalar<double>(prhs[5], "center_freq");
     int lod = (nrhs < 7) ? 2 : qd_mex_get_scalar<int>(prhs[6], "lod", 2);
     int verbose = (nrhs < 8) ? 0 : qd_mex_get_scalar<int>(prhs[7], "verbose", 0);
     arma::u32_vec sub_mesh_index = (nrhs < 9) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[8], true, "sub_mesh_index");

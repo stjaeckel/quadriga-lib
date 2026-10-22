@@ -5,7 +5,11 @@
 #include <catch2/catch_test_macros.hpp>
 #include "quadriga_tools.hpp"
 
+#include <cstdio>
+#include <cstdlib>
 #include <iostream>
+#include <map>
+#include <sstream>
 #include <unordered_map>
 #include <vector>
 #include <string>
@@ -1221,4 +1225,72 @@ TEST_CASE("Calc Diffraction Gain - lod range, coord shape and empty input")
     CHECK(message(arma::mat(0, 3), arma::mat(0, 3), 0) == "Inputs 'orig' and 'dest' cannot be empty.");
     CHECK_THROWS_AS(quadriga_lib::calc_diffraction_gain<double>(arma::mat(0, 3), arma::mat(0, 3), cube, mtl_ind, mtl_map, 1.0e9, 0, &gain),
                     std::invalid_argument);
+}
+
+TEST_CASE("Calc Diffraction Gain - verbose debug output with one position")
+{
+    // verbose = 2 with one position prints one line per ray and interaction. Two cubes beside the direct path: the
+    // inner rays pass between them and leave the R-set first, so in the next iteration of a segment the R-set index
+    // of a ray differs from its G-set index. The print used the G-set index for the R-set matrices (out of bounds).
+    // Check: the print does not throw, and the destination printed for a ray is the same in every iteration of a
+    // segment (it is the waypoint of that segment). The summary lines "iG <i> segP(...)" at the end are skipped.
+    arma::uvec mtl_ind;
+    std::unordered_map<std::string, std::vector<double>> mtl_map;
+    arma::mat mtl_prop = repmat(arma::mat({{1.5, 0.0, 0.001, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}}), 24, 1);
+    mtl_matrix_to_map(mtl_prop, mtl_ind, mtl_map);
+    arma::mat orig = {{-10.0, 0.0, 0.0}}, dest = {{10.0, 0.0, 0.0}};
+
+    for (double yoff : {0.6, 1.0})
+    {
+        INFO("yoff " << yoff);
+        arma::mat mesh = arma::join_cols(quadriga_lib::cube<double>({0.5}, {}, {0.0, yoff, 0.001}),
+                                         quadriga_lib::cube<double>({0.5}, {}, {0.0, -yoff, 0.001}));
+        arma::vec gain, gain_quiet;
+        quadriga_lib::calc_diffraction_gain<double>(orig, dest, mesh, mtl_ind, mtl_map, 0.3e9, 4, &gain_quiet);
+
+        std::ostringstream out;
+        std::streambuf *old_buf = std::cout.rdbuf(out.rdbuf());
+        bool threw = false;
+        try
+        {
+            quadriga_lib::calc_diffraction_gain<double>(orig, dest, mesh, mtl_ind, mtl_map, 0.3e9, 4, &gain, nullptr, nullptr, 2);
+        }
+        catch (...)
+        {
+            threw = true;
+        }
+        std::cout.rdbuf(old_buf);
+        REQUIRE(!threw);
+        CHECK(arma::approx_equal(gain, gain_quiet, "absdiff", 0.0)); // the print does not change the result
+
+        // Parse "Seg. <iS>.<iT>" and "iG <i>, ... D(<x>,<y>,<z>), ..." lines
+        std::map<std::pair<int, int>, std::string> dest_first; // (iS, iG) -> D(...) of iteration 0
+        std::istringstream lines(out.str());
+        std::string line;
+        int iS = -1, iT = -1, n_later = 0;
+        while (std::getline(lines, line))
+        {
+            size_t p = line.find("Seg. ");
+            if (p != std::string::npos)
+            {
+                REQUIRE(std::sscanf(line.c_str() + p, "Seg. %d.%d", &iS, &iT) == 2);
+                continue;
+            }
+            if (line.rfind("iG ", 0) != 0 || line.find(", nH ") == std::string::npos) // per-interaction lines only
+                continue;
+            int iG = std::atoi(line.c_str() + 3);
+            size_t d0 = line.find(", D("), d1 = line.find(')', d0);
+            REQUIRE(d0 != std::string::npos);
+            std::string d = line.substr(d0, d1 - d0);
+            if (iT == 0)
+                dest_first[{iS, iG}] = d;
+            else
+            {
+                ++n_later;
+                REQUIRE(dest_first.count({iS, iG}) == 1);
+                CHECK(dest_first[{iS, iG}] == d);
+            }
+        }
+        CHECK(n_later > 0); // the scene has a segment with a second iteration
+    }
 }

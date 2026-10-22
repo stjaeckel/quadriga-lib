@@ -151,4 +151,13 @@ catch ME
 end
 assertTrue( failed );
 
+% lod has no default: an empty value is an error (it became 1)
+failed = false;
+try
+    [~, ~] = quadriga_lib.generate_diffraction_paths(orig, dest, fc, []);
+catch ME
+    failed = ~isempty(strfind(ME.message, 'Input ''lod'' cannot be empty.'));
+end
+assertTrue( failed );
+
 end
