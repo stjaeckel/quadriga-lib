@@ -24,7 +24,7 @@ aabb = quadriga_lib.RTtools.triangle_mesh_aabb( triangles, sub_mesh_index, vec_s
 ```
 
 ## Inputs:
-- **`triangles`** — Triangle mesh vertices in global Cartesian coordinates; `(n_triangles, 9)`
+- **`triangles`** — Triangle mesh vertices in global Cartesian coordinates; further columns are ignored; `(n_triangles, 9)`
 - **`sub_mesh_index`** *(optional)* — 1-based start indices of sub-meshes; if omitted, the AABB
   of the entire mesh is returned; uint32; `(n_sub,)`
 - **`vec_size`** *(optional)* — Alignment size for SIMD/CUDA padding (e.g., `8` for AVX2, `32` for CUDA); default: 1

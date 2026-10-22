@@ -171,5 +171,17 @@ class test_case(unittest.TestCase):
         self.assertTrue(np.isfinite(a_s[0]))
 
 
+class test_defaults(unittest.TestCase):
+
+    # Defaults: wrapping off, bank angle off (the C++ defaults; same values in C++ and MATLAB)
+    def test(self):
+        az, el, pw = [np.array([0.1, 2.9, -3.0])], [np.array([0.1, -0.2, 0.3])], [np.array([1, 0.8, 0.5])]
+        r = quadriga_lib.tools.calc_angular_spread(az, el, pw)
+        r0 = quadriga_lib.tools.calc_angular_spread(az, el, pw, False, False)
+        npt.assert_array_equal(np.ravel(r[0]), np.ravel(r0[0]))
+        npt.assert_array_equal(np.ravel(r[1]), np.ravel(r0[1]))
+        npt.assert_allclose([np.ravel(r[0])[0], np.ravel(r[1])[0]], [1.627282, 0.190512], atol=1e-6)
+
+
 if __name__ == '__main__':
     unittest.main()

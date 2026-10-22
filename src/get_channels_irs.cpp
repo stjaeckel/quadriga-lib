@@ -27,6 +27,7 @@ Calculate MIMO channel coefficients for IRS-assisted communication
 - Each segment is computed by [[get_channels_spherical]]: NLOS path lengths are `max(path_length, d_poly)` with the
   polyline length `d_poly` of the segment; the delay of a combined path is the sum of both segment delays
 - Output paths `n_path_irs` are all combinations of segment 1 and segment 2 paths that exceed `threshold_dB`
+- A segment without paths (all its path inputs empty) gives empty outputs `[n_rx, n_tx, 0]`
 - If `active_path` is provided, it overrides `threshold_dB` for path selection
 - Optional `irs_array_2` provides a separate IRS antenna pattern for the RX-facing side (asymmetric IRS)
 - Setting `center_frequency = 0.0` disables phase computation

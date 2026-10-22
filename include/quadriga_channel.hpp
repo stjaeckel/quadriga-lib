@@ -73,7 +73,7 @@ namespace quadriga_lib
                        const arma::Mat<dtype> *path_lbs_pos_add = nullptr);     // Last-bounce scatterer positions, Matrix of size [3, n_path_add]
 
         // Calculate the the effective path gain (linear scale)
-        // - sum up the power of all paths and average over the transmit and receive antennas
+        // - sum up the power of all paths and over all transmit and receive antenna pairs
         // - if coeff_re/im are not available, use path_gain/polarization instead (assume ideal XPOL antennas)
         // - throws an error if neither coeff_re/im nor path_polarization is available
         // - returns one value for each snapshot (vector with n_snap elements)
@@ -111,7 +111,7 @@ namespace quadriga_lib
         // │ Jones: [ReVV,ImVV,ReHV,ImHV,ReVH,ImVH,ReHH,ImHH]    │
         // │        × nFREQ-1 = 32×(nFREQ-1) bytes               │
         // ├─────────────────────────────────────────────────────┤
-        // | Interactions: 4 * ((nSEG-3) / 4) bytes, nSEG ≥ 7    │
+        // | Interactions: 4 * ((nSEG+1) / 4) bytes, nSEG > 2    │
         // └─────────────────────────────────────────────────────┘
 
         // Data buffer SCALAR:
@@ -120,7 +120,7 @@ namespace quadriga_lib
         // ├─────────────────────────────────────────────────────┤
         // │ Coeff: [Re,Im] × (nFREQ-4) = 8×(nFREQ-4) bytes      │
         // ├─────────────────────────────────────────────────────┤
-        // | Interactions: 4 * ((nSEG-3) / 4) bytes, nSEG ≥ 7    │
+        // | Interactions: 4 * ((nSEG+1) / 4) bytes, nSEG > 2    │
         // └─────────────────────────────────────────────────────┘
 
     public:
@@ -175,7 +175,7 @@ namespace quadriga_lib
         // Duplicate path, writing to "target"; return length
         float duplicate(path &target) const;
 
-        // Duplicate path and append segment; increase nTRA for types 1-127, nREF for types 128-255; return length
+        // Duplicate path and append segment; nREF and nTRA are not changed; return length
         // - Must be called before xpr_update/gain to use the correct path length in gain calculation
         float extend(path &target, float x, float y, float z, uint8_t type = 0) const;
 
@@ -225,7 +225,7 @@ namespace quadriga_lib
     // - All data is stored in single precision
     // - Data is added to the end of the file
     // - The index is updated to include to the newly written data
-    // - If file does not exist, a new file will be created with (nx = 65535, ny = 1, nz = 1, nw = 1)
+    // - If file does not exist, a new file will be created with (nx = 65536, ny = 1, nz = 1, nw = 1)
     // - Returns 0 if new dataset was created, 1 if dataset was overwritten or modified
     // - Overwriting replaces the slot completely: the old structured data and all unstructured datasets of the slot
     //   (also those written with hdf5_write_dset) are removed; the file does not shrink, use h5repack for that
@@ -369,10 +369,12 @@ namespace quadriga_lib
     template <typename dtype>
     void quantize_delays(const std::vector<arma::Cube<dtype>> *coeff_re, // Channel coefficients, real part, vector (n_snap) of Cubes of size [n_rx, n_tx, n_path]
                          const std::vector<arma::Cube<dtype>> *coeff_im, // Channel coefficients, imaginary part, vector (n_snap) of Cubes of size [n_rx, n_tx, n_path]
-                         const std::vector<arma::Cube<dtype>> *delay,    // Path delays in seconds, vector (n_snap) of Cubes of size [n_rx, n_tx, n_path] or [1, 1, n_path]
+                         const std::vector<arma::Cube<dtype>> *delay,    // Path delays in seconds, vector (n_snap) of Cubes of size [n_rx, n_tx, n_path] or [1, 1, n_path];
+                                                                         //   finite, > -tap_spacing/2 (values below 0 count as 0) and < 2^31 * tap_spacing
                          std::vector<arma::Cube<dtype>> *coeff_re_quant, // Output coefficients, real part, vector (n_snap) of Cubes of size [n_rx, n_tx, n_taps]
                          std::vector<arma::Cube<dtype>> *coeff_im_quant, // Output coefficients, imaginary part, vector (n_snap) of Cubes of size [n_rx, n_tx, n_taps]
-                         std::vector<arma::Cube<dtype>> *delay_quant,    // Output delays in seconds, vector (n_snap) of Cubes of size [n_rx, n_tx, n_taps] or [1, 1, n_taps]
+                         std::vector<arma::Cube<dtype>> *delay_quant,    // Output delays in seconds, vector (n_snap) of Cubes of size [n_rx, n_tx, n_taps], or [1, 1, n_taps]
+                                                                         //   for delay input [1, 1, n_path] with fix_taps 1 or 2
                          dtype tap_spacing = 5.0e-9,                     // Tap spacing in seconds
                          arma::uword max_no_taps = 48,                   // 0 = unlimited
                          dtype power_exponent = 1.0,                     // Interpolation exponent (0.5=wideband, 1.0=narrowband)
@@ -441,7 +443,7 @@ namespace quadriga_lib
     // Read ray-tracing data from QRT file
     // normalize_M options:
     //  0 : M as in QRT file, path_gain is -FSPL
-    //  1 : M has sum-column power is 2, path_gain is -FSPL - material losses
+    //  1 : M has a maximum column power of 1, path_gain is -FSPL - material losses
     template <typename dtype>
     void qrt_file_read(const std::string &fn,                               // Path to the QRT file
                        arma::uword i_cir = 0,                               // Snapshot index

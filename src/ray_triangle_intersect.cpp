@@ -50,7 +50,7 @@ void quadriga_lib::ray_triangle_intersect(
 ## Inputs:
 - **`orig`** — Ray origins in GCS; `[n_ray, 3]`
 - **`dest`** — Ray destinations in GCS; `[n_ray, 3]`
-- **`mesh`** — Triangular mesh; each row: `{x1 y1 z1 x2 y2 z2 x3 y3 z3}`; `[n_mesh, 9]`
+- **`mesh`** — Triangular mesh; each row: `{x1 y1 z1 x2 y2 z2 x3 y3 z3}`; further columns are ignored; `[n_mesh, 9]`
 - **`sub_mesh_index`** (optional) — Start indices of sub-meshes in `mesh`; enables AABB-accelerated traversal; `[n_sub]`
 - **`aabb`** (optional) — Pre-computed axis-aligned bounding boxes per sub-mesh; each row: `{x_min x_max y_min y_max z_min z_max}`; if `nullptr`, AABBs are computed from `mesh`; `[n_sub, 6]`
 - **`use_kernel`** *(optional)* — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable and for other values; auto mode selects CUDA when `n_ray >= 500` and CUDA is available, else AVX2, else GENERIC.
@@ -98,7 +98,7 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
         throw std::invalid_argument("Input 'dest' cannot be NULL.");
     if (dest->n_cols < 3)
         throw std::invalid_argument("Input 'dest' must have at least 3 columns containing x,y,z coordinates.");
-    if (dest->n_rows < n_ray)
+    if (dest->n_rows != n_ray)
         throw std::invalid_argument("Number of elements in 'orig' and 'dest' dont match.");
 
     if (mesh == nullptr)

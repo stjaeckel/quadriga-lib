@@ -207,7 +207,7 @@ void calc_beamwidth_deg(arma::uword i_element,
     dtype threshold_dB = 3.0,
     dtype *beamwidth_az = nullptr,
     dtype *beamwidth_el = nullptr,
-    dtype *z_point_ang = nullptr,
+    dtype *az_point_ang = nullptr,
     dtype *el_point_ang = nullptr) const;
 ```
 
@@ -1066,6 +1066,7 @@ void quadriga_lib::arrayant<dtype>::export_obj_file(std::string fn, dtype direct
 
                     // Add the vertices to the final list
                     size_t i_vert_final = 0; // Face index
+                    bool found = false;
 
                     // Get vertex ID
                     for (size_t i = 0; i < no_final_vert; ++i) // Search existing vertex
@@ -1077,10 +1078,11 @@ void quadriga_lib::arrayant<dtype>::export_obj_file(std::string fn, dtype direct
                         if (dd < eps)
                         {
                             i_vert_final = i;
+                            found = true;
                             break;
                         }
                     }
-                    if (i_vert_final == 0) // Add new vertex to ist
+                    if (!found) // Add new vertex to list
                     {
                         i_vert_final = no_final_vert;
                         v_final[i_vert_final] = x;
@@ -1420,6 +1422,7 @@ void quadriga_lib::arrayant<dtype>::remove_zeros(quadriga_lib::arrayant<dtype> *
     arma::mat pow(n_el, n_az, arma::fill::zeros);
     double *pw = pow.memptr();
     dtype pi_half = dtype(arma::datum::pi / 2.0);
+    dtype two_pi = dtype(2.0 * arma::datum::pi);
 
     for (auto is = 0ULL; is < n_slices; ++is)
     {
@@ -1451,8 +1454,9 @@ void quadriga_lib::arrayant<dtype>::remove_zeros(quadriga_lib::arrayant<dtype> *
     dtype *grid_ptr = azimuth_grid.memptr();
     for (auto ia = 0ULL; ia < n_az; ++ia)
     {
-        dtype p = ia == 0 ? *grid_ptr + grid_ptr[n_az - 1] : grid_ptr[ia] - grid_ptr[ia - 1];
-        dtype n = ia == n_az - 1 ? *grid_ptr + grid_ptr[ia] : grid_ptr[ia + 1] - grid_ptr[ia];
+        // Spacing to the previous and the next grid point; the first and the last point are neighbours across +/- 180 deg
+        dtype p = ia == 0 ? *grid_ptr - grid_ptr[n_az - 1] + two_pi : grid_ptr[ia] - grid_ptr[ia - 1];
+        dtype n = ia == n_az - 1 ? *grid_ptr + two_pi - grid_ptr[ia] : grid_ptr[ia + 1] - grid_ptr[ia];
 
         unsigned long long ip = ia == 0ULL ? n_az - 1ULL : ia - 1ULL;
         unsigned long long in = ia == n_az - 1ULL ? 0ULL : ia + 1ULL;
@@ -1610,6 +1614,7 @@ void quadriga_lib::arrayant<dtype>::remove_zeros(quadriga_lib::arrayant<dtype> *
         }
 
         output->center_frequency = center_frequency;
+        output->name = name;
         output->validate();
     }
 }

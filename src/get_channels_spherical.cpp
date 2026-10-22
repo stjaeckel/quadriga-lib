@@ -44,6 +44,8 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
 - If `add_fake_los_path == true`, one output path is always added (`n_path + 1` outputs): slot 0 holds the LOS path,
   with zero power if no LOS path was found. If a LOS path was found, it is moved to slot 0 and its original slot
   (input index + 1) holds a zero-power path. All other paths keep their order, shifted by one slot.
+- With 0 paths (all path inputs empty), the outputs are empty, `[n_rx, n_tx, 0]`; with `add_fake_los_path = true` they
+  hold only this zero-power LOS path, with the LOS delays and angles per antenna pair.
 
 ## Declaration:
 ```
@@ -144,6 +146,41 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
         throw std::invalid_argument(error_message.c_str());
     }
 
+    // 0 paths with add_fake_los_path: the output holds only the zero-power LOS path. Its slot (delays and angles from
+    // the TX-RX geometry) does not depend on the path data, so a dummy NLOS path (1 m longer than the LOS path, never
+    // detected as LOS) fills the input; its own slot is dropped.
+    if (add_fake_los_path && fbs_pos->n_elem == 0 && lbs_pos->n_elem == 0 && path_gain->n_elem == 0 &&
+        path_length->n_elem == 0 && M->n_elem == 0)
+    {
+        const dtype x = Rx - Tx, y = Ry - Ty, z = Rz - Tz;
+        const arma::Mat<dtype> pos_d = {(Tx + Rx) * (dtype)0.5, (Ty + Ry) * (dtype)0.5, (Tz + Rz) * (dtype)0.5};
+        const arma::Mat<dtype> fbs_d = pos_d.t();
+        const arma::Col<dtype> gain_d = {(dtype)1.0}, length_d = {std::sqrt(x * x + y * y + z * z) + (dtype)1.0};
+        arma::Mat<dtype> M_d(8, 1, arma::fill::zeros);
+        M_d.at(0) = (dtype)1.0, M_d.at(6) = (dtype)-1.0;
+
+        arma::Cube<dtype> cr, ci, dl, ad, ed, aa, ea;
+        quadriga_lib::get_channels_spherical<dtype>(tx_array, rx_array, Tx, Ty, Tz, Tb, Tt, Th, Rx, Ry, Rz, Rb, Rt, Rh,
+                                                    &fbs_d, &fbs_d, &gain_d, &length_d, &M_d, &cr, &ci, &dl,
+                                                    center_frequency, use_absolute_delays, true,
+                                                    aod == nullptr ? nullptr : &ad, eod == nullptr ? nullptr : &ed,
+                                                    aoa == nullptr ? nullptr : &aa, eoa == nullptr ? nullptr : &ea,
+                                                    use_avx2);
+
+        // Copy slot 0 to the outputs
+        auto copy_slot = [](const arma::Cube<dtype> &src, arma::Cube<dtype> *dst)
+        {
+            if (dst == nullptr)
+                return;
+            if (dst->n_rows != src.n_rows || dst->n_cols != src.n_cols || dst->n_slices != 1ULL)
+                dst->set_size(src.n_rows, src.n_cols, 1ULL);
+            std::memcpy(dst->memptr(), src.memptr(), src.n_rows * src.n_cols * sizeof(dtype));
+        };
+        copy_slot(cr, coeff_re), copy_slot(ci, coeff_im), copy_slot(dl, delay);
+        copy_slot(ad, aod), copy_slot(ed, eod), copy_slot(aa, aoa), copy_slot(ea, eoa);
+        return;
+    }
+
     // Check if the antennas are valid
     error_message = tx_array->is_valid();
     if (error_message.length() != 0)
@@ -156,6 +193,16 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
     {
         error_message = "Receive antenna: " + error_message;
         throw std::invalid_argument(error_message.c_str());
+    }
+
+    // 0 paths without add_fake_los_path: empty outputs of size [n_rx_ports, n_tx_ports, 0]
+    if (fbs_pos->n_elem == 0 && lbs_pos->n_elem == 0 && path_gain->n_elem == 0 && path_length->n_elem == 0 && M->n_elem == 0)
+    {
+        const arma::uword n_tx_ports = tx_array->n_ports(), n_rx_ports = rx_array->n_ports();
+        for (arma::Cube<dtype> *out : {coeff_re, coeff_im, delay, aod, eod, aoa, eoa})
+            if (out != nullptr && (out->n_rows != n_rx_ports || out->n_cols != n_tx_ports || out->n_slices != 0ULL))
+                out->set_size(n_rx_ports, n_tx_ports, 0ULL);
+        return;
     }
 
     // Check if the number of paths is consistent in all inputs

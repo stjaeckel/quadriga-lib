@@ -50,7 +50,7 @@ ant = quadriga_lib.arrayant_generate('3GPP', res, freq, [], [], [], M, N, pol, t
 ant = quadriga_lib.arrayant_generate('multibeam', res, freq, az_3dB, el_3dB, bfr, M, N, pol, dir, spacing);
 ant = quadriga_lib.arrayant_generate('multibeam_sep', res, freq, az_3dB, el_3dB, bfr, M, N, pol, dir, spacing);
 
-% Separate outputs (must request exactly 11)
+% Separate outputs (2 to 11 outputs)
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
     coupling_re, coupling_im, center_freq, name] = quadriga_lib.arrayant_generate( ... );
 ```
@@ -58,7 +58,7 @@ ant = quadriga_lib.arrayant_generate('multibeam_sep', res, freq, az_3dB, el_3dB,
 ## Mapping table with defaults:<br>
 | Position          | 2   | 3    | 4      | 5      | 6   | 7   | 8   | 9   | 10       | 11      | 12  | 13  | 14  | 15  | 16      |
 | ----------------- | --: | ---: | -----: | -----: | --: | --: | --: | --: | -------: | ------: | --: | --: | --: | --: | ------: |
-|  **Varialbe**     | res | freq | az_3dB | el_3dB | bfr |   M |   N | pol | tilt_dir | spacing | Mg  | Ng  | dgv | dgh | pattern |
+|  **Variable**     | res | freq | az_3dB | el_3dB | bfr |   M |   N | pol | tilt_dir | spacing | Mg  | Ng  | dgv | dgh | pattern |
 |  **Type / Unit**  | deg |   Hz |    deg |    deg | lin | int | int | int |      deg |       λ | int | int | dbl | dbl |  struct |
 | omni              |  10 | 300k |      — |      — |   — |   — |   — |   — |        — |       — |   — |   — |   — |   — |       — |
 | dipole            |   1 | 300k |      — |      — |   — |   — |   — |   — |        — |       — |   — |   — |   — |   — |       — |
@@ -76,8 +76,9 @@ ant = quadriga_lib.arrayant_generate('multibeam_sep', res, freq, az_3dB, el_3dB,
 - **`freq`** — Center frequency in Hz; default: 299792458; equivalent to λ = 1 m
 
 ## Inputs (type custom, 3GPP, multibeam, multibeam_sep):
-- **`az_3dB`** — Azimuth 3dB beamwidth in degrees; default: 90 for `custom` else triggers 3GPP / multibeam internal defaults
-- **`el_3dB`** — Elevation 3dB beamwidth in degrees; default: 90 for `custom`; else triggers 3GPP / multibeam internal defaults
+- **`az_3dB`** — Azimuth 3dB beamwidth in degrees; default: 90 for `custom`, 120 (per element) for `multibeam` and
+  `multibeam_sep`; for `3GPP`, 0 or `[]` selects the 3GPP default element pattern
+- **`el_3dB`** — Elevation 3dB beamwidth in degrees; same defaults as `az_3dB`
 - **`bfr`** — Back-to-front gain ratio (linear); default: 0
 
 ## Inputs (type ula, 3GPP, multibeam, multibeam_sep):
@@ -252,9 +253,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         arma::vec el = dir.row(1).as_col();
         arma::vec weight = (dir.n_rows > 2) ? dir.row(2).as_col() : arma::vec(dir.n_cols, arma::fill::ones);
 
+        // Match the C++ default element beamwidth (120°/120°) when user passed nothing or zero
+        double az_bw = (az_3dB > 0.0) ? az_3dB : 120.0;
+        double el_bw = (el_3dB > 0.0) ? el_3dB : 120.0;
         bool separate_beams = array_type == "multibeam_sep";
         CALL_QD(arrayant = quadriga_lib::generate_arrayant_multibeam<double>(M, N, az, el, weight, freq, pol, spacing,
-                                                                             az_3dB, el_3dB, bfr, res, separate_beams));
+                                                                             az_bw, el_bw, bfr, res, separate_beams));
     }
     else
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Array type not supported!");

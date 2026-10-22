@@ -164,6 +164,47 @@ TEST_CASE("QRT Write - init argument validation")
                     std::invalid_argument);
 }
 
+TEST_CASE("QRT Write - init leaves an existing file unchanged when an input is invalid")
+{
+    // All inputs are checked before the file is opened: a rejected call does not truncate or partly write the file
+    std::string fn = "tests/data/test_write_keep.qrt";
+    const std::string content = "existing content, not a QRT file";
+    {
+        std::ofstream f(fn, std::ios::binary | std::ios::trunc);
+        f << content;
+    }
+    auto slurp = [&fn]()
+    {
+        std::ifstream f(fn, std::ios::binary);
+        return std::string((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+    };
+    arma::fmat cir_pos(2, 3, arma::fill::zeros);
+    arma::fmat cir_orient;
+
+    // RX name with 256 characters (the second of two names)
+    std::vector<std::string> names = {"RX", std::string(256, 'a')};
+    arma::u32_vec off = {0u, 1u};
+    CHECK_THROWS_AS(quadriga_lib::qrt_file_init<float>(fn, arma::fvec{1.0f}, cir_pos, cir_orient, names, off, 1, false),
+                    std::invalid_argument);
+    CHECK(slurp() == content);
+
+    // The first CIR offset must be 0 (the reader rejects other files)
+    names = {"RX1", "RX2"};
+    off = {1u, 1u};
+    CHECK_THROWS_AS(quadriga_lib::qrt_file_init<float>(fn, arma::fvec{1.0f}, cir_pos, cir_orient, names, off, 1, false),
+                    std::invalid_argument);
+    CHECK(slurp() == content);
+
+    // A name with 255 characters is valid and reads back
+    names = {std::string(255, 'b')};
+    off = {0u};
+    quadriga_lib::qrt_file_init<float>(fn, arma::fvec{1.0f}, cir_pos, cir_orient, names, off, 1, false);
+    std::vector<std::string> names_read;
+    quadriga_lib::qrt_file_parse(fn, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &names_read);
+    CHECK(names_read == names);
+    std::remove(fn.c_str());
+}
+
 TEST_CASE("QRT Write - append then read_raw round-trip (EM)")
 {
     std::string fn = "tests/data/test_write_rt.qrt";

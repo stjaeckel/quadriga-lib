@@ -50,8 +50,8 @@ arrayant_out = quadriga_lib.arrayant_rotate_pattern([], x_deg, y_deg, z_deg, usa
    | 3    | Yes     | Yes          | No        |
    | 4    | Yes     | No           | No        |
 
-  Multi-frequency input accepts `usage` in {0, 1, 2} and never adjusts the grid (internally maps
-  0 → 3 and 1 → 4 for uniform-grid consistency across frequencies).
+  Multi-frequency input never adjusts the grid (uniform-grid consistency across frequencies): 0 and 3
+  rotate pattern and polarization, 1 and 4 the pattern only, 2 the polarization only (as in Python).
 - **`i_element`** — 1-based element indices to rotate; defaults to all elements; `[n]`
 
 ## Outputs:
@@ -100,8 +100,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         if (nlhs > 1)
             mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Multi-frequency output supports only struct output.");
 
+        // Usage 3 and 4 (no grid adjustment) are what the multi-frequency function always does for 0 and 1
+        const unsigned usage_multi = (usage == 3) ? 0 : ((usage == 4) ? 1 : usage);
         auto ant_multi = qd_mex_struct2arrayant_multi(prhs[0], true, true);
-        CALL_QD(quadriga_lib::arrayant_rotate_pattern_multi(ant_multi, x_deg, y_deg, z_deg, usage, i_element));
+        CALL_QD(quadriga_lib::arrayant_rotate_pattern_multi(ant_multi, x_deg, y_deg, z_deg, usage_multi, i_element));
 
         plhs[0] = qd_mex_arrayant2struct_multi(ant_multi);
         return;
@@ -137,8 +139,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         for (auto el : i_element)
             CALL_QD(ant.rotate_pattern(x_deg, y_deg, z_deg, usage, (unsigned)el));
 
-    // Return to MATLAB
-    if (nlhs == 1)
+    // Return to MATLAB (no output argument: the struct goes to ans)
+    if (nlhs <= 1)
         plhs[0] = qd_mex_arrayant2struct(ant);
     else if (nlhs > 1)
     {
@@ -163,6 +165,4 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         if (nlhs > 10)
             plhs[10] = mxCreateString(ant.name.c_str());
     }
-    else
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 }

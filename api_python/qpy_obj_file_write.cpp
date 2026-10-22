@@ -21,14 +21,19 @@ Write a Wavefront .obj file
 - With `split_loose_parts`, each object is split into connected components ("separate by loose parts");
   faces sharing a vertex belong to the same part, and parts of a split object are named `name.001`, `name.002`, ...
 - Without `mtl_ind`, no `usemtl` tags and no `.mtl` file are written
+- A face with `mtl_ind = 0` that follows a face with a material in the same object (or part) is preceded by
+  `usemtl (null)`, which [[obj_file_read]] reads back as 0; the `.mtl` gets no `(null)` entry. Face order and objects
+  are unchanged; a material named `(null)` that is used by a face is rejected with a `ValueError` (unused entries of
+  `mtl_names` may carry the name)
 - The `.mtl` file is named after the `.obj` and lists each used material; values default to a gray material when `bsdf` is omitted
 - Duplicate entries in `mtl_names` are merged into one `.mtl` entry if their `bsdf` rows are identical (or if `bsdf`
   is omitted); duplicates with differing `bsdf` rows are written as `name.001`, `name.002`, ...
 - If `csv_names` is given, the EM/acoustic material table is written to a companion `.csv` (named after the
   `.obj`); columns follow a fixed canonical order then any extra `csv_prop` fields (alphabetical);
   `csv_write_defaults` also emits canonical columns absent from `csv_prop`, filled with their defaults
-  (`a`, `e`, `fRef` = 1, else 0)
-- For a detailed description of the material model see <a href="http://quadriga-lib.org/formats.html">Data Formats</a>
+  (`a`, `e`, `fRef` = 1, `side` = 3.29, else 0)
+- The material model and its columns: <a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md">The quadriga-lib Material Model and Ray-Surface Physics</a>; the CSV format
+  of the material table: <a href="http://quadriga-lib.org/formats.html">Data Formats</a>
 
 ## Usage:
 ```

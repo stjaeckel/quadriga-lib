@@ -53,6 +53,8 @@ static void qd_ieee_indoor_param(arma::mat &rx_pos,                      // Outp
         Dist_m = {4.99};
     if (Dist_m.n_elem != 1 && Dist_m.n_elem != n_users)
         throw std::invalid_argument("Dist_m must be a vector of length 1 or length n_users.");
+    if (!Dist_m.is_finite())
+        throw std::invalid_argument("TX-RX distance must be finite.");
     if (arma::any(Dist_m <= 0.0))
         throw std::invalid_argument("TX-RX distance cannot be 0 or negative.");
     if (Dist_m.n_elem == 1 && n_users != 1)
@@ -74,12 +76,18 @@ static void qd_ieee_indoor_param(arma::mat &rx_pos,                      // Outp
     if (n_walls.n_elem == 1 && n_users != 1)
         n_walls = arma::uvec(n_users, arma::fill::value(n_walls[0]));
 
+    if (!std::isfinite(CarrierFreq_Hz))
+        throw std::invalid_argument("Carrier frequency must be finite.");
     if (CarrierFreq_Hz <= 0.1e9)
         throw std::invalid_argument("Invalid carrier frequency, mut be at least 100 MHz.");
 
+    // Tap spacing 10 ns / 2^k (k >= 0), relative tolerance 1e-9
     double tap_spacing_ns = tap_spacing_s * 1e9;
-    arma::uword bw_factor = (arma::uword)std::round(10.0 / tap_spacing_ns); // bandwidth expansion factor
-    if ((bw_factor & (bw_factor - 1)) != 0 || tap_spacing_ns > 10.0 || tap_spacing_ns <= 0.0)
+    double bw_factor_d = (std::isfinite(tap_spacing_ns) && tap_spacing_ns > 0.0) ? std::round(10.0 / tap_spacing_ns) : 0.0;
+    if (!(bw_factor_d >= 1.0 && bw_factor_d <= 9007199254740992.0)) // 1 to 2^53
+        throw std::invalid_argument("Tap spacing must be equal to 10 ns divided by a power of 2.");
+    arma::uword bw_factor = (arma::uword)bw_factor_d; // bandwidth expansion factor
+    if ((bw_factor & (bw_factor - 1)) != 0 || std::abs(tap_spacing_ns * bw_factor_d - 10.0) > 1.0e-8)
         throw std::invalid_argument("Tap spacing must be equal to 10 ns divided by a power of 2.");
 
     if (offset_angles.n_elem != 0 && (offset_angles.n_rows != 4 || offset_angles.n_cols != n_users))

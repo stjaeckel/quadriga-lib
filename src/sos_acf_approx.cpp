@@ -30,6 +30,7 @@ ACF produced by a set of sinusoids
   half is its mirror image, so the symmetry is exact
 - Equally spaced has the meaning given in [[sos_acf_2d]]
 - `dist_2d` may be the same object as `dist`
+- `acf_approx` cannot share memory with `freq` or `dist`; such a call throws before anything is written
 
 ## Declaration:
 ```
@@ -80,6 +81,10 @@ void quadriga_lib::sos_acf_approx(const arma::Mat<dtype> &freq,
     const arma::uword n_coeff = freq.n_rows;
     const double two_pi = 6.283185307179586, step = (double)dist.at(dist.n_elem - 1) / (double)(dist.n_elem - 1);
     const long long half = 2 * (long long)dist.n_elem - 2;
+
+    // The output is written while the inputs are still read, so it cannot share memory with one of them
+    if (qd_sos_share_memory(acf_approx, freq) || qd_sos_share_memory(acf_approx, (const arma::Mat<dtype> &)dist))
+        throw std::invalid_argument("Output 'acf_approx' cannot share memory with an input.");
 
     if (acf_approx.n_rows != n_rows || acf_approx.n_cols != n_cols || acf_approx.n_slices != n_slices)
         acf_approx.set_size(n_rows, n_cols, n_slices);

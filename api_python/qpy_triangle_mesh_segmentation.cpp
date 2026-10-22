@@ -43,7 +43,7 @@ triangles_out, sub_mesh_index, mesh_index, mtl_ind_out = \
 ## Outputs:
 - **`triangles_out`** — Reordered and padded triangle vertices; `(n_triangles_out, 9)`
 - **`sub_mesh_index`** — 0-based start indices of sub-meshes in `triangles_out`; uint32; `(n_sub,)`
-- **`mesh_index`** — 1-based mapping from original to reorganized mesh (0 = padding); uint32; `(n_triangles_out,)`
+- **`mesh_index`** — 1-based row in the input mesh of each output triangle (0 = padding); uint32; `(n_triangles_out,)`
 - **`mtl_ind_out`** — Reordered and padded material indices; `(n_triangles_out,)`; empty if `mtl_ind` is not provided
 MD!*/
 

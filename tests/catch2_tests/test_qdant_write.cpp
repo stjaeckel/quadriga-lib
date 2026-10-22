@@ -9,7 +9,9 @@
 
 #include <iostream>
 #include <fstream>
+#include <iterator>
 #include <string>
+#include <clocale>
 
 TEST_CASE("Arrayant writing to QDANT file - Minimal test")
 {
@@ -341,6 +343,51 @@ TEST_CASE("Arrayant writing to QDANT file - Single-precision accuracy of positio
     std::remove(fn.c_str());
 }
 
+// Number text of the writer: the shortest float text in the form std::to_chars writes (fixed or scientific, whichever
+// is shorter), '.' as decimal point also when the C locale uses a comma
+TEST_CASE("Arrayant writing to QDANT file - Number text and locale")
+{
+    const std::string fn = "test_qdant_numtext.qdant", fn_loc = "test_qdant_numtext_locale.qdant";
+    auto read_text = [](const std::string &f)
+    {
+        std::ifstream in(f, std::ios::binary);
+        return std::string((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    };
+
+    auto a = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    a.copy_element(0, {1, 2});
+    a.element_pos = {{1200.0, 0.0001, 2.5e-7}, {-0.0, 1e-5, 1e15}, {123456.0, 0.1, 16777216.0}};
+    std::remove(fn.c_str());
+    a.qdant_write(fn);
+    const std::string txt = read_text(fn);
+    CHECK(txt.find("<ElementPosition>1200,-0,123456 1e-04,1e-05,0.1 2.5e-07,1e+15,16777216</ElementPosition>") != std::string::npos);
+
+    // A locale with a decimal comma (if one is installed) must not change a single byte
+    const std::string old_locale = std::setlocale(LC_NUMERIC, nullptr);
+    const char *comma_locale = nullptr;
+    for (const char *l : {"de_DE.UTF-8", "de_DE.utf8", "de_DE", "fr_FR.UTF-8", "fr_FR.utf8", "ru_RU.UTF-8"})
+        if (std::setlocale(LC_NUMERIC, l) != nullptr && std::string(std::localeconv()->decimal_point) == ",")
+        {
+            comma_locale = l;
+            break;
+        }
+    if (comma_locale != nullptr)
+    {
+        std::remove(fn_loc.c_str());
+        a.qdant_write(fn_loc);
+        std::setlocale(LC_NUMERIC, old_locale.c_str());
+        INFO("locale " << comma_locale);
+        CHECK(read_text(fn_loc) == txt);
+        std::remove(fn_loc.c_str());
+    }
+    else
+    {
+        std::setlocale(LC_NUMERIC, old_locale.c_str());
+        WARN("No locale with a decimal comma installed; the locale part of this test was skipped.");
+    }
+    std::remove(fn.c_str());
+}
+
 // B-041 (documented behaviour): a write without a layout replaces the layout in the file by all IDs in file order
 TEST_CASE("Arrayant writing to QDANT file - A write without layout resets the layout (B-041)")
 {
@@ -371,5 +418,48 @@ TEST_CASE("Arrayant writing to QDANT file - A write without layout resets the la
     REQUIRE(arma::size(L1) == arma::size(L_reset));
     CHECK(arma::all(arma::vectorise(L1 == L_reset)));
 
+    std::remove(fn.c_str());
+}
+
+TEST_CASE("Arrayant writing to QDANT file - append to a file with a namespace prefix")
+{
+    // A file whose root declares a prefix (xmlns:xx) has prefixed node names; an appended or overwritten entry must
+    // use the same prefix, or it cannot be read back
+    const std::string fn = "test_qdant_prefix.qdant";
+    std::remove(fn.c_str());
+    {
+        std::ofstream f(fn);
+        f << "<?xml version=\"1.0\" encoding=\"UTF-8\"?><qdant xmlns:xx=\"http://www.quadriga-channel-model.de\">\n"
+          << "<xx:arrayant id=\"1\">\n<xx:name>first</xx:name>\n"
+          << "<xx:ElevationGrid>-90 0 90</xx:ElevationGrid>\n<xx:AzimuthGrid>-180 0 90</xx:AzimuthGrid>\n"
+          << "<xx:EthetaMag>0 0 0 0 0 0 0 0 0</xx:EthetaMag>\n</xx:arrayant></qdant>\n";
+    }
+
+    auto ant = quadriga_lib::generate_arrayant_xpol<double>(10.0);
+    ant.name = "second";
+    unsigned id = ant.qdant_write(fn); // appended with ID 2
+    CHECK(id == 2);
+
+    auto first = quadriga_lib::qdant_read<double>(fn, 1);
+    CHECK(first.name == "first");
+    auto second = quadriga_lib::qdant_read<double>(fn, 2);
+    CHECK(second.name == "second");
+    CHECK(second.e_theta_re.n_slices == 2);
+    CHECK(arma::approx_equal(second.e_theta_re, ant.e_theta_re, "absdiff", 1e-6));
+    CHECK(arma::approx_equal(second.e_phi_re, ant.e_phi_re, "absdiff", 1e-6));
+    CHECK(arma::approx_equal(second.azimuth_grid, ant.azimuth_grid, "absdiff", 1e-6));
+
+    // Overwrite entry 1 in place
+    ant.name = "replaced";
+    CHECK(ant.qdant_write(fn, 1) == 1);
+    CHECK(quadriga_lib::qdant_read<double>(fn, 1).name == "replaced");
+    CHECK(quadriga_lib::qdant_read<double>(fn, 2).name == "second");
+
+    // Every node in the file carries the prefix
+    std::ifstream f(fn);
+    std::string txt((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+    CHECK(txt.find("<name>") == std::string::npos);
+    CHECK(txt.find("<arrayant") == std::string::npos);
+    CHECK(txt.find("<EthetaMag") == std::string::npos);
     std::remove(fn.c_str());
 }

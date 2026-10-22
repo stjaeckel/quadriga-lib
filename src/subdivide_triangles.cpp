@@ -155,12 +155,12 @@ arma::uword quadriga_lib::subdivide_triangles(arma::uword n_div,
                     p_triangles_out[cnt + n_triangles_out] = v1y + fvl * e12y + fuu * e13y;     // w1y
                     p_triangles_out[cnt + 2 * n_triangles_out] = v1z + fvl * e12z + fuu * e13z; // w1z
 
-                    // Upper triangle second vertex (stored in v2 columns)
+                    // Upper triangle second vertex (stored in v3 columns)
                     p_triangles_out[cnt + 6 * n_triangles_out] = v1x + fvu * e12x + fuu * e13x; // w2x
                     p_triangles_out[cnt + 7 * n_triangles_out] = v1y + fvu * e12y + fuu * e13y; // w2y
                     p_triangles_out[cnt + 8 * n_triangles_out] = v1z + fvu * e12z + fuu * e13z; // w2z
 
-                    // Upper triangle third vertex (stored in v3 columns)
+                    // Upper triangle third vertex (stored in v2 columns)
                     p_triangles_out[cnt + 3 * n_triangles_out] = v1x + fvu * e12x + ful * e13x; // w3x
                     p_triangles_out[cnt + 4 * n_triangles_out] = v1y + fvu * e12y + ful * e13y; // w3y
                     p_triangles_out[cnt + 5 * n_triangles_out] = v1z + fvu * e12z + ful * e13z; // w3z

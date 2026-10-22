@@ -38,12 +38,17 @@ center, length, vert, direction = quadriga_lib.RTtools.icosphere( no_div, radius
 - **`length`** — Distance from origin to face plane; equals the magnitude of each
   `center` vector; `(n_faces,)`
 - **`vert`** — Vertex offsets from face center `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `(n_faces, 9)`
-- **`direction`** — Edge directions; spherical `{az1,el1,az2,el2,az3,el3}` or Cartesian
+- **`direction`** — Directions of the vertex rays; spherical `{az1,el1,az2,el2,az3,el3}` or Cartesian
   `{x1,y1,z1,x2,y2,z2,x3,y3,z3}` per `direction_xyz` flag; `(n_faces, 6)` or `[n_faces, 9)`
 MD!*/
 
 py::tuple icosphere(arma::uword n_div, double radius, bool direction_xyz)
 {
+    // The largest output (20 * n_div^2 faces, 9 values each) must fit into 64 bits, checked before the outputs are
+    // allocated (same check and message as in C++)
+    const arma::uword uword_max = std::numeric_limits<arma::uword>::max();
+    if (n_div != 0 && (n_div > uword_max / n_div || n_div * n_div > uword_max / 180))
+        throw std::invalid_argument("Input 'n_div' is too large.");
     const arma::uword n_faces = 20 * n_div * n_div;
     const arma::uword n_dir_cols = direction_xyz ? 9 : 6;
 

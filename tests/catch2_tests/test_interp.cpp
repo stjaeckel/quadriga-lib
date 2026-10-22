@@ -144,3 +144,37 @@ TEST_CASE("interp - a NaN query gives NaN, outside the grid the nearest end valu
     CHECK(std::isnan(rm(3, 1)));
     CHECK(rm(1, 1) == 10.0);
 }
+
+TEST_CASE("interp - non-finite grid values in 'xi' or 'yi' throw")
+{
+    // A NaN in a grid that is_sorted() accepts gave NaN at some queries, an unsorted grid with NaN threw inside the
+    // sort; the grids are now checked first
+    auto message = [](auto fn) -> std::string
+    {
+        try
+        {
+            fn();
+        }
+        catch (const std::invalid_argument &e)
+        {
+            return e.what();
+        }
+        return "no error";
+    };
+    const arma::vec in = {0, 10, 20, 30}, xo = {0.5, 1.5, 2.5};
+    for (double bad : {(double)NAN, (double)INFINITY, -(double)INFINITY})
+    {
+        INFO("bad " << bad);
+        for (arma::uword pos = 0; pos < 4; ++pos)
+        {
+            arma::vec xi = {0, 1, 2, 3};
+            xi(pos) = bad;
+            CHECK(message([&]() { quadriga_lib::interp_1D<double>(in, xi, xo); }) == "Input 'xi' must be finite.");
+            arma::fvec xif = arma::conv_to<arma::fvec>::from(xi), inf_ = arma::conv_to<arma::fvec>::from(in);
+            CHECK(message([&]() { quadriga_lib::interp_1D<float>(inf_, xif, arma::fvec{0.5f}); }) == "Input 'xi' must be finite.");
+        }
+        arma::vec xi = {0, 1, 2, 3}, yi = {0, bad};
+        arma::mat d = {{0, 1, 2, 3}, {10, 11, 12, 13}};
+        CHECK(message([&]() { quadriga_lib::interp_2D<double>(d, xi, yi, xo, arma::vec{0.5}); }) == "Input 'yi' must be finite.");
+    }
+}

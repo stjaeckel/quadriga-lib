@@ -206,6 +206,21 @@ assert_cpp_error( @() quadriga_lib.arrayant_generate('3GPP', [], [], [], [], [],
 assert_cpp_error( @() quadriga_lib.arrayant_generate('3GPP', [], [], [], [], [], 1, 2^32), 'Input ''N'' must be an integer from 0 to 4294967295.' );
 a = quadriga_lib.arrayant_generate('3GPP', [], [], [], [], [], 2.0);
 assertEqual( size(a.e_theta_re, 3), 2 );
+
+% Multibeam: the default element beamwidth is the documented 120 deg (0 or [] select it)
+for type = {'multibeam', 'multibeam_sep'}
+    a0 = quadriga_lib.arrayant_generate(type{1});
+    a120 = quadriga_lib.arrayant_generate(type{1}, [], [], 120, 120);
+    a90 = quadriga_lib.arrayant_generate(type{1}, [], [], 90, 90);
+    assertEqual( a0.e_theta_re, a120.e_theta_re );
+    assertEqual( a0.e_phi_re, a120.e_phi_re );
+    assertTrue( max(abs(a0.e_theta_re(:) - a90.e_theta_re(:))) > 0.1 );
+    a0 = quadriga_lib.arrayant_generate(type{1}, [], [], 0, 0);
+    assertEqual( a0.e_theta_re, a120.e_theta_re );
+    a = quadriga_lib.arrayant_generate(type{1}, [], [], 90, []);   % only the elevation takes the default
+    b = quadriga_lib.arrayant_generate(type{1}, [], [], 90, 120);
+    assertEqual( a.e_theta_re, b.e_theta_re );
+end
 end
 
 % Assert that fn() raises quadriga_lib:CPPerror with a message that contains expected (substring).

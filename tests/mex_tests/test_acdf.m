@@ -80,20 +80,22 @@ assertEqual( numel(bins), 201 );
 assertElementsAlmostEqual( Sh(end, 1), 1.0, 'absolute', 1e-10 );
 
 % --- Error: empty data ---
+failed = false;
 try
-    quadriga_lib.acdf( [] );
-    error('Expected an error for empty data');
-catch
-    % Expected
+    [~] = quadriga_lib.acdf( [] );
+catch ME
+    failed = ~isempty(strfind(ME.message, 'Input ''data'' must not be empty.'));
 end
+assertTrue( failed );
 
 % --- Error: n_bins too small ---
+failed = false;
 try
-    quadriga_lib.acdf( (0:9).', [], uint64(1) );
-    error('Expected an error for n_bins=1');
-catch
-    % Expected
+    [~] = quadriga_lib.acdf( (0:9).', [], uint64(1) );
+catch ME
+    failed = ~isempty(strfind(ME.message, 'Input ''n_bins'' must be at least 2.'));
 end
+assertTrue( failed );
 
 % --- User bins must be finite and strictly ascending ---
 failed = false;

@@ -63,6 +63,7 @@ void generate_diffraction_paths(
    | 4     | 61       | 5       | -     |
    | 5     | 1        | 2       | debug |
    | 6     | 2        | 2       | debug |
+   | 7     | 1        | 10      | direct line in 10 segments |
 
 ## Outputs:
 - **`ray_x`** — x-coordinates of path waypoints (excluding endpoints); `[n_pos, n_path, n_seg-1]`

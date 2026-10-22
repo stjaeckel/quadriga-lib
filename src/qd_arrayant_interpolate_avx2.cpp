@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "qd_arrayant_interpolate_avx2.hpp"
+#include "qd_arrayant_interpolate.hpp"
 #include <immintrin.h>
 #include <limits>
 #include <memory>
@@ -664,6 +665,15 @@ void qd_arrayant_interpolate_avx2(const arma::Cube<dtype> &e_theta_re,    // Ver
     // Early return for empty inputs (avoids wraparound UB on N_total-1)
     if (n_out == 0 || n_ang == 0)
         return;
+
+    // The gathers below use int32 offsets into the pattern cubes; larger patterns use the generic kernel
+    if ((unsigned long long)e_theta_re.n_elem > (unsigned long long)std::numeric_limits<int>::max())
+    {
+        qd_arrayant_interpolate(e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, azimuth,
+                                elevation, i_element, orientation, element_pos, V_re, V_im, H_re, H_im,
+                                dist, azimuth_loc, elevation_loc, gamma);
+        return;
+    }
 
     // Grid must have at least one sample
     if (n_azimuth == 0 || n_elevation == 0)

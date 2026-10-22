@@ -71,7 +71,7 @@ try % Wrong mesh
     aabb = quadriga_lib.triangle_mesh_aabb( mesh_seg(:,1:8)  );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Input ''mesh'' must have 9 columns containing x,y,z coordinates of 3 vertices.';
+    expectedErrorMessage = 'Input ''mesh'' must have at least 9 columns containing x,y,z coordinates of 3 vertices.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end

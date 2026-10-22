@@ -762,6 +762,101 @@ TEST_CASE("sos_val - input validation")
     }
 }
 
+TEST_CASE("sos_val - an output that shares only part of the memory of an input throws")
+{
+    // 'val' as a matrix on foreign memory that starts inside an input, or ends inside one. With two devices
+    // the first kernel writes 'val' before the normalisation reads the input again, which gave wrong values.
+    // Every such call must throw before anything is written; memory that only touches an input is accepted.
+    arma::mat freq = rnd(10, 3, -0.3, 0.3, 60), phase = rnd(10, 1, -pi, pi, 61), phase_b = rnd(10, 1, -pi, pi, 62);
+    arma::mat pos = rnd(40, 3, -20.0, 20.0, 63), pos_b = pos + 1.0;
+    arma::vec acf = {1.0, 0.5, 0.2}, dist = {0.0, 1.0, 3.0};
+    arma::mat *no_mat = nullptr;
+
+    arma::mat ref_same, ref_maps;
+    quadriga_lib::sos_val<double>(freq, phase, pos, ref_same, &pos_b, no_mat, &acf, &dist);
+    quadriga_lib::sos_val<double>(freq, phase, pos, ref_maps, &pos_b, &phase_b);
+
+    SECTION("val on column 1 of pos, every device mode")
+    {
+        arma::mat p = pos;
+        arma::mat v(p.colptr(1), 40, 1, false, true);
+        CHECK_THROWS_AS(quadriga_lib::sos_val<double>(freq, phase, p, v, &pos_b, no_mat, &acf, &dist), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_val<double>(freq, phase, p, v, &pos_b, &phase_b), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_val<double>(freq, phase, p, v), std::invalid_argument);
+        CHECK(arma::approx_equal(p, pos, "absdiff", 0.0));
+    }
+    SECTION("val starts before an input and ends inside it")
+    {
+        // One block: val on elements 10 to 49, pos_b on 45 to 164
+        arma::vec block(165);
+        std::copy(pos_b.begin(), pos_b.end(), block.begin() + 45);
+        arma::mat pb(block.memptr() + 45, 40, 3, false, true), v(block.memptr() + 10, 40, 1, false, true);
+        CHECK_THROWS_AS(quadriga_lib::sos_val<double>(freq, phase, pos, v, &pb, no_mat, &acf, &dist), std::invalid_argument);
+        CHECK(arma::approx_equal(pb, pos_b, "absdiff", 0.0));
+    }
+    SECTION("each input in turn")
+    {
+        // A one-element output on the last element of each input (one position: 'val' is [1, 1])
+        arma::mat f = freq, ph = phase, pb = pos_b, phb = phase_b, p1 = pos.row(0), pb1 = pos_b.row(0);
+        arma::vec a = acf, d = dist;
+        arma::mat vf(f.memptr() + f.n_elem - 1, 1, 1, false, true), vph(ph.memptr() + ph.n_elem - 1, 1, 1, false, true);
+        arma::mat vphb(phb.memptr() + phb.n_elem - 1, 1, 1, false, true);
+        arma::mat va(a.memptr() + a.n_elem - 1, 1, 1, false, true), vd(d.memptr() + d.n_elem - 1, 1, 1, false, true);
+        CHECK_THROWS_AS(quadriga_lib::sos_val<double>(f, phase, p1, vf), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_val<double>(freq, ph, p1, vph), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_val<double>(freq, phase, p1, vphb, &pb1, &phb), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_val<double>(freq, phase, p1, va, &pb1, no_mat, &a, &dist), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_val<double>(freq, phase, p1, vd, &pb1, no_mat, &acf, &d), std::invalid_argument);
+        arma::mat vpb(pb.memptr() + 70, 40, 1, false, true);
+        CHECK_THROWS_AS(quadriga_lib::sos_val<double>(freq, phase, pos, vpb, &pb, &phase_b), std::invalid_argument);
+        CHECK(arma::approx_equal(f, freq, "absdiff", 0.0));
+        CHECK(arma::approx_equal(ph, phase, "absdiff", 0.0));
+        CHECK(arma::approx_equal(phb, phase_b, "absdiff", 0.0));
+        CHECK(arma::approx_equal(a, acf, "absdiff", 0.0));
+        CHECK(arma::approx_equal(d, dist, "absdiff", 0.0));
+        CHECK(arma::approx_equal(pb, pos_b, "absdiff", 0.0));
+    }
+    SECTION("the error names the output")
+    {
+        arma::mat p = pos;
+        arma::mat v(p.colptr(2), 40, 1, false, true);
+        std::string msg;
+        try
+        {
+            quadriga_lib::sos_val<double>(freq, phase, p, v, &pos_b, no_mat, &acf, &dist);
+        }
+        catch (const std::invalid_argument &e)
+        {
+            msg = e.what();
+        }
+        CHECK(msg.find("'val'") != std::string::npos);
+    }
+    SECTION("float")
+    {
+        arma::fmat ff = arma::conv_to<arma::fmat>::from(freq), phf = arma::conv_to<arma::fmat>::from(phase);
+        arma::fmat pf = arma::conv_to<arma::fmat>::from(pos), pbf = arma::conv_to<arma::fmat>::from(pos_b), keep = pf;
+        arma::fvec af = arma::conv_to<arma::fvec>::from(acf), df = arma::conv_to<arma::fvec>::from(dist);
+        arma::fmat v(pf.colptr(1), 40, 1, false, true);
+        CHECK_THROWS_AS(quadriga_lib::sos_val<float>(ff, phf, pf, v, &pbf, (arma::fmat *)nullptr, &af, &df), std::invalid_argument);
+        CHECK(arma::approx_equal(pf, keep, "absdiff", 0.0f));
+    }
+    SECTION("memory next to an input is accepted")
+    {
+        // One block: pos on elements 0 to 119, val on 120 to 159, pos_b on 160 to 279
+        arma::vec block(280);
+        std::copy(pos.begin(), pos.end(), block.begin());
+        std::copy(pos_b.begin(), pos_b.end(), block.begin() + 160);
+        arma::mat p(block.memptr(), 40, 3, false, true), pb(block.memptr() + 160, 40, 3, false, true);
+        arma::mat v(block.memptr() + 120, 40, 1, false, true);
+        REQUIRE_NOTHROW(quadriga_lib::sos_val<double>(freq, phase, p, v, &pb, no_mat, &acf, &dist));
+        CHECK(arma::approx_equal(v, ref_same, "absdiff", 0.0));
+        REQUIRE_NOTHROW(quadriga_lib::sos_val<double>(freq, phase, p, v, &pb, &phase_b));
+        CHECK(arma::approx_equal(v, ref_maps, "absdiff", 0.0));
+        CHECK(arma::approx_equal(p, pos, "absdiff", 0.0));
+        CHECK(arma::approx_equal(pb, pos_b, "absdiff", 0.0));
+    }
+}
+
 TEST_CASE("sos_val - a NaN or Inf coordinate gives NaN at that position only")
 {
     // 19 positions: three AVX2 blocks, the bad positions share their blocks with good ones

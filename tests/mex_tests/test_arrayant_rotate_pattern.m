@@ -216,6 +216,18 @@ for k = 1:2
     assertElementsAlmostEqual(out_2(k).e_phi_re,   ref_2.e_phi_re,   'absolute', 1e-12);
 end
 
+% --- usage 3 and 4 in multi-freq mode map to 0 and 1, as in Python ---
+out_3 = quadriga_lib.arrayant_rotate_pattern(mf_multi, 30, 45, 60, 3);
+out_4 = quadriga_lib.arrayant_rotate_pattern(mf_multi, 30, 45, 60, 4);
+assertEqual(out_3, out_0);
+assertEqual(out_4, out_1);
+
+% --- A call without output argument returns the result as ans (both branches) ---
+quadriga_lib.arrayant_rotate_pattern(mf_ant, 30, 45, 60, 3);
+assertEqual(ans, ref_0); %#ok<NOANS>
+quadriga_lib.arrayant_rotate_pattern(mf_multi, 30, 45, 60, 0);
+assertEqual(ans, out_0); %#ok<NOANS>
+
 % --- Element selection in multi-freq mode ---
 mf_ant3 = quadriga_lib.arrayant_copy_element(mf_ant, 1, [2,3]);  % 3-element antenna
 clear mf_multi3

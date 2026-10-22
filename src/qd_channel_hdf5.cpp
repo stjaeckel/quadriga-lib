@@ -1098,7 +1098,7 @@ void quadriga_lib::hdf5_create(std::string fn, unsigned nx, unsigned ny, unsigne
     // Create and open file
     qHDF_id file(H5Fcreate(fn.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT), H5Fclose);
     if (!file.valid()) // May be invalid if file is currently opened
-        throw std::invalid_argument("Error creating file. It may be already opened already.");
+        throw std::invalid_argument("Error creating file. It may be already opened.");
 
     // Store dimension size to file
     unsigned ChannelDims[4] = {nx, ny, nz, nw};

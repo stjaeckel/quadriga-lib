@@ -47,8 +47,8 @@ arrayant_out = quadriga_lib.arrayant_combine_pattern( [], center_freq_new, azimu
 - **`elevation_grid_new`** — Alternative elevation grid in rad; in [-pi/2, pi/2]; sorted; defaults to input grid
 - **`propagation_speed`** — Wave propagation speed in m/s; positive and finite; use about 343 for acoustics;
   5th input in struct mode, 16th input with separate inputs; default: 299792458
-- **`e_theta_re`** ... **`elevation_grid`** — Required inputs for slit-mode
-- **`element_pos`** ... **`name`** — Optional inputs for slit-mode
+- **`e_theta_re`** ... **`elevation_grid`** — Required inputs for split mode
+- **`element_pos`** ... **`name`** — Optional inputs for split mode
 
 ## Outputs:
 - **`arrayant_out`** — Arrayant struct (single-frequency result) or struct array (multi-frequency

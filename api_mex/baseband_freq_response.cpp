@@ -30,6 +30,9 @@ Compute the baseband frequency response of a MIMO channel
 - Carrier positions are specified one of two ways: as a normalized `pilot_grid` paired with `bandwidth`
   (where `0.0` corresponds to `center_freq(1)` and `1.0` to `center_freq(1) + bandwidth`), or as absolute
   frequencies via `carrier_freq`; supplying both pairs is an error
+- Single-frequency and multi-snapshot modes with `carrier_freq` (same rules as the Python wrapper): the carriers may
+  come in any order and the output keeps that order; the phase reference is `center_freq(1)` when given, else the
+  lowest carrier; more than one carrier with a zero span (e.g. duplicates only) is an error
 - Multi-frequency inputs always require `center_freq`; if `carrier_freq` is omitted it is derived as
   `center_freq(1) + pilot_grid · bandwidth`
 - Multi-snapshot inputs require `center_freq` to be omitted or scalar (no combined multi-freq + multi-snap)
@@ -63,7 +66,8 @@ Compute the baseband frequency response of a MIMO channel
   must be paired with `bandwidth`; `[n_carrier, 1]`
 - **`bandwidth`** — Total baseband bandwidth in Hz; must be paired with `pilot_grid`
 - **`center_freq`** — Input sample frequencies; required for multi-frequency inputs; length must equal
-  the 4th dimension of `coeff_re`; for multi-snap must be omitted or scalar; `[n_freq, 1]`
+  the 4th dimension of `coeff_re`; for multi-snap must be omitted or scalar; with `carrier_freq` in single-frequency
+  and multi-snap mode, `center_freq(1)` is the phase reference (default: the lowest carrier); `[n_freq, 1]`
 - **`carrier_freq`** — Absolute output carrier frequencies in Hz; cannot be combined with
   `pilot_grid` + `bandwidth`; `[n_carrier, 1]`
 - **`i_snap`** — Triggers multi-snap mode. Scalar `0` processes all snapshots; a positive vector of 1-based
@@ -78,6 +82,18 @@ Compute the baseband frequency response of a MIMO channel
 - [[get_channels_spherical]] (single-frequency channel generator)
 - [[get_channels_multifreq]] (multi-frequency channel generator)
 MD!*/
+
+// Output carriers given as frequencies -> pilot grid and bandwidth, with the rules of the Python wrapper:
+// bandwidth = span (max - min), pilot 0 at 'f_ref', output order = input order, a single carrier uses bandwidth 1 Hz
+static void carriers_to_pilot_grid(const arma::vec &carrier_freq, double f_ref, arma::vec &pilot_grid, double &bandwidth)
+{
+    bandwidth = carrier_freq.max() - carrier_freq.min();
+    if (bandwidth <= 0.0 && carrier_freq.n_elem > 1)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Values in 'carrier_freq' must span a positive range.");
+    if (bandwidth <= 0.0)
+        bandwidth = 1.0; // Single carrier: avoid division by zero
+    pilot_grid = (carrier_freq - f_ref) / bandwidth;
+}
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
@@ -131,15 +147,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "In multi-snap mode, center_freq must be omitted or scalar.");
         if (!has_grid_pair && !has_xf)
             mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Provide pilot_grid+bandwidth or carrier_freq.");
-        if (has_xf && carrier_freq_in.n_elem == 1 && !has_cf)
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Single-element carrier_freq requires center_freq as reference.");
     }
     else if (n_slab == 1)
     {
         // Single-frequency mode
-        bool has_freq_pair = has_cf && has_xf;
-        if (!has_grid_pair && !has_freq_pair)
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Provide pilot_grid+bandwidth or center_freq+carrier_freq.");
+        if (!has_grid_pair && !has_xf)
+            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Provide pilot_grid+bandwidth or carrier_freq.");
     }
     else
     {
@@ -193,29 +206,14 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             bw = bandwidth;
             pilot_grid = pilot_grid_in;
         }
-        else // has_xf
-        {
-            arma::uword n_c = carrier_freq_in.n_elem;
-            if (n_c == 1)
-            {
-                bw = std::abs(carrier_freq_in[0] - center_freq[0]);
-                pilot_grid.ones(1);
-                if (carrier_freq_in[0] < center_freq[0])
-                    pilot_grid[0] = -1.0;
-            }
-            else // Anchor pilot_grid = 0 to the carrier (center_freq); otherwise fall back to the first output carrier.
-            {
-                bw = carrier_freq_in[n_c - 1] - carrier_freq_in[0];
-                double f_ref = has_cf ? center_freq[0] : carrier_freq_in[0];
-                pilot_grid = (carrier_freq_in - f_ref) / bw;
-            }
-        }
+        else // has_xf: pilot_grid = 0 at the carrier (center_freq), else at the lowest output carrier
+            carriers_to_pilot_grid(carrier_freq_in, has_cf ? center_freq[0] : carrier_freq_in.min(), pilot_grid, bw);
 
         CALL_QD(quadriga_lib::baseband_freq_response_vec<double>(&coeff_re, &coeff_im, &delay,
                                                                  &pilot_grid, bw, p_hmat_re_v, p_hmat_im_v,
                                                                  i_snap.is_empty() ? nullptr : &i_snap));
     }
-    else if (n_slab == 1) // Single-frequency backend (center_freq is the carrier ref for freq_pair)
+    else if (n_slab == 1) // Single-frequency backend
     {
         arma::vec pilot_grid;
         double bw;
@@ -225,21 +223,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             bw = bandwidth;
             pilot_grid = pilot_grid_in;
         }
-        else // has_freq_pair
-        {
-            if (n_carrier == 1)
-            {
-                bw = std::abs(carrier_freq_in[0] - center_freq[0]);
-                pilot_grid.ones(1);
-                if (carrier_freq_in[0] < center_freq[0])
-                    pilot_grid[0] = -1.0;
-            }
-            else // Anchor pilot_grid = 0 to the carrier (center_freq)
-            {
-                bw = carrier_freq_in[n_carrier - 1] - carrier_freq_in[0];
-                pilot_grid = (carrier_freq_in - center_freq[0]) / bw;
-            }
-        }
+        else // has_xf: pilot_grid = 0 at the carrier (center_freq), else at the lowest output carrier
+            carriers_to_pilot_grid(carrier_freq_in, has_cf ? center_freq[0] : carrier_freq_in.min(), pilot_grid, bw);
 
         CALL_QD(quadriga_lib::baseband_freq_response<double>(&coeff_re[0], &coeff_im[0], &delay[0],
                                                              &pilot_grid, bw, p_hmat_re, p_hmat_im));

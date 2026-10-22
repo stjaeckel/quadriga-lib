@@ -40,7 +40,7 @@ arma::uword triangle_mesh_segmentation(
 - **`meshR`** — Reordered and padded triangle vertices; `[n_meshR, 9]`
 - **`sub_mesh_index`** — 0-based start indices of sub-meshes in `meshR`; `[n_sub]`
 - **`mtl_ind_out`** *(optional)* — Reordered and padded material indices (padding = 0); `[n_meshR]`
-- **`mesh_index`** *(optional)* — 1-based mapping from original to reorganized mesh (0 = padding); `[n_meshR]`
+- **`mesh_index`** *(optional)* — 1-based row in `mesh` of each row of `meshR` (0 = padding); `[n_meshR]`
 
 ## Returns:
 - Number of created sub-meshes `n_sub`

@@ -37,8 +37,8 @@ points_out, sub_cloud_ind, forward_ind, reverse_ind = \
 ## Outputs:
 - **`points_out`** — Reorganized point cloud with points grouped by sub-cloud; `(n_points_out, 3)`
 - **`sub_cloud_index`** — 0-based starting index of each sub-cloud within `points_out`; uint32; `(n_sub,)`
-- **`forward_index`** *(optional)* — 1-based index map from `points` to `points_out`; padding entries are `0`; uint32; `(n_points_out,)`
-- **`reverse_index`** *(optional)* — 0-based index map from `points_out` back to `points`; uint32; `(n_points,)`
+- **`forward_index`** *(optional)* — 1-based row in `points` of each row of `points_out`; padding entries are `0`; uint32; `(n_points_out,)`
+- **`reverse_index`** *(optional)* — 0-based row in `points_out` of each row of `points`; uint32; `(n_points,)`
 MD!*/
 
 py::tuple point_cloud_segmentation(const py::array_t<double> &points,

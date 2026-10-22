@@ -201,7 +201,7 @@ void qd_CART2GEO_GENERIC(const dtype * x, const dtype * y, const dtype * z,
         if (len)
             len[i] = r;
         az[i] = std::atan2(yi, xi);
-        dtype zn = r > dtype(0) ? zi / r : dtype(0);
+        dtype zn = r > dtype(0) ? zi / r : (r == dtype(0) ? dtype(0) : r); // NaN length gives NaN
         zn = zn > dtype(1) ? dtype(1) : (zn < dtype(-1) ? dtype(-1) : zn);
         el[i] = std::asin(zn);
     }

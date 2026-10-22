@@ -30,6 +30,11 @@ Write data to a PNG file
 - Converts input data into a color-coded PNG file for visualization
 - Support optional selection of a colormap, as well a minimum and maximum value limits
 - Uses the <a href="https://github.com/lvandeve/lodepng">LodePNG</a> library for PNG writing
+- The auto-detected range ignores `NaN` and `+-inf`; `inf` and `-inf` values get the last and first colour
+- `NaN` values get the first colour of the map
+- A degenerate range (`max <= min` after auto-detection, e.g. constant or single-value data, all-`NaN` data, or log
+  input without a positive value; also an infinite `min_val` or `max_val`) maps every value to the first colour
+- Raises `ValueError` for empty `data` and for `min_val > max_val` (both given)
 
 ## Declaration:
 ```

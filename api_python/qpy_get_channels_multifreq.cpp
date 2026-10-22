@@ -31,6 +31,8 @@ Compute channel coefficients for spherical waves across multiple frequencies
   (zero power if no LOS path was found; LOS = the path whose length is closest to the TX-RX distance, within 0.1 mm);
   a LOS path found in the input is moved to slot 0 and leaves a zero-power path in its original slot
   (input index + 1); all other paths keep their order, shifted by one slot
+- With 0 paths (all path inputs empty), the outputs are empty, `(n_rx, n_tx, 0, n_freq_out)`; with
+  `add_fake_los_path = True` they hold only this zero-power LOS path, with the LOS delays per antenna pair
 - If `use_absolute_delays` is false, the LOS delay between the TX and RX phase centres is subtracted from all paths;
   per-element delays can then be negative, down to about -(half the TX array size + half the RX array size) /
   `propagation_speed` (both arrays endfire). [[quantize_delays]] rejects delays at or below `-tap_spacing / 2`. For
@@ -136,29 +138,20 @@ py::tuple get_channels_multifreq(const py::dict &ant_tx,
     arma::uword n_path = add_fake_los_path ? fbs_pos_a.n_cols + 1 : fbs_pos_a.n_cols;
     arma::uword n_freq_out = freq_out_a.n_elem;
 
-    // C++ core needs at least one scatterer (the MEX guard); otherwise return zero-filled output
-    bool has_path = (fbs_pos_a.n_cols != 0);
-
     std::vector<arma::cube> coeff_re, coeff_im, delay;
 
     if (complex)
     {
         // Complex path: C++ sizes plain owning cubes, then stack2numpy interleaves Re/Im into one
         // complex array. init_output cannot back a complex buffer, so this path copies the result once.
-        if (has_path)
-            quadriga_lib::get_channels_multifreq<double>(ant_tx_vec, ant_rx_vec,
-                                                         Tx, Ty, Tz, Tb, Tt, Th,
-                                                         Rx, Ry, Rz, Rb, Rt, Rh,
-                                                         fbs_pos_a, lbs_pos_a, path_gain_a, path_length_a, M_a,
-                                                         freq_in_a, freq_out_a,
-                                                         coeff_re, coeff_im, delay,
-                                                         use_absolute_delays, add_fake_los_path, propagation_speed);
-        else // no scatterer: fabricate zero-filled outputs
-        {
-            coeff_re.assign(n_freq_out, arma::cube(n_ports_rx, n_ports_tx, n_path, arma::fill::zeros));
-            coeff_im = coeff_re;
-            delay = coeff_re;
-        }
+        // (0 paths: C++ returns the zero-power LOS path with add_fake_los_path, else empty outputs)
+        quadriga_lib::get_channels_multifreq<double>(ant_tx_vec, ant_rx_vec,
+                                                     Tx, Ty, Tz, Tb, Tt, Th,
+                                                     Rx, Ry, Rz, Rb, Rt, Rh,
+                                                     fbs_pos_a, lbs_pos_a, path_gain_a, path_length_a, M_a,
+                                                     freq_in_a, freq_out_a,
+                                                     coeff_re, coeff_im, delay,
+                                                     use_absolute_delays, add_fake_los_path, propagation_speed);
 
         auto coeff_py = qd_python_stack2numpy<double, std::complex<double>>(&coeff_re, &coeff_im);
         auto delay_py = qd_python_stack2numpy(&delay);
@@ -170,22 +163,14 @@ py::tuple get_channels_multifreq(const py::dict &ant_tx,
     auto coeff_im_py = qd_python_init_output(n_ports_rx, n_ports_tx, n_path, n_freq_out, &coeff_im);
     auto delay_py = qd_python_init_output(n_ports_rx, n_ports_tx, n_path, n_freq_out, &delay);
 
-    // Call C++ library function; skip when no real path exists (outputs stay zero-filled)
-    if (has_path)
-        quadriga_lib::get_channels_multifreq<double>(ant_tx_vec, ant_rx_vec,
-                                                     Tx, Ty, Tz, Tb, Tt, Th,
-                                                     Rx, Ry, Rz, Rb, Rt, Rh,
-                                                     fbs_pos_a, lbs_pos_a, path_gain_a, path_length_a, M_a,
-                                                     freq_in_a, freq_out_a,
-                                                     coeff_re, coeff_im, delay,
-                                                     use_absolute_delays, add_fake_los_path, propagation_speed);
-    else // no scatterer: init_output memory is not guaranteed zeroed, so fill explicitly
-        for (arma::uword i = 0; i < n_freq_out; ++i)
-        {
-            coeff_re[i].zeros();
-            coeff_im[i].zeros();
-            delay[i].zeros();
-        }
+    // Call C++ library function (0 paths: the zero-power LOS path with add_fake_los_path, else empty outputs)
+    quadriga_lib::get_channels_multifreq<double>(ant_tx_vec, ant_rx_vec,
+                                                 Tx, Ty, Tz, Tb, Tt, Th,
+                                                 Rx, Ry, Rz, Rb, Rt, Rh,
+                                                 fbs_pos_a, lbs_pos_a, path_gain_a, path_length_a, M_a,
+                                                 freq_in_a, freq_out_a,
+                                                 coeff_re, coeff_im, delay,
+                                                 use_absolute_delays, add_fake_los_path, propagation_speed);
 
     return py::make_tuple(coeff_re_py, coeff_im_py, delay_py);
 }

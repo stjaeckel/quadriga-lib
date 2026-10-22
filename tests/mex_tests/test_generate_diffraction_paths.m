@@ -5,7 +5,7 @@ dest = [100, 0, 10];
 fc = 2.4e9;
 
 % Verify output shapes and weight normalization for each lod level
-lod_table = [1, 7, 3; 2, 19, 3; 3, 37, 4; 4, 61, 5; 5, 1, 2; 6, 2, 2];
+lod_table = [1, 7, 3; 2, 19, 3; 3, 37, 4; 4, 61, 5; 5, 1, 2; 6, 2, 2; 7, 1, 10];
 
 for k = 1:size(lod_table, 1)
     lod = lod_table(k, 1);
@@ -90,8 +90,8 @@ catch ME
     end
 end
 
-try % invalid lod (7, above range)
-    quadriga_lib.generate_diffraction_paths(orig, dest, fc, 7);
+try % invalid lod (8, above range)
+    quadriga_lib.generate_diffraction_paths(orig, dest, fc, 8);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'lod';
@@ -129,5 +129,35 @@ catch ME
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
+
+% lod 7 (1 path, 10 segments) is public; the valid range is 1-7; empty input names the input
+[rays7, w7] = quadriga_lib.generate_diffraction_paths(orig_m, dest_m, fc, 7);
+assertEqual( size(rays7), [n_pos, 1, 9, 3] );
+assertEqual( size(w7), [n_pos, 1, 10] );
+for bad = [-1, 0, 8]
+    failed = false;
+    try
+        [~, ~] = quadriga_lib.generate_diffraction_paths(orig, dest, fc, bad);
+    catch ME
+        failed = ~isempty(strfind(ME.message, 'Input ''lod'' must be 1-7.'));
+    end
+    assertTrue( failed );
+end
+failed = false;
+try
+    [~, ~] = quadriga_lib.generate_diffraction_paths(zeros(0, 3), zeros(0, 3), fc, 2);
+catch ME
+    failed = ~isempty(strfind(ME.message, 'Input ''orig'' cannot be empty.'));
+end
+assertTrue( failed );
+
+% lod has no default: an empty value is an error (it became 1)
+failed = false;
+try
+    [~, ~] = quadriga_lib.generate_diffraction_paths(orig, dest, fc, []);
+catch ME
+    failed = ~isempty(strfind(ME.message, 'Input ''lod'' cannot be empty.'));
+end
+assertTrue( failed );
 
 end

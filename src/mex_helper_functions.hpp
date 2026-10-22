@@ -694,8 +694,8 @@ inline mxArray *qd_mex_copy2matlab(const arma::Col<dtype> *input, // Column Vect
     dtype *ptr_o = (dtype *)mxGetData(output);
     const dtype *ptr_i = input->memptr();
 
-    if (is == nullptr) // Copy all
-        std::memcpy(ptr_o, ptr_i, sizeof(dtype) * input->n_elem);
+    if (is == nullptr) // Copy all that fit, further output elements stay zero
+        std::memcpy(ptr_o, ptr_i, sizeof(dtype) * (ns < input->n_elem ? ns : input->n_elem));
     else // Copy selected
         for (size_t i = 0ULL; i < ns; ++i)
             ptr_o[i] = is[i] >= input->n_elem ? *ptr_i : ptr_i[is[i]];
@@ -732,8 +732,8 @@ inline mxArray *qd_mex_copy2matlab(const arma::Mat<dtype> *input, // Matrix
     mxArray *output = mxCreateNumericMatrix((mwSize)m, (mwSize)ns, classID, mxREAL);
     dtype *ptr = (dtype *)mxGetData(output);
 
-    if (is == nullptr) // Copy all
-        std::memcpy(ptr, input->memptr(), sizeof(dtype) * input->n_elem);
+    if (is == nullptr) // Copy all columns that fit, further output columns stay zero
+        std::memcpy(ptr, input->memptr(), sizeof(dtype) * m * (ns < input->n_cols ? ns : input->n_cols));
     else // Copy selected
         for (size_t i = 0ULL; i < ns; ++i)
         {
@@ -774,8 +774,8 @@ inline mxArray *qd_mex_copy2matlab(const arma::Cube<dtype> *input, // Cube
     mxArray *output = mxCreateNumericArray(3, dims, classID, mxREAL);
     dtype *ptr = (dtype *)mxGetData(output);
 
-    if (is == nullptr) // Copy all
-        std::memcpy(ptr, input->memptr(), sizeof(dtype) * input->n_elem);
+    if (is == nullptr) // Copy all slices that fit, further output slices stay zero
+        std::memcpy(ptr, input->memptr(), sizeof(dtype) * m * (ns < input->n_slices ? ns : input->n_slices));
     else // Copy selected
         for (size_t i = 0ULL; i < ns; ++i)
         {
@@ -859,21 +859,17 @@ inline mxArray *qd_mex_vector2matlab(const std::vector<arma::Col<dtype>> *input,
     mxArray *output = mxCreateNumericMatrix((mwSize)m, (mwSize)ns, classID, mxREAL);
     dtype *ptr = (dtype *)mxGetData(output);
 
-    // Get snapshot range
-    size_t *js;
-    if (is == nullptr)
-    {
-        js = new size_t[input->size()];
-        for (size_t i = 0ULL; i < input->size(); ++i)
-            js[i] = i;
-    }
-    else
-        js = const_cast<size_t *>(is); // Dirty, but fast
-
-    // Copy data
+    // Copy data; without "is", snapshots after the last input element stay zero (or "padding")
     for (size_t i = 0ULL; i < ns; ++i)
     {
-        size_t k = js[i] >= input->size() ? 0ULL : js[i];
+        if (is == nullptr && i >= input->size())
+        {
+            if (use_padding)
+                for (dtype *p = &ptr[i * m]; p < &ptr[(i + 1) * m]; ++p)
+                    *p = padding;
+            continue;
+        }
+        size_t k = (is == nullptr) ? i : (is[i] >= input->size() ? 0ULL : is[i]);
         size_t r = input->at(k).n_rows;
 
         if (use_padding && r != m)
@@ -882,9 +878,6 @@ inline mxArray *qd_mex_vector2matlab(const std::vector<arma::Col<dtype>> *input,
 
         std::memcpy(&ptr[i * m], input->at(k).memptr(), sizeof(dtype) * r);
     }
-
-    if (is == nullptr)
-        delete[] js;
 
     return output;
 }
@@ -930,21 +923,17 @@ inline mxArray *qd_mex_vector2matlab(const std::vector<arma::Mat<dtype>> *input,
     mxArray *output = mxCreateNumericArray(3, dims, classID, mxREAL);
     dtype *ptr = (dtype *)mxGetData(output);
 
-    // Get snapshot range
-    size_t *js;
-    if (is == nullptr)
-    {
-        js = new size_t[input->size()];
-        for (size_t i = 0ULL; i < input->size(); ++i)
-            js[i] = i;
-    }
-    else
-        js = const_cast<size_t *>(is); // Dirty, but fast
-
-    // Copy data
+    // Copy data; without "is", snapshots after the last input element stay zero (or "padding")
     for (size_t i = 0ULL; i < ns; ++i)
     {
-        size_t k = js[i] >= input->size() ? 0ULL : js[i];
+        if (is == nullptr && i >= input->size())
+        {
+            if (use_padding)
+                for (dtype *p = &ptr[i * m]; p < &ptr[(i + 1) * m]; ++p)
+                    *p = padding;
+            continue;
+        }
+        size_t k = (is == nullptr) ? i : (is[i] >= input->size() ? 0ULL : is[i]);
         size_t r = input->at(k).n_rows, c = input->at(k).n_cols;
 
         if (use_padding && r * c != m)
@@ -958,9 +947,6 @@ inline mxArray *qd_mex_vector2matlab(const std::vector<arma::Mat<dtype>> *input,
                 std::memcpy(&ptr[i * m + ic * n_rows],
                             input->at(k).colptr(ic), sizeof(dtype) * r);
     }
-
-    if (is == nullptr)
-        delete[] js;
 
     return output;
 }
@@ -979,6 +965,8 @@ inline mxArray *qd_mex_vector2matlab(const std::vector<arma::Cube<dtype>> *input
         classID = mxDOUBLE_CLASS;
     else if (typeid(dtype).name() == typeid(unsigned).name())
         classID = mxUINT32_CLASS;
+    else if (typeid(dtype).name() == typeid(int).name())
+        classID = mxINT32_CLASS;
     else if (typeid(dtype).name() == typeid(unsigned long long).name())
         classID = mxUINT64_CLASS;
     else if (typeid(dtype).name() == typeid(long long).name())
@@ -1005,21 +993,17 @@ inline mxArray *qd_mex_vector2matlab(const std::vector<arma::Cube<dtype>> *input
     mxArray *output = mxCreateNumericArray(4, dims, classID, mxREAL);
     dtype *ptr = (dtype *)mxGetData(output);
 
-    // Get snapshot range
-    size_t *js;
-    if (is == nullptr)
-    {
-        js = new size_t[input->size()];
-        for (size_t i = 0ULL; i < input->size(); ++i)
-            js[i] = i;
-    }
-    else
-        js = const_cast<size_t *>(is); // Dirty, but fast
-
-    // Copy data
+    // Copy data; without "is", snapshots after the last input element stay zero (or "padding")
     for (size_t i = 0ULL; i < ns; ++i)
     {
-        size_t k = js[i] >= input->size() ? 0ULL : js[i];
+        if (is == nullptr && i >= input->size())
+        {
+            if (use_padding)
+                for (dtype *p = &ptr[i * m]; p < &ptr[(i + 1) * m]; ++p)
+                    *p = padding;
+            continue;
+        }
+        size_t k = (is == nullptr) ? i : (is[i] >= input->size() ? 0ULL : is[i]);
         size_t r = input->at(k).n_rows, c = input->at(k).n_cols, s = input->at(k).n_slices;
 
         if (use_padding && r * c * s != m)
@@ -1034,9 +1018,6 @@ inline mxArray *qd_mex_vector2matlab(const std::vector<arma::Cube<dtype>> *input
                     std::memcpy(&ptr[i * m + is * n_rows * n_cols + ic * n_rows],
                                 input->at(k).slice_colptr(is, ic), sizeof(dtype) * r);
     }
-
-    if (is == nullptr)
-        delete[] js;
 
     return output;
 }
@@ -1527,7 +1508,7 @@ std::vector<arma::Cube<dtype>> qd_mex_matlab2vector_Cube(const mxArray *input, s
 }
 
 // Converts input to a std::vector<bool>
-std::vector<bool> qd_mex_matlab2vector_Bool(const mxArray *input, const std::string &var_name = "")
+inline std::vector<bool> qd_mex_matlab2vector_Bool(const mxArray *input, const std::string &var_name = "")
 {
     std::vector<bool> output;
 
@@ -1673,12 +1654,12 @@ inline mxArray *qd_mex_make_struct(const std::vector<std::string> &fields, size_
     return output;
 }
 
-void qd_mex_set_field(mxArray *strct, const std::string &field, mxArray *data, size_t n = 0)
+inline void qd_mex_set_field(mxArray *strct, const std::string &field, mxArray *data, size_t n = 0)
 {
     mxSetField(strct, n, field.c_str(), data);
 }
 
-bool qd_mex_has_field(const mxArray *strct, const std::string &field)
+inline bool qd_mex_has_field(const mxArray *strct, const std::string &field)
 {
     if (!mxIsStruct(strct))
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input must be a struct.");

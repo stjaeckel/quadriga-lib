@@ -270,7 +270,7 @@ void quadriga_lib::quantize_delays(const std::vector<arma::Cube<dtype>> *coeff_r
         throw std::invalid_argument("Inputs 'coeff_re' and 'delay' must have the same length.");
     if (!(tap_spacing > (dtype)0) || !std::isfinite(tap_spacing) || !std::isfinite((dtype)1.0 / tap_spacing))
         throw std::invalid_argument("Input 'tap_spacing' must be positive and finite.");
-    if (power_exponent <= (dtype)0)
+    if (!(power_exponent > (dtype)0)) // Also rejects NaN
         throw std::invalid_argument("Input 'power_exponent' must be positive.");
     if (fix_taps < 0 || fix_taps > 3)
         throw std::invalid_argument("Input 'fix_taps' must be 0, 1, 2, or 3.");

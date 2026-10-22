@@ -62,7 +62,7 @@ assert_throws( @() quadriga_lib.sos_rand( dd, pos, [], [], 'Comb256', 7, 1 ), 'W
 assert_throws( @() out2( dd, pos ), 'Wrong number of output arguments.' );
 assert_throws( @() quadriga_lib.sos_rand( [5, -1], pos ), 'dist_decorr' );                     % thrown by C++
 assert_throws( @() quadriga_lib.sos_rand( dd, pos, [], dd ), 'dist_decorr_b' );                % thrown by C++
-assert_throws( @() quadriga_lib.sos_rand( dd, pos, [], [], 'Comb300' ), 'name' );              % thrown by C++
+assert_throws( @() quadriga_lib.sos_rand( dd, pos, [], [], 'Comb300' ), 'Input ''preset'' is not a known preset.' );  % thrown by C++
 assert_throws( @() quadriga_lib.sos_rand( dd, pos, [], [], [], NaN ), 'Input ''seed''' );            % wrapper
 assert_throws( @() quadriga_lib.sos_rand( dd, pos, [], [], [], -2 ), 'seed' );                        % thrown by C++
 
