@@ -5,6 +5,7 @@
 #include "quadriga_channel.hpp"
 #include "quadriga_tools.hpp"
 #include "qd_atmospheric_absorption.hpp"
+#include <limits>
 
 static_assert(sizeof(arma::uword) == sizeof(unsigned long long), "arma::uword and unsigned long long have different sizes");
 static_assert(sizeof(size_t) == sizeof(unsigned long long), "size_t and unsigned long long have different sizes");
@@ -304,12 +305,13 @@ void quadriga_lib::qrt_file_init(
 ```
 
 ## Inputs:
-- **`fn`** — Path to the QRT file to create (truncated if it exists)
+- **`fn`** — Path to the QRT file to create (truncated if it exists; all inputs are checked before the file is
+  opened, so an invalid input throws and leaves an existing file unchanged)
 - **`freq`** — Frequencies in GHz (EM) or Hz (scalar); `[n_freq]`, 1 to 127 entries
 - **`cir_pos`** — CIR positions in Cartesian coordinates; `[no_cir, 3]`
 - **`cir_orientation`** — CIR orientations as Euler angles (bank, tilt, head); `[no_cir, 3]` or empty for none
-- **`dest_names`** — Receiver (MT) names; `[no_dest]`
-- **`cir_offset`** — CIR offset for each receiver, 0-based; `[no_dest]`, must equal `dest_names` in length
+- **`dest_names`** — Receiver (MT) names, at most 255 characters each; `[no_dest]`
+- **`cir_offset`** — CIR offset for each receiver, 0-based, the first entry 0; `[no_dest]`, must equal `dest_names` in length
 - **`no_orig`** — Number of origin (TX) slots to reserve; at least 1
 - **`scalar_mode`** — `true` writes a v6 scalar-layout file, `false` a v5 EM file
 
@@ -333,13 +335,23 @@ void quadriga_lib::qrt_file_init(const std::string &fn,
     if (no_orig == 0)
         throw std::invalid_argument("qrt_file_init: 'no_orig' must be at least 1.");
 
-    unsigned no_cir = (unsigned)cir_pos.n_rows;
+    // All inputs are checked here, before the file is opened, so that a rejected call leaves an existing file unchanged
     if (cir_pos.n_cols != 3)
         throw std::invalid_argument("qrt_file_init: 'cir_pos' must be [n_cir, 3].");
+    if ((unsigned long long)cir_pos.n_rows > (unsigned long long)std::numeric_limits<unsigned>::max())
+        throw std::invalid_argument("qrt_file_init: 'cir_pos' has too many rows.");
+    unsigned no_cir = (unsigned)cir_pos.n_rows;
     if (cir_orientation.n_elem != 0 && (cir_orientation.n_rows != no_cir || cir_orientation.n_cols != 3))
         throw std::invalid_argument("qrt_file_init: 'cir_orientation' must be empty or [n_cir, 3].");
     if (dest_names.size() != cir_offset.n_elem)
         throw std::invalid_argument("qrt_file_init: 'dest_names' and 'cir_offset' length mismatch.");
+    if ((unsigned long long)dest_names.size() > (unsigned long long)std::numeric_limits<unsigned>::max())
+        throw std::invalid_argument("qrt_file_init: 'dest_names' has too many entries.");
+    if (cir_offset.n_elem != 0 && cir_offset[0] != 0)
+        throw std::invalid_argument("qrt_file_init: 'cir_offset' must start with 0.");
+    for (const auto &name : dest_names)
+        if (name.size() > 255)
+            throw std::invalid_argument("qrt_file_init: RX name exceeds 255 characters.");
 
     unsigned no_dest = (unsigned)dest_names.size();
     unsigned no_freq = (unsigned)freq.n_elem;
@@ -405,8 +417,6 @@ void quadriga_lib::qrt_file_init(const std::string &fn,
     fileW.write((char *)cir_offset.memptr(), no_dest * sizeof(unsigned));
     for (unsigned i = 0; i < no_dest; ++i)
     {
-        if (dest_names[i].size() > 255)
-            throw std::invalid_argument("qrt_file_init: RX name exceeds 255 characters.");
         uint8_t len = (uint8_t)dest_names[i].size();
         fileW.write((char *)&len, sizeof(uint8_t));
         fileW.write(dest_names[i].data(), (std::streamsize)len);
@@ -1733,7 +1743,7 @@ Read raw ray-tracing path data from a QRT file into path objects
 - Reassembles the stored path data for a single origin (TX) into a vector of [[path]] objects — the inverse of [[qrt_file_append]].
 - Unlike [[qrt_file_read]], which returns processed CIR data (channel matrices, angles, path loss), this returns the raw per-path storage:
   coordinates, polarization coefficients, and interaction type codes.
-- Each returned path has `iC` set to its CIR index and `iR` to a running index within the origin. Counters not stored in the file
+- Each returned path has `iC` set to its CIR index. Counters not stored in the file
   (`nREF`, `nTRA`, `nSUB`, `nSCT`) and `length` are left at their defaults.
 - Only v05/v06 files can be read as raw paths; v4 legacy files are rejected.
 - An origin slot that was reserved by [[qrt_file_init]] but never written by [[qrt_file_append]] returns an empty vector.

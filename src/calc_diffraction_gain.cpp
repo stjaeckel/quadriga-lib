@@ -497,10 +497,10 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
                               << ", buf " << g_buf[iG] << ">" << buf_out[iR]
                               << ", P " << p_weight[iD] << " > " << seg_weight
                               << ", acc (" << g_acc_ref[iG] << ", " << g_acc_geo[iG] << ") > (" << acc_ref_out[iR] << ", " << acc_geo_out[iR] << ")"
-                              << ", O(" << s_orig.at(iG, 0) << "," << s_orig.at(iG, 1) << "," << s_orig.at(iG, 2) << ")"
-                              << ", D(" << s_dest.at(iG, 0) << "," << s_dest.at(iG, 1) << "," << s_dest.at(iG, 2) << ")"
-                              << ", F" << fbs_ind[iR] << "-(" << fbsN.at(iG, 0) << "," << fbsN.at(iG, 1) << "," << fbsN.at(iG, 2) << ")"
-                              << ", S" << sbs_ind[iR] << "-(" << sbsN.at(iG, 0) << "," << sbsN.at(iG, 1) << "," << sbsN.at(iG, 2) << ")"
+                              << ", O(" << s_orig.at(iR, 0) << "," << s_orig.at(iR, 1) << "," << s_orig.at(iR, 2) << ")"
+                              << ", D(" << s_dest.at(iR, 0) << "," << s_dest.at(iR, 1) << "," << s_dest.at(iR, 2) << ")"
+                              << ", F" << fbs_ind[iR] << "-(" << fbsN.at(iR, 0) << "," << fbsN.at(iR, 1) << "," << fbsN.at(iR, 2) << ")"
+                              << ", S" << sbs_ind[iR] << "-(" << sbsN.at(iR, 0) << "," << sbsN.at(iR, 1) << "," << sbsN.at(iR, 2) << ")"
                               << ", theta = " << fbs_angle[iR] * 57.29577951308232
                               << std::endl;
                     xprmatN.t().print("XPR = ");

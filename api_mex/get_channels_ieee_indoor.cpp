@@ -38,14 +38,14 @@ chan = quadriga_lib.get_channels_ieee_indoor( ap_array, sta_array, channel_type,
 - **`ap_array`** — Access point array antenna; `n_tx` = number of ports after element coupling; see [[arrayant_generate]]
 - **`sta_array`** — Mobile station array antenna; `n_rx` = number of ports after element coupling; see [[arrayant_generate]]
 - **`channel_type`** — Model type string; one of `"A"`, `"B"`, `"C"`, `"D"`, `"E"`, `"F"`
-- **`center_freq`** — Carrier frequency; default: 5.25e9
+- **`center_freq`** — Carrier frequency (finite); default: 5.25e9
 - **`tap_spacing_s`** — Tap spacing in seconds; must equal `10 ns / 2^k`; default: 10e-9
 - **`n_users`** — Number of users (TGac/TGah/TGax only); output vector length equals `n_users`; default: 1
 - **`observation_time`** — Channel observation time in seconds; must be finite; default: 0
 - **`update_rate`** — Channel update interval in seconds (finite, > 0); relevant only when `observation_time > 0`; default: 1e-3
-- **`speed_station_kmh`** — Station speed in km/h; movement direction is `AoA_offset`; relevant only when `observation_time > 0`; default: 0
-- **`speed_env_kmh`** — Environment speed in km/h; use `0.089` for TGac; relevant only when `observation_time > 0`; default: 1.2 (TGn)
-- **`dist_m`** — TX-to-RX distance(s); `[n_users]` or `[1]`; default: 4.99
+- **`speed_station_kmh`** — Station speed in km/h (finite); movement direction is `AoA_offset`; relevant only when `observation_time > 0`; default: 0
+- **`speed_env_kmh`** — Environment speed in km/h (finite); use `0.089` for TGac; relevant only when `observation_time > 0`; default: 1.2 (TGn)
+- **`dist_m`** — TX-to-RX distance(s) (finite); `[n_users]` or `[1]`; default: 4.99
 - **`n_floors`** — Number of floors per user for TGah or TGax models (0 to 4, attenuation only, no delay); `[n_users]` or `[1]`; default: 0
 - **`uplink`** — Set `true` to generate uplink (reverse) direction; coefficients are the transpose of the downlink; default: false
 - **`offset_angles`** — Azimuth offset angles in degrees; rows: AoD LOS, AoD NLOS, AoA LOS, AoA NLOS;

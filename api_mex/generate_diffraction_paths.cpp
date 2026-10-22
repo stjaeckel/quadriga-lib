@@ -62,6 +62,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::mat orig = qd_mex_get_Mat<double>(prhs[0]);
     const arma::mat dest = qd_mex_get_Mat<double>(prhs[1]);
     const double center_frequency = qd_mex_get_scalar<double>(prhs[2], "center_frequency", 0.0);
+    if (mxGetNumberOfElements(prhs[3]) == 0)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'lod' cannot be empty.");
     const int lod = qd_mex_get_scalar<int>(prhs[3], "lod", 1);
 
     // Output sizes depend on lod and are set by C++

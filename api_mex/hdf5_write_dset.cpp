@@ -23,7 +23,7 @@ Write a single unstructured dataset to an HDF5 file
 - Supported types: string, scalar, vector (row or column), 2D matrix, and 3D array; numeric element
   types: single, double, int32, uint32, int64, uint64
 - Arrays with more than 3 dimensions, sparse and complex arrays are rejected
-- Row vectors are stored as column vectors
+- Row vectors are stored as given (`[1, n]`)
 
 ## Usage:
 ```

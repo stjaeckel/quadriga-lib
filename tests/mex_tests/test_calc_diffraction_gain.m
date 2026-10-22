@@ -310,6 +310,14 @@ assert_throws( @() quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_ind
     'Input ''lod'' must be 0-7.' );
 assert_throws( @() quadriga_lib.calc_diffraction_gain( zeros(0,3), zeros(0,3), cube, mtl_ind, mtl_st, 1e9 ), ...
     'Inputs ''orig'' and ''dest'' cannot be empty.' );
+% center_freq is mandatory: an empty value is an error (it became 1 GHz)
+failed = false;
+try
+    [~] = quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_ind, mtl_st, [], 0 );
+catch ME
+    failed = ~isempty(strfind(ME.message, 'Input ''center_freq'' cannot be empty.'));
+end
+assertTrue( failed );
 mtl_ind_big = mtl_ind; mtl_ind_big(1) = 40000;
 assert_throws( @() quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_ind_big, mtl_st, 1e9, 0 ), ...
     '16383' );                                                                     % (guess) material index > 16383

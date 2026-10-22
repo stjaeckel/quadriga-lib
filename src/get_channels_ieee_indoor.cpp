@@ -63,14 +63,14 @@ std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_ieee_indoo
 - **`ap_array`** — Access point array antenna; `n_tx` = number of ports after element coupling, see [[arrayant]]
 - **`sta_array`** — Mobile station array antenna; `n_rx` = number of ports after element coupling, see [[arrayant]]
 - **`ChannelType`** — Model type string; one of `"A"`, `"B"`, `"C"`, `"D"`, `"E"`, `"F"`
-- **`CarrierFreq_Hz`** *(optional)* — Carrier frequency
+- **`CarrierFreq_Hz`** *(optional)* — Carrier frequency (finite)
 - **`tap_spacing_s`** *(optional)* — Tap spacing in seconds; must equal `10 ns / 2^k`
 - **`n_users`** *(optional)* — Number of users (TGac/TGah/TGax only); output vector length equals `n_users`
 - **`observation_time`** *(optional)* — Channel observation time in seconds; must be finite
 - **`update_rate`** *(optional)* — Channel update interval in seconds (finite, > 0); relevant only when `observation_time > 0`
-- **`speed_station_kmh`** *(optional)* — Station speed in km/h; movement direction is `AoA_offset`; relevant only when `observation_time > 0`
-- **`speed_env_kmh`** *(optional)* — Environment speed in km/h; use `0.089` for TGac; relevant only when `observation_time > 0`
-- **`Dist_m`** *(optional)* — TX-to-RX distance(s); `[n_users]` or `[1]`
+- **`speed_station_kmh`** *(optional)* — Station speed in km/h (finite); movement direction is `AoA_offset`; relevant only when `observation_time > 0`
+- **`speed_env_kmh`** *(optional)* — Environment speed in km/h (finite); use `0.089` for TGac; relevant only when `observation_time > 0`
+- **`Dist_m`** *(optional)* — TX-to-RX distance(s) (finite); `[n_users]` or `[1]`
 - **`n_floors`** *(optional)* — Number of floors per user for TGah or TGax models (0 to 4, attenuation only, no delay); `[n_users]` or `[1]`
 - **`uplink`** *(optional)* — Set `true` to generate uplink (reverse) direction; coefficients are the transpose of the downlink
 - **`offset_angles`** *(optional)* — Azimuth offset angles in degrees; rows: AoD LOS, AoD NLOS, AoA LOS, AoA NLOS; empty uses TGac auto-defaults for `n_users > 1`; `[4, n_users]`
@@ -143,6 +143,11 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
 
     if (!std::isfinite(update_rate) || update_rate <= 0.0)
         throw std::invalid_argument("Update rate must be finite and larger than 0.");
+
+    if (!std::isfinite(speed_station_kmh))
+        throw std::invalid_argument("Station speed must be finite.");
+    if (!std::isfinite(speed_env_kmh))
+        throw std::invalid_argument("Environment speed must be finite.");
 
     // Get the number of snapshots
     double n_snap_d = std::floor(observation_time / update_rate);

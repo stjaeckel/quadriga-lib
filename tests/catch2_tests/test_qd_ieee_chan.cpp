@@ -1128,3 +1128,38 @@ TEST_CASE("IEEE Chan - Non-finite observation time and update rate")
     CHECK(run(0.0, 1e-3)[0].n_snap() == 1);
     CHECK(run(0.01, 1e-3)[0].n_snap() == 11);
 }
+
+TEST_CASE("IEEE Chan - Tap spacing 10 ns / 2^k and non-finite carrier frequency, distance and speeds")
+{
+    // A tap spacing that is not 10 ns / 2^k (e.g. 7 ns, which rounded to a factor of 1 and was treated as 10 ns)
+    // throws; so do NaN and Inf carrier frequency, distance and speeds
+    auto omni = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    auto run = [&](double fc, double tap, double dist, double v_sta, double v_env)
+    {
+        return quadriga_lib::get_channels_ieee_indoor(omni, omni, "B", fc, tap, 1, 0.0, 1e-3, v_sta, v_env, {dist}, {0},
+                                                      false, {}, 20, 50.0, 7);
+    };
+    const double fc = 5.25e9, d = 3.0;
+
+    for (double tap : {7.0e-9, 12.0e-9, 4.0e-9, 3.0e-9, 5.000001e-9, 0.0, -10.0e-9, (double)NAN, (double)INFINITY, 1.0e-300})
+    {
+        INFO("tap " << tap);
+        CHECK_THROWS_AS(run(fc, tap, d, 0.0, 1.2), std::invalid_argument);
+    }
+    for (int k = 0; k <= 6; ++k)
+    {
+        INFO("k " << k);
+        const double tap = 10.0e-9 / std::pow(2.0, k);
+        CHECK_NOTHROW(run(fc, tap, d, 0.0, 1.2));
+        CHECK_NOTHROW(run(fc, tap * (1.0 + 5e-10), d, 0.0, 1.2)); // within the relative tolerance 1e-9
+    }
+
+    for (double bad : {(double)NAN, (double)INFINITY, -(double)INFINITY})
+    {
+        INFO("bad " << bad);
+        CHECK_THROWS_AS(run(bad, 10e-9, d, 0.0, 1.2), std::invalid_argument);
+        CHECK_THROWS_AS(run(fc, 10e-9, bad, 0.0, 1.2), std::invalid_argument);
+        CHECK_THROWS_AS(run(fc, 10e-9, d, bad, 1.2), std::invalid_argument);
+        CHECK_THROWS_AS(run(fc, 10e-9, d, 0.0, bad), std::invalid_argument);
+    }
+}
