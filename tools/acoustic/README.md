@@ -8,7 +8,8 @@ review in `/sjc/accoustic_research` (`references/index.csv`).
 | --- | --- | --- |
 | `sabine_to_random.py` | Reverberation-chamber (Sabine) absorption to random incidence by Jeong's method: one Miki flow resistivity per product, fitted so that a finite sample (Thomasson's field impedance of the rectangular patch) reproduces the chamber octaves; the output is the Paris integral (0°–90°) of the infinite layer. Also the edge correction `β·E` for mineral wool. | the rule for turning a chamber value into a `tf` reference (`md/acoustic_engine_notes.md` 5) |
 | `check_docs.py` | Mechanical checks of the material-model page `html_docu/quadriga_lib_material_model.md`: tables, spelling, every column `MaterialCols` reads in its column table, no internal labels, `$` balanced per paragraph, in-page anchors resolve; and of the material part of the Data Formats page `tools/data_formats_md/format_materials.md`: tables, spelling, every column `MaterialCols` reads in its column table, no internal labels. Run from the repository root; exit code 1 on a failure. | the check of every change that touches the page or the Data Formats file |
-| `band_probe.cpp`, `build_band_probe.sh`, `band_probe_example.in` | One ray through `ray_progress` with a band of frequencies, materials (with the peak columns `tfP`, `tfF`, `tfQ` and the panel size `side`) and plane faces given on stdin; T and R summed over every path that ends outside the structure. | checking that a band equals its single frequencies, and a construction against a transfer matrix (page 10.4) |
+| `band_probe.cpp`, `build_band_probe.sh`, `band_probe_example.in` | One ray through `ray_progress` with a band of frequencies, materials (all 26 columns of the table) and plane faces given on stdin, frequencies in acoustic Hz at the library's sound speed; T and R summed over every path that ends outside the structure. | checking that a band equals its single frequencies, and a construction against a transfer matrix (page 10.4) |
+| `grid_probe.py` | Validates the angle and frequency grid of the material rig (`tests/catch2_tests/test_acoustic_materials.cpp`) once against a fine grid: builds a stack from rows of a material CSV (room-side sheets, traced solids behind), runs every angle through `band_probe` and prints the octave random-incidence absorption and transmission loss of each grid and its deviation from the reference grid. Not run in the suite. | checking that the rig's default grid (50 angles × one tone per third) is close enough for a material |
 | `paris_cf.py` | The random-incidence (Paris, 0°–90°) absorption of a locally reacting face in closed form, and a peaked mass-law face as its series impedance with the pad of `tf` in front: normal-incidence, Paris and field (0°–78°) values per frequency; `check` against the numerical integral and Jeong's values. | the fit target of a peaked row (page 6.4) |
 | `txlib.py` | Formula copy of what the library gives a closed mass-law sheet in air: the mass term (`m > 0` the mass law, 20 dB per decade; resonance and bending stiffness in `X₀`), the plate rule, `tf` and the interface gain, at column level; the finite panel of a material's `side` (Davy's forced radiation efficiency in place of `1/cos θ`, 3.29 m where the column is absent, 0 the infinite plate); switches for the candidates the library does not build (a fitted slope, no `att`, the installed loss factor in frequency, a limiting angle (closed), the bending loss as a resistance). Within 0.0042 dB of the library through the walker (traced solid; the sheet 0.0000 dB). | a formula reference for transmission fits and fixtures (page 5.4, 6.5) |
 | `txfit.py`, `tl_refs.json` | The transmission fit of the expressibility test (`md/acoustic_engine_notes.md` 5, 8.4) on that formula, vectorized: the knobs of a mass-law material per construction, minimax over octaves, differential evolution and Nelder-Mead, selected at 768 angles × 12 frequencies per third; the 13 reference constructions (references, absorption laws, physical mass and coincidence) in `tl_refs.json`. Default: the library at random incidence (0–90°), each construction at its laboratory side (`side` `"lab"`; a number for one side, 0 for the infinite plate); `columns()` writes `side` and the rigid face's `a`. | the starting rows of page 11.4 (2.70 dB at the laboratory sides; the infinite plate 2.97 dB) and candidate studies |
@@ -41,12 +42,31 @@ tools/acoustic/build_band_probe.sh /tmp/band_probe          # after cmake --buil
 /tmp/band_probe < tools/acoustic/band_probe_example.in
 ```
 
-The input format is in the head of `band_probe.cpp` (24 columns per material: `coiA` removed on 2026-10-17; the peak `tfP`, `tfF`,
-`tfQ` added 2026-10-16 for the peaked face; the panel size `side` last, added 2026-10-19; the faces as `x material flipped`). The
-example is the board on a box of air on a mass-law wall; its expected values are in the file. The fixture that guards
-the same statement is *ray_progress - a leaf on a box of air at every frequency of a band*
+The input format is in the head of `band_probe.cpp`: 26 columns per material (`coiA` removed on 2026-10-17; the peak
+`tfP`, `tfF`, `tfQ` added 2026-10-16; the panel size `side` added 2026-10-19; `attB` and `alphaB` last, added
+2026-10-23), the faces as `x material flipped`. Frequencies are acoustic Hz, mapped with the library's sound speed
+(`qd_acoustic_freq_scale`, 342.76271 m/s; 343 m/s before 2026-10-23). The example is the board on a box of air on a
+mass-law wall at `thin_slab_threshold` 0; its expected values are in the file. The fixture that guards the same
+statement is *ray_progress - a leaf on a box of air at every frequency of a band*
 (`tests/catch2_tests/test_acoustic_leaf.cpp`), which also holds the fluid-layer transfer matrix (`lw::stack`) and a
 walker without recursion (`lw::walk`).
+
+## grid_probe.py
+
+```
+tools/acoustic/build_band_probe.sh /tmp/band_probe
+python3 -I tools/acoustic/grid_probe.py --probe /tmp/band_probe --csv data/materials_acoustic.csv \
+    --layer concrete_cast_152mm:sheet --grids 3072x12 192x6 50x1
+```
+
+- `--layer NAME:sheet|solid[:THK]`, room side first, as the rig builds stacks (sheets in the plane x = 0 in the order
+  given, traced solids behind them). `--grids NAxNS`: NA midpoint angles over 0–90° (weight cos θ sin θ) × NS tones
+  per third (1: the nominal center); the first grid is the reference.
+- Octaves as the rig forms them: a third the mean of its tones, an octave the mean of its thirds (absorption
+  arithmetic, transmission in energy); 125 Hz first in every band, `thin_slab_threshold` 0, gain floor −120 dB.
+- 2026-10-23, cast concrete 152 mm: the rig's grid 50 × 1 within 0.12 dB (31.5 Hz) and 0.032 dB (63 Hz–8 kHz) of
+  3072 × 12, absorption within 1e-4; 18 s on one thread. Light panels need more angles at their coincidence octaves
+  (measured in the plan: 50 × 1 up to 6.7 dB off at 8 kHz on glass, gypsum and double glazing).
 
 ## paris_cf.py
 
