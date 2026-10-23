@@ -157,11 +157,12 @@ sources are acceptable; urgency and whether step 3 can proceed without it. Steph
 ## 8. Engine items raised
 
 A material that cannot be expressed: what, the size of the miss, the column or physics missing. None leads to work
-without Stephan's OK.
+without Stephan's OK. Each item becomes an issue in `md/acoustic_engine_stage2b_issues.md` (issues 1–3 there: porous
+layer on a wall, band decision near grazing, two traced wave media back to back).
 
 | raised | material | miss and size | status |
 | --- | --- | --- | --- |
-| — | none yet | | |
+| 2026-10-23 | glass wool 50 mm (page 11.3 columns) as a sheet on cast concrete 152 mm (page 11.4 row) | transmission at normal incidence: the library adds 8.04 / 6.71 / 5.38 / 4.09 / 3.42 / 4.78 / 7.32 / 9.32 / 13.02 dB to the wall (31.5 Hz–8 kHz); an independent transfer matrix (the same fluid layer on a heavy limp plate, scratchpad `tmm/wool_on_plate.py`) adds −0.02 / −0.07 / −0.18 / −0.28 / 0.16 / 2.53 / 5.98 / 8.79 / 13.24 dB. Over-insulation up to 8 dB at 31.5 Hz, 5.6 dB at 125 Hz, 2.3 dB at 1 kHz. Reflection is fine (6.3e-3). Random incidence not yet measured. | issue 1 in `md/acoustic_engine_stage2b_issues.md` |
 
 ## 9. Current state
 
@@ -175,7 +176,101 @@ without Stephan's OK.
 - Files of phase 0: this file, `md/materials_agent_template.md`.
 - Phase-1 answers (2026-10-23): the CSV is `data/materials_acoustic.csv`; the rig copies the `lw` helpers it needs
   into its own file; combinations as defined in section 10.
-- Next: Stephan commits the phase-0 files; then the rig brief (`md/materials/rig_brief.md`).
+- Phase-0 files committed by Stephan (5be85fb, 2026-10-23).
+- **Phase 1 in work:** brief `md/materials/rig_brief.md` (two phases: plan, then rig and self-checks).
+  - Plan phase done 2026-10-23 (`md/materials/rig_report.md`). The manager reran the probe in
+    `build_linux/scratch/rig`: the band verdict (R 1.0726 at 89°, 1816 Hz, threshold 0.15; equal to the single
+    frequency at 0), glass 4 mm `tl` on G1 against 3072 × 12 (≤ 0.048 dB to 4 kHz, 0.278 dB at 8 kHz), a type-1 case
+    0.255 s CPU, octave α against the transfer matrix (9.2e-9 wool, 4.3e-7 board, 3.6e-5 filled box at −120 dB), the
+    wall's own `tf` (2.8e-3 against the pad referred to air). All reproduce.
+  - Stephan's answer to the first plan (2026-10-23) redirects the rig toward his earlier Python rig (a notebook kept
+    outside the repository: a point source at (−5, 0, 0.001), the material at x = 0, 50 receivers at y = 0 … 49 m on
+    x = −5 for reflection and x = 5 for transmission, third octaves with 125 Hz first). His decisions:
+    - **D1:** transmission through `calc_diffraction_gain` with a single path; the material is one layer or a stack
+      of two back to back (sheet | solid, sheet | sheet; check whether solid | solid sums its series or needs a
+      relaunch). Reflection through a short sequence of `ray_progress` calls (front reflection; then enter, reflect at
+      the back, exit), `refraction_mode` false, so the landing points are known and a minimal set of rays is launched.
+      A minimal version of the scene tracer is a rig helper; 50 materials should add well under 5 s of wall time.
+    - **D2:** 50 receiver angles, reported at 0, 5, 10, 30, 45, 60, 70, 80°; third-octave bands with 125 Hz as the
+      reference (first) frequency; sample at the frequencies of the research references rather than interpolate.
+    - **D3:** (c), with the aim that the rig gives meaningful simulator output for real scenes, not an idealized model.
+    - **D4:** combinations are a known failure mode (materials fine alone, wrong when combined: absorbers, bass traps,
+      carpets on or against rigid bodies). Order: wood alone, carpet alone (as a sheet?), carpet on wood measured with
+      diagnostic output and judged against references or for plausibility, then made a regression fixture; common
+      combinations before the scene models of the next step.
+    - **D5:** option A: the test case is lean; it defines the material, runs the rig's transmission and reflection
+      functions, and compares with the known constructions written in the test with a source comment.
+    - **D6:** redo the analysis with this input and propose the helpers; concrete is the first material, to see the rig
+      run with its diagnostic output.
+    - **D7:** (A), `band_probe` with `attB` and `alphaB` plus `tools/acoustic/grid_probe.py`.
+  - Revised plan done 2026-10-23 (`md/materials/rig_report.md`, "Revised plan" R0–R14; probe
+    `build_linux/scratch/rig/rig2_probe`). Manager reruns, all reproduce: transmission sheet | solid 0.063 dB,
+    sheet | sheet 9e-6 dB, wave solid | solid 4.91 dB (and T > 1); reflection board | box | wall 1.22e-4 in 4 calls,
+    filled box 1.57e-3 in 43 calls; threshold 0.15 with 125 Hz first 0.164 in R (board on box), 1.01 dB in T (wool
+    solid); old receivers 0°–78.7° read glass 4 mm `tl` +3.36 dB at 2 kHz, +8.74 dB at 8 kHz; 50 midpoints × 3 per
+    third ≤ 0.11 dB to 4 kHz. Cost correction: the probe's 0.65 s for 50 constructions used 50 transmission angles over
+    27 thirds; at 192 angles an ordinary construction takes 13–52 ms wall at 12 threads, the filled box 0.29 s.
+  - Stephan 2026-10-23: RD1 (a) and RD3 (a) accepted. Questions on RD2, RD4–RD7 answered with measurements:
+    - grids (first probe, `conv`, against 3072 × 12; glass 4 and 6 mm, gypsum, double glazing, concrete): 50 angles ×
+      1 per third ≤ 0.34 dB to 2 kHz, 0.49 dB at 4 kHz, 6.7 dB at 8 kHz; 50 × 3 ≤ 0.07 / 0.73 / 2.75; 192 × 3
+      ≤ 0.05 / 0.32. `calc_diffraction_gain` takes every angle in one call per frequency.
+    - the library's sound speed is 342.76271 m/s (`src/qd_atmospheric_absorption.hpp`, ISO 9613-1 at 20 °C; the
+      wrappers and `qrt_ray_trace` convert with it); only the page, `txlib.py` and `lw::GHZ` use 343.
+    - wool 50 mm on concrete 152 mm (engine item below).
+  - **Final rig decisions (Stephan, 2026-10-23):**
+    - RD1 (a): paths summed per angle inside the rig (plane wave); transmission through `calc_diffraction_gain`
+      (lod 0, scalar, threshold 0), reflection through an aimed ray set and a short `ray_progress` sequence,
+      `refraction_mode` false.
+    - RD2 / RD4: default grid 50 midpoint angles over 0°–90° (plus the report angles 0, 5, 10, 30, 45, 60, 70, 80° at
+      weight 0) × 1 tone per third, 31.5 Hz–8 kHz, 125 Hz first in a band; the grid is an argument of the rig
+      functions, a case evaluates the bands its references cover and may ask for more samples.
+    - RD3 (a): the builder throws on a forbidden stack (room-side layer a sheet, the rest traced; no wave
+      solid | solid, no mass-law sheet | sheet, no thin lossless wave layer as a solid).
+    - RD5: the CSV holds the parameters; a material case reads its row by name and holds the construction, the
+      expected values (literature octaves with a source comment) and the tolerances; the independent physics is
+      computed in the test. Rig self-check constructions are defined inline (D5 A).
+    - RD6: the library's sound speed, 342.76271 m/s (`qd_acoustic_freq_scale`); the 343 m/s difference (≤ 0.017 dB,
+      ≤ 4e-4) goes into the tolerance; the page's 343 is corrected in phase 4.
+    - RD7: combinations of a layer on a rigid body check the added insulation (with minus without the layer) against
+      a transfer matrix with a plate written in the test; misses are recorded in
+      `md/acoustic_engine_stage2b_issues.md` (issue 1: porous layer on a wall).
+    - D7 (A): `band_probe` gains `attB`, `alphaB`; `tools/acoustic/grid_probe.py` validates the grid once.
+    - Concrete is the first material, to see the rig run with its diagnostic output.
+  - **Phase 2 of the rig done 2026-10-23** (`md/materials/rig_report.md` "Phase 2"): the rig, five self-check cases,
+    the table case and `Material - concrete_cast_152mm`; `data/materials_acoustic.csv` (concrete); `band_probe` with 26
+    columns at 342.76271 m/s; `tools/acoustic/grid_probe.py`. Manager check (rebuild, reruns at 12 threads, load
+    1.9–2.0): `[wave]` 141128 and `[acoustic]~[materials]` 112451 numbers identical; whole suite 1347008 / 1309
+    (+151 / +7), 256775 numbers identical plus one inserted block; new cases 0.000–0.040 s; `check_docs.py` passes;
+    `grid_probe.py` on concrete 50 × 1 within 0.118 dB of 3072 × 12 and equal to the case's octaves. Manager fix:
+    `band_probe_example.in` had a stray uncommented line ("bad line") and the superseded expected values of
+    2026-10-15; removed, the probe reproduces 0.924972 / 0.648002 / 0.444103 / 0.779643.
+  - Review points for Stephan: the material case is about 60 lines (tier-1 loop and printed mass law inline; move to
+    helpers); concrete's tier-2 values are the page's reading of the Litvin plot, the research data reads
+    42.1 / 46.5 / 52.6 / 56.5 / 61.7 / 64.6 dB. Decisions PD1–PD3 open.
+  - Stephan read the rig (2026-10-23): sheet = traced solid of the same thickness is a standard assertion for every
+    isolated material (the rig builds both already; concrete asserts it); the rig (1028 lines) must be compressed
+    (it would pass 5000 lines) and made faster. Brief "Revision 3", phase 2b, sent to the rig agent. PD1–PD3 and the
+    research Litvin values still open.
+  - **Phase 2b done 2026-10-23** (`md/materials/rig_report.md` "Phase 2b"): test file 1028 → 677 lines (rig 481,
+    self-checks 89, concrete 17); `mt::check_material` runs a row as a traced solid on the full grid and as a sheet on
+    the report angles and asserts the twin, tier 1, R + T ≤ 1, diagnostics, tier 2; geometry from
+    `quadriga_lib::plane` / `cube` (a solid is a closed box), path length from `path::length()`, R / T from `nREF`.
+    Manager check (load 2.3–3.2): `[wave]` 141128 and `[acoustic]~[materials]` 112451 numbers identical; whole suite
+    1347054 / 1308; `[materials]` 197 assertions in 6 cases, concrete 0.006 s at 12 threads and 0.011 s on one
+    thread, all six 0.137 s / 0.459 s; `check_docs.py` passes. Side finding: the API page lists `length` of `path` as
+    an attribute; it is the member function `length()` (`include/quadriga_channel.hpp:158`), a documentation point
+    for the library, not for this step.
+  - **Engine issues for stage 2b** (Stephan, 2026-10-23): every engine miss found in step 3 becomes an issue in
+    `md/acoustic_engine_stage2b_issues.md` (tracked, public) with the diagnostics a later engine stage needs, the
+    affected materials and an interim modeling guideline; modeling guidelines (the box of cavity air, face order,
+    threshold 0) are collected there too.
+  - Earlier wording of the open RD questions: (in-rig plane-wave sum; 50 + 8 angles for reflection, 192 for transmission; the
+    stack rule; 16 Hz–16 kHz at 3 per third, 125 Hz first; definitions in the tests as source with a CSV equality case
+    and a writer switch; 343 m/s; transmission of a wave layer on a mass-law wall printed only).
+  - Earlier recommendations of the first plan, superseded by the above: (threshold 0; G1 192 × 3 for asserted `tl`, G0 24 × 2 otherwise; tier 1
+    of mass-law rows = column formulas asserted plus a physical plate printed as spread; the wall keeps its row except
+    `tf` 0 behind a fill, `tl` only where the wall's `tf` > 0; rig rows in `tests/data/materials_acoustic_rig.csv`;
+    `lw::walk` not copied; `band_probe` gains `attB` and `alphaB` with a driver `tools/acoustic/grid_probe.py`).
 
 ## 10. Scope (proposed in phase 0, confirmed by Stephan 2026-10-23)
 
@@ -188,7 +283,8 @@ file is read by `obj_file_read` with an empty `.obj` name (only the table), so i
   (and `side` 0 is the infinite plate);
 - names are lowercase `snake_case` with the build in millimeters, no dots, no commas (`glass_4mm`,
   `concrete_cast_152mm`, `glass_wool_50mm`); a dot would be cut to a base name by the material lookup;
-- frequency columns in GHz with the acoustic mapping of page 10.1 (343 m/s, 8.7403e-4 GHz per Hz).
+- frequency columns in GHz with the library's acoustic mapping (342.76271 m/s, `qd_acoustic_freq_scale`; decided
+  2026-10-23, replacing the page's 343 m/s).
 
 **The test file** `tests/catch2_tests/test_acoustic_materials.cpp`, tags `[acoustic][materials]` (names only):
 - `namespace mt` (the rig):
@@ -220,7 +316,9 @@ named for the construction (`glazing_4_16_4`).
 
 1. Phase 1: the rig (brief from the template's rig variant after Stephan's answers).
 2. Phase 2: the material list (analysis agents; the listening room's inventory with Stephan).
-3. Phase 3: materials in the order that settles the open rules early.
+3. Phase 3: materials in the order that settles the open rules early. Order for the first materials (Stephan): concrete (rig check), wood alone, carpet alone,
+   carpet on wood with diagnostics, judged and then fixed as a regression case; then the next material; common
+   combinations before the scene models of the next step.
 4. Phase 4: notes, page 11.4, corrected statements, README, cleanup.
 
 Leftovers of step 2 to settle where they fall: `tools/acoustic/band_probe.cpp` has no `attB` column (every fitted row
@@ -229,8 +327,9 @@ page 11.1, 11.2 and 11.4 are re-measured.
 
 ## 12. Traps
 
-- **Two sound speeds in the tests:** `ac2rf()` / `AC2RF` in `ray_test_helpers.hpp` use 342.77 m/s; `lw::GHZ`
-  (`test_acoustic_leaf.cpp`), `txlib.py` and the page use 343 m/s. The table and the rig use 343 m/s (page 10.1).
+- **Sound speed:** the library maps acoustic frequencies with 342.76271 m/s (`qd_acoustic_freq_scale`, ISO 9613-1 at
+  20 °C; the wrappers and `qrt_ray_trace` use it). `ac2rf()` (342.77), `lw::GHZ`, `txlib.py` and the page (343) differ;
+  the table and the rig use the library's constant (decided 2026-10-23).
 - **`lw` is not shared:** `lw::stack`, `lw::walk`, `lw::Mtl`, `lw::peak_f` live in `test_acoustic_leaf.cpp`, not in
   `ray_test_helpers.hpp`. Decided 2026-10-23: the rig copies the parts it needs into
   `test_acoustic_materials.cpp`; `test_acoustic_leaf.cpp` and the header stay as they are.
@@ -244,6 +343,15 @@ page 11.1, 11.2 and 11.4 are re-measured.
 - **Runs:** test binaries from the repository root; a case name with a comma needs `\,` in a test spec; a file filter
   needs `-#`; single-ray fixtures on one OpenMP thread (`ub::OneThread`); `ray_progress` requires
   `thin_slab_threshold` ≤ 1; `cd` in a Bash call moves the session's directory.
+- **Helper names:** `ray_test_helpers.hpp` has anonymous-namespace `Opt`, `Scene`, `Cfg`, `Hits`; a file-scope name
+  of the same kind in a file that includes it is ambiguous, so the rig keeps its names in `namespace mt`.
+- **Band verdicts:** in a `ray_progress` band every frequency takes the base frequency's follow-or-sum verdict; at the
+  default `thin_slab_threshold` 0.15 a leaf on a box reads R up to 1.073 near grazing (octave α 8.3e-4 off). The rig
+  runs at 0.
+- **Stacks in scenes:** co-located sheets form their stack in the order of their faces in the mesh (reversed order: ΔR
+  up to 0.999); `calc_diffraction_gain` (one path) is right for one layer, sheet | sheet and sheet | solid, not for a
+  solid | solid of two wave media (4.9 dB, T > 1).
+- **Coherent sums:** layered constructions need the coherent path sum; the power sum is off by up to 0.39 in octave α.
 - **Fits:** bound and densely sample; select on the evaluation grid; the mass level bound must reach about 3200 for a
   423 kg/m² wall; clip τ at one per frequency, not per band; coincidence needs about 4000 angles.
 
@@ -251,3 +359,5 @@ page 11.1, 11.2 and 11.4 are re-measured.
 
 - (phase 0) `build_linux` can be absent at the start of a session; reconfigure it as the generic build before
   regenerating baselines.
+- (phase 1) A plan phase with scratch probes and a manager rerun of the probe's key commands settles a rig's design
+  before any tracked file is written; light-panel coincidence decides the grid, not absorption.
