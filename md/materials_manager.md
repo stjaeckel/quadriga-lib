@@ -110,22 +110,9 @@ Run on every agent result; the report says which items were checked.
 
 ## 5. The material list
 
-Filled in phase 2. Status: proposed / waiting for research / in work / confirmed / recorded miss.
-
-| # | class | material (CSV row) | reference keys | status |
-| --- | --- | --- | --- | --- |
-| | 1 light single panels | | | |
-| | 2 heavy walls | | | |
-| | 3 double and triple glazing | | | |
-| | 4 porous absorbers on a rigid wall, carpets | | | |
-| | 5 linings | | | |
-| | 6 plaster, brick, plaster | | | |
-| | 7 air, water | | | |
-| | 8 panel absorbers | | | |
-| | 9 curtains | | | |
-| | 10 microperforated panels | | | |
-| | resonant family (perforated, slotted panels) | | | |
-| | listening room | | | |
+The list is `md/acoustic_materials.md` (the wish-list: six classes, two evidence tiers per row, references, gaps,
+impact, status), with `md/acoustic_modeling_guidelines.md` beside it. The ten acceptance classes of the kick-off are
+kept as test references inside it. Status changes are made there, not here.
 
 ## 6. Open rules
 
@@ -343,6 +330,50 @@ layer on a wall, band decision near grazing, two traced wave media back to back)
     rows (no 100 mm wall measured); masonry classes; clutter grid. Review points left for phase 3: glazing sheet names
     give the unit thickness (`glazing_double_24mm`) while the lumped row's `thk` is the glass alone; the CSV row
     `concrete_cast_152mm` breaks the naming rule until redone as `concrete_150mm`.
+  - Phase 2 documents committed by Stephan (19323d9, 2026-10-26). Before phase 3, a critical review at high effort
+    (brief `md/materials/r01_phase2_review_brief.md`, output `md/materials/r01_phase2_review.md`); the manager passes
+    its decisions to Stephan, then an agent updates the documents.
+  - r01 done 2026-10-26 (`md/materials/r01_phase2_review.md`): 13 findings, 8 for Stephan (1 two tiers per row,
+    transmission and absorption; 2 masonry rows as the finished plastered wall, recipes that hit engine limits; 3 rig
+    extensions and one case per row family; 4 class tolerance as the envelope of its walls ±1 dB, assert only within
+    the measured thickness range; 6 clutter as air-matched absorbing volumes; 8 ground rows with Delany-Bazley at the
+    class σ, gravel split; 9 glazing and lumped rows with `thk` = visible thickness, curtains flat / pleated; 12 the
+    listening room's rows first). Manager checks: data line 1845 is the lined brick wall (TL 69-287, + gypsum board on
+    furring; 1845 − 1847 = −0.3 / −1.4 / 8.4 / 9.9 / 8.6 / 5.4 dB); line 870 is Attenborough 2016; 1729 − 1847 =
+    5.3 / 7.4 / 8.4 / 9.2 / 6.2 / 5.5 dB; 1050 − 1049 = −0.6 / 7.6 / 9.9 / 11.0 / 6.2 / −1.9 / 0.6 dB;
+    `Material::same_as` compares `alpha` (`src/ray_mesh_interact.cpp:635`), so an air-matched lossy volume is not air.
+    The reviewer's "of little value" list includes `ice` and `box_fridge`, which Stephan asked for: kept unless he says
+    otherwise.
+  - **Decisions on r01 (Stephan, 2026-10-26):**
+    - D1 (a): two tiers per row, transmission and absorption.
+    - D2 (i): masonry rows stand for the finished wall, plastered both faces (a generic solid of the finished wall plus
+      sheets; `plaster_15mm` for exceptions). The engine's one-level state (three bonded bodies within ±3 dB) becomes a
+      stage-2b issue; phase 3 extends the rig to plaster sheets on both faces of a block solid and measures the miss
+      against the bonded plate, as the fixture for the engine rework.
+    - **ISSUE convention:** every rig check that fails because of an engine limit is marked: a comment `ISSUE <n>:`
+      naming the stage-2b issue, the assertion switched to a non-failing check (Catch2 `CHECK_NOFAIL` or equivalent)
+      that still prints and is countable, the measured and reference values in the diagnostics, and an entry in
+      `md/acoustic_engine_stage2b_issues.md`. No failing suite from known engine issues.
+    - D3 (a): one test case per row family, kept lean and clear.
+    - D4 (a), as a procedure: measure first; judge against the known range of measurements and models; if it needs an
+      engine fix, mark ISSUE; if not, assert tightly (about 1 dB against the measured library result) as a regression
+      guard; a comment in the case states what "reasonable" meant (the range used). The rig documents itself; the
+      wish-list is updated from the result.
+    - D6 (a): clutter as air-matched absorbing volumes, three rows by density, revisable when data arrive.
+    - D8: Delany-Bazley at the class σ with a passivity check and Miki printed; Miki refitted to the class impedance
+      where Delany-Bazley fails. Gravel split.
+    - D9 (a): lumped rows carry the visible thickness in `thk`, `fRef` scaled. Manager check: a mass-law sheet's `thk`
+      does not enter the phase (`src/ray_mesh_interact.cpp:1320–1324`, only non-mass-law layers displace the host),
+      so (a) is neutral for rigid lumped rows and makes sheet and solid of the visible thickness consistent; wave-medium
+      sheets keep their true thickness, which is displaced from the host. Curtains `curtain_flat_*` / `curtain_pleated_*`.
+    - D12 (a): tier, then impact; every relevant material in, each with diagnostics, before the engine is reopened.
+    - Furniture boards merged into one `furniture_board` family; `ice` dropped; `box_fridge` replaced by `box_metal`
+      (a hard box covered in metal: fridges, freezers, bar counters, metal cabinets), a glass front as a glass sheet on
+      that face; one material per closed body, finishes as sheets (to be confirmed in phase 3).
+  - Draft 3 written 2026-10-26 by the drafting agent (wish-list 587 lines, guidelines 234, stage-2b file with issue 4
+    and the ISSUE convention); manager check: no `ice` or `box_fridge` left, no private details, `check_docs.py` passes;
+    section 5 of this file now points to the wish-list. Open: asphalt absorption and hollow-core doors have no data
+    (research requests); several object row names marked proposed.
   - **Phase 2 result:** draft 2 of both documents, for Stephan to commit. Next: the research requests (section 6 of
     the wish-list, plus the data errors of a01) go to the research manager; phase 3 starts in a new session.
   - **Engine issues for stage 2b** (Stephan, 2026-10-23): every engine miss found in step 3 becomes an issue in
