@@ -5,7 +5,7 @@
 #include "python_quadriga_adapter.hpp"
 
 /*!SECTION
-Channel generation functions
+Geometry-based stochastic model
 SECTION!*/
 
 /*!MD
@@ -16,7 +16,7 @@ Read and validate a QuaDRiGa scenario configuration file
   lines are allowed; line ends can be LF or CRLF; space and tab are white space; a UTF-8 byte order mark at the
   start of the file is skipped
 - Keys are case-sensitive names of the characters `A-Z`, `a-z`, `0-9` and `_`; there are four kinds:
-  - Scenario parameters: 165 numeric keys with one number each. Keys that are not in the file have
+  - Scenario parameters: 171 numeric keys with one number each. Keys that are not in the file have
     their default value.
   - `SubpathMethod`: one of the words `legacy`, `Laplacian`, `mmMAGIC`; default `legacy`
   - Path-loss parameters: every key that starts with `PL_`. `PL_model` has one name as value. All
@@ -30,7 +30,7 @@ Read and validate a QuaDRiGa scenario configuration file
   subnormal reads as `0` (or `-0`)
 - Numbers are read independent of the locale (the decimal point is always `.`)
 - Elevation angles are used throughout (+90 deg is up); no key refers to a zenith angle
-- The 165 numeric keys are 138 keys of QuaDRiGa and 27 keys for 3GPP TR 38.901 v19.5.0. With their
+- The 171 numeric keys are 138 keys of QuaDRiGa and 33 keys for 3GPP TR 38.901 v19.5.0. With their
   default of 0 the new keys have no effect.
 - The QuaDRiGa key `GR_epsilon` (fixed relative permittivity of the ground) is not supported and is
   reported in `ignored_keys`; the permittivity is complex and is set in the simulation
@@ -45,7 +45,7 @@ Read and validate a QuaDRiGa scenario configuration file
 ## Usage:
 ```
 scenpar, plpar, lsp_xcorr, lsp_xcorr_chk, short_names, ignored_keys = \
-    quadriga_lib.tools.conf_file_read( fn, validate )
+    quadriga_lib.gbsm.conf_file_read( fn, validate )
 ```
 
 ## Inputs:
@@ -54,9 +54,9 @@ scenpar, plpar, lsp_xcorr, lsp_xcorr_chk, short_names, ignored_keys = \
   grammar is checked; bool or `numpy.bool_`; default: True; `None` selects the default
 
 ## Outputs:
-- **`scenpar`** — Scenario parameters; dict with 166 entries in the QuaDRiGa order: the 138 numeric
+- **`scenpar`** — Scenario parameters; dict with 172 entries in the QuaDRiGa order: the 138 numeric
   keys of QuaDRiGa with `SubpathMethod` (str) at position 106 (0-based), between `absTOA_lambda` and
-  `LOS_scatter_radius`, then the 27 new keys; all other values are float
+  `LOS_scatter_radius`, then the 33 new keys; all other values are float
 - **`plpar`** — Path-loss parameters; dict with the entry `model` (str, only if the file states
   `PL_model`) first, then one entry per `PL_` key in file order, named without the prefix `PL_`; each
   is a 1D array with one or more values; `{}` if the file has no `PL_` key

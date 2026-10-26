@@ -5,7 +5,7 @@
 #include "python_quadriga_adapter.hpp"
 
 /*!SECTION
-Channel generation functions
+Geometry-based stochastic model
 SECTION!*/
 
 /*!MD
@@ -13,12 +13,12 @@ SECTION!*/
 Validate scenario parameters and complete them with default values
 
 - Checks a dict of QuaDRiGa scenario parameters that did not come from a conf file and adds every
-  missing key with its default value, so that `scenpar_out` always has all 166 entries
+  missing key with its default value, so that `scenpar_out` always has all 172 entries
 - `None` or an empty dict returns the complete default parameter set
-- A dict with the keys of QuaDRiGa is completed with the 27 keys for 3GPP TR 38.901 v19.5.0, which
+- A dict with the keys of QuaDRiGa is completed with the 33 keys for 3GPP TR 38.901 v19.5.0, which
   have no effect at their default of 0
 - All values are real scalars, except `SubpathMethod`, which is a str
-- A key that is not one of the 166 names is an error, also with `validate = False`; this includes
+- A key that is not one of the 172 names is an error, also with `validate = False`; this includes
   the QuaDRiGa key `GR_epsilon`, which is not supported
 - Value checks with `validate = True`; `NaN` is an error for every key:
   - Integer from 1 to 1000: `NumClusters`, `NumSubPaths`
@@ -27,13 +27,15 @@ Validate scenario parameters and complete them with default values
     `absTOA_lambda`, `PerClusterDS`, `PerClusterDS_min`, `PerClusterAS_D`, `PerClusterAS_A`,
     `PerClusterES_D`, `PerClusterES_A`, `LNS_ksi`, `LOS_scatter_radius`, `GR_enabled`, `LSP_fc_min`,
     `EoD_offset_b`, `EoD_offset_hcl`, `PerClusterDS_fc_min`, `PerClusterES_D_scale`, `absTOA_Lmax`,
-    `NF_alpha`, `NF_beta`, `SNS_sigma`, `SNS_A`, `SNS_B`, `SNS_R`, `SNS_delta_var`, `PolVar_sigma`
+    `NF_alpha`, `NF_beta`, `SNS_sigma`, `SNS_A`, `SNS_B`, `SNS_R`, `SNS_delta_var`, `PolVar_sigma`,
+    `LOS_state_lambda`, `IO_state_lambda`, `O2I_d2D_in_max`, `DS_VS`, `DS_VS_a`, `DS_VS_b`
   - Integer from 0 to 1000: `NumClusters_min`, `NF_k1`
   - In the range from 0 to 1: `SNS_mu`
   - In the range from -1 to 1: the 28 correlations (`asD_ds` to `xpr_esa`)
   - All other numeric keys accept any value including `Inf` and `-Inf`
   - `NumClusters_min` must not exceed `NumClusters`
   - `NF_alpha` and `NF_beta` must be both 0 or both > 0
+  - `DS_VS_a` and `DS_VS_b` must not both be 0 if `DS_VS` is > 0
   - `SubpathMethod` must be `legacy`, `Laplacian` or `mmMAGIC`
 - With `validate = False` no value is checked: `NaN` and any `SubpathMethod` are accepted
 - The symmetric matrix `lsp_xcorr` is built from the 28 correlation keys and has a unit diagonal.
@@ -42,11 +44,11 @@ Validate scenario parameters and complete them with default values
 
 ## Usage:
 ```
-scenpar_out, lsp_xcorr, lsp_xcorr_chk = quadriga_lib.tools.scenpar_validate( scenpar_in, validate )
+scenpar_out, lsp_xcorr, lsp_xcorr_chk = quadriga_lib.gbsm.scenpar_validate( scenpar_in, validate )
 ```
 
 ## Inputs:
-- **`scenpar_in`** — Scenario parameters; dict with any subset of the 166 keys returned by
+- **`scenpar_in`** — Scenario parameters; dict with any subset of the 172 keys returned by
   [[conf_file_read]]; numeric values are real scalars (int, float, bool or a numpy value with one
   element); `SubpathMethod` is a str; `None` or `{}` returns the default set; default: None
 - **`validate`** — `False`: only complete with defaults, no value checks; bool or `numpy.bool_`;
@@ -54,8 +56,8 @@ scenpar_out, lsp_xcorr, lsp_xcorr_chk = quadriga_lib.tools.scenpar_validate( sce
 
 ## Outputs:
 - **`scenpar_out`** — Complete scenario parameters; given values are kept, missing keys have their
-  default; dict with 166 entries in the QuaDRiGa order: the 138 numeric keys of QuaDRiGa with
-  `SubpathMethod` (str) at position 106 (0-based), then the 27 new keys; all other values are float
+  default; dict with 172 entries in the QuaDRiGa order: the 138 numeric keys of QuaDRiGa with
+  `SubpathMethod` (str) at position 106 (0-based), then the 33 new keys; all other values are float
 - **`lsp_xcorr`** — LSP cross-correlation matrix; order of rows and columns: DS, KF, SF, ASD, ASA,
   ESD, ESA, XPR; `(8, 8)`
 - **`lsp_xcorr_chk`** — `True` if `lsp_xcorr` is positive definite; `False` also if it contains
