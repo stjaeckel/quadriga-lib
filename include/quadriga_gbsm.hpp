@@ -83,6 +83,34 @@ namespace quadriga_lib
     //   others mirror themselves; a decorrelation distance of 0 is used as 0.1 m
     // - The functions are documented in src/lsf_init_phases.cpp, src/lsf_draw.cpp, src/path_loss.cpp,
     //   src/lsp_generate.cpp, src/los_probability.cpp, src/o2i_loss.cpp
+
+    // Draw the random phases of the large-scale generators of one BS site and scenario
+    // - Generator order and reciprocity rules: see the LSF generator index above
+    // - Bias removal over the positions in 'rx_pos' (and 'tx_pos' for dual mobility) when given and n_link > 2
+    void lsf_init_phases(const std::unordered_map<std::string, double> &scenpar, // Scenario parameters (decorrelation distances)
+                         arma::cube &phase,                                      // Output: Phases in [rad], [n_coeff, 11, 2]; slice 0 = Rx side, slice 1 = Tx side
+                         arma::sword seed = -1,                                  // Seed, -1 = system random device
+                         const arma::mat *tx_pos = nullptr,                      // Optional: Tx positions, [1, 3] or [n_link, 3]
+                         const arma::mat *rx_pos = nullptr,                      // Optional: Rx positions of the drop (one floor) for the bias removal, [n_link, 3]
+                         bool dual_mobility = false,                             // Tx and Rx both move: the Tx side is a second device
+                         bool remove_bias = true,                                // Remove the sample mean over the positions
+                         const std::string &preset = "Comb256",                  // SOS preset, see sos_preset
+                         bool horizontal = true);                                // true: 2D correlation in the x-y plane (TR); false: 3D (legacy)
+
+    // Spatially correlated normalized random values of the large-scale generators at a set of links
+    // - Columns 0 to 8 are Normal(0,1), columns 9 and 10 Uniform(0,1)
+    // - Dual mobility: the Tx side uses the mirror generator, so ASD/ASA and ESD/ESA are correlated by the ACF
+    //   at the Tx-Rx distance
+    // - Links with different floor IDs are uncorrelated at equal horizontal positions; equal IDs share one field
+    void lsf_draw(const std::unordered_map<std::string, double> &scenpar, // Scenario parameters (decorrelation distances)
+                  const arma::cube &phase,                                 // Phases from lsf_init_phases, [n_coeff, 11, 2]
+                  const arma::mat &tx_pos,                                 // Tx positions, [1, 3] or [n_link, 3]
+                  const arma::mat &rx_pos,                                 // Rx positions, [n_link, 3]
+                  arma::mat &rnd,                                          // Output: Random values, [n_link, 11]
+                  const arma::uvec *floor_id = nullptr,                    // Optional: Floor index per link, [n_link]; nullptr = all on one floor
+                  bool dual_mobility = false,                              // As in lsf_init_phases
+                  const std::string &preset = "Comb256",                   // Must match lsf_init_phases
+                  bool horizontal = true);                                 // Must match lsf_init_phases
 }
 
 #endif
