@@ -26,7 +26,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/interfaces/catch_interfaces_capture.hpp>
 
-#include "quadriga_tools.hpp"
+#include "quadriga_gbsm.hpp"
 
 #include <cmath>
 #include <cstdio>
@@ -48,7 +48,8 @@ namespace
     const double QNAN = std::numeric_limits<double>::quiet_NaN();
 
     // Oracle: canonical key order. The 138 numeric legacy keys are typed from the struct(...) call in
-    // QuaDRiGa's set_scenario_table.m (without 'SubpathMethod' and 'GR_epsilon'), the 27 new keys from section 7.2 of the plan.
+    // QuaDRiGa's set_scenario_table.m (without 'SubpathMethod' and 'GR_epsilon'), then the 33 keys for TR 38.901 v19.5.0
+    // in the order in which they were added to the library.
     const std::vector<std::string> &ref_key_order()
     {
         static const std::vector<std::string> k = {
@@ -76,7 +77,8 @@ namespace
         "EoD_offset_a", "EoD_offset_a_gamma", "EoD_offset_b", "EoD_offset_c", "EoD_offset_c_gamma",
         "EoD_offset_c_hUT", "EoD_offset_hcl", "PerClusterDS_fc_min", "PerClusterES_D_scale", "absTOA_Lmax",
         "NumClusters_min", "NF_k1", "NF_alpha", "NF_beta", "SNS_mu", "SNS_sigma", "SNS_A", "SNS_B", "SNS_R",
-        "SNS_delta_var", "PolVar_sigma"};
+        "SNS_delta_var", "PolVar_sigma", "LOS_state_lambda", "IO_state_lambda", "O2I_d2D_in_max", "DS_VS",
+        "DS_VS_a", "DS_VS_b"};
         return k;
     }
 
@@ -86,7 +88,7 @@ namespace
     }
 
     // Oracle: default value of a key, written as rules read from set_scenario_table.m.
-    // Everything that is not named here is 0, including all 27 new keys.
+    // Everything that is not named here is 0, including all 33 new keys.
     double ref_default(const std::string &k)
     {
         if (k == "NumClusters") return 6.0;
@@ -95,6 +97,7 @@ namespace
         if (k == "LNS_ksi") return 3.0;
         if (k == "absTOA_mu") return -100.0;
         if (k == "absTOA_lambda" || k == "SC_lambda") return 0.0;
+        if (k == "LOS_state_lambda" || k == "IO_state_lambda") return 0.0; // state distances: 0 = uncorrelated
         if (k == "ES_D_mu_min") return -INF;
         if (ends_with(k, "_lambda")) return 20.0; // the 8 decorrelation distances
         if (k == "DS_mu") return -6.0;
@@ -124,7 +127,7 @@ namespace
     // Exact comparison that treats equal infinities as equal
     bool same(double a, double b) { return a == b; }
 
-    // Number of entries of 'sp' that differ from the default oracle; -1 if the key set is not the 165 keys
+    // Number of entries of 'sp' that differ from the default oracle; -1 if the key set is not the 171 keys
     int n_not_default(const std::unordered_map<std::string, double> &sp, const std::string &except = "")
     {
         if (sp.size() != ref_key_order().size())
@@ -173,7 +176,7 @@ namespace
     }
 
     // File name for the current test case: 'test_' and the case name with every character other than
-    // A-Z, a-z, 0-9 replaced by '_' (Q12: cases running in parallel processes do not share a file)
+    // A-Z, a-z, 0-9 replaced by '_', so that cases running in parallel processes do not share a file
     std::string case_file()
     {
         std::string name = Catch::getResultCapture().getCurrentTestName();
@@ -242,12 +245,12 @@ namespace
         "asD_sf = -0.5\nasA_sf = -0.5\nesA_sf = -0.8\nesD_asD = 0.5\nesD_asA = -0.3\nesA_asA = 0.4\n";
 }
 
-TEST_CASE("conf_file_read - an empty file gives the 165 default values")
+TEST_CASE("conf_file_read - an empty file gives the 171 default values")
 {
     conf_out r = read_text("");
 
     CHECK(r.ok); // the default correlation matrix is the identity
-    CHECK(r.scenpar.size() == 165);
+    CHECK(r.scenpar.size() == 171);
     CHECK(n_not_default(r.scenpar) == 0);
     CHECK(same(val(r, "ES_D_mu_min"), -INF));
     CHECK(r.subpath_method == "legacy");
@@ -257,7 +260,7 @@ TEST_CASE("conf_file_read - an empty file gives the 165 default values")
     CHECK(r.short_names.empty());
     CHECK(r.ignored_keys.empty());
 
-    REQUIRE(r.key_order.size() == 165);
+    REQUIRE(r.key_order.size() == 171);
     CHECK(r.key_order == ref_key_order());
     CHECK(r.key_order[105] == "absTOA_lambda"); // 'SubpathMethod' is legacy field 107, between these two
     CHECK(r.key_order[106] == "LOS_scatter_radius");
@@ -351,13 +354,13 @@ TEST_CASE("conf_file_read - unknown keys are ignored and reported once in file o
                            "ShortName = Xy\n"
                            "PL_A = 3\n"
                            "XPL_A = 3\n"
-                           "My_PL_key = 3\n"        // Q7: 'PL_' in the middle is not a path-loss key
+                           "My_PL_key = 3\n"        // 'PL_' in the middle is not a path-loss key
                            "GR_epsilon = 1+1e7j\n"); // legacy key that is not supported; its value is not examined
 
     CHECK(r.ignored_keys == std::vector<std::string>{"Zeta_unknown", "Alpha_unknown", "ds_mu", "XPL_A", "My_PL_key", "GR_epsilon"});
     CHECK(same(val(r, "DS_mu"), -7.0));
     CHECK(n_not_default(r.scenpar) == 1);
-    CHECK(r.scenpar.size() == 165); // unknown keys do not enter scenpar
+    CHECK(r.scenpar.size() == 171); // unknown keys do not enter scenpar
     CHECK(r.plpar.size() == 1);
     CHECK(r.plpar.count("A") == 1);
 }
@@ -504,7 +507,7 @@ TEST_CASE("conf_file_read - the return value tells if lsp_xcorr is positive defi
     {
         INFO("case " << c.name);
         conf_out r;
-        REQUIRE_NOTHROW(r = read_text(c.content)); // not positive definite is not an error (Q15)
+        REQUIRE_NOTHROW(r = read_text(c.content)); // not positive definite is not an error
         QD_DIAG("%s,%d,%d\n", c.name, (int)r.ok, (int)c.ref);
         CHECK(r.ok == c.ref);
     }
@@ -531,7 +534,7 @@ TEST_CASE("conf_file_read - value checks per validation class")
     {
         accepts("NumClusters = 1");
         accepts("NumSubPaths = 2e1");
-        accepts("NumClusters = 1000"); // Q11: upper bound 1000
+        accepts("NumClusters = 1000"); // upper bound 1000
         accepts("NumSubPaths = 1e3");
         rejects_value("NumClusters = 1001");
         rejects_value("NumSubPaths = 1e4");
@@ -557,13 +560,16 @@ TEST_CASE("conf_file_read - value checks per validation class")
                               "PerClusterDS", "PerClusterDS_min", "absTOA_lambda",
                               "LSP_fc_min", "EoD_offset_b", "EoD_offset_hcl", "PerClusterDS_fc_min",
                               "PerClusterES_D_scale", "absTOA_Lmax", "SNS_sigma", "SNS_A", "SNS_B", "SNS_R",
-                              "SNS_delta_var", "PolVar_sigma"};
+                              "SNS_delta_var", "PolVar_sigma", "LOS_state_lambda", "IO_state_lambda",
+                              "O2I_d2D_in_max", "DS_VS", "DS_VS_a", "DS_VS_b"};
         for (const char *k : keys)
         {
+            // DS_VS > 0 needs DS_VS_a or DS_VS_b > 0 (cross-key rule, tested below)
+            const std::string partner = std::string(k) == "DS_VS" ? "\nDS_VS_a = 26" : "";
             accepts(std::string(k) + " = 0");
-            accepts(std::string(k) + " = 2.5");
-            rejects_value(std::string(k) + " = -0.001");
-            rejects_value(std::string(k) + " = Inf"); // Inf is allowed for 'real' and unchecked keys only
+            accepts(std::string(k) + " = 2.5" + partner);
+            rejects_value(std::string(k) + " = -0.001" + partner);
+            rejects_value(std::string(k) + " = Inf" + partner); // Inf is allowed for 'real' and unchecked keys only
         }
     }
 
@@ -593,7 +599,7 @@ TEST_CASE("conf_file_read - value checks per validation class")
         }
     }
 
-    SECTION("correlation in [-1, 1], the 7 xpr_ keys included (Q13)")
+    SECTION("correlation in [-1, 1], the 7 xpr_ keys included")
     {
         for (int i = 0; i < 28; ++i)
         {
@@ -620,7 +626,7 @@ TEST_CASE("conf_file_read - value checks per validation class")
         accepts("NumClusters_min = 0");
         accepts("NumClusters_min = 6"); // equal to the default of NumClusters
         accepts("NF_k1 = 4");
-        accepts("NF_k1 = 1000"); // Q11: upper bound 1000
+        accepts("NF_k1 = 1000"); // upper bound 1000
         accepts("NumClusters = 1000\nNumClusters_min = 1000");
         rejects_value("NF_k1 = 1001");
         rejects_value("NumClusters_min = 2.5");
@@ -630,7 +636,7 @@ TEST_CASE("conf_file_read - value checks per validation class")
         rejects_value("NF_k1 = Inf");
     }
 
-    SECTION("the bound of the counts is reported with the line (Q11)")
+    SECTION("the bound of the counts is reported with the line")
     {
         std::string m = read_error("DS_mu = -7\nNumSubPaths = 1001\n");
         QD_DIAG("\n# diag: conf_file_read count bound: %s\n", m.c_str());
@@ -664,7 +670,23 @@ TEST_CASE("conf_file_read - value checks per validation class")
         rejects_value("NF_beta = 1.33");
     }
 
-    SECTION("SubpathMethod is one of three names (Q14)")
+    SECTION("DS_VS_a and DS_VS_b are not both 0 if DS_VS is > 0")
+    {
+        accepts("DS_VS = 4\nDS_VS_a = 30");
+        accepts("DS_VS_b = 32\nDS_VS = 4"); // the order of the lines does not matter
+        accepts("DS_VS = 4\nDS_VS_a = 30\nDS_VS_b = 32");
+        accepts("DS_VS_a = 30\nDS_VS_b = 32"); // DS_VS = 0: no V/S term
+        rejects_value("DS_VS = 4");
+        rejects_value("DS_VS_a = 0\nDS_VS = 4\nDS_VS_b = 0");
+
+        // The message names the file and the line of DS_VS
+        const std::string m = read_error("DS_mu = -9.44\nDS_VS_a = 0\nDS_VS = 4\n");
+        QD_DIAG("\n# diag: conf_file_read DS_VS cross-key check: %s\n", m.c_str());
+        CHECK(m.find(case_file() + ", line 3: ") != std::string::npos);
+        CHECK(m.find("Values of 'DS_VS_a' and 'DS_VS_b' must not both be 0 if 'DS_VS' is > 0.") != std::string::npos);
+    }
+
+    SECTION("SubpathMethod is one of three names")
     {
         accepts("SubpathMethod = legacy");
         accepts("SubpathMethod = Laplacian");
@@ -689,7 +711,7 @@ TEST_CASE("conf_file_read - input validation")
         std::unordered_map<std::string, double> sp;
         CHECK_THROWS_AS(quadriga_lib::conf_file_read("test_conf_file_read_missing.conf", sp), std::runtime_error);
 
-        // T3: a directory is not a file, also when its name ends in '.conf'
+        // A directory is not a file, also when its name ends in '.conf'
         const std::string dir = "test_conf_file_read_dir.conf";
         std::filesystem::remove_all(dir);
         std::filesystem::create_directory(dir);
@@ -697,7 +719,7 @@ TEST_CASE("conf_file_read - input validation")
         std::filesystem::remove_all(dir);
     }
 
-    SECTION("numbers outside the grammar (Q5)")
+    SECTION("numbers outside the grammar")
     {
         rejects_grammar("DS_mu = NaN");
         rejects_grammar("DS_mu = nan");
@@ -719,7 +741,7 @@ TEST_CASE("conf_file_read - input validation")
         rejects_grammar("PL_A = 1,2");
     }
 
-    SECTION("word for a numeric key, number for a string key (Q6)")
+    SECTION("word for a numeric key, number for a string key")
     {
         rejects_grammar("DS_mu = abc");
         rejects_grammar("NumClusters = legacy");
@@ -741,7 +763,7 @@ TEST_CASE("conf_file_read - input validation")
         rejects_grammar("ShortName = a-b");
     }
 
-    SECTION("path-loss lines (Q7, Q8)")
+    SECTION("path-loss lines")
     {
         rejects_grammar("PL_ = 1");
         rejects_grammar("PL_A =");
@@ -939,7 +961,7 @@ TEST_CASE("conf_file_read - optional outputs alone and together, stale content i
 
 TEST_CASE("conf_file_read - a number beyond the range of a double is an error, below it reads as 0")
 {
-    // Decision Q2: overflow is the error "is out of range"; underflow gives the value of strtod in the C locale,
+    // Overflow is the error "is out of range"; underflow gives the value of strtod in the C locale,
     // i.e. the nearest subnormal or a signed 0. Oracles: numeric_limits and the bit patterns of +0 and -0;
     // 2.4703282292062328e-324 lies just above half of the smallest subnormal and rounds up to it,
     // 2.4703282292062327e-324 lies just below and rounds to 0; 1.7976931348623159e308 lies above the midpoint between
@@ -994,7 +1016,7 @@ TEST_CASE("conf_file_read - a number beyond the range of a double is an error, b
 
 TEST_CASE("conf_file_read - a UTF-8 byte order mark at the start of the file is skipped")
 {
-    // Decision Q1: the three bytes EF BB BF are removed from the start of line 1 only
+    // The three bytes EF BB BF are removed from the start of line 1 only
     conf_out r = read_text("\xEF\xBB\xBF% comment\nDS_mu = -7\n");
     CHECK(same(val(r, "DS_mu"), -7.0));
     CHECK(n_not_default(r.scenpar) == 1);
@@ -1027,7 +1049,7 @@ TEST_CASE("conf_file_read - a UTF-8 byte order mark at the start of the file is 
 
 TEST_CASE("conf_file_read - a short name stated twice in one file is an error")
 {
-    // Decision Q3: grammar level, so in both modes; the error names the line of the repetition
+    // A repeated short name is a grammar error, so in both modes; the error names the line of the repetition
     for (bool validate : {true, false})
     {
         INFO("validate " << validate);

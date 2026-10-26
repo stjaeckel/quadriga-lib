@@ -49,6 +49,7 @@ static_assert(sizeof(unsigned long long) == sizeof(size_t), "unsigned long and s
 #include "quadriga_channel.hpp"
 #include "quadriga_tools.hpp"
 #include "quadriga_sos.hpp"
+#include "quadriga_gbsm.hpp"
 
 namespace quadriga_lib
 {

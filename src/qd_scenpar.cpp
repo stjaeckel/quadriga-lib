@@ -2,7 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-#include "quadriga_tools.hpp"
+#include "quadriga_gbsm.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -50,7 +50,7 @@ struct qd_scenpar_key
 static const double QD_INF = std::numeric_limits<double>::infinity();
 
 // Key table: the single source of truth for names, canonical order, defaults and validation classes
-// - 138 numeric legacy keys in the order of QuaDRiGa's 'set_scenario_table.m', then the 27 keys for TR 38.901 v19.5.0
+// - 138 numeric legacy keys in the order of QuaDRiGa's 'set_scenario_table.m', then the 33 keys for TR 38.901 v19.5.0
 // - The legacy key 'GR_epsilon' is not supported: a real value has no use, the relative permittivity of the ground is complex
 // - 'SubpathMethod' is the only string key and is not part of the table; its legacy position is field 107
 // - LSP order of the cross-correlation matrix: DS, KF, SF, ASD, ASA, ESD, ESA, XPR
@@ -221,6 +221,13 @@ static const qd_scenpar_key qd_scenpar_keys[] = {
     {"SNS_R", 0.0, QD_NONNEG, -1, -1, 9, 2, "visibility region parameter R [dB]"},
     {"SNS_delta_var", 0.0, QD_NONNEG, -1, -1, 9, 2, "variance of the visibility region parameter delta"},
     {"PolVar_sigma", 0.0, QD_NONNEG, -1, -1, 9, 3, "STD of the polarization variability powers [dB]"},
+    // TR 38.901 v19.5.0: LOS/indoor state correlation distances, maximum indoor distance, InF delay-spread terms
+    {"LOS_state_lambda", 0.0, QD_NONNEG, -1, -1, 4, 2, "decorrelation distance of the LOS/NLOS state [m]; 0 = uncorrelated"},
+    {"IO_state_lambda", 0.0, QD_NONNEG, -1, -1, 4, 2, "decorrelation distance of the indoor/outdoor state [m]; 0 = uncorrelated"},
+    {"O2I_d2D_in_max", 0.0, QD_NONNEG, -1, -1, 3, 4, "maximum indoor 2D distance of O2I UTs [m]; 0 = not stated"},
+    {"DS_VS", 0.0, QD_NONNEG, -1, -1, 0, 1, "volume-to-surface ratio V/S of the hall [m]; 0 = no V/S term"},
+    {"DS_VS_a", 0.0, QD_NONNEG, -1, -1, 0, 1, "factor a of the DS term log10(a V/S + b) [1/m]"},
+    {"DS_VS_b", 0.0, QD_NONNEG, -1, -1, 0, 1, "offset b of the DS term log10(a V/S + b)"},
 };
 
 static const arma::uword qd_scenpar_n_key = sizeof(qd_scenpar_keys) / sizeof(qd_scenpar_keys[0]);
@@ -291,6 +298,11 @@ static void qd_scenpar_check(const double *val, const std::string &subpath_metho
     if ((val[i_alpha] > 0.0) != (val[i_beta] > 0.0))
         throw std::invalid_argument(where(line == nullptr ? 0 : line[val[i_alpha] > 0.0 ? i_alpha : i_beta]) +
                                     "Values of 'NF_alpha' and 'NF_beta' must be both 0 or both > 0.");
+
+    const arma::uword i_vs = qd_scenpar_find("DS_VS"), i_vsa = qd_scenpar_find("DS_VS_a"), i_vsb = qd_scenpar_find("DS_VS_b");
+    if (val[i_vs] > 0.0 && val[i_vsa] == 0.0 && val[i_vsb] == 0.0)
+        throw std::invalid_argument(where(line == nullptr ? 0 : line[i_vs]) +
+                                    "Values of 'DS_VS_a' and 'DS_VS_b' must not both be 0 if 'DS_VS' is > 0.");
 }
 
 // LSP cross-correlation matrix from a complete parameter set, 'X' has 64 elements (8 x 8, symmetric)
@@ -692,7 +704,7 @@ static bool qd_conf_has_newline(const std::string &s)
 }
 
 /*!SECTION
-Channel generation functions
+Geometry-based stochastic model
 SECTION!*/
 
 /*!MD
@@ -703,7 +715,7 @@ Read and validate a QuaDRiGa scenario configuration file
   are allowed; line ends can be LF or CRLF; space and tab are white space; a UTF-8 byte order mark at the start
   of the file is skipped
 - Keys are case-sensitive names of the characters `A-Z`, `a-z`, `0-9` and `_`; there are four kinds:
-  - Scenario parameters: `n_key = 165` numeric keys with one number each, returned in `scenpar`. Keys that
+  - Scenario parameters: `n_key = 171` numeric keys with one number each, returned in `scenpar`. Keys that
     are not in the file have their default value. The names and their order are returned in `key_order`.
   - `SubpathMethod`: one of the words `legacy`, `Laplacian`, `mmMAGIC`; default `legacy`
   - Path-loss parameters: every key that starts with `PL_`. `PL_model` has one name as value. All others
@@ -717,7 +729,7 @@ Read and validate a QuaDRiGa scenario configuration file
   subnormal reads as `0` (or `-0`)
 - Numbers are read independent of the global locale (the decimal point is always `.`)
 - Elevation angles are used throughout (+90 deg is up); no key refers to a zenith angle
-- The 165 keys are 138 numeric keys of QuaDRiGa and 27 keys for 3GPP TR 38.901 v19.5.0. With their
+- The 171 keys are 138 numeric keys of QuaDRiGa and 33 keys for 3GPP TR 38.901 v19.5.0. With their
   default of 0 the new keys have no effect.
 - The QuaDRiGa key `GR_epsilon` (fixed relative permittivity of the ground) is not supported and is
   reported in `ignored_keys` like any other unknown key; the permittivity is complex and is set in the simulation
@@ -754,7 +766,7 @@ bool quadriga_lib::conf_file_read(
   grammar is checked
 
 ## Outputs:
-- **`scenpar`** — Numeric scenario parameters; previous content is discarded; `n_key = 165` entries
+- **`scenpar`** — Numeric scenario parameters; previous content is discarded; `n_key = 171` entries
 - **`subpath_method`** *(optional)* — Value of `SubpathMethod`; `legacy` if not in the file
 - **`pl_model`** *(optional)* — Value of `PL_model`; empty if not in the file
 - **`plpar`** *(optional)* — Path-loss parameters; keys without the prefix `PL_`; `PL_model` is not included;
@@ -762,7 +774,7 @@ bool quadriga_lib::conf_file_read(
 - **`lsp_xcorr`** *(optional)* — LSP cross-correlation matrix; order of rows and columns: DS, KF, SF, ASD, ASA,
   ESD, ESA, XPR; `[8, 8]`
 - **`key_order`** *(optional)* — Canonical order of the keys in `scenpar`: the QuaDRiGa order without
-  `SubpathMethod` (its position is between elements 105 and 106, 0-based), then the 27 new keys; `[n_key]`
+  `SubpathMethod` (its position is between elements 105 and 106, 0-based), then the 33 new keys; `[n_key]`
 - **`pl_order`** *(optional)* — Keys of `plpar` in the order of their first occurrence in the file; `[n_pl]`
 - **`short_names`** *(optional)* — Values of all `ShortName` lines in file order; `[n_short]`
 - **`ignored_keys`** *(optional)* — Unknown keys, each once, in the order of their first occurrence; `[n_ignored]`
@@ -916,11 +928,11 @@ bool quadriga_lib::conf_file_read(const std::string &fn,
 Validate scenario parameters and complete them with default values
 
 - Checks a set of QuaDRiGa scenario parameters that did not come from a conf file and adds every missing key
-  with its default value, so that `scenpar` has all `n_key = 165` entries on return
+  with its default value, so that `scenpar` has all `n_key = 171` entries on return
 - An empty `scenpar` returns the complete default parameter set
-- A set with the 138 numeric keys of QuaDRiGa is completed with the 27 keys for 3GPP TR 38.901 v19.5.0, which
+- A set with the 138 numeric keys of QuaDRiGa is completed with the 33 keys for 3GPP TR 38.901 v19.5.0, which
   have no effect at their default of 0
-- A name in `scenpar` that is not one of the 165 keys is an error, also with `validate = false`; this includes
+- A name in `scenpar` that is not one of the 171 keys is an error, also with `validate = false`; this includes
   the QuaDRiGa key `GR_epsilon`, which is not supported
 - Value checks with `validate = true`; `NaN` is an error for every key:
   - Integer from 1 to 1000: `NumClusters`, `NumSubPaths`
@@ -929,13 +941,15 @@ Validate scenario parameters and complete them with default values
     `absTOA_lambda`, `PerClusterDS`, `PerClusterDS_min`, `PerClusterAS_D`, `PerClusterAS_A`, `PerClusterES_D`,
     `PerClusterES_A`, `LNS_ksi`, `LOS_scatter_radius`, `GR_enabled`, `LSP_fc_min`, `EoD_offset_b`,
     `EoD_offset_hcl`, `PerClusterDS_fc_min`, `PerClusterES_D_scale`, `absTOA_Lmax`, `NF_alpha`, `NF_beta`,
-    `SNS_sigma`, `SNS_A`, `SNS_B`, `SNS_R`, `SNS_delta_var`, `PolVar_sigma`
+    `SNS_sigma`, `SNS_A`, `SNS_B`, `SNS_R`, `SNS_delta_var`, `PolVar_sigma`, `LOS_state_lambda`,
+    `IO_state_lambda`, `O2I_d2D_in_max`, `DS_VS`, `DS_VS_a`, `DS_VS_b`
   - Integer from 0 to 1000: `NumClusters_min`, `NF_k1`
   - In the range from 0 to 1: `SNS_mu`
   - In the range from -1 to 1: the 28 correlations (`asD_ds` to `xpr_esa`)
   - All other keys accept any value including `Inf` and `-Inf`
   - `NumClusters_min` must not exceed `NumClusters`
   - `NF_alpha` and `NF_beta` must be both 0 or both > 0
+  - `DS_VS_a` and `DS_VS_b` must not both be 0 if `DS_VS` is > 0
   - `subpath_method` must be `legacy`, `Laplacian` or `mmMAGIC`
 - With `validate = false` no value is checked: `NaN` and any `subpath_method` are accepted
 - The symmetric matrix `lsp_xcorr` is built from the 28 correlation keys and has a unit diagonal. It is
@@ -954,7 +968,7 @@ bool quadriga_lib::scenpar_validate(
 
 ## Inputs:
 - **`scenpar`** — Numeric scenario parameters; updated in-place: given values are kept, missing keys are
-  added with their default; `n_key = 165` entries on return
+  added with their default; `n_key = 171` entries on return
 - **`subpath_method`** *(optional)* — Value of `SubpathMethod`, the only parameter that is not numeric
 - **`validate`** *(optional)* — `false`: only complete with defaults, no value checks
 
@@ -962,7 +976,7 @@ bool quadriga_lib::scenpar_validate(
 - **`lsp_xcorr`** *(optional)* — LSP cross-correlation matrix; order of rows and columns: DS, KF, SF, ASD, ASA,
   ESD, ESA, XPR; `[8, 8]`
 - **`key_order`** *(optional)* — Canonical order of the keys in `scenpar`: the QuaDRiGa order without
-  `SubpathMethod` (its position is between elements 105 and 106, 0-based), then the 27 new keys; `[n_key]`
+  `SubpathMethod` (its position is between elements 105 and 106, 0-based), then the 33 new keys; `[n_key]`
 
 ## Returns:
 - `true` if `lsp_xcorr` is positive definite (all 8 pivots of the factorization are > 0); `false` also if it
@@ -1146,7 +1160,8 @@ Write a QuaDRiGa scenario configuration file
   `LOS_scatter_radius`
 - The overview formula of an LSP shows its mean and STD with the frequency, distance, height and elevation terms;
   with `LSP_fc_min > 0` the frequency is written as `max( fGHz, fc_min )`; the ESD line also has the terms of
-  `ES_D_mu_A` to `ES_D_mu_D` and, if `ES_D_mu_min` is not `-Inf`, the lower limit of the mean
+  `ES_D_mu_A` to `ES_D_mu_D` and, if `ES_D_mu_min` is not `-Inf`, the lower limit of the mean; the DS line has
+  the term `log10( a · V/S + b )` when `DS_VS > 0` (a = `DS_VS_a`, b = `DS_VS_b`; `V/S` stays symbolic)
 - Each line is `name = value % comment`, with the name padded to 19 and the value to 13 characters. The comment
   states the unit; for the mean and STD of an LSP it adds the reference point of the frequency, distance, height
   and elevation terms, e.g. `@ 1 GHz`.
@@ -1158,7 +1173,7 @@ Write a QuaDRiGa scenario configuration file
   kept
 - With `write_defaults = false` a key is written only if its value differs from the default, compared bit for bit;
   `SubpathMethod` only if it is not `legacy`; a section without a written key is left out
-- With `write_defaults = true` all 165 keys and `SubpathMethod` are written
+- With `write_defaults = true` all 171 keys and `SubpathMethod` are written
 - Validation before the file is opened: the file name has no line break; the value checks of [[scenpar_validate]]
   (unknown keys, `NaN`, classes, `subpath_method`); `pl_model` empty or one name; `plpar` keys are names other
   than `model`, each with at least one value and no `NaN`; `pl_order` names each key of `plpar` once; short names
@@ -1190,7 +1205,7 @@ void quadriga_lib::conf_file_write(
 
 ## Inputs:
 - **`fn`** — Path of the conf file to write
-- **`scenpar`** — Numeric scenario parameters; any subset of the `n_key = 165` keys of [[conf_file_read]]; missing
+- **`scenpar`** — Numeric scenario parameters; any subset of the `n_key = 171` keys of [[conf_file_read]]; missing
   keys have their default
 - **`subpath_method`** *(optional)* — Value of `SubpathMethod`: `legacy`, `Laplacian` or `mmMAGIC`
 - **`pl_model`** *(optional)* — Value of `PL_model`; one name; empty: not written
@@ -1445,6 +1460,13 @@ void quadriga_lib::conf_file_write(const std::string &fn,
                             add(mean, get("ES_D_mu_D"), "max( hUT - hBS, 0 )");
                             if (get("ES_D_mu_min") != -QD_INF)
                                 mean = "max( " + qd_conf_number(get("ES_D_mu_min")) + ", " + mean + " )";
+                        }
+                        if (p == "DS" && get("DS_VS") > 0.0) // InF: volume-to-surface term before the mean
+                        {
+                            const double m = get("DS_mu");
+                            mean = "log10( " + qd_conf_number(get("DS_VS_a")) + " * V/S + " +
+                                   qd_conf_number(get("DS_VS_b")) + " )" + (std::signbit(m) ? " - " : " + ") +
+                                   qd_conf_number(std::abs(m)) + mean.substr(qd_conf_number(m).size());
                         }
                         body += mean + " + ";
                     }

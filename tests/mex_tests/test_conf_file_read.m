@@ -17,10 +17,10 @@ write_file( fn, { '% Comment', 'DS_mu = -7.5   % delay spread', 'NumClusters = 1
 %% Basic call, all outputs
 [ scenpar, plpar, lsp_xcorr, lsp_xcorr_chk, short_names, ignored_keys ] = quadriga_lib.conf_file_read( fn );
 
-% scenpar: 166 fields, QuaDRiGa order, SubpathMethod is field 107, new keys at the end
+% scenpar: 172 fields, QuaDRiGa order, SubpathMethod is field 107, new keys at the end
 names = fieldnames( scenpar );
 assertEqual( size(scenpar), [1, 1] );
-assertEqual( numel(names), 166 );
+assertEqual( numel(names), 172 );
 assertEqual( names{1}, 'NumClusters' );
 assertEqual( names{2}, 'NumSubPaths' );
 assertEqual( names{106}, 'absTOA_lambda' );
@@ -31,6 +31,12 @@ assertEqual( names{112}, 'asD_ds' );
 assertEqual( names{139}, 'xpr_esa' );
 assertEqual( names{140}, 'LSP_fc_min' );
 assertEqual( names{166}, 'PolVar_sigma' );
+assertEqual( names{167}, 'LOS_state_lambda' );
+assertEqual( names{168}, 'IO_state_lambda' );
+assertEqual( names{169}, 'O2I_d2D_in_max' );
+assertEqual( names{170}, 'DS_VS' );
+assertEqual( names{171}, 'DS_VS_a' );
+assertEqual( names{172}, 'DS_VS_b' );
 assertTrue( ~isfield( scenpar, 'GR_epsilon' ) );
 
 % Values from the file, defaults for the rest; numeric fields are double scalars

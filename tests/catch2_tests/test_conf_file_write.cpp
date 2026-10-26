@@ -18,8 +18,8 @@
 // test_scenpar_validate).
 //
 // Oracles: the layout is a complete file typed by hand from the rules of QuaDRiGa's write_conf_file.m
-// (write_par_line: name, ' = ', padding to 19 characters, value padded to 13, ' % ', comment), with the
-// decisions of review point A: a key is written if its value differs from its default, sections without a
+// (write_par_line: name, ' = ', padding to 19 characters, value padded to 13, ' % ', comment), with these
+// changes: a key is written if its value differs from its default, sections without a
 // written key are left out, no trailing spaces, sections 9 (EoD offset) and 10 (optional components) are new.
 // Number texts are typed by hand (the shortest of 15, 16, 17 significant digits that reads back exactly).
 // The round trip uses conf_file_read as a supporting function: read, write, read again must give the same
@@ -30,7 +30,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "quadriga_tools.hpp"
+#include "quadriga_gbsm.hpp"
 
 #include <algorithm>
 #include <clocale>
@@ -63,8 +63,8 @@ namespace
 
     const char *LIB_CONFIG_DIR = "data/config";
 
-    // The 165 numeric keys, typed from QuaDRiGa's set_scenario_table.m (without 'SubpathMethod' and
-    // 'GR_epsilon') and the 27 keys for TR 38.901 v19.5.0
+    // The 171 numeric keys, typed from QuaDRiGa's set_scenario_table.m (without 'SubpathMethod' and
+    // 'GR_epsilon') and the 33 keys for TR 38.901 v19.5.0
     const std::vector<std::string> KEYS = {
         "NumClusters", "NumSubPaths", "DS_mu", "DS_sigma", "DS_lambda", "DS_omega", "DS_gamma", "DS_epsilon",
         "DS_zeta", "DS_alpha", "DS_delta", "DS_kappa", "DS_tau", "DS_beta", "AS_D_mu", "AS_D_sigma",
@@ -89,7 +89,8 @@ namespace
         "EoD_offset_a", "EoD_offset_a_gamma", "EoD_offset_b", "EoD_offset_c", "EoD_offset_c_gamma",
         "EoD_offset_c_hUT", "EoD_offset_hcl", "PerClusterDS_fc_min", "PerClusterES_D_scale", "absTOA_Lmax",
         "NumClusters_min", "NF_k1", "NF_alpha", "NF_beta", "SNS_mu", "SNS_sigma", "SNS_A", "SNS_B", "SNS_R",
-        "SNS_delta_var", "PolVar_sigma"};
+        "SNS_delta_var", "PolVar_sigma", "LOS_state_lambda", "IO_state_lambda", "O2I_d2D_in_max", "DS_VS",
+        "DS_VS_a", "DS_VS_b"};
 
     // Removes a file when it goes out of scope, and at construction
     struct tmp_name
@@ -601,7 +602,7 @@ TEST_CASE("conf_file_write - without write_defaults exactly the keys that differ
         CHECK(n_assignments(text) == 0);
     }
 
-    // Cases that QuaDRiGa's write_conf_file.m loses, measured in MATLAB at review point A
+    // Cases that QuaDRiGa's write_conf_file.m loses, measured in MATLAB
     struct loss_case
     {
         const char *what;
@@ -664,7 +665,7 @@ TEST_CASE("conf_file_write - with write_defaults every key is written once")
         QD_DIAG("\n# diag: conf_file_write write_defaults = true, %zu given keys: %d assignments, %d lines\n",
                 scenpar.size(), n_assignments(text), (int)lines_of(text).size());
         CHECK(d.empty());
-        CHECK(n_assignments(text) == 166); // 165 numeric keys and SubpathMethod
+        CHECK(n_assignments(text) == 172); // 171 numeric keys and SubpathMethod
         for (const auto &k : KEYS)
         {
             INFO("key " << k);
@@ -841,7 +842,7 @@ TEST_CASE("conf_file_write - input validation")
         CHECK_THROWS_AS(quadriga_lib::conf_file_write("test_conf_file_write_no_such_dir/x.conf", sp), std::runtime_error);
         CHECK(!std::filesystem::exists("test_conf_file_write_no_such_dir"));
 
-        // B2: a line break in the file name would end the header comment
+        // A line break in the file name would end the header comment
         for (const char *name : {"test_conf_file_write_x\nKF_mu = 5 %.conf", "test_conf_file_write_x\rKF_mu = 5 %.conf"})
         {
             tmp_name t(name);
@@ -859,7 +860,9 @@ TEST_CASE("conf_file_write - input validation")
         rejects([&]() { quadriga_lib::conf_file_write(f.fn, {{"ds_kf", 1.5}}); });        // class correlation
         rejects([&]() { quadriga_lib::conf_file_write(f.fn, {{"DS_lambda", INF}}); });    // class finite >= 0
         rejects([&]() { quadriga_lib::conf_file_write(f.fn, {{"NF_alpha", 1.0}}); });     // NF_alpha without NF_beta
-        rejects([&]() { quadriga_lib::conf_file_write(f.fn, {{"NumClusters", 1001.0}}); }); // Q11: bound 1000
+        rejects([&]() { quadriga_lib::conf_file_write(f.fn, {{"DS_VS", 4.0}}); });       // DS_VS without DS_VS_a, DS_VS_b
+        CHECK_NOTHROW(quadriga_lib::conf_file_write(f.fn, {{"DS_VS", 4.0}, {"DS_VS_b", 32.0}}));
+        rejects([&]() { quadriga_lib::conf_file_write(f.fn, {{"NumClusters", 1001.0}}); }); // bound 1000
         rejects([&]() { quadriga_lib::conf_file_write(f.fn, {{"NumSubPaths", 1001.0}}); });
         rejects([&]() { quadriga_lib::conf_file_write(f.fn, {{"NF_k1", 1001.0}}); });
         CHECK_NOTHROW(quadriga_lib::conf_file_write(f.fn, {{"NumClusters", 1000.0}, {"NumSubPaths", 1000.0},
@@ -897,7 +900,7 @@ TEST_CASE("conf_file_write - input validation")
 
     SECTION("short_names")
     {
-        const std::vector<std::string> space = {"A b"}, empty = {""}, twice = {"Ab", "Cd", "Ab"}; // Q3: distinct
+        const std::vector<std::string> space = {"A b"}, empty = {""}, twice = {"Ab", "Cd", "Ab"}; // must be distinct
         for (const auto *s : {&space, &empty, &twice})
             rejects([&]() { quadriga_lib::conf_file_write(f.fn, sp, "legacy", "", nullptr, nullptr, s); });
         const std::vector<std::string> case_differs = {"Ab", "AB"};
@@ -926,7 +929,7 @@ TEST_CASE("conf_file_write - input validation")
 
 TEST_CASE("conf_file_write - the ESD overview line shows the distance and height terms and the minimum")
 {
-    // Oracle: the lines typed by hand from the rule of Q10: the terms of ES_D_mu_A ... ES_D_mu_D follow the
+    // Oracle: the lines typed by hand from the rule of the ESD overview: the terms of ES_D_mu_A ... ES_D_mu_D follow the
     // log10 terms with the same sign style; max( mu_min, mean ) only if ES_D_mu_min is not -Inf; with
     // LSP_fc_min > 0 the frequency is written as max( fGHz, fc_min ), in the mean and in the STD term.
     tmp_name f("test_conf_file_write_esd.conf");
@@ -961,12 +964,116 @@ TEST_CASE("conf_file_write - the ESD overview line shows the distance and height
     }
 }
 
+TEST_CASE("conf_file_write - the DS overview line shows the V/S term")
+{
+    // Oracle: the lines typed by hand from the rule: with DS_VS > 0 the DS mean starts with
+    // log10( a * V/S + b ) (a = DS_VS_a, b = DS_VS_b, V/S symbolic), followed by the usual mean term with its sign
+    // and the further terms; with DS_VS = 0 the line is that of a file without the V/S keys.
+    tmp_name f("test_conf_file_write_ds_vs.conf");
+
+    SECTION("DS_VS > 0")
+    {
+        quadriga_lib::conf_file_write(f.fn, {{"DS_mu", -9.35}, {"DS_sigma", 0.15}, {"DS_VS", 47.0 / 11.0},
+                                             {"DS_VS_a", 26.0}, {"DS_VS_b", 14.0}});
+        const std::string text = slurp(f.fn);
+        QD_DIAG("\n# diag: conf_file_write DS overview with V/S\n%s\n", overview_line(text, "DS").c_str());
+        CHECK(overview_line(text, "DS") == "% DS  = log10( 26 * V/S + 14 ) - 9.35 + Xds * ( 0.15 )");
+    }
+
+    SECTION("positive mean and a frequency term")
+    {
+        quadriga_lib::conf_file_write(f.fn, {{"DS_mu", 0.5}, {"DS_gamma", -0.2}, {"DS_VS", 4.0}, {"DS_VS_a", 30.0},
+                                             {"DS_VS_b", 32.0}});
+        const std::string text = slurp(f.fn);
+        QD_DIAG("%s\n", overview_line(text, "DS").c_str());
+        CHECK(overview_line(text, "DS") == "% DS  = log10( 30 * V/S + 32 ) + 0.5 - 0.2 * log10( fGHz ) + Xds * ( 0.5 )");
+    }
+
+    SECTION("DS_VS = 0 gives the line without the V/S term")
+    {
+        quadriga_lib::conf_file_write(f.fn, {{"DS_mu", -9.35}, {"DS_sigma", 0.15}, {"DS_VS_a", 26.0}, {"DS_VS_b", 14.0}});
+        const std::string text = slurp(f.fn);
+        QD_DIAG("%s\n", overview_line(text, "DS").c_str());
+        CHECK(overview_line(text, "DS") == "% DS  = -9.35 + Xds * ( 0.15 )");
+    }
+}
+
+TEST_CASE("conf_file_write - the new keys land in their section and paragraph and are not written at their default")
+{
+    // Oracle: the complete lines typed by hand (name, ' = ', padding to 19 characters, value padded to 13, ' % ',
+    // comment of the key). LOS_state_lambda and IO_state_lambda form the paragraph after SC_lambda in the
+    // small-scale section, O2I_d2D_in_max has its own paragraph at the end of "Model parameters", the V/S keys
+    // follow the DS keys in the DS paragraph.
+    tmp_name f("test_conf_file_write_new_keys.conf");
+
+    SECTION("at value 0 none of the six keys is written")
+    {
+        quadriga_lib::conf_file_write(f.fn, {{"SC_lambda", 15.0}, {"NumClusters", 13.0}, {"DS_mu", -9.44},
+                                             {"LOS_state_lambda", 0.0}, {"IO_state_lambda", 0.0},
+                                             {"O2I_d2D_in_max", 0.0}, {"DS_VS", 0.0}, {"DS_VS_a", 0.0},
+                                             {"DS_VS_b", 0.0}});
+        const std::string text = slurp(f.fn);
+        for (const char *k : {"LOS_state_lambda", "IO_state_lambda", "O2I_d2D_in_max", "DS_VS", "DS_VS_a", "DS_VS_b"})
+        {
+            INFO("key " << k);
+            CHECK(n_lines(text, k) == 0);
+        }
+        CHECK(n_assignments(text) == 3);
+    }
+
+    SECTION("at other values the lines are in their paragraphs")
+    {
+        quadriga_lib::conf_file_write(f.fn, {{"SC_lambda", 15.0}, {"NumClusters", 13.0}, {"DS_mu", -9.44},
+                                             {"DS_sigma", 0.19}, {"LOS_state_lambda", 50.0}, {"IO_state_lambda", 50.0},
+                                             {"O2I_d2D_in_max", 25.0}, {"DS_VS", 4.0}, {"DS_VS_a", 30.0},
+                                             {"DS_VS_b", 32.0}});
+        const std::string text = slurp(f.fn);
+        QD_DIAG("\n# diag: conf_file_write new keys\n%s\n", text.c_str());
+
+        const std::string los = "LOS_state_lambda =     50           % decorrelation distance of the LOS/NLOS state [m]; 0 = uncorrelated\n",
+                          io = "IO_state_lambda =      50           % decorrelation distance of the indoor/outdoor state [m]; 0 = uncorrelated\n",
+                          o2i = "O2I_d2D_in_max =       25           % maximum indoor 2D distance of O2I UTs [m]; 0 = not stated\n",
+                          vs = "DS_VS =                4            % volume-to-surface ratio V/S of the hall [m]; 0 = no V/S term\n",
+                          vsa = "DS_VS_a =              30           % factor a of the DS term log10(a V/S + b) [1/m]\n",
+                          vsb = "DS_VS_b =              32           % offset b of the DS term log10(a V/S + b)\n",
+                          ds_sigma = "DS_sigma =             0.19         % delay spread STD [log10(s)]\n",
+                          sc = "SC_lambda =            15           % decorrelation distance [m]; 0 = disabled\n",
+                          ncl = "NumClusters =          13           % number of clusters\n";
+
+        CHECK(text.find(sc + "\n" + los + io) != std::string::npos); // the last section here, no blank line after it
+        CHECK(text.find(ncl + "\n" + o2i + "\n") != std::string::npos);
+        CHECK(text.find(ds_sigma + vs + vsa + vsb + "\n") != std::string::npos);
+
+        // Each line lies in its section
+        const size_t p_model = text.find("\n% Model parameters\n"), p_o2i = text.find(o2i),
+                     p_sc = text.find("\n% Decorrelation distance for the small-scale fading spatial consistency\n"),
+                     p_los = text.find(los), p_lsp = text.find("\n% Large scale distributions\n"), p_vs = text.find(vs),
+                     p_dd = text.find("\n% Large-Scale fading decorrelation distances\n");
+        REQUIRE(p_model != std::string::npos);
+        REQUIRE(p_sc != std::string::npos);
+        REQUIRE(p_lsp != std::string::npos);
+        CHECK((p_o2i > p_model && p_o2i < p_sc));
+        CHECK(p_los > p_sc);
+        CHECK((p_vs > p_lsp && (p_dd == std::string::npos || p_vs < p_dd) && p_vs < p_model));
+
+        // The file reads back with the same values
+        std::unordered_map<std::string, double> back;
+        quadriga_lib::conf_file_read(f.fn, back);
+        CHECK(back.at("LOS_state_lambda") == 50.0);
+        CHECK(back.at("IO_state_lambda") == 50.0);
+        CHECK(back.at("O2I_d2D_in_max") == 25.0);
+        CHECK(back.at("DS_VS") == 4.0);
+        CHECK(back.at("DS_VS_a") == 30.0);
+        CHECK(back.at("DS_VS_b") == 32.0);
+    }
+}
+
 TEST_CASE("conf_file_write - a failed write leaves an existing file unchanged")
 {
 #if !defined(__linux__)
     SKIP("needs Linux: file size limit and /dev/full");
 #else
-    // Decision B1: the text goes to a temporary file in the same directory, which is renamed over the target
+    // Safe write: the text goes to a temporary file in the same directory, which is renamed over the target
     // only after it was closed without error. A failed call leaves an existing file unchanged and no temporary
     // file behind. The write error is provoked by a file size limit of 2048 bytes (SIGXFSZ ignored, so that
     // write() fails with EFBIG); the limit is lifted before any assertion, since it also applies to a

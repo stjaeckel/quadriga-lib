@@ -7,7 +7,7 @@
 #include "mex_quadriga_lib_functions.hpp"
 
 /*!SECTION
-Channel generation functions
+Geometry-based stochastic model
 SECTION!*/
 
 /*!MD
@@ -29,7 +29,8 @@ Write a QuaDRiGa scenario configuration file
 - The overview formula of an LSP shows its mean and STD with the frequency, distance, height and
   elevation terms; with `LSP_fc_min > 0` the frequency is written as `max( fGHz, fc_min )`; the
   ESD line also has the terms of `ES_D_mu_A` to `ES_D_mu_D` and, if `ES_D_mu_min` is not `-Inf`,
-  the lower limit of the mean
+  the lower limit of the mean; the DS line has the term `log10( a · V/S + b )` when `DS_VS > 0`
+  (a = `DS_VS_a`, b = `DS_VS_b`; `V/S` stays symbolic)
 - Each line is `name = value % comment`, aligned in columns; the comment states the unit
 - The path-loss section has the formula blocks of the model (`logdist`, `dual_slope`, `nlos`,
   `tripple_slope`), the line `PL_model`, then the fields of `plpar` in struct order with the prefix
@@ -38,7 +39,7 @@ Write a QuaDRiGa scenario configuration file
   to the same double in [[conf_file_read]]; `Inf` and `-Inf` are written as such
 - With `write_defaults = false` a field is written only if its value differs from the default;
   `SubpathMethod` only if it is not `legacy`; a section without a written field is left out
-- With `write_defaults = true` all 165 numeric fields and `SubpathMethod` are written
+- With `write_defaults = true` all 171 numeric fields and `SubpathMethod` are written
 - The inputs are checked with the rules of [[scenpar_validate]] before the file is opened: unknown
   fields (including `GR_epsilon`), `NaN`, values outside their range and a wrong `SubpathMethod`
   are errors. Further errors: a line break in the file name, a `model` that is not one name, an
@@ -59,7 +60,7 @@ quadriga_lib.conf_file_write( fn, scenpar, plpar, short_names, ref, ref_sec, val
 
 ## Inputs:
 - **`fn`** — Path of the conf file to write; string
-- **`scenpar`** — Scenario parameters; struct with any subset of the 166 fields returned by
+- **`scenpar`** — Scenario parameters; struct with any subset of the 172 fields returned by
   [[conf_file_read]]; numeric fields are real scalars of class double, single, int32, uint32,
   int64, uint64 or logical; `SubpathMethod` is a string; missing fields have their default; `[]`
   writes the default set

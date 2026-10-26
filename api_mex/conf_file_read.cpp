@@ -7,7 +7,7 @@
 #include "mex_quadriga_lib_functions.hpp"
 
 /*!SECTION
-Channel generation functions
+Geometry-based stochastic model
 SECTION!*/
 
 /*!MD
@@ -18,7 +18,7 @@ Read and validate a QuaDRiGa scenario configuration file
   lines are allowed; line ends can be LF or CRLF; space and tab are white space; a UTF-8 byte order
   mark at the start of the file is skipped
 - Keys are case-sensitive names of the characters `A-Z`, `a-z`, `0-9` and `_`; there are four kinds:
-  - Scenario parameters: 165 numeric keys with one number each. Keys that are not in the file have
+  - Scenario parameters: 171 numeric keys with one number each. Keys that are not in the file have
     their default value.
   - `SubpathMethod`: one of the words `legacy`, `Laplacian`, `mmMAGIC`; default `legacy`
   - Path-loss parameters: every key that starts with `PL_`. `PL_model` has one name as value. All
@@ -33,7 +33,7 @@ Read and validate a QuaDRiGa scenario configuration file
   smallest subnormal reads as `0` (or `-0`)
 - Numbers are read independent of the locale (the decimal point is always `.`)
 - Elevation angles are used throughout (+90 deg is up); no key refers to a zenith angle
-- The 165 numeric keys are 138 keys of QuaDRiGa and 27 keys for 3GPP TR 38.901 v19.5.0. With their
+- The 171 numeric keys are 138 keys of QuaDRiGa and 33 keys for 3GPP TR 38.901 v19.5.0. With their
   default of 0 the new keys have no effect.
 - The QuaDRiGa key `GR_epsilon` (fixed relative permittivity of the ground) is not supported and is
   reported in `ignored_keys`; the permittivity is complex and is set in the simulation
@@ -57,8 +57,8 @@ Read and validate a QuaDRiGa scenario configuration file
   grammar is checked; default: true
 
 ## Outputs:
-- **`scenpar`** — Scenario parameters; struct with 166 fields in the QuaDRiGa field order: the 138
-  numeric keys of QuaDRiGa with `SubpathMethod` (string) as field 107, then the 27 new keys; all
+- **`scenpar`** — Scenario parameters; struct with 172 fields in the QuaDRiGa field order: the 138
+  numeric keys of QuaDRiGa with `SubpathMethod` (string) as field 107, then the 33 new keys; all
   numeric fields are scalars
 - **`plpar`** — Path-loss parameters; struct with the field `model` (string, only if the file states
   `PL_model`) followed by one field per `PL_` key in file order, named without the prefix `PL_`;

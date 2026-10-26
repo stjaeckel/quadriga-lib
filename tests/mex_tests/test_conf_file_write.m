@@ -66,6 +66,7 @@ quadriga_lib.conf_file_write( fn, s, [], [], [], [], [], true );      % write_de
 t2 = fileread( fn );
 assertEqual( numel( strfind( t2, 'NumSubPaths =' ) ), 1 );
 assertEqual( numel( strfind( t2, 'PolVar_sigma =' ) ), 1 );
+assertEqual( numel( regexp( t2, '^[A-Za-z]\w* += ', 'match', 'lineanchors' ) ), 172 );   % 171 keys and SubpathMethod
 
 quadriga_lib.conf_file_write( fn, [] );                                  % empty scenpar: default set
 assertEqual( fileread( fn ), sprintf( '%% Config file for scenario "test_conf_file_write_mex"\n' ) );
@@ -137,6 +138,8 @@ delete( fn );
 assert_throws( @() quadriga_lib.conf_file_write( fn, struct( 'GR_epsilon', 1 ) ), 'Unknown key ''GR_epsilon''' );
 assert_throws( @() quadriga_lib.conf_file_write( fn, struct( 'SubpathMethod', 'bla' ) ), 'SubpathMethod' );
 assert_throws( @() quadriga_lib.conf_file_write( fn, struct( 'NumClusters', 0 ) ), 'NumClusters' );
+assert_throws( @() quadriga_lib.conf_file_write( fn, struct( 'DS_VS', 4 ) ), ...
+    'Values of ''DS_VS_a'' and ''DS_VS_b'' must not both be 0 if ''DS_VS'' is > 0.' );
 assert_throws( @() quadriga_lib.conf_file_write( fn, s, struct( 'A', [] ) ), 'has no value' );
 assert_throws( @() quadriga_lib.conf_file_write( fn, s, [], {}, '', repmat( {'x'}, 1, 11 ) ), 'at most 10' );
 assert_throws( @() quadriga_lib.conf_file_write( fn, s, [], {}, '', {}, ones(3, 2) ), 'size [4, 2]' );

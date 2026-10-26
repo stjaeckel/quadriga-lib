@@ -7,13 +7,19 @@ function test_scenpar_validate
 [ scenpar, lsp_xcorr, lsp_xcorr_chk ] = quadriga_lib.scenpar_validate();
 names = fieldnames( scenpar );
 assertEqual( size(scenpar), [1, 1] );
-assertEqual( numel(names), 166 );
+assertEqual( numel(names), 172 );
 assertEqual( names{1}, 'NumClusters' );
 assertEqual( names{107}, 'SubpathMethod' );
 assertEqual( names{108}, 'LOS_scatter_radius' );
 assertEqual( names{139}, 'xpr_esa' );
 assertEqual( names{140}, 'LSP_fc_min' );
 assertEqual( names{166}, 'PolVar_sigma' );
+assertEqual( names{167}, 'LOS_state_lambda' );
+assertEqual( names{168}, 'IO_state_lambda' );
+assertEqual( names{169}, 'O2I_d2D_in_max' );
+assertEqual( names{170}, 'DS_VS' );
+assertEqual( names{171}, 'DS_VS_a' );
+assertEqual( names{172}, 'DS_VS_b' );
 assertEqual( scenpar.NumClusters, 6 );
 assertEqual( scenpar.DS_mu, -6 );
 assertEqual( scenpar.ES_D_mu_min, -Inf );
@@ -51,8 +57,8 @@ assertTrue( chk );
 assertEqual( out2, out );
 assertEqual( X2, X );
 
-% A struct with the fields of QuaDRiGa (no new keys) is completed with the 27 new fields
-legacy = rmfield( out, names(140:166) );
+% A struct with the fields of QuaDRiGa (no new keys) is completed with the 33 new fields
+legacy = rmfield( out, names(140:172) );
 assertEqual( numel(fieldnames(legacy)), 139 );
 assertEqual( quadriga_lib.scenpar_validate( legacy ), out );
 
@@ -99,6 +105,12 @@ assert_throws( @() quadriga_lib.scenpar_validate( struct('DS_mu_typo', 1), false
 assert_throws( @() quadriga_lib.scenpar_validate( struct('GR_epsilon', 10) ), 'Unknown key ''GR_epsilon''' );     % not supported
 assert_throws( @() quadriga_lib.scenpar_validate( struct('DS_mu', NaN) ), 'DS_mu' );
 assert_throws( @() quadriga_lib.scenpar_validate( struct('NumClusters', 1001) ), 'from 1 to 1000' );
+assert_throws( @() quadriga_lib.scenpar_validate( struct('DS_VS', 4) ), ...              % C++ cross-key check
+    'Values of ''DS_VS_a'' and ''DS_VS_b'' must not both be 0 if ''DS_VS'' is > 0.' );
+vs = quadriga_lib.scenpar_validate( struct('DS_VS', 4, 'DS_VS_a', 30) );
+assertEqual( vs.DS_VS, 4 );
+vs = quadriga_lib.scenpar_validate( struct('DS_VS', 4), false );
+assertEqual( vs.DS_VS, 4 );
 
 % Errors of the shared helpers carry the identifier of the library
 assert_identifier( @() quadriga_lib.scenpar_validate( struct('NumClusters', int8(7)) ), 'quadriga_lib:CPPerror' );

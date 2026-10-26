@@ -15,7 +15,8 @@
 // Left to other suites: the grammar and the value checks (test_conf_file_read).
 //
 // Oracles: the formulas and numbers of TR 38.901 v19.5.0 (Tables 7.5-6 to 7.5-12, 7.6.9-1, 7.6-13-1,
-// 7.6.14.1.2-1/-2, 7.6.15-1, 7.6.3.1-2), typed into this file from the TR, independently of the files.
+// 7.6.14.1.2-1/-2, 7.6.15-1, 7.6.3.1-2), typed into this file from the TR, independently of the files; the hall
+// and room dimensions of the InF calibration (Table 7.8-7, clause 7.8.4) and of the indoor office (Table 7.2-2).
 //
 // Conventions: QuaDRiGa uses elevation angles (+90 deg is up), the TR zenith angles. The EoD offset is
 // the ZOD offset of the TR with the opposite sign; spreads are the same in both conventions.
@@ -23,7 +24,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "quadriga_tools.hpp"
+#include "quadriga_gbsm.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -56,7 +57,7 @@ namespace
         return sp;
     }
 
-    // Key formula of the plan: EoD offset in degrees, elevation, positive = upwards
+    // Key formula: EoD offset in degrees, elevation, positive = upwards
     double eod_offset_keys(spmap &p, double fc, double d2D, double hBS, double hUT)
     {
         const double lf = std::log10(std::max(fc, p["LSP_fc_min"]));
@@ -70,7 +71,7 @@ namespace
         return off;
     }
 
-    // Key formula of the plan: mean of log10(ESD / 1 deg), without the legacy omega, epsilon, zeta, alpha terms
+    // Key formula: mean of log10(ESD / 1 deg), without the legacy omega, epsilon, zeta, alpha terms
     double esd_mean_keys(spmap &p, double fc, double d2D, double hBS, double hUT)
     {
         const double lf = std::log10(p["ES_D_omega"] + std::max(fc, p["LSP_fc_min"]));
@@ -115,6 +116,28 @@ namespace
         if (scen == "InF")
             return los ? 1.35 : 1.2;
         return 0.14; // SMa
+    }
+
+    // Hall or room of a file: TR 38.901 Table 7.8-7 (InF calibration, clause 7.8.4): InF-SL and InF-DH in the small
+    // hall 120 m x 60 m, InF-DL and InF-SH in the big hall 300 m x 150 m, room height 10 m; Table 7.2-2 (indoor
+    // office): 120 m x 50 m x 3 m. Returns false for files without a hall.
+    bool hall_of(const std::string &name, double &len, double &wid, double &hgt)
+    {
+        if (name == "InF_NLOS_SL" || name == "InF_NLOS_DH")
+            len = 120.0, wid = 60.0, hgt = 10.0;
+        else if (name == "InF_NLOS_DL" || name == "InF_NLOS_SH")
+            len = 300.0, wid = 150.0, hgt = 10.0;
+        else if (name == "Indoor_NLOS")
+            len = 120.0, wid = 50.0, hgt = 3.0;
+        else
+            return false;
+        return true;
+    }
+
+    // Volume-to-surface ratio V/S of a closed box
+    double vs_ratio(double len, double wid, double hgt)
+    {
+        return len * wid * hgt / (2.0 * (len * wid + len * hgt + wid * hgt));
     }
 
     // Split a file name into scenario and the table column that the ESD and EoD offset rows follow:
@@ -175,7 +198,6 @@ TEST_CASE("conf files v19 - all 23 files are read without ignored keys and pass 
         CHECK(sp["PerClusterDS_fc_min"] == 0.0); // the TR has no clamp for the cluster DS
         CHECK(sp["PolVar_sigma"] == 3.0);        // clause 7.6.16
         CHECK(sp["NumSubPaths"] == 20.0);
-        CHECK(sp["absTOA_Lmax"] == 0.0);
 
         // LOS files have a K-factor, all others switch the LOS path off and carry one extra cluster
         std::string s, state;
@@ -186,7 +208,8 @@ TEST_CASE("conf files v19 - all 23 files are read without ignored keys and pass 
         else
             CHECK(sp["KF_mu"] == -100.0);
 
-        // Absolute time of arrival only in NLOS and NLOS_O2I files (decision O10); active if absTOA_mu > -30
+        // Absolute time of arrival only in NLOS and NLOS_O2I files: the TR gives it for NLOS links, and the O2I
+        // links of an NLOS file are NLOS links; active if absTOA_mu > -30
         const bool nlos_outdoor = name.find("NLOS") != std::string::npos;
         CHECK((sp["absTOA_mu"] > -30.0) == nlos_outdoor);
     }
@@ -233,7 +256,7 @@ TEST_CASE("conf files v19 - the EoD offset keys give minus the ZOD offset of the
     }
     CHECK(n_nonzero > 100);
 
-    // Examples of the plan, section 7.2
+    // Worked examples of the EoD offset at single points
     spmap p = read_v19("UMi_NLOS");
     CHECK(std::abs(eod_offset_keys(p, 3.5, 100.0, 10.0, 1.5) - 1.9953) < 1e-4); // +2.0 deg at 100 m
     p = read_v19("RMa_NLOS");
@@ -378,6 +401,88 @@ TEST_CASE("conf files v19 - table values of TR 38.901 v19.5.0")
         ++n;
     }
     QD_DIAG("\n# diag: conf files v19, %d table values compared\n", n);
+}
+
+TEST_CASE("conf files v19 - state distances, indoor distance and TOA bound per file")
+{
+    // Oracles: TR 38.901 v19.5.0 Table 7.6.3.1-2 (LOS/NLOS state: RMa 60 m, UMi, UMa, SMa 50 m, InH 10 m,
+    // InF d_clutter / 2 with d_clutter 10 m for SL, SH and 2 m for DL, DH; indoor/outdoor state 50 m for RMa, UMi,
+    // UMa and SMa); clause 7.4.3.1 (maximum d2D-in: 25 m for UMa, UMi and SMa UTs in commercial buildings, 10 m for
+    // RMa); clause 7.6.9 (excess delay bound 2L/c, L = max(length, width, height) of the hall or room).
+    // The state distances are stored in the NLOS files, the indoor/outdoor values in the O2I files; all other
+    // files have 0.
+    QD_DIAG("\n# diag: conf files v19, state distances, d2D-in maximum and absTOA_Lmax\n");
+    QD_DIAG("file,LOS_state_lambda,IO_state_lambda,O2I_d2D_in_max,absTOA_Lmax,L_ref\n");
+    for (const std::string &name : v19_names())
+    {
+        INFO("file " << name);
+        spmap sp = read_v19(name);
+        std::string scen, state;
+        bool los_file, o2i;
+        split_name(name, scen, state, los_file, o2i);
+        const bool nlos_file = name.find("NLOS") != std::string::npos && !o2i;
+
+        double los_ref = 0.0;
+        if (nlos_file)
+            los_ref = scen == "RMa" ? 60.0 : scen == "Indoor" ? 10.0
+                    : scen == "InF" ? ((name == "InF_NLOS_SL" || name == "InF_NLOS_SH") ? 10.0 : 2.0) / 2.0
+                                    : 50.0;
+        const double io_ref = o2i ? 50.0 : 0.0;
+        const double d2d_ref = o2i ? (scen == "RMa" ? 10.0 : 25.0) : 0.0;
+
+        double len = 0.0, wid = 0.0, hgt = 0.0, L_ref = 0.0;
+        if (hall_of(name, len, wid, hgt))
+            L_ref = std::max(len, std::max(wid, hgt));
+
+        QD_DIAG("%s,%g,%g,%g,%g,%g\n", name.c_str(), sp["LOS_state_lambda"], sp["IO_state_lambda"],
+                sp["O2I_d2D_in_max"], sp["absTOA_Lmax"], L_ref);
+        CHECK(sp["LOS_state_lambda"] == los_ref);
+        CHECK(sp["IO_state_lambda"] == io_ref);
+        CHECK(sp["O2I_d2D_in_max"] == d2d_ref);
+        CHECK(sp["absTOA_Lmax"] == L_ref);
+    }
+}
+
+TEST_CASE("conf files v19 - the InF delay spread follows the V/S rule of Table 7.5-6 Part-3")
+{
+    // Oracle: TR 38.901 v19.5.0 Table 7.5-6 Part-3: mu_lgDS = log10(26 (V/S) + 14) - 9.35 (LOS) and
+    // log10(30 (V/S) + 32) - 9.44 (NLOS), V/S of the calibration hall of Table 7.8-7 (closed box, room height
+    // 10 m); the InF LOS file serves all sub-scenarios and uses the average V/S of the two halls.
+    // The key rule: mu_lgDS = DS_mu + log10(DS_VS_a * DS_VS + DS_VS_b). Files without a hall have no V/S keys.
+    // The files write V/S rounded to 2 decimals (4, 50/11 as 4.55, 47/11 as 4.27): derived values are written
+    // with as few digits as keep the LSP mean within 0.1 %. The rounding moves mu_lgDS by at most 3.52e-4
+    // (log10((30 * 4.55 + 32) / (30 * 50/11 + 32))); the tolerance is that limit, log10(1.001) = 4.34e-4.
+    const double tol_mu = std::log10(1.001);
+    const double vs_small = vs_ratio(120.0, 60.0, 10.0), vs_big = vs_ratio(300.0, 150.0, 10.0);
+    QD_DIAG("\n# diag: conf files v19, InF delay spread [log10(s)]\n");
+    QD_DIAG("file,DS_mu,DS_VS,DS_VS_a,DS_VS_b,mu_keys,mu_tr\n");
+    for (const std::string &name : v19_names())
+    {
+        INFO("file " << name);
+        spmap sp = read_v19(name);
+        if (name.compare(0, 4, "InF_") != 0)
+        {
+            CHECK(sp["DS_VS"] == 0.0);
+            CHECK(sp["DS_VS_a"] == 0.0);
+            CHECK(sp["DS_VS_b"] == 0.0);
+            continue;
+        }
+        const bool los = name == "InF_LOS";
+        double len = 0.0, wid = 0.0, hgt = 0.0;
+        const double vs = los ? 0.5 * (vs_small + vs_big) : (hall_of(name, len, wid, hgt), vs_ratio(len, wid, hgt));
+        const double mu_tr = los ? std::log10(26.0 * vs + 14.0) - 9.35 : std::log10(30.0 * vs + 32.0) - 9.44;
+        const double mu_keys = sp["DS_mu"] + std::log10(sp["DS_VS_a"] * sp["DS_VS"] + sp["DS_VS_b"]);
+        QD_DIAG("%s,%g,%.17g,%g,%g,%.15f,%.15f\n", name.c_str(), sp["DS_mu"], sp["DS_VS"], sp["DS_VS_a"],
+                sp["DS_VS_b"], mu_keys, mu_tr);
+
+        CHECK(sp["DS_mu"] == (los ? -9.35 : -9.44));
+        CHECK(sp["DS_VS_a"] == (los ? 26.0 : 30.0));
+        CHECK(sp["DS_VS_b"] == (los ? 14.0 : 32.0));
+        CHECK(std::abs(sp["DS_VS"] - std::round(100.0 * vs) / 100.0) < 1e-12); // V/S rounded to 2 decimals
+        CHECK(std::abs(mu_keys - mu_tr) < tol_mu);
+    }
+    CHECK(std::abs(vs_small - 4.0) < 1e-15);
+    CHECK(std::abs(vs_big - 50.0 / 11.0) < 1e-15);
 }
 
 TEST_CASE("conf files v19 - path-loss constants of RMa and SMa follow Table 7.4.1-1")
