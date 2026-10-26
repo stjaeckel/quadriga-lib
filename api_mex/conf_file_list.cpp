@@ -7,7 +7,7 @@
 #include "mex_helper_functions.hpp"
 
 /*!SECTION
-Channel generation functions
+Geometry-based stochastic model
 SECTION!*/
 
 /*!MD

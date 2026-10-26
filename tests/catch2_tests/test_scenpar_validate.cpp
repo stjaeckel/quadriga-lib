@@ -15,13 +15,14 @@
 // (test_conf_file_read).
 //
 // Oracles: key order and defaults are typed from QuaDRiGa's set_scenario_table.m, the validation
-// classes from check_scenario_parameter_table.m with the changes Q11 to Q14 of the plan, the matrix
-// positions from get.lsp_xcorr in qd_builder.m. The positive-definite oracle for 3 coupled LSPs is the
+// classes from check_scenario_parameter_table.m with these changes: the counts are bounded by 1000, NaN is an
+// error for every key, the 7 xpr_ correlations are checked like the others, 'subpath_method' is one of three
+// names and an unknown key is an error; the matrix positions from get.lsp_xcorr in qd_builder.m. The positive-definite oracle for 3 coupled LSPs is the
 // determinant of the 3 x 3 correlation matrix.
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "quadriga_tools.hpp"
+#include "quadriga_gbsm.hpp"
 
 #include <cmath>
 #include <limits>
@@ -39,7 +40,8 @@ namespace
     const double QNAN = std::numeric_limits<double>::quiet_NaN();
 
     // Oracle: canonical key order. The 138 numeric legacy keys are typed from the struct(...) call in
-    // QuaDRiGa's set_scenario_table.m (without 'SubpathMethod' and 'GR_epsilon'), the 27 new keys from section 7.2 of the plan.
+    // QuaDRiGa's set_scenario_table.m (without 'SubpathMethod' and 'GR_epsilon'), then the 33 keys for TR 38.901 v19.5.0
+    // in the order in which they were added to the library.
     const std::vector<std::string> &ref_key_order()
     {
         static const std::vector<std::string> k = {
@@ -67,7 +69,8 @@ namespace
         "EoD_offset_a", "EoD_offset_a_gamma", "EoD_offset_b", "EoD_offset_c", "EoD_offset_c_gamma",
         "EoD_offset_c_hUT", "EoD_offset_hcl", "PerClusterDS_fc_min", "PerClusterES_D_scale", "absTOA_Lmax",
         "NumClusters_min", "NF_k1", "NF_alpha", "NF_beta", "SNS_mu", "SNS_sigma", "SNS_A", "SNS_B", "SNS_R",
-        "SNS_delta_var", "PolVar_sigma"};
+        "SNS_delta_var", "PolVar_sigma", "LOS_state_lambda", "IO_state_lambda", "O2I_d2D_in_max", "DS_VS",
+        "DS_VS_a", "DS_VS_b"};
         return k;
     }
 
@@ -77,7 +80,7 @@ namespace
     }
 
     // Oracle: default value of a key, written as rules read from set_scenario_table.m.
-    // Everything that is not named here is 0, including all 27 new keys.
+    // Everything that is not named here is 0, including all 33 new keys.
     double ref_default(const std::string &k)
     {
         if (k == "NumClusters") return 6.0;
@@ -86,6 +89,7 @@ namespace
         if (k == "LNS_ksi") return 3.0;
         if (k == "absTOA_mu") return -100.0;
         if (k == "absTOA_lambda" || k == "SC_lambda") return 0.0;
+        if (k == "LOS_state_lambda" || k == "IO_state_lambda") return 0.0; // state distances: 0 = uncorrelated
         if (k == "ES_D_mu_min") return -INF;
         if (ends_with(k, "_lambda")) return 20.0; // the 8 decorrelation distances
         if (k == "DS_mu") return -6.0;
@@ -115,7 +119,7 @@ namespace
     // Exact comparison that treats equal infinities as equal
     bool same(double a, double b) { return a == b; }
 
-    // Number of entries of 'sp' that differ from the default oracle; -1 if the key set is not the 165 keys
+    // Number of entries of 'sp' that differ from the default oracle; -1 if the key set is not the 171 keys
     int n_not_default(const std::unordered_map<std::string, double> &sp, const std::string &except = "")
     {
         if (sp.size() != ref_key_order().size())
@@ -144,7 +148,7 @@ namespace
         CHECK(sp.size() == 1); // a failed call does not complete the set
 
         CHECK_NOTHROW(quadriga_lib::scenpar_validate(sp, "legacy", nullptr, nullptr, false));
-        CHECK(sp.size() == 165);
+        CHECK(sp.size() == 171);
         CHECK((sp[key] == value || (value != value && sp[key] != sp[key])));
     }
 
@@ -155,12 +159,12 @@ namespace
         spmap sp;
         sp[key] = value;
         CHECK_NOTHROW(quadriga_lib::scenpar_validate(sp));
-        CHECK(sp.size() == 165);
+        CHECK(sp.size() == 171);
         CHECK(sp[key] == value);
     }
 }
 
-TEST_CASE("scenpar_validate - an empty map returns the 165 default values")
+TEST_CASE("scenpar_validate - an empty map returns the 171 default values")
 {
     spmap sp;
     arma::mat X;
@@ -169,7 +173,7 @@ TEST_CASE("scenpar_validate - an empty map returns the 165 default values")
     bool ok = quadriga_lib::scenpar_validate(sp, "legacy", &X, &order);
 
     CHECK(ok);
-    CHECK(sp.size() == 165);
+    CHECK(sp.size() == 171);
     CHECK(n_not_default(sp) == 0);
     CHECK(order == ref_key_order());
     REQUIRE((X.n_rows == 8 && X.n_cols == 8));
@@ -188,7 +192,7 @@ TEST_CASE("scenpar_validate - an empty map returns the 165 default values")
     CHECK(sp2 == sp);
 }
 
-TEST_CASE("scenpar_validate - a legacy set with 138 numeric keys passes and grows to 165")
+TEST_CASE("scenpar_validate - a legacy set with 138 numeric keys passes and grows to 171")
 {
     // Distinct, valid, non-default values for the 138 legacy keys:
     // integers for the two counts, small correlations, positive values elsewhere
@@ -210,9 +214,9 @@ TEST_CASE("scenpar_validate - a legacy set with 138 numeric keys passes and grow
     bool ok = quadriga_lib::scenpar_validate(sp, "mmMAGIC", &X);
 
     CHECK(ok);
-    CHECK(sp.size() == 165);
+    CHECK(sp.size() == 171);
     int n_kept = 0, n_new_default = 0;
-    for (int i = 0; i < 165; ++i)
+    for (int i = 0; i < 171; ++i)
     {
         const std::string &k = ref_key_order()[i];
         if (i < 138 && sp.count(k) && sp[k] == given[k])
@@ -221,7 +225,7 @@ TEST_CASE("scenpar_validate - a legacy set with 138 numeric keys passes and grow
             ++n_new_default;
     }
     CHECK(n_kept == 138);        // given values are not changed
-    CHECK(n_new_default == 27);  // the 27 new keys are added with default 0
+    CHECK(n_new_default == 33);  // the 33 new keys are added with default 0
 
     // The matrix is built from the given correlations
     REQUIRE((X.n_rows == 8 && X.n_cols == 8));
@@ -307,7 +311,7 @@ TEST_CASE("scenpar_validate - value checks per validation class")
         accepts("NumClusters", 12.0);
     }
 
-    SECTION("NaN is an error for every key (Q12)")
+    SECTION("NaN is an error for every key")
     {
         for (const std::string &k : ref_key_order())
             rejects_value(k, QNAN);
@@ -319,7 +323,7 @@ TEST_CASE("scenpar_validate - value checks per validation class")
         {
             accepts(k, 1.0);
             accepts(k, 40.0);
-            accepts(k, 1000.0); // Q11: upper bound 1000
+            accepts(k, 1000.0); // upper bound 1000
             rejects_value(k, 1001.0);
             rejects_value(k, 1e300);
             rejects_value(k, 0.0);
@@ -345,13 +349,22 @@ TEST_CASE("scenpar_validate - value checks per validation class")
                               "PerClusterDS", "PerClusterDS_min", "absTOA_lambda",
                               "LSP_fc_min", "EoD_offset_b", "EoD_offset_hcl", "PerClusterDS_fc_min",
                               "PerClusterES_D_scale", "absTOA_Lmax", "SNS_sigma", "SNS_A", "SNS_B", "SNS_R",
-                              "SNS_delta_var", "PolVar_sigma"})
+                              "SNS_delta_var", "PolVar_sigma", "LOS_state_lambda", "IO_state_lambda",
+                              "O2I_d2D_in_max", "DS_VS_a", "DS_VS_b"})
         {
             accepts(k, 0.0);
             accepts(k, 3.5);
             rejects_value(k, -1e-9);
             rejects_value(k, INF);
         }
+
+        // DS_VS > 0 needs DS_VS_a or DS_VS_b > 0 (cross-key rule, tested below)
+        accepts("DS_VS", 0.0);
+        spmap sp = {{"DS_VS", 3.5}, {"DS_VS_a", 26.0}};
+        CHECK_NOTHROW(quadriga_lib::scenpar_validate(sp));
+        CHECK(sp["DS_VS"] == 3.5);
+        rejects_value("DS_VS", -1e-9);
+        rejects_value("DS_VS", INF);
     }
 
     SECTION("real and unchecked keys accept any value except NaN")
@@ -364,9 +377,10 @@ TEST_CASE("scenpar_validate - value checks per validation class")
             "AS_A_lambda", "ES_D_lambda", "ES_A_lambda", "SF_lambda", "KF_lambda", "XPR_lambda", "PerClusterDS",
             "PerClusterDS_min", "absTOA_lambda", "LSP_fc_min", "EoD_offset_b", "EoD_offset_hcl",
             "PerClusterDS_fc_min", "PerClusterES_D_scale", "absTOA_Lmax", "NumClusters_min", "NF_k1", "NF_alpha",
-            "NF_beta", "SNS_mu", "SNS_sigma", "SNS_A", "SNS_B", "SNS_R", "SNS_delta_var", "PolVar_sigma"};
+            "NF_beta", "SNS_mu", "SNS_sigma", "SNS_A", "SNS_B", "SNS_R", "SNS_delta_var", "PolVar_sigma",
+            "LOS_state_lambda", "IO_state_lambda", "O2I_d2D_in_max", "DS_VS", "DS_VS_a", "DS_VS_b"};
         int n = 0;
-        for (int i = 0; i < 165; ++i)
+        for (int i = 0; i < 171; ++i)
         {
             const std::string &k = ref_key_order()[i];
             bool is_bounded = (i >= 110 && i < 138); // correlations
@@ -382,7 +396,7 @@ TEST_CASE("scenpar_validate - value checks per validation class")
         CHECK(n == 35 + 53 + 10);
     }
 
-    SECTION("correlation in [-1, 1], the 7 xpr_ keys included (Q13)")
+    SECTION("correlation in [-1, 1], the 7 xpr_ keys included")
     {
         for (int i = 0; i < 28; ++i)
         {
@@ -408,7 +422,7 @@ TEST_CASE("scenpar_validate - value checks per validation class")
         accepts("NumClusters_min", 6.0);
         accepts("NF_k1", 0.0);
         accepts("NF_k1", 4.0);
-        accepts("NF_k1", 1000.0); // Q11: upper bound 1000
+        accepts("NF_k1", 1000.0); // upper bound 1000
         rejects_value("NF_k1", 1001.0);
         rejects_value("NumClusters_min", 1.5);
         rejects_value("NumClusters_min", -1.0);
@@ -417,7 +431,7 @@ TEST_CASE("scenpar_validate - value checks per validation class")
         rejects_value("NF_k1", INF);
     }
 
-    SECTION("the bound 1000 of the counts is named in the message (Q11)")
+    SECTION("the bound 1000 of the counts is named in the message")
     {
         // NumClusters_min = 1001 also exceeds NumClusters = 1000; the class check comes first and names the bound
         auto message = [](spmap sp) -> std::string
@@ -455,9 +469,31 @@ TEST_CASE("scenpar_validate - value checks per validation class")
         CHECK_NOTHROW(quadriga_lib::scenpar_validate(sp));
         rejects_value("NF_alpha", 1.53);
         rejects_value("NF_beta", 1.42);
+
+        // DS_VS > 0 needs DS_VS_a or DS_VS_b > 0; DS_VS = 0 switches the V/S term off
+        for (const spmap &ok : {spmap{{"DS_VS", 4.0}, {"DS_VS_a", 30.0}}, spmap{{"DS_VS", 4.0}, {"DS_VS_b", 32.0}},
+                                spmap{{"DS_VS_a", 30.0}, {"DS_VS_b", 32.0}}})
+        {
+            sp = ok;
+            CHECK_NOTHROW(quadriga_lib::scenpar_validate(sp));
+        }
+        rejects_value("DS_VS", 4.0);
+        sp = {{"DS_VS", 4.0}, {"DS_VS_a", 0.0}, {"DS_VS_b", 0.0}};
+        std::string m = "<no error>";
+        try
+        {
+            quadriga_lib::scenpar_validate(sp);
+        }
+        catch (const std::invalid_argument &e)
+        {
+            m = e.what();
+        }
+        QD_DIAG("\n# diag: scenpar_validate DS_VS cross-key check: %s\n", m.c_str());
+        CHECK(m == "Values of 'DS_VS_a' and 'DS_VS_b' must not both be 0 if 'DS_VS' is > 0.");
+        CHECK(sp.size() == 3); // a failed call does not complete the set
     }
 
-    SECTION("subpath_method is one of three names (Q14)")
+    SECTION("subpath_method is one of three names")
     {
         spmap sp;
         CHECK_NOTHROW(quadriga_lib::scenpar_validate(sp, "legacy"));
@@ -480,12 +516,12 @@ TEST_CASE("scenpar_validate - input validation")
     SECTION("valid baseline")
     {
         CHECK_NOTHROW(quadriga_lib::scenpar_validate(sp, "legacy", &X, &order));
-        CHECK(sp.size() == 165);
-        CHECK(order.size() == 165);
+        CHECK(sp.size() == 171);
+        CHECK(order.size() == 171);
         CHECK((X.n_rows == 8 && X.n_cols == 8));
     }
 
-    SECTION("unknown key, with and without value checks (Q11)")
+    SECTION("unknown key, with and without value checks")
     {
         sp["DS_mu_typo"] = 1.0;
         CHECK_THROWS_AS(quadriga_lib::scenpar_validate(sp, "legacy", &X, &order), std::invalid_argument);

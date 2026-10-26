@@ -14,15 +14,16 @@
 // Left to other suites: the content of the files (test_conf_file_read).
 //
 // Oracles: the expected lists are written by hand next to the directory content of each case. The
-// reference behaviour is QuaDRiGa's supported_scenarios.m with the changes Q9 and Q10 of the plan.
+// reference behaviour is QuaDRiGa's supported_scenarios.m with two changes: 'ShortName' counts only on lines
+// that are not comments, and a file whose name is shadowed by an earlier directory is skipped completely.
 //
 // Conventions: every case builds its own directories 'test_conf_file_list_*' in the working directory
-// and removes them; no two cases use the same name (Q12). Names are sorted byte-wise, so digits come before
+// and removes them; no two cases use the same name. Names are sorted byte-wise, so digits come before
 // upper case before lower case.
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "quadriga_tools.hpp"
+#include "quadriga_gbsm.hpp"
 
 #include <filesystem>
 #include <fstream>
@@ -129,7 +130,7 @@ TEST_CASE("conf_file_list - a file name defined by an earlier directory is skipp
     tmp_dir a("test_conf_file_list_shadow_a"), b("test_conf_file_list_shadow_b");
     a.add("X.conf", "ShortName = Xs\n");
     a.add("Z.conf");
-    b.add("X.conf", "ShortName = Other\n"); // shadowed: neither the file nor its short name is listed (Q10)
+    b.add("X.conf", "ShortName = Other\n"); // shadowed: neither the file nor its short name is listed
     b.add("Y.conf", "ShortName = Ys\n");
     b.add("A.conf");
 
@@ -148,7 +149,7 @@ TEST_CASE("conf_file_list - a file name defined by an earlier directory is skipp
     CHECK(scen == strvec{"A", "X", "Other", "Y", "Ys", "Z"});
     CHECK(dirs == strvec{b.name, b.name, b.name, b.name, b.name, a.name});
 
-    // A copy of a file with its short name in a second directory is not ambiguous (Q10)
+    // A copy of a file with its short name in a second directory is not ambiguous
     b.add("Z.conf", "ShortName = Zs\n");
     a.add("Z.conf", "ShortName = Zs\n");
     CHECK_NOTHROW(n = quadriga_lib::conf_file_list({a.name, b.name}, scen, &files, &dirs));
@@ -364,7 +365,7 @@ TEST_CASE("conf_file_list - a symbolic link to a regular file is listed, other l
 
 TEST_CASE("conf_file_list - a UTF-8 byte order mark before the first short name is skipped")
 {
-    // Decision Q1, as in conf_file_read: EF BB BF at the start of the file is removed
+    // As in conf_file_read: EF BB BF at the start of the file is removed
     tmp_dir d("test_conf_file_list_bom");
     d.add("Bom.conf", "\xEF\xBB\xBF"
                       "ShortName = Bs\nShortName = Bt\n");

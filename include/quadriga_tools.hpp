@@ -514,58 +514,6 @@ namespace quadriga_lib
                     bool apply_gain = false,                  // If true, read gain from *gain and apply it to xprmat after normalization
                     const arma::uvec *ray_index = nullptr);   // Optional rayU to ray mapping; default: 1:1 (n_ray == n_rayU)
 
-    // ---- Scenario parameters ----
-
-    // Read and validate a QuaDRiGa scenario configuration file
-    // - Returns true if the LSP cross-correlation matrix is positive definite
-    // - 'scenpar' always holds all n_key numeric keys; keys not in the file have their default value
-    bool conf_file_read(const std::string &fn,                                                 // Path to the .conf file
-                        std::unordered_map<std::string, double> &scenpar,                      // Output: Numeric scenario parameters, n_key entries
-                        std::string *subpath_method = nullptr,                                 // Optional output: Value of 'SubpathMethod'
-                        std::string *pl_model = nullptr,                                       // Optional output: Value of 'PL_model', empty if not in file
-                        std::unordered_map<std::string, std::vector<double>> *plpar = nullptr, // Optional output: Path-loss parameters, keys without "PL_"
-                        arma::mat *lsp_xcorr = nullptr,                                        // Optional output: LSP cross-correlation matrix, [8, 8]
-                        std::vector<std::string> *key_order = nullptr,                         // Optional output: Canonical order of the scenpar keys, [n_key]
-                        std::vector<std::string> *pl_order = nullptr,                          // Optional output: plpar keys in file order
-                        std::vector<std::string> *short_names = nullptr,                       // Optional output: Values of 'ShortName' in file order
-                        std::vector<std::string> *ignored_keys = nullptr,                      // Optional output: Keys in the file that are not known
-                        bool validate = true);                                                 // Apply the value checks of 'scenpar_validate'
-
-    // Validate scenario parameters and complete them with default values
-    // - Returns true if the LSP cross-correlation matrix is positive definite
-    // - An empty 'scenpar' returns the complete default parameter set
-    bool scenpar_validate(std::unordered_map<std::string, double> &scenpar, // In/out: Missing keys are added with their default
-                          const std::string &subpath_method = "legacy",     // Value of 'SubpathMethod'
-                          arma::mat *lsp_xcorr = nullptr,                   // Optional output: LSP cross-correlation matrix, [8, 8]
-                          std::vector<std::string> *key_order = nullptr,    // Optional output: Canonical order of the scenpar keys, [n_key]
-                          bool validate = true);                            // false: only complete with defaults, no value checks
-
-    // List the scenarios defined by the conf files in a set of directories
-    // - Returns the number of entries, n_scen
-    arma::uword conf_file_list(const std::vector<std::string> &dirs,           // Directories, searched in this order, not recursive
-                               std::vector<std::string> &scenarios,            // Output: Scenario names and short names, [n_scen]
-                               std::vector<std::string> *file_names = nullptr, // Optional output: File name incl. ".conf" per entry, [n_scen]
-                               std::vector<std::string> *file_dirs = nullptr,  // Optional output: Directory per entry, as given in 'dirs', [n_scen]
-                               bool parse_shortnames = true);                  // Read the files and add their short names
-
-    // Write a QuaDRiGa scenario configuration file
-    // - All inputs are validated and the complete text is composed before the file is opened; an existing file is replaced;
-    //   a failed call leaves it unchanged
-    // - Numbers are written with up to 15 significant digits, or with 16 or 17 where 15 do not read back to the same
-    //   double in 'conf_file_read'; Inf and -Inf are written as such
-    // - The scenario name in the header comment is the file name without the extension ".conf"
-    void conf_file_write(const std::string &fn,                                                       // Path of the .conf file to write
-                         const std::unordered_map<std::string, double> &scenpar,                      // Numeric scenario parameters, any subset of the n_key keys; missing keys have their default
-                         const std::string &subpath_method = "legacy",                                // Value of 'SubpathMethod'
-                         const std::string &pl_model = "",                                            // Value of 'PL_model', empty: not written
-                         const std::unordered_map<std::string, std::vector<double>> *plpar = nullptr, // Optional input: Path-loss parameters, keys without "PL_", [n_pl]
-                         const std::vector<std::string> *pl_order = nullptr,                          // Optional input: Order of the plpar keys, [n_pl]; nullptr: sorted by name
-                         const std::vector<std::string> *short_names = nullptr,                       // Optional input: Values of 'ShortName'
-                         const std::string &ref = "",                                                 // Literature reference for the header, empty: none
-                         const std::vector<std::string> *ref_sec = nullptr,                           // Optional input: Reference per section, up to n_sec = 10 entries, empty entry: none
-                         const arma::mat *valid_range = nullptr,                                      // Optional input: Validity range of frequency [GHz], distance, BS height, MT height [m], [4, 2]
-                         bool write_defaults = false);                                                // true: write all keys; false: only keys whose value differs from the default
-
 }
 
 #endif
