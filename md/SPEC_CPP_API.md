@@ -14,11 +14,13 @@ You are implementing a function of my C++ radio channel modelling library (quadr
 
 # REPOSITORY LAYOUT AND BUILD
 - `include/` — public headers, the contract:
-  - `quadriga_lib.hpp` — version functions, channel generation, the float-only ray-tracing pipeline (`ray_init`, `ray_progress`, `ray_commit`, ...); includes the four headers below
+  - `quadriga_lib.hpp` — version functions, channel generation, the float-only ray-tracing pipeline (`ray_init`, `ray_progress`, `ray_commit`, ...); includes the headers below
   - `quadriga_tools.hpp` — site-specific simulation tools, channel statistics, miscellaneous tools
   - `quadriga_math.hpp` — math functions
   - `quadriga_arrayant.hpp` — `arrayant` class and array antenna functions
   - `quadriga_channel.hpp` — `channel` and `path` classes, channel functions
+  - `quadriga_sos.hpp` — sum-of-sinusoids random number generator
+  - `quadriga_gbsm.hpp` — geometry-based stochastic model: scenario parameters (conf files), large-scale fading
 - `src/` — implementations (`*.cpp`) and internal headers (`*.hpp`, `*.h`); internal headers are not installed and may be included by tests that test internals.
 - `tests/catch2_tests/` — Catch2 (v3) tests, one file per function or topic; `tests/quadriga_lib_catch2_tests.cpp` holds `main`.
 - `tests/data/` — input files for tests.
@@ -214,7 +216,7 @@ if (omp_failed)
 Site-specific simulation tools
 SECTION!*/
 ```
-- Section names in use: "Array antenna class", "Array antenna functions", "Channel class", "Channel functions", "Channel generation functions", "Channel statistics", "Math functions", "Miscellaneous / Tools", "Site-specific simulation tools". The name must match exactly to end up in the same group. If the section is not clear from the header, ask.
+- Section names in use: "Array antenna class", "Array antenna functions", "Channel class", "Channel functions", "Channel generation functions", "Channel statistics", "Geometry-based stochastic model", "Math functions", "Miscellaneous / Tools", "Site-specific simulation tools", "Sum-of-sinusoids random number generator". The name must match exactly to end up in the same group. If the section is not clear from the header, ask.
 
 ## Documentation block
 - The block is placed immediately before the function definition. It starts with `/*!MD` and ends with `MD!*/`, each on its own line (the delimiters are matched literally by the documentation tools).

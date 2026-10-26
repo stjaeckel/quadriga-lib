@@ -343,7 +343,7 @@ mxArray *qd_mex_any2matlab(const std::any &dset);
 - Functions are grouped into sections, which are marked by a comment block like:
 - This should be provided with the documentation block, but if not, ask for it. 
 - It is important to include it in the mex file, as it is used for grouping functions in the generated documentation.
-- Section names currently in use: "Array antenna functions", "Channel functions", "Channel generation functions", "Channel statistics", "Math functions", "Miscellaneous / Tools", "Site-specific simulation tools". The name must match exactly to end up in the same group.
+- Section names currently in use: "Array antenna functions", "Channel functions", "Channel generation functions", "Channel statistics", "Geometry-based stochastic model", "Math functions", "Miscellaneous / Tools", "Site-specific simulation tools", "Sum-of-sinusoids random number generator". The name must match exactly to end up in the same group.
 ```
 /*!SECTION
 Section name from C++ documentation block
