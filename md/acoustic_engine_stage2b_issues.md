@@ -10,6 +10,12 @@ input, and the rig's cases become its regression tests.
 Each issue: what happens physically; how it was measured; the size; what it affects in typical rooms; the interim
 guideline; how to reproduce it.
 
+**ISSUE convention in the rig.** Every check in `tests/catch2_tests/test_acoustic_materials.cpp` that fails because
+of an engine limit listed here is marked: a comment `ISSUE <n>:` names the issue below; the assertion becomes a
+non-failing check (Catch2 `CHECK_NOFAIL` or equivalent) that still prints and is counted; the measured and the
+reference values go into the case's diagnostics. Known engine issues therefore never make the suite fail, and the
+marked checks are the regression list of the engine stage that fixes them.
+
 ## Issues
 
 ### 1. A porous layer on a rigid wall adds too much insulation at low frequency
@@ -82,6 +88,24 @@ guideline; how to reproduce it.
   (0.106 in reflection at −120 dB, 0.027 at −250 dB). Two bonded traced mass-law bodies deviate from the bonded plate
   by up to 2.0 dB at 16 kHz (0.05 dB at 1 kHz); the sheet | solid form is exact.
 - **Interim guideline.** Build stacks with the room-side layer as a sheet and the layers behind it as traced solids.
+
+### 4. Three or more bonded mass-law bodies: the state is one level deep
+
+- **Construction.** A masonry block with plaster bonded on both faces: three mass-law bodies that move as one plate
+  (the standard residential wall).
+- **Physics.** Bonded mass-law bodies are one plate whose surface masses add (material page, section 5.4). The ray
+  state remembers only the body before the current one, so a traced plate re-forms its first face's absorption at its
+  exit from that word alone; with three or more bodies the plate rule is paid within a bound, not exactly.
+- **Known size** (material page, section 13; engine notes 9.1): a plate of three or more bonded bodies pays its rule
+  within +3.02 / −3.01 dB; a wall with an ordered stack inside it is up to 3.01 dB from its traced twin. Not yet
+  measured on a plastered wall.
+- **Affects.** Plastered masonry if modeled as plaster sheets on both faces of a block; any bonded run of three
+  layers (a finish on a topping on a slab).
+- **Interim guideline.** The masonry rows of the material table are the finished wall, plastered on both faces, as
+  one row; keep bonded runs to two bodies.
+- **Planned fixture (phase 3).** The rig is extended to sheets behind a traced solid; plaster sheets on both faces of
+  a block solid are measured against the bonded plate of the three surface masses, with the measured plastered wall
+  (Hopkins, dense aggregate blocks 215 mm plastered on both faces) printed. The case carries `ISSUE 4:`.
 
 ## Modeling guidelines collected in step 3
 
