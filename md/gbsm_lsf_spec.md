@@ -1,12 +1,10 @@
 # Spec: port of the QuaDRiGa large-scale model to quadriga-lib
 
-Status: **r3** (2026-10-26). Branch `fixes` of `/home/stephan/sjc/quadriga-lib-fixes`, base cebd0c0 (v0.12.3).
-No user decision is open.
+Status: final for implementation (2026-10-26). Branch `fixes` of `/home/stephan/sjc/quadriga-lib-fixes`, base cebd0c0 (v0.12.3).
 
 This spec is self-contained. Together with the source code of quadriga-lib and QuaDRiGa-NG and the published
 material it cites (3GPP TR 38.901 v19.5.0 above all), it contains everything an implementation needs. Every
-requirement is stated where it applies, with its reason where the choice is not obvious. Section 12 is a
-non-normative change log.
+requirement is stated where it applies, with its reason where the choice is not obvious.
 
 No section number of this spec, no `md/` path, no local path and no QuaDRiGa-NG line number may appear in any
 produced source, header, test, wrapper, conf file or documentation block (9.1).
@@ -26,12 +24,11 @@ Contents
 4. Conf-key changes and the 23 v19 files
 5. Catch2 tests
 6. MEX and Python wrappers and their tests
-7. Implementation runs R1, R2a, R2b, R3a, R3b, R4a, R4b
+7. Implementation runs: Run 1, Run 2a, Run 2b, Run 3a, Run 3b, Run 4a, Run 4b
 8. Requirements from the later SSF port
 9. Constraints (copied into every run)
 10. Integration hand-over (QuaDRiGa-NG, after the merge)
 11. Appendix: tables
-12. Change log (non-normative)
 
 
 ## 1. Scope and requirements
@@ -210,13 +207,13 @@ v19 keys (3.0.4); the v19 conf files live in `data/config/` under Apache-2.0.
 
 ### 2.1 Header `include/quadriga_gbsm.hpp` (final text)
 
-The final content of the file is given below. R1 creates it with the include guard, the includes, the
+The final content of the file is given below. Run 1 creates it with the include guard, the includes, the
 `static_assert` lines, the "Scenario parameters" group and the comment block of the "Large-scale fading" group
 (generator index); the four moved declarations are copied unchanged, including their comments, from
 `include/quadriga_tools.hpp`: the block from the line after the group line `// ---- Scenario parameters ----` to
 the end of the `conf_file_write` declaration (its last argument `bool write_defaults = false);` with its comment).
 The block and the group line are removed there. Each later run adds the declarations it defines, at their place in this text:
-R2a `lsf_init_phases`, `lsf_draw`; R2b `lsp_generate`; R3a `path_loss`; R3b `los_probability`,
+Run 2a `lsf_init_phases`, `lsf_draw`; Run 2b `lsp_generate`; Run 3a `path_loss`; Run 3b `los_probability`,
 `o2i_loss`. `include/quadriga_lib.hpp` includes the header after `quadriga_sos.hpp`.
 
 ```cpp
@@ -478,7 +475,7 @@ sigma_i = max(0, s_i + P_kappa · lg(d) + P_tau · lg(h) + P_beta · lg(a))
 
 #### 3.0.5 Internal header `src/quadriga_gbsm_helpers.hpp`
 
-Created in R2a, extended in R2b; included by the source files named below and by nothing public. It holds only
+Created in Run 2a, extended in Run 2b; included by the source files named below and by nothing public. It holds only
 `static inline` helpers used by more than one source file; names start with `qd_gbsm_`. The header starts with a
 documentation block (comment lines) that states: purpose (helpers shared by the source files of the
 geometry-based stochastic model, not part of the public API), the users of each helper, the LSF generator index
@@ -518,7 +515,7 @@ static inline void qd_gbsm_lsp_mu_sigma(const std::unordered_map<std::string, do
 static inline bool qd_gbsm_chol8(const double *A, double *L);
 ```
 
-`qd_scenpar_xcorr` in `src/qd_scenpar.cpp` is refactored in R2b to call `qd_gbsm_chol8` (its own Cholesky loop is
+`qd_scenpar_xcorr` in `src/qd_scenpar.cpp` is refactored in Run 2b to call `qd_gbsm_chol8` (its own Cholesky loop is
 removed; behaviour unchanged, the existing conf tests cover it), so that the library has one 8x8
 Cholesky.
 
@@ -1176,7 +1173,7 @@ from `quadriga_lib.tools` to `quadriga_lib.gbsm`.
 
 ## 4. Conf-key changes
 
-### 4.1 New numeric keys (R1)
+### 4.1 New numeric keys (Run 1)
 
 Appended to the key table `qd_scenpar_keys[]` in `src/qd_scenpar.cpp` after `PolVar_sigma`, in this order, under the
 comment line given below. Defaults reproduce today's behaviour; class `QD_NONNEG` (finite and >= 0); `row = col = -1`.
@@ -1201,7 +1198,7 @@ land after the existing keys of the same paragraph.
 | `DS_VS` | Reference V/S of the InF hall | `lsp_generate` (3.0.4) |
 | `DS_VS_a`, `DS_VS_b` | `mu_lgDS = DS_mu + lg(a · V/S + b)` | `lsp_generate` |
 
-After R1: `n_key = 171`; MEX struct and Python dict of `scenpar` have 172 entries (with `SubpathMethod`); the
+After Run 1: `n_key = 171`; MEX struct and Python dict of `scenpar` have 172 entries (with `SubpathMethod`); the
 documentation says "138 numeric keys of QuaDRiGa and 33 keys for 3GPP TR 38.901 v19.5.0" and "then the 33 new
 keys" (`src/qd_scenpar.cpp`, `api_mex/conf_file_*.cpp`, `api_mex/scenpar_validate.cpp`,
 `api_python/qpy_conf_file_*.cpp`, `api_python/qpy_scenpar_validate.cpp`). The key-table comment at line 53 changes
@@ -1215,7 +1212,7 @@ written with `qd_conf_number`; `V/S` stays symbolic, its value is the `DS_VS` li
 ...) follow as today. With `DS_VS = 0` the line is unchanged. The `conf_file_write` documentation (C++, MEX,
 Python) adds to the overview item: "the DS line has the term log10( a * V/S + b ) when DS_VS > 0".
 
-### 4.2 Validation addition (R1)
+### 4.2 Validation addition (Run 1)
 
 In `qd_scenpar_check` (after the `NF_alpha`/`NF_beta` check), a cross-key check:
 
@@ -1229,7 +1226,7 @@ if (val[i_vs] > 0.0 && val[i_vsa] == 0.0 && val[i_vsb] == 0.0)
 The `scenpar_validate` documentation lists the 6 keys under "Finite and >= 0" and the new rule under the cross-key
 rules (C++, MEX, Python blocks).
 
-### 4.3 New `PL_` keys (R3a)
+### 4.3 New `PL_` keys (Run 3a)
 
 No interface change (`plpar` is an open map). Behaviour in 3.3.4 and 3.3.6.
 
@@ -1239,7 +1236,7 @@ No interface change (`plpar` is an open map). Behaviour in 3.3.4 and 3.3.6.
 | `PL_LOSmax` | nlos | 0: no maximum with the LOS term | 1 |
 | `PL_Ax`, `PL_Bx`, `PL_Cx` | nlos | extra term `Ax·lg d3D + Bx + Cx·lg f` inside the maximum; active if one of them is present | inactive |
 
-Writer comments: R3a adds these rows to `qd_conf_pl_comments` in `src/qd_scenpar.cpp` (before the last row):
+Writer comments: Run 3a adds these rows to `qd_conf_pl_comments` in `src/qd_scenpar.cpp` (before the last row):
 
 ```cpp
     {"hE_rand", "", "1 = random environment height (TR 38.901 Table 7.4.1-1, note 1); 0 = fixed hE"},
@@ -1259,7 +1256,7 @@ The formula blocks `qd_conf_pl_formulas` are not changed (the written files of e
 Lines are written in the style of the files (key name, `=`, value aligned with the neighbouring lines, `%` comment).
 The names below are the scenario names without the prefix `3GPP_38.901_v19_`.
 
-#### 4.4.1 R1: new numeric keys, the InF delay spread and the indoor TOA bound
+#### 4.4.1 Run 1: new numeric keys, the InF delay spread and the indoor TOA bound
 
 | File | Section of the file | New / changed lines |
 |---|---|---|
@@ -1310,7 +1307,7 @@ InF sub-scenarios; each InF NLOS file uses the V/S of its own hall (SL, DH: 4; D
 is the mean of lgDS of the two halls; with V/S = 47/11 the median becomes -7.2528 (a change of 0.0007 in lg, 0.16 % in DS). The
 values are written with full double precision.
 
-#### 4.4.2 R3a: path-loss keys and constants
+#### 4.4.2 Run 3a: path-loss keys and constants
 
 The derived path-loss constants are written with full double precision (e.g. `PL_E = 40/3` instead of 13.34), so
 that the TR oracles of 5.3 hold to 1e-9 dB (except the RMa/SMa breakpoint form, 3.3.4); with the rounded values
@@ -1355,7 +1352,7 @@ Comment changes in the path-loss sections:
   log10(d3D)`, SF 8.29, used in `max(PL_LOS, PL')` (model `nlos` with `PL_An = 31.9`, `PL_Bn = 32.4`, `PL_Cn = 20`,
   `PL_sig = 8.29`).
 
-After R3a every v19 file reads without ignored keys, passes the value checks and keeps a positive definite
+After Run 3a every v19 file reads without ignored keys, passes the value checks and keeps a positive definite
 correlation matrix (existing test).
 
 
@@ -1368,7 +1365,7 @@ correlation matrix (existing test).
   helper is covered through a public function with an independent oracle (5.7).
 - Header comment as SPEC_CPP_API (what is pinned, oracles, conventions). Include `"quadriga_gbsm.hpp"` (and
   `"quadriga_sos.hpp"` where SOS functions provide supporting data).
-- Diagnostics: `#include "qd_test_diag.hpp"` and `QD_TEST_DIAG_SWITCH("QD_DIAG_GBSM")`; R2a adds the line
+- Diagnostics: `#include "qd_test_diag.hpp"` and `QD_TEST_DIAG_SWITCH("QD_DIAG_GBSM")`; Run 2a adds the line
   `//   QD_DIAG_GBSM   large-scale model tests (test_lsf_*.cpp, test_path_loss.cpp, test_lsp_generate.cpp, ...)` to
   the list in `tests/catch2_tests/qd_test_diag.hpp`. Tables in CSV form with `# diag:` title. (The `QD_TEST_VERBOSE`
   define of SPEC_CPP_API is not used; the test suite has moved to the area switch.)
@@ -1544,7 +1541,7 @@ there with an independent oracle.
 
 ### 5.8 Changes to existing tests
 
-- R1: `test_conf_file_read.cpp`, `test_scenpar_validate.cpp`, `test_conf_file_write.cpp` (165 -> 171 keys, 27 ->
+- Run 1: `test_conf_file_read.cpp`, `test_scenpar_validate.cpp`, `test_conf_file_write.cpp` (165 -> 171 keys, 27 ->
   33 new keys, 166 -> 172 assignments with `SubpathMethod`, the key-order oracle extended by the 6 names, the new
   cross-key rule of 4.2 with a negative case in the validation test): the 6 keys are added to the
   `QD_NONNEG` lists of the cases "value checks per validation class" in `test_conf_file_read.cpp` and
@@ -1565,10 +1562,10 @@ there with an independent oracle.
   the new keys; the `DS_VS` cross-key error through `scenpar_validate`); Python tests of the four functions call
   `quadriga_lib.gbsm.*`, counts 166 -> 172, the `DS_VS` cross-key error (`ValueError`), plus one check that
   `quadriga_lib.tools` has no `conf_file_read` any more. Comments with planning labels in the Catch2 conf tests
-  that R1 edits are reworded to state the rule (9.1): "decision O10" in `test_conf_files_v19.cpp`, "Decision Q1",
+  that Run 1 edits are reworded to state the rule (9.1): "decision O10" in `test_conf_files_v19.cpp`, "Decision Q1",
   "Q2", "Q3" in `test_conf_file_read.cpp` and `test_conf_file_list.cpp`, "Decision B1" and "review point A" in
   `test_conf_file_write.cpp`.
-- R3a: `test_conf_files_v19.cpp` case "path-loss constants of RMa and SMa follow Table 7.4.1-1": tolerance 1e-12
+- Run 3a: `test_conf_files_v19.cpp` case "path-loss constants of RMa and SMa follow Table 7.4.1-1": tolerance 1e-12
   (full precision), SMa NLOS asserts `LOSmax == 0` and the absence of `A1, A2, B, C, E, hE`; new checks of
   `PL_hE_rand` (UMa files) and `PL_Ax/Bx/Cx` (InF-DL);
   the comment "E and hE ... needed by the QuaDRiGa model" is removed. `test_conf_file_write.cpp` case "path-loss
@@ -1626,7 +1623,7 @@ covers the checklist of SPEC_MATLAB_API "What every test covers" with these spec
 
 ### 6.2 Python (`api_python/qpy_<name>.cpp`, submodule `gbsm`, `tests/python_tests/test_<name>.py`)
 
-Dispatcher `api_python/python_gbsm.cpp` (created in R1 with the four conf functions; R4b adds the six), registered in
+Dispatcher `api_python/python_gbsm.cpp` (created in Run 1 with the four conf functions; Run 4b adds the six), registered in
 `python_main.cpp` as `py::module_ gbsm = m.def_submodule("gbsm", "Geometry-based stochastic model");`; the file is
 added to the source list in `CMakeLists.txt` (line ~639, after `python_tools.cpp`). Mandatory arrays use
 `.none(false)` as in `python_sos.cpp`.
@@ -1668,7 +1665,7 @@ loss, d2d_in, model_index = quadriga_lib.gbsm.o2i_loss( fc, rnd, models, weights
 
 ## 7. Implementation runs
 
-Seven sequential runs, each one agent session: R1, R2a, R2b, R3a, R3b, R4a, R4b. A run starts only after the previous
+Seven sequential runs, each one agent session: Run 1, Run 2a, Run 2b, Run 3a, Run 3b, Run 4a, Run 4b. A run starts only after the previous
 run's report was accepted and the maintainer committed. Every run reads the sections of this spec named in its "Read"
 line (always including 1, 9 and the parts of 2.1 it adds), `md/SPEC_CPP_API.md` and, for wrappers, the wrapper SPEC
 file of its API. The constraints of section 9 apply to every run. Each run adds to `include/quadriga_gbsm.hpp` only
@@ -1683,9 +1680,9 @@ required, load average before heavy runs); **Warnings** (compiler warnings, none
 (proposals for the spec, things not tested); **Suggested commit cut** (themes and file lists; the agent does not
 commit).
 
-### R1 — header move, new keys, Python submodule
+### Run 1 — header move, new keys, Python submodule
 
-Read: 1, 2.1, 3.7, 4.1, 4.2, 4.4.1, 5.8 (R1 part), 6 (general rules), 9.
+Read: 1, 2.1, 3.7, 4.1, 4.2, 4.4.1, 5.8 (Run 1 part), 6 (general rules), 9.
 
 Files: `include/quadriga_gbsm.hpp` (new: guard, includes, the moved declarations and the comment block of the
 "Large-scale fading" group, no new declarations), `include/quadriga_tools.hpp`, `include/quadriga_lib.hpp`,
@@ -1704,7 +1701,7 @@ Steps:
    documentation counts and lists (165 -> 171, 27 -> 33, 166 -> 172, the new keys in the `scenpar_validate`
    value-check list, the V/S term in the `conf_file_write` overview item).
 4. Edit the v19 files (4.4.1).
-5. Update the Catch2 tests (5.8, R1 part, including the rewording of the planning labels), run the conf tests,
+5. Update the Catch2 tests (5.8, Run 1 part, including the rewording of the planning labels), run the conf tests,
    then the full suite.
 6. Python: `python_gbsm.cpp` with the four includes and registrations moved from `python_tools.cpp` (identical
    `m.def` blocks), `python_main.cpp`, `CMakeLists.txt`; Usage lines `quadriga_lib.gbsm.<name>`; Python tests.
@@ -1719,7 +1716,7 @@ Acceptance: `make test` passes (all Catch2 cases), no warnings; MEX suite passes
 gate shows nothing above `GLIBCXX_3.4.28`; `make python` and `make python_test` pass; `quadriga_lib.tools` has no
 conf functions, `quadriga_lib.gbsm` has the four.
 
-### R2a — internal header, `lsf_init_phases`, `lsf_draw`
+### Run 2a — internal header, `lsf_init_phases`, `lsf_draw`
 
 Read: 1, 2 (2.1 declarations of the two functions, 2.2), 3.0, 3.1, 3.2, 5.0 to 5.2, 5.7, 8, 9; source files
 `include/quadriga_sos.hpp`, `src/sos_val.cpp` (device modes, kernel selection), `src/sos_remove_bias.cpp`,
@@ -1740,10 +1737,10 @@ final documentation blocks (3.1, 3.2); full suite.
 Acceptance: all new cases pass; `make test` passes; no warnings; documentation blocks complete. No MEX or Python
 build needed.
 
-### R2b — `lsp_generate`, shared LSP mean/std and Cholesky
+### Run 2b — `lsp_generate`, shared LSP mean/std and Cholesky
 
 Read: 1, 2 (2.1 declaration), 3.0, 3.4, 5.0, 5.4, 5.7, 8, 9; `src/quadriga_gbsm_helpers.hpp` and the
-documentation blocks written in R2a; `qd_scenpar_xcorr` in `src/qd_scenpar.cpp`.
+documentation blocks written in Run 2a; `qd_scenpar_xcorr` in `src/qd_scenpar.cpp`.
 
 Files: `src/quadriga_gbsm_helpers.hpp` (add `qd_gbsm_lsp_mu_sigma`, `qd_gbsm_chol8`), `src/lsp_generate.cpp` (new;
 the symmetric square root file-local), `src/qd_scenpar.cpp` (`qd_scenpar_xcorr` calls `qd_gbsm_chol8`),
@@ -1754,9 +1751,9 @@ Steps: declaration and stub, build; the helpers; the tests of 5.4; run against t
 
 Acceptance: all new cases pass; the existing conf tests pass unchanged; `make test` passes; no warnings.
 
-### R3a — `path_loss`, path-loss keys and constants
+### Run 3a — `path_loss`, path-loss keys and constants
 
-Read: 1, 2 (2.1 declaration), 3.0, 3.3, 4.3, 4.4.2, 5.0, 5.3, 5.8 (R3a part), 9, 11.1; `qd_conf_pl_comments` in
+Read: 1, 2 (2.1 declaration), 3.0, 3.3, 4.3, 4.4.2, 5.0, 5.3, 5.8 (Run 3a part), 9, 11.1; `qd_conf_pl_comments` in
 `src/qd_scenpar.cpp`; `src/quadriga_gbsm_helpers.hpp`.
 
 Files: `src/path_loss.cpp` (new), `include/quadriga_gbsm.hpp` (one declaration), `src/qd_scenpar.cpp`
@@ -1770,7 +1767,7 @@ implement; the writer comment rows and their test; the `test_conf_files_v19.cpp`
 
 Acceptance: all new cases pass; `make test` passes; no warnings.
 
-### R3b — `los_probability`, `o2i_loss`
+### Run 3b — `los_probability`, `o2i_loss`
 
 Read: 1, 2 (2.1 declarations, 2.3), 3.0, 3.5, 3.6, 5.0, 5.5, 5.6, 9, 11.2.
 
@@ -1782,10 +1779,10 @@ blocks (3.5.5, 3.6.3); full suite.
 
 Acceptance: all new cases pass; `make test` passes; no warnings.
 
-### R4a — MEX wrappers, documentation sweep
+### Run 4a — MEX wrappers, documentation sweep
 
 Read: 1, 2, 3 (documentation-block items), 6 (general rules, 6.1), 7, 9, `md/SPEC_MATLAB_API.md`, and the C++
-documentation blocks written in R2a to R3b.
+documentation blocks written in Run 2a to Run 3b.
 
 Files: `api_mex/lsf_init_phases.cpp`, `lsf_draw.cpp`, `path_loss.cpp`, `lsp_generate.cpp`, `los_probability.cpp`,
 `o2i_loss.cpp` (new); `tests/mex_tests/test_<name>.m` (6 new); `SECTION_DESC` blocks in `src/qd_scenpar.cpp` and
@@ -1804,7 +1801,7 @@ also` lines; full gates.
 Acceptance: MEX suite passes in Octave and MATLAB R2024a (R2026a if available), objdump gate clean; `make test`
 passes; no warnings in any build.
 
-### R4b — Python wrappers, release notes
+### Run 4b — Python wrappers, release notes
 
 Read: 1, 2, 6 (general rules, 6.2), 7, 9, `md/SPEC_PYTHON_API.md`, the C++ and MEX documentation blocks.
 
@@ -1842,10 +1839,10 @@ to 12, 7.6.2, 7.6.3.1, 7.6.13 to 7.6.16. The small-scale step needs from the LSF
 | Per-frequency handling (7.6.5: same x, independent per-cluster shadowing) | `xpr_sos`, `pin_sos` per frequency | LSF: one `x` for all frequencies; SSF: own generators | provided for LSF |
 | Anchor-frequency LSPs of the alternative multi-frequency method (7.6.5.1: DS0, ASD0, ASA0, ZSD0, ZSA0 at e.g. 2 GHz) | — | `lsp_generate` with the anchor frequency added to `fc` (same `x`, so the anchor and the frequencies of interest are consistent); `clip_spreads` applies to the anchor as well, since 7.6.5.1 takes the spreads "according to Step 4", which includes the clipping | provided |
 | Path loss for step 12 | `get_pl` | `path_loss` | provided |
-| Spatially consistent cluster and ray variables (7.6.3.1: delays, shadowing, offsets, signs, coupling, XPR, phases; SC_lambda; same floor rule; mirrored for dual mobility) | `init_sos.m` lines 168 to 237 (`path_sos`, `xpr_sos`, `pin_sos`, `clst_dl_sos`) | **not** the LSF phase set (fixed 11 generators, `[n_coeff, 11, 2]`); the SSF port defines its own phase sets and evaluates them with `qd_gbsm_eval`, `qd_gbsm_floor_offset` and `qd_gbsm_remove_bias`, which R2a writes generically over the generator table (`qd_gbsm_gen`: lambda, distribution, mirror partner, bias flag) with the signatures of 3.0.5 and which the SSF port moves unchanged into `src/quadriga_gbsm_helpers.hpp` | requirement on R2a |
-| Floor separation of cluster variables (7.6.3.3 last paragraph) | — | the floor offsets of 3.2.1 inside the generic evaluation, with the same per-UT floor IDs as `lsf_draw` (derived by the layout, 10.3) | requirement on R2a |
+| Spatially consistent cluster and ray variables (7.6.3.1: delays, shadowing, offsets, signs, coupling, XPR, phases; SC_lambda; same floor rule; mirrored for dual mobility) | `init_sos.m` lines 168 to 237 (`path_sos`, `xpr_sos`, `pin_sos`, `clst_dl_sos`) | **not** the LSF phase set (fixed 11 generators, `[n_coeff, 11, 2]`); the SSF port defines its own phase sets and evaluates them with `qd_gbsm_eval`, `qd_gbsm_floor_offset` and `qd_gbsm_remove_bias`, which Run 2a writes generically over the generator table (`qd_gbsm_gen`: lambda, distribution, mirror partner, bias flag) with the signatures of 3.0.5 and which the SSF port moves unchanged into `src/quadriga_gbsm_helpers.hpp` | requirement on Run 2a |
+| Floor separation of cluster variables (7.6.3.3 last paragraph) | — | the floor offsets of 3.2.1 inside the generic evaluation, with the same per-UT floor IDs as `lsf_draw` (derived by the layout, 10.3) | requirement on Run 2a |
 | Seeds of the SSF phase sets, independent of the LSF set | `init_sos.m` (one seed per `qd_sos` object) | `sos_init_phases` fills column g independently of the number of generators, so an SSF set drawn with the builder's LSF seed would repeat the LSF phases in its first 11 columns and, at an equal decorrelation distance (e.g. `SC_lambda` 50 m and an LSF lambda of 50 m in UMa NLOS), reproduce the LSF fields. Rule: the SSF sets take the columns from 11 on of one `sos_init_phases(n_coeff, 11 + n_ssf, seed)` call with the builder's seed (columns 0 to 10 are the raw LSF phases), or use a seed derived from the builder seed by a fixed rule. The first form requires the `n_coeff` of the LSF set: the matrix is filled column by column from one random stream, so with another `n_coeff` the SSF columns would reuse parts of the stream of the LSF columns; SSF sets with another `n_coeff` use a derived seed. The builder therefore stores an explicit seed (drawn once when the caller passes -1) or the SSF phase cubes | requirement on the SSF port and NG |
-| Grouping of the evaluation by decorrelation distance | `xpr_sos`: clusters · (M + 1) · n_freq generators at one `SC_lambda` | `qd_gbsm_freq` builds one frequency table per distinct lambda with a generator-to-table index; the evaluation and the bias removal make one call per table (3.0.5) | requirement on R2a |
+| Grouping of the evaluation by decorrelation distance | `xpr_sos`: clusters · (M + 1) · n_freq generators at one `SC_lambda` | `qd_gbsm_freq` builds one frequency table per distinct lambda with a generator-to-table index; the evaluation and the bias removal make one call per table (3.0.5) | requirement on Run 2a |
 | Dual-mobility flag and the Tx/Rx-side conventions | `h_builder.dual_mobility` | `dual_mobility` argument, slice convention of 2.2 | provided |
 | O2I flag (step 7: mean ZOA 90 deg for O2I), LOS/NLOS state | scenario of the builder | builder level, not LSF | n/a |
 | d3D for the propagation delay `d3D/c` (7.6-43) | geometry | caller | n/a |
@@ -1853,7 +1850,7 @@ to 12, 7.6.2, 7.6.3.1, 7.6.13 to 7.6.16. The small-scale step needs from the LSF
 
 Answer to "must the LSF phase set be extensible for SSF generators": no. It stays fixed at 11 generators (contract
 of 2.1); the SSF port gets its own `ssf_init_phases`-type function. What must be extensible is the internal
-evaluation, which is why R2a writes the evaluation and the bias removal generic over the generator table (3.0.5).
+evaluation, which is why Run 2a writes the evaluation and the bias removal generic over the generator table (3.0.5).
 No public API was added for SSF readiness.
 
 
@@ -1900,12 +1897,12 @@ No public API was added for SSF readiness.
   `QD_DIAG_GBSM=1 build_linux/test_bin "path_loss*"`.
 - MEX: `make matlab=ON` / `make octave=ON`; single tests from MATLAB/Octave as in SPEC_MATLAB_API; MATLAB R2024a,
   R2026a and Octave can be run from the shell (e.g. `matlab -batch "..."`, `octave --eval "..."`; the run report
-  states which binaries were used). The MEX suite runs in Octave and R2024a in R1 and R4a.
+  states which binaries were used). The MEX suite runs in Octave and R2024a in Run 1 and Run 4a.
 - Python: `make python`, `make python_test`, single files with `python3 -m pytest tests/python_tests/test_<name>.py -x -s`.
 - No CUDA involved.
 
 
-## 10. Integration hand-over (QuaDRiGa-NG, after the merge; out of scope for R1 to R4b)
+## 10. Integration hand-over (QuaDRiGa-NG, after the merge; out of scope for Run 1 to Run 4b)
 
 Starts after the merge into `main`; QuaDRiGa-NG (NG) becomes writable then. The manager splits it into prompts.
 
@@ -2059,17 +2056,3 @@ ends (elevations are always within [-90, 90]).
 | `38.811_DenseUrban` | 0, 0, 28.2, 33.1, 39.8, 46.8, 53.7, 61.2, 73.8, 82.0, 98.1 |
 | `38.811_Urban` | 0, 0, 24.6, 38.6, 49.3, 61.3, 72.6, 80.5, 91.9, 96.8, 99.2 |
 | `38.811_Suburban`, `38.811_Rural` | 0, 0, 78.2, 86.9, 91.9, 92.9, 93.5, 94.0, 94.9, 95.2, 99.8 |
-
-## 12. Change log (non-normative)
-
-Internal record for the reviewers; IDs refer to the findings table `md/gbsm_lsf_findings.md`. Nothing in this
-section is a requirement, and nothing from it goes into produced files.
-
-| Version | Change |
-|---|---|
-| r0 | First draft. |
-| r1 | Review round 1 (R1-01 to R1-30): kernel tolerances for `lsf_draw` values; no internal references in produced files; conf-key integration and writer DS line; bias removal on one floor; runs split into R1 to R4b; `winner_los` with `C2` and per-link heights; lean internal header with shared Cholesky; union-of-positions bias removal with exact swap reciprocity; 36.873 LOS names, `indoor_ut` and `o2i_total_distance` dropped; `scenpar_validate(..., true)`; floor-offset property; parity test split; lean `test_lsp_generate`; layout order; SSF table gaps; helper reuse; probit file-local; `sf_sigma >= 0`; declarations per run; permittivity sign note; one value per `plpar` entry. |
-| r1.1 | User decisions on r1: `PL_BP2D` dropped, `dual_slope` keeps the 3D breakpoint form, TR oracle of RMa/SMa beyond the breakpoint at 0.035 dB (R1-02); symmetric square root kept, by coupled Newton-Schulz instead of Jacobi (R1-09); `o2i_loss` reduced to the TR models, `path_loss` takes `d2d_in` for the legacy distance, Appendix 11.3 deleted (R1-10). Spec made self-contained: decisions, writer choices and issues stated as requirements in place, all D-/W-/I-/R1- markers and references to the plan and to earlier revisions removed from the normative text; 36.873 remnants removed; section 10 split into 10.1 to 10.5. |
-| r2 | Review round 2 (R2-01 to R2-22): dual-mobility coupling of ASD/ASA and ESD/ESA removed (the two-map sum already has the ACF correlation; QuaDRiGa's extra square root doubled it), 3e-5 tolerance class removed, statistical dual-mobility case added (R2-01); no 1.1·hE clamp of the UT height for the random hE, test links on floors 7 and 8 (R2-02); probit evaluated symmetrically, symmetric test-side bisection (R2-03); parity exceptions per track segment and for O2I links of `nlos` files (R2-04); header move anchored by content (R2-05); UMa limit test at 18.1 m (R2-06); `lsp_vals` replaced by per-link or builder-mean `lsp_mu`, no reference geometry (R2-07); floor IDs from the layout (R2-08); seed rule of the SSF phase sets (R2-09); hE steps along tracks documented, `rnd_he` per segment (R2-10); `o2i_loss` argument order (R2-13); `absTOA_Lmax` in the InF and InH NLOS files (R2-14); `lsf_init_phases(..., tx_pos, rx_pos, ...)` (R2-15); swap wording (R2-17); Cholesky failure on the permuted matrix (R2-18); `d2d_in = 0` documented (R2-19); covariance tolerance 0.05 (R2-20); frequency tables per distinct lambda (R2-21); small items, 3.2.4 renumbered 3.2.1 (R2-22). Pending user decisions with prepared edits: R2-11 (default preset), R2-12 (status of the SPEC files), R2-16 (`vs_ratio`). |
-| r2.1 | User decisions on r2: `Comb256` stays the default preset, reason stated in 1.2 (R2-11); the three SPEC files are permanent, binding coding-rule files of the repository (R2-12); `vs_ratio` dropped from `lsp_generate` (C++, MEX, Python), its validation and tests, the caller sets `DS_VS` in its scenpar copy, 3.4.1 renumbered (R2-16). |
-| r3 | Review round 3 (R3-01 to R3-15): `nlos` LOS term of the random-hE test observed through a `Bn = -1000` plpar copy, unmodified NLOS file checked as `max(PLn, PL_LOS)` (R3-01); complete LSP std limited at 0 (R3-02); SF std of the path-loss model in NG's default mode, `sf_sigma` switch row and SF parity rule (R3-03); `absTOA_Lmax` in section "Absolute time of arrival offset" (R3-04); comment anchors of the path-loss constants, SMa NLOS break-point line removed (R3-05); covariance case with unit mu/sigma and no clipping, spot-check geometry, SMa hB (R3-06); ACF tolerance 0.1 with the directional SOS error (R3-07); generic phase-set functions with fixed signatures in an anonymous namespace, SSF seed rule needs the LSF `n_coeff` (R3-08); seed check (R3-09); planning labels in the edited conf tests reworded (R3-10); writer case compares the written lines (R3-11); XPR factor 0.1 of QuaDRiGa's default mode (R3-12); MEX outputs beyond nlhs as nullptr, Python column-9 note (R3-13); wording (R3-14); repeated reasons kept once (R3-15). |
