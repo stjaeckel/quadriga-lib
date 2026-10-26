@@ -2,7 +2,7 @@
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
 
-# Python interface test for quadriga_lib.tools.conf_file_read.
+# Python interface test for quadriga_lib.gbsm.conf_file_read.
 # Scope: argument and output handling, defaults, dict order, error paths.
 # Physics validation lives in the Catch2 suite (test_conf_file_read.cpp).
 
@@ -60,16 +60,17 @@ class test_case(unittest.TestCase):
         return fn
 
     def test_basic_call(self):
-        out = quadriga_lib.tools.conf_file_read(self.fn)
+        out = quadriga_lib.gbsm.conf_file_read(self.fn)
         self.assertIsInstance(out, tuple)
         self.assertEqual(len(out), 6)
         scenpar, plpar, lsp_xcorr, lsp_xcorr_chk, short_names, ignored_keys = out
 
-        # scenpar: 166 entries, float values, 'SubpathMethod' (str) at position 106
+        # scenpar: 172 entries, float values, 'SubpathMethod' (str) at position 106, the newest keys at the end
         self.assertIsInstance(scenpar, dict)
-        self.assertEqual(len(scenpar), 166)
+        self.assertEqual(len(scenpar), 172)
         keys = list(scenpar)
         self.assertEqual(keys[105:108], ["absTOA_lambda", "SubpathMethod", "LOS_scatter_radius"])
+        self.assertEqual(keys[-6:], ["LOS_state_lambda", "IO_state_lambda", "O2I_d2D_in_max", "DS_VS", "DS_VS_a", "DS_VS_b"])
         self.assertEqual(keys[0], "NumClusters")
         for key, value in scenpar.items():
             self.assertIsInstance(value, str if key == "SubpathMethod" else float, key)
@@ -78,7 +79,7 @@ class test_case(unittest.TestCase):
         self.assertEqual(scenpar["NumClusters"], 12.0)
 
         # The order is the canonical one, the same as for the default set
-        default_set, _, _ = quadriga_lib.tools.scenpar_validate()
+        default_set, _, _ = quadriga_lib.gbsm.scenpar_validate()
         self.assertEqual(keys, list(default_set))
 
         # plpar: 'model' first, then the PL_ keys in file order (B before A), 1D float64 arrays
@@ -112,8 +113,8 @@ class test_case(unittest.TestCase):
         self.assertEqual(len(files), 23)
         for fn in files:
             scenpar, plpar, lsp_xcorr, lsp_xcorr_chk, short_names, ignored_keys = \
-                quadriga_lib.tools.conf_file_read(fn)
-            self.assertEqual(len(scenpar), 166, fn)
+                quadriga_lib.gbsm.conf_file_read(fn)
+            self.assertEqual(len(scenpar), 172, fn)
             self.assertEqual(list(scenpar)[106], "SubpathMethod", fn)
             self.assertEqual(list(plpar)[0], "model", fn)
             self.assertEqual(lsp_xcorr.shape, (8, 8), fn)
@@ -121,8 +122,8 @@ class test_case(unittest.TestCase):
             self.assertEqual(ignored_keys, [], fn)
 
     def test_keyword_arguments(self):
-        ref = quadriga_lib.tools.conf_file_read(self.fn, True)
-        out = quadriga_lib.tools.conf_file_read(fn=self.fn, validate=True)
+        ref = quadriga_lib.gbsm.conf_file_read(self.fn, True)
+        out = quadriga_lib.gbsm.conf_file_read(fn=self.fn, validate=True)
         self.assertEqual(out[0], ref[0])
         self.assertEqual(list(out[1]), list(ref[1]))
         npt.assert_array_equal(out[2], ref[2])
@@ -133,13 +134,13 @@ class test_case(unittest.TestCase):
 
         # Default is validate = True
         with self.assertRaises(ValueError) as ctx:
-            quadriga_lib.tools.conf_file_read(fn)
+            quadriga_lib.gbsm.conf_file_read(fn)
         self.assertIn("r_DS", str(ctx.exception))
         with self.assertRaises(ValueError):
-            quadriga_lib.tools.conf_file_read(fn, True)
+            quadriga_lib.gbsm.conf_file_read(fn, True)
 
         # validate = False only checks the grammar
-        scenpar = quadriga_lib.tools.conf_file_read(fn, False)[0]
+        scenpar = quadriga_lib.gbsm.conf_file_read(fn, False)[0]
         self.assertEqual(scenpar["r_DS"], -1.0)
 
     def test_validate_flag_types(self):
@@ -147,19 +148,19 @@ class test_case(unittest.TestCase):
         fn = self.write("conf_file_read_invalid.conf", "r_DS = -1\n")
         for args, kwargs in [((fn, None), {}), ((fn,), {"validate": None}), ((fn, np.bool_(True)), {})]:
             with self.assertRaises(ValueError) as ctx:
-                quadriga_lib.tools.conf_file_read(*args, **kwargs)
+                quadriga_lib.gbsm.conf_file_read(*args, **kwargs)
             self.assertIn("r_DS", str(ctx.exception))
-        self.assertEqual(quadriga_lib.tools.conf_file_read(fn, np.bool_(False))[0]["r_DS"], -1.0)
+        self.assertEqual(quadriga_lib.gbsm.conf_file_read(fn, np.bool_(False))[0]["r_DS"], -1.0)
 
-        ref = quadriga_lib.tools.conf_file_read(self.fn)
-        out = quadriga_lib.tools.conf_file_read(self.fn, None)
+        ref = quadriga_lib.gbsm.conf_file_read(self.fn)
+        out = quadriga_lib.gbsm.conf_file_read(self.fn, None)
         self.assertEqual(out[0], ref[0])
         npt.assert_array_equal(out[2], ref[2])
         self.assertEqual(out[3:], ref[3:])
 
         for value in ["yes", 1, 0, 1.0]:
             with self.assertRaises(TypeError) as ctx:
-                quadriga_lib.tools.conf_file_read(fn, value)
+                quadriga_lib.gbsm.conf_file_read(fn, value)
             self.assertIn("Input 'validate' must be a bool or None.", str(ctx.exception))
 
     def test_path_like(self):
@@ -171,18 +172,18 @@ class test_case(unittest.TestCase):
             def __fspath__(self):
                 return self.path
 
-        ref = quadriga_lib.tools.conf_file_read(self.fn)
+        ref = quadriga_lib.gbsm.conf_file_read(self.fn)
         for fn in [pathlib.Path(self.fn), os.fsencode(self.fn), fspath_only(self.fn), fspath_only(os.fsencode(self.fn))]:
-            out = quadriga_lib.tools.conf_file_read(fn)
+            out = quadriga_lib.gbsm.conf_file_read(fn)
             self.assertEqual(out[0], ref[0])
             self.assertEqual(list(out[1]), list(ref[1]))
             npt.assert_array_equal(out[2], ref[2])
             self.assertEqual(out[3:], ref[3:])
-        self.assertEqual(quadriga_lib.tools.conf_file_read(fn=pathlib.Path(self.fn))[0], ref[0])
+        self.assertEqual(quadriga_lib.gbsm.conf_file_read(fn=pathlib.Path(self.fn))[0], ref[0])
 
         for fn in [5, None, [self.fn]]:
             with self.assertRaises(TypeError) as ctx:
-                quadriga_lib.tools.conf_file_read(fn)
+                quadriga_lib.gbsm.conf_file_read(fn)
             self.assertIn("Input 'fn' must be a str or path-like object.", str(ctx.exception))
 
     def test_byte_order_mark_and_range(self):
@@ -190,7 +191,7 @@ class test_case(unittest.TestCase):
         fn = os.path.join(self.tmp.name, "conf_file_read_bom.conf")
         with open(fn, "wb") as f:
             f.write(b"\xef\xbb\xbfDS_mu = -7.25\nShortName = Bm\n")
-        scenpar, _, _, _, short_names, ignored_keys = quadriga_lib.tools.conf_file_read(fn)
+        scenpar, _, _, _, short_names, ignored_keys = quadriga_lib.gbsm.conf_file_read(fn)
         self.assertEqual(scenpar["DS_mu"], -7.25)
         self.assertEqual(short_names, ["Bm"])
         self.assertEqual(ignored_keys, [])
@@ -198,17 +199,17 @@ class test_case(unittest.TestCase):
         # A number beyond the range of a double is an error, below it reads as 0
         fn = self.write("conf_file_read_range.conf", "DS_sigma = 0.3\nDS_mu = 1e400\n")
         with self.assertRaises(ValueError) as ctx:
-            quadriga_lib.tools.conf_file_read(fn)
+            quadriga_lib.gbsm.conf_file_read(fn)
         self.assertIn("line 2: Value of 'DS_mu' is out of range.", str(ctx.exception))
         fn = self.write("conf_file_read_underflow.conf", "DS_mu = -1e-400\n")
-        value = quadriga_lib.tools.conf_file_read(fn)[0]["DS_mu"]
+        value = quadriga_lib.gbsm.conf_file_read(fn)[0]["DS_mu"]
         self.assertEqual(value, 0.0)
         self.assertTrue(np.signbit(value))
 
     def test_empty_outputs(self):
         # No PL_ key, no short name, no unknown key: empty dict and empty lists
         fn = self.write("conf_file_read_empty.conf", "% only a comment\n")
-        scenpar, plpar, _, lsp_xcorr_chk, short_names, ignored_keys = quadriga_lib.tools.conf_file_read(fn)
+        scenpar, plpar, _, lsp_xcorr_chk, short_names, ignored_keys = quadriga_lib.gbsm.conf_file_read(fn)
         self.assertEqual(plpar, {})
         self.assertIsInstance(plpar, dict)
         self.assertEqual(short_names, [])
@@ -218,27 +219,41 @@ class test_case(unittest.TestCase):
 
         # PL_ keys without PL_model: no 'model' entry
         fn = self.write("conf_file_read_nomodel.conf", "PL_A = 1\n")
-        plpar = quadriga_lib.tools.conf_file_read(fn)[1]
+        plpar = quadriga_lib.gbsm.conf_file_read(fn)[1]
         self.assertEqual(list(plpar), ["A"])
 
     def test_errors(self):
         # Thrown by C++: std::runtime_error -> RuntimeError
         with self.assertRaises(RuntimeError) as ctx:
-            quadriga_lib.tools.conf_file_read(os.path.join(self.tmp.name, "no_such_file.conf"))
+            quadriga_lib.gbsm.conf_file_read(os.path.join(self.tmp.name, "no_such_file.conf"))
         self.assertIn("Cannot open file", str(ctx.exception))
 
         # Thrown by C++: std::invalid_argument -> ValueError, with file name and line number
         fn = self.write("conf_file_read_grammar.conf", "% comment\nDS_mu = abc\n")
         with self.assertRaises(ValueError) as ctx:
-            quadriga_lib.tools.conf_file_read(fn, False)
+            quadriga_lib.gbsm.conf_file_read(fn, False)
         self.assertIn("line 2", str(ctx.exception))
         self.assertIn("DS_mu", str(ctx.exception))
 
+        # Cross-key check: DS_VS > 0 needs DS_VS_a or DS_VS_b > 0; the message names the line of DS_VS
+        fn = self.write("conf_file_read_ds_vs.conf", "DS_mu = -9.44\nDS_VS = 4\n")
+        with self.assertRaises(ValueError) as ctx:
+            quadriga_lib.gbsm.conf_file_read(fn)
+        self.assertIn("line 2", str(ctx.exception))
+        self.assertIn("Values of 'DS_VS_a' and 'DS_VS_b' must not both be 0 if 'DS_VS' is > 0.", str(ctx.exception))
+        self.assertEqual(quadriga_lib.gbsm.conf_file_read(fn, False)[0]["DS_VS"], 4.0)
+
         # Rejected by pybind11
         with self.assertRaises(TypeError):
-            quadriga_lib.tools.conf_file_read()
+            quadriga_lib.gbsm.conf_file_read()
         with self.assertRaises(TypeError):
-            quadriga_lib.tools.conf_file_read(self.fn, no_such_argument=1)
+            quadriga_lib.gbsm.conf_file_read(self.fn, no_such_argument=1)
+
+    def test_submodule(self):
+        # The conf functions live in quadriga_lib.gbsm, no longer in quadriga_lib.tools
+        for name in ["conf_file_read", "conf_file_write", "conf_file_list", "scenpar_validate"]:
+            self.assertTrue(hasattr(quadriga_lib.gbsm, name), name)
+            self.assertFalse(hasattr(quadriga_lib.tools, name), name)
 
 
 if __name__ == "__main__":

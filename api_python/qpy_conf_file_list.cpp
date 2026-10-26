@@ -5,7 +5,7 @@
 #include "python_quadriga_adapter.hpp"
 
 /*!SECTION
-Channel generation functions
+Geometry-based stochastic model
 SECTION!*/
 
 /*!MD
@@ -30,7 +30,7 @@ List the scenarios defined by the conf files in a set of directories
 
 ## Usage:
 ```
-scenarios, file_names, file_dirs = quadriga_lib.tools.conf_file_list( dirs, parse_shortnames )
+scenarios, file_names, file_dirs = quadriga_lib.gbsm.conf_file_list( dirs, parse_shortnames )
 ```
 
 ## Inputs:

@@ -5,7 +5,7 @@
 #include "python_quadriga_adapter.hpp"
 
 /*!SECTION
-Channel generation functions
+Geometry-based stochastic model
 SECTION!*/
 
 /*!MD
@@ -26,7 +26,9 @@ Write a QuaDRiGa scenario configuration file
   - The indices 0 to 7 are those of QuaDRiGa, so its 8 section references can be passed unchanged
 - The overview formula of an LSP shows its mean and STD with the frequency, distance, height and elevation
   terms; with `LSP_fc_min > 0` the frequency is written as `max( fGHz, fc_min )`; the ESD line also has the
-  terms of `ES_D_mu_A` to `ES_D_mu_D` and, if `ES_D_mu_min` is not `-Inf`, the lower limit of the mean
+  terms of `ES_D_mu_A` to `ES_D_mu_D` and, if `ES_D_mu_min` is not `-Inf`, the lower limit of the mean;
+  the DS line has the term `log10( a · V/S + b )` when `DS_VS > 0` (a = `DS_VS_a`, b = `DS_VS_b`;
+  `V/S` stays symbolic)
 - Each line is `name = value % comment`, aligned in columns; the comment states the unit
 - The path-loss section has the formula blocks of the model (`logdist`, `dual_slope`, `nlos`,
   `tripple_slope`), the line `PL_model`, then the entries of `plpar` in dict order with the prefix
@@ -35,7 +37,7 @@ Write a QuaDRiGa scenario configuration file
   the same double in [[conf_file_read]]; `Inf` and `-Inf` are written as such
 - With `write_defaults = False` a key is written only if its value differs from the default;
   `SubpathMethod` only if it is not `legacy`; a section without a written key is left out
-- With `write_defaults = True` all 165 numeric keys and `SubpathMethod` are written
+- With `write_defaults = True` all 171 numeric keys and `SubpathMethod` are written
 - The inputs are checked with the rules of [[scenpar_validate]] before the file is opened: unknown
   keys (including `GR_epsilon`), `NaN`, values outside their range and a wrong `SubpathMethod`
   are errors. Further errors: a line break in the file name, a `model` that is not one name, an empty or
@@ -50,12 +52,12 @@ Write a QuaDRiGa scenario configuration file
 
 ## Usage:
 ```
-quadriga_lib.tools.conf_file_write( fn, scenpar, plpar, short_names, ref, ref_sec, valid_range, write_defaults )
+quadriga_lib.gbsm.conf_file_write( fn, scenpar, plpar, short_names, ref, ref_sec, valid_range, write_defaults )
 ```
 
 ## Inputs:
 - **`fn`** — Path of the conf file to write; str, bytes or path-like object (e.g. `pathlib.Path`)
-- **`scenpar`** — Scenario parameters; dict with any subset of the 166 keys returned by
+- **`scenpar`** — Scenario parameters; dict with any subset of the 172 keys returned by
   [[conf_file_read]]; numeric values are real scalars (int, float, bool or a numpy value with one
   element); `SubpathMethod` is a str; missing keys have their default; `None` or `{}` writes the
   default set

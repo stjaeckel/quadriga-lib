@@ -2,7 +2,7 @@
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
 
-# Python interface test for quadriga_lib.tools.conf_file_write.
+# Python interface test for quadriga_lib.gbsm.conf_file_write.
 # Scope: argument and output handling, defaults, dict conversion, round trip, error paths.
 # Physics validation lives in the Catch2 suite (test_conf_file_write.cpp).
 
@@ -53,17 +53,17 @@ class test_case(unittest.TestCase):
 
     def write_text(self, *args, **kwargs):
         # Write to self.fn (overwriting) and return the file content
-        quadriga_lib.tools.conf_file_write(self.fn, *args, **kwargs)
+        quadriga_lib.gbsm.conf_file_write(self.fn, *args, **kwargs)
         with open(self.fn) as f:
             return f.read()
 
     def test_basic_call(self):
-        out = quadriga_lib.tools.conf_file_write(self.fn, self.scenpar, self.plpar, self.short_names,
+        out = quadriga_lib.gbsm.conf_file_write(self.fn, self.scenpar, self.plpar, self.short_names,
                                                  self.ref, self.ref_sec, self.valid_range)
         self.assertIsNone(out)
 
         scenpar, plpar, lsp_xcorr, lsp_xcorr_chk, short_names, ignored_keys = \
-            quadriga_lib.tools.conf_file_read(self.fn)
+            quadriga_lib.gbsm.conf_file_read(self.fn)
         for key, value in self.scenpar.items():
             self.assertEqual(scenpar[key], value, key)
         self.assertTrue(np.signbit(scenpar["DS_gamma"]))
@@ -90,12 +90,12 @@ class test_case(unittest.TestCase):
         files = sorted(glob.glob(os.path.join(config_dir, "*.conf")))
         self.assertEqual(len(files), 23)
         for fn in files:
-            ref = quadriga_lib.tools.conf_file_read(fn)
+            ref = quadriga_lib.gbsm.conf_file_read(fn)
             scenpar, plpar, _, _, short_names, _ = ref
 
             fn_out = os.path.join(self.tmp.name, "round_trip_" + os.path.basename(fn))
-            quadriga_lib.tools.conf_file_write(fn_out, scenpar, plpar, short_names)
-            out = quadriga_lib.tools.conf_file_read(fn_out)
+            quadriga_lib.gbsm.conf_file_write(fn_out, scenpar, plpar, short_names)
+            out = quadriga_lib.gbsm.conf_file_read(fn_out)
             os.remove(fn_out)
 
             # scenpar: same keys in the same order, same values bit for bit
@@ -121,7 +121,7 @@ class test_case(unittest.TestCase):
     def test_keyword_arguments(self):
         ref = self.write_text(self.scenpar, self.plpar, self.short_names, self.ref, self.ref_sec,
                               self.valid_range, True)
-        quadriga_lib.tools.conf_file_write(fn=self.fn, scenpar=self.scenpar, plpar=self.plpar,
+        quadriga_lib.gbsm.conf_file_write(fn=self.fn, scenpar=self.scenpar, plpar=self.plpar,
                                            short_names=self.short_names, ref=self.ref, ref_sec=self.ref_sec,
                                            valid_range=self.valid_range, write_defaults=True)
         with open(self.fn) as f:
@@ -151,10 +151,10 @@ class test_case(unittest.TestCase):
         self.assertIn("Valid frequency range", texts[4])
         self.assertIn("SubpathMethod =        legacy", texts[5])
 
-        # write_defaults = True writes all 165 numeric keys and SubpathMethod, the values do not change
-        quadriga_lib.tools.conf_file_write(self.fn, self.scenpar, write_defaults=True)
-        default_set = quadriga_lib.tools.scenpar_validate(self.scenpar)[0]
-        self.assertEqual(quadriga_lib.tools.conf_file_read(self.fn)[0], default_set)
+        # write_defaults = True writes all 171 numeric keys and SubpathMethod, the values do not change
+        quadriga_lib.gbsm.conf_file_write(self.fn, self.scenpar, write_defaults=True)
+        default_set = quadriga_lib.gbsm.scenpar_validate(self.scenpar)[0]
+        self.assertEqual(quadriga_lib.gbsm.conf_file_read(self.fn)[0], default_set)
 
         # A single str is one short name
         self.assertEqual(self.write_text({}, short_names="Ta"), self.write_text({}, short_names=["Ta"]))
@@ -168,7 +168,7 @@ class test_case(unittest.TestCase):
                          self.write_text(self.scenpar, write_defaults=True))
         for value in ["yes", 1, 0]:
             with self.assertRaises(TypeError) as ctx:
-                quadriga_lib.tools.conf_file_write(self.fn, self.scenpar, write_defaults=value)
+                quadriga_lib.gbsm.conf_file_write(self.fn, self.scenpar, write_defaults=value)
             self.assertIn("Input 'write_defaults' must be a bool or None.", str(ctx.exception))
 
     def test_path_like(self):
@@ -176,24 +176,24 @@ class test_case(unittest.TestCase):
         ref = self.write_text(self.scenpar, self.plpar)
         for fn in [pathlib.Path(self.fn), os.fsencode(self.fn)]:
             os.remove(self.fn)
-            quadriga_lib.tools.conf_file_write(fn, self.scenpar, self.plpar)
+            quadriga_lib.gbsm.conf_file_write(fn, self.scenpar, self.plpar)
             with open(self.fn) as f:
                 self.assertEqual(f.read(), ref)
         for fn in [5, None]:
             with self.assertRaises(TypeError) as ctx:
-                quadriga_lib.tools.conf_file_write(fn, self.scenpar)
+                quadriga_lib.gbsm.conf_file_write(fn, self.scenpar)
             self.assertIn("Input 'fn' must be a str or path-like object.", str(ctx.exception))
 
     def test_plpar_order(self):
         # The dict order is the write order; 'model' can be at any position of the input dict
         plpar = {"A": [4.0], "model": "logdist", "B": [1.0, 2.5, -3.0]}
-        quadriga_lib.tools.conf_file_write(self.fn, {}, plpar)
-        out = quadriga_lib.tools.conf_file_read(self.fn)[1]
+        quadriga_lib.gbsm.conf_file_write(self.fn, {}, plpar)
+        out = quadriga_lib.gbsm.conf_file_read(self.fn)[1]
         self.assertEqual(list(out), ["model", "A", "B"])
 
         # Without 'model'
-        quadriga_lib.tools.conf_file_write(self.fn, {}, {"B": 1.0, "A": 2.0})
-        out = quadriga_lib.tools.conf_file_read(self.fn)[1]
+        quadriga_lib.gbsm.conf_file_write(self.fn, {}, {"B": 1.0, "A": 2.0})
+        out = quadriga_lib.gbsm.conf_file_read(self.fn)[1]
         self.assertEqual(list(out), ["B", "A"])
 
     def test_value_types_and_layout(self):
@@ -222,7 +222,7 @@ class test_case(unittest.TestCase):
         scenpar = copy.deepcopy(self.scenpar)
         plpar = copy.deepcopy(self.plpar)
         valid_range = self.valid_range.copy()
-        quadriga_lib.tools.conf_file_write(self.fn, scenpar, plpar, self.short_names, self.ref, self.ref_sec,
+        quadriga_lib.gbsm.conf_file_write(self.fn, scenpar, plpar, self.short_names, self.ref, self.ref_sec,
                                            valid_range)
         self.assertEqual(list(scenpar), list(self.scenpar))
         npt.assert_array_equal(scenpar_bits(scenpar), scenpar_bits(self.scenpar))
@@ -236,12 +236,13 @@ class test_case(unittest.TestCase):
 
         def check(exc_type, text, *args, **kwargs):
             with self.assertRaises(exc_type) as ctx:
-                quadriga_lib.tools.conf_file_write(bad_fn, *args, **kwargs)
+                quadriga_lib.gbsm.conf_file_write(bad_fn, *args, **kwargs)
             self.assertIn(text, str(ctx.exception))
             self.assertFalse(os.path.exists(bad_fn))  # a failed call does not create a file
 
         # Thrown by C++: std::invalid_argument -> ValueError
         check(ValueError, "Unknown key 'GR_epsilon'", {"GR_epsilon": 1.0})
+        check(ValueError, "Values of 'DS_VS_a' and 'DS_VS_b' must not both be 0 if 'DS_VS' is > 0.", {"DS_VS": 4.0})
         check(ValueError, "SNS_mu", {"SNS_mu": 2.0})
         check(ValueError, "'A' in 'plpar' must not be NaN", {}, {"A": [np.nan]})
         check(ValueError, "'A' in 'plpar' has no value", {}, {"A": []})
@@ -255,13 +256,13 @@ class test_case(unittest.TestCase):
         for name in ["conf_file_write_x\nKF_mu = 5 %.conf", "conf_file_write_x\rKF_mu = 5 %.conf"]:
             fn = os.path.join(self.tmp.name, name)
             with self.assertRaises(ValueError) as ctx:
-                quadriga_lib.tools.conf_file_write(fn, {})
+                quadriga_lib.gbsm.conf_file_write(fn, {})
             self.assertIn("Input 'fn' must not contain a line break in the file name.", str(ctx.exception))
             self.assertFalse(os.path.exists(fn))
 
         # Thrown by C++: std::runtime_error -> RuntimeError
         with self.assertRaises(RuntimeError) as ctx:
-            quadriga_lib.tools.conf_file_write(os.path.join(self.tmp.name, "no_such_dir", "x.conf"), {})
+            quadriga_lib.gbsm.conf_file_write(os.path.join(self.tmp.name, "no_such_dir", "x.conf"), {})
         self.assertIn("for writing", str(ctx.exception))
 
         # Thrown by the wrapper and its dict conversion
@@ -281,9 +282,9 @@ class test_case(unittest.TestCase):
 
         # Rejected by pybind11
         with self.assertRaises(TypeError):
-            quadriga_lib.tools.conf_file_write(bad_fn)
+            quadriga_lib.gbsm.conf_file_write(bad_fn)
         with self.assertRaises(TypeError):
-            quadriga_lib.tools.conf_file_write(bad_fn, {}, no_such_argument=1)
+            quadriga_lib.gbsm.conf_file_write(bad_fn, {}, no_such_argument=1)
 
 
 if __name__ == "__main__":
