@@ -260,6 +260,91 @@ layer on a wall, band decision near grazing, two traced wave media back to back)
     thread, all six 0.137 s / 0.459 s; `check_docs.py` passes. Side finding: the API page lists `length` of `path` as
     an attribute; it is the member function `length()` (`include/quadriga_channel.hpp:158`), a documentation point
     for the library, not for this step.
+  - **Phase 1 closed:** the rig committed by Stephan (13e4e45, 2026-10-23). Baselines regenerated at 13e4e45:
+    `[wave]` 163474 / 178, `[acoustic]` 42938 / 65 (the rig's 6 cases included), whole suite 1347054 / 1308.
+    Decided by Stephan 2026-10-23: PD1 (a) the plate of the added-insulation model gets the library's finite-panel
+    radiation (Davy's σ at the wall's `side`) for the random-incidence row, printed, not asserted (implemented with the
+    first combination case); PD2 (a) measured references stay assertions, a known deviation is recorded in its case
+    with a wider, commented tolerance; PD3 the box-before-fill exception of the stack rule stays; concrete moves to the
+    research data's Litvin values when it is redone in phase 3.
+  - **Phase 2 started 2026-10-23:** analysis `a01_material_list` (brief `md/materials/a01_material_list_brief.md`):
+    the candidate rows per class from the research library, references, types, gaps, rules met, order. The listening
+    room's inventory comes from Stephan in parallel.
+  - a01 done 2026-10-23 (`md/materials/a01_material_list_report.md`): 47 candidate rows (30 with a usable reference,
+    25 of them measured; 8 compilation only; 3 per-object; 4 waiting for research; 1 out by an open rule; 1
+    definition). Wood alone = `plywood_19mm` (Wareing R, line 1334; Quirt 1983 α, Sabine, line 1344, max 0.116);
+    no carpet on timber is measured anywhere (every carpet row is on concrete, underlay or unstated). Proposed first
+    ten: plywood_19mm, carpet_tile_11mm, carpet on plywood, glass_wool_50mm, pu_foam_50mm, leaf_mdf_6mm (Shearer),
+    leaf_plywood_3mm (Sakagami), curtain_flat_pes_300g, mpp_steel_0_5mm, cpa_steel_1mm_on_foam_100mm. Six draft
+    research requests (doors, perforated and slotted panels, sofas / armchairs / beds blocking; carpet on timber,
+    floors on joists, brick plastered both faces not blocking). Data errors for the research manager: line 1451
+    (Fuchs 2005) typed normal incidence; lines 520 and 1819 (Cox) octave columns hold the centre third. Rig gaps:
+    no Miki / Komatsu / JCA printers yet (added with the first porous material), no 0° tier-2 comparison (needed for
+    the Broda carpet rows). Manager checked lines 1334, 1344, 1451, 520, 1819 and every carpet row's backing.
+  - **Phase 2 redefined by Stephan (2026-10-26).** The list is built from the modeling workflow (a venue, a Blender
+    model, materials chosen by guess, simulation for speaker placement and treatment), not from the literature:
+    - five material classes: structural building materials, hard furnishing, soft furnishing, complex assemblies,
+      acoustic treatment; three evidence tiers per material: 1 measured references, 2 first-principles physics,
+      3 informed guess; phase 3 works tier 1, then 2, then 3, by impact within a tier;
+    - generic rows: a traced solid (`concrete`) whose thickness comes from the geometry, plus sheet rows named by
+      thickness (`concrete_150mm`); some materials only as sheets (window glass); literature constructions are
+      test references, not rows; how a generic row holds from 100 to 600 mm (today's fitted knobs do not) is an
+      open design question for phase 3;
+    - panel size (`side`) adjusted per use; no combination rows: walls and floors first, carpets and absorbers
+      placed separately; combinations are rig tests only where measurements exist;
+    - deliverables of phase 2: `md/acoustic_materials.md` (the wish-list: name, intended use, recipe, evidence tier,
+      references, gaps, impact, status, starting columns from the tests or the page) and a separate
+      `md/acoustic_modeling_guidelines.md`; a procedure for adding materials later; no CSV, no code in phase 2;
+      then a research round on the gaps; phase 3 in a following session.
+    - Engine findings are recorded, not fixed, until every material is in.
+    - `obj_file_read` names (reviewed 2026-10-26, `src/obj_file_read.cpp` `base_material_name`, `resolve_csv`): exact
+      name, then the part before the first dot; no fallback across suffixes; case-sensitive; a dot inside a row name
+      breaks Blender duplicates; unmatched names become air unless `csv_strict`.
+  - a02 done 2026-10-26: draft 0 of `md/acoustic_materials.md` (64 entries: 21 structural, 8 hard furnishing, 9
+    soft, 10 complex assemblies, 16 treatment; 31 tier 1, 20 tier 2, 12 tier 3, plants split; 22 proposed additions;
+    13 measured combinations as test references; 9 open design questions; 12 research requests) and
+    `md/acoustic_modeling_guidelines.md` (14 engine limits). Manager spot-check of research lines 80, 82, 250, 374,
+    1202, 1937: as cited. Stephan's `.gitignore` now ignores `md/materials/`. First-round questions: two rows per
+    board (mass-law and leaf) or one plus a recipe; how a generic solid carries thickness; the hull recipe and whether
+    a hull transmits; how `side` is changed; which additions stay (`water_20c`?).
+  - Round 1 on draft 0 (Stephan, 2026-10-26): Q1 two rows per board, the leaf named `<material>_leaf_<NN>mm`
+    (`gypsum_leaf_12_5mm`; renamed in both drafts); Q2 one generic fit across thicknesses plus sheet rows, the sheet
+    rows and references at round thicknesses (150 and 200 mm, not 152 and 203), the miss measured, a thickness-scaled
+    coincidence recorded for stage 2b if needed; Q4 `side` a row value at a typical size, no engine change (the
+    engine sees one triangle, not the panel), drift accepted where the drawn panel differs; Q5 all proposed additions
+    stay. Q3 (2026-10-26): hard closed furniture (bookshelf, wardrobe, cupboard) as a hard box whose faces absorb the
+    measured per-object area divided by the box's surface; soft furniture (sofa, armchair, bed) as a porous body, a
+    low-poly shape or a cushion-like box of an upholstery row fitted to the per-object area, which reflects at its
+    face, absorbs inside and transmits some (an air-like absorbing volume rejected: it reflects nothing); objects as
+    Blender assets with the material assigned. The stage entry goes (it will be modeled in detail). Still open: lumped
+    rows against recipes for building assemblies; `water_20c` test-only or out.
+  - Draft 1 written 2026-10-26 (`md/acoustic_materials.md` 436 lines, `md/acoustic_modeling_guidelines.md` 171):
+    round-1 answers in; objects in section 2.4 (hard box, porous body, assets, object test still missing in the rig);
+    proposed object rows `box_wardrobe`, `box_cupboard`, `box_bookshelf`, `box_fridge`; mattress and pads merged into
+    `upholstery`; plants, clothes racks, a single person as porous bodies and the audience as a porous box (proposed);
+    typical `side` per entry (proposed); stage removed. Open for round 2: lumped rows against recipes for building
+    assemblies, `water_20c`, `concrete_block_190mm` (unit size, not round), the proposed object kinds, typical sides
+    and impact ratings.
+  - Round 2 (Stephan, 2026-10-26): the upholstery fit is phase-3 work; `water_20c` stays; an outdoor class is added
+    (vegetation, ice, ground, asphalt; the research data hold flow resistivities of grass, soil, forest floor, gravel,
+    snow and asphalt, asphalt α, ground factors, foliage excess attenuation per meter); drywall rows must start from
+    what a modeler sees (a plan with a wall thickness, perhaps a note on the fill), with a reasonable assumption
+    inside; `concrete_block_190mm` is not usable by a modeler; a clutter category (hard and soft, by density) for a box
+    drawn over a desk or shelf. Accepted (2026-10-26): outdoor class 6; drywall rows from the visible thickness and
+    fill with a standard build assumed; masonry classes (`masonry_heavy`, `masonry_hollow`, `masonry_light`) instead of
+    `concrete_block_190mm`; clutter as hard / soft × sparse / medium / dense, tier 3.
+  - **Naming rule (Stephan, 2026-10-26), for every material:** the thickness suffix `_<NN>mm` is the sheet marker and
+    always comes last; without it a row is a solid. `drywall`, `drywall_filled` (solids), `drywall_filled_100mm`
+    (sheet); likewise `gypsum_leaf_12_5mm`. Draft 2 requested from the drafting agent.
+  - Draft 2 written 2026-10-26 (`md/acoustic_materials.md` 515 lines, guidelines 197): naming rule applied
+    throughout; class 6 outdoor (ground rows from CNOSSOS classes, `asphalt` tier 2 since the research data hold no
+    absorption of asphalt paving (the three "asphalt" α rows are parquet in asphalt and a linoleum compilation, checked
+    by the manager), `asphalt_porous_40mm`, `ice` without data, `vegetation` as an air-matched lossy volume); drywall
+    rows (no 100 mm wall measured); masonry classes; clutter grid. Review points left for phase 3: glazing sheet names
+    give the unit thickness (`glazing_double_24mm`) while the lumped row's `thk` is the glass alone; the CSV row
+    `concrete_cast_152mm` breaks the naming rule until redone as `concrete_150mm`.
+  - **Phase 2 result:** draft 2 of both documents, for Stephan to commit. Next: the research requests (section 6 of
+    the wish-list, plus the data errors of a01) go to the research manager; phase 3 starts in a new session.
   - **Engine issues for stage 2b** (Stephan, 2026-10-23): every engine miss found in step 3 becomes an issue in
     `md/acoustic_engine_stage2b_issues.md` (tracked, public) with the diagnostics a later engine stage needs, the
     affected materials and an interim modeling guideline; modeling guidelines (the box of cavity air, face order,
