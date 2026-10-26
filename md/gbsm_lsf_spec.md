@@ -138,6 +138,15 @@ Interfaces
   numeric keys in the key table and new `PL_` keys are allowed. Numeric group-level settings (LOS-state and
   indoor-state decorrelation distances, maximum indoor distance of O2I UTs) are scenpar keys in the files where
   they are unique (NLOS files, O2I files) (4.1).
+- Precision of conf values: a value in a conf file is written with the precision of its source, as TR 38.901
+  prints it (`31.84`, `-9.35`, `43.42`). A derived value (computed from a TR formula, a hall geometry or a
+  constant such as `c = 3e8`: `40/3`, `20·pi/3`, V/S, the RMa/SMa constants for given h and W) is written with at
+  most 4 significant digits, fewer where they suffice, unless 4 digits change a result by more than 0.01 dB (path
+  loss, SF) or 0.1 % (LSP means, distances) over the TR ranges; then with the fewest digits that keep the change
+  within these limits. The exact expression may stand in the comment (`47/11 = 4.27`). Tests against TR oracles
+  take their tolerance from the bound of this rounding, stated in a comment (5.3, 5.4). Reason: long numbers such
+  as `4.2727272727272725` make the files unreadable, and the change is far below the model uncertainty (shadow
+  fading 4 to 8 dB, LSP standard deviations of 0.1 to 0.5 in lg); bit-identical results are not required.
 
 Model rules
 
@@ -395,7 +404,8 @@ Normal generators 0 to 8 only; the Uniform generators 9 and 10 are not corrected
   or the text says degrees. `atan` is the one-argument arctangent, `atan2(y, x)` the two-argument one.
 - `f = fc / 1e9` is the carrier frequency in GHz; `fc` is always given in Hz. `n_freq = fc.n_elem`.
 - `c = 299792458` m/s wherever the library computes with the speed of light. The TR breakpoint formulas use
-  `c = 3e8`; that value is part of the conf-file constants (`PL_E = 40/3`, `20·pi/3`), not of the code.
+  `c = 3e8`; that value is part of the conf-file constants (`PL_E = 4/0.3 = 40/3` and `2·pi/0.3 = 20·pi/3`,
+  written as 13.33 and 20.94, 1.2), not of the code.
 - Positions are rows `{x, y, z}` in meters. `n_link = rx_pos.n_rows`. `tx_pos` has 1 row (used for every link) or
   `n_link` rows; `tx(l)` denotes row 0 or row `l`.
 - Link geometry: `dx = rx(l) - tx(l)`; `d2D = sqrt(dx_x² + dx_y²)`; `d3D = sqrt(d2D² + dx_z²)`; `hBS = tx(l).z`;
@@ -1269,9 +1279,9 @@ The names below are the scenario names without the prefix `3GPP_38.901_v19_`.
 | UMi_*_O2I, UMa_*_O2I, SMa_*_O2I (6 files) | same section | `IO_state_lambda = 50` |
 | RMa_LOS_O2I, RMa_NLOS_O2I | "Model parameters", last paragraph | `O2I_d2D_in_max = 10` |
 | UMi_*_O2I, UMa_*_O2I, SMa_*_O2I (6 files) | "Model parameters", last paragraph | `O2I_d2D_in_max = 25` (SMa: commercial buildings; residential 10 m) |
-| InF_LOS | "Large scale distributions", DS paragraph | `DS_mu = -9.35`, `DS_VS = 4.2727272727272725`, `DS_VS_a = 26`, `DS_VS_b = 14` |
+| InF_LOS | "Large scale distributions", DS paragraph | `DS_mu = -9.35`, `DS_VS = 4.27`, `DS_VS_a = 26`, `DS_VS_b = 14` |
 | InF_NLOS_SL, InF_NLOS_DH | same | `DS_mu = -9.44`, `DS_VS = 4`, `DS_VS_a = 30`, `DS_VS_b = 32` |
-| InF_NLOS_DL, InF_NLOS_SH | same | `DS_mu = -9.44`, `DS_VS = 4.545454545454546`, `DS_VS_a = 30`, `DS_VS_b = 32` |
+| InF_NLOS_DL, InF_NLOS_SH | same | `DS_mu = -9.44`, `DS_VS = 4.55`, `DS_VS_a = 30`, `DS_VS_b = 32` |
 | InF_NLOS_SL, InF_NLOS_DH | "Absolute time of arrival offset", after `absTOA_lambda` | `absTOA_Lmax = 120` |
 | InF_NLOS_DL, InF_NLOS_SH | same | `absTOA_Lmax = 300` |
 | Indoor_NLOS | same | `absTOA_Lmax = 120` |
@@ -1287,9 +1297,9 @@ Comments:
   ```
   % The TR gives the InF delay spread as a function of the hall volume V and surface area S (Table 7.5-6 Part-3):
   % mu_lgDS = DS_mu + log10( DS_VS_a * V/S + DS_VS_b ). DS_VS is the V/S of the calibration hall of TR 7.8.4
-  % (120 x 60 x 10 m: 4; 300 x 150 x 10 m: 50/11); set DS_VS for another hall.
+  % (120 x 60 x 10 m: 4; 300 x 150 x 10 m: 50/11 = 4.55); set DS_VS for another hall.
   ```
-  InF_LOS: `% (LOS: the average of the two calibration halls, 47/11.)` as fourth line.
+  InF_LOS: `% (LOS: the average of the two calibration halls, 47/11 = 4.27.)` as fourth line.
 - `absTOA_Lmax`: the value line with the comment `% largest dimension L of the hall [m]; excess delay <= 2L/c`;
   the line `% L depends on the deployment and is not set here: absTOA_Lmax = 0 means no bound.` is replaced by
   `% L = max(length, width, height) of the calibration hall of TR 7.8.4 (120 x 60 x 10 m: 120 m;` and
@@ -1304,22 +1314,35 @@ lognormal tail exceeds the TR limit (e.g. InF small hall: `10^(-7.5 + 0.4·x)` s
 
 `DS_VS` of InF LOS is 47/11, the average V/S of the two calibration halls, because the one InF LOS file serves all
 InF sub-scenarios; each InF NLOS file uses the V/S of its own hall (SL, DH: 4; DL, SH: 50/11). Today's `DS_mu = -7.2535` of InF LOS
-is the mean of lgDS of the two halls; with V/S = 47/11 the median becomes -7.2528 (a change of 0.0007 in lg, 0.16 % in DS). The
-values are written with full double precision.
+is the mean of lgDS of the two halls; with V/S = 47/11 the median becomes -7.2528 (a change of 0.0007 in lg, 0.16 % in DS).
+The files write the V/S values rounded by the precision rule of 1.2 (47/11 as 4.27, 50/11 as 4.55; the comments give
+the fractions): mu_lgDS changes by -2.5e-4 (InF LOS, -0.06 % in DS) and +3.5e-4 (DL, SH, +0.08 % in DS), within the
+0.1 % of the rule; with 4.27 the InF LOS median is -7.2530.
 
 #### 4.4.2 Run 3a: path-loss keys and constants
 
-The derived path-loss constants are written with full double precision (e.g. `PL_E = 40/3` instead of 13.34), so
-that the TR oracles of 5.3 hold to 1e-9 dB (except the RMa/SMa breakpoint form, 3.3.4); with the rounded values
-they would need about 0.03 dB, which hides real errors. The path loss of these files changes by up to 0.02 dB.
+The derived path-loss constants follow the precision rule of 1.2: 4 significant digits, more only where 4 digits
+would change the loss by more than 0.01 dB. Bounds of the change against the exact constants (`c = 3e8`, the h and W
+of the files), evaluated in the `dual_slope` form of 3.3.4 over the TR ranges (UMa, UMi: hUT 1.5 to 22.5 m, 0.5 to
+100 GHz, d2D up to 5 km; RMa: hBS 10 to 150 m, hUT 1 to 10 m, 0.5 to 30 GHz; SMa: hBS 25 to 35 m, hUT 1 to 14 m,
+0.5 to 37 GHz; RMa and SMa d2D up to 10 km):
+- UMa, UMi: `PL_E = 13.33` instead of 40/3 changes the loss beyond the breakpoint by `(A2 - A1)·lg((40/3)/13.33)`,
+  at most 2.1e-3 dB (UMa 1.95e-3, UMi 2.06e-3).
+- InH and InF NLOS files: no change (`A1 = A2`, the breakpoint has no effect).
+- RMa LOS term: `A1 = 20.48`, `B = 31.74`, `D = 0.001398`, `E = 20.94`: at most 8.2e-3 dB (8.1e-3 dB at the test
+  points of 5.3); RMa NLOS term `Bn = 31.75`: 5.0e-3 dB.
+- SMa LOS term: `A1 = 21.574` (5 digits: 21.57 would change the loss by up to 0.023 dB at 10 km), `B = 30.13`,
+  `E = 20.94`: at most 6.6e-3 dB.
+Against the values of the files today (13.34, 20.944, 0.0014, ...), the path loss changes by up to 0.014 dB (RMa,
+mostly `PL_D` 0.0014 instead of 0.001398 at 10 km; UMa, UMi 0.006 dB, SMa 0.005 dB).
 
 | Files | Change |
 |---|---|
-| Indoor_NLOS, InF_NLOS_DH, _DL, _SH, _SL, UMa_LOS, _LOS_O2I, _NLOS, _NLOS_O2I, UMi_LOS, _LOS_O2I, _NLOS, _NLOS_O2I (13 files) | `PL_E = 13.333333333333334` (was 13.34); value comment `% Breakpoint scaling factor` unchanged |
-| RMa_LOS, _LOS_O2I, _NLOS, _NLOS_O2I, SMa_LOS, _LOS_O2I | `PL_E = 20.943951023931955` (was 20.944); comment `E = 2 pi / 0.3 = 20 pi / 3` |
-| RMa_LOS, _LOS_O2I, _NLOS, _NLOS_O2I | `PL_A1 = 20.477913900145722`, `PL_B = 31.74083179916828`, `PL_D = 0.0013979400086720378` |
-| RMa_NLOS, _NLOS_O2I | `PL_Bn = 31.754962063305896` |
-| SMa_LOS, _LOS_O2I | `PL_A1 = 21.57442238074932`, `PL_B = 30.132619360949676` (`PL_D = 0.002` exact) |
+| Indoor_NLOS, InF_NLOS_DH, _DL, _SH, _SL, UMa_LOS, _LOS_O2I, _NLOS, _NLOS_O2I, UMi_LOS, _LOS_O2I, _NLOS, _NLOS_O2I (13 files) | `PL_E = 13.33` (was 13.34, 40/3 rounded upwards); value comment `% Breakpoint scaling factor` unchanged |
+| RMa_LOS, _LOS_O2I, _NLOS, _NLOS_O2I, SMa_LOS, _LOS_O2I | `PL_E = 20.94` (was 20.944); comment `E = 2 pi / 0.3 = 20 pi / 3 = 20.94` |
+| RMa_LOS, _LOS_O2I, _NLOS, _NLOS_O2I | `PL_A1 = 20.48`, `PL_B = 31.74`, `PL_D = 0.001398` (were 20.478, 31.741, 0.0014) |
+| RMa_NLOS, _NLOS_O2I | `PL_Bn = 31.75` (was 31.755) |
+| SMa_LOS, _LOS_O2I | `PL_A1 = 21.574` (unchanged, 5 digits as above), `PL_B = 30.13` (was 30.133); `PL_D = 0.002` exact |
 | SMa_NLOS, _NLOS_O2I | remove `PL_A1`, `PL_A2`, `PL_B`, `PL_C`, `PL_E`, `PL_hE`; add `PL_LOSmax = 0` |
 | UMa_LOS, _LOS_O2I, _NLOS, _NLOS_O2I | add `PL_hE_rand = 1` after `PL_hE` |
 | InF_NLOS_DL | add `PL_Ax = 25.5`, `PL_Bx = 33`, `PL_Cx = 20` |
@@ -1327,12 +1350,13 @@ they would need about 0.03 dB, which hides real errors. The path loss of these f
 Comment changes in the path-loss sections:
 - UMa (4 files): `hE = 1 m (note 1; the random hE for hUT > 13 m is not modelled)` becomes
   `hE = 1 m or random for hUT >= 13 m (note 1; PL_hE_rand = 1, drawn from column 10 of lsf_draw)`;
-  `E = 4 / 0.3 = 13.34 (rounded)` becomes `E = 4 / 0.3 = 40/3` (in the line `% Break point of note 1: ...`). The
+  `E = 4 / 0.3 = 13.34 (rounded)` becomes `E = 4 / 0.3 = 40/3 = 13.33` (in the line `% Break point of note 1: ...`). The
   UMi, Indoor_NLOS and InF_NLOS files have no such explanatory line; no line is added there (only the value
   changes).
-- RMa (4 files), SMa_LOS, SMa_LOS_O2I: `E = 2 pi / 0.3 = 20.944` becomes `E = 2 pi / 0.3 = 20 pi / 3` (in the line
-  `% Break point of note 5: ...`); a line
-  `% The constants are evaluated with full double precision for h and W given above.`; and in RMa_LOS, _LOS_O2I,
+- RMa (4 files), SMa_LOS, SMa_LOS_O2I: `E = 2 pi / 0.3 = 20.944` becomes `E = 2 pi / 0.3 = 20 pi / 3 = 20.94` (in the
+  line `% Break point of note 5: ...`); a line
+  `% The constants are evaluated for h and W given above and rounded to 4 significant digits (change < 0.01 dB).`
+  (SMa_LOS, SMa_LOS_O2I: `... rounded to 4 significant digits, A1 to 5 (change < 0.01 dB).`); and in RMa_LOS, _LOS_O2I,
   _NLOS, _NLOS_O2I, SMa_LOS, _LOS_O2I after the QuaDRiGa formula block
   `% dual_slope evaluates PL2 with the 3D break-point distance sqrt( dBP^2 + (hBS-hUT)^2 ); the TR form with dBP`
   `% differs by less than 0.035 dB.`
@@ -1448,19 +1472,27 @@ SF oracle of the O2I files is the O2I shadow fading of Table 7.5-6 (7 dB UMa/UMi
 the files; they have no `sig` keys), not the outdoor value of Table 7.4.1-1. Points are chosen at `0.5·dBP` and
 `2·dBP` (never at the breakpoint itself).
 
+Rounded constants: the files write the derived constants rounded by the precision rule of 1.2 (4.4.2), the oracle
+uses the exact TR expressions. The tolerance of each file is the bound of that rounding over the TR ranges (4.4.2),
+written out with its reason in a comment of the test: UMa, UMi `tol_r = 2.1e-3 dB` (`PL_E = 13.33` for 40/3:
+`19·lg((40/3)/13.33)`); RMa `tol_r = 8.2e-3 dB` (A1, B, D, E of the LOS term; the NLOS term with `Bn = 31.75`
+differs by 5e-3 dB, so the maximum stays within the bound); SMa LOS `tol_r = 6.6e-3 dB`; InH, InF and SMa NLOS
+`tol_r = 1e-9 dB` (no rounded constant reaches the result there). The O2I files take the bound of their outdoor file.
+
 RMa and SMa beyond the breakpoint: the library evaluates PL2 with the 3D breakpoint distance
 `dBP3 = sqrt(dBP² + (hBS - hUT)²)` (3.3.4), the TR with the 2D one. For these points (the LOS term of RMa LOS, RMa
-NLOS and SMa LOS, each also O2I, at `d2D > dBP`) the test asserts (a) `abs(pl - PL_TR) <= 0.035 dB` against the TR
-formula and (b) `pl` equal to the TR formula with PL2 replaced by `PL1(dBP3) + 40·lg(d3D/dBP3)` to 1e-9 dB (for RMa
+NLOS and SMa LOS, each also O2I, at `d2D > dBP`) the test asserts (a) `abs(pl - PL_TR) <= 0.035 dB + tol_r` against
+the TR formula and (b) `pl` equal to the TR formula with PL2 replaced by `PL1(dBP3) + 40·lg(d3D/dBP3)` to `tol_r` (for RMa
 NLOS inside the maximum). The tolerance of (a) is the worst case of the difference over the TR ranges, given with
-its ranges in 3.3.4 (at the test points the difference is at most 4.1e-3 dB). A comment in the test states this
-reason with the bound and the ranges written out; (b) keeps the full precision for the rest of the formula.
+its ranges in 3.3.4 (at the test points the difference is at most 4.1e-3 dB), plus the rounding bound `tol_r`. A
+comment in the test states this reason with the bound and the ranges written out; (b) separates the breakpoint form
+from the rounding of the constants.
 
 | Test case | Asserts | Oracle | Tolerance |
 |---|---|---|---|
-| the v19 files reproduce TR 38.901 Table 7.4.1-1 | for every LOS, NLOS and O2I file: `pl` and `sf_sigma` at the points: UMa hBS 25, UMi hBS 10: hUT {1.5, 12}, fc {3.5, 28} GHz, d2D {15, 0.5 dBP', 2 dBP' if <= 5 km, 1000, 4500}; RMa hBS {35, 25}, hUT {1.5, 5}, fc {0.9, 3.5, 6}, d2D {50, 0.5 dBP, 2 dBP (LOS <= 10 km, NLOS <= 5 km), 4000}; SMa hBS {25, 35}, hUT {1.5, 4.5, 13.5}, fc {3.5, 20}, d2D {50, 0.5 dBP, 2 dBP, 3000}; InH hBS 3, hUT 1, fc {3.5, 28, 60}, d2D {1, 5, 20, 100}; InF hBS {1.5, 8}, hUT 1.5, fc {3.5, 28}, d2D {1, 5, 10, 30, 100, 500}. O2I files equal the outdoor TR formula at the geometric distance, `sf_sigma` the O2I value. A diagnostic counts the InF-DL points where the InF-SL term wins (> 0 asserted) | typed TR formulas | 1e-9 dB (full-precision constants in the files); RMa/SMa LOS terms beyond dBP: 0.035 dB against the TR, 1e-9 dB against the 3D-breakpoint form (see above); `sf_sigma` exact |
+| the v19 files reproduce TR 38.901 Table 7.4.1-1 | for every LOS, NLOS and O2I file: `pl` and `sf_sigma` at the points: UMa hBS 25, UMi hBS 10: hUT {1.5, 12}, fc {3.5, 28} GHz, d2D {15, 0.5 dBP', 2 dBP' if <= 5 km, 1000, 4500}; RMa hBS {35, 25}, hUT {1.5, 5}, fc {0.9, 3.5, 6}, d2D {50, 0.5 dBP, 2 dBP (LOS <= 10 km, NLOS <= 5 km), 4000}; SMa hBS {25, 35}, hUT {1.5, 4.5, 13.5}, fc {3.5, 20}, d2D {50, 0.5 dBP, 2 dBP, 3000}; InH hBS 3, hUT 1, fc {3.5, 28, 60}, d2D {1, 5, 20, 100}; InF hBS {1.5, 8}, hUT 1.5, fc {3.5, 28}, d2D {1, 5, 10, 30, 100, 500}. O2I files equal the outdoor TR formula at the geometric distance, `sf_sigma` the O2I value. A diagnostic counts the InF-DL points where the InF-SL term wins (> 0 asserted) | typed TR formulas | `tol_r` of the file (rounded constants, see above); RMa/SMa LOS terms beyond dBP: 0.035 dB + `tol_r` against the TR, `tol_r` against the 3D-breakpoint form (see above); `sf_sigma` exact |
 | O2I distances: geometric distance without d2d_in, outdoor distance with it | UMa NLOS file, hand-built links: the call without `d2d_in` equals the TR formula at the geometric distance (covered above); with `d2d_in` the typed formula at the outdoor distance of the geometry rule (`din = min(d2d_in, d2)`, `d3in = d3·din/d2`, outdoor `d3 - d3in` and `d2·(1 - d3in/d3)`); `d2d_in > d2D`; the 10 m minimum outdoor distance (d3D 15 m, `d2d_in` 12 m); `d2D = 0` with `d2d_in > 0`; `d3D = 0` (indoor fraction 0); `d2d_in = 0` equals the call without `d2d_in`, also at `d2D = 0` | typed legacy distance rule | 1e-12 dB |
-| UMa random hE follows the probability of TR note 1 | UMa LOS file, fc 0.05 GHz, hBS 25, hUT 20, d2D 400 m, K = 10000 links with `rnd_he = (k + 0.5)/K`: hE of each link identified by matching `pl` with the TR LOS formula for hE in {1, 12, 15, 18} (the candidates differ by > 0.01 dB, asserted first); count of hE = 1 equals `K/(1 + C)` within 1; counts of 12, 15, 18 equal `K·(1 - p1)/3` within 2; hUT 13.2 and hUT 10: all hE = 1; `rnd_he` omitted: hE = 1. Model `nlos`: the NLOS term of Table 7.4.1-1 is larger than the LOS term at most of these points, so the LOS term is observed through a plpar copy of the UMa NLOS file with `Bn = -1000` (the NLOS term never wins; the `nlos` code path with `hE_rand` is kept): with the same `rnd_he` its `pl` equals the TR LOS formula with the hE identified from the LOS file, link by link; the unmodified UMa NLOS file gives `max(PLn_TR, PL_LOS_TR(hE))` with that hE. TR UT heights of floors 7 and 8 (no 1.1·hE clamp of the UT height): hBS 25, hUT 19.5 and 22.5, fc 3.5 GHz, d2D 200 and 1000 m (both sides of d'BP = 490 m and 280 m), `rnd_he = p1 + (n - 0.5)/n · (1 - p1)` with `p1`, `n` of note 1 computed in the test, so that hE = 18 m and 21 m (h'UT = 1.5 m): `pl` equals the TR LOS formula with that hE for the UMa LOS file and for the `Bn = -1000` copy of the UMa NLOS file; the unmodified UMa NLOS file gives `max(PLn_TR, PL_LOS_TR(hE))` (the NLOS term wins there by 14 to 20 dB) | TR note 1 and Table 7.4.1-1 typed | match 1e-9 dB; counts deterministic; floors 7 and 8: 1e-9 dB |
+| UMa random hE follows the probability of TR note 1 | UMa LOS file, fc 0.05 GHz, hBS 25, hUT 20, d2D 400 m, K = 10000 links with `rnd_he = (k + 0.5)/K`: hE of each link identified by matching `pl` with the TR LOS formula for hE in {1, 12, 15, 18} (the candidates differ by > 0.01 dB, asserted first; more than twice the rounding bound 2.1e-3 dB of `PL_E`, so the nearest candidate is unique); count of hE = 1 equals `K/(1 + C)` within 1; counts of 12, 15, 18 equal `K·(1 - p1)/3` within 2; hUT 13.2 and hUT 10: all hE = 1; `rnd_he` omitted: hE = 1. Model `nlos`: the NLOS term of Table 7.4.1-1 is larger than the LOS term at most of these points, so the LOS term is observed through a plpar copy of the UMa NLOS file with `Bn = -1000` (the NLOS term never wins; the `nlos` code path with `hE_rand` is kept): with the same `rnd_he` its `pl` equals the TR LOS formula with the hE identified from the LOS file, link by link; the unmodified UMa NLOS file gives `max(PLn_TR, PL_LOS_TR(hE))` with that hE. TR UT heights of floors 7 and 8 (no 1.1·hE clamp of the UT height): hBS 25, hUT 19.5 and 22.5, fc 3.5 GHz, d2D 200 and 1000 m (both sides of d'BP = 490 m and 280 m), `rnd_he = p1 + (n - 0.5)/n · (1 - p1)` with `p1`, `n` of note 1 computed in the test, so that hE = 18 m and 21 m (h'UT = 1.5 m): `pl` equals the TR LOS formula with that hE for the UMa LOS file and for the `Bn = -1000` copy of the UMa NLOS file; the unmodified UMa NLOS file gives `max(PLn_TR, PL_LOS_TR(hE))` (the NLOS term wins there by 14 to 20 dB) | TR note 1 and Table 7.4.1-1 typed | match 2.1e-3 dB (`tol_r` of UMa: `PL_E = 13.33`); counts deterministic; floors 7 and 8: 2.1e-3 dB |
 | legacy models match the get_pl formulas | one SECTION per model with distinct parameter values, 4 links x 3 frequencies: constant; logdist with and without `SF`; logdist_simple; winner_los (links with different heights incl. < 1.5 m, both branches, breakpoint from each link's own heights, `C1 != C2` so that the second branch shows `C2`, continuity at the breakpoint for `F1 = F2`); winner_nlos (fc 1.0, 1.7, 2.5 GHz); winner_pathloss with `SF`; dual_slope (defaults A2, C, D; hE clamp 1.1·hE; both sides with `hBS != hUT`, so that the 3D breakpoint distance differs from the 2D one; sig1/sig2); tripple_slope (three regions, `E2` default, dBP1 > dBP2 case); nlos (all 13 terms non-zero, G2n default, `LOSmax` 0 and 1, `Ax/Bx/Cx`, `sig`); satellite (`usePLa` 1 at 1, 20.71, 33 and 150 GHz, `usePLa` 0, 600 km height, below the horizon gives +Inf) | model formulas typed in the test; zenith-attenuation table typed | 1e-10 dB |
 | distances below 0.1 m are clamped | co-located Tx and Rx give the loss at 0.1 m | typed | 1e-12 dB |
 | default sf_sigma follows the LSP formula | `SF_sigma 6, SF_delta 1.5, SF_omega 0.5, SF_kappa 0.3, SF_tau -0.2, SF_beta 0.1, LSP_fc_min 6`, fc 3 and 10 GHz, logdist model without `SF`; a second scenpar with `SF_sigma 1.4, SF_beta 1` (all other SF terms 0) and links at elevations 1 deg and 10 deg: `sf_sigma` 0 at 1 deg (the terms give -0.36), `1.4 + lg(a)` at 10 deg | LSP std formula typed, including both limits at 0 | 1e-12 |
@@ -1481,7 +1513,7 @@ the files: `KF_mu = -100` dB, `KF_sigma = 0`.
 | Test case | Asserts | Oracle | Tolerance |
 |---|---|---|---|
 | mean and std follow the formula with every term | custom keys as above, 4 links (hUT above and below hBS, a point where the ESD floor applies, and a link at d2D 5000 m where a negative `AS_D_kappa` makes the ASD std negative before the outer limit, so `lsp_sigma` slice 3 is 0 and `lsp` slice 3 equals `10^mu`), fc {1.5, 3.5, 28} GHz with `LSP_fc_min = 2`: `lsp_mu` and `lsp_sigma` of all 8 slices; SF mean 0 | mean/std formula typed, including both limits at 0 | 1e-12 |
-| TR spot checks of four v19 files | `lsp_mu`, `lsp_sigma` of all 8 slices: UMa NLOS (hBS 25, hUT 1.5 and 12, d2D 200 m, fc 3.5 and 28 GHz: the 6 GHz clamp); UMi LOS (hBS 10, hUT 1.5, d2D 200 m, fc 1.5 and 28 GHz: the 2 GHz clamp); SMa NLOS (hBS 35, hUT 1.5 and 4.5, d2D 200 m, fc 3.5 GHz: the ESD height terms); InF NLOS DL (hBS 1.5, hUT 1.5, d2D 30 m, DS with the file default V/S and with `DS_VS` 4 and 50/11 set in a scenpar copy) | Table 7.5-6 Parts 1, 3, 4, Tables 7.5-7, 7.5-8, 7.5-12, typed | 1e-12 |
+| TR spot checks of four v19 files | `lsp_mu`, `lsp_sigma` of all 8 slices: UMa NLOS (hBS 25, hUT 1.5 and 12, d2D 200 m, fc 3.5 and 28 GHz: the 6 GHz clamp); UMi LOS (hBS 10, hUT 1.5, d2D 200 m, fc 1.5 and 28 GHz: the 2 GHz clamp); SMa NLOS (hBS 35, hUT 1.5 and 4.5, d2D 200 m, fc 3.5 GHz: the ESD height terms); InF NLOS DL (hBS 1.5, hUT 1.5, d2D 30 m, DS with the file default V/S and with `DS_VS` 4 and 50/11 set in a scenpar copy) | Table 7.5-6 Parts 1, 3, 4, Tables 7.5-7, 7.5-8, 7.5-12, typed | 1e-12; DS mean of InF NLOS DL with the file default (4.55 for the hall's 50/11) 3.6e-4 in lg (rounding bound `lg((30·4.55 + 32)/(30·50/11 + 32))` = 3.52e-4, in a comment) |
 | EoD offset formula and sign | custom `EoD_offset_*` keys with every term active (`b` > 0 and 0, `hcl` above and below hUT), d2D {5, 50, 500, 2000}; spot checks against the TR: UMa NLOS (6 GHz clamp) and SMa NLOS (hUT above and below 3.5 m) give `-mu_offset,ZOD` of Tables 7.5-7 and 7.5-12; UMa LOS gives 0 | EoD formula typed; TR tables typed | 1e-10 deg |
 | values are 10^(mu + sigma x) with x from the correlation root | identity correlation, distinct mu/sigma per LSP, given `rnd`: `lsp = 10^(mu + sigma·s)` (KF, SF, XPR: `10^(0.1·(...))`) | typed | 1e-12 relative |
 | the Cholesky root follows the TR order | a custom positive definite matrix with all 28 correlations non-zero, mu = 0, sigma = 1 (dB for KF, SF, XPR): links with `s = e_j` give column j of `Q` built by the test-side Cholesky of the permuted matrix; `x_SF = s_SF`; `Q·Q^T = R` | test-side Cholesky | 1e-12 |
@@ -1491,7 +1523,7 @@ the files: `KF_mu = -100` dB, `KF_sigma = 0`.
 | the same random values apply to all frequencies | `(lg DS - mu)/sigma` equal at 3 frequencies | TR 7.6.5 | 1e-12 |
 | sf_sigma from path_loss replaces the SF standard deviation | `lsp SF = 10^(0.1·sf_sigma·x_SF)`, `lsp_sigma` slice 2 = `sf_sigma`, other slices unchanged | typed | 1e-12 |
 | LSP_fc_min clamps the frequency | with `LSP_fc_min = 6`: `lsp_mu`, `lsp_sigma` at 2 GHz equal those at 6 GHz, differ at 10 GHz | — | exact / > 1e-6 |
-| InF delay spread uses V/S | InF LOS file: the file default (47/11) and `DS_VS` set to 4 and 50/11 in a scenpar copy; `DS_VS = 0` gives no V/S term | Table 7.5-6 Part-3 typed | 1e-12 |
+| InF delay spread uses V/S | InF LOS file: the file default (4.27 for 47/11) and `DS_VS` set to 4 and 50/11 in a scenpar copy; `DS_VS = 0` gives no V/S term | Table 7.5-6 Part-3 typed | 1e-12 against the formula with the `DS_VS` used; the file default against the TR value with V/S = 47/11: 2.5e-4 in lg (rounding bound `lg((26·47/11 + 14)/(26·4.27 + 14))` = 2.46e-4, in a comment) |
 | absolute TOA | `absTOA_mu = -30` gives 0, -29.99 active; value `10^(mu + sigma·rnd(:,8))`; `absTOA_Lmax` bound on both sides of `2L/c` | rule typed (active above -30, bound `2·L/c`, `c = 299792458`) | 1e-12 relative |
 | ground permittivity interpolates dry, medium and wet ground | U = 0, 0.25, 0.5, 0.75, 1 at f 1, 10, 28 GHz; imaginary part >= 0 | permittivity model typed | 1e-12 |
 | optional outputs alone and together give the same values | every optional output alone vs. all together; pre-sized outputs; `n_link = 0`; one `tx_pos` row vs repeated | — | exact |
@@ -1554,7 +1586,9 @@ there with an independent oracle.
   case "the DS overview line shows the V/S term" next to the ESD overview case (`DS_VS > 0` gives
   `% DS  = log10( 26 * V/S + 14 ) - 9.35 + Xds * ( 0.15 )`, `DS_VS = 0` the line of today); `test_conf_files_v19.cpp`: include
   `quadriga_gbsm.hpp`, the InF DS checks (`DS_mu` -9.35 / -9.44, `DS_VS`, `DS_VS_a`, `DS_VS_b` and
-  `DS_mu + lg(a·VS + b)` against the TR formula for the hall of 7.8.4), the values of the 6 keys per file (4.4.1),
+  `DS_mu + lg(a·VS + b)` against the TR formula for the hall of 7.8.4; `DS_VS` equals the hall's V/S rounded to 2
+  decimals, the mean is within `lg(1.001)` = 4.3e-4 of the TR formula, the 0.1 % of the precision rule of 1.2),
+  the values of the 6 keys per file (4.4.1),
   `LOS_state_lambda` and `IO_state_lambda` 0 in all other files; `absTOA_Lmax` 120 (InF_NLOS_SL, _DH,
   Indoor_NLOS) and 300 (InF_NLOS_DL, _SH) against L = max(length, width, height) of the halls typed from TR 7.8.4
   and Table 7.2-2, 0 in all other files (the existing check `absTOA_Lmax == 0` for every file is changed); `test_conf_file_list.cpp`: include. MEX tests
@@ -1565,8 +1599,10 @@ there with an independent oracle.
   that Run 1 edits are reworded to state the rule (9.1): "decision O10" in `test_conf_files_v19.cpp`, "Decision Q1",
   "Q2", "Q3" in `test_conf_file_read.cpp` and `test_conf_file_list.cpp`, "Decision B1" and "review point A" in
   `test_conf_file_write.cpp`.
-- Run 3a: `test_conf_files_v19.cpp` case "path-loss constants of RMa and SMa follow Table 7.4.1-1": tolerance 1e-12
-  (full precision), SMa NLOS asserts `LOSmax == 0` and the absence of `A1, A2, B, C, E, hE`; new checks of
+- Run 3a: `test_conf_files_v19.cpp` case "path-loss constants of RMa and SMa follow Table 7.4.1-1": each file value
+  equals the exact constant rounded as in 4.4.2 (RMa `A1`, `B`, `Bn`, `E` to 2 decimals, `D` to 6; SMa `A1` to 3,
+  `B` and `E` to 2), tolerance half a unit of the last written digit plus 1e-12; UMa, UMi, InH, InF `E` equals 13.33
+  (40/3 to 2 decimals); SMa NLOS asserts `LOSmax == 0` and the absence of `A1, A2, B, C, E, hE`; new checks of
   `PL_hE_rand` (UMa files) and `PL_Ax/Bx/Cx` (InF-DL);
   the comment "E and hE ... needed by the QuaDRiGa model" is removed. `test_conf_file_write.cpp` case "path-loss
   comments and formulas depend on the model": one check per new `PL_` key comment (`hE_rand`, `LOSmax`, `Ax`,
@@ -1761,7 +1797,7 @@ Files: `src/path_loss.cpp` (new), `include/quadriga_gbsm.hpp` (one declaration),
 `test_conf_files_v19.cpp`, `test_conf_file_write.cpp` (comment rows).
 
 Steps: declaration and stub, build; the tests of 5.3; run against the stub; the file edits of 4.4.2 before the TR
-test is run against the implementation (it needs the full-precision constants and the new keys);
+test is run against the implementation (it needs the rounded constants of 4.4.2 and the new keys);
 implement; the writer comment rows and their test; the `test_conf_files_v19.cpp` updates; documentation block
 (3.3.7); full suite.
 
@@ -1810,7 +1846,7 @@ Files: `api_python/qpy_<name>.cpp` (6 new), `api_python/python_gbsm.cpp` (regist
 
 Steps: Python wrappers, registrations, tests; `SECTION_DESC` (Python); release-note text (new functions, header
 move, Python submodule move `tools` -> `gbsm` (breaking), new keys, changed v19 files incl. the path-loss changes of
-up to 0.02 dB and the TOA bound of the InF and InH NLOS files, the reduced O2I model set, the bias-removal change
+up to 0.014 dB and the TOA bound of the InF and InH NLOS files, the reduced O2I model set, the bias-removal change
 against QuaDRiGa, the dual-mobility ASD/ASA and ESD/ESA values without QuaDRiGa's extra coupling, the LSP standard
 deviation limited at 0) in the report
 (`README.md` has no release-notes section; the maintainer decides where the text goes); full gates.
@@ -1950,7 +1986,8 @@ Changes against today that are not switchable and that NG documents:
 - Bias removal: each Normal field is corrected once over all positions where it is evaluated, and the Tx side is
   mirrored from the corrected phases, so bias-removed ASD/ASA and ESD/ESA change in dual mobility and, for
   different decorrelation distances of a pair, also in single mobility (3.1, "Difference to QuaDRiGa").
-- The path-loss constants of the v19 files are written with full precision (changes up to 0.02 dB).
+- The path-loss constants of the v19 files are recomputed from the TR and rounded to 4 significant digits (changes
+  up to 0.014 dB).
 - O2I: only the TR models; the deviation is N(0,1) (QuaDRiGa: uniform).
 - Dual mobility: ASD/ASA and ESD/ESA are the two-map sums without QuaDRiGa's additional 2x2 square root (3.2
   step 5); the values change in dual mobility.
