@@ -287,6 +287,7 @@ MD!*/
 - Oracles: closed-form formulas, direct transcription of the governing equations in scalar `double` math, brute-force evaluation of what the function computes cleverly. Comment each oracle with the formula and its range of validity. An oracle must not call the function under test or the internals it is built on.
 - Prefer checks that are independent of conventions and hard to satisfy by accident: energy conservation, reciprocity, symmetry, invariance under subdivision / reordering / partitioning, agreement of two independent code paths, known limiting cases.
 - Use distinctive inputs (non-trivial values, distinct values per element, permuted index maps) so that a swapped argument, an off-by-one or cross-talk between elements changes the result visibly.
+- The Catch2 test binary links no BLAS (by design, like the library), so tests must not use Armadillo matrix products above 4x4 (`A * B` with a dimension larger than 4); write small loops instead. Armadillo multiplies with its own code only up to 4x4 and calls BLAS beyond that, which does not link. The same holds for the calls that Armadillo maps to BLAS (`arma::norm`, `arma::dot`, `arma::accu(a % b)`).
 
 ## Assertions
 - `CHECK` for the assertions under test (the case continues and reports all failures); `REQUIRE` only for preconditions without which the rest of the case would crash or be meaningless (output sizes before indexing).
