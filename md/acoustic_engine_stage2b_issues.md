@@ -18,7 +18,8 @@ fixes them.
 
 **Bounce cap.** Production scenes are traced with a cap of about 20 to 30 interactions per ray: a cavity that traps
 rays multiplies the paths at every bounce (each splits into reflection and transmission), and about 150 million traced
-rays is the practical limit. Sizes that depend on followed paths are measured at a cap of 10.
+rays is the practical limit. The rig takes the transmission of a box of air in front of a fill at a cap of 10 and
+prints the reflection at that cap beside the uncapped one.
 
 ## Issues
 
@@ -124,10 +125,15 @@ rays is the practical limit. Sizes that depend on followed paths are measured at
   miss; at the production cap of 20 to 30 interactions the traced paths are between the last two rows. Reflection
   moves with the cap too: at 10 interactions the precise drywall recipe's octave absorption changes by up to 0.042
   (0.23 per angle and tone), the MDF panel absorber with a fill by up to 8.2e-3.
+- **A dense leaf traced behind a box of air diverges** (2026-10-27, independent review of the rig): board sheet |
+  75 mm box of air | 12.5 mm board as a traced solid reflects up to 1.2e13 at 125 Hz between 40° and 53° (267 of
+  1566 nodes above one, 61 calls), octave α down to −1.9e12; transmission 20.8 dB off through the paths, 11.5 dB on
+  one path. The same back board as a sheet at the box's exit is right within 3.0e-3 dB. The rig refuses the traced
+  form.
 - **Affects.** Transmission through stud walls with a filled cavity drawn as the precise recipe, and through walls
   with filled panel absorbers; reflection of filled cavities at a low bounce cap.
-- **Interim guideline.** Build stacks with the room-side layer as a sheet and the layers behind it as traced solids.
-  For insulation between rooms through a filled stud wall, use the lumped `drywall_filled*` rows, not the precise
+- **Interim guideline.** Build stacks with the room-side layer as a sheet and the layers behind it as traced solids;
+  a leaf behind a box of air is a sheet at the box's exit, never a traced body. For insulation between rooms through a filled stud wall, use the lumped `drywall_filled*` rows, not the precise
   recipe.
 - **Reproduce.** `QD_DIAG_RAY=1 ./build_linux/test_bin "Materials rig - engine limits printed*"` (`ISSUE 3:` rows).
 

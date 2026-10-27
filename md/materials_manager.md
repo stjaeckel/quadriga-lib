@@ -41,8 +41,8 @@ the plate rule or the fluid-layer transfer matrix, R + T ≤ 1, diagnostics, tie
 `data/materials_acoustic.csv` holds one preliminary row, `concrete_cast_152mm` (page 11.4; breaks the naming rule; to
 be redone as the `concrete` family on the research data's Litvin values).
 
-**Baselines** (generic `build_linux`, at 13e4e45; later commits are documents only): `[wave]` 163474 / 178,
-`[acoustic]` 42938 / 65 (the rig included), whole suite 1347054 / 1308. Files `test_wave.txt`, `test_acoustic.txt`,
+**Baselines** (generic `build_linux`, at 69a4555, the extended rig): `[wave]` 163474 / 178,
+`[acoustic]` 43143 / 69 (the rig included), whole suite 1347259 / 1312. Files `test_wave.txt`, `test_acoustic.txt`,
 `test.txt` in the repository root (untracked).
 
 **Research:** the hand-over of 2026-10-27 (`md/materials/research_request_2026-10-27.md`: request 0 stable row ids,
@@ -60,12 +60,13 @@ Everything the documents need before material 1:
 3. a 0° (normal-incidence) tier-2 comparison;
 4. a sheet glued at a traced solid's exit (double leaf, curtain at a window, drywall precise recipe) and the issue-4
    fixture: plaster sheets on both faces of a block solid against the bonded plate, marked `ISSUE 4:`;
-5. a sheet | sheet | solid self-check, then a stack rule that refuses three co-located faces;
-6. the ISSUE mechanism (comment `ISSUE <n>:`, `CHECK_NOFAIL` or equivalent, counted and printed) and the regression
-   guard of the tolerance table;
+5. a stack rule that refuses three co-located faces (measured in a probe; no self-check case, no opt-out);
+6. the ISSUE marks (a comment `ISSUE <n>:`, no assertion, the values printed) and the regression guard of the
+   tolerance table (a `Measured` row of the library's own octaves);
 7. one test case per row family accepted by the table case;
-8. the porous models written in the test (Miki, Komatsu; JCA where a reference uses it), the passive Miki fit for
-   ground classes, and the finite-panel (Davy σ) plate in the added-insulation model of issue 1 (printed);
+8. the porous models written in the test (Miki, Komatsu, Delany-Bazley printed; JCA when a reference uses it), and
+   the finite-panel (Davy σ) plate in the added-insulation model of issue 1 (printed); the passive Miki fit of the
+   ground classes deferred to the ground family;
 9. a helper that rescales a lumped row's power laws with `fRef` (X·k^B);
 10. the object test (rays from all directions on a body give its absorption area), as its own step, designed and timed
     against about 0.3 s per case.
@@ -553,6 +554,25 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     1.7 rule 10 (`e` = ρ/ρ₀), 1.10 ISSUE wording and prerequisites, section 3 "rig today"; guidelines 3.1 and 12;
     stage-2b ISSUE convention and bounce cap, issues 1, 3, 4, 5 measured, issue 6 (grazing relaunch) new; open rule
     "dense ground classes". To Stephan for review and commit.
+  - Committed by Stephan (69a4555, 2026-10-27). Baselines regenerated at 69a4555: `[wave]` 163474 / 178,
+    `[acoustic]` 43143 / 69, whole suite 1347259 / 1312. Stephan asked for an independent review of the rig, its
+    findings worked in without escalation where possible, kept lean: review r03 started (brief
+    `md/materials/r03_rig_review_brief.md`).
+  - r03 done 2026-10-27 (`md/materials/r03_rig_review.md`): references, band forming, mass shift, 0° index and family
+    rule right; 11 findings. Manager rerun of its probes `[r1]`, `[r3]`, `[r5]`–`[r9]`: all reproduce (mixed stack
+    with a mass-law layer in front: `ref_auto` wrong, 1.4e-2 to 0.59 in R; box-before-fill exception admits a traced
+    dense leaf, R up to 1.2e13; drywall R 1.45e-2 uncapped, 0.222 at 10 calls; plaster side 0.675 dB reversed, 3e-6
+    at one side; `rescale` triples `mpp`). No finding needs Stephan: the rig agent works them in (brief revision 2:
+    F1–F10; reflection stays uncapped, transmission of a filled box at 10, R at 10 printed under ISSUE 3); the manager
+    fixed the documents (F11: section 0 items 5, 6, 8; wish-list 1.10 and the stage-2b cap wording; issue 3 gains the
+    traced dense leaf behind a box).
+  - Review fixes done 2026-10-27 by the rig agent (906 lines, was 908). Manager checks: rebuild clean; `[wave]`
+    141128 numbers identical; `[acoustic]` 43002 / 69, other files' rows identical, moved only the concrete | plaster
+    row (one side: 1.95e-4 → 3.1e-6 dB), Litvin's side digit, five T columns now `n/a`, the ISSUE 3 block (R at 10
+    interactions 0.222 printed beside 1.45e-2 uncapped) and the new refusals; whole suite 1347118 / 1312 (−141: 126
+    `isfinite`, 16 porous per-octave checks, 5 T checks that could not fail, 1 assertion on an ISSUE line; +7);
+    `[materials]` 0.36 s at 12 threads, load 3.4–5.6; `check_docs.py` passes. To Stephan with a summary and a commit
+    message.
 
 ## 10. Scope of phase 0 (2026-10-23; naming and combinations superseded by wish-list 1.6 and section 3)
 
