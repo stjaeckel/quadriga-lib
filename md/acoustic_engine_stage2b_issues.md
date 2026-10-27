@@ -10,11 +10,15 @@ input, and the rig's cases become its regression tests.
 Each issue: what happens physically; how it was measured; the size; what it affects in typical rooms; the interim
 guideline; how to reproduce it.
 
-**ISSUE convention in the rig.** Every check in `tests/catch2_tests/test_acoustic_materials.cpp` that fails because
-of an engine limit listed here is marked: a comment `ISSUE <n>:` names the issue below; the assertion becomes a
-non-failing check (Catch2 `CHECK_NOFAIL` or equivalent) that still prints and is counted; the measured and the
-reference values go into the case's diagnostics. Known engine issues therefore never make the suite fail, and the
-marked checks are the regression list of the engine stage that fixes them.
+**ISSUE convention in the rig.** A comparison in `tests/catch2_tests/test_acoustic_materials.cpp` that misses because
+of an engine limit listed here carries a comment `ISSUE <n>:` naming the issue below; it asserts nothing, and the
+measured and the reference values are printed in the case's diagnostics (`QD_DIAG_RAY=1`). Known engine issues
+therefore never make the suite fail; the comments (`grep "ISSUE "`) are the regression list of the engine stage that
+fixes them.
+
+**Bounce cap.** Production scenes are traced with a cap of about 20 to 30 interactions per ray: a cavity that traps
+rays multiplies the paths at every bounce (each splits into reflection and transmission), and about 150 million traced
+rays is the practical limit. Sizes that depend on followed paths are measured at a cap of 10.
 
 ## Issues
 
@@ -57,12 +61,28 @@ marked checks are the regression list of the engine stage that fixes them.
   | 0° | fluid layer on a limp plate of 346.7 kg/m² | −0.02 | −0.07 | −0.17 | −0.26 | 0.11 | 2.19 | 5.59 | 8.41 | 12.61 |
   | random | library | 3.09 | 3.13 | 2.81 | 2.98 | 4.27 | 6.74 | 9.87 | 14.78 | 21.55 |
   | random | fluid layer on an infinite limp plate | 1.27 | 2.80 | 4.23 | 5.84 | 7.95 | 10.86 | 14.24 | 18.27 | 25.02 |
+  | random | fluid layer on a finite limp plate (Davy's σ at `side` 3.52 m, as the library's wall) | 0.16 | 0.38 | 0.81 | 1.75 | 3.78 | 7.10 | 11.00 | 15.51 | 22.71 |
 
-  At random incidence the library adds more than the model below 125 Hz and less above. That row is not yet a clean
-  measure: the library's wall radiates as a finite panel (Davy's σ at `side` 3.52 m), the model's plate is infinite,
-  so the wall's radiation does not cancel in the difference at oblique incidence.
-- **Reproduce.** `QD_DIAG_RAY=1 ./build_linux/test_bin "Materials rig - a porous layer on a rigid wall*"` prints the
-  rows above.
+  With the finite plate the wall's radiation cancels in the difference: at random incidence the library adds
+  +2.93 / +2.75 / +2.00 / +1.23 / +0.49 / −0.36 / −1.13 / −0.73 / −1.16 dB more than the model (31.5 Hz–8 kHz), too
+  much at low frequency as at 0°, slightly too little above 1 kHz.
+- **The same mechanism in front of a pane** (2026-10-27): a curtain (3 mm of the rock-wool columns of the rig) on a
+  100 mm box of cavity air before a 4 mm pane (page 11.4 row, sheet at the box's exit). Reflection is right (7.1e-4
+  against the pane's half-space behind its pad). The insulation the curtain and box add, in dB:
+
+  | incidence | quantity | 31.5 | 63 | 125 | 250 | 500 | 1k | 2k | 4k | 8k |
+  | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+  | 0° | library | 0.35 | 0.28 | 0.30 | 0.55 | 1.28 | 1.65 | 0.73 | 1.00 | 1.69 |
+  | 0° | fluid layers on a limp plate of 10.0 kg/m² | 0.16 | 0.03 | 0.09 | 0.43 | 1.28 | 1.70 | 0.70 | 0.99 | 1.70 |
+  | random | library | 0.19 | 0.16 | 0.20 | 0.27 | 0.70 | 1.87 | 3.47 | 2.24 | 2.00 |
+  | random | fluid layers on a finite limp plate (side 1.35 m) | 0.12 | 0.02 | −0.00 | 0.10 | 0.68 | 1.69 | 2.05 | 2.55 | 4.30 |
+  | random | the layers alone in air (the loss paid on top of the pane's) | 0.72 | 0.71 | 0.71 | 0.71 | 0.74 | 0.84 | 1.14 | 1.80 | 3.04 |
+
+  At 0° the library is within 0.25 dB of the model. At random incidence the two estimates bracket where the result
+  should be; the library lies inside that band except +0.18 dB at 1 kHz, +1.42 dB at 2 kHz and −1.04 dB at 8 kHz.
+  Small for a curtain, but the same mechanism as the wall.
+- **Reproduce.** `QD_DIAG_RAY=1 ./build_linux/test_bin "Materials rig - a porous layer on a rigid wall*"` and
+  `"Materials rig - engine limits printed*"` (`ISSUE 1:`) print the rows above.
 
 ### 2. A band run near grazing can take the wrong bounce decision for a leaf on a box of air
 
@@ -87,7 +107,29 @@ marked checks are the regression list of the engine stage that fixes them.
   through `ray_progress` the exchange between the two bodies is followed as paths and depends on the gain floor
   (0.106 in reflection at −120 dB, 0.027 at −250 dB). Two bonded traced mass-law bodies deviate from the bonded plate
   by up to 2.0 dB at 16 kHz (0.05 dB at 1 kHz); the sheet | solid form is exact.
+- **A filled box in a wall** (2026-10-27): the same mechanism where a box of cavity air lies in front of a traced
+  porous fill (the precise drywall recipe: 12.5 mm board | 25 mm of air | 50 mm rock wool | 12.5 mm board at the
+  exit; panel absorbers with a fill). The sound bounces between the leaf and the fill face, and every bounce is a
+  path of its own. Transmission against the transfer matrix of the layers, largest per node:
+
+  | method | off by |
+  | --- | ---: |
+  | one straight path (`calc_diffraction_gain`) | 9.47 dB (100 Hz, 30°) |
+  | the traced paths, at most 10 interactions | 5.04 dB (100 Hz, 30°) |
+  | the traced paths, at most 60 interactions | 0.29 dB (63 Hz, 0°) |
+  | without the second board: one path / the traced paths (60) | 4.57 / 0.14 dB |
+
+  The scene tracer's LOS modes 2–6 drop the traced paths that arrive by transmission only and take the direct path
+  through a wall from the diffraction gain, so a scene's direct sound through a filled wall carries the one-path
+  miss; at the production cap of 20 to 30 interactions the traced paths are between the last two rows. Reflection
+  moves with the cap too: at 10 interactions the precise drywall recipe's octave absorption changes by up to 0.042
+  (0.23 per angle and tone), the MDF panel absorber with a fill by up to 8.2e-3.
+- **Affects.** Transmission through stud walls with a filled cavity drawn as the precise recipe, and through walls
+  with filled panel absorbers; reflection of filled cavities at a low bounce cap.
 - **Interim guideline.** Build stacks with the room-side layer as a sheet and the layers behind it as traced solids.
+  For insulation between rooms through a filled stud wall, use the lumped `drywall_filled*` rows, not the precise
+  recipe.
+- **Reproduce.** `QD_DIAG_RAY=1 ./build_linux/test_bin "Materials rig - engine limits printed*"` (`ISSUE 3:` rows).
 
 ### 4. Three or more bonded mass-law bodies: the state is one level deep
 
@@ -97,16 +139,28 @@ marked checks are the regression list of the engine stage that fixes them.
   state remembers only the body before the current one, so a traced plate re-forms its first face's absorption at its
   exit from that word alone; with three or more bodies the plate rule is paid within a bound, not exactly.
 - **Known size** (material page, section 13; engine notes 9.1): a plate of three or more bonded bodies pays its rule
-  within +3.02 / −3.01 dB; a wall with an ordered stack inside it is up to 3.01 dB from its traced twin. Not yet
-  measured on a plastered wall.
-- **Affects.** Plastered masonry if modeled as plaster sheets on both faces of a block; any bonded run of three
-  layers (a finish on a topping on a slab).
+  within +3.02 / −3.01 dB; a wall with an ordered stack inside it is up to 3.01 dB from its traced twin.
+- **Measured on a plastered wall** (2026-10-27; 13 mm plaster, 16.9 kg/m², on both faces of a 215 mm block,
+  396 kg/m², 430 kg/m² in all as Hopkins' wall, one `side` of 3.05 m): with the plaster as a sheet on the block's
+  front face and a sheet at its exit, every face is a two-face stack and the block carries the state: **exact**,
+  4.8e-5 dB per node against the bonded plate, also with unequal face absorptions. With the far plaster a traced
+  third body, random-incidence `tl` against the bonded plate, in dB:
+
+  | octave | 31.5 | 63 | 125 | 250 | 500 | 1k | 2k | 4k | 8k |
+  | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+  | library | 38.59 | 41.12 | 40.78 | 42.80 | 53.89 | 63.93 | 74.07 | 82.47 | 92.38 |
+  | bonded plate | 41.57 | 44.11 | 41.61 | 44.49 | 55.92 | 66.01 | 76.82 | 84.97 | 92.19 |
+  | Hopkins, measured (not fitted) | | 35.4 | 39.6 | 42.7 | 52.2 | 58.3 | 65.8 | 70.6 | |
+
+  Up to 6.56 dB per node (160 Hz, 89.1°). Exactness of the sheet form needs one `side` for the bonded run (page
+  rule 3): plaster at 3.05 m on concrete at 3.52 m is 0.80 dB off per node, a 4 mm pane on concrete 6.7 dB.
+- **Affects.** Bonded runs of three traced bodies (a finish solid on a screed solid on a slab solid); not plaster or
+  a finish drawn as sheets on a solid's two faces.
 - **Interim guideline.** The masonry rows of the material table are the finished wall, plastered on both faces, as
-  one row; a bonded floor is the slab and its screed as one solid with the finish solid on top; keep bonded runs to
-  two bodies.
-- **Planned fixture (phase 3).** The rig is extended to sheets behind a traced solid; plaster sheets on both faces of
-  a block solid are measured against the bonded plate of the three surface masses, with the measured plastered wall
-  (Hopkins, dense aggregate blocks 215 mm plastered on both faces) printed. The case carries `ISSUE 4:`.
+  one row; plaster sheets on both faces of a block solid are an equivalent recipe. A bonded floor is the slab and its
+  screed as one solid with the finish solid on top; keep traced bonded runs to two bodies.
+- **Reproduce.** `QD_DIAG_RAY=1 ./build_linux/test_bin "Materials rig - engine limits printed*"` (`ISSUE 4:`); the
+  sheet form is asserted in `"Materials rig - combinations*"`.
 
 ### 5. Three co-located faces: a rug on a leaf floor
 
@@ -116,15 +170,32 @@ marked checks are the regression list of the engine stage that fixes them.
   co-located faces form a stack; a third layer is a separate event"); a sheet | sheet pair is resolved only with air
   behind it. A third face in the same plane is resolved by whichever two faces the intersector reports. Making the
   leaf a traced solid instead gives two traced wave media back to back (issue 3).
-- **Known size.** Not measured for these stacks. The page's example of a wrong pair reads R 0.154 where the fluid
-  layers give 0.994 (material page, section 13); such rays are killed.
+- **Measured** (2026-10-27, a scratch probe of the rig; reflection against the fluid layers on the backing's
+  half-space behind its pad): a 10 mm rug (the glass-wool columns) on a 15 mm parquet sheet on 152 mm concrete is off
+  by up to 0.98 in R per node (25 Hz, 87.3°), octave α 0.42 where the layers give 0.005 at 31.5 Hz; a rug on a
+  12.5 mm board leaf on a 50 mm box of air is off by up to 0.96, octave α 0.48 against 0.03 at 31.5 Hz; both within
+  0.003 from 1 kHz. Which two of the three faces the engine pairs is not determined, so the size is not repeatable.
+  The recipe with the parquet as a traced finish solid is within 1.3e-2.
+- **A modeling limit, likely to stay.** The rig's stack rule refuses three co-located faces; there is no fixture.
 - **Affects.** Rugs on wooden floors on joists and on floating laminate, the common residential floors; any object
   standing on a sheet.
 - **Interim guideline.** Hard finishes (parquet, vinyl, tile) are thin traced solids, so a rug lies as a sheet on a
   solid; rugs on leaf floors are left out or drawn on a solid patch; objects stand on solids.
-- **Planned fixture (phase 3).** A sheet | sheet | solid self-check (a rug on parquet on concrete), then a stack rule
-  that refuses three co-located faces; a rug on a board leaf on a box, against the transfer matrix of the layers,
-  carries `ISSUE 5:`.
+
+### 6. A ray grazing a solid's face is relaunched onto the same face and gains energy
+
+- **Construction.** A closed box (1.0 × 0.5 × 2.0 m, a rigid mass-law row with `tf` 0.1) standing on a rigid floor,
+  plane waves from the upper hemisphere (the object-test probe of the rig, 2026-10-27).
+- **Physics.** A ray about 0.2° from grazing a face hits that face again at its own launch point at every
+  `ray_progress` call; each hit splits it into a reflected and a transmitted ray, so the ray count doubles per call
+  and the summed power grows.
+- **Measured.** One such ray: power 0.100 → 0.144 in six calls (rays 4 → 168), at the origin, not far from it as the
+  lost rays near grazing of page section 13. With a cap of 10 interactions the rays left over carry at most
+  2.3e-3 m² of an absorption area of 0.65 m² (0.4 %).
+- **Affects.** Any traced solid hit near grazing: objects, walls seen along their face; energy is created and the
+  path count grows with the cap.
+- **Interim guideline.** Keep the bounce cap (production runs at 20 to 30 interactions).
+- **Reproduce.** The object test of the rig (its own step) carries `ISSUE 6:` with the direction that triggers it.
 
 ## Modeling guidelines collected in step 3
 

@@ -69,8 +69,8 @@ Check every recipe against this list; the material list's recipes avoid them.
 | --- | --- | --- | --- |
 | three co-located faces (any three faces in one plane) | a rug sheet on a parquet, vinyl or tile sheet on a slab; a rug on a laminate or board leaf; an object standing on a rug or a finish sheet | reflection 0.154 where the fluid layers give 0.994 (page 13); such rays are killed | finishes as finish solids; cut the rug under objects; rugs on leaf floors are miss candidates (stage-2b issue 5) |
 | two mass-law sheets on one face | tile, vinyl or parquet on a screed sheet; a double glazing as two sheets | not allowed (rule 9; the rig refuses it) | the screed as a solid; glazing as one lumped sheet |
-| three or more bonded mass-law bodies | plaster sheets on both faces of a block solid; a finish on a bonded screed on a slab | within +3.02 / −3.01 dB (page 13; stage-2b issue 4) | the finished-wall masonry rows; slab and bonded screed as one solid, the finish solid on top |
-| a sheet at a traced solid's exit | plaster on the far face of a wall; the second leaf of a box window or a drywall recipe; a curtain's box ending on a glazing sheet | the engine supports it (page section 7); the rig cannot build it today | allowed; tested once the rig has it |
+| three or more bonded traced mass-law bodies | a finish solid on a bonded screed solid on a slab solid; plaster drawn as a traced body | within +3.02 / −3.01 dB (page 13); a plastered block with the far plaster traced −3.0 dB (stage-2b issue 4) | the finished-wall masonry rows, or plaster sheets on both faces of the block solid (exact at one `side`); slab and bonded screed as one solid, the finish solid on top |
+| a sheet at a traced solid's exit | plaster on the far face of a wall; the second leaf of a box window or a drywall recipe; a curtain's box ending on a glazing sheet | tested: a double leaf within 3.0e-3 dB, bonded runs within 2e-4 dB; a box of air in front of a fill is followed as paths (stage-2b issue 3: 5.0 dB in transmission at 10 interactions) | allowed; for insulation through a filled stud wall use the lumped rows |
 | two traced wave media back to back | a cushion on a sofa body; a person on a sofa; porous bodies touching | 4.9 dB off, transmission above one at 88° (stage-2b issue 3) | merge cushions into the body; keep porous bodies apart |
 | a free air space | a closed box of mass-law sheets (a casing); an air gap left open between a panel and the wall | up to 0.29 in reflection at 255 interactions (rule 9) | a hard box; a box of cavity air |
 
@@ -235,7 +235,7 @@ A furnished living room of 5 × 4 × 2.6 m, drawn with thickness **(proposed exa
 | floor | concrete slab with bonded screed as one box; parquet as a thin box on top | `concrete`, `parquet` | three bonded bodies avoided |
 | rug | one plane on the parquet solid, cut where the sofa stands | `carpet_tile_11mm` | three co-located faces avoided |
 | window | one plane in the wall opening | `glazing_double_24mm` | — |
-| curtain | a plane 100 mm in front of the window, a `cavity_air` box between | `curtain_pleated_0_8mm` | sheet at the box's exit (rig: not yet) |
+| curtain | a plane 100 mm in front of the window, a `cavity_air` box between | `curtain_pleated_0_8mm` | sheet at the box's exit |
 | ceiling | the slab above, as one box | `concrete` | — |
 | sofa | asset, standing on the parquet solid, cushions merged | `upholstery` (`sofa_3seat`) | porous bodies apart |
 | bookshelf | asset against a wall | `box_bookshelf` | — |
@@ -253,7 +253,8 @@ One line each, with the size measured.
 | A band near grazing takes the first frequency's bounce decision (issue 2) | reflection up to 1.073 at 0.15; 8.3e-4 in octave absorption | `thin_slab_threshold` 0 |
 | Two traced wave media back to back (issue 3) | 4.9 dB off at 16 Hz, transmission above one at 88° | room-side layer as a sheet, the rest traced |
 | Two bonded traced mass-law bodies (issue 3) | up to 2.0 dB at 16 kHz (0.05 dB at 1 kHz) | the outer layer as a sheet |
-| Three or more bonded bodies; the state is one level deep (page 13, stage-2b issue 4) | within +3.02 / −3.01 dB | the finished-wall masonry rows; keep bonded runs to two bodies |
+| Three or more bonded traced bodies; the state is one level deep (page 13, stage-2b issue 4) | within +3.02 / −3.01 dB; sheets on both faces of a solid are exact at one `side` | the finished-wall masonry rows or plaster sheets; keep traced bonded runs to two bodies |
+| A box of cavity air in front of a traced fill (stage-2b issue 3) | transmission 9.5 dB off on the direct path (LOS modes 2–6), 5.0 dB through the traced paths at 10 interactions | the lumped `drywall_filled*` rows for insulation between rooms |
 | A sheet between two bodies, three co-located faces (page 13) | reflection 0.154 where the fluid layers give 0.994 | make the middle layer a traced body (rule 10) |
 | Reversed face order of a co-located stack | reflection up to 0.999 different | check the face order after export |
 | A free air gap between objects (rule 9) | up to 0.29 in reflection at 255 interactions | a box of cavity air |
