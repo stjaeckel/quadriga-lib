@@ -1465,6 +1465,11 @@ Tolerances of `lsf_draw` values follow 5.0 (AVX2 kernel); the reason is stated i
 
 ### 5.3 `test_path_loss.cpp`
 
+Range limit of the TR-oracle points: only points inside the TR applicability range of each formula are compared
+with the rounding tolerances of 4.4.2 (d2D up to 5 km for UMa, UMi, RMa NLOS, SMa NLOS; 10 km for RMa LOS and SMa
+LOS). A break-point point (`0.5·dBP`, `2·dBP`) beyond this range is skipped, because the rounded constants are only
+accurate to the stated bound inside the range.
+
 TR oracle: Table 7.4.1-1 typed with `c = 3e8`, RMa `h = 5, W = 20`, SMa `h = 10, W = 10`, `hE = 1` for UMa/UMi (note 1
 with C = 0), RMa/SMa LOS `PL2 = PL1(dBP) + 40·lg(d3D/dBP)` with the 2D breakpoint distance, InF-DL `max(PL, PL_LOS,
 PL_InF-SL)`, SMa NLOS without max, the shadow-fading std of the table (RMa/SMa LOS 4 or 6 by the side of `dBP`). The

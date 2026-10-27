@@ -11,16 +11,17 @@
 // Pins down: all files are read by quadriga_lib::conf_file_read without ignored keys, pass the value
 // checks and have a positive definite LSP correlation matrix; the keys for the EoD offset and for the
 // ESD mean reproduce the formulas of 3GPP TR 38.901 v19.5.0; a set of table values that changed with
-// Release 19 or that belong to the new components.
+// Release 19 or that belong to the new components; the derived path-loss constants and the path-loss keys of
+// Table 7.4.1-1 (the path loss itself is verified in test_path_loss).
 // Left to other suites: the grammar and the value checks (test_conf_file_read).
 //
-// Oracles: the formulas and numbers of TR 38.901 v19.5.0 (Tables 7.5-6 to 7.5-12, 7.6.9-1, 7.6-13-1,
+// Oracles: the formulas and numbers of TR 38.901 v19.5.0 (Tables 7.4.1-1, 7.5-6 to 7.5-12, 7.6.9-1, 7.6-13-1,
 // 7.6.14.1.2-1/-2, 7.6.15-1, 7.6.3.1-2), typed into this file from the TR, independently of the files; the hall
 // and room dimensions of the InF calibration (Table 7.8-7, clause 7.8.4) and of the indoor office (Table 7.2-2).
 //
 // Conventions: QuaDRiGa uses elevation angles (+90 deg is up), the TR zenith angles. The EoD offset is
 // the ZOD offset of the TR with the opposite sign; spreads are the same in both conventions.
-// The key formulas are written out in this file. No library code evaluates them yet.
+// The key formulas are written out in this file, independently of the library functions that evaluate them.
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -488,58 +489,125 @@ TEST_CASE("conf files v19 - the InF delay spread follows the V/S rule of Table 7
 TEST_CASE("conf files v19 - path-loss constants of RMa and SMa follow Table 7.4.1-1")
 {
     // Oracle: the TR formula evaluated at the building height h and street width W that the file states in its
-    // comments (RMa: h = 5 m, W = 20 m; SMa: h = 10 m, W = 10 m). Constants are rounded to 3 decimals in the files.
+    // comments (RMa: h = 5 m, W = 20 m; SMa: h = 10 m, W = 10 m), with c = 3e8 m/s.
     //   LOS:  A1 = 20 + min(0.03 h^1.72, 10);  B = 20 log10(40 pi / 3) - min(0.044 h^1.72, 14.77);  D = 0.002 log10(h)
-    //         break point dBP = 2 pi hBS hUT fc / c: E = 2 pi / 0.3 with fc in GHz, hE = 0 (note 5)
+    //         break point dBP = 2 pi hBS hUT fc / c: E = 2 pi / 0.3 = 20 pi / 3 with fc in GHz, hE = 0 (note 5)
     //   NLOS: Bn = 161.04 - 7.1 log10(W) + 7.5 log10(h) - 3 * 43.42 + 4.97;  Dn = -24.37 + 3 * 3.1;  D2n = 3.7 h^2
+    // The files write the derived constants with 4 significant digits (SMa A1 with 5, where 4 digits would change
+    // the loss by more than 0.01 dB): RMa A1, B, Bn, E with 2 decimals, D with 6; SMa A1 with 3, B and E with 2.
+    // Each value equals the exact constant rounded to that many decimals: it has at most that many decimals, and
+    // it is within half a unit of the last digit (plus 1e-12) of the exact constant.
     const double pi = 3.14159265358979323846;
+    auto rounded = [](double file, double exact, int decimals)
+    {
+        const double s = std::pow(10.0, decimals);
+        const bool digits = std::abs(file * s - std::round(file * s)) < 1e-6;
+        return digits && std::abs(file - exact) <= 0.5 / s + 1e-12;
+    };
     QD_DIAG("\n# diag: conf files v19, derived path-loss constants\n");
     QD_DIAG("file,key,value,ref\n");
     for (const char *scen : {"RMa", "SMa"})
     {
-        const double h = std::string(scen) == "RMa" ? 5.0 : 10.0, W = std::string(scen) == "RMa" ? 20.0 : 10.0;
+        const bool rma = std::string(scen) == "RMa";
+        const double h = rma ? 5.0 : 10.0, W = rma ? 20.0 : 10.0;
         const double A1 = 20.0 + std::min(0.03 * std::pow(h, 1.72), 10.0);
         const double B = 20.0 * std::log10(40.0 * pi / 3.0) - std::min(0.044 * std::pow(h, 1.72), 14.77);
         const double D = 0.002 * std::log10(h), E = 2.0 * pi / 0.3;
         const double Bn = 161.04 - 7.1 * std::log10(W) + 7.5 * std::log10(h) - 3.0 * 43.42 + 4.97;
 
+        for (const char *suffix : {"_LOS", "_LOS_O2I"})
+        {
+            std::unordered_map<std::string, std::vector<double>> pl;
+            std::string model;
+            read_v19(std::string(scen) + suffix, &pl, &model);
+            INFO("file " << scen << suffix);
+            CHECK(model == "dual_slope");
+            REQUIRE((pl.count("A1") && pl.count("A2") && pl.count("B") && pl.count("C") && pl.count("D") && pl.count("E") && pl.count("hE")));
+            QD_DIAG("%s%s,A1,%g,%.6f\n%s%s,B,%g,%.6f\n%s%s,D,%g,%.9f\n%s%s,E,%g,%.6f\n", scen, suffix, pl["A1"][0], A1,
+                    scen, suffix, pl["B"][0], B, scen, suffix, pl["D"][0], D, scen, suffix, pl["E"][0], E);
+            CHECK(rounded(pl["A1"][0], A1, rma ? 2 : 3));
+            CHECK(pl["A2"][0] == 40.0);
+            CHECK(rounded(pl["B"][0], B, 2));
+            CHECK(pl["C"][0] == 20.0);
+            if (rma)
+                CHECK(rounded(pl["D"][0], D, 6));
+            else
+                CHECK(pl["D"][0] == 0.002); // exact for h = 10 m
+            CHECK(rounded(pl["E"][0], E, 2));
+            CHECK(pl["hE"][0] == 0.0);
+            if (std::string(suffix) == "_LOS")
+            {
+                CHECK(pl["sig1"][0] == 4.0);
+                CHECK(pl["sig2"][0] == 6.0);
+            }
+        }
+
+        for (const char *suffix : {"_NLOS", "_NLOS_O2I"})
+        {
+            std::unordered_map<std::string, std::vector<double>> pl;
+            std::string model;
+            read_v19(std::string(scen) + suffix, &pl, &model);
+            INFO("file " << scen << suffix);
+            CHECK(model == "nlos");
+            REQUIRE((pl.count("An") && pl.count("Bn") && pl.count("Cn") && pl.count("Dn") && pl.count("D2n") && pl.count("Fn") &&
+                     pl.count("G1n") && pl.count("G2n")));
+            QD_DIAG("%s%s,Bn,%g,%.6f\n%s%s,D2n,%g,%.5f\n", scen, suffix, pl["Bn"][0], Bn, scen, suffix, pl["D2n"][0], 3.7 * h * h);
+            CHECK(pl["An"][0] == 43.42);
+            CHECK(rounded(pl["Bn"][0], Bn, 2));
+            CHECK(pl["Cn"][0] == 20.0);
+            CHECK(std::abs(pl["Dn"][0] - (-24.37 + 3.0 * 3.1)) < 1e-9);
+            CHECK(std::abs(pl["D2n"][0] - 3.7 * h * h) < 1e-9);
+            CHECK(pl["Fn"][0] == -3.1);
+            CHECK(pl["G1n"][0] == -3.2);
+            CHECK(pl["G2n"][0] == 11.75);
+
+            // RMa NLOS is max(LOS, NLOS'), with the LOS constants of the LOS file; SMa NLOS has no LOS term in the
+            // TR: PL_LOSmax = 0 switches it off, and the keys of the LOS term are not written
+            if (rma)
+            {
+                REQUIRE((pl.count("A1") && pl.count("B") && pl.count("D") && pl.count("E")));
+                CHECK(rounded(pl["A1"][0], A1, 2));
+                CHECK(rounded(pl["B"][0], B, 2));
+                CHECK(rounded(pl["D"][0], D, 6));
+                CHECK(rounded(pl["E"][0], E, 2));
+                CHECK(pl.count("LOSmax") == 0);
+            }
+            else
+            {
+                REQUIRE(pl.count("LOSmax") == 1);
+                CHECK(pl["LOSmax"][0] == 0.0);
+                for (const char *k : {"A1", "A2", "B", "C", "E", "hE"})
+                    CHECK(pl.count(k) == 0);
+            }
+        }
+    }
+
+    // Break point of note 1 (UMa, UMi) and the LOS term of the InH and InF NLOS files: E = 4 / 0.3 = 40/3, written
+    // with 2 decimals as 13.33; UMa has the random environment height of note 1 (PL_hE_rand = 1); InF-DL takes the
+    // maximum with the InF-SL term 33 + 25.5 log10(d3D) + 20 log10(fc) as the additional term of the model "nlos"
+    for (const std::string &name : v19_names())
+    {
         std::unordered_map<std::string, std::vector<double>> pl;
         std::string model;
-        read_v19(std::string(scen) + "_LOS", &pl, &model);
-        INFO("scenario " << scen);
-        CHECK(model == "dual_slope");
-        REQUIRE((pl.count("A1") && pl.count("A2") && pl.count("B") && pl.count("C") && pl.count("D") && pl.count("E") && pl.count("hE")));
-        QD_DIAG("%s_LOS,A1,%g,%.5f\n%s_LOS,B,%g,%.5f\n%s_LOS,D,%g,%.6f\n%s_LOS,E,%g,%.5f\n", scen, pl["A1"][0], A1, scen,
-                pl["B"][0], B, scen, pl["D"][0], D, scen, pl["E"][0], E);
-        CHECK(std::abs(pl["A1"][0] - A1) < 0.5e-3);
-        CHECK(pl["A2"][0] == 40.0);
-        CHECK(std::abs(pl["B"][0] - B) < 0.5e-3);
-        CHECK(pl["C"][0] == 20.0);
-        CHECK(std::abs(pl["D"][0] - D) < 0.5e-4);
-        CHECK(std::abs(pl["E"][0] - E) < 0.5e-3);
-        CHECK(pl["hE"][0] == 0.0);
-        CHECK(pl["sig1"][0] == 4.0);
-        CHECK(pl["sig2"][0] == 6.0);
-
-        read_v19(std::string(scen) + "_NLOS", &pl, &model);
-        CHECK(model == "nlos");
-        REQUIRE((pl.count("An") && pl.count("Bn") && pl.count("Cn") && pl.count("Dn") && pl.count("D2n") && pl.count("Fn") &&
-                 pl.count("G1n") && pl.count("G2n") && pl.count("A1") && pl.count("B")));
-        CHECK((pl.count("E") == 1 && pl.count("hE") == 1)); // needed by the QuaDRiGa model also if the LOS term is off
-        QD_DIAG("%s_NLOS,Bn,%g,%.5f\n%s_NLOS,D2n,%g,%.5f\n", scen, pl["Bn"][0], Bn, scen, pl["D2n"][0], 3.7 * h * h);
-        CHECK(pl["An"][0] == 43.42);
-        CHECK(std::abs(pl["Bn"][0] - Bn) < 0.5e-3);
-        CHECK(pl["Cn"][0] == 20.0);
-        CHECK(std::abs(pl["Dn"][0] - (-24.37 + 3.0 * 3.1)) < 1e-9);
-        CHECK(std::abs(pl["D2n"][0] - 3.7 * h * h) < 1e-9);
-        CHECK(pl["Fn"][0] == -3.1);
-        CHECK(pl["G1n"][0] == -3.2);
-        CHECK(pl["G2n"][0] == 11.75);
-
-        // RMa NLOS is max(LOS, NLOS'); SMa NLOS has no LOS term in the TR, it is switched off in the file
-        if (std::string(scen) == "RMa")
-            CHECK(std::abs(pl["A1"][0] - A1) < 0.5e-3);
-        else
-            CHECK((pl["A1"][0] == 0.0 && pl["A2"][0] == 0.0 && pl["B"][0] == 0.0 && pl["C"][0] == 0.0));
+        read_v19(name, &pl, &model);
+        INFO("file " << name);
+        const std::string scen = name.substr(0, name.find('_'));
+        const bool nlos = name.find("NLOS") != std::string::npos;
+        if (scen == "UMa" || scen == "UMi" || ((scen == "Indoor" || scen == "InF") && nlos))
+        {
+            REQUIRE(pl.count("E") == 1);
+            CHECK(pl["E"][0] == 13.33);
+            CHECK(std::abs(pl["E"][0] - std::round(100.0 * 40.0 / 3.0) / 100.0) < 1e-12);
+        }
+        CHECK(pl.count("hE_rand") == (scen == "UMa" ? 1u : 0u));
+        if (scen == "UMa")
+            CHECK(pl["hE_rand"][0] == 1.0);
+        const bool dl = name == "InF_NLOS_DL";
+        CHECK(pl.count("Ax") == (dl ? 1u : 0u));
+        CHECK(pl.count("Bx") == (dl ? 1u : 0u));
+        CHECK(pl.count("Cx") == (dl ? 1u : 0u));
+        if (dl)
+            CHECK((pl["Ax"][0] == 25.5 && pl["Bx"][0] == 33.0 && pl["Cx"][0] == 20.0));
+        CHECK(pl.count("LOSmax") == (scen == "SMa" && nlos ? 1u : 0u));
     }
 }
