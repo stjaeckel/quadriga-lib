@@ -218,8 +218,10 @@ A floor of 4 × 5 m would be 4.47 m; on a heavy slab the effect is small (page 1
   mass per measured reference and the mass-shifted class envelope; a 0° comparison; a sheet glued at a traced solid's
   exit; a stack rule that refuses three co-located faces; one case per family (`Material - <family>`, several
   families joined by ` + `; the family is the name without `_<NN>mm`); Miki, Komatsu and Delany-Bazley written in the
-  test; a helper that rescales a lumped row with `fRef`. The object test follows as its own rig step, designed and
-  timed against the budget of about 0.3 s per case.
+  test; a helper that rescales a lumped row with `fRef`; the object test (a body on a rigid floor, plane waves from 16
+  directions of the upper hemisphere, about 65 rays each, octave tones 125 Hz–4 kHz, at most 10 interactions and 3
+  reflections, −60 dB floor: within 3 % of α·S for a hard box, equal to the chords for an absorbing volume, 0.24 s
+  CPU for three bodies).
 
 ### 1.11 Phase-3 start list (proposed)
 
