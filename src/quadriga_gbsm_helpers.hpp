@@ -71,9 +71,12 @@ static inline void qd_gbsm_check_fc(const arma::vec &fc)
 // - The keys that do not exist for SF (SF_mu, SF_gamma, SF_epsilon, SF_zeta, SF_alpha) count as 0, so the SF mean
 //   is 0. A frequency term with P_gamma = 0 (P_delta = 0) contributes 0 to mu (s)
 // - The constructor reads the coefficients and evaluates the frequency terms at 'fc' for the LSPs in 'lsps'
-//   (bit i = LSP i; the others are not evaluated and must not be queried). It throws std::invalid_argument if a
-//   frequency term of such an LSP is active (P_gamma or P_delta not 0) but P_omega + f' is not > 0, which would
-//   give a NaN mean and hide the NaN of the std in the limit at 0
+//   (bit i = LSP i; the others are not evaluated and must not be queried). It throws std::invalid_argument for
+//   such an LSP if a multiplying coefficient is not finite (P_sigma, P_gamma, P_delta, P_epsilon, P_zeta,
+//   P_alpha, P_kappa, P_tau, P_beta; ES_D_mu_A to ES_D_mu_D for ESD; P_omega of an active frequency term), since
+//   Inf·0 gives NaN, or if a frequency term is active (P_gamma or P_delta not 0) but P_omega + f' is not > 0, which
+//   would give a NaN mean and hide the NaN of the std in the limit at 0. P_mu and ES_D_mu_min are not checked
+//   (an infinite value gives no NaN)
 // - 'sp' must hold all keys (output of scenpar_validate), a missing key throws std::out_of_range; 'fc' in [Hz],
 //   finite and > 0 (not validated here)
 // - set_link() takes the geometry of one link, get() returns the values of one LSP and frequency for it
@@ -90,6 +93,13 @@ public:
             return (it == sp.end()) ? 0.0 : it->second;
         };
 
+        auto finite = [&](int i, const char *suffix)
+        {
+            if (!std::isfinite(key(i, suffix)))
+                throw std::invalid_argument("Scenario parameter '" + std::string(prefix[i]) + suffix +
+                                            "' must be finite.");
+        };
+
         const double fc_min = sp.at("LSP_fc_min");
         for (int i = 0; i < 8; ++i)
         {
@@ -100,13 +110,24 @@ public:
             c[i][6] = key(i, "_beta");
             if (((lsps >> i) & 1u) == 0u)
                 continue;
+            for (const char *suffix : {"_sigma", "_gamma", "_delta", "_epsilon", "_zeta", "_alpha", "_kappa", "_tau",
+                                       "_beta"})
+                finite(i, suffix);
+            if (i == 5)
+                for (const char *suffix : {"_mu_A", "_mu_B", "_mu_C", "_mu_D"})
+                    finite(i, suffix);
+            const bool active = p_gamma != 0.0 || p_delta != 0.0;
+            if (active)
+                finite(i, "_omega");
             for (arma::uword k = 0; k < fc.n_elem; ++k)
             {
                 const double arg = p_omega + std::max(fc[k] / 1.0e9, fc_min);
-                if ((p_gamma != 0.0 || p_delta != 0.0) && !(arg > 0.0))
+                if (active && !(arg > 0.0))
                     throw std::invalid_argument("Scenario parameter '" + std::string(prefix[i]) +
-                                                "_omega' plus the frequency in GHz must be > 0 where '" + prefix[i] +
-                                                "_gamma' or '" + prefix[i] + "_delta' is not 0.");
+                                                "_omega' plus the frequency in GHz must be > 0 where " +
+                                                (i == 2 ? "'SF_delta' is not 0." // SF has no key SF_gamma
+                                                        : "'" + std::string(prefix[i]) + "_gamma' or '" + prefix[i] +
+                                                              "_delta' is not 0."));
                 double s = p_sigma;
                 if (p_gamma != 0.0)
                     gamma_f[k * 8 + i] = p_gamma * std::log10(arg);

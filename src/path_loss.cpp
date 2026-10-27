@@ -153,14 +153,16 @@ Path loss and shadow-fading standard deviation of a set of links
   with the geometric distance, `sf = max(0, max(0, SF_sigma + SF_delta·lg(SF_omega + f')) + SF_kappa·lg(d) +
   SF_tau·lg(h) + SF_beta·lg(atan(h/d)))` with `d = max(d2D, 1e-4)`, `h = max(hBS, 1e-4)`,
   `f' = max(f, LSP_fc_min)`; for scenario files without such terms this is `SF_sigma`. Passing `sf_sigma` to
-  [[lsp_generate]] is then neutral. With `sf_sigma` requested, a frequency term with `SF_delta != 0` requires
+  [[lsp_generate]] is then neutral. With `sf_sigma` requested, `SF_sigma`, `SF_delta`, `SF_kappa`, `SF_tau`,
+  `SF_beta` must be finite, and a frequency term with `SF_delta != 0` requires a finite `SF_omega` and
   `SF_omega + f' > 0`
 - Validation: positions, `fc`, the lengths of `d2d_in` and `rnd_he`, their values, the model name, the
   parameters of the model in the order the model reads them (a required key that is missing throws
   `Path-loss model '<model>' requires the parameter '<key>'.`, naming `A1` for "A1 or A" and `E1` for "E1 or E";
-  every key that the model reads must have exactly one value; keys not read are ignored), the breakpoint factors
-  `E`, `E1`, `E2` (> 0) and `A1 != A2` of `winner_los`, then `scenpar` ([[scenpar_validate]], its messages pass
-  through), then the SF frequency term if `sf_sigma` is requested. All checks run before any output is written
+  every key that the model reads must have exactly one value, which must be finite; keys not read are ignored),
+  the breakpoint factors `E`, `E1`, `E2` and `G2n` of `nlos` (> 0) and `A1 != A2` of `winner_los`, then `scenpar`
+  ([[scenpar_validate]], its messages pass through), then the SF coefficients and frequency term if `sf_sigma` is
+  requested. All checks run before any output is written
 - The models are evaluated as written for any positive frequency, also outside their validity range
 - Outputs must not share memory with the inputs or with each other
 
@@ -230,7 +232,7 @@ void quadriga_lib::path_loss(const std::string &pl_model,
             if (!((*rnd_he)(l) >= 0.0 && (*rnd_he)(l) <= 1.0))
                 throw std::invalid_argument("Input 'rnd_he' must be in the range from 0 to 1.");
 
-    // Model
+    // Model, index into 'names'; the empty name is "no model"
     enum model_t
     {
         m_none,
@@ -245,31 +247,15 @@ void quadriga_lib::path_loss(const std::string &pl_model,
         m_nlos,
         m_satellite
     };
-    model_t model = m_none;
-    if (pl_model.empty())
-        model = m_none;
-    else if (pl_model == "constant")
-        model = m_constant;
-    else if (pl_model == "logdist")
-        model = m_logdist;
-    else if (pl_model == "logdist_simple")
-        model = m_logdist_simple;
-    else if (pl_model == "winner_los")
-        model = m_winner_los;
-    else if (pl_model == "winner_nlos")
-        model = m_winner_nlos;
-    else if (pl_model == "winner_pathloss")
-        model = m_winner_pathloss;
-    else if (pl_model == "dual_slope")
-        model = m_dual_slope;
-    else if (pl_model == "tripple_slope")
-        model = m_tripple_slope;
-    else if (pl_model == "nlos")
-        model = m_nlos;
-    else if (pl_model == "satellite")
-        model = m_satellite;
-    else
+    constexpr int n_model = m_satellite + 1;
+    const char *names[n_model] = {"", "constant", "logdist", "logdist_simple", "winner_los", "winner_nlos",
+                                  "winner_pathloss", "dual_slope", "tripple_slope", "nlos", "satellite"};
+    int m = 0;
+    while (m < n_model && pl_model != names[m])
+        ++m;
+    if (m == n_model)
         throw std::invalid_argument("Path-loss model '" + pl_model + "' is not supported.");
+    const model_t model = static_cast<model_t>(m);
 
     // Parameters, in the order the model reads them: 'opt' returns false if the key is absent, 'req' throws
     auto opt = [&](const char *key, double &val) -> bool
@@ -279,6 +265,8 @@ void quadriga_lib::path_loss(const std::string &pl_model,
             return false;
         if (it->second.size() != 1)
             throw std::invalid_argument(std::string("Path-loss parameter '") + key + "' must have one value.");
+        if (!std::isfinite(it->second[0]))
+            throw std::invalid_argument(std::string("Path-loss parameter '") + key + "' must be finite.");
         val = it->second[0];
         return true;
     };
@@ -313,11 +301,11 @@ void quadriga_lib::path_loss(const std::string &pl_model,
         positive(e_key, p.E);
     };
 
-    qd_pl_dual dual = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, false, false, false, 0.0, 0.0};
+    qd_pl_dual dual = {};
     double A = 0.0, B = 0.0, C = 0.0, D = 0.0, X = 0.0, SF = 0.0;
     bool has_SF = false;
     double w[21] = {}; // winner_los: A1, A2, B1, B2, C1, C2, D1, D2, E1, E2, F1, F2, sig1, sig2; winner_nlos: 21 keys
-    qd_pl_triple tri = {0.0, 0.0, 0.0, 0.0, 0.0, false};
+    qd_pl_triple tri = {};
     double nl[13] = {}; // An, Bn, Cn, Dn, D1n, D2n, D3n, En, E1n, E2n, E3n, Fn, G1n
     double G2n = 1.0, LOSmax = 1.0, Ax = 0.0, Bx = 0.0, Cx = 0.0, sig = 0.0, usePLa = 1.0;
     bool has_x = false, has_sig = false;
@@ -386,7 +374,8 @@ void quadriga_lib::path_loss(const std::string &pl_model,
         req(keys[0], nl[0]), req(keys[1], nl[1]);
         for (int i = 2; i < 13; ++i)
             opt(keys[i], nl[i]);
-        opt("G2n", G2n);
+        if (opt("G2n", G2n))
+            positive("G2n", G2n);
         opt("LOSmax", LOSmax);
         if (LOSmax != 0.0)
         {
@@ -410,8 +399,8 @@ void quadriga_lib::path_loss(const std::string &pl_model,
     std::unordered_map<std::string, double> sp = scenpar;
     quadriga_lib::scenpar_validate(sp, "legacy", nullptr, nullptr, true);
 
-    // Default shadow-fading std: the SF std of the LSP formula (only SF evaluated and checked)
-    qd_gbsm_lsp_stats sf_stats(sp, (sf_sigma != nullptr) ? fc : arma::vec(), 1u << 2);
+    // Default shadow-fading std: the SF std of the LSP formula (only SF evaluated and checked, only if requested)
+    qd_gbsm_lsp_stats sf_stats(sp, fc, (sf_sigma != nullptr) ? 1u << 2 : 0u);
 
     // UMa environment height of TR 38.901 Table 7.4.1-1, note 1, from a Uniform(0,1) value u
     // - d: 2D distance in [m], hUT: raw UT height in [m]

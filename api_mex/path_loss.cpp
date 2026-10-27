@@ -92,13 +92,15 @@ Path loss and shadow-fading standard deviation of a set of links
   SF_delta·lg(SF_omega + f')) + SF_kappa·lg(d) + SF_tau·lg(h) + SF_beta·lg(atan(h/d)))` with
   `d = max(d2D, 1e-4)`, `h = max(hBS, 1e-4)`, `f' = max(f, LSP_fc_min)`; for scenario files without
   such terms this is `SF_sigma`. Passing `sf_sigma` to [[lsp_generate]] is then neutral. With
-  `sf_sigma` requested, a frequency term with `SF_delta != 0` requires `SF_omega + f' > 0`
+  `sf_sigma` requested, `SF_sigma`, `SF_delta`, `SF_kappa`, `SF_tau`, `SF_beta` must be finite, and a
+  frequency term with `SF_delta != 0` requires a finite `SF_omega` and `SF_omega + f' > 0`
 - Validation: positions, `fc`, the lengths of `d2d_in` and `rnd_he`, their values, the model name,
   the parameters of the model in the order the model reads them (a required field that is missing
   raises `Path-loss model '<model>' requires the parameter '<key>'.`, naming `A1` for "A1 or A" and
-  `E1` for "E1 or E"; every field that the model reads must have exactly one value; fields not read
-  are ignored), the breakpoint factors `E`, `E1`, `E2` (> 0) and `A1 != A2` of `winner_los`, then
-  `scenpar` (as in [[scenpar_validate]], its messages pass through)
+  `E1` for "E1 or E"; every field that the model reads must have exactly one value, which must be
+  finite; fields not read are ignored), the breakpoint factors `E`, `E1`, `E2` and `G2n` of `nlos`
+  (> 0) and `A1 != A2` of `winner_los`, then `scenpar` (as in [[scenpar_validate]], its messages pass
+  through), then the SF coefficients and frequency term if `sf_sigma` is requested
 - The models are evaluated as written for any positive frequency, also outside their validity range
 
 ## Usage:

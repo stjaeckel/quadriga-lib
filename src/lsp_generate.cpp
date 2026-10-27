@@ -18,8 +18,11 @@ namespace
     // column-major double[64], by the coupled Newton-Schulz iteration on A / tr(A):
     //   Y = A / s, Z = I;  M = Z·Y, e = ||I - M||_F, T = (3·I - M) / 2, Y = Y·T, Z = T·Z  until e <= 1e-10
     //   (at most 100 iterations; the update computed with the final e is kept);  S = sqrt(s)·Y, symmetrized
-    // All eigenvalues of A / tr(A) lie in (0, 1), which is the convergence condition of the iteration
-    void qd_sqrtm8(const double *A, double *S)
+    // All eigenvalues of A / tr(A) lie in (0, 1), which is the convergence condition of the iteration. For a smallest
+    // eigenvalue at the rounding level it may be slightly negative in floating point: the iteration then stalls and
+    // diverges, so the iterate Y with the smallest e is kept and the iteration stops at a non-finite e
+    // - Returns false if S is not finite
+    bool qd_sqrtm8(const double *A, double *S)
     {
         // c = a·b for 8x8 matrices, column-major double[64]
         auto mul8 = [](const double *a, const double *b, double *c)
@@ -38,10 +41,12 @@ namespace
         for (int i = 0; i < 8; ++i)
             s += A[i * 9];
 
-        double Y[64], Z[64], M[64], T[64], tmp[64];
+        double Y[64], Z[64], M[64], T[64], tmp[64], Y_best[64];
         for (int i = 0; i < 64; ++i)
             Y[i] = A[i] / s, Z[i] = (i % 9 == 0) ? 1.0 : 0.0;
+        std::copy(Y, Y + 64, Y_best);
 
+        double e_best = std::numeric_limits<double>::infinity();
         for (int it = 0; it < 100; ++it)
         {
             mul8(Z, Y, M);
@@ -53,18 +58,30 @@ namespace
                 T[i] = 0.5 * (((i % 9 == 0) ? 3.0 : 0.0) - M[i]);
             }
             e = std::sqrt(e);
+            if (!std::isfinite(e))
+                break;
+            if (e < e_best)
+                e_best = e, std::copy(Y, Y + 64, Y_best);
             mul8(Y, T, tmp);
             std::copy(tmp, tmp + 64, Y);
             mul8(T, Z, tmp);
             std::copy(tmp, tmp + 64, Z);
             if (e <= 1e-10)
+            {
+                std::copy(Y, Y + 64, Y_best);
                 break;
+            }
         }
 
         const double r = std::sqrt(s);
+        bool finite = true;
         for (int j = 0; j < 8; ++j)
             for (int i = 0; i < 8; ++i)
-                S[j * 8 + i] = 0.5 * r * (Y[j * 8 + i] + Y[i * 8 + j]);
+            {
+                S[j * 8 + i] = 0.5 * r * (Y_best[j * 8 + i] + Y_best[i * 8 + j]);
+                finite = finite && std::isfinite(S[j * 8 + i]);
+            }
+        return finite;
     }
 }
 
@@ -92,7 +109,10 @@ Large-scale parameters of a set of links from normalized random values
   `s = max(0, P_sigma + P_delta·lg(P_omega + f'))`;
   `sigma = max(0, s + P_kappa·lg(d) + P_tau·lg(h) + P_beta·lg(a))`. The standard deviation is limited at 0 after
   all terms. SF has no mean keys (mean 0). A frequency term with the coefficient 0 contributes 0; an active one
-  (`P_gamma` or `P_delta` not 0) requires `P_omega + f' > 0` at every frequency
+  (`P_gamma` or `P_delta` not 0) requires `P_omega + f' > 0` at every frequency. The multiplying coefficients
+  (`P_sigma`, `P_gamma`, `P_delta`, `P_epsilon`, `P_zeta`, `P_alpha`, `P_kappa`, `P_tau`, `P_beta`,
+  `ES_D_mu_A` to `ES_D_mu_D`, `P_omega` of an active frequency term) must be finite; `P_mu` and `ES_D_mu_min` may
+  be infinite
 - DS with the V/S term of TR 38.901 Table 7.5-6 Part-3 (InF): if `DS_VS > 0`,
   `mu += lg(DS_VS_a·DS_VS + DS_VS_b)`. The InF files set `DS_VS` for the hall of their calibration scenario; a
   caller with another hall sets `DS_VS` (V/S in m) in its copy of `scenpar`
@@ -114,8 +134,9 @@ Large-scale parameters of a set of links from normalized random values
   randomness
 - Absolute TOA offset (TR 38.901 clause 7.6.9): active if `absTOA_mu > -30`, then
   `abs_toa = min(10^(absTOA_mu + absTOA_sigma·rnd(l, 8)), 2·absTOA_Lmax / c)` with `c = 299792458 m/s`, without
-  the bound if `absTOA_Lmax = 0`; 0 if not active. The InF and InH NLOS files set `absTOA_Lmax` to the largest
-  dimension of the hall or office of their calibration scenario; a caller with another hall sets the key
+  the bound if `absTOA_Lmax = 0` (`absTOA_sigma` must be finite); 0 if not active. The InF and InH NLOS files set
+  `absTOA_Lmax` to the largest dimension of the hall or office of their calibration scenario; a caller with another
+  hall sets the key
 - Ground permittivity with `U = rnd(l, 9)` and `f = fc / 1e9` (not limited by `LSP_fc_min`): dry ground
   `3 + j·0.003·f^1.34`, medium `30.4·f^-0.47 + j·0.18·f^1.05`, wet `31.3·f^-0.48 + j·0.63·f^0.77`; linear
   interpolation from dry (`U = 0`) to medium (`U = 0.5`) to wet (`U = 1`). The imaginary part is >= 0;
@@ -126,11 +147,14 @@ Large-scale parameters of a set of links from normalized random values
   `f'`, `d`, `h` as above: `e = EoD_offset_e + EoD_offset_e_gamma·lg f'`; if `EoD_offset_b > 0`:
   `e += 10^((EoD_offset_a + EoD_offset_a_gamma·lg f')·lg(max(EoD_offset_b, d)) + EoD_offset_c +
   EoD_offset_c_gamma·lg f' + EoD_offset_c_hUT·hUT)`; if `EoD_offset_hcl > 0` and `hUT < EoD_offset_hcl`:
-  `e += (atan((EoD_offset_hcl - h)/d) - atan((hUT - h)/d))·180/pi`
+  `e += (atan((EoD_offset_hcl - h)/d) - atan((hUT - h)/d))·180/pi`. The coefficients `EoD_offset_e`, `_e_gamma`,
+  `_a`, `_a_gamma`, `_c`, `_c_gamma`, `_c_hUT` must be finite
 - Optional outputs that are not requested are not computed. `n_link = 0` gives outputs with 0 rows
 - Outputs must not share memory with the inputs or with each other
 - Validation order: positions, `fc`, `rnd`, `sf_sigma`, `scenpar`, positive definiteness, column 9 of `rnd`, the
-  frequency terms; all checks run before any output is written
+  coefficients and frequency terms of the 8 LSPs, the `EoD_offset_` coefficients (if `eod_offset_deg` is
+  requested) and `absTOA_sigma` (if `abs_toa` is requested and active) finite; all checks run before any output is
+  written
 
 ## Declaration:
 ```
@@ -237,8 +261,8 @@ void quadriga_lib::lsp_generate(const std::unordered_map<std::string, double> &s
             for (int a = 0; a < 8; ++a)
                 Q[p[b] * 8 + p[a]] = L[b * 8 + a];
     }
-    else
-        qd_sqrtm8(R.memptr(), Q);
+    else if (!qd_sqrtm8(R.memptr(), Q))
+        throw std::invalid_argument("LSP cross-correlation matrix in 'scenpar' is not positive definite.");
 
     if (gr_eps_re != nullptr || gr_eps_im != nullptr)
     {
@@ -248,8 +272,21 @@ void quadriga_lib::lsp_generate(const std::unordered_map<std::string, double> &s
                 throw std::invalid_argument("Column 9 of 'rnd' must be in the range from 0 to 1.");
     }
 
-    // Mean and std per link, frequency and LSP; checks the frequency terms
+    // Mean and std per link, frequency and LSP; checks the coefficients and the frequency terms
     qd_gbsm_lsp_stats stats(sp, fc);
+
+    // Coefficients of the requested EoD offset and absolute TOA: an infinite value can give Inf·0 = NaN
+    auto finite = [&](const char *key)
+    {
+        if (!std::isfinite(sp.at(key)))
+            throw std::invalid_argument(std::string("Scenario parameter '") + key + "' must be finite.");
+    };
+    if (eod_offset_deg != nullptr)
+        for (const char *key : {"EoD_offset_e", "EoD_offset_e_gamma", "EoD_offset_a", "EoD_offset_a_gamma",
+                                "EoD_offset_c", "EoD_offset_c_gamma", "EoD_offset_c_hUT"})
+            finite(key);
+    if (abs_toa != nullptr && sp.at("absTOA_mu") > -30.0)
+        finite("absTOA_sigma");
 
     // Outputs
     auto size3 = [&](arma::cube *c)
