@@ -151,8 +151,10 @@ Interfaces
 Model rules
 
 - Spatial correlation of the LSF generators in the horizontal plane (2D) plus an optional floor ID; different
-  floors are uncorrelated (Table 7.5-6 note 3). 3D correlation is the legacy option (3.1, 3.2). The floor ID is
-  the caller's floor index of the UT (10.3).
+  floors are uncorrelated (Table 7.5-6 note 3). 3D correlation is the legacy option (3.1, 3.2); in 3D mode the
+  height separates the floors, so floor IDs are rejected there, and UTs on different floors are correlated by the
+  ACF of their height difference (per-link statistics are the same in both modes). The floor ID is the caller's
+  floor index of the UT (10.3).
 - ACF of the LSF generators: SOS preset `Comb256` by default (QuaDRiGa); the preset is an argument, `Exp256` gives
   the exponential ACF of the TR (eq. 7.4-5; clause 7.6.3.1). Reason: the TR gives the exponential ACF "with
   sufficient accuracy" as a fit, not as an exact requirement; its kink at zero distance makes the values evolve
@@ -267,11 +269,12 @@ namespace quadriga_lib
     // Draw the random phases of the large-scale generators of one BS site and scenario
     // - Generator order and reciprocity rules: see the LSF generator index above
     // - Bias removal over the positions in 'rx_pos' (and 'tx_pos' for dual mobility) when given and n_link > 2
+    // - TR 38.901 clause 7.4.4 literally: preset "Exp256", remove_bias = false
     void lsf_init_phases(const std::unordered_map<std::string, double> &scenpar, // Scenario parameters (decorrelation distances)
                          arma::cube &phase,                                      // Output: Phases in [rad], [n_coeff, 11, 2]; slice 0 = Rx side, slice 1 = Tx side
                          arma::sword seed = -1,                                  // Seed, -1 = system random device
                          const arma::mat *tx_pos = nullptr,                      // Optional: Tx positions, [1, 3] or [n_link, 3]
-                         const arma::mat *rx_pos = nullptr,                      // Optional: Rx positions of the drop (one floor) for the bias removal, [n_link, 3]
+                         const arma::mat *rx_pos = nullptr,                      // Optional: Rx positions for the bias removal (2D: one floor), [n_link, 3]
                          bool dual_mobility = false,                             // Tx and Rx both move: the Tx side is a second device
                          bool remove_bias = true,                                // Remove the sample mean over the positions
                          const std::string &preset = "Comb256",                  // SOS preset, see sos_preset
@@ -283,12 +286,13 @@ namespace quadriga_lib
     //   at the Tx-Rx distance
     // - Links with different floor IDs are uncorrelated at equal horizontal positions; equal IDs share one field
     // - Dual mobility: both devices of a link are on the link's floor
+    // - Floor IDs only in 2D mode: with horizontal = false the height separates the floors
     void lsf_draw(const std::unordered_map<std::string, double> &scenpar, // Scenario parameters (decorrelation distances)
                   const arma::cube &phase,                                 // Phases from lsf_init_phases, [n_coeff, 11, 2]
                   const arma::mat &tx_pos,                                 // Tx positions, [1, 3] or [n_link, 3]
                   const arma::mat &rx_pos,                                 // Rx positions, [n_link, 3]
                   arma::mat &rnd,                                          // Output: Random values, [n_link, 11]
-                  const arma::uvec *floor_id = nullptr,                    // Optional: Floor index per link, [n_link]; nullptr = all on one floor
+                  const arma::uvec *floor_id = nullptr,                    // Optional: Floor index per link, [n_link]; nullptr = all on one floor; 2D only
                   bool dual_mobility = false,                              // As in lsf_init_phases
                   const std::string &preset = "Comb256",                   // Must match lsf_init_phases
                   bool horizontal = true);                                 // Must match lsf_init_phases
@@ -574,15 +578,12 @@ namespace
     // Positions for the evaluation: R = rx_pos, T = tx_pos broadcast to n_link rows; z = 0 in 2D mode
     void qd_gbsm_positions(const arma::mat &rx_pos, const arma::mat &tx_pos, bool horizontal, arma::mat &R, arma::mat &T);
 
-    // Phase offsets of floor q, [n_coeff]: 2·pi·(q mod N)·n/N + psi_(q div N)(n)
-    arma::vec qd_gbsm_floor_offset(arma::uword n_coeff, arma::uword q);
-
     // Normalized values of a phase set at a set of links
     // - gen, freq, acf, dist, tab: generator table and frequency tables (qd_gbsm_lsf_generators, qd_gbsm_freq)
     // - phase [n_coeff, n_gen, 2]: slice 0 Rx side, slice 1 Tx side (mirror of slice 0)
     // - R, T [n_link, 3], n_link >= 1: positions from qd_gbsm_positions (T unused without dual mobility)
-    // - floor_id: [n_link] or nullptr (all on floor 0); the offsets go to both slices (both devices on the
-    //   link's floor)
+    // - floor_id: [n_link] or nullptr (all on floor 0); the offsets of 3.2.1 (a lambda inside, 'floor_offset') go
+    //   to both slices (both devices on the link's floor)
     // - val [n_link, n_gen]: column g Normal(0,1), or Uniform(0,1) (map 0.5·erfc(-x/sqrt(2))) if gen[g].uniform
     void qd_gbsm_eval(const std::vector<qd_gbsm_gen> &gen, const std::vector<arma::mat> &freq,
                       const std::vector<arma::vec> &acf, const std::vector<arma::vec> &dist,
@@ -598,9 +599,10 @@ namespace
 ```
 
 `qd_gbsm_eval` implements steps 3 to 6 of 3.2 for `n_gen` generators (`lsf_draw` copies `val` into `rnd`);
-`qd_gbsm_remove_bias` implements step 3 of 3.1 (the caller builds `U`); `qd_gbsm_floor_offset` implements 3.2.1.
-These functions are reused within the file or written for the SSF phase sets, so they are functions of the
-anonymous namespace, not lambdas. They group the `sos_val` / `sos_remove_bias` calls by frequency table (one call
+`qd_gbsm_remove_bias` implements step 3 of 3.1 (the caller builds `U`); the floor offsets of 3.2.1 are a lambda
+inside `qd_gbsm_eval` (15 lines, one caller; every phase set reaches it through `qd_gbsm_eval`). The other
+functions are reused within the file or written for the SSF phase sets, so they are functions of the anonymous
+namespace, not lambdas. They group the `sos_val` / `sos_remove_bias` calls by frequency table (one call
 per table and side with all phase columns that use it), so that a set with hundreds of generators at one
 decorrelation distance (the SSF sets) needs one call per table. A generator `g` with `mirror != g` is a pair
 member; pairs need no extra step (3.2 step 5).
@@ -651,11 +653,16 @@ over the positions is 0 (single mobility: over `rx_pos`; dual mobility: over the
 consequently the link mean of the `lsf_draw` values is 0 in single mobility, and in dual mobility for DS, KF, SF,
 XPR and TOA when all links have the same Tx-Rx distance (the normalization `1/sqrt(2 + 2·A(D))` is then the same
 for all links), while the ASD/ASA and ESD/ESA columns have a zero link mean only approximately (their two devices
-see different fields, each corrected over the union of the positions); bias removal over several floors: all positions in `rx_pos`
-are treated as one field (floor 0), because one phase correction per generator cannot zero the means of several
-floor fields at once; for a drop with several floors pass the positions of one floor (e.g.
-the links of floor 0) or set `remove_bias = false`, the fields of other floors keep their sample mean; `tx_pos` is
-ignored without dual mobility; uncorrected generators 9, 10.
+see different fields, each corrected over the union of the positions); bias removal over several floors in 2D
+mode: all positions in `rx_pos` are treated as one field (floor 0), because one phase correction per generator
+cannot zero the means of several floor fields at once; for a drop with several floors pass the positions of one
+floor (e.g. the links of floor 0) or set `remove_bias = false`, the fields of other floors keep their sample mean;
+in 3D mode (`horizontal = false`) there are no floor IDs (the height separates the floors, 3.2) and the correction
+covers all given positions as one 3D field; 2D and 3D mode give the same per-link statistics, and in 3D mode the
+LSPs of UTs on different floors are correlated by the ACF of their height difference, while TR 38.901
+(Table 7.5-6 note 3) assumes no correlation between floors; the TR-literal settings of clause 7.4.4 are
+`preset = "Exp256"` and `remove_bias = false`; `tx_pos` is ignored without dual mobility; uncorrected generators
+9, 10.
 
 Difference to QuaDRiGa (stated in section 10 and the release notes; not in the documentation block, which describes
 only the library's rule): `init_sos.m` removes the bias before the mirroring, and the mirroring overwrites the
@@ -677,7 +684,9 @@ taken, step 5), `qd_sos.m` `val`/`eval_mode`/`sos_eval`.
 **Validation**: 3.0.2 for `tx_pos`, `rx_pos`; `preset` known (`Input 'preset' is not a known preset.`);
 scenpar completed and validated (3.0.3); `phase` must be `[n_coeff, 11, 2]` with `n_coeff` of the preset:
 `Input 'phase' must have size [<n_coeff>, 11, 2] for preset '<preset>'.`; `phase` finite:
-`Input 'phase' must be finite.`; `floor_id` (if given) `n_link` elements.
+`Input 'phase' must be finite.`; `floor_id` (if given) `n_link` elements; `floor_id` given with
+`horizontal = false`: `Input 'floor_id' cannot be used with 'horizontal = false': in 3D mode the height separates
+the floors.` (also for IDs that are all 0; the MEX and Python wrappers pass an empty `floor_id` as `nullptr`).
 
 **Algorithm**
 
@@ -718,8 +727,8 @@ scenpar completed and validated (3.0.3); `phase` must be `[n_coeff, 11, 2]` with
      Normal(0,1).
 6. `rnd` `[n_link, 11]`: column g = `x_g` for g = 0..8; `0.5 · erfc(-x_g / sqrt(2))` for g = 9, 10.
 
-Steps 3 to 6 are `qd_gbsm_eval` (3.0.5) with the 11 LSF generators; the offsets of step 3 come from
-`qd_gbsm_floor_offset`.
+Steps 3 to 6 are `qd_gbsm_eval` (3.0.5) with the 11 LSF generators; the offsets of step 3 come from its
+`floor_offset` lambda (3.2.1).
 
 This is equivalent to the device modes of `sos_val` (two devices on one map for the self-mirrored generators, two
 maps with `freq_scale_b = lambda'_g / lambda'_m(g)` for the pairs) but evaluates each field with its own frequency
@@ -736,7 +745,9 @@ uncorrelated at equal horizontal positions (3.2.1), and the floor ID is the call
 the TR UT heights `hUT = 3(n_fl - 1) + 1.5` of Table 7.2-1, taken from TR 36.873: `floor_id = n_fl - 1`; outdoor
 UTs 0); precision: the sinusoids are evaluated with the AVX2 kernel where available (single-precision sin/cos,
 deviation below `4e-7 · sqrt(2 · n_coeff)`); `preset` and `horizontal` must be those of `lsf_init_phases` (a preset with the same `n_coeff`, e.g. `Exp256` for `Comb256`,
-cannot be detected).
+cannot be detected); 2D and 3D mode give the same per-link statistics; in 3D mode the height separates the floors
+(UTs on different floors are correlated by the ACF of their height difference, while Table 7.5-6 note 3 assumes no
+correlation between floors), so `floor_id` is rejected with `horizontal = false`.
 
 #### 3.2.1 Floor phase offsets
 
@@ -758,7 +769,7 @@ of a discrete cosine vanishes); for floors in different blocks it is a random nu
 (up to 0.11 to 0.16 for the 256-sinusoid presets, 0.07 to 0.10 for 1024, at lags of 0 to 60 m in 2D mode), the
 same level as for pseudo-random offsets; the documentation block states "uncorrelated at equal horizontal
 positions", not "independent". The same offsets serve both slices and all generators, so mirror relations and
-reciprocity are kept per floor. The offsets are `qd_gbsm_floor_offset` of 3.0.5 (anonymous namespace in
+reciprocity are kept per floor. The offsets are the `floor_offset` lambda of `qd_gbsm_eval` (3.0.5,
 `src/qd_gbsm_phases.cpp`).
 
 ### 3.3 `path_loss`
@@ -856,10 +867,13 @@ Formulas per link `l` and frequency `k` (`get_pl.m` line numbers in brackets):
 - **winner_pathloss** [280 to 289]: `pl = [A]·lg d3 + [B] + [C]·lg(f/5) + [X]`; `sf = [SF]` if present.
 - **dual_slope** [291 to 323]: `hE` = `[hE|0]`, or per link from 3.3.6 if `[hE_rand|0] != 0` and `rnd_he` is given;
   `hb = hBS; if hb < 1.1·hE: hb = 1.1·hE; if hb < 0.1: hb = 0.1`; the same for `hm` from `hUT` with the fixed hE,
-  but `hm = max(hUT, 0.1)` without the 1.1·hE clamp when hE is the random one of 3.3.6. Reason: the TR set of the
-  random hE ends at `hUT - 1.5`, so `hUT - hE >= 1.5` always holds, and the clamp would act at the TR UT heights of
-  floors 7 and 8 (hUT 19.5 m with hE 18 m, hUT 22.5 m with hE 21 m: `h'UT` 1.8 or 2.1 m instead of 1.5 m, the loss
-  beyond the breakpoint 1.4 or 2.6 dB too low). The clamp of `hb` stays: it never acts at the TR BS height of UMa
+  but `hm = max(hUT, hE + 0.1, 0.1)` instead of the 1.1·hE clamp when hE is the random one of 3.3.6. Reason: the
+  TR set of the random hE ends at `hUT - 1.5`, so `hUT - hE >= 1.5` always holds for a drawn height of 12 m or
+  more, and the 1.1·hE clamp would act at the TR UT heights of floors 7 and 8 (hUT 19.5 m with hE 18 m, hUT 22.5 m
+  with hE 21 m: `h'UT` 1.8 or 2.1 m instead of 1.5 m, the loss beyond the breakpoint 1.4 or 2.6 dB too low). The
+  draw also returns hE = 1 (always for hUT <= 13 m); `hE + 0.1` then equals the fixed-hE clamp of 1.1 m, so a UT
+  below 1.1 m gets the same loss with and without `rnd_he` (without any clamp `hm - hE <= 0` would put every
+  distance beyond the breakpoint, up to 22 dB too low at hUT 0.5 m). The clamp of `hb` stays: it never acts at the TR BS height of UMa
   (25 m > 1.1 · 21 m) and keeps `hb - hE` positive for a lower BS;
   `dBP = E·f·(hb - hE)·(hm - hE)`; `dBP3 = sqrt(dBP² + (hb - hm)²)`;
   `d2 <= dBP`: `pl = PL1(d3)`, `sf = [sig1]` if present; `d2 > dBP`: `pl = PL1(dBP3) + A2·lg(d3/dBP3)` with the
@@ -915,14 +929,16 @@ else:  j = min(floor((u - p1) / (1 - p1) · n), n - 1);  hE = 12 + 3·j
 `hUT = 20 m`); the other heights then have a probability below 1e-16, and without the rule `u = 1` would give
 `0/0` and a NaN path loss.
 
-The fixed `[hE]` is not used for such a link, and `hm` gets no 1.1·hE clamp (3.3.4). The value 1 m is the TR value
-(the v19 UMa files also have `PL_hE = 1`).
+The fixed `[hE]` is not used for such a link, and `hm` is clamped to `hE + 0.1` instead of `1.1·hE` (3.3.4). The
+value 1 m is the TR value (the v19 UMa files also have `PL_hE = 1`).
 
 `rnd_he` is column 10 of `lsf_draw`, a spatially consistent Uniform(0,1) value with the decorrelation distance
 `SF_lambda`. Along a track hE therefore switches between its discrete values wherever `u` crosses a threshold
 (`p1` itself varies with `d2D`), and beyond the breakpoint the path loss steps there (e.g. 3.7 dB between hE 1 m
-and 18 m at 1 GHz, d2D 300 m, hUT 20 m, hBS 25 m). This is the TR model (hE is a per-link draw); a caller that
-wants no steps along a track segment evaluates `rnd_he` once per segment (10.2).
+and 18 m at 1 GHz, d2D 300 m, hUT 20 m, hBS 25 m). The TR draws hE independently per link and gives no
+decorrelation distance; the library makes it spatially consistent in the sense of clause 7.6.3 with `SF_lambda`, so
+nearby UTs of a site share hE (the marginal distribution is the TR's). A caller that wants no steps along a track
+segment evaluates `rnd_he` once per segment (10.2).
 
 #### 3.3.7 Documentation block (must state)
 
@@ -931,7 +947,8 @@ The 10 models with their formulas or a pointer to the parameter names; the dista
 minimum outdoor distance; an entry `d2d_in = 0` marks an outdoor link, which keeps the geometric distance and gets
 no 10 m rule) and that the O2I loss is not added; that `dual_slope` uses the 3D breakpoint distance
 beyond the breakpoint, which differs from Table 7.4.1-1 for RMa and SMa LOS by at most 0.034 dB; the default
-`sf_sigma`; the random hE rule, without the 1.1·hE clamp of the UT height, and that the spatially consistent
+`sf_sigma`; the random hE rule, with the UT-height clamp `hE + 0.1` instead of `1.1·hE`, that hE is spatially
+consistent with `SF_lambda` (the TR draws it per link and gives no distance), and that the spatially consistent
 `rnd_he` makes hE and the path loss beyond the breakpoint step along a track (evaluate `rnd_he` once per segment to
 avoid this); the new keys `PL_hE_rand`, `PL_LOSmax`, `PL_Ax`, `PL_Bx`, `PL_Cx`; that
 `f` is not clamped; required keys, the one-value rule and the error for a missing key; `[n_link, n_freq]` sizes.
@@ -1064,7 +1081,9 @@ at 0, the V/S term
 (a caller with another hall sets `DS_VS`); both roots and the TR order; clipping; `sf_sigma`; same random values for all frequencies; the abs TOA
 rule and bound (the InF and InH NLOS files set `absTOA_Lmax` for the hall or office of their calibration
 scenario; a caller with another hall sets the key); the ground permittivity model and its sign convention, with the note that TR eq. (7.6-40) uses the
-opposite sign of the imaginary part (take the conjugate for the TR reflection formulas); the EoD offset formula and
+opposite sign of the imaginary part, and that the three ground types are QuaDRiGa's fits, not the models of TR
+Table 7.6.8-1 (very dry ground agrees, medium and wet differ; the caller computes the table values with
+eq. (7.6-40) to (7.6-42) if needed) (take the conjugate for the TR reflection formulas); the EoD offset formula and
 sign; that `sf_sigma` must be >= 0; that
 `rnd = zeros(n_link, 11)` gives the median LSPs and the `lsp_mu` / `lsp_sigma` outputs without randomness
 (replacement of `lsp_vals`, section 10).
@@ -1263,8 +1282,8 @@ land after the existing keys of the same paragraph.
 
 ```cpp
     // TR 38.901 v19.5.0: LOS/indoor state correlation distances, maximum indoor distance, InF delay-spread terms
-    {"LOS_state_lambda", 0.0, QD_NONNEG, -1, -1, 4, 2, "decorrelation distance of the LOS/NLOS state [m]; 0 = uncorrelated"},
-    {"IO_state_lambda", 0.0, QD_NONNEG, -1, -1, 4, 2, "decorrelation distance of the indoor/outdoor state [m]; 0 = uncorrelated"},
+    {"LOS_state_lambda", 0.0, QD_NONNEG, -1, -1, 4, 2, "decorrelation distance of the LOS/NLOS state [m], stated in the NLOS file of a scenario; 0 = not stated here"},
+    {"IO_state_lambda", 0.0, QD_NONNEG, -1, -1, 4, 2, "decorrelation distance of the indoor/outdoor state [m], stated in the O2I files of a scenario; 0 = not stated here"},
     {"O2I_d2D_in_max", 0.0, QD_NONNEG, -1, -1, 3, 4, "maximum indoor 2D distance of O2I UTs [m]; 0 = not stated"},
     {"DS_VS", 0.0, QD_NONNEG, -1, -1, 0, 1, "volume-to-surface ratio V/S of the hall [m]; 0 = no V/S term"},
     {"DS_VS_a", 0.0, QD_NONNEG, -1, -1, 0, 1, "factor a of the DS term log10(a V/S + b) [1/m]"},
@@ -1273,8 +1292,8 @@ land after the existing keys of the same paragraph.
 
 | Key | Meaning | Used by |
 |---|---|---|
-| `LOS_state_lambda` | Decorrelation distance of the LOS/NLOS state, Table 7.6.3.1-2 | caller (NG `set_scenario`), `sos_rand` |
-| `IO_state_lambda` | Decorrelation distance of the indoor/outdoor state, Table 7.6.3.1-2 | caller |
+| `LOS_state_lambda` | Decorrelation distance of the LOS/NLOS state, Table 7.6.3.1-2; one value for all links of a scenario, stated only in its NLOS file(s) (0 elsewhere = not stated here) | caller (NG `set_scenario`), `sos_rand` |
+| `IO_state_lambda` | Decorrelation distance of the indoor/outdoor state, Table 7.6.3.1-2; stated only in the O2I files of a scenario (0 elsewhere = not stated here) | caller |
 | `O2I_d2D_in_max` | Maximum indoor 2D distance, clause 7.4.3.1 | caller passes it as `d2d_in_max` of `o2i_loss` |
 | `DS_VS` | Reference V/S of the InF hall | `lsp_generate` (3.0.4) |
 | `DS_VS_a`, `DS_VS_b` | `mu_lgDS = DS_mu + lg(a · V/S + b)` | `lsp_generate` |
@@ -1450,6 +1469,26 @@ Comment changes in the path-loss sections:
 After Run 3a every v19 file reads without ignored keys, passes the value checks and keeps a positive definite
 correlation matrix (existing test).
 
+#### 4.4.3 Final review: absolute TOA of the O2I-LOS files, comments
+
+- UMa_LOS_O2I, UMi_LOS_O2I, RMa_LOS_O2I, SMa_LOS_O2I: a section "Absolute time of arrival offset" (`See: 3GPP TR
+  38.901 v19.5.0; Clause 7.6.9, Table 7.6.9-1`) before "Optional modelling components", with the three `absTOA_*`
+  lines of the matching NLOS_O2I file (UMa -7.4 / 0.2 / 50, UMi -7.5 / 0.5 / 15, RMa -8.33 / 0.26 / 50, SMa
+  -7.702 / 0.4 / 50) and the comment: an O2I link has no LOS ray (K-factor N/A in Table 7.5-6, `KF_mu = -100`), so
+  its impulse response is the NLOS form of TR eq. (7.6-43), which carries the offset. Reason: clause 7.6.9 gives
+  the offset for NLOS links; the O2I links of a LOS_O2I file are LOS only on their outdoor part. The absolute TOA is
+  thus active in all 9 NLOS and all 8 O2I files and off in the 6 LOS files.
+- All 23 files, after `SC_lambda`: the state distances of Table 7.6.3.1-2 apply to all links of a scenario and are
+  stated once, `LOS_state_lambda` in the NLOS file(s), `IO_state_lambda` in the O2I files; 0 in the other files
+  means "not stated here" (the key descriptions of 4.1 say the same).
+- UMa files: "hE = 1 m, or random for hUT > 13 m (note 1; ... the hE column of lsf_draw, index 10 counted from 0)".
+  RMa and SMa files: one sentence for the evaluation of the constants for h and W and their rounding; the SMa NLOS
+  files state that their constants are exact (h = W = 10 m).
+- SMa O2I files: the TR layout has 90 % residential and 10 % commercial buildings (Table 7.2-5), `o2i_loss` takes
+  one `d2d_in_max` per call, so the caller splits the UTs by building type (10 m / 25 m).
+- RMa_LOS, SMa_LOS: `SF_sigma = 5` is a legacy midpoint of the TR values 4 / 6 dB (`PL_sig1`, `PL_sig2`); TR
+  conformance needs the `sf_sigma` output of `path_loss` passed to `lsp_generate`.
+
 
 ## 5. Catch2 tests
 
@@ -1536,7 +1575,7 @@ Tolerances of `lsf_draw` values follow 5.0 (AVX2 kernel); the reason is stated i
 | marginal distributions | same grid, floor 0: columns 0..8 `abs(mean) < 0.05`, `abs(std - 1) < 0.05`; columns 9, 10 in [0, 1], `abs(mean - 0.5) < 0.015`, fraction below 0.1 within 0.015 of 0.1 | N(0,1), U(0,1) | 5 standard errors (0.01, 0.003, 0.003) |
 | the correlation follows the preset ACF | lambda 10 m, base grid as above, offsets 5, 10, 20 m in 4 directions: sample correlation within 0.1 of the `sos_preset` ACF at that distance (Comb256 and Exp256) | preset ACF table | 0.1 >= 5 standard errors (0.05) + directional SOS error (up to 0.045): the sample correlation converges to the ACF of the sinusoids along the offset direction, not to the table ACF (e.g. Comb256 at 10 m: 0.408 along x, 0.393 along y, against 0.368; Exp256 at 5 m along y: 0.572 against 0.607); stated in a comment |
 | sizes, empty input and pre-sized output | `n_link = 0` gives `[0, 11]` without an exception (single and dual mobility); a pre-sized `[n_link, 11]` output with stale content is overwritten; a wrong size is resized | — | exact |
-| input validation | sections: `phase` `[128, 11, 2]` with Comb256, `[256, 10, 2]`, `[256, 11, 1]`, NaN entry; unknown preset (`Input 'preset' is not a known preset.`); `rx_pos` 2 columns; Inf in `tx_pos`; `tx_pos` 2 rows for 3 links; `floor_id` length; negative `XPR_lambda` (`scenpar_validate` message) | — | — |
+| input validation | sections: `phase` `[128, 11, 2]` with Comb256, `[256, 10, 2]`, `[256, 11, 1]`, NaN entry; unknown preset (`Input 'preset' is not a known preset.`); `rx_pos` 2 columns; Inf in `tx_pos`; `tx_pos` 2 rows for 3 links; `floor_id` length; `floor_id` with `horizontal = false` (IDs 0, 1, 2 and all 0, single and dual mobility; output untouched; `nullptr` with `horizontal = false` runs); negative `XPR_lambda` (`scenpar_validate` message) | — | — |
 
 ### 5.3 `test_path_loss.cpp`
 
@@ -1572,7 +1611,7 @@ from the rounding of the constants.
 |---|---|---|---|
 | the v19 files reproduce TR 38.901 Table 7.4.1-1 | for every LOS, NLOS and O2I file: `pl` and `sf_sigma` at the points: UMa hBS 25, UMi hBS 10: hUT {1.5, 12}, fc {3.5, 28} GHz, d2D {15, 0.5 dBP', 2 dBP' if <= 5 km, 1000, 4500}; RMa hBS {35, 25}, hUT {1.5, 5}, fc {0.9, 3.5, 6}, d2D {50, 0.5 dBP, 2 dBP (LOS <= 10 km, NLOS <= 5 km), 4000}; SMa hBS {25, 35}, hUT {1.5, 4.5, 13.5}, fc {3.5, 20}, d2D {50, 0.5 dBP, 2 dBP, 3000}; InH hBS 3, hUT 1, fc {3.5, 28, 60}, d2D {1, 5, 20, 100}; InF hBS {1.5, 8}, hUT 1.5, fc {3.5, 28}, d2D {1, 5, 10, 30, 100, 500}. O2I files equal the outdoor TR formula at the geometric distance, `sf_sigma` the O2I value. A diagnostic counts the InF-DL points where the InF-SL term wins (> 0 asserted) | typed TR formulas | `tol_r` of the file (rounded constants, see above); RMa/SMa LOS terms beyond dBP: 0.035 dB + `tol_r` against the TR, `tol_r` against the 3D-breakpoint form (see above); `sf_sigma` exact |
 | O2I distances: geometric distance without d2d_in, outdoor distance with it | UMa NLOS file, hand-built links: the call without `d2d_in` equals the TR formula at the geometric distance (covered above); with `d2d_in` the typed formula at the outdoor distance of the geometry rule (`din = min(d2d_in, d2)`, `d3in = d3·din/d2`, outdoor `d3 - d3in` and `d2·(1 - d3in/d3)`); `d2d_in > d2D`; the 10 m minimum outdoor distance (d3D 15 m, `d2d_in` 12 m); `d2D = 0` with `d2d_in > 0`; `d3D = 0` (indoor fraction 0); `d2d_in = 0` equals the call without `d2d_in`, also at `d2D = 0` | typed legacy distance rule | 1e-12 dB |
-| UMa random hE follows the probability of TR note 1 | UMa LOS file, fc 0.05 GHz, hBS 25, hUT 20, d2D 400 m, K = 10000 links with `rnd_he = (k + 0.5)/K`: hE of each link identified by matching `pl` with the TR LOS formula for hE in {1, 12, 15, 18} (the candidates differ by > 0.01 dB, asserted first; more than twice the rounding bound 2.1e-3 dB of `PL_E`, so the nearest candidate is unique); count of hE = 1 equals `K/(1 + C)` within 1; counts of 12, 15, 18 equal `K·(1 - p1)/3` within 2; hUT 13.2 and hUT 10: all hE = 1; `rnd_he` omitted: hE = 1. Model `nlos`: the NLOS term of Table 7.4.1-1 is larger than the LOS term at most of these points, so the LOS term is observed through a plpar copy of the UMa NLOS file with `Bn = -1000` (the NLOS term never wins; the `nlos` code path with `hE_rand` is kept): with the same `rnd_he` its `pl` equals the TR LOS formula with the hE identified from the LOS file, link by link; the unmodified UMa NLOS file gives `max(PLn_TR, PL_LOS_TR(hE))` with that hE. TR UT heights of floors 7 and 8 (no 1.1·hE clamp of the UT height): hBS 25, hUT 19.5 and 22.5, fc 3.5 GHz, d2D 200 and 1000 m (both sides of d'BP = 490 m and 280 m), `rnd_he = p1 + (n - 0.5)/n · (1 - p1)` with `p1`, `n` of note 1 computed in the test, so that hE = 18 m and 21 m (h'UT = 1.5 m): `pl` equals the TR LOS formula with that hE for the UMa LOS file and for the `Bn = -1000` copy of the UMa NLOS file; the unmodified UMa NLOS file gives `max(PLn_TR, PL_LOS_TR(hE))` (the NLOS term wins there by 14 to 20 dB) | TR note 1 and Table 7.4.1-1 typed | match 2.1e-3 dB (`tol_r` of UMa: `PL_E = 13.33`); counts deterministic; floors 7 and 8: 2.1e-3 dB |
+| UMa random hE follows the probability of TR note 1 | UMa LOS file, fc 0.05 GHz, hBS 25, hUT 20, d2D 400 m, K = 10000 links with `rnd_he = (k + 0.5)/K`: hE of each link identified by matching `pl` with the TR LOS formula for hE in {1, 12, 15, 18} (the candidates differ by > 0.01 dB, asserted first; more than twice the rounding bound 2.1e-3 dB of `PL_E`, so the nearest candidate is unique); count of hE = 1 equals `K/(1 + C)` within 1; counts of 12, 15, 18 equal `K·(1 - p1)/3` within 2; hUT 13.2 and hUT 10: all hE = 1; `rnd_he` omitted: hE = 1. Model `nlos`: the NLOS term of Table 7.4.1-1 is larger than the LOS term at most of these points, so the LOS term is observed through a plpar copy of the UMa NLOS file with `Bn = -1000` (the NLOS term never wins; the `nlos` code path with `hE_rand` is kept): with the same `rnd_he` its `pl` equals the TR LOS formula with the hE identified from the LOS file, link by link; the unmodified UMa NLOS file gives `max(PLn_TR, PL_LOS_TR(hE))` with that hE. TR UT heights of floors 7 and 8 (no 1.1·hE clamp of the UT height): hBS 25, hUT 19.5 and 22.5, fc 3.5 GHz, d2D 200 and 1000 m (both sides of d'BP = 490 m and 280 m), `rnd_he = p1 + (n - 0.5)/n · (1 - p1)` with `p1`, `n` of note 1 computed in the test, so that hE = 18 m and 21 m (h'UT = 1.5 m): `pl` equals the TR LOS formula with that hE for the UMa LOS file and for the `Bn = -1000` copy of the UMa NLOS file; the unmodified UMa NLOS file gives `max(PLn_TR, PL_LOS_TR(hE))` (the NLOS term wins there by 14 to 20 dB). UT below 1.1 m (hUT 0.5 and 1.0 m, d2D 20, 50, 100, 300 m, `rnd_he` 0.3 and 0.99, 3.5 GHz): `pl` with `rnd_he` equals `pl` without it for the UMa LOS file and the `Bn = -1000` copy, and equals the reference `dual_slope` with hE = 1 and `hm = hE + 0.1` (before the breakpoint of 112 m for the three near links, beyond it at 300 m) | TR note 1 and Table 7.4.1-1 typed | match 2.1e-3 dB (`tol_r` of UMa: `PL_E = 13.33`); counts deterministic; floors 7 and 8: 2.1e-3 dB; hUT below 1.1 m: 1e-12 dB (with / without) and 1e-9 dB (reference) |
 | legacy models match the get_pl formulas | one SECTION per model with distinct parameter values, 4 links x 3 frequencies: constant; logdist with and without `SF`; logdist_simple; winner_los (links with different heights incl. < 1.5 m, both branches, breakpoint from each link's own heights, `C1 != C2` so that the second branch shows `C2`, continuity at the breakpoint for `F1 = F2`); winner_nlos (fc 1.0, 1.7, 2.5 GHz); winner_pathloss with `SF`; dual_slope (defaults A2, C, D; hE clamp 1.1·hE; both sides with `hBS != hUT`, so that the 3D breakpoint distance differs from the 2D one; sig1/sig2); tripple_slope (three regions, `E2` default, dBP1 > dBP2 case); nlos (all 13 terms non-zero, G2n default, `LOSmax` 0 and 1, `Ax/Bx/Cx`, `sig`); satellite (`usePLa` 1 at 1, 20.71, 33 and 150 GHz, `usePLa` 0, 600 km height, below the horizon gives +Inf) | model formulas typed in the test; zenith-attenuation table typed | 1e-10 dB |
 | distances below 0.1 m are clamped | co-located Tx and Rx give the loss at 0.1 m | typed | 1e-12 dB |
 | default sf_sigma follows the LSP formula | `SF_sigma 6, SF_delta 1.5, SF_omega 0.5, SF_kappa 0.3, SF_tau -0.2, SF_beta 0.1, LSP_fc_min 6`, fc 3 and 10 GHz, logdist model without `SF`; a second scenpar with `SF_sigma 1.4, SF_beta 1` (all other SF terms 0) and links at elevations 1 deg and 10 deg: `sf_sigma` 0 at 1 deg (the terms give -0.36), `1.4 + lg(a)` at 10 deg | LSP std formula typed, including both limits at 0 | 1e-12 |
@@ -1646,7 +1685,7 @@ there with an independent oracle.
 | `qd_gbsm_check_links`, `qd_gbsm_check_fc` | the validation cases of 5.1 to 5.6 (messages of 3.0.2) |
 | `qd_gbsm_lsp_stats` | 5.4 (formula with every term, frequency-term check), 5.3 (default `sf_sigma`, SF frequency-term check) |
 | `qd_gbsm_chol8` | 5.4 (TR-order root against a test-side Cholesky, not positive definite), existing conf tests (positive-definite flag of `qd_scenpar_xcorr`) |
-| `qd_gbsm_floor_offset` (file-local) | 5.2 (typed offset rule, zero correlation within a block) |
+| floor offsets (lambda `floor_offset` in `qd_gbsm_eval`) | 5.2 (typed offset rule, zero correlation within a block) |
 | `qd_gbsm_eval` (file-local) | 5.2 (`ref_sos`, two-device formulas, floors in single and dual mobility, uniform map) |
 | `qd_gbsm_remove_bias` (file-local) | 5.1 (zero drop mean with `ref_sos`, single and dual mobility, 2D/3D) |
 | symmetric square root (file-local) | 5.4 (`X·X = R`, symmetry, positive definite) |
@@ -1672,7 +1711,9 @@ there with an independent oracle.
   the values of the 6 keys per file (4.4.1),
   `LOS_state_lambda` and `IO_state_lambda` 0 in all other files; `absTOA_Lmax` 120 (InF_NLOS_SL, _DH,
   Indoor_NLOS) and 300 (InF_NLOS_DL, _SH) against L = max(length, width, height) of the halls typed from TR 7.8.4
-  and Table 7.2-2, 0 in all other files (the existing check `absTOA_Lmax == 0` for every file is changed); `test_conf_file_list.cpp`: include. MEX tests
+  and Table 7.2-2, 0 in all other files (the existing check `absTOA_Lmax == 0` for every file is changed); the
+  absolute TOA is active (`absTOA_mu > -30`) in every NLOS and every O2I file and off in the 6 LOS files, with the
+  values of the four LOS_O2I files equal to their NLOS_O2I files (4.4.3); `test_conf_file_list.cpp`: include. MEX tests
   `test_conf_file_read.m`, `test_scenpar_validate.m`, `test_conf_file_write.m` (166 -> 172 fields, field indices of
   the new keys; the `DS_VS` cross-key error through `scenpar_validate`); Python tests of the four functions call
   `quadriga_lib.gbsm.*`, counts 166 -> 172, the `DS_VS` cross-key error (`ValueError`), plus one check that
@@ -1728,7 +1769,8 @@ covers the checklist of SPEC_MATLAB_API "What every test covers" with these spec
   for 3 positions or more; errors: argument counts, unknown preset (C++ message `Comb999`), dual mobility without
   `tx_pos` (C++).
 - lsf_draw: `[n_link, 11]` double; z-independence in 2D, z-dependence with `horizontal = false`; `floor_id = []`
-  equals all zeros; `floor_id` with `-1`, `1.5` and `2^53` raise the wrapper error; `uint32` and `int64` floor IDs accepted; dual
+  equals all zeros; `floor_id` with `-1`, `1.5` and `2^53` raise the wrapper error; a non-empty `floor_id` with
+  `horizontal = false` raises the C++ error (also all zeros); `uint32` and `int64` floor IDs accepted; dual
   mobility swap of columns 4/5 (MATLAB 1-based) with swapped positions; `phase` of the wrong size raises the C++
   error.
 - path_loss: logdist via a hand-made `plpar` struct (`model = 'logdist'`, `A = 20`, `B = 30`, `C = 20`) at d3D =
@@ -1789,7 +1831,8 @@ loss, d2d_in, model_index = quadriga_lib.gbsm.o2i_loss( fc, rnd, models, weights
   flag of `lsp_generate` (tuple length 6 vs 7, `gr_eps.real == gr_eps_re`); `quadriga_lib.gbsm.conf_file_read` of a
   v19 file feeds `path_loss` and `lsp_generate` directly; `TypeError` for a missing mandatory argument and an
   unknown keyword; `ValueError` from C++ for an unknown path-loss model; every flag: `None` equals the default and
-  a non-bool value (e.g. 2.5) raises `TypeError`; clutter arguments `None` equal NaN.
+  a non-bool value (e.g. 2.5) raises `TypeError`; clutter arguments `None` equal NaN; `lsf_draw` with `floor_id`
+  and `horizontal=False` raises the C++ `ValueError` (also all zeros), `floor_id=None` with `horizontal=False` runs.
 
 
 ## 7. Implementation runs
@@ -1859,7 +1902,8 @@ Files: `src/quadriga_gbsm_helpers.hpp` (new: documentation block, `qd_gbsm_gen`,
 Steps (SPEC_CPP_API phases, without stops): declarations and stubs (section statement, first documentation block,
 outputs sized and zeroed), build; the helper header; the tests of 5.1 and 5.2; run against the stubs and record in
 the report which checks fail for the right reason; implement `lsf_init_phases`, then `lsf_draw` (the generic
-phase-set functions `qd_gbsm_remove_bias`, `qd_gbsm_eval`, `qd_gbsm_floor_offset` with the signatures of 3.0.5);
+phase-set functions `qd_gbsm_remove_bias`, `qd_gbsm_eval` with the signatures of 3.0.5; the floor offsets are a
+lambda in `qd_gbsm_eval`);
 iterate until green;
 final documentation blocks (3.1, 3.2); full suite.
 
@@ -1969,7 +2013,7 @@ to 12, 7.6.2, 7.6.3.1, 7.6.13 to 7.6.16. The small-scale step needs from the LSF
 | Per-frequency handling (7.6.5: same x, independent per-cluster shadowing) | `xpr_sos`, `pin_sos` per frequency | LSF: one `x` for all frequencies; SSF: own generators | provided for LSF |
 | Anchor-frequency LSPs of the alternative multi-frequency method (7.6.5.1: DS0, ASD0, ASA0, ZSD0, ZSA0 at e.g. 2 GHz) | — | `lsp_generate` with the anchor frequency added to `fc` (same `x`, so the anchor and the frequencies of interest are consistent); `clip_spreads` applies to the anchor as well, since 7.6.5.1 takes the spreads "according to Step 4", which includes the clipping | provided |
 | Path loss for step 12 | `get_pl` | `path_loss` | provided |
-| Spatially consistent cluster and ray variables (7.6.3.1: delays, shadowing, offsets, signs, coupling, XPR, phases; SC_lambda; same floor rule; mirrored for dual mobility) | `init_sos.m` lines 168 to 237 (`path_sos`, `xpr_sos`, `pin_sos`, `clst_dl_sos`) | **not** the LSF phase set (fixed 11 generators, `[n_coeff, 11, 2]`); the SSF port defines its own phase sets and evaluates them with `qd_gbsm_eval`, `qd_gbsm_floor_offset` and `qd_gbsm_remove_bias`, which Run 2a writes generically over the generator table (`qd_gbsm_gen`: lambda, distribution, mirror partner, bias flag) with the signatures of 3.0.5; the SSF functions that create and evaluate these sets are added to `src/qd_gbsm_phases.cpp`, so the machinery stays file-local there | requirement on Run 2a |
+| Spatially consistent cluster and ray variables (7.6.3.1: delays, shadowing, offsets, signs, coupling, XPR, phases; SC_lambda; same floor rule; mirrored for dual mobility) | `init_sos.m` lines 168 to 237 (`path_sos`, `xpr_sos`, `pin_sos`, `clst_dl_sos`) | **not** the LSF phase set (fixed 11 generators, `[n_coeff, 11, 2]`); the SSF port defines its own phase sets and evaluates them with `qd_gbsm_eval` (incl. its floor offsets) and `qd_gbsm_remove_bias`, which Run 2a writes generically over the generator table (`qd_gbsm_gen`: lambda, distribution, mirror partner, bias flag) with the signatures of 3.0.5; the SSF functions that create and evaluate these sets are added to `src/qd_gbsm_phases.cpp`, so the machinery stays file-local there | requirement on Run 2a |
 | Floor separation of cluster variables (7.6.3.3 last paragraph) | — | the floor offsets of 3.2.1 inside the generic evaluation, with the same per-UT floor IDs as `lsf_draw` (derived by the layout, 10.3) | requirement on Run 2a |
 | Seeds of the SSF phase sets, independent of the LSF set | `init_sos.m` (one seed per `qd_sos` object) | `sos_init_phases` fills column g independently of the number of generators, so an SSF set drawn with the builder's LSF seed would repeat the LSF phases in its first 11 columns and, at an equal decorrelation distance (e.g. `SC_lambda` 50 m and an LSF lambda of 50 m in UMa NLOS), reproduce the LSF fields. Rule: the SSF sets take the columns from 11 on of one `sos_init_phases(n_coeff, 11 + n_ssf, seed)` call with the builder's seed (columns 0 to 10 are the raw LSF phases), or use a seed derived from the builder seed by a fixed rule. The first form requires the `n_coeff` of the LSF set: the matrix is filled column by column from one random stream, so with another `n_coeff` the SSF columns would reuse parts of the stream of the LSF columns; SSF sets with another `n_coeff` use a derived seed. The builder therefore stores an explicit seed (drawn once when the caller passes -1) or the SSF phase cubes | requirement on the SSF port and NG |
 | Grouping of the evaluation by decorrelation distance | `xpr_sos`: clusters · (M + 1) · n_freq generators at one `SC_lambda` | `qd_gbsm_freq` builds one frequency table per distinct lambda with a generator-to-table index; the evaluation and the bias removal make one call per table (3.0.5) | requirement on Run 2a |
@@ -1999,8 +2043,8 @@ No public API was added for SSF readiness.
 - Lean code: reuse existing helpers (`qd_sos_rng`, `qd_sos_uniform`, `qd_interp_linear`, `qd_sos_preset_lookup`,
   `scenpar_validate`); a helper used once is a lambda, a helper used several times within one file is
   `static inline` or in an anonymous namespace, `src/quadriga_gbsm_helpers.hpp` only holds helpers used across
-  files (3.0.5). Exception: the generic phase-set functions `qd_gbsm_floor_offset`, `qd_gbsm_eval`,
-  `qd_gbsm_remove_bias` are anonymous-namespace functions with the signatures of 3.0.5 in
+  files (3.0.5). Exception: the generic phase-set functions `qd_gbsm_eval` (with the floor offsets as a lambda)
+  and `qd_gbsm_remove_bias` are anonymous-namespace functions with the signatures of 3.0.5 in
   `src/qd_gbsm_phases.cpp`, where the SSF port adds its phase sets.
 - No internal references in produced files: no IDs of planning decisions or review findings, no section numbers of
   this spec, no `md/` paths, no local paths (e.g. of the TR references folder) and no QuaDRiGa-NG line numbers in any
@@ -2041,22 +2085,93 @@ Starts after the merge into `main`; QuaDRiGa-NG (NG) becomes writable then. The 
 Copy the new quadriga-lib (as in the earlier ports: `external/`, the MEX `+quadriga_lib`), copy the 23 v19 conf
 files to `quadriga_src/config`.
 
+The library rejects the 1-D call form `quadriga_lib.interp( x, 0, data, xi )` (`Input 'yI' is required when 'y' is
+given (2D case).`, a fix already in `main`, not part of this port). NG must pass `[]` instead of `0` at three call
+sites in the same commit as the library update: `@qd_builder/get_pl.m` line 469 (satellite branch; moot once
+`get_pl` wraps `path_loss`) and `@qd_track/interpolate.m` lines 241 and 266. Without this, 29 of 129 NG unit tests
+fail in Octave (every test that interpolates a track); with it 28 of them pass, the 29th
+(`testLayout_Closed_Chan_Generation`) looks up its conf file relative to the current folder (pre-existing), and
+`testBuilder_parameter_generation` depends on the test order with the old and the new library alike.
+
 ### 10.2 Builder LSF
 
 The builder stores `lsf_phase` (`[n_coeff, 11, 2]`) instead of the 8 + 2 `qd_sos` objects in `sos`, `absTOA_sos`,
 `gr_sos` (`init_sos` LSF part replaced by `lsf_init_phases`; `copy`, `split_rx`, `split_multi_freq`, `add_paths`
-adapted); `gen_lsf_parameters`, `get_sf_profile`, `get_lsp_map` become thin wrappers of `lsf_draw` + `path_loss` +
+adapted, and every other site that stores, copies or clears the LSF state or reads `lsp_vals`:
+`@qd_layout/power_map.m` lines 185 and 191 (copies `.sos` of a template builder),
+`@qd_layout/private/get_channels_seg_unmerged.m` line 38, `add_sdc.m` lines 424, 431 to 447 and 580 to 590
+(`h_bld.sos = []`, four `lsp_vals` means, XPR mu and sigma), `qd_plan_mimo.m` lines 114 and 248,
+`gen_lsf_from_ssf.m` line 63, `qd_builder.m` lines 83 and 415 to 424 (`loadobj`: saved builders hold `qd_sos`
+objects and are migrated to `lsf_phase` with the rule of 10.4, `phase(:, g, 1) = sos(g).sos_phase(:, 1)`), and the
+public `lsp_vals` property); `gen_lsf_parameters`, `get_sf_profile`, `get_lsp_map` become thin wrappers of `lsf_draw` + `path_loss` +
 `lsp_generate`; `lsp_vals` is replaced by the per-link `lsp_mu` / `lsp_sigma` outputs where it is used (`add_sdc`,
 `gen_ssf_parameters`; call with `rnd = zeros` where no draw is wanted), or by their mean over the builder's links
 where a per-builder value is needed (no reference geometry reproduces `lsp_vals` for files with elevation terms,
 section 8); `get_pl` becomes a wrapper of `path_loss`.
-The builder passes the floor index of each UT (stored by the layout, 10.3) as `floor_id` to `lsf_draw`, on the drop
-positions and on every track position. It stores an explicit seed (drawn once if the user gives none) or the phase
+Floors: QuaDRiGa-NG has no multi-floor model today. The builders pass no floor IDs (all UTs on one floor), and the
+bias removal of `lsf_init_phases` covers all positions of the builder. Rule for a future multi-floor extension: the
+builder passes the floor index of each UT (stored by the layout, 10.3) as `floor_id` to `lsf_draw`, on the drop
+positions and on every track position, in 2D mode only (`floor_id` with `horizontal = false` is an error: the
+height separates the floors in 3D mode); the bias removal uses the floor-0 positions in 2D mode (when there are
+more than 2; else `remove_bias = false`) and all positions in 3D mode. The data path for that extension (no floor
+IDs and no legacy `d2d_in` reach the builder today): track `par` fields `floor_id` `[1, n_seg]` and `o2i_d2din`
+`[n_tx or 1, n_seg]` (replacing `o2i_d3din`), added to the fixed field list of `@qd_track/get_subtrack.m` (lines 72,
+151) and carried by `copy.m` (151, 181); a builder property `floor_id` `[1, n_rx]` filled in `init_builder` and
+carried by `copy`, `split_rx`, `split_multi_freq`, `add_paths` (positions from several builders) and the
+per-segment builders of `@qd_layout/private/get_channels_seg_unmerged.m`; the index `max(0, round((hUT - 1.5)/3))`
+for O2I UTs (an indoor UT below z = 0 would otherwise get a negative ID, which the MEX rejects), 0 otherwise. The
+`o2i_d2din` field is needed now for the legacy `d2d_in` of `path_loss`. The builder stores an explicit seed (drawn once if the user gives none) or the phase
 cubes, so that the SSF sets can be drawn independently of the LSF set (section 8). The random hE (`PL_hE_rand`,
 UMa) uses column 10 of `lsf_draw`; where steps of the path loss along a track segment are unwanted, the builder
 evaluates `rnd_he` once per segment, at its initial position, and uses it for all snapshots of the segment (3.3.6).
 The wrapper adds the O2I loss of the track once: today's `nlos` branch of `get_pl.m` adds it twice when the LOS term
 wins (once in the recursive `dual_slope` call, once at the end), and `path_loss` never adds O2I loss.
+
+`get_pl` keeps today's rule: without a track (`pow` <-> `gain`, `check_los`, `gen_lsf_from_ssf`,
+`get_los_channels`) it ignores the O2I loss and the indoor distance; with a track (`get_channels`) it adds the O2I
+loss of the track `par` and uses `d2d_in` in legacy mode. Changing this would change the `pow`/`gain` relation. The
+builder stores the hE value (`rnd(:, 11)` in MATLAB indexing, or all of `rnd`) per rx position, so that `get_pl()`
+and `get.pow` need no new draw; in TR mode `gen_lsf_parameters` also calls `path_loss` at the builder positions (for
+`sf_sigma`), with that `rnd_he`.
+
+Further integration notes:
+- Positions: NG stores them as columns (`[3, N]`), the library takes rows. One conversion helper serves all calls;
+  a missing transpose is rejected for N != 3 but silently accepted for N = 3, so the NG tests use exactly 3
+  positions at least once.
+- Empty builders (`init_builder` creates builders without rx positions): the MEX `lsf_draw`, `path_loss`,
+  `lsp_generate` reject `zeros(0, 3)` positions and `o2i_loss` rejects `zeros(0, 4)` (accepted restriction); the NG
+  wrappers `get_pl`, `get_sf_profile`, `get_lsp_map`, `gen_lsf_parameters` and the layout O2I call return empty
+  outputs for `n == 0` before calling the MEX.
+- `dual_mobility = -1` (NG's "unchecked" sentinel, `qd_builder.m` line 40) is read as `true` by the MEX:
+  `check_dual_mobility` runs before every library call.
+- `simpar.autocorrelation_function`: the wrapper maps the legacy names (`Comb300` ...) to presets with the regexp of
+  `qd_sos`; `'Disable'` maps to `Comb256` plus a scenpar copy with `SC_lambda = absTOA_lambda = 0` (0.1 m) for the
+  generators NG drew without spatial consistency.
+- The builder stores `preset` and `horizontal` with `lsf_phase` (a preset change with the same `n_coeff` is not
+  detected by the library). `lsf_draw` reads the decorrelation distances from `scenpar` at each call: changing the
+  scenpar lambdas after `lsf_init_phases` changes the fields and leaves the bias removal stale (document this in NG,
+  or store the lambdas too).
+- 3GPP-baseline mode (and `SC_lambda = 0`, `'Disable'`): NG draws the ground permittivity and the absolute TOA with
+  `rand` / `randn`; columns 9 and 10 (MATLAB) of `lsf_draw` are spatially consistent. Decide per mode; overwriting
+  these `rnd` columns before `lsp_generate` reproduces the old draws.
+- `get_lsp_map` passes `tx_position(:, 1)`: after `check_dual_mobility` `tx_position` is `[3, N]` for N > 1 and the
+  call would take the dual-mobility branch (pre-existing).
+- Without floor IDs the 2D correlation gives UTs stacked above each other identical LSPs (aerial UTs, D2D at
+  different heights, `get_lsp_map` at several `zc`): NG documents it; the legacy 3D mode is the alternative.
+- `power_map( ..., 'sf' )` (`power_map.m` lines 244 to 247, `get_los_channels.m` line 265) runs only `init_sos`,
+  `h_builder.sf` stays empty and the map has no shadow fading (pre-existing bug): the integration evaluates
+  `lsf_draw` + `lsp_generate` (+ `path_loss` for `sf_sigma`) on the grid.
+- Performance (R2026a, light probe at load 1.3 to 1.5, provisional): about 0.13 to 0.16 ms per MEX call with a full
+  scenpar struct; per link `lsf_draw` 1.2 µs, `path_loss` 0.14 µs, `lsp_generate` 0.2 to 0.27 µs; `lsf_init_phases`
+  0.14 ms (1.35 ms with bias removal over 1000 positions). In `get_channels` (lines 231, 338, 339, 415, 429 to 447)
+  `h_builder.pow(i_mobile, ...)` re-evaluates `get_pl` for all links inside the per-mobile loop (O(n²), as today):
+  cache `pow` and the builder-level PL before the loop; optionally batch `get_pl` / `get_sf_profile` of all mobiles
+  of a builder into one call.
+
+Builder state: `lsf_phase` `[n_coeff, 11, 2]`; the explicit seed (for the SSF sets of section 8); `preset` and
+`horizontal`; the hE value (or `rnd`) per rx position; `d2d_in` per rx position in legacy mode (from the track
+`par`); `dual_mobility` (never -1 at call time); later `floor_id` per rx position. `lsp_mu` / `lsp_sigma` are stored
+or recomputed with `rnd = zeros`.
 
 SF standard deviation: today the `sig`, `sig1` to `sig3` and `SF` keys of a path-loss model act only in the
 3GPP-baseline branch of `get_channels` (and in `get_los_channels`), which scales the SF by `scale_sf` of `get_pl`;
@@ -2087,9 +2202,12 @@ Changes against today that are not switchable and that NG documents:
   step 5); the values change in dual mobility.
 - Legacy O2I distance per link: `path_loss` computes the indoor 3D distance and the 10 m rule per link from
   `d2d_in`, while `gen_o2i_loss.m` computes `o2i_d3din` once at the start of each track segment and `get_pl.m`
-  applies it to every snapshot of the segment; equal at the segment start.
+  applies it to every snapshot of the segment; equal at the segment start. Reachable by the caller, not needed for
+  the parity test: pass `d2d_in(l) = d2D(l)·d3in_seg/d3D(l)`.
 - `sf_sigma` per link: `get_pl.m` averages `sf_sigma` over the snapshots of a segment (`use_track`); the library
-  returns it per link, which differs where a segment crosses a breakpoint with `sig1 != sig2`.
+  returns it per link, which differs where a segment crosses a breakpoint with `sig1 != sig2`. Reachable by the
+  caller, not needed for the parity test: average the `sf_sigma` of `path_loss` over the segment snapshots before
+  passing it to `lsp_generate`.
 - O2I links of `nlos` files: MATLAB returns `max(PLn, PL_LOS + o2i) + o2i`; the library gives
   `max(PLn, PL_LOS)` and the caller adds the O2I loss once.
 - `lsp_vals` has no library counterpart (section 8); this changes `add_sdc` and the XPR sigma of
@@ -2098,20 +2216,29 @@ Changes against today that are not switchable and that NG documents:
   flips the sign of the realization there. This affects NG files with `_kappa`, `_tau` or `_beta` terms at the
   links where it happens (e.g. satellite and 5G-ALLSTAR files at low elevation).
 - The InF and InH NLOS v19 files bound the absolute TOA by `2L/c` of their calibration hall (4.4.1).
+- The v19 LOS_O2I files of UMa, UMi, RMa and SMa carry the absolute TOA of their NLOS_O2I files (4.4.3).
+- InF-DH: NG's `set_scenario.m` (lines 660 to 665) uses the clutter density `r = 0.4`; the library default is 0.6
+  (TR Table 7.8-7). The legacy value is reachable with `r_clutter = 0.4`.
 
 ### 10.3 Layout
 
 `set_scenario` keeps a table group -> (LOS model name, member files, parameters) and calls `los_probability`; LOS
-and indoor state distances from `LOS_state_lambda`, `IO_state_lambda`; groups for the v19 set incl. SMa and InF-HH;
-NG's deprecated 3GPP_3D groups have no model name in the library (NG drops them or maps them to `38.901_UMi` /
-`38.901_UMa`). `gen_o2i_loss` is replaced by `o2i_loss` (models and weights from the group,
+and indoor state distances from `LOS_state_lambda` (read from the NLOS file of the group) and `IO_state_lambda`
+(read from an O2I file of the group); in the other files these keys are 0 = "not stated here"; groups for the v19
+set incl. SMa and InF-HH. NG's deprecated 3GPP_3D groups have no model name in the library: `3GPP_3D_UMi` maps to
+`38.901_UMi` (identical formula); `3GPP_3D_UMa` keeps its TR 36.873 formula in NG `set_scenario.m` (lines 352 to
+381; `g(d) = 1.25e-6·d²·exp(-d/150)` instead of 38.901's d³, C applied to indoor UTs only), the only p_LOS formula
+left there; the tutorials `calib_3GPP_3D_phase1.m` and `calib_3GPP_3D_phase2.m` stay unchanged. The O2I variables:
+NG draws them at the LOS-state distance (50 / 60 / 10 m, `set_scenario.m` lines 217 to 221), the library documents
+the distances of TR clause 7.6.3.3 (building type 50 m, d2D-in 25 m, sigma_P 10 m); decided in the integration of
+`gen_o2i_loss`. `gen_o2i_loss` is replaced by `o2i_loss` (models and weights from the group,
 `d2d_in_max = O2I_d2D_in_max`); the mmMAGIC model, the TR v14 high-loss wall and the legacy d2D-in distribution are
 deprecated and stay in MATLAB only if NG still needs them. Order: `o2i_loss` before `los_probability`,
 `d2d_out = max(d2D - d2d_in, 0)`; the layout stores `d2d_in` per UT, which the builder passes to `path_loss` in
-legacy mode (instead of today's d3D-in). The layout derives the floor index of each UT and stores it: for the TR UT
-heights `hUT = 3(n_fl - 1) + 1.5` (TR 38.901 Table 7.2-1, which takes them from TR 36.873) the index is
-`round((hUT - 1.5)/3)`, outdoor UTs get 0; the builder passes it to `lsf_draw` (10.2), and the SSF sets use the
-same IDs (section 8). An in-car option for UTs (`car`, `car_metal`). The renormalisation of the LOS-state draw stays
+legacy mode (instead of today's d3D-in; data path in 10.2). Future multi-floor extension (10.2): the layout derives
+the floor index of each UT and stores it: for the TR UT heights `hUT = 3(n_fl - 1) + 1.5` (TR 38.901 Table 7.2-1,
+which takes them from TR 36.873) the index is `max(0, round((hUT - 1.5)/3))` for O2I UTs, outdoor UTs get 0; the
+builder passes it to `lsf_draw` in 2D mode, and the SSF sets use the same IDs (section 8). An in-car option for UTs (`car`, `car_metal`). The renormalisation of the LOS-state draw stays
 in NG as a legacy option.
 
 ### 10.4 Parity test, in two parts
@@ -2141,6 +2268,10 @@ The phase cube for the library is built from the old generators: `phase(:, g, 1)
 mirroring. The parity runs without bias removal in the library (the phases come from MATLAB, already corrected by
 MATLAB's rule), so the bias-removal difference of 3.1 does not enter.
 
+The pre-integration code stores only `o2i_d3din`, not `d2d_in`; the reference script passes
+`d2d_in = d2D·d3din/d3D`. The library's legacy distance then equals MATLAB's at segment starts, including the 10 m
+rule and the clamp at 0 (`d3din = 0` gives `d2d_in = 0`, an outdoor link).
+
 ### 10.5 NG unit tests, tutorials, retired code
 
 All `xunit_new` tests pass in MATLAB R2024a and Octave; the calibration tutorials
@@ -2148,7 +2279,11 @@ All `xunit_new` tests pass in MATLAB R2024a and Octave; the calibration tutorial
 
 Retired MATLAB code (target): `gen_o2i_loss.m` except the deprecated parts NG keeps; the LSF part of `init_sos.m`;
 most of `gen_lsf_parameters.m`, `get_pl.m`, `get_sf_profile.m`, `get_lsp_map.m`; the p_LOS formulas in
-`set_scenario.m`; the `lsp_vals` property.
+`set_scenario.m` except the TR 36.873 UMa formula of `3GPP_3D_UMa` (10.3); the `lsp_vals` property.
+
+Unit tests that inspect internals are rewritten: `testBuilder_parameter_generation.m` lines 36 to 54,
+`testBuilder_add_clusters.m` lines 78 and 163, `testBuilder_gen_lsf_ssf.m` lines 15 to 53,
+`testBuilder_absTOA_model.m` line 31.
 
 
 ## 11. Appendix: tables
