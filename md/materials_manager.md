@@ -374,7 +374,42 @@ layer on a wall, band decision near grazing, two traced wave media back to back)
     and the ISSUE convention); manager check: no `ice` or `box_fridge` left, no private details, `check_docs.py` passes;
     section 5 of this file now points to the wish-list. Open: asphalt absorption and hollow-core doors have no data
     (research requests); several object row names marked proposed.
-  - **Phase 2 result:** draft 2 of both documents, for Stephan to commit. Next: the research requests (section 6 of
+  - Draft 3 committed by Stephan (be65346, 2026-10-26). Second independent review r02 started (brief
+    `md/materials/r02_phase2_review_brief.md`: draft 3 fresh, r01 decisions checked for consistent application, no
+    reopening of decisions without a concrete technical reason).
+  - r02 done 2026-10-26 (`md/materials/r02_phase2_review.md`): 16 findings, 9 for Stephan (1 rugs and objects on floor
+    finishes: three co-located faces; 3 ground rows by a passive Miki refit as the standard route; 4 stable ids for
+    research rows; 5 masonry references and the envelope across thickness; 6 bonded floors as three bodies; 7 how the
+    tolerance regimes combine; 8 which tier orders the work; 15 wood wool, blinds, clouds; 16 the roadmap against
+    D12). Manager checks: `src/ray_mesh_interact.cpp:2617` "At most two co-located faces form a stack; a third layer
+    is a separate event"; the reviewer's `d9scale.py` reproduces (double glazing: `tf` at 125 Hz 0.1124 → 0.1670,
+    `att` at 8 kHz 16.289 → 9.045 dB when only `fRef` is scaled), so the manager's D9 statement of 2026-10-26 was
+    wrong: every power-law coefficient must be rescaled with `fRef` (X·k^B); `db_passive.py` reproduces Delany-Bazley
+    needing a gain at 6 to 25 of 25 thirds at the class σ.
+  - **Decisions on r02 (Stephan, 2026-10-26):**
+    - F1 (b): hard floor finishes (parquet, vinyl, tile) are thin traced solids on the slab; a rug is a sheet on that
+      solid; objects stand on the finish solid. Three co-located faces are not resolvable, so only a sheet on a solid
+      or a sheet | sheet pair is allowed; into the modeling guidelines. Leaf floors (floating laminate, boards on
+      joists) under a rug stay misses (stage-2b).
+    - F3: ground rows by a Miki fit with passive columns to the class impedance, as the standard route.
+    - F4 (b): line numbers stay, pinned to the research commit 2dad906, remapped by script after a regeneration; a
+      stable id column goes to the research manager as an ISSUE with the hand-over package.
+    - F5 (a): masonry references = bare class walls plus the measured plaster increment of matched pairs (with its
+      spread); the envelope formed after a mass-law shift to the evaluated thickness; asserted where the trend miss
+      stays inside the tolerance, printed outside.
+    - F6 (a): slab and screed drawn as one solid of their full thickness, the finish on top (two bodies).
+    - F7: the four-line tolerance table confirmed (may move with more data).
+    - F8: order by the absorption tier, then impact, then the transmission tier (Stephan: the order matters less than
+      a complete table).
+    - F15: wood-wool panels added; blinds and ceiling clouds as recipes of existing rows.
+    - F16 (a): D12 governs the roadmap: concrete first as the rig check, then by the absorption tier and impact.
+    - D9 correction (no decision): every power-law coefficient is rescaled with `fRef` (X·k^B).
+  - Draft 4 written 2026-10-26 (wish-list 790 lines, guidelines 268, stage-2b 147 with issue 5: a rug on a leaf
+    floor); manager check: all r02 decisions present, the guidelines' worked room is a generic example (5 × 4 × 2.6 m,
+    proposed), no private details, `check_docs.py` passes. Side finding of the drafter: concrete 152 → 203 mm is
+    2.67 dB of mass law from the surface masses (draft 3 said 2.51 from the thickness ratio). Open: whether the
+    listening room's inventory stays a phase-2 deliverable (proposal: it moves to step 4, the reference simulation).
+  - **Phase 2 result:** the wish-list and the guidelines (draft 3 committed be65346; draft 4 after the second review). Next: the research requests (section 6 of
     the wish-list, plus the data errors of a01) go to the research manager; phase 3 starts in a new session.
   - **Engine issues for stage 2b** (Stephan, 2026-10-23): every engine miss found in step 3 becomes an issue in
     `md/acoustic_engine_stage2b_issues.md` (tracked, public) with the diagnostics a later engine stage needs, the
@@ -432,9 +467,8 @@ named for the construction (`glazing_4_16_4`).
 
 1. Phase 1: the rig (brief from the template's rig variant after Stephan's answers).
 2. Phase 2: the material list (analysis agents; the listening room's inventory with Stephan).
-3. Phase 3: materials in the order that settles the open rules early. Order for the first materials (Stephan): concrete (rig check), wood alone, carpet alone,
-   carpet on wood with diagnostics, judged and then fixed as a regression case; then the next material; common
-   combinations before the scene models of the next step.
+3. Phase 3: materials in the order that settles the open rules early. Order (D12, r02 F8 and F16, 2026-10-26): concrete first as the rig check, then by the absorption tier,
+   impact and the transmission tier, until every listed material is in.
 4. Phase 4: notes, page 11.4, corrected statements, README, cleanup.
 
 Leftovers of step 2 to settle where they fall: `tools/acoustic/band_probe.cpp` has no `attB` column (every fitted row

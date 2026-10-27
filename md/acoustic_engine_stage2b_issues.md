@@ -48,8 +48,8 @@ marked checks are the regression list of the engine stage that fixes them.
 - **Interim guideline.** Do not count porous treatment on a wall toward the insulation between rooms below about
   1 kHz; where it matters, fit the treated wall as one row (as page 11.4 does for lined walls), which loses the
   layer's angle-dependent absorption on the room side.
-- **Through the rig** (2026-10-23, `Materials rig - a porous layer on a rigid wall: reflection and the added
-  insulation`, 342.76271 m/s, one tone per third, 50 angles), the insulation the wool adds, in dB:
+- **Through the rig** (2026-10-23, `Materials rig - a porous layer on a rigid wall: the added insulation`,
+  342.76271 m/s, one tone per third, 50 angles), the insulation the wool adds, in dB:
 
   | incidence | quantity | 31.5 | 63 | 125 | 250 | 500 | 1k | 2k | 4k | 8k |
   | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -102,10 +102,29 @@ marked checks are the regression list of the engine stage that fixes them.
 - **Affects.** Plastered masonry if modeled as plaster sheets on both faces of a block; any bonded run of three
   layers (a finish on a topping on a slab).
 - **Interim guideline.** The masonry rows of the material table are the finished wall, plastered on both faces, as
-  one row; keep bonded runs to two bodies.
+  one row; a bonded floor is the slab and its screed as one solid with the finish solid on top; keep bonded runs to
+  two bodies.
 - **Planned fixture (phase 3).** The rig is extended to sheets behind a traced solid; plaster sheets on both faces of
   a block solid are measured against the bonded plate of the three surface masses, with the measured plastered wall
   (Hopkins, dense aggregate blocks 215 mm plastered on both faces) printed. The case carries `ISSUE 4:`.
+
+### 5. Three co-located faces: a rug on a leaf floor
+
+- **Construction.** A rug (a porous sheet) on boards on joists (a board leaf sheet on a box of cavity air) or on a
+  floating laminate (a leaf sheet on a traced underlay): two leaves, or a leaf and a fill, in one plane.
+- **Physics.** The engine forms each event from two co-located faces (`src/ray_mesh_interact.cpp:2617`: "At most two
+  co-located faces form a stack; a third layer is a separate event"); a sheet | sheet pair is resolved only with air
+  behind it. A third face in the same plane is resolved by whichever two faces the intersector reports. Making the
+  leaf a traced solid instead gives two traced wave media back to back (issue 3).
+- **Known size.** Not measured for these stacks. The page's example of a wrong pair reads R 0.154 where the fluid
+  layers give 0.994 (material page, section 13); such rays are killed.
+- **Affects.** Rugs on wooden floors on joists and on floating laminate, the common residential floors; any object
+  standing on a sheet.
+- **Interim guideline.** Hard finishes (parquet, vinyl, tile) are thin traced solids, so a rug lies as a sheet on a
+  solid; rugs on leaf floors are left out or drawn on a solid patch; objects stand on solids.
+- **Planned fixture (phase 3).** A sheet | sheet | solid self-check (a rug on parquet on concrete), then a stack rule
+  that refuses three co-located faces; a rug on a board leaf on a box, against the transfer matrix of the layers,
+  carries `ISSUE 5:`.
 
 ## Modeling guidelines collected in step 3
 
