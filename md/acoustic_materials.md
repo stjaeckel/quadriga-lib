@@ -105,8 +105,7 @@ findings are recorded as stage-2b issues in the meantime. A complete table matte
   the plate row (`gypsum_board_12_5mm`) and a leaf row `<material>_leaf_<NN>mm` (`gypsum_leaf_12_5mm`,
   `steel_leaf_1mm`).
 - **Names say what a modeler sees:** `curtain_flat_*`, `curtain_pleated_*`; `masonry_heavy`; `drywall_filled_125mm`.
-- **Every row is named,** object rows included. The preliminary row `concrete_cast_152mm` is a known exception until
-  it is redone as `concrete_150mm`.
+- **Every row is named,** object rows included.
 - **No combination rows.** Walls and floors are modeled first; rugs, curtains and absorbers are placed on them as
   separate rows. A combination is a rig test, and only where a measurement of the combination exists (section 3).
   Drywall and masonry rows are no combinations: each is the finished wall a modeler sees.
@@ -258,7 +257,7 @@ of section 3. R = laboratory sound reduction index; σ = flow resistivity.
 
 | # | name | intended use | recipe | A | T | valid | impact | status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1.1 | `concrete`, `concrete_150mm`, `concrete_200mm` | cast walls, slabs, ceilings; slab with bonded screed | solid of the full thickness (slab plus bonded screed) or sheet | 1 | 1 | 150–203 mm; R 125 Hz–4 kHz | high | in work |
+| 1.1 | `concrete`, `concrete_150mm`, `concrete_200mm` | cast walls, slabs, ceilings; slab with bonded screed | solid of the full thickness (slab plus bonded screed) or sheet | 1 | 1 | 150–203 mm; R 125 Hz–4 kHz | high | confirmed |
 | 1.2 | `masonry_heavy`, `masonry_heavy_150mm`, `_200mm`, `_250mm` | finished heavy wall plastered both faces (solid clay brick, dense block, sand-lime, about 1800–2400 kg/m³) | solid or sheet | 1 | 1 | about 140–241 mm (proposed from the trend); R 125 Hz–4 kHz | high | wish |
 | 1.3 | `masonry_hollow`, `masonry_hollow_100mm`, `_200mm` | finished hollow-unit wall plastered both faces (hollow clay brick, hollow block of any aggregate) | solid or sheet | 1 | 1 | about 90–200 mm, set in phase 3 by the same rule | high | wish |
 | 1.4 | `masonry_light`, `masonry_light_100mm`, `_150mm` | finished light wall, plastered (aircrete, expanded-clay and lightweight-aggregate solid units) | solid or sheet; 200 and 250 mm printed only | 1 | 1 | about 90–190 mm | medium | wish |
@@ -289,12 +288,15 @@ References and gaps:
 1.1 **Concrete.** (row) R: Litvin 228 (152 mm, 346.7 kg/m²), 229 (203 mm, 471.6 kg/m²); Mahn 369, 371. α: PTB#30
 1559 (Sabine, hard face), Nell 1730 (chamber boundary, from 31.5 Hz). Constants: Hopkins 374–376; Mahn η 370, 372.
 Line 229 minus 228: 1.7 / 0.8 / 2.1 / 1.6 / 1.6 / 2.7 dB (125 Hz–4 kHz), against 2.67 dB from the mass law of the two
-surface masses (script; 2.51 dB is the thickness ratio). Starting columns: the preliminary row `concrete_cast_152mm`
-in `data/materials_acoustic.csv` (page 11.4, fitted at 343 m/s to Litvin at side 3.5229 m): `fRef` 0.00019663, `a`
-3.85e-06, `e` 1901, `thk` 0.152, `att` 14.459, `attB` −0.086239, `m` 1, `resF` 0.068191, `resQ` 1.4354, `resS` −1,
-`coiF` 6.0529, `coiQ` 1.19, `tf` 0.00025486, `tfB` 0.52, `side` 3.5229; it is redone as `concrete_150mm` against the
-research Litvin values (42.1 / 46.5 / 52.6 / 56.5 / 61.7 / 64.6 dB, line 228). The fitted `coiF` corresponds to about
-6.9 kHz, while Hopkins' fc·h of 17.1 Hz·m (line 374) gives 114 Hz at 150 mm. Gaps: 63 Hz R; R outside 150–203 mm.
+surface masses (script; 2.51 dB is the thickness ratio). **Built (2026-10-27):** one generic solid and its two sheets,
+density 2281 kg/m³ (`e` 1901, Litvin 76-66), the face absorption one power law over PTB#30 and Nell (0.0204 at 1 kHz,
+exponent 0.3965), the mass-law knobs fitted at 342.76271 m/s to the mass-shifted Litvin pair at 150 and 203 mm. At side
+3.523 m the row is at most 0.27 dB outside the pair's envelope at both thicknesses, within 0.74 dB of 76-66 and
+2.14 dB of 76-77 (250 Hz, the spread of the pair itself); α within 0.015 of PTB#30 and 0.002 of Nell. `coiF` (4.4 kHz)
+and `att` are fit knobs: Hopkins' fc·h of 17.1 Hz·m (line 374) gives 114 Hz at 150 mm, and a plate with the physical
+coincidence and one constant loss factor misses the pair by 7–11 dB, because the measured loss factor falls from 0.04
+to 0.007 (Mahn 370, 372; stage-2b issue 7). Mahn 369, 371 (thirds at the octave centres, CON150 of unknown size) are
+printed only: 3 dB below the pair at 250 Hz, 9 dB above at 4 kHz. Gaps: 63 Hz R; R outside 150–203 mm.
 
 1.2 **Heavy masonry.** References (decided): the bare walls of the class plus the measured plaster increment, with
 its spread, for each missing plaster face. (row) bare walls: BIA 273 (95 mm), 1795 (SCR brick 140 mm), 1847 (203 mm),

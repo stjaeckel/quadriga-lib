@@ -56,7 +56,7 @@ walker without recursion (`lw::walk`).
 ```
 tools/acoustic/build_band_probe.sh /tmp/band_probe
 python3 -I tools/acoustic/grid_probe.py --probe /tmp/band_probe --csv data/materials_acoustic.csv \
-    --layer concrete_cast_152mm:sheet --grids 3072x12 192x6 50x1
+    --layer concrete_150mm:sheet --grids 3072x12 192x6 50x1
 ```
 
 - `--layer NAME:sheet|solid[:THK]`, room side first, as the rig builds stacks (sheets in the plane x = 0 in the order
