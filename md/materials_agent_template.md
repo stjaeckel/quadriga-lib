@@ -43,6 +43,12 @@ in the brief and return a short report.`
   commit. If a command cannot run, say so and stop.
 - Tier-1 references are independent physics written in the test, never library code or tools/acoustic/txlib.py.
 - No private details in tracked files (no rates, hours, money, personal circumstances; "the listening room").
+- Coding rules of md/SPEC_CPP_API.md: tests, code and tools cite only published material (the material-model page,
+  the Data Formats page, papers) and md/SPEC_*.md, never md/ working documents or tracking ids; tests use library
+  calls for supporting tasks; no Armadillo matrix products above 4x4 in tests (no BLAS in the test binary); a helper
+  used once is a lambda, cross-file helpers only in the rig header.
+- In a worktree: check `git log -1` first and fast-forward to the batch's HEAD; read untracked files (brief, baselines)
+  by absolute path in the main checkout; copy the report there with `cp`, or return its text.
 - No new items: side findings get a measured size and one line in the report, then they are dropped.
 - Scratch files in the session's scratchpad or build_linux/scratch; every number a decision rests on goes into the
   report.
@@ -118,7 +124,7 @@ early.
   <line, source key, property, coefficient type, bands, specimen side>; which are row references and which
   combination references (one measurement never fits two rows stacked in one model).
 - Rules that apply: md/acoustic_materials.md 1.3 (tiers, conversion budget), 1.6-1.8 (names, row design incl. the
-  fRef rescaling of lumped rows, side), 1.10 (procedure, ISSUE convention, tolerance table, thickness range);
+  fRef rescaling of lumped rows, side), 1.10 (procedure, engine-limit marks, tolerance table, thickness range);
   decided open rules in md/materials_manager.md section 6.
 - Open rules and engine issues this family meets: <none / which; the agent measures the options and stops>.
 - Tier-1 model: <plate rule / fluid-layer transfer matrix / Miki, Komatsu, JCA / leaf on a box / object test>, written
@@ -131,7 +137,7 @@ early.
    derived by the decided rule (fits bounded and densely sampled, selected on the evaluation grid).
 2. Measure and judge: the library through the rig against the independent model and against the converted
    measurements per octave; judged against the known range of measurements and models; an engine limit becomes an
-   `ISSUE <n>:` check with its size (for the manager's stage-2b entry), otherwise a regression guard; every deviation
+   `ENGINE LIMIT (<name>):` check with its size (for the manager's stage-2b entry), otherwise a regression guard; every deviation
    recorded with its size.
 3. The test case and the CSV rows (stop): one lean TEST_CASE per family reading its rows from
    data/materials_acoustic.csv, references with their source comments, a comment saying what "reasonable" meant; the

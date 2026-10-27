@@ -11,11 +11,12 @@ input, and the rig's cases become its regression tests.
 Each issue: what happens physically; how it was measured; the size; what it affects in typical rooms; the interim
 guideline; how to reproduce it.
 
-**ISSUE convention in the rig.** A comparison in the rig's test files (`tests/catch2_tests/test_acoustic_mat*`) that misses because
-of an engine limit listed here carries a comment `ISSUE <n>:` naming the issue below; it asserts nothing, and the
-measured and the reference values are printed in the case's diagnostics (`QD_DIAG_RAY=1`). Known engine issues
-therefore never make the suite fail; the comments (`grep "ISSUE "`) are the regression list of the engine stage that
-fixes them.
+**Engine-limit marks in the rig.** A comparison in the rig's test files (`tests/catch2_tests/acoustic_material_rig.hpp`,
+`test_acoustic_mat*`) that misses because of an engine limit listed here carries a comment
+`ENGINE LIMIT (<name>):` with the issue's name in its heading below (the code cites no document or number); it asserts
+nothing, and the measured and the reference values are printed in the case's diagnostics (`QD_DIAG_RAY=1`). Known
+engine issues therefore never make the suite fail; the marks (`grep "ENGINE LIMIT"`) are the regression list of the
+engine stage that fixes them.
 
 **Bounce cap.** Production scenes are traced with a cap of about 20 to 30 interactions per ray: a cavity that traps
 rays multiplies the paths at every bounce (each splits into reflection and transmission), and about 150 million traced
@@ -24,7 +25,7 @@ prints the reflection at that cap beside the uncapped one.
 
 ## Issues
 
-### 1. A porous layer on a rigid wall adds too much insulation at low frequency
+### 1. A porous layer on a rigid wall adds too much insulation at low frequency ("porous layer on a rigid wall")
 
 - **Construction.** 50 mm glass wool (the columns of page 11.3: Komatsu's model at a flow resistivity of
   13112 Pa·s/m²) as a sheet glued on 152 mm cast concrete (the preliminary row of page 11.4), sound from the wool side.
@@ -84,9 +85,9 @@ prints the reflection at that cap beside the uncapped one.
   should be; the library lies inside that band except +0.18 dB at 1 kHz, +1.42 dB at 2 kHz and −1.04 dB at 8 kHz.
   Small for a curtain, but the same mechanism as the wall.
 - **Reproduce.** `QD_DIAG_RAY=1 ./build_linux/test_bin "Materials rig - a porous layer on a rigid wall*"` and
-  `"Materials rig - engine limits printed*"` (`ISSUE 1:`) print the rows above.
+  `"Materials rig - engine limits printed*"` (`ENGINE LIMIT (porous layer on a rigid wall)`) print the rows above.
 
-### 2. A band run near grazing can take the wrong bounce decision for a leaf on a box of air
+### 2. A band run near grazing can take the wrong bounce decision for a leaf on a box of air ("band decision near grazing")
 
 - **Construction.** A 12.5 mm board (8.6 kg/m²) glued on a 25 mm box of air on a mass-law wall (page 10.4), one ray
   carrying a band of frequencies through `ray_progress` at the default `thin_slab_threshold` 0.15.
@@ -101,7 +102,7 @@ prints the reflection at that cap beside the uncapped one.
   times more at 0.15.
 - **Interim guideline.** Run acoustic scenes with `thin_slab_threshold` 0.
 
-### 3. Two traced wave media back to back on one straight path
+### 3. Two traced wave media back to back on one straight path ("wave media back to back")
 
 - **Construction.** Two wave-medium layers (glass wool | board) both traced as solids, glued face to face, through
   `calc_diffraction_gain` with one straight path.
@@ -136,9 +137,9 @@ prints the reflection at that cap beside the uncapped one.
 - **Interim guideline.** Build stacks with the room-side layer as a sheet and the layers behind it as traced solids;
   a leaf behind a box of air is a sheet at the box's exit, never a traced body. For insulation between rooms through a filled stud wall, use the lumped `drywall_filled*` rows, not the precise
   recipe.
-- **Reproduce.** `QD_DIAG_RAY=1 ./build_linux/test_bin "Materials rig - engine limits printed*"` (`ISSUE 3:` rows).
+- **Reproduce.** `QD_DIAG_RAY=1 ./build_linux/test_bin "Materials rig - engine limits printed*"` (`ENGINE LIMIT (wave media back to back)` rows).
 
-### 4. Three or more bonded mass-law bodies: the state is one level deep
+### 4. Three or more bonded mass-law bodies: the state is one level deep ("three bonded bodies")
 
 - **Construction.** A masonry block with plaster bonded on both faces: three mass-law bodies that move as one plate
   (the standard residential wall).
@@ -166,10 +167,10 @@ prints the reflection at that cap beside the uncapped one.
 - **Interim guideline.** The masonry rows of the material table are the finished wall, plastered on both faces, as
   one row; plaster sheets on both faces of a block solid are an equivalent recipe. A bonded floor is the slab and its
   screed as one solid with the finish solid on top; keep traced bonded runs to two bodies.
-- **Reproduce.** `QD_DIAG_RAY=1 ./build_linux/test_bin "Materials rig - engine limits printed*"` (`ISSUE 4:`); the
+- **Reproduce.** `QD_DIAG_RAY=1 ./build_linux/test_bin "Materials rig - engine limits printed*"` (`ENGINE LIMIT (three bonded bodies)`); the
   sheet form is asserted in `"Materials rig - combinations*"`.
 
-### 5. Three co-located faces: a rug on a leaf floor
+### 5. Three co-located faces: a rug on a leaf floor ("three co-located faces")
 
 - **Construction.** A rug (a porous sheet) on boards on joists (a board leaf sheet on a box of cavity air) or on a
   floating laminate (a leaf sheet on a traced underlay): two leaves, or a leaf and a fill, in one plane.
@@ -189,7 +190,7 @@ prints the reflection at that cap beside the uncapped one.
 - **Interim guideline.** Hard finishes (parquet, vinyl, tile) are thin traced solids, so a rug lies as a sheet on a
   solid; rugs on leaf floors are left out or drawn on a solid patch; objects stand on solids.
 
-### 6. A ray grazing a solid's face is relaunched onto the same face and gains energy
+### 6. A ray grazing a solid's face is relaunched onto the same face and gains energy ("grazing relaunch")
 
 - **Construction.** A closed box (1.0 × 0.5 × 2.0 m, a rigid mass-law row with `tf` 0.1) standing on a rigid floor,
   plane waves from the upper hemisphere (the object-test probe of the rig, 2026-10-27).
@@ -203,9 +204,9 @@ prints the reflection at that cap beside the uncapped one.
 - **Affects.** Any traced solid hit near grazing: objects, walls seen along their face; energy is created and the
   path count grows with the cap.
 - **Interim guideline.** Keep the bounce cap (production runs at 20 to 30 interactions).
-- **Reproduce.** `QD_DIAG_RAY=1 ./build_linux/test_bin "Materials rig - objects*"` (`ISSUE 6:`, the power per call).
+- **Reproduce.** `QD_DIAG_RAY=1 ./build_linux/test_bin "Materials rig - objects*"` (`ENGINE LIMIT (grazing relaunch)`, the power per call).
 
-### 7. A heavy wall's coincidence: one constant loss factor, a fixed coincidence frequency
+### 7. A heavy wall's coincidence: one constant loss factor, a fixed coincidence frequency ("heavy-wall coincidence")
 
 - **Construction.** Cast concrete walls 150–203 mm (the `concrete` rows), and any heavy generic solid drawn at another
   thickness.

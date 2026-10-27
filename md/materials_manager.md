@@ -17,7 +17,8 @@ rows come next, in batches with parallel agents (Stephan, 2026-10-27; plan below
 **Commits of step 3:** 5be85fb (manager file, agent template), 13e4e45 (the rig, `data/materials_acoustic.csv` with
 one preliminary row, `band_probe` with 26 columns, `grid_probe.py`), 19323d9 / be65346 / bd0a170 (the wish-list and
 the guidelines, drafts 2–4, after two independent reviews), 69a4555 / e5d3743 / e578aee / 5081648 (the rig
-extension, its two review rounds, the object test).
+extension, its two review rounds, the object test), a97c4ae (batch 0: the `concrete` rows, the rig in a header). The
+`fixes` branch (the large-scale model port) was merged into `main` afterwards (7e9fe61, v0.12.4 26da9f9).
 
 **The three step-3 documents** (tracked, public, no private details):
 - `md/acoustic_materials.md`, the wish-list: six classes (structural, hard furnishing, soft furnishing, complex
@@ -30,7 +31,8 @@ extension, its two review rounds, the object test).
 - `md/acoustic_modeling_guidelines.md`: how a venue is modeled (solids and sheets, Blender names and `csv_strict`, the
   checklist of forbidden and limited configurations: three co-located faces are not resolvable, only a sheet on a
   solid or a sheet | sheet pair; at most two bonded rigid bodies; objects as hard boxes or porous bodies; assets).
-- `md/acoustic_engine_stage2b_issues.md`: engine issues 1–5 with sizes and reproductions, and the ISSUE convention.
+- `md/acoustic_engine_stage2b_issues.md`: engine issues 1–7 with names, sizes and reproductions, and the engine-limit
+  marks (`ENGINE LIMIT (<name>):` in the code, since 2026-10-27; earlier log entries say `ISSUE <n>`).
   Engine findings are recorded there, never fixed in step 3.
 
 **The rig:** `tests/catch2_tests/test_acoustic_materials.cpp` (namespace `mt`; size and counts in the State line
@@ -44,8 +46,9 @@ and the table case stay in `test_acoustic_materials.cpp`; material cases go in `
 `heavy`, `porous`, `plates`, `floors`, `leaves`, `resonant`, `objects`, `ground`). `data/materials_acoustic.csv` holds
 the `concrete` family (batch 0).
 
-**Baselines** (generic `build_linux`, at 5081648, the rig with the object test): `[wave]` 163474 / 178,
-`[acoustic]` 43021 / 70 (the rig included), whole suite 1347137 / 1313. Files `test_wave.txt`, `test_acoustic.txt`,
+**Baselines** (generic `build_linux`, at 26da9f9, v0.12.4 after the merge): `[wave]` 163474 / 178,
+`[acoustic]` 43191 / 70 (the rig included), whole suite 1354225 / 1384 (1385 in the merge notice; the generic build
+leaves out one build-option case). Files `test_wave.txt`, `test_acoustic.txt`,
 `test.txt` in the repository root (untracked).
 
 **Research:** the hand-over of 2026-10-27 (`md/materials/research_request_2026-10-27.md`: request 0 stable row ids,
@@ -62,9 +65,9 @@ Everything the documents need before material 1:
 2. a specimen side per measured reference, and the class envelope shifted to the evaluated thickness by the mass law;
 3. a 0° (normal-incidence) tier-2 comparison;
 4. a sheet glued at a traced solid's exit (double leaf, curtain at a window, drywall precise recipe) and the issue-4
-   fixture: plaster sheets on both faces of a block solid against the bonded plate, marked `ISSUE 4:`;
+   fixture: plaster sheets on both faces of a block solid against the bonded plate, marked as an engine limit;
 5. a stack rule that refuses three co-located faces (measured in a probe; no self-check case, no opt-out);
-6. the ISSUE marks (a comment `ISSUE <n>:`, no assertion, the values printed) and the regression guard of the
+6. the engine-limit marks (a comment `ENGINE LIMIT (<name>):`, no assertion, the values printed) and the regression guard of the
    tolerance table (a `Measured` row of the library's own octaves);
 7. one test case per row family accepted by the table case;
 8. the porous models written in the test (Miki, Komatsu, Delany-Bazley printed; JCA when a reference uses it), and
@@ -87,7 +90,8 @@ family per agent, at most three at a time.
   **State 2026-10-27:** new manager session; brief `md/materials/m01_concrete_brief.md` written (the agent in its own
   worktree, plan phase first); approved by Stephan; phase 1 (plan) done and checked by the manager (report `md/materials/m01_concrete_report.md`;
   worktree `.claude/worktrees/agent-a00f2c2136594041a`); D1–D3 decided by Stephan; phases 2–4 done, merged into this
-  checkout and checked; batch report with Stephan. **Wait for his feedback before batch 1.**
+  checkout and checked; committed by Stephan (a97c4ae). **Wait for his feedback before batch 1**; the coding rules
+  of the merge (section 3) open one decision first (references to working documents in tests).
 - **Batches after that** (the manager cuts them; groups as proposed): batch 1 the lead family of each group, which
   settles the group's open rules (section 6): `masonry_heavy` (heavy walls), `glass_wool` (porous), `glass_4mm`/
   `glass_6mm` (thin plates); batch 2 the siblings (other masonry, `clt`, plaster; other porous rows; glazing, boards,
@@ -171,7 +175,7 @@ message) → his review and commit → this file updated.
    engine issues it will meet, the tolerance lines of wish-list 1.10 that apply.
 2. The agent: data → columns by the decided rule → tier 1 (the library through the rig against the independent model)
    → tier 2 (the columns against the converted measurement per octave) → judge (reasonable against the known range;
-   an engine limit becomes an `ISSUE <n>:` check and a stage-2b entry; otherwise a regression guard) → one lean
+   an engine limit becomes an `ENGINE LIMIT (<name>):` check and a stage-2b entry; otherwise a regression guard) → one lean
    `TEST_CASE` per family → the CSV rows. Stops where an open rule is met, with the options measured.
 3. The manager: rebuilds, reruns `[acoustic]` and `[wave]`, reads the CSV row and the test, recomputes the claims a
    decision rests on, runs the checklist.
@@ -180,6 +184,17 @@ message) → his review and commit → this file updated.
 
 **Decisions** go to Stephan as: what is decided; the options; trade-offs; what is correct (physics first, then the
 library's rules); a recommendation; a paste-ready message.
+
+**Coding rules from the SPEC files** (binding since the merge of 2026-10-27; every brief repeats them):
+- Produced code, tests, wrappers and conf files never cite temporary `md/` documents or tracking ids; only published
+  material (the material-model page `html_docu/quadriga_lib_material_model.md`, the Data Formats page, papers) and the
+  persistent `md/SPEC_*.md`. Today the rig and tools break this (decision open, section 9 log of 2026-10-27).
+- Tests use library calls for supporting tasks; the Catch2 binary links no BLAS, so no Armadillo matrix products
+  above 4×4 in tests (small loops instead).
+- Helper scoping (`md/SPEC_CPP_API.md`): a helper used once is a lambda (a self-contained algorithm of more than about
+  20 lines may be a named file-local function directly above its caller); reused within one file `static inline` or
+  an anonymous namespace; cross-file helpers only in a documented private header (the rig header).
+- Working documents are deleted before a merge (phase 4 of step 3).
 
 **Commit messages:** title "<area>: <what changed>", body in plain physical terms with the measured numbers and the
 suite counts, no internal labels (no rule labels, no `md/` documents, briefs, reports, phases), trailer
@@ -207,8 +222,9 @@ Run on every agent result; the report says which items were checked.
 - **Hard rules kept:** no change under `src/`, `include/`, `api_*`; nothing written in `/sjc/accoustic_research`;
   nothing committed by the agent.
 - **Energy:** R + T ≤ 1 from air for every construction the case builds; a sheet and its traced solid agree.
-- **ISSUE marks:** every check that fails because of an engine limit carries `ISSUE <n>:`, does not fail the suite,
-  prints its values, and the issue file lists it; no other non-failing checks.
+- **Engine-limit marks:** every check that fails because of an engine limit carries `ENGINE LIMIT (<name>):`, does
+  not fail the suite, prints its values, and the issue file lists the name; no other non-failing checks.
+- **References:** code, tests and tools cite only published material and `md/SPEC_*.md` (section 3).
 - **Names and rows:** the naming rule of wish-list 1.6; lumped rows rescale every power law with `fRef`; the wish-list
   status updated from the result.
 
@@ -676,6 +692,23 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     `tf` 0.00054451, `tfB` 0.3965, `e` 1901, `side` 3.22). Plaster probe: 15 mm adds 0.41–2.33 dB on both faces at
     150 mm, about twice the mass law. Documents: wish-list 1.1 confirmed, 1.6 exception removed, 2.1 entry rewritten;
     stage-2b issue 7 (heavy-wall coincidence, the bonded-mass side effect) and the rig paths; guidelines 12 one row.
+  - Committed by Stephan (a97c4ae, 2026-10-27; a first commit with the agent's worktree as a gitlink was undone
+    locally, `.claude/worktrees/` is now ignored). Then the `fixes` branch was merged (7e9fe61, v0.12.4 26da9f9; the
+    large-scale model: `include/quadriga_gbsm.hpp`, conf functions moved there, Python `quadriga_lib.gbsm`,
+    `qd_sos_acf_interp` renamed `qd_interp_linear`). Manager check at 26da9f9: our files unchanged by the merge except
+    one comment line in `qd_test_diag.hpp` (`QD_DIAG_GBSM`); rebuild clean; `[wave]` 141128 numbers identical;
+    `[acoustic]` 120637 identical to the batch-0 run; whole suite 1354225 / 1384, every changed number in the conf-file
+    cases. Baselines regenerated. New coding rules adopted (section 3). Open for Stephan: the rig and the tools cite
+    working documents and tracking ids (22 `ISSUE <n>` marks; wish-list 1.7.2, 1.10, 2.4 and engine notes 9.2 in 5
+    test comments; `md/acoustic_engine_notes.md` in 4 tool files and the tools README).
+  - Decided by Stephan 2026-10-27: option (a), the cleanup before batch 1 (brief `md/materials/c01_references_brief.md`).
+    Done by a cleanup agent in this checkout; the manager renamed the convention in the documents (issue names in the
+    stage-2b headings; wish-list 1.10; checklist; template) and fixed one more working label ("the ray of phase 1").
+    Manager checks: rebuild clean; `[wave]` 141128 identical; `[acoustic]` 120593 identical, 43191 / 70, the only
+    changed lines the 7 printed labels (with the old labels put back the output is identical); whole suite 270612
+    identical, 1354225 / 1384; `check_docs.py` passes; `sabine_to_random.py check` exits 0. Code marks:
+    `ENGINE LIMIT (<name>):`, 11 in `test_acoustic_materials.cpp`. Left for Stephan: three citations of research-data
+    lines at 2dad906 (concrete case, two self-checks). Baselines to be regenerated after the commit.
 
 ## 10. Scope of phase 0 (2026-10-23; naming and combinations superseded by wish-list 1.6 and section 3)
 

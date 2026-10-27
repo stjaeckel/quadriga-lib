@@ -460,7 +460,7 @@ namespace mt
     // The surface mass of a row at a thickness: e rho0 thk, or the row's own "mpp" (a lumped row's stated surface mass)
     static double mpp(const Row &r, double thk) { return r.count("mpp") ? r.at("mpp") : col(r, "e") * RHO0 * thk; }
     // A class envelope: walls (surface mass, octave values in dB) each shifted to the row's surface mass by the mass law,
-    // asserted within 1 dB of the band they span (wish-list 1.10)
+    // asserted within 1 dB of the band they span
     static Measured envelope(const char *key, const std::vector<double> &oct, const std::vector<std::pair<double, std::vector<double>>> &walls, double m_row, double side)
     {
         Measured M{key, "R_dB", "class envelope, mass-shifted", true, 1.0, oct, {}, side};
@@ -559,7 +559,7 @@ namespace mt
     // the fluid layer on a limp plate of the wall's surface mass (e rho0 thk), at 0 deg and at random incidence, the
     // plate infinite and finite (Davy's sigma at the wall's side); and the layer alone in air (asserted against the
     // fluid layer; it is also the series estimate, the layer's loss paid on top of the wall's). Printed, not asserted
-    // (engine stage-2b issue 1).
+    // (a measured engine limit: porous layer on a rigid wall).
     static void added_insulation(const char *name, const Stack &layer, const Stack &wall, const Grid &G = grid(), double bT = 3e-5, double bR = 3e-7)
     {
         Stack both = layer;
@@ -591,8 +591,8 @@ namespace mt
         CHECK(D.dT < bT);
         CHECK(D.dR < bR);
     }
-    // A lumped row at k times its thickness: thk and fRef times k, every power law's value at fRef times k^exponent
-    // (wish-list 1.7.2), so every column is unchanged at every frequency; resF, coiF, tfF are absolute. Mass-law rows only.
+    // A lumped row at k times its thickness: thk and fRef times k, every power law's value at fRef times k^exponent, so
+    // every column is unchanged at every frequency; resF, coiF, tfF are absolute. Mass-law rows only.
     static Row rescale(Row r, double k)
     {
         r["mpp"] = mpp(r, col(r, "thk")); // the surface mass stays

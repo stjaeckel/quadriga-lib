@@ -191,10 +191,11 @@ A floor of 4 × 5 m would be 4.47 m; on a heavy slab the effect is small (page 1
 
 - **One test case per row family** (decided): a generic row and its sheets share one lean case.
 - **Procedure (decided):** measure first; judge against the known range of measurements and models; if the result
-  needs an engine fix, mark it ISSUE; if not, assert. A comment in the case states what "reasonable" meant: the range
+  needs an engine fix, mark it as an engine limit; if not, assert. A comment in the case states what "reasonable" meant: the range
   of measurements and models it was judged against. The rig documents itself; this list is updated from the result.
-- **ISSUE convention (decided):** a rig comparison that misses because of an engine limit carries a comment
-  `ISSUE <n>:` naming the stage-2b issue and asserts nothing; the measured and the reference values go into the
+- **Engine-limit marks (decided; named since 2026-10-27):** a rig comparison that misses because of an engine limit
+  carries a comment `ENGINE LIMIT (<name>):` with the name of the stage-2b issue (code and tests cite no document or
+  issue number) and asserts nothing; the measured and the reference values go into the
   diagnostics (for a per-node comparison the largest deviation and its node stand for the reference); the issue has
   an entry in `md/acoustic_engine_stage2b_issues.md`. Known engine issues never make the suite fail. The transmission of a box of air in front of a fill is taken from the traced paths at a cap of 10
   interactions (production runs: 20 to 30); reflection runs to the engine's limit, its change at the cap is printed.
@@ -203,7 +204,7 @@ A floor of 4 × 5 m would be 4.47 m; on a heavy slab the effect is small (page 1
   | check | against | tolerance | assertion |
   | --- | --- | --- | --- |
   | independent physics | the model written in the test (plate, transfer matrix, porous layer) | at or above 2–3 × the measured maxima of the rig's self-checks (wide gates are preferred) | CHECK |
-  | measured single reference | the converted reference at its own specimen side | ±3 dB / ±0.05 (plus the conversion budget) | CHECK, or printed with ISSUE |
+  | measured single reference | the converted reference at its own specimen side | ±3 dB / ±0.05 (plus the conversion budget) | CHECK, or printed as an engine limit |
   | class row | the envelope of the class's walls, each shifted to the evaluated thickness by the mass law (20·log₁₀ of the surface-mass ratio; the row's surface mass is `e`·ρ₀·`thk`, a lumped row's the stated one) | ±1 dB | as above |
   | regression guard | the library's own measured result | about 1 dB / 0.01 in α | CHECK |
 
@@ -711,7 +712,7 @@ it now.
 | plasterboard on frame, room side | `gypsum_leaf_12_5mm`, `cavity_air` | PTB#341 1568, PTB#342 1569; Bradley 923 | yes | — |
 | dry lining on masonry | `gypsum_leaf_12_5mm`, `cavity_air`, masonry | Zeitler 1066–1086 (ΔR); Hopkins 444, 443; BIA 1797 / 1795, 1845 / 1847 | yes (leaf \| box \| wall; the bare wall inline) | issue 1 for a fill |
 | plaster on a bare wall | `plaster_15mm` on a bare brick written inline | BIA 1795 / 1796, 1905 / 1904 | sheet \| solid: yes | gives the plaster increment of 1.2 |
-| plaster on both faces of a block | plaster sheets on both faces of a block solid | Hopkins 448 (printed) | yes (exact); the far plaster traced is the ISSUE 4 fixture | — |
+| plaster on both faces of a block | plaster sheets on both faces of a block solid | Hopkins 448 (printed) | yes (exact); the far plaster traced is the engine-limit fixture of three bonded bodies | — |
 | box window | `glass_leaf_4mm` \| `cavity_air` \| `glass_leaf_4mm` | Quirt 578, 577, 580 | yes | — |
 | parquet on concrete | `parquet`, `concrete` | PTB#394 1581 | yes | — |
 | carpet on timber | `carpet_tile_11mm` on `board_leaf_22mm` or `laminate_leaf_8mm` | none (request 6) | **no: three co-located faces** (stage-2b issue 5) | miss candidate |
@@ -751,7 +752,7 @@ it now.
    request in section 6. The maintainer passes it to the research manager; the answer comes back as data rows with
    source, location and coefficient type.
 4. **Phase-3 pickup.** By the work order of 1.4. One worker builds its row family and its lean case by the procedure
-   of 1.10; engine-limited checks are marked ISSUE; the maintainer reviews and commits; the status moves to
+   of 1.10; engine-limited checks are marked `ENGINE LIMIT (<name>)`; the maintainer reviews and commits; the status moves to
    `confirmed`, or to `recorded miss`. Object rows also get their generated asset.
 5. **CSV traps.** An empty cell reads 0, not the column default; a text cell in a numeric column is an error; a
    material file replaces the built-in table.
