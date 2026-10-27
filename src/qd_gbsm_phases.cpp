@@ -30,6 +30,24 @@
 //
 // Units: positions in [m], rows {x, y, z}; frequencies of the sum-of-sinusoids tables in [1/m]; decorrelation
 // distances in [m].
+//
+// Design for further phase sets (the small-scale fading, SSF, of TR 38.901 clause 7.6.3.1: cluster and ray
+// variables at SC_lambda, mirrored for dual mobility, separated by floor as in clause 7.6.3.3):
+// - The LSF set stays fixed at 11 generators ([n_coeff, 11, 2] is part of the public contract). An SSF set gets its
+//   own generator table (qd_gbsm_gen: lambda, distribution, mirror partner, bias flag) and its own public functions
+//   that create and evaluate it; they are added to this file and call qd_gbsm_freq, qd_gbsm_positions,
+//   qd_gbsm_eval and qd_gbsm_remove_bias with the signatures below. The machinery therefore stays file-local here;
+//   if the SSF functions had to live in another file, these functions would move unchanged, as static inline, into
+//   quadriga_gbsm_helpers.hpp
+// - The helpers take everything as explicit arguments (no captured state, no LSF constants outside
+//   qd_gbsm_gen_lsf), and they group the sos_val / sos_remove_bias calls by frequency table: one call per
+//   distinct decorrelation distance and side, so a set with hundreds of generators at one distance needs one call
+// - SSF sets use the same floor IDs as lsf_draw (the floor offsets are inside qd_gbsm_eval)
+// - Seeds: sos_init_phases fills column g independently of the number of columns, so an SSF set drawn with the
+//   seed of the LSF set would repeat the LSF phases in its first 11 columns and, at an equal decorrelation distance,
+//   reproduce the LSF fields. An SSF set takes the columns from 11 on of one sos_init_phases(n_coeff, 11 + n_ssf,
+//   seed) call with the LSF seed (same n_coeff only: the matrix is filled column by column from one stream), or a
+//   seed derived from the LSF seed by a fixed rule. The caller therefore keeps an explicit seed (or the phase cubes)
 
 #include "quadriga_gbsm.hpp"
 #include "quadriga_gbsm_helpers.hpp"
@@ -68,7 +86,7 @@ namespace
 
     // The 11 LSF generators (index table above) from a completed scenpar
     // - 'sp' must hold all keys (output of scenpar_validate); a missing key throws std::out_of_range
-    std::vector<qd_gbsm_gen> qd_gbsm_lsf_generators(const std::unordered_map<std::string, double> &sp)
+    std::vector<qd_gbsm_gen> qd_gbsm_gen_lsf(const std::unordered_map<std::string, double> &sp)
     {
         const char *keys[11] = {"DS_lambda", "KF_lambda", "SF_lambda", "AS_D_lambda", "AS_A_lambda", "ES_D_lambda",
                                 "ES_A_lambda", "XPR_lambda", "absTOA_lambda", "SC_lambda", "SF_lambda"};
@@ -132,7 +150,7 @@ namespace
     }
 
     // Normalized values of a phase set at a set of links
-    // - gen, freq, acf, dist, tab: generator table and frequency tables (qd_gbsm_lsf_generators, qd_gbsm_freq)
+    // - gen, freq, acf, dist, tab: generator table and frequency tables (qd_gbsm_gen_lsf, qd_gbsm_freq)
     // - phase [n_coeff, n_gen, 2]: slice 0 Rx side, slice 1 Tx side (mirror of slice 0)
     // - R, T [n_link, 3], n_link >= 1: positions from qd_gbsm_positions (T unused without dual mobility)
     // - floor_id: [n_link] or nullptr (all on floor 0)
@@ -174,6 +192,10 @@ namespace
         //   stream qd_sos_rng(b)
         // - Two floors in the same block of N IDs have the cross-correlation (1/N)·sum_n cos(Delta_q(n) - Delta_q'(n))
         //   = 0 at zero horizontal lag; floors in different blocks a random one with standard deviation 1/sqrt(2N)
+        // - Phase offsets instead of a coordinate offset per floor: they work in 2D and 3D mode, keep the mirror
+        //   relations, need no large coordinates (which would push small decorrelation distances towards the
+        //   precision limit of the kernels) and give exactly zero correlation at zero horizontal lag (UTs stacked
+        //   above each other, the most relevant case) within a block of N floor IDs
         auto floor_offset = [n_coeff](arma::uword q)
         {
             const double two_pi = 6.283185307179586;
@@ -242,6 +264,13 @@ namespace
         }
 
         // Combination of the two devices
+        // - Each side is evaluated with the table of its own field (instead of the two-device modes of sos_val), so
+        //   swapping Tx and Rx repeats the same sos_val calls in swapped roles: swap reciprocity holds bit for bit,
+        //   also for unequal decorrelation distances and with bias-removed phases
+        // - The pairs need no further coupling: (f_g(R) + f_m(T))/sqrt(2) and (f_m(R) + f_g(T))/sqrt(2) already have
+        //   the correlation (A_g(D) + A_m(D))/2. QuaDRiGa's gen_lsf_parameters multiplied the pair once more by
+        //   sqrtm([1, A_g; A_m, 1]), which raises the variances above 1 (up to 2 at small D); that coupling is not
+        //   taken, so that columns 3 to 6 stay Normal(0,1)
         const double rsqrt2 = std::sqrt(0.5);
         if (dual_mobility)
             for (arma::uword g = 0; g < n_gen; ++g)
@@ -351,6 +380,9 @@ Draw the random phases of the large-scale generators of one BS site and scenario
 - With fewer than 3 positions, without `rx_pos` or with `remove_bias = false` no correction is made
 - TR 38.901 clause 7.4.4 literally (exponential ACF, no bias removal): `preset = "Exp256"` and
   `remove_bias = false`; the defaults `Comb256` and the bias removal are QuaDRiGa choices
+- Reason for `Comb256`: the TR gives the exponential ACF (eq. 7.4-5) as a fit "with sufficient accuracy",
+  not as an exact requirement; its kink at zero distance makes the values evolve roughly along a track.
+  `Comb256` (Gaussian near zero, exponential tail, same decorrelation distance) evolves smoothly
 - `phase` must not share memory with `tx_pos` or `rx_pos`
 - Validation order: `seed`, `preset`, `scenpar`, then the positions (3 columns, rows of `tx_pos` 1 or `n_link`
   when both are given, finite values), then the requirement of `tx_pos` for the bias removal in dual mobility
@@ -422,12 +454,16 @@ void quadriga_lib::lsf_init_phases(const std::unordered_map<std::string, double>
         throw std::invalid_argument("Input 'tx_pos' is required for the bias removal with dual mobility.");
 
     // Raw phases of the Rx side
-    const std::vector<qd_gbsm_gen> gen = qd_gbsm_lsf_generators(sp);
+    const std::vector<qd_gbsm_gen> gen = qd_gbsm_gen_lsf(sp);
     const arma::uword n_gen = (arma::uword)gen.size();
     arma::mat P0;
     quadriga_lib::sos_init_phases<double>(n_coeff, n_gen, P0, seed);
 
-    // Bias removal over all positions where the fields are evaluated
+    // Bias removal over all positions where the fields are evaluated, before the mirroring
+    // - Each Normal field is corrected once, with its own frequencies, over the union of the positions where it is
+    //   evaluated; the Tx side is then copied from the corrected phases. QuaDRiGa's init_sos corrected before the
+    //   mirroring, so the ASD/ASA and ESD/ESA phases carried a correction computed with the partner's frequencies,
+    //   which left a non-zero drop mean whenever the two decorrelation distances differ (also in single mobility)
     if (do_bias)
     {
         std::vector<arma::mat> freq;
@@ -564,7 +600,7 @@ void quadriga_lib::lsf_draw(const std::unordered_map<std::string, double> &scenp
 
     std::unordered_map<std::string, double> sp = scenpar;
     quadriga_lib::scenpar_validate(sp, "legacy", nullptr, nullptr, true);
-    const std::vector<qd_gbsm_gen> gen = qd_gbsm_lsf_generators(sp);
+    const std::vector<qd_gbsm_gen> gen = qd_gbsm_gen_lsf(sp);
     const arma::uword n_gen = (arma::uword)gen.size();
 
     if (phase.n_rows != n_coeff || phase.n_cols != n_gen || phase.n_slices != 2)

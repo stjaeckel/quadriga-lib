@@ -22,6 +22,14 @@
 // Conventions: QuaDRiGa uses elevation angles (+90 deg is up), the TR zenith angles. The EoD offset is
 // the ZOD offset of the TR with the opposite sign; spreads are the same in both conventions.
 // The key formulas are written out in this file, independently of the library functions that evaluate them.
+// Precision rule of the values in the files: a value is written with the precision of its source, as the TR prints
+// it (31.84, -9.35, 43.42). A derived value (from a TR formula, a hall geometry or a constant such as c = 3e8:
+// 40/3, 20·pi/3, V/S, the RMa and SMa constants for given h and W) has at most 4 significant digits, fewer where
+// they suffice, unless 4 digits change a result by more than 0.01 dB (path loss, SF) or 0.1 % (LSP means,
+// distances) over the TR ranges; then the fewest digits that stay within these limits (SMa PL_A1 = 21.574). The
+// exact expression may stand in the comment (47/11 = 4.27). Checks against TR values take their tolerance from the
+// bound of this rounding, stated at the check. Long numbers make the files unreadable, and the change is far below
+// the model uncertainty (shadow fading 4 to 8 dB, LSP standard deviations of 0.1 to 0.5 in lg).
 
 #include <catch2/catch_test_macros.hpp>
 

@@ -31,7 +31,8 @@ Large-scale parameters of a set of links from normalized random values
   terms); `mu = P_mu + P_gamma·lg(P_omega + f') + P_epsilon·lg(d) + P_zeta·lg(h) + P_alpha·lg(a)`;
   `s = max(0, P_sigma + P_delta·lg(P_omega + f'))`;
   `sigma = max(0, s + P_kappa·lg(d) + P_tau·lg(h) + P_beta·lg(a))`. The standard deviation is
-  limited at 0 after all terms. SF has no mean fields (mean 0). A frequency term with the
+  limited at 0 after all terms, since a negative value would flip the sign of the realization
+  and its cross-correlations. SF has no mean fields (mean 0). A frequency term with the
   coefficient 0 contributes 0; an active one (`P_gamma` or `P_delta` not 0) requires
   `P_omega + f' > 0` at every frequency. The multiplying coefficients (`P_sigma`, `P_gamma`,
   `P_delta`, `P_epsilon`, `P_zeta`, `P_alpha`, `P_kappa`, `P_tau`, `P_beta`, `ES_D_mu_A` to
@@ -63,7 +64,8 @@ Large-scale parameters of a set of links from normalized random values
   `c = 299792458 m/s`, without the bound if `absTOA_Lmax = 0` (`absTOA_sigma` must be finite); 0 if
   not active. The InF and InH NLOS
   files set `absTOA_Lmax` to the largest dimension of the hall or office of their calibration
-  scenario; a caller with another hall sets the field
+  scenario; a caller with another hall sets the field; in the TR 38.901 files the offset is active in all NLOS and O2I files (an O2I link
+  has no LOS ray) and off in the LOS files
 - Ground permittivity with `U = rnd(l, 10)` and `f = fc / 1e9` (not limited by `LSP_fc_min`): dry
   ground `3 + j·0.003·f^1.34`, medium `30.4·f^-0.47 + j·0.18·f^1.05`, wet
   `31.3·f^-0.48 + j·0.63·f^0.77`; linear interpolation from dry (`U = 0`) to medium (`U = 0.5`) to
