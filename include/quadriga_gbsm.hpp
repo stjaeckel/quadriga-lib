@@ -111,6 +111,26 @@ namespace quadriga_lib
                   bool dual_mobility = false,                              // As in lsf_init_phases
                   const std::string &preset = "Comb256",                   // Must match lsf_init_phases
                   bool horizontal = true);                                 // Must match lsf_init_phases
+
+    // Large-scale parameters of a set of links from normalized random values
+    // - Mean and std per link and frequency from the scenario parameters (incl. LSP_fc_min, ES_D_mu_B/C/D);
+    //   cross-correlation by the root of the LSP cross-correlation matrix; transformation to linear values
+    // - Same random values for all frequencies (TR 7.6.5)
+    void lsp_generate(const std::unordered_map<std::string, double> &scenpar, // Scenario parameters
+                      const arma::vec &fc,                                    // Carrier frequencies in [Hz], [n_freq]
+                      const arma::mat &tx_pos,                                // Tx positions, [1, 3] or [n_link, 3]
+                      const arma::mat &rx_pos,                                // Rx positions, [n_link, 3]
+                      const arma::mat &rnd,                                   // Random values from lsf_draw, [n_link, 11]
+                      arma::cube &lsp,                                        // Output: [n_link, n_freq, 8]: DS [s], KF, SF [linear], ASD, ASA, ESD, ESA [deg], XPR [linear]
+                      const arma::mat *sf_sigma = nullptr,                    // Optional: SF std in [dB] from path_loss, replaces the scenpar value, [n_link, n_freq]
+                      arma::vec *abs_toa = nullptr,                           // Optional output: Absolute TOA offset in [s], 0 if disabled, [n_link]
+                      arma::mat *gr_eps_re = nullptr,                         // Optional output: Ground permittivity, real part, [n_link, n_freq]
+                      arma::mat *gr_eps_im = nullptr,                         // Optional output: Ground permittivity, imaginary part, [n_link, n_freq]
+                      arma::mat *eod_offset_deg = nullptr,                    // Optional output: EoD offset in [deg], positive = up, [n_link, n_freq]
+                      arma::cube *lsp_mu = nullptr,                           // Optional output: Mean in the log domain (lg or dB), [n_link, n_freq, 8]
+                      arma::cube *lsp_sigma = nullptr,                        // Optional output: Std in the log domain, [n_link, n_freq, 8]
+                      bool cholesky = true,                                   // true: Cholesky in TR order; false: symmetric square root (legacy)
+                      bool clip_spreads = true);                              // Clip AS to 104 deg, ES to 52 deg (TR step 4)
 }
 
 #endif

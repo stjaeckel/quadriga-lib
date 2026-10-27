@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_gbsm.hpp"
+#include "quadriga_gbsm_helpers.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -320,26 +321,9 @@ static bool qd_scenpar_xcorr(const double *val, double *X)
             X[r * 8 + c] = val[i];
         }
 
-    // Cholesky-Banachiewicz, lower triangle; a NaN pivot fails the test
+    // Cholesky factorization; a NaN pivot fails the test
     double L[64];
-    for (int j = 0; j < 8; ++j)
-    {
-        double d = X[j * 8 + j];
-        for (int k = 0; k < j; ++k)
-            d -= L[k * 8 + j] * L[k * 8 + j];
-        if (!(d > 0.0))
-            return false;
-        d = std::sqrt(d);
-        L[j * 8 + j] = d;
-        for (int i = j + 1; i < 8; ++i)
-        {
-            double s = X[j * 8 + i];
-            for (int k = 0; k < j; ++k)
-                s -= L[k * 8 + i] * L[k * 8 + j];
-            L[j * 8 + i] = s / d;
-        }
-    }
-    return true;
+    return qd_gbsm_chol8(X, L);
 }
 
 // Write the optional outputs that both validators share
