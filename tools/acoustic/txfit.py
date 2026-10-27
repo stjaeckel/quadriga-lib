@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Part of quadriga-lib — see LICENSE for terms.
 #
-# The transmission fit of the expressibility test (md/acoustic_engine_notes.md 5, 8.4) on the formula copy txlib.py, vectorized: the knobs of a mass-law material
+# The transmission fit of the expressibility test (material page 10.5, 11.4) on the formula copy txlib.py, vectorized: the knobs of a mass-law material
 # fitted per construction to a transmission reference, minimax over octaves.
 #   Knobs p = [X1k, m, att, attB, cF, cQ, rF, rQ, rS, C]: X1k the level (X0 at 1 kHz, i.e. fRef with thk), m the mass
 #   column (a switch: fitted only with V['mfit']), att (dB at 1 kHz) / attB, cF / cQ the bending stiffness, rF / rQ / rS

@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Part of quadriga-lib — see LICENSE for terms.
 #
-# Reference models of sound transmission through plates in air (html_docu/quadriga_lib_material_model.md 5.4; md/acoustic_engine_notes.md 5), independent
+# Reference models of sound transmission through plates in air (html_docu/quadriga_lib_material_model.md 5.4), independent
 # of the library. Plane-wave acoustics, a plate in a rigid baffle between two half-spaces of air:
 #   - Plate: the transfer impedance Z_p(f, k) of a thin (Kirchhoff) or thick (Mindlin: shear and rotary inertia) plate at a
 #     trace wavenumber k; eta(f) the loss factor (eta_edge: internal plus a coupling loss m''/(Ce sqrt f) to the frame)

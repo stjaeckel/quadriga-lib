@@ -79,7 +79,7 @@ TEST_CASE("Materials rig - combinations against the fluid layers and the bonded 
     // Why: combinations are room-side sheets on traced layers, two sheets on one face (the first face the room side),
     // leaves on a box of air (page 10.4) and one sheet at the last solid's exit. Per node against the transfer matrix
     // of the layers in air, on the half-space of the first mass-law layer behind the pad of its tf (R only, T NaN; wool
-    // on concrete: the pad is formed on the medium in front, notes 9.2, up to 6.3e-3), or the bonded plate (one side).
+    // on concrete: the pad is formed on the medium in front, up to 6.3e-3), or the bonded plate (one side).
     // The filled box follows the exchange between box and fill as paths: 12 angles, its alpha within 0.0041 of 192
     // angles x 6 tones per third (grid_probe.py, 2026-10-23). Forbidden stacks throw: two traced wave media back to
     // back (4.9 dB off), two mass-law sheets (17 dB), a sheet between two solids, a lossless wave medium with a critical
@@ -165,44 +165,45 @@ TEST_CASE("Materials rig - a porous layer on a rigid wall: the added insulation"
     // the insulation the wool adds, library against the fluid layer on a limp plate (346.7 kg/m2), printed side by side
     // and not asserted (the library adds up to 8 dB too much at 31.5 Hz); the wool alone in air asserted against the
     // same matrix, so both sides map the layer alike.
-    // ISSUE 1: a porous layer on a rigid wall adds too much insulation at low frequency.
+    // ENGINE LIMIT (porous layer on a rigid wall): it adds too much insulation at low frequency.
     using namespace mt_rows;
     mt::added_insulation("50 mm glass wool to 152 mm concrete", {{WOOL, mt::SHEET, 0.05}}, {{CONCRETE152, mt::SOLID, 0.152}});
 }
 
 TEST_CASE("Materials rig - engine limits printed: a filled box on one path, wave layers before a pane, three bonded bodies", "[acoustic][materials]")
 {
-    // Why: the measured sizes of known engine limits, printed for the stage-2b list (no assertion; the same
+    // Why: known engine limits, printed as measured (no assertion; the same
     // constructions in their working forms are asserted in the combinations case).
     using namespace mt_rows;
     using mt::SHEET;
     using mt::SOLID;
     const mt::Grid G = mt::grid(), G12 = mt::grid(12);
     QD_DIAG("\n# diag: engine limits per node against the fluid layers or the bonded plate\n%s", mt::DEV_HEAD);
-    // ISSUE 3: a leaf behind a filled box (the precise drywall recipe). Its T is the exchange between box and fill, a
-    // series of paths: through the paths of the reflection ray set at most 10 interactions (5.0 dB off the fluid
-    // layers), on one straight path (calc_diffraction_gain, as the scene tracer's direct path through a wall: 9.5 dB);
-    // R uncapped (1.45e-2) and at 10 interactions (0.22).
+    // ENGINE LIMIT (wave media back to back): a leaf behind a filled box (the precise drywall recipe). Its T is the
+    // exchange between box and fill, a series of paths: through the paths of the reflection ray set at most 10
+    // interactions (5.0 dB off the fluid layers), on one straight path (calc_diffraction_gain, as the scene tracer's
+    // direct path through a wall: 9.5 dB); R uncapped (1.45e-2) and at 10 interactions (0.22).
     const mt::Stack dw = {{BOARD, SHEET, 0.0125}, {AIRBOX, SOLID, 0.025}, {ROCKWOOL, SOLID, 0.05}, {BOARD, SHEET, 0.0125}};
     mt::Out O = mt::run(dw, G12);
-    mt::against("ISSUE 3: board | air | rock wool | board, T from the paths (10 interactions), R uncapped", O, dw);
-    mt::rows("ISSUE 3: board | air | rock wool | board", O);
+    mt::against("ENGINE LIMIT (wave media back to back): board | air | rock wool | board, T from the paths (10 interactions), R uncapped", O, dw);
+    mt::rows("ENGINE LIMIT (wave media back to back): board | air | rock wool | board", O);
     O.T = mt::transmit(mt::scene(dw), G12), O.R = mt::reflect(mt::scene(dw), G12, O.calls, O.rays, nullptr, 10);
-    mt::against("ISSUE 3: board | air | rock wool | board, T on one straight path, R at 10 interactions", O, dw);
-    // ISSUE 4: plaster | block | plaster with the far plaster traced (the exit-sheet form is exact): the state is one
-    // level deep. Random-incidence tl, library against the bonded plate of the three, and Hopkins 448 measured
-    // [Hopkins_2007_SoundInsulation, research line 448 at 2dad906; the probe rows are physical, not fitted to it].
+    mt::against("ENGINE LIMIT (wave media back to back): board | air | rock wool | board, T on one straight path, R at 10 interactions", O, dw);
+    // ENGINE LIMIT (three bonded bodies): plaster | block | plaster with the far plaster traced (the exit-sheet form is
+    // exact): the state is one level deep. Random-incidence tl, library against the bonded plate of the three, and
+    // Hopkins 448 measured [Hopkins_2007_SoundInsulation, research line 448 at 2dad906; the probe rows are physical,
+    // not fitted to it].
     const mt::Stack pb = {{PLASTER, SHEET, 0.013}, {BLOCK, SOLID, 0.215}, {PLASTER, SOLID, 0.013}};
     const mt::Out P = mt::run(pb, G);
-    mt::against("ISSUE 4: plaster | block 215 mm | plaster traced", P, pb);
+    mt::against("ENGINE LIMIT (three bonded bodies): plaster | block 215 mm | plaster traced", P, pb);
     const auto pl = mt::octaves(G, [&](size_t q) { double t = 0.0; for (int i = 0; i < G.na; ++i) { double T, R; mt::ref_plate(pb, G.f[q], G.th[i], T, R); t += G.w[i] * T; } return t; });
     const double H448[9] = {NAN, 35.4, 39.6, 42.7, 52.2, 58.3, 65.8, 70.6, NAN};
-    QD_DIAG("# diag: ISSUE 4, random incidence tl (dB)\noctave,library,bonded_plate,hopkins_448\n");
+    QD_DIAG("# diag: ENGINE LIMIT (three bonded bodies), random incidence tl (dB)\noctave,library,bonded_plate,hopkins_448\n");
     for (int o = 0; o < 9; ++o)
         QD_DIAG("%g,%.2f,%.2f,%.1f\n", mt::OCT[o], P.t8[o], -10.0 * std::log10(pl[o]), H448[o]);
-    // ISSUE 1: a curtain (rock-wool columns, 3 mm) on 100 mm of air before a 4 mm pane: the insulation the curtain and
-    // the box add, library against the fluid layers on a limp plate of the pane's mass (infinite and finite at the
-    // pane's side) and against the layers alone in air (the series estimate)
+    // ENGINE LIMIT (porous layer on a rigid wall): a curtain (rock-wool columns, 3 mm) on 100 mm of air before a 4 mm
+    // pane: the insulation the curtain and the box add, library against the fluid layers on a limp plate of the pane's
+    // mass (infinite and finite at the pane's side) and against the layers alone in air (the series estimate)
     mt::added_insulation("a curtain on 100 mm of air to glass 4 mm", {{ROCKWOOL, SHEET, 0.003}, {AIRBOX, SOLID, 0.1}}, {{GLASS4, SHEET, 0.004}}, G, 2e-4, 2e-6);
 }
 
@@ -249,9 +250,9 @@ TEST_CASE("Materials rig - porous rows against their models", "[acoustic][materi
 
 TEST_CASE("Materials rig - a lumped row rescaled with fRef is the same wall", "[acoustic][materials]")
 {
-    // Why: lumped rows carry the visible thickness (wish-list 1.7.2): thk and fRef times k with every power law
-    // rescaled leaves every column unchanged at every frequency. Double glazing 4-16-4 of page 11.4 at 8 and 24 mm
-    // (k = 3; fRef alone would move tf at 125 Hz from 0.1124 to 0.1670), sheet and solid, per node.
+    // Why: lumped rows carry the visible thickness: thk and fRef times k with every power law rescaled leaves every
+    // column unchanged at every frequency. Double glazing 4-16-4 of page 11.4 at 8 and 24 mm (k = 3; fRef alone would
+    // move tf at 125 Hz from 0.1124 to 0.1670), sheet and solid, per node.
     using namespace mt_rows;
     const mt::Row R3 = mt::rescale(GLAZING, 3.0);
     const mt::Grid G = mt::grid();
@@ -270,9 +271,9 @@ TEST_CASE("Materials rig - a lumped row rescaled with fRef is the same wall", "[
 
 TEST_CASE("Materials rig - objects: absorption area of a hard box, an absorbing volume and a porous body on the floor", "[acoustic][materials]")
 {
-    // Why: objects take a per-object absorption area measured in a reverberation chamber (wish-list 2.4); in a diffuse
+    // Why: objects take a per-object absorption area measured in a reverberation chamber; in a diffuse
     // field it is 4 x the mean absorption cross-section. 16 directions x about 65 rays, the octave centers, at most 10
-    // interactions, 3 reflections, -60 dB: within 1.3 % of 64 directions x 2000 rays x 18 thirds (phase-3a probe, three
+    // interactions, 3 reflections, -60 dB: within 1.3 % of 64 directions x 2000 rays x 18 thirds (a probe, three
     // seeds, 0.19 s). A hard box (1.0 x 0.5 x 2.0 m, tf 0.1) against alpha S of its five exposed faces (-3.0 %: the
     // 16 directions; -1.9 % at 32, -0.4 % at 64); an absorbing
     // volume of the same size (m 0.05 per meter) against the chords of its rays (4mV printed); a porous cushion
@@ -291,8 +292,9 @@ TEST_CASE("Materials rig - objects: absorption area of a hard box, an absorbing 
         CHECK(std::abs(V.A[q] / V.chord - 1.0) < 1e-3);
         CHECK(std::abs(P.A[q] / REF[q] - 1.0) < 0.02);
     }
-    // ISSUE 6: a ray within 0.2 deg of grazing a box face re-hits the face at its launch point at every call, splits and
-    // gains power. The ray of phase 1 (the hard box, direction 36 of 64), alone; rays and their power per call printed.
+    // ENGINE LIMIT (grazing relaunch): a ray within 0.2 deg of grazing a box face re-hits the face at its launch point
+    // at every call, splits and gains power. The ray found on 64 directions (the hard box, direction 36), alone; rays and
+    // their power per call printed.
     const arma::fmat mesh = arma::join_cols(quadriga_lib::cube<float>({200.0, 200.0, 1.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, -1.0}), quadriga_lib::cube<float>({0.5, 0.25, 1.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 1.0}));
     rp::Pal pal;
     for (const char *k : mt::COLS)
@@ -307,7 +309,7 @@ TEST_CASE("Materials rig - objects: absorption area of a hard box, an absorbing 
     std::vector<quadriga_lib::path> paths(1);
     paths[0].init(0, 1, true);
     arma::Col<short> prev(1, arma::fill::zeros), cur(1, arma::fill::zeros), buf(1, arma::fill::zeros);
-    QD_DIAG("# diag: ISSUE 6, one grazing ray on the hard box\ncall,rays,power\n");
+    QD_DIAG("# diag: ENGINE LIMIT (grazing relaunch), one grazing ray on the hard box\ncall,rays,power\n");
     for (int g = 0; g < 10 && orig.n_rows; ++g)
     {
         quadriga_lib::ray_progress(mesh, arma::join_cols(arma::uvec(12, arma::fill::value(1)), arma::uvec(12, arma::fill::value(2))), pal, cf, 0.0f, 0.0f, 0.0f, orig, dest, prev, cur, buf,
