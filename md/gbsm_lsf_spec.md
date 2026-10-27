@@ -207,7 +207,7 @@ v19 keys (3.0.4); the v19 conf files live in `data/config/` under Apache-2.0.
 - Catch2 diagnostics via `qd_test_diag.hpp`, area `QD_DIAG_GBSM` (5.0).
 - Review points are not stops (see the header).
 - New internal header `src/quadriga_gbsm_helpers.hpp`, limited to helpers used by more than one source file
-  (3.0.5).
+  (3.0.5); the phase-set machinery is file-local in `src/qd_gbsm_phases.cpp`.
 - Each implementation run adds to `include/quadriga_gbsm.hpp` only the declarations it defines (section 7), so
   that no intermediate state declares functions without definition.
 
@@ -261,7 +261,7 @@ namespace quadriga_lib
     //  10 UMa environment height hE                              Uniform(0,1), SF_lambda
     // - Slice 1 (Tx side) of 'phase' is slice 0 (Rx side) of the mirror generator: ASD <-> ASA, ESD <-> ESA, all
     //   others mirror themselves; a decorrelation distance of 0 is used as 0.1 m
-    // - The functions are documented in src/lsf_init_phases.cpp, src/lsf_draw.cpp, src/path_loss.cpp,
+    // - The functions are documented in src/qd_gbsm_phases.cpp (lsf_init_phases, lsf_draw), src/path_loss.cpp,
     //   src/lsp_generate.cpp, src/los_probability.cpp, src/o2i_loss.cpp
 
     // Draw the random phases of the large-scale generators of one BS site and scenario
@@ -282,6 +282,7 @@ namespace quadriga_lib
     // - Dual mobility: the Tx side uses the mirror generator, so ASD/ASA and ESD/ESA are correlated by the ACF
     //   at the Tx-Rx distance
     // - Links with different floor IDs are uncorrelated at equal horizontal positions; equal IDs share one field
+    // - Dual mobility: both devices of a link are on the link's floor
     void lsf_draw(const std::unordered_map<std::string, double> &scenpar, // Scenario parameters (decorrelation distances)
                   const arma::cube &phase,                                 // Phases from lsf_init_phases, [n_coeff, 11, 2]
                   const arma::mat &tx_pos,                                 // Tx positions, [1, 3] or [n_link, 3]
@@ -482,42 +483,40 @@ sigma_i = max(0, s_i + P_kappa · lg(d) + P_tau · lg(h) + P_beta · lg(a))
   `mu_5 = max(mu_5, ES_D_mu_min)` (`ES_D_mu_min` defaults to `-Inf`). `hUT` is the raw z of the Rx.
 - Units: DS mean and std in lg(s); ASD, ASA, ESD, ESA in lg(deg); KF, SF, XPR in dB.
 - The same `(l, k)` values serve `lsp_mu`, `lsp_sigma` and the transformation in 3.4.
+- Frequency terms: a term with `P_gamma = 0` (`P_delta = 0`) contributes 0 to `mu_i` (`s_i`). An active term
+  (`P_gamma` or `P_delta` not 0) with `P_omega + f' <= 0` (NaN included) throws, before any output is written:
+  `Scenario parameter '<P>_omega' plus the frequency in GHz must be > 0 where '<P>_gamma' or '<P>_delta' is not 0.`
+  (`P_omega` accepts any value; without the check the mean would be NaN and the NaN of the std would disappear in
+  the limit at 0). `lsp_generate` checks all 8 LSPs, `path_loss` only SF and only when `sf_sigma` is requested.
 
-#### 3.0.5 Internal header `src/quadriga_gbsm_helpers.hpp`
+#### 3.0.5 Internal header `src/quadriga_gbsm_helpers.hpp` and the phase-set file `src/qd_gbsm_phases.cpp`
 
-Created in Run 2a, extended in Run 2b; included by the source files named below and by nothing public. It holds only
-`static inline` helpers used by more than one source file; names start with `qd_gbsm_`. The header starts with a
-documentation block (comment lines) that states: purpose (helpers shared by the source files of the
-geometry-based stochastic model, not part of the public API), the users of each helper, the LSF generator index
-(table of 2.2), the slice convention of the phase cube (slice 0 Rx side, slice 1 Tx side = mirror of slice 0),
-and the units (positions in m, frequencies in Hz, decorrelation distances in m). Required content (signatures may
-be adapted by the implementer; the report states the final form):
+The internal header is included by the source files named below and by nothing public. It holds only `static
+inline` helpers (and one class) used by more than one source file; names start with `qd_gbsm_`. It starts with a
+documentation block (comment lines) that states: purpose (helpers shared by the source files of the geometry-based
+stochastic model, not part of the public API), the users of each helper, the LSP order and the units. Content:
 
 ```cpp
-// One generator of a phase set: decorrelation distance in [m] (0 already replaced by 0.1 m), distribution,
-// mirror partner, bias removal on/off
-struct qd_gbsm_gen { double lambda; bool uniform; arma::uword mirror; bool bias; };
+// Common validation of the link positions (3.0.2 rows 1 to 4); nullptr skips the checks of that argument
+//                                                    users: qd_gbsm_phases.cpp, path_loss.cpp, lsp_generate.cpp
+static inline void qd_gbsm_check_links(const arma::mat *tx_pos, const arma::mat *rx_pos);
 
-// The 11 LSF generators (index table) from a completed scenpar             users: lsf_init_phases.cpp, lsf_draw.cpp
-static inline std::vector<qd_gbsm_gen> qd_gbsm_lsf_generators(const std::unordered_map<std::string, double> &sp);
+// Validation of the carrier frequencies (3.0.2 rows 5 and 6)
+//                                       users: path_loss.cpp, lsp_generate.cpp, los_probability.cpp, o2i_loss.cpp
+static inline void qd_gbsm_check_fc(const arma::vec &fc);
 
-// Frequency tables, one per distinct decorrelation distance of 'gen' (in order of first appearance):
-// sos_preset(preset, freq[t], &acf[t], &dist[t], lambda_t); tab[g] = table index of generator g; throws for an
-// unknown preset with "Input 'preset' is not a known preset." (checked with qd_sos_preset_lookup); returns n_coeff
-//                                                                          users: lsf_init_phases.cpp, lsf_draw.cpp
-static inline arma::uword qd_gbsm_freq(const std::string &preset, const std::vector<qd_gbsm_gen> &gen,
-                                       std::vector<arma::mat> &freq, std::vector<arma::vec> &acf,
-                                       std::vector<arma::vec> &dist, std::vector<arma::uword> &tab);
-
-// Positions for the evaluation: R = rx_pos, T = tx_pos broadcast to n_link rows; z = 0 in 2D mode
-//                                                                          users: lsf_init_phases.cpp, lsf_draw.cpp
-static inline void qd_gbsm_positions(const arma::mat &rx_pos, const arma::mat &tx_pos, bool horizontal,
-                                     arma::mat &R, arma::mat &T);
-
-// LSP mean and std of all links and frequencies, [n_link, n_freq, 8] each   users: lsp_generate.cpp, path_loss.cpp
-static inline void qd_gbsm_lsp_mu_sigma(const std::unordered_map<std::string, double> &sp, const arma::vec &fc,
-                                        const arma::mat &tx_pos, const arma::mat &rx_pos,
-                                        arma::cube &mu, arma::cube &sigma);
+// LSP mean and std per link and frequency of a completed scenpar (3.0.4)    users: lsp_generate.cpp, path_loss.cpp
+// - The constructor reads the coefficients and evaluates the frequency terms at 'fc' for the LSPs in 'lsps'
+//   (bit i = LSP i) and throws for an invalid frequency term (3.0.4); set_link() takes the geometry of one link,
+//   get() returns mean and std of one LSP and frequency. No [n_link, n_freq, 8] intermediate is formed, so the
+//   default sf_sigma of path_loss costs only the SF std
+class qd_gbsm_lsp_stats
+{
+public:
+    qd_gbsm_lsp_stats(const std::unordered_map<std::string, double> &sp, const arma::vec &fc, unsigned lsps = 0xFFu);
+    void set_link(double d2D, double hBS, double hUT);
+    void get(arma::uword i, arma::uword k, double &mu, double &sigma) const;
+};
 
 // Cholesky-Banachiewicz of a symmetric 8x8 matrix, column-major double[64]: A = L·L^T, L lower triangular with
 // zeros above the diagonal; returns false at the first pivot that is not > 0 (NaN included)
@@ -525,32 +524,55 @@ static inline void qd_gbsm_lsp_mu_sigma(const std::unordered_map<std::string, do
 static inline bool qd_gbsm_chol8(const double *A, double *L);
 ```
 
-`qd_scenpar_xcorr` in `src/qd_scenpar.cpp` is refactored in Run 2b to call `qd_gbsm_chol8` (its own Cholesky loop is
-removed; behaviour unchanged, the existing conf tests cover it), so that the library has one 8x8
-Cholesky.
+`qd_scenpar_xcorr` in `src/qd_scenpar.cpp` calls `qd_gbsm_chol8` (the library has one 8x8 Cholesky). The linear
+table interpolation `qd_interp_linear(y, x, n, x0)` of `src/quadriga_lib_helper_functions.hpp` (constant beyond
+both ends) serves the ACF tables, the zenith table of `path_loss` and the 38.811 tables.
 
 File-local (anonymous namespace or lambda in the one file that uses them): the symmetric square root
-(`lsp_generate.cpp`), the probit (`los_probability.cpp`), the path-loss models, the tables of section 11.
+(`lsp_generate.cpp`), the probit (`los_probability.cpp`), the path-loss models and the random hE
+(`path_loss.cpp`), the tables of section 11.
 
-Generic phase-set functions. The evaluation, the floor offsets and the bias removal are file-local as well, but
-they are written for any phase set, not only the LSF set: the later SSF port moves them unchanged (as `static inline`) into this header
-and evaluates its own phase sets (cluster delays, angles, XPR, phases) with the same rules for mirroring, floors,
-2D/3D and dual mobility (section 8). They are therefore functions in an anonymous namespace with explicit
-parameters and exactly these signatures (no lambdas, no captured state, no LSF-specific constants; the names
-already carry the header prefix, so the move needs no renaming; the comments may be copied, they contain no
-internal references):
+Phase-set machinery. `lsf_init_phases` and `lsf_draw` share one source file, `src/qd_gbsm_phases.cpp` (name: the
+`qd_` prefix marks a file with several public functions, as `qd_scenpar.cpp`; "gbsm_phases" because the file holds
+all phase sets of the model, not only the LSF set). It starts with the LSF generator index (table of 2.2), the
+slice convention of the phase cube (slice 0 Rx side, slice 1 Tx side = mirror of slice 0) and the units, followed
+by an anonymous namespace with the machinery, then the two documentation blocks and definitions. The machinery is
+written for any phase set, not only the LSF set (explicit parameters, no captured state, no LSF-specific
+constants except in `qd_gbsm_lsf_generators`); the later SSF port adds its own generator tables and the functions
+that create and evaluate its phase sets to this file, so the machinery never moves to a header (if the SSF
+functions had to live elsewhere, the functions below would move unchanged, as `static inline`, into the internal
+header):
 
 ```cpp
 namespace
 {
-    // Phase offsets of floor q, [n_coeff]: 2·pi·(q mod N)·n/N + psi_(q div N)(n)               file: lsf_draw.cpp
+    // One generator of a phase set
+    struct qd_gbsm_gen { double lambda; bool uniform; arma::uword mirror; bool bias; };
+
+    // Number of sinusoids of a preset; throws "Input 'preset' is not a known preset." (the one preset lookup)
+    arma::uword qd_gbsm_n_coeff(const std::string &preset);
+
+    // The 11 LSF generators (index table) from a completed scenpar
+    std::vector<qd_gbsm_gen> qd_gbsm_lsf_generators(const std::unordered_map<std::string, double> &sp);
+
+    // Frequency tables, one per distinct decorrelation distance of 'gen' (in order of first appearance):
+    // sos_preset(preset, freq[t], &acf[t], &dist[t], lambda_t); tab[g] = table index of generator g; 'preset' is
+    // known (checked by the caller with qd_gbsm_n_coeff)
+    void qd_gbsm_freq(const std::string &preset, const std::vector<qd_gbsm_gen> &gen, std::vector<arma::mat> &freq,
+                      std::vector<arma::vec> &acf, std::vector<arma::vec> &dist, std::vector<arma::uword> &tab);
+
+    // Positions for the evaluation: R = rx_pos, T = tx_pos broadcast to n_link rows; z = 0 in 2D mode
+    void qd_gbsm_positions(const arma::mat &rx_pos, const arma::mat &tx_pos, bool horizontal, arma::mat &R, arma::mat &T);
+
+    // Phase offsets of floor q, [n_coeff]: 2·pi·(q mod N)·n/N + psi_(q div N)(n)
     arma::vec qd_gbsm_floor_offset(arma::uword n_coeff, arma::uword q);
 
-    // Normalized values of a phase set at a set of links                                     file: lsf_draw.cpp
+    // Normalized values of a phase set at a set of links
     // - gen, freq, acf, dist, tab: generator table and frequency tables (qd_gbsm_lsf_generators, qd_gbsm_freq)
     // - phase [n_coeff, n_gen, 2]: slice 0 Rx side, slice 1 Tx side (mirror of slice 0)
     // - R, T [n_link, 3], n_link >= 1: positions from qd_gbsm_positions (T unused without dual mobility)
-    // - floor_id: [n_link] or nullptr (all on floor 0)
+    // - floor_id: [n_link] or nullptr (all on floor 0); the offsets go to both slices (both devices on the
+    //   link's floor)
     // - val [n_link, n_gen]: column g Normal(0,1), or Uniform(0,1) (map 0.5·erfc(-x/sqrt(2))) if gen[g].uniform
     void qd_gbsm_eval(const std::vector<qd_gbsm_gen> &gen, const std::vector<arma::mat> &freq,
                       const std::vector<arma::vec> &acf, const std::vector<arma::vec> &dist,
@@ -558,7 +580,7 @@ namespace
                       const arma::mat &R, const arma::mat &T, const arma::uvec *floor_id,
                       bool dual_mobility, arma::mat &val);
 
-    // Bias removal of the generators with gen[g].bias (Normal fields), in place      file: lsf_init_phases.cpp
+    // Bias removal of the generators with gen[g].bias (Normal fields), in place
     // - P0 [n_coeff, n_gen]: Rx-side phases; U [n_pos, 3], n_pos > 2: all positions where the fields are evaluated
     void qd_gbsm_remove_bias(const std::vector<qd_gbsm_gen> &gen, const std::vector<arma::mat> &freq,
                              const std::vector<arma::uword> &tab, arma::mat &P0, const arma::mat &U);
@@ -567,10 +589,11 @@ namespace
 
 `qd_gbsm_eval` implements steps 3 to 6 of 3.2 for `n_gen` generators (`lsf_draw` copies `val` into `rnd`);
 `qd_gbsm_remove_bias` implements step 3 of 3.1 (the caller builds `U`); `qd_gbsm_floor_offset` implements 3.2.1.
-These three are an approved exception to the rule "a helper used once is a lambda" (9.1). They group the `sos_val`
-/ `sos_remove_bias` calls by frequency table (one call per table and side with all phase columns that use it), so
-that a set with hundreds of generators at one decorrelation distance (the SSF sets) needs one call per table. A
-generator `g` with `mirror != g` is a pair member; pairs need no extra step (3.2 step 5).
+These functions are reused within the file or written for the SSF phase sets, so they are functions of the
+anonymous namespace, not lambdas. They group the `sos_val` / `sos_remove_bias` calls by frequency table (one call
+per table and side with all phase columns that use it), so that a set with hundreds of generators at one
+decorrelation distance (the SSF sets) needs one call per table. A generator `g` with `mirror != g` is a pair
+member; pairs need no extra step (3.2 step 5).
 
 ### 3.1 `lsf_init_phases`
 
@@ -580,8 +603,8 @@ Source: `init_sos.m` lines 112 to 160 (LSF part), `qd_sos.m` `init`, `remove_bia
 
 1. `seed >= -1`, else `Input 'seed' must be >= -1.` (the message of `sos_init_phases`, checked here so that it
    comes before any other work).
-2. `preset` known (`qd_sos_preset_lookup`), else `Input 'preset' is not a known preset.` (the message of `sos_rand`);
-   `n_coeff` from the lookup.
+2. `preset` known (`qd_gbsm_n_coeff`, which uses `qd_sos_preset_lookup`), else `Input 'preset' is not a known
+   preset.` (the message of `sos_rand`); `n_coeff` from the lookup (the only lookup of the call).
 3. scenpar completed and validated (3.0.3); this covers the 10 decorrelation-distance keys of 2.2.
 4. `rx_pos` (if given): 3 columns, finite. `tx_pos` (if given): 3 columns, finite; if `rx_pos` is given as well,
    1 or `n_link` rows.
@@ -657,7 +680,11 @@ scenpar completed and validated (3.0.3); `phase` must be `[n_coeff, 11, 2]` with
 3. Floors: `fl(l) = floor_id ? (*floor_id)(l) : 0`. Links are grouped by distinct floor ID. For floor `q` the phases
    are `P0_q = P0 + Delta_q`, `P1_q = P1 + Delta_q` (the same offset vector added to every column of both slices),
    `Delta_q` from 3.2.1. Floor 0 has `Delta_0 = 0`, so `floor_id` all 0 gives exactly the values of
-   `floor_id = nullptr`.
+   `floor_id = nullptr`. In dual mobility `floor_id` is one value per link and its offsets go to both sides: both
+   devices of a link are on the link's floor. A Tx device on another floor than its Rx (e.g. a D2D link between
+   two floors) is evaluated on the floor of the Rx, so the same Tx device sees different fields on links to Rx
+   devices on different floors. The documentation blocks (C++, MEX, Python) state this; a separate Tx floor ID is
+   not part of the API.
 4. Fields (all generators evaluated as Normal, `uniform = false`), for every floor group (links `L`) and generator
    g, with `sos_val<double>` in one-device mode and `use_kernel = 0`:
    - Rx side: `a_g = sos_val(F_g, P0_q.col(g), R.rows(L))`.
@@ -667,7 +694,7 @@ scenpar completed and validated (3.0.3); `phase` must be `[n_coeff, 11, 2]` with
    The calls are grouped by frequency table and side: one `sos_val` call per table evaluates all phase columns
    that use it (same values as one call per generator).
 5. Combination, per link `l`, with `D = norm(R(l) - T(l))` (projected positions in 2D mode) and
-   `A_g(D) = qd_sos_acf_interp(acf_g, dist_g, D)` (linear, constant beyond the last sample point):
+   `A_g(D) = qd_interp_linear(acf_g, dist_g, D)` (linear, constant beyond the last sample point):
    - single mobility: `x_g = a_g`;
    - dual mobility, `m(g) = g`: `x_g = (a_g + b_g) / sqrt(2 + 2·A_g(D))` (both devices on one map; unit variance);
    - dual mobility, pairs (3, 4) and (5, 6): `x_g = (a_g + b_g) / sqrt(2)` (two independent fields, unit
@@ -722,7 +749,7 @@ of a discrete cosine vanishes); for floors in different blocks it is a random nu
 same level as for pseudo-random offsets; the documentation block states "uncorrelated at equal horizontal
 positions", not "independent". The same offsets serve both slices and all generators, so mirror relations and
 reciprocity are kept per floor. The offsets are `qd_gbsm_floor_offset` of 3.0.5 (anonymous namespace in
-`src/lsf_draw.cpp`).
+`src/qd_gbsm_phases.cpp`).
 
 ### 3.3 `path_loss`
 
@@ -772,7 +799,9 @@ outdoor part. The O2I loss itself is never added by `path_loss`; the caller adds
 
 `sf_sigma(l, k) = sigma_2(l, k)` of 3.0.4 (SF index, raw geometry, not the O2I-scaled distances), not `SF_sigma + SF_delta · lg(f)`, so that passing `sf_sigma` to `lsp_generate` is neutral for models
 without `sig` keys. Models with `sig`-type keys replace it as stated below. For all v19 files without `sig` keys this
-is `SF_sigma` (they have `SF_delta = SF_omega = SF_kappa = SF_tau = SF_beta = 0`).
+is `SF_sigma` (they have `SF_delta = SF_omega = SF_kappa = SF_tau = SF_beta = 0`). The default is computed per
+link and frequency with `qd_gbsm_lsp_stats` restricted to SF (no 8-LSP intermediate); with `sf_sigma` requested,
+an active SF frequency term with `SF_omega + f' <= 0` throws (3.0.4) after the scenpar validation.
 
 #### 3.3.4 Models
 
@@ -842,7 +871,7 @@ Formulas per link `l` and frequency `k` (`get_pl.m` line numbers in brackets):
   ```
 - **satellite** [436 to 476]: `sa = min(hBS / d3, 1)` (absolute Tx height, as MATLAB); if `sa <= 0`: `pl = +Inf`; else
   `alpha = asin(sa)` [rad], `PLa = [usePLa] != 0 ? Z(f) / sa : 0` with `Z(f)` the zenith attenuation of Appendix 11.1,
-  linearly interpolated over f in GHz with constant values beyond 1 and 100 GHz (`qd_sos_acf_interp(Z, f_grid, 93,
+  linearly interpolated over f in GHz with constant values beyond 1 and 100 GHz (`qd_interp_linear(Z, f_grid, 93,
   f)`: linear, constant beyond both ends, strictly increasing grid); `pl = A·lg d3 + B + C·lg f + D·lg(alpha) + PLa`.
 
 `sf_sigma` is the default (3.3.3) wherever a model does not set it.
@@ -864,9 +893,13 @@ g  = (d <= 18) ? 0 : 1.25 · (d/100)³ · exp(-d/150)
 C' = (hUT < 13) ? 0 : (hUT <= 23 ? ((hUT - 13)/10)^1.5 : 1)
 C  = C' · g;   p1 = 1 / (1 + C)
 n  = (hUT - 1.5 >= 12) ? floor((hUT - 13.5)/3 + 1e-9) + 1 : 0          size of the set {12, 15, ..., hUT - 1.5}
-if C == 0 or n == 0 or u < p1:  hE = 1
+if C == 0 or n == 0 or u < p1 or p1 >= 1:  hE = 1
 else:  j = min(floor((u - p1) / (1 - p1) · n), n - 1);  hE = 12 + 3·j
 ```
+
+`p1 >= 1` occurs where `C` is below the rounding of `1 + C` (about 1.1e-16, e.g. beyond about 7.5 km at
+`hUT = 20 m`); the other heights then have a probability below 1e-16, and without the rule `u = 1` would give
+`0/0` and a NaN path loss.
 
 The fixed `[hE]` is not used for such a link, and `hm` gets no 1.1·hE clamp (3.3.4). The value 1 m is the TR value
 (the v19 UMa files also have `PL_hE = 1`).
@@ -951,6 +984,10 @@ step 4, Tables 7.5-6 to 7.5-12, 7.6.5, 7.6.9.
        e += (atan((EoD_offset_hcl - h)/d) - atan((hUT - h)/d)) · 180/pi
    eod_offset_deg(l, k) = e                       degrees, positive = up (= -mu_offset,ZOD of the TR)
    ```
+   RMa NLOS and both RMa O2I files: TR Table 7.5-9 gives `mu_offset,ZOD = atan((35 - 3.5)/d2D) - atan((35 -
+   1.5)/d2D)` with fixed heights for every link. The files encode it with `EoD_offset_hcl = 3.5`, i.e. with the
+   actual heights. This generalizes the TR row: it equals the TR at hBS 35 m, hUT 1.5 m and is 0 for UTs at or
+   above the clutter height of 3.5 m (RMa allows hUT up to 10 m). The comment of the three files says so.
 
 #### 3.4.3 Symmetric square root (`cholesky = false`)
 
@@ -1014,7 +1051,10 @@ Source: TR Table 7.4.2-1, clause 7.6.3.3 eq. (7.6-18), 7.8.4 Table 7.8-7; `set_s
    (`Input 'h_bs' must be finite.`). A single element applies to all links.
 4. `d_clutter` NaN or finite > 0 (`Input 'd_clutter' must be NaN or > 0.`); `r_clutter` NaN or in [0, 1)
    (`Input 'r_clutter' must be NaN or in the range from 0 to 1, 1 excluded.`); `h_clutter` NaN or finite >= 0
-   (`Input 'h_clutter' must be NaN or >= 0.`). Checked for every model, used only by InF and SMa.
+   (`Input 'h_clutter' must be NaN or >= 0.`). Checked for every model, used only by InF and SMa. A subnormal
+   `d_clutter` passes and gives `kinv = +Inf`: the clutter attenuation `exp(-d·k)` is evaluated as 1 at `d = 0`
+   and an SMa clutter type with `h_x <= hU` adds no term, so no `0·Inf` = NaN arises (1 at `d = 0`, 0 beyond for
+   a blocked UT).
 5. If `los_soft != nullptr`: `rnd_g` and `fc` are required (`Output 'los_soft' requires 'rnd_g' and 'fc'.`);
    `rnd_g` `n_link` elements, finite; `fc` non-empty, finite > 0. If `los_soft == nullptr`, `rnd_g` and `fc` are
    ignored (not validated).
@@ -1032,7 +1072,7 @@ Source: TR Table 7.4.2-1, clause 7.6.3.3 eq. (7.6-18), 7.8.4 Table 7.8-7; `set_s
 | `38.901_InF_SH`, `_DH` | see below |
 | `38.901_InF_HH` | 1 |
 | `38.901_SMa` | `d <= 10`: 1; else see below |
-| `38.811_DenseUrban`, `_Urban`, `_Suburban`, `_Rural` | `0.01 ·` linear interpolation of the table of Appendix 11.2 at the elevation `atan2(hB, d)` in degrees (`qd_sos_acf_interp` over the elevation grid) |
+| `38.811_DenseUrban`, `_Urban`, `_Suburban`, `_Rural` | `0.01 ·` linear interpolation of the table of Appendix 11.2 at the elevation `atan2(hB, d)` in degrees (`qd_interp_linear` over the elevation grid) |
 | `QuaDRiGa_Industrial` | `min(1, exp(-(d + 20)/80) · exp(min(hB, 8)/5 - 1))` |
 | `LOS` / `NLOS` | 1 / 0 |
 
@@ -1384,24 +1424,28 @@ correlation matrix (existing test).
 
 ### 5.0 Conventions for all new test files
 
-- One file per function: `tests/catch2_tests/test_lsf_init_phases.cpp`, `test_lsf_draw.cpp`, `test_path_loss.cpp`,
-  `test_lsp_generate.cpp`, `test_los_probability.cpp`, `test_o2i_loss.cpp`. No test of the internal header: every
-  helper is covered through a public function with an independent oracle (5.7).
+- One file per source file: `tests/catch2_tests/test_gbsm_phases.cpp` (`lsf_init_phases` and `lsf_draw`, one
+  fixture block), `test_path_loss.cpp`, `test_lsp_generate.cpp`, `test_los_probability.cpp`, `test_o2i_loss.cpp`.
+  No test of the internal header: every helper is covered through a public function with an independent oracle
+  (5.7).
 - Header comment as SPEC_CPP_API (what is pinned, oracles, conventions). Include `"quadriga_gbsm.hpp"` (and
   `"quadriga_sos.hpp"` where SOS functions provide supporting data).
 - Diagnostics: `#include "qd_test_diag.hpp"` and `QD_TEST_DIAG_SWITCH("QD_DIAG_GBSM")`; Run 2a adds the line
-  `//   QD_DIAG_GBSM   large-scale model tests (test_lsf_*.cpp, test_path_loss.cpp, test_lsp_generate.cpp, ...)` to
+  `//   QD_DIAG_GBSM   large-scale model tests (test_gbsm_phases.cpp, test_path_loss.cpp, test_lsp_generate.cpp, ...)` to
   the list in `tests/catch2_tests/qd_test_diag.hpp`. Tables in CSV form with `# diag:` title. (The `QD_TEST_VERBOSE`
   define of SPEC_CPP_API is not used; the test suite has moved to the area switch.)
 - Test case names `"<function> - <statement>"`, unique in the suite; one behaviour per case; one validation case
   per function named `"<function> - input validation"` with a valid baseline (`CHECK_NOTHROW`) and one `SECTION`
-  per check of the validation list.
+  per check of the validation list. Messages are checked with `CHECK_THROWS_MATCHES(expr, std::invalid_argument,
+  Catch::Matchers::Message("..."))`; no test-side try/catch helper.
 - Oracles are typed into the test file: TR 38.901 v19.5.0 formulas and tables (cited by clause, table and equation
   number), the formulas of this spec (written out, not cited by section), a scalar sum-of-sinusoids
   `ref_sos(F, phi, pos) = sqrt(2/N) · sum_n cos(2·pi·(F(n,0)·x + F(n,1)·y + F(n,2)·z) + phi(n))`, the uniform map
-  `0.5·erfc(-v/sqrt(2))`, a test-side linear ACF interpolation, a test-side 8x8 Cholesky. Supporting data from the
-  library: `sos_preset` (frequency and ACF tables), `sos_init_phases`, `conf_file_read` (the files under test),
-  `lsf_init_phases` / `lsf_draw` where a test of another function needs phases or random values.
+  `0.5·erfc(-v/sqrt(2))`, a test-side 8x8 Cholesky. Supporting tasks use library calls, not test-side
+  re-implementations: `sos_preset` (frequency and ACF tables), `sos_acfi` (linear interpolation of an ACF table),
+  `interp_1D` (linear interpolation of the typed zenith and 38.811 tables, which stay typed in the tests as oracle
+  data), `sos_init_phases`, `conf_file_read` (the files under test), `lsf_init_phases` / `lsf_draw` where a test of
+  another function needs phases or random values.
 - Never an oracle: the function under test or `quadriga_gbsm_helpers.hpp`.
 - Random inputs of statistical tests come from `std::mt19937_64` with fixed seeds and test-side transforms
   (Box-Muller for Normal values); `std::normal_distribution` is not used (not portable).
@@ -1422,7 +1466,7 @@ correlation matrix (existing test).
   equations or state the rule.
 - Determinism: a repeated call gives identical results (one check per file).
 
-### 5.1 `test_lsf_init_phases.cpp`
+### 5.1 `test_gbsm_phases.cpp`: `lsf_init_phases` cases
 
 Scenpar for most cases: all 10 decorrelation distances set explicitly (e.g. DS 11, KF 12, SF 13, ASD 14, ASA 15,
 ESD 16, ESA 17, XPR 18, absTOA 19, SC 20 m) so that a mix-up of generators is visible; every `ref_sos` of
@@ -1441,7 +1485,7 @@ generator g uses `sos_preset(preset, F_g, acf_g, dist_g, lambda_g)` with that ge
 | a decorrelation distance of 0 is used as 0.1 m | `DS_lambda = 0`, bias removal: mean of `ref_sos` with `sos_preset(.., 0.1)` is 0 | `ref_sos` | 1e-12 |
 | input validation | one section per check of 3.1: seed -2 (`Input 'seed' must be >= -1.`); unknown preset (`Input 'preset' is not a known preset.`); `DS_lambda` -1 and `SC_lambda` Inf (the `scenpar_validate` message passes through); an unknown key; `rx_pos` 2 columns; `rx_pos` NaN; `tx_pos` 2 columns; `tx_pos` 2 rows for 5 links; dual mobility with positions, bias removal, no `tx_pos`; baseline: the same call without bias removal does not throw | — | — |
 
-### 5.2 `test_lsf_draw.cpp`
+### 5.2 `test_gbsm_phases.cpp`: `lsf_draw` cases
 
 Tolerances of `lsf_draw` values follow 5.0 (AVX2 kernel); the reason is stated in a comment of each case.
 
@@ -1453,8 +1497,8 @@ Tolerances of `lsf_draw` values follow 5.0 (AVX2 kernel); the reason is stated i
 | 2D mode values do not depend on z | changing all z leaves `rnd` unchanged | — | exact |
 | single mobility ignores tx_pos | two different `tx_pos` give identical `rnd` | — | exact |
 | a link does not depend on the other links | links evaluated one by one equal the joint call | — | exact |
-| dual mobility values follow the two-device formulas | 6 links incl. one with Tx = Rx and one with distance > 5 lambda; self-mirrored columns `(ref_sos(F_g, P0_g, R) + ref_sos(F_g, P0_g, T)) / sqrt(2 + 2·A_g(D))`; columns 3..6 `(ref_sos(F_g, P0_g, R) + ref_sos(F_m, P0_m, T)) / sqrt(2)` (no further mixing of the pair); 9, 10 the uniform map | typed formulas, `ref_sos`, test-side linear interpolation of the `sos_preset` ACF table | 2e-5 (0..8), 1e-5 (9, 10) |
-| dual mobility keeps unit variance and correlates the pairs by the ACF at the Tx-Rx distance | lambdas ASD 10, ASA 15, ESD 10, ESA 20 m; the 100 x 100 Rx grid of the marginal case (50 m spacing), Tx = Rx + (D, 0, 0) for D = 5, 10, 20 m (one call per D): sample variance of columns 3, 4, 5, 6 within 0.07 of 1; sample correlation of (3, 4) within 0.08 of `(A_3(D) + A_4(D))/2` and of (5, 6) within 0.08 of `(A_5(D) + A_6(D))/2`; D = 0 (Tx = Rx): column 3 equals column 4 and column 5 equals column 6 | unit variance; `sos_preset` ACF tables, test-side linear interpolation | variance 0.07 = 5 standard errors (`sqrt(2/n)` = 0.014); correlation 0.08 = 5 standard errors (<= 0.01) + SOS approximation error (0.03); D = 0 exact |
+| dual mobility values follow the two-device formulas | 6 links incl. one with Tx = Rx and one with distance > 5 lambda; self-mirrored columns `(ref_sos(F_g, P0_g, R) + ref_sos(F_g, P0_g, T)) / sqrt(2 + 2·A_g(D))`; columns 3..6 `(ref_sos(F_g, P0_g, R) + ref_sos(F_m, P0_m, T)) / sqrt(2)` (no further mixing of the pair); 9, 10 the uniform map | typed formulas, `ref_sos`, the `sos_preset` ACF table interpolated by `sos_acfi`; floors 3 and 259 mixed with floor 0 in the same 6 links: the typed offsets of 3.2.1 added to the phases of both sides | 2e-5 (0..8), 1e-5 (9, 10) |
+| dual mobility keeps unit variance and correlates the pairs by the ACF at the Tx-Rx distance | lambdas ASD 10, ASA 15, ESD 10, ESA 20 m; the 100 x 100 Rx grid of the marginal case (50 m spacing), Tx = Rx + (D, 0, 0) for D = 5, 10, 20 m (one call per D): sample variance of columns 3, 4, 5, 6 within 0.07 of 1; sample correlation of (3, 4) within 0.08 of `(A_3(D) + A_4(D))/2` and of (5, 6) within 0.08 of `(A_5(D) + A_6(D))/2`; D = 0 (Tx = Rx): column 3 equals column 4 and column 5 equals column 6 | unit variance; `sos_preset` ACF tables, `sos_acfi` | variance 0.07 = 5 standard errors (`sqrt(2/n)` = 0.014); correlation 0.08 = 5 standard errors (<= 0.01) + SOS approximation error (0.03); D = 0 exact |
 | swapping Tx and Rx swaps ASD with ASA and ESD with ESA | dual mobility, unequal lambdas of ASD/ASA and ESD/ESA, phases with and without bias removal; both calls use one phase cube (computed once from the original positions): `rnd(tx=A, rx=B)` columns 0, 1, 2, 7, 8, 9, 10 equal `rnd(tx=B, rx=A)`, 3 <-> 4 and 5 <-> 6 swapped | reciprocity (same evaluations in swapped roles) | exact |
 | floor 0 equals no floor ID and equal IDs share one field | `floor_id = 0` gives the values of `nullptr` (exact); links of floor 3 and floor 259 equal `ref_sos` with the phases plus the offsets `2·pi·k·n/N + psi_b(n)` typed in the test (`k = q mod N`, `b = q div N`; `psi_1(n) = 2·pi·((x_n >> 11)·2^-53)` with `x_n` the n-th output of `std::mt19937_64 gen(1)`) | typed offset rule | exact; 2e-5 |
 | fields of different floors are uncorrelated at equal positions | lambda 10 m, 100 x 100 grid with 50 m spacing (n = 10^4, ACF at 5 lambda below 0.02), the same positions on every floor: sample correlation of every Normal column between floors (0, 1), (1, 5), (0, 255) below 0.05 in magnitude; between (0, 256) below 0.25 | zero within a block of N floor IDs, `1/sqrt(2N) = 0.044` between blocks | 0.05 = 5 standard errors of 1/sqrt(n); 0.25 = 5.6 · 0.044 |
@@ -1567,11 +1611,12 @@ there with an independent oracle.
 
 | Helper | Covered by |
 |---|---|
-| `qd_gbsm_lsf_generators`, `qd_gbsm_freq`, `qd_gbsm_positions` | 5.1, 5.2 (`ref_sos` with each generator's own distance, 2D/3D, Tx broadcast, unknown preset) |
-| `qd_gbsm_lsp_mu_sigma` | 5.4 (formula with every term), 5.3 (default `sf_sigma`) |
+| `qd_gbsm_lsf_generators`, `qd_gbsm_freq`, `qd_gbsm_positions`, `qd_gbsm_n_coeff` (file-local) | 5.1, 5.2 (`ref_sos` with each generator's own distance, 2D/3D, Tx broadcast, unknown preset) |
+| `qd_gbsm_check_links`, `qd_gbsm_check_fc` | the validation cases of 5.1 to 5.6 (messages of 3.0.2) |
+| `qd_gbsm_lsp_stats` | 5.4 (formula with every term, frequency-term check), 5.3 (default `sf_sigma`, SF frequency-term check) |
 | `qd_gbsm_chol8` | 5.4 (TR-order root against a test-side Cholesky, not positive definite), existing conf tests (positive-definite flag of `qd_scenpar_xcorr`) |
 | `qd_gbsm_floor_offset` (file-local) | 5.2 (typed offset rule, zero correlation within a block) |
-| `qd_gbsm_eval` (file-local) | 5.2 (`ref_sos`, two-device formulas, floors, uniform map) |
+| `qd_gbsm_eval` (file-local) | 5.2 (`ref_sos`, two-device formulas, floors in single and dual mobility, uniform map) |
 | `qd_gbsm_remove_bias` (file-local) | 5.1 (zero drop mean with `ref_sos`, single and dual mobility, 2D/3D) |
 | symmetric square root (file-local) | 5.4 (`X·X = R`, symmetry, positive definite) |
 | probit (file-local) | 5.5 (accuracy through `los_soft`) |
@@ -1623,7 +1668,9 @@ struct / dict of `conf_file_read` whose entry `model` is passed as `pl_model` (n
 empty model, zero loss). Helpers: MEX `qd_mex_struct2scenpar`, `qd_mex_struct2plpar`
 (`src/mex_quadriga_lib_functions.hpp`, include `mex_quadriga_lib_functions.hpp`); Python `qd_python_dict2scenpar`,
 `qd_python_dict2plpar` (`api_python/python_quadriga_adapter.hpp`). `floor_id` is read as double, checked to be
-non-negative integers (`Entries in 'floor_id' must be non-negative integers.`) and converted to `arma::uvec`.
+non-negative integers below 2^53 (`Entries in 'floor_id' must be non-negative integers below 2^53.`; from 2^53 on
+a double does not hold every integer, so larger IDs would change silently) and converted to `arma::uvec`. The
+documentation blocks of `lsf_draw` state that in dual mobility `floor_id` is the floor of both devices (3.2).
 
 ### 6.1 MEX (`api_mex/<name>.cpp`, `tests/mex_tests/test_<name>.m`)
 
@@ -1650,7 +1697,7 @@ covers the checklist of SPEC_MATLAB_API "What every test covers" with these spec
   for 3 positions or more; errors: argument counts, unknown preset (C++ message `Comb999`), dual mobility without
   `tx_pos` (C++).
 - lsf_draw: `[n_link, 11]` double; z-independence in 2D, z-dependence with `horizontal = false`; `floor_id = []`
-  equals all zeros; `floor_id` with `-1` and `1.5` raise the wrapper error; `uint32` and `int64` floor IDs accepted; dual
+  equals all zeros; `floor_id` with `-1`, `1.5` and `2^53` raise the wrapper error; `uint32` and `int64` floor IDs accepted; dual
   mobility swap of columns 4/5 (MATLAB 1-based) with swapped positions; `phase` of the wrong size raises the C++
   error.
 - path_loss: logdist via a hand-made `plpar` struct (`model = 'logdist'`, `A = 20`, `B = 30`, `C = 20`) at d3D =
@@ -1686,14 +1733,18 @@ lsp, abs_toa, gr_eps, eod_offset_deg, lsp_mu, lsp_sigma = quadriga_lib.gbsm.lsp_
 # complex=False
 lsp, abs_toa, gr_eps_re, gr_eps_im, eod_offset_deg, lsp_mu, lsp_sigma = quadriga_lib.gbsm.lsp_generate( ...,
     complex=False )
-p_los, los_soft = quadriga_lib.gbsm.los_probability( model, d2d_out, h_bs, h_ut, d_clutter=nan, r_clutter=nan,
-    h_clutter=nan, rnd_g=None, fc=None )
+p_los, los_soft = quadriga_lib.gbsm.los_probability( model, d2d_out, h_bs, h_ut, d_clutter=None, r_clutter=None,
+    h_clutter=None, rnd_g=None, fc=None )
 loss, d2d_in, model_index = quadriga_lib.gbsm.o2i_loss( fc, rnd, models, weights, d2d_in_max=25.0 )
 ```
 
-- `scenpar`, `plpar`: `py::handle` (dict or None). `seed`: `long long`. Flags: plain `bool` (SPEC_PYTHON_API
-  scalars). `d_clutter`, `r_clutter`, `h_clutter`: `double` with default `std::numeric_limits<double>::quiet_NaN()`
-  (Usage and docs say `nan`).
+- `scenpar`, `plpar`: `py::handle` (dict or None). `seed`: `long long`. Flags (`dual_mobility`, `remove_bias`,
+  `horizontal`, `cholesky`, `clip_spreads`, `complex`): `py::handle`, read with `qd_python_flag(handle, default,
+  name)` as in the four conf functions of the submodule (SPEC_PYTHON_API "Flags"): `None` selects the default, bool
+  and `numpy.bool_` give their value, any other type (float, int, str) raises `TypeError` (`Input '<name>' must be
+  a bool or None.`); the `m.def` defaults stay `true` / `false`. `d_clutter`, `r_clutter`, `h_clutter`:
+  `py::handle`, `None` (the default) = NaN = the TR default of the model, else a real scalar (`ValueError`
+  `Input '<name>' must be a real scalar or None.`), as MATLAB accepts `[]`.
 - Outputs: `phase` `(n_coeff, 11, 2)` copied after the call; all others pre-allocated with
   `qd_python_init_output`; `model_index` uint64 (pre-allocated, C++ type kept, 0-based); `abs_toa` 1D `(n_link,)`;
   `gr_eps` complex128 `(n_link, n_freq)` built with `qd_python_copy2numpy<double, std::complex<double>>`; `los_soft`
@@ -1706,7 +1757,8 @@ loss, d2d_in, model_index = quadriga_lib.gbsm.o2i_loss( fc, rnd, models, weights
   C-ordered, Fortran-ordered and strided `rx_pos` give the same result; `float32` positions accepted; `complex`
   flag of `lsp_generate` (tuple length 6 vs 7, `gr_eps.real == gr_eps_re`); `quadriga_lib.gbsm.conf_file_read` of a
   v19 file feeds `path_loss` and `lsp_generate` directly; `TypeError` for a missing mandatory argument and an
-  unknown keyword; `ValueError` from C++ for an unknown path-loss model.
+  unknown keyword; `ValueError` from C++ for an unknown path-loss model; every flag: `None` equals the default and
+  a non-bool value (e.g. 2.5) raises `TypeError`; clutter arguments `None` equal NaN.
 
 
 ## 7. Implementation runs
@@ -1885,7 +1937,7 @@ to 12, 7.6.2, 7.6.3.1, 7.6.13 to 7.6.16. The small-scale step needs from the LSF
 | Per-frequency handling (7.6.5: same x, independent per-cluster shadowing) | `xpr_sos`, `pin_sos` per frequency | LSF: one `x` for all frequencies; SSF: own generators | provided for LSF |
 | Anchor-frequency LSPs of the alternative multi-frequency method (7.6.5.1: DS0, ASD0, ASA0, ZSD0, ZSA0 at e.g. 2 GHz) | — | `lsp_generate` with the anchor frequency added to `fc` (same `x`, so the anchor and the frequencies of interest are consistent); `clip_spreads` applies to the anchor as well, since 7.6.5.1 takes the spreads "according to Step 4", which includes the clipping | provided |
 | Path loss for step 12 | `get_pl` | `path_loss` | provided |
-| Spatially consistent cluster and ray variables (7.6.3.1: delays, shadowing, offsets, signs, coupling, XPR, phases; SC_lambda; same floor rule; mirrored for dual mobility) | `init_sos.m` lines 168 to 237 (`path_sos`, `xpr_sos`, `pin_sos`, `clst_dl_sos`) | **not** the LSF phase set (fixed 11 generators, `[n_coeff, 11, 2]`); the SSF port defines its own phase sets and evaluates them with `qd_gbsm_eval`, `qd_gbsm_floor_offset` and `qd_gbsm_remove_bias`, which Run 2a writes generically over the generator table (`qd_gbsm_gen`: lambda, distribution, mirror partner, bias flag) with the signatures of 3.0.5 and which the SSF port moves unchanged into `src/quadriga_gbsm_helpers.hpp` | requirement on Run 2a |
+| Spatially consistent cluster and ray variables (7.6.3.1: delays, shadowing, offsets, signs, coupling, XPR, phases; SC_lambda; same floor rule; mirrored for dual mobility) | `init_sos.m` lines 168 to 237 (`path_sos`, `xpr_sos`, `pin_sos`, `clst_dl_sos`) | **not** the LSF phase set (fixed 11 generators, `[n_coeff, 11, 2]`); the SSF port defines its own phase sets and evaluates them with `qd_gbsm_eval`, `qd_gbsm_floor_offset` and `qd_gbsm_remove_bias`, which Run 2a writes generically over the generator table (`qd_gbsm_gen`: lambda, distribution, mirror partner, bias flag) with the signatures of 3.0.5; the SSF functions that create and evaluate these sets are added to `src/qd_gbsm_phases.cpp`, so the machinery stays file-local there | requirement on Run 2a |
 | Floor separation of cluster variables (7.6.3.3 last paragraph) | — | the floor offsets of 3.2.1 inside the generic evaluation, with the same per-UT floor IDs as `lsf_draw` (derived by the layout, 10.3) | requirement on Run 2a |
 | Seeds of the SSF phase sets, independent of the LSF set | `init_sos.m` (one seed per `qd_sos` object) | `sos_init_phases` fills column g independently of the number of generators, so an SSF set drawn with the builder's LSF seed would repeat the LSF phases in its first 11 columns and, at an equal decorrelation distance (e.g. `SC_lambda` 50 m and an LSF lambda of 50 m in UMa NLOS), reproduce the LSF fields. Rule: the SSF sets take the columns from 11 on of one `sos_init_phases(n_coeff, 11 + n_ssf, seed)` call with the builder's seed (columns 0 to 10 are the raw LSF phases), or use a seed derived from the builder seed by a fixed rule. The first form requires the `n_coeff` of the LSF set: the matrix is filled column by column from one random stream, so with another `n_coeff` the SSF columns would reuse parts of the stream of the LSF columns; SSF sets with another `n_coeff` use a derived seed. The builder therefore stores an explicit seed (drawn once when the caller passes -1) or the SSF phase cubes | requirement on the SSF port and NG |
 | Grouping of the evaluation by decorrelation distance | `xpr_sos`: clusters · (M + 1) · n_freq generators at one `SC_lambda` | `qd_gbsm_freq` builds one frequency table per distinct lambda with a generator-to-table index; the evaluation and the bias removal make one call per table (3.0.5) | requirement on Run 2a |
@@ -1912,12 +1964,12 @@ No public API was added for SSF readiness.
   Armadillo element access and products are fine.
 - Precision: functions are double; `lsf_draw` calls `sos_val<double>` with `use_kernel = 0` (AVX2 kernel with
   single-precision sin/cos where available); tests of `lsf_draw` values use the tolerances of 5.0.
-- Lean code: reuse existing helpers (`qd_sos_rng`, `qd_sos_uniform`, `qd_sos_acf_interp`, `qd_sos_preset_lookup`,
+- Lean code: reuse existing helpers (`qd_sos_rng`, `qd_sos_uniform`, `qd_interp_linear`, `qd_sos_preset_lookup`,
   `scenpar_validate`); a helper used once is a lambda, a helper used several times within one file is
   `static inline` or in an anonymous namespace, `src/quadriga_gbsm_helpers.hpp` only holds helpers used across
   files (3.0.5). Exception: the generic phase-set functions `qd_gbsm_floor_offset`, `qd_gbsm_eval`,
-  `qd_gbsm_remove_bias` are anonymous-namespace functions with the signatures of 3.0.5, so that the SSF port can
-  move them into the header unchanged.
+  `qd_gbsm_remove_bias` are anonymous-namespace functions with the signatures of 3.0.5 in
+  `src/qd_gbsm_phases.cpp`, where the SSF port adds its phase sets.
 - No internal references in produced files: no IDs of planning decisions or review findings, no section numbers of
   this spec, no `md/` paths, no local paths (e.g. of the TR references folder) and no QuaDRiGa-NG line numbers in any
   source, header, test, wrapper, conf file or documentation block. Cite TR 38.901 (clause, table, equation, note) or
