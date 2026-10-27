@@ -698,10 +698,12 @@ TEST_CASE("conf_file_write - path-loss comments and formulas depend on the model
 {
     tmp_name f("test_conf_file_write_pl.conf");
 
-    // Oracle: comments typed from write_conf_file.m, lines 568 to 692 ("Elevaion" corrected)
+    // Oracle: comments typed from the path-loss section of QuaDRiGa's write_conf_file.m ("Elevaion" corrected),
+    // plus the comments of the keys for TR 38.901 v19.5.0 (hE_rand, LOSmax, Ax, Bx, Cx)
     const std::unordered_map<std::string, std::vector<double>> plpar = {
         {"A", {1.0}}, {"A1", {2.0}}, {"A2", {3.0}}, {"B", {4.0}}, {"C", {5.0}}, {"D", {6.0}}, {"hE", {7.0}},
-        {"Bn", {8.0}}, {"usePLa", {1.0}}, {"Xyz", {9.0}}};
+        {"Bn", {8.0}}, {"usePLa", {1.0}}, {"Xyz", {9.0}}, {"hE_rand", {1.0}}, {"LOSmax", {0.0}}, {"Ax", {25.5}},
+        {"Bx", {33.0}}, {"Cx", {20.0}}};
     const std::string A_def = "TX-RX 3D dist.-dep. of the PL [dB/log10(m)]";
     const std::string A1_los = "TX-RX 3D dist.-dep. of the LOS-PL before break-point [dB/log10(m)]";
     const std::string A1_def = "TX-RX 3D dist.-dep. of the PL before break-point [dB/log10(m)]";
@@ -755,6 +757,11 @@ TEST_CASE("conf_file_write - path-loss comments and formulas depend on the model
         CHECK(comment_text(text, "PL_Bn") == "Reference NLOS-PL in [dB] @ 1 GHz, 1 m TX-RX dist.");
         CHECK(comment_text(text, "PL_usePLa") == "Enable/disable attenuation by atmospheric gases");
         CHECK(comment_text(text, "PL_Xyz") == "<none>");
+        CHECK(comment_text(text, "PL_hE_rand") == "1 = random environment height (TR 38.901 Table 7.4.1-1, note 1); 0 = fixed hE");
+        CHECK(comment_text(text, "PL_LOSmax") == "0 = no maximum with the LOS-PL; 1 = PL = max( PL_LOS, PLn )");
+        CHECK(comment_text(text, "PL_Ax") == "TX-RX 3D dist.-dep. of the additional PL term in the maximum [dB/log10(m)]");
+        CHECK(comment_text(text, "PL_Bx") == "Reference PL of the additional term in [dB] @ 1 GHz, 1 m TX-RX dist.");
+        CHECK(comment_text(text, "PL_Cx") == "Freq.-dep. of the additional PL term in [dB/log10(GHz)]");
         CHECK((text.find("% Formula for Hata pathloss model:") != std::string::npos) == c.hata);
         CHECK((text.find("% Formula for dual-slope (LOS) pathloss model:") != std::string::npos) == c.dual);
         CHECK((text.find("% Formula for triple-slope (LOS+GR) pathloss model:") != std::string::npos) == c.triple);

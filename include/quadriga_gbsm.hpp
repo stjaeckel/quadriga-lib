@@ -112,6 +112,21 @@ namespace quadriga_lib
                   const std::string &preset = "Comb256",                   // Must match lsf_init_phases
                   bool horizontal = true);                                 // Must match lsf_init_phases
 
+    // Path loss and shadow-fading standard deviation of a set of links
+    // - Models: logdist, logdist_simple, constant, winner_los, winner_nlos, winner_pathloss, dual_slope,
+    //   tripple_slope, nlos, satellite; parameters in 'plpar' as in the conf files (keys without "PL_")
+    // - An empty 'pl_model' gives zero loss
+    void path_loss(const std::string &pl_model,                                          // Path-loss model, value of 'PL_model'
+                   const std::unordered_map<std::string, std::vector<double>> &plpar,    // Path-loss parameters
+                   const std::unordered_map<std::string, double> &scenpar,               // Scenario parameters (SF std, LSP_fc_min)
+                   const arma::vec &fc,                                                  // Carrier frequencies in [Hz], [n_freq]
+                   const arma::mat &tx_pos,                                              // Tx positions, [1, 3] or [n_link, 3]
+                   const arma::mat &rx_pos,                                              // Rx positions, [n_link, 3]
+                   arma::mat &pl,                                                        // Output: Path loss in [dB], [n_link, n_freq]
+                   arma::mat *sf_sigma = nullptr,                                        // Optional output: SF standard deviation in [dB], [n_link, n_freq]
+                   const arma::vec *d2d_in = nullptr,                                    // Optional: Indoor 2D distance in [m], [n_link]; given = outdoor distance only (legacy); 0 = outdoor link, geometric distance
+                   const arma::vec *rnd_he = nullptr);                                   // Optional: Uniform(0,1) per link for the random hE, column 10 of lsf_draw, [n_link]
+
     // Large-scale parameters of a set of links from normalized random values
     // - Mean and std per link and frequency from the scenario parameters (incl. LSP_fc_min, ES_D_mu_B/C/D);
     //   cross-correlation by the root of the LSP cross-correlation matrix; transformation to linear values

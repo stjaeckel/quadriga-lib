@@ -604,6 +604,11 @@ static const char *const qd_conf_pl_comments[][3] = {
     {"sig1", "", "Shadow Fading STD before breakpoint [dB]"},
     {"sig2", "", "Shadow Fading STD after breakpoint [dB]"},
     {"sig3", "", "Shadow Fading STD after second breakpoint [dB]"},
+    {"hE_rand", "", "1 = random environment height (TR 38.901 Table 7.4.1-1, note 1); 0 = fixed hE"},
+    {"LOSmax", "", "0 = no maximum with the LOS-PL; 1 = PL = max( PL_LOS, PLn )"},
+    {"Ax", "", "TX-RX 3D dist.-dep. of the additional PL term in the maximum [dB/log10(m)]"},
+    {"Bx", "", "Reference PL of the additional term in [dB] @ 1 GHz, 1 m TX-RX dist."},
+    {"Cx", "", "Freq.-dep. of the additional PL term in [dB/log10(GHz)]"},
     {"usePLa", "", "Enable/disable attenuation by atmospheric gases"}};
 
 // Formula blocks of the path-loss section, written in this order; first entry: the models, each enclosed in '|'
