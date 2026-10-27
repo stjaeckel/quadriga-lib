@@ -74,11 +74,15 @@ Path loss and shadow-fading standard deviation of a set of links
   `((hUT - 13)/10)^1.5` for `hUT <= 23`, else 1; `C = C'·g`, `p1 = 1/(1 + C)`; `n` = size of the
   set {12, 15, ..., hUT - 1.5}; `hE = 1` if `C = 0`, `n = 0`, `u < p1` or `p1` rounds to 1 (C
   below 1.1e-16, e.g. beyond about 7.5 km at `hUT = 20`), else
-  `hE = 12 + 3·min(floor((u - p1)/(1 - p1)·n), n - 1)`. The UT height then gets no 1.1·hE clamp
-  (`hm = max(hUT, 0.1)`), since `hUT - hE >= 1.5` holds for the TR set. Without `rnd_he` the fixed
-  `[hE]` is used. `rnd_he` is column 11 of [[lsf_draw]], a spatially consistent uniform value:
-  along a track hE switches between its discrete values where `u` crosses a threshold, and the loss
-  beyond the breakpoint steps there; evaluate `rnd_he` once per track segment to avoid this
+  `hE = 12 + 3·min(floor((u - p1)/(1 - p1)·n), n - 1)`. The UT height is then clamped to
+  `hm = max(hUT, hE + 0.1, 0.1)` instead of `1.1·hE`: for `hE = 1` this is the fixed-hE clamp (also
+  below `hUT = 1.1`), and the drawn heights 12, 15, ... are not affected (`hUT - hE >= 1.5`).
+  Without `rnd_he` the fixed `[hE]` is used. `rnd_he` is column 11 of [[lsf_draw]], a spatially
+  consistent uniform value: TR 38.901 draws hE independently per link and gives no decorrelation
+  distance; the library makes it spatially consistent in the sense of clause 7.6.3 with the
+  decorrelation distance `SF_lambda`, so nearby UTs of a site share hE. Along a track hE switches
+  between its discrete values where `u` crosses a threshold, and the loss beyond the breakpoint
+  steps there; evaluate `rnd_he` once per track segment to avoid this
 - Distances: `d3`, `d2` are the geometric distances (TR 38.901 eq. 7.4-1: for an indoor UT
   `d3D-out + d3D-in`). If `d2d_in` is given (legacy mode), a link with `d2d_in(l) > 0` uses the
   outdoor distance instead: `din = min(d2d_in, d2)`, `d3in = d3·din/d2` (`d3` if `d2 = 0`), limited

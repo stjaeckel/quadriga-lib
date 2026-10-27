@@ -46,13 +46,19 @@ Draw the random phases of the large-scale generators of one BS site and scenario
   approximately (their two devices see different fields, each corrected over the union of the positions)
 - The positions are used as in [[lsf_draw]]: projected on the x-y plane (z = 0) for `horizontal = True`, in
   3D for `horizontal = False`. `preset` and `horizontal` must be the same in [[lsf_draw]]
-- All positions in `rx_pos` are treated as one field (floor 0): one phase correction per generator cannot zero
-  the means of several floor fields at once. For a drop with UTs on several floors pass the positions of one
-  floor (e.g. the links of floor 0) or set `remove_bias = False`; the fields of the other floors keep their
-  sample mean
+- 2D mode: all positions in `rx_pos` are treated as one field (floor 0): one phase correction per generator
+  cannot zero the means of several floor fields at once. For a drop with UTs on several floors pass the
+  positions of one floor (e.g. the links of floor 0) or set `remove_bias = False`; the fields of the other
+  floors keep their sample mean. 3D mode (`horizontal = False`): there are no floor IDs (the height separates
+  the floors) and the correction covers all given positions as one 3D field
+- 2D and 3D mode give the same per-link statistics. In 3D mode the LSPs of UTs on different floors are
+  correlated by the ACF of their height difference, while TR 38.901 (Table 7.5-6 note 3) assumes no
+  correlation between floors
 - The correction removes variance: the field is conditioned on a zero mean over the positions, which costs
   little only when the positions spread over many decorrelation distances (see [[sos.remove_bias]])
 - With fewer than 3 positions, without `rx_pos` or with `remove_bias = False` no correction is made
+- TR 38.901 clause 7.4.4 literally (exponential ACF, no bias removal): `preset = "Exp256"` and
+  `remove_bias = False`; the defaults `Comb256` and the bias removal are QuaDRiGa choices
 - The flags `dual_mobility`, `remove_bias` and `horizontal` take a bool or `numpy.bool_`; `None` selects the
   default, any other type raises `TypeError`
 - Validation order: `seed`, `preset`, `scenpar`, then the positions (3 columns, rows of `tx_pos` 1 or
@@ -73,8 +79,8 @@ phase = quadriga_lib.gbsm.lsf_init_phases( scenpar, seed, tx_pos, rx_pos, dual_m
   phases on each call; default: -1
 - **`tx_pos`** — Tx positions in m; used only for the bias removal with dual mobility, required there; one row
   is used for all links; `(1, 3)` or `(n_link, 3)`; default: None
-- **`rx_pos`** — Rx positions of the drop in m (one floor) for the bias removal; `None`, empty or fewer than
-  3 rows = no bias removal; `(n_link, 3)`; default: None
+- **`rx_pos`** — Rx positions of the drop in m (one floor in 2D mode, all floors in 3D mode) for the bias
+  removal; `None`, empty or fewer than 3 rows = no bias removal; `(n_link, 3)`; default: None
 - **`dual_mobility`** — `True`: Tx and Rx both move, the Tx is a second device on the same maps;
   default: False
 - **`remove_bias`** — `True`: remove the sample mean of the Normal fields over the positions; default: True

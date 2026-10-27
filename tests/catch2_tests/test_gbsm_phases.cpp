@@ -998,6 +998,18 @@ TEST_CASE("lsf_draw - input validation")
         const arma::uvec bad = {0, 1};
         CHECK_THROWS_MATCHES(quadriga_lib::lsf_draw(sp, phase, tx, rx, rnd, &bad), std::invalid_argument,
                              Message("Number of elements in 'floor_id' does not match number of rows in 'rx_pos'."));
+
+        // 3D mode: the height separates the floors, floor IDs are rejected (also all zero); the output is untouched
+        const std::string msg = "Input 'floor_id' cannot be used with 'horizontal = false': in 3D mode the height separates the floors.";
+        const arma::uvec fl0 = {0, 0, 0};
+        arma::mat keep(2, 2, arma::fill::ones);
+        CHECK_THROWS_MATCHES(quadriga_lib::lsf_draw(sp, phase, tx, rx, keep, &fl, false, "Comb256", false),
+                             std::invalid_argument, Message(msg));
+        CHECK_THROWS_MATCHES(quadriga_lib::lsf_draw(sp, phase, tx, rx, keep, &fl0, true, "Comb256", false),
+                             std::invalid_argument, Message(msg));
+        CHECK(keep.n_rows == 2);
+        CHECK(arma::all(arma::vectorise(keep) == 1.0));
+        CHECK_NOTHROW(quadriga_lib::lsf_draw(sp, phase, tx, rx, rnd, nullptr, false, "Comb256", false));
     }
     SECTION("scenpar")
     {

@@ -39,6 +39,10 @@ Spatially correlated normalized random values of the large-scale generators at a
 - Uniform columns 10 and 11: `0.5 · erfc( -x / sqrt(2) )` of the Normal value
 - `horizontal = true`: the positions are projected on the x-y plane (z = 0) and the values do not
   depend on z; `false`: 3D positions. `D` is measured in the same space
+- 2D and 3D mode give the same per-link statistics. In 3D mode the height separates the floors: the
+  LSPs of UTs on different floors are correlated by the ACF of their height difference, while
+  TR 38.901 (Table 7.5-6 note 3) assumes no correlation between floors. `floor_id` is therefore not
+  accepted with `horizontal = false`
 - Floors: links with different floor IDs see different fields, links with equal IDs share one
   field. Floor `q` adds the offsets `2·pi · k · n / N + psi_b(n)` to the phases of all generators
   on both sides, with `N = n_coeff`, `k = q mod N`, `b = q div N`, `n = 0 ... N-1`, `psi_0 = 0` and
@@ -64,7 +68,7 @@ Spatially correlated normalized random values of the large-scale generators at a
 - `preset` and `horizontal` must be those of [[lsf_init_phases]]. A wrong preset with the same
   number of sinusoids (e.g. `Exp256` for `Comb256`) cannot be detected
 - Validation order: positions (3 columns, rows of `tx_pos`, finite values), `preset`, `scenpar`,
-  size of `phase`, finite `phase`, length of `floor_id`
+  size of `phase`, finite `phase`, length of `floor_id`, `floor_id` with `horizontal = false`
 
 ## Usage:
 ```
@@ -83,7 +87,7 @@ rnd = quadriga_lib.lsf_draw( scenpar, phase, tx_pos, rx_pos, floor_id, dual_mobi
 - **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
 - **`floor_id`** *(optional)* — Floor index per link, a label starting at 0 (no index shift);
   non-negative integers below 2^53; omitted or empty = all links on floor 0; in dual mobility the
-  floor of both devices; `[n_link]`
+  floor of both devices; only with `horizontal = true`; `[n_link]`
 - **`dual_mobility`** — `true`: Tx and Rx both move, the Tx side is evaluated as a second device;
   default: false
 - **`preset`** — Sum-of-sinusoids preset, see [[sos_preset]]; must match [[lsf_init_phases]];

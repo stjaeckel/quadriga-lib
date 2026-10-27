@@ -34,6 +34,9 @@ Spatially correlated normalized random values of the large-scale generators at a
 - Uniform columns 9 and 10: `0.5 · erfc( -x / sqrt(2) )` of the Normal value
 - `horizontal = True`: the positions are projected on the x-y plane (z = 0) and the values do not depend on z;
   `False`: 3D positions. `D` is measured in the same space
+- 2D and 3D mode give the same per-link statistics. In 3D mode the height separates the floors: the LSPs of UTs
+  on different floors are correlated by the ACF of their height difference, while TR 38.901 (Table 7.5-6
+  note 3) assumes no correlation between floors. `floor_id` is therefore not accepted with `horizontal = False`
 - Floors: links with different floor IDs see different fields, links with equal IDs share one field. Floor `q`
   adds the offsets `2·pi · k · n / N + psi_b(n)` to the phases of all generators on both sides, with
   `N = n_coeff`, `k = q mod N`, `b = q div N`, `n = 0 ... N-1`, `psi_0 = 0` and `psi_b(n) = 2·pi · u_n` for
@@ -61,7 +64,8 @@ Spatially correlated normalized random values of the large-scale generators at a
 - The flags `dual_mobility` and `horizontal` take a bool or `numpy.bool_`; `None` selects the default, any other
   type raises `TypeError`
 - Validation order: `floor_id` (non-negative integers below 2^53, checked by the wrapper), positions (3 columns, rows of
-  `tx_pos`, finite values), `preset`, `scenpar`, size of `phase`, finite `phase`, length of `floor_id`
+  `tx_pos`, finite values), `preset`, `scenpar`, size of `phase`, finite `phase`, length of `floor_id`,
+  `floor_id` with `horizontal = False`
 
 ## Usage:
 ```
@@ -78,8 +82,8 @@ rnd = quadriga_lib.gbsm.lsf_draw( scenpar, phase, tx_pos, rx_pos, floor_id, dual
   validated); `(1, 3)` or `(n_link, 3)`
 - **`rx_pos`** — Rx positions in m; `(n_link, 3)`
 - **`floor_id`** — Floor index per link, starting at 0; non-negative integers below 2^53, given as int or float
-  array; `None` or empty = all links on floor 0; in dual mobility the floor of both devices; `(n_link,)`;
-  default: None
+  array; `None` or empty = all links on floor 0; in dual mobility the floor of both devices; only with
+  `horizontal = True`; `(n_link,)`; default: None
 - **`dual_mobility`** — `True`: Tx and Rx both move, the Tx side is evaluated as a second device;
   default: False
 - **`preset`** — Sum-of-sinusoids preset, see [[sos.preset]]; must match [[lsf_init_phases]];

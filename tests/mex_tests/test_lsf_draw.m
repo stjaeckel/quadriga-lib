@@ -105,6 +105,9 @@ assert_throws( @() quadriga_lib.lsf_draw( scenpar, phase(:, 1:10, :), tx_pos, rx
 assert_throws( @() quadriga_lib.lsf_draw( scenpar, phase, tx_pos, rx_pos, [], [], 'Comb1024' ), ...
     'Input ''phase'' must have size [1024, 11, 2] for preset ''Comb1024''.' );                      % C++
 assert_throws( @() quadriga_lib.lsf_draw( scenpar, phase, tx_pos, rx_pos, [ 0; 1 ] ), 'floor_id' );    % C++
+msg3d = 'Input ''floor_id'' cannot be used with ''horizontal = false'': in 3D mode the height separates the floors.';
+assert_throws( @() quadriga_lib.lsf_draw( scenpar, phase, tx_pos, rx_pos, fl, [], [], false ), msg3d );   % C++
+assert_throws( @() quadriga_lib.lsf_draw( scenpar, phase, tx_pos, rx_pos, zeros(5, 1), true, 'Comb256', false ), msg3d );
 assert_throws( @() quadriga_lib.lsf_draw( scenpar, phase, tx_pos(1:2), rx_pos ), ...
     'Input ''tx_pos'' must have 3 columns.' );                                                      % C++
 
