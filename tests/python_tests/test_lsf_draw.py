@@ -183,6 +183,12 @@ class test_case(unittest.TestCase):
         with self.assertRaises(ValueError) as ctx:  # C++
             f(*args, [0, 1])
         self.assertIn("Number of elements in 'floor_id' does not match", str(ctx.exception))
+        msg3d = "Input 'floor_id' cannot be used with 'horizontal = false': in 3D mode the height separates the floors."
+        for fl in (self.fl, np.zeros(5)):  # C++: 3D mode, also with all IDs 0
+            with self.assertRaises(ValueError) as ctx:
+                f(*args, fl, horizontal=False)
+            self.assertIn(msg3d, str(ctx.exception))
+        self.assertEqual(f(*args, None, horizontal=False).shape, (5, 11))
         with self.assertRaises(ValueError) as ctx:  # C++
             f(self.scenpar, self.phase, self.tx_pos[:, :2], self.rx_pos)
         self.assertIn("Input 'tx_pos' must have 3 columns.", str(ctx.exception))

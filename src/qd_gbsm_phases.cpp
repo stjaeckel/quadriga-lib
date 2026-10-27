@@ -131,27 +131,6 @@ namespace
             R.col(2).zeros(), T.col(2).zeros();
     }
 
-    // Phase offsets of floor q, [n_coeff]: 2·pi·(q mod N)·n/N + psi_(q div N)(n)
-    // - N = n_coeff; psi_0 = 0; psi_b(n) = 2·pi·u_n for b >= 1, with u_n the n-th value of qd_sos_uniform of the
-    //   stream qd_sos_rng(b)
-    // - Two floors in the same block of N IDs have the cross-correlation (1/N)·sum_n cos(Delta_q(n) - Delta_q'(n)) = 0
-    //   at zero horizontal lag; floors in different blocks a random one with standard deviation 1/sqrt(2N)
-    arma::vec qd_gbsm_floor_offset(arma::uword n_coeff, arma::uword q)
-    {
-        const double two_pi = 6.283185307179586;
-        const arma::uword k = q % n_coeff, b = q / n_coeff;
-        arma::vec offset(n_coeff);
-        for (arma::uword n = 0; n < n_coeff; ++n) // k·n is reduced modulo N, which keeps the argument below 2·pi
-            offset.at(n) = two_pi * (double)((k * n) % n_coeff) / (double)n_coeff;
-        if (b > 0)
-        {
-            std::mt19937_64 rng = qd_sos_rng((arma::sword)b);
-            for (arma::uword n = 0; n < n_coeff; ++n)
-                offset.at(n) += two_pi * qd_sos_uniform(rng);
-        }
-        return offset;
-    }
-
     // Normalized values of a phase set at a set of links
     // - gen, freq, acf, dist, tab: generator table and frequency tables (qd_gbsm_lsf_generators, qd_gbsm_freq)
     // - phase [n_coeff, n_gen, 2]: slice 0 Rx side, slice 1 Tx side (mirror of slice 0)
@@ -162,8 +141,8 @@ namespace
     //   of the mirror generator m(g) at T (phases slice1.col(g) = slice0.col(m(g)), table tab[m(g)])
     // - Dual mobility: self-mirrored generators (a + b) / sqrt(2 + 2·A_g(D)), pairs (a + b) / sqrt(2), with the
     //   Tx-Rx distance D and the ACF A_g of the table of g
-    // - Floors: the offsets of qd_gbsm_floor_offset of the link's floor are added to all phases of both slices, so
-    //   in dual mobility both devices of a link are evaluated on the link's floor
+    // - Floors: the phase offsets of the link's floor are added to all phases of both slices, so in dual mobility
+    //   both devices of a link are evaluated on the link's floor
     // - One sos_val call per floor, frequency table and side, with all phase columns that use the table
     void qd_gbsm_eval(const std::vector<qd_gbsm_gen> &gen, const std::vector<arma::mat> &freq,
                       const std::vector<arma::vec> &acf, const std::vector<arma::vec> &dist,
@@ -190,6 +169,27 @@ namespace
                 floors[floor_id->at(l)].push_back(l);
         const bool one_group = floors.size() == 1; // all links in their order, no copies of the positions
 
+        // Phase offsets of floor q, [n_coeff]: 2·pi·(q mod N)·n/N + psi_(q div N)(n)
+        // - N = n_coeff; psi_0 = 0; psi_b(n) = 2·pi·u_n for b >= 1, with u_n the n-th value of qd_sos_uniform of the
+        //   stream qd_sos_rng(b)
+        // - Two floors in the same block of N IDs have the cross-correlation (1/N)·sum_n cos(Delta_q(n) - Delta_q'(n))
+        //   = 0 at zero horizontal lag; floors in different blocks a random one with standard deviation 1/sqrt(2N)
+        auto floor_offset = [n_coeff](arma::uword q)
+        {
+            const double two_pi = 6.283185307179586;
+            const arma::uword k = q % n_coeff, blk = q / n_coeff;
+            arma::vec offset(n_coeff);
+            for (arma::uword n = 0; n < n_coeff; ++n) // k·n is reduced modulo N, which keeps the argument below 2·pi
+                offset.at(n) = two_pi * (double)((k * n) % n_coeff) / (double)n_coeff;
+            if (blk > 0)
+            {
+                std::mt19937_64 rng = qd_sos_rng((arma::sword)blk);
+                for (arma::uword n = 0; n < n_coeff; ++n)
+                    offset.at(n) += two_pi * qd_sos_uniform(rng);
+            }
+            return offset;
+        };
+
         for (const auto &fl : floors)
         {
             arma::uvec L;
@@ -205,7 +205,7 @@ namespace
 
             arma::vec offset;
             if (fl.first != 0)
-                offset = qd_gbsm_floor_offset(n_coeff, fl.first);
+                offset = floor_offset(fl.first);
 
             for (int side = 0; side < (dual_mobility ? 2 : 1); ++side)
                 for (arma::uword t = 0; t < n_tab; ++t)
@@ -339,12 +339,18 @@ Draw the random phases of the large-scale generators of one BS site and scenario
   approximately (their two devices see different fields, each corrected over the union of the positions)
 - The positions are used as in [[lsf_draw]]: projected on the x-y plane (z = 0) for `horizontal = true`, in 3D
   for `horizontal = false`. `preset` and `horizontal` must be the same in [[lsf_draw]]
-- All positions in `rx_pos` are treated as one field (floor 0): one phase correction per generator cannot zero the
-  means of several floor fields at once. For a drop with UTs on several floors pass the positions of one floor (e.g.
-  the links of floor 0) or set `remove_bias = false`; the fields of the other floors keep their sample mean
+- 2D mode: all positions in `rx_pos` are treated as one field (floor 0): one phase correction per generator cannot
+  zero the means of several floor fields at once. For a drop with UTs on several floors pass the positions of one
+  floor (e.g. the links of floor 0) or set `remove_bias = false`; the fields of the other floors keep their sample
+  mean. 3D mode (`horizontal = false`): there are no floor IDs (the height separates the floors) and the correction
+  covers all given positions as one 3D field
+- 2D and 3D mode give the same per-link statistics. In 3D mode the LSPs of UTs on different floors are correlated by
+  the ACF of their height difference, while TR 38.901 (Table 7.5-6 note 3) assumes no correlation between floors
 - The correction removes variance: the field is conditioned on a zero mean over the positions, which costs little
   only when the positions spread over many decorrelation distances (see [[sos_remove_bias]])
 - With fewer than 3 positions, without `rx_pos` or with `remove_bias = false` no correction is made
+- TR 38.901 clause 7.4.4 literally (exponential ACF, no bias removal): `preset = "Exp256"` and
+  `remove_bias = false`; the defaults `Comb256` and the bias removal are QuaDRiGa choices
 - `phase` must not share memory with `tx_pos` or `rx_pos`
 - Validation order: `seed`, `preset`, `scenpar`, then the positions (3 columns, rows of `tx_pos` 1 or `n_link`
   when both are given, finite values), then the requirement of `tx_pos` for the bias removal in dual mobility
@@ -370,8 +376,8 @@ void quadriga_lib::lsf_init_phases(
   phases on each call
 - **`tx_pos`** *(optional)* — Tx positions in [m]; used only for the bias removal with dual mobility, required
   there; one row is used for all links; `[1, 3]` or `[n_link, 3]`
-- **`rx_pos`** *(optional)* — Rx positions of the drop in [m] (one floor) for the bias removal; omitted or fewer
-  than 3 rows = no bias removal; `[n_link, 3]`
+- **`rx_pos`** *(optional)* — Rx positions of the drop in [m] (one floor in 2D mode, all floors in 3D mode) for
+  the bias removal; omitted or fewer than 3 rows = no bias removal; `[n_link, 3]`
 - **`dual_mobility`** *(optional)* — `true`: Tx and Rx both move, the Tx is a second device on the same maps
 - **`remove_bias`** *(optional)* — `true`: remove the sample mean of the Normal fields over the positions
 - **`preset`** *(optional)* — Sum-of-sinusoids preset, see [[sos_preset]]; sets `n_coeff`
@@ -472,6 +478,9 @@ Spatially correlated normalized random values of the large-scale generators at a
 - Uniform columns 9 and 10: `0.5 · erfc( -x / sqrt(2) )` of the Normal value
 - `horizontal = true`: the positions are projected on the x-y plane (z = 0) and the values do not depend on z;
   `false`: 3D positions. `D` is measured in the same space
+- 2D and 3D mode give the same per-link statistics. In 3D mode the height separates the floors: the LSPs of UTs on
+  different floors are correlated by the ACF of their height difference, while TR 38.901 (Table 7.5-6 note 3)
+  assumes no correlation between floors. `floor_id` is therefore not accepted with `horizontal = false`
 - Floors: links with different floor IDs see different fields, links with equal IDs share one field. Floor `q`
   adds the offsets `2·pi · k · n / N + psi_b(n)` to the phases of all generators on both sides, with
   `N = n_coeff`, `k = q mod N`, `b = q div N`, `n = 0 ... N-1`, `psi_0 = 0` and `psi_b(n) = 2·pi · u_n` for
@@ -497,7 +506,7 @@ Spatially correlated normalized random values of the large-scale generators at a
 - `n_link = 0` returns `rnd` with size `[0, 11]`. `rnd` may share memory with `tx_pos` or `rx_pos` (the positions
   are copied before `rnd` is written)
 - Validation order: positions (3 columns, rows of `tx_pos`, finite values), `preset`, `scenpar`, size of `phase`,
-  finite `phase`, length of `floor_id`
+  finite `phase`, length of `floor_id`, `floor_id` with `horizontal = false`
 
 ## Declaration:
 ```
@@ -522,7 +531,7 @@ void quadriga_lib::lsf_draw(
   `[1, 3]` or `[n_link, 3]`
 - **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
 - **`floor_id`** *(optional)* — Floor index per link, 0-based; omitted = all links on floor 0; in dual mobility
-  the floor of both devices; `[n_link]`
+  the floor of both devices; only with `horizontal = true`; `[n_link]`
 - **`dual_mobility`** *(optional)* — `true`: Tx and Rx both move, the Tx side is evaluated as a second device
 - **`preset`** *(optional)* — Sum-of-sinusoids preset, see [[sos_preset]]; must match [[lsf_init_phases]]
 - **`horizontal`** *(optional)* — `true`: 2D correlation in the x-y plane (TR 38.901 behaviour); `false`: 3D
@@ -565,6 +574,8 @@ void quadriga_lib::lsf_draw(const std::unordered_map<std::string, double> &scenp
         throw std::invalid_argument("Input 'phase' must be finite.");
     if (floor_id != nullptr && floor_id->n_elem != n_link)
         throw std::invalid_argument("Number of elements in 'floor_id' does not match number of rows in 'rx_pos'.");
+    if (floor_id != nullptr && !horizontal)
+        throw std::invalid_argument("Input 'floor_id' cannot be used with 'horizontal = false': in 3D mode the height separates the floors.");
 
     if (n_link == 0)
     {

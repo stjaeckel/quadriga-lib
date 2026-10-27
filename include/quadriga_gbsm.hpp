@@ -87,11 +87,12 @@ namespace quadriga_lib
     // Draw the random phases of the large-scale generators of one BS site and scenario
     // - Generator order and reciprocity rules: see the LSF generator index above
     // - Bias removal over the positions in 'rx_pos' (and 'tx_pos' for dual mobility) when given and n_link > 2
+    // - TR 38.901 clause 7.4.4 literally: preset "Exp256", remove_bias = false
     void lsf_init_phases(const std::unordered_map<std::string, double> &scenpar, // Scenario parameters (decorrelation distances)
                          arma::cube &phase,                                      // Output: Phases in [rad], [n_coeff, 11, 2]; slice 0 = Rx side, slice 1 = Tx side
                          arma::sword seed = -1,                                  // Seed, -1 = system random device
                          const arma::mat *tx_pos = nullptr,                      // Optional: Tx positions, [1, 3] or [n_link, 3]
-                         const arma::mat *rx_pos = nullptr,                      // Optional: Rx positions of the drop (one floor) for the bias removal, [n_link, 3]
+                         const arma::mat *rx_pos = nullptr,                      // Optional: Rx positions for the bias removal (2D: one floor), [n_link, 3]
                          bool dual_mobility = false,                             // Tx and Rx both move: the Tx side is a second device
                          bool remove_bias = true,                                // Remove the sample mean over the positions
                          const std::string &preset = "Comb256",                  // SOS preset, see sos_preset
@@ -103,12 +104,13 @@ namespace quadriga_lib
     //   at the Tx-Rx distance
     // - Links with different floor IDs are uncorrelated at equal horizontal positions; equal IDs share one field
     // - Dual mobility: both devices of a link are on the link's floor
+    // - Floor IDs only in 2D mode: with horizontal = false the height separates the floors
     void lsf_draw(const std::unordered_map<std::string, double> &scenpar, // Scenario parameters (decorrelation distances)
                   const arma::cube &phase,                                 // Phases from lsf_init_phases, [n_coeff, 11, 2]
                   const arma::mat &tx_pos,                                 // Tx positions, [1, 3] or [n_link, 3]
                   const arma::mat &rx_pos,                                 // Rx positions, [n_link, 3]
                   arma::mat &rnd,                                          // Output: Random values, [n_link, 11]
-                  const arma::uvec *floor_id = nullptr,                    // Optional: Floor index per link, [n_link]; nullptr = all on one floor
+                  const arma::uvec *floor_id = nullptr,                    // Optional: Floor index per link, [n_link]; nullptr = all on one floor; 2D only
                   bool dual_mobility = false,                              // As in lsf_init_phases
                   const std::string &preset = "Comb256",                   // Must match lsf_init_phases
                   bool horizontal = true);                                 // Must match lsf_init_phases

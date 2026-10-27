@@ -202,7 +202,7 @@ namespace
     }
     bool ph(const plpar_t &p, const char *k) { return p.count(k) != 0; }
 
-    // dual_slope: hb = max(hBS, 1.1 hE, 0.1), hm the same (random hE: hm = max(hUT, 0.1));
+    // dual_slope: hb = max(hBS, 1.1 hE, 0.1), hm the same (random hE: hm = max(hUT, hE + 0.1, 0.1));
     // dBP = E f (hb - hE)(hm - hE); dBP3 = sqrt(dBP^2 + (hb - hm)^2); PL1(x) = A1 lg x + B + C lg f + D x;
     // d2 <= dBP: PL1(d3), sf = sig1; else PL1(dBP3) + A2 lg(d3 / dBP3), sf = sig2 (each only if present)
     // hE_rnd: NaN = the fixed [hE|0]; region: 1 or 2
@@ -219,8 +219,9 @@ namespace
         if (hb < 0.1)
             hb = 0.1;
         double hm = hUT;
-        if (!rnd && hm < 1.1 * hE)
-            hm = 1.1 * hE;
+        const double hm_min = rnd ? hE + 0.1 : 1.1 * hE;
+        if (hm < hm_min)
+            hm = hm_min;
         if (hm < 0.1)
             hm = 0.1;
         const double dBP = E * f * (hb - hE) * (hm - hE);
@@ -640,6 +641,31 @@ TEST_CASE("path_loss - UMa random hE follows the probability of TR note 1")
         CHECK(b.is_finite());
         CHECK(b(0, 0) != a(0, 0)); // 4 km: C = 1.2e-7, u = 1 selects the largest hE (18 m)
         CHECK(b(1, 0) == a(1, 0));
+    }
+
+    // UT below 1.1 m: the draw gives hE = 1 (C' = 0), and the UT height is clamped to hE + 0.1 = 1.1 m as with the
+    // fixed hE, so 'rnd_he' does not change the loss (without the clamp, hm - hE <= 0 puts every distance beyond
+    // the breakpoint)
+    for (double hUT : {0.5, 1.0})
+    {
+        INFO("hUT " << hUT);
+        const arma::mat tx = {{0.0, 0.0, hBS}}, rx = {{20.0, 0.0, hUT}, {50.0, 0.0, hUT}, {100.0, 0.0, hUT}, {300.0, 0.0, hUT}};
+        const arma::vec fc = {3.5e9}, u = {0.3, 0.3, 0.99, 0.99};
+        arma::mat a, b, c, d;
+        quadriga_lib::path_loss(m_los, p_los, sp_los, fc, tx, rx, a);
+        quadriga_lib::path_loss(m_los, p_los, sp_los, fc, tx, rx, b, nullptr, nullptr, &u);
+        quadriga_lib::path_loss(m_nlos, p_copy, sp_nlos, fc, tx, rx, c);
+        quadriga_lib::path_loss(m_nlos, p_copy, sp_nlos, fc, tx, rx, d, nullptr, nullptr, &u);
+        CHECK(arma::approx_equal(a, b, "absdiff", 1e-12));
+        CHECK(arma::approx_equal(c, d, "absdiff", 1e-12));
+        for (arma::uword l = 0; l < 4; ++l)
+        {
+            const double d3 = std::sqrt(rx(l, 0) * rx(l, 0) + (hBS - hUT) * (hBS - hUT));
+            double sf = 0.0;
+            int region = 0;
+            CHECK(std::abs(b(l, 0) - ref_dual_slope(p_los, 3.5, d3, rx(l, 0), hBS, hUT, 1.0, sf, region)) <= 1e-9);
+            CHECK(region == (l < 3 ? 1 : 2)); // dBP = E f (hBS - 1)(1.1 - 1) = 112 m at 3.5 GHz
+        }
     }
 }
 
