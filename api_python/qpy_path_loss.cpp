@@ -78,13 +78,15 @@ Path loss and shadow-fading standard deviation of a set of links
   with the geometric distance, `sf = max(0, max(0, SF_sigma + SF_delta·lg(SF_omega + f')) + SF_kappa·lg(d) +
   SF_tau·lg(h) + SF_beta·lg(atan(h/d)))` with `d = max(d2D, 1e-4)`, `h = max(hBS, 1e-4)`,
   `f' = max(f, LSP_fc_min)`; for scenario files without such terms this is `SF_sigma`. Passing `sf_sigma` to
-  [[lsp_generate]] is then neutral. A frequency term with `SF_delta != 0` requires `SF_omega + f' > 0`
+  [[lsp_generate]] is then neutral. `SF_sigma`, `SF_delta`, `SF_kappa`, `SF_tau`, `SF_beta` must be finite, and
+  a frequency term with `SF_delta != 0` requires a finite `SF_omega` and `SF_omega + f' > 0`
 - Validation: positions, `fc`, the lengths of `d2d_in` and `rnd_he`, their values, the model name, the
   parameters of the model in the order the model reads them (a required key that is missing raises
   `Path-loss model '<model>' requires the parameter '<key>'.`, naming `A1` for "A1 or A" and `E1` for "E1 or E";
-  every key that the model reads must have exactly one value; keys not read are ignored), the breakpoint factors
-  `E`, `E1`, `E2` (> 0) and `A1 != A2` of `winner_los`, then `scenpar` ([[scenpar_validate]], its messages pass
-  through); all errors are raised as `ValueError`
+  every key that the model reads must have exactly one value, which must be finite; keys not read are ignored),
+  the breakpoint factors `E`, `E1`, `E2` and `G2n` of `nlos` (> 0) and `A1 != A2` of `winner_los`, then `scenpar`
+  ([[scenpar_validate]], its messages pass through), then the SF coefficients and frequency term; all errors are
+  raised as `ValueError`
 - The models are evaluated as written for any positive frequency, also outside their validity range
 
 ## Usage:

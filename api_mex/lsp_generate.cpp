@@ -33,7 +33,10 @@ Large-scale parameters of a set of links from normalized random values
   `sigma = max(0, s + P_kappa·lg(d) + P_tau·lg(h) + P_beta·lg(a))`. The standard deviation is
   limited at 0 after all terms. SF has no mean fields (mean 0). A frequency term with the
   coefficient 0 contributes 0; an active one (`P_gamma` or `P_delta` not 0) requires
-  `P_omega + f' > 0` at every frequency
+  `P_omega + f' > 0` at every frequency. The multiplying coefficients (`P_sigma`, `P_gamma`,
+  `P_delta`, `P_epsilon`, `P_zeta`, `P_alpha`, `P_kappa`, `P_tau`, `P_beta`, `ES_D_mu_A` to
+  `ES_D_mu_D`, `P_omega` of an active frequency term) must be finite; `P_mu` and `ES_D_mu_min` may be
+  infinite
 - DS with the V/S term of TR 38.901 Table 7.5-6 Part-3 (InF): if `DS_VS > 0`,
   `mu += lg(DS_VS_a·DS_VS + DS_VS_b)`. The InF files set `DS_VS` for the hall of their calibration
   scenario; a caller with another hall sets the field `DS_VS` (V/S in m) of `scenpar`
@@ -57,7 +60,8 @@ Large-scale parameters of a set of links from normalized random values
   without any randomness
 - Absolute TOA offset (TR 38.901 clause 7.6.9): active if `absTOA_mu > -30`, then
   `abs_toa = min(10^(absTOA_mu + absTOA_sigma·rnd(l, 9)), 2·absTOA_Lmax / c)` with
-  `c = 299792458 m/s`, without the bound if `absTOA_Lmax = 0`; 0 if not active. The InF and InH NLOS
+  `c = 299792458 m/s`, without the bound if `absTOA_Lmax = 0` (`absTOA_sigma` must be finite); 0 if
+  not active. The InF and InH NLOS
   files set `absTOA_Lmax` to the largest dimension of the hall or office of their calibration
   scenario; a caller with another hall sets the field
 - Ground permittivity with `U = rnd(l, 10)` and `f = fc / 1e9` (not limited by `LSP_fc_min`): dry
@@ -73,10 +77,12 @@ Large-scale parameters of a set of links from normalized random values
   7.5-12), with `f'`, `d`, `h` as above: `e = EoD_offset_e + EoD_offset_e_gamma·lg f'`; if
   `EoD_offset_b > 0`: `e += 10^((EoD_offset_a + EoD_offset_a_gamma·lg f')·lg(max(EoD_offset_b, d)) +
   EoD_offset_c + EoD_offset_c_gamma·lg f' + EoD_offset_c_hUT·hUT)`; if `EoD_offset_hcl > 0` and
-  `hUT < EoD_offset_hcl`: `e += (atan((EoD_offset_hcl - h)/d) - atan((hUT - h)/d))·180/pi`
+  `hUT < EoD_offset_hcl`: `e += (atan((EoD_offset_hcl - h)/d) - atan((hUT - h)/d))·180/pi`. The
+  coefficients `EoD_offset_e`, `_e_gamma`, `_a`, `_a_gamma`, `_c`, `_c_gamma`, `_c_hUT` must be finite
 - Outputs that are not requested are not computed
 - Validation order: positions, `fc`, `rnd`, `sf_sigma`, `scenpar`, positive definiteness, column 10
-  of `rnd`, the frequency terms
+  of `rnd`, the coefficients and frequency terms of the 8 LSPs, the `EoD_offset_` coefficients and
+  `absTOA_sigma` (each only if its output is requested)
 
 ## Usage:
 ```

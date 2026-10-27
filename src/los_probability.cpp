@@ -14,6 +14,41 @@
 
 namespace
 {
+    // Model identifiers
+    enum qd_los_model
+    {
+        QD_LOS_RMA,
+        QD_LOS_UMI,
+        QD_LOS_UMA,
+        QD_LOS_INH_MIXED,
+        QD_LOS_INH_OPEN,
+        QD_LOS_INF_SL,
+        QD_LOS_INF_DL,
+        QD_LOS_INF_SH,
+        QD_LOS_INF_DH,
+        QD_LOS_INF_HH,
+        QD_LOS_SMA,
+        QD_LOS_DENSEURBAN,
+        QD_LOS_URBAN,
+        QD_LOS_SUBURBAN,
+        QD_LOS_RURAL,
+        QD_LOS_INDUSTRIAL,
+        QD_LOS_LOS,
+        QD_LOS_NLOS,
+        QD_LOS_N_MODEL
+    };
+
+    const char *qd_los_names[QD_LOS_N_MODEL] = {
+        "38.901_RMa", "38.901_UMi", "38.901_UMa", "38.901_InH_Mixed", "38.901_InH_Open", "38.901_InF_SL",
+        "38.901_InF_DL", "38.901_InF_SH", "38.901_InF_DH", "38.901_InF_HH", "38.901_SMa", "38.811_DenseUrban",
+        "38.811_Urban", "38.811_Suburban", "38.811_Rural", "QuaDRiGa_Industrial", "LOS", "NLOS"};
+
+    // LOS probability of TR 38.811 Table 6.6.1-1 in percent over the elevation in degrees
+    const double qd_los_811_el[11] = {-90.0, 0.0, 10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0};
+    const double qd_los_811_dense_urban[11] = {0.0, 0.0, 28.2, 33.1, 39.8, 46.8, 53.7, 61.2, 73.8, 82.0, 98.1};
+    const double qd_los_811_urban[11] = {0.0, 0.0, 24.6, 38.6, 49.3, 61.3, 72.6, 80.5, 91.9, 96.8, 99.2};
+    const double qd_los_811_suburban_rural[11] = {0.0, 0.0, 78.2, 86.9, 91.9, 92.9, 93.5, 94.0, 94.9, 95.2, 99.8};
+
     // Inverse of the standard normal CDF Phi(x) = 0.5·erfc(-x/sqrt(2))
     // - p <= 0: -Inf; p >= 1: +Inf; p > 0.5: -F(1 - p) (1 - p is exact for p >= 0.5)
     // - p in (0, 0.5]: Acklam's rational approximation, followed by one Halley step on the lower-tail CDF
@@ -58,41 +93,6 @@ namespace
             x = x - u / (1.0 + 0.5 * x * u);
         return x;
     }
-
-    // Model identifiers
-    enum qd_los_model
-    {
-        QD_LOS_RMA,
-        QD_LOS_UMI,
-        QD_LOS_UMA,
-        QD_LOS_INH_MIXED,
-        QD_LOS_INH_OPEN,
-        QD_LOS_INF_SL,
-        QD_LOS_INF_DL,
-        QD_LOS_INF_SH,
-        QD_LOS_INF_DH,
-        QD_LOS_INF_HH,
-        QD_LOS_SMA,
-        QD_LOS_DENSEURBAN,
-        QD_LOS_URBAN,
-        QD_LOS_SUBURBAN,
-        QD_LOS_RURAL,
-        QD_LOS_INDUSTRIAL,
-        QD_LOS_LOS,
-        QD_LOS_NLOS,
-        QD_LOS_N_MODEL
-    };
-
-    const char *qd_los_names[QD_LOS_N_MODEL] = {
-        "38.901_RMa", "38.901_UMi", "38.901_UMa", "38.901_InH_Mixed", "38.901_InH_Open", "38.901_InF_SL",
-        "38.901_InF_DL", "38.901_InF_SH", "38.901_InF_DH", "38.901_InF_HH", "38.901_SMa", "38.811_DenseUrban",
-        "38.811_Urban", "38.811_Suburban", "38.811_Rural", "QuaDRiGa_Industrial", "LOS", "NLOS"};
-
-    // LOS probability of TR 38.811 Table 6.6.1-1 in percent over the elevation in degrees
-    const double qd_los_811_el[11] = {-90.0, 0.0, 10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0};
-    const double qd_los_811_dense_urban[11] = {0.0, 0.0, 28.2, 33.1, 39.8, 46.8, 53.7, 61.2, 73.8, 82.0, 98.1};
-    const double qd_los_811_urban[11] = {0.0, 0.0, 24.6, 38.6, 49.3, 61.3, 72.6, 80.5, 91.9, 96.8, 99.2};
-    const double qd_los_811_suburban_rural[11] = {0.0, 0.0, 78.2, 86.9, 91.9, 92.9, 93.5, 94.0, 94.9, 95.2, 99.8};
 }
 
 /*!SECTION

@@ -1123,6 +1123,28 @@ TEST_CASE("path_loss - input validation")
         p["A2"] = p["A1"];
         CHECK_THROWS_MATCHES(call("winner_los", p), std::invalid_argument,
                              Message("Path-loss parameters 'A1' and 'A2' must differ for model 'winner_los'."));
+        // G2n <= 0 makes lg(G2n·hm) infinite, and its default G1n = 0 then gives 0·Inf = NaN
+        for (double g2n : {0.0, -1.0})
+            CHECK_THROWS_MATCHES(call("nlos", {{"An", {30.0}}, {"Bn", {30.0}}, {"LOSmax", {0.0}}, {"G2n", {g2n}}}), std::invalid_argument,
+                                 Message("Path-loss parameter 'G2n' must be > 0."));
+    }
+    SECTION("finite parameters")
+    {
+        // Every parameter that a model reads must be finite (required and optional); keys not read are ignored
+        for (const auto &m : full)
+            for (const auto &e : m.second)
+            {
+                plpar_t p = m.second;
+                p[e.first] = {(e.first == "B") ? NAN : -INFINITY};
+                INFO("model " << m.first << ", key " << e.first);
+                CHECK_THROWS_MATCHES(call(m.first, p), std::invalid_argument,
+                                     Message("Path-loss parameter '" + e.first + "' must be finite."));
+            }
+        CHECK_THROWS_MATCHES(call("satellite", {{"D", {INFINITY}}}), std::invalid_argument,
+                             Message("Path-loss parameter 'D' must be finite."));
+        CHECK_THROWS_MATCHES(call("logdist", {{"A", {20.0}}, {"B", {30.0}}, {"C", {20.0}}, {"SF", {INFINITY}}}), std::invalid_argument,
+                             Message("Path-loss parameter 'SF' must be finite."));
+        CHECK_NOTHROW(call("logdist", {{"A", {20.0}}, {"B", {30.0}}, {"C", {20.0}}, {"Xyz", {NAN}}}));
     }
     SECTION("d2d_in")
     {
@@ -1193,7 +1215,13 @@ TEST_CASE("path_loss - input validation")
         bad["SF_omega"] = -3.5, bad["SF_delta"] = 1.0, bad["LSP_fc_min"] = 0.0;
         arma::mat sf;
         CHECK_THROWS_MATCHES(quadriga_lib::path_loss(model, plpar, bad, fc, tx, rx, pl, &sf), std::invalid_argument,
-                             Message("Scenario parameter 'SF_omega' plus the frequency in GHz must be > 0 where 'SF_gamma' or 'SF_delta' is not 0."));
+                             Message("Scenario parameter 'SF_omega' plus the frequency in GHz must be > 0 where 'SF_delta' is not 0."));
+        CHECK_NOTHROW(quadriga_lib::path_loss(model, plpar, bad, fc, tx, rx, pl));
+        // Infinite SF coefficients (Inf·0 = NaN), also checked only when sf_sigma is requested
+        bad = sp;
+        bad["SF_kappa"] = INFINITY;
+        CHECK_THROWS_MATCHES(quadriga_lib::path_loss(model, plpar, bad, fc, tx, rx, pl, &sf), std::invalid_argument,
+                             Message("Scenario parameter 'SF_kappa' must be finite."));
         CHECK_NOTHROW(quadriga_lib::path_loss(model, plpar, bad, fc, tx, rx, pl));
     }
     SECTION("outputs are not touched on error")

@@ -699,6 +699,24 @@ TEST_CASE("lsp_generate - the symmetric square root is the principal root of R")
         if (c.first == "identity")
             CHECK(arma::abs(X - arma::eye(8, 8)).max() <= 1e-12);
     }
+
+    // DS/KF/SF block singular to rounding (the singular -0.6 / 0.8 / 0 one ulp off, smallest eigenvalue about
+    // 1e-17): scenpar_validate and both Cholesky orders accept it, the iteration stalls and then diverges. The
+    // iterate with the smallest error is kept: finite, residual about 2e-12 (1e-10 allows for rounding)
+    arma::mat R_sing = arma::eye(8, 8);
+    R_sing(0, 1) = R_sing(1, 0) = -0.6000000000000001;
+    R_sing(0, 2) = R_sing(2, 0) = 0.8;
+    R_sing(1, 2) = R_sing(2, 1) = -2.220446049250313e-16;
+    scen_t sp = unit_scen();
+    set_corr(sp, R_sing);
+    arma::cube lsp;
+    quadriga_lib::lsp_generate(sp, arma::vec({3.5e9}), tx, rx, unit_rnd(), lsp, nullptr, nullptr, nullptr, nullptr,
+                               nullptr, nullptr, nullptr, false);
+    const arma::mat X = root_from_lsp(lsp);
+    QD_DIAG("singular to rounding,%.3e,%.3e\n", arma::abs(mm(X, X) - R_sing).max(), arma::abs(X - X.t()).max());
+    REQUIRE(X.is_finite());
+    CHECK(arma::abs(mm(X, X) - R_sing).max() <= 1e-10);
+    CHECK(arma::abs(X - X.t()).max() <= 1e-12);
 }
 
 TEST_CASE("lsp_generate - sample covariance of the log values equals the correlation matrix")
@@ -1203,11 +1221,48 @@ TEST_CASE("lsp_generate - input validation")
         bad = sp;
         bad["SF_omega"] = -28.0, bad["SF_delta"] = 1.0; // f' = max(f, LSP_fc_min = 6): -22 and 0
         CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(bad, fc, tx, rx, rnd, out), std::invalid_argument,
-                             Message("Scenario parameter 'SF_omega' plus the frequency in GHz must be > 0 where 'SF_gamma' or 'SF_delta' is not 0."));
+                             Message("Scenario parameter 'SF_omega' plus the frequency in GHz must be > 0 where 'SF_delta' is not 0."));
         CHECK(arma::all(arma::vectorise(out) == -7.0)); // output untouched
         bad = sp;
         bad["XPR_omega"] = -10.0, bad["XPR_gamma"] = 0.0, bad["XPR_delta"] = 0.0;
         CHECK_NOTHROW(quadriga_lib::lsp_generate(bad, fc, tx, rx, rnd, out));
         CHECK(out.is_finite());
+    }
+    SECTION("infinite coefficients")
+    {
+        // Inf·0 would give NaN: the multiplying coefficients and P_omega of an active term must be finite
+        const std::vector<std::pair<std::string, double>> cases = {
+            {"DS_omega", INFINITY}, {"SF_kappa", INFINITY}, {"AS_A_sigma", -INFINITY}, {"ES_D_mu_C", INFINITY},
+            {"KF_beta", -INFINITY}};
+        arma::cube out(3, 2, 8, arma::fill::value(-7.0));
+        for (const auto &c : cases)
+        {
+            scen_t bad = sp;
+            bad[c.first] = c.second;
+            if (c.first == "DS_omega")
+                bad["DS_delta"] = 1.0;
+            CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(bad, fc, tx, rx, rnd, out), std::invalid_argument,
+                                 Message("Scenario parameter '" + c.first + "' must be finite."));
+        }
+        CHECK(arma::all(arma::vectorise(out) == -7.0)); // output untouched
+
+        // EoD offset and absolute TOA: checked only if the output is requested (TOA only if active)
+        scen_t bad = sp;
+        bad["EoD_offset_a_gamma"] = INFINITY, bad["absTOA_mu"] = -7.0, bad["absTOA_sigma"] = -INFINITY;
+        arma::vec toa;
+        arma::mat eod;
+        CHECK_NOTHROW(quadriga_lib::lsp_generate(bad, fc, tx, rx, rnd, out));
+        CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(bad, fc, tx, rx, rnd, out, nullptr, nullptr, nullptr, nullptr, &eod), std::invalid_argument,
+                             Message("Scenario parameter 'EoD_offset_a_gamma' must be finite."));
+        CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(bad, fc, tx, rx, rnd, out, nullptr, &toa), std::invalid_argument,
+                             Message("Scenario parameter 'absTOA_sigma' must be finite."));
+        bad["absTOA_mu"] = -100.0; // inactive
+        CHECK_NOTHROW(quadriga_lib::lsp_generate(bad, fc, tx, rx, rnd, out, nullptr, &toa));
+
+        // An infinite P_mu gives no NaN and is allowed
+        bad = sp;
+        bad["XPR_mu"] = -INFINITY;
+        CHECK_NOTHROW(quadriga_lib::lsp_generate(bad, fc, tx, rx, rnd, out));
+        CHECK(arma::all(arma::vectorise(out.slice(7)) == 0.0));
     }
 }
