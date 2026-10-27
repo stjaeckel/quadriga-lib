@@ -146,6 +146,36 @@ namespace quadriga_lib
                       arma::cube *lsp_sigma = nullptr,                        // Optional output: Std in the log domain, [n_link, n_freq, 8]
                       bool cholesky = true,                                   // true: Cholesky in TR order; false: symmetric square root (legacy)
                       bool clip_spreads = true);                              // Clip AS to 104 deg, ES to 52 deg (TR step 4)
+
+    // LOS probability of a set of links, TR 38.901 Table 7.4.2-1 and other named models
+    // - Models: "38.901_RMa", "38.901_UMi", "38.901_UMa", "38.901_InH_Mixed", "38.901_InH_Open",
+    //   "38.901_InF_SL", "38.901_InF_DL", "38.901_InF_SH", "38.901_InF_DH", "38.901_InF_HH", "38.901_SMa",
+    //   "38.811_DenseUrban", "38.811_Urban", "38.811_Suburban", "38.811_Rural", "QuaDRiGa_Industrial",
+    //   "LOS" (always 1), "NLOS" (always 0)
+    // - Soft LOS (7.6-18) when 'rnd_g', 'fc' and 'los_soft' are given
+    void los_probability(const std::string &model,          // Model name
+                         const arma::vec &d2d_out,          // 2D outdoor distance in [m] (indoor scenarios: 2D distance), [n_link]
+                         const arma::vec &h_bs,             // BS height in [m], [n_link] or [1]
+                         const arma::vec &h_ut,             // UT height in [m], [n_link] or [1]
+                         arma::vec &p_los,                  // Output: LOS probability, [n_link]
+                         double d_clutter = NAN,            // InF, SMa: clutter size in [m]; NaN = TR default of the model
+                         double r_clutter = NAN,            // InF: clutter density; SMa: vegetation density r_vegetation; NaN = default
+                         double h_clutter = NAN,            // InF SH, DH: clutter height in [m]; NaN = default
+                         const arma::vec *rnd_g = nullptr,  // Optional: Normal(0,1) per link for the soft LOS state, [n_link]
+                         const arma::vec *fc = nullptr,     // Optional: Carrier frequencies in [Hz] for the soft LOS state, [n_freq]
+                         arma::mat *los_soft = nullptr);    // Optional output: Soft LOS state in [0, 1], [n_link, n_freq]
+
+    // O2I building or car penetration loss of a set of UTs, TR 38.901 clause 7.4.3
+    // - Models: "low", "high", "low_A" (Table 7.4.3-2), "legacy_6GHz" (Table 7.4.3-3), "car", "car_metal" (7.4.3.2)
+    // - The model of each UT is chosen by comparing column 0 of 'rnd' with the cumulative 'weights'
+    void o2i_loss(const arma::vec &fc,                       // Carrier frequencies in [Hz], [n_freq]
+                  const arma::mat &rnd,                      // Random values per UT, [n_ut, 4]: U model, U d2D-in 1, U d2D-in 2, N deviation
+                  const std::vector<std::string> &models,    // Models to mix, [n_model]
+                  const arma::vec &weights,                  // Probability of each model, sum 1, [n_model]
+                  arma::mat &loss,                           // Output: Penetration loss in [dB], [n_ut, n_freq]
+                  double d2d_in_max = 25.0,                  // Maximum indoor 2D distance in [m] (key O2I_d2D_in_max)
+                  arma::vec *d2d_in = nullptr,               // Optional output: Indoor 2D distance in [m], 0 for car models, [n_ut]
+                  arma::uvec *model_index = nullptr);        // Optional output: Chosen model per UT, 0-based index into 'models', [n_ut]
 }
 
 #endif
