@@ -209,10 +209,9 @@ TEST_CASE("conf files v19 - all 23 files are read without ignored keys and pass 
         else
             CHECK(sp["KF_mu"] == -100.0);
 
-        // Absolute time of arrival only in NLOS and NLOS_O2I files: the TR gives it for NLOS links, and the O2I
-        // links of an NLOS file are NLOS links; active if absTOA_mu > -30
-        const bool nlos_outdoor = name.find("NLOS") != std::string::npos;
-        CHECK((sp["absTOA_mu"] > -30.0) == nlos_outdoor);
+        // Absolute time of arrival in the NLOS and all O2I files: the TR gives it for NLOS links, and an O2I link
+        // has no LOS ray, so its response is the NLOS form (7.6-43); active if absTOA_mu > -30
+        CHECK((sp["absTOA_mu"] > -30.0) == !los_file);
     }
 }
 
@@ -358,7 +357,8 @@ TEST_CASE("conf files v19 - table values of TR 38.901 v19.5.0")
         {"SMa_NLOS", "absTOA_mu", -7.702}, {"SMa_NLOS", "absTOA_sigma", 0.4}, {"SMa_NLOS_O2I", "absTOA_lambda", 50},
         {"InF_NLOS_SL", "absTOA_mu", -7.5}, {"InF_NLOS_SL", "absTOA_sigma", 0.4}, {"InF_NLOS_SL", "absTOA_lambda", 6},
         {"InF_NLOS_DL", "absTOA_lambda", 6}, {"InF_NLOS_SH", "absTOA_lambda", 11}, {"InF_NLOS_DH", "absTOA_lambda", 11},
-        {"UMa_LOS", "absTOA_mu", -100}, {"UMa_LOS_O2I", "absTOA_mu", -100}, {"InF_LOS", "absTOA_mu", -100},
+        {"UMa_LOS", "absTOA_mu", -100}, {"UMa_LOS_O2I", "absTOA_mu", -7.4}, {"InF_LOS", "absTOA_mu", -100},
+        {"UMi_LOS_O2I", "absTOA_sigma", 0.5}, {"RMa_LOS_O2I", "absTOA_mu", -8.33}, {"SMa_LOS_O2I", "absTOA_lambda", 50},
         // Table 7.6-13-1, near field
         {"UMa_LOS", "NF_k1", 2}, {"UMa_NLOS", "NF_alpha", 1.93}, {"UMa_LOS_O2I", "NF_beta", 1.33},
         {"UMi_NLOS", "NF_k1", 2}, {"UMi_LOS", "NF_alpha", 1.53}, {"UMi_NLOS_O2I", "NF_beta", 1.42},

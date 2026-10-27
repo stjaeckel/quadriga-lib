@@ -223,8 +223,8 @@ static const qd_scenpar_key qd_scenpar_keys[] = {
     {"SNS_delta_var", 0.0, QD_NONNEG, -1, -1, 9, 2, "variance of the visibility region parameter delta"},
     {"PolVar_sigma", 0.0, QD_NONNEG, -1, -1, 9, 3, "STD of the polarization variability powers [dB]"},
     // TR 38.901 v19.5.0: LOS/indoor state correlation distances, maximum indoor distance, InF delay-spread terms
-    {"LOS_state_lambda", 0.0, QD_NONNEG, -1, -1, 4, 2, "decorrelation distance of the LOS/NLOS state [m]; 0 = uncorrelated"},
-    {"IO_state_lambda", 0.0, QD_NONNEG, -1, -1, 4, 2, "decorrelation distance of the indoor/outdoor state [m]; 0 = uncorrelated"},
+    {"LOS_state_lambda", 0.0, QD_NONNEG, -1, -1, 4, 2, "decorrelation distance of the LOS/NLOS state [m], stated in the NLOS file of a scenario; 0 = not stated here"},
+    {"IO_state_lambda", 0.0, QD_NONNEG, -1, -1, 4, 2, "decorrelation distance of the indoor/outdoor state [m], stated in the O2I files of a scenario; 0 = not stated here"},
     {"O2I_d2D_in_max", 0.0, QD_NONNEG, -1, -1, 3, 4, "maximum indoor 2D distance of O2I UTs [m]; 0 = not stated"},
     {"DS_VS", 0.0, QD_NONNEG, -1, -1, 0, 1, "volume-to-surface ratio V/S of the hall [m]; 0 = no V/S term"},
     {"DS_VS_a", 0.0, QD_NONNEG, -1, -1, 0, 1, "factor a of the DS term log10(a V/S + b) [1/m]"},
@@ -711,7 +711,9 @@ Per drop (layout): [[o2i_loss]] gives the penetration loss and the indoor distan
 [[los_probability]] evaluates the LOS probability at the outdoor distance `d2D - d2D-in`. The caller draws the LOS
 state and the indoor state with [[sos_rand]] / [[sos_randn]] at the decorrelation distances of the keys
 `LOS_state_lambda` and `IO_state_lambda`, and the O2I variables at the distances of TR 38.901 clause 7.6.3.3 (see
-[[o2i_loss]]). Per BS site and scenario (builder): [[lsf_init_phases]] draws the random
+[[o2i_loss]]). The two state distances apply to all links of a scenario and are stated once in the TR 38.901 files:
+`LOS_state_lambda` in the NLOS file, `IO_state_lambda` in the O2I files; 0 in the other files means "not stated
+here". Per BS site and scenario (builder): [[lsf_init_phases]] draws the random
 phases once; [[lsf_draw]] evaluates them at the links (columns 0 DS, 1 KF, 2 SF, 3 ASD, 4 ASA, 5 ESD, 6 ESA, 7 XPR,
 8 absolute TOA: Normal; 9 ground permittivity, 10 UMa environment height: Uniform; each at the decorrelation
 distance of its key); [[path_loss]] returns the path loss and the SF standard deviation; [[lsp_generate]] turns the

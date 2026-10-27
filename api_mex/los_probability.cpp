@@ -67,8 +67,10 @@ LOS probability of a set of links, TR 38.901 Table 7.4.2-1 and other named model
 - The LOS state itself (a draw against `p_los`) and its spatial correlation are the caller's: e.g. a
   spatially consistent uniform value from [[sos_rand]], or `rnd_g` from [[sos_randn]], at the
   decorrelation distance of the scenario field `LOS_state_lambda` (TR 38.901 Table 7.6.3.1-2). The
-  `LOS_state_lambda` of the InF conf files is `d_clutter / 2` of the TR defaults; it does not follow
-  a `d_clutter` argument, so a caller who changes `d_clutter` passes its own correlation distance
+  field applies to all links of a scenario and is stated only in its NLOS conf file (0 in the LOS and
+  O2I files means "not stated here"). The `LOS_state_lambda` of the InF conf files is
+  `d_clutter / 2` of the TR defaults; it does not follow a `d_clutter` argument, so a caller who
+  changes `d_clutter` passes its own correlation distance
 - O2I UTs: Table 7.4.2-1 uses the outdoor distance `d2d_out = d2D - d2D-in` with `d2D-in` from
   [[o2i_loss]], which therefore runs first; the caller clamps `d2d_out` at 0 (negative distances are
   rejected). Indoor scenarios (InH, InF) pass the 2D distance

@@ -143,6 +143,10 @@ Large-scale parameters of a set of links from normalized random values
   TR 38.901 eq. (7.6-40) writes the complex permittivity with the opposite sign of the imaginary part, so the TR
   reflection formulas take the complex conjugate `gr_eps_re - j·gr_eps_im`. Column 9 of `rnd` must be in [0, 1]
   when `gr_eps_re` or `gr_eps_im` is requested; it is not checked otherwise
+- The three ground types are QuaDRiGa's fits (as in QuaDRiGa's `gen_lsf_parameters`), not the models of TR 38.901
+  Table 7.6.8-1: very dry ground agrees, medium and wet ground differ (e.g. at 3.5 GHz medium `16.87 + j·0.67` here,
+  `13.23 + j·1.39` for medium dry ground of the table; wet `j·1.65` vs. `j·3.93`). A caller who needs the table
+  values computes them with eq. (7.6-40) to (7.6-42)
 - EoD offset in degrees, positive = up (the negative of the ZOD offset of TR 38.901 Tables 7.5-7 to 7.5-12), with
   `f'`, `d`, `h` as above: `e = EoD_offset_e + EoD_offset_e_gamma·lg f'`; if `EoD_offset_b > 0`:
   `e += 10^((EoD_offset_a + EoD_offset_a_gamma·lg f')·lg(max(EoD_offset_b, d)) + EoD_offset_c +

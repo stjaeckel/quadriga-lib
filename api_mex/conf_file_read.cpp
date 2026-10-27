@@ -26,9 +26,11 @@ Per drop (layout): [[o2i_loss]] gives the penetration loss and the indoor distan
 UT; then [[los_probability]] evaluates the LOS probability at the outdoor distance `d2D - d2D-in`.
 The caller draws the LOS state and the indoor state with [[sos_rand]] / [[sos_randn]] at the
 decorrelation distances of the fields `LOS_state_lambda` and `IO_state_lambda`, and the O2I
-variables at the distances of TR 38.901 clause 7.6.3.3 (see [[o2i_loss]]). Per BS site and
-scenario (builder): [[lsf_init_phases]] draws the random phases once; [[lsf_draw]] evaluates them
-at the links (columns 1 DS, 2 KF, 3 SF, 4 ASD, 5 ASA, 6 ESD, 7 ESA, 8 XPR, 9 absolute TOA: Normal;
+variables at the distances of TR 38.901 clause 7.6.3.3 (see [[o2i_loss]]). The two state distances
+apply to all links of a scenario and are stated once in the TR 38.901 files: `LOS_state_lambda` in
+the NLOS file, `IO_state_lambda` in the O2I files; 0 in the other files means "not stated here".
+Per BS site and scenario (builder): [[lsf_init_phases]] draws the random phases once; [[lsf_draw]]
+evaluates them at the links (columns 1 DS, 2 KF, 3 SF, 4 ASD, 5 ASA, 6 ESD, 7 ESA, 8 XPR, 9 absolute TOA: Normal;
 10 ground permittivity, 11 UMa environment height: Uniform; each at the decorrelation distance of
 its field); [[path_loss]] returns the path loss and the SF standard deviation; [[lsp_generate]]
 turns the random values into the LSPs of each link and frequency.<br><br>
