@@ -1,7 +1,7 @@
 ---
-title: "C++ API Documentation for Quadriga-Lib v0.12.3"
+title: "C++ API Documentation for Quadriga-Lib v0.12.4"
 author: "Stephan Jaeckel"
-date: "23.10.2026"
+date: "27.10.2026"
 lang: en-US
 ---
 
@@ -27,135 +27,141 @@ lang: en-US
 
 | Function | Section | Line |
 | --- | --- | --- |
-| [arrayant](#arrayant) | Array antenna class | 165 |
-| [.append](#append) | Array antenna class | 216 |
-| [.calc_beamwidth_deg](#calc_beamwidth_deg) | Array antenna class | 239 |
-| [.calc_directivity_dBi](#calc_directivity_dbi) | Array antenna class | 277 |
-| [.combine_pattern](#combine_pattern) | Array antenna class | 299 |
-| [.copy_element](#copy_element) | Array antenna class | 329 |
-| [.export_obj_file](#export_obj_file) | Array antenna class | 350 |
-| [.interpolate](#interpolate) | Array antenna class | 380 |
-| [.is_valid](#is_valid) | Array antenna class | 433 |
-| [.qdant_write](#qdant_write) | Array antenna class | 451 |
-| [.remove_zeros](#remove_zeros) | Array antenna class | 490 |
-| [.rotate_pattern](#rotate_pattern) | Array antenna class | 508 |
-| [.set_size](#set_size) | Array antenna class | 546 |
-| [arrayant_combine_pattern_multi](#arrayant_combine_pattern_multi) | Array antenna functions | 572 |
-| [arrayant_concat_multi](#arrayant_concat_multi) | Array antenna functions | 610 |
-| [arrayant_copy_element_multi](#arrayant_copy_element_multi) | Array antenna functions | 644 |
-| [arrayant_interpolate_multi](#arrayant_interpolate_multi) | Array antenna functions | 684 |
-| [arrayant_is_valid_multi](#arrayant_is_valid_multi) | Array antenna functions | 743 |
-| [arrayant_rotate_pattern_multi](#arrayant_rotate_pattern_multi) | Array antenna functions | 770 |
-| [arrayant_set_element_pos_multi](#arrayant_set_element_pos_multi) | Array antenna functions | 802 |
-| [generate_arrayant_3GPP](#generate_arrayant_3gpp) | Array antenna functions | 828 |
-| [generate_arrayant_custom](#generate_arrayant_custom) | Array antenna functions | 878 |
-| [generate_arrayant_dipole](#generate_arrayant_dipole) | Array antenna functions | 903 |
-| [generate_arrayant_half_wave_dipole](#generate_arrayant_half_wave_dipole) | Array antenna functions | 920 |
-| [generate_arrayant_multibeam](#generate_arrayant_multibeam) | Array antenna functions | 937 |
-| [generate_arrayant_omni](#generate_arrayant_omni) | Array antenna functions | 991 |
-| [generate_arrayant_ula](#generate_arrayant_ula) | Array antenna functions | 1008 |
-| [generate_arrayant_xpol](#generate_arrayant_xpol) | Array antenna functions | 1036 |
-| [generate_speaker](#generate_speaker) | Array antenna functions | 1053 |
-| [qdant_read](#qdant_read) | Array antenna functions | 1128 |
-| [qdant_read_multi](#qdant_read_multi) | Array antenna functions | 1160 |
-| [qdant_write_multi](#qdant_write_multi) | Array antenna functions | 1187 |
-| [channel](#channel) | Channel class | 1217 |
-| [.add_paths](#add_paths) | Channel class | 1264 |
-| [.calc_effective_path_gain](#calc_effective_path_gain) | Channel class | 1303 |
-| [.write_paths_to_obj_file](#write_paths_to_obj_file) | Channel class | 1322 |
-| [any_type_id](#any_type_id) | Channel functions | 1363 |
-| [baseband_freq_response](#baseband_freq_response) | Channel functions | 1406 |
-| [baseband_freq_response_multi](#baseband_freq_response_multi) | Channel functions | 1451 |
-| [baseband_freq_response_vec](#baseband_freq_response_vec) | Channel functions | 1503 |
-| [get_HDF5_version](#get_hdf5_version) | Channel functions | 1541 |
-| [hdf5_create](#hdf5_create) | Channel functions | 1553 |
-| [hdf5_read_channel](#hdf5_read_channel) | Channel functions | 1585 |
-| [hdf5_read_dset](#hdf5_read_dset) | Channel functions | 1623 |
-| [hdf5_read_dset_names](#hdf5_read_dset_names) | Channel functions | 1666 |
-| [hdf5_read_layout](#hdf5_read_layout) | Channel functions | 1700 |
-| [hdf5_reshape_layout](#hdf5_reshape_layout) | Channel functions | 1726 |
-| [hdf5_write](#hdf5_write) | Channel functions | 1754 |
-| [hdf5_write_dset](#hdf5_write_dset) | Channel functions | 1798 |
-| [path](#path) | Channel functions | 1840 |
-| [qrt_file_append](#qrt_file_append) | Channel functions | 1960 |
-| [qrt_file_init](#qrt_file_init) | Channel functions | 1996 |
-| [qrt_file_parse](#qrt_file_parse) | Channel functions | 2036 |
-| [qrt_file_read](#qrt_file_read) | Channel functions | 2085 |
-| [qrt_file_read_raw](#qrt_file_read_raw) | Channel functions | 2184 |
-| [qrt_read_cache_init](#qrt_read_cache_init) | Channel functions | 2222 |
-| [quantize_delays](#quantize_delays) | Channel functions | 2262 |
-| [conf_file_list](#conf_file_list) | Channel generation functions | 2341 |
-| [conf_file_read](#conf_file_read) | Channel generation functions | 2388 |
-| [conf_file_write](#conf_file_write) | Channel generation functions | 2468 |
-| [get_channels_ieee_indoor](#get_channels_ieee_indoor) | Channel generation functions | 2554 |
-| [get_channels_irs](#get_channels_irs) | Channel generation functions | 2641 |
-| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 2745 |
-| [get_channels_planar](#get_channels_planar) | Channel generation functions | 2837 |
-| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 2919 |
-| [scenpar_validate](#scenpar_validate) | Channel generation functions | 3009 |
-| [acdf](#acdf) | Channel statistics | 3074 |
-| [calc_angular_spreads_sphere](#calc_angular_spreads_sphere) | Channel statistics | 3112 |
-| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 3158 |
-| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 3224 |
-| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 3260 |
-| [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | 3295 |
-| [fast_acos](#fast_acos) | Math functions | 3328 |
-| [fast_asin](#fast_asin) | Math functions | 3347 |
-| [fast_atan2](#fast_atan2) | Math functions | 3366 |
-| [fast_cart2geo](#fast_cart2geo) | Math functions | 3388 |
-| [fast_geo2cart](#fast_geo2cart) | Math functions | 3424 |
-| [fast_sincos](#fast_sincos) | Math functions | 3470 |
-| [fast_slerp](#fast_slerp) | Math functions | 3494 |
-| [interp_2D](#interp_2d) | Math functions | 3531 |
-| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 3599 |
-| [colormap](#colormap) | Site-specific simulation tools | 3688 |
-| [combine_irs_coord](#combine_irs_coord) | Site-specific simulation tools | 3707 |
-| [coord2path](#coord2path) | Site-specific simulation tools | 3752 |
-| [cube](#cube) | Site-specific simulation tools | 3790 |
-| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 3825 |
-| [icosphere](#icosphere) | Site-specific simulation tools | 3870 |
-| [interface_gain](#interface_gain) | Site-specific simulation tools | 3904 |
-| [medium_gain](#medium_gain) | Site-specific simulation tools | 3937 |
-| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 3978 |
-| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 4021 |
-| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 4096 |
-| [obj_overlap_test](#obj_overlap_test) | Site-specific simulation tools | 4168 |
-| [path_to_tube](#path_to_tube) | Site-specific simulation tools | 4200 |
-| [plane](#plane) | Site-specific simulation tools | 4229 |
-| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 4267 |
-| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 4296 |
-| [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 4336 |
-| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 4372 |
-| [ray_commit](#ray_commit) | Site-specific simulation tools | 4408 |
-| [ray_init](#ray_init) | Site-specific simulation tools | 4513 |
-| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 4606 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 4751 |
-| [ray_progress](#ray_progress) | Site-specific simulation tools | 4800 |
-| [ray_state_update](#ray_state_update) | Site-specific simulation tools | 4945 |
-| [ray_subdivide_flag](#ray_subdivide_flag) | Site-specific simulation tools | 5148 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 5209 |
-| [refractive_index](#refractive_index) | Site-specific simulation tools | 5263 |
-| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 5295 |
-| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 5353 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 5385 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 5413 |
-| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 5454 |
-| [write_png](#write_png) | Site-specific simulation tools | 5489 |
-| [xpr_update](#xpr_update) | Site-specific simulation tools | 5520 |
-| [sos_acf_2d](#sos_acf_2d) | Sum-of-sinusoids random number generator | 5767 |
-| [sos_acf_approx](#sos_acf_approx) | Sum-of-sinusoids random number generator | 5802 |
-| [sos_acf_estimate](#sos_acf_estimate) | Sum-of-sinusoids random number generator | 5843 |
-| [sos_acfi](#sos_acfi) | Sum-of-sinusoids random number generator | 5903 |
-| [sos_calc_mse](#sos_calc_mse) | Sum-of-sinusoids random number generator | 5933 |
-| [sos_generate](#sos_generate) | Sum-of-sinusoids random number generator | 5994 |
-| [sos_init_phases](#sos_init_phases) | Sum-of-sinusoids random number generator | 6074 |
-| [sos_map](#sos_map) | Sum-of-sinusoids random number generator | 6113 |
-| [sos_preset](#sos_preset) | Sum-of-sinusoids random number generator | 6161 |
-| [sos_rand](#sos_rand) | Sum-of-sinusoids random number generator | 6211 |
-| [sos_randi](#sos_randi) | Sum-of-sinusoids random number generator | 6272 |
-| [sos_randn](#sos_randn) | Sum-of-sinusoids random number generator | 6336 |
-| [sos_remove_bias](#sos_remove_bias) | Sum-of-sinusoids random number generator | 6396 |
-| [sos_val](#sos_val) | Sum-of-sinusoids random number generator | 6482 |
+| [arrayant](#arrayant) | Array antenna class | 171 |
+| [.append](#append) | Array antenna class | 222 |
+| [.calc_beamwidth_deg](#calc_beamwidth_deg) | Array antenna class | 245 |
+| [.calc_directivity_dBi](#calc_directivity_dbi) | Array antenna class | 283 |
+| [.combine_pattern](#combine_pattern) | Array antenna class | 305 |
+| [.copy_element](#copy_element) | Array antenna class | 335 |
+| [.export_obj_file](#export_obj_file) | Array antenna class | 356 |
+| [.interpolate](#interpolate) | Array antenna class | 386 |
+| [.is_valid](#is_valid) | Array antenna class | 439 |
+| [.qdant_write](#qdant_write) | Array antenna class | 457 |
+| [.remove_zeros](#remove_zeros) | Array antenna class | 496 |
+| [.rotate_pattern](#rotate_pattern) | Array antenna class | 514 |
+| [.set_size](#set_size) | Array antenna class | 552 |
+| [arrayant_combine_pattern_multi](#arrayant_combine_pattern_multi) | Array antenna functions | 578 |
+| [arrayant_concat_multi](#arrayant_concat_multi) | Array antenna functions | 616 |
+| [arrayant_copy_element_multi](#arrayant_copy_element_multi) | Array antenna functions | 650 |
+| [arrayant_interpolate_multi](#arrayant_interpolate_multi) | Array antenna functions | 690 |
+| [arrayant_is_valid_multi](#arrayant_is_valid_multi) | Array antenna functions | 749 |
+| [arrayant_rotate_pattern_multi](#arrayant_rotate_pattern_multi) | Array antenna functions | 776 |
+| [arrayant_set_element_pos_multi](#arrayant_set_element_pos_multi) | Array antenna functions | 808 |
+| [generate_arrayant_3GPP](#generate_arrayant_3gpp) | Array antenna functions | 834 |
+| [generate_arrayant_custom](#generate_arrayant_custom) | Array antenna functions | 884 |
+| [generate_arrayant_dipole](#generate_arrayant_dipole) | Array antenna functions | 909 |
+| [generate_arrayant_half_wave_dipole](#generate_arrayant_half_wave_dipole) | Array antenna functions | 926 |
+| [generate_arrayant_multibeam](#generate_arrayant_multibeam) | Array antenna functions | 943 |
+| [generate_arrayant_omni](#generate_arrayant_omni) | Array antenna functions | 997 |
+| [generate_arrayant_ula](#generate_arrayant_ula) | Array antenna functions | 1014 |
+| [generate_arrayant_xpol](#generate_arrayant_xpol) | Array antenna functions | 1042 |
+| [generate_speaker](#generate_speaker) | Array antenna functions | 1059 |
+| [qdant_read](#qdant_read) | Array antenna functions | 1134 |
+| [qdant_read_multi](#qdant_read_multi) | Array antenna functions | 1166 |
+| [qdant_write_multi](#qdant_write_multi) | Array antenna functions | 1193 |
+| [channel](#channel) | Channel class | 1223 |
+| [.add_paths](#add_paths) | Channel class | 1270 |
+| [.calc_effective_path_gain](#calc_effective_path_gain) | Channel class | 1309 |
+| [.write_paths_to_obj_file](#write_paths_to_obj_file) | Channel class | 1328 |
+| [any_type_id](#any_type_id) | Channel functions | 1369 |
+| [baseband_freq_response](#baseband_freq_response) | Channel functions | 1412 |
+| [baseband_freq_response_multi](#baseband_freq_response_multi) | Channel functions | 1457 |
+| [baseband_freq_response_vec](#baseband_freq_response_vec) | Channel functions | 1509 |
+| [get_HDF5_version](#get_hdf5_version) | Channel functions | 1547 |
+| [hdf5_create](#hdf5_create) | Channel functions | 1559 |
+| [hdf5_read_channel](#hdf5_read_channel) | Channel functions | 1591 |
+| [hdf5_read_dset](#hdf5_read_dset) | Channel functions | 1629 |
+| [hdf5_read_dset_names](#hdf5_read_dset_names) | Channel functions | 1672 |
+| [hdf5_read_layout](#hdf5_read_layout) | Channel functions | 1706 |
+| [hdf5_reshape_layout](#hdf5_reshape_layout) | Channel functions | 1732 |
+| [hdf5_write](#hdf5_write) | Channel functions | 1760 |
+| [hdf5_write_dset](#hdf5_write_dset) | Channel functions | 1804 |
+| [path](#path) | Channel functions | 1846 |
+| [qrt_file_append](#qrt_file_append) | Channel functions | 1966 |
+| [qrt_file_init](#qrt_file_init) | Channel functions | 2002 |
+| [qrt_file_parse](#qrt_file_parse) | Channel functions | 2042 |
+| [qrt_file_read](#qrt_file_read) | Channel functions | 2091 |
+| [qrt_file_read_raw](#qrt_file_read_raw) | Channel functions | 2190 |
+| [qrt_read_cache_init](#qrt_read_cache_init) | Channel functions | 2228 |
+| [quantize_delays](#quantize_delays) | Channel functions | 2268 |
+| [get_channels_ieee_indoor](#get_channels_ieee_indoor) | Channel generation functions | 2347 |
+| [get_channels_irs](#get_channels_irs) | Channel generation functions | 2434 |
+| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 2538 |
+| [get_channels_planar](#get_channels_planar) | Channel generation functions | 2630 |
+| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 2712 |
+| [acdf](#acdf) | Channel statistics | 2806 |
+| [calc_angular_spreads_sphere](#calc_angular_spreads_sphere) | Channel statistics | 2844 |
+| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 2890 |
+| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 2956 |
+| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 2992 |
+| [conf_file_list](#conf_file_list) | Geometry-based stochastic model | 3057 |
+| [conf_file_read](#conf_file_read) | Geometry-based stochastic model | 3104 |
+| [conf_file_write](#conf_file_write) | Geometry-based stochastic model | 3186 |
+| [los_probability](#los_probability) | Geometry-based stochastic model | 3273 |
+| [lsf_draw](#lsf_draw) | Geometry-based stochastic model | 3375 |
+| [lsf_init_phases](#lsf_init_phases) | Geometry-based stochastic model | 3468 |
+| [lsp_generate](#lsp_generate) | Geometry-based stochastic model | 3562 |
+| [o2i_loss](#o2i_loss) | Geometry-based stochastic model | 3685 |
+| [path_loss](#path_loss) | Geometry-based stochastic model | 3754 |
+| [scenpar_validate](#scenpar_validate) | Geometry-based stochastic model | 3878 |
+| [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | 3945 |
+| [fast_acos](#fast_acos) | Math functions | 3978 |
+| [fast_asin](#fast_asin) | Math functions | 3997 |
+| [fast_atan2](#fast_atan2) | Math functions | 4016 |
+| [fast_cart2geo](#fast_cart2geo) | Math functions | 4038 |
+| [fast_geo2cart](#fast_geo2cart) | Math functions | 4074 |
+| [fast_sincos](#fast_sincos) | Math functions | 4120 |
+| [fast_slerp](#fast_slerp) | Math functions | 4144 |
+| [interp_2D](#interp_2d) | Math functions | 4181 |
+| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 4249 |
+| [colormap](#colormap) | Site-specific simulation tools | 4338 |
+| [combine_irs_coord](#combine_irs_coord) | Site-specific simulation tools | 4357 |
+| [coord2path](#coord2path) | Site-specific simulation tools | 4402 |
+| [cube](#cube) | Site-specific simulation tools | 4440 |
+| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 4475 |
+| [icosphere](#icosphere) | Site-specific simulation tools | 4520 |
+| [interface_gain](#interface_gain) | Site-specific simulation tools | 4554 |
+| [medium_gain](#medium_gain) | Site-specific simulation tools | 4587 |
+| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 4628 |
+| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 4671 |
+| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 4746 |
+| [obj_overlap_test](#obj_overlap_test) | Site-specific simulation tools | 4818 |
+| [path_to_tube](#path_to_tube) | Site-specific simulation tools | 4850 |
+| [plane](#plane) | Site-specific simulation tools | 4879 |
+| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 4917 |
+| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 4946 |
+| [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 4986 |
+| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 5022 |
+| [ray_commit](#ray_commit) | Site-specific simulation tools | 5058 |
+| [ray_init](#ray_init) | Site-specific simulation tools | 5163 |
+| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 5256 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 5401 |
+| [ray_progress](#ray_progress) | Site-specific simulation tools | 5450 |
+| [ray_state_update](#ray_state_update) | Site-specific simulation tools | 5595 |
+| [ray_subdivide_flag](#ray_subdivide_flag) | Site-specific simulation tools | 5798 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 5859 |
+| [refractive_index](#refractive_index) | Site-specific simulation tools | 5913 |
+| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 5945 |
+| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 6003 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 6035 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 6063 |
+| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 6104 |
+| [write_png](#write_png) | Site-specific simulation tools | 6139 |
+| [xpr_update](#xpr_update) | Site-specific simulation tools | 6170 |
+| [sos_acf_2d](#sos_acf_2d) | Sum-of-sinusoids random number generator | 6417 |
+| [sos_acf_approx](#sos_acf_approx) | Sum-of-sinusoids random number generator | 6452 |
+| [sos_acf_estimate](#sos_acf_estimate) | Sum-of-sinusoids random number generator | 6493 |
+| [sos_acfi](#sos_acfi) | Sum-of-sinusoids random number generator | 6553 |
+| [sos_calc_mse](#sos_calc_mse) | Sum-of-sinusoids random number generator | 6583 |
+| [sos_generate](#sos_generate) | Sum-of-sinusoids random number generator | 6644 |
+| [sos_init_phases](#sos_init_phases) | Sum-of-sinusoids random number generator | 6724 |
+| [sos_map](#sos_map) | Sum-of-sinusoids random number generator | 6763 |
+| [sos_preset](#sos_preset) | Sum-of-sinusoids random number generator | 6811 |
+| [sos_rand](#sos_rand) | Sum-of-sinusoids random number generator | 6861 |
+| [sos_randi](#sos_randi) | Sum-of-sinusoids random number generator | 6922 |
+| [sos_randn](#sos_randn) | Sum-of-sinusoids random number generator | 6986 |
+| [sos_remove_bias](#sos_remove_bias) | Sum-of-sinusoids random number generator | 7046 |
+| [sos_val](#sos_val) | Sum-of-sinusoids random number generator | 7132 |
 
 ---
 
@@ -2338,219 +2344,6 @@ quadriga_lib::quantize_delays(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, 5.0e-9, 48
 # Channel generation functions
 
 ---
-## conf_file_list
-List the scenarios defined by the conf files in a set of directories
-
-- Lists the regular files and symbolic links to regular files whose name ends in `.conf` (case-sensitive) and
-  is longer than `.conf`, not recursive. The scenario name is the file name without this extension, whatever
-  characters it has.
-- Directories are processed in the given order, the files of one directory in byte-wise sorted order of their
-  names (digits before upper case before lower case)
-- A file whose name was already found in an earlier directory is skipped completely, so the first directory
-  wins. This allows a local folder to override the files of a shared folder.
-- With `parse_shortnames = true` each file is read and one entry is added right after the file for every
-  line `ShortName = name` that is not a comment. Other lines are not examined; a UTF-8 byte order mark at the
-  start of the file is skipped.
-- Throws `std::invalid_argument` if a short name equals an earlier entry, if a file name equals an earlier
-  short name, or if the value of a `ShortName` line is not one name of the characters `A-Z`, `a-z`, `0-9`, `_`
-- Throws `std::runtime_error` if a listed file cannot be opened for reading the short names
-- A directory that does not exist, is not a directory or cannot be listed is skipped; an empty string is the
-  current directory
-- A failed call leaves the outputs untouched
-
-### Declaration:
-```
-arma::uword quadriga_lib::conf_file_list(
-    const std::vector<std::string> &dirs,
-    std::vector<std::string> &scenarios,
-    std::vector<std::string> *file_names = nullptr,
-    std::vector<std::string> *file_dirs = nullptr,
-    bool parse_shortnames = true);
-```
-
-### Inputs:
-- **`dirs`** — Directories, searched in this order; can be empty
-- **`parse_shortnames`** *(optional)* — `true`: read the files and add their short names; `false`: list the
-  files only, which is faster
-
-### Outputs:
-- **`scenarios`** — Scenario names and short names; previous content is discarded; `[n_scen]`
-- **`file_names`** *(optional)* — File name including `.conf` for each entry; `[n_scen]`
-- **`file_dirs`** *(optional)* — Directory of the file for each entry, exactly as given in `dirs`; `[n_scen]`
-
-### Returns:
-- Number of entries, `n_scen`
-
-### See also:
-- [conf_file_read](#conf_file_read) (read one of the files)
-
----
-## conf_file_read
-Read and validate a QuaDRiGa scenario configuration file
-
-- A conf file is a text file with one `Key = value` assignment per line; `%` starts a comment; blank lines
-  are allowed; line ends can be LF or CRLF; space and tab are white space; a UTF-8 byte order mark at the start
-  of the file is skipped
-- Keys are case-sensitive names of the characters `A-Z`, `a-z`, `0-9` and `_`; there are four kinds:
-  - Scenario parameters: `n_key = 165` numeric keys with one number each, returned in `scenpar`. Keys that
-    are not in the file have their default value. The names and their order are returned in `key_order`.
-  - `SubpathMethod`: one of the words `legacy`, `Laplacian`, `mmMAGIC`; default `legacy`
-  - Path-loss parameters: every key that starts with `PL_`. `PL_model` has one name as value. All others
-    have one or more numbers separated by white space and are returned in `plpar` without the prefix.
-  - `ShortName`: an alias for the scenario, one name; can occur several times with different values
-- Any other key is ignored and reported in `ignored_keys`; its value is not examined
-- A key that is stated more than once has its last value
-- Numbers are decimal with an optional sign, an optional decimal point and an optional exponent (`e` or
-  `E`), for example `-6.28`, `.5`, `6.2e-07`; `Inf`, `+Inf` and `-Inf` are accepted in any case
-- A number beyond the range of a double (`1e400`) is an error "out of range"; a number below the smallest
-  subnormal reads as `0` (or `-0`)
-- Numbers are read independent of the global locale (the decimal point is always `.`)
-- Elevation angles are used throughout (+90 deg is up); no key refers to a zenith angle
-- The 165 keys are 138 numeric keys of QuaDRiGa and 27 keys for 3GPP TR 38.901 v19.5.0. With their
-  default of 0 the new keys have no effect.
-- The QuaDRiGa key `GR_epsilon` (fixed relative permittivity of the ground) is not supported and is
-  reported in `ignored_keys` like any other unknown key; the permittivity is complex and is set in the simulation
-- The 28 correlation keys (`asD_ds` to `xpr_esa`) define the symmetric matrix `lsp_xcorr` with unit diagonal
-- Throws `std::runtime_error` if the file cannot be opened or is a directory
-- Throws `std::invalid_argument` with file name and line number for a line that is not blank, not a comment
-  and not a well-formed assignment: no `=`, more or less than one name before the `=`, a missing value, a
-  word where a number is required or the reverse, a second value or other text after the value, `NaN`,
-  complex numbers, a number out of range, a `PL_` key without a name, a `ShortName` value stated twice
-- With `validate = true`, a value that fails the checks of [scenpar_validate](#scenpar_validate) is an error as well
-- A correlation matrix that is not positive definite is not an error; it is reported by the return value
-- The file is parsed and checked completely before any output is written; a failed call leaves all
-  outputs untouched
-
-### Declaration:
-```
-bool quadriga_lib::conf_file_read(
-    const std::string &fn,
-    std::unordered_map<std::string, double> &scenpar,
-    std::string *subpath_method = nullptr,
-    std::string *pl_model = nullptr,
-    std::unordered_map<std::string, std::vector<double>> *plpar = nullptr,
-    arma::mat *lsp_xcorr = nullptr,
-    std::vector<std::string> *key_order = nullptr,
-    std::vector<std::string> *pl_order = nullptr,
-    std::vector<std::string> *short_names = nullptr,
-    std::vector<std::string> *ignored_keys = nullptr,
-    bool validate = true);
-```
-
-### Inputs:
-- **`fn`** — Path to the conf file
-- **`validate`** *(optional)* — `true`: apply the value checks of [scenpar_validate](#scenpar_validate); `false`: only the line
-  grammar is checked
-
-### Outputs:
-- **`scenpar`** — Numeric scenario parameters; previous content is discarded; `n_key = 165` entries
-- **`subpath_method`** *(optional)* — Value of `SubpathMethod`; `legacy` if not in the file
-- **`pl_model`** *(optional)* — Value of `PL_model`; empty if not in the file
-- **`plpar`** *(optional)* — Path-loss parameters; keys without the prefix `PL_`; `PL_model` is not included;
-  empty if the file has no such key; `n_pl` entries with one or more values each
-- **`lsp_xcorr`** *(optional)* — LSP cross-correlation matrix; order of rows and columns: DS, KF, SF, ASD, ASA,
-  ESD, ESA, XPR; `[8, 8]`
-- **`key_order`** *(optional)* — Canonical order of the keys in `scenpar`: the QuaDRiGa order without
-  `SubpathMethod` (its position is between elements 105 and 106, 0-based), then the 27 new keys; `[n_key]`
-- **`pl_order`** *(optional)* — Keys of `plpar` in the order of their first occurrence in the file; `[n_pl]`
-- **`short_names`** *(optional)* — Values of all `ShortName` lines in file order; `[n_short]`
-- **`ignored_keys`** *(optional)* — Unknown keys, each once, in the order of their first occurrence; `[n_ignored]`
-
-### Returns:
-- `true` if `lsp_xcorr` is positive definite, i.e. correlated LSPs can be generated from it
-
-### See also:
-- [scenpar_validate](#scenpar_validate) (value checks, defaults and the list of validation rules)
-- [conf_file_list](#conf_file_list) (find the conf files in a set of directories)
-- [conf_file_write](#conf_file_write) (write a conf file)
-
----
-## conf_file_write
-Write a QuaDRiGa scenario configuration file
-
-- Writes scenario parameters, path-loss parameters and short names in the layout of the conf files shipped with
-  QuaDRiGa, so that [conf_file_read](#conf_file_read) returns the same values bit for bit
-- Header: `% Config file for scenario "name"` with the file name without the extension `.conf`, then the
-  reference `ref`, the validity range and one line `ShortName = name` per short name
-- Up to 10 sections follow, each with a header and, if the entry of `ref_sec` is not empty, a line
-  `% See: ref; ref_sec`. Index in `ref_sec` and write order:
-  - 0: Large scale distributions, with an overview formula per LSP; 1: Large-Scale fading decorrelation distances;
-    2: Inter-parameter correlations, with the correlation matrix as comment; 3: Model parameters;
-    8: EoD offset; 4: Decorrelation distance for the small-scale fading spatial consistency;
-    5: Parameters for the ground reflection extension; 6: Absolute time of arrival offset;
-    9: Optional modelling components; 7: Path-loss model
-  - The indices 0 to 7 are those of QuaDRiGa, so its 8 section references can be passed unchanged
-- Within a section, keys are grouped into paragraphs separated by a blank line; correlations are written in the
-  row order of the matrix, all other keys in the order of `key_order`; `SubpathMethod` stands before
-  `LOS_scatter_radius`
-- The overview formula of an LSP shows its mean and STD with the frequency, distance, height and elevation terms;
-  with `LSP_fc_min > 0` the frequency is written as `max( fGHz, fc_min )`; the ESD line also has the terms of
-  `ES_D_mu_A` to `ES_D_mu_D` and, if `ES_D_mu_min` is not `-Inf`, the lower limit of the mean
-- Each line is `name = value % comment`, with the name padded to 19 and the value to 13 characters. The comment
-  states the unit; for the mean and STD of an LSP it adds the reference point of the frequency, distance, height
-  and elevation terms, e.g. `@ 1 GHz`.
-- The path-loss section has the formula blocks of the model (`logdist`, `dual_slope`, `nlos`, `tripple_slope`),
-  the line `PL_model`, then the keys of `plpar` with the prefix `PL_`; known keys have a comment that can depend on
-  the model; several values of one key are separated by a space
-- Numbers are written with up to 15 significant digits, or with 16 or 17 where 15 do not read back to the same
-  double in [conf_file_read](#conf_file_read), independent of the global locale; `Inf` and `-Inf` are written as such, `-0` is
-  kept
-- With `write_defaults = false` a key is written only if its value differs from the default, compared bit for bit;
-  `SubpathMethod` only if it is not `legacy`; a section without a written key is left out
-- With `write_defaults = true` all 165 keys and `SubpathMethod` are written
-- Validation before the file is opened: the file name has no line break; the value checks of [scenpar_validate](#scenpar_validate)
-  (unknown keys, `NaN`, classes, `subpath_method`); `pl_model` empty or one name; `plpar` keys are names other
-  than `model`, each with at least one value and no `NaN`; `pl_order` names each key of `plpar` once; short names
-  are names and distinct; `ref` and `ref_sec` have no line break; `ref_sec` has at most 10 entries; `valid_range`
-  is empty or `[4, 2]`
-- The text is written to a temporary file in the same directory, which must be writable, and then renamed to
-  `fn`; a symbolic link `fn` is written through
-- A failed call does not create a file and leaves an existing file unchanged; an existing file is replaced and
-  keeps its permissions
-- Throws `std::invalid_argument` for invalid input; `std::runtime_error` if the file cannot be opened or written,
-  or if `fn` exists and is not a regular file that can be opened for writing
-- Every file written passes [conf_file_read](#conf_file_read) with `validate = true` and without ignored keys
-
-### Declaration:
-```
-void quadriga_lib::conf_file_write(
-    const std::string &fn,
-    const std::unordered_map<std::string, double> &scenpar,
-    const std::string &subpath_method = "legacy",
-    const std::string &pl_model = "",
-    const std::unordered_map<std::string, std::vector<double>> *plpar = nullptr,
-    const std::vector<std::string> *pl_order = nullptr,
-    const std::vector<std::string> *short_names = nullptr,
-    const std::string &ref = "",
-    const std::vector<std::string> *ref_sec = nullptr,
-    const arma::mat *valid_range = nullptr,
-    bool write_defaults = false);
-```
-
-### Inputs:
-- **`fn`** — Path of the conf file to write
-- **`scenpar`** — Numeric scenario parameters; any subset of the `n_key = 165` keys of [conf_file_read](#conf_file_read); missing
-  keys have their default
-- **`subpath_method`** *(optional)* — Value of `SubpathMethod`: `legacy`, `Laplacian` or `mmMAGIC`
-- **`pl_model`** *(optional)* — Value of `PL_model`; one name; empty: not written
-- **`plpar`** *(optional)* — Path-loss parameters; keys without the prefix `PL_`, one or more values each; `[n_pl]`
-- **`pl_order`** *(optional)* — Order in which the keys of `plpar` are written; must name each key once; omitted:
-  sorted by name; `[n_pl]`
-- **`short_names`** *(optional)* — Values of the `ShortName` lines, one name each
-- **`ref`** *(optional)* — Literature reference; written in the header and before each non-empty entry of
-  `ref_sec`; one line
-- **`ref_sec`** *(optional)* — Reference per section, indexed as listed above; one line each; an empty or missing
-  entry writes no reference; up to `n_sec = 10` entries
-- **`valid_range`** *(optional)* — Validity range, written as comment; rows: frequency in GHz, distance, BS
-  height, MT height in m; columns: lower and upper end, one value is written if both are equal; a row with `NaN`
-  is not written; empty: no validity range; `[4, 2]`
-- **`write_defaults`** *(optional)* — `true`: write all keys; `false`: write only keys that differ from their default
-
-### See also:
-- [conf_file_read](#conf_file_read) (read the file back)
-- [scenpar_validate](#scenpar_validate) (value checks and defaults)
-
----
 ## get_channels_ieee_indoor
 Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models
 
@@ -3006,67 +2799,6 @@ void quadriga_lib::get_channels_spherical(
 - [quantize_delays](#quantize_delays) (for mapping delays to a fixed grid)
 
 ---
-## scenpar_validate
-Validate scenario parameters and complete them with default values
-
-- Checks a set of QuaDRiGa scenario parameters that did not come from a conf file and adds every missing key
-  with its default value, so that `scenpar` has all `n_key = 165` entries on return
-- An empty `scenpar` returns the complete default parameter set
-- A set with the 138 numeric keys of QuaDRiGa is completed with the 27 keys for 3GPP TR 38.901 v19.5.0, which
-  have no effect at their default of 0
-- A name in `scenpar` that is not one of the 165 keys is an error, also with `validate = false`; this includes
-  the QuaDRiGa key `GR_epsilon`, which is not supported
-- Value checks with `validate = true`; `NaN` is an error for every key:
-  - Integer from 1 to 1000: `NumClusters`, `NumSubPaths`
-  - Finite and > 0: `r_DS`
-  - Finite and >= 0: the 8 decorrelation distances (`DS_lambda` ... `XPR_lambda`), `SC_lambda`,
-    `absTOA_lambda`, `PerClusterDS`, `PerClusterDS_min`, `PerClusterAS_D`, `PerClusterAS_A`, `PerClusterES_D`,
-    `PerClusterES_A`, `LNS_ksi`, `LOS_scatter_radius`, `GR_enabled`, `LSP_fc_min`, `EoD_offset_b`,
-    `EoD_offset_hcl`, `PerClusterDS_fc_min`, `PerClusterES_D_scale`, `absTOA_Lmax`, `NF_alpha`, `NF_beta`,
-    `SNS_sigma`, `SNS_A`, `SNS_B`, `SNS_R`, `SNS_delta_var`, `PolVar_sigma`
-  - Integer from 0 to 1000: `NumClusters_min`, `NF_k1`
-  - In the range from 0 to 1: `SNS_mu`
-  - In the range from -1 to 1: the 28 correlations (`asD_ds` to `xpr_esa`)
-  - All other keys accept any value including `Inf` and `-Inf`
-  - `NumClusters_min` must not exceed `NumClusters`
-  - `NF_alpha` and `NF_beta` must be both 0 or both > 0
-  - `subpath_method` must be `legacy`, `Laplacian` or `mmMAGIC`
-- With `validate = false` no value is checked: `NaN` and any `subpath_method` are accepted
-- The symmetric matrix `lsp_xcorr` is built from the 28 correlation keys and has a unit diagonal. It is
-  tested by a Cholesky factorization. A matrix that is not positive definite is not an error.
-- Throws `std::invalid_argument`; a failed call leaves `scenpar` and the outputs untouched
-
-### Declaration:
-```
-bool quadriga_lib::scenpar_validate(
-    std::unordered_map<std::string, double> &scenpar,
-    const std::string &subpath_method = "legacy",
-    arma::mat *lsp_xcorr = nullptr,
-    std::vector<std::string> *key_order = nullptr,
-    bool validate = true);
-```
-
-### Inputs:
-- **`scenpar`** — Numeric scenario parameters; updated in-place: given values are kept, missing keys are
-  added with their default; `n_key = 165` entries on return
-- **`subpath_method`** *(optional)* — Value of `SubpathMethod`, the only parameter that is not numeric
-- **`validate`** *(optional)* — `false`: only complete with defaults, no value checks
-
-### Outputs:
-- **`lsp_xcorr`** *(optional)* — LSP cross-correlation matrix; order of rows and columns: DS, KF, SF, ASD, ASA,
-  ESD, ESA, XPR; `[8, 8]`
-- **`key_order`** *(optional)* — Canonical order of the keys in `scenpar`: the QuaDRiGa order without
-  `SubpathMethod` (its position is between elements 105 and 106, 0-based), then the 27 new keys; `[n_key]`
-
-### Returns:
-- `true` if `lsp_xcorr` is positive definite (all 8 pivots of the factorization are > 0); `false` also if it
-  contains `NaN`
-
-### See also:
-- [conf_file_read](#conf_file_read) (read the parameters from a conf file)
-- [conf_file_write](#conf_file_write) (applies the same checks before writing)
-
----
 
 # Channel statistics
 
@@ -3286,6 +3018,924 @@ void quadriga_lib::calc_rician_k_factor(
 ### Outputs:
 - **`kf`** *(optional)* — Rician K-Factor on linear scale; `[n_cir]`
 - **`pg`** *(optional)* — Total path gain (sum of all path powers) in [W]; `[n_cir]`
+
+---
+
+# Geometry-based stochastic model
+
+A **geometry-based stochastic model** (GBSM) generates channels from statistics of a type of environment, the
+*scenario* (e.g. urban macro-cell with or without line of sight), instead of from the geometry of one site. The
+functions of this section implement the large-scale part of the model of 3GPP TR 38.901, clause 7.5 steps 1 to 4:
+path loss, shadow fading, LOS probability, O2I penetration loss and the large-scale parameters (LSPs) of each link,
+i.e. the spreads of delays and angles, the K-factor and the cross-polarization ratio.
+
+The statistics of a scenario are read from a conf file by [conf_file_read](#conf_file_read). The folder `data/config` holds 23
+files for TR 38.901 v19.5.0; [scenpar_validate](#scenpar_validate) completes a parameter set from another source,
+[conf_file_list](#conf_file_list) finds the files and [conf_file_write](#conf_file_write) writes them.
+
+Per drop (layout): [o2i_loss](#o2i_loss) gives the penetration loss and the indoor distance of each indoor UT; then
+[los_probability](#los_probability) evaluates the LOS probability at the outdoor distance `d2D - d2D-in`. The caller draws the LOS
+state and the indoor state with [sos_rand](#sos_rand) / [sos_randn](#sos_randn) at the decorrelation distances of the keys
+`LOS_state_lambda` and `IO_state_lambda`, and the O2I variables at the distances of TR 38.901 clause 7.6.3.3 (see
+[o2i_loss](#o2i_loss)). The two state distances apply to all links of a scenario and are stated once in the TR 38.901 files:
+`LOS_state_lambda` in the NLOS file, `IO_state_lambda` in the O2I files; 0 in the other files means "not stated
+here". Per BS site and scenario (builder): [lsf_init_phases](#lsf_init_phases) draws the random
+phases once; [lsf_draw](#lsf_draw) evaluates them at the links (columns 0 DS, 1 KF, 2 SF, 3 ASD, 4 ASA, 5 ESD, 6 ESA, 7 XPR,
+8 absolute TOA: Normal; 9 ground permittivity, 10 UMa environment height: Uniform; each at the decorrelation
+distance of its key); [path_loss](#path_loss) returns the path loss and the SF standard deviation; [lsp_generate](#lsp_generate) turns the
+random values into the LSPs of each link and frequency.
+
+Where TR 38.901 and QuaDRiGa differ, the TR behaviour is the default; QuaDRiGa's behaviour is available
+through an argument where it is still wanted (3D correlation, symmetric square root of the LSP
+cross-correlation matrix, no clipping of the spreads, outdoor path-loss distance of O2I links). Where
+QuaDRiGa's behaviour was an error, only the corrected rule is implemented.
+
+Units: positions in m, frequencies in Hz, path loss in dB, DS in s, KF, SF and XPR as linear power ratios, angular
+spreads in degrees.
+
+---
+## conf_file_list
+List the scenarios defined by the conf files in a set of directories
+
+- Lists the regular files and symbolic links to regular files whose name ends in `.conf` (case-sensitive) and
+  is longer than `.conf`, not recursive. The scenario name is the file name without this extension, whatever
+  characters it has.
+- Directories are processed in the given order, the files of one directory in byte-wise sorted order of their
+  names (digits before upper case before lower case)
+- A file whose name was already found in an earlier directory is skipped completely, so the first directory
+  wins. This allows a local folder to override the files of a shared folder.
+- With `parse_shortnames = true` each file is read and one entry is added right after the file for every
+  line `ShortName = name` that is not a comment. Other lines are not examined; a UTF-8 byte order mark at the
+  start of the file is skipped.
+- Throws `std::invalid_argument` if a short name equals an earlier entry, if a file name equals an earlier
+  short name, or if the value of a `ShortName` line is not one name of the characters `A-Z`, `a-z`, `0-9`, `_`
+- Throws `std::runtime_error` if a listed file cannot be opened for reading the short names
+- A directory that does not exist, is not a directory or cannot be listed is skipped; an empty string is the
+  current directory
+- A failed call leaves the outputs untouched
+
+### Declaration:
+```
+arma::uword quadriga_lib::conf_file_list(
+    const std::vector<std::string> &dirs,
+    std::vector<std::string> &scenarios,
+    std::vector<std::string> *file_names = nullptr,
+    std::vector<std::string> *file_dirs = nullptr,
+    bool parse_shortnames = true);
+```
+
+### Inputs:
+- **`dirs`** — Directories, searched in this order; can be empty
+- **`parse_shortnames`** *(optional)* — `true`: read the files and add their short names; `false`: list the
+  files only, which is faster
+
+### Outputs:
+- **`scenarios`** — Scenario names and short names; previous content is discarded; `[n_scen]`
+- **`file_names`** *(optional)* — File name including `.conf` for each entry; `[n_scen]`
+- **`file_dirs`** *(optional)* — Directory of the file for each entry, exactly as given in `dirs`; `[n_scen]`
+
+### Returns:
+- Number of entries, `n_scen`
+
+### See also:
+- [conf_file_read](#conf_file_read) (read one of the files)
+
+---
+## conf_file_read
+Read and validate a QuaDRiGa scenario configuration file
+
+- A conf file is a text file with one `Key = value` assignment per line; `%` starts a comment; blank lines
+  are allowed; line ends can be LF or CRLF; space and tab are white space; a UTF-8 byte order mark at the start
+  of the file is skipped
+- Keys are case-sensitive names of the characters `A-Z`, `a-z`, `0-9` and `_`; there are four kinds:
+  - Scenario parameters: `n_key = 171` numeric keys with one number each, returned in `scenpar`. Keys that
+    are not in the file have their default value. The names and their order are returned in `key_order`.
+  - `SubpathMethod`: one of the words `legacy`, `Laplacian`, `mmMAGIC`; default `legacy`
+  - Path-loss parameters: every key that starts with `PL_`. `PL_model` has one name as value. All others
+    have one or more numbers separated by white space and are returned in `plpar` without the prefix.
+  - `ShortName`: an alias for the scenario, one name; can occur several times with different values
+- Any other key is ignored and reported in `ignored_keys`; its value is not examined
+- A key that is stated more than once has its last value
+- Numbers are decimal with an optional sign, an optional decimal point and an optional exponent (`e` or
+  `E`), for example `-6.28`, `.5`, `6.2e-07`; `Inf`, `+Inf` and `-Inf` are accepted in any case
+- A number beyond the range of a double (`1e400`) is an error "out of range"; a number below the smallest
+  subnormal reads as `0` (or `-0`)
+- Numbers are read independent of the global locale (the decimal point is always `.`)
+- Elevation angles are used throughout (+90 deg is up); no key refers to a zenith angle
+- The 171 keys are 138 numeric keys of QuaDRiGa and 33 keys for 3GPP TR 38.901 v19.5.0. With their
+  default of 0 the new keys have no effect.
+- The QuaDRiGa key `GR_epsilon` (fixed relative permittivity of the ground) is not supported and is
+  reported in `ignored_keys` like any other unknown key; the permittivity is complex and is set in the simulation
+- The 28 correlation keys (`asD_ds` to `xpr_esa`) define the symmetric matrix `lsp_xcorr` with unit diagonal
+- Throws `std::runtime_error` if the file cannot be opened or is a directory
+- Throws `std::invalid_argument` with file name and line number for a line that is not blank, not a comment
+  and not a well-formed assignment: no `=`, more or less than one name before the `=`, a missing value, a
+  word where a number is required or the reverse, a second value or other text after the value, `NaN`,
+  complex numbers, a number out of range, a `PL_` key without a name, a `ShortName` value stated twice
+- With `validate = true`, a value that fails the checks of [scenpar_validate](#scenpar_validate) is an error as well
+- A correlation matrix that is not positive definite is not an error; it is reported by the return value
+- The file is parsed and checked completely before any output is written; a failed call leaves all
+  outputs untouched
+
+### Declaration:
+```
+bool quadriga_lib::conf_file_read(
+    const std::string &fn,
+    std::unordered_map<std::string, double> &scenpar,
+    std::string *subpath_method = nullptr,
+    std::string *pl_model = nullptr,
+    std::unordered_map<std::string, std::vector<double>> *plpar = nullptr,
+    arma::mat *lsp_xcorr = nullptr,
+    std::vector<std::string> *key_order = nullptr,
+    std::vector<std::string> *pl_order = nullptr,
+    std::vector<std::string> *short_names = nullptr,
+    std::vector<std::string> *ignored_keys = nullptr,
+    bool validate = true);
+```
+
+### Inputs:
+- **`fn`** — Path to the conf file
+- **`validate`** *(optional)* — `true`: apply the value checks of [scenpar_validate](#scenpar_validate); `false`: only the line
+  grammar is checked
+
+### Outputs:
+- **`scenpar`** — Numeric scenario parameters; previous content is discarded; `n_key = 171` entries
+- **`subpath_method`** *(optional)* — Value of `SubpathMethod`; `legacy` if not in the file
+- **`pl_model`** *(optional)* — Value of `PL_model`; empty if not in the file
+- **`plpar`** *(optional)* — Path-loss parameters; keys without the prefix `PL_`; `PL_model` is not included;
+  empty if the file has no such key; `n_pl` entries with one or more values each
+- **`lsp_xcorr`** *(optional)* — LSP cross-correlation matrix; order of rows and columns: DS, KF, SF, ASD, ASA,
+  ESD, ESA, XPR; `[8, 8]`
+- **`key_order`** *(optional)* — Canonical order of the keys in `scenpar`: the QuaDRiGa order without
+  `SubpathMethod` (its position is between elements 105 and 106, 0-based), then the 33 new keys; `[n_key]`
+- **`pl_order`** *(optional)* — Keys of `plpar` in the order of their first occurrence in the file; `[n_pl]`
+- **`short_names`** *(optional)* — Values of all `ShortName` lines in file order; `[n_short]`
+- **`ignored_keys`** *(optional)* — Unknown keys, each once, in the order of their first occurrence; `[n_ignored]`
+
+### Returns:
+- `true` if `lsp_xcorr` is positive definite, i.e. correlated LSPs can be generated from it
+
+### See also:
+- [scenpar_validate](#scenpar_validate) (value checks, defaults and the list of validation rules)
+- [conf_file_list](#conf_file_list) (find the conf files in a set of directories)
+- [conf_file_write](#conf_file_write) (write a conf file)
+- [lsf_init_phases](#lsf_init_phases) (first step of the large-scale model with the scenario parameters)
+- [path_loss](#path_loss) (evaluates the path-loss model and its parameters)
+
+---
+## conf_file_write
+Write a QuaDRiGa scenario configuration file
+
+- Writes scenario parameters, path-loss parameters and short names in the layout of the conf files shipped with
+  QuaDRiGa, so that [conf_file_read](#conf_file_read) returns the same values bit for bit
+- Header: `% Config file for scenario "name"` with the file name without the extension `.conf`, then the
+  reference `ref`, the validity range and one line `ShortName = name` per short name
+- Up to 10 sections follow, each with a header and, if the entry of `ref_sec` is not empty, a line
+  `% See: ref; ref_sec`. Index in `ref_sec` and write order:
+  - 0: Large scale distributions, with an overview formula per LSP; 1: Large-Scale fading decorrelation distances;
+    2: Inter-parameter correlations, with the correlation matrix as comment; 3: Model parameters;
+    8: EoD offset; 4: Decorrelation distance for the small-scale fading spatial consistency;
+    5: Parameters for the ground reflection extension; 6: Absolute time of arrival offset;
+    9: Optional modelling components; 7: Path-loss model
+  - The indices 0 to 7 are those of QuaDRiGa, so its 8 section references can be passed unchanged
+- Within a section, keys are grouped into paragraphs separated by a blank line; correlations are written in the
+  row order of the matrix, all other keys in the order of `key_order`; `SubpathMethod` stands before
+  `LOS_scatter_radius`
+- The overview formula of an LSP shows its mean and STD with the frequency, distance, height and elevation terms;
+  with `LSP_fc_min > 0` the frequency is written as `max( fGHz, fc_min )`; the ESD line also has the terms of
+  `ES_D_mu_A` to `ES_D_mu_D` and, if `ES_D_mu_min` is not `-Inf`, the lower limit of the mean; the DS line has
+  the term `log10( a · V/S + b )` when `DS_VS > 0` (a = `DS_VS_a`, b = `DS_VS_b`; `V/S` stays symbolic)
+- Each line is `name = value % comment`, with the name padded to 19 and the value to 13 characters. The comment
+  states the unit; for the mean and STD of an LSP it adds the reference point of the frequency, distance, height
+  and elevation terms, e.g. `@ 1 GHz`.
+- The path-loss section has the formula blocks of the model (`logdist`, `dual_slope`, `nlos`, `tripple_slope`),
+  the line `PL_model`, then the keys of `plpar` with the prefix `PL_`; known keys have a comment that can depend on
+  the model; several values of one key are separated by a space
+- Numbers are written with up to 15 significant digits, or with 16 or 17 where 15 do not read back to the same
+  double in [conf_file_read](#conf_file_read), independent of the global locale; `Inf` and `-Inf` are written as such, `-0` is
+  kept
+- With `write_defaults = false` a key is written only if its value differs from the default, compared bit for bit;
+  `SubpathMethod` only if it is not `legacy`; a section without a written key is left out
+- With `write_defaults = true` all 171 keys and `SubpathMethod` are written
+- Validation before the file is opened: the file name has no line break; the value checks of [scenpar_validate](#scenpar_validate)
+  (unknown keys, `NaN`, classes, `subpath_method`); `pl_model` empty or one name; `plpar` keys are names other
+  than `model`, each with at least one value and no `NaN`; `pl_order` names each key of `plpar` once; short names
+  are names and distinct; `ref` and `ref_sec` have no line break; `ref_sec` has at most 10 entries; `valid_range`
+  is empty or `[4, 2]`
+- The text is written to a temporary file in the same directory, which must be writable, and then renamed to
+  `fn`; a symbolic link `fn` is written through
+- A failed call does not create a file and leaves an existing file unchanged; an existing file is replaced and
+  keeps its permissions
+- Throws `std::invalid_argument` for invalid input; `std::runtime_error` if the file cannot be opened or written,
+  or if `fn` exists and is not a regular file that can be opened for writing
+- Every file written passes [conf_file_read](#conf_file_read) with `validate = true` and without ignored keys
+
+### Declaration:
+```
+void quadriga_lib::conf_file_write(
+    const std::string &fn,
+    const std::unordered_map<std::string, double> &scenpar,
+    const std::string &subpath_method = "legacy",
+    const std::string &pl_model = "",
+    const std::unordered_map<std::string, std::vector<double>> *plpar = nullptr,
+    const std::vector<std::string> *pl_order = nullptr,
+    const std::vector<std::string> *short_names = nullptr,
+    const std::string &ref = "",
+    const std::vector<std::string> *ref_sec = nullptr,
+    const arma::mat *valid_range = nullptr,
+    bool write_defaults = false);
+```
+
+### Inputs:
+- **`fn`** — Path of the conf file to write
+- **`scenpar`** — Numeric scenario parameters; any subset of the `n_key = 171` keys of [conf_file_read](#conf_file_read); missing
+  keys have their default
+- **`subpath_method`** *(optional)* — Value of `SubpathMethod`: `legacy`, `Laplacian` or `mmMAGIC`
+- **`pl_model`** *(optional)* — Value of `PL_model`; one name; empty: not written
+- **`plpar`** *(optional)* — Path-loss parameters; keys without the prefix `PL_`, one or more values each; `[n_pl]`
+- **`pl_order`** *(optional)* — Order in which the keys of `plpar` are written; must name each key once; omitted:
+  sorted by name; `[n_pl]`
+- **`short_names`** *(optional)* — Values of the `ShortName` lines, one name each
+- **`ref`** *(optional)* — Literature reference; written in the header and before each non-empty entry of
+  `ref_sec`; one line
+- **`ref_sec`** *(optional)* — Reference per section, indexed as listed above; one line each; an empty or missing
+  entry writes no reference; up to `n_sec = 10` entries
+- **`valid_range`** *(optional)* — Validity range, written as comment; rows: frequency in GHz, distance, BS
+  height, MT height in m; columns: lower and upper end, one value is written if both are equal; a row with `NaN`
+  is not written; empty: no validity range; `[4, 2]`
+- **`write_defaults`** *(optional)* — `true`: write all keys; `false`: write only keys that differ from their default
+
+### See also:
+- [conf_file_read](#conf_file_read) (read the file back)
+- [scenpar_validate](#scenpar_validate) (value checks and defaults)
+
+---
+## los_probability
+LOS probability of a set of links, TR 38.901 Table 7.4.2-1 and other named models
+
+- Evaluates the probability that a link is in line-of-sight (LOS) for each link, from its 2D distance and the BS and
+  UT heights, and optionally the soft LOS state of TR 38.901 eq. (7.6-18)
+- Notation: `d = d2d_out(l)`, `hB = h_bs(l)`, `hU = h_ut(l)` in m, `lg = log10`, `ln` the natural logarithm. All
+  results are limited to [0, 1]
+- TR 38.901 v19.5.0 Table 7.4.2-1:
+  - `38.901_RMa`: 1 for `d <= 10`, else `exp(-(d - 10)/1000)`
+  - `38.901_UMi`: 1 for `d <= 18`, else `18/d + exp(-d/36)·(1 - 18/d)`
+  - `38.901_UMa`: 1 for `d <= 18`, else `(18/d + exp(-d/63)·(1 - 18/d))·(1 + C'·5/4·(d/100)³·exp(-d/150))`
+    with `C' = 0` for `hU <= 13`, `((hU - 13)/10)^1.5` for `13 < hU <= 23` and 1 for `hU > 23`; for `hU > 13`
+    the formula exceeds 1 slightly just above 18 m (e.g. up to 1.0060 for `hU = 22.5`), where the limit gives 1
+  - `38.901_InH_Mixed` (mixed office): 1 for `d <= 1.2`, `exp(-(d - 1.2)/4.7)` for `1.2 < d < 6.5`,
+    `exp(-(d - 6.5)/32.6)·0.32` for `d >= 6.5`
+  - `38.901_InH_Open` (open office): 1 for `d <= 5`, `exp(-(d - 5)/70.8)` for `5 < d <= 49`,
+    `exp(-(d - 49)/211.7)·0.54` for `d > 49`
+  - `38.901_InF_SL`, `38.901_InF_DL`: `exp(-d·kinv)` with `kinv = -ln(1 - r)/d_clutter`
+  - `38.901_InF_SH`, `38.901_InF_DH`: with `kinv = -ln(1 - r)/d_clutter`: 1 for `hU >= h_c` (UT above the
+    clutter); `exp(-d·kinv·(h_c - hU)/(hB - hU))` for `hB > hU` (TR: `k = -d_clutter/ln(1 - r)·(hB - hU)/(h_c - hU)`);
+    `exp(-d·kinv)` (the rule of SL and DL) for `hB <= hU < h_c`, where the TR formula has a BS above the UT and
+    would give `k <= 0`. `r = 0` gives 1
+  - `38.901_InF_HH`: 1
+  - `38.901_SMa` (TR v19): 1 for `d <= 10` or `hB <= hU`, else `exp(-d·(k_com + k_res + k_veg))` with
+    `k_x = -ln(1 - r_x)/d_clutter·max(h_x - hU, 0)/(hB - hU)`, heights `h_com = 20`, `h_res = 8`, `h_veg = 15` m,
+    densities `r_com = 0.02`, `r_res = 0.18`, `r_veg = r_clutter`; the TR writes `max(., 0)` only for the
+    residential term, which gives the same values for `hU < 15` m (the TR range)
+- Defaults of the clutter arguments (NaN), TR 38.901 Table 7.2-4 and Table 7.8-7 for InF, Table 7.4.2-1 for SMa:
+  - `InF_SL`: `r = 0.2`, `d_clutter = 10` m; `InF_DL`: `r = 0.6`, `d_clutter = 2` m
+  - `InF_SH`: `r = 0.2`, `d_clutter = 10` m, `h_c = 2` m; `InF_DH`: `r = 0.6`, `d_clutter = 2` m, `h_c = 6` m
+  - `SMa`: `d_clutter = 30` m, `r_veg = 0` (no vegetation; 0.1 sparse, 0.2 dense vegetation); `h_clutter` is not used
+  - The other models ignore the clutter arguments (they are validated for every model)
+- TR 38.811 (via QuaDRiGa), `38.811_DenseUrban`, `38.811_Urban`, `38.811_Suburban`, `38.811_Rural`: the LOS
+  probability in percent over the elevation `atan2(hB, d)` in degrees (absolute BS height), linear interpolation
+  over the grid -90, 0, 10, ..., 90 deg, times 0.01:
+  - DenseUrban: 0, 0, 28.2, 33.1, 39.8, 46.8, 53.7, 61.2, 73.8, 82.0, 98.1
+  - Urban: 0, 0, 24.6, 38.6, 49.3, 61.3, 72.6, 80.5, 91.9, 96.8, 99.2
+  - Suburban and Rural: 0, 0, 78.2, 86.9, 91.9, 92.9, 93.5, 94.0, 94.9, 95.2, 99.8
+- QuaDRiGa, `QuaDRiGa_Industrial`: `min(1, exp(-(d + 20)/80)·exp(min(hB, 8)/5 - 1))`
+- `LOS`: 1, `NLOS`: 0
+- Soft LOS state (TR 38.901 eq. 7.6-18), computed when `los_soft` is requested:
+  `los_soft(l, k) = 1/2 + atan(sqrt(20/lambda_k)·(rnd_g(l) + F(p_los(l))))/pi`, `lambda_k = c/fc(k)` with
+  `c = 299792458` m/s and `F(p) = sqrt(2)·erfinv(2p - 1)` the inverse of the standard normal CDF (accurate to
+  `1e-10·max(1, abs(F))` for `p` in [1e-12, 1 - 1e-12]). `p = 1` gives 1, `p = 0` gives 0. `los_soft > 0.5`
+  exactly when `rnd_g > -F(p)`, which has the probability `p` for `rnd_g` from N(0,1)
+- The LOS state itself (a draw against `p_los`) and its spatial correlation are the caller's: e.g. a spatially
+  consistent uniform value from [sos_rand](#sos_rand), or `rnd_g` from [sos_randn](#sos_randn), at the decorrelation distance of the
+  scenario key `LOS_state_lambda` (TR 38.901 Table 7.6.3.1-2). The key applies to all links of a scenario and is
+  stated only in its NLOS conf file (0 in the LOS and O2I files means "not stated here"). The `LOS_state_lambda` of
+  the InF conf files is `d_clutter / 2` of the TR defaults; it does not follow a `d_clutter` argument, so a caller
+  who changes `d_clutter` passes its own correlation distance
+- O2I UTs: Table 7.4.2-1 uses the outdoor distance `d2d_out = d2D - d2D-in` with `d2D-in` from [o2i_loss](#o2i_loss), which
+  therefore runs first; the caller clamps `d2d_out` at 0 (negative distances are rejected). Indoor scenarios
+  (InH, InF) pass the 2D distance
+- Outputs must not share memory with the inputs or with each other
+- Validation, in this order: the model name; `d2d_out` finite and >= 0; `h_bs` and `h_ut` with 1 or `n_link`
+  elements and finite; `d_clutter` NaN or finite and > 0, `r_clutter` NaN or in [0, 1), `h_clutter` NaN or finite
+  and >= 0 (for every model); if `los_soft` is requested: `rnd_g` and `fc` present, `rnd_g` with `n_link`
+  finite elements, `fc` non-empty, finite and > 0. Without `los_soft`, `rnd_g` and `fc` are ignored. All checks
+  run before any output is written
+
+### Declaration:
+```
+void quadriga_lib::los_probability(
+    const std::string &model,
+    const arma::vec &d2d_out,
+    const arma::vec &h_bs,
+    const arma::vec &h_ut,
+    arma::vec &p_los,
+    double d_clutter = NAN,
+    double r_clutter = NAN,
+    double h_clutter = NAN,
+    const arma::vec *rnd_g = nullptr,
+    const arma::vec *fc = nullptr,
+    arma::mat *los_soft = nullptr);
+```
+
+### Inputs:
+- **`model`** — Model name: `38.901_RMa`, `38.901_UMi`, `38.901_UMa`, `38.901_InH_Mixed`, `38.901_InH_Open`,
+  `38.901_InF_SL`, `38.901_InF_DL`, `38.901_InF_SH`, `38.901_InF_DH`, `38.901_InF_HH`, `38.901_SMa`,
+  `38.811_DenseUrban`, `38.811_Urban`, `38.811_Suburban`, `38.811_Rural`, `QuaDRiGa_Industrial`, `LOS`, `NLOS`
+- **`d2d_out`** — 2D outdoor distance in [m] (indoor scenarios: 2D distance), finite and >= 0; `[n_link]`, 0 allowed
+- **`h_bs`** — BS height in [m]; one element is used for all links; `[n_link]` or `[1]`
+- **`h_ut`** — UT height in [m]; one element is used for all links; `[n_link]` or `[1]`
+- **`d_clutter`** *(optional)* — Clutter size in [m] of the InF and SMa models; NaN = TR default of the model
+- **`r_clutter`** *(optional)* — Clutter density of the InF models, vegetation density `r_veg` of SMa, in [0, 1);
+  NaN = default
+- **`h_clutter`** *(optional)* — Clutter height in [m] of InF-SH and InF-DH; NaN = default
+- **`rnd_g`** *(optional)* — Normal(0,1) value per link for the soft LOS state (G of eq. 7.6-18); required with
+  `los_soft`; `[n_link]`
+- **`fc`** *(optional)* — Carrier frequencies in [Hz] for the soft LOS state; required with `los_soft`; `[n_freq]`
+
+### Outputs:
+- **`p_los`** — LOS probability in [0, 1]; `[n_link]`
+- **`los_soft`** *(optional)* — Soft LOS state in [0, 1]; `[n_link, n_freq]`
+
+### See also:
+- [o2i_loss](#o2i_loss) (indoor distance for `d2d_out`)
+- [sos_rand](#sos_rand), [sos_randn](#sos_randn) (spatially consistent LOS-state draw and `rnd_g`)
+- [conf_file_read](#conf_file_read) (key `LOS_state_lambda`)
+
+---
+## lsf_draw
+Spatially correlated normalized random values of the large-scale generators at a set of links
+
+- Evaluates the 11 large-scale fading generators of [lsf_init_phases](#lsf_init_phases) at the links: column 0 DS, 1 KF, 2 SF,
+  3 ASD, 4 ASA, 5 ESD, 6 ESA, 7 XPR, 8 absolute TOA (Normal(0,1)), 9 ground permittivity, 10 UMa environment height
+  hE (Uniform(0,1)); each generator with the sum-of-sinusoids frequencies of `preset` at its own decorrelation
+  distance (a distance of 0 is used as 0.1 m)
+- `scenpar` is completed and validated by [scenpar_validate](#scenpar_validate) as in [lsf_init_phases](#lsf_init_phases); its messages pass
+  through unchanged
+- Single mobility (`dual_mobility = false`): column g is the field of generator g at the Rx position,
+  `x_g = s_g(rx)` with `s_g(x) = sqrt(2/n_coeff) · sum_n cos( 2·pi · f_n·x + phi_n )` and the phases of slice 0;
+  the values do not depend on `tx_pos`
+- Dual mobility: the Tx is a second device. Its side uses slice 1, i.e. the field of the mirror generator `m(g)`
+  at the Tx position (ASD and ASA, ESD and ESA exchanged). Self-mirrored generators (DS, KF, SF, XPR, TOA, 9, 10)
+  share one map: `x_g = ( s_g(rx) + s_g(tx) ) / sqrt( 2 + 2·A_g(D) )`, with the Tx-Rx distance `D` and the ACF
+  `A_g` of the preset, linearly interpolated. The pairs are two maps: `x_g = ( s_g(rx) + s_m(tx) ) / sqrt(2)`.
+  Columns 3 to 6 thus stay Normal(0,1), and ASD/ASA and ESD/ESA have the correlation
+  `( A_g(D) + A_m(D) ) / 2` at the Tx-Rx distance, 1 at `D = 0` (then the two columns are equal)
+- Swap reciprocity in dual mobility: swapping `tx_pos` and `rx_pos` leaves columns 0, 1, 2, 7, 8, 9, 10
+  unchanged and swaps column 3 with 4 and column 5 with 6, exactly (the same evaluations in swapped roles), also
+  for unequal decorrelation distances and with bias-removed phases, when both calls use the same phase cube
+- Uniform columns 9 and 10: `0.5 · erfc( -x / sqrt(2) )` of the Normal value
+- `horizontal = true`: the positions are projected on the x-y plane (z = 0) and the values do not depend on z;
+  `false`: 3D positions. `D` is measured in the same space
+- 2D and 3D mode give the same per-link statistics. In 3D mode the height separates the floors: the LSPs of UTs on
+  different floors are correlated by the ACF of their height difference, while TR 38.901 (Table 7.5-6 note 3)
+  assumes no correlation between floors. `floor_id` is therefore not accepted with `horizontal = false`
+- Floors: links with different floor IDs see different fields, links with equal IDs share one field. Floor `q`
+  adds the offsets `2·pi · k · n / N + psi_b(n)` to the phases of all generators on both sides, with
+  `N = n_coeff`, `k = q mod N`, `b = q div N`, `n = 0 ... N-1`, `psi_0 = 0` and `psi_b(n) = 2·pi · u_n` for
+  `b >= 1`, where `u_n` are the uniform numbers of a `std::mt19937_64` seeded with `b` (the upper 53 bits of each
+  raw output times 2^-53). Floor 0 and `floor_id = nullptr` give the same values
+- Fields of two floors are uncorrelated at equal horizontal positions (TR 38.901 Table 7.5-6 note 3): exactly for
+  two IDs in the same block of `N` IDs, with a random residual of standard deviation `1/sqrt(2N)` for IDs in
+  different blocks (0.044 for 256 sinusoids). At other horizontal lags the cross-correlation of two floors is not
+  zero (up to about 0.16 for 256 sinusoids), the same level as for random offsets. Mirror relations and swap
+  reciprocity hold per floor
+- `floor_id` is the caller's floor index of the UT: for the UT heights `hUT = 3·(n_fl - 1) + 1.5` of TR 38.901
+  Table 7.2-1 it is `n_fl - 1`; outdoor UTs use 0
+- Dual mobility with floors: `floor_id` is one value per link and its offsets are added on both sides, i.e. both
+  devices of a link are on the link's floor. A Tx device on another floor than its Rx (e.g. a D2D link between two
+  floors) is evaluated on the floor of the Rx, so the same Tx device sees different fields on links to Rx devices
+  on different floors
+- The value of a link does not depend on the other links of the call
+- Precision: the sinusoids are evaluated by [sos_val](#sos_val) with the AVX2 kernel where available (sine and cosine in
+  single precision, accumulation in double); the values deviate from a double-precision evaluation by less than
+  `4e-7 · sqrt(2 · n_coeff)` (9e-6 for 256 sinusoids)
+- `preset` and `horizontal` must be those of [lsf_init_phases](#lsf_init_phases). A wrong preset with the same number of sinusoids
+  (e.g. `Exp256` for `Comb256`) cannot be detected
+- `n_link = 0` returns `rnd` with size `[0, 11]`. `rnd` may share memory with `tx_pos` or `rx_pos` (the positions
+  are copied before `rnd` is written)
+- Validation order: positions (3 columns, rows of `tx_pos`, finite values), `preset`, `scenpar`, size of `phase`,
+  finite `phase`, length of `floor_id`, `floor_id` with `horizontal = false`
+
+### Declaration:
+```
+void quadriga_lib::lsf_draw(
+    const std::unordered_map<std::string, double> &scenpar,
+    const arma::cube &phase,
+    const arma::mat &tx_pos,
+    const arma::mat &rx_pos,
+    arma::mat &rnd,
+    const arma::uvec *floor_id = nullptr,
+    bool dual_mobility = false,
+    const std::string &preset = "Comb256",
+    bool horizontal = true);
+```
+
+### Inputs:
+- **`scenpar`** — Scenario parameters as returned by [conf_file_read](#conf_file_read) or [scenpar_validate](#scenpar_validate); missing keys
+  have their default value; only the 10 decorrelation distances are used
+- **`phase`** — Phases in [rad] from [lsf_init_phases](#lsf_init_phases); slice 0 = Rx side, slice 1 = Tx side; must be finite;
+  `[n_coeff, 11, 2]`, `n_coeff` of `preset`
+- **`tx_pos`** — Tx positions in [m]; one row is used for all links; not used in single mobility (but validated);
+  `[1, 3]` or `[n_link, 3]`
+- **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
+- **`floor_id`** *(optional)* — Floor index per link, 0-based; omitted = all links on floor 0; in dual mobility
+  the floor of both devices; only with `horizontal = true`; `[n_link]`
+- **`dual_mobility`** *(optional)* — `true`: Tx and Rx both move, the Tx side is evaluated as a second device
+- **`preset`** *(optional)* — Sum-of-sinusoids preset, see [sos_preset](#sos_preset); must match [lsf_init_phases](#lsf_init_phases)
+- **`horizontal`** *(optional)* — `true`: 2D correlation in the x-y plane (TR 38.901 behaviour); `false`: 3D
+  correlation (legacy QuaDRiGa behaviour); must match [lsf_init_phases](#lsf_init_phases)
+
+### Output:
+- **`rnd`** — Random values; columns 0 to 8 Normal(0,1), columns 9 and 10 Uniform(0,1); `[n_link, 11]`
+
+### See also:
+- [lsf_init_phases](#lsf_init_phases) (draws the phases)
+- [path_loss](#path_loss) (column 10 as `rnd_he`)
+- [lsp_generate](#lsp_generate) (the large-scale parameters from `rnd`)
+- [sos_val](#sos_val) (evaluation of a sum-of-sinusoids generator)
+
+---
+## lsf_init_phases
+Draw the random phases of the large-scale generators of one BS site and scenario
+
+- The large-scale fading (LSF) of a site is described by 11 spatially correlated sum-of-sinusoids generators, one
+  column each: 0 DS, 1 KF, 2 SF, 3 ASD, 4 ASA, 5 ESD, 6 ESA, 7 XPR, 8 absolute TOA (Normal fields), 9 ground
+  permittivity, 10 UMa environment height hE (Uniform fields). Their decorrelation distances are the scenario
+  parameters `DS_lambda`, `KF_lambda`, `SF_lambda`, `AS_D_lambda`, `AS_A_lambda`, `ES_D_lambda`, `ES_A_lambda`,
+  `XPR_lambda`, `absTOA_lambda`, `SC_lambda` and again `SF_lambda` for hE; a decorrelation distance of 0 is used
+  as 0.1 m. The generator of column 8 exists also when the absolute TOA is disabled
+- This function draws the phases; [lsf_draw](#lsf_draw) evaluates them at the links. The caller stores `phase` and
+  evaluates the same fields again along tracks or on maps
+- `scenpar` is completed with the defaults of missing keys and validated by [scenpar_validate](#scenpar_validate); its messages
+  (e.g. for an unknown key or a negative decorrelation distance) pass through unchanged. An invalid value of a key
+  that is not used here throws as well
+- Slice 0 (Rx side) holds the phases of the 11 generators. Without bias removal it equals
+  `sos_init_phases(n_coeff, 11, seed)` of [sos_init_phases](#sos_init_phases), with `n_coeff` the number of sinusoids of
+  `preset`. The same seed gives the same phases
+- Slice 1 (Tx side) is always the mirror of slice 0: `slice1.col(g) = slice0.col(m(g))` with the mirror
+  generator `m(g)`: ASD and ASA (3, 4) and ESD and ESA (5, 6) are exchanged, all others mirror themselves. For dual
+  mobility the departure spreads at the Tx are thus the arrival spreads of the Tx as a second device
+- Bias removal (`remove_bias = true`, `rx_pos` given, `n_link > 2`): one realisation of a correlated field has a
+  non-zero mean over a drop. For each Normal generator (columns 0 to 8) one common phase offset is applied with
+  [sos_remove_bias](#sos_remove_bias), so that the sample mean of its field over the positions is exactly 0. Single mobility: over
+  the Rx positions; `tx_pos` is not used. Dual mobility: over the Rx and Tx positions together (`2·n_link`
+  positions), because the field of a generator is shared by both devices (the Tx side of ASD is the ASA field);
+  `tx_pos` is then required. The Uniform generators 9 and 10 are never corrected
+- The correction is applied to slice 0 and the Tx side is mirrored afterwards, so the mirror relation holds
+  exactly with and without bias removal. Swapping `tx_pos` and `rx_pos` in dual mobility gives the same phases up to
+  rounding (the sums over the positions are formed in another order)
+- Consequences for [lsf_draw](#lsf_draw) at the same positions: in single mobility the link mean of columns 0 to 8 is 0; in
+  dual mobility the link mean of DS, KF, SF, XPR and TOA is 0 when all links have the same Tx-Rx distance (the
+  normalisation is then the same for all links), while ASD/ASA and ESD/ESA have a zero link mean only
+  approximately (their two devices see different fields, each corrected over the union of the positions)
+- The positions are used as in [lsf_draw](#lsf_draw): projected on the x-y plane (z = 0) for `horizontal = true`, in 3D
+  for `horizontal = false`. `preset` and `horizontal` must be the same in [lsf_draw](#lsf_draw)
+- 2D mode: all positions in `rx_pos` are treated as one field (floor 0): one phase correction per generator cannot
+  zero the means of several floor fields at once. For a drop with UTs on several floors pass the positions of one
+  floor (e.g. the links of floor 0) or set `remove_bias = false`; the fields of the other floors keep their sample
+  mean. 3D mode (`horizontal = false`): there are no floor IDs (the height separates the floors) and the correction
+  covers all given positions as one 3D field
+- 2D and 3D mode give the same per-link statistics. In 3D mode the LSPs of UTs on different floors are correlated by
+  the ACF of their height difference, while TR 38.901 (Table 7.5-6 note 3) assumes no correlation between floors
+- The correction removes variance: the field is conditioned on a zero mean over the positions, which costs little
+  only when the positions spread over many decorrelation distances (see [sos_remove_bias](#sos_remove_bias))
+- With fewer than 3 positions, without `rx_pos` or with `remove_bias = false` no correction is made
+- TR 38.901 clause 7.4.4 literally (exponential ACF, no bias removal): `preset = "Exp256"` and
+  `remove_bias = false`; the defaults `Comb256` and the bias removal are QuaDRiGa choices
+- Reason for `Comb256`: the TR gives the exponential ACF (eq. 7.4-5) as a fit "with sufficient accuracy",
+  not as an exact requirement; its kink at zero distance makes the values evolve roughly along a track.
+  `Comb256` (Gaussian near zero, exponential tail, same decorrelation distance) evolves smoothly
+- `phase` must not share memory with `tx_pos` or `rx_pos`
+- Validation order: `seed`, `preset`, `scenpar`, then the positions (3 columns, rows of `tx_pos` 1 or `n_link`
+  when both are given, finite values), then the requirement of `tx_pos` for the bias removal in dual mobility
+
+### Declaration:
+```
+void quadriga_lib::lsf_init_phases(
+    const std::unordered_map<std::string, double> &scenpar,
+    arma::cube &phase,
+    arma::sword seed = -1,
+    const arma::mat *tx_pos = nullptr,
+    const arma::mat *rx_pos = nullptr,
+    bool dual_mobility = false,
+    bool remove_bias = true,
+    const std::string &preset = "Comb256",
+    bool horizontal = true);
+```
+
+### Inputs:
+- **`scenpar`** — Scenario parameters as returned by [conf_file_read](#conf_file_read) or [scenpar_validate](#scenpar_validate); missing keys
+  have their default value; only the 10 decorrelation distances are used
+- **`seed`** *(optional)* — Seed of the random phases, must be >= -1; -1 = system random device, a new set of
+  phases on each call
+- **`tx_pos`** *(optional)* — Tx positions in [m]; used only for the bias removal with dual mobility, required
+  there; one row is used for all links; `[1, 3]` or `[n_link, 3]`
+- **`rx_pos`** *(optional)* — Rx positions of the drop in [m] (one floor in 2D mode, all floors in 3D mode) for
+  the bias removal; omitted or fewer than 3 rows = no bias removal; `[n_link, 3]`
+- **`dual_mobility`** *(optional)* — `true`: Tx and Rx both move, the Tx is a second device on the same maps
+- **`remove_bias`** *(optional)* — `true`: remove the sample mean of the Normal fields over the positions
+- **`preset`** *(optional)* — Sum-of-sinusoids preset, see [sos_preset](#sos_preset); sets `n_coeff`
+- **`horizontal`** *(optional)* — `true`: 2D correlation in the x-y plane (TR 38.901 behaviour);
+  `false`: 3D correlation (legacy QuaDRiGa behaviour)
+
+### Output:
+- **`phase`** — Phases in [rad]; slice 0 = Rx side, slice 1 = Tx side (mirror of slice 0); all values in
+  [-pi, pi); `[n_coeff, 11, 2]`
+
+### See also:
+- [conf_file_read](#conf_file_read) (the scenario parameters)
+- [lsf_draw](#lsf_draw) (evaluates the phases at the links)
+- [sos_init_phases](#sos_init_phases) (the raw phases)
+- [sos_remove_bias](#sos_remove_bias) (the bias removal of one generator)
+
+---
+## lsp_generate
+Large-scale parameters of a set of links from normalized random values
+
+- Generates the 8 large-scale parameters (LSPs) of TR 38.901 clause 7.5 step 4 per link and frequency: delay
+  spread DS, Ricean K-factor KF, shadow fading SF, azimuth spreads of departure and arrival ASD, ASA, elevation
+  spreads of departure and arrival ESD, ESA and cross-polarization ratio XPR. The random values `rnd` are the
+  normalized, spatially correlated values of [lsf_draw](#lsf_draw) (columns 0 to 7 Normal(0,1) for the 8 LSPs, column 8
+  Normal(0,1) for the absolute TOA, column 9 Uniform(0,1) for the ground permittivity; column 10 is not used here)
+- `scenpar` is completed with the defaults of missing keys and validated by [scenpar_validate](#scenpar_validate); its messages pass
+  through unchanged. An invalid value of a key that is not used here throws as well
+- Mean and standard deviation in the log domain, per link `l` and frequency `k`, with the key prefix `P` of the
+  LSP (`DS`, `KF`, `SF`, `AS_D`, `AS_A`, `ES_D`, `ES_A`, `XPR`), the 2D distance `d2D`, the Tx height
+  `hBS = tx_pos.z` and the Rx height `hUT = rx_pos.z`:
+  `d = max(d2D, 1e-4)`, `h = max(hBS, 1e-4)`, `a = atan(h / d)` (elevation in rad),
+  `f' = max(fc / 1e9, LSP_fc_min)` (frequency in GHz, limited from below by `LSP_fc_min` for all LSP terms);
+  `mu = P_mu + P_gamma·lg(P_omega + f') + P_epsilon·lg(d) + P_zeta·lg(h) + P_alpha·lg(a)`;
+  `s = max(0, P_sigma + P_delta·lg(P_omega + f'))`;
+  `sigma = max(0, s + P_kappa·lg(d) + P_tau·lg(h) + P_beta·lg(a))`. The standard deviation is limited at 0 after
+  all terms, since a negative value would flip the sign of the realization and its cross-correlations. SF
+  has no mean keys (mean 0). A frequency term with the coefficient 0 contributes 0; an active one
+  (`P_gamma` or `P_delta` not 0) requires `P_omega + f' > 0` at every frequency. The multiplying coefficients
+  (`P_sigma`, `P_gamma`, `P_delta`, `P_epsilon`, `P_zeta`, `P_alpha`, `P_kappa`, `P_tau`, `P_beta`,
+  `ES_D_mu_A` to `ES_D_mu_D`, `P_omega` of an active frequency term) must be finite; `P_mu` and `ES_D_mu_min` may
+  be infinite
+- DS with the V/S term of TR 38.901 Table 7.5-6 Part-3 (InF): if `DS_VS > 0`,
+  `mu += lg(DS_VS_a·DS_VS + DS_VS_b)`. The InF files set `DS_VS` for the hall of their calibration scenario; a
+  caller with another hall sets `DS_VS` (V/S in m) in its copy of `scenpar`
+- ESD with the terms of TR 38.901 Tables 7.5-7 to 7.5-12: `mu += ES_D_mu_A·d/1000 + ES_D_mu_B·hUT +
+  ES_D_mu_C·abs(hUT - h) + ES_D_mu_D·max(hUT - h, 0)`, then the floor `mu = max(mu, ES_D_mu_min)`
+- Units of mean and std: DS in lg(s); ASD, ASA, ESD, ESA in lg(deg); KF, SF and XPR in dB
+- `sf_sigma` (e.g. from the path-loss model) replaces the SF standard deviation per link and frequency, also in
+  `lsp_sigma`; it must be finite and >= 0 (a negative value would flip the sign of the shadow fading)
+- Cross-correlation: `x = Q·s` with `s = rnd(l, 0..7)` and a root `Q` of the LSP cross-correlation matrix `R` of
+  `scenpar` (`Q·Q^T = R`). `cholesky = true` (TR 38.901 clause 7.5 step 4): Cholesky factorization in the TR order
+  [SF, KF, DS, ASD, ASA, ESD, ESA], XPR appended last; the SF value is passed through (`x_SF = s_SF`).
+  `cholesky = false`: the symmetric square root of `R` (principal root, legacy QuaDRiGa behaviour); it does not
+  depend on the order of the parameters. Both throw if `R` is not positive definite
+- The same `x` is used for all frequencies of a link (TR 38.901 clause 7.6.5)
+- Linear values: `lsp = 10^(mu + sigma·x)` for DS, ASD, ASA, ESD, ESA; `10^(0.1·(mu + sigma·x))` for KF, SF, XPR.
+  `clip_spreads = true` (TR 38.901 clause 7.5 step 4): ASD and ASA are limited to 104 deg, ESD and ESA to 52 deg;
+  `lsp_mu` and `lsp_sigma` are not affected
+- `rnd = zeros(n_link, 11)` gives the median LSPs; `lsp_mu` and `lsp_sigma` are the mean and std without any
+  randomness
+- Absolute TOA offset (TR 38.901 clause 7.6.9): active if `absTOA_mu > -30`, then
+  `abs_toa = min(10^(absTOA_mu + absTOA_sigma·rnd(l, 8)), 2·absTOA_Lmax / c)` with `c = 299792458 m/s`, without
+  the bound if `absTOA_Lmax = 0` (`absTOA_sigma` must be finite); 0 if not active. The InF and InH NLOS files set
+  `absTOA_Lmax` to the largest dimension of the hall or office of their calibration scenario; a caller with another
+  hall sets the key; in the TR 38.901 files the offset is active in all NLOS and O2I files (an O2I link
+  has no LOS ray) and off in the LOS files
+- Ground permittivity with `U = rnd(l, 9)` and `f = fc / 1e9` (not limited by `LSP_fc_min`): dry ground
+  `3 + j·0.003·f^1.34`, medium `30.4·f^-0.47 + j·0.18·f^1.05`, wet `31.3·f^-0.48 + j·0.63·f^0.77`; linear
+  interpolation from dry (`U = 0`) to medium (`U = 0.5`) to wet (`U = 1`). The imaginary part is >= 0;
+  TR 38.901 eq. (7.6-40) writes the complex permittivity with the opposite sign of the imaginary part, so the TR
+  reflection formulas take the complex conjugate `gr_eps_re - j·gr_eps_im`. Column 9 of `rnd` must be in [0, 1]
+  when `gr_eps_re` or `gr_eps_im` is requested; it is not checked otherwise
+- The three ground types are QuaDRiGa's fits (as in QuaDRiGa's `gen_lsf_parameters`), not the models of TR 38.901
+  Table 7.6.8-1: very dry ground agrees, medium and wet ground differ (e.g. at 3.5 GHz medium `16.87 + j·0.67` here,
+  `13.23 + j·1.39` for medium dry ground of the table; wet `j·1.65` vs. `j·3.93`). A caller who needs the table
+  values computes them with eq. (7.6-40) to (7.6-42)
+- EoD offset in degrees, positive = up (the negative of the ZOD offset of TR 38.901 Tables 7.5-7 to 7.5-12), with
+  `f'`, `d`, `h` as above: `e = EoD_offset_e + EoD_offset_e_gamma·lg f'`; if `EoD_offset_b > 0`:
+  `e += 10^((EoD_offset_a + EoD_offset_a_gamma·lg f')·lg(max(EoD_offset_b, d)) + EoD_offset_c +
+  EoD_offset_c_gamma·lg f' + EoD_offset_c_hUT·hUT)`; if `EoD_offset_hcl > 0` and `hUT < EoD_offset_hcl`:
+  `e += (atan((EoD_offset_hcl - h)/d) - atan((hUT - h)/d))·180/pi`. The coefficients `EoD_offset_e`, `_e_gamma`,
+  `_a`, `_a_gamma`, `_c`, `_c_gamma`, `_c_hUT` must be finite
+- Optional outputs that are not requested are not computed. `n_link = 0` gives outputs with 0 rows
+- Outputs must not share memory with the inputs or with each other
+- Validation order: positions, `fc`, `rnd`, `sf_sigma`, `scenpar`, positive definiteness, column 9 of `rnd`, the
+  coefficients and frequency terms of the 8 LSPs, the `EoD_offset_` coefficients (if `eod_offset_deg` is
+  requested) and `absTOA_sigma` (if `abs_toa` is requested and active) finite; all checks run before any output is
+  written
+
+### Declaration:
+```
+void quadriga_lib::lsp_generate(
+    const std::unordered_map<std::string, double> &scenpar,
+    const arma::vec &fc,
+    const arma::mat &tx_pos,
+    const arma::mat &rx_pos,
+    const arma::mat &rnd,
+    arma::cube &lsp,
+    const arma::mat *sf_sigma = nullptr,
+    arma::vec *abs_toa = nullptr,
+    arma::mat *gr_eps_re = nullptr,
+    arma::mat *gr_eps_im = nullptr,
+    arma::mat *eod_offset_deg = nullptr,
+    arma::cube *lsp_mu = nullptr,
+    arma::cube *lsp_sigma = nullptr,
+    bool cholesky = true,
+    bool clip_spreads = true);
+```
+
+### Inputs:
+- **`scenpar`** — Scenario parameters as returned by [conf_file_read](#conf_file_read) or [scenpar_validate](#scenpar_validate); missing keys
+  have their default value; the LSP cross-correlation matrix must be positive definite
+- **`fc`** — Carrier frequencies in [Hz], finite and > 0; `[n_freq]`
+- **`tx_pos`** — Tx positions in [m]; one row is used for all links; `[1, 3]` or `[n_link, 3]`
+- **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
+- **`rnd`** — Normalized random values from [lsf_draw](#lsf_draw), finite; columns 0 to 7 for the 8 LSPs, column 8 for the
+  absolute TOA, column 9 in [0, 1] for the ground permittivity, column 10 not used; `[n_link, 11]`
+- **`sf_sigma`** *(optional)* — SF standard deviation in [dB], finite and >= 0; replaces the value from
+  `scenpar`; omitted = the scenario value; `[n_link, n_freq]`
+- **`cholesky`** *(optional)* — `true`: Cholesky root in the TR order; `false`: symmetric square root (legacy)
+- **`clip_spreads`** *(optional)* — `true`: limit ASD and ASA to 104 deg, ESD and ESA to 52 deg
+
+### Outputs:
+- **`lsp`** — Large-scale parameters; slices: 0 DS in [s], 1 KF (linear), 2 SF (linear power ratio), 3 ASD,
+  4 ASA, 5 ESD, 6 ESA in [deg], 7 XPR (linear); `[n_link, n_freq, 8]`
+- **`abs_toa`** *(optional)* — Absolute TOA offset in [s], 0 if disabled; `[n_link]`
+- **`gr_eps_re`** *(optional)* — Relative permittivity of the ground, real part; `[n_link, n_freq]`
+- **`gr_eps_im`** *(optional)* — Relative permittivity of the ground, imaginary part, >= 0; `[n_link, n_freq]`
+- **`eod_offset_deg`** *(optional)* — EoD offset in [deg], positive = up; `[n_link, n_freq]`
+- **`lsp_mu`** *(optional)* — Mean in the log domain (lg for DS, ASD, ASA, ESD, ESA; dB for KF, SF, XPR);
+  `[n_link, n_freq, 8]`
+- **`lsp_sigma`** *(optional)* — Standard deviation in the log domain, >= 0; `[n_link, n_freq, 8]`
+
+### See also:
+- [lsf_draw](#lsf_draw) (the random values `rnd`)
+- [path_loss](#path_loss) (the SF standard deviation `sf_sigma`)
+- [lsf_init_phases](#lsf_init_phases) (the phases of the random generators)
+- [scenpar_validate](#scenpar_validate) (the scenario parameters and the cross-correlation matrix)
+
+---
+## o2i_loss
+O2I building or car penetration loss of a set of UTs, TR 38.901 clause 7.4.3
+
+- Draws for each UT one of the given penetration-loss models and evaluates its loss at each carrier frequency,
+  from four normalized random values per UT; `f = fc / 1e9` in GHz, `lg = log10`
+- Material losses of TR 38.901 v19.5.0 Table 7.4.3-1 in dB: `L_glass = 2 + 0.2 f`, `L_IRR = 25.4 + 0.11 f` (IRR
+  glass, Release 19 value), `L_concrete = 5 + 4 f`, `L_plywood = 1.03 + 0.17 f`; external wall
+  `tw(p1, L1, p2, L2) = 5 - 10·lg(p1·10^(-L1/10) + p2·10^(-L2/10))`
+- Models, with `N = rnd(u, 3)` and the indoor 2D distance `d2din`:
+  - `low` (low-loss, Table 7.4.3-2): `tw(0.3, L_glass, 0.7, L_concrete) + 0.5·d2din + 4.4·N`
+  - `high` (high-loss, Table 7.4.3-2): `tw(0.7, L_IRR, 0.3, L_concrete) + 0.5·d2din + 6.5·N`
+  - `low_A` (low-loss A, Table 7.4.3-2): `tw(0.3, L_glass, 0.7, L_plywood) + 0.5·d2din + 4.4·N`
+  - `legacy_6GHz` (backward compatible model for single-frequency simulations below 6 GHz, Table 7.4.3-3):
+    `20 + 0.5·d2din`, no deviation; it goes with a shadow-fading std of 7 dB (the O2I conf files of UMa and UMi
+    have `SF_sigma = 7`)
+  - `car` (clause 7.4.3.2): `9 + 5·N`; `car_metal` (metallized car windows): `20 + 5·N`; no indoor distance
+- Columns of `rnd`: 0 = Uniform(0,1) for the model choice, 1 and 2 = Uniform(0,1) for the indoor distance,
+  3 = Normal(0,1) for the deviation (sigma_P of Table 7.4.3-2, the car loss)
+- Model choice per UT: `Ccum_j = (w_0 + ... + w_j)/sum(w)`; the model is the smallest `j` with
+  `rnd(u, 0) < Ccum_j`, or, if there is none, the last `j` with `w_j > 0`. A model with weight 0 is never chosen
+- Indoor distance: `low`, `high`, `low_A`: `d2din = min(rnd(u, 1), rnd(u, 2))·d2d_in_max`, the minimum of two
+  uniforms of clause 7.4.3.1; `legacy_6GHz`: `d2din = rnd(u, 1)·d2d_in_max` (one uniform, Table 7.4.3-3);
+  `car`, `car_metal`: 0
+- The caller draws `rnd` with [sos_rand](#sos_rand) and [sos_randn](#sos_randn) at the correlation distances of TR 38.901 clause
+  7.6.3.3 (building type 50 m for column 0, d2D-in 25 m for columns 1 and 2, sigma_P 10 m for column 3) and adds
+  `loss` to the path loss of the indoor UT. `d2d_in` gives the outdoor distance `d2D - d2D-in` for
+  [los_probability](#los_probability) (call `o2i_loss` first) and is the input of the legacy outdoor distance of [path_loss](#path_loss)
+- Applicability (Table 7.4.3-2): RMa uses `low` only, InF `high` only; UMa, UMi: `low` and `high`; SMa: `low`,
+  `high` and `low_A`. TR maximum indoor distance: 25 m for UMa, UMi and SMa commercial buildings, 10 m for RMa and
+  SMa residential buildings (conf-file key `O2I_d2D_in_max`). The TR SMa layout has 90 % residential and 10 %
+  commercial buildings (Table 7.2-5): split the UTs by building type and call `o2i_loss` once per type
+- Outputs must not share memory with the inputs or with each other
+- Validation, in this order: `fc` non-empty, finite and > 0; `rnd` with 4 columns, columns 0 to 2 in [0, 1],
+  column 3 finite; `models` non-empty, each a known name; `weights` with one finite element >= 0 per model and a
+  sum of 1 within 1e-6; `d2d_in_max` finite and >= 0. All checks run before any output is written
+
+### Declaration:
+```
+void quadriga_lib::o2i_loss(
+    const arma::vec &fc,
+    const arma::mat &rnd,
+    const std::vector<std::string> &models,
+    const arma::vec &weights,
+    arma::mat &loss,
+    double d2d_in_max = 25.0,
+    arma::vec *d2d_in = nullptr,
+    arma::uvec *model_index = nullptr);
+```
+
+### Inputs:
+- **`fc`** — Carrier frequencies in [Hz], finite and > 0; `[n_freq]`
+- **`rnd`** — Random values per UT: Uniform(0,1) model choice, Uniform(0,1) d2D-in #1, Uniform(0,1) d2D-in #2,
+  Normal(0,1) deviation; `[n_ut, 4]`, `n_ut = 0` allowed
+- **`models`** — Models to mix: `low`, `high`, `low_A`, `legacy_6GHz`, `car`, `car_metal`; `[n_model]`
+- **`weights`** — Probability of each model, >= 0, sum 1; `[n_model]`
+- **`d2d_in_max`** *(optional)* — Maximum indoor 2D distance in [m], finite and >= 0 (conf-file key
+  `O2I_d2D_in_max`)
+
+### Outputs:
+- **`loss`** — Penetration loss in [dB]; `[n_ut, n_freq]`
+- **`d2d_in`** *(optional)* — Indoor 2D distance in [m], 0 for the car models; `[n_ut]`
+- **`model_index`** *(optional)* — Chosen model per UT, 0-based index into `models`; `[n_ut]`
+
+### See also:
+- [los_probability](#los_probability) (uses the outdoor distance `d2D - d2d_in`)
+- [path_loss](#path_loss) (basic path loss, legacy outdoor distance from `d2d_in`)
+- [sos_rand](#sos_rand), [sos_randn](#sos_randn) (spatially consistent random values for `rnd`)
+
+---
+## path_loss
+Path loss and shadow-fading standard deviation of a set of links
+
+- Evaluates one of the 10 parametric path-loss models of the QuaDRiGa conf files for every link and carrier
+  frequency. `pl_model` and `plpar` are the values of `PL_model` and the `PL_` keys (without the prefix) as returned
+  by [conf_file_read](#conf_file_read); the TR 38.901 v19.5.0 conf files in `data/config` reproduce Table 7.4.1-1 with them
+- Notation: `f = fc / 1e9` in GHz (not limited by `LSP_fc_min`); `d3`, `d2` the 3D and 2D distance in m; `hBS`,
+  `hUT` the z coordinates of Tx and Rx (no ground model); `[X]` the value of key `X`, or its default if the key is
+  missing (`X = v` in the lists below); `PL1(x) = A1·lg(x) + B + C·lg(f) + D·x`; `sf` the shadow-fading std
+- Models, required keys and defaults:
+  - `constant` (A): `pl = A`
+  - `logdist` (A, B, C; SF optional): `pl = A·lg(d3) + B + C·lg(f)`; `sf = [SF]` if present
+  - `logdist_simple` (A, B): `pl = A·lg(d3) + B`
+  - `winner_los` (A1, A2, B1, B2, C1, C2, D1, D2, E1, E2, F1, F2, sig1, sig2): `hb = max(hBS, 1.5)`,
+    `hm = max(hUT, 1.5)` of each link; `G = B1 + C1·lg f + D1·lg hb + E1·lg hm`,
+    `H = B2 + C2·lg f + D2·lg hb + E2·lg hm`, breakpoint `bp = 10^((H - G)/(A1 - A2))`;
+    `d2 <= bp`: `pl = A1·lg d2 + G + F1·hm`, `sf = sig1`; else `pl = A2·lg d2 + H + F2·hm`, `sf = sig2`
+    (continuous at `bp` for `F1 = F2`); `A1` and `A2` must differ
+  - `winner_nlos` (A1..A3, Ah1..Ah3, B1..B3, C1..C3, D1..D3, E1..E3, F1..F3): `hb`, `hm` as `winner_los`;
+    `L_j = (A_j + Ah_j·lg hb)·lg d2 + B_j + C_j·lg f + D_j·lg hb + E_j·lg hm + F_j·hm`; `pl = L_1` for `f < 1.5`,
+    `L_2` for `1.5 <= f < 2`, `L_3` for `f >= 2`
+  - `winner_pathloss` (A, B, C, X; SF optional): `pl = A·lg d3 + B + C·lg(f/5) + X`; `sf = [SF]` if present
+  - `dual_slope` (A1 or A, B, E; A2 = A1, C = 0, D = 0, hE = 0, hE_rand = 0, sig1, sig2 optional):
+    `hb = max(hBS, 1.1·hE, 0.1)`, `hm = max(hUT, 1.1·hE, 0.1)`; `dBP = E·f·(hb - hE)·(hm - hE)`;
+    `d2 <= dBP`: `pl = PL1(d3)`, `sf = [sig1]`; `d2 > dBP`: `pl = PL1(dBP3) + A2·lg(d3/dBP3)`, `sf = [sig2]`
+    (each only if present), with the 3D breakpoint distance `dBP3 = sqrt(dBP² + (hb - hm)²)`. This is Table 7.4.1-1
+    for UMa, UMi, InH and InF; for RMa and SMa LOS the TR uses the 2D breakpoint distance in PL2, which differs by
+    at most 0.034 dB over the TR ranges
+  - `tripple_slope` (A1 or A, B, E1 or E; A2 = A1, A3 = A2, C = 0, D = 0, E2 = E1, hE1 = 0, hE2 = 0, sig1..sig3
+    optional): `hb = max(hBS, 1.1·hE1, 1.1·hE2, 0.1)`, `hm` the same; `dBPj = Ej·f·(hb - hEj)·(hm - hEj)`,
+    `dBP1 = min(dBP1, dBP2)`, `dBPj3 = sqrt(dBPj² + (hb - hm)²)`; `LBP1 = PL1(dBP13)`,
+    `LBP2 = LBP1 + A2·lg(dBP23/dBP13)`; `d2 <= dBP1`: `PL1(d3)`, `sf = [sig1]`; `dBP1 < d2 <= dBP2`:
+    `LBP1 + A2·lg(d3/dBP13)`, `sf = [sig2]`; `d2 > dBP2`: `LBP2 + A3·lg(d3/dBP23)`, `sf = [sig3]`
+  - `nlos` (An, Bn; the `dual_slope` keys if `LOSmax != 0`; Cn, Dn, D1n, D2n, D3n, En, E1n, E2n, E3n, Fn, G1n = 0,
+    G2n = 1, LOSmax = 1, sig optional; Ax, Bx, Cx = 0): `hb = max(hBS, 0.1)`, `hm = max(hUT, 0.1)`;
+    `PLn = An·lg d3 + Bn + Cn·lg f + Dn·lg hb + D1n·lg(hb)/hb + D2n·lg(hb)/hb² + D3n·hb + En·lg hm +
+    E1n·lg(hm)/hm + E2n·lg(hm)/hm² + E3n·hm + Fn·lg(hb)·lg(d3) + G1n·(lg(G2n·hm))²`; `pl = PLn`;
+    if `[LOSmax] != 0`: `pl = max(pl, PL_LOS)` with the `dual_slope` loss of the same parameters (incl. the
+    random hE); if `Ax`, `Bx` or `Cx` is present: `pl = max(pl, Ax·lg d3 + Bx + Cx·lg f)` (e.g. the InF-SL term of
+    InF-DL); `sf = [sig]` if present
+  - `satellite` (A = 20, B = 32.45, C = 20, D = 0, usePLa = 1): `sa = min(hBS / d3, 1)` with the absolute Tx height;
+    `pl = +Inf` if `sa <= 0`; else `pl = A·lg d3 + B + C·lg f + D·lg(asin(sa)) + PLa` with `PLa = Z(f) / sa` if
+    `usePLa != 0`, else 0; `Z(f)` is the zenith attenuation by atmospheric gases (93 values from 1 to 100 GHz,
+    linear interpolation, constant beyond both ends)
+  - empty `pl_model`: `pl = 0`
+- New keys of the TR 38.901 v19 files: `hE_rand` (non-zero: random environment height of UMa), `LOSmax` (0: no
+  maximum with the LOS term in `nlos`), `Ax`, `Bx`, `Cx` (additional term in the maximum of `nlos`)
+- Random environment height (TR 38.901 Table 7.4.1-1, note 1), in `dual_slope` and the LOS term of `nlos` when
+  `[hE_rand] != 0` and `rnd_he` is given, per link with `u = rnd_he(l)`, `d = d2`, raw `hUT`:
+  `g = 0` for `d <= 18`, else `1.25·(d/100)³·exp(-d/150)`; `C' = 0` for `hUT < 13`, `((hUT - 13)/10)^1.5` for
+  `hUT <= 23`, else 1; `C = C'·g`, `p1 = 1/(1 + C)`; `n` = size of the set {12, 15, ..., hUT - 1.5};
+  `hE = 1` if `C = 0`, `n = 0`, `u < p1` or `p1` rounds to 1 (C below 1.1e-16, e.g. beyond about 7.5 km at
+  `hUT = 20`), else `hE = 12 + 3·min(floor((u - p1)/(1 - p1)·n), n - 1)`.
+  The UT height is then clamped to `hm = max(hUT, hE + 0.1, 0.1)` instead of `1.1·hE`: for `hE = 1` this is the
+  fixed-hE clamp (also below `hUT = 1.1`), and the drawn heights 12, 15, ... are not affected (`hUT - hE >= 1.5`).
+  Without `rnd_he` the fixed `[hE]` is used. `rnd_he` is column 10 of [lsf_draw](#lsf_draw), a spatially consistent uniform
+  value: TR 38.901 draws hE independently per link and gives no decorrelation distance; the library makes it
+  spatially consistent in the sense of clause 7.6.3 with the decorrelation distance `SF_lambda`, so nearby UTs of
+  a site share hE. Along a track hE switches between its discrete values where `u` crosses a threshold, and the
+  loss beyond the breakpoint steps there; evaluate `rnd_he` once per track segment to avoid this
+- Distances: `d3`, `d2` are the geometric distances (TR 38.901 eq. 7.4-1: for an indoor UT `d3D-out + d3D-in`).
+  If `d2d_in` is given (legacy mode), a link with `d2d_in(l) > 0` uses the outdoor distance instead:
+  `din = min(d2d_in, d2)`, `d3in = d3·din/d2` (`d3` if `d2 = 0`), limited to `d3`; if `d3 - d3in < 10`:
+  `d3in = d3 - 10` (minimum outdoor distance 10 m), then `max(d3in, 0)`; `p = d3in/d3` (0 if `d3 = 0`);
+  `d3 = d3 - d3in`, `d2 = d2·(1 - p)`. A link with `d2d_in(l) = 0` is an outdoor link and keeps the geometric
+  distances (no 10 m rule). Then `d3 = max(d3, 0.1)`, `d2 = max(d2, 0.1)`. The O2I penetration loss is not added;
+  add the output of [o2i_loss](#o2i_loss)
+- Default shadow-fading std, where a model does not set it: the SF std of the LSP formula of [lsp_generate](#lsp_generate)
+  with the geometric distance, `sf = max(0, max(0, SF_sigma + SF_delta·lg(SF_omega + f')) + SF_kappa·lg(d) +
+  SF_tau·lg(h) + SF_beta·lg(atan(h/d)))` with `d = max(d2D, 1e-4)`, `h = max(hBS, 1e-4)`,
+  `f' = max(f, LSP_fc_min)`; for scenario files without such terms this is `SF_sigma`. Passing `sf_sigma` to
+  [lsp_generate](#lsp_generate) is then neutral. With `sf_sigma` requested, `SF_sigma`, `SF_delta`, `SF_kappa`, `SF_tau`,
+  `SF_beta` must be finite, and a frequency term with `SF_delta != 0` requires a finite `SF_omega` and
+  `SF_omega + f' > 0`
+- Validation: positions, `fc`, the lengths of `d2d_in` and `rnd_he`, their values, the model name, the
+  parameters of the model in the order the model reads them (a required key that is missing throws
+  `Path-loss model '<model>' requires the parameter '<key>'.`, naming `A1` for "A1 or A" and `E1` for "E1 or E";
+  every key that the model reads must have exactly one value, which must be finite; keys not read are ignored),
+  the breakpoint factors `E`, `E1`, `E2` and `G2n` of `nlos` (> 0) and `A1 != A2` of `winner_los`, then `scenpar`
+  ([scenpar_validate](#scenpar_validate), its messages pass through), then the SF coefficients and frequency term if `sf_sigma` is
+  requested. All checks run before any output is written
+- The models are evaluated as written for any positive frequency, also outside their validity range
+- Outputs must not share memory with the inputs or with each other
+
+### Declaration:
+```
+void quadriga_lib::path_loss(
+    const std::string &pl_model,
+    const std::unordered_map<std::string, std::vector<double>> &plpar,
+    const std::unordered_map<std::string, double> &scenpar,
+    const arma::vec &fc,
+    const arma::mat &tx_pos,
+    const arma::mat &rx_pos,
+    arma::mat &pl,
+    arma::mat *sf_sigma = nullptr,
+    const arma::vec *d2d_in = nullptr,
+    const arma::vec *rnd_he = nullptr);
+```
+
+### Inputs:
+- **`pl_model`** — Path-loss model: `logdist`, `logdist_simple`, `constant`, `winner_los`, `winner_nlos`,
+  `winner_pathloss`, `dual_slope`, `tripple_slope`, `nlos`, `satellite`, or empty (zero loss)
+- **`plpar`** — Path-loss parameters, keys without "PL_", one value each, as returned by [conf_file_read](#conf_file_read)
+- **`scenpar`** — Scenario parameters (SF std terms, `LSP_fc_min`) as returned by [conf_file_read](#conf_file_read) or
+  [scenpar_validate](#scenpar_validate); missing keys have their default value
+- **`fc`** — Carrier frequencies in [Hz], finite and > 0; `[n_freq]`
+- **`tx_pos`** — Tx positions in [m]; one row is used for all links; `[1, 3]` or `[n_link, 3]`
+- **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
+- **`d2d_in`** *(optional)* — Indoor 2D distance in [m] of the UT of each link (e.g. from [o2i_loss](#o2i_loss)), finite
+  and >= 0; given = legacy mode with the outdoor distance; 0 = outdoor link; `[n_link]`
+- **`rnd_he`** *(optional)* — Uniform(0,1) value per link for the random environment height, column 10 of
+  [lsf_draw](#lsf_draw), in [0, 1]; `[n_link]`
+
+### Outputs:
+- **`pl`** — Path loss in [dB]; `[n_link, n_freq]`
+- **`sf_sigma`** *(optional)* — Shadow-fading standard deviation in [dB], >= 0 for the default; `[n_link, n_freq]`
+
+### See also:
+- [conf_file_read](#conf_file_read) (the model and its parameters)
+- [lsf_draw](#lsf_draw) (the random values, column 10 for `rnd_he`)
+- [lsp_generate](#lsp_generate) (takes `sf_sigma`)
+- [o2i_loss](#o2i_loss) (penetration loss and indoor distance)
+
+---
+## scenpar_validate
+Validate scenario parameters and complete them with default values
+
+- Checks a set of QuaDRiGa scenario parameters that did not come from a conf file and adds every missing key
+  with its default value, so that `scenpar` has all `n_key = 171` entries on return
+- An empty `scenpar` returns the complete default parameter set
+- A set with the 138 numeric keys of QuaDRiGa is completed with the 33 keys for 3GPP TR 38.901 v19.5.0, which
+  have no effect at their default of 0
+- A name in `scenpar` that is not one of the 171 keys is an error, also with `validate = false`; this includes
+  the QuaDRiGa key `GR_epsilon`, which is not supported
+- Value checks with `validate = true`; `NaN` is an error for every key:
+  - Integer from 1 to 1000: `NumClusters`, `NumSubPaths`
+  - Finite and > 0: `r_DS`
+  - Finite and >= 0: the 8 decorrelation distances (`DS_lambda` ... `XPR_lambda`), `SC_lambda`,
+    `absTOA_lambda`, `PerClusterDS`, `PerClusterDS_min`, `PerClusterAS_D`, `PerClusterAS_A`, `PerClusterES_D`,
+    `PerClusterES_A`, `LNS_ksi`, `LOS_scatter_radius`, `GR_enabled`, `LSP_fc_min`, `EoD_offset_b`,
+    `EoD_offset_hcl`, `PerClusterDS_fc_min`, `PerClusterES_D_scale`, `absTOA_Lmax`, `NF_alpha`, `NF_beta`,
+    `SNS_sigma`, `SNS_A`, `SNS_B`, `SNS_R`, `SNS_delta_var`, `PolVar_sigma`, `LOS_state_lambda`,
+    `IO_state_lambda`, `O2I_d2D_in_max`, `DS_VS`, `DS_VS_a`, `DS_VS_b`
+  - Integer from 0 to 1000: `NumClusters_min`, `NF_k1`
+  - In the range from 0 to 1: `SNS_mu`
+  - In the range from -1 to 1: the 28 correlations (`asD_ds` to `xpr_esa`)
+  - All other keys accept any value including `Inf` and `-Inf`
+  - `NumClusters_min` must not exceed `NumClusters`
+  - `NF_alpha` and `NF_beta` must be both 0 or both > 0
+  - `DS_VS_a` and `DS_VS_b` must not both be 0 if `DS_VS` is > 0
+  - `subpath_method` must be `legacy`, `Laplacian` or `mmMAGIC`
+- With `validate = false` no value is checked: `NaN` and any `subpath_method` are accepted
+- The symmetric matrix `lsp_xcorr` is built from the 28 correlation keys and has a unit diagonal. It is
+  tested by a Cholesky factorization. A matrix that is not positive definite is not an error.
+- Throws `std::invalid_argument`; a failed call leaves `scenpar` and the outputs untouched
+
+### Declaration:
+```
+bool quadriga_lib::scenpar_validate(
+    std::unordered_map<std::string, double> &scenpar,
+    const std::string &subpath_method = "legacy",
+    arma::mat *lsp_xcorr = nullptr,
+    std::vector<std::string> *key_order = nullptr,
+    bool validate = true);
+```
+
+### Inputs:
+- **`scenpar`** — Numeric scenario parameters; updated in-place: given values are kept, missing keys are
+  added with their default; `n_key = 171` entries on return
+- **`subpath_method`** *(optional)* — Value of `SubpathMethod`, the only parameter that is not numeric
+- **`validate`** *(optional)* — `false`: only complete with defaults, no value checks
+
+### Outputs:
+- **`lsp_xcorr`** *(optional)* — LSP cross-correlation matrix; order of rows and columns: DS, KF, SF, ASD, ASA,
+  ESD, ESA, XPR; `[8, 8]`
+- **`key_order`** *(optional)* — Canonical order of the keys in `scenpar`: the QuaDRiGa order without
+  `SubpathMethod` (its position is between elements 105 and 106, 0-based), then the 33 new keys; `[n_key]`
+
+### Returns:
+- `true` if `lsp_xcorr` is positive definite (all 8 pivots of the factorization are > 0); `false` also if it
+  contains `NaN`
+
+### See also:
+- [conf_file_read](#conf_file_read) (read the parameters from a conf file)
+- [conf_file_write](#conf_file_write) (applies the same checks before writing)
 
 ---
 
