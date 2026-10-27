@@ -24,3 +24,5 @@ deploy.py
 include/quadriga_lib_config.hpp
 version.tmp
 test*.txt
+md/materials/
+.claude/worktrees/
