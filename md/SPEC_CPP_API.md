@@ -150,6 +150,8 @@ template void quadriga_lib::function_name(const arma::Mat<double> *input, arma::
 
 ## File-local helpers
 - Helpers used only in this file are `static` (or in an anonymous namespace) and placed before the documentation block of the public function. Prefix them with `qd_` to avoid clashes with other headers.
+- A helper used once is a lambda inside the function that uses it. Exception: a self-contained algorithm of more than about 20 lines (e.g. a numerical kernel, or a function that calls itself) may be a named file-local function, placed directly above its single caller (for a public function: directly above its documentation block).
+- A helper used several times within one source file is `static inline` or in the anonymous namespace.
 - A helper that is needed by more than one source file goes into one of the internal headers as `static inline`; ask before adding a new internal header or a new public function.
 
 ## Input validation

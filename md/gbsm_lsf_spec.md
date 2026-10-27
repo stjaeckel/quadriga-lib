@@ -486,8 +486,15 @@ sigma_i = max(0, s_i + P_kappa · lg(d) + P_tau · lg(h) + P_beta · lg(a))
 - Frequency terms: a term with `P_gamma = 0` (`P_delta = 0`) contributes 0 to `mu_i` (`s_i`). An active term
   (`P_gamma` or `P_delta` not 0) with `P_omega + f' <= 0` (NaN included) throws, before any output is written:
   `Scenario parameter '<P>_omega' plus the frequency in GHz must be > 0 where '<P>_gamma' or '<P>_delta' is not 0.`
-  (`P_omega` accepts any value; without the check the mean would be NaN and the NaN of the std would disappear in
-  the limit at 0). `lsp_generate` checks all 8 LSPs, `path_loss` only SF and only when `sf_sigma` is requested.
+  (for SF, which has no key `SF_gamma`: `... where 'SF_delta' is not 0.`). `P_omega` accepts any value; without the
+  check the mean would be NaN and the NaN of the std would disappear in the limit at 0.
+- Infinite coefficients: the LSP keys accept any value except NaN (`scenpar_validate`), so +-Inf passes, and
+  `Inf·0` gives NaN (e.g. `DS_omega = Inf` with `DS_delta = 1`: NaN DS; `SF_kappa = Inf`: NaN SF). Per evaluated LSP,
+  before the frequency check, the multiplying coefficients `P_sigma`, `P_gamma`, `P_delta`, `P_epsilon`, `P_zeta`,
+  `P_alpha`, `P_kappa`, `P_tau`, `P_beta` (ESD also `ES_D_mu_A` to `ES_D_mu_D`) and `P_omega` of an active term must
+  be finite: `Scenario parameter '<key>' must be finite.` `P_mu` and `ES_D_mu_min` stay unchecked (an infinite
+  value gives no NaN; `ES_D_mu_min = -Inf` is the default).
+- `lsp_generate` checks all 8 LSPs, `path_loss` only SF and only when `sf_sigma` is requested.
 
 #### 3.0.5 Internal header `src/quadriga_gbsm_helpers.hpp` and the phase-set file `src/qd_gbsm_phases.cpp`
 
@@ -507,7 +514,7 @@ static inline void qd_gbsm_check_fc(const arma::vec &fc);
 
 // LSP mean and std per link and frequency of a completed scenpar (3.0.4)    users: lsp_generate.cpp, path_loss.cpp
 // - The constructor reads the coefficients and evaluates the frequency terms at 'fc' for the LSPs in 'lsps'
-//   (bit i = LSP i) and throws for an invalid frequency term (3.0.4); set_link() takes the geometry of one link,
+//   (bit i = LSP i) and throws for an infinite coefficient or an invalid frequency term (3.0.4); set_link() takes the geometry of one link,
 //   get() returns mean and std of one LSP and frequency. No [n_link, n_freq, 8] intermediate is formed, so the
 //   default sf_sigma of path_loss costs only the SF std
 class qd_gbsm_lsp_stats
@@ -530,7 +537,10 @@ both ends) serves the ACF tables, the zenith table of `path_loss` and the 38.811
 
 File-local (anonymous namespace or lambda in the one file that uses them): the symmetric square root
 (`lsp_generate.cpp`), the probit (`los_probability.cpp`), the path-loss models and the random hE
-(`path_loss.cpp`), the tables of section 11.
+(`path_loss.cpp`), the tables of section 11. Helpers used once are lambdas (the random hE, the 8x8 product of the
+square root); the square root and the probit (which calls itself for p > 0.5) are self-contained
+algorithms and stay named functions in the anonymous namespace, directly above the documentation block of their
+single caller (rule of SPEC_CPP_API, "File-local helpers").
 
 Phase-set machinery. `lsf_init_phases` and `lsf_draw` share one source file, `src/qd_gbsm_phases.cpp` (name: the
 `qd_` prefix marks a file with several public functions, as `qd_scenpar.cpp`; "gbsm_phases" because the file holds
@@ -763,8 +773,11 @@ Source: `get_pl.m` (complete), TR Table 7.4.1-1 and note 1, clause 7.4.3.1.
 4. Required parameters of the model (3.3.4) present: `Path-loss model '<model>' requires the parameter '<key>'.`
    Every `plpar` entry that the model reads (required or optional) must have exactly one value:
    `Path-loss parameter '<key>' must have one value.` (no conf file in `data/config` or in QuaDRiGa-NG has a
-   `PL_` key with several values). Entries not read by the model are ignored.
-5. Breakpoint factors: `E` (dual_slope; nlos with LOS term), `E1`, `E2` (tripple_slope) must be > 0:
+   `PL_` key with several values), and the value must be finite: `Path-loss parameter '<key>' must be finite.`
+   (`conf_file_read` rejects NaN in a file, but maps, MEX structs and Python dicts can hold NaN or Inf, which give a
+   NaN loss without the check). Entries not read by the model are ignored.
+5. Breakpoint factors: `E` (dual_slope; nlos with LOS term), `E1`, `E2` (tripple_slope) must be > 0, and `G2n`
+   (nlos; `G2n <= 0` makes `lg(G2n·hm)` infinite or NaN, and `G1n·(lg(G2n·hm))²` is NaN even at `G1n = 0`):
    `Path-loss parameter '<key>' must be > 0.`; `winner_los`: `A1 != A2`, else
    `Path-loss parameters 'A1' and 'A2' must differ for model 'winner_los'.`
 6. scenpar completed and validated (3.0.3; it holds `LSP_fc_min` and the SF keys of the default `sf_sigma`).
@@ -801,7 +814,8 @@ outdoor part. The O2I loss itself is never added by `path_loss`; the caller adds
 without `sig` keys. Models with `sig`-type keys replace it as stated below. For all v19 files without `sig` keys this
 is `SF_sigma` (they have `SF_delta = SF_omega = SF_kappa = SF_tau = SF_beta = 0`). The default is computed per
 link and frequency with `qd_gbsm_lsp_stats` restricted to SF (no 8-LSP intermediate); with `sf_sigma` requested,
-an active SF frequency term with `SF_omega + f' <= 0` throws (3.0.4) after the scenpar validation.
+an infinite SF coefficient or an active SF frequency term with `SF_omega + f' <= 0` throws (3.0.4) after the
+scenpar validation.
 
 #### 3.3.4 Models
 
@@ -941,9 +955,15 @@ step 4, Tables 7.5-6 to 7.5-12, 7.6.5, 7.6.9.
    `LSP cross-correlation matrix in 'scenpar' is not positive definite.` (both roots; MATLAB refuses as well,
    `gen_lsf_parameters.m` lines 120 to 123). The same message is thrown when `qd_gbsm_chol8` fails on the permuted
    matrix of 3.4.2 step 1 although `scenpar_validate` accepted `R` (possible for a nearly singular `R`, whose pivots
-   round differently in another order). This check runs before any output is touched.
+   round differently in another order), and when the symmetric root (3.4.3) is not finite. This check runs before
+   any output is touched.
 5. Only if `gr_eps_re` or `gr_eps_im` is requested: column 9 of `rnd` in [0, 1]:
    `Column 9 of 'rnd' must be in the range from 0 to 1.`
+6. The coefficients and frequency terms of the 8 LSPs (3.0.4).
+7. Only if `eod_offset_deg` is requested: `EoD_offset_e`, `_e_gamma`, `_a`, `_a_gamma`, `_c`, `_c_gamma`,
+   `_c_hUT` finite; only if `abs_toa` is requested and active (`absTOA_mu > -30`): `absTOA_sigma` finite
+   (`Scenario parameter '<key>' must be finite.`; an infinite value gives `Inf·0 = NaN`, e.g.
+   `EoD_offset_e_gamma·lg f'` at `f' = 1 GHz`, `absTOA_sigma·rnd` at `rnd = 0`).
 
 #### 3.4.2 Algorithm
 
@@ -999,13 +1019,16 @@ user), tested through `lsp_generate` (5.4).
 ```
 s = tr(A)                                    (= 8 for a correlation matrix)
 Y = A / s;   Z = I                           (8x8)
+Y_best = Y;  e_best = Inf
 for k = 1 .. 100:
     M = Z·Y
     e = ||I - M||_F                          Frobenius norm, written out (no arma::norm)
+    if e is not finite: stop                 diverged (see below)
+    if e < e_best: e_best = e, Y_best = Y    best iterate so far (the Y that e measures)
     T = (3·I - M) / 2
     Y = Y·T;   Z = T·Z
-    if e <= 1e-10: stop                      the update computed with this e is kept
-S = sqrt(s) · Y;   S = (S + S^T) / 2
+    if e <= 1e-10: Y_best = Y, stop          the update computed with this e is kept
+S = sqrt(s) · Y_best;   S = (S + S^T) / 2;   not finite: throw (3.4.1 item 4)
 ```
 
 - Scaling: for a positive definite `A` all eigenvalues of `A / tr(A)` lie in (0, 1) (n = 8 > 1), so
@@ -1016,9 +1039,17 @@ S = sqrt(s) · Y;   S = (S + S^T) / 2
   quadratically (`e_next ≈ 0.75·e²`), so the last update brings `Y` to rounding level. Iterations needed
   for a correlation matrix with smallest eigenvalue 1e-2: about 15; 1e-6: about 25; 1e-10: about 37.
 - Iteration limit 100. It is reached only for nearly singular matrices (smallest eigenvalue below about 1e-12),
-  whose root cannot be computed more accurately in double; the coupled iteration is stable, so the remaining
-  iterations do not degrade `S` (`max abs(S·S - A)` about 1e-8 for a smallest eigenvalue near 1e-16). No exception:
-  matrices that are not positive definite were rejected before (3.4.1 item 4).
+  whose root cannot be computed more accurately in double. For a regular matrix (convergence before the limit) the
+  result is the converged update, bit-identical to the plain iteration.
+- Matrices singular to rounding: the Cholesky test of `scenpar_validate` accepts a matrix whose smallest
+  eigenvalue is at the rounding level (a pivot of 1e-17 is > 0), and in floating point that eigenvalue of
+  `A / s` may be slightly negative. The iteration then stalls (`e` near 1e-8) and diverges to Inf and NaN after
+  about 45 iterations, which the plain iteration returned as a NaN root without an error. Hence the best iterate:
+  the result is the `Y` with the smallest `e`, and the iteration stops at a non-finite `e`. Measured (random 8x8
+  correlation matrices, 300 per smallest eigenvalue): 1e-2 and 1e-6 bit-identical to the plain iteration; 1e-12
+  `max abs(S·S - A)` <= 7e-10; 1e-15 <= 3e-8; 1e-16 and exactly singular (accepted ones): no NaN (before: 28 of 126
+  and 14 of 41 NaN), residual <= 4e-7; the DS/KF/SF block `-0.6000000000000001, 0.8, -2.2e-16`: 1.9e-12 (before:
+  NaN). If `S` is still not finite, `lsp_generate` throws the positive-definite message of 3.4.1 item 4.
 - For the well-conditioned matrices of the conf files the result equals MATLAB's `sqrtm` to rounding (about
   1e-14).
 - Test tolerance of `R^(1/2) · R^(1/2) = R` (5.4): `max abs(X·X - R) <= 1e-12` and `max abs(X - X^T) <= 1e-12`
@@ -1547,7 +1578,7 @@ from the rounding of the constants.
 | default sf_sigma follows the LSP formula | `SF_sigma 6, SF_delta 1.5, SF_omega 0.5, SF_kappa 0.3, SF_tau -0.2, SF_beta 0.1, LSP_fc_min 6`, fc 3 and 10 GHz, logdist model without `SF`; a second scenpar with `SF_sigma 1.4, SF_beta 1` (all other SF terms 0) and links at elevations 1 deg and 10 deg: `sf_sigma` 0 at 1 deg (the terms give -0.36), `1.4 + lg(a)` at 10 deg | LSP std formula typed, including both limits at 0 | 1e-12 |
 | an empty model gives zero loss | `pl == 0`, `sf_sigma` default | — | exact |
 | optional outputs and pre-sized outputs | `pl` with and without `sf_sigma` equal; pre-sized outputs overwritten; `n_link = 0`; one `tx_pos` row equals repeated rows; repeated call identical | — | exact |
-| input validation | sections for every check of 3.3.1 (unknown model; a missing required key for each model with required keys; empty value vector and a vector with two values (`Path-loss parameter 'B' must have one value.`); `E = 0`; `winner_los` `A1 == A2`; `d2d_in` negative and wrong length; `rnd_he` 1.5 and wrong length; `fc` empty, 0, NaN; positions; an invalid scenpar value passes the `scenpar_validate` message through) | — | — |
+| input validation | sections for every check of 3.3.1 (unknown model; a missing required key for each model with required keys; empty value vector and a vector with two values (`Path-loss parameter 'B' must have one value.`); `E = 0`; `winner_los` `A1 == A2`; `d2d_in` negative and wrong length; `rnd_he` 1.5 and wrong length; `fc` empty, 0, NaN; positions; an invalid scenpar value passes the `scenpar_validate` message through; every read parameter of every model NaN or +-Inf, the optional `SF` and `D`, a NaN key that is not read; `G2n` 0 and -1; an infinite `SF_kappa` with and without `sf_sigma`) | — | — |
 
 ### 5.4 `test_lsp_generate.cpp`
 
@@ -1566,7 +1597,7 @@ the files: `KF_mu = -100` dB, `KF_sigma = 0`.
 | EoD offset formula and sign | custom `EoD_offset_*` keys with every term active (`b` > 0 and 0, `hcl` above and below hUT), d2D {5, 50, 500, 2000}; spot checks against the TR: UMa NLOS (6 GHz clamp) and SMa NLOS (hUT above and below 3.5 m) give `-mu_offset,ZOD` of Tables 7.5-7 and 7.5-12; UMa LOS gives 0 | EoD formula typed; TR tables typed | 1e-10 deg |
 | values are 10^(mu + sigma x) with x from the correlation root | identity correlation, distinct mu/sigma per LSP, given `rnd`: `lsp = 10^(mu + sigma·s)` (KF, SF, XPR: `10^(0.1·(...))`) | typed | 1e-12 relative |
 | the Cholesky root follows the TR order | a custom positive definite matrix with all 28 correlations non-zero, mu = 0, sigma = 1 (dB for KF, SF, XPR): links with `s = e_j` give column j of `Q` built by the test-side Cholesky of the permuted matrix; `x_SF = s_SF`; `Q·Q^T = R` | test-side Cholesky | 1e-12 |
-| the symmetric square root is the principal root of R | `cholesky = false`, links with `s = e_j` give the columns of `X`: `X` symmetric, `X·X = R`, `X` positive definite (test-side Cholesky of `X` succeeds); for the custom matrix above, for a matrix with one correlation of 0.999999 (smallest eigenvalue about 1e-6) and for the identity (`X = I`) | uniqueness of the SPD root | 1e-12 absolute for `max abs(X·X - R)`, `max abs(X - X^T)`, `max abs(X - I)`; a comment states the reason: the iteration ends at rounding level (residual about 2e-14 for the 0.999999 matrix) |
+| the symmetric square root is the principal root of R | `cholesky = false`, links with `s = e_j` give the columns of `X`: `X` symmetric, `X·X = R`, `X` positive definite (test-side Cholesky of `X` succeeds); for the custom matrix above, for a matrix with one correlation of 0.999999 (smallest eigenvalue about 1e-6) and for the identity (`X = I`); the DS/KF/SF block `-0.6000000000000001, 0.8, -2.2e-16` (singular to rounding, 3.4.3): finite | uniqueness of the SPD root | 1e-12 absolute for `max abs(X·X - R)`, `max abs(X - X^T)`, `max abs(X - I)`; a comment states the reason: the iteration ends at rounding level (residual about 2e-14 for the 0.999999 matrix); singular block `max abs(X·X - R)` 1e-10 (measured 1.9e-12) |
 | sample covariance of the log values equals the correlation matrix | 20000 links with Box-Muller `rnd`, both roots, `clip_spreads = false`; scenpar: the 28 correlation keys of the UMa NLOS file, the `_mu` keys of the 8 LSPs 0 and the `_sigma` keys 1 (dB for KF, SF, XPR), all other keys at their defaults (no frequency, distance, height, elevation or V/S terms), so that `x = lg(lsp)` for DS, ASD, ASA, ESD, ESA and `x = 10·lg(lsp)` for KF, SF, XPR (the file's own KF std is 0, and clipping would falsify `x`): sample covariance of `x` within 0.05 of `R` | R | 0.05 = 5 standard errors (`sqrt(2/n)` = 0.010 on the diagonal, `sqrt((1 + r²)/n)` <= 0.010 off it) |
 | spreads are clipped at 104 and 52 degrees | mu of ASD, ASA 2.5 and of ESD, ESA 2.0: clipped with `clip_spreads = true`, not with false; `lsp_mu` the same in both | — | exact |
 | the same random values apply to all frequencies | `(lg DS - mu)/sigma` equal at 3 frequencies | TR 7.6.5 | 1e-12 |
@@ -1576,7 +1607,7 @@ the files: `KF_mu = -100` dB, `KF_sigma = 0`.
 | absolute TOA | `absTOA_mu = -30` gives 0, -29.99 active; value `10^(mu + sigma·rnd(:,8))`; `absTOA_Lmax` bound on both sides of `2L/c` | rule typed (active above -30, bound `2·L/c`, `c = 299792458`) | 1e-12 relative |
 | ground permittivity interpolates dry, medium and wet ground | U = 0, 0.25, 0.5, 0.75, 1 at f 1, 10, 28 GHz; imaginary part >= 0 | permittivity model typed | 1e-12 |
 | optional outputs alone and together give the same values | every optional output alone vs. all together; pre-sized outputs; `n_link = 0`; one `tx_pos` row vs repeated | — | exact |
-| input validation | sections for every check of 3.4.1 (incl. `rnd` 10 columns, NaN in `rnd`, `sf_sigma` size, `sf_sigma` -1 and NaN, `DS_VS > 0` with a = b = 0 and `LSP_fc_min` -1 (both `scenpar_validate` messages), a not positive definite matrix, column 9 = 1.5 only when `gr_eps_re` is requested) | — | — |
+| input validation | sections for every check of 3.4.1 (incl. `rnd` 10 columns, NaN in `rnd`, `sf_sigma` size, `sf_sigma` -1 and NaN, `DS_VS > 0` with a = b = 0 and `LSP_fc_min` -1 (both `scenpar_validate` messages), a not positive definite matrix, column 9 = 1.5 only when `gr_eps_re` is requested, infinite `DS_omega` (active), `SF_kappa`, `AS_A_sigma`, `ES_D_mu_C`, `KF_beta`, `EoD_offset_a_gamma` and `absTOA_sigma` only with their outputs requested, `XPR_mu = -Inf` allowed) | — | — |
 
 ### 5.5 `test_los_probability.cpp`
 
@@ -1890,8 +1921,9 @@ neighbours in the data flow of 1.1).
 The `SECTION_DESC` (C++ version; MEX and Python adapt the names) explains in 10 to 20 lines: what a geometry-based
 stochastic model is (TR 38.901 clause 7.5 steps 1 to 4 here), the conf files (`data/config`, 23 v19 files), the
 data flow of 1.1 with the function names as `[[links]]` (incl. the layout order `o2i_loss` before
-`los_probability`), the generator index of 2.2, the units, and that the LOS state and O2I draws are made by the
-caller with [[sos_rand]] / [[sos_randn]] at the distances of the keys `LOS_state_lambda`, `IO_state_lambda`.
+`los_probability`), the generator index of 2.2, the units, and that the caller draws the LOS state and the indoor
+state with [[sos_rand]] / [[sos_randn]] at the distances of the keys `LOS_state_lambda`, `IO_state_lambda`, and the
+O2I variables at the distances of TR 38.901 clause 7.6.3.3 (see `o2i_loss`; they are no keys).
 
 Steps: MEX wrappers and tests (SPEC_MATLAB_API order: wrapper, then test); `SECTION_DESC` (C++ and MEX); `See
 also` lines; full gates.
