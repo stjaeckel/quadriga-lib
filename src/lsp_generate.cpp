@@ -176,6 +176,7 @@ void quadriga_lib::lsp_generate(
 
 ## See also:
 - [[lsf_draw]] (the random values `rnd`)
+- [[path_loss]] (the SF standard deviation `sf_sigma`)
 - [[lsf_init_phases]] (the phases of the random generators)
 - [[scenpar_validate]] (the scenario parameters and the cross-correlation matrix)
 MD!*/

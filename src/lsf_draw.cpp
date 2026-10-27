@@ -246,6 +246,8 @@ void quadriga_lib::lsf_draw(
 
 ## See also:
 - [[lsf_init_phases]] (draws the phases)
+- [[path_loss]] (column 10 as `rnd_he`)
+- [[lsp_generate]] (the large-scale parameters from `rnd`)
 - [[sos_val]] (evaluation of a sum-of-sinusoids generator)
 MD!*/
 
