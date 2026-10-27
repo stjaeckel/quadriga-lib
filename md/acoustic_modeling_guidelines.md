@@ -1,6 +1,6 @@
-# Modeling a venue for the acoustic tracer (draft 3)
+# Modeling a venue for the acoustic tracer (draft 4)
 
-Draft 3, 2026-10-26 (draft 0 revised after two review rounds and an independent review). How to build a room model
+Draft 4, 2026-10-26 (draft 0 revised after two review rounds and two independent reviews). How to build a room model
 in Blender so that the acoustic material table (`md/acoustic_materials.md`) gives meaningful results. The rules are collected from the material page
 (`html_docu/quadriga_lib_material_model.md`, sections 2, 7, 10, 12, 13; "rule n" means its section 12) and from the
 engine issues measured during the material work (`md/acoustic_engine_stage2b_issues.md`). Rules that are the
@@ -46,9 +46,9 @@ drafter's own proposal are marked **(proposed)**.
 - **A sheet material goes on ONE plane.** A wall drawn as a single plane takes a sheet row (`concrete_150mm`,
   `drywall_filled_125mm`). A closed box with a sheet material on every face counts the wall twice (each face is a
   whole wall). Walls drawn as boxes, with their thickness, take the solid rows (`concrete`, `drywall_filled`).
-- **When to use which.** Sheets for thin layers on one plane: panes, glazing units, open boards, leaves, carpets,
-  curtains, finishes. Traced solids for walls drawn with thickness, for any layer that carries another layer
-  (a screed under tile), for closed objects (hard boxes, porous bodies), for a porous fill behind a box (rule 10) and
+- **When to use which.** Sheets for thin layers on one plane on which nothing lies or stands: panes, glazing units,
+  open boards, leaves, rugs, curtains. Traced solids for walls drawn with thickness, for any layer that carries
+  another layer or an object (a parquet, vinyl or tile finish under a rug or furniture), for closed objects (hard boxes, porous bodies), for a porous fill behind a box (rule 10) and
   for boxes of cavity air. A sheet and its traced twin agree within the limits of page section 13.
 - **One material per closed body; finishes as sheets** (to be confirmed in phase 3): a glass front on a metal box is
   a glass sheet glued on that face.
@@ -56,8 +56,10 @@ drafter's own proposal are marked **(proposed)**.
   a front-side hit enters the body that owns the face. Keep normals pointing out of solids (check after an export).
 - **Glue co-located faces exactly.** Hits closer than 1 mm along the ray are one event; near grazing, faces much
   closer than 1 mm in normal distance become two events with air between them (rule 12).
-- **No overlapping geometry.** At most two co-located sheets form a stack; a third layer is a separate event
-  (rule 13).
+- **Three co-located faces are not resolvable.** "Three co-located faces" means any three faces in one plane: two
+  sheets on a solid, a sheet between two bodies, or three sheets. The engine forms each event from two faces
+  (`src/ray_mesh_interact.cpp:2617`: "At most two co-located faces form a stack; a third layer is a separate event").
+  Allowed are a sheet on a solid, and a sheet | sheet pair with air behind. No overlapping geometry (rule 13).
 
 ### 3.1 Checklist: forbidden and limited configurations
 
@@ -65,10 +67,10 @@ Check every recipe against this list; the material list's recipes avoid them.
 
 | configuration | where it arises | size | instead |
 | --- | --- | --- | --- |
-| three co-located faces (a sheet between two bodies, or three sheets) | a finish sheet on a screed sheet on a slab; a carpet sheet under a standing object; an absorber sheet on a plaster sheet on masonry | reflection 0.154 where the fluid layers give 0.994 (page 13); such rays are killed | the carrying layer as a traced solid; cut the carpet under objects |
+| three co-located faces (any three faces in one plane) | a rug sheet on a parquet, vinyl or tile sheet on a slab; a rug on a laminate or board leaf; an object standing on a rug or a finish sheet | reflection 0.154 where the fluid layers give 0.994 (page 13); such rays are killed | finishes as finish solids; cut the rug under objects; rugs on leaf floors are miss candidates (stage-2b issue 5) |
 | two mass-law sheets on one face | tile, vinyl or parquet on a screed sheet; a double glazing as two sheets | not allowed (rule 9; the rig refuses it) | the screed as a solid; glazing as one lumped sheet |
-| three or more bonded mass-law bodies | plaster sheets on both faces of a block solid | within +3.02 / −3.01 dB (page 13; stage-2b issue 4) | the finished-wall masonry rows (plaster included) |
-| a sheet behind a traced solid | plaster on the far face of a wall | the rig cannot build it today | the finished-wall rows |
+| three or more bonded mass-law bodies | plaster sheets on both faces of a block solid; a finish on a bonded screed on a slab | within +3.02 / −3.01 dB (page 13; stage-2b issue 4) | the finished-wall masonry rows; slab and bonded screed as one solid, the finish solid on top |
+| a sheet at a traced solid's exit | plaster on the far face of a wall; the second leaf of a box window or a drywall recipe; a curtain's box ending on a glazing sheet | the engine supports it (page section 7); the rig cannot build it today | allowed; tested once the rig has it |
 | two traced wave media back to back | a cushion on a sofa body; a person on a sofa; porous bodies touching | 4.9 dB off, transmission above one at 88° (stage-2b issue 3) | merge cushions into the body; keep porous bodies apart |
 | a free air space | a closed box of mass-law sheets (a casing); an air gap left open between a panel and the wall | up to 0.29 in reflection at 255 interactions (rule 9) | a hard box; a box of cavity air |
 
@@ -81,7 +83,8 @@ Check every recipe against this list; the material list's recipes avoid them.
   does not read the drawn panel: it sees one triangle, not the panel.
 - **The drift is accepted.** Where a drawn panel differs from the typical size, the result drifts with it. Its size,
   as an example: a 4 mm pane read at 3.29 m instead of 1.349 m transmits 1.7 dB more at 125 Hz and 4.8 dB more at
-  31.5 Hz (page 11.2). There are no size-variant rows.
+  31.5 Hz (page 11.2). There are no size-variant rows. On a heavy slab the effect is small (page 11.1: 0.04–0.14 dB
+  from 63 Hz between 3.52 and 3.29 m).
 - **One `side` per bonded run** (rule 3): glued finishes carry the host's `side`.
 - Leaves and wave media keep the infinite plate: `side` acts only on mass-law materials (page section 13).
 
@@ -102,16 +105,20 @@ Check every recipe against this list; the material list's recipes avoid them.
   of the box, rule 10) | leaf; the studs are not modeled.
 - **Dry lining** on dabs or furring: `gypsum_leaf_12_5mm` on a box of cavity air of the dab or furring depth, on the
   masonry solid.
-- **Bonded toppings and finishes.** A layer that carries another layer is a traced solid: a screed under tile, vinyl
-  or parquet is a `screed` solid; the finish is a sheet on it. Two bonded traced mass-law bodies deviate from the
-  bonded plate by at most 2.0 dB at 16 kHz (stage-2b issue 3).
+- **Floors.** Slab and bonded screed are one solid of their full thickness (`concrete`). A hard finish (parquet,
+  vinyl, ceramic tile) on which a rug lies or an object stands is a thin traced solid (`parquet`, `vinyl`,
+  `ceramic_tile`) on top: two bonded bodies, which deviate from the bonded plate by at most 2.0 dB at 16 kHz
+  (stage-2b issue 3). The finish sheets (`parquet_15mm`, ...) serve only where nothing lies or stands on them.
+- **Leaf floors** (boards on joists, floating laminate) carry nothing in the model: a rug on them is three co-located
+  faces (a miss candidate, stage-2b issue 5); leave the rug out or draw it on a separate patch of solid floor.
 - **Floating screed:** `screed` solid on a resilient layer on the slab; how the resilient layer is carried is open
-  (material list, 4.6).
+  (material list, 4.6). The `screed` rows are for bare and floating screeds only.
 - **Glazing units** are one lumped sheet; never two meshed mass-law sheets for a double unit (rule 9). Two separate
   sashes with a wide air space are two leaves on a box of cavity air.
 - **Floors on joists** **(proposed recipe)**: `board_leaf_22mm` on a box of cavity air of the joist depth on the slab
   solid. Wood panelling on battens: `wood_leaf_12mm` on a box of the batten depth. A stage is modeled in detail from
   the same parts.
+- **Plaster** is part of the masonry rows; `plaster_15mm` is only for `concrete` or `clt` walls with plaster.
 - **Suspended ceilings** **(proposed recipe)**: `gypsum_leaf_12_5mm` (or a tile sheet) on a box of cavity air of the
   plenum depth.
 - **One board, two rows.** A board used as a free panel takes its plate row (`gypsum_board_12_5mm`); used as a leaf
@@ -135,7 +142,8 @@ Check every recipe against this list; the material list's recipes avoid them.
   wave media back to back (4.9 dB off and transmission above one), two mass-law sheets on one face, a thin lossless
   wave layer as a traced solid.
 - **Place treatment separately on the finished wall or floor.** The wall or floor is modeled with its own row first;
-  the carpet or absorber is a sheet glued to its face. There are no combination rows.
+  the rug or absorber is a sheet glued to its face (on a finish solid, never on a finish sheet). There are no
+  combination rows.
 - **Face order of co-located sheets.** The order of their faces in the mesh decides the stack order; the first face
   is the room side (stage-2b collection; the page states the stack as "the layer hit on its front side first").
   Reversing it turns wool | board into board | wool (reflection up to 0.999 different). Check the face order after an
@@ -146,7 +154,7 @@ Check every recipe against this list; the material list's recipes avoid them.
   0.29 in reflection at 255 interactions; rules 9 and 16).
 - **Curtains** hang as a fabric sheet on the front face of a box of cavity air that reaches the wall or window:
   `curtain_flat_*` for curtains hung flat, `curtain_pleated_*` for curtains with fullness (effective columns; the
-  pleats are not drawn).
+  pleats are not drawn). Roller and vertical blinds use `curtain_flat_*` the same way.
 - **Underlay** below a carpet or a laminate leaf is a thin traced body (`underlay`) of its real thickness.
 - **Small cushions and pillows** that lie free: a traced porous solid of the object's shape (`pu_foam`,
   `polyester_fiber`); the fabric cover is ignored. A cushion that lies on a sofa is merged into the sofa's body.
@@ -170,8 +178,9 @@ Check every recipe against this list; the material list's recipes avoid them.
 - **Placement.**
   - Assets stand on the floor as measured (the cabinet's measured surface excludes its floor face); against a wall,
     the share of the back face is lost.
-  - Cut the carpet sheet under a standing object, or keep a clearance of a few millimeters: a carpet sheet between
-    the floor and an object is three co-located faces (3.1).
+  - Objects stand on the slab or on a finish solid. Cut the rug sheet under a standing object, or keep a clearance
+    of a few millimeters: a rug between the floor and an object is three co-located faces (3.1). The object test runs
+    on the bare floor.
   - Porous bodies must not touch each other (a person on a sofa, a cushion on a body): merge or keep a gap.
 - **Per-object convention.** A per-object area measured in a reverberation chamber is used like for like; the rig's
   object test computes the asset's absorption area in a diffuse field. Placement values (an absorber measured in a
@@ -186,8 +195,11 @@ Check every recipe against this list; the material list's recipes avoid them.
 - Porous panels: a sheet on the wall or ceiling solid. Panels stood off the wall: absorber sheet | box of cavity air |
   wall.
 - Panel absorbers and microperforated panels: leaf sheet | box of cavity air (| porous fill as a traced body at the
-  back of the box) | wall. The wall keeps its own row behind a fill (its reflection is within 6.3e-3 of the transfer
-  matrix, stage-2b issue 1); no separate `tf` 0 row.
+  back of the box) | wall. The wall keeps its own row behind a fill: the rig plan measured 2.8e-3 in octave
+  absorption for the wall's own `tf` against the pad referred to air (engine notes 9.2 keep the convention open).
+- Wood-wool panels: `wood_wool_50mm` as a sheet on the wall or ceiling, or on a box of cavity air.
+- Ceiling clouds and baffles: a porous body of `glass_wool` hung in air, or an absorber sheet with air on both sides;
+  microperforated aprons as `mpp_foil_0_1mm` sheets in air.
 - Bass traps **(proposed recipe)**: a porous body of the trap's shape in the corner, from the asset library.
 - Suspended absorbing ceilings **(proposed recipe)**: tile sheet | box of cavity air of the plenum depth | slab.
 - Diffusers: a hard box (`box_diffuser`, proposed) gives their absorption; their scattering is out of scope.
@@ -196,13 +208,14 @@ Check every recipe against this list; the material list's recipes avoid them.
 
 - **Ground** is a porous half-space: a traced solid much thicker than the sound penetrates, of a ground row
   (`ground_grass`, `ground_soil`, `ground_gravel_loose`, `ground_gravel_compacted`, `ground_snow`,
-  `ground_forest_floor`). The rows are Delany-Bazley at the class flow resistivity. Loose gravel and a compacted
+  `ground_forest_floor`). The classes are defined by Delany-Bazley at a class flow resistivity, but Delany-Bazley needs
+  a gain in the columns at 6–25 of 25 thirds; the rows are Miki fits with passive columns to the class impedance. Loose gravel and a compacted
   gravel road differ by a factor of about 200 in flow resistivity: pick by what you see.
 - **At short range the ground acts nearly rigid at low frequency** (63–250 Hz excess attenuation +5.3 to +6.0 dB
-  for σ 12.5–200 kPa·s/m² at 20–200 m, review sizing); the uncertainty lies at higher frequencies and in the
+  for σ 12.5–200 kPa·s/m² at 20–200 m, closed-form estimate); the uncertainty lies at higher frequencies and in the
   spherical wave.
 - **Spherical-wave limit.** The engine reflects a plane wave; the ground wave of a spherical source is not modeled.
-  The difference (review sizing) is at most 0.6 dB on grass (σ 200 kPa·s/m²) to 200 m, but 2.8 dB (source at 1 m)
+  The difference (closed-form estimate) is at most 0.6 dB on grass (σ 200 kPa·s/m²) to 200 m, but 2.8 dB (source at 1 m)
   and 3.8 dB (source at 0.5 m) on snow (σ 12.5 kPa·s/m²) and 2.5 dB on forest floor (σ 31.5 kPa·s/m²) at 200 m.
   Keep sources over soft ground at least about 1 m high, or accept the size.
 - **Asphalt** is a hard solid (`asphalt`); porous asphalt is a thin porous sheet (`asphalt_porous_40mm`) on it.
@@ -211,7 +224,26 @@ Check every recipe against this list; the material list's recipes avoid them.
   the foliage: matched to air, it reflects nothing and attenuates along the path.
 - Keep coordinates local (section 1).
 
-## 11. Engine limits to work around
+## 11. Worked example: a residential room
+
+A furnished living room of 5 × 4 × 2.6 m, drawn with thickness **(proposed example)**:
+
+| element | drawn as | row | checklist (3.1) |
+| --- | --- | --- | --- |
+| outer walls | boxes of the wall thickness, plaster included | `masonry_heavy` | — |
+| partition | box of 125 mm, "filled" on the plan | `drywall_filled` | — |
+| floor | concrete slab with bonded screed as one box; parquet as a thin box on top | `concrete`, `parquet` | three bonded bodies avoided |
+| rug | one plane on the parquet solid, cut where the sofa stands | `carpet_tile_11mm` | three co-located faces avoided |
+| window | one plane in the wall opening | `glazing_double_24mm` | — |
+| curtain | a plane 100 mm in front of the window, a `cavity_air` box between | `curtain_pleated_0_8mm` | sheet at the box's exit (rig: not yet) |
+| ceiling | the slab above, as one box | `concrete` | — |
+| sofa | asset, standing on the parquet solid, cushions merged | `upholstery` (`sofa_3seat`) | porous bodies apart |
+| bookshelf | asset against a wall | `box_bookshelf` | — |
+| desk with items | `furniture_board_25mm` top; a box over the items | `furniture_board_25mm`, `clutter_medium` | — |
+| absorber panels | planes on the wall | `glass_wool_50mm` | — |
+| corner bass traps | assets in the corners | porous bodies of `glass_wool` | — |
+
+## 12. Engine limits to work around
 
 One line each, with the size measured.
 
@@ -230,5 +262,7 @@ One line each, with the size measured.
 | Leaves have no bending stiffness and keep the infinite plate (page 13) | coincidence not expressible (box windows: 2–3 kHz) | a mass-law row where coincidence matters |
 | A curtain's relaxation in μ holds on the random-incidence average only (page 13) | — | do not read a curtain per angle |
 | A source inside a medium with an unknown bend (rule 11) | 0.21 / 0.96 / 3.00 dB at 10° / 20° / 30° | seed the bent bit, use type 5 |
-| The ground wave of a spherical source (page 13) | ≤ 0.6 dB on grass to 200 m; 2.8 dB (source 1 m) and 3.8 dB (0.5 m) on snow, 2.5 dB on forest floor at 200 m (review sizing) | sources at least about 1 m above soft ground |
+| The ground wave of a spherical source (page 13) | ≤ 0.6 dB on grass to 200 m; 2.8 dB (source 1 m) and 3.8 dB (0.5 m) on snow, 2.5 dB on forest floor at 200 m (closed-form estimate) | sources at least about 1 m above soft ground |
+| Three co-located faces: a rug on a leaf floor (stage-2b issue 5) | not measured; such rays are killed | leave the rug out of leaf floors, or draw it on a solid patch |
+| Extended against local reaction of ground rows (the class σ are local-reaction values) | grass (σ 200 kPa·s/m²): at most 0.02 in \|R\|²; snow (σ 12.5) at 2–4 kHz: 0.456 against 0.348 at 80°, 0.201 against 0.112 at 70°, about 1.2 dB (plane wave, Delany-Bazley, closed form) | accept; state it for snow and forest floor |
 | Out of scope (page 13) | — | scattering, diffusion, edge diffraction, flanking through the building, level-dependent absorbers |
