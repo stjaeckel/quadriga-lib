@@ -46,3 +46,36 @@ Rules:
 - Full report to `md/reports/code_r1_review.md`: method, probes run and their results, findings rationale,
   untested areas, overall judgement.
 - Final answer: at most 20 lines — counts per severity, blockers and majors one line each, escalations, verdict.
+
+## Additional review criteria from the user (binding)
+
+- **References**: no produced source, header, test, wrapper or conf file may reference temporary documents in `md/`
+  (spec, plan, findings, reports, prompts) or carry tracking numbers. They must stand on their own and may cite
+  published material. The persistent coding-rule files `md/SPEC_*.md` may be referenced.
+- **No code bloat**: reuse existing helpers; clean, lean structure, readable for humans and AI. Given only a source
+  file, its purpose and working must be clear.
+- **Public API** must fit the existing code base (`html_docu/quadriga_lib_api_cpp.md`): only what a caller needs;
+  implementation details out unless needed to use the API correctly.
+- **Names and scope**: well-crafted, clear names. A helper used once inside one function is a lambda in that
+  function; helpers reused within one cpp are `static inline` or in an anonymous namespace; only helpers used across
+  several files go into a private header, which needs its own documentation.
+- **File structure**: several public functions may share one cpp file if they belong together, share helpers, or
+  if it eases documentation (as the read/write functions of one file type do). Many of the new files have only a
+  few hundred lines: evaluate merging them (e.g. `lsf_init_phases` + `lsf_draw` + the helper header; `path_loss`;
+  `los_probability` + `o2i_loss`), especially where it improves readability and removes helpers, private-header
+  entries or scattered tools. Make a concrete proposal (target file list, what moves where, what the private header
+  still needs to hold, effect on the SSF reuse requirement) and judge whether it is worth it.
+- **BLAS/LAPACK disabled**: work around it. **MSVC** must compile the code (not available here).
+- **Tests**: use the library API (`html_docu/quadriga_lib_api_cpp.md`) for supporting tasks instead of
+  re-implementing what one library call does (geometry helpers such as cubes or planes, coordinate conversions,
+  interpolation, ...). The functions under test are the exception and must not be used as their own oracle. Flag
+  test bloat and re-implemented helpers.
+
+## Sanitizers
+
+Build the Catch2 tests with AddressSanitizer and UndefinedBehaviorSanitizer in a separate gitignored build directory
+(e.g. `build_asan`, `-fsanitize=address,undefined -fno-omit-frame-pointer -g`, AVX2 on) and run the test cases of
+the new and changed functions (`lsf_*`, `lsp_generate`, `path_loss`, `los_probability`, `o2i_loss`, `conf_file_*`,
+`scenpar_validate`). Report every sanitizer diagnostic as a finding. Do not run unbounded allocation probes under
+ASan (a previous one crashed the machine); reproduce huge-allocation cases only in a plain build with `ulimit -v`.
+Resource rules apply (at most 12 threads, one build at a time, check the load).

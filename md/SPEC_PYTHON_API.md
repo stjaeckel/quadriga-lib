@@ -444,9 +444,16 @@ const auto vec = qd_python_list2vector_Cube<dtype>(pylist);
 - Optional strings: `py::arg("name") = ""` in the declaration.
 
 ### Scalars
-- Scalars use native C++ types directly in the wrapper signature: `arma::uword n_bins`, `double power`, `int count`, `bool flag`, etc.
+- Scalars use native C++ types directly in the wrapper signature: `arma::uword n_bins`, `double power`, `int count`, etc. Flags (bool options) follow "Flags" below.
 - Defaults are set in the pybind11 declaration only: `py::arg("n_bins") = 201`. Do not repeat the default in the C++ function signature.
-- Allowed types: `float`, `double`, `int`, `unsigned`, `long long`, `unsigned long long`, `arma::uword`, `bool`.
+- Allowed types: `float`, `double`, `int`, `unsigned`, `long long`, `unsigned long long`, `arma::uword`.
+
+### Flags
+- A flag is taken as `py::handle` and read with `qd_python_flag(handle, default_value, "name")` (`python_quadriga_adapter.hpp`): `None` selects the default, a Python `bool` or `numpy.bool_` gives its value, any other type (float, int, str, array) raises `TypeError` with `Input '<name>' must be a bool or None.`. A plain `bool` parameter is not used: pybind11 would turn `None` into `False` (silently not the default) and accept other types.
+- The default stays in the pybind11 declaration (`py::arg("flag") = true`) and is passed again as `default_value`, so that `None` and an omitted argument behave the same.
+- The `## Inputs:` line states the default; one bullet of the description states the rule once for all flags of the function ("take a bool or `numpy.bool_`; `None` selects the default, any other type raises `TypeError`").
+- Tests: `None` equals the default, a non-bool value (e.g. `2.5`) raises `TypeError`.
+- The `gbsm` submodule follows this rule for all its flags; older wrappers with plain `bool` flags predate it.
 
 ### Complex arrays
 - The C++ library represents complex data as separate `arma::Mat<dtype>` (or `arma::Cube<dtype>`) for the real and imaginary parts — `arma::cx_*` types are not used. This is to avoid copy overhead in the C++ pipeline.
@@ -517,6 +524,7 @@ auto pylist = qd_python_copy2list(&vec_of_mats);
 
 ## Standard flags
 - Two keyword flags are standard and are added wherever they apply. They are the last arguments of the wrapper, in this order, and each gets one line in the `## Inputs:` section.
+- Both are flags in the sense of "Flags" (read with `qd_python_flag`).
 - **`complex`** (`bool`, default: `true`) — applies when the C++ function outputs `X_re` / `X_im` pairs.
   - `complex=True`: each pair is returned as one complex array `X`.
   - `complex=False`: the pair is returned as two real arrays `X_re`, `X_im`, in place of `X` in the tuple; use `qd_python_init_output` for zero-copy where the size is known.
