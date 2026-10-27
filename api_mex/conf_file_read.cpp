@@ -35,6 +35,11 @@ evaluates them at the links (columns 1 DS, 2 KF, 3 SF, 4 ASD, 5 ASA, 6 ESD, 7 ES
 its field); [[path_loss]] returns the path loss and the SF standard deviation; [[lsp_generate]]
 turns the random values into the LSPs of each link and frequency.<br><br>
 
+Where TR 38.901 and QuaDRiGa differ, the TR behaviour is the default; QuaDRiGa's behaviour is available
+through an argument where it is still wanted (3D correlation, symmetric square root of the LSP
+cross-correlation matrix, no clipping of the spreads, outdoor path-loss distance of O2I links). Where
+QuaDRiGa's behaviour was an error, only the corrected rule is implemented.<br><br>
+
 Units: positions in m, frequencies in Hz, path loss in dB, DS in s, KF, SF and XPR as linear power
 ratios, angular spreads in degrees.
 SECTION_DESC!*/

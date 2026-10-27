@@ -1046,7 +1046,7 @@ TEST_CASE("baseband_freq_response_multi - Acoustic scenario large delay")
 TEST_CASE("baseband_freq_response_multi - get_channels_multifreq output with absolute delays")
 {
     // remove_delay_phase = true needs channels generated with use_absolute_delays = true: the coefficients of
-    // get_channels_* carry the phase of the absolute path length. From the C-2 repro: LOS + one single-bounce path,
+    // get_channels_* carry the phase of the absolute path length. Reproduction geometry: LOS + one single-bounce path,
     // TX (0,0,2), RX (30,0,1.5), freq_in 2-3 GHz in 100 MHz steps, freq_out in 1 MHz steps; the truth is
     // get_channels_multifreq evaluated directly at freq_out.
     auto omni = quadriga_lib::generate_arrayant_omni<double>(5.0);

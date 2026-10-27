@@ -59,6 +59,9 @@ Draw the random phases of the large-scale generators of one BS site and scenario
 - With fewer than 3 positions, without `rx_pos` or with `remove_bias = False` no correction is made
 - TR 38.901 clause 7.4.4 literally (exponential ACF, no bias removal): `preset = "Exp256"` and
   `remove_bias = False`; the defaults `Comb256` and the bias removal are QuaDRiGa choices
+- Reason for `Comb256`: the TR gives the exponential ACF (eq. 7.4-5) as a fit "with sufficient accuracy",
+  not as an exact requirement; its kink at zero distance makes the values evolve roughly along a track.
+  `Comb256` (Gaussian near zero, exponential tail, same decorrelation distance) evolves smoothly
 - The flags `dual_mobility`, `remove_bias` and `horizontal` take a bool or `numpy.bool_`; `None` selects the
   default, any other type raises `TypeError`
 - Validation order: `seed`, `preset`, `scenpar`, then the positions (3 columns, rows of `tx_pos` 1 or

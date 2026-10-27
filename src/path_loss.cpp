@@ -37,6 +37,13 @@ namespace
     // - d3, d2: 3D and 2D distance in [m] (clamped); hBS, hUT: raw heights in [m]
     // - hE: environment height in [m]; random_hE: the UT height is clamped to hE + 0.1 instead of 1.1·hE
     // - Returns the loss in [dB]; 'beyond' is true beyond the breakpoint
+    // - Beyond the breakpoint PL2 uses the 3D breakpoint distance for every scenario, as Table 7.4.1-1 does for UMa,
+    //   UMi, InH and InF. For RMa and SMa LOS the TR uses the 2D breakpoint distance; the difference
+    //   (A1 - A2)·lg(dBP3/dBP) + D·(dBP3 - dBP) is at most 0.034 dB over the TR ranges (RMa 0.0341 dB at 0.5 GHz and
+    //   hUT 1 m; SMa 0.0313 dB), which does not justify a key and a second branch
+    // - Random hE: the UT clamp hE + 0.1 replaces 1.1·hE because the TR set of hE ends at hUT - 1.5, while 1.1·hE
+    //   would act at the TR UT heights of floors 7 and 8 (loss beyond the breakpoint 1.4 or 2.6 dB too low); for
+    //   hE = 1 both clamps are 1.1 m
     inline double qd_pl_dual_slope(const qd_pl_dual &p, double f, double d3, double d2, double hBS, double hUT,
                                    double hE, bool random_hE, bool &beyond)
     {
@@ -262,6 +269,8 @@ void quadriga_lib::path_loss(const std::string &pl_model,
     const model_t model = static_cast<model_t>(m);
 
     // Parameters, in the order the model reads them: 'opt' returns false if the key is absent, 'req' throws
+    // - Every key a model reads must be finite: conf_file_read rejects NaN, but maps, MATLAB structs and Python dicts
+    //   can hold NaN or Inf, which would give a NaN loss without an error
     auto opt = [&](const char *key, double &val) -> bool
     {
         auto it = plpar.find(key);
@@ -480,6 +489,9 @@ void quadriga_lib::path_loss(const std::string &pl_model,
                 break;
             case m_winner_los:
             {
+                // Breakpoint from the heights of this link and C2 beyond it, so the loss is continuous at bp (for
+                // F1 = F2). QuaDRiGa's get_pl took the mean heights of the call and C1 in both branches, an error that
+                // has no legacy option here
                 const double hb = std::max(hBS, 1.5), hm = std::max(hUT, 1.5);
                 const double G = w[2] + w[4] * lf + w[6] * std::log10(hb) + w[8] * std::log10(hm);
                 const double H = w[3] + w[5] * lf + w[7] * std::log10(hb) + w[9] * std::log10(hm);
