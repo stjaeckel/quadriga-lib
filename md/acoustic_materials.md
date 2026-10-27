@@ -152,6 +152,8 @@ findings are recorded as stage-2b issues in the meantime. A complete table matte
    free air space (page rule 9: up to 0.29 in reflection at 255 interactions). Sheets are for open single panels.
 9. **One measurement never fits two rows that are stacked in one model.** Alternative models of one construction (a
    lumped row and its recipe) may share a reference.
+10. **A mass-law row carries its density in `e`** (`e` = ρ/ρ₀): the rig shifts measured walls of another thickness by
+    the surface mass `e`·ρ₀·`thk`. A lumped row's case passes its stated surface mass instead.
 
 ### 1.8 Panel size `side`
 
@@ -192,17 +194,17 @@ A floor of 4 × 5 m would be 4.47 m; on a heavy slab the effect is small (page 1
 - **Procedure (decided):** measure first; judge against the known range of measurements and models; if the result
   needs an engine fix, mark it ISSUE; if not, assert. A comment in the case states what "reasonable" meant: the range
   of measurements and models it was judged against. The rig documents itself; this list is updated from the result.
-- **ISSUE convention (decided):** a rig check that fails because of an engine limit carries a comment
-  `ISSUE <n>:` naming the stage-2b issue; its assertion becomes a non-failing check (Catch2 `CHECK_NOFAIL` or
-  equivalent) that still prints and is counted; the measured and the reference values go into the diagnostics; the
-  issue has an entry in `md/acoustic_engine_stage2b_issues.md`. Known engine issues never make the suite fail.
+- **ISSUE convention (decided):** a rig comparison that misses because of an engine limit carries a comment
+  `ISSUE <n>:` naming the stage-2b issue and asserts nothing; the measured and the reference values go into the
+  diagnostics; the issue has an entry in `md/acoustic_engine_stage2b_issues.md`. Known engine issues never make the
+  suite fail. Path-summed results are measured at a cap of 10 interactions (production runs: 20 to 30).
 - **Tolerances (decided; may move with more data):**
 
   | check | against | tolerance | assertion |
   | --- | --- | --- | --- |
   | independent physics | the model written in the test (plate, transfer matrix, porous layer) | 2–3 × the measured maxima of the rig's self-checks | CHECK |
-  | measured single reference | the converted reference at its own specimen side | ±3 dB / ±0.05 (plus the conversion budget) | CHECK, or CHECK_NOFAIL with ISSUE |
-  | class row | the envelope of the class's walls, each shifted to the evaluated thickness by the mass law (20·log₁₀ of the surface-mass ratio) | ±1 dB | as above |
+  | measured single reference | the converted reference at its own specimen side | ±3 dB / ±0.05 (plus the conversion budget) | CHECK, or printed with ISSUE |
+  | class row | the envelope of the class's walls, each shifted to the evaluated thickness by the mass law (20·log₁₀ of the surface-mass ratio; the row's surface mass is `e`·ρ₀·`thk`, a lumped row's the stated one) | ±1 dB | as above |
   | regression guard | the library's own measured result | about 1 dB / 0.01 in α | CHECK |
 
   Worked example: `concrete_150mm` against Litvin 76-66 (line 228, 152 mm, opening 4.37 × 2.84 m, side 3.523 m by
@@ -211,17 +213,12 @@ A floor of 4 × 5 m would be 4.47 m; on a heavy slab the effect is small (page 1
   model spread.
 - **Thickness range (decided):** a generic row is asserted where the trend miss of its class stays inside the
   tolerance, and printed outside. The range is stated in the column "valid".
-- **Rig prerequisites** (before the first material that needs them):
-  - a thickness argument for rows with `thk` 0 (generic solids, porous bodies, finish solids, ground rows;
-    `check_material` requires `thk` > 0 today);
-  - a specimen side per measured reference, and the mass-shifted class envelope;
-  - a 0° comparison (normal-incidence references);
-  - a sheet glued at a traced solid's exit (double leaf, box window, curtain at a window, drywall precise recipe, the
-    issue-4 fixture);
-  - a sheet | sheet | solid self-check (a rug on `parquet_15mm` on concrete), then a stack rule that refuses three
-    co-located faces (today it accepts two sheets before solids);
-  - the table case accepting one case per family instead of one per row;
-  - the object test as its own rig step, designed and timed against the budget of about 0.3 s per case.
+- **Rig prerequisites** (built 2026-10-27): a thickness argument for rows with `thk` 0; a specimen side and surface
+  mass per measured reference and the mass-shifted class envelope; a 0° comparison; a sheet glued at a traced solid's
+  exit; a stack rule that refuses three co-located faces; one case per family (`Material - <family>`, several
+  families joined by ` + `; the family is the name without `_<NN>mm`); Miki, Komatsu and Delany-Bazley written in the
+  test; a helper that rescales a lumped row with `fRef`. The object test follows as its own rig step, designed and
+  timed against the budget of about 0.3 s per case.
 
 ### 1.11 Phase-3 start list (proposed)
 
@@ -448,7 +445,7 @@ References and gaps:
 felt (another product, printed). Above 500 Hz the porous conversion applies once σ is measured. Gap: flow
 resistivity; 63 Hz.
 
-3.2 (comb.) Broda 1930 (normal incidence, rigid backing); SAA 1929. Needs the rig's 0° comparison.
+3.2 (comb.) Broda 1930 (normal incidence, rigid backing); SAA 1929. Compared at 0° in the rig.
 
 3.3 α alone: Broda 1186 (normal incidence, range only); (comb.) Broda 1931, PTB#156–158 1538–1540, Cox 1909, 1911.
 The floor below must be a mass-law body (two traced wave media back to back: stage-2b issue 3). Gap: σ of underlays
@@ -697,21 +694,21 @@ it now.
 
 | combination | materials tested | measured whole (line, type) | rig today | notes |
 | --- | --- | --- | --- | --- |
-| carpet on concrete | `carpet_tile_11mm`, `carpet_tufted_12mm`, `concrete` | Salford 227, BCTC 226 (Sabine); Broda 1930 (normal incidence); compilations 1910, 973, 1981 | yes; Broda needs the 0° comparison | transmission touches stage-2b issue 1 |
-| carpet with underlay on concrete | `carpet_*`, `underlay`, `concrete` | Broda 1931 (normal); compilations PTB#156–158 1538–1540, 974 | sheet \| solid \| solid: yes; 0° missing | — |
-| rug on a hard finish | `carpet_tile_11mm` on `parquet` solid on `concrete` | none | needs the finish solid (thickness argument) | plausibility |
+| carpet on concrete | `carpet_tile_11mm`, `carpet_tufted_12mm`, `concrete` | Salford 227, BCTC 226 (Sabine); Broda 1930 (normal incidence); compilations 1910, 973, 1981 | yes | transmission touches stage-2b issue 1 |
+| carpet with underlay on concrete | `carpet_*`, `underlay`, `concrete` | Broda 1931 (normal); compilations PTB#156–158 1538–1540, 974 | sheet \| solid \| solid: yes | — |
+| rug on a hard finish | `carpet_tile_11mm` on `parquet` solid on `concrete` | none | yes | plausibility |
 | porous absorber on a wall | `glass_wool_50mm`, `pu_foam_50mm`, `rock_wool_50mm` on `concrete` | Dupont 647, 1448; Kosten 1770 | yes (rig case exists for glass wool) | — |
 | porous absorber with an air gap | wool \| `cavity_air` \| wall | none typed | yes | plausibility only |
 | panel absorber over a cavity | `mdf_leaf_6mm`, `plywood_leaf_3mm`, `cavity_air`, fill | Shearer 1120, 1121; Sakagami 1314–1316 (Sabine) | yes | panel conversion pending |
 | curtain in front of a wall | `curtain_flat_0_2mm`, `curtain_pleated_0_8mm`, `cavity_air` | DelRey 428, 430; Zimmer+Rohde 412, 410; ADO 406, 408 | yes | fabric route pending |
-| curtain in front of a window | curtain \| `cavity_air` \| glazing sheet | none | no: sheet at the box's exit | — |
-| drywall, precise recipe | `gypsum_leaf_12_5mm`, `cavity_air`, `glass_wool` | Halliwell 937, 1049 (the build), 940, 943, 946, 948, 1050 (other builds); Fuchs 478 | no: sheet at the exit of the box or fill | the same walls test the lumped rows (an alternative model, 1.7.9) |
+| curtain in front of a window | curtain \| `cavity_air` \| glazing sheet | none | yes; transmission printed (stage-2b issue 1) | — |
+| drywall, precise recipe | `gypsum_leaf_12_5mm`, `cavity_air`, `glass_wool` | Halliwell 937, 1049 (the build), 940, 943, 946, 948, 1050 (other builds); Fuchs 478 | yes; transmission printed (stage-2b issue 3) | the same walls test the lumped rows (an alternative model, 1.7.9) |
 | plasterboard on frame, room side | `gypsum_leaf_12_5mm`, `cavity_air` | PTB#341 1568, PTB#342 1569; Bradley 923 | yes | — |
 | dry lining on masonry | `gypsum_leaf_12_5mm`, `cavity_air`, masonry | Zeitler 1066–1086 (ΔR); Hopkins 444, 443; BIA 1797 / 1795, 1845 / 1847 | yes (leaf \| box \| wall; the bare wall inline) | issue 1 for a fill |
 | plaster on a bare wall | `plaster_15mm` on a bare brick written inline | BIA 1795 / 1796, 1905 / 1904 | sheet \| solid: yes | gives the plaster increment of 1.2 |
-| plaster on both faces of a block | plaster sheets on both faces of a block solid | Hopkins 448 (printed) | no: sheet behind a solid | ISSUE 4 fixture |
-| box window | `glass_leaf_4mm` \| `cavity_air` \| `glass_leaf_4mm` | Quirt 578, 577, 580 | no: sheet at the box's exit | — |
-| parquet on concrete | `parquet`, `concrete` | PTB#394 1581 | needs the finish solid | — |
+| plaster on both faces of a block | plaster sheets on both faces of a block solid | Hopkins 448 (printed) | yes (exact); the far plaster traced is the ISSUE 4 fixture | — |
+| box window | `glass_leaf_4mm` \| `cavity_air` \| `glass_leaf_4mm` | Quirt 578, 577, 580 | yes | — |
+| parquet on concrete | `parquet`, `concrete` | PTB#394 1581 | yes | — |
 | carpet on timber | `carpet_tile_11mm` on `board_leaf_22mm` or `laminate_leaf_8mm` | none (request 6) | **no: three co-located faces** (stage-2b issue 5) | miss candidate |
 
 ## 4. Open design questions for phase 3

@@ -50,7 +50,11 @@ requests 1–13 by impact, three data errors) is with the research manager; Step
 wait: rows needing new data move down the order.
 
 **Next item: the rig extension** (one rig agent, phases plan → build, as in phase 1; brief from the agent template's
-rig variant). Everything the documents need before material 1:
+rig variant; brief `md/materials/rig_ext_brief.md` written 2026-10-27, Stephan's choices for it in the section-9 log).
+**State 2026-10-27:** items 1–9 built (rig 908 lines, 10 `[materials]` cases, 402 assertions), checked by the
+manager, documents updated, waiting for Stephan's review and commit; then the baselines are regenerated and item 10
+(the object test, cap of 10 interactions, porous body to the budget) is phase 3 of the same agent.
+Everything the documents need before material 1:
 1. a thickness argument for rows with `thk` 0 (generic solids, porous bodies, finish solids, ground rows);
 2. a specimen side per measured reference, and the class envelope shifted to the evaluated thickness by the mass law;
 3. a 0° (normal-incidence) tier-2 comparison;
@@ -204,6 +208,7 @@ Each is decided at the stop of the first material that needs it; record the deci
 | the upholstery row | fit of the porous body to per-object areas, with the object test | |
 | generic solid across thickness | the miss of one fit over the measured range; a thickness-scaled coincidence to stage 2b if too large (wish-list 4) | |
 | reference row per class | now: tolerance table of wish-list 1.10 (class envelope) | decided 2026-10-26 (r01 D4, r02 F5) |
+| dense ground classes | the passive Miki fit degenerates at 2 and 20 MPa·s/m² (μ′ near 0): rigid rows with a face absorption, as `asphalt`; the fit target (n and z, or the asserted reflection) | |
 
 ## 7. Research requests
 
@@ -501,6 +506,53 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     of mass-law rows = column formulas asserted plus a physical plate printed as spread; the wall keeps its row except
     `tf` 0 behind a fill, `tl` only where the wall's `tf` > 0; rig rows in `tests/data/materials_acoustic_rig.csv`;
     `lw::walk` not copied; `band_probe` gains `attB` and `alphaB` with a driver `tools/acoustic/grid_probe.py`).
+- **2026-10-27, phase 3 started** (new manager session). Build current at c9f5c00 (no source change since 13e4e45);
+  baselines rechecked with `rowdiff.py`: `[acoustic]` 42938 / 65 and `[wave]` 163474 / 178, 0 differences; not
+  regenerated. Decided by Stephan for the rig extension: the stack rule refuses three co-located faces, with one
+  opt-out argument used only by `ISSUE` fixtures (issue 5); a row belongs to the family of its name without the
+  `_<NN>mm` suffix, one case `Material - <generic name>` per family (the rule for two generic rows proposed by the
+  plan); Miki, Komatsu, JCA and the Davy σ plate written in the test, fits (passive Miki for ground) in
+  `tools/acoustic`; three phases: plan, items 1–9, the object test. Brief `md/materials/rig_ext_brief.md` written
+  (line budget about 250 + 100). Brief approved by Stephan; rig agent started on phase 1 (plan) 2026-10-27.
+  - Rig-extension plan done 2026-10-27 (`md/materials/rig_ext_report.md`; probes `build_linux/scratch/rig_ext/`):
+    items 1–9 about 146 lines, object test about 95; decisions D1–D9. Manager rerun of `[p1]`–`[p9]`, `[p4d]`: every
+    number reproduces (porous bounds fail as stated: 7.4e-4 > 5e-4 dB; filled box 9.466 dB on one path, 0.290 dB on
+    the paths; plaster sheet | block solid | plaster exit sheet 4.8e-5 dB, the far plaster traced −2.98 dB random,
+    6.68 dB per node; rug | parquet sheet | concrete 0.979 in R; surface mass 346.74 against 88.52 kg/m² from `fRef`;
+    `CHECK_NOFAIL` not counted by Catch2 3.8.1). "Exact" for issue 4 holds at one `side` per run: plaster (3.05 m) |
+    concrete (3.52 m) | plaster 0.80 dB per node, glass | concrete | glass 6.7 dB. Grazing relaunch in the object
+    probe (`P10DIR=36`): power 0.100 → 0.144 in six calls (the agent's 0.19 not reproduced; growth confirmed).
+    Decisions to Stephan.
+  - Stephan, 2026-10-27, on the plan: three co-located faces are a known limit (the engine takes two of the three
+    faces, which two is random) and will likely stay. ISSUE marks are comments only (`// ISSUE <n>:`), with the values
+    in the diagnostic output; no helper (replaces the plan's D5). Manager check for D1: the scene tracer's LOS modes
+    2–6 drop the traced transmission-only paths and take the direct path from the diffraction gain
+    (`/sjc/qrt/src_lib/beam_trace.cpp`, `ignore_direct_path`); mode 9 traces it. D1–D9 re-presented in full.
+  - **Decisions on the rig-extension plan (Stephan, 2026-10-27):** production runs are capped at about 20–30 bounces
+    (cavity traps explode the path count; about 150 million traced rays is the limit), so path sums are analyzed with
+    at most 10 interactions. D1 (a): T of a box in front of a fill from the traced paths (cap 10), the one-path value
+    printed under ISSUE 3. D2 (a), as an engine issue: curtain | box | glass T is the issue-1 mechanism; diagnostics,
+    a reasonable estimate (added-insulation form against a finite limp plate) and an ISSUE 1 remark. D3 (a): issue-4
+    fixture in both forms. D4 (a): one porous bound set. D5 (a): three co-located faces always refused, no opt-out, no
+    issue-5 fixture. D6 (b): cases may name several families joined by " + ". D7 (a): surface mass `e`·ρ₀·`thk` with
+    an override for lumped rows. D8 (c): models in the test, the ground fit deferred to the ground family (dense
+    classes as rigid rows: open rule). D9 (a): object test at the cap of 10; the porous body redesigned to the budget
+    (4.4 s far too much). Brief revision 1 written; the rig agent continued with phase 2 (items 1–9).
+    Manager follow-ups with the phase-2 package: wish-list 1.10 and the issue file's ISSUE wording (comments plus
+    diagnostics, no `CHECK_NOFAIL`); wish-list 1.7 rule `e` = ρ/ρ₀ for mass-law rows; issue 1 (curtain at a window),
+    issue 3 (one path, cap 10), issue 4 (scope narrowed), issue 5 (size, a modeling limit), the grazing relaunch;
+    open rule "dense ground classes as rigid rows".
+  - Rig extension phase 2 (items 1–9) done 2026-10-27 by the rig agent; manager checks: rebuild clean; `[wave]`
+    141128 numbers identical; `[acoustic]` 43143 / 69, of the old rows only the filled box on the closed wall moved
+    (T now from the paths: tl from 137–277 dB of leakage to inf, 25 numbers) and three tier-2 headers and one label
+    changed; whole suite 1347259 / 1312 (+205, +4), the same 25 numbers; `[materials]` 0.38 s at 12 threads, load 2.8;
+    `check_docs.py` passes. ISSUE rows as printed: issue 3 filled box 5.04 dB at 10 interactions (9.47 on one path,
+    0.29 at 60); issue 4 traced far plaster −2.98 dB random, 6.56 dB per node; issue 1 curtain | box | pane within
+    0.25 dB at 0°, at random +1.42 dB (2 kHz) and −1.04 dB (8 kHz) outside the band of the two estimates. Rig grew by
+    231 lines against about 146 planned (self-check cases and comments). Documents updated by the manager: wish-list
+    1.7 rule 10 (`e` = ρ/ρ₀), 1.10 ISSUE wording and prerequisites, section 3 "rig today"; guidelines 3.1 and 12;
+    stage-2b ISSUE convention and bounce cap, issues 1, 3, 4, 5 measured, issue 6 (grazing relaunch) new; open rule
+    "dense ground classes". To Stephan for review and commit.
 
 ## 10. Scope of phase 0 (2026-10-23; naming and combinations superseded by wish-list 1.6 and section 3)
 
