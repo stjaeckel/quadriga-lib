@@ -132,6 +132,19 @@ class test_case(unittest.TestCase):
         lsp_u = self.call(self.sp, self.fc, self.tx_pos, self.rx_pos, rnd_a, clip_spreads=False)[0]
         self.assertGreater(np.max(lsp_u[:, :, 3]), 104.0)
 
+    def test_flags(self):
+        args = (self.sp, self.fc, self.tx_pos, self.rx_pos, self.rnd)
+        out = self.call(*args, None, None, None, None)  # None selects the default of each flag
+        self.assertEqual(len(out), 6)
+        for a, b in zip(out, self.out):
+            npt.assert_array_equal(a, b)
+        self.assertEqual(len(self.call(*args, complex=np.bool_(False))), 7)
+        for name in ("cholesky", "clip_spreads", "complex"):
+            for bad in (2.5, 1, "yes"):
+                with self.assertRaises(TypeError) as ctx:
+                    self.call(*args, **{name: bad})
+                self.assertIn(f"Input '{name}' must be a bool or None.", str(ctx.exception))
+
     def test_scenpar(self):
         # DS_VS changes the InF delay spread by lg(a·V/S + b) (DS_VS_a = 30, DS_VS_b = 32 in the InF files)
         mu_4 = self.call(self.sp_inf, self.fc, self.tx_pos, self.rx_pos, self.rnd)[4]

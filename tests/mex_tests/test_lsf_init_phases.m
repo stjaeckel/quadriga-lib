@@ -1,7 +1,7 @@
 function test_lsf_init_phases
 % MEX interface test for quadriga_lib.lsf_init_phases.
 % Scope: argument and output handling, defaults, error paths.
-% Physics validation lives in the Catch2 suite (test_lsf_init_phases.cpp).
+% Physics validation lives in the Catch2 suite (test_gbsm_phases.cpp).
 
 %% Setup: distinct decorrelation distances, 4 Rx positions, one Tx
 scenpar = struct( 'DS_lambda', 10, 'AS_D_lambda', 18, 'AS_A_lambda', 15 );

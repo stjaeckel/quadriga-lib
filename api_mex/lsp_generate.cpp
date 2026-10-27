@@ -32,7 +32,8 @@ Large-scale parameters of a set of links from normalized random values
   `s = max(0, P_sigma + P_delta·lg(P_omega + f'))`;
   `sigma = max(0, s + P_kappa·lg(d) + P_tau·lg(h) + P_beta·lg(a))`. The standard deviation is
   limited at 0 after all terms. SF has no mean fields (mean 0). A frequency term with the
-  coefficient 0 contributes 0
+  coefficient 0 contributes 0; an active one (`P_gamma` or `P_delta` not 0) requires
+  `P_omega + f' > 0` at every frequency
 - DS with the V/S term of TR 38.901 Table 7.5-6 Part-3 (InF): if `DS_VS > 0`,
   `mu += lg(DS_VS_a·DS_VS + DS_VS_b)`. The InF files set `DS_VS` for the hall of their calibration
   scenario; a caller with another hall sets the field `DS_VS` (V/S in m) of `scenpar`
@@ -75,7 +76,7 @@ Large-scale parameters of a set of links from normalized random values
   `hUT < EoD_offset_hcl`: `e += (atan((EoD_offset_hcl - h)/d) - atan((hUT - h)/d))·180/pi`
 - Outputs that are not requested are not computed
 - Validation order: positions, `fc`, `rnd`, `sf_sigma`, `scenpar`, positive definiteness, column 10
-  of `rnd`
+  of `rnd`, the frequency terms
 
 ## Usage:
 ```
