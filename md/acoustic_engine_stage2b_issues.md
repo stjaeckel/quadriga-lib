@@ -195,13 +195,14 @@ prints the reflection at that cap beside the uncapped one.
 - **Physics.** A ray about 0.2° from grazing a face hits that face again at its own launch point at every
   `ray_progress` call; each hit splits it into a reflected and a transmitted ray, so the ray count doubles per call
   and the summed power grows.
-- **Measured.** One such ray: power 0.100 → 0.144 in six calls (rays 4 → 168), at the origin, not far from it as the
-  lost rays near grazing of page section 13. With a cap of 10 interactions the rays left over carry at most
-  2.3e-3 m² of an absorption area of 0.65 m² (0.4 %).
+- **Measured.** One such ray of unit power: 1.000 → 1.868 in ten calls (rays 2 → 364), at the origin, not far from
+  it as the lost rays near grazing of page section 13. In the object test (16 directions, cap 10, at most 3
+  reflections, −60 dB floor) no direction hits it and no power is left at the cap; on 64 directions it appears in 2
+  directions of a 1.5 × 0.9 × 0.8 m porous body, with rays doubling past about 12 interactions.
 - **Affects.** Any traced solid hit near grazing: objects, walls seen along their face; energy is created and the
   path count grows with the cap.
 - **Interim guideline.** Keep the bounce cap (production runs at 20 to 30 interactions).
-- **Reproduce.** The object test of the rig (its own step) carries `ISSUE 6:` with the direction that triggers it.
+- **Reproduce.** `QD_DIAG_RAY=1 ./build_linux/test_bin "Materials rig - objects*"` (`ISSUE 6:`, the power per call).
 
 ## Modeling guidelines collected in step 3
 

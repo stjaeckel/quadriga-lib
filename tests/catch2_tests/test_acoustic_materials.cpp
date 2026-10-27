@@ -33,6 +33,7 @@
 #include <cctype>
 #include <cstring>
 #include <numeric>
+#include <random>
 #include <regex>
 #include <tuple>
 #include <set>
@@ -610,6 +611,78 @@ namespace mt
             r[vx.first] = col(r, vx.first) * std::pow(k, col(r, vx.second));
         return r;
     }
+
+    // ---- the object test: a closed box of a row, half sizes h, standing on a rigid floor (z = 0) in a diffuse field.
+    // Plane waves from n_dir directions of the upper hemisphere (Fibonacci, equal solid angle), each a jittered grid of
+    // about n_ray parallel rays over the body and its floor image (a ray that misses both misses the body);
+    // ray_progress (scalar, refraction off, threshold 0) with at most 10 interactions, 3 reflections, -60 dB (rays
+    // dropped below it count as absorbed); the intersection passed in, so the power of the rays that leave is known.
+    // A = (1/pi) * the absorption cross-section integrated over the hemisphere = (2 / n_dir) * sum (the body and its
+    // image in free space: 4 x the mean cross-section, halved). chord: the same rays through body and image,
+    // 1 - exp(-m l) (an absorbing volume of power attenuation m per meter); left: the area still in flight at the cap.
+    struct Obj { std::vector<double> A; double chord = 0.0, left = 0.0; };
+    static Obj object_area(const Row &body, const arma::vec3 &h, const std::vector<double> &fa, double m = 0.0, int n_dir = 16, int n_ray = 65)
+    {
+        const size_t nf = fa.size();
+        Obj R{std::vector<double>(nf, 0.0)};
+        const arma::fmat mesh = arma::join_cols(quadriga_lib::cube<float>({200.0, 200.0, 1.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, -1.0}), quadriga_lib::cube<float>(h, {0.0, 0.0, 0.0}, {0.0, 0.0, h(2)}));
+        const arma::uvec mi = arma::join_cols(arma::uvec(12, arma::fill::value(1)), arma::uvec(12, arma::fill::value(2)));
+        const Row floor = {{"a", 3.850e-6}, {"e", 1901}, {"m", 20}, {"fRef", 5.0212e-5}}; // rigid, tf 0
+        rp::Pal pal;
+        for (const char *k : COLS)
+            pal[k] = {(float)col(floor, k), (float)col(body, k)};
+        arma::fvec cf(nf);
+        for (size_t q = 0; q < nf; ++q)
+            cf(q) = (float)(fa[q] * FS);
+        const arma::vec3 hi = {h(0), h(1), 2.0 * h(2)}; // body and image: |x| < hi
+        const double Rb = std::sqrt(arma::dot(hi, hi)), dx = std::sqrt(2.0 * (hi(0) * hi(1) + hi(0) * hi(2) + hi(1) * hi(2)) / n_ray); // mean projection S / 4
+        const int nx = (int)(Rb / dx) + 1;
+        std::mt19937 rng(7);
+        std::uniform_real_distribution<double> U(0.0, 1.0);
+        for (int k = 0; k < n_dir; ++k)
+        {
+            const double z = (k + 0.5) / n_dir, r = std::sqrt(1.0 - z * z), ph = QPI * (3.0 - std::sqrt(5.0)) * k, D = Rb / z + 1.0;
+            const arma::vec3 d = {-r * std::cos(ph), -r * std::sin(ph), -z}, u = arma::vec3{d(1), -d(0), 0.0} / r, v = {-d(2) * u(1), d(2) * u(0), d(0) * u(1) - d(1) * u(0)};
+            std::vector<arma::vec3> O;
+            for (int i = -nx; i < nx; ++i)
+                for (int j = -nx; j < nx; ++j)
+                {
+                    const arma::vec3 o = ((i + U(rng)) * dx) * u + ((j + U(rng)) * dx) * v - D * d, t0 = (-hi - o) / d, t1 = (hi - o) / d; // slab test
+                    const double a = arma::max(arma::min(t0, t1)), b = arma::min(arma::max(t0, t1));
+                    if (b > a)
+                        O.push_back(o), R.chord += dx * dx * (1.0 - std::exp(-m * (b - a))) * 2.0 / n_dir;
+                }
+            const size_t n = O.size();
+            arma::fmat orig(n, 3), dest(n, 3), acc(n, 1 + nf, arma::fill::zeros);
+            arma::fcube pd(n, 3, nf);
+            std::vector<quadriga_lib::path> paths(n);
+            for (size_t i = 0; i < n; ++i)
+                for (int a = 0; a < 3; ++a)
+                    orig(i, a) = (float)O[i](a), dest(i, a) = (float)(O[i](a) + (2.0 * D + 50.0) * d(a)), pd.tube(i, a, i, a).fill((float)d(a)), paths[i].init(0, nf, true);
+            arma::Col<short> prev(n, arma::fill::zeros), cur(n, arma::fill::zeros), buf(n, arma::fill::zeros);
+            arma::u32_vec noi, fbs, sbs;
+            auto power = [&](size_t q, bool missed) // of every ray, or of the rays that miss the mesh
+            {
+                double p = 0.0;
+                for (arma::uword i = 0; i < orig.n_rows; ++i)
+                    p += (!missed || fbs(i) == 0) ? std::norm(cd(paths[i].xpr_coeff(q)[0], paths[i].xpr_coeff(q)[1])) : 0.0;
+                return p;
+            };
+            std::vector<double> pin(nf, (double)n), miss(nf);
+            for (int g = 0; g < 10 && orig.n_rows; ++g)
+            {
+                quadriga_lib::ray_triangle_intersect<float>(&orig, &dest, &mesh, nullptr, nullptr, &noi, &fbs, &sbs);
+                for (size_t q = 0; q < nf; ++q)
+                    miss[q] = power(q, true);
+                quadriga_lib::ray_progress(mesh, mi, pal, cf, 0.0f, 0.0f, 0.0f, orig, dest, prev, cur, buf, pd, acc, paths, nullptr, nullptr, nullptr, nullptr, 10, 3, 255, 0,
+                                           -60.0f, 3.0f, 0.0f, false, true, &noi, &fbs, &sbs);
+                for (size_t q = 0; q < nf; ++q)
+                    R.A[q] += dx * dx * (pin[q] - miss[q] - power(q, false)) * 2.0 / n_dir, pin[q] = power(q, false);
+            }
+            R.left += dx * dx * pin[0] * 2.0 / n_dir;
+        }
+        return R;
+    }
 }
 
 // ============================================================================================================
@@ -859,6 +932,57 @@ TEST_CASE("Materials rig - a lumped row rescaled with fRef is the same wall", "[
         QD_DIAG("# diag: double glazing at 8 mm against 24 mm rescaled, %s: dT %.2e dB, dR %.2e\n", k == mt::SHEET ? "sheet" : "solid", dT, dR);
         CHECK(dT < (k == mt::SHEET ? 3e-6 : 1.3e-4));
         CHECK(dR < 3e-7);
+    }
+}
+
+TEST_CASE("Materials rig - objects: absorption area of a hard box, an absorbing volume and a porous body on the floor", "[acoustic][materials]")
+{
+    // Why: objects take a per-object absorption area measured in a reverberation chamber (wish-list 2.4); in a diffuse
+    // field it is 4 x the mean absorption cross-section. 16 directions x about 65 rays, the octave centers, at most 10
+    // interactions, 3 reflections, -60 dB: within 1.3 % of 64 directions x 2000 rays x 18 thirds (phase-3a probe, three
+    // seeds, 0.19 s). A hard box (1.0 x 0.5 x 2.0 m, tf 0.1) against alpha S of its five exposed faces (-3.0 %: the
+    // 16 directions; -1.9 % at 32, -0.4 % at 64); an absorbing
+    // volume of the same size (m 0.05 per meter) against the chords of its rays (4mV printed); a porous cushion
+    // (0.6 x 0.6 x 0.4 m of the glass-wool columns) against the dense grid, 0.8365 / 0.9007 / 0.9994 / 1.1195 / 1.2205 /
+    // 1.2551 m2, as a regression guard.
+    using namespace mt_rows;
+    const std::vector<double> F = {125, 250, 500, 1000, 2000, 4000}, REF = {0.8365, 0.9007, 0.9994, 1.1195, 1.2205, 1.2551};
+    const mt::Obj B = mt::object_area(wall(0.1), {0.5, 0.25, 1.0}, F), V = mt::object_area({{"e", 1.0}, {"alpha", 4.3429448 * 0.05}}, {0.5, 0.25, 1.0}, F, 0.05),
+                  P = mt::object_area(WOOL, {0.3, 0.3, 0.2}, F);
+    QD_DIAG("\n# diag: objects on the floor, absorption area (m2) per octave; volume: chords %.4f, 4mV %.4f; left at the cap %.1e / %.1e / %.1e\noctave,hard_box,alpha_S,volume,cushion,cushion_dense\n",
+            V.chord, 4.0 * 0.05 * 1.0, B.left, V.left, P.left);
+    for (size_t q = 0; q < F.size(); ++q)
+    {
+        QD_DIAG("%g,%.4f,%.4f,%.4f,%.4f,%.4f\n", F[q], B.A[q], 0.1 * 6.5, V.A[q], P.A[q], REF[q]);
+        CHECK(std::abs(B.A[q] / 0.65 - 1.0) < 0.06);
+        CHECK(std::abs(V.A[q] / V.chord - 1.0) < 1e-3);
+        CHECK(std::abs(P.A[q] / REF[q] - 1.0) < 0.02);
+    }
+    // ISSUE 6: a ray within 0.2 deg of grazing a box face re-hits the face at its launch point at every call, splits and
+    // gains power. The ray of phase 1 (the hard box, direction 36 of 64), alone; rays and their power per call printed.
+    const arma::fmat mesh = arma::join_cols(quadriga_lib::cube<float>({200.0, 200.0, 1.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, -1.0}), quadriga_lib::cube<float>({0.5, 0.25, 1.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 1.0}));
+    rp::Pal pal;
+    for (const char *k : mt::COLS)
+        pal[k] = {(float)mt::col(wall(0.0), k), (float)mt::col(wall(0.1), k)};
+    const arma::fvec cf = {(float)(1000.0 * mt::FS)};
+    const double nd = std::sqrt(0.2223 * 0.2223 + 45.5788 * 45.5788 + 31.6455 * 31.6455);
+    const arma::frowvec dir = {(float)(0.2223 / nd), (float)(45.5788 / nd), (float)(-31.6455 / nd)}, hit = {-0.5f, 0.0313f, 1.5332f};
+    arma::fmat orig = hit - dir, dest = hit + 50.0f * dir, acc(1, 2, arma::fill::zeros);
+    arma::fcube pd(1, 3, 1);
+    for (int a = 0; a < 3; ++a)
+        pd(0, a, 0) = dir(a);
+    std::vector<quadriga_lib::path> paths(1);
+    paths[0].init(0, 1, true);
+    arma::Col<short> prev(1, arma::fill::zeros), cur(1, arma::fill::zeros), buf(1, arma::fill::zeros);
+    QD_DIAG("# diag: ISSUE 6, one grazing ray on the hard box\ncall,rays,power\n");
+    for (int g = 0; g < 10 && orig.n_rows; ++g)
+    {
+        quadriga_lib::ray_progress(mesh, arma::join_cols(arma::uvec(12, arma::fill::value(1)), arma::uvec(12, arma::fill::value(2))), pal, cf, 0.0f, 0.0f, 0.0f, orig, dest, prev, cur, buf,
+                                   pd, acc, paths, nullptr, nullptr, nullptr, nullptr, 10, 255, 255, 0, -60.0f, 3.0f, 0.0f, false, true);
+        double p = 0.0;
+        for (arma::uword i = 0; i < orig.n_rows; ++i)
+            p += std::norm(mt::cd(paths[i].xpr_coeff(0)[0], paths[i].xpr_coeff(0)[1]));
+        QD_DIAG("%d,%llu,%.6f\n", g, (unsigned long long)orig.n_rows, p);
     }
 }
 

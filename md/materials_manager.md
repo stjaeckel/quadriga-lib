@@ -41,8 +41,8 @@ the plate rule or the fluid-layer transfer matrix, R + T ≤ 1, diagnostics, tie
 `data/materials_acoustic.csv` holds one preliminary row, `concrete_cast_152mm` (page 11.4; breaks the naming rule; to
 be redone as the `concrete` family on the research data's Litvin values).
 
-**Baselines** (generic `build_linux`, at e5d3743, the reviewed rig): `[wave]` 163474 / 178,
-`[acoustic]` 43002 / 69 (the rig included), whole suite 1347118 / 1312. Files `test_wave.txt`, `test_acoustic.txt`,
+**Baselines** (generic `build_linux`, at e578aee, the rig after two reviews): `[wave]` 163474 / 178,
+`[acoustic]` 43003 / 69 (the rig included), whole suite 1347119 / 1312. Files `test_wave.txt`, `test_acoustic.txt`,
 `test.txt` in the repository root (untracked).
 
 **Research:** the hand-over of 2026-10-27 (`md/materials/research_request_2026-10-27.md`: request 0 stable row ids,
@@ -52,8 +52,8 @@ wait: rows needing new data move down the order.
 **Next item: the rig extension** (one rig agent, phases plan → build, as in phase 1; brief from the agent template's
 rig variant; brief `md/materials/rig_ext_brief.md` written 2026-10-27, Stephan's choices for it in the section-9 log).
 **State 2026-10-27:** items 1–9 built and committed (69a4555), reviewed twice independently and fixed (e5d3743: rig
-906 lines; the second review's fixes then: 917 lines, 10 `[materials]` cases, 262 assertions, 0.4 s). Next: item 10, the
-object test (cap of 10 interactions, porous body to the budget), phase 3 of the same agent.
+906 lines; the second review's fixes then: 917 lines, 10 `[materials]` cases, 262 assertions, 0.4 s). Item 10, the object
+test, built (rig 1041 lines, 11 `[materials]` cases, 280 assertions). Next: material 1, concrete.
 Everything the documents need before material 1:
 1. a thickness argument for rows with `thk` 0 (generic solids, porous bodies, finish solids, ground rows);
 2. a specimen side per measured reference, and the class envelope shifted to the evaluated thickness by the mass law;
@@ -587,6 +587,25 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     line (double leaf: paths against `transmit()` 4.95e-5 dB); whole suite 1347119 / 1312; `[materials]` 0.48 s at
     10 threads, load 5–12; the NaN probe now fails every check (dT, dR, R + T infinite, tier 2 false);
     `check_docs.py` passes. To Stephan with a summary and a commit message.
+  - Committed by Stephan (e578aee, 2026-10-27). Baselines regenerated at e578aee: `[wave]` 163474 / 178,
+    `[acoustic]` 43003 / 69, whole suite 1347119 / 1312. Next: rig item 10, the object test.
+  - Object test started 2026-10-27 (Stephan: measure the porous body's accuracy against cost at the cap of 10 first,
+    stop, then build): brief revision 4, the rig agent on phase 3a.
+  - Phase 3a done 2026-10-27 (report "Phase 3a"; probe `build_linux/scratch/rig_ext/p3a/obj.cpp`): about 3 µs per ray
+    event and tone, 19.4 events per ray at the cap of 10, internal bounces of the porous body carry < 1 % after the
+    4th interaction; cap 10 against 20 within 1.5e-4 relative; 16 directions × about 65 rays, 6 octave tones,
+    `min_gain_dB` −60 and at most 3 reflections: 0.18–0.19 s per body, within 0.5–1.3 % of the dense reference
+    (cushion and sofa, three seeds). Manager rerun of the cushion at load 1.8: 0.181 s, 0.53 / 0.56 / 0.66 % (equal).
+    Grazing relaunch in 2 of 64 directions on the sofa. Choice of grid to Stephan.
+  - Decided by Stephan 2026-10-27: object test at 16 directions × about 65 rays, six octave tones, cap 10,
+    `min_gain_dB` −60, at most 3 reflections; the grazing ray as a single-ray ISSUE 6 fixture. Rig agent on phase 3b.
+  - Phase 3b done 2026-10-27 (rig 1041 lines, +124). Manager checks: rebuild clean; `[wave]` identical; `[acoustic]`
+    43021 / 70, only the new case's 21 lines; whole suite 1347137 / 1313 (+18, +1); the object case 0.077 s at 12
+    threads, 0.244 s CPU on one thread, load 2–3.4; `check_docs.py` passes. Hard box 0.6306–0.6331 m² against α·S
+    0.65 (−3.0 %, the 16 directions; bound 6 %; −0.4 % at 64 directions: left at 16, wide gates); volume = chords
+    (0.1937 m², 4mV 0.2000); cushion within 0.47 % of the dense reference (bound 2 %); ISSUE 6 single ray 1.000 →
+    1.868 in ten calls. Issue 6 entry and wish-list 1.10 updated. **Rig extension complete; next: material 1,
+    concrete.**
 
 ## 10. Scope of phase 0 (2026-10-23; naming and combinations superseded by wish-list 1.6 and section 3)
 
