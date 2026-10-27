@@ -1637,6 +1637,11 @@ non-negative integers (`Entries in 'floor_id' must be non-negative integers.`) a
 | o2i_loss | `[ loss, d2d_in, model_index ] = quadriga_lib.o2i_loss( fc, rnd, models, weights, d2d_in_max );` | d2d_in_max 25 | nrhs 4..5, nlhs <= 3; `models` cell array of char (or one char array); `model_index` uint64, **1-based** (shift +1 after the call) |
 
 Optional C++ outputs whose MEX output is not requested (beyond nlhs) are passed as `nullptr` in every wrapper.
+Numeric inputs, `floor_id` included, accept the types that the MEX helpers read (double, single, int32, uint32,
+int64, uint64); other integer types such as `uint8` are rejected by the helpers (user decision after Run 4a). Zero
+links: the MEX helpers turn an empty `[0, 3]` position array into 0x0, so the position-based wrappers reject zero
+links with the C++ message on the column count; this restriction is accepted and the MEX documentation blocks do not
+state the `n_link = 0` rule of the C++ blocks (C++ and the Python wrappers support zero links).
 Documentation blocks follow SPEC_MATLAB_API (UPPERCASE heading, `## Usage:`, 100-character lines). Each MEX test
 covers the checklist of SPEC_MATLAB_API "What every test covers" with these specific points:
 
@@ -1645,7 +1650,7 @@ covers the checklist of SPEC_MATLAB_API "What every test covers" with these spec
   for 3 positions or more; errors: argument counts, unknown preset (C++ message `Comb999`), dual mobility without
   `tx_pos` (C++).
 - lsf_draw: `[n_link, 11]` double; z-independence in 2D, z-dependence with `horizontal = false`; `floor_id = []`
-  equals all zeros; `floor_id` with `-1` and `1.5` raise the wrapper error; `uint8` floor IDs accepted; dual
+  equals all zeros; `floor_id` with `-1` and `1.5` raise the wrapper error; `uint32` and `int64` floor IDs accepted; dual
   mobility swap of columns 4/5 (MATLAB 1-based) with swapped positions; `phase` of the wrong size raises the C++
   error.
 - path_loss: logdist via a hand-made `plpar` struct (`model = 'logdist'`, `A = 20`, `B = 30`, `C = 20`) at d3D =

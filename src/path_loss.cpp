@@ -98,8 +98,8 @@ Path loss and shadow-fading standard deviation of a set of links
   frequency. `pl_model` and `plpar` are the values of `PL_model` and the `PL_` keys (without the prefix) as returned
   by [[conf_file_read]]; the TR 38.901 v19.5.0 conf files in `data/config` reproduce Table 7.4.1-1 with them
 - Notation: `f = fc / 1e9` in GHz (not limited by `LSP_fc_min`); `d3`, `d2` the 3D and 2D distance in m; `hBS`,
-  `hUT` the z coordinates of Tx and Rx (no ground model); `[X]` the value of key `X`, `[X|v]` the value of `X` if
-  present, else `v`; `PL1(x) = A1·lg(x) + B + C·lg(f) + D·x`; `sf` the shadow-fading std
+  `hUT` the z coordinates of Tx and Rx (no ground model); `[X]` the value of key `X`, or its default if the key is
+  missing (`X = v` in the lists below); `PL1(x) = A1·lg(x) + B + C·lg(f) + D·x`; `sf` the shadow-fading std
 - Models, required keys and defaults:
   - `constant` (A): `pl = A`
   - `logdist` (A, B, C; SF optional): `pl = A·lg(d3) + B + C·lg(f)`; `sf = [SF]` if present
@@ -128,7 +128,7 @@ Path loss and shadow-fading standard deviation of a set of links
     G2n = 1, LOSmax = 1, sig optional; Ax, Bx, Cx = 0): `hb = max(hBS, 0.1)`, `hm = max(hUT, 0.1)`;
     `PLn = An·lg d3 + Bn + Cn·lg f + Dn·lg hb + D1n·lg(hb)/hb + D2n·lg(hb)/hb² + D3n·hb + En·lg hm +
     E1n·lg(hm)/hm + E2n·lg(hm)/hm² + E3n·hm + Fn·lg(hb)·lg(d3) + G1n·(lg(G2n·hm))²`; `pl = PLn`;
-    if `[LOSmax|1] != 0`: `pl = max(pl, PL_LOS)` with the `dual_slope` loss of the same parameters (incl. the
+    if `[LOSmax] != 0`: `pl = max(pl, PL_LOS)` with the `dual_slope` loss of the same parameters (incl. the
     random hE); if `Ax`, `Bx` or `Cx` is present: `pl = max(pl, Ax·lg d3 + Bx + Cx·lg f)` (e.g. the InF-SL term of
     InF-DL); `sf = [sig]` if present
   - `satellite` (A = 20, B = 32.45, C = 20, D = 0, usePLa = 1): `sa = min(hBS / d3, 1)` with the absolute Tx height;
@@ -139,12 +139,12 @@ Path loss and shadow-fading standard deviation of a set of links
 - New keys of the TR 38.901 v19 files: `hE_rand` (non-zero: random environment height of UMa), `LOSmax` (0: no
   maximum with the LOS term in `nlos`), `Ax`, `Bx`, `Cx` (additional term in the maximum of `nlos`)
 - Random environment height (TR 38.901 Table 7.4.1-1, note 1), in `dual_slope` and the LOS term of `nlos` when
-  `[hE_rand|0] != 0` and `rnd_he` is given, per link with `u = rnd_he(l)`, `d = d2`, raw `hUT`:
+  `[hE_rand] != 0` and `rnd_he` is given, per link with `u = rnd_he(l)`, `d = d2`, raw `hUT`:
   `g = 0` for `d <= 18`, else `1.25·(d/100)³·exp(-d/150)`; `C' = 0` for `hUT < 13`, `((hUT - 13)/10)^1.5` for
   `hUT <= 23`, else 1; `C = C'·g`, `p1 = 1/(1 + C)`; `n` = size of the set {12, 15, ..., hUT - 1.5};
   `hE = 1` if `C = 0`, `n = 0` or `u < p1`, else `hE = 12 + 3·min(floor((u - p1)/(1 - p1)·n), n - 1)`.
   The UT height then gets no 1.1·hE clamp (`hm = max(hUT, 0.1)`), since `hUT - hE >= 1.5` holds for the TR set.
-  Without `rnd_he` the fixed `[hE|0]` is used. `rnd_he` is column 10 of [[lsf_draw]], a spatially consistent
+  Without `rnd_he` the fixed `[hE]` is used. `rnd_he` is column 10 of [[lsf_draw]], a spatially consistent
   uniform value: along a track hE switches between its discrete values where `u` crosses a threshold, and the
   loss beyond the breakpoint steps there; evaluate `rnd_he` once per track segment to avoid this
 - Distances: `d3`, `d2` are the geometric distances (TR 38.901 eq. 7.4-1: for an indoor UT `d3D-out + d3D-in`).
