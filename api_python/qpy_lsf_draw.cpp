@@ -45,7 +45,12 @@ Spatially correlated normalized random values of the large-scale generators at a
   is not zero (up to about 0.16 for 256 sinusoids), the same level as for random offsets. Mirror relations and
   swap reciprocity hold per floor
 - `floor_id` is the caller's floor index of the UT, starting at 0: for the UT heights
-  `hUT = 3·(n_fl - 1) + 1.5` of TR 38.901 Table 7.2-1 it is `n_fl - 1`; outdoor UTs use 0
+  `hUT = 3·(n_fl - 1) + 1.5` of TR 38.901 Table 7.2-1 it is `n_fl - 1`; outdoor UTs use 0. The IDs are read as
+  float64, so they must be below 2^53 (larger values would not be exact)
+- Dual mobility with floors: `floor_id` is one value per link and its offsets are added on both sides, i.e. both
+  devices of a link are on the link's floor. A Tx device on another floor than its Rx (e.g. a D2D link between two
+  floors) is evaluated on the floor of the Rx, so the same Tx device sees different fields on links to Rx devices
+  on different floors
 - The value of a link does not depend on the other links of the call; `n_link = 0` returns an array of
   shape `(0, 11)`
 - Precision: the sinusoids are evaluated by [[sos.val]] with the AVX2 kernel where available (sine and cosine
@@ -53,7 +58,9 @@ Spatially correlated normalized random values of the large-scale generators at a
   than `4e-7 · sqrt(2 · n_coeff)` (9e-6 for 256 sinusoids)
 - `preset` and `horizontal` must be those of [[lsf_init_phases]]. A wrong preset with the same number of
   sinusoids (e.g. `Exp256` for `Comb256`) cannot be detected
-- Validation order: `floor_id` (non-negative integers, checked by the wrapper), positions (3 columns, rows of
+- The flags `dual_mobility` and `horizontal` take a bool or `numpy.bool_`; `None` selects the default, any other
+  type raises `TypeError`
+- Validation order: `floor_id` (non-negative integers below 2^53, checked by the wrapper), positions (3 columns, rows of
   `tx_pos`, finite values), `preset`, `scenpar`, size of `phase`, finite `phase`, length of `floor_id`
 
 ## Usage:
@@ -70,8 +77,9 @@ rnd = quadriga_lib.gbsm.lsf_draw( scenpar, phase, tx_pos, rx_pos, floor_id, dual
 - **`tx_pos`** — Tx positions in m; one row is used for all links; not used in single mobility (but
   validated); `(1, 3)` or `(n_link, 3)`
 - **`rx_pos`** — Rx positions in m; `(n_link, 3)`
-- **`floor_id`** — Floor index per link, starting at 0; non-negative integers, given as int or float array;
-  `None` or empty = all links on floor 0; `(n_link,)`; default: None
+- **`floor_id`** — Floor index per link, starting at 0; non-negative integers below 2^53, given as int or float
+  array; `None` or empty = all links on floor 0; in dual mobility the floor of both devices; `(n_link,)`;
+  default: None
 - **`dual_mobility`** — `True`: Tx and Rx both move, the Tx side is evaluated as a second device;
   default: False
 - **`preset`** — Sum-of-sinusoids preset, see [[sos.preset]]; must match [[lsf_init_phases]];
@@ -94,9 +102,9 @@ py::array_t<double> lsf_draw(py::handle scenpar,
                              const py::array_t<double> &tx_pos,
                              const py::array_t<double> &rx_pos,
                              py::handle floor_id,
-                             bool dual_mobility,
+                             py::handle dual_mobility,
                              const std::string &preset,
-                             bool horizontal)
+                             py::handle horizontal)
 {
     // Read inputs; the entry 'SubpathMethod' of the scenario dict is not used
     std::string subpath_method;
@@ -105,14 +113,16 @@ py::array_t<double> lsf_draw(py::handle scenpar,
     const auto tx_pos_a = qd_python_numpy2arma_Mat<double>(tx_pos, true);
     const auto rx_pos_a = qd_python_numpy2arma_Mat<double>(rx_pos, true);
     const auto floor_id_in = qd_python_numpy2arma_Col<double>(floor_id, true);
+    const bool dual_mobility_b = qd_python_flag(dual_mobility, false, "dual_mobility");
+    const bool horizontal_b = qd_python_flag(horizontal, true, "horizontal");
 
-    // Floor IDs are labels: read as double, checked, converted
+    // Floor IDs are labels: read as double, checked, converted; integers from 2^53 on are not exact in a double
     arma::uvec floor_id_a(floor_id_in.n_elem);
     for (arma::uword i = 0; i < floor_id_in.n_elem; ++i)
     {
         const double v = floor_id_in[i];
-        if (!(v >= 0.0 && v < 18446744073709551616.0 && v == std::floor(v)))
-            throw std::invalid_argument("Entries in 'floor_id' must be non-negative integers.");
+        if (!(v >= 0.0 && v < 9007199254740992.0 && v == std::floor(v)))
+            throw std::invalid_argument("Entries in 'floor_id' must be non-negative integers below 2^53.");
         floor_id_a[i] = (arma::uword)v;
     }
 
@@ -124,8 +134,8 @@ py::array_t<double> lsf_draw(py::handle scenpar,
     const arma::uvec *p_floor_id = floor_id_a.is_empty() ? nullptr : &floor_id_a;
 
     // Call library function
-    quadriga_lib::lsf_draw(scenpar_a, phase_a, tx_pos_a, rx_pos_a, rnd, p_floor_id, dual_mobility, preset,
-                           horizontal);
+    quadriga_lib::lsf_draw(scenpar_a, phase_a, tx_pos_a, rx_pos_a, rnd, p_floor_id, dual_mobility_b, preset,
+                           horizontal_b);
 
     return rnd_py;
 }

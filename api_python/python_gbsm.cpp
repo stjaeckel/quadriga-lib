@@ -4,7 +4,6 @@
 
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
-#include <limits>
 
 namespace py = pybind11;
 
@@ -91,9 +90,9 @@ void quadriga_lib_gbsm(py::module_ &m)
           py::arg("d2d_out").none(false),
           py::arg("h_bs").none(false),
           py::arg("h_ut").none(false),
-          py::arg("d_clutter") = std::numeric_limits<double>::quiet_NaN(),
-          py::arg("r_clutter") = std::numeric_limits<double>::quiet_NaN(),
-          py::arg("h_clutter") = std::numeric_limits<double>::quiet_NaN(),
+          py::arg("d_clutter") = py::none(),
+          py::arg("r_clutter") = py::none(),
+          py::arg("h_clutter") = py::none(),
           py::arg("rnd_g") = py::none(),
           py::arg("fc") = py::none());
 

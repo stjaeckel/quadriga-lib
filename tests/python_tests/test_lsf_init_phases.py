@@ -4,7 +4,7 @@
 
 # Python interface test for quadriga_lib.gbsm.lsf_init_phases.
 # Scope: argument and output handling, defaults, error paths.
-# Physics validation lives in the Catch2 suite (test_lsf_init_phases.cpp).
+# Physics validation lives in the Catch2 suite (test_gbsm_phases.cpp).
 
 import sys
 import os
@@ -94,6 +94,20 @@ class test_case(unittest.TestCase):
         pc = f(self.scenpar, 7, preset="Comb1024")
         self.assertEqual(pc.shape, (1024, 11, 2))
         npt.assert_array_equal(pc[:, :, 0], quadriga_lib.sos.init_phases(1024, 11, 7))
+
+    def test_flags(self):
+        f = quadriga_lib.gbsm.lsf_init_phases
+        # None selects the default of each flag
+        npt.assert_array_equal(f(self.scenpar, 7, None, self.rx_pos, None, None, "Comb256", None), self.pb)
+        npt.assert_array_equal(f(self.scenpar, 7, rx_pos=self.rx_pos, remove_bias=None), self.pb)
+        npt.assert_array_equal(f(self.scenpar, 7, rx_pos=self.rx_pos, horizontal=None), self.pb)
+        npt.assert_array_equal(f(self.scenpar, 7, rx_pos=self.rx_pos, remove_bias=np.bool_(False)), self.phase)
+        # Any other type raises TypeError
+        for name in ("dual_mobility", "remove_bias", "horizontal"):
+            for bad in (2.5, 1, "yes", np.array([True])):
+                with self.assertRaises(TypeError) as ctx:
+                    f(self.scenpar, 7, rx_pos=self.rx_pos, **{name: bad})
+                self.assertIn(f"Input '{name}' must be a bool or None.", str(ctx.exception))
 
     def test_scenpar(self):
         f = quadriga_lib.gbsm.lsf_init_phases

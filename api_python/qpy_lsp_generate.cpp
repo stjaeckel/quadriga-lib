@@ -27,7 +27,8 @@ Large-scale parameters of a set of links from normalized random values
   `mu = P_mu + P_gamma·lg(P_omega + f') + P_epsilon·lg(d) + P_zeta·lg(h) + P_alpha·lg(a)`;
   `s = max(0, P_sigma + P_delta·lg(P_omega + f'))`;
   `sigma = max(0, s + P_kappa·lg(d) + P_tau·lg(h) + P_beta·lg(a))`. The standard deviation is limited at 0 after
-  all terms. SF has no mean keys (mean 0). A frequency term with the coefficient 0 contributes 0
+  all terms. SF has no mean keys (mean 0). A frequency term with the coefficient 0 contributes 0; an active one
+  (`P_gamma` or `P_delta` not 0) requires `P_omega + f' > 0` at every frequency
 - DS with the V/S term of TR 38.901 Table 7.5-6 Part-3 (InF): if `DS_VS > 0`,
   `mu += lg(DS_VS_a·DS_VS + DS_VS_b)`. The InF files set `DS_VS` for the hall of their calibration scenario; a
   caller with another hall sets `DS_VS` (V/S in m) in its copy of `scenpar`
@@ -63,10 +64,12 @@ Large-scale parameters of a set of links from normalized random values
   EoD_offset_c_gamma·lg f' + EoD_offset_c_hUT·hUT)`; if `EoD_offset_hcl > 0` and `hUT < EoD_offset_hcl`:
   `e += (atan((EoD_offset_hcl - h)/d) - atan((hUT - h)/d))·180/pi`
 - `n_link = 0` gives outputs with 0 rows
-- Validation order: positions, `fc`, `rnd`, `sf_sigma`, `scenpar`, positive definiteness, column 9 of `rnd`;
-  all errors are raised as `ValueError`
+- Validation order: positions, `fc`, `rnd`, `sf_sigma`, `scenpar`, positive definiteness, column 9 of `rnd`, the
+  frequency terms; all errors are raised as `ValueError`
 - `complex = True` returns the permittivity as one complex array `gr_eps = gr_eps_re + 1j·gr_eps_im`;
   `complex = False` returns the two real arrays `gr_eps_re`, `gr_eps_im` in its place (one more output)
+- The flags `cholesky`, `clip_spreads` and `complex` take a bool or `numpy.bool_`; `None` selects the default,
+  any other type raises `TypeError`
 
 ## Usage:
 ```
@@ -123,13 +126,16 @@ py::tuple lsp_generate(py::handle scenpar,
                        const py::array_t<double> &rx_pos,
                        const py::array_t<double> &rnd,
                        py::handle sf_sigma,
-                       bool cholesky,
-                       bool clip_spreads,
-                       bool complex)
+                       py::handle cholesky,
+                       py::handle clip_spreads,
+                       py::handle complex)
 {
     // Read inputs; the entry 'SubpathMethod' of the scenario dict is not used
     std::string subpath_method;
     const auto scenpar_a = qd_python_dict2scenpar(scenpar, subpath_method, "scenpar");
+    const bool cholesky_b = qd_python_flag(cholesky, true, "cholesky");
+    const bool clip_spreads_b = qd_python_flag(clip_spreads, true, "clip_spreads");
+    const bool complex_b = qd_python_flag(complex, true, "complex");
     const auto fc_a = qd_python_numpy2arma_Col<double>(fc, true);
     const auto tx_pos_a = qd_python_numpy2arma_Mat<double>(tx_pos, true);
     const auto rx_pos_a = qd_python_numpy2arma_Mat<double>(rx_pos, true);
@@ -150,7 +156,7 @@ py::tuple lsp_generate(py::handle scenpar,
 
     // The split permittivity is written zero-copy; the complex one is merged after the call
     py::array_t<double> gr_eps_re_py, gr_eps_im_py;
-    if (!complex)
+    if (!complex_b)
     {
         gr_eps_re_py = qd_python_init_output(n_link, n_freq, &gr_eps_re);
         gr_eps_im_py = qd_python_init_output(n_link, n_freq, &gr_eps_im);
@@ -161,9 +167,9 @@ py::tuple lsp_generate(py::handle scenpar,
 
     // Call library function
     quadriga_lib::lsp_generate(scenpar_a, fc_a, tx_pos_a, rx_pos_a, rnd_a, lsp, p_sf_sigma, &abs_toa, &gr_eps_re,
-                               &gr_eps_im, &eod_offset_deg, &lsp_mu, &lsp_sigma, cholesky, clip_spreads);
+                               &gr_eps_im, &eod_offset_deg, &lsp_mu, &lsp_sigma, cholesky_b, clip_spreads_b);
 
-    if (complex)
+    if (complex_b)
     {
         auto gr_eps_py = qd_python_copy2numpy<double, std::complex<double>>(&gr_eps_re, &gr_eps_im);
         return py::make_tuple(lsp_py, abs_toa_py, gr_eps_py, eod_offset_deg_py, lsp_mu_py, lsp_sigma_py);

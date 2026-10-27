@@ -2,8 +2,10 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-#include "python_arma_adapter.hpp"
+#include "python_quadriga_adapter.hpp"
 #include "quadriga_lib.hpp"
+
+#include <limits>
 
 /*!SECTION
 Geometry-based stochastic model
@@ -84,10 +86,12 @@ p_los, los_soft = quadriga_lib.gbsm.los_probability( model, d2d_out, h_bs, h_ut,
   `n_link = 0` allowed
 - **`h_bs`** — BS height in m; one element is used for all links; float or `(n_link,)`
 - **`h_ut`** — UT height in m; one element is used for all links; float or `(n_link,)`
-- **`d_clutter`** — Clutter size in m of the InF and SMa models; float; default: nan = TR default of the model
+- **`d_clutter`** — Clutter size in m of the InF and SMa models; float; `None` or nan = TR default of the model;
+  default: None
 - **`r_clutter`** — Clutter density of the InF models, vegetation density `r_veg` of SMa, in [0, 1); float;
-  default: nan = TR default of the model
-- **`h_clutter`** — Clutter height in m of InF-SH and InF-DH; float; default: nan = TR default of the model
+  `None` or nan = TR default of the model; default: None
+- **`h_clutter`** — Clutter height in m of InF-SH and InF-DH; float; `None` or nan = TR default of the model;
+  default: None
 - **`rnd_g`** — Normal(0,1) value per link for the soft LOS state (G of eq. 7.6-18); `(n_link,)`;
   default: None
 - **`fc`** — Carrier frequencies in Hz for the soft LOS state; `(n_freq,)`; default: None
@@ -106,12 +110,26 @@ py::tuple los_probability(const std::string &model,
                           const py::array_t<double> &d2d_out,
                           const py::array_t<double> &h_bs,
                           const py::array_t<double> &h_ut,
-                          double d_clutter,
-                          double r_clutter,
-                          double h_clutter,
+                          py::handle d_clutter,
+                          py::handle r_clutter,
+                          py::handle h_clutter,
                           py::handle rnd_g,
                           py::handle fc)
 {
+    // Clutter arguments: None = NaN (TR default of the model), else a real scalar
+    auto clutter = [](py::handle value, const std::string &name)
+    {
+        if (value.is_none())
+            return std::numeric_limits<double>::quiet_NaN();
+        const std::string error_msg = "Input '" + name + "' must be a real scalar or None.";
+        const auto a = qd_python_real_array(value, error_msg);
+        if (a.size() != 1)
+            throw std::invalid_argument(error_msg);
+        return *a.data();
+    };
+    const double d_clutter_d = clutter(d_clutter, "d_clutter"), r_clutter_d = clutter(r_clutter, "r_clutter"),
+                 h_clutter_d = clutter(h_clutter, "h_clutter");
+
     // Read inputs
     const auto d2d_out_a = qd_python_numpy2arma_Col<double>(d2d_out, true);
     const auto h_bs_a = qd_python_numpy2arma_Col<double>(h_bs, true);
@@ -134,7 +152,7 @@ py::tuple los_probability(const std::string &model,
     arma::mat *p_los_soft = soft ? &los_soft : nullptr;
 
     // Call library function
-    quadriga_lib::los_probability(model, d2d_out_a, h_bs_a, h_ut_a, p_los, d_clutter, r_clutter, h_clutter,
+    quadriga_lib::los_probability(model, d2d_out_a, h_bs_a, h_ut_a, p_los, d_clutter_d, r_clutter_d, h_clutter_d,
                                   p_rnd_g, p_fc, p_los_soft);
 
     return py::make_tuple(p_los_py, los_soft_py);
@@ -146,8 +164,8 @@ py::tuple los_probability(const std::string &model,
 //       py::arg("d2d_out").none(false),
 //       py::arg("h_bs").none(false),
 //       py::arg("h_ut").none(false),
-//       py::arg("d_clutter") = std::numeric_limits<double>::quiet_NaN(),
-//       py::arg("r_clutter") = std::numeric_limits<double>::quiet_NaN(),
-//       py::arg("h_clutter") = std::numeric_limits<double>::quiet_NaN(),
+//       py::arg("d_clutter") = py::none(),
+//       py::arg("r_clutter") = py::none(),
+//       py::arg("h_clutter") = py::none(),
 //       py::arg("rnd_g") = py::none(),
 //       py::arg("fc") = py::none());

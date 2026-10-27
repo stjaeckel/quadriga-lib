@@ -80,6 +80,8 @@ class test_case(unittest.TestCase):
         p_sl = f("38.901_InF_SL", self.d, 8.0, 1.5)[0]
         npt.assert_allclose(p_sl, np.exp(-self.d * (-np.log(1 - 0.2) / 10)), atol=1e-14, rtol=0)
         npt.assert_array_equal(f("38.901_InF_SL", self.d, 8.0, 1.5, math.nan, math.nan, math.nan)[0], p_sl)
+        npt.assert_array_equal(f("38.901_InF_SL", self.d, 8.0, 1.5, None, None, None)[0], p_sl)  # None = default
+        npt.assert_array_equal(f("38.901_InF_SL", self.d, 8.0, 1.5, d_clutter=np.array([10.0]))[0], p_sl)
         npt.assert_allclose(f("38.901_InF_SL", self.d, 8.0, 1.5, 10.0, 0.2)[0], p_sl, atol=1e-15, rtol=0)
         p_d = f("38.901_InF_SL", self.d, 8.0, 1.5, d_clutter=20.0)[0]
         npt.assert_allclose(p_d, np.exp(-self.d * (-np.log(1 - 0.2) / 20)), atol=1e-14, rtol=0)
@@ -163,8 +165,11 @@ class test_case(unittest.TestCase):
             f("38.901_UMi", self.d, 10.0)
         with self.assertRaises(TypeError):
             f("38.901_UMi", self.d, 10.0, 1.5, foo=1)
-        with self.assertRaises(TypeError):
-            f("38.901_UMi", self.d, 10.0, 1.5, d_clutter=None)  # clutter arguments are floats
+        for name in ("d_clutter", "r_clutter", "h_clutter"):
+            for bad in ("a", [1.0, 2.0], 1j):  # wrapper
+                with self.assertRaises(ValueError) as ctx:
+                    f("38.901_UMi", self.d, 10.0, 1.5, **{name: bad})
+                self.assertIn(f"Input '{name}' must be a real scalar or None.", str(ctx.exception))
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 function test_lsf_draw
 % MEX interface test for quadriga_lib.lsf_draw.
 % Scope: argument and output handling, floor IDs, defaults, error paths.
-% Physics validation lives in the Catch2 suite (test_lsf_draw.cpp).
+% Physics validation lives in the Catch2 suite (test_gbsm_phases.cpp).
 
 %% Setup: phases of a scenario with distinct decorrelation distances, 5 links
 scenpar = struct( 'DS_lambda', 10, 'AS_D_lambda', 18, 'AS_A_lambda', 15, 'ES_D_lambda', 12, 'ES_A_lambda', 8 );
@@ -93,11 +93,13 @@ assert_throws( @() quadriga_lib.lsf_draw( scenpar, phase, tx_pos, rx_pos, [], fa
     'Wrong number of input arguments.' );
 assert_throws( @() out2( scenpar, phase, tx_pos, rx_pos ), 'Wrong number of output arguments.' );
 assert_throws( @() quadriga_lib.lsf_draw( scenpar, phase, tx_pos, rx_pos, [ 0; -1; 0; 0; 0 ] ), ...
-    'Entries in ''floor_id'' must be non-negative integers.' );
+    'Entries in ''floor_id'' must be non-negative integers below 2^53.' );
 assert_throws( @() quadriga_lib.lsf_draw( scenpar, phase, tx_pos, rx_pos, [ 0; 1.5; 0; 0; 0 ] ), ...
-    'Entries in ''floor_id'' must be non-negative integers.' );
+    'Entries in ''floor_id'' must be non-negative integers below 2^53.' );
 assert_throws( @() quadriga_lib.lsf_draw( scenpar, phase, tx_pos, rx_pos, [ 0; NaN; 0; 0; 0 ] ), ...
-    'Entries in ''floor_id'' must be non-negative integers.' );
+    'Entries in ''floor_id'' must be non-negative integers below 2^53.' );
+assert_throws( @() quadriga_lib.lsf_draw( scenpar, phase, tx_pos, rx_pos, [ 0; 2^53; 0; 0; 0 ] ), ...
+    'Entries in ''floor_id'' must be non-negative integers below 2^53.' );
 assert_throws( @() quadriga_lib.lsf_draw( scenpar, phase(:, 1:10, :), tx_pos, rx_pos ), ...
     'Input ''phase'' must have size [256, 11, 2] for preset ''Comb256''.' );                        % C++
 assert_throws( @() quadriga_lib.lsf_draw( scenpar, phase, tx_pos, rx_pos, [], [], 'Comb1024' ), ...

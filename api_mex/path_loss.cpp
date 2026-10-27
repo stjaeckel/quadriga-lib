@@ -72,7 +72,8 @@ Path loss and shadow-fading standard deviation of a set of links
   `nlos` when `[hE_rand] != 0` and `rnd_he` is given, per link with `u = rnd_he(l)`, `d = d2`, raw
   `hUT`: `g = 0` for `d <= 18`, else `1.25·(d/100)³·exp(-d/150)`; `C' = 0` for `hUT < 13`,
   `((hUT - 13)/10)^1.5` for `hUT <= 23`, else 1; `C = C'·g`, `p1 = 1/(1 + C)`; `n` = size of the
-  set {12, 15, ..., hUT - 1.5}; `hE = 1` if `C = 0`, `n = 0` or `u < p1`, else
+  set {12, 15, ..., hUT - 1.5}; `hE = 1` if `C = 0`, `n = 0`, `u < p1` or `p1` rounds to 1 (C
+  below 1.1e-16, e.g. beyond about 7.5 km at `hUT = 20`), else
   `hE = 12 + 3·min(floor((u - p1)/(1 - p1)·n), n - 1)`. The UT height then gets no 1.1·hE clamp
   (`hm = max(hUT, 0.1)`), since `hUT - hE >= 1.5` holds for the TR set. Without `rnd_he` the fixed
   `[hE]` is used. `rnd_he` is column 11 of [[lsf_draw]], a spatially consistent uniform value:
@@ -90,7 +91,8 @@ Path loss and shadow-fading standard deviation of a set of links
   [[lsp_generate]] with the geometric distance, `sf = max(0, max(0, SF_sigma +
   SF_delta·lg(SF_omega + f')) + SF_kappa·lg(d) + SF_tau·lg(h) + SF_beta·lg(atan(h/d)))` with
   `d = max(d2D, 1e-4)`, `h = max(hBS, 1e-4)`, `f' = max(f, LSP_fc_min)`; for scenario files without
-  such terms this is `SF_sigma`. Passing `sf_sigma` to [[lsp_generate]] is then neutral
+  such terms this is `SF_sigma`. Passing `sf_sigma` to [[lsp_generate]] is then neutral. With
+  `sf_sigma` requested, a frequency term with `SF_delta != 0` requires `SF_omega + f' > 0`
 - Validation: positions, `fc`, the lengths of `d2d_in` and `rnd_he`, their values, the model name,
   the parameters of the model in the order the model reads them (a required field that is missing
   raises `Path-loss model '<model>' requires the parameter '<key>'.`, naming `A1` for "A1 or A" and

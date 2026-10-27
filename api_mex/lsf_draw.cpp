@@ -51,7 +51,12 @@ Spatially correlated normalized random values of the large-scale generators at a
   lags the cross-correlation of two floors is not zero (up to about 0.16 for 256 sinusoids), the
   same level as for random offsets. Mirror relations and swap reciprocity hold per floor
 - `floor_id` is the caller's floor index of the UT, a label (no index shift): for the UT heights
-  `hUT = 3·(n_fl - 1) + 1.5` of TR 38.901 Table 7.2-1 it is `n_fl - 1`; outdoor UTs use 0
+  `hUT = 3·(n_fl - 1) + 1.5` of TR 38.901 Table 7.2-1 it is `n_fl - 1`; outdoor UTs use 0. The IDs
+  are read as double, so they must be below 2^53 (larger values would not be exact)
+- Dual mobility with floors: `floor_id` is one value per link and its offsets are added on both
+  sides, i.e. both devices of a link are on the link's floor. A Tx device on another floor than its
+  Rx (e.g. a D2D link between two floors) is evaluated on the floor of the Rx, so the same Tx device
+  sees different fields on links to Rx devices on different floors
 - The value of a link does not depend on the other links of the call
 - Precision: the sinusoids are evaluated by [[sos_val]] with the AVX2 kernel where available (sine
   and cosine in single precision, accumulation in double); the values deviate from a
@@ -77,7 +82,8 @@ rnd = quadriga_lib.lsf_draw( scenpar, phase, tx_pos, rx_pos, floor_id, dual_mobi
   (but validated); `[1, 3]` or `[n_link, 3]`
 - **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
 - **`floor_id`** *(optional)* — Floor index per link, a label starting at 0 (no index shift);
-  non-negative integers; omitted or empty = all links on floor 0; `[n_link]`
+  non-negative integers below 2^53; omitted or empty = all links on floor 0; in dual mobility the
+  floor of both devices; `[n_link]`
 - **`dual_mobility`** — `true`: Tx and Rx both move, the Tx side is evaluated as a second device;
   default: false
 - **`preset`** — Sum-of-sinusoids preset, see [[sos_preset]]; must match [[lsf_init_phases]];
@@ -115,13 +121,14 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const std::string preset = (nrhs < 7) ? std::string("Comb256") : qd_mex_get_string(prhs[6], "Comb256");
     const bool horizontal = (nrhs < 8) ? true : qd_mex_get_scalar<bool>(prhs[7], "horizontal", true);
 
-    // Floor IDs are labels (no index shift): read as double, checked, converted
+    // Floor IDs are labels (no index shift): read as double, checked, converted; integers from 2^53 on are not
+    // exact in a double
     arma::uvec floor_id(floor_id_in.n_elem);
     for (arma::uword i = 0; i < floor_id_in.n_elem; ++i)
     {
         const double v = floor_id_in[i];
-        if (!(v >= 0.0 && v < 18446744073709551616.0 && v == std::floor(v)))
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Entries in 'floor_id' must be non-negative integers.");
+        if (!(v >= 0.0 && v < 9007199254740992.0 && v == std::floor(v)))
+            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Entries in 'floor_id' must be non-negative integers below 2^53.");
         floor_id[i] = (arma::uword)v;
     }
 

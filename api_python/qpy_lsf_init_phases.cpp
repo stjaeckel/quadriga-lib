@@ -53,6 +53,8 @@ Draw the random phases of the large-scale generators of one BS site and scenario
 - The correction removes variance: the field is conditioned on a zero mean over the positions, which costs
   little only when the positions spread over many decorrelation distances (see [[sos.remove_bias]])
 - With fewer than 3 positions, without `rx_pos` or with `remove_bias = False` no correction is made
+- The flags `dual_mobility`, `remove_bias` and `horizontal` take a bool or `numpy.bool_`; `None` selects the
+  default, any other type raises `TypeError`
 - Validation order: `seed`, `preset`, `scenpar`, then the positions (3 columns, rows of `tx_pos` 1 or
   `n_link` when both are given, finite values), then the requirement of `tx_pos` for the bias removal in
   dual mobility
@@ -95,14 +97,17 @@ py::array_t<double> lsf_init_phases(py::handle scenpar,
                                     long long seed,
                                     py::handle tx_pos,
                                     py::handle rx_pos,
-                                    bool dual_mobility,
-                                    bool remove_bias,
+                                    py::handle dual_mobility,
+                                    py::handle remove_bias,
                                     const std::string &preset,
-                                    bool horizontal)
+                                    py::handle horizontal)
 {
     // Read inputs; the entry 'SubpathMethod' of the scenario dict is not used
     std::string subpath_method;
     const auto scenpar_a = qd_python_dict2scenpar(scenpar, subpath_method, "scenpar");
+    const bool dual_mobility_b = qd_python_flag(dual_mobility, false, "dual_mobility");
+    const bool remove_bias_b = qd_python_flag(remove_bias, true, "remove_bias");
+    const bool horizontal_b = qd_python_flag(horizontal, true, "horizontal");
     const auto tx_pos_a = qd_python_numpy2arma_Mat<double>(tx_pos, true);
     const auto rx_pos_a = qd_python_numpy2arma_Mat<double>(rx_pos, true);
 
@@ -112,8 +117,8 @@ py::array_t<double> lsf_init_phases(py::handle scenpar,
 
     // Call library function; the size of 'phase' depends on the preset, so it is copied afterwards
     arma::cube phase;
-    quadriga_lib::lsf_init_phases(scenpar_a, phase, (arma::sword)seed, p_tx_pos, p_rx_pos, dual_mobility,
-                                  remove_bias, preset, horizontal);
+    quadriga_lib::lsf_init_phases(scenpar_a, phase, (arma::sword)seed, p_tx_pos, p_rx_pos, dual_mobility_b,
+                                  remove_bias_b, preset, horizontal_b);
 
     return qd_python_copy2numpy(&phase);
 }

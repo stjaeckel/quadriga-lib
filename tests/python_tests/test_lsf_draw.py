@@ -4,7 +4,7 @@
 
 # Python interface test for quadriga_lib.gbsm.lsf_draw.
 # Scope: argument and output handling, floor IDs, defaults, error paths.
-# Physics validation lives in the Catch2 suite (test_lsf_draw.cpp).
+# Physics validation lives in the Catch2 suite (test_gbsm_phases.cpp).
 
 import sys
 import os
@@ -90,6 +90,10 @@ class test_case(unittest.TestCase):
         npt.assert_array_equal(f(*args, self.fl.tolist()), rf)
         npt.assert_array_equal(f(*args, self.fl.reshape(1, 5)), rf)
 
+        # The largest exact ID is 2^53 - 1; larger values would be rounded when read as float64
+        big = np.array([2**53 - 1, 1, 0, 2, 1], dtype=np.int64)
+        self.assertEqual(f(*args, big).shape, (5, 11))
+
     def test_dual_mobility(self):
         f = quadriga_lib.gbsm.lsf_draw
         tx_d = np.array([[5.0, 5.0, 1.5], [30.0, 0.0, 1.5], [40.0, -20.0, 1.5], [60.0, 10.0, 1.5], [0.0, 9.0, 1.5]])
@@ -98,6 +102,17 @@ class test_case(unittest.TestCase):
         rs = f(self.scenpar, self.phase, self.rx_pos, tx_d, None, True)
         npt.assert_array_equal(rs, rd[:, SWAP])  # columns 3/4 and 5/6 swapped
         npt.assert_array_equal(f(self.scenpar, self.phase, tx_d, self.rx_pos, dual_mobility=False), self.rnd)
+
+    def test_flags(self):
+        f = quadriga_lib.gbsm.lsf_draw
+        args = (self.scenpar, self.phase, self.tx_pos, self.rx_pos)
+        npt.assert_array_equal(f(*args, None, None, "Comb256", None), self.rnd)  # None selects the default
+        npt.assert_array_equal(f(*args, dual_mobility=np.bool_(False), horizontal=np.bool_(True)), self.rnd)
+        for name in ("dual_mobility", "horizontal"):
+            for bad in (2.5, 0, "no"):
+                with self.assertRaises(TypeError) as ctx:
+                    f(*args, **{name: bad})
+                self.assertIn(f"Input '{name}' must be a bool or None.", str(ctx.exception))
 
     def test_horizontal_and_preset(self):
         f = quadriga_lib.gbsm.lsf_draw
@@ -154,10 +169,11 @@ class test_case(unittest.TestCase):
     def test_errors(self):
         f = quadriga_lib.gbsm.lsf_draw
         args = (self.scenpar, self.phase, self.tx_pos, self.rx_pos)
-        for bad in ([0, -1, 0, 0, 0], [0, 1.5, 0, 0, 0], [0, np.nan, 0, 0, 0]):  # wrapper
+        for bad in ([0, -1, 0, 0, 0], [0, 1.5, 0, 0, 0], [0, np.nan, 0, 0, 0], [0, 2.0**53, 0, 0, 0],
+                    np.array([0, 2**53 + 1, 0, 0, 0], dtype=np.int64)):  # wrapper
             with self.assertRaises(ValueError) as ctx:
                 f(*args, bad)
-            self.assertIn("Entries in 'floor_id' must be non-negative integers.", str(ctx.exception))
+            self.assertIn("Entries in 'floor_id' must be non-negative integers below 2^53.", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:  # C++
             f(self.scenpar, self.phase[:, :10, :], self.tx_pos, self.rx_pos)
         self.assertIn("Input 'phase' must have size [256, 11, 2] for preset 'Comb256'.", str(ctx.exception))
