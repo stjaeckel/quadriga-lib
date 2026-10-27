@@ -123,6 +123,7 @@ void quadriga_lib::lsf_init_phases(
   [-pi, pi); `[n_coeff, 11, 2]`
 
 ## See also:
+- [[conf_file_read]] (the scenario parameters)
 - [[lsf_draw]] (evaluates the phases at the links)
 - [[sos_init_phases]] (the raw phases)
 - [[sos_remove_bias]] (the bias removal of one generator)
