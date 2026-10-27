@@ -108,24 +108,33 @@ Phase-2 analysis topics (one agent each, as needed): the reference row per class
 listening room's inventory against the research data and its gaps; the order of materials that settles the open rules
 early.
 
-## Variant: material agents (phase 3)
+## Variant: material agents (phase 3: one row family per agent)
 
 ```
-## The material
-- Row name: <name>; class: <class>; build: <thickness, density, layers, mounting, cavity>.
-- Reference rows (research data/material_properties.csv): <key, property, coefficient type, bands, location>.
-- Rules that apply: <the tiered rule for absorption references / Miki or Komatsu / the membrane constant / ...>,
-  as decided in md/materials_manager.md section 6.
-- Open rules this material meets: <none / which; the agent measures the options and stops>.
-- Tier-1 model: <plate theory / the transfer matrix / Miki, Komatsu, JCA / the leaf on a box>, written in the test.
-- Tier-2 tolerance: about ±3 dB in transmission, ±0.05 in absorption; bands without a measurement take the model
-  spread <values>.
+## The row family
+- Family: <generic row and its sheets, names by md/acoustic_materials.md 1.6>; wish-list entry <class.number>;
+  build and recipe as stated there; evidence tiers A <..> / T <..>; impact <..>.
+- Reference rows (research data/material_properties.csv at commit 2dad906, or by stable id once it exists):
+  <line, source key, property, coefficient type, bands, specimen side>; which are row references and which
+  combination references (one measurement never fits two rows stacked in one model).
+- Rules that apply: md/acoustic_materials.md 1.3 (tiers, conversion budget), 1.6-1.8 (names, row design incl. the
+  fRef rescaling of lumped rows, side), 1.10 (procedure, ISSUE convention, tolerance table, thickness range);
+  decided open rules in md/materials_manager.md section 6.
+- Open rules and engine issues this family meets: <none / which; the agent measures the options and stops>.
+- Tier-1 model: <plate rule / fluid-layer transfer matrix / Miki, Komatsu, JCA / leaf on a box / object test>, written
+  in the test.
+- Tolerances: the lines of the tolerance table (wish-list 1.10) that apply, with the model spread of the bands
+  without a measurement <values>.
 
 ## Phases
 1. Data and columns (stop if an open rule is met): the reference rows read and their types checked; the columns
    derived by the decided rule (fits bounded and densely sampled, selected on the evaluation grid).
-2. Tier 1 and tier 2: the library through the rig against the independent model; the columns against the converted
-   measurement per octave; every deviation recorded with its size.
-3. The test case and the CSV row (stop): TEST_CASE("Material - <name>") reading the row from the CSV; the case within
-   about 0.3 s; [wave] and [acoustic] rows of the existing cases unchanged; python3 tools/acoustic/check_docs.py.
+2. Measure and judge: the library through the rig against the independent model and against the converted
+   measurements per octave; judged against the known range of measurements and models; an engine limit becomes an
+   `ISSUE <n>:` check with its size (for the manager's stage-2b entry), otherwise a regression guard; every deviation
+   recorded with its size.
+3. The test case and the CSV rows (stop): one lean TEST_CASE per family reading its rows from
+   data/materials_acoustic.csv, references with their source comments, a comment saying what "reasonable" meant; the
+   case within about 0.3 s; [wave] and [acoustic] rows of the existing cases unchanged; check_docs.py; the wish-list
+   status and "valid" column to be updated by the manager from the report.
 ```

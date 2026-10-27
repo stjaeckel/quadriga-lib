@@ -1,11 +1,74 @@
 # Step 3 of the acoustic project: the material tables (manager file)
 
-The memory of the step-3 manager. Kept current after every step; a new manager session reads this file first, then
-`md/materials_kickoff.md` (the kick-off, until it is deleted in phase 4). Public and tracked: no private details (no
+The memory of the step-3 manager. Kept current after every step; a new manager session reads **section 0 first**, then
+sections 1–8 and 12, then the three step-3 documents named in section 0. Section 9 is the dated log of how the
+decisions came about (read it when a decision's reason is needed). `md/materials_kickoff.md` is the original plan of
+step 3; where it differs from section 0, section 0 holds (it is deleted in phase 4). Public and tracked: no private details (no
 rates, hours, money, personal circumstances, nothing about whose room the listening room is). Briefs and reports in
 `md/materials/` are untracked working files; answers that are personal stay there. Old rule labels of the research
 handoff (A13, A14, A15, A19, P7, M6) are used here only as working shorthand; public documents and commit messages name
 the rule in words.
+
+## 0. Start here: state at the start of phase 3 (2026-10-27)
+
+**Where step 3 stands.** Phases 0–2 are closed. Phase 3 (building the material rows and their tests) starts with
+the rig extension. The engine stays closed until every listed material is in (Stephan, 2026-10-26).
+
+**Commits of step 3:** 5be85fb (manager file, agent template), 13e4e45 (the rig, `data/materials_acoustic.csv` with
+one preliminary row, `band_probe` with 26 columns, `grid_probe.py`), 19323d9 / be65346 / bd0a170 (the wish-list and
+the guidelines, drafts 2–4, after two independent reviews).
+
+**The three step-3 documents** (tracked, public, no private details):
+- `md/acoustic_materials.md`, the wish-list: six classes (structural, hard furnishing, soft furnishing, complex
+  assemblies, treatment, outdoor), two evidence tiers per row (A absorption, T transmission; 1, 1p pending conversion,
+  2, 3), impact, status, references (research lines at commit 2dad906), gaps. Read sections 1.3–1.11 in full: the
+  naming rule (1.6: `_<NN>mm` last marks a sheet, no suffix a traced solid), the row-design rules (1.7: lumped rows
+  carry the visible thickness and rescale every power-law coefficient with `fRef`, X·k^B), `side` (1.8), the phase-3
+  procedure, the ISSUE convention and the tolerance table (1.10), the start list (1.11). Section 4: open design
+  questions; section 5: adding a material; section 6: the research requests.
+- `md/acoustic_modeling_guidelines.md`: how a venue is modeled (solids and sheets, Blender names and `csv_strict`, the
+  checklist of forbidden and limited configurations: three co-located faces are not resolvable, only a sheet on a
+  solid or a sheet | sheet pair; at most two bonded rigid bodies; objects as hard boxes or porous bodies; assets).
+- `md/acoustic_engine_stage2b_issues.md`: engine issues 1–5 with sizes and reproductions, and the ISSUE convention.
+  Engine findings are recorded there, never fixed in step 3.
+
+**The rig:** `tests/catch2_tests/test_acoustic_materials.cpp` (677 lines, `namespace mt`): stacks room side first
+(sheets in front, traced solids behind, `quadriga_lib::plane` / `cube`), transmission through `calc_diffraction_gain`
+(lod 0, scalar, threshold 0), reflection through aimed rays and `ray_progress` (refraction off, threshold 0), plane
+waves, coherent sums, 50 angles × one tone per third 25 Hz–10 kHz as the default grid argument, octaves as in the
+research data, the library's sound speed (342.76271 m/s); `mt::check_material` (sheet = traced solid, tier 1 against
+the plate rule or the fluid-layer transfer matrix, R + T ≤ 1, diagnostics, tier 2). Six cases, 197 assertions, 0.14 s.
+`data/materials_acoustic.csv` holds one preliminary row, `concrete_cast_152mm` (page 11.4; breaks the naming rule; to
+be redone as the `concrete` family on the research data's Litvin values).
+
+**Baselines** (generic `build_linux`, at 13e4e45; later commits are documents only): `[wave]` 163474 / 178,
+`[acoustic]` 42938 / 65 (the rig included), whole suite 1347054 / 1308. Files `test_wave.txt`, `test_acoustic.txt`,
+`test.txt` in the repository root (untracked).
+
+**Research:** the hand-over of 2026-10-27 (`md/materials/research_request_2026-10-27.md`: request 0 stable row ids,
+requests 1–13 by impact, three data errors) is with the research manager; Stephan relays results. Phase 3 does not
+wait: rows needing new data move down the order.
+
+**Next item: the rig extension** (one rig agent, phases plan → build, as in phase 1; brief from the agent template's
+rig variant). Everything the documents need before material 1:
+1. a thickness argument for rows with `thk` 0 (generic solids, porous bodies, finish solids, ground rows);
+2. a specimen side per measured reference, and the class envelope shifted to the evaluated thickness by the mass law;
+3. a 0° (normal-incidence) tier-2 comparison;
+4. a sheet glued at a traced solid's exit (double leaf, curtain at a window, drywall precise recipe) and the issue-4
+   fixture: plaster sheets on both faces of a block solid against the bonded plate, marked `ISSUE 4:`;
+5. a sheet | sheet | solid self-check, then a stack rule that refuses three co-located faces;
+6. the ISSUE mechanism (comment `ISSUE <n>:`, `CHECK_NOFAIL` or equivalent, counted and printed) and the regression
+   guard of the tolerance table;
+7. one test case per row family accepted by the table case;
+8. the porous models written in the test (Miki, Komatsu; JCA where a reference uses it), the passive Miki fit for
+   ground classes, and the finite-panel (Davy σ) plate in the added-insulation model of issue 1 (printed);
+9. a helper that rescales a lumped row's power laws with `fRef` (X·k^B);
+10. the object test (rays from all directions on a body give its absorption area), as its own step, designed and timed
+    against about 0.3 s per case.
+
+Keep the rig lean (Stephan reviews it line by line); use library helpers instead of hand-written geometry; keep test
+cases short. Then the materials, in the order of wish-list 1.11 (concrete first as the rig check, then by the
+absorption tier, impact and the transmission tier), one family per material agent, until every listed row is in.
 
 ## 1. Roles
 
@@ -29,7 +92,7 @@ the rule in words.
   (section 7).
 - **An engine manager** only if Stephan installs one for an engine change (section 8).
 
-## 2. Decisions taken at the kick-off (2026-10-22)
+## 2. Decisions taken at the kick-off (2026-10-22; scope, test layout and order superseded, see section 0)
 
 - **Deliverable:** one shipped acoustic material table, a CSV in `data/` in the format of
   `tools/data_formats_md/format_materials.md` (name: section 10, proposed). Every row is asserted by a test that reads
@@ -67,12 +130,14 @@ the rule in words.
 manager's checks (section 4) → report to Stephan (what checks out, what does not, decisions in the form below, a commit
 message) → his review and commit → this file updated.
 
-**Per material (phase 3).**
-1. The manager writes the brief: material and class, reference rows (keys, coefficient types, bands), the rules that
-   apply, the tier-1 model, open rules it will meet.
+**Per row family (phase 3; the wish-list 1.10 procedure).**
+1. The manager writes the brief: the family (generic row and its sheets) and its class, reference rows (research
+   lines at 2dad906, coefficient types, bands, specimen sides), the rules that apply, the tier-1 model, open rules and
+   engine issues it will meet, the tolerance lines of wish-list 1.10 that apply.
 2. The agent: data → columns by the decided rule → tier 1 (the library through the rig against the independent model)
-   → tier 2 (the columns against the converted measurement per octave) → the `TEST_CASE` → the CSV row. Stops where an
-   open rule is met, with the options measured.
+   → tier 2 (the columns against the converted measurement per octave) → judge (reasonable against the known range;
+   an engine limit becomes an `ISSUE <n>:` check and a stage-2b entry; otherwise a regression guard) → one lean
+   `TEST_CASE` per family → the CSV rows. Stops where an open rule is met, with the options measured.
 3. The manager: rebuilds, reruns `[acoustic]` and `[wave]`, reads the CSV row and the test, recomputes the claims a
    decision rests on, runs the checklist.
 4. Report to Stephan: the row, its tier-1 and tier-2 residuals per octave, recorded deviations, decisions (if any), the
@@ -107,6 +172,10 @@ Run on every agent result; the report says which items were checked.
 - **Hard rules kept:** no change under `src/`, `include/`, `api_*`; nothing written in `/sjc/accoustic_research`;
   nothing committed by the agent.
 - **Energy:** R + T ≤ 1 from air for every construction the case builds; a sheet and its traced solid agree.
+- **ISSUE marks:** every check that fails because of an engine limit carries `ISSUE <n>:`, does not fail the suite,
+  prints its values, and the issue file lists it; no other non-failing checks.
+- **Names and rows:** the naming rule of wish-list 1.6; lumped rows rescale every power law with `fRef`; the wish-list
+  status updated from the result.
 
 ## 5. The material list
 
@@ -131,6 +200,10 @@ Each is decided at the stop of the first material that needs it; record the deci
 | damping branch of a peaked face | over-damped default against measured empty-cavity R′ at or below 1 | |
 | `alpha` on a porous layer | its role, if any, next to `a`–`h` | |
 | membrane constant with a bonded fill | 60 or 50 when the fill is bonded to the plate (handoff 5) | |
+| chamber to random for hanging fabrics, green walls, seat and audience blocks | the "1p" rows of the wish-list (1.3) | |
+| the upholstery row | fit of the porous body to per-object areas, with the object test | |
+| generic solid across thickness | the miss of one fit over the measured range; a thickness-scaled coincidence to stage 2b if too large (wish-list 4) | |
+| reference row per class | now: tolerance table of wish-list 1.10 (class envelope) | decided 2026-10-26 (r01 D4, r02 F5) |
 
 ## 7. Research requests
 
@@ -139,19 +212,20 @@ sources are acceptable; urgency and whether step 3 can proceed without it. Steph
 
 | sent | request | status |
 | --- | --- | --- |
-| — | none yet | |
+| 2026-10-27 | `md/materials/research_request_2026-10-27.md`: request 0 (stable row ids), 1–13 by impact (wish-list section 6), three data errors (lines 1451, 520, 1819 of 2dad906); routes proposed by the research manager, approved by Stephan | with the research manager |
 
 ## 8. Engine items raised
 
 A material that cannot be expressed: what, the size of the miss, the column or physics missing. None leads to work
-without Stephan's OK. Each item becomes an issue in `md/acoustic_engine_stage2b_issues.md` (issues 1–3 there: porous
-layer on a wall, band decision near grazing, two traced wave media back to back).
+without Stephan's OK. Each item becomes an issue in `md/acoustic_engine_stage2b_issues.md` (issues 1–5 there: porous
+layer on a wall, band decision near grazing, two traced wave media back to back, three or more bonded rigid bodies, a
+rug on a leaf floor). The table below is the first entry only; the issue file is the record.
 
 | raised | material | miss and size | status |
 | --- | --- | --- | --- |
 | 2026-10-23 | glass wool 50 mm (page 11.3 columns) as a sheet on cast concrete 152 mm (page 11.4 row) | transmission at normal incidence: the library adds 8.04 / 6.71 / 5.38 / 4.09 / 3.42 / 4.78 / 7.32 / 9.32 / 13.02 dB to the wall (31.5 Hz–8 kHz); an independent transfer matrix (the same fluid layer on a heavy limp plate, scratchpad `tmm/wool_on_plate.py`) adds −0.02 / −0.07 / −0.18 / −0.28 / 0.16 / 2.53 / 5.98 / 8.79 / 13.24 dB. Over-insulation up to 8 dB at 31.5 Hz, 5.6 dB at 125 Hz, 2.3 dB at 1 kHz. Reflection is fine (6.3e-3). Random incidence not yet measured. | issue 1 in `md/acoustic_engine_stage2b_issues.md` |
 
-## 9. Current state
+## 9. Log (dated, newest last; the state is section 0)
 
 - **2026-10-23, phase 0.** HEAD cebd0c0 (v0.12.3). `build_linux` reconfigured (it was absent): the generic build,
   g++-12, AVX2 and CUDA off, tests on, MATLAB, Octave and Python off; built with `--parallel 12`.
@@ -409,6 +483,11 @@ layer on a wall, band decision near grazing, two traced wave media back to back)
     proposed), no private details, `check_docs.py` passes. Side finding of the drafter: concrete 152 → 203 mm is
     2.67 dB of mass law from the surface masses (draft 3 said 2.51 from the thickness ratio). Open: whether the
     listening room's inventory stays a phase-2 deliverable (proposal: it moves to step 4, the reference simulation).
+  - Draft 4 committed by Stephan (bd0a170, 2026-10-26). Room inventory moved to step 4 (Stephan, 2026-10-27: the list
+    is enough to set up a simulation and iterate). **Phase 2 closed.**
+  - Research hand-over drafted 2026-10-27: `md/materials/research_request_2026-10-27.md` (request 0 stable row ids;
+    requests 1–13 by impact in the handoff-7 format; three data errors at lines 1451, 520, 1819 of 2dad906; handoff
+    gaps not requested, with reasons). The closed-source column is a proposal for Stephan to confirm.
   - **Phase 2 result:** the wish-list and the guidelines (draft 3 committed be65346; draft 4 after the second review). Next: the research requests (section 6 of
     the wish-list, plus the data errors of a01) go to the research manager; phase 3 starts in a new session.
   - **Engine issues for stage 2b** (Stephan, 2026-10-23): every engine miss found in step 3 becomes an issue in
@@ -423,7 +502,7 @@ layer on a wall, band decision near grazing, two traced wave media back to back)
     `tf` 0 behind a fill, `tl` only where the wall's `tf` > 0; rig rows in `tests/data/materials_acoustic_rig.csv`;
     `lw::walk` not copied; `band_probe` gains `attB` and `alphaB` with a driver `tools/acoustic/grid_probe.py`).
 
-## 10. Scope (proposed in phase 0, confirmed by Stephan 2026-10-23)
+## 10. Scope of phase 0 (2026-10-23; naming and combinations superseded by wish-list 1.6 and section 3)
 
 **The CSV.** `data/materials_acoustic.csv`, next to `data/materials_rf.csv`. The old name `materials_ac.csv` is avoided
 on purpose: it was the outdated one-parameter table removed in 8d89b84, and the history should not mix the two. The
@@ -465,15 +544,18 @@ named for the construction (`glazing_4_16_4`).
 
 ## 11. Roadmap
 
-1. Phase 1: the rig (brief from the template's rig variant after Stephan's answers).
-2. Phase 2: the material list (analysis agents; the listening room's inventory with Stephan).
-3. Phase 3: materials in the order that settles the open rules early. Order (D12, r02 F8 and F16, 2026-10-26): concrete first as the rig check, then by the absorption tier,
-   impact and the transmission tier, until every listed material is in.
-4. Phase 4: notes, page 11.4, corrected statements, README, cleanup.
+1. Phase 3a: the rig extension (section 0, items 1–10).
+2. Phase 3b: every row family of the wish-list, in the order of its section 1.11 and then by the absorption tier,
+   impact and the transmission tier; research results folded in as they arrive (wish-list section 5).
+3. Phase 4: `md/acoustic_material_notes.md`; page 11.4 replaced by the table; the page corrections of wish-list 1.12
+   (343 → 342.76271 m/s, rule 16, the `tf` 0 rule, `side`, the statements the research contradicts); the tools
+   README; the transitory files deleted (`md/materials_kickoff.md`, `md/materials/`).
+4. After step 3: the engine stage 2b (its own session, with the issue list and the table as regression tests); step 4,
+   the reference simulation of the listening room (its inventory is collected there); steps 5 and 6.
 
-Leftovers of step 2 to settle where they fall: `tools/acoustic/band_probe.cpp` has no `attB` column (every fitted row
-uses one); page section 9 says `irr_glass` follows TR 38.901, though only its `att` does; if `coiQ` changes meaning,
-page 11.1, 11.2 and 11.4 are re-measured.
+Leftovers of step 2 to settle where they fall: page section 9 says `irr_glass` follows TR 38.901, though only its
+`att` does; if `coiQ` changes meaning, page 11.1, 11.2 and 11.4 are re-measured. (`band_probe` has `attB` since
+13e4e45.)
 
 ## 12. Traps
 
@@ -511,3 +593,12 @@ page 11.1, 11.2 and 11.4 are re-measured.
   regenerating baselines.
 - (phase 1) A plan phase with scratch probes and a manager rerun of the probe's key commands settles a rig's design
   before any tracked file is written; light-panel coincidence decides the grid, not absorption.
+- (phase 1) Stephan reviews rig code line by line: keep it lean, table-driven, with library helpers (`plane`, `cube`,
+  `path::length()`); an "empty" rig of 1000 lines was too big.
+- (phase 2) Build the list from the modeler's workflow (what a modeler sees at a venue, time per object), not from the
+  literature; literature constructions become test references.
+- (phase 2) Two independent high-effort reviews found real defects each time (wrong references, recipes hitting engine
+  limits, a wrong statement of the manager's on `fRef` scaling); rerun the reviewer's scripts before passing a claim on.
+- (phase 2) Check a claim about what a column does in the code before stating it (the `fRef` power laws; which sheets
+  displace the host medium).
+
