@@ -8,6 +8,32 @@
 Geometry-based stochastic model
 SECTION!*/
 
+/*!SECTION_DESC
+A **geometry-based stochastic model** (GBSM) generates channels from statistics of a type of environment, the
+*scenario* (e.g. urban macro-cell with or without line of sight), instead of from the geometry of one site. The
+functions of this section implement the large-scale part of the model of 3GPP TR 38.901, clause 7.5 steps 1 to 4:
+path loss, shadow fading, LOS probability, O2I penetration loss and the large-scale parameters (LSPs) of each link,
+i.e. the spreads of delays and angles, the K-factor and the cross-polarization ratio. They are in the submodule
+`quadriga_lib.gbsm`.<br><br>
+
+The statistics of a scenario are read from a conf file by [[conf_file_read]] into two dicts, the scenario
+parameters `scenpar` and the path-loss parameters `plpar`. The folder `data/config` holds 23 files for TR 38.901
+v19.5.0; [[scenpar_validate]] completes a parameter set from another source, [[conf_file_list]] finds the files
+and [[conf_file_write]] writes them.<br><br>
+
+Per drop (layout): [[o2i_loss]] gives the penetration loss and the indoor distance of each indoor UT; then
+[[los_probability]] evaluates the LOS probability at the outdoor distance `d2D - d2D-in`. The caller draws the LOS
+state and the O2I variables with [[sos.rand]] / [[sos.randn]] at the decorrelation distances of the keys
+`LOS_state_lambda` and `IO_state_lambda`. Per BS site and scenario (builder): [[lsf_init_phases]] draws the random
+phases once; [[lsf_draw]] evaluates them at the links (columns 0 DS, 1 KF, 2 SF, 3 ASD, 4 ASA, 5 ESD, 6 ESA, 7 XPR,
+8 absolute TOA: Normal; 9 ground permittivity, 10 UMa environment height: Uniform; each at the decorrelation
+distance of its key); [[path_loss]] returns the path loss and the SF standard deviation; [[lsp_generate]] turns the
+random values into the LSPs of each link and frequency.<br><br>
+
+Units: positions in m, frequencies in Hz, path loss in dB, DS in s, KF, SF and XPR as linear power ratios, angular
+spreads in degrees.
+SECTION_DESC!*/
+
 /*!MD
 # conf_file_read
 Read and validate a QuaDRiGa scenario configuration file
