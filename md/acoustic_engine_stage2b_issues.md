@@ -2,7 +2,8 @@
 
 The acoustic interface engine was closed at the end of step 2 (see `md/acoustic_engine_notes.md`). Step 3 builds the
 acoustic material table and measures every material and its common combinations through a test rig
-(`tests/catch2_tests/test_acoustic_materials.cpp`). Where the engine cannot express a construction, the miss is
+(`tests/catch2_tests/acoustic_material_rig.hpp`, its self-checks in `test_acoustic_materials.cpp`, the material cases in
+`test_acoustic_mat_<group>.cpp`). Where the engine cannot express a construction, the miss is
 recorded here with its size, the independent reference it was measured against, the materials it affects, and an
 interim modeling guideline. Nothing here is worked on during step 3; a later engine stage (2b) takes this list as its
 input, and the rig's cases become its regression tests.
@@ -10,7 +11,7 @@ input, and the rig's cases become its regression tests.
 Each issue: what happens physically; how it was measured; the size; what it affects in typical rooms; the interim
 guideline; how to reproduce it.
 
-**ISSUE convention in the rig.** A comparison in `tests/catch2_tests/test_acoustic_materials.cpp` that misses because
+**ISSUE convention in the rig.** A comparison in the rig's test files (`tests/catch2_tests/test_acoustic_mat*`) that misses because
 of an engine limit listed here carries a comment `ISSUE <n>:` naming the issue below; it asserts nothing, and the
 measured and the reference values are printed in the case's diagnostics (`QD_DIAG_RAY=1`). Known engine issues
 therefore never make the suite fail; the comments (`grep "ISSUE "`) are the regression list of the engine stage that
@@ -203,6 +204,28 @@ prints the reflection at that cap beside the uncapped one.
   path count grows with the cap.
 - **Interim guideline.** Keep the bounce cap (production runs at 20 to 30 interactions).
 - **Reproduce.** `QD_DIAG_RAY=1 ./build_linux/test_bin "Materials rig - objects*"` (`ISSUE 6:`, the power per call).
+
+### 7. A heavy wall's coincidence: one constant loss factor, a fixed coincidence frequency
+
+- **Construction.** Cast concrete walls 150–203 mm (the `concrete` rows), and any heavy generic solid drawn at another
+  thickness.
+- **Physics.** A concrete wall's coincidence lies near 114 Hz at 150 mm (fc·h 17.1 Hz·m) and moves as 1/h. Above it,
+  measured walls gain about 4.5 dB per octave because their total loss factor falls with frequency (0.04 at 125 Hz to
+  0.007 at 4 kHz, NRC data). The mass-law body has one constant loss factor (`coiQ`), and `coiF` is a fixed column,
+  while the mass term scales with the traced thickness.
+- **Measured** (2026-10-27, the concrete fit, side 3.523 m, against the Litvin pair mass-shifted to 150 and 203 mm,
+  125 Hz–4 kHz): the physical plate (coincidence 114 Hz, η 0.005) misses by up to 8.3 dB, with η 0.02 up to 11.4 dB;
+  `coiF` pinned at 114 Hz and every other knob fitted misses by 1.25 dB with knobs at their bounds and needs about 4000
+  angles; `coiF` free (4.4 kHz) misses by 0.25 dB. The shipped row takes the free fit, so this is no miss of the row.
+- **Side effect.** The fitted mass level (`thk`/`fRef`) stands for 183 kg/m² instead of 342 kg/m² at 150 mm, so mass
+  bonded to the row counts about twice: a 15 mm plaster sheet (19.5 kg/m²) adds 0.22–1.24 dB on one face and
+  0.41–2.33 dB on both (random incidence, octaves 31.5 Hz–8 kHz), against 0.48 / 0.94 dB from the mass law (scratch
+  probe, exact against the bonded plate to 2.3e-6 dB).
+- **Affects.** Heavy walls outside their fitted range; plaster and finishes bonded to concrete (within the ±1 dB class
+  tolerance at the measured sizes).
+- **Interim guideline.** Use the concrete rows within 150–203 mm; read added insulation from bonded plaster or finishes
+  on concrete as an upper bound.
+- **Reproduce.** `QD_DIAG_RAY=1 ./build_linux/test_bin "Material - concrete"` (the row against the Litvin pair).
 
 ## Modeling guidelines collected in step 3
 

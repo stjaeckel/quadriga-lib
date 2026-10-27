@@ -13,9 +13,9 @@ transmission loss on each grid with its deviation from the first (the reference)
 
   tools/acoustic/build_band_probe.sh /tmp/band_probe
   python3 -I tools/acoustic/grid_probe.py --probe /tmp/band_probe --csv data/materials_acoustic.csv \\
-      --layer concrete_cast_152mm:sheet --grids 192x6 50x1 192x3
+      --layer concrete_150mm:sheet --grids 192x6 50x1 192x3
   python3 -I tools/acoustic/grid_probe.py --probe /tmp/band_probe --csv rows.csv --layer wool:sheet:0.05 \\
-      --layer concrete_cast_152mm:solid --grids 3072x12 50x1
+      --layer concrete:solid:0.15 --grids 3072x12 50x1
 
 --layer NAME:sheet|solid[:THK]: a row of the CSV (THK in m; the row's thk where omitted). The first grid is the
 reference; 3072x12 converges coincidence ridges of light panels (about 13 s per row on one thread in C++).
