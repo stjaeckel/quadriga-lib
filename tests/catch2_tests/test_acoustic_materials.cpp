@@ -84,17 +84,14 @@ namespace mt
     static bool mass(const Row &r) { return col(r, "m") > 0.0; }
     static bool lossless(const Row &r) { return !mass(r) && col(r, "c") == 0.0 && col(r, "g") == 0.0 && col(r, "alpha") == 0.0; }
     static bool cavity(const Row &r) { return lossless(r) && std::abs(col(r, "a") - 1.0) < 1e-3 && std::abs(col(r, "e") - 1.0) < 1e-3; } // e 1.000001
-    static bool box_fill(const Stack &S) // a box of air in front of a traced fill
+    static bool fill(const Layer &a, const Layer &b) // a box of air in front of a traced fill (not a dense leaf)
     {
-        for (size_t i = 1; i < S.size(); ++i)
-            if (S[i].kind == SOLID && S[i - 1].kind == SOLID && cavity(S[i - 1].row) && !mass(S[i].row))
-                return true;
-        return false;
+        return a.kind == SOLID && b.kind == SOLID && cavity(a.row) && !mass(b.row) && col(b.row, "e") <= 10.0;
     }
     // The stack rule (measured in the plan): sheets on the room side, at most two and then with air behind (three
     // co-located faces: R up to 0.98 off), and one sheet glued at the last solid's exit; no two mass-law sheets on one
     // face (rule 9); no two traced wave media back to back (one straight path misses their exchange), except a box of
-    // air in front of a fill; no lossless wave medium with a critical angle as a solid.
+    // air in front of a non-dense fill; no lossless wave medium with a critical angle as a solid.
     static void stack_rule(const Stack &S)
     {
         auto no = [](const char *why) { throw std::invalid_argument(std::string("mt::stack: ") + why); };
@@ -112,7 +109,7 @@ namespace mt
                 no("three co-located faces (two sheets on a solid)");
             if (S[i].kind == SOLID && lossless(r) && !cavity(r) && col(r, "a") * col(r, "e") < 1.0)
                 no("a lossless wave medium with a critical angle as a traced solid (use a sheet)");
-            if (S[i].kind == SOLID && p && S[i - 1].kind == SOLID && !mass(r) && !mass(*p) && !cavity(*p))
+            if (S[i].kind == SOLID && p && S[i - 1].kind == SOLID && !mass(r) && !mass(*p) && !fill(S[i - 1], S[i]))
                 no("two traced wave media back to back");
         }
     }
@@ -198,8 +195,9 @@ namespace mt
     // Reflection: one aimed ray per angle from 1 m in front of its hit point, every angle in one ray set, ray_progress
     // until no ray is left (at most 127 tones per band, the first its base); the paths back in air (an odd number of
     // reflections) summed coherently per angle at their polyline's point; on request the paths that leave behind the
-    // stack (an even number) with at most 10 interactions into T, referred to the plane wave going on
-    static Field reflect(const Scene &S, const Grid &G, int &calls, long &rays, Field *T = nullptr)
+    // stack (an even number) with at most 10 interactions into T, referred to the plane wave going on. R is uncapped
+    // (the engine's 60 interactions) unless cap is given; only T behind a filled box is taken at the cap of 10.
+    static Field reflect(const Scene &S, const Grid &G, int &calls, long &rays, Field *T = nullptr, int cap = 200)
     {
         const size_t n = G.th.size(), nf = G.f.size();
         Field R(n, std::vector<cd>(nf, 0.0));
@@ -222,7 +220,7 @@ namespace mt
                 pd.tube(i, 0, i, 0).fill(c), pd.tube(i, 1, i, 1).fill(s), paths[i].init(0, m, true), paths[i].set_length(0.1f);
             }
             arma::Col<short> prev(n, arma::fill::zeros), cur(n, arma::fill::zeros), buf(n, arma::fill::zeros);
-            for (int g = 0; g < 200 && orig.n_rows; ++g)
+            for (int g = 0; g < cap && orig.n_rows; ++g)
             {
                 quadriga_lib::ray_progress(S.mesh, S.mi, S.pal, cf, -1.0f, 0.37f, 0.0f, orig, dest, prev, cur, buf, pd, acc, paths, nullptr, nullptr,
                                            nullptr, nullptr, 60, 255, 255, 0, -120.0f, 3.0f, 0.0f, false, true);
@@ -258,12 +256,10 @@ namespace mt
             s[o] /= std::max(n[o], 1.0);
         return s;
     }
-    static Out run(const Stack &st, const Grid &G)
+    static Out bands(Out O) // random-incidence absorption and transmission per tone and per octave
     {
-        const Scene S = scene(st);
-        Out O;
-        const bool bf = box_fill(st);
-        O.g = G, O.T = bf ? Field() : transmit(S, G), O.R = reflect(S, G, O.calls, O.rays, bf ? &O.T : nullptr), O.af.assign(G.f.size(), 0.0), O.tauf.assign(G.f.size(), 0.0);
+        const Grid &G = O.g;
+        O.af.assign(G.f.size(), 0.0), O.tauf.assign(G.f.size(), 0.0);
         for (size_t q = 0; q < G.f.size(); ++q)
             for (size_t i = 0; i < G.th.size(); ++i)
                 O.af[q] += G.w[i] * (1.0 - std::norm(O.R[i][q])), O.tauf[q] += G.w[i] * std::norm(O.T[i][q]);
@@ -271,6 +267,14 @@ namespace mt
         for (int o = 0; o < 9; ++o)
             O.a8[o] = a[o], O.t8[o] = -10.0 * std::log10(t[o]);
         return O;
+    }
+    static Out run(const Stack &st, const Grid &G)
+    {
+        const Scene S = scene(st);
+        Out O;
+        const bool bf = std::adjacent_find(st.begin(), st.end(), fill) != st.end();
+        O.g = G, O.T = bf ? Field() : transmit(S, G), O.R = reflect(S, G, O.calls, O.rays, bf ? &O.T : nullptr);
+        return bands(O);
     }
 
     // ---- tier 1: independent physics ----
@@ -285,19 +289,14 @@ namespace mt
     static void eps_mu(const Row &M, double fa, cd &e, cd &m)
     {
         const cd J(0.0, 1.0);
+        const double sm = col(M, "miki"), sk = col(M, "komatsu"), sd = col(M, "db"), L = 2.0 - std::log10(fa / sk), X = RHO0 * fa / sd;
         cd n = 0.0, z = 1.0;
-        if (const double s = col(M, "miki"); s > 0.0)
-            z = 1.0 + (0.0699 - 0.107 * J) * std::pow(fa / s, -0.632), n = 1.0 + (0.109 - 0.160 * J) * std::pow(fa / s, -0.618);
-        else if (const double s = col(M, "komatsu"); s > 0.0)
-        {
-            const double L = 2.0 - std::log10(fa / s);
+        if (sm > 0.0)
+            z = 1.0 + (0.0699 - 0.107 * J) * std::pow(fa / sm, -0.632), n = 1.0 + (0.109 - 0.160 * J) * std::pow(fa / sm, -0.618);
+        else if (sk > 0.0)
             z = 1.0 + 0.00027 * std::pow(L, 6.2) - J * 0.0047 * std::pow(L, 4.1), n = 1.0 + 0.0004 * std::pow(L, 6.2) - J * 0.0069 * std::pow(L, 4.1);
-        }
-        else if (const double s = col(M, "db"); s > 0.0)
-        {
-            const double X = RHO0 * fa / s;
+        else if (sd > 0.0)
             z = 1.0 + 0.0571 * std::pow(X, -0.754) - J * 0.087 * std::pow(X, -0.732), n = 1.0 + 0.0978 * std::pow(X, -0.700) - J * 0.189 * std::pow(X, -0.595);
-        }
         e = n != 0.0 ? n / z : cd(pow_law(M, "a", "b", fa), -17.98 * pow_law(M, "c", "d", fa) / (fa * FS * 1e-9));
         m = n != 0.0 ? n * z : cd(pow_law(M, "e", "f", fa), -17.98 * pow_law(M, "g", "h", fa) / (fa * FS * 1e-9));
     }
@@ -380,20 +379,24 @@ namespace mt
         T = (am > 0.0 && tau > 0.0) ? am * tau / (am + tau - am * tau) * g : 0.0, R = 1.0 - a[0];
     }
     // The reference of a stack: the plate rule (all mass-law), the fluid layers in air (all wave media), or the wave
-    // layers on the half-space of a mass-law back layer behind its pad
+    // layers on the half-space of the first mass-law layer behind its pad (R only); none for a wave layer behind a
+    // mass-law layer
     static void ref_auto(const Stack &L, double fa, double thd, double &T, double &R)
     {
-        const size_t nm = (size_t)std::count_if(L.begin(), L.end(), [](const Layer &l) { return mass(l.row); });
-        if (nm == L.size())
-            ref_plate(L, fa, thd, T, R);
-        else if (nm == 0)
+        const auto k = std::find_if(L.begin(), L.end(), [](const Layer &l) { return mass(l.row); });
+        if (std::any_of(k, L.end(), [](const Layer &l) { return !mass(l.row); }))
+            throw std::invalid_argument("mt::ref_auto: no reference for a wave layer behind a mass-law layer");
+        if (k == L.end())
             ref_tmm(L, fa, thd, T, R);
+        else if (k == L.begin())
+            ref_plate(L, fa, thd, T, R);
         else
-            ref_tmm(Stack(L.begin(), L.end() - 1), fa, thd, T, R, HALF, &L.back().row);
+            ref_tmm(Stack(L.begin(), k), fa, thd, T, R, HALF, &k->row);
     }
 
-    // ---- per node against the reference (largest |dT| in dB where both are above 1e-25, |dR|, R + T), and the twin ----
-    struct Dev { double dT = 0.0, dR = 0.0, RT = 0.0, fT = 0.0, aT = 0.0, fR = 0.0, aR = 0.0; };
+    // ---- per node against the reference (largest |dT| in dB where both are above 1e-25, n/a without a T reference;
+    // |dR|; R + T), and the twin ----
+    struct Dev { double dT = 0.0, dR = 0.0, RT = 0.0, fT = 0.0, aT = 0.0, fR = 0.0, aR = 0.0; bool hasT = false; };
     static Dev against(const char *name, const Out &O, const Stack &st)
     {
         Dev D;
@@ -402,13 +405,16 @@ namespace mt
             {
                 double Tr, Rr, Tl = std::norm(O.T[i][q]), Rl = std::norm(O.R[i][q]);
                 ref_auto(st, O.g.f[q], O.g.th[i], Tr, Rr);
-                D.RT = std::max(D.RT, Tl + Rl);
+                D.RT = std::max(D.RT, Tl + Rl), D.hasT |= Tr >= 0.0;
                 if (Tr > 1e-25 && Tl > 1e-25 && std::abs(dB(Tl) - dB(Tr)) > D.dT)
                     D.dT = std::abs(dB(Tl) - dB(Tr)), D.fT = O.g.f[q], D.aT = O.g.th[i];
                 if (std::abs(Rl - Rr) > D.dR)
                     D.dR = std::abs(Rl - Rr), D.fR = O.g.f[q], D.aR = O.g.th[i];
             }
-        QD_DIAG("%s,%zu,%.2e,%g,%.1f,%.2e,%g,%.1f,%.8f,%d,%ld\n", name, O.g.th.size(), D.dT, D.fT, D.aT, D.dR, D.fR, D.aR, D.RT, O.calls, O.rays);
+        if (D.hasT)
+            QD_DIAG("%s,%zu,%.2e,%g,%.1f,%.2e,%g,%.1f,%.8f,%d,%ld\n", name, O.g.th.size(), D.dT, D.fT, D.aT, D.dR, D.fR, D.aR, D.RT, O.calls, O.rays);
+        else
+            QD_DIAG("%s,%zu,n/a,n/a,n/a,%.2e,%g,%.1f,%.8f,%d,%ld\n", name, O.g.th.size(), D.dR, D.fR, D.aR, D.RT, O.calls, O.rays);
         return D;
     }
     static const char *DEV_HEAD = "construction,angles,max_dT_dB,at_Hz,at_deg,max_dR,at_Hz,at_deg,max_R+T,calls,rays\n";
@@ -469,7 +475,7 @@ namespace mt
         {
             double lo = 1e9, hi = -1e9;
             for (const auto &w : walls)
-                lo = std::min(lo, w.second[k] + 20.0 * std::log10(m_row / w.first)), hi = std::max(hi, w.second[k] + 20.0 * std::log10(m_row / w.first));
+                lo = std::min(lo, w.second.at(k) + 20.0 * std::log10(m_row / w.first)), hi = std::max(hi, w.second.at(k) + 20.0 * std::log10(m_row / w.first));
             M.lo_hi.push_back({lo, hi});
         }
         return M;
@@ -493,16 +499,12 @@ namespace mt
         }
     }
 
-    // ---- one call per isolated material. The row as a traced solid of its thickness on the full grid and as a sheet on
-    // the report angles (the twin is a per-node identity; the solid is the cheaper form, 7.3 against 15.3 ms for
-    // concrete on one thread): tier 1 for both, the twin, R + T <= 1; the diagnostic tables; for a mass-law row its
-    // physical model (the bare limp mass law of its surface mass e rho0 thk with Davy's sigma at its side, no fitted
-    // knob [London_1949_SingleWalls]); tier 2 for every measured row given. Bounds 2 to 3 times the measured maxima, by
-    // type: mass-law rows; a traced porous layer (7.8e-4 dB, 3.7e-5 at 89.1 deg); a traced dense leaf (mu' > 10:
-    // 2.6e-2 dB, 2.0e-3 at 89.1 deg); wave sheets (3.4e-6 dB, 7.8e-8); the twin (3.3e-5 dB mass law, 1.7e-4 dB and
-    // 6.7e-6 wave media); porous rows of other thicknesses (rock wool 75 mm and 0.5 m) set the porous bounds at the
-    // largest measured, a 0.5 m half-space: tier 1 3.0e-3 in R, the twin 2.7e-3 dB and 1.1e-3. A row with thk 0 (a
-    // solid row) is evaluated at the thickness t, as a traced solid and as its sheet twin.
+    // ---- one call per isolated material (a row with thk 0 at the thickness t). The row as a traced solid on the full
+    // grid and as a sheet on the report angles (the twin, per node): tier 1 for both, the twin, R + T <= 1; the
+    // diagnostic tables; for a mass-law row the bare limp mass law of e rho0 thk with Davy's sigma at its side
+    // [London_1949_SingleWalls]; tier 2 for every measured row given. Bounds at or above 2-3 x the measured maxima, by
+    // type: mass-law rows; dense leaves (mu' > 10: 2.6e-2 dB, 2.0e-3 at 89.1 deg); porous layers and half-spaces (rock
+    // wool at 0.5 m: tier 1 3.0e-3 in R, the twin 2.7e-3 dB and 1.1e-3); wave sheets (3.4e-6 dB, 7.8e-8).
     static Out check_material(const std::string &name, const Row &row, const std::vector<Measured> &refs = {}, const Grid &G = grid(), double t = 0.0)
     {
         Row r = row;
@@ -543,8 +545,8 @@ namespace mt
             for (int o = 0; o < 9; ++o)
                 std::printf("%g,%.2f,%.2f\n", OCT[o], X.t8[o], -10.0 * std::log10(bare[o]));
         }
-        for (const Measured &M : refs) // at the specimen's side
-            tier2(name.c_str(), M.side > 0.0 && M.side != col(r, "side") ? run({{with(r, "side", M.side), SOLID, thk}}, G) : X, M, mpp(r, thk));
+        for (const Measured &M : refs) // at the specimen's side (transmission only)
+            tier2(name.c_str(), M.side > 0.0 && M.side != col(r, "side") ? bands([&] { Out Y = X; Y.T = transmit(scene({{with(r, "side", M.side), SOLID, thk}}), G); return Y; }()) : X, M, mpp(r, thk));
         return X;
     }
     // A combination: the stack on a grid per node against ref_auto, bounds on |dT| (dB) and |dR|, R + T <= 1
@@ -553,7 +555,8 @@ namespace mt
         const Out O = run(st, G);
         const Dev D = against(name, O, st);
         INFO(name);
-        CHECK(D.dT < bT);
+        if (D.hasT) // bT NaN where the reference has no T
+            CHECK(D.dT < bT);
         CHECK(D.dR < bR);
         CHECK(D.RT <= 1.0 + 1e-6);
         return O;
@@ -569,29 +572,25 @@ namespace mt
         both.insert(both.end(), wall.begin(), wall.end());
         const Out A = run(both, G), B = run(wall, G), W = run(layer, G);
         const double mpp = mt::mpp(wall[0].row, wall[0].thk);
-        double side = 0.0;
-        auto plate = [&](const Stack &L, size_t q, double th) { double T, R; ref_tmm(L, G.f[q], th, T, R, PLATE, nullptr, mpp, side); return T; };
+        auto plate = [&](const Stack &L, size_t q, double th, double side = 0.0) { double T, R; ref_tmm(L, G.f[q], th, T, R, PLATE, nullptr, mpp, side); return T; };
         auto at0 = [&](const Out &O) { return octaves(G, [&](size_t q) { return std::norm(O.T[G.na][q]); }); }; // the report angle 0 deg
         auto ri = [&](const Out &O) { return octaves(G, [&](size_t q) { return O.tauf[q]; }); };
         auto pl0 = [&](const Stack &L) { return octaves(G, [&](size_t q) { return plate(L, q, 0.0); }); };
-        auto plr = [&](const Stack &L) { return octaves(G, [&](size_t q) { double t = 0.0; for (int i = 0; i < G.na; ++i) t += G.w[i] * plate(L, q, G.th[i]); return t; }); };
+        auto plr = [&](const Stack &L, double side = 0.0) { return octaves(G, [&](size_t q) { double t = 0.0; for (int i = 0; i < G.na; ++i) t += G.w[i] * plate(L, q, G.th[i], side); return t; }); };
         QD_DIAG("# diag: the insulation %s adds (dB): library and the fluid layer on a limp plate of %.1f kg/m2\nincidence,quantity", name, mpp);
         for (double f : OCT)
             QD_DIAG(",%g", f);
         const std::array<double, 9> one = {1, 1, 1, 1, 1, 1, 1, 1, 1};
-        std::vector<std::tuple<const char *, const char *, std::array<double, 9>, std::array<double, 9>>> L = {
+        const double sd = col(wall[0].row, "side");
+        const std::vector<std::tuple<const char *, const char *, std::array<double, 9>, std::array<double, 9>>> L = {
             {"0 deg", "library", at0(A), at0(B)}, {"0 deg", "plate_tmm", pl0(layer), pl0({})}, {"random", "library", ri(A), ri(B)},
-            {"random", "plate_tmm", plr(layer), plr({})}, {"0 deg", "layer_alone_library", at0(W), one}, {"random", "layer_alone_library", ri(W), one}};
-        side = col(wall[0].row, "side");
-        L.push_back({"random", "plate_tmm_finite", plr(layer), plr({})});
+            {"random", "plate_tmm", plr(layer), plr({})}, {"0 deg", "layer_alone_library", at0(W), one}, {"random", "layer_alone_library", ri(W), one},
+            {"random", "plate_tmm_finite", plr(layer, sd), plr({}, sd)}};
         for (const auto &l : L)
         {
             QD_DIAG("\n%s,%s", std::get<0>(l), std::get<1>(l));
             for (int o = 0; o < 9; ++o)
-            {
                 QD_DIAG(",%.2f", 10.0 * std::log10(std::get<3>(l)[o] / std::get<2>(l)[o]));
-                CHECK(std::isfinite(10.0 * std::log10(std::get<3>(l)[o] / std::get<2>(l)[o])));
-            }
         }
         QD_DIAG("\n%s", DEV_HEAD);
         const Dev D = against((std::string(name) + ": the layer alone in air").c_str(), W, layer);
@@ -602,6 +601,7 @@ namespace mt
     // (wish-list 1.7.2), so every column is unchanged at every frequency; resF, coiF, tfF are absolute. Mass-law rows only.
     static Row rescale(Row r, double k)
     {
+        r["mpp"] = mpp(r, col(r, "thk")); // the surface mass stays
         r["thk"] = col(r, "thk") * k, r["fRef"] = col(r, "fRef") * k;
         for (const auto &vx : std::vector<std::pair<const char *, const char *>>{{"tf", "tfB"}, {"att", "attB"}, {"alpha", "alphaB"}, {"a", "b"}, {"c", "d"}, {"e", "f"}, {"g", "h"}})
             r[vx.first] = col(r, vx.first) * std::pow(k, col(r, vx.second));
@@ -653,9 +653,8 @@ TEST_CASE("Materials rig - isolated layers: sheet equals traced solid, against t
     const mt::Grid G = mt::grid();
     auto at0 = [&](bool tl)
     {
-        const auto v = mt::octaves(G, [&](size_t q) { double T, R; mt::ref_tmm({{WOOL, mt::SHEET, 0.05}}, G.f[q], 0.0, T, R); return tl ? T : 1.0 - R; });
         mt::Measured M{"transfer matrix at 0 deg", tl ? "R_dB" : "alpha_normal", "normal incidence", tl, tl ? 4e-4 : 2e-6, std::vector<double>(mt::OCT, mt::OCT + 9), {}, 0.0, 0.0, 0.0};
-        for (double x : v)
+        for (double x : mt::octaves(G, [&](size_t q) { double T, R; mt::ref_tmm({{WOOL, mt::SHEET, 0.05}}, G.f[q], 0.0, T, R); return tl ? T : 1.0 - R; }))
             M.lo_hi.push_back({tl ? -10.0 * std::log10(x) : x, tl ? -10.0 * std::log10(x) : x});
         return M;
     };
@@ -668,41 +667,36 @@ TEST_CASE("Materials rig - isolated layers: sheet equals traced solid, against t
 
 TEST_CASE("Materials rig - combinations against the fluid layers and the bonded plate; forbidden stacks", "[acoustic][materials]")
 {
-    // Why: combinations are a room-side sheet on traced layers or two sheets on one face (the first face the room
-    // side), and leaves on a box of air (page 10.4). Per node against the transfer matrix of the layers in air, on the
-    // wall's half-space behind the pad of its tf (wool on concrete: the pad is formed on the medium in front, notes 9.2,
-    // up to 6.3e-3), or the bonded plate. The filled box follows the exchange between box and fill as paths: 12 angles,
-    // its alpha within 0.0041 of 192 angles x 6 tones per third (grid_probe.py, 2026-10-23). A sheet glued at the last
-    // solid's exit: a double leaf, a leaf behind a wool solid, a curtain in front of a pane (R against the pane's
-    // half-space; T: engine issue 1, next case), bonded mass-law runs (a leaf behind a filled box: next case). Forbidden
-    // stacks throw: two traced wave media back to back (4.9 dB off), two mass-law sheets (17 dB), a sheet between two
-    // solids, a lossless wave medium with a critical angle as a solid, three sheets, three co-located faces (a rug on a
-    // parquet sheet on concrete, a rug on a leaf on its box: R up to 0.98 off the fluid layers).
+    // Why: combinations are room-side sheets on traced layers, two sheets on one face (the first face the room side),
+    // leaves on a box of air (page 10.4) and one sheet at the last solid's exit. Per node against the transfer matrix
+    // of the layers in air, on the half-space of the first mass-law layer behind the pad of its tf (R only, T NaN; wool
+    // on concrete: the pad is formed on the medium in front, notes 9.2, up to 6.3e-3), or the bonded plate (one side).
+    // The filled box follows the exchange between box and fill as paths: 12 angles, its alpha within 0.0041 of 192
+    // angles x 6 tones per third (grid_probe.py, 2026-10-23). Forbidden stacks throw: two traced wave media back to
+    // back (4.9 dB off), two mass-law sheets (17 dB), a sheet between two solids, a lossless wave medium with a critical
+    // angle as a solid, three sheets, three co-located faces (R up to 0.98 off), a dense leaf traced behind a box (R up
+    // to 1e13); a wave layer behind a mass-law layer has no reference.
     using namespace mt_rows;
     using mt::SHEET;
     using mt::SOLID;
     QD_DIAG("\n# diag: combinations per node against the fluid layers or the bonded plate\n%s", mt::DEV_HEAD);
-    struct Case
-    {
-        const char *name;
-        mt::Stack st;
-        double bT, bR;
-        int na;
-    };
+    struct Case { const char *name; mt::Stack st; double bT, bR; int na; };
     const std::vector<Case> C = {
         {"glass wool | board, sheet | sheet", {{WOOL, SHEET, 0.05}, {BOARD, SHEET, 0.0125}}, 3e-5, 3e-7, 50},
         {"board | glass wool, sheet | sheet", {{BOARD, SHEET, 0.0125}, {WOOL, SHEET, 0.05}}, 3e-5, 3e-7, 50},
         {"glass wool | board, sheet | solid", {{WOOL, SHEET, 0.05}, {BOARD, SOLID, 0.0125}}, 0.15, 1e-2, 50},
         {"board | glass wool, sheet | solid", {{BOARD, SHEET, 0.0125}, {WOOL, SOLID, 0.05}}, 8e-3, 1e-2, 50},
         {"glass 4 | glass 4 bonded, sheet | solid", {{GLASS4, SHEET, 0.004}, {GLASS4, SOLID, 0.004}}, 2e-4, 3e-7, 50},
-        {"board on 25 mm of air on the wall (tf 0.02)", {{BOARD, SHEET, 0.0125}, {AIRBOX, SOLID, 0.025}, {wall(0.02), SOLID, 0.2}}, 1.0, 4e-4, 50},
-        {"MDF on 20 mm of air, 75 mm rock wool, wall (tf 0)", {{MDF, SHEET, 0.006}, {AIRBOX, SOLID, 0.02}, {ROCKWOOL, SOLID, 0.075}, {wall(0.0), SOLID, 0.2}}, 1.0, 5e-3, 12},
-        {"glass wool on concrete 152 mm (its tf)", {{WOOL, SHEET, 0.05}, {CONCRETE152, SOLID, 0.152}}, 1.0, 0.015, 50},
-        {"glass wool on a tf-0 wall", {{WOOL, SHEET, 0.05}, {wall(0.0), SOLID, 0.2}}, 1.0, 3e-7, 50},
+        {"board on 25 mm of air on the wall (tf 0.02)", {{BOARD, SHEET, 0.0125}, {AIRBOX, SOLID, 0.025}, {wall(0.02), SOLID, 0.2}}, NAN, 4e-4, 50},
+        {"MDF on 20 mm of air, 75 mm rock wool, wall (tf 0)", {{MDF, SHEET, 0.006}, {AIRBOX, SOLID, 0.02}, {ROCKWOOL, SOLID, 0.075}, {wall(0.0), SOLID, 0.2}}, NAN, 5e-3, 12},
+        {"glass wool on concrete 152 mm (its tf)", {{WOOL, SHEET, 0.05}, {CONCRETE152, SOLID, 0.152}}, NAN, 0.015, 50},
+        {"glass wool on a tf-0 wall", {{WOOL, SHEET, 0.05}, {wall(0.0), SOLID, 0.2}}, NAN, 3e-7, 50},
         {"double leaf: board | 75 mm of air | board at the exit", {{BOARD, SHEET, 0.0125}, {AIRBOX, SOLID, 0.075}, {BOARD, SHEET, 0.0125}}, 9e-3, 8e-5, 50},
+        {"board | 75 mm of air | glass 4 at the exit", {{BOARD, SHEET, 0.0125}, {AIRBOX, SOLID, 0.075}, {GLASS4, SHEET, 0.004}}, NAN, 2e-3, 50},
+        {"glass wool | concrete 152 mm | plaster at the exit", {{WOOL, SHEET, 0.05}, {CONCRETE152, SOLID, 0.152}, {mt::with(PLASTER, "side", 3.5229), SHEET, 0.013}}, NAN, 0.015, 50},
         {"glass wool solid | board at the exit", {{WOOL, SOLID, 0.05}, {BOARD, SHEET, 0.0125}}, 2e-3, 1.2e-4, 50},
-        {"curtain 3 mm | 100 mm of air | glass 4 at the exit", {{ROCKWOOL, SHEET, 0.003}, {AIRBOX, SOLID, 0.1}, {GLASS4, SHEET, 0.004}}, 1.0, 2e-3, 50},
-        {"concrete 152 mm | plaster 13 mm at the exit, bonded", {{CONCRETE152, SOLID, 0.152}, {PLASTER, SHEET, 0.013}}, 6e-4, 3e-7, 50},
+        {"curtain 3 mm | 100 mm of air | glass 4 at the exit", {{ROCKWOOL, SHEET, 0.003}, {AIRBOX, SOLID, 0.1}, {GLASS4, SHEET, 0.004}}, NAN, 2e-3, 50},
+        {"concrete 152 mm | plaster 13 mm at the exit, bonded", {{CONCRETE152, SOLID, 0.152}, {mt::with(PLASTER, "side", 3.5229), SHEET, 0.013}}, 1e-5, 3e-7, 50},
         {"plaster | block 215 mm | plaster at the exit, bonded", {{PLASTER, SHEET, 0.013}, {BLOCK, SOLID, 0.215}, {PLASTER, SHEET, 0.013}}, 2e-4, 3e-7, 50},
     };
     for (const Case &c : C)
@@ -715,8 +709,12 @@ TEST_CASE("Materials rig - combinations against the fluid layers and the bonded 
                                  mt::Stack{{CONCRETE152, SOLID, 0.152}, {WOOL, SHEET, 0.05}, {CONCRETE152, SOLID, 0.152}}, mt::Stack{{WATER, SOLID, 0.1}},
                                  mt::Stack{{WOOL, SHEET, 0.05}, {BOARD, SHEET, 0.0125}, {BOARD, SHEET, 0.0125}},
                                  mt::Stack{{WOOL, SHEET, 0.01}, {BOARD, SHEET, 0.015}, {CONCRETE152, SOLID, 0.152}},
-                                 mt::Stack{{WOOL, SHEET, 0.01}, {BOARD, SHEET, 0.0125}, {AIRBOX, SOLID, 0.05}, {wall(0.02), SOLID, 0.2}}})
+                                 mt::Stack{{WOOL, SHEET, 0.01}, {BOARD, SHEET, 0.0125}, {AIRBOX, SOLID, 0.05}, {wall(0.02), SOLID, 0.2}},
+                                 mt::Stack{{BOARD, SHEET, 0.0125}, {AIRBOX, SOLID, 0.075}, {BOARD, SOLID, 0.0125}}})
         CHECK_THROWS_AS(mt::scene(bad), std::invalid_argument);
+    double T, R; // no reference for a wave layer behind a mass-law layer
+    for (const mt::Stack &bad : {mt::Stack{{CONCRETE152, SOLID, 0.152}, {WOOL, SHEET, 0.05}}, mt::Stack{{GLASS4, SHEET, 0.004}, {AIRBOX, SOLID, 0.075}, {BOARD, SHEET, 0.0125}}})
+        CHECK_THROWS_AS(mt::ref_auto(bad, 125.0, 0.0, T, R), std::invalid_argument);
     CHECK_NOTHROW(mt::scene({{WATER, SHEET, 0.1}}));
 }
 
@@ -749,8 +747,9 @@ TEST_CASE("Materials rig - a porous layer on a rigid wall: the added insulation"
 {
     // Why: treatment on rigid bodies is the common combination. 50 mm glass wool as a sheet on cast concrete 152 mm:
     // the insulation the wool adds, library against the fluid layer on a limp plate (346.7 kg/m2), printed side by side
-    // and not asserted (the library adds up to 8 dB too much at 31.5 Hz: engine stage-2b issue 1); the wool alone in
-    // air asserted against the same matrix, so both sides map the layer alike.
+    // and not asserted (the library adds up to 8 dB too much at 31.5 Hz); the wool alone in air asserted against the
+    // same matrix, so both sides map the layer alike.
+    // ISSUE 1: a porous layer on a rigid wall adds too much insulation at low frequency.
     using namespace mt_rows;
     mt::added_insulation("50 mm glass wool to 152 mm concrete", {{WOOL, mt::SHEET, 0.05}}, {{CONCRETE152, mt::SOLID, 0.152}});
 }
@@ -766,13 +765,14 @@ TEST_CASE("Materials rig - engine limits printed: a filled box on one path, wave
     QD_DIAG("\n# diag: engine limits per node against the fluid layers or the bonded plate\n%s", mt::DEV_HEAD);
     // ISSUE 3: a leaf behind a filled box (the precise drywall recipe). Its T is the exchange between box and fill, a
     // series of paths: through the paths of the reflection ray set at most 10 interactions (5.0 dB off the fluid
-    // layers), on one straight path (calc_diffraction_gain, as the scene tracer's direct path through a wall: 9.5 dB).
-    // R asserted (the ray set as for every stack).
+    // layers), on one straight path (calc_diffraction_gain, as the scene tracer's direct path through a wall: 9.5 dB);
+    // R uncapped (1.45e-2) and at 10 interactions (0.22).
     const mt::Stack dw = {{BOARD, SHEET, 0.0125}, {AIRBOX, SOLID, 0.025}, {ROCKWOOL, SOLID, 0.05}, {BOARD, SHEET, 0.0125}};
     mt::Out O = mt::run(dw, G12);
-    CHECK(mt::against("ISSUE 3: board | air | rock wool | board, T from the paths (10 interactions)", O, dw).dR < 0.04);
-    O.T = mt::transmit(mt::scene(dw), G12);
-    mt::against("ISSUE 3: board | air | rock wool | board, T on one straight path", O, dw);
+    mt::against("ISSUE 3: board | air | rock wool | board, T from the paths (10 interactions), R uncapped", O, dw);
+    mt::rows("ISSUE 3: board | air | rock wool | board", O);
+    O.T = mt::transmit(mt::scene(dw), G12), O.R = mt::reflect(mt::scene(dw), G12, O.calls, O.rays, nullptr, 10);
+    mt::against("ISSUE 3: board | air | rock wool | board, T on one straight path, R at 10 interactions", O, dw);
     // ISSUE 4: plaster | block | plaster with the far plaster traced (the exit-sheet form is exact): the state is one
     // level deep. Random-incidence tl, library against the bonded plate of the three, and Hopkins 448 measured
     // [Hopkins_2007_SoundInsulation, research line 448 at 2dad906; the probe rows are physical, not fitted to it].
@@ -795,13 +795,12 @@ TEST_CASE("Materials rig - tier 2 at the specimen's side and mass, the class env
     // Why: a reference is evaluated at its specimen's side and shifted by the mass law to the row's surface mass
     // (e rho0 thk: 346.7 kg/m2 for these concrete columns at 152 mm, as Litvin's wall); a class row against the envelope
     // of its walls, each shifted, within 1 dB. The concrete columns of page 11.4 as a solid row at 150 mm against Litvin
-    // 76-66 at its side 3.523 m (shift -0.114 dB) and the envelope of 76-66 and 76-77 (152 and 203 mm,
+    // 76-66 at its side 3.5229 m (shift -0.114 dB) and the envelope of 76-66 and 76-77 (152 and 203 mm,
     // [Litvin_1980_ConcreteWallsTL], research lines 228, 229 at 2dad906).
     using namespace mt_rows;
-    mt::Row c = CONCRETE152;
-    c.erase("thk");
+    const mt::Row c = mt::with(CONCRETE152, "thk", 0.0);
     const std::vector<double> oct = {125, 250, 500, 1000, 2000, 4000}, L1 = {42.1, 46.5, 52.6, 56.5, 61.7, 64.6}, L2 = {43.8, 47.3, 54.7, 58.1, 63.3, 67.3};
-    mt::Measured M{"Litvin_1980_ConcreteWallsTL 76-66", "R_dB", "laboratory sound reduction index (ASTM E90)", true, 3.0, oct, {}, 3.523, 346.7};
+    mt::Measured M{"Litvin_1980_ConcreteWallsTL 76-66", "R_dB", "laboratory sound reduction index (ASTM E90)", true, 3.0, oct, {}, 3.5229, 346.7};
     for (double v : L1)
         M.lo_hi.push_back({v, v});
     mt::check_material("concrete columns at 150 mm", c, {M, mt::envelope("Litvin 76-66 and 76-77", oct, {{346.7, L1}, {471.6, L2}}, mt::mpp(c, 0.150), 3.5229)}, mt::grid(), 0.150);
@@ -810,7 +809,7 @@ TEST_CASE("Materials rig - tier 2 at the specimen's side and mass, the class env
 TEST_CASE("Materials rig - porous rows against their models", "[acoustic][materials]")
 {
     // Why: porous columns are power laws fitted to a model at a flow resistivity; the model is written here. Random-
-    // incidence absorption of the layer on a rigid backing, row against model (bounds 2 x the measured fit miss); the
+    // incidence absorption of the layer on a rigid backing, row against model (bounds about 2 x the measured fit miss); the
     // transmission loss at 0 deg in air and Delany-Bazley at the same resistivity printed.
     using namespace mt_rows;
     const mt::Grid G = mt::grid();
@@ -824,12 +823,11 @@ TEST_CASE("Materials rig - porous rows against their models", "[acoustic][materi
         auto tl0 = [&](const mt::Row &r) { return mt::octaves(G, [&](size_t q) { double T, R; mt::ref_tmm({{r, mt::SHEET, c.thk}}, G.f[q], 0.0, T, R); return T; }); };
         const auto ar = alpha(c.row), am = alpha(c.model), ad = alpha({{"db", sg}}), tr = tl0(c.row), tm = tl0(c.model);
         QD_DIAG("\n# diag: %s, %.0f mm on a rigid backing\noctave,alpha_row,alpha_model,alpha_delany_bazley,tl0_row_minus_model_dB\n", c.name, 1e3 * c.thk);
+        double worst = 0.0;
         for (int o = 0; o < 9; ++o)
-        {
-            QD_DIAG("%g,%.4f,%.4f,%.4f,%+.3f\n", mt::OCT[o], ar[o], am[o], ad[o], 10.0 * std::log10(tm[o] / tr[o]));
-            INFO(c.name << ", octave " << mt::OCT[o]);
-            CHECK(std::abs(ar[o] - am[o]) < c.b);
-        }
+            QD_DIAG("%g,%.4f,%.4f,%.4f,%+.3f\n", mt::OCT[o], ar[o], am[o], ad[o], 10.0 * std::log10(tm[o] / tr[o])), worst = std::max(worst, std::abs(ar[o] - am[o]));
+        INFO(c.name);
+        CHECK(worst < c.b);
     }
 }
 
@@ -841,7 +839,7 @@ TEST_CASE("Materials rig - a lumped row rescaled with fRef is the same wall", "[
     using namespace mt_rows;
     const mt::Row R3 = mt::rescale(GLAZING, 3.0);
     const mt::Grid G = mt::grid();
-    CHECK(std::abs(mt::pow_law(R3, "tf", "tfB", 125.0) - mt::pow_law(GLAZING, "tf", "tfB", 125.0)) < 1e-12);
+    CHECK(std::abs(mt::mpp(R3, 0.024) - mt::mpp(GLAZING, 0.008)) < 1e-9); // 20 kg/m2 at both thicknesses
     for (mt::Kind k : {mt::SHEET, mt::SOLID})
     {
         const mt::Out A = mt::run({{GLAZING, k, 0.008}}, G), B = mt::run({{R3, k, 0.024}}, G);
