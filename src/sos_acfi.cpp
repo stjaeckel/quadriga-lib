@@ -61,7 +61,7 @@ void quadriga_lib::sos_acfi(const arma::Col<dtype> &acf,
         val.set_size(d.n_elem);
 
     for (arma::uword i = 0; i < d.n_elem; ++i)
-        val.at(i) = (dtype)qd_sos_acf_interp(acf_d.memptr(), dist_d.memptr(), acf_d.n_elem, (double)d.at(i));
+        val.at(i) = (dtype)qd_interp_linear(acf_d.memptr(), dist_d.memptr(), acf_d.n_elem, (double)d.at(i));
 }
 
 template void quadriga_lib::sos_acfi(const arma::Col<float> &acf, const arma::Col<float> &dist, const arma::Col<float> &d, arma::Col<float> &val);

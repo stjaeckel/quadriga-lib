@@ -14,19 +14,6 @@
 
 namespace
 {
-    // C = A·B for 8x8 matrices, column-major double[64]
-    inline void qd_mul8(const double *A, const double *B, double *C)
-    {
-        for (int j = 0; j < 8; ++j)
-            for (int i = 0; i < 8; ++i)
-            {
-                double s = 0.0;
-                for (int k = 0; k < 8; ++k)
-                    s += A[k * 8 + i] * B[j * 8 + k];
-                C[j * 8 + i] = s;
-            }
-    }
-
     // Principal square root S of a symmetric positive definite 8x8 matrix A (S symmetric positive definite, S·S = A),
     // column-major double[64], by the coupled Newton-Schulz iteration on A / tr(A):
     //   Y = A / s, Z = I;  M = Z·Y, e = ||I - M||_F, T = (3·I - M) / 2, Y = Y·T, Z = T·Z  until e <= 1e-10
@@ -34,6 +21,19 @@ namespace
     // All eigenvalues of A / tr(A) lie in (0, 1), which is the convergence condition of the iteration
     void qd_sqrtm8(const double *A, double *S)
     {
+        // c = a·b for 8x8 matrices, column-major double[64]
+        auto mul8 = [](const double *a, const double *b, double *c)
+        {
+            for (int j = 0; j < 8; ++j)
+                for (int i = 0; i < 8; ++i)
+                {
+                    double s = 0.0;
+                    for (int k = 0; k < 8; ++k)
+                        s += a[k * 8 + i] * b[j * 8 + k];
+                    c[j * 8 + i] = s;
+                }
+        };
+
         double s = 0.0;
         for (int i = 0; i < 8; ++i)
             s += A[i * 9];
@@ -44,7 +44,7 @@ namespace
 
         for (int it = 0; it < 100; ++it)
         {
-            qd_mul8(Z, Y, M);
+            mul8(Z, Y, M);
             double e = 0.0;
             for (int i = 0; i < 64; ++i)
             {
@@ -53,9 +53,9 @@ namespace
                 T[i] = 0.5 * (((i % 9 == 0) ? 3.0 : 0.0) - M[i]);
             }
             e = std::sqrt(e);
-            qd_mul8(Y, T, tmp);
+            mul8(Y, T, tmp);
             std::copy(tmp, tmp + 64, Y);
-            qd_mul8(T, Z, tmp);
+            mul8(T, Z, tmp);
             std::copy(tmp, tmp + 64, Z);
             if (e <= 1e-10)
                 break;
@@ -91,7 +91,8 @@ Large-scale parameters of a set of links from normalized random values
   `mu = P_mu + P_gamma·lg(P_omega + f') + P_epsilon·lg(d) + P_zeta·lg(h) + P_alpha·lg(a)`;
   `s = max(0, P_sigma + P_delta·lg(P_omega + f'))`;
   `sigma = max(0, s + P_kappa·lg(d) + P_tau·lg(h) + P_beta·lg(a))`. The standard deviation is limited at 0 after
-  all terms. SF has no mean keys (mean 0). A frequency term with the coefficient 0 contributes 0
+  all terms. SF has no mean keys (mean 0). A frequency term with the coefficient 0 contributes 0; an active one
+  (`P_gamma` or `P_delta` not 0) requires `P_omega + f' > 0` at every frequency
 - DS with the V/S term of TR 38.901 Table 7.5-6 Part-3 (InF): if `DS_VS > 0`,
   `mu += lg(DS_VS_a·DS_VS + DS_VS_b)`. The InF files set `DS_VS` for the hall of their calibration scenario; a
   caller with another hall sets `DS_VS` (V/S in m) in its copy of `scenpar`
@@ -127,8 +128,9 @@ Large-scale parameters of a set of links from normalized random values
   EoD_offset_c_gamma·lg f' + EoD_offset_c_hUT·hUT)`; if `EoD_offset_hcl > 0` and `hUT < EoD_offset_hcl`:
   `e += (atan((EoD_offset_hcl - h)/d) - atan((hUT - h)/d))·180/pi`
 - Optional outputs that are not requested are not computed. `n_link = 0` gives outputs with 0 rows
-- Validation order: positions, `fc`, `rnd`, `sf_sigma`, `scenpar`, positive definiteness, column 9 of `rnd`;
-  all checks run before any output is written
+- Outputs must not share memory with the inputs or with each other
+- Validation order: positions, `fc`, `rnd`, `sf_sigma`, `scenpar`, positive definiteness, column 9 of `rnd`, the
+  frequency terms; all checks run before any output is written
 
 ## Declaration:
 ```
@@ -198,22 +200,9 @@ void quadriga_lib::lsp_generate(const std::unordered_map<std::string, double> &s
                                 bool clip_spreads)
 {
     // Validation, before any output is touched
-    if (rx_pos.n_cols != 3)
-        throw std::invalid_argument("Input 'rx_pos' must have 3 columns.");
-    if (tx_pos.n_cols != 3)
-        throw std::invalid_argument("Input 'tx_pos' must have 3 columns.");
-    const arma::uword n_link = rx_pos.n_rows;
-    if (tx_pos.n_rows != 1 && tx_pos.n_rows != n_link)
-        throw std::invalid_argument("Number of rows in 'tx_pos' must be 1 or match the number of rows in 'rx_pos'.");
-    if (!rx_pos.is_finite())
-        throw std::invalid_argument("Input 'rx_pos' must be finite.");
-    if (!tx_pos.is_finite())
-        throw std::invalid_argument("Input 'tx_pos' must be finite.");
-    if (fc.n_elem == 0)
-        throw std::invalid_argument("Input 'fc' cannot be empty.");
-    if (!fc.is_finite() || arma::any(fc <= 0.0))
-        throw std::invalid_argument("Input 'fc' must be finite and > 0.");
-    const arma::uword n_freq = fc.n_elem;
+    qd_gbsm_check_links(&tx_pos, &rx_pos);
+    qd_gbsm_check_fc(fc);
+    const arma::uword n_link = rx_pos.n_rows, n_freq = fc.n_elem;
 
     if (rnd.n_rows != n_link || rnd.n_cols != 11)
         throw std::invalid_argument("Input 'rnd' must have size [n_link, 11].");
@@ -251,22 +240,42 @@ void quadriga_lib::lsp_generate(const std::unordered_map<std::string, double> &s
     else
         qd_sqrtm8(R.memptr(), Q);
 
-    if ((gr_eps_re != nullptr || gr_eps_im != nullptr) && (arma::any(rnd.col(9) < 0.0) || arma::any(rnd.col(9) > 1.0)))
-        throw std::invalid_argument("Column 9 of 'rnd' must be in the range from 0 to 1.");
+    if (gr_eps_re != nullptr || gr_eps_im != nullptr)
+    {
+        const double *u = rnd.memptr() + 9 * n_link; // column 9
+        for (arma::uword l = 0; l < n_link; ++l)
+            if (!(u[l] >= 0.0 && u[l] <= 1.0))
+                throw std::invalid_argument("Column 9 of 'rnd' must be in the range from 0 to 1.");
+    }
 
-    // Mean and std per link, frequency and LSP
-    arma::cube mu, sigma;
-    qd_gbsm_lsp_mu_sigma(sp, fc, tx_pos, rx_pos, mu, sigma);
-    if (sf_sigma != nullptr)
-        sigma.slice(2) = *sf_sigma;
+    // Mean and std per link, frequency and LSP; checks the frequency terms
+    qd_gbsm_lsp_stats stats(sp, fc);
 
-    // Large-scale parameters
-    if (lsp.n_rows != n_link || lsp.n_cols != n_freq || lsp.n_slices != 8)
-        lsp.set_size(n_link, n_freq, 8);
+    // Outputs
+    auto size3 = [&](arma::cube *c)
+    {
+        if (c != nullptr && (c->n_rows != n_link || c->n_cols != n_freq || c->n_slices != 8))
+            c->set_size(n_link, n_freq, 8);
+    };
+    size3(&lsp), size3(lsp_mu), size3(lsp_sigma);
+    if (eod_offset_deg != nullptr && (eod_offset_deg->n_rows != n_link || eod_offset_deg->n_cols != n_freq))
+        eod_offset_deg->set_size(n_link, n_freq);
+
+    // Large-scale parameters and EoD offset, per link
     const bool in_db[8] = {false, true, true, false, false, false, false, true};
     const double clip[8] = {0.0, 0.0, 0.0, 104.0, 104.0, 52.0, 52.0, 0.0};
+    const double e0 = sp.at("EoD_offset_e"), e_g = sp.at("EoD_offset_e_gamma"), a0 = sp.at("EoD_offset_a"),
+                 a_g = sp.at("EoD_offset_a_gamma"), b = sp.at("EoD_offset_b"), c0 = sp.at("EoD_offset_c"),
+                 c_g = sp.at("EoD_offset_c_gamma"), c_h = sp.at("EoD_offset_c_hUT"), hcl = sp.at("EoD_offset_hcl"),
+                 fc_min = sp.at("LSP_fc_min");
+    const bool tx_single = tx_pos.n_rows != n_link;
     for (arma::uword l = 0; l < n_link; ++l)
     {
+        const arma::uword t = tx_single ? 0 : l;
+        const double dx = rx_pos(l, 0) - tx_pos(t, 0), dy = rx_pos(l, 1) - tx_pos(t, 1);
+        const double d2D = std::sqrt(dx * dx + dy * dy), hBS = tx_pos(t, 2), h_ut = rx_pos(l, 2);
+        stats.set_link(d2D, hBS, h_ut);
+
         double x[8];
         for (int i = 0; i < 8; ++i)
         {
@@ -278,25 +287,37 @@ void quadriga_lib::lsp_generate(const std::unordered_map<std::string, double> &s
         for (arma::uword k = 0; k < n_freq; ++k)
             for (arma::uword i = 0; i < 8; ++i)
             {
-                const double v = mu(l, k, i) + sigma(l, k, i) * x[i];
+                double mu = 0.0, sigma = 0.0;
+                stats.get(i, k, mu, sigma);
+                if (i == 2 && sf_sigma != nullptr)
+                    sigma = (*sf_sigma)(l, k);
+                const double v = mu + sigma * x[i];
                 double val = in_db[i] ? std::pow(10.0, 0.1 * v) : std::pow(10.0, v);
                 if (clip_spreads && clip[i] > 0.0)
                     val = std::min(val, clip[i]);
                 lsp(l, k, i) = val;
+                if (lsp_mu != nullptr)
+                    (*lsp_mu)(l, k, i) = mu;
+                if (lsp_sigma != nullptr)
+                    (*lsp_sigma)(l, k, i) = sigma;
             }
-    }
 
-    if (lsp_mu != nullptr)
-    {
-        if (lsp_mu->n_rows != n_link || lsp_mu->n_cols != n_freq || lsp_mu->n_slices != 8)
-            lsp_mu->set_size(n_link, n_freq, 8);
-        std::copy(mu.memptr(), mu.memptr() + mu.n_elem, lsp_mu->memptr());
-    }
-    if (lsp_sigma != nullptr)
-    {
-        if (lsp_sigma->n_rows != n_link || lsp_sigma->n_cols != n_freq || lsp_sigma->n_slices != 8)
-            lsp_sigma->set_size(n_link, n_freq, 8);
-        std::copy(sigma.memptr(), sigma.memptr() + sigma.n_elem, lsp_sigma->memptr());
+        // EoD offset in degrees, positive = up
+        if (eod_offset_deg != nullptr)
+        {
+            const double d = std::max(d2D, 1e-4), h = std::max(hBS, 1e-4);
+            const double geo = (hcl > 0.0 && h_ut < hcl)
+                                   ? (std::atan((hcl - h) / d) - std::atan((h_ut - h) / d)) * 180.0 / arma::datum::pi
+                                   : 0.0;
+            for (arma::uword k = 0; k < n_freq; ++k)
+            {
+                const double lf = std::log10(std::max(fc(k) / 1.0e9, fc_min));
+                double e = e0 + e_g * lf;
+                if (b > 0.0)
+                    e += std::pow(10.0, (a0 + a_g * lf) * std::log10(std::max(b, d)) + c0 + c_g * lf + c_h * h_ut);
+                (*eod_offset_deg)(l, k) = e + geo;
+            }
+        }
     }
 
     // Absolute TOA offset
@@ -341,37 +362,6 @@ void quadriga_lib::lsp_generate(const std::unordered_map<std::string, double> &s
                     (*gr_eps_re)(l, k) = re;
                 if (gr_eps_im != nullptr)
                     (*gr_eps_im)(l, k) = im;
-            }
-        }
-    }
-
-    // EoD offset in degrees, positive = up
-    if (eod_offset_deg != nullptr)
-    {
-        if (eod_offset_deg->n_rows != n_link || eod_offset_deg->n_cols != n_freq)
-            eod_offset_deg->set_size(n_link, n_freq);
-        const double e0 = sp.at("EoD_offset_e"), e_g = sp.at("EoD_offset_e_gamma"), a0 = sp.at("EoD_offset_a"),
-                     a_g = sp.at("EoD_offset_a_gamma"), b = sp.at("EoD_offset_b"), c0 = sp.at("EoD_offset_c"),
-                     c_g = sp.at("EoD_offset_c_gamma"), c_h = sp.at("EoD_offset_c_hUT"), hcl = sp.at("EoD_offset_hcl"),
-                     fc_min = sp.at("LSP_fc_min");
-        const bool tx_single = tx_pos.n_rows != n_link;
-        for (arma::uword l = 0; l < n_link; ++l)
-        {
-            const arma::uword t = tx_single ? 0 : l;
-            const double dx = rx_pos(l, 0) - tx_pos(t, 0), dy = rx_pos(l, 1) - tx_pos(t, 1);
-            const double d = std::max(std::sqrt(dx * dx + dy * dy), 1e-4);
-            const double h = std::max(tx_pos(t, 2), 1e-4);
-            const double h_ut = rx_pos(l, 2);
-            const double geo = (hcl > 0.0 && h_ut < hcl)
-                                   ? (std::atan((hcl - h) / d) - std::atan((h_ut - h) / d)) * 180.0 / arma::datum::pi
-                                   : 0.0;
-            for (arma::uword k = 0; k < n_freq; ++k)
-            {
-                const double lf = std::log10(std::max(fc(k) / 1.0e9, fc_min));
-                double e = e0 + e_g * lf;
-                if (b > 0.0)
-                    e += std::pow(10.0, (a0 + a_g * lf) * std::log10(std::max(b, d)) + c0 + c_g * lf + c_h * h_ut);
-                (*eod_offset_deg)(l, k) = e + geo;
             }
         }
     }

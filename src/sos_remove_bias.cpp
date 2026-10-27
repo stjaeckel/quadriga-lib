@@ -243,7 +243,7 @@ void quadriga_lib::sos_remove_bias(const arma::Mat<dtype> &freq,
                 double a = (c < pos.n_cols) ? (double)pos.at(i, c) : 0.0, b = (c < pos_b->n_cols) ? (double)pos_b->at(i, c) : 0.0;
                 d2 += (a - b) * (a - b);
             }
-            double A = qd_sos_acf_interp(acf_d.memptr(), dist_d.memptr(), acf_d.n_elem, std::sqrt(d2));
+            double A = qd_interp_linear(acf_d.memptr(), dist_d.memptr(), acf_d.n_elem, std::sqrt(d2));
             w[i] = 1.0 / (std::sqrt(2.0 + 2.0 * A) * (double)pos.n_rows);
         }
         accumulate(pos, 1.0, w.data(), zr, zi);

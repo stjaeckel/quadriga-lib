@@ -18,7 +18,7 @@
 //  - the model formulas, typed from their definition (dual_slope with the 3D breakpoint distance beyond the
 //    breakpoint, tripple_slope, nlos with the maximum of up to three terms, winner_los with the breakpoint from the
 //    heights of each link and C2 beyond it, winner_nlos, winner_pathloss, logdist, logdist_simple, constant,
-//    satellite with the zenith attenuation table typed below)
+//    satellite with the zenith attenuation table typed below, interpolated linearly by interp_1D)
 //  - the legacy O2I distance rule (indoor part of the 3D distance, 10 m minimum outdoor distance)
 //  - the LSP std formula for the default SF std, with both limits at 0
 // Tolerances: the v19 files write derived constants rounded to 4 significant digits; the TR checks take the bound of
@@ -28,8 +28,10 @@
 // TR reference geometry tx = (0, 0, hBS), rx = (d2D, 0, hUT).
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_exception.hpp>
 
 #include "quadriga_gbsm.hpp"
+#include "quadriga_math.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -42,6 +44,8 @@
 
 #include "qd_test_diag.hpp"
 QD_TEST_DIAG_SWITCH("QD_DIAG_GBSM")
+
+using Catch::Matchers::Message;
 
 namespace
 {
@@ -58,24 +62,6 @@ namespace
         scen_t sp;
         quadriga_lib::conf_file_read("data/config/3GPP_38.901_v19_" + name + ".conf", sp, nullptr, model, pl);
         return sp;
-    }
-
-    // Message of the std::invalid_argument thrown by f, or a marker if none (or another type) was thrown
-    std::string err_msg(const std::function<void()> &f)
-    {
-        try
-        {
-            f();
-        }
-        catch (const std::invalid_argument &e)
-        {
-            return e.what();
-        }
-        catch (...)
-        {
-            return "<other exception>";
-        }
-        return "<no exception>";
     }
 
     bool close_rel(double a, double b, double tol) { return std::abs(a - b) <= tol * std::max(1.0, std::abs(b)); }
@@ -324,17 +310,10 @@ namespace
         119.21, 97.42, 68, 52.74, 39.81, 17.77, 8.61, 4.2, 2.8, 2.19, 1.69, 1.42, 1.22, 1.07, 0.93, 0.85, 0.79, 0.75,
         0.74, 0.75, 0.81, 0.87, 0.97};
 
-    // Linear interpolation of the zenith attenuation, constant beyond 1 and 100 GHz
+    // Linear interpolation of the zenith attenuation (interp_1D), constant beyond 1 and 100 GHz
     double zenith_att(double f)
     {
-        if (f <= zen_f[0])
-            return zen_a[0];
-        if (f >= zen_f[92])
-            return zen_a[92];
-        int i = 0;
-        while (zen_f[i + 1] < f)
-            ++i;
-        return zen_a[i] + (f - zen_f[i]) / (zen_f[i + 1] - zen_f[i]) * (zen_a[i + 1] - zen_a[i]);
+        return quadriga_lib::interp_1D<double>(arma::vec(zen_a, 93), arma::vec(zen_f, 93), arma::vec{f})(0);
     }
 
     // Links with per-link Tx used in the model sections: 4 links, heights below 1.5 m included
@@ -648,6 +627,20 @@ TEST_CASE("path_loss - UMa random hE follows the probability of TR note 1")
             CHECK(std::abs(b(0, 0) - los) <= tol);
             CHECK(std::abs(c(0, 0) - nl) <= tol);
         }
+
+    // u = 1 where p1 = 1/(1 + C) rounds to 1 (C < 1.1e-16 at 10 km, hUT 20 m): hE = 1, as for u = 0
+    {
+        const arma::mat tx = {{0.0, 0.0, hBS}}, rx = {{4000.0, 0.0, 20.0}, {10000.0, 0.0, 20.0}};
+        const arma::vec fc = {3.5e9}, u0 = {0.0, 0.0}, u1 = {1.0, 1.0};
+        arma::mat a, b;
+        quadriga_lib::path_loss(m_los, p_los, sp_los, fc, tx, rx, a, nullptr, nullptr, &u0);
+        quadriga_lib::path_loss(m_los, p_los, sp_los, fc, tx, rx, b, nullptr, nullptr, &u1);
+        QD_DIAG("\n# diag: path_loss random hE with u = 1: 4 km %.4f dB (u = 0: %.4f), 10 km %.4f dB (u = 0: %.4f)\n",
+                b(0, 0), a(0, 0), b(1, 0), a(1, 0));
+        CHECK(b.is_finite());
+        CHECK(b(0, 0) != a(0, 0)); // 4 km: C = 1.2e-7, u = 1 selects the largest hE (18 m)
+        CHECK(b(1, 0) == a(1, 0));
+    }
 }
 
 TEST_CASE("path_loss - legacy models match the get_pl formulas")
@@ -1050,8 +1043,7 @@ TEST_CASE("path_loss - input validation")
     arma::mat pl;
 
     auto call = [&](const std::string &m, const plpar_t &p)
-    { return err_msg([&]
-                     { quadriga_lib::path_loss(m, p, sp, fc, tx, rx, pl); }); };
+    { quadriga_lib::path_loss(m, p, sp, fc, tx, rx, pl); };
 
     // Complete parameter sets of each model
     plpar_t winner_nlos;
@@ -1076,18 +1068,20 @@ TEST_CASE("path_loss - input validation")
         CHECK_NOTHROW(quadriga_lib::path_loss(model, plpar, sp, fc, tx, rx, pl, &sf, &d2d_in, &u));
         CHECK_NOTHROW(quadriga_lib::path_loss(model, plpar, {}, fc, tx, rx, pl)); // empty scenpar: defaults
         for (const auto &m : full)
-            CHECK(call(m.first, m.second) == "<no exception>");
-        CHECK(call("satellite", {}) == "<no exception>");
-        CHECK(call("", {}) == "<no exception>");
-        CHECK(call("nlos", {{"An", {39.08}}, {"Bn", {13.54}}, {"LOSmax", {0.0}}}) == "<no exception>"); // no LOS keys
-        CHECK(call("logdist", {{"A", {20.0}}, {"B", {30.0}}, {"C", {20.0}}, {"Xyz", {1.0, 2.0}}}) == "<no exception>");
-        CHECK(call("dual_slope", {{"A", {22.0}}, {"B", {28.0}}, {"E", {13.33}}}) == "<no exception>"); // A for A1
-        CHECK(call("tripple_slope", {{"A", {22.0}}, {"B", {28.0}}, {"E", {13.33}}}) == "<no exception>");
+            CHECK_NOTHROW(call(m.first, m.second));
+        CHECK_NOTHROW(call("satellite", {}));
+        CHECK_NOTHROW(call("", {}));
+        CHECK_NOTHROW(call("nlos", {{"An", {39.08}}, {"Bn", {13.54}}, {"LOSmax", {0.0}}})); // no LOS keys
+        CHECK_NOTHROW(call("logdist", {{"A", {20.0}}, {"B", {30.0}}, {"C", {20.0}}, {"Xyz", {1.0, 2.0}}}));
+        CHECK_NOTHROW(call("dual_slope", {{"A", {22.0}}, {"B", {28.0}}, {"E", {13.33}}})); // A for A1
+        CHECK_NOTHROW(call("tripple_slope", {{"A", {22.0}}, {"B", {28.0}}, {"E", {13.33}}}));
     }
     SECTION("unknown model")
     {
-        CHECK(call("foo", plpar) == "Path-loss model 'foo' is not supported.");
-        CHECK(call("Logdist", plpar) == "Path-loss model 'Logdist' is not supported.");
+        CHECK_THROWS_MATCHES(call("foo", plpar), std::invalid_argument,
+                             Message("Path-loss model 'foo' is not supported."));
+        CHECK_THROWS_MATCHES(call("Logdist", plpar), std::invalid_argument,
+                             Message("Path-loss model 'Logdist' is not supported."));
     }
     SECTION("missing required key")
     {
@@ -1097,115 +1091,118 @@ TEST_CASE("path_loss - input validation")
                 plpar_t p = m.second;
                 p.erase(e.first);
                 INFO("model " << m.first << ", key " << e.first);
-                CHECK(call(m.first, p) == "Path-loss model '" + m.first + "' requires the parameter '" + e.first + "'.");
+                CHECK_THROWS_MATCHES(call(m.first, p), std::invalid_argument,
+                                     Message("Path-loss model '" + m.first + "' requires the parameter '" + e.first + "'."));
             }
     }
     SECTION("one value per parameter")
     {
-        CHECK(call("logdist", {{"A", {20.0}}, {"B", {}}, {"C", {20.0}}}) == "Path-loss parameter 'B' must have one value.");
-        CHECK(call("logdist", {{"A", {20.0}}, {"B", {30.0, 31.0}}, {"C", {20.0}}}) ==
-              "Path-loss parameter 'B' must have one value.");
-        CHECK(call("logdist", {{"A", {20.0}}, {"B", {30.0}}, {"C", {20.0}}, {"SF", {1.0, 2.0}}}) ==
-              "Path-loss parameter 'SF' must have one value.");
-        CHECK(call("satellite", {{"usePLa", {}}}) == "Path-loss parameter 'usePLa' must have one value.");
-        CHECK(call("nlos", {{"An", {39.08}}, {"Bn", {13.54}}, {"LOSmax", {0.0, 1.0}}}) ==
-              "Path-loss parameter 'LOSmax' must have one value.");
+        CHECK_THROWS_MATCHES(call("logdist", {{"A", {20.0}}, {"B", {}}, {"C", {20.0}}}), std::invalid_argument,
+                             Message("Path-loss parameter 'B' must have one value."));
+        CHECK_THROWS_MATCHES(call("logdist", {{"A", {20.0}}, {"B", {30.0, 31.0}}, {"C", {20.0}}}), std::invalid_argument,
+                             Message("Path-loss parameter 'B' must have one value."));
+        CHECK_THROWS_MATCHES(call("logdist", {{"A", {20.0}}, {"B", {30.0}}, {"C", {20.0}}, {"SF", {1.0, 2.0}}}), std::invalid_argument,
+                             Message("Path-loss parameter 'SF' must have one value."));
+        CHECK_THROWS_MATCHES(call("satellite", {{"usePLa", {}}}), std::invalid_argument,
+                             Message("Path-loss parameter 'usePLa' must have one value."));
+        CHECK_THROWS_MATCHES(call("nlos", {{"An", {39.08}}, {"Bn", {13.54}}, {"LOSmax", {0.0, 1.0}}}), std::invalid_argument,
+                             Message("Path-loss parameter 'LOSmax' must have one value."));
     }
     SECTION("breakpoint factors")
     {
-        CHECK(call("dual_slope", {{"A1", {22.0}}, {"B", {28.0}}, {"E", {0.0}}}) == "Path-loss parameter 'E' must be > 0.");
-        CHECK(call("nlos", {{"An", {39.0}}, {"Bn", {13.5}}, {"A1", {22.0}}, {"B", {28.0}}, {"E", {-1.0}}}) ==
-              "Path-loss parameter 'E' must be > 0.");
-        CHECK(call("nlos", {{"An", {39.0}}, {"Bn", {13.5}}, {"LOSmax", {0.0}}, {"E", {-1.0}}}) == "<no exception>");
-        CHECK(call("tripple_slope", {{"A1", {22.0}}, {"B", {28.0}}, {"E1", {0.0}}}) ==
-              "Path-loss parameter 'E1' must be > 0.");
-        CHECK(call("tripple_slope", {{"A1", {22.0}}, {"B", {28.0}}, {"E1", {4.0}}, {"E2", {-1.0}}}) ==
-              "Path-loss parameter 'E2' must be > 0.");
+        CHECK_THROWS_MATCHES(call("dual_slope", {{"A1", {22.0}}, {"B", {28.0}}, {"E", {0.0}}}), std::invalid_argument,
+                             Message("Path-loss parameter 'E' must be > 0."));
+        CHECK_THROWS_MATCHES(call("nlos", {{"An", {39.0}}, {"Bn", {13.5}}, {"A1", {22.0}}, {"B", {28.0}}, {"E", {-1.0}}}), std::invalid_argument,
+                             Message("Path-loss parameter 'E' must be > 0."));
+        CHECK_NOTHROW(call("nlos", {{"An", {39.0}}, {"Bn", {13.5}}, {"LOSmax", {0.0}}, {"E", {-1.0}}}));
+        CHECK_THROWS_MATCHES(call("tripple_slope", {{"A1", {22.0}}, {"B", {28.0}}, {"E1", {0.0}}}), std::invalid_argument,
+                             Message("Path-loss parameter 'E1' must be > 0."));
+        CHECK_THROWS_MATCHES(call("tripple_slope", {{"A1", {22.0}}, {"B", {28.0}}, {"E1", {4.0}}, {"E2", {-1.0}}}), std::invalid_argument,
+                             Message("Path-loss parameter 'E2' must be > 0."));
         plpar_t p = full[3].second;
         p["A2"] = p["A1"];
-        CHECK(call("winner_los", p) == "Path-loss parameters 'A1' and 'A2' must differ for model 'winner_los'.");
+        CHECK_THROWS_MATCHES(call("winner_los", p), std::invalid_argument,
+                             Message("Path-loss parameters 'A1' and 'A2' must differ for model 'winner_los'."));
     }
     SECTION("d2d_in")
     {
         arma::vec bad = {0.0, -1.0, 2.0};
-        CHECK(err_msg([&]
-                      { quadriga_lib::path_loss(model, plpar, sp, fc, tx, rx, pl, nullptr, &bad); }) ==
-              "Input 'd2d_in' must be finite and >= 0.");
+        CHECK_THROWS_MATCHES(quadriga_lib::path_loss(model, plpar, sp, fc, tx, rx, pl, nullptr, &bad), std::invalid_argument,
+                             Message("Input 'd2d_in' must be finite and >= 0."));
         bad(1) = NAN;
-        CHECK(err_msg([&]
-                      { quadriga_lib::path_loss(model, plpar, sp, fc, tx, rx, pl, nullptr, &bad); }) ==
-              "Input 'd2d_in' must be finite and >= 0.");
+        CHECK_THROWS_MATCHES(quadriga_lib::path_loss(model, plpar, sp, fc, tx, rx, pl, nullptr, &bad), std::invalid_argument,
+                             Message("Input 'd2d_in' must be finite and >= 0."));
         const arma::vec bad2 = {1.0, 2.0};
-        CHECK(err_msg([&]
-                      { quadriga_lib::path_loss(model, plpar, sp, fc, tx, rx, pl, nullptr, &bad2); }) ==
-              "Number of elements in 'd2d_in' does not match number of rows in 'rx_pos'.");
+        CHECK_THROWS_MATCHES(quadriga_lib::path_loss(model, plpar, sp, fc, tx, rx, pl, nullptr, &bad2), std::invalid_argument,
+                             Message("Number of elements in 'd2d_in' does not match number of rows in 'rx_pos'."));
     }
     SECTION("rnd_he")
     {
         arma::vec bad = {0.0, 1.5, 1.0};
-        CHECK(err_msg([&]
-                      { quadriga_lib::path_loss(model, plpar, sp, fc, tx, rx, pl, nullptr, nullptr, &bad); }) ==
-              "Input 'rnd_he' must be in the range from 0 to 1.");
+        CHECK_THROWS_MATCHES(quadriga_lib::path_loss(model, plpar, sp, fc, tx, rx, pl, nullptr, nullptr, &bad), std::invalid_argument,
+                             Message("Input 'rnd_he' must be in the range from 0 to 1."));
         bad(1) = NAN;
-        CHECK(err_msg([&]
-                      { quadriga_lib::path_loss(model, plpar, sp, fc, tx, rx, pl, nullptr, nullptr, &bad); }) ==
-              "Input 'rnd_he' must be in the range from 0 to 1.");
+        CHECK_THROWS_MATCHES(quadriga_lib::path_loss(model, plpar, sp, fc, tx, rx, pl, nullptr, nullptr, &bad), std::invalid_argument,
+                             Message("Input 'rnd_he' must be in the range from 0 to 1."));
         const arma::vec bad2 = {0.5, 0.5, 0.5, 0.5};
-        CHECK(err_msg([&]
-                      { quadriga_lib::path_loss(model, plpar, sp, fc, tx, rx, pl, nullptr, nullptr, &bad2); }) ==
-              "Number of elements in 'rnd_he' does not match number of rows in 'rx_pos'.");
+        CHECK_THROWS_MATCHES(quadriga_lib::path_loss(model, plpar, sp, fc, tx, rx, pl, nullptr, nullptr, &bad2), std::invalid_argument,
+                             Message("Number of elements in 'rnd_he' does not match number of rows in 'rx_pos'."));
     }
     SECTION("fc")
     {
-        CHECK(err_msg([&]
-                      { quadriga_lib::path_loss(model, plpar, sp, arma::vec(), tx, rx, pl); }) == "Input 'fc' cannot be empty.");
-        CHECK(err_msg([&]
-                      { quadriga_lib::path_loss(model, plpar, sp, arma::vec({3.5e9, 0.0}), tx, rx, pl); }) ==
-              "Input 'fc' must be finite and > 0.");
-        CHECK(err_msg([&]
-                      { quadriga_lib::path_loss(model, plpar, sp, arma::vec({NAN}), tx, rx, pl); }) ==
-              "Input 'fc' must be finite and > 0.");
+        CHECK_THROWS_MATCHES(quadriga_lib::path_loss(model, plpar, sp, arma::vec(), tx, rx, pl), std::invalid_argument,
+                             Message("Input 'fc' cannot be empty."));
+        CHECK_THROWS_MATCHES(quadriga_lib::path_loss(model, plpar, sp, arma::vec({3.5e9, 0.0}), tx, rx, pl), std::invalid_argument,
+                             Message("Input 'fc' must be finite and > 0."));
+        CHECK_THROWS_MATCHES(quadriga_lib::path_loss(model, plpar, sp, arma::vec({NAN}), tx, rx, pl), std::invalid_argument,
+                             Message("Input 'fc' must be finite and > 0."));
     }
     SECTION("positions")
     {
         arma::mat bad(3, 2, arma::fill::zeros);
-        CHECK(err_msg([&]
-                      { quadriga_lib::path_loss(model, plpar, sp, fc, tx, bad, pl); }) == "Input 'rx_pos' must have 3 columns.");
+        CHECK_THROWS_MATCHES(quadriga_lib::path_loss(model, plpar, sp, fc, tx, bad, pl), std::invalid_argument,
+                             Message("Input 'rx_pos' must have 3 columns."));
         bad = rx, bad(1, 2) = NAN;
-        CHECK(err_msg([&]
-                      { quadriga_lib::path_loss(model, plpar, sp, fc, tx, bad, pl); }) == "Input 'rx_pos' must be finite.");
+        CHECK_THROWS_MATCHES(quadriga_lib::path_loss(model, plpar, sp, fc, tx, bad, pl), std::invalid_argument,
+                             Message("Input 'rx_pos' must be finite."));
         bad.zeros(1, 2);
-        CHECK(err_msg([&]
-                      { quadriga_lib::path_loss(model, plpar, sp, fc, bad, rx, pl); }) == "Input 'tx_pos' must have 3 columns.");
+        CHECK_THROWS_MATCHES(quadriga_lib::path_loss(model, plpar, sp, fc, bad, rx, pl), std::invalid_argument,
+                             Message("Input 'tx_pos' must have 3 columns."));
         bad.zeros(2, 3);
-        CHECK(err_msg([&]
-                      { quadriga_lib::path_loss(model, plpar, sp, fc, bad, rx, pl); }) ==
-              "Number of rows in 'tx_pos' must be 1 or match the number of rows in 'rx_pos'.");
+        CHECK_THROWS_MATCHES(quadriga_lib::path_loss(model, plpar, sp, fc, bad, rx, pl), std::invalid_argument,
+                             Message("Number of rows in 'tx_pos' must be 1 or match the number of rows in 'rx_pos'."));
         bad = tx, bad(0, 0) = INFINITY;
-        CHECK(err_msg([&]
-                      { quadriga_lib::path_loss(model, plpar, sp, fc, bad, rx, pl); }) == "Input 'tx_pos' must be finite.");
+        CHECK_THROWS_MATCHES(quadriga_lib::path_loss(model, plpar, sp, fc, bad, rx, pl), std::invalid_argument,
+                             Message("Input 'tx_pos' must be finite."));
     }
     SECTION("scenpar")
     {
         scen_t bad = sp;
         bad["SF_lambda"] = -1.0;
-        CHECK(err_msg([&]
-                      { quadriga_lib::path_loss(model, plpar, bad, fc, tx, rx, pl); }) ==
-              "Value of 'SF_lambda' must be finite and >= 0.");
+        CHECK_THROWS_MATCHES(quadriga_lib::path_loss(model, plpar, bad, fc, tx, rx, pl), std::invalid_argument,
+                             Message("Value of 'SF_lambda' must be finite and >= 0."));
         bad = sp;
         bad["SF_sigmaX"] = 1.0;
-        CHECK(err_msg([&]
-                      { quadriga_lib::path_loss(model, plpar, bad, fc, tx, rx, pl); }) == "Unknown key 'SF_sigmaX' in 'scenpar'.");
+        CHECK_THROWS_MATCHES(quadriga_lib::path_loss(model, plpar, bad, fc, tx, rx, pl), std::invalid_argument,
+                             Message("Unknown key 'SF_sigmaX' in 'scenpar'."));
+    }
+    SECTION("SF frequency term of the default sf_sigma")
+    {
+        // Checked only when sf_sigma is requested; f' = max(f, LSP_fc_min) = 3.5 GHz gives SF_omega + f' = 0
+        scen_t bad = sp;
+        bad["SF_omega"] = -3.5, bad["SF_delta"] = 1.0, bad["LSP_fc_min"] = 0.0;
+        arma::mat sf;
+        CHECK_THROWS_MATCHES(quadriga_lib::path_loss(model, plpar, bad, fc, tx, rx, pl, &sf), std::invalid_argument,
+                             Message("Scenario parameter 'SF_omega' plus the frequency in GHz must be > 0 where 'SF_gamma' or 'SF_delta' is not 0."));
+        CHECK_NOTHROW(quadriga_lib::path_loss(model, plpar, bad, fc, tx, rx, pl));
     }
     SECTION("outputs are not touched on error")
     {
         arma::mat out(3, 2, arma::fill::value(-7.0)), sf(3, 2, arma::fill::value(-7.0));
-        CHECK(err_msg([&]
-                      { quadriga_lib::path_loss("foo", plpar, sp, fc, tx, rx, out, &sf); }) != "<no exception>");
+        CHECK_THROWS(quadriga_lib::path_loss("foo", plpar, sp, fc, tx, rx, out, &sf));
         scen_t bad = sp;
         bad["SF_lambda"] = -1.0;
-        CHECK(err_msg([&]
-                      { quadriga_lib::path_loss(model, plpar, bad, fc, tx, rx, out, &sf); }) != "<no exception>");
+        CHECK_THROWS(quadriga_lib::path_loss(model, plpar, bad, fc, tx, rx, out, &sf));
         CHECK(arma::all(arma::vectorise(out) == -7.0));
         CHECK(arma::all(arma::vectorise(sf) == -7.0));
     }

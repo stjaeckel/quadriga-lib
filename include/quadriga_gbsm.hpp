@@ -81,7 +81,7 @@ namespace quadriga_lib
     //  10 UMa environment height hE                              Uniform(0,1), SF_lambda
     // - Slice 1 (Tx side) of 'phase' is slice 0 (Rx side) of the mirror generator: ASD <-> ASA, ESD <-> ESA, all
     //   others mirror themselves; a decorrelation distance of 0 is used as 0.1 m
-    // - The functions are documented in src/lsf_init_phases.cpp, src/lsf_draw.cpp, src/path_loss.cpp,
+    // - The functions are documented in src/qd_gbsm_phases.cpp (lsf_init_phases, lsf_draw), src/path_loss.cpp,
     //   src/lsp_generate.cpp, src/los_probability.cpp, src/o2i_loss.cpp
 
     // Draw the random phases of the large-scale generators of one BS site and scenario
@@ -102,6 +102,7 @@ namespace quadriga_lib
     // - Dual mobility: the Tx side uses the mirror generator, so ASD/ASA and ESD/ESA are correlated by the ACF
     //   at the Tx-Rx distance
     // - Links with different floor IDs are uncorrelated at equal horizontal positions; equal IDs share one field
+    // - Dual mobility: both devices of a link are on the link's floor
     void lsf_draw(const std::unordered_map<std::string, double> &scenpar, // Scenario parameters (decorrelation distances)
                   const arma::cube &phase,                                 // Phases from lsf_init_phases, [n_coeff, 11, 2]
                   const arma::mat &tx_pos,                                 // Tx positions, [1, 3] or [n_link, 3]

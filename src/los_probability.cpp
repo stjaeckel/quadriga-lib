@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_gbsm.hpp"
+#include "quadriga_gbsm_helpers.hpp"
 #include "quadriga_lib_helper_functions.hpp"
 
 #include <algorithm>
@@ -152,6 +153,7 @@ LOS probability of a set of links, TR 38.901 Table 7.4.2-1 and other named model
 - O2I UTs: Table 7.4.2-1 uses the outdoor distance `d2d_out = d2D - d2D-in` with `d2D-in` from [[o2i_loss]], which
   therefore runs first; the caller clamps `d2d_out` at 0 (negative distances are rejected). Indoor scenarios
   (InH, InF) pass the 2D distance
+- Outputs must not share memory with the inputs or with each other
 - Validation, in this order: the model name; `d2d_out` finite and >= 0; `h_bs` and `h_ut` with 1 or `n_link`
   elements and finite; `d_clutter` NaN or finite and > 0, `r_clutter` NaN or in [0, 1), `h_clutter` NaN or finite
   and >= 0 (for every model); if `los_soft` is requested: `rnd_g` and `fc` present, `rnd_g` with `n_link`
@@ -250,11 +252,7 @@ void quadriga_lib::los_probability(const std::string &model,
             throw std::invalid_argument("Number of elements in 'rnd_g' does not match number of elements in 'd2d_out'.");
         if (!rnd_g->is_finite())
             throw std::invalid_argument("Input 'rnd_g' must be finite.");
-        if (fc->n_elem == 0)
-            throw std::invalid_argument("Input 'fc' cannot be empty.");
-        for (arma::uword k = 0; k < fc->n_elem; ++k)
-            if (!std::isfinite(fc->at(k)) || fc->at(k) <= 0.0)
-                throw std::invalid_argument("Input 'fc' must be finite and > 0.");
+        qd_gbsm_check_fc(*fc);
     }
 
     // Model parameters with their defaults
@@ -288,6 +286,10 @@ void quadriga_lib::los_probability(const std::string &model,
     // Outputs
     if (p_los.n_elem != n_link)
         p_los.set_size(n_link);
+
+    // Clutter attenuation exp(-d·k), 1 at d = 0 also for k = +Inf (a subnormal 'd_clutter')
+    auto clutter = [](double d, double k)
+    { return (d > 0.0) ? std::exp(-d * k) : 1.0; };
 
     const bool hb1 = h_bs.n_elem == 1, hu1 = h_ut.n_elem == 1;
     for (arma::uword l = 0; l < n_link; ++l)
@@ -327,16 +329,16 @@ void quadriga_lib::los_probability(const std::string &model,
             break;
         case QD_LOS_INF_SL:
         case QD_LOS_INF_DL:
-            p = std::exp(-d * kinv0);
+            p = clutter(d, kinv0);
             break;
         case QD_LOS_INF_SH:
         case QD_LOS_INF_DH:
             if (hU >= hc)
                 p = 1.0;
             else if (hB > hU)
-                p = std::exp(-d * kinv0 * (hc - hU) / (hB - hU));
+                p = clutter(d, kinv0 * (hc - hU) / (hB - hU));
             else
-                p = std::exp(-d * kinv0);
+                p = clutter(d, kinv0);
             break;
         case QD_LOS_INF_HH:
             break;
@@ -345,8 +347,9 @@ void quadriga_lib::los_probability(const std::string &model,
             {
                 double s = 0.0;
                 for (int x = 0; x < 3; ++x)
-                    s += ks[x] * std::max(hs[x] - hU, 0.0) / (hB - hU);
-                p = std::exp(-d * s);
+                    if (hs[x] > hU) // a UT above the clutter type is not blocked by it
+                        s += ks[x] * (hs[x] - hU) / (hB - hU);
+                p = clutter(d, s);
             }
             break;
         case QD_LOS_DENSEURBAN:
@@ -355,7 +358,7 @@ void quadriga_lib::los_probability(const std::string &model,
         case QD_LOS_RURAL:
         {
             const double el = std::atan2(hB, d) * 180.0 / arma::datum::pi;
-            p = 0.01 * qd_sos_acf_interp(tab, qd_los_811_el, 11, el);
+            p = 0.01 * qd_interp_linear(tab, qd_los_811_el, 11, el);
             break;
         }
         case QD_LOS_INDUSTRIAL:
@@ -379,7 +382,7 @@ void quadriga_lib::los_probability(const std::string &model,
 
         if (los_soft->n_rows != n_link || los_soft->n_cols != n_freq)
             los_soft->set_size(n_link, n_freq);
-        for (arma::uword k = 0; k < n_freq; ++k)
+        for (arma::uword k = 0; k < n_freq && n_link > 0; ++k)
         {
             const double kk = std::sqrt(20.0 * fc->at(k) / 299792458.0); // sqrt(20 / lambda)
             double *ps = los_soft->colptr(k);

@@ -487,7 +487,7 @@ void quadriga_lib::sos_val(const arma::Mat<dtype> &freq,
                 for (arma::uword p = i0; p < i1; ++p)
                 {
                     double dx = px[p] - qx[p], dy = py[p] - qy[p], dz = pz[p] - qz[p];
-                    double A = qd_sos_acf_interp(pa, pd, n_acf, std::sqrt(dx * dx + dy * dy + dz * dz));
+                    double A = qd_interp_linear(pa, pd, n_acf, std::sqrt(dx * dx + dy * dy + dz * dz));
                     w[p] = 1.0 / std::sqrt(2.0 + 2.0 * A);
                 } });
             qd_sos_parallel_ranges(n_elem, [=](arma::uword i0, arma::uword i1)
