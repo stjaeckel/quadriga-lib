@@ -4,6 +4,7 @@
 
 #include "quadriga_gbsm.hpp"
 #include "quadriga_gbsm_helpers.hpp"
+#include "quadriga_lib_helper_functions.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -15,13 +16,21 @@
 
 namespace
 {
-    // Parameters of the dual-slope model (also the LOS term of the model "nlos")
+    // Parameters of the dual-slope model (also the LOS term of the model "nlos" and the first two slopes of
+    // "tripple_slope", where E holds E1 and hE is not used)
     struct qd_pl_dual
     {
         double A1, A2, B, C, D, E, hE;
         bool hE_rand;          // Random environment height from 'rnd_he'
         bool has_sig1, has_sig2;
         double sig1, sig2;
+    };
+
+    // Additional parameters of the model "tripple_slope"
+    struct qd_pl_triple
+    {
+        double A3, E2, hE1, hE2, sig3;
+        bool has_sig3;
     };
 
     // Dual-slope path loss of one link at the frequency f in [GHz]
@@ -52,21 +61,6 @@ namespace
         beyond = true;
         const double dBP3 = std::sqrt(dBP * dBP + (hb - hm) * (hb - hm));
         return p.A1 * std::log10(dBP3) + p.B + p.C * lf + p.D * dBP3 + p.A2 * std::log10(d3 / dBP3);
-    }
-
-    // UMa environment height of TR 38.901 Table 7.4.1-1, note 1, from a Uniform(0,1) value u
-    // - d: 2D distance in [m], hUT: raw UT height in [m]
-    inline double qd_pl_random_hE(double u, double d, double hUT)
-    {
-        const double g = (d <= 18.0) ? 0.0 : 1.25 * std::pow(d / 100.0, 3.0) * std::exp(-d / 150.0);
-        const double Cp = (hUT < 13.0) ? 0.0 : (hUT <= 23.0 ? std::pow((hUT - 13.0) / 10.0, 1.5) : 1.0);
-        const double C = Cp * g;
-        const double p1 = 1.0 / (1.0 + C);
-        const double n = (hUT - 1.5 >= 12.0) ? std::floor((hUT - 13.5) / 3.0 + 1e-9) + 1.0 : 0.0;
-        if (C == 0.0 || n == 0.0 || u < p1)
-            return 1.0;
-        const double j = std::min(std::floor((u - p1) / (1.0 - p1) * n), n - 1.0);
-        return 12.0 + 3.0 * j;
     }
 
     // Zenith attenuation of the satellite model: frequencies in [GHz], attenuation in [dB]
@@ -142,7 +136,8 @@ Path loss and shadow-fading standard deviation of a set of links
   `[hE_rand] != 0` and `rnd_he` is given, per link with `u = rnd_he(l)`, `d = d2`, raw `hUT`:
   `g = 0` for `d <= 18`, else `1.25·(d/100)³·exp(-d/150)`; `C' = 0` for `hUT < 13`, `((hUT - 13)/10)^1.5` for
   `hUT <= 23`, else 1; `C = C'·g`, `p1 = 1/(1 + C)`; `n` = size of the set {12, 15, ..., hUT - 1.5};
-  `hE = 1` if `C = 0`, `n = 0` or `u < p1`, else `hE = 12 + 3·min(floor((u - p1)/(1 - p1)·n), n - 1)`.
+  `hE = 1` if `C = 0`, `n = 0`, `u < p1` or `p1` rounds to 1 (C below 1.1e-16, e.g. beyond about 7.5 km at
+  `hUT = 20`), else `hE = 12 + 3·min(floor((u - p1)/(1 - p1)·n), n - 1)`.
   The UT height then gets no 1.1·hE clamp (`hm = max(hUT, 0.1)`), since `hUT - hE >= 1.5` holds for the TR set.
   Without `rnd_he` the fixed `[hE]` is used. `rnd_he` is column 10 of [[lsf_draw]], a spatially consistent
   uniform value: along a track hE switches between its discrete values where `u` crosses a threshold, and the
@@ -158,14 +153,16 @@ Path loss and shadow-fading standard deviation of a set of links
   with the geometric distance, `sf = max(0, max(0, SF_sigma + SF_delta·lg(SF_omega + f')) + SF_kappa·lg(d) +
   SF_tau·lg(h) + SF_beta·lg(atan(h/d)))` with `d = max(d2D, 1e-4)`, `h = max(hBS, 1e-4)`,
   `f' = max(f, LSP_fc_min)`; for scenario files without such terms this is `SF_sigma`. Passing `sf_sigma` to
-  [[lsp_generate]] is then neutral
+  [[lsp_generate]] is then neutral. With `sf_sigma` requested, a frequency term with `SF_delta != 0` requires
+  `SF_omega + f' > 0`
 - Validation: positions, `fc`, the lengths of `d2d_in` and `rnd_he`, their values, the model name, the
   parameters of the model in the order the model reads them (a required key that is missing throws
   `Path-loss model '<model>' requires the parameter '<key>'.`, naming `A1` for "A1 or A" and `E1` for "E1 or E";
   every key that the model reads must have exactly one value; keys not read are ignored), the breakpoint factors
   `E`, `E1`, `E2` (> 0) and `A1 != A2` of `winner_los`, then `scenpar` ([[scenpar_validate]], its messages pass
-  through). All checks run before any output is written
+  through), then the SF frequency term if `sf_sigma` is requested. All checks run before any output is written
 - The models are evaluated as written for any positive frequency, also outside their validity range
+- Outputs must not share memory with the inputs or with each other
 
 ## Declaration:
 ```
@@ -219,22 +216,9 @@ void quadriga_lib::path_loss(const std::string &pl_model,
                              const arma::vec *rnd_he)
 {
     // Validation, before any output is touched
-    if (rx_pos.n_cols != 3)
-        throw std::invalid_argument("Input 'rx_pos' must have 3 columns.");
-    if (tx_pos.n_cols != 3)
-        throw std::invalid_argument("Input 'tx_pos' must have 3 columns.");
-    const arma::uword n_link = rx_pos.n_rows;
-    if (tx_pos.n_rows != 1 && tx_pos.n_rows != n_link)
-        throw std::invalid_argument("Number of rows in 'tx_pos' must be 1 or match the number of rows in 'rx_pos'.");
-    if (!rx_pos.is_finite())
-        throw std::invalid_argument("Input 'rx_pos' must be finite.");
-    if (!tx_pos.is_finite())
-        throw std::invalid_argument("Input 'tx_pos' must be finite.");
-    if (fc.n_elem == 0)
-        throw std::invalid_argument("Input 'fc' cannot be empty.");
-    if (!fc.is_finite() || arma::any(fc <= 0.0))
-        throw std::invalid_argument("Input 'fc' must be finite and > 0.");
-    const arma::uword n_freq = fc.n_elem;
+    qd_gbsm_check_links(&tx_pos, &rx_pos);
+    qd_gbsm_check_fc(fc);
+    const arma::uword n_link = rx_pos.n_rows, n_freq = fc.n_elem;
     if (d2d_in != nullptr && d2d_in->n_elem != n_link)
         throw std::invalid_argument("Number of elements in 'd2d_in' does not match number of rows in 'rx_pos'.");
     if (rnd_he != nullptr && rnd_he->n_elem != n_link)
@@ -298,10 +282,12 @@ void quadriga_lib::path_loss(const std::string &pl_model,
         val = it->second[0];
         return true;
     };
+    auto missing = [&](const char *key)
+    { return std::invalid_argument("Path-loss model '" + pl_model + "' requires the parameter '" + key + "'."); };
     auto req = [&](const char *key, double &val)
     {
         if (!opt(key, val))
-            throw std::invalid_argument("Path-loss model '" + pl_model + "' requires the parameter '" + key + "'.");
+            throw missing(key);
     };
     auto positive = [](const char *key, double val)
     {
@@ -309,36 +295,29 @@ void quadriga_lib::path_loss(const std::string &pl_model,
             throw std::invalid_argument(std::string("Path-loss parameter '") + key + "' must be > 0.");
     };
 
-    // Parameters of the dual-slope model; 'E1' names the breakpoint factor for 'tripple_slope'
+    // Parameters of the dual-slope model; the breakpoint factor is "E1 or E" for 'tripple_slope', "E" otherwise
     auto read_dual = [&](qd_pl_dual &p, bool triple)
     {
         if (!opt("A1", p.A1) && !opt("A", p.A1))
-            req("A1", p.A1);
+            throw missing("A1");
         req("B", p.B);
-        const char *e_key = triple ? "E1" : "E";
-        if (triple)
-        {
-            if (!opt("E1", p.E))
-            {
-                e_key = "E";
-                if (!opt("E", p.E))
-                    req("E1", p.E);
-            }
-        }
-        else
+        const char *e_key = "E";
+        if (!triple)
             req("E", p.E);
+        else if (opt("E1", p.E))
+            e_key = "E1";
+        else if (!opt("E", p.E))
+            throw missing("E1");
         p.A2 = p.A1, p.C = 0.0, p.D = 0.0, p.hE = 0.0, p.sig1 = 0.0, p.sig2 = 0.0;
         opt("A2", p.A2), opt("C", p.C), opt("D", p.D);
         positive(e_key, p.E);
-        return e_key;
     };
 
     qd_pl_dual dual = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, false, false, false, 0.0, 0.0};
     double A = 0.0, B = 0.0, C = 0.0, D = 0.0, X = 0.0, SF = 0.0;
     bool has_SF = false;
     double w[21] = {}; // winner_los: A1, A2, B1, B2, C1, C2, D1, D2, E1, E2, F1, F2, sig1, sig2; winner_nlos: 21 keys
-    double A3 = 0.0, E2 = 0.0, hE1 = 0.0, hE2 = 0.0, sig3 = 0.0;
-    bool has_sig3 = false;
+    qd_pl_triple tri = {0.0, 0.0, 0.0, 0.0, 0.0, false};
     double nl[13] = {}; // An, Bn, Cn, Dn, D1n, D2n, D3n, En, E1n, E2n, E3n, Fn, G1n
     double G2n = 1.0, LOSmax = 1.0, Ax = 0.0, Bx = 0.0, Cx = 0.0, sig = 0.0, usePLa = 1.0;
     bool has_x = false, has_sig = false;
@@ -391,14 +370,14 @@ void quadriga_lib::path_loss(const std::string &pl_model,
     case m_tripple_slope:
     {
         read_dual(dual, true);
-        A3 = dual.A2, E2 = dual.E;
-        opt("A3", A3);
-        if (opt("E2", E2))
-            positive("E2", E2);
-        opt("hE1", hE1), opt("hE2", hE2);
+        tri.A3 = dual.A2, tri.E2 = dual.E;
+        opt("A3", tri.A3);
+        if (opt("E2", tri.E2))
+            positive("E2", tri.E2);
+        opt("hE1", tri.hE1), opt("hE2", tri.hE2);
         dual.has_sig1 = opt("sig1", dual.sig1);
         dual.has_sig2 = opt("sig2", dual.sig2);
-        has_sig3 = opt("sig3", sig3);
+        tri.has_sig3 = opt("sig3", tri.sig3);
         break;
     }
     case m_nlos:
@@ -431,18 +410,31 @@ void quadriga_lib::path_loss(const std::string &pl_model,
     std::unordered_map<std::string, double> sp = scenpar;
     quadriga_lib::scenpar_validate(sp, "legacy", nullptr, nullptr, true);
 
+    // Default shadow-fading std: the SF std of the LSP formula (only SF evaluated and checked)
+    qd_gbsm_lsp_stats sf_stats(sp, (sf_sigma != nullptr) ? fc : arma::vec(), 1u << 2);
+
+    // UMa environment height of TR 38.901 Table 7.4.1-1, note 1, from a Uniform(0,1) value u
+    // - d: 2D distance in [m], hUT: raw UT height in [m]
+    // - hE = 1 where p1 = 1/(1 + C) rounds to 1 (C below the rounding of 1 + C): the other heights then have a
+    //   probability below 1e-16, and (u - p1)/(1 - p1) would be 0/0 for u = 1
+    auto draw_hE = [](double u, double d, double hUT)
+    {
+        const double g = (d <= 18.0) ? 0.0 : 1.25 * std::pow(d / 100.0, 3.0) * std::exp(-d / 150.0);
+        const double Cp = (hUT < 13.0) ? 0.0 : (hUT <= 23.0 ? std::pow((hUT - 13.0) / 10.0, 1.5) : 1.0);
+        const double Cg = Cp * g; // C of the TR note
+        const double p1 = 1.0 / (1.0 + Cg);
+        const double n = (hUT - 1.5 >= 12.0) ? std::floor((hUT - 13.5) / 3.0 + 1e-9) + 1.0 : 0.0;
+        if (Cg == 0.0 || n == 0.0 || u < p1 || p1 >= 1.0)
+            return 1.0;
+        const double j = std::min(std::floor((u - p1) / (1.0 - p1) * n), n - 1.0);
+        return 12.0 + 3.0 * j;
+    };
+
     // Outputs
     if (pl.n_rows != n_link || pl.n_cols != n_freq)
         pl.set_size(n_link, n_freq);
-    if (sf_sigma != nullptr)
-    {
-        // Default: SF std of the LSP formula with the geometric distances
-        arma::cube mu, sigma;
-        qd_gbsm_lsp_mu_sigma(sp, fc, tx_pos, rx_pos, mu, sigma);
-        if (sf_sigma->n_rows != n_link || sf_sigma->n_cols != n_freq)
-            sf_sigma->set_size(n_link, n_freq);
-        std::copy(sigma.slice(2).memptr(), sigma.slice(2).memptr() + n_link * n_freq, sf_sigma->memptr());
-    }
+    if (sf_sigma != nullptr && (sf_sigma->n_rows != n_link || sf_sigma->n_cols != n_freq))
+        sf_sigma->set_size(n_link, n_freq);
 
     const bool tx_single = tx_pos.n_rows != n_link;
     for (arma::uword l = 0; l < n_link; ++l)
@@ -452,6 +444,8 @@ void quadriga_lib::path_loss(const std::string &pl_model,
         const double hBS = tx_pos(t, 2), hUT = rx_pos(l, 2);
         const double dx = rx_pos(l, 0) - tx_pos(t, 0), dy = rx_pos(l, 1) - tx_pos(t, 1), dz = hUT - hBS;
         double d2 = std::sqrt(dx * dx + dy * dy), d3 = std::sqrt(dx * dx + dy * dy + dz * dz);
+        if (sf_sigma != nullptr)
+            sf_stats.set_link(d2, hBS, hUT);
         if (d2d_in != nullptr && (*d2d_in)(l) > 0.0) // Legacy outdoor distance
         {
             const double din = std::min((*d2d_in)(l), d2);
@@ -469,7 +463,7 @@ void quadriga_lib::path_loss(const std::string &pl_model,
 
         // Environment height of the dual-slope model
         const bool random_hE = dual.hE_rand && rnd_he != nullptr;
-        const double hE = random_hE ? qd_pl_random_hE((*rnd_he)(l), d2, hUT) : dual.hE;
+        const double hE = random_hE ? draw_hE((*rnd_he)(l), d2, hUT) : dual.hE;
 
         for (arma::uword k = 0; k < n_freq; ++k)
         {
@@ -528,10 +522,10 @@ void quadriga_lib::path_loss(const std::string &pl_model,
             }
             case m_tripple_slope:
             {
-                double hb = std::max(std::max(std::max(hBS, 1.1 * hE1), 1.1 * hE2), 0.1);
-                double hm = std::max(std::max(std::max(hUT, 1.1 * hE1), 1.1 * hE2), 0.1);
-                double dBP1 = dual.E * f * (hb - hE1) * (hm - hE1);
-                const double dBP2 = E2 * f * (hb - hE2) * (hm - hE2);
+                const double hb = std::max(std::max(std::max(hBS, 1.1 * tri.hE1), 1.1 * tri.hE2), 0.1);
+                const double hm = std::max(std::max(std::max(hUT, 1.1 * tri.hE1), 1.1 * tri.hE2), 0.1);
+                double dBP1 = dual.E * f * (hb - tri.hE1) * (hm - tri.hE1);
+                const double dBP2 = tri.E2 * f * (hb - tri.hE2) * (hm - tri.hE2);
                 dBP1 = std::min(dBP1, dBP2);
                 const double dBP13 = std::sqrt(dBP1 * dBP1 + (hb - hm) * (hb - hm));
                 const double dBP23 = std::sqrt(dBP2 * dBP2 + (hb - hm) * (hb - hm));
@@ -550,9 +544,9 @@ void quadriga_lib::path_loss(const std::string &pl_model,
                 }
                 else
                 {
-                    loss = LBP1 + dual.A2 * std::log10(dBP23 / dBP13) + A3 * std::log10(d3 / dBP23);
-                    if (has_sig3)
-                        sf = sig3, set_sf = true;
+                    loss = LBP1 + dual.A2 * std::log10(dBP23 / dBP13) + tri.A3 * std::log10(d3 / dBP23);
+                    if (tri.has_sig3)
+                        sf = tri.sig3, set_sf = true;
                 }
                 break;
             }
@@ -581,15 +575,22 @@ void quadriga_lib::path_loss(const std::string &pl_model,
                     loss = std::numeric_limits<double>::infinity();
                 else
                 {
-                    const double PLa = (usePLa != 0.0) ? qd_sos_acf_interp(qd_pl_zenith_att, qd_pl_zenith_f, 93, f) / sa : 0.0;
+                    const double PLa = (usePLa != 0.0) ? qd_interp_linear(qd_pl_zenith_att, qd_pl_zenith_f, 93, f) / sa : 0.0;
                     loss = A * lg_d3 + B + C * lf + D * std::log10(std::asin(sa)) + PLa;
                 }
                 break;
             }
             }
             pl(l, k) = loss;
-            if (sf_sigma != nullptr && set_sf)
+            if (sf_sigma != nullptr)
+            {
+                if (!set_sf)
+                {
+                    double mu = 0.0;
+                    sf_stats.get(2, k, mu, sf);
+                }
                 (*sf_sigma)(l, k) = sf;
+            }
         }
     }
 }

@@ -17,8 +17,8 @@
 //    limited to [0, 1]; for UMa above hUT = 23 m (not covered by the TR) C' = 1
 //  - the edge rules: InF SH/DH with hU >= h_c gives 1, with hB <= hU < h_c the rule of SL/DL; SMa with hB <= hU
 //    gives 1, a clutter height below hU gives no term of that clutter type
-//  - the 38.811 tables (elevation grid -90, 0, 10, ..., 90 deg, values in percent) with a linear interpolation
-//    typed here; QuaDRiGa industrial min(1, exp(-(d + 20)/80)·exp(min(hB, 8)/5 - 1))
+//  - the 38.811 tables (elevation grid -90, 0, 10, ..., 90 deg, values in percent) typed here, interpolated
+//    linearly by interp_1D; QuaDRiGa industrial min(1, exp(-(d + 20)/80)·exp(min(hB, 8)/5 - 1))
 //  - eq. (7.6-18) LOS_soft = 1/2 + atan(sqrt(20/lambda)·(G + F(p)))/pi with a test-side inverse normal CDF:
 //    bisection for x <= 0 on 0.5·erfc(-x/sqrt(2)) = min(p, 1 - p), F = x for p <= 0.5 and -x otherwise (the
 //    symmetric form keeps the upper tail exact)
@@ -29,12 +29,13 @@
 // Conventions: distances and heights in meters; frequencies in Hz; lambda = c/fc with c = 299792458 m/s.
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_exception.hpp>
 
 #include "quadriga_gbsm.hpp"
+#include "quadriga_math.hpp"
 
 #include <algorithm>
 #include <cmath>
-#include <functional>
 #include <limits>
 #include <stdexcept>
 #include <string>
@@ -42,6 +43,8 @@
 
 #include "qd_test_diag.hpp"
 QD_TEST_DIAG_SWITCH("QD_DIAG_GBSM")
+
+using Catch::Matchers::Message;
 
 namespace
 {
@@ -117,19 +120,12 @@ namespace
     const double tab_urban[11] = {0, 0, 24.6, 38.6, 49.3, 61.3, 72.6, 80.5, 91.9, 96.8, 99.2};
     const double tab_suburban[11] = {0, 0, 78.2, 86.9, 91.9, 92.9, 93.5, 94.0, 94.9, 95.2, 99.8};
 
+    // Linear interpolation of the table (interp_1D) at the elevation atan2(hB, d) in degrees
     double ref_811(const double *tab, double hB, double d)
     {
-        const double grid[11] = {-90, 0, 10, 20, 30, 40, 50, 60, 70, 80, 90};
-        double el = std::atan2(hB, d) * 180.0 / pi;
-        if (el <= grid[0])
-            return 0.01 * tab[0];
-        if (el >= grid[10])
-            return 0.01 * tab[10];
-        int i = 0;
-        while (i < 9 && el >= grid[i + 1])
-            ++i;
-        double w = (el - grid[i]) / (grid[i + 1] - grid[i]);
-        return 0.01 * (tab[i] + w * (tab[i + 1] - tab[i]));
+        const arma::vec grid = {-90, 0, 10, 20, 30, 40, 50, 60, 70, 80, 90};
+        const double el = std::atan2(hB, d) * 180.0 / pi;
+        return 0.01 * quadriga_lib::interp_1D<double>(arma::vec(tab, 11), grid, arma::vec{el})(0);
     }
 
     double ref_industrial(double d, double hB)
@@ -182,23 +178,6 @@ namespace
         arma::vec p;
         quadriga_lib::los_probability(model, arma::vec{d}, arma::vec{hB}, arma::vec{hU}, p, dcl, r, hc);
         return p.n_elem == 1 ? p(0) : NAN;
-    }
-
-    std::string err_msg(const std::function<void()> &f)
-    {
-        try
-        {
-            f();
-        }
-        catch (const std::invalid_argument &e)
-        {
-            return e.what();
-        }
-        catch (...)
-        {
-            return "<other exception>";
-        }
-        return "<no exception>";
     }
 
     const std::vector<std::string> all_models = {
@@ -386,6 +365,15 @@ TEST_CASE("los_probability - InF edge rules")
         CHECK(p_one(m, 50.0, 8.0, 1.5, NAN, 0.0) == 1.0);
         CHECK(p_one(m, 50.0, 1.0, 1.5, NAN, 0.0) == 1.0);
     }
+
+    // Subnormal clutter size: kinv = +Inf, 1 at d = 0 and 0 beyond (no NaN from 0·Inf)
+    for (const char *m : {"38.901_InF_SL", "38.901_InF_DL", "38.901_InF_SH", "38.901_InF_DH"})
+    {
+        INFO("model " << m);
+        CHECK(p_one(m, 0.0, 8.0, 1.5, 1e-310, 0.5) == 1.0);
+        CHECK(p_one(m, 5.0, 8.0, 1.5, 1e-310, 0.5) == 0.0);
+        CHECK(p_one(m, 5.0, 1.0, 1.5, 1e-310, 0.5) == 0.0);
+    }
 }
 
 TEST_CASE("los_probability - SMa edge rules")
@@ -410,6 +398,10 @@ TEST_CASE("los_probability - SMa edge rules")
             if (r_veg > 0.0)
                 CHECK(lit > ref * (1.0 + 1e-6));
         }
+
+    // Subnormal clutter size: UT above all clutter heights 1, below them 0 (no NaN from 0·Inf)
+    CHECK(p_one("38.901_SMa", 100.0, 35.0, 21.0, 1e-310, 0.1) == 1.0);
+    CHECK(p_one("38.901_SMa", 100.0, 35.0, 10.0, 1e-310, 0.1) == 0.0);
 
     // Clutter size as argument (60 m), r_veg 0.1, hB 35 m, hU 1.5 m
     const double s = (-std::log(0.98) * 18.5 - std::log(0.82) * 6.5 - std::log(0.9) * 13.5) / 60.0 / 33.5;
@@ -554,12 +546,10 @@ TEST_CASE("los_probability - optional inputs")
     arma::mat soft;
 
     // los_soft requires rnd_g and fc
-    CHECK(err_msg([&]
-                  { quadriga_lib::los_probability("38.901_UMi", d, arma::vec{10.0}, arma::vec{1.5}, p, NAN, NAN, NAN, nullptr, &fc, &soft); }) ==
-          "Output 'los_soft' requires 'rnd_g' and 'fc'.");
-    CHECK(err_msg([&]
-                  { quadriga_lib::los_probability("38.901_UMi", d, arma::vec{10.0}, arma::vec{1.5}, p, NAN, NAN, NAN, &g, nullptr, &soft); }) ==
-          "Output 'los_soft' requires 'rnd_g' and 'fc'.");
+    CHECK_THROWS_MATCHES(quadriga_lib::los_probability("38.901_UMi", d, arma::vec{10.0}, arma::vec{1.5}, p, NAN, NAN, NAN, nullptr, &fc, &soft), std::invalid_argument,
+                         Message("Output 'los_soft' requires 'rnd_g' and 'fc'."));
+    CHECK_THROWS_MATCHES(quadriga_lib::los_probability("38.901_UMi", d, arma::vec{10.0}, arma::vec{1.5}, p, NAN, NAN, NAN, &g, nullptr, &soft), std::invalid_argument,
+                         Message("Output 'los_soft' requires 'rnd_g' and 'fc'."));
 
     // rnd_g and fc without los_soft are ignored (not validated)
     quadriga_lib::los_probability("38.901_UMi", d, arma::vec{10.0}, arma::vec{1.5}, p_ref);
@@ -647,8 +637,7 @@ TEST_CASE("los_probability - input validation")
 
     auto call = [&](const std::string &m, const arma::vec &dd, const arma::vec &hb, const arma::vec &hu, double dcl,
                     double r, double hc, const arma::vec *gg, const arma::vec *ff, arma::mat *ss)
-    { return err_msg([&]
-                     { quadriga_lib::los_probability(m, dd, hb, hu, p, dcl, r, hc, gg, ff, ss); }); };
+    { quadriga_lib::los_probability(m, dd, hb, hu, p, dcl, r, hc, gg, ff, ss); };
     auto call_m = [&](const std::string &m)
     { return call(m, d, hB, hU, NAN, NAN, NAN, nullptr, nullptr, nullptr); };
     auto call_d = [&](const arma::vec &dd)
@@ -665,40 +654,49 @@ TEST_CASE("los_probability - input validation")
         for (const auto &m : all_models)
         {
             INFO("model " << m);
-            CHECK(call_m(m) == "<no exception>");
-            CHECK(call(m, d, hB, hU, 5.0, 0.0, 0.0, &g, &fc, &soft) == "<no exception>");
-            CHECK(call(m, d, hB, hU, 5.0, 0.99, 3.0, &g, &fc, &soft) == "<no exception>");
+            CHECK_NOTHROW(call_m(m));
+            CHECK_NOTHROW(call(m, d, hB, hU, 5.0, 0.0, 0.0, &g, &fc, &soft));
+            CHECK_NOTHROW(call(m, d, hB, hU, 5.0, 0.99, 3.0, &g, &fc, &soft));
         }
-        CHECK(call_d(arma::vec{0.0, 1e6}) == "<no exception>");
-        CHECK(call_h(arma::vec{-10.0, 0.0, 25.0}, arma::vec{0.0}) == "<no exception>");
+        CHECK_NOTHROW(call_d(arma::vec{0.0, 1e6}));
+        CHECK_NOTHROW(call_h(arma::vec{-10.0, 0.0, 25.0}, arma::vec{0.0}));
         CHECK_NOTHROW(quadriga_lib::los_probability("38.901_UMa", d, hB, hU, p));
     }
     SECTION("model")
     {
-        CHECK(call_m("foo") == "Model 'foo' is not supported.");
-        CHECK(call_m("38.901_uma") == "Model '38.901_uma' is not supported.");
-        CHECK(call_m("") == "Model '' is not supported.");
+        CHECK_THROWS_MATCHES(call_m("foo"), std::invalid_argument, Message("Model 'foo' is not supported."));
+        CHECK_THROWS_MATCHES(call_m("38.901_uma"), std::invalid_argument,
+                             Message("Model '38.901_uma' is not supported."));
+        CHECK_THROWS_MATCHES(call_m(""), std::invalid_argument, Message("Model '' is not supported."));
     }
     SECTION("d2d_out")
     {
         for (double v : {-1.0, -1e-300, double(NAN), inf, -inf})
         {
             INFO("value " << v);
-            CHECK(call_d(arma::vec{10.0, v}) == "Input 'd2d_out' must be finite and >= 0.");
+            CHECK_THROWS_MATCHES(call_d(arma::vec{10.0, v}), std::invalid_argument,
+                                 Message("Input 'd2d_out' must be finite and >= 0."));
         }
     }
     SECTION("h_bs")
     {
-        CHECK(call_h(arma::vec{25.0, 25.0}, hU) == "Number of elements in 'h_bs' must be 1 or match 'd2d_out'.");
-        CHECK(call_h(arma::vec(), hU) == "Number of elements in 'h_bs' must be 1 or match 'd2d_out'.");
-        CHECK(call_h(arma::vec{NAN}, hU) == "Input 'h_bs' must be finite.");
-        CHECK(call_h(arma::vec{25.0, inf, 25.0}, hU) == "Input 'h_bs' must be finite.");
+        CHECK_THROWS_MATCHES(call_h(arma::vec{25.0, 25.0}, hU), std::invalid_argument,
+                             Message("Number of elements in 'h_bs' must be 1 or match 'd2d_out'."));
+        CHECK_THROWS_MATCHES(call_h(arma::vec(), hU), std::invalid_argument,
+                             Message("Number of elements in 'h_bs' must be 1 or match 'd2d_out'."));
+        CHECK_THROWS_MATCHES(call_h(arma::vec{NAN}, hU), std::invalid_argument,
+                             Message("Input 'h_bs' must be finite."));
+        CHECK_THROWS_MATCHES(call_h(arma::vec{25.0, inf, 25.0}, hU), std::invalid_argument,
+                             Message("Input 'h_bs' must be finite."));
     }
     SECTION("h_ut")
     {
-        CHECK(call_h(hB, arma::vec{1.5, 1.5}) == "Number of elements in 'h_ut' must be 1 or match 'd2d_out'.");
-        CHECK(call_h(hB, arma::vec()) == "Number of elements in 'h_ut' must be 1 or match 'd2d_out'.");
-        CHECK(call_h(hB, arma::vec{1.5, -inf, 1.5}) == "Input 'h_ut' must be finite.");
+        CHECK_THROWS_MATCHES(call_h(hB, arma::vec{1.5, 1.5}), std::invalid_argument,
+                             Message("Number of elements in 'h_ut' must be 1 or match 'd2d_out'."));
+        CHECK_THROWS_MATCHES(call_h(hB, arma::vec()), std::invalid_argument,
+                             Message("Number of elements in 'h_ut' must be 1 or match 'd2d_out'."));
+        CHECK_THROWS_MATCHES(call_h(hB, arma::vec{1.5, -inf, 1.5}), std::invalid_argument,
+                             Message("Input 'h_ut' must be finite."));
     }
     SECTION("d_clutter")
     {
@@ -706,7 +704,8 @@ TEST_CASE("los_probability - input validation")
             for (double v : {0.0, -1.0, inf})
             {
                 INFO("model " << m << ", value " << v);
-                CHECK(call_c(m, v, NAN, NAN) == "Input 'd_clutter' must be NaN or > 0.");
+                CHECK_THROWS_MATCHES(call_c(m, v, NAN, NAN), std::invalid_argument,
+                                     Message("Input 'd_clutter' must be NaN or > 0."));
             }
     }
     SECTION("r_clutter")
@@ -715,7 +714,8 @@ TEST_CASE("los_probability - input validation")
             for (double v : {-0.1, 1.0, 1.5, inf, -inf})
             {
                 INFO("model " << m << ", value " << v);
-                CHECK(call_c(m, NAN, v, NAN) == "Input 'r_clutter' must be NaN or in the range from 0 to 1, 1 excluded.");
+                CHECK_THROWS_MATCHES(call_c(m, NAN, v, NAN), std::invalid_argument,
+                                     Message("Input 'r_clutter' must be NaN or in the range from 0 to 1, 1 excluded."));
             }
     }
     SECTION("h_clutter")
@@ -724,20 +724,24 @@ TEST_CASE("los_probability - input validation")
             for (double v : {-1.0, inf})
             {
                 INFO("model " << m << ", value " << v);
-                CHECK(call_c(m, NAN, NAN, v) == "Input 'h_clutter' must be NaN or >= 0.");
+                CHECK_THROWS_MATCHES(call_c(m, NAN, NAN, v), std::invalid_argument,
+                                     Message("Input 'h_clutter' must be NaN or >= 0."));
             }
     }
     SECTION("los_soft")
     {
-        CHECK(call_s(nullptr, &fc) == "Output 'los_soft' requires 'rnd_g' and 'fc'.");
-        CHECK(call_s(&g, nullptr) == "Output 'los_soft' requires 'rnd_g' and 'fc'.");
+        CHECK_THROWS_MATCHES(call_s(nullptr, &fc), std::invalid_argument,
+                             Message("Output 'los_soft' requires 'rnd_g' and 'fc'."));
+        CHECK_THROWS_MATCHES(call_s(&g, nullptr), std::invalid_argument,
+                             Message("Output 'los_soft' requires 'rnd_g' and 'fc'."));
         const arma::vec g2 = {0.3, 0.1}, g_nan = {0.3, NAN, 0.1}, g_inf = {0.3, inf, 0.1};
-        CHECK(call_s(&g2, &fc) == "Number of elements in 'rnd_g' does not match number of elements in 'd2d_out'.");
-        CHECK(call_s(&g_nan, &fc) == "Input 'rnd_g' must be finite.");
-        CHECK(call_s(&g_inf, &fc) == "Input 'rnd_g' must be finite.");
+        CHECK_THROWS_MATCHES(call_s(&g2, &fc), std::invalid_argument,
+                             Message("Number of elements in 'rnd_g' does not match number of elements in 'd2d_out'."));
+        CHECK_THROWS_MATCHES(call_s(&g_nan, &fc), std::invalid_argument, Message("Input 'rnd_g' must be finite."));
+        CHECK_THROWS_MATCHES(call_s(&g_inf, &fc), std::invalid_argument, Message("Input 'rnd_g' must be finite."));
         const arma::vec f0, f1 = {3.5e9, 0.0}, f2 = {-1.0}, f3 = {NAN}, f4 = {inf};
-        CHECK(call_s(&g, &f0) == "Input 'fc' cannot be empty.");
+        CHECK_THROWS_MATCHES(call_s(&g, &f0), std::invalid_argument, Message("Input 'fc' cannot be empty."));
         for (const arma::vec *f : {&f1, &f2, &f3, &f4})
-            CHECK(call_s(&g, f) == "Input 'fc' must be finite and > 0.");
+            CHECK_THROWS_MATCHES(call_s(&g, f), std::invalid_argument, Message("Input 'fc' must be finite and > 0."));
     }
 }

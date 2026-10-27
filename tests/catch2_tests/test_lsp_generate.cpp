@@ -32,6 +32,7 @@
 // SF, XPR.
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_exception.hpp>
 
 #include "quadriga_gbsm.hpp"
 
@@ -49,6 +50,8 @@
 
 #include "qd_test_diag.hpp"
 QD_TEST_DIAG_SWITCH("QD_DIAG_GBSM")
+
+using Catch::Matchers::Message;
 
 namespace
 {
@@ -236,24 +239,6 @@ namespace
         for (arma::uword j = 0; j < 8; ++j)
             rnd(j, j) = 1.0;
         return rnd;
-    }
-
-    // Message of the std::invalid_argument thrown by f, or a marker if none (or another type) was thrown
-    std::string err_msg(const std::function<void()> &f)
-    {
-        try
-        {
-            f();
-        }
-        catch (const std::invalid_argument &e)
-        {
-            return e.what();
-        }
-        catch (...)
-        {
-            return "<other exception>";
-        }
-        return "<no exception>";
     }
 
     // All outputs of one call
@@ -1111,82 +1096,72 @@ TEST_CASE("lsp_generate - input validation")
     SECTION("rx_pos")
     {
         arma::mat bad(3, 2, arma::fill::zeros);
-        CHECK(err_msg([&]
-                      { quadriga_lib::lsp_generate(sp, fc, tx, bad, rnd, lsp); }) == "Input 'rx_pos' must have 3 columns.");
+        CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, fc, tx, bad, rnd, lsp), std::invalid_argument,
+                             Message("Input 'rx_pos' must have 3 columns."));
         bad = rx;
         bad(1, 2) = NAN;
-        CHECK(err_msg([&]
-                      { quadriga_lib::lsp_generate(sp, fc, tx, bad, rnd, lsp); }) == "Input 'rx_pos' must be finite.");
+        CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, fc, tx, bad, rnd, lsp), std::invalid_argument,
+                             Message("Input 'rx_pos' must be finite."));
     }
     SECTION("tx_pos")
     {
         arma::mat bad(1, 2, arma::fill::zeros);
-        CHECK(err_msg([&]
-                      { quadriga_lib::lsp_generate(sp, fc, bad, rx, rnd, lsp); }) == "Input 'tx_pos' must have 3 columns.");
+        CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, fc, bad, rx, rnd, lsp), std::invalid_argument,
+                             Message("Input 'tx_pos' must have 3 columns."));
         bad.zeros(2, 3);
-        CHECK(err_msg([&]
-                      { quadriga_lib::lsp_generate(sp, fc, bad, rx, rnd, lsp); }) ==
-              "Number of rows in 'tx_pos' must be 1 or match the number of rows in 'rx_pos'.");
+        CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, fc, bad, rx, rnd, lsp), std::invalid_argument,
+                             Message("Number of rows in 'tx_pos' must be 1 or match the number of rows in 'rx_pos'."));
         bad = tx;
         bad(0, 0) = INFINITY;
-        CHECK(err_msg([&]
-                      { quadriga_lib::lsp_generate(sp, fc, bad, rx, rnd, lsp); }) == "Input 'tx_pos' must be finite.");
+        CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, fc, bad, rx, rnd, lsp), std::invalid_argument,
+                             Message("Input 'tx_pos' must be finite."));
     }
     SECTION("fc")
     {
-        CHECK(err_msg([&]
-                      { quadriga_lib::lsp_generate(sp, arma::vec(), tx, rx, rnd, lsp); }) == "Input 'fc' cannot be empty.");
-        CHECK(err_msg([&]
-                      { quadriga_lib::lsp_generate(sp, arma::vec({3.5e9, 0.0}), tx, rx, rnd, lsp); }) ==
-              "Input 'fc' must be finite and > 0.");
-        CHECK(err_msg([&]
-                      { quadriga_lib::lsp_generate(sp, arma::vec({NAN}), tx, rx, rnd, lsp); }) ==
-              "Input 'fc' must be finite and > 0.");
+        CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, arma::vec(), tx, rx, rnd, lsp), std::invalid_argument,
+                             Message("Input 'fc' cannot be empty."));
+        CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, arma::vec({3.5e9, 0.0}), tx, rx, rnd, lsp), std::invalid_argument,
+                             Message("Input 'fc' must be finite and > 0."));
+        CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, arma::vec({NAN}), tx, rx, rnd, lsp), std::invalid_argument,
+                             Message("Input 'fc' must be finite and > 0."));
     }
     SECTION("rnd")
     {
-        CHECK(err_msg([&]
-                      { quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd.cols(0, 9), lsp); }) ==
-              "Input 'rnd' must have size [n_link, 11].");
-        CHECK(err_msg([&]
-                      { quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd.rows(0, 1), lsp); }) ==
-              "Input 'rnd' must have size [n_link, 11].");
+        CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd.cols(0, 9), lsp), std::invalid_argument,
+                             Message("Input 'rnd' must have size [n_link, 11]."));
+        CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd.rows(0, 1), lsp), std::invalid_argument,
+                             Message("Input 'rnd' must have size [n_link, 11]."));
         arma::mat bad = rnd;
         bad(2, 4) = NAN;
-        CHECK(err_msg([&]
-                      { quadriga_lib::lsp_generate(sp, fc, tx, rx, bad, lsp); }) == "Input 'rnd' must be finite.");
+        CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, fc, tx, rx, bad, lsp), std::invalid_argument,
+                             Message("Input 'rnd' must be finite."));
     }
     SECTION("sf_sigma")
     {
         arma::mat sf(3, 1, arma::fill::value(4.0));
-        CHECK(err_msg([&]
-                      { quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, &sf); }) ==
-              "Input 'sf_sigma' must have size [n_link, n_freq].");
+        CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, &sf), std::invalid_argument,
+                             Message("Input 'sf_sigma' must have size [n_link, n_freq]."));
         sf.set_size(3, 2), sf.fill(4.0), sf(1, 1) = -1.0;
-        CHECK(err_msg([&]
-                      { quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, &sf); }) ==
-              "Input 'sf_sigma' must be finite and >= 0.");
+        CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, &sf), std::invalid_argument,
+                             Message("Input 'sf_sigma' must be finite and >= 0."));
         sf(1, 1) = NAN;
-        CHECK(err_msg([&]
-                      { quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, &sf); }) ==
-              "Input 'sf_sigma' must be finite and >= 0.");
+        CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, &sf), std::invalid_argument,
+                             Message("Input 'sf_sigma' must be finite and >= 0."));
     }
     SECTION("scenpar")
     {
         scen_t bad = sp;
         bad["DS_VS"] = 4.0, bad["DS_VS_a"] = 0.0, bad["DS_VS_b"] = 0.0;
-        CHECK(err_msg([&]
-                      { quadriga_lib::lsp_generate(bad, fc, tx, rx, rnd, lsp); }) ==
-              "Values of 'DS_VS_a' and 'DS_VS_b' must not both be 0 if 'DS_VS' is > 0.");
+        CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(bad, fc, tx, rx, rnd, lsp), std::invalid_argument,
+                             Message("Values of 'DS_VS_a' and 'DS_VS_b' must not both be 0 if 'DS_VS' is > 0."));
         bad = sp;
         bad["LSP_fc_min"] = -1.0;
-        CHECK(err_msg([&]
-                      { quadriga_lib::lsp_generate(bad, fc, tx, rx, rnd, lsp); }) ==
-              "Value of 'LSP_fc_min' must be finite and >= 0.");
+        CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(bad, fc, tx, rx, rnd, lsp), std::invalid_argument,
+                             Message("Value of 'LSP_fc_min' must be finite and >= 0."));
         bad = sp;
         bad["DS_muX"] = 1.0;
-        CHECK(err_msg([&]
-                      { quadriga_lib::lsp_generate(bad, fc, tx, rx, rnd, lsp); }) == "Unknown key 'DS_muX' in 'scenpar'.");
+        CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(bad, fc, tx, rx, rnd, lsp), std::invalid_argument,
+                             Message("Unknown key 'DS_muX' in 'scenpar'."));
     }
     SECTION("not positive definite")
     {
@@ -1195,10 +1170,8 @@ TEST_CASE("lsp_generate - input validation")
         for (bool chol : {true, false})
         {
             arma::cube out(3, 2, 8, arma::fill::value(-7.0));
-            CHECK(err_msg([&]
-                          { quadriga_lib::lsp_generate(bad, fc, tx, rx, rnd, out, nullptr, nullptr, nullptr, nullptr, nullptr,
-                                                       nullptr, nullptr, chol); }) ==
-                  "LSP cross-correlation matrix in 'scenpar' is not positive definite.");
+            CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(bad, fc, tx, rx, rnd, out, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, chol), std::invalid_argument,
+                                 Message("LSP cross-correlation matrix in 'scenpar' is not positive definite."));
             CHECK(arma::all(arma::vectorise(out) == -7.0)); // output untouched
         }
     }
@@ -1206,20 +1179,35 @@ TEST_CASE("lsp_generate - input validation")
     {
         arma::mat bad = rnd;
         bad(1, 9) = 1.5;
-        CHECK(err_msg([&]
-                      { quadriga_lib::lsp_generate(sp, fc, tx, rx, bad, lsp, nullptr, nullptr, &re); }) ==
-              "Column 9 of 'rnd' must be in the range from 0 to 1.");
-        CHECK(err_msg([&]
-                      { quadriga_lib::lsp_generate(sp, fc, tx, rx, bad, lsp, nullptr, nullptr, nullptr, &im); }) ==
-              "Column 9 of 'rnd' must be in the range from 0 to 1.");
+        CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, fc, tx, rx, bad, lsp, nullptr, nullptr, &re), std::invalid_argument,
+                             Message("Column 9 of 'rnd' must be in the range from 0 to 1."));
+        CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, fc, tx, rx, bad, lsp, nullptr, nullptr, nullptr, &im), std::invalid_argument,
+                             Message("Column 9 of 'rnd' must be in the range from 0 to 1."));
         bad(1, 9) = -0.1;
-        CHECK(err_msg([&]
-                      { quadriga_lib::lsp_generate(sp, fc, tx, rx, bad, lsp, nullptr, nullptr, &re, &im); }) ==
-              "Column 9 of 'rnd' must be in the range from 0 to 1.");
+        CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, fc, tx, rx, bad, lsp, nullptr, nullptr, &re, &im), std::invalid_argument,
+                             Message("Column 9 of 'rnd' must be in the range from 0 to 1."));
         // Not checked when the ground permittivity is not requested
         bad(1, 9) = 1.5;
         arma::vec toa;
         arma::mat eod;
         CHECK_NOTHROW(quadriga_lib::lsp_generate(sp, fc, tx, rx, bad, lsp, nullptr, &toa, nullptr, nullptr, &eod));
+    }
+    SECTION("frequency terms")
+    {
+        // An active term with P_omega + f' <= 0 would give a NaN mean and a std of 0; inactive terms are not checked
+        arma::cube out(3, 2, 8, arma::fill::value(-7.0));
+        scen_t bad = sp;
+        bad["DS_omega"] = -10.0, bad["DS_gamma"] = 1.0, bad["DS_delta"] = 0.0;
+        CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(bad, fc, tx, rx, rnd, out), std::invalid_argument,
+                             Message("Scenario parameter 'DS_omega' plus the frequency in GHz must be > 0 where 'DS_gamma' or 'DS_delta' is not 0."));
+        bad = sp;
+        bad["SF_omega"] = -28.0, bad["SF_delta"] = 1.0; // f' = max(f, LSP_fc_min = 6): -22 and 0
+        CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(bad, fc, tx, rx, rnd, out), std::invalid_argument,
+                             Message("Scenario parameter 'SF_omega' plus the frequency in GHz must be > 0 where 'SF_gamma' or 'SF_delta' is not 0."));
+        CHECK(arma::all(arma::vectorise(out) == -7.0)); // output untouched
+        bad = sp;
+        bad["XPR_omega"] = -10.0, bad["XPR_gamma"] = 0.0, bad["XPR_delta"] = 0.0;
+        CHECK_NOTHROW(quadriga_lib::lsp_generate(bad, fc, tx, rx, rnd, out));
+        CHECK(out.is_finite());
     }
 }

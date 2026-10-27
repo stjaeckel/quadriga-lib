@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_gbsm.hpp"
+#include "quadriga_gbsm_helpers.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -45,6 +46,7 @@ O2I building or car penetration loss of a set of UTs, TR 38.901 clause 7.4.3
 - Applicability (Table 7.4.3-2): RMa uses `low` only, InF `high` only; UMa, UMi: `low` and `high`; SMa: `low`,
   `high` and `low_A`. TR maximum indoor distance: 25 m for UMa, UMi and SMa commercial buildings, 10 m for RMa and
   SMa residential buildings (conf-file key `O2I_d2D_in_max`)
+- Outputs must not share memory with the inputs or with each other
 - Validation, in this order: `fc` non-empty, finite and > 0; `rnd` with 4 columns, columns 0 to 2 in [0, 1],
   column 3 finite; `models` non-empty, each a known name; `weights` with one finite element >= 0 per model and a
   sum of 1 within 1e-6; `d2d_in_max` finite and >= 0. All checks run before any output is written
@@ -92,25 +94,19 @@ void quadriga_lib::o2i_loss(const arma::vec &fc,
                             arma::uvec *model_index)
 {
     // Carrier frequencies
-    if (fc.n_elem == 0)
-        throw std::invalid_argument("Input 'fc' cannot be empty.");
-    for (arma::uword k = 0; k < fc.n_elem; ++k)
-        if (!std::isfinite(fc[k]) || fc[k] <= 0.0)
-            throw std::invalid_argument("Input 'fc' must be finite and > 0.");
+    qd_gbsm_check_fc(fc);
 
     // Random values
     if (rnd.n_cols != 4)
         throw std::invalid_argument("Input 'rnd' must have 4 columns.");
     const arma::uword n_ut = rnd.n_rows, n_freq = fc.n_elem;
-    for (arma::uword c = 0; c < 3; ++c)
-    {
-        const double *pr = rnd.colptr(c);
-        for (arma::uword u = 0; u < n_ut; ++u)
-            if (!(pr[u] >= 0.0 && pr[u] <= 1.0))
-                throw std::invalid_argument("Uniform columns of 'rnd' must be in the range from 0 to 1.");
-    }
-    if (!rnd.col(3).is_finite())
-        throw std::invalid_argument("Column 3 of 'rnd' must be finite.");
+    const double *pr = rnd.memptr(); // column c of UT u at pr[c · n_ut + u]
+    for (arma::uword u = 0; u < 3 * n_ut; ++u)
+        if (!(pr[u] >= 0.0 && pr[u] <= 1.0))
+            throw std::invalid_argument("Uniform columns of 'rnd' must be in the range from 0 to 1.");
+    for (arma::uword u = 3 * n_ut; u < 4 * n_ut; ++u)
+        if (!std::isfinite(pr[u]))
+            throw std::invalid_argument("Column 3 of 'rnd' must be finite.");
 
     // Models: 0 low, 1 high, 2 low_A, 3 legacy_6GHz, 4 car, 5 car_metal
     const char *names[6] = {"low", "high", "low_A", "legacy_6GHz", "car", "car_metal"};

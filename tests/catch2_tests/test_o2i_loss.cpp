@@ -26,12 +26,12 @@
 // (model choice, d2D-in #1, d2D-in #2), column 3 is Normal(0,1) (deviation).
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_exception.hpp>
 
 #include "quadriga_gbsm.hpp"
 
 #include <algorithm>
 #include <cmath>
-#include <functional>
 #include <limits>
 #include <stdexcept>
 #include <string>
@@ -39,6 +39,8 @@
 
 #include "qd_test_diag.hpp"
 QD_TEST_DIAG_SWITCH("QD_DIAG_GBSM")
+
+using Catch::Matchers::Message;
 
 namespace
 {
@@ -63,23 +65,6 @@ namespace
         if (model == "low_A")
             return tw(0.3, L_glass, 0.7, L_ply) + 0.5 * din + 4.4 * N;
         return NAN;
-    }
-
-    std::string err_msg_o2i(const std::function<void()> &f)
-    {
-        try
-        {
-            f();
-        }
-        catch (const std::invalid_argument &e)
-        {
-            return e.what();
-        }
-        catch (...)
-        {
-            return "<other exception>";
-        }
-        return "<no exception>";
     }
 
     // Random values of 5 UTs: U model, U1, U2, N
@@ -336,16 +321,14 @@ TEST_CASE("o2i_loss - input validation")
 
     auto call = [&](const arma::vec &f, const arma::mat &r, const std::vector<std::string> &m, const arma::vec &ww,
                     double d_max)
-    { return err_msg_o2i([&]
-                         { quadriga_lib::o2i_loss(f, r, m, ww, loss, d_max); }); };
+    { quadriga_lib::o2i_loss(f, r, m, ww, loss, d_max); };
 
     SECTION("valid baseline")
     {
-        CHECK(call(fc, rnd5, models, w, 25.0) == "<no exception>");
-        CHECK(call(fc, rnd5, {"low", "high", "low_A", "legacy_6GHz", "car", "car_metal"},
-                   arma::vec{0.1, 0.1, 0.2, 0.2, 0.2, 0.2}, 0.0) == "<no exception>");
-        CHECK(call(fc, rnd5, models, arma::vec{0.4, 0.6 + 9e-7}, 25.0) == "<no exception>");
-        CHECK(call(fc, arma::mat(0, 4), models, w, 25.0) == "<no exception>");
+        CHECK_NOTHROW(call(fc, rnd5, models, w, 25.0));
+        CHECK_NOTHROW(call(fc, rnd5, {"low", "high", "low_A", "legacy_6GHz", "car", "car_metal"}, arma::vec{0.1, 0.1, 0.2, 0.2, 0.2, 0.2}, 0.0));
+        CHECK_NOTHROW(call(fc, rnd5, models, arma::vec{0.4, 0.6 + 9e-7}, 25.0));
+        CHECK_NOTHROW(call(fc, arma::mat(0, 4), models, w, 25.0));
         arma::vec d2d_in;
         arma::uvec idx;
         CHECK_NOTHROW(quadriga_lib::o2i_loss(fc, rnd5, models, w, loss, 25.0, &d2d_in, &idx));
@@ -353,59 +336,80 @@ TEST_CASE("o2i_loss - input validation")
     }
     SECTION("fc")
     {
-        CHECK(call(arma::vec(), rnd5, models, w, 25.0) == "Input 'fc' cannot be empty.");
+        CHECK_THROWS_MATCHES(call(arma::vec(), rnd5, models, w, 25.0), std::invalid_argument,
+                             Message("Input 'fc' cannot be empty."));
         for (double v : {0.0, -1.0, double(NAN), inf_o2i})
         {
             INFO("value " << v);
-            CHECK(call(arma::vec{3.5e9, v}, rnd5, models, w, 25.0) == "Input 'fc' must be finite and > 0.");
+            CHECK_THROWS_MATCHES(call(arma::vec{3.5e9, v}, rnd5, models, w, 25.0), std::invalid_argument,
+                                 Message("Input 'fc' must be finite and > 0."));
         }
     }
     SECTION("rnd")
     {
-        CHECK(call(fc, arma::mat(5, 6, arma::fill::value(0.5)), models, w, 25.0) == "Input 'rnd' must have 4 columns.");
-        CHECK(call(fc, arma::mat(5, 3, arma::fill::value(0.5)), models, w, 25.0) == "Input 'rnd' must have 4 columns.");
-        CHECK(call(fc, arma::mat(0, 3), models, w, 25.0) == "Input 'rnd' must have 4 columns.");
+        CHECK_THROWS_MATCHES(call(fc, arma::mat(5, 6, arma::fill::value(0.5)), models, w, 25.0), std::invalid_argument,
+                             Message("Input 'rnd' must have 4 columns."));
+        CHECK_THROWS_MATCHES(call(fc, arma::mat(5, 3, arma::fill::value(0.5)), models, w, 25.0), std::invalid_argument,
+                             Message("Input 'rnd' must have 4 columns."));
+        CHECK_THROWS_MATCHES(call(fc, arma::mat(0, 3), models, w, 25.0), std::invalid_argument,
+                             Message("Input 'rnd' must have 4 columns."));
         for (arma::uword c = 0; c < 3; ++c)
             for (double v : {-1e-300, 1.0 + 1e-15, double(NAN), inf_o2i})
             {
                 arma::mat r = rnd5;
                 r(2, c) = v;
                 INFO("column " << c << ", value " << v);
-                CHECK(call(fc, r, models, w, 25.0) == "Uniform columns of 'rnd' must be in the range from 0 to 1.");
+                CHECK_THROWS_MATCHES(call(fc, r, models, w, 25.0), std::invalid_argument,
+                                     Message("Uniform columns of 'rnd' must be in the range from 0 to 1."));
             }
         for (double v : {double(NAN), inf_o2i, -inf_o2i})
         {
             arma::mat r = rnd5;
             r(4, 3) = v;
             INFO("value " << v);
-            CHECK(call(fc, r, models, w, 25.0) == "Column 3 of 'rnd' must be finite.");
+            CHECK_THROWS_MATCHES(call(fc, r, models, w, 25.0), std::invalid_argument,
+                                 Message("Column 3 of 'rnd' must be finite."));
         }
     }
     SECTION("models")
     {
-        CHECK(call(fc, rnd5, {}, arma::vec(), 25.0) == "Input 'models' cannot be empty.");
-        CHECK(call(fc, rnd5, {"low", "high_v14"}, w, 25.0) == "Model 'high_v14' is not supported.");
-        CHECK(call(fc, rnd5, {"Low", "high"}, w, 25.0) == "Model 'Low' is not supported.");
-        CHECK(call(fc, rnd5, {"low", "mmMAGIC"}, w, 25.0) == "Model 'mmMAGIC' is not supported.");
-        CHECK(call(fc, rnd5, {"low", ""}, w, 25.0) == "Model '' is not supported.");
+        CHECK_THROWS_MATCHES(call(fc, rnd5, {}, arma::vec(), 25.0), std::invalid_argument,
+                             Message("Input 'models' cannot be empty."));
+        CHECK_THROWS_MATCHES(call(fc, rnd5, {"low", "high_v14"}, w, 25.0), std::invalid_argument,
+                             Message("Model 'high_v14' is not supported."));
+        CHECK_THROWS_MATCHES(call(fc, rnd5, {"Low", "high"}, w, 25.0), std::invalid_argument,
+                             Message("Model 'Low' is not supported."));
+        CHECK_THROWS_MATCHES(call(fc, rnd5, {"low", "mmMAGIC"}, w, 25.0), std::invalid_argument,
+                             Message("Model 'mmMAGIC' is not supported."));
+        CHECK_THROWS_MATCHES(call(fc, rnd5, {"low", ""}, w, 25.0), std::invalid_argument,
+                             Message("Model '' is not supported."));
     }
     SECTION("weights")
     {
-        CHECK(call(fc, rnd5, models, arma::vec{1.0}, 25.0) == "Number of elements in 'weights' does not match number of models.");
-        CHECK(call(fc, rnd5, models, arma::vec{0.2, 0.3, 0.5}, 25.0) == "Number of elements in 'weights' does not match number of models.");
-        CHECK(call(fc, rnd5, models, arma::vec{-0.1, 1.1}, 25.0) == "Input 'weights' must be finite and >= 0.");
-        CHECK(call(fc, rnd5, models, arma::vec{NAN, 1.0}, 25.0) == "Input 'weights' must be finite and >= 0.");
-        CHECK(call(fc, rnd5, models, arma::vec{inf_o2i, 1.0}, 25.0) == "Input 'weights' must be finite and >= 0.");
-        CHECK(call(fc, rnd5, models, arma::vec{0.4, 0.5}, 25.0) == "Input 'weights' must sum to 1.");
-        CHECK(call(fc, rnd5, models, arma::vec{0.4, 0.6 + 2e-6}, 25.0) == "Input 'weights' must sum to 1.");
-        CHECK(call(fc, rnd5, models, arma::vec{0.0, 0.0}, 25.0) == "Input 'weights' must sum to 1.");
+        CHECK_THROWS_MATCHES(call(fc, rnd5, models, arma::vec{1.0}, 25.0), std::invalid_argument,
+                             Message("Number of elements in 'weights' does not match number of models."));
+        CHECK_THROWS_MATCHES(call(fc, rnd5, models, arma::vec{0.2, 0.3, 0.5}, 25.0), std::invalid_argument,
+                             Message("Number of elements in 'weights' does not match number of models."));
+        CHECK_THROWS_MATCHES(call(fc, rnd5, models, arma::vec{-0.1, 1.1}, 25.0), std::invalid_argument,
+                             Message("Input 'weights' must be finite and >= 0."));
+        CHECK_THROWS_MATCHES(call(fc, rnd5, models, arma::vec{NAN, 1.0}, 25.0), std::invalid_argument,
+                             Message("Input 'weights' must be finite and >= 0."));
+        CHECK_THROWS_MATCHES(call(fc, rnd5, models, arma::vec{inf_o2i, 1.0}, 25.0), std::invalid_argument,
+                             Message("Input 'weights' must be finite and >= 0."));
+        CHECK_THROWS_MATCHES(call(fc, rnd5, models, arma::vec{0.4, 0.5}, 25.0), std::invalid_argument,
+                             Message("Input 'weights' must sum to 1."));
+        CHECK_THROWS_MATCHES(call(fc, rnd5, models, arma::vec{0.4, 0.6 + 2e-6}, 25.0), std::invalid_argument,
+                             Message("Input 'weights' must sum to 1."));
+        CHECK_THROWS_MATCHES(call(fc, rnd5, models, arma::vec{0.0, 0.0}, 25.0), std::invalid_argument,
+                             Message("Input 'weights' must sum to 1."));
     }
     SECTION("d2d_in_max")
     {
         for (double v : {-1.0, double(NAN), inf_o2i})
         {
             INFO("value " << v);
-            CHECK(call(fc, rnd5, models, w, v) == "Input 'd2d_in_max' must be finite and >= 0.");
+            CHECK_THROWS_MATCHES(call(fc, rnd5, models, w, v), std::invalid_argument,
+                                 Message("Input 'd2d_in_max' must be finite and >= 0."));
         }
     }
 }

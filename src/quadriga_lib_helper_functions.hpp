@@ -562,25 +562,25 @@ static inline double qd_sos_uniform(std::mt19937_64 &rng)
     return (double)(rng() >> 11) * (1.0 / 9007199254740992.0);
 }
 
-// Linear interpolation of an ACF table at distance d, the last value is used beyond the last sample point
-// and the first value below the first sample point; 'dist' must increase strictly
-static inline double qd_sos_acf_interp(const double *acf, const double *dist, size_t n_acf, double d)
+// Linear interpolation of a table y(x) at x0 (e.g. an ACF table y = acf at the distances x = dist), the last value
+// is used beyond the last sample point and the first value below the first sample point; 'x' must increase strictly
+static inline double qd_interp_linear(const double *y, const double *x, size_t n, double x0)
 {
-    if (d >= dist[n_acf - 1])
-        return acf[n_acf - 1];
-    if (d <= dist[0])
-        return acf[0];
-    size_t lo = 0, hi = n_acf - 1;
+    if (x0 >= x[n - 1])
+        return y[n - 1];
+    if (x0 <= x[0])
+        return y[0];
+    size_t lo = 0, hi = n - 1;
     while (hi - lo > 1)
     {
         size_t mid = (lo + hi) / 2;
-        if (dist[mid] <= d)
+        if (x[mid] <= x0)
             lo = mid;
         else
             hi = mid;
     }
-    double w = (d - dist[lo]) / (dist[hi] - dist[lo]);
-    return acf[lo] + w * (acf[hi] - acf[lo]);
+    double w = (x0 - x[lo]) / (x[hi] - x[lo]);
+    return y[lo] + w * (y[hi] - y[lo]);
 }
 
 // Validate an ACF table given as (acf, dist), throws std::invalid_argument
