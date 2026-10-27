@@ -70,6 +70,10 @@ Large-scale parameters of a set of links from normalized random values
   wet (`U = 1`). The imaginary part is >= 0; TR 38.901 eq. (7.6-40) writes the complex permittivity
   with the opposite sign of the imaginary part, so the TR reflection formulas take the complex
   conjugate `gr_eps_re - j·gr_eps_im`
+- The three ground types are QuaDRiGa's fits (as in QuaDRiGa's `gen_lsf_parameters`), not the models
+  of TR 38.901 Table 7.6.8-1: very dry ground agrees, medium and wet ground differ (e.g. at 3.5 GHz
+  medium `16.87 + j·0.67` here, `13.23 + j·1.39` for medium dry ground of the table; wet `j·1.65`
+  vs. `j·3.93`). A caller who needs the table values computes them with eq. (7.6-40) to (7.6-42)
 - Column 10 of `rnd` must be in [0, 1] when `gr_eps_re` or `gr_eps_im` is requested, i.e. with 3 or
   more outputs; it is not checked otherwise. The error message counts the columns from 0
   ("Column 9 of 'rnd' ...")

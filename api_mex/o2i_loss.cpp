@@ -44,7 +44,9 @@ O2I building or car penetration loss of a set of UTs, TR 38.901 clause 7.4.3
   of the legacy outdoor distance of [[path_loss]]
 - Applicability (Table 7.4.3-2): RMa uses `low` only, InF `high` only; UMa, UMi: `low` and `high`;
   SMa: `low`, `high` and `low_A`. TR maximum indoor distance: 25 m for UMa, UMi and SMa commercial
-  buildings, 10 m for RMa and SMa residential buildings (conf-file field `O2I_d2D_in_max`)
+  buildings, 10 m for RMa and SMa residential buildings (conf-file field `O2I_d2D_in_max`). The TR
+  SMa layout has 90 % residential and 10 % commercial buildings (Table 7.2-5): split the UTs by
+  building type and call `o2i_loss` once per type
 - Validation, in this order: `fc` non-empty, finite and > 0; `rnd` with 4 columns, columns 1 to 3 in
   [0, 1], column 4 finite; `models` non-empty, each a known name; `weights` with one finite element
   >= 0 per model and a sum of 1 within 1e-6; `d2d_in_max` finite and >= 0. The error messages count

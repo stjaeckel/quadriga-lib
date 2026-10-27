@@ -1037,8 +1037,8 @@ TEST_CASE("conf_file_write - the new keys land in their section and paragraph an
         const std::string text = slurp(f.fn);
         QD_DIAG("\n# diag: conf_file_write new keys\n%s\n", text.c_str());
 
-        const std::string los = "LOS_state_lambda =     50           % decorrelation distance of the LOS/NLOS state [m]; 0 = uncorrelated\n",
-                          io = "IO_state_lambda =      50           % decorrelation distance of the indoor/outdoor state [m]; 0 = uncorrelated\n",
+        const std::string los = "LOS_state_lambda =     50           % decorrelation distance of the LOS/NLOS state [m], stated in the NLOS file of a scenario; 0 = not stated here\n",
+                          io = "IO_state_lambda =      50           % decorrelation distance of the indoor/outdoor state [m], stated in the O2I files of a scenario; 0 = not stated here\n",
                           o2i = "O2I_d2D_in_max =       25           % maximum indoor 2D distance of O2I UTs [m]; 0 = not stated\n",
                           vs = "DS_VS =                4            % volume-to-surface ratio V/S of the hall [m]; 0 = no V/S term\n",
                           vsa = "DS_VS_a =              30           % factor a of the DS term log10(a V/S + b) [1/m]\n",

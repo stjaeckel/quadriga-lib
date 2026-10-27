@@ -89,7 +89,7 @@ namespace
         if (k == "LNS_ksi") return 3.0;
         if (k == "absTOA_mu") return -100.0;
         if (k == "absTOA_lambda" || k == "SC_lambda") return 0.0;
-        if (k == "LOS_state_lambda" || k == "IO_state_lambda") return 0.0; // state distances: 0 = uncorrelated
+        if (k == "LOS_state_lambda" || k == "IO_state_lambda") return 0.0; // state distances: 0 = not stated
         if (k == "ES_D_mu_min") return -INF;
         if (ends_with(k, "_lambda")) return 20.0; // the 8 decorrelation distances
         if (k == "DS_mu") return -6.0;
