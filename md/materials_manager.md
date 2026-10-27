@@ -32,17 +32,17 @@ the guidelines, drafts 2–4, after two independent reviews).
 - `md/acoustic_engine_stage2b_issues.md`: engine issues 1–5 with sizes and reproductions, and the ISSUE convention.
   Engine findings are recorded there, never fixed in step 3.
 
-**The rig:** `tests/catch2_tests/test_acoustic_materials.cpp` (677 lines, `namespace mt`): stacks room side first
-(sheets in front, traced solids behind, `quadriga_lib::plane` / `cube`), transmission through `calc_diffraction_gain`
+**The rig:** `tests/catch2_tests/test_acoustic_materials.cpp` (namespace `mt`; size and counts in the State line
+below): stacks room side first (sheets in front, traced solids behind, one sheet at the last solid's exit, `quadriga_lib::plane` / `cube`), transmission through `calc_diffraction_gain`
 (lod 0, scalar, threshold 0), reflection through aimed rays and `ray_progress` (refraction off, threshold 0), plane
 waves, coherent sums, 50 angles × one tone per third 25 Hz–10 kHz as the default grid argument, octaves as in the
 research data, the library's sound speed (342.76271 m/s); `mt::check_material` (sheet = traced solid, tier 1 against
-the plate rule or the fluid-layer transfer matrix, R + T ≤ 1, diagnostics, tier 2). Six cases, 197 assertions, 0.14 s.
+the plate rule or the fluid-layer transfer matrix, R + T ≤ 1, diagnostics, tier 2).
 `data/materials_acoustic.csv` holds one preliminary row, `concrete_cast_152mm` (page 11.4; breaks the naming rule; to
 be redone as the `concrete` family on the research data's Litvin values).
 
-**Baselines** (generic `build_linux`, at 69a4555, the extended rig): `[wave]` 163474 / 178,
-`[acoustic]` 43143 / 69 (the rig included), whole suite 1347259 / 1312. Files `test_wave.txt`, `test_acoustic.txt`,
+**Baselines** (generic `build_linux`, at e5d3743, the reviewed rig): `[wave]` 163474 / 178,
+`[acoustic]` 43002 / 69 (the rig included), whole suite 1347118 / 1312. Files `test_wave.txt`, `test_acoustic.txt`,
 `test.txt` in the repository root (untracked).
 
 **Research:** the hand-over of 2026-10-27 (`md/materials/research_request_2026-10-27.md`: request 0 stable row ids,
@@ -51,9 +51,9 @@ wait: rows needing new data move down the order.
 
 **Next item: the rig extension** (one rig agent, phases plan → build, as in phase 1; brief from the agent template's
 rig variant; brief `md/materials/rig_ext_brief.md` written 2026-10-27, Stephan's choices for it in the section-9 log).
-**State 2026-10-27:** items 1–9 built (rig 908 lines, 10 `[materials]` cases, 402 assertions), checked by the
-manager, documents updated, waiting for Stephan's review and commit; then the baselines are regenerated and item 10
-(the object test, cap of 10 interactions, porous body to the budget) is phase 3 of the same agent.
+**State 2026-10-27:** items 1–9 built and committed (69a4555), reviewed twice independently and fixed (e5d3743: rig
+906 lines; the second review's fixes then: 917 lines, 10 `[materials]` cases, 262 assertions, 0.4 s). Next: item 10, the
+object test (cap of 10 interactions, porous body to the budget), phase 3 of the same agent.
 Everything the documents need before material 1:
 1. a thickness argument for rows with `thk` 0 (generic solids, porous bodies, finish solids, ground rows);
 2. a specimen side per measured reference, and the class envelope shifted to the evaluated thickness by the mass law;
@@ -573,6 +573,20 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     `isfinite`, 16 porous per-octave checks, 5 T checks that could not fail, 1 assertion on an ISSUE line; +7);
     `[materials]` 0.36 s at 12 threads, load 3.4–5.6; `check_docs.py` passes. To Stephan with a summary and a commit
     message.
+  - Committed by Stephan (e5d3743, 2026-10-27). Baselines regenerated at e5d3743: `[wave]` 163474 / 178,
+    `[acoustic]` 43002 / 69, whole suite 1347118 / 1312. Second independent review r04 started (same procedure; brief
+    `md/materials/r04_rig_review_brief.md`: own pass first, then the r03 fixes checked and what r03 missed).
+  - r04 done 2026-10-27 (`md/materials/r04_rig_review.md`): r03 fixes right except three incomplete; 8 new findings.
+    Manager rerun of `[p1]`, `[p2]`, `[p3]`, `[p7]`: all reproduce (NaN in R and T at 250 Hz prints the clean numbers
+    and passes every bound; the specimen-side rerun never runs; paths equal `transmit()` within 2e-5 dB on single-path
+    stacks; `set_length` has no effect; Komatsu NaN at 50 Pa·s/m², 10 kHz). No finding needs Stephan: the rig agent
+    works them in (brief revision 3); the manager fixed the documents (section 0 rig and State lines; wish-list 1.10
+    "at or above 2–3 ×" and the per-node reference print; trap: dense leaf on a `tf` wall 1.76e-2 in R).
+  - Second review fixes done 2026-10-27 (rig 917 lines). Manager checks: rebuild clean; `[wave]` identical;
+    `[acoustic]` 43003 / 69, 118951 numbers identical, two last-digit moves (Litvin at its side 3.523 m) and one new
+    line (double leaf: paths against `transmit()` 4.95e-5 dB); whole suite 1347119 / 1312; `[materials]` 0.48 s at
+    10 threads, load 5–12; the NaN probe now fails every check (dT, dR, R + T infinite, tier 2 false);
+    `check_docs.py` passes. To Stephan with a summary and a commit message.
 
 ## 10. Scope of phase 0 (2026-10-23; naming and combinations superseded by wish-list 1.6 and section 3)
 
@@ -656,6 +670,8 @@ Leftovers of step 2 to settle where they fall: page section 9 says `irr_glass` f
   up to 0.999); `calc_diffraction_gain` (one path) is right for one layer, sheet | sheet and sheet | solid, not for a
   solid | solid of two wave media (4.9 dB, T > 1).
 - **Coherent sums:** layered constructions need the coherent path sum; the power sum is off by up to 0.39 in octave α.
+- **A dense leaf on a `tf` wall:** the wall's pad referred to air (notes 9.2) costs 1.76e-2 in R for a leaf (6.3e-3 for
+  wool); leaf-on-wall cases need a reflection bound of about 0.04 (review r04).
 - **Fits:** bound and densely sample; select on the evaluation grid; the mass level bound must reach about 3200 for a
   423 kg/m² wall; clip τ at one per frequency, not per band; coincidence needs about 4000 angles.
 

@@ -196,14 +196,14 @@ A floor of 4 × 5 m would be 4.47 m; on a heavy slab the effect is small (page 1
   of measurements and models it was judged against. The rig documents itself; this list is updated from the result.
 - **ISSUE convention (decided):** a rig comparison that misses because of an engine limit carries a comment
   `ISSUE <n>:` naming the stage-2b issue and asserts nothing; the measured and the reference values go into the
-  diagnostics; the issue has an entry in `md/acoustic_engine_stage2b_issues.md`. Known engine issues never make the
-  suite fail. The transmission of a box of air in front of a fill is taken from the traced paths at a cap of 10
+  diagnostics (for a per-node comparison the largest deviation and its node stand for the reference); the issue has
+  an entry in `md/acoustic_engine_stage2b_issues.md`. Known engine issues never make the suite fail. The transmission of a box of air in front of a fill is taken from the traced paths at a cap of 10
   interactions (production runs: 20 to 30); reflection runs to the engine's limit, its change at the cap is printed.
 - **Tolerances (decided; may move with more data):**
 
   | check | against | tolerance | assertion |
   | --- | --- | --- | --- |
-  | independent physics | the model written in the test (plate, transfer matrix, porous layer) | 2–3 × the measured maxima of the rig's self-checks | CHECK |
+  | independent physics | the model written in the test (plate, transfer matrix, porous layer) | at or above 2–3 × the measured maxima of the rig's self-checks (wide gates are preferred) | CHECK |
   | measured single reference | the converted reference at its own specimen side | ±3 dB / ±0.05 (plus the conversion budget) | CHECK, or printed with ISSUE |
   | class row | the envelope of the class's walls, each shifted to the evaluated thickness by the mass law (20·log₁₀ of the surface-mass ratio; the row's surface mass is `e`·ρ₀·`thk`, a lumped row's the stated one) | ±1 dB | as above |
   | regression guard | the library's own measured result | about 1 dB / 0.01 in α | CHECK |

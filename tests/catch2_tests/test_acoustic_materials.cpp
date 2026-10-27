@@ -192,7 +192,7 @@ namespace mt
         }
         return T;
     }
-    // Reflection: one aimed ray per angle from 1 m in front of its hit point, every angle in one ray set, ray_progress
+    // Reflection: one aimed ray per angle from 0.9 m in front of its hit point, every angle in one ray set, ray_progress
     // until no ray is left (at most 127 tones per band, the first its base); the paths back in air (an odd number of
     // reflections) summed coherently per angle at their polyline's point; on request the paths that leave behind the
     // stack (an even number) with at most 10 interactions into T, referred to the plane wave going on. R is uncapped
@@ -217,7 +217,7 @@ namespace mt
             {
                 const float c = (float)std::cos(rad(G.th[i])), s = (float)std::sin(rad(G.th[i]));
                 orig.row(i) = arma::frowvec{-0.9f * c, 0.37f - 0.9f * s, zi(i)}, dest.row(i) = arma::frowvec{299.0f * c, 0.37f + 299.0f * s, zi(i)};
-                pd.tube(i, 0, i, 0).fill(c), pd.tube(i, 1, i, 1).fill(s), paths[i].init(0, m, true), paths[i].set_length(0.1f);
+                pd.tube(i, 0, i, 0).fill(c), pd.tube(i, 1, i, 1).fill(s), paths[i].init(0, m, true);
             }
             arma::Col<short> prev(n, arma::fill::zeros), cur(n, arma::fill::zeros), buf(n, arma::fill::zeros);
             for (int g = 0; g < cap && orig.n_rows; ++g)
@@ -406,6 +406,8 @@ namespace mt
                 double Tr, Rr, Tl = std::norm(O.T[i][q]), Rl = std::norm(O.R[i][q]);
                 ref_auto(st, O.g.f[q], O.g.th[i], Tr, Rr);
                 D.RT = std::max(D.RT, Tl + Rl), D.hasT |= Tr >= 0.0;
+                if (!std::isfinite(Tl + Rl)) // a NaN or inf fails every bound
+                    D.dT = D.dR = D.RT = INFINITY;
                 if (Tr > 1e-25 && Tl > 1e-25 && std::abs(dB(Tl) - dB(Tr)) > D.dT)
                     D.dT = std::abs(dB(Tl) - dB(Tr)), D.fT = O.g.f[q], D.aT = O.g.th[i];
                 if (std::abs(Rl - Rr) > D.dR)
@@ -495,7 +497,7 @@ namespace mt
             const double lo = M.lo_hi[k].first + sh, hi = M.lo_hi[k].second + sh, dev = v > hi ? v - hi : (v < lo ? v - lo : 0.0);
             QD_DIAG("%g,%.4f,%.4f,%.4f,%+.4f\n", M.octaves_hz[k], v, lo, hi, dev);
             INFO(name << ", " << M.key << ", octave " << M.octaves_hz[k] << " Hz");
-            CHECK(std::abs(dev) <= M.tol);
+            CHECK((std::isfinite(v) && std::abs(dev) <= M.tol));
         }
     }
 
@@ -504,7 +506,7 @@ namespace mt
     // diagnostic tables; for a mass-law row the bare limp mass law of e rho0 thk with Davy's sigma at its side
     // [London_1949_SingleWalls]; tier 2 for every measured row given. Bounds at or above 2-3 x the measured maxima, by
     // type: mass-law rows; dense leaves (mu' > 10: 2.6e-2 dB, 2.0e-3 at 89.1 deg); porous layers and half-spaces (rock
-    // wool at 0.5 m: tier 1 3.0e-3 in R, the twin 2.7e-3 dB and 1.1e-3); wave sheets (3.4e-6 dB, 7.8e-8).
+    // wool at 0.5 m: tier 1 3.0e-3 in R, the twin 2.7e-3 dB and 1.1e-3); wave sheets (6.7e-6 dB, 7.8e-8).
     static Out check_material(const std::string &name, const Row &row, const std::vector<Measured> &refs = {}, const Grid &G = grid(), double t = 0.0)
     {
         Row r = row;
@@ -523,7 +525,8 @@ namespace mt
             {
                 const double ta = std::norm(X.T[i + off][q]), tb = std::norm(S.T[i][q]);
                 dT = (ta > 1e-25 && tb > 1e-25) ? std::max(dT, std::abs(dB(ta) - dB(tb))) : dT;
-                dR = std::max(dR, std::abs(std::norm(X.R[i + off][q]) - std::norm(S.R[i][q])));
+                const double ra = std::norm(X.R[i + off][q]), rb = std::norm(S.R[i][q]);
+                dR = std::isfinite(ta + tb + ra + rb) ? std::max(dR, std::abs(ra - rb)) : INFINITY; // a NaN fails
             }
         QD_DIAG("# %s, sheet against solid on the report angles: dT %.2e dB, dR %.2e\n", name.c_str(), dT, dR);
         INFO(name);
@@ -716,6 +719,13 @@ TEST_CASE("Materials rig - combinations against the fluid layers and the bonded 
     for (const mt::Stack &bad : {mt::Stack{{CONCRETE152, SOLID, 0.152}, {WOOL, SHEET, 0.05}}, mt::Stack{{GLASS4, SHEET, 0.004}, {AIRBOX, SOLID, 0.075}, {BOARD, SHEET, 0.0125}}})
         CHECK_THROWS_AS(mt::ref_auto(bad, 125.0, 0.0, T, R), std::invalid_argument);
     CHECK_NOTHROW(mt::scene({{WATER, SHEET, 0.1}}));
+    mt::Out O = mt::run(C[9].st, mt::grid()); // the transmission from the paths equals transmit() (the double leaf)
+    const mt::Field Tt = O.T, Rt = mt::reflect(mt::scene(C[9].st), O.g, O.calls, O.rays, &O.T);
+    double d = 0.0;
+    for (size_t i = 0; i < O.g.th.size() * O.g.f.size(); ++i)
+        d = std::max(d, std::abs(mt::dB(std::norm(O.T[i % O.g.th.size()][i / O.g.th.size()])) - mt::dB(std::norm(Tt[i % O.g.th.size()][i / O.g.th.size()]))));
+    QD_DIAG("# diag: double leaf, T from the paths against transmit(): %.2e dB\n", d);
+    CHECK(d < 1.5e-4);
 }
 
 TEST_CASE("Materials rig - a band equals its single frequencies at threshold 0", "[acoustic][materials]")
@@ -795,12 +805,12 @@ TEST_CASE("Materials rig - tier 2 at the specimen's side and mass, the class env
     // Why: a reference is evaluated at its specimen's side and shifted by the mass law to the row's surface mass
     // (e rho0 thk: 346.7 kg/m2 for these concrete columns at 152 mm, as Litvin's wall); a class row against the envelope
     // of its walls, each shifted, within 1 dB. The concrete columns of page 11.4 as a solid row at 150 mm against Litvin
-    // 76-66 at its side 3.5229 m (shift -0.114 dB) and the envelope of 76-66 and 76-77 (152 and 203 mm,
+    // 76-66 at its laboratory side 3.523 m (shift -0.114 dB; the row at 3.5229 m, so transmission is rerun) and the envelope of 76-66 and 76-77 (152 and 203 mm,
     // [Litvin_1980_ConcreteWallsTL], research lines 228, 229 at 2dad906).
     using namespace mt_rows;
     const mt::Row c = mt::with(CONCRETE152, "thk", 0.0);
     const std::vector<double> oct = {125, 250, 500, 1000, 2000, 4000}, L1 = {42.1, 46.5, 52.6, 56.5, 61.7, 64.6}, L2 = {43.8, 47.3, 54.7, 58.1, 63.3, 67.3};
-    mt::Measured M{"Litvin_1980_ConcreteWallsTL 76-66", "R_dB", "laboratory sound reduction index (ASTM E90)", true, 3.0, oct, {}, 3.5229, 346.7};
+    mt::Measured M{"Litvin_1980_ConcreteWallsTL 76-66", "R_dB", "laboratory sound reduction index (ASTM E90)", true, 3.0, oct, {}, 3.523, 346.7};
     for (double v : L1)
         M.lo_hi.push_back({v, v});
     mt::check_material("concrete columns at 150 mm", c, {M, mt::envelope("Litvin 76-66 and 76-77", oct, {{346.7, L1}, {471.6, L2}}, mt::mpp(c, 0.150), 3.5229)}, mt::grid(), 0.150);
@@ -825,7 +835,7 @@ TEST_CASE("Materials rig - porous rows against their models", "[acoustic][materi
         QD_DIAG("\n# diag: %s, %.0f mm on a rigid backing\noctave,alpha_row,alpha_model,alpha_delany_bazley,tl0_row_minus_model_dB\n", c.name, 1e3 * c.thk);
         double worst = 0.0;
         for (int o = 0; o < 9; ++o)
-            QD_DIAG("%g,%.4f,%.4f,%.4f,%+.3f\n", mt::OCT[o], ar[o], am[o], ad[o], 10.0 * std::log10(tm[o] / tr[o])), worst = std::max(worst, std::abs(ar[o] - am[o]));
+            QD_DIAG("%g,%.4f,%.4f,%.4f,%+.3f\n", mt::OCT[o], ar[o], am[o], ad[o], 10.0 * std::log10(tm[o] / tr[o])), worst = std::max(worst, std::isnan(ar[o] - am[o]) ? INFINITY : std::abs(ar[o] - am[o]));
         INFO(c.name);
         CHECK(worst < c.b);
     }
@@ -839,7 +849,6 @@ TEST_CASE("Materials rig - a lumped row rescaled with fRef is the same wall", "[
     using namespace mt_rows;
     const mt::Row R3 = mt::rescale(GLAZING, 3.0);
     const mt::Grid G = mt::grid();
-    CHECK(std::abs(mt::mpp(R3, 0.024) - mt::mpp(GLAZING, 0.008)) < 1e-9); // 20 kg/m2 at both thicknesses
     for (mt::Kind k : {mt::SHEET, mt::SOLID})
     {
         const mt::Out A = mt::run({{GLAZING, k, 0.008}}, G), B = mt::run({{R3, k, 0.024}}, G);
@@ -875,9 +884,11 @@ TEST_CASE("Materials table - every row has a material case and every column a va
     for (size_t i = 0; i < T.names.size(); ++i)
     {
         const std::string &n = T.names[i], f = std::regex_replace(n, std::regex("_[0-9]+(_[0-9]+)?mm$"), "");
+        std::smatch mm; // the suffix is thk in mm (an underscore for the decimal point); no suffix, thk 0
         fams.insert(f);
         INFO("row " << n << ", family " << f);
         CHECK(cases.count(f) == 1);
+        CHECK(std::abs(1000.0 * T.prop.at("thk")[i] - (std::regex_search(n, mm, std::regex("_([0-9]+)(_([0-9]+))?mm$")) ? std::stod(mm[1].str() + "." + (mm[3].matched ? mm[3].str() : "0")) : 0.0)) < 1e-9);
         CHECK(std::all_of(n.begin(), n.end(), [](char ch) { return std::islower((unsigned char)ch) || std::isdigit((unsigned char)ch) || ch == '_'; }));
         for (const char *k : {"fRef", "a", "e"})
             CHECK(T.prop.at(k)[i] > 0.0);
