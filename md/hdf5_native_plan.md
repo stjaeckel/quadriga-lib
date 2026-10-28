@@ -34,7 +34,7 @@ that writes and reads the quadriga-lib channel file format directly as binary fi
 | D12 | Spec review stops    | The manager acts as reviewer at review points A, B and C of `md/SPEC_CPP_API.md` and logs each decision. It stops for the user only on the escalation conditions in §8. |
 | D13 | Commits              | Four milestone commits on `hdf5-native`: (1) this plan, (2) extended tests with `src/` unchanged, (3) the spec after its three reviews, (4) implementation, build purge and docs after the three code reviews. Nothing is pushed or merged. |
 | D14 | Test gates           | Before commits 2 and 4, all suites must be green: Catch2, Python (pytest), MATLAB R2024a, MATLAB R2026a, Octave. |
-| D15 | Benchmark            | Two mixes of ~5 GB each, v2 (libhdf5, v0.12.4) against v3: (a) MIMO: ~2000 channels × 10 snapshots × 16×4 antennas × 200 paths; (b) ray-tracing route: ~20k channels × 100 snapshots × SISO × 20 paths with all path fields. Write and read times are measured. |
+| D15 | Benchmark            | Two mixes of ~5 GB each, v2 (libhdf5, v0.12.4) against v3: (a) MIMO: ~2000 channels × 10 snapshots × 16×4 antennas × 200 paths; (b) ray-tracing route: ~20k channels × 100 snapshots × SISO × 20 paths with all path fields. Write and read times are measured. Update P1: mix b uses 7000 channels so that the v2 file stays at ~5 GB (20k would be ~14 GB); mix a uses 3200 channels for ~5 GB. |
 
 ## 3. Current state (v0.12.4)
 
@@ -74,9 +74,10 @@ Only this subset is implemented:
 - Append-only: all objects of a channel (group header, snapshot groups, datasets, attributes, data) are built in
   one memory buffer and written with one `fwrite` at the end of the file. Small datasets use compact layout (data
   inside the object header); larger ones are contiguous and follow their header.
-- In-place updates after the append, in an order that keeps the file consistent if the write is interrupted:
-  the new link in the parent group, the `Order` and `ChannelRef` entries of the slot (a few bytes, not the whole
-  index), then the superblock EOF address and checksum.
+- In-place updates after the append, in an order that keeps the file consistent if the write is interrupted
+  (corrected by the spike P2.1: libhdf5 cannot open a link past the stored EOF and truncates the file to it on a
+  read-write close): the superblock EOF address and checksum first, then the new link in the parent group, then the
+  `ChannelRef` and `Order` entries of the slot (a few bytes, not the whole index), then removal of an old link.
 - Growable link lists (root group, `Data` groups): object-header chunks get reserved NIL-message slack. When a chunk
   is full, a new continuation chunk with geometrically growing capacity is appended and linked from slack reserved
   in the previous chunk. Changing a chunk means rewriting only that chunk and its checksum. How libhdf5 deals with
@@ -170,7 +171,8 @@ do not overlap:
    the libhdf5 interop test as soon as files can be written.
 2. Rewrite `src/qd_channel_hdf5.cpp` on top of it; all P1 API tests must pass unchanged, except the tests listed as
    v2-specific (D4) and the version tests (D9).
-3. Replace `test_hdf_robustness.cpp` with v3 byte-level corruption tests (no libhdf5). Move the interop tests there
+3. Replace `test_hdf_robustness.cpp` with v3 byte-level corruption tests (no libhdf5) in
+   `test_hdf_robustness_internal.cpp` (it includes the internal header; `md/SPEC_CPP_API.md` naming). Move the interop tests there
    or into their own file.
 4. Remove `get_HDF5_version` (D9) across C++, MEX, Python, tests and docs.
 5. Build-system and packaging purge (D11); README/install docs; remove `external/hdf5-1.14.6.zip`.
@@ -259,7 +261,7 @@ do not overlap:
 ## 10. Risks
 | Risk | Mitigation |
 |------|------------|
-| libhdf5 rejects or slowly reads very large compact link lists | Spike P2.1 at 10^6 links; fallback: symbol-table root group (v1 B-tree + local heap) inside the v2 object header. |
+| libhdf5 rejects or slowly reads very large compact link lists | Spike P2.1 at 10^6 links; fallback: symbol-table root group (v1 B-tree + local heap) inside the v2 object header. Result: compact links read correctly at 10^6 (lookup ≤ 0.2 s); no fallback needed. |
 | Subtle conformance errors that libhdf5 tolerates but other readers don't | Interop test with libhdf5 on every test file; R1/C1 reviews against the published spec. |
 | MSVC build breaks (not testable here) | Portable code rules (§4.4), C3 review; avoid compiler-specific builtins. |
 | `-z nodelete` removal destabilizes MATLAB | Verify `clear mex` and MATLAB exit in R2024a and R2026a before removing; keep it if in doubt and log why. |
