@@ -110,7 +110,10 @@ Check every recipe against this list; the material list's recipes avoid them.
 - **Floors.** Slab and bonded screed are one solid of their full thickness (`concrete`). A hard finish (parquet,
   vinyl, ceramic tile) on which a rug lies or an object stands is a thin traced solid (`parquet`, `vinyl`,
   `ceramic_tile`) on top: two bonded bodies, which deviate from the bonded plate by at most 2.0 dB at 16 kHz
-  (stage-2b issue 3). The finish sheets (`parquet_15mm`, ...) serve only where nothing lies or stands on them.
+  (stage-2b issue 3). The finish sheets (`parquet_15mm`, ...) serve only where nothing lies or stands on them. Draw a
+  finish solid at least 1.6 mm thick (thinner traced bodies lose part of their mass, 0.11 dB). A rug
+  (`carpet_tile_11mm`) is a sheet on the finish solid; on parquet or vinyl it is within 0.7 dB of the rug on the slab
+  in transmission. Carpet rows are named by the tile a modeler sees; their `thk` is the pile.
 - **Leaf floors** (boards on joists, floating laminate) carry nothing in the model: a rug on them is three co-located
   faces (a miss candidate, stage-2b issue 5); leave the rug out or draw it on a separate patch of solid floor.
 - **Floating screed:** `screed` solid on a resilient layer on the slab; how the resilient layer is carried is open

@@ -94,7 +94,9 @@ findings are recorded as stage-2b issues in the meantime. A complete table matte
 - **The thickness suffix marks a sheet.** A row whose name ends in `_<NN>mm` is a sheet of that thickness; the
   suffix always comes last. A row without it is a traced solid, whose thickness comes from the geometry. A decimal
   point becomes an underscore. Examples: `concrete` (solid), `concrete_150mm` (sheet); `parquet` (solid),
-  `parquet_15mm` (sheet); `gypsum_leaf_12_5mm` (sheet).
+  `parquet_15mm` (sheet); `gypsum_leaf_12_5mm` (sheet). A porous sheet keeps its true thickness, which may be less
+  than the product's: its `thk` is at most the suffix (decided 2026-10-28; `carpet_tile_11mm` carries its 6.5 mm pile;
+  the table case checks it).
 - **Generic solid and round sheets.** Sheet rows exist at round thicknesses. A measured reference is compared with
   the sheet of the nearest round thickness, the difference stated in the case, up to about 10 % of the thickness
   **(proposed limit)**; a sheet with no reference within that distance is printed (tier 2). Product thicknesses keep
@@ -132,7 +134,10 @@ findings are recorded as stage-2b issues in the meantime. A complete table matte
 3. **Glued rows carry `att` 0 and the host's `side`** (page rules 2 and 3).
 4. **A layer that carries another layer or an object is a traced solid.** Hard floor finishes (parquet, vinyl,
    ceramic tile) are thin traced solids on the slab wherever a rug lies or an object stands on them; their sheet rows
-   serve only where nothing lies or stands on them. A rug is a sheet on the finish solid. Three co-located faces (any
+   serve only where nothing lies or stands on them. A rug is a sheet on the finish solid (measured 2026-10-28: on
+   `parquet` and `vinyl` it absorbs 0.003–0.030 more than on the slab and changes the floor's transmission by −0.69 to
+   +0.57 dB). A finish solid is drawn at least 1.6 mm thick (a 1.0 or 1.4 mm traced vinyl reads 0.11–0.12 dB off the
+   bonded plate, from 1.6 mm 1.3e-3 dB). Three co-located faces (any
    three faces in one plane) are not resolvable by the engine (`src/ray_mesh_interact.cpp:2617`: "At most two
    co-located faces form a stack; a third layer is a separate event"); allowed are a sheet on a solid and a
    sheet | sheet pair with air behind.
@@ -264,7 +269,7 @@ of section 3. R = laboratory sound reduction index; σ = flow resistivity.
 | 1.2 | `masonry_heavy`, `masonry_heavy_150mm`, `_200mm`, `_250mm` | finished heavy wall plastered both faces (solid clay brick, dense block, sand-lime, about 1700–2400 kg/m³) | solid or sheet | 1 | 1 | 150–250 mm; R 125 Hz–4 kHz; 100 and 300 mm, 63 Hz printed | high | confirmed |
 | 1.3 | `masonry_hollow`, `masonry_hollow_100mm`, `_200mm`, `_250mm` | finished hollow-unit wall plastered both faces (hollow clay brick, hollow block of any aggregate) | solid or sheet | 1 | 1 | 100–250 mm; R 125 Hz–4 kHz; 300 mm printed | high | confirmed |
 | 1.4 | `masonry_light`, `masonry_light_100mm`, `_150mm` | finished light wall, plastered (aircrete, expanded-clay and lightweight-aggregate solid units) | solid or sheet; 150–250 mm printed only | 1 | 1 | 90–130 mm; R 125 Hz–4 kHz; 150–250 mm printed | medium | confirmed |
-| 1.5 | `plaster_15mm` | plaster on `concrete` or `clt` | sheet on the solid; `att` 0, host's `side` | 1 | 2 | — | low | wish |
+| 1.5 | `plaster_15mm` | plaster on `concrete` or `clt` | sheet on the solid; `att` 0, host's `side` | 1 | 2 | on `concrete` 150–203 mm; R 125 Hz–4 kHz | low | confirmed |
 | 1.6 | `glass_4mm`, `glass_6mm` | single-pane windows | sheet only | 2 | 1 | R 125 Hz–4 kHz | high | confirmed |
 | 1.7 | `glazing_double_24mm`, `glazing_triple_36mm` | sealed units 4-16-4 (20 kg/m²) and 4-12-4-12-4 (30 kg/m²) | sheet, one lumped body | 2 | 1 | R 125 Hz–4 kHz (the triple's measured R printed: stage-2b issue 8) | high | confirmed |
 | 1.8 | `glass_leaf_4mm` | two sashes with a wide air space (box windows) | leaf sheet \| box of cavity air \| leaf (sheet at the box's exit) | 2 | 1 | — | low | wish |
@@ -275,12 +280,12 @@ of section 3. R = laboratory sound reduction index; σ = flow resistivity.
 | 1.13 | `plywood_19mm` | free wooden panels | sheet | 1 | 1 | R 125 Hz–4 kHz | low | wish |
 | 1.14 | `wood_leaf_12mm` | wood panelling on battens | leaf sheet on a box of cavity air (batten depth) | 2 | 2 | — | medium | wish |
 | 1.15 | `board_leaf_22mm` | floor boards on joists | leaf sheet on a box of cavity air (joist depth) on the slab solid; nothing lies or stands on it in the model | 1 | 2 | — | high | wish |
-| 1.16 | `parquet`, `parquet_15mm` | parquet glued on a slab | finish solid on the slab solid; the sheet only where nothing lies or stands on it | 1 | 2 | — | medium | wish |
+| 1.16 | `parquet`, `parquet_15mm` | parquet glued on a slab | finish solid on the slab solid; the sheet only where nothing lies or stands on it | 1 | 2 | α 125 Hz–4 kHz | medium | confirmed |
 | 1.17 | `laminate_leaf_8mm` | floating laminate on a foam underlay | leaf sheet \| `underlay` solid \| slab solid; nothing lies or stands on it in the model | 2 | 2 | — | medium | wish |
 | 1.18 | `screed`, `screed_50mm` | a bare screed; the screed of a floating floor | solid, or the sheet for a bare screed | 3 | 2 | — | low | wish |
 | 1.19 | floating screed (recipe; or a lumped row: 4.6) | screed on a resilient layer | `screed` solid \| resilient layer \| slab solid | 3 | 2 | — | medium | wish |
 | 1.20 | `ceramic_tile`, `ceramic_tile_10mm` | tiled floors and walls | finish solid; the sheet only where nothing lies or stands on it; `att` 0, host's `side` | 3 | 2 | — | low | wish |
-| 1.21 | `vinyl`, `vinyl_3mm` | linoleum or vinyl stuck to the slab | finish solid; the sheet as 1.20 | 1 | 2 | — | low | wish |
+| 1.21 | `vinyl`, `vinyl_3mm` | linoleum or vinyl stuck to the slab | finish solid; the sheet as 1.20 | 1 | 2 | α 125 Hz–4 kHz | low | confirmed |
 | 1.22 | `steel_1mm`, `aluminum_2mm` | metal sheets, metal doors, cladding | sheet | 2 | 1 | R 63 Hz–4 kHz | low | wish |
 | 1.23 | `door_solid_40mm` | solid timber doors | sheet, lumped; surface mass 23.9 kg/m² (the reference door; 22.5–25.2 kg/m² over the references) | 1 | 1 | R 125 Hz–4 kHz (sealed leaf) | medium | confirmed |
 | 1.24 | `door_hollow_core_40mm` | hollow-core interior doors | sheet, lumped; surface mass 9.3 kg/m² (NBS stated) | 3 | 1 | R 125 Hz–4 kHz (sealed leaf) | medium | confirmed |
@@ -434,7 +439,15 @@ Gaps: aircrete spectra with each wall's own surface mass; walls of 15–20 cm; a
 face, +1.7 to +2.6 dB on a sealed 290 mm block), the bare wall written inline in the case; printed:
 [Warnock_1984_ConcreteBlockWalls#2] / [Warnock_1984_ConcreteBlockWalls#3] (two faces on porous units, +5.3 to +6.5 dB,
 by sealing), Oliveira [Oliveira_2021_CeramicBlockCoating#1] to [Oliveira_2021_CeramicBlockCoating#14] (Rw +1 to +9 dB,
-single numbers). α: PTB#344 [PTB_2012_AbsorptionTable#38], PTB#346 [PTB_2012_AbsorptionTable#40].
+single numbers). α: PTB#344 [PTB_2012_AbsorptionTable#38], PTB#346 [PTB_2012_AbsorptionTable#40]. **Built
+(2026-10-28):** pure bonded mass at its physical level, 1317 kg/m³ (19.75 kg/m², the mean of the three pairs' plaster,
+912–1885 kg/m³), the masonry face law (within 0.020 of PTB#344). On inline bare walls with a fitted mass level, the
+plaster at each pair's own mass meets the measured increments within 1.81 / 2.63 / 1.32 dB (BIA brick, BIA tile,
+Warnock); the increments exceed the added mass by 1–2 dB (sealing, damping), which the fitted level stands for. On
+`concrete` (no plastered concrete measured) the plastered wall at 150 and 203 mm, one and both faces, lies inside the
+band between the Litvin pair mass-shifted (added mass alone) and the pair plus one measured increment per face
+(1.38 dB above the first, 1.83 dB below the second at most; ±1 dB asserted). The concrete row's mass level (0.53)
+makes the sheet count about twice its mass law there (stage-2b issue 7).
 
 1.6 **Glass.** (row) R: Pilkington [Pilkington_2020_OptiphonBrochure#3], [Pilkington_2020_OptiphonBrochure#4] (EN 12758
 generic); Quirt [Quirt_1981_WindowsTLMeasurements#24], [Quirt_1981_WindowsTLMeasurements#25]; AGC
@@ -531,7 +544,12 @@ model: printed). Moduli, densities and modes: Foy [Foy_2019_WoodFloorsVibroacous
 
 1.16 **Parquet.** α: PTB#394 [PTB_2012_AbsorptionTable#48] (glued, Sabine, hard face); Cox
 [Cox_2016_AbsorbersDiffusers#100]; BRAS [Aspoeck_2020_BRAS#58]; parquet on battens PTB#395
-[PTB_2012_AbsorptionTable#49].
+[PTB_2012_AbsorptionTable#49]. **Built (2026-10-28, with 1.21):** plain mass-law rows, density 710 kg/m³ (birch plywood
+[Hopkins_2007_SoundInsulation#153] as a stand-in; no hardwood row: density tier 3), the physical mass level, the PTB#394
+law (within 0.018), `att` 0, side 3.22 m, no coincidence or resonance columns: a glued finish bends with the slab, and
+its own coincidence (1122 Hz at 15 mm) would add 3.8 dB at 4 kHz. On 150 and 200 mm concrete the finish solid meets
+the bonded plate within 2.7e-3 dB, the sheet within 3.1e-6 dB, the two forms within 2.7e-3 dB; the added insulation
+is within 1 dB of the mass law (15 mm on 150 mm: 0.12–0.70 dB against 0.27 dB; the concrete row's mass level, issue 7).
 
 1.17 **Laminate.** None measured. Printed neighbours: Junckers [Junckers_ND_AcousticsFloorConstructions#2],
 [Junckers_ND_AcousticsFloorConstructions#3] (floating solid-wood clip floors 22 and 14 mm on foam over concrete, type
@@ -552,7 +570,8 @@ resonate with a fill (4.6).
 estimate).
 
 1.21 **Vinyl.** α: PTB#601 [PTB_2012_AbsorptionTable#73] (Sabine, hard face); Cox [Cox_2016_AbsorbersDiffusers#72]; Bork
-[Bork_2000_RR2#8].
+[Bork_2000_RR2#8]. **Built (2026-10-28):** as parquet (1.16), 1400 kg/m³ stated (no measured row: density tier 3), the
+PTB#601 law (within 0.014); 3 mm adds 0.05–0.28 dB to 150 mm concrete.
 
 1.22 **Metal sheets.** (row) R: Kosala [Kosala_2020_SingleBafflesAccuracy#51] (steel),
 [Kosala_2020_SingleBafflesAccuracy#6] (aluminum 2 mm); Northwood [Northwood_1968_PlasterboardWalls#6] (0.8 mm steel).
@@ -648,7 +667,7 @@ bookcase's size.
 
 | # | name | intended use | recipe | A | T | valid | impact | status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 3.1 | `carpet_tile_11mm` | carpet tiles, low-pile rugs | sheet on the slab or finish solid; cut out under standing objects | 1 at 63 Hz and to 500 Hz; above: 1 once σ is measured | 2 | 63 Hz–4 kHz | high | wish |
+| 3.1 | `carpet_tile_11mm` | carpet tiles, low-pile rugs | sheet on the slab or finish solid; cut out under standing objects | 1 at 63 Hz and to 500 Hz; 2 above (σ fitted) | 2 | 63 Hz–4 kHz; hard-backed tiles and low-pile rugs | high | confirmed |
 | 3.2 | `carpet_tufted_12mm` | tufted carpet without underlay | sheet on a solid | 1 | 2 | 125 Hz–4 kHz, 0° | medium | wish |
 | 3.3 | `underlay` | felt or foam underlay | traced solid of its real thickness: sheet \| `underlay` \| floor solid | 2 | 2 | — | medium | wish |
 | 3.4 | `curtain_flat_0_2mm` | curtains hung flat; roller and vertical blinds (recipe) | fabric leaf sheet \| box of cavity air \| wall or window (sheet at the box's exit) | 1p | 2 | — | high | wish |
@@ -670,7 +689,16 @@ mass on a spring and reach 0.30–0.35 at 500 Hz). 63 Hz (decided): A 1 from the
 [Bietz_2025_CombiningRoomVolumes#2] (0.00–0.01 whatever the backing: a hard face in that band). Cox
 [Cox_2016_AbsorbersDiffusers#15], [Cox_2016_AbsorbersDiffusers#16], [Cox_2016_AbsorbersDiffusers#17] (compilation
 spread); PTB#155 [PTB_2012_AbsorptionTable#4] is 5 mm needle felt (another product, printed). Above 500 Hz the porous
-conversion applies once σ is measured. Gap: flow resistivity of a tile's pile and backing.
+conversion applies once σ is measured. **Built (2026-10-28):** the porous pile of a hard-backed tile; the dense backing
+acts as the hard floor. Miki at σ 16469 Pa·s/m² over a 6.5 mm pile (`thk`; the name keeps the 11 mm a modeler sees,
+1.6), fitted with the depth free to Salford converted to random incidence (extended reaction; at the full 11 mm no σ
+fits better than 0.053). The fitted σ lies inside measured pile resistivities: rug piles alone 11797–47604 Pa·s/m²
+[Ardekani_2022_PersianRug#4] to [Ardekani_2022_PersianRug#6], piles fitted in complete rugs 10003–40162
+([Ardekani_2022_PersianRug#7] to [Ardekani_2022_PersianRug#12]), car carpet piles [Aretz_2014_CarCompartmentPartI#14],
+[Aretz_2014_CarCompartmentPartI#15] (30000, 20000). On the concrete slab within 0.023 of every reference (63 Hz
+neighbours, Salford to 500 Hz as measured, converted above at ±0.107); the slab's transmission carries the porous-layer
+engine limit (stage-2b issue 1). On `parquet` and `vinyl` see 1.7.4. Cushion backs printed. Gap: flow resistivity of a
+tile's pile and its depth.
 
 3.2 (comb.) Broda [Broda_2025_TuftedCarpets#3] (normal incidence, rigid backing); SAA [Broda_2025_TuftedCarpets#2].
 Compared at 0° in the rig. Printed: Ford [Ford_1980_CarpetsUnderlays#5] (tufted wool carpet on concrete, Sabine, figure,
