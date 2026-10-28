@@ -678,16 +678,32 @@ if (ENABLE_TESTS)
     file(GLOB TEST_SOURCES CONFIGURE_DEPENDS
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/catch2_tests/*.cpp
     )
-    
+
+    # Optional interop test: files written by the library are read back with the HDF5 C library (1.12 or newer).
+    # It is compiled only if CMake finds an HDF5 installation, which is then linked into test_bin only. A self-built
+    # or given HDF5 (BUILD_HDF5, HDF5_PATH) is already linked through the library; a second copy is not added.
+    set(HDF5_INTEROP_TEST "${CMAKE_CURRENT_SOURCE_DIR}/tests/catch2_tests/test_hdf5_interop.cpp")
+    list(REMOVE_ITEM TEST_SOURCES ${HDF5_INTEROP_TEST})
+    if(NOT BUILD_HDF5 AND NOT _HDF5_PATH)
+        find_package(HDF5 MODULE QUIET COMPONENTS C)
+        if(HDF5_FOUND)
+            list(APPEND TEST_SOURCES ${HDF5_INTEROP_TEST})
+            set(HDF5_INTEROP_LIBS ${HDF5_LIBRARIES})
+            set(HDF5_INTEROP_INCLUDE_DIRS ${HDF5_INCLUDE_DIRS})
+            message(STATUS "HDF5 interop test enabled (HDF5 ${HDF5_VERSION})")
+        endif()
+    endif()
+
     add_executable(test_bin ${CATCH2_MAIN_SRC} ${TEST_SOURCES})
     add_dependencies(test_bin catch2_dep)
     target_include_directories(test_bin PRIVATE
         ${QUADRIGA_CORE_INCLUDES}
         ${CATCH2_INCLUDE_DIR}
         ${HDF5_INCLUDE_DIRS} # HDF5 tests patch files with the HDF5 C API
+        ${HDF5_INTEROP_INCLUDE_DIRS}
     )
 
-    target_link_libraries(test_bin PRIVATE ${QUADRIGA_LINK_TARGET} ${CATCH2_LIB})
+    target_link_libraries(test_bin PRIVATE ${QUADRIGA_LINK_TARGET} ${CATCH2_LIB} ${HDF5_INTEROP_LIBS})
 
     # The kernel tests compare AVX2 with GENERIC under #ifdef BUILD_WITH_AVX2, so the macro is defined only when
     # the library has the AVX2 kernels (the library itself gets BUILD_WITH_AVX2=0 or 1)
