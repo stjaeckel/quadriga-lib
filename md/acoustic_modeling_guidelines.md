@@ -158,8 +158,8 @@ Check every recipe against this list; the material list's recipes avoid them.
   `curtain_flat_*` for curtains hung flat, `curtain_pleated_*` for curtains with fullness (effective columns; the
   pleats are not drawn). Roller and vertical blinds use `curtain_flat_*` the same way.
 - **Underlay** below a carpet or a laminate leaf is a thin traced body (`underlay`) of its real thickness.
-- **Small cushions and pillows** that lie free: a traced porous solid of the object's shape (`pu_foam`,
-  `polyester_fiber`); the fabric cover is ignored. A cushion that lies on a sofa is merged into the sofa's body.
+- **Small cushions and pillows** that lie free: a traced porous solid of the object's shape (a padding-foam
+  row, to come; `polyester_fiber`; `pu_foam` is the acoustic foam of panels); the fabric cover is ignored. A cushion that lies on a sofa is merged into the sofa's body.
 
 ## 8. Objects: hard boxes, porous bodies, absorbing volumes (classes 2–4)
 

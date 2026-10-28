@@ -263,10 +263,10 @@ of section 3. R = laboratory sound reduction index; σ = flow resistivity.
 | 1.1 | `concrete`, `concrete_150mm`, `concrete_200mm` | cast walls, slabs, ceilings; slab with bonded screed | solid of the full thickness (slab plus bonded screed) or sheet | 1 | 1 | 150–203 mm; R 125 Hz–4 kHz | high | confirmed |
 | 1.2 | `masonry_heavy`, `masonry_heavy_150mm`, `_200mm`, `_250mm` | finished heavy wall plastered both faces (solid clay brick, dense block, sand-lime, about 1700–2400 kg/m³) | solid or sheet | 1 | 1 | 150–250 mm; R 125 Hz–4 kHz; 100 and 300 mm, 63 Hz printed | high | confirmed |
 | 1.3 | `masonry_hollow`, `masonry_hollow_100mm`, `_200mm`, `_250mm` | finished hollow-unit wall plastered both faces (hollow clay brick, hollow block of any aggregate) | solid or sheet | 1 | 1 | 100–250 mm; R 125 Hz–4 kHz; 300 mm printed | high | confirmed |
-| 1.4 | `masonry_light`, `masonry_light_100mm`, `_150mm` | finished light wall, plastered (aircrete, expanded-clay and lightweight-aggregate solid units) | solid or sheet; 200 and 250 mm printed only | 1 | 1 | about 90–190 mm; 100 mm against the four bare 10 cm walls | medium | wish |
+| 1.4 | `masonry_light`, `masonry_light_100mm`, `_150mm` | finished light wall, plastered (aircrete, expanded-clay and lightweight-aggregate solid units) | solid or sheet; 150–250 mm printed only | 1 | 1 | 90–130 mm; R 125 Hz–4 kHz; 150–250 mm printed | medium | confirmed |
 | 1.5 | `plaster_15mm` | plaster on `concrete` or `clt` | sheet on the solid; `att` 0, host's `side` | 1 | 2 | — | low | wish |
 | 1.6 | `glass_4mm`, `glass_6mm` | single-pane windows | sheet only | 2 | 1 | R 125 Hz–4 kHz | high | confirmed |
-| 1.7 | `glazing_double_24mm`, `glazing_triple_36mm` | sealed units 4-16-4 (20 kg/m²) and 4-12-4-12-4 (30 kg/m²) | sheet, one lumped body | 2 | 1 | R 125 Hz–4 kHz | high | wish |
+| 1.7 | `glazing_double_24mm`, `glazing_triple_36mm` | sealed units 4-16-4 (20 kg/m²) and 4-12-4-12-4 (30 kg/m²) | sheet, one lumped body | 2 | 1 | R 125 Hz–4 kHz (the triple's measured R printed: stage-2b issue 8) | high | confirmed |
 | 1.8 | `glass_leaf_4mm` | two sashes with a wide air space (box windows) | leaf sheet \| box of cavity air \| leaf (sheet at the box's exit) | 2 | 1 | — | low | wish |
 | 1.9 | `gypsum_board_12_5mm` | a single free gypsum panel; the reference row of the leaf | sheet | 2 | 1 | R 63 Hz–4 kHz | low | wish |
 | 1.10 | `gypsum_leaf_12_5mm` | gypsum ceilings over a plenum, linings, the precise drywall recipe | leaf sheet on a box of cavity air | 1 (empty cavity); 1p (filled) | 2 | — | high | wish |
@@ -389,7 +389,9 @@ Warnock 166 mm (2.86 dB; its 4 kHz octave printed, two of three thirds), [BIA_20
 one-face increment at 100 mm (2.52 dB), Granzotto B (2.18 dB), and Granzotto C and E at 250 mm as one band (0.77 dB:
 the two walls of one build and thickness differ by up to 6 dB at 2–4 kHz, rule of 1.10). Sides 3.22 m (Warnock's
 laboratory inferred at 2.99 m: +3.01 dB at 125 Hz). Printed: 300 mm, Secchi, NBS, the bare walls plus increments;
-concrete block sealed and plastered reads 3–10.7 dB above the row at its mass.
+concrete block sealed and plastered reads 3–10.7 dB above the row at its mass. [Warnock_1995_BlockConstructions#2]
+(190 mm hollow lightweight-aggregate block, plastered one face, 183 kg/m² before plaster) belongs to this class
+(decided 2026-10-28; printed in the light-masonry case).
 α: plaster as 1.2. Gaps: hollow clay walls of 80–200 mm plastered both faces (spectra exist for 206–450 mm only);
 specimen sizes of Secchi and Granzotto; Oliveira's spectra (not extracted).
 
@@ -414,6 +416,16 @@ gives 51–65 kg/m² (509–646 kg/m³, script), circular as the mass of the tes
 against 34.1 dB for [Warnock_1995_BlockConstructions#2]; [Warnock_1995_BlockConstructions#5] 6.9 against 32.5 dB) and
 are not references. Density: Hopkins [Hopkins_2007_SoundInsulation#12] (aircrete 400–800 kg/m³),
 [Hopkins_2007_SoundInsulation#78], [Hopkins_2007_SoundInsulation#106]; Davy [Davy_2017_AACPanels#1]. α: plaster as 1.2.
+**Built (2026-10-28):** one generic solid and two sheets, density 620 kg/m³ (inside the stated 480–800 kg/m³), the
+mass-law knobs fitted to the two asserted references on the case's grid; the mass level stands for 0.40 × the physical
+mass. The bare walls dip at 400–630 Hz, the plastered wall [Hopkins_2007_SoundInsulation#4] shows none (6–8 dB apart in
+shape at one mass): the coincidence is a broad trough (`coiF` 463 Hz, `coiQ` 1.80) as a fit knob. Thin lightweight
+plaster (13 mm at 650 kg/m³, [Hopkins_2007_SoundInsulation#96]) weighs what the bare 100 mm wall weighs (−0.4 to
++0.8 dB over 480–800 kg/m³), so the four 10 cm walls are used as measured (decided). Asserted within ±3 dB: the four
+10 cm walls as one band at 100 mm (2.41 dB) and Hopkins at 128 mm (2.41 dB). The coincidence column is fixed while a
+wall's dip moves as 1/h (stage-2b issue 7): the row against itself with `coiF` scaled misses by 1.9 / 2.9 / 4.3 dB at
+128 / 150 / 190 mm, so 90–130 mm are asserted and 150–250 mm printed. [Warnock_1995_BlockConstructions#2] is a hollow
+lightweight-aggregate block (1.3, decided), printed here; [Warnock_1995_BlockConstructions#4] printed.
 Gaps: aircrete spectra with each wall's own surface mass; walls of 15–20 cm; a matched bare/plastered pair.
 
 1.5 **Plaster.** Only on hosts without plaster: `concrete`, `clt`. (comb.) matched pairs BIA
@@ -441,7 +453,16 @@ Quirt [Quirt_1981_WindowsTLMeasurements#11], [Quirt_1981_WindowsTLMeasurements#1
 Quirt [Quirt_1981_WindowsTLMeasurements#26] is 3-10-3-10-3 (neighbor, printed). α: PTB#208 [PTB_2012_AbsorptionTable#12]
 is 2–3 mm glass with a 10 mm gap (neighbor, printed): A tier 2. Starting columns: page 11.4 rows "double glazing 4-16-4"
 and "triple glazing 4-12-4-12-4" with `thk` 0.008 and 0.012; under rule 1.7.2 they become `thk` 0.024 and 0.036 with
-`fRef` × 3 and every power-law value rescaled.
+`fRef` × 3 and every power-law value rescaled. **Built (2026-10-28):** two lumped sheets, `e` carrying 20 and
+30 kg/m² at 24 and 36 mm; the panes' physical coincidence (fc·h 12.5 Hz·m: 3123 Hz, loss factor 0.005); `resS` +1 at
+the physical mass-air-mass frequency at normal incidence (211.3 Hz; the triple's lower one, 172.5 Hz; its upper,
+298.8 Hz, has no column); `att` rising with frequency in place of the double leaf's steeper slope; absorption the
+PTB#208 law (A 2); mass levels 0.57 and 0.42 × the stated masses; 200 angles. The double unit is asserted within ±3 dB
+of [AGC_2023_PocketStratophone#2] at 1.349 m (2.81 dB at 250 Hz). The triple's [AGC_2023_PocketStratophone#14] is
+printed (+3.37 / +3.34 / +2.00 / −3.31 / −1.98 / +3.25 dB, 125 Hz–4 kHz): the face absorption caps both its
+mass-air-mass and its coincidence dip (stage-2b issue 8); its model spread at 31.5, 63 Hz and 8 kHz is asserted;
+[Quirt_1981_WindowsTLMeasurements#26] printed (within 2.83 dB). Printed: Quirt #11 and #13 (3–6 dB above AGC at
+500 Hz–1 kHz, of which the cavity explains at most 1.3 dB), the EN 12758 generic values.
 
 1.8 **Box windows.** (row) R: Quirt [Quirt_1981_WindowsTLMeasurements#10], [Quirt_1981_WindowsTLMeasurements#9],
 [Quirt_1981_WindowsTLMeasurements#12]. A leaf has no bending stiffness, so the coincidence dip at 2–3 kHz is not
@@ -632,7 +653,7 @@ bookcase's size.
 | 3.3 | `underlay` | felt or foam underlay | traced solid of its real thickness: sheet \| `underlay` \| floor solid | 2 | 2 | — | medium | wish |
 | 3.4 | `curtain_flat_0_2mm` | curtains hung flat; roller and vertical blinds (recipe) | fabric leaf sheet \| box of cavity air \| wall or window (sheet at the box's exit) | 1p | 2 | — | high | wish |
 | 3.5 | `curtain_pleated_0_8mm` | curtains with fullness, stage drapes | as 3.4, effective columns | 1p | 2 | — | high | wish |
-| 3.6 | `pu_foam` | free small cushions and pillows | porous body of the cushion's shape | 2 | 2 | — | medium | wish |
+| 3.6 | padding foam (row named with 3.8) | free small cushions and pillows | porous body of the cushion's shape | 2 | 2 | — | medium | wish |
 | 3.7 | `polyester_fiber`, `polyester_fiber_20mm` | fiber pillows (solid), blankets (sheet) | solid, or sheet on a solid | 2 | 2 | — | low | wish |
 | 3.8 | `upholstery` | the body of soft furniture: sofas, armchairs, beds, mattresses, large cushions | porous body (2.4.2), assets in size variants; the fit is phase-3 work | 2 (measured padding and cover inputs) | — | per object | high | wish |
 
@@ -680,10 +701,11 @@ from the wall, Sabine), [ZimmerRohde_2020_KakaduCurtain#1]; ADO [ADO_2018_CannyC
 9.9 in flow resistance (1421 / 144, [ZimmerRohde_2022_Fabric10936Curtain#1], [DelRey_2013_CurtainFullness#28]) and 1.14
 in mass (342 / 300): fullness and resistance, not mass, separate them.
 
-3.6 Dupont [Dupont_2023_SoundFieldSynthesis#6], [Dupont_2023_SoundFieldSynthesis#7],
-[Dupont_2023_SoundFieldSynthesis#8], [Dupont_2023_SoundFieldSynthesis#9] (σ 10605 Pa·s/m²,
-[Dupont_2023_SoundFieldSynthesis#7]). Porous columns from Miki or Komatsu at the measured σ; generic solids of wave
-media are exact at any drawn thickness. Porous bodies must not touch each other.
+3.6 Padding foam, not the acoustic foam `pu_foam` of 5.3 (decided 2026-10-28): Rubino
+[Rubino_2026_UpholsteredSeatingCircular#9] (armchair padding, 30 kg/m³, σ 2700 Pa·s/m², about a quarter of the acoustic
+foam's), [Rubino_2026_UpholsteredSeatingCircular#11] (porosity 0.96); Miki at 2700 Pa·s/m² meets the authors' modelled
+free layup [Rubino_2026_UpholsteredSeatingCircular#3] within 0.024, the acoustic foam misses it by up to 0.22. The row
+is built with 3.8. Generic solids of wave media are exact at any drawn thickness. Porous bodies must not touch each other.
 
 3.7 σ: Garai (fiber blankets 10–70 mm; [Garai_2005_PolyesterModel#1], [Garai_2005_PolyesterModel#2],
 [Garai_2005_PolyesterModel#3], [Garai_2005_PolyesterModel#4], [Garai_2005_PolyesterModel#5],
@@ -836,7 +858,7 @@ to 1.051 / 1.088, values above one marked); Carvalho [Carvalho_2012_ChurchPews#2
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 5.1 | `glass_wool`, `glass_wool_50mm`, `glass_wool_100mm` | porous panels, cavity fill, ceiling clouds and baffles (recipe) | sheet on a rigid solid; solid for a fill, a block, a cloud or a baffle hung in air | 1 | 2 | 250 Hz–4 kHz; measured at 50 mm, 25–200 mm against the model | high | confirmed |
 | 5.2 | `rock_wool`, `rock_wool_50mm` | porous panels, cavity fill | as 5.1 | 1 | 2 | 250 Hz–4 kHz | medium | confirmed |
-| 5.3 | `pu_foam_50mm` | foam panels | sheet on a rigid solid | 1 | 2 | 250 Hz–4 kHz | medium | wish |
+| 5.3 | `pu_foam`, `pu_foam_50mm` | foam panels; foam bodies | sheet on a rigid solid; solid for a body | 1 | 2 | 250 Hz–4 kHz; 25–200 mm by the model | medium | confirmed |
 | 5.4 | `melamine_foam_50mm` | studio foam | sheet on a rigid solid | 2 | 2 | — | medium | wish |
 | 5.5 | `polyester_fiber_50mm` | PET felt panels | sheet on a rigid solid | 2 | 2 | — | medium | wish |
 | 5.6 | `wood_wool_50mm` | wood-wool panels on walls and ceilings | sheet on a rigid solid, or on a box of cavity air | 2 | 2 | — | medium | wish |
@@ -884,7 +906,14 @@ laboratories' reproducibility with extended reaction, ×0.24 locally reacting; n
 
 5.3 (comb.) Dupont [Dupont_2023_SoundFieldSynthesis#8], [Dupont_2023_SoundFieldSynthesis#6],
 [Dupont_2023_SoundFieldSynthesis#9]; σ [Dupont_2023_SoundFieldSynthesis#7]. Fitted-σ check 10.3 against 10.6 kPa·s/m²
-(engine notes 9.3).
+(engine notes 9.3; rerun 2026-10-28: 10268 Pa·s/m², ×0.97). **Built (2026-10-28):** `pu_foam` (solid) and `pu_foam_50mm`:
+power laws of the JCA model at the measured set [Dupont_2023_SoundFieldSynthesis#7] (porosity 0.956, tortuosity 1.67),
+within 0.021 of JCA from 25 to 200 mm; Komatsu and Miki at the same σ miss the band by 0.071 and 0.053. The 50 mm sheet
+on a rigid wall is within 0.012 of the band between [Dupont_2023_SoundFieldSynthesis#6] and
+[Dupont_2023_SoundFieldSynthesis#8] (±0.05) and within 0.085 of the converted chamber value (±0.107). The synthesis
+lies 0.025–0.056 below the rigid-frame JCA layer (glass wool's lies above it); a limp frame has that sign (bounded, not
+measured); read as an infinite layer it needs ×1.02 (Miki) and ×1.20 (Komatsu) the measured σ: printed, not marked.
+Transmission through a treated wall: stage-2b issue 1. The solid serves foam bodies of this foam; cushions are 3.6.
 
 5.4 BASF [BASF_2021_BasotectGplus#3] (Sabine, mounting not stated, marked); σ range Cox
 [Cox_2016_AbsorbersDiffusers#76].

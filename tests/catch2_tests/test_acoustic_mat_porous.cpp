@@ -136,3 +136,73 @@ TEST_CASE("Material - rock_wool", "[acoustic][materials]")
     // frequency; printed against the fluid layer on a limp plate, the layer alone in air asserted.
     mt::added_insulation("rock_wool_50mm to concrete 150 mm", {{mt::row("rock_wool_50mm"), mt::SHEET, 0.05}}, {{mt::row("concrete"), mt::SOLID, 0.15}}, G);
 }
+
+TEST_CASE("Material - pu_foam", "[acoustic][materials]")
+{
+    // Open-cell polyurethane (acoustic) foam, class 5 (wall panels) and the solid for foam bodies: the solid `pu_foam`
+    // (thk 0) at 50 and 100 mm, the sheet pu_foam_50mm. Columns: power laws of the JCA model [Jaouen_2026_APMRJCA] at
+    // the specimen's measured set [Dupont_2023_SoundFieldSynthesis#7] (sigma 10605 Pa s/m2, porosity 0.956, tortuosity
+    // 1.67, lengths 71.0 and 317 um), fitted at 342.76271 m/s on the worst random-incidence absorption miss over
+    // 63 Hz - 8 kHz at 25, 50, 100 and 200 mm on a rigid backing (0.0205), with the 0 deg transmission loss of 50 mm in
+    // air within 0.7 dB over 63 Hz - 4 kHz. Komatsu and Miki at the same resistivity miss the shape of this
+    // high-tortuosity foam: 0.071 and 0.053 below the band at 1 kHz. Absorption of the 50 mm sheet on a rigid wall
+    // (concrete with tf 0), within 0.05 of the band between [Dupont_2023_SoundFieldSynthesis#6] (JCA prediction of the
+    // infinite layer, 125 Hz - 4 kHz) and [Dupont_2023_SoundFieldSynthesis#8] (sound-field synthesis on a 1.5 x 1.5 m
+    // sample, 250 Hz - 4 kHz), and within 0.107 (0.05 plus the conversion's maximum error) of the chamber values
+    // [Dupont_2023_SoundFieldSynthesis#9] converted to random incidence (tools/acoustic/sabine_to_random.py, 3 x 4 m,
+    // extended reaction; fitted sigma 10268 Pa s/m2, 0.97 times the measured one; its finite-sample fit misses the
+    // chamber values by up to 0.19, and the converted curve is Miki at the measured sigma). The synthesis values lie
+    // 0.03-0.06 below the rigid-frame JCA layer (glass wool's lay above it on the same set-up, so not the sample's
+    // edges); a limp frame of 20-60 kg/m3 lowers the model by the same sign, 0.01-0.05 at 500 Hz - 1 kHz (bounded, not
+    // measured). Read as an infinite layer they need 1.02 (Miki) and 1.20 (Komatsu) times the measured resistivity:
+    // printed beside the band. The solid as a free body: its 0 deg transmission loss in air at 50 and 100 mm printed
+    // against JCA (within 1 dB over 63 Hz - 4 kHz). Not a furniture padding foam (about a quarter of this
+    // resistivity, [Rubino_2026_UpholsteredSeatingCircular#9]). Reasonable meant: within the JCA prediction and the synthesis measurement of one specimen, which
+    // agree within 0.06. Valid: 25-200 mm by the model, absorption 250 Hz - 4 kHz.
+    const mt::Grid G = mt::grid();
+    const mt::Row r = mt::row("pu_foam"), w0 = mt::with(mt::row("concrete"), "tf", 0.0);
+    const mt::Row jca = {{"jca", 10605.0}, {"phi", 0.956}, {"tort", 1.67}, {"lv", 71.0e-6}, {"lt", 317e-6}};
+    const mt::Out X50 = mt::check_material("pu_foam at 50 mm", r, {}, G, 0.05), X100 = mt::check_material("pu_foam at 100 mm", r, {}, G, 0.1);
+    mt::check_material("pu_foam_50mm", mt::row("pu_foam_50mm"));
+
+    // The row against its model on a rigid backing (random incidence, 63 Hz - 8 kHz; measured 0.0205, bound 0.05)
+    auto alpha = [&](const mt::Row &m, double d) { return mt::octaves(G, [&](size_t q) { double a = 0.0; for (int i = 0; i < G.na; ++i) { double T, R; mt::ref_tmm({{m, mt::SHEET, d}}, G.f[q], G.th[i], T, R, mt::HALF, &w0); a += G.w[i] * (1.0 - R); } return a; }); };
+    for (double d : {0.025, 0.05, 0.1, 0.2})
+    {
+        const auto ar = alpha(r, d), am = alpha(jca, d), ak = alpha({{"komatsu", 10605.0}}, d), ai = alpha({{"miki", 10605.0}}, d), ad = alpha({{"db", 10605.0}}, d);
+        QD_DIAG("\n# diag: pu_foam, %.0f mm on a rigid backing, random incidence\noctave,alpha_row,alpha_jca,alpha_komatsu,alpha_miki,alpha_delany_bazley\n", 1e3 * d);
+        double worst = 0.0;
+        for (int o = 1; o < 9; ++o)
+            QD_DIAG("%g,%.4f,%.4f,%.4f,%.4f,%.4f\n", mt::OCT[o], ar[o], am[o], ak[o], ai[o], ad[o]), worst = std::max(worst, std::isnan(ar[o] - am[o]) ? INFINITY : std::abs(ar[o] - am[o]));
+        INFO("pu_foam against JCA at " << 1e3 * d << " mm");
+        CHECK(worst < 0.05);
+    }
+
+    // The solid as a free body: 0 deg transmission loss in air, library against JCA (printed)
+    QD_DIAG("\n# diag: pu_foam in air at 0 deg, transmission loss (dB): library and JCA at 50 and 100 mm\noctave,library_50mm,jca_50mm,library_100mm,jca_100mm\n");
+    auto tl = [&](const mt::Out &X, size_t q) { return std::norm(X.T[G.na][q]); };
+    auto tj = [&](double d, size_t q) { double T, R; mt::ref_tmm({{jca, mt::SHEET, d}}, G.f[q], 0.0, T, R); return T; };
+    const auto l50 = mt::octaves(G, [&](size_t q) { return tl(X50, q); }), l100 = mt::octaves(G, [&](size_t q) { return tl(X100, q); });
+    const auto j50 = mt::octaves(G, [&](size_t q) { return tj(0.05, q); }), j100 = mt::octaves(G, [&](size_t q) { return tj(0.1, q); });
+    for (int o = 0; o < 9; ++o)
+        QD_DIAG("%g,%.2f,%.2f,%.2f,%.2f\n", mt::OCT[o], -10.0 * std::log10(l50[o]), -10.0 * std::log10(j50[o]), -10.0 * std::log10(l100[o]), -10.0 * std::log10(j100[o]));
+
+    // Tier 2: the 50 mm sheet on a rigid wall through the library
+    const std::vector<double> oct = {125, 250, 500, 1000, 2000, 4000};
+    const mt::Measured band{"Dupont_2023_SoundFieldSynthesis #6 and #8", "alpha_random", "band: JCA prediction (infinite layer) to sound-field synthesis (1.5 x 1.5 m)", false, 0.05, oct,
+                            {{0.177, 0.177}, {0.317, 0.380}, {0.620, 0.663}, {0.883, 0.907}, {0.880, 0.913}, {0.913, 0.947}}};
+    const mt::Measured conv{"Dupont_2023_SoundFieldSynthesis #9", "alpha_random", "Sabine (ISO 354) converted to random incidence (Jeong, 3 x 4 m)", false, 0.107, oct,
+                            {{0.143, 0.143}, {0.329, 0.329}, {0.591, 0.591}, {0.826, 0.826}, {0.928, 0.928}, {0.953, 0.953}}};
+    const mt::Out O = mt::run({{mt::row("pu_foam_50mm"), mt::SHEET, 0.05}, {w0, mt::SOLID, 0.15}}, G);
+    mt::rows("pu_foam_50mm on a rigid wall", O);
+    mt::tier2("pu_foam_50mm on a rigid wall", O, band, 0.0);
+    mt::tier2("pu_foam_50mm on a rigid wall", O, conv, 0.0);
+    const double sfs[6] = {NAN, 0.317, 0.620, 0.883, 0.880, 0.913}, sab[6] = {0.107, 0.437, 0.817, 0.980, 0.963, 0.973};
+    QD_DIAG("\n# diag: pu_foam printed: 50 mm against the synthesis values and the raw chamber values\noctave,library_50mm,sfs,library_minus_sfs,sabine_raw\n");
+    for (int o = 0; o < 6; ++o)
+        QD_DIAG("%g,%.4f,%.3f,%+.4f,%.3f\n", oct[o], O.a8[o + 2], sfs[o], O.a8[o + 2] - sfs[o], sab[o]);
+
+    // ENGINE LIMIT (porous layer on a rigid wall): the 50 mm sheet adds too much insulation to a concrete wall at low
+    // frequency; printed against the fluid layer on a limp plate, the layer alone in air asserted.
+    mt::added_insulation("pu_foam_50mm to concrete 150 mm", {{mt::row("pu_foam_50mm"), mt::SHEET, 0.05}}, {{mt::row("concrete"), mt::SOLID, 0.15}}, G);
+}
