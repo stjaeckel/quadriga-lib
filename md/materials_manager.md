@@ -244,7 +244,7 @@ Each is decided at the stop of the first material that needs it; record the deci
 | rule | question | decided |
 | --- | --- | --- |
 | reference row per class | which measured row is the tier-2 reference where compilations spread by 2 to 4 times | heavy masonry: walls measured plastered on both faces first, bare plus increment otherwise (2026-10-28, research fold D8) |
-| fitted-σ check | a converted absorption reference is marked when its fitted flow resistivity is off a measured one by more than about 1.5 times (notes 9.3) | |
+| fitted-σ check | a converted absorption reference is marked when its fitted flow resistivity is off a measured one by more than about 1.5 times (notes 9.3) | applied as written: glass wool's finite-sample measurement marked (×1.83), its chamber conversion passes (×1.45) (2026-10-28, glass wool) |
 | interlaboratory porous rows | the two Scrosati rows stay out until a polyester and a framed-sample model exist (notes 9.3) | |
 | resonant absorbers as one family | panels and membranes, perforated and slotted panels, MPP in the acceptance (notes 9.3) | |
 | bending loss as a resistance | needed if `coiQ` comes from a measured loss factor (notes 9.3; page 11.1, 11.2, 11.4 re-measured if `coiQ` changes meaning) | |
@@ -252,11 +252,11 @@ Each is decided at the stop of the first material that needs it; record the deci
 | Sabine to random for panels and MPP | a conversion as for porous layers, or classes 8 and 10 marked under the tiered rule | |
 | the leaf's loss ratio `rr` | which normalization transfers to room-size leaves (R/Z₀ or R/(ω₀m″)) | |
 | damping branch of a peaked face | over-damped default against measured empty-cavity R′ at or below 1 | |
-| `alpha` on a porous layer | its role, if any, next to `a`–`h` | |
+| `alpha` on a porous layer | its role, if any, next to `a`–`h` | none: 0 on porous rows (2026-10-28, glass wool) |
 | membrane constant with a bonded fill | 60 or 50 when the fill is bonded to the plate (handoff 5) | |
 | chamber to random for hanging fabrics, green walls, seat and audience blocks | the "1p" rows of the wish-list (1.3) | |
 | the upholstery row | fit of the porous body to per-object areas, with the object test | |
-| generic solid across thickness | the miss of one fit over the measured range; a thickness-scaled coincidence to stage 2b if too large (wish-list 4) | concrete 150–203 mm: one fit, `coiF` a fit knob, 0.25 dB off the envelope (2026-10-27, concrete); the masonry range still open |
+| generic solid across thickness | the miss of one fit over the measured range; a thickness-scaled coincidence to stage 2b if too large (wish-list 4) | concrete 150–203 mm: one fit, `coiF` a fit knob, 0.25 dB off the envelope (2026-10-27, concrete); heavy masonry 150–250 mm, one fit, worst wall 2.23 dB, ends printed (2026-10-28, masonry_heavy) |
 | reference row per class | now: tolerance table of wish-list 1.10 (class envelope) | decided 2026-10-26 (r01 D4, r02 F5) |
 | dense ground classes | the passive Miki fit degenerates at 2 and 20 MPa·s/m² (μ′ near 0): rigid rows with a face absorption, as `asphalt`; the fit target (n and z, or the asserted reflection) | |
 
@@ -750,6 +750,61 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     6 / 4 / 6 / 3 / 5 dB by script). Manager review: the tiers and table rows of 1.2, 1.3, 1.23, 1.24, 4.1, 5.15 as
     decided; D8 rule in 1.2; D6 without any query; D12 in 5.11; `ceiling_tile_25mm` gone; `check_docs.py` passes. To
     Stephan with one commit for the id conversion and the update. Next: the batch-1 briefs.
+  - Committed by Stephan (063f05b, 2026-10-28). Batch-1 briefs written: `md/materials/batch1_common.md` (worktrees at
+    063f05b, 4 threads each, own case only, CSV rows appended, reports copied with `cp`, ids and engine-limit names,
+    plan phase first), `m02_masonry_heavy_brief.md` (group file `heavy`; open rule generic solid across thickness over
+    140–250 mm), `m03_glass_wool_brief.md` (`porous`; fitted-σ check, Scrosati rows, `alpha` on a porous layer, the
+    finite sample), `m04_glass_brief.md` (`plates`; reference row per class for glass, thin-plate coincidence at
+    3.1 / 2.1 kHz, the absorption refit). To Stephan before the agents start.
+  - Briefs approved by Stephan 2026-10-28; the three material agents started on phase 1 (plan), each in its own worktree.
+  - m03 glass wool phase 1 done (worktree `.claude/worktrees/agent-a0f04c4dc30838bba`, fast-forwarded from 26da9f9).
+    Manager reruns (`compare.py`, `finite.py`): at σ 13112 Komatsu / Miki / JCA (Dupont's own set) miss SFS by −0.072 /
+    −0.066 / −0.084 at 250 Hz and −0.108 / −0.098 / −0.087 at 500 Hz; against the band [JCA #1, SFS] 0.049 / 0.035 /
+    0.024 (JCA polished 0.023); fitted σ SFS ×1.83 (1–4 kHz ×1.53), Sabine converted ×1.45 (extended reaction),
+    ×1.72–1.76 (local); Thomasson's diffuse-field excess of the 1.5 × 1.5 m patch +0.43 / +0.56 at 250 / 500 Hz is an
+    upper bound, so the finite sample as the cause of SFS's +0.08 is bounded, not measured. Decisions D1 (JCA in the
+    rig's `eps_mu`, about 6 lines, a rig change), D2 (the band [JCA #1, SFS] at ±0.05), D3 (tier 2 at 50 mm only),
+    D4 (`alpha` 0), D5 (Scrosati rows not met). Probe time provisional (load 13.5).
+  - m04 glass phase 1 done (worktree `.claude/worktrees/agent-a856d28aa70b22cbf`, at 063f05b). Manager reruns
+    (`tfcap.py`, `final.py`): physical `coiF` (3121 / 2080 Hz) and η 0.005 with the rest fitted to the laboratory
+    references: Quirt within 1.99 / 1.58 dB (4 / 6 mm), AGC 2.25 dB, 6 mm laboratory envelope 0.75 dB; the generic
+    EN 12758 values missed by 3.86 dB (4 mm, 250 Hz) and 2.85 dB (6 mm); masses 10.32 / 14.77 kg/m² against 10.00 /
+    15.00; α within 0.018 of PTB#207. Coincidence octave of the physical 4 mm plate 29.89 dB at `tf` 0.017, 21.74 dB at
+    `tf` 1 (6 mm 30.32 / 22.24): the face's absorption caps the dip (proposed engine-limit name "pane coincidence
+    capped by the face absorption"). Fit knobs at bounds in the 4 mm row (`att`, `resF` 1000 Hz). Decisions D1 (lab
+    values asserted, generic printed), D2 (physical coincidence), D3 (PTB#207 law, A 2), D4 (`grid(200,1)`, 8 kHz off
+    by 3.2 dB on 50 angles, about 0.17 s, load 9). Side finding: tier-1 bound 2.52e-4 dB on 400 angles at 10 kHz.
+  - m02 masonry_heavy phase 1 done (worktree `.claude/worktrees/agent-adf28abc4018f5af8`, at 063f05b). Manager rerun
+    (`meval.py fit_g.json`): one generic fit (ρ 1772 kg/m³, `coiF` 7427 Hz with η ≈ 1, a knob as for concrete; mass level
+    0.704 × physical) meets Weise#1 within 1.99 dB, Hopkins#68 2.23 dB, BIA#8 plus one increment 2.08 dB; the envelope
+    of the valid walls 0 dB at 100–300 mm, but it is 3–6 dB wide, so the ±1 dB envelope check asserts nothing here;
+    against the class trend the row reads +3.31 (100 mm, 125 Hz) to −3.39 dB (300 mm, 1 kHz). Decisions D1 (range
+    150–250 mm, the slope to issue 7), D2 (envelope of the four valid walls), D3 (ρ 1772), D4 (Weise at the row's
+    side), D5 (BIA#8 plus one increment at 150 mm), D6 (mass level free). Times provisional (load 8.2). All three
+    plans to Stephan together (15 decisions, the JCA rig change, one new engine-limit name).
+  - Decided by Stephan 2026-10-28 (all fifteen as recommended): masonry M1 range 150–250 mm, 100 / 300 mm printed,
+    the slope under issue 7; M2 the four valid walls' envelope kept, noted as wider than its tolerance; M3 ρ 1772;
+    M4 Weise at 3.22 m; M5 BIA#8 plus one increment at 150 mm; M6 mass level free. Glass wool G1 JCA with Dupont's set
+    (rig change approved: JCA in `eps_mu`, minimal, self-check rows identical); G2 the band [JCA #1, SFS] ±0.05, the
+    converted Sabine ±0.107, SFS marked as finite-sample; G3 tier 2 at 50 mm only; G4 `alpha` 0 on porous rows; G5
+    Scrosati rows to batch 2. Glass P1 laboratory values asserted, generic printed; P2 physical coincidence (η 0.005);
+    P3 PTB#207 law, A 2; P4 `grid(200,1)`. The three agents continued with phase 2 (build).
+  - Batch 1 built 2026-10-28 and merged by the manager (six files copied; the CSV rows appended in wish-list order, all
+    three agents' CSV diffs append-only). Manager checks at load 2–4: reconfigure and rebuild clean; `[materials]`
+    986 / 14 (concrete 0.034 s, masonry 0.054 s, glass 0.043 s, glass wool 0.084 s at 12 threads); `[wave]` 141128
+    identical, 163474 / 178; `[acoustic]` 43727 / 73, 120630 identical, one inserted block of 1064 lines (the three
+    cases); whole suite 1354761 / 1387, 270649 identical, the same insertion; `check_docs.py` passes. Rig change
+    (glass wool): 7 lines, a JCA branch in `eps_mu`, formulas checked by the manager against the standard JCA form,
+    source [Jaouen_2026_APMRJCA] in the research index; self-checks 8179 numbers identical. Open for Stephan: the 4 mm
+    glass refit (agent: `att` 0, `resF` 2315 Hz as a knob, worst Quirt 1.82 dB, dip 3413 → 3886 Hz against the physical
+    3121 Hz) against the approved phase-1 fit (dip 3413 Hz, worst Quirt 1.99 dB, two knobs at bounds); both pass the
+    case (81 / 81, manager run). Documents: wish-list 1.2, 1.6, 5.1 confirmed with built paragraphs, 4.1 and 4.4
+    decided; stage-2b issue 7 (masonry slope), issue 8 new (pane coincidence capped by the face absorption).
+  - Decided by Stephan 2026-10-28: (a) the approved phase-1 fit for `glass_4mm` (dip 3413 Hz, worst Quirt 1.99 dB;
+    the refit's in-band resonance knob moved the dip 14 % from the physical value). Manager swapped the row and one
+    comment word (`att` fitted in both rows); reran: case 81 / 81, `[materials]` 986 / 14, `[wave]` identical,
+    `[acoustic]` 43727 / 73 and the whole suite 1354761 / 1387 with the same single insertion, `check_docs.py` passes.
+    To Stephan for the commit; baselines to be regenerated after it. Next: batch 2a (masonry_hollow, rock_wool, doors).
 
 ## 10. Scope of phase 0 (2026-10-23; naming and combinations superseded by wish-list 1.6 and section 3)
 
