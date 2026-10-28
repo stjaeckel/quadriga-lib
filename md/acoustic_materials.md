@@ -258,11 +258,11 @@ of section 3. R = laboratory sound reduction index; σ = flow resistivity.
 | # | name | intended use | recipe | A | T | valid | impact | status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1.1 | `concrete`, `concrete_150mm`, `concrete_200mm` | cast walls, slabs, ceilings; slab with bonded screed | solid of the full thickness (slab plus bonded screed) or sheet | 1 | 1 | 150–203 mm; R 125 Hz–4 kHz | high | confirmed |
-| 1.2 | `masonry_heavy`, `masonry_heavy_150mm`, `_200mm`, `_250mm` | finished heavy wall plastered both faces (solid clay brick, dense block, sand-lime, about 1700–2400 kg/m³) | solid or sheet | 1 | 1 | about 140–250 mm (proposed from the trend; 250 mm decided); R 125 Hz–4 kHz; 63 Hz printed | high | wish |
+| 1.2 | `masonry_heavy`, `masonry_heavy_150mm`, `_200mm`, `_250mm` | finished heavy wall plastered both faces (solid clay brick, dense block, sand-lime, about 1700–2400 kg/m³) | solid or sheet | 1 | 1 | 150–250 mm; R 125 Hz–4 kHz; 100 and 300 mm, 63 Hz printed | high | confirmed |
 | 1.3 | `masonry_hollow`, `masonry_hollow_100mm`, `_200mm`, `_250mm` | finished hollow-unit wall plastered both faces (hollow clay brick, hollow block of any aggregate) | solid or sheet | 1 | 1 | about 90–250 mm, set in phase 3 by the same rule; measured plastered both faces at 166, 206, 240 and 270 mm | high | wish |
 | 1.4 | `masonry_light`, `masonry_light_100mm`, `_150mm` | finished light wall, plastered (aircrete, expanded-clay and lightweight-aggregate solid units) | solid or sheet; 200 and 250 mm printed only | 1 | 1 | about 90–190 mm; 100 mm against the four bare 10 cm walls | medium | wish |
 | 1.5 | `plaster_15mm` | plaster on `concrete` or `clt` | sheet on the solid; `att` 0, host's `side` | 1 | 2 | — | low | wish |
-| 1.6 | `glass_4mm`, `glass_6mm` | single-pane windows | sheet only | 2 | 1 | R 125 Hz–4 kHz | high | wish |
+| 1.6 | `glass_4mm`, `glass_6mm` | single-pane windows | sheet only | 2 | 1 | R 125 Hz–4 kHz | high | confirmed |
 | 1.7 | `glazing_double_24mm`, `glazing_triple_36mm` | sealed units 4-16-4 (20 kg/m²) and 4-12-4-12-4 (30 kg/m²) | sheet, one lumped body | 2 | 1 | R 125 Hz–4 kHz | high | wish |
 | 1.8 | `glass_leaf_4mm` | two sashes with a wide air space (box windows) | leaf sheet \| box of cavity air \| leaf (sheet at the box's exit) | 2 | 1 | — | low | wish |
 | 1.9 | `gypsum_board_12_5mm` | a single free gypsum panel; the reference row of the leaf | sheet | 2 | 1 | R 63 Hz–4 kHz | low | wish |
@@ -335,8 +335,13 @@ misses the ends by up to 2.85 dB at 500 Hz. Measured finding (script, 125 Hz–4
 [Secchi_2003_LaterizioLabInSitu#1] lies on the bare trend at its mass: +3.4 / +1.0 / −1.7 / −1.2 / −0.9 dB
 (125 Hz–2 kHz). Hence the asserted range of about 140–250 mm; 95–140 and 250–305 mm are printed. Walls of nearly equal
 mass differ widely: [BIA_2000_TN5AClayMasonry#6] minus [BIA_2000_TN5AClayMasonry#12] = 5.3 / 7.4 / 8.4 / 9.2 / 6.2 /
-5.5 dB against 1.07 dB from the mass law (script). Starting columns come from a fit to the series, not from the page
-rows (whose `att` and `coiF` differ wall by wall). Printed checks: NBS [NBS_1955_BMS144SoundInsulation#33] to
+5.5 dB against 1.07 dB from the mass law (script). **Built (2026-10-28):** one generic solid and three sheets, density
+1772 kg/m³ (the mean of Weise and Hopkins), the mass-law knobs fitted to the asserted walls on the case's own grid; the
+fitted mass level stands for 0.70 × the physical mass (nothing is bonded to these rows) and the coincidence column
+(7.4 kHz) is a fit knob, as for concrete. Asserted within ±3 dB: Weise at the row's side 3.22 m (worst 2.15 dB),
+Hopkins (2.23 dB), BIA brick 152 mm plus one increment at 150 mm (2.08 dB); the class envelope of the four valid walls
+is 3–6 dB wide, wider than its ±1 dB tolerance, so the single walls carry the test. Printed: 100 and 300 mm (−4.04 dB
+against [BIA_2000_TN5AClayMasonry#11] at 300 mm: the class's steeper slope, stage-2b issue 7). Printed checks: NBS [NBS_1955_BMS144SoundInsulation#33] to
 [NBS_1955_BMS144SoundInsulation#38] (clay brick 100 and 200 mm and on edge, 16 mm plaster both faces, tested 1926–1928,
 warble tones 256–2048 Hz, side 1.74 m, masses 154–474 kg/m² weighed with the frame; the 200 mm walls
 [NBS_1955_BMS144SoundInsulation#35] to [NBS_1955_BMS144SoundInsulation#37] read 1.9–10.5 dB below the trend plus two
@@ -413,9 +418,13 @@ single numbers). α: PTB#344 [PTB_2012_AbsorptionTable#38], PTB#346 [PTB_2012_Ab
 1.6 **Glass.** (row) R: Pilkington [Pilkington_2020_OptiphonBrochure#3], [Pilkington_2020_OptiphonBrochure#4] (EN 12758
 generic); Quirt [Quirt_1981_WindowsTLMeasurements#24], [Quirt_1981_WindowsTLMeasurements#25]; AGC
 [AGC_2023_PocketStratophone#11]. α: PTB#207 [PTB_2012_AbsorptionTable#11] is a 3 mm pane (neighbor build, printed): A
-tier 2. Starting columns: page 11.4 rows "glass 4 mm" (also the rig's `GLASS4`) and "glass 6 mm", side 1.3492 m. The
-generic values and Quirt's small panes differ by 5.6 to 6.6 dB at 125/250 Hz (4.4). The page row absorbs 0.305 at 125 Hz
-against PTB#207's 0.08: its absorption is refitted. Constants: Hopkins [Hopkins_2007_SoundInsulation#84],
+tier 2. The generic values and Quirt's small panes differ by 5.6 to 6.6 dB at 125/250 Hz (4.4); pane size explains
+about 1 dB. **Built (2026-10-28):** the physical coincidence (fc·h 12.5 Hz·m: 3121 / 2080 Hz, loss factor 0.005) and
+the other knobs fitted to the laboratory panes, side 1.30 m; asserted within ±3 dB at their own sides: Quirt 4 mm and
+6 mm (within 2.0 dB), AGC 6 mm (2.46 dB), the 6 mm laboratory envelope within 0.72 dB; the generic values printed
+(4.4 decided: laboratory values first). Absorption the PTB#207 power law (0.0285 at 1 kHz, exponent −0.37), printed,
+A tier 2. The case runs on 200 angles: the narrow dip reads up to 3.2 dB off at 8 kHz on 50 (stage-2b issue 8 for
+its depth). Constants: Hopkins [Hopkins_2007_SoundInsulation#84],
 [Hopkins_2007_SoundInsulation#85], [Hopkins_2007_SoundInsulation#86].
 
 1.7 **Glazing units.** (row) R: AGC [AGC_2023_PocketStratophone#2], Pilkington [Pilkington_2020_OptiphonBrochure#8],
@@ -814,7 +823,7 @@ to 1.051 / 1.088, values above one marked); Carvalho [Carvalho_2012_ChurchPews#2
 
 | # | name | intended use | recipe | A | T | valid | impact | status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 5.1 | `glass_wool`, `glass_wool_50mm`, `glass_wool_100mm` | porous panels, cavity fill, ceiling clouds and baffles (recipe) | sheet on a rigid solid; solid for a fill, a block, a cloud or a baffle hung in air | 1 | 2 | 250 Hz–4 kHz | high | wish |
+| 5.1 | `glass_wool`, `glass_wool_50mm`, `glass_wool_100mm` | porous panels, cavity fill, ceiling clouds and baffles (recipe) | sheet on a rigid solid; solid for a fill, a block, a cloud or a baffle hung in air | 1 | 2 | 250 Hz–4 kHz; measured at 50 mm, 25–200 mm against the model | high | confirmed |
 | 5.2 | `rock_wool`, `rock_wool_50mm` | porous panels, cavity fill | as 5.1 | 1 | 2 | 250 Hz–4 kHz | medium | wish |
 | 5.3 | `pu_foam_50mm` | foam panels | sheet on a rigid solid | 1 | 2 | 250 Hz–4 kHz | medium | wish |
 | 5.4 | `melamine_foam_50mm` | studio foam | sheet on a rigid solid | 2 | 2 | — | medium | wish |
@@ -837,9 +846,13 @@ References and gaps:
 
 5.1 (comb.) Dupont [Dupont_2023_SoundFieldSynthesis#3] (random incidence, sound-field synthesis),
 [Dupont_2023_SoundFieldSynthesis#1] (JCA prediction), [Dupont_2023_SoundFieldSynthesis#4] (Sabine, above one, marked); σ
-[Dupont_2023_SoundFieldSynthesis#2] (13112 Pa·s/m²). Starting columns: page 11.3 (also the rig's `WOOL`), Komatsu at
-13112 Pa·s/m², `fRef` 0.87403: `a` 1.1362, `b` −0.043932, `c` 0.0023911, `d` 1.2533, `e` 2.2495, `f` −0.45515, `g`
-0.088044, `h` 0.14944, `thk` 0.05. Transmission through a treated wall is over-insulated up to 8.1 dB at 31.5 Hz
+[Dupont_2023_SoundFieldSynthesis#2] (13112 Pa·s/m²). **Built (2026-10-28):** power laws of the JCA model at the
+specimen's measured set (Komatsu and Miki at the measured σ miss the measurement by 0.049 and 0.035 at 1 kHz, where the
+sample's edges no longer matter); the row is within 0.009 of JCA from 25 to 200 mm. On a rigid wall the 50 mm sheet is
+within 0.018 of the band between the JCA prediction and the measurement, and within 0.041 of the converted chamber
+value (±0.107 with the conversion budget). The measurement alone reads 0.08 above the infinite layer at 250–500 Hz,
+likely the 1.5 × 1.5 m sample's edges (bounded, not measured): printed, and marked by the fitted-σ rule (×1.83; the
+chamber conversion ×1.45 passes). Transmission through a treated wall is over-insulated up to 8.9 dB at 31.5 Hz
 (stage-2b issue 1). Clouds and baffles hung in air are porous bodies (solid) or sheets with air on both sides; their
 Sabine data are per object. Printed: glass-fibre boards van Hout [VanHout_2016_SuspendedCeilings#14] to
 [VanHout_2016_SuspendedCeilings#17] (100 kg/m³, 15–100 mm, Type A, Sabine, no σ; above one at 250 Hz–4 kHz for
@@ -1087,13 +1100,15 @@ it now.
 1. **The generic solid across thickness.** One generic fit, asserted where the trend miss stays inside the tolerance.
    First on `masonry_heavy` (the 95–305 mm series), then concrete within 150–203 mm. `coiF`, `resF`, `att` are fixed
    columns while fc·h of 17.1 Hz·m gives 171 Hz at 100 mm and 28.5 Hz at 600 mm; if the miss is too large, a
-   thickness-scaled coincidence goes to the stage-2b list.
+   thickness-scaled coincidence goes to the stage-2b list. **Decided (2026-10-28):** concrete 150–203 mm and heavy
+   masonry 150–250 mm, each one fit with the coincidence as a fit knob; the slope beyond is recorded (stage-2b issue 7).
 2. **`side` values.** The rule is decided; the typical sizes of 1.8 are proposed.
 3. **Objects.** The object test's design and cost; the porous columns fitted for a soft body; the asset size variants;
    the kind proposed for clothes racks, plants, persons and audiences; the per-area convention for seat and audience
    blocks (now 1p).
 4. **Reference row per class.** Glass (EN 12758 generic against Quirt), carpets (Cox minimum / mean / maximum),
-   concrete (Litvin against Mahn).
+   concrete (Litvin against Mahn). **Decided for glass and concrete (2026-10-27/28):** laboratory measurements of a
+   specimen are asserted, generic tabulated values and differently typed values printed; carpets open.
 5. **Free porous bodies.** A cushion, a cloud or a bass trap as a traced porous solid in air has no reference as a
    free body; the object test and the per-object data are the only checks.
 6. **Lumped rows against recipes for building assemblies.** Stud partitions of other builds, floating floors: one

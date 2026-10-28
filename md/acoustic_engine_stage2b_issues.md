@@ -226,7 +226,27 @@ prints the reflection at that cap beside the uncapped one.
   tolerance at the measured sizes).
 - **Interim guideline.** Use the concrete rows within 150–203 mm; read added insulation from bonded plaster or finishes
   on concrete as an upper bound.
-- **Reproduce.** `QD_DIAG_RAY=1 ./build_linux/test_bin "Material - concrete"` (the row against the Litvin pair).
+- **Heavy masonry** (2026-10-28): the measured walls gain 7.9–9.4 dB per doubling of surface mass at 125 Hz–1 kHz
+  against 6.02 dB of the mass term. One fit holds within the walls' own scatter over 150–250 mm (worst single wall
+  2.23 dB); at 300 mm it reads −4.04 dB against the thickest brick wall, at 100 mm up to +3.31 dB above the class
+  trend, so the rows are asserted at 150–250 mm only.
+- **Reproduce.** `QD_DIAG_RAY=1 ./build_linux/test_bin "Material - concrete"` (the row against the Litvin pair);
+  `"Material - masonry_heavy"` (the printed ends).
+
+### 8. A pane's coincidence dip is capped by its face absorption ("pane coincidence capped by the face absorption")
+
+- **Construction.** Single panes (`glass_4mm`, `glass_6mm`) and any thin mass-law sheet whose coincidence lies in the
+  band.
+- **Physics.** At coincidence a bare plate passes nearly all the sound at the coincidence angle. In the engine the face's
+  transmission factor `tf`, which also sets the face's absorption, caps the transmission at every angle, so the depth
+  of the coincidence dip is set by the face absorption, not by the plate's loss factor.
+- **Measured** (2026-10-28, the physical 4 mm plate, coincidence 3.12 kHz, loss factor 0.01, side 1.349 m, fine grid):
+  the coincidence octave (4 kHz) reads 29.89 dB at `tf` 0.017 (a pane's measured absorption) and 21.74 dB at `tf` 1;
+  6 mm (2 kHz octave) 30.32 dB against 22.24 dB. The shipped rows meet the laboratory panes within ±3 dB with the
+  measured absorption, so the case carries no mark.
+- **Affects.** Windows and thin panels near coincidence: the dip cannot be deeper than the face absorption allows.
+- **Interim guideline.** None needed for the glass rows; a row that must reproduce a deep dip cannot keep a hard face.
+- **Reproduce.** `QD_DIAG_RAY=1 ./build_linux/test_bin "Material - glass"`.
 
 ## Modeling guidelines collected in step 3
 

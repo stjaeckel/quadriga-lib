@@ -288,6 +288,13 @@ namespace mt
             z = 1.0 + 0.00027 * std::pow(L, 6.2) - J * 0.0047 * std::pow(L, 4.1), n = 1.0 + 0.0004 * std::pow(L, 6.2) - J * 0.0069 * std::pow(L, 4.1);
         else if (sd > 0.0)
             z = 1.0 + 0.0571 * std::pow(X, -0.754) - J * 0.087 * std::pow(X, -0.732), n = 1.0 + 0.0978 * std::pow(X, -0.700) - J * 0.189 * std::pow(X, -0.595);
+        else if (col(M, "jca") > 0.0) // JCA [Jaouen_2026_APMRJCA]: "phi", "tort", "lv", "lt" (m); air 1.81e-5 Pa s, Pr 0.71, gamma 1.4 with gamma P0 = rho0 c0^2
+        {
+            const double s = col(M, "jca"), w = 2.0 * QPI * fa, ph = col(M, "phi"), al = col(M, "tort"), lv = col(M, "lv"), lt = col(M, "lt"), eta = 1.81e-5;
+            const cd mu = al / ph * (1.0 + s * ph / (J * w * RHO0 * al) * std::sqrt(1.0 + 4.0 * J * al * al * eta * RHO0 * w / (s * s * lv * lv * ph * ph)));
+            const cd ep = ph * (1.4 - 0.4 / (1.0 + 8.0 * eta / (J * lt * lt * 0.71 * w * RHO0) * std::sqrt(1.0 + J * RHO0 * w * 0.71 * lt * lt / (16.0 * eta))));
+            n = std::sqrt(ep * mu), n = n.imag() > 0.0 ? -n : n, z = n / ep; // eps = rho0 c0^2 / K, mu = rho / rho0
+        }
         e = n != 0.0 ? n / z : cd(pow_law(M, "a", "b", fa), -17.98 * pow_law(M, "c", "d", fa) / (fa * FS * 1e-9));
         m = n != 0.0 ? n * z : cd(pow_law(M, "e", "f", fa), -17.98 * pow_law(M, "g", "h", fa) / (fa * FS * 1e-9));
     }
