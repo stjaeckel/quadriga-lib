@@ -13,19 +13,20 @@ TEST_CASE("Material - concrete", "[acoustic][materials]")
     // concrete_200mm. Columns: density 2281 kg/m3 in e (Litvin 76-66); tf and tfB the power law of PTB #30 and Nell
     // (0.0204 at 1 kHz, exponent 0.3965); the mass-law knobs fitted at 342.76271 m/s to the envelope below at 150 and
     // 203 mm (4096 angles x 12 tones per third, side 3.523 m). coiF (4.41 kHz) and att are fit knobs, not the physical
-    // coincidence (fc h = 17.1 Hz m, 114 Hz at 150 mm; Hopkins_2007_SoundInsulation, line 374): the library's single
-    // loss factor cannot follow the measured one, which falls from 0.04 to 0.007 over 125 Hz - 4 kHz (Mahn, lines 370,
-    // 372), and the physical plate with a constant loss factor misses the envelope by 7 to 11 dB.
-    // Transmission [Litvin_1980_ConcreteWallsTL, research lines 228 and 229 at 2dad906]: tests 76-66 (152 mm,
+    // coincidence (fc h = 17.1 Hz m, 114 Hz at 150 mm; [Hopkins_2007_SoundInsulation#58]): the library's single loss
+    // factor cannot follow the measured one, which falls from 0.04 to 0.007 over 125 Hz - 4 kHz
+    // ([Mahn_2023_GuideAirborneRR331#9], [Mahn_2023_GuideAirborneRR331#11]), and the physical plate with a constant
+    // loss factor misses the envelope by 7 to 11 dB.
+    // Transmission [Litvin_1980_ConcreteWallsTL#1] and [Litvin_1980_ConcreteWallsTL#2]: tests 76-66 (152 mm,
     // 346.7 kg/m2) and 76-77 (203 mm, 471.6 kg/m2), opening 4.37 x 2.84 m (side 3.523 m), octaves the energy mean of
     // thirds read from a plot (+/-0.5 dB); each within 3 dB, mass-shifted to the row's surface mass; their envelope
     // within 1 dB; 31.5, 63 Hz and 8 kHz take the spread of physical models (tools/acoustic/tl_refs.json). Absorption,
-    // hard faces used as measured, within 0.05: PTB #30 "smooth unpainted concrete" [PTB_2012_AbsorptionTable, line
-    // 1559; Sabine; its 63 Hz and 8 kHz are copies, dropped] and the painted boundary of a reverberation room
-    // [Nell_TIP_TieftonAbsorber, line 1730; Sabine from T30].
-    // Reasonable meant: within the Litvin pair; Mahn's NRC walls [Mahn_2023_GuideAirborneRR331, lines 369 and 371:
-    // thirds at the octave centres, CON150 of unknown size] are printed only, 3 dB below the pair at 250 Hz and 9 dB
-    // above at 4 kHz. Valid: 150-203 mm, R 125 Hz - 4 kHz.
+    // hard faces used as measured, within 0.05: PTB #30 "smooth unpainted concrete" [PTB_2012_AbsorptionTable#26]
+    // (Sabine; its 63 Hz and 8 kHz are copies, dropped) and the painted boundary of a reverberation room
+    // [Nell_TIP_TieftonAbsorber#4] (Sabine from T30).
+    // Reasonable meant: within the Litvin pair; Mahn's NRC walls [Mahn_2023_GuideAirborneRR331#8] and
+    // [Mahn_2023_GuideAirborneRR331#10] (thirds at the octave centres, CON150 of unknown size) are printed only, 3 dB
+    // below the pair at 250 Hz and 9 dB above at 4 kHz. Valid: 150-203 mm, R 125 Hz - 4 kHz.
     const std::vector<double> oct = {125, 250, 500, 1000, 2000, 4000}, L1 = {42.1, 46.5, 52.6, 56.5, 61.7, 64.6}, L2 = {43.8, 47.3, 54.7, 58.1, 63.3, 67.3};
     auto litvin = [&](const char *test, const std::vector<double> &v, double m, bool gaps)
     {

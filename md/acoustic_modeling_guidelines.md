@@ -98,6 +98,8 @@ Check every recipe against this list; the material list's recipes avoid them.
   block, sand-lime), `masonry_hollow` (hollow brick and block) or `masonry_light` (aircrete, lightweight block): each
   is the finished wall, plastered on both faces. Do not add plaster sheets to them; `plaster_15mm` is for an
   unplastered wall that gets plaster.
+- **Field values.** Measured field values (R′) of masonry read 3–6 dB below the laboratory rating (flanking, which the
+  engine does not trace); the rows carry the laboratory value.
 - **Drywall by what the plan shows.** `drywall` or `drywall_filled` (solid, wall drawn with thickness) or the sheet
   of the nearest total thickness (`drywall_100mm`, `_125mm`, `_150mm`, `drywall_filled_*`). The rows assume one
   12.5 mm gypsum board each side on metal studs, the rest cavity, empty unless filled. The precise option, for a
