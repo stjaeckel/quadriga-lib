@@ -328,8 +328,10 @@ TEST_CASE("Materials rig - objects: absorption area of a hard box, an absorbing 
 TEST_CASE("Materials table - every row has a material case and every column a valid value", "[acoustic][materials]")
 {
     // Why: the table and its tests must not drift. A row's family is its name without the sheet suffix _<NN>mm; every
-    // family has one case "Material - <family>[ + <family> ...]" and every family a case names has a row; all 26
-    // columns; fRef, a, e positive, the columns the library requires non-negative; lowercase snake_case names.
+    // family has one case "Material - <family>[ + <family> ...]" and every family a case names has a row; the suffix
+    // is thk in mm, except that a porous row (a lossy wave medium, m 0) may carry less: a porous sheet keeps its true
+    // thickness, which can be less than the product's (a carpet's pile on its backing); all 26 columns; fRef, a, e
+    // positive, the columns the library requires non-negative; lowercase snake_case names.
     const mt::Table &T = mt::table();
     REQUIRE(!T.names.empty());
     for (const char *k : mt::COLS)
@@ -343,11 +345,14 @@ TEST_CASE("Materials table - every row has a material case and every column a va
     for (size_t i = 0; i < T.names.size(); ++i)
     {
         const std::string &n = T.names[i], f = std::regex_replace(n, std::regex("_[0-9]+(_[0-9]+)?mm$"), "");
-        std::smatch mm; // the suffix is thk in mm (an underscore for the decimal point); no suffix, thk 0
+        std::smatch mm; // the suffix in mm (an underscore for the decimal point); no suffix, thk 0
         fams.insert(f);
         INFO("row " << n << ", family " << f);
         CHECK(cases.count(f) == 1);
-        CHECK(std::abs(1000.0 * T.prop.at("thk")[i] - (std::regex_search(n, mm, std::regex("_([0-9]+)(_([0-9]+))?mm$")) ? std::stod(mm[1].str() + "." + (mm[3].matched ? mm[3].str() : "0")) : 0.0)) < 1e-9);
+        const double sfx = std::regex_search(n, mm, std::regex("_([0-9]+)(_([0-9]+))?mm$")) ? std::stod(mm[1].str() + "." + (mm[3].matched ? mm[3].str() : "0")) : 0.0,
+                     thk = 1000.0 * T.prop.at("thk")[i];
+        const bool porous = T.prop.at("m")[i] == 0.0 && (T.prop.at("c")[i] > 0.0 || T.prop.at("g")[i] > 0.0);
+        CHECK((porous && sfx > 0.0 ? thk > 0.0 && thk <= sfx + 1e-9 : std::abs(thk - sfx) < 1e-9));
         CHECK(std::all_of(n.begin(), n.end(), [](char ch) { return std::islower((unsigned char)ch) || std::isdigit((unsigned char)ch) || ch == '_'; }));
         for (const char *k : {"fRef", "a", "e"})
             CHECK(T.prop.at(k)[i] > 0.0);

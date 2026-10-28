@@ -26,7 +26,8 @@ batch and brought to Stephan in five parts. The engine stays closed until every 
 | — | research rows cited by stable id; the research answer folded into the wish-list | 063f05b |
 | 1 | `masonry_heavy` (1.2), `glass_4mm` / `glass_6mm` (1.6), `glass_wool` (5.1); JCA in the rig | a73d1a2 |
 | 2a | `masonry_hollow` (1.3), `door_solid_40mm` + `door_hollow_core_40mm` (1.23, 1.24), `rock_wool` (5.2) | cbe2ae3 |
-| 2b | `masonry_light` (1.4), `glazing_double_24mm` + `glazing_triple_36mm` (1.7), `pu_foam` (5.3; 3.6 to a padding-foam row) | merged, waiting for Stephan's commit |
+| 2b | `masonry_light` (1.4), `glazing_double_24mm` + `glazing_triple_36mm` (1.7), `pu_foam` (5.3; 3.6 to a padding-foam row) | 1a3d92d |
+| 2c | `plaster_15mm` (1.5), `parquet` + `vinyl` (1.16, 1.21), `carpet_tile_11mm` (3.1); porous rows' `thk` at most the name's suffix | merged, waiting for Stephan's commit |
 
 Earlier commits of step 3: 5be85fb, 13e4e45, 19323d9 / be65346 / bd0a170 (wish-list and guidelines), 69a4555 /
 e5d3743 / e578aee / 5081648 (rig extension and its reviews).
@@ -58,8 +59,8 @@ doors, the first lumped rows (`plates`), glass wool and rock wool (`porous`).
 build: g++-12 / gcc-12, static library, tests on, AVX2, CUDA, MATLAB, Octave, Python off) and runs its `test_bin` from
 the repository root; agents build inside their worktrees.
 
-**Baselines** (the generic build, at cbe2ae3, batch 2a; regenerated 2026-10-28): `[wave]` 163474 / 178,
-`[acoustic]` 44326 / 76 (the rig included), whole suite 1355360 / 1390 (the generic build leaves out one build-option
+**Baselines** (the generic build, at 1a3d92d, batch 2b; regenerated 2026-10-28): `[wave]` 163474 / 178,
+`[acoustic]` 44750 / 79 (the rig included), whole suite 1355784 / 1393 (the generic build leaves out one build-option
 case of the merge notice's count). Files `test_wave.txt`, `test_acoustic.txt`, `test.txt` in `/home/stephan/quadriga-lib-agents/baselines/`.
 
 **Research:** the requests of 2026-10-27 are answered (research commit d501809; report
@@ -68,12 +69,10 @@ case of the merge notice's count). Files `test_wave.txt`, `test_acoustic.txt`, `
 The line citations are converted and the answer is folded into the wish-list with Stephan's twelve readings D1–D12
 (063f05b; the readings in the section-9 log of 2026-10-28). Further requests go through Stephan in the handoff-7 form.
 
-**Now: batch 2b** (built and merged 2026-10-28, waiting for Stephan's commit; then baselines, worktree cleanup, 2c): `masonry_light` (aircrete; D4 of the research fold
-decided: tested against the range of the four 10 cm walls, density inside 480–800 kg/m³), `pu_foam_50mm` (porous),
-the glazing units `glazing_double_24mm`, `glazing_triple_36mm` (lumped; the doors are the worked example). Then 2c
-(`plaster_15mm` with the bonded-mass effect of issue 7, `carpet_tile_11mm`, `parquet` / `vinyl` on the slab), 2d
-(`clt`, `screed`, ground classes and asphalt, `gypsum_board_12_5mm`, `plywood_19mm`, metal), batch 3 (leaves on
-cavities, drywall, resonant absorbers, ceiling tiles, objects); rows waiting for data at the end.
+**Now: batch 2c** (built and merged 2026-10-28, waiting for Stephan's commit; then baselines, worktree cleanup, 2d): `plaster_15mm` with the bonded-mass effect of issue 7, `carpet_tile_11mm`,
+`parquet` / `vinyl` on the slab. Then 2d (`clt`, `screed`, ground classes and asphalt, `gypsum_board_12_5mm`,
+`plywood_19mm`, metal), batch 3 (leaves on cavities, drywall, resonant absorbers, ceiling tiles, objects, the
+padding-foam row with upholstery 3.8); rows waiting for data at the end.
 
 **Mechanics per batch** (worked out over batches 0–2a; the briefs in the agents folder `materials/` show the form:
 `batch2a_common.md` and one brief per family):
@@ -930,6 +929,99 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     Documents: wish-list 1.3 (Warnock 1995 #2), 1.4, 1.7, 5.3 confirmed with built paragraphs, 3.6 to a padding-foam
     row; stage-2b issue 7 extended to light masonry, issue 8 to the glazing units' mass-air-mass dip; guidelines 7
     (cushions). To Stephan with the batch report.
+  - Committed by Stephan (1a3d92d, 2026-10-28). Manager: the three worktrees checked against the commit (test files
+    identical apart from the manager's citation of Rubino #9; every CSV row in the commit; no commits on the branches),
+    then removed with their `agent/*` branches; baselines regenerated at 1a3d92d (`[wave]` 163474 / 178, `[acoustic]`
+    44750 / 79, whole suite 1355784 / 1393; every number identical to the merge run). Noted: the citation made one
+    comment line of the foam case 161 characters long (the porous file has 8 comment lines over 120).
+  - Batch-2c briefs written in the agents folder: `batch2c_common.md` (worktrees at 1a3d92d; the 2b cases among the
+    confirmed; lessons of 2b: `python3 -I -B`, every printed vector names its bands, comment numbers checked against the
+    final run, comment lines at most 120 characters; a new group file and its header), `m11_plaster_brief.md` (heavy
+    file; the matched pairs through inline bare walls, the sheet on concrete and the mass-level side effect of issue 7,
+    density, face absorption), `m12_carpet_tile_brief.md` (new floors file; what the row is without a measured σ:
+    porous fitted to Salford or a face-absorption sheet, the conversion, the backing, a stand-in finish solid),
+    `m13_floor_finishes_brief.md` (new floors file; `parquet` + `vinyl`: the finish's own plate columns in a bonded run,
+    added insulation on concrete and issue 7, the face absorption, solid against sheet). Both floor agents create
+    `test_acoustic_mat_floors.cpp`; the manager joins them. The combination "rug on a hard finish" with the real rows is
+    the manager's after the merge. To Stephan before the agents start.
+  - Briefs approved by Stephan 2026-10-28. Worktrees created at 1a3d92d (`worktrees/m11_plaster`, `m12_carpet_tile`,
+    `m13_floor_finishes`, branches `agent/<id>`); the three agents started on phase 1 (plan), 4 threads each.
+  - m13 floor finishes phase 1 done (worktree clean at 1a3d92d). Manager rerun of the probe (2 threads, load 7–9,
+    identical to the agent's apart from timings): plain mass-law rows (density, physical mass level, the PTB face law,
+    `att` 0, no coincidence or resonance columns). Added insulation of 15 mm parquet (710 kg/m³) on 150 mm concrete
+    +0.12 / +0.44 / +0.59 / +0.52 / +0.50 / +0.51 / +0.57 / +0.70 / +0.52 dB (31.5 Hz–8 kHz) against +0.27 dB of mass
+    law, library minus bonded plate within 0.002 dB (solid) and 0.000 (sheet); with the physical coincidence
+    (1122 Hz) +3.81 / +4.20 dB at 4 / 8 kHz. Face law against PTB#394 within 0.018 (500 Hz). A traced vinyl of 1.0 /
+    1.4 mm reads 0.107 / 0.117 dB off the bonded plate, from 1.6 mm 1.3e-3 dB. Decisions Q1 (no plate columns), Q2
+    (physical mass level; added insulation within ±1 dB of the mass law asserted, the excess printed, no mark), Q3
+    (PTB laws ±0.05), Q4 (solid = sheet on the slab; finish solids at least 1.6 mm), Q5 (parquet 710 kg/m³ from birch
+    plywood as a stand-in, vinyl 1400 kg/m³ stated, tier 3). Case about 0.25 s, provisional (load 11–15).
+  - m12 carpet_tile phase 1 done (worktree clean at 1a3d92d). Manager reruns (`sabine_to_random.py` both reactions,
+    `conv2.py` output, `fit_tf.py 4.4`, the probe 93 / 96 with the 3 deliberate raw-Sabine failures, load 4–7): a
+    mass-law sheet of an assumed 4.4 kg/m² whose face law (`tf` 4.9065e-4 at `fRef`, `tfB` 0.73871) meets the
+    references within 0.027 (63 Hz neighbours, Salford as a hard face to 500 Hz, Salford converted above); α rises to
+    0.86 at 8 kHz (a gap band). The tool's conversion at 11 mm misses by 0.129 (extended, σ 1769) / 0.053 (local); the
+    agent's extended fit with a free thickness (6.5 mm, σ 16469) within 0.036, converted 0.198 / 0.337 / 0.489 at
+    1–4 kHz (0.092 / 0.063 / 0.011 below Sabine). Rug on a stand-in finish (15 mm, 700 kg/m³) on concrete: absorption
+    unchanged, transmission off the bonded plate up to 13.0 dB (10 kHz); against the rug on the slab +5.11 … −11.42 dB
+    (31.5 Hz–8 kHz): three bonded mass-law bodies (issue 4). The porous form on the finish changes the floor's
+    transmission by at most 0.55 dB, its absorption by up to 0.028. Decisions C1 (face-law sheet), C2 (extended
+    conversion asserted ±0.107, A 1 to 500 Hz, A 2 above), C3 (hard-backed tiles and low-pile rugs; cushion backs
+    printed), C4 (4.4 kg/m², physical mass level), C5 (rug on a finish printed under issue 4, issue 4 extended).
+    Manager: C5 bears on the recipe of wish-list 1.7.4 (a rug is a sheet on the finish solid); option to draw rugs on
+    the slab (the finish's mass under a rug is 0.1–0.7 dB) to be put to Stephan.
+  - m11 plaster phase 1 done (worktree clean at 1a3d92d). Manager reruns (`q1_pairs.py`, `q2_envelope.py`, `q2_d8.py`
+    identical to the agent's; the probe 125 / 125; load 3–6): pure bonded mass, 1317 kg/m³ (19.75 kg/m², the mean of
+    the three pairs 912–1885), physical mass level, the masonry face law. Matched pairs through inline bare walls with a
+    fitted mass level, the plaster at the pair's own mass: increments met within 1.81 (BIA brick) / 2.73 (BIA tile) /
+    1.32 dB (Warnock); limp walls 2.22 dB at most, walls at physical mass fail the tile by 4.85 dB. On concrete: above
+    the mass-shifted Litvin envelope by 0.75 / 1.38 dB (one / two faces, 150 mm; 0.61 / 1.07 at 203 mm), below
+    "Litvin plus the measured increments" by 0.73 / 1.40 (150 mm) and 0.96 / 1.83 dB (203 mm): between the two in every
+    octave. With the concrete row's level (0.534) instead: within 0.37 dB of the envelope. Measured increments on the
+    sealed Warnock block exceed the plaster's mass law (+1.7 … +2.6 against 0.38 dB). Decisions D1 (physical level),
+    D2 (fitted inline walls), D3 (the band between mass-only and plus-increments, ±1 dB; fallback one face asserted,
+    two printed under issue 7), D4 (1317 kg/m³), D5 (masonry face law), D6 (about 45 lines, 0.1 s). Side line for
+    issue 7: a bonded sheet has no coincidence term, so its mass fills the host's dip (+11.7 dB at 4 kHz on a clay tile
+    at physical mass against 1.0 dB measured).
+  - Stephan 2026-10-28: all batch-2c decisions as recommended except C1, asked from first principles (σ of similar
+    materials). Manager: the research data hold measured pile resistivities that brief and plan missed: Ardekani pile
+    zones alone 11797–47604 Pa·s/m² (7 mm, porosity 0.98–0.99), piles fitted inside complete rugs 10003–40162; Aretz
+    car carpets 20000 / 30000 (4–6 mm layers); Lupescu nonwoven carpets 22000–121000; Hasebe and Berthelot 0.3–1.6 MPa
+    are effective values of grazing ground models. A tile is a pile on a dense, practically impervious backing, so the
+    porous layer is the pile: the agent's extended-reaction fit at a free depth (6.5 mm, σ 16469) is that construction
+    and lies in the measured pile range. Through the library (probe rerun) the pile row on concrete meets the 63 Hz
+    neighbours within 0.0007, Salford to 500 Hz within 0.013 and the converted values within 0.023 (the face-law row
+    0.027); on a finish solid it changes the floor's transmission by at most 0.55 dB (face-law row −11.7 dB); its slab
+    transmission carries the porous-layer engine limit (+8.16 dB at 0° and 31.5 Hz) as the three porous rows do.
+  - Decided by Stephan 2026-10-28: plaster P1–P6 as recommended (physical level, fitted inline walls, the band on
+    concrete ±1 dB, 1317 kg/m³, the masonry face law); carpet C1 the porous pile (Miki, σ 16469 Pa·s/m², `thk` 6.5 mm,
+    the name `carpet_tile_11mm` kept as seen), C2 extended conversion ±0.107 (A 1 to 500 Hz, A 2 above), C3 hard-backed
+    tiles and low-pile rugs, C4 void, C5 the rug on a finish printed (no issue-4 extension); floor finishes F1–F5 as
+    recommended. The three agents continued with phase 2 (build).
+  - m11 plaster built (worktree: CSV +1 row; heavy file +75 lines after masonry_light). Manager rerun: 125 / 125,
+    0.243 s at load 6 (agent 0.095 s at load 9.6: provisional either way, rechecked at the merge); comment lines at
+    most 120 characters; Hopkins #121 (mortar 1600 kg/m³) exists. Clay-tile pair 2.63 dB on the case grid (2.73 fine).
+  - m13 floor finishes built (worktree: CSV +4 rows; new `test_acoustic_mat_floors.cpp`, 95 lines). Manager rerun:
+    126 / 126, 0.252 s at load 5.6; comment lines at most 120 characters.
+  - m12 carpet_tile built (worktree: CSV +1 row, `thk` 0.0065; new `test_acoustic_mat_floors.cpp` with its case, 30 / 30).
+    Manager rerun of `[materials]` in the worktree: 2057 / 2058, the one failure the table case's naming check
+    (`test_acoustic_materials.cpp:350`: the suffix must equal `thk`; 11 against 6.5 mm). The decided name and `thk`
+    conflict with wish-list 1.6; to Stephan: an exemption in the table case, a rename, or a product-thickness field.
+  - Decided by Stephan 2026-10-28: exempt in the table case as a general rule: a porous row (a lossy wave medium, `m` 0,
+    `c` or `g` above 0) carries `thk` at most its name's suffix; every other row equality (wish-list 1.6 amended).
+  - Batch 2c merged by the manager 2026-10-28: the heavy file from m11; `test_acoustic_mat_floors.cpp` joined (m13's
+    file and m12's case, headers identical); CSV rows appended in wish-list order 1.5, 1.16, 1.21, 3.1, all diffs
+    append-only. Manager edits: the table case's thickness check (the porous rule, 4 lines and 3 comment lines); the
+    carpet case's stand-in finish replaced by the real `parquet` (15 mm) and `vinyl` (3 mm) rows, its comment from the
+    run (absorption +0.003 … +0.030 at 63 Hz–4 kHz, the floor's transmission −0.69 … +0.57 dB). Checks at load 2–3,
+    12 threads: reconfigure and rebuild clean; `[materials]` 2402 / 23 (plaster 0.065 s, parquet + vinyl 0.096 s,
+    carpet 0.060 s); `[wave]` 163474 / 178, 141128 identical; `[acoustic]` 45143 / 82, 144418 identical, two inserted
+    blocks (487 lines: the floors file; 144: plaster); whole suite 1356177 / 1396 (+393), 294437 identical, the same
+    insertions; `check_docs.py` passes. Reran `q_extra.py` and `q1_levels.py` (identical): the clay tile at physical
+    mass +11.72 dB at 4 kHz against 1.0 dB measured. Documents: wish-list 1.5, 1.16, 1.21, 3.1 confirmed with built
+    paragraphs, 1.6 (porous `thk`), 1.7.4 (rug on a finish, finish solids at least 1.6 mm); stage-2b issue 7 (bonded
+    sheets and finishes), issue 1 (carpet); guidelines 5 (floors). Outputs in `/home/stephan/quadriga-lib-agents/scratch/b2c/`.
+    To Stephan with the batch report.
 
 ## 10. Scope of phase 0 (2026-10-23; naming and combinations superseded by wish-list 1.6 and section 3)
 

@@ -390,3 +390,80 @@ TEST_CASE("Material - masonry_light", "[acoustic][materials]")
     mt::check_material("masonry_light_100mm", mt::row("masonry_light_100mm"));
     mt::check_material("masonry_light_150mm", mt::row("masonry_light_150mm"));
 }
+
+TEST_CASE("Material - plaster", "[acoustic][materials]")
+{
+    // Plaster bonded on an unplastered wall (concrete; the masonry rows carry their plaster), class 1: the sheet
+    // plaster_15mm, glued (att 0, the host's side). Columns: pure bonded mass at its physical level (no resonance, no
+    // coincidence: the host's plate carries those); density 1317 kg/m3 in e (19.75 kg/m2), the mean of the plaster of
+    // the three pairs below (912-1885 kg/m3; mortar 1600 [Hopkins_2007_SoundInsulation#121], lightweight gypsum 650
+    // [Hopkins_2007_SoundInsulation#96]); tf and tfB the plaster law of masonry_heavy, absorption within 0.05 of PTB
+    // #344 [PTB_2012_AbsorptionTable#38] and PTB #346 [PTB_2012_AbsorptionTable#40] (Sabine, hard faces used as
+    // measured). On concrete: the row's mass level is 0.53 times its physical mass (heavy-wall coincidence engine
+    // limit), so the sheet adds about twice its mass law: 0.9-1.3 dB on one face of 150 mm, 1.7-2.4 dB on both (125 Hz
+    // - 4 kHz), against 0.49 / 0.95 dB. No plastered concrete is measured; the plastered wall at 150 and 203 mm (side
+    // 3.523 m) is asserted within 1 dB of the band between the Litvin pair [Litvin_1980_ConcreteWallsTL#1],
+    // [Litvin_1980_ConcreteWallsTL#2] mass-shifted to the plastered mass (added mass alone) and the pair plus one
+    // measured increment per face (the band of the three below): the library lies inside it, 1.38 dB above the first
+    // and 1.83 dB below the second at most. Increments of one face, each within 3 dB, the plaster at the pair's own
+    // measured mass on an inline bare wall whose mass-law knobs and mass level (0.47 / 0.36 / 0.30 times physical) are
+    // fitted to the bare wall on this case's grid: [BIA_2000_TN5AClayMasonry#8] minus [BIA_2000_TN5AClayMasonry#7] (SCR
+    // brick 140 mm, 13 mm, 24.5 kg/m2, 4.37 x 2.84 m), [BIA_2000_TN5AClayMasonry#14] minus
+    // [BIA_2000_TN5AClayMasonry#15] (clay tile 90 mm, 16 mm, 14.6 kg/m2), [Warnock_1984_ConcreteBlockWalls#5] minus
+    // [Warnock_1984_ConcreteBlockWalls#4] (hollow block 290 mm, 13 mm, 15.0 kg/m2; size not stated, 3.22 m). Reasonable
+    // meant: the measured increments exceed the added mass (0.38-1.09 dB) by 1-2 dB (sealing, damping), which the
+    // engine lacks; at the fitted level that every row carries, the plaster's mass counts 2-3 times and meets them
+    // within 1.81 / 2.63 / 1.32 dB. Printed only: Warnock [Warnock_1984_ConcreteBlockWalls#2] / #3 (two faces on porous
+    // units, +5.3 to +6.5 dB, by sealing), Oliveira [Oliveira_2021_CeramicBlockCoating#1] to #14 (Rw only). Valid: on
+    // concrete 150-203 mm, R 125 Hz - 4 kHz.
+    using V = std::vector<double>;
+    const V oct = {125, 250, 500, 1000, 2000, 4000};
+    const mt::Row p = mt::row("plaster_15mm");
+    const mt::Measured ptb344{"PTB_2012_AbsorptionTable #344", "alpha_random", "Sabine (ISO 354), compiled; a hard face", false, 0.05, oct,
+                              {{0.02, 0.02}, {0.02, 0.02}, {0.03, 0.03}, {0.04, 0.04}, {0.05, 0.05}, {0.05, 0.05}}};
+    const mt::Measured ptb346{"PTB_2012_AbsorptionTable #346", "alpha_random", "Sabine (ISO 354), compiled; a hard face", false, 0.05, oct,
+                              {{0.02, 0.02}, {0.02, 0.02}, {0.02, 0.02}, {0.02, 0.02}, {0.02, 0.02}, {0.02, 0.02}}};
+    mt::check_material("plaster_15mm", p, {ptb344, ptb346});
+    struct Pair { const char *name; mt::Row bare; double t, mp; V bare_R, plastered_R; }; // bare wall inline; plaster kg/m2
+    const std::vector<Pair> pairs = {
+        {"BIA #7 / #8", {{"fRef", 1.2592e-4}, {"a", 3.85e-6}, {"e", 1621.4}, {"m", 1}, {"resF", 0.13321}, {"resQ", 1.6287}, {"resS", 1}, {"coiF", 3.6202}, {"coiQ", 0.80601}, {"tf", 6.7231e-3}, {"tfB", 0.157}, {"side", 3.53}},
+         0.140, 24.5, {36.8, 40.4, 46.7, 51.7, 57.0, 62.7}, {39.3, 41.5, 48.2, 53.7, 58.5, 62.7}},
+        {"BIA #15 / #14", {{"fRef", 2.6189e-4}, {"a", 3.85e-6}, {"e", 1008.3}, {"m", 1}, {"resF", 0.25302}, {"resQ", 2.9516}, {"resS", 1}, {"coiF", 17.493}, {"coiQ", 0.5}, {"tf", 7.5422e-3}, {"tfB", 0.157}, {"side", 3.53}},
+         0.090, 14.6, {27.6, 30.6, 33.2, 38.9, 46.1, 51.5}, {30.3, 32.3, 35.7, 41.9, 47.7, 52.5}},
+        {"Warnock #4 / #5", {{"fRef", 3.2939e-4}, {"a", 3.85e-6}, {"e", 968.39}, {"m", 1}, {"resF", 0.051914}, {"resQ", 1.6061}, {"resS", 1}, {"coiF", 9.8209}, {"coiQ", 22.274}, {"tf", 7.8187e-3}, {"tfB", 0.157}, {"side", 3.22}},
+         0.290, 15.0, {34.3, 41.1, 44.6, 51.1, 57.2, 59.9}, {36.0, 42.8, 46.9, 53.7, 59.0, 62.5}}};
+    V lo(6, 1e9), hi(6, -1e9); // the lowest and highest measured increment per octave
+    QD_DIAG("\n# diag: plaster on the inline bare walls per node against the plate rule\n%s", mt::DEV_HEAD);
+    for (const Pair &P : pairs)
+    {
+        const mt::Out B = mt::run({{P.bare, mt::SOLID, P.t}}, mt::grid());
+        const mt::Out O = mt::check_stack(P.name, {{mt::with(p, "side", P.bare.at("side")), mt::SHEET, P.mp / (p.at("e") * mt::RHO0)}, {P.bare, mt::SOLID, P.t}}, 2e-4, 3e-7);
+        QD_DIAG("# diag: plaster on %s at its own %.1f kg/m2, increments (dB)\noctave,library,measured,deviation\n", P.name, P.mp);
+        for (int k = 0; k < 6; ++k)
+        {
+            const double inc = O.t8[k + 2] - B.t8[k + 2], im = P.plastered_R[k] - P.bare_R[k];
+            lo[k] = std::min(lo[k], im), hi[k] = std::max(hi[k], im);
+            QD_DIAG("%g,%.2f,%.1f,%+.2f\n", oct[k], inc, im, inc - im);
+            INFO(P.name << ", octave " << oct[k] << " Hz");
+            CHECK(std::abs(inc - im) <= 3.0);
+        }
+    }
+    const mt::Row c = mt::with(mt::row("concrete"), "side", 3.523), ps = mt::with(p, "side", 3.523);
+    const V L1 = {42.1, 46.5, 52.6, 56.5, 61.7, 64.6}, L2 = {43.8, 47.3, 54.7, 58.1, 63.3, 67.3}; // Litvin 76-66, 76-77
+    for (double t : {0.150, 0.203})
+        for (int n = 1; n <= 2; ++n)
+        {
+            mt::Stack st = {{ps, mt::SHEET, 0.015}, {c, mt::SOLID, t}};
+            if (n == 2)
+                st.push_back({ps, mt::SHEET, 0.015});
+            const double mc = mt::mpp(c, t), m = mc + n * mt::mpp(p, 0.015);
+            V w1 = L1, w2 = L2, w1lo = L1, w2lo = L2;
+            for (int k = 0; k < 6; ++k)
+                w1[k] += n * hi[k], w2[k] += n * hi[k], w1lo[k] += n * lo[k], w2lo[k] += n * lo[k];
+            const std::string name = std::string(n == 1 ? "plaster | concrete" : "plaster | concrete | plaster") + (t < 0.175 ? " at 150 mm" : " at 203 mm");
+            mt::tier2(name.c_str(), mt::check_stack(name.c_str(), st, 2e-4, 3e-7),
+                      mt::envelope("Litvin pair mass-shifted, and plus one measured increment per face", oct,
+                                   {{346.7, L1}, {471.6, L2}, {346.7 * m / mc, w1}, {471.6 * m / mc, w2}, {346.7 * m / mc, w1lo}, {471.6 * m / mc, w2lo}}, m, 3.523),
+                      m);
+        }
+}

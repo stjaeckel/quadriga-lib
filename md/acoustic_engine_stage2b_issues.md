@@ -84,6 +84,8 @@ prints the reflection at that cap beside the uncapped one.
   At 0° the library is within 0.25 dB of the model. At random incidence the two estimates bracket where the result
   should be; the library lies inside that band except +0.18 dB at 1 kHz, +1.42 dB at 2 kHz and −1.04 dB at 8 kHz.
   Small for a curtain, but the same mechanism as the wall.
+- **Carpet** (2026-10-28): the 6.5 mm pile of `carpet_tile_11mm` on 150 mm concrete adds 8.16 dB at 0° and 31.5 Hz
+  against 0.00 dB from the fluid layer on a limp plate (`"Material - carpet_tile"`).
 - **Reproduce.** `QD_DIAG_RAY=1 ./build_linux/test_bin "Materials rig - a porous layer on a rigid wall*"` and
   `"Materials rig - engine limits printed*"` (`ENGINE LIMIT (porous layer on a rigid wall)`) print the rows above.
 
@@ -238,8 +240,15 @@ prints the reflection at that cap beside the uncapped one.
   the coincidence scaled as 1/h misses by 1.86 / 2.90 / 4.31 dB at 128 / 150 / 190 mm (125 Hz–4 kHz); against an
   independent thin plate (loss factor 0.03, fc·h 53 Hz·m), its change from 100 mm misses by 2.28 / 4.46 / 11.43 dB.
   The rows are asserted at 90–130 mm only.
+- **Bonded sheets and finishes** (2026-10-28): on `concrete` (mass level 0.53) a 15 mm plaster sheet lies between
+  the added mass alone and the measured plaster increments (1.38 dB above the first, 1.83 dB below the second, both
+  faces); a 15 mm parquet finish adds 0.12–0.70 dB against 0.27 dB of its mass law. A bonded sheet has no coincidence
+  term of its own, so its mass fills the host's coincidence dip: on a clay-tile wall fitted at its physical mass a
+  plaster sheet adds 11.72 dB at 4 kHz against 1.0 dB measured; at the fitted mass level that every row carries it
+  meets the measured increments within 2.63 dB.
 - **Reproduce.** `QD_DIAG_RAY=1 ./build_linux/test_bin "Material - concrete"` (the row against the Litvin pair);
-  `"Material - masonry_heavy"` (the printed ends); `"Material - masonry_light"` (150–250 mm printed).
+  `"Material - masonry_heavy"` (the printed ends); `"Material - masonry_light"` (150–250 mm printed);
+  `"Material - plaster"`, `"Material - parquet + vinyl"` (the bonded additions).
 
 ### 8. A pane's coincidence dip is capped by its face absorption ("pane coincidence capped by the face absorption")
 
