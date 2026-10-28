@@ -151,7 +151,8 @@ findings are recorded as stage-2b issues in the meantime. A complete table matte
 9. **One measurement never fits two rows that are stacked in one model.** Alternative models of one construction (a
    lumped row and its recipe) may share a reference.
 10. **A mass-law row carries its density in `e`** (`e` = ρ/ρ₀): the rig shifts measured walls of another thickness by
-    the surface mass `e`·ρ₀·`thk`. A lumped row's case passes its stated surface mass instead.
+    the surface mass `e`·ρ₀·`thk`. A lumped row carries its stated surface mass the same way, `e` = m″/(ρ₀·`thk`) at its
+    visible thickness (decided 2026-10-28, doors).
 
 ### 1.8 Panel size `side`
 
@@ -205,6 +206,7 @@ A floor of 4 × 5 m would be 4.47 m; on a heavy slab the effect is small (page 1
   | independent physics | the model written in the test (plate, transfer matrix, porous layer) | at or above 2–3 × the measured maxima of the rig's self-checks (wide gates are preferred) | CHECK |
   | measured single reference | the converted reference at its own specimen side | ±3 dB / ±0.05 (plus the conversion budget) | CHECK, or printed as an engine limit |
   | class row | the envelope of the class's walls, each shifted to the evaluated thickness by the mass law (20·log₁₀ of the surface-mass ratio; the row's surface mass is `e`·ρ₀·`thk`, a lumped row's the stated one) | ±1 dB | as above |
+  | walls of one build and thickness that differ by more than the tolerance | the band between them, each mass-shifted | ±3 dB outside the band | CHECK |
   | regression guard | the library's own measured result | about 1 dB / 0.01 in α | CHECK |
 
   Worked example: `concrete_150mm` against Litvin 76-66 ([Litvin_1980_ConcreteWallsTL#1], 152 mm, opening 4.37 × 2.84 m,
@@ -242,7 +244,8 @@ In the decided order (concrete first, then absorption tier, impact, transmission
 ### 1.12 Page corrections for phase 4
 
 - `tf` 0 behind a fill (page 10.4): the wall keeps its own row (1.7.6).
-- Miki or Komatsu for porous columns (page 10.5): ground rows are Miki fits to the class impedance (2.6).
+- Miki or Komatsu for porous columns (page 10.5): ground rows are Miki fits to the class impedance (2.6); for products,
+  whichever model meets the reference (glass wool takes JCA, rock wool Miki).
 - 343 m/s (page 10.1 and the examples): the library's 342.76271 m/s.
 - The two-face limit (page section 2): two sheets form a stack only with air behind; never two sheets on a solid.
 
@@ -259,7 +262,7 @@ of section 3. R = laboratory sound reduction index; σ = flow resistivity.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1.1 | `concrete`, `concrete_150mm`, `concrete_200mm` | cast walls, slabs, ceilings; slab with bonded screed | solid of the full thickness (slab plus bonded screed) or sheet | 1 | 1 | 150–203 mm; R 125 Hz–4 kHz | high | confirmed |
 | 1.2 | `masonry_heavy`, `masonry_heavy_150mm`, `_200mm`, `_250mm` | finished heavy wall plastered both faces (solid clay brick, dense block, sand-lime, about 1700–2400 kg/m³) | solid or sheet | 1 | 1 | 150–250 mm; R 125 Hz–4 kHz; 100 and 300 mm, 63 Hz printed | high | confirmed |
-| 1.3 | `masonry_hollow`, `masonry_hollow_100mm`, `_200mm`, `_250mm` | finished hollow-unit wall plastered both faces (hollow clay brick, hollow block of any aggregate) | solid or sheet | 1 | 1 | about 90–250 mm, set in phase 3 by the same rule; measured plastered both faces at 166, 206, 240 and 270 mm | high | wish |
+| 1.3 | `masonry_hollow`, `masonry_hollow_100mm`, `_200mm`, `_250mm` | finished hollow-unit wall plastered both faces (hollow clay brick, hollow block of any aggregate) | solid or sheet | 1 | 1 | 100–250 mm; R 125 Hz–4 kHz; 300 mm printed | high | confirmed |
 | 1.4 | `masonry_light`, `masonry_light_100mm`, `_150mm` | finished light wall, plastered (aircrete, expanded-clay and lightweight-aggregate solid units) | solid or sheet; 200 and 250 mm printed only | 1 | 1 | about 90–190 mm; 100 mm against the four bare 10 cm walls | medium | wish |
 | 1.5 | `plaster_15mm` | plaster on `concrete` or `clt` | sheet on the solid; `att` 0, host's `side` | 1 | 2 | — | low | wish |
 | 1.6 | `glass_4mm`, `glass_6mm` | single-pane windows | sheet only | 2 | 1 | R 125 Hz–4 kHz | high | confirmed |
@@ -279,8 +282,8 @@ of section 3. R = laboratory sound reduction index; σ = flow resistivity.
 | 1.20 | `ceramic_tile`, `ceramic_tile_10mm` | tiled floors and walls | finish solid; the sheet only where nothing lies or stands on it; `att` 0, host's `side` | 3 | 2 | — | low | wish |
 | 1.21 | `vinyl`, `vinyl_3mm` | linoleum or vinyl stuck to the slab | finish solid; the sheet as 1.20 | 1 | 2 | — | low | wish |
 | 1.22 | `steel_1mm`, `aluminum_2mm` | metal sheets, metal doors, cladding | sheet | 2 | 1 | R 63 Hz–4 kHz | low | wish |
-| 1.23 | `door_solid_40mm` | solid timber doors | sheet, lumped; surface mass 23.9 kg/m² (the reference door; 22.5–25.2 kg/m² over the references) | 1 | 1 | R 125 Hz–4 kHz (sealed leaf) | medium | wish |
-| 1.24 | `door_hollow_core_40mm` | hollow-core interior doors | sheet, lumped; surface mass 9.3 kg/m² (NBS stated) | 3 | 1 | R 125 Hz–4 kHz (sealed leaf) | medium | wish |
+| 1.23 | `door_solid_40mm` | solid timber doors | sheet, lumped; surface mass 23.9 kg/m² (the reference door; 22.5–25.2 kg/m² over the references) | 1 | 1 | R 125 Hz–4 kHz (sealed leaf) | medium | confirmed |
+| 1.24 | `door_hollow_core_40mm` | hollow-core interior doors | sheet, lumped; surface mass 9.3 kg/m² (NBS stated) | 3 | 1 | R 125 Hz–4 kHz (sealed leaf) | medium | confirmed |
 | 1.25 | `clt`, `clt_100mm` | cross-laminated timber walls and floors | solid or sheet | 2 | 1 | 78–245 mm; R 63 Hz–4 kHz | low | wish |
 
 References and gaps:
@@ -380,7 +383,13 @@ and rendered, Rw only). (row) bare walls: Zeitler [Zeitler_2015_ConcreteBlockRR3
 [Warnock_1995_BlockConstructions#1]; BIA [BIA_2000_TN5AClayMasonry#13] (194 mm hollow clay tile),
 [BIA_2000_TN5AClayMasonry#15] (90 mm). [Warnock_1995_BlockConstructions#1] minus [Zeitler_2015_ConcreteBlockRR334#3]:
 −0.6 / 3.2 / 0.0 / 0.2 / −0.5 / 1.3 dB (script). The increment of two plaster faces on porous hollow units (+5.3 to
-+6.5 dB) is about twice the one-face increments of 1.2 and is the class's own. Starting columns: a fit to these walls.
++6.5 dB) is about twice the one-face increments of 1.2 and is the class's own. **Built (2026-10-28):** one generic
+solid for block and clay (1385 kg/m³; mass level 0.63 × physical, coincidence a fit knob), asserted within ±3 dB:
+Warnock 166 mm (2.86 dB; its 4 kHz octave printed, two of three thirds), [BIA_2000_TN5AClayMasonry#14] plus its own
+one-face increment at 100 mm (2.52 dB), Granzotto B (2.18 dB), and Granzotto C and E at 250 mm as one band (0.77 dB:
+the two walls of one build and thickness differ by up to 6 dB at 2–4 kHz, rule of 1.10). Sides 3.22 m (Warnock's
+laboratory inferred at 2.99 m: +3.01 dB at 125 Hz). Printed: 300 mm, Secchi, NBS, the bare walls plus increments;
+concrete block sealed and plastered reads 3–10.7 dB above the row at its mass.
 α: plaster as 1.2. Gaps: hollow clay walls of 80–200 mm plastered both faces (spectra exist for 206–450 mm only);
 specimen sizes of Secchi and Granzotto; Oliveira's spectra (not extracted).
 
@@ -539,7 +548,8 @@ caulked, 250 Hz–2 kHz, sound intensity, side 1.427 m by script), [Morin_1993_A
 22.5 kg/m², gaskets and caulking, warble tones, side 1.397 m). The field-incidence mass law R = 20 lg(m f) − 47 at
 Quirt's R needs 27.4 / 26.1 / 17.0 / 5.6 / 3.6 / 3.3 kg/m² (125 Hz–4 kHz, script): within 1.2 dB of the stated
 23.9 kg/m² at 125–250 Hz, far below from 500 Hz (coincidence and leaks; Quirt 28.0–31.6 dB at 500 Hz–2 kHz): `coiF` and
-`att` are fit knobs, as for concrete. (comb.) seal states [Quirt_1986_DoubleDoors#2] to [Quirt_1986_DoubleDoors#4]
+`att` are fit knobs, as for concrete (**built 2026-10-28:** Quirt within 1.10 dB, Morin caulked 1.12 dB, their envelope
+0 dB; the physical coincidence near 655 Hz misses by 5.3 dB at 125 Hz, stage-2b issue 7). (comb.) seal states [Quirt_1986_DoubleDoors#2] to [Quirt_1986_DoubleDoors#4]
 (magnetic, foam, none), [Morin_1993_AccessDoorsCMHC#1] / [Morin_1993_AccessDoorsCMHC#2] (section 3). Printed: NBS
 panelled doors [Berendt_1967_NBSMonograph77#17] to [Berendt_1967_NBSMonograph77#19] (64 mm, 38.1 kg/m²), the 64–67 mm
 NBS doors [NBS_1955_BMS144SoundInsulation#1] to [NBS_1955_BMS144SoundInsulation#4]. α: PTB#396
@@ -554,7 +564,8 @@ M.-J. Kim; 35 mm lattice-core leaf with 4.5 mm MDF faces, 875 × 2215 mm, all jo
 2808 (= ISO 140-3), thirds 63 Hz–5 kHz from a figure, the 63 and 80 Hz thirds outside the standard and the 63 Hz octave
 blank; surface mass not stated). The field mass law at Kim's R gives 7.6–9.2 kg/m² over 500 Hz–4 kHz (script), within
 1.75 dB of the NBS mass; NBS 634 itself reads 13.1–17.3 dB below Kim at 1–4 kHz (printed). Kim's mass-air-mass dip at
-315 Hz (3–5 dB) is not expressible by a lumped sheet: printed as an engine limit. (comb.) bottom gaps 2–17 mm
+315 Hz (3–5 dB) is carried by the row's resonance columns at the physical mass-air-mass frequency (283 Hz; library
+minimum at 306 Hz by a fine sweep): **built 2026-10-28**, Kim within 2.02 dB, mass level 0.69 × the stated mass. (comb.) bottom gaps 2–17 mm
 [Lee_2010_InteriorDoorAperture#2] to [Lee_2010_InteriorDoorAperture#14] (the 6 mm gap [Lee_2010_InteriorDoorAperture#4],
 the survey mean 6.4 mm, gives Rw 23 against 30 sealed; section 3). Gaps: surface mass of a modern hollow-core leaf; a
 second modern spectrum; absorption; a 50 Hz third.
@@ -824,7 +835,7 @@ to 1.051 / 1.088, values above one marked); Carvalho [Carvalho_2012_ChurchPews#2
 | # | name | intended use | recipe | A | T | valid | impact | status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 5.1 | `glass_wool`, `glass_wool_50mm`, `glass_wool_100mm` | porous panels, cavity fill, ceiling clouds and baffles (recipe) | sheet on a rigid solid; solid for a fill, a block, a cloud or a baffle hung in air | 1 | 2 | 250 Hz–4 kHz; measured at 50 mm, 25–200 mm against the model | high | confirmed |
-| 5.2 | `rock_wool`, `rock_wool_50mm` | porous panels, cavity fill | as 5.1 | 1 | 2 | 250 Hz–4 kHz | medium | wish |
+| 5.2 | `rock_wool`, `rock_wool_50mm` | porous panels, cavity fill | as 5.1 | 1 | 2 | 250 Hz–4 kHz | medium | confirmed |
 | 5.3 | `pu_foam_50mm` | foam panels | sheet on a rigid solid | 1 | 2 | 250 Hz–4 kHz | medium | wish |
 | 5.4 | `melamine_foam_50mm` | studio foam | sheet on a rigid solid | 2 | 2 | — | medium | wish |
 | 5.5 | `polyester_fiber_50mm` | PET felt panels | sheet on a rigid solid | 2 | 2 | — | medium | wish |
@@ -864,7 +875,12 @@ batts, 15 kg/m³); Froger [Froger_2026_NedpendladeUndertak#4] (JCA set of a 40 m
 [Kuhl_1960_EdgeEffect#2]; Sabine: Kosten [Kosten_1960_InternationalComparison#4] (round robin), Kuhl
 [Kuhl_1960_EdgeEffect#4] (both above one, marked). The rig's `ROCKWOOL` is Miki at 32.8 kPa·s/m² (`fRef` 0.87403, `a`
 1.31823, `b` −0.0125593, `c` 0.00481048, `d` 1.80573, `e` 0.823363, `f` 0.0954384, `g` 0.221513, `h` −0.0150261), a
-leaf-test fill, not fitted to Kosten's product. Printed: as 5.1 (van Hout, Froger). Gap: σ.
+leaf-test fill, not fitted to Kosten's product. **Built (2026-10-28):** one row for the Sillan boards and modern stone
+wool: Miki at the measured σ 30300 Pa·s/m² [Scrosati_2020_InterLaboratoryTest#8] (the Sillan curves need 27.4–29.3,
+0.90–0.97 × it; Komatsu misses Kosten by 0.074 at 500 Hz); the 50 mm sheet on a rigid wall within 0.018 of Kosten #7
+and 0.015 of Kuhl #2. Printed: the chamber values (Kosten #4 raw, converted and edge-corrected; Kuhl #4) and the
+framed stone wool [Scrosati_2020_InterLaboratoryTest#9], #10, #15, #16 (fitted σ ×1.71; ×1.32 / ×1.39 weighted by the
+laboratories' reproducibility with extended reaction, ×0.24 locally reacting; no frame model). Gap: σ of the Sillan rows.
 
 5.3 (comb.) Dupont [Dupont_2023_SoundFieldSynthesis#8], [Dupont_2023_SoundFieldSynthesis#6],
 [Dupont_2023_SoundFieldSynthesis#9]; σ [Dupont_2023_SoundFieldSynthesis#7]. Fitted-σ check 10.3 against 10.6 kPa·s/m²

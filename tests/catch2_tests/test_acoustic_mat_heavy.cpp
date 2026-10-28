@@ -181,3 +181,114 @@ TEST_CASE("Material - masonry_heavy", "[acoustic][materials]")
     mt::check_material("masonry_heavy_200mm", mt::row("masonry_heavy_200mm"));
     mt::check_material("masonry_heavy_250mm", mt::row("masonry_heavy_250mm"));
 }
+
+TEST_CASE("Material - masonry_hollow", "[acoustic][materials]")
+{
+    // Hollow-unit masonry plastered on both faces (hollow clay brick, hollow block of any aggregate), class 1: the solid
+    // `masonry_hollow` (thk 0) at 100, 166, 200 and 250 mm, the sheets masonry_hollow_100mm, _200mm, _250mm. Columns:
+    // density 1385 kg/m3 in e (the mean of the four walls plastered on both faces below, 1271-1558 kg/m3; the fit does
+    // not depend on it, the mass level absorbs it); tf and tfB the plaster law of masonry_heavy (PTB #344
+    // [PTB_2012_AbsorptionTable#38], PTB #346 [PTB_2012_AbsorptionTable#40]); the mass-law knobs fitted at 342.76271 m/s
+    // to the references below on 4096 angles x 12 tones per third and on this case's grid. coiF (4.8 kHz), coiQ, resF and
+    // the mass level are fit knobs: the level stands for 0.63 times the physical mass e rho0 t (pinned at the physical
+    // mass, the fit misses by 3.35 dB).
+    // Transmission, each mass-shifted to the row's surface mass, within 3 dB: at 166 mm Warnock
+    // [Warnock_1984_ConcreteBlockWalls#3] (140 mm hollow normal-weight block, 13 mm sand plaster both faces, 229 kg/m2:
+    // 199 kg/m2 of blocks plus 15 kg/m2 per face, [Warnock_1984_ConcreteBlockWalls#5] minus #4), 125 Hz - 2 kHz, its 4 kHz
+    // octave (two of three thirds) printed; at 200 mm Granzotto wall B [Granzotto_2019_ClayHollowBrickWalls#2] (206 mm,
+    // 321 kg/m2; 31.5, 63 Hz and 8 kHz the spread of physical models, tools/acoustic/tl_refs.json, block 190); at 250 mm
+    // walls C [Granzotto_2019_ClayHollowBrickWalls#3] (240 mm, 305 kg/m2) and E [Granzotto_2019_ClayHollowBrickWalls#5]
+    // (270 mm, 359 kg/m2) as one band: walls of one build and thickness that differ by more than the tolerance (here up to
+    // 6 dB at 2-4 kHz at one mass) are asserted as their band; at 100 mm BIA [BIA_2000_TN5AClayMasonry#14] (clay tile
+    // 90 mm, 16 mm plaster on one face, 4.37 x 2.84 m) plus one measured increment for the other face (the band of
+    // [BIA_2000_TN5AClayMasonry#14] minus #15, the same tile, [BIA_2000_TN5AClayMasonry#8] minus #7 and
+    // [Warnock_1984_ConcreteBlockWalls#5] minus #4; 14.6 kg/m2): 138.1 kg/m2 against the row's 138.5. The sides of
+    // Warnock and Granzotto are not stated: taken at the row's 3.22 m (the NRC opening of 3.66 x 2.44 m, 2.99 m, is only
+    // inferred for Warnock; it reads 0.17 dB higher at 125 Hz). The envelope of the four walls, within 1 dB, is 1.3-6.8 dB
+    // wide. Reasonable meant: within the walls of one mass (the plastered block reads 6 dB above clay wall E at 2 kHz; the
+    // seven Granzotto walls spread 2.7-5.9 dB). Printed: 300 mm against wall G [Granzotto_2019_ClayHollowBrickWalls#7];
+    // walls A, D, F [Granzotto_2019_ClayHollowBrickWalls#1], #4, #6; Secchi [Secchi_2003_LaterizioLabInSitu#1] to #3
+    // (filled cores); the NBS tile, cinder and pumice walls plastered on both faces [NBS_1955_BMS144SoundInsulation#39] to
+    // [NBS_1955_BMS144SoundInsulation#53] (warble tones, weighed with the frame); bare walls plus increments: BIA
+    // [BIA_2000_TN5AClayMasonry#13] plus two clay increments, Zeitler [Zeitler_2015_ConcreteBlockRR334#3] and Warnock
+    // [Warnock_1995_BlockConstructions#1] plus the two-face increment of the porous block
+    // ([Warnock_1984_ConcreteBlockWalls#3] minus #2, mostly by sealing). Valid: 100-250 mm, R 125 Hz - 4 kHz.
+    using V = std::vector<double>;
+    const V oct = {125, 250, 500, 1000, 2000, 4000}, inc[3] = {{2.7, 1.7, 2.5, 3.0, 1.6, 1.0}, {2.5, 1.1, 1.5, 2.0, 1.5, 0.0}, {1.7, 1.7, 2.3, 2.6, 1.8, 2.6}};
+    const V w3 = {35.6, 40.4, 46.6, 53.2, 59.4, 60.3}, w2 = {30.2, 33.9, 40.7, 47.4, 54.1, 54.8}, gB = {42.1, 44.1, 48.3, 54.0, 59.5, 61.6},
+            gC = {40.4, 42.4, 45.2, 52.6, 58.3, 61.9}, gE = {44.0, 43.8, 48.9, 54.4, 57.3, 57.4}, b14 = {30.3, 32.3, 35.7, 41.9, 47.7, 52.5};
+    auto one = [&](const char *key, const V &v, size_t n, double side, double m) // a single wall, its first n octaves
+    {
+        mt::Measured M{key, "R_dB", "laboratory sound reduction index", true, 3.0, V(oct.begin(), oct.begin() + n), {}, side, m};
+        for (size_t k = 0; k < n; ++k)
+            M.lo_hi.push_back({v[k], v[k]});
+        return M;
+    };
+    mt::Measured B = one("Granzotto B", gB, 6, 0.0, 321.0), bia = one("BIA #14 + 1 increment", b14, 6, 3.523, 123.5 + 14.6);
+    for (const auto &[f, lo, hi] : std::vector<std::tuple<double, double, double>>{{31.5, 27.8, 37.7}, {63, 30.0, 37.6}, {8000, 66.8, 70.2}}) // at 225 kg/m2
+        B.octaves_hz.push_back(f), B.lo_hi.push_back({lo + 20.0 * std::log10(321.0 / 225.0), hi + 20.0 * std::log10(321.0 / 225.0)});
+    bia.coefficient_type = "laboratory sound reduction index plus a measured plaster increment";
+    for (size_t k = 0; k < 6; ++k)
+        bia.lo_hi[k] = {b14[k] + std::min({inc[0][k], inc[1][k], inc[2][k]}), b14[k] + std::max({inc[0][k], inc[1][k], inc[2][k]})};
+    const mt::Measured ptb344{"PTB_2012_AbsorptionTable #344", "alpha_random", "Sabine (ISO 354), compiled; a hard face", false, 0.05, oct,
+                              {{0.02, 0.02}, {0.02, 0.02}, {0.03, 0.03}, {0.04, 0.04}, {0.05, 0.05}, {0.05, 0.05}}};
+    const mt::Measured ptb346{"PTB_2012_AbsorptionTable #346", "alpha_random", "Sabine (ISO 354), compiled; a hard face", false, 0.05, oct,
+                              {{0.02, 0.02}, {0.02, 0.02}, {0.02, 0.02}, {0.02, 0.02}, {0.02, 0.02}, {0.02, 0.02}}};
+    const mt::Row r = mt::row("masonry_hollow");
+    auto show = [&](const char *title, const mt::Out &X, double t, const std::vector<std::tuple<const char *, double, V>> &walls) // printed: row minus wall (dB)
+    {
+        QD_DIAG("\n# diag: masonry_hollow at %.0f mm against %s, printed (row at its side, walls mass-shifted): row minus wall (dB)\nwall,125,250,500,1000,2000,4000", 1e3 * t, title);
+        for (const auto &[name, m, v] : walls)
+        {
+            QD_DIAG("\n%s", name);
+            for (int k = 0; k < 6; ++k)
+                QD_DIAG(",%+.2f", X.t8[k + 2] - v[k] - 20.0 * std::log10(mt::mpp(r, t) / m));
+        }
+        QD_DIAG("\n");
+    };
+    for (double t : {0.100, 0.166, 0.200, 0.250})
+    {
+        std::vector<mt::Measured> refs = {mt::envelope("Warnock #3, Granzotto B, C and E", oct, {{229.0, w3}, {321.0, gB}, {305.0, gC}, {359.0, gE}}, mt::mpp(r, t), 0.0), ptb344, ptb346};
+        if (t < 0.15)
+            refs.push_back(bia);
+        else if (t < 0.18)
+            refs.push_back(one("Warnock #3", w3, 5, 0.0, 229.0));
+        else if (t < 0.225)
+            refs.push_back(B);
+        else
+        {
+            refs.push_back(mt::envelope("Granzotto C and E as one band", oct, {{305.0, gC}, {359.0, gE}}, mt::mpp(r, t), 0.0));
+            refs.back().coefficient_type = "laboratory sound reduction index, two walls of one build, mass-shifted";
+            refs.back().tol = 3.0;
+        }
+        char name[40];
+        std::snprintf(name, sizeof(name), "masonry_hollow at %.0f mm", 1e3 * t);
+        const mt::Out X = mt::check_material(name, r, refs, mt::grid(), t);
+        if (t > 0.15 && t < 0.18)
+            QD_DIAG("\n# diag: masonry_hollow at 166 mm, 4 kHz (two of three thirds): library %.2f dB, Warnock #3 mass-shifted %.2f dB (printed)\n", X.t8[7], w3[5] + 20.0 * std::log10(mt::mpp(r, t) / 229.0));
+        if (t < 0.15)
+            show("the NBS walls plastered on both faces", X, t,
+                 {{"NBS #39", 234.0, {NAN, 44, 44, 49, 58, NAN}}, {"NBS #40", 190.0, {NAN, 39, 42, 47, 54, NAN}}, {"NBS #41", 181.0, {NAN, 41, 37, 45, 52, NAN}},
+                  {"NBS #42", 181.0, {NAN, 41, 42, 44, 50, NAN}}, {"NBS #43", 142.0, {NAN, 41, 40, 42, 50, NAN}}, {"NBS #44", 134.0, {31, 31, 36, 47, 50, 58}},
+                  {"NBS #45", 183.0, {30, 35, 44, 52, 56, 65}}, {"NBS #46", 163.0, {33, 33, 42, 46, 49, 62}}, {"NBS #47", 137.0, {NAN, 41, 36, 43, 51, NAN}},
+                  {"NBS #48", 137.0, {NAN, 42, 41, 44, 50, NAN}}, {"NBS #49", 123.0, {29, 35.9, 35.7, 39, 48, 51}}, {"NBS #50", 145.0, {30, 30, 38, 48, 53, 59}},
+                  {"NBS #51", 175.0, {36, 37.7, 43.5, 51, 55, 62}}, {"NBS #52", 157.0, {34, 36.7, 41.9, 51, 57, 64}}, {"NBS #53", 124.0, {32, 33.4, 35.4, 39, 42, 52}}});
+        if (t > 0.18 && t < 0.225)
+        {
+            const V b13 = {32.6, 35.0, 39.5, 45.2, 51.3, 52.2}, z3 = {35.6, 37.9, 44.4, 49.9, 56.8, 61.7}, w95 = {35.0, 41.1, 44.4, 50.1, 56.3, 63.0};
+            V a(6), b(6), c(6);
+            for (size_t k = 0; k < 6; ++k)
+                a[k] = b13[k] + 2.0 * inc[0][k], b[k] = z3[k] + w3[k] - w2[k], c[k] = w95[k] + w3[k] - w2[k];
+            show("bare walls plus increments", X, t, {{"BIA #13 + 2 clay increments", 198.2 + 29.2, a}, {"Zeitler #3 + block increment", 238.0 + 30.0, b}, {"Warnock 1995 #1 + block increment", 236.2 + 30.0, c}});
+        }
+        if (t > 0.225)
+            show("walls of 210-330 mm", X, t,
+                 {{"Granzotto A", 330.0, {41.0, 45.7, 47.0, 52.0, 56.6, 60.3}}, {"Granzotto D", 343.0, {44.9, 40.9, 48.5, 53.0, 58.8, 60.6}},
+                  {"Granzotto F", 327.0, {39.5, 42.6, 46.7, 51.4, 57.4, 59.4}}, {"Secchi A", 400.0, {43.2, 44.4, 48.7, 55.1, 61.1, NAN}},
+                  {"Secchi B", 371.0, {40.2, 45.9, 48.2, 54.3, 60.0, NAN}}, {"Secchi C", 390.0, {45.4, 49.9, 50.8, 57.5, 62.3, NAN}}});
+    }
+    show("Granzotto G", mt::check_material("masonry_hollow at 300 mm", r, {}, mt::grid(), 0.300), 0.300, {{"Granzotto G", 377.0, {44.5, 46.1, 49.3, 53.1, 58.2, 59.9}}});
+    mt::check_material("masonry_hollow_100mm", mt::row("masonry_hollow_100mm"));
+    mt::check_material("masonry_hollow_200mm", mt::row("masonry_hollow_200mm"));
+    mt::check_material("masonry_hollow_250mm", mt::row("masonry_hollow_250mm"));
+}
