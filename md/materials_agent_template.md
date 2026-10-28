@@ -1,6 +1,6 @@
 # Brief template and kick-off prompts for the agents of step 3 (material tables)
 
-The manager copies the matching variant to `md/materials/<id>_brief.md`, fills it, and starts one agent with the
+The manager copies the matching variant to `<agents folder>/materials/<id>_brief.md` (outside the repository), fills it, and starts one agent with the
 kick-off prompt (Agent tool, one agent at a time in this checkout). Briefs and reports are untracked working files and
 are deleted in phase 4. Ids: `rig` (phase 1), `a<nn>_<topic>` (analysis), `m<nn>_<row name>` (material), for example
 `m03_glass_4mm`.
@@ -8,7 +8,7 @@ are deleted in phase 4. Ids: `rig` (phase 1), `a<nn>_<topic>` (analysis), `m<nn>
 ## Kick-off prompt (one line)
 
 ```
-Read md/materials/<id>_brief.md in full and follow it: do phase <n> and return a short report (at most 300 words); the substance goes in md/materials/<id>_report.md.
+Read <agents folder>/materials/<id>_brief.md in full and follow it: do phase <n> and return a short report (at most 300 words); the substance goes in <agents folder>/materials/<id>_report.md.
 ```
 
 For the next phase of the same agent (SendMessage): `Phase <n> approved with these decisions: <...>. Do phase <n+1> as
@@ -47,10 +47,11 @@ in the brief and return a short report.`
   the Data Formats page, papers) and md/SPEC_*.md, never md/ working documents or tracking ids; tests use library
   calls for supporting tasks; no Armadillo matrix products above 4x4 in tests (no BLAS in the test binary); a helper
   used once is a lambda, cross-file helpers only in the rig header.
-- In a worktree: check `git log -1` first and fast-forward to the batch's HEAD; read untracked files (brief, baselines)
-  by absolute path in the main checkout; copy the report there with `cp`, or return its text.
+- In your worktree (the manager created it in the agents folder): check `git log -1` first; work and build only there;
+  briefs, reports and baselines are in the agents folder, never in the main checkout.
 - No new items: side findings get a measured size and one line in the report, then they are dropped.
-- Scratch files in the session's scratchpad or build_linux/scratch; every number a decision rests on goes into the
+- Python with PYTHONDONTWRITEBYTECODE=1 (no __pycache__ in a checkout). Scratch files in your worktree's build_linux/scratch
+  (outside the main checkout); every number a decision rests on goes into the
   report.
 
 ## Phases
@@ -60,7 +61,7 @@ in the brief and return a short report.`
 - md/materials_manager.md section 12, plus <item-specific traps>
 
 ## Report format
-md/materials/<id>_report.md:
+<agents folder>/materials/<id>_report.md:
 1. Result in three lines.
 2. What was done, per phase, with the measured numbers (tables per octave where they apply).
 3. Checklist items run (md/materials_manager.md section 4) and their outcome.

@@ -4,21 +4,31 @@ The memory of the step-3 manager. Kept current after every step; a new manager s
 sections 1–8 and 12, then the three step-3 documents named in section 0. Section 9 is the dated log of how the
 decisions came about (read it when a decision's reason is needed). `md/materials_kickoff.md` is the original plan of
 step 3; where it differs from section 0, section 0 holds (it is deleted in phase 4). Public and tracked: no private details (no
-rates, hours, money, personal circumstances, nothing about whose room the listening room is). Briefs and reports in
-`md/materials/` are untracked working files; answers that are personal stay there. Old rule labels of the research
+rates, hours, money, personal circumstances, nothing about whose room the listening room is). Briefs, reports, agent
+worktrees, scratch files and the baselines live outside the repository in the agents' folder `/home/stephan/quadriga-lib-agents` (since
+2026-10-28: the repository's disk is backed up with history; log entries before that date name the old places
+`md/materials/`, `.claude/worktrees/`, `build_linux/scratch/` and the repository root); answers that are personal stay
+there. Old rule labels of the research
 handoff (A13, A14, A15, A19, P7, M6) are used here only as working shorthand; public documents and commit messages name
 the rule in words.
 
-## 0. Start here: state of phase 3 (2026-10-27)
+## 0. Start here: state of phase 3 (2026-10-28)
 
-**Where step 3 stands.** Phases 0–2 are closed. In phase 3 the rig extension is complete (5081648); the material
-rows come next, in batches with parallel agents (Stephan, 2026-10-27; plan below). The engine stays closed until every listed material is in (Stephan, 2026-10-26).
+**Where step 3 stands.** Phases 0–2 are closed. Phase 3 builds the material rows in batches (option (b), Stephan
+2026-10-27): one manager, at most three material agents at a time, one row family each, every decision collected per
+batch and brought to Stephan in five parts. The engine stays closed until every listed material is in (Stephan,
+2026-10-26). Committed so far:
 
-**Commits of step 3:** 5be85fb (manager file, agent template), 13e4e45 (the rig, `data/materials_acoustic.csv` with
-one preliminary row, `band_probe` with 26 columns, `grid_probe.py`), 19323d9 / be65346 / bd0a170 (the wish-list and
-the guidelines, drafts 2–4, after two independent reviews), 69a4555 / e5d3743 / e578aee / 5081648 (the rig
-extension, its two review rounds, the object test), a97c4ae (batch 0: the `concrete` rows, the rig in a header). The
-`fixes` branch (the large-scale model port) was merged into `main` afterwards (7e9fe61, v0.12.4 26da9f9).
+| batch | families (wish-list entry) | commit |
+| --- | --- | --- |
+| 0 | `concrete` (1.1); the rig moved into a header, cases per group | a97c4ae |
+| — | engine-limit marks by name; tests and tools cite published material only | 4641966 |
+| — | research rows cited by stable id; the research answer folded into the wish-list | 063f05b |
+| 1 | `masonry_heavy` (1.2), `glass_4mm` / `glass_6mm` (1.6), `glass_wool` (5.1); JCA in the rig | a73d1a2 |
+| 2a | `masonry_hollow` (1.3), `door_solid_40mm` + `door_hollow_core_40mm` (1.23, 1.24), `rock_wool` (5.2) | cbe2ae3 |
+
+Earlier commits of step 3: 5be85fb, 13e4e45, 19323d9 / be65346 / bd0a170 (wish-list and guidelines), 69a4555 /
+e5d3743 / e578aee / 5081648 (rig extension and its reviews).
 
 **The three step-3 documents** (tracked, public, no private details):
 - `md/acoustic_materials.md`, the wish-list: six classes (structural, hard furnishing, soft furnishing, complex
@@ -26,90 +36,57 @@ extension, its two review rounds, the object test), a97c4ae (batch 0: the `concr
   2, 3), impact, status, references (research row ids `<source key>#<n>` at research commit d501809), gaps. Read sections 1.3–1.11 in full: the
   naming rule (1.6: `_<NN>mm` last marks a sheet, no suffix a traced solid), the row-design rules (1.7: lumped rows
   carry the visible thickness and rescale every power-law coefficient with `fRef`, X·k^B), `side` (1.8), the phase-3
-  procedure, the ISSUE convention and the tolerance table (1.10), the start list (1.11). Section 4: open design
+  procedure, the engine-limit marks and the tolerance table (1.10), the start list (1.11). Section 4: open design
   questions; section 5: adding a material; section 6: the research requests.
 - `md/acoustic_modeling_guidelines.md`: how a venue is modeled (solids and sheets, Blender names and `csv_strict`, the
   checklist of forbidden and limited configurations: three co-located faces are not resolvable, only a sheet on a
   solid or a sheet | sheet pair; at most two bonded rigid bodies; objects as hard boxes or porous bodies; assets).
-- `md/acoustic_engine_stage2b_issues.md`: engine issues 1–7 with names, sizes and reproductions, and the engine-limit
+- `md/acoustic_engine_stage2b_issues.md`: engine issues 1–8 with names, sizes and reproductions, and the engine-limit
   marks (`ENGINE LIMIT (<name>):` in the code, since 2026-10-27; earlier log entries say `ISSUE <n>`).
   Engine findings are recorded there, never fixed in step 3.
 
-**The rig:** `tests/catch2_tests/test_acoustic_materials.cpp` (namespace `mt`; size and counts in the State line
-below): stacks room side first (sheets in front, traced solids behind, one sheet at the last solid's exit, `quadriga_lib::plane` / `cube`), transmission through `calc_diffraction_gain`
-(lod 0, scalar, threshold 0), reflection through aimed rays and `ray_progress` (refraction off, threshold 0), plane
-waves, coherent sums, 50 angles × one tone per third 25 Hz–10 kHz as the default grid argument, octaves as in the
-research data, the library's sound speed (342.76271 m/s); `mt::check_material` (sheet = traced solid, tier 1 against
-the plate rule or the fluid-layer transfer matrix, R + T ≤ 1, diagnostics, tier 2).
-The rig is `tests/catch2_tests/acoustic_material_rig.hpp` (namespace `mt`, 676 lines) since batch 0; its self-checks
-and the table case stay in `test_acoustic_materials.cpp`; material cases go in `test_acoustic_mat_<group>.cpp` (groups
-`heavy`, `porous`, `plates`, `floors`, `leaves`, `resonant`, `objects`, `ground`). `data/materials_acoustic.csv` holds
-the `concrete` family (batch 0).
+**The rig:** `tests/catch2_tests/acoustic_material_rig.hpp` (namespace `mt`: `check_material`, `Measured`,
+`envelope`, `mpp`, `rescale`, the porous models Miki, Komatsu, Delany-Bazley and JCA, the object test); its self-checks
+and the table case in `test_acoustic_materials.cpp`; the material cases in `test_acoustic_mat_heavy.cpp`, `_plates.cpp`,
+`_porous.cpp` (groups `heavy`, `porous`, `plates`, `floors`, `leaves`, `resonant`, `objects`, `ground`); the rows in
+`data/materials_acoustic.csv` (20 rows). The worked examples per group: concrete and masonry (`heavy`), glass and the
+doors, the first lumped rows (`plates`), glass wool and rock wool (`porous`).
 
-**Baselines** (generic `build_linux`, at a73d1a2, batch 1; regenerated 2026-10-28): `[wave]` 163474 / 178,
-`[acoustic]` 43727 / 73 (the rig included), whole suite 1354761 / 1387 (the generic build leaves out one build-option
-case of the merge notice's count). Files `test_wave.txt`, `test_acoustic.txt`,
-`test.txt` in the repository root (untracked).
+**Builds:** `build_linux` belongs to the repository's `make` and is not touched. The manager builds its own copy in
+`/home/stephan/quadriga-lib-agents/build` (`cmake -S /sjc/quadriga-lib -B` that folder with the options of `make`'s
+build: g++-12 / gcc-12, static library, tests on, AVX2, CUDA, MATLAB, Octave, Python off) and runs its `test_bin` from
+the repository root; agents build inside their worktrees.
+
+**Baselines** (the generic build, at cbe2ae3, batch 2a; regenerated 2026-10-28): `[wave]` 163474 / 178,
+`[acoustic]` 44326 / 76 (the rig included), whole suite 1355360 / 1390 (the generic build leaves out one build-option
+case of the merge notice's count). Files `test_wave.txt`, `test_acoustic.txt`, `test.txt` in `/home/stephan/quadriga-lib-agents/baselines/`.
 
 **Research:** the requests of 2026-10-27 are answered (research commit d501809; report
 `/sjc/accoustic_research/manager/step3_research_report_2026-10-27.md`). Research rows are cited by their stable id
 `<source key>#<n>` at d501809 (Stephan, 2026-10-27), never by line; `data/id_map_2dad906.csv` maps the old lines.
-Before batch 1 (decided 2026-10-27): a citation agent converts the line citations (brief `md/materials/c02_ids_brief.md`)
-and an analysis agent proposes the wish-list update from the answer with the tier readings for Stephan (brief
-`md/materials/a03_research_fold_brief.md`); then batch 1. Further requests go through Stephan in the handoff-7 form.
+The line citations are converted and the answer is folded into the wish-list with Stephan's twelve readings D1–D12
+(063f05b; the readings in the section-9 log of 2026-10-28). Further requests go through Stephan in the handoff-7 form.
 
-**Done: the rig extension** (one rig agent, phases plan → build, as in phase 1; brief from the agent template's
-rig variant; brief `md/materials/rig_ext_brief.md` written 2026-10-27, Stephan's choices for it in the section-9 log).
-**State 2026-10-27:** items 1–9 built and committed (69a4555), reviewed twice independently and fixed (e5d3743: rig
-906 lines; the second review's fixes then: 917 lines, 10 `[materials]` cases, 262 assertions, 0.4 s). Item 10, the object
-test, built (rig 1041 lines, 11 `[materials]` cases, 280 assertions). Next: material 1, concrete.
-Everything the documents need before material 1:
-1. a thickness argument for rows with `thk` 0 (generic solids, porous bodies, finish solids, ground rows);
-2. a specimen side per measured reference, and the class envelope shifted to the evaluated thickness by the mass law;
-3. a 0° (normal-incidence) tier-2 comparison;
-4. a sheet glued at a traced solid's exit (double leaf, curtain at a window, drywall precise recipe) and the issue-4
-   fixture: plaster sheets on both faces of a block solid against the bonded plate, marked as an engine limit;
-5. a stack rule that refuses three co-located faces (measured in a probe; no self-check case, no opt-out);
-6. the engine-limit marks (a comment `ENGINE LIMIT (<name>):`, no assertion, the values printed) and the regression guard of the
-   tolerance table (a `Measured` row of the library's own octaves);
-7. one test case per row family accepted by the table case;
-8. the porous models written in the test (Miki, Komatsu, Delany-Bazley printed; JCA when a reference uses it), and
-   the finite-panel (Davy σ) plate in the added-insulation model of issue 1 (printed); the passive Miki fit of the
-   ground classes deferred to the ground family;
-9. a helper that rescales a lumped row's power laws with `fRef` (X·k^B);
-10. the object test (rays from all directions on a body give its absorption area), as its own step, designed and timed
-    against about 0.3 s per case.
+**Next: batch 2b** (proposed to Stephan 2026-10-28, not yet briefed): `masonry_light` (aircrete; D4 of the research fold
+decided: tested against the range of the four 10 cm walls, density inside 480–800 kg/m³), `pu_foam_50mm` (porous),
+the glazing units `glazing_double_24mm`, `glazing_triple_36mm` (lumped; the doors are the worked example). Then 2c
+(`plaster_15mm` with the bonded-mass effect of issue 7, `carpet_tile_11mm`, `parquet` / `vinyl` on the slab), 2d
+(`clt`, `screed`, ground classes and asphalt, `gypsum_board_12_5mm`, `plywood_19mm`, metal), batch 3 (leaves on
+cavities, drywall, resonant absorbers, ceiling tiles, objects); rows waiting for data at the end.
 
-Keep the rig lean (Stephan reviews it line by line); use library helpers instead of hand-written geometry; keep test
-cases short.
-
-**Next: the materials in batches (option (b), Stephan 2026-10-27).** One manager, material agents in parallel, one
-family per agent, at most three at a time.
-- **Batch 0: `concrete` alone** (the rig check and the slab host of the floor finishes). In the same batch the rig's
-  `namespace mt` moves into a header (`tests/catch2_tests/acoustic_material_rig.hpp`, a pure move, no logic change)
-  and the material cases go into one test file per group (`test_acoustic_mat_<group>.cpp`); the table case finds
-  cases through the Catch registry, so it keeps working. Stephan reviews the move together with the concrete case.
-  **Then wait for Stephan's feedback before batch 1.**
-  **State 2026-10-27:** new manager session; brief `md/materials/m01_concrete_brief.md` written (the agent in its own
-  worktree, plan phase first); approved by Stephan; phase 1 (plan) done and checked by the manager (report `md/materials/m01_concrete_report.md`;
-  worktree `.claude/worktrees/agent-a00f2c2136594041a`); D1–D3 decided by Stephan; phases 2–4 done, merged into this
-  checkout and checked; committed by Stephan (a97c4ae). **Wait for his feedback before batch 1**; the coding rules
-  of the merge (section 3) open one decision first (references to working documents in tests).
-- **Batches after that** (the manager cuts them; groups as proposed): batch 1 the lead family of each group, which
-  settles the group's open rules (section 6): `masonry_heavy` (heavy walls), `glass_wool` (porous), `glass_4mm`/
-  `glass_6mm` (thin plates); batch 2 the siblings (other masonry, `clt`, plaster; other porous rows; glazing, boards,
-  metal, doors; floor finishes on the slab; ground classes); batch 3 what needs two groups (leaves on cavities and
-  `drywall`, laminate; resonant absorbers, MPP, ceiling tiles; hard boxes, upholstery, person, audience). Rows that
-  need research data not yet in hand move to a later batch.
-- **Mechanics:** each agent works in its own git worktree (Agent tool, `isolation: "worktree"`) with its own build
-  directory, at most 4 threads each (12 in total), and runs only its own case. The manager owns every shared
-  document (wish-list status, the stage-2b issues file, the guidelines, this file) and the merge of the agents'
-  test files and CSV rows into this checkout; agents only report. Full-suite checks (`[wave]`, `[acoustic]`, the
-  whole suite) run in this checkout, one at a time, after the merge.
-- **Per batch to Stephan:** a findings summary (rows, tier-1 and tier-2 residuals, recorded deviations, ISSUE
-  entries), the decisions in the five-part form (open rules met, collected over the batch), recommendations on how to
-  continue (the next batch and its cut), a commit message and the `git add` line; one commit per batch or per group,
-  as Stephan prefers.
+**Mechanics per batch** (worked out over batches 0–2a; the briefs in the agents folder `materials/` show the form:
+`batch2a_common.md` and one brief per family):
+- The manager writes a common part and one brief per family (from `md/materials_agent_template.md`), creates one
+  worktree per agent (`git worktree add /home/stephan/quadriga-lib-agents/worktrees/<id> -b agent/<id> HEAD`) and starts
+  each agent with the Agent tool **without** `isolation`, told to work and build only in its worktree, at most 4 threads.
+- Phase 1, plan (stop): the manager reruns the scripts each decision rests on and brings all plans together; Stephan
+  decides; the manager continues each agent (SendMessage) with the decisions. Phase 2, build exactly the approved design.
+- Merge: the manager copies the agents' test files and appends their CSV rows (diffs append-only, wish-list order),
+  rebuilds its own build, runs `[materials]`, `[wave]`, `[acoustic]` and the whole suite one at a time, rowdiff against
+  the baselines (old rows identical, only the new cases inserted), updates the shared documents, writes the batch
+  report, the commit message and the `git add` line. After Stephan's commit: baselines regenerated, worktrees and
+  `agent/*` branches removed after checking them against the commit.
+- Python in a checkout with `PYTHONDONTWRITEBYTECODE=1`; nothing temporary under `/sjc`.
 
 ## 1. Roles
 
@@ -168,7 +145,7 @@ family per agent, at most three at a time.
 
 ## 3. Workflow
 
-**Per phase.** Brief (`md/materials/<id>_brief.md`, from `md/materials_agent_template.md`) → one agent → the
+**Per phase.** Brief (`/home/stephan/quadriga-lib-agents/materials/<id>_brief.md`, from `md/materials_agent_template.md`) → one agent → the
 manager's checks (section 4) → report to Stephan (what checks out, what does not, decisions in the form below, a commit
 message) → his review and commit → this file updated.
 
@@ -858,6 +835,18 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     wool Kosten 0.018, Kuhl 0.015. Documents: wish-list 1.3, 1.23, 1.24, 5.2 confirmed with built paragraphs, the
     hollow-core dip sentence corrected, 1.7.10 (lumped mass in `e`), 1.10 (band rule), 1.12 (porous model by the
     reference); stage-2b issue 7 extended to timber doors. To Stephan with the batch report.
+  - Committed by Stephan (cbe2ae3, 2026-10-28). Stephan: no temporary files on the repository's disk (it is backed up
+    with history). Manager: all four agent worktrees and their branches removed after checking each against main (the
+    batch-0 one held only older versions of committed files); `md/materials/` (41 files), `build_linux/scratch/` (131
+    files) and the three baselines copied to `/home/stephan/quadriga-lib-agents/` (`materials/`, `scratch/`,
+    `baselines/`; counts and bytes checked), then removed here; baselines regenerated there at cbe2ae3. From batch 2b
+    on the manager creates the worktrees in `/home/stephan/quadriga-lib-agents/worktrees/` and starts the agents
+    without `isolation`.
+  - Stephan 2026-10-28: `build_linux` is built by the repository's `make` and not touched. The manager's own build
+    configured in `/home/stephan/quadriga-lib-agents/build` with the same options (90 s at 12 threads, nothing written
+    into the source tree); its `[wave]`, `[acoustic]` and whole-suite output equals the baselines number for number
+    (141128 / 135185 / 285204, no structural difference). A `tools/acoustic/__pycache__` left by an agent removed;
+    agents run Python with `PYTHONDONTWRITEBYTECODE=1`.
 
 ## 10. Scope of phase 0 (2026-10-23; naming and combinations superseded by wish-list 1.6 and section 3)
 
