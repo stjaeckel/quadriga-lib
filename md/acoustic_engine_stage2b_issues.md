@@ -230,6 +230,9 @@ prints the reflection at that cap beside the uncapped one.
   against 6.02 dB of the mass term. One fit holds within the walls' own scatter over 150–250 mm (worst single wall
   2.23 dB); at 300 mm it reads −4.04 dB against the thickest brick wall, at 100 mm up to +3.31 dB above the class
   trend, so the rows are asserted at 150–250 mm only.
+- **Timber doors** (2026-10-28): a 40 mm solid door has its physical coincidence near 655 Hz, and measured doors show a
+  plateau of 28–32 dB from 500 Hz to 2 kHz; with the physical coincidence the best fit misses by 5.3 dB at 125 Hz, with
+  the coincidence as a fit knob it meets the sealed doors within 1.12 dB.
 - **Reproduce.** `QD_DIAG_RAY=1 ./build_linux/test_bin "Material - concrete"` (the row against the Litvin pair);
   `"Material - masonry_heavy"` (the printed ends).
 

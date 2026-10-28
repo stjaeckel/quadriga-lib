@@ -46,9 +46,9 @@ and the table case stay in `test_acoustic_materials.cpp`; material cases go in `
 `heavy`, `porous`, `plates`, `floors`, `leaves`, `resonant`, `objects`, `ground`). `data/materials_acoustic.csv` holds
 the `concrete` family (batch 0).
 
-**Baselines** (generic `build_linux`, at 4641966, the named engine-limit marks; regenerated 2026-10-27): `[wave]` 163474 / 178,
-`[acoustic]` 43191 / 70 (the rig included), whole suite 1354225 / 1384 (1385 in the merge notice; the generic build
-leaves out one build-option case). Files `test_wave.txt`, `test_acoustic.txt`,
+**Baselines** (generic `build_linux`, at a73d1a2, batch 1; regenerated 2026-10-28): `[wave]` 163474 / 178,
+`[acoustic]` 43727 / 73 (the rig included), whole suite 1354761 / 1387 (the generic build leaves out one build-option
+case of the merge notice's count). Files `test_wave.txt`, `test_acoustic.txt`,
 `test.txt` in the repository root (untracked).
 
 **Research:** the requests of 2026-10-27 are answered (research commit d501809; report
@@ -245,7 +245,7 @@ Each is decided at the stop of the first material that needs it; record the deci
 | --- | --- | --- |
 | reference row per class | which measured row is the tier-2 reference where compilations spread by 2 to 4 times | heavy masonry: walls measured plastered on both faces first, bare plus increment otherwise (2026-10-28, research fold D8) |
 | fitted-σ check | a converted absorption reference is marked when its fitted flow resistivity is off a measured one by more than about 1.5 times (notes 9.3) | applied as written: glass wool's finite-sample measurement marked (×1.83), its chamber conversion passes (×1.45) (2026-10-28, glass wool) |
-| interlaboratory porous rows | the two Scrosati rows stay out until a polyester and a framed-sample model exist (notes 9.3) | |
+| interlaboratory porous rows | the two Scrosati rows stay out until a polyester and a framed-sample model exist (notes 9.3) | kept: printed only, with the measured fitted-σ ratios (×1.71; weighted ×1.32 / ×1.39 extended, ×0.24 local), polyester ×5.12 (2026-10-28, rock wool) |
 | resonant absorbers as one family | panels and membranes, perforated and slotted panels, MPP in the acceptance (notes 9.3) | |
 | bending loss as a resistance | needed if `coiQ` comes from a measured loss factor (notes 9.3; page 11.1, 11.2, 11.4 re-measured if `coiQ` changes meaning) | |
 | fabric relaxation on μ | curtains: random-incidence α reached, single angles off by up to 0.35 (notes 9.3) | |
@@ -805,6 +805,59 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     comment word (`att` fitted in both rows); reran: case 81 / 81, `[materials]` 986 / 14, `[wave]` identical,
     `[acoustic]` 43727 / 73 and the whole suite 1354761 / 1387 with the same single insertion, `check_docs.py` passes.
     To Stephan for the commit; baselines to be regenerated after it. Next: batch 2a (masonry_hollow, rock_wool, doors).
+  - Committed by Stephan (a73d1a2, 2026-10-28). Baselines regenerated there: `[wave]` 163474 / 178, `[acoustic]`
+    43727 / 73, whole suite 1354761 / 1387. The three batch-1 worktrees removed (their changes checked in main first;
+    branches without commits deleted); the batch-0 worktree `agent-a00f2c2136594041a` kept. Batch-2a briefs:
+    `batch2a_common.md` (HEAD a73d1a2; lessons: the case grid in the fit cost, build only the approved design, the
+    confirmed cases unchanged), `m05_masonry_hollow_brief.md` (heavy; range and one row for block and clay),
+    `m06_rock_wool_brief.md` (porous; the interlaboratory-rows rule with the Scrosati stone wool), `m07_doors_brief.md`
+    (plates; the first lumped rows, coincidence, the 315 Hz dip). To Stephan before the agents start.
+  - Briefs approved by Stephan 2026-10-28; the three batch-2a agents started on phase 1 (plan), each in its own worktree.
+  - m06 rock wool phase 1 done (worktree `.claude/worktrees/agent-af8355d6affe51559`, at a73d1a2). Manager reruns
+    (`models.py`, `fitw.py`, load 15–18): Miki fitted to Kosten #7 and Kuhl #2 together 25731 (extended) / 28213
+    (local) Pa·s/m², near the stone wool's measured 30300; at 30300 and 500 Hz Komatsu 0.448, Miki 0.428,
+    Delany-Bazley 0.387 (extended); the Scrosati 105 mm chamber means weighted by 1/s_R² give ×1.32 / ×1.39 for
+    extended reaction but ×0.24 / ×0.23 for local reaction (the pass depends on the reaction model). The agent's side
+    finding on page 10.5 (ε and μ inverted) is wrong: page 10.1 defines z = Z_air/Z, the inverse of the rig's z, so
+    ε = n z, μ = n/z there equals the rig's ε = n/z, μ = n z. Decisions D1–D5; D4 (e) needs a `--sR` weighting option
+    in `tools/acoustic/sabine_to_random.py` (4 lines, outside the agent's allowance).
+  - m07 doors phase 1 done (worktree `.claude/worktrees/agent-abaf75fed51c5c01d`, at a73d1a2). Manager rerun of the
+    probe (one thread, load 14): solid with `coiF` as a knob meets Quirt#1 within 1.10 dB, Morin#2 1.12 dB, their
+    envelope 0 dB; hollow-core with the physical mass-air-mass `resF` (283 Hz) meets Kim within 2.02 dB; the 44 mm
+    rescale equals the 40 mm row within 3.2e-7 dB; the probe's 14 failed assertions are all in references the plan
+    prints only (NBS 632 6.27, Morin#1 gasketed 3.42, NBS 633 4.68, NBS 634 11.46 dB). Decisions D1 (solid `coiF` a
+    knob; physical plate ~7 dB off, name proposed "thick-panel coincidence plateau" or issue 7 extended), D2
+    (hollow-core dip carried by `resS` +1 at 283 Hz; wish-list 1.24 "not expressible" to be corrected), D3 (mass
+    level free; `e` = m″/(ρ₀·thk) so the stated mass enters the shift without an override), D4 (Quirt#1, Morin#2, Kim
+    asserted; NBS 632/633/634 and Morin#1 printed), D5 (rescale asserted by one run at 1.1 ×, bound 1e-4 dB).
+  - m05 masonry_hollow phase 1 done (worktree `.claude/worktrees/agent-a834bb2bd76bd12d1`, at a73d1a2; two late fits
+    ran six workers at load 8). Manager rerun (`heval.py fit_w4kpb.json`): mass level 0.633 × physical; per wall (dB
+    outside, 125 Hz–4 kHz): Warnock#3 at 166 mm worst 2.86 (2 kHz; its 4 kHz octave printed, two of three thirds), BIA#14
+    plus its own increment at 100 mm 2.52, Granzotto B at 200 mm 2.02, Granzotto C at 250 mm −2.77 at 4 kHz, E +3.14 at
+    2 and 4 kHz: the two clay walls of one build and thickness pull opposite by about 6 dB, so no row meets each within
+    ±3 dB; the agent's pass needs a new ±0.3 dB figure-reading budget (3.14 against 3.3; Litvin's plot readings took
+    none). Decisions D1 (100–250 mm), D2 (one row; the tolerance question), D3 (ρ 1385), D4 (sides 3.22 m). All three
+    batch-2a plans to Stephan together (14 decisions and one tools change).
+  - Decided by Stephan 2026-10-28 (all fourteen as the manager recommended): H1 hollow masonry asserted 100–250 mm
+    (BIA#14 plus its own increment at 100 mm), 300 mm and NBS printed; H2 one row for block and clay, **walls of one
+    build and thickness that differ by more than the tolerance are asserted as their band** (Granzotto C and E at
+    250 mm), no figure-reading budget, Warnock's 4 kHz octave printed; H3 ρ 1385, mass level free; H4 sides 3.22 m.
+    R1 rock wool one row at the measured 30300, the Sillan rows its 50 mm references; R2 Miki (page 10.5 to read
+    "whichever meets the reference": phase-4 page correction); R3 Kosten#7, Kuhl#2 asserted, the chamber values
+    printed; R4 (b) the Scrosati stone wool printed only, no tools change (the open rule stays open for framed
+    samples); R5 25–200 mm by the model. T1 solid door `coiF` a knob, issue 7 extended to timber leaves; T2
+    hollow-core dip by the physical `resF` 283 Hz; T3 the stated mass in `e` = m″/(ρ₀·thk), no override (wish-list
+    1.7.10 to be amended); T4 Quirt#1, Morin#2, Kim asserted, NBS and Morin#1 printed; T5 the rescale by one run at
+    1.1 ×. The three agents continued with phase 2 (build).
+  - Batch 2a built 2026-10-28 and merged by the manager (three test files copied; CSV rows appended in wish-list order,
+    all three diffs append-only). Manager checks at load 3–5: rebuild clean; `[materials]` 1585 / 17 (masonry_hollow
+    0.048 s, doors 0.022 s, rock wool 0.075 s at 12 threads); `[wave]` 141128 identical; `[acoustic]` 44326 / 76, 127980
+    identical, three inserted blocks (633 / 175 / 264 lines: the three cases); whole suite 1355360 / 1390, 277999
+    identical, the same insertions; `check_docs.py` passes. Results: hollow masonry Warnock 2.86, BIA#14 2.52,
+    Granzotto B 2.18, the C+E band 0.77 dB; doors Quirt 1.10, Morin#2 1.12, Kim 2.02 dB, rescale within 1e-4 dB; rock
+    wool Kosten 0.018, Kuhl 0.015. Documents: wish-list 1.3, 1.23, 1.24, 5.2 confirmed with built paragraphs, the
+    hollow-core dip sentence corrected, 1.7.10 (lumped mass in `e`), 1.10 (band rule), 1.12 (porous model by the
+    reference); stage-2b issue 7 extended to timber doors. To Stephan with the batch report.
 
 ## 10. Scope of phase 0 (2026-10-23; naming and combinations superseded by wish-list 1.6 and section 3)
 
