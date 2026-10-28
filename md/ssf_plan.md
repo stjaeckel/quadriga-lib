@@ -15,8 +15,8 @@ complete 38.901 implementation in the library.
 
 In scope:
 - Steps 5–7: cluster delays, powers, angles, incl. C_τ, C_φ/C_θ, −25 dB rule, μ_offset,ZOD, O2I ZOA, LOS handling.
-- Four methods for steps 5–7: `38.901` (7.5), `38.901_B` (7.6.3.2 Procedure B), `38.901_MF` (7.6.5.1), and the
-  consistent method chosen in R0 (faithful `quadriga` and/or a redesigned consistent method).
+- Three methods for steps 5–7: `38.901` (7.5), `38.901_MF` (7.6.5.1), and the consistent method `quadriga`
+  (redesign, D3). Procedure B (7.6.3.2) dropped after R0 (D1).
 - Spatial consistency of the cluster random variables (7.6.3.1), multi-frequency (7.6.5, 7.6.5.1), dual mobility /
   D2D reciprocity, explicit ground reflection (7.6.8), absolute time of arrival (7.6.9), cluster-number variability
   (7.6.15).
@@ -30,14 +30,22 @@ Out of scope (later series; this series leaves the interface ready):
 
 ## 2. Decisions (binding for the spec)
 
-- **D1 Methods.** All four methods (section 4.2). The default is decided after R0.
+- **D1 Methods.** `38.901`, `38.901_MF`, `quadriga` (section 4.2). Default `38.901` (decided after R0,
+  `md/ssf_r0_report.md`); revisit after the ray series with antenna-level metrics. Procedure B (`38.901_B`) dropped
+  after R0: as written it gives 0.47–0.74 (NLOS) and 0.14–0.19 (LOS) of the input spreads with 1–2 dominant
+  clusters; it can be added later (append-only random-field blocks keep room for it). 7.6.5.1 stays TR-literal
+  (order "wrap, then scale by √(1+K)" and its LOS jumps stated in the spec).
 - **D2 Feature combinations.** Mirrored random fields in all methods (D2D reciprocity of the random inputs);
   `38.901` single frequency only (error otherwise: the TR requires frequency-independent delays and angles, 7.5
   cannot give them); spatial consistency allowed with `38.901`, its jumps documented; TR BS-specific terms
   (μ_offset,ZOD, cluster ZSD, O2I ZOA = 90°) kept as written and documented; a method × property table in the docs
   (continuity, frequency-independent delays/angles, exact spreads, swap reciprocity, per-cluster shadowing).
-- **D3 Consistent method.** Decided on R0's measurements: faithful port of NG's `quadriga` path, a redesigned
-  consistent method, or both. User's lean: redesign.
+- **D3 Consistent method.** Redesign only, named `quadriga` (decided after R0): NG's QuaDRiGa cluster generation
+  (delays, power product with the paper's g fits, analytic DS and iterative AS scaling averaged over frequencies,
+  caps 3 / 1.5, NG GR power split, no ζ) with three changes: LOS direction applied additively (azimuth wrap,
+  elevation pole fold) instead of the 3-D rotation; μ_offset,ZOD added to the NLOS departure elevations; no satellite
+  EoA fade. Not adopted: per-cluster ζ, Gaussian/Laplacian initial values, exact wrapped AS solve, exact
+  per-frequency scaling. No faithful port, no NG parity test; NG output changes documented (R0 report 4.2).
 - **D4 Cluster count.** `NumClusters = N + 1` in every file: slot 0 = LOS ray (zero power in NLOS), then N NLOS
   clusters; in TR LOS the first NLOS cluster is at τ = 0, aligned to LOS (7.5-12/-17). Change: +1 in `NumClusters`
   and `NumClusters_min` of the 8 v19 LOS files, comments updated. NG's old conf files keep their legacy meaning.
@@ -49,8 +57,7 @@ Out of scope (later series; this series leaves the interface ready):
 - **D6 Random fields.** Blocks by variable type, append-only (existing columns never move), ray blocks reserved;
   one shared cluster set plus one set per frequency (Z_n and later the per-frequency ray blocks), seeds derived from
   the LSF seed by a fixed documented rule; no bias removal; 2D + floor IDs as the LSF, 3D legacy mode, `SC_lambda =
-  0` → 0.1 m; Procedure B: delay/AOD/ZOD distance 2c·10^(μlgDS+σlgDS) from scenpar at a reference frequency and
-  distance given at init (multi-frequency: the frequency with the largest μ + σ), AOA/ZOA 50 m, Z_n at `SF_lambda`.
+  0` → 0.1 m.
 - **D7 Output.** Padded slots per link (0 LOS, 1 GR if enabled, then N), zero power for inactive entries (removal,
   smaller per-link N); delays in s relative to the LOS delay, NLOS + Δτ when abs TOA is on, frequency dimension only
   where a method needs it (7.6.5.1 LOS); powers per frequency as the coefficients use them (7.5-30: LOS K/(K+1),
@@ -104,9 +111,9 @@ Documents:
   the NG integration hand-off).
 
 Process:
-- Runs sized for one agent each (section 6). The manager session runs at effort medium; every sub-agent (R0,
-  spec writer, spec reviewers, implementation runs, code reviewers) is spawned with effort `high`, never above
-  (token budget).
+- Runs sized for one agent each (section 6). Effort per agent: manager `medium`; R0, spec writer, implementation
+  runs R1–R3, spec review rounds 1–2 and code review rounds 1–2 `high`; the final (third) spec review round and the
+  final code reviewers (code, TR compliance, NG readiness) `xhigh`; `max` never (fast pass, then thorough pass).
 - The machine is shared: check `cat /proc/loadavg`; at most 12 threads, one build or test suite at a time.
 - Separate final reviewers: code, TR compliance, NG integration readiness. Every bug claim needs a concrete input
   with wrong vs expected output. ASan/UBSan runs, never unbounded allocation probes under ASan.
@@ -119,19 +126,17 @@ Process:
 
 - **`ssf_init_phases`** — phases of an SSF generator set of one BS site and scenario, [n_coeff, n_gen, 2], slice 1
   the mirror of slice 0 (as `lsf_init_phases`). Set type: shared cluster set or per-frequency set (frequency index).
-  Generator table from scenpar (N_max from `NumClusters`, λ = `SC_lambda`) and the method (Procedure B distances
-  from the reference frequency and distance). Seed derived from the LSF seed.
+  Generator table from scenpar (N_max from `NumClusters`, λ = `SC_lambda`). Seed derived from the LSF seed.
 - **`ssf_draw`** — normalized values [n_link, n_gen] at the links (2D/3D, floors, dual mobility), as `lsf_draw`.
 
 Cluster blocks (each N_max columns): delay, shadowing Z_n (per-frequency set), sign ×4, jitter / offset ×4 (method
-dependent: Y_n, 7.6.5.1's Y/Z/V/W, Procedure B's uniforms; the spec fixes one layout that serves all methods or one
+dependent: Y_n, 7.6.5.1's Y/Z/V/W, `quadriga`'s uniforms; the spec fixes one layout that serves all methods or one
 table per method), then reserved ray blocks. Mirror pairs: delay, Z_n self; AOD↔AOA and ZOD↔ZOA for signs and
 offsets. The spec states the column layout as part of the public contract.
 
 ### 4.2 Deterministic model (new source file, e.g. `src/ssf_clusters.cpp`)
 
-- **`ssf_clusters`** — steps 5–7 per link with `method` ∈ {`38.901`, `38.901_B`, `38.901_MF`, consistent method(s)
-  from R0}. Inputs: positions; `lsp` of `lsp_generate` (+ anchor-frequency `lsp` for `38.901_MF`); `lsp_mu`
+- **`ssf_clusters`** — steps 5–7 per link with `method` ∈ {`38.901` (default), `38.901_MF`, `quadriga`}. Inputs: positions; `lsp` of `lsp_generate` (+ anchor-frequency `lsp` for `38.901_MF`); `lsp_mu`
   (μ_lgZSD); `eod_offset_deg`; `abs_toa`; ground permittivity (GR); O2I flag per link; optional N per link (7.6.15);
   `rnd` from `ssf_draw` (shared + per-frequency sets). Output as D7.
 - Optional small helpers only if a second user exists (e.g. the C_φ/C_θ interpolation as a documented function is
@@ -172,21 +177,21 @@ decides before the spec is written. Risk: no consistent method reaches the basel
 |---|---|---|
 | R0 | Comparison study (section 5) | prototype |
 | — | Spec, three spec review rounds | — |
-| R1 | `ssf_init_phases`, `ssf_draw`: tables, layout, mirror pairs, derived seeds, Procedure B distances; tests | 300 / 600 |
+| R1 | `ssf_init_phases`, `ssf_draw`: tables, layout, mirror pairs, derived seeds; tests | 300 / 600 |
 | R2a | `ssf_clusters` shared part + `38.901`: C factors, C_τ, −25 dB, ZOD offset, O2I ZOA, abs TOA, GR, per-link N; TR-oracle tests | 650 / 1,200 |
-| R2b | `38.901_B`, `38.901_MF`; tests | 270 / 650 |
-| R2c | Consistent method(s) from R0; property tests (exact spreads where promised, continuity, reciprocity); reference values for the NG parity | 350–500 / 600 |
+| R2b | `38.901_MF`; tests | 150 / 350 |
+| R2c | `quadriga` (redesign, D3); property tests (exact spreads where promised, continuity, reciprocity); documented differences to NG's current output | 350 / 600 |
 | R3 | MEX + Python wrappers, docs (`html_docu`), objdump gate, D4 conf change | 600 / 400 |
 | — | Three code review rounds (separate reviewers: code, TR compliance, NG readiness) | — |
 | — | NG integration: steps 5–7 of `gen_ssf_parameters` by library calls; store seed and SSF phase cubes; NG's MATLAB ray code stays | — |
 
-Total about 2,200–2,350 lines of code and docs, 3,450 lines of tests (≈ 60 % of the LSF series). Order: R1 → R2a
+Total about 2,100 lines of code and docs, 3,150 lines of tests (≈ 60 % of the LSF series). Order: R1 → R2a
 gives a usable TR baseline; R2b/R2c independent of each other after R2a.
 
 Risks:
-- R0 outcome may change the method list of R2c (one or two consistent methods).
 - Random-field layout must already serve the ray series and Procedure A (reserved, append-only blocks).
-- NG integration with a redesigned default changes NG's default output (measured in R0).
+- NG integration with the redesigned `quadriga` changes NG's default output (measured in R0: ESD, arrival and
+  departure centres, D4).
 - Open TR points (A1–A16 of the analysis) are resolved by policy; each must be stated in the spec.
 
 ## 7. NG integration notes (for the later hand-off)
@@ -197,4 +202,4 @@ Risks:
   `xpr_sos`, `pin_sos`, `clst_dl_sos` stay until the ray series (`clst_dl_sos` only for the deprecated mmMAGIC).
 - Signs/jitter: evaluate at segment starts and reuse along the segment (D5).
 - The D4 change affects NG users of the v19 LOS files (one more NLOS cluster); NG's legacy files unchanged.
-- Parity test against NG's QuaDRiGa path only if the faithful method is kept (D3).
+- No parity test against NG's QuaDRiGa path (D3: redesign only); the measured output changes are documented instead.

@@ -66,6 +66,10 @@ IDs: A = TR ambiguity, N = NG deviation or suspected bug, P = policy proposal, D
   `sns_element_gain` (section 6.2) are removed from this series. This series must still leave the interface ready:
   the cluster output carries everything the ray step needs, and the random-field layout reserves the ray-level
   blocks (appended later, existing columns never move).
+- **After R0 (`md/ssf_r0_report.md`):** default method `38.901`; D3 = redesign only, named `quadriga` (NG's
+  cluster generation + additive LOS application + additive ZOD offset in NLOS + no satellite fade; no ζ, no
+  Gaussian/Laplacian initial values, no exact wrapped solve, frequency-averaged scaling kept); Procedure B dropped
+  from the series (spreads 0.14–0.74 of the input). Methods: `38.901`, `38.901_MF`, `quadriga`. Details in the plan.
 
 ---
 
