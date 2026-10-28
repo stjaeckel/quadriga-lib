@@ -26,6 +26,7 @@ batch and brought to Stephan in five parts. The engine stays closed until every 
 | — | research rows cited by stable id; the research answer folded into the wish-list | 063f05b |
 | 1 | `masonry_heavy` (1.2), `glass_4mm` / `glass_6mm` (1.6), `glass_wool` (5.1); JCA in the rig | a73d1a2 |
 | 2a | `masonry_hollow` (1.3), `door_solid_40mm` + `door_hollow_core_40mm` (1.23, 1.24), `rock_wool` (5.2) | cbe2ae3 |
+| 2b | `masonry_light` (1.4), `glazing_double_24mm` + `glazing_triple_36mm` (1.7), `pu_foam` (5.3; 3.6 to a padding-foam row) | merged, waiting for Stephan's commit |
 
 Earlier commits of step 3: 5be85fb, 13e4e45, 19323d9 / be65346 / bd0a170 (wish-list and guidelines), 69a4555 /
 e5d3743 / e578aee / 5081648 (rig extension and its reviews).
@@ -67,7 +68,7 @@ case of the merge notice's count). Files `test_wave.txt`, `test_acoustic.txt`, `
 The line citations are converted and the answer is folded into the wish-list with Stephan's twelve readings D1–D12
 (063f05b; the readings in the section-9 log of 2026-10-28). Further requests go through Stephan in the handoff-7 form.
 
-**Next: batch 2b** (proposed to Stephan 2026-10-28, not yet briefed): `masonry_light` (aircrete; D4 of the research fold
+**Now: batch 2b** (built and merged 2026-10-28, waiting for Stephan's commit; then baselines, worktree cleanup, 2c): `masonry_light` (aircrete; D4 of the research fold
 decided: tested against the range of the four 10 cm walls, density inside 480–800 kg/m³), `pu_foam_50mm` (porous),
 the glazing units `glazing_double_24mm`, `glazing_triple_36mm` (lumped; the doors are the worked example). Then 2c
 (`plaster_15mm` with the bonded-mass effect of issue 7, `carpet_tile_11mm`, `parquet` / `vinyl` on the slab), 2d
@@ -86,6 +87,9 @@ cavities, drywall, resonant absorbers, ceiling tiles, objects); rows waiting for
   the baselines (old rows identical, only the new cases inserted), updates the shared documents, writes the batch
   report, the commit message and the `git add` line. After Stephan's commit: baselines regenerated, worktrees and
   `agent/*` branches removed after checking them against the commit.
+- Agent scratch (scripts, probes, fit outputs) in `/home/stephan/quadriga-lib-agents/scratch/<id>/`, not in the
+  worktree, so the manager can rerun it after the worktree is removed (from batch 2b; the batch-1 and 2a scripts were
+  lost with their worktrees).
 - Python in a checkout with `PYTHONDONTWRITEBYTECODE=1`; nothing temporary under `/sjc`.
 
 ## 1. Roles
@@ -847,6 +851,85 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     into the source tree); its `[wave]`, `[acoustic]` and whole-suite output equals the baselines number for number
     (141128 / 135185 / 285204, no structural difference). A `tools/acoustic/__pycache__` left by an agent removed;
     agents run Python with `PYTHONDONTWRITEBYTECODE=1`.
+  - Manager session handed over at 2b42dcd (2026-10-28). State checked: HEAD 2b42dcd (since cbe2ae3 only the manager
+    file and the template changed, so the cbe2ae3 baselines hold: `[wave]` 163474 / 178, `[acoustic]` 44326 / 76, whole
+    suite 1355360 / 1390); no agent worktrees or `agent/*` branches; the manager's build up to date. Batch-2b briefs
+    written in the agents folder: `batch2b_common.md` (worktrees created by the manager at 2b42dcd in `worktrees/`,
+    scratch in `scratch/<id>/`, reports written directly, build options of the manager's build, the confirmed cases
+    of 2a added, lessons of 2a: the band rule, no figure-reading budget, check page claims against definitions),
+    `m08_masonry_light_brief.md` (heavy group; plaster on a class whose D4 references are bare, the coincidence inside
+    the band and the range, which walls are light units, density, sides), `m09_pu_foam_brief.md` (porous group; the
+    family `pu_foam` + `pu_foam_50mm` from wish-list 3.6 and 5.3; the model, the reference band with the synthesis below
+    the JCA prediction, the fitted-σ check rerun, the solid for cushions, the range), `m10_glazing_brief.md` (plates
+    group; one case for both units; the mass-air-mass dip, one resonance column for the triple's two, coincidence,
+    the slope above the resonance, AGC against the Quirt cavities, mass level, grid, the rescale check). To Stephan
+    before the agents start.
+  - Briefs approved by Stephan 2026-10-28. Worktrees created by the manager at 2b42dcd
+    (`/home/stephan/quadriga-lib-agents/worktrees/m08_masonry_light`, `m09_pu_foam`, `m10_glazing`, branches
+    `agent/<id>`); the three agents started on phase 1 (plan) without `isolation`, 4 threads each.
+  - m09 pu_foam phase 1 done (worktree clean at 2b42dcd). Manager reruns (`compare.py`, `cushion.py`, load 8):
+    JCA with Dupont's PU2 set within 0.003 of the band [JCA #6, synthesis #8] (Komatsu 0.071, Miki 0.053,
+    Delany-Bazley 0.084 outside it); against the converted chamber value 0.084; the synthesis 0.025–0.056 below the JCA
+    model at 250 Hz–4 kHz (glass wool +0.08 above); fitted σ of the synthesis ×1.02 (Miki) / ×1.20 (Komatsu); the
+    engine notes' 10.3 kPa·s/m² reproduced; a limp frame of an assumed 20 kg/m³ lowers α by up to 0.050 at 500 Hz
+    (bounded, not measured). Cushion foam exists: Rubino #9 (σ 2700, measured), #11 (porosity 0.96); against the
+    authors' modelled free layup #3 Miki at 2700 within 0.024, the PU2 row up to 0.216. Decisions D1 (JCA power laws,
+    fit from 125 Hz), D2 (band ±0.05, conversion ±0.107, synthesis printed, not marked), D3 (`pu_foam` the acoustic
+    foam; 3.6 to a padding-foam row with 3.8), D4 (25–200 mm, 250 Hz–4 kHz). Case 0.148 s, provisional (load 7.8).
+  - m10 glazing phase 1 done (worktree clean at 2b42dcd). Manager reruns (`final.py`, the library probe on
+    `grid(200,1)` 2.9 s for all variants, `tfsens.py`, `tfcap.py`; load 2–5): double unit with physical columns (`resS` +1
+    at the mass-air-mass 211.3 Hz, coincidence 3123 Hz, η 0.005, the PTB#208 law, `att` rising) meets AGC#2 within
+    2.81 dB (250 Hz; 1 kHz −2.75, 4 kHz +2.73); mass level 0.57 × the stated 20 kg/m². Triple with the physical lower
+    resonance misses AGC#14 at four octaves (125 Hz +3.37, 250 Hz +3.34, 1 kHz −3.31, 4 kHz +3.25 dB); Quirt#26
+    within 2.83 dB (agent: 2.89). The face cap T ≤ `tf` also caps the mass-air-mass dip: 250 Hz reads 19.57 against
+    12.97 dB with `tf` 1 (double), 22.37 against 18.15 (triple); at 4 kHz 39.29 against 29.82 dB. Decisions G1 (physical
+    `resF`; fallback free at 167 Hz, 2.25 dB), G2 (triple: AGC#14 printed under the face-cap engine limit, issue 8
+    extended to the dip), G3 (physical coincidence), G4 (AGC asserted; the Quirt pair and Pilkington printed),
+    G5 (mass level free), G6 (`grid(200,1)`), G7 (no rescale loop). Case about 0.27 s, provisional.
+  - m08 masonry_light phase 1 done (worktree clean at 2b42dcd). Manager reruns (`plaster.py`, `leval.py fit_A_620.json`,
+    `coin.py fit_A_620.json`, the library probe 184 / 184 in 0.076 s, load 0.6–4): one solid (ρ 620 kg/m³, `coiF`
+    463 Hz with `coiQ` 1.80 as a broad trough, mass level 0.397 × physical) meets the band of Granzotto #2–#5 at 100 mm
+    within 2.41 dB and Hopkins #4 at 128 mm within 2.40 dB (both grids); gap bands 1.72 dB. The bare walls dip at
+    500 Hz (R250 − R500 +0.6 to +5.4 dB, 8 walls), Hopkins #4 rises (−6.9 dB). Plaster at equal finished thickness:
+    thin gypsum (650 kg/m³) −0.43 to +0.77 dB by mass law over 480–800 kg/m³ blocks, sanded 13 mm +1.52 to +3.47 dB;
+    the heavy class's two-face increments 2.2–6.0 dB. Coincidence fixed against scaled with 1/h: in the library
+    1.86 / 2.90 / 4.31 dB at 128 / 150 / 190 mm (125 Hz–4 kHz); against an independent thin plate (η 0.03,
+    fc·h 53 Hz·m) 2.28 / 4.46 / 11.43 dB at 125 Hz–4 kHz (the manager first misread the 4.46 and 11.43 dB as the 63 Hz
+    octave; they are the 250 Hz octave, corrected after the build, see below). Decisions D1 (D4 band as it is), D2 (joint fit, `coiF` a knob), D3 (asserted 90–130 mm,
+    `_150mm` twin only, issue 7 extended), D4 (Warnock 1995 #2 a hollow lightweight block: printed in 1.3; #4 printed),
+    D5 (ρ 620), D6 (sides 3.22 m). Side note: `python3 -I` ignores `PYTHONDONTWRITEBYTECODE`; use `-I -B`.
+  - Decided by Stephan 2026-10-28 (all seventeen as the manager recommended): masonry_light L1 the D4 band as it is
+    (thin plaster stated), L2 the joint fit with `coiF` a knob, the band and Hopkins #4 asserted, L3 asserted 90–130 mm,
+    `_150mm` twin only, 150–250 mm printed, issue 7 extended (in-band sizes), L4 Warnock 1995 #2 to the hollow class
+    (printed), #4 printed, L5 ρ 620, L6 sides 3.22 m; pu_foam F1 JCA power laws from 125 Hz, F2 the band ±0.05 and the
+    conversion ±0.107, F3 `pu_foam` the acoustic foam, wish-list 3.6 to a later padding-foam row with 3.8, F4 25–200 mm;
+    glazing G1 double with the physical `resF`, G2 triple: AGC#14 printed under the face-cap mark, issue 8 extended to
+    the mass-air-mass dip, G3 physical coincidence, G4 AGC asserted, G5 mass level free, G6 `grid(200,1)`, G7 no rescale
+    loop. The three agents continued with phase 2 (build).
+  - m09 pu_foam built (worktree: CSV +2 rows appended, equal to `cols_jca_10605_f125.json`; porous file +70 lines, one
+    case after rock wool). Manager rerun: `Material - pu_foam` 56 / 56, 0.156 s at load 1.8. Agent: `[materials]`
+    1678 / 18, the existing cases' 22734 numbers identical, one inserted block. Merge note: the padding-foam remark in
+    the comment gets its source id (Rubino #9).
+  - m10 glazing built (worktree: CSV +2 rows appended, equal to `fit_D.json` / `fit_T.json`; plates file +64 lines, one
+    case after the doors, one `ENGINE LIMIT (pane coincidence capped by the face absorption)` mark). Manager rerun:
+    42 / 42, 0.139 s at load 1.8; AGC#2 +0.14 / +2.81 / +0.15 / −2.75 / −1.24 / +2.73 dB (125 Hz–4 kHz); the triple
+    printed against AGC#14 +3.37 / +3.34 / +2.00 / −3.31 / −1.98 / +3.25 dB; Quirt#26 within 2.83 dB; library minima
+    of the dip 229 and 186 Hz (agent's sweep). Agent: `[materials]` 1665 / 18, the existing numbers identical.
+  - m08 masonry_light built (worktree: CSV +3 rows appended, equal to `fit_A_620`; heavy file +98 lines, one case after
+    hollow masonry). Manager rerun: 196 / 196, 0.162 s at load 1.6; band 2.41, Hopkins 2.41 dB. The agent corrected the
+    manager: `coin.py` prints 125 Hz–4 kHz, so the thin-plate misses 2.28 / 4.46 / 11.43 dB at 128 / 150 / 190 mm are in
+    band (the 250 Hz octave); the approved range 90–130 mm stands. Warnock 1995 #2 against the hollow row (agent, not
+    rerun): within +2.37 … −1.87 dB at 125 Hz–2 kHz, −3.70 dB at 4 kHz.
+  - Batch 2b merged by the manager 2026-10-28 (three test files copied, CSV rows appended in wish-list order 1.4, 1.7,
+    5.3, every diff append-only; one manager edit: the padding-foam remark in the foam case cites
+    [Rubino_2026_UpholsteredSeatingCircular#9]). Manager checks at load 1.4–1.9, 12 threads: rebuild clean;
+    `[materials]` 2009 / 20 (masonry_light 0.083 s, glazing 0.042 s, pu_foam 0.080 s); `[wave]` 163474 / 178, 141128
+    identical, no structural difference; `[acoustic]` 44750 / 79 (+424 = 196 + 42 + 56 in the cases, 130 in the table
+    case), 135185 identical, three inserted blocks (865 / 146 / 268 lines); whole suite 1355784 / 1393, 285204
+    identical, the same insertions; `check_docs.py` passes. Outputs in `/home/stephan/quadriga-lib-agents/scratch/b2b/`.
+    Documents: wish-list 1.3 (Warnock 1995 #2), 1.4, 1.7, 5.3 confirmed with built paragraphs, 3.6 to a padding-foam
+    row; stage-2b issue 7 extended to light masonry, issue 8 to the glazing units' mass-air-mass dip; guidelines 7
+    (cushions). To Stephan with the batch report.
 
 ## 10. Scope of phase 0 (2026-10-23; naming and combinations superseded by wish-list 1.6 and section 3)
 
@@ -935,9 +1018,9 @@ Leftovers of step 2 to settle where they fall: page section 9 says `irr_glass` f
 - **Fits:** bound and densely sample; select on the evaluation grid; the mass level bound must reach about 3200 for a
   423 kg/m² wall; clip τ at one per frequency, not per band; coincidence needs about 4000 angles.
 
-- **Worktree agents:** the Agent tool may create the worktree at an old commit (m01: cebd0c0, not HEAD); every brief
-  says to check `git log -1` and fast-forward to the batch's HEAD first. Untracked briefs and baselines are read by
-  absolute path; the report is copied into `md/materials/` with `cp` (the Write tool refuses the main checkout).
+- **Worktree agents:** the Agent tool's `isolation` may create the worktree at an old commit (m01: cebd0c0, not HEAD);
+  since batch 2b the manager creates the worktrees itself at the batch's HEAD and every brief says to check
+  `git log -1`. Briefs, reports, baselines and scratch are in the agents folder, read and written by absolute path.
 - **Catch order:** cases run in link order; `test_acoustic_mat_*` links before `test_acoustic_materials.cpp`, so a
   moved case moves its rows; compare moves with `--order lex`.
 

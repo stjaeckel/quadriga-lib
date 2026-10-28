@@ -233,8 +233,13 @@ prints the reflection at that cap beside the uncapped one.
 - **Timber doors** (2026-10-28): a 40 mm solid door has its physical coincidence near 655 Hz, and measured doors show a
   plateau of 28–32 dB from 500 Hz to 2 kHz; with the physical coincidence the best fit misses by 5.3 dB at 125 Hz, with
   the coincidence as a fit knob it meets the sealed doors within 1.12 dB.
+- **Light masonry** (2026-10-28): aircrete walls have their coincidence inside the band (fc·h 44–60 Hz·m, 500 Hz at
+  100 mm). The row's fixed coincidence (a broad trough at 463 Hz, fitted at 100 and 128 mm) against the same row with
+  the coincidence scaled as 1/h misses by 1.86 / 2.90 / 4.31 dB at 128 / 150 / 190 mm (125 Hz–4 kHz); against an
+  independent thin plate (loss factor 0.03, fc·h 53 Hz·m), its change from 100 mm misses by 2.28 / 4.46 / 11.43 dB.
+  The rows are asserted at 90–130 mm only.
 - **Reproduce.** `QD_DIAG_RAY=1 ./build_linux/test_bin "Material - concrete"` (the row against the Litvin pair);
-  `"Material - masonry_heavy"` (the printed ends).
+  `"Material - masonry_heavy"` (the printed ends); `"Material - masonry_light"` (150–250 mm printed).
 
 ### 8. A pane's coincidence dip is capped by its face absorption ("pane coincidence capped by the face absorption")
 
@@ -247,9 +252,18 @@ prints the reflection at that cap beside the uncapped one.
   the coincidence octave (4 kHz) reads 29.89 dB at `tf` 0.017 (a pane's measured absorption) and 21.74 dB at `tf` 1;
   6 mm (2 kHz octave) 30.32 dB against 22.24 dB. The shipped rows meet the laboratory panes within ±3 dB with the
   measured absorption, so the case carries no mark.
-- **Affects.** Windows and thin panels near coincidence: the dip cannot be deeper than the face absorption allows.
+- **Glazing units** (2026-10-28): the same cap fills the mass-air-mass dip of a lumped double or triple unit, and
+  f0 / cos θ carries it into every octave above f0 at oblique angles. The 250 Hz octave reads 19.57 dB with the
+  measured absorption against 12.97 dB with `tf` 1 (`glazing_double_24mm`), 22.37 against 18.15 dB
+  (`glazing_triple_36mm`); at 4 kHz 39.29 against 29.82 dB (double). The double unit meets its laboratory value within
+  2.81 dB; the triple misses [AGC_2023_PocketStratophone#14] by +3.37 / +3.34 / +2.00 / −3.31 / −1.98 / +3.25 dB
+  (125 Hz–4 kHz), so that comparison carries the mark and prints.
+- **Affects.** Windows and thin panels near coincidence, and glazing units at their mass-air-mass resonance: neither dip
+  can be deeper than the face absorption allows.
 - **Interim guideline.** None needed for the glass rows; a row that must reproduce a deep dip cannot keep a hard face.
-- **Reproduce.** `QD_DIAG_RAY=1 ./build_linux/test_bin "Material - glass"`.
+  Triple glazing reads up to 3.4 dB above its laboratory value at 125–250 Hz.
+- **Reproduce.** `QD_DIAG_RAY=1 ./build_linux/test_bin "Material - glass"`; `"Material - glazing_double +
+  glazing_triple"`.
 
 ## Modeling guidelines collected in step 3
 

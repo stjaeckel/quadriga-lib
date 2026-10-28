@@ -292,3 +292,101 @@ TEST_CASE("Material - masonry_hollow", "[acoustic][materials]")
     mt::check_material("masonry_hollow_200mm", mt::row("masonry_hollow_200mm"));
     mt::check_material("masonry_hollow_250mm", mt::row("masonry_hollow_250mm"));
 }
+
+TEST_CASE("Material - masonry_light", "[acoustic][materials]")
+{
+    // Light masonry plastered on both faces (aircrete, expanded-clay and lightweight-aggregate solid units), class 1: the
+    // solid `masonry_light` (thk 0) at 100 and 128 mm, the sheets masonry_light_100mm and _150mm. Columns: density
+    // 620 kg/m3 in e (the geometric centre of the stated 480-800 kg/m3); tf and tfB the plaster law of masonry_heavy (PTB
+    // #344 [PTB_2012_AbsorptionTable#38], PTB #346 [PTB_2012_AbsorptionTable#40]); the mass-law knobs fitted at
+    // 342.76271 m/s to the two references below on 4096 angles x 12 tones per third and on this case's grid. coiF
+    // (463 Hz), coiQ (1.80), resF and the mass level are fit knobs: the level stands for 0.40 times the physical mass
+    // e rho0 t (pinned at the physical mass, the fit misses by 4.1 dB), so a bonded addition counts about 2.5 times its
+    // mass law. The bare walls show a coincidence dip at fc h 44-60 Hz m (500 Hz at 100 mm, Granzotto's fits); plaster
+    // acts as added mass and damps that dip (the plastered walls show none), so the row carries a broad trough.
+    // Transmission, within 3 dB: at 100 mm the four bare 10 cm walls [Granzotto_2026_AACAirborneInsulation#2] to #5
+    // (thin-bed mortar, ISO 10140, thirds from 100 Hz) as one band, not mass-shifted: their density is stated only as
+    // 480-800 kg/m3 (48-80 kg/m2, 4.44 dB of mass law, printed). A finished 100 mm wall with thin lightweight plaster
+    // (13 mm at 650 kg/m3, [Hopkins_2007_SoundInsulation#96]) weighs what the bare 100 mm wall weighs (-0.4 to +0.8 dB
+    // over 480-800 kg/m3), so the band is used as measured. Its 31.5, 63 Hz and 8 kHz take the spread of 144 plate models
+    // (tools/acoustic/gzlib.py: thin and Mindlin plates, infinite and finite at 3.22 m; 48-80 kg/m2, coincidence
+    // 440-600 Hz, loss factor 0.001-0.03). At 128 mm Hopkins [Hopkins_2007_SoundInsulation#4] (aircrete 115 mm, 13 mm
+    // lightweight plaster on one face, 71 kg/m2, 3.53 x 2.63 m), mass-shifted. Granzotto's specimen size is not stated:
+    // taken at the row's 3.22 m (0.04 dB from the 10 m2 of ISO 10140). Reasonable meant: between the bare walls (a dip
+    // at 400-630 Hz) and the plastered wall (none), which differ in shape by 6-8 dB at one mass. The coincidence column
+    // is fixed while a wall's dip moves as 1/h (heavy-wall coincidence engine limit): the row against the same row with
+    // coiF scaled as 1/h misses by 1.9 / 2.9 / 4.3 dB at 128 / 150 / 190 mm, so 150-250 mm are printed. Printed: the bare
+    // walls Davy [Davy_2017_AACPanels#2] (75 mm), Granzotto #1 (7 cm), #6, #7 (12 cm), #8 (12.5 cm, build unknown, not
+    // shifted), the plastered #9 (16.5 cm, build inferred); Warnock [Warnock_1995_BlockConstructions#4] (wood-fibre
+    // blocks, 2 mm plaster on one face) and [Warnock_1995_BlockConstructions#2] (hollow lightweight blocks, plaster on one
+    // face: the hollow class); the row's Rw (ISO 717-1) against Granzotto's law over 50 walls, Rw = 29.0 lg m - 15.5
+    // [Granzotto_2026_AACAirborneInsulation#10]. Valid: 90-130 mm, R 125 Hz - 4 kHz.
+    using V = std::vector<double>;
+    const V oct = {125, 250, 500, 1000, 2000, 4000};
+    const mt::Row r = mt::row("masonry_light");
+    mt::Measured band = mt::envelope("Granzotto #2 to #5 as one band", oct,
+                                     {{1.0, {27.5, 29.7, 27.1, 34.4, 42.6, 49.3}}, {1.0, {27.9, 31.1, 26.3, 35.0, 43.3, 48.8}},
+                                      {1.0, {31.0, 29.4, 28.8, 37.1, 43.6, 49.9}}, {1.0, {33.3, 34.0, 28.6, 37.8, 46.4, 53.7}}},
+                                     1.0, 0.0); // density not stated: not mass-shifted
+    band.coefficient_type = "laboratory sound reduction index, four walls of one build", band.tol = 3.0;
+    for (const auto &[f, lo, hi] : std::vector<std::tuple<double, double, double>>{{31.5, 14.13, 26.77}, {63, 18.96, 29.96}, {8000, 39.38, 68.46}})
+        band.octaves_hz.push_back(f), band.lo_hi.push_back({lo, hi});
+    mt::Measured hop{"Hopkins #4", "R_dB", "laboratory sound reduction index (intensity), plaster on one face", true, 3.0, oct, {}, std::sqrt(3.53 * 2.63), 71.0};
+    for (double v : {23.6, 26.9, 33.8, 42.2, 50.8, 56.0})
+        hop.lo_hi.push_back({v, v});
+    const mt::Measured ptb344{"PTB_2012_AbsorptionTable #344", "alpha_random", "Sabine (ISO 354), compiled; a hard face", false, 0.05, oct,
+                              {{0.02, 0.02}, {0.02, 0.02}, {0.03, 0.03}, {0.04, 0.04}, {0.05, 0.05}, {0.05, 0.05}}};
+    const mt::Measured ptb346{"PTB_2012_AbsorptionTable #346", "alpha_random", "Sabine (ISO 354), compiled; a hard face", false, 0.05, oct,
+                              {{0.02, 0.02}, {0.02, 0.02}, {0.02, 0.02}, {0.02, 0.02}, {0.02, 0.02}, {0.02, 0.02}}};
+    auto rw = [](const mt::Out &X) // ISO 717-1 on the thirds 100 Hz - 3.15 kHz (one tone per third)
+    {
+        static const double ref[16] = {33, 36, 39, 42, 45, 48, 51, 52, 53, 54, 55, 56, 56, 56, 56, 56};
+        double R[16] = {};
+        for (size_t q = 0; q < X.g.f.size(); ++q)
+            if (X.g.third[q] >= 6 && X.g.third[q] < 22)
+                R[X.g.third[q] - 6] = -10.0 * std::log10(X.tauf[q]);
+        auto below = [&](int s) { double u = 0.0; for (int k = 0; k < 16; ++k) u += std::max(0.0, ref[k] + s - R[k]); return u; };
+        int s = -40;
+        while (below(s + 1) <= 32.0) // the highest 1 dB shift with at most 32 dB of unfavourable deviations
+            ++s;
+        return 52 + s;
+    };
+    const std::vector<std::tuple<double, const char *, double, V>> walls = { // thickness, wall, surface mass (0: not shifted), octaves
+        {0.070, "Granzotto #1 (600 kg/m3 blocks)", 42.0, {31.1, 32.7, 27.5, 30.3, 41.9, 49.8}},
+        {0.075, "Davy #2", 38.2, {27.8, 31.5, 28.2, 32.9, 42.4, 49.1}},
+        {0.090, "Warnock 1995 #4 (wood-fibre blocks)", 98.0, {32.5, 36.0, 37.5, 42.8, 48.4, 55.0}},
+        {0.120, "Granzotto #6 (500-600 kg/m3, at 66 kg/m2)", 66.0, {26.9, 30.1, 28.2, 34.9, 44.5, 51.8}},
+        {0.120, "Granzotto #7 (500-600 kg/m3, at 66 kg/m2)", 66.0, {29.8, 31.6, 26.3, 36.1, 43.2, 46.9}},
+        {0.125, "Granzotto #8 (build unknown)", 0.0, {28.6, 31.1, 31.6, 37.6, 42.9, 46.3}},
+        {0.165, "Granzotto #9 (plastered, 120.1 kg/m2)", 120.1, {41.9, 39.0, 39.7, 46.4, 51.2, 51.7}},
+        {0.190, "Warnock 1995 #2 (hollow lightweight blocks)", 183.0, {34.1, 39.8, 44.1, 49.5, 54.2, 58.4}}};
+    std::vector<std::pair<double, mt::Out>> runs;
+    for (double t : {0.070, 0.075, 0.090, 0.100, 0.120, 0.125, 0.128, 0.150, 0.165, 0.190, 0.200, 0.250})
+    {
+        std::vector<mt::Measured> refs;
+        if (t == 0.100)
+            refs = {band, ptb344, ptb346};
+        else if (t == 0.128)
+            refs = {hop, ptb344, ptb346};
+        char name[40];
+        std::snprintf(name, sizeof(name), "masonry_light at %.0f mm", 1e3 * t);
+        runs.push_back({t, mt::check_material(name, r, refs, mt::grid(), t)});
+    }
+    QD_DIAG("\n# diag: masonry_light, the stated block density 480-800 kg/m3 at 100 mm: 48-80 kg/m2, %.2f dB of mass law (printed)\n", 20.0 * std::log10(800.0 / 480.0));
+    QD_DIAG("# diag: masonry_light, printed: Rw of the row and Granzotto's law at e rho0 t; row (at its side) minus wall, mass-shifted (dB)\nthickness_mm,wall,125,250,500,1000,2000,4000");
+    for (const auto &[t, X] : runs)
+    {
+        const double m = mt::mpp(r, t);
+        QD_DIAG("\n%.0f,Rw %d (law %.1f)", 1e3 * t, rw(X), 29.0 * std::log10(m) - 15.5);
+        for (const auto &[tw, wall, mw, v] : walls)
+            if (tw == t)
+            {
+                QD_DIAG("\n%.0f,%s", 1e3 * t, wall);
+                for (int k = 0; k < 6; ++k)
+                    QD_DIAG(",%+.2f", X.t8[k + 2] - v[k] - (mw > 0.0 ? 20.0 * std::log10(m / mw) : 0.0));
+            }
+    }
+    QD_DIAG("\n");
+    mt::check_material("masonry_light_100mm", mt::row("masonry_light_100mm"));
+    mt::check_material("masonry_light_150mm", mt::row("masonry_light_150mm"));
+}
