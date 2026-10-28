@@ -44,7 +44,8 @@ namespace mt_rows // inline rows: page 11.4 (fitted at 343 m/s), page 11.3, the 
         return {{"m", 1}, {"e", rho / 1.2}, {"a", std::pow(mt::CS / cl, 2) * 1.2 / rho}, {"fRef", mt::FS * 1e-9 * 1.2 * mt::CS / (QPI * rho)}, {"tf", tf},
                 {"side", side}, {"coiF", fc * mt::FS * 1e-9}, {"coiQ", 1.0 / eta}};
     }
-    // Hopkins 448: dense aggregate blocks 215 mm and 13 mm plaster on both faces, 430 kg/m2, specimen 3.53 x 2.63 m
+    // Hopkins [Hopkins_2007_SoundInsulation#68]: dense aggregate blocks 215 mm and 13 mm plaster on both faces,
+    // 430 kg/m2, specimen 3.53 x 2.63 m
     static const Row PLASTER = limp(1300.0, 2000.0, 0.02, std::sqrt(3.53 * 2.63));                        // 16.9 kg/m2 at 13 mm
     static const Row BLOCK = limp(396.2 / 0.215, 3500.0, 0.01, std::sqrt(3.53 * 2.63), 159.0, 0.02);       // 396.2 kg/m2 at 215 mm
     static const Row GLAZING = {{"thk", 0.008}, {"fRef", 0.00011189}, {"tf", 1.3406}, {"tfB", -0.36}, {"att", 0.044026}, {"attB", 0.53547}, {"coiF", 2.686},
@@ -191,8 +192,7 @@ TEST_CASE("Materials rig - engine limits printed: a filled box on one path, wave
     mt::against("ENGINE LIMIT (wave media back to back): board | air | rock wool | board, T on one straight path, R at 10 interactions", O, dw);
     // ENGINE LIMIT (three bonded bodies): plaster | block | plaster with the far plaster traced (the exit-sheet form is
     // exact): the state is one level deep. Random-incidence tl, library against the bonded plate of the three, and
-    // Hopkins 448 measured [Hopkins_2007_SoundInsulation, research line 448 at 2dad906; the probe rows are physical,
-    // not fitted to it].
+    // Hopkins measured [Hopkins_2007_SoundInsulation#68] (the probe rows are physical, not fitted to it).
     const mt::Stack pb = {{PLASTER, SHEET, 0.013}, {BLOCK, SOLID, 0.215}, {PLASTER, SOLID, 0.013}};
     const mt::Out P = mt::run(pb, G);
     mt::against("ENGINE LIMIT (three bonded bodies): plaster | block 215 mm | plaster traced", P, pb);
@@ -213,7 +213,7 @@ TEST_CASE("Materials rig - tier 2 at the specimen's side and mass, the class env
     // (e rho0 thk: 346.7 kg/m2 for these concrete columns at 152 mm, as Litvin's wall); a class row against the envelope
     // of its walls, each shifted, within 1 dB. The concrete columns of page 11.4 as a solid row at 150 mm against Litvin
     // 76-66 at its laboratory side 3.523 m (shift -0.114 dB; the row at 3.5229 m, so transmission is rerun) and the envelope of 76-66 and 76-77 (152 and 203 mm,
-    // [Litvin_1980_ConcreteWallsTL], research lines 228, 229 at 2dad906).
+    // [Litvin_1980_ConcreteWallsTL#1], [Litvin_1980_ConcreteWallsTL#2]).
     using namespace mt_rows;
     const mt::Row c = mt::with(CONCRETE152, "thk", 0.0);
     const std::vector<double> oct = {125, 250, 500, 1000, 2000, 4000}, L1 = {42.1, 46.5, 52.6, 56.5, 61.7, 64.6}, L2 = {43.8, 47.3, 54.7, 58.1, 63.3, 67.3};

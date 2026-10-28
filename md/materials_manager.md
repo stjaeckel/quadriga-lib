@@ -23,7 +23,7 @@ extension, its two review rounds, the object test), a97c4ae (batch 0: the `concr
 **The three step-3 documents** (tracked, public, no private details):
 - `md/acoustic_materials.md`, the wish-list: six classes (structural, hard furnishing, soft furnishing, complex
   assemblies, treatment, outdoor), two evidence tiers per row (A absorption, T transmission; 1, 1p pending conversion,
-  2, 3), impact, status, references (research lines at commit 2dad906), gaps. Read sections 1.3–1.11 in full: the
+  2, 3), impact, status, references (research row ids `<source key>#<n>` at research commit d501809), gaps. Read sections 1.3–1.11 in full: the
   naming rule (1.6: `_<NN>mm` last marks a sheet, no suffix a traced solid), the row-design rules (1.7: lumped rows
   carry the visible thickness and rescale every power-law coefficient with `fRef`, X·k^B), `side` (1.8), the phase-3
   procedure, the ISSUE convention and the tolerance table (1.10), the start list (1.11). Section 4: open design
@@ -46,14 +46,17 @@ and the table case stay in `test_acoustic_materials.cpp`; material cases go in `
 `heavy`, `porous`, `plates`, `floors`, `leaves`, `resonant`, `objects`, `ground`). `data/materials_acoustic.csv` holds
 the `concrete` family (batch 0).
 
-**Baselines** (generic `build_linux`, at 26da9f9, v0.12.4 after the merge): `[wave]` 163474 / 178,
+**Baselines** (generic `build_linux`, at 4641966, the named engine-limit marks; regenerated 2026-10-27): `[wave]` 163474 / 178,
 `[acoustic]` 43191 / 70 (the rig included), whole suite 1354225 / 1384 (1385 in the merge notice; the generic build
 leaves out one build-option case). Files `test_wave.txt`, `test_acoustic.txt`,
 `test.txt` in the repository root (untracked).
 
-**Research:** the hand-over of 2026-10-27 (`md/materials/research_request_2026-10-27.md`: request 0 stable row ids,
-requests 1–13 by impact, three data errors) is with the research manager; Stephan relays results. Phase 3 does not
-wait: rows needing new data move down the order.
+**Research:** the requests of 2026-10-27 are answered (research commit d501809; report
+`/sjc/accoustic_research/manager/step3_research_report_2026-10-27.md`). Research rows are cited by their stable id
+`<source key>#<n>` at d501809 (Stephan, 2026-10-27), never by line; `data/id_map_2dad906.csv` maps the old lines.
+Before batch 1 (decided 2026-10-27): a citation agent converts the line citations (brief `md/materials/c02_ids_brief.md`)
+and an analysis agent proposes the wish-list update from the answer with the tier readings for Stephan (brief
+`md/materials/a03_research_fold_brief.md`); then batch 1. Further requests go through Stephan in the handoff-7 form.
 
 **Done: the rig extension** (one rig agent, phases plan → build, as in phase 1; brief from the agent template's
 rig variant; brief `md/materials/rig_ext_brief.md` written 2026-10-27, Stephan's choices for it in the section-9 log).
@@ -171,7 +174,7 @@ message) → his review and commit → this file updated.
 
 **Per row family (phase 3; the wish-list 1.10 procedure).**
 1. The manager writes the brief: the family (generic row and its sheets) and its class, reference rows (research
-   lines at 2dad906, coefficient types, bands, specimen sides), the rules that apply, the tier-1 model, open rules and
+   ids at d501809, coefficient types, bands, specimen sides), the rules that apply, the tier-1 model, open rules and
    engine issues it will meet, the tolerance lines of wish-list 1.10 that apply.
 2. The agent: data → columns by the decided rule → tier 1 (the library through the rig against the independent model)
    → tier 2 (the columns against the converted measurement per octave) → judge (reasonable against the known range;
@@ -240,7 +243,7 @@ Each is decided at the stop of the first material that needs it; record the deci
 
 | rule | question | decided |
 | --- | --- | --- |
-| reference row per class | which measured row is the tier-2 reference where compilations spread by 2 to 4 times | |
+| reference row per class | which measured row is the tier-2 reference where compilations spread by 2 to 4 times | heavy masonry: walls measured plastered on both faces first, bare plus increment otherwise (2026-10-28, research fold D8) |
 | fitted-σ check | a converted absorption reference is marked when its fitted flow resistivity is off a measured one by more than about 1.5 times (notes 9.3) | |
 | interlaboratory porous rows | the two Scrosati rows stay out until a polyester and a framed-sample model exist (notes 9.3) | |
 | resonant absorbers as one family | panels and membranes, perforated and slotted panels, MPP in the acceptance (notes 9.3) | |
@@ -264,7 +267,7 @@ sources are acceptable; urgency and whether step 3 can proceed without it. Steph
 
 | sent | request | status |
 | --- | --- | --- |
-| 2026-10-27 | `md/materials/research_request_2026-10-27.md`: request 0 (stable row ids), 1–13 by impact (wish-list section 6), three data errors (lines 1451, 520, 1819 of 2dad906); routes proposed by the research manager, approved by Stephan | with the research manager |
+| 2026-10-27 | `md/materials/research_request_2026-10-27.md`: request 0 (stable row ids), 1–13 by impact (wish-list section 6), three data errors (lines 1451, 520, 1819 of 2dad906); routes proposed by the research manager, approved by Stephan | answered 2026-10-27 (research commit d501809; report `/sjc/accoustic_research/manager/step3_research_report_2026-10-27.md`): stable row ids `<source key>#<n>` with a map of the 2dad906 lines; 17 rows changed (2 of them cited: Fuchs 327, 328, combination references of 5.11); gains for doors, masonry, beds, sofa, cabinets, plants, ceiling tiles, perforated gypsum, carpet at 63 Hz, asphalt, rug σ; no open data for requests 6, 8, 10 |
 
 ## 8. Engine items raised
 
@@ -709,6 +712,44 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     identical, 1354225 / 1384; `check_docs.py` passes; `sabine_to_random.py check` exits 0. Code marks:
     `ENGINE LIMIT (<name>):`, 11 in `test_acoustic_materials.cpp`. Left for Stephan: three citations of research-data
     lines at 2dad906 (concrete case, two self-checks). Baselines to be regenerated after the commit.
+  - Research answer received 2026-10-27 (relayed by Stephan; research commit d501809): request 0 done (ids, map
+    `data/id_map_2dad906.csv`), 17 rows of 2dad906 changed (manager check by script over the map: 1980 material rows
+    mapped; the wish-list cites 2 of the changed rows, Fuchs 327 and 328 of 5.11), library 2544 rows. Plan to work it in
+    before batch 1 proposed to Stephan.
+  - Cleanup committed by Stephan (4641966); baselines regenerated there (`[acoustic]` the 7 new labels). Decided by
+    Stephan 2026-10-27: rows cited as source key plus id, research pinned at d501809; the citation agent (c02) and the
+    analysis agent (a03) started in parallel; batch 1 after the tier readings.
+  - c02 done 2026-10-27: wish-list 392 of 426 line citations converted (545 ids), the test comments 10; 34 refused
+    (author word does not match the row's source, mostly our misattributions: ADO rows given to Zimmer+Rohde, Kosten to
+    Kuhl, Garai's range over non-σ rows, ground-class and water rows without an author word) left for the manager with
+    the a03 update; changed rows met: Fuchs_2013_AppliedAcoustics#13, #14 (5.11; #14 f125 1.14 → 1.023, still above
+    one). Manager checks: both test files identical to HEAD without comments; every id found exists at d501809 and is
+    in the map; six concrete ids name the right rows; `check_docs.py` passes.
+  - a03 done 2026-10-27 (`md/materials/a03_research_fold_report.md`, 1003 lines; scripts `build_linux/scratch/a03/`):
+    23 entries touched, proposed text per entry in ids, 12 decisions D1–D12, batch cut. Manager reruns (`masonry.py`,
+    `aac.py`, `doors.py`): densities Weise#1 1760, Hopkins#68 1784, Secchi A 1905, Granzotto B 1558 kg/m³; Weise#1
+    minus (bare trend + two increments) −2.8 / −3.5 / −3.6 / −3.1 / −1.3 / −3.1 dB (125 Hz–4 kHz; outside ±3 dB at
+    250 Hz–1 kHz and 4 kHz), minus the bare trend at its mass +1.8 … −0.7; bare-wall scatter about the trend up to
+    3.96 dB; aircrete 10 cm density range 4.44 dB, the four walls spread 2.5–5.8 dB per band; hollow-core door mass
+    from Kim's R 7.6–9.2 kg/m² (500 Hz–4 kHz). Batch-1 blocking: D7 (Weise as measured, range to 250 mm), D8
+    (plastered walls before bare plus increment). To Stephan with all twelve.
+  - Decided by Stephan 2026-10-28 (the twelve in five parts first): D7 (a) Weise's 12-laboratory mean measured, tier 1,
+    `masonry_heavy` valid to 250 mm, class density about 1700–2400 kg/m³; D8 (a) walls measured plastered on both faces
+    are the references where they exist, bare plus increment only otherwise, the old rule's miss printed; D3 (a)
+    Granzotto B for `masonry_hollow_200mm`, Secchi A printed (offered to the heavy class), `masonry_hollow_250mm` back
+    with Granzotto C and E; D4 (a) aircrete 100 mm against the range of the four walls, density inside 480–800 kg/m³,
+    4.44 dB stated; D5 (a) field values printed only; D9 (a) hollow-core door 9.3 kg/m² (NBS), Kim the spectrum;
+    D10 (a) doors stay 40 mm; D11 (a) carpet tile A 1 at 63 Hz, 1.3 amended to a hard face in that band; D1 (b) Caimi
+    printed as the upper bound of fabric seats, the leather sofa tier 1; D2 (a) Focus A tier 1 at E-50 and E-200, the
+    row renamed `ceiling_tile_20mm`, Aoki printed; D6 (a) the bookcase tier 3 with the fill ratios, **no author
+    query**; D12 (a) Fuchs 2005 rows cited, 2013 printed. Wish-list update by agent c03 (brief
+    `md/materials/c03_wishlist_brief.md`).
+  - c03 done 2026-10-28: wish-list sections 2, 3, 4 (item 8 closed), 6 updated, 827 ids (all at d501809, no short
+    forms), the 34 refused citations resolved (ADO, Kosten, Primacoustic named; Garai's non-σ rows and Szelag's α rows
+    corrected; ground σ and G separated); guidelines 5: field values 3–6 dB below the laboratory rating (Secchi Rw
+    6 / 4 / 6 / 3 / 5 dB by script). Manager review: the tiers and table rows of 1.2, 1.3, 1.23, 1.24, 4.1, 5.15 as
+    decided; D8 rule in 1.2; D6 without any query; D12 in 5.11; `ceiling_tile_25mm` gone; `check_docs.py` passes. To
+    Stephan with one commit for the id conversion and the update. Next: the batch-1 briefs.
 
 ## 10. Scope of phase 0 (2026-10-23; naming and combinations superseded by wish-list 1.6 and section 3)
 
@@ -776,7 +817,7 @@ Leftovers of step 2 to settle where they fall: page section 9 says `irr_glass` f
 - **Reader:** an empty cell reads 0, not the default; a material file replaces the built-in table; a text cell in a
   numeric column is an error; a name's part after the first dot is a variant of its base name.
 - **A material identical to air is air:** a box of air needs `e` 1.000001.
-- **Research data:** generated files (never patch a copy; report a wrong row); PTB 63 Hz values equal to 125 Hz and
+- **Research data:** cite rows by id (`<source key>#<n>`, d501809), never by line; generated files (never patch a copy; report a wrong row); PTB 63 Hz values equal to 125 Hz and
   compilation 8 kHz values equal to 4 kHz are copies; Sabine and placement values above one are no material
   property; the property name `alpha_random` covers every diffuse or unstated type, the `coefficient_type` column
   decides.
