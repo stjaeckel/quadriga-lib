@@ -79,6 +79,10 @@ assertTrue( all( abs_toa_n > 0 ) );
 assertElementsAlmostEqual( dt(:, 2:end) - d0(:, 2:end), repmat( abs_toa_n, 1, 19 ), 'absolute', 1e-15 );
 assertEqual( pt, pn );
 assertEqual( quadriga_lib.ssf_clusters( sn, tx_pos, rx_pos, lsp_n, rnd_n, '38.901', rnd_fn, [], [], abs_toa_n' ), dt );
+dqn = quadriga_lib.ssf_clusters( sn, tx_pos, rx_pos, lsp_n, rnd_n, 'quadriga', [], [], [], abs_toa_n );
+assertEqual( min( dqn(:, 2:end), [], 2 ), abs_toa_n );                         % 'quadriga': first NLOS cluster at abs_toa
+assert_throws( @() quadriga_lib.ssf_clusters( sn, tx_pos, rx_pos, lsp_n, rnd_n, 'quadriga' ), ...
+    'Method ''quadriga'' requires ''abs_toa''' );                                                    % C++
 
 %% Optional inputs: ground reflection (slot 2)
 sg = sp;
@@ -148,7 +152,7 @@ assert_throws( @() quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos, lsp ), 'Wrong 
 assert_throws( @() quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos, lsp, rnd, 'quadriga', [], [], [], [], [], [], ...
     [], [], 1 ), 'Wrong number of input arguments.' );
 assert_throws( @() out8( sp, tx_pos, rx_pos, lsp, rnd, 'quadriga' ), 'Wrong number of output arguments.' );
-msg_nc = 'Entries in ''n_cluster'' must be non-negative integers.';
+msg_nc = 'Entries in ''n_cluster'' must be non-negative integers below 2^53.';
 assert_throws( @() quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos, lsp, rnd, 'quadriga', [], [], [], [], [], [], ...
     [], [ 12; 6.5; 9; 12 ] ), msg_nc );
 assert_throws( @() quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos, lsp, rnd, 'quadriga', [], [], [], [], [], [], ...

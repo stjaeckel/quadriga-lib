@@ -116,7 +116,7 @@ seeds; N16 (GR power split) kept inside `quadriga`'s spread scaling. N6, N7, N9,
 | W10 | `NumClusters >= 1`; `NumClusters = 1` (N = 0) gives the LOS path only (full power, K ignored) plus the GR slot if enabled; the random-field sets are then empty. Maintainer decision. | NG has LOS-only files (`Freespace`, `LOSonly`, `Null`: NumClusters 1) and a LOS + GR file (`TwoRayGR`: 2 with GR, read with NumClusters − 1, 10.2); one rule serves them in all methods. | 3.0.9 |
 | W11 | `n_cluster` must lie in [min(max(1, `NumClusters_min` − 1), N), N], N = `NumClusters` − 1 (all 0 when N = 0). | Uses the TR range where the file states it (7.6.15), any count otherwise. | 3.0.6 |
 | W12 | Slots beyond `n_cluster(l)` get delay 0, power 0 and the LOS angles. | Every output element is written; zero-power entries with valid angles are harmless for consumers. | 3.0.6 |
-| W13 | Absolute TOA in NLOS scenarios only (TR 7.6-43/-44, all methods): TR methods add Δτ; `quadriga` shifts the NLOS delays to start at Δτ where `abs_toa(l) > 0`; `abs_toa` is ignored in LOS scenarios. | TR-literal; in a LOS scenario the shift would break the exact DS of `quadriga` (measured: DS ratio 1.00 → 1.10 for Δτ = 30 ns, K = 9 dB). NG applies the shift whenever an offset exists; `lsp_generate` returns 0 for the LOS files, so NG with v19 files is unaffected. | 3.3.3, 3.6 |
+| W13 | Absolute TOA in NLOS scenarios only (TR 7.6-43/-44, all methods): TR methods add Δτ; `quadriga` shifts the NLOS delays to start at Δτ. Changed after code review 1 (M1, maintainer decision): `quadriga` requires `abs_toa` in NLOS scenarios with `absTOA_mu > -30` (missing → `std::invalid_argument`, the NLOS clusters must start at the calibrated excess delay of TR 7.6.9, otherwise the origin `s·min(τ̃)` is arbitrary for few clusters and scatterers derived from the clusters can collapse onto the arrays) and then always shifts, also for Δτ = 0; NLOS scenarios without `absTOA_mu > -30` (legacy files) keep the shift only where `abs_toa(l) > 0`; `abs_toa` is ignored in LOS scenarios. TR methods unchanged (7.6.9 optional). | TR-literal; in a LOS scenario the shift would break the exact DS of `quadriga` (measured: DS ratio 1.00 → 1.10 for Δτ = 30 ns, K = 9 dB). NG applies the shift whenever an offset exists; `lsp_generate` returns 0 for the LOS files, so NG with v19 files is unaffected. | 3.3.3, 3.6 |
 | W14 | No special case for 1 or 2 NLOS clusters in `quadriga` (NG: fixed ±40.5°). | Fields work for any N; only the deprecated mmMAGIC file has N = 2. | 3.6 |
 | W15 | With GR the slot count grows by one; NG takes the GR slot from `NumClusters`. | D7 layout (0 LOS, 1 GR, then N): the number of NLOS clusters does not depend on the GR switch. | 2.3 |
 | W16 | `lsp_mu` is not an input of `ssf_clusters` (the plan lists it). | μ_lgZSD enters only 7.5-20, the ray ZOD spread (ray series). | 2.1 |
@@ -575,7 +575,7 @@ block; definition.
 | `rnd_freq` | required (F = 1) | required | ignored |
 | `lsp_anchor` | ignored | required | ignored |
 | `eod_offset_deg` | NLOS scenarios (μ_offset,ZOD = −value) | ignored (W6) | NLOS scenarios: mean over k (W5) |
-| `abs_toa` | NLOS scenarios: + Δτ | NLOS scenarios: + Δτ | NLOS scenarios: shift to Δτ if > 0 (W13) |
+| `abs_toa` | NLOS scenarios: + Δτ | NLOS scenarios: + Δτ | NLOS scenarios: shift to Δτ; required if `absTOA_mu > -30`, else only where > 0 (W13) |
 | `gr_eps_*` (`GR_enabled`) | TR 7.6.8 | TR 7.6.8 | NG split inside the scaling; output coefficient powers |
 | `o2i` | NLOS: mean ZOA 90° | ignored (W6) | ignored (W6) |
 | `n_cluster` | yes (also in C_φ, C_θ) | yes | yes |
@@ -597,7 +597,10 @@ results do not depend on the number of threads (each link is computed alone).
 
 TR methods, NLOS scenarios only: every active NLOS delay (all frequencies of n_fd) `+= abs_toa(l)` (7.6-43: τ_n +
 Δτ; the d3D/c of the equation is the LOS delay to which all output delays are relative). In LOS scenarios `abs_toa`
-is ignored (7.6-44/-44a have no Δτ; W13). `quadriga`: 3.6 step 10.
+is ignored (7.6-44/-44a have no Δτ; W13). `quadriga`: 3.6 step 10 (validation: `abs_toa` missing in an NLOS scenario
+with `absTOA_mu > -30` and N > 0 → `Method 'quadriga' requires 'abs_toa' in NLOS scenarios that define the absolute
+TOA ('absTOA_mu' > -30): the NLOS clusters start at the excess delay of TR 38.901 clause 7.6.9.`, checked after
+`abs_toa` itself).
 
 #### 3.3.4 Ground-reflection power (7.6.8)
 
@@ -608,6 +611,13 @@ GR power contract: 2.3. TR methods (7.6-32, no renormalisation, A14): `power(l, 
 LOS power is used only inside the DS and AS scaling (3.6 steps 5–7). Consumer contract: 2.3.
 
 #### 3.3.5 Documentation block (must state)
+
+Superseded after code review 1 by the documentation rules of the maintainer (binding): the MD block describes the
+API (data layout, ranges, units, defaults, user-triggerable errors) with a brief statement of what the function does
+and is for; no implementation details, formulas or derivations (they are source comments next to the code); brief
+references to the TR clauses and the 2019 paper; each fact once; the qualitative table and the consumer rule of 3.7
+in the C++ `ssf_clusters` block only; MEX and Python blocks do not re-expand. The original list follows for the
+record:
 
 Purpose and the three methods in one bullet each with their TR clause; the slot layout of 2.3 and n_slot; LOS
 condition (W1) and that NLOS gives zero LOS/GR power whatever `lsp` holds; units and conventions (delays relative to
@@ -747,12 +757,15 @@ changes are marked [D3].
    ```
 6. Delay scale per k (paper eq. (13), (14); NG closed form with GR), weights S_LOS, S_GR, P_n (sum 1):
    ```
-   no GR:  b = Σ_n P_n,k·τ̃_n,  c = Σ_n P_n,k·τ̃_n²;  s_k = (c - b² > 0) ? DS_k/sqrt(c - b²) : 1
+   no GR:  b = Σ_n P_n,k·τ̃_n,  c = Σ_n P_n,k·τ̃_n²;  s_k = (c - b² > 0) ? DS_k/sqrt(c - b²) : 0
    GR:     a = DS_k², B = S_GR,k·τ_GR², D = S_GR,k·τ_GR, c as above and e = Σ_n P_n,k·τ̃_n;
-           den = c - e²;  t = max(a·c - a·e² - B·c + B·e² + c·D², 0);  s_k = (den > 0) ? (sqrt(t) + D·e)/den : 1
+           den = c - e²;  t = max(a·c - a·e² - B·c + B·e² + c·D², 0);  s_k = (den > 0) ? (sqrt(t) + D·e)/den : 0
    s_τ = (1/F)·Σ_k s_k;   τ_n = s_τ·τ̃_n   [s]
    ```
    (With GR the delay spread cannot be smaller than the one of LOS + GR alone; t is then clamped at 0, as NG.)
+   Fallback 0 (code review 1, B1; was 1): s_k has the unit [s]; without spread of the τ̃ (one active cluster, equal
+   u) there is nothing to scale, and 1 gave delays of −ln(u) seconds (measured up to 708 s). With 0 the active
+   clusters are at delay 0 (then the abs-TOA shift of step 10).
 7. Angle scale per type x and frequency k (NG's iterative linear solve, D3). Angle set A = fixed-slot offsets of
    step 3 and the active ã^x_n; weights p̂ = (S_LOS,k, S_GR,k, P_n,k) (sum 1):
    ```
@@ -775,8 +788,9 @@ changes are marked [D3].
    eoa = efold(ε_A + b^EOA_n)                                     [D3: no satellite EoA fade]
    ```
    Slot 0 and the GR slot keep their geometric angles (3.0.3, 3.0.5); NG's rotation gives the same for them.
-10. Absolute TOA (W13), NLOS scenarios only: if `abs_toa` is given and `abs_toa(l) > 0`: `τ_n = τ_n − min_m τ_m +
-    abs_toa(l)` over the active clusters; ignored in LOS scenarios.
+10. Absolute TOA (W13), NLOS scenarios only: `τ_n = τ_n − min_m τ_m + abs_toa(l)` over the active clusters, where
+    `absTOA_mu > -30` always (`abs_toa` required), else only if `abs_toa` is given and `abs_toa(l) > 0`; ignored in
+    LOS scenarios. The shift is applied in `ssf_clusters` after the kernel, next to the TR methods' addition.
 11. Output: delays `[·, ·, 1]`: slot 0 → 0, GR → τ_GR, clusters → τ_n; coefficient powers per k (W7): slot 0
     K_k/(1 + K_k), GR slot K_k/(1 + K_k)·R²_k, clusters P_n,k; angles of step 9. No per-cluster shadowing (ζ unused), `rnd_freq` and `o2i` unused.
 
@@ -800,6 +814,23 @@ Properties to document (measured in the comparison study on UMi/UMa, 6 and 30 GH
   NLOS) and in the LOS ASA at moderate K (UMa LOS 0.61 vs 0.83).
 
 ### 3.7 Method × property table (for the `ssf_clusters` documentation, D2)
+
+After code review 1 (maintainer decision) the documentation carries this table without numbers, once, in the C++
+`ssf_clusters` block (the MEX and Python blocks refer to it); the method bullets then state only what each method is
+for:
+
+| Property | `"38.901"` | `"38.901_MF"` | `"quadriga"` |
+| --- | --- | --- | --- |
+| Continuous along tracks | no | NLOS only | yes |
+| Same delays and angles at all frequencies | one frequency | NLOS, or K the same at all frequencies | yes |
+| Output spreads equal the input spreads | no | no | DS, and AS below the caps, at one frequency |
+| Per-cluster shadowing | yes | yes, per frequency | no |
+| TR ZOD offset, O2I arrival elevation | both | neither | ZOD offset |
+
+Consumer rule (documented in the slot bullet): the LOS path is slot 0; consumers identify it by its slot, never by
+delay or path length (NLOS clusters of the TR methods can sit at delay 0).
+
+The measured table below stays in this working document only (unpublished numbers):
 
 | Property | `38.901` | `38.901_MF` | `quadriga` |
 |---|---|---|---|
@@ -959,7 +990,8 @@ fixture; the fixture avoids values within 1e-6 dB of the threshold).
 | `ssf_clusters - quadriga applies the LOS direction additively` | angles = wrap(centre + offset), efold for elevations, slot 0 and GR geometric; an EoD near the pole folds | `ref_qd`; 1e-12 |
 | `ssf_clusters - quadriga adds the EoD offset to the NLOS departures only` | NLOS scenario: δ = mean over frequencies; EoA, azimuths, LOS and GR slots unchanged; LOS scenario: output with the offset equals the output without it | difference exact to 1e-12 / bitwise |
 | `ssf_clusters - quadriga outputs coefficient powers with the ground reflection` | slot 0 K/(1+K), GR K/(1+K)·R², clusters summing to 1/(1+K) at every frequency; the scaling uses the split (checked through `ref_qd`); elevation centre (1 − ω)·EoD_L + ω·E_GR in LOS, EoD_L / EoA_L (ω = 0) in an NLOS scenario | typed; 1e-12 |
-| `ssf_clusters - quadriga shifts the NLOS delays to the absolute TOA only where it is positive` | NLOS scenario: abs_toa > 0: min NLOS delay = Δτ; abs_toa = 0 and omitted: no shift; LOS scenario: `abs_toa` ignored (output bitwise equal to omitted) | exact / 1e-15 |
+| `ssf_clusters - quadriga places the first NLOS cluster at the absolute TOA in NLOS scenarios` | v19 NLOS (`absTOA_mu > -30`): omitted → error; given: min NLOS delay = Δτ, also for Δτ = 0; `absTOA_mu = -100`: omitted → no shift, given → shift only where > 0; LOS scenario: `abs_toa` ignored (bitwise equal to omitted) | exact / 1e-15 |
+| `ssf_clusters - quadriga gives delay 0 to clusters without delay spread` (B1) | RMa NLOS and RMa LOS with K = 0, `n_cluster = 1`, GR off/on, 2 frequencies: active delay 0 (NLOS with abs TOA: Δτ) | exact |
 | `ssf_clusters - quadriga gives zero LOS power in NLOS scenarios` | K in lsp ignored | bitwise |
 | `ssf_clusters - quadriga is continuous along tracks` | UMi LOS and NLOS, 5 tracks × 20 m at 1 cm steps, LSPs and fields from the library along the track (`lsf_draw`, `lsp_generate`, `ssf_draw`): no event (angle > 10°, delay > DS/4, power > 3 dB, clusters within 20 dB of the strongest) | count 0 (study: 0 events) |
 | `ssf_clusters - quadriga is swap-reciprocal with dual-mobility fields` | `ssf_draw` with dual mobility at swapped positions, mirrored LSPs, offset 0, LOS and NLOS, heights 1.5/1.5 and 1.5/25 m | 1e-10 |
@@ -1237,13 +1269,23 @@ No parity test (D3). Delays, powers, DS, ASD, ASA unchanged except:
   at 35–100 m).
 - Smaller differences: GR adds a slot instead of taking one of `NumClusters` (W15, handled by the scenpar copy of
   10.2); no fixed angles for 1–2 NLOS
-  clusters (W14); no power sort when SC is off (W3); abs TOA shift only where Δτ > 0 (W13); 2D fields with floors
+  clusters (W14); no power sort when SC is off (W3); 2D fields with floors
   instead of 3D (new realisations); per-frequency EoD offset averaged (W5).
 
 Baseline path (`use_3GPP_baseline` → `38.901`): the TR angle mapping replaces NG's alternative mapping (N2), C_τ
 applied (N1), −25 dB removal (N5), ZOD offset (N4), N + 1 slots in LOS (N3), LOS power exactly 0 in NLOS; NG unit
 tests that inspect the old baseline angles (`testBuilder_SSF_generation*`, `3GPP_baseline_multifreq`) are rewritten
 against the library.
+
+- Absolute TOA (W13 as changed after code review 1): NG requests Δτ from `lsp_generate` (output `abs_toa`) and
+  passes it to `ssf_clusters` for `quadriga` in NLOS builders (required for files with `absTOA_mu > -30`). The NLOS
+  impulse responses then start Δτ after the LOS time instead of at the scale-dependent origin s·min(τ̃): a documented
+  change of NG's default output; the DS is unchanged (no LOS weight in NLOS). Legacy files without abs TOA keep the
+  unshifted delays.
+- Later scatterer series (ray level, FBS/LBS positions from the clusters): a cluster whose delay is short for its
+  angles (e.g. Δτ = 0 or a first cluster near the LOS delay with wide departure and arrival angles) has no scatterer
+  geometry that satisfies both; the series needs a minimum-distance guard (scatterers kept a minimum distance from
+  both arrays, the excess path length lower-bounded) so that they cannot collapse onto the arrays.
 
 ### 10.4 NG tests
 
