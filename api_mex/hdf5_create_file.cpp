@@ -20,6 +20,7 @@ Create a new HDF5 channel file with a custom storage layout
 - Storage layout is fixed at creation and cannot be altered later, except by reshaping while
   keeping the total slot count constant
 - Errors if the target file already exists; delete it first to recreate it
+- Files can be read by any HDF5 tool but must be modified only with quadriga-lib
 
 ## Usage:
 ```
@@ -59,10 +60,17 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nx == 0 || ny == 0 || nz == 0 || nw == 0)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'storage_dims' cannot contain zeros.");
 
-    // Fail if file already exists - hdf5_read_layout returns [0,0,0,0] if the file is missing
-    arma::u32_vec existing;
-    CALL_QD(existing = quadriga_lib::hdf5_read_layout(fn));
-    if (existing.at(0) != 0)
+    // Fail if the file exists: hdf5_read_layout returns zeros only for a missing file and throws for any other file
+    // it cannot read (files of older versions, other files, unreadable files)
+    bool exists = true;
+    try
+    {
+        exists = quadriga_lib::hdf5_read_layout(fn).at(0) != 0;
+    }
+    catch (const std::exception &)
+    {
+    }
+    if (exists)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "File already exists.");
 
     // Create file

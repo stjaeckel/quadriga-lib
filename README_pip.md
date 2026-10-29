@@ -11,6 +11,17 @@ pip install quadriga-lib
 Prebuilt wheels are available for Linux (x86_64 and aarch64, Python 3.9–3.13).
 On other platforms, pip will build from source (requires CMake and a C++17 compiler).
 
+## Channel files of quadriga-lib 0.12.4 and earlier
+
+The HDF5 channel files use file format version 3; files of version 2 (written by quadriga-lib 0.12.4 and
+earlier) are rejected. Convert them once with the script [hdf5_convert_v2.py](https://github.com/stjaeckel/quadriga-lib/blob/main/tools/hdf5_convert_v2.py)
+of the quadriga-lib sources:
+
+```
+pip install quadriga-lib h5py
+python hdf5_convert_v2.py old.hdf5 new.hdf5
+```
+
 ## Quick Start
 
 ```python

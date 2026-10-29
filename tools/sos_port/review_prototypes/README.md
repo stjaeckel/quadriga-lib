@@ -20,8 +20,8 @@ All prototypes gave output bit-identical to `qd_SOS_AVX2` / `qd_SOS_GENERIC` of 
 Build, with `LIB` pointing to a build of the library with AVX2 (gcc 12, as `make` uses):
 
 ```
-INC="-DARMA_DONT_USE_BLAS -DARMA_DONT_USE_LAPACK -DBUILD_WITH_AVX2=1 -I../../../include -I../../../src -I/usr/include/hdf5/serial"
-LNK="$LIB/libquadriga.a /usr/lib/x86_64-linux-gnu/hdf5/serial/libhdf5.so -lcurl -lcrypto -lz -lsz -lgomp -lpthread -ldl -lm"
+INC="-DARMA_DONT_USE_BLAS -DARMA_DONT_USE_LAPACK -DBUILD_WITH_AVX2=1 -I../../../include -I../../../src"
+LNK="$LIB/libquadriga.a -lgomp -lpthread -ldl -lm"
 g++-12 -std=gnu++17 -O3 -fopenmp -mavx2 -mfma $INC -c proto_avx2_tiled.cpp proto_avx2_named_acc.cpp
 g++-12 -std=gnu++17 -O3 -fopenmp $INC -c proto_generic_grouped.cpp
 g++-12 -std=gnu++17 -O3 -fopenmp $INC bench_variants.cpp proto_*.o -o bench_variants $LNK

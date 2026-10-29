@@ -8,14 +8,14 @@ Full documentation is available at [quadriga-lib.org](http://quadriga-lib.org).
 
 ## Package Contents
 
-| Folder / File    | Content                                                          |
-| :--------------- | :--------------------------------------------------------------- |
-| `include/`       | Public C++ header files (quadriga-lib and Armadillo)             |
-| `lib/`           | Static library (`quadriga.lib`) and HDF5 library (`libhdf5.lib`) |
-| `+quadriga_lib/` | Compiled MEX files and `.m` documentation for MATLAB             |
-| `wheels/`        | Prebuilt Python wheels for Windows (cp310–cp314)                 |
-| `html_docu/`     | Full offline API documentation                                   |
-| `LICENSE`        | Apache License, Version 2.0                                      |
+| Folder / File    | Content                                              |
+| :--------------- | :--------------------------------------------------- |
+| `include/`       | Public C++ header files (quadriga-lib and Armadillo) |
+| `lib/`           | Static library (`quadriga.lib`)                      |
+| `+quadriga_lib/` | Compiled MEX files and `.m` documentation for MATLAB |
+| `wheels/`        | Prebuilt Python wheels for Windows (cp310–cp314)     |
+| `html_docu/`     | Full offline API documentation                       |
+| `LICENSE`        | Apache License, Version 2.0                          |
 
 ---
 
@@ -60,9 +60,22 @@ pip install quadriga-lib
 
 ---
 
+## Channel files of quadriga-lib 0.12.4 and earlier
+
+The HDF5 channel files use file format version 3; files of version 2 (written by quadriga-lib 0.12.4 and
+earlier) are rejected. Convert them once with the script [hdf5_convert_v2.py](https://github.com/stjaeckel/quadriga-lib/blob/main/tools/hdf5_convert_v2.py)
+of the quadriga-lib sources (also for MATLAB users):
+
+```
+pip install quadriga-lib h5py
+python hdf5_convert_v2.py old.hdf5 new.hdf5
+```
+
+---
+
 ## C++ Integration
 
-The `include\` folder contains all public headers including the bundled Armadillo headers. Link against `lib\quadriga.lib` and `lib\libhdf5.lib` in your build system of choice.
+The `include\` folder contains all public headers including the bundled Armadillo headers. Link against `lib\quadriga.lib` in your build system of choice.
 
 ---
 

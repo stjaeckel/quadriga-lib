@@ -16,8 +16,9 @@ Create a new HDF5 channel file with a custom storage layout
 - Initializes a new HDF5 file for storing channel data
 - Defines a 4D storage layout `(nx, ny, nz, nw)`; each index combination maps to one channel slot
 - Typical dimension mapping: nx = BS, ny = UE, nz = frequency, nw = scenario/repetition
-- Storage layout is fixed at creation and cannot be changed afterwards
+- The total slot count is fixed at creation; the layout can be reshaped with [[hdf5_reshape_layout]]
 - Raises an error if the target file already exists; delete it first to recreate it
+- Files can be read by any HDF5 tool but must be modified only with quadriga-lib
 
 ## Usage:
 ```
@@ -41,9 +42,17 @@ MD!*/
 
 py::array_t<py::ssize_t> hdf5_create_file(const std::string &fn, unsigned nx, unsigned ny, unsigned nz, unsigned nw)
 {
-    // Fail if file already exists - hdf5_read_layout returns [0,0,0,0] if the file is missing
-    arma::u32_vec existing = quadriga_lib::hdf5_read_layout(fn);
-    if (existing.at(0) != 0)
+    // Fail if the file exists: hdf5_read_layout returns zeros only for a missing file and throws for any other file
+    // it cannot read (files of older versions, other files, unreadable files)
+    bool exists = true;
+    try
+    {
+        exists = quadriga_lib::hdf5_read_layout(fn).at(0) != 0;
+    }
+    catch (const std::exception &)
+    {
+    }
+    if (exists)
         throw std::invalid_argument("File already exists.");
 
     // Create file with the requested storage layout

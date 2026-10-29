@@ -1,8 +1,6 @@
 # This Makefile is for Linux / GCC environments
 
-# Set Armadillo and HDF5 sources
-# Internal HDF5 deactivates Python and Octave
-hdf5_internal = OFF
+# Set Armadillo sources
 arma_internal = OFF
 static_lib = ON
 shared_lib = OFF
@@ -44,7 +42,6 @@ all:
 		-D ENABLE_PYTHON=$(python) \
 		-D ENABLE_TESTS=OFF \
 		-D ARMA_EXT=$(arma_internal) \
-		-D HDF5_STATIC=$(hdf5_internal) \
 		-D ENABLE_AVX2=$(avx2) \
 		-D ENABLE_CUDA=$(cuda) \
 		-D ENABLE_STATIC_LIB=$(static_lib) \
@@ -60,7 +57,6 @@ python:
 		-D ENABLE_PYTHON=ON \
 		-D ENABLE_TESTS=OFF \
 		-D ARMA_EXT=$(arma_internal) \
-		-D HDF5_STATIC=OFF \
 		-D ENABLE_AVX2=$(avx2) \
 		-D ENABLE_CUDA=OFF \
 		-D ENABLE_STATIC_LIB=ON \
@@ -91,12 +87,12 @@ ifeq ($(matlab),ON)
 endif
 ifeq ($(python),ON)
 ifneq ($(PYTHON_SHARED_OBJ),)
-	python3 -m pytest tests/python_tests -x -s
+	PYTHONPATH=$(CURDIR)/lib python3 -m pytest tests/python_tests -x -s
 endif
 endif
 
 python_test: 
-	python3 -m pytest tests/python_tests -x -s
+	PYTHONPATH=$(CURDIR)/lib python3 -m pytest tests/python_tests -x -s
 
 # Documentation
 documentation:
@@ -245,6 +241,5 @@ tidy:   clean
 	- rm -rf lib
 	- rm -rf wheelhouse 
 	- rm -rf external/MOxUnit-master
-	- rm -rf external/hdf5-prebuilt
 	- rm -rf external/Catch2-prebuilt
 	

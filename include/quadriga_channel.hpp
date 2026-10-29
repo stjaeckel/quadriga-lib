@@ -185,9 +185,6 @@ namespace quadriga_lib
     };
     static_assert(sizeof(path) == 56, "path must be exactly 56 bytes");
 
-    // Function to obtain the HDF5 library version
-    std::string get_HDF5_version();
-
     // Returns type ID of a std::any field and allows low-level data access
     // - Optional parameter dims = Pointer to 3-element array to store the size of each dimension
     // - For strings, dims[0] contains the length of the string
@@ -225,12 +222,15 @@ namespace quadriga_lib
     // - All data is stored in single precision
     // - Data is added to the end of the file
     // - The index is updated to include to the newly written data
-    // - If file does not exist, a new file will be created with (nx = 65536, ny = 1, nz = 1, nw = 1)
+    // - If file does not exist, a new file will be created with (nx = 65536, ny = 1, nz = 1, nw = 1); an existing
+    //   file must be a version-3 channel file written by quadriga-lib (version-2 files are rejected)
     // - Returns 0 if new dataset was created, 1 if dataset was overwritten or modified
     // - Overwriting replaces the slot completely: the old structured data and all unstructured datasets of the slot
-    //   (also those written with hdf5_write_dset) are removed; the file does not shrink, use h5repack for that
+    //   (also those written with hdf5_write_dset) are removed; the file does not shrink; copy the channels into a new
+    //   file to reclaim the space
+    // - One writer per file at a time (no file locking)
     // - The switch "assume_valid" can be used to skip the data integrity check (for better performance)
-    // - Throws and error if the requested index in the file has not been reserved during hdf5_create
+    // - Throws an error if the requested index in the file has not been reserved during hdf5_create
     template <typename dtype>                              // Float or double
     int hdf5_write(const quadriga_lib::channel<dtype> *ch, // Channel object to write
                    std::string fn,                         // Filename of the HDF5 file
@@ -238,7 +238,7 @@ namespace quadriga_lib
                    unsigned iy = 0,                        // y-Index in the HDF file
                    unsigned iz = 0,                        // z-Index in the HDF file
                    unsigned iw = 0,                        // w-Index in the HDF file
-                   bool assume_valid = false);             // Swith to skip the data integrity check
+                   bool assume_valid = false);             // Switch to skip the data integrity check
 
     // Read the storage layout of channel data inside an HDF5 file
     // - Returns 4-element vector with storage layout in form: {nx, ny, nz, nw}
@@ -250,6 +250,7 @@ namespace quadriga_lib
     // Reshapes the storage layout inside an existing HDF5 file
     // - Total number of elements in the HDF5 file is fixed when calling hdf5_create
     // - Reshaping is possible only when the total number does not change (at most 4294967295 entries)
+    // - Throws if the file does not exist or is not a version-3 channel file; one writer per file at a time
     void hdf5_reshape_layout(std::string fn,   // Filename of the HDF5 file
                              unsigned nx,      // Number of x-entries in the storage layout (first dimension, e.g. for BSs)
                              unsigned ny = 1,  // Number of y-entries in the storage layout (second dimension, e.g. for UEs)
@@ -260,7 +261,9 @@ namespace quadriga_lib
     // - Returns empty channel object if channel ID does not exist
     // - All structured data is stored in single precision, but is converted to double in case if dtype = double
     // - Conversion to float or double is not done for unstructured data
-    // - Throws std::invalid_argument if the file is malformed (e.g. dataset sizes do not match the attributes)
+    // - Throws std::invalid_argument if the file is malformed or not a version-3 channel file (version-2 files are
+    //   rejected; files modified with other HDF5 tools are not supported and may be rejected); convert version-2
+    //   files with tools/hdf5_convert_v2.py
     template <typename dtype>                          // Read as float or double
     channel<dtype> hdf5_read_channel(std::string fn,   // Filename of the HDF5 file
                                      unsigned ix = 0,  // x-Index in the HDF file
@@ -274,6 +277,7 @@ namespace quadriga_lib
     // - Returns a std::any object, that can be further analyzed using the function quadriga_lib::any_type_id
     // - Returns empty std::any if there is no dataset at this location or under this name
     // - Scalar datasets are returned as scalars, 1D datasets as arma::Col (also with one element)
+    // - Throws if the file does not exist or is not a version-3 channel file
     std::any hdf5_read_dset(std::string fn,               // Filename of the HDF5 file
                             std::string par_name,         // Dataset name without the prefix (typically "par_")
                             unsigned ix = 0,              // x-Index in the HDF file
@@ -285,6 +289,7 @@ namespace quadriga_lib
     // Read names of the unstructured datasets from the HDF file
     // - Returns number of the unstructured datasets at the given location
     // - par_names will contain all dataset name without the prefix
+    // - Throws if the file does not exist or is not a version-3 channel file
     arma::uword hdf5_read_dset_names(std::string fn,                      // Filename of the HDF5 file
                                      std::vector<std::string> *par_names, // Output data
                                      unsigned ix = 0,                     // x-Index in the HDF file
@@ -303,6 +308,8 @@ namespace quadriga_lib
     // - Unsupported data types will cause an error
     // - The dataset is added to the slot, everything else in the slot is kept; an existing dataset of the same
     //   name causes an error (no overwrite)
+    // - Creates the file if it does not exist; an existing file must be a version-3 channel file
+    // - One writer per file at a time (no file locking)
     void hdf5_write_dset(std::string fn,               // Filename of the HDF5 file
                          std::string par_name,         // Dataset name without the prefix (typically "par_")
                          const std::any *par_data,     // Data to be written

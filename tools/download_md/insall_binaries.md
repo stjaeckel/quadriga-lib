@@ -36,6 +36,6 @@ pip install quadriga-lib
 <br>
 
 **C++ Integration**<br>
-- The binary packages include public header files (in `include/`) and static libraries (in `lib/`). Link against `quadriga.lib` (or `libquadriga.a` on Linux) and `libhdf5` in your build system of choice. The bundled <a target="_blank" rel="noopener noreferrer" href="https://arma.sourceforge.net">Armadillo</a> headers are included.
+- The binary packages include public header files (in `include/`) and static libraries (in `lib/`). Link against `quadriga.lib` (or `libquadriga.a` on Linux) in your build system of choice. The bundled <a target="_blank" rel="noopener noreferrer" href="https://arma.sourceforge.net">Armadillo</a> headers are included.
 
 SECTION_DESC!*/

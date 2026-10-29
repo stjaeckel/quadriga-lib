@@ -111,7 +111,7 @@ pip install quadriga-lib
  
 <b>C++ Integration</b><br> 
 <ul>
-<li>The binary packages include public header files (in <code>include/</code>) and static libraries (in <code>lib/</code>). Link against <code>quadriga.lib</code> (or <code>libquadriga.a</code> on Linux) and <code>libhdf5</code> in your build system of choice. The bundled <a target="_blank" rel="noopener noreferrer" href="https://arma.sourceforge.net">Armadillo</a> headers are included.</li>
+<li>The binary packages include public header files (in <code>include/</code>) and static libraries (in <code>lib/</code>). Link against <code>quadriga.lib</code> (or <code>libquadriga.a</code> on Linux) in your build system of choice. The bundled <a target="_blank" rel="noopener noreferrer" href="https://arma.sourceforge.net">Armadillo</a> headers are included.</li>
 </ul>
 <hr class="greyline"><br>
 <span id="904e3979" class="qd-section"><b>Installation from Source</b></span><br>
@@ -124,7 +124,7 @@ pip install quadriga-lib
 <li>Install the required packages (octave-dev is only needed if you want to use Octave):</li>
 </ul>
 <pre>
-sudo apt install bzip2 gcc git make cmake g++ libhdf5-dev python3-dev python3-pytest python3-numpy python3-pip python3-venv octave-dev
+sudo apt install bzip2 gcc git make cmake g++ python3-dev python3-pytest python3-numpy python3-pip python3-venv octave-dev
 </pre>
 <ul>
 <li>Get Quadriga-Lib either from Github or <a target="_blank" rel="noopener noreferrer" href="http://quadriga-lib.org">quadriga-lib.org</a></li>
@@ -171,7 +171,7 @@ chmod +x Miniconda3-latest-Linux-x86_64.sh
 </ul>
 <pre>
 conda deactivate
-conda create --name quadriga-lib -c conda-forge python=3.14 numpy pandas jupyterlab seaborn pytest scipy jupyterlab_widgets ipywidgets traittypes jupyter compilers make cmake hdf5 octave
+conda create --name quadriga-lib -c conda-forge python=3.14 numpy pandas jupyterlab seaborn pytest scipy jupyterlab_widgets ipywidgets traittypes jupyter compilers make cmake octave h5py
 conda activate quadriga-lib
 </pre>
 <ul>
