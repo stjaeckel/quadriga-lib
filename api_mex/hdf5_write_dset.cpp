@@ -16,7 +16,8 @@ Write a single unstructured dataset to an HDF5 file
 
 - Dataset is stored under `prefix + name` at slot `(ix, iy, iz, iw)`
 - `name` must contain only alphanumeric characters and underscores
-- The file must already exist (use [[hdf5_create_file]] first)
+- The file must already exist (use [[hdf5_create_file]] first) and be a quadriga-lib channel file of
+  version 3 (see [[hdf5_read_channel]])
 - A dataset of the same name at the same slot is not overwritten; an error is thrown instead
 - The dataset is added to the slot; everything else stored there is kept. A later [[hdf5_write_channel]] to the
   same slot replaces the slot completely, including the datasets written with this function
@@ -24,6 +25,7 @@ Write a single unstructured dataset to an HDF5 file
   types: single, double, int32, uint32, int64, uint64
 - Arrays with more than 3 dimensions, sparse and complex arrays are rejected
 - Row vectors are stored as given (`[1, n]`)
+- One writer per file at a time; files are not locked
 
 ## Usage:
 ```

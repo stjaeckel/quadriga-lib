@@ -8,14 +8,14 @@ Full documentation is available at [quadriga-lib.org](http://quadriga-lib.org).
 
 ## Package Contents
 
-| Folder / File    | Content                                                          |
-| :--------------- | :--------------------------------------------------------------- |
-| `include/`       | Public C++ header files (quadriga-lib and Armadillo)             |
-| `lib/`           | Static library (`quadriga.lib`) and HDF5 library (`libhdf5.lib`) |
-| `+quadriga_lib/` | Compiled MEX files and `.m` documentation for MATLAB             |
-| `wheels/`        | Prebuilt Python wheels for Windows (cp310–cp314)                 |
-| `html_docu/`     | Full offline API documentation                                   |
-| `LICENSE`        | Apache License, Version 2.0                                      |
+| Folder / File    | Content                                              |
+| :--------------- | :--------------------------------------------------- |
+| `include/`       | Public C++ header files (quadriga-lib and Armadillo) |
+| `lib/`           | Static library (`quadriga.lib`)                      |
+| `+quadriga_lib/` | Compiled MEX files and `.m` documentation for MATLAB |
+| `wheels/`        | Prebuilt Python wheels for Windows (cp310–cp314)     |
+| `html_docu/`     | Full offline API documentation                       |
+| `LICENSE`        | Apache License, Version 2.0                          |
 
 ---
 
@@ -62,7 +62,7 @@ pip install quadriga-lib
 
 ## C++ Integration
 
-The `include\` folder contains all public headers including the bundled Armadillo headers. Link against `lib\quadriga.lib` and `lib\libhdf5.lib` in your build system of choice.
+The `include\` folder contains all public headers including the bundled Armadillo headers. Link against `lib\quadriga.lib` in your build system of choice.
 
 ---
 

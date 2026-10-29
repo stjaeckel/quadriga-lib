@@ -14,10 +14,14 @@ Write one or more channel objects to an HDF5 file
 
 - Writes a struct array of channels into 4D slots (one slot per array element)
 - Optional unstructured data can be passed as a matching struct array
-- Creates the file with a sensible default layout if it does not yet exist; appends to existing files otherwise
-- A warning is issued if any selected slot already contains data. That slot is replaced completely: its old
-  structured data and all its unstructured datasets (also those written with [[hdf5_write_dset]]) are removed.
-  The file does not shrink; use `h5repack` to reclaim the space of the removed data
+- Creates the file with a sensible default layout if it does not yet exist; an existing file must be
+  a quadriga-lib channel file of version 3 (files of quadriga-lib 0.12.4 and earlier are rejected,
+  see [[hdf5_read_channel]])
+- A warning is issued if any selected slot already contains data. That slot is replaced completely:
+  its old structured data and all its unstructured datasets (also those written with
+  [[hdf5_write_dset]]) are removed. The file does not shrink; copy the channels into a new file to
+  reclaim the space of the removed data
+- One writer per file at a time; files are not locked
 - Structured data is stored in single precision regardless of MATLAB input precision
 - Unstructured datasets retain their MATLAB type and shape (see [[hdf5_write_dset]])
 - Each scalar location input is broadcast to all `numel(chan)` channels; each vector input must have exactly `numel(chan)` elements

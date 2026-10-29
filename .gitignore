@@ -9,7 +9,6 @@ external/armadillo-*/
 external/MOxUnit-master/
 external/pugixml-*/
 external/Catch2-*/
-external/hdf5-*/
 external/pybind11-*/
 release/
 html_docu/releases/

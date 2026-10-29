@@ -15,6 +15,8 @@ Read a single unstructured dataset from an HDF5 file
 - Reads a user-defined dataset stored under `prefix + name` (e.g. `"par_carrier_frequency"`)
 - Type and shape of the returned data are determined by the dataset's HDF5 dataspace
 - Returns an empty `[]` matrix if the dataset does not exist at the requested slot
+- Errors if the file does not exist or is not a quadriga-lib channel file of version 3 (see
+  [[hdf5_read_channel]])
 - Supported types: string, scalar, vector (row or column), 2D matrix, and 3D array; numeric element 
   types: single, double, int32, uint32, int64, uint64
 

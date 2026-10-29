@@ -16,6 +16,8 @@ Read the names of unstructured datasets from an HDF5 file
 - Lists all unstructured datasets stored at the slot addressed by the 0-based indices `(ix, iy, iz, iw)`
 - Datasets are identified by the `par_` prefix; the returned names have that prefix stripped
 - Returns an empty list if no unstructured datasets are present at the slot
+- Errors if the file does not exist or is not a quadriga-lib channel file of version 3 (see
+  [[hdf5_read_channel]])
 
 ## Usage:
 ```

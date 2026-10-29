@@ -13,8 +13,8 @@
 // timed. After writing, the file is flushed to disk (fsync, timed separately) and its page cache is dropped
 // (posix_fadvise, Linux only), so the reads come from disk.
 //
-// Compile (add the HDF5 library only if quadriga-lib was built with it):
-// g++-12 -std=c++17 -O3 -fopenmp -I/sjc/quadriga-lib/include -o benchmark_hdf5 benchmark_hdf5.cpp /sjc/quadriga-lib/lib/libquadriga.a [-L/usr/lib/x86_64-linux-gnu/hdf5/serial -lhdf5]
+// Compile:
+// g++-12 -std=c++17 -O3 -fopenmp -I/sjc/quadriga-lib/include -o benchmark_hdf5 benchmark_hdf5.cpp /sjc/quadriga-lib/lib/libquadriga.a
 //
 // Usage: benchmark_hdf5 [-d <dir>] [-m a|b|both] [-s <scale>] [-k]
 //   -d  output directory on a disk, not a RAM file system (default: current directory)

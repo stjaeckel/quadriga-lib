@@ -38,7 +38,6 @@ override_dh_auto_configure:
 		-DENABLE_AVX2=ON \
 		-DENABLE_CUDA=OFF \
 		-DENABLE_TESTS=ON \
-		-DHDF5_STATIC=OFF \
 		-DARMA_EXT=OFF
 
 	# --- Build 2: gcc11 (MATLAB MEX + static lib only) ---
@@ -56,7 +55,6 @@ override_dh_auto_configure:
 		-DENABLE_AVX2=ON \
 		-DENABLE_CUDA=OFF \
 		-DENABLE_TESTS=OFF \
-		-DHDF5_STATIC=OFF \
 		-DARMA_EXT=OFF
 
 # ---------------------------------------------------------------------------
@@ -89,7 +87,7 @@ override_dh_auto_install:
 # Exclude Octave .mex files — liboctinterp.so lives in a non-standard path
 # that dpkg-shlibdeps cannot find, and octave is Suggests (not Depends) so
 # we don't want a hard runtime dep generated anyway.
-# All real runtime deps (libgomp, libhdf5, libstdc++) are covered by the
+# All real runtime deps (libgomp, libstdc++) are covered by the
 # Python module and libquadriga.so which are scanned normally.
 override_dh_shlibdeps:
 	dh_shlibdeps -Xmexa64 -Xmex

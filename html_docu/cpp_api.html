@@ -145,7 +145,6 @@
   <tr><td><a href="#baseband_freq_response">baseband_freq_response</a></td><td>Compute the baseband frequency response of a MIMO channel</td></tr>
   <tr><td><a href="#baseband_freq_response_multi">baseband_freq_response_multi</a></td><td>Compute the wideband frequency response of a MIMO channel with frequency-dependent coefficients</td></tr>
   <tr><td><a href="#baseband_freq_response_vec">baseband_freq_response_vec</a></td><td>Compute the baseband frequency response of multiple MIMO channels</td></tr>
-  <tr><td><a href="#get_HDF5_version">get_HDF5_version</a></td><td>Return the HDF5 version string as defined by the compile-time header macros</td></tr>
   <tr><td><a href="#hdf5_create">hdf5_create</a></td><td>Create a new HDF5 channel file with a defined storage layout</td></tr>
   <tr><td><a href="#hdf5_read_channel">hdf5_read_channel</a></td><td>Read a channel object from an HDF5 file at a specified 4D index</td></tr>
   <tr><td><a href="#hdf5_read_dset">hdf5_read_dset</a></td><td>Read an unstructured dataset from an HDF5 file at a specified 4D index</td></tr>
@@ -2273,21 +2272,6 @@ void quadriga_lib::baseband_freq_response_vec(
 </ul>
 
 <hr class="greyline"><br>
-<span id="get_HDF5_version" class="qd-func"><b>get_HDF5_version</b></span><br>
-<hr class="thin">
-Return the HDF5 version string as defined by the compile-time header macros
-<br><br>
-<b>Declaration:</b><br>
-<pre>
-std::string quadriga_lib::get_HDF5_version();
-</pre>
-
-<b>Returns:</b><br>
-<ul>
-<li>Version string in the format <code>"x.y.z"</code>, e.g., <code>"1.12.2"</code></li>
-</ul>
-
-<hr class="greyline"><br>
 <span id="hdf5_create" class="qd-func"><b>hdf5_create</b></span><br>
 <hr class="thin">
 Create a new HDF5 channel file with a defined storage layout
@@ -2297,6 +2281,7 @@ Create a new HDF5 channel file with a defined storage layout
 <li>Typical dimension mapping: x = BS, y = UE, z = frequency, w = scenario/repetition.</li>
 <li>Layout can be reshaped later with <a href="#hdf5_reshape_layout">hdf5_reshape_layout</a> if the total slot count stays constant.</li>
 <li>The total slot count <code>nx × ny × nz × nw</code> must not exceed 4294967295 (2^32 - 1); larger layouts throw before the file is created.</li>
+<li>Files use the quadriga-lib channel file format version 3, an HDF5 file readable by any HDF5 reader (h5py, MATLAB, HDFView). Modify files only with the quadriga-lib functions: files changed by other HDF5 tools are not supported and may be rejected.</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -2329,11 +2314,11 @@ void quadriga_lib::hdf5_create(
 <hr class="thin">
 Read a channel object from an HDF5 file at a specified 4D index
 <ul>
-<li>Returns an empty channel object (<code>no_snapshots == 0</code>) if the slot contains no valid data.</li>
+<li>Returns an empty channel object (<code>n_snap() == 0</code>) if the slot is empty or outside the layout.</li>
 <li>Structured data is stored in single precision in the file and converted to <code>dtype</code> on read.</li>
 <li>Unstructured fields (<code>std::any</code>) retain their original stored type without conversion; see <a href="#hdf5_read_dset">hdf5_read_dset</a> for the returned types.</li>
 <li>Round trip with <a href="#hdf5_write">hdf5_write</a>: every per-snapshot field comes back with one entry per snapshot, also for snapshots without paths (empty entries keep their shape); a channel written without <code>center_frequency</code> comes back with an empty <code>center_frequency</code>; empty <code>tx_orientation</code> / <code>rx_orientation</code> come back as <code>[3, 1]</code> zeros.</li>
-<li>Throws <code>std::invalid_argument</code> if the file is malformed, e.g. if a dataset does not have the size given by the attributes of the channel, or a required dataset or attribute is missing.</li>
+<li>Throws <code>std::invalid_argument</code> if the file is malformed (e.g. a dataset does not have the size given by the attributes of the channel, or a required dataset or attribute is missing) or is not a channel file of version 3 written by quadriga-lib: files written by quadriga-lib 0.12.4 and earlier (version 2) are rejected; files modified with other HDF5 tools are not supported and may be rejected.</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -2375,8 +2360,9 @@ Read an unstructured dataset from an HDF5 file at a specified 4D index
 <li>Returns an empty <code>std::any</code> if the dataset does not exist at the specified slot or name.</li>
 <li>Use <a href="#any_type_id">any_type_id</a> to determine the contained type and obtain a raw pointer.</li>
 <li>Returned types: a scalar dataset gives a scalar; a 1D dataset an <code>arma::Col</code>, also when it has a single element; a 2D dataset an <code>arma::Mat</code>; a 3D dataset an <code>arma::Cube</code>. An <code>arma::Row</code> written with <a href="#hdf5_write_dset">hdf5_write_dset</a> therefore comes back as an <code>arma::Col</code>.</li>
-<li>Element types: float, double, 32- and 64-bit signed and unsigned integers. Datasets of other types or with more than 3 dimensions are returned as empty <code>std::any</code>.</li>
-<li>Strings: fixed-length strings are returned without trailing NUL characters (an empty string written by <a href="#hdf5_write_dset">hdf5_write_dset</a> comes back empty); variable-length strings (the default of h5py and MATLAB) are supported.</li>
+<li>Element types: float, double, 32- and 64-bit signed and unsigned integers.</li>
+<li>Strings are returned without trailing NUL characters (an empty string written by <a href="#hdf5_write_dset">hdf5_write_dset</a> comes back empty).</li>
+<li>Throws if the file does not exist or is not a channel file of version 3 (see <a href="#hdf5_read_channel">hdf5_read_channel</a>).</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -2419,6 +2405,7 @@ std::any quadriga_lib::hdf5_read_dset(
 Read names of unstructured datasets stored at a 4D slot in an HDF5 file
 <ul>
 <li>Finds all datasets whose HDF5 name starts with <code>prefix</code> at slot <code>(ix, iy, iz, iw)</code>; returned names exclude the prefix.</li>
+<li>Throws if the file does not exist or is not a channel file of version 3 (see <a href="#hdf5_read_channel">hdf5_read_channel</a>).</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -2461,7 +2448,7 @@ arma::uword quadriga_lib::hdf5_read_dset_names(
 Read the storage layout of an HDF5 channel file
 <ul>
 <li>Returns <code>{nx, ny, nz, nw}</code> describing the 4D slot grid of the file.</li>
-<li>Returns <code>{0, 0, 0, 0}</code> if the file does not exist; throws if the file exists but is not a valid HDF5 file.</li>
+<li>Returns <code>{0, 0, 0, 0}</code> if the file does not exist; throws if the file exists but is not a channel file of version 3 (see <a href="#hdf5_read_channel">hdf5_read_channel</a>).</li>
 <li><code>channelID</code> entries are <code>0</code> for empty slots; length equals <code>nx × ny × nz × nw</code> (serialized linear index).</li>
 </ul>
 
@@ -2496,6 +2483,8 @@ Reshape the 4D storage layout of an existing HDF5 channel file
 <ul>
 <li>Updates <code>{nx, ny, nz, nw}</code> of an existing file; total slot count <code>nx × ny × nz × nw</code> must remain unchanged.</li>
 <li>Throws if the new layout violates the total-count constraint or has more than 4294967295 (2^32 - 1) slots.</li>
+<li>Throws if the file does not exist or is not a channel file of version 3 (see <a href="#hdf5_read_channel">hdf5_read_channel</a>).</li>
+<li>One writer per file at a time; files are not locked.</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -2529,13 +2518,14 @@ void quadriga_lib::hdf5_reshape_layout(
 Write a channel object to an HDF5 file at a specified 4D index
 <ul>
 <li>Writes a <code>quadriga_lib::channel&lt;dtype&gt;</code> object to slot <code>(ix, iy, iz, iw)</code> in the HDF5 file.</li>
-<li>Creates the file with default layout <code>(65536 × 1 × 1 × 1)</code> if it does not exist; appends to existing files.</li>
-<li>If the slot already holds data, the slot is replaced completely: the old structured data and all unstructured datasets of the slot (<code>par_*</code>, including those added with <a href="#hdf5_write_dset">hdf5_write_dset</a>) are removed, and only the new channel is stored there. HDF5 does not reuse the space of the removed data: the file does not shrink; use <code>h5repack</code> to reclaim the space.</li>
+<li>Creates the file with default layout <code>(65536 × 1 × 1 × 1)</code> if it does not exist; an existing file must be a channel file of version 3 written by quadriga-lib (files of quadriga-lib 0.12.4 and earlier are rejected, see <a href="#hdf5_read_channel">hdf5_read_channel</a>).</li>
+<li>If the slot already holds data, the slot is replaced completely: the old structured data and all unstructured datasets of the slot (<code>par_*</code>, including those added with <a href="#hdf5_write_dset">hdf5_write_dset</a>) are removed, and only the new channel is stored there. The space of the removed data is not reused, so the file does not shrink; to reclaim it, copy the channels into a new file (<a href="#hdf5_read_channel">hdf5_read_channel</a>, <a href="#hdf5_write">hdf5_write</a>).</li>
 <li>Throws if the index was not reserved during <a href="#hdf5_create">hdf5_create</a>.</li>
 <li>Structured data is always stored in single precision; input may be float or double.</li>
 <li>Unstructured data: supported types are string, double, float, (u)int32, (u)int64; up to 3D; storage order preserved.</li>
 <li>Set <code>assume_valid = true</code> to skip integrity validation (faster but unsafe for potentially corrupted data).</li>
 <li>The channel name is stored with at most 255 characters.</li>
+<li>One writer per file at a time; files are not locked. Reading is safe while no one writes; different files can be read and written from parallel threads.</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -2584,6 +2574,8 @@ Write a single unstructured dataset to an HDF5 file at a specified 4D index
 <li><code>arma::Row</code> is converted to <code>arma::Col</code> before writing.</li>
 <li>Throws for unsupported types and invalid names, before the file is changed.</li>
 <li>Throws if a dataset with the same name already exists at the specified slot; no overwrite/update is supported.</li>
+<li>One writer per file at a time; files are not locked.</li>
+<li>Creates the file with the default layout of <a href="#hdf5_create">hdf5_create</a> if it does not exist; an existing file must be a channel file of version 3 (see <a href="#hdf5_read_channel">hdf5_read_channel</a>).</li>
 </ul>
 
 <b>Declaration:</b><br>

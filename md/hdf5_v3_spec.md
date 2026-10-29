@@ -358,7 +358,7 @@ chunks holding only Continuation messages and the tail; body 16380 = 819 entries
   chunk without free space is full and its last entry points to the next directory chunk; every other entry points
   to a link chunk. Chunk 0 holds up to 15 link-chunk entries, each directory chunk 818. Entries are read in order;
   each must start at or after the end of the chunk named by the previous entry (4.1 rule 3).
-- Link chunk `k` (counted from 0 over all link chunks) has body `min(1024 · 2^k, 16384)`. A new link is appended to
+- Link chunk `k` (counted from 0 over all link chunks) has body `min(1024 · 2^k, 8192)`. A new link is appended to
   the last link chunk if it fits (`L ≤ F`, tail rule for the rest); otherwise a new link chunk is created in the
   block (with the link and the tail), and its directory entry is inserted in place (3.7, step 3).
 - Link chunks and directory chunks lie in the file in creation order (increasing addresses), and every root link is
@@ -372,20 +372,25 @@ chunks holding only Continuation messages and the tail; body 16380 = 819 entries
   group names" for every file written by the library, without reading `Order`. ID > 2^32 − 1 throws
   `std::runtime_error("No free channel ID left in the HDF5 file.")`.
 
-Costs (chunk bodies of 16 KB; lookup3 ≈ 0.35 ms/MB): at 20 000 channels the links (≈ 28 bytes each) fill ≈ 40 link
-chunks; a write reads chunk 0, all directory chunks (one below ≈ 480 000 links) and the last link chunk, i.e.
-≤ 34 KB (directory and link chunks are read directly, 3.6; `open` adds the 64 KiB header-window loads for root
-chunk 0 and the root dataset headers), and rewrites one chunk. At 10^6 channels: 3 directory chunks; a write reads
-≈ 66 KB and checksums ≈ 82 KB (≈ 30 µs); an overwrite additionally reads one link chunk. A chain without directory would read all ≈ 28 MB of root links per write at
-10^6 channels. libhdf5 reads such root groups correctly and fast (10^6 links: H5Fopen 1 ms, first lookup by name
-0.2 s, iteration 0.4 s; 7116 continuation chunks tested).
+Costs (implemented constants: link chunks up to 8 KB, 16 KiB header window; lookup3 ≈ 0.35 ms/MB): link chunk 0
+holds 41 links, root chunk 0's 15 link chunks ≈ 3900 links; at 20 000 channels the links (≈ 28 bytes each) fill
+≈ 72 link chunks (15 from chunk 0, the rest from one directory chunk); at 10^6 channels ≈ 3400 link chunks in 5 directory chunks. A
+write reads chunk 0 (through the header window), all directory chunks and the last link chunk (directly, 3.6),
+validates them (decoding every link of the link chunks it reads, 4.1 rule 8) and rewrites one link chunk (≤ 8 KB) or
+one directory chunk; an overwrite additionally reads and rewrites the old link's chunk. Measured with the
+implementation (10^5-slot file, minimal channels: 1 snapshot, SISO, 1 path, float; ≈ 25 system calls per write):
+write 74–75 µs, overwrite 99–100 µs, read 26–27 µs per call (open to close). Of the variants tried, 8 KB link chunks
+and a 16 KiB window were fastest together (16 KB / 64 KiB: 88–90 / 120–124 / 38 µs). A chain without directory would
+read all ≈ 28 MB of root links per write at 10^6 channels. libhdf5 reads such root groups correctly and fast (10^6
+links: H5Fopen 1 ms, first lookup by name 0.2 s, iteration 0.4 s; 7116 continuation chunks tested).
 
 ### 3.5 Writer data flow
 
 All functions that change a file first read and validate everything they will need or modify (superblock, root,
 the slot's entries, directory and link chunks, channel and `Data` headers) and validate the inputs, then emit the
-block (3.2) and perform the remaining writes of 3.7 without reading again. A malformed file therefore throws `std::invalid_argument` before it
-is changed. When the same chunk is changed twice (e.g. the new root link and the removed old link are in the same
+block (3.2) and perform the remaining writes of 3.7 without reading again. Each writer reads only what it needs
+(listed in 8.2 item 6); a malformed part that it reads throws `std::invalid_argument` before the file is changed,
+parts it does not read are not validated (the read functions validate them when they read them). When the same chunk is changed twice (e.g. the new root link and the removed old link are in the same
 link chunk), the second rewrite starts from the image after the first change.
 
 The file is opened unbuffered (`setvbuf(f, nullptr, _IONBF, 0)`), so every write reaches the operating system in
@@ -397,12 +402,20 @@ against power loss (as libhdf5 and v2).
 Reads whose length is known in advance go directly into their destination: the superblock, contiguous data (always
 > 4096 bytes, 2.6), continuation chunks (length from the Continuation message, so also directory and link chunks),
 `Order`/`ChannelRef`/`ChannelDims` data and entries. Only chunk 0 of an object header, whose size is known only after
-its prefix, is read through a 64 KiB window in the file handle: a header read that is not inside the window loads
-`[addr, addr + 64 KiB)` (limited to the file size) and copies from it. Within a channel block the reader visits a
-snapshot's datasets in link order, i.e. in increasing addresses, so consecutive header reads hit the window.
+its prefix, is read through a 16 KiB window in the file handle (`file::read_header`): a header read that is not
+inside the window loads `[addr − 4 KiB, addr + 12 KiB)` (start at 0 at the most; limited to the file size; for a
+header longer than 12 KiB the window starts at `addr`) and copies from it; a header read longer than the window goes
+directly into its destination. The 4 KiB look-back serves the post-order layout: a snapshot group header lies after
+its datasets and is read first, so the following dataset headers (before it) are mostly inside the same window.
+Within a snapshot the reader visits the datasets in link order, i.e. in increasing addresses, so consecutive header
+reads hit the window. (Measured, scale 0.3, mix b reads: a forward window 2.37 s, with the look-back 1.91 s together
+with the allocation-free datatype decoding of 2.5, which alone gave 2.15 s; mix a unchanged.)
 Contiguous float data is read straight into the Armadillo memory (`dtype = float`) or through one float buffer per
 dataset (`dtype = double`). Any write drops the window. (A 1 MiB centered window was measured to cost 80–370 µs per
-load and about four loads per call; the 64 KiB forward window costs 6–26 µs.)
+load and about four loads per call. A 64 KiB window made mix-a reads slower than v2, because each header of a 51 KB
+MIMO coefficient dataset loaded 64 KiB of mostly coefficient data; 16 KiB and 8 KiB were equal within noise.)
+Every direct read and write (`file::read`, `file::write`) is issued in pieces of at most 1 GiB: the Windows C runtime
+rejects single `fread`/`fwrite` calls above 2 GiB (libhdf5 caps its I/O calls for the same reason).
 
 ### 3.7 Update order and interrupted writes
 
@@ -447,37 +460,51 @@ that needs the damaged chunk throws `std::invalid_argument`. A torn superblock m
 ### 4.1 Rules (D4, D6)
 
 Applied by every function to everything it reads; all violations throw `std::invalid_argument`.
-0. Superblock, in this order: file ≥ 8 bytes and signature (else `Not an HDF5 file.`), version byte = 2 (else
-   unsupported, 4.2), then the remaining fields of 2.1 and the checksum.
+0. Superblock, in this order: file ≥ 8 bytes and signature (else `Not an HDF5 file.`); file ≥ 48 bytes (else
+   `Malformed … the superblock is truncated`); version 2, offset and length sizes 8, base address 0, extension
+   `UNDEF` (else `Unsupported`, 4.2); consistency flags 0 or 1 (else `Malformed … unknown superblock flags`); checksum;
+   `48 < EOF ≤ file size`; `48 ≤ root < EOF`.
 1. Bounds: every address and length is checked against EOF before anything is read or allocated, in the
    overflow-safe form `length ≤ EOF && addr ≥ 48 && addr ≤ EOF − length`; `addr + length` is never computed before
    this check (`UNDEF` is an ordinary value in the file). The same form is used by `file::read` (against the file
    size) and for every `offset + size` inside a chunk image. Products are checked as `a != 0 && b > max / a`, without
    builtins. EOF ≤ file size.
 2. Checksums: superblock and every chunk read (also by writers) are verified.
-3. Chunks: chunk-0 size-field width code 0 or 1; every chunk (chunk 0 and continuation) has a body ≤ 65535, i.e. a
+3. Chunks: chunk 0 is checked in the order signature `OHDR` and version 2, flags (bits 2–7 = 0 and width code 0
+   or 1, else `Malformed … unsupported object header flags` — checked before the size field is read, because a header
+   with the "times stored" flag, which libhdf5 writes for every object it creates, has the size field at another
+   offset), size field, bounds (rule 1), checksum; every chunk (chunk 0 and continuation) has a body ≤ 65535, i.e. a
    chunk image of at most 65543 bytes and a continuation length in `[8, 65543]` (else `Malformed`); messages must fit the body; 1–3 trailing bytes
    are the gap; a gap together with a NIL message is rejected. Continuation chunks are read in the order their
    Continuation messages are found (queue); each must start at or after the end of the chunk read before it. This rules out cycles and repeated chunks and bounds the bytes read per header by the file
    size.
 4. Messages: only the types of 2.4; Link Info version 0 with flags 0 or 3 and fractal heap / name index `UNDEF`
-   (dense storage → rejected); Group Info version 0, flags 0; Link version 1, hard links only (flags bits 3, 4 = 0);
+   (dense link storage, in any group: root, channel or `Data` → `Unsupported HDF5 file`); Group Info version 0, flags 0; Link version 1, hard links only (flags bits 3, 4 = 0);
    Attribute version 3 with flags 0; Dataspace version 2, flags 0, type scalar with rank 0 or simple with rank 1–3;
    Datatype as in 2.5; Fill Value version 3 (content ignored); Data Layout version 3, class compact or contiguous
    (chunked/virtual → rejected); Attribute Info version 0, flags 0, fractal heap and name index `UNDEF` (dense
-   attribute storage → rejected); message flag bit 1 (shared) → rejected. The data bytes of NIL messages are
+   attribute storage → `Unsupported HDF5 file`); message flag bit 1 (shared) → rejected. The data bytes of NIL messages are
    ignored (libhdf5 leaves stale bytes in them after its own edits).
 5. Objects: a dataset has exactly one Dataspace, Datatype and Data Layout message (Fill Value optional), no Link or
    Attribute messages; a group has exactly one Link Info and Group Info message, at most one Attribute Info message
    (exactly one if it has Attribute messages), and no Dataspace/Datatype/Layout. Datasets have no Attribute Info.
    Data size: `n_elem · element size` (overflow-checked) must equal the compact size or the contiguous size; a
    contiguous size 0 needs address `UNDEF`, otherwise the bounds of rule 1. Attributes likewise (value size).
-   Total: per call, the reader sums the stored raw size of every dataset it reads (compact and contiguous); if the sum
-   exceeds EOF → `Malformed HDF5 file: the channel references more data than the file holds.` This bounds the sum of
-   all allocations by the file size, also when several links point to the same object (library-written files never
-   share targets).
+   Total: per call, the readers count every object header chunk they read for the channel (channel, snapshot and
+   `Data` groups, datasets, compact data included) and the size of every contiguous data range, and for a dataset of
+   rank 3 without elements 8 bytes per slice (an `arma::Cube` allocates one pointer per slice also when it is empty;
+   such a dataset is rejected if the product of its other two extents does not fit 64 bits). If the count exceeds EOF
+   → `Malformed HDF5 file: the channel references more data than the file holds.` In a library-written file every
+   header and data range is read once and none overlaps another, so the count stays ≤ EOF; when several links point
+   to the same object (crafted files), every re-read is counted again. This bounds memory and time of a call by a
+   fixed multiple of the file size. The root objects of `open` are not counted (read once, rule 6).
 6. Schema: as in section 1 with the v2 checks: the root links and dataset types/shapes of 1.1 (`Order` and
-   `ChannelRef` contiguous with `n_slot` elements, `n_slot` = product of `ChannelDims` ≤ 2^32 − 1); `ChannelRef`
+   `ChannelRef` contiguous with `n_slot` elements, `n_slot` = product of `ChannelDims` ≤ 2^32 − 1); the data ranges
+   of `ChannelDims`, `Order` and `ChannelRef`, root chunk 0 and the four root dataset headers are pairwise disjoint
+   (checked by every `open`; else `Malformed … the storage index overlaps the object header or data at address <a>`),
+   because the index data is written in place; writers also check that no chunk they read and may rewrite (directory
+   and link chunks, channel and `Data` group chunks) overlaps the index data (`Malformed … the storage index overlaps
+   the object header at address <a>`), before anything is written; `ChannelRef`
    entries are 0 or point to a group header inside EOF; channel attributes with exactly their type and value count
    (`NumSnap` required; `NumTx`, `NumRx`, `tx_position`, `rx_position` required if `NumSnap > 0`; others optional);
    `Name` a 256-byte fixed string; snapshot datasets with the extents of 1.3 derived from `NumPath`, `NumTx`,
@@ -486,6 +513,8 @@ Applied by every function to everything it reads; all violations throw `std::inv
    `NumSnap > 1` either no `Snap_<i>` links or exactly `Snap_0 … Snap_<NumSnap−1>` (`Snap_` + 1–10 decimal digits,
    no leading zero, value < `NumSnap`, no duplicates), every snapshot with the same set of datasets as `Snap_0`; `Data` links point to datasets of the types of 1.4; strings are scalar. Unknown links in a
    channel group are ignored. Allocations sized by `NumSnap` happen only after the snapshot links were counted.
+   Element types are exact, as written: structured datasets (channel-level and snapshot) float32, `no_interact`
+   uint32, attributes as in 1.2 (else `Malformed … has an unexpected type`; v2 converted any numeric type).
 7. Version: the `Version` value must be 3.
 8. Root structure (checked by the writers; the read functions never need it, D3). Every `open(fn, update)` (5)
    checks the chunk-0 part on the root chunk-0 image it already holds, so no writer changes a file with a foreign
@@ -511,24 +540,30 @@ v2 messages are kept where the situation exists in v3 (several are pinned by the
 |-----------|-----------|---------|
 | file missing: `hdf5_read_channel`, `hdf5_read_dset`, `hdf5_read_dset_names`, `hdf5_reshape_layout` (`hdf5_read_layout` returns zeros; `hdf5_write`, `hdf5_write_dset` create the file) | invalid_argument | `File does not exist.` |
 | file shorter than 8 bytes or wrong signature | invalid_argument | `Not an HDF5 file.` (pinned by MEX and Python tests) |
-| HDF5 file outside the subset at file level: superblock version ≠ 2 (e.g. every v2 file, which libhdf5 writes with superblock version 0), offset/length sizes ≠ 8, base ≠ 0, extension defined, root chunk 0 without the four dataset links or with dense link storage, any violation of 4.1 rule 8 (writers), a growable group without room for the new link or with an unexpected Link Info (3.3, writers) | invalid_argument | `Unsupported HDF5 file: quadriga-lib reads only channel files of version 3 that it wrote itself; files written by quadriga-lib 0.12.4 and earlier (version 2) and files modified with other HDF5 tools are not supported.` |
+| HDF5 file outside the subset at file level: superblock version ≠ 2 (e.g. every v2 file, which libhdf5 writes with superblock version 0), offset/length sizes ≠ 8, base ≠ 0, extension defined, root chunk 0 without exactly one link each named `ChannelDims`, `Order`, `Version`, `ChannelRef`, dense link or attribute storage in any group (4.1 rule 4), any violation of 4.1 rule 8 (writers), a growable group without room for the new link or with an unexpected Link Info (3.3, writers) | invalid_argument | `Unsupported HDF5 file: quadriga-lib reads only channel files of version 3 that it wrote itself; files written by quadriga-lib 0.12.4 and earlier (version 2) and files modified with other HDF5 tools are not supported.` |
 | `Version` ≠ 3 | invalid_argument | `Unsupported channel file version <n>; this version of quadriga-lib reads version 3 only.` |
 | `ChannelDims`/`Order`/`ChannelRef` inconsistent (product > 2^32 − 1, extents ≠ product, wrong type or layout) | invalid_argument | `Storage index in HDF file is corrupted.` |
-| any other rule of 4.1 | invalid_argument | `Malformed HDF5 file: <what>.` e.g. `… checksum mismatch at address <a>`, `… address <a> is outside the file`, `… dataset 'coeff_re' has extent 1 in dimension 0, expected 50`, `… attribute 'NumSnap' is missing`, `… attribute 'Name' must be a fixed-length string of 256 bytes` (v2 texts for the semantic checks) |
+| any other rule of 4.1, including objects that libhdf5 created or rewrote in a library file (they carry the "times stored" header flag → `… unsupported object header flags at address <a>`; a group extended twice by libhdf5 gets continuation chunks in decreasing order → `… continuation chunk at address <a> is out of order`) | invalid_argument | `Malformed HDF5 file: <what>.` e.g. `… checksum mismatch at address <a>`, `… address <a> is outside the file`, `… dataset 'coeff_re' has extent 1 in dimension 0, expected 50`, `… attribute 'NumSnap' is missing`, `… attribute 'Name' must be a fixed-length string of 256 bytes` (v2 texts for the semantic checks) |
 | cannot open for reading, or the size cannot be determined | invalid_argument | `Error opening file.` |
 | a seek or read fails while reading (in readers, and in writers before their first write; e.g. a file truncated by another process, a directory passed as `fn`) | invalid_argument | `Malformed HDF5 file: cannot read <n> bytes at address <a>.` |
 | cannot open for writing | invalid_argument | `hdf5_write`: `Error opening file. It may be opened by another program.`; others `Error opening file.` |
 | cannot create (`hdf5_create`) | invalid_argument | `Error creating file. It may be already opened.` |
 | argument errors | invalid_argument | unchanged v2 texts: `Storage layout dimension sizes cannot be 0.`, `Storage layout has too many slots: nx * ny * nz * nw must not exceed 4294967295.`, `Index out of bound.`, `Mismatch in number of elements in storage index.`, `Parameter name must only contain letters, numbers and the underscore '_'.`, `NULL pointer was passed as data object.`, `Unsupported data type for '<name>'`, `Dataset '<name>' already exists.`, `Number of elements in 'par_data' must match number of elements in 'par_name'.`, `Too many snapshots.`, `Number of elements returned by 'n_path()' does not match number of snapshots.`, `Size mismatch between …`, `'<field>' must have 3 rows.` |
 | dataset name longer than 65000 bytes (a link message must fit 16 bits) | invalid_argument | `Parameter name is too long.` (new; v2 had no practical limit) |
+| string unstructured data longer than 4294967295 bytes (the string datatype stores its size in 32 bits) | invalid_argument | `String '<name>' is too long: at most 4294967295 bytes can be stored.` (before the file is touched) |
 | a write, a seek before a write, or the close after writing fails (disk full, I/O error) | runtime_error | `Cannot write file '<fn>'.` (the only runtime_error besides the channel ID; all other file errors are invalid_argument) |
 | no channel ID left | runtime_error | `No free channel ID left in the HDF5 file.` |
+| internal consistency check of the writer (computed channel-group address ≠ emitted address) | logic_error | `Channel group address mismatch.` (a library bug, never caused by a file) |
 
 ---------------------------------------------------------------------------------------------------------------------
 
 ## 5. Public functions
 
-Common step `open(fn, mode)`: open (`rb` or `r+b`), size, superblock (4.1), root chunk 0; find `ChannelDims`,
+Common step `open(fn, mode)`: open (`rb` or `r+b`); only if the open fails is `file::exists(fn)` asked, to tell a
+missing file (`File does not exist.`, zeros for `hdf5_read_layout`, creation for the writers) from one that cannot be
+opened (`hdf5_reshape_layout` checks existence first, as v2). `file::exists` is true unless the open for reading
+fails with `ENOENT` or `ENOTDIR` (`errno`, standard C), so a file that exists but cannot be read (e.g. mode 0200) is
+not taken as missing: the writers throw the open error instead of replacing it with a new file (v2 truncated it); size, superblock (4.1), root chunk 0; find `ChannelDims`,
 `Order`, `Version`, `ChannelRef` by name among the Link messages of root chunk 0 (each exactly once, else
 `Unsupported`); readers ignore other Link and Continuation messages there, `open(fn, update)` applies the chunk-0 part
 of 4.1 rule 8. Then `Version` (value 3), `ChannelDims`, `Order`, `ChannelRef` headers. Result: layout `{nx, ny, nz, nw}`, `n_slot`, data addresses of `Order`
@@ -585,8 +620,8 @@ dataset → `std::any` (as 5.8), name without prefix. Then `Name` (the bytes bef
 (optional); `NumSnap = 0` → return. Then exactly v2: `NumTx`, `NumRx`; `CenterFrequency` dataset `[n_snap]` or
 attribute (NaN → empty); positions/orientations dataset `[n_snap, 3]` or attribute `[3]` (orientations optional);
 snapshot data from the channel group (`n_snap = 1`) or `Snap_<i>` (4.1 rule 6): `NumPath` (optional, default 0) and
-the datasets of 1.3 with their extents checked; `interact_coord` read only if `sum(no_interact) > 0`, otherwise
-`[3, 0]`. Structured data converted from float32 to `dtype`. v2's padding of missing snapshot groups (files of
+the datasets of 1.3 with their extents checked; `interact_coord` read only if `sum(no_interact) > 0` (its extents
+`{sum, 3}` are checked before the `[3, sum]` matrix is allocated), otherwise `[3, 0]`. Structured data converted from float32 to `dtype`. v2's padding of missing snapshot groups (files of
 older library versions) is dropped.
 
 ### 5.7 `hdf5_read_dset_names(fn, par_names, ix, iy, iz, iw, prefix)`
@@ -664,28 +699,33 @@ ownership:
 
 | Name | Responsibility |
 |------|----------------|
-| constants | `undef`, `max_chunk_body` 65535, `compact_limit` 4096, directory and link-chunk sizes (Appendix A) |
-| `lookup3(const uint8_t*, size_t)` | checksum (2.2) |
-| `put_le`, `get_le` | little-endian integer encoding into a `std::vector<uint8_t>` / from a pointer |
-| `enum class type_t {f32, f64, u64, i64, u32, i32, str, ref}`, `struct dtype {type_t t; uint32_t size;}` | element types; `encode_datatype`, `decode_datatype` (table 2.5, exact match) |
-| `class file` | owns a `FILE*` (opened `rb`, `r+b` or `wb`, unbuffered; UTF-8 names, 7); `static bool exists(fn)`; `size()`; `read(addr, dst, n)` (direct) and `read_header(addr, …)` through the 64 KiB window (3.6) and the overflow-safe bounds check of 4.1 rule 1 against the size given at open; seek/read failures → `invalid_argument`; `write(addr, src, n)` (`runtime_error`); `close()` (`runtime_error` on failure; the destructor closes silently); 64-bit offsets (7) |
-| `superblock` | `{eof, root}`; `read_superblock(file&)` (4.1), `superblock_bytes(eof, root)` |
-| `struct chunk` | address, length, OHDR or OCHK, owned image bytes, message list (type, flags, offset, size), free space at the end; `read_chunk(file&, addr, length_or_0_for_ohdr, eof)` (verifies), `encode_chunk(...)` (messages + body size → image with tail rule and checksum) |
-| `struct object` | the chunks of one header in reading order; `read_object(file&, addr, eof)` (4.1 rule 3) |
-| `struct link`, `attribute`, `dataset`, `group` | decoded views (name, target, creation order / type, dataspace, value bytes / layout, data location); `decode_group(const object&)`, `decode_dataset(const object&, eof)`; views point into the object's images and are valid while the object lives |
-| `read_raw(file&, const dataset&, void* dst)` | compact copy or contiguous read |
-| `class header` | object-header builder: `dataspace`, `datatype`, `fill_value`, `layout_compact`, `layout_contiguous`, `link_info`, `group_info`, `attribute_info` (added automatically before the first attribute), `link`, `attribute`,
-`continuation`; `emit(std::vector<uint8_t>& block, uint64_t base, size_t reserve)` → address of chunk 0 (splitting, 3.2) |
-| `emit_dataset(block, base, dtype, rank, dims, data, n_bytes, force_contiguous)` | dataset header + contiguous data (2.6) |
-| `struct patch {uint64_t addr; std::vector<uint8_t> bytes;}` | an in-place rewrite to be written later in a given order |
-| `class chain_links` | growable group (3.3): `load(file&, addr, eof)`, `find(name)`, `prepare_insert(link message, block, base) → patches` (computes the real free space with compaction; channel groups: insert into the reserve or throw `Unsupported`; `Data` groups: insert, new chunk, or throw; keeps the Link Info creation index) |
-| `class root_links` | root directory (3.4): `load(file&, chunk0, eof, all_directory_chunks)` (validates 4.1 rule 8), `last_link()`, `prepare_insert(...) → patches` (new link chunk and directory chunk go into the block), `prepare_remove(target address) → patch` |
+| constants | `undef`, `superblock_size` 48, `max_chunk_body` 65535, `compact_limit` 4096, `root_directory_entries` 16, `directory_chunk_body` 16380, `link_chunk_body_first` 1024, `link_chunk_body_max` 8192, `chain_chunk_body_max` 16384, `continuation_size` 20, `header_window` 16384, `header_lookback` 4096, `io_max` 1 GiB, `io_block` 1 MiB, `max_name_length` 65000 (Appendix A); message type constants `msg_nil` … `msg_attribute_info` |
+| `malformed(what)`, `unsupported()` | throw the `Malformed HDF5 file: <what>.` and the `Unsupported HDF5 file …` messages of 4.2 |
+| `lookup3(const uint8_t*, size_t)` | checksum, byte-wise (2.2) |
+| `put_le`, `get_le`, `in_bounds(addr, n, end, lower)`, `multiply(a, b, &product)`, `parse_decimal(string_view)` | little-endian encoding, overflow-safe bounds and products (4.1 rule 1), decimal digits without leading zero (≤ 10 digits, −1 otherwise) |
+| `enum class type_t {f32, f64, u64, i64, u32, i32, str, ref}`, `struct dtype {type_t t; uint32_t size;}`, constants `float32` … `object_reference`, `string_type(n)` | element types; `datatype_bytes` (one constant byte table of table 2.5, shared by encoding and decoding; no allocation per decode), `encode_datatype`, `decode_datatype` (exact match), `datatype_size` |
+| `class file` | owns a `FILE*`; `bool open(fn, mode)` (`"rb"`, `"r+b"`, `"wb"`; UTF-8 name, 7; unbuffered; sizes the file; returns false on failure, the caller throws its own message); `static bool exists(fn)` (false only for `ENOENT`/`ENOTDIR`, 7); `size()`; `read(addr, dst, n)` (direct); `read_header(addr, dst, n)` (16 KiB window, 3.6); both with the bounds check of 4.1 rule 1 against the size and `Malformed … cannot read <n> bytes at address <a>` on failure; `write(addr, src, n)` and `close()` → `runtime_error` `Cannot write file '<fn>'.`; any write drops the window; the destructor closes silently; 64-bit offsets (7) |
+| `struct superblock {eof, root}`, `superblock_bytes(eof, root)`, `read_superblock(file&)` | 2.1; `read_superblock` raises `Not an HDF5 file.`, `Unsupported` and `Malformed` (4.1 rule 0) |
+| `struct message_ref`, `struct chunk`, `struct patch {addr, bytes}` | a chunk: address, OHDR/OCHK, owned image, messages (type, flags, offset, size; NIL included), body range, `free_space` (body − non-NIL messages); a patch: an in-place rewrite written after the block |
+| message encoders | `begin_message`/`end_message` (message flags of 2.3), `link_message`, `link_message_size`, `continuation_message`, `encode_dataspace`, `dataspace_message`, `datatype_message`, `fill_value_message` |
+| `encode_chunk(out, ohdr, msgs, n, body, width_code)`, `parse_chunk(chunk&, verify_checksum)`, `read_chunk(file&, addr, length_or_0, eof)`, `chunk_messages(chunk, skip)`, `rewrite_chunk(chunk&, msgs)` | chunk images with the tail rule and checksum; parsing and verification (4.1 rules 2–4); compaction (non-NIL messages, optionally without one); rewrite in place (same address and length, no re-verification of its own checksum) |
+| `struct object {chunks}`, `read_object(file&, addr, eof)`, `chunk_ranges(object)` | the chunks of one header in reading order (4.1 rule 3); their address ranges |
+| `struct link`, `attribute`, `group` (`links`, `attributes`, `link_info_flags`, `max_corder`, `find`, `find_attribute`), `dataset` (`type`, `rank`, `dims`, `n_elem`, `compact`, `data`, `address`, `size`) | decoded views; `decode_link`, `decode_dataspace`, `decode_link_info` (dense → `Unsupported`), `decode_attribute`, `decode_group(object)` (dense attribute storage → `Unsupported`), `decode_dataset(object, eof)`; views point into the object's images and are valid while the object lives |
+| `read_raw(file&, const dataset&, void* dst)` | compact copy or direct contiguous read |
+| `class output` (`base`, `buf`, `addr()`, `append`, `append_float`, `flush`, `flush_if_full`) | the append block of 3.2: 1 MiB buffer written when full; data of ≥ 1 MiB written directly; double → float conversion in ≤ 1 MiB pieces |
+| `emit_dataset<T>(output&, dtype, rank, dims, const T* data, n_bytes, force_contiguous)` | dataset header + contiguous data (2.6); `T = double` with a float32 type converts |
+| `class header` (`link_info`, `group_info`, `attribute`, `link`, `size(reserve)`, `emit(block, base, reserve)`) | group-header builder; the Attribute Info message is added automatically before the first attribute; `emit` applies the packing rule of 3.2 and returns the address of chunk 0 |
+| `class chain_links` (`load(file&, addr, eof)`, `find(name)`, `check_insert(name_length, creation_order)`, `prepare_insert(name, target, creation_order, block, base) → patches`, `ranges()`) | growable group (3.3): `check_insert` throws `Unsupported` before anything is emitted (channel group: `L > F`; `Data` group: Link Info flags ≠ 3, creation index ≥ 2^63, `F < 20`); `prepare_insert` returns the rewrites in write order (the Link Info chunk, then the last chunk) and appends a new chunk to the block if needed |
+| `class root_links(prefix)` (`static check_chunk0(chunk0, n_fixed)`, `load(file&, chunk0, eof, old_target)`, `last_id()`, `insert_size(name_length)`, `prepare_insert(name, target, block, base) → patch`, `prepare_remove(target, patch&) → bool`, `ranges()`) | root directory (3.4) and 4.1 rule 8 (all violations → `Unsupported`): `check_chunk0` at every update open; `load` reads all directory chunks, the last link chunk and the old link's chunk; `insert_size` gives the bytes the insertion appends to the block, so that the channel group's address is known before the link chunk that holds its link is emitted (block items 4 before 5); `ranges()` lists the chunks `load` read (checked against the index data, 4.1 rule 6) |
+
+The header raises: `Not an HDF5 file.`, `Unsupported HDF5 file …`, `Malformed HDF5 file: …`, `Cannot write file '<fn>'.`
 
 What stays in `src/qd_channel_hdf5.cpp`: the schema (names, attribute defaults, field-to-dataset mapping, ID naming
 `channel_<id>`, parsing the ID of the last root link), the public functions and their MD blocks, argument and
 channel validation, the `open` step of section 5, block assembly for channels and unstructured data
-(`any_type_id` mapping), reading channels and `std::any` values, the update order of 3.7, and all error messages of
-4.2 except the generic `Malformed HDF5 file` texts raised in `qd_hdf5.hpp`. File-local helpers keep the `qHDF_`
+(`any_type_id` mapping), reading channels and `std::any` values, the update order of 3.7, and the error messages of
+4.2 not raised by the header (open/create errors, argument errors, version and storage-index messages, the semantic
+`Malformed` texts, `No free channel ID left …`). File-local helpers keep the `qHDF_`
 prefix; helpers used once are lambdas, except self-contained steps of more than ≈ 20 lines, which may be named
 file-local functions directly above their single caller (`md/SPEC_CPP_API.md`, "File-local helpers"); helpers used by
 several functions are `static inline`.
@@ -709,11 +749,14 @@ variable-length types, attribute dense storage, superblock versions other than 2
   Linux MATLAB; file existence by `file::exists`); decimal parsing of
   channel and snapshot numbers by a digit loop. Build with g++-12 and check the MEX files' GLIBCXX versions.
 - File names are UTF-8 (as libhdf5 1.14 treats them on Windows, and as the Python wrapper passes them). Under
-  `_WIN32` only: `std::filesystem::path p = std::filesystem::u8path(fn)` and `_wfopen(p.c_str(), mode)` (wide mode
-  string, e.g. `L"rb"`); no `<windows.h>`. Elsewhere `std::fopen(fn.c_str(), mode)`. The conversion lives in one place,
-  `qd::hdf5::file` (open and the static `file::exists(fn)` used for the existence checks of section 5). An invalid
-  UTF-8 name (`u8path` throws or the open fails) → `Error opening file.`; for `file::exists` → `false` (then
-  `File does not exist.` where v2 checked existence).
+  `_WIN32` only: `std::filesystem::path p = std::filesystem::u8path(fn)` and `_wfsopen(p.c_str(), mode,
+  _SH_DENYNO)` from `<share.h>` (wide mode string, e.g. `L"rb"`; shared like `fopen`; `_wfopen` is flagged as
+  unsafe (C4996) at `/W3`, and `_wfopen_s` would open without sharing); no `<windows.h>`. Elsewhere `std::fopen(fn.c_str(), mode)`. The conversion lives in one place,
+  `qd::hdf5::file` (open and the static `file::exists(fn)` used for the existence checks of section 5;
+  `file::exists` decides by `errno` after a failed `fopen(fn, "rb")`: `ENOENT`/`ENOTDIR` = missing, any other error =
+  exists but unreadable; no `stat`/`std::filesystem`). An invalid UTF-8 name (`u8path` throws or the open fails) →
+  `Error opening file.`; for `file::exists` → `false` (then `File does not exist.` where v2 checked existence).
+- Single reads and writes in pieces of at most 1 GiB (`io_max`; the Windows C runtime rejects counts above 2 GiB).
 - No OpenMP in the HDF5 code; reading different files from parallel threads is safe; one writer per file (D8).
 
 ---------------------------------------------------------------------------------------------------------------------
@@ -738,7 +781,7 @@ and to rewrite a modified chunk with a correct checksum (`read_object`, `encode_
 semantic checks behind the checksums are reached. The oracle is the documented behavior: `std::invalid_argument` (or
 the stated result), no other exception, no crash, no allocation beyond the file size. In the sanitizer build these
 cases run with `ASAN_OPTIONS=max_allocation_size_mb=1024:allocator_may_return_null=0`, so an allocation larger than
-1 GB fails the test (ASan alone does not flag large allocations). Each case writes a fresh file with the public API, patches it, and removes it at the end. Cases (one
+1 GB fails the test (ASan alone does not flag large allocations). Each case writes a fresh file with the public API, patches it, and removes it at the end. Test case names contain no commas (Catch2 test-spec filters split at commas). Cases (one
 `TEST_CASE` per group, one `SECTION` per patch):
 
 1. File level: empty file and 7-byte file → `Not an HDF5 file.`; wrong signature byte → same; superblock checksum
@@ -754,9 +797,14 @@ cases run with `ASAN_OPTIONS=max_allocation_size_mb=1024:allocator_may_return_nu
    invalid_argument; `ChannelRef[slot]` = EOF + 8, = address of a dataset header, = address inside raw data,
    = `UNDEF` → invalid_argument; `ChannelRef[slot]` = 0 → empty channel (no throw); a `ChannelDims` entry 0 →
    corrupted index. Bounds overflow: a contiguous layout with address `UNDEF` and size 16, and with address 2^63 and
-   size 2^63 → invalid_argument without allocation.
+   size 2^63 → invalid_argument without allocation. Index data overlapping metadata (4.1 rule 6, re-signed headers):
+   `ChannelRef` data inside root chunk 0, `ChannelDims` data in the last 16 bytes of the `Order` header, `Order` data
+   overlapping the `ChannelRef` header, `ChannelRef` data overlapping the `Order` data → every function throws, file
+   byte-identical; `Order` data placed on the first root link chunk → reads work, `hdf5_write` and `hdf5_write_dset`
+   (empty slot) throw before changing the file.
 4. Object headers: chunk-0 size field enlarged beyond EOF (re-signed) → invalid_argument without allocation; body
-   > 65535 → invalid_argument; message size beyond the body; unknown message type (e.g. 0x11 symbol table) in a
+   > 65535 (in chunk 0 only expressible with a size-field width code 2, rejected as unsupported header flags) →
+   invalid_argument; message size beyond the body; unknown message type (e.g. 0x11 symbol table) in a
    dataset; shared-message flag; Continuation pointing beyond EOF, backwards (to the chunk itself) and twice to the
    same chunk; a Continuation length of 65544 (re-signed) and of several GB (no allocation); Link Info with a
    defined fractal-heap address; Attribute Info with a defined fractal-heap address,
@@ -768,21 +816,32 @@ cases run with `ASAN_OPTIONS=max_allocation_size_mb=1024:allocator_may_return_nu
    removed; `delay` dataspace of rank 1 and rank 4; `Name` as a 300-byte string; `NumPath` 2^30 with `coeff_re`,
    `coeff_im`, `delay` extents `{2^30, 2, 4}` but the original data (compact/contiguous size mismatch, no 64 GB
    allocation); `NumSnap` 4·10^9 with one `Snap_0` group (no 4·10^9-entry allocation); `Snap_1` missing in a
-   3-snapshot channel; a link `Snap_07`; `interact_coord` with one row less than `sum(no_interact)`; compact `par_`
+   3-snapshot channel; a link `Snap_01` (leading zero with a value below `NumSnap`); `interact_coord` with one row less than `sum(no_interact)`; compact `par_`
    data size ≠ elements × type size; a `Data` link pointing to a group; a rank-4 `par_` dataset → invalid_argument
    from `hdf5_read_channel` and `hdf5_read_dset` (changed from v2's empty `std::any`); `coeff_im` without `coeff_re`;
    a link `Snap_4294967296` and `Snap_` with 25 digits. Shared targets: in a 3-snapshot channel, `Snap_1` and `Snap_2`
    re-pointed to `Snap_0` with `Snap_0`'s data enlarged so that the sum of read sizes exceeds EOF → the
    `references more data than the file holds` message; the variant within the limit reads back without throwing.
-   The unpatched file reads back.
-6. Writers on malformed files: last root link chunk with a flipped byte, a `Data` chunk with a flipped byte, and the
-   `ChannelDims` corruption → `hdf5_write`, `hdf5_write_dset`, `hdf5_reshape_layout` throw invalid_argument and the
-   file is byte-identical afterwards. Root structure (4.1 rule 8, re-signed): a foreign link in chunk 0 after the
-   directory entries; chunk 0 free space not a multiple of 20; in the *last* link chunk and in the link chunk holding
-   an overwritten slot's link: a Continuation message, a link `channel_07`, `channel_4294967296`, decreasing IDs;
-   a last link chunk without links → `hdf5_write` and `hdf5_write_dset` (empty slot) throw the `Unsupported HDF5
-   file` message, file byte-identical; the foreign link in chunk 0 also makes `hdf5_write_dset` (filled slot) and
-   `hdf5_reshape_layout` throw it (checked at `open(fn, update)`); read functions unaffected. A NIL message with non-zero data bytes is
+   Header budget: a channel group with 2000 `Snap_<i>` links to one snapshot group without paths (raw size 0) → the
+   same message (every re-read of the snapshot's headers is counted); with 3 links it reads back. Extents: a `par_`
+   cube with extents `{2^29, 0, 0}` and with `{0, 2^40, 2^40}`, a `delay` with `{2^29, 0, 1}` and `NumPath` 2^29, and
+   `no_interact` values `{2^32 − 1, 2^32 − 1}` and `{2^29, 0}` without matching `interact_coord` → invalid_argument
+   without allocation (sanitizer allocation limit). The unpatched file reads back.
+6. Writers on malformed files, per writer and following what each writer reads (5): `hdf5_reshape_layout` reads
+   only the superblock, root chunk 0 and the four root dataset headers; `hdf5_write` reads in addition all directory
+   chunks, the last link chunk and the old link's chunk, but never the old channel group or its `Data` group;
+   `hdf5_write_dset` reads the directory and the last link chunk only for an empty slot, and the channel group (and its
+   `Data` group) for a filled slot. Expected, each time with the file byte-identical when the writer throws:
+   - `ChannelDims` corruption, a flipped byte in root chunk 0 or a root dataset header → all three writers throw.
+   - Last root link chunk with a flipped byte → `hdf5_write` and `hdf5_write_dset` (empty slot) throw;
+     `hdf5_write_dset` (filled slot) and `hdf5_reshape_layout` succeed.
+   - A `Data` chunk with a flipped byte → `hdf5_write_dset` to that slot throws; `hdf5_write` overwriting that slot
+     and `hdf5_reshape_layout` succeed (the overwrite replaces the slot; the damaged group becomes dead space).
+   Root structure (4.1 rule 8, re-signed): a foreign link in chunk 0 after the directory entries, or chunk 0 free
+   space not a multiple of 20 → every writer throws the `Unsupported HDF5 file` message at `open(fn, update)`; in the
+   *last* link chunk and in the link chunk holding an overwritten slot's link: a Continuation message, a link
+   `channel_07`, `channel_4294967296`, decreasing IDs; a last link chunk without links → `hdf5_write` and
+   `hdf5_write_dset` (empty slot) throw `Unsupported`; read functions unaffected. A NIL message with non-zero data bytes is
    accepted. Chain growth (3.3, re-signed): a channel group created by `hdf5_write_dset` whose `Data` link was turned
    into a 19-byte NIL (free space 19) and one with free space 4 → `hdf5_write_dset` adds the `Data` link (19 ≤ F)
    resp. throws `Unsupported` (4 < 19), file byte-identical when it throws; a `Data` group whose last chunk has free
@@ -799,8 +858,11 @@ cases run with `ASAN_OPTIONS=max_allocation_size_mb=1024:allocator_may_return_nu
    filled slot and an `hdf5_write` overwrite either succeed and read back, or throw `std::invalid_argument` with the
    file byte-identical. Nothing else. Size: ≈ 9000 variants in (a), ≈ 18000 in (b), each with 4 read calls (≈ 15 µs)
    and 2 writer calls on a fresh copy (≈ 80–100 µs). To keep the case ≤ ≈ 2 s (release build), the read calls run on
-   every variant of (a) and (c) and on every 2nd variant of (b), the writer calls on every 8th variant of (a), (b) and
-   (c), with a fixed stride so the positions are deterministic and cover every chunk. The sanitizer build runs the
+   every variant of (a) and (c) and on every 2nd variant of (b), the writer calls on every 16th variant of (a) and
+   (b) and on every variant of (c), with a fixed stride so the positions are deterministic and cover every chunk.
+   For (a) the oracle is stronger: every flip must be detected by at least one call (if all reads accept it, the
+   writers run and one must throw), except the bytes of the `interact_coord` header of a snapshot whose
+   `no_interact` sums to 0, which `hdf5_read_channel` does not read (5.6). The sanitizer build runs the
    same case with the allocation limit above (several times slower; acceptable there).
 8. Interrupted writes (3.7). File A: 50 minimal channels in slots 0–49 (link chunk 0 with body 1024 holds 41 links:
    IDs 1–9 take 24 bytes, IDs 10–99 25 bytes), slot 50 empty. File B: A after an `hdf5_write` overwrite of slot 0. The
@@ -818,6 +880,11 @@ cases run with `ASAN_OPTIONS=max_allocation_size_mb=1024:allocator_may_return_nu
 9. Many channels: 8000 minimal channels (1 snapshot, SISO, 1 path) into an 8000-slot file (crosses from root chunk 0
    into the first directory chunk, 3.4), overwrite slots 0, 3999, 7999 and the last-written slot twice; IDs as in v2
    (largest + 1), all slots read back. Runtime target < 2 s.
+10. Files and arguments: a file that exists but cannot be read (mode 0200; skipped when it stays readable, e.g. as
+    root, and under Windows) → every function throws invalid_argument and the file is unchanged (not replaced by a new
+    file). The length limit of string `par_` data (4.2: at most 4294967295 bytes) has no test case: a test would
+    need a 4 GiB allocation, which the default suite cannot afford and `md/SPEC_CPP_API.md` forbids hiding behind a
+    tag; the check is a single comparison in the name/type check of the writers.
 
 ### 8.3 `tests/catch2_tests/test_qd_hdf5_internal.cpp` (focused tests of the header)
 
@@ -835,7 +902,7 @@ cases run with `ASAN_OPTIONS=max_allocation_size_mb=1024:allocator_may_return_nu
 - `header::emit` packing rule of 3.2 at the boundary: messages that fit exactly with the reserve, and one byte more.
 - `file::exists` and open with a non-ASCII UTF-8 name (on Linux the bytes are passed through).
 - `root_links` with the constants of Appendix A: the 16th directory entry is the next directory chunk; link chunk
-  sizes 1024 … 16384; binary search finds the chunk for every link; removal keeps the order; `last_link()` after
+  sizes 1024 … 8192; binary search finds the chunk for every link; removal keeps the order; `last_id()` after
   removals.
 - `file`: reading beyond the size throws invalid_argument, also for `addr = UNDEF`, `n = 16` and `addr = n = 2^63`
   (overflow-safe check); header window: header reads inside, crossing the end of and outside the window return the
@@ -864,10 +931,16 @@ needs the internal header goes into `test_hdf_robustness_internal.cpp` instead. 
   default), otherwise it converts the group to dense storage. Specific files and expectations:
   (a) `H5Gcreate2` of a root group in a file with ≤ 3 channels (root stays compact): read functions work, every
   writer except `hdf5_create` (which replaces the file) throws `Unsupported HDF5 file` at `open` (4.1 rule 8); the same in the file of the existing case (9 root links → dense
-  root): every function throws `Unsupported HDF5 file`;
+  root): every function throws `Unsupported HDF5 file` (the dataset links have left chunk 0, and its Link Info names a
+  fractal heap);
   (b) a variable-length string dataset added to a `Data` group with ≤ 6 links (stays compact): `hdf5_read_dset_names`
-  lists it, `hdf5_read_dset` of that name and `hdf5_read_channel` throw; added to `/channel_1/Data` of the existing
-  case (10 links → dense): all functions on that slot throw `Unsupported HDF5 file`, other slots work;
+  lists it (targets are not opened), `hdf5_read_dset` of that name and `hdf5_read_channel` throw `Malformed … unsupported
+  object header flags` (every object libhdf5 creates carries the "times stored" flag, 4.1 rule 3); a second dataset
+  added by libhdf5 to the same group makes libhdf5 rewrite the group's chunk 0 with its Continuation messages in
+  decreasing address order → every function that reads that `Data` group throws `Malformed … out of order`. Added to
+  `/channel_1/Data` of the existing case (10 links → dense): the read functions and `hdf5_write_dset` on that slot
+  throw `Unsupported HDF5 file` (dense link storage, 4.1 rule 4); `hdf5_write` overwriting that slot succeeds (it does
+  not read the old groups); other slots work;
   (c) `H5Ldelete` of `par_note` in the two-dataset `Data` group of slot 2 of the existing case: `hdf5_read_channel`,
   `hdf5_read_dset`, `hdf5_read_dset_names` return only `values`; `hdf5_write_dset` to that slot appends and the slot
   reads back in creation order; libhdf5 reads the result;
@@ -882,7 +955,7 @@ From `git grep -i -E 'hdf5|H5[A-Z]|h5repack|nodelete|libhdf'` (binary matches in
 
 | File | Change |
 |------|--------|
-| `CMakeLists.txt` | remove: `HDF5_PATH`/`_HDF5_PATH` (l. 32–34), option `HDF5_STATIC` + comment (l. 39–41), `hdf5_version` (l. 51), `HDF5_ZIP` (l. 83), `BUILD_HDF5` (l. 155), MSVC prebuilt autodetect (l. 223–230), `find_package(HDF5 … C HL)` for the library (l. 232–244), Octave disabling for static HDF5 (l. 246–252), `_HDF5_PATH` handling (l. 254–263), `ExternalProject_Add(hdf5_dep …)` (l. 265–301), `HDF5_LINK_LIBS` (l. 303–307), `${HDF5_INCLUDE_DIRS}` in both libraries (l. 420, 452), `hdf5_dep` dependencies (l. 438–440, 654–656), shared-lib HDF5 linking (l. 477–485), `${HDF5_LINK_LIBS}` in MEX (l. 529, 545), Python (l. 660) and test (l. 714–716) links, test include `${HDF5_INCLUDE_DIRS}` (l. 702), install of `libhdf5` (l. 779–781); rewrite the comments on HDF5 linking and sonames (l. 196–203, 497–500) to the remaining facts (MEX files link the static library); interop hook (l. 682–694): keep `find_package(HDF5 MODULE QUIET COMPONENTS C)` for `test_bin` only, drop the `BUILD_HDF5`/`_HDF5_PATH` condition and update its comment; `-Wl,-z,nodelete` (l. 537–538, 547): **verify in MATLAB R2024a and R2026a with `clear mex` and MATLAB exit before removing** (build without the flag, call several `hdf5_*` and other MEX functions, `clear mex`, call again, `exit`, three times per release; remove flag and comment only if no crash, otherwise keep and reword the comment) |
+| `CMakeLists.txt` | remove: `HDF5_PATH`/`_HDF5_PATH` (l. 32–34), option `HDF5_STATIC` + comment (l. 39–41), `hdf5_version` (l. 51), `HDF5_ZIP` (l. 83), `BUILD_HDF5` (l. 155), MSVC prebuilt autodetect (l. 223–230), `find_package(HDF5 … C HL)` for the library (l. 232–244), Octave disabling for static HDF5 (l. 246–252), `_HDF5_PATH` handling (l. 254–263), `ExternalProject_Add(hdf5_dep …)` (l. 265–301), `HDF5_LINK_LIBS` (l. 303–307), `${HDF5_INCLUDE_DIRS}` in both libraries (l. 420, 452), `hdf5_dep` dependencies (l. 438–440, 654–656), shared-lib HDF5 linking (l. 477–485), `${HDF5_LINK_LIBS}` in MEX (l. 529, 545), Python (l. 660) and test (l. 714–716) links, test include `${HDF5_INCLUDE_DIRS}` (l. 702), install of `libhdf5` (l. 779–781); rewrite the comments on HDF5 linking and sonames (l. 196–203, 497–500) to the remaining facts (MEX files link the static library); interop hook (l. 682–694): keep `find_package(HDF5 1.12 MODULE QUIET COMPONENTS C)` for `test_bin` only (the test uses `H5Ovisit3`/`H5Literate2` of 1.12; an older HDF5 skips the test instead of breaking the build), pass `${HDF5_DEFINITIONS}` to `test_bin` (e.g. the dllimport switch of a shared HDF5 on Windows), drop the `BUILD_HDF5`/`_HDF5_PATH` condition and update its comment; `-Wl,-z,nodelete` (l. 537–538, 547): **verify in MATLAB R2024a and R2026a with `clear mex` and MATLAB exit before removing** (build without the flag, call several `hdf5_*` and other MEX functions, `clear mex`, call again, `exit`, three times per release; remove flag and comment only if no crash, otherwise keep and reword the comment) |
 | `GNUmakefile` | l. 3 "Set Armadillo and HDF5 sources" → "Set Armadillo sources" (it also documents `arma_internal`); remove l. 4 (comment) and `hdf5_internal` (l. 5), `-D HDF5_STATIC=…` (l. 47, 63), `rm -rf external/hdf5-prebuilt` in `tidy` (l. 248); keep `rm *.hdf5` in `clean` (test files) |
 | `Makefile` (Windows) | remove the HDF5 prebuild variables (l. 13–20, keep Catch2/Armadillo), `hdf5` from `external:` (l. 61), the `hdf5` target (l. 63–70), `rmdir $(HDF5_PREBUILT)` in `tidy` (l. 139); fix the comment of l. 13 |
 | `external/hdf5-1.14.6.zip` | delete (`git rm`) |
@@ -960,6 +1033,21 @@ Wrapper MD blocks (MEX `api_mex/hdf5_*.cpp`, Python `api_python/qpy_hdf5_*.cpp`)
 - `hdf5_create_file` (both): add "- Files can be read by any HDF5 tool but must be modified only with quadriga-lib."
 Regenerate the MEX `.m` help and the HTML/Markdown docs (section 9).
 
+Corrections after code review (supersede the wording above where they differ; the sources hold the final text):
+- "files modified with other HDF5 tools are rejected" → "… are not supported and may be rejected" everywhere (some
+  edits are read, e.g. a group added to a compact root or a dataset deleted from `Data`, see 8.4).
+- Every function documents the version requirement: `hdf5_write`/`hdf5_write_channel` ("appends to existing files"
+  replaced by "an existing file must be a channel file of version 3 written by quadriga-lib; files of quadriga-lib
+  0.12.4 and earlier are rejected"), `hdf5_write_dset`, `hdf5_reshape_layout`, `hdf5_read_dset`,
+  `hdf5_read_dset_names` (C++ MD, header comments, MEX, Python).
+- `hdf5_reshape_layout` (C++, MEX, Python) also carries "One writer per file at a time; files are not locked."
+- `hdf5_read_channel`: "Returns an empty channel object (`n_snap() == 0`) if the slot is empty or outside the
+  layout."; Python `hdf5_create_file`: the total slot count is fixed, the layout can be reshaped; header-comment
+  typos fixed. MEX doc lines touched here are wrapped at 100 characters.
+- Wrappers `hdf5_create_file` (MEX, Python): "File already exists." for every existing file, also one that
+  `hdf5_read_layout` cannot read (an old or foreign file): `hdf5_read_layout` returns zeros only for a missing file,
+  any exception from it means the file exists.
+
 ---------------------------------------------------------------------------------------------------------------------
 
 ## 11. Benchmark protocol (plan §7, D15)
@@ -982,27 +1070,31 @@ Regenerate the MEX `.m` help and the HTML/Markdown docs (section 9).
   8.44 s, 4995.1 MB; b: write 127.63 s, write + fsync 128.71 s, read 158.13 s, 5012.1 MB.
 - Acceptance: v3 not slower than v2 for either mix (otherwise one optimization round, then escalate, plan §8).
 - Additional P4 check (not part of the D15 table): a micro-benchmark of 10^5 minimal channels written and overwritten
-  once, to confirm that one minimal-channel write (open to close, including the 64 KiB header-window loads and the
-  root bookkeeping of 3.4) stays below ≈ 100 µs (measured I/O pattern alone: ≈ 41 µs). P4 tunes the constants of
-  Appendix A with it (the structure of 3.3–3.4 stays; changed values are entered in Appendix A).
+  once, then every 10th slot read; target: one minimal-channel write (open to close) below ≈ 100 µs. Measured in P4
+  with the implementation (10^5 slots, 3 runs, `flock`, load 1.7–2.9): write 73.7–75.0 µs, overwrite 99.1–99.7 µs,
+  read 26.4–26.8 µs per call. The constants of Appendix A were tuned with it (link chunks 8 KB, header window 16 KiB).
+- P4 sanity run at scale 0.1 (provisional for D15; 3 runs, load 1.2–2.5, medians, `bad=0`): mix a (320 channels)
+  v2 0.530 s write / 0.886 s read, v3 0.157 s / 0.452 s (file 499.5 vs 493.5 MB); mix b (700 channels) v2 12.46 s /
+  15.33 s, v3 0.341 s / 0.758 s (file 501.2 vs 247.0 MB). The full-scale D15 run of P6 replaces these numbers.
 
 ---------------------------------------------------------------------------------------------------------------------
 
 ## Appendix A: constants
 
-The values are derived from measured lookup3 throughput and the size estimates of 3.4, not from an end-to-end
-measurement; P4 tunes them with the 10^5-write micro-benchmark of section 11.
+Values as implemented. `link_chunk_body_max` (8192) and `header_window` (16 KiB) were tuned in P4 with the
+10^5-write micro-benchmark of section 11 (3.4, 3.6); the others are the design values.
 
 | Constant | Value | Reason |
 |----------|-------|--------|
 | max chunk body | 65535 | free space must fit a 16-bit NIL size |
 | compact limit | 4096 bytes of raw data | small datasets in the checksummed header (one read, 14 bytes smaller layout message); large data unchecksummed and read directly into Armadillo memory; every value ≤ 65531 reads in libhdf5 |
-| root chunk 0 directory | 16 entries (320 bytes) | 15 link chunks cover ≈ 7300 channel links before the first directory chunk; small fixed root header |
-| directory chunk body | 16380 (819 entries) | one 16 KB chunk covers ≈ 480 000 links (818 link chunks of 16 KB) |
-| link chunk body | `min(1024 · 2^k, 16384)` | small files stay small; rewrite + checksum per write ≤ 32 KB |
+| root chunk 0 directory | 16 entries (320 bytes) | 15 link chunks cover ≈ 3900 channel links before the first directory chunk; small fixed root header |
+| directory chunk body | 16380 (819 entries) | one 16 KB chunk covers ≈ 240 000 links (818 link chunks of 8 KB) |
+| link chunk body | `min(1024 · 2^k, 8192)` (`link_chunk_body_first`, `link_chunk_body_max`) | small files stay small; every write reads, validates and rewrites the last link chunk, so its size dominates the root bookkeeping: 8 KB was fastest at 10^5 channels (4 KB equal within noise, but more directory chunks at 10^6) |
 | chain growth chunk body | `max(L + 20, min(16384, 2 · previous body))` | `Data` groups grow geometrically |
 | reserves | 19 (channel group without `Data`), 20 (`Data` group) | 3.2 |
-| header read window | 64 KiB, forward, chunk-0 header reads only; all reads of known length direct | 3.6 |
+| header read window | 16 KiB (`header_window`) starting 4 KiB before the header (`header_lookback`), chunk-0 header reads only; all reads of known length direct | 3.6; 64 KiB made mix-a reads slower than v2, 8 KiB equal to 16 KiB; the look-back halves the window loads of multi-snapshot channels (post-order layout) |
+| largest single read or write | 1 GiB (`io_max`) | 7; Windows C runtime limit of 2 GiB per call |
 | output buffer | 1 MiB; larger contiguous data written directly | 3.2 |
 | zero-fill block | 1 MiB | 3.1 |
 | dataset name limit | 65000 bytes | link message ≤ 65535 bytes |

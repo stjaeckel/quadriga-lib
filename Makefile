@@ -10,14 +10,9 @@ avx2 = ON
 USE_NINJA = 1
 CMAKE_BUILD_DIR = build_windows
 
-# Options for prebuilding the HDF5 and Catch2 libraries to speed up build time
-hdf5_version      = 1.14.6
+# Options for prebuilding the Catch2 library to speed up build time
 catch2_version    = 3.8.1
 armadillo_version = 14.2.2
-
-HDF5_PREBUILT  = external\hdf5-prebuilt
-HDF5_SRC_DIR   = hdf5-hdf5_$(hdf5_version)
-HDF5_LIB_CHECK = $(HDF5_PREBUILT)\lib\libhdf5.lib
 
 CATCH2_PREBUILT  = external\Catch2-prebuilt
 CATCH2_SRC_DIR   = Catch2-$(catch2_version)
@@ -58,16 +53,7 @@ test: all moxunit-lib
 !ENDIF
 
 # Prebuild libraries
-external: hdf5 catch2 moxunit-lib
-
-hdf5: $(HDF5_LIB_CHECK)
-$(HDF5_LIB_CHECK):
-	tar -xf external\hdf5-$(hdf5_version).zip -C external
-	cmake $(GENERATOR) -D CMAKE_BUILD_TYPE=Release -B external\hdf5-build -S external\$(HDF5_SRC_DIR) -DCMAKE_INSTALL_PREFIX=%CD%\$(HDF5_PREBUILT) -DBUILD_SHARED_LIBS=OFF -DHDF5_ENABLE_Z_LIB_SUPPORT=OFF -DBUILD_TESTING=OFF -DHDF5_BUILD_TOOLS=OFF -DHDF5_BUILD_EXAMPLES=OFF -DHDF5_BUILD_HL_LIB=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
-	cmake --build external\hdf5-build --config Release
-	cmake --install external\hdf5-build --config Release
-	- rmdir /s /q external\$(HDF5_SRC_DIR)
-	- rmdir /s /q external\hdf5-build
+external: catch2 moxunit-lib
 
 catch2: $(CATCH2_LIB_CHECK)
 $(CATCH2_LIB_CHECK):
@@ -136,7 +122,6 @@ clean:
 	- del lib\*.pyd
 
 tidy: clean
-	- rmdir /s /q $(HDF5_PREBUILT)
 	- rmdir /s /q $(CATCH2_PREBUILT)
 	- rmdir /s /q external\MOxUnit-master
 	- rmdir /s /q "+quadriga_lib"

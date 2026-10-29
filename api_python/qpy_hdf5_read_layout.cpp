@@ -16,7 +16,9 @@ Read the storage layout of channel data inside an HDF5 file
 - Returns the dimensions of the 4D channel-slot grid stored inside an HDF5 file
 - Also reports which slots already hold data, so free slots can be found without scanning the file
 - Returns `(0, 0, 0, 0)` dimensions if the file does not exist
-- Raises an error if the file exists but is not a valid HDF5 file
+- Raises an error if the file exists but is not a quadriga-lib channel file of version 3 (files written by
+  quadriga-lib 0.12.4 and earlier are rejected; files modified with other HDF5 tools are not supported and may be
+  rejected)
 
 ## Usage:
 ```
