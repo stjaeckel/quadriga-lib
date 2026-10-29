@@ -195,3 +195,86 @@ TEST_CASE("Material - glazing_double + glazing_triple", "[acoustic][materials]")
         QD_DIAG("%g,%.2f,%.1f,%+.2f,%.2f,%.2f,%.4f,%.2f\n", oct[o], -10.0 * std::log10(t1[o + 2]), A14[o], -10.0 * std::log10(t1[o + 2]) - A14[o],
                 -10.0 * std::log10(t0[o + 2]), Q[2][o] + s26, XT.a8[o + 2], ptb[o]);
 }
+
+TEST_CASE("Material - gypsum_board + plywood", "[acoustic][materials]")
+{
+    // Free single boards, class 1: the sheets gypsum_board_12_5mm (side 3.22 m, a wall of boards) and plywood_19mm
+    // (side 1.77 m, a sheet of 2.6 x 1.2 m). Gypsum: 680 kg/m3 in e [Hopkins_2007_SoundInsulation#135]; a from cL 1810
+    // m/s [Hopkins_2007_SoundInsulation#138]; the coincidence is physical, coiF = fc h / h with fc h = 35.8 Hz m at 343
+    // m/s (2860 Hz at 342.76 m/s) [Hopkins_2007_SoundInsulation#134] and coiQ = 1 / 0.0125
+    // [Hopkins_2007_SoundInsulation#136] (0.0136 in [Quirt_1995_GypsumWallsSummaryIR693#20]); att 0, no resonance; only
+    // fRef fitted (mass level 7.66 kg/m2, 0.90 x 8.5). Plywood: 710 kg/m3 in e [Hopkins_2007_SoundInsulation#153] (the
+    // specimens' density is not stated); a from cL 3850 m/s [Hopkins_2007_SoundInsulation#156]; coiF and coiQ are fit
+    // knobs: an orthotropic sheet has two coincidences (Wareing's minima at the 800 and 1250 Hz thirds), one column
+    // takes the upper, 1245 Hz, where the isotropic fc h 16.8 Hz m [Hopkins_2007_SoundInsulation#152] (883 Hz, eta
+    // 0.016 [Hopkins_2007_SoundInsulation#154]) reads 3.3 dB below #5 at 1 kHz; fRef, att fitted (mass level 8.42
+    // kg/m2, 0.62 x 13.49). Fits at 342.76271 m/s (4096 angles x 12 tones per third and this case's grid). The face
+    // absorption caps the transmission at every angle (an engine limit, "pane coincidence capped by the face
+    // absorption"): below the coincidence a light board passes more than a hard face absorbs. Gypsum tf and tfB: the
+    // power law of VanHout [VanHout_2016_SuspendedCeilings#9] (Sabine, the 10 mm plasterboard back of a composite tile
+    // laid on the floor, a neighbour build; 0.0692 at 1 kHz, exponent -0.411), printed; a law of the board's own
+    // transmission plus a painted plaster face [PTB_2012_AbsorptionTable#40] misses the references by 3.5 dB. Plywood
+    // tf and tfB: the minimax law of Quirt [Quirt_1983_WindowsII#1] (19 mm unfinished plywood lying on the chamber
+    // floor, Sabine; 0.081 at 1 kHz, exponent 0.305), asserted; the free sheet also passes what it transmits, which the
+    // floor mounting does not. Against a face that absorbs all, the face law adds 1.8 / 6.5 dB to gypsum at 63 Hz / 4
+    // kHz and 4.5 / 5.0 dB to plywood at 63 Hz / 1 kHz.
+    // Transmission, each within 3 dB at its specimen's side and mass-shifted: Hopkins
+    // [Hopkins_2007_SoundInsulation#132] (12.5 mm, no frame, 10.8 kg/m2, intensity, octaves the energy mean of thirds
+    // read from a figure, 3.53 x 2.63 m, side 3.047 m), Northwood [Northwood_1968_PlasterboardWalls#2] (12.7 mm, taped
+    // joints, 10.3 kg/m2, ASTM E90, mean of three, 3.05 x 2.44 m, side 2.728 m), their envelope within 1 dB; Wareing
+    // [Wareing_2016_OrthotropicPlywood#5] (19 mm) and [Wareing_2016_OrthotropicPlywood#7] (21 mm), small specimens
+    // clamped, 0.95 x 1.55 m (side 1.213 m), intensity. 31.5 Hz, 8 kHz (gypsum) and 31.5, 63 Hz, 8 kHz (plywood) take
+    // the spread of three physical models at the asserted side (the thin plate of the constants above with Davy's
+    // sigma, the same infinite at field incidence 0-78 deg, the limp mass with Davy's sigma). The grid has 200 angles:
+    // on 50 the 8 kHz octave reads up to 2.1 dB off.
+    // Reasonable meant: within the laboratory boards. Printed: Wareing [Wareing_2015_SampleSizeVariations#1] /
+    // [Wareing_2015_SampleSizeVariations#2] (10 mm gypsum, large on studs / small); [Wareing_2016_OrthotropicPlywood#4]
+    // (17 mm small: its coincidence moves with 1 / h, which the mass shift does not carry; 3.2 dB at 4 kHz) and
+    // [Wareing_2016_OrthotropicPlywood#6] (21 mm large on a glued frame: 2.3-4.5 dB below the small one above fc, where
+    // the side adds at most 0.8 dB; the row reads up to 4.5 dB above it). Valid: gypsum R 63 Hz - 4 kHz, plywood R 125
+    // Hz - 4 kHz.
+    const std::vector<double> oct = {125, 250, 500, 1000, 2000, 4000}, oct7 = {63, 125, 250, 500, 1000, 2000, 4000}, H = {12.6, 16.2, 21.6, 26.9, 32.0, 34.5, 28.8},
+                              N = {16.5, 19.8, 24.6, 29.7, 30.6, 25.6}, W[2] = {{12.5, 16.0, 20.6, 26.9, 30.2, 24.0}, {15.8, 19.9, 24.9, 29.3, 30.9, 24.9}},
+                              P5 = {18.9, 22.9, 25.8, 25.1, 26.0, 32.7}, P7 = {18.6, 23.5, 25.8, 24.8, 27.0, 33.3}, P4 = {17.1, 20.3, 24.2, 26.3, 25.1, 29.1},
+                              P6 = {16.2, 18.6, 21.4, 20.3, 23.5, 31.0}, vh = {0.28, 0.12, 0.06, 0.04, 0.04, 0.08};
+    const double sH = std::sqrt(3.53 * 2.63), sN = std::sqrt(3.05 * 2.44), sS = std::sqrt(0.95 * 1.55), sL = std::sqrt(4.8 * 2.4);
+    auto lab = [](const char *key, const char *type, const std::vector<double> &o, const std::vector<double> &v, double side, double m)
+    {
+        mt::Measured M{key, "R_dB", type, true, 3.0, o, {}, side, m};
+        for (double x : v)
+            M.lo_hi.push_back({x, x});
+        return M;
+    };
+    const char *iso = "laboratory sound reduction index (sound intensity), octave = energy mean of thirds";
+    const mt::Row g = mt::row("gypsum_board_12_5mm"), p = mt::row("plywood_19mm");
+    const mt::Measured gapG{"model spread", "R_dB", "physical models", true, 3.0, {31.5, 8000}, {{4.29, 7.76}, {35.35, 46.00}}, sH};
+    const mt::Measured gapP{"model spread", "R_dB", "physical models", true, 3.0, {31.5, 63, 8000}, {{6.76, 18.44}, {11.46, 19.10}, {46.75, 50.72}}, sS};
+    const mt::Measured quirt{"Quirt_1983_WindowsII #1", "alpha_random", "Sabine (ISO 354), on the chamber floor", false, 0.05, oct,
+                             {{0.018, 0.018}, {0.018, 0.018}, {0.085, 0.085}, {0.116, 0.116}, {0.092, 0.092}, {0.089, 0.089}}};
+    const mt::Out XG = mt::check_material("gypsum_board_12_5mm", g,
+                                          {lab("Hopkins #132", iso, oct7, H, sH, 10.8), lab("Northwood #2", "laboratory sound reduction index (ASTM E90), octave = energy mean of thirds", oct, N, sN, 10.3),
+                                           mt::envelope("Hopkins #132 and Northwood #2", oct, {{10.8, {H.begin() + 1, H.end()}}, {10.3, N}}, mt::mpp(g, 0.0125), sH), gapG},
+                                          mt::grid(200, 1));
+    const mt::Out XP = mt::check_material("plywood_19mm", p, {lab("Wareing 2016 #5", iso, oct, P5, sS, mt::mpp(p, 0.019)), lab("Wareing 2016 #7", iso, oct, P7, sS, mt::mpp(p, 0.021)), gapP, quirt},
+                                          mt::grid(200, 1));
+    const mt::Grid G = mt::grid(200, 1);
+    auto tl = [&](const mt::Row &r, double side) // the row's random-incidence octaves (dB) at a specimen's side
+    {
+        const mt::Field T = mt::transmit(mt::scene({{mt::with(r, "side", side), mt::SOLID, mt::col(r, "thk")}}), G);
+        const auto t = mt::octaves(G, [&](size_t q) { double s = 0.0; for (int i = 0; i < G.na; ++i) s += G.w[i] * std::norm(T[i][q]); return s; });
+        std::array<double, 9> d;
+        for (int o = 0; o < 9; ++o)
+            d[o] = -10.0 * std::log10(t[o]);
+        return d;
+    };
+    const auto gL = tl(g, sL), gS = tl(g, sS), pL = tl(p, sL), pS = tl(p, sS);
+    const double sw = 20.0 * std::log10(0.0125 / 0.010), s4 = 20.0 * std::log10(0.019 / 0.017), s6 = 20.0 * std::log10(0.019 / 0.021);
+    QD_DIAG("# diag: gypsum_board_12_5mm against Wareing 2015 #1 / #2 (10 mm, row at 3.394 / 1.213 m, mass-shifted) and its absorption against VanHout #9, "
+            "printed\noctave,library_tl_3.394,wareing1,library_tl_1.213,wareing2,library_alpha,vanhout9\n");
+    for (int o = 0; o < 6; ++o)
+        QD_DIAG("%g,%.2f,%.2f,%.2f,%.2f,%.4f,%.2f\n", oct[o], gL[o + 2], W[0][o] + sw, gS[o + 2], W[1][o] + sw, XG.a8[o + 2], vh[o]);
+    QD_DIAG("# diag: plywood_19mm against Wareing 2016 #4 (17 mm, row at 1.213 m) and #6 (21 mm large, row at 3.394 m), mass-shifted, printed\n"
+            "octave,library_tl_1.213,wareing4,library_tl_3.394,wareing6\n");
+    for (int o = 0; o < 6; ++o)
+        QD_DIAG("%g,%.2f,%.2f,%.2f,%.2f\n", oct[o], pS[o + 2], P4[o] + s4, pL[o + 2], P6[o] + s6);
+}

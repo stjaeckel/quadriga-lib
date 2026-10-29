@@ -211,10 +211,11 @@ Check every recipe against this list; the material list's recipes avoid them.
 
 ## 10. Class 6: outdoor
 
-- **Ground** is a porous half-space: a traced solid much thicker than the sound penetrates, of a ground row
-  (`ground_grass`, `ground_soil`, `ground_gravel_loose`, `ground_gravel_compacted`, `ground_snow`,
-  `ground_forest_floor`). The classes are defined by Delany-Bazley at a class flow resistivity, but Delany-Bazley needs
-  a gain in the columns at 6–25 of 25 thirds; the rows are Miki fits with passive columns to the class impedance. Loose gravel and a compacted
+- **Ground** is a porous half-space: a traced solid at least 1 m thick, of a ground row (`ground_grass`, or
+  `ground_grass_dry` for loose or dry grass, `ground_soil`, `ground_gravel_loose`, `ground_gravel_compacted`,
+  `ground_snow`, `ground_forest_floor`). The classes are defined by Delany-Bazley at a class flow resistivity, but Delany-Bazley needs
+  a gain in the columns at 6–25 of 25 thirds; the rows are Miki fits with passive columns to the class's plane-wave reflection (within about
+  0.06 in R, at most 1 dB in the ground effect). Loose gravel and a compacted
   gravel road differ by a factor of about 200 in flow resistivity: pick by what you see.
 - **At short range the ground acts nearly rigid at low frequency** (63–250 Hz excess attenuation +5.3 to +6.0 dB
   for σ 12.5–200 kPa·s/m² at 20–200 m, closed-form estimate); the uncertainty lies at higher frequencies and in the
