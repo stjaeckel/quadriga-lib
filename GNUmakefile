@@ -6,8 +6,8 @@ static_lib = ON
 shared_lib = OFF
 octave = ON
 matlab = ON
-python = OFF
-avx2 = OFF
+python = ON
+avx2 = ON
 cuda = OFF
 
 # GCC version override. Empty for system default. Note: NVCC max is 13, MATLAB max is 12
@@ -76,14 +76,14 @@ python_install: python
 test:   moxunit-lib
 	cmake -B $(CMAKE_BUILD_DIR) -D ENABLE_TESTS=ON
 	cmake --build $(CMAKE_BUILD_DIR) --parallel
-	$(CMAKE_BUILD_DIR)/test_bin
+	time $(CMAKE_BUILD_DIR)/test_bin
 ifeq ($(octave),ON)
 ifneq ($(OCTAVE_VERSION),)
-	octave --eval "cd tests; quadriga_lib_mex_tests;"
+	time octave --eval "cd tests; quadriga_lib_mex_tests;"
 endif
 endif
 ifeq ($(matlab),ON)
-	$(MATLAB_BIN) -batch "run('tests/quadriga_lib_mex_tests.m');"
+	time $(MATLAB_BIN) -batch "run('tests/quadriga_lib_mex_tests.m');"
 endif
 ifeq ($(python),ON)
 ifneq ($(PYTHON_SHARED_OBJ),)
