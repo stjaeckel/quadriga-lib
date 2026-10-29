@@ -195,7 +195,7 @@ namespace quadriga_lib
     // - All generators use SC_lambda (0 is used as 0.1 m); no bias removal; floors and 2D/3D as lsf_draw
     // - Later versions append blocks; existing columns and their values never change
     // - NumClusters = 1 (N = 0): both sets are empty, n_gen = 0
-    // - The functions are documented in src/qd_gbsm_phases.cpp (ssf_init_phases, ssf_draw)
+    // - The functions are documented in src/qd_gbsm_phases.cpp (ssf_init_phases, ssf_draw), src/ssf_clusters.cpp
 
     // Draw the random phases of one small-scale fading generator set of a BS site and scenario
     // - The seed of the set is derived from the seed of the site's large-scale set and 'set_id'
@@ -217,6 +217,35 @@ namespace quadriga_lib
                   bool dual_mobility = false,                              // Tx and Rx both move: the Tx side is a second device
                   const std::string &preset = "Comb256",                   // Must match ssf_init_phases
                   bool horizontal = true);                                 // true: 2D correlation (TR); false: 3D (legacy)
+
+    // Cluster delays, powers and angles of a set of links, TR 38.901 clause 7.5 steps 5 to 7
+    // - Methods: "38.901" (clause 7.5, one frequency), "38.901_MF" (clause 7.6.5.1), "quadriga" (spatially consistent,
+    //   multi-frequency, swap-reciprocal; exact delay spread)
+    // - Slots per link: 0 = LOS path (zero power in NLOS scenarios), 1 = ground reflection if GR_enabled, then the
+    //   N = NumClusters - 1 NLOS clusters; n_slot = NumClusters + (GR ? 1 : 0); NumClusters = 1: LOS path only
+    // - The ground-reflection power contains the polarisation-averaged reflection power; see the documentation
+    // - Delays relative to the LOS delay; angles in GCS, elevation convention; powers as used by the coefficients
+    void ssf_clusters(const std::unordered_map<std::string, double> &scenpar, // Scenario parameters
+                      const arma::mat &tx_pos,                                // Tx positions in [m], [1, 3] or [n_link, 3]
+                      const arma::mat &rx_pos,                                // Rx positions in [m], [n_link, 3]
+                      const arma::cube &lsp,                                  // LSPs from lsp_generate, [n_link, n_freq, 8]
+                      const arma::mat &rnd,                                   // Shared cluster set from ssf_draw, [n_link, 9·N]
+                      arma::cube &delay,                                      // Output: Delays in [s], [n_link, n_slot, n_fd]; n_fd = n_freq for 38.901_MF, else 1
+                      arma::cube &power,                                      // Output: Powers (linear), [n_link, n_slot, n_freq]
+                      arma::cube &aod,                                        // Output: Azimuth of departure in [rad], [n_link, n_slot, n_fd]
+                      arma::cube &eod,                                        // Output: Elevation of departure in [rad], [n_link, n_slot, n_fd]
+                      arma::cube &aoa,                                        // Output: Azimuth of arrival in [rad], [n_link, n_slot, n_fd]
+                      arma::cube &eoa,                                        // Output: Elevation of arrival in [rad], [n_link, n_slot, n_fd]
+                      const std::string &method = "38.901",                   // "38.901", "38.901_MF" or "quadriga"
+                      const arma::cube *rnd_freq = nullptr,                   // Optional: Per-frequency sets from ssf_draw, [n_link, N, n_freq]; required by 38.901, 38.901_MF if N > 0
+                      const arma::cube *lsp_anchor = nullptr,                 // Optional: LSPs at the anchor frequency, [n_link, 1, 8]; required by 38.901_MF if N > 0
+                      const arma::mat *eod_offset_deg = nullptr,              // Optional: EoD offset in [deg] from lsp_generate, positive = up, [n_link, n_freq]; nullptr = 0
+                      const arma::vec *abs_toa = nullptr,                     // Optional: Absolute TOA offset in [s] from lsp_generate, [n_link]; nullptr = 0
+                      const arma::mat *gr_eps_re = nullptr,                   // Optional: Ground permittivity, real part, [n_link, n_freq]; required if GR_enabled
+                      const arma::mat *gr_eps_im = nullptr,                   // Optional: Ground permittivity, imaginary part, [n_link, n_freq]; required if GR_enabled
+                      const std::vector<bool> *o2i = nullptr,                 // Optional: O2I flag per link (mean ZOA 90 deg in 38.901), [n_link]; nullptr = none
+                      const arma::uvec *n_cluster = nullptr,                  // Optional: Number of NLOS clusters per link (TR clause 7.6.15), [n_link]; nullptr = N
+                      arma::uvec *n_active = nullptr);                        // Optional output: Number of NLOS clusters with power > 0, [n_link]
 }
 
 #endif

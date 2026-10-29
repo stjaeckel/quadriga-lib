@@ -31,9 +31,10 @@
 // Units: positions in [m], rows {x, y, z}; frequencies of the sum-of-sinusoids tables in [1/m]; decorrelation
 // distances in [m].
 //
-// SSF generator index (small-scale fading, TR 38.901 clause 7.6.3.1; ssf_init_phases, ssf_draw). N = NumClusters - 1
-// NLOS clusters; column c = b·N + n belongs to block b and cluster n (0-based). All generators use SC_lambda (0 is
-// used as 0.1 m), none is bias-corrected. Mirror: column b·N + n mirrors m(b)·N + n.
+// SSF generator index (small-scale fading, TR 38.901 clause 7.6.3.1; ssf_init_phases, ssf_draw; the values are used by
+// ssf_clusters in ssf_clusters.cpp). N = NumClusters - 1 NLOS clusters; column c = b·N + n belongs to block b and
+// cluster n (0-based). All generators use SC_lambda (0 is used as 0.1 m), none is bias-corrected. Mirror: column
+// b·N + n mirrors m(b)·N + n.
 //
 //   Shared cluster set (set_id = -1, frequency-independent), n_gen = 9·N
 //   b   Variable                   Distribution   m(b)
