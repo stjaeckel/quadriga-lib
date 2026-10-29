@@ -28,67 +28,67 @@ lang: en-US
 | [channel_export_obj_file](#channel_export_obj_file) | Channel functions | 791 |
 | [hdf5_create_file](#hdf5_create_file) | Channel functions | 837 |
 | [hdf5_read_channel](#hdf5_read_channel) | Channel functions | 867 |
-| [hdf5_read_dset](#hdf5_read_dset) | Channel functions | 928 |
-| [hdf5_read_dset_names](#hdf5_read_dset_names) | Channel functions | 963 |
-| [hdf5_read_layout](#hdf5_read_layout) | Channel functions | 992 |
-| [hdf5_reshape_layout](#hdf5_reshape_layout) | Channel functions | 1019 |
-| [hdf5_write_channel](#hdf5_write_channel) | Channel functions | 1043 |
-| [hdf5_write_dset](#hdf5_write_dset) | Channel functions | 1089 |
-| [qrt_file_parse](#qrt_file_parse) | Channel functions | 1126 |
-| [qrt_file_read](#qrt_file_read) | Channel functions | 1159 |
-| [quantize_delays](#quantize_delays) | Channel functions | 1220 |
-| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 1296 |
-| [get_channels_planar](#get_channels_planar) | Channel generation functions | 1378 |
-| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 1454 |
-| [get_ieee_indoor](#get_ieee_indoor) | Channel generation functions | 1555 |
-| [acdf](#acdf) | Channel statistics | 1644 |
-| [calc_angular_spread](#calc_angular_spread) | Channel statistics | 1678 |
-| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 1718 |
-| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 1780 |
-| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 1810 |
-| [conf_file_list](#conf_file_list) | Geometry-based stochastic model | 1876 |
-| [conf_file_read](#conf_file_read) | Geometry-based stochastic model | 1916 |
-| [conf_file_write](#conf_file_write) | Geometry-based stochastic model | 1980 |
-| [los_probability](#los_probability) | Geometry-based stochastic model | 2052 |
-| [lsf_draw](#lsf_draw) | Geometry-based stochastic model | 2147 |
-| [lsf_init_phases](#lsf_init_phases) | Geometry-based stochastic model | 2239 |
-| [lsp_generate](#lsp_generate) | Geometry-based stochastic model | 2332 |
-| [o2i_loss](#o2i_loss) | Geometry-based stochastic model | 2455 |
-| [path_loss](#path_loss) | Geometry-based stochastic model | 2516 |
-| [scenpar_validate](#scenpar_validate) | Geometry-based stochastic model | 2631 |
-| [cart2geo](#cart2geo) | Math functions | 2694 |
-| [geo2cart](#geo2cart) | Math functions | 2726 |
-| [components](#components) | Miscellaneous / Tools | 2764 |
-| [version](#version) | Miscellaneous / Tools | 2773 |
-| [write_png](#write_png) | Miscellaneous / Tools | 2786 |
-| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 2834 |
-| [cube](#cube) | Site-specific simulation tools | 2909 |
-| [icosphere](#icosphere) | Site-specific simulation tools | 2937 |
-| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 2969 |
-| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 3004 |
-| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 3059 |
-| [plane](#plane) | Site-specific simulation tools | 3117 |
-| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 3147 |
-| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 3174 |
-| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 3205 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 3238 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 3284 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 3332 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 3358 |
-| [sos.acf_2d](#sosacf_2d) | Sum-of-sinusoids random number generator | 3534 |
-| [sos.acf_approx](#sosacf_approx) | Sum-of-sinusoids random number generator | 3564 |
-| [sos.acf_estimate](#sosacf_estimate) | Sum-of-sinusoids random number generator | 3599 |
-| [sos.acfi](#sosacfi) | Sum-of-sinusoids random number generator | 3654 |
-| [sos.calc_mse](#soscalc_mse) | Sum-of-sinusoids random number generator | 3678 |
-| [sos.generate](#sosgenerate) | Sum-of-sinusoids random number generator | 3728 |
-| [sos.init_phases](#sosinit_phases) | Sum-of-sinusoids random number generator | 3795 |
-| [sos.map](#sosmap) | Sum-of-sinusoids random number generator | 3829 |
-| [sos.preset](#sospreset) | Sum-of-sinusoids random number generator | 3866 |
-| [sos.rand](#sosrand) | Sum-of-sinusoids random number generator | 3905 |
-| [sos.randi](#sosrandi) | Sum-of-sinusoids random number generator | 3964 |
-| [sos.randn](#sosrandn) | Sum-of-sinusoids random number generator | 4025 |
-| [sos.remove_bias](#sosremove_bias) | Sum-of-sinusoids random number generator | 4083 |
-| [sos.val](#sosval) | Sum-of-sinusoids random number generator | 4162 |
+| [hdf5_read_dset](#hdf5_read_dset) | Channel functions | 930 |
+| [hdf5_read_dset_names](#hdf5_read_dset_names) | Channel functions | 966 |
+| [hdf5_read_layout](#hdf5_read_layout) | Channel functions | 998 |
+| [hdf5_reshape_layout](#hdf5_reshape_layout) | Channel functions | 1025 |
+| [hdf5_write_channel](#hdf5_write_channel) | Channel functions | 1049 |
+| [hdf5_write_dset](#hdf5_write_dset) | Channel functions | 1095 |
+| [qrt_file_parse](#qrt_file_parse) | Channel functions | 1133 |
+| [qrt_file_read](#qrt_file_read) | Channel functions | 1166 |
+| [quantize_delays](#quantize_delays) | Channel functions | 1227 |
+| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 1303 |
+| [get_channels_planar](#get_channels_planar) | Channel generation functions | 1385 |
+| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 1461 |
+| [get_ieee_indoor](#get_ieee_indoor) | Channel generation functions | 1562 |
+| [acdf](#acdf) | Channel statistics | 1651 |
+| [calc_angular_spread](#calc_angular_spread) | Channel statistics | 1685 |
+| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 1725 |
+| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 1787 |
+| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 1817 |
+| [conf_file_list](#conf_file_list) | Geometry-based stochastic model | 1883 |
+| [conf_file_read](#conf_file_read) | Geometry-based stochastic model | 1923 |
+| [conf_file_write](#conf_file_write) | Geometry-based stochastic model | 1987 |
+| [los_probability](#los_probability) | Geometry-based stochastic model | 2059 |
+| [lsf_draw](#lsf_draw) | Geometry-based stochastic model | 2154 |
+| [lsf_init_phases](#lsf_init_phases) | Geometry-based stochastic model | 2246 |
+| [lsp_generate](#lsp_generate) | Geometry-based stochastic model | 2339 |
+| [o2i_loss](#o2i_loss) | Geometry-based stochastic model | 2462 |
+| [path_loss](#path_loss) | Geometry-based stochastic model | 2523 |
+| [scenpar_validate](#scenpar_validate) | Geometry-based stochastic model | 2638 |
+| [cart2geo](#cart2geo) | Math functions | 2701 |
+| [geo2cart](#geo2cart) | Math functions | 2733 |
+| [components](#components) | Miscellaneous / Tools | 2771 |
+| [version](#version) | Miscellaneous / Tools | 2780 |
+| [write_png](#write_png) | Miscellaneous / Tools | 2793 |
+| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 2841 |
+| [cube](#cube) | Site-specific simulation tools | 2916 |
+| [icosphere](#icosphere) | Site-specific simulation tools | 2944 |
+| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 2976 |
+| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 3011 |
+| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 3066 |
+| [plane](#plane) | Site-specific simulation tools | 3124 |
+| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 3154 |
+| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 3181 |
+| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 3212 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 3245 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 3291 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 3339 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 3365 |
+| [sos.acf_2d](#sosacf_2d) | Sum-of-sinusoids random number generator | 3541 |
+| [sos.acf_approx](#sosacf_approx) | Sum-of-sinusoids random number generator | 3571 |
+| [sos.acf_estimate](#sosacf_estimate) | Sum-of-sinusoids random number generator | 3606 |
+| [sos.acfi](#sosacfi) | Sum-of-sinusoids random number generator | 3661 |
+| [sos.calc_mse](#soscalc_mse) | Sum-of-sinusoids random number generator | 3685 |
+| [sos.generate](#sosgenerate) | Sum-of-sinusoids random number generator | 3735 |
+| [sos.init_phases](#sosinit_phases) | Sum-of-sinusoids random number generator | 3802 |
+| [sos.map](#sosmap) | Sum-of-sinusoids random number generator | 3836 |
+| [sos.preset](#sospreset) | Sum-of-sinusoids random number generator | 3873 |
+| [sos.rand](#sosrand) | Sum-of-sinusoids random number generator | 3912 |
+| [sos.randi](#sosrandi) | Sum-of-sinusoids random number generator | 3971 |
+| [sos.randn](#sosrandn) | Sum-of-sinusoids random number generator | 4032 |
+| [sos.remove_bias](#sosremove_bias) | Sum-of-sinusoids random number generator | 4090 |
+| [sos.val](#sosval) | Sum-of-sinusoids random number generator | 4169 |
 
 ---
 
@@ -879,6 +879,8 @@ Reads channel data from HDF5 files
 - `snap` selects a subset of snapshots; if `None`, all snapshots are read
 - Errors if the file is not a quadriga-lib channel file of version 3: files written by quadriga-lib 0.12.4 and
   earlier are rejected; files modified with other HDF5 tools are not supported and may be rejected.
+- Convert files of quadriga-lib 0.12.4 and earlier with `tools/hdf5_convert_v2.py` of the quadriga-lib sources
+  (needs h5py): `python tools/hdf5_convert_v2.py old.hdf5 new.hdf5`.
 
 ### Usage:
 ```
@@ -929,7 +931,7 @@ chan, par = quadriga_lib.channel.hdf5_read_channel( fn, ix, iy, iz, iw, snap, st
 Read a single unstructured dataset from an HDF5 file
 
 - Reads one user-defined dataset from the slot addressed by the 0-based indices `(ix, iy, iz, iw)`
-- The dataset is looked up under `'par_' + name` — the `par_` prefix is prepended internally
+- The dataset is looked up under `prefix + name` (default prefix `par_`)
 - The returned type and shape are defined by the dataset's HDF5 dataspace: a scalar dataset gives a Python
   number, a vector a numpy array of shape `(n,)` (also with a single element), a matrix or 3D array a numpy array
   of the stored shape
@@ -940,7 +942,7 @@ Read a single unstructured dataset from an HDF5 file
 
 ### Usage:
 ```
-dset = quadriga_lib.channel.hdf5_read_dset( fn, ix, iy, iz, iw, name )
+dset = quadriga_lib.channel.hdf5_read_dset( fn, ix, iy, iz, iw, name, prefix )
 ```
 
 ### Inputs:
@@ -949,7 +951,8 @@ dset = quadriga_lib.channel.hdf5_read_dset( fn, ix, iy, iz, iw, name )
 - **`iy`** — Storage index for the y-dimension; 0-based; default: 0
 - **`iz`** — Storage index for the z-dimension; 0-based; default: 0
 - **`iw`** — Storage index for the w-dimension; 0-based; default: 0
-- **`name`** — Dataset name without the `par_` prefix, e.g. `'carrier_frequency'`; str
+- **`name`** — Dataset name without the prefix, e.g. `'carrier_frequency'`; str
+- **`prefix`** — Prefix prepended to `name` when looking up the dataset; str; default: `'par_'`
 
 ### Outputs:
 - **`dset`** — Dataset contents; type and shape are defined by the HDF5 dataspace; `None` if the dataset is missing
@@ -964,14 +967,15 @@ dset = quadriga_lib.channel.hdf5_read_dset( fn, ix, iy, iz, iw, name )
 Read the names of unstructured datasets from an HDF5 file
 
 - Lists all unstructured datasets stored at the slot addressed by the 0-based indices `(ix, iy, iz, iw)`
-- Datasets are identified by the `par_` prefix; the returned names have that prefix stripped
+- Lists the datasets whose names start with `prefix` (default `par_`; `''` lists all); the returned names have the
+  prefix stripped
 - Returns an empty list if no unstructured datasets are present at the slot
 - Errors if the file does not exist or is not a quadriga-lib channel file of version 3 (see
   [hdf5_read_channel](#hdf5_read_channel))
 
 ### Usage:
 ```
-names = quadriga_lib.channel.hdf5_read_dset_names( fn, ix, iy, iz, iw )
+names = quadriga_lib.channel.hdf5_read_dset_names( fn, ix, iy, iz, iw, prefix )
 ```
 
 ### Inputs:
@@ -980,9 +984,11 @@ names = quadriga_lib.channel.hdf5_read_dset_names( fn, ix, iy, iz, iw )
 - **`iy`** — Storage index for the y-dimension; 0-based; default: 0
 - **`iz`** — Storage index for the z-dimension; 0-based; default: 0
 - **`iw`** — Storage index for the w-dimension; 0-based; default: 0
+- **`prefix`** — Prefix used to identify unstructured datasets; `''` lists all datasets; str; default: `'par_'`
 
 ### Outputs:
-- **`names`** — Names of all unstructured datasets at the slot, with the `par_` prefix stripped; list of str
+- **`names`** — Names of the unstructured datasets at the slot whose names start with `prefix`, with the prefix
+  stripped, in creation order; list of str
 
 ### See also:
 - [hdf5_read_dset](#hdf5_read_dset) (for reading individual unstructured datasets)
@@ -1090,7 +1096,7 @@ storage_dims = quadriga_lib.channel.hdf5_write_channel( fn, chan, par, ix, iy, i
 Write a single unstructured dataset to an HDF5 file
 
 - Dataset is stored under `prefix + name` at slot `(ix, iy, iz, iw)`
-- `name` must contain only alphanumeric characters and underscores
+- `prefix + name` must contain only alphanumeric characters and underscores
 - The file must already exist (use [hdf5_create_file](#hdf5_create_file) first) and be a quadriga-lib channel file of
   version 3 (see [hdf5_read_channel](#hdf5_read_channel))
 - A dataset of the same name at the same slot is not overwritten; an error is thrown instead
@@ -1106,7 +1112,7 @@ Write a single unstructured dataset to an HDF5 file
 
 ### Usage:
 ```
-quadriga_lib.channel.hdf5_write_dset( fn, ix, iy, iz, iw, name, data )
+quadriga_lib.channel.hdf5_write_dset( fn, ix, iy, iz, iw, name, data, prefix )
 ```
 
 ### Input Arguments:
@@ -1117,6 +1123,7 @@ quadriga_lib.channel.hdf5_write_dset( fn, ix, iy, iz, iw, name, data )
 - **`iw`** — Storage index for the w-dimension; 0-based; default: 0
 - **`name`** — Dataset name without prefix, e.g. `'carrier_frequency'`; alphanumeric and underscores only; str
 - **`data`** — Data to be written; type must be supported (see above); cannot be empty
+- **`prefix`** — Prefix prepended to `name` in the HDF5 file; alphanumeric and underscores only; str; default: `'par_'`
 
 ### See also:
 - [hdf5_read_dset_names](#hdf5_read_dset_names) (for reading names of already written datasets)

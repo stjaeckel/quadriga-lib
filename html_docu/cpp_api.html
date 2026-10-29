@@ -2319,6 +2319,7 @@ Read a channel object from an HDF5 file at a specified 4D index
 <li>Unstructured fields (<code>std::any</code>) retain their original stored type without conversion; see <a href="#hdf5_read_dset">hdf5_read_dset</a> for the returned types.</li>
 <li>Round trip with <a href="#hdf5_write">hdf5_write</a>: every per-snapshot field comes back with one entry per snapshot, also for snapshots without paths (empty entries keep their shape); a channel written without <code>center_frequency</code> comes back with an empty <code>center_frequency</code>; empty <code>tx_orientation</code> / <code>rx_orientation</code> come back as <code>[3, 1]</code> zeros.</li>
 <li>Throws <code>std::invalid_argument</code> if the file is malformed (e.g. a dataset does not have the size given by the attributes of the channel, or a required dataset or attribute is missing) or is not a channel file of version 3 written by quadriga-lib: files written by quadriga-lib 0.12.4 and earlier (version 2) are rejected; files modified with other HDF5 tools are not supported and may be rejected.</li>
+<li>Files of quadriga-lib 0.12.4 and earlier can be converted to version 3 with the Python script <code>tools/hdf5_convert_v2.py</code> of the quadriga-lib sources (needs numpy, h5py and the quadriga_lib Python module): <code>python tools/hdf5_convert_v2.py old.hdf5 new.hdf5</code>.</li>
 </ul>
 
 <b>Declaration:</b><br>

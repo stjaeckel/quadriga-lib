@@ -24,6 +24,8 @@ Reads channel data from HDF5 files
 - `snap` selects a subset of snapshots; if `None`, all snapshots are read
 - Errors if the file is not a quadriga-lib channel file of version 3: files written by quadriga-lib 0.12.4 and
   earlier are rejected; files modified with other HDF5 tools are not supported and may be rejected.
+- Convert files of quadriga-lib 0.12.4 and earlier with `tools/hdf5_convert_v2.py` of the quadriga-lib sources
+  (needs h5py): `python tools/hdf5_convert_v2.py old.hdf5 new.hdf5`.
 
 ## Usage:
 ```

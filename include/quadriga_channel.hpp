@@ -262,7 +262,8 @@ namespace quadriga_lib
     // - All structured data is stored in single precision, but is converted to double in case if dtype = double
     // - Conversion to float or double is not done for unstructured data
     // - Throws std::invalid_argument if the file is malformed or not a version-3 channel file (version-2 files are
-    //   rejected; files modified with other HDF5 tools are not supported and may be rejected)
+    //   rejected; files modified with other HDF5 tools are not supported and may be rejected); convert version-2
+    //   files with tools/hdf5_convert_v2.py
     template <typename dtype>                          // Read as float or double
     channel<dtype> hdf5_read_channel(std::string fn,   // Filename of the HDF5 file
                                      unsigned ix = 0,  // x-Index in the HDF file

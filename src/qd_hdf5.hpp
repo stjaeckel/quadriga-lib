@@ -119,7 +119,8 @@ namespace qd
         {
             throw std::invalid_argument("Unsupported HDF5 file: quadriga-lib reads only channel files of version 3 that it "
                                         "wrote itself; files written by quadriga-lib 0.12.4 and earlier (version 2) and "
-                                        "files modified with other HDF5 tools are not supported.");
+                                        "files modified with other HDF5 tools are not supported. Version-2 files can be "
+                                        "converted with tools/hdf5_convert_v2.py.");
         }
 
         // ---- Checksum ----

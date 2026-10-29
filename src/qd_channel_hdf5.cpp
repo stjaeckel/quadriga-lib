@@ -906,6 +906,9 @@ Read a channel object from an HDF5 file at a specified 4D index
   attributes of the channel, or a required dataset or attribute is missing) or is not a channel file of version 3
   written by quadriga-lib: files written by quadriga-lib 0.12.4 and earlier (version 2) are rejected; files modified
   with other HDF5 tools are not supported and may be rejected.
+- Files of quadriga-lib 0.12.4 and earlier can be converted to version 3 with the Python script
+  `tools/hdf5_convert_v2.py` of the quadriga-lib sources (needs numpy, h5py and the quadriga_lib Python module):
+  `python tools/hdf5_convert_v2.py old.hdf5 new.hdf5`.
 
 ## Declaration:
 ```

@@ -14,7 +14,7 @@ SECTION!*/
 Write a single unstructured dataset to an HDF5 file
 
 - Dataset is stored under `prefix + name` at slot `(ix, iy, iz, iw)`
-- `name` must contain only alphanumeric characters and underscores
+- `prefix + name` must contain only alphanumeric characters and underscores
 - The file must already exist (use [[hdf5_create_file]] first) and be a quadriga-lib channel file of
   version 3 (see [[hdf5_read_channel]])
 - A dataset of the same name at the same slot is not overwritten; an error is thrown instead
@@ -30,7 +30,7 @@ Write a single unstructured dataset to an HDF5 file
 
 ## Usage:
 ```
-quadriga_lib.channel.hdf5_write_dset( fn, ix, iy, iz, iw, name, data )
+quadriga_lib.channel.hdf5_write_dset( fn, ix, iy, iz, iw, name, data, prefix )
 ```
 
 ## Input Arguments:
@@ -41,6 +41,7 @@ quadriga_lib.channel.hdf5_write_dset( fn, ix, iy, iz, iw, name, data )
 - **`iw`** — Storage index for the w-dimension; 0-based; default: 0
 - **`name`** — Dataset name without prefix, e.g. `'carrier_frequency'`; alphanumeric and underscores only; str
 - **`data`** — Data to be written; type must be supported (see above); cannot be empty
+- **`prefix`** — Prefix prepended to `name` in the HDF5 file; alphanumeric and underscores only; str; default: `'par_'`
 
 ## See also:
 - [[hdf5_read_dset_names]] (for reading names of already written datasets)
@@ -50,7 +51,8 @@ MD!*/
 void hdf5_write_dset(const std::string fn,
                      unsigned ix, unsigned iy, unsigned iz, unsigned iw,
                      const std::string name = "",
-                     const py::handle data = py::none())
+                     const py::handle data = py::none(),
+                     const std::string prefix = "par_")
 {
 
     // Check if data is None
@@ -73,5 +75,5 @@ void hdf5_write_dset(const std::string fn,
         throw std::invalid_argument("Location exceeds storage space in HDF file.");
 
     // Write to file
-    quadriga_lib::hdf5_write_dset(fn, name, &any_data, ix, iy, iz, iw);
+    quadriga_lib::hdf5_write_dset(fn, name, &any_data, ix, iy, iz, iw, prefix);
 }

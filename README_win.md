@@ -60,6 +60,19 @@ pip install quadriga-lib
 
 ---
 
+## Channel files of quadriga-lib 0.12.4 and earlier
+
+The HDF5 channel files use file format version 3; files of version 2 (written by quadriga-lib 0.12.4 and
+earlier) are rejected. Convert them once with the script [hdf5_convert_v2.py](https://github.com/stjaeckel/quadriga-lib/blob/main/tools/hdf5_convert_v2.py)
+of the quadriga-lib sources (also for MATLAB users):
+
+```
+pip install quadriga-lib h5py
+python hdf5_convert_v2.py old.hdf5 new.hdf5
+```
+
+---
+
 ## C++ Integration
 
 The `include\` folder contains all public headers including the bundled Armadillo headers. Link against `lib\quadriga.lib` in your build system of choice.

@@ -70,7 +70,8 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("stack") = false);
 
     m.def("hdf5_read_dset_names", &hdf5_read_dset_names, py::arg("fn"),
-          py::arg("ix") = 0, py::arg("iy") = 0, py::arg("iz") = 0, py::arg("iw") = 0);
+          py::arg("ix") = 0, py::arg("iy") = 0, py::arg("iz") = 0, py::arg("iw") = 0,
+          py::arg("prefix") = "par_");
 
     m.def("hdf5_read_dset", &hdf5_read_dset,
           py::arg("fn"),
@@ -78,7 +79,8 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("iy") = 0,
           py::arg("iz") = 0,
           py::arg("iw") = 0,
-          py::arg("name"));
+          py::arg("name"),
+          py::arg("prefix") = "par_");
 
     m.def("hdf5_read_layout", &hdf5_read_layout, py::arg("fn"));
 
@@ -97,7 +99,8 @@ void quadriga_lib_channel(py::module_ &m)
     m.def("hdf5_write_dset", &hdf5_write_dset, py::arg("fn"),
           py::arg("ix") = 0, py::arg("iy") = 0, py::arg("iz") = 0, py::arg("iw") = 0,
           py::arg("name"),
-          py::arg("data") = py::none());
+          py::arg("data") = py::none(),
+          py::arg("prefix") = "par_");
 
     m.def("get_ieee_indoor", &get_channels_ieee_indoor,
           py::arg("ap_array") = py::dict(),

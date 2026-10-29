@@ -13,7 +13,7 @@ SECTION!*/
 Read a single unstructured dataset from an HDF5 file
 
 - Reads one user-defined dataset from the slot addressed by the 0-based indices `(ix, iy, iz, iw)`
-- The dataset is looked up under `'par_' + name` — the `par_` prefix is prepended internally
+- The dataset is looked up under `prefix + name` (default prefix `par_`)
 - The returned type and shape are defined by the dataset's HDF5 dataspace: a scalar dataset gives a Python
   number, a vector a numpy array of shape `(n,)` (also with a single element), a matrix or 3D array a numpy array
   of the stored shape
@@ -24,7 +24,7 @@ Read a single unstructured dataset from an HDF5 file
 
 ## Usage:
 ```
-dset = quadriga_lib.channel.hdf5_read_dset( fn, ix, iy, iz, iw, name )
+dset = quadriga_lib.channel.hdf5_read_dset( fn, ix, iy, iz, iw, name, prefix )
 ```
 
 ## Inputs:
@@ -33,7 +33,8 @@ dset = quadriga_lib.channel.hdf5_read_dset( fn, ix, iy, iz, iw, name )
 - **`iy`** — Storage index for the y-dimension; 0-based; default: 0
 - **`iz`** — Storage index for the z-dimension; 0-based; default: 0
 - **`iw`** — Storage index for the w-dimension; 0-based; default: 0
-- **`name`** — Dataset name without the `par_` prefix, e.g. `'carrier_frequency'`; str
+- **`name`** — Dataset name without the prefix, e.g. `'carrier_frequency'`; str
+- **`prefix`** — Prefix prepended to `name` when looking up the dataset; str; default: `'par_'`
 
 ## Outputs:
 - **`dset`** — Dataset contents; type and shape are defined by the HDF5 dataspace; `None` if the dataset is missing
@@ -46,10 +47,10 @@ MD!*/
 
 py::object hdf5_read_dset(const std::string &fn,
                           unsigned ix, unsigned iy, unsigned iz, unsigned iw,
-                          const std::string &name)
+                          const std::string &name,
+                          const std::string &prefix)
 {
-    // Read the dataset; the C++ side prepends the default 'par_' prefix to 'name'
-    std::any dset = quadriga_lib::hdf5_read_dset(fn, name, ix, iy, iz, iw);
+    std::any dset = quadriga_lib::hdf5_read_dset(fn, name, ix, iy, iz, iw, prefix);
 
     // Convert to numpy array / scalar / str; None if the dataset is missing
     return qd_python_any2numpy(dset);
@@ -62,4 +63,5 @@ py::object hdf5_read_dset(const std::string &fn,
 //       py::arg("iy") = 0,
 //       py::arg("iz") = 0,
 //       py::arg("iw") = 0,
-//       py::arg("name"));
+//       py::arg("name"),
+//       py::arg("prefix") = "par_");
