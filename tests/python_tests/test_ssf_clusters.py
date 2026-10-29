@@ -119,6 +119,12 @@ class test_case(unittest.TestCase):
                             rtol=0)
         npt.assert_array_equal(pt, p0)
         npt.assert_array_equal(f(*args, abs_toa=list(self.abs_toa_n))[0], dt)
+        # "quadriga" in an NLOS scenario with absolute TOA: abs_toa required, the first NLOS cluster at abs_toa
+        with self.assertRaises(ValueError) as ctx:
+            f(self.sn, TX, RX, self.lsp_n, self.rnd_n, "quadriga")
+        self.assertIn("Method 'quadriga' requires 'abs_toa'", str(ctx.exception))
+        dq = f(self.sn, TX, RX, self.lsp_n, self.rnd_n, "quadriga", abs_toa=self.abs_toa_n)[0]
+        npt.assert_array_equal(dq[:, 1:, 0].min(axis=1), self.abs_toa_n)
 
     def test_ground_reflection(self):
         f = gbsm.ssf_clusters
@@ -143,6 +149,9 @@ class test_case(unittest.TestCase):
         with self.assertRaises(ValueError) as ctx:
             f(sg, TX, RX, self.lsp, self.rnd, "38.901", self.rnd_f, gr_eps=np.conj(self.gr_eps))
         self.assertIn("'gr_eps_im' >= 0", str(ctx.exception))
+        with self.assertRaises(ValueError) as ctx:  # a 3-D array is not flattened
+            f(sg, TX, RX, self.lsp, self.rnd, "38.901", self.rnd_f, gr_eps=self.gr_eps[:, :, np.newaxis])
+        self.assertIn("Input 'gr_eps' must have size (n_link, n_freq).", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:
             f(sg, TX, RX, self.lsp, self.rnd, "quadriga")
         self.assertIn("are required when 'GR_enabled' is set", str(ctx.exception))
@@ -165,7 +174,7 @@ class test_case(unittest.TestCase):
         npt.assert_array_equal(f(self.sp, TX, RX, self.lsp, self.rnd, "quadriga", n_cluster=nc.astype(float))[0], dc)
         with self.assertRaises(ValueError) as ctx:
             f(self.sp, TX, RX, self.lsp, self.rnd, "quadriga", n_cluster=[12, 6.5, 9, 12])
-        self.assertIn("Entries in 'n_cluster' must be non-negative integers.", str(ctx.exception))
+        self.assertIn("Entries in 'n_cluster' must be non-negative integers below 2^53.", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:
             f(self.sp, TX, RX, self.lsp, self.rnd, "quadriga", n_cluster=[12, 3, 9, 12])
         self.assertIn("Entries of 'n_cluster' must be in [6, 12].", str(ctx.exception))

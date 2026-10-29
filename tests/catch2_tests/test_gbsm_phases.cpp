@@ -22,15 +22,12 @@
 // independence of z in 2D mode, of tx_pos in single mobility and of the other links, sizes, empty input, pre-sized
 // outputs and the input validation.
 // Oracles, independent of the functions:
-//  - ref_sos(F, phi, x) = sqrt(2/N) · sum_n cos( 2·pi · F(n,:)·x + phi(n) + off(n) ), typed here, with the
+//  - the sum of sinusoids qd_ref_sos, the Uniform map and the floor offsets of qd_test_sos_oracle.hpp, with the
 //    frequencies of sos_preset at the decorrelation distance of each generator
 //  - the mirror table and the raw phases of sos_init_phases (documented contract)
-//  - dual mobility: (ref_sos(F_g, P0_g, R) + ref_sos(F_g, P0_g, T)) / sqrt(2 + 2·A_g(D)) for the self-mirrored
-//    generators, (ref_sos(F_g, P0_g, R) + ref_sos(F_m, P0_m, T)) / sqrt(2) for the pairs, A_g the ACF table of
+//  - dual mobility: (qd_ref_sos(F_g, P0_g, R) + qd_ref_sos(F_g, P0_g, T)) / sqrt(2 + 2·A_g(D)) for the self-mirrored
+//    generators, (qd_ref_sos(F_g, P0_g, R) + qd_ref_sos(F_m, P0_m, T)) / sqrt(2) for the pairs, A_g the ACF table of
 //    sos_preset interpolated linearly by sos_acfi, D the Tx-Rx distance (horizontal in 2D mode)
-//  - the Uniform map 0.5·erfc(-v/sqrt(2))
-//  - floor offsets 2·pi·k·n/N + psi_b(n), k = q mod N, b = q div N, psi_0 = 0, psi_b(n) = 2·pi·u_n with u_n from
-//    the raw outputs x_n of std::mt19937_64 seeded with b: u_n = (x_n >> 11)·2^-53
 //  - statistics: Normal(0,1), Uniform(0,1), the ACF table of sos_preset
 // Tolerances of lsf_draw values: lsf_draw evaluates the sinusoids with the AVX2 kernel where available (sine and
 // cosine in single precision, accumulation in double, deviation below 4e-7·sqrt(2·n_coeff) = 9e-6 for 256
@@ -54,6 +51,7 @@
 #include <unordered_map>
 
 #include "qd_test_diag.hpp"
+#include "qd_test_sos_oracle.hpp"
 QD_TEST_DIAG_SWITCH("QD_DIAG_GBSM")
 
 using Catch::Matchers::Message;
@@ -125,92 +123,13 @@ namespace
         return true;
     }
 
-    // Oracle: sum of sinusoids sqrt(2/N) · sum_n cos( 2·pi · (F(n,0)·x + F(n,1)·y + F(n,2)·z) + phi(n) + off(n) )
-    double ref_sos(const arma::mat &F, const double *phi, double x, double y, double z, const arma::vec *off = nullptr)
-    {
-        double s = 0.0;
-        for (arma::uword n = 0; n < F.n_rows; ++n)
-            s += std::cos(2.0 * pi * (F(n, 0) * x + F(n, 1) * y + F(n, 2) * z) + phi[n] + (off ? (*off)(n) : 0.0));
-        return std::sqrt(2.0 / (double)F.n_rows) * s;
-    }
-
-    // Mean of ref_sos over the rows of U; use_z = false evaluates at z = 0
+    // Mean of qd_ref_sos over the rows of U; use_z = false evaluates at z = 0
     double mean_ref(const arma::mat &F, const double *phi, const arma::mat &U, bool use_z)
     {
         double s = 0.0;
         for (arma::uword i = 0; i < U.n_rows; ++i)
-            s += ref_sos(F, phi, U(i, 0), U(i, 1), use_z ? U(i, 2) : 0.0);
+            s += qd_ref_sos(F, phi, U(i, 0), U(i, 1), use_z ? U(i, 2) : 0.0);
         return s / (double)U.n_rows;
-    }
-
-    double unif(double v) { return 0.5 * std::erfc(-v / std::sqrt(2.0)); }
-
-    // Frequencies and ACF table of a preset at decorrelation distance d
-    struct preset_tab
-    {
-        arma::mat F;
-        arma::vec acf, dist;
-    };
-
-    preset_tab get_preset(const std::string &preset, double d)
-    {
-        preset_tab t;
-        quadriga_lib::sos_preset<double>(preset, t.F, &t.acf, &t.dist, d);
-        return t;
-    }
-
-    // ACF of the table at distance D (linear interpolation by sos_acfi)
-    double acf_at(const preset_tab &t, double D)
-    {
-        arma::vec v;
-        quadriga_lib::sos_acfi<double>(t.acf, t.dist, arma::vec{D}, v);
-        return v(0);
-    }
-
-    // Floor offsets typed from the rule: 2·pi·k·n/N + psi_b(n)
-    arma::vec floor_offset(arma::uword N, arma::uword q)
-    {
-        const arma::uword k = q % N, b = q / N;
-        arma::vec d(N);
-        std::mt19937_64 gen(b);
-        for (arma::uword n = 0; n < N; ++n)
-        {
-            d(n) = 2.0 * pi * (double)k * (double)n / (double)N;
-            if (b > 0)
-                d(n) += 2.0 * pi * ((double)(gen() >> 11) / 9007199254740992.0);
-        }
-        return d;
-    }
-
-    // Regular grid of nx · ny positions with the given spacing at height z
-    arma::mat grid(arma::uword nx, arma::uword ny, double spacing, double z)
-    {
-        arma::mat p(nx * ny, 3);
-        for (arma::uword i = 0; i < nx; ++i)
-            for (arma::uword j = 0; j < ny; ++j)
-                p(i * ny + j, 0) = spacing * (double)i, p(i * ny + j, 1) = spacing * (double)j, p(i * ny + j, 2) = z;
-        return p;
-    }
-
-    double corr(const arma::vec &a, const arma::vec &b)
-    {
-        double ma = arma::mean(a), mb = arma::mean(b), sab = 0.0, saa = 0.0, sbb = 0.0;
-        for (arma::uword i = 0; i < a.n_elem; ++i)
-            sab += (a(i) - ma) * (b(i) - mb), saa += (a(i) - ma) * (a(i) - ma), sbb += (b(i) - mb) * (b(i) - mb);
-        return sab / std::sqrt(saa * sbb);
-    }
-
-    double var(const arma::vec &a)
-    {
-        double m = arma::mean(a), s = 0.0;
-        for (arma::uword i = 0; i < a.n_elem; ++i)
-            s += (a(i) - m) * (a(i) - m);
-        return s / (double)(a.n_elem - 1);
-    }
-
-    bool equal(const arma::mat &a, const arma::mat &b)
-    {
-        return a.n_rows == b.n_rows && a.n_cols == b.n_cols && arma::all(arma::vectorise(a == b));
     }
 
     // 7 links with distinct coordinates, negative values, up to 300 m, z != 0
@@ -312,7 +231,7 @@ TEST_CASE("lsf_init_phases - bias removal zeroes the drop mean in single mobilit
     QD_DIAG("g,lambda,mean_raw,mean_corrected\n");
     for (arma::uword g = 0; g < 9; ++g)
     {
-        const arma::mat F = get_preset("Comb256", lambda_g[g]).F;
+        const arma::mat F = qd_preset("Comb256", lambda_g[g]).F;
         double m = mean_ref(F, phase.slice(0).colptr(g), rx, false);
         double m0 = mean_ref(F, phase_raw.slice(0).colptr(g), rx, false);
         QD_DIAG("%llu,%.1f,%.6e,%.3e\n", (unsigned long long)g, lambda_g[g], m0, m);
@@ -341,7 +260,7 @@ TEST_CASE("lsf_init_phases - bias removal in 3D mode uses the z coordinate")
     QD_DIAG("g,mean_3d,mean_2d\n");
     for (arma::uword g = 0; g < 9; ++g)
     {
-        const arma::mat F = get_preset("Comb256", lambda_g[g]).F;
+        const arma::mat F = qd_preset("Comb256", lambda_g[g]).F;
         double m3 = mean_ref(F, phase.slice(0).colptr(g), rx, true);
         double m2 = mean_ref(F, phase.slice(0).colptr(g), rx, false);
         QD_DIAG("%llu,%.3e,%.6e\n", (unsigned long long)g, m3, m2);
@@ -370,7 +289,7 @@ TEST_CASE("lsf_init_phases - bias removal with dual mobility uses the Rx and Tx 
     QD_DIAG("g,mean_union,mean_rx_only\n");
     for (arma::uword g = 0; g < 9; ++g)
     {
-        const arma::mat F = get_preset("Comb256", lambda_g[g]).F;
+        const arma::mat F = qd_preset("Comb256", lambda_g[g]).F;
         double m = mean_ref(F, phase.slice(0).colptr(g), U, false);
         QD_DIAG("%llu,%.3e,%.6e\n", (unsigned long long)g, m, mean_ref(F, phase.slice(0).colptr(g), rx, false));
         INFO("g " << g);
@@ -434,7 +353,7 @@ TEST_CASE("lsf_init_phases - a decorrelation distance of 0 is used as 0.1 m")
     arma::cube phase;
     quadriga_lib::lsf_init_phases(sp, phase, 14, nullptr, &rx);
 
-    const arma::mat F = get_preset("Comb256", 0.1).F;
+    const arma::mat F = qd_preset("Comb256", 0.1).F;
     double m = mean_ref(F, phase.slice(0).colptr(0), rx, false);
     QD_DIAG("\n# diag: lsf_init_phases DS_lambda = 0, mean with the 0.1 m table: %.3e\n", m);
     CHECK(std::abs(m) < 1e-12);
@@ -523,13 +442,13 @@ TEST_CASE("lsf_draw - single mobility values equal the sum of sinusoids of each 
     QD_DIAG("g,lambda,max_diff\n");
     for (arma::uword g = 0; g < 11; ++g)
     {
-        const arma::mat F = get_preset("Comb256", lambda_g[g]).F;
+        const arma::mat F = qd_preset("Comb256", lambda_g[g]).F;
         double max_d = 0.0;
         for (arma::uword l = 0; l < 7; ++l)
         {
-            double v = ref_sos(F, phase.slice(0).colptr(g), rx(l, 0), rx(l, 1), 0.0);
+            double v = qd_ref_sos(F, phase.slice(0).colptr(g), rx(l, 0), rx(l, 1), 0.0);
             if (g >= 9)
-                v = unif(v);
+                v = qd_unif(v);
             max_d = std::max(max_d, std::abs(rnd(l, g) - v));
         }
         QD_DIAG("%llu,%.1f,%.3e\n", (unsigned long long)g, lambda_g[g], max_d);
@@ -539,7 +458,7 @@ TEST_CASE("lsf_draw - single mobility values equal the sum of sinusoids of each 
 
     // Determinism: a repeated call gives identical results
     quadriga_lib::lsf_draw(sp, phase, tx, rx, rnd2);
-    CHECK(equal(rnd, rnd2));
+    CHECK(qd_equal(rnd, rnd2));
 }
 
 TEST_CASE("lsf_draw - 3D mode uses the z coordinate")
@@ -554,12 +473,12 @@ TEST_CASE("lsf_draw - 3D mode uses the z coordinate")
     REQUIRE(rnd.n_cols == 11);
     for (arma::uword g = 0; g < 11; ++g)
     {
-        const arma::mat F = get_preset("Comb256", lambda_g[g]).F;
+        const arma::mat F = qd_preset("Comb256", lambda_g[g]).F;
         for (arma::uword l = 0; l < 7; ++l)
         {
-            double v = ref_sos(F, phase.slice(0).colptr(g), rx(l, 0), rx(l, 1), rx(l, 2));
+            double v = qd_ref_sos(F, phase.slice(0).colptr(g), rx(l, 0), rx(l, 1), rx(l, 2));
             if (g >= 9)
-                v = unif(v);
+                v = qd_unif(v);
             INFO("g " << g << ", link " << l);
             CHECK(std::abs(rnd(l, g) - v) < (g >= 9 ? 1e-5 : 2e-5)); // AVX2 kernel tolerance, see header
         }
@@ -579,11 +498,11 @@ TEST_CASE("lsf_draw - other presets")
         arma::mat rnd;
         quadriga_lib::lsf_draw(sp, phase, tx, rx, rnd, nullptr, false, presets[i]);
         REQUIRE(rnd.n_rows == 7);
-        const arma::mat F = get_preset(presets[i], lambda_g[0]).F;
+        const arma::mat F = qd_preset(presets[i], lambda_g[0]).F;
         for (arma::uword l = 0; l < 7; ++l)
         {
             INFO("preset " << presets[i] << ", link " << l);
-            CHECK(std::abs(rnd(l, 0) - ref_sos(F, phase.slice(0).colptr(0), rx(l, 0), rx(l, 1), 0.0)) < tol[i]);
+            CHECK(std::abs(rnd(l, 0) - qd_ref_sos(F, phase.slice(0).colptr(0), rx(l, 0), rx(l, 1), 0.0)) < tol[i]);
         }
     }
 }
@@ -600,8 +519,8 @@ TEST_CASE("lsf_draw - 2D mode values do not depend on z")
     rx.col(2) += 17.0, tx.col(2) -= 3.0;
     quadriga_lib::lsf_draw(sp, phase, tx, rx, b);
     quadriga_lib::lsf_draw(sp, phase, tx, rx, d, nullptr, true);
-    CHECK(equal(a, b));
-    CHECK(equal(c, d)); // dual mobility as well
+    CHECK(qd_equal(a, b));
+    CHECK(qd_equal(c, d)); // dual mobility as well
 }
 
 TEST_CASE("lsf_draw - single mobility ignores tx_pos")
@@ -612,7 +531,7 @@ TEST_CASE("lsf_draw - single mobility ignores tx_pos")
     arma::mat a, b;
     quadriga_lib::lsf_draw(sp, phase, tx1, rx, a);
     quadriga_lib::lsf_draw(sp, phase, tx2, rx, b);
-    CHECK(equal(a, b));
+    CHECK(qd_equal(a, b));
 }
 
 TEST_CASE("lsf_draw - a link does not depend on the other links")
@@ -632,7 +551,7 @@ TEST_CASE("lsf_draw - a link does not depend on the other links")
             const arma::uvec f = {fl(l)};
             quadriga_lib::lsf_draw(sp, phase, t, r, one, &f, dual == 1);
             INFO("dual " << dual << ", link " << l);
-            CHECK(equal(one, all.row(l)));
+            CHECK(qd_equal(one, all.row(l)));
         }
     }
 }
@@ -654,12 +573,12 @@ TEST_CASE("lsf_draw - dual mobility values follow the two-device formulas")
     auto oracle = [&](const arma::mat &R, const arma::mat &T, arma::uword l, arma::uword g, const arma::vec *off = nullptr)
     {
         const arma::uword m = mirror_g[g];
-        const preset_tab tg = get_preset("Comb256", lambda_g[g]), tm = get_preset("Comb256", lambda_g[m]);
-        double a = ref_sos(tg.F, phase.slice(0).colptr(g), R(l, 0), R(l, 1), 0.0, off);
-        double b = ref_sos(tm.F, phase.slice(0).colptr(m), T(l, 0), T(l, 1), 0.0, off);
+        const qd_preset_tab tg = qd_preset("Comb256", lambda_g[g]), tm = qd_preset("Comb256", lambda_g[m]);
+        double a = qd_ref_sos(tg.F, phase.slice(0).colptr(g), R(l, 0), R(l, 1), 0.0, off);
+        double b = qd_ref_sos(tm.F, phase.slice(0).colptr(m), T(l, 0), T(l, 1), 0.0, off);
         double D = std::sqrt((R(l, 0) - T(l, 0)) * (R(l, 0) - T(l, 0)) + (R(l, 1) - T(l, 1)) * (R(l, 1) - T(l, 1)));
-        double x = (m == g) ? (a + b) / std::sqrt(2.0 + 2.0 * acf_at(tg, D)) : (a + b) / std::sqrt(2.0);
-        return g >= 9 ? unif(x) : x;
+        double x = (m == g) ? (a + b) / std::sqrt(2.0 + 2.0 * qd_acf_at(tg, D)) : (a + b) / std::sqrt(2.0);
+        return g >= 9 ? qd_unif(x) : x;
     };
 
     QD_DIAG("\n# diag: lsf_draw dual mobility against the two-device formulas\n");
@@ -686,7 +605,7 @@ TEST_CASE("lsf_draw - dual mobility values follow the two-device formulas")
 
     // Floors 3 (k = 3, b = 0) and 259 (k = 3, b = 1) mixed with floor 0: the offsets go to both sides
     const arma::uvec fl = {3, 259, 0, 259, 3, 0};
-    const arma::vec off3 = floor_offset(256, 3), off259 = floor_offset(256, 259);
+    const arma::vec off3 = qd_floor_offset(256, 3), off259 = qd_floor_offset(256, 259);
     quadriga_lib::lsf_draw(sp, phase, tx, rx, rnd, &fl, true);
     REQUIRE(rnd.n_rows == 6);
     for (arma::uword l = 0; l < 6; ++l)
@@ -703,8 +622,8 @@ TEST_CASE("lsf_draw - dual mobility keeps unit variance and correlates the pairs
     auto sp = scen_distinct();
     sp["AS_D_lambda"] = 10.0, sp["AS_A_lambda"] = 15.0, sp["ES_D_lambda"] = 10.0, sp["ES_A_lambda"] = 20.0;
     const arma::cube phase = make_phase(256, 28);
-    const arma::mat rx = grid(100, 100, 50.0, 1.5);
-    const preset_tab t10 = get_preset("Comb256", 10.0), t15 = get_preset("Comb256", 15.0), t20 = get_preset("Comb256", 20.0);
+    const arma::mat rx = qd_grid(100, 100, 50.0, 1.5);
+    const qd_preset_tab t10 = qd_preset("Comb256", 10.0), t15 = qd_preset("Comb256", 15.0), t20 = qd_preset("Comb256", 20.0);
 
     // Variance: 5 standard errors of the sample variance, sqrt(2/n) = 0.014 -> 0.07
     // Correlation: 5 standard errors (<= 0.01) + approximation error of the SOS ACF (0.03) -> 0.08
@@ -718,10 +637,10 @@ TEST_CASE("lsf_draw - dual mobility keeps unit variance and correlates the pairs
         arma::mat rnd;
         quadriga_lib::lsf_draw(sp, phase, tx, rx, rnd, nullptr, true);
         REQUIRE(rnd.n_rows == rx.n_rows);
-        double v[4] = {var(rnd.col(3)), var(rnd.col(4)), var(rnd.col(5)), var(rnd.col(6))};
-        double c34 = corr(rnd.col(3), rnd.col(4)), c56 = corr(rnd.col(5), rnd.col(6));
-        double r34 = 0.5 * (acf_at(t10, D) + acf_at(t15, D));
-        double r56 = 0.5 * (acf_at(t10, D) + acf_at(t20, D));
+        double v[4] = {arma::var(rnd.col(3)), arma::var(rnd.col(4)), arma::var(rnd.col(5)), arma::var(rnd.col(6))};
+        double c34 = qd_corr(rnd.col(3), rnd.col(4)), c56 = qd_corr(rnd.col(5), rnd.col(6));
+        double r34 = 0.5 * (qd_acf_at(t10, D) + qd_acf_at(t15, D));
+        double r56 = 0.5 * (qd_acf_at(t10, D) + qd_acf_at(t20, D));
         QD_DIAG("%.0f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f\n", D, v[0], v[1], v[2], v[3], c34, r34, c56, r56);
         INFO("D " << D);
         for (int i = 0; i < 4; ++i)
@@ -776,23 +695,23 @@ TEST_CASE("lsf_draw - floor 0 equals no floor ID and equal IDs share one field")
     const arma::uvec fl0(7, arma::fill::zeros);
     quadriga_lib::lsf_draw(sp, phase, tx, rx, a);
     quadriga_lib::lsf_draw(sp, phase, tx, rx, b, &fl0);
-    CHECK(equal(a, b));
+    CHECK(qd_equal(a, b));
 
     // Floors 3 (k = 3, b = 0) and 259 (k = 3, b = 1) mixed with floor 0 in one call
     const arma::uvec fl = {3, 259, 3, 0, 259, 3, 259};
     quadriga_lib::lsf_draw(sp, phase, tx, rx, b, &fl);
     REQUIRE(b.n_rows == 7);
-    const arma::vec off3 = floor_offset(256, 3), off259 = floor_offset(256, 259), off0(256, arma::fill::zeros);
+    const arma::vec off3 = qd_floor_offset(256, 3), off259 = qd_floor_offset(256, 259), off0(256, arma::fill::zeros);
     QD_DIAG("\n# diag: lsf_draw floors against ref_sos with typed offsets\n");
     QD_DIAG("link,floor,g,value,oracle,diff\n");
     for (arma::uword l = 0; l < 7; ++l)
         for (arma::uword g = 0; g < 11; ++g)
         {
             const arma::vec *off = fl(l) == 3 ? &off3 : (fl(l) == 259 ? &off259 : &off0);
-            const arma::mat F = get_preset("Comb256", lambda_g[g]).F;
-            double v = ref_sos(F, phase.slice(0).colptr(g), rx(l, 0), rx(l, 1), 0.0, off);
+            const arma::mat F = qd_preset("Comb256", lambda_g[g]).F;
+            double v = qd_ref_sos(F, phase.slice(0).colptr(g), rx(l, 0), rx(l, 1), 0.0, off);
             if (g >= 9)
-                v = unif(v);
+                v = qd_unif(v);
             QD_DIAG("%llu,%llu,%llu,%.8f,%.8f,%.3e\n", (unsigned long long)l, (unsigned long long)fl(l), (unsigned long long)g, b(l, g), v, b(l, g) - v);
             INFO("link " << l << ", floor " << fl(l) << ", g " << g);
             CHECK(std::abs(b(l, g) - v) < (g >= 9 ? 1e-5 : 2e-5)); // AVX2 kernel tolerance, see header
@@ -803,7 +722,7 @@ TEST_CASE("lsf_draw - fields of different floors are uncorrelated at equal posit
 {
     const auto sp = scen_equal(10.0);
     const arma::cube phase = make_phase(256, 31);
-    const arma::mat g0 = grid(100, 100, 50.0, 1.5); // n = 10^4, spacing 5 decorrelation distances (ACF < 0.02)
+    const arma::mat g0 = qd_grid(100, 100, 50.0, 1.5); // n = 10^4, spacing 5 decorrelation distances (ACF < 0.02)
     const arma::uword n = g0.n_rows;
     const arma::uword floors[5] = {0, 1, 5, 255, 256};
 
@@ -828,7 +747,7 @@ TEST_CASE("lsf_draw - fields of different floors are uncorrelated at equal posit
         for (arma::uword g = 0; g < 9; ++g)
         {
             const arma::uword fa = (arma::uword)pairs[p][0], fb = (arma::uword)pairs[p][1];
-            double c = corr(rnd.col(g).rows(fa * n, fa * n + n - 1), rnd.col(g).rows(fb * n, fb * n + n - 1));
+            double c = qd_corr(rnd.col(g).rows(fa * n, fa * n + n - 1), rnd.col(g).rows(fb * n, fb * n + n - 1));
             QD_DIAG("%llu,%llu,%llu,%.4f\n", (unsigned long long)floors[fa], (unsigned long long)floors[fb], (unsigned long long)g, c);
             INFO("floors " << floors[fa] << ", " << floors[fb] << ", g " << g);
             CHECK(std::abs(c) < bound[p]);
@@ -839,7 +758,7 @@ TEST_CASE("lsf_draw - marginal distributions")
 {
     const auto sp = scen_equal(10.0);
     const arma::cube phase = make_phase(256, 32);
-    const arma::mat rx = grid(100, 100, 50.0, 1.5), tx = {{0.0, 0.0, 25.0}};
+    const arma::mat rx = qd_grid(100, 100, 50.0, 1.5), tx = {{0.0, 0.0, 25.0}};
     arma::mat rnd;
     quadriga_lib::lsf_draw(sp, phase, tx, rx, rnd);
     REQUIRE(rnd.n_cols == 11);
@@ -851,7 +770,7 @@ TEST_CASE("lsf_draw - marginal distributions")
     for (arma::uword g = 0; g < 11; ++g)
     {
         const arma::vec c = rnd.col(g);
-        double m = arma::mean(c), s = std::sqrt(var(c)), frac = (double)arma::accu(c < 0.1) / (double)c.n_elem;
+        double m = arma::mean(c), s = std::sqrt(arma::var(c)), frac = (double)arma::accu(c < 0.1) / (double)c.n_elem;
         QD_DIAG("%llu,%.4f,%.4f,%.4f\n", (unsigned long long)g, m, s, frac);
         INFO("g " << g);
         if (g < 9)
@@ -876,7 +795,7 @@ TEST_CASE("lsf_draw - the correlation follows the preset ACF")
     // ACF (e.g. Comb256 at 10 m: 0.408 along x, 0.393 along y, against 0.368; Exp256 at 5 m along y: 0.572
     // against 0.607)
     const auto sp = scen_equal(10.0);
-    const arma::mat base = grid(100, 100, 50.0, 1.5), tx = {{0.0, 0.0, 25.0}};
+    const arma::mat base = qd_grid(100, 100, 50.0, 1.5), tx = {{0.0, 0.0, 25.0}};
     const char *presets[2] = {"Comb256", "Exp256"};
     const double offsets[3] = {5.0, 10.0, 20.0};
     const double az[4] = {0.0, 0.25 * pi, 0.5 * pi, 0.75 * pi};
@@ -886,7 +805,7 @@ TEST_CASE("lsf_draw - the correlation follows the preset ACF")
     for (int p = 0; p < 2; ++p)
     {
         const arma::cube phase = make_phase(256, 33 + p);
-        const preset_tab t = get_preset(presets[p], 10.0);
+        const qd_preset_tab t = qd_preset(presets[p], 10.0);
         arma::mat a;
         quadriga_lib::lsf_draw(sp, phase, tx, base, a, nullptr, false, presets[p]);
         for (double d : offsets)
@@ -895,12 +814,12 @@ TEST_CASE("lsf_draw - the correlation follows the preset ACF")
                 arma::mat moved = base, b;
                 moved.col(0) += d * std::cos(phi), moved.col(1) += d * std::sin(phi);
                 quadriga_lib::lsf_draw(sp, phase, tx, moved, b, nullptr, false, presets[p]);
-                double ref = acf_at(t, d);
-                QD_DIAG("%s,%.0f,%.0f,%.4f,%.4f\n", presets[p], d, phi * 180.0 / pi, corr(a.col(0), b.col(0)), ref);
+                double ref = qd_acf_at(t, d);
+                QD_DIAG("%s,%.0f,%.0f,%.4f,%.4f\n", presets[p], d, phi * 180.0 / pi, qd_corr(a.col(0), b.col(0)), ref);
                 for (arma::uword g = 0; g < 9; ++g)
                 {
                     INFO(presets[p] << ", offset " << d << ", azimuth " << phi << ", g " << g);
-                    CHECK(std::abs(corr(a.col(g), b.col(g)) - ref) < 0.1);
+                    CHECK(std::abs(qd_corr(a.col(g), b.col(g)) - ref) < 0.1);
                 }
             }
     }
@@ -932,16 +851,16 @@ TEST_CASE("lsf_draw - sizes, empty input and pre-sized output")
     const double *mem = pre.memptr();
     quadriga_lib::lsf_draw(sp, phase, tx, rx, pre, &fl);
     CHECK(pre.memptr() == mem);
-    CHECK(equal(pre, ref1));
+    CHECK(qd_equal(pre, ref1));
     pre.fill(99.0);
     quadriga_lib::lsf_draw(sp, phase, tx, rx, pre, nullptr, true);
     CHECK(pre.memptr() == mem);
-    CHECK(equal(pre, ref));
+    CHECK(qd_equal(pre, ref));
 
     // Wrong size: resized
     arma::mat wrong(3, 3, arma::fill::ones);
     quadriga_lib::lsf_draw(sp, phase, tx, rx, wrong, nullptr, true);
-    CHECK(equal(wrong, ref));
+    CHECK(qd_equal(wrong, ref));
 }
 
 TEST_CASE("lsf_draw - input validation")

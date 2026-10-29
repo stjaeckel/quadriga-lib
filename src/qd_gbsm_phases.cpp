@@ -53,17 +53,15 @@
 // NumClusters = 1 (N = 0): both sets are empty and no sum-of-sinusoids function is called.
 //
 // Seeds of the SSF sets: seed_set = splitmix64( splitmix64(seed) ^ tag ) >> 1 with the seed of the LSF set of the
-// same site and scenario, tag = 1 for the shared set and 2 + k for the set of frequency k; slice 0 =
-// sos_init_phases(n_coeff, n_gen, seed_set). A set never repeats the LSF phases of the same seed, and the sets are
-// independent streams. Seed -1 passes -1 on (system random device).
+// same site and scenario, tag = 1 for the shared set and 2 + k for the set of frequency k, and splitmix64(x):
+// z = x + 0x9E3779B97F4A7C15; z = (z ^ (z >> 30))·0xBF58476D1CE4E5B9; z = (z ^ (z >> 27))·0x94D049BB133111EB;
+// return z ^ (z >> 31) (uint64, wrapping); slice 0 = sos_init_phases(n_coeff, n_gen, seed_set). A set never repeats
+// the LSF phases of the same seed (no shared stream) and the sets are independent streams; seed -1 passes -1 on
+// (system random device).
 //
 // Append-only rule: sos_init_phases fills column g from one stream independently of n_gen, and ssf_draw evaluates
 // each column with its own phases only. A later version that appends blocks to a set (N columns or a multiple of N
 // each, never reordered or resized) therefore keeps the values of all existing columns bit for bit.
-//
-// The machinery in the anonymous namespace takes everything as explicit arguments and groups the sos_val /
-// sos_remove_bias calls by frequency table (one call per distinct decorrelation distance and side), so a set with
-// hundreds of generators at one distance needs one call per side and floor.
 
 #include "quadriga_gbsm.hpp"
 #include "quadriga_gbsm_helpers.hpp"
@@ -676,38 +674,16 @@ void quadriga_lib::lsf_draw(const std::unordered_map<std::string, double> &scenp
 # ssf_init_phases
 Draw the random phases of one small-scale fading generator set of a BS site and scenario
 
-- The small-scale fading (SSF) random variables of the clusters (TR 38.901 clause 7.6.3.1) are spatially correlated
-  sum-of-sinusoids generators in two kinds of sets, with `N = NumClusters - 1` NLOS clusters. Column `c = b·N + n`
-  belongs to block `b` and cluster `n` (0-based):
-- Shared cluster set (`set_id = -1`, frequency-independent), `9·N` generators: block 0 cluster delay (Uniform(0,1));
-  blocks 1, 2 sign of AOD, AOA; 3, 4 sign of ZOD, ZOA; 5, 6 angle offset of AOD, AOA; 7, 8 angle offset of ZOD, ZOA
-  (all Normal(0,1))
-- Per-frequency set (`set_id = k >= 0`), `N` generators: block 0 cluster shadowing (Normal(0,1)). `k` is the index
-  of the frequency in the caller's frequency list; the list must have the same order in every call
-- This function draws the phases; [[ssf_draw]] evaluates them at the links. The caller stores `phase` and evaluates
-  the same fields again along tracks or on maps
-- Slice 1 (Tx side) is always the mirror of slice 0: column `b·N + n` of slice 1 is column `m(b)·N + n` of slice
-  0, with `m` exchanging the blocks 1 and 2, 3 and 4, 5 and 6, 7 and 8 (departure and arrival of the same cluster);
-  the delay block and the shadowing block mirror themselves
-- Seed of the set, derived from `seed`, the seed of the large-scale set of the same site and scenario (see
-  [[lsf_init_phases]]): `seed_set = splitmix64( splitmix64(seed) ^ tag ) >> 1` with `tag = 1` for the shared set
-  and `tag = 2 + k` for the set of frequency `k`, and `splitmix64(x)`: `z = x + 0x9E3779B97F4A7C15`,
-  `z = (z ^ (z >> 30)) · 0xBF58476D1CE4E5B9`, `z = (z ^ (z >> 27)) · 0x94D049BB133111EB`, result `z ^ (z >> 31)`
-  (unsigned 64-bit arithmetic, wrapping). Slice 0 equals `sos_init_phases(n_coeff, n_gen, seed_set)` of
-  [[sos_init_phases]], with `n_coeff` the number of sinusoids of `preset`. The sets therefore never repeat the
-  large-scale phases of the same seed, and the sets of different frequencies are independent streams
-- The same seed gives the same phases on all platforms; the caller keeps an explicit seed (or the phase cubes) to
-  reproduce the clusters. `seed = -1` draws unrelated random phases from the system random device
-- Each scenario of a site (link type LOS, NLOS, O2I) needs its own large-scale seed: TR 38.901 clause 7.6.3.4 makes
-  the link types uncorrelated, and one seed would give the LOS and the NLOS scenario identical cluster fields
-- `NumClusters = 1` (`N = 0`, LOS path only): both sets are empty, `phase` has size `[n_coeff, 0, 2]`
-- Append-only: a later version that appends blocks to a set keeps the existing columns and their phases;
-  `sos_init_phases` fills column `g` from one stream independently of the number of columns
-- No bias removal (the function takes no positions). `SC_lambda`, the decorrelation distance of all generators, is
-  used only by [[ssf_draw]]
-- `scenpar` is completed with the defaults of missing keys and validated by [[scenpar_validate]]; its messages pass
-  through unchanged. An invalid value of a key that is not used here throws as well
-- Validation order: `seed`, `set_id`, `preset`, `scenpar`
+- The cluster random values of the small-scale fading (TR 38.901 clause 7.6.3.1) come in two kinds of sets, with
+  `N = NumClusters - 1` NLOS clusters: one shared cluster set (`set_id = -1`, `9·N` generators) and one set per
+  carrier frequency (`set_id = k`, `N` generators, `k` = index in the caller's frequency list, the same order in
+  every call). [[ssf_draw]] evaluates the phases at the links and lists the columns
+- The phases are a fixed function of `seed`, the seed of the large-scale set of the same site and scenario
+  ([[lsf_init_phases]]), and `set_id`, equal on all platforms; the sets do not repeat the large-scale phases and are
+  independent of each other. Keep an explicit seed (or the phase cubes) to reproduce the clusters
+- Each scenario of a site (LOS, NLOS, O2I) needs its own large-scale seed: TR 38.901 clause 7.6.3.4 makes the link
+  types uncorrelated
+- `NumClusters = 1`: both sets are empty
 
 ## Declaration:
 ```
@@ -720,22 +696,20 @@ void quadriga_lib::ssf_init_phases(
 ```
 
 ## Inputs:
-- **`scenpar`** — Scenario parameters as returned by [[conf_file_read]] or [[scenpar_validate]]; missing keys
-  have their default value; `NumClusters` sets the number of generators
-- **`seed`** *(optional)* — Seed of the large-scale set of the same site and scenario, must be >= -1; -1 = system
-  random device, a new set of phases on each call
-- **`set_id`** *(optional)* — `-1` = shared cluster set; `k >= 0` = set of frequency `k` (0-based); must be >= -1
+- **`scenpar`** — Scenario parameters from [[conf_file_read]] or [[scenpar_validate]], missing keys take their
+  defaults; `NumClusters` sets `N`
+- **`seed`** *(optional)* — Seed of the large-scale set, >= -1; -1 = system random device (new phases per call)
+- **`set_id`** *(optional)* — `-1` = shared cluster set; `k >= 0` = set of frequency `k`
 - **`preset`** *(optional)* — Sum-of-sinusoids preset, see [[sos_preset]]; sets `n_coeff`
 
 ## Output:
-- **`phase`** — Phases in [rad]; slice 0 = Rx side, slice 1 = Tx side (mirror of slice 0); all values in
-  [-pi, pi); `[n_coeff, n_gen, 2]` with `n_gen = 9·N` (shared set) or `N` (per-frequency set)
+- **`phase`** — Phases in [rad], in [-pi, pi); slice 0 = Rx side, slice 1 = Tx side (mirror generators);
+  `[n_coeff, n_gen, 2]`, `n_gen = 9·N` (shared set) or `N`
 
 ## See also:
 - [[ssf_draw]] (evaluates the phases at the links)
 - [[ssf_clusters]] (the clusters from the random values)
 - [[lsf_init_phases]] (the large-scale set and its seed)
-- [[sos_init_phases]] (the raw phases)
 MD!*/
 
 void quadriga_lib::ssf_init_phases(const std::unordered_map<std::string, double> &scenpar,
@@ -794,43 +768,20 @@ void quadriga_lib::ssf_init_phases(const std::unordered_map<std::string, double>
 # ssf_draw
 Spatially correlated normalized random values of one small-scale fading generator set at a set of links
 
-- Evaluates the generators of a set of [[ssf_init_phases]] at the links. With `N = NumClusters - 1`, column
-  `c = b·N + n` belongs to block `b` and NLOS cluster `n`. Shared cluster set (`set_id = -1`, `9·N` columns): block
-  0 cluster delay (Uniform(0,1)), blocks 1, 2 sign of AOD, AOA, 3, 4 sign of ZOD, ZOA, 5, 6 angle offset of AOD,
-  AOA, 7, 8 angle offset of ZOD, ZOA (Normal(0,1)). Per-frequency set (`set_id = k >= 0`, `N` columns): cluster
-  shadowing (Normal(0,1))
-- All generators use the decorrelation distance `SC_lambda` (TR 38.901 Table 7.6.3.1-2); `SC_lambda = 0`
-  (spatial consistency off) is used as 0.1 m, which gives fields that decorrelate within 0.1 m
-- `scenpar` is completed and validated by [[scenpar_validate]] as in [[ssf_init_phases]]; its messages pass
-  through unchanged
-- Single mobility (`dual_mobility = false`): column `c` is the field of generator `c` at the Rx position,
-  `x_c = s_c(rx)` with `s_c(x) = sqrt(2/n_coeff) · sum_n cos( 2·pi · f_n·x + phi_n )` and the phases of slice 0; the
-  values do not depend on `tx_pos`
-- Dual mobility: the Tx is a second device. Its side uses slice 1, i.e. the field of the mirror generator at the Tx
-  position (departure and arrival blocks exchanged). Self-mirrored columns (delay, shadowing) share one map:
-  `x_c = ( s_c(rx) + s_c(tx) ) / sqrt( 2 + 2·A(D) )`, with the Tx-Rx distance `D` and the ACF `A` of the preset,
-  linearly interpolated. The pair columns are two maps: `x_c = ( s_c(rx) + s_m(tx) ) / sqrt(2)`
-- Swap reciprocity in dual mobility (S. Jaeckel et al., "A Spatially Consistent Geometric D2D Small-Scale Fading
-  Model for Multiple Frequencies", 2019, eqs. (3)-(5)): swapping `tx_pos` and `rx_pos` leaves the delay and the shadowing blocks unchanged and exchanges
-  block 1 with 2, 3 with 4, 5 with 6 and 7 with 8, exactly (the same evaluations in swapped roles)
-- Uniform block 0 of the shared set: `0.5 · erfc( -x / sqrt(2) )` of the Normal value
-- `horizontal = true`: the positions are projected on the x-y plane (z = 0) and the values do not depend on z;
-  `false`: 3D positions (legacy). `D` is measured in the same space
-- Floors as in [[lsf_draw]] (same phase offsets per floor ID; TR 38.901 clause 7.6.3.3: SSF variables are
-  uncorrelated across floors): pass the same `floor_id` as to [[lsf_draw]]; only in 2D mode
-- The value of a link does not depend on the other links of the call, and a column does not depend on the phases of
-  the other columns (append-only: appended blocks leave the existing columns unchanged bit for bit)
-- Clusters by TR 38.901 clause 7.5 under spatial consistency: clause 7.6.3.1 keeps the signs and the random offsets
-  of the clusters unchanged per drop; the caller evaluates them at the drop or segment-start positions and reuses
-  those values along the track
-- Precision: the sinusoids are evaluated by [[sos_val]] with the AVX2 kernel where available (sine and cosine in
-  single precision, accumulation in double); the values deviate from a double-precision evaluation by less than
-  `4e-7 · sqrt(2 · n_coeff)` (9e-6 for 256 sinusoids)
-- `preset`, `horizontal` and the set type (`set_id < 0` or `>= 0`) must match [[ssf_init_phases]]
-- `n_link = 0` returns `rnd` with size `[0, n_gen]`; `NumClusters = 1` returns `[n_link, 0]` and accepts any empty
-  `phase`. `rnd` may share memory with `tx_pos` or `rx_pos` (the positions are copied before `rnd` is written)
-- Validation order: positions (3 columns, rows of `tx_pos`, finite values), `set_id`, `preset`, `scenpar`, size of
-  `phase`, finite `phase`, length of `floor_id`, `floor_id` with `horizontal = false`
+- Evaluates a set of [[ssf_init_phases]] at the links with the rules of [[lsf_draw]] for single and dual mobility,
+  floors, 2D/3D mode and precision; every generator uses the decorrelation distance `SC_lambda` (TR 38.901 Table
+  7.6.3.1-2; 0 = spatial consistency off, used as 0.1 m)
+- Columns, `N = NumClusters - 1`; column `b·N + n` belongs to block `b` and NLOS cluster `n`:
+  - shared set (`set_id = -1`, `9·N` columns): block 0 cluster delay, Uniform(0,1); blocks 1, 2 sign of AOD, AOA;
+    3, 4 sign of ZOD, ZOA; 5, 6 angle offset of AOD, AOA; 7, 8 angle offset of ZOD, ZOA; Normal(0,1)
+  - per-frequency set (`set_id = k`, `N` columns): cluster shadowing, Normal(0,1)
+- Dual mobility: swapping `tx_pos` and `rx_pos` exchanges the blocks 1 and 2, 3 and 4, 5 and 6, 7 and 8 and keeps
+  the delay and shadowing blocks, exactly (D2D reciprocity of S. Jaeckel et al., "A Spatially Consistent Geometric
+  D2D Small-Scale Fading Model for Multiple Frequencies", 2019)
+- A column depends neither on the other columns nor on the other links; later versions append blocks and keep the
+  values of the existing columns
+- `preset`, `horizontal` and the set type must match [[ssf_init_phases]]. `NumClusters = 1` gives `[n_link, 0]`
+  (any empty `phase` is accepted)
 
 ## Declaration:
 ```
@@ -848,31 +799,23 @@ void quadriga_lib::ssf_draw(
 ```
 
 ## Inputs:
-- **`scenpar`** — Scenario parameters as returned by [[conf_file_read]] or [[scenpar_validate]]; missing keys
-  have their default value; `NumClusters` and `SC_lambda` are used
-- **`phase`** — Phases in [rad] from [[ssf_init_phases]]; slice 0 = Rx side, slice 1 = Tx side; must be finite;
-  `[n_coeff, n_gen, 2]`, `n_coeff` of `preset`, `n_gen` of the set type
-- **`tx_pos`** — Tx positions in [m]; one row is used for all links; not used in single mobility (but validated);
-  `[1, 3]` or `[n_link, 3]`
+- **`scenpar`** — Scenario parameters as in [[ssf_init_phases]]; `NumClusters` and `SC_lambda` are used
+- **`phase`** — Phases from [[ssf_init_phases]], finite; `[n_coeff, n_gen, 2]`
+- **`tx_pos`** — Tx positions in [m], one row for all links; used in dual mobility; `[1, 3]` or `[n_link, 3]`
 - **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
-- **`set_id`** *(optional)* — Set type as in [[ssf_init_phases]]: `-1` = shared cluster set, `k >= 0` =
-  per-frequency set; must be >= -1
-- **`floor_id`** *(optional)* — Floor index per link, 0-based; omitted = all links on floor 0; in dual mobility
-  the floor of both devices; only with `horizontal = true`; `[n_link]`
-- **`dual_mobility`** *(optional)* — `true`: Tx and Rx both move, the Tx side is evaluated as a second device
-- **`preset`** *(optional)* — Sum-of-sinusoids preset, see [[sos_preset]]; must match [[ssf_init_phases]]
-- **`horizontal`** *(optional)* — `true`: 2D correlation in the x-y plane (TR 38.901 behaviour); `false`: 3D
-  correlation (legacy QuaDRiGa behaviour); must match [[ssf_init_phases]]
+- **`set_id`** *(optional)* — `-1` = shared cluster set; `k >= 0` = per-frequency set
+- **`floor_id`** *(optional)* — Floor index per link as in [[lsf_draw]], 2D mode only; omitted = floor 0; `[n_link]`
+- **`dual_mobility`** *(optional)* — `true`: the Tx is a second moving device
+- **`preset`** *(optional)* — Sum-of-sinusoids preset, see [[sos_preset]]
+- **`horizontal`** *(optional)* — `true`: 2D correlation (TR 38.901); `false`: 3D (legacy QuaDRiGa)
 
 ## Output:
-- **`rnd`** — Random values; shared set: columns `0 ... N-1` Uniform(0,1), the others Normal(0,1); per-frequency
-  set: Normal(0,1); `[n_link, n_gen]`
+- **`rnd`** — Random values; `[n_link, n_gen]` (`[0, n_gen]` for no link)
 
 ## See also:
 - [[ssf_init_phases]] (draws the phases)
 - [[ssf_clusters]] (the clusters from the random values)
-- [[lsf_draw]] (the large-scale values, same floors and mobility rules)
-- [[sos_val]] (evaluation of a sum-of-sinusoids generator)
+- [[lsf_draw]] (the large-scale values; mobility, floor and precision rules)
 MD!*/
 
 void quadriga_lib::ssf_draw(const std::unordered_map<std::string, double> &scenpar,

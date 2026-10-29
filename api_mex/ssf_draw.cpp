@@ -14,50 +14,20 @@ SECTION!*/
 # SSF_DRAW
 Spatially correlated normalized random values of one small-scale fading generator set at a set of links
 
-- Evaluates the generators of a set of [[ssf_init_phases]] at the links. With
-  `N = NumClusters - 1`, column `b·N + n + 1` belongs to block `b` and NLOS cluster `n` (`b`, `n`
-  counted from 0). Shared cluster set (`set_id = 0`, `9·N` columns): block 0 cluster delay
-  (Uniform(0,1)), blocks 1, 2 sign of AOD, AOA, 3, 4 sign of ZOD, ZOA, 5, 6 angle offset of AOD,
-  AOA, 7, 8 angle offset of ZOD, ZOA (Normal(0,1)). Per-frequency set (`set_id = k >= 1`, `N`
-  columns): cluster shadowing (Normal(0,1))
-- All generators use the decorrelation distance `SC_lambda` (TR 38.901 Table 7.6.3.1-2);
-  `SC_lambda = 0` (spatial consistency off) is used as 0.1 m, which gives fields that decorrelate
-  within 0.1 m
-- `scenpar` is completed and validated as in [[ssf_init_phases]]; the messages of
-  [[scenpar_validate]] pass through unchanged
-- Single mobility (`dual_mobility = false`): column `c` is the field of generator `c` at the Rx
-  position, `x_c = s_c(rx)` with `s_c(x) = sqrt(2/n_coeff) · sum_n cos( 2·pi · f_n·x + phi_n )` and
-  the phases of slice 1; the values do not depend on `tx_pos`
-- Dual mobility: the Tx is a second device. Its side uses slice 2, i.e. the field of the mirror
-  generator at the Tx position (departure and arrival blocks exchanged). Self-mirrored columns
-  (delay, shadowing) share one map: `x_c = ( s_c(rx) + s_c(tx) ) / sqrt( 2 + 2·A(D) )`, with the
-  Tx-Rx distance `D` and the ACF `A` of the preset, linearly interpolated. The pair columns are two
-  maps: `x_c = ( s_c(rx) + s_m(tx) ) / sqrt(2)`
-- Swap reciprocity in dual mobility (S. Jaeckel et al., "A Spatially Consistent Geometric D2D
-  Small-Scale Fading Model for Multiple Frequencies", 2019, eqs. (3)-(5)): swapping `tx_pos` and
-  `rx_pos` leaves the delay and the shadowing blocks unchanged and exchanges block 1 with 2, 3 with
-  4, 5 with 6 and 7 with 8, exactly (the same evaluations in swapped roles)
-- Uniform block 0 of the shared set: `0.5 · erfc( -x / sqrt(2) )` of the Normal value
-- `horizontal = true`: the positions are projected on the x-y plane (z = 0) and the values do not
-  depend on z; `false`: 3D positions (legacy). `D` is measured in the same space
-- Floors as in [[lsf_draw]] (same phase offsets per floor ID; TR 38.901 clause 7.6.3.3: SSF
-  variables are uncorrelated across floors): pass the same `floor_id` as to [[lsf_draw]]; only in
-  2D mode
-- The value of a link does not depend on the other links of the call, and a column does not depend
-  on the phases of the other columns (append-only: appended blocks leave the existing columns
-  unchanged bit for bit)
-- Clusters by TR 38.901 clause 7.5 under spatial consistency: clause 7.6.3.1 keeps the signs and the
-  random offsets of the clusters unchanged per drop; the caller evaluates them at the drop or
-  segment-start positions and reuses those values along the track
-- Precision: the sinusoids are evaluated by [[sos_val]] with the AVX2 kernel where available (sine
-  and cosine in single precision, accumulation in double); the values deviate from a
-  double-precision evaluation by less than `4e-7 · sqrt(2 · n_coeff)` (9e-6 for 256 sinusoids)
-- `preset`, `horizontal` and the set type (`set_id = 0` or `>= 1`) must match [[ssf_init_phases]]
-- `NumClusters = 1` returns an empty `rnd` and accepts any empty `phase`. At least one link is
-  required
-- Validation order: positions (3 columns, rows of `tx_pos`, finite values), `set_id`, `preset`,
-  `scenpar`, size of `phase`, finite `phase`, length of `floor_id`, `floor_id` with
-  `horizontal = false`
+- Evaluates a set of [[ssf_init_phases]] at the links with the rules of [[lsf_draw]] for single and dual mobility,
+  floors, 2D/3D mode and precision; every generator uses the decorrelation distance `SC_lambda` (TR 38.901 Table
+  7.6.3.1-2; 0 = spatial consistency off, used as 0.1 m)
+- Columns, `N = NumClusters - 1`; block `b = 0 ... 8` holds the columns `b·N + 1` to `(b + 1)·N`, one per NLOS
+  cluster:
+  - shared set (`set_id = 0`, `9·N` columns): block 0 cluster delay, Uniform(0,1); blocks 1, 2 sign of AOD, AOA;
+    3, 4 sign of ZOD, ZOA; 5, 6 angle offset of AOD, AOA; 7, 8 angle offset of ZOD, ZOA; Normal(0,1)
+  - per-frequency set (`set_id = k >= 1`, `N` columns): cluster shadowing, Normal(0,1)
+- Dual mobility: swapping `tx_pos` and `rx_pos` exchanges the blocks 1 and 2, 3 and 4, 5 and 6, 7 and 8 and keeps
+  the delay and shadowing blocks, exactly (D2D reciprocity of S. Jaeckel et al., "A Spatially Consistent Geometric
+  D2D Small-Scale Fading Model for Multiple Frequencies", 2019)
+- A column depends neither on the other columns nor on the other links; later versions append blocks and keep the
+  values of the existing columns
+- `preset`, `horizontal` and the set type must match [[ssf_init_phases]]; at least one link is required
 
 ## Usage:
 ```
@@ -66,35 +36,24 @@ rnd = quadriga_lib.ssf_draw( scenpar, phase, tx_pos, rx_pos, set_id, floor_id, d
 ```
 
 ## Inputs:
-- **`scenpar`** — Scenario parameters; struct as returned by [[conf_file_read]] or
-  [[scenpar_validate]] (the field `SubpathMethod` is ignored), or any subset of its fields; missing
-  fields have their default value; `[]` = all defaults; `NumClusters` and `SC_lambda` are used
-- **`phase`** — Phases in [rad] from [[ssf_init_phases]]; slice 1 = Rx side, slice 2 = Tx side;
-  must be finite; `[n_coeff, n_gen, 2]`, `n_coeff` of `preset`, `n_gen` of the set type
-- **`tx_pos`** — Tx positions in [m]; one row is used for all links; not used in single mobility
-  (but validated); `[1, 3]` or `[n_link, 3]`
+- **`scenpar`** — Scenario parameters as in [[ssf_init_phases]]; `NumClusters` and `SC_lambda` are used
+- **`phase`** — Phases from [[ssf_init_phases]]; `[n_coeff, n_gen, 2]`
+- **`tx_pos`** — Tx positions in [m], one row for all links; used in dual mobility; `[1, 3]` or `[n_link, 3]`
 - **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
-- **`set_id`** — Set type as in [[ssf_init_phases]]: `0` = shared cluster set, `k >= 1` =
-  per-frequency set; default: 0
-- **`floor_id`** *(optional)* — Floor index per link, a label starting at 0 (no index shift);
-  non-negative integers below 2^53; omitted or empty = all links on floor 0; in dual mobility the
-  floor of both devices; only with `horizontal = true`; `[n_link]`
-- **`dual_mobility`** — `true`: Tx and Rx both move, the Tx side is evaluated as a second device;
-  default: false
-- **`preset`** — Sum-of-sinusoids preset, see [[sos_preset]]; must match [[ssf_init_phases]];
-  default: `'Comb256'`
-- **`horizontal`** — `true`: 2D correlation in the x-y plane (TR 38.901 behaviour); `false`: 3D
-  correlation (legacy QuaDRiGa behaviour); must match [[ssf_init_phases]]; default: true
+- **`set_id`** *(optional)* — `0` = shared cluster set; `k >= 1` = per-frequency set; default: 0
+- **`floor_id`** *(optional)* — Floor label per link starting at 0 (no index shift) as in [[lsf_draw]], 2D mode
+  only; omitted or empty = floor 0; `[n_link]`
+- **`dual_mobility`** *(optional)* — `true`: the Tx is a second moving device; default: false
+- **`preset`** *(optional)* — Sum-of-sinusoids preset, see [[sos_preset]]; default: `'Comb256'`
+- **`horizontal`** *(optional)* — `true`: 2D correlation (TR 38.901); `false`: 3D (legacy); default: true
 
 ## Output:
-- **`rnd`** — Random values; shared set: columns 1 to N Uniform(0,1), the others Normal(0,1);
-  per-frequency set: Normal(0,1); `[n_link, n_gen]`
+- **`rnd`** — Random values; `[n_link, n_gen]`
 
 ## See also:
 - [[ssf_init_phases]] (draws the phases)
 - [[ssf_clusters]] (the clusters from the random values)
-- [[lsf_draw]] (the large-scale values, same floors and mobility rules)
-- [[sos_val]] (evaluation of a sum-of-sinusoids generator)
+- [[lsf_draw]] (the large-scale values; mobility, floor and precision rules)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
@@ -122,16 +81,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'set_id' must be 0 (shared set) or a frequency index >= 1.");
     const arma::sword set_id = (arma::sword)set_id_in - 1;
 
-    // Floor IDs are labels (no index shift): read as double, checked, converted; integers from 2^53 on are not
-    // exact in a double
-    arma::uvec floor_id(floor_id_in.n_elem);
-    for (arma::uword i = 0; i < floor_id_in.n_elem; ++i)
-    {
-        const double v = floor_id_in[i];
-        if (!(v >= 0.0 && v < 9007199254740992.0 && v == std::floor(v)))
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Entries in 'floor_id' must be non-negative integers below 2^53.");
-        floor_id[i] = (arma::uword)v;
-    }
+    const arma::uvec floor_id = qd_mex_uint_entries(floor_id_in, "floor_id");
 
     // Wrap optional pointers
     const arma::uvec *p_floor_id = floor_id.empty() ? nullptr : &floor_id;
