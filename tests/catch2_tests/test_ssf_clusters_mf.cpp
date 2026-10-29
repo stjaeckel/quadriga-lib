@@ -49,9 +49,8 @@ namespace
 {
     const double r_mf = 1.5; // proportionality factor r of TR clause 7.6.5.1
 
-    // TR 38.901 Table 7.5-6: per-cluster shadowing std zeta [dB] and number of clusters N
+    // TR 38.901 Table 7.5-6: per-cluster shadowing std zeta [dB]
     const double zeta_UMi = 3.0;
-    const arma::uword N_UMi_LOS = 12, N_UMi_NLOS = 19;
 
     // Principal value of arg(exp(-j·x)) in degrees, x in degrees (TR clause 7.6.5.1 step 5')
     double arg_deg(double x) { return std::arg(std::polar(1.0, -x * pi / 180.0)) * 180.0 / pi; }

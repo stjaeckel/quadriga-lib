@@ -364,28 +364,28 @@ Cluster delays, powers and angles of a set of links (TR 38.901 clause 7.5 steps 
 | Property | `"38.901"` | `"38.901_MF"` | `"quadriga"` |
 | --- | --- | --- | --- |
 | Continuous along tracks | no | NLOS only | yes |
-| Same delays and angles at all frequencies | one frequency | NLOS, or K the same at all frequencies | yes |
-| Output spreads equal the input spreads | no | no | DS, and AS below the caps, at one frequency |
+| Same delays and angles at all frequencies | n/a | NLOS, or K the same at all frequencies | yes |
+| Output spreads equal the input spreads | no | no | DS, and AS below the caps, at one frequency without ground reflection |
 | Per-cluster shadowing | yes | yes, per frequency | no |
-| TR ZOD offset, O2I arrival elevation | both | neither | ZOD offset |
 
 - Slots per link: 0 = LOS path, 1 = ground reflection if `GR_enabled > 0` (`G = 1`), then the `N = NumClusters - 1`
   NLOS clusters; `n_slot = NumClusters + G`. Slot `1 + G + n` belongs to column `n` of each block of `rnd` (no
   sorting). Clusters `n >= n_cluster(l)` (TR clause 7.6.15) get delay 0, power 0 and the LOS angles. Identify the
   LOS path by its slot, never by delay or path length: NLOS clusters of the TR methods can have delay 0
 - A scenario is LOS if `KF_mu > -30` dB. In an NLOS scenario the LOS and ground-reflection powers are 0 whatever
-  `lsp` holds; legacy QuaDRiGa "NLOS" files with `KF_mu > -30` run as LOS
+  `lsp` holds (`NumClusters > 1`); legacy QuaDRiGa "NLOS" files with `KF_mu > -30` run as LOS
 - Delays in [s] relative to the LOS delay `d3D/c`; angles in [rad], GCS, elevation convention; slot 0 holds the
   geometric LOS direction. Powers are the coefficient powers of TR eq. (7.5-30), LOS `K/(K+1)`, NLOS clusters
   `P_n/(K+1)`, without path loss and shadow fading
 - Absolute TOA (TR clause 7.6.9), NLOS scenarios only: `"38.901"`, `"38.901_MF"` add `abs_toa(l)` to the NLOS
-  delays; `"quadriga"` places the first NLOS cluster at `abs_toa(l)`. `"quadriga"` requires `abs_toa` in NLOS
-  scenarios that define it (`absTOA_mu > -30`); in other NLOS scenarios it shifts only where `abs_toa(l) > 0`
+  delays; `"quadriga"` places the first NLOS cluster at `abs_toa(l)` (where `absTOA_mu <= -30`: only where
+  `abs_toa(l) > 0`)
 - Ground reflection (TR clause 7.6.8) on the plane z = 0. Slot power `K/(K+1)·(d3D/d_GR)²·R²` (TR methods, on top of
   the other slots) or `K/(K+1)·R²` (`"quadriga"`) with `R² = (abs(R_par)² + abs(R_perp)²)/2` of TR eqs. (7.6-38),
   (7.6-39). The coefficient is `sqrt(power)·diag(R_par, -R_perp)/R`, without polarisation
   `sqrt(power)·exp(j·arg(R_par))`
-- `NumClusters = 1`: the LOS path only, power 1 in all scenarios, plus the ground reflection if enabled
+- `NumClusters = 1`: the LOS path only, power 1 in all scenarios (`K/(K+1) = 1`, also in the ground-reflection
+  power), plus the ground reflection if enabled; `rnd`, `rnd_freq` and `lsp_anchor` may be empty
 - Swap reciprocity: with mirrored random values (dual mobility in [[ssf_draw]]) and mirrored LSPs, swapping `tx_pos`
   and `rx_pos` exchanges the departure and arrival angles (`"38.901"`: `eod_offset_deg` = 0 and no O2I link;
   `"quadriga"`: `eod_offset_deg` = 0)
@@ -431,13 +431,14 @@ void quadriga_lib::ssf_clusters(
   `"38.901"` and `"38.901_MF"`; `[n_link, N, n_freq]`
 - **`lsp_anchor`** *(optional)* — LSPs at the anchor frequency (e.g. 2 GHz) from [[lsp_generate]]; required by
   `"38.901_MF"`; `[n_link, 1, 8]`
-- **`eod_offset_deg`** *(optional)* — EoD offset in [deg] from [[lsp_generate]], NLOS scenarios; omitted = 0;
-  `[n_link, n_freq]`
-- **`abs_toa`** *(optional)* — Absolute TOA offset in [s] from [[lsp_generate]], >= 0; omitted = no offset;
-  `[n_link]`
+- **`eod_offset_deg`** *(optional)* — EoD offset in [deg] from [[lsp_generate]]; used by `"38.901"` and
+  `"quadriga"` in NLOS scenarios; omitted = 0; `[n_link, n_freq]`
+- **`abs_toa`** *(optional)* — Absolute TOA offset in [s] from [[lsp_generate]], >= 0; required by `"quadriga"` in
+  NLOS scenarios with `absTOA_mu > -30`; omitted = no offset; `[n_link]`
 - **`gr_eps_re`**, **`gr_eps_im`** *(optional)* — Ground permittivity `gr_eps_re - j·gr_eps_im` from
   [[lsp_generate]], real part >= 1, imaginary part >= 0; required if `GR_enabled > 0`; `[n_link, n_freq]`
-- **`o2i`** *(optional)* — O2I flag per link (mean ZOA 90 deg), NLOS scenarios; omitted = none; `[n_link]`
+- **`o2i`** *(optional)* — O2I flag per link (mean ZOA 90 deg); used by `"38.901"` in NLOS scenarios; omitted =
+  none; `[n_link]`
 - **`n_cluster`** *(optional)* — Active NLOS clusters per link in `[min(max(1, NumClusters_min - 1), N), N]`;
   omitted = N; `[n_link]`
 

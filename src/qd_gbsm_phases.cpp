@@ -31,33 +31,14 @@
 // Units: positions in [m], rows {x, y, z}; frequencies of the sum-of-sinusoids tables in [1/m]; decorrelation
 // distances in [m].
 //
-// SSF generator index (small-scale fading, TR 38.901 clause 7.6.3.1; ssf_init_phases, ssf_draw; the values are used by
-// ssf_clusters in ssf_clusters.cpp). N = NumClusters - 1 NLOS clusters; column c = b·N + n belongs to block b and
-// cluster n (0-based). All generators use SC_lambda (0 is used as 0.1 m), none is bias-corrected. Mirror: column
-// b·N + n mirrors m(b)·N + n.
+// SSF generators (small-scale fading, TR 38.901 clause 7.6.3.1; ssf_init_phases, ssf_draw; used by ssf_clusters).
+// N = NumClusters - 1; column b·N + n belongs to block b and cluster n (0-based). Blocks and distributions: see the
+// documentation of ssf_draw; mirror partner: qd_gbsm_gen_ssf. All generators use SC_lambda (0 is used as 0.1 m), none
+// is bias-corrected. NumClusters = 1 (N = 0): both sets are empty and no sum-of-sinusoids function is called.
 //
-//   Shared cluster set (set_id = -1, frequency-independent), n_gen = 9·N
-//   b   Variable                   Distribution   m(b)
-//   0   cluster delay              Uniform        0
-//   1   sign of AOD                Normal         2
-//   2   sign of AOA                Normal         1
-//   3   sign of ZOD                Normal         4
-//   4   sign of ZOA                Normal         3
-//   5   angle offset of AOD        Normal         6
-//   6   angle offset of AOA        Normal         5
-//   7   angle offset of ZOD        Normal         8
-//   8   angle offset of ZOA        Normal         7
-//   Per-frequency set (set_id = k >= 0, the k-th frequency of the caller's list), n_gen = N
-//   0   cluster shadowing          Normal         0
-//
-// NumClusters = 1 (N = 0): both sets are empty and no sum-of-sinusoids function is called.
-//
-// Seeds of the SSF sets: seed_set = splitmix64( splitmix64(seed) ^ tag ) >> 1 with the seed of the LSF set of the
-// same site and scenario, tag = 1 for the shared set and 2 + k for the set of frequency k, and splitmix64(x):
-// z = x + 0x9E3779B97F4A7C15; z = (z ^ (z >> 30))·0xBF58476D1CE4E5B9; z = (z ^ (z >> 27))·0x94D049BB133111EB;
-// return z ^ (z >> 31) (uint64, wrapping); slice 0 = sos_init_phases(n_coeff, n_gen, seed_set). A set never repeats
-// the LSF phases of the same seed (no shared stream) and the sets are independent streams; seed -1 passes -1 on
-// (system random device).
+// Seeds of the SSF sets: SplitMix64 of the seed of the LSF set of the same site and scenario and the set tag (see
+// derive_seed): the sets are independent streams, distinct from the LSF phases; seed -1 passes on (system random
+// device).
 //
 // Append-only rule: sos_init_phases fills column g from one stream independently of n_gen, and ssf_draw evaluates
 // each column with its own phases only. A later version that appends blocks to a set (N columns or a multiple of N
@@ -119,7 +100,7 @@ namespace
         return gen;
     }
 
-    // SSF generators (index table above) from a completed scenpar: set_id = -1 shared cluster set (9·N), >= 0
+    // SSF generators (column layout above) from a completed scenpar: set_id = -1 shared cluster set (9·N), >= 0
     // per-frequency set (N); N = NumClusters - 1, empty for N = 0
     std::vector<qd_gbsm_gen> qd_gbsm_gen_ssf(const std::unordered_map<std::string, double> &sp, arma::sword set_id)
     {
