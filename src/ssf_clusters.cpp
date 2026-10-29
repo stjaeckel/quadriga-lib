@@ -169,6 +169,148 @@ namespace
             }
         }
     }
+
+    // Clusters of one link by the QuaDRiGa method (paper: Jaeckel et al., 2019, section II), all frequencies
+    // (method "quadriga")
+    // - x: values of the shared set of the link, column b·N + n; N_l active clusters; F frequencies
+    // - sp[k·5 + i] = {DS [s], ASD, ASA, ESD, ESA [rad]} at frequency k; kf[k] linear K (0 in NLOS)
+    // - los_ang = {AOD, AOA, EOD, EOA} [rad]; gr: ground reflection with delay tau_gr [s], elevation e_gr [rad] and
+    //   reflection power r2[k]; delta: EoD offset [rad]; toa: absolute TOA [s], the delays are shifted if > 0
+    // - Outputs for n < N_l: delay[n] [s], power[k·N_l + n] coefficient power, ang[a·N_l + n] [rad] for a = 0 AOD,
+    //   1 AOA, 2 EOD, 3 EOA
+    void qd_ssf_quadriga(const double *x, arma::uword N, arma::uword N_l, arma::uword F, bool los, double r_tau,
+                         const double *sp, const double *kf, const double *los_ang, bool gr, double tau_gr,
+                         double e_gr, const double *r2, double delta, double toa, double *delay, double *power,
+                         double *ang)
+    {
+        auto efold = [](double e) // elevation mirrored at the poles
+        {
+            e = qd_wrap(e);
+            return e > 0.5 * qd_pi ? qd_pi - e : (e < -0.5 * qd_pi ? -qd_pi - e : e);
+        };
+
+        // Initial delays and angles, paper eqs. (1), (4), (5); (Phi(y) - 0.5)·pi = erf(y/sqrt(2))·pi/2
+        std::vector<double> tt(N_l), at(4 * N_l), lam(N_l), P(N_l), A(N_l + 2), wt(N_l + 2);
+        for (arma::uword n = 0; n < N_l; ++n)
+        {
+            tt[n] = -std::log(std::max(x[n], DBL_MIN));
+            for (arma::uword a = 0; a < 4; ++a)
+                at[a * N_l + n] = 0.5 * qd_pi * std::erf(x[(5 + a) * N + n] / std::sqrt(2.0));
+        }
+
+        // Centres: LOS azimuths; elevations weighted between the LOS and the ground reflection (weight 0 in NLOS)
+        double w = 0.0, mx[5], mn[5];
+        for (arma::uword k = 0; k < F && gr && los; ++k)
+            w += r2[k] / (double)F;
+        const double cen[4] = {los_ang[0], los_ang[1], (1.0 - w) * los_ang[2] + w * e_gr,
+                               (1.0 - w) * los_ang[3] + w * e_gr};
+        for (arma::uword i = 0; i < 5; ++i)
+        {
+            mx[i] = sp[i], mn[i] = sp[i];
+            for (arma::uword k = 1; k < F; ++k)
+                mx[i] = std::max(mx[i], sp[5 * k + i]), mn[i] = std::min(mn[i], sp[5 * k + i]);
+        }
+
+        const arma::uword n0 = gr ? 2 : 1; // fixed slots (LOS, ground reflection) in the scaling sets
+        double s_tau = 0.0, s_ang[4] = {0.0, 0.0, 0.0, 0.0};
+        for (arma::uword k = 0; k < F; ++k)
+        {
+            // Power coefficients, paper eqs. (7) to (11)
+            const double *s = sp + 5 * k;
+            double g[5] = {r_tau - 1.0, 0.56, 0.56, 0.76, 0.76};
+            if (F > 1)
+            {
+                if (std::abs(mx[0] / mn[0] - 1.0) >= 1e-6)
+                    g[0] = -1.5 * std::log(1.2 * std::min(std::max(s[0] / (mx[0] + mn[0]), 0.15), 0.85) - 0.15);
+                for (arma::uword i = 1; i < 5; ++i)
+                {
+                    const double b = std::max(0.75 * s[i] / mx[i], 0.25);
+                    g[i] = (i < 3) ? -2.2 * std::log(1.5 * b - 0.35) : -3.4 * std::log(1.2 * b - 0.1);
+                }
+            }
+
+            // Scaling powers, paper eqs. (6), (12), normalised in the log domain; the LOS power split into LOS and
+            // ground reflection
+            double l_max = -INFINITY, sum = 0.0, e = 0.0, c = 0.0;
+            for (arma::uword n = 0; n < N_l; ++n)
+            {
+                lam[n] = -tt[n] * g[0] - at[n] * at[n] * g[1] - at[N_l + n] * at[N_l + n] * g[2] -
+                         std::abs(at[2 * N_l + n]) * g[3] - std::abs(at[3 * N_l + n]) * g[4];
+                l_max = std::max(l_max, lam[n]);
+            }
+            for (arma::uword n = 0; n < N_l; ++n)
+                P[n] = std::exp(lam[n] - l_max), sum += P[n];
+            const double kk = kf[k] / (1.0 + kf[k]), s_los = kk * (1.0 - (gr ? r2[k] : 0.0)), s_gr = gr ? kk * r2[k] : 0.0;
+            for (arma::uword n = 0; n < N_l; ++n)
+            {
+                P[n] /= sum * (1.0 + kf[k]), power[k * N_l + n] = P[n];
+                e += P[n] * tt[n], c += P[n] * tt[n] * tt[n];
+            }
+
+            // Delay scale, paper eqs. (13), (14), in closed form with the ground reflection as a fixed path
+            const double den = c - e * e, a2 = s[0] * s[0], B = s_gr * tau_gr * tau_gr, D = s_gr * tau_gr;
+            const double t = std::max(a2 * c - a2 * e * e - B * c + B * e * e + c * D * D, 0.0);
+            s_tau += ((den > 0.0) ? (gr ? (std::sqrt(t) + D * e) / den : s[0] / std::sqrt(den)) : 1.0) / (double)F;
+
+            // Angle scales: the input spread over the wrapped spread of the initial angles, then iterated on the
+            // linear spread of the scaled cluster offsets with the fixed offsets of LOS and ground reflection
+            for (arma::uword a = 0; a < 4; ++a)
+            {
+                wt[0] = s_los, A[0] = (a < 2) ? 0.0 : los_ang[a] - cen[a];
+                wt[1] = s_gr, A[1] = (a < 2) ? 0.0 : e_gr - cen[a];
+                for (arma::uword n = 0; n < N_l; ++n)
+                    wt[n0 + n] = P[n], A[n0 + n] = at[a * N_l + n];
+                auto spread = [&](double mu, double f, bool wrapped)
+                {
+                    double m1 = 0.0, m2 = 0.0;
+                    for (arma::uword i = 0; i < n0 + N_l; ++i)
+                    {
+                        const double v = wrapped ? qd_wrap(A[i] - mu) : (i < n0 ? A[i] : f * A[i]);
+                        m1 += wt[i] * v, m2 += wt[i] * v * v;
+                    }
+                    return std::sqrt(std::max(m2 - m1 * m1, 0.0));
+                };
+                double ss = 0.0, cs = 0.0, sc = 1.0;
+                for (arma::uword i = 0; i < n0 + N_l; ++i)
+                    ss += wt[i] * std::sin(A[i]), cs += wt[i] * std::cos(A[i]);
+                const double S0 = spread(std::atan2(ss, cs), 1.0, true);
+                if (S0 > 0.0)
+                {
+                    double sL = 10.0 * std::log10(s[1 + a] / S0);
+                    for (int i = 0; i < 9; ++i)
+                    {
+                        const double S1 = spread(0.0, std::pow(10.0, 0.1 * sL), false);
+                        if (!(S1 > 0.0))
+                            break;
+                        const double sN = 10.0 * std::log10(s[1 + a] / S1);
+                        if (std::abs(sN) <= 1e-4)
+                            break;
+                        sL += sN;
+                    }
+                    sc = std::pow(10.0, 0.1 * sL);
+                }
+                s_ang[a] += sc / (double)F;
+            }
+        }
+
+        // Scaled offsets (caps of paper eq. (18)), the LOS direction added, elevations mirrored at the poles
+        for (arma::uword a = 0; a < 4; ++a)
+        {
+            const double s = std::min(s_ang[a], (a < 2) ? 3.0 : 1.5);
+            for (arma::uword n = 0; n < N_l; ++n)
+            {
+                const double b = s * at[a * N_l + n];
+                ang[a * N_l + n] = (a < 2) ? qd_wrap(cen[a] + b) : efold(cen[a] + (a == 2 ? delta : 0.0) + efold(b));
+            }
+        }
+
+        // Delays; absolute TOA: the first NLOS cluster at toa
+        double t_min = INFINITY;
+        for (arma::uword n = 0; n < N_l; ++n)
+            delay[n] = s_tau * tt[n], t_min = std::min(t_min, delay[n]);
+        for (arma::uword n = 0; n < N_l && toa > 0.0; ++n)
+            delay[n] = delay[n] - t_min + toa;
+    }
 }
 
 /*!SECTION
@@ -309,6 +451,49 @@ Cluster delays, powers and angles of a set of links, TR 38.901 clause 7.5 steps 
   clause 7.5 statistics in UMi and UMa NLOS), no O2I rule; the per-cluster shadowing is drawn per frequency (TR
   clause 7.6.5); the anchor LSPs (TR: e.g. at 2 GHz) are an input; the zenith fold of clause 7.5 step 7 is applied
   to the final zenith angles, for which clause 7.6.5.1 states no rule
+- Method `"quadriga"` (the paper's section II with the changes below), per link with `N_l` active clusters, in rad;
+  `u_n` = block 0, `y^x_n` the offset block of angle type x (blocks 5 to 8: AOD, AOA, EOD, EOA); DS, the four
+  angular spreads `AS_x` and `K` from `lsp` at frequency k (`K = 0` in NLOS scenarios); `R²_k` the reflection power
+  and `G = 1` with ground reflection, else 0. Delays and angles are the same at all frequencies.
+  Initial values (paper eqs. (1), (4), (5)): `tau~_n = -ln(u_n)` (unitless), `a~^x_n = (Phi(y^x_n) - 0.5)·pi` in
+  (-pi/2, pi/2), `Phi(y) = 0.5·erfc(-y/sqrt(2))`.
+  Centres: the LOS azimuths; the elevations `(1 - w)·LOS elevation + w·E_GR` with `w` the mean of `R²_k` over the
+  frequencies in LOS scenarios with ground reflection, else `w = 0`. LOS path and ground reflection enter the scaling
+  as fixed offsets (azimuth 0, elevation their elevation minus the centre).
+  Powers per frequency (paper eqs. (6) to (12)): `P_n` proportional to `exp(-tau~_n·g_DS - (a~^AOD_n)²·g_AOD -
+  (a~^AOA_n)²·g_AOA - abs(a~^EOD_n)·g_EOD - abs(a~^EOA_n)·g_EOA)`, normalised to `1/(K+1)`; no per-cluster shadowing.
+  One frequency: `g_DS = r_tau - 1`, `g_AOD = g_AOA = 0.56`, `g_EOD = g_EOA = 0.76`. Several frequencies:
+  `g_DS = -1.5·ln(1.2·d - 0.15)`, `d = DS_k/(max DS + min DS)` limited to [0.15, 0.85] (`r_tau - 1` if DS does not
+  depend on the frequency); azimuth `g = -2.2·ln(1.5·b - 0.35)`, elevation `g = -3.4·ln(1.2·b - 0.1)`,
+  `b = max(0.75·AS_k/max AS, 0.25)`.
+  Scaling weights: LOS `K/(K+1)·(1 - G·R²)`, ground reflection `K/(K+1)·G·R²`, clusters `P_n` (sum 1).
+  Delay scale per frequency (paper eqs. (13), (14)): the factor `s_k` for which the weighted delays (LOS 0, ground
+  reflection its delay, clusters `s_k·tau~_n`) have the delay spread DS_k, in closed form (1 if the clusters have no
+  spread; with ground reflection at least the factor that minimises the spread); delays `s·tau~_n` in [s] with `s`
+  the mean of `s_k`.
+  Angle scale per type and frequency: the input spread over the wrapped spread of the initial angles, then up to 9
+  updates of the factor in dB until the linear power-weighted spread of the scaled cluster offsets together with the
+  fixed offsets equals the input to 1e-4 dB; the mean over the frequencies, at most 3 (azimuth) and 1.5 (elevation)
+  (paper eq. (18)). Scaled elevation offsets are mirrored at +-pi/2.
+  Angles: AOD, AOA = LOS azimuth + offset (wrapped); EOD = centre + `delta` + offset, EOA = centre + offset, both
+  mirrored at the poles (the azimuth is kept); `delta` = the mean of `eod_offset_deg` over the frequencies in NLOS
+  scenarios (TR eq. (7.5-19) with mu_offset,ZOD = -offset), 0 in LOS scenarios.
+  Absolute TOA in NLOS scenarios: where `abs_toa(l) > 0` the NLOS delays are shifted so that the first is at
+  `abs_toa(l)`
+- Changes of `"quadriga"` against the paper and QuaDRiGa: the LOS direction is added to the scaled offsets (azimuth
+  wrapped, elevation mirrored at the poles) instead of the 3-D rotation of the paper (which widens the elevation
+  spread of departures); the EoD offset of the TR is added in NLOS scenarios; no weakening of the arrival elevations
+  for links with a large height difference; no pull of the NLOS elevations towards the ground reflection in NLOS
+  scenarios; no fixed angles for one or two NLOS clusters. `o2i` is not used
+- Properties of `"quadriga"`: at one frequency the delay spread of the output (all slots) equals DS, also with the
+  absolute TOA; with ground reflection the scaling uses the split weights above, so the delay spread from the slot
+  powers is smaller (about 0.85 of DS in UMi and UMa LOS at 6 GHz, medium ground), and the elevation spreads cannot
+  fall below the spread of the LOS path and the reflection alone (the target is then not reached). Below the caps
+  the linear power-weighted spread of the angle offsets equals the input; with the circular definition of
+  [[calc_angular_spreads_sphere]] the medians are 1.00 for ASD, ESD, ESA and ASA in NLOS, while in LOS the LOS power
+  bounds the ASA (median 0.86 UMi, 0.59 UMa). With several frequencies the averaged scales leave a per-frequency
+  spread error of about +-15 to 20 %. Continuous along tracks; delays and angles independent of the frequency; the
+  relation between angle offset and power is weaker than in clause 7.5
 - Swap reciprocity: with mirrored random values (dual-mobility values of [[ssf_draw]], or the blocks 1 and 2, 3 and
   4, 5 and 6, 7 and 8 exchanged) and mirrored LSPs (ASD and ASA, ESD and ESA exchanged, also in `lsp_anchor`),
   swapping `tx_pos` and `rx_pos` gives the same delays and powers with departure and arrival angles exchanged;
@@ -525,8 +710,6 @@ void quadriga_lib::ssf_clusters(const std::unordered_map<std::string, double> &s
             throw std::invalid_argument("Entries of 'n_cluster' must be in [" + std::to_string(N_lo) + ", " +
                                         std::to_string(N) + "].");
     }
-    if (m_qd)
-        throw std::runtime_error("Method '" + method + "' is not implemented yet.");
 
     // Outputs
     const arma::uword n_slot = 1 + (G ? 1 : 0) + N, n_fd = m_mf ? F : 1;
@@ -586,10 +769,10 @@ void quadriga_lib::ssf_clusters(const std::unordered_map<std::string, double> &s
         std::vector<double> c_delay(N_l * n_fd), c_power(N_l * F), c_ang(4 * N_l * n_fd);
         if (N_l > 0)
         {
-            std::vector<double> x(9 * N), z(N * F);
+            std::vector<double> x(9 * N), z(m_qd ? 0 : N * F);
             for (arma::uword c = 0; c < 9 * N; ++c)
                 x[c] = rnd(l, c);
-            for (arma::uword k = 0; k < F; ++k)
+            for (arma::uword k = 0; k < F && !m_qd; ++k)
                 for (arma::uword n = 0; n < N; ++n)
                     z[k * N + n] = (*rnd_freq)(l, n, k);
             double centre[4] = {los_ang[0] * r2d, los_ang[1] * r2d, 90.0 - eod_l * r2d, 90.0 + eod_l * r2d};
@@ -619,6 +802,23 @@ void quadriga_lib::ssf_clusters(const std::unordered_map<std::string, double> &s
                     kf[k] = los ? lsp(l, k, 1) : 0.0;
                 qd_ssf_mf(x.data(), z.data(), N, N_l, F, los, zeta, sp0, spk.data(), kf.data(), centre,
                           c_delay.data(), c_power.data(), c_ang.data());
+            }
+            else
+            {
+                // Spreads in [s] and [rad]; EoD offset averaged over the frequencies (NLOS scenarios)
+                std::vector<double> spk(5 * F), kf(F);
+                double delta = 0.0;
+                for (arma::uword k = 0; k < F; ++k)
+                {
+                    spk[5 * k] = lsp(l, k, 0);
+                    for (arma::uword i = 1; i < 5; ++i)
+                        spk[5 * k + i] = lsp(l, k, 2 + i) / r2d;
+                    kf[k] = los ? lsp(l, k, 1) : 0.0;
+                    delta += (!los && eod_offset_deg != nullptr) ? (*eod_offset_deg)(l, k) / r2d / (double)F : 0.0;
+                }
+                const double toa = (!los && abs_toa != nullptr) ? (*abs_toa)(l) : 0.0;
+                qd_ssf_quadriga(x.data(), N, N_l, F, los, r_tau, spk.data(), kf.data(), los_ang, G, tau_gr, e_gr,
+                                R2.data(), delta, toa, c_delay.data(), c_power.data(), c_ang.data());
             }
 
             // Absolute TOA in NLOS scenarios, TR methods (TR 38.901 eq. (7.6-43)); "quadriga" shifts in its kernel
