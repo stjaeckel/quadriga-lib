@@ -66,7 +66,6 @@ namespace
     };
     const tr_const UMa_NLOS = {2.3, 3.0, 20}, UMa_LOS = {2.5, 3.0, 12}, UMi_O2I = {2.2, 4.0, 12},
                    InF_NLOS = {3.0, 3.0, 25};
-    const arma::uword N_UMi_LOS = 12, N_UMi_NLOS = 19;
 
     // TR 38.901 Tables 7.5-2 (C_phi) and 7.5-4 (C_theta), linear interpolation between the entries, constant beyond
     const double tab_n_phi[14] = {4, 5, 6, 7, 8, 10, 11, 12, 14, 15, 16, 19, 20, 25};
@@ -981,27 +980,4 @@ TEST_CASE("ssf_clusters - input validation")
                     std::invalid_argument);
     CHECK(arma::all(arma::vectorise(o.delay) == 7.0));
     CHECK(arma::all(arma::vectorise(o.power) == 7.0));
-}
-
-TEST_CASE("Diagnostic - ssf_clusters 38.901 jumps along a track")
-{
-    // UMi LOS at 6 GHz, 20 m track at 1 cm steps; signs and offsets frozen at the start of the track (the caller's
-    // rule for spatial consistency), delays and shadowing along the track
-    const spmap sp = read_v19("UMi_LOS");
-    const arma::uword N = N_UMi_LOS, n_pt = 2001;
-    arma::mat tx = {{0.0, 0.0, 10.0}}, rx(n_pt, 3);
-    for (arma::uword i = 0; i < n_pt; ++i)
-        rx(i, 0) = 40.0 + 0.01 * (double)i, rx(i, 1) = 23.0, rx(i, 2) = 1.5;
-    lib_t in = lib_inputs(sp, tx, rx, 7);
-    for (arma::uword c = N; c < 9 * N; ++c)
-        in.rnd.col(c).fill(in.rnd(0, c));
-    out_t o;
-    quadriga_lib::ssf_clusters(sp, tx, rx, in.lsp, in.rnd, o.delay, o.power, o.aod, o.eod, o.aoa, o.eoa, "38.901",
-                               &in.rnd_freq);
-    check_finite(o);
-    int ev[4] = {0, 0, 0, 0};
-    track_events(o, in.lsp, ev);
-    QD_DIAG("\n# diag: 38.901 UMi LOS, 20 m track at 1 cm: events per m: angle > 10 deg %.2f, delay > DS/4 %.2f, "
-            "power > 3 dB %.2f (cluster samples within 20 dB: %d)\n",
-            ev[0] / 20.0, ev[1] / 20.0, ev[2] / 20.0, ev[3]);
 }

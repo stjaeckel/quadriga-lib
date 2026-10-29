@@ -36,6 +36,7 @@ namespace
     const double pi = arma::datum::pi;
     const double c0 = 299792458.0;
     const char *const qd_methods[3] = {"38.901", "38.901_MF", "quadriga"};
+    const arma::uword N_UMi_LOS = 12, N_UMi_NLOS = 19; // TR 38.901 Table 7.5-6: NLOS clusters N = NumClusters - 1
 
     spmap read_v19(const std::string &name)
     {

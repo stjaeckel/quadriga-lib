@@ -182,7 +182,7 @@ namespace quadriga_lib
 
     // ---- Small-scale fading ----
     // Cluster level of TR 38.901 clause 7.5 steps 5 to 7; N = NumClusters - 1 NLOS clusters. The column layout of
-    // the random values is documented in src/qd_gbsm_phases.cpp (ssf_draw)
+    // the random values: see the documentation of ssf_draw
 
     // Draw the random phases of one small-scale fading generator set (seed derived from the large-scale seed)
     void ssf_init_phases(const std::unordered_map<std::string, double> &scenpar, // Scenario parameters (NumClusters)

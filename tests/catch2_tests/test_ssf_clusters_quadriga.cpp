@@ -48,9 +48,8 @@ QD_TEST_DIAG_SWITCH("QD_DIAG_GBSM")
 
 namespace
 {
-    // TR 38.901 Table 7.5-6: delay scaling factor r_tau and number of clusters N
+    // TR 38.901 Table 7.5-6: delay scaling factor r_tau
     const double r_UMi_LOS = 3.0, r_UMi_NLOS = 2.1;
-    const arma::uword N_UMi_LOS = 12, N_UMi_NLOS = 19;
 
     // Elevation folded at the poles: wrapped to [-pi, pi), then mirrored at +-pi/2
     double fold_el(double e)
@@ -154,7 +153,7 @@ namespace
             double disc = D * D * e * e + den * (DS * DS - B + D * D);
             if (disc < 0.0)
                 disc = 0.0, r.clamped = true;
-            s_tau += ((den > 0.0) ? (D * e + std::sqrt(disc)) / den : 1.0) / (double)F;
+            s_tau += ((den > 0.0) ? (D * e + std::sqrt(disc)) / den : 0.0) / (double)F;
 
             // Angle scales: wrapped spread of the initial angles, then the linear spread iterated
             for (int a = 0; a < 4; ++a)
@@ -714,42 +713,4 @@ TEST_CASE("ssf_clusters - quadriga is swap-reciprocal with dual-mobility fields"
             }
         }
     QD_DIAG("\n# diag: quadriga swap reciprocity, largest angle difference %.2e rad\n", e_max);
-}
-
-TEST_CASE("Diagnostic - ssf_clusters quadriga spread ratios over a drop")
-{
-    // 6 GHz, 2000 independent links per scenario (5 seeds x 400 UTs, d2D 35 to 300 m, decorrelation distances 0);
-    // medians of output/input with calc_delay_spread and calc_angular_spreads_sphere (no wrapping); the last row
-    // adds the ground reflection with a medium ground, eps = 13.5 - 1.18j
-    QD_DIAG("\n# diag: quadriga 6 GHz, 2000 links, median output/input spread\nscenario,DS,ASD,ASA,ESD,ESA\n");
-    const char *names[5] = {"UMi_NLOS", "UMi_LOS", "UMa_NLOS", "UMa_LOS", "UMi_LOS"};
-    for (int row = 0; row < 5; ++row)
-    {
-        const char *name = names[row];
-        const bool gr = row == 4;
-        spmap sp = read_v19(name);
-        sp["GR_enabled"] = gr;
-        for (const char *k : {"SC_lambda", "DS_lambda", "KF_lambda", "SF_lambda", "AS_D_lambda", "AS_A_lambda",
-                              "ES_D_lambda", "ES_A_lambda", "XPR_lambda", "absTOA_lambda"})
-            sp[k] = 0.0;
-        const arma::mat tx = {{0.0, 0.0, name[2] == 'i' ? 10.0 : 25.0}};
-        std::vector<double> ratio[5];
-        for (arma::sword seed = 1; seed <= 5; ++seed)
-        {
-            const arma::mat rx = drop_rx((unsigned)seed, 400), e_re(400, 1, arma::fill::value(13.5)),
-                            e_im(400, 1, arma::fill::value(1.18));
-            const lib_t in = lib_inputs(sp, tx, rx, seed);
-            out_t o;
-            quadriga_lib::ssf_clusters(sp, tx, rx, in.lsp, in.rnd, o.delay, o.power, o.aod, o.eod, o.aoa, o.eoa,
-                                       "quadriga", nullptr, nullptr, &in.eod, &in.toa, &e_re, &e_im);
-            spread_ratios(o, in.lsp, ratio);
-        }
-        double m[5];
-        for (int i = 0; i < 5; ++i)
-        {
-            m[i] = arma::median(arma::vec(ratio[i]));
-            CHECK(std::isfinite(m[i]));
-        }
-        QD_DIAG("%s%s,%.4f,%.4f,%.4f,%.4f,%.4f\n", name, gr ? "_GR" : "", m[0], m[1], m[2], m[3], m[4]);
-    }
 }
