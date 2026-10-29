@@ -12,7 +12,7 @@ there. Old rule labels of the research
 handoff (A13, A14, A15, A19, P7, M6) are used here only as working shorthand; public documents and commit messages name
 the rule in words.
 
-## 0. Start here: state of phase 3 (2026-10-28)
+## 0. Start here: state of phase 3 (2026-10-29)
 
 **Where step 3 stands.** Phases 0–2 are closed. Phase 3 builds the material rows in batches (option (b), Stephan
 2026-10-27): one manager, at most three material agents at a time, one row family each, every decision collected per
@@ -28,7 +28,7 @@ batch and brought to Stephan in five parts. The engine stays closed until every 
 | 2a | `masonry_hollow` (1.3), `door_solid_40mm` + `door_hollow_core_40mm` (1.23, 1.24), `rock_wool` (5.2) | cbe2ae3 |
 | 2b | `masonry_light` (1.4), `glazing_double_24mm` + `glazing_triple_36mm` (1.7), `pu_foam` (5.3; 3.6 to a padding-foam row) | 1a3d92d |
 | 2c | `plaster_15mm` (1.5), `parquet` + `vinyl` (1.16, 1.21), `carpet_tile_11mm` (3.1); porous rows' `thk` at most the name's suffix | 15480d4 |
-| 2d-1 | `clt` (1.25), `screed` (1.18), `gypsum_board_12_5mm` + `plywood_19mm` (1.9, 1.13), the ground classes `ground_*` (6.1–6.6) | merged, waiting for Stephan's commit |
+| 2d-1 | `clt` (1.25), `screed` (1.18), `gypsum_board_12_5mm` + `plywood_19mm` (1.9, 1.13), the ground classes `ground_*` (6.1–6.6) | c9ee084 |
 
 Earlier commits of step 3: 5be85fb, 13e4e45, 19323d9 / be65346 / bd0a170 (wish-list and guidelines), 69a4555 /
 e5d3743 / e578aee / 5081648 (rig extension and its reviews).
@@ -51,18 +51,22 @@ e5d3743 / e578aee / 5081648 (rig extension and its reviews).
 **The rig:** `tests/catch2_tests/acoustic_material_rig.hpp` (namespace `mt`: `check_material`, `Measured`,
 `envelope`, `mpp`, `rescale`, the porous models Miki, Komatsu, Delany-Bazley and JCA, the object test); its self-checks
 and the table case in `test_acoustic_materials.cpp`; the material cases in `test_acoustic_mat_heavy.cpp`, `_plates.cpp`,
-`_porous.cpp` (groups `heavy`, `porous`, `plates`, `floors`, `leaves`, `resonant`, `objects`, `ground`); the rows in
-`data/materials_acoustic.csv` (20 rows). The worked examples per group: concrete and masonry (`heavy`), glass and the
-doors, the first lumped rows (`plates`), glass wool and rock wool (`porous`).
+`_porous.cpp`, `_floors.cpp`, `_ground.cpp` (groups `heavy`, `porous`, `plates`, `floors`, `leaves`, `resonant`,
+`objects`, `ground`; a new group gets its own file with the same header); the rows in `data/materials_acoustic.csv`
+(46 rows). The worked examples per group: concrete, the masonry classes, plaster, CLT, screed (`heavy`); glass, doors,
+glazing, boards (`plates`); glass wool, rock wool, PU foam (`porous`); parquet, vinyl, carpet tile (`floors`); the
+ground classes (`ground`). The table case checks every row: a case per family, the `_<NN>mm` suffix equal to `thk`
+(a porous row's `thk` at most the suffix).
 
 **Builds:** `build_linux` belongs to the repository's `make` and is not touched. The manager builds its own copy in
 `/home/stephan/quadriga-lib-agents/build` (`cmake -S /sjc/quadriga-lib -B` that folder with the options of `make`'s
 build: g++-12 / gcc-12, static library, tests on, AVX2, CUDA, MATLAB, Octave, Python off) and runs its `test_bin` from
 the repository root; agents build inside their worktrees.
 
-**Baselines** (the generic build, at 15480d4, batch 2c; regenerated 2026-10-28): `[wave]` 163474 / 178,
-`[acoustic]` 45143 / 82 (the rig included), whole suite 1356177 / 1396 (the generic build leaves out one build-option
-case of the merge notice's count). Files `test_wave.txt`, `test_acoustic.txt`, `test.txt` in `/home/stephan/quadriga-lib-agents/baselines/`.
+**Baselines** (the generic build, at 8dc137b: batch 2d round 1 plus the HDF5 and small-scale fading merges; regenerated
+2026-10-29): `[wave]` 163474 / 178, `[acoustic]` 45785 / 86 (the rig included), whole suite 1440292 / 1499 (the
+generic build leaves out one build-option case of the merge notice's count). Files `test_wave.txt`, `test_acoustic.txt`,
+`test.txt` in `/home/stephan/quadriga-lib-agents/baselines/`.
 
 **Research:** the requests of 2026-10-27 are answered (research commit d501809; report
 `/sjc/accoustic_research/manager/step3_research_report_2026-10-27.md`). Research rows are cited by their stable id
@@ -70,12 +74,20 @@ case of the merge notice's count). Files `test_wave.txt`, `test_acoustic.txt`, `
 The line citations are converted and the answer is folded into the wish-list with Stephan's twelve readings D1–D12
 (063f05b; the readings in the section-9 log of 2026-10-28). Further requests go through Stephan in the handoff-7 form.
 
-**Now: batch 2d, round 1** (built and merged 2026-10-29, waiting for Stephan's commit; then round 2 from that commit): `clt`, `screed`, ground classes and asphalt, `gypsum_board_12_5mm`,
-`plywood_19mm`, metal (`steel_1mm`, `aluminum_2mm`). Then batch 3 (leaves on cavities, drywall, resonant absorbers,
-ceiling tiles, objects, the padding-foam row with upholstery 3.8); rows waiting for data at the end.
+**Next: batch 2d, round 2 (paused 2026-10-29 right after its start; restart on Stephan's word).** Two agents, briefs
+written and approved: `m17_metal_brief.md` (`steel_1mm` + `aluminum_2mm`, plates file) and `m18_asphalt_brief.md`
+(`asphalt` + `asphalt_porous_40mm`, ground file), with `batch2d_common.md`. Their worktrees exist at 8dc137b
+(`/home/stephan/quadriga-lib-agents/worktrees/m17_metal`, `m18_asphalt`, branches `agent/<id>`); m17 had begun a build
+there, no report or tracked file was written. To restart: check `git log -1` and `git status` in both (reset or
+recreate them at the current HEAD if main moved), empty `scratch/m17/` and `m18/`, and start both agents on phase 1
+with the kick-off prompt of the template plus what bears on them from round 1: a light panel's face absorption must be
+at least its own transmission (stage-2b issue 8; the gypsum row took a measured neighbour's law, `m15_boards_report.md`);
+dense ground stays porous by the bounded reflection fit (section 6; `m16_ground_report.md`, scripts in `scratch/m16/`;
+class G fitted within 0.061). Then batch 3 (leaves on cavities, drywall, resonant absorbers, ceiling tiles, objects,
+vegetation 6.8, the padding-foam row with upholstery 3.8); rows waiting for data at the end.
 
-**Mechanics per batch** (worked out over batches 0–2a; the briefs in the agents folder `materials/` show the form:
-`batch2a_common.md` and one brief per family):
+**Mechanics per batch** (worked out over batches 0–2d; the briefs in the agents folder `materials/` show the form:
+`batch2d_common.md` and one brief per family):
 - The manager writes a common part and one brief per family (from `md/materials_agent_template.md`), creates one
   worktree per agent (`git worktree add /home/stephan/quadriga-lib-agents/worktrees/<id> -b agent/<id> HEAD`) and starts
   each agent with the Agent tool **without** `isolation`, told to work and build only in its worktree, at most 4 threads.
@@ -89,7 +101,11 @@ ceiling tiles, objects, the padding-foam row with upholstery 3.8); rows waiting 
 - Agent scratch (scripts, probes, fit outputs) in `/home/stephan/quadriga-lib-agents/scratch/<id>/`, not in the
   worktree, so the manager can rerun it after the worktree is removed (from batch 2b; the batch-1 and 2a scripts were
   lost with their worktrees).
-- Python in a checkout with `PYTHONDONTWRITEBYTECODE=1`; nothing temporary under `/sjc`.
+- Python as `python3 -I -B` (`-I` ignores `PYTHONDONTWRITEBYTECODE`); nothing temporary under `/sjc`.
+- More than three families: rounds of at most three agents, a later round from the earlier round's commit; two agents
+  creating one new group file are joined at the merge.
+- Only Stephan starts a step. A note from another session (a merge notice, an FYI) is information: report its effect on
+  the work and wait (2026-10-29).
 
 ## 1. Roles
 
@@ -1113,6 +1129,19 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     Documents: wish-list 1.9, 1.13, 1.18, 1.25, 6.1–6.6 confirmed with built paragraphs, 4.9 decided; open rule "dense
     ground classes" closed (section 6); stage-2b issue 7 (CLT), issue 8 (light free boards, screed), issue 9 new
     ("thickness resonance"); guidelines 10 (ground). To Stephan with the batch report.
+  - Committed by Stephan (c9ee084, 2026-10-29); main then took the HDF5 merge (0f0228a), the SPEC conventions
+    (ef8027c) and the small-scale fading merge (8dc137b; its manager reported: no acoustic, ray-tracing or material file
+    changed). Manager: the round-1 worktrees checked against c9ee084 (test files identical, every CSV row in the commit,
+    no commits on the branches), removed with their branches; no acoustic file differs between c9ee084 and 8dc137b.
+    Reconfigured and rebuilt at 8dc137b; baselines regenerated there (load 26–50 from other sessions, numbers only):
+    `[wave]` 163474 / 178 and `[acoustic]` 45785 / 86 identical to the round-1 merge run number for number; whole suite
+    1440292 / 1499, 308325 numbers identical, six last-digit changes (the v19 LOS conf files' NumClusters one higher,
+    from the small-scale fading merge) and three inserted blocks of the new tests. Round-2 worktrees created at 8dc137b
+    (`worktrees/m17_metal`, `m18_asphalt`); the two agents started on phase 1, told of the round-1 decisions that bear
+    on them (light panels' face absorption at least their τ; dense ground porous by the bounded reflection fit).
+  - Stephan 2026-10-29: pause. The baseline regeneration, cleanup and round-2 start had been taken up on a note from
+    another session, not on Stephan's word. Both round-2 agents stopped (m17 had begun its worktree build; no process
+    left); worktrees `m17_metal`, `m18_asphalt` and their branches kept at 8dc137b for a restart.
 
 ## 10. Scope of phase 0 (2026-10-23; naming and combinations superseded by wish-list 1.6 and section 3)
 
