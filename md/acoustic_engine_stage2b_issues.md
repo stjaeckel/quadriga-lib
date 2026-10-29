@@ -246,6 +246,8 @@ prints the reflection at that cap beside the uncapped one.
   term of its own, so its mass fills the host's coincidence dip: on a clay-tile wall fitted at its physical mass a
   plaster sheet adds 11.72 dB at 4 kHz against 1.0 dB measured; at the fitted mass level that every row carries it
   meets the measured increments within 2.63 dB.
+- **CLT** (2026-10-29): the physical coincidence (200–400 Hz) misses the three Hoeller walls by 4.0 dB; with the
+  coincidence a fit knob and the mass level 0.885 they are met within 2.93 dB at 63 Hz–2 kHz (`"Material - clt"`).
 - **Reproduce.** `QD_DIAG_RAY=1 ./build_linux/test_bin "Material - concrete"` (the row against the Litvin pair);
   `"Material - masonry_heavy"` (the printed ends); `"Material - masonry_light"` (150–250 mm printed);
   `"Material - plaster"`, `"Material - parquet + vinyl"` (the bonded additions).
@@ -271,8 +273,27 @@ prints the reflection at that cap beside the uncapped one.
   can be deeper than the face absorption allows.
 - **Interim guideline.** None needed for the glass rows; a row that must reproduce a deep dip cannot keep a hard face.
   Triple glazing reads up to 3.4 dB above its laboratory value at 125–250 Hz.
+- **Light free boards** (2026-10-29): below their coincidence such boards pass more than a hard face absorbs
+  (gypsum 12.5 mm: τ 0.29 / 0.09 at 31.5 / 63 Hz), so the cap adds insulation there too: with a hard-face law +9.97 /
+  +5.64 dB (gypsum), and the board misses its references by 7.1 dB. A light panel's face absorption must be at least
+  its own transmission. With the shipped laws the cap adds +3.34 dB (gypsum) and +9.02 dB (plywood) at 31.5 Hz, in gap
+  bands. A 50 mm screed's coincidence dip at 400 Hz is filled the same way (the 500 Hz octave 31.4 dB against
+  22.3–28.0 dB of independent plates, printed).
 - **Reproduce.** `QD_DIAG_RAY=1 ./build_linux/test_bin "Material - glass"`; `"Material - glazing_double +
-  glazing_triple"`.
+  glazing_triple"`; `"Material - gypsum_board + plywood"`; `"Material - screed"`.
+
+### 9. Thick timber plates have a thickness resonance above about 2 kHz ("thickness resonance")
+
+- **Construction.** Cross-laminated timber walls and floors (`clt`, 78–245 mm).
+- **Physics.** Above about 2 kHz a thick timber plate no longer bends as a thin plate (shear and thickness modes); the
+  measured walls show dips near 2, 4 and 6 kHz at 245, 175 and 78 mm. The mass-law body has one coincidence column and
+  no thickness mode.
+- **Measured** (2026-10-29, the `clt` fit at 63 Hz–2 kHz, the Hoeller walls at their sides): the 4 kHz octave misses
+  by −2.89 / +2.99 / −0.48 dB (78 / 175 / 245 mm); with 4 kHz in the fit's cost the walls are met within 3.02 dB, with
+  4 kHz left free it lands up to 13.4 dB off.
+- **Affects.** CLT above 2 kHz.
+- **Interim guideline.** Read CLT transmission above 2 kHz as within about 3 dB.
+- **Reproduce.** `QD_DIAG_RAY=1 ./build_linux/test_bin "Material - clt"` (`ENGINE LIMIT (thickness resonance)`).
 
 ## Modeling guidelines collected in step 3
 

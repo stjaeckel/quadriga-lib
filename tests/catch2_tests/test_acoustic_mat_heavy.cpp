@@ -467,3 +467,108 @@ TEST_CASE("Material - plaster", "[acoustic][materials]")
                       m);
         }
 }
+
+TEST_CASE("Material - clt", "[acoustic][materials]")
+{
+    // Cross-laminated timber, class 1: the solid `clt` (thk 0) at 78, 175 and 245 mm, the sheet clt_100mm. Columns:
+    // density 530 kg/m3 in e (the three walls: 522-544); tf and tfB the parquet law (PTB #394, 0.0583 at 1 kHz);
+    // a = (c0/cL)^2/e, membrane cL of equal C24 layers (3418 m/s); the mass-law knobs fitted at 342.76271 m/s to
+    // the walls below at 63 Hz - 2 kHz (4096 angles x 12 tones per third and this case's grid). coiF (5.96 kHz), coiQ
+    // and resF are fit knobs; the mass level is 0.885 times the physical mass e rho0 t. CLT is orthotropic and soft in
+    // shear: the source states the coincidence at about 400 / 300 / 200 Hz (78 / 175 / 245 mm) and total loss factors
+    // of 0.021-0.077 ([Hoeller_2017_CLTBuildingsRR335#4] to #6); the walls show no clear dip. A row with coiF within
+    // 200-400 Hz and coiQ from those loss factors misses by 4.0 dB.
+    // Transmission, within 3 dB at each wall's side, mass-shifted: Hoeller [Hoeller_2017_CLTBuildingsRR335#1] (3-ply
+    // 78 mm, 42.4 kg/m2, wall opening 3.66 x 2.44 m), #2 (5-ply 175 mm, 91.4 kg/m2; its test is not stated, taken on
+    // the wall opening as the report code of CLT03's wall tests), #3 (7-ply 245 mm, 130 kg/m2, floor opening
+    // 4.70 x 3.78 m); ASTM E90, leakage-corrected, octaves the energy mean of thirds from 50 Hz; their envelope within
+    // 1 dB. 31.5 Hz and 8 kHz take the spread of 72 orthotropic plates per thickness (thin and Mindlin, equal C24
+    // layers [Churchill_2023_CLTElasticModuli#4], loss factor 0.02-0.08). The 4 kHz octave is printed: the walls'
+    // thickness resonance (dips near 2, 4, 6 kHz at 245, 175, 78 mm, source) has no column. Absorption within 0.05
+    // of PTB #394 [PTB_2012_AbsorptionTable#48] (Sabine, parquet on concrete: a hard wood face, the neighbour build).
+    // Reasonable meant: between the three walls, which one fit meets within 2.9 dB at 63 Hz - 2 kHz.
+    // Valid: 78-245 mm, R 63 Hz - 2 kHz; 60, 280 and 320 mm printed.
+    using V = std::vector<double>;
+    const V oct = {63, 125, 250, 500, 1000, 2000};
+    const mt::Row r = mt::row("clt");
+    struct Wall { const char *name; double t, m, side; V R; double R4k, g31lo, g31hi, g8lo, g8hi; };
+    const std::vector<Wall> walls = {
+        {"Hoeller #1 (CLT03)", 0.078, 42.4, std::sqrt(3.66 * 2.44), {24.0, 26.0, 27.6, 30.2, 36.2, 44.2}, 49.2, 13.23, 21.22, 40.13, 68.15},
+        {"Hoeller #2 (CLT05)", 0.175, 91.4, std::sqrt(3.66 * 2.44), {27.9, 30.2, 30.0, 38.7, 44.2, 50.0}, 49.6, 18.13, 27.66, 47.44, 79.64},
+        {"Hoeller #3 (CLT07)", 0.245, 130.0, std::sqrt(4.70 * 3.78), {31.2, 31.8, 33.5, 40.7, 45.2, 51.3}, 55.5, 19.97, 30.46, 50.41, 84.75}};
+    const mt::Measured ptb394{"PTB_2012_AbsorptionTable #394", "alpha_random", "Sabine (ISO 354), compiled; a hard face", false, 0.05,
+                              {125, 250, 500, 1000, 2000, 4000}, {{0.04, 0.04}, {0.07, 0.07}, {0.06, 0.06}, {0.06, 0.06}, {0.07, 0.07}, {0.07, 0.07}}};
+    std::vector<std::pair<double, V>> env;
+    for (const Wall &w : walls)
+        env.push_back({w.m, w.R});
+    for (const Wall &w : walls)
+    {
+        mt::Measured M{w.name, "R_dB", "laboratory sound reduction index (ASTM E90), leakage-corrected", true, 3.0, oct, {}, w.side, w.m};
+        for (double v : w.R)
+            M.lo_hi.push_back({v, v});
+        const mt::Measured gap{"model spread", "R_dB", "orthotropic plates", true, 3.0, {31.5, 8000}, {{w.g31lo, w.g31hi}, {w.g8lo, w.g8hi}}, 3.22};
+        const std::string name = "clt at " + std::to_string(int(1e3 * w.t + 0.5)) + " mm";
+        const double m = mt::mpp(r, w.t);
+        const mt::Out X = mt::check_material(name, mt::with(r, "side", w.side), {M, mt::envelope("Hoeller #1 to #3", oct, env, m, w.side), gap, ptb394}, mt::grid(), w.t);
+        // ENGINE LIMIT (thickness resonance): the 4 kHz octave, row at the wall's side against the mass-shifted wall
+        QD_DIAG("# diag: %s, 4 kHz octave (thickness resonance, printed): library %.2f, %s %.2f\n", name.c_str(), X.t8[7], w.name, w.R4k + 20.0 * std::log10(m / w.m));
+    }
+    for (double t : {0.060, 0.280, 0.320})
+        mt::check_material("clt at " + std::to_string(int(1e3 * t + 0.5)) + " mm (printed)", r, {}, mt::grid(), t);
+    mt::check_material("clt_100mm", mt::row("clt_100mm"));
+}
+
+TEST_CASE("Material - screed", "[acoustic][materials]")
+{
+    // Sand-cement screed, bare or the screed of a floating floor (a bonded screed is drawn with the slab), class 1: the
+    // solid `screed` (thk 0) at 50 mm, the sheet screed_50mm. Columns: the physical plate of Hopkins' constants
+    // ([Hopkins_2007_SoundInsulation#171] to #176): density 2000 kg/m3 in e at the physical mass level, coincidence
+    // fc h 20 Hz m fixed at the 50 mm sheet (coiF 400 Hz), loss factor 0.01 (coiQ 100), a from cL 3250 m/s, no
+    // resonance and no att; tf and tfB concrete's law (PTB #30 and Nell; no measured screed face: a guess, printed).
+    // No measured spectrum of a screed is known. Within 3 dB of the spread of 16 independent plates at 50 mm and 3.22 m
+    // (tools/acoustic/gzlib.py: thin and Mindlin, infinite and finite, loss factor 0.005 / 0.01 / 0.02 and the measured
+    // one of 150 mm concrete, 0.040 to 0.0069 [Mahn_2023_GuideAirborneRR331#9]) on this case's grid; the 500 Hz octave
+    // is printed: the face absorption fills the plate's 400 Hz coincidence dip. The sharp coincidence needs more angles
+    // than 50 (1 and 2 kHz read 3.8 and 3.6 dB high, 8 kHz 8.3 dB, against 4096 angles x 12 tones), while the tier-1
+    // bound of a mass-law row holds only on 50; so 8 kHz and the octaves on 400 angles are printed.
+    // Reasonable meant: the plate physics; concrete's or heavy masonry's fitted knobs at screed density fill that dip
+    // and lie 10.8-13.3 dB above the plates at 500 Hz. Printed: the thin dense walls at equal surface mass (at 125 Hz
+    // the row reads 9.7-14.8 dB above them, the independent plates 7.7-12.2 dB): [BIA_2000_TN5AClayMasonry#3],
+    // [Warnock_1984_ConcreteBlockWalls#1], [Hopkins_2007_SoundInsulation#67]; the mass-spring-mass resonance of a
+    // floating screed on the resilient layers [Hopkins_2007_SoundInsulation#55], #83, #91 to #94, #164 to #166
+    // (48-194 Hz under 50 mm on 150 mm concrete), which no mass-law row carries.
+    // Valid: 50 mm (coiF is fixed: other thicknesses move their coincidence as 1/h), R 31.5 Hz - 4 kHz.
+    using V = std::vector<double>;
+    const mt::Row s = mt::row("screed");
+    const mt::Measured plates{"16 independent plates", "R_dB", "model spread", true, 3.0, {31.5, 63, 125, 250, 1000, 2000, 4000},
+                              {{19.33, 28.69}, {24.36, 31.83}, {29.13, 35.91}, {31.35, 38.20}, {35.46, 39.76}, {43.12, 49.74}, {52.62, 58.83}}};
+    const mt::Out X = mt::check_material("screed at 50 mm", s, {plates}, mt::grid(), 0.050);
+    const mt::Out F = mt::run({{s, mt::SOLID, 0.050}}, mt::grid(400));
+    // ENGINE LIMIT (pane coincidence capped by the face absorption): the 500 Hz octave against the plates' spread
+    QD_DIAG("# diag: screed at 50 mm, 500 Hz octave (coincidence capped by the face absorption, printed): library %.2f, plates 22.33-27.97\n", X.t8[4]);
+    QD_DIAG("# diag: screed at 50 mm, 8 kHz octave (printed): library %.2f, on 400 angles %.2f, plates 64.14-68.49\n", X.t8[8], F.t8[8]);
+    QD_DIAG("# diag: screed at 50 mm on 400 angles (printed)\noctave,library\n");
+    for (int o = 0; o < 9; ++o)
+        QD_DIAG("%g,%.2f\n", mt::OCT[o], F.t8[o]);
+    QD_DIAG("# diag: screed at 50 mm, absorption (a guess) against PTB #30, #29, #344 (printed)\noctave,library,ptb30,ptb29,ptb344\n");
+    const double ref[3][6] = {{0.01, 0.02, 0.02, 0.02, 0.05, 0.05}, {0.02, 0.03, 0.03, 0.03, 0.04, 0.07}, {0.02, 0.02, 0.03, 0.04, 0.05, 0.05}};
+    for (int o = 0; o < 6; ++o)
+        QD_DIAG("%g,%.4f,%.2f,%.2f,%.2f\n", mt::OCT[o + 2], X.a8[o + 2], ref[0][o], ref[1][o], ref[2][o]);
+    const std::vector<std::tuple<const char *, double, double, V>> thin = { // wall, surface mass, side, octaves 125 Hz - 4 kHz
+        {"BIA #3 (brick 95 mm)", 189.0, 3.53, {31.6, 33.5, 39.3, 46.7, 54.7, 60.7}},
+        {"Warnock 1984 #1 (solid blocks 90 mm)", 195.2, 3.22, {28.0, 36.2, 41.3, 50.4, 56.9, 60.0}},
+        {"Hopkins #67 (dense blocks 100 mm, plaster one face)", 200.0, std::sqrt(3.53 * 2.63), {27.4, 33.0, 42.8, 51.1, 59.8, 66.3}}};
+    QD_DIAG("# diag: screed at the walls' surface mass and side minus the thin dense walls (printed)\nwall,thickness_mm,125,250,500,1000,2000,4000");
+    for (const auto &[wall, m, side, R] : thin)
+    {
+        const mt::Out W = mt::run({{mt::with(s, "side", side), mt::SOLID, m / mt::mpp(s, 1.0)}}, mt::grid());
+        QD_DIAG("\n%s,%.1f", wall, 1e3 * m / mt::mpp(s, 1.0));
+        for (int o = 0; o < 6; ++o)
+            QD_DIAG(",%+.2f", W.t8[o + 2] - R[o]);
+    }
+    QD_DIAG("\n# diag: floating screed, 50 mm on 150 mm concrete: mass-spring-mass resonance (Hz) by the dynamic stiffness (MN/m3)\n");
+    const double m1 = mt::mpp(s, 0.050), m2 = mt::mpp(mt::row("concrete"), 0.150);
+    for (double sd : {115.0, 78.0, 28.0, 11.0, 12.0, 7.0, 14.0, 19.0, 10.0})
+        QD_DIAG("%g,%.0f\n", sd, std::sqrt(sd * 1e6 * (1.0 / m1 + 1.0 / m2)) / (2.0 * QPI));
+    mt::check_material("screed_50mm", mt::row("screed_50mm"));
+}

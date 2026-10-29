@@ -27,7 +27,8 @@ batch and brought to Stephan in five parts. The engine stays closed until every 
 | 1 | `masonry_heavy` (1.2), `glass_4mm` / `glass_6mm` (1.6), `glass_wool` (5.1); JCA in the rig | a73d1a2 |
 | 2a | `masonry_hollow` (1.3), `door_solid_40mm` + `door_hollow_core_40mm` (1.23, 1.24), `rock_wool` (5.2) | cbe2ae3 |
 | 2b | `masonry_light` (1.4), `glazing_double_24mm` + `glazing_triple_36mm` (1.7), `pu_foam` (5.3; 3.6 to a padding-foam row) | 1a3d92d |
-| 2c | `plaster_15mm` (1.5), `parquet` + `vinyl` (1.16, 1.21), `carpet_tile_11mm` (3.1); porous rows' `thk` at most the name's suffix | merged, waiting for Stephan's commit |
+| 2c | `plaster_15mm` (1.5), `parquet` + `vinyl` (1.16, 1.21), `carpet_tile_11mm` (3.1); porous rows' `thk` at most the name's suffix | 15480d4 |
+| 2d-1 | `clt` (1.25), `screed` (1.18), `gypsum_board_12_5mm` + `plywood_19mm` (1.9, 1.13), the ground classes `ground_*` (6.1–6.6) | merged, waiting for Stephan's commit |
 
 Earlier commits of step 3: 5be85fb, 13e4e45, 19323d9 / be65346 / bd0a170 (wish-list and guidelines), 69a4555 /
 e5d3743 / e578aee / 5081648 (rig extension and its reviews).
@@ -43,7 +44,7 @@ e5d3743 / e578aee / 5081648 (rig extension and its reviews).
 - `md/acoustic_modeling_guidelines.md`: how a venue is modeled (solids and sheets, Blender names and `csv_strict`, the
   checklist of forbidden and limited configurations: three co-located faces are not resolvable, only a sheet on a
   solid or a sheet | sheet pair; at most two bonded rigid bodies; objects as hard boxes or porous bodies; assets).
-- `md/acoustic_engine_stage2b_issues.md`: engine issues 1–8 with names, sizes and reproductions, and the engine-limit
+- `md/acoustic_engine_stage2b_issues.md`: engine issues 1–9 with names, sizes and reproductions, and the engine-limit
   marks (`ENGINE LIMIT (<name>):` in the code, since 2026-10-27; earlier log entries say `ISSUE <n>`).
   Engine findings are recorded there, never fixed in step 3.
 
@@ -59,8 +60,8 @@ doors, the first lumped rows (`plates`), glass wool and rock wool (`porous`).
 build: g++-12 / gcc-12, static library, tests on, AVX2, CUDA, MATLAB, Octave, Python off) and runs its `test_bin` from
 the repository root; agents build inside their worktrees.
 
-**Baselines** (the generic build, at 1a3d92d, batch 2b; regenerated 2026-10-28): `[wave]` 163474 / 178,
-`[acoustic]` 44750 / 79 (the rig included), whole suite 1355784 / 1393 (the generic build leaves out one build-option
+**Baselines** (the generic build, at 15480d4, batch 2c; regenerated 2026-10-28): `[wave]` 163474 / 178,
+`[acoustic]` 45143 / 82 (the rig included), whole suite 1356177 / 1396 (the generic build leaves out one build-option
 case of the merge notice's count). Files `test_wave.txt`, `test_acoustic.txt`, `test.txt` in `/home/stephan/quadriga-lib-agents/baselines/`.
 
 **Research:** the requests of 2026-10-27 are answered (research commit d501809; report
@@ -69,10 +70,9 @@ case of the merge notice's count). Files `test_wave.txt`, `test_acoustic.txt`, `
 The line citations are converted and the answer is folded into the wish-list with Stephan's twelve readings D1–D12
 (063f05b; the readings in the section-9 log of 2026-10-28). Further requests go through Stephan in the handoff-7 form.
 
-**Now: batch 2c** (built and merged 2026-10-28, waiting for Stephan's commit; then baselines, worktree cleanup, 2d): `plaster_15mm` with the bonded-mass effect of issue 7, `carpet_tile_11mm`,
-`parquet` / `vinyl` on the slab. Then 2d (`clt`, `screed`, ground classes and asphalt, `gypsum_board_12_5mm`,
-`plywood_19mm`, metal), batch 3 (leaves on cavities, drywall, resonant absorbers, ceiling tiles, objects, the
-padding-foam row with upholstery 3.8); rows waiting for data at the end.
+**Now: batch 2d, round 1** (built and merged 2026-10-29, waiting for Stephan's commit; then round 2 from that commit): `clt`, `screed`, ground classes and asphalt, `gypsum_board_12_5mm`,
+`plywood_19mm`, metal (`steel_1mm`, `aluminum_2mm`). Then batch 3 (leaves on cavities, drywall, resonant absorbers,
+ceiling tiles, objects, the padding-foam row with upholstery 3.8); rows waiting for data at the end.
 
 **Mechanics per batch** (worked out over batches 0–2a; the briefs in the agents folder `materials/` show the form:
 `batch2a_common.md` and one brief per family):
@@ -238,7 +238,7 @@ Each is decided at the stop of the first material that needs it; record the deci
 | the upholstery row | fit of the porous body to per-object areas, with the object test | |
 | generic solid across thickness | the miss of one fit over the measured range; a thickness-scaled coincidence to stage 2b if too large (wish-list 4) | concrete 150–203 mm: one fit, `coiF` a fit knob, 0.25 dB off the envelope (2026-10-27, concrete); heavy masonry 150–250 mm, one fit, worst wall 2.23 dB, ends printed (2026-10-28, masonry_heavy) |
 | reference row per class | now: tolerance table of wish-list 1.10 (class envelope) | decided 2026-10-26 (r01 D4, r02 F5) |
-| dense ground classes | the passive Miki fit degenerates at 2 and 20 MPa·s/m² (μ′ near 0): rigid rows with a face absorption, as `asphalt`; the fit target (n and z, or the asserted reflection) | |
+| dense ground classes | the passive Miki fit degenerates at 2 and 20 MPa·s/m² (μ′ near 0): rigid rows with a face absorption, as `asphalt`; the fit target (n and z, or the asserted reflection) | porous throughout: the fit to the complex plane-wave reflection with Re μ ≥ 1 follows class F within 0.061; no rigid row (2026-10-29, ground classes) |
 
 ## 7. Research requests
 
@@ -1022,6 +1022,97 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     paragraphs, 1.6 (porous `thk`), 1.7.4 (rug on a finish, finish solids at least 1.6 mm); stage-2b issue 7 (bonded
     sheets and finishes), issue 1 (carpet); guidelines 5 (floors). Outputs in `/home/stephan/quadriga-lib-agents/scratch/b2c/`.
     To Stephan with the batch report.
+  - Committed by Stephan (15480d4, 2026-10-28). Manager: the three worktrees checked against the commit (m11's heavy
+    file and m13's floors part identical; m12's case differs only by the manager's real finish rows; every CSV row in
+    the commit; no commits on the branches), then removed with their `agent/*` branches; baselines regenerated at
+    15480d4 (`[wave]` 163474 / 178, `[acoustic]` 45143 / 82, whole suite 1356177 / 1396; every number identical to the
+    merge run).
+  - Batch-2d briefs written in the agents folder, two rounds of at most three agents: `batch2d_common.md` (round 1 at
+    15480d4, round 2 at the round-1 commit; the 2c cases among the confirmed; lessons of 2c: search the research data
+    for the class before calling a quantity unmeasured, the table's name/`thk` rule, a bonded addition counts with the
+    host's mass level). Round 1: `m14_clt_screed_brief.md` (heavy; CLT across 78–245 mm with its coincidence in the
+    band, screed without a spectrum: physical plate or concrete's knobs), `m15_boards_brief.md` (plates;
+    `gypsum_board_12_5mm` + `plywood_19mm`: coincidence, specimen size, orthotropy, `side`), `m16_ground_brief.md` (new
+    ground file; six porous ground classes by the decided Miki route; the open rule "dense ground classes"; the
+    asserted quantity near grazing; extended against local reaction; grass by season). Round 2: `m17_metal_brief.md`
+    (plates; steel + aluminum: unstated specimen sides, loss factor, face absorption), `m18_asphalt_brief.md` (ground;
+    dense by the round-1 rule, porous 40 mm on the dense solid). `vegetation` (6.8) moves to batch 3 with the objects.
+    To Stephan before the agents start.
+  - Briefs approved by Stephan 2026-10-28. Round-1 worktrees created at 15480d4 (`worktrees/m14_clt_screed`,
+    `m15_boards`, `m16_ground`, branches `agent/<id>`); the three agents started on phase 1 (plan), 4 threads each.
+  - m16 ground phase 1 done (worktree clean at 15480d4). Manager reruns (`gphase.py`, `gsigma.py`, `gstudy.py q3`, `q4`
+    identical; the probe 156 / 156 in 0.125 s, load 7–8): passive Miki columns fitted to the complex plane-wave
+    reflection of the Delany-Bazley half-space (Re μ ≥ 1, a weak pull of n to Delany-Bazley) follow every class from
+    loose gravel (10 kPa·s/m²) to F (2 MPa·s/m²): minimax |ΔR| 0.046–0.064 at 0° and 80–89.9°, 31.5 Hz–8 kHz,
+    effective σ within ×1.049 of the class. The floor of about 0.06 is Delany-Bazley's impedance phase below −45°
+    (to −50.8°; below 48 Hz for loose gravel up to 7.9 kHz for F), which no passive column set reaches. Grass C against D
+    in the ground effect up to 5.43 dB (four geometries); loose gravel as a 0.1 / 0.2 / 0.5 m bed on soil against the
+    half-space 4.33 / 1.80 / 0.10 dB. Decisions G1 (assert complex |ΔR| at 0° and 80–89.9° per third, bound 0.15, own
+    grazing grid), G2 (the open rule: dense classes stay porous by the reflection fit; no rigid row for F), G3 (extended
+    reaction; local printed: up to 0.22 in |ΔR|, 0.59 dB in the ground effect), G4 (two grass rows, D and C; the C
+    row's name to Stephan), G5 (loose gravel a half-space; the layer form recorded), G6 (ground solids at least 1 m,
+    within 0.0014), G7 (one case named by the seven families joined by " + "; a shorter name needs a table change).
+    Side finding for m18: class G fits as a porous half-space too (0.061).
+  - m15 boards phase 1 done (worktree clean at 15480d4). Manager reruns (`summary.py`, `tfcap.py`, the probe 130 / 134
+    in 2.2 s, identical to the agent's, its 4 failures in the printed plywood P4 and P6; load 3–6): gypsum physical
+    (coincidence 2.86 kHz, η 0.0125; dip 3084 Hz by 1/96-octave sweep), mass level 0.90 ×, Hopkins #132 within 2.39,
+    Northwood #2 2.29 dB, their envelope 0.45 dB; plywood `coiF` a knob (1245 Hz), mass level 0.62 ×, Wareing #5 and
+    #7 within 1.23 / 1.36 dB, #4 and #6 printed (the large sheet 3–5 dB below the small one above coincidence). The face
+    cap acts below coincidence too: a light free board transmits more than a hard face absorbs (gypsum τ 0.29 / 0.09 at
+    31.5 / 63 Hz), and T ≤ `tf` adds +9.97 / +5.64 dB with the default law; the agent's face law fitted to VanHout #9
+    keeps the cap at +2.67 / +1.51 dB. Manager note: VanHout #9 is a 10 mm plasterboard bonded to 25 mm glass fibre,
+    laid on the floor (a panel on a spring), not a free board's face; the physical reason for a high face law is that a
+    free panel's 1 − R contains its own τ. Decisions B1–B7.
+  - m14 clt + screed phase 1 done (worktree clean at 15480d4). Manager reruns (`ceval.py fit_A_530.json`, `screed.py`
+    identical to the agent's; the probe 196 / 200, failures the CLT 0.02 dB overshoots and the screed fine-grid bound;
+    load 0.4–5): CLT one solid at 530 kg/m³, `coiF` 3.39 kHz and `coiQ` 2.08 as knobs, mass level 0.895: Hoeller CLT03
+    (78 mm, wall side 2.988 m) −3.01 at 250 Hz and −2.96 / −3.02 at 4 kHz, CLT05 (175 mm, side not stated, taken 2.988 m)
+    +3.02 at 4 kHz, CLT07 (245 mm, floor 4.215 m) 1.96 dB; envelope 0 / 0.08 / 0.76 dB; physical coincidence misses by
+    4.0 dB; CLT05 at the floor side passes all (2.81 dB). Fixed against 1/h-scaled coincidence 2.51 / 4.80 dB at 78 /
+    245 mm (anchored at 175 mm). Screed: no measured spectrum; the physical plate within the spread of 16 independent
+    plates except 3.56 dB at 500 Hz (the face cap), concrete's and masonry's knobs 10.8–13.3 dB above at 500 Hz; every
+    plate model 8–12 dB above the thin dense walls at 125 Hz. Decisions D1 (CLT `coiF` a knob), D2 (CLT05 at the wall
+    side; 4 kHz printed as "thickness resonance", or the floor side), D3 (78–245 mm), D4 (screed the physical plate,
+    T 2, 50 mm; grid or a one-line rig bound), D5 (mass levels), D6 (no floating-screed row), D7 (faces: CLT the
+    parquet law, screed concrete's).
+  - Decided by Stephan 2026-10-29 (all as the manager recommended): ground G1 complex |ΔR| at 0° and 80–89.9°, bound
+    0.15, own grazing grid; G2 the open rule closed: every class porous by the bounded reflection fit, no rigid row;
+    G3 extended reaction, local printed; G4 `ground_grass` (D) and `ground_grass_dry` (C); G5 loose gravel a half-space;
+    G6 ground solids at least 1 m (guideline); G7 one case by the seven families. Boards B1 physical gypsum
+    coincidence; B2 the gypsum face law fitted to the board's own τ plus a measured hard face (fallback the VanHout #9
+    law if a reference then misses 3 dB; VanHout printed as a neighbour), issue 8 extended; B3–B7 as proposed.
+    CLT/screed D1 `coiF` a knob; D2 CLT05 at the wall side, refit without 4 kHz, 63 Hz–2 kHz asserted, 4 kHz printed
+    under the new engine-limit name "thickness resonance" (any further miss above 3 dB printed and reported); D3
+    78–245 mm; D4 screed the physical plate, `grid(200,1)` if tier 1 holds, else 50 angles with the fine grid printed,
+    no rig change; D5–D7 as proposed. The three agents continued with phase 2 (build).
+  - m16 ground built (worktree: CSV +7 rows, solids, `c`/`d` written 0 where the fit sat at its 1e-12 bound; new
+    `test_acoustic_mat_ground.cpp`, 83 lines, one case named by the seven families, its name line 153 characters).
+    Manager rerun: 70 / 70, 0.139 s at load 16 (provisional). Agent: |R − R_DB| 0.0466–0.0644 (bound 0.15), tier 1 on
+    the ground-path angles ≤ 1.87e-3 (bound 9e-3); `[materials]` 2605 / 24, 35995 numbers identical. Resource slip
+    reported by the agent: one timing run without `OMP_NUM_THREADS` for about 30 s.
+  - m15 boards built (worktree: CSV +2 rows; plates file +83 lines after glazing). B2 fell back as allowed: the face
+    law of the board's own τ plus painted plaster (PTB #346) misses by 3.48 dB (manager rerun of `summary.py
+    fit_GE_tfownm.json`: Hopkins #132 −3.48 at 2 kHz, Northwood #2 +3.48 at 4 kHz, the 31.5 Hz gap band +3.48); the row
+    keeps the VanHout #9 law, the comment names it a neighbour build and states the own-τ miss. Manager rerun of the
+    case: 108 / 108, 0.255 s at load 6. Cap with the final laws (row minus `tf` 1, 31.5 Hz–8 kHz): gypsum +3.34 /
+    +1.82 / +1.12 / +0.72 / +0.47 / +0.36 / +2.14 / +6.52 / +2.38 dB, plywood +9.02 / +4.52 / +2.33 / +1.03 / +0.52 /
+    +5.03 / +5.43 / +5.16 / +4.60 dB (agent's `capfinal.py`).
+  - m14 clt + screed built (worktree: CSV +4 rows; heavy file, two cases after plaster). Deviations reported: the CLT
+    refit without 4 kHz needed a tie-break (63 Hz–2 kHz within tolerance first, then the worst 4 kHz minimised; left
+    free, 4 kHz landed up to 13.4 dB off); `coiF` moved to 5957 Hz, mass level 0.885. Screed on 50 angles (on 200 the
+    tier-1 bound fails, 4.1e-4 against 2e-4: the decided fallback), its 500 Hz octave printed under the face-cap mark,
+    8 kHz printed (74.05 dB on 50 angles, 66.01 on 400). Manager reruns: `ceval.py fit_A_no4k_tie0_530.json` (fine
+    grid: CLT03 2.93, CLT05 1.91 at 63 Hz–2 kHz, CLT07 1.39 dB; 4 kHz −2.89 / +2.99 / −0.48 dB), the cases 188 / 188
+    and 31 / 31, 0.12 s each at load 2.3.
+  - Round 1 merged by the manager 2026-10-29: the heavy file from m14, the plates file from m15, the new ground file
+    from m16; CSV rows appended in wish-list order 1.9, 1.13, 1.18, 1.25, 6.1–6.6, all diffs append-only; no manager
+    edits to code. Checks at load 2–3, 12 threads: reconfigure and rebuild clean; `[materials]` 3044 / 27; `[wave]`
+    163474 / 178, 141128 identical; `[acoustic]` 45785 / 86, 148446 identical, three inserted blocks (518
+    lines: the ground file; 649: the heavy cases; 194: the boards); whole suite 1356819 / 1400 (+642), 298465 identical,
+    the same insertions; `check_docs.py` passes. Outputs in `/home/stephan/quadriga-lib-agents/scratch/b2d1/`.
+    Documents: wish-list 1.9, 1.13, 1.18, 1.25, 6.1–6.6 confirmed with built paragraphs, 4.9 decided; open rule "dense
+    ground classes" closed (section 6); stage-2b issue 7 (CLT), issue 8 (light free boards, screed), issue 9 new
+    ("thickness resonance"); guidelines 10 (ground). To Stephan with the batch report.
 
 ## 10. Scope of phase 0 (2026-10-23; naming and combinations superseded by wish-list 1.6 and section 3)
 

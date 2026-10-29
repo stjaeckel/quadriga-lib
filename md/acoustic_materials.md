@@ -273,23 +273,23 @@ of section 3. R = laboratory sound reduction index; σ = flow resistivity.
 | 1.6 | `glass_4mm`, `glass_6mm` | single-pane windows | sheet only | 2 | 1 | R 125 Hz–4 kHz | high | confirmed |
 | 1.7 | `glazing_double_24mm`, `glazing_triple_36mm` | sealed units 4-16-4 (20 kg/m²) and 4-12-4-12-4 (30 kg/m²) | sheet, one lumped body | 2 | 1 | R 125 Hz–4 kHz (the triple's measured R printed: stage-2b issue 8) | high | confirmed |
 | 1.8 | `glass_leaf_4mm` | two sashes with a wide air space (box windows) | leaf sheet \| box of cavity air \| leaf (sheet at the box's exit) | 2 | 1 | — | low | wish |
-| 1.9 | `gypsum_board_12_5mm` | a single free gypsum panel; the reference row of the leaf | sheet | 2 | 1 | R 63 Hz–4 kHz | low | wish |
+| 1.9 | `gypsum_board_12_5mm` | a single free gypsum panel; the reference row of the leaf | sheet | 2 | 1 | R 63 Hz–4 kHz | low | confirmed |
 | 1.10 | `gypsum_leaf_12_5mm` | gypsum ceilings over a plenum, linings, the precise drywall recipe | leaf sheet on a box of cavity air | 1 (empty cavity); 1p (filled) | 2 | — | high | wish |
 | 1.11 | `drywall`, `drywall_filled`; `drywall_100mm`, `drywall_125mm`, `drywall_150mm`; `drywall_filled_100mm`, `drywall_filled_125mm`, `drywall_filled_150mm` | stud partitions as a plan shows them | lumped mass-law row of the standard build (one 12.5 mm gypsum board each side, metal studs, the rest cavity, empty unless filled; boards 17.0 kg/m² from 680 kg/m³, [Hopkins_2007_SoundInsulation#135]); `thk` the visible thickness | 1 (empty); 1p (filled) | 1 for `drywall_filled_125mm` and the solid at 115 mm; 2 (double-wall model) for the rest | filled 115 mm | high | wish |
 | 1.12 | dry lining (no row: a recipe) | gypsum board on dabs or on furring over masonry | `gypsum_leaf_12_5mm` \| box of cavity air (dab or furring depth) \| masonry solid | 1p | 2 | — | medium | wish |
-| 1.13 | `plywood_19mm` | free wooden panels | sheet | 1 | 1 | R 125 Hz–4 kHz | low | wish |
+| 1.13 | `plywood_19mm` | free wooden panels | sheet | 1 | 1 | R 125 Hz–4 kHz | low | confirmed |
 | 1.14 | `wood_leaf_12mm` | wood panelling on battens | leaf sheet on a box of cavity air (batten depth) | 2 | 2 | — | medium | wish |
 | 1.15 | `board_leaf_22mm` | floor boards on joists | leaf sheet on a box of cavity air (joist depth) on the slab solid; nothing lies or stands on it in the model | 1 | 2 | — | high | wish |
 | 1.16 | `parquet`, `parquet_15mm` | parquet glued on a slab | finish solid on the slab solid; the sheet only where nothing lies or stands on it | 1 | 2 | α 125 Hz–4 kHz | medium | confirmed |
 | 1.17 | `laminate_leaf_8mm` | floating laminate on a foam underlay | leaf sheet \| `underlay` solid \| slab solid; nothing lies or stands on it in the model | 2 | 2 | — | medium | wish |
-| 1.18 | `screed`, `screed_50mm` | a bare screed; the screed of a floating floor | solid, or the sheet for a bare screed | 3 | 2 | — | low | wish |
+| 1.18 | `screed`, `screed_50mm` | a bare screed; the screed of a floating floor | solid, or the sheet for a bare screed | 3 | 2 | 50 mm; R 31.5 Hz–4 kHz (500 Hz printed) | low | confirmed |
 | 1.19 | floating screed (recipe; or a lumped row: 4.6) | screed on a resilient layer | `screed` solid \| resilient layer \| slab solid | 3 | 2 | — | medium | wish |
 | 1.20 | `ceramic_tile`, `ceramic_tile_10mm` | tiled floors and walls | finish solid; the sheet only where nothing lies or stands on it; `att` 0, host's `side` | 3 | 2 | — | low | wish |
 | 1.21 | `vinyl`, `vinyl_3mm` | linoleum or vinyl stuck to the slab | finish solid; the sheet as 1.20 | 1 | 2 | α 125 Hz–4 kHz | low | confirmed |
 | 1.22 | `steel_1mm`, `aluminum_2mm` | metal sheets, metal doors, cladding | sheet | 2 | 1 | R 63 Hz–4 kHz | low | wish |
 | 1.23 | `door_solid_40mm` | solid timber doors | sheet, lumped; surface mass 23.9 kg/m² (the reference door; 22.5–25.2 kg/m² over the references) | 1 | 1 | R 125 Hz–4 kHz (sealed leaf) | medium | confirmed |
 | 1.24 | `door_hollow_core_40mm` | hollow-core interior doors | sheet, lumped; surface mass 9.3 kg/m² (NBS stated) | 3 | 1 | R 125 Hz–4 kHz (sealed leaf) | medium | confirmed |
-| 1.25 | `clt`, `clt_100mm` | cross-laminated timber walls and floors | solid or sheet | 2 | 1 | 78–245 mm; R 63 Hz–4 kHz | low | wish |
+| 1.25 | `clt`, `clt_100mm` | cross-laminated timber walls and floors | solid or sheet | 2 | 1 | 78–245 mm; R 63 Hz–2 kHz (4 kHz printed) | low | confirmed |
 
 References and gaps:
 
@@ -486,7 +486,13 @@ expressible (page section 13).
 [Wareing_2015_SampleSizeVariations#2] are 10 mm boards (neighbors, printed). η: Quirt
 [Quirt_1995_GypsumWallsSummaryIR693#20], Hopkins [Hopkins_2007_SoundInsulation#136]. Density: Hopkins
 [Hopkins_2007_SoundInsulation#135]. Starting columns: page 11.4 row "gypsum board 12.5 mm" (side 1.6971 m); Hopkins'
-specimen side is √(3.53 × 2.63) = 3.047 m (script). Gaps: 31.5 Hz, 8 kHz.
+specimen side is √(3.53 × 2.63) = 3.047 m (script). Gaps: 31.5 Hz, 8 kHz. **Built (2026-10-29):** 680 kg/m³, the
+physical coincidence (fc·h 35.8 Hz·m: 2860 Hz, loss factor 0.0125; dip 3084 Hz), no `att`, only the mass level fitted
+(0.90 × 8.5 kg/m²), side 3.22 m; Hopkins within 2.39 dB, Northwood within 2.29 dB, their envelope within 0.47 dB;
+Wareing printed. A light free board passes more than a hard face absorbs (τ 0.29 at 31.5 Hz), and the engine caps the
+transmission at `tf` (stage-2b issue 8): the face law is the power law of [VanHout_2016_SuspendedCeilings#9] (a 10 mm
+plasterboard bonded to glass fibre, laid on the floor: a neighbour build, printed); a law of the board's own τ plus a
+painted plaster face misses the references by 3.48 dB. The cap still adds 3.3 dB at 31.5 Hz (a gap band).
 
 1.10 **Gypsum leaf.** (comb.) section 3; α: PTB#341 [PTB_2012_AbsorptionTable#35] (empty cavity, Sabine, hard face: A
 1), PTB#342 [PTB_2012_AbsorptionTable#36] (filled, above 0.2: 1p), Bradley [Bradley_1997_GypsumCavityAbsorption#2]
@@ -526,6 +532,10 @@ furring". The furring is not modeled.
 mounting difference, stated in the case). Constants: Hopkins [Hopkins_2007_SoundInsulation#151],
 [Hopkins_2007_SoundInsulation#152], [Hopkins_2007_SoundInsulation#153], [Hopkins_2007_SoundInsulation#154]. Starting
 columns: page 11.4 row "plywood 18 mm" (side 1.6971 m). Gaps: density of the specimens (710 kg/m³ assumed); 31.5/63 Hz.
+**Built (2026-10-29):** 710 kg/m³, side 1.77 m; the coincidence a fit knob at 1245 Hz (an orthotropic sheet has two
+dips, the 800 and 1250 Hz thirds; the isotropic 883 Hz misses by 3.3 dB), mass level 0.62 ×; Wareing #5 and #7 within
+1.43 dB, #4 (17 mm) and #6 (the large sheet, 2.3–4.5 dB below the small one above coincidence) printed; the face law
+Quirt's, asserted within 0.035.
 
 1.14 **Wood panelling.** α (compilation): Cox [Cox_2016_AbsorbersDiffusers#119], Scheibler
 [Scheibler_2018_Pyroomacoustics#78], [Scheibler_2018_Pyroomacoustics#97].
@@ -558,7 +568,14 @@ absorption of a floating laminate floor (request 8: none found).
 
 1.18 **Screed.** Constants: Hopkins [Hopkins_2007_SoundInsulation#171], [Hopkins_2007_SoundInsulation#172],
 [Hopkins_2007_SoundInsulation#173], [Hopkins_2007_SoundInsulation#174], [Hopkins_2007_SoundInsulation#175],
-[Hopkins_2007_SoundInsulation#176]. A bonded screed is drawn with the slab (1.7.5).
+[Hopkins_2007_SoundInsulation#176]. A bonded screed is drawn with the slab (1.7.5). **Built (2026-10-29):** no
+measured spectrum of a screed exists in the research data; the row is the physical plate of these constants (2000 kg/m³,
+coincidence 400 Hz at 50 mm, loss factor 0.01, mass level 1), concrete's face law (tier 3). At 50 mm it lies within 3 dB
+of 16 independent plate models from 31.5 Hz to 4 kHz except 500 Hz, where the face absorption fills its dip
+(stage-2b issue 8, printed); concrete's or heavy masonry's fitted knobs would fill it by 10.8–13.3 dB. Every plate model
+reads 8–12 dB above thin dense walls of equal mass at 125 Hz. The case runs on 50 angles (on 200 the tier-1 bound fails;
+the fine-grid octaves are printed, 8 kHz 74.1 against 66.0 dB). A floating screed resonates at 48–194 Hz on the
+resilient layers of 1.19, which no row carries (4.6).
 
 1.19 **Floating screed.** Resilient layers: Hopkins [Hopkins_2007_SoundInsulation#55],
 [Hopkins_2007_SoundInsulation#83], [Hopkins_2007_SoundInsulation#91], [Hopkins_2007_SoundInsulation#92],
@@ -612,7 +629,12 @@ second modern spectrum; absorption; a 50 Hz third.
 
 1.25 **CLT.** (row) R: Hoeller [Hoeller_2017_CLTBuildingsRR335#1], [Hoeller_2017_CLTBuildingsRR335#2],
 [Hoeller_2017_CLTBuildingsRR335#3]; η: [Hoeller_2017_CLTBuildingsRR335#4], [Hoeller_2017_CLTBuildingsRR335#5],
-[Hoeller_2017_CLTBuildingsRR335#6].
+[Hoeller_2017_CLTBuildingsRR335#6]. **Built (2026-10-29):** one generic solid and one sheet, 530 kg/m³, side 3.22 m;
+the coincidence a fit knob (the physical 200–400 Hz misses by 4.0 dB), mass level 0.885 ×; the face law of parquet
+(PTB#394). Asserted within ±3 dB at 63 Hz–2 kHz: CLT03 78 mm and CLT05 175 mm at the wall opening (2.988 m; CLT05's
+size is not stated, its report code is a wall test's), CLT07 245 mm at the floor opening (4.215 m); worst 2.93 dB. The
+4 kHz octave is printed: thick timber shows a thickness resonance above about 2 kHz that no column carries (stage-2b
+issue 9; −2.89 / +2.99 / −0.48 dB). 60 and 280–320 mm printed.
 
 ### 2.2 Class 2: hard furnishing
 
@@ -1050,12 +1072,12 @@ both limits are in the modeling guidelines.
 
 | # | name | intended use | recipe | A | T | valid | impact | status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 6.1 | `ground_snow` | snow cover | porous half-space (thick traced solid) | 2 | — | — | high (winter sites) | wish |
-| 6.2 | `ground_forest_floor` | forest floor, moss, heather | porous half-space; a layer form is the alternative | 2 | — | — | medium | wish |
-| 6.3 | `ground_grass` | lawns, pasture, sports fields | porous half-space | 2 | — | — | high | wish |
-| 6.4 | `ground_soil` | compacted soil, earth | porous half-space | 2 | — | — | medium | wish |
-| 6.5 | `ground_gravel_loose` | loose gravel, gravel beds, gabion fill | porous half-space, or a layer on soil | 2 | — | — | medium | wish |
-| 6.6 | `ground_gravel_compacted` | gravel roads, car parks | porous half-space | 2 | — | — | medium | wish |
+| 6.1 | `ground_snow` | snow cover | porous half-space (thick traced solid) | 2 | — | — | high (winter sites) | confirmed |
+| 6.2 | `ground_forest_floor` | forest floor, moss, heather | porous half-space; a layer form is the alternative | 2 | — | — | medium | confirmed |
+| 6.3 | `ground_grass`, `ground_grass_dry` | lawns, pasture, sports fields (`_dry`: class C, loose or dry) | porous half-space | 2 | — | — | high | confirmed |
+| 6.4 | `ground_soil` | compacted soil, earth | porous half-space | 2 | — | — | medium | confirmed |
+| 6.5 | `ground_gravel_loose` | loose gravel, gravel beds, gabion fill | porous half-space, or a layer on soil | 2 | — | — | medium | confirmed |
+| 6.6 | `ground_gravel_compacted` | gravel roads, car parks | porous half-space | 2 | — | — | medium | confirmed |
 | 6.7 | `asphalt`, `asphalt_porous_40mm` (proposed thickness) | dense asphalt and concrete paving; porous asphalt | dense: rigid traced solid with a small face absorption; porous: thin porous sheet on the `asphalt` solid | 1 (dense 250 Hz–1 kHz; porous 500 Hz–1 kHz); 2 outside | — | dense 250 Hz–1 kHz; porous 500 Hz–1 kHz | high | wish |
 | 6.8 | `vegetation` | foliage of trees, hedges, shrubs | absorbing volume (2.4.3) around the foliage; `alpha`, `alphaB` fitted to the excess attenuation per meter | — | 2 | 63 Hz–8 kHz, paths 20–200 m | medium | wish |
 
@@ -1105,6 +1127,17 @@ semi-infinite), [Bashir_2014_PhDRoughMixedImpedance#155]. Loose and compacted gr
 
 6.6 Class F 2000 (Fuchs [Fuchs_2025_GroundImpedanceNTACOU104#7]; G 0.3, Kephalopoulos [Kephalopoulos_2012_CNOSSOS#6]);
 Nordtest [Nordtest_1999_NTACOU104#2]; Piercy [Piercy_1981_PropagationReview#7].
+
+**Built 6.1–6.6 (2026-10-29):** seven porous half-spaces (`ground_grass` class D 200, `ground_grass_dry` class C 80
+kPa·s/m², decided: up to 5.4 dB apart in the ground effect), passive Miki columns fitted to the complex plane-wave
+reflection of the Delany-Bazley half-space (extended reaction) at 0° and 80–89.9° with Re μ ≥ 1 and a weak pull of n
+to Delany-Bazley. Every class, compacted gravel included, stays porous (the earlier degeneration came from an
+unbounded fit; a rigid row misses class F by 1.5–1.9 in R). The rows meet Delany-Bazley within 0.047–0.064 (complex R,
+asserted below 0.15); below a frequency that rises with σ the class impedance's phase lies beyond −45° (to −50.8°),
+which no passive medium reaches; at most 0.99 dB in the octave ground effect of four geometries. Effective σ within
+×1.05 of the class. The locally reacting face differs by up to 0.22 in R (0.59 dB in the ground effect), printed. Loose
+gravel is a half-space (a 0.1 / 0.2 / 0.5 m bed on soil differs by 4.3 / 1.8 / 0.1 dB). Ground solids are drawn at
+least 1 m thick (within 0.0014 of the half-space). `asphalt` follows with 6.7; `vegetation` with the objects.
 
 6.7 Dense: class G 20 000 [Fuchs_2025_GroundImpedanceNTACOU104#8] (G 0, [Kephalopoulos_2012_CNOSSOS#7]), class H 200 000
 [Fuchs_2025_GroundImpedanceNTACOU104#9] (G 0, [Kephalopoulos_2012_CNOSSOS#8]); FHWA [FHWA_2010_GroundPavementEffects#1],
@@ -1190,7 +1223,8 @@ it now.
    solid scales with the traced thickness; the measured depth effect comes from the cavity resonance.
 8. **Masonry class boundaries.** Whether three classes cover what a modeler sees. Sand-lime: closed, Weise
    [Weise_2003_PruefstandAbweichungen#1] is the wall (1.2).
-9. **Ground.** One grass row or two by season; a layer form for snow, loose gravel and forest floor.
+9. **Ground.** One grass row or two by season; a layer form for snow, loose gravel and forest floor. **Decided
+   (2026-10-29):** two grass rows (classes D and C); half-spaces only, the layer form recorded with its size (6.5).
 10. **Conversions first.** The routes for panel absorbers, microperforated panels, hanging fabrics, green walls and
     per-area blocks decide every "1p" entry.
 11. **One material per closed body, finishes as sheets.** To be confirmed in phase 3.
