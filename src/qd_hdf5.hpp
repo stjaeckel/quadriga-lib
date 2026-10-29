@@ -334,7 +334,8 @@ namespace qd
         // ---- File access ----
         // A file opened unbuffered, so that every write reaches the operating system in program order. Reads are
         // bounds-checked against the size at open; seek or read failures throw std::invalid_argument, write and close
-        // failures std::runtime_error. Object headers of unknown length are read through a forward window of 16 KiB.
+        // failures std::runtime_error. Object headers of unknown length are read through a 16 KiB window that starts up to
+        // 4 KiB before the header (a snapshot group header follows its datasets).
         class file
         {
         public:
