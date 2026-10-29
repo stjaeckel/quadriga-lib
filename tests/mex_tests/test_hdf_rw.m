@@ -484,12 +484,13 @@ assertTrue(~isfield(chanR, 'lbs_pos'));
 assertTrue(~isfield(chanR, 'no_interact'));
 assertTrue(~isfield(chanR, 'interact_coord'));
 
-% Writing to an occupied slot replaces it and issues a warning
+% Writing to an occupied slot replaces it and issues a warning; evalc keeps the expected warning off the console
 lastwarn('');
 quadriga_lib.hdf5_write_channel(fn, chan, [], 7, 1, 1, 2);
 assertTrue(isempty(lastwarn));
-quadriga_lib.hdf5_write_channel(fn, chan, [], 6, 1, 1, 2);
+txt = evalc('quadriga_lib.hdf5_write_channel(fn, chan, [], 6, 1, 1, 2);');
 assertTrue(~isempty(strfind(lastwarn, 'overwriting existing dataset')));
+assertTrue(~isempty(strfind(txt, 'overwriting existing dataset')));
 [~, parR] = quadriga_lib.hdf5_read_channel(fn, 6, 1, 1, 2);
 assertTrue(isempty(fieldnames(parR)));   % the datasets of the old slot are removed
 
