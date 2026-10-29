@@ -16,7 +16,10 @@ Reshapes the storage layout inside an existing HDF5 file
 - Changes the 4D slot grid `(nx, ny, nz, nw)` of an existing HDF5 channel file
 - The total number of slots (`nx · ny · nz · nw`) must match the original layout
 - Only the dimension metadata is updated; stored channel data is not moved
-- Errors if the file does not exist or is not a valid HDF5 file
+- Errors if the file does not exist or is not a quadriga-lib channel file of version 3 (files written by
+  quadriga-lib 0.12.4 and earlier are rejected; files modified with other HDF5 tools are not supported and may be
+  rejected)
+- One writer per file at a time; files are not locked
 
 ## Usage:
 ```

@@ -29,16 +29,8 @@ option(ENABLE_AVX2 "Enable AVX2 Acceleration" ON)
 option(ENABLE_CUDA "Enable CUDA GPU Acceleration" OFF)
 option(ENABLE_TESTS "Build tests" OFF)
 
-set(HDF5_PATH "" CACHE PATH "Location of the HDF5 library (include files and .a/.lib file).
-    If left empty, HDF5 location is detected automatically; if not found, HDF5 is built from sources.")
-set(_HDF5_PATH ${HDF5_PATH}) # For internal use
-
 set(CATCH2_PATH "" CACHE PATH "Location of the Catch2 library. If left empty, Catch2 is built from sources.")
 set(_CATCH2_PATH ${CATCH2_PATH}) # For internal use
-
-# If HDF5_STATIC is ON, HDF5 is build from sources and statically linked
-# Static linking the HDF5 library may cause Octave to crash but usually works fine with MATLAB
-option(HDF5_STATIC "Link HDF5 statically" OFF)
 
 # Cmake tries to detect Armadillo include files on the system and link to these files.
 # If Armadillo is not found, the version provided in the "external" folder is used instead.
@@ -48,7 +40,6 @@ option(ARMA_EXT "Use armadillo headers provided with quadriga-lib" OFF)
 set(armadillo_version "14.2.2")
 set(pugixml_version "1.15")
 set(pybind11_version "3.0.0")
-set(hdf5_version "1.14.6")
 set(catch2_version "3.8.1")
 
 # Set the C++ standard and basic compile flags
@@ -80,7 +71,6 @@ endif()
 set(ARMADILLO_ZIP "${CMAKE_SOURCE_DIR}/external/armadillo-${armadillo_version}.zip")
 set(PUGIXML_ZIP "${CMAKE_SOURCE_DIR}/external/pugixml-${pugixml_version}.zip")
 set(PYBIND11_ZIP "${CMAKE_SOURCE_DIR}/external/pybind11-${pybind11_version}.zip")
-set(HDF5_ZIP "${CMAKE_SOURCE_DIR}/external/hdf5-${hdf5_version}.zip")
 set(CATCH2_ZIP "${CMAKE_SOURCE_DIR}/external/Catch2-${catch2_version}.zip")
 set(MATLAB_MEX_ZIP "${CMAKE_SOURCE_DIR}/external/matlab_mex.zip")
 
@@ -152,7 +142,6 @@ set(BUILD_PYTHON ${ENABLE_PYTHON})
 set(BUILD_STATIC_LIB ${ENABLE_STATIC_LIB})
 set(BUILD_SHARED_LIB ${ENABLE_SHARED_LIB})
 set(BUILD_CUDA ${ENABLE_CUDA})
-set(BUILD_HDF5 ${HDF5_STATIC})
 
 if(MSVC) # Platform Overwrites for MSVC / Windows
     if(BUILD_OCTAVE)
@@ -194,13 +183,6 @@ if(BUILD_MATLAB) # Detect MATLAB MEX headers
 endif()
 
 # MATLAB MEX files link the static quadriga library, so they do not depend on a libquadriga.so at run time.
-# HDF5 is linked as found: a system HDF5 (find_package) is linked as a shared library (e.g. Debian/Ubuntu
-# libhdf5_serial.so.310, whose soname differs from MATLAB's bundled libhdf5.so.310, so both can be loaded side
-# by side); HDF5_PATH or BUILD_HDF5 link a static libhdf5.a into every MEX file. On Linux, the MEX files are
-# linked with -z nodelete (see the MATLAB API section below): the thread-safe HDF5 creates pthread keys with
-# destructors that it never deletes, and MATLAB R2026a unloads MEX files at exit or on "clear mex"; if HDF5 were
-# unmapped with them, the exiting thread would call a destructor in unmapped code and MATLAB would crash. A MEX
-# file therefore stays mapped once loaded, and a rebuilt MEX file is only picked up after a MATLAB restart.
 if(BUILD_MATLAB)
     set(BUILD_STATIC_LIB ON)
     message(STATUS "MATLAB enabled: forcing BUILD_STATIC_LIB=ON (MEX files link libquadriga.a)")
@@ -218,92 +200,6 @@ endif()
 
 if(NOT BUILD_STATIC_LIB AND NOT BUILD_SHARED_LIB) # Validation Rules
     message(FATAL_ERROR "At least one of STATIC_LIB or SHARED_LIB must be ON")
-endif()
-
-# Auto-detect pre-built HDF5 in external/hdf5-prebuilt
-if (MSVC AND NOT _HDF5_PATH AND NOT BUILD_HDF5)
-    set(_HDF5_PREBUILT_LIB "${CMAKE_SOURCE_DIR}/external/hdf5-prebuilt/lib/libhdf5.lib")
-    if (EXISTS "${_HDF5_PREBUILT_LIB}")
-        set(_HDF5_PATH "${CMAKE_SOURCE_DIR}/external/hdf5-prebuilt")
-        message(STATUS "Auto-detected pre-built HDF5: ${_HDF5_PATH}")
-    endif()
-endif()
-
-# Build instructions for HDF5 library
-if (NOT _HDF5_PATH AND NOT BUILD_HDF5) # Detect HDF5 automatically
-    find_package(HDF5 MODULE COMPONENTS C HL)
-    if(HDF5_FOUND)
-        get_filename_component(HDF5_LIB_DIR "${HDF5_LIBRARIES}" DIRECTORY)
-        message(STATUS "HDF5 Include dir: ${HDF5_INCLUDE_DIRS}")
-        message(STATUS "HDF5 Libraries: ${HDF5_LIBRARIES}")
-    else()
-        set(BUILD_HDF5 ON)
-    endif()
-else()
-    set(HDF5_FOUND OFF)
-endif()
-
-# Octave does not support static linking HDF5 library (version clash, undefined behavior)
-if (_HDF5_PATH OR BUILD_HDF5)
-    if (BUILD_OCTAVE)
-        message(STATUS "Octave does not support static linking HDF5 library. Octave disabled!")
-        set(BUILD_OCTAVE OFF)
-    endif()
-endif()
-
-if (_HDF5_PATH) # Use given HDF5 location before building it
-    set(BUILD_HDF5 OFF)
-    get_filename_component(HDF5_PATH_ABSOLUTE "${_HDF5_PATH}" ABSOLUTE BASE_DIR "${CMAKE_SOURCE_DIR}")
-    set(HDF5_INCLUDE_DIRS "${_HDF5_PATH}/include")
-    if (MSVC)
-        set(HDF5_LIB "${HDF5_PATH_ABSOLUTE}/lib/libhdf5.lib")
-    else()
-        set(HDF5_LIB "${HDF5_PATH_ABSOLUTE}/lib/libhdf5.a")
-    endif()
-endif()
-
-if (BUILD_HDF5) # Compile HDF5 library
-    set(HDF5_EP_ARGS
-        URL ${HDF5_ZIP}
-        BINARY_DIR "${CMAKE_BINARY_DIR}/hdf5-${hdf5_version}_build"
-        INSTALL_DIR "${CMAKE_BINARY_DIR}/hdf5-${hdf5_version}_bin"
-        CMAKE_ARGS
-            -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
-            -DCMAKE_BUILD_TYPE=Release
-            -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
-            -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
-            -DBUILD_SHARED_LIBS=OFF
-            -DHDF5_ENABLE_Z_LIB_SUPPORT=OFF
-            -DHDF5_ENABLE_SZIP_SUPPORT=OFF
-            -DHDF5_BUILD_UTILS=OFF
-            -DBUILD_TESTING=OFF
-            -DHDF5_BUILD_TOOLS=OFF
-            -DHDF5_BUILD_EXAMPLES=OFF
-            -DHDF5_BUILD_HL_LIB=OFF
-            -DHDF5_BUILD_CPP_LIB=OFF
-            -DHDF5_BUILD_JAVA=OFF
-            -DHDF5_BUILD_FORTRAN=OFF
-            -DCMAKE_POSITION_INDEPENDENT_CODE=ON
-    )
-    if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.24")
-        list(APPEND HDF5_EP_ARGS DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
-    endif()
-
-    if (MSVC)
-        list(APPEND HDF5_EP_ARGS CMAKE_ARGS -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded)
-        set(HDF5_LIB "${CMAKE_BINARY_DIR}/hdf5-${hdf5_version}_bin/lib/libhdf5.lib")
-    else()
-        set(HDF5_LIB "${CMAKE_BINARY_DIR}/hdf5-${hdf5_version}_bin/lib/libhdf5.a")
-    endif()
-    set(HDF5_INCLUDE_DIRS "${CMAKE_BINARY_DIR}/hdf5-${hdf5_version}_bin/include")
-
-    ExternalProject_Add(hdf5_dep ${HDF5_EP_ARGS} BUILD_BYPRODUCTS ${HDF5_LIB})
-endif()
-
-if(HDF5_FOUND)
-    set(HDF5_LINK_LIBS ${HDF5_LIBRARIES})
-elseif(HDF5_LIB)
-    set(HDF5_LINK_LIBS ${HDF5_LIB})
 endif()
 
 # Build instructions for CATCH2 library
@@ -417,7 +313,6 @@ if(BUILD_STATIC_LIB)
     add_library(quadriga_static STATIC ${SRC_FILES} ${SRC_AVX2} ${SRC_CUDA})
     target_include_directories(quadriga_static PRIVATE
         ${QUADRIGA_CORE_INCLUDES}
-        ${HDF5_INCLUDE_DIRS}
     )
     set_target_properties(quadriga_static PROPERTIES OUTPUT_NAME quadriga)
     add_dependencies(quadriga_static pugixml_lib)
@@ -435,9 +330,6 @@ if(BUILD_STATIC_LIB)
         target_link_libraries(quadriga_static PRIVATE ${CUDA_LINK_LIBS})
         set_target_properties(quadriga_static PROPERTIES CUDA_SEPARABLE_COMPILATION ON CUDA_RESOLVE_DEVICE_SYMBOLS ON)
     endif()
-    if (BUILD_HDF5)
-        add_dependencies(quadriga_static hdf5_dep)
-    endif()
     if (NOT ARMADILLO_FOUND)
         add_dependencies(quadriga_static armadillo_lib)
     endif()
@@ -449,7 +341,6 @@ if (BUILD_SHARED_LIB)
     add_library(quadriga_shared SHARED ${SRC_FILES} ${SRC_AVX2} ${SRC_CUDA})
     target_include_directories(quadriga_shared PRIVATE
         ${QUADRIGA_CORE_INCLUDES}
-        ${HDF5_INCLUDE_DIRS}
     )
     set_target_properties(quadriga_shared PROPERTIES
         OUTPUT_NAME quadriga
@@ -474,15 +365,6 @@ if (BUILD_SHARED_LIB)
     if (NOT ARMADILLO_FOUND)
         add_dependencies(quadriga_shared armadillo_lib)
     endif()
-    # HDF5 handling: link directly into shared lib
-    if (BUILD_HDF5)
-        add_dependencies(quadriga_shared hdf5_dep)
-        target_link_libraries(quadriga_shared PUBLIC ${HDF5_LIB})
-    elseif(_HDF5_PATH)
-        target_link_libraries(quadriga_shared PUBLIC ${HDF5_LIB})
-    elseif(HDF5_FOUND)
-        target_link_libraries(quadriga_shared PUBLIC HDF5::HDF5)
-    endif()
 endif()
 
 # --- Link Target Selection ---
@@ -496,8 +378,7 @@ endif()
 if(BUILD_MATLAB)
     # Compiles MEX files directly with g++ (Linux) or cl.exe (Windows). No MATLAB installation required
     # Note: MATLAB always links quadriga_static regardless of QUADRIGA_LINK_TARGET, so the MEX files do not need a
-    # libquadriga.so at run time; the system HDF5 and MATLAB's bundled libhdf5.so are kept apart by their different
-    # sonames, not by the static link (see the comment on HDF5 linking above)
+    # libquadriga.so at run time
     file(MAKE_DIRECTORY ${MEX_OUTPUT_DIR})
     if(MSVC)
         set(MEX_COMPAT_SHIM "")
@@ -526,7 +407,7 @@ if(BUILD_MATLAB)
                 COMMAND ${CMAKE_CXX_COMPILER}
                         /nologo /std:c++17 /EHs /O2 /MT /LD /DMATLAB_MEX_FILE
                         /I${MATLAB_MEX_INCLUDE_DIR} /I${CMAKE_SOURCE_DIR}/include /I${CMAKE_SOURCE_DIR}/src /I${ARMADILLO_INCLUDE_DIRS}
-                        ${mex_src} ${MEX_COMPAT_SHIM} /link $<TARGET_FILE:quadriga_static> ${HDF5_LINK_LIBS} ${CUDA_MEX_LINK_LIBS}
+                        ${mex_src} ${MEX_COMPAT_SHIM} /link $<TARGET_FILE:quadriga_static> ${CUDA_MEX_LINK_LIBS}
                         shlwapi.lib "${MATLAB_MEX_LIB_DIR}/libmex.lib" "${MATLAB_MEX_LIB_DIR}/libmx.lib"
                         /OUT:${mex_output} /DLL /EXPORT:mexFunction
                 DEPENDS ${mex_deps}
@@ -534,17 +415,14 @@ if(BUILD_MATLAB)
                 VERBATIM
             )
         else()
-            # -z nodelete keeps the MEX file and the HDF5 library it loads mapped after MATLAB unloads the MEX file
-            # (dangling HDF5 pthread-key destructors crash MATLAB R2026a at exit otherwise; see BUILD_MATLAB above)
             set(mex_output "${MEX_OUTPUT_DIR}/${mex_basename}.mexa64")
             add_custom_command(
                 OUTPUT ${mex_output}
                 COMMAND ${CMAKE_CXX_COMPILER}
                         -std=c++17 -O3 -shared -fPIC -DMATLAB_MEX_FILE
                         -I${MATLAB_MEX_INCLUDE_DIR} -I${CMAKE_SOURCE_DIR}/include -I${CMAKE_SOURCE_DIR}/src -I${ARMADILLO_INCLUDE_DIRS}
-                        ${mex_src} ${MEX_COMPAT_SHIM} $<TARGET_FILE:quadriga_static> ${HDF5_LINK_LIBS} ${CUDA_MEX_LINK_LIBS} -lgomp
+                        ${mex_src} ${MEX_COMPAT_SHIM} $<TARGET_FILE:quadriga_static> ${CUDA_MEX_LINK_LIBS} -lgomp
                         -Wl,--version-script,${MATLAB_MEX_VERSION_SCRIPT} -Wl,--no-undefined-version -Wl,--unresolved-symbols=ignore-all
-                        -Wl,-z,nodelete
                         -o ${mex_output}
                 DEPENDS ${mex_deps}
                 COMMENT "Building MATLAB MEX file ${mex_basename}.mexa64"
@@ -651,13 +529,10 @@ if (BUILD_PYTHON)
         ${Python3_INCLUDE_DIRS}
     )
     add_dependencies(quadriga_py pybind11_lib pugixml_lib)
-    if(BUILD_HDF5)
-        add_dependencies(quadriga_py hdf5_dep)
-    endif()
     if(QUADRIGA_LINK_TARGET STREQUAL "quadriga_shared")
         target_link_libraries(quadriga_py PRIVATE ${QUADRIGA_LINK_TARGET} ${Python3_LIBRARIES})
     else()
-        target_link_libraries(quadriga_py PRIVATE ${QUADRIGA_LINK_TARGET} ${Python3_LIBRARIES} ${HDF5_LINK_LIBS} ${CUDA_LINK_LIBS})
+        target_link_libraries(quadriga_py PRIVATE ${QUADRIGA_LINK_TARGET} ${Python3_LIBRARIES} ${CUDA_LINK_LIBS})
     endif()
     set_target_properties(quadriga_py PROPERTIES PREFIX "" OUTPUT_NAME "quadriga_lib" SUFFIX "${PYTHON_EXTENSION_SUFFIX}" POSITION_INDEPENDENT_CODE ON)
     if(MSVC)
@@ -678,16 +553,32 @@ if (ENABLE_TESTS)
     file(GLOB TEST_SOURCES CONFIGURE_DEPENDS
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/catch2_tests/*.cpp
     )
-    
+
+    # Optional interop test: files written by the library are read back with the HDF5 C library (1.12 or newer, the
+    # test uses H5Ovisit3). It is compiled only if CMake finds such an HDF5 installation, which is then linked into
+    # test_bin only (the library itself does not use the HDF5 C library).
+    set(HDF5_INTEROP_TEST "${CMAKE_CURRENT_SOURCE_DIR}/tests/catch2_tests/test_hdf5_interop.cpp")
+    list(REMOVE_ITEM TEST_SOURCES ${HDF5_INTEROP_TEST})
+    find_package(HDF5 1.12 MODULE QUIET COMPONENTS C)
+    if(HDF5_FOUND)
+        list(APPEND TEST_SOURCES ${HDF5_INTEROP_TEST})
+        set(HDF5_INTEROP_LIBS ${HDF5_LIBRARIES})
+        set(HDF5_INTEROP_INCLUDE_DIRS ${HDF5_INCLUDE_DIRS})
+        message(STATUS "HDF5 interop test enabled (HDF5 ${HDF5_VERSION})")
+    endif()
+
     add_executable(test_bin ${CATCH2_MAIN_SRC} ${TEST_SOURCES})
     add_dependencies(test_bin catch2_dep)
     target_include_directories(test_bin PRIVATE
         ${QUADRIGA_CORE_INCLUDES}
         ${CATCH2_INCLUDE_DIR}
-        ${HDF5_INCLUDE_DIRS} # HDF5 tests patch files with the HDF5 C API
+        ${HDF5_INTEROP_INCLUDE_DIRS}
     )
 
-    target_link_libraries(test_bin PRIVATE ${QUADRIGA_LINK_TARGET} ${CATCH2_LIB})
+    target_link_libraries(test_bin PRIVATE ${QUADRIGA_LINK_TARGET} ${CATCH2_LIB} ${HDF5_INTEROP_LIBS})
+    if(HDF5_FOUND)
+        target_compile_options(test_bin PRIVATE ${HDF5_DEFINITIONS}) # E.g. the dllimport switch of a shared HDF5
+    endif()
 
     # The kernel tests compare AVX2 with GENERIC under #ifdef BUILD_WITH_AVX2, so the macro is defined only when
     # the library has the AVX2 kernels (the library itself gets BUILD_WITH_AVX2=0 or 1)
@@ -695,10 +586,6 @@ if (ENABLE_TESTS)
         target_compile_definitions(test_bin PRIVATE BUILD_WITH_AVX2=1)
     endif()
 
-    if(QUADRIGA_LINK_TARGET STREQUAL "quadriga_static")
-        target_link_libraries(test_bin PRIVATE ${HDF5_LINK_LIBS})
-    endif()
-    
     if(MSVC)
         target_link_libraries(test_bin PRIVATE shlwapi.lib)
         target_compile_options(test_bin PRIVATE /EHsc /Zc:__cplusplus /nologo /MP)
@@ -758,10 +645,6 @@ if (BUILD_SHARED_LIB AND NOT DEFINED SKBUILD_PLATLIB_DIR)
             $<TARGET_SONAME_FILE:quadriga_shared>
             DESTINATION ${INSTALL_MEX_DIR}/+quadriga_lib)
     endif()
-endif()
-
-if ((BUILD_HDF5 OR _HDF5_PATH) AND NOT DEFINED SKBUILD_PLATLIB_DIR)
-    install(FILES ${HDF5_LIB} DESTINATION ${INSTALL_LIBDIR})
 endif()
 
 if((BUILD_MATLAB OR BUILD_OCTAVE) AND NOT DEFINED SKBUILD_PLATLIB_DIR)
