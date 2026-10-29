@@ -11,10 +11,10 @@ SECTION!*/
 /*!SECTION_DESC
 A **geometry-based stochastic model** (GBSM) generates channels from statistics of a type of environment, the
 *scenario* (e.g. urban macro-cell with or without line of sight), instead of from the geometry of one site. The
-functions of this section implement the large-scale part of the model of 3GPP TR 38.901, clause 7.5 steps 1 to 4:
-path loss, shadow fading, LOS probability, O2I penetration loss and the large-scale parameters (LSPs) of each link,
-i.e. the spreads of delays and angles, the K-factor and the cross-polarization ratio. They are in the submodule
-`quadriga_lib.gbsm`.<br><br>
+functions of this section implement the model of 3GPP TR 38.901, clause 7.5 steps 1 to 7 (cluster level): path
+loss, shadow fading, LOS probability, O2I penetration loss, the large-scale parameters (LSPs) of each link, i.e. the
+spreads of delays and angles, the K-factor and the cross-polarization ratio, and the delays, powers and angles of the
+clusters. They are in the submodule `quadriga_lib.gbsm`.<br><br>
 
 The statistics of a scenario are read from a conf file by [[conf_file_read]] into two dicts, the scenario
 parameters `scenpar` and the path-loss parameters `plpar`. The folder `data/config` holds 23 files for TR 38.901
@@ -32,6 +32,15 @@ phases once; [[lsf_draw]] evaluates them at the links (columns 0 DS, 1 KF, 2 SF,
 8 absolute TOA: Normal; 9 ground permittivity, 10 UMa environment height: Uniform; each at the decorrelation
 distance of its key); [[path_loss]] returns the path loss and the SF standard deviation; [[lsp_generate]] turns the
 random values into the LSPs of each link and frequency.<br><br>
+
+The small-scale part implements TR 38.901 clause 7.5 steps 5 to 7 (cluster level). Per BS site and scenario,
+[[ssf_init_phases]] draws the phases of the shared cluster set and of one set per frequency, with seeds derived from
+the LSF seed; [[ssf_draw]] evaluates them at the links (cluster delays, signs and angle offsets, and the cluster
+shadowing per frequency, all at the decorrelation distance `SC_lambda`); [[ssf_clusters]] turns the LSPs and the
+random values into the delays, powers and angles of the clusters with one of three methods: `"38.901"` (clause 7.5,
+one frequency; the default), `"38.901_MF"` (the multi-frequency method of clause 7.6.5.1) and `"quadriga"`
+(spatially consistent, the same delays and angles at all frequencies, swap-reciprocal). The ray level (steps 8 to
+12) follows in a later version.<br><br>
 
 Where TR 38.901 and QuaDRiGa differ, the TR behaviour is the default; QuaDRiGa's behaviour is available
 through an argument where it is still wanted (3D correlation, symmetric square root of the LSP

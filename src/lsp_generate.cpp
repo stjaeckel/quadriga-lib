@@ -211,6 +211,7 @@ void quadriga_lib::lsp_generate(
 - [[path_loss]] (the SF standard deviation `sf_sigma`)
 - [[lsf_init_phases]] (the phases of the random generators)
 - [[scenpar_validate]] (the scenario parameters and the cross-correlation matrix)
+- [[ssf_clusters]] (the clusters from the LSPs)
 MD!*/
 
 void quadriga_lib::lsp_generate(const std::unordered_map<std::string, double> &scenpar,

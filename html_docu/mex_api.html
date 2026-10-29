@@ -151,6 +151,9 @@
   <tr><td><a href="#o2i_loss">o2i_loss</a></td><td>O2I building or car penetration loss of a set of UTs, TR 38.901 clause 7.4.3</td></tr>
   <tr><td><a href="#path_loss">path_loss</a></td><td>Path loss and shadow-fading standard deviation of a set of links</td></tr>
   <tr><td><a href="#scenpar_validate">scenpar_validate</a></td><td>Validate scenario parameters and complete them with default values</td></tr>
+  <tr><td><a href="#ssf_clusters">ssf_clusters</a></td><td>Cluster delays, powers and angles of a set of links, TR 38.901 clause 7.5 steps 5 to 7</td></tr>
+  <tr><td><a href="#ssf_draw">ssf_draw</a></td><td>Spatially correlated normalized random values of one small-scale fading generator set at a set of links</td></tr>
+  <tr><td><a href="#ssf_init_phases">ssf_init_phases</a></td><td>Draw the random phases of one small-scale fading generator set of a BS site and scenario</td></tr>
 </tbody></table><br>
 
 <b>Math functions</b><br><br>
@@ -2505,10 +2508,10 @@ Calculate the Rician K-Factor from channel impulse response data
 <br>
 A <b>geometry-based stochastic model</b> (GBSM) generates channels from statistics of a type of 
 environment, the <i>scenario</i> (e.g. urban macro-cell with or without line of sight), instead of from 
-the geometry of one site. The functions of this section implement the large-scale part of the model 
-of 3GPP TR 38.901, clause 7.5 steps 1 to 4: path loss, shadow fading, LOS probability, O2I 
-penetration loss and the large-scale parameters (LSPs) of each link, i.e. the spreads of delays and 
-angles, the K-factor and the cross-polarization ratio.<br><br> 
+the geometry of one site. The functions of this section implement the model of 3GPP TR 38.901, 
+clause 7.5 steps 1 to 7 (cluster level): path loss, shadow fading, LOS probability, O2I penetration 
+loss, the large-scale parameters (LSPs) of each link, i.e. the spreads of delays and angles, the 
+K-factor and the cross-polarization ratio, and the delays, powers and angles of the clusters.<br><br> 
  
 The statistics of a scenario are read from a conf file by <a href="#conf_file_read">conf_file_read</a>. The folder 
 <code>data/config</code> holds 23 files for TR 38.901 v19.5.0; <a href="#scenpar_validate">scenpar_validate</a> completes a parameter set 
@@ -2526,6 +2529,16 @@ evaluates them at the links (columns 1 DS, 2 KF, 3 SF, 4 ASD, 5 ASA, 6 ESD, 7 ES
 10 ground permittivity, 11 UMa environment height: Uniform; each at the decorrelation distance of 
 its field); <a href="#path_loss">path_loss</a> returns the path loss and the SF standard deviation; <a href="#lsp_generate">lsp_generate</a> 
 turns the random values into the LSPs of each link and frequency.<br><br> 
+ 
+The small-scale part implements TR 38.901 clause 7.5 steps 5 to 7 (cluster level). Per BS site and 
+scenario, <a href="#ssf_init_phases">ssf_init_phases</a> draws the phases of the shared cluster set and of one set per 
+frequency, with seeds derived from the LSF seed; <a href="#ssf_draw">ssf_draw</a> evaluates them at the links (cluster 
+delays, signs and angle offsets, and the cluster shadowing per frequency, all at the decorrelation 
+distance <code>SC_lambda</code>); <a href="#ssf_clusters">ssf_clusters</a> turns the LSPs and the random values into the delays, powers 
+and angles of the clusters with one of three methods: <code>'38.901'</code> (clause 7.5, one frequency; the 
+default), <code>'38.901_MF'</code> (the multi-frequency method of clause 7.6.5.1) and <code>'quadriga'</code> (spatially 
+consistent, the same delays and angles at all frequencies, swap-reciprocal). The ray level (steps 8 
+to 12) follows in a later version.<br><br> 
  
 Where TR 38.901 and QuaDRiGa differ, the TR behaviour is the default; QuaDRiGa's behaviour is available 
 through an argument where it is still wanted (3D correlation, symmetric square root of the LSP 
@@ -2858,6 +2871,7 @@ phase = quadriga_lib.lsf_init_phases( scenpar, seed, tx_pos, rx_pos, dual_mobili
 <ul>
 <li><a href="#conf_file_read">conf_file_read</a> (the scenario parameters)</li>
 <li><a href="#lsf_draw">lsf_draw</a> (evaluates the phases at the links)</li>
+<li><a href="#ssf_init_phases">ssf_init_phases</a> (the small-scale sets, seeds derived from this seed)</li>
 <li><a href="#sos_init_phases">sos_init_phases</a> (the raw phases)</li>
 <li><a href="#sos_remove_bias">sos_remove_bias</a> (the bias removal of one generator)</li>
 </ul>
@@ -2922,6 +2936,7 @@ Large-scale parameters of a set of links from normalized random values
 <li><a href="#path_loss">path_loss</a> (the SF standard deviation <code>sf_sigma</code>)</li>
 <li><a href="#lsf_init_phases">lsf_init_phases</a> (the phases of the random generators)</li>
 <li><a href="#scenpar_validate">scenpar_validate</a> (the scenario parameters and the cross-correlation matrix)</li>
+<li><a href="#ssf_clusters">ssf_clusters</a> (the clusters from the LSPs)</li>
 </ul>
 
 <hr class="greyline"><br>
@@ -3087,6 +3102,310 @@ Validate scenario parameters and complete them with default values
 <ul>
 <li><a href="#conf_file_read">conf_file_read</a> (read the parameters from a conf file)</li>
 <li><a href="#conf_file_write">conf_file_write</a> (applies the same checks before writing)</li>
+</ul>
+
+<hr class="greyline"><br>
+<span id="ssf_clusters" class="qd-func"><b>ssf_clusters</b></span><br>
+<hr class="thin">
+Cluster delays, powers and angles of a set of links, TR 38.901 clause 7.5 steps 5 to 7
+<ul>
+<li>Turns the large-scale parameters of <a href="#lsp_generate">lsp_generate</a> and the random values of <a href="#ssf_draw">ssf_draw</a> into the delays, powers and angles of the clusters of each link, by one of three methods:</li>
+<li><code>'38.901'</code> (default): TR 38.901 clause 7.5 steps 5 to 7 (exponential delays, powers with per-cluster shadowing, inverse Gaussian and Laplacian angle mapping with the scaling factors C_phi and C_theta); one frequency only</li>
+<li><code>'38.901_MF'</code>: the multi-frequency method of TR 38.901 clause 7.6.5.1 (nominal delays and angles from anchor spreads, frequency-dependent powers, scaling by the K-factor per frequency)</li>
+<li><code>'quadriga'</code>: the cluster generation of QuaDRiGa (paper: Jaeckel, Raschkowski, Burkhardt, Thiele, "A Spatially Consistent Geometric D2D Small-Scale Fading Model for Multiple Frequencies", 2019): continuous in space, frequency-independent delays and angles for several frequencies, swap-reciprocal, exact delay spread</li>
+<li>Slots per link: slot 1 = LOS path (delay 0, geometric LOS angles); slot 2 = ground reflection if <code>GR_enabled</code> is > 0; then the <code>N = NumClusters - 1</code> NLOS clusters, slot <code>2 + G + n</code> for cluster <code>n = 0 ... N-1</code> (<code>G = 1</code> with ground reflection, else 0); <code>n_slot = NumClusters + G</code>. Slot <code>2 + G + n</code> always belongs to column <code>b·N + n + 1</code> of each block <code>b</code> of the random values (the clusters are not sorted)</li>
+<li>LOS condition: the scenario is a LOS scenario if <code>KF_mu &gt; -30</code> (dB). In an NLOS scenario the LOS slot and the ground-reflection slot have power 0 whatever K-factor <code>lsp</code> holds, and every method uses its NLOS formulas. Legacy QuaDRiGa "NLOS" files with <code>KF_mu &gt; -30</code> (e.g. <code>BERLIN_UMa_NLOS</code>, <code>QuaDRiGa_Industrial_NLOS</code>) therefore run the LOS formulas</li>
+<li>Units and conventions: delays in [s] relative to the LOS delay (absolute delay = d3D / c + delay); angles in [rad] in global coordinates, elevation convention (elevation = 90 deg - zenith); azimuths in [-pi, pi), elevations in [-pi/2, pi/2]; the LOS angles from the positions: AoD = atan2(dy, dx), EoD = atan2(dz, d2D), AoA = AoD + pi (wrapped), EoA = -EoD</li>
+<li>Powers are the powers of the channel coefficients of TR 38.901 eq. (7.5-30): LOS slot <code>K/(K+1)</code>, NLOS clusters <code>P_n/(K+1)</code> (sum <code>1/(K+1)</code>); in NLOS scenarios K = 0. Path loss and shadow fading are not included (step 12, the caller)</li>
+<li>Per-link number of clusters (TR 38.901 clause 7.6.15): <code>n_cluster(l)</code> NLOS clusters are active; the other slots get delay 0, power 0 and the LOS angles. Every normalisation, minimum, maximum and scaling runs over the active clusters; in <code>'38.901'</code> the scaling factors C_phi, C_theta use <code>n_cluster(l)</code>. <code>n_active(l)</code> counts the active clusters with a power > 0 at one frequency at least (removed clusters are not counted)</li>
+<li>Random values, <code>N</code> columns per block, block <code>b</code> in the columns <code>b·N + 1</code> to <code>(b + 1)·N</code> (see <a href="#ssf_draw">ssf_draw</a>): the shared set <code>rnd</code> (block 0 delays, blocks 1 to 4 signs of AOD, AOA, ZOD, ZOA, blocks 5 to 8 angle offsets of AOD, AOA, ZOD, ZOA) and one per-frequency set (the cluster shadowing) per frequency in <code>rnd_freq</code>. <code>'38.901'</code> uses all nine blocks and the shadowing; <code>'38.901_MF'</code> uses blocks 0, 5, 6, 7, 8 and the shadowing per frequency; <code>'quadriga'</code> uses blocks 0, 5, 6, 7, 8. Normal blocks are mapped to Uniform(0,1) by <code>0.5·erfc(-x/sqrt(2))</code> where a method needs uniform values</li>
+<li>Spatial consistency with <code>'38.901'</code> (TR 38.901 clause 7.6.3.1): the caller evaluates the sign and offset blocks (1 to 8) at the drop or segment-start positions and reuses these values along the track; the delays and the shadowing follow the positions. The method still jumps along tracks (see the table below)</li>
+<li>Inputs used per method (inputs that a method does not use are ignored and not validated):</li>
+</ul>
+<table class="md">
+<tr>
+  <th>Input</th>
+  <th><code>38.901</code></th>
+  <th><code>38.901_MF</code></th>
+  <th><code>quadriga</code></th>
+</tr>
+<tr>
+  <td><code>rnd</code> blocks</td>
+  <td>0 to 8</td>
+  <td>0, 5, 6, 7, 8</td>
+  <td>0, 5, 6, 7, 8</td>
+</tr>
+<tr>
+  <td><code>rnd_freq</code></td>
+  <td>required (one frequency)</td>
+  <td>required</td>
+  <td>ignored</td>
+</tr>
+<tr>
+  <td><code>lsp_anchor</code></td>
+  <td>ignored</td>
+  <td>required</td>
+  <td>ignored</td>
+</tr>
+<tr>
+  <td><code>eod_offset_deg</code></td>
+  <td>NLOS scenarios: mu_offset,ZOD = -value</td>
+  <td>ignored</td>
+  <td>NLOS scenarios: mean over the frequencies</td>
+</tr>
+<tr>
+  <td><code>abs_toa</code></td>
+  <td>NLOS scenarios: added</td>
+  <td>NLOS scenarios: added</td>
+  <td>NLOS scenarios: shift to the offset if > 0</td>
+</tr>
+<tr>
+  <td><code>gr_eps_re</code>, <code>gr_eps_im</code></td>
+  <td>TR 38.901 clause 7.6.8</td>
+  <td>TR 38.901 clause 7.6.8</td>
+  <td>coefficient powers; power split inside the scaling</td>
+</tr>
+<tr>
+  <td><code>o2i</code></td>
+  <td>NLOS: mean ZOA 90 deg</td>
+  <td>ignored</td>
+  <td>ignored</td>
+</tr>
+<tr>
+  <td><code>n_cluster</code></td>
+  <td>yes, also in C_phi, C_theta</td>
+  <td>yes</td>
+  <td>yes</td>
+</tr>
+</table>
+ 
+<ul>
+<li>Absolute time of arrival (TR 38.901 clause 7.6.9), NLOS scenarios only: <code>'38.901'</code> and <code>'38.901_MF'</code> add <code>abs_toa(l)</code> to every active NLOS delay (eq. (7.6-43); with <code>'38.901'</code> the first cluster is then at <code>abs_toa(l)</code>); <code>'quadriga'</code> shifts the NLOS delays so that the first starts at <code>abs_toa(l)</code> where it is > 0. In LOS scenarios <code>abs_toa</code> is ignored (eq. (7.6-44) has no offset)</li>
+<li>Ground reflection (TR 38.901 clause 7.6.8), on if <code>GR_enabled &gt; 0</code>; the ground is the plane z = 0 (<code>tx_pos</code> and <code>rx_pos</code> must have z >= 0). Slot 2: delay <code>(d_GR - d3D)/c</code>, computed as <code>4·h_t·h_r/((d_GR + d3D)·c)</code> with <code>d_GR = sqrt(d2D² + (h_t + h_r)²)</code>; AoD and AoA of the LOS path; EoD = EoA = <code>-atan2(h_t + h_r, d2D)</code>. Reflection coefficients per frequency of eqs. (7.6-38), (7.6-39) with the permittivity <code>eps = gr_eps_re - j·gr_eps_im</code> (the sign of eq. (7.6-40); <code>gr_eps_im</code> >= 0 as from <a href="#lsp_generate">lsp_generate</a>), <code>cos theta = -(h_t + h_r)/d_GR'</code>, <code>sin² theta = (d2D/d_GR')²</code>, <code>d_GR' = max(d_GR, 1e-5)</code>; a coefficient with a zero denominator (only at grazing with <code>eps = 1</code>) is 0. Polarisation-averaged reflection power <code>R² = (abs(R_par)² + abs(R_perp)²)/2</code></li>
+<li>Ground-reflection power: <code>'38.901'</code>, <code>'38.901_MF'</code>: <code>K/(K+1)·(d3D/d_GR')²·R²</code> (eq. (7.6-32)), the other slots unchanged, so the total power is above 1 (no renormalisation; median +1.6 dB in UMi LOS at 6 GHz); <code>'quadriga'</code>: <code>K/(K+1)·R²</code> (QuaDRiGa's two-ray channel, eq. (7.6-32) without the factor d3D/d_GR); its spread scaling splits the LOS power into <code>(1 - R²)·K/(K+1)</code> and <code>R²·K/(K+1)</code>, so the delay spread computed from the slot powers of a ground-reflection link is about 0.85 of the input. In NLOS scenarios the ground-reflection power is 0</li>
+<li>Coefficients from the slot powers, the same for all methods: LOS path amplitude <code>sqrt(power)</code> with the polarisation <code>diag(1, -1)</code> of eq. (7.5-29); ground reflection amplitude <code>sqrt(power)</code> with the polarisation <code>diag(R_par, -R_perp)/R</code>, <code>R = sqrt(R²)</code>, which applies the reflection exactly once and gives eq. (7.6-32); <code>R² = 0</code> gives a zero coefficient. A consumer without polarisation uses <code>sqrt(power)·exp(j·arg(R_par))</code> (<code>arg(0) = 0</code>) for the reflection: it keeps the reflection phase (about pi near grazing), without which the two-ray interference is reversed. NLOS clusters: amplitude <code>sqrt(power)</code></li>
+<li>Permittivity: <code>gr_eps_re &gt;= 1</code> and <code>gr_eps_im &gt;= 0</code>; <a href="#lsp_generate">lsp_generate</a> gives real parts of 3.0 to 44 between 0.5 and 100 GHz; its fit falls below 1 above about 1.3 THz, where this function rejects it</li>
+<li><code>NumClusters = 1</code> (<code>N = 0</code>): the LOS path only, with power 1 in all methods and all scenarios (K is not used), plus the ground reflection if enabled, with the power of the method's rule for <code>K/(K+1) = 1</code>; <code>rnd</code> is empty, <code>rnd_freq</code> and <code>lsp_anchor</code> are not needed, <code>n_cluster</code> entries are 0, <code>n_active</code> is 0</li>
+<li>Method <code>'38.901'</code>, per link with <code>N_l</code> active clusters, in degrees; <code>u_n</code> = block 0, <code>s_n</code> the sign block and <code>y_n</code> the offset block of the angle type, <code>z_n</code> the shadowing value, <code>r_tau = r_DS</code>, <code>zeta = LNS_ksi</code>, <code>K</code> = KF of <code>lsp</code> (LOS scenarios): <code>tau'_n = -r_tau·DS·ln(u_n)</code>, <code>tau_n = tau'_n - min(tau')</code>; the first cluster <code>f</code> has the smallest <code>tau'_n</code> (lowest index on ties). LOS: <code>K_lim = max(10·lg K, -5)</code>, <code>C_tau = 0.7705 - 0.0433·K_lim + 0.0002·K_lim² + 0.000017·K_lim³</code>, delay <code>tau_n / C_tau</code> (eq. (7.5-4)); NLOS: delay <code>tau_n</code>. <code>P_n = P'_n / sum(P')</code>, <code>P'_n = exp(-tau_n·(r_tau - 1)/(r_tau·DS))·10^(-zeta·z_n/10)</code> (eqs. (7.5-5), (7.5-6), computed in the log domain). Clusters with <code>P_n &amp;lt; 10^(-2.5)·max(P)</code> are removed: power 0, delay and angles kept, no renormalisation. Output power <code>P_n/(K+1)</code>. Angle mapping with <code>Pa_n = P_n/(K+1) + (n = f ? K/(K+1) : 0)</code> (eq. (7.5-8); NLOS <code>Pa_n = P_n</code>): azimuth <code>a_n = 2·(AS/1.4)·sqrt(-ln(Pa_n/max(Pa)))/C_phi</code>, zenith <code>a_n = -ZS·ln(Pa_n/max(Pa))/C_theta</code>, with <code>C_phi = C_phi^NLOS(N_l)·(1.1035 - 0.028·K_lim - 0.002·K_lim² + 0.0001·K_lim³)</code> and <code>C_theta = C_theta^NLOS(N_l)·(1.3086 + 0.0339·K_lim - 0.0077·K_lim² + 0.0002·K_lim³)</code> in LOS (NLOS: the table values); <code>C_phi^NLOS</code>, <code>C_theta^NLOS</code> from TR 38.901 Tables 7.5-2 and 7.5-4, linearly interpolated between the table entries and constant beyond both ends. <code>v_n = X_n·a_n + Y_n</code>, <code>X_n = +1</code> if <code>s_n &gt;= 0</code>, else -1, <code>Y_n = y_n·AS/7</code>. NLOS: AOD = LOS AOD + v_n, AOA = LOS AOA + v_n, ZOD = LOS ZOD + mu_offset,ZOD + v_n with <code>mu_offset,ZOD = -eod_offset_deg(l, 1)</code>, ZOA = (90 if <code>o2i(l)</code> else LOS ZOA) + v_n. LOS: angle = LOS angle + v_n - v_f (eqs. (7.5-12), (7.5-17): the first cluster at delay 0 in the LOS direction; <code>o2i</code> and the ZOD offset have no effect). Zenith angles are wrapped to [0, 360] and mapped to <code>360 - theta</code> in [180, 360] (ZOA and ZOD), azimuths wrapped</li>
+<li>Deviations of <code>'38.901'</code> from the TR text: the K-factor in eqs. (7.5-3), (7.5-10), (7.5-15) is limited to >= -5 dB (below, C_theta turns negative near -10 dB); for links far below -5 dB the ASA is then about 0.86 of the input. The delays are not sorted: the TR's sort of eq. (7.5-2) only relabels the clusters, and keeping the cluster of each field column keeps the clusters stable under spatial consistency</li>
+<li>Method <code>'38.901_MF'</code> (TR 38.901 clause 7.6.5.1 as written), per link with <code>N_l</code> active clusters, in degrees; <code>r = 1.5</code>; anchor spreads <code>DS0</code>, <code>ASD0</code>, <code>ASA0</code>, <code>ZSD0</code>, <code>ZSA0</code> from <code>lsp_anchor</code>; DS, ASD, ASA, ZSD, ZSA and <code>K</code> from <code>lsp</code> at frequency k (<code>K = 0</code> in NLOS scenarios); <code>u_n</code> = block 0, <code>y_n</code> the offset block of the angle type (blocks 5 to 8: Y_n, Z_n of the TR and, through <code>V = Phi(y)</code>, V_n, W_n), <code>z_{n,k}</code> the shadowing at frequency k, <code>zeta = LNS_ksi</code>. Step 5', the same at all frequencies: <code>tau'_n = -r·DS0·ln(u_n)</code>; azimuths <code>phi'_n = arg(exp(-j·r·AS0·y_n))</code>, i.e. <code>-r·AS0·y_n</code> wrapped to [-180, 180); zeniths <code>theta'_n = arg(exp(-j·r·ZS0·sgn(y_n)·ln(erfc(abs(y_n)/sqrt(2)))/sqrt(2)))</code>, which equals the TR's <code>sgn(V_n - 0.5)·ln(1 - 2·abs(V_n - 0.5))</code> with full precision near V = 0 or 1. LOS: cluster 0 (the TR's cluster 1) has <code>tau'_0 = 0</code> and all four nominal angles 0. Step 6' per frequency: <code>P'_n = exp(-tau'_n·g_DS - (phi'_AOD,n·g_ASD/sqrt(2))² - (phi'_AOA,n·g_ASA/sqrt(2))² -</code> <code>sqrt(2)·abs(theta'_ZOD,n)·g_ZSD - sqrt(2)·abs(theta'_ZOA,n)·g_ZSA)·10^(-zeta·z_{n,k}/10)</code> (eq. (7.6.30a)) with <code>g_DS = max(r·DS0 - DS, 0)/(DS·r·DS0)</code>, <code>g_ASD = sqrt(max((r·ASD0)² - ASD², 0))/(ASD·r·ASD0)</code> (ASA likewise), <code>g_ZSD = max(r·ZSD0 - ZSD, 0)/(ZSD·r·ZSD0)</code> (ZSA likewise); a g factor is 0 where the spread at k is at least r times the anchor spread. <code>P_n = P'_n/sum(P')</code> (log domain), output power <code>P_n/(K+1)</code>; with the LOS slot <code>K/(K+1)</code> this is eq. (7.6.30h). Step 7' per frequency: delay <code>sqrt(1 + K/2)·tau'_n</code> (LOS) or <code>tau'_n</code> (NLOS), plus <code>abs_toa</code> in NLOS scenarios; angle = LOS angle + <code>sqrt(1 + K)·angle'_n</code> (LOS) or LOS angle + <code>angle'_n</code> (NLOS) for AOD, AOA, ZOD, ZOA (eqs. (7.6.30i) to (7.6.30m) without the ray terms); azimuths wrapped, zenith angles folded as in <code>'38.901'</code></li>
+<li><code>'38.901_MF'</code> follows the TR text literally: the nominal angles are wrapped in step 5' and scaled by <code>sqrt(1 + K)</code> in step 7', so in LOS an angle that crosses +-180 deg in step 5' jumps by <code>sqrt(1 + K)·360</code> deg before the final wrap (about 0.05 to 0.07 jumps per metre along LOS tracks); in LOS the delays and angles depend on the frequency through K (they are equal at all frequencies if K is); the NLOS delays are not shifted to start at 0 (no cluster at delay 0 in NLOS); no sort, no -25 dB removal, no C factors, no ZOD offset (mean EoD about 2 to 3 deg off the clause 7.5 statistics in UMi and UMa NLOS), no O2I rule; the per-cluster shadowing is drawn per frequency (TR clause 7.6.5); the anchor LSPs (TR: e.g. at 2 GHz) are an input; the zenith fold of clause 7.5 step 7 is applied to the final zenith angles, for which clause 7.6.5.1 states no rule</li>
+<li>Method <code>'quadriga'</code> (the paper's section II with the changes below), per link with <code>N_l</code> active clusters, in rad; <code>u_n</code> = block 0, <code>y^x_n</code> the offset block of angle type x (blocks 5 to 8: AOD, AOA, EOD, EOA); DS, the four angular spreads <code>AS_x</code> and <code>K</code> from <code>lsp</code> at frequency k (<code>K = 0</code> in NLOS scenarios); <code>R²_k</code> the reflection power and <code>G = 1</code> with ground reflection, else 0. Delays and angles are the same at all frequencies. Initial values (paper eqs. (1), (4), (5)): <code>tau~_n = -ln(u_n)</code> (unitless), <code>a~^x_n = (Phi(y^x_n) - 0.5)·pi</code> in (-pi/2, pi/2), <code>Phi(y) = 0.5·erfc(-y/sqrt(2))</code>. Centres: the LOS azimuths; the elevations <code>(1 - w)·LOS elevation + w·E_GR</code> with <code>w</code> the mean of <code>R²_k</code> over the frequencies in LOS scenarios with ground reflection, else <code>w = 0</code>. LOS path and ground reflection enter the scaling as fixed offsets (azimuth 0, elevation their elevation minus the centre). Powers per frequency (paper eqs. (6) to (12)): <code>P_n</code> proportional to <code>exp(-tau~_n·g_DS - (a~^AOD_n)²·g_AOD - (a~^AOA_n)²·g_AOA -</code> <code>abs(a~^EOD_n)·g_EOD - abs(a~^EOA_n)·g_EOA)</code>, normalised to <code>1/(K+1)</code>; no per-cluster shadowing. One frequency: <code>g_DS = r_tau - 1</code>, <code>g_AOD = g_AOA = 0.56</code>, <code>g_EOD = g_EOA = 0.76</code>. Several frequencies: <code>g_DS = -1.5·ln(1.2·d - 0.15)</code>, <code>d = DS_k/(max DS + min DS)</code> limited to [0.15, 0.85] (<code>r_tau - 1</code> if DS does not depend on the frequency); azimuth <code>g = -2.2·ln(1.5·b - 0.35)</code>, elevation <code>g = -3.4·ln(1.2·b - 0.1)</code>, <code>b = max(0.75·AS_k/max AS, 0.25)</code>. Scaling weights: LOS <code>K/(K+1)·(1 - G·R²)</code>, ground reflection <code>K/(K+1)·G·R²</code>, clusters <code>P_n</code> (sum 1). Delay scale per frequency (paper eqs. (13), (14)): the factor <code>s_k</code> for which the weighted delays (LOS 0, ground reflection its delay, clusters <code>s_k·tau~_n</code>) have the delay spread DS_k, in closed form (1 if the clusters have no spread; with ground reflection at least the factor that minimises the spread); delays <code>s·tau~_n</code> in [s] with <code>s</code> the mean of <code>s_k</code>. Angle scale per type and frequency: the input spread over the wrapped spread of the initial angles, then up to 9 updates of the factor in dB until the linear power-weighted spread of the scaled cluster offsets together with the fixed offsets equals the input to 1e-4 dB; the mean over the frequencies, at most 3 (azimuth) and 1.5 (elevation) (paper eq. (18)). Scaled elevation offsets are mirrored at +-pi/2. Angles: AOD, AOA = LOS azimuth + offset (wrapped); EOD = centre + <code>delta</code> + offset, EOA = centre + offset, both mirrored at the poles (the azimuth is kept); <code>delta</code> = the mean of <code>eod_offset_deg</code> over the frequencies in NLOS scenarios (TR eq. (7.5-19) with mu_offset,ZOD = -offset), 0 in LOS scenarios. Absolute TOA in NLOS scenarios: where <code>abs_toa(l) &gt; 0</code> the NLOS delays are shifted so that the first is at <code>abs_toa(l)</code></li>
+<li>Changes of <code>'quadriga'</code> against the paper and QuaDRiGa: the LOS direction is added to the scaled offsets (azimuth wrapped, elevation mirrored at the poles) instead of the 3-D rotation of the paper (which widens the elevation spread of departures); the EoD offset of the TR is added in NLOS scenarios; no weakening of the arrival elevations for links with a large height difference; no pull of the NLOS elevations towards the ground reflection in NLOS scenarios; no fixed angles for one or two NLOS clusters. <code>o2i</code> is not used</li>
+<li>Properties of <code>'quadriga'</code>: at one frequency the delay spread of the output (all slots) equals DS, also with the absolute TOA; with ground reflection the scaling uses the split weights above, so the delay spread from the slot powers is smaller (about 0.85 of DS in UMi and UMa LOS at 6 GHz, medium ground), and the elevation spreads cannot fall below the spread of the LOS path and the reflection alone (the target is then not reached). Below the caps the linear power-weighted spread of the angle offsets equals the input; with the circular definition of <a href="#calc_angular_spread">calc_angular_spread</a> the medians are 1.00 for ASD, ESD, ESA and ASA in NLOS, while in LOS the LOS power bounds the ASA (median 0.86 UMi, 0.59 UMa). With several frequencies the averaged scales leave a per-frequency spread error of about +-15 to 20 %. Continuous along tracks; delays and angles independent of the frequency; the relation between angle offset and power is weaker than in clause 7.5</li>
+<li>Swap reciprocity: with mirrored random values (dual-mobility values of <a href="#ssf_draw">ssf_draw</a>, or the blocks 1 and 2, 3 and 4, 5 and 6, 7 and 8 exchanged) and mirrored LSPs (ASD and ASA, ESD and ESA exchanged, also in <code>lsp_anchor</code>), swapping <code>tx_pos</code> and <code>rx_pos</code> gives the same delays and powers with departure and arrival angles exchanged; <code>'38.901'</code> needs <code>eod_offset_deg</code> = 0 and no O2I link, <code>'quadriga'</code> <code>eod_offset_deg</code> = 0</li>
+<li>Properties of the methods (typical values for UMi and UMa at 6 and 30 GHz):</li>
+</ul>
+<table class="md">
+<tr>
+  <th>Property</th>
+  <th><code>38.901</code></th>
+  <th><code>38.901_MF</code></th>
+  <th><code>quadriga</code></th>
+</tr>
+<tr>
+  <td>Output/input spread, median</td>
+  <td>DS 0.96-1.02, ASD 0.95-1.02, ASA 0.99 (NLOS) / 0.80-0.89 (LOS), ESD 0.97-1.04, ESA 0.97-1.03</td>
+  <td>NLOS 0.88-0.94, LOS 0.44-0.77</td>
+  <td>DS 1.00, ASD 1.00, ESD 1.00, ESA 1.00, ASA 1.00 (NLOS) / 0.59-0.86 (LOS)</td>
+</tr>
+<tr>
+  <td>Continuous along a track</td>
+  <td>no: in LOS the first cluster changes (0.03-0.11 jumps/m), the -25 dB rule switches clusters (0.03-0.19 /m), signs and offsets must be frozen per segment; nearby UTs see sign flips (0.5-1.5 jumps per m of separation)</td>
+  <td>NLOS yes; LOS no (0.05-0.07 /m, wrap before the scaling by sqrt(1+K))</td>
+  <td>yes</td>
+</tr>
+<tr>
+  <td>Delays and angles equal at all frequencies</td>
+  <td>one frequency only</td>
+  <td>NLOS yes; LOS only if K does not depend on frequency</td>
+  <td>yes</td>
+</tr>
+<tr>
+  <td>Exact spreads</td>
+  <td>no (C factors calibrated)</td>
+  <td>no</td>
+  <td>DS exact at one frequency; AS exact below the caps (linear definition); averaged scales with several frequencies</td>
+</tr>
+<tr>
+  <td>Swap-reciprocal (mirrored fields and LSPs)</td>
+  <td>yes, if <code>eod_offset_deg</code> = 0 and no O2I link</td>
+  <td>yes</td>
+  <td>yes, if <code>eod_offset_deg</code> = 0</td>
+</tr>
+<tr>
+  <td>Per-cluster shadowing</td>
+  <td>yes (zeta)</td>
+  <td>yes (Q_n)</td>
+  <td>no</td>
+</tr>
+<tr>
+  <td>TR terms mu_offset,ZOD (NLOS), O2I ZOA 90 deg</td>
+  <td>both</td>
+  <td>neither</td>
+  <td>offset only</td>
+</tr>
+<tr>
+  <td><code>NumClusters = 1</code></td>
+  <td>LOS path only (+ GR, eq. (7.6-32))</td>
+  <td>LOS path only (+ GR, eq. (7.6-32))</td>
+  <td>LOS path only (+ GR, R²)</td>
+</tr>
+<tr>
+  <td>Ground reflection (coefficient powers)</td>
+  <td>TR 7.6.8: K/(K+1)·(d3D/d_GR)²·R²</td>
+  <td>TR 7.6.8</td>
+  <td>K/(K+1)·R²; power split inside the scaling</td>
+</tr>
+</table>
+ 
+<ul>
+<li>Recommended use: <code>'38.901'</code> for drop-based calibration at one frequency; <code>'quadriga'</code> for tracks, several frequencies or device-to-device links; <code>'38.901_MF'</code> where the multi-frequency method of the TR is required</li>
+<li><code>scenpar</code>, <code>lsp</code>, <code>rnd</code> and <code>rnd_freq</code> must come from the same scenario (<a href="#lsp_generate">lsp_generate</a>, <a href="#ssf_draw">ssf_draw</a>); this is not checked beyond the sizes. <code>scenpar</code> is completed with the defaults of missing fields and validated by <a href="#scenpar_validate">scenpar_validate</a>; its messages pass through unchanged</li>
+<li>At least one link is required (an empty <code>rx_pos</code> loses its 3 columns in MATLAB)</li>
+<li>Validation order: <code>method</code>, positions, <code>scenpar</code>, <code>lsp</code>, one frequency for <code>'38.901'</code>, <code>rnd</code>, <code>rnd_freq</code>, <code>lsp_anchor</code>, <code>eod_offset_deg</code>, <code>abs_toa</code>, ground-reflection inputs and heights, <code>o2i</code>, <code>n_cluster</code>; the message on the delay columns of <code>rnd</code> counts the columns from 0 ("Columns 0 to N-1 of 'rnd' ...")</li>
+</ul>
+
+<b>Usage:</b><br>
+<pre>
+[ delay, power, aod, eod, aoa, eoa, n_active ] = quadriga_lib.ssf_clusters( scenpar, tx_pos, ...
+    rx_pos, lsp, rnd, method, rnd_freq, lsp_anchor, eod_offset_deg, abs_toa, gr_eps_re, ...
+    gr_eps_im, o2i, n_cluster );
+</pre>
+
+<b>Inputs:</b><br>
+<ul>
+<li><b><code>scenpar</code></b> — Scenario parameters; struct as returned by <a href="#conf_file_read">conf_file_read</a> or <a href="#scenpar_validate">scenpar_validate</a> (the field <code>SubpathMethod</code> is ignored), or any subset of its fields; missing fields have their default value; <code>[]</code> = all defaults; used: <code>NumClusters</code>, <code>NumClusters_min</code>, <code>KF_mu</code> (LOS condition), <code>r_DS</code>, <code>LNS_ksi</code>, <code>GR_enabled</code></li>
+<li><b><code>tx_pos</code></b> — Tx positions in [m]; one row is used for all links; <code>[1, 3]</code> or <code>[n_link, 3]</code></li>
+<li><b><code>rx_pos</code></b> — Rx positions in [m]; <code>[n_link, 3]</code></li>
+<li><b><code>lsp</code></b> — Large-scale parameters from <a href="#lsp_generate">lsp_generate</a>, finite; DS, ASD, ASA, ESD, ESA (slices 1, 4, 5, 6, 7) > 0, KF (slice 2) >= 0; slices 3 and 8 are not used; <code>[n_link, n_freq, 8]</code></li>
+<li><b><code>rnd</code></b> — Shared cluster set from <a href="#ssf_draw">ssf_draw</a> (<code>set_id = 0</code>), finite, columns 1 to N in [0, 1]; <code>[n_link, 9·N]</code> (any empty matrix for <code>N = 0</code>)</li>
+<li><b><code>method</code></b> — <code>'38.901'</code>, <code>'38.901_MF'</code> or <code>'quadriga'</code>; default: <code>'38.901'</code></li>
+<li><b><code>rnd_freq</code></b> <i>(optional)</i> — Per-frequency sets from <a href="#ssf_draw">ssf_draw</a> (<code>set_id = k</code> in slice <code>k</code>), finite; required by <code>'38.901'</code> and <code>'38.901_MF'</code> if N > 0; <code>[n_link, N, n_freq]</code></li>
+<li><b><code>lsp_anchor</code></b> <i>(optional)</i> — LSPs at the anchor frequency from <a href="#lsp_generate">lsp_generate</a>, finite, spreads > 0; required by <code>'38.901_MF'</code> if N > 0; <code>[n_link, 1, 8]</code></li>
+<li><b><code>eod_offset_deg</code></b> <i>(optional)</i> — EoD offset in [deg] from <a href="#lsp_generate">lsp_generate</a>, positive = up, finite; omitted or empty = 0; <code>[n_link, n_freq]</code></li>
+<li><b><code>abs_toa</code></b> <i>(optional)</i> — Absolute TOA offset in [s] from <a href="#lsp_generate">lsp_generate</a>, finite and >= 0; omitted or empty = 0; <code>[n_link]</code></li>
+<li><b><code>gr_eps_re</code></b>, <b><code>gr_eps_im</code></b> <i>(optional)</i> — Relative permittivity of the ground, real part >= 1 and imaginary part >= 0, from <a href="#lsp_generate">lsp_generate</a>; required if <code>GR_enabled &gt; 0</code>; <code>[n_link, n_freq]</code></li>
+<li><b><code>o2i</code></b> <i>(optional)</i> — O2I flag per link, logical or numeric (nonzero = O2I; mean ZOA 90 deg in <code>'38.901'</code>); omitted or empty = no O2I link; <code>[n_link]</code></li>
+<li><b><code>n_cluster</code></b> <i>(optional)</i> — Number of active NLOS clusters per link (a count, no index shift), non-negative integers in [N_lo, N] with <code>N_lo = min(max(1, NumClusters_min - 1), N)</code> (TR 38.901 Table 7.6.15-1 where the file states the range); omitted or empty = N; <code>[n_link]</code></li>
+</ul>
+
+<b>Outputs:</b><br>
+<ul>
+<li><b><code>delay</code></b> — Delays in [s] relative to the LOS delay; <code>[n_link, n_slot, n_fd]</code>, <code>n_fd = n_freq</code> for <code>'38.901_MF'</code>, else 1</li>
+<li><b><code>power</code></b> — Coefficient powers (linear) per frequency; <code>[n_link, n_slot, n_freq]</code></li>
+<li><b><code>aod</code></b>, <b><code>aoa</code></b> — Azimuth of departure and arrival in [rad], in [-pi, pi); <code>[n_link, n_slot, n_fd]</code></li>
+<li><b><code>eod</code></b>, <b><code>eoa</code></b> — Elevation of departure and arrival in [rad], in [-pi/2, pi/2]; <code>[n_link, n_slot, n_fd]</code></li>
+<li><b><code>n_active</code></b> — Number of NLOS clusters with power > 0; uint64; <code>[n_link, 1]</code></li>
+</ul>
+
+<b>See also:</b><br>
+<ul>
+<li><a href="#ssf_draw">ssf_draw</a> (the random values <code>rnd</code> and <code>rnd_freq</code>)</li>
+<li><a href="#ssf_init_phases">ssf_init_phases</a> (the phases of the random generators)</li>
+<li><a href="#lsp_generate">lsp_generate</a> (the LSPs, the EoD offset, the absolute TOA and the ground permittivity)</li>
+<li><a href="#lsf_draw">lsf_draw</a> (the random values of the LSPs)</li>
+<li><a href="#calc_delay_spread">calc_delay_spread</a>, <a href="#calc_angular_spread">calc_angular_spread</a> (spreads of the output)</li>
+</ul>
+
+<hr class="greyline"><br>
+<span id="ssf_draw" class="qd-func"><b>ssf_draw</b></span><br>
+<hr class="thin">
+Spatially correlated normalized random values of one small-scale fading generator set at a set of links
+<ul>
+<li>Evaluates the generators of a set of <a href="#ssf_init_phases">ssf_init_phases</a> at the links. With <code>N = NumClusters - 1</code>, column <code>b·N + n + 1</code> belongs to block <code>b</code> and NLOS cluster <code>n</code> (<code>b</code>, <code>n</code> counted from 0). Shared cluster set (<code>set_id = 0</code>, <code>9·N</code> columns): block 0 cluster delay (Uniform(0,1)), blocks 1, 2 sign of AOD, AOA, 3, 4 sign of ZOD, ZOA, 5, 6 angle offset of AOD, AOA, 7, 8 angle offset of ZOD, ZOA (Normal(0,1)). Per-frequency set (<code>set_id = k &gt;= 1</code>, <code>N</code> columns): cluster shadowing (Normal(0,1))</li>
+<li>All generators use the decorrelation distance <code>SC_lambda</code> (TR 38.901 Table 7.6.3.1-2); <code>SC_lambda = 0</code> (spatial consistency off) is used as 0.1 m, which gives fields that decorrelate within 0.1 m</li>
+<li><code>scenpar</code> is completed and validated as in <a href="#ssf_init_phases">ssf_init_phases</a>; the messages of <a href="#scenpar_validate">scenpar_validate</a> pass through unchanged</li>
+<li>Single mobility (<code>dual_mobility = false</code>): column <code>c</code> is the field of generator <code>c</code> at the Rx position, <code>x_c = s_c(rx)</code> with <code>s_c(x) = sqrt(2/n_coeff) · sum_n cos( 2·pi · f_n·x + phi_n )</code> and the phases of slice 1; the values do not depend on <code>tx_pos</code></li>
+<li>Dual mobility: the Tx is a second device. Its side uses slice 2, i.e. the field of the mirror generator at the Tx position (departure and arrival blocks exchanged). Self-mirrored columns (delay, shadowing) share one map: <code>x_c = ( s_c(rx) + s_c(tx) ) / sqrt( 2 + 2·A(D) )</code>, with the Tx-Rx distance <code>D</code> and the ACF <code>A</code> of the preset, linearly interpolated. The pair columns are two maps: <code>x_c = ( s_c(rx) + s_m(tx) ) / sqrt(2)</code></li>
+<li>Swap reciprocity in dual mobility (S. Jaeckel et al., "A Spatially Consistent Geometric D2D Small-Scale Fading Model for Multiple Frequencies", 2019, eqs. (3)-(5)): swapping <code>tx_pos</code> and <code>rx_pos</code> leaves the delay and the shadowing blocks unchanged and exchanges block 1 with 2, 3 with 4, 5 with 6 and 7 with 8, exactly (the same evaluations in swapped roles)</li>
+<li>Uniform block 0 of the shared set: <code>0.5 · erfc( -x / sqrt(2) )</code> of the Normal value</li>
+<li><code>horizontal = true</code>: the positions are projected on the x-y plane (z = 0) and the values do not depend on z; <code>false</code>: 3D positions (legacy). <code>D</code> is measured in the same space</li>
+<li>Floors as in <a href="#lsf_draw">lsf_draw</a> (same phase offsets per floor ID; TR 38.901 clause 7.6.3.3: SSF variables are uncorrelated across floors): pass the same <code>floor_id</code> as to <a href="#lsf_draw">lsf_draw</a>; only in 2D mode</li>
+<li>The value of a link does not depend on the other links of the call, and a column does not depend on the phases of the other columns (append-only: appended blocks leave the existing columns unchanged bit for bit)</li>
+<li>Clusters by TR 38.901 clause 7.5 under spatial consistency: clause 7.6.3.1 keeps the signs and the random offsets of the clusters unchanged per drop; the caller evaluates them at the drop or segment-start positions and reuses those values along the track</li>
+<li>Precision: the sinusoids are evaluated by <a href="#sos_val">sos_val</a> with the AVX2 kernel where available (sine and cosine in single precision, accumulation in double); the values deviate from a double-precision evaluation by less than <code>4e-7 · sqrt(2 · n_coeff)</code> (9e-6 for 256 sinusoids)</li>
+<li><code>preset</code>, <code>horizontal</code> and the set type (<code>set_id = 0</code> or <code>&gt;= 1</code>) must match <a href="#ssf_init_phases">ssf_init_phases</a></li>
+<li><code>NumClusters = 1</code> returns an empty <code>rnd</code> and accepts any empty <code>phase</code>. At least one link is required</li>
+<li>Validation order: positions (3 columns, rows of <code>tx_pos</code>, finite values), <code>set_id</code>, <code>preset</code>, <code>scenpar</code>, size of <code>phase</code>, finite <code>phase</code>, length of <code>floor_id</code>, <code>floor_id</code> with <code>horizontal = false</code></li>
+</ul>
+
+<b>Usage:</b><br>
+<pre>
+rnd = quadriga_lib.ssf_draw( scenpar, phase, tx_pos, rx_pos, set_id, floor_id, dual_mobility, ...
+    preset, horizontal );
+</pre>
+
+<b>Inputs:</b><br>
+<ul>
+<li><b><code>scenpar</code></b> — Scenario parameters; struct as returned by <a href="#conf_file_read">conf_file_read</a> or <a href="#scenpar_validate">scenpar_validate</a> (the field <code>SubpathMethod</code> is ignored), or any subset of its fields; missing fields have their default value; <code>[]</code> = all defaults; <code>NumClusters</code> and <code>SC_lambda</code> are used</li>
+<li><b><code>phase</code></b> — Phases in [rad] from <a href="#ssf_init_phases">ssf_init_phases</a>; slice 1 = Rx side, slice 2 = Tx side; must be finite; <code>[n_coeff, n_gen, 2]</code>, <code>n_coeff</code> of <code>preset</code>, <code>n_gen</code> of the set type</li>
+<li><b><code>tx_pos</code></b> — Tx positions in [m]; one row is used for all links; not used in single mobility (but validated); <code>[1, 3]</code> or <code>[n_link, 3]</code></li>
+<li><b><code>rx_pos</code></b> — Rx positions in [m]; <code>[n_link, 3]</code></li>
+<li><b><code>set_id</code></b> — Set type as in <a href="#ssf_init_phases">ssf_init_phases</a>: <code>0</code> = shared cluster set, <code>k &gt;= 1</code> = per-frequency set; default: 0</li>
+<li><b><code>floor_id</code></b> <i>(optional)</i> — Floor index per link, a label starting at 0 (no index shift); non-negative integers below 2^53; omitted or empty = all links on floor 0; in dual mobility the floor of both devices; only with <code>horizontal = true</code>; <code>[n_link]</code></li>
+<li><b><code>dual_mobility</code></b> — <code>true</code>: Tx and Rx both move, the Tx side is evaluated as a second device; default: false</li>
+<li><b><code>preset</code></b> — Sum-of-sinusoids preset, see <a href="#sos_preset">sos_preset</a>; must match <a href="#ssf_init_phases">ssf_init_phases</a>; default: <code>'Comb256'</code></li>
+<li><b><code>horizontal</code></b> — <code>true</code>: 2D correlation in the x-y plane (TR 38.901 behaviour); <code>false</code>: 3D correlation (legacy QuaDRiGa behaviour); must match <a href="#ssf_init_phases">ssf_init_phases</a>; default: true</li>
+</ul>
+
+<b>Output:</b><br>
+<ul>
+<li><b><code>rnd</code></b> — Random values; shared set: columns 1 to N Uniform(0,1), the others Normal(0,1); per-frequency set: Normal(0,1); <code>[n_link, n_gen]</code></li>
+</ul>
+
+<b>See also:</b><br>
+<ul>
+<li><a href="#ssf_init_phases">ssf_init_phases</a> (draws the phases)</li>
+<li><a href="#ssf_clusters">ssf_clusters</a> (the clusters from the random values)</li>
+<li><a href="#lsf_draw">lsf_draw</a> (the large-scale values, same floors and mobility rules)</li>
+<li><a href="#sos_val">sos_val</a> (evaluation of a sum-of-sinusoids generator)</li>
+</ul>
+
+<hr class="greyline"><br>
+<span id="ssf_init_phases" class="qd-func"><b>ssf_init_phases</b></span><br>
+<hr class="thin">
+Draw the random phases of one small-scale fading generator set of a BS site and scenario
+<ul>
+<li>The small-scale fading (SSF) random variables of the clusters (TR 38.901 clause 7.6.3.1) are spatially correlated sum-of-sinusoids generators in two kinds of sets, with <code>N = NumClusters - 1</code> NLOS clusters. Column <code>b·N + n + 1</code> belongs to block <code>b</code> and cluster <code>n</code> (<code>b</code>, <code>n</code> counted from 0)</li>
+<li>Shared cluster set (<code>set_id = 0</code>, frequency-independent), <code>9·N</code> generators: block 0 cluster delay (Uniform(0,1)); blocks 1, 2 sign of AOD, AOA; 3, 4 sign of ZOD, ZOA; 5, 6 angle offset of AOD, AOA; 7, 8 angle offset of ZOD, ZOA (all Normal(0,1))</li>
+<li>Per-frequency set (<code>set_id = k &gt;= 1</code>), <code>N</code> generators: block 0 cluster shadowing (Normal(0,1)). <code>k</code> is the index of the frequency in the caller's frequency list (1-based); the list must have the same order in every call</li>
+<li>This function draws the phases; <a href="#ssf_draw">ssf_draw</a> evaluates them at the links. The caller stores <code>phase</code> and evaluates the same fields again along tracks or on maps</li>
+<li>Slice 2 (Tx side) is always the mirror of slice 1: column <code>b·N + n + 1</code> of slice 2 is column <code>m(b)·N + n + 1</code> of slice 1, with <code>m</code> exchanging the blocks 1 and 2, 3 and 4, 5 and 6, 7 and 8 (departure and arrival of the same cluster); the delay block and the shadowing block mirror themselves</li>
+<li>Seed of the set, derived from <code>seed</code>, the seed of the large-scale set of the same site and scenario (see <a href="#lsf_init_phases">lsf_init_phases</a>): <code>seed_set = splitmix64( splitmix64(seed) ^ tag ) &gt;&gt; 1</code> with <code>tag = 1</code> for the shared set and <code>tag = 1 + k</code> for the set of frequency <code>k &gt;= 1</code>, and <code>splitmix64(x)</code>: <code>z = x + 0x9E3779B97F4A7C15</code>, <code>z = (z ^ (z &gt;&gt; 30)) · 0xBF58476D1CE4E5B9</code>, <code>z = (z ^ (z &gt;&gt; 27)) · 0x94D049BB133111EB</code>, result <code>z ^ (z &gt;&gt; 31)</code> (unsigned 64-bit arithmetic, wrapping). Slice 1 equals <code>quadriga_lib.sos_init_phases( n_coeff, n_gen, seed_set )</code> of <a href="#sos_init_phases">sos_init_phases</a>, with <code>n_coeff</code> the number of sinusoids of <code>preset</code>. The sets therefore never repeat the large-scale phases of the same seed, and the sets of different frequencies are independent streams</li>
+<li>The same seed gives the same phases on all platforms; the caller keeps an explicit seed (or the phase arrays) to reproduce the clusters. <code>seed = -1</code> draws unrelated random phases from the system random device. Seeds above 2^53 are exact only when given as <code>int64</code> or <code>uint64</code></li>
+<li>Each scenario of a site (link type LOS, NLOS, O2I) needs its own large-scale seed: TR 38.901 clause 7.6.3.4 makes the link types uncorrelated, and one seed would give the LOS and the NLOS scenario identical cluster fields</li>
+<li><code>NumClusters = 1</code> (<code>N = 0</code>, LOS path only): both sets are empty, <code>phase</code> is empty</li>
+<li>Append-only: a later version that appends blocks to a set keeps the existing columns and their phases; <a href="#sos_init_phases">sos_init_phases</a> fills column <code>g</code> from one stream independently of the number of columns</li>
+<li>No bias removal (the function takes no positions). <code>SC_lambda</code>, the decorrelation distance of all generators, is used only by <a href="#ssf_draw">ssf_draw</a></li>
+<li><code>scenpar</code> is completed with the defaults of missing fields and validated as in <a href="#scenpar_validate">scenpar_validate</a>; its messages pass through unchanged. An invalid value of a field that is not used here throws as well</li>
+<li>Validation order: <code>seed</code>, <code>set_id</code>, <code>preset</code>, <code>scenpar</code></li>
+</ul>
+
+<b>Usage:</b><br>
+<pre>
+phase = quadriga_lib.ssf_init_phases( scenpar, seed, set_id, preset );
+</pre>
+
+<b>Inputs:</b><br>
+<ul>
+<li><b><code>scenpar</code></b> — Scenario parameters; struct as returned by <a href="#conf_file_read">conf_file_read</a> or <a href="#scenpar_validate">scenpar_validate</a> (the field <code>SubpathMethod</code> is ignored), or any subset of its fields; missing fields have their default value; <code>[]</code> = all defaults; <code>NumClusters</code> sets the number of generators</li>
+<li><b><code>seed</code></b> — Seed of the large-scale set of the same site and scenario; integer from -1 to 2^63-1; -1 = system random device, a new set of phases on each call; default: -1</li>
+<li><b><code>set_id</code></b> — <code>0</code> = shared cluster set; <code>k &gt;= 1</code> = set of frequency <code>k</code> (1-based); default: 0</li>
+<li><b><code>preset</code></b> — Sum-of-sinusoids preset, see <a href="#sos_preset">sos_preset</a>; sets <code>n_coeff</code>; default: <code>'Comb256'</code></li>
+</ul>
+
+<b>Output:</b><br>
+<ul>
+<li><b><code>phase</code></b> — Phases in [rad]; slice 1 = Rx side, slice 2 = Tx side (mirror of slice 1); all values in [-pi, pi); <code>[n_coeff, n_gen, 2]</code> with <code>n_gen = 9·N</code> (shared set) or <code>N</code> (per-frequency set)</li>
+</ul>
+
+<b>See also:</b><br>
+<ul>
+<li><a href="#ssf_draw">ssf_draw</a> (evaluates the phases at the links)</li>
+<li><a href="#ssf_clusters">ssf_clusters</a> (the clusters from the random values)</li>
+<li><a href="#lsf_init_phases">lsf_init_phases</a> (the large-scale set and its seed)</li>
+<li><a href="#sos_init_phases">sos_init_phases</a> (the raw phases)</li>
 </ul>
 
 <hr class="greyline"><br><br>
