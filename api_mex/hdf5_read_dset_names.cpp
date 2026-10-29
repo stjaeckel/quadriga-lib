@@ -17,6 +17,8 @@ Read names of unstructured datasets stored at a 4D slot in an HDF5 file
 - Finds all datasets whose HDF5 name starts with `prefix` at slot `(ix, iy, iz, iw)`
 - Returned names have the prefix stripped
 - Returns an empty cell array if no matching datasets are present at the slot
+- Errors if the file does not exist or is not a quadriga-lib channel file of version 3 (see
+  [[hdf5_read_channel]])
 
 ## Usage:
 ```

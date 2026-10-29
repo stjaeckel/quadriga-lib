@@ -1,7 +1,7 @@
 function test_hdf_rw
 % MEX interface test for the HDF5 functions: quadriga_lib.hdf5_create_file, hdf5_read_layout,
-% hdf5_reshape_layout, hdf5_write_channel, hdf5_read_channel, hdf5_write_dset, hdf5_read_dset,
-% hdf5_read_dset_names and hdf5_version.
+% hdf5_reshape_layout, hdf5_write_channel, hdf5_read_channel, hdf5_write_dset, hdf5_read_dset and
+% hdf5_read_dset_names.
 % Scope: argument and output handling, defaults, index conversion, type handling, error paths.
 % The file format and the core behavior are tested in the Catch2 suite (test_hdf_functions.cpp).
 
@@ -133,11 +133,6 @@ fprintf(fid, 'This is not HDF5 data');
 fclose(fid);
 assert_cpp_error( @() quadriga_lib.hdf5_read_layout(non_hdf5), 'Not an HDF5 file' );
 delete(non_hdf5);
-
-%% ===== HDF5 version =====
-
-v = quadriga_lib.hdf5_version;
-assertTrue(ischar(v) && ~isempty(regexp(v, '^\d+\.\d+\.\d+', 'once')));
 
 %% ===== Unstructured data (par) round-trip =====
 

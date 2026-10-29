@@ -5,7 +5,8 @@
 // Behavior of the public HDF5 channel-file functions, observed through the API only: file creation, storage layout
 // and slot indexing, round trips of the structured channel data and of unstructured datasets of every supported type
 // and rank, slot overwrite, and the error types. The on-disk tree is checked object by object with the HDF5 C library
-// in test_hdf5_interop.cpp; malformed files and files changed by other tools are covered in test_hdf_robustness.cpp.
+// in test_hdf5_interop.cpp; malformed files and files changed by other tools are rejected, which is covered in
+// test_hdf_robustness_internal.cpp.
 //
 // Oracles: the written channel objects themselves. Structured data is stored in single precision, so it comes back
 // as the written value rounded to float and converted to the read type, (R)(float)x, which is compared exactly.
@@ -199,7 +200,8 @@ namespace
         if (da[0] != db[0] || da[1] != db[1] || da[2] != db[2])
             return false;
         const size_t elem_size = (ta % 10 == 0 || ta % 10 >= 4) ? 4 : 8; // float, uint32, int32 : 64-bit types
-        return std::memcmp(pa, pb, (size_t)(da[0] * da[1] * da[2]) * elem_size) == 0;
+        const size_t n_bytes = (size_t)(da[0] * da[1] * da[2]) * elem_size;
+        return n_bytes == 0 || std::memcmp(pa, pb, n_bytes) == 0; // Empty objects may have null pointers
     }
 
     // One unstructured dataset of every type ID supported by the HDF5 functions (any_type_id 9 to 55)

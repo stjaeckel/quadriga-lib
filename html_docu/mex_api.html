@@ -113,7 +113,6 @@
   <tr><td><a href="#hdf5_read_dset_names">hdf5_read_dset_names</a></td><td>Read names of unstructured datasets stored at a 4D slot in an HDF5 file</td></tr>
   <tr><td><a href="#hdf5_read_layout">hdf5_read_layout</a></td><td>Read the storage layout of channel data inside an HDF5 file</td></tr>
   <tr><td><a href="#hdf5_reshape_layout">hdf5_reshape_layout</a></td><td>Reshape the storage layout inside an existing HDF5 file</td></tr>
-  <tr><td><a href="#hdf5_version">hdf5_version</a></td><td>Return the HDF5 library version string</td></tr>
   <tr><td><a href="#hdf5_write_channel">hdf5_write_channel</a></td><td>Write one or more channel objects to an HDF5 file</td></tr>
   <tr><td><a href="#hdf5_write_dset">hdf5_write_dset</a></td><td>Write a single unstructured dataset to an HDF5 file</td></tr>
   <tr><td><a href="#qrt_file_parse">qrt_file_parse</a></td><td>Read metadata from a QRT file</td></tr>
@@ -1322,6 +1321,7 @@ Create a new HDF5 channel file with a custom storage layout
 <li>Typical dimension mapping: nx = BS, ny = UE, nz = frequency, nw = scenario/repetition</li>
 <li>Storage layout is fixed at creation and cannot be altered later, except by reshaping while keeping the total slot count constant</li>
 <li>Errors if the target file already exists; delete it first to recreate it</li>
+<li>Files can be read by any HDF5 tool but must be modified only with quadriga-lib</li>
 </ul>
 
 <b>Usage:</b><br>
@@ -1357,6 +1357,7 @@ Read one or more channel objects from an HDF5 file
 <li>Structured fields are stored in single precision in the file and returned in double.</li>
 <li>Unstructured datasets keep their stored type and shape.</li>
 <li>If no data is found, both outputs are empty <code>0x0</code> structs.</li>
+<li>Errors if the file is not a quadriga-lib channel file of version 3: files written by quadriga-lib 0.12.4 and earlier are rejected; files modified with other HDF5 tools are not supported and may be rejected.</li>
 </ul>
 
 <b>Usage:</b><br>
@@ -1494,6 +1495,7 @@ Read a single unstructured dataset from an HDF5 file
 <li>Reads a user-defined dataset stored under <code>prefix + name</code> (e.g. <code>"par_carrier_frequency"</code>)</li>
 <li>Type and shape of the returned data are determined by the dataset's HDF5 dataspace</li>
 <li>Returns an empty <code>[]</code> matrix if the dataset does not exist at the requested slot</li>
+<li>Errors if the file does not exist or is not a quadriga-lib channel file of version 3 (see <a href="#hdf5_read_channel">hdf5_read_channel</a>)</li>
 <li>Supported types: string, scalar, vector (row or column), 2D matrix, and 3D array; numeric element types: single, double, int32, uint32, int64, uint64</li>
 </ul>
 
@@ -1529,6 +1531,7 @@ Read names of unstructured datasets stored at a 4D slot in an HDF5 file
 <li>Finds all datasets whose HDF5 name starts with <code>prefix</code> at slot <code>(ix, iy, iz, iw)</code></li>
 <li>Returned names have the prefix stripped</li>
 <li>Returns an empty cell array if no matching datasets are present at the slot</li>
+<li>Errors if the file does not exist or is not a quadriga-lib channel file of version 3 (see <a href="#hdf5_read_channel">hdf5_read_channel</a>)</li>
 </ul>
 
 <b>Usage:</b><br>
@@ -1560,7 +1563,7 @@ names = quadriga_lib.hdf5_read_dset_names( fn, location, prefix );
 Read the storage layout of channel data inside an HDF5 file
 <ul>
 <li>Returns the dimensions of the 4D channel slot grid stored inside an HDF5 file</li>
-<li>Returns <code>[0, 0, 0, 0]</code> if the file does not exist; errors if the file exists but is not a valid HDF5 file</li>
+<li>Returns <code>[0, 0, 0, 0]</code> if the file does not exist; errors if the file exists but is not a quadriga-lib channel file of version 3 (files written by quadriga-lib 0.12.4 and earlier are rejected; files modified with other HDF5 tools are not supported and may be rejected)</li>
 <li>Also reports which slots already contain data, so callers can locate free slots without scanning the file</li>
 </ul>
 
@@ -1594,7 +1597,8 @@ Reshape the storage layout inside an existing HDF5 file
 <li>Changes the 4D slot grid <code>(nx, ny, nz, nw)</code> of an existing HDF5 channel file</li>
 <li>The total number of slots (<code>nx · ny · nz · nw</code>) must match the original layout</li>
 <li>Only the dimension metadata is updated; stored channel data is not moved</li>
-<li>Errors if the file does not exist or is not a valid HDF5 file</li>
+<li>Errors if the file does not exist or is not a quadriga-lib channel file of version 3 (files written by quadriga-lib 0.12.4 and earlier are rejected; files modified with other HDF5 tools are not supported and may be rejected)</li>
+<li>One writer per file at a time; files are not locked</li>
 </ul>
 
 <b>Usage:</b><br>
@@ -1620,33 +1624,15 @@ storage_space = quadriga_lib.hdf5_reshape_layout( fn, storage_dims );
 </ul>
 
 <hr class="greyline"><br>
-<span id="hdf5_version" class="qd-func"><b>hdf5_version</b></span><br>
-<hr class="thin">
-Return the HDF5 library version string
-<ul>
-<li>Reports the HDF5 C library version that quadriga-lib was compiled against, taken from the HDF5 header macros at compile time</li>
-<li>Useful for diagnosing binary/library mismatches when loading or writing channel files</li>
-</ul>
-
-<b>Usage:</b><br>
-<pre>
-version = quadriga_lib.hdf5_version;
-</pre>
-
-<b>Outputs:</b><br>
-<ul>
-<li><b><code>version</code></b> — HDF5 version string in the format <code>"x.y.z"</code> (e.g. <code>"1.12.2"</code>); string</li>
-</ul>
-
-<hr class="greyline"><br>
 <span id="hdf5_write_channel" class="qd-func"><b>hdf5_write_channel</b></span><br>
 <hr class="thin">
 Write one or more channel objects to an HDF5 file
 <ul>
 <li>Writes a struct array of channels into 4D slots (one slot per array element)</li>
 <li>Optional unstructured data can be passed as a matching struct array</li>
-<li>Creates the file with a sensible default layout if it does not yet exist; appends to existing files otherwise</li>
-<li>A warning is issued if any selected slot already contains data. That slot is replaced completely: its old structured data and all its unstructured datasets (also those written with <a href="#hdf5_write_dset">hdf5_write_dset</a>) are removed. The file does not shrink; use <code>h5repack</code> to reclaim the space of the removed data</li>
+<li>Creates the file with a sensible default layout if it does not yet exist; an existing file must be a quadriga-lib channel file of version 3 (files of quadriga-lib 0.12.4 and earlier are rejected, see <a href="#hdf5_read_channel">hdf5_read_channel</a>)</li>
+<li>A warning is issued if any selected slot already contains data. That slot is replaced completely: its old structured data and all its unstructured datasets (also those written with <a href="#hdf5_write_dset">hdf5_write_dset</a>) are removed. The file does not shrink; copy the channels into a new file to reclaim the space of the removed data</li>
+<li>One writer per file at a time; files are not locked</li>
 <li>Structured data is stored in single precision regardless of MATLAB input precision</li>
 <li>Unstructured datasets retain their MATLAB type and shape (see <a href="#hdf5_write_dset">hdf5_write_dset</a>)</li>
 <li>Each scalar location input is broadcast to all <code>numel(chan)</code> channels; each vector input must have exactly <code>numel(chan)</code> elements</li>
@@ -1688,12 +1674,13 @@ Write a single unstructured dataset to an HDF5 file
 <ul>
 <li>Dataset is stored under <code>prefix + name</code> at slot <code>(ix, iy, iz, iw)</code></li>
 <li><code>name</code> must contain only alphanumeric characters and underscores</li>
-<li>The file must already exist (use <a href="#hdf5_create_file">hdf5_create_file</a> first)</li>
+<li>The file must already exist (use <a href="#hdf5_create_file">hdf5_create_file</a> first) and be a quadriga-lib channel file of version 3 (see <a href="#hdf5_read_channel">hdf5_read_channel</a>)</li>
 <li>A dataset of the same name at the same slot is not overwritten; an error is thrown instead</li>
 <li>The dataset is added to the slot; everything else stored there is kept. A later <a href="#hdf5_write_channel">hdf5_write_channel</a> to the same slot replaces the slot completely, including the datasets written with this function</li>
 <li>Supported types: string, scalar, vector (row or column), 2D matrix, and 3D array; numeric element types: single, double, int32, uint32, int64, uint64</li>
 <li>Arrays with more than 3 dimensions, sparse and complex arrays are rejected</li>
 <li>Row vectors are stored as given (<code>[1, n]</code>)</li>
+<li>One writer per file at a time; files are not locked</li>
 </ul>
 
 <b>Usage:</b><br>

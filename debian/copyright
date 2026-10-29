@@ -11,8 +11,8 @@ Files: external/*
 Copyright: Various authors (see individual library licenses)
 License: Apache-2.0 or BSD-3-Clause or MIT
 Comment:
- Bundled third-party libraries (Armadillo, PugiXML, Pybind11, HDF5,
- Catch2, MATLAB MEX headers) are used at build time only. None are
+ Bundled third-party libraries (Armadillo, PugiXML, Pybind11, Catch2,
+ MATLAB MEX headers) are used at build time only. None are
  installed into the binary package when building against system
  libraries. See each library's own license file for details.
 

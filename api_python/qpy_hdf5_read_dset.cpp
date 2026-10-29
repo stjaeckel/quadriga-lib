@@ -18,6 +18,8 @@ Read a single unstructured dataset from an HDF5 file
   number, a vector a numpy array of shape `(n,)` (also with a single element), a matrix or 3D array a numpy array
   of the stored shape
 - Returns `None` if the dataset does not exist at the requested slot
+- Errors if the file does not exist or is not a quadriga-lib channel file of version 3 (see
+  [[hdf5_read_channel]])
 - Supported types: str, scalar, vector, 2D array, and 3D array
 
 ## Usage:

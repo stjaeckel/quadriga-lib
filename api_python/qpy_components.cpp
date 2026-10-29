@@ -37,7 +37,6 @@ std::string components()
     std::ostringstream oss;
     oss << "quadriga-lib = " << quadriga_lib::quadriga_lib_version() << std::endl;
     oss << "Armadillo    = " << quadriga_lib::quadriga_lib_armadillo_version() << std::endl;
-    oss << "HDF5         = " << quadriga_lib::get_HDF5_version() << std::endl;
     std::string py_version_full = Py_GetVersion();
     std::string py_version_short = py_version_full.substr(0, py_version_full.find(' '));
     oss << "Python       = " << py_version_short << std::endl;

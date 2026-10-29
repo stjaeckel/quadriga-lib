@@ -16,7 +16,7 @@ Installation of **`quadriga-lib`** is supported on Linux/Ubuntu and Windows. The
 * [**OPTIONAL**]: Install Matlab from (https://www.mathworks.com) - you need to obtain a license
 * Install the required packages (octave-dev is only needed if you want to use Octave):
 ```
-sudo apt install bzip2 gcc git make cmake g++ libhdf5-dev python3-dev python3-pytest python3-numpy octave-dev python3-pip python3-venv octave-dev
+sudo apt install bzip2 gcc git make cmake g++ python3-dev python3-pytest python3-numpy octave-dev python3-pip python3-venv octave-dev
 ```
 * Get Quadriga-Lib either from Github or [quadriga-lib.org](http://quadriga-lib.org)
 ```
@@ -52,7 +52,7 @@ chmod +x Miniconda3-latest-Linux-x86_64.sh
 * Setup a new Anaconda environment with the required packages (you can also use the default channel instead of `conda-forge`, but octave is only available in `conda-forge`):
 ```
 conda deactivate
-conda create --name quadriga-lib -c conda-forge python=3.13 numpy pandas jupyterlab seaborn pytest scipy jupyterlab_widgets ipywidgets traittypes jupyter compilers make cmake hdf5 octave
+conda create --name quadriga-lib -c conda-forge python=3.13 numpy pandas jupyterlab seaborn pytest scipy jupyterlab_widgets ipywidgets traittypes jupyter compilers make cmake octave
 conda activate quadriga-lib
 ```
 * Get Quadriga-Lib either from Github or [quadriga-lib.org](http://quadriga-lib.org)
