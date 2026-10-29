@@ -8,7 +8,8 @@
 // qd_gbsm_phases.cpp.
 //
 // Helpers and their users:
-//   qd_gbsm_check_links   common validation of tx_pos / rx_pos     qd_gbsm_phases.cpp, path_loss.cpp, lsp_generate.cpp
+//   qd_gbsm_check_links   common validation of tx_pos / rx_pos     qd_gbsm_phases.cpp, path_loss.cpp, lsp_generate.cpp,
+//                                                                  ssf_clusters.cpp
 //   qd_gbsm_check_fc      validation of the carrier frequencies    path_loss.cpp, lsp_generate.cpp, los_probability.cpp,
 //                                                                  o2i_loss.cpp
 //   qd_gbsm_lsp_stats     LSP mean and std per link and frequency  lsp_generate.cpp, path_loss.cpp
@@ -32,7 +33,7 @@
 
 // Common validation of the link positions, in this order: 3 columns of rx_pos and tx_pos, rows of tx_pos 1 or
 // n_link (when both are given), finite rx_pos and tx_pos; throws std::invalid_argument
-//                                                    users: qd_gbsm_phases.cpp, path_loss.cpp, lsp_generate.cpp
+//                                  users: qd_gbsm_phases.cpp, path_loss.cpp, lsp_generate.cpp, ssf_clusters.cpp
 // - nullptr skips the checks of that argument
 static inline void qd_gbsm_check_links(const arma::mat *tx_pos, const arma::mat *rx_pos)
 {

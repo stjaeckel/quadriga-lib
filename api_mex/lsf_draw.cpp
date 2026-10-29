@@ -125,16 +125,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const std::string preset = (nrhs < 7) ? std::string("Comb256") : qd_mex_get_string(prhs[6], "Comb256");
     const bool horizontal = (nrhs < 8) ? true : qd_mex_get_scalar<bool>(prhs[7], "horizontal", true);
 
-    // Floor IDs are labels (no index shift): read as double, checked, converted; integers from 2^53 on are not
-    // exact in a double
-    arma::uvec floor_id(floor_id_in.n_elem);
-    for (arma::uword i = 0; i < floor_id_in.n_elem; ++i)
-    {
-        const double v = floor_id_in[i];
-        if (!(v >= 0.0 && v < 9007199254740992.0 && v == std::floor(v)))
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Entries in 'floor_id' must be non-negative integers below 2^53.");
-        floor_id[i] = (arma::uword)v;
-    }
+    const arma::uvec floor_id = qd_mex_uint_entries(floor_id_in, "floor_id");
 
     // Output allocation
     arma::mat rnd;

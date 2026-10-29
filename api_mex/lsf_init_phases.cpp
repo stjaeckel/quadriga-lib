@@ -105,6 +105,7 @@ phase = quadriga_lib.lsf_init_phases( scenpar, seed, tx_pos, rx_pos, dual_mobili
 ## See also:
 - [[conf_file_read]] (the scenario parameters)
 - [[lsf_draw]] (evaluates the phases at the links)
+- [[ssf_init_phases]] (the small-scale sets, seeds derived from this seed)
 - [[sos_init_phases]] (the raw phases)
 - [[sos_remove_bias]] (the bias removal of one generator)
 MD!*/

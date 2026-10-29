@@ -130,6 +130,7 @@ Large-scale parameters of a set of links from normalized random values
 - [[path_loss]] (the SF standard deviation `sf_sigma`)
 - [[lsf_init_phases]] (the phases of the random generators)
 - [[scenpar_validate]] (the scenario parameters and the cross-correlation matrix)
+- [[ssf_clusters]] (the clusters from the LSPs)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
