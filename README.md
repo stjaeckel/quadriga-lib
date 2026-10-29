@@ -80,6 +80,12 @@ cd quadriga-lib
 * [**OPTIONAL**]: Add the library to your MATLAB path by running `addpath('quadriga-lib')` in the MATLAB command window or by adding it to your `startup.m` file.
 
 
+## Channel files of quadriga-lib 0.12.4 and earlier
+The HDF5 channel files use file format version 3; files of version 2 (written by quadriga-lib 0.12.4 and
+earlier) are rejected. Convert them once with `python tools/hdf5_convert_v2.py old.hdf5 new.hdf5` (needs numpy,
+h5py and the quadriga_lib Python module; also for MATLAB and Octave users).
+
+
 ## Distribution License
 
 **`quadriga-lib`** can be used in both open-source and proprietary (closed-source) software.

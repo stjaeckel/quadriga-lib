@@ -582,6 +582,32 @@ class test_case(unittest.TestCase):
         self.assertEqual(chan[0]['name'], 'ch')
         self.assert_same(par, {'extra': 4})
 
+    def test_dset_prefix(self):
+        fn = self.fn('dset_prefix.hdf5')
+        channel.hdf5_create_file(fn, 2)
+        channel.hdf5_write_dset(fn, 0, 0, 0, 0, 'a', 1.0)
+        channel.hdf5_write_dset(fn, 0, 0, 0, 0, 'b', np.arange(2.0), 'x_')        # positional
+        channel.hdf5_write_dset(fn, name='c', data='text')
+        channel.hdf5_write_dset(fn, name='d', data=np.int32(4), prefix='x_')      # keyword
+
+        self.assertEqual(channel.hdf5_read_dset_names(fn), ['a', 'c'])
+        self.assertEqual(channel.hdf5_read_dset_names(fn, 0, 0, 0, 0, 'x_'), ['b', 'd'])
+        self.assertEqual(channel.hdf5_read_dset_names(fn, prefix=''), ['par_a', 'x_b', 'par_c', 'x_d'])
+        self.assertEqual(channel.hdf5_read_dset_names(fn, 1, prefix='x_'), [])
+
+        self.assert_same(channel.hdf5_read_dset(fn, name='b', prefix='x_'), np.arange(2.0))
+        self.assertEqual(channel.hdf5_read_dset(fn, 0, 0, 0, 0, 'd', 'x_'), 4)
+        self.assertEqual(channel.hdf5_read_dset(fn, name='x_d', prefix=''), 4)
+        self.assertIsNone(channel.hdf5_read_dset(fn, name='b'))                    # looked up as 'par_b'
+        self.assertEqual(channel.hdf5_read_dset(fn, name='a', prefix='par_'), 1.0)
+
+        with self.assertRaises(ValueError) as ctx:
+            channel.hdf5_write_dset(fn, name='e', data=1.0, prefix='x-')
+        self.assertIn('Parameter name must only contain', str(ctx.exception))
+
+        # hdf5_read_channel returns only the 'par_' datasets
+        self.assertEqual(list(channel.hdf5_read_channel(fn, 0)[1]), ['a', 'c'])
+
     def test_dset_types(self):
         fn = self.fn('dset_types.hdf5')
         channel.hdf5_create_file(fn, 1)

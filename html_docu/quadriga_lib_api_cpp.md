@@ -69,98 +69,98 @@ lang: en-US
 | [baseband_freq_response_vec](#baseband_freq_response_vec) | Channel functions | 1508 |
 | [hdf5_create](#hdf5_create) | Channel functions | 1546 |
 | [hdf5_read_channel](#hdf5_read_channel) | Channel functions | 1581 |
-| [hdf5_read_dset](#hdf5_read_dset) | Channel functions | 1621 |
-| [hdf5_read_dset_names](#hdf5_read_dset_names) | Channel functions | 1664 |
-| [hdf5_read_layout](#hdf5_read_layout) | Channel functions | 1699 |
-| [hdf5_reshape_layout](#hdf5_reshape_layout) | Channel functions | 1726 |
-| [hdf5_write](#hdf5_write) | Channel functions | 1756 |
-| [hdf5_write_dset](#hdf5_write_dset) | Channel functions | 1804 |
-| [path](#path) | Channel functions | 1849 |
-| [qrt_file_append](#qrt_file_append) | Channel functions | 1969 |
-| [qrt_file_init](#qrt_file_init) | Channel functions | 2005 |
-| [qrt_file_parse](#qrt_file_parse) | Channel functions | 2045 |
-| [qrt_file_read](#qrt_file_read) | Channel functions | 2094 |
-| [qrt_file_read_raw](#qrt_file_read_raw) | Channel functions | 2193 |
-| [qrt_read_cache_init](#qrt_read_cache_init) | Channel functions | 2231 |
-| [quantize_delays](#quantize_delays) | Channel functions | 2271 |
-| [get_channels_ieee_indoor](#get_channels_ieee_indoor) | Channel generation functions | 2350 |
-| [get_channels_irs](#get_channels_irs) | Channel generation functions | 2437 |
-| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 2541 |
-| [get_channels_planar](#get_channels_planar) | Channel generation functions | 2633 |
-| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 2715 |
-| [acdf](#acdf) | Channel statistics | 2809 |
-| [calc_angular_spreads_sphere](#calc_angular_spreads_sphere) | Channel statistics | 2847 |
-| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 2893 |
-| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 2959 |
-| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 2995 |
-| [conf_file_list](#conf_file_list) | Geometry-based stochastic model | 3060 |
-| [conf_file_read](#conf_file_read) | Geometry-based stochastic model | 3107 |
-| [conf_file_write](#conf_file_write) | Geometry-based stochastic model | 3189 |
-| [los_probability](#los_probability) | Geometry-based stochastic model | 3276 |
-| [lsf_draw](#lsf_draw) | Geometry-based stochastic model | 3378 |
-| [lsf_init_phases](#lsf_init_phases) | Geometry-based stochastic model | 3471 |
-| [lsp_generate](#lsp_generate) | Geometry-based stochastic model | 3565 |
-| [o2i_loss](#o2i_loss) | Geometry-based stochastic model | 3688 |
-| [path_loss](#path_loss) | Geometry-based stochastic model | 3757 |
-| [scenpar_validate](#scenpar_validate) | Geometry-based stochastic model | 3881 |
-| [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | 3948 |
-| [fast_acos](#fast_acos) | Math functions | 3981 |
-| [fast_asin](#fast_asin) | Math functions | 4000 |
-| [fast_atan2](#fast_atan2) | Math functions | 4019 |
-| [fast_cart2geo](#fast_cart2geo) | Math functions | 4041 |
-| [fast_geo2cart](#fast_geo2cart) | Math functions | 4077 |
-| [fast_sincos](#fast_sincos) | Math functions | 4123 |
-| [fast_slerp](#fast_slerp) | Math functions | 4147 |
-| [interp_2D](#interp_2d) | Math functions | 4184 |
-| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 4252 |
-| [colormap](#colormap) | Site-specific simulation tools | 4341 |
-| [combine_irs_coord](#combine_irs_coord) | Site-specific simulation tools | 4360 |
-| [coord2path](#coord2path) | Site-specific simulation tools | 4405 |
-| [cube](#cube) | Site-specific simulation tools | 4443 |
-| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 4478 |
-| [icosphere](#icosphere) | Site-specific simulation tools | 4523 |
-| [interface_gain](#interface_gain) | Site-specific simulation tools | 4557 |
-| [medium_gain](#medium_gain) | Site-specific simulation tools | 4590 |
-| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 4631 |
-| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 4674 |
-| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 4749 |
-| [obj_overlap_test](#obj_overlap_test) | Site-specific simulation tools | 4821 |
-| [path_to_tube](#path_to_tube) | Site-specific simulation tools | 4853 |
-| [plane](#plane) | Site-specific simulation tools | 4882 |
-| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 4920 |
-| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 4949 |
-| [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 4989 |
-| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 5025 |
-| [ray_commit](#ray_commit) | Site-specific simulation tools | 5061 |
-| [ray_init](#ray_init) | Site-specific simulation tools | 5166 |
-| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 5259 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 5404 |
-| [ray_progress](#ray_progress) | Site-specific simulation tools | 5453 |
-| [ray_state_update](#ray_state_update) | Site-specific simulation tools | 5598 |
-| [ray_subdivide_flag](#ray_subdivide_flag) | Site-specific simulation tools | 5801 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 5862 |
-| [refractive_index](#refractive_index) | Site-specific simulation tools | 5916 |
-| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 5948 |
-| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 6006 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 6038 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 6066 |
-| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 6107 |
-| [write_png](#write_png) | Site-specific simulation tools | 6142 |
-| [xpr_update](#xpr_update) | Site-specific simulation tools | 6173 |
-| [sos_acf_2d](#sos_acf_2d) | Sum-of-sinusoids random number generator | 6420 |
-| [sos_acf_approx](#sos_acf_approx) | Sum-of-sinusoids random number generator | 6455 |
-| [sos_acf_estimate](#sos_acf_estimate) | Sum-of-sinusoids random number generator | 6496 |
-| [sos_acfi](#sos_acfi) | Sum-of-sinusoids random number generator | 6556 |
-| [sos_calc_mse](#sos_calc_mse) | Sum-of-sinusoids random number generator | 6586 |
-| [sos_generate](#sos_generate) | Sum-of-sinusoids random number generator | 6647 |
-| [sos_init_phases](#sos_init_phases) | Sum-of-sinusoids random number generator | 6727 |
-| [sos_map](#sos_map) | Sum-of-sinusoids random number generator | 6766 |
-| [sos_preset](#sos_preset) | Sum-of-sinusoids random number generator | 6814 |
-| [sos_rand](#sos_rand) | Sum-of-sinusoids random number generator | 6864 |
-| [sos_randi](#sos_randi) | Sum-of-sinusoids random number generator | 6925 |
-| [sos_randn](#sos_randn) | Sum-of-sinusoids random number generator | 6989 |
-| [sos_remove_bias](#sos_remove_bias) | Sum-of-sinusoids random number generator | 7049 |
-| [sos_val](#sos_val) | Sum-of-sinusoids random number generator | 7135 |
+| [hdf5_read_dset](#hdf5_read_dset) | Channel functions | 1624 |
+| [hdf5_read_dset_names](#hdf5_read_dset_names) | Channel functions | 1667 |
+| [hdf5_read_layout](#hdf5_read_layout) | Channel functions | 1702 |
+| [hdf5_reshape_layout](#hdf5_reshape_layout) | Channel functions | 1729 |
+| [hdf5_write](#hdf5_write) | Channel functions | 1759 |
+| [hdf5_write_dset](#hdf5_write_dset) | Channel functions | 1807 |
+| [path](#path) | Channel functions | 1852 |
+| [qrt_file_append](#qrt_file_append) | Channel functions | 1972 |
+| [qrt_file_init](#qrt_file_init) | Channel functions | 2008 |
+| [qrt_file_parse](#qrt_file_parse) | Channel functions | 2048 |
+| [qrt_file_read](#qrt_file_read) | Channel functions | 2097 |
+| [qrt_file_read_raw](#qrt_file_read_raw) | Channel functions | 2196 |
+| [qrt_read_cache_init](#qrt_read_cache_init) | Channel functions | 2234 |
+| [quantize_delays](#quantize_delays) | Channel functions | 2274 |
+| [get_channels_ieee_indoor](#get_channels_ieee_indoor) | Channel generation functions | 2353 |
+| [get_channels_irs](#get_channels_irs) | Channel generation functions | 2440 |
+| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 2544 |
+| [get_channels_planar](#get_channels_planar) | Channel generation functions | 2636 |
+| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 2718 |
+| [acdf](#acdf) | Channel statistics | 2812 |
+| [calc_angular_spreads_sphere](#calc_angular_spreads_sphere) | Channel statistics | 2850 |
+| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 2896 |
+| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 2962 |
+| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 2998 |
+| [conf_file_list](#conf_file_list) | Geometry-based stochastic model | 3063 |
+| [conf_file_read](#conf_file_read) | Geometry-based stochastic model | 3110 |
+| [conf_file_write](#conf_file_write) | Geometry-based stochastic model | 3192 |
+| [los_probability](#los_probability) | Geometry-based stochastic model | 3279 |
+| [lsf_draw](#lsf_draw) | Geometry-based stochastic model | 3381 |
+| [lsf_init_phases](#lsf_init_phases) | Geometry-based stochastic model | 3474 |
+| [lsp_generate](#lsp_generate) | Geometry-based stochastic model | 3568 |
+| [o2i_loss](#o2i_loss) | Geometry-based stochastic model | 3691 |
+| [path_loss](#path_loss) | Geometry-based stochastic model | 3760 |
+| [scenpar_validate](#scenpar_validate) | Geometry-based stochastic model | 3884 |
+| [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | 3951 |
+| [fast_acos](#fast_acos) | Math functions | 3984 |
+| [fast_asin](#fast_asin) | Math functions | 4003 |
+| [fast_atan2](#fast_atan2) | Math functions | 4022 |
+| [fast_cart2geo](#fast_cart2geo) | Math functions | 4044 |
+| [fast_geo2cart](#fast_geo2cart) | Math functions | 4080 |
+| [fast_sincos](#fast_sincos) | Math functions | 4126 |
+| [fast_slerp](#fast_slerp) | Math functions | 4150 |
+| [interp_2D](#interp_2d) | Math functions | 4187 |
+| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 4255 |
+| [colormap](#colormap) | Site-specific simulation tools | 4344 |
+| [combine_irs_coord](#combine_irs_coord) | Site-specific simulation tools | 4363 |
+| [coord2path](#coord2path) | Site-specific simulation tools | 4408 |
+| [cube](#cube) | Site-specific simulation tools | 4446 |
+| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 4481 |
+| [icosphere](#icosphere) | Site-specific simulation tools | 4526 |
+| [interface_gain](#interface_gain) | Site-specific simulation tools | 4560 |
+| [medium_gain](#medium_gain) | Site-specific simulation tools | 4593 |
+| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 4634 |
+| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 4677 |
+| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 4752 |
+| [obj_overlap_test](#obj_overlap_test) | Site-specific simulation tools | 4824 |
+| [path_to_tube](#path_to_tube) | Site-specific simulation tools | 4856 |
+| [plane](#plane) | Site-specific simulation tools | 4885 |
+| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 4923 |
+| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 4952 |
+| [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 4992 |
+| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 5028 |
+| [ray_commit](#ray_commit) | Site-specific simulation tools | 5064 |
+| [ray_init](#ray_init) | Site-specific simulation tools | 5169 |
+| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 5262 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 5407 |
+| [ray_progress](#ray_progress) | Site-specific simulation tools | 5456 |
+| [ray_state_update](#ray_state_update) | Site-specific simulation tools | 5601 |
+| [ray_subdivide_flag](#ray_subdivide_flag) | Site-specific simulation tools | 5804 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 5865 |
+| [refractive_index](#refractive_index) | Site-specific simulation tools | 5919 |
+| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 5951 |
+| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 6009 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 6041 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 6069 |
+| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 6110 |
+| [write_png](#write_png) | Site-specific simulation tools | 6145 |
+| [xpr_update](#xpr_update) | Site-specific simulation tools | 6176 |
+| [sos_acf_2d](#sos_acf_2d) | Sum-of-sinusoids random number generator | 6423 |
+| [sos_acf_approx](#sos_acf_approx) | Sum-of-sinusoids random number generator | 6458 |
+| [sos_acf_estimate](#sos_acf_estimate) | Sum-of-sinusoids random number generator | 6499 |
+| [sos_acfi](#sos_acfi) | Sum-of-sinusoids random number generator | 6559 |
+| [sos_calc_mse](#sos_calc_mse) | Sum-of-sinusoids random number generator | 6589 |
+| [sos_generate](#sos_generate) | Sum-of-sinusoids random number generator | 6650 |
+| [sos_init_phases](#sos_init_phases) | Sum-of-sinusoids random number generator | 6730 |
+| [sos_map](#sos_map) | Sum-of-sinusoids random number generator | 6769 |
+| [sos_preset](#sos_preset) | Sum-of-sinusoids random number generator | 6817 |
+| [sos_rand](#sos_rand) | Sum-of-sinusoids random number generator | 6867 |
+| [sos_randi](#sos_randi) | Sum-of-sinusoids random number generator | 6928 |
+| [sos_randn](#sos_randn) | Sum-of-sinusoids random number generator | 6992 |
+| [sos_remove_bias](#sos_remove_bias) | Sum-of-sinusoids random number generator | 7052 |
+| [sos_val](#sos_val) | Sum-of-sinusoids random number generator | 7138 |
 
 ---
 
@@ -1592,6 +1592,9 @@ Read a channel object from an HDF5 file at a specified 4D index
   attributes of the channel, or a required dataset or attribute is missing) or is not a channel file of version 3
   written by quadriga-lib: files written by quadriga-lib 0.12.4 and earlier (version 2) are rejected; files modified
   with other HDF5 tools are not supported and may be rejected.
+- Files of quadriga-lib 0.12.4 and earlier can be converted to version 3 with the Python script
+  `tools/hdf5_convert_v2.py` of the quadriga-lib sources (needs numpy, h5py and the quadriga_lib Python module):
+  `python tools/hdf5_convert_v2.py old.hdf5 new.hdf5`.
 
 ### Declaration:
 ```

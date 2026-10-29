@@ -87,12 +87,12 @@ ifeq ($(matlab),ON)
 endif
 ifeq ($(python),ON)
 ifneq ($(PYTHON_SHARED_OBJ),)
-	python3 -m pytest tests/python_tests -x -s
+	PYTHONPATH=$(CURDIR)/lib python3 -m pytest tests/python_tests -x -s
 endif
 endif
 
 python_test: 
-	python3 -m pytest tests/python_tests -x -s
+	PYTHONPATH=$(CURDIR)/lib python3 -m pytest tests/python_tests -x -s
 
 # Documentation
 documentation:
