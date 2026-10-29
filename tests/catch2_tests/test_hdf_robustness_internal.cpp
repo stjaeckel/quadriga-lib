@@ -36,14 +36,10 @@
 #include <string>
 #include <vector>
 
-// Diagnostic output. Comment out to silence the tables. The assertions run either way.
-#define QD_TEST_VERBOSE
-
-#ifdef QD_TEST_VERBOSE
-#define QD_DIAG(...) std::printf(__VA_ARGS__)
-#else
-#define QD_DIAG(...) ((void)0)
-#endif
+// Diagnostic output: off by default. QD_DIAG_HDF=1 prints the tables of this file, QD_DIAG=1 those of all areas
+// (see qd_test_diag.hpp); the assertions run either way.
+#include "qd_test_diag.hpp"
+QD_TEST_DIAG_SWITCH("QD_DIAG_HDF")
 
 namespace h5 = qd::hdf5;
 using Catch::Matchers::Message;
