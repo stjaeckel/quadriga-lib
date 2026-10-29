@@ -120,15 +120,7 @@ py::array_t<double> lsf_draw(py::handle scenpar,
     const bool dual_mobility_b = qd_python_flag(dual_mobility, false, "dual_mobility");
     const bool horizontal_b = qd_python_flag(horizontal, true, "horizontal");
 
-    // Floor IDs are labels: read as double, checked, converted; integers from 2^53 on are not exact in a double
-    arma::uvec floor_id_a(floor_id_in.n_elem);
-    for (arma::uword i = 0; i < floor_id_in.n_elem; ++i)
-    {
-        const double v = floor_id_in[i];
-        if (!(v >= 0.0 && v < 9007199254740992.0 && v == std::floor(v)))
-            throw std::invalid_argument("Entries in 'floor_id' must be non-negative integers below 2^53.");
-        floor_id_a[i] = (arma::uword)v;
-    }
+    const arma::uvec floor_id_a = qd_python_uint_entries(floor_id_in, "floor_id");
 
     // Output allocation
     arma::mat rnd;

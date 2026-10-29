@@ -12,83 +12,86 @@ lang: en-US
 
 | Function | Section | Line |
 | --- | --- | --- |
-| [calc_beamwidth](#calc_beamwidth) | Array antenna functions | 98 |
-| [calc_directivity](#calc_directivity) | Array antenna functions | 140 |
-| [combine_pattern](#combine_pattern) | Array antenna functions | 170 |
-| [concat](#concat) | Array antenna functions | 219 |
-| [copy_element](#copy_element) | Array antenna functions | 249 |
-| [export_obj_file](#export_obj_file) | Array antenna functions | 285 |
-| [generate](#generate) | Array antenna functions | 310 |
-| [generate_speaker](#generate_speaker) | Array antenna functions | 407 |
-| [interpolate](#interpolate) | Array antenna functions | 493 |
-| [qdant_read](#qdant_read) | Array antenna functions | 573 |
-| [qdant_write](#qdant_write) | Array antenna functions | 620 |
-| [rotate_pattern](#rotate_pattern) | Array antenna functions | 668 |
-| [baseband_freq_response](#baseband_freq_response) | Channel functions | 719 |
-| [channel_export_obj_file](#channel_export_obj_file) | Channel functions | 791 |
-| [hdf5_create_file](#hdf5_create_file) | Channel functions | 837 |
-| [hdf5_read_channel](#hdf5_read_channel) | Channel functions | 867 |
-| [hdf5_read_dset](#hdf5_read_dset) | Channel functions | 930 |
-| [hdf5_read_dset_names](#hdf5_read_dset_names) | Channel functions | 966 |
-| [hdf5_read_layout](#hdf5_read_layout) | Channel functions | 998 |
-| [hdf5_reshape_layout](#hdf5_reshape_layout) | Channel functions | 1025 |
-| [hdf5_write_channel](#hdf5_write_channel) | Channel functions | 1049 |
-| [hdf5_write_dset](#hdf5_write_dset) | Channel functions | 1095 |
-| [qrt_file_parse](#qrt_file_parse) | Channel functions | 1133 |
-| [qrt_file_read](#qrt_file_read) | Channel functions | 1166 |
-| [quantize_delays](#quantize_delays) | Channel functions | 1227 |
-| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 1303 |
-| [get_channels_planar](#get_channels_planar) | Channel generation functions | 1385 |
-| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 1461 |
-| [get_ieee_indoor](#get_ieee_indoor) | Channel generation functions | 1562 |
-| [acdf](#acdf) | Channel statistics | 1651 |
-| [calc_angular_spread](#calc_angular_spread) | Channel statistics | 1685 |
-| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 1725 |
-| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 1787 |
-| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 1817 |
-| [conf_file_list](#conf_file_list) | Geometry-based stochastic model | 1883 |
-| [conf_file_read](#conf_file_read) | Geometry-based stochastic model | 1923 |
-| [conf_file_write](#conf_file_write) | Geometry-based stochastic model | 1987 |
-| [los_probability](#los_probability) | Geometry-based stochastic model | 2059 |
-| [lsf_draw](#lsf_draw) | Geometry-based stochastic model | 2154 |
-| [lsf_init_phases](#lsf_init_phases) | Geometry-based stochastic model | 2246 |
-| [lsp_generate](#lsp_generate) | Geometry-based stochastic model | 2339 |
-| [o2i_loss](#o2i_loss) | Geometry-based stochastic model | 2462 |
-| [path_loss](#path_loss) | Geometry-based stochastic model | 2523 |
-| [scenpar_validate](#scenpar_validate) | Geometry-based stochastic model | 2638 |
-| [cart2geo](#cart2geo) | Math functions | 2701 |
-| [geo2cart](#geo2cart) | Math functions | 2733 |
-| [components](#components) | Miscellaneous / Tools | 2771 |
-| [version](#version) | Miscellaneous / Tools | 2780 |
-| [write_png](#write_png) | Miscellaneous / Tools | 2793 |
-| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 2841 |
-| [cube](#cube) | Site-specific simulation tools | 2916 |
-| [icosphere](#icosphere) | Site-specific simulation tools | 2944 |
-| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 2976 |
-| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 3011 |
-| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 3066 |
-| [plane](#plane) | Site-specific simulation tools | 3124 |
-| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 3154 |
-| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 3181 |
-| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 3212 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 3245 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 3291 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 3339 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 3365 |
-| [sos.acf_2d](#sosacf_2d) | Sum-of-sinusoids random number generator | 3541 |
-| [sos.acf_approx](#sosacf_approx) | Sum-of-sinusoids random number generator | 3571 |
-| [sos.acf_estimate](#sosacf_estimate) | Sum-of-sinusoids random number generator | 3606 |
-| [sos.acfi](#sosacfi) | Sum-of-sinusoids random number generator | 3661 |
-| [sos.calc_mse](#soscalc_mse) | Sum-of-sinusoids random number generator | 3685 |
-| [sos.generate](#sosgenerate) | Sum-of-sinusoids random number generator | 3735 |
-| [sos.init_phases](#sosinit_phases) | Sum-of-sinusoids random number generator | 3802 |
-| [sos.map](#sosmap) | Sum-of-sinusoids random number generator | 3836 |
-| [sos.preset](#sospreset) | Sum-of-sinusoids random number generator | 3873 |
-| [sos.rand](#sosrand) | Sum-of-sinusoids random number generator | 3912 |
-| [sos.randi](#sosrandi) | Sum-of-sinusoids random number generator | 3971 |
-| [sos.randn](#sosrandn) | Sum-of-sinusoids random number generator | 4032 |
-| [sos.remove_bias](#sosremove_bias) | Sum-of-sinusoids random number generator | 4090 |
-| [sos.val](#sosval) | Sum-of-sinusoids random number generator | 4169 |
+| [calc_beamwidth](#calc_beamwidth) | Array antenna functions | 101 |
+| [calc_directivity](#calc_directivity) | Array antenna functions | 143 |
+| [combine_pattern](#combine_pattern) | Array antenna functions | 173 |
+| [concat](#concat) | Array antenna functions | 222 |
+| [copy_element](#copy_element) | Array antenna functions | 252 |
+| [export_obj_file](#export_obj_file) | Array antenna functions | 288 |
+| [generate](#generate) | Array antenna functions | 313 |
+| [generate_speaker](#generate_speaker) | Array antenna functions | 410 |
+| [interpolate](#interpolate) | Array antenna functions | 496 |
+| [qdant_read](#qdant_read) | Array antenna functions | 576 |
+| [qdant_write](#qdant_write) | Array antenna functions | 623 |
+| [rotate_pattern](#rotate_pattern) | Array antenna functions | 671 |
+| [baseband_freq_response](#baseband_freq_response) | Channel functions | 722 |
+| [channel_export_obj_file](#channel_export_obj_file) | Channel functions | 794 |
+| [hdf5_create_file](#hdf5_create_file) | Channel functions | 840 |
+| [hdf5_read_channel](#hdf5_read_channel) | Channel functions | 870 |
+| [hdf5_read_dset](#hdf5_read_dset) | Channel functions | 933 |
+| [hdf5_read_dset_names](#hdf5_read_dset_names) | Channel functions | 969 |
+| [hdf5_read_layout](#hdf5_read_layout) | Channel functions | 1001 |
+| [hdf5_reshape_layout](#hdf5_reshape_layout) | Channel functions | 1028 |
+| [hdf5_write_channel](#hdf5_write_channel) | Channel functions | 1052 |
+| [hdf5_write_dset](#hdf5_write_dset) | Channel functions | 1098 |
+| [qrt_file_parse](#qrt_file_parse) | Channel functions | 1136 |
+| [qrt_file_read](#qrt_file_read) | Channel functions | 1169 |
+| [quantize_delays](#quantize_delays) | Channel functions | 1230 |
+| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 1306 |
+| [get_channels_planar](#get_channels_planar) | Channel generation functions | 1388 |
+| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 1464 |
+| [get_ieee_indoor](#get_ieee_indoor) | Channel generation functions | 1565 |
+| [acdf](#acdf) | Channel statistics | 1654 |
+| [calc_angular_spread](#calc_angular_spread) | Channel statistics | 1688 |
+| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 1728 |
+| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 1790 |
+| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 1820 |
+| [conf_file_list](#conf_file_list) | Geometry-based stochastic model | 1892 |
+| [conf_file_read](#conf_file_read) | Geometry-based stochastic model | 1932 |
+| [conf_file_write](#conf_file_write) | Geometry-based stochastic model | 1996 |
+| [los_probability](#los_probability) | Geometry-based stochastic model | 2068 |
+| [lsf_draw](#lsf_draw) | Geometry-based stochastic model | 2163 |
+| [lsf_init_phases](#lsf_init_phases) | Geometry-based stochastic model | 2255 |
+| [lsp_generate](#lsp_generate) | Geometry-based stochastic model | 2349 |
+| [o2i_loss](#o2i_loss) | Geometry-based stochastic model | 2473 |
+| [path_loss](#path_loss) | Geometry-based stochastic model | 2534 |
+| [scenpar_validate](#scenpar_validate) | Geometry-based stochastic model | 2649 |
+| [ssf_clusters](#ssf_clusters) | Geometry-based stochastic model | 2708 |
+| [ssf_draw](#ssf_draw) | Geometry-based stochastic model | 2791 |
+| [ssf_init_phases](#ssf_init_phases) | Geometry-based stochastic model | 2836 |
+| [cart2geo](#cart2geo) | Math functions | 2876 |
+| [geo2cart](#geo2cart) | Math functions | 2908 |
+| [components](#components) | Miscellaneous / Tools | 2946 |
+| [version](#version) | Miscellaneous / Tools | 2955 |
+| [write_png](#write_png) | Miscellaneous / Tools | 2968 |
+| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 3016 |
+| [cube](#cube) | Site-specific simulation tools | 3091 |
+| [icosphere](#icosphere) | Site-specific simulation tools | 3119 |
+| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 3151 |
+| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 3186 |
+| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 3241 |
+| [plane](#plane) | Site-specific simulation tools | 3299 |
+| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 3329 |
+| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 3356 |
+| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 3387 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 3420 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 3466 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 3514 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 3540 |
+| [sos.acf_2d](#sosacf_2d) | Sum-of-sinusoids random number generator | 3716 |
+| [sos.acf_approx](#sosacf_approx) | Sum-of-sinusoids random number generator | 3746 |
+| [sos.acf_estimate](#sosacf_estimate) | Sum-of-sinusoids random number generator | 3781 |
+| [sos.acfi](#sosacfi) | Sum-of-sinusoids random number generator | 3836 |
+| [sos.calc_mse](#soscalc_mse) | Sum-of-sinusoids random number generator | 3860 |
+| [sos.generate](#sosgenerate) | Sum-of-sinusoids random number generator | 3910 |
+| [sos.init_phases](#sosinit_phases) | Sum-of-sinusoids random number generator | 3977 |
+| [sos.map](#sosmap) | Sum-of-sinusoids random number generator | 4011 |
+| [sos.preset](#sospreset) | Sum-of-sinusoids random number generator | 4048 |
+| [sos.rand](#sosrand) | Sum-of-sinusoids random number generator | 4087 |
+| [sos.randi](#sosrandi) | Sum-of-sinusoids random number generator | 4146 |
+| [sos.randn](#sosrandn) | Sum-of-sinusoids random number generator | 4207 |
+| [sos.remove_bias](#sosremove_bias) | Sum-of-sinusoids random number generator | 4265 |
+| [sos.val](#sosval) | Sum-of-sinusoids random number generator | 4344 |
 
 ---
 
@@ -1849,9 +1852,9 @@ kf, pg = quadriga_lib.tools.calc_rician_k_factor( powers, path_length, tx_pos, r
 
 A **geometry-based stochastic model** (GBSM) generates channels from statistics of a type of environment, the
 *scenario* (e.g. urban macro-cell with or without line of sight), instead of from the geometry of one site. The
-functions of this section implement the large-scale part of the model of 3GPP TR 38.901, clause 7.5 steps 1 to 4:
-path loss, shadow fading, LOS probability, O2I penetration loss and the large-scale parameters (LSPs) of each link,
-i.e. the spreads of delays and angles, the K-factor and the cross-polarization ratio. They are in the submodule
+functions of this section implement the model of 3GPP TR 38.901, clause 7.5 steps 1 to 7: path loss, shadow fading,
+LOS probability, O2I penetration loss, the large-scale parameters (LSPs) of each link, i.e. the spreads of delays and
+angles, the K-factor and the cross-polarization ratio, and the clusters. They are in the submodule
 `quadriga_lib.gbsm`.
 
 The statistics of a scenario are read from a conf file by [conf_file_read](#conf_file_read) into two dicts, the scenario
@@ -1870,6 +1873,12 @@ phases once; [lsf_draw](#lsf_draw) evaluates them at the links (columns 0 DS, 1 
 8 absolute TOA: Normal; 9 ground permittivity, 10 UMa environment height: Uniform; each at the decorrelation
 distance of its key); [path_loss](#path_loss) returns the path loss and the SF standard deviation; [lsp_generate](#lsp_generate) turns the
 random values into the LSPs of each link and frequency.
+
+The small-scale part (clause 7.5 steps 5 to 7, cluster level): [ssf_init_phases](#ssf_init_phases) draws the phases of the cluster
+random values per site, scenario and frequency from the LSF seed, [ssf_draw](#ssf_draw) evaluates them at the links, and
+[ssf_clusters](#ssf_clusters) turns the LSPs and random values into cluster delays, powers and angles with the method `"38.901"`
+(clause 7.5), `"38.901_MF"` (clause 7.6.5.1) or `"quadriga"` (spatially consistent, frequency-independent). The ray
+level (steps 8 to 12) follows in a later version.
 
 Where TR 38.901 and QuaDRiGa differ, the TR behaviour is the default; QuaDRiGa's behaviour is available
 through an argument where it is still wanted (3D correlation, symmetric square root of the LSP
@@ -2332,6 +2341,7 @@ phase = quadriga_lib.gbsm.lsf_init_phases( scenpar, seed, tx_pos, rx_pos, dual_m
 ### See also:
 - [conf_file_read](#conf_file_read) (the scenario parameters)
 - [lsf_draw](#lsf_draw) (evaluates the phases at the links)
+- [ssf_init_phases](#ssf_init_phases) (the small-scale sets, seeds derived from this seed)
 - [sos.init_phases](#sosinit_phases) (the raw phases)
 - [sos.remove_bias](#sosremove_bias) (the bias removal of one generator)
 
@@ -2457,6 +2467,7 @@ lsp, abs_toa, gr_eps_re, gr_eps_im, eod_offset_deg, lsp_mu, lsp_sigma = quadriga
 - [path_loss](#path_loss) (the SF standard deviation `sf_sigma`)
 - [lsf_init_phases](#lsf_init_phases) (the phases of the random generators)
 - [scenpar_validate](#scenpar_validate) (the scenario parameters and the cross-correlation matrix)
+- [ssf_clusters](#ssf_clusters) (the clusters from the LSPs)
 
 ---
 ## o2i_loss
@@ -2692,6 +2703,170 @@ scenpar_out, lsp_xcorr, lsp_xcorr_chk = quadriga_lib.gbsm.scenpar_validate( scen
 ### See also:
 - [conf_file_read](#conf_file_read) (read the parameters from a conf file)
 - [conf_file_write](#conf_file_write) (applies the same checks before writing)
+
+---
+## ssf_clusters
+Cluster delays, powers and angles of a set of links (TR 38.901 clause 7.5 steps 5 to 7)
+
+- Turns the LSPs of [lsp_generate](#lsp_generate) and the random values of [ssf_draw](#ssf_draw) into the clusters of each link, by one of
+  three methods (a method × property table is in the C++ documentation of `ssf_clusters`):
+  - `"38.901"` (default): TR 38.901 clause 7.5 steps 5 to 7 at one frequency, for drop-based calibration. Clusters
+    25 dB below the strongest get power 0 (no renormalisation); the K-factor in the scaling factors is limited to
+    >= -5 dB. Under spatial consistency (clause 7.6.3.1) evaluate the blocks 1 to 8 of `rnd` at the drop or segment
+    start and keep them along the track
+  - `"38.901_MF"`: TR 38.901 clause 7.6.5.1 as written, with the anchor LSPs `lsp_anchor`; where the multi-frequency
+    method of the TR is required
+  - `"quadriga"`: S. Jaeckel et al., "A Spatially Consistent Geometric D2D Small-Scale Fading Model for Multiple
+    Frequencies", 2019, with the LOS direction added to the cluster offsets; for tracks, several frequencies and
+    device-to-device links
+- Slots per link: 0 = LOS path, 1 = ground reflection if `GR_enabled > 0` (`G = 1`), then the `N = NumClusters - 1`
+  NLOS clusters; `n_slot = NumClusters + G`. Slot `1 + G + n` belongs to column `n` of each block of `rnd` (no
+  sorting). Clusters `n >= n_cluster(l)` (TR clause 7.6.15) get delay 0, power 0 and the LOS angles. Zero links give
+  outputs with 0 rows. Identify the LOS path by its slot, never by delay or path length: NLOS clusters of the TR
+  methods can have delay 0
+- A scenario is LOS if `KF_mu > -30` dB. In an NLOS scenario the LOS and ground-reflection powers are 0 whatever
+  `lsp` holds (`NumClusters > 1`); legacy QuaDRiGa "NLOS" files with `KF_mu > -30` run as LOS
+- Delays in [s] relative to the LOS delay `d3D/c`; angles in [rad], GCS, elevation convention; slot 0 holds the
+  geometric LOS direction. Powers are the coefficient powers of TR eq. (7.5-30), LOS `K/(K+1)`, NLOS clusters
+  `P_n/(K+1)`, without path loss and shadow fading
+- Absolute TOA (TR clause 7.6.9), NLOS scenarios only: `"38.901"`, `"38.901_MF"` add `abs_toa(l)` to the NLOS
+  delays; `"quadriga"` places the first NLOS cluster at `abs_toa(l)` (where `absTOA_mu <= -30`: only where
+  `abs_toa(l) > 0`)
+- Ground reflection (TR clause 7.6.8) on the plane z = 0. Slot power `K/(K+1)·(d3D/d_GR)²·R²` (TR methods, on top of
+  the other slots) or `K/(K+1)·R²` (`"quadriga"`) with `R² = (abs(R_par)² + abs(R_perp)²)/2` of TR eqs. (7.6-38),
+  (7.6-39). The coefficient is `sqrt(power)·diag(R_par, -R_perp)/R`, without polarisation
+  `sqrt(power)·exp(j·arg(R_par))`
+- `NumClusters = 1`: the LOS path only, power 1 in all scenarios (`K/(K+1) = 1`, also in the ground-reflection
+  power), plus the ground reflection if enabled; `rnd`, `rnd_freq` and `lsp_anchor` may be empty
+- Swap reciprocity: with mirrored random values (dual mobility in [ssf_draw](#ssf_draw)) and mirrored LSPs, swapping `tx_pos`
+  and `rx_pos` exchanges the departure and arrival angles (`"38.901"`: `eod_offset_deg` = 0 and no O2I link;
+  `"quadriga"`: `eod_offset_deg` = 0)
+- `scenpar`, `lsp`, `rnd` and `rnd_freq` must come from the same scenario (only sizes are checked); `scenpar` is
+  validated by [scenpar_validate](#scenpar_validate)
+
+### Usage:
+```
+delay, power, aod, eod, aoa, eoa, n_active = quadriga_lib.gbsm.ssf_clusters( scenpar, tx_pos, rx_pos, lsp, rnd, \
+    method, rnd_freq, lsp_anchor, eod_offset_deg, abs_toa, gr_eps, o2i, n_cluster )
+```
+
+### Inputs:
+- **`scenpar`** — Scenario parameters (dict, `SubpathMethod` ignored); used: `NumClusters`, `NumClusters_min`,
+  `KF_mu`, `absTOA_mu`, `r_DS`, `LNS_ksi`, `GR_enabled`
+- **`tx_pos`** — Tx positions in m, one row for all links; z >= 0 with ground reflection; `(1, 3)` or `(n_link, 3)`
+- **`rx_pos`** — Rx positions in m; z >= 0 with ground reflection; `(n_link, 3)`
+- **`lsp`** — LSPs from [lsp_generate](#lsp_generate); DS, ASD, ASA, ESD, ESA (slices 0, 3 to 6) > 0, KF (slice 1) >= 0;
+  `"38.901"`: one frequency; `(n_link, n_freq, 8)`
+- **`rnd`** — Shared cluster set of [ssf_draw](#ssf_draw) (`set_id = -1`), columns 0 to N-1 in [0, 1]; `(n_link, 9·N)`
+- **`method`** — `"38.901"`, `"38.901_MF"` or `"quadriga"`; default: `"38.901"`
+- **`rnd_freq`** — Per-frequency sets of [ssf_draw](#ssf_draw), slice `k` from `set_id = k`; required by `"38.901"` and
+  `"38.901_MF"`; `(n_link, N, n_freq)`; default: None
+- **`lsp_anchor`** — LSPs at the anchor frequency (e.g. 2 GHz) from [lsp_generate](#lsp_generate); required by `"38.901_MF"`;
+  `(n_link, 1, 8)`; default: None
+- **`eod_offset_deg`** — EoD offset in deg from [lsp_generate](#lsp_generate); used by `"38.901"` and `"quadriga"` in NLOS
+  scenarios; `None` = 0; `(n_link, n_freq)`; default: None
+- **`abs_toa`** — Absolute TOA offset in s from [lsp_generate](#lsp_generate), >= 0; required by `"quadriga"` in NLOS scenarios
+  with `absTOA_mu > -30`; `None` = no offset; `(n_link,)`; default: None
+- **`gr_eps`** — Ground permittivity as [lsp_generate](#lsp_generate) returns it (complex, real part >= 1, imaginary part >= 0,
+  used as `real - j·imag`; a real array = imaginary part 0); required if `GR_enabled > 0`; `(n_link, n_freq)`;
+  default: None
+- **`o2i`** — O2I flag per link (mean ZOA 90 deg), bool or numeric array (nonzero = O2I); used by `"38.901"` in
+  NLOS scenarios; `None` = none; `(n_link,)`; default: None
+- **`n_cluster`** — Active NLOS clusters per link in `[min(max(1, NumClusters_min - 1), N), N]`, int or float
+  array of non-negative integers; `None` = N; `(n_link,)`; default: None
+
+### Outputs:
+- **`delay`** — Delays in s; `(n_link, n_slot, n_fd)`, `n_fd = n_freq` for `"38.901_MF"`, else 1
+- **`power`** — Coefficient powers (linear); `(n_link, n_slot, n_freq)`
+- **`aod`**, **`aoa`** — Azimuth of departure and arrival in rad, in [-pi, pi); `(n_link, n_slot, n_fd)`
+- **`eod`**, **`eoa`** — Elevation of departure and arrival in rad, in [-pi/2, pi/2]; `(n_link, n_slot, n_fd)`
+- **`n_active`** — Number of NLOS clusters with power > 0; uint64; `(n_link,)`
+
+### See also:
+- [ssf_draw](#ssf_draw) (the random values `rnd` and `rnd_freq`)
+- [lsp_generate](#lsp_generate) (the LSPs, EoD offset, absolute TOA and ground permittivity)
+- [calc_delay_spread](#calc_delay_spread), [calc_angular_spread](#calc_angular_spread) (spreads of the output)
+
+---
+## ssf_draw
+Spatially correlated normalized random values of one small-scale fading generator set at a set of links
+
+- Evaluates a set of [ssf_init_phases](#ssf_init_phases) at the links with the rules of [lsf_draw](#lsf_draw) for single and dual mobility,
+  floors, 2D/3D mode and precision; every generator uses the decorrelation distance `SC_lambda` (TR 38.901 Table
+  7.6.3.1-2; 0 = spatial consistency off, used as 0.1 m)
+- Columns, `N = NumClusters - 1`; column `b·N + n` belongs to block `b` and NLOS cluster `n`:
+  - shared set (`set_id = -1`, `9·N` columns): block 0 cluster delay, Uniform(0,1); blocks 1, 2 sign of AOD, AOA;
+    3, 4 sign of ZOD, ZOA; 5, 6 angle offset of AOD, AOA; 7, 8 angle offset of ZOD, ZOA; Normal(0,1)
+  - per-frequency set (`set_id = k`, `N` columns): cluster shadowing, Normal(0,1)
+- Dual mobility: swapping `tx_pos` and `rx_pos` exchanges the blocks 1 and 2, 3 and 4, 5 and 6, 7 and 8 and keeps
+  the delay and shadowing blocks, exactly (D2D reciprocity of S. Jaeckel et al., "A Spatially Consistent Geometric
+  D2D Small-Scale Fading Model for Multiple Frequencies", 2019)
+- A column depends neither on the other columns nor on the other links; later versions append blocks and keep the
+  values of the existing columns
+- `preset`, `horizontal` and the set type must match [ssf_init_phases](#ssf_init_phases). Zero links give `(0, n_gen)`;
+  `NumClusters = 1` gives `(n_link, 0)`
+
+### Usage:
+```
+rnd = quadriga_lib.gbsm.ssf_draw( scenpar, phase, tx_pos, rx_pos, set_id, floor_id, dual_mobility, preset, \
+    horizontal )
+```
+
+### Inputs:
+- **`scenpar`** — Scenario parameters as in [ssf_init_phases](#ssf_init_phases); `NumClusters` and `SC_lambda` are used
+- **`phase`** — Phases from [ssf_init_phases](#ssf_init_phases), finite; `(n_coeff, n_gen, 2)`
+- **`tx_pos`** — Tx positions in m, one row for all links; used in dual mobility; `(1, 3)` or `(n_link, 3)`
+- **`rx_pos`** — Rx positions in m; `(n_link, 3)`
+- **`set_id`** — `-1` = shared cluster set; `k >= 0` = per-frequency set; int; default: -1
+- **`floor_id`** — Floor index per link as in [lsf_draw](#lsf_draw), 2D mode only; int or float array of non-negative
+  integers; `None` or empty = floor 0; `(n_link,)`; default: None
+- **`dual_mobility`** — `True`: the Tx is a second moving device; bool; default: False
+- **`preset`** — Sum-of-sinusoids preset, see [sos.preset](#sospreset); default: `"Comb256"`
+- **`horizontal`** — `True`: 2D correlation (TR 38.901); `False`: 3D (legacy QuaDRiGa); bool; default: True
+
+### Output:
+- **`rnd`** — Random values; `(n_link, n_gen)`
+
+### See also:
+- [ssf_init_phases](#ssf_init_phases) (draws the phases)
+- [ssf_clusters](#ssf_clusters) (the clusters from the random values)
+- [lsf_draw](#lsf_draw) (the large-scale values; mobility, floor and precision rules)
+
+---
+## ssf_init_phases
+Draw the random phases of one small-scale fading generator set of a BS site and scenario
+
+- The cluster random values of the small-scale fading (TR 38.901 clause 7.6.3.1) come in two kinds of sets, with
+  `N = NumClusters - 1` NLOS clusters: one shared cluster set (`set_id = -1`, `9·N` generators) and one set per
+  carrier frequency (`set_id = k`, `N` generators, `k` = index in the caller's frequency list, the same order in
+  every call). [ssf_draw](#ssf_draw) evaluates the phases at the links and lists the columns
+- The phases are a fixed function of `seed`, the seed of the large-scale set of the same site and scenario
+  ([lsf_init_phases](#lsf_init_phases)), and `set_id`, equal on all platforms; the sets do not repeat the large-scale phases and are
+  independent of each other. Keep an explicit seed (or the phase cubes) to reproduce the clusters
+- Each scenario of a site (LOS, NLOS, O2I) needs its own large-scale seed: TR 38.901 clause 7.6.3.4 makes the link
+  types uncorrelated
+- `NumClusters = 1`: both sets are empty
+
+### Usage:
+```
+phase = quadriga_lib.gbsm.ssf_init_phases( scenpar, seed, set_id, preset )
+```
+
+### Inputs:
+- **`scenpar`** — Scenario parameters; dict from [conf_file_read](#conf_file_read) or [scenpar_validate](#scenpar_validate) or any subset of its
+  keys (missing keys take their defaults, `SubpathMethod` is ignored); `NumClusters` sets `N`
+- **`seed`** — Seed of the large-scale set, int from -1 to 2^63-1; -1 = system random device; default: -1
+- **`set_id`** — `-1` = shared cluster set; `k >= 0` = set of frequency `k`; default: -1
+- **`preset`** — Sum-of-sinusoids preset, see [sos.preset](#sospreset); default: `"Comb256"`
+
+### Output:
+- **`phase`** — Phases in rad, in [-pi, pi); slice 0 = Rx side, slice 1 = Tx side (mirror generators);
+  `(n_coeff, n_gen, 2)`, `n_gen = 9·N` (shared set) or `N`
+
+### See also:
+- [ssf_draw](#ssf_draw) (evaluates the phases at the links)
+- [ssf_clusters](#ssf_clusters) (the clusters from the random values)
+- [lsf_init_phases](#lsf_init_phases) (the large-scale set and its seed)
 
 ---
 

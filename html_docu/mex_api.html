@@ -150,6 +150,9 @@
   <tr><td><a href="#o2i_loss">o2i_loss</a></td><td>O2I building or car penetration loss of a set of UTs, TR 38.901 clause 7.4.3</td></tr>
   <tr><td><a href="#path_loss">path_loss</a></td><td>Path loss and shadow-fading standard deviation of a set of links</td></tr>
   <tr><td><a href="#scenpar_validate">scenpar_validate</a></td><td>Validate scenario parameters and complete them with default values</td></tr>
+  <tr><td><a href="#ssf_clusters">ssf_clusters</a></td><td>Cluster delays, powers and angles of a set of links (TR 38.901 clause 7.5 steps 5 to 7)</td></tr>
+  <tr><td><a href="#ssf_draw">ssf_draw</a></td><td>Spatially correlated normalized random values of one small-scale fading generator set at a set of links</td></tr>
+  <tr><td><a href="#ssf_init_phases">ssf_init_phases</a></td><td>Draw the random phases of one small-scale fading generator set of a BS site and scenario</td></tr>
 </tbody></table><br>
 
 <b>Math functions</b><br><br>
@@ -2493,10 +2496,10 @@ Calculate the Rician K-Factor from channel impulse response data
 <br>
 A <b>geometry-based stochastic model</b> (GBSM) generates channels from statistics of a type of 
 environment, the <i>scenario</i> (e.g. urban macro-cell with or without line of sight), instead of from 
-the geometry of one site. The functions of this section implement the large-scale part of the model 
-of 3GPP TR 38.901, clause 7.5 steps 1 to 4: path loss, shadow fading, LOS probability, O2I 
-penetration loss and the large-scale parameters (LSPs) of each link, i.e. the spreads of delays and 
-angles, the K-factor and the cross-polarization ratio.<br><br> 
+the geometry of one site. The functions of this section implement the model of 3GPP TR 38.901, 
+clause 7.5 steps 1 to 7: path loss, shadow fading, LOS probability, O2I penetration loss, the 
+large-scale parameters (LSPs) of each link, i.e. the spreads of delays and angles, the K-factor and 
+the cross-polarization ratio, and the clusters.<br><br> 
  
 The statistics of a scenario are read from a conf file by <a href="#conf_file_read">conf_file_read</a>. The folder 
 <code>data/config</code> holds 23 files for TR 38.901 v19.5.0; <a href="#scenpar_validate">scenpar_validate</a> completes a parameter set 
@@ -2514,6 +2517,13 @@ evaluates them at the links (columns 1 DS, 2 KF, 3 SF, 4 ASD, 5 ASA, 6 ESD, 7 ES
 10 ground permittivity, 11 UMa environment height: Uniform; each at the decorrelation distance of 
 its field); <a href="#path_loss">path_loss</a> returns the path loss and the SF standard deviation; <a href="#lsp_generate">lsp_generate</a> 
 turns the random values into the LSPs of each link and frequency.<br><br> 
+ 
+The small-scale part (clause 7.5 steps 5 to 7, cluster level): <a href="#ssf_init_phases">ssf_init_phases</a> draws the phases 
+of the cluster random values per site, scenario and frequency from the LSF seed, <a href="#ssf_draw">ssf_draw</a> 
+evaluates them at the links, and <a href="#ssf_clusters">ssf_clusters</a> turns the LSPs and random values into cluster 
+delays, powers and angles with the method <code>'38.901'</code> (clause 7.5), <code>'38.901_MF'</code> (clause 7.6.5.1) or 
+<code>'quadriga'</code> (spatially consistent, frequency-independent). The ray level (steps 8 to 12) follows in 
+a later version.<br><br> 
  
 Where TR 38.901 and QuaDRiGa differ, the TR behaviour is the default; QuaDRiGa's behaviour is available 
 through an argument where it is still wanted (3D correlation, symmetric square root of the LSP 
@@ -2846,6 +2856,7 @@ phase = quadriga_lib.lsf_init_phases( scenpar, seed, tx_pos, rx_pos, dual_mobili
 <ul>
 <li><a href="#conf_file_read">conf_file_read</a> (the scenario parameters)</li>
 <li><a href="#lsf_draw">lsf_draw</a> (evaluates the phases at the links)</li>
+<li><a href="#ssf_init_phases">ssf_init_phases</a> (the small-scale sets, seeds derived from this seed)</li>
 <li><a href="#sos_init_phases">sos_init_phases</a> (the raw phases)</li>
 <li><a href="#sos_remove_bias">sos_remove_bias</a> (the bias removal of one generator)</li>
 </ul>
@@ -2910,6 +2921,7 @@ Large-scale parameters of a set of links from normalized random values
 <li><a href="#path_loss">path_loss</a> (the SF standard deviation <code>sf_sigma</code>)</li>
 <li><a href="#lsf_init_phases">lsf_init_phases</a> (the phases of the random generators)</li>
 <li><a href="#scenpar_validate">scenpar_validate</a> (the scenario parameters and the cross-correlation matrix)</li>
+<li><a href="#ssf_clusters">ssf_clusters</a> (the clusters from the LSPs)</li>
 </ul>
 
 <hr class="greyline"><br>
@@ -3075,6 +3087,151 @@ Validate scenario parameters and complete them with default values
 <ul>
 <li><a href="#conf_file_read">conf_file_read</a> (read the parameters from a conf file)</li>
 <li><a href="#conf_file_write">conf_file_write</a> (applies the same checks before writing)</li>
+</ul>
+
+<hr class="greyline"><br>
+<span id="ssf_clusters" class="qd-func"><b>ssf_clusters</b></span><br>
+<hr class="thin">
+Cluster delays, powers and angles of a set of links (TR 38.901 clause 7.5 steps 5 to 7)
+<ul>
+<li>Turns the LSPs of <a href="#lsp_generate">lsp_generate</a> and the random values of <a href="#ssf_draw">ssf_draw</a> into the clusters of each link, by one of three methods (a method × property table is in the C++ documentation of <code>ssf_clusters</code>):
+<ul>
+<li><code>'38.901'</code> (default): TR 38.901 clause 7.5 steps 5 to 7 at one frequency, for drop-based calibration. Clusters 25 dB below the strongest get power 0 (no renormalisation); the K-factor in the scaling factors is limited to >= -5 dB. Under spatial consistency (clause 7.6.3.1) evaluate the blocks 1 to 8 of <code>rnd</code> (columns N + 1 to 9·N) at the drop or segment start and keep them along the track</li>
+<li><code>'38.901_MF'</code>: TR 38.901 clause 7.6.5.1 as written, with the anchor LSPs <code>lsp_anchor</code>; where the multi-frequency method of the TR is required</li>
+<li><code>'quadriga'</code>: S. Jaeckel et al., "A Spatially Consistent Geometric D2D Small-Scale Fading Model for Multiple Frequencies", 2019, with the LOS direction added to the cluster offsets; for tracks, several frequencies and device-to-device links</li>
+</ul>
+</li>
+<li>Slots per link: 1 = LOS path, 2 = ground reflection if <code>GR_enabled &gt; 0</code> (<code>G = 1</code>), then the <code>N = NumClusters - 1</code> NLOS clusters; <code>n_slot = NumClusters + G</code>. NLOS cluster <code>n = 1 ... N</code> is in slot <code>1 + G + n</code> and belongs to the columns <code>b·N + n</code> of <code>rnd</code> (no sorting). Clusters <code>n &gt; n_cluster(l)</code> (TR clause 7.6.15) get delay 0, power 0 and the LOS angles. Identify the LOS path by its slot, never by delay or path length: NLOS clusters of the TR methods can have delay 0</li>
+<li>A scenario is LOS if <code>KF_mu &gt; -30</code> dB. In an NLOS scenario the LOS and ground-reflection powers are 0 whatever <code>lsp</code> holds (<code>NumClusters &gt; 1</code>); legacy QuaDRiGa "NLOS" files with <code>KF_mu &gt; -30</code> run as LOS</li>
+<li>Delays in [s] relative to the LOS delay <code>d3D/c</code>; angles in [rad], GCS, elevation convention; slot 1 holds the geometric LOS direction. Powers are the coefficient powers of TR eq. (7.5-30), LOS <code>K/(K+1)</code>, NLOS clusters <code>P_n/(K+1)</code>, without path loss and shadow fading</li>
+<li>Absolute TOA (TR clause 7.6.9), NLOS scenarios only: <code>'38.901'</code>, <code>'38.901_MF'</code> add <code>abs_toa(l)</code> to the NLOS delays; <code>'quadriga'</code> places the first NLOS cluster at <code>abs_toa(l)</code> (where <code>absTOA_mu &lt;= -30</code>: only where <code>abs_toa(l) &gt; 0</code>)</li>
+<li>Ground reflection (TR clause 7.6.8) on the plane z = 0. Slot power <code>K/(K+1)·(d3D/d_GR)²·R²</code> (TR methods, on top of the other slots) or <code>K/(K+1)·R²</code> (<code>'quadriga'</code>) with <code>R² = (abs(R_par)² + abs(R_perp)²)/2</code> of TR eqs. (7.6-38), (7.6-39). The coefficient is <code>sqrt(power)·diag(R_par, -R_perp)/R</code>, without polarisation <code>sqrt(power)·exp(j·arg(R_par))</code></li>
+<li><code>NumClusters = 1</code>: the LOS path only, power 1 in all scenarios (<code>K/(K+1) = 1</code>, also in the ground-reflection power), plus the ground reflection if enabled; <code>rnd</code>, <code>rnd_freq</code> and <code>lsp_anchor</code> may be empty</li>
+<li>Swap reciprocity: with mirrored random values (dual mobility in <a href="#ssf_draw">ssf_draw</a>) and mirrored LSPs, swapping <code>tx_pos</code> and <code>rx_pos</code> exchanges the departure and arrival angles (<code>'38.901'</code>: <code>eod_offset_deg</code> = 0 and no O2I link; <code>'quadriga'</code>: <code>eod_offset_deg</code> = 0)</li>
+<li><code>scenpar</code>, <code>lsp</code>, <code>rnd</code> and <code>rnd_freq</code> must come from the same scenario (only sizes are checked); <code>scenpar</code> is validated by <a href="#scenpar_validate">scenpar_validate</a>. At least one link is required</li>
+</ul>
+
+<b>Usage:</b><br>
+<pre>
+[ delay, power, aod, eod, aoa, eoa, n_active ] = quadriga_lib.ssf_clusters( scenpar, tx_pos, rx_pos, ...
+    lsp, rnd, method, rnd_freq, lsp_anchor, eod_offset_deg, abs_toa, gr_eps_re, gr_eps_im, o2i, n_cluster );
+</pre>
+
+<b>Inputs:</b><br>
+<ul>
+<li><b><code>scenpar</code></b> — Scenario parameters (struct, <code>SubpathMethod</code> ignored); used: <code>NumClusters</code>, <code>NumClusters_min</code>, <code>KF_mu</code>, <code>absTOA_mu</code>, <code>r_DS</code>, <code>LNS_ksi</code>, <code>GR_enabled</code></li>
+<li><b><code>tx_pos</code></b> — Tx positions in [m], one row for all links; z >= 0 with ground reflection; <code>[1, 3]</code> or <code>[n_link, 3]</code></li>
+<li><b><code>rx_pos</code></b> — Rx positions in [m]; z >= 0 with ground reflection; <code>[n_link, 3]</code></li>
+<li><b><code>lsp</code></b> — LSPs from <a href="#lsp_generate">lsp_generate</a>; DS, ASD, ASA, ESD, ESA (slices 1, 4 to 7) > 0, KF (slice 2) >= 0; <code>'38.901'</code>: one frequency; <code>[n_link, n_freq, 8]</code></li>
+<li><b><code>rnd</code></b> — Shared cluster set of <a href="#ssf_draw">ssf_draw</a> (<code>set_id = 0</code>), columns 1 to N in [0, 1]; <code>[n_link, 9·N]</code></li>
+<li><b><code>method</code></b> <i>(optional)</i> — <code>'38.901'</code> (default), <code>'38.901_MF'</code> or <code>'quadriga'</code></li>
+<li><b><code>rnd_freq</code></b> <i>(optional)</i> — Per-frequency sets of <a href="#ssf_draw">ssf_draw</a>, slice <code>k</code> from <code>set_id = k</code>; required by <code>'38.901'</code> and <code>'38.901_MF'</code>; <code>[n_link, N, n_freq]</code></li>
+<li><b><code>lsp_anchor</code></b> <i>(optional)</i> — LSPs at the anchor frequency (e.g. 2 GHz); required by <code>'38.901_MF'</code>; <code>[n_link, 1, 8]</code></li>
+<li><b><code>eod_offset_deg</code></b> <i>(optional)</i> — EoD offset in [deg] from <a href="#lsp_generate">lsp_generate</a>; used by <code>'38.901'</code> and <code>'quadriga'</code> in NLOS scenarios; omitted or empty = 0; <code>[n_link, n_freq]</code></li>
+<li><b><code>abs_toa</code></b> <i>(optional)</i> — Absolute TOA offset in [s] from <a href="#lsp_generate">lsp_generate</a>, >= 0; required by <code>'quadriga'</code> in NLOS scenarios with <code>absTOA_mu &gt; -30</code>; omitted or empty = no offset; <code>[n_link]</code></li>
+<li><b><code>gr_eps_re</code></b>, <b><code>gr_eps_im</code></b> <i>(optional)</i> — Ground permittivity <code>gr_eps_re - j·gr_eps_im</code>, real part >= 1, imaginary part >= 0; required if <code>GR_enabled &gt; 0</code>; <code>[n_link, n_freq]</code></li>
+<li><b><code>o2i</code></b> <i>(optional)</i> — O2I flag per link (mean ZOA 90 deg), logical or numeric; used by <code>'38.901'</code> in NLOS scenarios; omitted or empty = none; <code>[n_link]</code></li>
+<li><b><code>n_cluster</code></b> <i>(optional)</i> — Active NLOS clusters per link (a count) in <code>[min(max(1, NumClusters_min - 1), N), N]</code>; omitted or empty = N; <code>[n_link]</code></li>
+</ul>
+
+<b>Outputs:</b><br>
+<ul>
+<li><b><code>delay</code></b> — Delays in [s]; <code>[n_link, n_slot, n_fd]</code>, <code>n_fd = n_freq</code> for <code>'38.901_MF'</code>, else 1</li>
+<li><b><code>power</code></b> — Coefficient powers (linear); <code>[n_link, n_slot, n_freq]</code></li>
+<li><b><code>aod</code></b>, <b><code>aoa</code></b> — Azimuth of departure and arrival in [rad], in [-pi, pi); <code>[n_link, n_slot, n_fd]</code></li>
+<li><b><code>eod</code></b>, <b><code>eoa</code></b> — Elevation of departure and arrival in [rad], in [-pi/2, pi/2]; <code>[n_link, n_slot, n_fd]</code></li>
+<li><b><code>n_active</code></b> — Number of NLOS clusters with power > 0; uint64; <code>[n_link, 1]</code></li>
+</ul>
+
+<b>See also:</b><br>
+<ul>
+<li><a href="#ssf_draw">ssf_draw</a> (the random values <code>rnd</code> and <code>rnd_freq</code>)</li>
+<li><a href="#lsp_generate">lsp_generate</a> (the LSPs, EoD offset, absolute TOA and ground permittivity)</li>
+<li><a href="#calc_delay_spread">calc_delay_spread</a>, <a href="#calc_angular_spread">calc_angular_spread</a> (spreads of the output)</li>
+</ul>
+
+<hr class="greyline"><br>
+<span id="ssf_draw" class="qd-func"><b>ssf_draw</b></span><br>
+<hr class="thin">
+Spatially correlated normalized random values of one small-scale fading generator set at a set of links
+<ul>
+<li>Evaluates a set of <a href="#ssf_init_phases">ssf_init_phases</a> at the links with the rules of <a href="#lsf_draw">lsf_draw</a> for single and dual mobility, floors, 2D/3D mode and precision; every generator uses the decorrelation distance <code>SC_lambda</code> (TR 38.901 Table 7.6.3.1-2; 0 = spatial consistency off, used as 0.1 m)</li>
+<li>Columns, <code>N = NumClusters - 1</code>; block <code>b = 0 ... 8</code> holds the columns <code>b·N + 1</code> to <code>(b + 1)·N</code>, one per NLOS cluster:
+<ul>
+<li>shared set (<code>set_id = 0</code>, <code>9·N</code> columns): block 0 cluster delay, Uniform(0,1); blocks 1, 2 sign of AOD, AOA; 3, 4 sign of ZOD, ZOA; 5, 6 angle offset of AOD, AOA; 7, 8 angle offset of ZOD, ZOA; Normal(0,1)</li>
+<li>per-frequency set (<code>set_id = k &gt;= 1</code>, <code>N</code> columns): cluster shadowing, Normal(0,1)</li>
+</ul>
+</li>
+<li>Dual mobility: swapping <code>tx_pos</code> and <code>rx_pos</code> exchanges the blocks 1 and 2, 3 and 4, 5 and 6, 7 and 8 and keeps the delay and shadowing blocks, exactly (D2D reciprocity of S. Jaeckel et al., "A Spatially Consistent Geometric D2D Small-Scale Fading Model for Multiple Frequencies", 2019)</li>
+<li>A column depends neither on the other columns nor on the other links; later versions append blocks and keep the values of the existing columns</li>
+<li><code>preset</code>, <code>horizontal</code> and the set type must match <a href="#ssf_init_phases">ssf_init_phases</a>; at least one link is required</li>
+</ul>
+
+<b>Usage:</b><br>
+<pre>
+rnd = quadriga_lib.ssf_draw( scenpar, phase, tx_pos, rx_pos, set_id, floor_id, dual_mobility, ...
+    preset, horizontal );
+</pre>
+
+<b>Inputs:</b><br>
+<ul>
+<li><b><code>scenpar</code></b> — Scenario parameters as in <a href="#ssf_init_phases">ssf_init_phases</a>; <code>NumClusters</code> and <code>SC_lambda</code> are used</li>
+<li><b><code>phase</code></b> — Phases from <a href="#ssf_init_phases">ssf_init_phases</a>; <code>[n_coeff, n_gen, 2]</code></li>
+<li><b><code>tx_pos</code></b> — Tx positions in [m], one row for all links; used in dual mobility; <code>[1, 3]</code> or <code>[n_link, 3]</code></li>
+<li><b><code>rx_pos</code></b> — Rx positions in [m]; <code>[n_link, 3]</code></li>
+<li><b><code>set_id</code></b> <i>(optional)</i> — <code>0</code> = shared cluster set; <code>k &gt;= 1</code> = per-frequency set; default: 0</li>
+<li><b><code>floor_id</code></b> <i>(optional)</i> — Floor label per link starting at 0 (no index shift) as in <a href="#lsf_draw">lsf_draw</a>, 2D mode only; omitted or empty = floor 0; <code>[n_link]</code></li>
+<li><b><code>dual_mobility</code></b> <i>(optional)</i> — <code>true</code>: the Tx is a second moving device; default: false</li>
+<li><b><code>preset</code></b> <i>(optional)</i> — Sum-of-sinusoids preset, see <a href="#sos_preset">sos_preset</a>; default: <code>'Comb256'</code></li>
+<li><b><code>horizontal</code></b> <i>(optional)</i> — <code>true</code>: 2D correlation (TR 38.901); <code>false</code>: 3D (legacy); default: true</li>
+</ul>
+
+<b>Output:</b><br>
+<ul>
+<li><b><code>rnd</code></b> — Random values; <code>[n_link, n_gen]</code></li>
+</ul>
+
+<b>See also:</b><br>
+<ul>
+<li><a href="#ssf_init_phases">ssf_init_phases</a> (draws the phases)</li>
+<li><a href="#ssf_clusters">ssf_clusters</a> (the clusters from the random values)</li>
+<li><a href="#lsf_draw">lsf_draw</a> (the large-scale values; mobility, floor and precision rules)</li>
+</ul>
+
+<hr class="greyline"><br>
+<span id="ssf_init_phases" class="qd-func"><b>ssf_init_phases</b></span><br>
+<hr class="thin">
+Draw the random phases of one small-scale fading generator set of a BS site and scenario
+<ul>
+<li>The cluster random values of the small-scale fading (TR 38.901 clause 7.6.3.1) come in two kinds of sets, with <code>N = NumClusters - 1</code> NLOS clusters: one shared cluster set (<code>set_id = 0</code>, <code>9·N</code> generators) and one set per carrier frequency (<code>set_id = k</code>, <code>N</code> generators, <code>k</code> = position in the caller's frequency list, the same order in every call). <a href="#ssf_draw">ssf_draw</a> evaluates the phases at the links and lists the columns</li>
+<li>The phases are a fixed function of <code>seed</code>, the seed of the large-scale set of the same site and scenario (<a href="#lsf_init_phases">lsf_init_phases</a>), and <code>set_id</code>, equal on all platforms; the sets do not repeat the large-scale phases and are independent of each other. Keep an explicit seed (or the phase arrays) to reproduce the clusters</li>
+<li>Each scenario of a site (LOS, NLOS, O2I) needs its own large-scale seed: TR 38.901 clause 7.6.3.4 makes the link types uncorrelated</li>
+<li><code>NumClusters = 1</code>: both sets are empty</li>
+</ul>
+
+<b>Usage:</b><br>
+<pre>
+phase = quadriga_lib.ssf_init_phases( scenpar, seed, set_id, preset );
+</pre>
+
+<b>Inputs:</b><br>
+<ul>
+<li><b><code>scenpar</code></b> — Scenario parameters; struct from <a href="#conf_file_read">conf_file_read</a> or <a href="#scenpar_validate">scenpar_validate</a> or any subset of its fields (missing fields take their defaults, <code>SubpathMethod</code> is ignored); <code>NumClusters</code> sets <code>N</code></li>
+<li><b><code>seed</code></b> <i>(optional)</i> — Seed of the large-scale set; -1 = system random device; default: -1</li>
+<li><b><code>set_id</code></b> <i>(optional)</i> — <code>0</code> = shared cluster set; <code>k &gt;= 1</code> = set of frequency <code>k</code>; default: 0</li>
+<li><b><code>preset</code></b> <i>(optional)</i> — Sum-of-sinusoids preset, see <a href="#sos_preset">sos_preset</a>; default: <code>'Comb256'</code></li>
+</ul>
+
+<b>Output:</b><br>
+<ul>
+<li><b><code>phase</code></b> — Phases in [rad], in [-pi, pi); slice 1 = Rx side, slice 2 = Tx side (mirror generators); <code>[n_coeff, n_gen, 2]</code>, <code>n_gen = 9·N</code> (shared set) or <code>N</code></li>
+</ul>
+
+<b>See also:</b><br>
+<ul>
+<li><a href="#ssf_draw">ssf_draw</a> (evaluates the phases at the links)</li>
+<li><a href="#ssf_clusters">ssf_clusters</a> (the clusters from the random values)</li>
+<li><a href="#lsf_init_phases">lsf_init_phases</a> (the large-scale set and its seed)</li>
 </ul>
 
 <hr class="greyline"><br><br>

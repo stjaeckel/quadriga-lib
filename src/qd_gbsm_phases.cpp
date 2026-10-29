@@ -31,23 +31,18 @@
 // Units: positions in [m], rows {x, y, z}; frequencies of the sum-of-sinusoids tables in [1/m]; decorrelation
 // distances in [m].
 //
-// Design for further phase sets (the small-scale fading, SSF, of TR 38.901 clause 7.6.3.1: cluster and ray
-// variables at SC_lambda, mirrored for dual mobility, separated by floor as in clause 7.6.3.3):
-// - The LSF set stays fixed at 11 generators ([n_coeff, 11, 2] is part of the public contract). An SSF set gets its
-//   own generator table (qd_gbsm_gen: lambda, distribution, mirror partner, bias flag) and its own public functions
-//   that create and evaluate it; they are added to this file and call qd_gbsm_freq, qd_gbsm_positions,
-//   qd_gbsm_eval and qd_gbsm_remove_bias with the signatures below. The machinery therefore stays file-local here;
-//   if the SSF functions had to live in another file, these functions would move unchanged, as static inline, into
-//   quadriga_gbsm_helpers.hpp
-// - The helpers take everything as explicit arguments (no captured state, no LSF constants outside
-//   qd_gbsm_gen_lsf), and they group the sos_val / sos_remove_bias calls by frequency table: one call per
-//   distinct decorrelation distance and side, so a set with hundreds of generators at one distance needs one call
-// - SSF sets use the same floor IDs as lsf_draw (the floor offsets are inside qd_gbsm_eval)
-// - Seeds: sos_init_phases fills column g independently of the number of columns, so an SSF set drawn with the
-//   seed of the LSF set would repeat the LSF phases in its first 11 columns and, at an equal decorrelation distance,
-//   reproduce the LSF fields. An SSF set takes the columns from 11 on of one sos_init_phases(n_coeff, 11 + n_ssf,
-//   seed) call with the LSF seed (same n_coeff only: the matrix is filled column by column from one stream), or a
-//   seed derived from the LSF seed by a fixed rule. The caller therefore keeps an explicit seed (or the phase cubes)
+// SSF generators (small-scale fading, TR 38.901 clause 7.6.3.1; ssf_init_phases, ssf_draw; used by ssf_clusters).
+// N = NumClusters - 1; column b·N + n belongs to block b and cluster n (0-based). Blocks and distributions: see the
+// documentation of ssf_draw; mirror partner: qd_gbsm_gen_ssf. All generators use SC_lambda (0 is used as 0.1 m), none
+// is bias-corrected. NumClusters = 1 (N = 0): both sets are empty and no sum-of-sinusoids function is called.
+//
+// Seeds of the SSF sets: SplitMix64 of the seed of the LSF set of the same site and scenario and the set tag (see
+// derive_seed): the sets are independent streams, distinct from the LSF phases; seed -1 passes on (system random
+// device).
+//
+// Append-only rule: sos_init_phases fills column g from one stream independently of n_gen, and ssf_draw evaluates
+// each column with its own phases only. A later version that appends blocks to a set (N columns or a multiple of N
+// each, never reordered or resized) therefore keeps the values of all existing columns bit for bit.
 
 #include "quadriga_gbsm.hpp"
 #include "quadriga_gbsm_helpers.hpp"
@@ -55,6 +50,7 @@
 #include "quadriga_lib_helper_functions.hpp"
 
 #include <cmath>
+#include <cstdint>
 #include <map>
 #include <random>
 #include <stdexcept>
@@ -100,6 +96,27 @@ namespace
             gen[g].uniform = g >= 9;
             gen[g].mirror = mirror[g];
             gen[g].bias = g < 9;
+        }
+        return gen;
+    }
+
+    // SSF generators (column layout above) from a completed scenpar: set_id = -1 shared cluster set (9·N), >= 0
+    // per-frequency set (N); N = NumClusters - 1, empty for N = 0
+    std::vector<qd_gbsm_gen> qd_gbsm_gen_ssf(const std::unordered_map<std::string, double> &sp, arma::sword set_id)
+    {
+        const arma::uword mirror_b[9] = {0, 2, 1, 4, 3, 6, 5, 8, 7};
+        const arma::uword N = (arma::uword)sp.at("NumClusters") - 1;
+        const double lambda = sp.at("SC_lambda");
+        const bool shared = set_id < 0;
+
+        std::vector<qd_gbsm_gen> gen(shared ? 9 * N : N);
+        for (arma::uword c = 0; c < (arma::uword)gen.size(); ++c)
+        {
+            const arma::uword b = c / N, n = c % N;
+            gen[c].lambda = (lambda > 0.0) ? lambda : 0.1;
+            gen[c].uniform = shared && b == 0;
+            gen[c].mirror = shared ? mirror_b[b] * N + n : c;
+            gen[c].bias = false;
         }
         return gen;
     }
@@ -150,7 +167,8 @@ namespace
     }
 
     // Normalized values of a phase set at a set of links
-    // - gen, freq, acf, dist, tab: generator table and frequency tables (qd_gbsm_gen_lsf, qd_gbsm_freq)
+    // - gen, freq, acf, dist, tab: generator table (qd_gbsm_gen_lsf or qd_gbsm_gen_ssf) and frequency tables
+    //   (qd_gbsm_freq)
     // - phase [n_coeff, n_gen, 2]: slice 0 Rx side, slice 1 Tx side (mirror of slice 0)
     // - R, T [n_link, 3], n_link >= 1: positions from qd_gbsm_positions (T unused without dual mobility)
     // - floor_id: [n_link] or nullptr (all on floor 0)
@@ -423,6 +441,7 @@ void quadriga_lib::lsf_init_phases(
 ## See also:
 - [[conf_file_read]] (the scenario parameters)
 - [[lsf_draw]] (evaluates the phases at the links)
+- [[ssf_init_phases]] (the small-scale sets, seeds derived from this seed)
 - [[sos_init_phases]] (the raw phases)
 - [[sos_remove_bias]] (the bias removal of one generator)
 MD!*/
@@ -617,6 +636,207 @@ void quadriga_lib::lsf_draw(const std::unordered_map<std::string, double> &scenp
     {
         if (rnd.n_rows != 0 || rnd.n_cols != n_gen)
             rnd.set_size(0, n_gen);
+        return;
+    }
+
+    std::vector<arma::mat> freq;
+    std::vector<arma::vec> acf, dist;
+    std::vector<arma::uword> tab;
+    qd_gbsm_freq(preset, gen, freq, acf, dist, tab);
+
+    arma::mat R, T;
+    qd_gbsm_positions(rx_pos, tx_pos, horizontal, R, T);
+
+    qd_gbsm_eval(gen, freq, acf, dist, tab, phase, R, T, floor_id, dual_mobility, rnd);
+}
+
+
+/*!MD
+# ssf_init_phases
+Draw the random phases of one small-scale fading generator set of a BS site and scenario
+
+- The cluster random values of the small-scale fading (TR 38.901 clause 7.6.3.1) come in two kinds of sets, with
+  `N = NumClusters - 1` NLOS clusters: one shared cluster set (`set_id = -1`, `9·N` generators) and one set per
+  carrier frequency (`set_id = k`, `N` generators, `k` = index in the caller's frequency list, the same order in
+  every call). [[ssf_draw]] evaluates the phases at the links and lists the columns
+- The phases are a fixed function of `seed`, the seed of the large-scale set of the same site and scenario
+  ([[lsf_init_phases]]), and `set_id`, equal on all platforms; the sets do not repeat the large-scale phases and are
+  independent of each other. Keep an explicit seed (or the phase cubes) to reproduce the clusters
+- Each scenario of a site (LOS, NLOS, O2I) needs its own large-scale seed: TR 38.901 clause 7.6.3.4 makes the link
+  types uncorrelated
+- `NumClusters = 1`: both sets are empty
+
+## Declaration:
+```
+void quadriga_lib::ssf_init_phases(
+    const std::unordered_map<std::string, double> &scenpar,
+    arma::cube &phase,
+    arma::sword seed = -1,
+    arma::sword set_id = -1,
+    const std::string &preset = "Comb256");
+```
+
+## Inputs:
+- **`scenpar`** — Scenario parameters from [[conf_file_read]] or [[scenpar_validate]], missing keys take their
+  defaults; `NumClusters` sets `N`
+- **`seed`** *(optional)* — Seed of the large-scale set, >= -1; -1 = system random device (new phases per call)
+- **`set_id`** *(optional)* — `-1` = shared cluster set; `k >= 0` = set of frequency `k`
+- **`preset`** *(optional)* — Sum-of-sinusoids preset, see [[sos_preset]]; sets `n_coeff`
+
+## Output:
+- **`phase`** — Phases in [rad], in [-pi, pi); slice 0 = Rx side, slice 1 = Tx side (mirror generators);
+  `[n_coeff, n_gen, 2]`, `n_gen = 9·N` (shared set) or `N`
+
+## See also:
+- [[ssf_draw]] (evaluates the phases at the links)
+- [[ssf_clusters]] (the clusters from the random values)
+- [[lsf_init_phases]] (the large-scale set and its seed)
+MD!*/
+
+void quadriga_lib::ssf_init_phases(const std::unordered_map<std::string, double> &scenpar,
+                                   arma::cube &phase,
+                                   arma::sword seed,
+                                   arma::sword set_id,
+                                   const std::string &preset)
+{
+    // Validation, before any output is touched
+    if (seed < -1)
+        throw std::invalid_argument("Input 'seed' must be >= -1.");
+    if (set_id < -1)
+        throw std::invalid_argument("Input 'set_id' must be >= -1.");
+
+    const arma::uword n_coeff = qd_gbsm_n_coeff(preset);
+
+    std::unordered_map<std::string, double> sp = scenpar;
+    quadriga_lib::scenpar_validate(sp, "legacy", nullptr, nullptr, true);
+
+    const std::vector<qd_gbsm_gen> gen = qd_gbsm_gen_ssf(sp, set_id);
+    const arma::uword n_gen = (arma::uword)gen.size();
+
+    if (phase.n_rows != n_coeff || phase.n_cols != n_gen || phase.n_slices != 2)
+        phase.set_size(n_coeff, n_gen, 2);
+    if (n_gen == 0) // N = 0: empty set, sos_init_phases rejects zero generators
+        return;
+
+    // Seed of the set: SplitMix64 of the large-scale seed and the set tag; -1 passes on
+    auto derive_seed = [](arma::sword seed, arma::sword set_id) -> arma::sword
+    {
+        if (seed == -1)
+            return -1;
+        auto splitmix64 = [](std::uint64_t x)
+        {
+            std::uint64_t z = x + 0x9E3779B97F4A7C15ULL;
+            z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ULL;
+            z = (z ^ (z >> 27)) * 0x94D049BB133111EBULL;
+            return z ^ (z >> 31);
+        };
+        const std::uint64_t tag = (set_id < 0) ? 1ULL : 2ULL + (std::uint64_t)set_id;
+        return (arma::sword)(splitmix64(splitmix64((std::uint64_t)seed) ^ tag) >> 1);
+    };
+
+    arma::mat P0;
+    quadriga_lib::sos_init_phases<double>(n_coeff, n_gen, P0, derive_seed(seed, set_id));
+
+    // Output: slice 0 = Rx side, slice 1 = mirror of the Rx side
+    for (arma::uword g = 0; g < n_gen; ++g)
+    {
+        phase.slice(0).col(g) = P0.col(g);
+        phase.slice(1).col(g) = P0.col(gen[g].mirror);
+    }
+}
+
+/*!MD
+# ssf_draw
+Spatially correlated normalized random values of one small-scale fading generator set at a set of links
+
+- Evaluates a set of [[ssf_init_phases]] at the links with the rules of [[lsf_draw]] for single and dual mobility,
+  floors, 2D/3D mode and precision; every generator uses the decorrelation distance `SC_lambda` (TR 38.901 Table
+  7.6.3.1-2; 0 = spatial consistency off, used as 0.1 m)
+- Columns, `N = NumClusters - 1`; column `b·N + n` belongs to block `b` and NLOS cluster `n`:
+  - shared set (`set_id = -1`, `9·N` columns): block 0 cluster delay, Uniform(0,1); blocks 1, 2 sign of AOD, AOA;
+    3, 4 sign of ZOD, ZOA; 5, 6 angle offset of AOD, AOA; 7, 8 angle offset of ZOD, ZOA; Normal(0,1)
+  - per-frequency set (`set_id = k`, `N` columns): cluster shadowing, Normal(0,1)
+- Dual mobility: swapping `tx_pos` and `rx_pos` exchanges the blocks 1 and 2, 3 and 4, 5 and 6, 7 and 8 and keeps
+  the delay and shadowing blocks, exactly (D2D reciprocity of S. Jaeckel et al., "A Spatially Consistent Geometric
+  D2D Small-Scale Fading Model for Multiple Frequencies", 2019)
+- A column depends neither on the other columns nor on the other links; later versions append blocks and keep the
+  values of the existing columns
+- `preset`, `horizontal` and the set type must match [[ssf_init_phases]]. `NumClusters = 1` gives `[n_link, 0]`
+  (any empty `phase` is accepted)
+
+## Declaration:
+```
+void quadriga_lib::ssf_draw(
+    const std::unordered_map<std::string, double> &scenpar,
+    const arma::cube &phase,
+    const arma::mat &tx_pos,
+    const arma::mat &rx_pos,
+    arma::mat &rnd,
+    arma::sword set_id = -1,
+    const arma::uvec *floor_id = nullptr,
+    bool dual_mobility = false,
+    const std::string &preset = "Comb256",
+    bool horizontal = true);
+```
+
+## Inputs:
+- **`scenpar`** — Scenario parameters as in [[ssf_init_phases]]; `NumClusters` and `SC_lambda` are used
+- **`phase`** — Phases from [[ssf_init_phases]], finite; `[n_coeff, n_gen, 2]`
+- **`tx_pos`** — Tx positions in [m], one row for all links; used in dual mobility; `[1, 3]` or `[n_link, 3]`
+- **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
+- **`set_id`** *(optional)* — `-1` = shared cluster set; `k >= 0` = per-frequency set
+- **`floor_id`** *(optional)* — Floor index per link as in [[lsf_draw]], 2D mode only; omitted = floor 0; `[n_link]`
+- **`dual_mobility`** *(optional)* — `true`: the Tx is a second moving device
+- **`preset`** *(optional)* — Sum-of-sinusoids preset, see [[sos_preset]]
+- **`horizontal`** *(optional)* — `true`: 2D correlation (TR 38.901); `false`: 3D (legacy QuaDRiGa)
+
+## Output:
+- **`rnd`** — Random values; `[n_link, n_gen]` (`[0, n_gen]` for no link)
+
+## See also:
+- [[ssf_init_phases]] (draws the phases)
+- [[ssf_clusters]] (the clusters from the random values)
+- [[lsf_draw]] (the large-scale values; mobility, floor and precision rules)
+MD!*/
+
+void quadriga_lib::ssf_draw(const std::unordered_map<std::string, double> &scenpar,
+                            const arma::cube &phase,
+                            const arma::mat &tx_pos,
+                            const arma::mat &rx_pos,
+                            arma::mat &rnd,
+                            arma::sword set_id,
+                            const arma::uvec *floor_id,
+                            bool dual_mobility,
+                            const std::string &preset,
+                            bool horizontal)
+{
+    // Validation, before any output is touched
+    const arma::uword n_link = rx_pos.n_rows;
+    qd_gbsm_check_links(&tx_pos, &rx_pos);
+    if (set_id < -1)
+        throw std::invalid_argument("Input 'set_id' must be >= -1.");
+    const arma::uword n_coeff = qd_gbsm_n_coeff(preset);
+
+    std::unordered_map<std::string, double> sp = scenpar;
+    quadriga_lib::scenpar_validate(sp, "legacy", nullptr, nullptr, true);
+    const std::vector<qd_gbsm_gen> gen = qd_gbsm_gen_ssf(sp, set_id);
+    const arma::uword n_gen = (arma::uword)gen.size();
+
+    // An empty set accepts any empty cube (MATLAB passes zeros(n_coeff, 0, 2) as 0x0x0)
+    if (n_gen == 0 ? phase.n_elem != 0 : (phase.n_rows != n_coeff || phase.n_cols != n_gen || phase.n_slices != 2))
+        throw std::invalid_argument("Input 'phase' must have size [" + std::to_string(n_coeff) + ", " + std::to_string(n_gen) +
+                                    ", 2] for preset '" + preset + "' and this set.");
+    if (!phase.is_finite())
+        throw std::invalid_argument("Input 'phase' must be finite.");
+    if (floor_id != nullptr && floor_id->n_elem != n_link)
+        throw std::invalid_argument("Number of elements in 'floor_id' does not match number of rows in 'rx_pos'.");
+    if (floor_id != nullptr && !horizontal)
+        throw std::invalid_argument("Input 'floor_id' cannot be used with 'horizontal = false': in 3D mode the height separates the floors.");
+
+    if (n_link == 0 || n_gen == 0)
+    {
+        if (rnd.n_rows != n_link || rnd.n_cols != n_gen)
+            rnd.set_size(n_link, n_gen);
         return;
     }
 

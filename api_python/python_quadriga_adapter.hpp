@@ -713,6 +713,22 @@ static bool qd_python_flag(const py::handle &value, bool default_value, const st
     throw py::type_error("Input '" + name + "' must be a bool or None.");
 }
 
+// Entries of a real vector that hold non-negative integers (counts or labels, no index shift) -> uvec
+// - Every entry must be an integer in [0, 2^53) (larger integers are not exact in a double); otherwise
+//   std::invalid_argument naming the input 'name'
+static arma::uvec qd_python_uint_entries(const arma::vec &input, const std::string &name)
+{
+    arma::uvec out(input.n_elem);
+    for (arma::uword i = 0; i < input.n_elem; ++i)
+    {
+        const double v = input[i];
+        if (!(v >= 0.0 && v < 9007199254740992.0 && v == std::floor(v)))
+            throw std::invalid_argument("Entries in '" + name + "' must be non-negative integers below 2^53.");
+        out[i] = (arma::uword)v;
+    }
+    return out;
+}
+
 // Python path -> std::string; returns false if 'value' is not a path
 // - str and bytes as they are; an object with '__fspath__' is converted with os.fspath first
 static bool qd_python_try_path(const py::handle &value, std::string &path)

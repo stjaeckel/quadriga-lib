@@ -10,6 +10,7 @@
 #include "quadriga_lib.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <unordered_map>
 
 inline mxArray *qd_mex_arrayant2struct(const quadriga_lib::arrayant<double> &ant)
@@ -367,6 +368,23 @@ inline std::vector<quadriga_lib::channel<double>> qd_mex_struct2channel(const mx
     }
 
     return chan;
+}
+
+// Entries of a real vector that hold non-negative integers (counts or labels, no index shift) -> uvec
+// - Every entry must be an integer in [0, 2^53) (larger integers are not exact in a double); otherwise a MATLAB
+//   error naming the input 'var_name'
+inline arma::uvec qd_mex_uint_entries(const arma::vec &input, const std::string &var_name)
+{
+    arma::uvec out(input.n_elem);
+    for (arma::uword i = 0; i < input.n_elem; ++i)
+    {
+        const double v = input[i];
+        if (!(v >= 0.0 && v < 9007199254740992.0 && v == std::floor(v)))
+            mexErrMsgIdAndTxt("quadriga_lib:CPPerror",
+                              ("Entries in '" + var_name + "' must be non-negative integers below 2^53.").c_str());
+        out[i] = (arma::uword)v;
+    }
+    return out;
 }
 
 // 1x1 struct of QuaDRiGa scenario parameters -> map of the numeric values and the string 'SubpathMethod'

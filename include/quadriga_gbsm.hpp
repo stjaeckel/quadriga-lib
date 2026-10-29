@@ -179,6 +179,54 @@ namespace quadriga_lib
                   double d2d_in_max = 25.0,                  // Maximum indoor 2D distance in [m] (key O2I_d2D_in_max)
                   arma::vec *d2d_in = nullptr,               // Optional output: Indoor 2D distance in [m], 0 for car models, [n_ut]
                   arma::uvec *model_index = nullptr);        // Optional output: Chosen model per UT, 0-based index into 'models', [n_ut]
+
+    // ---- Small-scale fading ----
+    // Cluster level of TR 38.901 clause 7.5 steps 5 to 7; N = NumClusters - 1 NLOS clusters. The column layout of
+    // the random values: see the documentation of ssf_draw
+
+    // Draw the random phases of one small-scale fading generator set (seed derived from the large-scale seed)
+    void ssf_init_phases(const std::unordered_map<std::string, double> &scenpar, // Scenario parameters (NumClusters)
+                         arma::cube &phase,                                      // Output: Phases in [rad], [n_coeff, n_gen, 2]; slice 0 = Rx side, slice 1 = Tx side
+                         arma::sword seed = -1,                                  // Seed of the large-scale set (lsf_init_phases), -1 = system random device
+                         arma::sword set_id = -1,                                // -1 = shared cluster set; k >= 0 = set of frequency k (0-based)
+                         const std::string &preset = "Comb256");                 // SOS preset, see sos_preset
+
+    // Spatially correlated normalized random values of one small-scale fading generator set at a set of links
+    void ssf_draw(const std::unordered_map<std::string, double> &scenpar, // Scenario parameters (NumClusters, SC_lambda)
+                  const arma::cube &phase,                                 // Phases from ssf_init_phases, [n_coeff, n_gen, 2]
+                  const arma::mat &tx_pos,                                 // Tx positions, [1, 3] or [n_link, 3]
+                  const arma::mat &rx_pos,                                 // Rx positions, [n_link, 3]
+                  arma::mat &rnd,                                          // Output: Random values, [n_link, n_gen]
+                  arma::sword set_id = -1,                                 // Set type, as in ssf_init_phases: -1 = shared, k >= 0 = per-frequency
+                  const arma::uvec *floor_id = nullptr,                    // Optional: Floor index per link, [n_link]; nullptr = all on one floor; 2D only
+                  bool dual_mobility = false,                              // Tx and Rx both move: the Tx side is a second device
+                  const std::string &preset = "Comb256",                   // Must match ssf_init_phases
+                  bool horizontal = true);                                 // true: 2D correlation (TR); false: 3D (legacy)
+
+    // Cluster delays, powers and angles of a set of links, TR 38.901 clause 7.5 steps 5 to 7
+    // - Methods "38.901", "38.901_MF" (clause 7.6.5.1), "quadriga"
+    // - Slots: 0 = LOS path, 1 = ground reflection if GR_enabled, then the N NLOS clusters
+    void ssf_clusters(const std::unordered_map<std::string, double> &scenpar, // Scenario parameters
+                      const arma::mat &tx_pos,                                // Tx positions in [m], [1, 3] or [n_link, 3]
+                      const arma::mat &rx_pos,                                // Rx positions in [m], [n_link, 3]
+                      const arma::cube &lsp,                                  // LSPs from lsp_generate, [n_link, n_freq, 8]
+                      const arma::mat &rnd,                                   // Shared cluster set from ssf_draw, [n_link, 9·N]
+                      arma::cube &delay,                                      // Output: Delays in [s], [n_link, n_slot, n_fd]; n_fd = n_freq for 38.901_MF, else 1
+                      arma::cube &power,                                      // Output: Powers (linear), [n_link, n_slot, n_freq]
+                      arma::cube &aod,                                        // Output: Azimuth of departure in [rad], [n_link, n_slot, n_fd]
+                      arma::cube &eod,                                        // Output: Elevation of departure in [rad], [n_link, n_slot, n_fd]
+                      arma::cube &aoa,                                        // Output: Azimuth of arrival in [rad], [n_link, n_slot, n_fd]
+                      arma::cube &eoa,                                        // Output: Elevation of arrival in [rad], [n_link, n_slot, n_fd]
+                      const std::string &method = "38.901",                   // "38.901", "38.901_MF" or "quadriga"
+                      const arma::cube *rnd_freq = nullptr,                   // Optional: Per-frequency sets from ssf_draw, [n_link, N, n_freq]; required by 38.901, 38.901_MF
+                      const arma::cube *lsp_anchor = nullptr,                 // Optional: LSPs at the anchor frequency, [n_link, 1, 8]; required by 38.901_MF
+                      const arma::mat *eod_offset_deg = nullptr,              // Optional: EoD offset in [deg] from lsp_generate, positive = up, [n_link, n_freq]; nullptr = 0
+                      const arma::vec *abs_toa = nullptr,                     // Optional: Absolute TOA offset in [s] from lsp_generate, [n_link]; required by quadriga in NLOS if absTOA_mu > -30
+                      const arma::mat *gr_eps_re = nullptr,                   // Optional: Ground permittivity, real part, [n_link, n_freq]; required if GR_enabled
+                      const arma::mat *gr_eps_im = nullptr,                   // Optional: Ground permittivity, imaginary part, [n_link, n_freq]; required if GR_enabled
+                      const std::vector<bool> *o2i = nullptr,                 // Optional: O2I flag per link (mean ZOA 90 deg in 38.901), [n_link]; nullptr = none
+                      const arma::uvec *n_cluster = nullptr,                  // Optional: Number of NLOS clusters per link (TR clause 7.6.15), [n_link]; nullptr = N
+                      arma::uvec *n_active = nullptr);                        // Optional output: Number of NLOS clusters with power > 0, [n_link]
 }
 
 #endif

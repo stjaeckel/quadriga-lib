@@ -208,7 +208,8 @@ TEST_CASE("conf files v19 - all 23 files are read without ignored keys and pass 
         CHECK(sp["PolVar_sigma"] == 3.0);        // clause 7.6.16
         CHECK(sp["NumSubPaths"] == 20.0);
 
-        // LOS files have a K-factor, all others switch the LOS path off and carry one extra cluster
+        // LOS files have a K-factor, all others switch the LOS path off; every file carries the TR cluster number N
+        // plus one slot for the LOS path
         std::string s, state;
         bool los_file, o2i;
         split_name(name, s, state, los_file, o2i);
@@ -216,6 +217,12 @@ TEST_CASE("conf files v19 - all 23 files are read without ignored keys and pass 
             CHECK(sp["KF_mu"] > 0.0);
         else
             CHECK(sp["KF_mu"] == -100.0);
+
+        // Number of NLOS clusters N of Table 7.5-6 (Parts 1 to 4), per scenario {LOS, NLOS, O2I}; the O2I files of
+        // UMa, UMi, RMa and SMa use the O2I column
+        const double n_tr[6][3] = {{12, 19, 12}, {12, 20, 12}, {11, 10, 10}, {15, 19, 0}, {25, 25, 0}, {15, 14, 14}};
+        const int i_scen = s == "UMi" ? 0 : s == "UMa" ? 1 : s == "RMa" ? 2 : s == "Indoor" ? 3 : s == "InF" ? 4 : 5;
+        CHECK(sp["NumClusters"] == n_tr[i_scen][o2i ? 2 : (los_file ? 0 : 1)] + 1.0);
 
         // Absolute time of arrival in the NLOS and all O2I files: the TR gives it for NLOS links, and an O2I link
         // has no LOS ray, so its response is the NLOS form (7.6-43); active if absTOA_mu > -30
@@ -343,19 +350,19 @@ TEST_CASE("conf files v19 - table values of TR 38.901 v19.5.0")
         {"InF_LOS", "LSP_fc_min", 0},
         // Table 7.5-6 Part-4, SMa
         {"SMa_LOS", "DS_mu", -7.42}, {"SMa_LOS", "DS_sigma", 0.60}, {"SMa_LOS", "KF_mu", 9}, {"SMa_LOS", "KF_sigma", 7},
-        {"SMa_LOS", "NumClusters", 15}, {"SMa_LOS", "r_DS", 2.4}, {"SMa_LOS", "PerClusterAS_D", 2.08}, {"SMa_LOS", "esA_sf", -0.8},
+        {"SMa_LOS", "NumClusters", 16}, {"SMa_LOS", "r_DS", 2.4}, {"SMa_LOS", "PerClusterAS_D", 2.08}, {"SMa_LOS", "esA_sf", -0.8},
         {"SMa_NLOS", "DS_mu", -7.20}, {"SMa_NLOS", "AS_A_mu", 1.63}, {"SMa_NLOS", "NumClusters", 15}, {"SMa_NLOS", "r_DS", 1.5},
         {"SMa_NLOS", "XPR_mu", 4}, {"SMa_NLOS", "ds_sf", -0.13}, {"SMa_NLOS", "esA_sf", -0.47}, {"SMa_NLOS", "esA_asA", 0.36},
         {"SMa_NLOS_O2I", "SF_sigma", 8}, {"SMa_NLOS", "ES_D_mu", 0.14}, {"SMa_NLOS", "ES_D_sigma", 0.16},
         {"SMa_NLOS", "EoD_offset_hcl", 3.5}, {"SMa_LOS_O2I", "EoD_offset_hcl", 3.5}, {"RMa_NLOS", "EoD_offset_hcl", 3.5},
-        // Number of clusters: N for LOS, N + 1 otherwise; lower end of the range D1 likewise (Table 7.6.15-1)
-        {"UMi_LOS", "NumClusters", 12}, {"UMi_NLOS", "NumClusters", 20}, {"UMi_NLOS_O2I", "NumClusters", 13},
-        {"UMa_NLOS", "NumClusters", 21}, {"RMa_LOS", "NumClusters", 11}, {"RMa_NLOS", "NumClusters", 11},
-        {"Indoor_LOS", "NumClusters", 15}, {"Indoor_NLOS", "NumClusters", 20}, {"InF_LOS", "NumClusters", 25},
+        // Number of clusters: N + 1 in every file; lower end of the range D1 + 1 (Table 7.6.15-1)
+        {"UMi_LOS", "NumClusters", 13}, {"UMi_NLOS", "NumClusters", 20}, {"UMi_NLOS_O2I", "NumClusters", 13},
+        {"UMa_NLOS", "NumClusters", 21}, {"RMa_LOS", "NumClusters", 12}, {"RMa_NLOS", "NumClusters", 11},
+        {"Indoor_LOS", "NumClusters", 16}, {"Indoor_NLOS", "NumClusters", 20}, {"InF_LOS", "NumClusters", 26},
         {"InF_NLOS_DL", "NumClusters", 26},
-        {"UMi_LOS", "NumClusters_min", 6}, {"UMi_NLOS", "NumClusters_min", 7}, {"UMi_LOS_O2I", "NumClusters_min", 7},
-        {"UMa_LOS", "NumClusters_min", 10}, {"UMa_NLOS", "NumClusters_min", 16}, {"UMa_NLOS_O2I", "NumClusters_min", 11},
-        {"Indoor_LOS", "NumClusters_min", 7}, {"Indoor_NLOS", "NumClusters_min", 7}, {"RMa_LOS", "NumClusters_min", 0},
+        {"UMi_LOS", "NumClusters_min", 7}, {"UMi_NLOS", "NumClusters_min", 7}, {"UMi_LOS_O2I", "NumClusters_min", 7},
+        {"UMa_LOS", "NumClusters_min", 11}, {"UMa_NLOS", "NumClusters_min", 16}, {"UMa_NLOS_O2I", "NumClusters_min", 11},
+        {"Indoor_LOS", "NumClusters_min", 8}, {"Indoor_NLOS", "NumClusters_min", 7}, {"RMa_LOS", "NumClusters_min", 0},
         {"SMa_NLOS", "NumClusters_min", 0}, {"InF_LOS", "NumClusters_min", 0},
         // Table 7.6.9-1, absolute time of arrival
         {"Indoor_NLOS", "absTOA_mu", -8.6}, {"Indoor_NLOS", "absTOA_sigma", 0.1}, {"Indoor_NLOS", "absTOA_lambda", 10},
