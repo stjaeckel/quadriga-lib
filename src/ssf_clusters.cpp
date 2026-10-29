@@ -103,6 +103,72 @@ namespace
             }
         }
     }
+
+    // Clusters of one link by TR 38.901 clause 7.6.5.1 steps 5' to 7', all frequencies (method "38.901_MF")
+    // - x: values of the shared set of the link, column b·N + n; z: shadowing values, z[k·N + n]; N_l active clusters
+    // - sp0 = {DS0, ASD0, ASA0, ZSD0, ZSA0} anchor spreads; sp[k·5 + i] the same at frequency k; kf[k] linear K
+    //   (0 in NLOS); DS in [s], angular spreads in [deg]
+    // - centre = {AOD, AOA, ZOD, ZOA} of the LOS direction in [deg]
+    // - Outputs for n < N_l: delay[k·N_l + n] [s] (relative, without abs TOA), power[k·N_l + n] coefficient power,
+    //   ang[(k·4 + a)·N_l + n] [rad] for a = 0 AOD, 1 AOA, 2 EOD, 3 EOA
+    void qd_ssf_mf(const double *x, const double *z, arma::uword N, arma::uword N_l, arma::uword F, bool los,
+                   double zeta, const double *sp0, const double *sp, const double *kf, const double *centre,
+                   double *delay, double *power, double *ang)
+    {
+        const double r = 1.5, s2 = std::sqrt(2.0);
+        auto wrap180 = [](double v) { return v - 360.0 * std::floor((v + 180.0) / 360.0); };
+
+        // Step 5': nominal delays and angles; arg(exp(-j·v)) = wrap180(-v); the Laplacian term of the TR,
+        // sgn(V - 0.5)·ln(1 - 2·abs(V - 0.5)) with V = Phi(y), as sgn(y)·ln(erfc(abs(y)/sqrt(2)))
+        std::vector<double> tau(N_l), a0(4 * N_l), lam(N_l);
+        for (arma::uword n = 0; n < N_l; ++n)
+        {
+            const bool first = los && n == 0; // TR cluster 1 in LOS: delay and angles 0
+            tau[n] = first ? 0.0 : -r * sp0[0] * std::log(std::max(x[n], DBL_MIN));
+            for (arma::uword a = 0; a < 4; ++a)
+            {
+                const double y = x[(5 + a) * N + n];
+                const double v = (a < 2) ? y : (double)((y > 0.0) - (y < 0.0)) *
+                                                   std::log(std::max(std::erfc(std::abs(y) / s2), DBL_MIN)) / s2;
+                a0[a * N_l + n] = first ? 0.0 : wrap180(-r * sp0[1 + a] * v);
+            }
+        }
+
+        for (arma::uword k = 0; k < F; ++k)
+        {
+            // Step 6': eqs. (7.6.30a) to (7.6.30h), normalised in the log domain; the LOS power is in slot 0
+            const double *s = sp + 5 * k;
+            double g[5];
+            g[0] = std::max(r * sp0[0] - s[0], 0.0) / (s[0] * r * sp0[0]);
+            for (arma::uword i = 1; i < 5; ++i)
+                g[i] = (i < 3) ? std::sqrt(std::max(r * sp0[i] * r * sp0[i] - s[i] * s[i], 0.0)) / (s[i] * r * sp0[i])
+                               : std::max(r * sp0[i] - s[i], 0.0) / (s[i] * r * sp0[i]);
+            double l_max = -INFINITY, sum = 0.0;
+            for (arma::uword n = 0; n < N_l; ++n)
+            {
+                const double e1 = a0[n] * g[1] / s2, e2 = a0[N_l + n] * g[2] / s2;
+                lam[n] = -tau[n] * g[0] - e1 * e1 - e2 * e2 - s2 * std::abs(a0[2 * N_l + n]) * g[3] -
+                         s2 * std::abs(a0[3 * N_l + n]) * g[4] - zeta * z[k * N + n] * std::log(10.0) / 10.0;
+                l_max = std::max(l_max, lam[n]);
+            }
+            for (arma::uword n = 0; n < N_l; ++n)
+                power[k * N_l + n] = std::exp(lam[n] - l_max), sum += power[k * N_l + n];
+            for (arma::uword n = 0; n < N_l; ++n)
+                power[k * N_l + n] /= sum * (kf[k] + 1.0);
+
+            // Step 7': eqs. (7.6.30i) to (7.6.30m), cluster level; the wrapped nominal angles are scaled in LOS
+            const double c_tau = std::sqrt(1.0 + kf[k] / 2.0), c_ang = std::sqrt(1.0 + kf[k]);
+            for (arma::uword n = 0; n < N_l; ++n)
+            {
+                delay[k * N_l + n] = c_tau * tau[n];
+                for (arma::uword a = 0; a < 4; ++a)
+                {
+                    const double t = centre[a] + c_ang * a0[a * N_l + n];
+                    ang[(k * 4 + a) * N_l + n] = (a < 2) ? qd_wrap(t * qd_pi / 180.0) : qd_elev(t);
+                }
+            }
+        }
+    }
 }
 
 /*!SECTION
@@ -216,10 +282,37 @@ Cluster delays, powers and angles of a set of links, TR 38.901 clause 7.5 steps 
   >= -5 dB (below, C_theta turns negative near -10 dB); for links far below -5 dB the ASA is then about 0.86 of the
   input. The delays are not sorted: the TR's sort of eq. (7.5-2) only relabels the clusters, and keeping the
   cluster of each field column keeps the clusters stable under spatial consistency
+- Method `"38.901_MF"` (TR 38.901 clause 7.6.5.1 as written), per link with `N_l` active clusters, in degrees;
+  `r = 1.5`; anchor spreads `DS0`, `ASD0`, `ASA0`, `ZSD0`, `ZSA0` from `lsp_anchor`; DS, ASD, ASA, ZSD, ZSA and `K`
+  from `lsp` at frequency k (`K = 0` in NLOS scenarios); `u_n` = block 0, `y_n` the offset block of the angle type
+  (blocks 5 to 8: Y_n, Z_n of the TR and, through `V = Phi(y)`, V_n, W_n), `z_{n,k}` the shadowing at frequency k,
+  `zeta = LNS_ksi`.
+  Step 5', the same at all frequencies: `tau'_n = -r·DS0·ln(u_n)`; azimuths
+  `phi'_n = arg(exp(-j·r·AS0·y_n))`, i.e. `-r·AS0·y_n` wrapped to [-180, 180); zeniths
+  `theta'_n = arg(exp(-j·r·ZS0·sgn(y_n)·ln(erfc(abs(y_n)/sqrt(2)))/sqrt(2)))`, which equals the TR's
+  `sgn(V_n - 0.5)·ln(1 - 2·abs(V_n - 0.5))` with full precision near V = 0 or 1. LOS: cluster 0 (the TR's cluster
+  1) has `tau'_0 = 0` and all four nominal angles 0.
+  Step 6' per frequency: `P'_n = exp(-tau'_n·g_DS - (phi'_AOD,n·g_ASD/sqrt(2))² - (phi'_AOA,n·g_ASA/sqrt(2))² -
+  sqrt(2)·abs(theta'_ZOD,n)·g_ZSD - sqrt(2)·abs(theta'_ZOA,n)·g_ZSA)·10^(-zeta·z_{n,k}/10)` (eq. (7.6.30a)) with
+  `g_DS = max(r·DS0 - DS, 0)/(DS·r·DS0)`, `g_ASD = sqrt(max((r·ASD0)² - ASD², 0))/(ASD·r·ASD0)` (ASA likewise),
+  `g_ZSD = max(r·ZSD0 - ZSD, 0)/(ZSD·r·ZSD0)` (ZSA likewise); a g factor is 0 where the spread at k is at least r
+  times the anchor spread. `P_n = P'_n/sum(P')` (log domain), output power `P_n/(K+1)`; with the LOS slot
+  `K/(K+1)` this is eq. (7.6.30h).
+  Step 7' per frequency: delay `sqrt(1 + K/2)·tau'_n` (LOS) or `tau'_n` (NLOS), plus `abs_toa` in NLOS scenarios;
+  angle = LOS angle + `sqrt(1 + K)·angle'_n` (LOS) or LOS angle + `angle'_n` (NLOS) for AOD, AOA, ZOD, ZOA
+  (eqs. (7.6.30i) to (7.6.30m) without the ray terms); azimuths wrapped, zenith angles folded as in `"38.901"`
+- `"38.901_MF"` follows the TR text literally: the nominal angles are wrapped in step 5' and scaled by `sqrt(1 + K)`
+  in step 7', so in LOS an angle that crosses +-180 deg in step 5' jumps by `sqrt(1 + K)·360` deg before the final
+  wrap (about 0.05 to 0.07 jumps per metre along LOS tracks); in LOS the delays and angles depend on the frequency
+  through K (they are equal at all frequencies if K is); the NLOS delays are not shifted to start at 0 (no cluster
+  at delay 0 in NLOS); no sort, no -25 dB removal, no C factors, no ZOD offset (mean EoD about 2 to 3 deg off the
+  clause 7.5 statistics in UMi and UMa NLOS), no O2I rule; the per-cluster shadowing is drawn per frequency (TR
+  clause 7.6.5); the anchor LSPs (TR: e.g. at 2 GHz) are an input; the zenith fold of clause 7.5 step 7 is applied
+  to the final zenith angles, for which clause 7.6.5.1 states no rule
 - Swap reciprocity: with mirrored random values (dual-mobility values of [[ssf_draw]], or the blocks 1 and 2, 3 and
-  4, 5 and 6, 7 and 8 exchanged) and mirrored LSPs (ASD and ASA, ESD and ESA exchanged), swapping `tx_pos` and
-  `rx_pos` gives the same delays and powers with departure and arrival angles exchanged; `"38.901"` needs
-  `eod_offset_deg` = 0 and no O2I link, `"quadriga"` `eod_offset_deg` = 0
+  4, 5 and 6, 7 and 8 exchanged) and mirrored LSPs (ASD and ASA, ESD and ESA exchanged, also in `lsp_anchor`),
+  swapping `tx_pos` and `rx_pos` gives the same delays and powers with departure and arrival angles exchanged;
+  `"38.901"` needs `eod_offset_deg` = 0 and no O2I link, `"quadriga"` `eod_offset_deg` = 0
 - Properties of the methods (typical values for UMi and UMa at 6 and 30 GHz):
 
 | Property | `38.901` | `38.901_MF` | `quadriga` |
@@ -432,7 +525,7 @@ void quadriga_lib::ssf_clusters(const std::unordered_map<std::string, double> &s
             throw std::invalid_argument("Entries of 'n_cluster' must be in [" + std::to_string(N_lo) + ", " +
                                         std::to_string(N) + "].");
     }
-    if (!m_tr)
+    if (m_qd)
         throw std::runtime_error("Method '" + method + "' is not implemented yet.");
 
     // Outputs
@@ -499,15 +592,34 @@ void quadriga_lib::ssf_clusters(const std::unordered_map<std::string, double> &s
             for (arma::uword k = 0; k < F; ++k)
                 for (arma::uword n = 0; n < N; ++n)
                     z[k * N + n] = (*rnd_freq)(l, n, k);
-            const double as[4] = {lsp(l, 0, 3), lsp(l, 0, 4), lsp(l, 0, 5), lsp(l, 0, 6)};
             double centre[4] = {los_ang[0] * r2d, los_ang[1] * r2d, 90.0 - eod_l * r2d, 90.0 + eod_l * r2d};
-            if (!los)
+            if (m_tr)
             {
-                centre[2] -= (eod_offset_deg != nullptr) ? (*eod_offset_deg)(l, 0) : 0.0; // mu_offset,ZOD
-                centre[3] = (o2i != nullptr && (*o2i)[l]) ? 90.0 : centre[3];
+                const double as[4] = {lsp(l, 0, 3), lsp(l, 0, 4), lsp(l, 0, 5), lsp(l, 0, 6)};
+                if (!los)
+                {
+                    centre[2] -= (eod_offset_deg != nullptr) ? (*eod_offset_deg)(l, 0) : 0.0; // mu_offset,ZOD
+                    centre[3] = (o2i != nullptr && (*o2i)[l]) ? 90.0 : centre[3];
+                }
+                qd_ssf_tr(x.data(), z.data(), N, N_l, los, r_tau, zeta, lsp(l, 0, 0), los ? lsp(l, 0, 1) : 0.0, as,
+                          centre, c_delay.data(), c_power.data(), c_ang.data());
             }
-            qd_ssf_tr(x.data(), z.data(), N, N_l, los, r_tau, zeta, lsp(l, 0, 0), los ? lsp(l, 0, 1) : 0.0, as,
-                      centre, c_delay.data(), c_power.data(), c_ang.data());
+            else if (m_mf)
+            {
+                const arma::uword si[5] = {0, 3, 4, 5, 6}; // DS, ASD, ASA, ZSD, ZSA
+                double sp0[5];
+                std::vector<double> spk(5 * F), kf(F);
+                for (arma::uword i = 0; i < 5; ++i)
+                {
+                    sp0[i] = (*lsp_anchor)(l, 0, si[i]);
+                    for (arma::uword k = 0; k < F; ++k)
+                        spk[5 * k + i] = lsp(l, k, si[i]);
+                }
+                for (arma::uword k = 0; k < F; ++k)
+                    kf[k] = los ? lsp(l, k, 1) : 0.0;
+                qd_ssf_mf(x.data(), z.data(), N, N_l, F, los, zeta, sp0, spk.data(), kf.data(), centre,
+                          c_delay.data(), c_power.data(), c_ang.data());
+            }
 
             // Absolute TOA in NLOS scenarios, TR methods (TR 38.901 eq. (7.6-43)); "quadriga" shifts in its kernel
             if (!los && abs_toa != nullptr && !m_qd)

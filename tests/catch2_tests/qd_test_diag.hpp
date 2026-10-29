@@ -9,7 +9,7 @@
 //   QD_DIAG_CONF   conf-file and scenario-parameter tests (test_conf_*.cpp, test_scenpar_validate.cpp)
 //   QD_DIAG_RAY    ray-tracing tests, tags [wave] and [acoustic] (test_wave_*.cpp, test_acoustic_*.cpp)
 //   QD_DIAG_GBSM   geometry-based stochastic model tests (test_gbsm_phases.cpp, test_ssf_phases.cpp,
-//                  test_ssf_clusters.cpp, test_path_loss.cpp, test_lsp_generate.cpp, ...)
+//                  test_ssf_clusters*.cpp, test_path_loss.cpp, test_lsp_generate.cpp, ...)
 //   QD_DIAG        all areas
 //
 // Example: QD_DIAG_SOS=1 ./build_linux/test_bin "sos_val*"
