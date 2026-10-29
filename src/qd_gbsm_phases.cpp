@@ -462,6 +462,7 @@ void quadriga_lib::lsf_init_phases(
 ## See also:
 - [[conf_file_read]] (the scenario parameters)
 - [[lsf_draw]] (evaluates the phases at the links)
+- [[ssf_init_phases]] (the small-scale sets, seeds derived from this seed)
 - [[sos_init_phases]] (the raw phases)
 - [[sos_remove_bias]] (the bias removal of one generator)
 MD!*/
@@ -732,6 +733,7 @@ void quadriga_lib::ssf_init_phases(
 
 ## See also:
 - [[ssf_draw]] (evaluates the phases at the links)
+- [[ssf_clusters]] (the clusters from the random values)
 - [[lsf_init_phases]] (the large-scale set and its seed)
 - [[sos_init_phases]] (the raw phases)
 MD!*/
@@ -868,6 +870,7 @@ void quadriga_lib::ssf_draw(
 
 ## See also:
 - [[ssf_init_phases]] (draws the phases)
+- [[ssf_clusters]] (the clusters from the random values)
 - [[lsf_draw]] (the large-scale values, same floors and mobility rules)
 - [[sos_val]] (evaluation of a sum-of-sinusoids generator)
 MD!*/

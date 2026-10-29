@@ -130,6 +130,7 @@ lsp, abs_toa, gr_eps_re, gr_eps_im, eod_offset_deg, lsp_mu, lsp_sigma = quadriga
 - [[path_loss]] (the SF standard deviation `sf_sigma`)
 - [[lsf_init_phases]] (the phases of the random generators)
 - [[scenpar_validate]] (the scenario parameters and the cross-correlation matrix)
+- [[ssf_clusters]] (the clusters from the LSPs)
 MD!*/
 
 py::tuple lsp_generate(py::handle scenpar,

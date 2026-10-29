@@ -18,6 +18,9 @@ namespace py = pybind11;
 #include "qpy_lsp_generate.cpp"
 #include "qpy_los_probability.cpp"
 #include "qpy_o2i_loss.cpp"
+#include "qpy_ssf_init_phases.cpp"
+#include "qpy_ssf_draw.cpp"
+#include "qpy_ssf_clusters.cpp"
 
 // Mandatory arrays are declared with .none(false): without it pybind11 converts None to a 0-dimensional
 // array holding NaN.
@@ -102,4 +105,36 @@ void quadriga_lib_gbsm(py::module_ &m)
           py::arg("models"),
           py::arg("weights").none(false),
           py::arg("d2d_in_max") = 25.0);
+
+    m.def("ssf_init_phases", &ssf_init_phases,
+          py::arg("scenpar"),
+          py::arg("seed") = -1,
+          py::arg("set_id") = -1,
+          py::arg("preset") = "Comb256");
+
+    m.def("ssf_draw", &ssf_draw,
+          py::arg("scenpar"),
+          py::arg("phase").none(false),
+          py::arg("tx_pos").none(false),
+          py::arg("rx_pos").none(false),
+          py::arg("set_id") = -1,
+          py::arg("floor_id") = py::none(),
+          py::arg("dual_mobility") = false,
+          py::arg("preset") = "Comb256",
+          py::arg("horizontal") = true);
+
+    m.def("ssf_clusters", &ssf_clusters,
+          py::arg("scenpar"),
+          py::arg("tx_pos").none(false),
+          py::arg("rx_pos").none(false),
+          py::arg("lsp").none(false),
+          py::arg("rnd").none(false),
+          py::arg("method") = "38.901",
+          py::arg("rnd_freq") = py::none(),
+          py::arg("lsp_anchor") = py::none(),
+          py::arg("eod_offset_deg") = py::none(),
+          py::arg("abs_toa") = py::none(),
+          py::arg("gr_eps") = py::none(),
+          py::arg("o2i") = py::none(),
+          py::arg("n_cluster") = py::none());
 }
