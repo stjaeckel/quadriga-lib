@@ -383,7 +383,8 @@ TEST_CASE("Arrayant writing to QDANT file - Number text and locale")
     else
     {
         std::setlocale(LC_NUMERIC, old_locale.c_str());
-        WARN("No locale with a decimal comma installed; the locale part of this test was skipped.");
+        std::remove(fn.c_str()); // SKIP leaves the test case at once
+        SKIP("No locale with a decimal comma installed; the locale part was skipped.");
     }
     std::remove(fn.c_str());
 }
