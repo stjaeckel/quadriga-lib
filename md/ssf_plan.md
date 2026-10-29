@@ -114,6 +114,9 @@ Process:
 - Runs sized for one agent each (section 6). Effort per agent: manager `medium`; R0, spec writer, implementation
   runs R1–R3, spec review rounds 1–2 and code review rounds 1–2 `high`; the final (third) spec review round and the
   final code reviewers (code, TR compliance, NG readiness) `xhigh`; `max` never (fast pass, then thorough pass).
+- Changed 2026-10-29 (token budget): spec round 3 skipped after round 2 (0 blockers, 1 major, fixed); W22 and the
+  TwoRayGR TR form accepted as written. Implementation effort: R1, R2b, R2c, R3 `medium`, R2a `high`; one mandatory
+  code review `high` (code + TR compliance); further rounds decided on its findings.
 - The machine is shared: check `cat /proc/loadavg`; at most 12 threads, one build or test suite at a time.
 - Separate final reviewers: code, TR compliance, NG integration readiness. Every bug claim needs a concrete input
   with wrong vs expected output. ASan/UBSan runs, never unbounded allocation probes under ASan.

@@ -179,6 +179,44 @@ namespace quadriga_lib
                   double d2d_in_max = 25.0,                  // Maximum indoor 2D distance in [m] (key O2I_d2D_in_max)
                   arma::vec *d2d_in = nullptr,               // Optional output: Indoor 2D distance in [m], 0 for car models, [n_ut]
                   arma::uvec *model_index = nullptr);        // Optional output: Chosen model per UT, 0-based index into 'models', [n_ut]
+
+    // ---- Small-scale fading ----
+
+    // Generators of the small-scale fading (SSF) phase sets, N = NumClusters - 1 NLOS clusters; column c = b·N + n of
+    // 'phase' and of the random values belongs to block b and cluster n (0-based):
+    //   Shared cluster set (set_id = -1), frequency-independent, n_gen = 9·N
+    //     b = 0     cluster delay                Uniform(0,1)   mirror: itself
+    //     b = 1, 2  sign of AOD, AOA             Normal(0,1)    mirror: each other
+    //     b = 3, 4  sign of ZOD, ZOA             Normal(0,1)    mirror: each other
+    //     b = 5, 6  angle offset of AOD, AOA     Normal(0,1)    mirror: each other
+    //     b = 7, 8  angle offset of ZOD, ZOA     Normal(0,1)    mirror: each other
+    //   Per-frequency set (set_id = k >= 0, the k-th frequency of the caller's list), n_gen = N
+    //     b = 0     cluster shadowing            Normal(0,1)    mirror: itself
+    // - All generators use SC_lambda (0 is used as 0.1 m); no bias removal; floors and 2D/3D as lsf_draw
+    // - Later versions append blocks; existing columns and their values never change
+    // - NumClusters = 1 (N = 0): both sets are empty, n_gen = 0
+    // - The functions are documented in src/qd_gbsm_phases.cpp (ssf_init_phases, ssf_draw)
+
+    // Draw the random phases of one small-scale fading generator set of a BS site and scenario
+    // - The seed of the set is derived from the seed of the site's large-scale set and 'set_id'
+    void ssf_init_phases(const std::unordered_map<std::string, double> &scenpar, // Scenario parameters (NumClusters)
+                         arma::cube &phase,                                      // Output: Phases in [rad], [n_coeff, n_gen, 2]; slice 0 = Rx side, slice 1 = Tx side
+                         arma::sword seed = -1,                                  // Seed of the large-scale set (lsf_init_phases), -1 = system random device
+                         arma::sword set_id = -1,                                // -1 = shared cluster set; k >= 0 = set of frequency k (0-based)
+                         const std::string &preset = "Comb256");                 // SOS preset, see sos_preset
+
+    // Spatially correlated normalized random values of one small-scale fading generator set at a set of links
+    // - Generator order and reciprocity rules: see the SSF generator index above
+    void ssf_draw(const std::unordered_map<std::string, double> &scenpar, // Scenario parameters (NumClusters, SC_lambda)
+                  const arma::cube &phase,                                 // Phases from ssf_init_phases, [n_coeff, n_gen, 2]
+                  const arma::mat &tx_pos,                                 // Tx positions, [1, 3] or [n_link, 3]
+                  const arma::mat &rx_pos,                                 // Rx positions, [n_link, 3]
+                  arma::mat &rnd,                                          // Output: Random values, [n_link, n_gen]
+                  arma::sword set_id = -1,                                 // Set type, as in ssf_init_phases: -1 = shared, k >= 0 = per-frequency
+                  const arma::uvec *floor_id = nullptr,                    // Optional: Floor index per link, [n_link]; nullptr = all on one floor; 2D only
+                  bool dual_mobility = false,                              // Tx and Rx both move: the Tx side is a second device
+                  const std::string &preset = "Comb256",                   // Must match ssf_init_phases
+                  bool horizontal = true);                                 // true: 2D correlation (TR); false: 3D (legacy)
 }
 
 #endif
