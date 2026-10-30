@@ -1,0 +1,65 @@
+name: Bug report
+description: Something in Quadriga-Lib gives a wrong result, crashes, or does not build.
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for taking the time to report a problem. A small example that shows it is the most useful part of a report. For usage questions, please use [Discussions](https://github.com/stjaeckel/quadriga-lib/discussions) instead.
+  - type: input
+    id: version
+    attributes:
+      label: Quadriga-Lib version
+      description: "Python: `quadriga_lib.version()`, MATLAB / Octave: `quadriga_lib.version`, C++: `quadriga_lib::quadriga_lib_version()`. If you built from source, the commit hash."
+      placeholder: "e.g. 0.12.4"
+    validations:
+      required: true
+  - type: dropdown
+    id: interface
+    attributes:
+      label: Interface
+      multiple: true
+      options:
+        - C++
+        - Python
+        - MATLAB
+        - Octave
+        - Build / installation
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Operating system and compiler / interpreter
+      placeholder: "e.g. Ubuntu 24.04, GCC 13, Python 3.12"
+    validations:
+      required: true
+  - type: textarea
+    id: what-happens
+    attributes:
+      label: What happens
+      description: The wrong result, the error message, or the crash. Paste error output as text, not as a screenshot.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+      description: The correct result, and how you know it (a reference, a measurement, a different tool, physics).
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce
+      description: The smallest self-contained example that shows the problem. Include the input data or the code that creates it.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else
+      description: Workarounds you found, related issues, a suspected cause.
+    validations:
+      required: false

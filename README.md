@@ -229,7 +229,12 @@ The rules for adding or changing an API function are in `md/SPEC_CPP_API.md`, `m
 
 ## Contributing and bug reports
 
-*To be written.* Until then: please report bugs as a [GitHub issue](https://github.com/stjaeckel/quadriga-lib/issues) with a small, self-contained example that shows the problem.
+- **Bugs:** open a [bug report](https://github.com/stjaeckel/quadriga-lib/issues/new?template=bug_report.yml) with the library version and a small, self-contained example that shows the problem.
+- **Feature requests:** use the [feature request form](https://github.com/stjaeckel/quadriga-lib/issues/new?template=feature_request.yml) and describe the task you want to solve.
+- **Questions:** ask in [Discussions](https://github.com/stjaeckel/quadriga-lib/discussions).
+- **Security problems:** report them privately, see [SECURITY.md](SECURITY.md).
+
+Please search the [existing issues](https://github.com/stjaeckel/quadriga-lib/issues?q=is%3Aissue) first. How issues are handled, and how to contribute code, is described in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## How to cite
 
