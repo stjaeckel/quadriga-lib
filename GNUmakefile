@@ -15,6 +15,9 @@ gcc_version = 12
 
 CMAKE_BUILD_DIR = build_linux
 
+# Scripts, page parts and page text of the HTML documentation
+HB = html_builder
+
 # Location where pip-installable packages live
 PYTHON_SITE_PACKAGES := $(shell python3 -c "import sysconfig, pathlib, json; print(sysconfig.get_paths()['purelib'])")
 
@@ -96,24 +99,24 @@ python_test:
 
 # Documentation
 documentation:
-	sed 's/__VERSION__/$(QUADRIGA_VERSION)/g' tools/download_md/download.md.in > tools/download_md/download.md
+	sed 's/__VERSION__/$(QUADRIGA_VERSION)/g' $(HB)/download/download.md.in > $(HB)/download/download.md
 
-	python3 tools/extract_version.py tools/html_parts/mex_api.html.part "MALAB / Octave API Documentation for Quadriga-Lib"
-	python3 tools/extract_version.py tools/html_parts/python_api.html.part "Python API Documentation for Quadriga-Lib"
-	python3 tools/extract_version.py tools/html_parts/cpp_api.html.part "C++ API Documentation for Quadriga-Lib"
+	python3 $(HB)/extract_version.py $(HB)/parts/mex_api.html.part "MATLAB / Octave API Documentation for Quadriga-Lib"
+	python3 $(HB)/extract_version.py $(HB)/parts/python_api.html.part "Python API Documentation for Quadriga-Lib"
+	python3 $(HB)/extract_version.py $(HB)/parts/cpp_api.html.part "C++ API Documentation for Quadriga-Lib"
 
-	python3 tools/extract_html.py -o html_docu/index.html -p tools/html_parts/index.html.part
-	python3 tools/extract_html.py -o html_docu/mex_api.html -p tools/html_parts/mex_api.html.part -d api_mex/ -l
-	python3 tools/extract_html.py -o html_docu/cpp_api.html -p tools/html_parts/cpp_api.html.part -d src/ 
-	python3 tools/extract_html.py -o html_docu/python_api.html -p tools/html_parts/python_api.html.part -d api_python/ 
-	python3 tools/extract_html.py -o html_docu/formats.html -p tools/html_parts/formats.html.part -d tools/data_formats_md/
-	python3 tools/extract_html.py -o html_docu/faq.html -p tools/html_parts/faq.html.part -d tools/questions_md/ -c
-	python3 tools/extract_html.py -o html_docu/publications.html -p tools/html_parts/publications.html.part
-	python3 tools/extract_html.py -o html_docu/download.html -p tools/html_parts/download.html.part -d tools/download_md/ -c
+	python3 $(HB)/extract_html.py -o html_docu/index.html -p $(HB)/parts/index.html.part
+	python3 $(HB)/extract_html.py -o html_docu/mex_api.html -p $(HB)/parts/mex_api.html.part -d api_mex/ -l
+	python3 $(HB)/extract_html.py -o html_docu/cpp_api.html -p $(HB)/parts/cpp_api.html.part -d src/ 
+	python3 $(HB)/extract_html.py -o html_docu/python_api.html -p $(HB)/parts/python_api.html.part -d api_python/ 
+	python3 $(HB)/extract_html.py -o html_docu/formats.html -p $(HB)/parts/formats.html.part -d $(HB)/formats/
+	python3 $(HB)/extract_html.py -o html_docu/faq.html -p $(HB)/parts/faq.html.part -d $(HB)/faq/ -c
+	python3 $(HB)/extract_html.py -o html_docu/publications.html -p $(HB)/parts/publications.html.part
+	python3 $(HB)/extract_html.py -o html_docu/download.html -p $(HB)/parts/download.html.part -d $(HB)/download/ -c
 
-	python3 tools/extract_md.py -o html_docu/quadriga_lib_api_cpp.md -a cpp
-	python3 tools/extract_md.py -o html_docu/quadriga_lib_api_mex.md -a mex
-	python3 tools/extract_md.py -o html_docu/quadriga_lib_api_python.md -a python
+	python3 $(HB)/extract_md.py -o html_docu/quadriga_lib_api_cpp.md -a cpp
+	python3 $(HB)/extract_md.py -o html_docu/quadriga_lib_api_mex.md -a mex
+	python3 $(HB)/extract_md.py -o html_docu/quadriga_lib_api_python.md -a python
 
 moxunit-lib:
 	- rm -rf external/MOxUnit-master

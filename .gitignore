@@ -18,7 +18,6 @@ tests/test*
 tests/afl/afl_out/*
 tests/afl/bin/*
 __pycache__/
-tools/extract_html_mex_api.py
 deploy.py
 include/quadriga_lib_config.hpp
 version.tmp

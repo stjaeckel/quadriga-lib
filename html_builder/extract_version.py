@@ -73,7 +73,7 @@ def main():
     )
     parser.add_argument(
         'headline',
-        help="Base headline string (e.g. 'MALAB / Octave API Documentation for Quadriga-Lib')."
+        help="Base headline string (e.g. 'MATLAB / Octave API Documentation for Quadriga-Lib')."
     )
     parser.add_argument(
         '--version-path',
