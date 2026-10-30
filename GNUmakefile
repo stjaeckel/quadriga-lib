@@ -31,7 +31,7 @@ OCTAVE_VERSION := $(shell mkoctfile -v 2>/dev/null)
 QUADRIGA_VERSION := $(shell grep -oP '(?<=#define QUADRIGA_LIB_VERSION_STR ")[^"]+' include/quadriga_lib.hpp)
 
 # Matlab
-MATLAB_BIN = matlab24
+MATLAB_BIN = matlab
 
 ifneq ($(gcc_version),)
   CMAKE_CXX_ARG = -D CMAKE_C_COMPILER=gcc-$(gcc_version) -D CMAKE_CXX_COMPILER=g++-$(gcc_version)
