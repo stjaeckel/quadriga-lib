@@ -54,6 +54,8 @@ All commands use the GitHub CLI (`gh`), run from the repository root.
    ```
 5. Report the issue number and link.
 
+Findings from a full bug scan ([md/BUG_SCAN.md](md/BUG_SCAN.md)) go through the same steps, after the maintainer has decided on each one in the scan's triage phase.
+
 ### 2. Fixing an issue
 
 1. Read the issue and its comments: `gh issue view <N> --comments`.
