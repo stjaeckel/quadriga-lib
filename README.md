@@ -3,15 +3,15 @@
 [![PyPI](https://img.shields.io/pypi/v/quadriga-lib)](https://pypi.org/project/quadriga-lib/)
 [![Python](https://img.shields.io/pypi/pyversions/quadriga-lib)](https://pypi.org/project/quadriga-lib/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
-[![Docs](https://img.shields.io/badge/docs-quadriga--lib.org-informational)](https://quadriga-lib.org)
+[![Docs](https://img.shields.io/badge/docs-quadriga--lib.org-informational)](http://quadriga-lib.org)
 
 C++ library with MATLAB, Octave and Python interfaces for radio channel modelling and simulation.
 
-Quadriga-Lib generates channel impulse responses for system-level studies of mobile radio networks. It also provides tools for array antennas, channel data storage and processing, and site-specific (ray-tracing) simulations. Documentation and API reference: **[quadriga-lib.org](https://quadriga-lib.org)**.
+Quadriga-Lib generates channel impulse responses for system-level studies of mobile radio networks. It also provides tools for array antennas, channel data storage and processing, and site-specific (ray-tracing) simulations. Documentation and API reference: **[quadriga-lib.org](http://quadriga-lib.org)**.
 
 ## Relation to QuaDRiGa
 
-[QuaDRiGa](https://quadriga-channel-model.de) is a geometry-based stochastic channel model written in MATLAB. Quadriga-Lib is its C++ successor by the same lead developer: the model components are being rewritten in C++ for speed, with thin interfaces to MATLAB, Octave and Python. It is not a drop-in replacement for the MATLAB toolbox; functions, names and file formats follow their own API. See the [API documentation](https://quadriga-lib.org) for what is available.
+[QuaDRiGa](https://quadriga-channel-model.de) is a geometry-based stochastic channel model written in MATLAB. Quadriga-Lib is its C++ successor by the same lead developer: the model components are being rewritten in C++ for speed, with thin interfaces to MATLAB, Octave and Python. It is not a drop-in replacement for the MATLAB toolbox; functions, names and file formats follow their own API. See the [API documentation](http://quadriga-lib.org) for what is available.
 
 [QuaDRiGa-NG](https://github.com/stjaeckel/QuaDRiGa-NG) is a fork of the MATLAB QuaDRiGa toolbox that uses Quadriga-Lib in its backend.
 
@@ -38,12 +38,12 @@ Prebuilt Python wheels also exist for Linux aarch64.
 
 ## Installation
 
-Binary packages are built for each release. The [download page](https://quadriga-lib.org/download.html) always offers the latest release; the `main` branch on GitHub may be ahead of it (see [Changes on main](#changes-on-main)).
+Binary packages are built for each release. The [download page](http://quadriga-lib.org/download.html) always offers the latest release; the `main` branch on GitHub may be ahead of it (see [Changes on main](#changes-on-main)).
 
 | Package                     | How to install                                                                 |
 | :-------------------------- | :----------------------------------------------------------------------------- |
 | Python (Linux, Windows)     | `pip install quadriga-lib`                                                     |
-| Ubuntu (`.deb`)             | download from the [download page](https://quadriga-lib.org/download.html), then `sudo dpkg -i quadriga-lib_<version>+<distro>_amd64.deb`; MATLAB path: `/usr/share/quadriga-lib` |
+| Ubuntu (`.deb`)             | download from the [download page](http://quadriga-lib.org/download.html), then `sudo dpkg -i quadriga-lib_<version>+<distro>_amd64.deb`; MATLAB path: `/usr/share/quadriga-lib` |
 | Windows (`.zip`)            | download and extract; contains the MEX files, static library, headers and Python wheels |
 | Source                      | see [Building from source](#building-from-source)                              |
 
@@ -89,7 +89,7 @@ int main()
 g++ -std=c++17 -O2 -fopenmp -I include -I external/armadillo-14.2.2/include example.cpp lib/libquadriga.a -o example
 ```
 
-More examples are in the usage sections of the [API documentation](https://quadriga-lib.org).
+More examples are in the usage sections of the [API documentation](http://quadriga-lib.org).
 
 ## Building from source
 
@@ -218,7 +218,7 @@ This needs `numpy`, `h5py` and the `quadriga_lib` Python module, also for MATLAB
 | `lib/`          | Built static library and Python module                                          |
 | `tests/`        | C++, MATLAB / Octave and Python tests, benchmarks                               |
 | `data/`         | Scenario configuration files and material tables                                |
-| `html_docu/`    | Website and API reference ([quadriga-lib.org](https://quadriga-lib.org)), built by `make documentation` |
+| `html_docu/`    | Website and API reference ([quadriga-lib.org](http://quadriga-lib.org)), built by `make documentation` |
 | `html_builder/` | Scripts and page sources for the website                                        |
 | `md/`           | API specifications and development notes                                        |
 | `tools/`        | Helper scripts, e.g. the HDF5 file converter                                    |
@@ -249,7 +249,7 @@ The installed version is returned by `quadriga_lib.version()`.
 
 ## Support
 
-If Quadriga-Lib is useful to you, you can support its development via [GitHub Sponsors](https://github.com/sponsors/stjaeckel) or the options on [quadriga-lib.org](https://quadriga-lib.org).
+If Quadriga-Lib is useful to you, you can support its development via [GitHub Sponsors](https://github.com/sponsors/stjaeckel) or the options on [quadriga-lib.org](http://quadriga-lib.org).
 
 ## License
 
