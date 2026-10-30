@@ -497,7 +497,7 @@ if(BUILD_MEX_DOC AND (BUILD_MATLAB OR BUILD_OCTAVE))
         set(m_file_output "${MEX_OUTPUT_DIR}/${mex_basename}.m")
         add_custom_command(
             OUTPUT ${m_file_output}
-            COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/extract_matlab_comments.py ${mex_src} ${m_file_output}
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/html_builder/extract_matlab_comments.py ${mex_src} ${m_file_output}
             COMMENT "Building MEX Documentation ${m_file_output}"
             VERBATIM
         )

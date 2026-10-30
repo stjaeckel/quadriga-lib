@@ -8,6 +8,8 @@ import re
 import hashlib
 import argparse
 
+PARTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "parts")
+
 
 def get_parser():
     parser = argparse.ArgumentParser(
@@ -44,7 +46,7 @@ def extract_md_sections(file_content):
 
 
 def extract_sections_desc(file_content):
-    md_sections = re.findall(r'\/\*!SECTION_DESC\n(.*?)\SECTION_DESC!\*\/', file_content, re.DOTALL)
+    md_sections = re.findall(r'\/\*!SECTION_DESC\n(.*?)\nSECTION_DESC!\*\/', file_content, re.DOTALL)
     return md_sections
 
 
@@ -219,8 +221,8 @@ def format_tables(text):
 
 def generate_html(folder_name, html_output_file, html_preamble, compact, lower_case):
 
-    # Read the content of the file 'tools/html_parts/html_head.html.part'
-    with open("tools/html_parts/html_head.html.part", "r") as head_file:
+    # Page header, read from the parts folder next to this script
+    with open(os.path.join(PARTS_DIR, "html_head.html.part"), "r") as head_file:
         head_content = head_file.read()
 
     # Search and replace the specified line
@@ -420,8 +422,8 @@ def generate_html(folder_name, html_output_file, html_preamble, compact, lower_c
 
                 html_content += '\n'
 
-    # Read the content of the file 'tools/html_parts/html_foot.html.part'
-    with open("tools/html_parts/html_foot.html.part", "r") as foot_file:
+    # Page footer, read from the parts folder next to this script
+    with open(os.path.join(PARTS_DIR, "html_foot.html.part"), "r") as foot_file:
         foot_content = foot_file.read()
 
     html_content = html_content + foot_content

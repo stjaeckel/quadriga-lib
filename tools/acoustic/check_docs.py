@@ -11,7 +11,7 @@ repository root:
    (resolve("...") in src/ray_mesh_interact.cpp) is a row of the page's column table; no internal labels (item ids,
    "round 1", md/ files, briefs, rigs, scratch paths) outside math and code; `$` balanced per paragraph and `$$` per
    file; no \newcommand; every in-page anchor resolves to a heading.
-2. The material part of the Data Formats page, tools/data_formats_md/format_materials.md: tables and spelling as
+2. The material part of the Data Formats page, html_builder/formats/format_materials.md: tables and spelling as
    above; every column that MaterialCols reads is a row of its column table (header "| Key |"); no internal labels.
 
 Exit code 0 when every check passes, 1 otherwise. It reports; it changes nothing.
@@ -20,7 +20,7 @@ import os, re, sys
 
 ROOT = os.getcwd()
 PAGE = 'html_docu/quadriga_lib_material_model.md'
-FORMATS = 'tools/data_formats_md/format_materials.md'
+FORMATS = 'html_builder/formats/format_materials.md'
 SOURCE = 'src/ray_mesh_interact.cpp'
 BRITISH = ['neighbour', 'centre', 'behaviour', 'modelled', 'modelling', 'colour', 'millimetre', 'metre ', 'favour',
            'labelled', 'travelled', 'grey ']

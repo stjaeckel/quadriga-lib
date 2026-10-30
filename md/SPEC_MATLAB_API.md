@@ -13,7 +13,7 @@ quadriga-lib is a C++ radio channel modelling library with MATLAB/Octave and Pyt
   - `html_docu/quadriga_lib_api_cpp.md` — all C++ functions
   - `html_docu/quadriga_lib_api_mex.md` — all MATLAB functions
   - Both start with a "Function Index"; use it as described in `md/SPEC_CPP_API.md` ("Fixtures and oracles").
-- The text in the `/*!MD ... MD!*/` block of a wrapper is reused for 3 purposes: (1) merged into the Markdown overview, (2) compiled to HTML, (3) converted into the `.m` help file of the function that provides the MATLAB `help` text (`tools/extract_matlab_comments.py`, which strips backticks and asterisks and prefixes each line with `%`). The delimiters `/*!MD`, `MD!*/`, `/*!SECTION`, `SECTION!*/` are matched literally, each on its own line.
+- The text in the `/*!MD ... MD!*/` block of a wrapper is reused for 3 purposes: (1) merged into the Markdown overview, (2) compiled to HTML, (3) converted into the `.m` help file of the function that provides the MATLAB `help` text (`html_builder/extract_matlab_comments.py`, which strips backticks and asterisks and prefixes each line with `%`). The delimiters `/*!MD`, `MD!*/`, `/*!SECTION`, `SECTION!*/` are matched literally, each on its own line.
 - Commands (Linux, from the repository root):
   - `make` — build the library and install the MEX files into `+quadriga_lib/` (`matlab` and `octave` default to ON); run it after every wrapper change
   - `make test` — build and run the Catch2 suite and the complete MEX test suites; it does not install, so run `make` first
