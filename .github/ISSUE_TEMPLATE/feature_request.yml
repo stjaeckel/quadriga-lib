@@ -1,0 +1,41 @@
+name: Feature request
+description: Suggest a new function, option, or a change to existing behaviour.
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe what you want to do with the library, not only the function you have in mind. That makes it easier to find the right place for it.
+  - type: textarea
+    id: use-case
+    attributes:
+      label: What you want to do
+      description: The task or simulation you are working on and where the library falls short today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How you imagine it would work, e.g. a function signature, an option, an output. References (papers, standards such as 3GPP TR 38.901) are welcome.
+    validations:
+      required: false
+  - type: dropdown
+    id: interface
+    attributes:
+      label: Interface
+      multiple: true
+      options:
+        - C++
+        - Python
+        - MATLAB / Octave
+        - All
+    validations:
+      required: false
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and workarounds
+      description: What you do today instead, if anything.
+    validations:
+      required: false
