@@ -15,6 +15,14 @@ gcc_version = 12
 
 CMAKE_BUILD_DIR = build_linux
 
+# Build tool: Ninja if installed, else Make (override with USE_NINJA=0/1). Switching tools needs "make clean".
+USE_NINJA ?= $(if $(shell command -v ninja),1,0)
+ifeq ($(USE_NINJA),1)
+  CMAKE_GENERATOR_ARG = -G Ninja
+else
+  BUILD_TOOL_ARGS = -- --no-print-directory
+endif
+
 # Scripts, page parts and page text of the HTML documentation
 HB = html_builder
 
@@ -38,7 +46,7 @@ ifneq ($(gcc_version),)
 endif
 
 all:
-	cmake -B $(CMAKE_BUILD_DIR) -D CMAKE_INSTALL_PREFIX=. $(CMAKE_CXX_ARG) \
+	cmake -B $(CMAKE_BUILD_DIR) $(CMAKE_GENERATOR_ARG) -D CMAKE_INSTALL_PREFIX=. $(CMAKE_CXX_ARG) \
 		-D ENABLE_MATLAB=$(matlab) \
 		-D ENABLE_OCTAVE=$(octave) \
 		-D ENABLE_MEX_DOC=$(python) \
@@ -49,11 +57,11 @@ all:
 		-D ENABLE_CUDA=$(cuda) \
 		-D ENABLE_STATIC_LIB=$(static_lib) \
 		-D ENABLE_SHARED_LIB=$(shared_lib)
-	cmake --build $(CMAKE_BUILD_DIR) --parallel -- --no-print-directory
+	cmake --build $(CMAKE_BUILD_DIR) --parallel $(shell nproc) $(BUILD_TOOL_ARGS)
 	cmake --install $(CMAKE_BUILD_DIR)
 
 python:
-	cmake -B $(CMAKE_BUILD_DIR) -D CMAKE_INSTALL_PREFIX=. $(CMAKE_CXX_ARG) \
+	cmake -B $(CMAKE_BUILD_DIR) $(CMAKE_GENERATOR_ARG) -D CMAKE_INSTALL_PREFIX=. $(CMAKE_CXX_ARG) \
 		-D ENABLE_MATLAB=OFF \
 		-D ENABLE_OCTAVE=OFF \
 		-D ENABLE_MEX_DOC=OFF \
@@ -64,7 +72,7 @@ python:
 		-D ENABLE_CUDA=OFF \
 		-D ENABLE_STATIC_LIB=ON \
 		-D ENABLE_SHARED_LIB=OFF
-	cmake --build $(CMAKE_BUILD_DIR) --parallel -- --no-print-directory
+	cmake --build $(CMAKE_BUILD_DIR) --parallel $(shell nproc) $(BUILD_TOOL_ARGS)
 	cmake --install $(CMAKE_BUILD_DIR)
 
 python_install: python
@@ -78,7 +86,7 @@ python_install: python
 # Tests: builds and installs as "make" does, then builds Catch2 and the test binary and runs the tests
 test:   all moxunit-lib
 	cmake -B $(CMAKE_BUILD_DIR) -D ENABLE_TESTS=ON
-	cmake --build $(CMAKE_BUILD_DIR) --parallel
+	cmake --build $(CMAKE_BUILD_DIR) --parallel $(shell nproc)
 	time $(CMAKE_BUILD_DIR)/test_bin
 ifeq ($(octave),ON)
 ifneq ($(OCTAVE_VERSION),)
