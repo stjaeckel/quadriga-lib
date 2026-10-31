@@ -204,10 +204,6 @@ endif()
 
 # Build instructions for CATCH2 library
 if (ENABLE_TESTS)
-    if (MSVC AND NOT _CATCH2_PATH AND EXISTS "${CMAKE_SOURCE_DIR}/external/Catch2-prebuilt/lib/Catch2.lib")
-        set(_CATCH2_PATH "${CMAKE_SOURCE_DIR}/external/Catch2-prebuilt")
-        message(STATUS "Auto-detected pre-built Catch2: ${_CATCH2_PATH}")
-    endif()
     if (_CATCH2_PATH)
         set(CATCH2_LIB "${_CATCH2_PATH}/lib/Catch2.lib")
         set(CATCH2_INCLUDE_DIR "${_CATCH2_PATH}/include")

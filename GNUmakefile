@@ -244,5 +244,4 @@ tidy:   clean
 	- rm -rf lib
 	- rm -rf wheelhouse 
 	- rm -rf external/MOxUnit-master
-	- rm -rf external/Catch2-prebuilt
 	
