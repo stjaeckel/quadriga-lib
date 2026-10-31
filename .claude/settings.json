@@ -2,8 +2,17 @@
     "permissions": {
         "allow": [
             "mcp__github__issue_write",
-            "mcp__github__add_issue_comment",
-            "Bash(gh issue:*)"
+            "mcp__github__add_issue_comment"
+        ],
+        "deny": [
+            "Bash(git push:*)",
+            "Bash(gh api:*)",
+            "mcp__github__push_files",
+            "mcp__github__create_or_update_file",
+            "mcp__github__delete_file",
+            "mcp__github__create_branch",
+            "mcp__github__create_pull_request",
+            "mcp__github__merge_pull_request"
         ]
     }
 }
