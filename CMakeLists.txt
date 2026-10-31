@@ -590,6 +590,9 @@ if (ENABLE_TESTS)
     else()
         target_compile_options(test_bin PRIVATE -O3 -fPIC -w)
     endif()
+
+    # Catch2 and the library headers are parsed once and reused by every test file
+    target_precompile_headers(test_bin PRIVATE <catch2/catch_test_macros.hpp> <quadriga_lib.hpp>)
 endif()
 
 # --- Install options ---
