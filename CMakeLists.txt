@@ -40,7 +40,7 @@ option(ARMA_EXT "Use armadillo headers provided with quadriga-lib" OFF)
 set(armadillo_version "15.6.2")
 set(pugixml_version "1.15")
 set(pybind11_version "3.0.0")
-set(catch2_version "3.8.1")
+set(catch2_version "3.16.1")
 
 # Set the C++ standard and basic compile flags
 set(CMAKE_CXX_STANDARD 17)
@@ -219,6 +219,8 @@ if (ENABLE_TESTS)
                 -DCMAKE_CXX_STANDARD=17
                 -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
                 -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+                -DCATCH_INSTALL_DOCS=OFF
+                -DCATCH_INSTALL_EXTRAS=OFF
         )
         if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.24")
             list(APPEND CATCH2_EP_ARGS DOWNLOAD_EXTRACT_TIMESTAMP TRUE)

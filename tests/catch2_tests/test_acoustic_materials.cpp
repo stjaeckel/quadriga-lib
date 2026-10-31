@@ -337,10 +337,13 @@ TEST_CASE("Materials table - every row has a material case and every column a va
     for (const char *k : mt::COLS)
         CHECK(T.prop.count(k) == 1);
     std::multiset<std::string> cases; // the families named by the cases
-    for (const Catch::TestCaseInfo *tc : Catch::getRegistryHub().getTestCaseRegistry().getAllInfos())
-        if (tc->name.rfind("Material - ", 0) == 0)
+    for (const Catch::TestCaseHandle &h : Catch::getRegistryHub().getTestCaseRegistry().getAllTests())
+    {
+        const std::string &name = h.getTestCaseInfo().name;
+        if (name.rfind("Material - ", 0) == 0)
             for (size_t a = 11, b; a != std::string::npos; a = b == std::string::npos ? b : b + 3)
-                b = tc->name.find(" + ", a), cases.insert(tc->name.substr(a, b == std::string::npos ? b : b - a));
+                b = name.find(" + ", a), cases.insert(name.substr(a, b == std::string::npos ? b : b - a));
+    }
     std::set<std::string> fams;
     for (size_t i = 0; i < T.names.size(); ++i)
     {
