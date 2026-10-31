@@ -32,10 +32,16 @@ TEST_CASE("Arrayant append")
     CHECK(std::abs(g1 - 25.627f) < 0.001f);
 }
 
+#if defined(_MSC_VER)
+#define ARRAYANT_TEST_NOINLINE __declspec(noinline)
+#else
+#define ARRAYANT_TEST_NOINLINE __attribute__((noinline))
+#endif
+
 // The default constructor must initialise check_ptr. The arrayant is created twice in the same stack slot;
 // small matrices live inside the Armadillo objects, so stale check_ptr values of the first object would match the
 // data pointers of the second one and let the quick is_valid() pass an invalid, never validated object.
-static __attribute__((noinline)) std::string arrayant_check_ptr_helper(bool first)
+static ARRAYANT_TEST_NOINLINE std::string arrayant_check_ptr_helper(bool first)
 {
     quadriga_lib::arrayant<double> a;
     a.e_theta_re.ones(2, 2, 1), a.e_theta_im.zeros(2, 2, 1), a.e_phi_re.zeros(2, 2, 1), a.e_phi_im.zeros(2, 2, 1);

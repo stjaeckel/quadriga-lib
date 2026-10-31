@@ -4,6 +4,7 @@
 
 #include "quadriga_lib.hpp"
 #include "quadriga_lib_helper_functions.hpp"
+#include <atomic>
 #include <limits>
 
 // Line-Triangle intersect in 2D coordinates
@@ -525,8 +526,12 @@ arma::uvec quadriga_lib::obj_overlap_test(const arma::Mat<dtype> *mesh, const ar
     // the result does not depend on the processing order or the number of threads. A recorded key can only become
     // smaller. 'no_pair' marks an object without an overlapping pair.
     const arma::uword no_pair = std::numeric_limits<arma::uword>::max();
-    std::vector<arma::uword> first_pair(n_obj, no_pair);
-    arma::uword *p_first_pair = first_pair.data();
+    // Atomic entries: threads read them outside the critical section to skip pairs. A stale value is too large,
+    // which only costs a pair test that could have been skipped, so relaxed ordering is sufficient.
+    std::vector<std::atomic<arma::uword>> first_pair(n_obj);
+    for (auto &entry : first_pair)
+        entry.store(no_pair, std::memory_order_relaxed);
+    std::atomic<arma::uword> *p_first_pair = first_pair.data();
 
     // Record an overlapping pair, keep the earlier one per object
     auto record = [&](arma::uword i_obj_1, arma::uword i_obj_2, const std::string &why_1, const std::string &why_2)
@@ -534,17 +539,15 @@ arma::uvec quadriga_lib::obj_overlap_test(const arma::Mat<dtype> *mesh, const ar
         const arma::uword key = i_obj_1 * n_obj + i_obj_2;
 #pragma omp critical
         {
-            if (key < p_first_pair[i_obj_1])
+            if (key < p_first_pair[i_obj_1].load(std::memory_order_relaxed))
             {
-#pragma omp atomic write
-                p_first_pair[i_obj_1] = key;
+                p_first_pair[i_obj_1].store(key, std::memory_order_relaxed);
                 if (want_to_know)
                     why[i_obj_1] = why_1;
             }
-            if (key < p_first_pair[i_obj_2])
+            if (key < p_first_pair[i_obj_2].load(std::memory_order_relaxed))
             {
-#pragma omp atomic write
-                p_first_pair[i_obj_2] = key;
+                p_first_pair[i_obj_2].store(key, std::memory_order_relaxed);
                 if (want_to_know)
                     why[i_obj_2] = why_2;
             }
@@ -573,11 +576,8 @@ arma::uvec quadriga_lib::obj_overlap_test(const arma::Mat<dtype> *mesh, const ar
 
             // Skip the pair if it cannot change the result: both objects already have an overlapping pair, and,
             // when the reasons are requested, both pairs come before this one
-            arma::uword first_1, first_2;
-#pragma omp atomic read
-            first_1 = p_first_pair[i_obj_1];
-#pragma omp atomic read
-            first_2 = p_first_pair[i_obj_2];
+            const arma::uword first_1 = p_first_pair[i_obj_1].load(std::memory_order_relaxed);
+            const arma::uword first_2 = p_first_pair[i_obj_2].load(std::memory_order_relaxed);
             const arma::uword key = want_to_know ? i_obj_1 * n_obj + i_obj_2 : no_pair;
             if (first_1 < key && first_2 < key)
                 continue;
@@ -898,7 +898,7 @@ arma::uvec quadriga_lib::obj_overlap_test(const arma::Mat<dtype> *mesh, const ar
     // Get the number of intersecting objects
     arma::uword n_intersecting = 0;
     for (arma::uword i_obj = 0; i_obj < n_obj; ++i_obj)
-        if (p_first_pair[i_obj] != no_pair)
+        if (p_first_pair[i_obj].load(std::memory_order_relaxed) != no_pair)
             ++n_intersecting;
 
     if (want_to_know)
@@ -908,7 +908,7 @@ arma::uvec quadriga_lib::obj_overlap_test(const arma::Mat<dtype> *mesh, const ar
     arma::uvec obj_ids_intersecting(n_intersecting);
     n_intersecting = 0;
     for (arma::uword i_obj = 0; i_obj < n_obj; ++i_obj)
-        if (p_first_pair[i_obj] != no_pair)
+        if (p_first_pair[i_obj].load(std::memory_order_relaxed) != no_pair)
         {
             obj_ids_intersecting(n_intersecting) = p_obj_ids[i_obj];
             if (want_to_know)
