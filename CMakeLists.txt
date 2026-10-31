@@ -39,7 +39,7 @@ option(ARMA_EXT "Use armadillo headers provided with quadriga-lib" OFF)
 # Versions for external libraries (adjust as needed)
 set(armadillo_version "15.6.2")
 set(pugixml_version "1.15")
-set(pybind11_version "3.0.0")
+set(pybind11_version "3.1.0")
 set(catch2_version "3.16.1")
 
 # Set the C++ standard and basic compile flags
