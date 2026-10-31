@@ -1,5 +1,5 @@
 # This Makefile is for Windows / MSVC environments
-# Build steps: external, all, (moxunit-lib), test, pip-win, release-win
+# Build steps: all, test, pip-win, release-win
 
 # Components to build
 matlab = ON
@@ -10,13 +10,8 @@ avx2 = ON
 USE_NINJA = 1
 CMAKE_BUILD_DIR = build_windows
 
-# Options for prebuilding the Catch2 library to speed up build time
-catch2_version    = 3.8.1
+# Armadillo version bundled in external\ (headers copied by release-win)
 armadillo_version = 14.2.2
-
-CATCH2_PREBUILT  = external\Catch2-prebuilt
-CATCH2_SRC_DIR   = Catch2-$(catch2_version)
-CATCH2_LIB_CHECK = $(CATCH2_PREBUILT)\lib\Catch2.lib
 
 # Read Quadriga-Lib version number from include\quadriga_lib.hpp
 !IF [cmd /c tools\get_version.cmd] == 0
@@ -52,18 +47,6 @@ test: all moxunit-lib
 	python -m pytest tests/python_tests -x -s
 !ENDIF
 
-# Prebuild libraries
-external: catch2 moxunit-lib
-
-catch2: $(CATCH2_LIB_CHECK)
-$(CATCH2_LIB_CHECK):
-	tar -xf external\Catch2-$(catch2_version).zip -C external
-	cmake $(GENERATOR) -D CMAKE_BUILD_TYPE=Release -B external\catch2-build -S external\$(CATCH2_SRC_DIR) -DCMAKE_INSTALL_PREFIX=%CD%\$(CATCH2_PREBUILT) -DBUILD_TESTING=OFF -DCMAKE_CXX_STANDARD=17 -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
-	cmake --build external\catch2-build --config Release
-	cmake --install external\catch2-build --config Release
-	- rmdir /s /q external\$(CATCH2_SRC_DIR)
-	- rmdir /s /q external\catch2-build
-
 moxunit-lib:
 	- rmdir /s /q external\MOxUnit-master
 	tar -xf external/MOxUnit.zip
@@ -98,7 +81,7 @@ pip-win-cp314: wheelhouse\quadriga_lib-$(QUADRIGA_VERSION)-cp314-cp314-win_amd64
 pip-win: pip-win-cp310 pip-win-cp311 pip-win-cp312 pip-win-cp313 pip-win-cp314
 
 # Release
-# Make these first: external all pip-win
+# Make these first: all pip-win
 release-win: 
 	- rmdir /s /q $(DIST_DIR)
 	cmake --install $(CMAKE_BUILD_DIR) --config Release --prefix $(DIST_DIR)
@@ -122,7 +105,6 @@ clean:
 	- del lib\*.pyd
 
 tidy: clean
-	- rmdir /s /q $(CATCH2_PREBUILT)
 	- rmdir /s /q external\MOxUnit-master
 	- rmdir /s /q "+quadriga_lib"
 	- rmdir /s /q lib
