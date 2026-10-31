@@ -1,59 +1,78 @@
 <span class="qd-heading"><b>About Quadriga-Lib</b></span>
 <br><br>
 
-<p><b>Quadriga-Lib</b> is an open-source utility library for radio channel modelling and simulation. 
-It generates realistic channel impulse responses for system-level studies of mobile radio networks 
-and offers a rich toolset for antenna arrays, channel data handling, and site-specific simulations.</p><br>
+<p><b>Quadriga-Lib</b> is an open-source C++ library with MATLAB, Octave and Python interfaces for radio channel modelling and simulation.
+It generates channel impulse responses for system-level studies of mobile radio networks. It also provides tools for array antennas,
+channel data storage and processing, and site-specific (ray-tracing) simulations.</p><br>
 
-<b>What it does</b>
-
-<p>Quadriga-Lib helps researchers and engineers model wireless propagation. Beyond tools for generating
-channel impulse responses, it includes utilities to create and manage array antenna 
-models; embed antenna information into path data; store, load, and transform channel data (including 
-baseband transformations); and run site-specific tests such as ray–object and beam–point intersections, 
-plus mesh data-format conversions.</p><br>
-
-<b>Built for speed and integration</b>
-
-<p>At its core, Quadriga-Lib is written in C++ with optional AVX2 acceleration, delivering 
-fast runtimes for large-scale studies. It provides APIs for MATLAB, Octave, and 
-Python, so you can integrate it into your existing workflows.</p><br>
-
-
-<b>Features at a glance</b>
+<b>Who it is for</b>
 
 <ul>
-<li><b>Realistic channel impulse responses</b> for system-level simulations of mobile radio networks</li>
-<li><b>Array antenna tools</b> for generating and managing antenna models</li>
-<li><b>Channel data utilities</b> for embedding arrays into path data, storing/loading datasets, and baseband transformation</li>
-<li><b>Site-specific simulation helpers</b> including ray–object and beam–point intersection tests and mesh format conversion</li>
-<li><b>High-performance core</b> in C++ with optional AVX2 vectorization</li>
-<li><b>APIs</b> for MATLAB, Octave, and Python</li>
+<li><b>Researchers and engineers</b> who need realistic radio channels for link- and system-level simulations,
+antenna array studies or ray-tracing post-processing. Install it with <code>pip install quadriga-lib</code> and try the
+<a href="#quickstart">example below</a>.<br><br></li>
+<li><b>QuaDRiGa users.</b> Quadriga-Lib is the C++ successor of the
+<a target="_blank" rel="noopener noreferrer" href="https://quadriga-channel-model.de">QuaDRiGa</a> MATLAB channel model, by the same lead developer.
+It is not a drop-in replacement: functions, names and file formats follow their own API.
+<a target="_blank" rel="noopener noreferrer" href="https://github.com/stjaeckel/QuaDRiGa-NG">QuaDRiGa-NG</a> is a fork of the
+MATLAB toolbox that uses Quadriga-Lib in its backend.<br><br></li>
+<li><b>Standardization work.</b> The library implements the 3GPP TR 38.901 stochastic channel model and the IEEE 802.11 indoor
+channel models (TGn, TGac, TGax, TGah). The <a href="publications.html">publications</a> describe the implementation and
+compare the two model families.</li>
+</ul>
+
+<br>
+<b>Features</b>
+
+<ul>
+<li><b>Stochastic channel model (GBSM)</b>: large-scale and small-scale fading parameters, path loss, LOS probability, O2I loss, and scenario parameters for 3GPP TR 38.901</li>
+<li><b>IEEE 802.11 (Wi-Fi) indoor channel models</b>: TGn channel types A to F with the TGac, TGax and TGah extensions (MU-MIMO, floor penetration loss, time-evolving channels)</li>
+<li><b>Spatially consistent random fields</b>: sum-of-sinusoids generators for correlated random variables</li>
+<li><b>Array antennas</b>: predefined models (omni, dipole, ULA, 3GPP panels, multibeam), pattern interpolation, rotation, coupling, directivity and beamwidth, QDANT file format</li>
+<li><b>Channel coefficients</b>: antenna patterns applied to path data (spherical and planar wave, multi-frequency, IRS), baseband frequency response, delay quantization, delay and angular spread, K-factor, XPR</li>
+<li><b>Channel data storage</b>: HDF5 channel files for large datasets (read, write, reshape)</li>
+<li><b>Site-specific simulation</b>: ray–triangle and ray–point intersection, mesh tools, OBJ and Mitsuba XML export, reading of QRT ray-tracing results</li>
+<li><b>Acoustics (experimental)</b>: room-acoustic simulation with the ray tracer, loudspeaker models and acoustic material tables; under active development</li>
+<li><b>Fast core</b>: C++17 with OpenMP, optional AVX2 and CUDA acceleration</li>
 </ul>
 
 <br>
 <b>Platforms</b>
+<br><br>
 
-<ul>
-<li>Linux: C++, MATLAB, Octave, Python</li>
-<li>Windows: C++, MATLAB, Python</li>
-</ul>
+<table class="md">
+<tr><th>Platform</th><th class="c">C++</th><th class="c">MATLAB</th><th class="c">Octave</th><th class="c">Python</th></tr>
+<tr><td>Linux (x86_64)</td><td class="c">yes</td><td class="c">yes</td><td class="c">yes</td><td class="c">yes</td></tr>
+<tr><td>Windows (x64)</td><td class="c">yes</td><td class="c">yes</td><td class="c">–</td><td class="c">yes</td></tr>
+</table>
 
-<br>
+<p>Prebuilt Python wheels also exist for Linux aarch64.</p><br>
+
+<b id="quickstart">Quick start (Python)</b>
+
+<p>Install the package from PyPI:</p>
+
+<pre>
+pip install quadriga-lib
+</pre>
+
+<p>Create a 2 × 2 3GPP antenna array at 3.7 GHz and print the directivity of its first element (about 9.8 dBi):</p>
+
+<pre>
+import quadriga_lib
+
+ant = quadriga_lib.arrayant.generate('3gpp', M=2, N=2, freq=3.7e9)
+print(quadriga_lib.version())
+print(quadriga_lib.arrayant.calc_directivity(ant, 0))
+</pre>
+
+<p>The same example for MATLAB, Octave and C++ is on the <a href="download.html">download page</a>.
+The <a href="python_api.html">Python</a>, <a href="mex_api.html">MATLAB / Octave</a> and <a href="cpp_api.html">C++</a>
+API references have more examples.</p><br>
+
 <b>Get the code</b>
 
-<p>Explore the source, examples, and contribution guidelines on GitHub:<br>
+<p>The source code, issue tracker and discussions are on GitHub:<br>
 <a target="_blank" rel="noopener noreferrer" href="https://github.com/stjaeckel/quadriga-lib">https://github.com/stjaeckel/quadriga-lib</a></p>
 
-<!--
-    <br>
-    <b>Donate</b>
-    <p>Help keep this open-source project alive and growing. Your support lets me spend more time building 
-    features, fixing bugs, and making it better for everyone. You can donate using:</p>
-
-    <ul>
-    <li><a target="_blank" rel="noopener noreferrer" href="https://github.com/sponsors/stjaeckel">GitHub Sponsors</a></li>
-    <li><a target="_blank" rel="noopener noreferrer" href="https://www.paypal.com/donate/?hosted_button_id=B2N5HS5F4HHFE">Paypal</a></li>
-    <li><a target="_blank" rel="noopener noreferrer" href="https://pay.rcane.eu/apps/xkDkKTnJBr4yABvkFgqmea9XkmZ/pos">Bitcoin</a></li>
-    </ul>
--->
+<p>Questions, bug reports, citing the library and supporting its development: see <a href="faq.html">Questions</a>.</p>
