@@ -285,6 +285,8 @@ class test_case(unittest.TestCase):
     # reach Python; before the fix std::terminate aborted the process.
     # The address space of the subprocess is capped so that an allocation fails.
     # ------------------------------------------------------------------
+    @unittest.skipUnless(sys.platform.startswith('linux'),
+                         'needs the resource module and /proc/self/status (Linux only)')
     @unittest.skipIf('asan' in os.environ.get('LD_PRELOAD', ''),
                      'RLIMIT_AS cannot make allocations fail under AddressSanitizer')
     def test_read_exception_while_reader_thread_runs(self):
