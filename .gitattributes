@@ -1,0 +1,3 @@
+# Left out of source packages (git archive, make package, GitHub source downloads)
+html_docu/publications/ export-ignore
+tools/sos_port/ export-ignore
