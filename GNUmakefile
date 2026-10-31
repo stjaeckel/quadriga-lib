@@ -75,8 +75,8 @@ python_install: python
 	@echo "Installing $(notdir $(PYTHON_SHARED_OBJ)) into $(PYTHON_SITE_PACKAGES)"
 	cp  $(PYTHON_SHARED_OBJ)  $(PYTHON_SITE_PACKAGES)/
 
-# Tests
-test:   moxunit-lib
+# Tests: builds and installs as "make" does, then builds Catch2 and the test binary and runs the tests
+test:   all moxunit-lib
 	cmake -B $(CMAKE_BUILD_DIR) -D ENABLE_TESTS=ON
 	cmake --build $(CMAKE_BUILD_DIR) --parallel
 	time $(CMAKE_BUILD_DIR)/test_bin
@@ -89,9 +89,9 @@ ifeq ($(matlab),ON)
 	time $(MATLAB_BIN) -batch "run('tests/quadriga_lib_mex_tests.m');"
 endif
 ifeq ($(python),ON)
-ifneq ($(PYTHON_SHARED_OBJ),)
-	PYTHONPATH=$(CURDIR)/lib python3 -m pytest tests/python_tests -x -s
-endif
+	if ls lib/quadriga_lib.cpython*linux-gnu.so >/dev/null 2>&1; then \
+		PYTHONPATH=$(CURDIR)/lib python3 -m pytest tests/python_tests -x -s; \
+	fi
 endif
 
 python_test: 

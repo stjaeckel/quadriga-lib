@@ -29,21 +29,22 @@ TEST_BIN  = $(CMAKE_BUILD_DIR)\Release\test_bin.exe
 !ENDIF
 
 all:
-	if not exist $(CMAKE_BUILD_DIR)\build.ninja cmake -B $(CMAKE_BUILD_DIR) $(GENERATOR) -D CMAKE_BUILD_TYPE=Release -D CMAKE_INSTALL_PREFIX=%CD% -D ENABLE_AVX2=$(avx2) -D ENABLE_MATLAB=$(matlab) -D ENABLE_PYTHON=$(python) -D ENABLE_TESTS=ON
+	cmake -B $(CMAKE_BUILD_DIR) $(GENERATOR) -D CMAKE_BUILD_TYPE=Release -D CMAKE_INSTALL_PREFIX=%CD% -D ENABLE_AVX2=$(avx2) -D ENABLE_MATLAB=$(matlab) -D ENABLE_PYTHON=$(python) -D ENABLE_TESTS=OFF
 	cmake --build $(CMAKE_BUILD_DIR) --config Release --parallel
 	cmake --install $(CMAKE_BUILD_DIR) --config Release
 
 # Requires pytest and numpy:
 #	pip install pytest numpy
+# Builds Catch2 and the test binary, then runs the C++, MATLAB and Python tests
 test: all moxunit-lib
-#	cmake -B $(CMAKE_BUILD_DIR) $(GENERATOR) -D CMAKE_BUILD_TYPE=Release -D ENABLE_TESTS=ON
-#	cmake --build $(CMAKE_BUILD_DIR) --config Release --target test_bin
+	cmake -B $(CMAKE_BUILD_DIR) -D ENABLE_TESTS=ON
+	cmake --build $(CMAKE_BUILD_DIR) --config Release --parallel
 	$(TEST_BIN)
 !IF "$(matlab)" == "ON"
 	matlab -batch "run('tests\quadriga_lib_mex_tests.m');"
 !ENDIF
 !IF "$(python)" == "ON"
-	set PYTHONPATH=%CD%\lib
+	set PYTHONPATH=$(MAKEDIR)\lib
 	python -m pytest tests/python_tests -x -s
 !ENDIF
 
