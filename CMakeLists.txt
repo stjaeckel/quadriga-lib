@@ -220,6 +220,7 @@ if (ENABLE_TESTS)
             CMAKE_ARGS
                 -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
                 -DCMAKE_BUILD_TYPE=Release
+                -DCMAKE_CXX_STANDARD=17
                 -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
                 -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
         )

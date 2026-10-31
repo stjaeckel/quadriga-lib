@@ -58,7 +58,7 @@ external: catch2 moxunit-lib
 catch2: $(CATCH2_LIB_CHECK)
 $(CATCH2_LIB_CHECK):
 	tar -xf external\Catch2-$(catch2_version).zip -C external
-	cmake $(GENERATOR) -D CMAKE_BUILD_TYPE=Release -B external\catch2-build -S external\$(CATCH2_SRC_DIR) -DCMAKE_INSTALL_PREFIX=%CD%\$(CATCH2_PREBUILT) -DBUILD_TESTING=OFF -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
+	cmake $(GENERATOR) -D CMAKE_BUILD_TYPE=Release -B external\catch2-build -S external\$(CATCH2_SRC_DIR) -DCMAKE_INSTALL_PREFIX=%CD%\$(CATCH2_PREBUILT) -DBUILD_TESTING=OFF -DCMAKE_CXX_STANDARD=17 -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
 	cmake --build external\catch2-build --config Release
 	cmake --install external\catch2-build --config Release
 	- rmdir /s /q external\$(CATCH2_SRC_DIR)
