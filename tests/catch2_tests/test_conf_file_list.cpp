@@ -70,7 +70,7 @@ TEST_CASE("conf_file_list - files ending in .conf are listed in byte-wise sorted
     tmp_dir d("test_conf_file_list_sorted");
     d.add("b.conf");
     d.add("A.conf");
-    d.add("a.conf");
+    d.add("aa.conf"); // byte-wise order puts it after "QuaDRiGa_x", a case-insensitive order before it
     d.add("10.conf");
     d.add("mmMAGIC_x.conf");
     d.add("QuaDRiGa_x.conf");
@@ -87,7 +87,7 @@ TEST_CASE("conf_file_list - files ending in .conf are listed in byte-wise sorted
     arma::uword n = quadriga_lib::conf_file_list({d.name}, scen, &files, &dirs);
     print_list("sorted order", scen, files, dirs);
 
-    const strvec ref = {"10", "3GPP_38.901_UMa", "A", "QuaDRiGa_x", "a", "b", "mmMAGIC_x"};
+    const strvec ref = {"10", "3GPP_38.901_UMa", "A", "QuaDRiGa_x", "aa", "b", "mmMAGIC_x"};
     CHECK(n == 7);
     CHECK(scen == ref);
     REQUIRE(files.size() == 7);
