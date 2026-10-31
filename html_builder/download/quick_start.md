@@ -44,7 +44,7 @@ int main()
 ```
 Compile in the source folder after `make`:
 ```
-g++ -std=c++17 -O2 -fopenmp -I include -I external/armadillo-14.2.2/include example.cpp lib/libquadriga.a -o example
+g++ -std=c++17 -O2 -fopenmp -I include -I external/armadillo-15.6.2/include example.cpp lib/libquadriga.a -o example
 ```
 
 SECTION_DESC!*/

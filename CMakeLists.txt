@@ -37,7 +37,7 @@ set(_CATCH2_PATH ${CATCH2_PATH}) # For internal use
 option(ARMA_EXT "Use armadillo headers provided with quadriga-lib" OFF)
 
 # Versions for external libraries (adjust as needed)
-set(armadillo_version "14.2.2")
+set(armadillo_version "15.6.2")
 set(pugixml_version "1.15")
 set(pybind11_version "3.0.0")
 set(catch2_version "3.8.1")

@@ -86,7 +86,7 @@ int main()
 ```
 
 ```bash
-g++ -std=c++17 -O2 -fopenmp -I include -I external/armadillo-14.2.2/include example.cpp lib/libquadriga.a -o example
+g++ -std=c++17 -O2 -fopenmp -I include -I external/armadillo-15.6.2/include example.cpp lib/libquadriga.a -o example
 ```
 
 More examples are in the usage sections of the [API documentation](http://quadriga-lib.org).

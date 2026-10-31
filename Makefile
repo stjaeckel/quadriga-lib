@@ -11,7 +11,7 @@ USE_NINJA = 1
 CMAKE_BUILD_DIR = build_windows
 
 # Armadillo version bundled in external\ (headers copied by release-win)
-armadillo_version = 14.2.2
+armadillo_version = 15.6.2
 
 # Read Quadriga-Lib version number from include\quadriga_lib.hpp
 !IF [cmd /c tools\get_version.cmd] == 0
