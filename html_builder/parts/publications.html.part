@@ -1,6 +1,10 @@
 <span class="qd-heading"><b>Publications</b></span>
 <br><br>
 
+<p>How to cite the library itself is described under <a href="faq.html">Questions</a>.</p><br>
+
+<b>Quadriga-Lib</b>
+
 <ul>
 <li>S. Jaeckel, L. Raschkowski, F. Burkhardt, L. Thiele; "Efficient Sum-of-Sinusoids-Based Spatial Consistency for the 3GPP New-Radio Channel Model"; 2018 IEEE Globecom Workshops (GC Wkshps); 2018; <br>Available: 
 <a target="_blank" rel="noopener noreferrer" href="https://ieeexplore.ieee.org/document/8644265">IEEE Xplore</a> (Original version), 
@@ -21,5 +25,20 @@
 <a target="_blank" rel="noopener noreferrer" href="https://mentor.ieee.org/802.11/dcn/26/11-26-0617-00-0ucm-extracting-3gpp-tr-38-901-channel-parameters-from-ray-tracing-simulations.docx">IEEE Mentor</a> (Original .docx version), 
 <a target="_blank" rel="noopener noreferrer" href="publications/11-26-0617-00-0ucm-extracting-3gpp-tr-38-901-channel-parameters-from-ray-tracing-simulations.pdf">PDF version</a>, 
 <a target="_blank" rel="noopener noreferrer" href="publications/11-26-0617-extracting-channel-parameters.md">Markdown version</a><br><br></li>
-    
+
 </ul>
+
+<br>
+<b>QuaDRiGa background</b>
+
+<p>Quadriga-Lib continues the work on the QuaDRiGa channel model. These publications describe the model concepts it builds on.</p>
+
+<ul>
+<li>S. Jaeckel, L. Raschkowski, K. Börner, L. Thiele; "QuaDRiGa: A 3-D Multi-Cell Channel Model With Time Evolution for Enabling Virtual Field Trials"; IEEE Transactions on Antennas and Propagation, vol. 62, no. 6, pp. 3242–3256; 2014; <br>Available:
+<a target="_blank" rel="noopener noreferrer" href="https://doi.org/10.1109/TAP.2014.2310220">IEEE Xplore</a> (open access)<br><br></li>
+
+<li>S. Jaeckel; "Quasi-deterministic channel modeling and experimental validation in cooperative and massive MIMO deployment topologies"; PhD thesis, Technische Universität Ilmenau; 2017; <br>Available:
+<a target="_blank" rel="noopener noreferrer" href="https://www.db-thueringen.de/receive/dbt_mods_00032895">Digitale Bibliothek Thüringen</a> (open access)<br><br></li>
+</ul>
+
+<p>More QuaDRiGa publications are listed on <a target="_blank" rel="noopener noreferrer" href="https://quadriga-channel-model.de">quadriga-channel-model.de</a>.</p>

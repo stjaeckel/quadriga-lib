@@ -52,35 +52,63 @@
 
 <b>Overview</b>
 <ul>
-<li><a href="#227164d0">Bug Reports and Development</a></li>
+<li><a href="#e63d3e38">About the Library</a></li>
+<li><a href="#59d38498">Bug Reports and Contact</a></li>
 <li><a href="#89373af1">Distribution License</a></li>
-<li><a href="#e97fa996">Features / Functions</a></li>
+<li><a href="#d8094d72">Supporting the Project</a></li>
 </ul>
 <br>
 <hr class="greyline"><br>
-<span id="227164d0" class="qd-section"><b>Bug Reports and Development</b></span><br>
+<span id="e63d3e38" class="qd-section"><b>About the Library</b></span><br>
 <ul>
-<li><b>Bug reports</b><br> Please make a small and self-contained program which exposes the bug, and then open an issue at the <a target="_blank" rel="noopener noreferrer" href="https://github.com/stjaeckel/quadriga-lib">Github repo</a>. The small program should have a main() function and use only functions/classes from Quadriga-Lib, Armadillo and the standard C++ library (no other libraries). We appreciate your time to make a bug report.</li>
-<li><b>Who are the developers?</b><br> Lead development is done by <a target="_blank" rel="noopener noreferrer" href="https://sjc-wireless.com">Stephan Jaeckel</a>.</li>
-<li><b>How can I contact the developers?</b><br> You can contact me via &quot;info [&Auml;T] quadriga-lib [D&Ouml;T] org&quot;</li>
-<li><b>Can you implement features on request?</b><br> I am available for consulting and development work on request. Please contact me via eMail (see above) the <a target="_blank" rel="noopener noreferrer" href="https://sjc-wireless.com">contact form</a> on my website or vial <a target="_blank" rel="noopener noreferrer" href="https://www.linkedin.com/in/stephan-jaeckel-phd-a66990a4">LinkedIn</a>.</li>
-<li><b>How can I contribute to the development?</b><br> Contributions are welcome, provided they are cleanly written, tested, and have accompanying documentation. Ideally, prepare a pull request on the <a target="_blank" rel="noopener noreferrer" href="https://github.com/stjaeckel/quadriga-lib">Github repo</a></li>
+<li><b>How is Quadriga-Lib related to QuaDRiGa?</b><br> <a target="_blank" rel="noopener noreferrer" href="https://quadriga-channel-model.de">QuaDRiGa</a> is a geometry-based stochastic channel model written in MATLAB. Quadriga-Lib is its C++ successor by the same lead developer: the model components are being rewritten in C++ for speed, with thin interfaces to MATLAB, Octave and Python. It is not a drop-in replacement for the MATLAB toolbox; functions, names and file formats follow their own API. <a target="_blank" rel="noopener noreferrer" href="https://github.com/stjaeckel/QuaDRiGa-NG">QuaDRiGa-NG</a> is a fork of the MATLAB QuaDRiGa toolbox that uses Quadriga-Lib in its backend.</li>
+<li><b>How do I cite Quadriga-Lib?</b><br> If you use Quadriga-Lib in published work, please cite the software and the version you used. The installed version is returned by <code>quadriga_lib.version()</code> in Python, <code>quadriga_lib.version</code> in MATLAB / Octave and <code>quadriga_lib::quadriga_lib_version()</code> in C++. Publications on the models are listed on the <a href="publications.html">Publications</a> page.</li>
+</ul>
+<pre>
+@software{quadriga_lib,
+  author  = {Jaeckel, Stephan},
+  title   = {Quadriga-Lib: C++/MATLAB/Python library for radio channel modelling and simulation},
+  url     = {https://github.com/stjaeckel/quadriga-lib},
+  version = {&lt;version&gt;},
+  year    = {&lt;year&gt;}
+}
+</pre>
+ 
+<ul>
+<li><b>Is the API stable?</b><br> Quadriga-Lib is under active development. Breaking changes are avoided where possible, but they do happen between releases. For reproducible results, use a release version and note it, or check out a release tag of the <a target="_blank" rel="noopener noreferrer" href="https://github.com/stjaeckel/quadriga-lib">GitHub repository</a>. The <code>main</code> branch may be ahead of the latest release. The API documentation on this site is generated from the source code of the latest release.</li>
+<li><b>Which compilers are supported?</b><br> Quadriga-Lib needs C++17. It is built and tested with GCC 11 or newer (GCC 12 by default on Linux) and with MSVC 2022 on Windows.</li>
+<li><b>MATLAB reports a "GLIBCXX ... not found" error when loading the MEX files. What can I do?</b><br> MATLAB ships its own, older C++ runtime (<code>libstdc++</code>). MEX files built with a newer GCC than your MATLAB release supports fail to load with this error. The build uses GCC 12 by default. If your MATLAB release needs a different version, install it (e.g. <code>sudo apt install g++-11</code>) and build with <code>make gcc_version=11</code>. The compilers supported by each MATLAB release are listed by MathWorks.</li>
+<li><b>Can Quadriga-Lib be used together with other C++ libraries?</b><br> Yes. Quadriga-Lib uses <a target="_blank" rel="noopener noreferrer" href="https://arma.sourceforge.net">Armadillo</a> for its matrices and cubes. To exchange data with other libraries, create Armadillo objects that use auxiliary memory, use their STL-style iterators, or get a pointer to the matrix memory with <code>.memptr()</code>.</li>
+</ul>
+<hr class="greyline"><br>
+<span id="59d38498" class="qd-section"><b>Bug Reports and Contact</b></span><br>
+<ul>
+<li><b>How do I report a bug?</b><br> Open an issue with the <a target="_blank" rel="noopener noreferrer" href="https://github.com/stjaeckel/quadriga-lib/issues/new?template=bug_report.yml">bug report form</a> on GitHub. The most useful part is a small, self-contained example that shows the problem, together with the library version and the interface (C++, Python, MATLAB or Octave). Please search the <a target="_blank" rel="noopener noreferrer" href="https://github.com/stjaeckel/quadriga-lib/issues?q=is%3Aissue">existing issues</a> first; if your problem is already there, add your case as a comment.</li>
+<li><b>How do I request a feature?</b><br> Use the <a target="_blank" rel="noopener noreferrer" href="https://github.com/stjaeckel/quadriga-lib/issues/new?template=feature_request.yml">feature request form</a>. Describe the task you want to solve, not only the function you have in mind.</li>
+<li><b>Where can I ask how to use the library?</b><br> Ask in <a target="_blank" rel="noopener noreferrer" href="https://github.com/stjaeckel/quadriga-lib/discussions">GitHub Discussions</a>. You can also share your results there.</li>
+<li><b>How do I report a security problem?</b><br> Please do not open a public issue. Use GitHub's <a target="_blank" rel="noopener noreferrer" href="https://github.com/stjaeckel/quadriga-lib/security/advisories/new">private vulnerability reporting</a> instead; only the maintainer sees the report.</li>
+<li><b>How can I contribute code?</b><br> Small fixes are welcome as pull requests on <a target="_blank" rel="noopener noreferrer" href="https://github.com/stjaeckel/quadriga-lib">GitHub</a>. For anything larger, please open an issue first so the approach can be agreed before you write code. Contributions need tests and documentation; see <a target="_blank" rel="noopener noreferrer" href="https://github.com/stjaeckel/quadriga-lib/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a>.</li>
+<li><b>Who develops Quadriga-Lib?</b><br> Lead development is done by <a target="_blank" rel="noopener noreferrer" href="https://sjc-wireless.com">Stephan Jaeckel</a>.</li>
+<li><b>How can I contact the developers?</b><br> By email to &quot;info [&Auml;T] quadriga-lib [D&Ouml;T] org&quot;. For bugs, feature requests and usage questions, GitHub is preferred, so that other users can find the answers.</li>
 </ul>
 <hr class="greyline"><br>
 <span id="89373af1" class="qd-section"><b>Distribution License</b></span><br>
 <ul>
-<li><b>What is the distribution license for Quadriga-Lib?</b><br> Quadriga-Lib is licensed under the <a target="_blank" rel="noopener noreferrer" href="https://opensource.org/license/apache-2-0">Apache License 2.0</a>. The Apache license is a permissive license; its main conditions simply require preservation of copyright and license notices. See also a <a target="_blank" rel="noopener noreferrer" href="https://www.tldrlegal.com/license/apache-license-2-0-apache-2-0">Quick Summary</a> of the license.</li>
-<li><b>Can I use Quadriga-Lib in commercial products without releasing the source code?</b><br> Yes. Quadriga-Lib can be used in proprietary software, without releasing the source code. However, any software that incorporates or distributes Quadriga-Lib in source or binary form must include a readable copy of the attributions in the NOTICE.txt file that comes with Quadriga-Lib. The attributions can be placed in the documentation and/or other materials provided with the software.</li>
-<li><b>How is the Apache License related to the GPL?</b><br> The Apache license and the GPL are completely separate and distinct licenses. Unlike the GPL, the Apache license does not "infect" your source code. See also the comparison of open-source software licenses on Wikipedia.</li>
-<li><b>How is the Apache license related to the MIT and BSD licenses?</b><br> The Apache license is a permissive license similar to the MIT and BSD licenses, but also provides a grant of patent rights from contributors to users. As such, the Apache license can be thought of as an improved version of the MIT and BSD licenses.</li>
-<li><b>Is Quadriga-Lib a product from the Apache Software Foundation ?</b><br> No. We just use the Apache license.</li>
+<li><b>What is the distribution license for Quadriga-Lib?</b><br> Quadriga-Lib is licensed under the <a target="_blank" rel="noopener noreferrer" href="https://opensource.org/license/apache-2-0">Apache License 2.0</a>, a permissive license. See also a <a target="_blank" rel="noopener noreferrer" href="https://www.tldrlegal.com/license/apache-license-2-0-apache-2-0">quick summary</a> of the license.</li>
+<li><b>Can I use Quadriga-Lib in commercial products without releasing the source code?</b><br> Yes. Quadriga-Lib can be used in open-source and proprietary software. If you distribute it, in source or binary form, keep its copyright and license notice (the <code>LICENSE</code> file) with your software or its documentation.</li>
+<li><b>How does the Apache License compare to the GPL, MIT and BSD licenses?</b><br> Unlike the GPL, the Apache License does not require you to publish the source code of software that uses Quadriga-Lib. It is a permissive license like MIT and BSD, and it also grants users the patent rights of the contributors.</li>
+<li><b>Is Quadriga-Lib a product of the Apache Software Foundation?</b><br> No. It only uses the Apache License.</li>
 </ul>
 <hr class="greyline"><br>
-<span id="e97fa996" class="qd-section"><b>Features / Functions</b></span><br>
+<span id="d8094d72" class="qd-section"><b>Supporting the Project</b></span><br>
 <ul>
-<li><b>Is the API stable?</b><br> Quadriga-Lib is under active development, and the API may change in future releases. However, we try to keep the API stable and avoid breaking changes. If you use the API in your code, we recommend to use the latest release version of Quadriga-Lib to ensure compatibility. If you need to use a specific version of the API, you can use the <code>git checkout</code> command to switch to a specific commit or tag in the repository. The API documentation is generated from the source code, so it will always match the current state of the code.</li>
-<li><b>What is the minimum required C++ version?</b><br> Quadriga-Lib requires C++17. The code is tested with GCC 11 and later, and with MSVC 14. You may need to enable C++17 support explicitly (e.g., by using the <code>-std=c++17</code> flag).</li>
-<li><b>Is it possible to interface Quadriga-Lib with other libraries ?</b><br> Yes, Quadriga-Lib is designed to be easily integrated with other libraries. It uses <a target="_blank" rel="noopener noreferrer" href="https://arma.sourceforge.net">Armadillo</a> for linear algebra operations, which is a C++ library that provides a high-level interface for matrix operations. You can use Armadillo functions in your code, and Quadriga-Lib will work seamlessly with them. Interfacing with other libraries can be done by creating matrices (or cubes) that use auxiliary memory, or by accessing elements through STL-style iterators, or by directly obtaining a pointer to matrix memory via the .memptr() function.</li>
+<li><b>How can I support the development?</b><br> If Quadriga-Lib is useful to you, you can support its development with a donation. It lets me spend more time on new features, bug fixes and documentation.
+<ul>
+<li><a target="_blank" rel="noopener noreferrer" href="https://github.com/sponsors/stjaeckel">GitHub Sponsors</a></li>
+<li><a target="_blank" rel="noopener noreferrer" href="https://www.paypal.com/donate/?hosted_button_id=B2N5HS5F4HHFE">PayPal</a></li>
+</ul>
+</li>
+<li><b>Other ways to help</b><br> Report bugs with a small example, answer questions in <a target="_blank" rel="noopener noreferrer" href="https://github.com/stjaeckel/quadriga-lib/discussions">Discussions</a>, and cite the library in your publications.</li>
 </ul>
     <!-- CONTENT END -->
 
