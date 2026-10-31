@@ -230,3 +230,49 @@ TEST_CASE("Test Mitsuba XML File Write - PLY paths are relative to the XML file"
     }
     std::filesystem::remove_all(dir, ec);
 }
+
+TEST_CASE("mitsuba_xml_file_write - input validation")
+{
+    // Two triangles; obj_ind and mtl_ind must have exactly one entry per row of face_ind. A longer list would make
+    // the writer read face rows that do not exist, a shorter one would leave faces without object or material.
+    arma::mat vert_list = {{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {1.0, 1.0, 0.0}};
+    arma::umat face_ind = {{0, 1, 2}, {1, 3, 2}};
+    arma::uvec obj_ind = {0, 0}, mtl_ind = {1, 1};
+    std::vector<std::string> obj_names = {"obj"}, mtl_names = {"concrete"};
+
+    const std::filesystem::path dir = "mitsuba_input_validation_test";
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+    std::filesystem::create_directory(dir);
+    const std::string xml = (dir / "scene.xml").string();
+
+    auto write = [&](const arma::uvec &o, const arma::uvec &m)
+    {
+        quadriga_lib::mitsuba_xml_file_write<double>(xml, vert_list, face_ind, o, m, obj_names, mtl_names);
+    };
+
+    CHECK_NOTHROW(write(obj_ind, mtl_ind));
+
+    SECTION("obj_ind longer than face_ind")
+    {
+        arma::uvec obj_long = {0, 0, 0, 0};
+        CHECK_THROWS_AS(write(obj_long, mtl_ind), std::invalid_argument);
+    }
+    SECTION("obj_ind shorter than face_ind")
+    {
+        arma::uvec obj_short = {0};
+        CHECK_THROWS_AS(write(obj_short, mtl_ind), std::invalid_argument);
+    }
+    SECTION("mtl_ind longer than face_ind")
+    {
+        arma::uvec mtl_long = {1, 1, 1, 1};
+        CHECK_THROWS_AS(write(obj_ind, mtl_long), std::invalid_argument);
+    }
+    SECTION("mtl_ind shorter than face_ind")
+    {
+        arma::uvec mtl_short = {1};
+        CHECK_THROWS_AS(write(obj_ind, mtl_short), std::invalid_argument);
+    }
+
+    std::filesystem::remove_all(dir, ec);
+}

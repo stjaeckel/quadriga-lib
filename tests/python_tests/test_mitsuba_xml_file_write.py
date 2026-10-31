@@ -108,3 +108,22 @@ class test_case(unittest.TestCase):
             self.assertIn('itu', open(fn).read())
         finally:
             shutil.rmtree(d, ignore_errors=True)
+
+    def test_index_lengths_must_match_faces(self):
+        """obj_ind and mtl_ind with more or fewer entries than face_ind has rows are rejected."""
+        import tempfile, shutil
+        d = tempfile.mkdtemp()
+        try:
+            fn = os.path.join(d, 's.xml')
+            vert = np.array([[0., 0, 0], [1, 0, 0], [0, 1, 0]])
+            face = np.array([[0, 1, 2]], dtype=np.uint64)
+            one = np.array([0], dtype=np.uint64)
+            four = np.array([0, 0, 0, 0], dtype=np.uint64)
+            write = quadriga_lib.RTtools.mitsuba_xml_file_write
+            write(fn, vert, face, one, one + 1, ['a'], ['concrete'])
+            with self.assertRaisesRegex(ValueError, "'obj_ind'"):
+                write(fn, vert, face, four, one + 1, ['a'], ['concrete'])
+            with self.assertRaisesRegex(ValueError, "'mtl_ind'"):
+                write(fn, vert, face, one, four + 1, ['a'], ['concrete'])
+        finally:
+            shutil.rmtree(d, ignore_errors=True)

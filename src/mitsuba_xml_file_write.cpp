@@ -138,6 +138,12 @@ void quadriga_lib::mitsuba_xml_file_write(const std::string &fn,
     if (face_ind.n_cols != 3)
         throw std::invalid_argument("Face indices 'face_ind' must have 3 columns (triangle mesh).");
 
+    if (obj_ind.n_elem != face_ind.n_rows)
+        throw std::invalid_argument("Found " + std::to_string(obj_ind.n_elem) + " object indices 'obj_ind', but 'face_ind' has " + std::to_string(face_ind.n_rows) + " faces.");
+
+    if (mtl_ind.n_elem != face_ind.n_rows)
+        throw std::invalid_argument("Found " + std::to_string(mtl_ind.n_elem) + " material indices 'mtl_ind', but 'face_ind' has " + std::to_string(face_ind.n_rows) + " faces.");
+
     arma::uvec unique_obj_ind = arma::unique(obj_ind);
     arma::uword n_obj = arma::max(unique_obj_ind) + 1; // Number of mesh objects
 
