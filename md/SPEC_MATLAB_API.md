@@ -308,6 +308,7 @@ SECTION!*/
 - Argument format: ``- **`name`** — Description; further facts separated by semicolons; `[size]`; default: X``
 - Optional inputs (C++: default value or `nullptr`) can be omitted or passed as `[]`. A stated default implies that the input is optional; mark it `*(optional)*` only if no default can be stated. Outputs are never marked optional.
 - State the type only when not `double`, the unit only when not SI. C++ returns are listed under `## Outputs:`.
+- `[[name]]` links only to a function documented on the same API page, by the name that page shows it under, without a namespace or submodule prefix. Do not refer to a function that exists only in another API: leave it out of the text and out of `## See also:`.
 
 ## Function body
 - Signature: `void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])`

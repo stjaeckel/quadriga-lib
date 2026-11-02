@@ -81,7 +81,6 @@ Calculate MIMO channel coefficients for IRS-assisted communication
 - [[get_channels_spherical]] (single-segment spherical-wave channel)
 - [[get_channels_planar]] (single-segment planar-wave channel)
 - [[arrayant_generate]] (antenna array generator)
-- [[combine_irs_coord]] (coordinate setup for IRS geometry)
 MD!*/
 
 // Cube output; an empty result keeps its [n_rx, n_tx, 0] shape (the generic copy returns 0x0)

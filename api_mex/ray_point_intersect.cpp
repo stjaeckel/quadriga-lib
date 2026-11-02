@@ -47,7 +47,6 @@ Calculate intersections of ray beams with points in 3D space
 ## See also:
 - [[icosphere]] (generate ray beams)
 - [[point_cloud_segmentation]] (generate sub-cloud index)
-- [[subdivide_rays]] (subdivide beams into sub-beams)
 - [[ray_triangle_intersect]] (ray–triangle intersection)
 - [[ray_mesh_interact]] (beam–mesh interaction)
 MD!*/
