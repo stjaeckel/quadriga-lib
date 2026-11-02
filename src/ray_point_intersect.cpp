@@ -187,7 +187,7 @@ void quadriga_lib::ray_point_intersect(const arma::Mat<dtype> &points,
         float *p_dirA = dirA.memptr();
         float *p_invDotA = invDotA.memptr();
 
-#pragma omp parallel for
+#pragma omp parallel for if (n_ray_i >= 8192)
         for (int i_ray = 0; i_ray < n_ray_i; ++i_ray)
         {
             // Load origin
@@ -462,7 +462,7 @@ void quadriga_lib::ray_point_intersect(const arma::Mat<dtype> &points,
         hits_per_point->resize(n_point_t);
         arma::u32_vec *p_out = hits_per_point->data();
 
-#pragma omp parallel for schedule(static)
+#pragma omp parallel for schedule(static) if (n_point_l >= 4096)
         for (long long i_point = 0; i_point < n_point_l; ++i_point)
         {
             unsigned n_local = p_off[i_point + 1] - p_off[i_point];

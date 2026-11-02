@@ -2967,7 +2967,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
                             p_fbs_angleN, p_thicknessN, p_edge_lengthN, p_normal_vecN, p_path_dirN,
                             p_out_typeN, p_ray_indN, (size_t)nXPR};
 
-#pragma omp parallel for schedule(static)
+#pragma omp parallel for schedule(static) if (n_ray >= 64)
     for (long long i_ray = 0; i_ray < (long long)n_ray; ++i_ray) // Ray loop
     {
         if (compact && p_fbs_ind[i_ray] == 0) // Compact stream, skip non-hits
@@ -3626,7 +3626,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
 
     const double fGHz = (double)center_frequency * 1e-9;
 
-#pragma omp parallel for schedule(static)
+#pragma omp parallel for schedule(static) if (n_rayN >= 64)
     for (long long i_ev = 0; i_ev < (long long)n_rayN; ++i_ev) // Interaction loop (compact set)
     {
         const size_t i_rayN = (size_t)i_ev;                                    // compact-set index

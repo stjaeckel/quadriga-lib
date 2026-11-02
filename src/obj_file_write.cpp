@@ -110,7 +110,7 @@ static void mesh2vert_list(const arma::Mat<dtype> &mesh, // mesh, Size: [ n_mesh
     std::vector<std::vector<dtype>> bvx(n_blk), bvy(n_blk), bvz(n_blk);
 
     // Weld each object independently; objects never share vertices
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for schedule(dynamic) if (n_blk > 1 && n_mesh >= 64)
     for (long long b = 0; b < (long long)n_blk; ++b)
     {
         const size_t bb = (size_t)b;
@@ -182,7 +182,7 @@ static void mesh2vert_list(const arma::Mat<dtype> &mesh, // mesh, Size: [ n_mesh
     const arma::uword n_vert = offs[n_blk];
     vert_list.set_size(n_vert, 3);
 
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for schedule(dynamic) if (n_blk > 1 && n_vert >= 8192)
     for (long long b = 0; b < (long long)n_blk; ++b)
     {
         const size_t bb = (size_t)b;

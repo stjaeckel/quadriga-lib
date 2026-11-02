@@ -501,7 +501,7 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
         std::complex<double> *p_coeff_cplx = coeff_cplx.memptr();
         double *p_Doppler_Jakes = Doppler_Jakes.memptr();
 
-#pragma omp parallel for
+#pragma omp parallel for if (n_snap_ll > 1 && (arma::uword)n_snap_ll * n_path_out * n_probe * n_probe * n_subpath >= 32768)
         for (long long i_snap = 0; i_snap < n_snap_ll; ++i_snap)
             for (arma::uword i_path = 0; i_path < n_path_out; ++i_path)
             {
@@ -662,7 +662,7 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
         // Process actual coefficients
         p_coeff_cplx = coeff_cplx.memptr();
 
-#pragma omp parallel
+#pragma omp parallel if (n_snap_ll > 1 && (arma::uword)n_snap_ll * n_rx * n_tx * n_path_out >= 128)
         {
             // Allocate coefficient storage per thread, reuse for iterations
             arma::cube coeff_snap_re, coeff_snap_im;

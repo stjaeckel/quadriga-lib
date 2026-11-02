@@ -601,7 +601,7 @@ void quadriga_lib::ssf_clusters(const std::unordered_map<std::string, double> &s
     const bool tx_single = tx_pos.n_rows != n_link;
     arma::cube *ang_out[4] = {&aod, &aoa, &eod, &eoa};
 
-#pragma omp parallel for
+#pragma omp parallel for if (n_link >= 8)
     for (long long i = 0; i < (long long)n_link; ++i)
     {
         const arma::uword l = (arma::uword)i, t = tx_single ? 0 : l;

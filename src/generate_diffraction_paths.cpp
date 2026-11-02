@@ -227,7 +227,7 @@ void quadriga_lib::generate_diffraction_paths(const arma::Mat<dtype> &orig,
     double lambda_div_8 = 0.125 * 299792458.0 / (double)center_frequency; // lambda / 8
 
 // Iterate through positions
-#pragma omp parallel for schedule(static)
+#pragma omp parallel for schedule(static) if (n_pos >= 64)
     for (long long i = 0; i < (long long)n_pos; ++i)
     {
         // Calculate ellipsoid orientation and length of the semi-major axis

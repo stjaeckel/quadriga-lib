@@ -588,7 +588,7 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
 
     // Phase 2: Per-frequency processing (parallelized over output frequencies)
     const int n_freq_out_i = (int)n_freq_out;
-#pragma omp parallel for schedule(static)
+#pragma omp parallel for schedule(static) if (n_freq_out >= 8)
     for (int f_i = 0; f_i < n_freq_out_i; ++f_i)
     {
         const arma::uword f = (arma::uword)f_i;

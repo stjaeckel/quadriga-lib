@@ -416,7 +416,7 @@ arma::uvec quadriga_lib::obj_overlap_test(const arma::Mat<dtype> *mesh, const ar
     std::vector<arma::Mat<dtype>> obj_faces(n_obj); // Mesh split into individual objects
     std::vector<arma::Mat<dtype>> obj_edges(n_obj);
 
-#pragma omp parallel for
+#pragma omp parallel for if (n_obj >= 32)
     for (int i_obj_int = 0; i_obj_int < (int)n_obj; ++i_obj_int)
     {
         arma::uword i_obj = (arma::uword)i_obj_int;
@@ -558,7 +558,7 @@ arma::uvec quadriga_lib::obj_overlap_test(const arma::Mat<dtype> *mesh, const ar
     std::string omp_error;
 
     // Pairwise tests, dynamic scheduling balances objects of different size
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for schedule(dynamic) if (n_obj >= 8)
     for (int i_obj_1_int = 0; i_obj_1_int < (int)n_obj; ++i_obj_1_int)
     {
         arma::uword i_obj_1 = (arma::uword)i_obj_1_int;

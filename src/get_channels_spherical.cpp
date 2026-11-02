@@ -554,7 +554,7 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
 
     // Calculate the MIMO channel coefficients for each path
     const int n_out_i = (int)n_out;
-#pragma omp parallel for
+#pragma omp parallel for if (n_out > 1 && n_out * n_links >= 512)
     for (int i_out = 0; i_out < n_out_i; ++i_out) // Loop over paths
     {
         const arma::uword j = (arma::uword)i_out;

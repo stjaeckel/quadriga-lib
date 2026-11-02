@@ -136,7 +136,7 @@ void quadriga_lib::sos_acf_approx(const arma::Mat<dtype> &freq,
             const double *Cb = C[second[s]].data(), *Sb = S[second[s]].data();
             dtype *out = acf_approx.slice_memptr(s);
 
-#pragma omp parallel for
+#pragma omp parallel for if (n_half_ll * n_grid * n_coeff >= 32768)
             for (long long i_col = 0; i_col < n_half_ll; ++i_col)
             {
                 const arma::uword c = (arma::uword)i_col;
