@@ -9,7 +9,7 @@ Sessions that read this plan: the decisions in section 3 are settled. Do not reo
 | Step | What | Output | State |
 |------|------|--------|-------|
 | 1 | Project plan | `md/website_plan.md` | signed off 2026-11-02 |
-| 2 | Design session | `md/website_design.md` | not started |
+| 2 | Design session | `md/website_design.md`, `html_builder/design_prototype/` | signed off 2026-11-02 |
 | 3 | Spec | `md/website_spec.md` | not started |
 | 4 | Spec review (1 to 3 rounds) | updated spec | not started |
 | 5 | Implementation | builder, static parts, pages | not started |
