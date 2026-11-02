@@ -62,7 +62,6 @@ mesh, vert_list, face_ind, obj_ind, obj_names, mtl_ind, mtl_names, bsdf, csv_ind
 ## See also:
 - [[obj_file_write]] (for writing OBJ files)
 - [[triangle_mesh_segmentation]] (used to calculate indexed mesh for faster processing)
-- [[ray_mesh_interact]] (calculating interactions between rays and the triangular mesh)
 MD!*/
 
 py::tuple obj_file_read(const std::string &fn,

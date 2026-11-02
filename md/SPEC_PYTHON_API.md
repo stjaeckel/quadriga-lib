@@ -319,6 +319,7 @@ out1, out2 = quadriga_lib.tools.function_name( in1, in2, optional_in3 )
 - Argument format: ``- **`name`** — Description; further facts separated by semicolons; `(shape)`; default: X``
 - Optional inputs state their default (`default: 201`, `default: None`), which is not visible in the Usage line; the user can omit them or pass `None` for arrays. Mark an input `*(optional)*` only if no default can be stated.
 - State the unit only when not SI. C++ returns are listed under `## Outputs:`.
+- `[[name]]` links only to a function documented on the same API page, by the name that page shows it under, without a namespace or submodule prefix (for Python, the exposed name). Do not refer to a function that exists only in another API: leave it out of the text and out of `## See also:`.
 
 ## Function body structure
 - The wrapper is a regular C++ free function. Its return type depends on the number of outputs:

@@ -14,7 +14,7 @@ SECTION!*/
 # GENERATE_DIFFRACTION_PATHS
 Generate elliptic propagation paths and weights for diffraction gain estimation
 
-- Generates inputs required by quadriga_lib.[[calc_diffraction_gain]]: elliptic-arc paths sampling
+- Generates inputs required by [[calc_diffraction_gain]]: elliptic-arc paths sampling
   the Fresnel ellipsoid volume between each TX-RX pair, plus per-segment weights
 - Each ellipsoid has `n_path` paths, each with `n_seg` segments; `orig` and `dest` lie on the
   semi-major axis

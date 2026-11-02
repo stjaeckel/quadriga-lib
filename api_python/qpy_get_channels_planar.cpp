@@ -81,7 +81,7 @@ coeff_re, coeff_im, delays, rx_Doppler = quadriga_lib.arrayant.get_channels_plan
 
 ## See also:
 - [[get_channels_spherical]] (spherical wave variant)
-- [[get_channels_ieee_indoor]] (IEEE compliant channels using `get_channels_planar` internally)
+- [[get_ieee_indoor]] (IEEE compliant channels using `get_channels_planar` internally)
 - [[generate]] (antenna array generator)
 MD!*/
 
