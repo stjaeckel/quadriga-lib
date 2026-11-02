@@ -10,7 +10,8 @@ Sessions that read this plan: the decisions in section 3 are settled. Do not reo
 |------|------|--------|-------|
 | 1 | Project plan | `md/website_plan.md` | signed off 2026-11-02 |
 | 2 | Design session | `md/website_design.md`, `html_builder/design_prototype/` | signed off 2026-11-02 |
-| 3 | Spec | `md/website_spec.md` | not started |
+| 3 | Spec | `md/website_spec.md` | written, waiting for sign-off |
+| 3a | Doc-block fixes on `main`, merge of `main` into `website`, re-check (D20) | fixed doc blocks; spec measurements updated | not started |
 | 4 | Spec review (1 to 3 rounds) | updated spec | not started |
 | 5 | Implementation | builder, static parts, pages | not started |
 | 6 | Implementation review (1 to 3 rounds) | fixes | not started |
@@ -59,7 +60,7 @@ Success criteria:
 | D1 | JavaScript | Every page works fully without JavaScript. Small optional scripts may add comfort: search over function names, copy buttons on code, remembering the chosen API language. Nothing may break or disappear when JavaScript is off. No JavaScript from third parties. |
 | D2 | API page structure | One page per language, as now, with a navigation sidebar on wide screens and a collapsible section/function index on phones. |
 | D3 | URLs | All current website file names and anchors stay valid: `index.html` (including `#quickstart`), `cpp_api.html`, `mex_api.html`, `python_api.html` with every function anchor (for example `cpp_api.html#arrayant_interpolate_multi`), `formats.html`, `faq.html`, `publications.html`, `download.html`, and the hash section anchors of all pages (doc blocks link for example `formats.html#6cab4884`). Old hash anchors are kept as explicit ids next to the new readable ids; meaningless ids of the old pages (for example `id="1"`) are dropped. New pages get new names. The full API Markdown files keep their URLs `/quadriga_lib_api_{cpp,mex,python}.md`. |
-| D4 | Build tools | Python 3 with pinned pip packages (for example markdown-it-py, Pygments, Jinja2) and Node.js at build time. No server-side processing on the web server. |
+| D4 | Build tools | Python 3 with pinned pip packages (for example markdown-it-py, Pygments, Jinja2) and Node.js at build time. No server-side processing on the web server. Amended by the maintainer on 2026-11-02: the tools come from PyPI and npm (not from system packages), installed either into a conda environment named `quadriga-web` (preferred; everything, Node included, goes there) or into a virtual environment; both ways must work. The requirement files give minimum versions only, so the tools can be upgraded; an upgrade may change the tracked Markdown, which is then regenerated. |
 | D5 | Formulas | LaTeX (`$...$`, `$$...$$`) rendered to HTML at build time with KaTeX; KaTeX stylesheet and fonts self-hosted. No math JavaScript in the browser. |
 | D6 | Doc-block syntax | The `/*!SECTION`, `/*!SECTION_DESC`, `/*!MD` syntax stays. Small extensions are allowed (for example math, notes) if the SPEC files are updated in the same project. The lean-API rule stays: API blocks hold layout, ranges, units and errors, not derivations. |
 | D7 | Builder strictness | Structural errors stop the build with file and line (unclosed code fence, unresolved `[[link]]`, missing name line, missing `## Declaration:` (`## Usage:` in MATLAB and Python blocks) where required, duplicate anchors). Style issues print a warning. The builder has its own test suite. |
@@ -75,7 +76,7 @@ Success criteria:
 | D17 | Legal pages | An Impressum page and a short privacy page, linked from every footer. Their text comes from Markdown files the maintainer fills in. No address goes into git until the maintainer has settled it; until then the Impressum file holds a placeholder and going live is blocked. |
 | D18 | Privacy and analytics | No analytics, no cookies, no third-party requests (fonts, scripts, images all self-hosted). The privacy page covers the hoster and its server logs. Storing the chosen API language in the browser happens only after the visitor clicks a language. |
 | D19 | Commits | The maintainer makes every commit. Sessions give the `git add` line and the commit message. |
-| D20 | Branch and working copy | Branch `website`, working copy `/home/stephan/quadriga-lib-website`, made from `main` at 4b0cfe4. The branch stays on its own: `main` is not merged into it. The branch adds `docs/`, `docs_builder/`, `tutorials/` and the new make targets (D21); it does not change library sources, doc blocks, SPEC files, CMake files, packaging files or the old builder. Touch-ups of the doc-block format, if needed, are a later step. Local only, not pushed until the merge (D31). |
+| D20 | Branch and working copy | Branch `website`, working copy `/home/stephan/quadriga-lib-website`, made from `main` at 4b0cfe4. The branch stays on its own: `main` is not merged into it. The branch adds `docs/`, `docs_builder/`, `tutorials/` and the new make targets (D21); it does not change library sources, doc blocks, SPEC files, CMake files, packaging files or the old builder. Touch-ups of the doc-block format, if needed, are a later step. Local only, not pushed until the merge (D31). Amended by the maintainer on 2026-11-02: the doc-block defects that the new builder's checks found are fixed in a separate session on `main`, and `main` is then merged into `website` once, before the spec review; the merged tree is checked again. |
 | D21 | Make targets and toolchain | `make docs` builds the tracked Markdown in `docs/` with Python alone (no Node; pip packages only where the spec shows them to be needed). `make website` depends on `make docs` and builds the full site in `docs/website/` with the full toolchain (D4), on the maintainer's Linux machine only. `make tutorials` runs the notebooks (D28). A missing tool stops the build with a plain message naming the tool and how to install it, not with a stack trace. Node runs only when a page contains a formula. The old `make documentation` stays unchanged until the cutover (D31). |
 | D22 | Packages | The website is built only on Linux; no website tooling on Windows or in the Docker image. CMake installs the prebuilt `docs/website/` through its own `docs_builder/CMakeLists.txt` and never builds the site. Failsafe: at CMake configure time, seconds after the start and before compiling, if documentation install is on and `docs/website/` is missing or its stamp file names a different library version than the one being built, configure stops with an error that says to run `make website`; an explicit option builds the package without documentation. This covers the deb build (Docker copies the working tree), the Windows package (built from the same tree through the shared drive) and `make install`. Wheels ship no documentation (pip builds skip the documentation install), so they need no check. Step 5 writes `docs_builder/CMakeLists.txt` and tests it on its own (`cmake -S docs_builder`); the top-level `CMakeLists.txt` includes it with one line at the cutover. |
 | D23 | Staleness check | `make docs` has a check mode (for example `build.py --check`) that rebuilds the tracked Markdown in memory and fails if it differs from the committed files. It runs on demand and before a release; regeneration is otherwise manual. |
@@ -135,8 +136,8 @@ Landing-page content (the wording is drafted in the design session, numbers come
 - Clean output: the builder writes the complete `docs/` Markdown tree and `docs/website/`, and removes stale files from earlier builds.
 - Checks after the build: every internal link and anchor resolves; generated HTML is well formed; size warnings for pages over a budget the spec sets.
 - Errors and warnings as in D7. A test suite for the builder with small fixture blocks covers the parser, both renderers and the error cases.
-- Same input gives byte-identical output.
-- Pinned dependencies: a Python requirements file and a Node package file with lockfile in `docs_builder/`. The build runs on Linux; the spec states the minimum Python and Node versions, and the extra dependencies of the tutorial target (Jupyter, kernels).
+- Same input and the same tool versions give byte-identical output (D4).
+- Dependencies with minimum versions (D4): Python requirements files and a Node package file in `docs_builder/`, no lockfile. The build runs on Linux; the spec states the minimum Python and Node versions, and the extra dependencies of the tutorial target (Jupyter, kernels).
 - `docs_builder/CMakeLists.txt` installs `docs/website/` with the configure-time failsafe of D22; `make website` writes the stamp file it checks.
 - The old builder, `html_docu/`, `extract_matlab_comments.py` and all their users stay untouched until the cutover (D31). The spec describes the cutover changes (section 11) so that `docs_builder/README.md` can carry them as a checklist.
 - `.gitignore` additions: `docs/website/`, the tutorial cache, `docs_builder/node_modules/` and any virtual environment; everything else in `docs/` is tracked Markdown (D8, D24). Existing unanchored patterns (`test*.txt`, `dist/`, `release/`, `build*`) must not catch files inside `docs_builder/`.
@@ -218,8 +219,8 @@ Each step ends with the maintainer's sign-off; the next step starts only after i
 
 ### 8.4 Prerequisites
 
-- Node.js and npm on the build machine (Ubuntu package `nodejs`; the spec states the minimum version) before step 5.
-- The Python packages from the requirements file, installed in a virtual environment or with the user's pip before step 5.
+- Node.js and npm on the build machine (in the conda environment `quadriga-web`, or the system Node for the venv set-up; D4; the spec states the minimum version) before step 5.
+- The Python packages from the requirements files, installed in the conda environment `quadriga-web` or in a virtual environment (D4) before step 5.
 
 ## 9. Design session (step 2)
 
