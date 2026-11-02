@@ -8,6 +8,7 @@
 
 #include <cmath>
 #include <iostream>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -244,5 +245,11 @@ TEST_CASE("Arrayant copy_element - Read-only object and empty destination")
     CHECK(a.n_elements() == 1);
 
     REQUIRE_NOTHROW(a.copy_element(0, 2));
+    CHECK(a.n_elements() == 3);
+
+    // The largest index cannot be reached by resizing (index + 1 wraps to 0); it must throw, not write
+    const arma::uword idx_max = std::numeric_limits<arma::uword>::max();
+    CHECK_THROWS_AS(a.copy_element(0, idx_max), std::invalid_argument);
+    CHECK_THROWS_AS(a.copy_element(0, arma::uvec{1, idx_max}), std::invalid_argument);
     CHECK(a.n_elements() == 3);
 }
