@@ -628,6 +628,7 @@ elseif(NOT DEFINED SKBUILD_PLATLIB_DIR)
     endif()
     install(DIRECTORY html_docu/ DESTINATION ${INSTALL_DOCDIR})
     install(FILES LICENSE DESTINATION ${INSTALL_LICENSEDIR})
+    install(DIRECTORY data/config/ DESTINATION share/quadriga-lib/config FILES_MATCHING PATTERN "*.conf")
 endif()
 
 if(BUILD_STATIC_LIB AND NOT DEFINED SKBUILD_PLATLIB_DIR)
@@ -657,6 +658,8 @@ if (BUILD_PYTHON)
     if(DEFINED SKBUILD_PLATLIB_DIR) # pip / scikit-build-core install
         message(STATUS "SKBUILD_PLATLIB_DIR = '${SKBUILD_PLATLIB_DIR}'")
         install(TARGETS quadriga_py LIBRARY DESTINATION ${SKBUILD_PLATLIB_DIR})
+        install(DIRECTORY data/config/ DESTINATION ${SKBUILD_DATA_DIR}/share/quadriga-lib/config
+                FILES_MATCHING PATTERN "*.conf")
     elseif(INSTALL_IS_LOCAL)
         install(TARGETS quadriga_py
             ARCHIVE DESTINATION ${INSTALL_LIBDIR}

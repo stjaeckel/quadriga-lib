@@ -14,7 +14,7 @@ Path loss and shadow-fading standard deviation of a set of links
 
 - Evaluates one of the 10 parametric path-loss models of the QuaDRiGa conf files for every link and carrier
   frequency. `plpar` is the dict of [[conf_file_read]]: its entry `model` is the model (value of `PL_model`), the
-  other entries are the `PL_` keys without the prefix; the TR 38.901 v19.5.0 conf files in `data/config`
+  other entries are the `PL_` keys without the prefix; the TR 38.901 v19.5.0 conf files of the library
   reproduce Table 7.4.1-1 with them
 - Notation: `f = fc / 1e9` in GHz (not limited by `LSP_fc_min`); `d3`, `d2` the 3D and 2D distance in m; `hBS`,
   `hUT` the z coordinates of Tx and Rx (no ground model); `[X]` the value of key `X`, or its default if the key is
