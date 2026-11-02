@@ -327,6 +327,21 @@ class test_zero_cir(unittest.TestCase):
         with self.assertRaises(IndexError):
             channel.qrt_file_read(fn, [0])
 
+    # A v4 file without origins stores no frequency: one frequency of 0 Hz, empty outputs
+    def test_v4_no_orig(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            fn = os.path.join(d, 'v4_no_orig.qrt')
+            with open(fn, 'wb') as f:
+                f.write(b'#QRT-BINv04' + bytes(12))
+            out = channel.qrt_file_read(fn)
+        self.assertEqual(len(out), 18)
+        npt.assert_array_equal(out[0], [0.0])
+        for k in range(1, 5):
+            self.assertEqual(out[k].shape, (3, 0))
+        for k in range(5, 18):
+            self.assertEqual(len(out[k]), 0)
+
     # The documented keyword names are the registered ones
     def test_documented_keywords(self):
         a = channel.qrt_file_read(fn=FN_V4, i_cir=[1, 0], i_orig=0, downlink=False, normalize_M=0)

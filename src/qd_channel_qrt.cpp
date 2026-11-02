@@ -153,7 +153,9 @@ quadriga_lib::qrt_read_cache quadriga_lib::qrt_read_cache_init(const std::string
 
     size_t pos = 11 + 3 * sizeof(unsigned); // read position (ID, version, 3 counters)
 
+    // Version 4 has one frequency, read from the first origin below; 0 Hz if there is no origin
     cache.no_freq = 1;
+    cache.freq.zeros(1);
     if (cache.version > 4)
     {
         fileR.read((char *)&cache.no_freq, sizeof(unsigned));
@@ -803,7 +805,7 @@ void quadriga_lib::qrt_file_parse(const std::string &fn,
 
     size_t pos = 11 + 3 * sizeof(unsigned); // read position (ID, version, 3 counters)
 
-    arma::fvec l_freq;
+    arma::fvec l_freq(1, arma::fill::zeros); // Version 4: read from the first origin below; 0 Hz if there is no origin
     if (ver > 4)
     {
         fileR.read((char *)&l_no_freq, sizeof(unsigned));
