@@ -81,7 +81,6 @@ Calculate MIMO channel coefficients for IRS-assisted communication
 - [[get_channels_spherical]] (single-segment spherical-wave channel)
 - [[get_channels_planar]] (single-segment planar-wave channel)
 - [[arrayant_generate]] (antenna array generator)
-- [[combine_irs_coord]] (coordinate setup for IRS geometry)
 MD!*/
 
 // Cube output; an empty result keeps its [n_rx, n_tx, 0] shape (the generic copy returns 0x0)
@@ -147,7 +146,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     {
         std::string msg = "Input 'i_irs' must be from 1 to " + std::to_string(n_codebook == 0 ? 1 : n_codebook) +
                           " (1-based codebook port index, one per column of the IRS coupling matrix).";
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", msg.c_str());
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
     }
     i_irs -= 1;
 

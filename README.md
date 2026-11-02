@@ -17,7 +17,7 @@ Quadriga-Lib generates channel impulse responses for system-level studies of mob
 
 ## Features
 
-- **Stochastic channel model (GBSM)**: large-scale and small-scale fading parameters, path loss, LOS probability, O2I loss, and scenario parameters for 3GPP TR 38.901 (configuration files in `data/config/`)
+- **Stochastic channel model (GBSM)**: large-scale and small-scale fading parameters, path loss, LOS probability, O2I loss, and scenario parameters for 3GPP TR 38.901 (configuration files in `data/config/`, installed to `share/quadriga-lib/config/`)
 - **IEEE 802.11 (Wi-Fi) indoor channel models**: TGn channel types A to F with the TGac, TGax and TGah extensions (MU-MIMO, floor penetration loss, time-evolving channels)
 - **Spatially consistent random fields**: sum-of-sinusoids generators for correlated random variables
 - **Array antennas**: predefined models (omni, dipole, ULA, 3GPP panels, multibeam), pattern interpolation, rotation, coupling, directivity and beamwidth, QDANT file format

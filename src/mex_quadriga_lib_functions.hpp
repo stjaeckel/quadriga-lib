@@ -101,7 +101,7 @@ inline quadriga_lib::arrayant<double> qd_mex_struct2arrayant(const mxArray *inpu
     {
         auto error_msg = ant.validate();
         if (!error_msg.empty())
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", error_msg.c_str());
+            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", error_msg.c_str());
     }
 
     return ant;
@@ -158,7 +158,7 @@ inline std::vector<quadriga_lib::arrayant<double>> qd_mex_struct2arrayant_multi(
     {
         auto error_msg = quadriga_lib::arrayant_is_valid_multi(ant, false);
         if (!error_msg.empty())
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", error_msg.c_str());
+            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", error_msg.c_str());
     }
 
     return ant;
@@ -243,7 +243,7 @@ inline mxArray *qd_mex_channel2struct(const std::vector<quadriga_lib::channel<do
         {
             auto error_msg = c.is_valid();
             if (!error_msg.empty())
-                mexErrMsgIdAndTxt("quadriga_lib:CPPerror", error_msg.c_str());
+                mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", error_msg.c_str());
         }
 
         qd_mex_set_field(output, "name", mxCreateString(c.name.c_str()), n);
@@ -361,7 +361,7 @@ inline std::vector<quadriga_lib::channel<double>> qd_mex_struct2channel(const mx
         {
             auto error_msg = c.is_valid();
             if (!error_msg.empty())
-                mexErrMsgIdAndTxt("quadriga_lib:CPPerror", error_msg.c_str());
+                mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", error_msg.c_str());
         }
 
         chan.push_back(std::move(c));
@@ -380,7 +380,7 @@ inline arma::uvec qd_mex_uint_entries(const arma::vec &input, const std::string 
     {
         const double v = input[i];
         if (!(v >= 0.0 && v < 9007199254740992.0 && v == std::floor(v)))
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror",
+            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s",
                               ("Entries in '" + var_name + "' must be non-negative integers below 2^53.").c_str());
         out[i] = (arma::uword)v;
     }
@@ -401,7 +401,7 @@ inline std::unordered_map<std::string, double> qd_mex_struct2scenpar(const mxArr
         return scenpar;
 
     if (!mxIsStruct(input) || mxGetNumberOfElements(input) != 1)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", ("Input '" + var_name + "' must be a 1x1 struct.").c_str());
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", ("Input '" + var_name + "' must be a 1x1 struct.").c_str());
 
     const int n_fields = mxGetNumberOfFields(input);
     for (int f = 0; f < n_fields; ++f)
@@ -418,7 +418,7 @@ inline std::unordered_map<std::string, double> qd_mex_struct2scenpar(const mxArr
         {
             if (data == nullptr || mxGetNumberOfElements(data) != 1 || mxIsComplex(data) ||
                 !(mxIsNumeric(data) || mxIsLogical(data)))
-                mexErrMsgIdAndTxt("quadriga_lib:CPPerror", ("Field '" + name + "' must be a real numeric scalar.").c_str());
+                mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", ("Field '" + name + "' must be a real numeric scalar.").c_str());
             scenpar[name] = qd_mex_get_scalar<double>(data, name);
         }
     }
@@ -460,7 +460,7 @@ inline std::unordered_map<std::string, std::vector<double>> qd_mex_struct2plpar(
         return plpar;
 
     if (!mxIsStruct(input) || mxGetNumberOfElements(input) != 1)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", ("Input '" + var_name + "' must be a 1x1 struct.").c_str());
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", ("Input '" + var_name + "' must be a 1x1 struct.").c_str());
 
     const int n_fields = mxGetNumberOfFields(input);
     for (int f = 0; f < n_fields; ++f)
@@ -477,7 +477,7 @@ inline std::unordered_map<std::string, std::vector<double>> qd_mex_struct2plpar(
         {
             if (data == nullptr || mxIsComplex(data) || !mxIsNumeric(data) || mxGetNumberOfDimensions(data) > 2 ||
                 (mxGetM(data) > 1 && mxGetN(data) > 1))
-                mexErrMsgIdAndTxt("quadriga_lib:CPPerror", ("Field '" + name + "' must be a real numeric vector.").c_str());
+                mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", ("Field '" + name + "' must be a real numeric vector.").c_str());
             const arma::vec values = qd_mex_typecast_Col<double>(data, name);
             plpar[name] = std::vector<double>(values.begin(), values.end());
             pl_order.push_back(name);

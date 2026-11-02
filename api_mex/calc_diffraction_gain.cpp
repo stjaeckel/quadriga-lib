@@ -49,7 +49,7 @@ Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh
 - **`scalar_mode`** — If `true`, uses scalar transmission (TE-only reflection coefficient,
   energy-conservation transmission) instead of EM TE/TM averaging. Default `false` (EM mode).
 - **`thin_slab_threshold`** — Thin-slab (Fabry-Pérot) resolve threshold; 0 = resolve always (default), 
-  1 = resolve never, see [[ray_state_update]]
+  1 = resolve never
 - **`apply_fspl`** — If `true`, folds the geometric spreading loss into `gain`, making it an absolute
   propagation gain instead of a value relative to FSPL. The reference distance is the direct TX-RX
   distance, matching the `path_length` used by [[qrt_file_read]] for a

@@ -18,8 +18,9 @@ clause 7.5 steps 1 to 7: path loss, shadow fading, LOS probability, O2I penetrat
 large-scale parameters (LSPs) of each link, i.e. the spreads of delays and angles, the K-factor and
 the cross-polarization ratio, and the clusters.<br><br>
 
-The statistics of a scenario are read from a conf file by [[conf_file_read]]. The folder
-`data/config` holds 23 files for TR 38.901 v19.5.0; [[scenpar_validate]] completes a parameter set
+The statistics of a scenario are read from a conf file by [[conf_file_read]]. 23 files for
+TR 38.901 v19.5.0 come with the library, in `data/config` of the source tree and in
+`share/quadriga-lib/config` of an installed package; [[scenpar_validate]] completes a parameter set
 from another source, [[conf_file_list]] finds the files and [[conf_file_write]] writes them.<br><br>
 
 Per drop (layout): [[o2i_loss]] gives the penetration loss and the indoor distance of each indoor

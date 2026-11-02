@@ -205,6 +205,14 @@ class TestCopyElementSingleFreq(unittest.TestCase):
             arrayant.copy_element(ant, source_element=np.array([5], dtype=np.uint64),
                                   dest_element=np.array([1], dtype=np.uint64))
 
+    def test_negative_dest_throws(self):
+        """A destination of -1 becomes the largest unsigned index and must raise, not write memory."""
+        ant = make_single_freq_ant(n_elem=1)
+        with self.assertRaises(ValueError):
+            arrayant.copy_element(ant, 0, np.array([-1]))
+        with self.assertRaises(ValueError):
+            arrayant.copy_element(ant, 0, np.array([2**64 - 1], dtype=np.uint64))
+
     # ================================================================================
     # Integration with generate
     # ================================================================================

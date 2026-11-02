@@ -26,7 +26,6 @@ SECTION!*/
 # write_png
 Write data to a PNG file
 
-## Description:
 - Converts input data into a color-coded PNG file for visualization
 - Support optional selection of a colormap, as well a minimum and maximum value limits
 - Uses the <a href="https://github.com/lvandeve/lodepng">LodePNG</a> library for PNG writing
@@ -36,10 +35,8 @@ Write data to a PNG file
   input without a positive value; also an infinite `min_val` or `max_val`) maps every value to the first colour
 - Raises `ValueError` for empty `data` and for `min_val > max_val` (both given)
 
-## Declaration:
+## Usage:
 ```
-import quadriga_lib
-
 quadriga_lib.tools.write_png( fn, data, colormap, min_val, max_val, log_transform )
 ```
 

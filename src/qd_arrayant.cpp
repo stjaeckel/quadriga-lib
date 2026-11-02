@@ -7,6 +7,7 @@
 #include <iomanip>   // std::setprecision
 #include <algorithm> // std::replace
 #include <iostream>
+#include <limits>    // std::numeric_limits
 
 #include "quadriga_arrayant.hpp"
 #include "quadriga_tools.hpp"
@@ -678,7 +679,7 @@ Copy a single antenna element to one or more destination slots
 
 - Array is resized if any destination index exceeds the current number of elements
 - Coupling matrix for added elements is set to identity; if not existing, it gets initialized to identity
-- Throws `std::invalid_argument` for a read-only object or an empty `destination`
+- Throws `std::invalid_argument` for a read-only object, an empty `destination`, or a destination index equal to the largest `arma::uword` (e.g. `-1` cast to unsigned)
 
 ## Declaration:
 ```
@@ -703,6 +704,10 @@ void quadriga_lib::arrayant<dtype>::copy_element(arma::uword source, arma::uvec 
 
     if (destination.n_elem == 0)
         throw std::invalid_argument("Input 'destination' is empty.");
+
+    // The largest index cannot be reached by resizing: index + 1 would wrap to 0
+    if (destination.max() == std::numeric_limits<arma::uword>::max())
+        throw std::invalid_argument("Destination index out of bound.");
 
     // Check if arrayant object is valid
     std::string error_message = validate(); // Deep check

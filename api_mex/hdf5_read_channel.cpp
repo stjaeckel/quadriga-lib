@@ -158,7 +158,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                     {
                         std::string error_msg = c.is_valid();
                         if (!error_msg.empty())
-                            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", error_msg.c_str());
+                            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", error_msg.c_str());
                     }
 
                     channels.push_back(std::move(c));
