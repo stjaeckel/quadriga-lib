@@ -504,7 +504,7 @@ The engine was developed with AI assistance throughout: Claude (Anthropic) wrote
 - Usable, not perfect (2026-10-19): no new open items, studies or roadmap entries from side findings, and no work on fringe edge cases; every effect is sized for typical scenes (indoor rooms, site models in local coordinates) before work is proposed. This veto ended the growth of the open list; the open questions of section 9 are what remained.
 - Explain in physical terms first (2026-10-14 to 10-21): what a quantity is, what happens, how large it is in a typical scene, before the option is named.
 - Commit messages in plain physical terms, with the measured numbers, the line count and the suite counts, and without internal labels or references to transitory documents (2026-10-17).
-- Shared machine: at most 12 threads, one suite at a time, timings as single-threaded CPU time with old and new binaries alternated (2026-10-19).
+- Shared machine: timings as single-threaded CPU time with old and new binaries alternated (2026-10-19); the 12-thread limit was dropped on 2026-11-02 after the OpenMP size limits.
 
 ### 10.4 What it caught and what it cost
 

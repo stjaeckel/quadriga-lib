@@ -216,7 +216,7 @@ Run on every agent result; the report says which items were checked.
 - **CSV = test:** the CSV row is the row the test reads and asserts (the test reads the file; no copy of the numbers in
   the test).
 - **Documents:** `python3 tools/acoustic/check_docs.py` passes; tracked files carry no private details.
-- **Resources:** at most 12 threads, compiler and tests; one suite at a time; numpy workers with
+- **Resources:** all cores for compiler and tests, `test_bin` with `OMP_WAIT_POLICY=passive`; numpy workers with
   `OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1`; no heavy tools.
 - **Hard rules kept:** no change under `src/`, `include/`, `api_*`; nothing written in `/sjc/accoustic_research`;
   nothing committed by the agent.
