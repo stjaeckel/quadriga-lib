@@ -258,5 +258,5 @@ TR tables.
 - MATLAB R2024a is required (libstdc++ up to `GLIBCXX_3.4.28`: check new MEX files with
   `objdump -T +quadriga_lib/*.mexa64 | grep -o 'GLIBCXX_3\.4\.[0-9]*' | sort -u`); Octave as well.
 - NG unit tests are in `xunit_new/` (`run_tests.m`).
-- The machine is shared: check `cat /proc/loadavg`, at most 12 threads, one test suite at a time, heavy tools once
+- The machine is shared: check `cat /proc/loadavg`, run `test_bin` with `OMP_WAIT_POLICY=passive`, heavy tools once
   on the final code.

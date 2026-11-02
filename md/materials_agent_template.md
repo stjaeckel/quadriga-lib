@@ -36,8 +36,8 @@ in the brief and return a short report.`
 ## Hard rules
 - No change under src/, include/ or api_*. Never edit /sjc/accoustic_research (read only; report a wrong row instead).
   Never commit.
-- At most 12 threads, compiler and tests (cmake --build build_linux --parallel 12; OMP_NUM_THREADS=12 or fewer);
-  numpy workers with OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1, at most 12; one suite at a time;
+- Compiler and tests use all cores (cmake --build build_linux --parallel $(nproc); test_bin with OMP_WAIT_POLICY=passive);
+  numpy workers with OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1, at most one per core;
   no ASAN, AFL or other heavy tools. Check /proc/loadavg before heavy work and use fewer threads when it is high.
 - Measure, don't compute by hand: every number in the report comes from a run, a printed test row or a recorded
   commit. If a command cannot run, say so and stop.

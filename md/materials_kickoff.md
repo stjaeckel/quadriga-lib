@@ -16,7 +16,7 @@ the whole pipeline, with the engine as its methods core).
 
 - Your memory index loads by itself. Read in full: `parameter-project-inheritance`, `user-stephan`,
   `acoustic-engine-domain-decisions`, `probe-and-test-techniques`, `measure-dont-compute-by-hand`,
-  `md-public-no-private-details`, `resource-limit-12-threads`, `usable-not-perfect-no-new-items`,
+  `md-public-no-private-details`, `shared-machine-resources`, `usable-not-perfect-no-new-items`,
   `commit-messages-no-internal-labels`.
 - `/sjc/accoustic_research/manager/handoff_parameter_session.md`, in full. It covers:
   - where the data are and how to read them (generated files; coefficient types; copies at 63 Hz and 8 kHz);
@@ -110,8 +110,8 @@ the whole pipeline, with the engine as its methods core).
 ## Phase 0 — setup (stop)
 
 1. **Baseline:**
-   - build with `--parallel 12`;
-   - `QD_DIAG_RAY=1 OMP_NUM_THREADS=12 ./build_linux/test_bin "[wave]" > test_wave.txt` (163474 / 178);
+   - build with `--parallel $(nproc)`;
+   - `QD_DIAG_RAY=1 OMP_WAIT_POLICY=passive ./build_linux/test_bin "[wave]" > test_wave.txt` (163474 / 178);
    - the same for `"[acoustic]"` into `test_acoustic.txt` (42741 / 59);
    - `QD_DIAG=1 … > test.txt` for the whole suite (1344398 / 1264);
    - `python3 tools/acoustic/check_docs.py`.
@@ -145,8 +145,8 @@ the whole pipeline, with the engine as its methods core).
    - the rules that apply;
    - the tier-1 model;
    - the steps (data → columns by the decided rule → tier 1 → tier 2 → the test case → the CSV row);
-   - the hard rules: no change under `src/`, `include/` or `api_*`; no edit of the research repository; ≤ 12 threads;
-     one suite at a time; measure, don't compute by hand; no private details;
+   - the hard rules: no change under `src/`, `include/` or `api_*`; no edit of the research repository;
+     measure, don't compute by hand; no private details;
    - the report format: a short return to the manager, the substance in `md/materials/<id>_report.md`.
 4. **Scope:** propose the CSV's name and location, the test file's skeleton (names only), and how a combination
    ("meaningful combinations") is defined and named in the CSV.
@@ -160,7 +160,7 @@ the whole pipeline, with the engine as its methods core).
   edit `/sjc/accoustic_research`. Never commit; Stephan commits.
 - Agents run one at a time; each gets its brief file and returns a short report. The manager verifies every claim a
   decision rests on: rebuild, rerun, read the CSV and the test.
-- Resources: at most 12 threads, compiler and tests alike; one suite at a time; `OMP_NUM_THREADS=1` per numpy worker;
+- Resources: all cores for compiler and tests, `test_bin` with `OMP_WAIT_POLICY=passive`; `OMP_NUM_THREADS=1` per numpy worker;
   no heavy tools.
 - Tracked documents carry no private details; Stephan's answers stay in untracked working files when they are
   personal.
