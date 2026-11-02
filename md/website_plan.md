@@ -10,8 +10,8 @@ Sessions that read this plan: the decisions in section 3 are settled. Do not reo
 |------|------|--------|-------|
 | 1 | Project plan | `md/website_plan.md` | signed off 2026-11-02 |
 | 2 | Design session | `md/website_design.md`, `html_builder/design_prototype/` | signed off 2026-11-02 |
-| 3 | Spec | `md/website_spec.md` | committed 2026-11-02; amendment for D4 (environments, speed, tidy) waiting for commit |
-| 3a | Doc-block fixes on `main`, merge of `main` into `website`, re-check (D20) | fixed doc blocks; spec measurements updated | not started |
+| 3 | Spec | `md/website_spec.md` | done 2026-11-02 |
+| 3a | Doc-block fixes on `main`, merge of `main` into `website`, re-check (D20) | fixed doc blocks; spec measurements updated | done 2026-11-02: fixed on `main`, merged, re-check passed |
 | 4 | Spec review (1 to 3 rounds) | updated spec | not started |
 | 5 | Implementation | builder, static parts, pages | not started |
 | 6 | Implementation review (1 to 3 rounds) | fixes | not started |

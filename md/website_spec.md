@@ -345,7 +345,7 @@ A block starts with a line that is exactly `/*!SECTION`, `/*!SECTION_DESC` or `/
 | E-name | The first line of an `/*!MD` block does not match `^# (\.?[A-Za-z_][A-Za-z0-9_.]*)(<\+\+>)?$`. `<++>` is accepted and ignored (plan section 11). |
 | E-fence | A code fence (a line whose stripped text starts with three backticks) without a closing fence in the same block part. |
 | E-required | A required sub-block is missing (section 5.3). |
-| E-link | An unresolved `[[...]]` link, or a raw link to an API page whose anchor is no function, section or legacy id of that page (section 8.7). |
+| E-link | An unresolved `[[...]]` link (section 8.7.2). |
 | E-anchor | Two anchors equal on one page (functions, section ids, legacy ids, prose heading ids). |
 | E-gap | A gap marker opened and not closed on the same line (section 6.4). |
 
@@ -361,7 +361,7 @@ Split at the source-line level, outside code fences: name (line 1), brief (line 
 | `params` | `Input`, `Inputs`, `Output`, `Outputs`, `Attributes`, `Arguments`, `Input Arguments`, `Output Argument`, `Output Arguments`, `Optional outputs`, and labels starting with `Inputs (`, `Outputs (` or `In/out` | Parameter lists (section 5.4). |
 | `plain` | everything else | Fragment. |
 
-Required sub-blocks (D7): C++ blocks need `Declaration`, `Declarations` or `Usage`, except class blocks (blocks with an `Attributes` sub-block: `arrayant`, `channel`, `path`); MATLAB and Python blocks need `Usage`. The twelve doc-block defects found on `main` (one Python block with `## Declaration:` instead of `## Usage:`, eleven unresolvable links) are fixed on `main` and merged into `website` before the spec review (D20 as amended); the expected error count on the merged tree is zero.
+Required sub-blocks (D7): C++ blocks need `Declaration`, `Declarations` or `Usage`, except class blocks (blocks with an `Attributes` sub-block: `arrayant`, `channel`, `path`); MATLAB and Python blocks need `Usage`. The current sources satisfy this rule (zero errors).
 
 Display name: the name without `<++>`; on the MATLAB page lower-cased (as today, design open point 7).
 
@@ -577,7 +577,7 @@ Every link becomes a target; each renderer asks for its URL at its output locati
 
 | Kind | Example in a source | HTML in root | HTML in `tutorials/` | Twin in `docs/` |
 |------|---------------------|--------------|----------------------|-----------------|
-| API function | `[[x]]`, `cpp_api.html#x` | `cpp_api.html#x` (same page: `#x`) | `../cpp_api.html#x` | full file: `#<gh-slug>` or `quadriga_lib_api_<lang>.md#<gh-slug>`; section file: `#<gh-slug>`, `<slug>.md#<gh-slug>` or `../<lang>/<slug>.md#<gh-slug>` |
+| API function | `[[x]]` in a block; `cpp_api.html#x` in prose | `cpp_api.html#x` (same page: `#x`) | `../cpp_api.html#x` | full file: `#<gh-slug>`; section file: `#<gh-slug>` or `<slug>.md#<gh-slug>`; prose twin: `api/<lang>/<slug>.md#<gh-slug>` |
 | Page with twin | `faq.html#cite` | `faq.html#cite` | `../faq.html#cite` | twin path plus the GitHub slug of the heading with that id (`faq.md#how-do-i-cite-quadriga-lib`) |
 | Page without twin | `index.html#quickstart` | relative | relative | absolute: `<base_url>/index.html#quickstart` |
 | Twin file | `quadriga_lib_api_cpp.md` | relative | relative | relative |
@@ -585,11 +585,11 @@ Every link becomes a target; each renderer asks for its URL at its output locati
 | External | `https://...` | unchanged | unchanged | unchanged |
 | Same-page anchor | `#files` | unchanged | unchanged | GitHub slug of the target heading |
 
-Links in sources are written relative to the site root. A link to another API page with a function anchor, written as a raw link in a doc block (`<a href="cpp_api.html#ray_state_update">ray_state_update</a> (C++ API)`, as the doc-block fixes on `main` write cross-language references) or as a Markdown link in prose, is the kind "API function"; an anchor that is not a function, section or legacy id of that page is E-link.
+Links in sources are written relative to the site root. Doc blocks link only within their own API page (`[[name]]`; `md/SPEC_MATLAB_API.md`, `md/SPEC_PYTHON_API.md`); their raw links point to site pages such as `formats.html#6cab4884`, site files or external URLs. A prose link to an API page with a function anchor (for example `cpp_api.html#obj_file_read` on the formats page) is the kind "API function". A wrong anchor in any site-relative link is caught by the link check (section 15.1).
 
 #### 8.7.2 Resolving `[[name]]`
 
-`[[name]]` in a block or intro of language L links to the function of L whose display name equals `name` (MATLAB: compared in lower case); `.[[name]]` links to the member function `.name`. Nothing else is tried; an unresolved link is E-link (D7). Expected on the merged tree: zero unresolved links (today 0 of 637 C++, 5 of 391 MATLAB and 6 of 358 Python, all on the fix list).
+`[[name]]` in a block or intro of language L links to the function of L whose display name equals `name` (MATLAB: compared in lower case); `.[[name]]` links to the member function `.name`. Nothing else is tried; an unresolved link is E-link (D7). Zero unresolved links on the current tree (637 C++, 387 MATLAB, 354 Python).
 
 ### 8.8 `llms.txt` and `docs/README.md`
 
@@ -860,7 +860,7 @@ pytest; run with `python3 -m pytest docs_builder/tests` in the active environmen
 | `test_output.py` | A | Only changed files written; stale files removed; `docs` leaves `docs/website/` alone; `--check` writes nothing, exits 1 on a changed, missing or extra file and prints the hint; stamp deleted first and written last |
 | `test_docblocks.py` | A | Line numbers; each error id of section 5.2 (one small fixture each); sub-block kinds; required sub-blocks with the class-block exemption; parameter pattern variants of section 5.4, note rows, warnings |
 | `test_mdparse.py` | A | `wikilink` with member form; `raw_a`; `raw_br`; raw HTML in prose shown as text; `heading_attrs`; `site_url`; `$5 and $6` not math; code untouched |
-| `test_links.py` | A | `[[...]]` resolution and E-link; raw cross-language links; URLs of each link kind per output location; `slug`, legacy hashes (section 9.3 values), `gh_slug` vectors; E-anchor; families, mapping order and mapping errors |
+| `test_links.py` | A | `[[...]]` resolution and E-link; URLs of each link kind per output location; `slug`, legacy hashes (section 9.3 values), `gh_slug` vectors; E-anchor; families, mapping order and mapping errors |
 | `test_prose.py` | A | Front matter and schema errors with key paths; build variables and the unknown-name error; note boxes; heading ids; gap markers in HTML, meta and twins; gap list and `website --release` failing on gaps |
 | `test_render_md.py` | A | Substrings of the full API file (front matter without date, index without "Line", "Also in"), a section file, a prose twin (index table, alert, braces removed, GitHub-slug links), `llms.txt` and `docs/README.md` (absolute and relative links) |
 | `test_render_html.py` | B | Substrings: head tags (alternate link and Markdown footer link only with a twin, `og:image` only with the image), tabs with `aria-current`, function entry, parameter rows, pills, section and legacy ids, text-page index, note boxes, gap spans, span-free code colouring; `404.html` root-absolute; tutorial pages with `../` |
@@ -933,7 +933,7 @@ Acceptance (each package also passes its tests and leaves the others green):
 
 | Id | Done when |
 |----|-----------|
-| A | `make docs`, `make docs-check` and `make docs-env` work; on the merged tree (D20 as amended) the real sources parse with zero errors and about 17 `param-separator` and 25 `param-item` warnings; `make docs` writes the files of section 2.3, `docs --check` passes right after, and no output contains a date; for both set-ups, a fresh set-up following only the README section succeeds, `make docs-env` passes, and `git status --porcelain --ignored` shows nothing new in the working copy. |
+| A | `make docs`, `make docs-check` and `make docs-env` work; the real sources parse with zero errors and about 17 `param-separator` and 25 `param-item` warnings; `make docs` writes the files of section 2.3, `docs --check` passes right after, and no output contains a date; for both set-ups, a fresh set-up following only the README section succeeds, `make docs-env` passes, and `git status --porcelain --ignored` shows nothing new in the working copy. |
 | B | `make website` builds all pages with link, anchor and well-formedness checks passing and the C++ page within budget; manual: the CSS token values equal the prototype's, and the pages match the prototype at 375, 768 and 1280 px in the browser pane. |
 | C | The real content passes all schemas; `cite` and the legacy ids exist; every prototype draft and design-section-9 item is a gap; `test_real_repo.py` passes; a plain-text comparison of the old and new formats, FAQ and download pages shows no lost text. |
 | D | `make tutorials` runs `pipeline_demo.ipynb`, a second run skips it, and `make website` shows it with figure, table, formula and downloads; without the cache, `make website` passes with the warning; the skill zip is byte-identical across runs; the CMake cases pass. |
