@@ -78,6 +78,7 @@ The report at the end of the implementation, read by the code review:
 - the test record of step 2, and every expectation or tolerance changed after it, with the reason
 - test results (new cases and complete suite) with the actual output of the run; do not report a test as passing that was not run
 - compiler warnings, if any
+- the size limit of each new or changed OpenMP region, with the measurement it comes from
 - deviations from the contract or the reference, and known limitations
 
 # PUBLIC HEADER
@@ -173,12 +174,13 @@ if (out != nullptr && (out->n_rows != n_ray || out->n_cols != 3))
 
 ## OpenMP
 - Parallelize only loops that dominate the run time and are independent per iteration. Guard nothing with `#ifdef _OPENMP` unless OpenMP runtime functions are called; a plain `#pragma omp parallel for` is ignored by a compiler without OpenMP.
+- Every parallel region has an `if (...)` clause with a measured size limit, so that small calls run serially. Starting a thread team costs a few microseconds on an idle machine and up to a scheduler time slice (milliseconds) when other processes compete for the cores. The limit is the smallest size at which the default thread count is at least 2× faster than serial on an idle machine; where the tests do not reach that size, it is the size at which the serial work reaches about 20 µs at the measured cost per item. Express the limit in the quantity the work scales with (e.g. `n_ray * n_point`), and also require at least 2 iterations when the count of the parallel loop can be 1.
 - The loop variable of a parallel `for` must be a signed integer type (`int` or `long long`) for MSVC; cast to `arma::uword` inside the loop.
 - Exceptions must not leave a parallel region. Wrap throwing calls with the `OMP_SAFE_CALL` macro from `quadriga_lib.hpp` and rethrow after the region:
 ```
 bool omp_failed = false;
 std::string omp_error;
-#pragma omp parallel for
+#pragma omp parallel for if (n_iter >= 64)
 for (long long i = 0; i < n_iter; ++i)
 {
     OMP_SAFE_CALL(omp_failed, omp_error, do_work((arma::uword)i));

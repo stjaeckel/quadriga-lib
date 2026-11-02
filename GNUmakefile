@@ -87,7 +87,7 @@ python_install: python
 test:   all moxunit-lib
 	cmake -B $(CMAKE_BUILD_DIR) -D ENABLE_TESTS=ON
 	cmake --build $(CMAKE_BUILD_DIR) --parallel $(shell nproc)
-	time $(CMAKE_BUILD_DIR)/test_bin
+	OMP_WAIT_POLICY=$${OMP_WAIT_POLICY:-passive} time $(CMAKE_BUILD_DIR)/test_bin
 ifeq ($(octave),ON)
 ifneq ($(OCTAVE_VERSION),)
 	time octave --eval "cd tests; quadriga_lib_mex_tests;"

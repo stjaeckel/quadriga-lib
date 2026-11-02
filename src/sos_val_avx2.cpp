@@ -195,7 +195,7 @@ void qd_SOS_AVX2(const double *fx, const double *fy, const double *fz,
         }
     }
 
-#pragma omp parallel num_threads(n_threads)
+#pragma omp parallel num_threads(n_threads) if (n_pos * n_coeff * n_gen >= 8192)
     {
         // Cosine and sine of all sinusoids at the positions of the blocks of one tile, Size [8, n_coeff, tile]
 #ifdef _OPENMP

@@ -175,7 +175,7 @@ void qd_arrayant_interpolate(const arma::Cube<dtype> &e_theta_re, const arma::Cu
 
     // Interpolate the pattern data using spheric interpolation
     // datatype "int" is required by MSVC to allow parallel for
-#pragma omp parallel for
+#pragma omp parallel for if (n_ang > 1 && n_ang * n_out >= 256)
     for (int a_i32 = 0; a_i32 < (int)n_ang; ++a_i32)
     {
         // Convert a_i32 to 64 bit

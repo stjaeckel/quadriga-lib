@@ -189,7 +189,7 @@ arma::uword quadriga_lib::subdivide_rays(const arma::Mat<dtype> &orig,
     int out_of_bound = 0;                             // Set by any thread that hits an invalid index
 
     // Iterate through all selected rays
-#pragma omp parallel for schedule(static) reduction(| : out_of_bound)
+#pragma omp parallel for schedule(static) reduction(| : out_of_bound) if (n_subdiv_l >= 64)
     for (long long i_subdiv = 0; i_subdiv < n_subdiv_l; ++i_subdiv)
     {
         const arma::uword i_ray = p_ind ? (arma::uword)p_ind[i_subdiv] : (arma::uword)i_subdiv;

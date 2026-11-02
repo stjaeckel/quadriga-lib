@@ -35,7 +35,7 @@ void qd_RTI_GENERIC(const dtype *Tx, const dtype *Ty, const dtype *Tz, // First 
     const int n_mesh_int = (int)n_mesh;
     const int n_ray_int = (int)n_ray;
 
-#pragma omp parallel for
+#pragma omp parallel for if (n_ray > 1 && n_ray * n_mesh >= 8192)
     for (int i_ray = 0; i_ray < n_ray_int; ++i_ray) // Ray loop
     {
         // Load origin

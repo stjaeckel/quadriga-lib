@@ -317,7 +317,7 @@ void quadriga_lib::baseband_freq_response_vec(const std::vector<arma::Cube<dtype
     bool omp_failed = false;
     std::string omp_error;
 
-#pragma omp parallel for
+#pragma omp parallel for if (n_iter > 1 && (arma::uword)n_iter * n_rx * n_tx * n_carrier >= 1024)
     for (long long i = 0; i < n_iter; ++i)
     {
         arma::uword js = (p_snap == nullptr) ? (arma::uword)i : p_snap[i];

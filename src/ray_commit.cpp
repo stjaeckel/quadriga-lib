@@ -255,7 +255,7 @@ arma::uword quadriga_lib::ray_commit(const std::vector<quadriga_lib::path> &path
     constexpr unsigned GATE_HAS_FBS = 2;   // ray has a first-bounce face that can shade
 
     int bad = 0; // out-of-range flag, reported after the parallel region
-#pragma omp parallel for schedule(static) reduction(| : bad)
+#pragma omp parallel for schedule(static) reduction(| : bad) if (n_ray >= 1024)
     for (long long i_ray = 0; i_ray < (long long)n_ray; ++i_ray)
     {
         const size_t iR = (size_t)i_ray;           // Ray index
@@ -324,7 +324,7 @@ arma::uword quadriga_lib::ray_commit(const std::vector<quadriga_lib::path> &path
     std::vector<size_t> block_offset(n_block + 1, 0u);
     qd::bits<uint8_t> *p_mask = mask.data();
 
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for schedule(dynamic) if (n_block > 1)
     for (long long i_block = 0; i_block < (long long)n_block; ++i_block)
     {
         const size_t k0 = (size_t)i_block * BLOCK;
@@ -421,7 +421,7 @@ arma::uword quadriga_lib::ray_commit(const std::vector<quadriga_lib::path> &path
     static const float mirror[8] = {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f};
     const float *p_mirror = scalar_mode ? nullptr : mirror;
 
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for schedule(dynamic) if (n_block > 1)
     for (long long i_block = 0; i_block < (long long)n_block; ++i_block)
     {
         const size_t k0 = (size_t)i_block * BLOCK;

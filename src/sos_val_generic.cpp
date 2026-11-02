@@ -32,7 +32,7 @@ void qd_SOS_GENERIC(const double *fx, const double *fy, const double *fz,
 #endif
     std::vector<double> buffer(2 * n_coeff * (size_t)n_threads);
 
-#pragma omp parallel num_threads(n_threads)
+#pragma omp parallel num_threads(n_threads) if (n_pos * n_coeff * n_gen >= 512)
     {
 #ifdef _OPENMP
         double *c = &buffer[2 * n_coeff * (size_t)omp_get_thread_num()], *s = c + n_coeff;

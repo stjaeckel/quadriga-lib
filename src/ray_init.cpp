@@ -229,7 +229,7 @@ arma::uword quadriga_lib::ray_init(arma::uword n_ray_target,
             const arma::uword n_points = rx_points->n_rows;
             const float *p_points = rx_points->memptr();
 
-#pragma omp parallel
+#pragma omp parallel if (n_points >= 32768)
             {
                 float d2_local = d2_min;
 
@@ -282,7 +282,7 @@ arma::uword quadriga_lib::ray_init(arma::uword n_ray_target,
     if (has_paths && paths->size() != n_ray)
         paths->resize(n_ray);
 
-#pragma omp parallel for schedule(static)
+#pragma omp parallel for schedule(static) if (n_ray * n_freq >= 2048)
     for (long long i_ray = 0; i_ray < (long long)n_ray; ++i_ray)
     {
         arma::uword i_ray0 = (arma::uword)i_ray;

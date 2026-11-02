@@ -83,7 +83,7 @@ void qd_RPI_assemble(const unsigned long long *const *hit_buffer, // Packed hit 
     const long long n_point_l = (long long)n_point;
 
     // Count the hits per point, each worker into its own histogram
-#pragma omp parallel for schedule(static)
+#pragma omp parallel for schedule(static) if (n_hit_total >= 16384)
     for (long long i_work = 0; i_work < n_work; ++i_work)
     {
         unsigned *p_local = p_hist + (size_t)i_work * n_point;
@@ -99,7 +99,7 @@ void qd_RPI_assemble(const unsigned long long *const *hit_buffer, // Packed hit 
     }
 
     // Total hits per point
-#pragma omp parallel for schedule(static)
+#pragma omp parallel for schedule(static) if (n_point_l >= 65536)
     for (long long i_point = 0; i_point < n_point_l; ++i_point)
     {
         unsigned total = 0u;
@@ -115,7 +115,7 @@ void qd_RPI_assemble(const unsigned long long *const *hit_buffer, // Packed hit 
 
     // Turn the histograms into disjoint write cursors, worker order decides
     // the order of the ray indices within a point's block
-#pragma omp parallel for schedule(static)
+#pragma omp parallel for schedule(static) if (n_point_l >= 65536)
     for (long long i_point = 0; i_point < n_point_l; ++i_point)
     {
         unsigned running = hit_offset[i_point];
@@ -132,7 +132,7 @@ void qd_RPI_assemble(const unsigned long long *const *hit_buffer, // Packed hit 
     unsigned *p_index = hit_index->data();
 
     // Scatter, each worker writes into its own disjoint slots
-#pragma omp parallel for schedule(static)
+#pragma omp parallel for schedule(static) if (n_hit_total >= 16384)
     for (long long i_work = 0; i_work < n_work; ++i_work)
     {
         unsigned *p_cursor = p_hist + (size_t)i_work * n_point;
@@ -195,7 +195,7 @@ void qd_RPI_GENERIC(const dtype *Px, const dtype *Py, const dtype *Pz,    // Poi
     // data is written exactly once and the peak memory is the payload size
     std::vector<std::vector<std::vector<unsigned long long>>> stage((size_t)n_threads);
 
-#pragma omp parallel
+#pragma omp parallel if (n_ray_l > 1 && n_ray_l * n_point_l >= 32768)
     {
 #ifdef _OPENMP
         const size_t i_thread = (size_t)omp_get_thread_num();

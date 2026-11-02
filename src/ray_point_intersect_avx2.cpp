@@ -85,7 +85,7 @@ void qd_RPI_AVX2(const float *Px, const float *Py, const float *Pz,    // Point 
     // data is written exactly once and the peak memory is the payload size
     std::vector<std::vector<std::vector<unsigned long long>>> stage((size_t)n_threads);
 
-#pragma omp parallel
+#pragma omp parallel if (n_ray_l > 1 && n_ray_l * n_point_l >= 131072)
     {
 #ifdef _OPENMP
         const size_t i_thread = (size_t)omp_get_thread_num();
