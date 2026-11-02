@@ -17,7 +17,7 @@ static arma::uword qd_mex_sos_count(const mxArray *input, const char *name, doub
     if (!(v >= 1.0) || !(v < 9.0e18) || v != std::floor(v))
     {
         const std::string msg = std::string("Input '") + name + "' must be an integer >= 1.";
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", msg.c_str());
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
     }
     return (arma::uword)v;
 }

@@ -147,7 +147,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     {
         std::string msg = "Input 'i_irs' must be from 1 to " + std::to_string(n_codebook == 0 ? 1 : n_codebook) +
                           " (1-based codebook port index, one per column of the IRS coupling matrix).";
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", msg.c_str());
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
     }
     i_irs -= 1;
 

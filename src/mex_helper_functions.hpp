@@ -17,17 +17,17 @@
 #include <limits>
 
 // Macro to redirect any exception to stderr
-#define CALL_QD(expr)                                              \
-    do                                                             \
-    {                                                              \
-        try                                                        \
-        {                                                          \
-            expr;                                                  \
-        }                                                          \
-        catch (const std::exception &ex)                           \
-        {                                                          \
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", ex.what()); \
-        }                                                          \
+#define CALL_QD(expr)                                                    \
+    do                                                                   \
+    {                                                                    \
+        try                                                              \
+        {                                                                \
+            expr;                                                        \
+        }                                                                \
+        catch (const std::exception &ex)                                 \
+        {                                                                \
+            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", ex.what()); \
+        }                                                                \
     } while (0)
 
 // Helper: check if MATLAB array type matches the requested C++ dtype
@@ -185,7 +185,7 @@ inline dtype qd_mex_read_scalar(const mxArray *input, const std::string &var_nam
     else
     {
         std::string error_message = "Input '" + var_name + "' has an unsupported data type.";
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", error_message.c_str());
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", error_message.c_str());
     }
 
     return default_value;
@@ -415,7 +415,7 @@ inline std::any qd_mex_anycast(const mxArray *input, std::string var_name = "", 
     else
     {
         std::string error_message = "Input '" + var_name + "' has an unsupported data type.";
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", error_message.c_str());
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", error_message.c_str());
     }
 
     return std::any();
@@ -451,7 +451,7 @@ inline void qd_mex_copy_convert(const mxArray *input, dtype *ptr, size_t n_data,
     else
     {
         std::string msg = var_name.empty() ? "Unsupported data type." : "Input '" + var_name + "' has an unsupported data type.";
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", msg.c_str());
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
     }
     if (bad)
         qd_mex_integer_error<dtype>(var_name, false);
@@ -467,7 +467,7 @@ inline arma::Col<dtype> qd_mex_typecast_Col(const mxArray *input, std::string va
     if (n_elem != 0 && n_data != n_elem)
     {
         std::string msg = var_name.empty() ? "Incorrect number of elements." : "Input '" + var_name + "' has incorrect number of elements.";
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", msg.c_str());
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
     }
     arma::Col<dtype> output(n_data, arma::fill::none);
     qd_mex_copy_convert<dtype>(input, output.memptr(), n_data, var_name);
@@ -538,7 +538,7 @@ inline std::vector<arma::Cube<dtype>> qd_mex_typecast_CubeVec(const mxArray *inp
     else
     {
         std::string msg = var_name.empty() ? "Unsupported data type." : "Input '" + var_name + "' has an unsupported data type.";
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", msg.c_str());
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
     }
     if (bad)
         qd_mex_integer_error<dtype>(var_name, false);
@@ -1673,11 +1673,11 @@ inline mxArray *qd_mex_get_field(const mxArray *strct, const std::string &field,
 
     size_t n_elem = (size_t)mxGetNumberOfElements(strct);
     if (n >= n_elem)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", ("Struct index " + std::to_string(n) + " out of range (size " + std::to_string(n_elem) + ").").c_str());
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", ("Struct index " + std::to_string(n) + " out of range (size " + std::to_string(n_elem) + ").").c_str());
 
     mxArray *data = mxGetField(strct, (mwIndex)n, field.c_str());
     if (data == nullptr)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", ("Field '" + field + "' not found at index " + std::to_string(n) + "!").c_str());
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", ("Field '" + field + "' not found at index " + std::to_string(n) + "!").c_str());
     return data;
 }
 
@@ -1746,9 +1746,9 @@ inline std::unordered_map<std::string, std::vector<dtype>> qd_mex_struct2map(con
         if (!n_mtl_set)
             n_mtl = n_data, n_mtl_set = true;
         else if (n_data != n_mtl)
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", ("Material property field '" + std::string(name) +
-                               "' has " + std::to_string(n_data) + " elements, expected " +
-                               std::to_string(n_mtl) + " (all fields must have the same length).").c_str());
+            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", ("Material property field '" + std::string(name) +
+                                     "' has " + std::to_string(n_data) + " elements, expected " +
+                                     std::to_string(n_mtl) + " (all fields must have the same length).").c_str());
 
         std::vector<dtype> vec(n_data);
         if (n_data != 0)
