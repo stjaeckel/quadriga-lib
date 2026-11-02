@@ -15,7 +15,7 @@ Generate a parametric frequency-dependent loudspeaker directivity model
 - Returns a multi-frequency arrayant dict; pattern fields are 4D arrays where the 4th dim is frequency; for a
   single frequency the dict is a single-frequency arrayant dict (3D pattern fields, scalar `center_freq`)
 - Directivity is stored as real-valued data in `e_theta_re`; dipole rear hemisphere is encoded with negative sign for 180° phase inversion
-- Multi-driver systems (e.g. two-way) are built by calling this per driver and combining via arrayant.[[concat]];
+- Multi-driver systems (e.g. two-way) are built by calling this per driver and combining via [[concat]];
   crossover behavior emerges from overlapping bandpass responses
 - Frequency response is a Butterworth-style bandpass: `H(f) = 1/sqrt(1+(f_low/f)^(2n)) · 1/sqrt(1+(f/f_high)^(2n))`,
   where `n = slope_dB_per_octave / 6`; -3 dB at the cutoff frequencies

@@ -52,7 +52,7 @@ gain, xprmat, coord = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, me
 - **`scalar_mode`** — If `True`, uses scalar transmission (TE-only reflection coefficient,
   energy-conservation transmission) instead of EM TE/TM averaging; default: `False`
 - **`thin_slab_threshold`** — Thin-slab (Fabry-Pérot) resolve threshold; 0 = resolve always, 1 = resolve
-  never; see [[ray_state_update]]; default: 0
+  never; default: 0
 - **`apply_fspl`** — If `True`, folds the geometric spreading loss into `gain`, making it an absolute
   propagation gain instead of a value relative to FSPL. The reference distance is the direct TX-RX
   distance, matching the `path_length` used by [[qrt_file_read]] for a
@@ -78,7 +78,6 @@ gain, xprmat, coord = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, me
   (e.g. `(3, 2, n_pos)` for lod 2, `(3, 9, n_pos)` for lod 7, `(3, 0, n_pos)` for lod 0)
 
 ## See also:
-- [[generate_diffraction_paths]] (controls path/segment count via `lod`)
 - [[triangle_mesh_segmentation]] (generates `sub_mesh_index`)
 - [[obj_file_read]] (defines the material format)
 - [[qrt_file_read]] (same path-loss model, used by `apply_fspl`)

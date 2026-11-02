@@ -110,7 +110,6 @@ coeff_re, coeff_im, delays = quadriga_lib.arrayant.get_channels_spherical( ..., 
 ## See also:
 - [[get_channels_multifreq]] (multi-frequency extension)
 - [[get_channels_planar]] (planar wave variant)
-- [[get_channels_irs]] (IRS-assisted communication)
 - [[qrt_file_read]] (produces the list format used by batch mode)
 MD!*/
 

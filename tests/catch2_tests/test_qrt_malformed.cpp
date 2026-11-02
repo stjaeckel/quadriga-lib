@@ -165,3 +165,22 @@ TEST_CASE("QRT Reader - truncated files")
     }
     std::remove(fn.c_str());
 }
+
+TEST_CASE("QRT Reader - v4 file without origins")
+{
+    // A v4 file stores its frequency in the first origin block. Without origins, the cache holds one
+    // frequency of 0 Hz, as qrt_file_read does for an unfilled v4 slot, so that freq.n_elem == no_freq.
+    const std::string fn = "tests/data/test_qrt_v4_no_orig.qrt";
+    std::vector<char> data(23, 0); // "#QRT-BINv04", then no_orig = no_cir = no_dest = 0
+    std::memcpy(data.data(), "#QRT-BINv04", 11);
+    qrt_write_bytes(fn, data, data.size());
+
+    auto cache = quadriga_lib::qrt_read_cache_init(fn);
+    CHECK(cache.version == 4);
+    CHECK(cache.no_orig == 0);
+    CHECK(cache.no_freq == 1);
+    REQUIRE(cache.freq.n_elem == cache.no_freq);
+    CHECK(cache.freq(0) == 0.0f);
+
+    std::remove(fn.c_str());
+}

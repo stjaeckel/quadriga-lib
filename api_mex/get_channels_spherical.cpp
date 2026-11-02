@@ -21,7 +21,7 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
   rows 3-4 = (H rx, V tx), rows 5-6 = (V rx, H tx), rows 7-8 = (H rx, H tx).
 - NLOS paths: the path length between the TX and RX phase centres is `max(path_length, d_poly)`, where `d_poly` is the
   TX-FBS-LBS-RX polyline length; the length beyond the polyline (interactions between FBS and LBS, e.g. paths of
-  [[coord2path]] or [[qrt_file_read]] with more than two interactions) is added to the FBS-LBS segment. Delays and
+  [[qrt_file_read]] with more than two interactions) is added to the FBS-LBS segment. Delays and
   phases follow this length; the per-element offsets follow the FBS / LBS geometry.
 - If `center_freq == 0`, phase calculation is disabled and only delays are computed.
 - If `use_absolute_delays == false`, the LOS delay between the TX and RX phase centres is subtracted from all paths.

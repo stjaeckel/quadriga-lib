@@ -108,9 +108,13 @@ assertElementsAlmostEqual( xprmatN, [-R_par;0;0;0;0;0;-R_per;0], 'absolute', 1e-
 th2  = asin(sin(45*pi/180) / sqrt(eps));
 T_te = 2*cos_th / (cos_th + sqrt(eps)*cos(th2));
 T_tm = 2*cos_th / (sqrt(eps)*cos_th + cos(th2));
-[ ~, ~, ~, ~, gainN ] = ...
+% Transmitted power is |T|^2 times the ratio of normal power flux n*cos(th2) / cos(th1)
+obl = sqrt(eps)*cos(th2) / cos_th;
+[ ~, ~, ~, ~, gainN, xprmatN ] = ...
     quadriga_lib.ray_mesh_interact( 2, 10e9, orig_d, dest_d, mesh, mtl_d_ind, mtl_d_st, fbs_ind_d, sbs_ind_d );
-assertElementsAlmostEqual( gainN, 0.5*T_te^2 + 0.5*T_tm^2, 'absolute', 1e-6 );
+assertElementsAlmostEqual( gainN, obl * (0.5*T_te^2 + 0.5*T_tm^2), 'absolute', 1e-6 );
+assertElementsAlmostEqual( gainN + 0.5*R_par^2 + 0.5*R_per^2, 1, 'absolute', 1e-9 );  % R + T = 1
+assertElementsAlmostEqual( xprmatN, sqrt(obl) * [T_tm;0;0;0;0;0;T_te;0], 'absolute', 1e-6 );
 
 % In-medium absorption (alpha) no longer contributes to gainN; it moved to the (non-MEX) medium_gain
 % helper. With real eps and sigma = 0, gainN is the lossless Fresnel reflection only.
@@ -192,12 +196,14 @@ assertEqual( size(xprmatN), [2 1] );
     quadriga_lib.ray_mesh_interact( 4, 10e9, orig_s, dest_s, mesh, mtl_s_ind, mtl_s_st, fbs_ind_s, sbs_ind_s );
 assertElementsAlmostEqual( gainN, 1 - R^2, 'absolute', 1e-6 );
 
-% Type 5 (scalar refraction): Snell-bent path, gain = |1+R|^2 (pressure-coefficient power).
-% For a dense->rare interface this exceeds 1, mirroring the EM refraction coefficient.
+% Type 5 (scalar refraction): Snell-bent path, gain = transmitted power, |1+R|^2 times the ratio of
+% normal power flux cos(th2) / (sqrt(1.5)*cos(th1)); the same power as type 4, 1 - R^2
+obl_s = cos_th2s / (sqrt(1.5)*cos_th);
 [ ~, ~, ~, ~, gainN, xprmatN ] = ...
     quadriga_lib.ray_mesh_interact( 5, 10e9, orig_s, dest_s, mesh, mtl_s_ind, mtl_s_st, fbs_ind_s, sbs_ind_s );
 assertEqual( size(xprmatN), [2 1] );
-assertElementsAlmostEqual( gainN, (1+R)^2, 'absolute', 1e-6 );
+assertElementsAlmostEqual( gainN, obl_s * (1+R)^2, 'absolute', 1e-6 );
+assertElementsAlmostEqual( gainN, 1 - R^2, 'absolute', 1e-9 );
 assertElementsAlmostEqual( xprmatN(1)^2 + xprmatN(2)^2, gainN, 'absolute', 1e-6 );  % coeff energy == gain
 
 % Transmission factor (tf/tfB optional columns) splits reflection/transmission energy

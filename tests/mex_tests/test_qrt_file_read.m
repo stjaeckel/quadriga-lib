@@ -346,4 +346,20 @@ catch ME
 end
 assertTrue(failed);
 
+% ---------- qrt_file_read: a v4 file without origins stores no frequency ----------
+% (header "#QRT-BINv04" with no_orig = no_cir = no_dest = 0): one frequency of 0 Hz, empty outputs
+fn_v4 = [tempname, '.qrt'];
+fid = fopen(fn_v4, 'w'); fwrite(fid, [uint8('#QRT-BINv04'), zeros(1, 12, 'uint8')], 'uint8'); fclose(fid);
+out = cell(1, 18);
+[out{:}] = quadriga_lib.qrt_file_read(fn_v4);
+delete(fn_v4);
+assertEqual(out{1}, 0);
+for k = 2:5
+    assertEqual(size(out{k}), [3, 0]);
+end
+for k = 6:18
+    assertTrue(iscell(out{k}));
+    assertEqual(size(out{k}), [0, 1]);
+end
+
 end
