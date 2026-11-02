@@ -68,12 +68,11 @@ Everything below is new. "Tracked" means committed by the maintainer (D19); "ign
 | `docs_builder/package.json` | tracked | npm packages, minimum versions (section 4.3). No lockfile is committed (D4 as amended). |
 | `docs_builder/.htmlvalidate.json`, `docs_builder/.pa11yci.json` | tracked, hand-made | Optional validator settings (section 15.5). |
 | `docs_builder/CMakeLists.txt` | tracked, hand-made | Package install and failsafe (section 16). |
-| `docs_builder/node_modules/` | ignored | npm packages of the venv set-up (section 4.4); the conda set-up installs them into the environment instead. |
-| `docs_builder/.venv/` | ignored | Virtual environment of the venv set-up, made by `make docs-setup-venv`. |
-| `docs_builder/package-lock.json` | ignored | Written by npm in the venv set-up if `--no-package-lock` is forgotten; never committed. |
 | `docs_builder/.cache/` | ignored, generated | Builder cache: `tutorials/` (section 13.4), `staging/` (section 3.6). |
 | `tutorials/` | tracked | Notebooks without outputs (D28); one dummy notebook `tutorials/pipeline_demo.ipynb` (section 13.7). |
-| `docs_builder/README.md` | tracked | Written in step 7, not step 5. |
+| `docs_builder/README.md` | tracked, hand-made | Section "Set up a build machine" written in step 5 (WP1, section 4.5); the rest (make targets, content formats, failsafe, cutover checklist) in step 7. |
+
+Nothing is installed into the working copy (D4 as amended): the tool environments, their Python packages and their npm packages live outside the repository (section 4.4). Section 3.10 lists everything the builder and its tests can leave in the tree.
 
 The old builder (`html_builder/`), `html_docu/` and every file D20 protects stay unchanged. The only files outside the three new folders that step 5 changes are `GNUmakefile` (new targets, section 3.5) and `.gitignore` (section 2.4).
 
@@ -109,6 +108,8 @@ Module names are fixed so that work packages own disjoint files (section 19). No
 | `staticfiles.py` | Static copy, extra sources until the cutover, figure slots, stamp file (section 12). |
 | `checks.py` | Link and anchor check, well-formedness, size budgets (section 15). |
 | `output.py` | In-memory output tree, writing, stale-file removal, check mode (section 3.6). |
+| `setupnode.py` | The `setup-node` command: installs the npm packages of `package.json` into the active environment (section 4.4). The only module that installs anything; imported by `cli.py` only for this command. |
+| `testrun.py` | The `test` command: runs pytest in-process (section 17.1). |
 
 ### 2.3 Output files
 
@@ -157,15 +158,12 @@ Append this block at the end of the root `.gitignore`, unchanged:
 !/docs_builder/**
 !/tutorials/**
 /docs/website/
-/docs_builder/node_modules/
-/docs_builder/package-lock.json
-/docs_builder/.venv/
 /docs_builder/.cache/
 /tutorials/**/.ipynb_checkpoints/
 **/__pycache__/
 ```
 
-Why: the existing unanchored patterns `release/`, `dist/`, `test*.txt`, `build*.log` and `__pycache__/` match at any depth (measured with `git check-ignore`: `docs_builder/tests/fixtures/test_a.txt`, `docs_builder/tests/fixtures/release/x` and `docs_builder/dist/x` are ignored today). The negations re-include everything below the three new folders; later lines re-exclude the generated and installed parts, because the last matching pattern wins. `.venv/`, `node_modules/` and `package-lock.json` exist only in the venv set-up; the conda set-up keeps all tools outside the repository and needs no ignore line (section 4.4). Measured in a scratch repository with a copy of the current `.gitignore`: with this block, fixture files named `test_a.txt` or inside `release/` are visible to git, while `docs/website/`, `.venv/`, `node_modules/`, `.cache/` and `__pycache__/` stay ignored. `build.py` itself is not caught by any pattern (`build/*` and `build_*/*` are anchored to the root). A test (section 17.2, `test_gitignore.py`) keeps this true.
+Why: the existing unanchored patterns `release/`, `dist/`, `test*.txt`, `build*.log` and `__pycache__/` match at any depth (measured with `git check-ignore`: `docs_builder/tests/fixtures/test_a.txt`, `docs_builder/tests/fixtures/release/x` and `docs_builder/dist/x` are ignored today). The negations re-include everything below the three new folders; later lines re-exclude the generated and installed parts, because the last matching pattern wins. There are no ignore lines for `.venv/`, `node_modules/` or `package-lock.json`: nothing is installed into the working copy (section 4.4), and an install there by mistake should show up in `git status` instead of being hidden. `**/__pycache__/` stays as a safety net, because the negations above would otherwise re-include byte-code that a direct `python3 -m pytest` can write (section 3.10). Measured in a scratch repository with a copy of the current `.gitignore`: with this block, fixture files named `test_a.txt` or inside `release/` are visible to git, while `docs/website/`, `.venv/`, `node_modules/`, `.cache/` and `__pycache__/` stay ignored. `build.py` itself is not caught by any pattern (`build/*` and `build_*/*` are anchored to the root). A test (section 17.2, `test_gitignore.py`) keeps this true.
 
 ## 3. Builder entry point, CLI and make targets
 
@@ -180,9 +178,12 @@ Why: the existing unanchored patterns `release/`, `dist/`, `test*.txt`, `build*.
 | `website` | Runs `docs` (writes `docs/`), then renders the site, runs the checks of section 15 and writes `docs/website/`. Starts Node only if a page has a formula (D21). |
 | `website --release` | Strict mode (plan section 11): additionally fails on remaining gaps, missing figures, the placeholder preview image and tutorials whose cache entry is missing or stale. |
 | `tutorials [--force] [STEM ...]` | Executes notebooks whose cache key changed (all with `--force`; only the named ones if stems are given) and writes their cache entries (section 13). |
+| `env` | Checks the whole toolchain and prints one line per tool (section 3.4). Run it after setting up a build machine. |
 | `gaps [--release]` | Prints the gap list (section 6.4). Exit 0; with `--release`, exit 1 if the list is not empty. |
 | `validate` | Runs the optional npm validators on `docs/website/` (section 15.5). |
-| `setup-node [--global] [--validators]` | Installs the npm packages of `docs_builder/package.json` with their minimum-version specs: with `--global` into the active Node installation (`npm install -g`, the conda set-up), otherwise into `docs_builder/node_modules/` (`npm install --no-package-lock --prefix docs_builder`, the venv set-up); `--validators` adds the `devDependencies`. Sets `PUPPETEER_SKIP_DOWNLOAD=1` for the npm call, so no browser is downloaded (section 15.5). The specs are read from `package.json`, so they are written once. |
+| `test [PYTEST ARGS]` | Runs the builder's test suite (section 17.1); extra arguments go to pytest. |
+| `setup-node [--validators]` | Machine set-up only: installs the npm packages into the active environment (section 4.4). Not a build command; it is the only command that downloads. |
+
 
 Options for all commands: `-v` / `--verbose` (print every warning in full and phase timings), `-q` / `--quiet` (print only errors and the summary line), `--root DIR` (repository root; used by tests). Unknown options or commands: usage message, exit 2.
 
@@ -190,7 +191,7 @@ Exit codes: 0 success (warnings allowed); 1 build failed (structural errors, fai
 
 ### 3.2 Code layout and imports
 
-`build.py` must run under any Python 3 far enough to print the version message: it contains no syntax newer than Python 3.6, checks `sys.version_info >= (3, 11)` first (message as in section 3.4), then puts its own folder on `sys.path` and calls `qdocs.cli.main()`. Third-party packages are imported inside the functions that need them, through `env.require(...)` (section 3.4), so that `make docs` never imports Pygments, Jinja2 or nbclient.
+`build.py` must run under any Python 3 far enough to print the version message: it contains no syntax newer than Python 3.6, checks `sys.version_info >= (3, 11)` first (message as in section 3.4), then puts its own folder on `sys.path` and calls `qdocs.cli.main()`. Third-party packages are imported inside the functions that need them, through `env.check(...)` (section 3.4), so that `make docs` never imports Pygments, Jinja2 or nbclient.
 
 Code, templates and `katex_render.mjs` are always taken from the folder of `build.py`. Everything else is taken relative to `--root`: sources (`src/`, `api_mex/`, `api_python/`, `include/`, `CMakeLists.txt`), `docs_builder/site.toml`, `docs_builder/content/`, `docs_builder/static/`, `docs_builder/skill/`, `tutorials/`, the outputs `docs/` and `docs/website/`, and the cache `docs_builder/.cache/`. Tests use this to build small fixture repositories.
 
@@ -359,75 +360,60 @@ Rules: `page.id` unique; `file` and `twin` unique; `template` one of `landing`, 
 
 ### 3.4 Missing tools: plain messages
 
-`env.require(command, packages)` imports each package; on `ImportError` it prints one message per missing package and exits 2, without a traceback (D21). Messages (`<python>` is `sys.executable`):
+The toolchain check lives in the builder, not in CMake: `docs_builder/CMakeLists.txt` runs on the packaging machines (Docker, Windows), which have no website tools; it checks only the built site's stamp (section 16).
+
+Up-front check: each command checks everything it needs before it reads any source (`env.check(command)`), collects every missing or too-old tool, prints all of them in one run, one message per tool, and exits 2 without a traceback (D21). It never stops at the first problem. What each command needs:
+
+| Command | Checked up front |
+|---------|------------------|
+| `docs`, `docs --check`, `gaps` | Python 3.11+; `markdown-it-py`, `mdit-py-plugins`, `mdformat`, `mdformat-gfm` at their minimums |
+| `website` | the `docs` set; `Pygments`, `Jinja2`; `node` 22+ on `PATH` and `katex` at its minimum in `<sys.prefix>/lib/node_modules/` |
+| `tutorials` | the `website` set; the packages of `requirements-tutorials.txt`; the kernels the notebooks name (a missing kernel is a warning, section 13.3) |
+| `validate` | `node` 22+; `html-validate` and `pa11y-ci` in `<sys.prefix>/bin/` at their minimums; Chrome at `QDOCS_CHROME` |
+
+Node and katex are checked up front for `website` (and `tutorials`), although only a formula makes them run. Reason: the check costs one `node --version` call (about 0.02 s) and reading katex's `package.json`; it makes a build machine fail on the day it is set up rather than on the day the first formula appears in a source, and the result does not depend on the content. D21 is kept: Node renders formulas only when a page contains one (section 11).
+
+`build.py env` (make target `docs-env`) checks the whole toolchain: every package of the three requirement files, Node, katex, the validators, Chrome, and the Jupyter kernels the notebooks in `tutorials/` name. It prints one line per tool: `<tool>  <found version or "missing">  <minimum>  <ok | missing | too old | optional, missing>`, then a summary. Exit 2 if anything that `docs` or `website` needs is missing or too old; the tutorial packages and kernels, the validators and Chrome are reported but optional and do not change the exit code.
+
+`env.check` imports each Python package with `importlib.import_module` and reads its version with `importlib.metadata.version`. Messages (`<python>` is `sys.executable`):
 
 | Missing | Message |
 |---------|---------|
-| Python < 3.11 | `error: Python 3.11 or newer is needed (found 3.X at <python>). Activate the tool environment: conda activate quadriga-web (or: source docs_builder/.venv/bin/activate); to create one, see make docs-setup-conda or make docs-setup-venv` |
-| A package of `requirements.txt` | `error: the Python package '<name>' (minimum <version>) is missing for <python>. Activate the tool environment (conda activate quadriga-web, or source docs_builder/.venv/bin/activate) or install it there: <python> -m pip install -r docs_builder/requirements.txt` |
-| A package of `requirements.txt` older than its minimum | `error: the Python package '<name>' is <found>, at least <minimum> is needed. Upgrade: <python> -m pip install -U -r docs_builder/requirements.txt` |
+| Python < 3.11 | `error: Python 3.11 or newer is needed (found 3.X at <python>). Activate the tool environment (conda activate quadriga-web, or source ~/.venvs/quadriga-web/bin/activate). To set one up, see "Set up a build machine" in docs_builder/README.md` |
+| A package of `requirements.txt` | `error: the Python package '<name>' (minimum <version>) is missing for <python>. Activate the tool environment (conda activate quadriga-web, or source ~/.venvs/quadriga-web/bin/activate), or install it there: <python> -m pip install -r docs_builder/requirements.txt (see "Set up a build machine" in docs_builder/README.md)` |
+| A package of `requirements.txt` older than its minimum | `error: the Python package '<name>' is <found>, at least <minimum> is needed. Upgrade the tool environment (machine set-up, section 4.4): <python> -m pip install -U -r docs_builder/requirements.txt` |
 | A package of `requirements-tutorials.txt` | the same two messages with `requirements-tutorials.txt` |
-| `node` on `PATH` (only when a formula exists) | `error: Node.js is needed because <file>:<line> contains a formula. Activate the tool environment (conda activate quadriga-web, which holds Node.js), or for the venv set-up install Node.js 22 or newer from nodejs.org or with conda; then run: python3 docs_builder/build.py setup-node (add --global in the conda environment)` |
-| katex (neither in `docs_builder/node_modules/` nor in `npm root -g`) | `error: the npm package 'katex' is missing. Run in the active environment: python3 docs_builder/build.py setup-node --global (conda) or python3 docs_builder/build.py setup-node (venv)` |
+| `node` on `PATH` (`website`, `tutorials`, `validate`) | `error: Node.js 22 or newer is needed and was not found on PATH. Activate the tool environment (conda activate quadriga-web holds Node.js); for the venv set-up install Node.js on the machine (see "Set up a build machine" in docs_builder/README.md)` |
+| katex missing in `<sys.prefix>/lib/node_modules/` | `error: the npm package 'katex' is missing in <sys.prefix>. Install it into the active environment: python3 docs_builder/build.py setup-node` |
 | Node older than 22 | `error: Node.js 22 or newer is needed (found vX.Y.Z).` |
 | Jupyter kernel of a notebook | warning, not error: `warning: tutorials/<stem>.ipynb needs the Jupyter kernel '<name>', which is not installed; skipped` (D28: MATLAB notebooks run only where a kernel exists) |
-| `html-validate` or `pa11y-ci` for `validate` | `error: the validators are not installed. Run: python3 docs_builder/build.py setup-node --validators (add --global in the conda environment)` |
+| `html-validate` or `pa11y-ci` for `validate` | `error: the validators are not installed in <sys.prefix>. Install them into the active environment: python3 docs_builder/build.py setup-node --validators` |
 | Chrome for pa11y | `error: pa11y needs Chrome; set QDOCS_CHROME to its path (default /usr/bin/google-chrome)` |
 
-`env.require` also compares each package's installed version (`importlib.metadata.version`) with the minimum in the requirements file it belongs to (parsed by `env.py`; `packaging` is not needed: versions are compared as tuples of their leading integers). The `docs` command needs only `markdown_it`, `mdit_py_plugins`, `mdformat`, `mdformat_gfm`; the `website` command adds `pygments`, `jinja2`; the `tutorials` command adds `nbformat`, `nbclient`, `jupyter_client` and the website packages.
+`env.check` compares each package's installed version (`importlib.metadata.version`) with the minimum in the requirements file it belongs to (parsed by `env.py`; `packaging` is not needed: versions are compared as tuples of their leading integers). No message ever starts an installation: the build never downloads anything (section 3.11). The `docs` command needs only `markdown_it`, `mdit_py_plugins`, `mdformat`, `mdformat_gfm`; the `website` command adds `pygments`, `jinja2`; the `tutorials` command adds `nbformat`, `nbclient`, `jupyter_client` and the website packages.
 
 ### 3.5 `GNUmakefile` targets
 
-Rule for finding the tools: the targets use the `python3` and `node` that are on `PATH`; the user activates the tool environment first (`conda activate quadriga-web`, or `source docs_builder/.venv/bin/activate`). A make variable overrides the Python: `make docs DOCS_PY=/path/to/python3`. Why: one rule serves both set-ups and also a direct call of `build.py`; make needs no detection logic, which would have to know conda's layout or guess between two environments that may both exist; and `build.py` reports `sys.executable` in every missing-tool message, so a wrong environment is obvious. The builder finds katex and the validators in `docs_builder/node_modules/` first and then in the active Node installation (`npm root -g`, and the validators' commands on `PATH`), so the same rule covers Node in both set-ups.
-
-Added after the `documentation` target, which stays unchanged (D21, D31):
+`GNUmakefile` is a lean wrapper around CMake; the documentation builder adds only one-line callers, with no logic and no variables. Added after the `documentation` target, which stays unchanged (D21, D31):
 
 ```make
-# New documentation builder (docs_builder/README.md). Activate the tool
-# environment first: conda activate quadriga-web (preferred), or
-# source docs_builder/.venv/bin/activate.
-DOCS_PY ?= python3
-
+# Documentation builder; set-up and other commands: docs_builder/README.md
 docs:
-	$(DOCS_PY) docs_builder/build.py docs
-
+	python3 docs_builder/build.py docs
 docs-check:
-	$(DOCS_PY) docs_builder/build.py docs --check
-
+	python3 docs_builder/build.py docs --check
 website:
-	$(DOCS_PY) docs_builder/build.py website
-
-website-release:
-	$(DOCS_PY) docs_builder/build.py website --release
-
+	python3 docs_builder/build.py website
 tutorials:
-	$(DOCS_PY) docs_builder/build.py tutorials
-
-docs-test:
-	$(DOCS_PY) -m pytest -c docs_builder/pytest.ini docs_builder/tests
-
-docs-validate:
-	$(DOCS_PY) docs_builder/build.py validate
-
-# Tool environment, conda (preferred): everything in the env "quadriga-web"
-docs-setup-conda:
-	conda create -y --name quadriga-web -c conda-forge "python>=3.11" "nodejs>=22" pip
-	conda run --name quadriga-web python -m pip install -r docs_builder/requirements.txt -r docs_builder/requirements-test.txt -r docs_builder/requirements-tutorials.txt
-	conda run --name quadriga-web python docs_builder/build.py setup-node --global --validators
-
-# Tool environment, venv: Python packages in docs_builder/.venv, Node.js from the system
-docs-setup-venv:
-	python3 -m venv docs_builder/.venv
-	docs_builder/.venv/bin/python3 -m pip install -r docs_builder/requirements.txt -r docs_builder/requirements-test.txt
-	docs_builder/.venv/bin/python3 docs_builder/build.py setup-node
-
-docs-setup-tutorials-venv: docs-setup-venv
-	docs_builder/.venv/bin/python3 -m pip install -r docs_builder/requirements-tutorials.txt
-
-.PHONY: docs docs-check website website-release tutorials docs-test docs-validate docs-setup-conda docs-setup-venv docs-setup-tutorials-venv
+	python3 docs_builder/build.py tutorials
+docs-env:
+	python3 docs_builder/build.py env
+.PHONY: docs docs-check website tutorials docs-env
 ```
 
-The comment style follows the existing note on the `quadriga-pip` conda environment in `GNUmakefile` (PyPI packaging). The conda set-up installs the tutorial packages too, because it is the maintainer's full environment; the venv set-up keeps them optional. Upgrading the tools: `python -m pip install -U -r docs_builder/requirements.txt` (and the other files) and `python3 docs_builder/build.py setup-node [--global]` again, in the active environment.
+Everything else is called directly: `python3 docs_builder/build.py website --release`, `... validate`, `... test`, `... gaps`, `... setup-node`. The machine set-up is a manual step (section 4.5), not a make target.
+
+Rule for finding the tools: `python3` and `node` from `PATH`; the user activates the tool environment first (`conda activate quadriga-web`, or `source ~/.venvs/quadriga-web/bin/activate`). Another Python is used by calling `build.py` with it directly. Why: one rule serves both set-ups and direct calls; make needs no detection logic; `build.py` reports `sys.executable` in every missing-tool message, so a wrong environment is obvious. npm packages are found by one rule too: in `<sys.prefix>/lib/node_modules/` of the Python that runs the build (section 4.4).
 
 `make website` runs the `docs` phase itself inside one process (the builder parses the sources once), which is how it "depends on make docs" (D21): it always rewrites `docs/` before the site. `make tutorials` is separate and never runs as part of `docs` or `website` (D28).
 
@@ -450,6 +436,51 @@ Format, one per line: `<path>:<line>: error: <message>` and `<path>:<line>: warn
 ### 3.9 Byte-identical output
 
 The same inputs give byte-identical `docs/` and `docs/website/` trees (plan 5.1). Rules: sorted file and directory listings (`sorted()` on POSIX path strings); no dates, times, user names, host names or absolute paths in any output; JSON written with `sort_keys=True`; Jinja2 rendering with a fixed environment (section 8.1); the skill zip as in section 14; tutorial outputs read from the cache, which is itself deterministic given the same notebook and package versions (section 13.5). A test builds the real repository twice into separate roots and compares all bytes (section 17.2). Byte-identity holds for the same tool versions. The tools have minimum versions only (section 4), so an upgrade may change the output without any source change (measured: the Markdown of a doc block rendered with markdown-it-py 3.0.0, mdit-py-plugins 0.4.2 and with 4.2.0, 0.6.1 was identical; the span-free C++ page was 693,763 bytes with Pygments 2.17.2 and 694,128 bytes with 2.21.0). Tool versions are never written into any output file. When `docs --check` finds differences it prints, after the file list, the versions that affect the tracked Markdown: `Python <x.y.z>, markdown-it-py <v>, mdit-py-plugins <v>, mdformat <v>, mdformat-gfm <v>`, and the line `If the sources did not change, the differences come from these tool versions; regenerate with make docs and commit docs/.` (D4 as amended, D23).
+
+### 3.10 What the builder leaves in the working copy
+
+Complete list; `make tidy` removes all of it (section 3.13):
+
+| Path | Written by | `make clean` | `make tidy` |
+|------|------------|--------------|-------------|
+| `docs/` except `website/` | `docs`, `website` | keeps (tracked) | keeps (tracked) |
+| `docs/website/` | `website` | keeps | deletes |
+| `docs_builder/.cache/` (`staging/`, `tutorials/`) | `website`, `tutorials` | keeps | deletes |
+| `docs_builder/**/__pycache__/` | only a direct `python3 -m pytest` or an import of `qdocs` without the settings below | — | deletes |
+| `build_docs_check/` | the early check in the `deb` recipe (after the cutover, section 16.4) | — | deletes (the existing `tidy` line `rm -rf build*`) |
+
+To keep the list short: `build.py` sets `sys.dont_write_bytecode = True` before it imports `qdocs`, the `test` command runs pytest in the same process (so this setting covers the tests), and `pytest.ini` has `addopts = -p no:cacheprovider`, so neither byte-code nor `.pytest_cache/` is written in normal use. Tests write only below pytest's `tmp_path` (outside the repository); `test_real_repo.py` builds into a temporary root and never into `docs/` (section 17.2). Node writes nothing (the KaTeX script reads standard input and writes standard output). Jupyter's own `tutorials/.ipynb_checkpoints/` comes from editing notebooks, not from the builder; it stays ignored (section 2.4) and is not removed by `tidy`.
+
+### 3.11 No downloads during a build
+
+A build (`docs`, `website`, `tutorials`, `gaps`, `validate`, `env`, `test`) never downloads or installs anything (D4 as amended). Apart from `qdocs/setupnode.py`, `qdocs/` and `build.py` contain no call of pip, npm, npx or any other installer; the only external programs the builder starts are `node` (`node --version` in the tool check, and one process for the formulas, section 11), the Jupyter kernels through nbclient (section 13.3), and for `validate` the two validators. A missing package or tool ends the build with the message of section 3.4, which points to the machine set-up. `qdocs/setupnode.py` is the only module that installs (npm packages, run by `setup-node` during the machine set-up); `cli.py` imports it only for that command. The test `test_no_downloads.py` (section 17.2) checks this.
+
+### 3.12 Speed
+
+Time targets on the build machine, idle (1-minute load below 4), measured as wall and CPU time with the load average recorded before and after (shared machine): `make docs` under 5 s; `make website` under 15 s, including the `docs` phase and the checks, without notebook execution and without formulas; plus at most 2 s when the site has formulas. `make tutorials` is not bound (it executes notebooks), but a run that finds every cache entry current must finish under 5 s.
+
+Measured with the prototypes on 2026-11-02 (Python 3.14.4, markdown-it-py 4.2.0, mdformat 1.0.0, Pygments 2.21.0; load 1.5 to 1.8; `/home/stephan/quadriga-lib-agents/website_step3/timing.py`, `timing2.py`): importing the docs packages 0.04 s, all build packages 0.06 s; reading the 308 doc blocks of the three languages 0.02 s; markdown-it parsing of all of them 0.42 s; markdown-it HTML rendering 0.04 s; span-free Pygments over all 325 code fences 0.26 s; mdformat rendering of all blocks once 1.73 s (twice 3.49 s); `html.parser` well-formedness pass over three C++-sized pages 0.20 s; reading and hashing the 13 MB of publications 0.01 s; one Node process rendering 50 formulas 0.11 s. Estimated: `make docs` about 2.5 s, `make website` about 4 s; the targets leave headroom of two to three times.
+
+Design rules that meet the targets and bind the implementation:
+
+- One Python process per command; the sources are read and parsed once, and both renderers use the same token lists (section 5.7).
+- mdformat runs once per fragment, not once per output file: the full API file and the section file share the rendered text of each fragment; link URLs, which differ between the two, are rendered as unique placeholder strings and filled in per output file by string replacement. (mdformat is the most expensive step; running it per output would double the `docs` time, measured.)
+- At most one Node process per build (section 11); no subprocess per page or per code block; no network access.
+- Tutorials are read from the cache (section 13.6); `website` never executes a notebook.
+- Static files are compared before they are written (section 3.6), so unchanged publications are not copied again.
+- The checks of section 15 parse each output file once.
+
+### 3.13 `clean` and `tidy`
+
+`make tidy` restores the working copy to the state of a clean clone (D4 as amended); `make clean` keeps `docs/website/` and `docs_builder/.cache/`. No `git clean`: it would also delete the maintainer's ignored local files (for example the deploy script). The lines for the new builder's products are added in step 5 to the existing `tidy` target, because they touch none of the old builder's files and do not change what `tidy` does to anything else:
+
+```make
+	- rm -rf docs/website
+	- rm -rf docs_builder/.cache
+	- find docs_builder -name __pycache__ -type d -prune -exec rm -rf {} +
+```
+
+`clean` gets no new line. `build_docs_check/` is already covered by the existing `- rm -rf build*` of `tidy`. The tool environments are outside the repository and are never touched by `clean` or `tidy`. The `html_docu`-related changes to `GNUmakefile` stay at the cutover (section 18.3).
 
 ## 4. Dependencies
 
@@ -479,7 +510,7 @@ Jinja2>=3.1.2
 | Pygments | 2.17.2 | measured: the span-free formatter of section 10 runs on the prototype page; tested with 2.21.0 as well | website |
 | Jinja2 | 3.1.2 | tested with 3.1.2 and 3.1.6 (installs MarkupSafe) | website |
 
-Measurement: a scratch venv with exactly these minimums (`/home/stephan/quadriga-lib-agents/website_step3/venv_min/`) ran the parser and renderer prototypes; their Markdown output was byte-identical to the one with the newest versions (markdown-it-py 4.2.0, mdit-py-plugins 0.6.1). A later major version (mdformat 2, markdown-it-py 5) may change an API the builder uses; `docs-test` shows it.
+Measurement: a scratch venv with exactly these minimums (`/home/stephan/quadriga-lib-agents/website_step3/venv_min/`) ran the parser and renderer prototypes; their Markdown output was byte-identical to the one with the newest versions (markdown-it-py 4.2.0, mdit-py-plugins 0.6.1). A later major version (mdformat 2, markdown-it-py 5) may change an API the builder uses; the test command (`build.py test`) shows it.
 
 `docs_builder/requirements-test.txt`: `pytest>=8.0` (tested with 9.1.1).
 
@@ -489,7 +520,7 @@ Measurement: a scratch venv with exactly these minimums (`/home/stephan/quadriga
 
 ### 4.2 Node
 
-Minimum Node 22 (`engines` of html-validate needs `^22.22.0 || >=24.8.0`, pa11y-ci `^22.13.0 || >=24`; katex itself would run on older Node). Measured: system Node v22.22.1 and npm 9.2.0 on the build machine; conda-forge offers `nodejs` 22.x (newest 22.23.4) up to 26.12.1 (`conda search -c conda-forge --override-channels "nodejs>=22"`, 2026-11-02). Node is needed only by `make website` when a page has a formula, by `make tutorials` when a notebook has a formula, and by `make docs-validate`.
+Minimum Node 22 (`engines` of html-validate needs `^22.22.0 || >=24.8.0`, pa11y-ci `^22.13.0 || >=24`; katex itself would run on older Node). Measured: system Node v22.22.1 and npm 9.2.0 on the build machine; conda-forge offers `nodejs` 22.x (newest 22.23.4) up to 26.12.1 (`conda search -c conda-forge --override-channels "nodejs>=22"`, 2026-11-02). Node is needed only by `make website` when a page has a formula, by `make tutorials` when a notebook has a formula, and by `build.py validate`.
 
 ### 4.3 `docs_builder/package.json`
 
@@ -510,19 +541,55 @@ katex: measured with 0.16.0 and 0.18.11 under Node 22.22.1 (MathML output and pe
 
 ### 4.4 The two tool set-ups
 
-Both must work (D4 as amended); `docs_builder/README.md` (step 7) documents both.
+Both must work (D4 as amended); `docs_builder/README.md` documents both in its section "Set up a build machine" (section 4.5). Both are part of the build machine's set-up, done once per machine, outside the repository; nothing is installed into the working copy.
 
 | | Conda (preferred) | Virtual environment |
 |---|-------------------|---------------------|
-| Environment | conda env `quadriga-web` from conda-forge: Python, pip, Node.js and npm | `docs_builder/.venv/` with the system `python3`; Node.js from the system (any source, version 22 or newer) |
+| Environment | conda env `quadriga-web` from conda-forge: Python, pip, Node.js and npm | venv at a path the user chooses, default `~/.venvs/quadriga-web`, made with the system `python3`; Node.js from the system (version 22 or newer, any source) |
 | Python packages | `pip install -r ...` inside the env | `pip install -r ...` inside the venv |
-| npm packages | `build.py setup-node --global [--validators]`: into the env's Node prefix (`npm root -g` lies inside the env), not into the repository | `build.py setup-node [--validators]`: into `docs_builder/node_modules/` (ignored) |
-| Create | `make docs-setup-conda` | `make docs-setup-venv` (tutorials: `make docs-setup-tutorials-venv`) |
-| Use | `conda activate quadriga-web`, then `make docs` and so on | `source docs_builder/.venv/bin/activate`, then `make docs` and so on |
-| Files in the repository | none | `.venv/`, `node_modules/` (both ignored) |
+| npm packages | `build.py setup-node`: into `<env>/lib/node_modules/` | `build.py setup-node`: into `<venv>/lib/node_modules/` |
+| Create (once) | commands of section 4.5 | commands of section 4.5 |
+| Use | `conda activate quadriga-web`, then `make docs` and so on | `source ~/.venvs/quadriga-web/bin/activate`, then `make docs` and so on |
+| Files in the repository | none | none |
+
+npm rule, the same for both: `build.py setup-node` runs `npm install --global --prefix <sys.prefix> <name>@<spec> ...` with the `dependencies` (and with `--validators` also the `devDependencies`) read from `package.json`, so the specs are written once; it sets `PUPPETEER_SKIP_DOWNLOAD=1` (pa11y uses the installed Chrome, section 15.5). With `--global --prefix`, npm puts the packages into `<sys.prefix>/lib/node_modules/` and their commands into `<sys.prefix>/bin/`, which is on `PATH` when the environment is active. The builder looks only there: katex in `<sys.prefix>/lib/node_modules/katex`, the validators as `<sys.prefix>/bin/html-validate` and `<sys.prefix>/bin/pa11y-ci`. Why this rule: `sys.prefix` is the environment's own folder in both set-ups (for conda it is also the prefix of its Node), so one path rule covers both without asking npm at build time, without `PATH` guessing and without anything in the repository; for the venv it keeps npm packages next to the Python packages, so deleting the venv removes everything. `<sys.prefix>` is the prefix of the Python that runs `setup-node`, which the set-up commands choose explicitly. Why a builder command and not a separate script: the install location and the lookup location come from the same function in `env.py`, and the specs are read by the same code that checks them, so set-up and build cannot drift apart; all logic stays in one place.
 
 The tutorial kernel `python3` is the one of the active environment (ipykernel installed there, section 13.3).
 
+### 4.5 README section "Set up a build machine"
+
+Written in step 5 by WP1 as the first section of `docs_builder/README.md`; step 7 adds the rest of that README (make targets, content formats, failsafe, cutover checklist). The mention of the new targets in the top-level `README.md` stays a step-7 item. The section is a manual, once-per-machine procedure, run from the repository root, with these exact commands:
+
+1. Prerequisites: either conda (Miniconda or Miniforge), or a system Python 3.11+ and Node.js 22+.
+2. Conda set-up (preferred):
+
+```bash
+conda create -y --name quadriga-web -c conda-forge "python>=3.11" "nodejs>=22" pip
+conda activate quadriga-web
+python -m pip install -r docs_builder/requirements.txt -r docs_builder/requirements-test.txt -r docs_builder/requirements-tutorials.txt
+python docs_builder/build.py setup-node --validators
+```
+
+3. Venv set-up (the path is free; this is the default the messages name):
+
+```bash
+python3 -m venv ~/.venvs/quadriga-web
+source ~/.venvs/quadriga-web/bin/activate
+python -m pip install -r docs_builder/requirements.txt -r docs_builder/requirements-test.txt
+python docs_builder/build.py setup-node
+# optional: tutorials and validators
+python -m pip install -r docs_builder/requirements-tutorials.txt
+python docs_builder/build.py setup-node --validators
+```
+
+4. Activate before each build session: `conda activate quadriga-web` or `source ~/.venvs/quadriga-web/bin/activate`.
+5. Verify: `make docs-env` (section 3.4) must report every tool for `docs` and `website` as ok.
+6. Upgrade: repeat the `pip install` lines with `-U` and `setup-node`; afterwards `make docs-check` may show differences that come from the new tool versions (section 3.9).
+7. Nothing is installed into the working copy; deleting the environment (`conda env remove --name quadriga-web`, or deleting the venv folder) removes the tools completely.
+
+The conda set-up includes the tutorial packages and the validators, because it is the maintainer's full environment; in the venv set-up they are optional. The commands follow the style of the existing note on the `quadriga-pip` conda environment in `GNUmakefile`.
+
+## 5. Doc-block parser
 ## 5. Doc-block parser
 
 ### 5.1 Files read
@@ -1115,7 +1182,7 @@ Size (measured, plan section 11): the prototype C++ page is 1,042,598 bytes raw.
 
 - Syntax: `$...$` inline and `$$...$$` display (D5), parsed by `dollarmath` (section 5.6) in doc blocks, prose, data-file inline strings and notebook Markdown cells. Today no site source contains a formula (plan 5.1; measured: no `$` outside code in any doc block).
 - Output: KaTeX with `output: "mathml"`. Reasons: MathML Core is supported by all browsers of plan 5.2 (current Chrome, Edge, Firefox and Safari), it needs no KaTeX stylesheet and no KaTeX fonts (about 300 kB of `woff2` files and 25 kB of CSS in katex 0.18.11), it is accessible to screen readers without the extra hidden copy that `htmlAndMathml` adds, and it is small (measured: a sum formula is 581 bytes as MathML, 3,936 bytes as KaTeX HTML). Trade-off: the glyphs come from the device's math font (CSS: `math { font-family: "Latin Modern Math", "STIX Two Math", "Cambria Math", math; }`, as in the prototype), so formulas look slightly different across systems. This satisfies D5 (rendered at build time, no math script in the browser, nothing from third parties); with MathML output there is nothing to self-host.
-- One Node process per build (plan 5.1): `katex.py` collects every formula of the build (text and display flag, with its source file and line), removes duplicates, and only if at least one exists runs `node docs_builder/katex_render.mjs <katex directory>` once, with a JSON document on standard input and a timeout of 120 s. The katex directory is `docs_builder/node_modules/katex` if it exists, else `<npm root -g>/katex` (section 3.5); the script loads it with `createRequire(import.meta.url)(<katex directory>)`, so it works for both set-ups. Input: `{"items": [{"tex": "...", "display": true}, ...]}`. Output on standard output: `{"results": [{"ok": true, "html": "..."} | {"ok": false, "error": "..."}, ...]}` in the same order. The script calls `katex.renderToString(tex, {displayMode, output: "mathml", throwOnError: true, strict: "error", trust: false})` for each item and catches errors per item. A failed item is a structural error at its source location with KaTeX's message; a non-zero exit of Node or invalid JSON is an error naming the script. Tested in a scratch folder with katex 0.18.11 and Node 22.22.1: valid formulas give `<span class="katex"><math ...>`, `\frac{1}{2` gives "KaTeX parse error: Unexpected end of input ...".
+- One Node process per build (plan 5.1): `katex.py` collects every formula of the build (text and display flag, with its source file and line), removes duplicates, and only if at least one exists runs `node docs_builder/katex_render.mjs <katex directory>` once, with a JSON document on standard input and a timeout of 120 s. The katex directory is `<sys.prefix>/lib/node_modules/katex` (section 4.4); the script loads it with `createRequire(import.meta.url)(<katex directory>)`, so it works for both set-ups. Input: `{"items": [{"tex": "...", "display": true}, ...]}`. Output on standard output: `{"results": [{"ok": true, "html": "..."} | {"ok": false, "error": "..."}, ...]}` in the same order. The script calls `katex.renderToString(tex, {displayMode, output: "mathml", throwOnError: true, strict: "error", trust: false})` for each item and catches errors per item. A failed item is a structural error at its source location with KaTeX's message; a non-zero exit of Node or invalid JSON is an error naming the script. Tested in a scratch folder with katex 0.18.11 and Node 22.22.1: valid formulas give `<span class="katex"><math ...>`, `\frac{1}{2` gives "KaTeX parse error: Unexpected end of input ...".
 - Twins keep the `$...$` source (GitHub renders it, D8).
 
 ## 12. Static parts
@@ -1304,7 +1371,7 @@ Each exceeded budget prints `warning: <file> is <n> bytes, budget <b> [size]`.
 
 ### 15.5 Optional validators (plan 8.3)
 
-`make docs-validate` (`build.py validate`) needs the validators (`build.py setup-node --validators`, with `--global` in the conda set-up) and is never part of `docs` or `website`. It runs `html-validate --config docs_builder/.htmlvalidate.json "docs/website/**/*.html"` and `pa11y-ci --config docs_builder/.pa11yci.json`, each taken from `docs_builder/node_modules/.bin/` if present, else from `PATH`. `.htmlvalidate.json` extends `html-validate:recommended` and `html-validate:a11y`; rules that conflict with the design are switched off with a one-line reason each in the hand-over report (for example `no-inline-style` is not needed: the templates use no inline styles). `.pa11yci.json` lists `file://` URLs of one page per template (index, cpp_api, formats, publications, tutorials, one tutorial if built, impressum, 404), standard `WCAG2AA`, runners `axe` and `htmlcs`, and `chromeLaunchConfig.executablePath` from the environment variable `QDOCS_CHROME` (default `/usr/bin/google-chrome`, present on the build machine); `validate` passes it through. No legacy id contains whitespace (section 6.6), so the `valid-id` rule stays on. Neither tool needs Java (plan section 11). Findings are printed; the command exits 1 if either tool reports errors.
+`python3 docs_builder/build.py validate` needs the validators (installed once with `build.py setup-node --validators`, section 4.5) and is never part of `docs` or `website`. It runs `html-validate --config docs_builder/.htmlvalidate.json "docs/website/**/*.html"` and `pa11y-ci --config docs_builder/.pa11yci.json`, both from `<sys.prefix>/bin/` (section 4.4). `.htmlvalidate.json` extends `html-validate:recommended` and `html-validate:a11y`; rules that conflict with the design are switched off with a one-line reason each in the hand-over report (for example `no-inline-style` is not needed: the templates use no inline styles). `.pa11yci.json` lists `file://` URLs of one page per template (index, cpp_api, formats, publications, tutorials, one tutorial if built, impressum, 404), standard `WCAG2AA`, runners `axe` and `htmlcs`, and `chromeLaunchConfig.executablePath` from the environment variable `QDOCS_CHROME` (default `/usr/bin/google-chrome`, present on the build machine); `validate` passes it through. No legacy id contains whitespace (section 6.6), so the `valid-id` rule stays on. Neither tool needs Java (plan section 11). Findings are printed; the command exits 1 if either tool reports errors.
 
 ## 16. Package install and failsafe (D22)
 
@@ -1342,9 +1409,9 @@ Applied at the cutover (section 18.3); step 5 only provides `docs_builder/CMakeL
 
 | Path | Today | After the cutover |
 |------|-------|-------------------|
-| Debian package | `GNUmakefile` `deb-*` → `docker build` with `Dockerfile.ubuntu` (`COPY . .`) → `dpkg-buildpackage` → `debian/rules` `override_dh_auto_configure` with two configure runs, both `-DCMAKE_INSTALL_PREFIX=/usr`; build 1 (gcc13) installs `html_docu/`, build 2 (gcc11, MATLAB MEX only; only its `.mexa64` files are copied into the package) | `COPY . .` brings the ignored `docs/website/` into the container (`.dockerignore` keeps out `docs_builder/node_modules/`, `docs_builder/.venv/`, `docs_builder/.cache/` and the publication PDFs). Build 1 gets `-DENABLE_DOCS_INSTALL=ON` and so runs the check and installs the site; build 2 stays at the default OFF. |
-| Early fail before Docker | none | A new `GNUmakefile` target `docs-install-check` runs `cmake -S docs_builder -B build_docs_check -DENABLE_DOCS_INSTALL=ON -DCMAKE_INSTALL_PREFIX=/usr` (configure only: the same check, no install). `deb-jammy`, `deb-noble` and `deb-resolute` get it as their first prerequisite, with the Docker build moved into their recipe (`deb-jammy: docs-install-check` and recipe `$(MAKE) release/$(DEB_JAMMY)`), so that under `make -j` the check finishes before any Docker build starts; a missing or stale site stops in seconds. |
-| Release | `release: documentation package`, then `$(MAKE) deb`, `$(MAKE) pip` | Recipe of sequential steps: `$(MAKE) docs-check`, `$(MAKE) website-release`, `$(MAKE) docs-install-check`, `$(MAKE) package`, `$(MAKE) deb`, `$(MAKE) pip`. The release rebuilds the site first, so the check runs right after that rebuild, the earliest point where it can pass, and before the source package and any Docker build. Sequential recipe lines instead of prerequisites, so that `make -j release` keeps the order. |
+| Debian package | `GNUmakefile` `deb-*` → `docker build` with `Dockerfile.ubuntu` (`COPY . .`) → `dpkg-buildpackage` → `debian/rules` `override_dh_auto_configure` with two configure runs, both `-DCMAKE_INSTALL_PREFIX=/usr`; build 1 (gcc13) installs `html_docu/`, build 2 (gcc11, MATLAB MEX only; only its `.mexa64` files are copied into the package) | `COPY . .` brings the ignored `docs/website/` into the container (`.dockerignore` keeps out `docs_builder/.cache/` and the publication PDFs). Build 1 gets `-DENABLE_DOCS_INSTALL=ON` and so runs the check and installs the site; build 2 stays at the default OFF. |
+| Early fail before Docker | none | The first line of the `deb` recipe: `cmake -S docs_builder -B build_docs_check -DENABLE_DOCS_INSTALL=ON -DCMAKE_INSTALL_PREFIX=/usr` (configure only: the same check, no install); then the existing `$(MAKE) -j deb-jammy deb-noble deb-resolute`. A missing or stale site stops in seconds, before any Docker build. Chosen over a separate target because it is one line in one place, with no new target and no change to the `deb-*` rules; a direct `make deb-jammy` skips the early check but is still protected by the same check inside the container, only later. |
+| Release | `release: documentation package`, then `$(MAKE) deb`, `$(MAKE) pip` | `release: package` with the recipe `python3 docs_builder/build.py docs --check`, `python3 docs_builder/build.py website --release`, `$(MAKE) deb`, `$(MAKE) pip`. Order: the tracked Markdown must be committed (`--check`), the site is rebuilt strictly, then `deb` runs the early check of the row above against the fresh site. |
 | Windows package | `Makefile` `all` configures with `CMAKE_INSTALL_PREFIX=%CD%` (local layout: the check would never run); `release-win` runs `cmake --install ... --prefix $(DIST_DIR)` on that build without re-configuring and copies `html_docu\*` by `xcopy` to a hard-coded `0.11.5` path | `release-win` starts with a standalone configure `cmake -S docs_builder -B $(CMAKE_BUILD_DIR)\docs $(GENERATOR) -D ENABLE_DOCS_INSTALL=ON -D QDOCS_INSTALL_DIR=documentation -D CMAKE_INSTALL_PREFIX=%CD%\$(DIST_DIR)` (fails before anything is copied or zipped), and after the existing `cmake --install` of the library runs `cmake --install $(CMAKE_BUILD_DIR)\docs`; the `xcopy html_docu` line is deleted. The site goes to `documentation\` at the top of the zip: on Windows the FHS path `share\doc\quadriga-lib\html` means nothing, a top-level folder is found at once, and the name says what it holds without being confused with the repository's `docs/` (which holds only the Markdown). `README_win.md` is updated at the cutover. |
 | pip wheels and sdist (`SKBUILD_PLATLIB_DIR`) | no documentation | unchanged: skipped (D22) |
 | `make` and `cmake --install` into the local layout (`CMAKE_INSTALL_PREFIX` = repository root) | `html_docu/` stays in place | unchanged: skipped; `docs/website/` is already in place |
@@ -1359,24 +1426,28 @@ pytest (version in section 4.1). Location `docs_builder/tests/`; fixtures in `do
 ```ini
 [pytest]
 testpaths = tests
+addopts = -p no:cacheprovider
 markers =
-    node: needs Node.js and katex (in docs_builder/node_modules or the active environment)
+    node: needs Node.js and katex in the active environment
     cmake: needs cmake
     kernel: needs the tutorial packages and the python3 Jupyter kernel
     repo: reads the real repository sources
 ```
 
-Run all: `make docs-test` (section 3.5) in the active tool environment; the suite runs the same in the conda and the venv set-up, and finds katex in either place. Tests marked `node`, `cmake` or `kernel` skip themselves with a reason when the tool is missing. The suite must run in under two minutes on the build machine without the `kernel` tests; it starts no GPU work and needs no network. `conftest.py` provides a fixture `mini_repo(tmp_path)` that copies `fixtures/wp1/mini_repo/` (a minimal repository: `include/quadriga_lib.hpp` with version `9.9.9`, `CMakeLists.txt` with `set(armadillo_version "1.0.0")`, two or three small blocks per language, a reduced `docs_builder/site.toml`, small content files) and a helper `run_build(root, *args)` that calls `qdocs.cli.main([... , "--root", root])` and returns exit code, stdout and stderr.
+Run all: `python3 docs_builder/build.py test` in the active tool environment. The command runs `pytest.main(["-c", "docs_builder/pytest.ini", "docs_builder/tests", *args])` in-process, after `build.py` has set `sys.dont_write_bytecode`, so the caller needs no flags or environment variables; the suite runs the same in the conda and the venv set-up, and finds katex in the environment by the rule of section 4.4. No test writes into the working copy (section 3.10). Tests marked `node`, `cmake` or `kernel` skip themselves with a reason when the tool is missing. The suite must run in under two minutes on the build machine without the `kernel` tests; it starts no GPU work and needs no network. `conftest.py` provides a fixture `mini_repo(tmp_path)` that copies `fixtures/wp1/mini_repo/` (a minimal repository: `include/quadriga_lib.hpp` with version `9.9.9`, `CMakeLists.txt` with `set(armadillo_version "1.0.0")`, two or three small blocks per language, a reduced `docs_builder/site.toml`, small content files) and a helper `run_build(root, *args)` that calls `qdocs.cli.main([... , "--root", root])` and returns exit code, stdout and stderr.
 
 ### 17.2 Test files and what they cover
 
 | File | Package | Covers |
 |------|---------|--------|
 | `test_cli.py` | WP1 | commands and options; exit codes 0, 1, 2, 3; `--root`; usage message |
-| `test_env.py` | WP1 | Python version message (simulated); missing package message without traceback (simulated `ImportError`), exit 2; `docs` imports no Pygments, Jinja2, nbclient (checked with `sys.modules`); a package below its minimum (simulated) gives the upgrade message; `docs --check` prints the tool-version lines of section 3.9 on a difference; `setup-node` builds the right npm command for `--global` and local (command checked, npm not run) |
+| `test_env.py` | WP1 | Python version message (simulated); missing package message without traceback (simulated `ImportError`), exit 2, naming both set-ups; `docs` imports no Pygments, Jinja2, nbclient (checked with `sys.modules`); a package below its minimum (simulated) gives the upgrade message; `docs --check` prints the tool-version lines of section 3.9 on a difference; katex and validator lookup in `<sys.prefix>` (simulated prefix) |
 | `test_config.py` | WP1 | `site.toml` schema errors with key paths; version and Armadillo version read once; missing header error |
 | `test_output.py` | WP1 | writing only changed files; stale files in `docs/` and `docs/website/` removed, `docs/website/` untouched by `docs`; `--check` writes nothing and exits 3 on a changed, a missing and an extra file, 0 when equal; refusal of paths under `download/` and `releases/`; stamp deleted at the start of `website` and written last; no write when a structural error exists |
-| `test_gitignore.py` | WP1 | (`repo`) `git check-ignore --no-index` reports none of the files the builder tracks (every file under `docs/` except `website/`, every committed file under `docs_builder/`, `tutorials/*.ipynb`, fixture names such as `test_a.txt` or `release/x` below `docs_builder/tests/fixtures/`) and reports `docs/website/x`, `docs_builder/.venv/x`, `docs_builder/node_modules/x`, `docs_builder/.cache/x`, `docs_builder/qdocs/__pycache__/x.pyc` |
+| `test_gitignore.py` | WP1 | (`repo`) `git check-ignore --no-index` reports none of the files the builder tracks (every file under `docs/` except `website/`, every committed file under `docs_builder/`, `tutorials/*.ipynb`, fixture names such as `test_a.txt` or `release/x` below `docs_builder/tests/fixtures/`) and reports `docs/website/x`, `docs_builder/.cache/x`, `docs_builder/qdocs/__pycache__/x.pyc` as ignored |
+| `test_toolcheck.py` | WP1 | with two Python packages and katex missing (simulated through a fake `sys.prefix` and patched `importlib`), `website` prints three messages in one run and exits 2 before reading sources; the per-command sets of section 3.4; `env` prints one line per tool with found version, minimum and status, exits 2 when a `docs` or `website` tool is missing or too old, and 0 when only tutorial packages, kernels, validators or Chrome are missing |
+| `test_no_downloads.py` | WP1 | (`repo`) a text scan of `build.py` and `docs_builder/qdocs/*.py` finds none of `pip`, `npm`, `npx`, `ensurepip`, `urllib.request`, `http.client`, `socket` (outside comments) in any module except `setupnode.py`, and `cli.py` imports `setupnode` only inside the `setup-node` branch; a `website` run on `mini_repo` with a fixture formula, with `subprocess.run` and `subprocess.Popen` patched to record their commands, starts exactly two processes, `node --version` (tool check) and `node .../katex_render.mjs`; the run also passes with `PIP_NO_INDEX=1` and `npm_config_offline=true` set |
+| `test_tidy.py` | WP1 | (`repo`) after `docs`, `website` and `test` on a temporary clone (`git clone` of the working copy into `tmp_path`, with the builder files copied in), `make tidy` leaves `git status --porcelain --ignored` empty apart from what the clone had before; `make clean` keeps `docs/website/` and `docs_builder/.cache/` |
 | `test_docblocks.py` | WP2 | extraction and line numbers; every error id of section 5.2 with its file and line (one fixture each); `<++>` ignored; sub-block labels and kinds; required sub-blocks including the class-block exemption, and E-required for a MATLAB or Python block with `## Declaration:` instead of `## Usage:`; ignored non-`.cpp` files |
 | `test_params.py` | WP2 | the item pattern on every variant of section 5.4 (single name, several names in one bold, `, ` and ` / ` between bolds, `...`, each qualifier form, separators em dash, en dash, hyphen, `<br>`, none); note rows and the `param-item` warning; nested table and list in a description |
 | `test_mdparse.py` | WP2 | `wikilink` including the member form `.[[name]]` (also after a word, `x.[[name]]`, which is then unresolved in MATLAB and Python); `raw_a` (drops `target`, `rel`); `raw_br` (trailing breaks removed, others kept, `<br>` in table cells kept); `no_html` error in prose; `heading_attrs`; `site_url`; `dollarmath` not triggered by `$5 and $6`; no rule touches code spans or fences |
@@ -1400,7 +1471,7 @@ Run all: `make docs-test` (section 3.5) in the active tool environment; the suit
 
 ### 17.3 Golden files
 
-Golden outputs live in `fixtures/<package>/golden/`. A test compares bytes and, on a difference, prints a unified diff. Updating golden files is a deliberate act (`QDOCS_UPDATE_GOLDEN=1 make docs-test`), never automatic.
+Golden outputs live in `fixtures/<package>/golden/`. A test compares bytes and, on a difference, prints a unified diff. Updating golden files is a deliberate act (`QDOCS_UPDATE_GOLDEN=1 python3 docs_builder/build.py test`), never automatic.
 
 ## 18. Cutover checklist (D31)
 
@@ -1423,10 +1494,10 @@ Done after go-live and the maintainer's sign-off, not in step 5. Step 7 copies t
 | File | Change |
 |------|--------|
 | `CMakeLists.txt` | Add `add_subdirectory(docs_builder)` after the version block (after line 18); the option default stays OFF (section 16.4). Delete `set(INSTALL_DOCDIR html_docu)` (line 608), `set(INSTALL_DOCDIR share/doc/quadriga-lib/html)` (line 620) and `install(DIRECTORY html_docu/ DESTINATION ${INSTALL_DOCDIR})` (line 629). Change the path in the `mex_documentation` command (line 499) to `${CMAKE_SOURCE_DIR}/docs_builder/extract_matlab_comments.py`. |
-| `GNUmakefile` | Delete `HB = html_builder` and the `documentation` target. Add `docs-install-check` and change `deb-jammy`, `deb-noble`, `deb-resolute` and `release` as in section 16.4. `package_dirty`: replace `-x 'html_docu/releases/*'` with `-x 'docs_builder/node_modules/*' -x 'docs_builder/.venv/*' -x 'docs_builder/.cache/*'`. `clean`: no change (keeps `docs/website/` and `docs_builder/.cache/`). `tidy` (decided, section 21.2, Q10): add `- rm -rf docs/website` and `- rm -rf docs_builder/.cache` (the tutorial cache included); `docs_builder/.venv/` and `docs_builder/node_modules/` are installed tools, not build products, and stay. This changes the existing `tidy` target, so it waits for the cutover. |
+| `GNUmakefile` | Delete `HB = html_builder` and the `documentation` target. Add the early check line to the `deb` recipe and change `release` as in section 16.4. `package_dirty`: replace `-x 'html_docu/releases/*'` with `-x 'docs_builder/.cache/*'`. `clean` and `tidy`: no cutover change; the `tidy` lines for the new builder were added in step 5 (section 3.13). |
 | `Makefile` (Windows) | `release-win` as in section 16.4: standalone configure of `docs_builder` as the first command, its install after the library install, and the line `if exist html_docu xcopy ... "release\quadriga_lib_0.11.5_win64\html_docu\"` (line 95) deleted. |
 | `Dockerfile.ubuntu` | No change needed: `COPY . .` copies the ignored `docs/website/` from the working tree; build 1 of `debian/rules` then runs the check and installs it. Check after the first deb build that `share/doc/quadriga-lib/html/index.html` is in the package listing printed in step 5 of the Dockerfile. |
-| `.dockerignore` | Replace `html_docu/releases/` and `html_docu/publications/` with `docs/website/publications/` (keeps the 13 MB of PDFs out of the deb, as today), `docs_builder/node_modules/`, `docs_builder/.venv/`, `docs_builder/package-lock.json`, `docs_builder/.cache/`, `docs_builder/static/publications/` (the first three exist only in the venv set-up; the conda environment is outside the repository). |
+| `.dockerignore` | Replace `html_docu/releases/` and `html_docu/publications/` with `docs/website/publications/` (keeps the 13 MB of PDFs out of the deb, as today), `docs_builder/.cache/`, `docs_builder/static/publications/`. The tool environments are outside the repository and are not in the Docker context. |
 | `debian/stamp-changelog.sh` | No change: "HTML API documentation included." stays true, since the deb build installs `docs/website/`. |
 | `debian/rules` | Build 1 (`dh_auto_configure`, gcc13): add `-DENABLE_DOCS_INSTALL=ON`. Build 2 (gcc11, MATLAB MEX): no change (default OFF). |
 | `.gitattributes` | `html_docu/publications/ export-ignore` becomes `docs_builder/static/publications/ export-ignore`. |
@@ -1445,10 +1516,10 @@ Done after go-live and the maintainer's sign-off, not in step 5. Step 7 copies t
 
 ### 18.4 Checks after the cutover
 
-1. `make docs-check` passes; `make website-release` passes; `make docs-test` passes.
+1. `make docs-check`, `python3 docs_builder/build.py website --release` and `python3 docs_builder/build.py test` pass.
 2. `cmake -S . -B build_check -DENABLE_DOCS_INSTALL=ON -DCMAKE_INSTALL_PREFIX=/tmp/qd_inst` stops with the failsafe message when `docs/website/` is missing, and succeeds after `make website`; `cmake --install` puts the site into `/tmp/qd_inst/share/doc/quadriga-lib/html/`.
 3. A MEX build still writes the `.m` help files (`make` with MATLAB or Octave on).
-4. A deb build contains `share/doc/quadriga-lib/html/index.html`; a Windows package contains `documentation\index.html`; `make docs-install-check` with a stale stamp stops before any Docker build.
+4. A deb build contains `share/doc/quadriga-lib/html/index.html`; a Windows package contains `documentation\index.html`; `make deb` with a stale stamp stops at its first line, before any Docker build.
 5. `git grep -n 'html_docu\|html_builder'` finds nothing outside the git history and `docs_builder/README.md`.
 
 Go-live checks (before or at go-live, after the first deploy; plan section 7): `curl -sI <base>/formats.md` shows `Content-Type: text/markdown; charset=utf-8`; `curl -sI <base>/llms.txt` shows `text/plain; charset=utf-8`; `curl -sI <base>/no-such-page` returns 404 with the new page; compression test (section 21.2, Q7): add `AddOutputFilterByType DEFLATE text/html text/css application/javascript text/markdown text/plain` to `.htaccess` on the server, then `curl -sI -H 'Accept-Encoding: gzip' <base>/cpp_api.html` must show `Content-Encoding: gzip` and a normal request must still return the page; if it does, the line goes into `docs_builder/static/.htaccess`, otherwise it is removed again; `python3 docs_builder/build.py gaps --release` exits 0.
@@ -1459,7 +1530,7 @@ Each package owns the files listed; no file has two owners. Shared interfaces ar
 
 | Id | Package | Owns | Depends on |
 |----|---------|------|------------|
-| WP1 | Foundation | `build.py`; `qdocs/__init__.py`, `cli.py`, `env.py`, `diag.py`, `config.py`, `schema.py`, `output.py`; `site.toml`; `requirements*.txt` (three files); `package.json`; `pytest.ini`; `tests/conftest.py`; `tests/fixtures/wp1/`; `test_cli.py`, `test_env.py`, `test_config.py`, `test_output.py`, `test_gitignore.py`; the `.gitignore` block; the `GNUmakefile` targets | none |
+| WP1 | Foundation | `build.py`; `qdocs/__init__.py`, `cli.py`, `env.py`, `diag.py`, `config.py`, `schema.py`, `output.py`; `site.toml`; `requirements*.txt` (three files); `package.json`; `qdocs/setupnode.py`, `qdocs/testrun.py`; `pytest.ini`; `tests/conftest.py`; `tests/fixtures/wp1/`; `test_cli.py`, `test_env.py`, `test_config.py`, `test_output.py`, `test_gitignore.py`, `test_toolcheck.py`, `test_no_downloads.py`, `test_tidy.py`; `docs_builder/README.md`, section "Set up a build machine" (section 4.5); the `.gitignore` block; the five one-line `GNUmakefile` targets of section 3.5 and the `tidy` lines of section 3.13 | none |
 | WP2 | Doc-block parser and model | `qdocs/docblocks.py`, `model.py`, `mdparse.py`, `params.py`, `links.py`, `anchors.py`, `matching.py`; `content/api_matching.toml`; `tests/fixtures/wp2/`; `test_docblocks.py`, `test_params.py`, `test_mdparse.py`, `test_links.py`, `test_anchors.py`, `test_matching.py` | WP1 |
 | WP3 | Markdown output, prose and data pages | `qdocs/prose.py`, `structured.py`, `gaps.py`, `render_md.py`, `mdformat_ext.py`; `tests/fixtures/wp3/`; `test_prose.py`, `test_structured.py`, `test_gaps.py`, `test_render_md.py` | WP2 |
 | WP4 | Content conversion | `content/formats.md`, `faq.md`, `download.md`, `ai_agents.md`, `impressum.md`, `privacy.md`, `tutorials.md`, `404.md`, `api_intro_cpp.md`, `api_intro_mex.md`, `api_intro_python.md`, `landing.toml`, `publications.toml`, `llms.toml`; `tests/fixtures/wp4/`; `test_content.py` | WP3 (formats of sections 6 and 7) |
@@ -1475,7 +1546,7 @@ Acceptance criteria (each package also passes its own tests and leaves the tests
 
 | Id | Done when |
 |----|-----------|
-| WP1 | `make docs`, `make website`, `make docs-check` run end to end with stubs; exit codes and messages of sections 3.1 and 3.4 shown by tests; `.gitignore` test passes; both tool set-ups work from scratch: `make docs-setup-conda` creates `quadriga-web` with Python, Node and all packages and leaves nothing in the repository, and `make docs-setup-venv` creates `docs_builder/.venv/` and `docs_builder/node_modules/`; in each, `make docs`, `make website` (with a fixture formula) and `make docs-test` pass; a package below its minimum gives the message of section 3.4; `docs --check` prints the tool versions on a difference. |
+| WP1 | `make docs`, `make website`, `make docs-check` and `make docs-env` run end to end with stubs; exit codes and messages of sections 3.1 and 3.4 shown by tests; for both variants, a fresh set-up done by following only the README section of 4.5 succeeds, `make docs-env` then passes, and `git status --porcelain --ignored` shows nothing new in the working copy; in each, `make docs`, `make website` (with a fixture formula) and `python3 docs_builder/build.py test` pass; `.gitignore`, tool-check, no-download and tidy tests pass; a package below its minimum gives the message of section 3.4; `docs --check` prints the tool versions on a difference. |
 | WP2 | All real sources of the merged tree (D20 as amended) parse with zero errors (an unmerged tree shows exactly the twelve errors of the doc-block fix list); warning counts reported in the hand-over (expected near: 17 `param-separator`, 25 `param-item`); the measured numbers of sections 5.4 and 9.4 reproduced by tests. |
 | WP3 | Golden-file tests pass; `make docs` on the real repository writes the files of section 2.3 with zero errors; `docs --check` passes right after; `docs` output contains no date. |
 | WP4 | Real content passes all schemas; the legacy ids and `cite` exist; every draft text from the prototype and every design-section-9 item is marked as a gap; `make docs` output reviewed by the manager against the old pages for lost text (a script compares the plain text of old and new formats, FAQ and download pages and lists differences). |
@@ -1483,7 +1554,7 @@ Acceptance criteria (each package also passes its own tests and leaves the tests
 | WP6 | CSS values equal the prototype's (test); the favicon, PNG fallbacks and preview placeholder exist with the stated sizes; `.htaccess` as section 12.4. |
 | WP7 | With the tutorial requirements installed, `make tutorials` runs `pipeline_demo.ipynb`, a second run skips it, and `make website` shows it with figure, table, formula and downloads; without the cache, `make website` passes with the warning. |
 | WP8 | CMake cases (a) to (h) pass; zip byte-identical across runs. |
-| WP9 | `test_real_repo.py` passes; the manager gets a report with the gap list, warning counts, page sizes against budgets and the run time of `make docs` and `make website`. |
+| WP9 | `test_real_repo.py` passes; the time targets of section 3.12 are met on the real repository (`make docs` under 5 s, `make website` under 15 s, an up-to-date `make tutorials` under 5 s), measured with `/usr/bin/time` as wall and CPU time, three runs each, with the 1-minute load average recorded before and after; runs above load 4 are repeated or reported as provisional; the manager gets a report with these timings, the gap list, warning counts and page sizes against budgets. |
 
 ## 20. Traceability
 
@@ -1551,7 +1622,7 @@ Every item of design section 11, plan section 10 and plan section 11, with the s
 
 **Q9. Decided: drop** `style2.css`, `quadriga-lib-logo80.png` and `quadriga-lib-q_letter64.png` (sections 9.6, 12.7).
 
-**Q10. Decided: `make tidy` deletes `docs/website/` and `docs_builder/.cache/`** (the tutorial cache included); `make clean` keeps both; `tidy` keeps `docs_builder/.venv/` and `docs_builder/node_modules/`, which are installed tools, not build products (to be confirmed by the maintainer); the conda environment `quadriga-web` is outside the repository and is never touched by any make target except `docs-setup-conda`. It changes an existing target and is therefore a cutover item (section 18.3).
+**Q10. Decided: `make tidy` restores the state of a clean clone** (D4 as amended): it deletes `docs/website/`, `docs_builder/.cache/` (the tutorial cache included) and byte-code below `docs_builder/`; `build_docs_check/` falls under its existing `rm -rf build*`; `make clean` keeps the site and the cache. No `git clean`. The lines are added in step 5 (section 3.13). The tool environments are outside the repository and never touched by `clean` or `tidy`.
 
 ## Appendix A. Measurements
 
