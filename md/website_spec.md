@@ -153,8 +153,8 @@ Two entry points, run from any folder:
 |---------|------|
 | `python3 docs_builder/build.py docs` | Parses all sources, renders the tracked Markdown tree and writes `docs/` (section 3.6). |
 | `python3 docs_builder/build.py docs --check` | Same rendering in memory; writes nothing; compares with `docs/` (D23); prints each differing, missing or extra file. |
-| `python3 website_builder/build.py website` | Runs the `docs` phase through `qdocs` (writes `docs/`), then renders the site, runs the checks of section 15 and writes `website/`. |
-| `python3 website_builder/build.py website --release` | The one strict switch (plan section 11): additionally fails on any remaining gap. |
+| `python3 website_builder/build.py website` | Runs the `docs` phase through `qdocs` (builds `docs/` in memory, section 3.6), then renders the site, runs the checks of section 15 and writes `website/`. |
+| `python3 website_builder/build.py website --release` | The one strict switch (plan section 11): additionally fails on any remaining gap; a failure writes nothing. |
 
 Option for both: `--root DIR` (repository root; used by tests). Exit codes: 0 success (warnings allowed); 1 build failed (structural errors, failed checks, `--check` differences, strict-mode failures); 2 environment or usage problem (wrong Python, missing tool, bad arguments).
 
@@ -200,7 +200,7 @@ Source paths are constants too (`src/`, `api_mex/`, `api_python/`, `include/quad
 
 `website_builder/build.py` checks the same, and also that `markdown_it`, `mdit_py_plugins`, `pygments` and `jinja2` are importable and that `pandoc` is on `PATH` (`shutil.which`). There are no lazy imports and no version comparisons.
 
-Each collects everything missing, prints it in one run, one line per item, and exits 2 without a traceback (D21). The message names the Python in use (`sys.executable`); the website message also says to activate the conda environment `quadriga-web`, gives both set-up lines of section 4.2 and points to "Set up a build machine" in `website_builder/README.md`. No message starts an installation; a build never downloads anything. There is no `env` command and no `make docs-env` (D38).
+Each collects everything missing, prints it in one run, one line per item, and exits 2 without a traceback (D21). A missing TOML reader reads: use Python 3.11 or newer, or on 3.10 install `python3-tomli` (Ubuntu) or `pip install tomli`. `build.py` uses no syntax newer than Python 3.6 and imports `qdocs` or `qsite` only after its checks, so an older Python also gets the plain message. The message names the Python in use (`sys.executable`); the website message also says to activate the conda environment `quadriga-web`, gives both set-up lines of section 4.2 and points to "Set up a build machine" in `website_builder/README.md`. No message starts an installation; a build never downloads anything. There is no `env` command and no `make docs-env` (D38).
 
 ### 3.5 `GNUmakefile` lines
 
@@ -277,7 +277,7 @@ Time targets on the idle build machine (1-minute load below 4): `make docs` unde
 | Pygments | none | lexers of section 10 |
 | Jinja2 | 3.1 | environment options of section 8.1 |
 | pandoc | 3.7 | formula step (section 11); tested with 3.7.0.2 (the version of Ubuntu 26.04), 3.9.0.2 and 3.13: the defaults file works and only invalid formulas print a warning; the MathML differs in small attributes between versions (section 3.9) |
-| pytest | none | tests (section 17); also on the Windows VM for the docs tests |
+| pytest | none | tests (section 17); also on Windows for the docs tests after the merge (section 18.4) |
 
 Notebooks are read with the standard library (`json`); the website builder needs no Jupyter package (D34). Minimums are not checked by the build (section 3.4); they are the versions the set-up lines below install.
 
@@ -346,7 +346,7 @@ In a `params` sub-block, outside code fences, a top-level item starts at a line 
 ^- (?P<names>\*\*NAME\*\*(?:(?:, | / )\*\*NAME\*\*)*)(?:\s+(?P<qual>\*\([^)]*\)\*|\([^)]*\)))?(?P<sep>\s+[—–-]\s+|<br>\s*$|\s*$)
 ```
 
-- A matching item is a parameter row: names as written (for example `` `Dx`, `Dy`, `Dz`, `*D` `` or `` `V_re` / `V_im` ``), qualifier (text in the parentheses: `optional`, `in/out`, `optional, in/out`, ...; empty if absent) and description (the rest of the item, including continuation lines, nested lists and tables).
+- A matching item is a parameter row: names as written (for example `` `Dx`, `Dy`, `Dz`, `*D` `` or `` `V_re` / `V_im` ``), qualifier (text in the parentheses: `optional`, `in/out`, `optional, in/out`, ...; empty if absent) and description (the rest of the item, including continuation lines, nested lists and tables). The description's source lines, which the website builder parses into a fragment, are the first line without the matched `- **names** (qual) — ` prefix and the following lines dedented by the item's content indent (2).
 - ` — ` is the SPEC separator; ` - ` and ` – ` give the warning `param-separator`; `<br>` or nothing means the description starts on the next line.
 - A non-matching item is a note row across both columns, with the warning `param-item`.
 - Other blocks in a `params` sub-block (paragraphs, tables) render in place.
@@ -778,34 +778,34 @@ The built site goes into no package. Every binary package carries the tracked Ma
 
 | Package | How `docs/` gets in | Changed in package D (section 18.3) |
 |---------|---------------------|-------------------------------------|
-| System install (`make install` with a prefix, deb build 1) | `CMakeLists.txt`, system-install branch: `install(DIRECTORY docs/ DESTINATION share/doc/quadriga-lib)` in place of `install(DIRECTORY html_docu/ DESTINATION ${INSTALL_DOCDIR})` | both `set(INSTALL_DOCDIR ...)` lines go; the local layout installs nothing (the tree already has `docs/`) |
-| Debian package | through the system install of build 1 (`COPY . .` in `Dockerfile.ubuntu` brings `docs/` and `docs_builder/`; `.dockerignore` keeps `website/` and `website_builder/` out) | `debian/rules`: `override_dh_compress:` with recipe `dh_compress -X.md`; `debian/control`: "and HTML API documentation" (it spans a line break in the description) becomes "and the API documentation as Markdown files", with the description lines reflowed; `debian/stamp-changelog.sh` line 53: "HTML API documentation included." becomes "Markdown API documentation included." |
+| System install (`cmake --install` with a prefix other than the source folder, deb build 1) | `CMakeLists.txt`, system-install branch: `install(DIRECTORY docs/ DESTINATION share/doc/quadriga-lib)` in place of `install(DIRECTORY html_docu/ DESTINATION ${INSTALL_DOCDIR})` | both `set(INSTALL_DOCDIR ...)` lines go; the local layout installs nothing (the tree already has `docs/`) |
+| Debian package | through the system install of build 1 (`COPY . .` in `Dockerfile.ubuntu` brings `docs/` and `docs_builder/`; `.dockerignore` keeps `website/` and `website_builder/` out) | `debian/rules`: `override_dh_compress:` with recipe `dh_compress -X.md -Xllms.txt`; `debian/control`: "and HTML API documentation" (it spans a line break in the description) becomes "and the API documentation as Markdown files", with the description lines reflowed; `debian/stamp-changelog.sh` line 53: "HTML API documentation included." becomes "Markdown API documentation included." |
 | Windows zip | `Makefile` `release-win`: `xcopy /E /I "docs" "$(DIST_DIR)\docs"` in place of the `xcopy html_docu` line. `cmake --install` does not do it: `all` configures with `CMAKE_INSTALL_PREFIX=%CD%`, the local layout, so the system-install branch never runs for this build. | `README_win.md`: the `html_docu/` row becomes `docs/` "Documentation as Markdown files (the content of quadriga-lib.org)" |
 | pip wheels | none (as today) | — |
 | pip sdist (scikit-build-core) | contains every file git does not ignore, so `docs/` (today `html_docu/`); it also carries `website_builder/`, as it carries the publications today (`export-ignore` does not apply to it) | — |
 | Source zip (`make package`, `git archive HEAD`) | `docs/` and `docs_builder/` are tracked; `website_builder/` is `export-ignore` (section 18.1) | — |
 
-`dh_compress` (debhelper 13, compat 13 here) gzips every file below `usr/share/doc` larger than 4 kB, except a fixed list of extensions (`.htm*`, `.css`, `.js`, `.svg`, `.pdf`, images, archives, fonts and a few others); `.md` is not on that list, so without `-X.md` the larger Markdown files would become `.md.gz` and every relative link to them would break. `-X` excludes files whose name contains the given text. Checked against the `dh_compress` man page and its source on salsa.debian.org (the `find` expression with `-size +4k`). `llms.txt` may be compressed: it holds absolute links only and no installed file links to it, so that is harmless.
+`dh_compress` (debhelper 13, compat 13 here) gzips every file below `usr/share/doc` larger than 4 kB, except a fixed list of extensions (`.htm*`, `.css`, `.js`, `.svg`, `.pdf`, images, archives, fonts and a few others); `.md` is not on that list, so without `-X.md` the larger Markdown files would become `.md.gz` and every relative link to them would break; `-Xllms.txt` keeps `llms.txt`, which `ai_agents.md` links relatively. `-X` excludes files whose name contains the given text. Checked against the `dh_compress` man page and its source on salsa.debian.org (the `find` expression with `-size +4k`).
 
 Every release build runs the docs check (D39) with a plain Python 3.10 or newer, no conda environment and no website tools; a stale `docs/` stops the build before anything is packaged:
 
 | Release path | Where the check runs | Why there |
 |--------------|----------------------|-----------|
-| `make release` (`GNUmakefile`, D32) | First line of the recipe: `python3 docs_builder/build.py docs --check` (the tracked Markdown is current), then `test -z "$$(git status --porcelain -- docs)"` (it is committed, including new files, which `git diff --quiet HEAD -- docs` would miss), then `$(MAKE) package`, `$(MAKE) deb`, `$(MAKE) pip`. `release:` has no prerequisites and its own line `.PHONY: release` (the folder `release/` exists, so without it make reports the target up to date and runs nothing). | Before the source zip, which is the first package made. |
-| Each deb container (`Dockerfile.ubuntu`, also when `make deb-jammy` and the others run on their own) | A step `RUN python3 docs_builder/build.py docs --check` directly after `COPY . .` and before the changelog stamp; `python3-tomli` is added to the existing `apt-get install` line (needed on 22.04, harmless on newer releases). | It checks the tree the container packages, and it fails in seconds, before the long compile of `dpkg-buildpackage`. |
-| Windows zip (`Makefile`, `release-win`) | First command of the recipe: `python docs_builder\build.py docs --check`. | Before the old dist folder is removed and anything is copied, so a failure leaves nothing half-made; `release-win` is the step that copies `docs` into the zip. The Windows build machine needs Python 3.10 or newer on `PATH` (section 18.3, `README.md`). |
+| `make release` (`GNUmakefile`, D32) | First line of the recipe: `test -z "$$(git status --porcelain --untracked-files=no; git status --porcelain -- docs)" \|\| { echo "uncommitted changes: commit before a release"; exit 1; }`, which refuses any uncommitted change to a tracked file (the packages are made from `HEAD` and from the working tree, which must agree) and any new file in `docs/` not yet committed (a new section file); then `python3 docs_builder/build.py docs --check` (the committed Markdown is current); then `$(MAKE) package`, `$(MAKE) deb`, `$(MAKE) pip`. `release:` has no prerequisites and its own line `.PHONY: release` (the folder `release/` exists, so without it make reports the target up to date and runs nothing). | Before the source zip, which is the first package made. |
+| Each deb container (`Dockerfile.ubuntu`, also when `make deb-jammy` and the others run on their own) | A step `RUN python3 docs_builder/build.py docs --check` directly after `COPY . .` and before the changelog stamp; `python3-tomli` is added to the existing `apt-get install` line (needed on 22.04, harmless on newer releases). | It checks the tree the container packages, and it fails in seconds, before the long compile of `dpkg-buildpackage`. The deb recipes pipe `docker build` into `tee`; `GNUmakefile` gets `SHELL := /bin/bash` and `.SHELLFLAGS := -o pipefail -c` (section 18.3), so the failure stops make. |
+| Windows zip (`Makefile`, `release-win`) | First command of the recipe: `python docs_builder\build.py docs --check`. | Before the old dist folder is removed and anything is copied, so a failure leaves nothing half-made; `release-win` is the step that copies `docs` into the zip. The Windows build machine needs Python on `PATH` for this step (section 18.3, `README.md`). |
 
 The website is built (`make website`) and deployed independently of the release (D29).
 
 ## 17. Tests
 
-pytest, on the maintainer's machine only (the builders never need it). All tests are in `website_builder/tests/` (section 2.1): `tests/docs/` tests `qdocs` and imports nothing else; `tests/site/` tests `qsite`. `website_builder/pytest.ini` sets `testpaths = tests`, `pythonpath = . ../docs_builder`, `addopts = -p no:cacheprovider` and the marker `repo` (reads the real repository). Test file names are unique across both folders (they have no `__init__.py`). Run all with `python3 -m pytest website_builder/tests` in the active environment; the docs tests alone with `python3 -m pytest website_builder/tests/docs`, which needs only Python and pytest, also on Windows. The suite runs in under two minutes, needs no network and writes only below `tmp_path`.
+pytest, on the maintainer's machine only (the builders never need it). All tests are in `website_builder/tests/` (section 2.1): `tests/docs/` tests `qdocs` and imports nothing else; `tests/site/` tests `qsite`. `website_builder/pytest.ini` sets `testpaths = tests`, `addopts = -p no:cacheprovider` and the marker `repo` (reads the real repository); `tests/conftest.py` inserts `docs_builder/` and `website_builder/` into `sys.path` (no `pythonpath` setting, so pytest 6.2 of Ubuntu 22.04 works too). Test file names are unique across both folders (they have no `__init__.py`). Run all with `python3 -m pytest website_builder/tests` in the active environment; the docs tests alone with `python3 -m pytest website_builder/tests/docs`, which needs only Python and pytest. The suite runs in under two minutes, needs no network and writes only below `tmp_path`.
 
 `tests/conftest.py` provides `mini_repo(tmp_path)`, a copy of `tests/fixtures/mini_repo/` (a minimal repository: header with version `9.9.9`, `CMakeLists.txt` with `set(armadillo_version "1.0.0")`, two or three small blocks per language, `docs_builder/content/`, `website_builder/content/`, `website_builder/skill/` and a small notebook with outputs in `tutorials/`); `run_docs(root, *args)`, which calls `qdocs.cli.main` with `--root` and returns exit code and output; and `run_site(root, *args)`, the same for `qsite.cli.main`, importing `qsite` inside the function so the docs tests never import it. Rendering tests assert substrings of the `mini_repo` output, not whole files; for real data the tracked `docs/` plus `docs --check` is the reference output.
 
 | File | Package | Covers |
 |------|---------|--------|
-| `docs/test_docs_cli.py` | A | `docs` on `mini_repo` exits 0; a structural error gives 1 and writes nothing; `docs_builder/build.py docs --check --root <mini_repo>` run as a subprocess with `sys.executable -S` (no site-packages) after a `docs` run exits 0 (skipped on Python 3.10, where `tomli` sits in site-packages); every `import` in `docs_builder/**/*.py` names a module of `sys.stdlib_module_names`, `qdocs` or the `tomli` fallback, never `qsite` |
+| `docs/test_docs_cli.py` | A | `docs` on `mini_repo` exits 0; a structural error gives 1 and writes nothing; every `import` in `docs_builder/**/*.py` names a module of `sys.stdlib_module_names`, `qdocs`, `tomllib` or `tomli` (`tomllib` is not in that set on 3.10), never `qsite` |
 | `docs/test_docs_output.py` | A | Only changed files written; stale files removed; `--check` writes nothing and exits 1 on a changed, missing or extra file; a copy of `mini_repo` whose sources and `docs/` have `\r\n` line ends gives the same output, and `--check` passes on it |
 | `docs/test_docblocks.py` | A | Line numbers; each error id of section 5.2 found on the docs path (one small fixture each); sub-block kinds; required sub-blocks with the class-block exemption; parameter items (lazy continuation, end at a blank line, nested lists and tables kept in the item), pattern variants of section 5.4, note rows, warnings |
 | `docs/test_links.py` | A | `[[...]]` resolution and E-link; URLs of each link kind per output location; `slug`, legacy hashes (section 9.3 values); E-anchor; families, mapping order and mapping errors |
@@ -822,7 +822,7 @@ pytest, on the maintainer's machine only (the builders never need it). All tests
 | `site/test_site_checks.py` | B | Missing file, missing id, absolute `base_url` link in a twin, the `faq.html#cite` case in HTML; unclosed tag, duplicate id, two `h1`, `img` without `alt`; size warnings |
 | `site/test_site_real_repo.py` | C | (`repo`) every id of `fixtures/old_anchors.json` (captured once from `html_docu/*.html` without the dropped ids of section 9.6) and `index.html#quickstart` exist in the `website` output; two `website` runs give identical bytes; `pipeline_demo.ipynb` converts without warnings (these cases skip themselves while `website_builder/templates/base.html` is missing) |
 
-On the Windows VM (Y: drive, the same working tree): `python docs_builder\build.py docs --check` passes and `python -m pytest website_builder\tests\docs` passes.
+Windows is checked after the merge, on the `main` checkout, which is the only tree the Windows VM sees (section 18.4).
 
 ## 18. Cutover work items (D35)
 
@@ -844,14 +844,14 @@ Package 0 does section 18.1 at the start of step 5, so the builders know only th
 | File | Change |
 |------|--------|
 | `CMakeLists.txt` | As in section 16: delete both `set(INSTALL_DOCDIR ...)` lines; `install(DIRECTORY docs/ DESTINATION share/doc/quadriga-lib)` replaces the `html_docu` install line. |
-| `GNUmakefile` | Delete `HB = html_builder` and the `documentation` target; `release` and its `.PHONY: release` line as in section 16 (with plain `python3`, no environment); in `package_dirty` the exclusion `-x 'html_docu/releases/*'` becomes `-x 'website/*'`; `clean` unchanged (it keeps `website/`); `tidy` already has the lines of section 3.10. |
+| `GNUmakefile` | Add `SHELL := /bin/bash` and `.SHELLFLAGS := -o pipefail -c` near the top, so the deb recipes, which pipe `docker build` into `tee`, fail when the build fails (section 16); delete `HB = html_builder` and the `documentation` target; `release` and its `.PHONY: release` line as in section 16 (with plain `python3`, no environment); in `package_dirty` the exclusion `-x 'html_docu/releases/*'` becomes `-x 'website/*'`; `clean` unchanged (it keeps `website/`); `tidy` already has the lines of section 3.10. |
 | `Makefile` (Windows) | `release-win` as in section 16: the docs check as its first command, the `xcopy` of `docs`. |
 | `debian/rules`, `debian/control` | As in section 16. |
 | `Dockerfile.ubuntu` | As in section 16: `python3-tomli` in the `apt-get install` line (with a comment: the docs check on 22.04), the `RUN python3 docs_builder/build.py docs --check` step after `COPY . .`. |
 | `debian/stamp-changelog.sh` | As in section 16. |
 | `.dockerignore` | Delete `html_docu/releases/`. |
 | `.gitignore` | Delete `html_docu/releases/`. |
-| `README.md` | Make-target table: the `make documentation` row becomes `make docs` (tracked Markdown in `docs/`), `make docs-check`, `make website` (site in `website/`); repository-layout table: the `html_docu/` and `html_builder/` rows become `docs/` (documentation as Markdown, generated by `make docs`), `docs_builder/` (makes `docs/` and the MATLAB help files; Python standard library), `website_builder/` (makes the website; not in the source package) and `tutorials/`; Windows build step 1: Python 3.10 or newer is required (the docs check of `nmake release-win`), with `numpy` and `pytest` optional for the tests. |
+| `README.md` | Make-target table: the `make documentation` row becomes `make docs` (tracked Markdown in `docs/`), `make docs-check`, `make website` (site in `website/`); repository-layout table: the `html_docu/` and `html_builder/` rows become `docs/` (documentation as Markdown, generated by `make docs`), `docs_builder/` (makes `docs/` and the MATLAB help files; Python standard library), `website_builder/` (makes the website; not in the source package) and `tutorials/`; Windows build step 1: for `nmake release-win`, Python 3.11 or newer (3.10 with `tomli`), for its docs check; `numpy` and `pytest` stay optional for the tests. |
 | `README_win.md` | As in section 16. |
 | `md/SPEC_CPP_API.md` | "the pages in `html_docu/`" becomes "the pages of quadriga-lib.org"; `html_docu/quadriga_lib_api_cpp.md` becomes `docs/quadriga_lib_api_cpp.md`; `make documentation` becomes `make docs`; the "Line" column advice becomes: read the function index of the full file, then open only the section file `docs/api/cpp/<section>.md`; "may lag behind" becomes: regenerated by hand, may lag behind `main` (D8); document the doc-block extensions of D6: `$...$` and `$$...$$` math; line 208 "compiled to HTML and Markdown (`make documentation`)" becomes "rendered into the website and the Markdown files in `docs/` (`make website`, `make docs`)". |
 | `md/SPEC_MATLAB_API.md`, `md/SPEC_PYTHON_API.md` | `make documentation`, `html_docu/quadriga_lib_api_*.md` and "may lag behind" as for the C++ file; script path `docs_builder/extract_matlab_comments.py`. |
@@ -863,7 +863,9 @@ Package 0 does section 18.1 at the start of step 5, so the builders know only th
 
 ### 18.4 Acceptance of the cutover and checks at go-live
 
-After package D: `make docs-check`, `make website` and the tests pass; `git grep -n 'html_docu\|html_builder'` finds nothing outside `md/website_*.md` and `html_builder/design_prototype/`; a configure with `-DCMAKE_INSTALL_PREFIX=<tmp>` and `cmake --install` puts `docs/` into `<tmp>/share/doc/quadriga-lib/`; a MEX build (`ENABLE_MEX_DOC=ON`) still writes the `.m` help files; the deb built in Docker (`make deb-noble`, and `make deb-jammy` for Python 3.10 with `tomli`) shows the docs check passing in its log and contains `usr/share/doc/quadriga-lib/quadriga_lib_api_cpp.md` uncompressed and `api/cpp/*.md`, and lintian shows no new tags; on the Windows VM, `release-win` runs the docs check first and gives a zip with `docs\quadriga_lib_api_cpp.md`, and the two Windows checks of section 17 pass; a source zip made with `git archive --format=zip HEAD` after the maintainer's commit, unpacked into a scratch folder, contains no `website_builder/`, passes `make docs-check` there, and `make website` there stops with the message of section 3.5. These builds compile the library; they follow the machine rules (load, thread count) and are run by the manager or with the maintainer's agreement.
+After package D: `make docs-check`, `make website` and the tests pass; `git grep -n 'html_docu\|html_builder'` finds nothing outside `md/website_*.md` and `html_builder/design_prototype/`; a configure with `-DCMAKE_INSTALL_PREFIX=<tmp>` and `cmake --install` puts `docs/` into `<tmp>/share/doc/quadriga-lib/`; a MEX build (`ENABLE_MEX_DOC=ON`) still writes the `.m` help files; the deb built in Docker (`make deb-noble`, and `make deb-jammy` for Python 3.10 with `tomli`) shows the docs check passing in its log and contains `usr/share/doc/quadriga-lib/quadriga_lib_api_cpp.md` uncompressed and `api/cpp/*.md`, and lintian shows no new tags; in a scratch copy of the tree with a stale `docs/`, `make deb-jammy` exits non-zero; a source zip made with `git archive --format=zip HEAD` after the maintainer's commit, unpacked into a scratch folder, contains no `website_builder/`, passes `make docs-check` there, and `make website` there stops with the message of section 3.5. These builds compile the library; they follow the machine rules (load, thread count) and are run by the manager or with the maintainer's agreement.
+
+After the merge, on the `main` checkout (the Windows VM sees only that tree), with the first `nmake release-win`: `python docs_builder\build.py docs --check` and `python -m pytest website_builder\tests\docs` pass, and `release-win` runs the docs check first and gives a zip with `docs\quadriga_lib_api_cpp.md`. Before the merge the docs builder is checked on Linux and on Python 3.10 in the jammy container only (section 19, package A).
 
 At go-live, after the first deploy (plan section 7): `curl -sI <base>/formats.md` shows `text/markdown; charset=utf-8`; `curl -sI <base>/llms.txt` shows `text/plain; charset=utf-8`; a missing page returns 404 with the new page; compression test: add `AddOutputFilterByType DEFLATE text/html text/css application/javascript text/markdown text/plain` to the server's `.htaccess`; if `curl -sI -H 'Accept-Encoding: gzip' <base>/cpp_api.html` then shows `Content-Encoding: gzip` and a plain request still works, the line goes into `website_builder/static/.htaccess`, otherwise it is removed; the twin anchors work on GitHub (section 9.5); `website_builder/build.py website --release` passes (no gaps left).
 
@@ -876,12 +878,12 @@ Each package owns the files listed; a package that needs a change in a file it d
 | 0 | Moves | the `git mv` and line changes of section 18.1 | none |
 | A | Docs builder | `docs_builder/build.py`; `docs_builder/qdocs/` (all modules of section 2.2); `docs_builder/content/api_matching.toml`; `website_builder/pytest.ini`; `website_builder/tests/conftest.py`; `tests/fixtures/mini_repo/` except its `website_builder/` and `tutorials/` folders; the tests marked A; the `GNUmakefile` lines of sections 3.5 and 3.10; the lines of section 2.4 | 0 |
 | B | Website builder | `website_builder/build.py`; `website_builder/qsite/`; `pandoc_math.yaml`; `templates/` (with the landing text of section 7.1); `static/` except the moved files; `website_builder/README.md` section "Set up a build machine"; `mini_repo/website_builder/` and `mini_repo/tutorials/`; the tests marked B | A |
-| C | Content | `docs_builder/content/` except `api_matching.toml`; `website_builder/content/`; `website_builder/skill/quadriga-lib/SKILL.md`; `tutorials/pipeline_demo.ipynb` with outputs; `tests/fixtures/old_anchors.json`; the tests marked C | A (B for the visual check) |
+| C | Content | `docs_builder/content/` except `api_matching.toml`; `website_builder/content/`; `website_builder/skill/quadriga-lib/SKILL.md`; `tutorials/pipeline_demo.ipynb` with outputs; `tests/fixtures/old_anchors.json`; the tests marked C | A; B for acceptance |
 | D | Cutover | the deletions and changes of sections 18.2 and 18.3 | A, B, C accepted |
 
 Order: 0; A (the docs builder first); then B and C in parallel; B's checks on the real repository run after C is in; then D.
 
-Interface from A to B: `qsite` uses only these names of `qdocs`; A chooses their arguments and documents them in docstrings, and changes them only through the manager:
+Interface from A to B: `qsite` uses only these names of `qdocs` and keeps no copy of their logic; A chooses their arguments and documents them in docstrings, and changes them only through the manager:
 
 | Name | Gives |
 |------|-------|
@@ -889,18 +891,21 @@ Interface from A to B: `qsite` uses only these names of `qdocs`; A chooses their
 | `cli.Diagnostics`, `cli.write_tree(folder, mapping)` | Error, warning and gap collection and printing (section 3.7); writing a mapping with the rules of section 3.6. |
 | `config` | The constants and `PAGES` (section 3.3), the versions (section 3.8), `tomllib`. |
 | `prose.read_page(path, diag)`, `prose.substitute(text)`, `prose.gap_scan(folders)` | A website-only prose page with front matter and heading ids (sections 6.1, 6.2); build variables (section 6.3); the gap scan (section 6.4). |
+| `prose.heading_ids(lines, level_shift)` | The heading ids of section 6.2 for a list of source lines; used by `read_page` (shift 0) and for notebook Markdown cells (shift 1, section 13.3). |
 | `links.url(target, location)`, `links.slug(text)` | URLs per output location (section 8.7.1), ids (section 9.2). |
 | `render_md.twin_lines(lines, ...)` | The twin writer for one part, used for notebook Markdown cells (sections 8.6.1, 13.3). |
+| `render_md.twin_header(title, web_url, headings)` | The twin header with the index table (section 8.6.1), used for the tutorial twins. |
+| `render_md.prose_twin(page)` | The whole twin of a prose page, gap removal in fields included (sections 6.4, 8.6.1), used for `tutorials.md`. |
 | `checks.check_markdown(mapping, scope)` | The Markdown link check (section 15.1). |
 
 Acceptance (each package also passes its tests and leaves the others green):
 
 | Id | Done when |
 |----|-----------|
-| 0 | `git status` shows the four moves as renames; after a configure with `ENABLE_MEX_DOC=ON`, `cmake --build <dir> --target mex_documentation` writes the `.m` help files (CMake does not check the script path at configure time; the target needs Python and Octave or MATLAB found by the configure). |
-| A | `docs` and `docs --check` work on `mini_repo`; the real doc blocks (parser only; the real `content/` arrives with C) parse with zero errors and about 17 `param-separator` and 25 `param-item` warnings; no output contains a date; `make docs` and `make docs-check` run with the system `python3`, outside any conda environment; the same runs work with Python 3.10 and tomli 1.2 (a throwaway container of the local image `quadriga-deb-jammy` with `python3-tomli` installed, `docker run --rm`); the docs tests pass on the Windows VM (section 17); after `make tidy`, `git status --porcelain --ignored` shows nothing new in the working copy. |
+| 0 | `git status` shows the four moves as renames; after a configure with `ENABLE_PYTHON=ON` and `ENABLE_MEX_DOC=ON` (without Python, `CMakeLists.txt` switches the MEX help off), `cmake --build <dir> --target mex_documentation` writes the `.m` help files (CMake does not check the script path at configure time; the target needs Python and Octave or MATLAB found by the configure). |
+| A | `python3 docs_builder/build.py docs` and `docs --check`, with `--root <copy of mini_repo>`, work with the system `python3` outside any conda environment and in a throwaway container of the local image `quadriga-deb-jammy` with `python3-tomli` installed (Python 3.10, tomli 1.2): `docker run --rm --user $(id -u):$(id -g) -e PYTHONDONTWRITEBYTECODE=1`, the tree mounted read-only and the run made on a copy under `/tmp` in the container, optionally with `python3 -m pytest website_builder/tests/docs` there; a scratch script that calls `qdocs.docblocks` on the real doc blocks (parser only; the real `content/` arrives with C) finds zero errors and about 17 `param-separator` and 25 `param-item` warnings; no output contains a date; after `make tidy`, `git status --porcelain --ignored` shows nothing new in the working copy. |
 | B | On `mini_repo`: the tests marked B pass. The conda set-up following only the README section succeeds and `make website` runs in it (the Ubuntu line is checked where a 26.04 machine is at hand); without `pandoc` on `PATH` the build stops with the message of section 3.4. After C is in: `make website` builds all pages with link, anchor and well-formedness checks passing and the C++ page within budget; the dummy tutorial shows code, text output, figure, table, formula and downloads; manual: the CSS token values equal the prototype's, and the pages match the prototype at 375, 768 and 1280 px in the browser pane. |
-| C | `make docs` on the real repository writes the files of section 2.3 with zero errors and `docs --check` passes right after; publications pass their key check; `cite` and the legacy ids exist; every prototype draft and design-section-9 item is a gap; `pipeline_demo.ipynb` is committed with outputs and without warning text; `test_docs_real_repo.py` and `test_site_real_repo.py` pass; a plain-text comparison of the old and new formats, FAQ and download pages shows no lost text. |
+| C | `make docs` on the real repository writes the files of section 2.3 with zero errors and `make docs-check` passes right after; publications pass their key check; `cite` and the legacy ids exist; every prototype draft and design-section-9 item is a gap; `pipeline_demo.ipynb` is committed with outputs and without warning text; `test_docs_real_repo.py` and `test_site_real_repo.py` pass; a plain-text comparison of the old and new formats, FAQ and download pages shows no lost text. |
 | D | Section 18.4, first paragraph. |
 
 The manager's acceptance run after all packages: the full build on the real repository; one timed run each of `make docs` and `make website` (`/usr/bin/time`, wall and CPU) with the 1-minute load average recorded before and after, compared with the targets of section 3.11 (a run above load 4 is reported as provisional); manual check that `make tidy` after `docs`, `website` and the tests leaves the state of a clean clone and that `make clean` keeps `website/`; and a report with these timings, the gap list, the warning counts and the page sizes against the budgets.
@@ -920,10 +925,10 @@ Every item of design section 11, plan section 10, plan section 11 and decisions 
 | Design 11.7 | MATLAB and Python pages: labels, lower-case names | 5.3, 5.5, 6.7, 3.3 |
 | Design 11.8 | Placeholder marking, look on the page, build list | 6.4, 12.3, 12.4, 3.1 (`--release`) |
 | Plan 10 | Paths of the design mapped to D24 and D33 | 1.2, 2.3 |
-| Plan 10 | FAQ provides `#cite`; link check catches such gaps | 6.6, 15.1, 17 (`test_checks.py`, `test_content.py`) |
+| Plan 10 | FAQ provides `#cite`; link check catches such gaps | 6.6, 15.1, 17 (`test_md_checks.py`, `test_site_checks.py`, `test_docs_content.py`) |
 | Plan 10 | Page size: budget per API page | 10, 15.3 |
 | Plan 5.2 | Landing-page size budget, fonts and images included | 15.3 |
-| Plan 10 | Old section anchors keep working | 9.3, 6.6, 9.6, 17 (`test_real_repo.py`) |
+| Plan 10 | Old section anchors keep working | 9.3, 6.6, 9.6, 17 (`test_site_real_repo.py`) |
 | Plan 10 | HTTPS: site base URL, `http://` until SSL, commented redirect, doc-block links stay | 3.3, 12.5, 5.6 (`site_url`) |
 | Plan 10 | "For team leads" points into the landing page | 7.1 |
 | Plan 10 | Design open points answered using D24 to D38 | the design rows above |
@@ -939,13 +944,13 @@ Every item of design section 11, plan section 10, plan section 11 and decisions 
 | Plan 11 | Cross-language matching | 9.4 |
 | Plan 11 | Doc-block grammar variants | 5.2, 5.3, 5.4, 5.6 |
 | Plan 11 | Pygments: uncoloured tokens without `<span>` | 10 |
-| Plan 11 | Byte-identical output: sorted lists, no dates (no zip any more, D37) | 3.9, 17 (`test_real_repo.py`) |
+| Plan 11 | Byte-identical output: sorted lists, no dates (no zip any more, D37) | 3.9, 17 (`test_docs_real_repo.py`, `test_site_real_repo.py`) |
 | Plan 11 | Server without compression and `.md` type: raw budgets; content types in `.htaccess` | 12.5, 15.3, 18.4 |
 | Plan 11 | `404.html` root-absolute; never write `download/` or `releases/` | 8.1, 2.3 |
 | Plan 11 | Python version (3.10 with the `tomli` fallback, D39); no Java validators (validators dropped) | 3.4, 4.1 |
 | Plan 11 | Privacy page mentions the storage key | 6.8, 12.1 |
 | Plan 11 | Generated `docs/README.md` | 8.8 |
-| D32 | No site in packages; packages install `docs/`; `dh_compress -X.md`; Windows zip; release checks `docs/` current and committed | 16, 18.3 |
+| D32 | No site in packages; packages install `docs/`; `dh_compress -X.md -Xllms.txt`; Windows zip; release checks `docs/` current and committed | 16, 18.3 |
 | D33 | Site in top-level `website/`, ignored, removed by `make tidy`, out of the Docker context; `docs/` only tracked Markdown | 2.1, 2.3, 2.4, 3.6, 3.10 |
 | D34 | Notebooks committed with outputs; builder converts only; no `make tutorials`, cache or kernels; dummy run once in step 5; demo without DeprecationWarning | 13, 4.1, 3.5 |
 | D35 | Cutover inside step 5: moves first, deletions and updates last, checks as acceptance; no edits in two places | 18, 19, 6.6 |
