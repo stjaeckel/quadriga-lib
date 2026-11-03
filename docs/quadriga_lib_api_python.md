@@ -1270,6 +1270,7 @@ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, p
     | :-----------: | :-------------------: | :------------------------------: |
     | 0             | As stored in QRT file | -PL                              |
     | 1             | Max column power = 1  | -PL minus material losses        |
+
     Other values raise an error.
 
 ### Outputs:

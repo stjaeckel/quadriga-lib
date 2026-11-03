@@ -82,6 +82,7 @@ Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh 
    |   3  | Same-direction flag (FBS and SBS normals point the same way)            |
    |   4  | Corner-hit flag (FBS/SBS faces not parallel)                            |
    |   5  | Total-reflection flag (also set when a transmission factor forced it)   |
+
    Reachable composite values (add 32 for the total-reflection variant):<br><br>
    | Code  |  TIR  | Description                                         |
    | :---: | :---: | --------------------------------------------------- |

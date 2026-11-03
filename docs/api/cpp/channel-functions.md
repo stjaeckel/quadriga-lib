@@ -856,10 +856,12 @@ void quadriga_lib::qrt_file_read(
 - **`normalize_M`** *(optional)* — Controls `M` and `path_gain` scaling where PL is the propagation-only path loss
   - v4/v5 (EM):    FSPL = 32.45 + 20·log10(f_GHz) + 20·log10(d_m)  [dB]
   - v6 (scalar):   20·log10(d_m) + α(f)·d_m  [dB], with α from ISO 9613-1 at T=20°C, RH=50%, p=1 atm
-  | `normalize_M` | `M`                   | `path_gain`                      |
-  | ------------- | --------------------- | -------------------------------- |
-  | 0             | As stored in QRT file | -PL                              |
-  | 1             | Max column power = 1  | -PL minus material losses        |
+
+    | `normalize_M` | `M`                   | `path_gain`                      |
+    | ------------- | --------------------- | -------------------------------- |
+    | 0             | As stored in QRT file | -PL                              |
+    | 1             | Max column power = 1  | -PL minus material losses        |
+
   Other values throw `std::invalid_argument`.
 - **`file`** *(optional)* — Pre-opened binary `std::ifstream`; left open on return
 - **`cache`** *(optional)* — Pre-populated cache from [qrt_read_cache_init](#qrt_read_cache_init)
