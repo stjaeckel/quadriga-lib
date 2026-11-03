@@ -78,7 +78,7 @@ def test_api_page(site):
 def test_text_page_index_and_note_boxes(site):
     formats = site("formats.html")
     side = ('<ul><li><details open><summary><span>QuaDRiGa Array Antenna Exchange Format (QDANT)</span></summary><ul>'
-            '<li><a href="#qdant">Overview</a></li><li class="fn"><a href="#entry-arrayant">Entry &lt;arrayant&gt;</a>'
+            '<li><a href="#qdant">Overview</a></li><li class="fn"><a href="#entry-arrayant">Entry <code>&lt;arrayant&gt;</code></a>'
             '</li></ul></details></li><li><a href="#material-properties">Material Properties</a></li></ul>')
     assert '<nav class="doc-side idx" aria-label="Page sections">' + side in formats
     assert '<details class="doc-index"><summary>On this page</summary>' in formats

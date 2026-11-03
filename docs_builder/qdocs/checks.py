@@ -8,14 +8,17 @@ import re
 
 from . import links, render_md
 
-_ANCHOR_RE = re.compile(r'<a id="([^"]*)"></a>')
+# The explicit anchors that the twins carry, one per id
+ANCHOR_RE = re.compile(r'<a id="([^"]*)"></a>')
 _HTML_ID_RE = re.compile(r'\sid="([^"]*)"')
 
 
-def _ids(mapping, path, cache):
+def collect_ids(mapping, path, cache):
+    """The ids of the file mapping[path]: <a id> anchors in a .md file, id attributes otherwise.
+    cache is a dict kept by the caller, so each file is read once."""
     if path not in cache:
         text = mapping[path].decode("utf-8", "replace")
-        cache[path] = set((_ANCHOR_RE if path.endswith(".md") else _HTML_ID_RE).findall(text))
+        cache[path] = set((ANCHOR_RE if path.endswith(".md") else _HTML_ID_RE).findall(text))
     return cache[path]
 
 
@@ -56,5 +59,5 @@ def check_markdown(mapping, scope, diag, paths=None):
                 diag.error(*where, "link leaves the site: %s" % url)
             elif file_part not in mapping:
                 diag.error(*where, "link target missing: %s" % url)
-            elif frag and (file_part.endswith(".html") or file_part in paths) and frag not in _ids(mapping, file_part, cache):
+            elif frag and (file_part.endswith(".html") or file_part in paths) and frag not in collect_ids(mapping, file_part, cache):
                 diag.error(*where, "anchor missing: %s (no id '%s' in %s)" % (url, frag, file_part))

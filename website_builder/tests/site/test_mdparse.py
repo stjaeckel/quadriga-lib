@@ -26,7 +26,7 @@ def doc(ctx, text, lang="cpp"):
 
 def prose_html(ctx, text):
     lines = text.split("\n")
-    return str(ctx.fragment(lines, "prose", "p.md", 1, headings=prose.heading_ids(lines, 0)))
+    return str(ctx.fragment(lines, "prose", "p.md", 1, headings=prose.heading_ids(lines)))
 
 
 def test_wikilink_with_member_form(ctx):

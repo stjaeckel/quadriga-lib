@@ -64,12 +64,20 @@ def test_twin_lines_code_span_across_lines_and_warning():
 def test_twin_lines_prose_headings():
     lines = ["## Material Properties {#material-properties legacy=\"9f6922f9\"}", "", "### Cite {#cite}", "",
              "#### Detail {#ignored}"]
-    out = render_md.twin_lines(lines, "formats.md", headings=prose.heading_ids(lines, 0))
+    out = render_md.twin_lines(lines, "formats.md", headings=prose.heading_ids(lines))
     assert out == ['<a id="material-properties"></a><a id="9f6922f9"></a>', "## Material Properties", "",
                    '<a id="cite"></a>', "### Cite", "", "#### Detail"]
-    cell = ["# Set-up", "## Step", "### Deeper", "#### Deepest"]
-    out = render_md.twin_lines(cell, "tutorials/x.md", headings=prose.heading_ids(cell, 1), level_shift=1)
-    assert out == ['<a id="set-up"></a>', "## Set-up", '<a id="step"></a>', "### Step", "#### Deeper", "#### Deepest"]
+    cell = ["## Step", "### Deeper", "#### Deepest"]
+    out = render_md.twin_lines(cell, "tutorials/x.md", headings=prose.heading_ids(cell))
+    assert out == ['<a id="step"></a>', "## Step", '<a id="deeper"></a>', "### Deeper", "#### Deepest"]
+
+
+def test_twin_header_topics_column():
+    rows = render_md.index_rows(prose.heading_ids(["## A", "## B", "### B1"]))
+    assert render_md.twin_header("T", "u", rows)[-4:] == [
+        "| Section | Topics |", "| --- | --- |", "| [A](#a) |  |", "| [B](#b) | [B1](#b1) |"]
+    rows = render_md.index_rows(prose.heading_ids(["## A", "## B"]))
+    assert render_md.twin_header("T", "u", rows)[-4:] == ["| Section |", "| --- |", "| [A](#a) |", "| [B](#b) |"]
 
 
 def test_full_api_file(docs):

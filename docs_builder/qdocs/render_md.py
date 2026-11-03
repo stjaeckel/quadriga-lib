@@ -104,15 +104,15 @@ def _rewrite(line, masked, location, lang):
     return "".join(out)
 
 
-def twin_lines(lines, location, lang=None, headings=None, level_shift=0, fence_lang=None, docblock=False,
+def twin_lines(lines, location, lang=None, headings=None, fence_lang=None, docblock=False,
                diag=None, path=None, first_line=1):
-    """The twin writer for one part: copy the source lines and change only what section 8.6.1 lists.
+    """The twin writer for one part: copy the source lines and change only headings, bare fences,
+    [[name]] links, raw <a href> links, trailing <br>, link URLs (all outside code) and gap markers.
 
     location: output path relative to the site root (see links.url).
     lang: resolve [[name]] and .[[name]] on the API page of this language (doc blocks, API intros).
-    headings: prose.heading_ids(lines, level_shift) for prose and notebook cells; each heading loses
-      its trailing {...}, moves down by level_shift (deeper than #### stays ####) and gets <a id>
-      anchors on the line before it. None for doc-block parts.
+    headings: prose.heading_ids(lines) for prose and notebook cells; each heading loses its
+      trailing {...} and gets <a id> anchors on the line before it. None for doc-block parts.
     fence_lang, docblock: doc-block parts; fences without info string get fence_lang, and the
       sub-block heading "## X:" becomes "### X:".
     diag, path, first_line: give the code-span warning for this part (once per part).
@@ -141,8 +141,7 @@ def twin_lines(lines, location, lang=None, headings=None, level_shift=0, fence_l
             work[i] = "#" + ln
         elif i in heads:
             h = heads[i]
-            level = h.level if not level_shift else min(h.level + level_shift, 4)
-            work[i] = "#" * level + " " + h.text
+            work[i] = "#" * h.level + " " + h.text
             ids = ([h.id] if h.id else []) + h.legacy
             if ids:
                 anchors[i] = "".join('<a id="%s"></a>' % a for a in ids)
@@ -177,13 +176,14 @@ def _cell(text):
 def twin_header(title, web_url, headings):
     """The lines every twin starts with: '# title', the version and web page line, and an index table.
 
-    headings: [(text, id, topics)] of the page's ## headings; topics is None (no Topics column)
-    or a list of (text, id) of the ### headings below. The table is written for two or more headings.
+    headings: [(text, id, topics)] of the page's ## headings; topics is None or a list of (text, id)
+    of the ### headings below. The table is written for two or more headings; it has a Topics
+    column if at least one row has topics.
     """
     out = ["# " + title, ""] if title else []
     out += ["Quadriga-Lib %s · Web page: %s" % (config.version(), web_url)]
     if len(headings) >= 2:
-        topics = any(t is not None for _, _, t in headings)
+        topics = any(t for _, _, t in headings)  # a Topics column only if some row has topics
         out += [""] + (["| Section | Topics |", "| --- | --- |"] if topics else ["| Section |", "| --- |"])
         for text, hid, sub in headings:
             row = "| [%s](#%s) |" % (_cell(text), hid)
@@ -199,13 +199,14 @@ def _link_text(text):
     return re.sub(r"!?\[((?:\\.|[^\]\\])*)\]\([^)]*\)", r"\1", text)
 
 
-def _index(headings, shift=0):
-    """[(text, id, topics)] of the h2 headings with their h3 headings."""
+def index_rows(headings):
+    """Rows of a page index: [(text, id, topics)] of the ## headings (from prose.heading_ids) with
+    the (text, id) of the ### headings below each; text is the heading text with links as their text."""
     out = []
     for h in headings:
-        if h.id and h.level + shift == 2:
+        if h.id and h.level == 2:
             out.append((_link_text(h.text), h.id, []))
-        elif h.id and h.level + shift == 3 and out:
+        elif h.id and h.level == 3 and out:
             out[-1][2].append((_link_text(h.text), h.id))
     return out
 
@@ -230,7 +231,7 @@ def prose_twin(page, location=None, lang=None):
     location defaults to the twin path of the page id (config.TWINS); lang: wikilinks of an API intro."""
     location = location or config.TWINS[page.page_id]
     web = "%s/%s.html" % (config.SITE_BASE_URL, page.page_id)
-    head = twin_header(prose.strip_gaps(page.title), web, _index(page.headings))
+    head = twin_header(prose.strip_gaps(page.title), web, index_rows(page.headings))
     lead = prose.strip_gaps(page.lead)
     return _text(_join(head,
                        twin_lines(lead.split("\n"), location, lang) if lead else [],
@@ -305,7 +306,7 @@ def intro_file(page):
     """docs/api/<lang>/general-usage-notes.md."""
     loc = "api/%s/general-usage-notes.md" % page.lang
     web = "%s/%s_api.html#sec-general-usage-notes" % (config.SITE_BASE_URL, page.lang)
-    head = twin_header("General usage notes", web, _index(page.intro.headings))
+    head = twin_header("General usage notes", web, index_rows(page.intro.headings))
     return _text(_join(head, twin_lines(page.intro.body, loc, page.lang, page.intro.headings)))
 
 

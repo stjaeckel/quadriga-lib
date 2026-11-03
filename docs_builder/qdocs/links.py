@@ -9,7 +9,8 @@ import re
 
 from . import config
 
-_ABSOLUTE_RE = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
+# An absolute URL: it starts with a scheme such as http: or mailto:
+ABSOLUTE_URL_RE = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
 _SITE_RE = re.compile(r"^https?://(?:www\.)?quadriga-lib\.org(?=/|#|$)/?")
 
 API_PAGES = {"%s_api" % lang: lang for lang in config.LANGS}
@@ -138,7 +139,7 @@ def site_path(target):
 
 
 def is_external(target):
-    return bool(_ABSOLUTE_RE.match(site_path(target)))
+    return bool(ABSOLUTE_URL_RE.match(site_path(target)))
 
 
 def website_only(path):
@@ -169,7 +170,7 @@ def url(target, location):
     'tutorials.md', 'tutorials/x.md'), 'README.md' for docs/README.md, or 'llms.txt'.
     """
     t = site_path(target)
-    if _ABSOLUTE_RE.match(t) or t.startswith("#"):
+    if ABSOLUTE_URL_RE.match(t) or t.startswith("#"):
         return t
     path, hash_, frag = t.lstrip("/").partition("#")
     frag = hash_ + frag

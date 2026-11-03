@@ -4,14 +4,12 @@
 """Checks of the built site in memory: links and anchors, HTML well-formedness, size budgets."""
 
 import posixpath
-import re
 from html.parser import HTMLParser
 
 from qdocs import checks as md_checks
+from qdocs import links
 
 VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"}
-_ABSOLUTE_RE = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
-_MD_ANCHOR_RE = re.compile(r'<a id="([^"]*)"></a>')
 
 API_BUDGET, PAGE_BUDGET = 800_000, 150_000
 LANDING_BUDGET, FIGURE_BUDGET = 480_000, 150_000
@@ -103,7 +101,7 @@ def check_site(mapping, diag, markdown):
     md_ids, generated = {}, set(markdown)
     for path, parser in pages.items():
         for line, url in parser.urls:
-            if _ABSOLUTE_RE.match(url) or url.startswith("//"):
+            if links.ABSOLUTE_URL_RE.match(url) or url.startswith("//"):
                 continue  # external, mailto:, download/ and releases/ are not fetched
             target, frag = _target(path, url)
             where = ("website/" + path, line)
@@ -111,11 +109,8 @@ def check_site(mapping, diag, markdown):
                 diag.error(*where, "link target missing: %s" % url)
             elif frag and target.endswith(".html") and frag not in {i for i, _ in pages[target].ids}:
                 diag.error(*where, "anchor missing: %s (no id '%s' in %s)" % (url, frag, target))
-            elif frag and target in generated:  # hand-made files are checked for existence only
-                if target not in md_ids:
-                    md_ids[target] = set(_MD_ANCHOR_RE.findall(mapping[target].decode("utf-8", "replace")))
-                if frag not in md_ids[target]:
-                    diag.error(*where, "anchor missing: %s (no <a id> '%s' in %s)" % (url, frag, target))
+            elif frag and target in generated and frag not in md_checks.collect_ids(mapping, target, md_ids):
+                diag.error(*where, "anchor missing: %s (no <a id> '%s' in %s)" % (url, frag, target))
     md_checks.check_markdown(mapping, "website", diag, markdown)
     sizes(mapping, diag)
 

@@ -2,11 +2,11 @@
 
 Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/ai_agents.html
 
-| Section | Topics |
-| --- | --- |
-| [Files for agents](#files-for-agents) |  |
-| [Pointing an agent at the docs](#pointing-an-agent-at-the-docs) |  |
-| [Agent skill](#agent-skill) |  |
+| Section |
+| --- |
+| [Files for agents](#files-for-agents) |
+| [Pointing an agent at the docs](#pointing-an-agent-at-the-docs) |
+| [Agent skill](#agent-skill) |
 
 <a id="files-for-agents"></a>
 ## Files for agents

@@ -7,11 +7,11 @@ import argparse
 from pathlib import Path
 
 from qdocs import cli as docs_cli
-from qdocs import config, prose
+from qdocs import config, links, prose
 from . import assets, checks, render_html, tutorials
 
-WEBSITE_PAGES = ("impressum", "privacy", "404", "tutorials")
-TEMPLATES = "website_builder/templates"  # how the template folder is named in diagnostics
+# Pages whose source is website_builder/content/<id>.md: no twin in docs/ (the landing is its template)
+WEBSITE_PAGES = [pid for pid, _, twin in config.PAGES if pid != "index" and (twin is None or links.website_only(twin))]
 
 
 def build_site(root, diag, release=False):
@@ -30,7 +30,9 @@ def build_site(root, diag, release=False):
     for t in tuts:
         files.update(t.files)
     diag.gaps.extend(prose.gap_scan(root, [config.WEBSITE_CONTENT], diag))
-    diag.gaps.extend((TEMPLATES + "/" + p, n, text) for p, n, text in prose.gap_scan(assets.TEMPLATES_DIR, ["."], diag))
+    # Named from the folder above the builder, like the other paths: website_builder/templates/<file>
+    code_root = assets.TEMPLATES_DIR.parents[1]
+    diag.gaps.extend(prose.gap_scan(code_root, [assets.TEMPLATES_DIR.relative_to(code_root).as_posix()], diag))
     if diag.errors:
         return {}, {}
     order = sorted(tuts, key=lambda t: (t.order, t.title))

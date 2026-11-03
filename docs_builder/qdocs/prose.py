@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from . import config, docblocks, links
 
 VARIABLE_RE = re.compile(r"\{\{\s*([a-z_]+)\s*\}\}")
+# A gap marker %%GAP: text%% (one line): missing content or a draft awaiting approval; group 1 is the text
 GAP_RE = re.compile(r"%%GAP:(.*?)%%")
 HEADING_RE = re.compile(r"^(#{1,6}) (.+)$")
 _ATTRS_RE = re.compile(r'\s*\{\s*(#[^\s}"]+)?((?:\s*legacy="[^"]*")*)\s*\}\s*$')
@@ -33,7 +34,7 @@ class Heading:
     index: int          # line index in the list of lines passed to heading_ids()
     level: int          # number of '#' in the source
     text: str           # heading text without the '#'s and without a trailing {...}
-    plain: str          # plain text (section 6.2 rule)
+    plain: str          # text without Markdown: links as their text, no '*' or backticks, escapes and entities resolved
     id: str = None      # set for headings that become h2 or h3
     legacy: list = field(default_factory=list)
 
@@ -118,12 +119,11 @@ def plain_text(text):
     return html.unescape(text)
 
 
-def heading_ids(lines, level_shift, diag=None, path=None, first_line=1):
+def heading_ids(lines, diag=None, path=None, first_line=1):
     """Headings of a list of Markdown lines (column 0, outside fences), in order.
 
-    level_shift: 0 for prose (## and ### get ids), 1 for notebook cells (# and ## get ids).
-    Headings that become h2 or h3 get an id: the explicit {#id}, else the slug of the plain
-    text, made unique with -2, -3. Explicit ids or legacy ids used twice are E-anchor.
+    ## and ### headings get an id: the explicit {#id}, else the slug of the plain text, made
+    unique with -2, -3. Explicit ids or legacy ids used twice are E-anchor.
     """
     states, _ = docblocks.fence_states(lines)
     heads = []
@@ -138,7 +138,7 @@ def heading_ids(lines, level_shift, diag=None, path=None, first_line=1):
             legacy = re.findall(r'legacy="([^"]*)"', a.group(2))
             text = text[:a.start()].rstrip()
         heads.append(Heading(i, len(m.group(1)), text, plain_text(text), explicit, legacy))
-    with_id = [h for h in heads if h.level + level_shift in (2, 3)]
+    with_id = [h for h in heads if h.level in (2, 3)]
     used = set()
     for h in with_id:
         for anchor in ([h.id] if h.id else []) + h.legacy:
@@ -181,7 +181,9 @@ def read_page(path, diag, root):
     while body and not body[-1].strip():
         body.pop()
     page.body, page.body_line = body, end + 2
-    page.headings = heading_ids(body, 0, diag, rel, page.body_line)
+    for k in docblocks.table_errors(body):
+        diag.error(rel, page.body_line + k, docblocks.TABLE_MESSAGE)
+    page.headings = heading_ids(body, diag, rel, page.body_line)
     return page
 
 

@@ -14,7 +14,7 @@ from markupsafe import Markup
 from pygments.lexers import get_lexer_by_name
 from pygments.token import Comment, Generic, Keyword, Name, Number, String
 
-from qdocs import config, links
+from qdocs import config, links, prose, render_md
 from . import assets, mdparse
 
 # Span-free colouring: the first matching entry gives the class; other tokens are plain text
@@ -24,10 +24,8 @@ TOKEN_CLASSES = ((Comment, "c"), (Keyword.Type, "kt"), (Name.Class, "kt"), (Name
 LEXERS = {"cpp": "cpp", "c++": "cpp", "matlab": "matlab", "octave": "matlab", "python": "python",
           "py": "python", "bash": "bash", "sh": "bash", "shell": "bash", "console": "console"}
 PLAIN = ("text", "none")
-GAP_RE = re.compile(r"%%GAP:(.*?)%%")
 MATH_RE = re.compile("\x02M(\\d+)\x03")
 LANG_DISPLAY = config.LANG_TITLE
-LEVELS = {"beginner": "Beginner", "intermediate": "Intermediate", "advanced": "Advanced"}
 
 
 def highlight(code, lang):
@@ -81,7 +79,7 @@ class Context:
             self._parsers[key] = md
         return self._parsers[key]
 
-    def fragment(self, lines, kind, path, line, lang=None, headings=None, shift=0, tight=False, note=""):
+    def fragment(self, lines, kind, path, line, lang=None, headings=None, tight=False, note=""):
         """Render source lines to HTML (Markup).
 
         kind: docblock, prose or notebook. path, line: source file and 1-based line of lines[0]
@@ -99,7 +97,7 @@ class Context:
             self.diag.warning(*where(i), note + msg, k)
 
         md = self.parser(kind, lang)
-        env = {"location": self.location, "headings": {h.index: h for h in headings or []}, "shift": shift,
+        env = {"location": self.location, "headings": {h.index: h for h in headings or []},
                "error": error, "warn": warn, "ctx": self, "kind": kind, "lang": lang, "where": where, "note": note}
         tokens = md.parse("\n".join(lines), env)
         if tight and [t.type for t in tokens] == ["paragraph_open", "inline", "paragraph_close"]:
@@ -198,14 +196,14 @@ def gap_pass(text):
         count[0] += 1
         return m.group(1).strip()
 
-    text = re.sub(r"<[^>]*>", lambda t: GAP_RE.sub(plain, t.group(0)), text)
-    text = re.sub(r"<title>.*?</title>", lambda t: GAP_RE.sub(plain, t.group(0)), text, flags=re.S)
+    text = re.sub(r"<[^>]*>", lambda t: prose.GAP_RE.sub(plain, t.group(0)), text)
+    text = re.sub(r"<title>.*?</title>", lambda t: prose.GAP_RE.sub(plain, t.group(0)), text, flags=re.S)
 
     def span(m):
         count[0] += 1
         return '<span class="ph">%s</span>' % m.group(1).strip()
 
-    return GAP_RE.sub(span, text), count[0]
+    return prose.GAP_RE.sub(span, text), count[0]
 
 
 # ---------- Pages ----------
@@ -221,15 +219,11 @@ def environment():
     return env
 
 
-def _index(headings):
-    """Text-page index: [(text, id, [(text, id)])] of the h2 headings with their h3 headings."""
-    out = []
-    for h in headings:
-        if h.id and h.level == 2:
-            out.append((h.plain, h.id, []))
-        elif h.id and h.level == 3 and out:
-            out[-1][2].append((h.plain, h.id))
-    return out if len(out) >= 2 else []
+def _index(ctx, page):
+    """Text-page index (two or more h2 headings): [(text, id, [(text, id)])], texts as inline HTML."""
+    rows = render_md.index_rows(page.headings)
+    return [(ctx.inline(t, page.path), i, [(ctx.inline(st, page.path), si) for st, si in sub])
+            for t, i, sub in rows] if len(rows) >= 2 else []
 
 
 def _pills(f, page_lang, location):
@@ -310,7 +304,7 @@ def tutorial_page(ctx, t):
     cells = []
     for c in t.cells:
         if c.kind == "markdown":
-            cells.append({"md": ctx.fragment(c.lines, "notebook", t.path, None, headings=c.headings, shift=1,
+            cells.append({"md": ctx.fragment(c.lines, "notebook", t.path, None, headings=c.headings,
                                              note="cell %d: " % c.number)})
         else:
             outs = []
@@ -323,7 +317,7 @@ def tutorial_page(ctx, t):
                           "code": highlight("\n".join(c.lines), t.lexer), "outs": outs})
     summary = ctx.inline(t.summary, t.path)
     return {"stem": t.stem, "title": t.title, "summary": summary, "description": _plain(summary),
-            "language": t.language, "level": LEVELS[t.level], "duration": t.duration, "cells": cells}
+            "language": t.language, "level": t.level.capitalize(), "duration": t.duration, "cells": cells}
 
 
 def render_site(model, diag):
@@ -353,7 +347,7 @@ def render_site(model, diag):
     for pid, p in sorted(model["pages"].items()):
         ctx.location = pid + ".html"
         page(pid + ".html", "text.html", current=pid, twin=config.TWINS[pid], page=p, lead=ctx.inline(p.lead, p.path),
-             body=_prose(ctx, p), index=_index(p.headings), title=p.title, description=p.description)
+             body=_prose(ctx, p), index=_index(ctx, p), title=p.title, description=p.description)
     ctx.location = "publications.html"
     pubs = publications(ctx, model["publications"], config.DOCS_CONTENT + "/publications.toml")
     page("publications.html", "publications.html", current="publications", twin="publications.md", pubs=pubs,
@@ -371,7 +365,7 @@ def render_site(model, diag):
     ctx.location = "tutorials.html"
     idx = web["tutorials"]
     cards = [{"stem": t.stem, "title": t.title, "summary": ctx.inline(t.summary, t.path), "language": t.language,
-              "level": LEVELS[t.level]} for t in tuts]
+              "level": t.level.capitalize()} for t in tuts]
     page("tutorials.html", "tutorials_index.html", current="tutorials", twin="tutorials.md", page=idx,
          lead=ctx.inline(idx.lead, idx.path), note=ctx.inline(idx.extra.get("dummy_note", ""), idx.path),
          dummy=bool(tuts) and all(t.dummy for t in tuts), body=_prose(ctx, idx), cards=cards,

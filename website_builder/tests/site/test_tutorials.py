@@ -70,13 +70,26 @@ def test_output_warnings_and_error(mini_repo, run_site):
     assert code == 1 and "cell 2: the notebook was committed with a failing cell (ValueError)" in out
 
 
-def test_headings_move_down(mini_repo, run_site):
+def test_headings(mini_repo, run_site):
+    def deep(nb):
+        nb["cells"][2]["source"].append("\n##### Deep\n")
+    edit(mini_repo, deep)
     assert run_site(mini_repo)[0] == 0
     page = site(mini_repo, "tutorials/mini_demo.html")
-    assert '<h2 id="set-up">Set-up</h2>' in page and '<h3 id="a-figure">A figure</h3>' in page
+    assert '<h1>Mini demo</h1>' in page and '<h2 id="set-up">Set-up</h2>' in page
+    assert '<h3 id="a-figure">A figure</h3>' in page and "<h4>Deep</h4>" in page
     twin = site(mini_repo, "tutorials/mini_demo.md")
     assert '<a id="set-up"></a>\n## Set-up' in twin and '<a id="a-figure"></a>\n### A figure' in twin
+    assert "\n#### Deep\n" in twin
     assert "| [Set-up](#set-up) |" in twin  # index of the two h2 headings
+
+
+def test_level_one_heading_is_an_error(mini_repo, run_site):
+    edit(mini_repo, lambda nb: nb["cells"][0]["source"].__setitem__(0, "# Set-up\n"))
+    code, out = run_site(mini_repo)
+    assert code == 1
+    assert ("tutorials/mini_demo.ipynb: error: cell 1: a notebook starts its sections with ##; the page title "
+            "comes from the notebook metadata") in out
 
 
 def test_pages_twins_and_index(mini_repo, run_site):

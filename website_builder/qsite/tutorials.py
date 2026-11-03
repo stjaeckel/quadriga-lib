@@ -114,11 +114,17 @@ def read(p, rel, diag):
         else:
             continue
         t.cells.append(cell)
-    # One heading scan over all Markdown cells keeps the ids unique on the page
-    heads = prose.heading_ids(md_lines, 1, diag, rel)
+    # One heading scan over all Markdown cells keeps the ids unique on the page; headings deeper
+    # than #### are written as #### (h4), as on the page
+    heads = prose.heading_ids(md_lines, diag, rel)
     for cell, off in offsets:
-        cell.headings = [dataclasses.replace(h, index=h.index - off) for h in heads
+        cell.headings = [dataclasses.replace(h, index=h.index - off, level=min(h.level, 4)) for h in heads
                          if off <= h.index < off + len(cell.lines)]
+        if any(h.level == 1 for h in cell.headings):
+            diag.error(rel, None, "cell %d: a notebook starts its sections with ##; the page title comes from "
+                       "the notebook metadata" % cell.number)
+    if diag.errors > errors:
+        return None
     t.files["%s/%s.md" % (FOLDER, stem)] = twin(t).encode("utf-8")
     return t
 
@@ -162,12 +168,12 @@ def _fence(lines, lang):
 def twin(t):
     """tutorials/<stem>.md: twin header, the downloads, Markdown cells through the twin writer, code and outputs."""
     loc = "%s/%s.md" % (FOLDER, t.stem)
-    h2 = [(h.text, h.id, None) for c in t.cells for h in c.headings if h.id and h.level == 1]
+    h2 = [(h.text, h.id, None) for c in t.cells for h in c.headings if h.id and h.level == 2]
     out = render_md.twin_header(t.title, "%s/%s/%s.html" % (config.SITE_BASE_URL, FOLDER, t.stem), h2)
     out += ["", "[Download notebook .ipynb](%s.ipynb) · [Markdown .md](%s.md)" % (t.stem, t.stem)]
     for c in t.cells:
         if c.kind == "markdown":
-            block = render_md.twin_lines(c.lines, loc, headings=c.headings, level_shift=1)
+            block = render_md.twin_lines(c.lines, loc, headings=c.headings)
         else:
             block = _fence(c.lines, t.lexer)
             for o in c.outputs:
