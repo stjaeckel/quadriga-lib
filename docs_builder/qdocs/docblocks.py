@@ -92,21 +92,63 @@ class ApiPage:
 
 def fence_states(lines):
     """Per line: "open" for a fence opener, "in" for a line inside a fence or its closer, "" outside.
+    A fence closes on a line of backticks only, at least as many as the opener has.
     Returns (states, line index of an unclosed opener or None)."""
-    states, opener = [], None
+    states, opener, run = [], None, 0
     for i, ln in enumerate(lines):
         s = ln.strip()
         if opener is None:
             if s.startswith("```"):
-                opener = i
+                opener, run = i, len(s) - len(s.lstrip("`"))
                 states.append("open")
             else:
                 states.append("")
         else:
             states.append("in")
-            if _CLOSING_FENCE_RE.fullmatch(s):
+            if _CLOSING_FENCE_RE.fullmatch(s) and len(s) >= run:
                 opener = None
     return states, opener
+
+
+_TABLE_ROW_RE = re.compile(r"^\s*\|")
+_DELIMITER_ROW_RE = re.compile(r"^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$")
+# Lines that end a table: lists, quotes, headings, fences and rules start their own block
+_ENDS_TABLE_RE = re.compile(r"^(?:[-*+](?:\s|$)|\d{1,9}[.)](?:\s|$)|>|#{1,6}(?:\s|$)|```|~~~|(?:[-*_]\s*){3,}$)")
+_LIST_MARKER_RE = re.compile(r"^\s*(?:[-*+]|\d{1,9}[.)])\s+")
+
+
+TABLE_MESSAGE = "E-table: a table and the text next to it need a blank line between them"
+
+
+def _indent(ln):
+    return len(ln) - len(ln.lstrip(" "))
+
+
+def table_errors(lines):
+    """Line indices where a Markdown table and its neighbours run together (outside fences):
+    a non-blank line directly after a table, at the table's indent or deeper, that does not start
+    a block of its own (it would become a table row), and a table that directly follows a text
+    line whose content starts further right (the table would be read as part of that text)."""
+    states, _ = fence_states(lines)
+    out, i = [], 0
+    while i + 1 < len(lines):
+        if states[i] or not _TABLE_ROW_RE.match(lines[i]) or states[i + 1] or not _DELIMITER_ROW_RE.match(lines[i + 1]):
+            i += 1
+            continue
+        indent = _indent(lines[i])
+        prev = lines[i - 1] if i else ""
+        if prev.strip() and not states[i - 1] and not _TABLE_ROW_RE.match(prev):
+            m = _LIST_MARKER_RE.match(prev)
+            if (m.end() if m else _indent(prev)) > indent:
+                out.append(i)
+        j = i + 2
+        while j < len(lines) and not states[j] and _TABLE_ROW_RE.match(lines[j]):
+            j += 1
+        if j < len(lines) and lines[j].strip() and _indent(lines[j]) >= indent and \
+                not _ENDS_TABLE_RE.match(lines[j].strip()):
+            out.append(j)
+        i = j
+    return out
 
 
 def sub_label(heading):
@@ -225,6 +267,8 @@ def parse_function(lang, path, first, lines, diag):
     if opener is not None:
         diag.error(path, first + 2 + opener, "E-fence: code fence without a closing fence in the same part")
         return None
+    for k in table_errors(body):
+        diag.error(path, first + 2 + k, TABLE_MESSAGE)
     starts = [k for k, ln in enumerate(body) if ln.startswith("## ") and not states[k]]
     intro_end = starts[0] if starts else len(body)
     intro = Part(path, first + 2, body[:intro_end])
@@ -281,6 +325,8 @@ def read_api(root, lang, intro, diag):
                 if opener is not None:
                     diag.error(path, first + opener, "E-fence: code fence without a closing fence in the same part")
                     continue
+                for k in table_errors(lines):
+                    diag.error(path, first + k, TABLE_MESSAGE)
                 sec.descs.append(Part(path, first, lines))
             else:
                 fn = parse_function(lang, path, first, lines, diag)

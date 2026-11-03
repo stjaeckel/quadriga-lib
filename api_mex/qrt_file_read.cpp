@@ -38,6 +38,7 @@ Read ray-tracing CIR data from a QRT file
     | :-----------: | :-------------------: | :------------------------------: |
     | 0             | As stored in QRT file | -PL                              |
     | 1             | Max column power = 1  | -PL minus material losses        |<br><br>
+
     Other values are rejected with an error.
 
 ## Outputs:

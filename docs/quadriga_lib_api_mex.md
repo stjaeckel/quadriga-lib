@@ -1306,6 +1306,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#qrt_file_read) · [Python](quadriga_lib_a
     | :-----------: | :-------------------: | :------------------------------: |
     | 0             | As stored in QRT file | -PL                              |
     | 1             | Max column power = 1  | -PL minus material losses        |
+
     Other values are rejected with an error.
 
 ### Outputs:
@@ -3543,6 +3544,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#ray_mesh_interact) · Not in: Python
    |   3  | Same-direction flag (FBS and SBS normals point the same way)            |
    |   4  | Corner-hit flag (FBS/SBS faces not parallel)                            |
    |   5  | Total-reflection flag (also set when a transmission factor forced it)   |
+
    Reachable composite values (add 32 for the total-reflection variant):
    | Code  |  TIR  | Description                                         |
    | :---: | :---: | --------------------------------------------------- |

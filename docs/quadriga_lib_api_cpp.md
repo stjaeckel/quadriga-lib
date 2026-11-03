@@ -2311,10 +2311,12 @@ void quadriga_lib::qrt_file_read(
 - **`normalize_M`** *(optional)* — Controls `M` and `path_gain` scaling where PL is the propagation-only path loss
   - v4/v5 (EM):    FSPL = 32.45 + 20·log10(f_GHz) + 20·log10(d_m)  [dB]
   - v6 (scalar):   20·log10(d_m) + α(f)·d_m  [dB], with α from ISO 9613-1 at T=20°C, RH=50%, p=1 atm
-  | `normalize_M` | `M`                   | `path_gain`                      |
-  | ------------- | --------------------- | -------------------------------- |
-  | 0             | As stored in QRT file | -PL                              |
-  | 1             | Max column power = 1  | -PL minus material losses        |
+
+    | `normalize_M` | `M`                   | `path_gain`                      |
+    | ------------- | --------------------- | -------------------------------- |
+    | 0             | As stored in QRT file | -PL                              |
+    | 1             | Max column power = 1  | -PL minus material losses        |
+
   Other values throw `std::invalid_argument`.
 - **`file`** *(optional)* — Pre-opened binary `std::ifstream`; left open on return
 - **`cache`** *(optional)* — Pre-populated cache from [qrt_read_cache_init](#qrt_read_cache_init)
@@ -5634,6 +5636,7 @@ void quadriga_lib::ray_mesh_interact(
    |   4  | Corner-hit flag (FBS/SBS faces not parallel)                            |
    |   5  | Total-reflection flag (also set when a transmission factor forced it)   |
    |   6  | Thin-sheet flag (at least one of FBS/SBS is a `thk > 0` material)       |
+
    Bit 1 by context:
    | Context                                     | Bit 1 = 1 means                               |
    | ------------------------------------------- | --------------------------------------------- |
@@ -5641,6 +5644,7 @@ void quadriga_lib::ray_mesh_interact(
    | Isolated sheet (bit 6 = 1, bit 2 = 0)       | Front-side hit on FBS; informational only     |
    | Sheet glued to a solid (exactly one sheet)  | Front-side hit on the **solid** face          |
    | Two co-located sheets                       | FBS traversed first (0 = SBS traversed first) |
+
    Reachable composite values (add 32 for the total-reflection variant):
    | Code  |  TIR  | Description                                                                        |
    | :---: | :---: | ---------------------------------------------------------------------------------- |
@@ -5660,6 +5664,7 @@ void quadriga_lib::ray_mesh_interact(
    |  69   |  101  | Glued exit (solid→sheet→air); or a stack with SBS first; or a collapsed duplicate  |
    |  71   |  103  | Glued entry (air→sheet→solid); or a stack with FBS first; or a collapsed duplicate |
    |  79   |   —   | Two-sheet stack with an ill-posed order (geometric FBS→SBS fallback was used)      |
+
    Codes 69 and 71 each stand for three cases, which [ray_state_update](#ray_state_update) tells apart from the materials of the two
    faces. Total reflection occurs with bit 6 only for a glued pair. Bit 7 is unused.
 - **`path_dirN`** — Refraction-correct path direction: mirror for types 0/3, Snell direction for types 1/2/4/5; `[n_rayN, 3]`.
@@ -5966,6 +5971,7 @@ void quadriga_lib::ray_state_update(
    | `mtl_ind_prev`       | medium the leg was entered from, or the sheet crossed or reflected off | a sheet in this word lies inside the current medium; with a solid, the face into the current medium was evaluated at a real-invariant cosine | the leg's faces are not parallel |
    | `mtl_ind_buffer`     | deferred medium                    | followed, with a zero index: the leg began at a reflection that left the series to the tracer. With an index: the layer of an ordered stack behind the ray that the previous-medium word does not name | clear |
    | `mtl_ind_buffer`     | thickness code, bits 0-14          | (part of the code)                            | set: mass-crossed         |
+
    Under bit 15 the buffer word is the normal thickness, as a logarithmic code, of a mass-law leg closed on the way
    into the current one (bonded mass-law bodies are one plate); it is exempt from the material range check.
 - **`path_dir_prev`** — Physical ray direction entering this segment, full ray set; `[n_ray, 3]`
@@ -6030,17 +6036,20 @@ void quadriga_lib::ray_state_update(
    |   5  | tir         | Total-reflection flag (also set when a transmission factor forced reflection)  |
    |   6  | trans/sheet | See the qualification below                                                    |
    |   7  | refl        | Reflection flag (0 = transmission/refraction, 1 = reflection/scattering)       |
+
    Bit 6 is qualified by bit 2 (a transparent interface sums no series, and scattering is not implemented):
    | Bit 6 | Bit 2 | Meaning                                                                       |
    | :---: | :---: | ----------------------------------------------------------------------------- |
    |   1   |   0   | Transparent interface (transmission) / scatter (reflection)                   |
    |   1   |   1   | **Thin-sheet crossing**                                                       |
+
    In the thin-sheet region bit 1 carries the glued verdict instead of the VBS flag (a sheet is always
    re-resolved at the VBS angle):
    | Bit 1 (sheet region) | Meaning                                                                |
    | :------------------: | ---------------------------------------------------------------------- |
    |          0           | Isolated — the same medium bounds both sides of the sheet              |
    |          1           | Glued — the two bounding media differ                                  |
+
    The sheet region reports the resolved state, not the sheet topology. The codes 69 and 71 below are unrelated
    to the `out_typeN` codes of the same value.
    Reachable composite values for transmission / refraction:
@@ -6062,6 +6071,7 @@ void quadriga_lib::ray_state_update(
    |   77 | 0x4D |   93 |   109   | sheet, resolve, inside, ok | isolated sheet crossed inside a medium (embedded)  |
    |   71 | 0x47 |   87 |   103   | sheet, glued, resolve, ok  | glued exit, solid \| sheet \| air                  |
    |   79 | 0x4F |   95 |   111   | sheet, glued, resolve, inside, ok | glued entry, host \| sheet \| solid         |
+
    Reachable composite values for reflection:
    |  Dec | Hex  |  FIX |   TIR   | Flags set                       | Meaning                                                      |
    | :--: | :--: | :--: | :-----: | ------------------------------- |------------------------------------------------------------- |
@@ -6075,6 +6085,7 @@ void quadriga_lib::ray_state_update(
    |  199 | 0xC7 |  215 |   231   | refl, sheet, glued, resolve, ok | reflection off a glued sheet from the host side              |
    |  207 | 0xCF |  223 |   239   | refl, sheet, glued, resolve, inside, ok | reflection off a glued sheet from the solid side    |
    |  192+| 0xC0+|    — |    —    | refl, scatter, resolve clear    | reserved: scattering not implemented                         |
+
    A stack of two different sheets is crossed as one event with the codes of a sheet; a singular stack kills the ray.
 
 ### See also:
