@@ -1,0 +1,76 @@
+[page]
+title = "Publications"
+description = "%%GAP: Publications and IEEE 802.11 contributions behind Quadriga-Lib and QuaDRiGa.%%"
+lead = "How to cite the library itself is described under [Questions](faq.html#cite)."
+
+[[group]]
+id = "quadriga-lib"
+title = "Quadriga-Lib"
+
+[[group.entry]]
+year = 2026
+title = "Extracting 3GPP TR 38.901 channel parameters from ray-tracing simulations"
+authors = "S. Jaeckel"
+venue = "IEEE 802.11-26/0617r0, Tech. Rep."
+link = [
+  { label = "IEEE Mentor (original .docx version)", url = "https://mentor.ieee.org/802.11/dcn/26/11-26-0617-00-0ucm-extracting-3gpp-tr-38-901-channel-parameters-from-ray-tracing-simulations.docx" },
+  { label = "PDF version", url = "publications/11-26-0617-00-0ucm-extracting-3gpp-tr-38-901-channel-parameters-from-ray-tracing-simulations.pdf" },
+  { label = "Markdown version", url = "publications/11-26-0617-extracting-channel-parameters.md" },
+]
+
+[[group.entry]]
+year = 2026
+title = "Comparison of IEEE and 3GPP indoor channel models"
+authors = "S. Jaeckel"
+venue = "IEEE 802.11-26/0211r0, Tech. Rep."
+link = [
+  { label = "IEEE Mentor (original .docx version)", url = "https://mentor.ieee.org/802.11/dcn/26/11-26-0211-00-0ucm-comparison-of-ieee-and-3gpp-indoor-channel-models.docx" },
+  { label = "PDF version", url = "publications/11-26-0211r0-comparison-of-IEEE-and-3GPP-indoor-channel-models.pdf" },
+  { label = "Markdown version", url = "publications/11-26-0211-comparison_ieee_3gpp.md" },
+]
+
+[[group.entry]]
+year = 2025
+title = "A modern C++ framework for the IEEE indoor channel models"
+authors = "S. Jaeckel"
+venue = "IEEE 802.11-25/2318r0, Tech. Rep."
+link = [
+  { label = "IEEE Mentor (original .docx version)", url = "https://mentor.ieee.org/802.11/dcn/25/11-25-2318-00-0ucm-a-modern-c-framework-for-the-ieee-indoor-channel-models.docx" },
+  { label = "PDF version", url = "publications/11-25-2318-00-0ucm-a-modern-cpp-framework-for-the-ieee-indoor-channel-models.pdf" },
+  { label = "Markdown version", url = "publications/11-25-2318-modern-cpp-framework.md" },
+]
+
+[[group.entry]]
+year = 2018
+title = "Efficient Sum-of-Sinusoids-Based Spatial Consistency for the 3GPP New-Radio Channel Model"
+authors = "S. Jaeckel, L. Raschkowski, F. Burkhardt, L. Thiele"
+venue = "2018 IEEE Globecom Workshops (GC Wkshps)"
+link = [
+  { label = "IEEE Xplore (original version)", url = "https://ieeexplore.ieee.org/document/8644265" },
+  { label = "PDF version", url = "publications/2018_sum_of_sinusoids.pdf" },
+  { label = "Markdown version", url = "publications/2018_sum_of_sinusoids.md" },
+]
+
+[[group]]
+id = "quadriga-background"
+title = "QuaDRiGa background"
+intro = "Quadriga-Lib continues the work on the QuaDRiGa channel model. These publications describe the model concepts it builds on."
+outro = "More QuaDRiGa publications are listed on [quadriga-channel-model.de](https://quadriga-channel-model.de)."
+
+[[group.entry]]
+year = 2017
+title = "Quasi-deterministic channel modeling and experimental validation in cooperative and massive MIMO deployment topologies"
+authors = "S. Jaeckel"
+venue = "PhD thesis, Technische Universität Ilmenau"
+link = [
+  { label = "Digitale Bibliothek Thüringen (open access)", url = "https://www.db-thueringen.de/receive/dbt_mods_00032895" },
+]
+
+[[group.entry]]
+year = 2014
+title = "QuaDRiGa: A 3-D Multi-Cell Channel Model With Time Evolution for Enabling Virtual Field Trials"
+authors = "S. Jaeckel, L. Raschkowski, K. Börner, L. Thiele"
+venue = "IEEE Transactions on Antennas and Propagation, vol. 62, no. 6, pp. 3242–3256"
+link = [
+  { label = "IEEE Xplore (open access)", url = "https://doi.org/10.1109/TAP.2014.2310220" },
+]
