@@ -1,0 +1,10 @@
+Options -Indexes
+ErrorDocument 404 /404.html
+AddType text/markdown .md
+AddType font/woff2 .woff2
+AddType image/webp .webp
+AddCharset utf-8 .html .css .js .md .txt .svg
+# Switch on only after HTTPS works at the hoster:
+# RewriteEngine On
+# RewriteCond %{HTTPS} off
+# RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]

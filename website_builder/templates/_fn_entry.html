@@ -1,0 +1,16 @@
+<article class="fn-entry" id="{{ f.name }}">
+<div class="fn-head"><h3>{{ f.name }}</h3><a class="anchor" href="#{{ f.name }}" aria-label="Link to {{ f.name }}">#</a></div>
+<div class="fn-langs"><span class="lbl">Also in</span>{% for label, href, here in f.pills %}{% if here %}<a class="pill" aria-current="page" href="{{ href }}">{{ label }}</a>{% elif href %}<a class="pill" href="{{ href }}">{{ label }}</a>{% else %}<span class="pill none" title="No {{ label }} counterpart">{{ label }} –</span>{% endif %}{% endfor %}<a class="md" href="{{ root }}{{ f.md }}">Markdown</a></div>
+<p class="fn-brief">{{ f.brief }}</p>
+{{ f.intro }}
+{% for s in f.subs %}
+<h4>{{ s.label }}</h4>
+{% for it in s.parts %}
+{% if it.rows is not none %}
+<dl class="params">{% for r in it.rows %}{% if r.note %}<div class="pnote"><dt></dt><dd>{{ r.desc }}</dd></div>{% else %}<div><dt>{{ r.names }}{% if r.qual %}<span class="opt">{{ r.qual }}</span>{% endif %}</dt><dd>{{ r.desc }}</dd></div>{% endif %}{% endfor %}</dl>
+{% else %}
+{{ it.html }}
+{% endif %}
+{% endfor %}
+{% endfor %}
+</article>
