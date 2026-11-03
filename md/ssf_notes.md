@@ -6,7 +6,7 @@ What is worth keeping from the first small-scale fading series (TR 38.901 v19.5.
 
 - Built on v0.12.4. Public API: `ssf_init_phases`, `ssf_draw` (`src/qd_gbsm_phases.cpp`), `ssf_clusters` with methods `38.901` (default), `38.901_MF`, `quadriga` (`src/ssf_clusters.cpp`); MEX and Python wrappers; the six v19 LOS files hold N + 1 clusters.
 - Process: R0 study → spec (2 review rounds, round 3 skipped) → runs R1, R2a, R2b, R2c, R3 → code review 1 (1 bug, 3 major, 8 minor) → fixes → full code review 2 (0 bugs, 2 major doc, 6 minor) → fixes. Gates at the end: Catch2, ASan/UBSan, Octave, MATLAB R2024a/R2026a, Python, objdump (≤ GLIBCXX_3.4.26).
-- Next: NG integration (section 6 below), then the ray series.
+- NG integration done (NG commits 6c30173 to bb594cd on e318034, section 6). Next: the ray series.
 
 ## 2. Comparison study (R0): key numbers
 
@@ -24,6 +24,7 @@ Prototype (NumPy, not kept), UMi/UMa LOS/NLOS at 6 and 30 GHz, 4000 links per ca
 - Not adopted (measured worse): per-cluster ζ in `quadriga` (within 10 dB 13 → 10), Gaussian/Laplacian initial values (UMi LOS ASA 0.86 → 0.64), exact wrapped AS solve (jumps), exact per-frequency scaling (2↔30 GHz power correlation 0.86 → 0.67).
 - `quadriga` vs `38.901` differences that remain: angle–power rank correlation −0.33 vs −0.84; UMa LOS ASA at moderate K 0.61 vs 0.83. Antenna-level effect unknown until the ray series.
 - TR ground reflection adds +1.6 dB of link power (median) and gives `38.901` DS 0.85 in UMi LOS.
+- Re-measured in NG (1000 links per case, 3.5/6/30 GHz; section 6): the `38.901` LOS ASA range does not hold for UMa LOS (0.65–0.67 with NG's legacy file, 0.78 with v19: large input ASA at K ≈ 9 dB), and NLOS DS reaches 0.95–0.97; an independent MATLAB TR 7.5 oracle gives the same values (library within ±0.02), so both are TR-literal.
 
 ## 3. Decisions
 
@@ -94,50 +95,41 @@ Readiness:
 - Outputs: everything the ray step needs is in the cluster output (slot identity incl. LOS and GR, delays, powers per frequency, angles) or in existing outputs: K from `lsp`, μ_lgZSD for 7.5-20 from `lsp_mu` slice 5, cluster spreads, c_DS(f), M from `scenpar`, the GR polarisation from the permittivity under the consumer contract of 2.3 (the slot powers are coefficient powers; the GR slot already contains R²; the ray step applies diag(R∥, −R⊥)/R). Procedure A needs the absolute cluster state at the segment start (this output plus d3D/c) and an appended sign block.
 - `ssf_clusters` validates the exact sizes of this version's layout; a later version that appends blocks changes the size rule together with the layout.
 
-## 6. NG integration hand-off
+## 6. NG integration (done)
 
-### What NG replaces
+NG commits on e318034: 6c30173 (generator state), 15c6590 (`quadriga`, coefficient powers, GR consumers), 0840170 (`38.901`), 15c24c5 (`38.901_MF`), bb594cd (review fixes). The commit messages list the behaviour changes with numbers. NG has no notes of its own; this section is the record.
 
-- Steps 5–7 of `gen_ssf_parameters` (both paths: `use_3GPP_baseline` → `38.901`, QuaDRiGa path → `quadriga`; `38.901_MF` as a new option) by `ssf_clusters`; `taus`, `pow`, `AoD`, `AoA`, `EoD`, `EoA` from its outputs (NG stores `taus` `[n_rx, L]`: take slice 0 of `delay`; for `38.901_MF` in LOS the delays and angles are per frequency, which needs NG's per-frequency builders of `split_multi_freq`).
-- Keep in MATLAB until the ray series: `xprmat`, `pin`, `subpath_coupling`, `get_subpath_angles`, `gen_fbs_lbs`, `get_channels`. The sub-cluster split and the "two strongest" selection read the output powers (no sort in the library).
-- Ground reflection (W7, consumer contract of 2.3). The stored `pow` holds coefficient powers in every method: LOS K/(1+K), GR K/(1+K)·(d3D/d_GR)²·R² (TR methods) or K/(1+K)·R² (`quadriga`). Today NG stores the split ((1 − R²)·K/(1+K), R²·K/(1+K)) and undoes it in `get_channels` (`Rsq = 2·P_GR/(P_LOS + P_GR)`, `gSv = sqrt(2/Rsq)· R_par`, `Sl = 1/sqrt(1 − Rsq/2)`). At integration NG sets `Sl = 1` for every method and uses diag(R∥, −R⊥)/R with R² taken from the permittivity (or `P_GR/P_LOS` for `quadriga`). NG's channel is then unchanged: a NumPy check of the narrowband LOS + GR coefficient (V and H polarisation, 4 geometries 40 m–10 km, K 0–15 dB, ε = 13.5 − 1.18j) gives the same complex values as today's `get_channels` formulas to 2.5e-16; only the stored `pow` arrays differ (LOS K/(1+K) instead of (1 − R²)·K/(1+K), sum above 1). NG computes R with ε = re + j·im (the conjugate of the TR sign the contract prescribes); keeping NG's own R keeps its channel bit-compatible, the phase difference is that of a conjugated small imaginary part.
-- Seeds: one LSF seed per builder, i.e. per scenario and site (W21; TR 7.6.3.4); the SSF sets derive from it.
-- Builder: store the LSF seed (drawn once with `floor(rand·2^52)` if the user gives none; today drawn but not stored) and the SSF phase cubes (shared set + one per frequency) instead of `path_sos`; `xpr_sos`, `pin_sos`, `clst_dl_sos` stay until the ray series (`clst_dl_sos` only for the deprecated mmMAGIC method).
-- Per call: `rnd = ssf_draw(...)` at the builder positions with the builder's `dual_mobility`, `floor_id`, `horizontal`; `38.901` under spatial consistency: evaluate blocks 1–8 at the segment start and reuse them for all snapshots of the segment (D5); `abs_toa`, `eod_offset_deg`, `gr_eps` from `lsp_generate`; `o2i` true for the O2I builders; NLOS builders pass their own scenpar (LOS by `KF_mu`, W1).
-- `use_3GPP_baseline` with `SC_lambda = 0` / `'Disable'`: the fields at 0.1 m replace NG's `rand` draws (different realisations, same statistics).
+### How NG uses the library
 
-### Conf files
+- `qd_builder.lsf_generator.seed` (stored now) and `qd_builder.ssf_generator` (`shared` `[n_coeff, 9·N, 2]`, `freq` `[n_coeff, N, 2, F]`, `set_id`); drawn in `init_sos`, carried by `copy`, `split_rx`, `split_multi_freq` (frequency f keeps set `set_id(f)`, also after a redraw), `add_paths`; `path_sos` removed; `xpr_sos`, `pin_sos`, `clst_dl_sos` stay until the ray series. Builders saved before the series without `seed` get a new seed for the SSF sets only.
+- One `ssf_draw` per set and one `ssf_clusters` per builder (`private/ssf_eval.m`); `lsp` from the builder properties (user edits honoured), clamped at the call (K ≤ 1e10, spreads ≥ 1e-6°, DS ≥ 1e-12 s, non-finite SF/XPR → 1); `eod_offset_deg` from `lsp_generate`; `abs_toa` = `absTOA_offset` (empty → `absTOA_mu = -100` in the scenpar copy, no shift); `'Disable'` → `SC_lambda = 0`; `floor_id` not used (UTs at the same x-y share fields, as in the LSF port).
+- Method: QuaDRiGa path `quadriga`; 3GPP baseline `qd_simulation_parameters.ssf_model` = `38.901` (default) or `38.901_MF`. `38.901` with several frequencies errors (builder and `qd_layout.get_channels`); `38.901_MF` runs per split builder (7.6.5.1 is exactly separable per frequency given the anchor and the frequency's set; measured difference 0) with anchor LSPs at 2 GHz from the builder's generators; an unsplit multi-frequency builder errors.
+- Conventions: `NumClusters` counts LOS and GR, so NG passes `NumClusters − 1` whenever `GR_enabled` (every scenpar); O2I = scenario name ends in `_O2I` (all O2I files have `KF_mu = -100`; a `'Custom'` scenpar is not O2I); stored `pow` = coefficient powers (LOS + NLOS = 1, GR on top), `gen_ssf_parameters` writes `gain` directly, the `pow` setter normalises all slots except the GR slot (found by geometry); NLOS scenarios keep a zero-power LOS path.
+- GR: polarisation matrix diag(R∥, −R⊥)/R in both paths; `get_channels` uses R(t)/R0 with R0 at the segment start and `p_los = pow(:,1)` in the KF scaling; `gen_lsf_from_ssf` inverts K, SF and ε for both power forms. NG keeps its own permittivity sign (ε = re + j·im, the conjugate of the TR sign; same |R|).
+- v19 conf files: NG's CMake copies `share/quadriga-lib/config` to `quadriga_lib/config`, searched after NG's own `config` folder.
 
-The D4 change affects NG users of the v19 LOS files (one more NLOS cluster). NG's legacy files keep their meaning:
-- Without GR, NG reads `NumClusters − 1` NLOS clusters, as the library: same count as today.
-- With GR (`TwoRayGR`: 2, `3GPP_38.901_UMi_LOS_GR`: 13) NG counts the GR slot inside `NumClusters`, the library adds it on top (W15). At integration NG passes a scenpar copy with `NumClusters − 1` for legacy files with `GR_enabled` (TwoRayGR → 1, i.e. LOS + GR only, 3.0.9; UMi_LOS_GR → 12, i.e. 11 NLOS clusters as today). The v19 rule (GR slot on top) stays.
-- `Freespace`, `LOSonly`, `Null` (NumClusters 1): LOS path only (3.0.9), as NG's `n_clusters == 1` branch. For `TwoRayGR` with `quadriga` the library gives the coefficient powers (1, R²), NG's channel; with the baseline path (`38.901`) the TR form (1, (d3D/d_GR)²·R²) (NG's baseline channel has no d3D/d_GR factor).
-- Legacy "NLOS" files with `KF_mu > -30` run the LOS branch (list in 3.0.4).
+### Measured in NG (1000 links per case; e318034 vs bb594cd)
 
-### Changes of NG's default output (QuaDRiGa path → `quadriga`), measured in the comparison study
+- Spherical GR channel unchanged (7e-16 on a 40 m track, V and H). Baseline GR/LOS coefficient = TR eq. (7.6-32) to 2e-15; before, NG's baseline had an inverted H sign and wrong magnitudes (pre-existing bug, fixed).
+- `quadriga`: DS, ASD, ASA unchanged; 1-D ESD/ESA match the input exactly (before up to +11 % median, +167 % p90; the old excess shrinks with distance: UMi LOS 1.39/1.10/1.02 for 35–100/100–200/200–500 m, which explains the study's 1.22 for near links); NLOS EoA centre at the LOS elevation (±0.4°; UMa NLOS +6.6–7.0°, +20° at 35–100 m); EoD centre moves by the TR offset minus 0.4–0.7° (additive LOS application); multi-frequency ESD at 2 GHz 1.10 (p90 1.88) → 1.00 (p90 1.11). NG's spherical estimator `qf.calc_angular_spreads_sphere` moves the other way (ESD 1.00 → 1.05–1.13, p90 up to 4.9 at tiny input ESD; ESA up to 1.34 in UMa NLOS at 35–100 m).
+- `38.901`: library = oracle within ±0.02; LOS DS 0.45 → 1.0 (C_τ); −25 dB removal on 21–60 % of links; D2D swap reciprocity exact for all three methods (before: baseline not reciprocal, QuaDRiGa path broken above 20 m height difference).
+- `38.901_MF`: the TR LOS files have no frequency-dependent K, so LOS delays and angles are identical at all frequencies too (mmMAGIC UMi LOS with frequency-dependent K: median delay ratio 30/2 GHz 1.52).
+- abs TOA: v19 NLOS clusters start exactly at Δτ; DS unchanged. "+1 cluster in the v19 LOS files" is no change in NG (NG first read the v19 files with N + 1 already).
+- Statistics from one builder over a small area are dominated by the correlated cluster fields (now also in the baseline): one builder with 100 links within 200 m gave v19 UMa NLOS DS 0.90; 20 builders 0.96.
 
-No parity test (D3). Delays, powers, DS, ASD, ASA unchanged except:
-- D4 in the v19 LOS files: +1 NLOS cluster (UMi LOS: clusters within 10 dB 6 → 7, KS 0.005).
-- Additive LOS application: ESD median ratio 1.22 → 1.00 (UMi LOS), 1.09 → 1.00 (UMi NLOS), ESA up to −4 %; multi-frequency ESD at 2 GHz 1.30 (p90 3.31) → 1.03 (p90 1.21); NLOS arrival centre up by 2.1° (UMi NLOS), 4.5° (UMi LOS).
-- No satellite fade: UMa NLOS arrival centre up by 7.3° in total (with the additive application); D2D reciprocity restored for height differences > 10 m in NLOS.
-- EoD offset on NLOS departures: departure centre moves by the TR offset (median 1.9° UMi NLOS, 3.0° UMa NLOS).
-- Per-link worst-spread change median 0.004–0.093 in lg (largest: ESD in UMi LOS); KS distance 0.006–0.058.
-- GR in NLOS scenarios: no pull of the NLOS EoA centre towards the GR elevation (W20; NG moves it by 10–23° in UMa at 35–100 m).
-- Smaller differences: GR adds a slot instead of taking one of `NumClusters` (W15, handled by the scenpar copy of 10.2); no fixed angles for 1–2 NLOS clusters (W14); no power sort when SC is off (W3); 2D fields with floors instead of 3D (new realisations); per-frequency EoD offset averaged (W5).
+### NG items not fixed (pre-existing)
 
-Baseline path (`use_3GPP_baseline` → `38.901`): the TR angle mapping replaces NG's alternative mapping (N2), C_τ applied (N1), −25 dB removal (N5), ZOD offset (N4), N + 1 slots in LOS (N3), LOS power exactly 0 in NLOS; NG unit tests that inspect the old baseline angles (`testBuilder_SSF_generation*`, `3GPP_baseline_multifreq`) are rewritten against the library.
-
-- Absolute TOA (W13 as changed after code review 1): NG requests Δτ from `lsp_generate` (output `abs_toa`) and passes it to `ssf_clusters` for `quadriga` in NLOS builders (required for files with `absTOA_mu > -30`). The NLOS impulse responses then start Δτ after the LOS time instead of at the scale-dependent origin s·min(τ̃): a documented change of NG's default output; the DS is unchanged (no LOS weight in NLOS). Legacy files without abs TOA keep the unshifted delays.
-- Later scatterer series (ray level, FBS/LBS positions from the clusters): a cluster whose delay is short for its angles (e.g. Δτ = 0 or a first cluster near the LOS delay with wide departure and arrival angles) has no scatterer geometry that satisfies both; the series needs a minimum-distance guard (scatterers kept a minimum distance from both arrays, the excess path length lower-bounded) so that they cannot collapse onto the arrays.
-
-### NG tests
-
-`testBuilder_SSF_generation_dual` (exact swap reciprocity) must pass with `quadriga` and with `38.901` for offset 0; `3GPP_baseline_multifreq` now errors for `38.901` with several frequencies (use `38.901_MF` or `quadriga`).
+- Baseline `get_channels_seg` for part of a multi-segment track fails ("matrix cannot be indexed with ." at `par_tmp.pg`), also at one frequency.
+- An NLOS scenario with `GR_enabled` makes `gen_lsf_from_ssf` clear `gr_epsilon_r`; the next `gen_ssf_parameters` fails (no shipped file has this combination).
+- Changing `NumClusters` after `init_sos` under spatial consistency fails on the `xpr_sos` size check.
+- NG's CMake relocate step is not idempotent: changing its commands after an install re-runs it without the install step and it deletes `+quadriga_lib`; remove the install and relocate stamps and rebuild.
+- Builders saved in MATLAB before the series with GR carry the old LOS/GR power split (LOS lower by 1 − R² in the new `get_channels`); regenerate their SSF.
+- The global MATLAB R2024a `pathdef.m` lists `/sjc/quadriga-lib`: when MEX files are built there, MATLAB uses them instead of NG's package (NG then sees 92 instead of 115 conf files); add NG's `quadriga_lib` first.
 
 ## 7. Open items for later series
 
 - Revisit the default method with antenna-level metrics (coupling loss, singular values of 7.8.2) once the ray step exists; `quadriga`'s weak angle–power coupling and the UMa LOS ASA gap are the reasons it is not the default.
-- Scatterer series: minimum-distance guard for clusters whose delay is short for their angles (section 6).
+- Scatterer series: minimum-distance guard for clusters whose delay is short for their angles. Measured in NG's `gen_fbs_lbs` (unchanged by the integration): scatterers within 1 m of the Rx for 0.2–0.8 % of NLOS sub-paths in the legacy files (10–29 % of links have one), ≤ 0.04 % in v19 NLOS (abs TOA); all at the Rx in the single-bounce fallback, 73–97 % with excess path < 0.01·d3D and angle > 30° from the LOS.
 - `quadriga` with only 2–4 active clusters in LOS can place a weak cluster far out (RMa: delay span up to ≈ 700·DS vs 150·DS for `38.901`); in the TR cluster-count ranges the tails match `38.901`. Recorded, no action.
 - `quadriga` with GR in LOS: the ESD/ESA target is often unreachable because the fixed LOS and GR elevations already spread more than the target (NG behaviour, documented); with GR the slot-power DS is ≈ 0.85 of the input.
 - Procedure B can be added later (append-only random-field blocks); as written it does not reproduce 7.5.
@@ -151,3 +143,5 @@ Baseline path (`use_3GPP_baseline` → `38.901`): the TR angle mapping replaces 
 - Test-size estimates were exceeded 1.5–2× by every run; shared test headers and method-generic cases (all three methods in one case) should be specified up front.
 - Two spec review rounds were enough when the TR transcription is checked numerically by each reviewer; the parts changed after the last review (GR contract, log-domain powers, abs-TOA rule) were caught by the implementation's TR-oracle tests.
 - Effort: medium sufficed for the implementation runs with a detailed spec; high for the largest TR run (R2a) and the first code review.
+- NG integration: three plan reviews were needed; the third, which built rough versions of the steps and ran NG's full suite against them, found no blocker or major — prototype runs belong in the first plan review. Check the brief's assumptions in the code first (NG had never read the v19 files; the `pow` setter renormalised).
+- MOxUnit's `assertElementsAlmostEqual(..., 'relative', tol)` adds an absolute floor of sqrt(eps): relative checks on values near 1e-9 (path powers) pass vacuously; compare ratios to 1 with `'absolute'`. Mutant checks (revert a line, the test must fail) found two untested paths.
