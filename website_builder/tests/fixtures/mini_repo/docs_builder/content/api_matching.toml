@@ -1,0 +1,2 @@
+[families]
+arrayant_interpolate = [".interpolate", "arrayant_interpolate_multi"]

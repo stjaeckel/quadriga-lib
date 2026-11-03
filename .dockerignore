@@ -9,3 +9,4 @@ dist/
 wheelhouse/
 tests/test*
 deploy.py
+website/

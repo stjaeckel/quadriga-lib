@@ -1,0 +1,28 @@
+[page]
+title = "Publications"
+description = "%%GAP: page description%%"
+lead = "How to cite: see the [FAQ](faq.html#cite)."
+
+[[group]]
+id = "quadriga-lib"
+title = "Quadriga-Lib"
+intro = "Papers about the library."
+
+[[group.entry]]
+year = 2025
+title = "A modern C++ framework"
+authors = "S. Jaeckel"
+venue = "IEEE 802.11"
+link = [{ label = "PDF", url = "publications/x.pdf" }]
+
+[[group]]
+id = "quadriga-background"
+title = "QuaDRiGa background"
+outro = "More on [GitHub]({{ github_url }})."
+
+[[group.entry]]
+year = 2014
+title = "QuaDRiGa: A 3-D multi-cell channel model"
+authors = "S. Jaeckel, L. Raschkowski, K. Börner, L. Thiele"
+venue = "IEEE Trans. Antennas Propag."
+link = [{ label = "IEEE Xplore", url = "https://ieeexplore.ieee.org/document/6758357" }, { label = "Markdown", url = "http://quadriga-lib.org/publications/y.md" }]
