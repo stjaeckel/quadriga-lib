@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block main %}
+<div class="notfound">
+  {% include "_logo.svg" %}
+
+  <h1>{{ page.title }}</h1>
+  <div class="lead">{{ body }}</div>
+  <div class="actions"><a class="btn btn-primary" href="{{ url("index") }}">Home</a><a class="btn btn-secondary" href="{{ url("cpp_api") }}">C++ API</a><a class="btn btn-secondary" href="{{ url("mex_api") }}">MATLAB API</a><a class="btn btn-secondary" href="{{ url("python_api") }}">Python API</a></div>
+</div>
+{% endblock %}

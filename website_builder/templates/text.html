@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block main %}
+{% if index %}
+<div class="wrap doc">
+<nav class="doc-side idx" aria-label="Page sections">{% include "_text_index.html" %}</nav>
+{% else %}
+<div class="wrap page">
+{% endif %}
+<div class="doc-main prose">
+  <p class="crumbs"><a href="{{ url("index") }}">Home</a> › {{ page.title }}</p>
+  <h1>{{ page.title }}</h1>
+{% if lead %}
+  <p class="lead">{{ lead }}</p>
+{% endif %}
+  <div class="page-tools"><a href="{{ root }}{{ twin }}">Markdown version</a></div>
+{% if index %}
+  <details class="doc-index"><summary>On this page</summary><nav class="idx" aria-label="Page sections (collapsible)">{% include "_text_index.html" %}</nav></details>
+{% endif %}
+{{ body }}
+</div>
+</div>
+{% endblock %}

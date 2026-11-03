@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block main %}
+<div class="wrap page">
+<div class="doc-main prose page-narrow">
+  <p class="crumbs"><a href="{{ url("index") }}">Home</a> › <a href="{{ url("tutorials") }}">Tutorials</a> › {{ tut.title }}</p>
+  <h1>{{ tut.title }}</h1>
+  <div class="tut-card"><div class="meta"><span class="tag lang">{{ tut.language }}</span><span class="tag">{{ tut.level }}</span><span class="tag">about {{ tut.duration }} minutes</span></div></div>
+  <div class="downloads"><a class="dl" href="{{ tut.stem }}.ipynb">Download notebook <small>.ipynb</small></a><a class="dl" href="{{ tut.stem }}.md">Markdown <small>.md</small></a></div>
+{% for c in tut.cells %}
+{% if c.md is not none %}
+{{ c.md }}
+{% else %}
+  <div class="cell"><div class="cell-label">In [{{ c.label }}]</div><pre><code class="language-{{ c.lang }}">{{ c.code }}</code></pre>{% for o in c.outs %}<div class="out">{{ o }}</div>{% endfor %}</div>
+{% endif %}
+{% endfor %}
+  <p><a href="{{ url("tutorials") }}">← All tutorials</a></p>
+</div>
+</div>
+{% endblock %}

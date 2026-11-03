@@ -131,7 +131,10 @@ docs:
 	python3 docs_builder/build.py docs
 docs-check:
 	python3 docs_builder/build.py docs --check
-.PHONY: docs docs-check
+website:
+	@test -f website_builder/build.py || { echo "make website: website_builder/ is not part of the source package; build the website from a git clone"; exit 1; }
+	python3 website_builder/build.py website
+.PHONY: docs docs-check website
 
 moxunit-lib:
 	- rm -rf external/MOxUnit-master

@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block main %}
+<div class="wrap page">
+<div class="doc-main prose">
+  <p class="crumbs"><a href="{{ url("index") }}">Home</a> › {{ pubs.title }}</p>
+  <h1>{{ pubs.title }}</h1>
+  <p class="lead">{{ pubs.lead }}</p>
+  <div class="page-tools"><a href="{{ root }}{{ twin }}">Markdown version</a></div>
+{% for g in pubs.groups %}
+  <h2 id="{{ g.id }}">{{ g.title }}</h2>
+{% if g.intro %}
+  <p>{{ g.intro }}</p>
+{% endif %}
+  <ul class="pubs">{% for e in g.entries %}<li><span class="year">{{ e.year }}</span><span class="ptitle">{{ e.title }}</span><span class="pmeta">{{ e.meta }}</span><div class="plinks">{% for label, href in e.links %}<a class="dl" href="{{ href }}">{{ label }}</a>{% endfor %}</div></li>{% endfor %}</ul>
+{% if g.outro %}
+  <p>{{ g.outro }}</p>
+{% endif %}
+{% endfor %}
+</div>
+</div>
+{% endblock %}

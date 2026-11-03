@@ -1,0 +1,11 @@
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="cols">
+      <div><h2>Documentation</h2><ul><li><a href="{{ url("download") }}">Get started</a></li><li><a href="{{ url("cpp_api") }}">C++ API</a></li><li><a href="{{ url("mex_api") }}">MATLAB / Octave API</a></li><li><a href="{{ url("python_api") }}">Python API</a></li><li><a href="{{ url("formats") }}">Data formats</a></li></ul></div>
+      <div><h2>Learn</h2><ul><li><a href="{{ url("tutorials") }}">Tutorials</a></li><li><a href="{{ url("publications") }}">Publications</a></li><li><a href="{{ url("faq") }}">Questions</a></li><li><a href="{{ url("ai_agents") }}">AI agents</a></li></ul></div>
+      <div><h2>Project</h2><ul><li><a href="{{ github_url }}">GitHub</a></li><li><a href="{{ github_url }}/issues">Issues</a></li><li><a href="{{ url("faq") }}#cite">How to cite</a></li><li><a href="{{ github_url }}/blob/main/LICENSE">Apache-2.0 licence</a></li></ul></div>
+      <div><h2>For agents</h2><ul><li><a href="{{ root }}llms.txt">llms.txt</a></li>{% if twin %}<li><a href="{{ root }}{{ twin }}">This page as Markdown</a></li>{% endif %}</ul></div>
+    </div>
+    <div class="foot-bottom"><span>Quadriga-Lib v{{ version }}</span><a href="{{ url("impressum") }}">Impressum</a><a href="{{ url("privacy") }}">Privacy</a></div>
+  </div>
+</footer>
