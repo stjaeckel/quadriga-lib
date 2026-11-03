@@ -5,14 +5,14 @@ repository root:
 
   python3 tools/acoustic/check_docs.py
 
-1. The material-model page html_docu/quadriga_lib_material_model.md: every row of a markdown table has the column
-   count of its header row (an unescaped `|` inside a cell, e.g. in `|R|` or `4|16|4`, splits the cell; write `\\|`);
-   no British spellings (American English; italic test-case names are skipped); every column that MaterialCols reads
-   (resolve("...") in src/ray_mesh_interact.cpp) is a row of the page's column table; no internal labels (item ids,
-   "round 1", md/ files, briefs, rigs, scratch paths) outside math and code; `$` balanced per paragraph and `$$` per
-   file; no \newcommand; every in-page anchor resolves to a heading.
-2. The material part of the Data Formats page, html_builder/formats/format_materials.md: tables and spelling as
-   above; every column that MaterialCols reads is a row of its column table (header "| Key |"); no internal labels.
+1. The material-model page website_builder/static/quadriga_lib_material_model.md: every row of a markdown table has
+   the column count of its header row (an unescaped `|` inside a cell, e.g. in `|R|` or `4|16|4`, splits the cell;
+   write `\\|`); no British spellings (American English; italic test-case names are skipped); every column that
+   MaterialCols reads (resolve("...") in src/ray_mesh_interact.cpp) is a row of the page's column table; no internal
+   labels (item ids, "round 1", md/ files, briefs, rigs, scratch paths) outside math and code; `$` balanced per
+   paragraph and `$$` per file; no \newcommand; every in-page anchor resolves to a heading.
+2. The Data Formats page, docs_builder/content/formats.md: tables and spelling as above; every column that
+   MaterialCols reads is a row of its column table (header "| Key |"); no internal labels.
 
 Exit code 0 when every check passes, 1 otherwise. It reports; it changes nothing.
 """
@@ -20,7 +20,7 @@ import os, re, sys
 
 ROOT = os.getcwd()
 PAGE = 'website_builder/static/quadriga_lib_material_model.md'
-FORMATS = 'html_builder/formats/format_materials.md'
+FORMATS = 'docs_builder/content/formats.md'
 SOURCE = 'src/ray_mesh_interact.cpp'
 BRITISH = ['neighbour', 'centre', 'behaviour', 'modelled', 'modelling', 'colour', 'millimetre', 'metre ', 'favour',
            'labelled', 'travelled', 'grey ']

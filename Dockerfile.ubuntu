@@ -51,6 +51,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-dev \
     python3-numpy \
     python3-pytest \
+    # TOML reader for the docs check on 22.04 (Python 3.10)
+    python3-tomli \
     # Octave
     octave-dev \
     octave \
@@ -62,6 +64,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Build context = repo root (directory containing CMakeLists.txt + debian/)
 WORKDIR /build/quadriga-lib
 COPY . .
+
+# The committed Markdown documentation in docs/ must be current
+RUN python3 docs_builder/build.py docs --check
 
 # ---- 3. Stamp version from include/quadriga_lib.hpp into debian/changelog ----
 RUN CODENAME=$(cat /etc/build-codename) && \

@@ -2,7 +2,7 @@
 
 Draft 4, 2026-10-26 (draft 0 revised after two review rounds and two independent reviews). How to build a room model
 in Blender so that the acoustic material table (`md/acoustic_materials.md`) gives meaningful results. The rules are collected from the material page
-(`html_docu/quadriga_lib_material_model.md`, sections 2, 7, 10, 12, 13; "rule n" means its section 12) and from the
+(`website_builder/static/quadriga_lib_material_model.md`, sections 2, 7, 10, 12, 13; "rule n" means its section 12) and from the
 engine issues measured during the material work (`md/acoustic_engine_stage2b_issues.md`). Rules that are the
 drafter's own proposal are marked **(proposed)**.
 

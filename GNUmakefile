@@ -1,5 +1,9 @@
 # This Makefile is for Linux / GCC environments
 
+# bash with pipefail, so a recipe that pipes into tee (the deb builds) fails when the command before the pipe fails
+SHELL := /bin/bash
+.SHELLFLAGS := -o pipefail -c
+
 # Set Armadillo sources
 arma_internal = OFF
 static_lib = ON
@@ -22,9 +26,6 @@ ifeq ($(USE_NINJA),1)
 else
   BUILD_TOOL_ARGS = -- --no-print-directory
 endif
-
-# Scripts, page parts and page text of the HTML documentation
-HB = html_builder
 
 # Location where pip-installable packages live
 PYTHON_SITE_PACKAGES := $(shell python3 -c "import sysconfig, pathlib, json; print(sysconfig.get_paths()['purelib'])")
@@ -105,27 +106,6 @@ endif
 python_test: 
 	PYTHONPATH=$(CURDIR)/lib python3 -m pytest tests/python_tests -x -s
 
-# Documentation
-documentation:
-	sed 's/__VERSION__/$(QUADRIGA_VERSION)/g' $(HB)/download/download.md.in > $(HB)/download/download.md
-
-	python3 $(HB)/extract_version.py $(HB)/parts/mex_api.html.part "MATLAB / Octave API Documentation for Quadriga-Lib"
-	python3 $(HB)/extract_version.py $(HB)/parts/python_api.html.part "Python API Documentation for Quadriga-Lib"
-	python3 $(HB)/extract_version.py $(HB)/parts/cpp_api.html.part "C++ API Documentation for Quadriga-Lib"
-
-	python3 $(HB)/extract_html.py -o html_docu/index.html -p $(HB)/parts/index.html.part
-	python3 $(HB)/extract_html.py -o html_docu/mex_api.html -p $(HB)/parts/mex_api.html.part -d api_mex/ -l
-	python3 $(HB)/extract_html.py -o html_docu/cpp_api.html -p $(HB)/parts/cpp_api.html.part -d src/ 
-	python3 $(HB)/extract_html.py -o html_docu/python_api.html -p $(HB)/parts/python_api.html.part -d api_python/ 
-	python3 $(HB)/extract_html.py -o html_docu/formats.html -p $(HB)/parts/formats.html.part -d $(HB)/formats/
-	python3 $(HB)/extract_html.py -o html_docu/faq.html -p $(HB)/parts/faq.html.part -d $(HB)/faq/ -c
-	python3 $(HB)/extract_html.py -o html_docu/publications.html -p $(HB)/parts/publications.html.part
-	python3 $(HB)/extract_html.py -o html_docu/download.html -p $(HB)/parts/download.html.part -d $(HB)/download/ -c
-
-	python3 $(HB)/extract_md.py -o html_docu/quadriga_lib_api_cpp.md -a cpp
-	python3 $(HB)/extract_md.py -o html_docu/quadriga_lib_api_mex.md -a mex
-	python3 $(HB)/extract_md.py -o html_docu/quadriga_lib_api_python.md -a python
-
 # Documentation: docs_builder/README.md and website_builder/README.md
 docs:
 	python3 docs_builder/build.py docs
@@ -149,7 +129,7 @@ package:
 package_dirty: clean
 	mkdir -p release
 	- rm release/quadriga_lib_$(QUADRIGA_VERSION).zip
-	zip -r release/quadriga_lib_$(QUADRIGA_VERSION).zip . -x '.git/*' -x 'release/*' -x 'html_docu/releases/*'
+	zip -r release/quadriga_lib_$(QUADRIGA_VERSION).zip . -x '.git/*' -x 'release/*' -x 'website/*'
 
 # Python targets:
 #
@@ -229,9 +209,13 @@ deb:
 	$(MAKE) -j deb-jammy deb-noble deb-resolute
 
 # Release
-release: documentation package
+release:
+	test -z "$$(git status --porcelain --untracked-files=no; git status --porcelain -- docs)" || { echo "uncommitted changes: commit before a release"; exit 1; }
+	python3 docs_builder/build.py docs --check
+	$(MAKE) package
 	$(MAKE) deb
 	$(MAKE) pip
+.PHONY: release
 
 clean:
 	- rm -rf $(CMAKE_BUILD_DIR)
