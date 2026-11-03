@@ -37,7 +37,8 @@ quadriga_lib.channel_export_obj_file( fn, max_no_paths, gain_max, gain_min, colo
 - **`rx_pos`** — Receiver positions; `[3, n_snap]` or `[3, 1]`
 - **`tx_pos`** — Transmitter positions; `[3, n_snap]` or `[3, 1]`
 - **`no_interact`** — Number of interaction points of paths with the environment; uint32; `[n_path, n_snap]`
-- **`interact_coord`** — Interaction coordinates; `[3, max(sum(no_interact)), n_snap]`
+- **`interact_coord`** — Interaction coordinates; `[3, max(sum(no_interact)), n_snap]`; fewer than `sum(no_interact)`
+  columns in a snapshot raise an error
 - **`center_freq`** — Center frequency in Hz; `[n_snap]` or scalar
 - **`coeff_re`** — Channel coefficients, real part; `[n_rx, n_tx, n_path, n_snap]`
 - **`coeff_im`** — Channel coefficients, imaginary part; `[n_rx, n_tx, n_path, n_snap]`
@@ -96,8 +97,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                           c.coeff_re[i_snap_a].n_slices);
         c.delay.push_back(delays);
 
-        // Remove trailing zeros from interact_coord
-        unsigned sum_no_int = arma::sum(c.no_interact[i_snap_a]);
+        // Remove trailing zeros from interact_coord; too few columns are an error, not padded with zeros
+        arma::uword sum_no_int = arma::accu(arma::conv_to<arma::uvec>::from(c.no_interact[i_snap_a]));
+        if (sum_no_int != 0 && (c.interact_coord[i_snap_a].n_rows != 3 || c.interact_coord[i_snap_a].n_cols < sum_no_int))
+            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", ("Snapshot " + std::to_string(i_snap_a + 1) +
+                              ": 'interact_coord' must have 3 rows and at least sum(no_interact) = " +
+                              std::to_string(sum_no_int) + " columns.").c_str());
         c.interact_coord[i_snap_a] = arma::resize(c.interact_coord[i_snap_a], 3, sum_no_int);
     }
 

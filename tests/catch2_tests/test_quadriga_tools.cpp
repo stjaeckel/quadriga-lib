@@ -445,6 +445,20 @@ TEST_CASE("Quadriga tools - Coord 2 Path")
     CHECK(arma::approx_equal(path_coord[0], M, "absdiff", 1e-14));
 }
 
+TEST_CASE("Quadriga tools - coord2path interaction count sum does not wrap at 32 bits")
+{
+    // The two counts add up to 2^32 + 6; a 32-bit sum would wrap to 6 and accept 6 columns
+    arma::u32_vec no_interact = {0xFFFFFFFFu, 7u};
+    arma::mat interact_coord(3, 6, arma::fill::ones);
+    arma::vec path_length;
+    arma::mat fbs_pos, lbs_pos, path_angles;
+    std::vector<arma::mat> path_coord;
+
+    CHECK_THROWS_AS(quadriga_lib::coord2path(0.0, 0.0, 0.0, 10.0, 0.0, 0.0, &no_interact, &interact_coord,
+                                             &path_length, &fbs_pos, &lbs_pos, &path_angles, &path_coord),
+                    std::invalid_argument);
+}
+
 TEST_CASE("Quadriga tools - Rotation matrix")
 {
     arma::mat ori(3, 1);

@@ -301,5 +301,14 @@ class test_channel_export_obj_file(unittest.TestCase):
                                                     interact_coord=[np.zeros((3, 0))], **common)
 
 
+    def test_interact_count_sum_does_not_wrap(self):
+        """The counts add up to 2^32 + 6; a 32-bit sum would wrap to 6 and accept 6 columns."""
+        ni = np.array([[0xFFFFFFFF], [7]], dtype=np.uint32)
+        with self.assertRaisesRegex(ValueError, '4294967302'):
+            quadriga_lib.channel.channel_export_obj_file(
+                self._path('wrap.obj'), rx_pos=np.array([[10.0], [0], [1]]), tx_pos=np.array([[0.0], [0], [10]]),
+                no_interact=ni, interact_coord=np.ones((3, 6, 1)), center_freq=np.array([3e9]),
+                coeff_re=np.ones((1, 1, 2, 1)), coeff_im=np.zeros((1, 1, 2, 1)), gain_min=-500.0, gain_max=0.0)
+
 if __name__ == '__main__':
     unittest.main()

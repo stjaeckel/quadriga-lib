@@ -59,13 +59,11 @@ void quadriga_lib::coord2path(dtype Tx, dtype Ty, dtype Tz, dtype Rx, dtype Ry, 
 
     size_t n_path = (size_t)no_interact->n_elem;
 
-    // Calculate the total number of interactions
-    unsigned interact_cnt = 0;
+    // Calculate the total number of interactions (64-bit sum, a 32-bit sum can wrap)
+    size_t n_interact = 0;
     const unsigned *p_interact = no_interact->memptr();
     for (size_t i = 0; i < n_path; ++i)
-        interact_cnt += p_interact[i];
-
-    size_t n_interact = (size_t)interact_cnt;
+        n_interact += (size_t)p_interact[i];
 
     if (interact_coord == nullptr || interact_coord->n_rows != 3)
         throw std::invalid_argument("Input 'interact_coord' must have 3 rows.");
