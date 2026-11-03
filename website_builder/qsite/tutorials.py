@@ -114,11 +114,10 @@ def read(p, rel, diag):
         else:
             continue
         t.cells.append(cell)
-    # One heading scan over all Markdown cells keeps the ids unique on the page; headings deeper
-    # than #### are written as #### (h4), as on the page
-    heads = prose.heading_ids(md_lines, diag, rel)
+    # One heading scan over all Markdown cells keeps the ids unique on the page
+    heads = prose.heading_ids(md_lines, _CellDiag(diag, offsets), rel)
     for cell, off in offsets:
-        cell.headings = [dataclasses.replace(h, index=h.index - off, level=min(h.level, 4)) for h in heads
+        cell.headings = [dataclasses.replace(h, index=h.index - off) for h in heads
                          if off <= h.index < off + len(cell.lines)]
         if any(h.level == 1 for h in cell.headings):
             diag.error(rel, None, "cell %d: a notebook starts its sections with ##; the page title comes from "
@@ -127,6 +126,17 @@ def read(p, rel, diag):
         return None
     t.files["%s/%s.md" % (FOLDER, stem)] = twin(t).encode("utf-8")
     return t
+
+
+class _CellDiag:
+    """Reports errors at a line of the joined Markdown cells as errors of that cell."""
+
+    def __init__(self, diag, offsets):
+        self.diag, self.offsets = diag, offsets
+
+    def error(self, path, line, message):
+        cell = [c for c, off in self.offsets if off <= line - 1][-1]
+        self.diag.error(path, None, "cell %d: %s" % (cell.number, message))
 
 
 def _outputs(t, c, n, rel, diag):

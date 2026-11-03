@@ -75,6 +75,17 @@ def test_api_page(site):
     assert "<h1>MATLAB / Octave API</h1>" in mex
 
 
+def test_sub_block_label_as_inline_markdown(mini_repo, run_site):
+    src = mini_repo / "src/qd_tools.cpp"
+    src.write_text(src.read_text(encoding="utf-8").replace("## Inputs:", "## Inputs (required when `ant` is `[]`):"),
+                   encoding="utf-8")
+    code, out = run_site(mini_repo)
+    assert code == 0, out
+    cpp = (mini_repo / "website/cpp_api.html").read_text(encoding="utf-8")
+    assert "<h4>Inputs (required when <code>ant</code> is <code>[]</code>)</h4>" in cpp
+    assert '<dl class="params"><div><dt>ant</dt>' in cpp  # still a parameter list
+
+
 def test_text_page_index_and_note_boxes(site):
     formats = site("formats.html")
     side = ('<ul><li><details open><summary><span>QuaDRiGa Array Antenna Exchange Format (QDANT)</span></summary><ul>'

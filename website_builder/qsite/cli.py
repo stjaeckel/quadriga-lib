@@ -7,6 +7,7 @@ import argparse
 from pathlib import Path
 
 from qdocs import cli as docs_cli
+from qdocs import checks as md_checks
 from qdocs import config, links, prose
 from . import assets, checks, render_html, tutorials
 
@@ -44,6 +45,8 @@ def build_site(root, diag, release=False):
     # Generated Markdown; the hand-made static files are only checked as link targets
     generated = [p for p in site if p.endswith((".md", ".txt")) and (p in docs or p.startswith("tutorials"))]
     checks.check_site(site, diag, generated)
+    # docs/README.md is not copied to the site; its links are checked against the site all the same
+    md_checks.check_markdown(dict(site, **{"README.md": docs["README.md"]}), "website", diag, ["README.md"])
     if release:
         gaps = len(set(diag.gaps))
         if gaps or markers:

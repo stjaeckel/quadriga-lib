@@ -243,10 +243,13 @@ def _function(ctx, f, sec):
     def frag(part, tight=False):
         return ctx.fragment(part.lines, "docblock", part.path, part.line, f.lang, tight=tight)
 
+    def label(sub):  # labels may hold inline Markdown, such as code spans
+        return ctx.inline(sub.label, sub.heading.path, f.lang)
+
     subs = []
     for sub in f.subblocks:
         if sub.kind != "params":
-            subs.append({"label": sub.label, "parts": [{"rows": None, "html": frag(sub.content)}]})
+            subs.append({"label": label(sub), "parts": [{"rows": None, "html": frag(sub.content)}]})
             continue
         items = []
         for it in sub.items:
@@ -259,7 +262,7 @@ def _function(ctx, f, sec):
                     items.append({"rows": [row], "html": None})
             else:
                 items.append({"rows": None, "html": frag(it)})
-        subs.append({"label": sub.label, "parts": items})
+        subs.append({"label": label(sub), "parts": items})
     return {"name": f.name, "pills": _pills(f, f.lang, ctx.location), "md": "api/%s/%s.md" % (f.lang, sec.slug),
             "brief": frag(f.brief, tight=True), "intro": frag(f.intro), "subs": subs}
 
