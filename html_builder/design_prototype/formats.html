@@ -1,0 +1,1076 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Data formats · Quadriga-Lib</title>
+<meta name="description" content="File formats used by Quadriga-Lib: QDANT array antenna exchange format and material tables.">
+<meta name="theme-color" content="#2e7d46" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#24603a" media="(prefers-color-scheme: dark)">
+<meta property="og:title" content="Data formats · Quadriga-Lib">
+<meta property="og:description" content="File formats used by Quadriga-Lib: QDANT array antenna exchange format and material tables.">
+<meta property="og:image" content="img/og-card.png">
+<link rel="icon" href="img/logo.svg" type="image/svg+xml">
+<link rel="alternate" type="text/markdown" href="formats.md">
+<link rel="preload" href="fonts/ibm-plex-sans-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="css/site.css">
+<script>document.documentElement.className = "js";</script>
+<script src="js/site.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="site-header">
+  <div class="wrap hdr">
+    <details class="menu"><summary aria-label="Menu"><svg class="icon-open" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg><svg class="icon-close" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg></summary>
+      <nav aria-label="Site menu"><p class="menu-group">Start</p><a href="index.html">Home</a><a href="download.html">Get started</a><a href="tutorials.html">Tutorials</a><p class="menu-group">API reference</p><a href="cpp_api.html">C++ API</a><a href="mex_api.html">MATLAB API</a><a href="python_api.html">Python API</a><p class="menu-group">More</p><a href="formats.html" aria-current="page">Formats</a><a href="publications.html">Publications</a><a href="ai_agents.html">AI agents</a><a href="faq.html">FAQ</a><p class="menu-group">Project</p><a href="https://github.com/stjaeckel/quadriga-lib">GitHub</a></nav>
+    </details>
+    <a class="brand" href="index.html"><svg aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 185.69272 177.11873" fill="currentColor"><g transform="translate(-16.157506,-12.779575)"><g><path d="m 419.69727,138.50977 v 33.86132 c 39.1207,1.34451 78.40747,13.06264 113.6582,36.04883 l 18.58008,-28.49414 C 511.02593,153.24955 465.26321,139.80513 419.69727,138.50977 Z m -58.79688,5.10351 c -64.81167,13.20882 -124.52738,51.2765 -163.44141,110.93555 -18.73093,28.71638 -30.94304,59.82876 -37.00976,91.58594 h 34.63281 c 5.65611,-25.27355 15.85949,-49.99575 30.86328,-72.99805 32.49202,-49.8135 81.43097,-82.28974 134.95508,-94.9336 z M 552.05469,180 533.45898,208.48633 c 81.51363,53.21716 116.55002,150.47963 94.20508,239.76562 h 34.81836 C 683.96246,347.64246 643.23581,239.5287 552.05469,180 Z M 155.91602,393.44531 c -0.22114,83.95807 40.70752,166.40041 116.12109,215.60547 27.89442,18.20027 58.05137,30.24391 88.86328,36.48242 V 610.79688 C 336.57446,605.02456 312.79983,595.02505 290.625,580.55664 224.95575,537.70944 189.42702,466.27698 189.75195,393.44531 Z m 458.99023,91.62891 c -4.73055,10.54463 -10.33482,20.86272 -16.85547,30.85351 -41.13435,63.02515 -108.59868,98.27033 -178.35351,100.70313 v 33.8418 c 80.8885,-2.53882 159.34026,-43.17922 206.83984,-115.95704 10.34281,-15.84699 18.68248,-32.42818 25.11719,-49.4414 z" transform="scale(0.26458333)" fill="currentColor" /><path d="m 409.25195,211.76367 c -58.71233,0.98379 -115.96937,30.10523 -150.37695,82.85547 -55.05213,84.4004 -31.16235,197.94992 53.23047,253.01367 15.46493,10.0904 31.91084,17.51952 48.79492,22.42188 v -35.71875 c -10.39141,-3.82363 -20.52539,-8.87248 -30.20703,-15.18946 -68.99811,-45.01916 -88.3417,-136.94294 -43.33203,-205.94726 45.00967,-69.0043 136.9309,-88.35369 205.9414,-43.35352 l 18.58008,-28.49414 C 480.2298,220.71137 444.47934,211.1734 409.25195,211.76367 Z m 102.71875,29.63867 -18.5957,28.48633 c 68.98571,45.03816 88.29427,136.96317 43.26562,205.95508 -27.08179,41.49409 -71.12611,65.01381 -116.94335,67.38477 v 33.86718 c 56.95826,-2.48039 111.98144,-31.40458 145.43164,-82.65625 55.07535,-84.38521 31.21948,-197.95013 -53.15821,-253.03711 z" transform="scale(0.26458333)" fill="currentColor" /><path d="m 419.69727,282.67578 v 33.98438 c 12.07933,1.21119 24.07824,5.2552 35.00585,12.38086 l 18.58008,-28.49414 c -16.59814,-10.82327 -35.05716,-16.6446 -53.58593,-17.8711 z m -58.79688,12.06836 c -16.87291,8.59418 -31.78494,21.54913 -42.83008,38.48242 -33.73072,51.71257 -19.05752,121.48091 32.65039,155.21875 3.32285,2.16806 6.72199,4.13303 10.17969,5.9043 v -40.70703 c -29.33561,-25.2089 -36.08657,-68.50204 -14.34375,-101.83594 4.10838,-6.29855 8.95376,-11.80866 14.34375,-16.49219 z m 112.43359,5.83984 -18.5957,28.47852 c 36.30667,23.70325 46.4209,71.85023 22.72266,108.16016 -13.53402,20.73651 -35.04159,32.9119 -57.76367,35.14453 v 33.9414 c 33.88525,-2.38436 66.33915,-19.99304 86.25,-50.5 33.74498,-51.70325 19.08532,-121.47253 -32.61329,-155.22461 z" transform="scale(0.26458333)" fill="currentColor" /><path d="M 108.67547,19.690816 108.18118,182.98707" fill="none" stroke="currentColor" stroke-width="8" /><path d="m 112.19989,13.901741 a 6.8991342,6.8991342 0 0 1 2.0152,9.533481 6.8991342,6.8991342 0 0 1 -9.5282,2.040013 6.8991342,6.8991342 0 0 1 -2.06481,-9.52286 6.8991342,6.8991342 0 0 1 9.51745,-2.089592" fill="currentColor" /><path d="m 112.19989,177.22221 a 6.8991342,6.8991342 0 0 1 2.0152,9.53348 6.8991342,6.8991342 0 0 1 -9.5282,2.04001 6.8991342,6.8991342 0 0 1 -2.06481,-9.52286 6.8991342,6.8991342 0 0 1 9.51745,-2.08959" fill="currentColor" /><path d="m 104.67578,19.677734 -0.49414,163.296876 8,0.0254 0.49414,-163.296875 z" fill="currentColor" /><path d="m 23.056641,100.33008 v 8 h 42.905661 v -8 z" fill="currentColor" /><path d="m 152.18452,100.33008 v 8 h 42.76657 v -8 z" fill="currentColor" /><path d="m 198.72266,98.55311 a 6.8991342,6.8991342 0 0 1 2.0152,9.53348 6.8991342,6.8991342 0 0 1 -9.5282,2.04001 6.8991342,6.8991342 0 0 1 -2.06481,-9.52286 6.8991342,6.8991342 0 0 1 9.51745,-2.089588" fill="currentColor" /><path d="m 26.828204,98.55311 a 6.8991342,6.8991342 0 0 1 2.015203,9.53348 6.8991342,6.8991342 0 0 1 -9.528202,2.04001 6.8991342,6.8991342 0 0 1 -2.06481,-9.52286 6.8991342,6.8991342 0 0 1 9.517453,-2.089588" fill="currentColor" /><path d="m 113.55568,96.430542 a 9.4340076,9.4340076 0 0 1 2.75563,13.036258 9.4340076,9.4340076 0 0 1 -13.02904,2.78956 9.4340076,9.4340076 0 0 1 -2.82346,-13.021742 9.4340076,9.4340076 0 0 1 13.01434,-2.857348" fill="currentColor" /><path d="m 180.96319,37.789452 a 4.3679552,4.3679552 0 0 1 1.27585,6.035803 4.3679552,4.3679552 0 0 1 -6.03246,1.291566 4.3679552,4.3679552 0 0 1 -1.30726,-6.029079 4.3679552,4.3679552 0 0 1 6.02565,-1.322955" fill="currentColor" /><path d="m 172.63259,49.180035 a 4.3679552,4.3679552 0 0 1 1.27586,6.035803 4.3679552,4.3679552 0 0 1 -6.03246,1.291566 4.3679552,4.3679552 0 0 1 -1.30727,-6.029079 4.3679552,4.3679552 0 0 1 6.02566,-1.322955" fill="currentColor" /><path d="m 172.3664,151.71058 a 4.3679552,4.3679552 0 0 1 1.27586,6.0358 4.3679552,4.3679552 0 0 1 -6.03246,1.29157 4.3679552,4.3679552 0 0 1 -1.30727,-6.02908 4.3679552,4.3679552 0 0 1 6.02566,-1.32296" fill="currentColor" /><path d="m 181.12098,162.94061 a 4.3679552,4.3679552 0 0 1 1.27586,6.0358 4.3679552,4.3679552 0 0 1 -6.03247,1.29156 4.3679552,4.3679552 0 0 1 -1.30726,-6.02907 4.3679552,4.3679552 0 0 1 6.02566,-1.32296" fill="currentColor" /><path d="m 41.838332,37.67807 a 4.3679552,4.3679552 0 0 1 1.275858,6.035803 4.3679552,4.3679552 0 0 1 -6.032462,1.291566 4.3679552,4.3679552 0 0 1 -1.307265,-6.029079 4.3679552,4.3679552 0 0 1 6.025656,-1.322955" fill="currentColor" /><path d="m 50.371802,49.332722 a 4.3679552,4.3679552 0 0 1 1.275858,6.035803 4.3679552,4.3679552 0 0 1 -6.032462,1.291566 4.3679552,4.3679552 0 0 1 -1.307264,-6.029079 4.3679552,4.3679552 0 0 1 6.025655,-1.322955" fill="currentColor" /><path d="m 50.52891,151.47147 a 4.3679552,4.3679552 0 0 1 1.275858,6.03581 4.3679552,4.3679552 0 0 1 -6.032461,1.29156 4.3679552,4.3679552 0 0 1 -1.307265,-6.02908 4.3679552,4.3679552 0 0 1 6.025655,-1.32295" fill="currentColor" /><path d="m 42.021567,163.06608 a 4.3679552,4.3679552 0 0 1 1.275858,6.0358 4.3679552,4.3679552 0 0 1 -6.032462,1.29157 4.3679552,4.3679552 0 0 1 -1.307264,-6.02908 4.3679552,4.3679552 0 0 1 6.025655,-1.32296" fill="currentColor" /></g></g></svg><span>Quadriga-Lib</span></a>
+    <span class="version">v0.12.4</span>
+    <span class="grow"></span>
+    <a class="hdr-link hdr-gh" href="https://github.com/stjaeckel/quadriga-lib">GitHub</a>
+  </div>
+  <nav class="tabs" aria-label="Site sections"><div class="wrap"><ul><li><a href="index.html">Home</a></li><li><a href="download.html">Get started</a></li><li><a href="cpp_api.html">C++ API</a></li><li><a href="mex_api.html">MATLAB API</a></li><li><a href="python_api.html">Python API</a></li><li><a href="tutorials.html">Tutorials</a></li><li><a href="formats.html" aria-current="page">Formats</a></li><li><a href="publications.html">Publications</a></li><li><a href="ai_agents.html">AI agents</a></li><li><a href="faq.html">FAQ</a></li></ul></div></nav>
+</header>
+<main id="content">
+<div class="wrap doc">
+<nav class="doc-side idx" aria-label="Formats index"><ul><li><details open><summary><span>QuaDRiGa Array Antenna Exchange Format (QDANT)</span></summary><ul><li><a href="#sec-quadriga-array-antenna-exchange-format-qdant">Overview</a></li><li class="fn"><a href="#quadriga-array-antenna-exchange-format-qdant-layout">&lt;layout&gt;</a></li><li class="fn"><a href="#quadriga-array-antenna-exchange-format-qdant-arrayant">&lt;arrayant&gt;</a></li></ul></details></li><li><details open><summary><span>Material Properties</span></summary><ul><li><a href="#sec-material-properties">Overview</a></li><li class="fn"><a href="#material-properties-1-material-table">1. Material Table</a></li><li class="fn"><a href="#material-properties-2-built-in-em-materials">2. Built-in EM Materials</a></li><li class="fn"><a href="#material-properties-3-principled-bsdf">3. Principled BSDF</a></li><li class="fn"><a href="#material-properties-4-references">4. References</a></li></ul></details></li></ul></nav>
+<div class="doc-main prose">
+  <p class="crumbs"><a href="index.html">Home</a> › Data formats</p>
+  <h1>Data formats</h1>
+  <p class="lead">File formats that Quadriga-Lib reads and writes: the QDANT antenna exchange format and the material table.</p>
+  <div class="page-tools"><a href="formats.md">Markdown version</a></div>
+  <details class="doc-index"><summary>On this page</summary><nav class="idx" aria-label="Formats index (collapsible)"><ul><li><details open><summary><span>QuaDRiGa Array Antenna Exchange Format (QDANT)</span></summary><ul><li><a href="#sec-quadriga-array-antenna-exchange-format-qdant">Overview</a></li><li class="fn"><a href="#quadriga-array-antenna-exchange-format-qdant-layout">&lt;layout&gt;</a></li><li class="fn"><a href="#quadriga-array-antenna-exchange-format-qdant-arrayant">&lt;arrayant&gt;</a></li></ul></details></li><li><details open><summary><span>Material Properties</span></summary><ul><li><a href="#sec-material-properties">Overview</a></li><li class="fn"><a href="#material-properties-1-material-table">1. Material Table</a></li><li class="fn"><a href="#material-properties-2-built-in-em-materials">2. Built-in EM Materials</a></li><li class="fn"><a href="#material-properties-3-principled-bsdf">3. Principled BSDF</a></li><li class="fn"><a href="#material-properties-4-references">4. References</a></li></ul></details></li></ul></nav></details>
+  <h2 id="sec-quadriga-array-antenna-exchange-format-qdant">QuaDRiGa Array Antenna Exchange Format (QDANT)</h2>
+<p>QDANT is an XML grammar for exchanging array-antenna pattern data. Tag names are
+case-sensitive. A file contains a single <code>&lt;qdant&gt;</code> root element that may
+include an optional <code>&lt;layout&gt;</code> and one or more <code>&lt;arrayant&gt;</code>
+elements. A namespace is required on the root (with or without a prefix).</p>
+<p>Coordinate convention (for interpreting pattern data):</p>
+<ul>
+<li>Spherical (polar-spherical) angles theta (elevation) and phi (azimuth).</li>
+<li>Elevation theta: −90° (down) … 0° (horizon) … +90° (up).</li>
+<li>Azimuth phi: −180° (west) … −90° (south) … 0° (east) … +90° (north) … +180° (west); counting is anti-clockwise.</li>
+<li>Pattern components are resolved along unit vectors ê_theta and ê_phi (far-field, no ê_r component).</li>
+</ul>
+<p>See related read / write functions in the API documentation for details on how to use this format:</p>
+<ul>
+<li>C++ QDANT read function (<a href="cpp_api.html#qdant_read">qdant_read</a>)</li>
+<li>C++ QDANT write function (<a href="cpp_api.html#.qdant_write">arrayant.qdant_write</a>)</li>
+<li>MATLAB / Octave QDANT read function (<a href="mex_api.html#arrayant_qdant_read">arrayant_qdant_read</a>)</li>
+<li>MATLAB / Octave QDANT write function (<a href="mex_api.html#arrayant_qdant_write">arrayant_qdant_write</a>)</li>
+<li>Python QDANT read function (<a href="python_api.html#qdant_read">qdant_read</a>)</li>
+<li>Python QDANT write function (<a href="python_api.html#qdant_write">qdant_write</a>)</li>
+</ul>
+
+<h3 id="quadriga-array-antenna-exchange-format-qdant-layout">&lt;layout&gt;</h3><p>Defines how multiple &lt;arrayant&gt; objects are arranged into an object array (optional)</p>
+<h4>Content</h4>
+<ul>
+<li>One or more column vectors, separated by spaces; entries within a vector are comma-separated.</li>
+<li>Values: Integers that must match the id of corresponding <code>&lt;arrayant&gt;</code> elements.</li>
+</ul>
+<h4>Examples</h4>
+<ul>
+<li>Linear list: 1 2 3 (three columns with one entry each).</li>
+<li>3×2 matrix of object IDs (3 columns, each a column vector of length 2): 1,2 1,2 2,1</li>
+</ul>
+
+<h3 id="quadriga-array-antenna-exchange-format-qdant-arrayant">&lt;arrayant&gt;</h3><p>Describes a single array antenna</p>
+<h4>Attributes</h4>
+<ul>
+<li><strong><code>id</code></strong> (integer, required if multiple arrayants present)<br>
+Unique values per file; if <code>&lt;layout&gt;</code> is used, each id referenced there must exist.</li>
+</ul>
+<h4>Child elements</h4>
+<ul>
+<li>
+<p><strong><code>&lt;name&gt;</code></strong> (string, optional)<br>
+Human-readable identifier.</p>
+</li>
+<li>
+<p><strong><code>&lt;CenterFrequency&gt;</code></strong> (Hz, integer or float, optional)<br>
+Default 300 MHz if omitted. When omitted, element positions are interpreted in wavelength multiples (i.e., meters scaled by λ at 300 MHz).</p>
+</li>
+<li>
+<p><strong><code>&lt;NoElements&gt;</code></strong> (integer, required for multi-element arrays)<br>
+Number of elements in this array.</p>
+</li>
+<li>
+<p><strong><code>&lt;ElementPosition&gt;</code></strong> (optional)<br>
+One or more position vectors [x,y,z] in meters, relative to the phase center. Axis orientation:
+x = east, y = north, z = up. Formatting: Vectors separated by spaces; within each vector, components
+separated by commas. Requires <code>&lt;NoElements&gt;</code> to be defined and to match the number of vectors.
+Example: <code>0,0,0 0.05,0,0</code></p>
+</li>
+<li>
+<p><strong><code>&lt;ElevationGrid&gt;</code></strong> (degrees, required)<br>
+List of elevation samples (−90 … +90). Example: <code>-90 -45 0 45 90</code></p>
+</li>
+<li>
+<p><strong><code>&lt;AzimuthGrid&gt;</code></strong> (degrees, required)<br>
+List of azimuth samples (−180 … +180; 0 points east; anti-clockwise positive). Example: <code>-180 -90 0 90 180</code></p>
+</li>
+<li>
+<p><strong><code>&lt;CouplingAbs&gt;</code></strong> (optional; only with <code>&lt;NoElements&gt;</code>)<br>
+N×M absolute values of the coupling matrix. Column vectors separated by spaces; entries within a
+column are separated by commas. Dimensions must be consistent with NoElements = N.
+M is the number of antenna ports. Example (N=2): <code>1,0 0,1</code></p>
+</li>
+<li>
+<p><strong><code>&lt;CouplingPhase&gt;</code></strong> (optional; only with <code>&lt;NoElements&gt;</code> and <code>&lt;CouplingAbs&gt;</code>)<br>
+N×N phases (degrees) for the same matrix. Column vectors separated by spaces; entries within a
+column are separated by commas. Dimensions must be consistent with NoElements = N.
+Example (N=2): <code>0,0 0,0</code></p>
+</li>
+<li>
+<p><strong><code>&lt;EthetaMag&gt;</code></strong> (optional)<br>
+Magnitude in [dB] of the electric field aligned with the ê − θ vector of the spherical coordinate
+system. One line contains all azimuth values for one elevation angle. The order is given by
+<code>AzimuthGrid</code> (columns) and <code>ElevationGrid</code> (rows). If <code>NoElements</code> is greater than 1, an additional
+attribute <code>&lt;EthetaMag el=&quot;[no]&quot;&gt;</code> must be provided. In the first example, the first line contains the
+values for the -90 degree elevation angle (down) and the last line contains the values for the 90
+degree elevation (up). If there is no field in θ-direction, this XML-element can be omitted.</p>
+</li>
+<li>
+<p><strong><code>&lt;EthetaPhase&gt;</code></strong> (optional; only with <code>&lt;EthetaMag&gt;</code>)<br>
+Phase in [degree] of the electric field aligned with the ê − θ vector. One line contains all
+azimuth values for one elevation angle. The order is given by <code>AzimuthGrid</code> and <code>ElevationGrid</code>.
+If <code>NoElements</code> is greater than 1, an additional attribute <code>&lt;EthetaPhase el=&quot;[no]&quot;&gt;</code> must be provided.
+EthetaPhase cannot be defined without defining EthetaMag first. If all phases are 0, this
+XML-element can be omitted.</p>
+</li>
+<li>
+<p><strong><code>&lt;EphiMag&gt;</code></strong> (optional)<br>
+Magnitude in [dB] of the electric field aligned with the ê − φ vector of the spherical coordinate system.</p>
+</li>
+<li>
+<p><strong><code>&lt;EphiPhase&gt;</code></strong> (optional; only with <code>&lt;EphiMag&gt;</code>)<br>
+Phase in [degree] of the electric field aligned with the ê − φ vector.</p>
+</li>
+</ul>
+<h4>Validation &amp; Formatting Rules (at a glance)</h4>
+<ul>
+<li>Case-sensitive tag names.</li>
+<li><code>&lt;qdant&gt;</code> must be present; it may contain 0 or 1 <code>&lt;layout&gt;</code> and 1+ <code>&lt;arrayant&gt;</code>.</li>
+<li>If <code>&lt;layout&gt;</code> is present, every integer in it must match an existing <code>&lt;arrayant id=&quot;…&quot;&gt;</code></li>
+<li>If <code>NoElements</code> is provided:<br>
+(1) ElementPosition (if present) must provide exactly NoElements vectors.<br>
+(2) CouplingAbs and CouplingPhase (if present) must be N×N with N = NoElements.<br>
+(3) Pattern tags (Etheta*, Ephi*) must include el=&quot;1&quot; … &quot;N&quot; for per-element data.</li>
+<li>Pattern blocks: Number of lines = length of <code>ElevationGrid</code>. Numbers per line = length of <code>AzimuthGrid</code>.
+Magnitudes in dB; phases in degrees.</li>
+<li>Omissions: If a component is everywhere zero, omit its *Mag (and its *Phase). If all phases are zero, *Phase may be omitted.</li>
+<li>Zeros and levels: a magnitude of <code>-inf</code> dB is an exact zero; there is no lower limit for other values.
+quadriga-lib writes every non-zero sample, and an element that is zero in both components as an
+all-<code>-inf</code> <code>EthetaMag</code> node.</li>
+<li>Precision written by quadriga-lib (single-precision equivalent relative to the element peak): magnitudes (dB)
+and phases (degree) get the fewest decimals (0 to 6) that keep the error of each complex sample at or below
+6e-8 times the peak amplitude of its element (over both components); magnitudes get 6 decimals within 20 dB of
+the peak and one fewer per 20 dB below it. Samples far below the peak are therefore less accurate relative to
+their own value (about 6e-4 at -80 dB, 6e-2 at -120 dB). Positions and coupling as the shortest text that reads
+back as the same float (at most 9 significant digits), grids rounded to 0.001 degree. A phase tag is omitted if
+all phases round to 0.</li>
+<li><code>NoElements</code> must be backed by data: <code>ElementPosition</code>, <code>CouplingAbs</code>, or pattern tags with <code>el=&quot;N&quot;</code>.</li>
+</ul>
+<h4>Quick Reference</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Element</th>
+<th style="text-align:right">Required</th>
+<th>Type / Units</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>qdant</code></td>
+<td style="text-align:right">Yes</td>
+<td>–</td>
+<td>Root; carries namespace</td>
+</tr>
+<tr>
+<td><code>layout</code></td>
+<td style="text-align:right">No</td>
+<td>int matrix (text)</td>
+<td>Columns separated by spaces; within a column, IDs comma-separated</td>
+</tr>
+<tr>
+<td><code>arrayant@id</code></td>
+<td style="text-align:right">Cond.</td>
+<td>int</td>
+<td>Unique; referenced by <code>layout</code></td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td style="text-align:right">No</td>
+<td>string</td>
+<td>Free text</td>
+</tr>
+<tr>
+<td><code>CenterFrequency</code></td>
+<td style="text-align:right">No</td>
+<td>Hz</td>
+<td>Default 300 MHz if absent</td>
+</tr>
+<tr>
+<td><code>NoElements</code></td>
+<td style="text-align:right">Cond.</td>
+<td>int</td>
+<td>Required for multi-element arrays</td>
+</tr>
+<tr>
+<td><code>ElementPosition</code></td>
+<td style="text-align:right">No</td>
+<td>meters</td>
+<td>Vectors <code>x,y,z</code>; vectors space-separated; components comma-separated</td>
+</tr>
+<tr>
+<td><code>ElevationGrid</code></td>
+<td style="text-align:right"><strong>Yes</strong></td>
+<td>degrees</td>
+<td>−90 … +90</td>
+</tr>
+<tr>
+<td><code>AzimuthGrid</code></td>
+<td style="text-align:right"><strong>Yes</strong></td>
+<td>degrees</td>
+<td>−180 … +180; 0° east; anti-clockwise positive</td>
+</tr>
+<tr>
+<td><code>CouplingAbs</code></td>
+<td style="text-align:right">No</td>
+<td>matrix</td>
+<td>N×M; columns space-sep; entries comma-sep</td>
+</tr>
+<tr>
+<td><code>CouplingPhase</code></td>
+<td style="text-align:right">No</td>
+<td>matrix (deg)</td>
+<td>Requires <code>CouplingAbs</code>; same shape</td>
+</tr>
+<tr>
+<td><code>EthetaMag</code></td>
+<td style="text-align:right">Cond.</td>
+<td>dB grid</td>
+<td>Rows = elevations; cols = azimuths; <code>el=&quot;n&quot;</code> if N&gt;1</td>
+</tr>
+<tr>
+<td><code>EthetaPhase</code></td>
+<td style="text-align:right">Cond.</td>
+<td>deg grid</td>
+<td>Only with <code>EthetaMag</code>; omit if all zeros</td>
+</tr>
+<tr>
+<td><code>EphiMag</code></td>
+<td style="text-align:right">Cond.</td>
+<td>dB grid</td>
+<td>Rows = elevations; cols = azimuths; <code>el=&quot;n&quot;</code> if N&gt;1</td>
+</tr>
+<tr>
+<td><code>EphiPhase</code></td>
+<td style="text-align:right">Cond.</td>
+<td>deg grid</td>
+<td>Only with <code>EphiMag</code>; omit if all zeros</td>
+</tr>
+</tbody>
+</table></div>
+<h4>Example</h4>
+<p>2-Element Cross-Polarized Array (minimal pattern values):</p>
+<pre><code class="language-xml"><span class="cp">&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;</span>
+<span class="nt">&lt;qdant</span><span class="w"> </span><span class="na">xmlns=</span><span class="s">&quot;http://www.quadriga-channel-model.de&quot;</span><span class="nt">&gt;</span>
+<span class="w">  </span><span class="nt">&lt;layout&gt;</span>1<span class="nt">&lt;/layout&gt;</span>
+<span class="w">  </span><span class="nt">&lt;arrayant</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;1&quot;</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;name&gt;</span>Simple<span class="w"> </span>XPOL<span class="nt">&lt;/name&gt;</span>
+<span class="w">    </span><span class="nt">&lt;CenterFrequency&gt;</span>2600000000<span class="nt">&lt;/CenterFrequency&gt;</span>
+<span class="w">    </span><span class="nt">&lt;NoElements&gt;</span>2<span class="nt">&lt;/NoElements&gt;</span>
+<span class="w">    </span><span class="nt">&lt;ElementPosition&gt;</span>0,0,0<span class="w"> </span>0,0,0<span class="nt">&lt;/ElementPosition&gt;</span>
+
+<span class="w">    </span><span class="nt">&lt;ElevationGrid&gt;</span>-90<span class="w"> </span>0<span class="w"> </span>90<span class="nt">&lt;/ElevationGrid&gt;</span>
+<span class="w">    </span><span class="nt">&lt;AzimuthGrid&gt;</span>-180<span class="w"> </span>-90<span class="w"> </span>0<span class="w"> </span>90<span class="w"> </span>180<span class="nt">&lt;/AzimuthGrid&gt;</span>
+
+<span class="w">    </span><span class="nt">&lt;CouplingAbs&gt;</span>1,0<span class="w"> </span>0,1<span class="nt">&lt;/CouplingAbs&gt;</span>
+<span class="w">    </span><span class="nt">&lt;CouplingPhase&gt;</span>0,0<span class="w"> </span>0,0<span class="nt">&lt;/CouplingPhase&gt;</span>
+
+<span class="w">    </span><span class="nt">&lt;EthetaMag</span><span class="w"> </span><span class="na">el=</span><span class="s">&quot;1&quot;</span><span class="nt">&gt;</span>
+<span class="w">      </span>0<span class="w"> </span>0<span class="w"> </span>0<span class="w"> </span>0<span class="w"> </span>0
+<span class="w">      </span>0<span class="w"> </span>0<span class="w"> </span>0<span class="w"> </span>0<span class="w"> </span>0
+<span class="w">      </span>0<span class="w"> </span>0<span class="w"> </span>0<span class="w"> </span>0<span class="w"> </span>0
+<span class="w">    </span><span class="nt">&lt;/EthetaMag&gt;</span>
+<span class="w">    </span><span class="nt">&lt;EthetaPhase</span><span class="w"> </span><span class="na">el=</span><span class="s">&quot;1&quot;</span><span class="nt">&gt;</span>
+<span class="w">      </span>0<span class="w"> </span>0<span class="w"> </span>0<span class="w"> </span>0<span class="w"> </span>0
+<span class="w">      </span>0<span class="w"> </span>0<span class="w"> </span>0<span class="w"> </span>0<span class="w"> </span>0
+<span class="w">      </span>0<span class="w"> </span>0<span class="w"> </span>0<span class="w"> </span>0<span class="w"> </span>0
+<span class="w">    </span><span class="nt">&lt;/EthetaPhase&gt;</span>
+
+<span class="w">    </span><span class="nt">&lt;EphiMag</span><span class="w"> </span><span class="na">el=</span><span class="s">&quot;2&quot;</span><span class="nt">&gt;</span>
+<span class="w">      </span>0<span class="w"> </span>0<span class="w"> </span>0<span class="w"> </span>0<span class="w"> </span>0
+<span class="w">      </span>0<span class="w"> </span>0<span class="w"> </span>0<span class="w"> </span>0<span class="w"> </span>0
+<span class="w">      </span>0<span class="w"> </span>0<span class="w"> </span>0<span class="w"> </span>0<span class="w"> </span>0
+<span class="w">    </span><span class="nt">&lt;/EphiMag&gt;</span>
+<span class="w">    </span><span class="nt">&lt;EphiPhase</span><span class="w"> </span><span class="na">el=</span><span class="s">&quot;2&quot;</span><span class="nt">&gt;</span>
+<span class="w">      </span>0<span class="w"> </span>0<span class="w"> </span>0<span class="w"> </span>0<span class="w"> </span>0
+<span class="w">      </span>0<span class="w"> </span>0<span class="w"> </span>0<span class="w"> </span>0<span class="w"> </span>0
+<span class="w">      </span>0<span class="w"> </span>0<span class="w"> </span>0<span class="w"> </span>0<span class="w"> </span>0
+<span class="w">    </span><span class="nt">&lt;/EphiPhase&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/arrayant&gt;</span>
+<span class="nt">&lt;/qdant&gt;</span></code></pre>
+<h2 id="sec-material-properties">Material Properties</h2>
+<p>The material table describes the media of a scene for propagation, one row per material, keyed by the material's name. <a href="cpp_api.html#obj_file_read">obj_file_read</a> reads it from a CSV file (or uses its built-in table), assigns every triangle the row of its <code>.obj</code> material (<code>csv_ind</code>), and returns the row names in <code>csv_names</code> and the columns in <code>csv_prop</code>, a map from column name to a vector with one value per row. <code>csv_ind</code> is 1-based, so the value of face <code>i</code> is <code>csv_prop[&quot;a&quot;][csv_ind[i] - 1]</code>; index 0 is no material. The ray functions take <code>csv_prop</code> as their material table (<code>mtl_prop</code>) and <code>csv_ind</code> as the material index of each face.</p>
+<p>This section describes the table and its file format. The model behind the columns (the formulas, the interface physics, sheets and traced solids, the electromagnetic and the acoustic use, the rules of use and the limits) is described on the page <a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md">The quadriga-lib Material Model and Ray-Surface Physics</a>.</p>
+<p>Related functions:</p>
+<ul>
+<li>C++ OBJ reader (<a href="cpp_api.html#obj_file_read">obj_file_read</a>) and writer (<a href="cpp_api.html#obj_file_write">obj_file_write</a>)</li>
+<li>C++ ray / mesh interaction (<a href="cpp_api.html#ray_mesh_interact">ray_mesh_interact</a>)</li>
+<li>C++ ray tracer (<a href="cpp_api.html#ray_progress">ray_progress</a>)</li>
+<li>C++ diffraction gain (<a href="cpp_api.html#calc_diffraction_gain">calc_diffraction_gain</a>)</li>
+<li>C++ Mitsuba scene export (<a href="cpp_api.html#mitsuba_xml_file_write">mitsuba_xml_file_write</a>)</li>
+</ul>
+
+<h3 id="material-properties-1-material-table">1. Material Table</h3><p>The CSV form of the table, how it is read, and its 26 columns</p>
+<h4>CSV form</h4>
+<p>A material file is a comma-separated text file. The first line is the header with the column names; every further line is one material. Only the <code>name</code> column is required, at any position; every other column is numeric, and the column order does not matter. Example: a concrete wall traced as a solid and a 6 mm glass pane as a thin sheet:<br><br></p>
+<pre><code class="language-xml">name,a,b,c,d,thk
+itu_concrete,5.24,0,0.0462,0.7822,0
+itu_glass,6.31,0,0.0036,1.3394,0.006</code></pre>
+<h4>Reader rules</h4>
+<ul>
+<li>Cells are separated by commas and trimmed of surrounding white space; there is no quoting, so a name or a value cannot contain a comma. A UTF-8 byte-order mark is skipped, and blank lines are ignored.</li>
+<li>Column names are case-sensitive. An empty column name in the header is an error.</li>
+<li>Every material needs a non-empty name, and names must be unique.</li>
+<li>An empty numeric cell, and a missing cell at the end of a line, reads as 0, not as the column's default. Where the default is not 0, fill every cell or leave the column out: a 0 in <code>fRef</code>, <code>a</code> or <code>e</code> is rejected, and a 0 in <code>side</code> selects the infinite plate. A cell that does not start with a number is an error.</li>
+<li>The file needs at least one material. A material file replaces the built-in table; the two are not merged.</li>
+<li>Columns the model does not know are returned in <code>csv_prop</code> and ignored by the ray functions.</li>
+<li><code>obj_file_read</code> does not check the values. The functions that take the table check it when they read it: all columns have one length; <code>fRef</code>, <code>a</code> and <code>e</code> are positive; <code>c</code>, <code>g</code>, <code>thk</code>, <code>att</code>, <code>alpha</code>, <code>m</code>, <code>resF</code>, <code>resQ</code>, <code>coiF</code>, <code>coiQ</code>, <code>tfF</code> and <code>side</code> are not negative. A violation throws and names the column and the 1-based material. <code>ray_progress</code> takes at most 16383 materials.</li>
+<li><a href="cpp_api.html#obj_file_write">obj_file_write</a> writes <code>csv_names</code> and <code>csv_prop</code> in the same form, as a <code>.csv</code> file named after the <code>.obj</code> file.</li>
+</ul>
+<h4>Material lookup</h4>
+<ul>
+<li>Each face takes the material of its <code>usemtl</code> name: the row of the same name, else the row of its base name, the part before the first dot (<code>concrete.gray</code> and <code>concrete.001</code> both map to <code>concrete</code>). Several visual materials can so share one row of the table.</li>
+<li>A name that matches no row is an error when <code>csv_strict</code> is set; otherwise the face gets index 0, no material, which the ray functions treat as air.</li>
+<li>Row <code>k</code> of the table (counted from 1) is index <code>k</code> in <code>csv_ind</code>.</li>
+<li>Without a material file the built-in table is used (Section 2). With an empty <code>.obj</code> file name, only the table is read and returned.</li>
+</ul>
+<h4>Columns</h4>
+<p>Every column is optional apart from <code>name</code>; an absent column takes its default for every material. Frequencies are in GHz (the API takes frequencies in Hz); a value &quot;at <code>fRef</code>&quot; is scaled by its exponent as <code>(f/fRef)^exponent</code>. Wave media are the materials without the mass column (<code>m</code> = 0); <code>m &gt; 0</code> switches a material to a mass-law material, a lumped plate with the mass law. The last column says which of the two a column acts on.<br><br></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th style="text-align:center">Key</th>
+<th style="text-align:center">Unit</th>
+<th style="text-align:center">Default</th>
+<th>Meaning</th>
+<th>Acts on</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">fRef</td>
+<td style="text-align:center">GHz</td>
+<td style="text-align:center">1</td>
+<td>reference frequency of every power law; of a mass-law material it also sets the surface mass</td>
+<td>both</td>
+</tr>
+<tr>
+<td style="text-align:center">a</td>
+<td style="text-align:center">—</td>
+<td style="text-align:center">1</td>
+<td>relative permittivity ε′ at <code>fRef</code></td>
+<td>both</td>
+</tr>
+<tr>
+<td style="text-align:center">b</td>
+<td style="text-align:center">—</td>
+<td style="text-align:center">0</td>
+<td>frequency exponent of <code>a</code></td>
+<td>both</td>
+</tr>
+<tr>
+<td style="text-align:center">c</td>
+<td style="text-align:center">S/m</td>
+<td style="text-align:center">0</td>
+<td>conductivity σ at <code>fRef</code></td>
+<td>both</td>
+</tr>
+<tr>
+<td style="text-align:center">d</td>
+<td style="text-align:center">—</td>
+<td style="text-align:center">0</td>
+<td>frequency exponent of <code>c</code></td>
+<td>both</td>
+</tr>
+<tr>
+<td style="text-align:center">e</td>
+<td style="text-align:center">—</td>
+<td style="text-align:center">1</td>
+<td>relative permeability μ′ at <code>fRef</code></td>
+<td>both</td>
+</tr>
+<tr>
+<td style="text-align:center">f</td>
+<td style="text-align:center">—</td>
+<td style="text-align:center">0</td>
+<td>frequency exponent of <code>e</code></td>
+<td>both</td>
+</tr>
+<tr>
+<td style="text-align:center">g</td>
+<td style="text-align:center">S/m</td>
+<td style="text-align:center">0</td>
+<td>magnetic loss at <code>fRef</code> (the loss of μ, as <code>c</code> is that of ε)</td>
+<td>both</td>
+</tr>
+<tr>
+<td style="text-align:center">h</td>
+<td style="text-align:center">—</td>
+<td style="text-align:center">0</td>
+<td>frequency exponent of <code>g</code></td>
+<td>both</td>
+</tr>
+<tr>
+<td style="text-align:center">thk</td>
+<td style="text-align:center">m</td>
+<td style="text-align:center">0</td>
+<td>thickness: &gt; 0 makes every face of the material a thin sheet of this thickness; 0 a traced solid</td>
+<td>both</td>
+</tr>
+<tr>
+<td style="text-align:center">att</td>
+<td style="text-align:center">dB</td>
+<td style="text-align:center">0</td>
+<td>penetration loss paid once per entry, at <code>fRef</code></td>
+<td>both</td>
+</tr>
+<tr>
+<td style="text-align:center">attB</td>
+<td style="text-align:center">—</td>
+<td style="text-align:center">0</td>
+<td>frequency exponent of <code>att</code></td>
+<td>both</td>
+</tr>
+<tr>
+<td style="text-align:center">alpha</td>
+<td style="text-align:center">dB/m</td>
+<td style="text-align:center">0</td>
+<td>absorption along the path inside the material, at <code>fRef</code></td>
+<td>both</td>
+</tr>
+<tr>
+<td style="text-align:center">alphaB</td>
+<td style="text-align:center">—</td>
+<td style="text-align:center">0</td>
+<td>frequency exponent of <code>alpha</code></td>
+<td>both</td>
+</tr>
+<tr>
+<td style="text-align:center">m</td>
+<td style="text-align:center">—</td>
+<td style="text-align:center">0</td>
+<td>the mass column: any value &gt; 0 makes the material a mass-law material</td>
+<td>switch</td>
+</tr>
+<tr>
+<td style="text-align:center">resF</td>
+<td style="text-align:center">GHz</td>
+<td style="text-align:center">0</td>
+<td>resonance frequency: a pole of ε (wave media); the plate's resonance (mass-law)</td>
+<td>both, differently</td>
+</tr>
+<tr>
+<td style="text-align:center">resQ</td>
+<td style="text-align:center">—</td>
+<td style="text-align:center">0</td>
+<td>quality factor of that resonance</td>
+<td>both</td>
+</tr>
+<tr>
+<td style="text-align:center">resS</td>
+<td style="text-align:center">—</td>
+<td style="text-align:center">0</td>
+<td>strength of the pole (wave media); its sign selects the form of the resonance (mass-law)</td>
+<td>both, differently</td>
+</tr>
+<tr>
+<td style="text-align:center">coiF</td>
+<td style="text-align:center">GHz</td>
+<td style="text-align:center">0</td>
+<td>coincidence frequency, the plate's bending stiffness</td>
+<td>mass-law</td>
+</tr>
+<tr>
+<td style="text-align:center">coiQ</td>
+<td style="text-align:center">—</td>
+<td style="text-align:center">0</td>
+<td>1 / loss factor of the bending</td>
+<td>mass-law</td>
+</tr>
+<tr>
+<td style="text-align:center">tf</td>
+<td style="text-align:center">—</td>
+<td style="text-align:center">0</td>
+<td>transmission factor of the faces at <code>fRef</code>: &gt; 0 leaks reflected power into transmission, a negative value forces reflection</td>
+<td>both</td>
+</tr>
+<tr>
+<td style="text-align:center">tfB</td>
+<td style="text-align:center">—</td>
+<td style="text-align:center">0</td>
+<td>frequency exponent of <code>tf</code></td>
+<td>both</td>
+</tr>
+<tr>
+<td style="text-align:center">tfP</td>
+<td style="text-align:center">—</td>
+<td style="text-align:center">0</td>
+<td>height of a resonant peak added to <code>tf</code></td>
+<td>both (a series impedance on mass-law faces)</td>
+</tr>
+<tr>
+<td style="text-align:center">tfF</td>
+<td style="text-align:center">GHz</td>
+<td style="text-align:center">0</td>
+<td>frequency of that peak</td>
+<td>both</td>
+</tr>
+<tr>
+<td style="text-align:center">tfQ</td>
+<td style="text-align:center">—</td>
+<td style="text-align:center">0</td>
+<td>quality factor of that peak; a negative value selects the under-damped branch</td>
+<td>both</td>
+</tr>
+<tr>
+<td style="text-align:center">side</td>
+<td style="text-align:center">m</td>
+<td style="text-align:center">3.29</td>
+<td>panel size of a mass-law material, √(area); 0 the infinite plate</td>
+<td>mass-law</td>
+</tr>
+</tbody>
+</table></div>
+
+<h3 id="material-properties-2-built-in-em-materials">2. Built-in EM Materials</h3><p>The table obj_file_read uses when no material file is given</p>
+<h4>Table</h4>
+<p>Built-in material table used by <a href="cpp_api.html#obj_file_read">obj_file_read</a> when no material file is given. It defines only the columns <code>a</code>, <code>b</code>, <code>c</code>, <code>d</code> and <code>att</code>; every other column is absent and takes its default (<code>fRef</code> 1 GHz, μ = 1, no <code>thk</code>, so every material is a traced solid). A scene using only built-in materials therefore has the keys <code>a</code>, <code>b</code>, <code>c</code>, <code>d</code>, <code>att</code> in <code>csv_prop</code>. The range is the frequency range of the source in GHz.<br><br></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Name</th>
+<th style="text-align:right">a</th>
+<th style="text-align:right">b</th>
+<th style="text-align:right">c</th>
+<th style="text-align:right">d</th>
+<th style="text-align:right">att</th>
+<th style="text-align:right">Range (GHz)</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>air</td>
+<td style="text-align:right">1.0</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">0.001–100</td>
+<td>P.2040-3</td>
+</tr>
+<tr>
+<td>vacuum</td>
+<td style="text-align:right">1.0</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">0.001–100</td>
+<td>P.2040-3</td>
+</tr>
+<tr>
+<td>textiles</td>
+<td style="text-align:right">1.5</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">5e-5</td>
+<td style="text-align:right">0.62</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">1–100</td>
+<td>estimate</td>
+</tr>
+<tr>
+<td>plastic</td>
+<td style="text-align:right">2.44</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">2.33e-5</td>
+<td style="text-align:right">1.0</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">1–100</td>
+<td>estimate</td>
+</tr>
+<tr>
+<td>ceramic</td>
+<td style="text-align:right">6.5</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">0.0023</td>
+<td style="text-align:right">1.32</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">1–100</td>
+<td>estimate</td>
+</tr>
+<tr>
+<td>sea_water</td>
+<td style="text-align:right">80.0</td>
+<td style="text-align:right">-0.25</td>
+<td style="text-align:right">4.0</td>
+<td style="text-align:right">0.58</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">1–100</td>
+<td>estimate</td>
+</tr>
+<tr>
+<td>sea_ice</td>
+<td style="text-align:right">3.2</td>
+<td style="text-align:right">-0.022</td>
+<td style="text-align:right">1.1</td>
+<td style="text-align:right">1.5</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">1–100</td>
+<td>estimate</td>
+</tr>
+<tr>
+<td>water</td>
+<td style="text-align:right">80.0</td>
+<td style="text-align:right">-0.18</td>
+<td style="text-align:right">0.6</td>
+<td style="text-align:right">1.52</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">1–20</td>
+<td>estimate</td>
+</tr>
+<tr>
+<td>water_ice</td>
+<td style="text-align:right">3.17</td>
+<td style="text-align:right">-0.005</td>
+<td style="text-align:right">5.6e-5</td>
+<td style="text-align:right">1.7</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">1–20</td>
+<td>estimate</td>
+</tr>
+<tr>
+<td>itu_concrete</td>
+<td style="text-align:right">5.24</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">0.0462</td>
+<td style="text-align:right">0.7822</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">1–100</td>
+<td>P.2040-3</td>
+</tr>
+<tr>
+<td>itu_brick</td>
+<td style="text-align:right">3.91</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">0.0238</td>
+<td style="text-align:right">0.16</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">1–40</td>
+<td>P.2040-3</td>
+</tr>
+<tr>
+<td>itu_plasterboard</td>
+<td style="text-align:right">2.73</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">0.0085</td>
+<td style="text-align:right">0.9395</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">1–100</td>
+<td>P.2040-3</td>
+</tr>
+<tr>
+<td>itu_wood</td>
+<td style="text-align:right">1.99</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">0.0047</td>
+<td style="text-align:right">1.0718</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">0.001–100</td>
+<td>P.2040-3</td>
+</tr>
+<tr>
+<td>itu_glass</td>
+<td style="text-align:right">6.31</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">0.0036</td>
+<td style="text-align:right">1.3394</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">0.1–100</td>
+<td>P.2040-3</td>
+</tr>
+<tr>
+<td>itu_ceiling_board</td>
+<td style="text-align:right">1.48</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">0.0011</td>
+<td style="text-align:right">1.075</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">1–100</td>
+<td>P.2040-3</td>
+</tr>
+<tr>
+<td>itu_chipboard</td>
+<td style="text-align:right">2.58</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">0.0217</td>
+<td style="text-align:right">0.78</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">1–100</td>
+<td>P.2040-3</td>
+</tr>
+<tr>
+<td>itu_plywood</td>
+<td style="text-align:right">2.71</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">0.33</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">1–40</td>
+<td>P.2040-3</td>
+</tr>
+<tr>
+<td>itu_marble</td>
+<td style="text-align:right">7.074</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">0.0055</td>
+<td style="text-align:right">0.9262</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">1–60</td>
+<td>P.2040-3</td>
+</tr>
+<tr>
+<td>itu_floorboard</td>
+<td style="text-align:right">3.66</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">0.0044</td>
+<td style="text-align:right">1.3515</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">50–100</td>
+<td>P.2040-3</td>
+</tr>
+<tr>
+<td>itu_metal</td>
+<td style="text-align:right">1.0</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">1.0e7</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">1–100</td>
+<td>P.2040-3</td>
+</tr>
+<tr>
+<td>itu_very_dry_ground</td>
+<td style="text-align:right">3.0</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">0.00015</td>
+<td style="text-align:right">2.52</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">1–10</td>
+<td>P.2040-3</td>
+</tr>
+<tr>
+<td>itu_medium_dry_ground</td>
+<td style="text-align:right">15.0</td>
+<td style="text-align:right">-0.1</td>
+<td style="text-align:right">0.035</td>
+<td style="text-align:right">1.63</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">1–10</td>
+<td>P.2040-3</td>
+</tr>
+<tr>
+<td>itu_wet_ground</td>
+<td style="text-align:right">30.0</td>
+<td style="text-align:right">-0.4</td>
+<td style="text-align:right">0.15</td>
+<td style="text-align:right">1.3</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">1–10</td>
+<td>P.2040-3</td>
+</tr>
+<tr>
+<td>itu_vegetation</td>
+<td style="text-align:right">1.0</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">1.0e-4</td>
+<td style="text-align:right">1.1</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">0.03–30</td>
+<td>P.833-9</td>
+</tr>
+<tr>
+<td>irr_glass</td>
+<td style="text-align:right">6.27</td>
+<td style="text-align:right">0.0</td>
+<td style="text-align:right">0.0043</td>
+<td style="text-align:right">1.1925</td>
+<td style="text-align:right">23.0</td>
+<td style="text-align:right">0.5–100</td>
+<td>TR 38.901</td>
+</tr>
+</tbody>
+</table></div>
+<h4>Notes</h4>
+<ul>
+<li>The P.2040-3 rows are Rec. ITU-R P.2040-3, Table 3. Its frequency ranges are not hard limits but indicate the measurements behind each fit, except for the three ground types, which must not be used outside 1–10 GHz.</li>
+<li><code>air</code> and <code>vacuum</code> are rows 1 and 2, identical (lossless free space). A face with no material (index 0) is also treated as air.</li>
+<li><code>itu_vegetation</code> follows the specific attenuation of woodland in Rec. ITU-R P.833-9, Figure 2 (30 MHz to about 30 GHz).</li>
+<li><code>irr_glass</code> (infrared-reflective glass) takes its <code>att</code> from 3GPP TR 38.901 V17.0.0, Table 7.4.3-1 (the constant 23 dB of its loss <code>23 + 0.3 f</code> dB) and is the only built-in material with a non-zero <code>att</code>.</li>
+<li><code>textiles</code>, <code>plastic</code>, <code>ceramic</code>, <code>sea_water</code>, <code>sea_ice</code>, <code>water</code> and <code>water_ice</code> are estimates of the library, not values of a recommendation; the range is the band they were made for.</li>
+<li>There is no built-in acoustic table. Preliminary starting rows for rigid constructions are listed in <a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md#114-starting-rows-for-rigid-constructions">Section 11.4 of the material-model page</a>.</li>
+</ul>
+
+<h3 id="material-properties-3-principled-bsdf">3. Principled BSDF</h3><p>Visual material parameters read from the companion .mtl file</p>
+<h4>Parameters</h4>
+<p>When an OBJ file references an <code>.mtl</code> library, the per-material Principled BSDF parameters can be returned as an <code>[n_mtl, 17]</code> matrix (<code>bsdf</code>). These describe visual appearance only and do not affect propagation. Each row corresponds to one entry of <code>mtl_names</code>; if no matching <code>.mtl</code> file is found, the matrix is empty. All color, alpha, and 0–1 parameters are clamped to [0, 1].<br><br></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th style="text-align:center">Index</th>
+<th>Field</th>
+<th>Property</th>
+<th style="text-align:center">Range</th>
+<th style="text-align:center">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">0</td>
+<td>R</td>
+<td>Base color, red</td>
+<td style="text-align:center">0 … 1</td>
+<td style="text-align:center">0.8</td>
+</tr>
+<tr>
+<td style="text-align:center">1</td>
+<td>G</td>
+<td>Base color, green</td>
+<td style="text-align:center">0 … 1</td>
+<td style="text-align:center">0.8</td>
+</tr>
+<tr>
+<td style="text-align:center">2</td>
+<td>B</td>
+<td>Base color, blue</td>
+<td style="text-align:center">0 … 1</td>
+<td style="text-align:center">0.8</td>
+</tr>
+<tr>
+<td style="text-align:center">3</td>
+<td>alpha</td>
+<td>Opacity</td>
+<td style="text-align:center">0 … 1</td>
+<td style="text-align:center">1.0</td>
+</tr>
+<tr>
+<td style="text-align:center">4</td>
+<td>roughness</td>
+<td>Surface roughness</td>
+<td style="text-align:center">0 … 1</td>
+<td style="text-align:center">0.5</td>
+</tr>
+<tr>
+<td style="text-align:center">5</td>
+<td>metallic</td>
+<td>Metallic factor</td>
+<td style="text-align:center">0 … 1</td>
+<td style="text-align:center">0.0</td>
+</tr>
+<tr>
+<td style="text-align:center">6</td>
+<td>ior</td>
+<td>Index of refraction</td>
+<td style="text-align:center">≥ 1</td>
+<td style="text-align:center">1.45</td>
+</tr>
+<tr>
+<td style="text-align:center">7</td>
+<td>specular</td>
+<td>Specular factor</td>
+<td style="text-align:center">0 … 1</td>
+<td style="text-align:center">0.5</td>
+</tr>
+<tr>
+<td style="text-align:center">8</td>
+<td>Re</td>
+<td>Emission color, red</td>
+<td style="text-align:center">0 … 1</td>
+<td style="text-align:center">0.0</td>
+</tr>
+<tr>
+<td style="text-align:center">9</td>
+<td>Ge</td>
+<td>Emission color, green</td>
+<td style="text-align:center">0 … 1</td>
+<td style="text-align:center">0.0</td>
+</tr>
+<tr>
+<td style="text-align:center">10</td>
+<td>Be</td>
+<td>Emission color, blue</td>
+<td style="text-align:center">0 … 1</td>
+<td style="text-align:center">0.0</td>
+</tr>
+<tr>
+<td style="text-align:center">11</td>
+<td>sheen</td>
+<td>Sheen factor</td>
+<td style="text-align:center">0 … 1</td>
+<td style="text-align:center">0.0</td>
+</tr>
+<tr>
+<td style="text-align:center">12</td>
+<td>clearcoat</td>
+<td>Clearcoat factor</td>
+<td style="text-align:center">0 … 1</td>
+<td style="text-align:center">0.0</td>
+</tr>
+<tr>
+<td style="text-align:center">13</td>
+<td>clearcoat_roughness</td>
+<td>Clearcoat roughness</td>
+<td style="text-align:center">0 … 1</td>
+<td style="text-align:center">0.0</td>
+</tr>
+<tr>
+<td style="text-align:center">14</td>
+<td>anisotropic</td>
+<td>Anisotropy factor</td>
+<td style="text-align:center">0 … 1</td>
+<td style="text-align:center">0.0</td>
+</tr>
+<tr>
+<td style="text-align:center">15</td>
+<td>anisotropic_rotation</td>
+<td>Anisotropy rotation</td>
+<td style="text-align:center">0 … 1</td>
+<td style="text-align:center">0.0</td>
+</tr>
+<tr>
+<td style="text-align:center">16</td>
+<td>transmission</td>
+<td>Transmission factor</td>
+<td style="text-align:center">0 … 1</td>
+<td style="text-align:center">0.0</td>
+</tr>
+</tbody>
+</table></div>
+<h4>Mapping from .mtl keywords</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>.mtl keyword</th>
+<th>BSDF field</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Kd</code></td>
+<td>R, G, B</td>
+<td>Base color</td>
+</tr>
+<tr>
+<td><code>Ke</code></td>
+<td>Re, Ge, Be</td>
+<td>Emission color</td>
+</tr>
+<tr>
+<td><code>Ka</code></td>
+<td>metallic</td>
+<td>First component only</td>
+</tr>
+<tr>
+<td><code>Pm</code></td>
+<td>metallic</td>
+<td>The later of <code>Ka</code> and <code>Pm</code> wins</td>
+</tr>
+<tr>
+<td><code>Ks</code></td>
+<td>specular</td>
+<td>First component only</td>
+</tr>
+<tr>
+<td><code>d</code></td>
+<td>alpha</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>Ni</code></td>
+<td>ior</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>Ns</code></td>
+<td>roughness</td>
+<td>Converted: <code>roughness = 1 − sqrt(Ns · 0.001)</code></td>
+</tr>
+<tr>
+<td><code>Pr</code></td>
+<td>roughness</td>
+<td>The later of <code>Ns</code> and <code>Pr</code> wins</td>
+</tr>
+<tr>
+<td><code>Ps</code></td>
+<td>sheen</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>Pc</code></td>
+<td>clearcoat</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>Pcr</code></td>
+<td>clearcoat_roughness</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>aniso</code></td>
+<td>anisotropic</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>anisor</code></td>
+<td>anisotropic_rotation</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>Tf</code></td>
+<td>transmission</td>
+<td>First component only</td>
+</tr>
+</tbody>
+</table></div>
+
+<h3 id="material-properties-4-references">4. References</h3><p>Sources of the built-in table and the description of the model</p>
+<ul>
+<li><a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md">The quadriga-lib Material Model and Ray-Surface Physics</a> — the model behind the columns, with its own references.</li>
+<li><a target="_blank" rel="noopener noreferrer" href="https://www.itu.int/rec/R-REC-P.2040">Rec. ITU-R P.2040-3</a>, Effects of building materials and structures on radiowave propagation above about 100 MHz, 2023 — Table 3, the source of the P.2040-3 rows.</li>
+<li><a target="_blank" rel="noopener noreferrer" href="https://www.itu.int/rec/R-REC-P.833">Rec. ITU-R P.833-9</a>, Attenuation in vegetation, 2016 — Figure 2, the source of <code>itu_vegetation</code>.</li>
+<li>3GPP TR 38.901 V17.0.0, Study on channel model for frequencies from 0.5 to 100 GHz, 2022 — Table 7.4.3-1, material penetration losses, the source of the <code>att</code> of <code>irr_glass</code>.</li>
+</ul>
+
+</div>
+</div>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="cols">
+      <div><h2>Documentation</h2><ul><li><a href="download.html">Get started</a></li><li><a href="cpp_api.html">C++ API</a></li><li><a href="mex_api.html">MATLAB / Octave API</a></li><li><a href="python_api.html">Python API</a></li><li><a href="formats.html">Data formats</a></li></ul></div>
+      <div><h2>Learn</h2><ul><li><a href="tutorials.html">Tutorials</a></li><li><a href="publications.html">Publications</a></li><li><a href="faq.html">Questions</a></li><li><a href="ai_agents.html">AI agents</a></li></ul></div>
+      <div><h2>Project</h2><ul><li><a href="https://github.com/stjaeckel/quadriga-lib">GitHub</a></li><li><a href="https://github.com/stjaeckel/quadriga-lib/issues">Issues</a></li><li><a href="faq.html#cite">How to cite</a></li><li><a href="https://github.com/stjaeckel/quadriga-lib/blob/main/LICENSE">Apache-2.0 licence</a></li></ul></div>
+      <div><h2>For agents</h2><ul><li><a href="llms.txt">llms.txt</a></li><li><a href="formats.md">This page as Markdown</a></li></ul></div>
+    </div>
+    <div class="foot-bottom"><span>Quadriga-Lib v0.12.4</span><a href="impressum.html">Impressum</a><a href="privacy.html">Privacy</a></div>
+  </div>
+</footer>
+</body>
+</html>
