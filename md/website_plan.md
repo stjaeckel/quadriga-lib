@@ -12,7 +12,8 @@ Sessions that read this plan: the decisions in section 3 are settled. Do not reo
 | 2 | Design session | `md/website_design.md`, `html_builder/design_prototype/` | signed off 2026-11-02 |
 | 3 | Spec | `md/website_spec.md` | done 2026-11-02 |
 | 3a | Doc-block fixes on `main`, merge of `main` into `website`, re-check (D20) | fixed doc blocks; spec measurements updated | done 2026-11-02: fixed on `main`, merged, re-check passed |
-| 4 | Spec review (1 to 3 rounds) | updated spec | round 1 done 2026-11-02 (21 findings fixed); waiting for sign-off |
+| 4 | Spec review (1 to 3 rounds) | updated spec | round 1 done 2026-11-02 (21 findings fixed, committed) |
+| 4a | Simplification analysis before review round 2: no built site in packages, rules that cost complexity, comparison with other documentation builders, Ubuntu packages instead of PyPI | decisions for the maintainer, then spec update | done 2026-11-03: D32 to D38, spec updated |
 | 5 | Implementation | builder, static parts, pages | not started |
 | 6 | Implementation review (1 to 3 rounds) | fixes | not started |
 | 7 | Documentation, cleanup, merge into `main` | `docs_builder/README.md` with the cutover checklist | not started |
@@ -81,7 +82,7 @@ Success criteria:
 | D22 | Packages | The website is built only on Linux; no website tooling on Windows or in the Docker image. CMake installs the prebuilt `docs/website/` through its own `docs_builder/CMakeLists.txt` and never builds the site. Failsafe: at CMake configure time, seconds after the start and before compiling, if documentation install is on and `docs/website/` is missing or its stamp file names a different library version than the one being built, configure stops with an error that says to run `make website`; an explicit option builds the package without documentation. This covers the deb build (Docker copies the working tree), the Windows package (built from the same tree through the shared drive) and `make install`. Wheels ship no documentation (pip builds skip the documentation install), so they need no check. Step 5 writes `docs_builder/CMakeLists.txt` and tests it on its own (`cmake -S docs_builder`); the top-level `CMakeLists.txt` includes it with one line at the cutover. Amended by the maintainer on 2026-11-02: the documentation install option is OFF by default; the Debian and Windows package builds and the release target switch it ON, so the failsafe guards every package, while a user's own system install from a clone or source zip installs no documentation unless the option is given. |
 | D23 | Staleness check | `make docs` has a check mode (for example `build.py --check`) that rebuilds the tracked Markdown in memory and fails if it differs from the committed files. It runs on demand and before a release; regeneration is otherwise manual. |
 
-Decisions D24 to D31 were added after the design session (2026-11-02) and its review. Order of precedence where texts differ: D24 to D31, then the rest of this plan, then `md/website_design.md`, then the prototype. The design and the prototype use the old paths (`html_builder/`, `html_docu/`, `md/cpp/...`) and show twins on every page; the spec maps paths to D24 and twins to D26.
+Decisions D24 to D31 were added after the design session (2026-11-02) and its review. Order of precedence where texts differ: D32 onward, then D24 to D31, then the rest of this plan, then `md/website_design.md`, then the prototype. The design and the prototype use the old paths (`html_builder/`, `html_docu/`, `md/cpp/...`) and show twins on every page; the spec maps paths to D24 and twins to D26.
 
 | Id | Topic | Decision |
 |----|-------|----------|
@@ -93,6 +94,18 @@ Decisions D24 to D31 were added after the design session (2026-11-02) and its re
 | D29 | Deployment | The maintainer adapts his local deploy script (outside the repository) to `docs/website/`; release packages are mirrored as today (D25). |
 | D30 | Landing page for team leads | No separate overview page. The "For team leads" card points to sections of the landing page, as in the design. |
 | D31 | Coexistence and cutover | The new system is built next to the old one, from the same tree: `make documentation` (old, unchanged) and `make docs` / `make website` (new). Going live with the new site does not need the old one removed. The cutover comes after go-live and the maintainer's sign-off: it deletes `html_builder/` and `html_docu/`, moves the shared hand-made files and the MATLAB help script, includes `docs_builder/CMakeLists.txt`, and updates every user of the old paths (section 11). Step 7 writes its checklist into `docs_builder/README.md`, so it survives the deletion of the planning documents. When the branch is merged into `main` is decided at step 7. |
+
+Decisions D32 to D38 were taken on 2026-11-03 after a simplification analysis; where they differ from earlier text (including D24 to D31 and their amendments), they win.
+
+| Id | Topic | Decision |
+|----|-------|----------|
+| D32 | No website in packages | The built website does not go into any package. The binary packages (deb, Windows zip, system install) install the tracked Markdown in `docs/`, which contains all the documentation; the website is a prettier rendering of the same content. Replaces the package part of D22: no configure-time failsafe, no stamp file, no install option, no ordering between building the site and packaging. |
+| D33 | Built site location | The site is built into a top-level folder `website/`, ignored by git and removed by `make tidy`. `docs/` holds only tracked Markdown. Replaces `docs/website/` in D8 and D24. |
+| D34 | Tutorials | Notebooks in `tutorials/` are committed with their outputs. The website builder only converts them; it never executes them. Running and refreshing the notebooks before a release is a separate project, outside this one. Replaces the execution and cache parts of D28 (no `make tutorials`). |
+| D35 | Cutover at the merge | The cutover is part of this project: the branch removes the old builder and `html_docu/`, moves the shared hand-made files, updates CMake, packaging files, READMEs and SPEC files, and is merged into `main` when the project concludes, before the next release. The old site cannot be built after that. Replaces the coexistence of D31 and the "no packaging or CMake changes" part of D20; until the merge, the old builder on `main` keeps serving the old site. |
+| D36 | Landing text | The landing page text is written in its template, not in a TOML data file; publications stay a small TOML list. Replaces D27 for the landing page; no generic schema checker. |
+| D37 | Skill placeholder | Until the skill exists, the AI page links the stub `SKILL.md`; no zip. Replaces the zip of D10 for now. |
+| D38 | Toolchain and formulas | The build tools come either from conda-forge (a conda environment `quadriga-web`, created with one command; works on any Linux; the documented path) or from Ubuntu packages (one `apt install` line); no pip, no virtual environment, no requirement files. Formulas are converted to MathML by pandoc (one call per build, only when a page contains a formula); pandoc's warnings stop the build. Replaces the PyPI part of D4 and the converter of D5. |
 
 ## 4. Site content
 
