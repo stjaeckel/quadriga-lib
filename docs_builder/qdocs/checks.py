@@ -26,12 +26,14 @@ def check_markdown(mapping, scope, diag, paths=None):
     to files in it are checked; scope "website": mapping is the whole site, absolute links to
     SITE_BASE_URL are checked too, and fragments on HTML targets must be ids there.
     paths: the Markdown files to check (default: every .md and .txt file of mapping).
-    A fragment on a .md target must be an <a id> there.
+    A fragment on a generated .md target (one of paths) must be an <a id> there; hand-made
+    files (publications/**, quadriga_lib_material_model.md) are checked for existence only.
     """
     prefix = "docs/" if scope == "docs" else "website/"
     cache = {}
     if paths is None:
         paths = [p for p in mapping if p.endswith((".md", ".txt"))]
+    paths = set(paths)
     for path in sorted(paths):
         lines = mapping[path].decode("utf-8").split("\n")
         for i, url in render_md.scan_links(lines):
@@ -54,5 +56,5 @@ def check_markdown(mapping, scope, diag, paths=None):
                 diag.error(*where, "link leaves the site: %s" % url)
             elif file_part not in mapping:
                 diag.error(*where, "link target missing: %s" % url)
-            elif frag and file_part.endswith((".md", ".html")) and frag not in _ids(mapping, file_part, cache):
+            elif frag and (file_part.endswith(".html") or file_part in paths) and frag not in _ids(mapping, file_part, cache):
                 diag.error(*where, "anchor missing: %s (no id '%s' in %s)" % (url, frag, file_part))
