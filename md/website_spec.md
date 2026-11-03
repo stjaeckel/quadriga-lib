@@ -1,22 +1,22 @@
 # Quadriga-Lib website overhaul: specification
 
-This is the specification (step 3 of `md/website_plan.md`). Implementation sub-agents (step 5) build the new documentation builder, templates, static parts and tests from it alone. It refers to the plan by decision number (D1 to D31) and section, and to `md/website_design.md` as "design" with its section number. Step 7 deletes this document; it stays in the git history.
+This is the specification (step 3 of `md/website_plan.md`). Implementation sub-agents (step 5) build the new documentation builder, templates, static parts and tests from it alone, and carry out the cutover (D35). It refers to the plan by decision number (D1 to D38) and section, and to `md/website_design.md` as "design" with its section number. Step 7 deletes this document; it stays in the git history.
 
 ## 1. Scope and conventions
 
 ### 1.1 What this spec covers
 
-The new builder in `docs_builder/`, its outputs in `docs/` and `docs/website/`, the page templates, the static parts, the tutorial pipeline with one dummy notebook in `tutorials/`, the agent skill placeholder, the package-install failsafe `docs_builder/CMakeLists.txt`, the builder's tests, the new `GNUmakefile` lines, the `.gitignore` additions, the cutover checklist (D31) and the work packages for step 5. It does not cover the landing-figure scripts and images (D15), the skill content (D10), real tutorials (D11), the deploy script (D29) or any change to files D20 protects.
+The new builder in `docs_builder/`, its outputs in `docs/` and `website/`, the page templates, the static parts, the tutorial conversion with one dummy notebook in `tutorials/`, the agent skill placeholder, the builder's tests, the new `GNUmakefile` lines, the `.gitignore` and `.dockerignore` additions, the cutover work items (D35: moves, deletions, CMake, packaging, READMEs, SPEC files) and the work packages for step 5. It does not cover the landing-figure scripts and images (D15), the skill content (D10), real tutorials (D11), running and refreshing notebooks before a release (D34) or the deploy script (D29).
 
 The code is meant to stay lean: fewer modules, fewer settings, conventions instead of configuration. Where this spec leaves an internal detail open (function names, data structures inside a module), the implementer chooses the simplest form.
 
 ### 1.2 Precedence and references
 
-Where texts differ: D24 to D31, then the rest of the plan, then the design, then the prototype in `html_builder/design_prototype/`. Paths in the design and prototype map as follows:
+Where texts differ: D32 to D38, then D24 to D31, then the rest of the plan, then the design, then the prototype in `html_builder/design_prototype/`. Paths in the design and prototype map as follows:
 
 | Design / prototype | This spec |
 |--------------------|-----------|
-| `html_docu/` (output) | `docs/website/` (built site) and `docs/` (tracked Markdown) |
+| `html_docu/` (output) | `website/` (built site) and `docs/` (tracked Markdown) |
 | `html_builder/` (builder, page sources) | `docs_builder/` |
 | `md/cpp/<section>.md` | `docs/api/cpp/<section-slug>.md` (and `mex`, `python`) |
 | `index.md` and other twins on every page | twins only as in D26 |
@@ -30,11 +30,11 @@ Where texts differ: D24 to D31, then the rest of the plan, then the design, then
 | Language, `lang` | One of `cpp`, `mex`, `python`; display names "C++", "MATLAB / Octave", "Python". |
 | Function | One `/*!MD` block. Its anchor is its name exactly as on today's pages (section 9). |
 | Family | A MATLAB/Python function pair matched by file stem, plus its C++ counterpart(s) (section 9.4). |
-| Fragment | A list of markdown-it-py block tokens after the builder's own rules ran (section 5.6). |
-| Twin | The Markdown version of an HTML page (D26). |
+| Fragment | A list of markdown-it-py block tokens after the builder's own rules ran (section 5.6); used for HTML only. |
+| Twin | The Markdown version of an HTML page (D26), written from the source text (section 8.6). |
 | Gap | A content placeholder written with the gap marker (section 6.4), a missing landing figure or a missing preview image (section 12). |
 | Build variable | A value filled in at build time, written `{{ name }}` (section 6.3). |
-| Site root | `docs/website/`; URLs in this spec are relative to it unless absolute. |
+| Site root | `website/`; URLs in this spec are relative to it unless absolute. |
 | Repository root | The folder holding `CMakeLists.txt`; default is the parent of `docs_builder/`. |
 | Structural error | A defect that stops the build with file and line (D7). |
 | Warning | A defect that is printed and does not stop the build (D7). |
@@ -47,24 +47,23 @@ Where texts differ: D24 to D31, then the rest of the plan, then the design, then
 
 | Path | Kind | Purpose |
 |------|------|---------|
-| `docs/` | tracked, generated | Markdown tree (D8, D24). Fully owned by the builder: files it does not write are deleted (section 3.6), except `docs/website/`. |
-| `docs/website/` | ignored, generated | Built site and deploy root (D24). Fully owned by the builder. |
-| `docs_builder/build.py` | tracked | Entry point (section 3). Standard library only at import time. |
+| `docs/` | tracked, generated | Markdown tree (D8, D24, D33). Fully owned by the builder: files it does not write are deleted (section 3.6). |
+| `website/` | ignored, generated | Built site and deploy root (D33, D29). Fully owned by the builder. |
+| `docs_builder/build.py` | tracked | Entry point (section 3). |
 | `docs_builder/qdocs/` | tracked | Builder package (section 2.2). |
-| `docs_builder/templates/` | tracked | Jinja2 templates (section 8). |
-| `docs_builder/site.toml` | tracked | Site URLs and page list (section 3.3). |
-| `docs_builder/content/` | tracked | Prose pages (`*.md`), `landing.toml`, `publications.toml`, API intros, `api_matching.toml` (sections 6, 7, 9.4). |
-| `docs_builder/static/` | tracked | Files copied unchanged into the site root (section 12). |
+| `docs_builder/templates/` | tracked | Jinja2 templates, including the landing text (sections 7.1, 8). |
+| `docs_builder/content/` | tracked | Prose pages (`*.md`), `publications.toml`, API intros, `api_matching.toml` (sections 6, 7.2, 9.4). |
+| `docs_builder/static/` | tracked | Files copied unchanged into the site root, including `publications/` and `quadriga_lib_material_model.md` (section 12). |
+| `docs_builder/logo/` | tracked | Logo sources moved from `html_builder/img/` (section 18.1); not deployed. |
+| `docs_builder/extract_matlab_comments.py` | tracked | MATLAB help-file script moved from `html_builder/` (section 18.1); called by CMake. |
 | `docs_builder/skill/quadriga-lib/SKILL.md` | tracked | Skill placeholder (section 14). |
 | `docs_builder/tests/` | tracked | Test suite and the fixture repository `tests/fixtures/mini_repo/` (section 17). |
 | `docs_builder/pytest.ini` | tracked | pytest settings (section 17). |
-| `docs_builder/requirements.txt`, `requirements-test.txt`, `requirements-tutorials.txt` | tracked | Python packages, minimum versions (section 4). The whole toolchain is Python; there is no Node.js (D4, D5 as amended). |
-| `docs_builder/CMakeLists.txt` | tracked | Package install and failsafe (section 16). |
-| `docs_builder/README.md` | tracked | Section "Set up a build machine" in step 5 (section 4.3); the rest (make targets, content formats, failsafe, cutover checklist) in step 7. |
-| `docs_builder/.cache/` | ignored, generated | Tutorial cache (section 13.4). |
-| `tutorials/` | tracked | Notebooks without outputs (D28); one dummy notebook `tutorials/pipeline_demo.ipynb` (section 13.6). |
+| `docs_builder/pandoc_math.yaml` | tracked | pandoc defaults file for the formula step (section 11). |
+| `docs_builder/README.md` | tracked | Section "Set up a build machine" in step 5 (section 4.3); the rest (make targets, content formats) in step 7. |
+| `tutorials/` | tracked | Notebooks committed with their outputs (D34); one dummy notebook `tutorials/pipeline_demo.ipynb` (section 13.5). |
 
-Nothing is installed into the working copy (D4 as amended): the tool environments with their packages live outside the repository (section 4.2). The old builder, `html_docu/` and every file D20 protects stay unchanged. Outside the three new folders, step 5 changes only `GNUmakefile` (section 3.5) and `.gitignore` (section 2.4).
+Nothing is installed into the working copy: the tools come from a conda environment or from Ubuntu packages, outside the repository (section 4, D38).
 
 Naming rule: no file in the new folders may be named `build*.log`, `test*.txt` or `deploy.py`, or sit in a folder named `release`, `dist` or `build`. These names match unanchored patterns of the existing `.gitignore` at any depth and would be silently ignored.
 
@@ -74,24 +73,23 @@ A guide, not a contract; the implementer may merge further where it keeps the co
 
 | Module | Responsibility |
 |--------|----------------|
-| `cli.py` | Argument parsing, command dispatch, diagnostics (section 3.7), output writing and check mode (section 3.6). |
-| `config.py` | `site.toml`, page conventions (section 3.3), library and Armadillo versions (section 3.8), the small schema checker (section 7.1). |
-| `env.py` | Tool presence check and the `env` command (section 3.4). |
+| `cli.py` | Argument parsing, command dispatch, tool check (section 3.4), diagnostics (section 3.7), output writing and check mode (section 3.6). |
+| `config.py` | Site constants and page list (section 3.3), library and Armadillo versions (section 3.8). |
 | `docblocks.py` | Block extraction, block grammar, parameter lists, content model (section 5). |
 | `mdparse.py` | markdown-it set-up and the builder's rules (section 5.6). |
-| `links.py` | Link targets and URLs per output location, `[[...]]` resolution, ids, legacy hashes, GitHub slugs, cross-language matching (sections 8.7, 9). |
-| `prose.py` | Prose pages, front matter, build variables, landing and publications data, gap markers and the gap list (sections 6, 7). |
-| `render_md.py` | Markdown output: API files, twins, `llms.txt`, `docs/README.md`; the mdformat extension (section 8.6 to 8.8). |
-| `render_html.py` | HTML output: Jinja2, fragment rendering, span-free code colouring, LaTeX to MathML (sections 8.1 to 8.5, 10, 11). |
+| `links.py` | Link targets and URLs per output location, `[[...]]` resolution, ids, legacy hashes, cross-language matching (sections 8.7, 9). |
+| `prose.py` | Prose pages, front matter, build variables, publications data, gap markers and the gap list (sections 6, 7). |
+| `render_md.py` | Markdown output: the source-text twin writer, API files, `llms.txt`, `docs/README.md` (sections 8.6 to 8.8). |
+| `render_html.py` | HTML output: Jinja2, fragment rendering, span-free code colouring, the pandoc formula step (sections 8.1 to 8.5, 10, 11). |
 | `checks.py` | Link and anchor check, well-formedness, size budgets (section 15). |
-| `tutorials.py` | Notebook execution, cache, tutorial pages (section 13). |
-| `assets.py` | Static files, hand-made files until the cutover, landing figures, skill zip, stamp (sections 12, 14, 16.2). |
+| `tutorials.py` | Notebook reading and conversion, tutorial pages and twins (section 13). |
+| `assets.py` | Static files, landing figures, skill copy (sections 12, 14). |
 
 ### 2.3 Output files
 
-`<lang>` is `cpp`, `mex` or `python`; `<slug>` is a section slug (section 9.2); `<stem>` is a notebook file stem; `<v>` is the library version.
+`<lang>` is `cpp`, `mex` or `python`; `<slug>` is a section slug (section 9.2); `<stem>` is a notebook file stem.
 
-Tracked Markdown in `docs/` (written by `make docs`):
+Tracked Markdown in `docs/` (written by `make docs`; D33: nothing else lives in `docs/`):
 
 | Path | Content |
 |------|---------|
@@ -102,7 +100,7 @@ Tracked Markdown in `docs/` (written by `make docs`):
 | `docs/api/<lang>/<slug>.md` | One file per API section (section 8.6.3); 10 C++, 9 MATLAB, 9 Python sections today. |
 | `docs/download.md`, `docs/formats.md`, `docs/faq.md`, `docs/ai_agents.md`, `docs/publications.md` | Twins of the content pages (D26). |
 
-Site in `docs/website/` (written by `make website`):
+Site in `website/` (written by `make website`):
 
 | Path | Content |
 |------|---------|
@@ -114,24 +112,21 @@ Site in `docs/website/` (written by `make website`):
 | `tutorials/<stem>.html`, `tutorials/<stem>.md`, `tutorials/<stem>.ipynb`, `tutorials/<stem>/<figure files>` | One tutorial page, its twin, the notebook for download, its figures. |
 | `impressum.html`, `privacy.html`, `404.html` | Legal pages (D17) and not-found page; no twins. |
 | every file of `docs/` except `README.md` | Copied byte for byte at the same relative path (D24). |
-| `skill/quadriga-lib-skill-<v>.zip` | Skill placeholder zip (section 14). |
-| `css/`, `js/`, `fonts/`, `img/`, `favicon.ico`, `.htaccess` | Static parts (section 12). |
-| `publications/**`, `quadriga_lib_material_model.md` | Hand-made files, read from `html_docu/` until the cutover (section 12.5). |
-| `docs-stamp.txt` | Version stamp for the package failsafe (section 16.2). |
+| `skill/SKILL.md` | Skill placeholder (section 14, D37). |
+| `css/`, `js/`, `fonts/`, `img/`, `favicon.ico`, `.htaccess`, `publications/**`, `quadriga_lib_material_model.md` | Static parts (section 12). |
 
 The builder writes nothing below `download/` or `releases/` of the site root (plan section 11): none of its outputs has such a path.
 
-### 2.4 `.gitignore` additions
+### 2.4 `.gitignore` and `.dockerignore` additions
 
 Append to the root `.gitignore`:
 
 ```
-/docs/website/
-/docs_builder/.cache/
+/website/
 .ipynb_checkpoints/
 ```
 
-The existing `__pycache__/` line already covers byte-code. The naming rule of section 2.1 keeps the new files clear of the existing unanchored patterns.
+Append `website/` to `.dockerignore`, so the built site never enters the Docker context of the deb build (D33). The existing `__pycache__/` line of `.gitignore` already covers byte-code. The naming rule of section 2.1 keeps the new files clear of the existing unanchored patterns.
 
 ## 3. Builder entry point, CLI and make targets
 
@@ -142,43 +137,36 @@ The existing `__pycache__/` line already covers byte-code. The naming rule of se
 | Command | Does |
 |---------|------|
 | `docs` | Parses all sources, renders the tracked Markdown tree and writes `docs/` (section 3.6). |
-| `docs --check` | Same rendering in memory; writes nothing; compares with `docs/` (D23); prints each differing, missing or extra file and the hint of section 3.9. |
-| `website` | Runs the `docs` phase (writes `docs/`), then renders the site, runs the checks of section 15 and writes `docs/website/`. |
-| `website --release` | The one strict switch (plan section 11): additionally fails on any remaining gap and on tutorials whose cache entry is missing or stale. |
-| `tutorials [--force] [STEM ...]` | Executes notebooks whose cache key changed (all with `--force`; only the named ones if stems are given) (section 13). |
-| `env` | Checks the whole toolchain and prints one line per tool (section 3.4). |
+| `docs --check` | Same rendering in memory; writes nothing; compares with `docs/` (D23); prints each differing, missing or extra file. |
+| `website` | Runs the `docs` phase (writes `docs/`), then renders the site, runs the checks of section 15 and writes `website/`. |
+| `website --release` | The one strict switch (plan section 11): additionally fails on any remaining gap. |
 
-Option for all commands: `--root DIR` (repository root; used by tests). Exit codes: 0 success (warnings allowed); 1 build failed (structural errors, failed checks, `--check` differences, strict-mode failures, notebook errors); 2 environment or usage problem (wrong Python, missing or too old tool, bad arguments).
+Option for all commands: `--root DIR` (repository root; used by tests). Exit codes: 0 success (warnings allowed); 1 build failed (structural errors, failed checks, `--check` differences, strict-mode failures); 2 environment or usage problem (wrong Python, missing tool, bad arguments).
 
-### 3.2 Code layout and imports
+### 3.2 Code layout
 
-`build.py` contains no syntax newer than Python 3.6, so that it can print the version message of section 3.4 under an old Python; it then puts its own folder on `sys.path` and calls `qdocs.cli.main()`. Third-party packages are imported inside the functions that need them, so that `make docs` never imports Pygments, Jinja2 or nbclient.
+`build.py` puts its own folder on `sys.path` and calls `qdocs.cli.main()`. Code and templates are always taken from the folder of `build.py`. Everything else is taken relative to `--root`: sources, `docs_builder/content/`, `docs_builder/static/`, `docs_builder/skill/`, `tutorials/` and the outputs.
 
-Code and templates are always taken from the folder of `build.py`. Everything else is taken relative to `--root`: sources, `docs_builder/site.toml`, `docs_builder/content/`, `docs_builder/static/`, `docs_builder/skill/`, `tutorials/`, the outputs and the cache.
+### 3.3 Site constants and page conventions (`config.py`)
 
-### 3.3 `docs_builder/site.toml` and page conventions
+Constants, not a settings file:
 
-```toml
-[site]
-base_url = "http://quadriga-lib.org"                     # no trailing slash; http until HTTPS works (plan section 10)
-download_base_url = "http://quadriga-lib.org/download"   # D25
-releases_url = "http://quadriga-lib.org/releases/"       # D25
-github_url = "https://github.com/stjaeckel/quadriga-lib"
+| Constant | Value |
+|----------|-------|
+| `SITE_BASE_URL` | `http://quadriga-lib.org` (no trailing slash; http until HTTPS works, plan section 10) |
+| `DOWNLOAD_BASE_URL` | `http://quadriga-lib.org/download` (D25) |
+| `RELEASES_URL` | `http://quadriga-lib.org/releases/` (D25) |
+| `GITHUB_URL` | `https://github.com/stjaeckel/quadriga-lib` |
+| `PAGES` | Tuple of `(id, tab, twin)` in tab order; `file` is `<id>.html`; `tab` is the label in the tab row and menu (`None`: not in them); `twin` is the twin path (`None`: no twin, D26) |
+| `LANDING_FIGURES` | `("img/landing/coverage", "img/landing/antenna")` (section 12.4) |
 
-[[page]]
-id = "index"
-file = "index.html"
-tab = "Home"
-# ... one entry per page, in tab order
-```
+Initial `PAGES`: `index` (Home), `download` (Get started, `download.md`), `cpp_api` (C++ API, `quadriga_lib_api_cpp.md`), `mex_api` (MATLAB API, `quadriga_lib_api_mex.md`), `python_api` (Python API, `quadriga_lib_api_python.md`), `tutorials` (Tutorials, `tutorials.md`), `formats` (Formats, `formats.md`), `publications` (Publications, `publications.md`), `ai_agents` (AI agents, `ai_agents.md`), `faq` (FAQ, `faq.md`), `impressum`, `privacy`, `404`, the last three without tab and twin.
 
-Each `[[page]]` has `id`, `file`, optional `tab` (label in the tab row and menu; pages without `tab` are not in them) and optional `twin` (path of the twin; pages without it have no twin, D26). List order is tab order. Initial list: `index` (Home), `download` (Get started, twin `download.md`), `cpp_api` (C++ API, twin `quadriga_lib_api_cpp.md`), `mex_api` (MATLAB API, twin `quadriga_lib_api_mex.md`), `python_api` (Python API, twin `quadriga_lib_api_python.md`), `tutorials` (Tutorials, twin `tutorials.md`), `formats` (Formats, twin `formats.md`), `publications` (Publications, twin `publications.md`), `ai_agents` (AI agents, twin `ai_agents.md`), `faq` (FAQ, twin `faq.md`), `impressum`, `privacy`, `404`; `file` is `<id>.html`. Unknown or missing keys are structural errors (section 7.1).
-
-Conventions in `config.py`, not settings:
+Template and source per page id:
 
 | Page id | Template | Source |
 |---------|----------|--------|
-| `index` | `landing.html` | `content/landing.toml` |
+| `index` | `landing.html` | the template itself (section 7.1) |
 | `cpp_api`, `mex_api`, `python_api` | `api.html` | doc blocks of the language, intro `content/api_intro_<lang>.md` |
 | `publications` | `publications.html` | `content/publications.toml` |
 | `tutorials` | `tutorials_index.html` | `content/tutorials.md` and the notebooks |
@@ -186,27 +174,15 @@ Conventions in `config.py`, not settings:
 | `404` | `notfound.html` | `content/404.md` |
 | any other id | `text.html` | `content/<id>.md` |
 
-Source paths are constants in `config.py` (`src/`, `api_mex/`, `api_python/`, `include/quadriga_lib.hpp`, `CMakeLists.txt`). The tutorial twins are website only (D28): a coded exception keeps `tutorials.md` and the tutorial pages out of `docs/`. One tutorial page per notebook is added by the builder (section 13). The header menu, tab row and footer are written in the templates with a helper `url(page_id)` (section 8.2).
+Source paths are constants too (`src/`, `api_mex/`, `api_python/`, `include/quadriga_lib.hpp`, `CMakeLists.txt`). The tutorial twins are website only (D28): a coded exception keeps `tutorials.md` and the tutorial pages out of `docs/`. One tutorial page per notebook is added by the builder (section 13). The header menu, tab row and footer are written in the templates with a helper `url(page_id)` (section 8.2).
 
-### 3.4 Tool check and the `env` command
+### 3.4 Tool check
 
-The toolchain check lives in the builder, not in CMake: `docs_builder/CMakeLists.txt` runs on the packaging machines (Docker, Windows), which have no website tools; it checks only the built site's stamp (section 16).
-
-Each command checks, before it reads any source, that everything it needs is present (importable), collects every missing tool, prints all of them in one run, one message per tool, and exits 2 without a traceback (D21). Build commands check presence only; version comparisons are the job of `env`.
-
-| Command | Checked up front (present) |
-|---------|----------------------------|
-| `docs`, `docs --check` | Python 3.11+; `markdown-it-py`, `mdit-py-plugins`, `mdformat`, `mdformat-gfm` |
-| `website` | the `docs` set; `Pygments`, `Jinja2`, `latex2mathml` |
-| `tutorials` | the `website` set; the packages of `requirements-tutorials.txt`; the kernels the notebooks name (a missing kernel is a warning, section 13.3) |
-
-`build.py env` (make target `docs-env`) checks the whole toolchain: every package of the three requirement files and the kernels the notebooks name. It also compares installed versions (`importlib.metadata.version`) with the minimums in the requirement files, as tuples of their leading integers. It prints one line per tool with found version (or "missing"), minimum and status (ok, missing, too old, optional), then a summary. Exit 2 if anything that `docs` or `website` needs is missing or too old; tutorial packages and kernels are reported but optional.
-
-Each message must contain the tool, "missing" (or for `env` the found version and the minimum), the Python in use (`sys.executable`), and the remedy: activate the tool environment, or the exact `pip install -r ...` command of section 4.3, with a pointer to "Set up a build machine" in `docs_builder/README.md`. No message starts an installation; a build never downloads anything (D4 as amended).
+Before any work, every command checks once that Python is 3.11 or newer, that `markdown_it`, `mdit_py_plugins`, `pygments` and `jinja2` are importable and that `pandoc` is on `PATH` (`shutil.which`). It collects everything missing, prints it in one run, one line per tool, and exits 2 without a traceback (D21). There are no per-command tool sets, no lazy imports and no version comparisons. The message names the Python in use (`sys.executable`), says to activate the conda environment `quadriga-web`, gives both set-up lines of section 4 (conda and Ubuntu) and points to "Set up a build machine" in `docs_builder/README.md`. No message starts an installation; a build never downloads anything. There is no `env` command and no `make docs-env`: with tools from conda or apt there are no pip minimums to compare, and the presence check of every command already reports what is missing (D38).
 
 ### 3.5 `GNUmakefile` lines
 
-`GNUmakefile` is a lean wrapper around CMake; the builder adds only one-line callers, after the `documentation` target, which stays unchanged (D21, D31):
+`GNUmakefile` is a lean wrapper around CMake; the builder adds only one-line callers:
 
 ```make
 # Documentation builder; set-up and other commands: docs_builder/README.md
@@ -216,21 +192,17 @@ docs-check:
 	python3 docs_builder/build.py docs --check
 website:
 	python3 docs_builder/build.py website
-tutorials:
-	python3 docs_builder/build.py tutorials
-docs-env:
-	python3 docs_builder/build.py env
-.PHONY: docs docs-check website tutorials docs-env
+.PHONY: docs docs-check website
 ```
 
-And two lines at the end of the existing `tidy` recipe (section 3.10). Everything else is called directly (`build.py website --release`, `python3 -m pytest docs_builder/tests`). The tools are those of the active environment: `python3` from `PATH`; another Python is used by calling `build.py` with it. `make website` runs the `docs` phase itself in one process, which is how it "depends on make docs" (D21); `make tutorials` never runs as part of `docs` or `website` (D28).
+And two lines at the end of the existing `tidy` recipe (section 3.10). Everything else is called directly (`build.py website --release`, `python3 -m pytest docs_builder/tests`). The tools are those of the active environment: `python3` from `PATH`. `make website` runs the `docs` phase itself in one process, which is how it "depends on make docs" (D21). The old `documentation` target goes in package D (section 18.3).
 
 ### 3.6 Output handling
 
 - Every command builds the complete output as an in-memory mapping from relative path to bytes. Iteration over files, sections, functions and pages is always sorted.
 - No file is written while any structural error exists; errors from all inputs are collected first.
-- `docs`: writes each file whose bytes differ from the file on disk, then deletes every file under `docs/` not in the mapping (except `docs/website/`) and removes empty folders. `--check` writes and deletes nothing.
-- `website`: deletes `docs/website/docs-stamp.txt` first; renders the site into memory; runs the checks of section 15 on the in-memory mapping; only if they pass, writes changed files, deletes files not in the mapping, removes empty folders, and finally writes `docs-stamp.txt`. A failed build leaves the previous site without its stamp, so the package failsafe (section 16) refuses it.
+- `docs`: writes each file whose bytes differ from the file on disk, then deletes every file under `docs/` not in the mapping and removes empty folders. `--check` writes and deletes nothing.
+- `website`: renders the site into memory; runs the checks of section 15 on the in-memory mapping; only if they pass, writes changed files into `website/`, deletes files not in the mapping and removes empty folders.
 - All text files are UTF-8 without BOM with `\n` line ends and one final newline.
 
 ### 3.7 Diagnostics
@@ -243,90 +215,65 @@ One per line: `<path>:<line>: error: <message>` or `<path>:<line>: warning: <mes
 
 ### 3.9 Byte-identical output
 
-The same inputs and the same tool versions give byte-identical `docs/` and `docs/website/` trees (plan 5.1): sorted listings; no dates, user names or absolute paths in any output; the skill zip as in section 14. Tool versions are never written into outputs. Because the tools have minimum versions only (section 4), an upgrade may change the output without a source change; when `docs --check` finds differences it prints the fixed hint `If the sources did not change, a tool upgrade may be the cause; regenerate with make docs.` (D23, D4 as amended).
+The same inputs give byte-identical `docs/` and `website/` trees (plan 5.1): sorted listings; no dates, user names or absolute paths in any output; tool versions are never written into outputs. The tracked Markdown is written from the source text by the builder's own code (section 8.6), so it does not depend on the versions of the installed tools; `docs --check` (D23) compares only sources and builder. The HTML in `website/` may change with the pandoc or Pygments version.
 
 ### 3.10 What the builder leaves in the working copy, `clean` and `tidy`
 
-The builder writes `docs/` (tracked), `docs/website/` and `docs_builder/.cache/`; running the builder or the tests leaves `__pycache__/` below `docs_builder/`; editing notebooks in Jupyter leaves `.ipynb_checkpoints/`; after the cutover the early check in the `deb` recipe leaves `build_docs_check/` (section 16.3). Tests write only below pytest's `tmp_path`.
+The builder writes `docs/` (tracked) and `website/`; running the builder or the tests leaves `__pycache__/` below `docs_builder/`; editing notebooks in Jupyter leaves `.ipynb_checkpoints/`. Tests write only below pytest's `tmp_path`.
 
-`make tidy` restores the working copy to the state of a clean clone (D4 as amended); `make clean` keeps `docs/website/` and the cache. No `git clean`: it would also delete the maintainer's ignored local files, such as the deploy script. Step 5 appends to the existing `tidy` recipe, which changes nothing it does today:
+`make tidy` restores the working copy to the state of a clean clone (D4, D33); `make clean` keeps `website/`. No `git clean`: it would also delete the maintainer's ignored local files, such as the deploy script. Step 5 appends to the existing `tidy` recipe:
 
 ```make
-	- rm -rf docs/website docs_builder/.cache
+	- rm -rf website
 	- find docs_builder tutorials \( -name __pycache__ -o -name .ipynb_checkpoints \) -type d -prune -exec rm -rf {} +
 ```
 
-`build_docs_check/` falls under the existing `rm -rf build*` of `tidy`. The tool environments are outside the repository and never touched.
+The conda environment is outside the repository and never touched.
 
 ### 3.11 Speed
 
-Time targets on the idle build machine (1-minute load below 4), measured as wall and CPU time with the load average recorded before and after: `make docs` under 5 s; `make website` under 15 s (with the `docs` phase and the checks, without notebook execution, formulas included); `make tutorials` with every cache entry current under 5 s. The prototypes measured about 2.5 s for the `docs` work and about 4 s for the `website` work, most of it mdformat (about 1.7 s per pass over all doc blocks); converting 1,091 formulas to MathML took 0.12 s. Rules that keep the targets:
+Time targets on the idle build machine (1-minute load below 4): `make docs` under 5 s; `make website` under 15 s (with the `docs` phase and the checks, formulas included). One pandoc call converted 44 formulas in 0.05 s (manager's measurement, pandoc 3.13). Rules that keep the targets:
 
-- One Python process per command; the sources are read and parsed once; both renderers use the same token lists.
-- mdformat runs once per fragment, not once per output file: link URLs, which differ between the full API file and the section file, are rendered as placeholder strings and filled in per file.
-- No subprocess in `docs` and `website`; no network access.
-- `website` reads tutorials from the cache and never executes a notebook.
+- One Python process per command; the sources are read and parsed once.
+- No subprocess in `docs`; in `website` at most one pandoc call per build, and none when no page has a formula (section 11); no network access.
 - Files are compared before they are written; the checks parse each output once.
 
-## 4. Dependencies and tool set-up
+## 4. Dependencies and tool set-up (D38)
 
-### 4.1 Packages
+### 4.1 Tools and minimum versions
 
-The tools come from PyPI, not from Ubuntu packages, with minimum versions only, so that they can be upgraded; no exact pins (D4 as amended). Python 3.11 or newer (`tomllib`); no Node.js (D5 as amended). The minimums below were run with the prototypes and are the lowest versions known to work.
+The tools come from conda-forge (documented path, any Linux) or from Ubuntu packages; no pip, no virtual environment, no requirement files (D38). No Node.js (D5).
 
-`docs_builder/requirements.txt`:
+| Tool | Minimum | Why |
+|------|---------|-----|
+| Python | 3.11 | `tomllib` |
+| markdown-it-py | 3.0 | parser API used in section 5.6 |
+| mdit-py-plugins | 0.4.2 | `dollarmath_plugin` with the options of section 5.6 |
+| Pygments | none | lexers of section 10 |
+| Jinja2 | 3.1 | environment options of section 8.1 |
+| pandoc | 3.7 | formula step (section 11); tested with 3.7.0.2 (the version of Ubuntu 26.04), 3.9.0.2 and 3.13: the defaults file works, the MathML is identical on the test formulas, and only invalid formulas print a warning |
+| pytest | none | tests (section 17) |
 
-```
-markdown-it-py>=3.0.0
-mdit-py-plugins>=0.4.2
-mdformat>=1.0.0
-mdformat-gfm>=1.0.0
-Pygments>=2.17.2
-Jinja2>=3.1.2
-latex2mathml>=3.81.1
-```
+Notebooks are read with the standard library (`json`); the builder needs no Jupyter package (D34). Minimums are not checked by the build (section 3.4); they are the versions the set-up lines below install.
 
-`make docs` needs only the first four (D21). `requirements-test.txt`: `pytest>=8.0`. `requirements-tutorials.txt`: `nbformat>=5.10`, `nbclient>=0.10`, `jupyter-client>=8.0`, `ipykernel>=6.29`, `matplotlib>=3.8`, `numpy>=1.26`, `quadriga-lib>=0.12.2` (the released pip package, D28). `latex2mathml` 3.81.1 is the version tested (section 11); older versions give different MathML for about a tenth of the test formulas.
+### 4.2 README section "Set up a build machine"
 
-### 4.2 The two tool set-ups
+Written in step 5 as the first section of `docs_builder/README.md`; step 7 adds the rest of that README. Once per machine, one of two variants:
 
-Both must work (D4 as amended); both are part of the build machine's set-up, done once per machine, outside the repository.
-
-| | Conda (preferred) | Virtual environment |
-|---|-------------------|---------------------|
-| Environment | conda env `quadriga-web` from conda-forge: Python and pip | venv at a path the user chooses, default `~/.venvs/quadriga-web` |
-| Use | `conda activate quadriga-web` | `source ~/.venvs/quadriga-web/bin/activate` |
-| Files in the repository | none | none |
-
-The tutorial kernel `python3` is the one of the active environment.
-
-### 4.3 README section "Set up a build machine"
-
-Written in step 5 as the first section of `docs_builder/README.md`; step 7 adds the rest of that README, and the mention of the new targets in the top-level `README.md` stays a step-7 item. A manual, once-per-machine procedure, run from the repository root:
-
-1. Prerequisites: conda (Miniconda or Miniforge), or a system Python 3.11+.
-2. Conda set-up (preferred):
+1. Conda (any Linux; the documented path):
 
 ```bash
-conda create -y --name quadriga-web -c conda-forge "python>=3.11" pip
+conda create -y -n quadriga-web -c conda-forge "python>=3.11" "markdown-it-py>=3.0" "mdit-py-plugins>=0.4.2" pygments "jinja2>=3.1" pytest "pandoc>=3.7"
 conda activate quadriga-web
-python -m pip install -r docs_builder/requirements.txt -r docs_builder/requirements-test.txt -r docs_builder/requirements-tutorials.txt
 ```
 
-3. Venv set-up:
+2. Ubuntu 26.04 or newer (older releases ship an older pandoc; use conda there):
 
 ```bash
-python3 -m venv ~/.venvs/quadriga-web
-source ~/.venvs/quadriga-web/bin/activate
-python -m pip install -r docs_builder/requirements.txt -r docs_builder/requirements-test.txt
-# optional: tutorials
-python -m pip install -r docs_builder/requirements-tutorials.txt
+sudo apt install pandoc python3-markdown-it python3-mdit-py-plugins python3-pygments python3-jinja2 python3-pytest
 ```
 
-4. Activate the environment before each build session.
-5. Verify with `make docs-env`: every tool for `docs` and `website` must be ok (it also compares versions with the minimums).
-6. Upgrade: repeat the install lines with `pip install -U`; then run `python3 docs_builder/build.py tutorials --force` (the tutorial cache key does not see tool or builder versions, section 13.4), and expect `make docs-check` to show differences that come from the new versions (section 3.9).
-7. Nothing is installed into the working copy; removing the environment removes the tools.
+With conda, activate the environment before each build session. To check the set-up, run `make docs`: if anything is missing it stops with the plain message of section 3.4. Upgrade with `conda update -n quadriga-web --all` or the system's package updates. Nothing is installed into the working copy.
 
 ## 5. Doc-block parser
 
@@ -353,10 +300,10 @@ Other malformed content (stray raw HTML, odd headings) is caught by the HTML wel
 
 ### 5.3 Parts of an `/*!MD` block
 
-Split at the source-line level, outside code fences: name (line 1), brief (line 2), intro (up to the first sub-block heading), sub-blocks. A sub-block heading is a line starting with `## `; its label is the heading text with a trailing `<br>`, then a trailing `:` or `;`, removed (variants today: `## Inputs:`, `## Attributes:<br>`, `## Function 'duplicate';`).
+Split at the source-line level, outside code fences: name (line 1), brief (line 2), intro (up to the first sub-block heading), sub-blocks. Each part keeps its source lines, which the twin writer copies (section 8.6). A sub-block heading is a line starting with `## `; its label is the heading text with a trailing `<br>`, then a trailing `:` or `;`, removed (variants today: `## Inputs:`, `## Attributes:<br>`, `## Function 'duplicate';`).
 
-| Kind | Labels | Rendering |
-|------|--------|-----------|
+| Kind | Labels | HTML rendering |
+|------|--------|----------------|
 | `code` | `Declaration`, `Declarations`, `Usage`, `Example`, `Examples` | Fragment; fences without info string use the page language. |
 | `params` | `Input`, `Inputs`, `Output`, `Outputs`, `Attributes`, `Arguments`, `Input Arguments`, `Output Argument`, `Output Arguments`, `Optional outputs`, and labels starting with `Inputs (`, `Outputs (` or `In/out` | Parameter lists (section 5.4). |
 | `plain` | everything else | Fragment. |
@@ -378,7 +325,7 @@ In a `params` sub-block, each top-level bullet item is tested on its first sourc
 - A non-matching item is a note row across both columns, with the warning `param-item`.
 - Other blocks in a `params` sub-block (paragraphs, tables) render in place.
 
-Expected on today's sources: about 17 `param-separator` and 25 `param-item` warnings; the pattern covers every variant of plan section 11 (`*(optional)*`, `(optional)`, `*(in/out)*`, several names).
+Expected on today's sources: about 17 `param-separator` and 25 `param-item` warnings; the pattern covers every variant of plan section 11 (`*(optional)*`, `(optional)`, `*(in/out)*`, several names). The structure is for the HTML page only; twins keep the item text as written.
 
 ### 5.5 Differences between the languages
 
@@ -392,7 +339,7 @@ Expected on today's sources: about 17 `param-separator` and 25 `param-item` warn
 
 ### 5.6 markdown-it set-up and the builder's rules (`mdparse.py`)
 
-One factory for three kinds: `docblock`, `prose`, `notebook`. All: `MarkdownIt("commonmark").enable("table")` with `dollarmath_plugin(allow_space=False, allow_digits=False, double_inline=True)` (D5; `$5 and $6` stays text) and the gap rule (section 6.4). `html` is on for doc blocks only; in prose and notebooks raw HTML is not interpreted and shows as text (D27: hand-written HTML is not used for content). The builder's rules:
+markdown-it renders HTML only; twins never pass through it (section 8.6). One factory for three kinds: `docblock`, `prose`, `notebook`. All: `MarkdownIt("commonmark").enable("table")` with `dollarmath_plugin(allow_space=False, allow_digits=False, double_inline=True)` (D5; `$5 and $6` stays text). `html` is on for doc blocks only; in prose and notebooks raw HTML is not interpreted and shows as text (D27: hand-written HTML is not used for content). The builder's rules:
 
 | Rule | Kinds | Effect |
 |------|-------|--------|
@@ -400,14 +347,14 @@ One factory for three kinds: `docblock`, `prose`, `notebook`. All: `MarkdownIt("
 | `raw_a` | docblock | `<a href="U" ...>text</a>` becomes a link to `U`; `target` and `rel` are dropped, so every link opens in the same tab. |
 | `raw_br` | docblock | `<br>` is kept, except trailing `<br>` at the end of a paragraph or heading (the old pages used them as spacing). |
 | `heading_attrs` | prose, notebook | A trailing `{...}` on a heading sets its id and legacy ids (section 6.2) and is removed from the text. |
-| `note` | prose | `container_plugin` for `note` and `warning` (section 6.5). |
-| `site_url` | all | Links starting with `http://` or `https://` plus `quadriga-lib.org/` (also `www.`) become site-relative, so the absolute links in doc blocks (plan section 10) resolve locally and in twins. URLs that start with `download_base_url` or `releases_url` stay absolute and count as external: the builder never writes those folders (section 2.3). |
+| `alert` | prose, notebook | A blockquote whose first line is exactly `[!NOTE]` or `[!WARNING]` becomes a note box (section 6.5). |
+| `site_url` | all | Links starting with `http://` or `https://` plus `quadriga-lib.org/` (also `www.`) become site-relative, so the absolute links in doc blocks (plan section 10) resolve locally and in twins. URLs that start with `DOWNLOAD_BASE_URL` or `RELEASES_URL` stay absolute and count as external: the builder never writes those folders (section 2.3). |
 
 These rules never touch code spans or fences. Token line maps plus the part's first source line give the line numbers.
 
 ### 5.7 Content model
 
-Leaf content is a fragment (token list, source file, first line). A function has language, display name (= anchor), source and line, brief, intro, sub-blocks (label, kind, content; `params` content as rows with names, qualifier, description, note flag) and family. A section has language, title, slug, legacy id, descriptions (several `SECTION_DESC` blocks in file-name order) and functions. An API page has the intro (a prose page) and its sections. Prose pages, landing, publications and tutorials have their own small classes. One parser and one model feed both renderers; neither re-parses source text (plan 5.1).
+Leaf content is the part's source lines (for twins) plus its fragment (for HTML), with source file and first line. A function has language, display name (= anchor), source and line, brief, intro, sub-blocks (label, kind, content; `params` content as rows with names, qualifier, description, note flag) and family. A section has language, title, slug, legacy id, descriptions (several `SECTION_DESC` blocks in file-name order) and functions. An API page has the intro (a prose page) and its sections. Prose pages, publications and tutorials have their own small classes. One parser feeds both renderers; the sources are read once (plan 5.1).
 
 Ordering: sections by title, functions by `(name.startswith("."), name)` on the display name (as today); the general usage notes come first.
 
@@ -417,38 +364,40 @@ Formats, FAQ, Get started, the AI page, the legal pages, the tutorial index text
 
 ### 6.1 File format
 
-The file starts with TOML front matter between two lines that are exactly `+++`; the Markdown body follows. Keys: `title` (required; `h1`, `<title>` "`title` · Quadriga-Lib", `og:title`, twin heading), `description` (required; meta and `og:description`), `lead` (optional, inline Markdown; lead paragraph on the page and in the twin), `dummy_note` (only `tutorials.md`; section 13.5). Unknown keys, missing required keys and wrong types are structural errors (section 7.1). Body: CommonMark with tables, math, note boxes, heading ids, build variables and gap markers; headings from `##` to `####` (the `h1` comes from `title`).
+The file starts with TOML front matter between two lines that are exactly `+++`; the Markdown body follows. Keys: `title` (required; `h1`, `<title>` "`title` · Quadriga-Lib", `og:title`, twin heading), `description` (required; meta and `og:description`), `lead` (optional, inline Markdown; lead paragraph on the page and in the twin), `dummy_note` (only `tutorials.md`; section 13.4), `llms_summary` (only `ai_agents.md`; the summary paragraph of `llms.txt`, section 8.8). A missing required key, an unknown key or a value that is not a string is a structural error naming file and key. Body: CommonMark with tables, math, note boxes, heading ids, build variables and gap markers; headings from `##` to `####` (the `h1` comes from `title`).
 
 ### 6.2 Heading ids
 
-Every `##` and `###` heading gets an id: the slug of its text (section 9.2), unique within the page by appending `-2`, `-3`. An explicit id is written at the end of the heading: `### How do I cite Quadriga-Lib? {#cite}`. Legacy ids (old anchors, D3) are added with `legacy="..."`, repeatable: `## Material Properties {#material-properties legacy="9f6922f9"}`. In HTML the id goes on the heading, each legacy id on an empty `<span id="...">` as its first child. In twins the braces are removed and anchors are GitHub slugs (section 9.5).
+Every `##` and `###` heading gets an id: the slug of its text (section 9.2), unique within the page by appending `-2`, `-3`. An explicit id is written at the end of the heading: `### How do I cite Quadriga-Lib? {#cite}`. Legacy ids (old anchors, D3) are added with `legacy="..."`, repeatable: `## Material Properties {#material-properties legacy="9f6922f9"}`. In HTML the id goes on the heading, each legacy id on an empty `<span id="...">` as its first child. In twins the braces are removed and the same ids are written as explicit anchors (section 9.5).
 
 ### 6.3 Build variables
 
-`{{ name }}` in prose bodies, front matter and TOML text fields (not in doc blocks or notebooks), substituted before parsing, also inside code: `version`, `armadillo_version` (section 3.8), `site_base_url`, `download_base_url`, `releases_url`, `github_url` (from `[site]`). An unknown name is a structural error. Build variables are values; gap markers are placeholders; the two syntaxes differ on purpose (plan section 11).
+`{{ name }}` in prose bodies, front matter, `publications.toml` strings and the skill stub (not in doc blocks or notebooks), substituted in the source text before parsing, so HTML and twin get the same text, also inside code: `version`, `armadillo_version` (section 3.8), `site_base_url`, `download_base_url`, `releases_url`, `github_url` (section 3.3). An unknown name is a structural error. Templates get the same values as Jinja2 context variables. Build variables are values; gap markers are placeholders; the two syntaxes differ on purpose (plan section 11).
 
 ### 6.4 Gap markers
 
-One marker for all sources (D27): `%%GAP: text%%` on one line. `text` describes missing content (`%%GAP: performance numbers and hardware%%`) or is a draft awaiting approval (`%%GAP: Realistic radio channels ...%%`); removing the marker is the approval.
+One marker: `%%GAP: text%%` on one line. `text` describes missing content (`%%GAP: performance numbers and hardware%%`) or is a draft awaiting approval (`%%GAP: Realistic radio channels ...%%`); removing the marker is the approval.
 
-- It may appear in prose files and their front matter, `landing.toml`, `publications.toml`, doc blocks and notebook Markdown cells.
-- HTML: `<span class="ph">text</span>` in body text; plain `text` in `<title>`, meta, `alt` and `og:*`.
+- It may appear only in `docs_builder/content/` (prose files, their front matter, `publications.toml`) and `docs_builder/templates/` (the landing text, section 7.1); not in doc blocks or notebooks.
+- HTML: one pass over each rendered page replaces markers in element text with `<span class="ph">text</span>`, and markers inside tags (attribute values such as `alt`, `content`) and inside `<title>` with plain `text`.
 - Twins keep the marker verbatim.
-- The gap list: all markers found in the sources (`path:line: text`, sorted), plus missing landing figures (section 12.4) and a missing `img/og-card.png` (section 12.3). `docs` and `website` print it in full; `website --release` fails if it is not empty.
+- The gap list: all markers found by a plain text scan of `content/` and `templates/` (`path:line: text`, sorted), plus missing landing figures (section 12.4) and a missing `img/og-card.png` (section 12.3). `docs` and `website` print it in full; `website --release` fails if it is not empty.
 
 ### 6.5 Note boxes
 
+GitHub alert syntax (it renders on GitHub as is):
+
 ```
-::: note Optional title
-Body Markdown.
-:::
+> [!NOTE]
+> **Optional title**
+> Body Markdown.
 ```
 
-`note` or `warning`. HTML: `<div class="note-box">` or `<div class="note-box warn">` with `<b>title</b>` first (default "Note" or "Warning"). Twin: a GitHub alert, `> [!NOTE]` or `> [!WARNING]`, then `> **title**` and the body.
+`[!NOTE]` or `[!WARNING]`. HTML: `<div class="note-box">` or `<div class="note-box warn">` with `<b>title</b>` first; the title is the first body line if that line is entirely bold, otherwise "Note" or "Warning". Twins keep the blockquote as written.
 
 ### 6.6 One-time conversion of the old prose sources
 
-Step 5 converts `html_builder/formats/*.md`, `faq/*.md` and `download/*.md` into `content/formats.md`, `faq.md` and `download.md`. The old files stay until the cutover; until then an edit to these pages is made in both places (D24).
+Step 5 converts `html_builder/formats/*.md`, `faq/*.md` and `download/*.md` into `content/formats.md`, `faq.md` and `download.md`. The old files are deleted with `html_builder/` in package D (section 18.2).
 
 - Each old `/*!SECTION` becomes an `##` heading with an explicit id and the old hash as legacy id: formats "QuaDRiGa Array Antenna Exchange Format (QDANT)" `6cab4884`, "Material Properties" `9f6922f9`; FAQ "About the Library" `e63d3e38`, "Bug Reports and Contact" `59d38498`, "Distribution License" `89373af1`, "Supporting the Project" `d8094d72`; download "Download" `7c9ba8cc`, "Installation from Binaries" `7fc9f392`, "Installation from Source" `904e3979`, "Quick Start" `fdc96a45`.
 - `/*!SECTION_DESC` text becomes the section body; each `/*!MD` block becomes a `###` heading with its brief and body, its `## X:` sub-headings becoming `#### X`. The formats entry ids `<arrayant>` and `<layout>` are kept as legacy ids. The old ids with spaces (`1. Material Table`, `2. Built-in EM Materials`, `3. Principled BSDF`, `4. References`) and the ids `…` and `1` are dropped: they are not valid HTML ids or are meaningless, and nothing links to them (D3).
@@ -467,50 +416,21 @@ Step 5 converts `html_builder/formats/*.md`, `faq/*.md` and `download/*.md` into
 
 | File | Initial content |
 |------|-----------------|
-| `content/ai_agents.md` | The prototype's draft text, with the file table adapted to section 2.3 paths, the skill link `skill/quadriga-lib-skill-{{ version }}.zip`, and a `::: warning Placeholder` box saying the skill is a placeholder (plan 5.4); first line `%%GAP: whole page text is a draft (design section 9)%%`. |
-| `content/impressum.md` | `::: warning Placeholder` with `%%GAP: Impressum text from the maintainer (D17); no address in git until settled%%`. |
-| `content/privacy.md` | `::: warning Placeholder` with `%%GAP: privacy text: the hoster and its server logs; no cookies, no analytics, no third-party requests; the browser stores the chosen code language under the localStorage key qlib-lang, only after a click (D18)%%`. |
+| `content/ai_agents.md` | The prototype's draft text, with the file table adapted to section 2.3 paths, the skill link `skill/SKILL.md`, and a `> [!WARNING]` box titled **Placeholder** saying the skill is a placeholder (plan 5.4, D37); first line `%%GAP: whole page text is a draft (design section 9)%%`; `llms_summary` a gap-marked draft from the landing lead. |
+| `content/impressum.md` | A `> [!WARNING]` box titled **Placeholder** with `%%GAP: Impressum text from the maintainer (D17); no address in git until settled%%`. |
+| `content/privacy.md` | A `> [!WARNING]` box titled **Placeholder** with `%%GAP: privacy text: the hoster and its server logs; no cookies, no analytics, no third-party requests; the browser stores the chosen code language under the localStorage key qlib-lang, only after a click (D18)%%`. |
 | `content/tutorials.md` | `lead` and `dummy_note` from the prototype, gap-marked. |
 | `content/404.md` | `title` and `description` "Page not found"; the prototype sentence, gap-marked. |
 
-## 7. Structured pages
+## 7. Landing and publications
 
-### 7.1 Schema checker
+### 7.1 Landing text in `templates/landing.html` (D36)
 
-A schema is a nested dict: per key its type (`str`, `int`, `bool`, `table`, list of either), whether it is required, whether strings allow inline Markdown, and for lists an exact or minimum count. The checker reports every problem as `<file>: error: <key path>: <problem>` (for example `why.card[2].title: missing`). Inline-Markdown strings are rendered with `renderInline` of the prose parser; other strings are escaped. Used for `site.toml`, front matter, `landing.toml`, `publications.toml` and notebook metadata.
+The landing text is written in the template as HTML, ported from the prototype `index.html`: every design-section-9 gap and every `<span class="ph">` becomes a gap marker in the template text. Section ids are fixed: `why`, `paths`, `quickstart` (D3 keeps `index.html#quickstart`), `apis`, `covers`, `open`. The template sets title and meta description itself. The "For team leads" card keeps `href="#covers"` (D30); acoustics carries the "experimental" badge (D12). The quick-start code is written in the template inside `{% filter highlight("python") %}...{% endfilter %}` (and `matlab`, `cpp`, `bash`), the colouring of section 10. Figures: a macro `figure(name, alt, caption)` renders the slot of section 12.4 for `img/landing/<name>`; the builder passes `figures`, a dict from each entry of `LANDING_FIGURES` to whether both variants exist. Figures `coverage` (pitch) and `antenna` (quick start) keep the prototype's alt texts and captions.
 
-### 7.2 `content/landing.toml`
+### 7.2 `content/publications.toml`
 
-Section ids are fixed in the template: `why`, `paths`, `quickstart` (D3 keeps `index.html#quickstart`), `apis`, `covers`, `open`.
-
-| Key | Type | Inline MD | Notes |
-|-----|------|-----------|-------|
-| `meta.title`, `meta.description` | str | no | `<title>`, `og:title`, meta |
-| `llms.summary` | str | no | the summary paragraph of `llms.txt` (section 8.8) |
-| `pitch.headline`, `pitch.lead` | str | yes | `h1`, lead |
-| `pitch.primary`, `pitch.secondary` | `{label, href}` | no | filled and outlined button |
-| `pitch.proof` | list[str], exactly 3 | yes | proof lines |
-| `pitch.figure` | str | no | id of a `figure` entry |
-| `why.heading`, `why.intro` | str | no / yes | |
-| `why.card` | exactly 3 of `{title, text}` | text | |
-| `paths.heading` | str | no | visually hidden `h2` |
-| `paths.card` | exactly 2 of `{label, href, text}` | text | template appends " →" to the label |
-| `quickstart.heading`, `quickstart.intro`, `quickstart.note` | str | no / yes / yes | |
-| `quickstart.install` | str | no | `bash` code block |
-| `quickstart.python`, `.matlab`, `.cpp` | multi-line str | no | the three language tabs; one final newline stripped |
-| `quickstart.figure` | str | no | id of a `figure` entry |
-| `apis.heading`, `apis.intro` | str | no / yes | |
-| `apis.card`, `open.card` | exactly 3 of `{label, href, text}` | text | |
-| `covers.heading`, `covers.intro` | str | no / yes | |
-| `covers.feature` | at least 1 of `{title, text, badge?}` | text | `badge` only `"experimental"` (D12) |
-| `open.heading`, `open.intro` | str | no / yes | |
-| `figure` | at least 1 of `{id, base, alt, caption}` | caption | files `<base>-light.webp`, `<base>-dark.webp` (section 12.4) |
-
-All keys are required except `badge`. Step 5 fills the file from the prototype `index.html`: every design-section-9 gap and every `<span class="ph">` becomes a gap marker; figures `coverage` (`img/landing/coverage`, pitch) and `antenna` (`img/landing/antenna`, quick start) with the prototype's alt texts and captions; the "For team leads" card keeps `href = "#covers"` (D30); `llms.summary` is a gap-marked draft from the landing lead.
-
-### 7.3 `content/publications.toml`
-
-`page.title`, `page.description`, `page.lead` (inline MD, links `faq.html#cite`); `group` (at least 1, in display order) with `id`, `title`, optional `intro` and `outro` (inline MD) and `entry` (at least 1, in display order: newest first, as written) with `year` (int), `title`, `authors`, `venue` and `link` (at least 1 of `{label, url}`; `url` absolute or site-relative such as `publications/x.pdf`). Step 5 fills it from `html_builder/parts/publications.html.part` in the grouping of the prototype (groups `quadriga-lib` and `quadriga-background`); only `page.description` is a gap.
+`page.title`, `page.description`, `page.lead` (inline Markdown, links `faq.html#cite`); `group` (at least 1, in display order) with `id`, `title`, optional `intro` and `outro` (inline Markdown) and `entry` (at least 1, in display order: newest first, as written) with `year` (int), `title`, `authors`, `venue` and `link` (at least 1 of `{label, url}`; `url` absolute or site-relative such as `publications/x.pdf`). A plain check in `prose.py` reports a missing required key, an unknown key or an empty list as a structural error with file and key path (for example `group[1].entry[2].year: missing`). Inline-Markdown strings are rendered with `renderInline` of the prose parser; other strings are escaped. Step 5 fills it from `html_builder/parts/publications.html.part` in the grouping of the prototype (groups `quadriga-lib` and `quadriga-background`); only `page.description` is a gap. The twin `docs/publications.md` is written from the same data: per group `## title` with intro, one list item per entry (year, title, authors, venue, links), outro.
 
 ## 8. Renderers and templates
 
@@ -523,18 +443,18 @@ All keys are required except `badge`. Step 5 fills the file from the prototype `
 | File | Used by | Structure (prototype file) |
 |------|---------|----------------------------|
 | `base.html` | all | head (section 8.3), skip link, header, `<main id="content">`, footer (`index.html`) |
-| `_header.html` | base | menu `<details class="menu">` with the groups of design 4.1, inline logo, name, version, GitHub link; tab row from the page list |
+| `_header.html` | base | menu `<details class="menu">` with the groups of design 4.1, inline logo, name, version, GitHub link; tab row from `PAGES` |
 | `_footer.html` | base | the four columns of design 4.2, bottom line "Quadriga-Lib v`version`", Impressum, Privacy; "This page as Markdown" only on pages with a twin (D26) |
 | `_logo.svg` | header, 404 | the logo inline, `aria-hidden="true" focusable="false"` |
-| `landing.html` | landing | design 5.1 (`index.html`) |
+| `landing.html` | landing | design 5.1 with the landing text (section 7.1; `index.html`) |
 | `api.html`, `_api_index.html`, `_fn_entry.html` | API pages | section 8.4 (`cpp_api.html`) |
 | `text.html` | text pages | breadcrumb, `h1`, lead, "Markdown version" link, index, prose (`formats.html`, `ai_agents.html`) |
 | `legal.html` | Impressum, privacy | breadcrumb, `h1`, prose; no index (`impressum.html`) |
-| `tutorials_index.html`, `tutorial.html` | tutorials | section 13.5 (`tutorials.html`, `tutorial_sample.html`) |
+| `tutorials_index.html`, `tutorial.html` | tutorials | section 13.4 (`tutorials.html`, `tutorial_sample.html`) |
 | `publications.html` | publications | groups with entry lists (`publications.html`) |
 | `notfound.html` | 404 | centred logo 96 px, `h1`, sentence, buttons Home, C++ API, MATLAB API, Python API (design 5.8) |
 
-Menu groups, footer columns and their labels are written in the templates (design 4.1 and 4.2) with the helper `url(page_id)`, which returns `root` plus the page's `file`; external links use the `[site]` URLs. Breadcrumbs: "Home › `title`"; "Home › Tutorials › `title`" on tutorial pages; "Home › API reference › C++" (and "MATLAB / Octave", "Python") with "API reference" linking to `index.html#apis`. The current tab and menu entry get `aria-current="page"`; tutorial pages mark "Tutorials". Text pages: the index lists the `h2` headings; an `h2` with `h3` headings below it becomes an open `<details>` with "Overview" and the `h3` links; the list appears in `nav.doc-side.idx` (`aria-label="Page sections"`) and in `details.doc-index` ("On this page"); a page with fewer than two `h2` headings has no index. Other templates follow their prototype files with all texts from the data files; the landing language tabs keep the prototype structure (`div.ltabs[data-lang-tabs]`, radios `name="qs"`, values `python`, `matlab`, `cpp`, Python checked). Inline `style` attributes of the prototype become classes in `site.css`.
+Menu groups, footer columns and their labels are written in the templates (design 4.1 and 4.2) with the helper `url(page_id)`, which returns `root` plus the page's file; external links use the URL constants. Breadcrumbs: "Home › `title`"; "Home › Tutorials › `title`" on tutorial pages; "Home › API reference › C++" (and "MATLAB / Octave", "Python") with "API reference" linking to `index.html#apis`. The current tab and menu entry get `aria-current="page"`; tutorial pages mark "Tutorials". Text pages: the index lists the `h2` headings; an `h2` with `h3` headings below it becomes an open `<details>` with "Overview" and the `h3` links; the list appears in `nav.doc-side.idx` (`aria-label="Page sections"`) and in `details.doc-index` ("On this page"); a page with fewer than two `h2` headings has no index. Other templates follow their prototype files; the landing language tabs keep the prototype structure (`div.ltabs[data-lang-tabs]`, radios `name="qs"`, values `python`, `matlab`, `cpp`, Python checked). Inline `style` attributes of the prototype become classes in `site.css`.
 
 ### 8.3 Head of every page (design 4.3)
 
@@ -552,19 +472,26 @@ Follows the prototype `cpp_api.html` and design 5.2:
 
 ### 8.5 Fragment rendering to HTML
 
-markdown-it's renderer with overrides: fences through the span-free colouring (section 10) as `<pre><code class="language-<lang>">`; tables wrapped in `<div class="table-wrap">`; link URLs from `links.py` for the output location; math converted to MathML (section 11), block math in `<div class="math-block">`; note boxes (section 6.5); gap spans; heading ids (section 6.2).
+markdown-it's renderer with overrides: fences through the span-free colouring (section 10) as `<pre><code class="language-<lang>">`; tables wrapped in `<div class="table-wrap">`; link URLs from `links.py` for the output location; math converted to MathML (section 11), block math in `<div class="math-block">`; note boxes (section 6.5); heading ids (section 6.2). Gap spans come from the pass of section 6.4.
 
 ### 8.6 Markdown output
 
-#### 8.6.1 Renderer and twin layout
+#### 8.6.1 Twin writer and twin layout
 
-Fragments are rendered with `mdformat.renderer.MDRenderer` (options `wrap: keep`, `number: false`, `end_of_line: lf`, the `tables` extension) plus a small extension with renderers for math (`$...$`, `$$` blocks), note boxes (GitHub alerts) and gap markers (verbatim). Structure around the fragments is written directly. Parameter rows are written in the SPEC form `` - **`name`** *(qualifier)* — description ``; note rows as their item. Sub-block labels become `### Label`; fences get the language.
+Twins are written from the source text, not from markdown-it tokens. Each part (name, brief, intro, sub-blocks, prose body, notebook Markdown cell) is copied line by line, and only these things change:
+
+- Doc-block sub-block headings `## X:` are demoted to the twin's sub-block level (`### X:`, text otherwise unchanged).
+- Prose and notebook headings lose their trailing `{...}`; the ids are written as anchors (section 9.5).
+- Fences without info string in doc blocks get the page language (section 5.5).
+- Outside code spans and fences: `[[name]]` and `.[[name]]` become Markdown links; raw `<a href="U" ...>T</a>` becomes `[T](U')`; a trailing `<br>` at the end of a line is removed; the URLs of Markdown links and images and of raw links are mapped for the twin's location (section 8.7.1, including the `site_url` rule).
+
+The writer keeps a fence map per part (which lines lie inside a fence) and splits each other line at backtick runs, so code spans stay untouched. Math, tables, note boxes and gap markers pass through verbatim; parameter items keep their source form. Structure around the parts (headings, anchors, index tables, separators) is written directly.
 
 Every twin starts with `# title`, an empty line, and `Quadriga-Lib <version> · Web page: <absolute URL>` (for a section file `<base_url>/<lang>_api.html#sec-<slug>`); then, if the page has at least two `##` headings, an index table (D26) of its `##` headings (with a `Topics` column of `###` links on prose pages); then the lead and the body. Exception: the full API files.
 
 #### 8.6.2 Full API files `docs/quadriga_lib_api_<lang>.md`
 
-The old layout, without build date and without the "Line" column (plan section 11): YAML front matter with `title` ("C++ API Documentation for Quadriga-Lib v`version`" and the MATLAB / Octave and Python forms), `author`, `lang`; `# General usage notes`; `# Function Index` with the columns Function, Section, Summary (the brief); then per section `---`, `# Section title`, description, and per function `---`, `## name`, brief, an "Also in:" line with links to existing counterparts (omitted when there are none), intro and the sub-blocks.
+The old layout, without build date and without the "Line" column (plan section 11): YAML front matter with `title` ("C++ API Documentation for Quadriga-Lib v`version`" and the MATLAB / Octave and Python forms), `author`, `lang`; `# General usage notes`; `# Function Index` with the columns Function, Section, Summary (the brief); then per section `---`, anchors, `# Section title`, description, and per function `---`, its anchor, `## name`, brief, an "Also in:" line with links to existing counterparts (omitted when there are none), intro and the sub-blocks (`### X:`).
 
 #### 8.6.3 Per-section files `docs/api/<lang>/<slug>.md`
 
@@ -574,20 +501,20 @@ Twin header with the section title, index table `| Function | Summary |`, descri
 
 #### 8.7.1 Link targets
 
-Every link becomes a target; each renderer asks for its URL at its output location.
+Every link becomes a target; each renderer asks for its URL at its output location. Twins carry the same ids as the HTML (section 9.5), so the twin URL only changes the path.
 
 | Kind | Example in a source | HTML in root | HTML in `tutorials/` | Twin in `docs/` |
 |------|---------------------|--------------|----------------------|-----------------|
-| API function | `[[x]]` in a block; `cpp_api.html#x` in prose | `cpp_api.html#x` (same page: `#x`) | `../cpp_api.html#x` | full file: `#<gh-slug>`; section file: `#<gh-slug>` or `<slug>.md#<gh-slug>`; prose twin: `api/<lang>/<slug>.md#<gh-slug>` |
-| Page with twin | `faq.html#cite` | `faq.html#cite` | `../faq.html#cite` | twin path plus the GitHub slug of the heading with that id (`faq.md#how-do-i-cite-quadriga-lib`) |
+| API function or section | `[[x]]` in a block; `cpp_api.html#x` in prose | `cpp_api.html#x` (same page: `#x`) | `../cpp_api.html#x` | full file: `#x`; section file: `#x` or `<slug>.md#x`; prose twin: `api/<lang>/<slug>.md#x` (the section file holding id `x`) |
+| Page with twin | `faq.html#cite` | `faq.html#cite` | `../faq.html#cite` | twin path, same fragment (`faq.md#cite`) |
 | Page without twin | `index.html#quickstart` | relative | relative | absolute: `<base_url>/index.html#quickstart` |
 | Twin file | `quadriga_lib_api_cpp.md` | relative | relative | relative |
-| Site file outside `docs/` | `publications/x.pdf`, `quadriga_lib_material_model.md`, `skill/...zip` | relative | relative | absolute: `<base_url>/<path>` (plan section 11) |
+| Site file outside `docs/` | `publications/x.pdf`, `quadriga_lib_material_model.md`, `skill/SKILL.md` | relative | relative | absolute: `<base_url>/<path>` (plan section 11) |
 | External | `https://...` | unchanged | unchanged | unchanged |
-| Same-page anchor | `#files` | unchanged | unchanged | GitHub slug of the target heading |
-| "Also in" (twins only, section 8.6.2) | counterpart in language X | — | — | full file: `quadriga_lib_api_<X>.md#<gh-slug>`; section file: `../<X>/<slug>.md#<gh-slug>` |
+| Same-page anchor | `#files` | unchanged | unchanged | unchanged |
+| "Also in" (twins only, section 8.6.2) | counterpart in language X | — | — | full file: `quadriga_lib_api_<X>.md#<anchor>`; section file: `../<X>/<slug>.md#<anchor>` |
 
-Links in sources are written relative to the site root. Doc blocks link only within their own API page (`[[name]]`; `md/SPEC_MATLAB_API.md`, `md/SPEC_PYTHON_API.md`); their raw links point to site pages such as `formats.html#6cab4884`, site files or external URLs. A prose link to an API page with a function anchor (for example `cpp_api.html#obj_file_read` on the formats page) is the kind "API function". A wrong anchor in any site-relative link is caught by the link check (section 15.1).
+Links in sources are written relative to the site root. Doc blocks link only within their own API page (`[[name]]`; `md/SPEC_MATLAB_API.md`, `md/SPEC_PYTHON_API.md`); their raw links point to site pages such as `formats.html#6cab4884`, site files or external URLs. A wrong anchor in any site-relative link is caught by the link check (section 15.1).
 
 #### 8.7.2 Resolving `[[name]]`
 
@@ -600,7 +527,7 @@ One function writes both, with absolute links (`base_url`) for `llms.txt`, which
 ```
 # Quadriga-Lib
 
-> <landing.toml llms.summary>
+> <llms_summary of content/ai_agents.md>
 
 Version <version>. Every page of quadriga-lib.org has a Markdown version; the API reference exists per language as one full file and as one file per section.
 
@@ -623,7 +550,7 @@ Version <version>. Every page of quadriga-lib.org has a Markdown version; the AP
 - ... (all sections, C++ then MATLAB / Octave then Python)
 
 ## Optional
-- [Agent skill (placeholder)](<base>/skill/quadriga-lib-skill-<version>.zip)
+- [Agent skill (placeholder)](<base>/skill/SKILL.md)
 ```
 
 `docs/README.md` is the same list after one intro sentence: generated by `make docs` from the documentation comments and `docs_builder/content/`, do not edit; quadriga-lib.org shows the latest release, these files this branch as of the last `make docs`. In `docs/README.md`, links to files outside `docs/` (tutorials, skill) are absolute. It is not copied to the site.
@@ -674,15 +601,17 @@ An unknown stem, an unknown C++ name or a C++ name in two families is a structur
 
 ### 9.5 Anchors in twins
 
-GitHub makes heading anchors itself; twins use them, never HTML ids. `gh_slug()` follows github-slugger: lower-case the heading's plain text; keep characters of Unicode categories `L*`, `M*`, `N*`, `Pc`, plus `-` and space; spaces become `-`; a repeated slug in the same file gets `-1`, `-2`, ... in document order. Test vectors: `.calc_directivity_dBi` → `calc_directivity_dbi`; `sos.acf_2d` → `sosacf_2d`; "How do I cite Quadriga-Lib?" → `how-do-i-cite-quadriga-lib`; "Miscellaneous / Tools" → `miscellaneous--tools`; the second "Inputs" → `inputs-1`.
+Twins write explicit anchors with the ids the HTML uses, so one id works in both formats and no GitHub heading slug is computed. On its own line directly before the element: `<a id="<anchor>"></a>` before each function heading; `<a id="sec-<slug>"></a><a id="<legacy hash>"></a>` before each API section heading; before each prose or notebook heading, one `<a id>` for its id and one per legacy id. Links in twins use these ids (section 8.7.1).
+
+GitHub keeps such anchors with the prefix `user-content-` and its page script resolves `#x` to them. This must be checked once on GitHub after the first push (a function link with a `.` such as `#.calc_directivity_dBi`, a section link, `faq.md#cite`). If it fails, the fallback is a slug function that follows GitHub's heading anchors (github-slugger: lower case, punctuation dropped, spaces to `-`, `-1`, `-2` for repeats), used for links in twins only. The HTML ids stay as they are either way.
 
 ### 9.6 URL inventory (D3)
 
-Kept: `index.html#quickstart`; `cpp_api.html`, `mex_api.html`, `python_api.html` with every function anchor (137, 85, 80 today) and section hash (10, 9, 9); `formats.html` with `#6cab4884`, `#9f6922f9`, `#<arrayant>`, `#<layout>`; `faq.html` and `download.html` with their four hashes each; `publications.html`; `/quadriga_lib_api_{cpp,mex,python}.md`; `/quadriga_lib_material_model.md`; `/publications/...`. Dropped (D3 as amended): the `quadriga-lib_*` layout ids of the old pages, the formats ids of section 6.6, `style2.css`, `quadriga-lib-logo80.png`, `quadriga-lib-q_letter64.png`. New: `ai_agents.html`, `tutorials.html`, `tutorials/...`, `impressum.html`, `privacy.html`, `404.html`, the twins, `api/...`, `llms.txt`, `skill/...`.
+Kept: `index.html#quickstart`; `cpp_api.html`, `mex_api.html`, `python_api.html` with every function anchor (137, 85, 80 today) and section hash (10, 9, 9); `formats.html` with `#6cab4884`, `#9f6922f9`, `#<arrayant>`, `#<layout>`; `faq.html` and `download.html` with their four hashes each; `publications.html`; `/quadriga_lib_api_{cpp,mex,python}.md`; `/quadriga_lib_material_model.md`; `/publications/...`. Dropped (D3 as amended): the `quadriga-lib_*` layout ids of the old pages, the formats ids of section 6.6, `style2.css`, `quadriga-lib-logo80.png`, `quadriga-lib-q_letter64.png`. New: `ai_agents.html`, `tutorials.html`, `tutorials/...`, `impressum.html`, `privacy.html`, `404.html`, the twins, `api/...`, `llms.txt`, `skill/SKILL.md`.
 
 ## 10. Code colouring
 
-`render_html.py` has its own small formatter over `pygments.lex()` (no `HtmlFormatter`). Each token type maps to the first matching entry; tokens without an entry produce plain escaped text and no `<span>` (design open point 4); adjacent tokens of one class share one `<span>`.
+`render_html.py` has its own small formatter over `pygments.lex()` (no `HtmlFormatter`). Each token type maps to the first matching entry; tokens without an entry produce plain escaped text and no `<span>` (design open point 4); adjacent tokens of one class share one `<span>`. The same function is the template filter `highlight(lang)` (section 7.1).
 
 | Token type (and subtypes) | Class | Colour (site.css) |
 |---------------------------|-------|-------------------|
@@ -699,9 +628,10 @@ Lexers: `cpp`, `c++` → C++; `matlab`, `octave` → MATLAB; `python`, `py` → 
 ## 11. Formulas
 
 - Syntax: `$...$` and `$$...$$` (D5) in doc blocks, prose, inline data strings and notebook Markdown cells. No site source has a formula today.
-- Output: MathML, converted at build time by the pure-Python package `latex2mathml` (D5 as amended): `latex2mathml.converter.convert(tex, display="block")` for `$$...$$`, `display="inline"` for `$...$`; the result is a `<math>` element inserted as is (block formulas inside `<div class="math-block">`). All browsers of plan 5.2 render MathML Core; no math CSS beyond the prototype's `math { font-family: "Latin Modern Math", "STIX Two Math", "Cambria Math", math; }` and no math fonts are shipped; glyphs come from the device's math font.
-- Evaluated on 1,091 formulas (the material model, the four publication Markdown files and the tutorial formulas): none raises; the elements it emits are all MathML Core; the visible text equals KaTeX's MathML for all but 12 formulas, which differ in accents (`\bar` as a combining macron), `‖` for `\|` and two failures below; bold, script and double-struck letters come out as Unicode math letters (𝐇, 𝒩, ℂ), which render in every browser, where KaTeX's `mathvariant` attributes are ignored by Chrome. Rendered side by side with KaTeX's MathML in the browser pane, both look alike.
-- The converter does not raise on unknown commands or unbalanced braces; it passes them through. So the builder treats as a structural error at the formula's source file and line (D7): unbalanced `{` `}` in the source, any backslash left in the text of the MathML output (an unsupported command), and any exception of the converter. Found in the evaluation: `\arg` (unsupported; write `\operatorname{arg}`) and `\_` inside `\text{}`. Environments the converter does not handle (`aligned`, `gather`, `gathered`, `eqnarray`, `multline`, `alignat`; tested) are a structural error when `\begin{<name>}` appears in a formula; `align`, `split`, `array`, the matrix environments, `cases` and `\tag` work.
+- Converter: pandoc, LaTeX to MathML (D38). `website` collects every formula of the build first (the `math_inline` and `math_block` tokens of all fragments, with source file and line), then runs pandoc once, and only if there is at least one formula: `pandoc -d docs_builder/pandoc_math.yaml -f markdown -t html` with the document on stdin and the HTML on stdout. `pandoc_math.yaml` holds `html-math-method:` / `  method: mathml`; the defaults file is used instead of a command-line flag because `--mathml` prints a deprecation warning from pandoc 3.11 on and `--math-method` does not exist before 3.11, while the defaults key works in 3.7 to 3.13 without a warning.
+- Batching: the document has, per formula in order, a marker paragraph `QDOCSMATH<n>` and then the formula as its own paragraph (`$tex$` or `$$tex$$`). The output is split at the `<p>QDOCSMATH<n></p>` lines. Marker paragraphs are plain words, which pandoc passes through unchanged, so the split cannot drift, and one process handles any number of formulas.
+- Checks (D7, structural errors at the formula's source file and line): pandoc's exit status is not 0; pandoc writes anything to stderr (for example "Could not convert TeX math ...", which it prints for unknown commands while leaving raw TeX in the output); or a formula's chunk is not exactly one `<p>` holding a single `<math>` element (this also catches unbalanced braces, which pandoc's reader does not take as math at all). Stderr text is assigned to the formulas whose TeX it quotes; text that quotes none is one error without a line.
+- Output: the `<math>` element as pandoc writes it (with its `<semantics>` and TeX annotation), inline in the text flow, block formulas inside `<div class="math-block">`. Measured by the manager with pandoc 3.13: accents with subscripts, primes, `\pm` and `\sim` spacing, upright `\mathrm{d}`, `aligned`, `\frac12`, `\underbrace` and `\arg` render correctly; `\mathbf{x}` comes out as bold-italic Unicode (ISO vector style, accepted). All browsers of plan 5.2 render MathML Core; no math CSS beyond the prototype's `math { font-family: "Latin Modern Math", "STIX Two Math", "Cambria Math", math; }` and no math fonts are shipped.
 - Twins keep the `$...$` source (GitHub renders it, D8).
 
 ## 12. Static parts
@@ -719,7 +649,8 @@ Copied unchanged into the site root (files named `README.md` are skipped):
 | `img/favicon.svg` | The logo with `<style>svg { color: #2e7d46 } @media (prefers-color-scheme: dark) { svg { color: #7fd197 } }</style>` |
 | `img/favicon-32.png`, `img/apple-touch-icon.png` (180 × 180), `favicon.ico` | Rendered once from `img/favicon.svg` (Inkscape, ImageMagick) and committed (design open point 5) |
 | `img/landing/README.md` | One line: the figures of D15 go here, with the file names of design section 8 |
-| `.htaccess` | Section 12.6 |
+| `.htaccess` | Section 12.5 |
+| `publications/`, `quadriga_lib_material_model.md` | Hand-made files moved from `html_docu/` in package 0 (section 18.1) |
 
 ### 12.2 `site.css`
 
@@ -731,13 +662,9 @@ A port of the prototype: every token value, breakpoint, size and colour stays (d
 
 ### 12.4 Landing figures
 
-For each `figure` entry: if `static/<base>-light.webp` and `-dark.webp` exist, `<figure><div class="frame"><picture><source media="(prefers-color-scheme: dark)" srcset="<base>-dark.webp"><img src="<base>-light.webp" width="1600" height="1200" alt="..." decoding="async"></picture></div><figcaption>...</figcaption></figure>`; otherwise the same frame, empty, with the alt text as a centred label, and the gap list names the missing files. Every figure except the first on the page gets `loading="lazy"`. The figure scripts go into `docs_builder/figures/` in the figure session (D15, D24); they write the WebP files into `static/img/landing/`, where the images are committed.
+For each entry of `LANDING_FIGURES`: if `static/<base>-light.webp` and `-dark.webp` exist, `<figure><div class="frame"><picture><source media="(prefers-color-scheme: dark)" srcset="<base>-dark.webp"><img src="<base>-light.webp" width="1600" height="1200" alt="..." decoding="async"></picture></div><figcaption>...</figcaption></figure>`; otherwise the same frame, empty, with the alt text as a centred label, and the gap list names the missing files. Every figure except the first on the page gets `loading="lazy"`. The figure scripts go into `docs_builder/figures/` in the figure session (D15, D24); they write the WebP files into `static/img/landing/`, where the images are committed.
 
-### 12.5 Hand-made files until the cutover
-
-`assets.py` copies, as constants until the cutover, `html_docu/publications/` to `publications/` and `html_docu/quadriga_lib_material_model.md` to `quadriga_lib_material_model.md` (D24); a missing source is a structural error. At the cutover the files move to `static/` and the constants go (section 18).
-
-### 12.6 `.htaccess`
+### 12.5 `.htaccess`
 
 ```
 Options -Indexes
@@ -754,38 +681,34 @@ AddCharset utf-8 .html .css .js .md .txt .svg
 
 `.md` is served as `text/markdown; charset=utf-8`, `llms.txt` as `text/plain; charset=utf-8` (plan section 11). The hoster serves no compressed responses today, so the budgets of section 15.3 are in raw bytes; `mod_deflate` is tested after the first deploy (section 18.4), not in step 5.
 
-## 13. Tutorial pipeline (D28, plan 5.3)
+## 13. Tutorials (D28, D34, plan 5.3)
 
 ### 13.1 Notebooks
 
-`tutorials/<stem>.ipynb`, `<stem>` matching `[a-z0-9][a-z0-9_-]*`, stored without outputs (every code cell has no outputs and no execution count; otherwise a structural error telling the author to clear outputs). The builder never rewrites notebooks.
+`tutorials/<stem>.ipynb`, `<stem>` matching `[a-z0-9][a-z0-9_-]*`, committed with their outputs (D34). The builder reads them with `json` from the standard library, never executes and never rewrites them. Running and refreshing the notebooks before a release is a separate project (D34). A code cell without an execution count gives the warning `not-run`.
 
 ### 13.2 Metadata
 
-Notebook-level `metadata.quadriga_tutorial`, schema-checked: `title` (str), `summary` (str, inline MD), `level` (`beginner`, `intermediate`, `advanced`), `duration_min` (int), `order` (int; index order, then title), `dummy` (bool, optional). Language and kernel from `metadata.kernelspec` (`name`; `language`: `python` → "Python", `matlab` → "MATLAB", `octave` → "Octave"). Cell-level `metadata.quadriga_tutorial.alt` is the alt text of that cell's images; missing gives the warning `figure-alt` and "Figure output of cell <n>".
+Notebook-level `metadata.quadriga_tutorial`, checked like the publications data (section 7.2): `title` (str), `summary` (str, inline Markdown), `level` (`beginner`, `intermediate`, `advanced`), `duration_min` (int), `order` (int; index order, then title), `dummy` (bool, optional). Language from `metadata.kernelspec.language` (`python` → "Python", `matlab` → "MATLAB", `octave` → "Octave"). Cell-level `metadata.quadriga_tutorial.alt` is the alt text of that cell's images; missing gives the warning `figure-alt` and "Figure output of cell <n>".
 
-### 13.3 Running (`make tutorials`)
-
-For each notebook, sorted: if a cache entry with the current key exists and `--force` is not given, skip. If the kernel is not installed (`jupyter_client.kernelspec`), skip with a warning (D28: MATLAB notebooks run only where a kernel exists). Otherwise execute with `nbclient.NotebookClient(nb, kernel_name=..., timeout=600)` in an empty work folder in the cache. A cell error is an error naming the cell and the exception; the old entry is deleted and the run continues, exiting 1 at the end. Entries of removed notebooks are deleted. The run uses the released pip package of the active environment (D28).
-
-### 13.4 Cache
-
-`docs_builder/.cache/tutorials/<stem>/` with `key.txt`, `fragment.html`, `page.md` and the figures. Key: SHA-256 of the notebook bytes, the installed quadriga-lib version (`importlib.metadata.version("quadriga-lib")`, the released package the notebook runs with) and the kernel name. The key does not see the builder's code or other tools: after a tool upgrade or a change of the tutorial rendering, run `tutorials --force` (section 4.3).
-
-### 13.5 Output
+### 13.3 Conversion
 
 - Markdown cells: rendered like prose (notebook kind; a `#` heading is rendered as `h2`), heading ids as section 6.2.
-- Code cells: `<div class="cell"><div class="cell-label">In [n]</div><pre><code class="language-<lang>">...</code></pre>` and one `<div class="out">` per output.
-- Output types: `stream` and `text/plain` as `<pre>` (ANSI codes removed); `image/png` and `image/svg+xml` written to `<stem>/fig-<cell>-<output>.<ext>` and shown as `<img alt loading="lazy">`. Any other type falls back to its `text/plain` with the warning `output-type`.
-- `page.md` (the twin, D26): twin header (web page `<base_url>/tutorials/<stem>.html`), a line with the two downloads, Markdown cells verbatim, code cells as fenced blocks, text outputs as `text` fences, images as `![alt](<stem>/fig-<cell>-<output>.<ext>)`. Twin and page sit side by side, so one relative image path works in both (D28).
-- Interface: `tutorials.load_tutorials(root)` returns one entry per notebook with a current cache entry: `stem`, `meta` (title, summary, level, duration_min, order, dummy, language), `fragment` (HTML), `page_md` (the twin text) and `files` (relative path → bytes: the notebook copy and the figures). Package A ships `tutorials.py` as a stub returning `[]`; package D replaces it. `render_html.py` (B) renders `tutorial.html` with `root` (`"../"`), `tut` (the entry) and `fragment`, and `tutorials_index.html` with `page` (front matter and lead of `content/tutorials.md`), `tutorials` (the entries, sorted) and `show_dummy_note`; `assets.py` (B) writes `page_md` and `files`; `render_md.py` (A) writes the index twin `tutorials.md`.
-- `website` uses the cache entry whose key matches; otherwise the notebook is left out with the warning `tutorial-missing` ("run make tutorials"), an error with `--release`. Without any entry the index shows "No tutorials yet." (plan 5.3). Per included notebook: `tutorials/<stem>.html` (template around `fragment.html`), `tutorials/<stem>.md`, `tutorials/<stem>.ipynb` (the source notebook, D28), the figures. Metadata for the page and the index is read from the notebook. Downloads: "Download notebook .ipynb" and "Markdown .md". The index (`tutorials.html`, twin `tutorials.md`, both website only) shows cards in `order` with language tag, level tag, title and summary; if every included notebook is a dummy, `dummy_note` is shown as a warning note box.
+- Code cells: `<div class="cell"><div class="cell-label">In [n]</div><pre><code class="language-<lang>">...</code></pre>` and one `<div class="out">` per output (`n` is the execution count).
+- Outputs: `stream` text and `text/plain` of `execute_result` and `display_data` as `<pre>` (ANSI codes removed); `image/png` (base64, decoded) and `image/svg+xml` (stored as text in the notebook, written as is) to `<stem>/fig-<cell>-<output>.<ext>`, shown as `<img alt loading="lazy">`. Any other type falls back to its `text/plain` with the warning `output-type`. An `error` output is a structural error (the notebook was committed with a failing cell).
+- Twin `tutorials/<stem>.md` (D26): twin header (web page `<base_url>/tutorials/<stem>.html`), a line with the two downloads, Markdown cells through the twin writer (section 8.6.1), code cells as fenced blocks, text outputs as `text` fences, images as `![alt](<stem>/fig-<cell>-<output>.<ext>)`. Twin and page sit side by side, so one relative image path works in both (D28).
 
-### 13.6 The dummy notebook
+### 13.4 Pages
 
-`tutorials/pipeline_demo.ipynb`, kernel `python3`, metadata `title` "Pipeline demo", `summary` "Placeholder notebook that tests the tutorial pipeline.", `level` beginner, `duration_min` 5, `order` 1, `dummy` true. Cells (fixed seed): (1) Markdown `## Set-up` and a sentence; (2) code: `import numpy as np`, `import quadriga_lib`, `rng = np.random.default_rng(1)`, `print(quadriga_lib.version())`; (3) Markdown `## An antenna` with `$D = 10 \log_{10}(\max G)$`; (4) code: `ant = quadriga_lib.arrayant.generate('3gpp', M=2, N=2, freq=3.7e9)` and `print(round(float(quadriga_lib.arrayant.calc_directivity(ant, 0)), 2))`; (5) code with `alt` "Line plot of 50 random values": a matplotlib plot of `rng.standard_normal(50)` with `%matplotlib inline`; (6) Markdown with a three-row table and `$$\sigma^2 = \frac{1}{N}\sum_{n=1}^{N} (x_n - \bar x)^2$$`. Step 5 checks the calls against quadriga-lib 0.12.2.
+Per notebook: `tutorials/<stem>.html` (template `tutorial.html` with `root` `"../"`), `tutorials/<stem>.md`, `tutorials/<stem>.ipynb` (the source notebook, D28), the figures. Downloads: "Download notebook .ipynb" and "Markdown .md". The index (`tutorials.html`, twin `tutorials.md`, both website only) shows cards in `order` with language tag, level tag, title and summary; if every notebook is a dummy, `dummy_note` is shown as a warning note box; with no notebook the index shows "No tutorials yet." (plan 5.3).
 
-## 14. Agent skill placeholder (D10)
+### 13.5 The dummy notebook
+
+`tutorials/pipeline_demo.ipynb`, kernel `python3`, metadata `title` "Pipeline demo", `summary` "Placeholder notebook that tests the tutorial pipeline.", `level` beginner, `duration_min` 5, `order` 1, `dummy` true. Cells (fixed seed): (1) Markdown `## Set-up` and a sentence; (2) code: `import numpy as np`, `import quadriga_lib`, `rng = np.random.default_rng(1)`, `print(quadriga_lib.version())`; (3) Markdown `## An antenna` with `$D = 10 \log_{10}(\max G)$`; (4) code: `ant = quadriga_lib.arrayant.generate('3gpp', M=2, N=2, freq=3.7e9)` and `print(round(quadriga_lib.arrayant.calc_directivity(ant, 0)[0], 2))` (indexing, not `float()` on the array, so numpy prints no DeprecationWarning); (5) code with `alt` "Line plot of 50 random values": a matplotlib plot of `rng.standard_normal(50)` with `%matplotlib inline`; (6) Markdown with a three-row table and `$$\sigma^2 = \frac{1}{N}\sum_{n=1}^{N} (x_n - \bar x)^2$$`.
+
+Step 5 runs it once to store the outputs: `jupyter nbconvert --to notebook --execute --inplace tutorials/pipeline_demo.ipynb` in any environment with `quadriga-lib` (0.12.2 or newer from pip), `numpy`, `matplotlib` and `jupyter` installed, for example a scratch conda environment in the agents folder. That environment is not part of the project. The stored outputs must contain no warning text.
+
+## 14. Agent skill placeholder (D10, D37)
 
 `docs_builder/skill/quadriga-lib/SKILL.md`:
 
@@ -800,7 +723,7 @@ description: Placeholder for the Quadriga-Lib agent skill (radio channel modelli
 This skill is a placeholder. The documentation for agents starts at {{ site_base_url }}/llms.txt.
 ```
 
-The placeholder is not a gap: the site may go live with it (plan 5.4 asks for a note on the AI page). `website` packs every file below `skill/` into `skill/quadriga-lib-skill-<version>.zip` with `ZIP_STORED` (bytes independent of the zlib version), sorted entries, `date_time=(1980, 1, 1, 0, 0, 0)`, `external_attr = 0o644 << 16`, `create_system = 3`, after substituting build variables.
+`website` copies it to `skill/SKILL.md` after substituting build variables; the AI page and `llms.txt` link it. No zip (D37). The placeholder is not a gap: the site may go live with it (plan 5.4 asks for a note on the AI page).
 
 ## 15. Checks after the build
 
@@ -808,7 +731,7 @@ The placeholder is not a gap: the site may go live with it (plan 5.4 asks for a 
 
 ### 15.1 Links and anchors
 
-For every HTML file: every `href`, `src` and `srcset` that is not absolute or `mailto:` is resolved against the file (root-absolute against the site root); the target must exist in the output; a fragment on an HTML target must be an `id` there, on a `.md` target a GitHub slug of a heading there. For every Markdown file the builder generates (twins, API files, `llms.txt`, `docs/README.md`, tutorial twins): every link and image URL, the same way; absolute URLs that start with `base_url` are mapped to the output and checked too. Hand-made files copied into the site (`publications/**`, `quadriga_lib_material_model.md`) are not checked inside; links into them are checked for existence only. URLs that start with `download_base_url` or `releases_url` and all other external URLs are not fetched. In the `docs` phase only links whose target lies in `docs/` are checked; absolute site links and links to files outside `docs/` are checked in `website`. It must catch the case of plan section 10: a FAQ without `cite` breaks the footer link `faq.html#cite` on every page and the twin link to the cite heading.
+For every HTML file: every `href`, `src` and `srcset` that is not absolute or `mailto:` is resolved against the file (root-absolute against the site root); the target must exist in the output; a fragment on an HTML target must be an `id` there, on a `.md` target an `<a id>` there (section 9.5). For every Markdown file the builder generates (twins, API files, `llms.txt`, `docs/README.md`, tutorial twins): every link and image URL, the same way; absolute URLs that start with `base_url` are mapped to the output and checked too. Hand-made files copied into the site (`publications/**`, `quadriga_lib_material_model.md`) are not checked inside; links into them are checked for existence only. URLs that start with `DOWNLOAD_BASE_URL` or `RELEASES_URL` and all other external URLs are not fetched. In the `docs` phase only links whose target lies in `docs/` are checked; absolute site links and links to files outside `docs/` are checked in `website`. It must catch the case of plan section 10: a FAQ without `cite` breaks the footer link `faq.html#cite` on every page and the twin link `faq.md#cite`.
 
 ### 15.2 HTML well-formedness
 
@@ -816,108 +739,85 @@ For every HTML file: every `href`, `src` and `srcset` that is not absolute or `m
 
 ### 15.3 Size budgets (warnings)
 
-Raw bytes (section 12.6): API pages 800 kB (the C++ page is expected near 700 kB); other HTML pages 150 kB; landing total 550 kB, counting `index.html`, `site.css`, `site.js`, the font files and, per landing figure that exists, the larger of its two theme variants (a browser loads one). Each exceeded budget is a warning `[size]`.
+Raw bytes (section 12.5), per page: API pages 800 kB (the C++ page is expected near 700 kB); other HTML pages 150 kB. Each exceeded budget is a warning `[size]`.
 
-## 16. Package install and failsafe (D22)
+## 16. Documentation in packages and the release (D32)
 
-### 16.1 `docs_builder/CMakeLists.txt`
+The built site goes into no package. Every binary package carries the tracked Markdown of `docs/`, which holds all the documentation:
 
-Works standalone (`cmake -S docs_builder`) and, after the cutover, as `add_subdirectory(docs_builder)`:
+| Package | How `docs/` gets in | Changed in package D (section 18.3) |
+|---------|---------------------|-------------------------------------|
+| System install (`make install` with a prefix, deb build 1) | `CMakeLists.txt`, system-install branch: `install(DIRECTORY docs/ DESTINATION share/doc/quadriga-lib)` in place of `install(DIRECTORY html_docu/ DESTINATION ${INSTALL_DOCDIR})` | both `set(INSTALL_DOCDIR ...)` lines go; the local layout installs nothing (the tree already has `docs/`) |
+| Debian package | through the system install of build 1 (`COPY . .` in `Dockerfile.ubuntu` brings `docs/`; `.dockerignore` keeps `website/` out) | `debian/rules`: `override_dh_compress:` with recipe `dh_compress -X.md`; `debian/control`: "and HTML API documentation" becomes "and the API documentation as Markdown files" |
+| Windows zip | `Makefile` `release-win`: `xcopy /E /I "docs" "$(DIST_DIR)\docs"` in place of the `xcopy html_docu` line. `cmake --install` does not do it: `all` configures with `CMAKE_INSTALL_PREFIX=%CD%`, the local layout, so the system-install branch never runs for this build. | `README_win.md`: the `html_docu/` row becomes `docs/` "Documentation as Markdown files (the content of quadriga-lib.org)" |
+| pip wheels and sdist | none (as today) | — |
+| Source zip (`make package`, `git archive HEAD`) | `docs/` is tracked | — |
 
-1. Standalone (`CMAKE_CURRENT_SOURCE_DIR` equals `CMAKE_SOURCE_DIR`): `cmake_minimum_required(VERSION 3.18)`, `project(QuadrigaLibDocs LANGUAGES NONE)`.
-2. `option(ENABLE_DOCS_INSTALL "Install the prebuilt documentation from docs/website" OFF)` and the cache string `QDOCS_INSTALL_DIR` (default `share/doc/quadriga-lib/html`). OFF by default, the package builds switch it ON (D22 as amended; section 16.3).
-3. If the option is OFF: return. This is the only skip condition (pip builds, the local layout of `make` and users' own installs leave it OFF).
-4. Version: `QUADRIGA_VERSION` from the parent, or parsed standalone from `../include/quadriga_lib.hpp` as the top-level file does.
-5. Stamp: `../docs/website/docs-stamp.txt`, line `version=<v>`; found version, or `none` if the folder or file is missing.
-6. If the found version differs: `message(FATAL_ERROR ...)`. The message must name `docs/website/`, the found and the expected version, `make website` as the fix, and `-DENABLE_DOCS_INSTALL=OFF` as the way to build without documentation.
-7. Otherwise `install(DIRECTORY ../docs/website/ DESTINATION ${QDOCS_INSTALL_DIR})`.
+`dh_compress` (debhelper 13, compat 13 here) gzips every file below `usr/share/doc` larger than 4 kB, except a fixed list of extensions (`.htm*`, `.css`, `.js`, `.svg`, `.pdf`, images, archives, fonts and a few others); `.md` is not on that list, so without `-X.md` the larger Markdown files would become `.md.gz` and every relative link to them would break. `-X` excludes files whose name contains the given text. Checked against the `dh_compress` man page and its source on salsa.debian.org (the `find` expression with `-size +4k`).
 
-The check runs at configure time, before anything is compiled; after the cutover the `add_subdirectory` line sits right after the version block of the top-level file, so it comes seconds after the start (D22).
-
-### 16.2 Stamp file
-
-`docs/website/docs-stamp.txt`, written last by a successful `website` (section 3.6), content `version=<version>\n`; no date, so builds stay byte-identical.
-
-### 16.3 Build paths (applied at the cutover)
-
-| Path | After the cutover |
-|------|-------------------|
-| Debian package | `GNUmakefile` `deb-*` → `docker build` (`COPY . .` includes the ignored `docs/website/`) → `debian/rules`. Build 1 (gcc13, installs the docs) gets `-DENABLE_DOCS_INSTALL=ON`; build 2 (MATLAB MEX only) stays OFF. |
-| Early fail before Docker | First line of the `deb` recipe: `cmake -S docs_builder -B build_docs_check -DENABLE_DOCS_INSTALL=ON` (configure only), then the existing `$(MAKE) -j deb-...`. One line, no new target; a direct `make deb-jammy` is still protected by the check inside the container, only later. |
-| Release | `release:` without prerequisites, with the recipe `python3 docs_builder/build.py docs --check`, `python3 docs_builder/build.py website --release`, `$(MAKE) package`, `$(MAKE) deb`, `$(MAKE) pip`: the checks run before the source package is made. |
-| Windows package | `release-win` starts with `cmake -S docs_builder -B $(CMAKE_BUILD_DIR)\docs $(GENERATOR) -D ENABLE_DOCS_INSTALL=ON -D QDOCS_INSTALL_DIR=documentation -D CMAKE_INSTALL_PREFIX=%CD%\$(DIST_DIR)` and, after the library install, runs `cmake --install $(CMAKE_BUILD_DIR)\docs`; the `xcopy html_docu` line goes. Today `all` configures the local layout and `release-win` installs that build with `--prefix`, so a check in the top-level project would never run there. The site goes to `documentation\` at the top of the zip: the FHS path means nothing on Windows, and the name is not confused with the repository's `docs/`. |
-| pip, `make` (local layout), users' system installs | option OFF: no check, no documentation install, as with pip today (D22). |
-
-### 16.4 Test
-
-`test_cmake.py` (skipped without `cmake`) copies `docs_builder/CMakeLists.txt` into a temporary tree with `include/quadriga_lib.hpp` (version `1.2.3`) and `docs/website/`, and configures with `-DENABLE_DOCS_INSTALL=ON -DCMAKE_INSTALL_PREFIX=<tmp>/inst` unless stated: (a) no site: configure fails naming `none` and `1.2.3`; (b) stamp `version=1.2.2`: fails naming `1.2.2`; (c) stamp `version=1.2.3` and `index.html`: succeeds, and `cmake --install` puts both into `<tmp>/inst/share/doc/quadriga-lib/html/`; (d) no site, option not given: succeeds, installs nothing. The top-level `CMakeLists.txt` is not touched before the cutover (D22).
+Release (`GNUmakefile`, D32): `release:` without prerequisites; its recipe runs `python3 docs_builder/build.py docs --check` (the tracked Markdown is current), then `test -z "$$(git status --porcelain -- docs)"` (it is committed, including new files, which `git diff --quiet HEAD -- docs` would miss), then `$(MAKE) package`, `$(MAKE) deb`, `$(MAKE) pip`. The release machine therefore needs the tools of section 4 (conda environment active, or the Ubuntu packages). The website is built (`make website`) and deployed independently of the release (D29).
 
 ## 17. Tests
 
-pytest; run with `python3 -m pytest docs_builder/tests` in the active environment. `docs_builder/pytest.ini` sets `testpaths = tests`, `addopts = -p no:cacheprovider` and the markers `cmake`, `kernel` (tests that need cmake or the python3 kernel skip themselves without them) and `repo` (reads the real repository). The suite runs in under two minutes without `kernel` tests, needs no network and writes only below `tmp_path`. `tests/conftest.py` provides `mini_repo(tmp_path)`, a copy of `tests/fixtures/mini_repo/` (a minimal repository: header with version `9.9.9`, `CMakeLists.txt` with `set(armadillo_version "1.0.0")`, two or three small blocks per language, a reduced `site.toml` and content), and `run_build(root, *args)`, which calls `qdocs.cli.main` with `--root` and returns exit code and output. Rendering tests assert substrings of the `mini_repo` output, not whole files; for real data the tracked `docs/` plus `docs --check` is the reference output.
+pytest; run with `python3 -m pytest docs_builder/tests` in the active environment. `docs_builder/pytest.ini` sets `testpaths = tests`, `addopts = -p no:cacheprovider` and the marker `repo` (reads the real repository). The suite runs in under two minutes, needs no network and writes only below `tmp_path`. `tests/conftest.py` provides `mini_repo(tmp_path)`, a copy of `tests/fixtures/mini_repo/` (a minimal repository: header with version `9.9.9`, `CMakeLists.txt` with `set(armadillo_version "1.0.0")`, two or three small blocks per language, content and a small notebook with outputs), and `run_build(root, *args)`, which calls `qdocs.cli.main` with `--root` and returns exit code and output. Rendering tests assert substrings of the `mini_repo` output, not whole files; for real data the tracked `docs/` plus `docs --check` is the reference output.
 
 | File | Package | Covers |
 |------|---------|--------|
-| `test_cli.py` | A | Smoke: `docs` on `mini_repo` exits 0; a structural error gives 1 and writes nothing; a `website` run with a fixture formula starts no subprocess (checked by patching `subprocess`) |
-| `test_env.py` | A | All missing tools reported in one run, exit 2 before reading sources; the per-command sets; build commands do not compare versions; `env` compares versions and gives the right lines and exit codes (2 for a `docs` or `website` tool missing or too old, 0 when only optional tools are missing) |
-| `test_output.py` | A | Only changed files written; stale files removed; `docs` leaves `docs/website/` alone; `--check` writes nothing, exits 1 on a changed, missing or extra file and prints the hint; stamp deleted first and written last |
+| `test_cli.py` | A | `docs` on `mini_repo` exits 0; a structural error gives 1 and writes nothing; all missing tools (Python packages and `pandoc`) reported in one run, exit 2 before reading sources |
+| `test_output.py` | A | Only changed files written; stale files removed; `--check` writes nothing and exits 1 on a changed, missing or extra file |
 | `test_docblocks.py` | A | Line numbers; each error id of section 5.2 (one small fixture each); sub-block kinds; required sub-blocks with the class-block exemption; parameter pattern variants of section 5.4, note rows, warnings |
-| `test_mdparse.py` | A | `wikilink` with member form; `raw_a`; `raw_br`; raw HTML in prose shown as text; `heading_attrs`; `site_url`; `$5 and $6` not math; code untouched |
-| `test_links.py` | A | `[[...]]` resolution and E-link; URLs of each link kind per output location; `slug`, legacy hashes (section 9.3 values), `gh_slug` vectors; E-anchor; families, mapping order and mapping errors |
-| `test_prose.py` | A | Front matter and schema errors with key paths; build variables and the unknown-name error; note boxes; heading ids; gap markers in HTML, meta and twins; gap list and `website --release` failing on gaps |
-| `test_render_md.py` | A | Substrings of the full API file (front matter without date, index without "Line", "Also in"), a section file, a prose twin (index table, alert, braces removed, GitHub-slug links), `llms.txt` and `docs/README.md` (absolute and relative links) |
-| `test_render_html.py` | B | Substrings: head tags (alternate link and Markdown footer link only with a twin, `og:image` only with the image), tabs with `aria-current`, function entry, parameter rows, pills, section and legacy ids, text-page index, note boxes, gap spans, span-free code colouring; `404.html` root-absolute; tutorial pages with `../` |
-| `test_math.py` | B | Inline and block MathML (`display` attribute); a formula with an unknown command, one with unbalanced braces: structural errors at their source lines; twins keep `$...$` |
-| `test_checks.py` | A | Missing file, missing id, missing Markdown slug, absolute `base_url` link in a twin, the `faq.html#cite` case in HTML and Markdown; unclosed tag, duplicate id, two `h1`, `img` without `alt`; size warnings |
-| `test_content.py` | C | (`repo`) the real content parses; `cite` and the legacy ids of sections 6.6 and 9.3 exist; landing and publications pass their schemas |
+| `test_mdparse.py` | A | `wikilink` with member form; `raw_a`; `raw_br`; raw HTML in prose shown as text; `heading_attrs`; `alert`; `site_url`; `$5 and $6` not math; code untouched |
+| `test_links.py` | A | `[[...]]` resolution and E-link; URLs of each link kind per output location; `slug`, legacy hashes (section 9.3 values); E-anchor; families, mapping order and mapping errors |
+| `test_prose.py` | A | Front matter errors; publications key check with key paths; build variables and the unknown-name error; heading ids; gap markers (page text, `<title>` and attributes, twins); gap list from `content/` and `templates/`; `website --release` failing on gaps |
+| `test_render_md.py` | A | Twin writer: sub-block demotion, `{...}` stripped, fence language added, `[[x]]`, raw `<a href>`, trailing `<br>` and site URLs rewritten outside code and unchanged inside code spans and fences; anchors before functions, sections and headings; full API file (front matter without date, index without "Line", "Also in"), a section file, a prose twin (index table, alert kept), `llms.txt` and `docs/README.md` (absolute and relative links) |
+| `test_render_html.py` | B | Substrings: head tags (alternate link and Markdown footer link only with a twin, `og:image` only with the image), tabs with `aria-current`, function entry, parameter rows, pills, section and legacy ids, text-page index, note boxes with default and bold titles, span-free code colouring and the `highlight` filter; `404.html` root-absolute; tutorial pages with `../` |
+| `test_math.py` | B | Inline and block MathML (`display` attribute); several formulas give exactly one pandoc call and a page set without formulas none (counted by patching `subprocess.run`); a formula with an unknown command and one with unbalanced braces: structural errors at their source lines; twins keep `$...$` |
+| `test_tutorials.py` | B | Metadata errors; output conversion (stream, `text/plain`, PNG, SVG, fallback with `output-type`, `error` output rejected, `not-run`); page, twin, notebook copy, figures, card and dummy note in the `website` output |
+| `test_checks.py` | A | Missing file, missing id, missing `<a id>` in a Markdown target, absolute `base_url` link in a twin, the `faq.html#cite` case in HTML and Markdown; unclosed tag, duplicate id, two `h1`, `img` without `alt`; size warnings |
+| `test_content.py` | C | (`repo`) the real content parses; `cite` and the legacy ids of sections 6.6 and 9.3 exist; publications pass their key check; `pipeline_demo.ipynb` converts without warnings |
 | `test_real_repo.py` | C | (`repo`) `docs` on the real repository into a temporary root: zero errors; 137, 85, 80 functions; 10, 9, 9 sections; every id of `fixtures/old_anchors.json` (captured once from `html_docu/*.html` without the dropped ids of section 9.6) and `index.html#quickstart` exist; two `website` runs give identical bytes; `docs --check` passes after `docs` |
-| `test_tutorials.py` | D | Metadata errors; notebook with outputs rejected; cache key changes; `website` without cache (warning, no cards) and with a fake entry (page, twin, notebook, figures, card, dummy note); stale entry and `--release`; output conversion from a fixture executed notebook; (`kernel`) `pipeline_demo.ipynb` end to end |
-| `test_cmake.py` | D | (`cmake`) cases (a) to (d) of section 16.4 |
 
-## 18. Cutover checklist (D31)
+## 18. Cutover work items (D35)
 
-Done after go-live and the maintainer's sign-off, not in step 5. Step 7 copies this section into `docs_builder/README.md`.
+Package 0 does section 18.1 at the start of step 5, so the builder knows only the new paths and has no `html_docu` constants. Package D does sections 18.2 and 18.3 at the end of step 5; section 18.4 is its acceptance. D20's ban on CMake and packaging changes does not apply to these items (D35).
 
-### 18.1 Files that move (`git mv`)
+### 18.1 Moves (package 0)
 
-1. `html_docu/publications/` → `docs_builder/static/publications/`.
-2. `html_docu/quadriga_lib_material_model.md` → `docs_builder/static/quadriga_lib_material_model.md`.
-3. `html_builder/extract_matlab_comments.py` → `docs_builder/extract_matlab_comments.py`; it keeps to the standard library and Python 3.10 (deb build in a jammy container, CMake on Windows) and does not import `qdocs`.
-4. `html_builder/img/*` → `docs_builder/logo/` (logo sources, not deployed).
-5. Then delete the two hand-made-file constants in `assets.py` (section 12.5).
+1. `git mv html_docu/publications docs_builder/static/publications`; in `.gitattributes` `html_docu/publications/ export-ignore` becomes `docs_builder/static/publications/ export-ignore`; in `.dockerignore` `html_docu/publications/` becomes `docs_builder/static/publications/`.
+2. `git mv html_docu/quadriga_lib_material_model.md docs_builder/static/quadriga_lib_material_model.md`; `tools/acoustic/check_docs.py`: `PAGE` points to the new path.
+3. `git mv html_builder/img docs_builder/logo` (logo sources, not deployed).
+4. `git mv html_builder/extract_matlab_comments.py docs_builder/extract_matlab_comments.py`; in `CMakeLists.txt` (`mex_documentation`) the path becomes `${CMAKE_SOURCE_DIR}/docs_builder/extract_matlab_comments.py`. The script keeps to the standard library and Python 3.10 (deb build in a jammy container, CMake on Windows) and does not import `qdocs`.
 
-### 18.2 Files that are deleted
+### 18.2 Deletions (package D)
 
-`html_builder/` and `html_docu/` (all remaining files).
+`html_docu/` (all remaining files) and `html_builder/` except `html_builder/design_prototype/`, which step 6 still compares against and step 7 deletes.
 
-### 18.3 Files that change
+### 18.3 Changes (package D)
 
-| File | Find | Change |
-|------|------|--------|
-| `CMakeLists.txt` | the version block; `INSTALL_DOCDIR`; `install(DIRECTORY html_docu/ ...)`; the `mex_documentation` command | Add `add_subdirectory(docs_builder)` after the version block; delete both `set(INSTALL_DOCDIR ...)` lines and the `html_docu` install line; point the help script path to `docs_builder/extract_matlab_comments.py`. |
-| `GNUmakefile` | `HB = html_builder`, the `documentation` target, `deb:`, `release:`, `package_dirty:` | Delete `HB` and `documentation`; the `deb` and `release` recipes as in section 16.3; in `package_dirty` replace the `html_docu/releases` exclusion with `docs_builder/.cache`. |
-| `Makefile` (Windows) | `release-win`, the `xcopy html_docu` line | As in section 16.3. |
-| `debian/rules` | `override_dh_auto_configure`, build 1 | Add `-DENABLE_DOCS_INSTALL=ON` to build 1. |
-| `Dockerfile.ubuntu`, `debian/stamp-changelog.sh` | — | No change; check after the first deb build that `share/doc/quadriga-lib/html/index.html` is in the package listing. |
-| `.dockerignore` | `html_docu/releases/`, `html_docu/publications/` | Replace with `docs/website/publications/` (keeps the PDFs out of the deb, as today), `docs_builder/.cache/`, `docs_builder/static/publications/`. |
-| `.gitattributes` | `html_docu/publications/ export-ignore` | `docs_builder/static/publications/ export-ignore`. |
-| `.gitignore` | `html_docu/releases/` | Delete. |
-| `pyproject.toml` | — | Check only: pip builds install no documentation (option OFF). Optional `sdist.exclude` for `docs_builder/static/publications/`. |
-| `README.md` | make-target table, repository-layout table | `make documentation` becomes `make docs`, `make website`, `make tutorials`; the `html_docu/` and `html_builder/` rows become `docs/`, `docs_builder/`, `tutorials/`. |
-| `README_win.md` | `html_docu/` in the package contents | `documentation/`. |
-| `md/SPEC_CPP_API.md` | "the pages in `html_docu/`"; `html_docu/quadriga_lib_api_cpp.md`; `make documentation`; the "Line" column advice and "may lag behind" | "the pages of quadriga-lib.org"; `docs/quadriga_lib_api_cpp.md`; `make docs`; read the function index of the full file, then open only the section file `docs/api/cpp/<section>.md`; regenerated by hand, may lag behind `main` (D8); document the doc-block extensions of D6: `$...$` and `$$...$$` math and the gap marker `%%GAP: text%%`. |
-| `md/SPEC_MATLAB_API.md`, `md/SPEC_PYTHON_API.md` | `make documentation`, `html_docu/quadriga_lib_api_*.md`, "may lag behind", the help script path | As for the C++ file; script path `docs_builder/extract_matlab_comments.py`. |
-| `md/BUG_SCAN.md` | "A stale `html_docu/` alone" | "Stale generated Markdown in `docs/` alone" (`make docs-check` shows it). |
-| `md/acoustic_modeling_guidelines.md`, `md/acoustic_engine_notes.md`, `md/materials_kickoff.md`, `md/materials_manager.md`, `md/gbsm_integration_handoff.md` | `html_docu/quadriga_lib_material_model.md`, `make documentation` | `docs_builder/static/quadriga_lib_material_model.md`, `make docs`; working notes may instead be left or deleted. |
-| `tools/update_armadillo.py` | `html_builder/download/quick_start.md` in `VERSION_FILES` | Delete the entry and its comment: the Get started page takes the Armadillo version from `CMakeLists.txt`. |
-| `tools/acoustic/check_docs.py` | `PAGE`, `FORMATS` | `docs_builder/static/quadriga_lib_material_model.md`, `docs_builder/content/formats.md`; run it once, its parser may need a small change for the new headings. |
-| `tools/acoustic/README.md`, `band_probe.cpp`, `gzlib.py`, `paris_cf.py`, `txlib.py`, `tools/sos_port/SOS_PAPER_REPRODUCTION.md`, `tests/catch2_tests/test_ieee_indoor_publication.cpp` | comments naming `html_docu/...` | Point to `docs_builder/static/...` or the URL on quadriga-lib.org. |
+| File | Change |
+|------|--------|
+| `CMakeLists.txt` | As in section 16: delete both `set(INSTALL_DOCDIR ...)` lines; `install(DIRECTORY docs/ DESTINATION share/doc/quadriga-lib)` replaces the `html_docu` install line. |
+| `GNUmakefile` | Delete `HB = html_builder` and the `documentation` target; `release` as in section 16; in `package_dirty` the exclusion `-x 'html_docu/releases/*'` becomes `-x 'website/*'`; `clean` unchanged (it keeps `website/`); `tidy` already has the lines of section 3.10. |
+| `Makefile` (Windows) | As in section 16. |
+| `debian/rules`, `debian/control` | As in section 16. |
+| `Dockerfile.ubuntu`, `debian/stamp-changelog.sh` | No change. |
+| `.dockerignore` | Delete `html_docu/releases/`. |
+| `.gitignore` | Delete `html_docu/releases/`. |
+| `README.md` | Make-target table: the `make documentation` row becomes `make docs` (tracked Markdown in `docs/`), `make docs-check`, `make website` (site in `website/`); repository-layout table: the `html_docu/` and `html_builder/` rows become `docs/` (documentation as Markdown, generated by `make docs`), `docs_builder/` and `tutorials/`. |
+| `README_win.md` | As in section 16. |
+| `md/SPEC_CPP_API.md` | "the pages in `html_docu/`" becomes "the pages of quadriga-lib.org"; `html_docu/quadriga_lib_api_cpp.md` becomes `docs/quadriga_lib_api_cpp.md`; `make documentation` becomes `make docs`; the "Line" column advice becomes: read the function index of the full file, then open only the section file `docs/api/cpp/<section>.md`; "may lag behind" becomes: regenerated by hand, may lag behind `main` (D8); document the doc-block extensions of D6: `$...$` and `$$...$$` math. |
+| `md/SPEC_MATLAB_API.md`, `md/SPEC_PYTHON_API.md` | `make documentation`, `html_docu/quadriga_lib_api_*.md` and "may lag behind" as for the C++ file; script path `docs_builder/extract_matlab_comments.py`. |
+| `md/BUG_SCAN.md` | "A stale `html_docu/` alone" becomes "Stale generated Markdown in `docs/` alone" (`make docs-check` shows it). |
+| `md/acoustic_modeling_guidelines.md`, `md/acoustic_engine_notes.md`, `md/materials_kickoff.md`, `md/materials_manager.md`, `md/gbsm_integration_handoff.md` | `html_docu/quadriga_lib_material_model.md` becomes `docs_builder/static/quadriga_lib_material_model.md`, `make documentation` becomes `make docs`. |
+| `tools/update_armadillo.py` | Delete `html_builder/download/quick_start.md` from `VERSION_FILES` and its comment: the Get started page takes the Armadillo version from `CMakeLists.txt`. |
+| `tools/acoustic/check_docs.py` | `FORMATS` becomes `docs_builder/content/formats.md`; run it once, its parser may need a small change for the new headings. |
+| `tools/acoustic/README.md`, `band_probe.cpp`, `gzlib.py`, `paris_cf.py`, `txlib.py`, `tools/sos_port/SOS_PAPER_REPRODUCTION.md`, `tests/catch2_tests/test_ieee_indoor_publication.cpp` | Comments naming `html_docu/...` point to `docs_builder/static/...` or the URL on quadriga-lib.org. |
 
-### 18.4 Checks after the cutover and at go-live
+### 18.4 Acceptance of the cutover and checks at go-live
 
-After the cutover: `make docs-check`, `build.py website --release` and the tests pass; `cmake -S . -B build_check -DENABLE_DOCS_INSTALL=ON -DCMAKE_INSTALL_PREFIX=/tmp/qd_inst` fails without `docs/website/` and succeeds after `make website`, and `cmake --install` puts the site into `share/doc/quadriga-lib/html/`; a MEX build still writes the `.m` help files; a deb contains `share/doc/quadriga-lib/html/index.html` and a Windows package `documentation\index.html`; `make deb` with a stale stamp stops at its first line; `git grep -n 'html_docu\|html_builder'` finds nothing outside `docs_builder/README.md`.
+After package D: `make docs-check`, `build.py website` and the tests pass; `git grep -n 'html_docu\|html_builder'` finds nothing outside `md/website_*.md` and `html_builder/design_prototype/`; a configure with `-DCMAKE_INSTALL_PREFIX=<tmp>` and `cmake --install` puts `docs/` into `<tmp>/share/doc/quadriga-lib/`; a MEX build (`ENABLE_MEX_DOC=ON`) still writes the `.m` help files; the deb built in Docker (`make deb-noble`) contains `usr/share/doc/quadriga-lib/quadriga_lib_api_cpp.md` uncompressed and `api/cpp/*.md`, and lintian shows no new tags; on the Windows VM, `release-win` gives a zip with `docs\quadriga_lib_api_cpp.md`. These builds compile the library; they follow the machine rules (load, thread count) and are run by the manager or with the maintainer's agreement.
 
-At go-live, after the first deploy (plan section 7): `curl -sI <base>/formats.md` shows `text/markdown; charset=utf-8`; `curl -sI <base>/llms.txt` shows `text/plain; charset=utf-8`; a missing page returns 404 with the new page; compression test: add `AddOutputFilterByType DEFLATE text/html text/css application/javascript text/markdown text/plain` to the server's `.htaccess`; if `curl -sI -H 'Accept-Encoding: gzip' <base>/cpp_api.html` then shows `Content-Encoding: gzip` and a plain request still works, the line goes into `static/.htaccess`, otherwise it is removed; `build.py website --release` passes (no gaps left).
+At go-live, after the first deploy (plan section 7): `curl -sI <base>/formats.md` shows `text/markdown; charset=utf-8`; `curl -sI <base>/llms.txt` shows `text/plain; charset=utf-8`; a missing page returns 404 with the new page; compression test: add `AddOutputFilterByType DEFLATE text/html text/css application/javascript text/markdown text/plain` to the server's `.htaccess`; if `curl -sI -H 'Accept-Encoding: gzip' <base>/cpp_api.html` then shows `Content-Encoding: gzip` and a plain request still works, the line goes into `static/.htaccess`, otherwise it is removed; the twin anchors work on GitHub (section 9.5); `build.py website --release` passes (no gaps left).
 
 ## 19. Work packages for step 5
 
@@ -925,27 +825,29 @@ Each package owns the files listed; a package that needs a change in a file it d
 
 | Id | Package | Owns | Depends on |
 |----|---------|------|------------|
-| A | Core and Markdown output | `build.py`; `qdocs/cli.py`, `config.py`, `env.py`, `docblocks.py`, `mdparse.py`, `links.py`, `prose.py`, `render_md.py`, `checks.py`, the stub `tutorials.py`; `site.toml`; `content/api_matching.toml`; the requirement files; `pytest.ini`; `tests/conftest.py`; `tests/fixtures/mini_repo/`; the tests marked A; the `GNUmakefile` lines and `.gitignore` lines of sections 2.4, 3.5 and 3.10; `docs_builder/README.md` section "Set up a build machine" | none |
-| B | HTML output and static parts | `qdocs/render_html.py`, `assets.py`; `templates/`; `static/`; the tests marked B | A |
-| C | Content conversion | `content/` except `api_matching.toml`; `tests/fixtures/old_anchors.json`; the tests marked C | A (B for the visual check) |
-| D | Tutorials, skill, CMake | `qdocs/tutorials.py` (replacing A's stub); `tutorials/pipeline_demo.ipynb`; `skill/quadriga-lib/SKILL.md`; `docs_builder/CMakeLists.txt`; the tests marked D | A, B |
+| 0 | Moves | the `git mv` and line changes of section 18.1 | none |
+| A | Core and Markdown output | `build.py`; `qdocs/cli.py`, `config.py`, `docblocks.py`, `mdparse.py`, `links.py`, `prose.py`, `render_md.py`, `checks.py`; `content/api_matching.toml`; `pytest.ini`; `tests/conftest.py`; `tests/fixtures/mini_repo/`; the tests marked A; the `GNUmakefile` lines of sections 3.5 and 3.10; the lines of section 2.4; `docs_builder/README.md` section "Set up a build machine" | 0 |
+| B | HTML output, static parts, tutorials | `qdocs/render_html.py`, `assets.py`, `tutorials.py`; `pandoc_math.yaml`; `templates/` (with the landing text of section 7.1); `static/` except the moved files; the tests marked B | A |
+| C | Content | `content/` except `api_matching.toml`; `tutorials/pipeline_demo.ipynb` with outputs; `skill/quadriga-lib/SKILL.md`; `tests/fixtures/old_anchors.json`; the tests marked C | A (B for the visual check) |
+| D | Cutover | the deletions and changes of sections 18.2 and 18.3 | A, B, C accepted |
 
-Order: A; then B, C and the CMake part of D in parallel; then the rest of D.
+Order: 0; A; then B and C in parallel; then D.
 
 Acceptance (each package also passes its tests and leaves the others green):
 
 | Id | Done when |
 |----|-----------|
-| A | `docs`, `docs --check` and `env` work on `mini_repo`; the real doc blocks parse with zero errors and about 17 `param-separator` and 25 `param-item` warnings; no output contains a date; for both set-ups, a fresh set-up following only the README section succeeds, `make docs-env` passes, and after `make tidy`, `git status --porcelain --ignored` shows nothing new in the working copy. |
-| B | `make website` builds all pages with link, anchor and well-formedness checks passing and the C++ page within budget; manual: the CSS token values equal the prototype's, and the pages match the prototype at 375, 768 and 1280 px in the browser pane. |
-| C | `make docs` on the real repository writes the files of section 2.3 with zero errors and `docs --check` passes right after; the real content passes all schemas; `cite` and the legacy ids exist; every prototype draft and design-section-9 item is a gap; `test_real_repo.py` passes; a plain-text comparison of the old and new formats, FAQ and download pages shows no lost text. |
-| D | `make tutorials` runs `pipeline_demo.ipynb`, a second run skips it, and `make website` shows it with figure, table, formula and downloads; without the cache, `make website` passes with the warning; the skill zip is byte-identical across runs; the CMake cases pass. |
+| 0 | `git status` shows the four moves as renames; `make documentation` is not run; a configure with `ENABLE_MEX_DOC=ON` finds the script at its new path (configure only, no build). |
+| A | `docs` and `docs --check` work on `mini_repo`; the real doc blocks parse with zero errors and about 17 `param-separator` and 25 `param-item` warnings; no output contains a date; the conda set-up following only the README section succeeds and `make docs` runs in it (the Ubuntu line is checked where a 26.04 machine is at hand); without `pandoc` on `PATH` the build stops with the message of section 3.4; after `make tidy`, `git status --porcelain --ignored` shows nothing new in the working copy. |
+| B | `make website` builds all pages with link, anchor and well-formedness checks passing and the C++ page within budget; the dummy tutorial shows code, text output, figure, table, formula and downloads; manual: the CSS token values equal the prototype's, and the pages match the prototype at 375, 768 and 1280 px in the browser pane. |
+| C | `make docs` on the real repository writes the files of section 2.3 with zero errors and `docs --check` passes right after; publications pass their key check; `cite` and the legacy ids exist; every prototype draft and design-section-9 item is a gap; `pipeline_demo.ipynb` is committed with outputs and without warning text; `test_real_repo.py` passes; a plain-text comparison of the old and new formats, FAQ and download pages shows no lost text. |
+| D | Section 18.4, first paragraph. |
 
-The manager's acceptance run after all packages: the full build on the real repository; the time targets of section 3.11 met (`/usr/bin/time`, wall and CPU, three runs each, the 1-minute load average recorded before and after; runs above load 4 repeated or reported as provisional); manual check that `make tidy` after `docs`, `website` and the tests leaves the state of a clean clone (the clean-clone state is checked after `make tidy`, not after a build) and that `make clean` keeps the site and the cache; and a report with these timings, the gap list, the warning counts and the page sizes against the budgets.
+The manager's acceptance run after all packages: the full build on the real repository; one timed run each of `make docs` and `make website` (`/usr/bin/time`, wall and CPU) with the 1-minute load average recorded before and after, compared with the targets of section 3.11 (a run above load 4 is reported as provisional); manual check that `make tidy` after `docs`, `website` and the tests leaves the state of a clean clone and that `make clean` keeps `website/`; and a report with these timings, the gap list, the warning counts and the page sizes against the budgets.
 
 ## 20. Traceability
 
-Every item of design section 11, plan section 10 and plan section 11, with the section that answers it. This section is deleted after the spec review.
+Every item of design section 11, plan section 10, plan section 11 and decisions D32 to D38, with the section that answers it. This section is deleted after the spec review.
 
 | Source | Item | Answered in |
 |--------|------|-------------|
@@ -957,28 +859,35 @@ Every item of design section 11, plan section 10 and plan section 11, with the s
 | Design 11.6 | Where the figure scripts live, how images are committed | 12.4 |
 | Design 11.7 | MATLAB and Python pages: labels, lower-case names | 5.3, 5.5, 6.7, 3.3 |
 | Design 11.8 | Placeholder marking, look on the page, build list | 6.4, 12.3, 12.4, 3.1 (`--release`) |
-| Plan 10 | Paths of the design mapped to D24 | 1.2, 2.3 |
+| Plan 10 | Paths of the design mapped to D24 and D33 | 1.2, 2.3 |
 | Plan 10 | FAQ provides `#cite`; link check catches such gaps | 6.6, 15.1, 17 (`test_checks.py`, `test_content.py`) |
 | Plan 10 | Page size: budget per API page | 10, 15.3 |
 | Plan 10 | Old section anchors keep working | 9.3, 6.6, 9.6, 17 (`test_real_repo.py`) |
-| Plan 10 | HTTPS: site base URL, `http://` until SSL, commented redirect, doc-block links stay | 3.3, 12.6, 5.6 (`site_url`) |
-| Plan 10 | "For team leads" points into the landing page | 7.2 |
-| Plan 10 | Design open points answered using D24 to D31 | the design rows above |
-| Plan 11, cutover | `CMakeLists.txt`: install lines, help script path, Python 3.10 and standard library | 18.1, 18.3, 16.1 |
-| Plan 11, cutover | `Makefile`, `Dockerfile.ubuntu`, `.dockerignore`, `debian/stamp-changelog.sh`, `.gitattributes`, `GNUmakefile` (`documentation`, `release`, `package_dirty`, `clean`, `tidy`) | 18.3, 16.3, 3.10 |
+| Plan 10 | HTTPS: site base URL, `http://` until SSL, commented redirect, doc-block links stay | 3.3, 12.5, 5.6 (`site_url`) |
+| Plan 10 | "For team leads" points into the landing page | 7.1 |
+| Plan 10 | Design open points answered using D24 to D38 | the design rows above |
+| Plan 11, cutover | `CMakeLists.txt`: install lines, help script path, Python 3.10 and standard library | 18.1, 16, 18.3 |
+| Plan 11, cutover | `Makefile`, `Dockerfile.ubuntu`, `.dockerignore`, `debian/stamp-changelog.sh`, `.gitattributes`, `GNUmakefile` (`documentation`, `release`, `package_dirty`, `clean`, `tidy`) | 16, 18.1, 18.3, 3.10 |
 | Plan 11, cutover | Text naming old paths (SPEC files, `md/BUG_SCAN.md`, `md/acoustic_modeling_guidelines.md`, `md/gbsm_integration_handoff.md`, `README.md`, `README_win.md`, `tools/update_armadillo.py`); further users found | 18.3 |
 | Plan 11 | Full API files, no build date, no "Line" column; per-section files; largest section accepted or split | 8.6.2, 8.6.3, 2.3 |
-| Plan 11 | Links in twins to files outside `docs/`; raw `<a href>` in doc blocks | 8.7.1, 5.6 |
+| Plan 11 | Links in twins to files outside `docs/`; raw `<a href>` in doc blocks | 8.7.1, 8.6.1, 5.6 |
 | Plan 11 | One Markdown intro per language; Python intro is a content gap | 6.7 |
 | Plan 11 | Build variables and gap markers with different syntax; strict mode fails on gaps and missing figures | 6.3, 6.4, 3.1, 12.3, 12.4 |
-| Plan 11 | Explicit heading ids stripped from twins | 6.2, 9.5 |
-| Plan 11 | Fonts committed; MathML output chosen with reason (D5 as amended: Python converter) | 12.1, 11 |
+| Plan 11 | Explicit heading ids stripped from twins | 6.2, 8.6.1, 9.5 |
+| Plan 11 | Fonts committed; MathML output chosen with reason (D38: pandoc) | 12.1, 11 |
 | Plan 11 | Cross-language matching | 9.4 |
 | Plan 11 | Doc-block grammar variants | 5.2, 5.3, 5.4, 5.6 |
 | Plan 11 | Pygments: uncoloured tokens without `<span>` | 10 |
-| Plan 11 | Byte-identical output: sorted lists, fixed zip timestamps, no dates | 3.9, 14, 17 (`test_real_repo.py`) |
-| Plan 11 | Server without compression and `.md` type: raw budgets; content types in `.htaccess` | 12.6, 15.3, 18.4 |
+| Plan 11 | Byte-identical output: sorted lists, no dates (no zip any more, D37) | 3.9, 17 (`test_real_repo.py`) |
+| Plan 11 | Server without compression and `.md` type: raw budgets; content types in `.htaccess` | 12.5, 15.3, 18.4 |
 | Plan 11 | `404.html` root-absolute; never write `download/` or `releases/` | 8.1, 2.3 |
 | Plan 11 | Python 3.11 (`tomllib`); no Java validators (validators dropped) | 4.1 |
 | Plan 11 | Privacy page mentions the storage key | 6.8, 12.1 |
 | Plan 11 | Generated `docs/README.md` | 8.8 |
+| D32 | No site in packages; packages install `docs/`; `dh_compress -X.md`; Windows zip; release checks `docs/` current and committed | 16, 18.3 |
+| D33 | Site in top-level `website/`, ignored, removed by `make tidy`, out of the Docker context; `docs/` only tracked Markdown | 2.1, 2.3, 2.4, 3.6, 3.10 |
+| D34 | Notebooks committed with outputs; builder converts only; no `make tutorials`, cache or kernels; dummy run once in step 5; demo without DeprecationWarning | 13, 4.1, 3.5 |
+| D35 | Cutover inside step 5: moves first, deletions and updates last, checks as acceptance; no edits in two places | 18, 19, 6.6 |
+| D36 | Landing text in the template; publications TOML with a plain key check; `llms.txt` summary in the AI page front matter | 7.1, 7.2, 6.1, 8.8 |
+| D37 | AI page links the stub `SKILL.md`; no zip | 14, 6.8, 8.8 |
+| D38 | Tools from conda-forge or Ubuntu packages, no pip, venv or requirement files; one presence check incl. `pandoc`, no `env`; formulas by one pandoc call, its warnings stop the build; HTML may vary with tool versions | 4, 3.4, 3.5, 3.9, 3.11, 11, 17 |
