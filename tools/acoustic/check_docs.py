@@ -19,7 +19,7 @@ Exit code 0 when every check passes, 1 otherwise. It reports; it changes nothing
 import os, re, sys
 
 ROOT = os.getcwd()
-PAGE = 'html_docu/quadriga_lib_material_model.md'
+PAGE = 'website_builder/static/quadriga_lib_material_model.md'
 FORMATS = 'html_builder/formats/format_materials.md'
 SOURCE = 'src/ray_mesh_interact.cpp'
 BRITISH = ['neighbour', 'centre', 'behaviour', 'modelled', 'modelling', 'colour', 'millimetre', 'metre ', 'favour',
