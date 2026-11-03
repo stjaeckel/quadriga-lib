@@ -13,7 +13,7 @@ year = 2025
 title = "A modern C++ framework"
 authors = "S. Jaeckel"
 venue = "IEEE 802.11"
-link = [{ label = "PDF", url = "publications/x.pdf" }]
+link = [{ label = "PDF", url = "publications/2018_sum_of_sinusoids.pdf" }]
 
 [[group]]
 id = "quadriga-background"
@@ -25,4 +25,4 @@ year = 2014
 title = "QuaDRiGa: A 3-D multi-cell channel model"
 authors = "S. Jaeckel, L. Raschkowski, K. Börner, L. Thiele"
 venue = "IEEE Trans. Antennas Propag."
-link = [{ label = "IEEE Xplore", url = "https://ieeexplore.ieee.org/document/6758357" }, { label = "Markdown", url = "http://quadriga-lib.org/publications/y.md" }]
+link = [{ label = "IEEE Xplore", url = "https://ieeexplore.ieee.org/document/6758357" }, { label = "Markdown", url = "http://quadriga-lib.org/publications/2018_sum_of_sinusoids.md" }]

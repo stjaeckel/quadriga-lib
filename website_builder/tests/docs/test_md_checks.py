@@ -38,6 +38,14 @@ def test_links_outside_docs_skipped_in_docs_phase():
                                           "(no id 'nope' in index.html)"]
 
 
+def test_hand_made_targets_checked_for_existence_only():
+    site = {"a.md": "[m](quadriga_lib_material_model.md#any-heading) [p](publications/gone.md#x)\n",
+            "quadriga_lib_material_model.md": "# Material model\n"}
+    diag = cli.Diagnostics()
+    checks.check_markdown({k: v.encode("utf-8") for k, v in site.items()}, "website", diag, paths=["a.md"])
+    assert [ln.split(": error: ")[1] for ln in diag.lines] == ["link target missing: publications/gone.md#x"]
+
+
 def test_faq_without_cite(mini_repo, run_docs):
     faq = mini_repo / "docs_builder/content/faq.md"
     faq.write_text(faq.read_text(encoding="utf-8").replace(" {#cite}", ""), encoding="utf-8")

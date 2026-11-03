@@ -120,7 +120,7 @@ def test_prose_twin(docs):
     assert "[release archive](http://quadriga-lib.org/releases/)" in download
     pubs = docs["publications.md"]
     assert '<a id="quadriga-lib"></a>\n## Quadriga-Lib\n\nPapers about the library.\n\n- 2025 · **A modern C++' in pubs
-    assert "[PDF](%s/publications/x.pdf)" % BASE in pubs and "[FAQ](faq.md#cite)" in pubs
+    assert "[PDF](%s/publications/2018_sum_of_sinusoids.pdf)" % BASE in pubs and "[FAQ](faq.md#cite)" in pubs
 
 
 def test_llms_and_readme(docs):

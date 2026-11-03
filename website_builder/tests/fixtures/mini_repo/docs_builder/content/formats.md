@@ -15,7 +15,7 @@ The format of [`arrayant_qdant_read`](cpp_api.html#arrayant_interpolate_multi). 
 
 ### Entry `<arrayant>` {legacy="arrayant"}
 
-Text with a `[[code]]` span and a [paper](publications/x.pdf).
+Text with a `[[code]]` span and a [paper](publications/2018_sum_of_sinusoids.pdf).
 
 ## Material Properties {#material-properties legacy="9f6922f9"}
 
