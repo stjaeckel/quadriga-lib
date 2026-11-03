@@ -126,6 +126,13 @@ documentation:
 	python3 $(HB)/extract_md.py -o html_docu/quadriga_lib_api_mex.md -a mex
 	python3 $(HB)/extract_md.py -o html_docu/quadriga_lib_api_python.md -a python
 
+# Documentation: docs_builder/README.md and website_builder/README.md
+docs:
+	python3 docs_builder/build.py docs
+docs-check:
+	python3 docs_builder/build.py docs --check
+.PHONY: docs docs-check
+
 moxunit-lib:
 	- rm -rf external/MOxUnit-master
 	unzip external/MOxUnit.zip -d external/
@@ -252,4 +259,6 @@ tidy:   clean
 	- rm -rf lib
 	- rm -rf wheelhouse 
 	- rm -rf external/MOxUnit-master
+	- rm -rf website
+	- find docs_builder website_builder tutorials \( -name __pycache__ -o -name .ipynb_checkpoints \) -type d -prune -exec rm -rf {} +
 	
