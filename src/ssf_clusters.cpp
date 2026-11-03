@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_gbsm.hpp"
+#include "quadriga_lib.hpp"
 #include "quadriga_gbsm_helpers.hpp"
 #include "quadriga_lib_helper_functions.hpp"
 
@@ -380,17 +381,16 @@ Cluster delays, powers and angles of a set of links (TR 38.901 clause 7.5 steps 
 - Absolute TOA (TR clause 7.6.9), NLOS scenarios only: `"38.901"`, `"38.901_MF"` add `abs_toa(l)` to the NLOS
   delays; `"quadriga"` places the first NLOS cluster at `abs_toa(l)` (where `absTOA_mu <= -30`: only where
   `abs_toa(l) > 0`)
-- Ground reflection (TR clause 7.6.8) on the plane z = 0. Slot power `K/(K+1)·(d3D/d_GR)²·R²` (TR methods, on top of
-  the other slots) or `K/(K+1)·R²` (`"quadriga"`) with `R² = (abs(R_par)² + abs(R_perp)²)/2` of TR eqs. (7.6-38),
-  (7.6-39). The coefficient is `sqrt(power)·diag(R_par, -R_perp)/R`, without polarisation
+- Ground reflection (TR clause 7.6.8) on the plane z = 0: slot power `K/(K+1)·(d3D/d_GR)²·R²` (TR methods, on top of
+  the other slots) or `K/(K+1)·R²` (`"quadriga"`), with `R²` the mean of `abs(R_par)²` and `abs(R_perp)²` of TR
+  eqs. (7.6-38), (7.6-39); the coefficient is `sqrt(power)·diag(R_par, -R_perp)/R`, without polarisation
   `sqrt(power)·exp(j·arg(R_par))`
-- `NumClusters = 1`: the LOS path only, power 1 in all scenarios (`K/(K+1) = 1`, also in the ground-reflection
-  power), plus the ground reflection if enabled; `rnd`, `rnd_freq` and `lsp_anchor` may be empty
+- `NumClusters = 1`: the LOS path only, power 1 in all scenarios, plus the ground reflection if enabled; `rnd` must
+  be empty, `rnd_freq` and `lsp_anchor` are not used
 - Swap reciprocity: with mirrored random values (dual mobility in [[ssf_draw]]) and mirrored LSPs, swapping `tx_pos`
   and `rx_pos` exchanges the departure and arrival angles (`"38.901"`: `eod_offset_deg` = 0 and no O2I link;
   `"quadriga"`: `eod_offset_deg` = 0)
-- `scenpar`, `lsp`, `rnd` and `rnd_freq` must come from the same scenario (only sizes are checked); `scenpar` is
-  validated by [[scenpar_validate]]. Outputs must not share memory with the inputs
+- `scenpar`, `lsp`, `rnd` and `rnd_freq` must come from the same scenario; only their sizes are checked
 
 ## Declaration:
 ```
@@ -421,7 +421,7 @@ void quadriga_lib::ssf_clusters(
 ## Inputs:
 - **`scenpar`** — Scenario parameters; used: `NumClusters`, `NumClusters_min`, `KF_mu`, `absTOA_mu`, `r_DS`,
   `LNS_ksi`, `GR_enabled`
-- **`tx_pos`** — Tx positions in [m], one row for all links; z >= 0 with ground reflection; `[1, 3]` or `[n_link, 3]`
+- **`tx_pos`** — Tx positions in [m]; z >= 0 with ground reflection; `[1, 3]` or `[n_link, 3]`
 - **`rx_pos`** — Rx positions in [m]; z >= 0 with ground reflection; `[n_link, 3]`
 - **`lsp`** — LSPs from [[lsp_generate]]; DS, ASD, ASA, ESD, ESA (slices 0, 3 to 6) > 0, KF (slice 1) >= 0;
   `"38.901"`: one frequency; `[n_link, n_freq, 8]`
@@ -601,10 +601,9 @@ void quadriga_lib::ssf_clusters(const std::unordered_map<std::string, double> &s
     const bool tx_single = tx_pos.n_rows != n_link;
     arma::cube *ang_out[4] = {&aod, &aoa, &eod, &eoa};
 
-#pragma omp parallel for if (n_link >= 8)
-    for (long long i = 0; i < (long long)n_link; ++i)
+    auto one_link = [&](arma::uword l)
     {
-        const arma::uword l = (arma::uword)i, t = tx_single ? 0 : l;
+        const arma::uword t = tx_single ? 0 : l;
         const arma::uword N_l = n_cluster != nullptr ? (*n_cluster)(l) : N;
 
         // LOS geometry; the angles of slot 0 and of the inactive slots
@@ -736,5 +735,16 @@ void quadriga_lib::ssf_clusters(const std::unordered_map<std::string, double> &s
         }
         if (n_active != nullptr)
             (*n_active)(l) = act;
+    };
+
+    // Exceptions (only std::bad_alloc can occur) must not leave the parallel region
+    bool omp_failed = false;
+    std::string omp_error;
+#pragma omp parallel for if (n_link >= 8)
+    for (long long i = 0; i < (long long)n_link; ++i)
+    {
+        OMP_SAFE_CALL(omp_failed, omp_error, one_link((arma::uword)i));
     }
+    if (omp_failed)
+        throw std::runtime_error(omp_error);
 }
