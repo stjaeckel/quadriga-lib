@@ -6,7 +6,7 @@
 The rules read from the parse environment `env`:
   location  output path of the page (relative to the site root), for link URLs
   headings  {line index in the parsed text: qdocs Heading} (prose and notebook)
-  shift     heading level shift: 0 for prose, 1 for notebook cells
+  kind      docblock, prose or notebook; notebook headings deeper than h4 become h4
   error     error(line index, message): reports a structural error at a source line
 """
 
@@ -103,8 +103,8 @@ def _heading_attrs(state):
     for i, tok in enumerate(toks):
         if tok.type != "heading_open":
             continue
-        level = int(tok.tag[1:]) + env.get("shift", 0)
-        level = min(level, 4) if env.get("shift") else level
+        level = int(tok.tag[1:])
+        level = min(level, 4) if env["kind"] == "notebook" else level
         tok.tag = toks[i + 2].tag = "h%d" % level
         h = env["headings"].get(tok.map[0]) if tok.map else None
         if h is None:

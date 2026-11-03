@@ -17,11 +17,7 @@ TESTS = Path(__file__).resolve().parents[1]
 REPO = TESTS.parents[1]
 OLD_ANCHORS = TESTS / "fixtures" / "old_anchors.json"
 
-pytestmark = [
-    pytest.mark.repo,
-    pytest.mark.skipif(not (REPO / "website_builder" / "templates" / "base.html").is_file(),
-                       reason="the website templates are not there yet"),
-]
+pytestmark = pytest.mark.repo
 
 
 class _Ids(html.parser.HTMLParser):

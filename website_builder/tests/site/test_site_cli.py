@@ -56,3 +56,16 @@ def test_structural_error_writes_nothing(mini_repo, run_site):
     code, out = run_site(mini_repo)
     assert code == 1 and "website_builder/content/privacy.md: error: content file missing" in out
     assert not (mini_repo / "website").exists() and not (mini_repo / "docs").exists()
+
+
+def test_template_gap_errors_name_the_template(mini_repo, run_site, tmp_path, monkeypatch):
+    import shutil
+    from qsite import assets
+    copy = tmp_path / "code" / "website_builder" / "templates"
+    shutil.copytree(str(assets.TEMPLATES_DIR), str(copy))
+    legal = copy / "legal.html"
+    legal.write_text(legal.read_text(encoding="utf-8") + "%%GAP: not closed\n", encoding="utf-8")
+    monkeypatch.setattr(assets, "TEMPLATES_DIR", copy)
+    code, out = run_site(mini_repo)
+    assert code == 1 and "website_builder/templates/legal.html:11: error: E-gap" in out
+    assert "website_builder/templates/landing.html:" in out

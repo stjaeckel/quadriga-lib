@@ -315,11 +315,12 @@ All of this section runs on the docs path, line by line (D39). A block starts wi
 | E-delim-open | An opening delimiter without its closing delimiter before the next opening delimiter or the end of the file. |
 | E-section-count | A file with `/*!MD` or `/*!SECTION_DESC` blocks and no `/*!SECTION` block, or with more than one, or a `/*!SECTION` block that is not exactly one non-empty line. (The old builder silently dropped such blocks.) |
 | E-name | The first line of an `/*!MD` block does not match `^# (\.?[A-Za-z_][A-Za-z0-9_.]*)(<\+\+>)?$`. `<++>` is accepted and ignored (plan section 11). |
-| E-fence | A code fence (a line whose stripped text starts with three backticks) without a closing fence in the same block part. |
+| E-fence | A code fence (a line whose stripped text starts with three backticks) without a closing fence in the same block part; a fence closes only on a backtick run at least as long as the opening one. |
 | E-required | A required sub-block is missing (section 5.3). |
 | E-link | An unresolved `[[...]]` link (section 8.7.2). |
 | E-anchor | Two anchors equal on one page (functions, section ids, legacy ids, prose heading ids). |
 | E-gap | A gap marker opened and not closed on the same line (section 6.4). |
+| E-table | A table and the text next to it need a blank line between them. Outside fences, a table is a line starting with `\|` followed by a delimiter row, then consecutive `\|` lines. Error (a): the first line after a table is non-blank, indented at least as far as the table, and does not start a block (list item, `>`, `#`, fence, thematic break). Error (b): the line before a table header is non-blank, not a table row, and its content (for a list item, after the marker) starts further right than the table. Checked in `/*!MD` and `/*!SECTION_DESC` bodies and in prose pages. The current sources pass (13 places were fixed by whitespace-only edits). |
 | E-heading | A heading that markdown-it parses and that becomes `h2` or `h3` in a prose page or notebook cell, but that the line scan of section 6.2 does not see (a setext or indented heading); found by the website builder. |
 
 Other malformed content (stray raw HTML, odd headings) is caught by the HTML well-formedness check (section 15.2).
@@ -394,7 +395,7 @@ The file starts with TOML front matter between two lines that are exactly `+++`;
 
 ### 6.2 Heading ids
 
-Headings are found line by line outside fences: a line in column 0 that matches `^(#{1,6}) (.+)$`. Every heading that becomes an `h2` or `h3` gets an id (`##` and `###` in prose; `#` and `##` in notebook cells, section 13.3), computed once by `qdocs/prose.py` in the content model and used by both renderers: the slug (section 9.2) of the heading's plain text, unique within the page by appending `-2`, `-3`. Plain text: the heading text without a trailing `{...}`; `[[x]]` and `.[[x]]` become `x`; a link or image `[t](u)` or `![t](u)` becomes `t`; `*` and backticks are removed; a backslash before an ASCII punctuation character is removed; entities are decoded (`html.unescape`). On the 41 distinct headings of the old formats, FAQ and download pages, and on test headings with code spans, links, `[[x]]`, escapes and entities, this gives the same ids as markdown-it's plain text (measured). The website builder takes each heading's id from the model by source line; a heading token that becomes `h2` or `h3` without one is E-heading. An explicit id is written at the end of the heading: `### How do I cite Quadriga-Lib? {#cite}`. Legacy ids (old anchors, D3) are added with `legacy="..."`, repeatable: `## Material Properties {#material-properties legacy="9f6922f9"}`. In HTML the id goes on the heading, each legacy id on an empty `<span id="...">` as its first child. In twins the braces are removed and the same ids are written as explicit anchors (section 9.5).
+Headings are found line by line outside fences: a line in column 0 that matches `^(#{1,6}) (.+)$`. Every `##` and `###` heading gets an id (in prose and in notebook cells, section 13.3), computed once by `qdocs/prose.py` in the content model and used by both renderers: the slug (section 9.2) of the heading's plain text, unique within the page by appending `-2`, `-3`. Plain text: the heading text without a trailing `{...}`; `[[x]]` and `.[[x]]` become `x`; a link or image `[t](u)` or `![t](u)` becomes `t`; `*` and backticks are removed; a backslash before an ASCII punctuation character is removed; entities are decoded (`html.unescape`). On the 41 distinct headings of the old formats, FAQ and download pages, and on test headings with code spans, links, `[[x]]`, escapes and entities, this gives the same ids as markdown-it's plain text (measured). The website builder takes each heading's id from the model by source line; a heading token that becomes `h2` or `h3` without one is E-heading. An explicit id is written at the end of the heading: `### How do I cite Quadriga-Lib? {#cite}`. Legacy ids (old anchors, D3) are added with `legacy="..."`, repeatable: `## Material Properties {#material-properties legacy="9f6922f9"}`. In HTML the id goes on the heading, each legacy id on an empty `<span id="...">` as its first child. In twins the braces are removed and the same ids are written as explicit anchors (section 9.5).
 
 ### 6.3 Build variables
 
@@ -509,13 +510,13 @@ markdown-it's renderer with overrides: fences through the span-free colouring (s
 Twins are written from the source text, not from markdown-it tokens. Each part (name, brief, intro, sub-blocks, prose body, notebook Markdown cell) is copied line by line, and only these things change:
 
 - Doc-block sub-block headings `## X:` are demoted to the twin's sub-block level (`### X:`, text otherwise unchanged).
-- Prose and notebook headings lose their trailing `{...}`; the ids are written as anchors (section 9.5). Notebook headings move down one level (`#` → `##`, `##` → `###`, deeper levels → `####`), as in HTML (section 13.3).
+- Prose and notebook headings lose their trailing `{...}`; the ids are written as anchors (section 9.5). Notebook headings keep their level (section 13.3).
 - Fences without info string in doc blocks get the page language (section 5.5).
 - Outside code spans and fences: `[[name]]` and `.[[name]]` become Markdown links; raw `<a href="U" ...>T</a>` becomes `[T](U')`; a trailing `<br>` at the end of a line becomes a Markdown hard break (`\` at the line end) when the next line continues the paragraph, and is removed at the end of a paragraph; the URLs of Markdown links and images and of raw links are mapped for the twin's location (section 8.7.1, including the `site_url` rule).
 
 The writer keeps a fence map per part (which lines lie inside a fence) and splits the other lines at backtick runs, carrying an open code span across the lines of a paragraph until its closing run (a blank line ends the paragraph), so code spans stay untouched. A backtick run left open at the end of a paragraph is literal text (CommonMark); the writer then gives the warning `code-span` and leaves the rest of that paragraph unrewritten. Gap markers are removed (section 6.4): the one deliberate exception to D26's "same text"; it is part of the same rewrite, so `docs --check` compares the output without markers. Math, tables and note boxes pass through verbatim; parameter items keep their source form. Links and images are found by one scanner, which takes the inline forms `[t](u)` and `![t](u)` (the sources use no reference-style links) and is also used by the Markdown link check (section 15.1). Structure around the parts (headings, anchors, index tables, separators) is written directly. Heading ids come from the content model (section 6.2), matched by source line.
 
-Every twin starts with `# title`, an empty line, and `Quadriga-Lib <version> · Web page: <absolute URL>` (for a section file `<base_url>/<lang>_api.html#sec-<slug>`); then, if the page has at least two `##` headings, an index table (D26) of its `##` headings (with a `Topics` column of `###` links on prose pages); then the lead and the body. Exception: the full API files.
+Every twin starts with `# title`, an empty line, and `Quadriga-Lib <version> · Web page: <absolute URL>` (for a section file `<base_url>/<lang>_api.html#sec-<slug>`); then, if the page has at least two `##` headings, an index table (D26) of its `##` headings (with a `Topics` column of `###` links on prose pages, only when at least one row has topics); then the lead and the body. Exception: the full API files.
 
 #### 8.6.2 Full API files `docs/quadriga_lib_api_<lang>.md`
 
@@ -724,7 +725,7 @@ Notebook-level `metadata.quadriga_tutorial`, checked like the publications data 
 
 ### 13.3 Conversion
 
-- Markdown cells: rendered like prose (notebook kind). All heading levels move down one: `#` → `h2`, `##` → `h3`, deeper → `h4`; the twin does the same (section 8.6.1); ids as for prose headings (section 6.2).
+- Markdown cells: rendered like prose (notebook kind). Headings keep their level: `##` → `h2`, `###` → `h3`, deeper → `h4`; the twin keeps the source headings (section 8.6.1); ids as for prose headings (section 6.2). A `#` heading in a Markdown cell is a structural error: the page title comes from the notebook metadata.
 - Code cells: `<div class="cell"><div class="cell-label">In [n]</div><pre><code class="language-<lang>">...</code></pre>` and one `<div class="out">` per output (`n` is the execution count).
 - Outputs: `stream` text as `<pre>` (ANSI codes removed). An `execute_result` or `display_data` bundle shows one representation, the first present of `image/svg+xml` (stored as text in the notebook, written as is), `image/png` (base64, decoded), `text/plain` (as `<pre>`); images go to `<stem>/fig-<cell>-<output>.<ext>` (`<cell>` is the 1-based position of the cell among all cells, `<output>` the 1-based position of the output in the cell) and are shown as `<img alt loading="lazy">`. Only a bundle with none of the three gives the warning `output-type` and is left out. An `error` output is a structural error (the notebook was committed with a failing cell).
 - Twin `tutorials/<stem>.md` (D26): twin header (web page `<base_url>/tutorials/<stem>.html`), a line with the two downloads, Markdown cells through the twin writer (section 8.6.1), code cells as fenced blocks, text outputs as `text` fences, images as `![alt](<stem>/fig-<cell>-<output>.<ext>)`. Twin and page sit side by side, so one relative image path works in both (D28).
@@ -818,7 +819,7 @@ pytest, on the maintainer's machine only (the builders never need it). All tests
 | `site/test_mdparse.py` | B | `wikilink` with member form; `raw_a`; `raw_br`; raw HTML in prose shown as text; `heading_attrs`; `alert`; `site_url`; `$5 and $6` not math; code untouched; E-heading for a setext heading |
 | `site/test_render_html.py` | B | Substrings: head tags (alternate link and Markdown footer link only with a twin, `og:image` only with the image), tabs with `aria-current`, function entry, parameter rows, pills, section and legacy ids, text-page index, note boxes with default and bold titles, span-free code colouring and the `highlight` filter; `404.html` root-absolute; tutorial pages with `../`; gap markers kept as placeholders in HTML (page text, `<title>` and attributes) and `website --release` failing on gaps or replaced markers; `.htaccess` copied to the site root; the landing size warning |
 | `site/test_math.py` | B | Inline (`math_inline`) and display (`math_block`, `math_inline_double`) MathML (`display` attribute); `math_block_label` a structural error; several formulas give exactly one pandoc call and a page set without formulas none (counted by patching `subprocess.run`); a formula with an unknown command and one with unbalanced braces: structural errors at their source lines; twins keep `$...$` |
-| `site/test_tutorials.py` | B | Metadata errors; output conversion (stream; SVG before PNG before `text/plain` in one bundle; a bundle with none of them gives `output-type`; `error` output rejected; `not-run`; figure numbering); heading levels moved down in page and twin; page, twin, notebook copy, figures, card and dummy note in the `website` output |
+| `site/test_tutorials.py` | B | Metadata errors; output conversion (stream; SVG before PNG before `text/plain` in one bundle; a bundle with none of them gives `output-type`; `error` output rejected; `not-run`; figure numbering); heading levels kept in page and twin, a `#` heading rejected; page, twin, notebook copy, figures, card and dummy note in the `website` output |
 | `site/test_site_checks.py` | B | Missing file, missing id, absolute `base_url` link in a twin, the `faq.html#cite` case in HTML; unclosed tag, duplicate id, two `h1`, `img` without `alt`; size warnings |
 | `site/test_site_real_repo.py` | C | (`repo`) every id of `fixtures/old_anchors.json` (captured once from `html_docu/*.html` without the dropped ids of section 9.6) and `index.html#quickstart` exist in the `website` output; two `website` runs give identical bytes; `pipeline_demo.ipynb` converts without warnings (these cases skip themselves while `website_builder/templates/base.html` is missing) |
 
@@ -891,12 +892,19 @@ Interface from A to B: `qsite` uses only these names of `qdocs` and keeps no cop
 | `cli.Diagnostics`, `cli.write_tree(folder, mapping)` | Error, warning and gap collection and printing (section 3.7); writing a mapping with the rules of section 3.6. |
 | `config` | The constants and `PAGES` (section 3.3), the versions (section 3.8), `tomllib`. |
 | `prose.read_page(path, diag)`, `prose.substitute(text)`, `prose.gap_scan(folders)` | A website-only prose page with front matter and heading ids (sections 6.1, 6.2); build variables (section 6.3); the gap scan (section 6.4). |
-| `prose.heading_ids(lines, level_shift)` | The heading ids of section 6.2 for a list of source lines; used by `read_page` (shift 0) and for notebook Markdown cells (shift 1, section 13.3). |
+| `prose.heading_ids(lines, diag, path, first_line)` | The heading ids of section 6.2 for a list of source lines; used by `read_page` and for notebook Markdown cells (section 13.3). |
 | `links.url(target, location)`, `links.slug(text)` | URLs per output location (section 8.7.1), ids (section 9.2). |
 | `render_md.twin_lines(lines, ...)` | The twin writer for one part, used for notebook Markdown cells (sections 8.6.1, 13.3). |
 | `render_md.twin_header(title, web_url, headings)` | The twin header with the index table (section 8.6.1), used for the tutorial twins. |
 | `render_md.prose_twin(page)` | The whole twin of a prose page, gap removal in fields included (sections 6.4, 8.6.1), used for `tutorials.md`. |
 | `checks.check_markdown(mapping, scope)` | The Markdown link check (section 15.1). |
+| `links.resolve` | The target of a `[[name]]` link (section 8.7.2). |
+| `prose.check_keys` | The key check with key paths, for the notebook metadata (sections 7.2, 13.2). |
+| `render_md.index_rows` | The rows of a twin index table (section 8.6.1). |
+| `prose.GAP_RE` | The gap-marker pattern (section 6.4). |
+| `links.ABSOLUTE_URL_RE` | The pattern of absolute URLs (sections 8.7.1, 15.1). |
+| `checks.ANCHOR_RE` | The pattern of `<a id>` anchors in Markdown (sections 9.5, 15.1). |
+| `checks.collect_ids` | The ids of a generated Markdown file, as link targets (section 15.1). |
 
 Acceptance (each package also passes its tests and leaves the others green):
 
