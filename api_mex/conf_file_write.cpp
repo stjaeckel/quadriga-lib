@@ -15,42 +15,26 @@ SECTION!*/
 Write a QuaDRiGa scenario configuration file
 
 - Writes scenario parameters, path-loss parameters and short names in the layout of the conf files
-  shipped with QuaDRiGa, so that [[conf_file_read]] returns the same values bit for bit
-- Header: `% Config file for scenario "name"` with the file name without the extension `.conf`,
-  then the reference `ref`, the validity range and one line `ShortName = name` per short name
-- Up to 10 sections follow, each with a header and, if the entry of `ref_sec` is not empty, a line
-  `% See: ref; ref_sec`. Entry in `ref_sec` and write order:
-  - 1: Large scale distributions, with an overview formula per LSP; 2: Large-Scale fading
-    decorrelation distances; 3: Inter-parameter correlations, with the correlation matrix as
-    comment; 4: Model parameters; 9: EoD offset; 5: Decorrelation distance for the small-scale
-    fading spatial consistency; 6: Parameters for the ground reflection extension; 7: Absolute
-    time of arrival offset; 10: Optional modelling components; 8: Path-loss model
-  - The entries 1 to 8 are those of QuaDRiGa, so its 8 section references can be passed unchanged
-- The overview formula of an LSP shows its mean and STD with the frequency, distance, height and
-  elevation terms; with `LSP_fc_min > 0` the frequency is written as `max( fGHz, fc_min )`; the
-  ESD line also has the terms of `ES_D_mu_A` to `ES_D_mu_D` and, if `ES_D_mu_min` is not `-Inf`,
-  the lower limit of the mean; the DS line has the term `log10( a · V/S + b )` when `DS_VS > 0`
-  (a = `DS_VS_a`, b = `DS_VS_b`; `V/S` stays symbolic)
-- Each line is `name = value % comment`, aligned in columns; the comment states the unit
-- The path-loss section has the formula blocks of the model (`logdist`, `dual_slope`, `nlos`,
-  `tripple_slope`), the line `PL_model`, then the fields of `plpar` in struct order with the prefix
-  `PL_`; several values of one field are written on one line
-- Numbers are written with up to 15 significant digits, or with 16 or 17 where 15 do not read back
-  to the same double in [[conf_file_read]]; `Inf` and `-Inf` are written as such
-- With `write_defaults = false` a field is written only if its value differs from the default;
-  `SubpathMethod` only if it is not `legacy`; a section without a written field is left out
-- With `write_defaults = true` all 171 numeric fields and `SubpathMethod` are written
-- The inputs are checked with the rules of [[scenpar_validate]] before the file is opened: unknown
-  fields (including `GR_epsilon`), `NaN`, values outside their range and a wrong `SubpathMethod`
-  are errors. Further errors: a line break in the file name, a `model` that is not one name, an
-  empty or `NaN` path-loss value, short names that are not one name or not distinct, line breaks
-  in `ref` or `ref_sec`, more than 10 entries in `ref_sec`, a `valid_range` that is not empty and
-  not `[4, 2]`.
-- The text is written to a temporary file in the same directory, which must be writable, and then
-  renamed to `fn`; a symbolic link `fn` is written through
-- A failed call does not create a file and leaves an existing file unchanged; an existing file is
-  replaced and keeps its permissions
-- Every file written passes [[conf_file_read]] with `validate = true` and without ignored keys
+  of QuaDRiGa; every written file passes [[conf_file_read]] with `validate = true`, without ignored
+  keys and with the same values bit for bit
+- The header has the scenario name (the file name without `.conf`), `ref`, the validity range and
+  the short names. Up to 10 sections follow, each with an optional line `% See: ref; ref_sec` and,
+  for the LSPs and the path-loss model, the formulas as comments; the `plpar` fields are written in
+  struct order. Sections by entry of `ref_sec`: 1 large-scale distributions, 2 large-scale
+  decorrelation distances, 3 inter-parameter correlations, 4 model parameters, 5 small-scale
+  decorrelation distance, 6 ground reflection, 7 absolute TOA, 8 path-loss model, 9 EoD offset, 10
+  optional modelling components; 1 to 8 are those of QuaDRiGa, so its 8 section references can be
+  passed unchanged
+- Numbers have up to 15 significant digits, or 16 or 17 where 15 do not read back to the same
+  double, independent of the locale; `Inf`, `-Inf` and `-0` are kept
+- `write_defaults = false`: only fields whose value differs from the default (bit for bit) and
+  `SubpathMethod` if it is not `legacy`; a section without a written field is left out
+- All inputs are validated before the file is opened: the checks of [[scenpar_validate]]; `model`,
+  the other fields of `plpar` and the short names are names, the short names distinct; every `plpar`
+  field has at least one value and no `NaN`; `fn`, `ref` and `ref_sec` have no line break
+- The text is written to a temporary file in the same directory, which must be writable, and renamed
+  to `fn`: a failed call creates no file and leaves an existing file unchanged; an existing file
+  keeps its permissions, a symbolic link `fn` is written through
 
 ## Usage:
 ```

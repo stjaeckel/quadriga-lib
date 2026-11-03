@@ -14,15 +14,15 @@ SECTION!*/
 # SSF_INIT_PHASES
 Draw the random phases of one small-scale fading generator set of a BS site and scenario
 
-- The cluster random values of the small-scale fading (TR 38.901 clause 7.6.3.1) come in two kinds of sets, with
-  `N = NumClusters - 1` NLOS clusters: one shared cluster set (`set_id = 0`, `9·N` generators) and one set per
-  carrier frequency (`set_id = k`, `N` generators, `k` = position in the caller's frequency list, the same order
-  in every call). [[ssf_draw]] evaluates the phases at the links and lists the columns
-- The phases are a fixed function of `seed`, the seed of the large-scale set of the same site and scenario
-  ([[lsf_init_phases]]), and `set_id`, equal on all platforms; the sets do not repeat the large-scale phases and are
-  independent of each other. Keep an explicit seed (or the phase arrays) to reproduce the clusters
-- Each scenario of a site (LOS, NLOS, O2I) needs its own large-scale seed: TR 38.901 clause 7.6.3.4 makes the link
-  types uncorrelated
+- The cluster random values (TR 38.901 clause 7.6.3.1) come in one shared cluster set (`set_id = 0`,
+  `9·N` generators, `N = NumClusters - 1` NLOS clusters) and one set per carrier frequency (`set_id
+  = k`, `N` generators, `k` the position in the caller's frequency list, 1-based); [[ssf_draw]]
+  evaluates them and lists the columns
+- The phases are a fixed function of `seed` and `set_id`, equal on all platforms; the sets are
+  independent of each other and of the large-scale phases. Keep an explicit seed (or the phase
+  arrays) to reproduce the clusters
+- Each scenario of a site (LOS, NLOS, O2I) needs its own large-scale seed: TR 38.901 clause 7.6.3.4
+  makes the link types uncorrelated
 - `NumClusters = 1`: both sets are empty
 
 ## Usage:
@@ -31,19 +31,18 @@ phase = quadriga_lib.ssf_init_phases( scenpar, seed, set_id, preset );
 ```
 
 ## Inputs:
-- **`scenpar`** — Scenario parameters; struct from [[conf_file_read]] or [[scenpar_validate]] or any subset of
-  its fields (missing fields take their defaults, `SubpathMethod` is ignored); `NumClusters` sets `N`
-- **`seed`** *(optional)* — Seed of the large-scale set; -1 = system random device; default: -1
-- **`set_id`** *(optional)* — `0` = shared cluster set; `k >= 1` = set of frequency `k`; default: 0
-- **`preset`** *(optional)* — Sum-of-sinusoids preset, see [[sos_preset]]; default: `'Comb256'`
+- **`scenpar`** — Scenario parameters; `NumClusters` sets `N`
+- **`seed`** — Seed of the large-scale set of the same site and scenario ([[lsf_init_phases]]);
+  integer from -1 to 2^63-1; -1 = system random device, new phases on each call; default: -1
+- **`set_id`** — `0` = shared cluster set; `k >= 1` = set of frequency `k`; default: 0
+- **`preset`** — Sum-of-sinusoids preset, see [[sos_preset]]; sets `n_coeff`; default: `'Comb256'`
 
 ## Output:
-- **`phase`** — Phases in [rad], in [-pi, pi); slice 1 = Rx side, slice 2 = Tx side (mirror generators);
-  `[n_coeff, n_gen, 2]`, `n_gen = 9·N` (shared set) or `N`
+- **`phase`** — Phases in [rad], in [-pi, pi); slice 1 = Rx side, slice 2 = Tx side; `[n_coeff,
+  n_gen, 2]`, `n_gen = 9·N` (shared set) or `N`
 
 ## See also:
 - [[ssf_draw]] (evaluates the phases at the links)
-- [[ssf_clusters]] (the clusters from the random values)
 - [[lsf_init_phases]] (the large-scale set and its seed)
 MD!*/
 

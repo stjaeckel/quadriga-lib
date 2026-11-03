@@ -13,37 +13,20 @@ SECTION!*/
 # o2i_loss
 O2I building or car penetration loss of a set of UTs, TR 38.901 clause 7.4.3
 
-- Draws for each UT one of the given penetration-loss models and evaluates its loss at each carrier frequency,
-  from four normalized random values per UT; `f = fc / 1e9` in GHz, `lg = log10`
-- Material losses of TR 38.901 v19.5.0 Table 7.4.3-1 in dB: `L_glass = 2 + 0.2 f`, `L_IRR = 25.4 + 0.11 f` (IRR
-  glass, Release 19 value), `L_concrete = 5 + 4 f`, `L_plywood = 1.03 + 0.17 f`; external wall
-  `tw(p1, L1, p2, L2) = 5 - 10·lg(p1·10^(-L1/10) + p2·10^(-L2/10))`
-- Models, with `N = rnd(u, 3)` and the indoor 2D distance `d2din`:
-  - `low` (low-loss, Table 7.4.3-2): `tw(0.3, L_glass, 0.7, L_concrete) + 0.5·d2din + 4.4·N`
-  - `high` (high-loss, Table 7.4.3-2): `tw(0.7, L_IRR, 0.3, L_concrete) + 0.5·d2din + 6.5·N`
-  - `low_A` (low-loss A, Table 7.4.3-2): `tw(0.3, L_glass, 0.7, L_plywood) + 0.5·d2din + 4.4·N`
-  - `legacy_6GHz` (backward compatible model for single-frequency simulations below 6 GHz, Table 7.4.3-3):
-    `20 + 0.5·d2din`, no deviation; it goes with a shadow-fading std of 7 dB (the O2I conf files of UMa and UMi
-    have `SF_sigma = 7`)
-  - `car` (clause 7.4.3.2): `9 + 5·N`; `car_metal` (metallized car windows): `20 + 5·N`; no indoor distance
-- Columns of `rnd`: 0 = Uniform(0,1) for the model choice, 1 and 2 = Uniform(0,1) for the indoor distance,
-  3 = Normal(0,1) for the deviation (sigma_P of Table 7.4.3-2, the car loss)
-- Model choice per UT: `Ccum_j = (w_0 + ... + w_j)/sum(w)`; the model is the smallest `j` with
-  `rnd(u, 0) < Ccum_j`, or, if there is none, the last `j` with `w_j > 0`. A model with weight 0 is never chosen
-- Indoor distance: `low`, `high`, `low_A`: `d2din = min(rnd(u, 1), rnd(u, 2))·d2d_in_max`, the minimum of two
-  uniforms of clause 7.4.3.1; `legacy_6GHz`: `d2din = rnd(u, 1)·d2d_in_max` (one uniform, Table 7.4.3-3);
-  `car`, `car_metal`: 0
-- The caller draws `rnd` with [[sos.rand]] and [[sos.randn]] at the correlation distances of TR 38.901 clause
-  7.6.3.3 (building type 50 m for column 0, d2D-in 25 m for columns 1 and 2, sigma_P 10 m for column 3) and adds
-  `loss` to the path loss of the indoor UT. `d2d_in` gives the outdoor distance `d2D - d2D-in` for
-  [[los_probability]] (call `o2i_loss` first) and is the input of the legacy outdoor distance of [[path_loss]]
-- Applicability (Table 7.4.3-2): RMa uses `low` only, InF `high` only; UMa, UMi: `low` and `high`; SMa: `low`,
-  `high` and `low_A`. TR maximum indoor distance: 25 m for UMa, UMi and SMa commercial buildings, 10 m for RMa and
-  SMa residential buildings (conf-file key `O2I_d2D_in_max`). The TR SMa layout has 90 % residential and 10 %
-  commercial buildings (Table 7.2-5): split the UTs by building type and call `o2i_loss` once per type
-- Validation, in this order: `fc` non-empty, finite and > 0; `rnd` with 4 columns, columns 0 to 2 in [0, 1],
-  column 3 finite; `models` non-empty, each a known name; `weights` with one finite element >= 0 per model and a
-  sum of 1 within 1e-6; `d2d_in_max` finite and >= 0. All errors are raised as `ValueError`
+- Draws for each UT one of the given penetration-loss models and evaluates its loss at each carrier frequency; the
+  caller adds `loss` to the path loss of the UT
+- Models of TR 38.901 v19.5.0: `low`, `high`, `low_A` (Table 7.4.3-2 with the materials of Table 7.4.3-1), `legacy_6GHz`
+  (Table 7.4.3-3, single-frequency UMa and UMi below 6 GHz; the O2I conf files of UMa and UMi have its `SF_sigma = 7`),
+  `car` and `car_metal` (clause 7.4.3.2, metallized windows)
+- Model of UT `u`: the first model `j` with `rnd(u, 0)` below the sum of the weights up to `j`, else the last model with
+  a weight > 0; a model with weight 0 is never chosen
+- Indoor distance: the minimum of columns 1 and 2 of `rnd` times `d2d_in_max` (`low`, `high`, `low_A`, clause 7.4.3.1),
+  column 1 times `d2d_in_max` (`legacy_6GHz`), 0 for the car models
+- Draw `rnd` with [[sos.rand]] and [[sos.randn]] at the correlation distances of TR 38.901 clause 7.6.3.3: 50 m for
+  column 0, 25 m for columns 1 and 2, 10 m for column 3
+- TR applicability (Table 7.4.3-2): RMa `low` only, InF `high` only, UMa and UMi `low` and `high`, SMa all three. SMa
+  has 90 % residential and 10 % commercial buildings (Table 7.2-5) with different maximum indoor distances: call
+  `o2i_loss` once per building type
 
 ## Usage:
 ```
@@ -52,13 +35,13 @@ loss, d2d_in, model_index = quadriga_lib.gbsm.o2i_loss( fc, rnd, models, weights
 
 ## Inputs:
 - **`fc`** — Carrier frequencies in Hz, finite and > 0; `(n_freq,)`
-- **`rnd`** — Random values per UT: Uniform(0,1) model choice, Uniform(0,1) d2D-in #1, Uniform(0,1) d2D-in #2,
-  Normal(0,1) deviation; `(n_ut, 4)`, `n_ut = 0` allowed
-- **`models`** — Models to mix: `low`, `high`, `low_A`, `legacy_6GHz`, `car`, `car_metal`; list of str or one
-  str; `n_model` entries
-- **`weights`** — Probability of each model, >= 0, sum 1; `(n_model,)`
-- **`d2d_in_max`** — Maximum indoor 2D distance in m, finite and >= 0 (conf-file key `O2I_d2D_in_max`);
-  default: 25.0
+- **`rnd`** — Random values per UT: columns 0 to 2 Uniform in [0, 1] (model choice, two indoor distances), column 3
+  Normal(0,1), finite (deviation `sigma_P`, car loss); `(n_ut, 4)`, `n_ut = 0` allowed
+- **`models`** — Models to mix: `low`, `high`, `low_A`, `legacy_6GHz`, `car`, `car_metal`; list of str or one str;
+  `n_model` entries
+- **`weights`** — Probability of each model, finite and >= 0, sum 1 within 1e-6; `(n_model,)`
+- **`d2d_in_max`** — Maximum indoor 2D distance in m, finite and >= 0 (key `O2I_d2D_in_max`; TR: 25 m for UMa, UMi and
+  SMa commercial buildings, 10 m for RMa and SMa residential buildings); default: 25.0
 
 ## Outputs:
 - **`loss`** — Penetration loss in dB; `(n_ut, n_freq)`
@@ -68,7 +51,6 @@ loss, d2d_in, model_index = quadriga_lib.gbsm.o2i_loss( fc, rnd, models, weights
 ## See also:
 - [[los_probability]] (uses the outdoor distance `d2D - d2d_in`)
 - [[path_loss]] (basic path loss, legacy outdoor distance from `d2d_in`)
-- [[sos.rand]], [[sos.randn]] (spatially consistent random values for `rnd`)
 MD!*/
 
 py::tuple o2i_loss(const py::array_t<double> &fc,
