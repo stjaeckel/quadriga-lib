@@ -33,7 +33,8 @@ arma::Mat<dtype> quadriga_lib::plane(
 ## Inputs:
 - **`scale`** — Length 1 scales x and y uniformly; length 2 scales `{x,y}` independently; length 3 is accepted for
   compatibility with [[cube]], but the third element is ignored; empty = 1 (no scaling)
-- **`rotation`** — Euler angles in [rad] about {x,y,z}, applied as R = Rz*Ry*Rx (Blender XYZ); length 3 or empty (no rotation)
+- **`rotation`** — Euler angles in [rad] about {x,y,z}, applied as `R = Rz*Ry*Rx` (Blender XYZ);
+  length 3 or empty (no rotation)
 - **`location`** — Translation {x,y,z} in [m]; length 3 or empty (origin)
 - **`n_div`** — Number of subdivisions per edge; results in `2 * n_div^2` triangles
 

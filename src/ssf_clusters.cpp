@@ -353,8 +353,8 @@ Cluster delays, powers and angles of a set of links (TR 38.901 clause 7.5 steps 
 - Turns the LSPs of [[lsp_generate]] and the random values of [[ssf_draw]] into the clusters of each link, by one of
   three methods:
   - `"38.901"` (default): TR 38.901 clause 7.5 steps 5 to 7 at one frequency, for drop-based calibration. Clusters
-    25 dB below the strongest get power 0 (no renormalisation); the K-factor in the scaling factors is limited to
-    >= -5 dB. Under spatial consistency (clause 7.6.3.1) evaluate the blocks 1 to 8 of `rnd` at the drop or segment
+    25 dB below the strongest get power 0 (no renormalisation); the K-factor in the scaling factors is limited
+    to >= -5 dB. Under spatial consistency (clause 7.6.3.1) evaluate the blocks 1 to 8 of `rnd` at the drop or segment
     start and keep them along the track
   - `"38.901_MF"`: TR 38.901 clause 7.6.5.1 as written, with the anchor LSPs `lsp_anchor`; where the multi-frequency
     method of the TR is required
