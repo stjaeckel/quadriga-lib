@@ -13,7 +13,7 @@ Sessions that read this plan: the decisions in section 3 are settled. Do not reo
 | 3 | Spec | `md/website_spec.md` | done 2026-11-02 |
 | 3a | Doc-block fixes on `main`, merge of `main` into `website`, re-check (D20) | fixed doc blocks; spec measurements updated | done 2026-11-02: fixed on `main`, merged, re-check passed |
 | 4 | Spec review (1 to 3 rounds) | updated spec | round 1 done 2026-11-02 (21 findings fixed, committed); round 2 done 2026-11-03 (29 findings: 28 fixed, gap markers left out of `docs/` by the maintainer's decision); round 3 done 2026-11-03 (12 findings fixed; the release environment question led to D39) |
-| 4b | Rework for two builders (D39), then review round 4 | updated spec | rework done 2026-11-03; waiting for sign-off before round 4 |
+| 4b | Rework for two builders (D39), then review round 4 | updated spec | rework done and signed off 2026-11-03; round 4 done (17 technical fixes; Windows checked after the merge; release refuses uncommitted changes); waiting for sign-off |
 | 4a | Simplification analysis before review round 2: no built site in packages, rules that cost complexity, comparison with other documentation builders, Ubuntu packages instead of PyPI | decisions for the maintainer, then spec update | done 2026-11-03: D32 to D38, spec updated |
 | 5 | Implementation | builder, static parts, pages | not started |
 | 6 | Implementation review (1 to 3 rounds) | fixes | not started |
