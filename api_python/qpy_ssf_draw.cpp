@@ -12,20 +12,17 @@ SECTION!*/
 # ssf_draw
 Spatially correlated normalized random values of one small-scale fading generator set at a set of links
 
-- Evaluates a set of [[ssf_init_phases]] at the links with the rules of [[lsf_draw]] for single and dual mobility,
-  floors, 2D/3D mode and precision; every generator uses the decorrelation distance `SC_lambda` (TR 38.901 Table
-  7.6.3.1-2; 0 = spatial consistency off, used as 0.1 m)
+- Evaluates a set of [[ssf_init_phases]] at the links with the rules of [[lsf_draw]] (dual mobility, floors, accuracy);
+  every generator uses the decorrelation distance `SC_lambda` (TR 38.901 Table 7.6.3.1-2; 0 = spatial consistency off)
 - Columns, `N = NumClusters - 1`; column `b·N + n` belongs to block `b` and NLOS cluster `n`:
-  - shared set (`set_id = -1`, `9·N` columns): block 0 cluster delay, Uniform(0,1); blocks 1, 2 sign of AOD, AOA;
-    3, 4 sign of ZOD, ZOA; 5, 6 angle offset of AOD, AOA; 7, 8 angle offset of ZOD, ZOA; Normal(0,1)
-  - per-frequency set (`set_id = k`, `N` columns): cluster shadowing, Normal(0,1)
-- Dual mobility: swapping `tx_pos` and `rx_pos` exchanges the blocks 1 and 2, 3 and 4, 5 and 6, 7 and 8 and keeps
-  the delay and shadowing blocks, exactly (D2D reciprocity of S. Jaeckel et al., "A Spatially Consistent Geometric
-  D2D Small-Scale Fading Model for Multiple Frequencies", 2019)
-- A column depends neither on the other columns nor on the other links; later versions append blocks and keep the
-  values of the existing columns
-- `preset`, `horizontal` and the set type must match [[ssf_init_phases]]. Zero links give `(0, n_gen)`;
-  `NumClusters = 1` gives `(n_link, 0)`
+  - shared set (`9·N` columns): block 0 cluster delay, Uniform(0,1); blocks 1, 2 sign of AOD, AOA; 3, 4 sign of ZOD,
+    ZOA; 5, 6 angle offset of AOD, AOA; 7, 8 angle offset of ZOD, ZOA; Normal(0,1)
+  - per-frequency set (`N` columns): cluster shadowing, Normal(0,1)
+- Dual mobility: swapping `tx_pos` and `rx_pos` exchanges the blocks 1 and 2, 3 and 4, 5 and 6, 7 and 8 and keeps the
+  delay and shadowing blocks, exactly
+- A column depends neither on the other columns nor on the other links; later versions append blocks and keep the values
+  of the existing columns
+- `NumClusters = 1` gives an empty result with `n_link` rows
 
 ## Usage:
 ```
@@ -34,16 +31,16 @@ rnd = quadriga_lib.gbsm.ssf_draw( scenpar, phase, tx_pos, rx_pos, set_id, floor_
 ```
 
 ## Inputs:
-- **`scenpar`** — Scenario parameters as in [[ssf_init_phases]]; `NumClusters` and `SC_lambda` are used
+- **`scenpar`** — Scenario parameters; `NumClusters` and `SC_lambda` are used
 - **`phase`** — Phases from [[ssf_init_phases]], finite; `(n_coeff, n_gen, 2)`
-- **`tx_pos`** — Tx positions in m, one row for all links; used in dual mobility; `(1, 3)` or `(n_link, 3)`
+- **`tx_pos`** — Tx positions in m; used in dual mobility; `(1, 3)` or `(n_link, 3)`
 - **`rx_pos`** — Rx positions in m; `(n_link, 3)`
-- **`set_id`** — `-1` = shared cluster set; `k >= 0` = per-frequency set; int; default: -1
-- **`floor_id`** — Floor index per link as in [[lsf_draw]], 2D mode only; int or float array of non-negative
-  integers; `None` or empty = floor 0; `(n_link,)`; default: None
-- **`dual_mobility`** — `True`: the Tx is a second moving device; bool; default: False
-- **`preset`** — Sum-of-sinusoids preset, see [[sos.preset]]; default: `"Comb256"`
-- **`horizontal`** — `True`: 2D correlation (TR 38.901); `False`: 3D (legacy QuaDRiGa); bool; default: True
+- **`set_id`** — Set of [[ssf_init_phases]]: `-1` = shared cluster set; `k >= 0` = per-frequency set; default: -1
+- **`floor_id`** — Floor index per link as in [[lsf_draw]]; int or float array; `None` or empty = floor 0; 2D mode only;
+  `(n_link,)`; default: None
+- **`dual_mobility`** — `True`: Tx and Rx both move; default: False
+- **`preset`** — Sum-of-sinusoids preset of [[ssf_init_phases]], see [[sos.preset]]; default: `"Comb256"`
+- **`horizontal`** — `True`: 2D mode (TR 38.901); `False`: 3D mode (legacy QuaDRiGa); default: True
 
 ## Output:
 - **`rnd`** — Random values; `(n_link, n_gen)`
@@ -51,7 +48,6 @@ rnd = quadriga_lib.gbsm.ssf_draw( scenpar, phase, tx_pos, rx_pos, set_id, floor_
 ## See also:
 - [[ssf_init_phases]] (draws the phases)
 - [[ssf_clusters]] (the clusters from the random values)
-- [[lsf_draw]] (the large-scale values; mobility, floor and precision rules)
 MD!*/
 
 py::array_t<double> ssf_draw(py::handle scenpar,

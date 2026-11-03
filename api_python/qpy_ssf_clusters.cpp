@@ -13,40 +13,37 @@ SECTION!*/
 Cluster delays, powers and angles of a set of links (TR 38.901 clause 7.5 steps 5 to 7)
 
 - Turns the LSPs of [[lsp_generate]] and the random values of [[ssf_draw]] into the clusters of each link, by one of
-  three methods (a method × property table is in the C++ documentation of `ssf_clusters`):
-  - `"38.901"` (default): TR 38.901 clause 7.5 steps 5 to 7 at one frequency, for drop-based calibration. Clusters
-    25 dB below the strongest get power 0 (no renormalisation); the K-factor in the scaling factors is limited to
-    >= -5 dB. Under spatial consistency (clause 7.6.3.1) evaluate the blocks 1 to 8 of `rnd` at the drop or segment
-    start and keep them along the track
+  three methods (a method and property table is in the C++ documentation of `ssf_clusters`):
+  - `"38.901"` (default): TR 38.901 clause 7.5 steps 5 to 7 at one frequency, for drop-based calibration. Clusters 25 dB
+    below the strongest get power 0 (no renormalisation); the K-factor in the scaling factors is limited to >= -5 dB.
+    Under spatial consistency (clause 7.6.3.1) evaluate the blocks 1 to 8 of `rnd` at the drop or segment start and keep
+    them along the track
   - `"38.901_MF"`: TR 38.901 clause 7.6.5.1 as written, with the anchor LSPs `lsp_anchor`; where the multi-frequency
     method of the TR is required
   - `"quadriga"`: S. Jaeckel et al., "A Spatially Consistent Geometric D2D Small-Scale Fading Model for Multiple
     Frequencies", 2019, with the LOS direction added to the cluster offsets; for tracks, several frequencies and
     device-to-device links
-- Slots per link: 0 = LOS path, 1 = ground reflection if `GR_enabled > 0` (`G = 1`), then the `N = NumClusters - 1`
-  NLOS clusters; `n_slot = NumClusters + G`. Slot `1 + G + n` belongs to column `n` of each block of `rnd` (no
-  sorting). Clusters `n >= n_cluster(l)` (TR clause 7.6.15) get delay 0, power 0 and the LOS angles. Zero links give
-  outputs with 0 rows. Identify the LOS path by its slot, never by delay or path length: NLOS clusters of the TR
-  methods can have delay 0
-- A scenario is LOS if `KF_mu > -30` dB. In an NLOS scenario the LOS and ground-reflection powers are 0 whatever
-  `lsp` holds (`NumClusters > 1`); legacy QuaDRiGa "NLOS" files with `KF_mu > -30` run as LOS
-- Delays in [s] relative to the LOS delay `d3D/c`; angles in [rad], GCS, elevation convention; slot 0 holds the
-  geometric LOS direction. Powers are the coefficient powers of TR eq. (7.5-30), LOS `K/(K+1)`, NLOS clusters
-  `P_n/(K+1)`, without path loss and shadow fading
-- Absolute TOA (TR clause 7.6.9), NLOS scenarios only: `"38.901"`, `"38.901_MF"` add `abs_toa(l)` to the NLOS
-  delays; `"quadriga"` places the first NLOS cluster at `abs_toa(l)` (where `absTOA_mu <= -30`: only where
-  `abs_toa(l) > 0`)
-- Ground reflection (TR clause 7.6.8) on the plane z = 0. Slot power `K/(K+1)·(d3D/d_GR)²·R²` (TR methods, on top of
-  the other slots) or `K/(K+1)·R²` (`"quadriga"`) with `R² = (abs(R_par)² + abs(R_perp)²)/2` of TR eqs. (7.6-38),
-  (7.6-39). The coefficient is `sqrt(power)·diag(R_par, -R_perp)/R`, without polarisation
+- Slots per link: 0 = LOS path, 1 = ground reflection if `GR_enabled > 0` (`G = 1`), then the `N = NumClusters - 1` NLOS
+  clusters; `n_slot = NumClusters + G`. Slot `1 + G + n` belongs to column `n` of each block of `rnd` (no sorting).
+  Clusters `n >= n_cluster[l]` (TR clause 7.6.15) get delay 0, power 0 and the LOS angles. Identify the LOS path by its
+  slot, never by delay or path length: NLOS clusters of the TR methods can have delay 0
+- A scenario is LOS if `KF_mu > -30` dB. In an NLOS scenario the LOS and ground-reflection powers are 0 whatever `lsp`
+  holds (`NumClusters > 1`); legacy QuaDRiGa "NLOS" files with `KF_mu > -30` run as LOS
+- Delays in s relative to the LOS delay `d3D/c`; angles in rad, GCS, elevation convention; slot 0 holds the geometric
+  LOS direction. Powers are the coefficient powers of TR eq. (7.5-30), LOS `K/(K+1)`, NLOS clusters `P_n/(K+1)`, without
+  path loss and shadow fading
+- Absolute TOA (TR clause 7.6.9), NLOS scenarios only: `"38.901"`, `"38.901_MF"` add `abs_toa` to the NLOS delays;
+  `"quadriga"` places the first NLOS cluster at `abs_toa` (where `absTOA_mu <= -30`: only where `abs_toa > 0`)
+- Ground reflection (TR clause 7.6.8) on the plane z = 0: slot power `K/(K+1)·(d3D/d_GR)²·R²` (TR methods, on top of the
+  other slots) or `K/(K+1)·R²` (`"quadriga"`), with `R²` the mean of `abs(R_par)²` and `abs(R_perp)²` of TR eqs.
+  (7.6-38), (7.6-39); the coefficient is `sqrt(power)·diag(R_par, -R_perp)/R`, without polarisation
   `sqrt(power)·exp(j·arg(R_par))`
-- `NumClusters = 1`: the LOS path only, power 1 in all scenarios (`K/(K+1) = 1`, also in the ground-reflection
-  power), plus the ground reflection if enabled; `rnd`, `rnd_freq` and `lsp_anchor` may be empty
-- Swap reciprocity: with mirrored random values (dual mobility in [[ssf_draw]]) and mirrored LSPs, swapping `tx_pos`
-  and `rx_pos` exchanges the departure and arrival angles (`"38.901"`: `eod_offset_deg` = 0 and no O2I link;
-  `"quadriga"`: `eod_offset_deg` = 0)
-- `scenpar`, `lsp`, `rnd` and `rnd_freq` must come from the same scenario (only sizes are checked); `scenpar` is
-  validated by [[scenpar_validate]]
+- `NumClusters = 1`: the LOS path only, power 1 in all scenarios, plus the ground reflection if enabled; `rnd` must be
+  empty, `rnd_freq` and `lsp_anchor` are not used
+- Swap reciprocity: with mirrored random values (dual mobility in [[ssf_draw]]) and mirrored LSPs, swapping `tx_pos` and
+  `rx_pos` exchanges the departure and arrival angles (`"38.901"`: `eod_offset_deg` = 0 and no O2I link; `"quadriga"`:
+  `eod_offset_deg` = 0)
+- `scenpar`, `lsp`, `rnd` and `rnd_freq` must come from the same scenario; only their sizes are checked
 
 ## Usage:
 ```
@@ -55,9 +52,9 @@ delay, power, aod, eod, aoa, eoa, n_active = quadriga_lib.gbsm.ssf_clusters( sce
 ```
 
 ## Inputs:
-- **`scenpar`** — Scenario parameters (dict, `SubpathMethod` ignored); used: `NumClusters`, `NumClusters_min`,
+- **`scenpar`** — Scenario parameters; used: `NumClusters`, `NumClusters_min`,
   `KF_mu`, `absTOA_mu`, `r_DS`, `LNS_ksi`, `GR_enabled`
-- **`tx_pos`** — Tx positions in m, one row for all links; z >= 0 with ground reflection; `(1, 3)` or `(n_link, 3)`
+- **`tx_pos`** — Tx positions in m; z >= 0 with ground reflection; `(1, 3)` or `(n_link, 3)`
 - **`rx_pos`** — Rx positions in m; z >= 0 with ground reflection; `(n_link, 3)`
 - **`lsp`** — LSPs from [[lsp_generate]]; DS, ASD, ASA, ESD, ESA (slices 0, 3 to 6) > 0, KF (slice 1) >= 0;
   `"38.901"`: one frequency; `(n_link, n_freq, 8)`

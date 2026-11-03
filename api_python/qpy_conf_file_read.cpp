@@ -9,79 +9,76 @@ Geometry-based stochastic model
 SECTION!*/
 
 /*!SECTION_DESC
-A **geometry-based stochastic model** (GBSM) generates channels from statistics of a type of environment, the
-*scenario* (e.g. urban macro-cell with or without line of sight), instead of from the geometry of one site. The
-functions of this section implement the model of 3GPP TR 38.901, clause 7.5 steps 1 to 7: path loss, shadow fading,
-LOS probability, O2I penetration loss, the large-scale parameters (LSPs) of each link, i.e. the spreads of delays and
-angles, the K-factor and the cross-polarization ratio, and the clusters. They are in the submodule
-`quadriga_lib.gbsm`.<br><br>
+A **geometry-based stochastic model** (GBSM) generates channels from statistics of a type of environment, the *scenario*
+(e.g. urban macro-cell with or without line of sight), instead of from the geometry of one site. The functions of this
+section implement 3GPP TR 38.901 clause 7.5 steps 1 to 7 (path loss, LOS probability, O2I penetration loss, large-scale
+parameters (LSPs) and clusters) with the spatial consistency of clause 7.6.3. The ray level (steps 8 to 12) follows in a
+later version. They are in the submodule `quadriga_lib.gbsm`.<br><br>
 
-The statistics of a scenario are read from a conf file by [[conf_file_read]] into two dicts, the scenario
-parameters `scenpar` and the path-loss parameters `plpar`. 23 files for TR 38.901 v19.5.0 come with the library,
-in `data/config` of the source tree and in `share/quadriga-lib/config` of an installed package (for pip, below
-`sys.prefix`); [[scenpar_validate]] completes a parameter set from another source, [[conf_file_list]] finds the
-files and [[conf_file_write]] writes them.<br><br>
+**Scenario parameters.** A scenario is a dict of numeric parameters (`scenpar`), a dict of path-loss parameters
+(`plpar`) and optional short names, read from a conf file by [[conf_file_read]]. 23 files for TR 38.901 v19.5.0 come
+with the library, in `data/config` of the source tree and in `share/quadriga-lib/config` of an installed package (for
+pip, below `sys.prefix`); [[conf_file_list]] finds them and [[conf_file_write]] writes them. Every function that takes
+`scenpar` accepts the dict of [[conf_file_read]] or [[scenpar_validate]] or any subset of its keys (`SubpathMethod` is
+ignored, `None` = all defaults), completes it with the defaults of missing keys and validates it with
+[[scenpar_validate]]; an invalid value of a key that the function does not use is an error as well. Invalid input raises
+`ValueError`, a failure to read or write a file `RuntimeError`.<br><br>
 
-Per drop (layout): [[o2i_loss]] gives the penetration loss and the indoor distance of each indoor UT; then
-[[los_probability]] evaluates the LOS probability at the outdoor distance `d2D - d2D-in`. The caller draws the LOS
-state and the indoor state with [[sos.rand]] / [[sos.randn]] at the decorrelation distances of the keys
-`LOS_state_lambda` and `IO_state_lambda`, and the O2I variables at the distances of TR 38.901 clause 7.6.3.3 (see
-[[o2i_loss]]). The two state distances apply to all links of a scenario and are stated once in the TR 38.901 files:
-`LOS_state_lambda` in the NLOS file, `IO_state_lambda` in the O2I files; 0 in the other files means "not stated
-here". Per BS site and scenario (builder): [[lsf_init_phases]] draws the random
-phases once; [[lsf_draw]] evaluates them at the links (columns 0 DS, 1 KF, 2 SF, 3 ASD, 4 ASA, 5 ESD, 6 ESA, 7 XPR,
-8 absolute TOA: Normal; 9 ground permittivity, 10 UMa environment height: Uniform; each at the decorrelation
-distance of its key); [[path_loss]] returns the path loss and the SF standard deviation; [[lsp_generate]] turns the
-random values into the LSPs of each link and frequency.<br><br>
+**Workflow.** Per drop: [[o2i_loss]] gives the penetration loss and the indoor distance of each indoor UT, then
+[[los_probability]] the LOS probability at the outdoor distance `d2D - d2D-in`. The caller draws the LOS, indoor and O2I
+states with [[sos.rand]] / [[sos.randn]] at the correlation distances of TR 38.901 clause 7.6.3.3; the keys
+`LOS_state_lambda` and `IO_state_lambda` apply to all links of a scenario and are stated in the NLOS and in the O2I
+files (0 in the other files means "not stated here"). Per BS site and scenario: [[lsf_init_phases]] draws the phases of
+the large-scale generators once, [[lsf_draw]] evaluates them at the links, [[path_loss]] gives the path loss and the
+shadow-fading (SF) standard deviation, and [[lsp_generate]] the LSPs of each link and frequency. Small scale:
+[[ssf_init_phases]] and [[ssf_draw]] do the same for the cluster random values, and [[ssf_clusters]] turns the LSPs and
+random values into cluster delays, powers and angles.<br><br>
 
-The small-scale part (clause 7.5 steps 5 to 7, cluster level): [[ssf_init_phases]] draws the phases of the cluster
-random values per site, scenario and frequency from the LSF seed, [[ssf_draw]] evaluates them at the links, and
-[[ssf_clusters]] turns the LSPs and random values into cluster delays, powers and angles with the method `"38.901"`
-(clause 7.5), `"38.901_MF"` (clause 7.6.5.1) or `"quadriga"` (spatially consistent, frequency-independent). The ray
-level (steps 8 to 12) follows in a later version.<br><br>
+**Large-scale generators.** Columns of the phase array of [[lsf_init_phases]] and of the random values of [[lsf_draw]];
+a decorrelation distance of 0 is used as 0.1 m:
 
-Where TR 38.901 and QuaDRiGa differ, the TR behaviour is the default; QuaDRiGa's behaviour is available
-through an argument where it is still wanted (3D correlation, symmetric square root of the LSP
-cross-correlation matrix, no clipping of the spreads, outdoor path-loss distance of O2I links). Where
-QuaDRiGa's behaviour was an error, only the corrected rule is implemented.<br><br>
+| Column | Generator | Distribution | Decorrelation distance |
+| --- | --- | --- | --- |
+| 0 to 7 | DS, KF, SF, ASD, ASA, ESD, ESA, XPR | Normal(0,1) | `DS_lambda`, `KF_lambda`, `SF_lambda`, `AS_D_lambda`, `AS_A_lambda`, `ES_D_lambda`, `ES_A_lambda`, `XPR_lambda` |
+| 8 | absolute TOA | Normal(0,1) | `absTOA_lambda` |
+| 9 | ground permittivity | Uniform(0,1) | `SC_lambda` |
+| 10 | UMa environment height hE | Uniform(0,1) | `SF_lambda` |
 
-Units: positions in m, frequencies in Hz, path loss in dB, DS in s, KF, SF and XPR as linear power ratios, angular
-spreads in degrees.
+The Tx side of a phase array (slice 1) exchanges ASD and ASA, ESD and ESA, so that in dual mobility (Tx and Rx both
+move) the departure spreads at the Tx are the arrival spreads of the Tx as a second device.<br><br>
+
+**Conventions.** Positions are in m with the columns x, y, z: `rx_pos` is `(n_link, 3)`, `tx_pos` is `(1, 3)` (one Tx
+for all links) or `(n_link, 3)`; heights are the z coordinates. In 2D mode (`horizontal = True`, the TR behaviour) the
+random values are correlated in the x-y plane, and `floor_id` separates the floors, which are uncorrelated (TR 38.901
+Table 7.5-6 note 3). In 3D mode (`horizontal = False`, legacy QuaDRiGa) the height separates the floors, so UTs on
+different floors are correlated by the ACF of their height difference; the per-link statistics are the same in both
+modes. Where TR 38.901 and QuaDRiGa differ, the TR behaviour is the default and QuaDRiGa's is available through an
+argument where it is still wanted; where QuaDRiGa's behaviour was an error, only the corrected rule is implemented.
+Units: frequencies in Hz, path loss in dB, DS in s, KF, SF and XPR as linear power ratios, spreads in degrees.
 SECTION_DESC!*/
 
 /*!MD
 # conf_file_read
 Read and validate a QuaDRiGa scenario configuration file
 
-- A conf file is a text file with one `Key = value` assignment per line; `%` starts a comment; blank
-  lines are allowed; line ends can be LF or CRLF; space and tab are white space; a UTF-8 byte order mark at the
-  start of the file is skipped
-- Keys are case-sensitive names of the characters `A-Z`, `a-z`, `0-9` and `_`; there are four kinds:
-  - Scenario parameters: 171 numeric keys with one number each. Keys that are not in the file have
-    their default value.
-  - `SubpathMethod`: one of the words `legacy`, `Laplacian`, `mmMAGIC`; default `legacy`
-  - Path-loss parameters: every key that starts with `PL_`. `PL_model` has one name as value. All
-    others have one or more numbers separated by white space.
-  - `ShortName`: an alias for the scenario, one name; can occur several times with different values
-- Any other key is ignored and reported in `ignored_keys`; its value is not examined
-- A key that is stated more than once has its last value
-- Numbers are decimal with an optional sign, an optional decimal point and an optional exponent
-  (`e` or `E`), for example `-6.28`, `.5`, `6.2e-07`; `Inf`, `+Inf` and `-Inf` are accepted in any case
-- A number beyond the range of a double (`1e400`) is an error "out of range"; a number below the smallest
-  subnormal reads as `0` (or `-0`)
-- Numbers are read independent of the locale (the decimal point is always `.`)
+- A conf file has one `Key = value` assignment per line; `%` starts a comment; blank lines, LF or CRLF line ends and a
+  UTF-8 byte order mark at the start are accepted; keys are case-sensitive names of `A-Z`, `a-z`, `0-9` and `_`
+- Four kinds of keys:
+  - 171 numeric scenario parameters (see [[scenpar_validate]]), one number each; keys that are not in the file have
+    their default value
+  - `SubpathMethod`: one word, default `legacy`
+  - `PL_` keys: `PL_model` has one name, the others one or more numbers separated by white space
+  - `ShortName`: an alias of the scenario, one name; can occur several times with different values
+- Any other key is reported in `ignored_keys` and its value is not examined; this includes the QuaDRiGa key `GR_epsilon`
+  (the complex ground permittivity comes from [[lsp_generate]]). A key stated more than once has its last value
+- Numbers are decimal with an optional sign, decimal point and exponent (`-6.28`, `.5`, `6.2e-07`), read independent of
+  the locale; `Inf`, `+Inf` and `-Inf` in any case; a number below the smallest subnormal reads as 0
 - Elevation angles are used throughout (+90 deg is up); no key refers to a zenith angle
-- The 171 numeric keys are 138 keys of QuaDRiGa and 33 keys for 3GPP TR 38.901 v19.5.0. With their
-  default of 0 the new keys have no effect.
-- The QuaDRiGa key `GR_epsilon` (fixed relative permittivity of the ground) is not supported and is
-  reported in `ignored_keys`; the permittivity is complex and is set in the simulation
 - Raises `RuntimeError` if the file cannot be opened or is a directory
-- Raises `ValueError` with file name and line number for a line that is not blank, not a comment and
-  not a well-formed assignment: no `=`, more or less than one name before the `=`, a missing value, a
-  word where a number is required or the reverse, a second value or other text after the value, `NaN`,
-  complex numbers, a number out of range, a `PL_` key without a name, a `ShortName` value stated twice
-- With `validate = True`, a value that fails the checks of [[scenpar_validate]] is an error as well
-- A correlation matrix that is not positive definite is not an error; see `lsp_xcorr_chk`
+- Raises `ValueError` with file name and line number for a line that is not blank, not a comment and not a well-formed
+  assignment (no `=`, not one name before the `=`, a missing value, a word where a number is required or the reverse,
+  text after the value, `NaN`, a number beyond the range of a double, a `PL_` key without a name, a `ShortName` value
+  stated twice), and with `validate = True` for a value that fails [[scenpar_validate]]
 
 ## Usage:
 ```
@@ -109,7 +106,7 @@ scenpar, plpar, lsp_xcorr, lsp_xcorr_chk, short_names, ignored_keys = \
 - **`ignored_keys`** — Unknown keys, each once, in the order of their first occurrence; list of str
 
 ## See also:
-- [[scenpar_validate]] (value checks, defaults and the list of validation rules)
+- [[scenpar_validate]] (value checks and defaults)
 - [[conf_file_list]] (find the conf files in a set of directories)
 - [[conf_file_write]] (write a conf file)
 MD!*/

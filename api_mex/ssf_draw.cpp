@@ -14,20 +14,19 @@ SECTION!*/
 # SSF_DRAW
 Spatially correlated normalized random values of one small-scale fading generator set at a set of links
 
-- Evaluates a set of [[ssf_init_phases]] at the links with the rules of [[lsf_draw]] for single and dual mobility,
-  floors, 2D/3D mode and precision; every generator uses the decorrelation distance `SC_lambda` (TR 38.901 Table
-  7.6.3.1-2; 0 = spatial consistency off, used as 0.1 m)
-- Columns, `N = NumClusters - 1`; block `b = 0 ... 8` holds the columns `b·N + 1` to `(b + 1)·N`, one per NLOS
-  cluster:
-  - shared set (`set_id = 0`, `9·N` columns): block 0 cluster delay, Uniform(0,1); blocks 1, 2 sign of AOD, AOA;
+- Evaluates a set of [[ssf_init_phases]] at the links with the rules of [[lsf_draw]] (dual mobility,
+  floors, accuracy); every generator uses the decorrelation distance `SC_lambda` (TR 38.901 Table
+  7.6.3.1-2; 0 = spatial consistency off)
+- Columns, `N = NumClusters - 1`; block `b = 0 ... 8` holds the columns `b·N + 1` to `(b + 1)·N`,
+  one per NLOS cluster:
+  - shared set (`9·N` columns): block 0 cluster delay, Uniform(0,1); blocks 1, 2 sign of AOD, AOA;
     3, 4 sign of ZOD, ZOA; 5, 6 angle offset of AOD, AOA; 7, 8 angle offset of ZOD, ZOA; Normal(0,1)
-  - per-frequency set (`set_id = k >= 1`, `N` columns): cluster shadowing, Normal(0,1)
-- Dual mobility: swapping `tx_pos` and `rx_pos` exchanges the blocks 1 and 2, 3 and 4, 5 and 6, 7 and 8 and keeps
-  the delay and shadowing blocks, exactly (D2D reciprocity of S. Jaeckel et al., "A Spatially Consistent Geometric
-  D2D Small-Scale Fading Model for Multiple Frequencies", 2019)
-- A column depends neither on the other columns nor on the other links; later versions append blocks and keep the
-  values of the existing columns
-- `preset`, `horizontal` and the set type must match [[ssf_init_phases]]; at least one link is required
+  - per-frequency set (`N` columns): cluster shadowing, Normal(0,1)
+- Dual mobility: swapping `tx_pos` and `rx_pos` exchanges the blocks 1 and 2, 3 and 4, 5 and 6, 7
+  and 8 and keeps the delay and shadowing blocks, exactly
+- A column depends neither on the other columns nor on the other links; later versions append blocks
+  and keep the values of the existing columns
+- `NumClusters = 1` gives an empty result with `n_link` rows; at least one link is required
 
 ## Usage:
 ```
@@ -36,16 +35,18 @@ rnd = quadriga_lib.ssf_draw( scenpar, phase, tx_pos, rx_pos, set_id, floor_id, d
 ```
 
 ## Inputs:
-- **`scenpar`** — Scenario parameters as in [[ssf_init_phases]]; `NumClusters` and `SC_lambda` are used
-- **`phase`** — Phases from [[ssf_init_phases]]; `[n_coeff, n_gen, 2]`
-- **`tx_pos`** — Tx positions in [m], one row for all links; used in dual mobility; `[1, 3]` or `[n_link, 3]`
+- **`scenpar`** — Scenario parameters; `NumClusters` and `SC_lambda` are used
+- **`phase`** — Phases from [[ssf_init_phases]], finite; `[n_coeff, n_gen, 2]`
+- **`tx_pos`** — Tx positions in [m]; used in dual mobility; `[1, 3]` or `[n_link, 3]`
 - **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
-- **`set_id`** *(optional)* — `0` = shared cluster set; `k >= 1` = per-frequency set; default: 0
-- **`floor_id`** *(optional)* — Floor label per link starting at 0 (no index shift) as in [[lsf_draw]], 2D mode
-  only; omitted or empty = floor 0; `[n_link]`
-- **`dual_mobility`** *(optional)* — `true`: the Tx is a second moving device; default: false
-- **`preset`** *(optional)* — Sum-of-sinusoids preset, see [[sos_preset]]; default: `'Comb256'`
-- **`horizontal`** *(optional)* — `true`: 2D correlation (TR 38.901); `false`: 3D (legacy); default: true
+- **`set_id`** — Set of [[ssf_init_phases]]: `0` = shared cluster set; `k >= 1` = per-frequency set;
+  default: 0
+- **`floor_id`** *(optional)* — Floor index per link as in [[lsf_draw]]; omitted or empty = floor 0;
+  2D mode only; `[n_link]`
+- **`dual_mobility`** — `true`: Tx and Rx both move; default: false
+- **`preset`** — Sum-of-sinusoids preset of [[ssf_init_phases]], see [[sos_preset]]; default:
+  `'Comb256'`
+- **`horizontal`** — `true`: 2D mode (TR 38.901); `false`: 3D mode (legacy QuaDRiGa); default: true
 
 ## Output:
 - **`rnd`** — Random values; `[n_link, n_gen]`
@@ -53,7 +54,6 @@ rnd = quadriga_lib.ssf_draw( scenpar, phase, tx_pos, rx_pos, set_id, floor_id, d
 ## See also:
 - [[ssf_init_phases]] (draws the phases)
 - [[ssf_clusters]] (the clusters from the random values)
-- [[lsf_draw]] (the large-scale values; mobility, floor and precision rules)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

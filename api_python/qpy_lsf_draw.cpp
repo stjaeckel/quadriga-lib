@@ -12,60 +12,15 @@ SECTION!*/
 # lsf_draw
 Spatially correlated normalized random values of the large-scale generators at a set of links
 
-- Evaluates the 11 large-scale fading generators of [[lsf_init_phases]] at the links: column 0 DS, 1 KF, 2 SF,
-  3 ASD, 4 ASA, 5 ESD, 6 ESA, 7 XPR, 8 absolute TOA (Normal(0,1)), 9 ground permittivity, 10 UMa environment
-  height hE (Uniform(0,1)); each generator with the sum-of-sinusoids frequencies of `preset` at its own
-  decorrelation distance (a distance of 0 is used as 0.1 m)
-- `scenpar` is completed and validated as in [[lsf_init_phases]]; the messages of [[scenpar_validate]] pass
-  through unchanged
-- Single mobility (`dual_mobility = False`): column g is the field of generator g at the Rx position,
-  `x_g = s_g(rx)` with `s_g(x) = sqrt(2/n_coeff) · sum_n cos( 2·pi · f_n·x + phi_n )` and the phases of
-  slice 0; the values do not depend on `tx_pos`
-- Dual mobility: the Tx is a second device. Its side uses slice 1, i.e. the field of the mirror generator
-  `m(g)` at the Tx position (ASD and ASA, ESD and ESA exchanged). Self-mirrored generators (DS, KF, SF, XPR,
-  TOA, columns 9 and 10) share one map: `x_g = ( s_g(rx) + s_g(tx) ) / sqrt( 2 + 2·A_g(D) )`, with the Tx-Rx
-  distance `D` and the ACF `A_g` of the preset, linearly interpolated. The pairs are two maps:
-  `x_g = ( s_g(rx) + s_m(tx) ) / sqrt(2)`. Columns 3 to 6 thus stay Normal(0,1), and ASD/ASA and ESD/ESA have
-  the correlation `( A_g(D) + A_m(D) ) / 2` at the Tx-Rx distance, 1 at `D = 0` (then the two columns are
-  equal)
-- Swap reciprocity in dual mobility: swapping `tx_pos` and `rx_pos` leaves columns 0, 1, 2, 7, 8, 9, 10
-  unchanged and swaps column 3 with 4 and column 5 with 6, exactly (the same evaluations in swapped roles), also
-  for unequal decorrelation distances and with bias-removed phases, when both calls use the same `phase`
-- Uniform columns 9 and 10: `0.5 · erfc( -x / sqrt(2) )` of the Normal value
-- `horizontal = True`: the positions are projected on the x-y plane (z = 0) and the values do not depend on z;
-  `False`: 3D positions. `D` is measured in the same space
-- 2D and 3D mode give the same per-link statistics. In 3D mode the height separates the floors: the LSPs of UTs
-  on different floors are correlated by the ACF of their height difference, while TR 38.901 (Table 7.5-6
-  note 3) assumes no correlation between floors. `floor_id` is therefore not accepted with `horizontal = False`
-- Floors: links with different floor IDs see different fields, links with equal IDs share one field. Floor `q`
-  adds the offsets `2·pi · k · n / N + psi_b(n)` to the phases of all generators on both sides, with
-  `N = n_coeff`, `k = q mod N`, `b = q div N`, `n = 0 ... N-1`, `psi_0 = 0` and `psi_b(n) = 2·pi · u_n` for
-  `b >= 1`, where `u_n` are the uniform numbers of a `std::mt19937_64` seeded with `b` (the upper 53 bits of
-  each raw output times 2^-53). Floor 0 and `floor_id = None` give the same values
-- Fields of two floors are uncorrelated at equal horizontal positions (TR 38.901 Table 7.5-6 note 3): exactly
-  for two IDs in the same block of `N` IDs, with a random residual of standard deviation `1/sqrt(2N)` for IDs
-  in different blocks (0.044 for 256 sinusoids). At other horizontal lags the cross-correlation of two floors
-  is not zero (up to about 0.16 for 256 sinusoids), the same level as for random offsets. Mirror relations and
-  swap reciprocity hold per floor
-- `floor_id` is the caller's floor index of the UT, starting at 0: for the UT heights
-  `hUT = 3·(n_fl - 1) + 1.5` of TR 38.901 Table 7.2-1 it is `n_fl - 1`; outdoor UTs use 0. The IDs are read as
-  float64, so they must be below 2^53 (larger values would not be exact)
-- Dual mobility with floors: `floor_id` is one value per link and its offsets are added on both sides, i.e. both
-  devices of a link are on the link's floor. A Tx device on another floor than its Rx (e.g. a D2D link between two
-  floors) is evaluated on the floor of the Rx, so the same Tx device sees different fields on links to Rx devices
-  on different floors
-- The value of a link does not depend on the other links of the call; `n_link = 0` returns an array of
-  shape `(0, 11)`
-- Precision: the sinusoids are evaluated by [[sos.val]] with the AVX2 kernel where available (sine and cosine
-  in single precision, accumulation in double); the values deviate from a double-precision evaluation by less
-  than `4e-7 · sqrt(2 · n_coeff)` (9e-6 for 256 sinusoids)
-- `preset` and `horizontal` must be those of [[lsf_init_phases]]. A wrong preset with the same number of
-  sinusoids (e.g. `Exp256` for `Comb256`) cannot be detected
-- The flags `dual_mobility` and `horizontal` take a bool or `numpy.bool_`; `None` selects the default, any other
-  type raises `TypeError`
-- Validation order: `floor_id` (non-negative integers below 2^53, checked by the wrapper), positions (3 columns, rows of
-  `tx_pos`, finite values), `preset`, `scenpar`, size of `phase`, finite `phase`, length of `floor_id`,
-  `floor_id` with `horizontal = False`
+- Evaluates the phases of [[lsf_init_phases]] at the links, one column per generator (see the section description). The
+  value of a link does not depend on the other links of the call; in single mobility it does not depend on `tx_pos`
+- Dual mobility: the Tx is a second device on the same maps. Every column keeps its distribution; ASD and ASA, ESD and
+  ESA of a link are correlated by the ACF at the Tx-Rx distance (equal at distance 0). Swapping `tx_pos` and `rx_pos`
+  swaps the columns 3 and 4, 5 and 6 and leaves the others unchanged, exactly
+- Floors (2D mode): links with equal `floor_id` share one field; fields of different floors are uncorrelated at equal
+  horizontal positions, exactly within a block of `n_coeff` consecutive IDs, otherwise up to a random residual of
+  standard deviation `1/sqrt(2·n_coeff)`. In dual mobility both devices of a link are on the link's floor
+- The values are within `4e-7 · sqrt(2·n_coeff)` of a double-precision evaluation (AVX2 kernel of [[sos.val]])
 
 ## Usage:
 ```
@@ -73,32 +28,25 @@ rnd = quadriga_lib.gbsm.lsf_draw( scenpar, phase, tx_pos, rx_pos, floor_id, dual
 ```
 
 ## Inputs:
-- **`scenpar`** — Scenario parameters; dict as returned by [[conf_file_read]] or [[scenpar_validate]] (the
-  entry `SubpathMethod` is ignored), or any subset of its keys; missing keys have their default value;
-  `None` = all defaults; only the 10 decorrelation distances are used
-- **`phase`** — Phases in rad from [[lsf_init_phases]]; slice 0 = Rx side, slice 1 = Tx side; must be finite;
-  `(n_coeff, 11, 2)`, `n_coeff` of `preset`
-- **`tx_pos`** — Tx positions in m; one row is used for all links; not used in single mobility (but
-  validated); `(1, 3)` or `(n_link, 3)`
+- **`scenpar`** — Scenario parameters; the decorrelation distances are used
+- **`phase`** — Phases from [[lsf_init_phases]], finite; `(n_coeff, 11, 2)`
+- **`tx_pos`** — Tx positions in m; used in dual mobility, always validated; `(1, 3)` or `(n_link, 3)`
 - **`rx_pos`** — Rx positions in m; `(n_link, 3)`
-- **`floor_id`** — Floor index per link, starting at 0; non-negative integers below 2^53, given as int or float
-  array; `None` or empty = all links on floor 0; in dual mobility the floor of both devices; only with
-  `horizontal = True`; `(n_link,)`; default: None
-- **`dual_mobility`** — `True`: Tx and Rx both move, the Tx side is evaluated as a second device;
-  default: False
-- **`preset`** — Sum-of-sinusoids preset, see [[sos.preset]]; must match [[lsf_init_phases]];
-  default: `"Comb256"`
-- **`horizontal`** — `True`: 2D correlation in the x-y plane (TR 38.901 behaviour); `False`: 3D correlation
-  (legacy QuaDRiGa behaviour); must match [[lsf_init_phases]]; default: True
+- **`floor_id`** — Floor index of the UT per link, starting at 0; int or float array of non-negative integers below 2^53
+  (`n_fl - 1` for the UT heights of TR 38.901 Table 7.2-1, 0 for outdoor UTs); `None` or empty = floor 0; 2D mode only;
+  `(n_link,)`; default: None
+- **`dual_mobility`** — `True`: Tx and Rx both move; default: False
+- **`preset`** — Sum-of-sinusoids preset of [[lsf_init_phases]], see [[sos.preset]]; a different preset with the same
+  number of sinusoids is not detected; default: `"Comb256"`
+- **`horizontal`** — Mode of [[lsf_init_phases]]; default: True
 
 ## Output:
-- **`rnd`** — Random values; columns 0 to 8 Normal(0,1), columns 9 and 10 Uniform(0,1); `(n_link, 11)`
+- **`rnd`** — Random values, columns as in the section description; `(n_link, 11)`
 
 ## See also:
 - [[lsf_init_phases]] (draws the phases)
 - [[path_loss]] (column 10 as `rnd_he`)
 - [[lsp_generate]] (the large-scale parameters from `rnd`)
-- [[sos.val]] (evaluation of a sum-of-sinusoids generator)
 MD!*/
 
 py::array_t<double> lsf_draw(py::handle scenpar,

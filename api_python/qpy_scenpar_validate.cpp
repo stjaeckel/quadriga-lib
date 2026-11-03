@@ -12,23 +12,20 @@ SECTION!*/
 # scenpar_validate
 Validate scenario parameters and complete them with default values
 
-- Checks a dict of QuaDRiGa scenario parameters that did not come from a conf file and adds every
-  missing key with its default value, so that `scenpar_out` always has all 172 entries
-- `None` or an empty dict returns the complete default parameter set
-- A dict with the keys of QuaDRiGa is completed with the 33 keys for 3GPP TR 38.901 v19.5.0, which
-  have no effect at their default of 0
-- All values are real scalars, except `SubpathMethod`, which is a str
-- A key that is not one of the 172 names is an error, also with `validate = False`; this includes
-  the QuaDRiGa key `GR_epsilon`, which is not supported
+- Checks scenario parameters that did not come from a conf file and adds every missing key with its default value, so
+  that `scenpar_out` has all 172 keys: the 138 numeric keys of QuaDRiGa, `SubpathMethod` and 33 keys for TR 38.901
+  v19.5.0, which have no effect at their default of 0. `None` or an empty dict gives the complete default set
+- A name that is not one of the keys is an error, also with `validate = False`; this includes the QuaDRiGa key
+  `GR_epsilon`, which is not supported
 - Value checks with `validate = True`; `NaN` is an error for every key:
   - Integer from 1 to 1000: `NumClusters`, `NumSubPaths`
   - Finite and > 0: `r_DS`
-  - Finite and >= 0: the 8 decorrelation distances (`DS_lambda` ... `XPR_lambda`), `SC_lambda`,
-    `absTOA_lambda`, `PerClusterDS`, `PerClusterDS_min`, `PerClusterAS_D`, `PerClusterAS_A`,
-    `PerClusterES_D`, `PerClusterES_A`, `LNS_ksi`, `LOS_scatter_radius`, `GR_enabled`, `LSP_fc_min`,
-    `EoD_offset_b`, `EoD_offset_hcl`, `PerClusterDS_fc_min`, `PerClusterES_D_scale`, `absTOA_Lmax`,
-    `NF_alpha`, `NF_beta`, `SNS_sigma`, `SNS_A`, `SNS_B`, `SNS_R`, `SNS_delta_var`, `PolVar_sigma`,
-    `LOS_state_lambda`, `IO_state_lambda`, `O2I_d2D_in_max`, `DS_VS`, `DS_VS_a`, `DS_VS_b`
+  - Finite and >= 0: the 8 decorrelation distances (`DS_lambda` ... `XPR_lambda`), `SC_lambda`, `absTOA_lambda`,
+    `PerClusterDS`, `PerClusterDS_min`, `PerClusterAS_D`, `PerClusterAS_A`, `PerClusterES_D`, `PerClusterES_A`,
+    `LNS_ksi`, `LOS_scatter_radius`, `GR_enabled`, `LSP_fc_min`, `EoD_offset_b`, `EoD_offset_hcl`,
+    `PerClusterDS_fc_min`, `PerClusterES_D_scale`, `absTOA_Lmax`, `NF_alpha`, `NF_beta`, `SNS_sigma`, `SNS_A`, `SNS_B`,
+    `SNS_R`, `SNS_delta_var`, `PolVar_sigma`, `LOS_state_lambda`, `IO_state_lambda`, `O2I_d2D_in_max`, `DS_VS`,
+    `DS_VS_a`, `DS_VS_b`
   - Integer from 0 to 1000: `NumClusters_min`, `NF_k1`
   - In the range from 0 to 1: `SNS_mu`
   - In the range from -1 to 1: the 28 correlations (`asD_ds` to `xpr_esa`)
@@ -38,9 +35,6 @@ Validate scenario parameters and complete them with default values
   - `DS_VS_a` and `DS_VS_b` must not both be 0 if `DS_VS` is > 0
   - `SubpathMethod` must be `legacy`, `Laplacian` or `mmMAGIC`
 - With `validate = False` no value is checked: `NaN` and any `SubpathMethod` are accepted
-- The symmetric matrix `lsp_xcorr` is built from the 28 correlation keys and has a unit diagonal.
-  It is tested by a Cholesky factorization. A matrix that is not positive definite is not an error.
-- Raises `ValueError` for invalid input; `scenpar_in` is not modified
 
 ## Usage:
 ```
