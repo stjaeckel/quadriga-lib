@@ -3707,8 +3707,8 @@ void quadriga_lib::lsp_generate(
 - **`lsp`** — Large-scale parameters; slices: 0 DS in [s], 1 KF, 2 SF, 3 ASD, 4 ASA, 5 ESD, 6 ESA in [deg], 7 XPR;
   `[n_link, n_freq, 8]`
 - **`abs_toa`** *(optional)* — Absolute TOA offset in [s], 0 if not active; `[n_link]`
-- **`gr_eps_re`**, **`gr_eps_im`** *(optional)* — Relative permittivity of the ground, real part and imaginary part
-  >= 0; the complex value of TR 38.901 eq. (7.6-40) is `gr_eps_re - j·gr_eps_im`; `[n_link, n_freq]`
+- **`gr_eps_re`**, **`gr_eps_im`** *(optional)* — Relative permittivity of the ground, real part and imaginary
+  part >= 0; the complex value of TR 38.901 eq. (7.6-40) is `gr_eps_re - j·gr_eps_im`; `[n_link, n_freq]`
 - **`eod_offset_deg`** *(optional)* — EoD offset in [deg], positive = up; `[n_link, n_freq]`
 - **`lsp_mu`** *(optional)* — Mean `mu` in the log domain; `[n_link, n_freq, 8]`
 - **`lsp_sigma`** *(optional)* — Standard deviation `sigma` in the log domain, >= 0; `[n_link, n_freq, 8]`
@@ -3844,8 +3844,8 @@ void quadriga_lib::path_loss(
 - **`fc`** — Carrier frequencies in [Hz], finite and > 0; `[n_freq]`
 - **`tx_pos`** — Tx positions in [m]; `[1, 3]` or `[n_link, 3]`
 - **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
-- **`d2d_in`** *(optional)* — Indoor 2D distance in [m] of the UT of each link (e.g. from [o2i_loss](#o2i_loss)), finite and
-  >= 0; given = legacy outdoor distance; 0 = outdoor link; `[n_link]`
+- **`d2d_in`** *(optional)* — Indoor 2D distance in [m] of the UT of each link (e.g. from [o2i_loss](#o2i_loss)), finite
+  and >= 0; given = legacy outdoor distance; 0 = outdoor link; `[n_link]`
 - **`rnd_he`** *(optional)* — Uniform(0,1) value per link for the random environment height, column 10 of
   [lsf_draw](#lsf_draw); `[n_link]`
 
@@ -3929,8 +3929,8 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#ssf_clusters) · [Python](quadriga_lib
 - Turns the LSPs of [lsp_generate](#lsp_generate) and the random values of [ssf_draw](#ssf_draw) into the clusters of each link, by one of
   three methods:
   - `"38.901"` (default): TR 38.901 clause 7.5 steps 5 to 7 at one frequency, for drop-based calibration. Clusters
-    25 dB below the strongest get power 0 (no renormalisation); the K-factor in the scaling factors is limited to
-    >= -5 dB. Under spatial consistency (clause 7.6.3.1) evaluate the blocks 1 to 8 of `rnd` at the drop or segment
+    25 dB below the strongest get power 0 (no renormalisation); the K-factor in the scaling factors is limited
+    to >= -5 dB. Under spatial consistency (clause 7.6.3.1) evaluate the blocks 1 to 8 of `rnd` at the drop or segment
     start and keep them along the track
   - `"38.901_MF"`: TR 38.901 clause 7.6.5.1 as written, with the anchor LSPs `lsp_anchor`; where the multi-frequency
     method of the TR is required
@@ -4690,7 +4690,8 @@ arma::Mat<dtype> quadriga_lib::cube(
 
 ### Inputs:
 - **`scale`** — Length 1 scales all axes uniformly; length 3 scales `{x,y,z}` independently; empty = 1 (no scaling)
-- **`rotation`** — Euler angles in [rad] about {x,y,z}, applied as R = Rz*Ry*Rx (Blender XYZ); length 3 or empty (no rotation)
+- **`rotation`** — Euler angles in [rad] about {x,y,z}, applied as `R = Rz*Ry*Rx` (Blender XYZ);
+  length 3 or empty (no rotation)
 - **`location`** — Translation {x,y,z} in [m]; length 3 or empty (origin)
 - **`n_div`** — Number of subdivisions per edge; results in `12 * n_div^2` triangles
 
@@ -5161,7 +5162,8 @@ arma::Mat<dtype> quadriga_lib::plane(
 ### Inputs:
 - **`scale`** — Length 1 scales x and y uniformly; length 2 scales `{x,y}` independently; length 3 is accepted for
   compatibility with [cube](#cube), but the third element is ignored; empty = 1 (no scaling)
-- **`rotation`** — Euler angles in [rad] about {x,y,z}, applied as R = Rz*Ry*Rx (Blender XYZ); length 3 or empty (no rotation)
+- **`rotation`** — Euler angles in [rad] about {x,y,z}, applied as `R = Rz*Ry*Rx` (Blender XYZ);
+  length 3 or empty (no rotation)
 - **`location`** — Translation {x,y,z} in [m]; length 3 or empty (origin)
 - **`n_div`** — Number of subdivisions per edge; results in `2 * n_div^2` triangles
 

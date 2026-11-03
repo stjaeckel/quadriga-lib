@@ -48,6 +48,12 @@ def test_front_matter_extra_keys_and_missing_delimiters(tmp_path):
     assert errors(diag) == ["page.md:1: error: the file must start with TOML front matter between two lines '+++'"]
 
 
+def test_e_table_and_e_wrap_on_a_prose_page(tmp_path):
+    _, diag = page(tmp_path, FRONT + "\n| a | b |\n| - | - |\nText\n\nWrapped and\n> 0\n")
+    assert errors(diag) == ["page.md:8: error: E-table: a table and the text next to it need a blank line between them",
+                            "page.md:11: error: E-wrap: a wrapped line must not start with '>' or '+ '; move the line break"]
+
+
 def test_build_variables(tmp_path):
     config.VARIABLES["version"] = "9.9.9"
     p, diag = page(tmp_path, FRONT.replace('"T"', '"T {{ version }}"') +

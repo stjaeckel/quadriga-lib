@@ -158,8 +158,8 @@ void quadriga_lib::lsp_generate(
 - **`lsp`** — Large-scale parameters; slices: 0 DS in [s], 1 KF, 2 SF, 3 ASD, 4 ASA, 5 ESD, 6 ESA in [deg], 7 XPR;
   `[n_link, n_freq, 8]`
 - **`abs_toa`** *(optional)* — Absolute TOA offset in [s], 0 if not active; `[n_link]`
-- **`gr_eps_re`**, **`gr_eps_im`** *(optional)* — Relative permittivity of the ground, real part and imaginary part
-  >= 0; the complex value of TR 38.901 eq. (7.6-40) is `gr_eps_re - j·gr_eps_im`; `[n_link, n_freq]`
+- **`gr_eps_re`**, **`gr_eps_im`** *(optional)* — Relative permittivity of the ground, real part and imaginary
+  part >= 0; the complex value of TR 38.901 eq. (7.6-40) is `gr_eps_re - j·gr_eps_im`; `[n_link, n_freq]`
 - **`eod_offset_deg`** *(optional)* — EoD offset in [deg], positive = up; `[n_link, n_freq]`
 - **`lsp_mu`** *(optional)* — Mean `mu` in the log domain; `[n_link, n_freq, 8]`
 - **`lsp_sigma`** *(optional)* — Standard deviation `sigma` in the log domain, >= 0; `[n_link, n_freq, 8]`

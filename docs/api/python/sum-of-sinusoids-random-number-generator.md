@@ -599,8 +599,8 @@ val = quadriga_lib.sos.rand( dist_decorr, pos, pos_b, dist_decorr_b, preset, see
   position
 - **`pos_b`** — Positions of the second device; `None` = one device; `(n_pos, 1)`, `(n_pos, 2)` or
   `(n_pos, 3)` as for `pos`; the number of columns may differ from `pos`; default: `None`
-- **`dist_decorr_b`** — Decorrelation distances of the second device; requires `pos_b`; must be
-  >= 0; `None` = same as `dist_decorr`; `(n_gen,)`; default: `None`
+- **`dist_decorr_b`** — Decorrelation distances of the second device; requires `pos_b`; must
+  be >= 0; `None` = same as `dist_decorr`; `(n_gen,)`; default: `None`
 - **`preset`** — Name of the preset, see [sos.preset](#sos.preset); `str`; default: "Comb256"
 - **`seed`** — Seed of the phases; `int`; must be >= -1; -1 seeds from the system random device;
   default: -1
@@ -663,8 +663,8 @@ val = quadriga_lib.sos.randi( dist_decorr, pos, imax, pos_b, dist_decorr_b, pres
 - **`imax`** — Largest value; `int`; must be > 0
 - **`pos_b`** — Positions of the second device; `None` = one device; `(n_pos, 1)`, `(n_pos, 2)` or
   `(n_pos, 3)` as for `pos`; the number of columns may differ from `pos`; default: `None`
-- **`dist_decorr_b`** — Decorrelation distances of the second device; requires `pos_b`; must be
-  >= 0; `None` = same as `dist_decorr`; `(n_gen,)`; default: `None`
+- **`dist_decorr_b`** — Decorrelation distances of the second device; requires `pos_b`; must
+  be >= 0; `None` = same as `dist_decorr`; `(n_gen,)`; default: `None`
 - **`preset`** — Name of the preset, see [sos.preset](#sos.preset); `str`; default: "Comb256"
 - **`seed`** — Seed of the phases; `int`; must be >= -1; -1 seeds from the system random device;
   default: -1
@@ -724,8 +724,8 @@ val = quadriga_lib.sos.randn( dist_decorr, pos, pos_b, dist_decorr_b, preset, se
   position
 - **`pos_b`** — Positions of the second device; `None` = one device; `(n_pos, 1)`, `(n_pos, 2)` or
   `(n_pos, 3)` as for `pos`; the number of columns may differ from `pos`; default: `None`
-- **`dist_decorr_b`** — Decorrelation distances of the second device; requires `pos_b`; must be
-  >= 0; `None` = same as `dist_decorr`; `(n_gen,)`; default: `None`
+- **`dist_decorr_b`** — Decorrelation distances of the second device; requires `pos_b`; must
+  be >= 0; `None` = same as `dist_decorr`; `(n_gen,)`; default: `None`
 - **`preset`** — Name of the preset, see [sos.preset](#sos.preset); `str`; default: "Comb256"
 - **`seed`** — Seed of the phases; `int`; must be >= -1; -1 seeds from the system random device;
   default: -1

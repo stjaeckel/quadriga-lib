@@ -2165,9 +2165,9 @@ Also in: [C++](quadriga_lib_api_cpp.md#los_probability) · [MATLAB](quadriga_lib
   when `rnd_g` and `fc` are given, the soft LOS state of TR 38.901 eq. (7.6-18); the LOS state itself (a draw against
   `p_los`) and its spatial correlation are the caller's
 - `38.901_*`: TR 38.901 v19.5.0 Table 7.4.2-1 (`InH_Mixed`, `InH_Open`: mixed and open office). Where the table leaves
-  cases open: all results are limited to [0, 1]; UMa uses `C' = 1` for `hUT > 23` m; InF-SH and InF-DH give 1 for `hUT
-  >= h_clutter` and the rule of InF-SL and InF-DL for `hBS <= hUT`; SMa gives 1 for `hBS <= hUT` and uses `max(h_x -
-  hUT, 0)` in all three terms (the TR only in the residential term; equal for `hUT < 15` m)
+  cases open: all results are limited to [0, 1]; UMa uses `C' = 1` for `hUT > 23` m; InF-SH and InF-DH give 1 for
+  `hUT >= h_clutter` and the rule of InF-SL and InF-DL for `hBS <= hUT`; SMa gives 1 for `hBS <= hUT` and uses
+  `max(h_x - hUT, 0)` in all three terms (the TR only in the residential term; equal for `hUT < 15` m)
 - `38.811_*`: TR 38.811 Table 6.6.1-1 over the elevation `atan2(hBS, d2d_out)`, linearly interpolated; `Suburban` and
   `Rural` share one table
 - `QuaDRiGa_Industrial`: `min(1, exp(-(d2d_out + 20)/80)·exp(min(hBS, 8)/5 - 1))`; `LOS`: 1; `NLOS`: 0
@@ -2452,10 +2452,10 @@ Also in: [C++](quadriga_lib_api_cpp.md#path_loss) · [MATLAB](quadriga_lib_api_m
     `dual_slope` rule with the breakpoints `dBP1 = min(dBP1, dBP2)` and `dBP2` of `E1, hE1` and `E2, hE2`, the slopes
     `A1`, `A2`, `A3` and `sf = sig1`, `sig2`, `sig3`
   - `nlos` (An, Bn; Cn, Dn, D1n, D2n, D3n, En, E1n, E2n, E3n, Fn, G1n = 0, G2n = 1, LOSmax = 1, Ax, Bx, Cx, sig): `hb =
-    max(hBS, 0.1)`, `hm = max(hUT, 0.1)`; `An·lg d3 + Bn + Cn·lg f + Dn·lg hb + D1n·lg(hb)/hb + D2n·lg(hb)/hb² + D3n·hb
-    + En·lg hm + E1n·lg(hm)/hm + E2n·lg(hm)/hm² + E3n·hm + Fn·lg(hb)·lg(d3) + G1n·(lg(G2n·hm))²`; with `LOSmax != 0`
-    (which requires the `dual_slope` keys) at least the `dual_slope` loss; with `Ax`, `Bx` or `Cx` at least `Ax·lg d3 +
-    Bx + Cx·lg f` (e.g. the InF-SL term of InF-DL); `sf = sig`
+    max(hBS, 0.1)`, `hm = max(hUT, 0.1)`; `An·lg d3 + Bn + Cn·lg f + Dn·lg hb + D1n·lg(hb)/hb + D2n·lg(hb)/hb² +
+    D3n·hb + En·lg hm + E1n·lg(hm)/hm + E2n·lg(hm)/hm² + E3n·hm + Fn·lg(hb)·lg(d3) + G1n·(lg(G2n·hm))²`; with
+    `LOSmax != 0` (which requires the `dual_slope` keys) at least the `dual_slope` loss; with `Ax`, `Bx` or `Cx` at
+    least `Ax·lg d3 + Bx + Cx·lg f` (e.g. the InF-SL term of InF-DL); `sf = sig`
   - `satellite` (A = 20, B = 32.45, C = 20, D = 0, usePLa = 1): `sa = min(hBS/d3, 1)`; `+Inf` for `sa <= 0`, else `A·lg
     d3 + B + C·lg f + D·lg(asin(sa))`, plus the zenith attenuation by atmospheric gases over `sa` (1 to 100 GHz,
     constant beyond) if `usePLa != 0`
@@ -4060,8 +4060,8 @@ val = quadriga_lib.sos.rand( dist_decorr, pos, pos_b, dist_decorr_b, preset, see
   position
 - **`pos_b`** — Positions of the second device; `None` = one device; `(n_pos, 1)`, `(n_pos, 2)` or
   `(n_pos, 3)` as for `pos`; the number of columns may differ from `pos`; default: `None`
-- **`dist_decorr_b`** — Decorrelation distances of the second device; requires `pos_b`; must be
-  >= 0; `None` = same as `dist_decorr`; `(n_gen,)`; default: `None`
+- **`dist_decorr_b`** — Decorrelation distances of the second device; requires `pos_b`; must
+  be >= 0; `None` = same as `dist_decorr`; `(n_gen,)`; default: `None`
 - **`preset`** — Name of the preset, see [sos.preset](#sos.preset); `str`; default: "Comb256"
 - **`seed`** — Seed of the phases; `int`; must be >= -1; -1 seeds from the system random device;
   default: -1
@@ -4124,8 +4124,8 @@ val = quadriga_lib.sos.randi( dist_decorr, pos, imax, pos_b, dist_decorr_b, pres
 - **`imax`** — Largest value; `int`; must be > 0
 - **`pos_b`** — Positions of the second device; `None` = one device; `(n_pos, 1)`, `(n_pos, 2)` or
   `(n_pos, 3)` as for `pos`; the number of columns may differ from `pos`; default: `None`
-- **`dist_decorr_b`** — Decorrelation distances of the second device; requires `pos_b`; must be
-  >= 0; `None` = same as `dist_decorr`; `(n_gen,)`; default: `None`
+- **`dist_decorr_b`** — Decorrelation distances of the second device; requires `pos_b`; must
+  be >= 0; `None` = same as `dist_decorr`; `(n_gen,)`; default: `None`
 - **`preset`** — Name of the preset, see [sos.preset](#sos.preset); `str`; default: "Comb256"
 - **`seed`** — Seed of the phases; `int`; must be >= -1; -1 seeds from the system random device;
   default: -1
@@ -4185,8 +4185,8 @@ val = quadriga_lib.sos.randn( dist_decorr, pos, pos_b, dist_decorr_b, preset, se
   position
 - **`pos_b`** — Positions of the second device; `None` = one device; `(n_pos, 1)`, `(n_pos, 2)` or
   `(n_pos, 3)` as for `pos`; the number of columns may differ from `pos`; default: `None`
-- **`dist_decorr_b`** — Decorrelation distances of the second device; requires `pos_b`; must be
-  >= 0; `None` = same as `dist_decorr`; `(n_gen,)`; default: `None`
+- **`dist_decorr_b`** — Decorrelation distances of the second device; requires `pos_b`; must
+  be >= 0; `None` = same as `dist_decorr`; `(n_gen,)`; default: `None`
 - **`preset`** — Name of the preset, see [sos.preset](#sos.preset); `str`; default: "Comb256"
 - **`seed`** — Seed of the phases; `int`; must be >= -1; -1 seeds from the system random device;
   default: -1

@@ -125,6 +125,32 @@ def test_e_table_text_after_table(tmp_path):
     assert errors(diag) == []
 
 
+def test_e_table_column_0_text_after_an_indented_table(tmp_path):
+    _, diag = parse(tmp_path, "cpp", SECTION + md("# f", "B", "## Declaration:", "## Inputs:",
+                                                  "- **`x`** — Codes:", "  | a | b |", "  | - | - |",
+                                                  "lazy text in column 0"))
+    assert errors(diag) == ["src/a.cpp:12: error: E-table: a table and the text next to it need a blank line between them"]
+
+
+def test_e_wrap(tmp_path):
+    _, diag = parse(tmp_path, "cpp", SECTION + md("# f", "B", "## Declaration:", "## Inputs:",
+                                                  "- **`x`** — Distance, finite and", "  >= 0; `[n]`",
+                                                  "- **`y`** — Sum `a + b", "  + c`"))
+    assert errors(diag) == [
+        "src/a.cpp:10: error: E-wrap: a wrapped line must not start with '>' or '+ '; move the line break",
+        "src/a.cpp:12: error: E-wrap: a wrapped line must not start with '>' or '+ '; move the line break"]
+    _, diag = parse(tmp_path / "desc", "cpp", SECTION + "/*!SECTION_DESC\nText\n> quote\nSECTION_DESC!*/\n")
+    assert errors(diag) == ["src/a.cpp:6: error: E-wrap: a wrapped line must not start with '>' or '+ '; move the line break"]
+    # fine: fenced code, a quote after a fence, a blank line or a heading, a quote or '+' list continued;
+    # a wrapped code span is not: the line still becomes a block quote
+    _, diag = parse(tmp_path / "ok", "cpp", SECTION + md("# f", "B", "## Declaration:", "```", "a", "+ b", "```",
+                                                         "> quote", "> more", "", "> [!NOTE]", "> text", "",
+                                                         "#### Heading", "> quote", "", "+ one", "+ two",
+                                                         "Text with `x", ">= 0` in code"))
+    assert errors(diag) == ["src/a.cpp:24: error: E-wrap: a wrapped line must not start with '>' or '+ '; "
+                            "move the line break"]
+
+
 def test_e_table_after_deeper_text(tmp_path):
     _, diag = parse(tmp_path, "cpp", SECTION + md("# f", "B", "## Declaration:", "## Inputs:",
                                                   "- **`x`** — Modes", "  - v1: text", "  | a | b |", "  | - | - |"))

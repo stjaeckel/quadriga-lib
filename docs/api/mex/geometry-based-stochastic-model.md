@@ -411,9 +411,9 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#lsp_generate) · [Pytho
   - `sigma = max(0, max(0, P_sigma + P_delta·lg(P_omega + f')) + P_kappa·lg(d) + P_tau·lg(h) +
     P_beta·lg(a))`
   - SF has the mean 0. DS adds `lg(DS_VS_a·DS_VS + DS_VS_b)` if `DS_VS > 0` (V/S of the InF hall, TR
-    38.901 Table 7.5-6 Part-3). ESD adds `ES_D_mu_A·d/1000 + ES_D_mu_B·hUT + ES_D_mu_C·abs(hUT - h)
-    + ES_D_mu_D·max(hUT - h, 0)` and is limited below by `ES_D_mu_min` (TR 38.901 Tables 7.5-7 to
-    7.5-12)
+    38.901 Table 7.5-6 Part-3). ESD adds
+    `ES_D_mu_A·d/1000 + ES_D_mu_B·hUT + ES_D_mu_C·abs(hUT - h) + ES_D_mu_D·max(hUT - h, 0)` and is
+    limited below by `ES_D_mu_min` (TR 38.901 Tables 7.5-7 to 7.5-12)
   - The multiplying coefficients must be finite; a frequency term with `P_gamma` or `P_delta` not 0
     requires `P_omega + f' > 0`
 - `lsp = 10^(mu + sigma·x)` for DS and the angular spreads, `10^(0.1·(mu + sigma·x))` for KF, SF and
@@ -448,8 +448,8 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#lsp_generate) · [Pytho
 - **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
 - **`rnd`** — Random values from [lsf_draw](#lsf_draw), finite; column 10 in [0, 1] when 3 or more outputs
   are requested (the error message counts the columns from 0); column 11 is not used; `[n_link, 11]`
-- **`sf_sigma`** *(optional)* — SF standard deviation in [dB] (e.g. from [path_loss](#path_loss)), finite and
-  >= 0; replaces the value from `scenpar`, also in `lsp_sigma`; omitted or empty = the scenario
+- **`sf_sigma`** *(optional)* — SF standard deviation in [dB] (e.g. from [path_loss](#path_loss)), finite
+  and >= 0; replaces the value from `scenpar`, also in `lsp_sigma`; omitted or empty = the scenario
   value; `[n_link, n_freq]`
 - **`cholesky`** — `true`: Cholesky root in the order of TR 38.901 clause 7.5 step 4 (SF, KF, DS,
   ASD, ASA, ESD, ESA; XPR last); `false`: symmetric square root (legacy QuaDRiGa); default: true

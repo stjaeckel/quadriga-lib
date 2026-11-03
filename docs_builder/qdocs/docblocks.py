@@ -117,6 +117,35 @@ _ENDS_TABLE_RE = re.compile(r"^(?:[-*+](?:\s|$)|\d{1,9}[.)](?:\s|$)|>|#{1,6}(?:\
 _LIST_MARKER_RE = re.compile(r"^\s*(?:[-*+]|\d{1,9}[.)])\s+")
 
 
+WRAP_MESSAGE = "E-wrap: a wrapped line must not start with '>' or '+ '; move the line break"
+_WRAP_START_RE = re.compile(r"^(>|\+ )")
+_BLOCK_LINE_RE = re.compile(r"^(#{1,6}(\s|$)|```|~~~)")
+
+
+def wrap_errors(lines):
+    """Line indices of wrapped lines that Markdown would read as a block quote or a '+' list item:
+    outside fences, a line starting with '>' or '+ ' directly after a non-blank line, unless that
+    line is a heading, a fence line or itself starts with the same marker."""
+    states, _ = fence_states(lines)
+    out = []
+    for i in range(1, len(lines)):
+        cur, prev = lines[i].strip(), lines[i - 1].strip()
+        m = _WRAP_START_RE.match(cur)
+        if not m or states[i] or not prev or states[i - 1] or _BLOCK_LINE_RE.match(prev) or \
+                prev.startswith(m.group(1)):
+            continue
+        out.append(i)
+    return out
+
+
+def block_errors(lines, path, first, diag):
+    """Report E-table and E-wrap for the lines of a block part; first is the line of lines[0]."""
+    for k in table_errors(lines):
+        diag.error(path, first + k, TABLE_MESSAGE)
+    for k in wrap_errors(lines):
+        diag.error(path, first + k, WRAP_MESSAGE)
+
+
 TABLE_MESSAGE = "E-table: a table and the text next to it need a blank line between them"
 
 
@@ -126,8 +155,9 @@ def _indent(ln):
 
 def table_errors(lines):
     """Line indices where a Markdown table and its neighbours run together (outside fences):
-    a non-blank line directly after a table, at the table's indent or deeper, that does not start
-    a block of its own (it would become a table row), and a table that directly follows a text
+    a non-blank line directly after a table that does not start a block of its own (it would
+    become a table row, at any indent: a parameter item is dedented before it is parsed), and a
+    table that directly follows a text
     line whose content starts further right (the table would be read as part of that text)."""
     states, _ = fence_states(lines)
     out, i = [], 0
@@ -144,8 +174,7 @@ def table_errors(lines):
         j = i + 2
         while j < len(lines) and not states[j] and _TABLE_ROW_RE.match(lines[j]):
             j += 1
-        if j < len(lines) and lines[j].strip() and _indent(lines[j]) >= indent and \
-                not _ENDS_TABLE_RE.match(lines[j].strip()):
+        if j < len(lines) and lines[j].strip() and not _ENDS_TABLE_RE.match(lines[j].strip()):
             out.append(j)
         i = j
     return out
@@ -267,8 +296,7 @@ def parse_function(lang, path, first, lines, diag):
     if opener is not None:
         diag.error(path, first + 2 + opener, "E-fence: code fence without a closing fence in the same part")
         return None
-    for k in table_errors(body):
-        diag.error(path, first + 2 + k, TABLE_MESSAGE)
+    block_errors(body, path, first + 2, diag)
     starts = [k for k, ln in enumerate(body) if ln.startswith("## ") and not states[k]]
     intro_end = starts[0] if starts else len(body)
     intro = Part(path, first + 2, body[:intro_end])
@@ -325,8 +353,7 @@ def read_api(root, lang, intro, diag):
                 if opener is not None:
                     diag.error(path, first + opener, "E-fence: code fence without a closing fence in the same part")
                     continue
-                for k in table_errors(lines):
-                    diag.error(path, first + k, TABLE_MESSAGE)
+                block_errors(lines, path, first, diag)
                 sec.descs.append(Part(path, first, lines))
             else:
                 fn = parse_function(lang, path, first, lines, diag)

@@ -181,8 +181,7 @@ def read_page(path, diag, root):
     while body and not body[-1].strip():
         body.pop()
     page.body, page.body_line = body, end + 2
-    for k in docblocks.table_errors(body):
-        diag.error(rel, page.body_line + k, docblocks.TABLE_MESSAGE)
+    docblocks.block_errors(body, rel, page.body_line, diag)
     page.headings = heading_ids(body, diag, rel, page.body_line)
     return page
 
