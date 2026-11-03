@@ -33,7 +33,6 @@
 
 // Common validation of the link positions, in this order: 3 columns of rx_pos and tx_pos, rows of tx_pos 1 or
 // n_link (when both are given), finite rx_pos and tx_pos; throws std::invalid_argument
-//                                  users: qd_gbsm_phases.cpp, path_loss.cpp, lsp_generate.cpp, ssf_clusters.cpp
 // - nullptr skips the checks of that argument
 static inline void qd_gbsm_check_links(const arma::mat *tx_pos, const arma::mat *rx_pos)
 {
@@ -50,7 +49,6 @@ static inline void qd_gbsm_check_links(const arma::mat *tx_pos, const arma::mat 
 }
 
 // Validation of the carrier frequencies in [Hz]: not empty, finite and > 0; throws std::invalid_argument
-//                                       users: path_loss.cpp, lsp_generate.cpp, los_probability.cpp, o2i_loss.cpp
 static inline void qd_gbsm_check_fc(const arma::vec &fc)
 {
     if (fc.n_elem == 0)
@@ -60,7 +58,7 @@ static inline void qd_gbsm_check_fc(const arma::vec &fc)
             throw std::invalid_argument("Input 'fc' must be finite and > 0.");
 }
 
-// LSP mean and std per link and frequency of a completed scenpar             users: lsp_generate.cpp, path_loss.cpp
+// LSP mean and std per link and frequency of a completed scenpar
 // - Per link and frequency, with P the key prefix of the LSP (DS, KF, SF, AS_D, AS_A, ES_D, ES_A, XPR):
 //     d = max(d2D, 1e-4), h = max(hBS, 1e-4), a = atan(h / d), f' = max(fc / 1e9, LSP_fc_min)
 //     mu    = P_mu + P_gamma·lg(P_omega + f') + P_epsilon·lg(d) + P_zeta·lg(h) + P_alpha·lg(a)
@@ -180,7 +178,6 @@ private:
 
 // Cholesky factorization of a symmetric 8x8 matrix, column-major double[64]: A = L·L^T, L lower triangular with
 // zeros above the diagonal; returns false at the first pivot that is not > 0 (NaN included), L is then incomplete
-//                                                                          users: lsp_generate.cpp, qd_scenpar.cpp
 // - Only the lower triangle of A is read; the pivots are formed in ascending order
 static inline bool qd_gbsm_chol8(const double *A, double *L)
 {

@@ -702,78 +702,76 @@ SECTION!*/
 /*!SECTION_DESC
 A **geometry-based stochastic model** (GBSM) generates channels from statistics of a type of environment, the
 *scenario* (e.g. urban macro-cell with or without line of sight), instead of from the geometry of one site. The
-functions of this section implement the model of 3GPP TR 38.901, clause 7.5 steps 1 to 7: path loss, shadow fading,
-LOS probability, O2I penetration loss, the large-scale parameters (LSPs) of each link, i.e. the spreads of delays and
-angles, the K-factor and the cross-polarization ratio, and the clusters.<br><br>
+functions of this section implement 3GPP TR 38.901 clause 7.5 steps 1 to 7 (path loss, LOS probability, O2I
+penetration loss, large-scale parameters (LSPs) and clusters) with the spatial consistency of clause 7.6.3. The ray
+level (steps 8 to 12) follows in a later version.<br><br>
 
-The statistics of a scenario are read from a conf file by [[conf_file_read]]. 23 files for TR 38.901 v19.5.0 come
-with the library, in `data/config` of the source tree and in `share/quadriga-lib/config` of an installed package;
-[[scenpar_validate]] completes a parameter set from another source, [[conf_file_list]] finds the files and
-[[conf_file_write]] writes them.<br><br>
+**Scenario parameters.** A scenario is a set of numeric keys (`scenpar`), a path-loss model with its parameters and
+optional short names, read from a conf file by [[conf_file_read]]. 23 files for TR 38.901 v19.5.0 come with the
+library, in `data/config` of the source tree and in `share/quadriga-lib/config` of an installed package;
+[[conf_file_list]] finds them and [[conf_file_write]] writes them. Every function that takes `scenpar` completes it
+with the defaults of missing keys and validates it with [[scenpar_validate]], whose messages pass through; an invalid
+value of a key that the function does not use throws as well.<br><br>
 
-Per drop (layout): [[o2i_loss]] gives the penetration loss and the indoor distance of each indoor UT; then
-[[los_probability]] evaluates the LOS probability at the outdoor distance `d2D - d2D-in`. The caller draws the LOS
-state and the indoor state with [[sos_rand]] / [[sos_randn]] at the decorrelation distances of the keys
-`LOS_state_lambda` and `IO_state_lambda`, and the O2I variables at the distances of TR 38.901 clause 7.6.3.3 (see
-[[o2i_loss]]). The two state distances apply to all links of a scenario and are stated once in the TR 38.901 files:
-`LOS_state_lambda` in the NLOS file, `IO_state_lambda` in the O2I files; 0 in the other files means "not stated
-here". Per BS site and scenario (builder): [[lsf_init_phases]] draws the random
-phases once; [[lsf_draw]] evaluates them at the links (columns 0 DS, 1 KF, 2 SF, 3 ASD, 4 ASA, 5 ESD, 6 ESA, 7 XPR,
-8 absolute TOA: Normal; 9 ground permittivity, 10 UMa environment height: Uniform; each at the decorrelation
-distance of its key); [[path_loss]] returns the path loss and the SF standard deviation; [[lsp_generate]] turns the
-random values into the LSPs of each link and frequency.<br><br>
+**Workflow.** Per drop: [[o2i_loss]] gives the penetration loss and the indoor distance of each indoor UT, then
+[[los_probability]] the LOS probability at the outdoor distance `d2D - d2D-in`. The caller draws the LOS, indoor and
+O2I states with [[sos_rand]] / [[sos_randn]] at the correlation distances of TR 38.901 clause 7.6.3.3; the keys
+`LOS_state_lambda` and `IO_state_lambda` apply to all links of a scenario and are stated in the NLOS and in the O2I
+files (0 in the other files means "not stated here"). Per BS site and scenario: [[lsf_init_phases]] draws the phases
+of the large-scale generators once, [[lsf_draw]] evaluates them at the links, [[path_loss]] gives the path loss and
+the shadow-fading (SF) standard deviation, and [[lsp_generate]] the LSPs of each link and frequency. Small scale:
+[[ssf_init_phases]] and [[ssf_draw]] do the same for the cluster random values, and [[ssf_clusters]] turns the LSPs
+and random values into cluster delays, powers and angles.<br><br>
 
-The small-scale part (clause 7.5 steps 5 to 7, cluster level): [[ssf_init_phases]] draws the phases of the cluster
-random values per site, scenario and frequency from the LSF seed, [[ssf_draw]] evaluates them at the links, and
-[[ssf_clusters]] turns the LSPs and random values into cluster delays, powers and angles with the method `38.901`
-(clause 7.5), `38.901_MF` (clause 7.6.5.1) or `quadriga` (spatially consistent, frequency-independent). The ray level
-(steps 8 to 12) follows in a later version.<br><br>
+**Large-scale generators.** Columns of the phase cube of [[lsf_init_phases]] and of the random values of
+[[lsf_draw]]; a decorrelation distance of 0 is used as 0.1 m:
 
-Where TR 38.901 and QuaDRiGa differ, the TR behaviour is the default; QuaDRiGa's behaviour is available
-through an argument where it is still wanted (3D correlation, symmetric square root of the LSP
-cross-correlation matrix, no clipping of the spreads, outdoor path-loss distance of O2I links). Where
-QuaDRiGa's behaviour was an error, only the corrected rule is implemented.<br><br>
+| Column | Generator | Distribution | Decorrelation distance |
+| --- | --- | --- | --- |
+| 0 to 7 | DS, KF, SF, ASD, ASA, ESD, ESA, XPR | Normal(0,1) | `DS_lambda`, `KF_lambda`, `SF_lambda`, `AS_D_lambda`, `AS_A_lambda`, `ES_D_lambda`, `ES_A_lambda`, `XPR_lambda` |
+| 8 | absolute TOA | Normal(0,1) | `absTOA_lambda` |
+| 9 | ground permittivity | Uniform(0,1) | `SC_lambda` |
+| 10 | UMa environment height hE | Uniform(0,1) | `SF_lambda` |
 
-Units: positions in m, frequencies in Hz, path loss in dB, DS in s, KF, SF and XPR as linear power ratios, angular
-spreads in degrees.
+The Tx side of a phase cube (slice 1) exchanges ASD and ASA, ESD and ESA, so that in dual mobility (Tx and Rx both
+move) the departure spreads at the Tx are the arrival spreads of the Tx as a second device.<br><br>
+
+**Conventions.** Positions are in m with the rows `{x, y, z}`: `rx_pos` is `[n_link, 3]`, `tx_pos` is `[1, 3]`
+(one Tx for all links) or `[n_link, 3]`; heights are the z coordinates. In 2D mode (`horizontal = true`, the TR
+behaviour) the random values are correlated in the x-y plane, and `floor_id` separates the floors, which are
+uncorrelated (TR 38.901 Table 7.5-6 note 3). In 3D mode (`horizontal = false`, legacy QuaDRiGa) the height separates
+the floors, so UTs on different floors are correlated by the ACF of their height difference; the per-link statistics
+are the same in both modes. Where TR 38.901 and QuaDRiGa differ, the TR behaviour is the default and QuaDRiGa's is
+available through an argument where it is still wanted; where QuaDRiGa's behaviour was an error, only the corrected
+rule is implemented. Outputs must not share memory with the inputs or with each other unless stated otherwise.
+Units: frequencies in Hz, path loss in dB, DS in s, KF, SF and XPR as linear power ratios, spreads in degrees.
 SECTION_DESC!*/
 
 /*!MD
 # conf_file_read
 Read and validate a QuaDRiGa scenario configuration file
 
-- A conf file is a text file with one `Key = value` assignment per line; `%` starts a comment; blank lines
-  are allowed; line ends can be LF or CRLF; space and tab are white space; a UTF-8 byte order mark at the start
-  of the file is skipped
-- Keys are case-sensitive names of the characters `A-Z`, `a-z`, `0-9` and `_`; there are four kinds:
-  - Scenario parameters: `n_key = 171` numeric keys with one number each, returned in `scenpar`. Keys that
-    are not in the file have their default value. The names and their order are returned in `key_order`.
-  - `SubpathMethod`: one of the words `legacy`, `Laplacian`, `mmMAGIC`; default `legacy`
-  - Path-loss parameters: every key that starts with `PL_`. `PL_model` has one name as value. All others
-    have one or more numbers separated by white space and are returned in `plpar` without the prefix.
-  - `ShortName`: an alias for the scenario, one name; can occur several times with different values
-- Any other key is ignored and reported in `ignored_keys`; its value is not examined
-- A key that is stated more than once has its last value
-- Numbers are decimal with an optional sign, an optional decimal point and an optional exponent (`e` or
-  `E`), for example `-6.28`, `.5`, `6.2e-07`; `Inf`, `+Inf` and `-Inf` are accepted in any case
-- A number beyond the range of a double (`1e400`) is an error "out of range"; a number below the smallest
-  subnormal reads as `0` (or `-0`)
-- Numbers are read independent of the global locale (the decimal point is always `.`)
+- A conf file has one `Key = value` assignment per line; `%` starts a comment; blank lines, LF or CRLF line ends and
+  a UTF-8 byte order mark at the start are accepted; keys are case-sensitive names of `A-Z`, `a-z`, `0-9` and `_`
+- Four kinds of keys:
+  - the `n_key` numeric scenario parameters of [[scenpar_validate]], one number each; keys that are not in the file
+    have their default value
+  - `SubpathMethod`: one word, default `legacy`
+  - `PL_` keys: `PL_model` has one name, the others one or more numbers separated by white space
+  - `ShortName`: an alias of the scenario, one name; can occur several times with different values
+- Any other key is reported in `ignored_keys` and its value is not examined; this includes the QuaDRiGa key
+  `GR_epsilon` (the complex ground permittivity comes from [[lsp_generate]]). A key stated more than once has its
+  last value
+- Numbers are decimal with an optional sign, decimal point and exponent (`-6.28`, `.5`, `6.2e-07`), read
+  independent of the global locale; `Inf`, `+Inf` and `-Inf` in any case; a number below the smallest subnormal
+  reads as 0
 - Elevation angles are used throughout (+90 deg is up); no key refers to a zenith angle
-- The 171 keys are 138 numeric keys of QuaDRiGa and 33 keys for 3GPP TR 38.901 v19.5.0. With their
-  default of 0 the new keys have no effect.
-- The QuaDRiGa key `GR_epsilon` (fixed relative permittivity of the ground) is not supported and is
-  reported in `ignored_keys` like any other unknown key; the permittivity is complex and is set in the simulation
-- The 28 correlation keys (`asD_ds` to `xpr_esa`) define the symmetric matrix `lsp_xcorr` with unit diagonal
 - Throws `std::runtime_error` if the file cannot be opened or is a directory
-- Throws `std::invalid_argument` with file name and line number for a line that is not blank, not a comment
-  and not a well-formed assignment: no `=`, more or less than one name before the `=`, a missing value, a
-  word where a number is required or the reverse, a second value or other text after the value, `NaN`,
-  complex numbers, a number out of range, a `PL_` key without a name, a `ShortName` value stated twice
-- With `validate = true`, a value that fails the checks of [[scenpar_validate]] is an error as well
-- A correlation matrix that is not positive definite is not an error; it is reported by the return value
-- The file is parsed and checked completely before any output is written; a failed call leaves all
-  outputs untouched
+- Throws `std::invalid_argument` with file name and line number for a line that is not blank, not a comment and not
+  a well-formed assignment (no `=`, not one name before the `=`, a missing value, a word where a number is required
+  or the reverse, text after the value, `NaN`, a number beyond the range of a double, a `PL_` key without a name, a
+  `ShortName` value stated twice), and with `validate = true` for a value that fails [[scenpar_validate]]
+- A failed call leaves all outputs untouched
 
 ## Declaration:
 ```
@@ -797,28 +795,24 @@ bool quadriga_lib::conf_file_read(
   grammar is checked
 
 ## Outputs:
-- **`scenpar`** — Numeric scenario parameters; previous content is discarded; `n_key = 171` entries
-- **`subpath_method`** *(optional)* — Value of `SubpathMethod`; `legacy` if not in the file
+- **`scenpar`** — Numeric scenario parameters; previous content is discarded; `n_key` entries
+- **`subpath_method`** *(optional)* — Value of `SubpathMethod`
 - **`pl_model`** *(optional)* — Value of `PL_model`; empty if not in the file
-- **`plpar`** *(optional)* — Path-loss parameters; keys without the prefix `PL_`; `PL_model` is not included;
-  empty if the file has no such key; `n_pl` entries with one or more values each
-- **`lsp_xcorr`** *(optional)* — LSP cross-correlation matrix; order of rows and columns: DS, KF, SF, ASD, ASA,
-  ESD, ESA, XPR; `[8, 8]`
-- **`key_order`** *(optional)* — Canonical order of the keys in `scenpar`: the QuaDRiGa order without
-  `SubpathMethod` (its position is between elements 105 and 106, 0-based), then the 33 new keys; `[n_key]`
+- **`plpar`** *(optional)* — Path-loss parameters: the `PL_` keys other than `PL_model`, without the prefix, with
+  one or more values each; `n_pl` entries
+- **`lsp_xcorr`** *(optional)* — LSP cross-correlation matrix, see [[scenpar_validate]]; `[8, 8]`
+- **`key_order`** *(optional)* — Canonical order of the keys in `scenpar`, see [[scenpar_validate]]; `[n_key]`
 - **`pl_order`** *(optional)* — Keys of `plpar` in the order of their first occurrence in the file; `[n_pl]`
 - **`short_names`** *(optional)* — Values of all `ShortName` lines in file order; `[n_short]`
 - **`ignored_keys`** *(optional)* — Unknown keys, each once, in the order of their first occurrence; `[n_ignored]`
 
 ## Returns:
-- `true` if `lsp_xcorr` is positive definite, i.e. correlated LSPs can be generated from it
+- `true` if `lsp_xcorr` is positive definite; a matrix that is not is no error
 
 ## See also:
-- [[scenpar_validate]] (value checks, defaults and the list of validation rules)
+- [[scenpar_validate]] (value checks and defaults)
 - [[conf_file_list]] (find the conf files in a set of directories)
 - [[conf_file_write]] (write a conf file)
-- [[lsf_init_phases]] (first step of the large-scale model with the scenario parameters)
-- [[path_loss]] (evaluates the path-loss model and its parameters)
 MD!*/
 
 bool quadriga_lib::conf_file_read(const std::string &fn,
@@ -960,13 +954,11 @@ bool quadriga_lib::conf_file_read(const std::string &fn,
 # scenpar_validate
 Validate scenario parameters and complete them with default values
 
-- Checks a set of QuaDRiGa scenario parameters that did not come from a conf file and adds every missing key
-  with its default value, so that `scenpar` has all `n_key = 171` entries on return
-- An empty `scenpar` returns the complete default parameter set
-- A set with the 138 numeric keys of QuaDRiGa is completed with the 33 keys for 3GPP TR 38.901 v19.5.0, which
-  have no effect at their default of 0
-- A name in `scenpar` that is not one of the 171 keys is an error, also with `validate = false`; this includes
-  the QuaDRiGa key `GR_epsilon`, which is not supported
+- Checks scenario parameters that did not come from a conf file and adds every missing key with its default value,
+  so that `scenpar` has all `n_key = 171` keys on return: the 138 numeric keys of QuaDRiGa and 33 keys for TR 38.901
+  v19.5.0, which have no effect at their default of 0. An empty `scenpar` gives the complete default set
+- A name that is not one of the keys is an error, also with `validate = false`; this includes the QuaDRiGa key
+  `GR_epsilon`, which is not supported
 - Value checks with `validate = true`; `NaN` is an error for every key:
   - Integer from 1 to 1000: `NumClusters`, `NumSubPaths`
   - Finite and > 0: `r_DS`
@@ -984,9 +976,6 @@ Validate scenario parameters and complete them with default values
   - `NF_alpha` and `NF_beta` must be both 0 or both > 0
   - `DS_VS_a` and `DS_VS_b` must not both be 0 if `DS_VS` is > 0
   - `subpath_method` must be `legacy`, `Laplacian` or `mmMAGIC`
-- With `validate = false` no value is checked: `NaN` and any `subpath_method` are accepted
-- The symmetric matrix `lsp_xcorr` is built from the 28 correlation keys and has a unit diagonal. It is
-  tested by a Cholesky factorization. A matrix that is not positive definite is not an error.
 - Throws `std::invalid_argument`; a failed call leaves `scenpar` and the outputs untouched
 
 ## Declaration:
@@ -1001,19 +990,20 @@ bool quadriga_lib::scenpar_validate(
 
 ## Inputs:
 - **`scenpar`** — Numeric scenario parameters; updated in-place: given values are kept, missing keys are
-  added with their default; `n_key = 171` entries on return
+  added with their default; `n_key` entries on return
 - **`subpath_method`** *(optional)* — Value of `SubpathMethod`, the only parameter that is not numeric
-- **`validate`** *(optional)* — `false`: only complete with defaults, no value checks
+- **`validate`** *(optional)* — `false`: only complete with defaults, no value checks (`NaN` and any
+  `subpath_method` are accepted)
 
 ## Outputs:
-- **`lsp_xcorr`** *(optional)* — LSP cross-correlation matrix; order of rows and columns: DS, KF, SF, ASD, ASA,
-  ESD, ESA, XPR; `[8, 8]`
+- **`lsp_xcorr`** *(optional)* — LSP cross-correlation matrix from the 28 correlation keys, symmetric with unit
+  diagonal; order of rows and columns: DS, KF, SF, ASD, ASA, ESD, ESA, XPR; `[8, 8]`
 - **`key_order`** *(optional)* — Canonical order of the keys in `scenpar`: the QuaDRiGa order without
   `SubpathMethod` (its position is between elements 105 and 106, 0-based), then the 33 new keys; `[n_key]`
 
 ## Returns:
-- `true` if `lsp_xcorr` is positive definite (all 8 pivots of the factorization are > 0); `false` also if it
-  contains `NaN`
+- `true` if `lsp_xcorr` is positive definite (all pivots of its Cholesky factorization > 0); `false` also if it
+  contains `NaN`; a matrix that is not positive definite is no error
 
 ## See also:
 - [[conf_file_read]] (read the parameters from a conf file)
@@ -1050,22 +1040,16 @@ bool quadriga_lib::scenpar_validate(std::unordered_map<std::string, double> &sce
 # conf_file_list
 List the scenarios defined by the conf files in a set of directories
 
-- Lists the regular files and symbolic links to regular files whose name ends in `.conf` (case-sensitive) and
-  is longer than `.conf`, not recursive. The scenario name is the file name without this extension, whatever
-  characters it has.
-- Directories are processed in the given order, the files of one directory in byte-wise sorted order of their
-  names (digits before upper case before lower case)
-- A file whose name was already found in an earlier directory is skipped completely, so the first directory
-  wins. This allows a local folder to override the files of a shared folder.
-- With `parse_shortnames = true` each file is read and one entry is added right after the file for every
-  line `ShortName = name` that is not a comment. Other lines are not examined; a UTF-8 byte order mark at the
-  start of the file is skipped.
-- Throws `std::invalid_argument` if a short name equals an earlier entry, if a file name equals an earlier
-  short name, or if the value of a `ShortName` line is not one name of the characters `A-Z`, `a-z`, `0-9`, `_`
-- Throws `std::runtime_error` if a listed file cannot be opened for reading the short names
+- Lists the regular files and symbolic links to regular files named `<scenario>.conf` (case-sensitive, non-empty
+  scenario name) in each directory, not recursive: the directories in the given order, the files of one directory
+  in byte-wise sorted order of their names
+- A file name found in an earlier directory is skipped, so a local folder can override the files of a shared one
+- With `parse_shortnames = true` every line `ShortName = name` that is not a comment adds an entry right after its
+  file; other lines are not examined
+- Throws `std::invalid_argument` if a short name equals an earlier entry, if a file name equals an earlier short
+  name, or if a `ShortName` value is not one name; `std::runtime_error` if a listed file cannot be opened
 - A directory that does not exist, is not a directory or cannot be listed is skipped; an empty string is the
-  current directory
-- A failed call leaves the outputs untouched
+  current directory. A failed call leaves the outputs untouched
 
 ## Declaration:
 ```
@@ -1176,49 +1160,28 @@ arma::uword quadriga_lib::conf_file_list(const std::vector<std::string> &dirs,
 # conf_file_write
 Write a QuaDRiGa scenario configuration file
 
-- Writes scenario parameters, path-loss parameters and short names in the layout of the conf files shipped with
-  QuaDRiGa, so that [[conf_file_read]] returns the same values bit for bit
-- Header: `% Config file for scenario "name"` with the file name without the extension `.conf`, then the
-  reference `ref`, the validity range and one line `ShortName = name` per short name
-- Up to 10 sections follow, each with a header and, if the entry of `ref_sec` is not empty, a line
-  `% See: ref; ref_sec`. Index in `ref_sec` and write order:
-  - 0: Large scale distributions, with an overview formula per LSP; 1: Large-Scale fading decorrelation distances;
-    2: Inter-parameter correlations, with the correlation matrix as comment; 3: Model parameters;
-    8: EoD offset; 4: Decorrelation distance for the small-scale fading spatial consistency;
-    5: Parameters for the ground reflection extension; 6: Absolute time of arrival offset;
-    9: Optional modelling components; 7: Path-loss model
-  - The indices 0 to 7 are those of QuaDRiGa, so its 8 section references can be passed unchanged
-- Within a section, keys are grouped into paragraphs separated by a blank line; correlations are written in the
-  row order of the matrix, all other keys in the order of `key_order`; `SubpathMethod` stands before
-  `LOS_scatter_radius`
-- The overview formula of an LSP shows its mean and STD with the frequency, distance, height and elevation terms;
-  with `LSP_fc_min > 0` the frequency is written as `max( fGHz, fc_min )`; the ESD line also has the terms of
-  `ES_D_mu_A` to `ES_D_mu_D` and, if `ES_D_mu_min` is not `-Inf`, the lower limit of the mean; the DS line has
-  the term `log10( a · V/S + b )` when `DS_VS > 0` (a = `DS_VS_a`, b = `DS_VS_b`; `V/S` stays symbolic)
-- Each line is `name = value % comment`, with the name padded to 19 and the value to 13 characters. The comment
-  states the unit; for the mean and STD of an LSP it adds the reference point of the frequency, distance, height
-  and elevation terms, e.g. `@ 1 GHz`.
-- The path-loss section has the formula blocks of the model (`logdist`, `dual_slope`, `nlos`, `tripple_slope`),
-  the line `PL_model`, then the keys of `plpar` with the prefix `PL_`; known keys have a comment that can depend on
-  the model; several values of one key are separated by a space
-- Numbers are written with up to 15 significant digits, or with 16 or 17 where 15 do not read back to the same
-  double in [[conf_file_read]], independent of the global locale; `Inf` and `-Inf` are written as such, `-0` is
-  kept
-- With `write_defaults = false` a key is written only if its value differs from the default, compared bit for bit;
-  `SubpathMethod` only if it is not `legacy`; a section without a written key is left out
-- With `write_defaults = true` all 171 keys and `SubpathMethod` are written
-- Validation before the file is opened: the file name has no line break; the value checks of [[scenpar_validate]]
-  (unknown keys, `NaN`, classes, `subpath_method`); `pl_model` empty or one name; `plpar` keys are names other
-  than `model`, each with at least one value and no `NaN`; `pl_order` names each key of `plpar` once; short names
-  are names and distinct; `ref` and `ref_sec` have no line break; `ref_sec` has at most 10 entries; `valid_range`
-  is empty or `[4, 2]`
-- The text is written to a temporary file in the same directory, which must be writable, and then renamed to
-  `fn`; a symbolic link `fn` is written through
-- A failed call does not create a file and leaves an existing file unchanged; an existing file is replaced and
-  keeps its permissions
-- Throws `std::invalid_argument` for invalid input; `std::runtime_error` if the file cannot be opened or written,
-  or if `fn` exists and is not a regular file that can be opened for writing
-- Every file written passes [[conf_file_read]] with `validate = true` and without ignored keys
+- Writes scenario parameters, path-loss parameters and short names in the layout of the conf files of QuaDRiGa;
+  every written file passes [[conf_file_read]] with `validate = true`, without ignored keys and with the same
+  values bit for bit
+- The header has the scenario name (the file name without `.conf`), `ref`, the validity range and the short names.
+  Up to 10 sections follow, each with an optional line `% See: ref; ref_sec` and, for the LSPs and the path-loss
+  model, the formulas as comments. Sections by index in `ref_sec`: 0 large-scale distributions, 1 large-scale
+  decorrelation distances, 2 inter-parameter correlations, 3 model parameters, 4 small-scale decorrelation distance,
+  5 ground reflection, 6 absolute TOA, 7 path-loss model, 8 EoD offset, 9 optional modelling components; 0 to 7 are
+  those of QuaDRiGa, so its 8 section references can be passed unchanged
+- Numbers have up to 15 significant digits, or 16 or 17 where 15 do not read back to the same double, independent of
+  the global locale; `Inf`, `-Inf` and `-0` are kept
+- `write_defaults = false`: only keys whose value differs from the default (bit for bit) and `SubpathMethod` if it
+  is not `legacy`; a section without a written key is left out
+- All inputs are validated before the file is opened: the checks of [[scenpar_validate]]; `pl_model`, the keys of
+  `plpar` (other than `model`) and the short names are names, the short names distinct; every `plpar` key has at
+  least one value and no `NaN`; `pl_order` names each key of `plpar` once; `fn`, `ref` and `ref_sec` have no line
+  break
+- The text is written to a temporary file in the same directory, which must be writable, and renamed to `fn`: a
+  failed call creates no file and leaves an existing file unchanged; an existing file keeps its permissions, a
+  symbolic link `fn` is written through
+- Throws `std::invalid_argument` for invalid input; `std::runtime_error` if the file cannot be written, or if `fn`
+  exists and is not a regular file that can be opened for writing
 
 ## Declaration:
 ```
@@ -1238,18 +1201,16 @@ void quadriga_lib::conf_file_write(
 
 ## Inputs:
 - **`fn`** — Path of the conf file to write
-- **`scenpar`** — Numeric scenario parameters; any subset of the `n_key = 171` keys of [[conf_file_read]]; missing
-  keys have their default
-- **`subpath_method`** *(optional)* — Value of `SubpathMethod`: `legacy`, `Laplacian` or `mmMAGIC`
-- **`pl_model`** *(optional)* — Value of `PL_model`; one name; empty: not written
+- **`scenpar`** — Numeric scenario parameters; any subset of the `n_key` keys; missing keys have their default
+- **`subpath_method`** *(optional)* — Value of `SubpathMethod`
+- **`pl_model`** *(optional)* — Value of `PL_model`; empty: not written
 - **`plpar`** *(optional)* — Path-loss parameters; keys without the prefix `PL_`, one or more values each; `[n_pl]`
-- **`pl_order`** *(optional)* — Order in which the keys of `plpar` are written; must name each key once; omitted:
-  sorted by name; `[n_pl]`
-- **`short_names`** *(optional)* — Values of the `ShortName` lines, one name each
+- **`pl_order`** *(optional)* — Order in which the keys of `plpar` are written; omitted: sorted by name; `[n_pl]`
+- **`short_names`** *(optional)* — Values of the `ShortName` lines
 - **`ref`** *(optional)* — Literature reference; written in the header and before each non-empty entry of
-  `ref_sec`; one line
-- **`ref_sec`** *(optional)* — Reference per section, indexed as listed above; one line each; an empty or missing
-  entry writes no reference; up to `n_sec = 10` entries
+  `ref_sec`
+- **`ref_sec`** *(optional)* — Reference per section, indexed as listed above; an empty or missing entry writes no
+  reference; up to 10 entries
 - **`valid_range`** *(optional)* — Validity range, written as comment; rows: frequency in GHz, distance, BS
   height, MT height in m; columns: lower and upper end, one value is written if both are equal; a row with `NaN`
   is not written; empty: no validity range; `[4, 2]`
@@ -1257,7 +1218,6 @@ void quadriga_lib::conf_file_write(
 
 ## See also:
 - [[conf_file_read]] (read the file back)
-- [[scenpar_validate]] (value checks and defaults)
 MD!*/
 
 void quadriga_lib::conf_file_write(const std::string &fn,
@@ -1272,6 +1232,15 @@ void quadriga_lib::conf_file_write(const std::string &fn,
                                    const arma::mat *valid_range,
                                    bool write_defaults)
 {
+    // Layout of the written file (QuaDRiGa's conf files): within a section, keys in paragraphs separated by a blank
+    // line, correlations in the row order of the matrix, all other keys in the order of key_order, SubpathMethod
+    // before LOS_scatter_radius; each line 'name = value % comment' with the name padded to 19 and the value to 13
+    // characters, the comment giving the unit and, for the mean and STD of an LSP, the reference point of its terms
+    // (e.g. '@ 1 GHz'). The overview formula of an LSP shows its frequency (max(fGHz, fc_min) with LSP_fc_min > 0),
+    // distance, height and elevation terms, for ESD also ES_D_mu_A to _D and the lower limit, for DS the V/S term.
+    // The path-loss section has the formula blocks of logdist, dual_slope, nlos and tripple_slope, then PL_model and
+    // the plpar keys with the prefix PL_, known keys with a comment that can depend on the model.
+
     // Input validation
     if (fn.empty())
         throw std::invalid_argument("Input 'fn' cannot be empty.");

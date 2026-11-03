@@ -81,8 +81,6 @@ namespace quadriga_lib
     //  10 UMa environment height hE                              Uniform(0,1), SF_lambda
     // - Slice 1 (Tx side) of 'phase' is slice 0 (Rx side) of the mirror generator: ASD <-> ASA, ESD <-> ESA, all
     //   others mirror themselves; a decorrelation distance of 0 is used as 0.1 m
-    // - The functions are documented in src/qd_gbsm_phases.cpp (lsf_init_phases, lsf_draw), src/path_loss.cpp,
-    //   src/lsp_generate.cpp, src/los_probability.cpp, src/o2i_loss.cpp
 
     // Draw the random phases of the large-scale generators of one BS site and scenario
     // - Generator order and reciprocity rules: see the LSF generator index above
@@ -184,7 +182,8 @@ namespace quadriga_lib
     // Cluster level of TR 38.901 clause 7.5 steps 5 to 7; N = NumClusters - 1 NLOS clusters. The column layout of
     // the random values: see the documentation of ssf_draw
 
-    // Draw the random phases of one small-scale fading generator set (seed derived from the large-scale seed)
+    // Draw the random phases of one small-scale fading generator set of a BS site and scenario
+    // - The seed is derived from the seed of the large-scale set
     void ssf_init_phases(const std::unordered_map<std::string, double> &scenpar, // Scenario parameters (NumClusters)
                          arma::cube &phase,                                      // Output: Phases in [rad], [n_coeff, n_gen, 2]; slice 0 = Rx side, slice 1 = Tx side
                          arma::sword seed = -1,                                  // Seed of the large-scale set (lsf_init_phases), -1 = system random device
@@ -203,7 +202,7 @@ namespace quadriga_lib
                   const std::string &preset = "Comb256",                   // Must match ssf_init_phases
                   bool horizontal = true);                                 // true: 2D correlation (TR); false: 3D (legacy)
 
-    // Cluster delays, powers and angles of a set of links, TR 38.901 clause 7.5 steps 5 to 7
+    // Cluster delays, powers and angles of a set of links (TR 38.901 clause 7.5 steps 5 to 7)
     // - Methods "38.901", "38.901_MF" (clause 7.6.5.1), "quadriga"
     // - Slots: 0 = LOS path, 1 = ground reflection if GR_enabled, then the N NLOS clusters
     void ssf_clusters(const std::unordered_map<std::string, double> &scenpar, // Scenario parameters

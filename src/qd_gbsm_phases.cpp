@@ -2,48 +2,6 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-// Phase sets of the geometry-based stochastic model: the spatially correlated sum-of-sinusoids generators, their
-// phases (lsf_init_phases) and their evaluation at the links (lsf_draw). The machinery in the anonymous namespace
-// is generic over a generator table (qd_gbsm_gen): further phase sets are defined by their own table and are
-// evaluated with the same functions (mirroring, floors, 2D / 3D, dual mobility, bias removal).
-//
-// LSF generator index (column of the phase cube and of the random values of lsf_draw):
-//
-//   g   Generator                  Distribution   Decorrelation distance   Mirror m(g)   Bias removal
-//   0   DS                         Normal         DS_lambda                0             yes
-//   1   KF                         Normal         KF_lambda                1             yes
-//   2   SF                         Normal         SF_lambda                2             yes
-//   3   ASD                        Normal         AS_D_lambda              4             yes
-//   4   ASA                        Normal         AS_A_lambda              3             yes
-//   5   ESD                        Normal         ES_D_lambda              6             yes
-//   6   ESA                        Normal         ES_A_lambda              5             yes
-//   7   XPR                        Normal         XPR_lambda               7             yes
-//   8   absolute TOA               Normal         absTOA_lambda            8             yes
-//   9   ground permittivity        Uniform        SC_lambda                9             no
-//  10   UMa environment height hE  Uniform        SF_lambda                10            no
-//
-// A decorrelation distance of 0 is used as 0.1 m (as in sos_randn).
-//
-// Phase cube of a phase set, [n_coeff, n_gen, 2]: slice 0 = Rx side, slice 1 = Tx side. The Tx side is the mirror of
-// the Rx side, slice1.col(g) = slice0.col(m(g)): at the Tx position, generator g evaluates the field of its mirror
-// generator m(g) (e.g. the ASD of a link seen from the Tx is the ASA field of the Tx as a second device).
-//
-// Units: positions in [m], rows {x, y, z}; frequencies of the sum-of-sinusoids tables in [1/m]; decorrelation
-// distances in [m].
-//
-// SSF generators (small-scale fading, TR 38.901 clause 7.6.3.1; ssf_init_phases, ssf_draw; used by ssf_clusters).
-// N = NumClusters - 1; column b·N + n belongs to block b and cluster n (0-based). Blocks and distributions: see the
-// documentation of ssf_draw; mirror partner: qd_gbsm_gen_ssf. All generators use SC_lambda (0 is used as 0.1 m), none
-// is bias-corrected. NumClusters = 1 (N = 0): both sets are empty and no sum-of-sinusoids function is called.
-//
-// Seeds of the SSF sets: SplitMix64 of the seed of the LSF set of the same site and scenario and the set tag (see
-// derive_seed): the sets are independent streams, distinct from the LSF phases; seed -1 passes on (system random
-// device).
-//
-// Append-only rule: sos_init_phases fills column g from one stream independently of n_gen, and ssf_draw evaluates
-// each column with its own phases only. A later version that appends blocks to a set (N columns or a multiple of N
-// each, never reordered or resized) therefore keeps the values of all existing columns bit for bit.
-
 #include "quadriga_gbsm.hpp"
 #include "quadriga_gbsm_helpers.hpp"
 #include "quadriga_sos.hpp"
@@ -57,6 +15,27 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+
+// Phase sets of the geometry-based stochastic model: the spatially correlated sum-of-sinusoids generators, their
+// phases (lsf_init_phases, ssf_init_phases) and their evaluation at the links (lsf_draw, ssf_draw). The machinery in
+// the anonymous namespace is generic over a generator table (qd_gbsm_gen_lsf, qd_gbsm_gen_ssf): mirroring, floors,
+// 2D / 3D, dual mobility and bias removal work the same for every phase set. The column layouts are documented in
+// the section description (LSF) and in ssf_draw (SSF).
+//
+// Phase cube of a phase set, [n_coeff, n_gen, 2]: slice 0 = Rx side, slice 1 = Tx side, slice1.col(g) =
+// slice0.col(m(g)): at the Tx position, generator g evaluates the field of its mirror generator m(g).
+//
+// Units: positions in [m], rows {x, y, z}; frequencies of the sum-of-sinusoids tables in [1/m]; decorrelation
+// distances in [m], 0 used as 0.1 m (as in sos_randn).
+//
+// Seeds of the SSF sets: SplitMix64 of the seed of the LSF set of the same site and scenario and the set tag (see
+// derive_seed): the sets are independent streams, distinct from the LSF phases; seed -1 passes on (system random
+// device). No SSF generator is bias-corrected; NumClusters = 1 (N = 0) gives empty sets without a sum-of-sinusoids
+// call.
+//
+// Append-only rule: sos_init_phases fills column g from one stream independently of n_gen, and ssf_draw evaluates
+// each column with its own phases only. A later version that appends blocks to a set (N columns or a multiple of N
+// each, never reordered or resized) therefore keeps the values of all existing columns bit for bit.
 
 namespace
 {
@@ -80,7 +59,7 @@ namespace
         return n_coeff;
     }
 
-    // The 11 LSF generators (index table above) from a completed scenpar
+    // The 11 LSF generators from a completed scenpar; column layout in quadriga_gbsm.hpp, "Large-scale fading"
     // - 'sp' must hold all keys (output of scenpar_validate); a missing key throws std::out_of_range
     std::vector<qd_gbsm_gen> qd_gbsm_gen_lsf(const std::unordered_map<std::string, double> &sp)
     {
@@ -100,7 +79,7 @@ namespace
         return gen;
     }
 
-    // SSF generators (column layout above) from a completed scenpar: set_id = -1 shared cluster set (9·N), >= 0
+    // SSF generators (column layout in the documentation of ssf_draw) from a completed scenpar: set_id = -1 shared cluster set (9·N), >= 0
     // per-frequency set (N); N = NumClusters - 1, empty for N = 0
     std::vector<qd_gbsm_gen> qd_gbsm_gen_ssf(const std::unordered_map<std::string, double> &sp, arma::sword set_id)
     {
@@ -214,6 +193,10 @@ namespace
         //   relations, need no large coordinates (which would push small decorrelation distances towards the
         //   precision limit of the kernels) and give exactly zero correlation at zero horizontal lag (UTs stacked
         //   above each other, the most relevant case) within a block of N floor IDs
+        // - At other horizontal lags the cross-correlation of two floors is not zero (up to about 0.16 for 256
+        //   sinusoids), the same level as for random offsets; mirror relations and swap reciprocity hold per floor
+        // - Dual mobility: the offsets are added on both sides, so a Tx device on another floor than its Rx (a D2D
+        //   link between two floors) is evaluated on the floor of the Rx
         auto floor_offset = [n_coeff](arma::uword q)
         {
             const double two_pi = 6.283185307179586;
@@ -354,56 +337,18 @@ SECTION!*/
 # lsf_init_phases
 Draw the random phases of the large-scale generators of one BS site and scenario
 
-- The large-scale fading (LSF) of a site is described by 11 spatially correlated sum-of-sinusoids generators, one
-  column each: 0 DS, 1 KF, 2 SF, 3 ASD, 4 ASA, 5 ESD, 6 ESA, 7 XPR, 8 absolute TOA (Normal fields), 9 ground
-  permittivity, 10 UMa environment height hE (Uniform fields). Their decorrelation distances are the scenario
-  parameters `DS_lambda`, `KF_lambda`, `SF_lambda`, `AS_D_lambda`, `AS_A_lambda`, `ES_D_lambda`, `ES_A_lambda`,
-  `XPR_lambda`, `absTOA_lambda`, `SC_lambda` and again `SF_lambda` for hE; a decorrelation distance of 0 is used
-  as 0.1 m. The generator of column 8 exists also when the absolute TOA is disabled
-- This function draws the phases; [[lsf_draw]] evaluates them at the links. The caller stores `phase` and
-  evaluates the same fields again along tracks or on maps
-- `scenpar` is completed with the defaults of missing keys and validated by [[scenpar_validate]]; its messages
-  (e.g. for an unknown key or a negative decorrelation distance) pass through unchanged. An invalid value of a key
-  that is not used here throws as well
-- Slice 0 (Rx side) holds the phases of the 11 generators. Without bias removal it equals
-  `sos_init_phases(n_coeff, 11, seed)` of [[sos_init_phases]], with `n_coeff` the number of sinusoids of
-  `preset`. The same seed gives the same phases
-- Slice 1 (Tx side) is always the mirror of slice 0: `slice1.col(g) = slice0.col(m(g))` with the mirror
-  generator `m(g)`: ASD and ASA (3, 4) and ESD and ESA (5, 6) are exchanged, all others mirror themselves. For dual
-  mobility the departure spreads at the Tx are thus the arrival spreads of the Tx as a second device
-- Bias removal (`remove_bias = true`, `rx_pos` given, `n_link > 2`): one realisation of a correlated field has a
-  non-zero mean over a drop. For each Normal generator (columns 0 to 8) one common phase offset is applied with
-  [[sos_remove_bias]], so that the sample mean of its field over the positions is exactly 0. Single mobility: over
-  the Rx positions; `tx_pos` is not used. Dual mobility: over the Rx and Tx positions together (`2·n_link`
-  positions), because the field of a generator is shared by both devices (the Tx side of ASD is the ASA field);
-  `tx_pos` is then required. The Uniform generators 9 and 10 are never corrected
-- The correction is applied to slice 0 and the Tx side is mirrored afterwards, so the mirror relation holds
-  exactly with and without bias removal. Swapping `tx_pos` and `rx_pos` in dual mobility gives the same phases up to
-  rounding (the sums over the positions are formed in another order)
-- Consequences for [[lsf_draw]] at the same positions: in single mobility the link mean of columns 0 to 8 is 0; in
-  dual mobility the link mean of DS, KF, SF, XPR and TOA is 0 when all links have the same Tx-Rx distance (the
-  normalisation is then the same for all links), while ASD/ASA and ESD/ESA have a zero link mean only
-  approximately (their two devices see different fields, each corrected over the union of the positions)
-- The positions are used as in [[lsf_draw]]: projected on the x-y plane (z = 0) for `horizontal = true`, in 3D
-  for `horizontal = false`. `preset` and `horizontal` must be the same in [[lsf_draw]]
-- 2D mode: all positions in `rx_pos` are treated as one field (floor 0): one phase correction per generator cannot
-  zero the means of several floor fields at once. For a drop with UTs on several floors pass the positions of one
-  floor (e.g. the links of floor 0) or set `remove_bias = false`; the fields of the other floors keep their sample
-  mean. 3D mode (`horizontal = false`): there are no floor IDs (the height separates the floors) and the correction
-  covers all given positions as one 3D field
-- 2D and 3D mode give the same per-link statistics. In 3D mode the LSPs of UTs on different floors are correlated by
-  the ACF of their height difference, while TR 38.901 (Table 7.5-6 note 3) assumes no correlation between floors
-- The correction removes variance: the field is conditioned on a zero mean over the positions, which costs little
-  only when the positions spread over many decorrelation distances (see [[sos_remove_bias]])
-- With fewer than 3 positions, without `rx_pos` or with `remove_bias = false` no correction is made
-- TR 38.901 clause 7.4.4 literally (exponential ACF, no bias removal): `preset = "Exp256"` and
-  `remove_bias = false`; the defaults `Comb256` and the bias removal are QuaDRiGa choices
-- Reason for `Comb256`: the TR gives the exponential ACF (eq. 7.4-5) as a fit "with sufficient accuracy",
-  not as an exact requirement; its kink at zero distance makes the values evolve roughly along a track.
-  `Comb256` (Gaussian near zero, exponential tail, same decorrelation distance) evolves smoothly
-- `phase` must not share memory with `tx_pos` or `rx_pos`
-- Validation order: `seed`, `preset`, `scenpar`, then the positions (3 columns, rows of `tx_pos` 1 or `n_link`
-  when both are given, finite values), then the requirement of `tx_pos` for the bias removal in dual mobility
+- Draws the phases of the 11 large-scale generators (see the section description); [[lsf_draw]] evaluates them at
+  the links. The caller stores `phase` to evaluate the same fields again along tracks or on maps
+- Without bias removal, slice 0 (Rx side) equals [[sos_init_phases]] with 11 generators and the `n_coeff` of
+  `preset`; slice 1 (Tx side) is its mirror, with and without bias removal
+- Bias removal (`remove_bias = true` and at least 3 rows in `rx_pos`): [[sos_remove_bias]] sets the sample mean of
+  each Normal field (columns 0 to 8) over the positions to 0; in dual mobility over `rx_pos` and `tx_pos` together.
+  It removes variance unless the positions spread over many decorrelation distances
+- In 2D mode the bias removal treats all positions as one floor: for a drop with UTs on several floors pass the
+  positions of one floor or set `remove_bias = false`
+- TR 38.901 clause 7.4.4 literally (exponential ACF, no bias removal): `preset = "Exp256"`, `remove_bias = false`.
+  The default `Comb256` has the same decorrelation distance without the kink of the exponential ACF at zero
+  distance, so the values evolve smoothly along a track
 
 ## Declaration:
 ```
@@ -420,29 +365,23 @@ void quadriga_lib::lsf_init_phases(
 ```
 
 ## Inputs:
-- **`scenpar`** — Scenario parameters as returned by [[conf_file_read]] or [[scenpar_validate]]; missing keys
-  have their default value; only the 10 decorrelation distances are used
-- **`seed`** *(optional)* — Seed of the random phases, must be >= -1; -1 = system random device, a new set of
-  phases on each call
-- **`tx_pos`** *(optional)* — Tx positions in [m]; used only for the bias removal with dual mobility, required
-  there; one row is used for all links; `[1, 3]` or `[n_link, 3]`
-- **`rx_pos`** *(optional)* — Rx positions of the drop in [m] (one floor in 2D mode, all floors in 3D mode) for
-  the bias removal; omitted or fewer than 3 rows = no bias removal; `[n_link, 3]`
-- **`dual_mobility`** *(optional)* — `true`: Tx and Rx both move, the Tx is a second device on the same maps
+- **`scenpar`** — Scenario parameters; the decorrelation distances are used
+- **`seed`** *(optional)* — Seed of the phases, >= -1; -1 = system random device, new phases on each call
+- **`tx_pos`** *(optional)* — Tx positions in [m]; required for the bias removal in dual mobility, otherwise not
+  used; `[1, 3]` or `[n_link, 3]`
+- **`rx_pos`** *(optional)* — Rx positions of the drop in [m] for the bias removal; omitted or fewer than 3 rows:
+  no bias removal; `[n_link, 3]`
+- **`dual_mobility`** *(optional)* — `true`: Tx and Rx both move
 - **`remove_bias`** *(optional)* — `true`: remove the sample mean of the Normal fields over the positions
 - **`preset`** *(optional)* — Sum-of-sinusoids preset, see [[sos_preset]]; sets `n_coeff`
-- **`horizontal`** *(optional)* — `true`: 2D correlation in the x-y plane (TR 38.901 behaviour);
-  `false`: 3D correlation (legacy QuaDRiGa behaviour)
+- **`horizontal`** *(optional)* — `true`: 2D mode (TR 38.901); `false`: 3D mode (legacy QuaDRiGa)
 
 ## Output:
-- **`phase`** — Phases in [rad]; slice 0 = Rx side, slice 1 = Tx side (mirror of slice 0); all values in
-  [-pi, pi); `[n_coeff, 11, 2]`
+- **`phase`** — Phases in [rad], in [-pi, pi); slice 0 = Rx side, slice 1 = Tx side; `[n_coeff, 11, 2]`
 
 ## See also:
-- [[conf_file_read]] (the scenario parameters)
 - [[lsf_draw]] (evaluates the phases at the links)
 - [[ssf_init_phases]] (the small-scale sets, seeds derived from this seed)
-- [[sos_init_phases]] (the raw phases)
 - [[sos_remove_bias]] (the bias removal of one generator)
 MD!*/
 
@@ -483,6 +422,12 @@ void quadriga_lib::lsf_init_phases(const std::unordered_map<std::string, double>
     //   evaluated; the Tx side is then copied from the corrected phases. QuaDRiGa's init_sos corrected before the
     //   mirroring, so the ASD/ASA and ESD/ESA phases carried a correction computed with the partner's frequencies,
     //   which left a non-zero drop mean whenever the two decorrelation distances differ (also in single mobility)
+    // - Consequences for lsf_draw at the same positions: in single mobility the link mean of columns 0 to 8 is 0; in
+    //   dual mobility the link mean of DS, KF, SF, XPR and TOA is 0 when all links have the same Tx-Rx distance (the
+    //   normalisation is then the same for all links), while ASD/ASA and ESD/ESA have a zero link mean only
+    //   approximately (their two devices see different fields, each corrected over the union of the positions)
+    // - 2D mode: one offset per generator cannot zero the means of several floor fields at once, so all positions
+    //   are corrected as floor 0; in 3D mode the correction covers all positions as one 3D field
     if (do_bias)
     {
         std::vector<arma::mat> freq;
@@ -512,56 +457,17 @@ void quadriga_lib::lsf_init_phases(const std::unordered_map<std::string, double>
 # lsf_draw
 Spatially correlated normalized random values of the large-scale generators at a set of links
 
-- Evaluates the 11 large-scale fading generators of [[lsf_init_phases]] at the links: column 0 DS, 1 KF, 2 SF,
-  3 ASD, 4 ASA, 5 ESD, 6 ESA, 7 XPR, 8 absolute TOA (Normal(0,1)), 9 ground permittivity, 10 UMa environment height
-  hE (Uniform(0,1)); each generator with the sum-of-sinusoids frequencies of `preset` at its own decorrelation
-  distance (a distance of 0 is used as 0.1 m)
-- `scenpar` is completed and validated by [[scenpar_validate]] as in [[lsf_init_phases]]; its messages pass
-  through unchanged
-- Single mobility (`dual_mobility = false`): column g is the field of generator g at the Rx position,
-  `x_g = s_g(rx)` with `s_g(x) = sqrt(2/n_coeff) · sum_n cos( 2·pi · f_n·x + phi_n )` and the phases of slice 0;
-  the values do not depend on `tx_pos`
-- Dual mobility: the Tx is a second device. Its side uses slice 1, i.e. the field of the mirror generator `m(g)`
-  at the Tx position (ASD and ASA, ESD and ESA exchanged). Self-mirrored generators (DS, KF, SF, XPR, TOA, 9, 10)
-  share one map: `x_g = ( s_g(rx) + s_g(tx) ) / sqrt( 2 + 2·A_g(D) )`, with the Tx-Rx distance `D` and the ACF
-  `A_g` of the preset, linearly interpolated. The pairs are two maps: `x_g = ( s_g(rx) + s_m(tx) ) / sqrt(2)`.
-  Columns 3 to 6 thus stay Normal(0,1), and ASD/ASA and ESD/ESA have the correlation
-  `( A_g(D) + A_m(D) ) / 2` at the Tx-Rx distance, 1 at `D = 0` (then the two columns are equal)
-- Swap reciprocity in dual mobility: swapping `tx_pos` and `rx_pos` leaves columns 0, 1, 2, 7, 8, 9, 10
-  unchanged and swaps column 3 with 4 and column 5 with 6, exactly (the same evaluations in swapped roles), also
-  for unequal decorrelation distances and with bias-removed phases, when both calls use the same phase cube
-- Uniform columns 9 and 10: `0.5 · erfc( -x / sqrt(2) )` of the Normal value
-- `horizontal = true`: the positions are projected on the x-y plane (z = 0) and the values do not depend on z;
-  `false`: 3D positions. `D` is measured in the same space
-- 2D and 3D mode give the same per-link statistics. In 3D mode the height separates the floors: the LSPs of UTs on
-  different floors are correlated by the ACF of their height difference, while TR 38.901 (Table 7.5-6 note 3)
-  assumes no correlation between floors. `floor_id` is therefore not accepted with `horizontal = false`
-- Floors: links with different floor IDs see different fields, links with equal IDs share one field. Floor `q`
-  adds the offsets `2·pi · k · n / N + psi_b(n)` to the phases of all generators on both sides, with
-  `N = n_coeff`, `k = q mod N`, `b = q div N`, `n = 0 ... N-1`, `psi_0 = 0` and `psi_b(n) = 2·pi · u_n` for
-  `b >= 1`, where `u_n` are the uniform numbers of a `std::mt19937_64` seeded with `b` (the upper 53 bits of each
-  raw output times 2^-53). Floor 0 and `floor_id = nullptr` give the same values
-- Fields of two floors are uncorrelated at equal horizontal positions (TR 38.901 Table 7.5-6 note 3): exactly for
-  two IDs in the same block of `N` IDs, with a random residual of standard deviation `1/sqrt(2N)` for IDs in
-  different blocks (0.044 for 256 sinusoids). At other horizontal lags the cross-correlation of two floors is not
-  zero (up to about 0.16 for 256 sinusoids), the same level as for random offsets. Mirror relations and swap
-  reciprocity hold per floor
-- `floor_id` is the caller's floor index of the UT: for the UT heights `hUT = 3·(n_fl - 1) + 1.5` of TR 38.901
-  Table 7.2-1 it is `n_fl - 1`; outdoor UTs use 0
-- Dual mobility with floors: `floor_id` is one value per link and its offsets are added on both sides, i.e. both
-  devices of a link are on the link's floor. A Tx device on another floor than its Rx (e.g. a D2D link between two
-  floors) is evaluated on the floor of the Rx, so the same Tx device sees different fields on links to Rx devices
-  on different floors
-- The value of a link does not depend on the other links of the call
-- Precision: the sinusoids are evaluated by [[sos_val]] with the AVX2 kernel where available (sine and cosine in
-  single precision, accumulation in double); the values deviate from a double-precision evaluation by less than
-  `4e-7 · sqrt(2 · n_coeff)` (9e-6 for 256 sinusoids)
-- `preset` and `horizontal` must be those of [[lsf_init_phases]]. A wrong preset with the same number of sinusoids
-  (e.g. `Exp256` for `Comb256`) cannot be detected
-- `n_link = 0` returns `rnd` with size `[0, 11]`. `rnd` may share memory with `tx_pos` or `rx_pos` (the positions
-  are copied before `rnd` is written)
-- Validation order: positions (3 columns, rows of `tx_pos`, finite values), `preset`, `scenpar`, size of `phase`,
-  finite `phase`, length of `floor_id`, `floor_id` with `horizontal = false`
+- Evaluates the phases of [[lsf_init_phases]] at the links, one column per generator (see the section
+  description). The value of a link does not depend on the other links of the call; in single mobility it does not
+  depend on `tx_pos`
+- Dual mobility: the Tx is a second device on the same maps. Every column keeps its distribution; ASD and ASA, ESD
+  and ESA of a link are correlated by the ACF at the Tx-Rx distance (equal at distance 0). Swapping `tx_pos` and
+  `rx_pos` swaps the columns 3 and 4, 5 and 6 and leaves the others unchanged, exactly
+- Floors (2D mode): links with equal `floor_id` share one field; fields of different floors are uncorrelated at
+  equal horizontal positions, exactly within a block of `n_coeff` consecutive IDs, otherwise up to a random residual
+  of standard deviation `1/sqrt(2·n_coeff)`. In dual mobility both devices of a link are on the link's floor
+- The values are within `4e-7 · sqrt(2·n_coeff)` of a double-precision evaluation (AVX2 kernel of [[sos_val]])
+- `rnd` may share memory with `tx_pos` or `rx_pos`
 
 ## Declaration:
 ```
@@ -578,28 +484,24 @@ void quadriga_lib::lsf_draw(
 ```
 
 ## Inputs:
-- **`scenpar`** — Scenario parameters as returned by [[conf_file_read]] or [[scenpar_validate]]; missing keys
-  have their default value; only the 10 decorrelation distances are used
-- **`phase`** — Phases in [rad] from [[lsf_init_phases]]; slice 0 = Rx side, slice 1 = Tx side; must be finite;
-  `[n_coeff, 11, 2]`, `n_coeff` of `preset`
-- **`tx_pos`** — Tx positions in [m]; one row is used for all links; not used in single mobility (but validated);
-  `[1, 3]` or `[n_link, 3]`
-- **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
-- **`floor_id`** *(optional)* — Floor index per link, 0-based; omitted = all links on floor 0; in dual mobility
-  the floor of both devices; only with `horizontal = true`; `[n_link]`
-- **`dual_mobility`** *(optional)* — `true`: Tx and Rx both move, the Tx side is evaluated as a second device
-- **`preset`** *(optional)* — Sum-of-sinusoids preset, see [[sos_preset]]; must match [[lsf_init_phases]]
-- **`horizontal`** *(optional)* — `true`: 2D correlation in the x-y plane (TR 38.901 behaviour); `false`: 3D
-  correlation (legacy QuaDRiGa behaviour); must match [[lsf_init_phases]]
+- **`scenpar`** — Scenario parameters; the decorrelation distances are used
+- **`phase`** — Phases from [[lsf_init_phases]], finite; `[n_coeff, 11, 2]`
+- **`tx_pos`** — Tx positions in [m]; used in dual mobility, always validated; `[1, 3]` or `[n_link, 3]`
+- **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`, `n_link = 0` allowed
+- **`floor_id`** *(optional)* — Floor index of the UT per link, 0-based (`n_fl - 1` for the UT heights of TR 38.901
+  Table 7.2-1, 0 for outdoor UTs); omitted = floor 0; 2D mode only; `[n_link]`
+- **`dual_mobility`** *(optional)* — `true`: Tx and Rx both move
+- **`preset`** *(optional)* — Sum-of-sinusoids preset of [[lsf_init_phases]], see [[sos_preset]]; a different
+  preset with the same number of sinusoids is not detected
+- **`horizontal`** *(optional)* — Mode of [[lsf_init_phases]]
 
 ## Output:
-- **`rnd`** — Random values; columns 0 to 8 Normal(0,1), columns 9 and 10 Uniform(0,1); `[n_link, 11]`
+- **`rnd`** — Random values, columns as in the section description; `[n_link, 11]`
 
 ## See also:
 - [[lsf_init_phases]] (draws the phases)
 - [[path_loss]] (column 10 as `rnd_he`)
 - [[lsp_generate]] (the large-scale parameters from `rnd`)
-- [[sos_val]] (evaluation of a sum-of-sinusoids generator)
 MD!*/
 
 void quadriga_lib::lsf_draw(const std::unordered_map<std::string, double> &scenpar,
@@ -655,13 +557,11 @@ void quadriga_lib::lsf_draw(const std::unordered_map<std::string, double> &scenp
 # ssf_init_phases
 Draw the random phases of one small-scale fading generator set of a BS site and scenario
 
-- The cluster random values of the small-scale fading (TR 38.901 clause 7.6.3.1) come in two kinds of sets, with
-  `N = NumClusters - 1` NLOS clusters: one shared cluster set (`set_id = -1`, `9·N` generators) and one set per
-  carrier frequency (`set_id = k`, `N` generators, `k` = index in the caller's frequency list, the same order in
-  every call). [[ssf_draw]] evaluates the phases at the links and lists the columns
-- The phases are a fixed function of `seed`, the seed of the large-scale set of the same site and scenario
-  ([[lsf_init_phases]]), and `set_id`, equal on all platforms; the sets do not repeat the large-scale phases and are
-  independent of each other. Keep an explicit seed (or the phase cubes) to reproduce the clusters
+- The cluster random values (TR 38.901 clause 7.6.3.1) come in one shared cluster set (`set_id = -1`, `9·N`
+  generators, `N = NumClusters - 1` NLOS clusters) and one set per carrier frequency (`set_id = k`, `N` generators,
+  `k` the index in the caller's frequency list); [[ssf_draw]] evaluates them and lists the columns
+- The phases are a fixed function of `seed` and `set_id`, equal on all platforms; the sets are independent of each
+  other and of the large-scale phases. Keep an explicit seed (or the phase cubes) to reproduce the clusters
 - Each scenario of a site (LOS, NLOS, O2I) needs its own large-scale seed: TR 38.901 clause 7.6.3.4 makes the link
   types uncorrelated
 - `NumClusters = 1`: both sets are empty
@@ -677,19 +577,18 @@ void quadriga_lib::ssf_init_phases(
 ```
 
 ## Inputs:
-- **`scenpar`** — Scenario parameters from [[conf_file_read]] or [[scenpar_validate]], missing keys take their
-  defaults; `NumClusters` sets `N`
-- **`seed`** *(optional)* — Seed of the large-scale set, >= -1; -1 = system random device (new phases per call)
+- **`scenpar`** — Scenario parameters; `NumClusters` sets `N`
+- **`seed`** *(optional)* — Seed of the large-scale set of the same site and scenario ([[lsf_init_phases]]), >= -1;
+  -1 = system random device, new phases on each call
 - **`set_id`** *(optional)* — `-1` = shared cluster set; `k >= 0` = set of frequency `k`
 - **`preset`** *(optional)* — Sum-of-sinusoids preset, see [[sos_preset]]; sets `n_coeff`
 
 ## Output:
-- **`phase`** — Phases in [rad], in [-pi, pi); slice 0 = Rx side, slice 1 = Tx side (mirror generators);
-  `[n_coeff, n_gen, 2]`, `n_gen = 9·N` (shared set) or `N`
+- **`phase`** — Phases in [rad], in [-pi, pi); slice 0 = Rx side, slice 1 = Tx side; `[n_coeff, n_gen, 2]`,
+  `n_gen = 9·N` (shared set) or `N`
 
 ## See also:
 - [[ssf_draw]] (evaluates the phases at the links)
-- [[ssf_clusters]] (the clusters from the random values)
 - [[lsf_init_phases]] (the large-scale set and its seed)
 MD!*/
 
@@ -749,20 +648,18 @@ void quadriga_lib::ssf_init_phases(const std::unordered_map<std::string, double>
 # ssf_draw
 Spatially correlated normalized random values of one small-scale fading generator set at a set of links
 
-- Evaluates a set of [[ssf_init_phases]] at the links with the rules of [[lsf_draw]] for single and dual mobility,
-  floors, 2D/3D mode and precision; every generator uses the decorrelation distance `SC_lambda` (TR 38.901 Table
-  7.6.3.1-2; 0 = spatial consistency off, used as 0.1 m)
+- Evaluates a set of [[ssf_init_phases]] at the links with the rules of [[lsf_draw]] (dual mobility, floors,
+  accuracy); every generator uses the decorrelation distance `SC_lambda` (TR 38.901 Table 7.6.3.1-2; 0 = spatial
+  consistency off)
 - Columns, `N = NumClusters - 1`; column `b·N + n` belongs to block `b` and NLOS cluster `n`:
-  - shared set (`set_id = -1`, `9·N` columns): block 0 cluster delay, Uniform(0,1); blocks 1, 2 sign of AOD, AOA;
-    3, 4 sign of ZOD, ZOA; 5, 6 angle offset of AOD, AOA; 7, 8 angle offset of ZOD, ZOA; Normal(0,1)
-  - per-frequency set (`set_id = k`, `N` columns): cluster shadowing, Normal(0,1)
+  - shared set (`9·N` columns): block 0 cluster delay, Uniform(0,1); blocks 1, 2 sign of AOD, AOA; 3, 4 sign of
+    ZOD, ZOA; 5, 6 angle offset of AOD, AOA; 7, 8 angle offset of ZOD, ZOA; Normal(0,1)
+  - per-frequency set (`N` columns): cluster shadowing, Normal(0,1)
 - Dual mobility: swapping `tx_pos` and `rx_pos` exchanges the blocks 1 and 2, 3 and 4, 5 and 6, 7 and 8 and keeps
-  the delay and shadowing blocks, exactly (D2D reciprocity of S. Jaeckel et al., "A Spatially Consistent Geometric
-  D2D Small-Scale Fading Model for Multiple Frequencies", 2019)
+  the delay and shadowing blocks, exactly
 - A column depends neither on the other columns nor on the other links; later versions append blocks and keep the
   values of the existing columns
-- `preset`, `horizontal` and the set type must match [[ssf_init_phases]]. `NumClusters = 1` gives `[n_link, 0]`
-  (any empty `phase` is accepted)
+- `NumClusters = 1` gives `[n_link, 0]` (any empty `phase` is accepted)
 
 ## Declaration:
 ```
@@ -780,23 +677,22 @@ void quadriga_lib::ssf_draw(
 ```
 
 ## Inputs:
-- **`scenpar`** — Scenario parameters as in [[ssf_init_phases]]; `NumClusters` and `SC_lambda` are used
+- **`scenpar`** — Scenario parameters; `NumClusters` and `SC_lambda` are used
 - **`phase`** — Phases from [[ssf_init_phases]], finite; `[n_coeff, n_gen, 2]`
-- **`tx_pos`** — Tx positions in [m], one row for all links; used in dual mobility; `[1, 3]` or `[n_link, 3]`
+- **`tx_pos`** — Tx positions in [m]; used in dual mobility; `[1, 3]` or `[n_link, 3]`
 - **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
-- **`set_id`** *(optional)* — `-1` = shared cluster set; `k >= 0` = per-frequency set
-- **`floor_id`** *(optional)* — Floor index per link as in [[lsf_draw]], 2D mode only; omitted = floor 0; `[n_link]`
-- **`dual_mobility`** *(optional)* — `true`: the Tx is a second moving device
-- **`preset`** *(optional)* — Sum-of-sinusoids preset, see [[sos_preset]]
-- **`horizontal`** *(optional)* — `true`: 2D correlation (TR 38.901); `false`: 3D (legacy QuaDRiGa)
+- **`set_id`** *(optional)* — Set of [[ssf_init_phases]]: `-1` = shared cluster set; `k >= 0` = per-frequency set
+- **`floor_id`** *(optional)* — Floor index per link as in [[lsf_draw]]; omitted = floor 0; 2D mode only; `[n_link]`
+- **`dual_mobility`** *(optional)* — `true`: Tx and Rx both move
+- **`preset`** *(optional)* — Sum-of-sinusoids preset of [[ssf_init_phases]], see [[sos_preset]]
+- **`horizontal`** *(optional)* — `true`: 2D mode (TR 38.901); `false`: 3D mode (legacy QuaDRiGa)
 
 ## Output:
-- **`rnd`** — Random values; `[n_link, n_gen]` (`[0, n_gen]` for no link)
+- **`rnd`** — Random values; `[n_link, n_gen]`
 
 ## See also:
 - [[ssf_init_phases]] (draws the phases)
 - [[ssf_clusters]] (the clusters from the random values)
-- [[lsf_draw]] (the large-scale values; mobility, floor and precision rules)
 MD!*/
 
 void quadriga_lib::ssf_draw(const std::unordered_map<std::string, double> &scenpar,
