@@ -61,8 +61,8 @@ sudo dpkg -i quadriga-lib_<version>-1+<distro>_amd64.deb
 - MATLAB: add the library to the path with `addpath('C:\quadriga-lib')` in the command window or in your `startup.m` file.
 - Python (optional): install the wheel that matches your Python version. Replace `cp312` with your version (`cp310` to `cp314`); `python --version` shows it.
 
-```bash
-pip install wheels\quadriga_lib-<version>-cp312-cp312-win_amd64.whl
+```text
+pip install wheels\quadriga_lib-{{ version }}-cp312-cp312-win_amd64.whl
 ```
 
 ### C++

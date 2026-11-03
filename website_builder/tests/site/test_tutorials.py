@@ -80,8 +80,18 @@ def test_headings(mini_repo, run_site):
     assert '<h3 id="a-figure">A figure</h3>' in page and "<h4>Deep</h4>" in page
     twin = site(mini_repo, "tutorials/mini_demo.md")
     assert '<a id="set-up"></a>\n## Set-up' in twin and '<a id="a-figure"></a>\n### A figure' in twin
-    assert "\n#### Deep\n" in twin
+    assert "\n##### Deep\n" in twin  # the twin keeps the source level
     assert "| [Set-up](#set-up) |" in twin  # index of the two h2 headings
+
+
+def test_heading_errors_name_the_cell(mini_repo, run_site):
+    def twice(nb):
+        nb["cells"][0]["source"][0] = "## Set-up {#setup}\n"
+        nb["cells"][5]["source"].insert(0, "## Again {#setup}\n\n")
+    edit(mini_repo, twice)
+    code, out = run_site(mini_repo)
+    assert code == 1
+    assert "tutorials/mini_demo.ipynb: error: cell 6: E-anchor: id 'setup' appears twice on the page" in out
 
 
 def test_level_one_heading_is_an_error(mini_repo, run_site):

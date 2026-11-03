@@ -46,6 +46,18 @@ def test_faq_without_cite(mini_repo, run_site):
     assert not (mini_repo / "website").exists()
 
 
+def test_docs_readme_checked(mini_repo, run_site, monkeypatch):
+    from qdocs import render_md
+    index_file = render_md.index_file
+
+    def broken(model, location):
+        text = index_file(model, location)
+        return text + "- [Missing](http://quadriga-lib.org/nothing.html)\n" if location == "README.md" else text
+    monkeypatch.setattr(render_md, "index_file", broken)
+    code, out = run_site(mini_repo)
+    assert code == 1 and "README.md:" in out and "error: link target missing: http://quadriga-lib.org/nothing.html" in out
+
+
 def test_well_formedness():
     d = run({"a.html": "<div><p>x</div>", "b.html": '<p id="q"></p><p id="q"></p><img src="b.html">',
              "c.html": "<h1>again</h1>", "e.html": "<section>open", "d.html": "<!doctype html><html><body><h1>x</h1></body></html>"})

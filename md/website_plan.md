@@ -16,7 +16,7 @@ Sessions that read this plan: the decisions in section 3 are settled. Do not reo
 | 4b | Rework for two builders (D39), then review round 4 | updated spec | rework done and signed off 2026-11-03; round 4 done (17 technical fixes; Windows checked after the merge; release refuses uncommitted changes); signed off 2026-11-03 |
 | 4a | Simplification analysis before review round 2: no built site in packages, rules that cost complexity, comparison with other documentation builders, Ubuntu packages instead of PyPI | decisions for the maintainer, then spec update | done 2026-11-03: D32 to D38, spec updated |
 | 5 | Implementation | builder, static parts, pages | signed off 2026-11-03: packages 0, A, B, C, D committed; compiled checks passed except the 22.04 deb, which fails on `main` too (issue #17) |
-| 6 | Implementation review (1 to 3 rounds) | fixes | round 1 done 2026-11-03 (9 findings: tables in 5 doc blocks fixed and a new build error; notebook headings without shift; small code fixes); round 2 in progress |
+| 6 | Implementation review (1 to 3 rounds) | fixes | round 1 done 2026-11-03 (9 findings: tables in 5 doc blocks fixed and a new build error; notebook headings without shift; small code fixes); round 2 done 2026-11-03 (7 findings: 12 wrapped doc-block lines re-wrapped and a new build error; small fixes); waiting for sign-off |
 | 7 | Documentation, cleanup, merge into `main` | `docs_builder/README.md` with the cutover checklist | not started |
 | after go-live | Cutover (D31) | old builder and `html_docu/` removed | not started |
 
