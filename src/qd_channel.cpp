@@ -361,11 +361,11 @@ std::string quadriga_lib::channel<dtype>::is_valid() const
             if (interact_coord[i].n_rows != 3ULL)
                 return std::string("'interact_coord[" + std::to_string(i) + "]' must have 3 rows.");
 
-            unsigned cnt = 0;
+            arma::uword cnt = 0;
             for (const unsigned *p = no_interact[i].begin(); p < no_interact[i].end(); ++p)
-                cnt += *p;
+                cnt += (arma::uword)*p;
 
-            if (interact_coord[i].n_cols != (arma::uword)cnt)
+            if (interact_coord[i].n_cols != cnt)
                 return std::string("Number of columns in 'interact_coord[" + std::to_string(i) + "]' must match the sum of 'no_interact'.");
         }
 
@@ -486,7 +486,10 @@ void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
         if (no_interact_add->n_elem != n_path_add)
             throw std::invalid_argument("Size of 'no_interact_add' does not match size of 'coeff_re_add'");
 
-        auto sum_no_interact = (arma::uword)arma::sum(*no_interact_add);
+        // 64-bit sum: arma::sum of a u32_vec is a 32-bit sum and can wrap
+        arma::uword sum_no_interact = 0;
+        for (const unsigned *p = no_interact_add->begin(); p < no_interact_add->end(); ++p)
+            sum_no_interact += (arma::uword)*p;
         if (interact_coord_add->n_cols != sum_no_interact)
             throw std::invalid_argument("Number of columns in 'interact_coord_add' must match sum of 'no_interact_add'.");
 

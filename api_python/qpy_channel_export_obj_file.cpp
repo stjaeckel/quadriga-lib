@@ -143,7 +143,7 @@ void channel_export_obj_file(const std::string &fn,
     for (size_t i = 0; i < n_snap; ++i)
     {
         c.delay.push_back(arma::cube(c.coeff_re[i].n_rows, c.coeff_re[i].n_cols, c.coeff_re[i].n_slices));
-        unsigned sum_no_int = arma::sum(c.no_interact[i]);
+        arma::uword sum_no_int = arma::accu(arma::conv_to<arma::uvec>::from(c.no_interact[i]));
         if (sum_no_int != 0 && (c.interact_coord[i].n_rows != 3 || c.interact_coord[i].n_cols < sum_no_int))
             throw std::invalid_argument("Snapshot " + std::to_string(i) + ": 'interact_coord' must have 3 rows and at least " +
                                         "sum(no_interact) = " + std::to_string(sum_no_int) + " columns.");

@@ -114,3 +114,29 @@ TEST_CASE("Channel - Effective Path Gain")
 
     CHECK(c.is_valid().empty());
 }
+TEST_CASE("Channel - Interaction count sum does not wrap at 32 bits")
+{
+    // The two counts add up to 2^32 + 6; a 32-bit sum would wrap to 6 and accept 6 columns
+    const arma::u32_vec no_interact_huge = {0xFFFFFFFFu, 7u};
+    const arma::mat coord_6(3, 6, arma::fill::ones);
+
+    quadriga_lib::channel<double> c;
+    c.rx_pos = arma::mat(3, 1, arma::fill::zeros);
+    c.tx_pos = arma::mat(3, 1, arma::fill::ones);
+    c.coeff_re.push_back(arma::cube(1, 1, 2, arma::fill::ones));
+    c.coeff_im.push_back(arma::cube(1, 1, 2, arma::fill::zeros));
+    c.delay.push_back(arma::cube(1, 1, 2, arma::fill::zeros));
+    c.no_interact.push_back(arma::u32_vec{1u, 5u});
+    c.interact_coord.push_back(coord_6);
+    REQUIRE(c.is_valid().empty());
+
+    // is_valid must report the mismatch
+    auto c_huge = c;
+    c_huge.no_interact[0] = no_interact_huge;
+    CHECK(!c_huge.is_valid().empty());
+
+    // add_paths must reject the counts before anything is appended
+    const arma::cube cre(1, 1, 2, arma::fill::ones), cim(1, 1, 2, arma::fill::zeros), dl(1, 1, 2, arma::fill::zeros);
+    CHECK_THROWS_AS(c.add_paths(0, &cre, &cim, &dl, &no_interact_huge, &coord_6), std::invalid_argument);
+    CHECK(c.n_path().at(0) == 2);
+}
