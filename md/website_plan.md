@@ -12,7 +12,8 @@ Sessions that read this plan: the decisions in section 3 are settled. Do not reo
 | 2 | Design session | `md/website_design.md`, `html_builder/design_prototype/` | signed off 2026-11-02 |
 | 3 | Spec | `md/website_spec.md` | done 2026-11-02 |
 | 3a | Doc-block fixes on `main`, merge of `main` into `website`, re-check (D20) | fixed doc blocks; spec measurements updated | done 2026-11-02: fixed on `main`, merged, re-check passed |
-| 4 | Spec review (1 to 3 rounds) | updated spec | round 1 done 2026-11-02 (21 findings fixed, committed); round 2 done 2026-11-03 (29 findings: 28 fixed, gap markers left out of `docs/` by the maintainer's decision); round 3 in progress |
+| 4 | Spec review (1 to 3 rounds) | updated spec | round 1 done 2026-11-02 (21 findings fixed, committed); round 2 done 2026-11-03 (29 findings: 28 fixed, gap markers left out of `docs/` by the maintainer's decision); round 3 done 2026-11-03 (12 findings fixed; the release environment question led to D39) |
+| 4b | Rework for two builders (D39), then review round 4 | updated spec | rework done 2026-11-03; waiting for sign-off before round 4 |
 | 4a | Simplification analysis before review round 2: no built site in packages, rules that cost complexity, comparison with other documentation builders, Ubuntu packages instead of PyPI | decisions for the maintainer, then spec update | done 2026-11-03: D32 to D38, spec updated |
 | 5 | Implementation | builder, static parts, pages | not started |
 | 6 | Implementation review (1 to 3 rounds) | fixes | not started |
@@ -95,7 +96,7 @@ Decisions D24 to D31 were added after the design session (2026-11-02) and its re
 | D30 | Landing page for team leads | No separate overview page. The "For team leads" card points to sections of the landing page, as in the design. |
 | D31 | Coexistence and cutover | The new system is built next to the old one, from the same tree: `make documentation` (old, unchanged) and `make docs` / `make website` (new). Going live with the new site does not need the old one removed. The cutover comes after go-live and the maintainer's sign-off: it deletes `html_builder/` and `html_docu/`, moves the shared hand-made files and the MATLAB help script, includes `docs_builder/CMakeLists.txt`, and updates every user of the old paths (section 11). Step 7 writes its checklist into `docs_builder/README.md`, so it survives the deletion of the planning documents. When the branch is merged into `main` is decided at step 7. |
 
-Decisions D32 to D38 were taken on 2026-11-03 after a simplification analysis; where they differ from earlier text (including D24 to D31 and their amendments), they win.
+Decisions D32 to D39 were taken on 2026-11-03 after a simplification analysis; where they differ from earlier text (including D24 to D31 and their amendments), they win.
 
 | Id | Topic | Decision |
 |----|-------|----------|
@@ -106,6 +107,7 @@ Decisions D32 to D38 were taken on 2026-11-03 after a simplification analysis; w
 | D36 | Landing text | The landing page text is written in its template, not in a TOML data file; publications stay a small TOML list. Replaces D27 for the landing page; no generic schema checker. |
 | D37 | Skill placeholder | Until the skill exists, the AI page links the stub `SKILL.md`; no zip. Replaces the zip of D10 for now. |
 | D38 | Toolchain and formulas | The build tools come either from conda-forge (a conda environment `quadriga-web`, created with one command; works on any Linux; the documented path) or from Ubuntu packages (one `apt install` line); no pip, no virtual environment, no requirement files. Formulas are converted to MathML by pandoc (one call per build, only when a page contains a formula); pandoc's warnings stop the build. Replaces the PyPI part of D4 and the converter of D5. |
+| D39 | Two builders | The documentation tooling is split in two folders. `docs_builder/` makes everything that release builds need: the tracked Markdown in `docs/` (twins, API files, `llms.txt`) and the MATLAB help files. It uses only the Python standard library (Python 3.10 or newer; on 3.10 the TOML reader comes from the system package `python3-tomli`), runs on Linux and Windows, ships in the source package, and every release build (deb containers, Windows package, `make release`) runs its check. `website_builder/` makes the website: it holds the templates, static assets, publications, figures and the website tools (D38), imports the parser from `docs_builder/`, runs only on the maintainer's Linux machine, and is excluded from the source package; `make website` on package contents stops with a plain message. Refines D21, D24, D32 and D38. |
 
 ## 4. Site content
 
