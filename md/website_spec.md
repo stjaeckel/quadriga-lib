@@ -549,7 +549,7 @@ Links in sources are written relative to the site root. Doc blocks link only wit
 
 #### 8.7.2 Resolving `[[name]]`
 
-`[[name]]` in a block or intro of language L links to the function of L whose display name equals `name` (MATLAB: compared in lower case); `.[[name]]` links to the member function `.name`. Nothing else is tried; an unresolved link is E-link (D7). Zero unresolved links on the current tree (637 C++, 387 MATLAB, 354 Python).
+`[[name]]` in a block or intro of language L links to the function of L whose display name equals `name` (MATLAB: compared in lower case); `.[[name]]` links to the member function `.name`. Nothing else is tried; an unresolved link is E-link (D7). Zero unresolved links on the current tree.
 
 ### 8.8 `llms.txt` and `docs/README.md`
 
