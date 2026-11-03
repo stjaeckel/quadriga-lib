@@ -15,7 +15,7 @@ Sessions that read this plan: the decisions in section 3 are settled. Do not reo
 | 4 | Spec review (1 to 3 rounds) | updated spec | round 1 done 2026-11-02 (21 findings fixed, committed); round 2 done 2026-11-03 (29 findings: 28 fixed, gap markers left out of `docs/` by the maintainer's decision); round 3 done 2026-11-03 (12 findings fixed; the release environment question led to D39) |
 | 4b | Rework for two builders (D39), then review round 4 | updated spec | rework done and signed off 2026-11-03; round 4 done (17 technical fixes; Windows checked after the merge; release refuses uncommitted changes); signed off 2026-11-03 |
 | 4a | Simplification analysis before review round 2: no built site in packages, rules that cost complexity, comparison with other documentation builders, Ubuntu packages instead of PyPI | decisions for the maintainer, then spec update | done 2026-11-03: D32 to D38, spec updated |
-| 5 | Implementation | builder, static parts, pages | in progress: package 0 (moves) done 2026-11-03; package A (docs builder) done 2026-11-03; B (website builder) and C (content) done 2026-11-03; next D (cutover) |
+| 5 | Implementation | builder, static parts, pages | in progress: package 0 (moves) done 2026-11-03; package A (docs builder) done 2026-11-03; B (website builder) and C (content) done 2026-11-03; D (cutover) done, compiled checks pending |
 | 6 | Implementation review (1 to 3 rounds) | fixes | not started |
 | 7 | Documentation, cleanup, merge into `main` | `docs_builder/README.md` with the cutover checklist | not started |
 | after go-live | Cutover (D31) | old builder and `html_docu/` removed | not started |

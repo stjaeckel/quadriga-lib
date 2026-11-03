@@ -1,6 +1,5 @@
 build/
 release/
-html_docu/releases/
 website_builder/
 lib/*
 .vscode/*

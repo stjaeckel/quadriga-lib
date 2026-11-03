@@ -65,7 +65,7 @@ Notes on the areas:
 **Kinds of findings, all counted:**
 
 1. Wrong results, crashes, undefined behaviour, memory errors, data races, unchecked input that leads to undefined behaviour, resource leaks, exception-safety holes.
-2. Documentation that disagrees with the code: the header comment blocks in `src/` (the HTML and MD API docs are generated from them), `md/SPEC_CPP_API.md`, `md/SPEC_MATLAB_API.md`, `md/SPEC_PYTHON_API.md`. A stale `html_docu/` alone is one minor item covering all of it.
+2. Documentation that disagrees with the code: the header comment blocks in `src/` (the HTML and MD API docs are generated from them), `md/SPEC_CPP_API.md`, `md/SPEC_MATLAB_API.md`, `md/SPEC_PYTHON_API.md`. Stale generated Markdown in `docs/` alone (`make docs-check` shows it) is one minor item covering all of it.
 3. Inconsistencies between the APIs: C++, MATLAB / Octave and Python give different results, defaults, shapes, types or error behaviour for the same call.
 4. Clear performance defects, such as accidental quadratic work, copies in hot loops, false sharing, or OpenMP regions that serialise. General tuning ideas are not findings.
 

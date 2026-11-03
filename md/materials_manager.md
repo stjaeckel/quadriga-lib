@@ -186,7 +186,7 @@ library's rules); a recommendation; a paste-ready message.
 
 **Coding rules from the SPEC files** (binding since the merge of 2026-10-27; every brief repeats them):
 - Produced code, tests, wrappers and conf files never cite temporary `md/` documents or tracking ids; only published
-  material (the material-model page `html_docu/quadriga_lib_material_model.md`, the Data Formats page, papers) and the
+  material (the material-model page `website_builder/static/quadriga_lib_material_model.md`, the Data Formats page, papers) and the
   persistent `md/SPEC_*.md`. Today the rig and tools break this (decision open, section 9 log of 2026-10-27).
 - Tests use library calls for supporting tasks; the Catch2 binary links no BLAS, so no Armadillo matrix products
   above 4×4 in tests (small loops instead).

@@ -47,7 +47,7 @@ Every model function is deterministic; randomness enters only through the seed a
 
 Documentation: the documentation blocks in `src/qd_gbsm_phases.cpp`, `src/path_loss.cpp`, `src/lsp_generate.cpp`,
 `src/los_probability.cpp`, `src/o2i_loss.cpp`, `src/qd_scenpar.cpp` (section "Geometry-based stochastic model"),
-the MEX blocks in `api_mex/<name>.cpp`, `html_docu/` after `make documentation`. The 23 v19 conf files are in
+the MEX blocks in `api_mex/<name>.cpp`, `docs/` after `make docs`. The 23 v19 conf files are in
 `data/config/3GPP_38.901_v19_*.conf`; their comments state the TR source and the encoding of every value.
 
 ## 2. Library update in NG

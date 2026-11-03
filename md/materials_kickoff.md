@@ -30,7 +30,7 @@ the whole pipeline, with the engine as its methods core).
 - `md/acoustic_engine_notes.md`: sections 5 (decisions), 8 (validation, the reference classes in 8.4), 9 (limits,
   open conventions, pending decisions in 9.3) and 10 (how the engine was developed). These notes are the record of
   step 2.
-- `html_docu/quadriga_lib_material_model.md`:
+- `website_builder/static/quadriga_lib_material_model.md`:
   - sections 4 (columns), 5 (formulas), 6 (faces, the plate rule) and 10 (acoustic use; 10.4 leaves on a box, 10.5
     deriving columns from data);
   - 11 (worked examples; 11.4 the 13 preliminary starting rows) and 12–13 (rules of use, limits);

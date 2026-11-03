@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Part of quadriga-lib — see LICENSE for terms.
 #
-# Formula copy of what the library gives a closed mass-law sheet in air (html_docu/quadriga_lib_material_model.md 5.4, 6.5), written from
+# Formula copy of what the library gives a closed mass-law sheet in air (website_builder/static/quadriga_lib_material_model.md 5.4, 6.5), written from
 # src/ray_mesh_interact.cpp (Material::mass_X0, mass_TL, davy_sigma, Material::interface_gain, Material::tf, qd_plate) as built on
 # 2026-10-19 (m > 0 switches the mass law on at 20 dB per decade, bc24b0c; no coiA; the finite panel: the column side).
 # Column level, GHz as the library reads them; one face in air, one body, the plate rule:
