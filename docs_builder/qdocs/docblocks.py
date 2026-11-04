@@ -28,7 +28,9 @@ PARAM_RE = re.compile(
     r"(?:\s+(?P<qual>\*\([^)]*\)\*|\([^)]*\)))?"
     r"(?P<sep>\s+[—–-]\s+|<br>\s*$|\s*$)")
 _BOLD_NAME_RE = re.compile(r"\*\*(" + _NAME + r")\*\*")
-_CLOSING_FENCE_RE = re.compile(r"`{3,}\s*")
+FENCE_MESSAGE = "E-fence: code fence without a closing fence in the same part"
+# A fence opens with three or more backticks or tildes; it closes on a line of the same character only
+FENCE_RE = re.compile(r"^(`{3,}|~{3,})")
 
 
 @dataclass
@@ -91,20 +93,21 @@ class ApiPage:
 
 def fence_states(lines):
     """Per line: "open" for a fence opener, "in" for a line inside a fence or its closer, "" outside.
-    A fence closes on a line of backticks only, at least as many as the opener has.
-    Returns (states, line index of an unclosed opener or None)."""
-    states, opener, run = [], None, 0
+    A fence opens with ``` or ~~~ and closes on a line of the same character only, at least as many
+    as the opener has. Returns (states, line index of an unclosed opener or None)."""
+    states, opener, run = [], None, ""
     for i, ln in enumerate(lines):
         s = ln.strip()
         if opener is None:
-            if s.startswith("```"):
-                opener, run = i, len(s) - len(s.lstrip("`"))
+            m = FENCE_RE.match(s)
+            if m:
+                opener, run = i, m.group(1)
                 states.append("open")
             else:
                 states.append("")
         else:
             states.append("in")
-            if _CLOSING_FENCE_RE.fullmatch(s) and len(s) >= run:
+            if s.startswith(run) and s == run[0] * len(s):
                 opener = None
     return states, opener
 
@@ -192,11 +195,11 @@ def _indent(ln):
 
 
 def table_errors(lines):
-    """Line indices where a Markdown table and its neighbours run together (outside fences):
-    a non-blank line directly after a table that does not start a block of its own (it would
-    become a table row, at any indent: a parameter item is dedented before it is parsed), and a
-    table that directly follows a text
-    line whose content starts further right (the table would be read as part of that text)."""
+    """Line indices where a Markdown table and its neighbours run together (outside fences): a
+    non-blank line directly after a table that does not start a block of its own (it would become
+    a table row, at any indent: a parameter item is dedented before it is parsed), and a table that
+    directly follows a text line whose content starts further right (the table would be read as
+    part of that text)."""
     states, _ = fence_states(lines)
     out, i = [], 0
     while i + 1 < len(lines):
@@ -326,13 +329,13 @@ def parse_function(lang, path, first, lines, diag):
         return None
     name = m.group(1).lower() if lang == "mex" else m.group(1)
     brief = Part(path, first + 1, lines[1:2])
-    if brief.lines and brief.lines[0].strip().startswith("```"):
-        diag.error(path, first + 1, "E-fence: code fence without a closing fence in the same part")
+    if brief.lines and FENCE_RE.match(brief.lines[0].strip()):
+        diag.error(path, first + 1, FENCE_MESSAGE)
         return None
     body = lines[2:]
     states, opener = fence_states(body)
     if opener is not None:
-        diag.error(path, first + 2 + opener, "E-fence: code fence without a closing fence in the same part")
+        diag.error(path, first + 2 + opener, FENCE_MESSAGE)
         return None
     block_errors(body, path, first + 2, diag)
     starts = [k for k, ln in enumerate(body) if ln.startswith("## ") and not states[k]]
@@ -389,7 +392,7 @@ def read_api(root, lang, intro, diag):
             if kind == "SECTION_DESC":
                 _, opener = fence_states(lines)
                 if opener is not None:
-                    diag.error(path, first + opener, "E-fence: code fence without a closing fence in the same part")
+                    diag.error(path, first + opener, FENCE_MESSAGE)
                     continue
                 block_errors(lines, path, first, diag)
                 sec.descs.append(Part(path, first, lines))

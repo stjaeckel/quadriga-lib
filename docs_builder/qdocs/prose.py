@@ -74,7 +74,8 @@ def strip_gaps(text):
 
 
 def check_keys(data, spec, prefix, report):
-    """Plain key check: report(key_path_message) for missing, unknown, wrongly typed keys and empty lists."""
+    """Plain key check: report(key_path_message) once per missing, unknown or wrongly typed key and empty list.
+    spec: {key: (kind, required)}; kind is str, int, bool, a dict (a table) or [dict] (a list of tables)."""
     for key in data:
         if key not in spec:
             report("%s%s: unknown key" % (prefix, key))
@@ -100,6 +101,8 @@ def check_keys(data, spec, prefix, report):
                 report(p + ": not a table")
         elif kind is int and (not isinstance(v, int) or isinstance(v, bool)):
             report(p + ": not an integer")
+        elif kind is bool and not isinstance(v, bool):
+            report(p + ": not true or false")
         elif kind is str and not isinstance(v, str):
             report(p + ": not a string")
 
@@ -192,6 +195,9 @@ def read_page(path, diag, root, keys=None, ids=True):
     while body and not body[-1].strip():
         body.pop()
     page.body, page.body_line = body, end + 2
+    _, opener = docblocks.fence_states(body)
+    if opener is not None:
+        diag.error(rel, page.body_line + opener, docblocks.FENCE_MESSAGE)
     docblocks.block_errors(body, rel, page.body_line, diag, page=True)
     if ids:
         page.headings = heading_ids(body, diag, rel, page.body_line)
@@ -219,7 +225,8 @@ def read_publications(path, diag, root):
 
 
 def gap_scan(root, folders, diag):
-    """All gap markers in the files below folders (relative to root): sorted [(path, line, text)].
+    """All gap markers in the files below folders (relative to root): sorted [(path, line, text)], the
+    text with build variables substituted.
     A marker opened and not closed on its line is E-gap."""
     gaps = []
     for folder in folders:
@@ -235,7 +242,7 @@ def gap_scan(root, folders, diag):
                 if "%%GAP:" not in ln:
                     continue
                 for m in GAP_RE.finditer(ln):
-                    gaps.append((rel, n, m.group(1).strip()))
+                    gaps.append((rel, n, substitute(m.group(1)).strip()))  # as the page shows it
                 if "%%GAP:" in GAP_RE.sub("", ln):
                     diag.error(rel, n, "E-gap: gap marker %%GAP: ... not closed with %% on the same line")
     return sorted(gaps, key=lambda g: (g[0], g[1]))

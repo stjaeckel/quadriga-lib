@@ -84,11 +84,15 @@ The build runs in memory. Errors from all sources are collected first; while any
 Diagnostics, one per line, paths relative to the repository root with `/`:
 
 ```
+wrote docs/<path>
+deleted docs/<path>
 <path>:<line>: error: <message>
 <path>:<line>: warning: <message> [<kind>]
 <path>:<line>: <gap text>
 docs: <N> errors, <M> warnings, <K> gaps
 ```
+
+`docs` first lists the files it wrote or deleted (nothing when `docs/` was current). With `--check` the summary line starts with `docs --check:`, and each file that is out of date is one error line (see the end of [Errors and warnings](#errors-and-warnings)).
 
 `:<line>` is left out where there is no line. Errors of the doc-block grammar start their message with an id such as `E-table:`; each warning ends with its kind in brackets, so all cases of one kind can be found with `grep`. The gap list follows the errors and warnings, sorted; the last line is the summary. Ids and kinds are listed in [Errors and warnings](#errors-and-warnings).
 
@@ -98,7 +102,7 @@ docs: <N> errors, <M> warnings, <K> gaps
 python3 docs_builder/extract_matlab_comments.py api_mex/<name>.cpp <build folder>/+quadriga_lib/<name>.m
 ```
 
-CMake calls it once per MEX source in the target `mex_documentation` (`CMakeLists.txt`, section "MEX Documentation", with `ENABLE_MEX_DOC=ON`). It takes the first `/*!MD` block of the file, removes backticks, asterisks, `<br>` and raw links, prefixes each line with `%` and appends the licence text. The result is the MATLAB / Octave `help` text. The script uses only the standard library, runs on Python 3.10 (the Ubuntu 22.04 Debian build) and on Windows, and does not import `qdocs`. Keep it that way.
+CMake calls it once per MEX source in the target `mex_documentation` (`CMakeLists.txt`, section "MEX Documentation"; the target exists with `ENABLE_MEX_DOC=ON` and `ENABLE_PYTHON=ON`, because the MATLAB help needs Python). It takes the first `/*!MD` block of the file and prefixes each line with `%`. On every line it replaces `[[name]]` by `name` and `[text](url)` by `text (url)`. The first two lines (name and summary) stay otherwise as written. Fence lines are left out. In headings it removes the `#` characters and `<br>`; in table rows it replaces `*` and backticks by spaces; in all other lines it removes `<br>`, `*` and backticks and replaces a raw `<a href="...">text</a>` by its text. Then it appends the licence text. The result is the MATLAB / Octave `help` text. The script uses only the standard library, runs on Python 3.10 (the Ubuntu 22.04 Debian build) and on Windows, and does not import `qdocs`. Keep it that way.
 
 ## Content pages
 
@@ -292,7 +296,7 @@ The Markdown files keep every item as written; only the website splits it into n
 
 ### Links
 
-- `[[name]]` links to the function `name` on the same API page, by the name exactly as in its name line (`[[arrayant_generate]]`, `[[sos.val]]`), without a `quadriga_lib.` prefix; `.[[name]]` links to the member function `.name` (C++). MATLAB names are compared in lower case. Nothing else is tried: a name that matches no function on that page stops the build (`E-link`). Links go only to functions of the same language; a function that exists only in another API cannot be linked from a doc block.
+- `[[name]]` links to the function `name` on the same API page, by the name exactly as in its name line (`[[arrayant_generate]]`, `[[sos.val]]`), without a `quadriga_lib.` prefix; `.[[name]]` links to the member function `.name` (C++). MATLAB names are compared in lower case. Nothing else is tried: a name that matches no function on that page stops the build (`E-link`). To link a function on another API page, write the site-root link, for example `[arrayant_generate](cpp_api.html#arrayant_generate)` or `<a href="python_api.html#arrayant.generate">...</a>`; such links work from doc blocks and content pages and are checked like every other link.
 - Links to other pages and files are written relative to the site root, as on the website: `formats.html#qdant`, `faq.html#cite`, `publications/x.pdf`. Absolute links to `http://quadriga-lib.org/...` (with or without `www.`, http or https) are treated the same; links below `download/` and `releases/` stay absolute. Every such link and its anchor is checked: a wrong anchor stops the build.
 - A raw `<a href="U">text</a>` in a doc block works like `[text](U)`; `target` and `rel` are dropped. A `<br>` at the end of a line becomes a line break when the next line continues the paragraph, and is dropped at the end of a paragraph.
 - Inside code spans and fences nothing is rewritten.
@@ -327,7 +331,7 @@ These follow from how Markdown reads the text, and the builder checks the first 
 
 - **Tables need blank lines around them** (`E-table`). A table is a line starting with `|` followed by a delimiter row. The line after its last row must be blank or start a block of its own (list item, `>`, heading, fence, rule), and the line before its header must be blank, a table row, or a line whose content does not start further right than the table; otherwise the text runs into the table.
 - **A wrapped line must not start with `>` or `+ `** (`E-wrap`): Markdown would read a quote or a list item. Move the line break, for example before the word in front of the `>`.
-- **Code fences close on a backtick run at least as long as the opener** and only on a line that holds nothing but backticks (`E-fence`). To show a fence inside a fence, open the outer one with four backticks.
+- **Code fences close on a run of the opener's character (backticks or `~`) at least as long as the opener**, and only on a line that holds nothing but that run (`E-fence`). To show a fence inside a fence, open the outer one with four backticks or with `~~~`.
 - **No `*` or `|` in running text**: they are emphasis and table syntax. Write `·` for multiplication and `abs()` for absolute values; inside a formula use `\cdot` and `\lvert x \rvert`.
 - **A backtick run needs its closing run in the same paragraph** (warning `code-span`); otherwise the rest of the paragraph is not rewritten in the Markdown files. Escape a literal backtick as `` \` ``.
 - **Line length in doc blocks**: up to 120 characters in all three languages (a soft limit; tables and usage lines may be longer). Continuation lines of a list item are indented by 2 spaces. Content pages are not wrapped: one line per paragraph and per list item.
@@ -342,11 +346,11 @@ Errors stop the build; nothing is written. Warnings are printed and do not stop 
 | `E-delim-open` | error | docs | An opening delimiter has no closing delimiter of its kind before the next opening delimiter or the end of the file. | Add the closing line (`MD!*/`, `SECTION!*/`, `SECTION_DESC!*/`) on its own, without spaces. |
 | `E-section-count` | error | docs | A file with `/*!MD` or `/*!SECTION_DESC` blocks has no `/*!SECTION` block or more than one, or the `/*!SECTION` block is not exactly one non-empty line. | One `/*!SECTION` block per file, holding only the section title. |
 | `E-name` | error | docs | The first line of an `/*!MD` block is not `# name`. | Write `# name` (member: `# .name`) and nothing else on the line. |
-| `E-fence` | error | docs | A code fence is not closed within its part (the summary line, the body of an `/*!MD` block, an `/*!SECTION_DESC` block). | Close it with a line of at least as many backticks as the opener. |
+| `E-fence` | error | docs | A code fence is not closed within its part (the summary line, the body of an `/*!MD` block, an `/*!SECTION_DESC` block, the body of a content page). | Close it with a line of at least as many backticks (or `~`) as the opener. |
 | `E-required` | error | docs | A required sub-block is missing. | Add `## Declaration:` (C++) or `## Usage:` (MATLAB, Python). |
 | `E-link` | error | docs | `[[name]]` matches no function on the API page of the same language. | Correct the name, use `.[[name]]` for a member function, or remove the link. |
 | `E-anchor` | error | docs | Two equal ids on one page: function names, section ids, heading ids or publication group ids (on the formats page across all format files). | Rename one, or give a heading an explicit `{#id}`. |
-| `E-gap` | error | docs | A gap marker `%%GAP:` is not closed with `%%` on the same line. | Close it on the same line. |
+| `E-gap` | error | docs, website | A gap marker `%%GAP:` is not closed with `%%` on the same line (`docs` checks `docs_builder/content/`, the website build also `website_builder/content/` and the templates). | Close it on the same line. |
 | `E-table` | error | docs | A table and the text next to it have no blank line between them. | Add the blank line. |
 | `E-wrap` | error | docs | A wrapped line starts with `>` or `+ `. | Move the line break. |
 | `E-heading` | error | docs | In a doc block or on a content page, a text line underlined with `=` or `-` (setext heading) or a `#` heading that does not start in column 0; on a content page also a `#` heading in the body. The website build also reports a heading in a notebook cell that is not written as `## text` in column 0. | Write it as `## text` or `### text` at the start of the line; put a blank line before a `---` rule; the page title belongs in the front matter. |
@@ -365,10 +369,11 @@ Errors without an id name the file and, where possible, the line or key:
 |---------|---------------|
 | `content file missing` | A file of `docs_builder/content/` (or `website_builder/content/`, the skill stub) that the page list needs is not there. |
 | `file not found`, `no match for ...` | The version could not be read from `include/quadriga_lib.hpp` or `CMakeLists.txt`. |
-| `the file must start with TOML front matter ...`, `TOML: ...`, `front matter: <key>: ...` | Front matter missing, not valid TOML, or a key missing, unknown or not a string. |
+| `the file must start with TOML front matter ...`, `TOML: ...`, `front matter: <key>: ...` | Front matter missing, not valid TOML, or a key missing, unknown or of the wrong type (`not a string`, `not an integer`). |
 | `unknown build variable '{{ x }}'` | See [build variables](#file-format). |
-| `<key path>: missing`, `unknown key`, `empty list`, `not an integer` | `publications.toml` or notebook metadata does not match its keys. |
-| `unknown stem`, `unknown C++ function`, `... is in two families` | `api_matching.toml` names a file or C++ function that does not exist, or one function twice. |
+| `<key path>: missing`, `unknown key`, `empty list`, `not a string`, `not an integer`, `not true or false`, `not a table`, `not a list of tables` | `publications.toml` or notebook metadata does not match its keys. |
+| `no format files (*.md) found` | `docs_builder/content/formats/` is missing or holds no format file. |
+| `unknown stem`, `unknown C++ function`, `... is in two families`, `expected only a [families] table ...`, `TOML: ...` | `api_matching.toml` names a file or C++ function that does not exist or one function twice, is not valid TOML, or has another structure than one `[families]` table of `stem = ["C++ name", ...]`. |
 | `link target missing`, `anchor missing`, `link leaves the site` | A link in the generated files points to a file or id that does not exist. The `docs` build checks only links inside `docs/`; the website build checks all of them. |
 | `differs from the build output`, `missing, the build writes it`, `extra, the build does not write it` | `docs --check` found `docs/` out of date: run `make docs` and commit. |
 
@@ -387,13 +392,7 @@ A gap marker marks content that is still missing or a draft that waits for appro
 
 **Checks.** `make docs-check` tells whether the committed `docs/` matches the sources. Every build also checks every link and anchor in the generated Markdown that points into `docs/`.
 
-**Tests.** The tests of this builder are in `website_builder/tests/docs/`. They live in the website builder's folder because their fixture repository (`website_builder/tests/fixtures/mini_repo/`, which holds copies of `CMakeLists.txt`, the header and small sources) must not ship in the source package. They need only Python and pytest:
-
-```bash
-python3 -m pytest website_builder/tests/docs
-```
-
-They import nothing of the website builder and write only below pytest's temporary folders. Tests marked `repo` read the real repository. `test_readme.py` checks that the table in [Errors and warnings](#errors-and-warnings) lists exactly the ids and kinds the code defines: update the table when you add or remove one.
+**Tests.** The tests of both builders and how to run them are described in the website README, section [Tests](../website_builder/README.md#tests); the tests of this builder need only Python and pytest, and `test_readme.py` checks that the table in [Errors and warnings](#errors-and-warnings) lists exactly the ids and kinds the code defines.
 
 **Byte-identical output.** The same sources give byte-identical files in `docs/` on Linux and Windows, in the Debian containers and with any Python from 3.10: listings are sorted, and no date, user name, absolute path or tool version is written. So `docs --check` gives the same answer everywhere.
 
@@ -405,7 +404,7 @@ They import nothing of the website builder and write only below pytest's tempora
 | Debian build (`Dockerfile.ubuntu`, also `make deb-jammy` and the others on their own) | `RUN python3 docs_builder/build.py docs --check` right after copying the tree, before the long compile. |
 | `nmake release-win` (`Makefile`) | First command: `python docs_builder\build.py docs --check`. The Windows build machine needs Python on `PATH`. |
 
-The packages carry `docs/`: the system install (`cmake --install` with a prefix) puts it into `share/doc/quadriga-lib/`, the Debian package keeps the `.md` files and `llms.txt` uncompressed (`dh_compress -X.md -Xllms.txt` in `debian/rules`, so the relative links work), and the Windows zip has a `docs\` folder. The source zip (`git archive`) contains `docs/` and `docs_builder/`, but not `website_builder/`.
+The packages carry `docs/`: the system install (`cmake --install` with a prefix) puts it into `share/doc/quadriga-lib/`, the Debian package keeps the `.md` files and `llms.txt` uncompressed (`dh_compress -X.md -Xllms.txt` in `debian/rules`, so the relative links work), and the Windows zip has a `docs\` folder. The source zip (`git archive`) contains `docs/` and `docs_builder/` (what it leaves out is described in the [website README](../website_builder/README.md)).
 
 ## Twins and agents
 

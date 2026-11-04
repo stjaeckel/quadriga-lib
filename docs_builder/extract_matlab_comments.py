@@ -1,11 +1,28 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+# Part of quadriga-lib — see LICENSE for terms.
+"""MATLAB / Octave help text (.m file) from the first /*!MD block of a MEX source file.
+
+Usage: python3 extract_matlab_comments.py <mex source .cpp> <output .m>
+Standard library only; runs on Python 3.10 and on Windows.
+"""
+
 import sys
 import re
+
+
+def plain_links(line):
+    """[[name]] and .[[name]] become the name, [text](url) becomes 'text (url)'."""
+    line = re.sub(r"\[\[([^\[\]]+)\]\]", r"\1", line)
+    return re.sub(r"\[([^\]]*)\]\(([^)\s]*)\)", r"\1 (\2)", line)
+
 
 def markdown_converter(content_md):
     lines = content_md.split('\n')
     content_mat = []
 
     for ind, line in enumerate(lines):
+        line = plain_links(line)
         # Check if line starts with a heading syntax (e.g., #, ##, ###, etc.)
         if ind < 2:
             content_mat.append('% ' + line)
@@ -72,7 +89,7 @@ def extract_matlab_comments(mex_filename, m_filename):
 
 if __name__ == "__main__":
     if len(sys.argv) != 3:
-        print("Usage: python extract_comments.py <path_to_your_mex_file.cpp> <output.m>")
+        print("Usage: python3 extract_matlab_comments.py <mex source .cpp> <output .m>")
         sys.exit(1)
 
     mex_file = sys.argv[1]
