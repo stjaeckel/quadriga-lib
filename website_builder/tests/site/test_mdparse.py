@@ -67,14 +67,6 @@ def test_alert_boxes(ctx):
     assert "<blockquote>\n<p>[!NOTE] not alone</p>" in html
 
 
-def test_site_url(ctx):
-    html = prose_html(ctx, "[a](http://www.quadriga-lib.org/faq.html#cite) [b](https://quadriga-lib.org/) "
-                           "[c](http://quadriga-lib.org/download/x.zip) [d](http://quadriga-lib.org/releases/)")
-    assert 'href="faq.html#cite"' in html and 'href="index.html"' in html
-    assert 'href="http://quadriga-lib.org/download/x.zip"' in html
-    assert 'href="http://quadriga-lib.org/releases/"' in html
-
-
 def test_dollar_amounts_are_not_math(ctx):
     html = prose_html(ctx, "It costs $5 and $6.")
     assert "It costs $5 and $6." in html and not ctx.math

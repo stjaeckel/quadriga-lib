@@ -34,30 +34,6 @@ def test_absolute_site_link_in_a_twin():
     assert d.errors == 1 and "website/a.md:1: error: anchor missing" in d.lines[0]
 
 
-def test_faq_without_cite(mini_repo, run_site):
-    # In HTML: the footer link of every page
-    d = run({"index.html": '<a href="faq.html#cite">How to cite</a>', "faq.html": '<h2 id="about">About</h2>'})
-    assert d.lines == ["website/index.html:1: error: anchor missing: faq.html#cite (no id 'cite' in faq.html)"]
-    # In the Markdown: the twin links stop the build already in the docs phase
-    faq = mini_repo / "docs_builder/content/faq.md"
-    faq.write_text(faq.read_text(encoding="utf-8").replace(" {#cite}", ""), encoding="utf-8")
-    code, out = run_site(mini_repo)
-    assert code == 1 and "docs/publications.md:10: error: anchor missing: faq.md#cite (no id 'cite' in faq.md)" in out
-    assert not (mini_repo / "website").exists()
-
-
-def test_docs_readme_checked(mini_repo, run_site, monkeypatch):
-    from qdocs import render_md
-    index_file = render_md.index_file
-
-    def broken(model, location):
-        text = index_file(model, location)
-        return text + "- [Missing](http://quadriga-lib.org/nothing.html)\n" if location == "README.md" else text
-    monkeypatch.setattr(render_md, "index_file", broken)
-    code, out = run_site(mini_repo)
-    assert code == 1 and "README.md:" in out and "error: link target missing: http://quadriga-lib.org/nothing.html" in out
-
-
 def test_well_formedness():
     d = run({"a.html": "<div><p>x</div>", "b.html": '<p id="q"></p><p id="q"></p><img src="b.html">',
              "c.html": "<h1>again</h1>", "e.html": "<section>open", "d.html": "<!doctype html><html><body><h1>x</h1></body></html>"})

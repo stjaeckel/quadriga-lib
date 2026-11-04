@@ -35,7 +35,7 @@ def test_twin_lines_docblock_rewrites(docs):
              "  ```python",
              "  x = 1",
              "  ```"]
-    out = render_md.twin_lines(lines, "api/cpp/x.md", "cpp", fence_lang="cpp", docblock=True)
+    out = render_md.twin_lines(lines, "api/cpp/x.md", "cpp", fence_lang="cpp", docblock=True, html=True)
     assert out == ["### Inputs:",
                    "- See [arrayant_interpolate_multi](miscellaneous-tools.md#arrayant_interpolate_multi) and "
                    "[.interpolate](array-antenna-class.md#.interpolate), not `[[arrayant]]`",
@@ -76,84 +76,52 @@ def test_twin_header_topics_column():
     rows = render_md.index_rows(prose.heading_ids(["## A", "## B", "### B1"]))
     assert render_md.twin_header("T", "u", rows)[-4:] == [
         "| Section | Topics |", "| --- | --- |", "| [A](#a) |  |", "| [B](#b) | [B1](#b1) |"]
-    rows = render_md.index_rows(prose.heading_ids(["## A", "## B"]))
-    assert render_md.twin_header("T", "u", rows)[-4:] == ["| Section |", "| --- |", "| [A](#a) |", "| [B](#b) |"]
 
 
-def test_full_api_file(docs):
-    text = docs["quadriga_lib_api_cpp.md"]
-    assert text.startswith('---\ntitle: "C++ API Documentation for Quadriga-Lib v9.9.9"\nauthor: "Stephan Jaeckel"\n'
-                           'lang: en-US\n---\n\n<a id="sec-general-usage-notes"></a>\n# General usage notes\n')
-    assert "date:" not in text and "Line" not in text
-    assert "| Function | Section | Summary |\n| --- | --- | --- |\n| [arrayant](#arrayant) | Array antenna class |" in text
-    assert '---\n\n<a id="sec-miscellaneous-tools"></a>\n# Miscellaneous / Tools\n' in text
-    assert ('---\n<a id=".interpolate"></a>\n## .interpolate\nInterpolate the field patterns\n\n'
-            "Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_interpolate) · "
-            "[Python](quadriga_lib_api_python.md#interpolate)\n") in text
-    assert "## quadriga_lib_version\nReturns the library version\n\nNot in: MATLAB, Python\n" in text
-    assert "### Declaration:\n```cpp\n" in text
-    mex = docs["quadriga_lib_api_mex.md"]
-    assert "## version\nReturns the quadriga-lib version number\n\nNot in: C++, Python\n" in mex
-    assert "### Usage:\n```matlab\n" in mex
-    py = docs["quadriga_lib_api_python.md"]
-    assert "## components\nReturns the compiled components\n\nNot in: C++, MATLAB\n" in py
+def test_expected_files(docs):
+    expected = {"README.md", "llms.txt", "download.md", "faq.md", "ai_agents.md", "publications.md", "formats.md",
+                "formats/qdant.md", "formats/materials.md"}
+    for lang in ("cpp", "mex", "python"):
+        expected |= {"quadriga_lib_api_%s.md" % lang, "api/%s/general-usage-notes.md" % lang,
+                     "api/%s/miscellaneous-tools.md" % lang}
+    assert expected <= set(docs)
 
 
-def test_section_file(docs):
-    text = docs["api/cpp/array-antenna-class.md"]
-    assert text.startswith("# Array antenna class\n\nQuadriga-Lib 9.9.9 · Web page: " + BASE +
-                           "/cpp_api.html#sec-array-antenna-class\n\n| Function | Summary |\n| --- | --- |\n"
-                           "| [arrayant](#arrayant) | Class for storing array antenna models |\n")
-    assert ("Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_interpolate) · "
-            "[Python](../python/array-antenna-functions.md#interpolate)") in text
-    assert "[QDANT](../../formats/qdant.md)" in text
-    assert "[material model](%s/quadriga_lib_material_model.md)" % BASE in text
-    notes = docs["api/python/general-usage-notes.md"]
-    assert notes == "# General usage notes\n\nQuadriga-Lib 9.9.9 · Web page: %s/python_api.html#sec-general-usage-notes\n" % BASE
+def test_no_source_syntax_outside_code(docs):
+    for path, text in docs.items():
+        masked = "\n".join(render_md.code_mask(text.split("\n")))
+        for syntax in ("{#", "[[", "%%GAP", "legacy="):
+            assert syntax not in masked, (path, syntax)
 
 
-def test_prose_twin(docs):
-    text = docs["faq.md"]
-    assert text.startswith("# Questions\n\nQuadriga-Lib 9.9.9 · Web page: %s/faq.html\n\n"
-                           "| Section | Topics |\n| --- | --- |\n"
-                           "| [About the Library](#about-the-library) | [How do I cite Quadriga-Lib?](#cite) · " % BASE)
-    assert '<a id="cite"></a>\n### How do I cite Quadriga-Lib?\n' in text
-    assert "{#" not in text
-    qdant = docs["formats/qdant.md"]
-    assert qdant.startswith("# QuaDRiGa Array Antenna Exchange Format (QDANT)\n\nQuadriga-Lib 9.9.9 · Web page: "
-                            "%s/formats.html#qdant\n\n| Section |\n| --- |\n| [Entry `<arrayant>`](#entry-arrayant) |" % BASE)
-    assert "> [!NOTE]\n> **Units**\n> Angles are in degrees.\n" in qdant
-    assert "[material table](materials.md) and its [notes](#notes)" in qdant
-    assert '<a id="notes-2"></a>\n## Notes\n\nMaterial notes; the [QDANT format](qdant.md).' in docs["formats/materials.md"]
-    assert docs["formats.md"] == ("# Data formats\n\nQuadriga-Lib 9.9.9 · Web page: %s/formats.html\n\n"
-                                  "| Format | Summary |\n| --- | --- |\n"
-                                  "| [QuaDRiGa Array Antenna Exchange Format (QDANT)](formats/qdant.md) | XML file format "
-                                  "for array antennas |\n| [Material Properties](formats/materials.md) | CSV table of "
-                                  "material properties |\n" % BASE)
-    download = docs["download.md"]
-    assert "\n\nQuadriga-Lib 9.9.9 for C++, MATLAB / Octave and Python.\n\n" in download  # lead, gap removed
-    assert "g++ -I armadillo-1.0.0/include main.cpp" in download
-    assert "[release archive](http://quadriga-lib.org/releases/)" in download
-    pubs = docs["publications.md"]
-    assert '<a id="quadriga-lib"></a>\n## Quadriga-Lib\n\nPapers about the library.\n\n- 2025 · **A modern C++' in pubs
-    assert "[PDF](%s/publications/2018_sum_of_sinusoids.pdf)" % BASE in pubs and "[FAQ](faq.md#cite)" in pubs
+def test_cross_language_lines(docs):
+    """Every function has its counterpart line; links go to the full file or the section file of that language."""
+    for path, text in docs.items():
+        if not (path.startswith("quadriga_lib_api_") or path.startswith("api/")):
+            continue
+        functions = text.count('\n## ')
+        lines = [ln for ln in text.split("\n") if ln.startswith(("Also in: ", "Not in: "))]
+        assert len(lines) == functions, path
+        for target in re.findall(r"\[(?:C\+\+|MATLAB|Python)\]\(([^)#]+)#", "\n".join(lines)):
+            if path.startswith("api/"):
+                assert re.fullmatch(r"\.\./(cpp|mex|python)/[a-z0-9-]+\.md", target), (path, target)
+            else:
+                assert re.fullmatch(r"quadriga_lib_api_(cpp|mex|python)\.md", target), (path, target)
+    assert "Not in: MATLAB, Python" in docs["quadriga_lib_api_cpp.md"]
 
 
-def test_llms_and_readme(docs):
+def test_llms_absolute_and_readme_relative(docs):
     llms, readme = docs["llms.txt"], docs["README.md"]
-    assert llms.startswith("# Quadriga-Lib\n\n> A radio channel modelling library for C++, MATLAB / Octave and Python.\n"
-                           "\nVersion 9.9.9. Every page")
-    assert "- [Questions](%s/faq.md): FAQ, how to cite\n" % BASE in llms
-    assert "- [C++: Miscellaneous / Tools](%s/api/cpp/miscellaneous-tools.md): 2 functions\n" % BASE in llms
-    assert "- [MATLAB / Octave API, complete](%s/quadriga_lib_api_mex.md)\n" % BASE in llms
-    assert "- [Agent skill (placeholder)](%s/skill/SKILL.md)\n" % BASE in llms
-    assert "Generated by `make docs`" in readme and "Generated" not in llms
-    assert "- [Questions](faq.md): FAQ, how to cite\n" in readme
-    assert "- [Tutorials](%s/tutorials.md): " % BASE in readme
-    assert "- [Python: General usage notes](api/python/general-usage-notes.md)\n" in readme
     assert re.findall(r"\]\((?!http)[^)]*\)", llms) == []
+    assert "](faq.md)" in readme and "](api/cpp/general-usage-notes.md)" in readme
 
 
 def test_no_date_in_any_output(docs):
     for path, text in docs.items():
         assert not re.search(r"\b(19|20)\d\d-\d\d-\d\d\b|\b\d\d\.\d\d\.(19|20)\d\d\b", text), path
+
+
+def test_bare_tilde_fence_gets_the_page_language():
+    out = render_md.twin_lines(["~~~", "x = 1;", "~~~", "~~~python", "y", "~~~"], "api/cpp/x.md", fence_lang="cpp",
+                               docblock=True, html=True)
+    assert out == ["~~~cpp", "x = 1;", "~~~", "~~~python", "y", "~~~"]

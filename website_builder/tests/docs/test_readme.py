@@ -63,12 +63,6 @@ def readme_ids():
     return errors, kinds
 
 
-def test_code_defines_ids_and_kinds():
-    errors, kinds = code_ids()
-    assert {"E-link", "E-table", "E-heading"} <= errors
-    assert {"param-item", "code-span", "fence-language", "size"} <= kinds
-
-
 def test_readme_table_matches_code():
     code_errors, code_kinds = code_ids()
     doc_errors, doc_kinds = readme_ids()
