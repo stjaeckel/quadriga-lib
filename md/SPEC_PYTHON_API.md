@@ -17,7 +17,7 @@ quadriga-lib is a C++ radio channel modelling library with MATLAB/Octave and Pyt
   - `docs/quadriga_lib_api_python.md` — all Python functions
   - `docs/quadriga_lib_api_mex.md` — all MATLAB functions
   - Each starts with a "Function Index"; use it as described in `md/SPEC_CPP_API.md` ("Fixtures and oracles").
-- The text in the `/*!MD ... MD!*/` block of a wrapper is merged into the Markdown overview and compiled to HTML. It also serves as the reference when reading the wrapper source. The delimiters `/*!MD`, `MD!*/`, `/*!SECTION`, `SECTION!*/` are matched literally, each on its own line.
+- The text in the `/*!MD ... MD!*/` block of a wrapper is merged into the Markdown overview and compiled to HTML. It also serves as the reference when reading the wrapper source.
 - Commands (Linux, from the repository root):
   - `make python` — build the library and the Python module into `lib/`
   - `make python_test` — run the complete Python test suite (`python3 -m pytest tests/python_tests -x -s`)
@@ -306,7 +306,7 @@ SECTION!*/
 ```
 
 ## Documentation block
-- The format and the lean rules of the C++ block apply (`md/SPEC_CPP_API.md`, "Documentation block"): same one-line summary, description as bullets without a heading, singular `## Input:` / `## Output:` for one entry, `## See also:`, no `*` or `|` in text, lines up to 120 characters with continuation lines indented by 2. Do not expand what is brief in the C++ block. The differences:
+- The layout and the lean rules of the C++ block apply (`md/SPEC_CPP_API.md`, "Documentation block"): same one-line summary, description as bullets without a heading, singular `## Input:` / `## Output:` for one entry, `## See also:`. Do not expand what is brief in the C++ block. The differences:
 - The heading is the name exposed to Python, without case conversion (`sos` wrappers: see "Submodules").
 - Omit dtype specifications (except for integer and complex arguments). Use Python types and syntax: tuples `(n, m)` for shapes, `list`, `dict`, `str`, `None`.
 - A `## Usage:` section replaces the Declaration. It shows the call with its full path and no import statements; split it at 120 characters with continuation lines indented by 4 and ending in ` \`. If flags change the returned tuple (see "Standard flags"), show one usage line per variant, each preceded by a `#` comment line; later variants may abbreviate unchanged arguments as `...`.
@@ -316,10 +316,11 @@ SECTION!*/
 out1, out2 = quadriga_lib.tools.function_name( in1, in2, optional_in3 )
 ```
 ```
-- Argument format: ``- **`name`** — Description; further facts separated by semicolons; `(shape)`; default: X``
+- Argument entries: the description, further facts separated by semicolons, the shape `(shape)`, then `default: X`.
 - Optional inputs state their default (`default: 201`, `default: None`), which is not visible in the Usage line; the user can omit them or pass `None` for arrays. Mark an input `*(optional)*` only if no default can be stated.
 - State the unit only when not SI. C++ returns are listed under `## Outputs:`.
-- `[[name]]` links only to a function documented on the same API page, by the name that page shows it under, without a namespace or submodule prefix (for Python, the exposed name). Do not refer to a function that exists only in another API: leave it out of the text and out of `## See also:`.
+- Do not refer to a function that exists only in another API: leave it out of the text and out of `## See also:`.
+- Doc-block format (delimiters, name and summary lines, sub-block headings, parameter lines, links, tables, line length and wrapping, formulas): see `docs_builder/README.md`, section "API documentation from the sources".
 
 ## Function body structure
 - The wrapper is a regular C++ free function. Its return type depends on the number of outputs:

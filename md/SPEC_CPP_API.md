@@ -204,7 +204,8 @@ SECTION!*/
 - Section names in use: "Array antenna class", "Array antenna functions", "Channel class", "Channel functions", "Channel generation functions", "Channel statistics", "Geometry-based stochastic model", "Math functions", "Miscellaneous / Tools" (wrappers only), "Site-specific simulation tools", "Sum-of-sinusoids random number generator". The name must match exactly to end up in the same group. If the section is not clear from the header, ask.
 
 ## Documentation block
-- The block is placed immediately before the function definition. It starts with `/*!MD` and ends with `MD!*/`, each on its own line (the delimiters are matched literally by the documentation tools).
+- The block is placed immediately before the function definition.
+- Doc-block format (delimiters, name and summary lines, sub-block headings, parameter lines, links, tables, line length and wrapping, formulas): see `docs_builder/README.md`, section "API documentation from the sources".
 - It is the reference documentation of the function: it is rendered into the website and the Markdown files in `docs/` (`make website`, `make docs`), and it is the input from which the MEX and Python wrappers and their documentation are derived. Sizes, units, index bases, defaults and optionality must therefore be complete and exact.
 - Keep it as short as possible and as long as needed. All blocks are merged into one public document that AI agents also read, so every line costs tokens. Ask: what does a caller need to use the function correctly? Leave out the rest.
   - The block describes the API: what the function does and what it is for, the data layout, sizes, ranges, units, defaults and the errors a caller can trigger.
@@ -212,18 +213,16 @@ SECTION!*/
   - State each fact once, in the place where it fits best: the description, the argument list, or the section description. Do not repeat a fact from the description in an argument entry; a list of options goes in one place only.
 - Facts that concern all functions of a section (the common model, data structures, how the functions work together) go into one section description, a `/*!SECTION_DESC ... SECTION_DESC!*/` block next to the section statement in one of the section's source files (see `src/qd_scenpar.cpp`). The same rules apply there: only what is relevant, stated once.
 - Layout, in this order: name, one-line summary, description, `## Declaration:`, `## Inputs:`, `## Outputs:`, `## Returns:`, `## See also:`; see the block in "REFERENCE SKELETON".
-- First line: `# ` and the function name as declared (member functions of a class: `# .method_name`). Second line: the one-line summary, which is reused verbatim by the wrappers.
+- The name line gives the function name as declared (member functions of a class with a leading `.`); the one-line summary that follows is reused verbatim by the wrappers.
 - The description follows after one empty line as a bullet list, without a `## Description:` heading. Start with a brief statement of what the function does and what it is for; then what a caller must know: conventions, edge cases, what is and is not validated, what happens for empty or omitted arguments. Do not narrate the implementation.
 - `## Declaration:` repeats the declaration from the header including the default values, without the per-argument comments and without the `template` line.
 - `## Inputs:`, `## Outputs:`, `## Returns:`; use the singular (`## Input:`, `## Output:`) when there is exactly one; omit a section that would be empty. In/out arguments are listed under Inputs and marked "updated in-place" (or under Outputs when they are primarily results).
-- Argument format: ``- **`name`** *(optional)* — Description; facts separated by semicolons; `[size]` ``
+- Argument entries: the description, further facts separated by semicolons, the size `[size]`.
   - Mark every argument that has a default value or accepts `nullptr` with `*(optional)*` (the default itself is visible in the Declaration) and state what omitting it means.
   - Give the size in backticks, with the symbolic dimension names used consistently across all arguments; define each dimension name where it first appears.
   - State the unit when it is not SI, the index base for every index argument, and the meaning of sentinel values (0, NaN, negative).
-- `## See also:` lists related functions as `[[name]]` with a short reason; `[[...]]` becomes a link.
-- Never use `*` or `|` in formulas or running text — they are markdown syntax. Use `·` for multiplication and `abs()` for absolute values.
-- Math notation, where plain text would be unclear: `$...$` inline and `$$...$$` as a display formula, in LaTeX, without equation labels; the website and GitHub render it. The rule against derivations still applies.
-- Lines should not exceed 120 characters (soft limit); indent continuation lines by 2 spaces.
+- `## See also:` lists related functions as links, each with a short reason.
+- Math notation only where plain text would be unclear; the rule against derivations still applies.
 - The existing blocks predate these rules and are longer than they allow; follow the rules, not the older blocks.
 
 # TESTS
