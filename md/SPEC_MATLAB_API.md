@@ -13,7 +13,7 @@ quadriga-lib is a C++ radio channel modelling library with MATLAB/Octave and Pyt
   - `docs/quadriga_lib_api_cpp.md` — all C++ functions
   - `docs/quadriga_lib_api_mex.md` — all MATLAB functions
   - Both start with a "Function Index"; use it as described in `md/SPEC_CPP_API.md` ("Fixtures and oracles").
-- The text in the `/*!MD ... MD!*/` block of a wrapper is reused for 3 purposes: (1) merged into the Markdown overview, (2) compiled to HTML, (3) converted into the `.m` help file of the function that provides the MATLAB `help` text (`docs_builder/extract_matlab_comments.py`, which strips backticks and asterisks and prefixes each line with `%`). The delimiters `/*!MD`, `MD!*/`, `/*!SECTION`, `SECTION!*/` are matched literally, each on its own line.
+- The text in the `/*!MD ... MD!*/` block of a wrapper is reused for 3 purposes: (1) merged into the Markdown overview, (2) compiled to HTML, (3) converted into the `.m` help file of the function that provides the MATLAB `help` text (`docs_builder/extract_matlab_comments.py`, which strips backticks and asterisks and prefixes each line with `%`).
 - Commands (Linux, from the repository root):
   - `make` — build the library and install the MEX files into `+quadriga_lib/` (`matlab` and `octave` default to ON); run it after every wrapper change
   - `make test` — build and run the Catch2 suite and the complete MEX test suites; it does not install, so run `make` first
@@ -294,10 +294,9 @@ SECTION!*/
 ```
 
 ## Documentation block
-- The format and the lean rules of the C++ block apply (`md/SPEC_CPP_API.md`, "Documentation block"): same one-line summary, description as bullets without a heading, singular `## Input:` / `## Output:` for one entry, `## See also:`, no `*` or `|` in text. Do not expand what is brief in the C++ block. The differences:
+- The layout and the lean rules of the C++ block apply (`md/SPEC_CPP_API.md`, "Documentation block"): same one-line summary, description as bullets without a heading, singular `## Input:` / `## Output:` for one entry, `## See also:`. Do not expand what is brief in the C++ block. The differences:
 - The heading is the function name in UPPERCASE, e.g. `acdf` becomes `ACDF`.
 - The description is adapted to MATLAB users: C++-specific details (dtype, pointers) are dropped, MATLAB-specific notes added where needed.
-- Lines should not exceed 100 characters (soft limit), since the block also becomes the `.m` help file. Indent continuation lines by 2 spaces; table rows and usage lines may exceed the limit.
 - A `## Usage:` section replaces the Declaration; split it at 100 characters with continuation lines indented by 4 spaces:
 
     ## Usage:
@@ -305,10 +304,11 @@ SECTION!*/
     [ output1, output2 ] = quadriga_lib.function_name( input1, input2, optional_input3 );
     ```
 
-- Argument format: ``- **`name`** — Description; further facts separated by semicolons; `[size]`; default: X``
+- Argument entries: the description, further facts separated by semicolons, the size `[size]`, then `default: X`.
 - Optional inputs (C++: default value or `nullptr`) can be omitted or passed as `[]`. A stated default implies that the input is optional; mark it `*(optional)*` only if no default can be stated. Outputs are never marked optional.
 - State the type only when not `double`, the unit only when not SI. C++ returns are listed under `## Outputs:`.
-- `[[name]]` links only to a function documented on the same API page, by the name that page shows it under, without a namespace or submodule prefix. Do not refer to a function that exists only in another API: leave it out of the text and out of `## See also:`.
+- Do not refer to a function that exists only in another API: leave it out of the text and out of `## See also:`.
+- Doc-block format (delimiters, name and summary lines, sub-block headings, parameter lines, links, tables, line length and wrapping, formulas): see `docs_builder/README.md`, section "API documentation from the sources".
 
 ## Function body
 - Signature: `void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])`

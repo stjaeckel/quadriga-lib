@@ -10,7 +10,7 @@
 
 **Security problems.** Report them privately, see [SECURITY.md](SECURITY.md).
 
-**Pull requests.** Small fixes are welcome. For anything larger, please open an issue first so the approach can be agreed before you write code. New or changed API functions follow `md/SPEC_CPP_API.md`, `md/SPEC_MATLAB_API.md` and `md/SPEC_PYTHON_API.md`.
+**Pull requests.** Small fixes are welcome. For anything larger, please open an issue first so the approach can be agreed before you write code. New or changed API functions follow `md/SPEC_CPP_API.md`, `md/SPEC_MATLAB_API.md` and `md/SPEC_PYTHON_API.md`. A change to the doc-block or content format, or to what the documentation builders do, updates `docs_builder/README.md` or `website_builder/README.md` in the same commit.
 
 ## For the maintainer and coding sessions
 
