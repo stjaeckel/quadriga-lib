@@ -56,8 +56,9 @@
   --radius-lg: 10px;
   --shadow: 0 1px 2px rgba(19,36,26,.06), 0 2px 8px rgba(19,36,26,.06);
   --header-h: 56px;
-  --content-max: 1200px;
+  --content-max: 1300px;
   --text-max: 760px;
+  --api-max: 900px;         /* main column of the API pages */
 }
 @media (min-width: 600px) { :root { --gutter: 24px; } }
 @media (min-width: 960px) { :root { --gutter: 32px; } }
@@ -259,6 +260,7 @@ math { font-family: "Latin Modern Math", "STIX Two Math", "Cambria Math", math; 
 /* ---------- Doc layout: sidebar + content (API and text pages) ---------- */
 .doc { display: grid; gap: var(--s5); padding-top: var(--s5); padding-bottom: var(--s8); }
 .doc-main { min-width: 0; max-width: var(--text-max); }
+.doc-main.api-main { max-width: var(--api-max); }
 .doc-main > * + * { margin-top: var(--s4); }
 .doc-main h1 { margin-bottom: var(--s2); }
 .crumbs { font-size: var(--fs-xs); color: var(--muted); }
@@ -327,14 +329,23 @@ math { font-family: "Latin Modern Math", "STIX Two Math", "Cambria Math", math; 
 .params { margin: 0; border-top: 1px solid var(--line); }
 .params > div { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px var(--s4); padding: 10px 0; border-bottom: 1px solid var(--line); }
 .params dd { min-width: 0; overflow-wrap: anywhere; }
-.params dt { font-family: var(--font-mono); font-size: var(--fs-sm); font-weight: 500; overflow-wrap: anywhere; }
+/* tables never break inside a word, so columns size to their longest word; text and code wrap at spaces,
+   and a table that is still too wide scrolls in its .table-wrap */
+.table-wrap table, .table-wrap code { overflow-wrap: normal; word-break: normal; }
+.params dt { font-family: var(--font-mono); font-size: var(--fs-sm); font-weight: 500; overflow-wrap: normal; word-break: normal; }  /* names stay whole; a group wraps after its commas */
 .params dt .opt { font-family: var(--font-sans); font-weight: 400; font-size: var(--fs-xs); color: var(--muted); display: block; }
 .params dd { margin: 0; font-size: .9375rem; }
 .params dd .table-wrap { margin-top: var(--s2); }
 .params dd > * + * { margin-top: var(--s2); }
 .params > .pnote > dt { display: none; }
 .params > .pnote > dd { grid-column: 1 / -1; }
-@media (min-width: 600px) { .params > div { grid-template-columns: 150px minmax(0, 1fr); } }
+/* from 600 px one grid per list, shared by its rows: the name column is as wide as the longest name
+   (at least 120 px, at most 35 % for long groups) */
+@media (min-width: 600px) {
+  .params { display: grid; grid-template-columns: fit-content(35%) minmax(0, 1fr); column-gap: var(--s4); }
+  .params > div { grid-column: 1 / -1; grid-template-columns: subgrid; }
+  .params dt { min-width: 120px; }
+}
 
 /* ---------- Text pages ---------- */
 .prose > * + * { margin-top: var(--s4); }

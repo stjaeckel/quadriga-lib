@@ -2,7 +2,7 @@
 {% block main %}
 <div class="wrap doc">
 <nav class="doc-side idx" aria-label="{{ api.display }} API index">{% include "_api_index.html" %}</nav>
-<div class="doc-main">
+<div class="doc-main api-main">
   <p class="crumbs"><a href="{{ url("index") }}">Home</a> › <a href="{{ url("index") }}#apis">API reference</a> › {{ api.display }}</p>
   <h1>{{ api.title }}</h1>
 {% if api.lead %}
