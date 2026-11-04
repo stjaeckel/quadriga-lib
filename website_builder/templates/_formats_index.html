@@ -1,0 +1,1 @@
+<ul>{% for text, hid, subs in intro_index %}<li><a href="#{{ hid }}">{{ text }}</a></li>{% endfor %}{% for f in formats %}<li><details open><summary><span>{{ f.title }}</span></summary><ul><li><a href="#{{ f.id }}">Overview</a></li>{% for t, i in f.index %}<li class="sub"><a href="#{{ i }}">{{ t }}</a></li>{% endfor %}</ul></details></li>{% endfor %}</ul>

@@ -12,12 +12,12 @@ quadriga-lib is a C++ radio channel modelling library with MATLAB/Octave and Pyt
 - `include/*.hpp` — C++ declarations; `src/*.cpp` — C++ implementations with their documentation blocks (`/*!MD ... MD!*/`); `api_mex/*.cpp` — MEX wrappers.
 - `tests/python_tests/test_<function_name>.py` — tests, one file per wrapper; pytest collects all `test_*.py` files in the folder, so a new test file needs no registration.
 - `lib/` — the compiled Python module (`quadriga_lib.cpython-*.so`) is installed here by the build; the tests import it from there.
-- Generated overviews (read-only, produced by `make documentation`, never edit them; they may lag behind the sources until the documentation is rebuilt):
-  - `html_docu/quadriga_lib_api_cpp.md` — all C++ functions
-  - `html_docu/quadriga_lib_api_python.md` — all Python functions
-  - `html_docu/quadriga_lib_api_mex.md` — all MATLAB functions
+- Generated overviews (read-only, produced by `make docs`, never edit them):
+  - `docs/quadriga_lib_api_cpp.md` — all C++ functions
+  - `docs/quadriga_lib_api_python.md` — all Python functions
+  - `docs/quadriga_lib_api_mex.md` — all MATLAB functions
   - Each starts with a "Function Index"; use it as described in `md/SPEC_CPP_API.md` ("Fixtures and oracles").
-- The text in the `/*!MD ... MD!*/` block of a wrapper is merged into the Markdown overview and compiled to HTML. It also serves as the reference when reading the wrapper source. The delimiters `/*!MD`, `MD!*/`, `/*!SECTION`, `SECTION!*/` are matched literally, each on its own line.
+- The text in the `/*!MD ... MD!*/` block of a wrapper is merged into the Markdown overview and compiled to HTML. It also serves as the reference when reading the wrapper source.
 - Commands (Linux, from the repository root):
   - `make python` — build the library and the Python module into `lib/`
   - `make python_test` — run the complete Python test suite (`python3 -m pytest tests/python_tests -x -s`)
@@ -48,7 +48,7 @@ Existing wrappers that show the patterns:
 Unlike the C++ work, the wrapper is written first and the test second: the physics is already verified by the Catch2 suite, and the Python test exercises the wrapper.
 1. **Wrapper and registration.** Write `api_python/qpy_<function_name>.cpp` following the "IMPLEMENTATION GUIDELINES". Register it in the dispatcher of its submodule AND add the identical registration as a comment block at the end of the wrapper file. It must compile without warnings.
 2. **Test.** Write `tests/python_tests/test_<function_name>.py` (see "TESTS") and run it. It is expected to pass. If it fails, the cause is in the wrapper, the registration or the test's expectation; find out which before changing anything. If the failure points to the C++ function itself, stop and report it; do not work around it in the wrapper.
-3. **Finish.** The new test passes; the complete Python test suite passes. The documentation block of the wrapper is complete and matches what the wrapper does; the usage line, the wrapper signature, the dispatcher entry and the comment block name the same arguments in the same order.
+3. **Finish.** The new test passes; the complete Python test suite passes. The documentation block of the wrapper is complete and matches what the wrapper does; the usage line, the wrapper signature, the dispatcher entry and the comment block name the same arguments in the same order. If the C++ function has another name than the wrapper, add the pair to `docs_builder/content/api_matching.toml` (`docs_builder/README.md`, section "Cross-language buttons"). Run `make docs` and commit the changed files in `docs/` with the change (`docs_builder/README.md`, "Quick start").
 
 # HAND-OVER REPORT
 - the Python usage line and the submodule
@@ -306,20 +306,21 @@ SECTION!*/
 ```
 
 ## Documentation block
-- The format and the lean rules of the C++ block apply (`md/SPEC_CPP_API.md`, "Documentation block"): same one-line summary, description as bullets without a heading, singular `## Input:` / `## Output:` for one entry, `## See also:`, no `*` or `|` in text, lines up to 120 characters with continuation lines indented by 2. Do not expand what is brief in the C++ block. The differences:
+- The layout and the lean rules of the C++ block apply (`md/SPEC_CPP_API.md`, "Documentation block"): same one-line summary, description as bullets without a heading, singular `## Input:` / `## Output:` for one entry, `## See also:`. Do not expand what is brief in the C++ block. The differences:
 - The heading is the name exposed to Python, without case conversion (`sos` wrappers: see "Submodules").
 - Omit dtype specifications (except for integer and complex arguments). Use Python types and syntax: tuples `(n, m)` for shapes, `list`, `dict`, `str`, `None`.
-- A `## Usage:` section replaces the Declaration. It shows the call with its full path and no import statements; split it at 120 characters with continuation lines indented by 4 and ending in ` \`. If flags change the returned tuple (see "Standard flags"), show one usage line per variant, each preceded by a `#` comment line; later variants may abbreviate unchanged arguments as `...`.
+- A `## Usage:` section replaces the Declaration. It shows the call with its full path and no import statements; split long calls (line length: `docs_builder/README.md`, "Writing pitfalls") with continuation lines indented by 4 and ending in ` \`. If flags change the returned tuple (see "Standard flags"), show one usage line per variant, each preceded by a `#` comment line; later variants may abbreviate unchanged arguments as `...`.
 ```
 ## Usage:
 ```
 out1, out2 = quadriga_lib.tools.function_name( in1, in2, optional_in3 )
 ```
 ```
-- Argument format: ``- **`name`** — Description; further facts separated by semicolons; `(shape)`; default: X``
-- Optional inputs state their default (`default: 201`, `default: None`), which is not visible in the Usage line; the user can omit them or pass `None` for arrays. Mark an input `*(optional)*` only if no default can be stated.
+- Argument entries: the description, further facts, the shape `(shape)`, then `default: X` (entry syntax: `docs_builder/README.md`, "Parameter lines").
+- Optional inputs state their default (`default: 201`, `default: None`), which is not visible in the Usage line; the user can omit them or pass `None` for arrays. Mark an input optional only if no default can be stated.
 - State the unit only when not SI. C++ returns are listed under `## Outputs:`.
-- `[[name]]` links only to a function documented on the same API page, by the name that page shows it under, without a namespace or submodule prefix (for Python, the exposed name). Do not refer to a function that exists only in another API: leave it out of the text and out of `## See also:`.
+- Do not refer to a function that exists only in another API: leave it out of the text and out of `## See also:`.
+- Doc-block format (delimiters, name and summary lines, sub-block headings, parameter lines, links, tables, line length and wrapping, formulas): see `docs_builder/README.md`, section "API documentation from the sources".
 
 ## Function body structure
 - The wrapper is a regular C++ free function. Its return type depends on the number of outputs:
@@ -552,7 +553,7 @@ if __name__ == "__main__":
 ```
 - One class `test_case(unittest.TestCase)` per file; one method per aspect of the checklist below, named `test_<what_is_checked>`. Shared inputs are built in `setUp` or in small module-level helper functions.
 - Call the function through its full path, `quadriga_lib.<submodule>.<function_name>(...)`, as in the Usage line of the documentation.
-- Use other library functions for supporting tasks (`quadriga_lib.RTtools.cube` for a mesh, `quadriga_lib.arrayant.generate` for an antenna, `quadriga_lib.RTtools.ray_triangle_intersect` for hit indices, ...) instead of building such data by hand; `html_docu/quadriga_lib_api_python.md` lists what is available.
+- Use other library functions for supporting tasks (`quadriga_lib.RTtools.cube` for a mesh, `quadriga_lib.arrayant.generate` for an antenna, `quadriga_lib.RTtools.ray_triangle_intersect` for hit indices, ...) instead of building such data by hand; `docs/quadriga_lib_api_python.md` lists what is available.
 - Tests that write files use `tempfile` (or distinct file names) and remove the files at the end.
 - The random generator, where used, is seeded: `rng = np.random.default_rng(0)`.
 

@@ -12,7 +12,7 @@ The larger project has six steps: (1) literature research, (2) the interface eng
 
 How to read the notes:
 - Commits are given by their short hash; test cases in italics, by the name they carry in `tests/catch2_tests/test_wave_*.cpp` and `tests/catch2_tests/test_acoustic_*.cpp`.
-- "Page *n*" is section *n* of `html_docu/quadriga_lib_material_model.md`, the public description of the model with every formula as implemented. "Review *n*" is section *n* of `/sjc/accoustic_research/review.md`; a source key in square brackets resolves in that repository's `references/index.csv`.
+- "Page *n*" is section *n* of `website_builder/static/quadriga_lib_material_model.md`, the public description of the model with every formula as implemented. "Review *n*" is section *n* of `/sjc/accoustic_research/review.md`; a source key in square brackets resolves in that repository's `references/index.csv`.
 - Numbers are given as recorded at the time, with the commit or date; a number that a later change replaced is marked "superseded". Nothing was re-measured for these notes.
 - Frequencies of acoustic quantities are acoustic frequencies; the engine works at the EM-equivalent frequency $f_\text{radio} = f\,c_\text{light}/c_\text{sound}$ (1 kHz ≈ 0.874 GHz).
 - "EM" means the interaction types 0 (reflection), 1 (transmission) and 2 (refraction) on EM materials; the scalar (acoustic) types are 3 (reflection), 4 (transmission) and 5 (refraction). "Wave medium" is a material without the mass column (`m = 0`); "mass-law material" one with it. The glossary (section 12) defines the engine's own terms.

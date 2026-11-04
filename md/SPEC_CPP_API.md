@@ -10,7 +10,7 @@ quadriga-lib is a C++ radio channel modelling library and the numerical core beh
 - Units: angles in radians (degrees only where stated, e.g. `*_deg`, `*_3dB`); distances in meters; frequencies in Hz; time in seconds; powers linear unless `_dB`.
 - Coordinate system: GCS = right-handed Cartesian, meters. Euler angles are intrinsic Tait-Bryan in the order (bank=x, tilt=y, heading=z), applied as Rz·Ry·Rx.
 - Speed of light/sound defaults: `299792458.0` m/s (EM), `343.0` m/s (acoustic).
-- Sources, headers and tests stand on their own. They may cite published material (papers, standards, the pages in `html_docu/`) and the persistent `md/SPEC_*.md`, but never temporary documents in `md/` (plans, notes, briefs) or internal labels (tracking ids, item numbers, review remarks). Those labels belong in the project plan, the spec or other internal documents.
+- Sources, headers and tests stand on their own. They may cite published material (papers, standards, the pages of quadriga-lib.org) and the persistent `md/SPEC_*.md`, but never temporary documents in `md/` (plans, notes, briefs) or internal labels (tracking ids, item numbers, review remarks). Those labels belong in the project plan, the spec or other internal documents.
 - Code is lean: reuse existing library functions and helpers before writing new ones, no layers or generality that nothing uses. Someone given only the source files should understand what each part is for and how it works. Names of variables and functions are clear and say what the thing is; their scope is as narrow as possible (see "File-local helpers").
 - The project has grown over several years. Older files deviate from this document in naming, documentation layout and style. For new code follow this document and the recent files named as examples; do not copy older conventions, and do not restyle existing files unless asked.
 
@@ -45,7 +45,7 @@ The contract of a function is worked out in the plan or the spec, which is then 
 - The test coverage: which instantiations (`float`, `double`) are tested, the test cases and their oracles, as far as the plan asks for them before implementation.
 - The reference (e.g. a MATLAB implementation), if there is one, and which APIs are in scope: C++ only, or also MEX (`md/SPEC_MATLAB_API.md`) and Python (`md/SPEC_PYTHON_API.md`).
 
-To write or review a contract, read the neighbouring functions it builds on and fits in with. Their documentation is collected in `html_docu/quadriga_lib_api_cpp.md` (read-only, generated; see "Fixtures and oracles" for how to use its line index); the sources of the documentation blocks are in `src/*.cpp`.
+To write or review a contract, read the neighbouring functions it builds on and fits in with. Their documentation is collected in `docs/quadriga_lib_api_cpp.md` (read-only, generated; see "Fixtures and oracles" for how to use its function index); the sources of the documentation blocks are in `src/*.cpp`.
 
 The implementer does not change the declaration (names, order, types, defaults). If the contract is ambiguous, contradicts the reference, or cannot be implemented as written, the implementer stops and reports it instead of deciding it alone.
 
@@ -72,6 +72,7 @@ The work is test-first: write the tests, see them fail against a stub, then impl
 4. **Finish.**
    - All new tests pass, for every instantiation the plan or spec covers. The complete suite passes (`make test`); the library compiles without warnings.
    - The documentation block describes what the function actually does, including the decisions made during the work that a caller needs to know (see "Documentation block").
+   - Run `make docs` and commit the changed files in `docs/` with the change (see `docs_builder/README.md`, "Quick start").
 
 # HAND-OVER REPORT
 The report at the end of the implementation, read by the code review:
@@ -94,7 +95,7 @@ The conventions a declaration follows, for writing one in the plan or the spec a
 - Results are returned through output arguments; the return value is used for a single natural result (a count, a mesh, a status vector) and documented under "Returns".
 - Default values exist only in the header, never in the definition.
 - Functions that are not templates use fixed types (e.g. the `float`-only ray-tracing pipeline).
-- A new function fits the existing API (`html_docu/quadriga_lib_api_cpp.md`): the same argument names, types and patterns as its neighbours, and no new public function or argument for what is an implementation detail. Expose only what a caller needs.
+- A new function fits the existing API (`docs/quadriga_lib_api_cpp.md`): the same argument names, types and patterns as its neighbours, and no new public function or argument for what is an implementation detail. Expose only what a caller needs.
 
 # IMPLEMENTATION GUIDELINES
 
@@ -204,25 +205,25 @@ SECTION!*/
 - Section names in use: "Array antenna class", "Array antenna functions", "Channel class", "Channel functions", "Channel generation functions", "Channel statistics", "Geometry-based stochastic model", "Math functions", "Miscellaneous / Tools" (wrappers only), "Site-specific simulation tools", "Sum-of-sinusoids random number generator". The name must match exactly to end up in the same group. If the section is not clear from the header, ask.
 
 ## Documentation block
-- The block is placed immediately before the function definition. It starts with `/*!MD` and ends with `MD!*/`, each on its own line (the delimiters are matched literally by the documentation tools).
-- It is the reference documentation of the function: it is compiled to HTML and Markdown (`make documentation`), and it is the input from which the MEX and Python wrappers and their documentation are derived. Sizes, units, index bases, defaults and optionality must therefore be complete and exact.
+- The block is placed immediately before the function definition.
+- Doc-block format (delimiters, name and summary lines, sub-block headings, parameter lines, links, tables, line length and wrapping, formulas): see `docs_builder/README.md`, section "API documentation from the sources".
+- It is the reference documentation of the function: it is rendered into the website and the Markdown files in `docs/` (`make website`, `make docs`), and it is the input from which the MEX and Python wrappers and their documentation are derived. Sizes, units, index bases, defaults and optionality must therefore be complete and exact.
 - Keep it as short as possible and as long as needed. All blocks are merged into one public document that AI agents also read, so every line costs tokens. Ask: what does a caller need to use the function correctly? Leave out the rest.
   - The block describes the API: what the function does and what it is for, the data layout, sizes, ranges, units, defaults and the errors a caller can trigger.
   - No implementation details, formulas or derivations; they go into source comments (see "File-local helpers"). Where the function implements a specific published algorithm, cite it briefly instead of restating it.
   - State each fact once, in the place where it fits best: the description, the argument list, or the section description. Do not repeat a fact from the description in an argument entry; a list of options goes in one place only.
 - Facts that concern all functions of a section (the common model, data structures, how the functions work together) go into one section description, a `/*!SECTION_DESC ... SECTION_DESC!*/` block next to the section statement in one of the section's source files (see `src/qd_scenpar.cpp`). The same rules apply there: only what is relevant, stated once.
 - Layout, in this order: name, one-line summary, description, `## Declaration:`, `## Inputs:`, `## Outputs:`, `## Returns:`, `## See also:`; see the block in "REFERENCE SKELETON".
-- First line: `# ` and the function name as declared (member functions of a class: `# .method_name`). Second line: the one-line summary, which is reused verbatim by the wrappers.
+- The name line gives the function name as declared (member functions of a class with a leading `.`); the one-line summary that follows is reused verbatim by the wrappers.
 - The description follows after one empty line as a bullet list, without a `## Description:` heading. Start with a brief statement of what the function does and what it is for; then what a caller must know: conventions, edge cases, what is and is not validated, what happens for empty or omitted arguments. Do not narrate the implementation.
 - `## Declaration:` repeats the declaration from the header including the default values, without the per-argument comments and without the `template` line.
 - `## Inputs:`, `## Outputs:`, `## Returns:`; use the singular (`## Input:`, `## Output:`) when there is exactly one; omit a section that would be empty. In/out arguments are listed under Inputs and marked "updated in-place" (or under Outputs when they are primarily results).
-- Argument format: ``- **`name`** *(optional)* — Description; facts separated by semicolons; `[size]` ``
-  - Mark every argument that has a default value or accepts `nullptr` with `*(optional)*` (the default itself is visible in the Declaration) and state what omitting it means.
+- Argument entries: the description, further facts, the size (entry syntax: `docs_builder/README.md`, section "Parameter lines").
+  - Mark every argument that has a default value or accepts `nullptr` as optional (the default itself is visible in the Declaration) and state what omitting it means.
   - Give the size in backticks, with the symbolic dimension names used consistently across all arguments; define each dimension name where it first appears.
   - State the unit when it is not SI, the index base for every index argument, and the meaning of sentinel values (0, NaN, negative).
-- `## See also:` lists related functions as `[[name]]` with a short reason; `[[...]]` becomes a link.
-- Never use `*` or `|` in formulas or running text — they are markdown syntax. Use `·` for multiplication and `abs()` for absolute values.
-- Lines should not exceed 120 characters (soft limit); indent continuation lines by 2 spaces.
+- `## See also:` lists related functions as links, each with a short reason.
+- Math notation only where plain text would be unclear; the rule against derivations still applies.
 - The existing blocks predate these rules and are longer than they allow; follow the rules, not the older blocks.
 
 # TESTS
@@ -240,9 +241,9 @@ SECTION!*/
 - Keep it lean. Separate two kinds of code in a test file:
   - **Oracles** for the test object: these you build yourself, in the test file, independently of the library.
   - **Supporting tasks** (scene geometry, intersections that feed the function under test, antenna patterns, coordinate conversions, file I/O, ...): use the library. It is fine and preferred to call library functions that are not related to the current test objective, e.g. `quadriga_lib::cube` to generate geometry or `quadriga_lib::ray_triangle_intersect` to produce the hit indices for a function that consumes them. They have their own tests; do not re-implement them in the test file. A dozen lines that rebuild what one library call does (a cube or plane mesh, a rotation, a coordinate conversion) are bloat.
-- A complete overview of all available C++ functions is in `html_docu/quadriga_lib_api_cpp.md`. Use it to find helpers before writing one.
-  - The file is generated by `make documentation` from the documentation blocks in `src/`; never edit it. It may lag behind the sources until the documentation is rebuilt.
-  - It starts with general usage notes and a "Function Index" table with the columns Function, Section and Line. The Line column is the line number at which the entry starts, so read the index first and then extract only the entries you need by line range instead of reading the whole file.
+- A complete overview of all available C++ functions is in `docs/quadriga_lib_api_cpp.md`. Use it to find helpers before writing one.
+  - The file is generated by `make docs` from the documentation blocks in `src/`; never edit it.
+  - It starts with general usage notes and a "Function Index" table with the columns Function, Section and Summary. Read the index first, then open only the section file `docs/api/cpp/<section>.md` with the entries you need instead of reading the whole file.
 - Build the smallest input that isolates the behavior: one ray, one face, one path. Exact-by-construction geometry (axis-aligned, unit distances) gives expectations that need no tolerance discussion.
 - Put shared setup into a few small helper functions or a fixture struct at the top of the file. Write a helper only when it is used more than once or makes a test case readable; no helper layers, no generality that no test uses.
 - Oracles: closed-form formulas, direct transcription of the governing equations in scalar `double` math, brute-force evaluation of what the function computes cleverly. Comment each oracle with the formula and its range of validity.
@@ -298,7 +299,7 @@ arma::uword my_function(const arma::Mat<dtype> &points,     // Points in GCS, [n
 
 `src/my_function.cpp`:
 
-```
+````
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
@@ -359,6 +360,6 @@ arma::uword quadriga_lib::my_function(const arma::Mat<dtype> &points,
 
 template arma::uword quadriga_lib::my_function(const arma::Mat<float> &points, arma::Col<float> *dist, float scale);
 template arma::uword quadriga_lib::my_function(const arma::Mat<double> &points, arma::Col<double> *dist, double scale);
-```
+````
 
 For a complete source and test file see `src/ray_commit.cpp` and `tests/catch2_tests/test_ray_commit.cpp` (layout, validation, test structure; the documentation block predates the lean rules).

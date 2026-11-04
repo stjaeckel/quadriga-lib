@@ -99,6 +99,13 @@ override_dh_strip:
 	dh_strip -Xmexa64 -Xmex
 
 # ---------------------------------------------------------------------------
+# Compress: keep the Markdown documentation and llms.txt uncompressed,
+# so the relative links between the files keep working
+# ---------------------------------------------------------------------------
+override_dh_compress:
+	dh_compress -X.md -Xllms.txt
+
+# ---------------------------------------------------------------------------
 # Skip dh_auto_test — tests run in Docker
 # ---------------------------------------------------------------------------
 override_dh_auto_test:

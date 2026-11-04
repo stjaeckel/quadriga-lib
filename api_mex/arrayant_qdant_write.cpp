@@ -67,7 +67,7 @@ id_in_file = quadriga_lib.arrayant_qdant_write( fn, [], id, layout, e_theta_re, 
 ## See also:
 - [[arrayant_qdant_read]] (for reading QDANT data)
 - [[arrayant_generate]] (for the arrayant struct layout)
-- QuaDRiGa Array Antenna Exchange Format (<a href="formats.html#6cab4884">QDANT</a>)
+- QuaDRiGa Array Antenna Exchange Format (<a href="formats.html#qdant">QDANT</a>)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

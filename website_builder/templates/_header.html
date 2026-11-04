@@ -1,0 +1,13 @@
+{% macro item(pid) %}<a href="{{ url(pid) }}"{% if pid == current %} aria-current="page"{% endif %}>{{ labels[pid] }}</a>{% endmacro %}
+<header class="site-header">
+  <div class="wrap hdr">
+    <details class="menu"><summary aria-label="Menu"><svg class="icon-open" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg><svg class="icon-close" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg></summary>
+      <nav aria-label="Site menu"><p class="menu-group">Start</p>{{ item("index") }}{{ item("download") }}{{ item("tutorials") }}<p class="menu-group">API reference</p>{{ item("cpp_api") }}{{ item("mex_api") }}{{ item("python_api") }}<p class="menu-group">More</p>{{ item("formats") }}{{ item("publications") }}{{ item("ai_agents") }}{{ item("faq") }}<p class="menu-group">Project</p><a href="{{ github_url }}">GitHub</a></nav>
+    </details>
+    <a class="brand" href="{{ url("index") }}">{% include "_logo.svg" %}<span>Quadriga-Lib</span></a>
+    <span class="version">v{{ version }}</span>
+    <span class="grow"></span>
+    <a class="hdr-link hdr-gh" href="{{ github_url }}">GitHub</a>
+  </div>
+  <nav class="tabs" aria-label="Site sections"><div class="wrap"><ul>{% for pid, tab in tabs %}<li>{{ item(pid) }}</li>{% endfor %}</ul></div></nav>
+</header>

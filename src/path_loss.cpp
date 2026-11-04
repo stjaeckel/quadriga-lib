@@ -162,8 +162,8 @@ void quadriga_lib::path_loss(
 - **`fc`** — Carrier frequencies in [Hz], finite and > 0; `[n_freq]`
 - **`tx_pos`** — Tx positions in [m]; `[1, 3]` or `[n_link, 3]`
 - **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
-- **`d2d_in`** *(optional)* — Indoor 2D distance in [m] of the UT of each link (e.g. from [[o2i_loss]]), finite and
-  >= 0; given = legacy outdoor distance; 0 = outdoor link; `[n_link]`
+- **`d2d_in`** *(optional)* — Indoor 2D distance in [m] of the UT of each link (e.g. from [[o2i_loss]]), finite
+  and >= 0; given = legacy outdoor distance; 0 = outdoor link; `[n_link]`
 - **`rnd_he`** *(optional)* — Uniform(0,1) value per link for the random environment height, column 10 of
   [[lsf_draw]]; `[n_link]`
 

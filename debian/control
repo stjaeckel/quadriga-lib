@@ -31,8 +31,8 @@ Description: High-performance C++ radio channel modelling library
  antenna pattern interpolation, and 3GPP-compatible channel generation.
  .
  This package includes the static library, public headers, MATLAB MEX
- files (.mexa64), Octave MEX files (.mex), the Python module, and HTML
- API documentation.
+ files (.mexa64), Octave MEX files (.mex), the Python module, and the API
+ documentation as Markdown files.
  .
  Optional AVX2 SIMD acceleration is compiled in where supported at build
  time. CUDA GPU acceleration is provided separately.

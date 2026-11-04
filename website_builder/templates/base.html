@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block full_title %}{{ title }} · Quadriga-Lib{% endblock %}</title>
+<meta name="description" content="{% block description %}{{ description }}{% endblock %}">
+<meta name="theme-color" content="#2e7d46" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#24603a" media="(prefers-color-scheme: dark)">
+<meta property="og:type" content="website">
+<meta property="og:title" content="{% block title %}{{ title }}{% endblock %}">
+<meta property="og:description" content="{{ self.description() }}">
+<meta property="og:url" content="{{ site_base_url }}/{{ path }}">
+{% if og_image %}
+<meta property="og:image" content="{{ site_base_url }}/img/og-card.png">
+<meta name="twitter:card" content="summary_large_image">
+{% endif %}
+<link rel="icon" href="{{ root }}img/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="{{ root }}img/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="{{ root }}img/apple-touch-icon.png">
+{% if twin %}
+<link rel="alternate" type="text/markdown" href="{{ root }}{{ twin }}">
+{% endif %}
+<link rel="preload" href="{{ root }}fonts/ibm-plex-sans-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="{{ root }}css/site.css">
+<script>document.documentElement.className = "js";</script>
+<script src="{{ root }}js/site.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+{% include "_header.html" %}
+<main id="content">
+{% block main %}{% endblock %}
+</main>
+{% include "_footer.html" %}
+</body>
+</html>

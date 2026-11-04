@@ -1,0 +1,24 @@
+# C++ counterparts of the MATLAB / Python functions that the names do not find.
+# Key: the file stem (api_mex/<stem>.cpp, api_python/qpy_<stem>.cpp). Value: the C++ functions
+# that the wrappers call to carry out their operation; the first one is the target of the C++ pill.
+# A family listed here does not use the name match.
+
+[families]
+arrayant_calc_beamwidth = [".calc_beamwidth_deg"]
+arrayant_calc_directivity = [".calc_directivity_dBi"]
+arrayant_combine_pattern = [".combine_pattern", "arrayant_combine_pattern_multi"]
+arrayant_concat = ["arrayant_concat_multi", ".append"]
+arrayant_copy_element = [".copy_element", "arrayant_copy_element_multi"]
+arrayant_export_obj_file = [".export_obj_file"]
+arrayant_generate = ["generate_arrayant_3GPP", "generate_arrayant_custom", "generate_arrayant_dipole", "generate_arrayant_half_wave_dipole", "generate_arrayant_multibeam", "generate_arrayant_omni", "generate_arrayant_ula", "generate_arrayant_xpol"]
+arrayant_interpolate = [".interpolate", "arrayant_interpolate_multi"]
+arrayant_qdant_read = ["qdant_read", "qdant_read_multi"]
+arrayant_qdant_write = [".qdant_write", "qdant_write_multi"]
+arrayant_rotate_pattern = [".rotate_pattern", "arrayant_rotate_pattern_multi"]
+calc_angular_spread = ["calc_angular_spreads_sphere"]
+channel_export_obj_file = [".write_paths_to_obj_file"]
+hdf5_create_file = ["hdf5_create"]
+hdf5_write_channel = ["hdf5_write"]
+interp = ["interp_2D"]
+cart2geo = ["fast_cart2geo"]
+geo2cart = ["fast_geo2cart"]

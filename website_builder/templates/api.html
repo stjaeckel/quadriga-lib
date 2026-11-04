@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block main %}
+<div class="wrap doc">
+<nav class="doc-side idx" aria-label="{{ api.display }} API index">{% include "_api_index.html" %}</nav>
+<div class="doc-main api-main">
+  <p class="crumbs"><a href="{{ url("index") }}">Home</a> › <a href="{{ url("index") }}#apis">API reference</a> › {{ api.display }}</p>
+  <h1>{{ api.title }}</h1>
+{% if api.lead %}
+  <p class="lead">{{ api.lead }}</p>
+{% endif %}
+  <div class="page-tools"><span>Same API in {% for o in api.others %}<a href="{{ url(o ~ "_api") }}">{{ lang_display[o] }}</a>{% if not loop.last %} · {% endif %}{% endfor %}</span><a href="{{ root }}{{ twin }}">Markdown version</a></div>
+  <details class="doc-index"><summary>Sections and functions</summary><nav class="idx" aria-label="{{ api.display }} API index (collapsible)">{% include "_api_index.html" %}</nav></details>
+  <section class="api-section" id="sec-general-usage-notes"><h2>General usage notes</h2>
+{{ api.notes }}
+</section>
+{% for s in api.sections %}
+<section class="api-section" id="sec-{{ s.slug }}"><h2>{{ s.title }}</h2>
+{% if s.desc %}
+<div class="section-desc">{{ s.desc }}</div>
+{% endif %}
+{% for f in s.functions %}
+{% include "_fn_entry.html" %}
+{% endfor %}
+</section>
+{% endfor %}
+</div>
+</div>
+{% endblock %}

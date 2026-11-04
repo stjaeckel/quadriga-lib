@@ -1,0 +1,3 @@
+<input class="idx-filter js-only" type="search" placeholder="Filter functions   /" aria-label="Filter functions">
+    <ul><li><a href="#sec-general-usage-notes">General usage notes</a></li>{% for s in api.sections %}<li><details><summary><span>{{ s.title }}</span><span class="count">{{ s.functions|length }}</span></summary><ul><li><a href="#sec-{{ s.slug }}">Section overview</a></li>{% for f in s.functions %}<li class="fn"><a href="#{{ f.name }}">{{ f.name }}</a></li>{% endfor %}</ul></details></li>{% endfor %}</ul>
+    <div class="idx-other"><ul>{% for o in api.others %}<li><a href="{{ url(o ~ "_api") }}">{{ lang_display[o] }} API</a></li>{% endfor %}<li><a href="{{ root }}{{ twin }}">Full {{ api.display }} API as Markdown</a></li></ul></div>
