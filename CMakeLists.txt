@@ -496,7 +496,8 @@ if(BUILD_MEX_DOC AND (BUILD_MATLAB OR BUILD_OCTAVE))
         set(m_file_output "${MEX_OUTPUT_DIR}/${mex_basename}.m")
         add_custom_command(
             OUTPUT ${m_file_output}
-            COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/html_builder/extract_matlab_comments.py ${mex_src} ${m_file_output}
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/docs_builder/extract_matlab_comments.py ${mex_src} ${m_file_output}
+            DEPENDS ${mex_src} ${CMAKE_SOURCE_DIR}/docs_builder/extract_matlab_comments.py
             COMMENT "Building MEX Documentation ${m_file_output}"
             VERBATIM
         )
@@ -605,7 +606,6 @@ if(CMAKE_INSTALL_PREFIX STREQUAL "${CMAKE_CURRENT_SOURCE_DIR}")
     set(INSTALL_LIBDIR lib)
     set(INSTALL_INCLUDEDIR include)
     set(INSTALL_MEX_DIR .)
-    set(INSTALL_DOCDIR html_docu)
     set(INSTALL_LICENSEDIR .)
     set(INSTALL_ARMADIR .)
     set(INSTALL_IS_LOCAL TRUE)
@@ -617,7 +617,6 @@ elseif(NOT DEFINED SKBUILD_PLATLIB_DIR)
     set(INSTALL_LIBDIR ${CMAKE_INSTALL_LIBDIR})
     set(INSTALL_INCLUDEDIR ${CMAKE_INSTALL_INCLUDEDIR})
     set(INSTALL_MEX_DIR share/quadriga-lib)
-    set(INSTALL_DOCDIR share/doc/quadriga-lib/html)
     set(INSTALL_LICENSEDIR share/doc/quadriga-lib)
     set(INSTALL_ARMADIR ${CMAKE_INSTALL_INCLUDEDIR})
     set(INSTALL_IS_LOCAL FALSE)
@@ -626,7 +625,7 @@ elseif(NOT DEFINED SKBUILD_PLATLIB_DIR)
     if (NOT ARMADILLO_FOUND)
         install(DIRECTORY ${ARMADILLO_INCLUDE_DIRS} DESTINATION ${INSTALL_ARMADIR})
     endif()
-    install(DIRECTORY html_docu/ DESTINATION ${INSTALL_DOCDIR})
+    install(DIRECTORY docs/ DESTINATION share/doc/quadriga-lib)
     install(FILES LICENSE DESTINATION ${INSTALL_LICENSEDIR})
     install(DIRECTORY data/config/ DESTINATION share/quadriga-lib/config FILES_MATCHING PATTERN "*.conf")
 endif()

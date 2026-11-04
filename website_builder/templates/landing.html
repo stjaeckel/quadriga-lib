@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block full_title %}Quadriga-Lib{% endblock %}
+{% block title %}Quadriga-Lib{% endblock %}
+{% block description %}%%GAP: Open-source radio channel modelling: 3GPP TR 38.901 and IEEE 802.11 channel models, array antennas and site-specific simulation, with C++, MATLAB, Octave and Python interfaces.%%{% endblock %}
+{% macro figure(name, alt, caption) %}
+{% set base = figure_base(name) %}
+<figure><div class="frame{% if not figures[name] %} frame-empty{% endif %}">{% if figures[name] %}<picture><source media="(prefers-color-scheme: dark)" srcset="{{ base }}-dark.webp"><img src="{{ base }}-light.webp" width="1600" height="1200" alt="{{ alt }}" decoding="async"{% if name != figure_names[0] %} loading="lazy"{% endif %}></picture>{% else %}<span>{{ alt }}</span>{% endif %}</div><figcaption>{{ caption|safe }}</figcaption></figure>
+{% endmacro %}
+{% block main %}
+<section class="pitch">
+  <div class="wrap">
+    <div>
+      <h1>%%GAP: Realistic radio channels for mobile and Wi-Fi network simulation%%</h1>
+      <p class="lead">%%GAP: Open-source library built on the 3GPP TR 38.901 and IEEE 802.11 channel models. A fast C++ core with MATLAB, Octave and Python interfaces, from the developer of QuaDRiGa.%%</p>
+      <div class="actions"><a class="btn btn-primary" href="{{ url("download") }}">Get started</a><a class="btn btn-secondary" href="#apis">API reference</a></div>
+      <ul class="proof-inline">
+        <li>3GPP TR 38.901 and IEEE 802.11 TGn, TGac, TGax, TGah channel models</li>
+        <li>C++ successor of QuaDRiGa, by the same lead developer</li>
+        <li>%%GAP: N%%&nbsp;channels per second on %%GAP: hardware%%</li>
+      </ul>
+    </div>
+    {{ figure("coverage", "Placeholder for a coverage map", "Received power over a city block, computed with <code>calc_diffraction_gain</code>. %%GAP: figure to come%%") }}
+  </div>
+</section>
+
+<div class="wrap">
+<section class="section" aria-labelledby="why">
+  <h2 id="why">Why Quadriga-Lib</h2>
+  <p class="sub">%%GAP: intro sentence: content session%%</p>
+  <div class="grid-3">
+    <div class="card"><h3>Standards models</h3><p>Implements the 3GPP TR 38.901 stochastic channel model and the IEEE 802.11 indoor channel models TGn, TGac, TGax and TGah. %%GAP: standards contribution: maintainer's wording%%</p></div>
+    <div class="card"><h3>QuaDRiGa lineage</h3><p>The C++ successor of the QuaDRiGa channel model, by the same lead developer. %%GAP: track record: maintainer's wording%%</p></div>
+    <div class="card"><h3>Measured performance</h3><p>%%GAP: N%% channels per second on %%GAP: CPU / GPU%%, %%GAP: factor%% faster than %%GAP: reference%%. %%GAP: how it was measured%%</p></div>
+  </div>
+</section>
+
+<section class="section" aria-labelledby="paths">
+  <h2 id="paths" class="visually-hidden">Where to start</h2>
+  <div class="grid-2">
+    <a class="card" href="{{ url("download") }}"><span class="go">For engineers →</span><p>%%GAP: Install with pip, MATLAB or from source, run a first example, then find any function in the C++, MATLAB and Python references.%%</p></a>
+    <a class="card" href="#covers"><span class="go">For team leads →</span><p>%%GAP: What the models cover, the publications behind them, the Apache-2.0 licence and how to cite the library.%%</p></a>
+  </div>
+</section>
+
+<section class="section" aria-labelledby="quickstart">
+  <div class="split">
+    <div>
+      <h2 id="quickstart">Quick start</h2>
+      <p class="sub">Create a 2&nbsp;×&nbsp;2 3GPP antenna array at 3.7&nbsp;GHz and print the directivity of its first element, about 9.8&nbsp;dBi.</p>
+      <div class="code"><pre><code class="language-bash">{% filter highlight("bash") %}pip install quadriga-lib{% endfilter %}</code></pre></div>
+      <div class="qs-tabs"><div class="ltabs" data-lang-tabs><input type="radio" name="qs" id="qs-python" value="python" checked><input type="radio" name="qs" id="qs-matlab" value="matlab"><input type="radio" name="qs" id="qs-cpp" value="cpp"><div class="tablist" role="presentation"><label for="qs-python">Python</label><label for="qs-matlab">MATLAB / Octave</label><label for="qs-cpp">C++</label></div><div class="panel code"><pre><code class="language-python">{% filter highlight("python") %}
+import quadriga_lib
+
+ant = quadriga_lib.arrayant.generate('3gpp', M=2, N=2, freq=3.7e9)
+print(quadriga_lib.version())
+print(quadriga_lib.arrayant.calc_directivity(ant, 0))
+{% endfilter %}</code></pre></div><div class="panel code"><pre><code class="language-matlab">{% filter highlight("matlab") %}
+ant = quadriga_lib.arrayant_generate('3GPP', 1, 3.7e9, [], [], [], 2, 2);
+disp(quadriga_lib.version())
+disp(quadriga_lib.arrayant_calc_directivity(ant, 1))
+{% endfilter %}</code></pre></div><div class="panel code"><pre><code class="language-cpp">{% filter highlight("cpp") %}
+#include <quadriga_lib.hpp>
+#include <iostream>
+
+int main()
+{
+    auto ant = quadriga_lib::generate_arrayant_3GPP<double>(2, 2, 3.7e9);
+    std::cout << quadriga_lib::quadriga_lib_version() << "\n";
+    std::cout << ant.calc_directivity_dBi(0) << " dBi\n";
+}
+{% endfilter %}</code></pre></div><p class="note">Same example in all three languages. MATLAB and C++ setup: <a href="{{ url("download") }}">Get started</a>.</p></div></div>
+    </div>
+    {{ figure("antenna", "Placeholder for an antenna pattern", "Pattern of the array from this example, made with <code>arrayant.generate</code>. %%GAP: figure to come%%") }}
+  </div>
+</section>
+
+<section class="section" aria-labelledby="apis">
+  <h2 id="apis">API reference</h2>
+  <p class="sub">One page per language, every function with its inputs, outputs, shapes and units.</p>
+  <div class="grid-3">
+    <a class="card" href="{{ url("cpp_api") }}"><span class="go">C++ API →</span><p>%%GAP: Header-level reference for the C++17 library.%%</p></a>
+    <a class="card" href="{{ url("mex_api") }}"><span class="go">MATLAB / Octave API →</span><p>%%GAP: MEX functions in the <code>quadriga_lib</code> package.%%</p></a>
+    <a class="card" href="{{ url("python_api") }}"><span class="go">Python API →</span><p>%%GAP: The <code>quadriga_lib</code> module from PyPI.%%</p></a>
+  </div>
+</section>
+
+<section class="section" aria-labelledby="covers">
+  <h2 id="covers">What it covers</h2>
+  <p class="sub">From standard channel models to site-specific simulation and data storage.</p>
+  <div class="grid-4">
+    <div class="feature"><b>Stochastic channel model</b><span>%%GAP: 3GPP TR 38.901 large- and small-scale parameters, path loss, LOS probability, O2I loss%%</span></div>
+    <div class="feature"><b>IEEE 802.11 channels</b><span>%%GAP: TGn types A to F with the TGac, TGax and TGah extensions%%</span></div>
+    <div class="feature"><b>Array antennas</b><span>%%GAP: 3GPP panels, ULA, multibeam; interpolation, rotation, directivity, QDANT files%%</span></div>
+    <div class="feature"><b>Channel coefficients</b><span>%%GAP: Spherical and planar wave, multi-frequency, IRS, frequency response%%</span></div>
+    <div class="feature"><b>Site-specific simulation</b><span>%%GAP: Ray–triangle intersection, mesh tools, OBJ and Mitsuba export%%</span></div>
+    <div class="feature"><b>Channel data storage</b><span>%%GAP: HDF5 channel files for large datasets%%</span></div>
+    <div class="feature"><b>Fast core</b><span>%%GAP: C++17 with OpenMP, optional AVX2 and CUDA%%</span></div>
+    <div class="feature"><b>Acoustics<span class="badge">experimental</span></b><span>%%GAP: Room acoustics with the ray tracer; under development%%</span></div>
+  </div>
+</section>
+
+<section class="section" aria-labelledby="open">
+  <h2 id="open">Open source</h2>
+  <p class="sub">Apache-2.0 licence. Source, issues and discussions on GitHub.</p>
+  <div class="grid-3">
+    <a class="card" href="{{ github_url }}"><span class="go">GitHub →</span><p>%%GAP: Source code, issue tracker, discussions.%%</p></a>
+    <a class="card" href="{{ url("publications") }}"><span class="go">Publications →</span><p>%%GAP: Papers and IEEE 802.11 contributions behind the models.%%</p></a>
+    <a class="card" href="{{ url("ai_agents") }}"><span class="go">Use with AI agents →</span><p>%%GAP: Markdown versions of every page and <code>llms.txt</code>.%%</p></a>
+  </div>
+</section>
+</div>
+{% endblock %}

@@ -9,11 +9,11 @@ quadriga-lib is a C++ radio channel modelling library with MATLAB/Octave and Pyt
 - `include/*.hpp` — C++ declarations; `src/*.cpp` — C++ implementations with their documentation blocks (`/*!MD ... MD!*/`).
 - `tests/mex_tests/test_<function_name>.m` — MOxUnit tests, one file per wrapper; `tests/quadriga_lib_mex_tests.m` collects and runs all `tests/mex_tests/test*.m` files, so a new test file needs no registration.
 - `+quadriga_lib/` — the MATLAB package populated by the build: the compiled MEX files and one `.m` help file per function.
-- Generated overviews (read-only, produced by `make documentation`, never edit them; they may lag behind the sources until the documentation is rebuilt):
-  - `html_docu/quadriga_lib_api_cpp.md` — all C++ functions
-  - `html_docu/quadriga_lib_api_mex.md` — all MATLAB functions
+- Generated overviews (read-only, produced by `make docs`, never edit them):
+  - `docs/quadriga_lib_api_cpp.md` — all C++ functions
+  - `docs/quadriga_lib_api_mex.md` — all MATLAB functions
   - Both start with a "Function Index"; use it as described in `md/SPEC_CPP_API.md` ("Fixtures and oracles").
-- The text in the `/*!MD ... MD!*/` block of a wrapper is reused for 3 purposes: (1) merged into the Markdown overview, (2) compiled to HTML, (3) converted into the `.m` help file of the function that provides the MATLAB `help` text (`html_builder/extract_matlab_comments.py`, which strips backticks and asterisks and prefixes each line with `%`). The delimiters `/*!MD`, `MD!*/`, `/*!SECTION`, `SECTION!*/` are matched literally, each on its own line.
+- The text in the `/*!MD ... MD!*/` block of a wrapper is reused for 3 purposes: (1) merged into the Markdown overview, (2) compiled to HTML, (3) converted into the `.m` help file of the function that provides the MATLAB `help` text (`docs_builder/extract_matlab_comments.py`; what it changes: `docs_builder/README.md`, section "`extract_matlab_comments.py`").
 - Commands (Linux, from the repository root):
   - `make` — build the library and install the MEX files into `+quadriga_lib/` (`matlab` and `octave` default to ON); run it after every wrapper change
   - `make test` — build and run the Catch2 suite and the complete MEX test suites; it does not install, so run `make` first
@@ -43,7 +43,7 @@ Existing wrappers that show the patterns:
 Unlike the C++ work, the wrapper is written first and the test second: the physics is already verified by the Catch2 suite, and the MEX test exercises the wrapper.
 1. **Wrapper.** Write `api_mex/<function_name>.cpp` following the "IMPLEMENTATION GUIDELINES". It must compile without warnings.
 2. **Test.** Write `tests/mex_tests/test_<function_name>.m` (see "TESTS") and run it. It is expected to pass. If it fails, the cause is in the wrapper or in the test's expectation; find out which before changing either. If the failure points to the C++ function itself, stop and report it; do not work around it in the wrapper.
-3. **Finish.** The new test passes; the complete MEX test suite passes. The documentation block of the wrapper is complete and matches what the wrapper does.
+3. **Finish.** The new test passes; the complete MEX test suite passes. The documentation block of the wrapper is complete and matches what the wrapper does. If the C++ function has another name than the wrapper, add the pair to `docs_builder/content/api_matching.toml` (`docs_builder/README.md`, section "Cross-language buttons"). Run `make docs` and commit the changed files in `docs/` with the change (`docs_builder/README.md`, "Quick start").
 
 # HAND-OVER REPORT
 - the MATLAB usage line
@@ -294,21 +294,21 @@ SECTION!*/
 ```
 
 ## Documentation block
-- The format and the lean rules of the C++ block apply (`md/SPEC_CPP_API.md`, "Documentation block"): same one-line summary, description as bullets without a heading, singular `## Input:` / `## Output:` for one entry, `## See also:`, no `*` or `|` in text. Do not expand what is brief in the C++ block. The differences:
+- The layout and the lean rules of the C++ block apply (`md/SPEC_CPP_API.md`, "Documentation block"): same one-line summary, description as bullets without a heading, singular `## Input:` / `## Output:` for one entry, `## See also:`. Do not expand what is brief in the C++ block. The differences:
 - The heading is the function name in UPPERCASE, e.g. `acdf` becomes `ACDF`.
 - The description is adapted to MATLAB users: C++-specific details (dtype, pointers) are dropped, MATLAB-specific notes added where needed.
-- Lines should not exceed 100 characters (soft limit), since the block also becomes the `.m` help file. Indent continuation lines by 2 spaces; table rows and usage lines may exceed the limit.
-- A `## Usage:` section replaces the Declaration; split it at 100 characters with continuation lines indented by 4 spaces:
+- A `## Usage:` section replaces the Declaration; split long calls (line length: `docs_builder/README.md`, "Writing pitfalls") with continuation lines indented by 4 spaces:
 
     ## Usage:
     ```
     [ output1, output2 ] = quadriga_lib.function_name( input1, input2, optional_input3 );
     ```
 
-- Argument format: ``- **`name`** — Description; further facts separated by semicolons; `[size]`; default: X``
-- Optional inputs (C++: default value or `nullptr`) can be omitted or passed as `[]`. A stated default implies that the input is optional; mark it `*(optional)*` only if no default can be stated. Outputs are never marked optional.
+- Argument entries: the description, further facts, the size, then `default: X` (entry syntax: `docs_builder/README.md`, "Parameter lines").
+- Optional inputs (C++: default value or `nullptr`) can be omitted or passed as `[]`. A stated default implies that the input is optional; mark it optional only if no default can be stated. Outputs are never marked optional.
 - State the type only when not `double`, the unit only when not SI. C++ returns are listed under `## Outputs:`.
-- `[[name]]` links only to a function documented on the same API page, by the name that page shows it under, without a namespace or submodule prefix. Do not refer to a function that exists only in another API: leave it out of the text and out of `## See also:`.
+- Do not refer to a function that exists only in another API: leave it out of the text and out of `## See also:`.
+- Doc-block format (delimiters, name and summary lines, sub-block headings, parameter lines, links, tables, line length and wrapping, formulas): see `docs_builder/README.md`, section "API documentation from the sources".
 
 ## Function body
 - Signature: `void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])`
@@ -385,7 +385,7 @@ end
 ```
 - Local helper functions go after the `end` of the main function; every function in the file is then closed with `end`.
 - Structure the body with `%%` section comments in this order: setup, basic call and values, optional inputs, outputs, type handling, indices, errors.
-- Use other library functions for supporting tasks (`quadriga_lib.cube` for a mesh, `quadriga_lib.arrayant_generate` for an antenna, `quadriga_lib.ray_triangle_intersect` for hit indices, ...) instead of building such data by hand; `html_docu/quadriga_lib_api_mex.md` lists what is available.
+- Use other library functions for supporting tasks (`quadriga_lib.cube` for a mesh, `quadriga_lib.arrayant_generate` for an antenna, `quadriga_lib.ray_triangle_intersect` for hit indices, ...) instead of building such data by hand; `docs/quadriga_lib_api_mex.md` lists what is available.
 - Tests that write files use distinct file names in the working directory, delete leftovers at the start and the files at the end.
 - The code must run in MATLAB and Octave: use `strfind` (not `contains`), char arrays in single quotes (not `"strings"`), no `arguments` blocks, no functions that exist in only one of the two.
 

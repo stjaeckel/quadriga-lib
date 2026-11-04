@@ -65,8 +65,8 @@ Remove the sample mean of sum-of-sinusoids generators over a set of positions
   any number for different maps
 - **`phase_b_in`** *(optional)* — Phases of the second device; requires `pos_b`; omitted
   or empty = same map; `[n_coeff, n_gen]`
-- **`acf`** *(optional)* — Target ACF; required for two devices on the same map, must then be
-  > -1; `[n_acf]`
+- **`acf`** *(optional)* — Target ACF; required for two devices on the same map, must then
+  be > -1; `[n_acf]`
 - **`dist`** *(optional)* — Sample points of the ACF; must start at 0, increase strictly and be
   finite; `[n_acf]`
 - **`freq_scale_b`** — Frequency scale of the second device, i.e. decorrelation distance of the

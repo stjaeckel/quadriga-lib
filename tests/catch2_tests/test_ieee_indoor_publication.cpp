@@ -4,7 +4,7 @@
 
 // Anchors the results of the published report
 //   S. Jaeckel, "A modern C++ framework for the IEEE indoor channel models", IEEE 802.11-25/2318r0, 2025
-//   (html_docu/publications/11-25-2318-modern-cpp-framework.md)
+//   (website_builder/static/publications/11-25-2318-modern-cpp-framework.md)
 // as fast regression tests. Each case cites the section of the report.
 //
 // - Deterministic quantities (tables, seeds, closed-form values) are checked exactly.

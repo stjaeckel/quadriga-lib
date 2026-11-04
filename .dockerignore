@@ -1,7 +1,6 @@
 build/
 release/
-html_docu/releases/
-html_docu/publications/
+website_builder/
 lib/*
 .vscode/*
 +quadriga_lib/
@@ -9,3 +8,4 @@ dist/
 wheelhouse/
 tests/test*
 deploy.py
+website/

@@ -2,7 +2,7 @@
 
 Paper: S. Jaeckel, L. Raschkowski, F. Burkhardt, L. Thiele, "Efficient Sum-of-Sinusoids-Based Spatial
 Consistency for the 3GPP New-Radio Channel Model", 2018
-(`html_docu/publications/2018_sum_of_sinusoids.md`).
+(`website_builder/static/publications/2018_sum_of_sinusoids.md`).
 
 This folder re-runs the numeric results of the paper (section V) with the sum-of-sinusoids functions of
 quadriga-lib (`include/quadriga_sos.hpp`) and compares them with the paper. Run on 2026-10-12 in MATLAB

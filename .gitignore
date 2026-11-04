@@ -11,7 +11,6 @@ external/pugixml-*/
 external/Catch2-*/
 external/pybind11-*/
 release/
-html_docu/releases/
 dist/
 wheelhouse/
 tests/test*
@@ -23,3 +22,5 @@ include/quadriga_lib_config.hpp
 version.tmp
 test*.txt
 .claude/worktrees/
+/website/
+.ipynb_checkpoints/

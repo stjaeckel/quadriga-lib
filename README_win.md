@@ -14,7 +14,7 @@ Full documentation is available at [quadriga-lib.org](http://quadriga-lib.org).
 | `lib/`           | Static library (`quadriga.lib`)                      |
 | `+quadriga_lib/` | Compiled MEX files and `.m` documentation for MATLAB |
 | `wheels/`        | Prebuilt Python wheels for Windows (cp310–cp314)     |
-| `html_docu/`     | Full offline API documentation                       |
+| `docs/`          | Documentation as Markdown files (the content of quadriga-lib.org) |
 | `LICENSE`        | Apache License, Version 2.0                          |
 
 ---

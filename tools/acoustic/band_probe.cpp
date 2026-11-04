@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Part of quadriga-lib — see LICENSE for terms.
 //
-// Band probe for the acoustic add-on (html_docu/quadriga_lib_material_model.md 10.4): one ray through ray_progress until no ray is left, a band
+// Band probe for the acoustic add-on (website_builder/static/quadriga_lib_material_model.md 10.4): one ray through ray_progress until no ray is left, a band
 // of frequencies on the base frequency's geometry (the first one), every path that ends in air outside the structure
 // summed at its polyline's point: T beyond the last face, R in front of the first. Scalar mode; tracer 5 =
 // refraction_mode. Faces are planes x = const (normal towards -x, or +x when flipped), as ub::build makes them.

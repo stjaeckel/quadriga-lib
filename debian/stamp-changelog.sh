@@ -50,7 +50,7 @@ quadriga-lib (${DEB_VERSION}) ${CODENAME}; urgency=medium
 
   * Packaged from upstream version ${VERSION}.
   * Static library, headers, MATLAB MEX, Octave MEX, Python module.
-  * HTML API documentation included.
+  * Markdown API documentation included.
   * AVX2 acceleration enabled; CUDA excluded from .deb.
 
  -- Stephan Jaeckel <info@quadriga-lib.org>  ${TIMESTAMP}

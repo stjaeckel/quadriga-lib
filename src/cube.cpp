@@ -31,7 +31,8 @@ arma::Mat<dtype> quadriga_lib::cube(
 
 ## Inputs:
 - **`scale`** — Length 1 scales all axes uniformly; length 3 scales `{x,y,z}` independently; empty = 1 (no scaling)
-- **`rotation`** — Euler angles in [rad] about {x,y,z}, applied as R = Rz*Ry*Rx (Blender XYZ); length 3 or empty (no rotation)
+- **`rotation`** — Euler angles in [rad] about {x,y,z}, applied as `R = Rz*Ry*Rx` (Blender XYZ);
+  length 3 or empty (no rotation)
 - **`location`** — Translation {x,y,z} in [m]; length 3 or empty (origin)
 - **`n_div`** — Number of subdivisions per edge; results in `12 * n_div^2` triangles
 

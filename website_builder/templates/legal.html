@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block main %}
+<div class="wrap page">
+<div class="doc-main prose">
+  <p class="crumbs"><a href="{{ url("index") }}">Home</a> › {{ page.title }}</p>
+  <h1>{{ page.title }}</h1>
+{{ body }}
+</div>
+</div>
+{% endblock %}

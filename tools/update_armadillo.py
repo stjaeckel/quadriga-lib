@@ -37,8 +37,8 @@ BEST_RELEASE = "https://sourceforge.net/projects/arma/best_release.json"
 FILE_FEED = "https://sourceforge.net/projects/arma/rss?path=/"  # lists the most recent ~100 files
 FILE_URL = "https://sourceforge.net/projects/arma/files/armadillo-{v}.tar.xz/download"
 
-# Files that name the bundled version. html_docu/download.html is generated from quick_start.md by the doc build.
-VERSION_FILES = ("CMakeLists.txt", "Makefile", "README.md", "html_builder/download/quick_start.md")
+# Files that name the bundled version.
+VERSION_FILES = ("CMakeLists.txt", "Makefile", "README.md")
 
 KEEP_FILES = ("LICENSE.txt", "NOTICE.txt", "README.md")  # Apache-2.0 requires LICENSE and NOTICE
 
