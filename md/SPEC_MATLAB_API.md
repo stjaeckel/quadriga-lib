@@ -297,7 +297,7 @@ SECTION!*/
 - The layout and the lean rules of the C++ block apply (`md/SPEC_CPP_API.md`, "Documentation block"): same one-line summary, description as bullets without a heading, singular `## Input:` / `## Output:` for one entry, `## See also:`. Do not expand what is brief in the C++ block. The differences:
 - The heading is the function name in UPPERCASE, e.g. `acdf` becomes `ACDF`.
 - The description is adapted to MATLAB users: C++-specific details (dtype, pointers) are dropped, MATLAB-specific notes added where needed.
-- A `## Usage:` section replaces the Declaration; split it at 100 characters with continuation lines indented by 4 spaces:
+- A `## Usage:` section replaces the Declaration; split it at 120 characters with continuation lines indented by 4 spaces:
 
     ## Usage:
     ```

@@ -53,7 +53,7 @@ data = quadriga_lib.arrayant.qdant_read( fn, id=0 )
 ## See also:
 - [[qdant_write]] (for writing QDANT data)
 - [[generate]] (for the arrayant struct layout)
-- QuaDRiGa Array Antenna Exchange Format (<a href="formats.html#6cab4884">QDANT</a>)
+- QuaDRiGa Array Antenna Exchange Format (<a href="formats.html#qdant">QDANT</a>)
 MD!*/
 
 py::dict arrayant_qdant_read(const std::string &fn,

@@ -14,10 +14,12 @@ VARIABLE_RE = re.compile(r"\{\{\s*([a-z_]+)\s*\}\}")
 # A gap marker %%GAP: text%% (one line): missing content or a draft awaiting approval; group 1 is the text
 GAP_RE = re.compile(r"%%GAP:(.*?)%%")
 HEADING_RE = re.compile(r"^(#{1,6}) (.+)$")
-_ATTRS_RE = re.compile(r'\s*\{\s*(#[^\s}"]+)?((?:\s*legacy="[^"]*")*)\s*\}\s*$')
+_ID_RE = re.compile(r'\s*\{#([^\s}"]+)\}\s*$')
 _ESCAPE_RE = re.compile(r"(\\[!-/:-@\[-`{-~])")
 
 PAGE_KEYS = {"title": (str, True), "description": (str, True), "lead": (str, False)}
+# A format file of docs_builder/content/formats/: one section of the formats page and one Markdown file
+FORMAT_KEYS = {"title": (str, True), "summary": (str, True), "order": (int, True)}
 EXTRA_KEYS = {"tutorials.md": "dummy_note", "ai_agents.md": "llms_summary"}  # allowed in one file each
 
 _LINK = {"label": (str, True), "url": (str, True)}
@@ -36,16 +38,17 @@ class Heading:
     text: str           # heading text without the '#'s and without a trailing {...}
     plain: str          # text without Markdown: links as their text, no '*' or backticks, escapes and entities resolved
     id: str = None      # set for headings that become h2 or h3
-    legacy: list = field(default_factory=list)
 
 
 @dataclass
 class Page:
     path: str           # relative to the repository root
-    page_id: str        # file stem
+    page_id: str        # file stem; for a format file also its section id on the formats page
     title: str = ""
     description: str = ""
     lead: str = ""
+    summary: str = ""   # format files: one line for the index of formats
+    order: int = 0      # format files: position on the formats page
     extra: dict = field(default_factory=dict)  # dummy_note, llms_summary
     body: list = field(default_factory=list)   # source lines after the front matter
     body_line: int = 1  # 1-based line of body[0]
@@ -119,11 +122,14 @@ def plain_text(text):
     return html.unescape(text)
 
 
-def heading_ids(lines, diag=None, path=None, first_line=1):
+def heading_ids(lines, diag=None, path=None, first_line=1, used=None):
     """Headings of a list of Markdown lines (column 0, outside fences), in order.
 
-    ## and ### headings get an id: the explicit {#id}, else the slug of the plain text, made
-    unique with -2, -3. Explicit ids or legacy ids used twice are E-anchor.
+    ## and ### headings get an id: the explicit {#id} at the end of the heading, else the slug of
+    the plain text, made unique with -2, -3, also against the ids the page templates write
+    (config.RESERVED_IDS). An explicit id used twice or equal to a reserved id is E-anchor.
+    used: ids already taken on the same page (a set, updated), for pages made of several files;
+    it must contain config.RESERVED_IDS.
     """
     states, _ = docblocks.fence_states(lines)
     heads = []
@@ -131,20 +137,21 @@ def heading_ids(lines, diag=None, path=None, first_line=1):
         m = None if states[i] else HEADING_RE.match(ln)
         if not m:
             continue
-        text, explicit, legacy = m.group(2).rstrip(), None, []
-        a = _ATTRS_RE.search(text)
+        text, explicit = m.group(2).rstrip(), None
+        a = _ID_RE.search(text)
         if a:
-            explicit = a.group(1)[1:] if a.group(1) else None
-            legacy = re.findall(r'legacy="([^"]*)"', a.group(2))
-            text = text[:a.start()].rstrip()
-        heads.append(Heading(i, len(m.group(1)), text, plain_text(text), explicit, legacy))
+            explicit, text = a.group(1), text[:a.start()].rstrip()
+        heads.append(Heading(i, len(m.group(1)), text, plain_text(text), explicit))
     with_id = [h for h in heads if h.level in (2, 3)]
-    used = set()
+    used = set(config.RESERVED_IDS) if used is None else used
     for h in with_id:
-        for anchor in ([h.id] if h.id else []) + h.legacy:
-            if anchor in used and diag:
-                diag.error(path, first_line + h.index, "E-anchor: id '%s' appears twice on the page" % anchor)
-            used.add(anchor)
+        if h.id:
+            if h.id in config.RESERVED_IDS and diag:
+                diag.error(path, first_line + h.index, "E-anchor: id '%s' is used by the page template; choose "
+                           "another" % h.id)
+            elif h.id in used and diag:
+                diag.error(path, first_line + h.index, "E-anchor: id '%s' appears twice on the page" % h.id)
+            used.add(h.id)
     for h in heads:
         if h not in with_id:
             h.id = None
@@ -157,8 +164,12 @@ def heading_ids(lines, diag=None, path=None, first_line=1):
     return heads
 
 
-def read_page(path, diag, root):
-    """Read a prose page: front matter between '+++' lines, build variables substituted, heading ids."""
+def read_page(path, diag, root, keys=None, ids=True):
+    """Read a prose page: front matter between '+++' lines, build variables substituted, heading ids.
+
+    keys: the front-matter keys {name: (type, required)}, default PAGE_KEYS (FORMAT_KEYS for a format file).
+    ids: False leaves page.headings empty, for a caller that computes them across several files.
+    """
     rel = path.relative_to(root).as_posix()
     page = Page(rel, path.stem)
     lines = substitute(path.read_text(encoding="utf-8"), diag, rel).split("\n")
@@ -169,20 +180,21 @@ def read_page(path, diag, root):
     data = _toml("\n".join(lines[1:end]), diag, rel, 2)
     if data is None:
         return page
-    spec = dict(PAGE_KEYS)
-    if path.name in EXTRA_KEYS:
+    spec = dict(keys or PAGE_KEYS)
+    if keys is None and path.name in EXTRA_KEYS:
         spec[EXTRA_KEYS[path.name]] = (str, False)
     check_keys(data, spec, "", lambda msg: diag.error(rel, None, "front matter: " + msg))
-    for key in ("title", "description", "lead"):
-        if isinstance(data.get(key), str):
+    for key, (kind, _) in spec.items():
+        if key in data and isinstance(data[key], kind) and hasattr(page, key):
             setattr(page, key, data[key])
-    page.extra = {k: v for k, v in data.items() if k not in PAGE_KEYS and k in spec and isinstance(v, str)}
+    page.extra = {k: v for k, v in data.items() if k in spec and not hasattr(page, k) and isinstance(v, str)}
     body = lines[end + 1:]
     while body and not body[-1].strip():
         body.pop()
     page.body, page.body_line = body, end + 2
     docblocks.block_errors(body, rel, page.body_line, diag, page=True)
-    page.headings = heading_ids(body, diag, rel, page.body_line)
+    if ids:
+        page.headings = heading_ids(body, diag, rel, page.body_line)
     return page
 
 

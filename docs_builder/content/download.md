@@ -5,7 +5,7 @@ description = "%%GAP: meta description of the Get started page%%"
 
 %%GAP: text converted from the old page; check it against the new layout (headings for the index)%%
 
-## Download {#download legacy="7c9ba8cc"}
+## Download {#download}
 
 ### Latest Version (Source Code)
 
@@ -33,7 +33,7 @@ description = "%%GAP: meta description of the Get started page%%"
 
 ### [Older versions]({{ releases_url }})
 
-## Installation from Binaries {#installation-from-binaries legacy="7fc9f392"}
+## Installation from Binaries {#installation-from-binaries}
 
 ### Python
 
@@ -69,7 +69,7 @@ pip install wheels\quadriga_lib-{{ version }}-cp312-cp312-win_amd64.whl
 
 - The binary packages contain the public headers and the static library (`libquadriga.a` on Linux, `quadriga.lib` on Windows), together with the [Armadillo](https://arma.sourceforge.net) headers. Link the static library and enable OpenMP (`-fopenmp` with GCC).
 
-## Installation from Source {#installation-from-source legacy="904e3979"}
+## Installation from Source {#installation-from-source}
 
 ### Linux
 
@@ -100,7 +100,7 @@ make
 
 - Build options (AVX2, CUDA, shared library), make targets, a conda setup, the test suites and the MATLAB compiler versions are described in the [README on GitHub](https://github.com/stjaeckel/quadriga-lib#building-from-source).
 
-## Quick Start {#quick-start legacy="fdc96a45"}
+## Quick Start {#quick-start}
 
 All three examples create a 2 × 2 3GPP antenna array at 3.7 GHz and print the directivity of the first element (about 9.8 dBi). More examples are in the API references.
 

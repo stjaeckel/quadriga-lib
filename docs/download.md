@@ -9,7 +9,7 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/download.html
 | [Installation from Source](#installation-from-source) | [Linux](#linux) · [Windows](#windows-2) · [More options](#more-options) |
 | [Quick Start](#quick-start) | [Python](#python-3) · [MATLAB / Octave](#matlab-octave) · [C++](#c-2) |
 
-<a id="download"></a><a id="7c9ba8cc"></a>
+<a id="download"></a>
 ## Download
 
 <a id="latest-version-source-code"></a>
@@ -45,7 +45,7 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/download.html
 <a id="older-versions"></a>
 ### [Older versions](http://quadriga-lib.org/releases/)
 
-<a id="installation-from-binaries"></a><a id="7fc9f392"></a>
+<a id="installation-from-binaries"></a>
 ## Installation from Binaries
 
 <a id="python-2"></a>
@@ -86,7 +86,7 @@ pip install wheels\quadriga_lib-0.12.5-cp312-cp312-win_amd64.whl
 
 - The binary packages contain the public headers and the static library (`libquadriga.a` on Linux, `quadriga.lib` on Windows), together with the [Armadillo](https://arma.sourceforge.net) headers. Link the static library and enable OpenMP (`-fopenmp` with GCC).
 
-<a id="installation-from-source"></a><a id="904e3979"></a>
+<a id="installation-from-source"></a>
 ## Installation from Source
 
 <a id="linux"></a>
@@ -121,7 +121,7 @@ make
 
 - Build options (AVX2, CUDA, shared library), make targets, a conda setup, the test suites and the MATLAB compiler versions are described in the [README on GitHub](https://github.com/stjaeckel/quadriga-lib#building-from-source).
 
-<a id="quick-start"></a><a id="fdc96a45"></a>
+<a id="quick-start"></a>
 ## Quick Start
 
 All three examples create a 2 × 2 3GPP antenna array at 3.7 GHz and print the directivity of the first element (about 9.8 dBi). More examples are in the API references.

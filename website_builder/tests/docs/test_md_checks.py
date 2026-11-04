@@ -51,6 +51,6 @@ def test_faq_without_cite(mini_repo, run_docs):
     faq.write_text(faq.read_text(encoding="utf-8").replace(" {#cite}", ""), encoding="utf-8")
     code, out = run_docs(mini_repo)
     assert code == 1
-    assert "docs/formats.md:" in out and ": error: anchor missing: faq.md#cite (no id 'cite' in faq.md)" in out
+    assert "docs/formats/qdant.md:" in out and ": error: anchor missing: ../faq.md#cite (no id 'cite' in faq.md)" in out
     assert "docs/publications.md:" in out
     assert not (mini_repo / "docs").exists()

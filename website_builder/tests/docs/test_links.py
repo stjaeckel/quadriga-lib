@@ -26,14 +26,6 @@ def test_slug():
     assert links.slug("C++") == "c"
 
 
-def test_legacy_hashes():
-    expected = {"Array antenna class": "3a0c780f", "Array antenna functions": "e091e809", "Channel class": "4f5f509b",
-                "Channel functions": "eab50272", "Channel generation functions": "6f9553d7",
-                "Channel statistics": "c2d4d113", "Geometry-based stochastic model": "85ec7f8f",
-                "Math functions": "40522dfe", "Miscellaneous / Tools": "b11e2d16",
-                "Site-specific simulation tools": "386370db", "Sum-of-sinusoids random number generator": "2d15ed9b"}
-    assert {t: links.legacy_hash(t) for t in expected} == expected
-
 
 def test_wikilinks_resolve(mini_repo):
     model, mapping, diag = build(mini_repo)
@@ -113,7 +105,6 @@ def test_mapping_errors(mini_repo, run_docs, toml, message):
     ("cpp_api.html#.interpolate", "api/mex/miscellaneous-tools.md", "../cpp/array-antenna-class.md#.interpolate"),
     ("cpp_api.html#.interpolate", "faq.md", "api/cpp/array-antenna-class.md#.interpolate"),
     ("cpp_api.html#sec-miscellaneous-tools", "faq.md", "api/cpp/miscellaneous-tools.md"),
-    ("cpp_api.html#b11e2d16", "faq.md", "api/cpp/miscellaneous-tools.md"),
     ("cpp_api.html#sec-miscellaneous-tools", "quadriga_lib_api_cpp.md", "#sec-miscellaneous-tools"),
     ("cpp_api.html", "faq.md", "quadriga_lib_api_cpp.md"),
     ("cpp_api.html#.interpolate", "tutorials/x.md", "../api/cpp/array-antenna-class.md#.interpolate"),
@@ -122,6 +113,16 @@ def test_mapping_errors(mini_repo, run_docs, toml, message):
     ("faq.html#cite", "tutorials/x.html", "../faq.html#cite"),
     ("faq.html#cite", "404.html", "/faq.html#cite"),
     ("faq.html#cite", "formats.md", "faq.md#cite"),
+    ("faq.html#cite", "formats/qdant.md", "../faq.md#cite"),
+    # the formats page: one file per format
+    ("formats.html", "faq.md", "formats.md"),
+    ("formats.html#qdant", "faq.md", "formats/qdant.md"),
+    ("formats.html#qdant", "api/mex/x.md", "../../formats/qdant.md"),
+    ("formats.html#notes-2", "faq.md", "formats/materials.md#notes-2"),
+    ("formats.html#materials", "formats/qdant.md", "materials.md"),
+    ("formats.html#notes", "formats/qdant.md", "#notes"),
+    ("formats.html#qdant", "cpp_api.html", "formats.html#qdant"),
+    ("formats.html#qdant", "llms.txt", BASE + "/formats/qdant.md"),
     ("faq.html#cite", "api/cpp/x.md", "../../faq.md#cite"),
     ("faq.html#cite", "tutorials/x.md", "../faq.md#cite"),
     # page without twin
@@ -146,7 +147,7 @@ def test_mapping_errors(mini_repo, run_docs, toml, message):
     ("tutorials.html", "tutorials/x.md", "../tutorials.md"),
     ("tutorials.html", "faq.html", "tutorials.html"),
     # absolute site URLs become site-relative; download/ and releases/ stay absolute
-    ("http://quadriga-lib.org/formats.html#6cab4884", "cpp_api.html", "formats.html#6cab4884"),
+    ("http://quadriga-lib.org/formats.html#qdant", "cpp_api.html", "formats.html#qdant"),
     ("https://www.quadriga-lib.org/formats.html", "faq.md", "formats.md"),
     ("http://quadriga-lib.org/download/x.zip", "faq.md", BASE + "/download/x.zip"),
     ("http://quadriga-lib.org/releases/", "faq.html", BASE + "/releases/"),

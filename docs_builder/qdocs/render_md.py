@@ -142,9 +142,8 @@ def twin_lines(lines, location, lang=None, headings=None, fence_lang=None, docbl
         elif i in heads:
             h = heads[i]
             work[i] = "#" * h.level + " " + h.text
-            ids = ([h.id] if h.id else []) + h.legacy
-            if ids:
-                anchors[i] = "".join('<a id="%s"></a>' % a for a in ids)
+            if h.id:
+                anchors[i] = '<a id="%s"></a>' % h.id
     keep = [i for i, ln in enumerate(work) if ln is not None]
     texts = [work[i] for i in keep]
     masked = code_mask(texts, diag, path, first_line)
@@ -238,6 +237,27 @@ def prose_twin(page, location=None, lang=None):
                        twin_lines(page.body, location, lang, page.headings)))
 
 
+def formats_index(intro, formats):
+    """docs/formats.md: the formats page's title, lead and intro, and a table linking each format file."""
+    web = config.SITE_BASE_URL + "/formats.html"
+    head = twin_header(prose.strip_gaps(intro.title), web, [])
+    lead = prose.strip_gaps(intro.lead)
+    table = ["| Format | Summary |", "| --- | --- |"]
+    table += ["| [%s](formats/%s.md) | %s |" % (_cell(prose.strip_gaps(f.title)), f.page_id,
+                                                _cell(" ".join(twin_lines([prose.strip_gaps(f.summary)], "formats.md"))))
+              for f in formats]
+    return _text(_join(head, twin_lines(lead.split("\n"), "formats.md") if lead else [],
+                       twin_lines(intro.body, "formats.md", headings=intro.headings), table))
+
+
+def format_file(f):
+    """docs/formats/<id>.md: twin header with the index of the format's headings, then its text."""
+    loc = "formats/%s.md" % f.page_id
+    web = "%s/formats.html#%s" % (config.SITE_BASE_URL, f.page_id)
+    head = twin_header(prose.strip_gaps(f.title), web, index_rows(f.headings))
+    return _text(_join(head, twin_lines(f.body, loc, headings=f.headings)))
+
+
 def counterpart_line(f, location):
     """'Also in: [C++](...) · Not in: Python': both other languages, as the pills of the HTML page."""
     also, absent = [], []
@@ -283,7 +303,7 @@ def full_api(page):
             index.append("| [%s](#%s) | %s | %s |" % (f.name, f.name, _cell(sec.title), _brief(f, loc)))
     out = _join(out, index)
     for sec in page.sections:
-        out = _join(out, ["---"], ['<a id="sec-%s"></a><a id="%s"></a>' % (sec.slug, sec.legacy), "# " + sec.title],
+        out = _join(out, ["---"], ['<a id="sec-%s"></a>' % sec.slug, "# " + sec.title],
                     *[_part(d, loc, lang) for d in sec.descs])
         for f in sec.functions:
             out = _join(out, function_lines(f, loc))
@@ -331,7 +351,7 @@ def publications_twin(data):
 
 
 DOC_LIST = (("Get started", "download.html", "installation and quick start"),
-            ("Data formats", "formats.html", "QDANT antenna files and the material table"),
+            ("Data formats", "formats.html", "index of the file formats, one Markdown file per format"),
             ("Questions", "faq.html", "FAQ, how to cite"),
             ("Publications", "publications.html", "papers and IEEE 802.11 contributions"),
             ("AI agents", "ai_agents.html", "how to use these files and the agent skill"),
@@ -351,6 +371,9 @@ def index_file(model, location):
     out += ["Version %s. Every page of quadriga-lib.org has a Markdown version; the API reference exists per "
             "language as one full file and as one file per section." % config.version(), "", "## Documentation"]
     out += ["- [%s](%s): %s" % (t, u(target), d) for t, target, d in DOC_LIST]
+    out += ["", "## Data formats"]
+    out += ["- [%s](%s): %s" % (prose.strip_gaps(f.title), u("formats.html#" + f.page_id), prose.strip_gaps(f.summary))
+            for f in model["formats"]]
     out += ["", "## API reference"]
     out += ["- [%s API, complete](%s)" % (config.LANG_TITLE[lang], u(lang + "_api.html")) for lang in config.LANGS]
     out += ["", "## API sections"]
@@ -380,7 +403,7 @@ def check_parts(model, diag):
                 if not links.resolve(lang, name, member):
                     diag.error(path, first + i, "E-link: [[%s]] matches no function on the %s API page"
                                % (("." if member else "") + name, lang))
-    for page in model["pages"].values():
+    for page in list(model["pages"].values()) + model["formats"]:
         code_mask(page.body, diag, page.path, page.body_line)
 
 
@@ -393,7 +416,9 @@ def render_docs(model, diag):
         for sec in page.sections:
             files["api/%s/%s.md" % (lang, sec.slug)] = section_file(page, sec)
     for pid, page in model["pages"].items():
-        files[config.TWINS[pid]] = prose_twin(page)
+        files[config.TWINS[pid]] = prose_twin(page) if pid != "formats" else formats_index(page, model["formats"])
+    for f in model["formats"]:
+        files["formats/%s.md" % f.page_id] = format_file(f)
     files["publications.md"] = publications_twin(model["publications"])
     files["llms.txt"] = index_file(model, "llms.txt")
     files["README.md"] = index_file(model, "README.md")

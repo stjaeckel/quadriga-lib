@@ -36,8 +36,14 @@ TWINS = {pid: twin for pid, _, twin in PAGES if twin}
 # Twins written only into the website, never into docs/: the tutorial index and the tutorial pages
 WEBSITE_ONLY = ("tutorials.md", "tutorials/")
 
-# Prose pages of docs/ whose source is docs_builder/content/<id>.md
+# Prose pages of docs/ whose source is docs_builder/content/<id>.md; formats.md is the formats page's intro
 TEXT_PAGES = ("download", "formats", "faq", "ai_agents")
+FORMATS_DIR = "docs_builder/content/formats"  # one file per data format, a section of formats.html each
+
+# Ids the website templates write themselves (main content, landing sections, quick-start tabs, API intro);
+# heading ids avoid them, because an id may appear only once on a page
+RESERVED_IDS = ("apis", "content", "covers", "open", "paths", "qs-cpp", "qs-matlab", "qs-python", "quickstart",
+                "sec-general-usage-notes", "why")
 
 LANGS = ("cpp", "mex", "python")
 LANG_TITLE = {"cpp": "C++", "mex": "MATLAB / Octave", "python": "Python"}  # page titles, llms.txt

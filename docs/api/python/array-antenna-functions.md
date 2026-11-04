@@ -567,7 +567,7 @@ data = quadriga_lib.arrayant.qdant_read( fn, id=0 )
 ### See also:
 - [qdant_write](#qdant_write) (for writing QDANT data)
 - [generate](#generate) (for the arrayant struct layout)
-- QuaDRiGa Array Antenna Exchange Format ([QDANT](../../formats.md#6cab4884))
+- QuaDRiGa Array Antenna Exchange Format ([QDANT](../../formats/qdant.md))
 
 ---
 <a id="qdant_write"></a>
@@ -618,7 +618,7 @@ arrayant.quadriga_lib.qdant_write( fn, arrayant )
 ### See also:
 - [qdant_read](#qdant_read) (for reading QDANT data)
 - [generate](#generate) (for the arrayant struct layout)
-- QuaDRiGa Array Antenna Exchange Format ([QDANT](../../formats.md#6cab4884))
+- QuaDRiGa Array Antenna Exchange Format ([QDANT](../../formats/qdant.md))
 
 ---
 <a id="rotate_pattern"></a>

@@ -55,7 +55,7 @@ arrayant.quadriga_lib.qdant_write( fn, arrayant )
 ## See also:
 - [[qdant_read]] (for reading QDANT data)
 - [[generate]] (for the arrayant struct layout)
-- QuaDRiGa Array Antenna Exchange Format (<a href="formats.html#6cab4884">QDANT</a>)
+- QuaDRiGa Array Antenna Exchange Format (<a href="formats.html#qdant">QDANT</a>)
 MD!*/
 
 py::ssize_t arrayant_qdant_write(const std::string &fn,

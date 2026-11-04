@@ -523,7 +523,7 @@ Also in: [C++](../cpp/array-antenna-functions.md#qdant_read) · [Python](../pyth
 ### See also:
 - [arrayant_qdant_write](#arrayant_qdant_write) (for writing QDANT data)
 - [arrayant_generate](#arrayant_generate) (for the arrayant struct layout)
-- QuaDRiGa Array Antenna Exchange Format ([QDANT](../../formats.md#6cab4884))
+- QuaDRiGa Array Antenna Exchange Format ([QDANT](../../formats/qdant.md))
 
 ---
 <a id="arrayant_qdant_write"></a>
@@ -587,7 +587,7 @@ id_in_file = quadriga_lib.arrayant_qdant_write( fn, [], id, layout, e_theta_re, 
 ### See also:
 - [arrayant_qdant_read](#arrayant_qdant_read) (for reading QDANT data)
 - [arrayant_generate](#arrayant_generate) (for the arrayant struct layout)
-- QuaDRiGa Array Antenna Exchange Format ([QDANT](../../formats.md#6cab4884))
+- QuaDRiGa Array Antenna Exchange Format ([QDANT](../../formats/qdant.md))
 
 ---
 <a id="arrayant_rotate_pattern"></a>

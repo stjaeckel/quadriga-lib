@@ -5,7 +5,7 @@ description = "%%GAP: meta description of the FAQ page%%"
 
 %%GAP: text converted from the old page; check it against the new layout (headings for the index)%%
 
-## About the Library {#about-the-library legacy="e63d3e38"}
+## About the Library {#about-the-library}
 
 ### How is Quadriga-Lib related to QuaDRiGa?
 
@@ -41,7 +41,7 @@ MATLAB ships its own, older C++ runtime (`libstdc++`). MEX files built with a ne
 
 Yes. Quadriga-Lib uses [Armadillo](https://arma.sourceforge.net) for its matrices and cubes. To exchange data with other libraries, create Armadillo objects that use auxiliary memory, use their STL-style iterators, or get a pointer to the matrix memory with `.memptr()`.
 
-## Bug Reports and Contact {#bug-reports-and-contact legacy="59d38498"}
+## Bug Reports and Contact {#bug-reports-and-contact}
 
 ### How do I report a bug?
 
@@ -71,7 +71,7 @@ Lead development is done by [Stephan Jaeckel](https://sjc-wireless.com).
 
 By email to "info \[ÄT] quadriga-lib \[DÖT] org". For bugs, feature requests and usage questions, GitHub is preferred, so that other users can find the answers.
 
-## Distribution License {#distribution-license legacy="89373af1"}
+## Distribution License {#distribution-license}
 
 ### What is the distribution license for Quadriga-Lib?
 
@@ -89,7 +89,7 @@ Unlike the GPL, the Apache License does not require you to publish the source co
 
 No. It only uses the Apache License.
 
-## Supporting the Project {#supporting-the-project legacy="d8094d72"}
+## Supporting the Project {#supporting-the-project}
 
 ### How can I support the development?
 

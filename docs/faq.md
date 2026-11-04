@@ -9,7 +9,7 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/faq.html
 | [Distribution License](#distribution-license) | [What is the distribution license for Quadriga-Lib?](#what-is-the-distribution-license-for-quadriga-lib) · [Can I use Quadriga-Lib in commercial products without releasing the source code?](#can-i-use-quadriga-lib-in-commercial-products-without-releasing-the-source-code) · [How does the Apache License compare to the GPL, MIT and BSD licenses?](#how-does-the-apache-license-compare-to-the-gpl-mit-and-bsd-licenses) · [Is Quadriga-Lib a product of the Apache Software Foundation?](#is-quadriga-lib-a-product-of-the-apache-software-foundation) |
 | [Supporting the Project](#supporting-the-project) | [How can I support the development?](#how-can-i-support-the-development) · [Other ways to help](#other-ways-to-help) |
 
-<a id="about-the-library"></a><a id="e63d3e38"></a>
+<a id="about-the-library"></a>
 ## About the Library
 
 <a id="how-is-quadriga-lib-related-to-quadriga"></a>
@@ -52,7 +52,7 @@ MATLAB ships its own, older C++ runtime (`libstdc++`). MEX files built with a ne
 
 Yes. Quadriga-Lib uses [Armadillo](https://arma.sourceforge.net) for its matrices and cubes. To exchange data with other libraries, create Armadillo objects that use auxiliary memory, use their STL-style iterators, or get a pointer to the matrix memory with `.memptr()`.
 
-<a id="bug-reports-and-contact"></a><a id="59d38498"></a>
+<a id="bug-reports-and-contact"></a>
 ## Bug Reports and Contact
 
 <a id="how-do-i-report-a-bug"></a>
@@ -90,7 +90,7 @@ Lead development is done by [Stephan Jaeckel](https://sjc-wireless.com).
 
 By email to "info \[ÄT] quadriga-lib \[DÖT] org". For bugs, feature requests and usage questions, GitHub is preferred, so that other users can find the answers.
 
-<a id="distribution-license"></a><a id="89373af1"></a>
+<a id="distribution-license"></a>
 ## Distribution License
 
 <a id="what-is-the-distribution-license-for-quadriga-lib"></a>
@@ -113,7 +113,7 @@ Unlike the GPL, the Apache License does not require you to publish the source co
 
 No. It only uses the Apache License.
 
-<a id="supporting-the-project"></a><a id="d8094d72"></a>
+<a id="supporting-the-project"></a>
 ## Supporting the Project
 
 <a id="how-can-i-support-the-development"></a>
