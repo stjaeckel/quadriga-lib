@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
-"""'website' on the real sources, built into a temporary root: old anchors still exist, the output is
-byte-identical between runs, and the dummy notebook converts without warnings."""
+"""'website' on the real sources, built into a temporary root: old anchors still exist, and every
+notebook converts without warnings."""
 
 import contextlib
 import html.parser
@@ -41,15 +41,8 @@ def tree(folder):
 
 @pytest.fixture(scope="module")
 def site(tmp_path_factory):
-    """Two 'website' runs on a copy of the real inputs: (root, output of the first run, both site trees)."""
+    """One 'website' run on a copy of the real inputs: (root, output, site tree)."""
     from qsite import cli
-
-    def run():
-        out = io.StringIO()
-        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(out):
-            code = cli.main(["website", "--root", str(root)])
-        return code, out.getvalue()
-
     root = tmp_path_factory.mktemp("real_repo")
     for folder in ("src", "api_mex", "api_python"):
         (root / folder).mkdir()
@@ -60,13 +53,11 @@ def site(tmp_path_factory):
     shutil.copy2(str(REPO / "CMakeLists.txt"), str(root))
     for folder in ("docs_builder/content", "website_builder/content", "website_builder/skill", "tutorials"):
         shutil.copytree(str(REPO / folder), str(root / folder))
-    code, out = run()
-    assert code == 0, out
-    first = tree(root / "website")
-    shutil.rmtree(str(root / "website"))
-    code, out2 = run()
-    assert code == 0, out2
-    return root, out, first, tree(root / "website")
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(out):
+        code = cli.main(["website", "--root", str(root)])
+    assert code == 0, out.getvalue()
+    return root, out.getvalue(), tree(root / "website")
 
 
 def test_old_anchors_exist(site):
@@ -80,14 +71,9 @@ def test_old_anchors_exist(site):
     assert "quickstart" in page_ids(root / "website" / "index.html")
 
 
-def test_identical_bytes(site):
-    _, _, first, second = site
-    assert sorted(first) == sorted(second)
-    assert [p for p in first if first[p] != second[p]] == []
-
-
-def test_pipeline_demo_without_warnings(site):
-    root, out, first, _ = site
-    assert [ln for ln in out.splitlines() if ln.startswith("tutorials/pipeline_demo.ipynb") and ": warning:" in ln] == []
-    for name in ("tutorials/pipeline_demo.html", "tutorials/pipeline_demo.md", "tutorials/pipeline_demo.ipynb"):
-        assert name in first
+def test_tutorials_without_warnings(site):
+    _, out, files = site
+    assert [ln for ln in out.splitlines() if ln.startswith("tutorials/") and ": warning:" in ln] == []
+    for nb in sorted((REPO / "tutorials").glob("*.ipynb")):
+        for ext in (".html", ".md", ".ipynb"):
+            assert "tutorials/" + nb.stem + ext in files

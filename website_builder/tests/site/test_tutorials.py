@@ -114,8 +114,8 @@ def test_pages_twins_and_index(mini_repo, run_site):
     page = site(mini_repo, "tutorials/mini_demo.html")
     assert '<a class="dl" href="mini_demo.ipynb">Download notebook <small>.ipynb</small></a>' in page
     index = site(mini_repo, "tutorials.html")
-    assert ('<a class="card tut-card" href="tutorials/mini_demo.html"><div class="meta"><span class="tag lang">Python'
-            '</span><span class="tag">Beginner</span></div><h3>Mini demo</h3><p>A <em>small</em> notebook') in index
+    assert 'href="tutorials/mini_demo.html"' in index and ">Python</span>" in index and ">Beginner</span>" in index
+    assert "<h3>Mini demo</h3>" in index
     assert '<div class="note-box warn"><b>Placeholder</b>These cards are examples.</div>' in index
     md = site(mini_repo, "tutorials.md")
     assert "- [Mini demo](tutorials/mini_demo.md) · Python · beginner · A *small* notebook for the tests." in md

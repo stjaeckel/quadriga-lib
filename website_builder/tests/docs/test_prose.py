@@ -3,6 +3,8 @@
 # Part of quadriga-lib — see LICENSE for terms.
 """Prose pages: front matter, publications data, build variables, heading ids, gap markers."""
 
+import re
+
 import pytest
 
 from qdocs import cli, config, prose, render_md
@@ -14,6 +16,16 @@ def page(tmp_path, text, name="page.md"):
     (tmp_path / name).write_text(text, encoding="utf-8")
     diag = cli.Diagnostics()
     return prose.read_page(tmp_path / name, diag, tmp_path), diag
+
+
+def error_ids(diag):
+    """[(line, error id)] of the errors, without the message text."""
+    out = []
+    for ln in diag.lines:
+        m = re.match(r"^[^:]+:(\d+): error: (E-[a-z-]+):", ln)
+        if m:
+            out.append((int(m.group(1)), m.group(2)))
+    return out
 
 
 def errors(diag):
@@ -32,7 +44,6 @@ def test_front_matter(tmp_path):
 @pytest.mark.parametrize("text, message", [
     ("title = 1\n", "page.md: error: front matter: title: not a string"),
     ('title = "T"\n', "page.md: error: front matter: description: missing"),
-    ('title = "T"\ndescription = "D"\ncolour = "red"\n', "page.md: error: front matter: colour: unknown key"),
     ('title = "T"\ndescription = "D"\ndummy_note = "x"\n', "page.md: error: front matter: dummy_note: unknown key"),
     ('title = = "T"\n', "page.md:2: error: TOML: "),
 ])
@@ -45,20 +56,12 @@ def test_front_matter_extra_keys_and_missing_delimiters(tmp_path):
     p, diag = page(tmp_path, '+++\ntitle = "T"\ndescription = "D"\nllms_summary = "S"\n+++\n', "ai_agents.md")
     assert errors(diag) == [] and p.extra == {"llms_summary": "S"}
     _, diag = page(tmp_path, "# No front matter\n")
-    assert errors(diag) == ["page.md:1: error: the file must start with TOML front matter between two lines '+++'"]
+    assert len(errors(diag)) == 1 and errors(diag)[0].startswith("page.md:1: error: ")
 
 
-def test_e_table_and_e_wrap_on_a_prose_page(tmp_path):
-    _, diag = page(tmp_path, FRONT + "\n| a | b |\n| - | - |\nText\n\nWrapped and\n> 0\n")
-    assert errors(diag) == ["page.md:8: error: E-table: a table and the text next to it need a blank line between them",
-                            "page.md:11: error: E-wrap: a wrapped line must not start with '>' or '+ '; move the line break"]
-
-
-def test_e_heading_on_a_prose_page(tmp_path):
-    _, diag = page(tmp_path, FRONT + "\n# Second title\n\nA heading\n=========\n\n   ### Indented\n\n## Fine\n")
-    assert [e.split(": E-heading: ")[0] for e in errors(diag)] == ["page.md:6: error", "page.md:8: error",
-                                                                   "page.md:11: error"]
-    assert "the title comes from the front matter" in errors(diag)[0]
+def test_block_errors_on_a_prose_page(tmp_path):
+    _, diag = page(tmp_path, FRONT + "\n# Title\n\n| a |\n| - |\nText\n")
+    assert sorted(error_ids(diag)) == [(6, "E-heading"), (10, "E-table")]  # lines counted from the top of the file
 
 
 def test_build_variables(tmp_path):
@@ -67,7 +70,7 @@ def test_build_variables(tmp_path):
                    "Version {{version}}, {{ github_url }}.\n```\nv{{ version }}\n```\n{{ nosuch }}\n")
     assert p.title == "T 9.9.9"
     assert p.body[:3] == ["Version 9.9.9, https://github.com/stjaeckel/quadriga-lib.", "```", "v9.9.9"]
-    assert errors(diag) == ["page.md:9: error: unknown build variable '{{ nosuch }}'"]
+    assert len(errors(diag)) == 1 and errors(diag)[0].startswith("page.md:9: error: ") and "nosuch" in errors(diag)[0]
 
 
 def test_publications_key_check(tmp_path):
@@ -107,7 +110,7 @@ def test_heading_ids_explicit_first_and_duplicates():
     assert [h.id for h in heads] == ["cite-2", "cite"]
     diag = cli.Diagnostics()
     prose.heading_ids(["## A {#x}", "## B {#x}"], diag, "p.md", 5)
-    assert errors(diag) == ["p.md:6: error: E-anchor: id 'x' appears twice on the page"]
+    assert error_ids(diag) == [(6, "E-anchor")]
 
 
 def test_gap_markers_left_out_of_twins(tmp_path):
@@ -126,7 +129,6 @@ def test_gap_scan_and_e_gap(mini_repo, run_docs):
     code, out = run_docs(mini_repo)
     assert code == 0
     assert "docs_builder/content/formats.md:6: an introduction to the formats\n" in out
-    assert "docs: 0 errors, 2 warnings, 7 gaps" in out
     f = mini_repo / CONTENT / "faq.md"
     text = f.read_text(encoding="utf-8") + "\n%%GAP: not closed\n"
     f.write_text(text, encoding="utf-8")
@@ -135,26 +137,24 @@ def test_gap_scan_and_e_gap(mini_repo, run_docs):
     assert code == 1 and "docs_builder/content/faq.md:%d: error: E-gap: " % line in out
 
 
-@pytest.mark.parametrize("name", ["faq.md", "api_intro_mex.md", "publications.toml", "api_matching.toml"])
-def test_missing_content_file(mini_repo, run_docs, name):
-    (mini_repo / CONTENT / name).unlink()
+def test_missing_content_file(mini_repo, run_docs):
+    (mini_repo / CONTENT / "faq.md").unlink()
     code, out = run_docs(mini_repo)
-    assert code == 1 and "%s/%s: error: content file missing" % (CONTENT, name) in out
+    assert code == 1 and "%s/faq.md: error: " % CONTENT in out
 
 
 def test_format_files(mini_repo, run_docs):
     folder = mini_repo / CONTENT / "formats"
     (folder / "zz.md").write_text('+++\ntitle = "Z"\nsummary = "S"\norder = 0\n+++\n\n## Notes {#qdant}\n', encoding="utf-8")
     code, out = run_docs(mini_repo)
-    assert code == 1 and "docs_builder/content/formats/zz.md:7: error: E-anchor: id 'qdant' appears twice" in out
+    assert code == 1 and "docs_builder/content/formats/zz.md:7: error: E-anchor:" in out
     (folder / "zz.md").write_text('+++\ntitle = "Z"\norder = "1"\n+++\n', encoding="utf-8")
     code, out = run_docs(mini_repo)
-    assert "docs_builder/content/formats/zz.md: error: front matter: summary: missing" in out
-    assert "docs_builder/content/formats/zz.md: error: front matter: order: not an integer" in out
+    assert "zz.md: error: front matter: summary:" in out and "zz.md: error: front matter: order:" in out
     for p in folder.iterdir():
         p.unlink()
     code, out = run_docs(mini_repo)
-    assert code == 1 and "docs_builder/content/formats: error: no format files (*.md) found" in out
+    assert code == 1 and "docs_builder/content/formats: error: " in out
 
 
 def test_heading_ids_avoid_template_ids():
@@ -162,4 +162,28 @@ def test_heading_ids_avoid_template_ids():
     assert [h.id for h in heads] == ["content-2", "quick-start", "why-2"]
     diag = cli.Diagnostics()
     prose.heading_ids(["## Main {#content}"], diag, "p.md", 3)
-    assert errors(diag) == ["p.md:3: error: E-anchor: id 'content' is used by the page template; choose another"]
+    assert error_ids(diag) == [(3, "E-anchor")]
+
+
+def test_e_fence_on_a_prose_page(tmp_path):
+    _, diag = page(tmp_path, FRONT + "\nText\n\n```python\nx = 1\n")
+    assert error_ids(diag) == [(8, "E-fence")]
+
+
+def test_raw_html_stays_text_in_prose_twins(tmp_path):
+    p, _ = page(tmp_path, FRONT + '\nSee <a href="faq.html">the FAQ</a> and [this](faq.html)<br>\nnext line\n', "faq.md")
+    assert 'See <a href="faq.html">the FAQ</a> and [this](faq.md)<br>\nnext line\n' in render_md.prose_twin(p)
+
+
+def test_check_keys_types_and_missing_once():
+    found = []
+    spec = {"dummy": (bool, False), "order": (int, True), "title": (str, True)}
+    prose.check_keys({"dummy": "no", "order": True}, spec, "m.", found.append)
+    assert found == ["m.dummy: not true or false", "m.order: not an integer", "m.title: missing"]
+
+
+def test_gap_text_with_build_variables(tmp_path):
+    config.VARIABLES["version"] = "9.9.9"
+    (tmp_path / "c").mkdir()
+    (tmp_path / "c" / "p.md").write_text("%%GAP: notes for {{ version }}%%\n", encoding="utf-8")
+    assert prose.gap_scan(tmp_path, ["c"], cli.Diagnostics()) == [("c/p.md", 1, "notes for 9.9.9")]

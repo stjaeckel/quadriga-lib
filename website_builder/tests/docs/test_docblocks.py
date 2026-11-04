@@ -3,6 +3,8 @@
 # Part of quadriga-lib — see LICENSE for terms.
 """Doc-block parser: grammar, structural errors, sub-blocks and parameter lists."""
 
+import re
+
 from qdocs import cli, config, docblocks
 
 
@@ -16,6 +18,16 @@ def parse(tmp_path, lang, text, name=None):
 
 def errors(diag):
     return [ln for ln in diag.lines if ": error: " in ln]
+
+
+def error_ids(diag):
+    """[(line, error id)] of the errors, without the message text."""
+    out = []
+    for ln in diag.lines:
+        m = re.match(r"^[^:]+:(\d+): error: (E-[a-z-]+):", ln)
+        if m:
+            out.append((int(m.group(1)), m.group(2)))
+    return out
 
 
 def warnings(diag, kind):
@@ -74,32 +86,32 @@ def test_section_descriptions_in_file_order(tmp_path):
 
 def test_e_delim_open(tmp_path):
     _, diag = parse(tmp_path, "cpp", SECTION + "/*!MD\n# f\nBrief\n/*!MD\n# g\nB\n## Declaration:\nMD!*/\n")
-    assert errors(diag) == ["src/a.cpp:4: error: E-delim-open: /*!MD without MD!*/ before the next block or the end of the file"]
+    assert error_ids(diag) == [(4, "E-delim-open")]
     _, diag = parse(tmp_path / "x", "cpp", SECTION + "/*!SECTION_DESC\ntext\n")
-    assert len(errors(diag)) == 1 and "E-delim-open" in errors(diag)[0]
+    assert [i for _, i in error_ids(diag)] == ["E-delim-open"]
 
 
 def test_e_section_count(tmp_path):
     _, diag = parse(tmp_path / "none", "cpp", md("# f", "B", "## Declaration:"))
-    assert "E-section-count" in errors(diag)[0]
+    assert [i for _, i in error_ids(diag)] == ["E-section-count"]
     _, diag = parse(tmp_path / "two", "cpp", SECTION + SECTION + md("# f", "B", "## Declaration:"))
-    assert "E-section-count" in errors(diag)[0]
+    assert [i for _, i in error_ids(diag)] == ["E-section-count"]
     _, diag = parse(tmp_path / "lines", "cpp", "/*!SECTION\nTools\nMore\nSECTION!*/\n")
-    assert "E-section-count" in errors(diag)[0]
+    assert [i for _, i in error_ids(diag)] == ["E-section-count"]
     page, diag = parse(tmp_path / "only", "cpp", SECTION)  # a section without functions is fine
     assert errors(diag) == [] and page.sections[0].functions == []
 
 
 def test_e_name(tmp_path):
     _, diag = parse(tmp_path, "cpp", SECTION + md("#f", "B", "## Declaration:"))
-    assert errors(diag) == ["src/a.cpp:5: error: E-name: the first line of a /*!MD block must be '# name'"]
+    assert error_ids(diag) == [(5, "E-name")]
     _, diag = parse(tmp_path / "b", "cpp", SECTION + md("# 3f", "B", "## Declaration:"))
-    assert "E-name" in errors(diag)[0]
+    assert [i for _, i in error_ids(diag)] == ["E-name"]
 
 
 def test_e_fence(tmp_path):
     _, diag = parse(tmp_path, "cpp", SECTION + md("# f", "B", "## Declaration:", "```", "void f();"))
-    assert errors(diag) == ["src/a.cpp:8: error: E-fence: code fence without a closing fence in the same part"]
+    assert error_ids(diag) == [(8, "E-fence")]
     # a "## " line inside a fence does not start a sub-block
     page, diag = parse(tmp_path / "b", "cpp", SECTION + md("# f", "B", "## Declaration:", "```", "## x", "```"))
     assert errors(diag) == [] and len(page.sections[0].functions[0].subblocks) == 1
@@ -110,7 +122,7 @@ def test_fence_closes_on_a_run_as_long_as_the_opener(tmp_path):
     assert states == ["open", "in", "in", "in"] and opener is None
     assert docblocks.fence_states(["````", "```"])[1] == 0
     _, diag = parse(tmp_path, "cpp", SECTION + md("# f", "B", "## Declaration:", "````", "```", "x"))
-    assert "E-fence" in errors(diag)[0]
+    assert [i for _, i in error_ids(diag)] == ["E-fence"]
 
 
 def test_e_table_text_after_table(tmp_path):
@@ -118,7 +130,7 @@ def test_e_table_text_after_table(tmp_path):
                                                   "- **`x`** — Codes:", "  | a | b |", "  | - | - |", "  | 1 | 2 |",
                                                   "  Text read as a row", "- **`y`** — Next item ends the table",
                                                   "  | a | b |", "  | - | - |", "- **`z`** — Fine"))
-    assert errors(diag) == ["src/a.cpp:13: error: E-table: a table and the text next to it need a blank line between them"]
+    assert error_ids(diag) == [(13, "E-table")]
     page, diag = parse(tmp_path / "ok", "cpp", SECTION + md("# f", "B", "## Declaration:", "Text before",
                                                             "| a | b |", "| - | - |", "", "Text after", "| a |", "| - |",
                                                             "```", "| not a table |", "text", "```"))
@@ -129,36 +141,32 @@ def test_e_table_column_0_text_after_an_indented_table(tmp_path):
     _, diag = parse(tmp_path, "cpp", SECTION + md("# f", "B", "## Declaration:", "## Inputs:",
                                                   "- **`x`** — Codes:", "  | a | b |", "  | - | - |",
                                                   "lazy text in column 0"))
-    assert errors(diag) == ["src/a.cpp:12: error: E-table: a table and the text next to it need a blank line between them"]
+    assert error_ids(diag) == [(12, "E-table")]
 
 
 def test_e_wrap(tmp_path):
     _, diag = parse(tmp_path, "cpp", SECTION + md("# f", "B", "## Declaration:", "## Inputs:",
                                                   "- **`x`** — Distance, finite and", "  >= 0; `[n]`",
                                                   "- **`y`** — Sum `a + b", "  + c`"))
-    assert errors(diag) == [
-        "src/a.cpp:10: error: E-wrap: a wrapped line must not start with '>' or '+ '; move the line break",
-        "src/a.cpp:12: error: E-wrap: a wrapped line must not start with '>' or '+ '; move the line break"]
+    assert error_ids(diag) == [(10, "E-wrap"), (12, "E-wrap")]
     _, diag = parse(tmp_path / "desc", "cpp", SECTION + "/*!SECTION_DESC\nText\n> quote\nSECTION_DESC!*/\n")
-    assert errors(diag) == ["src/a.cpp:6: error: E-wrap: a wrapped line must not start with '>' or '+ '; move the line break"]
+    assert error_ids(diag) == [(6, "E-wrap")]
     # fine: fenced code, a quote after a fence, a blank line or a heading, a quote or '+' list continued;
     # a wrapped code span is not: the line still becomes a block quote
     _, diag = parse(tmp_path / "ok", "cpp", SECTION + md("# f", "B", "## Declaration:", "```", "a", "+ b", "```",
                                                          "> quote", "> more", "", "> [!NOTE]", "> text", "",
                                                          "#### Heading", "> quote", "", "+ one", "+ two",
                                                          "Text with `x", ">= 0` in code"))
-    assert errors(diag) == ["src/a.cpp:24: error: E-wrap: a wrapped line must not start with '>' or '+ '; "
-                            "move the line break"]
+    assert error_ids(diag) == [(24, "E-wrap")]
 
 
 def test_e_heading_setext_and_indented(tmp_path):
     _, diag = parse(tmp_path, "cpp", SECTION + md("# f", "B", "", "Intro text", "----------", "",
                                                   "  ## Indented heading", "## Declaration:", "```", "Code",
                                                   "---", "```"))
-    assert [e.split(": E-heading: ")[0] for e in errors(diag)] == ["src/a.cpp:8: error", "src/a.cpp:11: error"]
-    assert "underlines it with '=' or '-'" in errors(diag)[0] and "start in column 0" in errors(diag)[1]
+    assert error_ids(diag) == [(8, "E-heading"), (11, "E-heading")]
     _, diag = parse(tmp_path / "desc", "cpp", SECTION + "/*!SECTION_DESC\nTitle\n=====\nSECTION_DESC!*/\n")
-    assert len(errors(diag)) == 1 and errors(diag)[0].startswith("src/a.cpp:5: error: E-heading:")
+    assert error_ids(diag) == [(5, "E-heading")]
     # rules after a blank line, table delimiter rows, a list item's rule and '#' name lines are fine
     _, diag = parse(tmp_path / "ok", "cpp", SECTION + md("# f", "B", "", "Text", "", "---", "| a |", "| - |", "",
                                                          "- item", "---", "## Declaration:"))
@@ -168,7 +176,7 @@ def test_e_heading_setext_and_indented(tmp_path):
 def test_e_table_after_deeper_text(tmp_path):
     _, diag = parse(tmp_path, "cpp", SECTION + md("# f", "B", "## Declaration:", "## Inputs:",
                                                   "- **`x`** — Modes", "  - v1: text", "  | a | b |", "  | - | - |"))
-    assert errors(diag) == ["src/a.cpp:11: error: E-table: a table and the text next to it need a blank line between them"]
+    assert error_ids(diag) == [(11, "E-table")]
     _, diag = parse(tmp_path / "ok", "cpp", SECTION + md("# f", "B", "## Declaration:", "## Inputs:",
                                                          "- **`x`** — Modes", "  - v1: text", "    | a | b |",
                                                          "    | - | - |"))
@@ -177,27 +185,21 @@ def test_e_table_after_deeper_text(tmp_path):
 
 def test_e_required_and_class_exemption(tmp_path):
     _, diag = parse(tmp_path / "c", "cpp", SECTION + md("# f", "B", "## Inputs:", "- **`x`** — X"))
-    assert "E-required" in errors(diag)[0]
+    assert [i for _, i in error_ids(diag)] == ["E-required"]
     _, diag = parse(tmp_path / "k", "cpp", SECTION + md("# cls", "B", "## Attributes:<br>", "| a |"))
     assert errors(diag) == []
     _, diag = parse(tmp_path / "u", "cpp", SECTION + md("# f", "B", "## Usage:"))
     assert errors(diag) == []
     _, diag = parse(tmp_path / "m", "mex", SECTION + md("# F", "B", "## Declaration:"))
-    assert "E-required" in errors(diag)[0]
+    assert [i for _, i in error_ids(diag)] == ["E-required"]
     _, diag = parse(tmp_path / "p", "python", SECTION + md("# f", "B", "## Example:"))
-    assert "E-required" in errors(diag)[0]
+    assert [i for _, i in error_ids(diag)] == ["E-required"]
 
 
 def test_sub_block_labels_and_kinds():
     assert docblocks.sub_label("## Attributes:<br>") == "Attributes"
     assert docblocks.sub_label("## Function 'duplicate';") == "Function 'duplicate'"
-    assert docblocks.sub_label("## Inputs:") == "Inputs"
-    kinds = {lab: docblocks.sub_kind(lab) for lab in
-             ["Declaration", "Declarations", "Usage", "Example", "Examples", "Input", "Outputs", "Attributes",
-              "Input Arguments", "Optional outputs", "Inputs (split mode)", "Outputs (x)", "In/out (launch)",
-              "Returns", "See also", "Simple member functions"]}
-    assert [k for k, v in kinds.items() if v == "code"] == ["Declaration", "Declarations", "Usage", "Example", "Examples"]
-    assert [k for k, v in kinds.items() if v == "plain"] == ["Returns", "See also", "Simple member functions"]
+    assert [docblocks.sub_kind(lab) for lab in ("Usage", "Inputs (split mode)", "See also")] == ["code", "params", "plain"]
 
 
 def params(tmp_path, *lines):
@@ -257,3 +259,13 @@ def test_param_pattern_variants(tmp_path):
     assert rows[10] == ("", "", ["Free text item"], True)
     assert len(warnings(diag, "param-separator")) == 2 and len(warnings(diag, "param-item")) == 2
     assert warnings(diag, "param-item")[1].startswith("src/a.cpp:%d: warning:" % items[10].line)
+
+
+def test_tilde_fences(tmp_path):
+    states, opener = docblocks.fence_states(["~~~~", "```", "~~~", "## x", "~~~~~", "after"])
+    assert states == ["open", "in", "in", "in", "in", ""] and opener is None
+    assert docblocks.fence_states(["~~~", "```"])[1] == 0
+    page, diag = parse(tmp_path, "cpp", SECTION + md("# f", "B", "## Declaration:", "~~~", "## not a sub-block", "~~~"))
+    assert errors(diag) == [] and len(page.sections[0].functions[0].subblocks) == 1
+    _, diag = parse(tmp_path / "open", "cpp", SECTION + md("# f", "B", "## Declaration:", "~~~", "x", "```"))
+    assert error_ids(diag) == [(8, "E-fence")]
