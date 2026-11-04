@@ -151,6 +151,20 @@ def test_e_wrap(tmp_path):
                             "move the line break"]
 
 
+def test_e_heading_setext_and_indented(tmp_path):
+    _, diag = parse(tmp_path, "cpp", SECTION + md("# f", "B", "", "Intro text", "----------", "",
+                                                  "  ## Indented heading", "## Declaration:", "```", "Code",
+                                                  "---", "```"))
+    assert [e.split(": E-heading: ")[0] for e in errors(diag)] == ["src/a.cpp:8: error", "src/a.cpp:11: error"]
+    assert "underlines it with '=' or '-'" in errors(diag)[0] and "start in column 0" in errors(diag)[1]
+    _, diag = parse(tmp_path / "desc", "cpp", SECTION + "/*!SECTION_DESC\nTitle\n=====\nSECTION_DESC!*/\n")
+    assert len(errors(diag)) == 1 and errors(diag)[0].startswith("src/a.cpp:5: error: E-heading:")
+    # rules after a blank line, table delimiter rows, a list item's rule and '#' name lines are fine
+    _, diag = parse(tmp_path / "ok", "cpp", SECTION + md("# f", "B", "", "Text", "", "---", "| a |", "| - |", "",
+                                                         "- item", "---", "## Declaration:"))
+    assert errors(diag) == []
+
+
 def test_e_table_after_deeper_text(tmp_path):
     _, diag = parse(tmp_path, "cpp", SECTION + md("# f", "B", "## Declaration:", "## Inputs:",
                                                   "- **`x`** — Modes", "  - v1: text", "  | a | b |", "  | - | - |"))
