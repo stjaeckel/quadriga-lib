@@ -65,7 +65,8 @@ Exit codes, the diagnostics format and the build-in-memory rule are those of the
 | `templates/_logo.svg` | The logo, inline (`fill="currentColor"`). | — |
 | `templates/landing.html` | The landing page with its text. | `index.html` |
 | `templates/api.html`, `_api_index.html`, `_fn_entry.html` | API page, its index (sidebar and "Sections and functions"), one function entry. | `cpp_api.html`, `mex_api.html`, `python_api.html` |
-| `templates/text.html`, `_text_index.html` | Content page and its index. | `download.html`, `formats.html`, `faq.html`, `ai_agents.html` |
+| `templates/text.html`, `_text_index.html` | Content page and its index. | `download.html`, `faq.html`, `ai_agents.html` |
+| `templates/formats.html`, `_formats_index.html` | The formats page: intro, one section per format file, and its index. | `formats.html` |
 | `templates/publications.html` | Publications. | `publications.html` |
 | `templates/legal.html` | Impressum and privacy. | `impressum.html`, `privacy.html` |
 | `templates/notfound.html` | Not-found page. | `404.html` |
@@ -96,6 +97,8 @@ The content pages with twins (Get started, formats, FAQ, AI agents, API intros, 
 **Landing text.** The text of the landing page is HTML in `templates/landing.html`. Drafts are marked with gap markers in the template text, the same `%%GAP: ...%%` as on content pages. The section ids `why`, `paths`, `quickstart`, `apis`, `covers` and `open` are fixed; `index.html#quickstart` is an old URL that must keep working, and the "For team leads" card points to `#covers`. The quick-start code is written raw inside `{% filter highlight("python") %}...{% endfilter %}` (also `matlab`, `cpp`, `bash`), which colours it like a code fence. The template sets title and description itself.
 
 **Legal pages and 404.** `content/impressum.md`, `content/privacy.md` and `content/404.md` have the front matter and body of a content page, without twin and without index. The privacy text must name what the site stores in the browser: the chosen code language under the `localStorage` key `qlib-lang`, written only after a click on a language tab. Change it together with `static/js/site.js`. The 404 page is served for any missing URL, so all its links are root-absolute (`/cpp_api.html`).
+
+**Formats page.** `formats.html` is made from `docs_builder/content/formats.md` (title, lead and intro) and one file per format in `docs_builder/content/formats/` (docs-builder README, "Content pages"). Each format file becomes a section of the page, in the order of its `order` key: an `h2` with the format's title and the file stem as id (`formats.html#<stem>`), a "Markdown" link to its twin `formats/<stem>.md`, and its text, whose headings move down one level (`##` becomes `h3`, `###` `h4`). The index "On this page" has one group per format with its `##` headings. A new file in `docs_builder/content/formats/` appears on the page with the next `make website`; nothing in the templates changes. The page's "Markdown version" link points to `formats.md`, which links the format files.
 
 **Publications** are kept in `docs_builder/content/publications.toml` (docs-builder README, "Publications data"); the files they link to go into `static/publications/`.
 

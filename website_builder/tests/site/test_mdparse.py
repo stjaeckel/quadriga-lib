@@ -40,8 +40,8 @@ def test_wikilink_with_member_form(ctx):
 
 
 def test_raw_a_drops_target_and_rel(ctx):
-    html = doc(ctx, 'A <a target="_blank" rel="noopener" href="formats.html#6cab4884">QDANT</a> file')
-    assert 'A <a href="formats.html#6cab4884">QDANT</a> file' in html
+    html = doc(ctx, 'A <a target="_blank" rel="noopener" href="formats.html#qdant">QDANT</a> file')
+    assert 'A <a href="formats.html#qdant">QDANT</a> file' in html
 
 
 def test_raw_br_trailing_dropped(ctx):
@@ -54,8 +54,8 @@ def test_raw_html_in_prose_is_text(ctx):
 
 
 def test_heading_attrs(ctx):
-    html = prose_html(ctx, '## Material Properties {#material-properties legacy="9f6922f9"}\n\n### Plain `code` [[x]]\n\n#### Deep {#d}')
-    assert '<h2 id="material-properties"><span id="9f6922f9"></span>Material Properties</h2>' in html
+    html = prose_html(ctx, '## Material Properties {#materials}\n\n### Plain `code` [[x]]\n\n#### Deep {#d}')
+    assert '<h2 id="materials">Material Properties</h2>' in html
     assert '<h3 id="plain-code-x">Plain <code>code</code> [[x]]</h3>' in html
     assert "<h4>Deep</h4>" in html
 
