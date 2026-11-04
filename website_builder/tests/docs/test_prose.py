@@ -54,6 +54,13 @@ def test_e_table_and_e_wrap_on_a_prose_page(tmp_path):
                             "page.md:11: error: E-wrap: a wrapped line must not start with '>' or '+ '; move the line break"]
 
 
+def test_e_heading_on_a_prose_page(tmp_path):
+    _, diag = page(tmp_path, FRONT + "\n# Second title\n\nA heading\n=========\n\n   ### Indented\n\n## Fine\n")
+    assert [e.split(": E-heading: ")[0] for e in errors(diag)] == ["page.md:6: error", "page.md:8: error",
+                                                                   "page.md:11: error"]
+    assert "the title comes from the front matter" in errors(diag)[0]
+
+
 def test_build_variables(tmp_path):
     config.VARIABLES["version"] = "9.9.9"
     p, diag = page(tmp_path, FRONT.replace('"T"', '"T {{ version }}"') +

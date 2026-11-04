@@ -138,12 +138,51 @@ def wrap_errors(lines):
     return out
 
 
-def block_errors(lines, path, first, diag):
-    """Report E-table and E-wrap for the lines of a block part; first is the line of lines[0]."""
+_UNDERLINE_RE = re.compile(r"^ {0,3}(=+|-+)\s*$")
+_INDENTED_HEADING_RE = re.compile(r"^\s+#{1,6}(\s|$)")
+_NOT_PARAGRAPH_RE = re.compile(r"^(#{1,6}(\s|$)|>|\||```|~~~|<)")
+SETEXT_MESSAGE = ("E-heading: the line below this text underlines it with '=' or '-', which makes it a heading; "
+                  "write headings as '## text', or add a blank line before a rule")
+INDENTED_MESSAGE = "E-heading: a heading must start in column 0 ('## text'); remove the indentation"
+H1_MESSAGE = "E-heading: a '#' heading is not allowed in the page body (the title comes from the front matter); use '##'"
+
+
+def heading_errors(lines, page=False):
+    """(line index, message) of headings that the line scan for heading ids would not see:
+    a text line underlined with '=' or '-' (a setext heading) and an indented '#' heading,
+    outside fences. With page=True (prose pages) also a '#' heading in column 0."""
+    states, _ = fence_states(lines)
+    out = []
+    for i, ln in enumerate(lines):
+        if states[i]:
+            continue
+        if page and re.match(r"^#(\s|$)", ln):
+            out.append((i, H1_MESSAGE))
+        elif _INDENTED_HEADING_RE.match(ln):
+            out.append((i, INDENTED_MESSAGE))
+        elif i and _UNDERLINE_RE.match(ln) and not states[i - 1]:
+            prev = lines[i - 1]
+            text = prev.strip()
+            if not text or _NOT_PARAGRAPH_RE.match(text) or _DELIMITER_ROW_RE.match(prev):
+                continue
+            m = _LIST_MARKER_RE.match(prev)
+            if m and (prev[m.end():].strip() == "" or _indent(ln) < m.end()):
+                continue  # inside a list item the underline must reach the item's text
+            if _UNDERLINE_RE.match(prev):
+                continue
+            out.append((i - 1, SETEXT_MESSAGE))
+    return out
+
+
+def block_errors(lines, path, first, diag, page=False):
+    """Report E-table, E-wrap and E-heading for the lines of a block part or page body;
+    first is the line of lines[0]; page=True for prose pages (a '#' heading is an error there)."""
     for k in table_errors(lines):
         diag.error(path, first + k, TABLE_MESSAGE)
     for k in wrap_errors(lines):
         diag.error(path, first + k, WRAP_MESSAGE)
+    for k, message in heading_errors(lines, page):
+        diag.error(path, first + k, message)
 
 
 TABLE_MESSAGE = "E-table: a table and the text next to it need a blank line between them"
