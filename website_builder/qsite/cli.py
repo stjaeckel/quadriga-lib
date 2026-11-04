@@ -11,15 +11,16 @@ from qdocs import checks as md_checks
 from qdocs import config, links, prose
 from . import assets, checks, render_html, tutorials
 
-# Pages whose source is website_builder/content/<id>.md: no twin in docs/ (the landing is its template)
-WEBSITE_PAGES = [pid for pid, _, twin in config.PAGES if pid != "index" and (twin is None or links.website_only(twin))]
+def website_pages():
+    """Pages whose source is website_builder/content/<id>.md: no twin in docs/ (the landing is its template)."""
+    return [pid for pid, _, twin in config.PAGES if pid != "index" and (twin is None or links.website_only(twin))]
 
 
 def build_site(root, diag, release=False):
     """Build docs/ and the site in memory: returns (docs mapping, site mapping); both empty after an error."""
     model, docs = docs_cli.build_docs(root, diag)
     web = {}
-    for pid in WEBSITE_PAGES:
+    for pid in website_pages():
         path = root / config.WEBSITE_CONTENT / (pid + ".md")
         if path.is_file():
             web[pid] = prose.read_page(path, diag, root)
@@ -36,8 +37,7 @@ def build_site(root, diag, release=False):
     diag.gaps.extend(prose.gap_scan(code_root, [assets.TEMPLATES_DIR.relative_to(code_root).as_posix()], diag))
     if diag.errors:
         return {}, {}
-    order = sorted(tuts, key=lambda t: (t.order, t.title))
-    files["tutorials.md"] = tutorials.index_twin(web["tutorials"], order).encode("utf-8")
+    files["tutorials.md"] = tutorials.index_twin(web["tutorials"], tuts).encode("utf-8")
     model.update(docs=docs, website=web, tutorials=tuts, files=files)
     site, markers = render_html.render_site(model, diag)
     if diag.errors:

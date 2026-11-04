@@ -16,7 +16,7 @@ _INLINE_RE = re.compile(
     r"|(?P<raw><a\s[^>\x00]*?\bhref=\"(?P<href>[^\"\x00]*)\"[^>\x00]*>(?P<atext>.*?)</a>)"
     r"|(?P<md>(?<!\\)(?P<bang>!?)\[(?P<text>(?:\\.|[^\]\\])*)\]\((?P<url>[^)\s\x00]*)(?P<title>\s+\"[^\"\x00]*\")?\))")
 _TRAILING_BR_RE = re.compile(r"(?:\s*<br\s*/?>)+\s*$")
-_BLOCK_START_RE = re.compile(r"^\s*(?:[-*+] |\d+[.)] |\||#|>|```)")
+_BLOCK_START_RE = re.compile(r"^\s*(?:[-*+] |\d+[.)] |\||#|>|```|~~~)")
 _MARKER_ONLY_RE = re.compile(r"^[\s>]*(?:[-*+]|\d+[.)])?\s*$")
 _GAP_SUB_RE = re.compile(r" ?%%GAP:.*?%%")
 
@@ -82,8 +82,8 @@ def wikilinks(lines):
                 yield i, m.group("wname"), bool(m.group("dot"))
 
 
-def _rewrite(line, masked, location, lang):
-    """Rewrite the links of one line outside code for the output location."""
+def _rewrite(line, masked, location, lang, html):
+    """Rewrite the links of one line outside code for the output location; raw <a href> only with html."""
     out, pos = [], 0
     for m in _INLINE_RE.finditer(masked):
         out.append(line[pos:m.start()])
@@ -94,7 +94,8 @@ def _rewrite(line, masked, location, lang):
                 text = line[m.start("dot"):m.end("dot")] + line[m.start("wname"):m.end("wname")]
                 src = "[%s](%s)" % (text, links.url("%s_api.html#%s" % (lang, anchor), location))
         elif m.group("raw"):
-            src = "[%s](%s)" % (line[m.start("atext"):m.end("atext")], links.url(m.group("href"), location))
+            if html:
+                src = "[%s](%s)" % (line[m.start("atext"):m.end("atext")], links.url(m.group("href"), location))
         else:
             u = links.url(m.group("url"), location)
             src = line[m.start():m.start("url")] + u + line[m.end("url"):m.end()]
@@ -104,7 +105,7 @@ def _rewrite(line, masked, location, lang):
     return "".join(out)
 
 
-def twin_lines(lines, location, lang=None, headings=None, fence_lang=None, docblock=False,
+def twin_lines(lines, location, lang=None, headings=None, fence_lang=None, docblock=False, html=False,
                diag=None, path=None, first_line=1):
     """The twin writer for one part: copy the source lines and change only headings, bare fences,
     [[name]] links, raw <a href> links, trailing <br>, link URLs (all outside code) and gap markers.
@@ -115,6 +116,9 @@ def twin_lines(lines, location, lang=None, headings=None, fence_lang=None, docbl
       trailing {...} and gets <a id> anchors on the line before it. None for doc-block parts.
     fence_lang, docblock: doc-block parts; fences without info string get fence_lang, and the
       sub-block heading "## X:" becomes "### X:".
+    html: the part is from a doc block, where raw HTML is interpreted: raw <a href> links become
+      Markdown links and a trailing <br> a hard break. In prose and notebooks raw HTML is text,
+      so it stays as written.
     diag, path, first_line: give the code-span warning for this part (once per part).
     Gap markers are removed; a line or list item holding only a marker is dropped.
     """
@@ -135,8 +139,9 @@ def twin_lines(lines, location, lang=None, headings=None, fence_lang=None, docbl
         if ln is None or states[i] == "in":
             continue
         if states[i] == "open":
-            if fence_lang and ln.strip() == "```":
-                work[i] = ln.replace("```", "```" + fence_lang, 1)
+            s = ln.strip()
+            if fence_lang and docblocks.FENCE_RE.match(s) and s == s[0] * len(s):  # no info string
+                work[i] = ln.rstrip() + fence_lang
         elif docblock and ln.startswith("## "):
             work[i] = "#" + ln
         elif i in heads:
@@ -154,8 +159,8 @@ def twin_lines(lines, location, lang=None, headings=None, fence_lang=None, docbl
             continue  # a dropped marker line leaves no double blank line
         if i in anchors:
             out.append(anchors[i])
-        new = _rewrite(ln, mk, location, lang)
-        br = _TRAILING_BR_RE.search(mk)
+        new = _rewrite(ln, mk, location, lang, html)
+        br = _TRAILING_BR_RE.search(mk) if html else None
         if br:  # a hard break if the next line continues the paragraph, else nothing
             nxt = texts[n + 1] if n + 1 < len(texts) else ""
             hard = nxt.strip() and not _BLOCK_START_RE.match(nxt) and not ln.lstrip().startswith(("|", "#"))
@@ -274,7 +279,7 @@ def counterpart_line(f, location):
 
 
 def _part(part, location, lang, docblock=False):
-    return twin_lines(part.lines, location, lang, fence_lang=config.FENCE_LANG[lang], docblock=docblock)
+    return twin_lines(part.lines, location, lang, fence_lang=config.FENCE_LANG[lang], docblock=docblock, html=True)
 
 
 def function_lines(f, location):
@@ -282,7 +287,7 @@ def function_lines(f, location):
     out = _join(out, [counterpart_line(f, location)], _part(f.intro, location, f.lang))
     for sub in f.subblocks:
         out = _join(out, twin_lines(sub.heading.lines + sub.content.lines, location, f.lang,
-                                    fence_lang=config.FENCE_LANG[f.lang], docblock=True))
+                                    fence_lang=config.FENCE_LANG[f.lang], docblock=True, html=True))
     return out
 
 

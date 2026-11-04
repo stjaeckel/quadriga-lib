@@ -46,7 +46,7 @@ python3 website_builder/build.py website --root /path/to/repository
 | `--release` | Also fail if any gap is left (see [Gaps and `--release`](#gaps-and---release)). Use it for the build that is deployed. |
 | `--root DIR` | Repository root; default: the folder above `website_builder/`. Code, templates, static files and `pandoc_math.yaml` always come from the `website_builder/` next to `build.py`; sources and output are taken below `--root` (the tests use this). |
 
-Exit codes, the diagnostics format and the build-in-memory rule are those of the docs builder (see "Scripts and options" in its README). The last line reads `website: N errors, M warnings, K gaps`; before it, a line says how many files of `website/` were written, deleted and left unchanged. A failed build writes neither `docs/` nor `website/`.
+Exit codes, the diagnostics format and the build-in-memory rule are those of the docs builder (see "Scripts and options" in its README). A successful build first prints one `wrote docs/...` or `deleted docs/...` line per changed file of `docs/` and a line saying how many files of `website/` were written, deleted and left unchanged; then come the errors and warnings, the gap list and the summary `website: N errors, M warnings, K gaps` (with `--release`: `website --release: ...`). A failed build writes neither `docs/` nor `website/` and prints no file lines.
 
 ## Folder layout
 
@@ -94,9 +94,9 @@ The root `.gitignore` has unanchored patterns that would silently ignore new fil
 
 The content pages with twins (Get started, formats, FAQ, AI agents, API intros, publications) are sources of the docs builder: see "Content pages" in the [docs-builder README](../docs_builder/README.md#content-pages). The parts below are website only.
 
-**Landing text.** The text of the landing page is HTML in `templates/landing.html`. Drafts are marked with gap markers in the template text, the same `%%GAP: ...%%` as on content pages. The section ids `why`, `paths`, `quickstart`, `apis`, `covers` and `open` are fixed; `index.html#quickstart` is an old URL that must keep working, and the "For team leads" card points to `#covers`. The quick-start code is written raw inside `{% filter highlight("python") %}...{% endfilter %}` (also `matlab`, `cpp`, `bash`), which colours it like a code fence. The template sets title and description itself.
+**Landing text.** The text of the landing page is HTML in `templates/landing.html`. Drafts are marked with gap markers in the template text, as on content pages (docs-builder README, "Gap markers and going live"). The section ids `why`, `paths`, `quickstart`, `apis`, `covers` and `open` are fixed; `index.html#quickstart` is an old URL that must keep working, and the "For team leads" card points to `#covers`. The quick-start code is written raw inside `{% filter highlight("python") %}...{% endfilter %}` (also `matlab`, `cpp`, `bash`), which colours it like a code fence. The template sets title and description itself.
 
-**Legal pages and 404.** `content/impressum.md`, `content/privacy.md` and `content/404.md` have the front matter and body of a content page, without twin and without index. The privacy text must name what the site stores in the browser: the chosen code language under the `localStorage` key `qlib-lang`, written only after a click on a language tab. Change it together with `static/js/site.js`. The 404 page is served for any missing URL, so all its links are root-absolute (`/cpp_api.html`).
+**Legal pages and 404.** `content/impressum.md`, `content/privacy.md` and `content/404.md` have the front matter and body of a content page, without twin and without index. The privacy text must name what the site stores in the browser, the remembered code language of `static/js/site.js` (see [Design and static parts](#design-and-static-parts)); change the two together. The 404 page is served for any missing URL, so all its links are root-absolute (`/cpp_api.html`).
 
 **Formats page.** `formats.html` is made from `docs_builder/content/formats.md` (title, lead and intro) and one file per format in `docs_builder/content/formats/` (docs-builder README, "Content pages"). Each format file becomes a section of the page, in the order of its `order` key: an `h2` with the format's title and the file stem as id (`formats.html#<stem>`), a "Markdown" link to its twin `formats/<stem>.md`, and its text, whose headings move down one level (`##` becomes `h3`, `###` `h4`). The index "On this page" has one group per format with its `##` headings. A new file in `docs_builder/content/formats/` appears on the page with the next `make website`; nothing in the templates changes. The page's "Markdown version" link points to `formats.md`, which links the format files.
 
@@ -104,7 +104,7 @@ The content pages with twins (Get started, formats, FAQ, AI agents, API intros, 
 
 **Navigation.** The tab row comes from `PAGES` in `docs_builder/qdocs/config.py`. The menu groups (Start, API reference, More, Project) are written in `templates/_header.html`, the footer columns in `templates/_footer.html`, both with the helper `url(page_id)`, which gives the page's URL from the current page. The current tab and menu entry get `aria-current="page"`.
 
-**Add a page.** For a page with a twin, follow "Add a page" in the docs-builder README, then add the page to the menu in `templates/_header.html` and to a footer column in `templates/_footer.html`. A page with a new layout also needs a template and a line in `render_site()` in `qsite/render_html.py`, which also renders the website-only pages; a website-only page needs its source in `website_builder/content/` and its line in `render_site()`.
+**Add a page.** For a page with a twin, follow "Add a page" in the docs-builder README, then add the page to the menu in `templates/_header.html` and to a footer column in `templates/_footer.html`. A page with a new layout also needs a template and a line in `render_site()` in `qsite/render_html.py`. A website-only text page (like the Impressum) needs only its source `website_builder/content/<id>.md` (front matter and body of a content page) and a line `("<id>", None, None)` in `PAGES` in `docs_builder/qdocs/config.py`; it is rendered with `templates/legal.html` as `<id>.html`, without tab, twin or index. Link it from the footer or a page so that visitors find it.
 
 **Landing figures.** The landing page has two figure slots, `coverage` (next to the pitch) and `antenna` (next to the quick start); the names are `LANDING_FIGURES` in `qsite/assets.py`, the alt texts and captions are in `templates/landing.html`. Each figure is two files, `static/img/landing/<name>-light.webp` and `static/img/landing/<name>-dark.webp`, committed with the code. Rules: WebP, 1600 × 1200 px (4 : 3, the frame crops nothing), at most 150 kB each; backgrounds `#ffffff` and `#0b120e` (or transparent), text and rules in the theme's `--fg`, `--muted` and `--line` colours; a sequential colour map that does not depend on red/green; text at least 28 px high at 1600 px width; the caption names the library function that made the figure. While a variant is missing, the slot shows an empty frame with the alt text, and the gap list names the file.
 
@@ -139,11 +139,31 @@ What is shown: Markdown cells like a content page; code cells as "In [n]" with t
 
 Each tutorial gives `tutorials/<stem>.html`, its Markdown version `tutorials/<stem>.md`, the notebook `tutorials/<stem>.ipynb` for download and its figures; the page links "Download notebook .ipynb" and "Markdown .md". The index `tutorials.html` and its twin `tutorials.md` list the tutorials; with no notebook they say "No tutorials yet.". The tutorial pages and their twins exist only on the website, never in `docs/`.
 
+Notebook errors stop the build; each names the notebook, and the cell where there is one:
+
+| Error | Cause | Fix |
+|-------|-------|-----|
+| `notebook file name must match [a-z0-9][a-z0-9_-]*.ipynb` | Upper-case letters, spaces or other characters in the file name | Rename the file |
+| `not a JSON notebook: ...` | The file is not valid JSON (for example a merge conflict) | Repair or re-save it in Jupyter |
+| `metadata.quadriga_tutorial: missing` | The notebook has no tutorial metadata | Add the keys of the table above |
+| `metadata.quadriga_tutorial.<key>: missing`, `not a string`, `not an integer`, `unknown key` | A key of the table above is absent, of the wrong type or misspelt | Correct the metadata |
+| `metadata.quadriga_tutorial.level: one of beginner, intermediate, advanced` | Another level | Use one of the three |
+| `metadata.kernelspec.language: missing or not one of python, matlab, octave` | The notebook was saved without a kernel, or with another one | Select the Python, MATLAB or Octave kernel and save |
+| `cell N: a notebook starts its sections with ##; ...` | A `#` heading in a Markdown cell | Make it `##`; the page title is `title` of the metadata |
+| `cell N: the notebook was committed with a failing cell (...)` | An `error` output is stored | Fix the cell, run the notebook again, commit |
+| `cell N: E-anchor: ...` | Two headings with the same explicit id, or an id the templates use | Change one of the ids |
+
 ## Formulas
 
 The formula syntax is described in the docs-builder README ("Formulas"). On the website every formula becomes MathML: the build collects all formulas of all pages, converts them with one pandoc call (`pandoc -d website_builder/pandoc_math.yaml -f markdown -t html`, no call when there is no formula) and puts the result back into the pages. The defaults file `pandoc_math.yaml` selects MathML; it is used instead of a command-line flag because the flag's name changed between pandoc versions. Browsers render MathML without a script; no math fonts are shipped.
 
-pandoc reads LaTeX math, not full LaTeX. Known to work: accents with subscripts, primes, `\pm`, `\sim`, `\mathrm{d}`, `\frac12`, `\underbrace`, `\arg`, `\lvert x \rvert`, `\cdot`, the `aligned` environment; `\mathbf{x}` comes out bold italic (vector style). These stop the build, with file and line: an unknown command or unbalanced braces (pandoc leaves the formula as text), an environment pandoc rejects, an equation label (`$$...$$ (1)`), and any message pandoc prints.
+pandoc reads LaTeX math, not full LaTeX. Known to work: accents with subscripts, primes, `\pm`, `\sim`, `\mathrm{d}`, `\frac12`, `\underbrace`, `\arg`, `\lvert x \rvert`, `\cdot`, the `aligned` environment; `\mathbf{x}` comes out bold italic (vector style). These stop the build:
+
+| Error | Cause | Fix |
+|-------|-------|-----|
+| `formula not converted to MathML (unknown command or unbalanced braces?): <tex>` (at the formula's file and line; in a notebook its cell) | pandoc left the formula as text: an unknown command, unbalanced braces or an environment it rejects | Correct the LaTeX or use a command from the list above |
+| `pandoc: error: formula conversion failed:` followed by pandoc's own messages | pandoc printed a warning or exited with an error; it comes together with the error above for the formula concerned | As above; the messages name the command pandoc did not understand |
+| `equation labels ($$...$$ (label)) are not supported` | A display formula with a label such as `$$...$$ (1)` | Remove the label; refer to the formula in words |
 
 ## Design and static parts
 
@@ -169,7 +189,7 @@ The build checks the whole site in memory before it writes anything:
 
 ### Gaps and `--release`
 
-Gap markers (docs-builder README, "Gap markers and going live") are shown on the page as a yellow highlight; inside attributes and the `<title>` they become plain text. The website build prints the full gap list: the markers in `docs_builder/content/`, `website_builder/content/` and `website_builder/templates/`, every missing landing figure file and a missing `img/og-card.png`. `website_builder/build.py website --release` fails, and writes nothing, if that list is not empty or if any marker reached the HTML (for example one written into a doc block or a notebook). Build the deployed site with `--release`.
+The gap markers and the gap list are described in the docs-builder README ("Gap markers and going live"); the website build adds the markers of `website_builder/content/` and `website_builder/templates/`, every missing landing figure file and a missing `img/og-card.png` to the list. On the page a marker shows as a yellow highlight, inside attributes and the `<title>` as plain text. `website_builder/build.py website --release` fails, and writes nothing, if the gap list is not empty or if any marker reached the HTML (for example one written into a doc block or a notebook). Build the deployed site with `--release`.
 
 ## Tests
 

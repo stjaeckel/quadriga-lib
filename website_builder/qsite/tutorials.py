@@ -60,14 +60,14 @@ def _text(value):
 
 
 def read_all(root, diag):
-    """All notebooks of tutorials/, sorted by file name; a notebook with errors is left out."""
+    """All notebooks of tutorials/ in index order (order, then title); a notebook with errors is left out."""
     folder = root / FOLDER
     out = []
     for p in sorted(folder.glob("*.ipynb")) if folder.is_dir() else []:
         t = read(p, "%s/%s" % (FOLDER, p.name), diag)
         if t:
             out.append(t)
-    return out
+    return sorted(out, key=lambda t: (t.order, t.title))
 
 
 def read(p, rel, diag):
@@ -87,7 +87,7 @@ def read(p, rel, diag):
         diag.error(rel, None, "metadata.quadriga_tutorial: missing")
         return None
     prose.check_keys(info, META_KEYS, "metadata.quadriga_tutorial.", lambda msg: diag.error(rel, None, msg))
-    if info.get("level") not in LEVELS:
+    if "level" in info and info["level"] not in LEVELS:  # a missing level is reported by check_keys
         diag.error(rel, None, "metadata.quadriga_tutorial.level: one of %s" % ", ".join(LEVELS))
     kernel = meta.get("kernelspec", {}).get("language")
     if kernel not in LANGUAGES:

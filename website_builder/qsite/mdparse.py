@@ -87,7 +87,7 @@ def _raw_a(state):
 
 
 def _raw_br(state):
-    """Trailing <br> at the end of a paragraph or heading is dropped (the old pages used it as spacing)."""
+    """Trailing <br> at the end of a paragraph or heading is dropped (it adds only empty space)."""
     for tok in _inlines(state):
         ch = tok.children
         k = len(ch)

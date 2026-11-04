@@ -1,1 +1,0 @@
-The landing figures go here: `coverage-light.webp`, `coverage-dark.webp`, `antenna-light.webp`, `antenna-dark.webp` (WebP, 1600 × 1200 px, at most 150 kB each), written by the figure scripts in `website_builder/figures/`.

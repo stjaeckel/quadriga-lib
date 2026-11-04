@@ -25,7 +25,6 @@ LEXERS = {"cpp": "cpp", "c++": "cpp", "matlab": "matlab", "octave": "matlab", "p
           "py": "python", "bash": "bash", "sh": "bash", "shell": "bash", "console": "console"}
 PLAIN = ("text", "none")
 MATH_RE = re.compile("\x02M(\\d+)\x03")
-LANG_DISPLAY = config.LANG_TITLE
 
 
 def highlight(code, lang):
@@ -62,7 +61,7 @@ class Context:
 
     def __init__(self, diag):
         self.diag = diag
-        self.math = []      # (tex, kind, path, line)
+        self.math = []      # (tex, token type, path, line, cell note) per formula, in order
         self.location = ""
         self._parsers = {}
 
@@ -208,7 +207,7 @@ def environment():
     env.filters["highlight"] = highlight
     env.globals.update(config.VARIABLES)
     env.globals.update(tabs=[(pid, tab) for pid, tab, _ in config.PAGES if tab],
-                       labels={pid: tab for pid, tab, _ in config.PAGES if tab}, lang_display=LANG_DISPLAY,
+                       labels={pid: tab for pid, tab, _ in config.PAGES if tab}, lang_display=config.LANG_TITLE,
                        figure_names=assets.LANDING_FIGURES, figure_base=assets.figure)
     return env
 
@@ -277,7 +276,7 @@ def api_page(ctx, page):
         desc = Markup("").join(ctx.fragment(d.lines, "docblock", d.path, d.line, lang) for d in sec.descs)
         sections.append({"title": sec.title, "slug": sec.slug, "desc": desc,
                          "functions": [_function(ctx, f, sec) for f in sec.functions]})
-    return {"lang": lang, "display": LANG_DISPLAY[lang], "title": intro.title, "description": intro.description,
+    return {"lang": lang, "display": config.LANG_TITLE[lang], "title": intro.title, "description": intro.description,
             "lead": ctx.inline(intro.lead, intro.path, lang), "others": [x for x in config.LANGS if x != lang],
             "notes": ctx.fragment(intro.body, "prose", intro.path, intro.body_line, lang, intro.headings),
             "sections": sections}
@@ -363,16 +362,17 @@ def render_site(model, diag):
     pubs = publications(ctx, model["publications"], config.DOCS_CONTENT + "/publications.toml")
     page("publications.html", "publications.html", current="publications", twin="publications.md", pubs=pubs,
          title=pubs["title"], description=pubs["description"])
+    # Website-only pages: the tutorial index and the not-found page have their own templates, every
+    # other one (Impressum, privacy, any page added later) is a plain text page without index
     web = model["website"]
-    for pid in ("impressum", "privacy"):
+    for pid, p in web.items():
+        if pid == "tutorials":
+            continue
         ctx.location = pid + ".html"
-        page(pid + ".html", "legal.html", page=web[pid], body=_prose(ctx, web[pid]), title=web[pid].title,
-             description=web[pid].description)
-    ctx.location = "404.html"
-    page("404.html", "notfound.html", root="/", page=web["404"], body=_prose(ctx, web["404"]), title=web["404"].title,
-         description=web["404"].description)
+        page(pid + ".html", "notfound.html" if pid == "404" else "legal.html", root="/" if pid == "404" else "",
+             page=p, body=_prose(ctx, p), title=p.title, description=p.description)
 
-    tuts = sorted(model["tutorials"], key=lambda t: (t.order, t.title))
+    tuts = model["tutorials"]
     ctx.location = "tutorials.html"
     idx = web["tutorials"]
     cards = [{"stem": t.stem, "title": t.title, "summary": ctx.inline(t.summary, t.path), "language": t.language,

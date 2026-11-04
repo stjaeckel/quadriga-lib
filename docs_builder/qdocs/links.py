@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
-"""Ids, slugs, old hash ids, cross-language matching, [[name]] resolution and URLs per output location."""
+"""Slugs, cross-language matching, [[name]] resolution and URLs per output location."""
 
 import posixpath
 import re
